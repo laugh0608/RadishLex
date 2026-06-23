@@ -1,0 +1,82 @@
+# Normalize text files to LF in the repository and working tree.
+* text=auto eol=lf
+
+# Source and configuration files.
+*.rs text eol=lf
+*.go text eol=lf
+*.dart text eol=lf
+*.swift text eol=lf
+*.kt text eol=lf
+*.kts text eol=lf
+*.java text eol=lf
+*.c text eol=lf
+*.cc text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.hpp text eol=lf
+*.m text eol=lf
+*.mm text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.jsonc text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+*.xml text eol=lf
+*.plist text eol=lf
+*.gradle text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.csv text eol=lf
+*.sql text eol=lf
+
+# Scripts.
+*.sh text eol=lf
+*.ps1 text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Flutter / platform text resources.
+*.arb text eol=lf
+*.storyboard text eol=lf
+*.xib text eol=lf
+*.xcconfig text eol=lf
+
+# Binary assets and generated packages.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.bmp binary
+*.icns binary
+*.svg text eol=lf
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.7z binary
+*.rar binary
+*.dylib binary
+*.so binary
+*.dll binary
+*.exe binary
+*.pdb binary
+*.a binary
+*.lib binary
+*.framework binary
+*.xcframework binary
+*.apk binary
+*.aab binary
+*.ipa binary

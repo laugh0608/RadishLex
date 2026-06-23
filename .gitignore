@@ -1,0 +1,104 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Go
+/bin/
+*.test
+*.prof
+*.cover
+coverage.out
+
+# Dart / Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub/
+.pub-cache/
+**/build/
+**/doc/api/
+
+# JavaScript / frontend tooling
+node_modules/
+dist/
+.vite/
+.vite-inspect/
+coverage/
+playwright-report/
+test-results/
+
+# Android / Gradle
+**/.gradle/
+**/local.properties
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+*.jks
+*.keystore
+
+# Apple platforms
+.build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.mobileprovision
+*.provisionprofile
+*.p12
+*.cer
+*.xcarchive
+
+# Native build systems
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+compile_commands.json
+
+# Local runtime data, databases and generated artifacts
+/artifacts/
+/tmp/
+/temp/
+/data/
+/storage/
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.orig
+*.rej
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Editor and IDE local settings
+.idea/
+.vscode/
+.vs/
+.fleet/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# OS metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# AI assistant local state
+.agents
+.agents/
+.claude
+.claude/
+.codex
+.codex/
