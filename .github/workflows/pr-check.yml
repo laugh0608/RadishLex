@@ -1,0 +1,65 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - master
+      - main
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repo-hygiene:
+    name: Repo Hygiene
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check text files
+        shell: bash
+        run: ./scripts/check-text-files.sh
+
+      - name: Check docs
+        shell: bash
+        run: ./scripts/check-docs.sh
+
+      - name: Check committed diff whitespace
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
+
+  repository-baseline:
+    name: Repository Baseline
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check repository baseline
+        shell: bash
+        run: ./scripts/check-repo.sh --skip-text-files
