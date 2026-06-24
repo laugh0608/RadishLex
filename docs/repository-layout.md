@@ -71,6 +71,7 @@ RadishLex/
 
 - `Cargo.toml`：Rust workspace 入口。
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
+- `crates/ime-cli/`：基于 demo adapter 的命令行复验入口。
 - `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
 
 ## Rust crates 建议
@@ -152,6 +153,8 @@ librime adapter：
 - 词库导入导出。
 - 同步测试。
 - ranker explain。
+
+当前已落地基于合成 demo adapter 的 `demo <input-code> [candidate-index]` 命令，用于复验 `ime-core` 生命周期；它不代表真实中文输入引擎。
 
 ## Go server 建议
 

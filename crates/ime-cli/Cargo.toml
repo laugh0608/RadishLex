@@ -1,0 +1,11 @@
+[package]
+name = "radishlex-ime-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../LICENSE"
+description = "Command line demo for the RadishLex input core."
+
+[dependencies]
+radishlex-ime-core = { path = "../ime-core" }

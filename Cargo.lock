@@ -3,5 +3,12 @@
 version = 3
 
 [[package]]
+name = "radishlex-ime-cli"
+version = "0.1.0"
+dependencies = [
+ "radishlex-ime-core",
+]
+
+[[package]]
 name = "radishlex-ime-core"
 version = "0.1.0"

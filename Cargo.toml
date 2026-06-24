@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/ime-core"]
+members = ["crates/ime-cli", "crates/ime-core"]
 resolver = "2"
 
 [workspace.package]

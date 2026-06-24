@@ -24,6 +24,9 @@ REQUIRED_FILES = [
     "CLAUDE.md",
     "Cargo.lock",
     "Cargo.toml",
+    "crates/ime-cli/Cargo.toml",
+    "crates/ime-cli/src/lib.rs",
+    "crates/ime-cli/src/main.rs",
     "LICENSE",
     "README.md",
     "crates/ime-core/Cargo.toml",
@@ -183,7 +186,7 @@ def check_path_budget() -> None:
 
 def check_rust_workspace() -> None:
     run_command(["cargo", "fmt", "--check"])
-    run_command(["cargo", "test", "-p", "radishlex-ime-core"])
+    run_command(["cargo", "test", "--workspace"])
 
 
 def parse_args() -> argparse.Namespace:
