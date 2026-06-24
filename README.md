@@ -33,9 +33,27 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - [详细技术方案](docs/technical-plan.md)
 - [阶段路线图](docs/roadmap.md)
 - [仓库结构草案](docs/repository-layout.md)
+- [CLI 说明](docs/cli.md)
 - [Engine Boundary](docs/engine-boundary.md)
 - [ime-engine-rime Adapter 设计](docs/engine-rime-adapter.md)
 - [隐私与同步设计](docs/privacy-sync.md)
+
+## 当前可运行入口
+
+当前仓库已提供 `radishlex-ime-cli` 作为 Phase 1 复验入口：
+
+```bash
+cargo run -p radishlex-ime-cli -- demo luobo
+```
+
+真实 Rime adapter 需要本机 `librime` 和隔离 schema 数据：
+
+```bash
+cargo run -p radishlex-ime-cli --features native-rime -- \
+  rime --schema luna_pinyin --shared-data <path> --user-data <path> luobo
+```
+
+完整命令说明见 [CLI 说明](docs/cli.md)，本机 Rime 数据准备步骤见 [Rime Native Smoke Runbook](docs/runbooks/rime-native-smoke.md)。
 
 ## MVP 边界
 

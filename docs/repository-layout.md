@@ -41,6 +41,7 @@ RadishLex/
     roadmap.md
     repository-layout.md
     privacy-sync.md
+    cli.md
     engine-boundary.md
     engine-rime-adapter.md
     runbooks/
@@ -75,6 +76,7 @@ RadishLex/
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
 - `crates/ime-cli/`：基于 demo adapter 与可选 Rime adapter 的命令行复验入口。
 - `crates/ime-engine-rime/`：Rime adapter crate，默认不启用 native 绑定。
+- `docs/cli.md`：`radishlex-ime-cli` 命令、输出、退出码和安全边界说明。
 - `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
 - `docs/engine-rime-adapter.md`：`ime-engine-rime` 的 adapter 边界、构建策略和验证分层。
 - `docs/runbooks/rime-native-smoke.md`：真实 `librime` 本机 smoke 操作步骤。

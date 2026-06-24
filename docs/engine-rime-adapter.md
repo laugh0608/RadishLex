@@ -197,6 +197,8 @@ radishlex-ime-cli rime --schema luna_pinyin --shared-data <path> --user-data <pa
 - CLI 输出继续包含 schema、composition、candidates、commit。
 - 没有真实 Rime 环境时，测试只验证参数解析和错误提示，不伪造真实 Rime 输出。
 
+命令参数、输出字段和退出码说明见 `docs/cli.md`。
+
 ## 验证分层
 
 默认验证：
