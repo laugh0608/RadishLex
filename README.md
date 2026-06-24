@@ -10,7 +10,7 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - **中文定位**：萝卜词核
 - **核心目标**：让输入法逐步理解用户的词库、语气、场景和候选偏好，达到可解释、可删除、可自部署的个人化输入体验。
 - **技术主轴**：Rust + Go + Flutter
-- **复核日期**：2026-06-22
+- **复核日期**：2026-06-24
 
 ## 设计原则
 
@@ -33,6 +33,7 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - [详细技术方案](docs/technical-plan.md)
 - [阶段路线图](docs/roadmap.md)
 - [仓库结构草案](docs/repository-layout.md)
+- [Engine Boundary](docs/engine-boundary.md)
 - [隐私与同步设计](docs/privacy-sync.md)
 
 ## MVP 边界

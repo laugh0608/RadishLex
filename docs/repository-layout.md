@@ -67,6 +67,12 @@ RadishLex/
 - `examples/`：示例输入方案、词库和同步样本。
 - `tests/`：跨语言、跨平台集成测试。
 
+## 当前已落地
+
+- `Cargo.toml`：Rust workspace 入口。
+- `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
+- `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
+
 ## Rust crates 建议
 
 ### ime-core
@@ -81,6 +87,8 @@ RadishLex/
 - `Engine`
 - `Ranker`
 - `LearningEvent`
+
+当前已落地 `InputSession`、`KeyEvent`、`Composition`、`Candidate`、`Commit`、`Engine` 和基础生命周期测试。`Ranker` 与 `LearningEvent` 后续在个人化学习阶段补齐。
 
 ### ime-engine-rime
 

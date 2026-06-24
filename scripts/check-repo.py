@@ -22,8 +22,13 @@ REQUIRED_FILES = [
     ".github/workflows/release-check.yml",
     "AGENTS.md",
     "CLAUDE.md",
+    "Cargo.lock",
+    "Cargo.toml",
     "LICENSE",
     "README.md",
+    "crates/ime-core/Cargo.toml",
+    "crates/ime-core/src/lib.rs",
+    "docs/engine-boundary.md",
     "docs/privacy-sync.md",
     "docs/repository-layout.md",
     "docs/roadmap.md",
@@ -44,6 +49,15 @@ def run_script(script_name: str, args: list[str] | None = None) -> None:
     if args:
         command.extend(args)
     result = subprocess.run(command, cwd=REPO_ROOT)
+    if result.returncode != 0:
+        raise SystemExit(result.returncode)
+
+
+def run_command(command: list[str]) -> None:
+    try:
+        result = subprocess.run(command, cwd=REPO_ROOT)
+    except FileNotFoundError as exc:
+        raise SystemExit(f"{command[0]} is required to run repository baseline checks.") from exc
     if result.returncode != 0:
         raise SystemExit(result.returncode)
 
@@ -167,10 +181,16 @@ def check_path_budget() -> None:
             )
 
 
+def check_rust_workspace() -> None:
+    run_command(["cargo", "fmt", "--check"])
+    run_command(["cargo", "test", "-p", "radishlex-ime-core"])
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run RadishLex repository baseline checks.")
     parser.add_argument("--skip-text-files", action="store_true", help="Skip text hygiene checks.")
     parser.add_argument("--skip-docs", action="store_true", help="Skip documentation budget checks.")
+    parser.add_argument("--skip-rust", action="store_true", help="Skip Rust workspace checks.")
     return parser.parse_args()
 
 
@@ -187,6 +207,8 @@ def main() -> int:
     check_license_wording()
     check_ruleset_and_workflows()
     check_path_budget()
+    if not args.skip_rust:
+        check_rust_workspace()
 
     print("Repository baseline passed.")
     return 0

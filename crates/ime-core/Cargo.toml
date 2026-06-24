@@ -1,0 +1,12 @@
+[package]
+name = "radishlex-ime-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../LICENSE"
+description = "Core input session and engine boundary types for RadishLex."
+
+[lib]
+name = "radishlex_ime_core"
+path = "src/lib.rs"
