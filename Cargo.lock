@@ -12,3 +12,10 @@ dependencies = [
 [[package]]
 name = "radishlex-ime-core"
 version = "0.1.0"
+
+[[package]]
+name = "radishlex-ime-engine-rime"
+version = "0.1.0"
+dependencies = [
+ "radishlex-ime-core",
+]

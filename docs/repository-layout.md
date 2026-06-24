@@ -73,6 +73,7 @@ RadishLex/
 - `Cargo.toml`：Rust workspace 入口。
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
 - `crates/ime-cli/`：基于 demo adapter 的命令行复验入口。
+- `crates/ime-engine-rime/`：Rime adapter skeleton，默认不启用 native 绑定。
 - `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
 - `docs/engine-rime-adapter.md`：`ime-engine-rime` 的 adapter 边界、构建策略和验证分层。
 
@@ -101,7 +102,7 @@ librime adapter：
 - 转换 librime candidate 到 RadishLex candidate。
 - 屏蔽 C++ 细节。
 
-实现前先遵循 `docs/engine-rime-adapter.md` 中的构建探测、FFI、目录和验证分层；默认 workspace 检查不依赖本机安装 `librime`。
+当前已落地 skeleton、配置模型、错误类型、key 分类、候选转换和 `native-rime` build 探测；默认 workspace 检查不依赖本机安装 `librime`。真实 FFI session 尚未实现。
 
 ### ime-ranker
 

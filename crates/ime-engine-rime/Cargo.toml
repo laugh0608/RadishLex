@@ -1,0 +1,16 @@
+[package]
+name = "radishlex-ime-engine-rime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../LICENSE"
+description = "Rime engine adapter boundary for RadishLex."
+build = "build.rs"
+
+[features]
+default = []
+native-rime = []
+
+[dependencies]
+radishlex-ime-core = { path = "../ime-core" }

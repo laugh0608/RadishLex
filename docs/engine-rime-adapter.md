@@ -232,4 +232,10 @@ cargo run -p radishlex-ime-cli --features native-rime -- rime --schema <schema> 
 6. 增加本机 native smoke 文档与可选 CI job。
 7. 将 `ime-cli rime` 接入真实 adapter。
 
+当前进度：
+
+- 第 1-3 步已落地。
+- 已补配置模型、错误类型、key 分类和候选转换测试。
+- 第 4 步只落地 opaque FFI 类型和未实现的 `RimeEngine` skeleton，尚未调用真实 C API。
+
 阶段停止线：在 `ime-cli rime` 可通过真实 `librime` 输出候选前，不推进平台壳；在候选转换和错误释放没有测试前，不推进 ranker 或 userdb。
