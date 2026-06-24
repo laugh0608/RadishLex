@@ -1,6 +1,6 @@
 # RadishLex Engine Boundary
 
-本文档用于说明 RadishLex Rust core 与底层输入引擎之间的稳定边界，读者是后续实现 `ime-core`、engine adapter、CLI demo 和平台薄壳的开发者。本文只定义 v1 原型所需的领域模型、生命周期和验证口径，不包含 `librime` 绑定细节、平台输入法协议、候选排序权重公式或同步协议。
+本文档用于说明 RadishLex Rust core 与底层输入引擎之间的稳定边界，读者是后续实现 `ime-core`、engine adapter、CLI demo 和平台薄壳的开发者。本文只定义 v1 原型所需的领域模型、生命周期和验证口径，不包含 `librime` 绑定细节、平台输入法协议、候选排序权重公式或同步协议；`librime` adapter 细节见 `docs/engine-rime-adapter.md`。
 
 ## 阶段定位
 

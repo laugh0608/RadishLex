@@ -32,6 +32,7 @@ REQUIRED_FILES = [
     "crates/ime-core/Cargo.toml",
     "crates/ime-core/src/lib.rs",
     "docs/engine-boundary.md",
+    "docs/engine-rime-adapter.md",
     "docs/privacy-sync.md",
     "docs/repository-layout.md",
     "docs/roadmap.md",

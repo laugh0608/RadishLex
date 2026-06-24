@@ -42,6 +42,7 @@ RadishLex/
     repository-layout.md
     privacy-sync.md
     engine-boundary.md
+    engine-rime-adapter.md
     platform-notes/
   scripts/
     check-repo.sh
@@ -73,6 +74,7 @@ RadishLex/
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
 - `crates/ime-cli/`：基于 demo adapter 的命令行复验入口。
 - `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
+- `docs/engine-rime-adapter.md`：`ime-engine-rime` 的 adapter 边界、构建策略和验证分层。
 
 ## Rust crates 建议
 
@@ -98,6 +100,8 @@ librime adapter：
 - 封装 librime session。
 - 转换 librime candidate 到 RadishLex candidate。
 - 屏蔽 C++ 细节。
+
+实现前先遵循 `docs/engine-rime-adapter.md` 中的构建探测、FFI、目录和验证分层；默认 workspace 检查不依赖本机安装 `librime`。
 
 ### ime-ranker
 
