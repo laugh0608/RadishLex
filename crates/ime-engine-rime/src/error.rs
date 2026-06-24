@@ -11,6 +11,10 @@ pub enum RimeEngineError {
     },
     EmptyCandidateText,
     NativeFeatureDisabled,
+    NullApi,
+    MissingApiFunction {
+        name: &'static str,
+    },
     NativeProbeFailed {
         message: String,
     },
@@ -36,6 +40,10 @@ impl fmt::Display for RimeEngineError {
                 f,
                 "native Rime support is disabled; rebuild with the native-rime feature"
             ),
+            Self::NullApi => write!(f, "rime_get_api returned a null pointer"),
+            Self::MissingApiFunction { name } => {
+                write!(f, "native librime is missing required API function: {name}")
+            }
             Self::NativeProbeFailed { message } => {
                 write!(f, "failed to locate native librime: {message}")
             }
