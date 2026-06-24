@@ -64,6 +64,11 @@ impl RimeEngineConfig {
     pub fn deploy_on_start(&self) -> bool {
         self.deploy_on_start
     }
+
+    #[cfg(feature = "native-rime")]
+    pub(crate) fn replace_schema(&mut self, schema: SchemaId) {
+        self.schema = schema;
+    }
 }
 
 fn validate_config_path(field: &'static str, path: &Path) -> RimeEngineResult<()> {

@@ -237,6 +237,8 @@ cargo run -p radishlex-ime-cli --features native-rime -- rime --schema <schema> 
 - 第 1-3 步已落地。
 - 已补配置模型、错误类型、key 分类和候选转换测试。
 - 第 4 步已覆盖 `setup`、`initialize`、`create_session`、`select_schema` 和 `destroy_session` 的 FFI session 管理。
-- 尚未实现 `process_key`、`get_context`、`get_commit`、候选读取和 commit 释放。
+- 已补 `process_key`、`get_context`、`get_commit`、`free_context` 和 `free_commit` 的 Rust 侧调用路径。
+- 候选提交当前通过当前页 `select_keys` 模拟选择，后续 native smoke 需要确认与目标 schema 的行为一致。
+- 尚未实现 `ime-cli rime` 子命令和真实 `librime` native smoke。
 
 阶段停止线：在 `ime-cli rime` 可通过真实 `librime` 输出候选前，不推进平台壳；在候选转换和错误释放没有测试前，不推进 ranker 或 userdb。

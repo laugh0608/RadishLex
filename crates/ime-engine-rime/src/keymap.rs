@@ -1,3 +1,5 @@
+use std::ffi::c_int;
+
 use radishlex_ime_core::{Key, KeyEvent, KeyPhase, NamedKey};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,11 +55,32 @@ pub fn classify_key_event(event: KeyEvent) -> RimeKeyInput {
     }
 }
 
+#[cfg_attr(not(feature = "native-rime"), allow(dead_code))]
+pub fn rime_keycode(input: RimeKeyInput) -> Option<c_int> {
+    match input {
+        RimeKeyInput::Character(ch) if ch.is_ascii() => Some(ch as c_int),
+        RimeKeyInput::Character(_) | RimeKeyInput::Ignored => None,
+        RimeKeyInput::Named(named) => Some(match named {
+            RimeNamedKey::Space => 0x20,
+            RimeNamedKey::Enter => 0xff0d,
+            RimeNamedKey::Backspace => 0xff08,
+            RimeNamedKey::Escape => 0xff1b,
+            RimeNamedKey::Tab => 0xff09,
+            RimeNamedKey::ArrowLeft => 0xff51,
+            RimeNamedKey::ArrowUp => 0xff52,
+            RimeNamedKey::ArrowRight => 0xff53,
+            RimeNamedKey::ArrowDown => 0xff54,
+            RimeNamedKey::PageUp => 0xff55,
+            RimeNamedKey::PageDown => 0xff56,
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use radishlex_ime_core::{Key, KeyEvent, KeyModifiers, KeyPhase, NamedKey};
 
-    use super::{classify_key_event, RimeKeyInput, RimeNamedKey};
+    use super::{classify_key_event, rime_keycode, RimeKeyInput, RimeNamedKey};
 
     #[test]
     fn classifies_ascii_input_without_native_keycodes() {
@@ -79,5 +102,17 @@ mod tests {
             KeyPhase::Release,
         ));
         assert_eq!(input, RimeKeyInput::Ignored);
+    }
+
+    #[test]
+    fn maps_named_keys_to_rime_keycodes() {
+        assert_eq!(
+            rime_keycode(RimeKeyInput::Named(RimeNamedKey::Backspace)),
+            Some(0xff08)
+        );
+        assert_eq!(
+            rime_keycode(RimeKeyInput::Named(RimeNamedKey::Space)),
+            Some(0x20)
+        );
     }
 }

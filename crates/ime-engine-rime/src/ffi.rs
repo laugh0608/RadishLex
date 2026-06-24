@@ -65,12 +65,44 @@ pub struct RimeApi {
 
 #[repr(C)]
 pub struct RimeContext {
-    _private: [u8; 0],
+    pub data_size: c_int,
+    pub composition: RimeComposition,
+    pub menu: RimeMenu,
+    pub commit_text_preview: *mut c_char,
+    pub select_labels: *mut *mut c_char,
 }
 
 #[repr(C)]
 pub struct RimeCommit {
-    _private: [u8; 0],
+    pub data_size: c_int,
+    pub text: *mut c_char,
+}
+
+#[repr(C)]
+pub struct RimeComposition {
+    pub length: c_int,
+    pub cursor_pos: c_int,
+    pub sel_start: c_int,
+    pub sel_end: c_int,
+    pub preedit: *mut c_char,
+}
+
+#[repr(C)]
+pub struct RimeCandidate {
+    pub text: *mut c_char,
+    pub comment: *mut c_char,
+    pub reserved: *mut c_void,
+}
+
+#[repr(C)]
+pub struct RimeMenu {
+    pub page_size: c_int,
+    pub page_no: c_int,
+    pub is_last_page: Bool,
+    pub highlighted_candidate_index: c_int,
+    pub num_candidates: c_int,
+    pub candidates: *mut RimeCandidate,
+    pub select_keys: *mut c_char,
 }
 
 #[repr(C)]
