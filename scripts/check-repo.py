@@ -15,6 +15,7 @@ REQUIRED_FILES = [
     ".editorconfig",
     ".gitattributes",
     ".gitignore",
+    ".github/PULL_REQUEST_TEMPLATE.md",
     ".github/rulesets/README.md",
     ".github/rulesets/master-protection.json",
     ".github/workflows/pr-check.yml",
