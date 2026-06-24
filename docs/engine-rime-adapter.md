@@ -242,8 +242,8 @@ cargo run -p radishlex-ime-cli --features native-rime -- rime --schema <schema> 
 - 已补配置模型、错误类型、key 分类和候选转换测试。
 - 第 4 步已覆盖 `setup`、`initialize`、`create_session`、`select_schema` 和 `destroy_session` 的 FFI session 管理。
 - 已补 `process_key`、`get_context`、`get_commit`、`free_context` 和 `free_commit` 的 Rust 侧调用路径。
-- 候选提交当前通过当前页 `select_keys` 模拟选择，后续 native smoke 需要确认与目标 schema 的行为一致。
 - 已实现 `ime-cli rime` 子命令；默认 feature 下会给出明确 `native-rime` 构建提示，启用 feature 后可构造 `RimeEngine` 并进入 `InputSession`。
-- 尚未在安装真实 `librime` 与合法 schema 数据的环境中执行 native smoke。
+- 已在 macOS 本机 `librime` 1.17.0、`luna_pinyin` 隔离数据目录下完成真实 native smoke，`luobo` 可输出 composition、候选和默认 commit。
+- 候选提交当前通过当前页 `select_keys` 模拟选择；native smoke 已验证默认首候选可提交，非首候选和翻页选择后续仍需补充覆盖。
 
-阶段停止线：在 `ime-cli rime` 可通过真实 `librime` 输出候选前，不推进平台壳；在候选转换和错误释放没有测试前，不推进 ranker 或 userdb。
+阶段停止线：在 `ime-cli rime` 的非首候选选择、翻页选择和 native 异常路径没有补充验证前，不推进平台壳、ranker 或 userdb。

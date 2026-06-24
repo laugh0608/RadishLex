@@ -68,6 +68,8 @@ compile_commands.json
 *.sqlite-wal
 
 # Logs and temporary files
+/log/
+/logs/
 *.log
 *.tmp
 *.temp

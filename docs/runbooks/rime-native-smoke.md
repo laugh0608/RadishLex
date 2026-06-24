@@ -223,10 +223,16 @@ essay.txt
 ```bash
 case "$SMOKE" in
   /tmp/radishlex-rime-smoke.*|/private/tmp/radishlex-rime-smoke.*)
-    rm -rf "$SMOKE"
+    /bin/rm -rf -- "$SMOKE"
     ;;
   *)
     echo "Refuse to remove unexpected SMOKE path: $SMOKE"
     ;;
 esac
+```
+
+如果本机将 `rm` alias 到 `trash`，也可以在确认路径后手动执行：
+
+```bash
+trash "$SMOKE"
 ```
