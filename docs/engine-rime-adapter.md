@@ -216,6 +216,8 @@ cargo check -p radishlex-ime-cli --features native-rime
 cargo run -p radishlex-ime-cli --features native-rime -- rime --schema <schema> --shared-data <path> --user-data <path> <input-code>
 ```
 
+本机准备步骤见 `docs/runbooks/rime-native-smoke.md`。
+
 退出标准：
 
 - 未安装 `librime` 时，默认仓库基线仍通过。
