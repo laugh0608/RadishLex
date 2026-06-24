@@ -72,8 +72,8 @@ RadishLex/
 
 - `Cargo.toml`：Rust workspace 入口。
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
-- `crates/ime-cli/`：基于 demo adapter 的命令行复验入口。
-- `crates/ime-engine-rime/`：Rime adapter skeleton，默认不启用 native 绑定。
+- `crates/ime-cli/`：基于 demo adapter 与可选 Rime adapter 的命令行复验入口。
+- `crates/ime-engine-rime/`：Rime adapter crate，默认不启用 native 绑定。
 - `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
 - `docs/engine-rime-adapter.md`：`ime-engine-rime` 的 adapter 边界、构建策略和验证分层。
 
@@ -102,7 +102,7 @@ librime adapter：
 - 转换 librime candidate 到 RadishLex candidate。
 - 屏蔽 C++ 细节。
 
-当前已落地 skeleton、配置模型、错误类型、key 分类、候选转换和 `native-rime` build 探测；默认 workspace 检查不依赖本机安装 `librime`。真实 FFI session 尚未实现。
+当前已落地配置模型、错误类型、key 分类、候选转换、`native-rime` build 探测、FFI session 生命周期、输入处理、context / commit 读取路径；默认 workspace 检查不依赖本机安装 `librime`。真实 native smoke 尚未完成。
 
 ### ime-ranker
 
@@ -159,7 +159,7 @@ librime adapter：
 - 同步测试。
 - ranker explain。
 
-当前已落地基于合成 demo adapter 的 `demo <input-code> [candidate-index]` 命令，用于复验 `ime-core` 生命周期；它不代表真实中文输入引擎。
+当前已落地基于合成 demo adapter 的 `demo <input-code> [candidate-index]` 命令，以及需要 `native-rime` feature 和本机 `librime` 依赖的 `rime --schema <schema> --shared-data <path> --user-data <path> <input-code> [candidate-index]` 命令。`demo` 用于默认复验 `ime-core` 生命周期；它不代表真实中文输入引擎。
 
 ## Go server 建议
 

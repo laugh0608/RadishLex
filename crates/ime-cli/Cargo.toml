@@ -7,5 +7,13 @@ repository.workspace = true
 license-file = "../../LICENSE"
 description = "Command line demo for the RadishLex input core."
 
+[features]
+default = []
+native-rime = [
+    "dep:radishlex-ime-engine-rime",
+    "radishlex-ime-engine-rime/native-rime",
+]
+
 [dependencies]
 radishlex-ime-core = { path = "../ime-core" }
+radishlex-ime-engine-rime = { path = "../ime-engine-rime", optional = true }

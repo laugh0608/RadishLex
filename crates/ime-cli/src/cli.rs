@@ -1,17 +1,24 @@
 use std::fmt;
+use std::path::PathBuf;
 use std::process::ExitCode;
 
-use radishlex_ime_core::{Candidate, CoreError, InputSession, KeyEvent, SchemaId, SessionState};
+use radishlex_ime_core::{
+    Candidate, CoreError, Engine, InputSession, KeyEvent, SchemaId, SessionState,
+};
+#[cfg(feature = "native-rime")]
+use radishlex_ime_engine_rime::{RimeEngine, RimeEngineConfig};
 
 use crate::DemoEngine;
 
 const USAGE: &str = "\
 Usage:
   radishlex-ime-cli demo <input-code> [candidate-index]
+  radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> <input-code> [candidate-index]
 
 Examples:
   radishlex-ime-cli demo luobo
   radishlex-ime-cli demo luobo 1
+  radishlex-ime-cli rime --schema luna_pinyin --shared-data ./rime-data --user-data ./tmp/rime-user luobo
 ";
 
 #[derive(Debug)]
@@ -50,6 +57,7 @@ pub fn run(args: &[String]) -> Result<String, CliError> {
     let command = args.get(1).map(String::as_str);
     match command {
         Some("demo") => run_demo(args),
+        Some("rime") => run_rime(args),
         Some("-h" | "--help") => Ok(USAGE.to_owned()),
         Some(other) => Err(CliError::Usage(format!("unknown command: {other}"))),
         None => Err(CliError::Usage("missing command".to_owned())),
@@ -62,16 +70,39 @@ fn run_demo(args: &[String]) -> Result<String, CliError> {
         .ok_or_else(|| CliError::Usage("missing input code".to_owned()))?;
     validate_input_code(input_code)?;
 
-    let selected_index = match args.get(3) {
-        Some(value) => Some(parse_candidate_index(value)?),
-        None => None,
-    };
+    let selected_index = parse_optional_candidate_index(args.get(3))?;
     if args.len() > 4 {
         return Err(CliError::Usage("too many arguments for demo".to_owned()));
     }
 
     let mut session = InputSession::new(DemoEngine::new());
     session.set_schema(SchemaId::new("demo.pinyin")?)?;
+    run_input_session(session, input_code, selected_index)
+}
+
+#[cfg(not(feature = "native-rime"))]
+fn run_rime(args: &[String]) -> Result<String, CliError> {
+    let _ = parse_rime_args(args)?;
+    Err(CliError::Usage(
+        "rime command requires building radishlex-ime-cli with --features native-rime".to_owned(),
+    ))
+}
+
+#[cfg(feature = "native-rime")]
+fn run_rime(args: &[String]) -> Result<String, CliError> {
+    let options = parse_rime_args(args)?;
+    let schema = SchemaId::new(options.schema)?;
+    let config = RimeEngineConfig::new(options.shared_data, options.user_data, schema)
+        .map_err(rime_error_to_cli)?;
+    let session = InputSession::new(RimeEngine::new(config).map_err(rime_error_to_cli)?);
+    run_input_session(session, &options.input_code, options.selected_index)
+}
+
+fn run_input_session<E: Engine>(
+    mut session: InputSession<E>,
+    input_code: &str,
+    selected_index: Option<usize>,
+) -> Result<String, CliError> {
     for ch in input_code.chars() {
         session.push_key(KeyEvent::press_char(ch))?;
     }
@@ -83,7 +114,92 @@ fn run_demo(args: &[String]) -> Result<String, CliError> {
         None
     };
 
-    Ok(render_demo(input_code, &state, commit_text.as_deref()))
+    Ok(render_session(input_code, &state, commit_text.as_deref()))
+}
+
+#[cfg(feature = "native-rime")]
+fn rime_error_to_cli(error: radishlex_ime_engine_rime::RimeEngineError) -> CliError {
+    CliError::Core(CoreError::engine(error.to_string()))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RimeCommandOptions {
+    schema: String,
+    shared_data: PathBuf,
+    user_data: PathBuf,
+    input_code: String,
+    selected_index: Option<usize>,
+}
+
+fn parse_rime_args(args: &[String]) -> Result<RimeCommandOptions, CliError> {
+    let mut schema = None;
+    let mut shared_data = None;
+    let mut user_data = None;
+    let mut positional = Vec::new();
+    let mut index = 2;
+
+    while index < args.len() {
+        match args[index].as_str() {
+            "--schema" => {
+                index += 1;
+                schema = Some(required_option_value(args, index, "--schema")?.to_owned());
+            }
+            "--shared-data" => {
+                index += 1;
+                shared_data = Some(PathBuf::from(required_option_value(
+                    args,
+                    index,
+                    "--shared-data",
+                )?));
+            }
+            "--user-data" => {
+                index += 1;
+                user_data = Some(PathBuf::from(required_option_value(
+                    args,
+                    index,
+                    "--user-data",
+                )?));
+            }
+            value if value.starts_with("--") => {
+                return Err(CliError::Usage(format!("unknown rime option: {value}")));
+            }
+            value => positional.push(value.to_owned()),
+        }
+        index += 1;
+    }
+
+    let input_code = positional
+        .first()
+        .ok_or_else(|| CliError::Usage("missing input code for rime".to_owned()))?;
+    validate_input_code(input_code)?;
+    if positional.len() > 2 {
+        return Err(CliError::Usage(
+            "too many positional arguments for rime".to_owned(),
+        ));
+    }
+
+    Ok(RimeCommandOptions {
+        schema: schema.ok_or_else(|| CliError::Usage("missing --schema".to_owned()))?,
+        shared_data: shared_data
+            .ok_or_else(|| CliError::Usage("missing --shared-data".to_owned()))?,
+        user_data: user_data.ok_or_else(|| CliError::Usage("missing --user-data".to_owned()))?,
+        input_code: input_code.to_owned(),
+        selected_index: parse_optional_candidate_index(positional.get(1))?,
+    })
+}
+
+fn required_option_value<'a>(
+    args: &'a [String],
+    index: usize,
+    option: &str,
+) -> Result<&'a str, CliError> {
+    let value = args
+        .get(index)
+        .ok_or_else(|| CliError::Usage(format!("missing value for {option}")))?;
+    if value.starts_with("--") {
+        return Err(CliError::Usage(format!("missing value for {option}")));
+    }
+    Ok(value)
 }
 
 fn validate_input_code(input_code: &str) -> Result<(), CliError> {
@@ -109,6 +225,10 @@ fn parse_candidate_index(value: &str) -> Result<usize, CliError> {
     })
 }
 
+fn parse_optional_candidate_index(value: Option<&String>) -> Result<Option<usize>, CliError> {
+    value.map(|value| parse_candidate_index(value)).transpose()
+}
+
 fn default_index(state: &SessionState) -> Option<usize> {
     if state.candidates().is_empty() {
         None
@@ -117,7 +237,7 @@ fn default_index(state: &SessionState) -> Option<usize> {
     }
 }
 
-fn render_demo(input_code: &str, state: &SessionState, commit_text: Option<&str>) -> String {
+fn render_session(input_code: &str, state: &SessionState, commit_text: Option<&str>) -> String {
     let mut output = String::new();
     output.push_str(&format!("schema: {}\n", state.schema().as_str()));
     output.push_str(&format!("input: {input_code}\n"));
@@ -196,5 +316,39 @@ mod tests {
             .expect_err("invalid index must fail");
 
         assert!(matches!(err, CliError::Usage(_)));
+    }
+
+    #[test]
+    fn rime_command_requires_native_feature_by_default() {
+        let err = run(&args(&[
+            "radishlex-ime-cli",
+            "rime",
+            "--schema",
+            "luna_pinyin",
+            "--shared-data",
+            "shared",
+            "--user-data",
+            "user",
+            "luobo",
+        ]))
+        .expect_err("default build cannot run native rime");
+
+        assert!(err.to_string().contains("native-rime"));
+    }
+
+    #[test]
+    fn rime_command_rejects_missing_schema() {
+        let err = run(&args(&[
+            "radishlex-ime-cli",
+            "rime",
+            "--shared-data",
+            "shared",
+            "--user-data",
+            "user",
+            "luobo",
+        ]))
+        .expect_err("schema is required");
+
+        assert!(err.to_string().contains("missing --schema"));
     }
 }

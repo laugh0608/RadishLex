@@ -7,6 +7,7 @@ name = "radishlex-ime-cli"
 version = "0.1.0"
 dependencies = [
  "radishlex-ime-core",
+ "radishlex-ime-engine-rime",
 ]
 
 [[package]]

@@ -183,7 +183,7 @@ Rime candidate 转 RadishLex candidate 时只保留稳定字段：
 
 ## CLI 集成策略
 
-`ime-cli` 后续增加真实 engine 时建议使用子命令或显式参数：
+`ime-cli` 当前通过独立子命令接入真实 engine：
 
 ```text
 radishlex-ime-cli demo <input-code> [candidate-index]
@@ -208,10 +208,11 @@ cargo run -p radishlex-ime-cli -- demo luobo
 ./scripts/check-repo.sh
 ```
 
-native Rime 验证，后续实现后再启用：
+可选 native Rime 验证：
 
 ```text
 cargo test -p radishlex-ime-engine-rime --features native-rime
+cargo check -p radishlex-ime-cli --features native-rime
 cargo run -p radishlex-ime-cli --features native-rime -- rime --schema <schema> --shared-data <path> --user-data <path> <input-code>
 ```
 
@@ -231,6 +232,7 @@ cargo run -p radishlex-ime-cli --features native-rime -- rime --schema <schema> 
 5. 增加 conversion 单元测试，优先测试 Rust 侧转换和错误语义。
 6. 增加本机 native smoke 文档与可选 CI job。
 7. 将 `ime-cli rime` 接入真实 adapter。
+8. 在安装 `librime` 和合法 schema 数据的开发机上执行真实 native smoke。
 
 当前进度：
 
@@ -239,6 +241,7 @@ cargo run -p radishlex-ime-cli --features native-rime -- rime --schema <schema> 
 - 第 4 步已覆盖 `setup`、`initialize`、`create_session`、`select_schema` 和 `destroy_session` 的 FFI session 管理。
 - 已补 `process_key`、`get_context`、`get_commit`、`free_context` 和 `free_commit` 的 Rust 侧调用路径。
 - 候选提交当前通过当前页 `select_keys` 模拟选择，后续 native smoke 需要确认与目标 schema 的行为一致。
-- 尚未实现 `ime-cli rime` 子命令和真实 `librime` native smoke。
+- 已实现 `ime-cli rime` 子命令；默认 feature 下会给出明确 `native-rime` 构建提示，启用 feature 后可构造 `RimeEngine` 并进入 `InputSession`。
+- 尚未在安装真实 `librime` 与合法 schema 数据的环境中执行 native smoke。
 
 阶段停止线：在 `ime-cli rime` 可通过真实 `librime` 输出候选前，不推进平台壳；在候选转换和错误释放没有测试前，不推进 ranker 或 userdb。
