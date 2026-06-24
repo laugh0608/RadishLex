@@ -36,6 +36,7 @@
 - 底层引擎策略：v1 可接 `librime`，但必须通过 engine adapter 隔离；长期保留 Rust 自研引擎替换空间
 - 隐私立场：服务端默认不可信，客户端才是数据真相源
 - 当前远程仓库：`https://github.com/laugh0608/RadishLex`
+- 当前常态开发分支：`dev`；`master` 作为稳定主线
 - 协作入口文件：`AGENTS.md` 与 `CLAUDE.md` 必须保持基本复制和长期同步
 
 ## 文档真相源
@@ -129,8 +130,10 @@
 
 ## 分支与 PR 约定
 
-- 当前仓库初始化分支为 `master`
-- 若进入持续开发阶段，建议建立 `dev` 作为日常集成分支，`master` 作为稳定主线
+- 当前常态开发分支为 `dev`
+- `master` 作为稳定主线
+- 非特殊情况不直接在 `master` 上开发
+- 阶段性稳定后，再从 `dev` 发起到 `master` 的 Pull Request
 - 远端分支保护、合并策略、稳定主线 PR 目标和阶段性例外，后续应以 `docs/adr/0001-branch-and-pr-governance.md` 或同类 ADR 为准
 - 在正式 ADR 补齐前，以当前 Git 实际状态和用户明确指令为准，不擅自改分支策略
 - 默认不执行破坏性 Git 操作
