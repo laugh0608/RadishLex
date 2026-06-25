@@ -18,11 +18,19 @@ impl RadishLexSession {
     }
 
     pub fn push_char(&mut self, ch: char) -> radishlex_ime_core::CoreResult<()> {
-        self.inner.push_key(KeyEvent::press_char(ch))?;
+        self.push_key_event(KeyEvent::press_char(ch))
+    }
+
+    pub fn push_key_event(&mut self, key: KeyEvent) -> radishlex_ime_core::CoreResult<()> {
+        self.inner.push_key(key)?;
         Ok(())
     }
 
-    pub fn snapshot(&self) -> radishlex_ime_core::CoreResult<String> {
+    pub fn state(&self) -> radishlex_ime_core::CoreResult<SessionState> {
+        self.inner.state()
+    }
+
+    pub fn snapshot_text(&self) -> radishlex_ime_core::CoreResult<String> {
         render_snapshot(&self.inner.state()?)
     }
 }

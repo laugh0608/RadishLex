@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前已落地 `crates/ime-ffi/` 起步验证：C ABI 已覆盖 opaque session handle、错误对象、UTF-8 buffer、释放函数、schema 设置、字符按键输入、snapshot 和候选提交的 host smoke。当前 session 内部使用 deterministic demo engine 证明 ABI 生命周期，不代表真实 Rime adapter、平台壳或系统输入法已经接入。
+当前已落地 `crates/ime-ffi/` 起步验证：C ABI 已覆盖 opaque session handle、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、释放函数、schema 设置、按键输入、snapshot 和候选提交的 host smoke。当前 session 内部使用 deterministic demo engine 证明 ABI 生命周期，不代表真实 Rime adapter、平台壳或系统输入法已经接入。
 
 平台壳后续只能通过 FFI 调用 Rust core，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。
 
@@ -33,10 +33,11 @@
 ```text
 RadishLexSession*
 RadishLexBuffer*
+RadishLexSnapshot*
 RadishLexError*
 ```
 
-平台端只能持有 opaque pointer，不能解引用 Rust 内部结构。所有跨 ABI 返回的字符串必须明确编码为 UTF-8，并由 Rust 提供释放函数。
+平台端只能持有 opaque pointer，不能解引用 Rust 内部结构。跨 ABI 文本优先使用带长度的 UTF-8 view；需要 Rust 分配的 buffer 或 snapshot handle 时，必须由 Rust 提供释放函数。
 
 建议基本函数族：
 
@@ -46,7 +47,9 @@ radishlex_session_free
 radishlex_session_reset
 radishlex_session_set_schema
 radishlex_session_push_key
+radishlex_session_push_key_event
 radishlex_session_snapshot
+radishlex_session_snapshot_new
 radishlex_session_commit_candidate
 radishlex_buffer_free
 radishlex_error_code
@@ -62,7 +65,15 @@ radishlex_session_free
 radishlex_session_reset
 radishlex_session_set_schema
 radishlex_session_push_key
+radishlex_session_push_key_event
 radishlex_session_snapshot
+radishlex_session_snapshot_new
+radishlex_snapshot_schema
+radishlex_snapshot_preedit
+radishlex_snapshot_cursor
+radishlex_snapshot_candidate_count
+radishlex_snapshot_candidate
+radishlex_snapshot_free
 radishlex_session_commit_candidate
 radishlex_buffer_data
 radishlex_buffer_len
@@ -72,7 +83,15 @@ radishlex_error_message
 radishlex_error_free
 ```
 
-`radishlex_session_push_key` 当前只接收单个 Unicode scalar value，用于起步 host smoke。后续真实平台壳接入前，需要扩展为完整 normalized key event ABI，覆盖命名键、修饰键、按下 / 释放阶段和平台不可识别键。
+`radishlex_session_push_key` 保留为字符输入便利函数；真实平台壳后续应优先使用 `radishlex_session_push_key_event`。当前 normalized key event 使用数值常量承载字符键、命名键、修饰键、按下 / 释放阶段和平台不可识别键，避免让无效 enum discriminant 在 FFI 边界形成未定义行为。
+
+结构化 snapshot 规则：
+
+- `radishlex_session_snapshot_new` 返回 `RadishLexSnapshot*`，由 `radishlex_snapshot_free` 释放。
+- `radishlex_snapshot_schema`、`radishlex_snapshot_preedit` 和 candidate view 中的文本均为借用自 snapshot 的 UTF-8 `data + len` view。
+- 平台端只能在 snapshot 释放前读取这些 view；不得缓存 view 指针。
+- `radishlex_snapshot_candidate` 通过输出参数返回单个 `RadishLexCandidateView`，候选越界或输出指针为空时返回 `InvalidArgument`。
+- `radishlex_session_snapshot` 保留为调试用文本 buffer，不作为后续平台壳读取 composition / candidate 的主入口。
 
 ## 所有权与生命周期
 
@@ -130,7 +149,7 @@ InternalError
 - userdb 删除 tombstone、导入导出和 ranker explain 已通过测试。
 - 同步 payload 草案已区分 P1 本地和 P2 加密同步。
 - FFI 文档明确所有权、生命周期、错误语义、字符串编码和释放责任。
-- `ime-ffi` 至少有 C ABI 单元测试或 host smoke，证明字符串、数组和错误释放不泄漏。当前已完成起步 host smoke；真实平台壳前仍需补结构化 snapshot / candidate ABI、完整 key event ABI 和 engine adapter 选择策略。
+- `ime-ffi` 至少有 C ABI 单元测试或 host smoke，证明字符串、数组、snapshot、candidate view、normalized key event 和错误释放路径可复验。当前已完成结构化 snapshot / candidate ABI 与 normalized key event 起步 host smoke；真实平台壳前仍需补 engine adapter 选择策略和受控 userdb / sync 状态入口。
 
 ## 验证口径
 

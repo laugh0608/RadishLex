@@ -7,7 +7,9 @@ use radishlex_ime_core::SchemaId;
 
 use crate::buffer::RadishLexBuffer;
 use crate::error::{FfiError, RadishLexError, RadishLexStatusCode};
+use crate::key::RadishLexKeyEvent;
 use crate::session::RadishLexSession;
+use crate::snapshot::{RadishLexCandidateView, RadishLexSnapshot, RadishLexStringView};
 
 #[no_mangle]
 pub extern "C" fn radishlex_session_new(
@@ -58,10 +60,22 @@ pub extern "C" fn radishlex_session_push_key(
     error_out: *mut *mut RadishLexError,
 ) -> RadishLexStatusCode {
     ffi_status(error_out, || {
-        let ch = char::from_u32(codepoint).ok_or_else(|| {
+        let event = RadishLexKeyEvent::press_char(char::from_u32(codepoint).ok_or_else(|| {
             FfiError::invalid_argument("key codepoint is not a valid Unicode scalar value")
-        })?;
-        session_mut(session)?.push_char(ch)?;
+        })?);
+        session_mut(session)?.push_key_event(event.try_into()?)?;
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_session_push_key_event(
+    session: *mut RadishLexSession,
+    event: RadishLexKeyEvent,
+    error_out: *mut *mut RadishLexError,
+) -> RadishLexStatusCode {
+    ffi_status(error_out, || {
+        session_mut(session)?.push_key_event(event.try_into()?)?;
         Ok(())
     })
 }
@@ -72,9 +86,77 @@ pub extern "C" fn radishlex_session_snapshot(
     error_out: *mut *mut RadishLexError,
 ) -> *mut RadishLexBuffer {
     ffi_ptr(error_out, || {
-        let snapshot = session_mut(session)?.snapshot()?;
+        let snapshot = session_mut(session)?.snapshot_text()?;
         Ok(RadishLexBuffer::from_string(snapshot))
     })
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_session_snapshot_new(
+    session: *mut RadishLexSession,
+    error_out: *mut *mut RadishLexError,
+) -> *mut RadishLexSnapshot {
+    ffi_ptr(error_out, || {
+        let snapshot = RadishLexSnapshot::from_state(session_mut(session)?.state()?);
+        Ok(Box::into_raw(Box::new(snapshot)))
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_snapshot_schema(
+    snapshot: *const RadishLexSnapshot,
+) -> RadishLexStringView {
+    snapshot_ref(snapshot).map_or_else(
+        |_| RadishLexStringView::empty(),
+        |snapshot| snapshot.schema(),
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_snapshot_preedit(
+    snapshot: *const RadishLexSnapshot,
+) -> RadishLexStringView {
+    snapshot_ref(snapshot).map_or_else(
+        |_| RadishLexStringView::empty(),
+        |snapshot| snapshot.preedit(),
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_snapshot_cursor(snapshot: *const RadishLexSnapshot) -> usize {
+    snapshot_ref(snapshot).map_or(0, RadishLexSnapshot::cursor)
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_snapshot_candidate_count(snapshot: *const RadishLexSnapshot) -> usize {
+    snapshot_ref(snapshot).map_or(0, RadishLexSnapshot::candidate_count)
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_snapshot_candidate(
+    snapshot: *const RadishLexSnapshot,
+    index: usize,
+    candidate_out: *mut RadishLexCandidateView,
+    error_out: *mut *mut RadishLexError,
+) -> RadishLexStatusCode {
+    ffi_status(error_out, || {
+        if candidate_out.is_null() {
+            return Err(FfiError::invalid_argument(
+                "candidate output pointer is null",
+            ));
+        }
+
+        let view = snapshot_ref(snapshot)?.candidate_view(index)?;
+        unsafe {
+            *candidate_out = view;
+        }
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn radishlex_snapshot_free(snapshot: *mut RadishLexSnapshot) {
+    RadishLexSnapshot::free(snapshot);
 }
 
 #[no_mangle]
@@ -136,6 +218,13 @@ fn session_mut<'a>(session: *mut RadishLexSession) -> Result<&'a mut RadishLexSe
         return Err(FfiError::invalid_argument("session handle is null"));
     }
     Ok(unsafe { &mut *session })
+}
+
+fn snapshot_ref<'a>(snapshot: *const RadishLexSnapshot) -> Result<&'a RadishLexSnapshot, FfiError> {
+    if snapshot.is_null() {
+        return Err(FfiError::invalid_argument("snapshot handle is null"));
+    }
+    Ok(unsafe { &*snapshot })
 }
 
 fn read_utf8<'a>(value: *const c_char, field: &'static str) -> Result<&'a str, FfiError> {
@@ -215,6 +304,10 @@ mod tests {
     use std::slice;
 
     use super::*;
+    use crate::key::{
+        RADISHLEX_KEY_MOD_SHIFT, RADISHLEX_KEY_PHASE_RELEASE, RADISHLEX_NAMED_KEY_BACKSPACE,
+    };
+    use crate::snapshot::RADISHLEX_CANDIDATE_SOURCE_ENGINE;
 
     #[test]
     fn session_snapshot_and_commit_round_trip() {
@@ -252,6 +345,118 @@ mod tests {
         assert_eq!(commit_text, "萝卜词核");
         unsafe {
             radishlex_buffer_free(commit);
+            radishlex_session_free(session);
+        }
+    }
+
+    #[test]
+    fn structured_snapshot_exposes_candidate_views() {
+        let mut error = ptr::null_mut();
+        let session = radishlex_session_new(&mut error);
+        assert!(!session.is_null());
+
+        for ch in "luox".chars() {
+            assert_eq!(
+                radishlex_session_push_key_event(
+                    session,
+                    RadishLexKeyEvent::press_char(ch),
+                    &mut error
+                ),
+                RadishLexStatusCode::Ok
+            );
+        }
+
+        assert_eq!(
+            radishlex_session_push_key_event(
+                session,
+                RadishLexKeyEvent::press_named(RADISHLEX_NAMED_KEY_BACKSPACE),
+                &mut error
+            ),
+            RadishLexStatusCode::Ok
+        );
+
+        for ch in "bo".chars() {
+            assert_eq!(
+                radishlex_session_push_key_event(
+                    session,
+                    RadishLexKeyEvent {
+                        modifiers: RADISHLEX_KEY_MOD_SHIFT,
+                        ..RadishLexKeyEvent::press_char(ch)
+                    },
+                    &mut error,
+                ),
+                RadishLexStatusCode::Ok
+            );
+        }
+
+        let snapshot = radishlex_session_snapshot_new(session, &mut error);
+        assert!(!snapshot.is_null());
+        assert_eq!(
+            unsafe { view_to_string(radishlex_snapshot_schema(snapshot)) },
+            "ffi.demo"
+        );
+        assert_eq!(
+            unsafe { view_to_string(radishlex_snapshot_preedit(snapshot)) },
+            "luobo"
+        );
+        assert_eq!(radishlex_snapshot_cursor(snapshot), 5);
+        assert_eq!(radishlex_snapshot_candidate_count(snapshot), 2);
+
+        let mut candidate = RadishLexCandidateView::empty();
+        assert_eq!(
+            radishlex_snapshot_candidate(snapshot, 1, &mut candidate, &mut error),
+            RadishLexStatusCode::Ok
+        );
+        assert_eq!(candidate.index, 1);
+        assert_eq!(unsafe { view_to_string(candidate.text) }, "萝卜词核");
+        assert_eq!(candidate.reading_present, 1);
+        assert_eq!(unsafe { view_to_string(candidate.reading) }, "luobo");
+        assert_eq!(candidate.annotation_present, 1);
+        assert_eq!(
+            unsafe { view_to_string(candidate.annotation) },
+            "project term"
+        );
+        assert_eq!(candidate.source, RADISHLEX_CANDIDATE_SOURCE_ENGINE);
+
+        assert_eq!(
+            radishlex_snapshot_candidate(snapshot, 2, &mut candidate, &mut error),
+            RadishLexStatusCode::InvalidArgument
+        );
+        assert_eq!(
+            radishlex_error_code(error),
+            RadishLexStatusCode::InvalidArgument
+        );
+
+        unsafe {
+            radishlex_error_free(error);
+            radishlex_snapshot_free(snapshot);
+            radishlex_session_free(session);
+        }
+    }
+
+    #[test]
+    fn invalid_key_event_reports_argument_error() {
+        let mut error = ptr::null_mut();
+        let session = radishlex_session_new(&mut error);
+        assert!(!session.is_null());
+
+        let status = radishlex_session_push_key_event(
+            session,
+            RadishLexKeyEvent {
+                phase: RADISHLEX_KEY_PHASE_RELEASE + 10,
+                ..RadishLexKeyEvent::press_char('l')
+            },
+            &mut error,
+        );
+
+        assert_eq!(status, RadishLexStatusCode::InvalidArgument);
+        let message = unsafe { CStr::from_ptr(radishlex_error_message(error)) }
+            .to_string_lossy()
+            .into_owned();
+        assert!(message.contains("unknown key phase code"));
+
+        unsafe {
+            radishlex_error_free(error);
             radishlex_session_free(session);
         }
     }
@@ -327,10 +532,14 @@ mod tests {
             radishlex_session_free(ptr::null_mut());
             radishlex_buffer_free(ptr::null_mut());
             radishlex_error_free(ptr::null_mut());
+            radishlex_snapshot_free(ptr::null_mut());
         }
         assert!(radishlex_buffer_data(ptr::null()).is_null());
         assert_eq!(radishlex_buffer_len(ptr::null()), 0);
         assert!(radishlex_error_message(ptr::null()).is_null());
+        assert_eq!(radishlex_snapshot_cursor(ptr::null()), 0);
+        assert_eq!(radishlex_snapshot_candidate_count(ptr::null()), 0);
+        assert!(radishlex_snapshot_schema(ptr::null()).data.is_null());
     }
 
     unsafe fn buffer_to_string(buffer: *mut RadishLexBuffer) -> String {
@@ -338,5 +547,10 @@ mod tests {
         let len = radishlex_buffer_len(buffer);
         let bytes = slice::from_raw_parts(data, len);
         String::from_utf8(bytes.to_vec()).expect("buffer must be UTF-8")
+    }
+
+    unsafe fn view_to_string(view: RadishLexStringView) -> String {
+        let bytes = slice::from_raw_parts(view.data, view.len);
+        String::from_utf8(bytes.to_vec()).expect("view must be UTF-8")
     }
 }

@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 2 起步：`ime-core` 已具备可测试的输入会话、候选模型、提交模型和 engine interface；`ime-cli` 已能分别通过合成 demo adapter 和真实 Rime adapter 复验输入生命周期。真实 Rime adapter 已覆盖首候选、非首候选、翻页候选和候选索引异常路径 smoke。`ime-userdb` 已承载本地用户词库、选择事件、负反馈、删除 tombstone、导入导出和同步前置计数；`ime-ranker` 已具备可解释排序模型；`ime-sync` 已定义同步 payload 来源分类和加密对象外壳草案；`ime-ffi` 已完成 C ABI 起步 host smoke。下一步应继续补结构化 snapshot / candidate ABI 和完整 key event ABI，不直接推进平台壳。
+当前处于 Phase 2 起步：`ime-core` 已具备可测试的输入会话、候选模型、提交模型和 engine interface；`ime-cli` 已能分别通过合成 demo adapter 和真实 Rime adapter 复验输入生命周期。真实 Rime adapter 已覆盖首候选、非首候选、翻页候选和候选索引异常路径 smoke。`ime-userdb` 已承载本地用户词库、选择事件、负反馈、删除 tombstone、导入导出和同步前置计数；`ime-ranker` 已具备可解释排序模型；`ime-sync` 已定义同步 payload 来源分类和加密对象外壳草案；`ime-ffi` 已完成结构化 snapshot / candidate ABI 与 normalized key event host smoke。下一步应继续补 engine adapter 选择策略和受控 userdb / sync 状态入口，不直接推进平台壳。
 
 当前边界：
 
