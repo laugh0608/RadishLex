@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 1 向 Phase 2 过渡。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，下一阶段目标是在 RadishLex candidate 层建立本地用户词库、选择事件、负反馈和可解释候选重排。
+当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone。下一阶段目标是补齐 `ime-ranker` 的可解释候选重排，并把学习链路接入 CLI 复验入口。
 
 Phase 2 不改变底层 engine adapter 边界：
 
@@ -347,16 +347,15 @@ cargo test --workspace
 ./scripts/check-repo.sh
 ```
 
-在 `ime-userdb` 和 `ime-ranker` crate 尚未创建前，先以设计文档评审和仓库级检查作为本阶段入口验证。
+当前 `ime-userdb` 已创建，`ime-ranker` 尚未创建。`ime-userdb` 起步验证以 `cargo test -p radishlex-ime-userdb` 和仓库级检查为准。
 
 ## 实施顺序
 
-1. 新增 `crates/ime-userdb/`，只包含 SQLite schema、migration、词条 CRUD、选择事件和负反馈记录。
-2. 为 userdb 增加合成 fixture，覆盖 P0 拦截、P1 本地事件、P2 用户词条和删除 tombstone。
-3. 新增 `crates/ime-ranker/`，定义 `RankRequest`、`RankedCandidate` 和 explain 模型。
-4. 用合成候选验证频次、近期、负反馈、删除 tombstone 对排序的影响。
-5. 扩展 `ime-cli` 的 `dict`、`learn` 和 `rank explain` 命令。
-6. 再考虑把 Rime adapter 输出接入 ranker smoke，验证真实 engine candidates 进入个人化层。
+1. `crates/ime-userdb/` 已创建，已包含 SQLite schema、migration、词条 CRUD、选择事件、负反馈记录和删除 tombstone 起步测试。
+2. 下一步新增 `crates/ime-ranker/`，定义 `RankRequest`、`RankedCandidate` 和 explain 模型。
+3. 用合成候选验证频次、近期、负反馈、删除 tombstone 对排序的影响。
+4. 扩展 `ime-cli` 的 `dict`、`learn` 和 `rank explain` 命令。
+5. 再考虑把 Rime adapter 输出接入 ranker smoke，验证真实 engine candidates 进入个人化层。
 
 阶段停止线：
 

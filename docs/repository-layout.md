@@ -120,7 +120,7 @@ librime adapter：
 - 短语上下文。
 - 负反馈。
 
-当前已在 `docs/personalization-learning.md` 中定义 Phase 2 的 rank request、ranked candidate、explain 输出和验证标准；crate 尚未创建。
+当前已在 `docs/personalization-learning.md` 中定义 Phase 2 的 rank request、ranked candidate、explain 输出和验证标准；crate 尚未创建，下一步应在 `ime-userdb` 起步验证后推进。
 
 ### ime-userdb
 
@@ -132,7 +132,7 @@ librime adapter：
 - 学习记录。
 - 导入导出。
 
-当前已在 `docs/personalization-learning.md` 中定义 Phase 2 的 userdb 数据分级、schema 草案、选择事件、负反馈、删除 tombstone 和 CLI 管理入口；crate 尚未创建。
+当前已创建 `crates/ime-userdb/`，落地 SQLite schema migration、用户词条 CRUD、选择事件记录、负反馈记录、删除 tombstone 和 ranker weight 摘要起步测试；导入导出和 CLI 管理入口后续补齐。
 
 ### ime-sync
 

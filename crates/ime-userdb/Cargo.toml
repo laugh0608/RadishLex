@@ -1,0 +1,15 @@
+[package]
+name = "radishlex-ime-userdb"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../LICENSE"
+description = "Local user dictionary and learning event store for RadishLex."
+
+[lib]
+name = "radishlex_ime_userdb"
+path = "src/lib.rs"
+
+[dependencies]
+rusqlite = { version = "0.32.1", features = ["bundled"] }
