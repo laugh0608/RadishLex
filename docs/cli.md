@@ -21,6 +21,8 @@ radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path>
 radishlex-ime-cli dict list --db <path>
 radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
+radishlex-ime-cli dict export --db <path> --file <path>
+radishlex-ime-cli dict import --db <path> --file <path> [--source <name>]
 radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
 radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
 radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
@@ -232,6 +234,60 @@ cargo run -p radishlex-ime-cli -- \
 
 删除会写入 tombstone，并清除对应 ranker 权重摘要，避免旧选择事件或旧导入立即复活该词。后续如需恢复同一词条，必须通过 `dict add` 这类明确的人工添加动作。
 
+导出用户词库：
+
+```bash
+cargo run -p radishlex-ime-cli -- \
+  dict export \
+  --db /tmp/radishlex-userdb.sqlite \
+  --file /tmp/radishlex-terms.tsv
+```
+
+输出：
+
+```text
+exported: 1
+file: /tmp/radishlex-terms.tsv
+format: radishlex-user-terms-v1
+```
+
+导入用户词库：
+
+```bash
+cargo run -p radishlex-ime-cli -- \
+  dict import \
+  --db /tmp/radishlex-userdb.sqlite \
+  --file /tmp/radishlex-terms.tsv \
+  --source smoke
+```
+
+输出：
+
+```text
+imported: 1
+total: 1
+skipped_deleted: 0
+source: smoke
+file: /tmp/radishlex-terms.tsv
+```
+
+导入导出格式为 UTF-8 TSV：
+
+```text
+# radishlex-user-terms-v1
+input_code	text	reading	source	weight	status
+luobo	萝卜	luo bo	manual_add	2	active
+```
+
+字段固定为 `input_code`、`text`、`reading`、`source`、`weight`、`status`。字段内 tab、换行、回车和反斜杠分别写作 `\t`、`\n`、`\r` 和 `\\`。
+
+边界：
+
+- `dict export` 只导出 P2 用户词条字段，不导出 P1 原始选择事件、负反馈详细事件、上下文统计或 ranker 权重摘要。
+- `dict import` 不接受 `deleted` 状态的词条。
+- `dict import` 遇到本地 deleted tombstone 命中的词条会跳过，并计入 `skipped_deleted`，不会把普通导入当成恢复删除词条。
+- `dict export --output <path>` 与 `dict import --input <path>` 是路径别名；正式文档优先使用 `--file <path>`。
+
 ## learn 命令
 
 `learn` 命令用于向 userdb 写入本地学习事件。当前只支持合成数据和人工指定参数，适合验证排序变化，不代表平台壳已经接入真实输入事件。
@@ -355,6 +411,7 @@ explain:
 - `rime` 必须显式指定 `shared-data` 与 `user-data`，不应指向真实 Rime 用户目录。
 - `rime --rank-db` 必须显式指定隔离 userdb，建议使用 `/tmp` 下临时 SQLite 文件。
 - `dict`、`learn` 和 `rank explain` 必须显式指定 `--db`，不应指向真实用户生产库；本阶段建议使用 `/tmp` 下临时 SQLite 文件。
+- `dict import/export` 的文件也建议放在 `/tmp` 下，测试内容使用合成词，不应导入真实个人词库或真实输入历史。
 - `learn` 当前没有平台 secure text entry 信号输入，CLI smoke 只应使用合成词、虚构上下文和临时数据库。
 - 本机 smoke 应使用 `/tmp` 下的隔离目录和合成输入码，不提交 schema 数据、用户目录、日志或输出中的敏感内容。
 
@@ -418,6 +475,12 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
 ```bash
 cargo run -p radishlex-ime-cli -- dict list --db /tmp/radishlex-userdb.sqlite
 ```
+
+### `invalid import_file`
+
+原因：`dict import` 文件缺少版本头、字段表头不匹配、字段数错误、转义不合法，或出现不允许导入的 `deleted` 状态。
+
+处理：使用 `dict export` 生成的 `radishlex-user-terms-v1` TSV 作为模板，并只保留 `active` 或 `suppressed` 词条。
 
 ### `unknown negative feedback reason ...`
 

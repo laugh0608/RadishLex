@@ -5,10 +5,13 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 
 use crate::error::{UserDbError, UserDbResult};
 use crate::model::{
-    NegativeFeedbackDraft, PrivacyLevel, SelectionEventDraft, TermSource, TermStatus, UserTerm,
+    DictionaryImportSummary, DictionaryTermRecord, NegativeFeedbackDraft, PrivacyLevel,
+    SelectionEventDraft, TermSource, TermStatus, UserTerm,
 };
 
 const SCHEMA_VERSION: i64 = 1;
+const DICTIONARY_EXPORT_VERSION: &str = "# radishlex-user-terms-v1";
+const DICTIONARY_EXPORT_HEADER: &str = "input_code\ttext\treading\tsource\tweight\tstatus";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RankerWeight {
@@ -104,6 +107,80 @@ impl UserDb {
             .query_map([], user_term_from_row)?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(terms)
+    }
+
+    pub fn export_dictionary_records(&self) -> UserDbResult<Vec<DictionaryTermRecord>> {
+        let mut statement = self.connection.prepare(
+            "SELECT id, text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms
+             FROM user_terms
+             WHERE status IN ('active', 'suppressed')
+             ORDER BY input_code, text, reading",
+        )?;
+        let terms = statement
+            .query_map([], user_term_from_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(terms.iter().map(DictionaryTermRecord::from).collect())
+    }
+
+    pub fn import_dictionary_records(
+        &mut self,
+        records: &[DictionaryTermRecord],
+        source_name: impl AsRef<str>,
+    ) -> UserDbResult<DictionaryImportSummary> {
+        let source_name = normalized_required("source_name", source_name.as_ref())?;
+        let now = now_ms()?;
+        let mut summary = DictionaryImportSummary {
+            total_records: records.len(),
+            imported_terms: 0,
+            skipped_deleted_terms: 0,
+        };
+
+        let transaction = self.connection.transaction()?;
+        for record in records {
+            validate_dictionary_record(record)?;
+            let input_code = normalized_required("input_code", &record.input_code)?;
+            let text = normalized_required("text", &record.text)?;
+            let reading = normalized_optional(record.reading.as_deref());
+
+            if has_deleted_tombstone_on(&transaction, &input_code, &text, &reading)?
+                || fetch_term_status_on(&transaction, &input_code, &text, &reading)?
+                    == Some(TermStatus::Deleted)
+            {
+                summary.skipped_deleted_terms += 1;
+                continue;
+            }
+
+            transaction.execute(
+                "INSERT INTO user_terms (
+                    text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms
+                 )
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, NULL)
+                 ON CONFLICT(input_code, text, reading) DO UPDATE SET
+                    source = excluded.source,
+                    weight = excluded.weight,
+                    status = excluded.status,
+                    updated_at_ms = excluded.updated_at_ms",
+                params![
+                    text,
+                    reading,
+                    input_code,
+                    record.source.as_str(),
+                    record.weight,
+                    record.status.as_str(),
+                    now
+                ],
+            )?;
+            summary.imported_terms += 1;
+        }
+
+        transaction.execute(
+            "INSERT INTO import_batches (source_name, term_count, created_at_ms, notes)
+             VALUES (?1, ?2, ?3, '')",
+            params![source_name, summary.imported_terms as i64, now],
+        )?;
+        transaction.commit()?;
+
+        Ok(summary)
     }
 
     pub fn fetch_term(
@@ -276,6 +353,10 @@ impl UserDb {
         count_rows(&self.connection, "deleted_terms")
     }
 
+    pub fn import_batch_count(&self) -> UserDbResult<i64> {
+        count_rows(&self.connection, "import_batches")
+    }
+
     pub fn ranker_weight(
         &self,
         input_code: &str,
@@ -402,18 +483,7 @@ impl UserDb {
         text: &str,
         reading: &str,
     ) -> UserDbResult<bool> {
-        let count: i64 = self.connection.query_row(
-            "SELECT COUNT(*)
-             FROM deleted_terms
-             WHERE input_code_hash = ?1 AND text_hash = ?2 AND reading_hash = ?3",
-            params![
-                stable_hash_hex(input_code),
-                stable_hash_hex(text),
-                stable_hash_hex(reading)
-            ],
-            |row| row.get(0),
-        )?;
-        Ok(count > 0)
+        has_deleted_tombstone_on(&self.connection, input_code, text, reading)
     }
 
     fn clear_deleted_tombstones(
@@ -526,6 +596,94 @@ fn to_sqlite_conversion_failure(error: UserDbError) -> rusqlite::Error {
     rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(error))
 }
 
+pub fn encode_dictionary_terms_tsv(records: &[DictionaryTermRecord]) -> String {
+    let mut output = String::new();
+    output.push_str(DICTIONARY_EXPORT_VERSION);
+    output.push('\n');
+    output.push_str(DICTIONARY_EXPORT_HEADER);
+    output.push('\n');
+
+    for record in records {
+        output.push_str(&escape_tsv_field(&record.input_code));
+        output.push('\t');
+        output.push_str(&escape_tsv_field(&record.text));
+        output.push('\t');
+        output.push_str(&escape_tsv_field(
+            record.reading.as_deref().unwrap_or_default(),
+        ));
+        output.push('\t');
+        output.push_str(record.source.as_str());
+        output.push('\t');
+        output.push_str(&record.weight.to_string());
+        output.push('\t');
+        output.push_str(record.status.as_str());
+        output.push('\n');
+    }
+
+    output
+}
+
+pub fn decode_dictionary_terms_tsv(input: &str) -> UserDbResult<Vec<DictionaryTermRecord>> {
+    let mut lines = input.lines();
+    let version = lines
+        .next()
+        .ok_or_else(|| UserDbError::invalid_input("import_file", "file is empty"))?;
+    if version != DICTIONARY_EXPORT_VERSION {
+        return Err(UserDbError::invalid_input(
+            "import_file",
+            format!("expected version line {DICTIONARY_EXPORT_VERSION}"),
+        ));
+    }
+
+    let header = lines.next().ok_or_else(|| {
+        UserDbError::invalid_input("import_file", "missing dictionary field header")
+    })?;
+    if header != DICTIONARY_EXPORT_HEADER {
+        return Err(UserDbError::invalid_input(
+            "import_file",
+            format!("expected header {DICTIONARY_EXPORT_HEADER}"),
+        ));
+    }
+
+    let mut records = Vec::new();
+    for (offset, line) in lines.enumerate() {
+        let line_number = offset + 3;
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let fields = split_tsv_line(line, line_number)?;
+        if fields.len() != 6 {
+            return Err(UserDbError::invalid_input(
+                "import_file",
+                format!("line {line_number} has {} fields; expected 6", fields.len()),
+            ));
+        }
+
+        let source = TermSource::from_str(&fields[3])?;
+        let weight = fields[4].parse::<f64>().map_err(|_| {
+            UserDbError::invalid_input(
+                "weight",
+                format!("line {line_number} has invalid weight {}", fields[4]),
+            )
+        })?;
+        let status = TermStatus::from_str(&fields[5])?;
+
+        let record = DictionaryTermRecord {
+            input_code: fields[0].clone(),
+            text: fields[1].clone(),
+            reading: optional_from_storage(&fields[2]),
+            source,
+            weight,
+            status,
+        };
+        validate_dictionary_record(&record)?;
+        records.push(record);
+    }
+
+    Ok(records)
+}
+
 fn count_rows(connection: &Connection, table: &str) -> UserDbResult<i64> {
     let sql = format!("SELECT COUNT(*) FROM {table}");
     connection
@@ -545,6 +703,24 @@ fn validate_selection_event(event: &SelectionEventDraft) -> UserDbResult<()> {
                 "{} is out of range for {} candidates",
                 event.candidate_index, event.candidate_count
             ),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_dictionary_record(record: &DictionaryTermRecord) -> UserDbResult<()> {
+    validate_required("input_code", &record.input_code)?;
+    validate_required("text", &record.text)?;
+    if !record.weight.is_finite() || record.weight < 0.0 {
+        return Err(UserDbError::invalid_input(
+            "weight",
+            "value must be finite and non-negative",
+        ));
+    }
+    if record.status == TermStatus::Deleted {
+        return Err(UserDbError::invalid_input(
+            "status",
+            "dictionary import does not accept deleted terms",
         ));
     }
     Ok(())
@@ -574,6 +750,99 @@ fn optional_from_storage(value: &str) -> Option<String> {
     }
 }
 
+fn has_deleted_tombstone_on(
+    connection: &Connection,
+    input_code: &str,
+    text: &str,
+    reading: &str,
+) -> UserDbResult<bool> {
+    let count: i64 = connection.query_row(
+        "SELECT COUNT(*)
+         FROM deleted_terms
+         WHERE input_code_hash = ?1 AND text_hash = ?2 AND reading_hash = ?3",
+        params![
+            stable_hash_hex(input_code),
+            stable_hash_hex(text),
+            stable_hash_hex(reading)
+        ],
+        |row| row.get(0),
+    )?;
+    Ok(count > 0)
+}
+
+fn fetch_term_status_on(
+    connection: &Connection,
+    input_code: &str,
+    text: &str,
+    reading: &str,
+) -> UserDbResult<Option<TermStatus>> {
+    connection
+        .query_row(
+            "SELECT status
+             FROM user_terms
+             WHERE input_code = ?1 AND text = ?2 AND reading = ?3",
+            params![input_code, text, reading],
+            |row| {
+                let status: String = row.get(0)?;
+                TermStatus::from_str(&status).map_err(to_sqlite_conversion_failure)
+            },
+        )
+        .optional()
+        .map_err(Into::into)
+}
+
+fn escape_tsv_field(value: &str) -> String {
+    let mut escaped = String::new();
+    for ch in value.chars() {
+        match ch {
+            '\\' => escaped.push_str("\\\\"),
+            '\t' => escaped.push_str("\\t"),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            _ => escaped.push(ch),
+        }
+    }
+    escaped
+}
+
+fn split_tsv_line(line: &str, line_number: usize) -> UserDbResult<Vec<String>> {
+    let mut fields = Vec::new();
+    let mut current = String::new();
+    let mut chars = line.chars();
+
+    while let Some(ch) = chars.next() {
+        match ch {
+            '\t' => {
+                fields.push(std::mem::take(&mut current));
+            }
+            '\\' => {
+                let escaped = chars.next().ok_or_else(|| {
+                    UserDbError::invalid_input(
+                        "import_file",
+                        format!("line {line_number} ends with an incomplete escape"),
+                    )
+                })?;
+                match escaped {
+                    '\\' => current.push('\\'),
+                    't' => current.push('\t'),
+                    'n' => current.push('\n'),
+                    'r' => current.push('\r'),
+                    _ => {
+                        return Err(UserDbError::invalid_input(
+                            "import_file",
+                            format!("line {line_number} contains unknown escape \\{escaped}"),
+                        ));
+                    }
+                }
+            }
+            _ => current.push(ch),
+        }
+    }
+
+    fields.push(current);
+    Ok(fields)
+}
+
 fn now_ms() -> UserDbResult<i64> {
     let duration = SystemTime::now().duration_since(UNIX_EPOCH)?;
     Ok(duration.as_millis() as i64)
@@ -589,166 +858,4 @@ fn stable_hash_hex(value: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::UserDb;
-    use crate::{
-        NegativeFeedbackDraft, NegativeFeedbackReason, PrivacyLevel, SelectionEventDraft,
-        TermSource, TermStatus,
-    };
-
-    #[test]
-    fn migration_initializes_empty_database() {
-        let db = UserDb::open_in_memory().expect("userdb opens");
-
-        assert_eq!(db.schema_version().expect("schema version"), 1);
-        assert!(db.list_active_terms().expect("terms").is_empty());
-    }
-
-    #[test]
-    fn add_query_and_delete_term_records_tombstone() {
-        let mut db = UserDb::open_in_memory().expect("userdb opens");
-
-        let term = db
-            .add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualAdd)
-            .expect("term is added");
-        assert_eq!(term.status, TermStatus::Active);
-        assert_eq!(term.reading.as_deref(), Some("luo bo"));
-
-        let terms = db.list_active_terms().expect("terms");
-        assert_eq!(terms.len(), 1);
-
-        db.delete_term("luobo", "萝卜", Some("luo bo"))
-            .expect("term is deleted");
-
-        assert!(db.list_active_terms().expect("terms").is_empty());
-        assert_eq!(db.deleted_term_count().expect("deleted count"), 1);
-    }
-
-    #[test]
-    fn selection_event_updates_term_and_ranker_summary() {
-        let mut db = UserDb::open_in_memory().expect("userdb opens");
-        let event = SelectionEventDraft::new("session-1", "luobo", "萝卜", 0, 5)
-            .with_reading("luo bo")
-            .with_context_kind("chat");
-
-        assert!(db.record_selection(event.clone()).expect("event").is_some());
-        assert!(db.record_selection(event).expect("event").is_some());
-
-        assert_eq!(db.selection_event_count().expect("event count"), 2);
-        let term = db
-            .fetch_term("luobo", "萝卜", "luo bo")
-            .expect("term lookup")
-            .expect("term exists");
-        assert_eq!(term.weight, 2.0);
-
-        let weight = db
-            .ranker_weight("luobo", "萝卜", Some("luo bo"), "chat")
-            .expect("ranker weight")
-            .expect("ranker weight exists");
-        assert_eq!(weight.frequency, 2);
-        assert_eq!(weight.negative_score, 0.0);
-    }
-
-    #[test]
-    fn p0_selection_is_not_recorded() {
-        let mut db = UserDb::open_in_memory().expect("userdb opens");
-        let event = SelectionEventDraft::new("session-1", "secret", "敏感", 0, 1)
-            .with_privacy(PrivacyLevel::P0NeverLearn);
-
-        assert_eq!(db.record_selection(event).expect("event"), None);
-        assert_eq!(db.selection_event_count().expect("event count"), 0);
-        assert!(db.list_active_terms().expect("terms").is_empty());
-    }
-
-    #[test]
-    fn negative_feedback_suppresses_term_and_records_penalty() {
-        let mut db = UserDb::open_in_memory().expect("userdb opens");
-        db.add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualAdd)
-            .expect("term is added");
-
-        let feedback =
-            NegativeFeedbackDraft::new("luobo", "萝卜", NegativeFeedbackReason::ManualSuppress)
-                .with_reading("luo bo")
-                .with_context_kind("general");
-        assert!(db
-            .record_negative_feedback(feedback)
-            .expect("feedback")
-            .is_some());
-
-        assert_eq!(
-            db.fetch_term("luobo", "萝卜", "luo bo")
-                .expect("term lookup")
-                .expect("term exists")
-                .status,
-            TermStatus::Suppressed
-        );
-        assert_eq!(db.negative_feedback_count().expect("count"), 1);
-
-        let weight = db
-            .ranker_weight("luobo", "萝卜", Some("luo bo"), "general")
-            .expect("ranker weight")
-            .expect("ranker weight exists");
-        assert_eq!(weight.negative_score, 1.0);
-    }
-
-    #[test]
-    fn deleted_term_is_not_revived_by_later_selection_event() {
-        let mut db = UserDb::open_in_memory().expect("userdb opens");
-        db.add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualAdd)
-            .expect("term is added");
-        db.delete_term("luobo", "萝卜", Some("luo bo"))
-            .expect("term is deleted");
-
-        let event =
-            SelectionEventDraft::new("session-2", "luobo", "萝卜", 0, 5).with_reading("luo bo");
-        db.record_selection(event).expect("event is recorded");
-
-        assert_eq!(db.selection_event_count().expect("event count"), 1);
-        assert!(db.list_active_terms().expect("terms").is_empty());
-        assert_eq!(
-            db.fetch_term("luobo", "萝卜", "luo bo")
-                .expect("term lookup")
-                .expect("term exists")
-                .status,
-            TermStatus::Deleted
-        );
-        assert!(db
-            .ranker_weight("luobo", "萝卜", Some("luo bo"), "general")
-            .expect("ranker weight")
-            .is_none());
-    }
-
-    #[test]
-    fn manual_import_does_not_revive_deleted_term() {
-        let mut db = UserDb::open_in_memory().expect("userdb opens");
-        db.add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualAdd)
-            .expect("term is added");
-        db.delete_term("luobo", "萝卜", Some("luo bo"))
-            .expect("term is deleted");
-
-        let term = db
-            .add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualImport)
-            .expect("import respects tombstone");
-
-        assert_eq!(term.status, TermStatus::Deleted);
-        assert!(db.list_active_terms().expect("terms").is_empty());
-        assert_eq!(db.deleted_term_count().expect("deleted count"), 1);
-    }
-
-    #[test]
-    fn manual_add_can_restore_deleted_term() {
-        let mut db = UserDb::open_in_memory().expect("userdb opens");
-        db.add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualAdd)
-            .expect("term is added");
-        db.delete_term("luobo", "萝卜", Some("luo bo"))
-            .expect("term is deleted");
-
-        let term = db
-            .add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualAdd)
-            .expect("manual add restores term");
-
-        assert_eq!(term.status, TermStatus::Active);
-        assert_eq!(db.list_active_terms().expect("terms").len(), 1);
-        assert_eq!(db.deleted_term_count().expect("deleted count"), 0);
-    }
-}
+mod tests;

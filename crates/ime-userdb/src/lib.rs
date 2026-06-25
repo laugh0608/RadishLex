@@ -8,7 +8,7 @@ mod store;
 
 pub use error::{UserDbError, UserDbResult};
 pub use model::{
-    NegativeFeedbackDraft, NegativeFeedbackReason, PrivacyLevel, SelectionEventDraft, TermSource,
-    TermStatus, UserTerm,
+    DictionaryImportSummary, DictionaryTermRecord, NegativeFeedbackDraft, NegativeFeedbackReason,
+    PrivacyLevel, SelectionEventDraft, TermSource, TermStatus, UserTerm,
 };
-pub use store::{RankerWeight, UserDb};
+pub use store::{decode_dictionary_terms_tsv, encode_dictionary_terms_tsv, RankerWeight, UserDb};

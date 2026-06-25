@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -10,6 +11,7 @@ use radishlex_ime_core::{
 use radishlex_ime_engine_rime::{RimeEngine, RimeEngineConfig};
 use radishlex_ime_ranker::{RankRequest, RankedCandidate, Ranker};
 use radishlex_ime_userdb::{
+    decode_dictionary_terms_tsv, encode_dictionary_terms_tsv, DictionaryTermRecord,
     NegativeFeedbackDraft, NegativeFeedbackReason, RankerWeight, SelectionEventDraft, TermSource,
     UserDb, UserDbError, UserTerm,
 };
@@ -23,6 +25,8 @@ Usage:
   radishlex-ime-cli dict list --db <path>
   radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
   radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
+  radishlex-ime-cli dict export --db <path> --file <path>
+  radishlex-ime-cli dict import --db <path> --file <path> [--source <name>]
   radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
   radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
   radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
@@ -34,6 +38,8 @@ Examples:
   radishlex-ime-cli rime --schema luna_pinyin --shared-data ./rime-data --user-data ./tmp/rime-user luobo --key page-down 0
   radishlex-ime-cli rime --schema luna_pinyin --shared-data ./rime-data --user-data ./tmp/rime-user --rank-db /tmp/radishlex-userdb.sqlite luobo
   radishlex-ime-cli dict add --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
+  radishlex-ime-cli dict export --db /tmp/radishlex-userdb.sqlite --file /tmp/radishlex-terms.tsv
+  radishlex-ime-cli dict import --db /tmp/radishlex-userdb.sqlite --file /tmp/radishlex-terms.tsv --source smoke
   radishlex-ime-cli learn select --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
   radishlex-ime-cli rank explain --db /tmp/radishlex-userdb.sqlite --input luobo --candidate 萝卜
 ";
@@ -137,6 +143,8 @@ fn run_dict(args: &[String]) -> Result<String, CliError> {
         Some("list") => run_dict_list(args),
         Some("add") => run_dict_add(args),
         Some("delete") => run_dict_delete(args),
+        Some("export") => run_dict_export(args),
+        Some("import") => run_dict_import(args),
         Some(other) => Err(CliError::Usage(format!("unknown dict command: {other}"))),
         None => Err(CliError::Usage("missing dict command".to_owned())),
     }
@@ -199,6 +207,50 @@ fn run_dict_delete(args: &[String]) -> Result<String, CliError> {
     db.delete_term(input_code, text, reading)?;
 
     Ok(format!("deleted: {text}\ninput: {input_code}\n"))
+}
+
+fn run_dict_export(args: &[String]) -> Result<String, CliError> {
+    let options = parse_named_options(args, 3, &["db", "file", "output"], "dict export")?;
+    let db_path = required_named_option(&options, "db")?;
+    let file_path = required_one_of_options(&options, "file", "output")?;
+
+    let db = UserDb::open(db_path)?;
+    let records = db.export_dictionary_records()?;
+    let encoded = encode_dictionary_terms_tsv(&records);
+    fs::write(&file_path, encoded).map_err(|error| {
+        CliError::Data(format!("failed to write {}: {error}", file_path.display()))
+    })?;
+
+    Ok(format!(
+        "exported: {}\nfile: {}\nformat: radishlex-user-terms-v1\n",
+        records.len(),
+        file_path.display()
+    ))
+}
+
+fn run_dict_import(args: &[String]) -> Result<String, CliError> {
+    let options = parse_named_options(args, 3, &["db", "file", "input", "source"], "dict import")?;
+    let db_path = required_named_option(&options, "db")?;
+    let file_path = required_one_of_options(&options, "file", "input")?;
+    let source_name = options.get("source").map_or("cli", String::as_str);
+
+    let encoded = fs::read_to_string(&file_path).map_err(|error| {
+        CliError::Data(format!("failed to read {}: {error}", file_path.display()))
+    })?;
+    let records = decode_dictionary_terms_tsv(&encoded)?;
+    validate_import_input_codes(&records)?;
+
+    let mut db = UserDb::open(db_path)?;
+    let summary = db.import_dictionary_records(&records, source_name)?;
+
+    Ok(format!(
+        "imported: {}\ntotal: {}\nskipped_deleted: {}\nsource: {}\nfile: {}\n",
+        summary.imported_terms,
+        summary.total_records,
+        summary.skipped_deleted_terms,
+        source_name,
+        file_path.display()
+    ))
 }
 
 fn run_learn(args: &[String]) -> Result<String, CliError> {
@@ -537,6 +589,20 @@ fn required_named_option<'a>(
         .ok_or_else(|| CliError::Usage(format!("missing --{name}")))
 }
 
+fn required_one_of_options(
+    options: &BTreeMap<String, String>,
+    first: &'static str,
+    second: &'static str,
+) -> Result<PathBuf, CliError> {
+    match (options.get(first), options.get(second)) {
+        (Some(_), Some(_)) => Err(CliError::Usage(format!(
+            "--{first} and --{second} cannot be used together"
+        ))),
+        (Some(value), None) | (None, Some(value)) => Ok(PathBuf::from(value)),
+        (None, None) => Err(CliError::Usage(format!("missing --{first}"))),
+    }
+}
+
 fn required_option_value<'a>(
     args: &'a [String],
     index: usize,
@@ -562,6 +628,23 @@ fn validate_input_code(input_code: &str) -> Result<(), CliError> {
         return Err(CliError::Usage(
             "input code must contain only ASCII letters, digits, or apostrophes".to_owned(),
         ));
+    }
+    Ok(())
+}
+
+fn validate_import_input_codes(records: &[DictionaryTermRecord]) -> Result<(), CliError> {
+    for record in records {
+        if record.input_code.is_empty()
+            || !record
+                .input_code
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || ch == '\'')
+        {
+            return Err(CliError::Data(format!(
+                "invalid import file: input code for term {} must contain only ASCII letters, digits, or apostrophes",
+                record.text
+            )));
+        }
     }
     Ok(())
 }
@@ -850,395 +933,4 @@ fn render_rank_explanation(
 }
 
 #[cfg(test)]
-mod tests {
-    use std::fs;
-    use std::path::PathBuf;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    use radishlex_ime_core::{InputSession, NamedKey};
-
-    use super::{parse_rime_args, run, run_input_session, CliError, RankSmokeOptions};
-    use crate::DemoEngine;
-
-    fn args(values: &[&str]) -> Vec<String> {
-        values.iter().map(|value| (*value).to_owned()).collect()
-    }
-
-    fn temp_db_path(test_name: &str) -> String {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system clock")
-            .as_nanos();
-        let mut path = std::env::temp_dir();
-        path.push(format!(
-            "radishlex-cli-{test_name}-{}-{timestamp}.sqlite",
-            std::process::id()
-        ));
-        path.to_string_lossy().into_owned()
-    }
-
-    #[test]
-    fn demo_command_commits_default_candidate() {
-        let output =
-            run(&args(&["radishlex-ime-cli", "demo", "luobo"])).expect("demo command succeeds");
-
-        assert!(output.contains("schema: demo.pinyin"));
-        assert!(output.contains("composition: luobo"));
-        assert!(output.contains("0. 萝卜 [luobo]"));
-        assert!(output.contains("commit: 萝卜"));
-    }
-
-    #[test]
-    fn demo_command_can_select_candidate_by_index() {
-        let output = run(&args(&["radishlex-ime-cli", "demo", "luobo", "1"]))
-            .expect("demo command succeeds");
-
-        assert!(output.contains("1. 萝卜词核 [luobo]"));
-        assert!(output.contains("commit: 萝卜词核"));
-    }
-
-    #[test]
-    fn demo_command_shows_no_commit_for_unknown_code() {
-        let output =
-            run(&args(&["radishlex-ime-cli", "demo", "unknown"])).expect("demo command succeeds");
-
-        assert!(output.contains("candidates:\n  <none>"));
-        assert!(output.contains("commit: <none>"));
-    }
-
-    #[test]
-    fn demo_command_rejects_invalid_candidate_index() {
-        let err = run(&args(&["radishlex-ime-cli", "demo", "luobo", "abc"]))
-            .expect_err("invalid index must fail");
-
-        assert!(matches!(err, CliError::Usage(_)));
-    }
-
-    #[test]
-    fn rime_command_requires_native_feature_by_default() {
-        let err = run(&args(&[
-            "radishlex-ime-cli",
-            "rime",
-            "--schema",
-            "luna_pinyin",
-            "--shared-data",
-            "shared",
-            "--user-data",
-            "user",
-            "luobo",
-        ]))
-        .expect_err("default build cannot run native rime");
-
-        assert!(err.to_string().contains("native-rime"));
-    }
-
-    #[test]
-    fn rime_command_rejects_missing_schema() {
-        let err = run(&args(&[
-            "radishlex-ime-cli",
-            "rime",
-            "--shared-data",
-            "shared",
-            "--user-data",
-            "user",
-            "luobo",
-        ]))
-        .expect_err("schema is required");
-
-        assert!(err.to_string().contains("missing --schema"));
-    }
-
-    #[test]
-    fn rime_args_parse_extra_key_after_input_code() {
-        let options = parse_rime_args(&args(&[
-            "radishlex-ime-cli",
-            "rime",
-            "--schema",
-            "luna_pinyin",
-            "--shared-data",
-            "shared",
-            "--user-data",
-            "user",
-            "luobo",
-            "--key",
-            "page-down",
-            "0",
-        ]))
-        .expect("rime args should parse");
-
-        assert_eq!(options.input_code, "luobo");
-        assert_eq!(options.extra_keys, vec![NamedKey::PageDown]);
-        assert_eq!(options.selected_index, Some(0));
-    }
-
-    #[test]
-    fn rime_args_parse_repeated_extra_keys_before_input_code() {
-        let options = parse_rime_args(&args(&[
-            "radishlex-ime-cli",
-            "rime",
-            "--schema",
-            "luna_pinyin",
-            "--shared-data",
-            "shared",
-            "--user-data",
-            "user",
-            "--key",
-            "page-down",
-            "--key",
-            "page-up",
-            "luobo",
-        ]))
-        .expect("rime args should parse");
-
-        assert_eq!(
-            options.extra_keys,
-            vec![NamedKey::PageDown, NamedKey::PageUp]
-        );
-        assert_eq!(options.selected_index, None);
-    }
-
-    #[test]
-    fn rime_args_parse_rank_smoke_options() {
-        let options = parse_rime_args(&args(&[
-            "radishlex-ime-cli",
-            "rime",
-            "--schema",
-            "luna_pinyin",
-            "--shared-data",
-            "shared",
-            "--user-data",
-            "user",
-            "--rank-db",
-            "/tmp/radishlex-userdb.sqlite",
-            "--context",
-            "chat",
-            "luobo",
-        ]))
-        .expect("rime args should parse");
-
-        assert_eq!(
-            options.rank_smoke,
-            Some(RankSmokeOptions {
-                db_path: PathBuf::from("/tmp/radishlex-userdb.sqlite"),
-                context_kind: "chat".to_owned(),
-            })
-        );
-    }
-
-    #[test]
-    fn rime_args_reject_context_without_rank_db() {
-        let err = parse_rime_args(&args(&[
-            "radishlex-ime-cli",
-            "rime",
-            "--schema",
-            "luna_pinyin",
-            "--shared-data",
-            "shared",
-            "--user-data",
-            "user",
-            "--context",
-            "chat",
-            "luobo",
-        ]))
-        .expect_err("context without rank db must fail");
-
-        assert!(err.to_string().contains("--context requires --rank-db"));
-    }
-
-    #[test]
-    fn rime_command_rejects_unknown_extra_key() {
-        let err = run(&args(&[
-            "radishlex-ime-cli",
-            "rime",
-            "--schema",
-            "luna_pinyin",
-            "--shared-data",
-            "shared",
-            "--user-data",
-            "user",
-            "luobo",
-            "--key",
-            "home",
-        ]))
-        .expect_err("unknown key must fail");
-
-        assert!(matches!(err, CliError::Usage(_)));
-        assert!(err.to_string().contains("unknown key name: home"));
-    }
-
-    #[test]
-    fn ranked_input_session_promotes_user_term_and_commits_engine_index() {
-        let db = temp_db_path("ranked-session");
-        run(&args(&[
-            "radishlex-ime-cli",
-            "dict",
-            "add",
-            "--db",
-            &db,
-            "--input",
-            "luobo",
-            "--text",
-            "萝卜词核",
-        ]))
-        .expect("dict add succeeds");
-
-        let options = RankSmokeOptions {
-            db_path: PathBuf::from(&db),
-            context_kind: "general".to_owned(),
-        };
-        let output = run_input_session(
-            InputSession::new(DemoEngine::new()),
-            "luobo",
-            &[],
-            None,
-            Some(&options),
-        )
-        .expect("ranked session succeeds");
-
-        assert!(output.contains("rank_context: general"));
-        assert!(output.contains("0. 萝卜词核 [luobo] - project term (engine_index=1"));
-        assert!(output.contains("user_term=1.000"));
-        assert!(output.contains("commit: 萝卜词核"));
-        assert!(output.contains("commit_engine_index: 1"));
-
-        let _ = fs::remove_file(db);
-    }
-
-    #[test]
-    fn dict_commands_add_list_and_delete_terms() {
-        let db = temp_db_path("dict");
-
-        let empty =
-            run(&args(&["radishlex-ime-cli", "dict", "list", "--db", &db])).expect("list succeeds");
-        assert!(empty.contains("terms:\n  <none>"));
-
-        let added = run(&args(&[
-            "radishlex-ime-cli",
-            "dict",
-            "add",
-            "--db",
-            &db,
-            "--input",
-            "luobo",
-            "--text",
-            "萝卜",
-            "--reading",
-            "luo bo",
-        ]))
-        .expect("add succeeds");
-        assert!(added.contains("added: 萝卜"));
-        assert!(added.contains("status: active"));
-
-        let listed =
-            run(&args(&["radishlex-ime-cli", "dict", "list", "--db", &db])).expect("list succeeds");
-        assert!(listed.contains("luobo -> 萝卜 [luo bo]"));
-
-        let deleted = run(&args(&[
-            "radishlex-ime-cli",
-            "dict",
-            "delete",
-            "--db",
-            &db,
-            "--input",
-            "luobo",
-            "--text",
-            "萝卜",
-            "--reading",
-            "luo bo",
-        ]))
-        .expect("delete succeeds");
-        assert!(deleted.contains("deleted: 萝卜"));
-
-        let listed =
-            run(&args(&["radishlex-ime-cli", "dict", "list", "--db", &db])).expect("list succeeds");
-        assert!(listed.contains("terms:\n  <none>"));
-
-        let _ = fs::remove_file(db);
-    }
-
-    #[test]
-    fn learn_commands_feed_rank_explain() {
-        let db = temp_db_path("learn");
-
-        let event = run(&args(&[
-            "radishlex-ime-cli",
-            "learn",
-            "select",
-            "--db",
-            &db,
-            "--input",
-            "luobo",
-            "--text",
-            "萝卜",
-            "--index",
-            "1",
-            "--count",
-            "2",
-            "--context",
-            "chat",
-        ]))
-        .expect("selection succeeds");
-        assert!(event.contains("selection_event:"));
-
-        let explain = run(&args(&[
-            "radishlex-ime-cli",
-            "rank",
-            "explain",
-            "--db",
-            &db,
-            "--input",
-            "luobo",
-            "--candidate",
-            "萝卜",
-            "--context",
-            "chat",
-        ]))
-        .expect("rank explain succeeds");
-        assert!(explain.contains("candidate: 萝卜"));
-        assert!(explain.contains("user_term_boost: 1.000"));
-        assert!(explain.contains("frequency_boost: 0.350"));
-        assert!(explain.contains("context_boost: 0.300"));
-
-        let feedback = run(&args(&[
-            "radishlex-ime-cli",
-            "learn",
-            "suppress",
-            "--db",
-            &db,
-            "--input",
-            "luobo",
-            "--text",
-            "萝卜",
-            "--reason",
-            "manual_suppress",
-        ]))
-        .expect("feedback succeeds");
-        assert!(feedback.contains("negative_feedback:"));
-
-        let explain = run(&args(&[
-            "radishlex-ime-cli",
-            "rank",
-            "explain",
-            "--db",
-            &db,
-            "--input",
-            "luobo",
-            "--candidate",
-            "萝卜",
-        ]))
-        .expect("rank explain succeeds");
-        assert!(explain.contains("negative_feedback_penalty: 1.200"));
-        assert!(explain.contains("suppressed_penalty: 2.000"));
-
-        let _ = fs::remove_file(db);
-    }
-
-    #[test]
-    fn learning_commands_require_explicit_database_path() {
-        let err =
-            run(&args(&["radishlex-ime-cli", "dict", "list"])).expect_err("db path is required");
-
-        assert!(matches!(err, CliError::Usage(_)));
-        assert!(err.to_string().contains("missing --db"));
-    }
-}
+mod tests;

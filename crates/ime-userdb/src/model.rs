@@ -134,6 +134,56 @@ pub struct UserTerm {
     pub last_used_at_ms: Option<i64>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct DictionaryTermRecord {
+    pub input_code: String,
+    pub text: String,
+    pub reading: Option<String>,
+    pub source: TermSource,
+    pub weight: f64,
+    pub status: TermStatus,
+}
+
+impl DictionaryTermRecord {
+    pub fn new(
+        input_code: impl Into<String>,
+        text: impl Into<String>,
+        reading: Option<impl Into<String>>,
+        source: TermSource,
+        weight: f64,
+        status: TermStatus,
+    ) -> Self {
+        Self {
+            input_code: input_code.into(),
+            text: text.into(),
+            reading: reading.map(Into::into),
+            source,
+            weight,
+            status,
+        }
+    }
+}
+
+impl From<&UserTerm> for DictionaryTermRecord {
+    fn from(term: &UserTerm) -> Self {
+        Self {
+            input_code: term.input_code.clone(),
+            text: term.text.clone(),
+            reading: term.reading.clone(),
+            source: term.source,
+            weight: term.weight,
+            status: term.status,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DictionaryImportSummary {
+    pub total_records: usize,
+    pub imported_terms: usize,
+    pub skipped_deleted_terms: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SelectionEventDraft {
     pub session_id: String,
