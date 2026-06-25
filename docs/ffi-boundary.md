@@ -4,7 +4,9 @@
 
 ## 当前定位
 
-当前尚未落地 `crates/ime-ffi/`。在 FFI 边界进入代码前，必须先稳定 Rust 本地学习链路、同步 payload 草案和 ABI 规则。平台壳只能通过 FFI 调用 Rust core，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。
+当前已落地 `crates/ime-ffi/` 起步验证：C ABI 已覆盖 opaque session handle、错误对象、UTF-8 buffer、释放函数、schema 设置、字符按键输入、snapshot 和候选提交的 host smoke。当前 session 内部使用 deterministic demo engine 证明 ABI 生命周期，不代表真实 Rime adapter、平台壳或系统输入法已经接入。
+
+平台壳后续只能通过 FFI 调用 Rust core，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。
 
 ## 职责边界
 
@@ -51,6 +53,26 @@ radishlex_error_code
 radishlex_error_message
 radishlex_error_free
 ```
+
+当前已落地函数：
+
+```text
+radishlex_session_new
+radishlex_session_free
+radishlex_session_reset
+radishlex_session_set_schema
+radishlex_session_push_key
+radishlex_session_snapshot
+radishlex_session_commit_candidate
+radishlex_buffer_data
+radishlex_buffer_len
+radishlex_buffer_free
+radishlex_error_code
+radishlex_error_message
+radishlex_error_free
+```
+
+`radishlex_session_push_key` 当前只接收单个 Unicode scalar value，用于起步 host smoke。后续真实平台壳接入前，需要扩展为完整 normalized key event ABI，覆盖命名键、修饰键、按下 / 释放阶段和平台不可识别键。
 
 ## 所有权与生命周期
 
@@ -108,7 +130,7 @@ InternalError
 - userdb 删除 tombstone、导入导出和 ranker explain 已通过测试。
 - 同步 payload 草案已区分 P1 本地和 P2 加密同步。
 - FFI 文档明确所有权、生命周期、错误语义、字符串编码和释放责任。
-- `ime-ffi` 至少有 C ABI 单元测试或 host smoke，证明字符串、数组和错误释放不泄漏。
+- `ime-ffi` 至少有 C ABI 单元测试或 host smoke，证明字符串、数组和错误释放不泄漏。当前已完成起步 host smoke；真实平台壳前仍需补结构化 snapshot / candidate ABI、完整 key event ABI 和 engine adapter 选择策略。
 
 ## 验证口径
 

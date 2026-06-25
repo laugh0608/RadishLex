@@ -77,6 +77,7 @@ RadishLex/
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
 - `crates/ime-cli/`：基于 demo adapter、可选 Rime adapter、userdb 和 ranker 的命令行复验入口。
 - `crates/ime-engine-rime/`：Rime adapter crate，默认不启用 native 绑定。
+- `crates/ime-ffi/`：C ABI 起步 crate，覆盖 opaque handle、错误对象、UTF-8 buffer 和 host smoke。
 - `crates/ime-sync/`：同步 payload 来源分类、对象类型和加密对象外壳草案。
 - `docs/cli.md`：`radishlex-ime-cli` 命令、输出、退出码和安全边界说明。
 - `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
@@ -164,6 +165,8 @@ librime adapter：
 - C ABI。
 - Flutter bridge。
 - Swift/Kotlin/C++ 调用边界。
+
+当前已创建 `crates/ime-ffi/`，落地 C ABI 起步验证：opaque session handle、错误对象、UTF-8 buffer、释放函数、schema 设置、字符按键输入、snapshot 和候选提交。当前 host smoke 使用 deterministic demo engine，不代表真实平台壳或 Rime adapter 已接入。
 
 ### ime-cli
 

@@ -135,6 +135,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "radishlex-ime-ffi"
+version = "0.1.0"
+dependencies = [
+ "radishlex-ime-core",
+]
+
+[[package]]
 name = "radishlex-ime-ranker"
 version = "0.1.0"
 dependencies = [

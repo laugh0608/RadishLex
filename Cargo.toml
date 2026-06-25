@@ -3,6 +3,7 @@ members = [
     "crates/ime-cli",
     "crates/ime-core",
     "crates/ime-engine-rime",
+    "crates/ime-ffi",
     "crates/ime-ranker",
     "crates/ime-sync",
     "crates/ime-userdb",
