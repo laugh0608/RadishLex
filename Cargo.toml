@@ -3,6 +3,7 @@ members = [
     "crates/ime-cli",
     "crates/ime-core",
     "crates/ime-engine-rime",
+    "crates/ime-ranker",
     "crates/ime-userdb",
 ]
 resolver = "2"

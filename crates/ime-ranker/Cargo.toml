@@ -1,0 +1,16 @@
+[package]
+name = "radishlex-ime-ranker"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../LICENSE"
+description = "Candidate reranking and explain output for RadishLex."
+
+[lib]
+name = "radishlex_ime_ranker"
+path = "src/lib.rs"
+
+[dependencies]
+radishlex-ime-core = { path = "../ime-core" }
+radishlex-ime-userdb = { path = "../ime-userdb" }

@@ -120,7 +120,7 @@ librime adapter：
 - 短语上下文。
 - 负反馈。
 
-当前已在 `docs/personalization-learning.md` 中定义 Phase 2 的 rank request、ranked candidate、explain 输出和验证标准；crate 尚未创建，下一步应在 `ime-userdb` 起步验证后推进。
+当前已创建 `crates/ime-ranker/`，落地 `RankRequest`、`RankedCandidate`、结构化 explain 输出和频次、近期、上下文、负反馈、suppressed、deleted tombstone 排序测试；CLI `rank explain` 后续补齐。
 
 ### ime-userdb
 

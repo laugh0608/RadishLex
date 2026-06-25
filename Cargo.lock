@@ -133,6 +133,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "radishlex-ime-ranker"
+version = "0.1.0"
+dependencies = [
+ "radishlex-ime-core",
+ "radishlex-ime-userdb",
+]
+
+[[package]]
 name = "radishlex-ime-userdb"
 version = "0.1.0"
 dependencies = [
