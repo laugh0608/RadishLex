@@ -102,6 +102,195 @@ radishlex_error_message
 radishlex_error_free
 ```
 
+## 当前 ABI 数据结构
+
+所有 `repr(C)` 结构只承载稳定 ABI 字段，不暴露 Rust 内部对象。数值常量是 ABI 的一部分，平台绑定层应使用常量名，不应直接依赖 Rust enum discriminant。
+
+### Status 与文本 view
+
+`RadishLexStatusCode`：
+
+```text
+Ok = 0
+InvalidArgument = 1
+InvalidState = 2
+EngineError = 3
+UserDbError = 4
+RankerError = 5
+SyncError = 6
+InternalError = 255
+```
+
+`RadishLexStringView`：
+
+```text
+data: *const u8
+len: usize
+```
+
+规则：
+
+- `data + len` 表示 UTF-8 字节片段，不保证 NUL 结尾。
+- `len = 0` 时 `data` 可以为空指针。
+- view 只在其所属 handle 存活期间有效，例如 snapshot view 依赖 `RadishLexSnapshot*`，term view 依赖 `RadishLexUserTermList*`。
+
+### Session options 与 engine kind
+
+`RadishLexSessionOptions`：
+
+```text
+version: u32
+engine_kind: u32
+```
+
+当前常量：
+
+```text
+RADISHLEX_SESSION_OPTIONS_VERSION = 1
+RADISHLEX_ENGINE_KIND_DEMO = 1
+RADISHLEX_ENGINE_KIND_RIME = 2
+```
+
+当前只允许 demo engine。Rime kind 作为后续稳定入口预留，当前返回 `InvalidState`，避免平台端误以为真实 Rime FFI 已可用。
+
+### Key event
+
+`RadishLexKeyEvent`：
+
+```text
+key_kind: u32
+codepoint: u32
+named_key: u32
+modifiers: u32
+phase: u32
+```
+
+当前 key kind：
+
+```text
+RADISHLEX_KEY_KIND_CHAR = 1
+RADISHLEX_KEY_KIND_NAMED = 2
+```
+
+当前 named key：
+
+```text
+space = 1
+enter = 2
+backspace = 3
+escape = 4
+tab = 5
+arrow_up = 6
+arrow_down = 7
+arrow_left = 8
+arrow_right = 9
+page_up = 10
+page_down = 11
+shift = 12
+control = 13
+alt = 14
+meta = 15
+unknown = 255
+```
+
+当前 modifiers bit：
+
+```text
+shift = 1 << 0
+control = 1 << 1
+alt = 1 << 2
+meta = 1 << 3
+```
+
+当前 phase：
+
+```text
+press = 1
+release = 2
+```
+
+字符键必须提供合法 Unicode scalar value。未知 key kind、未知 named key、未知 modifier bit 或未知 phase 均返回 `InvalidArgument`。
+
+### Snapshot 与 candidate view
+
+`RadishLexCandidateView`：
+
+```text
+index: usize
+text: RadishLexStringView
+reading: RadishLexStringView
+reading_present: u8
+annotation: RadishLexStringView
+annotation_present: u8
+source: u32
+```
+
+当前 candidate source：
+
+```text
+engine = 1
+user_dictionary = 2
+personalized = 3
+system = 4
+```
+
+`reading_present` 和 `annotation_present` 用于区分“字段不存在”和“存在但为空字符串”。candidate view 中所有 string view 都借用自 `RadishLexSnapshot*`。
+
+### Sync preflight summary
+
+`RadishLexSyncPreflightSummary`：
+
+```text
+schema_version: i64
+plaintext_payload: u8
+syncable_user_terms: usize
+syncable_ranker_weights: usize
+syncable_deleted_terms: usize
+local_selection_events: usize
+local_negative_feedback: usize
+local_import_batches: usize
+```
+
+`plaintext_payload` 当前固定为 `0`，表示没有生成明文同步 payload，也没有连接远端服务。`syncable_*` 是后续可进入加密对象的 P2 计数，`local_*` 是不得直接同步的 P1 或本地审计计数。
+
+### User term view
+
+`RadishLexUserTermView`：
+
+```text
+id: i64
+input_code: RadishLexStringView
+text: RadishLexStringView
+reading: RadishLexStringView
+reading_present: u8
+source: u32
+status: u32
+weight: f64
+created_at_ms: i64
+updated_at_ms: i64
+last_used_at_ms: i64
+last_used_at_present: u8
+```
+
+当前 term source：
+
+```text
+engine_selection = 1
+manual_import = 2
+manual_add = 3
+phrase_learning = 4
+```
+
+当前 term status：
+
+```text
+active = 1
+suppressed = 2
+deleted = 3
+```
+
+term list 当前只返回 active / suppressed 词条。删除 tombstone 不通过 list 暴露；需要通过删除语义和 sync preflight 的 `syncable_deleted_terms` 观察。
+
 `radishlex_session_push_key` 保留为字符输入便利函数；真实平台壳后续应优先使用 `radishlex_session_push_key_event`。当前 normalized key event 使用数值常量承载字符键、命名键、修饰键、按下 / 释放阶段和平台不可识别键，避免让无效 enum discriminant 在 FFI 边界形成未定义行为。
 
 Engine adapter 选择规则：

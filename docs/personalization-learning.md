@@ -333,6 +333,30 @@ radishlex-ime-cli sync preflight --db <path>
 - `dict inspect` 用于在不打开 userdb 的情况下检查导入文件格式版本、记录数和 CLI 输入码兼容性。
 - `sync preflight` 只输出 P2 可同步对象计数、P1 本地事件计数和本地审计计数，不生成明文同步 payload。
 
+### FFI 管理入口
+
+`ime-ffi` 当前暴露的 userdb 管理入口只覆盖用户明确管理的 P2 词条与同步状态摘要：
+
+```text
+radishlex_userdb_add_term(db_path, input_code, text, reading)
+radishlex_userdb_delete_term(db_path, input_code, text, reading)
+radishlex_userdb_terms_new(db_path)
+radishlex_userdb_terms_count(terms)
+radishlex_userdb_terms_get(terms, index, term_out)
+radishlex_userdb_terms_free(terms)
+radishlex_userdb_sync_preflight(db_path, summary_out)
+```
+
+规则：
+
+- FFI 入口必须显式传入 UTF-8 SQLite 路径，不隐式读取真实用户输入法目录。
+- `add_term` 使用 `manual_add` 来源，表示用户明确添加或恢复词条。
+- `delete_term` 沿用 userdb tombstone 语义，删除后普通导入和旧权重不得立即复活该词。
+- `terms_new` 返回只读 list handle，平台端只能通过 `terms_get` 读取 view，并必须调用 `terms_free` 释放。
+- list view 中的字符串只在 list handle 释放前有效，平台端不得缓存裸指针。
+- 当前 FFI 不记录 selection event、negative feedback 或上下文统计，不作为学习事件入口。
+- 当前 FFI 不提供导入导出、导入 dry-run、导入批次查询或格式 inspect；这些仍先由 CLI 承担，后续进入 FFI 前必须保持 P1 不导出和 tombstone 不复活边界。
+
 ### 用户词库导入导出格式
 
 当前导入导出格式为 UTF-8 TSV，版本头和字段表头固定：

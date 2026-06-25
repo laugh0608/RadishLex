@@ -12,6 +12,25 @@
 
 `ime-ffi` 当前暴露 `radishlex_userdb_sync_preflight` 这类状态摘要入口：调用方必须显式传入 SQLite 路径，返回值只包含 P2 / P1 / 本地审计计数和 `plaintext_payload = false`，不返回同步 payload、P1 明细事件或数据库句柄。`ime-ffi` 的 userdb add / delete / list 入口只用于用户明确管理 P2 词条，不作为同步 payload 生成器。
 
+FFI preflight summary 字段含义：
+
+```text
+schema_version
+plaintext_payload
+syncable_user_terms
+syncable_ranker_weights
+syncable_deleted_terms
+local_selection_events
+local_negative_feedback
+local_import_batches
+```
+
+- `plaintext_payload` 当前必须为 `false` / `0`。
+- `syncable_user_terms`、`syncable_ranker_weights`、`syncable_deleted_terms` 是后续可进入 P2 加密对象的本地计数。
+- `local_selection_events` 和 `local_negative_feedback` 是 P1 明细事件计数，只能本地保留。
+- `local_import_batches` 是本地审计计数，不进入同步 payload。
+- 该 summary 只用于状态展示和进入真实同步前的边界检查，不是上传计划，不包含对象内容、hash、密文大小或版本号。
+
 ## 数据来源映射
 
 | 本地来源 | 分级 | 后续同步对象 | 当前策略 |
