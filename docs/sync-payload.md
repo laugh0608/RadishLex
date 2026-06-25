@@ -10,7 +10,7 @@
 - P1 明细事件默认只能留在本地。
 - 导入批次属于本地审计信息，不作为同步 payload。
 
-`ime-ffi` 当前只暴露 `radishlex_userdb_sync_preflight` 这类状态摘要入口：调用方必须显式传入 SQLite 路径，返回值只包含 P2 / P1 / 本地审计计数和 `plaintext_payload = false`，不返回同步 payload、用户词明文、P1 明细事件或数据库句柄。
+`ime-ffi` 当前暴露 `radishlex_userdb_sync_preflight` 这类状态摘要入口：调用方必须显式传入 SQLite 路径，返回值只包含 P2 / P1 / 本地审计计数和 `plaintext_payload = false`，不返回同步 payload、P1 明细事件或数据库句柄。`ime-ffi` 的 userdb add / delete / list 入口只用于用户明确管理 P2 词条，不作为同步 payload 生成器。
 
 ## 数据来源映射
 

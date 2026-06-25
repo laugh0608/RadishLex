@@ -24,7 +24,7 @@ impl RadishLexStringView {
         }
     }
 
-    fn from_str(value: &str) -> Self {
+    pub(crate) fn from_str(value: &str) -> Self {
         Self {
             data: value.as_ptr(),
             len: value.len(),

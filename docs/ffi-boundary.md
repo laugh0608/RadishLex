@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前已落地 `crates/ime-ffi/` 起步验证：C ABI 已覆盖 opaque session handle、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、释放函数、schema 设置、按键输入、snapshot、候选提交和 userdb sync preflight 状态摘要的 host smoke。当前 session 内部使用 deterministic demo engine 证明 ABI 生命周期，不代表真实 Rime adapter、平台壳或系统输入法已经接入。
+当前已落地 `crates/ime-ffi/` 起步验证：C ABI 已覆盖 opaque session handle、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、释放函数、schema 设置、按键输入、snapshot、候选提交、userdb sync preflight 状态摘要和受控 userdb 词条管理入口的 host smoke。当前 session 内部使用 deterministic demo engine 证明 ABI 生命周期，不代表真实 Rime adapter、平台壳或系统输入法已经接入。
 
 平台壳后续只能通过 FFI 调用 Rust core，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。
 
@@ -34,6 +34,7 @@
 RadishLexSession*
 RadishLexBuffer*
 RadishLexSnapshot*
+RadishLexUserTermList*
 RadishLexError*
 ```
 
@@ -54,6 +55,12 @@ radishlex_session_snapshot
 radishlex_session_snapshot_new
 radishlex_session_commit_candidate
 radishlex_userdb_sync_preflight
+radishlex_userdb_add_term
+radishlex_userdb_delete_term
+radishlex_userdb_terms_new
+radishlex_userdb_terms_count
+radishlex_userdb_terms_get
+radishlex_userdb_terms_free
 radishlex_buffer_free
 radishlex_error_code
 radishlex_error_message
@@ -81,6 +88,12 @@ radishlex_snapshot_candidate
 radishlex_snapshot_free
 radishlex_session_commit_candidate
 radishlex_userdb_sync_preflight
+radishlex_userdb_add_term
+radishlex_userdb_delete_term
+radishlex_userdb_terms_new
+radishlex_userdb_terms_count
+radishlex_userdb_terms_get
+radishlex_userdb_terms_free
 radishlex_buffer_data
 radishlex_buffer_len
 radishlex_buffer_free
@@ -113,6 +126,15 @@ Userdb / sync 状态入口规则：
 - 返回结构只包含 schema version、P2 可同步对象计数、P1 本地事件计数、本地审计计数和 `plaintext_payload = false`。
 - 函数不返回用户词明文、选择事件明细、负反馈明细、导入批次内容、同步 payload、SQLite connection、statement 或 row 指针。
 - 该入口不连接 Go server，不执行加密、hash、签名、上传下载或冲突合并。
+
+Userdb 词条管理入口规则：
+
+- `radishlex_userdb_add_term` 和 `radishlex_userdb_delete_term` 必须显式传入 UTF-8 SQLite 路径、输入码、词条文本和可选 reading。
+- 这些入口只表达用户明确管理的 P2 词条操作，不记录 P1 selection event、negative feedback 或上下文统计。
+- `radishlex_userdb_delete_term` 必须沿用 userdb tombstone 语义，后续旧权重或普通导入不得立即复活该词条。
+- `radishlex_userdb_terms_new` 返回只读 `RadishLexUserTermList*`，由 `radishlex_userdb_terms_free` 释放。
+- `radishlex_userdb_terms_get` 返回的 string view 借用自 term list handle，平台端只能在 list 释放前读取，不得缓存指针。
+- term list 只列出当前 active / suppressed 用户词条；deleted tombstone 不通过词条列表导出，只通过删除语义和 sync preflight 计数体现。
 
 ## 所有权与生命周期
 
@@ -170,7 +192,7 @@ InternalError
 - userdb 删除 tombstone、导入导出和 ranker explain 已通过测试。
 - 同步 payload 草案已区分 P1 本地和 P2 加密同步。
 - FFI 文档明确所有权、生命周期、错误语义、字符串编码和释放责任。
-- `ime-ffi` 至少有 C ABI 单元测试或 host smoke，证明字符串、数组、snapshot、candidate view、normalized key event、session options、sync preflight 状态摘要和错误释放路径可复验。当前已完成结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁和 sync preflight 状态入口；真实平台壳前仍需补 Rime adapter FFI 配置策略和更多受控 userdb 管理入口。
+- `ime-ffi` 至少有 C ABI 单元测试或 host smoke，证明字符串、数组、snapshot、candidate view、normalized key event、session options、sync preflight 状态摘要、userdb 词条管理入口和错误释放路径可复验。当前已完成结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、sync preflight 状态入口和 userdb add / delete / list；真实平台壳前仍需补 Rime adapter FFI 配置策略和更多受控 userdb 管理入口。
 
 ## 验证口径
 
