@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 1：Rust Core 原型。`ime-core` 已具备可测试的输入会话、候选模型、提交模型和 engine interface；`ime-cli` 已能分别通过合成 demo adapter 和真实 Rime adapter 复验输入生命周期。下一步仍应优先稳固真实 adapter 的候选选择、错误路径和可复验说明，再推进 ranker、userdb 或平台壳。
+当前处于 Phase 1 向 Phase 2 过渡：`ime-core` 已具备可测试的输入会话、候选模型、提交模型和 engine interface；`ime-cli` 已能分别通过合成 demo adapter 和真实 Rime adapter 复验输入生命周期。真实 Rime adapter 已覆盖首候选、非首候选、翻页候选和候选索引异常路径 smoke。下一步应进入个人化学习边界设计，优先补齐 `ime-userdb`、`ime-ranker`、学习事件和 CLI 管理命令的职责边界，再进入实现。
 
 当前边界：
 

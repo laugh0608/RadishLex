@@ -106,7 +106,7 @@ librime adapter：
 - 转换 librime candidate 到 RadishLex candidate。
 - 屏蔽 C++ 细节。
 
-当前已落地配置模型、错误类型、key 分类、候选转换、`native-rime` build 探测、FFI session 生命周期、输入处理、context / commit 读取路径；默认 workspace 检查不依赖本机安装 `librime`。macOS 本机 `librime` 1.17.0 与隔离 `luna_pinyin` 数据目录下的首候选 native smoke 已通过，非首候选、翻页候选和异常路径仍待补测。
+当前已落地配置模型、错误类型、key 分类、候选转换、`native-rime` build 探测、FFI session 生命周期、输入处理、context / commit 读取路径；默认 workspace 检查不依赖本机安装 `librime`。macOS 本机 `librime` 1.17.0 与隔离 `luna_pinyin` 数据目录下的 native smoke 已覆盖首候选、非首候选、翻页后当前页候选和越界候选索引错误。
 
 ### ime-ranker
 

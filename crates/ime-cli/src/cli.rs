@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use radishlex_ime_core::{
-    Candidate, CoreError, Engine, InputSession, KeyEvent, SchemaId, SessionState,
+    Candidate, CoreError, Engine, InputSession, Key, KeyEvent, NamedKey, SchemaId, SessionState,
 };
 #[cfg(feature = "native-rime")]
 use radishlex_ime_engine_rime::{RimeEngine, RimeEngineConfig};
@@ -13,12 +13,13 @@ use crate::DemoEngine;
 const USAGE: &str = "\
 Usage:
   radishlex-ime-cli demo <input-code> [candidate-index]
-  radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> <input-code> [candidate-index]
+  radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] <input-code> [candidate-index]
 
 Examples:
   radishlex-ime-cli demo luobo
   radishlex-ime-cli demo luobo 1
   radishlex-ime-cli rime --schema luna_pinyin --shared-data ./rime-data --user-data ./tmp/rime-user luobo
+  radishlex-ime-cli rime --schema luna_pinyin --shared-data ./rime-data --user-data ./tmp/rime-user luobo --key page-down 0
 ";
 
 #[derive(Debug)]
@@ -77,7 +78,7 @@ fn run_demo(args: &[String]) -> Result<String, CliError> {
 
     let mut session = InputSession::new(DemoEngine::new());
     session.set_schema(SchemaId::new("demo.pinyin")?)?;
-    run_input_session(session, input_code, selected_index)
+    run_input_session(session, input_code, &[], selected_index)
 }
 
 #[cfg(not(feature = "native-rime"))]
@@ -95,16 +96,25 @@ fn run_rime(args: &[String]) -> Result<String, CliError> {
     let config = RimeEngineConfig::new(options.shared_data, options.user_data, schema)
         .map_err(rime_error_to_cli)?;
     let session = InputSession::new(RimeEngine::new(config).map_err(rime_error_to_cli)?);
-    run_input_session(session, &options.input_code, options.selected_index)
+    run_input_session(
+        session,
+        &options.input_code,
+        &options.extra_keys,
+        options.selected_index,
+    )
 }
 
 fn run_input_session<E: Engine>(
     mut session: InputSession<E>,
     input_code: &str,
+    extra_keys: &[NamedKey],
     selected_index: Option<usize>,
 ) -> Result<String, CliError> {
     for ch in input_code.chars() {
         session.push_key(KeyEvent::press_char(ch))?;
+    }
+    for key in extra_keys {
+        session.push_key(KeyEvent::press(Key::Named(*key)))?;
     }
 
     let state = session.state()?;
@@ -128,6 +138,7 @@ struct RimeCommandOptions {
     shared_data: PathBuf,
     user_data: PathBuf,
     input_code: String,
+    extra_keys: Vec<NamedKey>,
     selected_index: Option<usize>,
 }
 
@@ -135,6 +146,7 @@ fn parse_rime_args(args: &[String]) -> Result<RimeCommandOptions, CliError> {
     let mut schema = None;
     let mut shared_data = None;
     let mut user_data = None;
+    let mut extra_keys = Vec::new();
     let mut positional = Vec::new();
     let mut index = 2;
 
@@ -160,6 +172,11 @@ fn parse_rime_args(args: &[String]) -> Result<RimeCommandOptions, CliError> {
                     "--user-data",
                 )?));
             }
+            "--key" => {
+                index += 1;
+                let value = required_option_value(args, index, "--key")?;
+                extra_keys.push(parse_named_key(value)?);
+            }
             value if value.starts_with("--") => {
                 return Err(CliError::Usage(format!("unknown rime option: {value}")));
             }
@@ -184,6 +201,7 @@ fn parse_rime_args(args: &[String]) -> Result<RimeCommandOptions, CliError> {
             .ok_or_else(|| CliError::Usage("missing --shared-data".to_owned()))?,
         user_data: user_data.ok_or_else(|| CliError::Usage("missing --user-data".to_owned()))?,
         input_code: input_code.to_owned(),
+        extra_keys,
         selected_index: parse_optional_candidate_index(positional.get(1))?,
     })
 }
@@ -227,6 +245,25 @@ fn parse_candidate_index(value: &str) -> Result<usize, CliError> {
 
 fn parse_optional_candidate_index(value: Option<&String>) -> Result<Option<usize>, CliError> {
     value.map(|value| parse_candidate_index(value)).transpose()
+}
+
+fn parse_named_key(value: &str) -> Result<NamedKey, CliError> {
+    match value {
+        "space" => Ok(NamedKey::Space),
+        "enter" => Ok(NamedKey::Enter),
+        "backspace" => Ok(NamedKey::Backspace),
+        "escape" => Ok(NamedKey::Escape),
+        "tab" => Ok(NamedKey::Tab),
+        "arrow-up" => Ok(NamedKey::ArrowUp),
+        "arrow-down" => Ok(NamedKey::ArrowDown),
+        "arrow-left" => Ok(NamedKey::ArrowLeft),
+        "arrow-right" => Ok(NamedKey::ArrowRight),
+        "page-up" => Ok(NamedKey::PageUp),
+        "page-down" => Ok(NamedKey::PageDown),
+        _ => Err(CliError::Usage(format!(
+            "unknown key name: {value}; expected one of space, enter, backspace, escape, tab, arrow-up, arrow-down, arrow-left, arrow-right, page-up, page-down"
+        ))),
+    }
 }
 
 fn default_index(state: &SessionState) -> Option<usize> {
@@ -275,7 +312,9 @@ fn format_candidate(index: usize, candidate: &Candidate) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{run, CliError};
+    use radishlex_ime_core::NamedKey;
+
+    use super::{parse_rime_args, run, CliError};
 
     fn args(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_owned()).collect()
@@ -350,5 +389,75 @@ mod tests {
         .expect_err("schema is required");
 
         assert!(err.to_string().contains("missing --schema"));
+    }
+
+    #[test]
+    fn rime_args_parse_extra_key_after_input_code() {
+        let options = parse_rime_args(&args(&[
+            "radishlex-ime-cli",
+            "rime",
+            "--schema",
+            "luna_pinyin",
+            "--shared-data",
+            "shared",
+            "--user-data",
+            "user",
+            "luobo",
+            "--key",
+            "page-down",
+            "0",
+        ]))
+        .expect("rime args should parse");
+
+        assert_eq!(options.input_code, "luobo");
+        assert_eq!(options.extra_keys, vec![NamedKey::PageDown]);
+        assert_eq!(options.selected_index, Some(0));
+    }
+
+    #[test]
+    fn rime_args_parse_repeated_extra_keys_before_input_code() {
+        let options = parse_rime_args(&args(&[
+            "radishlex-ime-cli",
+            "rime",
+            "--schema",
+            "luna_pinyin",
+            "--shared-data",
+            "shared",
+            "--user-data",
+            "user",
+            "--key",
+            "page-down",
+            "--key",
+            "page-up",
+            "luobo",
+        ]))
+        .expect("rime args should parse");
+
+        assert_eq!(
+            options.extra_keys,
+            vec![NamedKey::PageDown, NamedKey::PageUp]
+        );
+        assert_eq!(options.selected_index, None);
+    }
+
+    #[test]
+    fn rime_command_rejects_unknown_extra_key() {
+        let err = run(&args(&[
+            "radishlex-ime-cli",
+            "rime",
+            "--schema",
+            "luna_pinyin",
+            "--shared-data",
+            "shared",
+            "--user-data",
+            "user",
+            "luobo",
+            "--key",
+            "home",
+        ]))
+        .expect_err("unknown key must fail");
+
+        assert!(matches!(err, CliError::Usage(_)));
+        assert!(err.to_string().contains("unknown key name: home"));
     }
 }

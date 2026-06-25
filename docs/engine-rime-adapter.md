@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 1：Rust Core 原型。`ime-core` 已有平台无关 engine trait，`ime-cli` 已有合成 demo adapter。下一步目标不是直接做平台壳，而是让真实底层 engine 能通过 `ime-core::Engine` 进入 CLI 可复验链路。
+当前处于 Phase 1 向 Phase 2 过渡：`ime-core` 已有平台无关 engine trait，`ime-cli` 已有合成 demo adapter 和真实 Rime adapter 复验入口。真实 Rime 路径已通过 CLI 覆盖首候选、非首候选、翻页候选和候选索引异常路径，可作为后续 `ime-userdb` 与 `ime-ranker` 的 engine 输入基线。
 
 阶段目标：
 
@@ -187,13 +187,14 @@ Rime candidate 转 RadishLex candidate 时只保留稳定字段：
 
 ```text
 radishlex-ime-cli demo <input-code> [candidate-index]
-radishlex-ime-cli rime --schema luna_pinyin --shared-data <path> --user-data <path> <input-code> [candidate-index]
+radishlex-ime-cli rime --schema luna_pinyin --shared-data <path> --user-data <path> [--key <name> ...] <input-code> [candidate-index]
 ```
 
 规则：
 
 - `demo` 保持无 native 依赖，继续作为默认 smoke。
 - `rime` 只在启用 `native-rime` 且本机依赖可用时编译或运行。
+- `rime --key <name>` 仅作为 CLI smoke 调试入口，用于在输入码后追加 `page-down`、`page-up`、方向键等命名键事件。
 - CLI 输出继续包含 schema、composition、candidates、commit。
 - 没有真实 Rime 环境时，测试只验证参数解析和错误提示，不伪造真实 Rime 输出。
 
@@ -246,6 +247,7 @@ cargo run -p radishlex-ime-cli --features native-rime -- rime --schema <schema> 
 - 已补 `process_key`、`get_context`、`get_commit`、`free_context` 和 `free_commit` 的 Rust 侧调用路径。
 - 已实现 `ime-cli rime` 子命令；默认 feature 下会给出明确 `native-rime` 构建提示，启用 feature 后可构造 `RimeEngine` 并进入 `InputSession`。
 - 已在 macOS 本机 `librime` 1.17.0、`luna_pinyin` 隔离数据目录下完成真实 native smoke，`luobo` 可输出 composition、候选和默认 commit。
-- 候选提交当前通过当前页 `select_keys` 模拟选择；native smoke 已验证默认首候选可提交，非首候选和翻页选择后续仍需补充覆盖。
+- 已给 `ime-cli rime` 补充可重复的 `--key <name>` smoke 调试参数，用于在输入码后追加 `page-down`、`page-up`、方向键等命名键事件。
+- 候选提交当前通过当前页 `select_keys` 模拟选择；2026-06-25 本机 native smoke 已验证首候选、非首候选、翻页后当前页候选均可提交，越界候选索引返回明确错误。
 
-阶段停止线：在 `ime-cli rime` 的非首候选选择、翻页选择和 native 异常路径没有补充验证前，不推进平台壳、ranker 或 userdb。
+阶段结论：`ime-cli rime` 已满足 Phase 1 的真实 adapter 可复验要求。下一步不推进平台壳，应按路线图进入 Phase 2，先定义个人化学习、userdb、ranker、删除/降权语义和 CLI 管理命令边界，再实现对应 crate。

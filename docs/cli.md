@@ -16,7 +16,7 @@ input code -> push_key -> composition -> candidates -> commit_candidate
 
 ```text
 radishlex-ime-cli demo <input-code> [candidate-index]
-radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> <input-code> [candidate-index]
+radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] <input-code> [candidate-index]
 ```
 
 ## 输出字段
@@ -79,6 +79,19 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
   luobo
 ```
 
+翻页或导航 smoke 可在输入码后追加命名键：
+
+```bash
+RIME_INCLUDE_DIR=/opt/homebrew/opt/librime/include \
+RIME_LIB_DIR=/opt/homebrew/opt/librime/lib \
+cargo run -p radishlex-ime-cli --features native-rime -- \
+  rime \
+  --schema luna_pinyin \
+  --shared-data /tmp/radishlex-rime-smoke.<id>/shared \
+  --user-data /tmp/radishlex-rime-smoke.<id>/user \
+  luobo --key page-down 0
+```
+
 用途：
 
 - 通过 `ime-engine-rime::RimeEngine` 调用真实 `librime`。
@@ -90,8 +103,25 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
 - `--schema <schema>`：Rime schema id，例如 `luna_pinyin`。
 - `--shared-data <path>`：Rime shared data 目录，包含 schema 和公开词典数据。
 - `--user-data <path>`：Rime user data 目录，保存本次 smoke 的用户配置和 build 产物。
+- `--key <name>`：可重复，用于在输入码之后追加命名键事件，只作为 CLI smoke 调试入口。
 - `<input-code>`：输入码，例如 `luobo`。
 - `[candidate-index]`：可选候选索引；未传入时默认提交首候选。
+
+当前支持的 `--key` 值：
+
+```text
+space
+enter
+backspace
+escape
+tab
+arrow-up
+arrow-down
+arrow-left
+arrow-right
+page-up
+page-down
+```
 
 构建要求：
 
@@ -111,6 +141,8 @@ Rime 数据准备步骤见 [Rime Native Smoke Runbook](runbooks/rime-native-smok
 - apostrophe，即 `'`
 
 其他字符会返回用法错误。该限制是 CLI 复验入口的输入约束，不代表后续平台壳只能接收这些按键。
+
+`--key` 仅用于 `rime` 命令的 smoke 调试，不改变 `<input-code>` 的字符限制，也不代表后续平台壳的完整按键协议。
 
 ## 退出码
 
@@ -158,5 +190,10 @@ radishlex-ime-cli rime --schema luna_pinyin --shared-data <path> --user-data <pa
 
 原因：底层 engine 没有接受该候选索引或未产生提交文本。
 
-处理：先用不带 `candidate-index` 的命令确认候选列表，再选择当前输出中存在的候选索引。真实 Rime 路径的非首候选、翻页候选和异常路径仍需要补充验证。
+处理：先用不带 `candidate-index` 的命令确认候选列表，再选择当前输出中存在的候选索引。真实 Rime 路径已用 `luobo 1`、`luobo --key page-down 0` 和 `luobo 999` 覆盖非首候选、翻页候选和越界候选索引 smoke；候选文本会受 Rime 数据版本和隔离 user data 内学习状态影响。
 
+### `unknown key name: ...`
+
+原因：`--key` 的值不是当前 CLI smoke 支持的命名键。
+
+处理：使用 `page-down`、`page-up`、`arrow-down`、`arrow-up` 等文档列出的键名。
