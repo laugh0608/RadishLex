@@ -1,20 +1,31 @@
 use radishlex_ime_core::{InputSession, KeyEvent, SessionState};
 
 use crate::demo_engine::FfiDemoEngine;
+use crate::engine::RADISHLEX_ENGINE_KIND_DEMO;
 
 pub struct RadishLexSession {
     inner: InputSession<FfiDemoEngine>,
+    engine_kind: u32,
 }
 
 impl RadishLexSession {
     pub fn new() -> Self {
+        Self::new_with_engine_kind(RADISHLEX_ENGINE_KIND_DEMO)
+    }
+
+    pub fn new_with_engine_kind(engine_kind: u32) -> Self {
         Self {
             inner: InputSession::new(FfiDemoEngine::new()),
+            engine_kind,
         }
     }
 
     pub fn inner_mut(&mut self) -> &mut InputSession<FfiDemoEngine> {
         &mut self.inner
+    }
+
+    pub fn engine_kind(&self) -> u32 {
+        self.engine_kind
     }
 
     pub fn push_char(&mut self, ch: char) -> radishlex_ime_core::CoreResult<()> {

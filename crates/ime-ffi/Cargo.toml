@@ -14,3 +14,4 @@ crate-type = ["rlib", "staticlib", "cdylib"]
 
 [dependencies]
 radishlex-ime-core = { path = "../ime-core" }
+radishlex-ime-userdb = { path = "../ime-userdb" }

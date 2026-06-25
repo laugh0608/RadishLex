@@ -6,10 +6,12 @@ use std::ptr;
 use radishlex_ime_core::SchemaId;
 
 use crate::buffer::RadishLexBuffer;
+use crate::engine::{validate_session_options, RadishLexSessionOptions};
 use crate::error::{FfiError, RadishLexError, RadishLexStatusCode};
 use crate::key::RadishLexKeyEvent;
 use crate::session::RadishLexSession;
 use crate::snapshot::{RadishLexCandidateView, RadishLexSnapshot, RadishLexStringView};
+use crate::sync_status::{sync_preflight_for_path, RadishLexSyncPreflightSummary};
 
 #[no_mangle]
 pub extern "C" fn radishlex_session_new(
@@ -21,11 +23,39 @@ pub extern "C" fn radishlex_session_new(
 }
 
 #[no_mangle]
+pub extern "C" fn radishlex_session_new_with_options(
+    options: *const RadishLexSessionOptions,
+    error_out: *mut *mut RadishLexError,
+) -> *mut RadishLexSession {
+    ffi_ptr(error_out, || {
+        if options.is_null() {
+            return Err(FfiError::invalid_argument(
+                "session options pointer is null",
+            ));
+        }
+
+        let engine_kind = validate_session_options(unsafe { *options })?;
+        Ok(Box::into_raw(Box::new(
+            RadishLexSession::new_with_engine_kind(engine_kind),
+        )))
+    })
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn radishlex_session_free(session: *mut RadishLexSession) {
     if session.is_null() {
         return;
     }
     let _ = Box::from_raw(session);
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_session_engine_kind(session: *const RadishLexSession) -> u32 {
+    if session.is_null() {
+        return 0;
+    }
+
+    unsafe { (*session).engine_kind() }
 }
 
 #[no_mangle]
@@ -157,6 +187,28 @@ pub extern "C" fn radishlex_snapshot_candidate(
 #[no_mangle]
 pub unsafe extern "C" fn radishlex_snapshot_free(snapshot: *mut RadishLexSnapshot) {
     RadishLexSnapshot::free(snapshot);
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_userdb_sync_preflight(
+    db_path: *const c_char,
+    summary_out: *mut RadishLexSyncPreflightSummary,
+    error_out: *mut *mut RadishLexError,
+) -> RadishLexStatusCode {
+    ffi_status(error_out, || {
+        if summary_out.is_null() {
+            return Err(FfiError::invalid_argument(
+                "sync preflight summary output pointer is null",
+            ));
+        }
+
+        let db_path = read_utf8(db_path, "db_path")?;
+        let summary = sync_preflight_for_path(db_path)?;
+        unsafe {
+            *summary_out = summary;
+        }
+        Ok(())
+    })
 }
 
 #[no_mangle]
@@ -301,13 +353,23 @@ fn write_error(error_out: *mut *mut RadishLexError, error: FfiError) {
 #[cfg(test)]
 mod tests {
     use std::ffi::{CStr, CString};
+    use std::fs;
+    use std::path::PathBuf;
+    use std::process;
     use std::slice;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
+    use crate::engine::{
+        RADISHLEX_ENGINE_KIND_DEMO, RADISHLEX_ENGINE_KIND_RIME, RADISHLEX_SESSION_OPTIONS_VERSION,
+    };
     use crate::key::{
         RADISHLEX_KEY_MOD_SHIFT, RADISHLEX_KEY_PHASE_RELEASE, RADISHLEX_NAMED_KEY_BACKSPACE,
     };
     use crate::snapshot::RADISHLEX_CANDIDATE_SOURCE_ENGINE;
+    use radishlex_ime_userdb::{
+        NegativeFeedbackDraft, NegativeFeedbackReason, SelectionEventDraft, TermSource, UserDb,
+    };
 
     #[test]
     fn session_snapshot_and_commit_round_trip() {
@@ -315,6 +377,10 @@ mod tests {
         let session = radishlex_session_new(&mut error);
         assert!(!session.is_null());
         assert!(error.is_null());
+        assert_eq!(
+            radishlex_session_engine_kind(session),
+            RADISHLEX_ENGINE_KIND_DEMO
+        );
 
         let schema = CString::new("ffi.demo").expect("schema");
         assert_eq!(
@@ -347,6 +413,106 @@ mod tests {
             radishlex_buffer_free(commit);
             radishlex_session_free(session);
         }
+    }
+
+    #[test]
+    fn session_options_select_demo_and_reject_unavailable_rime() {
+        let mut error = ptr::null_mut();
+        let options = RadishLexSessionOptions::demo();
+        let session = radishlex_session_new_with_options(&options, &mut error);
+        assert!(!session.is_null());
+        assert_eq!(
+            radishlex_session_engine_kind(session),
+            RADISHLEX_ENGINE_KIND_DEMO
+        );
+        unsafe {
+            radishlex_session_free(session);
+        }
+
+        let rime_options = RadishLexSessionOptions {
+            version: RADISHLEX_SESSION_OPTIONS_VERSION,
+            engine_kind: RADISHLEX_ENGINE_KIND_RIME,
+        };
+        let session = radishlex_session_new_with_options(&rime_options, &mut error);
+        assert!(session.is_null());
+        assert_eq!(
+            radishlex_error_code(error),
+            RadishLexStatusCode::InvalidState
+        );
+        let message = unsafe { CStr::from_ptr(radishlex_error_message(error)) }
+            .to_string_lossy()
+            .into_owned();
+        assert!(message.contains("rime engine is not available"));
+        unsafe {
+            radishlex_error_free(error);
+        }
+
+        let bad_options = RadishLexSessionOptions {
+            version: RADISHLEX_SESSION_OPTIONS_VERSION + 1,
+            engine_kind: RADISHLEX_ENGINE_KIND_DEMO,
+        };
+        let session = radishlex_session_new_with_options(&bad_options, &mut error);
+        assert!(session.is_null());
+        assert_eq!(
+            radishlex_error_code(error),
+            RadishLexStatusCode::InvalidArgument
+        );
+        unsafe {
+            radishlex_error_free(error);
+        }
+    }
+
+    #[test]
+    fn sync_preflight_returns_counts_without_payload() {
+        let path = temp_db_path("sync-preflight");
+        {
+            let mut db = UserDb::open(&path).expect("userdb opens");
+            db.add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualAdd)
+                .expect("term is added");
+            db.record_selection(
+                SelectionEventDraft::new("session-local", "cihe", "词核", 0, 1)
+                    .with_context_kind("chat"),
+            )
+            .expect("selection is recorded");
+            db.record_negative_feedback(
+                NegativeFeedbackDraft::new("cihe", "词核", NegativeFeedbackReason::ManualSuppress)
+                    .with_context_kind("chat"),
+            )
+            .expect("feedback is recorded");
+            db.delete_term("luobo", "萝卜", Some("luo bo"))
+                .expect("term is deleted");
+        }
+
+        let mut error = ptr::null_mut();
+        let db_path = CString::new(path.to_string_lossy().as_bytes()).expect("path");
+        let mut summary = RadishLexSyncPreflightSummary::empty();
+        assert_eq!(
+            radishlex_userdb_sync_preflight(db_path.as_ptr(), &mut summary, &mut error),
+            RadishLexStatusCode::Ok
+        );
+        assert!(error.is_null());
+        assert_eq!(summary.schema_version, 2);
+        assert_eq!(summary.plaintext_payload, 0);
+        assert_eq!(summary.syncable_user_terms, 1);
+        assert_eq!(summary.syncable_ranker_weights, 1);
+        assert_eq!(summary.syncable_deleted_terms, 1);
+        assert_eq!(summary.local_selection_events, 1);
+        assert_eq!(summary.local_negative_feedback, 1);
+        assert_eq!(summary.local_import_batches, 0);
+
+        assert_eq!(
+            radishlex_userdb_sync_preflight(db_path.as_ptr(), ptr::null_mut(), &mut error),
+            RadishLexStatusCode::InvalidArgument
+        );
+        assert_eq!(
+            radishlex_error_code(error),
+            RadishLexStatusCode::InvalidArgument
+        );
+        unsafe {
+            radishlex_error_free(error);
+        }
+
+        let _ = fs::remove_file(path);
     }
 
     #[test]
@@ -540,6 +706,7 @@ mod tests {
         assert_eq!(radishlex_snapshot_cursor(ptr::null()), 0);
         assert_eq!(radishlex_snapshot_candidate_count(ptr::null()), 0);
         assert!(radishlex_snapshot_schema(ptr::null()).data.is_null());
+        assert_eq!(radishlex_session_engine_kind(ptr::null()), 0);
     }
 
     unsafe fn buffer_to_string(buffer: *mut RadishLexBuffer) -> String {
@@ -552,5 +719,16 @@ mod tests {
     unsafe fn view_to_string(view: RadishLexStringView) -> String {
         let bytes = slice::from_raw_parts(view.data, view.len);
         String::from_utf8(bytes.to_vec()).expect("view must be UTF-8")
+    }
+
+    fn temp_db_path(name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time is valid")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "radishlex-ime-ffi-{name}-{}-{nanos}.sqlite",
+            process::id()
+        ))
     }
 }

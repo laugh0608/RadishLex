@@ -2,6 +2,7 @@ use std::ffi::CString;
 use std::os::raw::c_char;
 
 use radishlex_ime_core::CoreError;
+use radishlex_ime_userdb::UserDbError;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,6 +70,10 @@ impl FfiError {
         Self::new(RadishLexStatusCode::InvalidArgument, message)
     }
 
+    pub fn invalid_state(message: impl Into<String>) -> Self {
+        Self::new(RadishLexStatusCode::InvalidState, message)
+    }
+
     pub fn internal(message: impl Into<String>) -> Self {
         Self::new(RadishLexStatusCode::InternalError, message)
     }
@@ -86,6 +91,17 @@ impl From<CoreError> for FfiError {
             CoreError::InvalidCompositionCursor { .. } => Self::internal(error.to_string()),
             CoreError::EngineFailure { .. } => {
                 Self::new(RadishLexStatusCode::EngineError, error.to_string())
+            }
+        }
+    }
+}
+
+impl From<UserDbError> for FfiError {
+    fn from(error: UserDbError) -> Self {
+        match error {
+            UserDbError::InvalidInput { .. } => Self::invalid_argument(error.to_string()),
+            UserDbError::Sqlite(_) | UserDbError::Time(_) => {
+                Self::new(RadishLexStatusCode::UserDbError, error.to_string())
             }
         }
     }

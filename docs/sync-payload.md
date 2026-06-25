@@ -10,6 +10,8 @@
 - P1 明细事件默认只能留在本地。
 - 导入批次属于本地审计信息，不作为同步 payload。
 
+`ime-ffi` 当前只暴露 `radishlex_userdb_sync_preflight` 这类状态摘要入口：调用方必须显式传入 SQLite 路径，返回值只包含 P2 / P1 / 本地审计计数和 `plaintext_payload = false`，不返回同步 payload、用户词明文、P1 明细事件或数据库句柄。
+
 ## 数据来源映射
 
 | 本地来源 | 分级 | 后续同步对象 | 当前策略 |
@@ -107,4 +109,3 @@ cargo test -p radishlex-ime-cli
 - P1 来源没有同步对象类型。
 - 本地审计来源没有同步对象类型。
 - 加密对象外壳拒绝空 ID、空设备 ID、空 hash、0 版本、0 payload 大小和非法版本关系。
-
