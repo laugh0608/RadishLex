@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查和同步前置检查命令。下一阶段目标是继续补齐后续同步 payload 草案和 FFI 边界。
+当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查和同步前置检查命令。`ime-sync` 已补 payload 来源分类和加密对象外壳草案。下一阶段目标是继续补齐 FFI 边界和后续 `ime-ffi` 起步验证。
 
 Phase 2 不改变底层 engine adapter 边界：
 
@@ -414,7 +414,8 @@ cargo test --workspace
 5. 用户词库导入导出已补入 `ime-userdb` 与 `ime-cli`，格式为带版本头和字段表头的 UTF-8 TSV，并通过测试覆盖 P1 不导出、deleted tombstone 不复活和 malformed 文件错误。
 6. 导入 dry-run、批次查询、insert/update/duplicate/deleted 统计和 `import_batches` v2 migration 已补入。
 7. 导入格式版本解析、`dict inspect` 和 `sync preflight` 已补入。
-8. 下一步继续补同步 payload 草案和 FFI 边界。
+8. `ime-sync` 已补同步 payload 来源分类、同步对象类型和加密对象外壳草案。
+9. 下一步继续补 FFI 边界和后续 `ime-ffi` 起步验证。
 
 阶段停止线：
 

@@ -69,6 +69,7 @@ SyncObject
 对象类型：
 
 - `dictionary.user_terms`
+- `dictionary.deleted_terms`
 - `ranker.weights`
 - `settings.profile`
 - `settings.schema`
@@ -83,6 +84,8 @@ SyncObject
 - 本地审计记录：`import_batches`。
 
 该命令不得生成明文同步 payload，不连接后端，不输出用户词明文、原始事件明文或负反馈明细。它的作用是提前复验“哪些表可以进入后续加密对象，哪些表必须留在本地”。
+
+`crates/ime-sync/` 当前只定义 payload 来源分类、同步对象类型和加密对象外壳草案。真实加密、hash 计算、签名、设备授权、上传下载和冲突合并执行器仍属于后续阶段。
 
 ## 设备授权
 
