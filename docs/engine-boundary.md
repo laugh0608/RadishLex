@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 2 起步：`ime-core` 已具备可测试的输入会话、候选模型、提交模型和 engine interface；`ime-cli` 已能分别通过合成 demo adapter 和真实 Rime adapter 复验输入生命周期。真实 Rime adapter 已覆盖首候选、非首候选、翻页候选和候选索引异常路径 smoke。`ime-userdb` 已开始承载本地用户词库、选择事件、负反馈和删除 tombstone；下一步应补 `ime-ranker` 的可解释排序模型，再把学习链路接入 CLI 复验入口。
+当前处于 Phase 2 起步：`ime-core` 已具备可测试的输入会话、候选模型、提交模型和 engine interface；`ime-cli` 已能分别通过合成 demo adapter 和真实 Rime adapter 复验输入生命周期。真实 Rime adapter 已覆盖首候选、非首候选、翻页候选和候选索引异常路径 smoke。`ime-userdb` 已开始承载本地用户词库、选择事件、负反馈和删除 tombstone；`ime-ranker` 已具备可解释排序模型；`ime-cli` 已接入基础 `dict`、`learn` 和 `rank explain` 学习命令。下一步应把真实 Rime adapter 输出接入 ranker smoke，验证 engine candidates 进入个人化层。
 
 当前边界：
 

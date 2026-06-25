@@ -75,7 +75,7 @@ RadishLex/
 
 - `Cargo.toml`：Rust workspace 入口。
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
-- `crates/ime-cli/`：基于 demo adapter 与可选 Rime adapter 的命令行复验入口。
+- `crates/ime-cli/`：基于 demo adapter、可选 Rime adapter、userdb 和 ranker 的命令行复验入口。
 - `crates/ime-engine-rime/`：Rime adapter crate，默认不启用 native 绑定。
 - `docs/cli.md`：`radishlex-ime-cli` 命令、输出、退出码和安全边界说明。
 - `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
@@ -120,7 +120,7 @@ librime adapter：
 - 短语上下文。
 - 负反馈。
 
-当前已创建 `crates/ime-ranker/`，落地 `RankRequest`、`RankedCandidate`、结构化 explain 输出和频次、近期、上下文、负反馈、suppressed、deleted tombstone 排序测试；CLI `rank explain` 后续补齐。
+当前已创建 `crates/ime-ranker/`，落地 `RankRequest`、`RankedCandidate`、结构化 explain 输出和频次、近期、上下文、负反馈、suppressed、deleted tombstone 排序测试；`ime-cli rank explain` 已接入基础解释链路。
 
 ### ime-userdb
 
@@ -132,7 +132,7 @@ librime adapter：
 - 学习记录。
 - 导入导出。
 
-当前已创建 `crates/ime-userdb/`，落地 SQLite schema migration、用户词条 CRUD、选择事件记录、负反馈记录、删除 tombstone 和 ranker weight 摘要起步测试；导入导出和 CLI 管理入口后续补齐。
+当前已创建 `crates/ime-userdb/`，落地 SQLite schema migration、用户词条 CRUD、选择事件记录、负反馈记录、删除 tombstone 和 ranker weight 摘要起步测试；基础 CLI 管理入口已由 `ime-cli` 承接，导入导出后续补齐。
 
 ### ime-sync
 
@@ -169,7 +169,7 @@ librime adapter：
 - 同步测试。
 - ranker explain。
 
-当前已落地基于合成 demo adapter 的 `demo <input-code> [candidate-index]` 命令，以及需要 `native-rime` feature 和本机 `librime` 依赖的 `rime --schema <schema> --shared-data <path> --user-data <path> <input-code> [candidate-index]` 命令。`demo` 用于默认复验 `ime-core` 生命周期；它不代表真实中文输入引擎。
+当前已落地基于合成 demo adapter 的 `demo <input-code> [candidate-index]` 命令，以及需要 `native-rime` feature 和本机 `librime` 依赖的 `rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] <input-code> [candidate-index]` 命令。`demo` 用于默认复验 `ime-core` 生命周期；它不代表真实中文输入引擎。Phase 2 起步已补 `dict list/add/delete`、`learn select/suppress` 和 `rank explain`，通过显式 `--db` 的临时 SQLite 数据库复验用户词条、学习事件、负反馈和 explain 输出。
 
 ## Go server 建议
 

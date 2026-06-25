@@ -10,7 +10,7 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - **中文定位**：萝卜词核
 - **核心目标**：让输入法逐步理解用户的词库、语气、场景和候选偏好，达到可解释、可删除、可自部署的个人化输入体验。
 - **技术主轴**：Rust + Go + Flutter
-- **复核日期**：2026-06-24
+- **复核日期**：2026-06-25
 
 ## 设计原则
 
@@ -41,7 +41,7 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 
 ## 当前可运行入口
 
-当前仓库已提供 `radishlex-ime-cli` 作为 Phase 1 复验入口：
+当前仓库已提供 `radishlex-ime-cli` 作为 Rust 侧复验入口：
 
 ```bash
 cargo run -p radishlex-ime-cli -- demo luobo
@@ -52,6 +52,14 @@ cargo run -p radishlex-ime-cli -- demo luobo
 ```bash
 cargo run -p radishlex-ime-cli --features native-rime -- \
   rime --schema luna_pinyin --shared-data <path> --user-data <path> luobo
+```
+
+Phase 2 起步的本地学习链路可通过显式 SQLite 路径复验：
+
+```bash
+cargo run -p radishlex-ime-cli -- dict add --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
+cargo run -p radishlex-ime-cli -- learn select --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
+cargo run -p radishlex-ime-cli -- rank explain --db /tmp/radishlex-userdb.sqlite --input luobo --candidate 萝卜
 ```
 
 完整命令说明见 [CLI 说明](docs/cli.md)，本机 Rime 数据准备步骤见 [Rime Native Smoke Runbook](docs/runbooks/rime-native-smoke.md)。

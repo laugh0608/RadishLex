@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型。下一阶段目标是把学习链路接入 CLI 复验入口。
+当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn` 和 `rank explain` 命令。下一阶段目标是把真实 Rime adapter 输出接入 ranker smoke，验证 engine candidates 能进入个人化层。
 
 Phase 2 不改变底层 engine adapter 边界：
 
@@ -12,9 +12,9 @@ Phase 2 不改变底层 engine adapter 边界：
 - `ime-core` 继续定义平台无关输入模型。
 - `ime-userdb` 保存本地学习数据和用户词库。
 - `ime-ranker` 根据 engine candidates 与 userdb summary 输出重排后的候选。
-- `ime-cli` 提供可复验的学习、查询、删除、导入、导出和 explain 命令。
+- `ime-cli` 提供可复验的学习、查询、删除和 explain 命令；导入导出后续补齐。
 
-Phase 2 仍不推进平台壳、同步后端、Flutter manager 或自研拼音 engine。真实平台输入法应等待 userdb、ranker 和 CLI 复验链路稳定后再进入。
+Phase 2 仍不推进平台壳、同步后端、Flutter manager 或自研拼音 engine。真实平台输入法应等待真实 engine candidates 与学习层复验稳定后再进入。
 
 ## 目标
 
@@ -303,25 +303,31 @@ manual delete
 
 ## CLI 管理入口
 
-建议扩展 `radishlex-ime-cli`：
+当前已落地的 `radishlex-ime-cli` 学习管理入口：
 
 ```text
-radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>]
-radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reason <reason>]
 radishlex-ime-cli dict list --db <path>
 radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
-radishlex-ime-cli dict delete --db <path> --input <code> --text <text>
-radishlex-ime-cli dict import --db <path> --file <path>
-radishlex-ime-cli dict export --db <path> --file <path>
-radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text>
+radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
+radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
+radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
+radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
 ```
 
 规则：
 
 - CLI 必须显式传入 `--db`，不隐式读取真实用户输入法数据。
 - 测试使用临时 SQLite 数据库和合成词。
-- 导入导出格式初期可用 UTF-8 文本或 JSON Lines，但字段必须明确，不能使用模糊列序。
-- `rank explain` 应输出排序因子，不能只输出最终分数。
+- `rank explain` 输出排序因子，不能只输出最终分数。
+
+后续导入导出命令建议：
+
+```text
+radishlex-ime-cli dict import --db <path> --file <path>
+radishlex-ime-cli dict export --db <path> --file <path>
+```
+
+导入导出格式初期可用 UTF-8 文本或 JSON Lines，但字段必须明确，不能使用模糊列序；导出不得包含 P1 原始选择事件或负反馈详细事件。
 
 ## 验证标准
 
@@ -348,17 +354,19 @@ cargo test --workspace
 ```
 
 当前 `ime-userdb` 与 `ime-ranker` 均已创建。起步验证以 `cargo test -p radishlex-ime-userdb`、`cargo test -p radishlex-ime-ranker` 和仓库级检查为准。
+基础 CLI 学习命令已接入 `ime-userdb` 与 `ime-ranker`，应额外覆盖 `cargo test -p radishlex-ime-cli`，确认 `dict add/list/delete`、`learn select/suppress` 和 `rank explain` 的命令参数、输出与隐私边界。
 
 ## 实施顺序
 
 1. `crates/ime-userdb/` 已创建，已包含 SQLite schema、migration、词条 CRUD、选择事件、负反馈记录和删除 tombstone 起步测试。
 2. `crates/ime-ranker/` 已创建，已包含 `RankRequest`、`RankedCandidate`、explain 模型和频次、近期、负反馈、删除 tombstone 排序测试。
-3. 下一步扩展 `ime-cli` 的 `dict`、`learn` 和 `rank explain` 命令。
-4. 再考虑把 Rime adapter 输出接入 ranker smoke，验证真实 engine candidates 进入个人化层。
+3. `ime-cli` 已扩展 `dict`、`learn` 和 `rank explain` 命令，基础学习链路可通过临时 SQLite 数据库复验。
+4. 下一步把 Rime adapter 输出接入 ranker smoke，验证真实 engine candidates 进入个人化层。
+5. 再补用户词库导入导出，明确 P1/P2 导出边界。
 
 阶段停止线：
 
 - userdb schema 与删除语义未验证前，不接同步。
 - ranker explain 未落地前，不做主观权重调参。
-- CLI 学习链路未可复验前，不推进平台壳。
+- 真实 engine candidates 未进入 ranker smoke 前，不推进平台壳。
 - P0/P1/P2 分级未在测试中体现前，不进入管理 UI 或远端同步设计。

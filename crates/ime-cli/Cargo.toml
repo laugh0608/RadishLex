@@ -17,3 +17,5 @@ native-rime = [
 [dependencies]
 radishlex-ime-core = { path = "../ime-core" }
 radishlex-ime-engine-rime = { path = "../ime-engine-rime", optional = true }
+radishlex-ime-ranker = { path = "../ime-ranker" }
+radishlex-ime-userdb = { path = "../ime-userdb" }

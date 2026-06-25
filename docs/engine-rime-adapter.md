@@ -250,4 +250,4 @@ cargo run -p radishlex-ime-cli --features native-rime -- rime --schema <schema> 
 - 已给 `ime-cli rime` 补充可重复的 `--key <name>` smoke 调试参数，用于在输入码后追加 `page-down`、`page-up`、方向键等命名键事件。
 - 候选提交当前通过当前页 `select_keys` 模拟选择；2026-06-25 本机 native smoke 已验证首候选、非首候选、翻页后当前页候选均可提交，越界候选索引返回明确错误。
 
-阶段结论：`ime-cli rime` 已满足 Phase 1 的真实 adapter 可复验要求。下一步不推进平台壳，应按路线图进入 Phase 2，先定义个人化学习、userdb、ranker、删除/降权语义和 CLI 管理命令边界，再实现对应 crate。
+阶段结论：`ime-cli rime` 已满足 Phase 1 的真实 adapter 可复验要求。Phase 2 已开始落地 `ime-userdb`、`ime-ranker` 和 CLI 学习管理命令；下一步不推进平台壳，应先把真实 Rime candidates 接入 ranker smoke，验证 adapter 输出能稳定进入个人化层。

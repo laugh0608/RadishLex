@@ -4,24 +4,31 @@
 
 ## 定位
 
-`radishlex-ime-cli` 是 Phase 1 的命令行复验入口，用于验证输入生命周期：
+`radishlex-ime-cli` 是当前 Rust 侧命令行复验入口，用于验证两类链路：
 
 ```text
 input code -> push_key -> composition -> candidates -> commit_candidate
+userdb -> learning event -> ranker summary -> rank explain
 ```
 
-它不是系统输入法，也不注册平台输入法服务。CLI 只在当前进程内运行，用于观察 `ime-core` 与 adapter 的行为。
+它不是系统输入法，也不注册平台输入法服务。CLI 只在当前进程内运行，用于观察 `ime-core`、engine adapter、`ime-userdb` 与 `ime-ranker` 的行为。
 
 当前命令：
 
 ```text
 radishlex-ime-cli demo <input-code> [candidate-index]
 radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] <input-code> [candidate-index]
+radishlex-ime-cli dict list --db <path>
+radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
+radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
+radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
+radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
+radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
 ```
 
-## 输出字段
+## 输入会话输出
 
-两个命令使用相同输出形态：
+`demo` 与 `rime` 使用相同输出形态：
 
 ```text
 schema: <schema-id>
@@ -132,9 +139,156 @@ page-down
 
 Rime 数据准备步骤见 [Rime Native Smoke Runbook](runbooks/rime-native-smoke.md)。
 
+## dict 命令
+
+`dict` 命令用于管理本地 SQLite userdb 中的用户词条。所有子命令都必须显式传入 `--db <path>`，CLI 不会隐式读取系统输入法目录或真实 Rime 用户目录。
+
+添加词条：
+
+```bash
+cargo run -p radishlex-ime-cli -- \
+  dict add \
+  --db /tmp/radishlex-userdb.sqlite \
+  --input luobo \
+  --text 萝卜 \
+  --reading "luo bo"
+```
+
+输出：
+
+```text
+added: 萝卜
+input: luobo
+status: active
+weight: 1.000
+```
+
+查看词条：
+
+```bash
+cargo run -p radishlex-ime-cli -- dict list --db /tmp/radishlex-userdb.sqlite
+```
+
+输出：
+
+```text
+terms:
+  luobo -> 萝卜 [luo bo] source=manual_add status=active weight=1.000
+```
+
+删除词条：
+
+```bash
+cargo run -p radishlex-ime-cli -- \
+  dict delete \
+  --db /tmp/radishlex-userdb.sqlite \
+  --input luobo \
+  --text 萝卜 \
+  --reading "luo bo"
+```
+
+删除会写入 tombstone，并清除对应 ranker 权重摘要，避免旧选择事件或旧导入立即复活该词。后续如需恢复同一词条，必须通过 `dict add` 这类明确的人工添加动作。
+
+## learn 命令
+
+`learn` 命令用于向 userdb 写入本地学习事件。当前只支持合成数据和人工指定参数，适合验证排序变化，不代表平台壳已经接入真实输入事件。
+
+记录一次候选选择：
+
+```bash
+cargo run -p radishlex-ime-cli -- \
+  learn select \
+  --db /tmp/radishlex-userdb.sqlite \
+  --input luobo \
+  --text 萝卜 \
+  --index 1 \
+  --count 2 \
+  --context chat
+```
+
+参数：
+
+- `--index <n>`：候选在 RadishLex candidate 列表中的 `0` 基索引，默认 `0`。
+- `--count <n>`：本次候选总数，默认 `index + 1`。
+- `--session <id>`：本次 CLI 学习事件的会话标识，默认 `cli`。
+- `--context <kind>`：归类后的上下文，例如 `general`、`chat`、`code`、`search`，默认 `general`。
+
+输出：
+
+```text
+selection_event: 1
+input: luobo
+text: 萝卜
+```
+
+记录一次负反馈：
+
+```bash
+cargo run -p radishlex-ime-cli -- \
+  learn suppress \
+  --db /tmp/radishlex-userdb.sqlite \
+  --input luobo \
+  --text 萝卜 \
+  --reason manual_suppress
+```
+
+当前支持的 `--reason`：
+
+```text
+immediate_backspace
+reselect_same_code
+manual_suppress
+manual_delete
+```
+
+未传 `--reason` 时默认使用 `manual_suppress`。负反馈会记录 P1 本地事件，并更新对应 ranker 权重摘要；如果词条存在且未删除，会把词条状态降为 `suppressed`。
+
+## rank explain 命令
+
+`rank explain` 用于从 userdb 读取用户词条和权重摘要，调用 `ime-ranker` 输出结构化排序解释。
+
+```bash
+cargo run -p radishlex-ime-cli -- \
+  rank explain \
+  --db /tmp/radishlex-userdb.sqlite \
+  --input luobo \
+  --candidate 萝卜 \
+  --context chat
+```
+
+输出：
+
+```text
+input: luobo
+candidate: 萝卜
+context: chat
+original_index: 0
+final_score: 2.650
+explain:
+  engine_order_factor: 1.000
+  user_term_boost: 1.000
+  frequency_boost: 0.350
+  recency_boost: 0.000
+  context_boost: 0.300
+  negative_feedback_penalty: 0.000
+  suppressed_penalty: 0.000
+  deleted_penalty: 0.000
+```
+
+解释字段含义：
+
+- `engine_order_factor`：原始 engine 候选顺序折算因子；CLI 当前只解释单个候选，所以原始索引为 `0`。
+- `user_term_boost`：用户词条带来的提升。
+- `frequency_boost`：选择频次带来的提升。
+- `recency_boost`：近期使用带来的提升。
+- `context_boost`：同一 `context_kind` 下的场景提升。
+- `negative_feedback_penalty`：负反馈权重惩罚。
+- `suppressed_penalty`：词条处于 suppressed 状态时的额外惩罚。
+- `deleted_penalty`：删除 tombstone 命中时的惩罚。
+
 ## 输入限制
 
-当前 CLI 的 `<input-code>` 只接受：
+当前 CLI 的 `<input-code>` 与 `--input <code>` 只接受：
 
 - ASCII 字母
 - ASCII 数字
@@ -147,7 +301,7 @@ Rime 数据准备步骤见 [Rime Native Smoke Runbook](runbooks/rime-native-smok
 ## 退出码
 
 - `0`：命令成功。
-- `1`：core 或 engine 运行错误，例如底层 engine 初始化失败、候选提交失败。
+- `1`：core、engine、userdb 或 ranker 运行错误，例如底层 engine 初始化失败、候选提交失败、SQLite 读写失败或学习事件被隐私策略跳过。
 - `2`：命令用法错误，例如缺少参数、未知选项、候选索引不是非负整数，或未启用 `native-rime` 运行 `rime`。
 
 ## 安全与隐私边界
@@ -156,6 +310,8 @@ Rime 数据准备步骤见 [Rime Native Smoke Runbook](runbooks/rime-native-smok
 - CLI 不上传输入内容，不连接 RadishLex 后端。
 - `demo` 不读取本机输入法数据。
 - `rime` 必须显式指定 `shared-data` 与 `user-data`，不应指向真实 Rime 用户目录。
+- `dict`、`learn` 和 `rank explain` 必须显式指定 `--db`，不应指向真实用户生产库；本阶段建议使用 `/tmp` 下临时 SQLite 文件。
+- `learn` 当前没有平台 secure text entry 信号输入，CLI smoke 只应使用合成词、虚构上下文和临时数据库。
 - 本机 smoke 应使用 `/tmp` 下的隔离目录和合成输入码，不提交 schema 数据、用户目录、日志或输出中的敏感内容。
 
 ## 常见错误
@@ -197,3 +353,19 @@ radishlex-ime-cli rime --schema luna_pinyin --shared-data <path> --user-data <pa
 原因：`--key` 的值不是当前 CLI smoke 支持的命名键。
 
 处理：使用 `page-down`、`page-up`、`arrow-down`、`arrow-up` 等文档列出的键名。
+
+### `missing --db`
+
+原因：`dict`、`learn` 或 `rank explain` 命令缺少显式 SQLite 路径。
+
+处理：
+
+```bash
+cargo run -p radishlex-ime-cli -- dict list --db /tmp/radishlex-userdb.sqlite
+```
+
+### `unknown negative feedback reason ...`
+
+原因：`learn suppress --reason` 不是当前支持的负反馈类型。
+
+处理：使用 `immediate_backspace`、`reselect_same_code`、`manual_suppress` 或 `manual_delete`。
