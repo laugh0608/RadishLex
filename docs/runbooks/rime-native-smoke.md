@@ -143,6 +143,8 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
 
 最后一条越界候选命令预期失败，返回非 0 退出码是正确结果；重点检查错误信息是否明确。
 
+同一个 `$SMOKE/user` 目录不要并行运行多条 Rime smoke 命令。Rime userdb 使用本地数据库锁，并发打开同一隔离用户目录可能触发 LevelDB `LOCK` 或 corruption 报错；遇到这种情况应丢弃该 `$SMOKE`，重新创建隔离目录后串行重跑。
+
 ### 4. 运行 rank smoke
 
 rank smoke 用于确认真实 Rime candidates 能进入 `ime-ranker`，并且重排后的候选能映射回原始 engine index 提交。
@@ -204,6 +206,17 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
 - 非首候选 smoke 可提交当前 1 号候选。
 - `--key page-down 0` 可翻页并提交翻页后的当前 0 号候选。
 - `luobo 999` 返回明确错误：`candidate index 999 is out of range for 5 candidates`。
+
+2026-06-25 本机 rank smoke 结论：
+
+- `librime` 路径为 `/opt/homebrew/opt/librime`，schema 为 `luna_pinyin`。
+- 有效隔离目录为 `/tmp/radishlex-rime-smoke.HpbV0l`；公开 Rime schema 数据、Rime user data 和临时 rank userdb 均位于该目录下。
+- `cargo check -p radishlex-ime-cli --features native-rime` 通过。
+- 基础 `luobo` smoke 输出 `composition: luo bo`，当前候选包含 `蘿蔔`、`落泊`、`蘿菠`、`羅柏`、`洛伯`，首候选提交 `蘿蔔`。
+- `luobo 1` 可提交当前 1 号候选 `落泊`；`luobo --key page-down 0` 可提交翻页后的当前 0 号候选 `落薄`；`luobo 999` 返回明确越界错误。
+- rank userdb 使用 `/tmp/radishlex-rime-smoke.HpbV0l/radishlex-userdb.sqlite`，通过 `dict add --input luobo --text 落泊` 写入当前 Rime 输出中真实存在的候选文本。
+- `rime --rank-db /tmp/radishlex-rime-smoke.HpbV0l/radishlex-userdb.sqlite --context chat luobo` 输出 `rank_context: chat`，候选行包含 `engine_index` 和 `score`，explain 行包含 `user_term`、`frequency`、`context`、`negative`、`suppressed`、`deleted`，提交结果包含 `commit_engine_index: 1`。
+- 本次 smoke 未使用真实个人词库、真实输入历史、真实 Rime 用户目录或仓库内临时数据目录。
 
 若运行时报 `dyld` 找不到 `librime`，执行：
 
