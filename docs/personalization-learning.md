@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn` 和 `rank explain` 命令。下一阶段目标是把真实 Rime adapter 输出接入 ranker smoke，验证 engine candidates 能进入个人化层。
+当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn`、`rank explain` 和 `rime --rank-db` 命令。下一阶段目标是记录本机 Rime rank smoke 证据，并补齐用户词库导入导出边界。
 
 Phase 2 不改变底层 engine adapter 边界：
 
@@ -306,6 +306,7 @@ manual delete
 当前已落地的 `radishlex-ime-cli` 学习管理入口：
 
 ```text
+radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] --rank-db <path> [--context <kind>] <input-code> [candidate-index]
 radishlex-ime-cli dict list --db <path>
 radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
@@ -317,6 +318,7 @@ radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--
 规则：
 
 - CLI 必须显式传入 `--db`，不隐式读取真实用户输入法数据。
+- `rime --rank-db` 必须显式传入隔离 userdb，重排后的候选索引需要映射回原始 engine index 再提交。
 - 测试使用临时 SQLite 数据库和合成词。
 - `rank explain` 输出排序因子，不能只输出最终分数。
 
@@ -361,12 +363,12 @@ cargo test --workspace
 1. `crates/ime-userdb/` 已创建，已包含 SQLite schema、migration、词条 CRUD、选择事件、负反馈记录和删除 tombstone 起步测试。
 2. `crates/ime-ranker/` 已创建，已包含 `RankRequest`、`RankedCandidate`、explain 模型和频次、近期、负反馈、删除 tombstone 排序测试。
 3. `ime-cli` 已扩展 `dict`、`learn` 和 `rank explain` 命令，基础学习链路可通过临时 SQLite 数据库复验。
-4. 下一步把 Rime adapter 输出接入 ranker smoke，验证真实 engine candidates 进入个人化层。
-5. 再补用户词库导入导出，明确 P1/P2 导出边界。
+4. `ime-cli rime --rank-db` 已把 Rime adapter candidates 接入 ranker smoke，单元测试覆盖候选重排、explain 输出和原始 engine index 提交映射；本机 native rank smoke 命令已写入 runbook。
+5. 下一步补用户词库导入导出，明确 P1/P2 导出边界。
 
 阶段停止线：
 
 - userdb schema 与删除语义未验证前，不接同步。
 - ranker explain 未落地前，不做主观权重调参。
-- 真实 engine candidates 未进入 ranker smoke 前，不推进平台壳。
+- 本机 Rime rank smoke 未形成可复验证据前，不推进平台壳。
 - P0/P1/P2 分级未在测试中体现前，不进入管理 UI 或远端同步设计。

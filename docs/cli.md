@@ -17,7 +17,7 @@ userdb -> learning event -> ranker summary -> rank explain
 
 ```text
 radishlex-ime-cli demo <input-code> [candidate-index]
-radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] <input-code> [candidate-index]
+radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] [--rank-db <path>] [--context <kind>] <input-code> [candidate-index]
 radishlex-ime-cli dict list --db <path>
 radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
@@ -104,6 +104,7 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
 - 通过 `ime-engine-rime::RimeEngine` 调用真实 `librime`。
 - 复验 Rime C API 到 RadishLex `Composition` / `Candidate` / `Commit` 的转换。
 - 检查真实 engine 路径下的 schema、composition、候选和提交行为。
+- 可选接入 `--rank-db`，把真实 engine candidates 送入 `ime-ranker` 并输出 explain。
 
 参数：
 
@@ -111,8 +112,10 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
 - `--shared-data <path>`：Rime shared data 目录，包含 schema 和公开词典数据。
 - `--user-data <path>`：Rime user data 目录，保存本次 smoke 的用户配置和 build 产物。
 - `--key <name>`：可重复，用于在输入码之后追加命名键事件，只作为 CLI smoke 调试入口。
+- `--rank-db <path>`：可选 SQLite userdb 路径；传入后会对当前 Rime candidates 执行重排和 explain。
+- `--context <kind>`：可选上下文分类，只在传入 `--rank-db` 时有效，默认 `general`。
 - `<input-code>`：输入码，例如 `luobo`。
-- `[candidate-index]`：可选候选索引；未传入时默认提交首候选。
+- `[candidate-index]`：可选候选索引；未传入时默认提交首候选。启用 `--rank-db` 后，该索引表示重排后的候选索引，CLI 提交时会映射回原始 engine candidate index。
 
 当前支持的 `--key` 值：
 
@@ -138,6 +141,46 @@ page-down
 - 未启用 `native-rime` 时，命令会返回明确的构建提示，不会静默退回 `demo`。
 
 Rime 数据准备步骤见 [Rime Native Smoke Runbook](runbooks/rime-native-smoke.md)。
+
+### Rime rank smoke 输出
+
+传入 `--rank-db` 后，`rime` 命令会在 `composition` 后增加 rank 上下文，并将候选输出为重排后的顺序：
+
+```bash
+RIME_INCLUDE_DIR=/opt/homebrew/opt/librime/include \
+RIME_LIB_DIR=/opt/homebrew/opt/librime/lib \
+cargo run -p radishlex-ime-cli --features native-rime -- \
+  rime \
+  --schema luna_pinyin \
+  --shared-data /tmp/radishlex-rime-smoke.<id>/shared \
+  --user-data /tmp/radishlex-rime-smoke.<id>/user \
+  --rank-db /tmp/radishlex-userdb.sqlite \
+  --context chat \
+  luobo
+```
+
+输出形态：
+
+```text
+schema: luna_pinyin
+input: luobo
+composition: luo bo
+rank_context: chat
+candidates:
+  0. <candidate> (engine_index=<n> score=<score>)
+     explain: engine_order=<score> user_term=<score> frequency=<score> recency=<score> context=<score> negative=<score> suppressed=<score> deleted=<score>
+commit: <text>
+commit_engine_index: <n>
+```
+
+字段含义：
+
+- `engine_index`：该候选在底层 engine 当前候选列表中的原始索引。
+- `score`：ranker 最终分数。
+- `explain`：本地 userdb 与 ranker summary 对该候选的排序贡献。
+- `commit_engine_index`：最终提交给 `commit_candidate` 的原始 engine index。
+
+该模式只读取显式传入的 `--rank-db`，不把 Rime 内部对象 ID 写入 userdb。
 
 ## dict 命令
 
@@ -310,6 +353,7 @@ explain:
 - CLI 不上传输入内容，不连接 RadishLex 后端。
 - `demo` 不读取本机输入法数据。
 - `rime` 必须显式指定 `shared-data` 与 `user-data`，不应指向真实 Rime 用户目录。
+- `rime --rank-db` 必须显式指定隔离 userdb，建议使用 `/tmp` 下临时 SQLite 文件。
 - `dict`、`learn` 和 `rank explain` 必须显式指定 `--db`，不应指向真实用户生产库；本阶段建议使用 `/tmp` 下临时 SQLite 文件。
 - `learn` 当前没有平台 secure text entry 信号输入，CLI smoke 只应使用合成词、虚构上下文和临时数据库。
 - 本机 smoke 应使用 `/tmp` 下的隔离目录和合成输入码，不提交 schema 数据、用户目录、日志或输出中的敏感内容。
@@ -353,6 +397,17 @@ radishlex-ime-cli rime --schema luna_pinyin --shared-data <path> --user-data <pa
 原因：`--key` 的值不是当前 CLI smoke 支持的命名键。
 
 处理：使用 `page-down`、`page-up`、`arrow-down`、`arrow-up` 等文档列出的键名。
+
+### `--context requires --rank-db for rime`
+
+原因：`rime --context` 只在 rank smoke 中有意义，不能单独使用。
+
+处理：
+
+```bash
+cargo run -p radishlex-ime-cli --features native-rime -- \
+  rime --schema luna_pinyin --shared-data <path> --user-data <path> --rank-db /tmp/radishlex-userdb.sqlite --context chat luobo
+```
 
 ### `missing --db`
 

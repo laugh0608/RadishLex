@@ -143,7 +143,46 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
 
 最后一条越界候选命令预期失败，返回非 0 退出码是正确结果；重点检查错误信息是否明确。
 
-### 4. 记录结论
+### 4. 运行 rank smoke
+
+rank smoke 用于确认真实 Rime candidates 能进入 `ime-ranker`，并且重排后的候选能映射回原始 engine index 提交。
+
+先创建临时 userdb，并把上一步 `luobo` 输出中确实存在的候选文本写入 userdb。下面的 `<candidate-text>` 需要替换为当前 smoke 输出里的候选文本，不要使用真实个人词库数据：
+
+```bash
+RANK_DB="$SMOKE/radishlex-userdb.sqlite"
+
+cargo run -p radishlex-ime-cli -- \
+  dict add \
+  --db "$RANK_DB" \
+  --input luobo \
+  --text "<candidate-text>"
+```
+
+然后运行带 ranker 的 Rime smoke：
+
+```bash
+RIME_INCLUDE_DIR="$RIME_INCLUDE_DIR" \
+RIME_LIB_DIR="$RIME_LIB_DIR" \
+cargo run -p radishlex-ime-cli --features native-rime -- \
+  rime \
+  --schema luna_pinyin \
+  --shared-data "$SMOKE/shared" \
+  --user-data "$SMOKE/user" \
+  --rank-db "$RANK_DB" \
+  --context chat \
+  luobo
+```
+
+重点检查：
+
+- 输出包含 `rank_context: chat`。
+- candidates 行包含 `engine_index=<n>` 和 `score=<score>`。
+- explain 行包含 `user_term`、`frequency`、`context`、`negative`、`suppressed`、`deleted`。
+- 若发生提交，输出包含 `commit_engine_index: <n>`。
+- `candidate-index` 在该模式下表示重排后的索引，而不是底层 engine 原始索引。
+
+### 5. 记录结论
 
 记录时不要复制整段命令输出，只保留可复验事实：
 
@@ -153,6 +192,7 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
 - `cargo check -p radishlex-ime-cli --features native-rime` 是否通过
 - 首候选、非首候选、翻页后候选是否都能按当前输出候选提交
 - 越界候选索引是否返回明确错误
+- rank smoke 是否输出 `rank_context`、`engine_index`、explain 和 `commit_engine_index`
 - 是否发现 candidate index 或 `select_keys` 行为异常
 
 候选文本取决于 Rime 数据版本和 `$SMOKE/user` 内的学习状态。同一个 `$SMOKE` 目录内重复提交候选后，后续候选顺序可能变化；如果需要稳定复现首轮结果，重新创建一个新的 `$SMOKE` 目录。

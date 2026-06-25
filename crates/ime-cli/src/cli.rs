@@ -10,8 +10,8 @@ use radishlex_ime_core::{
 use radishlex_ime_engine_rime::{RimeEngine, RimeEngineConfig};
 use radishlex_ime_ranker::{RankRequest, RankedCandidate, Ranker};
 use radishlex_ime_userdb::{
-    NegativeFeedbackDraft, NegativeFeedbackReason, SelectionEventDraft, TermSource, UserDb,
-    UserDbError,
+    NegativeFeedbackDraft, NegativeFeedbackReason, RankerWeight, SelectionEventDraft, TermSource,
+    UserDb, UserDbError, UserTerm,
 };
 
 use crate::DemoEngine;
@@ -19,7 +19,7 @@ use crate::DemoEngine;
 const USAGE: &str = "\
 Usage:
   radishlex-ime-cli demo <input-code> [candidate-index]
-  radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] <input-code> [candidate-index]
+  radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] [--rank-db <path>] [--context <kind>] <input-code> [candidate-index]
   radishlex-ime-cli dict list --db <path>
   radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
   radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
@@ -32,6 +32,7 @@ Examples:
   radishlex-ime-cli demo luobo 1
   radishlex-ime-cli rime --schema luna_pinyin --shared-data ./rime-data --user-data ./tmp/rime-user luobo
   radishlex-ime-cli rime --schema luna_pinyin --shared-data ./rime-data --user-data ./tmp/rime-user luobo --key page-down 0
+  radishlex-ime-cli rime --schema luna_pinyin --shared-data ./rime-data --user-data ./tmp/rime-user --rank-db /tmp/radishlex-userdb.sqlite luobo
   radishlex-ime-cli dict add --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
   radishlex-ime-cli learn select --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
   radishlex-ime-cli rank explain --db /tmp/radishlex-userdb.sqlite --input luobo --candidate 萝卜
@@ -104,7 +105,7 @@ fn run_demo(args: &[String]) -> Result<String, CliError> {
 
     let mut session = InputSession::new(DemoEngine::new());
     session.set_schema(SchemaId::new("demo.pinyin")?)?;
-    run_input_session(session, input_code, &[], selected_index)
+    run_input_session(session, input_code, &[], selected_index, None)
 }
 
 #[cfg(not(feature = "native-rime"))]
@@ -127,6 +128,7 @@ fn run_rime(args: &[String]) -> Result<String, CliError> {
         &options.input_code,
         &options.extra_keys,
         options.selected_index,
+        options.rank_smoke.as_ref(),
     )
 }
 
@@ -334,6 +336,7 @@ fn run_input_session<E: Engine>(
     input_code: &str,
     extra_keys: &[NamedKey],
     selected_index: Option<usize>,
+    rank_smoke: Option<&RankSmokeOptions>,
 ) -> Result<String, CliError> {
     for ch in input_code.chars() {
         session.push_key(KeyEvent::press_char(ch))?;
@@ -343,7 +346,27 @@ fn run_input_session<E: Engine>(
     }
 
     let state = session.state()?;
-    let commit_text = if let Some(index) = selected_index.or(default_index(&state)) {
+    if let Some(rank_smoke) = rank_smoke {
+        let ranked = rank_state_candidates(input_code, &state, rank_smoke)?;
+        let commit_engine_index = ranked_commit_engine_index(&ranked, selected_index)?;
+        let commit_text = if let Some(index) = commit_engine_index {
+            Some(session.commit_candidate(index)?.text().to_owned())
+        } else {
+            None
+        };
+
+        return Ok(render_ranked_session(
+            input_code,
+            &state,
+            &ranked,
+            rank_smoke,
+            commit_text.as_deref(),
+            commit_engine_index,
+        ));
+    }
+
+    let commit_engine_index = selected_index.or(default_index(&state));
+    let commit_text = if let Some(index) = commit_engine_index {
         Some(session.commit_candidate(index)?.text().to_owned())
     } else {
         None
@@ -365,12 +388,21 @@ struct RimeCommandOptions {
     input_code: String,
     extra_keys: Vec<NamedKey>,
     selected_index: Option<usize>,
+    rank_smoke: Option<RankSmokeOptions>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RankSmokeOptions {
+    db_path: PathBuf,
+    context_kind: String,
 }
 
 fn parse_rime_args(args: &[String]) -> Result<RimeCommandOptions, CliError> {
     let mut schema = None;
     let mut shared_data = None;
     let mut user_data = None;
+    let mut rank_db = None;
+    let mut context_kind = None;
     let mut extra_keys = Vec::new();
     let mut positional = Vec::new();
     let mut index = 2;
@@ -402,6 +434,18 @@ fn parse_rime_args(args: &[String]) -> Result<RimeCommandOptions, CliError> {
                 let value = required_option_value(args, index, "--key")?;
                 extra_keys.push(parse_named_key(value)?);
             }
+            "--rank-db" => {
+                index += 1;
+                rank_db = Some(PathBuf::from(required_option_value(
+                    args,
+                    index,
+                    "--rank-db",
+                )?));
+            }
+            "--context" => {
+                index += 1;
+                context_kind = Some(required_option_value(args, index, "--context")?.to_owned());
+            }
             value if value.starts_with("--") => {
                 return Err(CliError::Usage(format!("unknown rime option: {value}")));
             }
@@ -420,6 +464,19 @@ fn parse_rime_args(args: &[String]) -> Result<RimeCommandOptions, CliError> {
         ));
     }
 
+    let rank_smoke = match rank_db {
+        Some(db_path) => Some(RankSmokeOptions {
+            db_path,
+            context_kind: context_kind.unwrap_or_else(|| "general".to_owned()),
+        }),
+        None if context_kind.is_some() => {
+            return Err(CliError::Usage(
+                "--context requires --rank-db for rime".to_owned(),
+            ));
+        }
+        None => None,
+    };
+
     Ok(RimeCommandOptions {
         schema: schema.ok_or_else(|| CliError::Usage("missing --schema".to_owned()))?,
         shared_data: shared_data
@@ -428,6 +485,7 @@ fn parse_rime_args(args: &[String]) -> Result<RimeCommandOptions, CliError> {
         input_code: input_code.to_owned(),
         extra_keys,
         selected_index: parse_optional_candidate_index(positional.get(1))?,
+        rank_smoke,
     })
 }
 
@@ -560,6 +618,91 @@ fn default_index(state: &SessionState) -> Option<usize> {
     }
 }
 
+fn rank_state_candidates(
+    input_code: &str,
+    state: &SessionState,
+    options: &RankSmokeOptions,
+) -> Result<Vec<RankedCandidate>, CliError> {
+    let db = UserDb::open(&options.db_path)?;
+    let mut user_terms = Vec::new();
+    let mut ranker_weights = Vec::new();
+
+    for candidate in state.candidates() {
+        if let Some(term) = fetch_candidate_user_term(&db, input_code, candidate)? {
+            user_terms.push(term);
+        }
+        if let Some(weight) =
+            fetch_candidate_ranker_weight(&db, input_code, candidate, &options.context_kind)?
+        {
+            ranker_weights.push(weight);
+        }
+    }
+
+    let request = RankRequest::new(input_code, state.candidates().to_vec())
+        .with_context_kind(&options.context_kind)
+        .with_user_terms(user_terms)
+        .with_ranker_weights(ranker_weights);
+    Ok(Ranker::default().rank(request))
+}
+
+fn fetch_candidate_user_term(
+    db: &UserDb,
+    input_code: &str,
+    candidate: &Candidate,
+) -> Result<Option<UserTerm>, CliError> {
+    let reading = candidate.reading().unwrap_or_default();
+    if let Some(term) = db.fetch_term(input_code, candidate.text(), reading)? {
+        return Ok(Some(term));
+    }
+    if !reading.is_empty() {
+        return db
+            .fetch_term(input_code, candidate.text(), "")
+            .map_err(Into::into);
+    }
+    Ok(None)
+}
+
+fn fetch_candidate_ranker_weight(
+    db: &UserDb,
+    input_code: &str,
+    candidate: &Candidate,
+    context_kind: &str,
+) -> Result<Option<RankerWeight>, CliError> {
+    if let Some(weight) = db.ranker_weight(
+        input_code,
+        candidate.text(),
+        candidate.reading(),
+        context_kind,
+    )? {
+        return Ok(Some(weight));
+    }
+    if candidate.reading().is_some() {
+        return db
+            .ranker_weight(input_code, candidate.text(), None, context_kind)
+            .map_err(Into::into);
+    }
+    Ok(None)
+}
+
+fn ranked_commit_engine_index(
+    ranked: &[RankedCandidate],
+    selected_index: Option<usize>,
+) -> Result<Option<usize>, CliError> {
+    let Some(index) = selected_index.or_else(|| if ranked.is_empty() { None } else { Some(0) })
+    else {
+        return Ok(None);
+    };
+
+    ranked
+        .get(index)
+        .map(|candidate| Some(candidate.original_index))
+        .ok_or_else(|| CoreError::InvalidCandidateIndex {
+            index,
+            len: ranked.len(),
+        })
+        .map_err(Into::into)
+}
+
 fn render_session(input_code: &str, state: &SessionState, commit_text: Option<&str>) -> String {
     let mut output = String::new();
     output.push_str(&format!("schema: {}\n", state.schema().as_str()));
@@ -583,6 +726,40 @@ fn render_session(input_code: &str, state: &SessionState, commit_text: Option<&s
     output
 }
 
+fn render_ranked_session(
+    input_code: &str,
+    state: &SessionState,
+    ranked: &[RankedCandidate],
+    options: &RankSmokeOptions,
+    commit_text: Option<&str>,
+    commit_engine_index: Option<usize>,
+) -> String {
+    let mut output = String::new();
+    output.push_str(&format!("schema: {}\n", state.schema().as_str()));
+    output.push_str(&format!("input: {input_code}\n"));
+    output.push_str(&format!("composition: {}\n", state.composition().preedit()));
+    output.push_str(&format!("rank_context: {}\n", options.context_kind));
+    output.push_str("candidates:\n");
+
+    if ranked.is_empty() {
+        output.push_str("  <none>\n");
+    } else {
+        for (index, candidate) in ranked.iter().enumerate() {
+            output.push_str(&format_ranked_candidate(index, candidate));
+        }
+    }
+
+    match commit_text {
+        Some(text) => output.push_str(&format!("commit: {text}\n")),
+        None => output.push_str("commit: <none>\n"),
+    }
+    if let Some(index) = commit_engine_index {
+        output.push_str(&format!("commit_engine_index: {index}\n"));
+    }
+
+    output
+}
+
 fn format_candidate(index: usize, candidate: &Candidate) -> String {
     let reading = candidate
         .reading()
@@ -594,6 +771,34 @@ fn format_candidate(index: usize, candidate: &Candidate) -> String {
         .unwrap_or_default();
 
     format!("  {index}. {}{reading}{annotation}\n", candidate.text())
+}
+
+fn format_ranked_candidate(index: usize, ranked: &RankedCandidate) -> String {
+    let candidate = &ranked.candidate;
+    let reading = candidate
+        .reading()
+        .map(|value| format!(" [{value}]"))
+        .unwrap_or_default();
+    let annotation = candidate
+        .annotation()
+        .map(|value| format!(" - {value}"))
+        .unwrap_or_default();
+    let explanation = &ranked.explanation;
+
+    format!(
+        "  {index}. {}{reading}{annotation} (engine_index={} score={:.3})\n     explain: engine_order={:.3} user_term={:.3} frequency={:.3} recency={:.3} context={:.3} negative={:.3} suppressed={:.3} deleted={:.3}\n",
+        candidate.text(),
+        ranked.original_index,
+        ranked.final_score,
+        explanation.engine_order_factor,
+        explanation.user_term_boost,
+        explanation.frequency_boost,
+        explanation.recency_boost,
+        explanation.context_boost,
+        explanation.negative_feedback_penalty,
+        explanation.suppressed_penalty,
+        explanation.deleted_penalty
+    )
 }
 
 fn render_rank_explanation(
@@ -647,11 +852,13 @@ fn render_rank_explanation(
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use radishlex_ime_core::NamedKey;
+    use radishlex_ime_core::{InputSession, NamedKey};
 
-    use super::{parse_rime_args, run, CliError};
+    use super::{parse_rime_args, run, run_input_session, CliError, RankSmokeOptions};
+    use crate::DemoEngine;
 
     fn args(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_owned()).collect()
@@ -791,6 +998,54 @@ mod tests {
     }
 
     #[test]
+    fn rime_args_parse_rank_smoke_options() {
+        let options = parse_rime_args(&args(&[
+            "radishlex-ime-cli",
+            "rime",
+            "--schema",
+            "luna_pinyin",
+            "--shared-data",
+            "shared",
+            "--user-data",
+            "user",
+            "--rank-db",
+            "/tmp/radishlex-userdb.sqlite",
+            "--context",
+            "chat",
+            "luobo",
+        ]))
+        .expect("rime args should parse");
+
+        assert_eq!(
+            options.rank_smoke,
+            Some(RankSmokeOptions {
+                db_path: PathBuf::from("/tmp/radishlex-userdb.sqlite"),
+                context_kind: "chat".to_owned(),
+            })
+        );
+    }
+
+    #[test]
+    fn rime_args_reject_context_without_rank_db() {
+        let err = parse_rime_args(&args(&[
+            "radishlex-ime-cli",
+            "rime",
+            "--schema",
+            "luna_pinyin",
+            "--shared-data",
+            "shared",
+            "--user-data",
+            "user",
+            "--context",
+            "chat",
+            "luobo",
+        ]))
+        .expect_err("context without rank db must fail");
+
+        assert!(err.to_string().contains("--context requires --rank-db"));
+    }
+
+    #[test]
     fn rime_command_rejects_unknown_extra_key() {
         let err = run(&args(&[
             "radishlex-ime-cli",
@@ -809,6 +1064,44 @@ mod tests {
 
         assert!(matches!(err, CliError::Usage(_)));
         assert!(err.to_string().contains("unknown key name: home"));
+    }
+
+    #[test]
+    fn ranked_input_session_promotes_user_term_and_commits_engine_index() {
+        let db = temp_db_path("ranked-session");
+        run(&args(&[
+            "radishlex-ime-cli",
+            "dict",
+            "add",
+            "--db",
+            &db,
+            "--input",
+            "luobo",
+            "--text",
+            "萝卜词核",
+        ]))
+        .expect("dict add succeeds");
+
+        let options = RankSmokeOptions {
+            db_path: PathBuf::from(&db),
+            context_kind: "general".to_owned(),
+        };
+        let output = run_input_session(
+            InputSession::new(DemoEngine::new()),
+            "luobo",
+            &[],
+            None,
+            Some(&options),
+        )
+        .expect("ranked session succeeds");
+
+        assert!(output.contains("rank_context: general"));
+        assert!(output.contains("0. 萝卜词核 [luobo] - project term (engine_index=1"));
+        assert!(output.contains("user_term=1.000"));
+        assert!(output.contains("commit: 萝卜词核"));
+        assert!(output.contains("commit_engine_index: 1"));
+
+        let _ = fs::remove_file(db);
     }
 
     #[test]

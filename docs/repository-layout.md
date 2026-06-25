@@ -169,7 +169,7 @@ librime adapter：
 - 同步测试。
 - ranker explain。
 
-当前已落地基于合成 demo adapter 的 `demo <input-code> [candidate-index]` 命令，以及需要 `native-rime` feature 和本机 `librime` 依赖的 `rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] <input-code> [candidate-index]` 命令。`demo` 用于默认复验 `ime-core` 生命周期；它不代表真实中文输入引擎。Phase 2 起步已补 `dict list/add/delete`、`learn select/suppress` 和 `rank explain`，通过显式 `--db` 的临时 SQLite 数据库复验用户词条、学习事件、负反馈和 explain 输出。
+当前已落地基于合成 demo adapter 的 `demo <input-code> [candidate-index]` 命令，以及需要 `native-rime` feature 和本机 `librime` 依赖的 `rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] [--rank-db <path>] [--context <kind>] <input-code> [candidate-index]` 命令。`demo` 用于默认复验 `ime-core` 生命周期；它不代表真实中文输入引擎。Phase 2 起步已补 `dict list/add/delete`、`learn select/suppress`、`rank explain` 和 Rime rank smoke，通过显式 `--db` / `--rank-db` 的临时 SQLite 数据库复验用户词条、学习事件、负反馈、真实 engine candidates 重排和 explain 输出。
 
 ## Go server 建议
 
