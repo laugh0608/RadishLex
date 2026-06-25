@@ -74,6 +74,16 @@ SyncObject
 - `settings.schema`
 - `backup.snapshot`
 
+## 同步前置检查
+
+在 Go 后端、`ime-sync` 和 `ime-crypto` 落地前，`radishlex-ime-cli sync preflight --db <path>` 只用于检查本地 userdb 的分类边界：
+
+- P2 后续可加密同步：`dictionary.user_terms`、`ranker.weights`、`dictionary.deleted_terms`。
+- P1 默认本地保留：`selection_events`、`negative_feedback`。
+- 本地审计记录：`import_batches`。
+
+该命令不得生成明文同步 payload，不连接后端，不输出用户词明文、原始事件明文或负反馈明细。它的作用是提前复验“哪些表可以进入后续加密对象，哪些表必须留在本地”。
+
 ## 设备授权
 
 推荐流程：

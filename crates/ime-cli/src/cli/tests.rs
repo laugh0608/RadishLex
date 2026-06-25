@@ -374,6 +374,19 @@ fn dict_export_import_round_trip_feeds_rank_explain() {
     assert!(!export_text.contains("session-private"));
     assert!(!export_text.contains("chat"));
 
+    let inspected = run(&args(&[
+        "radishlex-ime-cli",
+        "dict",
+        "inspect",
+        "--file",
+        &export_file,
+    ]))
+    .expect("inspect succeeds");
+    assert!(inspected.contains("format: radishlex-user-terms-v1"));
+    assert!(inspected.contains("records: 1"));
+    assert!(inspected.contains("sync_class: P2"));
+    assert!(inspected.contains("compatible: true"));
+
     let preview = run(&args(&[
         "radishlex-ime-cli",
         "dict",
@@ -725,6 +738,88 @@ fn learn_commands_feed_rank_explain() {
     .expect("rank explain succeeds");
     assert!(explain.contains("negative_feedback_penalty: 1.200"));
     assert!(explain.contains("suppressed_penalty: 2.000"));
+
+    let _ = fs::remove_file(db);
+}
+
+#[test]
+fn sync_preflight_reports_syncable_and_local_only_counts() {
+    let db = temp_db_path("sync-preflight");
+
+    run(&args(&[
+        "radishlex-ime-cli",
+        "dict",
+        "add",
+        "--db",
+        &db,
+        "--input",
+        "luobo",
+        "--text",
+        "萝卜",
+        "--reading",
+        "luo bo",
+    ]))
+    .expect("add succeeds");
+    run(&args(&[
+        "radishlex-ime-cli",
+        "learn",
+        "select",
+        "--db",
+        &db,
+        "--input",
+        "cihe",
+        "--text",
+        "词核",
+        "--context",
+        "chat",
+    ]))
+    .expect("selection succeeds");
+    run(&args(&[
+        "radishlex-ime-cli",
+        "learn",
+        "suppress",
+        "--db",
+        &db,
+        "--input",
+        "cihe",
+        "--text",
+        "词核",
+        "--context",
+        "chat",
+    ]))
+    .expect("feedback succeeds");
+    run(&args(&[
+        "radishlex-ime-cli",
+        "dict",
+        "delete",
+        "--db",
+        &db,
+        "--input",
+        "luobo",
+        "--text",
+        "萝卜",
+        "--reading",
+        "luo bo",
+    ]))
+    .expect("delete succeeds");
+
+    let output = run(&args(&[
+        "radishlex-ime-cli",
+        "sync",
+        "preflight",
+        "--db",
+        &db,
+    ]))
+    .expect("preflight succeeds");
+
+    assert!(output.contains("sync_preflight: ready"));
+    assert!(output.contains("plaintext_payload: false"));
+    assert!(output.contains("dictionary.user_terms: 1"));
+    assert!(output.contains("ranker.weights: 1"));
+    assert!(output.contains("dictionary.deleted_terms: 1"));
+    assert!(output.contains("selection_events: 1"));
+    assert!(output.contains("negative_feedback: 1"));
+    assert!(output.contains("import_batches: 0"));
 
     let _ = fs::remove_file(db);
 }

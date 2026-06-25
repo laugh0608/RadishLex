@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn`、`rank explain`、`rime --rank-db` 和用户词库导入导出命令。下一阶段目标是继续补齐用户词库导入导出的格式兼容、管理边界和后续同步前置验证。
+当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查和同步前置检查命令。下一阶段目标是继续补齐后续同步 payload 草案和 FFI 边界。
 
 Phase 2 不改变底层 engine adapter 边界：
 
@@ -311,11 +311,13 @@ radishlex-ime-cli dict list --db <path>
 radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict export --db <path> --file <path>
+radishlex-ime-cli dict inspect --file <path>
 radishlex-ime-cli dict import --db <path> --file <path> [--source <name>] [--dry-run]
 radishlex-ime-cli dict import-batches --db <path>
 radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
 radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
 radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
+radishlex-ime-cli sync preflight --db <path>
 ```
 
 规则：
@@ -328,6 +330,8 @@ radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--
 - `dict import` 普通导入不得复活本地 deleted tombstone 命中的词条；恢复删除词条必须通过 `dict add` 这类明确人工动作。
 - `dict import --dry-run` 必须复用实际导入的分类逻辑，报告 `inserted`、`updated`、`skipped_deleted` 和 `skipped_duplicate`，但不得写入词条或导入批次。
 - `dict import-batches` 用于查看导入批次来源、导入数量、插入数量、更新数量、删除跳过数量、重复跳过数量和创建时间。
+- `dict inspect` 用于在不打开 userdb 的情况下检查导入文件格式版本、记录数和 CLI 输入码兼容性。
+- `sync preflight` 只输出 P2 可同步对象计数、P1 本地事件计数和本地审计计数，不生成明文同步 payload。
 
 ### 用户词库导入导出格式
 
@@ -355,8 +359,20 @@ luobo	萝卜	luo bo	manual_add	2	active
 - 字段内回车写作 `\r`。
 - 字段内反斜杠写作 `\\`。
 
+导入解析先识别格式版本，再按对应 header 解析字段。当前只支持 `radishlex-user-terms-v1`；未来未知版本必须返回明确的不兼容错误，不能按 v1 静默导入。
+
 导入会记录 `import_batches`，其中 `source_name` 来自 `dict import --source <name>`，未传时为 `cli`。该批次记录只表达导入来源，不改变每条词条的 `source` 字段。
 `source_name` 只允许 ASCII 字母、数字、dot、underscore 和 dash，最长 64 bytes。导入文件内重复的 `input_code`、`text`、`reading` 身份会跳过后续重复项；同 `input_code`、`text` 但不同 `reading` 视为不同词条。
+
+### 同步前置检查
+
+`sync preflight` 只做本地分类计数：
+
+- P2 后续可加密同步：`dictionary.user_terms`、`ranker.weights`、`dictionary.deleted_terms`。
+- P1 默认本地保留：`selection_events`、`negative_feedback`。
+- 本地审计记录：`import_batches`。
+
+该命令必须输出 `plaintext_payload: false`，表示当前阶段没有生成明文同步对象，也没有连接后端。
 
 ## 验证标准
 
@@ -372,6 +388,8 @@ Phase 2 起步必须覆盖：
 - P1 原始事件不会出现在导出文件或同步 payload 草案中。
 - 用户词库导出只包含 P2 词条字段，导入 malformed 文件返回明确错误。
 - 导入 dry-run 不写数据库，实际导入记录 `import_batches`，并区分 insert、update、deleted skip 和 duplicate skip。
+- 导入格式检查能识别当前 v1 文件，并对未知未来版本返回明确不兼容错误。
+- 同步前置检查只输出分类计数，不输出明文用户词、原始事件或负反馈明细。
 - `rank explain` 能说明候选排序变化原因。
 
 默认验证入口：
@@ -395,7 +413,8 @@ cargo test --workspace
 4. `ime-cli rime --rank-db` 已把 Rime adapter candidates 接入 ranker smoke，单元测试覆盖候选重排、explain 输出和原始 engine index 提交映射；本机 native rank smoke 命令已写入 runbook。
 5. 用户词库导入导出已补入 `ime-userdb` 与 `ime-cli`，格式为带版本头和字段表头的 UTF-8 TSV，并通过测试覆盖 P1 不导出、deleted tombstone 不复活和 malformed 文件错误。
 6. 导入 dry-run、批次查询、insert/update/duplicate/deleted 统计和 `import_batches` v2 migration 已补入。
-7. 下一步继续补导入导出跨版本兼容和后续同步前置验证。
+7. 导入格式版本解析、`dict inspect` 和 `sync preflight` 已补入。
+8. 下一步继续补同步 payload 草案和 FFI 边界。
 
 阶段停止线：
 

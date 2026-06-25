@@ -22,11 +22,13 @@ radishlex-ime-cli dict list --db <path>
 radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict export --db <path> --file <path>
+radishlex-ime-cli dict inspect --file <path>
 radishlex-ime-cli dict import --db <path> --file <path> [--source <name>] [--dry-run]
 radishlex-ime-cli dict import-batches --db <path>
 radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
 radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
 radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
+radishlex-ime-cli sync preflight --db <path>
 ```
 
 ## 输入会话输出
@@ -220,6 +222,16 @@ cargo run -p radishlex-ime-cli -- \
 
 成功后输出导出数量、文件路径和格式版本。
 
+检查导入文件兼容性：
+
+```bash
+cargo run -p radishlex-ime-cli -- \
+  dict inspect \
+  --file /tmp/radishlex-terms.tsv
+```
+
+成功后输出格式版本、记录数、同步分级和兼容状态。当前只支持 `radishlex-user-terms-v1`，未来版本文件会返回明确的不兼容错误，不会被当成 v1 继续导入。
+
 导入用户词库：
 
 ```bash
@@ -273,6 +285,7 @@ luobo	萝卜	luo bo	manual_add	2	active
 - `dict import` 对已存在且未删除的同身份词条执行更新，并计入 `updated`；不同 `reading` 视为不同词条。
 - `--source <name>` 只用于记录导入批次来源，允许 ASCII 字母、数字、dot、underscore 和 dash，最长 64 bytes；未传时为 `cli`。
 - `dict export --output <path>` 与 `dict import --input <path>` 是路径别名；正式文档优先使用 `--file <path>`。
+- `dict inspect --input <path>` 是 `dict inspect --file <path>` 的路径别名。
 
 ## learn 命令
 
@@ -365,6 +378,18 @@ explain:
 - `suppressed_penalty`：词条处于 suppressed 状态时的额外惩罚。
 - `deleted_penalty`：删除 tombstone 命中时的惩罚。
 
+## sync preflight 命令
+
+`sync preflight` 是同步实现前的本地检查入口，只统计 userdb 当前可进入后续加密同步对象的数据类别，不生成明文 payload，不连接后端。
+
+```bash
+cargo run -p radishlex-ime-cli -- \
+  sync preflight \
+  --db /tmp/radishlex-userdb.sqlite
+```
+
+输出包含 `dictionary.user_terms`、`ranker.weights`、`dictionary.deleted_terms` 这类 P2 可同步计数，以及 `selection_events`、`negative_feedback` 这类 P1 本地计数。`plaintext_payload: false` 表示该命令没有输出明文同步对象。
+
 ## 输入限制
 
 当前 CLI 的 `<input-code>` 与 `--input <code>` 只接受：
@@ -392,6 +417,7 @@ explain:
 - `rime --rank-db` 必须显式指定隔离 userdb，建议使用 `/tmp` 下临时 SQLite 文件。
 - `dict`、`learn` 和 `rank explain` 必须显式指定 `--db`，不应指向真实用户生产库；本阶段建议使用 `/tmp` 下临时 SQLite 文件。
 - `dict import/export` 的文件也建议放在 `/tmp` 下，测试内容使用合成词，不应导入真实个人词库或真实输入历史。
+- `sync preflight` 只输出分类计数，不输出用户词明文、事件明文或加密 payload。
 - `learn` 当前没有平台 secure text entry 信号输入，CLI smoke 只应使用合成词、虚构上下文和临时数据库。
 - 本机 smoke 应使用 `/tmp` 下的隔离目录和合成输入码，不提交 schema 数据、用户目录、日志或输出中的敏感内容。
 

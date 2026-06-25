@@ -6,12 +6,12 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 
 use crate::error::{UserDbError, UserDbResult};
 use crate::model::{
-    DictionaryImportBatch, DictionaryImportSummary, DictionaryTermRecord, NegativeFeedbackDraft,
-    PrivacyLevel, SelectionEventDraft, TermSource, TermStatus, UserTerm,
+    DictionaryImportBatch, DictionaryImportSummary, DictionaryTermRecord, DictionaryTermsDocument,
+    DictionaryTermsFormat, NegativeFeedbackDraft, PrivacyLevel, SelectionEventDraft,
+    SyncPreflightSummary, TermSource, TermStatus, UserTerm,
 };
 
 const SCHEMA_VERSION: i64 = 2;
-const DICTIONARY_EXPORT_VERSION: &str = "# radishlex-user-terms-v1";
 const DICTIONARY_EXPORT_HEADER: &str = "input_code\ttext\treading\tsource\tweight\tstatus";
 
 #[derive(Debug, Clone, PartialEq)]
@@ -379,6 +379,18 @@ impl UserDb {
         Ok(batches)
     }
 
+    pub fn sync_preflight_summary(&self) -> UserDbResult<SyncPreflightSummary> {
+        Ok(SyncPreflightSummary {
+            schema_version: self.schema_version()?,
+            syncable_user_terms: self.count_user_terms_for_sync()?,
+            syncable_ranker_weights: count_rows(&self.connection, "ranker_weights")? as usize,
+            syncable_deleted_terms: count_rows(&self.connection, "deleted_terms")? as usize,
+            local_selection_events: count_rows(&self.connection, "selection_events")? as usize,
+            local_negative_feedback: count_rows(&self.connection, "negative_feedback")? as usize,
+            local_import_batches: count_rows(&self.connection, "import_batches")? as usize,
+        })
+    }
+
     pub fn ranker_weight(
         &self,
         input_code: &str,
@@ -590,6 +602,19 @@ impl UserDb {
         Ok(())
     }
 
+    fn count_user_terms_for_sync(&self) -> UserDbResult<usize> {
+        self.connection
+            .query_row(
+                "SELECT COUNT(*)
+                 FROM user_terms
+                 WHERE status IN ('active', 'suppressed')",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map(|count| count as usize)
+            .map_err(Into::into)
+    }
+
     fn upsert_term_from_selection(
         &self,
         input_code: &str,
@@ -717,7 +742,7 @@ fn to_sqlite_conversion_failure(error: UserDbError) -> rusqlite::Error {
 
 pub fn encode_dictionary_terms_tsv(records: &[DictionaryTermRecord]) -> String {
     let mut output = String::new();
-    output.push_str(DICTIONARY_EXPORT_VERSION);
+    output.push_str(DictionaryTermsFormat::V1.version_line());
     output.push('\n');
     output.push_str(DICTIONARY_EXPORT_HEADER);
     output.push('\n');
@@ -743,25 +768,22 @@ pub fn encode_dictionary_terms_tsv(records: &[DictionaryTermRecord]) -> String {
 }
 
 pub fn decode_dictionary_terms_tsv(input: &str) -> UserDbResult<Vec<DictionaryTermRecord>> {
+    Ok(decode_dictionary_terms_tsv_document(input)?.records)
+}
+
+pub fn decode_dictionary_terms_tsv_document(input: &str) -> UserDbResult<DictionaryTermsDocument> {
     let mut lines = input.lines();
     let version = lines
         .next()
         .ok_or_else(|| UserDbError::invalid_input("import_file", "file is empty"))?;
-    if version != DICTIONARY_EXPORT_VERSION {
-        return Err(UserDbError::invalid_input(
-            "import_file",
-            format!("expected version line {DICTIONARY_EXPORT_VERSION}"),
-        ));
-    }
+    let format = DictionaryTermsFormat::from_version_line(version)?;
 
     let header = lines.next().ok_or_else(|| {
         UserDbError::invalid_input("import_file", "missing dictionary field header")
     })?;
-    if header != DICTIONARY_EXPORT_HEADER {
-        return Err(UserDbError::invalid_input(
-            "import_file",
-            format!("expected header {DICTIONARY_EXPORT_HEADER}"),
-        ));
+
+    match format {
+        DictionaryTermsFormat::V1 => validate_dictionary_v1_header(header)?,
     }
 
     let mut records = Vec::new();
@@ -800,7 +822,7 @@ pub fn decode_dictionary_terms_tsv(input: &str) -> UserDbResult<Vec<DictionaryTe
         records.push(record);
     }
 
-    Ok(records)
+    Ok(DictionaryTermsDocument { format, records })
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -873,6 +895,16 @@ fn table_columns(connection: &Connection, table: &str) -> UserDbResult<BTreeSet<
         .query_map([], |row| row.get::<_, String>(1))?
         .collect::<Result<BTreeSet<_>, _>>()?;
     Ok(columns)
+}
+
+fn validate_dictionary_v1_header(header: &str) -> UserDbResult<()> {
+    if header != DICTIONARY_EXPORT_HEADER {
+        return Err(UserDbError::invalid_input(
+            "import_file",
+            format!("expected v1 header {DICTIONARY_EXPORT_HEADER}"),
+        ));
+    }
+    Ok(())
 }
 
 fn validate_selection_event(event: &SelectionEventDraft) -> UserDbResult<()> {

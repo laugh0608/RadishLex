@@ -11,9 +11,9 @@ use radishlex_ime_core::{
 use radishlex_ime_engine_rime::{RimeEngine, RimeEngineConfig};
 use radishlex_ime_ranker::{RankRequest, RankedCandidate, Ranker};
 use radishlex_ime_userdb::{
-    decode_dictionary_terms_tsv, encode_dictionary_terms_tsv, DictionaryTermRecord,
-    NegativeFeedbackDraft, NegativeFeedbackReason, RankerWeight, SelectionEventDraft, TermSource,
-    UserDb, UserDbError, UserTerm,
+    decode_dictionary_terms_tsv_document, encode_dictionary_terms_tsv, DictionaryTermRecord,
+    NegativeFeedbackDraft, NegativeFeedbackReason, RankerWeight, SelectionEventDraft,
+    SyncPreflightSummary, TermSource, UserDb, UserDbError, UserTerm,
 };
 
 use crate::DemoEngine;
@@ -26,11 +26,13 @@ Usage:
   radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
   radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
   radishlex-ime-cli dict export --db <path> --file <path>
+  radishlex-ime-cli dict inspect --file <path>
   radishlex-ime-cli dict import --db <path> --file <path> [--source <name>] [--dry-run]
   radishlex-ime-cli dict import-batches --db <path>
   radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
   radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
   radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
+  radishlex-ime-cli sync preflight --db <path>
 
 Examples:
   radishlex-ime-cli demo luobo
@@ -40,11 +42,13 @@ Examples:
   radishlex-ime-cli rime --schema luna_pinyin --shared-data ./rime-data --user-data ./tmp/rime-user --rank-db /tmp/radishlex-userdb.sqlite luobo
   radishlex-ime-cli dict add --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
   radishlex-ime-cli dict export --db /tmp/radishlex-userdb.sqlite --file /tmp/radishlex-terms.tsv
+  radishlex-ime-cli dict inspect --file /tmp/radishlex-terms.tsv
   radishlex-ime-cli dict import --db /tmp/radishlex-userdb.sqlite --file /tmp/radishlex-terms.tsv --dry-run
   radishlex-ime-cli dict import --db /tmp/radishlex-userdb.sqlite --file /tmp/radishlex-terms.tsv --source smoke
   radishlex-ime-cli dict import-batches --db /tmp/radishlex-userdb.sqlite
   radishlex-ime-cli learn select --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
   radishlex-ime-cli rank explain --db /tmp/radishlex-userdb.sqlite --input luobo --candidate 萝卜
+  radishlex-ime-cli sync preflight --db /tmp/radishlex-userdb.sqlite
 ";
 
 #[derive(Debug)]
@@ -95,6 +99,7 @@ pub fn run(args: &[String]) -> Result<String, CliError> {
         Some("dict") => run_dict(args),
         Some("learn") => run_learn(args),
         Some("rank") => run_rank(args),
+        Some("sync") => run_sync(args),
         Some("-h" | "--help") => Ok(USAGE.to_owned()),
         Some(other) => Err(CliError::Usage(format!("unknown command: {other}"))),
         None => Err(CliError::Usage("missing command".to_owned())),
@@ -147,6 +152,7 @@ fn run_dict(args: &[String]) -> Result<String, CliError> {
         Some("add") => run_dict_add(args),
         Some("delete") => run_dict_delete(args),
         Some("export") => run_dict_export(args),
+        Some("inspect") => run_dict_inspect(args),
         Some("import") => run_dict_import(args),
         Some("import-batches") => run_dict_import_batches(args),
         Some(other) => Err(CliError::Usage(format!("unknown dict command: {other}"))),
@@ -232,6 +238,23 @@ fn run_dict_export(args: &[String]) -> Result<String, CliError> {
     ))
 }
 
+fn run_dict_inspect(args: &[String]) -> Result<String, CliError> {
+    let options = parse_named_options(args, 3, &["file", "input"], "dict inspect")?;
+    let file_path = required_one_of_options(&options, "file", "input")?;
+    let encoded = fs::read_to_string(&file_path).map_err(|error| {
+        CliError::Data(format!("failed to read {}: {error}", file_path.display()))
+    })?;
+    let document = decode_dictionary_terms_tsv_document(&encoded)?;
+    validate_import_input_codes(&document.records)?;
+
+    Ok(format!(
+        "format: {}\nrecords: {}\nsync_class: P2\ncompatible: true\nfile: {}\n",
+        document.format,
+        document.records.len(),
+        file_path.display()
+    ))
+}
+
 fn run_dict_import(args: &[String]) -> Result<String, CliError> {
     let parsed = parse_named_options_with_flags(
         args,
@@ -249,14 +272,14 @@ fn run_dict_import(args: &[String]) -> Result<String, CliError> {
     let encoded = fs::read_to_string(&file_path).map_err(|error| {
         CliError::Data(format!("failed to read {}: {error}", file_path.display()))
     })?;
-    let records = decode_dictionary_terms_tsv(&encoded)?;
-    validate_import_input_codes(&records)?;
+    let document = decode_dictionary_terms_tsv_document(&encoded)?;
+    validate_import_input_codes(&document.records)?;
 
     let mut db = UserDb::open(db_path)?;
     let summary = if dry_run {
-        db.preview_dictionary_import(&records, source_name)?
+        db.preview_dictionary_import(&document.records, source_name)?
     } else {
-        db.import_dictionary_records(&records, source_name)?
+        db.import_dictionary_records(&document.records, source_name)?
     };
 
     Ok(render_import_summary(
@@ -293,6 +316,22 @@ fn run_dict_import_batches(args: &[String]) -> Result<String, CliError> {
         }
     }
     Ok(output)
+}
+
+fn run_sync(args: &[String]) -> Result<String, CliError> {
+    match args.get(2).map(String::as_str) {
+        Some("preflight") => run_sync_preflight(args),
+        Some(other) => Err(CliError::Usage(format!("unknown sync command: {other}"))),
+        None => Err(CliError::Usage("missing sync command".to_owned())),
+    }
+}
+
+fn run_sync_preflight(args: &[String]) -> Result<String, CliError> {
+    let options = parse_named_options(args, 3, &["db"], "sync preflight")?;
+    let db_path = required_named_option(&options, "db")?;
+    let db = UserDb::open(db_path)?;
+    let summary = db.sync_preflight_summary()?;
+    Ok(render_sync_preflight(&summary))
 }
 
 fn run_learn(args: &[String]) -> Result<String, CliError> {
@@ -1058,6 +1097,41 @@ fn render_import_summary(
     ));
     output.push_str(&format!("source: {source_name}\n"));
     output.push_str(&format!("file: {}\n", file_path.display()));
+    output
+}
+
+fn render_sync_preflight(summary: &SyncPreflightSummary) -> String {
+    let mut output = String::new();
+    output.push_str("sync_preflight: ready\n");
+    output.push_str(&format!("schema_version: {}\n", summary.schema_version));
+    output.push_str("plaintext_payload: false\n");
+    output.push_str("p2_syncable:\n");
+    output.push_str(&format!(
+        "  dictionary.user_terms: {}\n",
+        summary.syncable_user_terms
+    ));
+    output.push_str(&format!(
+        "  ranker.weights: {}\n",
+        summary.syncable_ranker_weights
+    ));
+    output.push_str(&format!(
+        "  dictionary.deleted_terms: {}\n",
+        summary.syncable_deleted_terms
+    ));
+    output.push_str("p1_local_only:\n");
+    output.push_str(&format!(
+        "  selection_events: {}\n",
+        summary.local_selection_events
+    ));
+    output.push_str(&format!(
+        "  negative_feedback: {}\n",
+        summary.local_negative_feedback
+    ));
+    output.push_str("local_audit:\n");
+    output.push_str(&format!(
+        "  import_batches: {}\n",
+        summary.local_import_batches
+    ));
     output
 }
 

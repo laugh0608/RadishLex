@@ -2,9 +2,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::UserDb;
 use crate::{
-    decode_dictionary_terms_tsv, encode_dictionary_terms_tsv, DictionaryTermRecord,
-    NegativeFeedbackDraft, NegativeFeedbackReason, PrivacyLevel, SelectionEventDraft, TermSource,
-    TermStatus,
+    decode_dictionary_terms_tsv, decode_dictionary_terms_tsv_document, encode_dictionary_terms_tsv,
+    DictionaryTermRecord, DictionaryTermsFormat, NegativeFeedbackDraft, NegativeFeedbackReason,
+    PrivacyLevel, SelectionEventDraft, TermSource, TermStatus,
 };
 
 fn temp_db_path(test_name: &str) -> String {
@@ -397,6 +397,10 @@ fn dictionary_tsv_round_trips_escaped_fields() {
 
     let decoded = decode_dictionary_terms_tsv(&encoded).expect("decode succeeds");
     assert_eq!(decoded, records);
+
+    let document = decode_dictionary_terms_tsv_document(&encoded).expect("document decodes");
+    assert_eq!(document.format, DictionaryTermsFormat::V1);
+    assert_eq!(document.records, records);
 }
 
 #[test]
@@ -424,6 +428,15 @@ luobo\t萝卜\t\tunknown\t1.0\tactive
 ";
     let error = decode_dictionary_terms_tsv(bad_source).expect_err("source fails");
     assert!(error.to_string().contains("unknown term source"));
+
+    let future_version = "\
+# radishlex-user-terms-v2
+input_code\ttext\treading\tsource\tweight\tstatus
+luobo\t萝卜\t\tmanual_import\t1.0\tactive
+";
+    let error = decode_dictionary_terms_tsv(future_version).expect_err("future version fails");
+    assert!(error.to_string().contains("unsupported dictionary format"));
+    assert!(error.to_string().contains("radishlex-user-terms-v1"));
 }
 
 #[test]
@@ -447,4 +460,32 @@ fn dictionary_import_rejects_invalid_batch_source_name() {
         .preview_dictionary_import(&records, "bad source")
         .expect_err("bad preview source fails");
     assert!(error.to_string().contains("source_name"));
+}
+
+#[test]
+fn sync_preflight_separates_syncable_and_local_only_counts() {
+    let mut db = UserDb::open_in_memory().expect("userdb opens");
+    db.add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualAdd)
+        .expect("term is added");
+    db.record_selection(
+        SelectionEventDraft::new("session-local", "cihe", "词核", 0, 1).with_context_kind("chat"),
+    )
+    .expect("selection is recorded");
+    db.record_negative_feedback(
+        NegativeFeedbackDraft::new("cihe", "词核", NegativeFeedbackReason::ManualSuppress)
+            .with_context_kind("chat"),
+    )
+    .expect("feedback is recorded");
+    db.delete_term("luobo", "萝卜", Some("luo bo"))
+        .expect("term is deleted");
+
+    let summary = db.sync_preflight_summary().expect("summary");
+
+    assert_eq!(summary.schema_version, 2);
+    assert_eq!(summary.syncable_user_terms, 1);
+    assert_eq!(summary.syncable_ranker_weights, 1);
+    assert_eq!(summary.syncable_deleted_terms, 1);
+    assert_eq!(summary.local_selection_events, 1);
+    assert_eq!(summary.local_negative_feedback, 1);
+    assert_eq!(summary.local_import_batches, 0);
 }

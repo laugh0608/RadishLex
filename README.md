@@ -60,6 +60,7 @@ Phase 2 起步的本地学习链路可通过显式 SQLite 路径复验：
 cargo run -p radishlex-ime-cli -- dict add --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
 cargo run -p radishlex-ime-cli -- learn select --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
 cargo run -p radishlex-ime-cli -- rank explain --db /tmp/radishlex-userdb.sqlite --input luobo --candidate 萝卜
+cargo run -p radishlex-ime-cli -- sync preflight --db /tmp/radishlex-userdb.sqlite
 ```
 
 启用 `native-rime` 时，可进一步用 `rime --rank-db <path>` 验证真实 Rime candidates 进入本地 ranker。

@@ -178,6 +178,61 @@ impl From<&UserTerm> for DictionaryTermRecord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DictionaryTermsFormat {
+    V1,
+}
+
+impl DictionaryTermsFormat {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::V1 => "radishlex-user-terms-v1",
+        }
+    }
+
+    pub fn version_line(self) -> &'static str {
+        match self {
+            Self::V1 => "# radishlex-user-terms-v1",
+        }
+    }
+
+    pub fn supported_versions() -> &'static [&'static str] {
+        &["radishlex-user-terms-v1"]
+    }
+
+    pub fn from_version_line(line: &str) -> UserDbResult<Self> {
+        let Some(version) = line.strip_prefix("# ") else {
+            return Err(UserDbError::invalid_input(
+                "import_file",
+                "missing dictionary format version line",
+            ));
+        };
+
+        match version.trim() {
+            "radishlex-user-terms-v1" => Ok(Self::V1),
+            unsupported => Err(UserDbError::invalid_input(
+                "import_file",
+                format!(
+                    "unsupported dictionary format {unsupported}; supported versions: {}",
+                    Self::supported_versions().join(", ")
+                ),
+            )),
+        }
+    }
+}
+
+impl fmt::Display for DictionaryTermsFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DictionaryTermsDocument {
+    pub format: DictionaryTermsFormat,
+    pub records: Vec<DictionaryTermRecord>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DictionaryImportSummary {
     pub import_batch_id: Option<i64>,
     pub total_records: usize,
@@ -214,6 +269,17 @@ pub struct DictionaryImportBatch {
     pub skipped_duplicate_terms: usize,
     pub created_at_ms: i64,
     pub notes: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SyncPreflightSummary {
+    pub schema_version: i64,
+    pub syncable_user_terms: usize,
+    pub syncable_ranker_weights: usize,
+    pub syncable_deleted_terms: usize,
+    pub local_selection_events: usize,
+    pub local_negative_feedback: usize,
+    pub local_import_batches: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
