@@ -374,6 +374,33 @@ fn dict_export_import_round_trip_feeds_rank_explain() {
     assert!(!export_text.contains("session-private"));
     assert!(!export_text.contains("chat"));
 
+    let preview = run(&args(&[
+        "radishlex-ime-cli",
+        "dict",
+        "import",
+        "--db",
+        &target_db,
+        "--file",
+        &export_file,
+        "--source",
+        "round-trip",
+        "--dry-run",
+    ]))
+    .expect("preview succeeds");
+    assert!(preview.contains("dry_run: true"));
+    assert!(preview.contains("would_import: 1"));
+    assert!(preview.contains("inserted: 1"));
+
+    let batches = run(&args(&[
+        "radishlex-ime-cli",
+        "dict",
+        "import-batches",
+        "--db",
+        &target_db,
+    ]))
+    .expect("batch list succeeds");
+    assert!(batches.contains("import_batches:\n  <none>"));
+
     let imported = run(&args(&[
         "radishlex-ime-cli",
         "dict",
@@ -386,8 +413,21 @@ fn dict_export_import_round_trip_feeds_rank_explain() {
         "round-trip",
     ]))
     .expect("import succeeds");
+    assert!(imported.contains("import_batch: 1"));
     assert!(imported.contains("imported: 1"));
+    assert!(imported.contains("inserted: 1"));
+    assert!(imported.contains("updated: 0"));
     assert!(imported.contains("skipped_deleted: 0"));
+
+    let batches = run(&args(&[
+        "radishlex-ime-cli",
+        "dict",
+        "import-batches",
+        "--db",
+        &target_db,
+    ]))
+    .expect("batch list succeeds");
+    assert!(batches.contains("1. source=round-trip imported=1 inserted=1 updated=0"));
 
     let explain = run(&args(&[
         "radishlex-ime-cli",
@@ -408,6 +448,77 @@ fn dict_export_import_round_trip_feeds_rank_explain() {
     let _ = fs::remove_file(source_db);
     let _ = fs::remove_file(target_db);
     let _ = fs::remove_file(export_file);
+}
+
+#[test]
+fn dict_import_reports_updates_and_duplicate_records() {
+    let db = temp_db_path("dict-import-stats");
+    let import_file = temp_file_path("dict-import-stats", "tsv");
+    fs::write(
+        &import_file,
+        "\
+# radishlex-user-terms-v1
+input_code\ttext\treading\tsource\tweight\tstatus
+luobo\t萝卜\tluo bo\tmanual_import\t3.0\tsuppressed
+luobo\t萝卜\tluo bo\tmanual_import\t9.0\tactive
+cihe\t词核\t\tmanual_import\t1.0\tactive
+",
+    )
+    .expect("import file is written");
+
+    run(&args(&[
+        "radishlex-ime-cli",
+        "dict",
+        "add",
+        "--db",
+        &db,
+        "--input",
+        "luobo",
+        "--text",
+        "萝卜",
+        "--reading",
+        "luo bo",
+    ]))
+    .expect("add succeeds");
+
+    let preview = run(&args(&[
+        "radishlex-ime-cli",
+        "dict",
+        "import",
+        "--db",
+        &db,
+        "--file",
+        &import_file,
+        "--dry-run",
+    ]))
+    .expect("preview succeeds");
+    assert!(preview.contains("would_import: 2"));
+    assert!(preview.contains("inserted: 1"));
+    assert!(preview.contains("updated: 1"));
+    assert!(preview.contains("skipped_duplicate: 1"));
+
+    let imported = run(&args(&[
+        "radishlex-ime-cli",
+        "dict",
+        "import",
+        "--db",
+        &db,
+        "--file",
+        &import_file,
+    ]))
+    .expect("import succeeds");
+    assert!(imported.contains("imported: 2"));
+    assert!(imported.contains("updated: 1"));
+    assert!(imported.contains("skipped_duplicate: 1"));
+
+    let listed =
+        run(&args(&["radishlex-ime-cli", "dict", "list", "--db", &db])).expect("list succeeds");
+    assert!(listed
+        .contains("luobo -> 萝卜 [luo bo] source=manual_import status=suppressed weight=3.000"));
+    assert!(listed.contains("cihe -> 词核 source=manual_import status=active weight=1.000"));
+
+    let _ = fs::remove_file(db);
+    let _ = fs::remove_file(import_file);
 }
 
 #[test]
@@ -501,6 +612,41 @@ luobo\t萝卜\t\tmanual_import\tbad\tactive
 
     assert!(matches!(err, CliError::Data(_)));
     assert!(err.to_string().contains("invalid weight"));
+
+    let _ = fs::remove_file(db);
+    let _ = fs::remove_file(import_file);
+}
+
+#[test]
+fn dict_import_rejects_invalid_source_name() {
+    let db = temp_db_path("dict-import-source");
+    let import_file = temp_file_path("dict-import-source", "tsv");
+    fs::write(
+        &import_file,
+        "\
+# radishlex-user-terms-v1
+input_code\ttext\treading\tsource\tweight\tstatus
+luobo\t萝卜\t\tmanual_import\t1.0\tactive
+",
+    )
+    .expect("import file is written");
+
+    let err = run(&args(&[
+        "radishlex-ime-cli",
+        "dict",
+        "import",
+        "--db",
+        &db,
+        "--file",
+        &import_file,
+        "--source",
+        "bad source",
+        "--dry-run",
+    ]))
+    .expect_err("bad source must fail");
+
+    assert!(matches!(err, CliError::Data(_)));
+    assert!(err.to_string().contains("source_name"));
 
     let _ = fs::remove_file(db);
     let _ = fs::remove_file(import_file);

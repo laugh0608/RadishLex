@@ -311,7 +311,8 @@ radishlex-ime-cli dict list --db <path>
 radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict export --db <path> --file <path>
-radishlex-ime-cli dict import --db <path> --file <path> [--source <name>]
+radishlex-ime-cli dict import --db <path> --file <path> [--source <name>] [--dry-run]
+radishlex-ime-cli dict import-batches --db <path>
 radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
 radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
 radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
@@ -325,6 +326,8 @@ radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--
 - `rank explain` 输出排序因子，不能只输出最终分数。
 - `dict export` 只导出 P2 用户词条数据，不导出 P1 原始选择事件、负反馈详细事件、上下文统计或 ranker 权重摘要。
 - `dict import` 普通导入不得复活本地 deleted tombstone 命中的词条；恢复删除词条必须通过 `dict add` 这类明确人工动作。
+- `dict import --dry-run` 必须复用实际导入的分类逻辑，报告 `inserted`、`updated`、`skipped_deleted` 和 `skipped_duplicate`，但不得写入词条或导入批次。
+- `dict import-batches` 用于查看导入批次来源、导入数量、插入数量、更新数量、删除跳过数量、重复跳过数量和创建时间。
 
 ### 用户词库导入导出格式
 
@@ -353,6 +356,7 @@ luobo	萝卜	luo bo	manual_add	2	active
 - 字段内反斜杠写作 `\\`。
 
 导入会记录 `import_batches`，其中 `source_name` 来自 `dict import --source <name>`，未传时为 `cli`。该批次记录只表达导入来源，不改变每条词条的 `source` 字段。
+`source_name` 只允许 ASCII 字母、数字、dot、underscore 和 dash，最长 64 bytes。导入文件内重复的 `input_code`、`text`、`reading` 身份会跳过后续重复项；同 `input_code`、`text` 但不同 `reading` 视为不同词条。
 
 ## 验证标准
 
@@ -367,6 +371,7 @@ Phase 2 起步必须覆盖：
 - P0 输入事件不会写入 userdb。
 - P1 原始事件不会出现在导出文件或同步 payload 草案中。
 - 用户词库导出只包含 P2 词条字段，导入 malformed 文件返回明确错误。
+- 导入 dry-run 不写数据库，实际导入记录 `import_batches`，并区分 insert、update、deleted skip 和 duplicate skip。
 - `rank explain` 能说明候选排序变化原因。
 
 默认验证入口：
@@ -389,7 +394,8 @@ cargo test --workspace
 3. `ime-cli` 已扩展 `dict`、`learn` 和 `rank explain` 命令，基础学习链路可通过临时 SQLite 数据库复验。
 4. `ime-cli rime --rank-db` 已把 Rime adapter candidates 接入 ranker smoke，单元测试覆盖候选重排、explain 输出和原始 engine index 提交映射；本机 native rank smoke 命令已写入 runbook。
 5. 用户词库导入导出已补入 `ime-userdb` 与 `ime-cli`，格式为带版本头和字段表头的 UTF-8 TSV，并通过测试覆盖 P1 不导出、deleted tombstone 不复活和 malformed 文件错误。
-6. 下一步继续补导入导出格式兼容、批量导入来源管理和后续同步前置验证。
+6. 导入 dry-run、批次查询、insert/update/duplicate/deleted 统计和 `import_batches` v2 migration 已补入。
+7. 下一步继续补导入导出跨版本兼容和后续同步前置验证。
 
 阶段停止线：
 

@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -5,11 +6,11 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 
 use crate::error::{UserDbError, UserDbResult};
 use crate::model::{
-    DictionaryImportSummary, DictionaryTermRecord, NegativeFeedbackDraft, PrivacyLevel,
-    SelectionEventDraft, TermSource, TermStatus, UserTerm,
+    DictionaryImportBatch, DictionaryImportSummary, DictionaryTermRecord, NegativeFeedbackDraft,
+    PrivacyLevel, SelectionEventDraft, TermSource, TermStatus, UserTerm,
 };
 
-const SCHEMA_VERSION: i64 = 1;
+const SCHEMA_VERSION: i64 = 2;
 const DICTIONARY_EXPORT_VERSION: &str = "# radishlex-user-terms-v1";
 const DICTIONARY_EXPORT_HEADER: &str = "input_code\ttext\treading\tsource\tweight\tstatus";
 
@@ -128,28 +129,13 @@ impl UserDb {
         source_name: impl AsRef<str>,
     ) -> UserDbResult<DictionaryImportSummary> {
         let source_name = normalized_required("source_name", source_name.as_ref())?;
+        validate_import_source_name(&source_name)?;
         let now = now_ms()?;
-        let mut summary = DictionaryImportSummary {
-            total_records: records.len(),
-            imported_terms: 0,
-            skipped_deleted_terms: 0,
-        };
 
         let transaction = self.connection.transaction()?;
-        for record in records {
-            validate_dictionary_record(record)?;
-            let input_code = normalized_required("input_code", &record.input_code)?;
-            let text = normalized_required("text", &record.text)?;
-            let reading = normalized_optional(record.reading.as_deref());
+        let (mut summary, actions) = prepare_dictionary_import(&transaction, records)?;
 
-            if has_deleted_tombstone_on(&transaction, &input_code, &text, &reading)?
-                || fetch_term_status_on(&transaction, &input_code, &text, &reading)?
-                    == Some(TermStatus::Deleted)
-            {
-                summary.skipped_deleted_terms += 1;
-                continue;
-            }
-
+        for action in actions {
             transaction.execute(
                 "INSERT INTO user_terms (
                     text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms
@@ -161,25 +147,48 @@ impl UserDb {
                     status = excluded.status,
                     updated_at_ms = excluded.updated_at_ms",
                 params![
-                    text,
-                    reading,
-                    input_code,
-                    record.source.as_str(),
-                    record.weight,
-                    record.status.as_str(),
+                    action.text,
+                    action.reading,
+                    action.input_code,
+                    action.source.as_str(),
+                    action.weight,
+                    action.status.as_str(),
                     now
                 ],
             )?;
-            summary.imported_terms += 1;
         }
 
         transaction.execute(
-            "INSERT INTO import_batches (source_name, term_count, created_at_ms, notes)
-             VALUES (?1, ?2, ?3, '')",
-            params![source_name, summary.imported_terms as i64, now],
+            "INSERT INTO import_batches (
+                source_name, term_count, total_count, inserted_count, updated_count,
+                skipped_deleted_count, skipped_duplicate_count, created_at_ms, notes
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, '')",
+            params![
+                source_name,
+                summary.imported_terms as i64,
+                summary.total_records as i64,
+                summary.inserted_terms as i64,
+                summary.updated_terms as i64,
+                summary.skipped_deleted_terms as i64,
+                summary.skipped_duplicate_terms as i64,
+                now
+            ],
         )?;
+        summary.import_batch_id = Some(transaction.last_insert_rowid());
         transaction.commit()?;
 
+        Ok(summary)
+    }
+
+    pub fn preview_dictionary_import(
+        &self,
+        records: &[DictionaryTermRecord],
+        source_name: impl AsRef<str>,
+    ) -> UserDbResult<DictionaryImportSummary> {
+        let source_name = normalized_required("source_name", source_name.as_ref())?;
+        validate_import_source_name(&source_name)?;
+        let (summary, _) = prepare_dictionary_import(&self.connection, records)?;
         Ok(summary)
     }
 
@@ -357,6 +366,19 @@ impl UserDb {
         count_rows(&self.connection, "import_batches")
     }
 
+    pub fn list_import_batches(&self) -> UserDbResult<Vec<DictionaryImportBatch>> {
+        let mut statement = self.connection.prepare(
+            "SELECT id, source_name, total_count, term_count, inserted_count, updated_count,
+                    skipped_deleted_count, skipped_duplicate_count, created_at_ms, notes
+             FROM import_batches
+             ORDER BY id",
+        )?;
+        let batches = statement
+            .query_map([], import_batch_from_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(batches)
+    }
+
     pub fn ranker_weight(
         &self,
         input_code: &str,
@@ -458,13 +480,36 @@ impl UserDb {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 source_name TEXT NOT NULL,
                 term_count INTEGER NOT NULL,
+                total_count INTEGER NOT NULL DEFAULT 0,
+                inserted_count INTEGER NOT NULL DEFAULT 0,
+                updated_count INTEGER NOT NULL DEFAULT 0,
+                skipped_deleted_count INTEGER NOT NULL DEFAULT 0,
+                skipped_duplicate_count INTEGER NOT NULL DEFAULT 0,
                 created_at_ms INTEGER NOT NULL,
                 notes TEXT NOT NULL DEFAULT ''
             );
-
-            PRAGMA user_version = 1;
             ",
         )?;
+
+        match self.schema_version()? {
+            0 => {
+                self.ensure_import_batch_v2_columns()?;
+                self.connection
+                    .pragma_update(None, "user_version", SCHEMA_VERSION)?;
+            }
+            1 => {
+                self.ensure_import_batch_v2_columns()?;
+                self.connection
+                    .pragma_update(None, "user_version", SCHEMA_VERSION)?;
+            }
+            SCHEMA_VERSION => {}
+            version => {
+                return Err(UserDbError::invalid_input(
+                    "schema_version",
+                    format!("expected {SCHEMA_VERSION}, got {version}"),
+                ));
+            }
+        }
 
         let version = self.schema_version()?;
         if version != SCHEMA_VERSION {
@@ -473,6 +518,47 @@ impl UserDb {
                 format!("expected {SCHEMA_VERSION}, got {version}"),
             ));
         }
+
+        Ok(())
+    }
+
+    fn ensure_import_batch_v2_columns(&self) -> UserDbResult<()> {
+        let columns = table_columns(&self.connection, "import_batches")?;
+        let migrations = [
+            (
+                "total_count",
+                "ALTER TABLE import_batches ADD COLUMN total_count INTEGER NOT NULL DEFAULT 0",
+            ),
+            (
+                "inserted_count",
+                "ALTER TABLE import_batches ADD COLUMN inserted_count INTEGER NOT NULL DEFAULT 0",
+            ),
+            (
+                "updated_count",
+                "ALTER TABLE import_batches ADD COLUMN updated_count INTEGER NOT NULL DEFAULT 0",
+            ),
+            (
+                "skipped_deleted_count",
+                "ALTER TABLE import_batches ADD COLUMN skipped_deleted_count INTEGER NOT NULL DEFAULT 0",
+            ),
+            (
+                "skipped_duplicate_count",
+                "ALTER TABLE import_batches ADD COLUMN skipped_duplicate_count INTEGER NOT NULL DEFAULT 0",
+            ),
+        ];
+
+        for (column, sql) in migrations {
+            if !columns.contains(column) {
+                self.connection.execute(sql, [])?;
+            }
+        }
+
+        self.connection.execute(
+            "UPDATE import_batches
+             SET total_count = CASE WHEN total_count = 0 THEN term_count ELSE total_count END,
+                 inserted_count = CASE WHEN inserted_count = 0 THEN term_count ELSE inserted_count END",
+            [],
+        )?;
 
         Ok(())
     }
@@ -592,6 +678,39 @@ fn user_term_from_row(row: &Row<'_>) -> rusqlite::Result<UserTerm> {
     })
 }
 
+fn import_batch_from_row(row: &Row<'_>) -> rusqlite::Result<DictionaryImportBatch> {
+    Ok(DictionaryImportBatch {
+        id: row.get(0)?,
+        source_name: row.get(1)?,
+        total_records: import_batch_count_from_row(row, 2, "total_count")?,
+        imported_terms: import_batch_count_from_row(row, 3, "term_count")?,
+        inserted_terms: import_batch_count_from_row(row, 4, "inserted_count")?,
+        updated_terms: import_batch_count_from_row(row, 5, "updated_count")?,
+        skipped_deleted_terms: import_batch_count_from_row(row, 6, "skipped_deleted_count")?,
+        skipped_duplicate_terms: import_batch_count_from_row(row, 7, "skipped_duplicate_count")?,
+        created_at_ms: row.get(8)?,
+        notes: row.get(9)?,
+    })
+}
+
+fn import_batch_count_from_row(
+    row: &Row<'_>,
+    index: usize,
+    field: &'static str,
+) -> rusqlite::Result<usize> {
+    let value: i64 = row.get(index)?;
+    usize::try_from(value).map_err(|_| {
+        rusqlite::Error::FromSqlConversionFailure(
+            index,
+            rusqlite::types::Type::Integer,
+            Box::new(UserDbError::invalid_input(
+                field,
+                format!("expected non-negative integer, got {value}"),
+            )),
+        )
+    })
+}
+
 fn to_sqlite_conversion_failure(error: UserDbError) -> rusqlite::Error {
     rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(error))
 }
@@ -684,11 +803,76 @@ pub fn decode_dictionary_terms_tsv(input: &str) -> UserDbResult<Vec<DictionaryTe
     Ok(records)
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct PreparedDictionaryImport {
+    input_code: String,
+    text: String,
+    reading: String,
+    source: TermSource,
+    weight: f64,
+    status: TermStatus,
+}
+
+fn prepare_dictionary_import(
+    connection: &Connection,
+    records: &[DictionaryTermRecord],
+) -> UserDbResult<(DictionaryImportSummary, Vec<PreparedDictionaryImport>)> {
+    let mut summary = DictionaryImportSummary::empty(records.len());
+    let mut actions = Vec::new();
+    let mut seen = BTreeSet::new();
+
+    for record in records {
+        validate_dictionary_record(record)?;
+        let input_code = normalized_required("input_code", &record.input_code)?;
+        let text = normalized_required("text", &record.text)?;
+        let reading = normalized_optional(record.reading.as_deref());
+        let identity = (input_code.clone(), text.clone(), reading.clone());
+
+        if !seen.insert(identity) {
+            summary.skipped_duplicate_terms += 1;
+            continue;
+        }
+
+        let current_status = fetch_term_status_on(connection, &input_code, &text, &reading)?;
+        if has_deleted_tombstone_on(connection, &input_code, &text, &reading)?
+            || current_status == Some(TermStatus::Deleted)
+        {
+            summary.skipped_deleted_terms += 1;
+            continue;
+        }
+
+        if current_status.is_some() {
+            summary.updated_terms += 1;
+        } else {
+            summary.inserted_terms += 1;
+        }
+        summary.imported_terms += 1;
+        actions.push(PreparedDictionaryImport {
+            input_code,
+            text,
+            reading,
+            source: record.source,
+            weight: record.weight,
+            status: record.status,
+        });
+    }
+
+    Ok((summary, actions))
+}
+
 fn count_rows(connection: &Connection, table: &str) -> UserDbResult<i64> {
     let sql = format!("SELECT COUNT(*) FROM {table}");
     connection
         .query_row(&sql, [], |row| row.get(0))
         .map_err(Into::into)
+}
+
+fn table_columns(connection: &Connection, table: &str) -> UserDbResult<BTreeSet<String>> {
+    let mut statement = connection.prepare(&format!("PRAGMA table_info({table})"))?;
+    let columns = statement
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    Ok(columns)
 }
 
 fn validate_selection_event(event: &SelectionEventDraft) -> UserDbResult<()> {
@@ -721,6 +905,25 @@ fn validate_dictionary_record(record: &DictionaryTermRecord) -> UserDbResult<()>
         return Err(UserDbError::invalid_input(
             "status",
             "dictionary import does not accept deleted terms",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_import_source_name(value: &str) -> UserDbResult<()> {
+    if value.len() > 64 {
+        return Err(UserDbError::invalid_input(
+            "source_name",
+            "value must be 64 bytes or fewer",
+        ));
+    }
+    if !value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.'))
+    {
+        return Err(UserDbError::invalid_input(
+            "source_name",
+            "value must contain only ASCII letters, digits, dot, underscore, or dash",
         ));
     }
     Ok(())

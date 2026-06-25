@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs;
 use std::path::PathBuf;
@@ -26,7 +26,8 @@ Usage:
   radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
   radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
   radishlex-ime-cli dict export --db <path> --file <path>
-  radishlex-ime-cli dict import --db <path> --file <path> [--source <name>]
+  radishlex-ime-cli dict import --db <path> --file <path> [--source <name>] [--dry-run]
+  radishlex-ime-cli dict import-batches --db <path>
   radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
   radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
   radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
@@ -39,7 +40,9 @@ Examples:
   radishlex-ime-cli rime --schema luna_pinyin --shared-data ./rime-data --user-data ./tmp/rime-user --rank-db /tmp/radishlex-userdb.sqlite luobo
   radishlex-ime-cli dict add --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
   radishlex-ime-cli dict export --db /tmp/radishlex-userdb.sqlite --file /tmp/radishlex-terms.tsv
+  radishlex-ime-cli dict import --db /tmp/radishlex-userdb.sqlite --file /tmp/radishlex-terms.tsv --dry-run
   radishlex-ime-cli dict import --db /tmp/radishlex-userdb.sqlite --file /tmp/radishlex-terms.tsv --source smoke
+  radishlex-ime-cli dict import-batches --db /tmp/radishlex-userdb.sqlite
   radishlex-ime-cli learn select --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
   radishlex-ime-cli rank explain --db /tmp/radishlex-userdb.sqlite --input luobo --candidate 萝卜
 ";
@@ -145,6 +148,7 @@ fn run_dict(args: &[String]) -> Result<String, CliError> {
         Some("delete") => run_dict_delete(args),
         Some("export") => run_dict_export(args),
         Some("import") => run_dict_import(args),
+        Some("import-batches") => run_dict_import_batches(args),
         Some(other) => Err(CliError::Usage(format!("unknown dict command: {other}"))),
         None => Err(CliError::Usage("missing dict command".to_owned())),
     }
@@ -229,7 +233,15 @@ fn run_dict_export(args: &[String]) -> Result<String, CliError> {
 }
 
 fn run_dict_import(args: &[String]) -> Result<String, CliError> {
-    let options = parse_named_options(args, 3, &["db", "file", "input", "source"], "dict import")?;
+    let parsed = parse_named_options_with_flags(
+        args,
+        3,
+        &["db", "file", "input", "source"],
+        &["dry-run"],
+        "dict import",
+    )?;
+    let options = parsed.options;
+    let dry_run = parsed.flags.contains("dry-run");
     let db_path = required_named_option(&options, "db")?;
     let file_path = required_one_of_options(&options, "file", "input")?;
     let source_name = options.get("source").map_or("cli", String::as_str);
@@ -241,16 +253,46 @@ fn run_dict_import(args: &[String]) -> Result<String, CliError> {
     validate_import_input_codes(&records)?;
 
     let mut db = UserDb::open(db_path)?;
-    let summary = db.import_dictionary_records(&records, source_name)?;
+    let summary = if dry_run {
+        db.preview_dictionary_import(&records, source_name)?
+    } else {
+        db.import_dictionary_records(&records, source_name)?
+    };
 
-    Ok(format!(
-        "imported: {}\ntotal: {}\nskipped_deleted: {}\nsource: {}\nfile: {}\n",
-        summary.imported_terms,
-        summary.total_records,
-        summary.skipped_deleted_terms,
+    Ok(render_import_summary(
+        &summary,
         source_name,
-        file_path.display()
+        &file_path,
+        dry_run,
     ))
+}
+
+fn run_dict_import_batches(args: &[String]) -> Result<String, CliError> {
+    let options = parse_named_options(args, 3, &["db"], "dict import-batches")?;
+    let db_path = required_named_option(&options, "db")?;
+    let db = UserDb::open(db_path)?;
+    let batches = db.list_import_batches()?;
+
+    let mut output = String::from("import_batches:\n");
+    if batches.is_empty() {
+        output.push_str("  <none>\n");
+    } else {
+        for batch in batches {
+            output.push_str(&format!(
+                "  {}. source={} imported={} inserted={} updated={} skipped_deleted={} skipped_duplicate={} total={} created_at_ms={}\n",
+                batch.id,
+                batch.source_name,
+                batch.imported_terms,
+                batch.inserted_terms,
+                batch.updated_terms,
+                batch.skipped_deleted_terms,
+                batch.skipped_duplicate_terms,
+                batch.total_records,
+                batch.created_at_ms
+            ));
+        }
+    }
+    Ok(output)
 }
 
 fn run_learn(args: &[String]) -> Result<String, CliError> {
@@ -577,6 +619,61 @@ fn parse_named_options(
     }
 
     Ok(options)
+}
+
+struct ParsedNamedOptions {
+    options: BTreeMap<String, String>,
+    flags: BTreeSet<String>,
+}
+
+fn parse_named_options_with_flags(
+    args: &[String],
+    start: usize,
+    allowed_options: &[&str],
+    allowed_flags: &[&str],
+    command_name: &str,
+) -> Result<ParsedNamedOptions, CliError> {
+    let mut options = BTreeMap::new();
+    let mut flags = BTreeSet::new();
+    let mut index = start;
+
+    while index < args.len() {
+        let option = args[index].as_str();
+        if !option.starts_with("--") {
+            return Err(CliError::Usage(format!(
+                "unexpected positional argument for {command_name}: {option}"
+            )));
+        }
+
+        let name = option.trim_start_matches("--");
+        if allowed_flags.contains(&name) {
+            if !flags.insert(name.to_owned()) {
+                return Err(CliError::Usage(format!(
+                    "duplicate {command_name} flag: {option}"
+                )));
+            }
+            index += 1;
+            continue;
+        }
+
+        if !allowed_options.contains(&name) {
+            return Err(CliError::Usage(format!(
+                "unknown {command_name} option: {option}"
+            )));
+        }
+        if options.contains_key(name) {
+            return Err(CliError::Usage(format!(
+                "duplicate {command_name} option: {option}"
+            )));
+        }
+
+        index += 1;
+        let value = required_option_value(args, index, option)?;
+        options.insert(name.to_owned(), value.to_owned());
+        index += 1;
+    }
+
+    Ok(ParsedNamedOptions { options, flags })
 }
 
 fn required_named_option<'a>(
@@ -929,6 +1026,38 @@ fn render_rank_explanation(
         "  deleted_penalty: {:.3}\n",
         explanation.deleted_penalty
     ));
+    output
+}
+
+fn render_import_summary(
+    summary: &radishlex_ime_userdb::DictionaryImportSummary,
+    source_name: &str,
+    file_path: &PathBuf,
+    dry_run: bool,
+) -> String {
+    let mut output = String::new();
+    if dry_run {
+        output.push_str("dry_run: true\n");
+        output.push_str(&format!("would_import: {}\n", summary.imported_terms));
+    } else {
+        if let Some(batch_id) = summary.import_batch_id {
+            output.push_str(&format!("import_batch: {batch_id}\n"));
+        }
+        output.push_str(&format!("imported: {}\n", summary.imported_terms));
+    }
+    output.push_str(&format!("total: {}\n", summary.total_records));
+    output.push_str(&format!("inserted: {}\n", summary.inserted_terms));
+    output.push_str(&format!("updated: {}\n", summary.updated_terms));
+    output.push_str(&format!(
+        "skipped_deleted: {}\n",
+        summary.skipped_deleted_terms
+    ));
+    output.push_str(&format!(
+        "skipped_duplicate: {}\n",
+        summary.skipped_duplicate_terms
+    ));
+    output.push_str(&format!("source: {source_name}\n"));
+    output.push_str(&format!("file: {}\n", file_path.display()));
     output
 }
 

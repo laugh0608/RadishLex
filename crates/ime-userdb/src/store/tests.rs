@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use super::UserDb;
 use crate::{
     decode_dictionary_terms_tsv, encode_dictionary_terms_tsv, DictionaryTermRecord,
@@ -5,12 +7,62 @@ use crate::{
     TermStatus,
 };
 
+fn temp_db_path(test_name: &str) -> String {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock")
+        .as_nanos();
+    let mut path = std::env::temp_dir();
+    path.push(format!(
+        "radishlex-userdb-{test_name}-{}-{timestamp}.sqlite",
+        std::process::id()
+    ));
+    path.to_string_lossy().into_owned()
+}
+
 #[test]
 fn migration_initializes_empty_database() {
     let db = UserDb::open_in_memory().expect("userdb opens");
 
-    assert_eq!(db.schema_version().expect("schema version"), 1);
+    assert_eq!(db.schema_version().expect("schema version"), 2);
     assert!(db.list_active_terms().expect("terms").is_empty());
+    assert!(db.list_import_batches().expect("batches").is_empty());
+}
+
+#[test]
+fn migration_upgrades_v1_import_batches() {
+    let path = temp_db_path("migration-v1");
+    {
+        let connection = rusqlite::Connection::open(&path).expect("sqlite opens");
+        connection
+            .execute_batch(
+                "
+                CREATE TABLE import_batches (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_name TEXT NOT NULL,
+                    term_count INTEGER NOT NULL,
+                    created_at_ms INTEGER NOT NULL,
+                    notes TEXT NOT NULL DEFAULT ''
+                );
+                INSERT INTO import_batches (source_name, term_count, created_at_ms, notes)
+                VALUES ('legacy', 3, 42, '');
+                PRAGMA user_version = 1;
+                ",
+            )
+            .expect("legacy schema is created");
+    }
+
+    let db = UserDb::open(&path).expect("userdb migrates");
+    assert_eq!(db.schema_version().expect("schema version"), 2);
+
+    let batches = db.list_import_batches().expect("batches");
+    assert_eq!(batches.len(), 1);
+    assert_eq!(batches[0].source_name, "legacy");
+    assert_eq!(batches[0].total_records, 3);
+    assert_eq!(batches[0].imported_terms, 3);
+    assert_eq!(batches[0].inserted_terms, 3);
+
+    let _ = std::fs::remove_file(path);
 }
 
 #[test]
@@ -219,8 +271,20 @@ fn dictionary_import_preserves_term_fields_and_skips_deleted_tombstones() {
 
     assert_eq!(summary.total_records, 2);
     assert_eq!(summary.imported_terms, 1);
+    assert_eq!(summary.inserted_terms, 1);
+    assert_eq!(summary.updated_terms, 0);
     assert_eq!(summary.skipped_deleted_terms, 1);
+    assert_eq!(summary.skipped_duplicate_terms, 0);
+    assert!(summary.import_batch_id.is_some());
     assert_eq!(db.import_batch_count().expect("batch count"), 1);
+
+    let batches = db.list_import_batches().expect("batches");
+    assert_eq!(batches.len(), 1);
+    assert_eq!(batches[0].source_name, "unit-test");
+    assert_eq!(batches[0].total_records, 2);
+    assert_eq!(batches[0].imported_terms, 1);
+    assert_eq!(batches[0].inserted_terms, 1);
+    assert_eq!(batches[0].skipped_deleted_terms, 1);
 
     let terms = db.list_active_terms().expect("terms");
     assert_eq!(terms.len(), 1);
@@ -228,6 +292,92 @@ fn dictionary_import_preserves_term_fields_and_skips_deleted_tombstones() {
     assert_eq!(terms[0].text, "词核");
     assert_eq!(terms[0].weight, 3.5);
     assert_eq!(terms[0].status, TermStatus::Suppressed);
+}
+
+#[test]
+fn dictionary_import_preview_does_not_write_batch_or_terms() {
+    let db = UserDb::open_in_memory().expect("userdb opens");
+    let records = vec![DictionaryTermRecord::new(
+        "cihe",
+        "词核",
+        None::<String>,
+        TermSource::ManualImport,
+        1.0,
+        TermStatus::Active,
+    )];
+
+    let summary = db
+        .preview_dictionary_import(&records, "preview")
+        .expect("preview succeeds");
+
+    assert_eq!(summary.import_batch_id, None);
+    assert_eq!(summary.total_records, 1);
+    assert_eq!(summary.imported_terms, 1);
+    assert_eq!(summary.inserted_terms, 1);
+    assert_eq!(db.import_batch_count().expect("batch count"), 0);
+    assert!(db.list_active_terms().expect("terms").is_empty());
+}
+
+#[test]
+fn dictionary_import_reports_updates_duplicates_and_distinct_readings() {
+    let mut db = UserDb::open_in_memory().expect("userdb opens");
+    db.add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualAdd)
+        .expect("term is added");
+
+    let records = vec![
+        DictionaryTermRecord::new(
+            "luobo",
+            "萝卜",
+            Some("luo bo"),
+            TermSource::ManualImport,
+            4.0,
+            TermStatus::Suppressed,
+        ),
+        DictionaryTermRecord::new(
+            "luobo",
+            "萝卜",
+            Some("luo bo"),
+            TermSource::ManualImport,
+            8.0,
+            TermStatus::Active,
+        ),
+        DictionaryTermRecord::new(
+            "luobo",
+            "萝卜",
+            Some("luo bu"),
+            TermSource::ManualImport,
+            2.0,
+            TermStatus::Active,
+        ),
+    ];
+
+    let preview = db
+        .preview_dictionary_import(&records, "batch-1")
+        .expect("preview succeeds");
+    assert_eq!(preview.total_records, 3);
+    assert_eq!(preview.imported_terms, 2);
+    assert_eq!(preview.inserted_terms, 1);
+    assert_eq!(preview.updated_terms, 1);
+    assert_eq!(preview.skipped_duplicate_terms, 1);
+
+    let summary = db
+        .import_dictionary_records(&records, "batch-1")
+        .expect("import succeeds");
+    assert_eq!(summary.imported_terms, 2);
+    assert_eq!(summary.inserted_terms, 1);
+    assert_eq!(summary.updated_terms, 1);
+    assert_eq!(summary.skipped_duplicate_terms, 1);
+
+    let updated = db
+        .fetch_term("luobo", "萝卜", "luo bo")
+        .expect("term lookup")
+        .expect("term exists");
+    assert_eq!(updated.status, TermStatus::Suppressed);
+    assert_eq!(updated.weight, 4.0);
+    assert!(db
+        .fetch_term("luobo", "萝卜", "luo bu")
+        .expect("term lookup")
+        .is_some());
 }
 
 #[test]
@@ -266,4 +416,35 @@ luobo\t萝卜\t\tmanual_import\t1.0\tdeleted
 ";
     let error = decode_dictionary_terms_tsv(deleted_term).expect_err("deleted status fails");
     assert!(error.to_string().contains("does not accept deleted"));
+
+    let bad_source = "\
+# radishlex-user-terms-v1
+input_code\ttext\treading\tsource\tweight\tstatus
+luobo\t萝卜\t\tunknown\t1.0\tactive
+";
+    let error = decode_dictionary_terms_tsv(bad_source).expect_err("source fails");
+    assert!(error.to_string().contains("unknown term source"));
+}
+
+#[test]
+fn dictionary_import_rejects_invalid_batch_source_name() {
+    let mut db = UserDb::open_in_memory().expect("userdb opens");
+    let records = vec![DictionaryTermRecord::new(
+        "cihe",
+        "词核",
+        None::<String>,
+        TermSource::ManualImport,
+        1.0,
+        TermStatus::Active,
+    )];
+
+    let error = db
+        .import_dictionary_records(&records, "bad source")
+        .expect_err("bad source fails");
+    assert!(error.to_string().contains("source_name"));
+
+    let error = db
+        .preview_dictionary_import(&records, "bad source")
+        .expect_err("bad preview source fails");
+    assert!(error.to_string().contains("source_name"));
 }

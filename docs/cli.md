@@ -22,7 +22,8 @@ radishlex-ime-cli dict list --db <path>
 radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict export --db <path> --file <path>
-radishlex-ime-cli dict import --db <path> --file <path> [--source <name>]
+radishlex-ime-cli dict import --db <path> --file <path> [--source <name>] [--dry-run]
+radishlex-ime-cli dict import-batches --db <path>
 radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
 radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
 radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
@@ -119,21 +120,7 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
 - `<input-code>`：输入码，例如 `luobo`。
 - `[candidate-index]`：可选候选索引；未传入时默认提交首候选。启用 `--rank-db` 后，该索引表示重排后的候选索引，CLI 提交时会映射回原始 engine candidate index。
 
-当前支持的 `--key` 值：
-
-```text
-space
-enter
-backspace
-escape
-tab
-arrow-up
-arrow-down
-arrow-left
-arrow-right
-page-up
-page-down
-```
+当前支持的 `--key` 值：`space`、`enter`、`backspace`、`escape`、`tab`、`arrow-up`、`arrow-down`、`arrow-left`、`arrow-right`、`page-up`、`page-down`。
 
 构建要求：
 
@@ -199,14 +186,7 @@ cargo run -p radishlex-ime-cli -- \
   --reading "luo bo"
 ```
 
-输出：
-
-```text
-added: 萝卜
-input: luobo
-status: active
-weight: 1.000
-```
+成功后输出新增词条、输入码、状态和初始权重。
 
 查看词条：
 
@@ -214,12 +194,7 @@ weight: 1.000
 cargo run -p radishlex-ime-cli -- dict list --db /tmp/radishlex-userdb.sqlite
 ```
 
-输出：
-
-```text
-terms:
-  luobo -> 萝卜 [luo bo] source=manual_add status=active weight=1.000
-```
+输出按输入码列出词条文本、reading、source、status 和 weight。
 
 删除词条：
 
@@ -243,15 +218,21 @@ cargo run -p radishlex-ime-cli -- \
   --file /tmp/radishlex-terms.tsv
 ```
 
-输出：
-
-```text
-exported: 1
-file: /tmp/radishlex-terms.tsv
-format: radishlex-user-terms-v1
-```
+成功后输出导出数量、文件路径和格式版本。
 
 导入用户词库：
+
+```bash
+cargo run -p radishlex-ime-cli -- \
+  dict import \
+  --db /tmp/radishlex-userdb.sqlite \
+  --file /tmp/radishlex-terms.tsv \
+  --dry-run
+```
+
+预览输出不会写入词条或 `import_batches`，会返回 `dry_run: true`、`would_import`、`total`、`inserted`、`updated`、`skipped_deleted`、`skipped_duplicate`、`source` 和 `file`。
+
+实际导入用户词库：
 
 ```bash
 cargo run -p radishlex-ime-cli -- \
@@ -261,15 +242,17 @@ cargo run -p radishlex-ime-cli -- \
   --source smoke
 ```
 
-输出：
+成功后输出 `import_batch`、`imported`、`total`、`inserted`、`updated`、`skipped_deleted`、`skipped_duplicate`、`source` 和 `file`。
 
-```text
-imported: 1
-total: 1
-skipped_deleted: 0
-source: smoke
-file: /tmp/radishlex-terms.tsv
+查看导入批次：
+
+```bash
+cargo run -p radishlex-ime-cli -- \
+  dict import-batches \
+  --db /tmp/radishlex-userdb.sqlite
 ```
+
+输出每个批次的来源、导入数量、插入数量、更新数量、跳过数量、总记录数和创建时间；无批次时显示 `<none>`。
 
 导入导出格式为 UTF-8 TSV：
 
@@ -286,6 +269,9 @@ luobo	萝卜	luo bo	manual_add	2	active
 - `dict export` 只导出 P2 用户词条字段，不导出 P1 原始选择事件、负反馈详细事件、上下文统计或 ranker 权重摘要。
 - `dict import` 不接受 `deleted` 状态的词条。
 - `dict import` 遇到本地 deleted tombstone 命中的词条会跳过，并计入 `skipped_deleted`，不会把普通导入当成恢复删除词条。
+- `dict import` 遇到同一导入文件内重复的 `input_code`、`text`、`reading` 身份会跳过后续重复项，并计入 `skipped_duplicate`。
+- `dict import` 对已存在且未删除的同身份词条执行更新，并计入 `updated`；不同 `reading` 视为不同词条。
+- `--source <name>` 只用于记录导入批次来源，允许 ASCII 字母、数字、dot、underscore 和 dash，最长 64 bytes；未传时为 `cli`。
 - `dict export --output <path>` 与 `dict import --input <path>` 是路径别名；正式文档优先使用 `--file <path>`。
 
 ## learn 命令
@@ -312,13 +298,7 @@ cargo run -p radishlex-ime-cli -- \
 - `--session <id>`：本次 CLI 学习事件的会话标识，默认 `cli`。
 - `--context <kind>`：归类后的上下文，例如 `general`、`chat`、`code`、`search`，默认 `general`。
 
-输出：
-
-```text
-selection_event: 1
-input: luobo
-text: 萝卜
-```
+成功后输出 selection event id、输入码和候选文本。
 
 记录一次负反馈：
 

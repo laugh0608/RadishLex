@@ -12,7 +12,7 @@ RadishLex 当前处于 Phase 2 起步阶段：
 - `ime-ranker` 已提供可解释候选重排。
 - `radishlex-ime-cli` 已提供 `demo`、`rime`、`dict`、`learn`、`rank explain` 和 `rime --rank-db` 复验入口。
 
-当前下一步仍在 Rust 本地学习链路内推进，重点是用户词库导入导出格式兼容、批量导入来源管理、后续同步前置验证和 FFI 边界。现阶段不推进平台壳、Go 同步后端或 Flutter manager 主线。
+当前下一步仍在 Rust 本地学习链路内推进，重点是用户词库导入导出跨版本兼容、后续同步前置验证和 FFI 边界。现阶段不推进平台壳、Go 同步后端或 Flutter manager 主线。
 
 ## 设计原则
 

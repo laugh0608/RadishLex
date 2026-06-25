@@ -179,9 +179,41 @@ impl From<&UserTerm> for DictionaryTermRecord {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DictionaryImportSummary {
+    pub import_batch_id: Option<i64>,
     pub total_records: usize,
     pub imported_terms: usize,
+    pub inserted_terms: usize,
+    pub updated_terms: usize,
     pub skipped_deleted_terms: usize,
+    pub skipped_duplicate_terms: usize,
+}
+
+impl DictionaryImportSummary {
+    pub fn empty(total_records: usize) -> Self {
+        Self {
+            import_batch_id: None,
+            total_records,
+            imported_terms: 0,
+            inserted_terms: 0,
+            updated_terms: 0,
+            skipped_deleted_terms: 0,
+            skipped_duplicate_terms: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DictionaryImportBatch {
+    pub id: i64,
+    pub source_name: String,
+    pub total_records: usize,
+    pub imported_terms: usize,
+    pub inserted_terms: usize,
+    pub updated_terms: usize,
+    pub skipped_deleted_terms: usize,
+    pub skipped_duplicate_terms: usize,
+    pub created_at_ms: i64,
+    pub notes: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
