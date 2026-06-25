@@ -36,6 +36,7 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - [CLI 说明](docs/cli.md)
 - [Engine Boundary](docs/engine-boundary.md)
 - [ime-engine-rime Adapter 设计](docs/engine-rime-adapter.md)
+- [个人化学习设计](docs/personalization-learning.md)
 - [隐私与同步设计](docs/privacy-sync.md)
 
 ## 当前可运行入口

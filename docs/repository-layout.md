@@ -44,6 +44,7 @@ RadishLex/
     cli.md
     engine-boundary.md
     engine-rime-adapter.md
+    personalization-learning.md
     runbooks/
     platform-notes/
   scripts/
@@ -79,6 +80,7 @@ RadishLex/
 - `docs/cli.md`：`radishlex-ime-cli` 命令、输出、退出码和安全边界说明。
 - `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
 - `docs/engine-rime-adapter.md`：`ime-engine-rime` 的 adapter 边界、构建策略和验证分层。
+- `docs/personalization-learning.md`：Phase 2 个人化学习、userdb、ranker、负反馈和 CLI 管理边界。
 - `docs/runbooks/rime-native-smoke.md`：真实 `librime` 本机 smoke 操作步骤。
 
 ## Rust crates 建议
@@ -118,6 +120,8 @@ librime adapter：
 - 短语上下文。
 - 负反馈。
 
+当前已在 `docs/personalization-learning.md` 中定义 Phase 2 的 rank request、ranked candidate、explain 输出和验证标准；crate 尚未创建。
+
 ### ime-userdb
 
 本地用户词库：
@@ -127,6 +131,8 @@ librime adapter：
 - 选择事件。
 - 学习记录。
 - 导入导出。
+
+当前已在 `docs/personalization-learning.md` 中定义 Phase 2 的 userdb 数据分级、schema 草案、选择事件、负反馈、删除 tombstone 和 CLI 管理入口；crate 尚未创建。
 
 ### ime-sync
 
