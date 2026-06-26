@@ -10,7 +10,7 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - **中文定位**：萝卜词核
 - **核心目标**：让输入法逐步理解用户的词库、语气、场景和候选偏好，达到可解释、可删除、可自部署的个人化输入体验。
 - **技术主轴**：Rust + Go + Flutter
-- **复核日期**：2026-06-22
+- **复核日期**：2026-06-25
 
 ## 设计原则
 
@@ -33,7 +33,41 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - [详细技术方案](docs/technical-plan.md)
 - [阶段路线图](docs/roadmap.md)
 - [仓库结构草案](docs/repository-layout.md)
+- [CLI 说明](docs/cli.md)
+- [Engine Boundary](docs/engine-boundary.md)
+- [ime-engine-rime Adapter 设计](docs/engine-rime-adapter.md)
+- [个人化学习设计](docs/personalization-learning.md)
 - [隐私与同步设计](docs/privacy-sync.md)
+- [同步 Payload 草案](docs/sync-payload.md)
+- [FFI 边界](docs/ffi-boundary.md)
+
+## 当前可运行入口
+
+当前仓库已提供 `radishlex-ime-cli` 作为 Rust 侧复验入口：
+
+```bash
+cargo run -p radishlex-ime-cli -- demo luobo
+```
+
+真实 Rime adapter 需要本机 `librime` 和隔离 schema 数据：
+
+```bash
+cargo run -p radishlex-ime-cli --features native-rime -- \
+  rime --schema luna_pinyin --shared-data <path> --user-data <path> luobo
+```
+
+Phase 2 起步的本地学习链路可通过显式 SQLite 路径复验：
+
+```bash
+cargo run -p radishlex-ime-cli -- dict add --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
+cargo run -p radishlex-ime-cli -- learn select --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
+cargo run -p radishlex-ime-cli -- rank explain --db /tmp/radishlex-userdb.sqlite --input luobo --candidate 萝卜
+cargo run -p radishlex-ime-cli -- sync preflight --db /tmp/radishlex-userdb.sqlite
+```
+
+启用 `native-rime` 时，可进一步用 `rime --rank-db <path>` 验证真实 Rime candidates 进入本地 ranker。
+
+完整命令说明见 [CLI 说明](docs/cli.md)，本机 Rime 数据准备步骤见 [Rime Native Smoke Runbook](docs/runbooks/rime-native-smoke.md)。
 
 ## MVP 边界
 

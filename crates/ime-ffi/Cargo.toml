@@ -1,0 +1,17 @@
+[package]
+name = "radishlex-ime-ffi"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../LICENSE"
+description = "C ABI boundary for RadishLex."
+
+[lib]
+name = "radishlex_ime_ffi"
+path = "src/lib.rs"
+crate-type = ["rlib", "staticlib", "cdylib"]
+
+[dependencies]
+radishlex-ime-core = { path = "../ime-core" }
+radishlex-ime-userdb = { path = "../ime-userdb" }

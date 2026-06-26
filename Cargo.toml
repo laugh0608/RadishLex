@@ -1,0 +1,17 @@
+[workspace]
+members = [
+    "crates/ime-cli",
+    "crates/ime-core",
+    "crates/ime-engine-rime",
+    "crates/ime-ffi",
+    "crates/ime-ranker",
+    "crates/ime-sync",
+    "crates/ime-userdb",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.80"
+repository = "https://github.com/laugh0608/RadishLex"

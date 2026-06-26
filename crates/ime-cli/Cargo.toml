@@ -1,0 +1,21 @@
+[package]
+name = "radishlex-ime-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../LICENSE"
+description = "Command line demo for the RadishLex input core."
+
+[features]
+default = []
+native-rime = [
+    "dep:radishlex-ime-engine-rime",
+    "radishlex-ime-engine-rime/native-rime",
+]
+
+[dependencies]
+radishlex-ime-core = { path = "../ime-core" }
+radishlex-ime-engine-rime = { path = "../ime-engine-rime", optional = true }
+radishlex-ime-ranker = { path = "../ime-ranker" }
+radishlex-ime-userdb = { path = "../ime-userdb" }

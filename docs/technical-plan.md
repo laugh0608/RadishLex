@@ -1,569 +1,210 @@
 # RadishLex 技术方案
 
-## 1. 项目背景
+本文档是 RadishLex 当前技术方向的入口摘要，读者是需要快速判断架构边界、阶段顺序和后续开发重点的维护者与协作者。本文不包含完整 trait 字段、SQLite migration、同步协议细节、平台安装流程、长期推演或验证流水；这些内容应放在对应专题文档、runbook 或 devlog 中。
 
-中文输入法的难点不只是拼音转汉字，还包括长期使用中的个人化适配：
+## 当前阶段
 
-- 用户常用的人名、项目名、地名、缩写和专有名词。
-- 同音词和近音词的个人排序偏好。
-- 不同应用场景下的候选差异，例如聊天、代码、文档、搜索框。
-- 常用短句、语气、标点、emoji 和中英混输习惯。
-- 用户纠错、删除、改选候选等负反馈。
+RadishLex 当前处于 Phase 2 起步阶段：
 
-主流商业输入法通常把这些能力和云服务绑定。RadishLex 的核心假设是：输入习惯应当属于用户本人，并且应该能自部署、可迁移、可审计、可删除。
+- `ime-core` 已建立平台无关输入会话、候选模型、提交模型和 engine trait。
+- `ime-engine-rime` 已接入真实 `librime` adapter，并通过本机隔离 Rime smoke 复验 `compose -> candidates -> commit`。
+- `ime-userdb` 已落地本地 SQLite 用户词库、选择事件、负反馈、删除 tombstone、用户词库导入导出和同步前置计数。
+- `ime-ranker` 已提供可解释候选重排。
+- `ime-sync` 已提供同步 payload 来源分类和加密对象外壳草案，不连接后端、不实现加密。
+- `ime-ffi` 已提供 C ABI 起步验证，覆盖 opaque handle、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、sync preflight 状态摘要、userdb add / delete / list 管理入口、释放函数和 demo engine host smoke。
+- `radishlex-ime-cli` 已提供 `demo`、`rime`、`dict`、`learn`、`rank explain`、`rime --rank-db` 和 `sync preflight` 复验入口。
 
-## 2. 项目目标
+当前下一步仍在 Rust 本地学习链路内推进，重点是 `ime-ffi` 的 Rime adapter 配置策略和更完整的受控 userdb 管理入口。现阶段不推进平台壳、Go 同步后端或 Flutter manager 主线。
 
-RadishLex 的长期目标是做一个全平台中文输入系统：
+## 设计原则
 
-- 覆盖 Windows、macOS、Linux、Android、iOS。
-- 输入热路径本地运行，低延迟、可离线。
-- 自部署后端负责同步、备份和多设备协作。
-- Rust core 统一输入逻辑和个人化学习。
-- Go server 提供简单可靠的私有云能力。
-- Flutter 提供跨平台管理 UI。
-- 底层输入引擎可替换，先接成熟引擎，长期演进到自研 Rust 引擎。
+- 本地优先：输入热路径、候选生成、候选重排和学习必须离线可用。
+- 隐私优先：服务端默认不可信，不保存明文输入历史、明文用户词库、明文候选偏好或明文上下文片段。
+- 引擎可替换：v1 可接 `librime`，但 Rust core 不依赖 Rime 私有对象或内部评分。
+- 平台薄壳：平台端只处理系统输入法生命周期、按键接收、候选窗展示和文本提交。
+- 可解释学习：用户能查看输入法学到了什么，并能删除、导出、暂停或限制学习。
+- 自部署同步：后端只做设备管理、密文 blob 存储、版本历史、备份恢复和包分发。
 
-## 3. 总体架构
+## 总体架构
 
 ```text
 Platform IME Shell
-  - Windows TSF
-  - macOS InputMethodKit
-  - Linux Fcitx5 / IBus
-  - Android InputMethodService
-  - iOS Keyboard Extension
+  Windows TSF / macOS InputMethodKit / Linux Fcitx5
+  Android InputMethodService / iOS Keyboard Extension
         |
         v
 Rust Core
-  - session state
-  - composing buffer
-  - candidate model
-  - personalization
-  - user dictionary
-  - ranker
-  - sync client
-  - encryption
+  ime-core      input session, composition, candidates, commit
+  ime-ranker    rerank and explain
+  ime-userdb    local dictionary, learning events, tombstones
+  ime-sync      sync payload boundary and planned sync client
+  ime-crypto    planned client-side encryption
+  ime-ffi       C ABI boundary and planned platform bridge
         |
         v
 Engine Adapter
-  - librime adapter in v1
-  - native Rust engine in future
+  ime-engine-rime in v1
+  native Rust engine in later phases
         |
         v
 Local Storage
-  - SQLite
-  - encrypted profile data
-  - local model files
+  SQLite userdb
+  encrypted profile data
+  local schema/model packages
 
 Management UI
-  - Flutter desktop/mobile app
-  - optional egui engineering tools
+  Flutter desktop/mobile manager
         |
         v
 Go Self-host Backend
-  - device registry
-  - encrypted blob storage
-  - sync version history
-  - backup and restore
-  - package distribution
+  device registry
+  encrypted blob storage
+  version history
+  backup / restore
+  package distribution
 ```
 
-## 4. 技术栈分工
+## 组件职责
 
-### Rust
+### Rust Core
 
-Rust 是 RadishLex 的核心语言，负责所有需要跨平台复用、低延迟和高可靠性的逻辑。
+Rust 是跨端复用和输入热路径的核心层，负责：
 
-Rust 负责：
+- 输入会话状态机、composition、candidate 和 commit 模型。
+- Engine trait 与底层 engine adapter 边界。
+- 用户词库、选择事件、负反馈、删除 tombstone。
+- 候选重排、排序 explain 和后续学习摘要。
+- 后续同步客户端、端到端加密和 FFI 边界。
+- CLI / smoke 工具。
 
-- 输入会话状态机
-- 拼音输入过程抽象
-- 候选词数据结构
-- 候选重排
-- 用户词库
-- 个人化学习
-- 同步客户端
-- 端到端加密
-- FFI 边界
-- CLI 调试工具
+Rust core 不负责注册系统输入法、强行统一系统候选窗 UI、托管云端实时转换，或在 v1 阶段从零实现完整中文输入引擎。
 
-Rust 不负责：
+### Engine Adapter
 
-- 直接实现所有平台系统输入法协议。
-- 强行统一所有候选窗 UI。
-- 在 v1 阶段从零实现完整中文输入引擎。
+`ime-engine-rime` 负责把 `librime` 的输入、候选、composition 和 commit 转换为 RadishLex 稳定模型。Rime 相关概念必须停留在 adapter 内部，不向 `ime-core`、`ime-userdb`、`ime-ranker` 或平台壳泄漏。
 
-### Go
+v1 采用 `librime` 作为成熟底层引擎。长期可以加入 Rust 自研 engine，但不能抢占当前 Rust core、userdb、ranker、同步前置验证和真实平台落地的优先级。
 
-Go 负责自部署服务端。后端不参与每次按键，不做云端实时转换。
+### ime-userdb 与 ime-ranker
 
-Go 负责：
+`ime-userdb` 保存本地学习数据和用户可管理词条。当前已覆盖：
 
-- 用户和设备注册
-- 设备密钥公钥登记
-- 加密数据 blob 存储
-- 同步版本号与冲突检测
-- 词库和模型包分发
-- 备份、恢复和审计日志
-- Docker Compose 一键部署
+- `user_terms`
+- `selection_events`
+- `negative_feedback`
+- `deleted_terms`
+- `ranker_weights`
+- `import_batches`
 
-Go 不负责：
+`ime-ranker` 只消费 RadishLex candidate、userdb summary 和 deleted tombstone summary，不访问 SQLite、不访问 Rime、不读取平台私有生命周期。排序结果必须输出 explain，说明 engine 顺序、用户词提升、频次、近期、上下文、负反馈、suppressed 和 deleted 的贡献。
 
-- 解密用户输入数据。
-- 参与候选排序。
-- 保存明文输入历史。
+### Go Backend
 
-### Flutter
+Go 后端属于后续阶段。它只负责：
 
-Flutter 负责管理体验，而不是所有输入热路径。
+- 用户和设备注册。
+- 设备公钥登记。
+- 加密 blob 存储。
+- 同步版本号、冲突检测和版本历史。
+- 备份恢复、审计日志和包分发。
+- 默认单用户 SQLite 自部署模式。
 
-Flutter 负责：
+Go 后端不参与每次按键，不做候选排序，不做云端实时转换，不保存明文输入历史或明文用户词库。
 
-- 移动端设置 App
-- 桌面管理器
-- 同步状态
-- 词库管理
-- 学习记录可视化
-- 隐私设置
-- 后端连接配置
+### Flutter Manager
 
-Flutter 不建议负责：
+Flutter manager 属于后续阶段。它负责设置、词库管理、学习记录可视化、隐私控制台、同步状态、设备管理、后端连接和备份恢复。
 
-- iOS Keyboard Extension 的主键盘 UI。
-- Android IME 的核心输入热路径。
-- 桌面系统候选窗。
+Flutter 不进入输入热路径，不作为系统候选窗的跨平台统一实现，也不承担用户词库、同步、排序或隐私策略真相源。
 
-## 5. 平台落地策略
+### Platform Shells
 
-### Windows
+平台壳只负责系统输入法接入：
 
-- 系统输入法接入使用 TSF 薄壳。
-- Rust core 通过 C ABI 或 CXX bridge 调用。
-- 候选窗优先使用平台原生能力。
-- 设置页使用 Flutter desktop。
+- Windows：TSF 薄壳，后置。
+- macOS：InputMethodKit，第一批桌面候选平台。
+- Linux：优先 Fcitx5，其次 IBus，适合作为第一批真实平台。
+- Android：Kotlin `InputMethodService`，移动端首选。
+- iOS：Swift / UIKit Keyboard Extension，默认离线，同步依赖 full access，后置。
 
-风险：
+候选窗优先使用平台原生机制，不强行统一 Windows、macOS、Linux、Android 和 iOS 的候选窗 UI。
 
-- TSF / COM 工程复杂度高。
-- 候选窗定位、焦点和兼容性需要大量实测。
+## 隐私与数据分级
 
-建议：
+RadishLex 按 `docs/privacy-sync.md` 的数据分级推进：
 
-- Windows 不作为第一个真实平台。
-- 等 Rust core 和至少一个 Unix-like 平台稳定后再做。
+- P0：密码框、支付、证件、secure text entry、隐私模式输入，永不学习、永不同步。
+- P1：原始选择事件、负反馈详细事件、应用上下文统计，默认只本地学习。
+- P2：用户词库、候选权重摘要、自定义短语、输入方案配置，后续只能端到端加密同步。
+- P3：官方词库包、输入方案模板、模型包、UI 主题，可公开下载。
 
-### macOS
+删除语义必须强于普通降权。被删除词条需要 tombstone 或等价语义，避免旧选择事件、旧导入、旧设备或旧备份复活。
 
-- 系统输入法接入使用 InputMethodKit。
-- 外壳使用 Swift / Objective-C 薄层。
-- Rust core 编译为 static lib 或 dynamic lib。
-- 设置页使用 Flutter desktop。
+## 同步方向
 
-风险：
+同步不是当前开发主线，但架构需要提前保持边界：
 
-- 输入法沙盒、候选窗、权限和安装流程要重点验证。
+- 输入热路径不得依赖后端。
+- 服务端只看到设备 ID、加密对象 ID、密文 blob 大小、对象版本、更新时间和必要同步元数据。
+- 新设备加入必须通过已有设备授权或恢复码。
+- 单台设备丢失后应允许撤销设备，并在后续对象上轮换同步密钥。
+- 冲突合并应按对象类型处理：用户词按词合并，删除使用 tombstone，设置项可 last-write-wins 或显式提示。
 
-建议：
+当前 `ime-sync` 只定义 payload 来源分类、同步对象类型和加密对象外壳校验。它不实现网络客户端、加密、签名、hash 计算、设备授权或冲突合并执行器。
 
-- macOS 适合作为第一批桌面平台之一。
+## Clean-room 原则
 
-### Linux
-
-- 优先接 Fcitx5 插件。
-- 其次考虑 IBus。
-- Wayland 下尽量走输入法框架 panel，不自己硬造浮窗协议。
-- 设置页使用 Flutter desktop 或 egui 工具。
-
-风险：
-
-- 桌面环境差异大。
-- X11 / Wayland 行为差异明显。
-
-建议：
-
-- Linux 适合作为第一个真实输入法端，因为调试成本低，开源社区友好。
-
-### Android
-
-- 键盘服务使用 Kotlin 的 InputMethodService 薄壳。
-- Rust core 通过 NDK 编译为 `.so`。
-- 设置 App 使用 Flutter。
-- 键盘 UI v1 可用 Kotlin 原生实现，避免 Flutter engine 冷启动和内存成本。
-
-风险：
-
-- 输入法生命周期复杂。
-- 不同厂商系统会有兼容性差异。
-
-建议：
-
-- Android 是移动端首选平台。
-
-### iOS
-
-- 键盘扩展使用 Swift / UIKit。
-- Rust core 编译为 XCFramework。
-- 设置 App 使用 Flutter。
-- 默认离线可用；同步需要用户开启 full access。
-
-风险：
-
-- iOS 自定义键盘限制最多。
-- 默认无网络能力。
-- 安全输入框、电话键盘等场景会切回系统键盘。
-- App Store 审核和隐私说明要求高。
-
-建议：
-
-- iOS 放在 Android 之后。
-- 隐私可信和离线体验必须先做好。
-
-## 6. 底层输入引擎策略
-
-第一阶段建议接入 librime，理由是：
-
-- 成熟。
-- 跨平台。
-- 中文输入能力完整。
-- BSD-3-Clause 许可证相对友好。
-- 已有大量输入方案和词库生态。
-
-但 RadishLex 不应把 librime 作为不可替换核心。正确抽象是：
-
-```text
-trait Engine {
-    fn reset(&mut self);
-    fn push_key(&mut self, key: KeyEvent) -> EngineResult;
-    fn candidates(&self) -> Vec<EngineCandidate>;
-    fn commit(&mut self, index: usize) -> CommitResult;
-    fn set_schema(&mut self, schema: SchemaId);
-}
-```
-
-v1：
-
-- `ime-engine-rime` 提供 librime adapter。
-- Rust core 在候选结果之上做个人化重排和学习。
-
-v2：
-
-- 开始自研 Rust 拼音核心。
-- 先实现全拼、双拼和基础词库。
-- 不急于覆盖五笔、粤拼、仓颉等方案。
-
-v3：
-
-- Rust engine 逐步替代更多底层能力。
-- librime 仍可作为兼容引擎保留。
-
-## 7. 个人化学习设计
-
-### 学习对象
-
-- 用户词：专有名词、项目名、人名、缩写。
-- 候选偏好：同音词排序。
-- 短语习惯：常用二元、三元短语。
-- 场景偏好：不同 App 或输入场景的权重差异。
-- 标点习惯：中文标点、英文标点、空格习惯。
-- 中英混输：代码、变量名、命令、英文缩写。
-- emoji 和符号习惯。
-
-### 正反馈
-
-- 选择候选并提交。
-- 连续多次选择同一候选。
-- 输入后未立即删除。
-- 在同一上下文反复使用同一短语。
-
-### 负反馈
-
-- 提交后立即退格删除。
-- 改选同音候选。
-- 删除整段刚输入内容。
-- 手动从学习记录中移除。
-
-### 排序因子
-
-候选最终分数可以由这些因素组成：
-
-```text
-final_score =
-  engine_score
-  + user_word_boost
-  + recency_boost
-  + frequency_boost
-  + app_context_boost
-  + phrase_context_boost
-  - negative_feedback_penalty
-  - decay_penalty
-```
-
-### 可解释性
-
-管理 UI 应展示：
-
-- 最近学会的词。
-- 高频词。
-- 被降权的词。
-- 某个词为什么排在前面。
-- 哪些 App 允许学习。
-- 哪些数据参与同步。
-
-用户必须能：
-
-- 删除单个词。
-- 清空某个 App 的学习数据。
-- 暂停学习。
-- 开启临时隐私模式。
-- 导出自己的词库。
-
-## 8. 本地存储
-
-建议本地存储使用 SQLite。
-
-原因：
-
-- 跨平台成熟。
-- 易调试。
-- 移动端可用。
-- 支持事务。
-- 适合用户词库、事件日志和同步元数据。
-
-核心表草案：
-
-```text
-user_terms
-  id
-  text
-  reading
-  source
-  weight
-  created_at
-  updated_at
-  last_used_at
-
-selection_events
-  id
-  session_id
-  input_code
-  selected_text
-  candidate_index
-  app_context
-  created_at
-
-negative_feedback
-  id
-  text
-  reading
-  reason
-  app_context
-  created_at
-
-app_profiles
-  id
-  app_id
-  learning_enabled
-  sync_enabled
-  profile_weight
-
-sync_objects
-  id
-  object_type
-  local_version
-  remote_version
-  encrypted_blob
-  updated_at
-```
-
-## 9. 同步与隐私
-
-### 后端定位
-
-后端是私有同步服务，不是云输入服务。
-
-后端保存：
-
-- 设备列表。
-- 加密后的同步对象。
-- 对象版本。
-- 备份快照。
-- 模型和词库包。
-
-后端不保存：
-
-- 明文输入历史。
-- 明文用户词库。
-- 明文候选偏好。
-- 明文上下文片段。
-
-### 加密策略
-
-建议采用端到端加密：
-
-- 用户首次初始化生成主密钥。
-- 每台设备生成设备密钥对。
-- 同步对象在客户端加密。
-- 服务端只保存密文 blob。
-- 新设备加入需要已有设备授权或恢复码。
-
-### 冲突策略
-
-不同对象采用不同策略：
-
-- 用户词：按词合并，权重做合成。
-- 删除操作：使用 tombstone，避免被旧设备复活。
-- 设置项：last-write-wins 或显式冲突提示。
-- 事件日志：只追加，压缩后生成统计状态。
-
-## 10. 服务端 API 草案
-
-```text
-POST /api/v1/devices/register
-POST /api/v1/devices/authorize
-GET  /api/v1/sync/objects
-PUT  /api/v1/sync/objects/{id}
-POST /api/v1/sync/batch
-GET  /api/v1/backups
-POST /api/v1/backups
-POST /api/v1/backups/{id}/restore
-GET  /api/v1/packages
-GET  /api/v1/packages/{id}
-GET  /api/v1/health
-```
-
-服务端 MVP：
-
-- Go
-- SQLite 默认
-- Postgres 可选
-- Docker Compose
-- 单用户模式优先
-- 后期支持多用户
-
-## 11. UI 方案
-
-### Flutter 管理界面
-
-主要页面：
-
-- 总览
-- 当前输入方案
-- 用户词库
-- 学习记录
-- 隐私模式
-- 应用学习权限
-- 同步状态
-- 设备列表
-- 后端连接
-- 备份恢复
-- 导入导出
-
-设计原则：
-
-- 管理 UI 不进入输入热路径。
-- 输入法启用后，设置页面可以独立升级。
-- 移动端和桌面端共享大部分页面。
-
-### 平台候选窗
-
-候选窗不强行统一：
-
-- Windows 使用 TSF / Win32 原生能力。
-- macOS 使用 Cocoa / InputMethodKit。
-- Linux 走 Fcitx5 / IBus panel。
-- Android 使用 Kotlin 原生 view。
-- iOS 使用 Swift / UIKit。
-
-这样可以降低兼容性风险。
-
-## 12. Clean-room 实现原则
-
-用户希望尽量不直接引用现成开源项目，必要时换语言照着实现。这里需要严格区分“借鉴行为”和“复制实现”。
+外部输入法和底层引擎只作为行为规格、接口约束和测试用例来源，不复制实现。
 
 允许：
 
 - 阅读公开文档。
 - 观察公开软件行为。
 - 总结输入法交互规格。
-- 自己设计数据结构和模块边界。
-- 用兼容许可证的库作为可选 adapter。
+- 自己设计数据结构、Rust API 和模块边界。
+- 使用兼容许可证的库作为可选 adapter。
 
-不建议：
+禁止：
 
-- 复制源码。
-- 复制私有函数结构。
-- 复制测试数据中带有版权风险的词库。
-- 从 GPL/LGPL 项目搬实现进 permissive core。
-- 把开源项目的实现细节逐行翻译成 Rust。
+- 复制源码、私有函数结构或有版权风险的词库。
+- 从 GPL / LGPL 项目搬实现进核心层。
+- 把外部项目实现细节逐行翻译成 Rust。
 
-建议流程：
+## 主要风险
 
-1. 调研已有项目。
-2. 写行为规格文档。
-3. 根据规格重新设计 Rust API。
-4. 实现自己的模块。
-5. 用黑盒测试验证行为，而不是复制源码测试。
+- 输入质量风险：短期内依赖成熟底层引擎，RadishLex 先把个人化、可解释、可删除和同步边界做好。
+- 平台集成风险：系统输入法接入复杂，每个平台只写薄壳，并优先 Linux / macOS / Android。
+- iOS 限制风险：iOS 后置，默认离线可用，同步需要用户显式开启 full access。
+- 隐私信任风险：默认不上传明文，提供本地可视化学习记录、禁学名单、删除和导出能力。
+- 文档漂移风险：阶段目标、协议、隐私边界和平台策略变化必须同步更新对应专题文档。
 
-## 13. 主要风险
+## MVP 成功标准
 
-### 输入质量风险
+MVP 至少需要证明：
 
-中文输入质量长期依赖词库、语言模型、纠错和排序。短期内自研引擎很难超过成熟项目。
+- CLI 能通过成熟底层 engine 输出真实候选。
+- Rime candidates 能进入 ranker，并输出可解释排序。
+- 用户选择、删除、负反馈能影响后续排序。
+- 用户词库能导入、导出，且普通导入不会复活 deleted tombstone。
+- 同步设计能保证服务端不接触明文 P2 数据。
+- 至少一个桌面或移动平台能作为真实系统输入法使用。
 
-应对：
+## 当前停止线
 
-- v1 接成熟引擎。
-- 先做个人化层。
-- 逐步自研替换。
+- userdb schema、删除语义、导入导出和 ranker explain 未稳定前，不接远端同步。
+- FFI 所有权、生命周期、错误语义、字符串编码、线程模型和释放责任未明确前，不推进平台壳。
+- Rime native smoke 和学习层复验未稳定前，不推进复杂平台候选窗或管理 UI。
+- P0/P1/P2 分级未在测试和文档中体现前，不进入同步 payload 或管理 UI 主线。
 
-### 平台集成风险
+## 专题文档索引
 
-系统输入法接入比普通 App 难很多。
-
-应对：
-
-- 每个平台只写薄壳。
-- 不追求 UI 完全统一。
-- 优先 Linux / macOS / Android。
-
-### iOS 限制风险
-
-iOS 自定义键盘限制严格。
-
-应对：
-
-- iOS 放后期。
-- 离线优先。
-- 同步需要用户显式开启。
-
-### 隐私信任风险
-
-输入法天然敏感，任何上传行为都会降低信任。
-
-应对：
-
-- 默认不上传明文。
-- 开源同步协议。
-- 本地可视化学习记录。
-- 提供一键清除和禁学名单。
-
-## 14. 成功标准
-
-MVP 成功标准：
-
-- 能在 CLI 中输入拼音并得到候选。
-- 能记录用户选择并影响下一次候选排序。
-- 能删除学习到的词。
-- 能导入/导出用户词库。
-- 能连接自部署 Go 后端。
-- 能端到端加密同步用户词库。
-- 至少一个桌面或移动平台能作为真实输入法使用。
-
-长期成功标准：
-
-- 用户在多台设备上的词库和候选习惯自然一致。
-- 用户可以完全掌控输入习惯数据。
-- 服务端可以自部署且无需明文数据。
-- 输入热路径稳定低延迟。
-- 底层引擎可以从 librime 平滑演进到 Rust 自研。
+- [Engine Boundary](engine-boundary.md)：engine trait、核心模型、adapter 职责、错误语义和 clean-room 边界。
+- [ime-engine-rime Adapter 设计](engine-rime-adapter.md)：Rime adapter 构建、FFI 生命周期、数据目录和 native smoke。
+- [个人化学习设计](personalization-learning.md)：userdb、ranker、学习事件、负反馈、删除 tombstone、导入导出和 CLI 管理入口。
+- [隐私与同步设计](privacy-sync.md)：P0/P1/P2/P3 分级、加密对象、设备授权、删除语义和威胁模型。
+- [同步 Payload 草案](sync-payload.md)：同步对象类型、P1/P2 来源分类、加密对象外壳和验证口径。
+- [FFI 边界](ffi-boundary.md)：C ABI 职责、所有权、生命周期、错误语义和平台壳停止线。
+- [仓库结构草案](repository-layout.md)：crate、server、app、platform、scripts 和 tests 职责。
+- [阶段路线图](roadmap.md)：Phase 0 到 Phase 7 的交付物和退出标准。
+- [CLI 说明](cli.md)：当前可运行命令、输出字段、错误语义和安全边界。
+- [Rime Native Smoke Runbook](runbooks/rime-native-smoke.md)：本机隔离 `librime` smoke 和 rank smoke 操作步骤。

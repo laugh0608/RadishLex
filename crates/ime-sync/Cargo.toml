@@ -1,0 +1,12 @@
+[package]
+name = "radishlex-ime-sync"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../LICENSE"
+description = "Sync payload boundary models for RadishLex."
+
+[lib]
+name = "radishlex_ime_sync"
+path = "src/lib.rs"

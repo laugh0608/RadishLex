@@ -41,7 +41,11 @@ RadishLex/
     roadmap.md
     repository-layout.md
     privacy-sync.md
+    cli.md
     engine-boundary.md
+    engine-rime-adapter.md
+    personalization-learning.md
+    runbooks/
     platform-notes/
   scripts/
     check-repo.sh
@@ -67,6 +71,22 @@ RadishLex/
 - `examples/`：示例输入方案、词库和同步样本。
 - `tests/`：跨语言、跨平台集成测试。
 
+## 当前已落地
+
+- `Cargo.toml`：Rust workspace 入口。
+- `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
+- `crates/ime-cli/`：基于 demo adapter、可选 Rime adapter、userdb 和 ranker 的命令行复验入口。
+- `crates/ime-engine-rime/`：Rime adapter crate，默认不启用 native 绑定。
+- `crates/ime-ffi/`：C ABI 起步 crate，覆盖 opaque handle、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、sync preflight 状态摘要、userdb add / delete / list 管理入口和 host smoke。
+- `crates/ime-sync/`：同步 payload 来源分类、对象类型和加密对象外壳草案。
+- `docs/cli.md`：`radishlex-ime-cli` 命令、输出、退出码和安全边界说明。
+- `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
+- `docs/engine-rime-adapter.md`：`ime-engine-rime` 的 adapter 边界、构建策略和验证分层。
+- `docs/personalization-learning.md`：Phase 2 个人化学习、userdb、ranker、负反馈和 CLI 管理边界。
+- `docs/sync-payload.md`：同步 payload 草案和 P1/P2 来源分类。
+- `docs/ffi-boundary.md`：后续 C ABI、所有权、生命周期和错误语义边界。
+- `docs/runbooks/rime-native-smoke.md`：真实 `librime` 本机 smoke 操作步骤。
+
 ## Rust crates 建议
 
 ### ime-core
@@ -82,6 +102,8 @@ RadishLex/
 - `Ranker`
 - `LearningEvent`
 
+当前已落地 `InputSession`、`KeyEvent`、`Composition`、`Candidate`、`Commit`、`Engine` 和基础生命周期测试。`Ranker` 与 `LearningEvent` 后续在个人化学习阶段补齐。
+
 ### ime-engine-rime
 
 librime adapter：
@@ -89,6 +111,8 @@ librime adapter：
 - 封装 librime session。
 - 转换 librime candidate 到 RadishLex candidate。
 - 屏蔽 C++ 细节。
+
+当前已落地配置模型、错误类型、key 分类、候选转换、`native-rime` build 探测、FFI session 生命周期、输入处理、context / commit 读取路径；默认 workspace 检查不依赖本机安装 `librime`。macOS 本机 `librime` 1.17.0 与隔离 `luna_pinyin` 数据目录下的 native smoke 已覆盖首候选、非首候选、翻页后当前页候选和越界候选索引错误。
 
 ### ime-ranker
 
@@ -100,6 +124,8 @@ librime adapter：
 - 短语上下文。
 - 负反馈。
 
+当前已创建 `crates/ime-ranker/`，落地 `RankRequest`、`RankedCandidate`、结构化 explain 输出和频次、近期、上下文、负反馈、suppressed、deleted tombstone 排序测试；`ime-cli rank explain` 已接入基础解释链路。
+
 ### ime-userdb
 
 本地用户词库：
@@ -110,6 +136,8 @@ librime adapter：
 - 学习记录。
 - 导入导出。
 
+当前已创建 `crates/ime-userdb/`，落地 SQLite schema migration、用户词条 CRUD、选择事件记录、负反馈记录、删除 tombstone 和 ranker weight 摘要起步测试；基础 CLI 管理入口已由 `ime-cli` 承接，导入导出后续补齐。
+
 ### ime-sync
 
 同步客户端：
@@ -118,6 +146,8 @@ librime adapter：
 - 冲突合并。
 - 版本管理。
 - 设备状态。
+
+当前已创建 `crates/ime-sync/`，只落地 payload 来源分类、同步对象类型、P1/P2/本地审计分层和加密对象外壳元数据校验；不连接后端、不实现加密或设备授权。
 
 ### ime-crypto
 
@@ -136,6 +166,8 @@ librime adapter：
 - Flutter bridge。
 - Swift/Kotlin/C++ 调用边界。
 
+当前已创建 `crates/ime-ffi/`，落地 C ABI 起步验证：opaque session handle、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、sync preflight 状态摘要、userdb add / delete / list 管理入口、释放函数、schema 设置、按键输入、snapshot 和候选提交。当前 host smoke 使用 deterministic demo engine，不代表真实平台壳或 Rime adapter 已接入。
+
 ### ime-cli
 
 调试工具：
@@ -144,6 +176,8 @@ librime adapter：
 - 词库导入导出。
 - 同步测试。
 - ranker explain。
+
+当前已落地基于合成 demo adapter 的 `demo <input-code> [candidate-index]` 命令，以及需要 `native-rime` feature 和本机 `librime` 依赖的 `rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] [--rank-db <path>] [--context <kind>] <input-code> [candidate-index]` 命令。`demo` 用于默认复验 `ime-core` 生命周期；它不代表真实中文输入引擎。Phase 2 起步已补 `dict list/add/delete`、`learn select/suppress`、`rank explain` 和 Rime rank smoke，通过显式 `--db` / `--rank-db` 的临时 SQLite 数据库复验用户词条、学习事件、负反馈、真实 engine candidates 重排和 explain 输出。
 
 ## Go server 建议
 
