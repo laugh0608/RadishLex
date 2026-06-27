@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查和同步前置检查命令。`ime-sync` 已补 payload 来源分类和加密对象外壳草案，`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、sync preflight 状态入口和 userdb add / delete / list host smoke。下一阶段目标是继续补齐 Rime adapter FFI 配置策略和更完整的受控 userdb 管理入口。
+当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查和同步前置检查命令。`ime-sync` 已补 payload 来源分类和加密对象外壳草案，`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options 默认 unavailable 门禁、sync preflight 状态入口和 userdb add / delete / list host smoke。下一阶段目标是继续把真实 Rime adapter 安全接入 FFI，并补更完整的受控 userdb 管理入口。
 
 Phase 2 不改变底层 engine adapter 边界：
 
@@ -443,7 +443,8 @@ cargo test --workspace
 10. `ime-ffi` 已补结构化 snapshot / candidate ABI 和 normalized key event。
 11. `ime-ffi` 已补 session options、engine kind 门禁和 sync preflight 状态摘要入口，当前只允许 demo engine，Rime kind 明确返回未可用。
 12. `ime-ffi` 已补受控 userdb add / delete / list 管理入口，继续使用显式 SQLite 路径，不暴露 SQLite handle，不记录 P1 学习事件。
-13. 下一步继续补 Rime adapter FFI 配置策略和更完整的受控 userdb 管理入口。
+13. `ime-ffi` 已补 Rime session options ABI 和默认 unavailable 门禁，先固定 shared data、user data、schema、log dir 与 deploy flag 的跨语言配置形态。
+14. 下一步继续把真实 Rime adapter 安全接入 FFI，并补更完整的受控 userdb 管理入口。
 
 阶段停止线：
 

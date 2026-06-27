@@ -11,10 +11,10 @@ RadishLex 当前处于 Phase 2 起步阶段：
 - `ime-userdb` 已落地本地 SQLite 用户词库、选择事件、负反馈、删除 tombstone、用户词库导入导出和同步前置计数。
 - `ime-ranker` 已提供可解释候选重排。
 - `ime-sync` 已提供同步 payload 来源分类和加密对象外壳草案，不连接后端、不实现加密。
-- `ime-ffi` 已提供 C ABI 起步验证，覆盖 opaque handle、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、sync preflight 状态摘要、userdb add / delete / list 管理入口、释放函数和 demo engine host smoke。
+- `ime-ffi` 已提供 C ABI 起步验证，覆盖 opaque handle、session options、Rime session options 默认 unavailable 门禁、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、sync preflight 状态摘要、userdb add / delete / list 管理入口、释放函数和 demo engine host smoke。
 - `radishlex-ime-cli` 已提供 `demo`、`rime`、`dict`、`learn`、`rank explain`、`rime --rank-db` 和 `sync preflight` 复验入口。
 
-当前下一步仍在 Rust 本地学习链路内推进，重点是 `ime-ffi` 的 Rime adapter 配置策略和更完整的受控 userdb 管理入口。现阶段不推进平台壳、Go 同步后端或 Flutter manager 主线。
+当前下一步仍在 Rust 本地学习链路内推进，重点是把真实 Rime adapter 安全接入 `ime-ffi`，并补更完整的受控 userdb 管理入口。现阶段不推进平台壳、Go 同步后端或 Flutter manager 主线。
 
 ## 设计原则
 

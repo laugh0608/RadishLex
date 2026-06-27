@@ -9,7 +9,10 @@ use crate::buffer::RadishLexBuffer;
 use crate::dictionary::{
     add_user_term, delete_user_term, list_user_terms, RadishLexUserTermList, RadishLexUserTermView,
 };
-use crate::engine::{validate_session_options, RadishLexSessionOptions};
+use crate::engine::{
+    validate_rime_session_options_version, validate_session_options, RadishLexRimeSessionOptions,
+    RadishLexSessionOptions,
+};
 use crate::error::{FfiError, RadishLexError, RadishLexStatusCode};
 use crate::key::RadishLexKeyEvent;
 use crate::session::RadishLexSession;
@@ -41,6 +44,33 @@ pub extern "C" fn radishlex_session_new_with_options(
         Ok(Box::into_raw(Box::new(
             RadishLexSession::new_with_engine_kind(engine_kind),
         )))
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_session_new_rime(
+    options: *const RadishLexRimeSessionOptions,
+    error_out: *mut *mut RadishLexError,
+) -> *mut RadishLexSession {
+    ffi_ptr(error_out, || {
+        if options.is_null() {
+            return Err(FfiError::invalid_argument(
+                "rime session options pointer is null",
+            ));
+        }
+
+        let options = unsafe { *options };
+        validate_rime_session_options_version(options)?;
+        let _shared_data_dir = read_required_utf8(options.shared_data_dir, "shared_data_dir")?;
+        let _user_data_dir = read_required_utf8(options.user_data_dir, "user_data_dir")?;
+        let schema = read_required_utf8(options.schema, "schema")?;
+        let _schema = SchemaId::new(schema)?;
+        let _log_dir = read_optional_nonempty_utf8(options.log_dir, "log_dir")?;
+        let _deploy_on_start = read_ffi_bool(options.deploy_on_start, "deploy_on_start")?;
+
+        Err(FfiError::invalid_state(
+            "rime engine is not available through ime-ffi yet; keep using demo engine or CLI native-rime smoke",
+        ))
     })
 }
 
@@ -379,6 +409,16 @@ fn read_utf8<'a>(value: *const c_char, field: &'static str) -> Result<&'a str, F
         .map_err(|_| FfiError::invalid_argument(format!("{field} must be valid UTF-8")))
 }
 
+fn read_required_utf8<'a>(value: *const c_char, field: &'static str) -> Result<&'a str, FfiError> {
+    let value = read_utf8(value, field)?;
+    if value.is_empty() {
+        return Err(FfiError::invalid_argument(format!(
+            "{field} cannot be empty"
+        )));
+    }
+    Ok(value)
+}
+
 fn read_optional_utf8<'a>(
     value: *const c_char,
     field: &'static str,
@@ -387,6 +427,31 @@ fn read_optional_utf8<'a>(
         return Ok(None);
     }
     read_utf8(value, field).map(Some)
+}
+
+fn read_optional_nonempty_utf8<'a>(
+    value: *const c_char,
+    field: &'static str,
+) -> Result<Option<&'a str>, FfiError> {
+    let Some(value) = read_optional_utf8(value, field)? else {
+        return Ok(None);
+    };
+    if value.is_empty() {
+        return Err(FfiError::invalid_argument(format!(
+            "{field} cannot be empty when provided"
+        )));
+    }
+    Ok(Some(value))
+}
+
+fn read_ffi_bool(value: u8, field: &'static str) -> Result<bool, FfiError> {
+    match value {
+        0 => Ok(false),
+        1 => Ok(true),
+        other => Err(FfiError::invalid_argument(format!(
+            "{field} must be 0 or 1, got {other}"
+        ))),
+    }
 }
 
 fn ffi_status<F>(error_out: *mut *mut RadishLexError, f: F) -> RadishLexStatusCode
@@ -463,7 +528,8 @@ mod tests {
     use super::*;
     use crate::dictionary::{RADISHLEX_TERM_SOURCE_MANUAL_ADD, RADISHLEX_TERM_STATUS_ACTIVE};
     use crate::engine::{
-        RADISHLEX_ENGINE_KIND_DEMO, RADISHLEX_ENGINE_KIND_RIME, RADISHLEX_SESSION_OPTIONS_VERSION,
+        RadishLexRimeSessionOptions, RADISHLEX_ENGINE_KIND_DEMO, RADISHLEX_ENGINE_KIND_RIME,
+        RADISHLEX_RIME_SESSION_OPTIONS_VERSION, RADISHLEX_SESSION_OPTIONS_VERSION,
     };
     use crate::key::{
         RADISHLEX_KEY_MOD_SHIFT, RADISHLEX_KEY_PHASE_RELEASE, RADISHLEX_NAMED_KEY_BACKSPACE,
@@ -559,6 +625,72 @@ mod tests {
             radishlex_error_code(error),
             RadishLexStatusCode::InvalidArgument
         );
+        unsafe {
+            radishlex_error_free(error);
+        }
+    }
+
+    #[test]
+    fn rime_session_options_validate_before_returning_unavailable() {
+        let shared_data_dir = CString::new("/tmp/radishlex-rime/shared").expect("shared path");
+        let user_data_dir = CString::new("/tmp/radishlex-rime/user").expect("user path");
+        let schema = CString::new("luna_pinyin").expect("schema");
+        let log_dir = CString::new("/tmp/radishlex-rime/log").expect("log path");
+        let mut error = ptr::null_mut();
+
+        let options = RadishLexRimeSessionOptions {
+            version: RADISHLEX_RIME_SESSION_OPTIONS_VERSION,
+            shared_data_dir: shared_data_dir.as_ptr(),
+            user_data_dir: user_data_dir.as_ptr(),
+            schema: schema.as_ptr(),
+            log_dir: log_dir.as_ptr(),
+            deploy_on_start: 0,
+        };
+        let session = radishlex_session_new_rime(&options, &mut error);
+        assert!(session.is_null());
+        assert_eq!(
+            radishlex_error_code(error),
+            RadishLexStatusCode::InvalidState
+        );
+        let message = unsafe { CStr::from_ptr(radishlex_error_message(error)) }
+            .to_string_lossy()
+            .into_owned();
+        assert!(message.contains("rime engine is not available"));
+        unsafe {
+            radishlex_error_free(error);
+        }
+
+        error = ptr::null_mut();
+        let bad_version = RadishLexRimeSessionOptions {
+            version: RADISHLEX_RIME_SESSION_OPTIONS_VERSION + 1,
+            ..options
+        };
+        let session = radishlex_session_new_rime(&bad_version, &mut error);
+        assert!(session.is_null());
+        assert_eq!(
+            radishlex_error_code(error),
+            RadishLexStatusCode::InvalidArgument
+        );
+        unsafe {
+            radishlex_error_free(error);
+        }
+
+        error = ptr::null_mut();
+        let bad_deploy_flag = RadishLexRimeSessionOptions {
+            deploy_on_start: 2,
+            log_dir: ptr::null(),
+            ..options
+        };
+        let session = radishlex_session_new_rime(&bad_deploy_flag, &mut error);
+        assert!(session.is_null());
+        assert_eq!(
+            radishlex_error_code(error),
+            RadishLexStatusCode::InvalidArgument
+        );
+        let message = unsafe { CStr::from_ptr(radishlex_error_message(error)) }
+            .to_string_lossy()
+            .into_owned();
+        assert!(message.contains("deploy_on_start"));
         unsafe {
             radishlex_error_free(error);
         }

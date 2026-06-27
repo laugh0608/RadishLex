@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前已落地 `crates/ime-ffi/` 起步验证：C ABI 已覆盖 opaque session handle、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、释放函数、schema 设置、按键输入、snapshot、候选提交、userdb sync preflight 状态摘要和受控 userdb 词条管理入口的 host smoke。当前 session 内部使用 deterministic demo engine 证明 ABI 生命周期，不代表真实 Rime adapter、平台壳或系统输入法已经接入。
+当前已落地 `crates/ime-ffi/` 起步验证：C ABI 已覆盖 opaque session handle、session options、Rime session options ABI、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、释放函数、schema 设置、按键输入、snapshot、候选提交、userdb sync preflight 状态摘要和受控 userdb 词条管理入口的 host smoke。当前 session 内部使用 deterministic demo engine 证明 ABI 生命周期；`radishlex_session_new_rime` 只先验证 Rime 配置 ABI 并在默认构建下返回明确 unavailable 错误，不代表真实 Rime adapter、平台壳或系统输入法已经接入。
 
 平台壳后续只能通过 FFI 调用 Rust core，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。
 
@@ -45,6 +45,7 @@ RadishLexError*
 ```text
 radishlex_session_new
 radishlex_session_new_with_options
+radishlex_session_new_rime
 radishlex_session_free
 radishlex_session_engine_kind
 radishlex_session_reset
@@ -72,6 +73,7 @@ radishlex_error_free
 ```text
 radishlex_session_new
 radishlex_session_new_with_options
+radishlex_session_new_rime
 radishlex_session_free
 radishlex_session_engine_kind
 radishlex_session_reset
@@ -152,6 +154,34 @@ RADISHLEX_ENGINE_KIND_RIME = 2
 ```
 
 当前只允许 demo engine。Rime kind 作为后续稳定入口预留，当前返回 `InvalidState`，避免平台端误以为真实 Rime FFI 已可用。
+
+### Rime session options
+
+`RadishLexRimeSessionOptions`：
+
+```text
+version: u32
+shared_data_dir: *const c_char
+user_data_dir: *const c_char
+schema: *const c_char
+log_dir: *const c_char
+deploy_on_start: u8
+```
+
+当前常量：
+
+```text
+RADISHLEX_RIME_SESSION_OPTIONS_VERSION = 1
+```
+
+规则：
+
+- `radishlex_session_new_rime` 是后续真实 Rime FFI 的专用构造入口，不复用 `RadishLexSessionOptions.engine_kind = RIME` 承载路径和 schema。
+- `shared_data_dir`、`user_data_dir` 和 `schema` 必须是非空 UTF-8 C string；`log_dir` 可以为空指针，传入时也必须非空 UTF-8。
+- `deploy_on_start` 只接受 `0` 或 `1`，避免跨语言 bool 布局差异。
+- 默认 workspace 构建下，参数通过 ABI 校验后返回 `InvalidState`，错误消息明确说明 Rime engine 尚未通过 `ime-ffi` 可用。
+- 后续接入真实 Rime adapter 时，仍必须显式启用 native feature，并使用隔离的 Rime shared / user data 目录；不得静默退回 demo engine，不得读取真实用户输入法目录。
+- 平台端不能缓存这些路径指针；Rust 侧只在调用期间借用传入字符串，真实 Rime session 后续需要在 Rust 内部复制必要配置。
 
 ### Key event
 
@@ -297,7 +327,8 @@ Engine adapter 选择规则：
 
 - `radishlex_session_new` 等价于创建 demo engine session。
 - `radishlex_session_new_with_options` 接收带 `version` 的 `RadishLexSessionOptions`，当前只允许 `RADISHLEX_ENGINE_KIND_DEMO`。
-- `RADISHLEX_ENGINE_KIND_RIME` 已保留为稳定 kind，但当前返回 `InvalidState`；真实 Rime adapter 进入 FFI 前还需要显式配置 shared data、user data、native library 生命周期和 feature 门禁。
+- `RADISHLEX_ENGINE_KIND_RIME` 已保留为稳定 kind，但当前返回 `InvalidState`；真实 Rime adapter 不通过该通用 options 入口传路径。
+- `radishlex_session_new_rime` 是 Rime 专用构造入口，负责校验 `RadishLexRimeSessionOptions`，当前默认构建下仍返回 `InvalidState`。
 - 未知 options version 或未知 engine kind 返回 `InvalidArgument`。
 - 平台端不能直接创建或持有 Rime session、Rime candidate 指针或底层 native handle。
 
@@ -381,7 +412,7 @@ InternalError
 - userdb 删除 tombstone、导入导出和 ranker explain 已通过测试。
 - 同步 payload 草案已区分 P1 本地和 P2 加密同步。
 - FFI 文档明确所有权、生命周期、错误语义、字符串编码和释放责任。
-- `ime-ffi` 至少有 C ABI 单元测试或 host smoke，证明字符串、数组、snapshot、candidate view、normalized key event、session options、sync preflight 状态摘要、userdb 词条管理入口和错误释放路径可复验。当前已完成结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、sync preflight 状态入口和 userdb add / delete / list；真实平台壳前仍需补 Rime adapter FFI 配置策略和更多受控 userdb 管理入口。
+- `ime-ffi` 至少有 C ABI 单元测试或 host smoke，证明字符串、数组、snapshot、candidate view、normalized key event、session options、Rime session options、sync preflight 状态摘要、userdb 词条管理入口和错误释放路径可复验。当前已完成结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime 配置 ABI 默认 unavailable 门禁、sync preflight 状态入口和 userdb add / delete / list；真实平台壳前仍需把 Rime adapter 真正接入 FFI，并补更多受控 userdb 管理入口。
 
 ## 验证口径
 
