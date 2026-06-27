@@ -140,7 +140,7 @@ librime adapter：
 - 学习记录。
 - 导入导出。
 
-当前已创建 `crates/ime-userdb/`，落地 SQLite schema migration、用户词条 CRUD、选择事件记录、负反馈记录、删除 tombstone、ranker weight 摘要、用户词库导入导出、同步前置计数，以及 `dictionary.user_terms` / `dictionary.deleted_terms` P2 plaintext payload 只读迭代器；基础 CLI 管理入口已由 `ime-cli` 承接。
+当前已创建 `crates/ime-userdb/`，落地 SQLite schema migration、用户词条 CRUD、选择事件记录、负反馈记录、删除 tombstone、ranker weight 摘要、用户词库导入导出、同步前置计数，以及 `dictionary.user_terms` / `ranker.weights` / `dictionary.deleted_terms` P2 plaintext payload 只读迭代器；基础 CLI 管理入口已由 `ime-cli` 承接。
 
 ### ime-sync
 
@@ -151,7 +151,7 @@ librime adapter：
 - 版本管理。
 - 设备状态。
 
-当前已创建 `crates/ime-sync/`，只落地 payload 来源分类、同步对象类型、P1/P2/本地审计分层和从 `ime-crypto` envelope 派生加密对象外壳元数据；不连接后端、不实现网络同步或设备授权。
+当前已创建 `crates/ime-sync/`，落地 payload 来源分类、同步对象类型、P1/P2/本地审计分层、从 `ime-crypto` envelope 派生加密对象外壳元数据、同步域、设备状态、加入请求、授权包、撤销记录和对象版本冲突草案模型；不连接后端、不实现网络同步或客户端冲突合并执行器。
 
 ### ime-crypto
 
@@ -162,7 +162,7 @@ librime adapter：
 - blob 加密。
 - 签名和校验。
 
-当前已创建 `crates/ime-crypto/`，落地 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、key role、object envelope、AAD、nonce、删除同步和篡改失败测试；签名、设备授权和恢复码尚未落地。
+当前已创建 `crates/ime-crypto/`，落地 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、key role、object envelope、AAD、nonce、device key descriptor、device wrapping key / record、recovery material、删除同步和篡改失败测试；签名、生产恢复码 KDF 和真实设备密钥存储尚未落地。
 
 ### ime-ffi
 

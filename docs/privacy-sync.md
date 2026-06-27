@@ -60,7 +60,11 @@ SyncObject
   owner_device_id
   version
   base_version
-  encrypted_payload
+  key_id
+  key_epoch
+  algorithm
+  nonce
+  encrypted_payload_len
   ciphertext_hash
   created_at
   updated_at
@@ -85,11 +89,11 @@ SyncObject
 
 该命令不得生成明文同步 payload，不连接后端，不输出用户词明文、原始事件明文或负反馈明细。它的作用是提前复验“哪些表可以进入后续加密对象，哪些表必须留在本地”。
 
-`crates/ime-sync/` 当前只定义 payload 来源分类、同步对象类型和加密对象外壳草案。真实加密、hash 计算、签名、设备授权、上传下载和冲突合并执行器仍属于后续阶段。
+`crates/ime-sync/` 当前定义 payload 来源分类、同步对象类型、加密对象外壳草案、同步域、设备状态、加入请求、授权包、撤销记录和对象版本冲突草案模型。上传下载、Go server 存储和客户端冲突合并执行器仍属于后续阶段。
 
-`docs/crypto-boundary.md` 已补 `ime-crypto` 进入实现前的客户端加密边界。后续服务端可见 hash 必须是 ciphertext hash 或密文加 AAD 的 hash，不得是 plaintext payload hash。
+`docs/crypto-boundary.md` 已补 `ime-crypto` 客户端加密边界，并已落地本地 AEAD envelope、ciphertext hash、device wrapping、recovery material 和撤销后 key epoch 解密边界测试。后续服务端可见 hash 必须是 ciphertext hash 或密文加 AAD 的 hash，不得是 plaintext payload hash。
 
-`docs/sync-key-management.md` 已补真实同步前的同步密钥与设备生命周期边界，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突方向。进入 Go server 前，应先在 Rust 侧补可测试模型。
+`docs/sync-key-management.md` 已补真实同步前的同步密钥与设备生命周期边界，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突方向。进入 Go server 前，应先补客户端删除合并测试、生产级 envelope 组装边界、恢复码 KDF ADR 和签名 / 设备密钥存储设计。
 
 ## 设备授权
 
