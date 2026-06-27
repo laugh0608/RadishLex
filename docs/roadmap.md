@@ -63,6 +63,10 @@
 
 - 用户连续选择某个候选后，该候选排序可提升。
 - 用户删除或降权某个词后，该词不会被旧权重立即复活。
+- Rime candidates 能进入 ranker，并输出可解释排序与提交映射。
+- 用户词库导入导出、导入检查、删除 tombstone 和同步前置计数均可复验。
+- FFI 管理入口只暴露受控 userdb、dictionary、learning status 和 sync preflight 摘要，不导出 P1 明细或明文同步 payload。
+- 进入 Phase 3 代码前，必须先完成 `ime-crypto` 边界设计和本地加密对象测试计划。
 
 ## Phase 3: 自部署同步
 
@@ -71,7 +75,7 @@
 目标：
 
 - 实现 Go 单用户同步服务。
-- 实现端到端加密 blob 同步。
+- 实现端到端加密 blob 同步；`ime-crypto` 本地 envelope、key、nonce、AAD、ciphertext hash 和篡改失败测试必须先于 Go server 上传下载。
 - 实现设备注册。
 - 实现备份恢复。
 

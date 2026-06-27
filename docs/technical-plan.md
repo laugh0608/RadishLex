@@ -11,10 +11,11 @@ RadishLex 当前处于 Phase 2 起步阶段：
 - `ime-userdb` 已落地本地 SQLite 用户词库、选择事件、负反馈、删除 tombstone、用户词库导入导出和同步前置计数。
 - `ime-ranker` 已提供可解释候选重排。
 - `ime-sync` 已提供同步 payload 来源分类和加密对象外壳草案，不连接后端、不实现加密。
+- `ime-crypto` 已补进入实现前的客户端加密、密钥、envelope、删除同步和验证边界设计，但 crate 尚未落地。
 - `ime-ffi` 已提供 C ABI 起步验证，覆盖 ABI contract、opaque handle、session owner-thread policy、session options、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、learning status 只读摘要、sync preflight 状态摘要、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、平台绑定式 view copy / release host smoke、释放函数 panic 边界、demo engine host smoke 和 FFI 调用 runbook。
 - `radishlex-ime-cli` 已提供 `demo`、`rime`、`dict`、`learn status`、`learn select/suppress`、`rank explain`、`rime --rank-db` 和 `sync preflight` 复验入口。
 
-当前下一步仍在 Rust 本地学习与 FFI 边界内推进，重点是评估 Phase 2 退出标准，以及进入 `ime-crypto` / 同步加密设计前还缺哪些可复验证据。现阶段不推进平台壳、Go 同步后端或 Flutter manager 主线。
+当前下一步转入 Rust 本地同步加密前置工作，重点是按 `docs/crypto-boundary.md` 补 `ime-crypto` envelope、key role、nonce、ciphertext hash 和错误模型测试。现阶段不推进平台壳、Go 同步后端或 Flutter manager 主线。
 
 ## 设计原则
 
@@ -186,7 +187,7 @@ MVP 至少需要证明：
 - Rime candidates 能进入 ranker，并输出可解释排序。
 - 用户选择、删除、负反馈能影响后续排序。
 - 用户词库能导入、导出，且普通导入不会复活 deleted tombstone。
-- 同步设计能保证服务端不接触明文 P2 数据。
+- 同步设计能保证服务端不接触明文 P2 数据，且服务端可见 hash 只基于 ciphertext 或 ciphertext + AAD。
 - 至少一个桌面或移动平台能作为真实系统输入法使用。
 
 ## 当前停止线
@@ -194,7 +195,7 @@ MVP 至少需要证明：
 - userdb schema、删除语义、导入导出和 ranker explain 未稳定前，不接远端同步。
 - FFI 所有权、生命周期、错误语义、字符串编码、线程模型和释放责任未明确前，不推进平台壳。
 - Rime native smoke 和学习层复验未稳定前，不推进复杂平台候选窗或管理 UI。
-- P0/P1/P2 分级未在测试和文档中体现前，不进入同步 payload 或管理 UI 主线。
+- `ime-crypto` envelope、密钥、nonce、AAD、ciphertext hash 和篡改失败测试未落地前，不进入 Go server、远端同步或管理 UI 同步主线。
 
 ## 专题文档索引
 
@@ -203,6 +204,7 @@ MVP 至少需要证明：
 - [个人化学习设计](personalization-learning.md)：userdb、ranker、学习事件、负反馈、删除 tombstone、导入导出和 CLI 管理入口。
 - [隐私与同步设计](privacy-sync.md)：P0/P1/P2/P3 分级、加密对象、设备授权、删除语义和威胁模型。
 - [同步 Payload 草案](sync-payload.md)：同步对象类型、P1/P2 来源分类、加密对象外壳和验证口径。
+- [ime-crypto 边界设计](crypto-boundary.md)：客户端加密、密钥、envelope、删除同步和验证边界。
 - [FFI 边界](ffi-boundary.md)：C ABI 职责、所有权、生命周期、错误语义和平台壳停止线。
 - [仓库结构草案](repository-layout.md)：crate、server、app、platform、scripts 和 tests 职责。
 - [阶段路线图](roadmap.md)：Phase 0 到 Phase 7 的交付物和退出标准。

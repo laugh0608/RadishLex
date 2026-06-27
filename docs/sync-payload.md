@@ -1,6 +1,6 @@
 # RadishLex 同步 Payload 草案
 
-本文档定义当前 Rust 侧同步 payload 草案、数据分级映射和验证口径，读者是后续实现 `ime-sync`、`ime-crypto`、同步 CLI、Go server 和管理 UI 的开发者。本文不包含加密算法实现、设备授权流程完整协议、HTTP API、Go server 数据库 migration 或远端同步客户端实现。
+本文档定义当前 Rust 侧同步 payload 草案、数据分级映射和验证口径，读者是后续实现 `ime-sync`、`ime-crypto`、同步 CLI、Go server 和管理 UI 的开发者。本文不包含加密算法实现、设备授权流程完整协议、HTTP API、Go server 数据库 migration 或远端同步客户端实现；客户端加密边界见 `docs/crypto-boundary.md`。
 
 ## 当前定位
 
@@ -57,7 +57,7 @@ settings.schema
 backup.snapshot
 ```
 
-本阶段只验证类型和边界，不定义完整字段序列化格式。真正写入服务端前必须先经过 `ime-crypto` 加密，服务端只能看到对象类型、设备 ID、版本、密文大小、hash 和时间戳。
+本阶段只验证类型和边界，不定义完整字段序列化格式。真正写入服务端前必须先经过 `ime-crypto` 加密，服务端只能看到对象类型、设备 ID、版本、密文大小、ciphertext hash 和时间戳。
 
 ## 加密对象外壳
 
@@ -70,14 +70,14 @@ owner_device_id
 version
 base_version
 encrypted_payload_len
-payload_hash
+ciphertext_hash
 created_at_ms
 updated_at_ms
 ```
 
 规则：
 
-- `object_id`、`owner_device_id` 和 `payload_hash` 不能为空。
+- `object_id`、`owner_device_id` 和 `ciphertext_hash` 不能为空；该字段是密文或密文加 AAD 的 hash，不能是 plaintext hash。
 - `version` 从 1 开始。
 - `base_version` 必须小于 `version`。
 - `encrypted_payload_len` 必须大于 0。
@@ -102,7 +102,7 @@ updated_at_ms
 - `PayloadSource`：本地表来源分类。
 - `LocalDataClass`：P1 本地、P2 加密同步、本地审计分级。
 - `SyncPayloadPlan`：把本地来源分为可同步和本地保留。
-- `EncryptedSyncObjectDraft`：加密对象外壳元数据与校验。
+- `EncryptedSyncObjectDraft`：加密对象外壳元数据与 `ciphertext_hash` 校验。
 
 未落地：
 

@@ -1,0 +1,181 @@
+# RadishLex ime-crypto 边界设计
+
+本文档定义 `ime-crypto` 进入实现前必须遵守的客户端加密、密钥、对象 envelope、删除同步和验证边界，读者是后续实现 `ime-crypto`、扩展 `ime-sync`、设计同步 CLI 和审阅 Go server 接口的开发者。本文不包含具体第三方 crate 选型、完整设备配对协议、HTTP API、Go server migration、Flutter 页面设计或真实上传下载流程。
+
+## 当前定位
+
+Phase 2 的 userdb、ranker、Rime adapter、FFI 管理入口和学习状态摘要已具备进入 `ime-crypto` 设计的证据链；但真实同步仍未开始。
+
+当前结论：
+
+- 可以进入 `ime-crypto` 本地 crate 的设计与测试准备。
+- 不连接 Go server，不生成可上传明文 payload，不把加密入口暴露给 FFI 或平台壳。
+- 不把平台壳、Flutter manager 或 Go 后端提前压入当前主线。
+- 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
+
+第一批实现只有在能同时覆盖 envelope 校验、密钥语义、nonce 唯一性、密文 hash、AAD 绑定和篡改失败测试时再落地；不要创建只转发字节或只占位的加密 crate。
+
+## 职责分工
+
+`ime-userdb` 负责：
+
+- 保存本地 P1 / P2 数据和删除 tombstone。
+- 提供可复验的 P2 来源计数和后续导出迭代入口。
+- 继续阻止普通导入或旧事件复活 deleted tombstone。
+
+`ime-sync` 负责：
+
+- 定义同步对象类型、版本、base version 和冲突语义。
+- 判断本地来源是否允许进入 P2 加密同步。
+- 后续把 P2 记录整理成规范化 plaintext payload 字节。
+
+`ime-crypto` 负责：
+
+- 管理本地密钥、设备密钥、对象密钥和恢复材料的模型。
+- 对允许同步的 plaintext payload 执行加密、解密和完整性校验。
+- 生成密文长度、密文 hash、nonce、算法标识和 key id 等 envelope 字段。
+- 使用 AAD 绑定对象元数据，避免密文被换绑到其他对象或版本。
+
+Go server 只负责：
+
+- 存储密文对象和同步元数据。
+- 做版本冲突检测和设备公钥登记。
+- 不解密、不排序、不解析用户词、不保存明文事件。
+
+## 数据准入
+
+允许进入 `ime-crypto` 的 P2 plaintext payload：
+
+- `dictionary.user_terms`
+- `dictionary.deleted_terms`
+- `ranker.weights`
+- `settings.profile`
+- `settings.schema`
+- `backup.snapshot`
+
+禁止进入 `ime-crypto` 的数据：
+
+- P0 输入内容。
+- P1 原始选择事件。
+- 负反馈详细 reason 列表。
+- 应用上下文统计和窗口正文。
+- `import_batches` 本地审计记录。
+- Rime 私有对象、SQLite handle、平台窗口句柄。
+- 任何通过 FFI 导出的明文同步 payload。
+
+P1 原始事件后续只能先在本机压缩为 P2 权重摘要，再由 P2 对象进入加密同步；原始事件行本身不能同步。
+
+## 密钥模型
+
+后续实现至少需要区分：
+
+- `ProfileRootKey`：本设备本地保护的根材料，用于解锁同步密钥或恢复流程。
+- `SyncMasterKey`：用户同步域的主密钥材料，用于派生对象加密密钥和设备包装密钥。
+- `DeviceKeyPair`：设备加入同步域时使用的非对称密钥对。
+- `DeviceWrappingKey`：旧设备或恢复流程为新设备包装同步密钥时使用。
+- `ObjectKey`：按对象类型、对象 ID、版本和用途派生的对象加密密钥。
+
+规则：
+
+- 服务端账号密码不得直接解密用户数据。
+- 新设备加入必须通过已有设备授权或恢复码。
+- 撤销设备后，后续对象必须使用新同步密钥或新 key epoch；旧设备不应能解密撤销后的新对象。
+- 历史对象是否重加密是独立策略；如果不重加密，UI 和文档必须说明旧设备在被撤销前已经取得的历史密钥无法被技术上追回。
+- 恢复码必须使用适合低熵口令的 KDF，具体算法和参数进入实现前用 ADR 固化。
+
+## 加密对象 Envelope
+
+后续 `ime-crypto` 应输出类似结构：
+
+```text
+EncryptedObjectEnvelope
+  schema_version
+  object_id
+  object_type
+  owner_device_id
+  key_id
+  key_epoch
+  algorithm
+  nonce
+  version
+  base_version
+  encrypted_payload
+  ciphertext_hash
+  created_at_ms
+  updated_at_ms
+```
+
+`ciphertext_hash` 必须是密文或密文加 AAD 的 hash，不得是 plaintext payload hash。服务端可以用它做对象完整性和去重辅助，但不能通过 hash 猜测用户词。
+
+AAD 至少绑定：
+
+```text
+schema_version
+object_id
+object_type
+owner_device_id
+key_id
+key_epoch
+version
+base_version
+created_at_ms
+updated_at_ms
+```
+
+解密时 AAD 不匹配、nonce 重复风险、算法未知、key id 不存在或认证标签失败，都必须返回明确错误，不得输出部分 plaintext。
+
+## Payload 规范化
+
+Plaintext payload 后续必须有稳定 schema：
+
+- 包含 `payload_schema_version` 和 `object_type`。
+- 字段顺序、字符串编码、空 reading 表达和时间戳单位必须稳定。
+- 不依赖 SQLite rowid 作为跨设备身份。
+- 不包含测试机路径、平台窗口信息、Rime session id 或调试日志。
+- 测试 fixture 只能使用合成词和虚构设备 ID。
+
+对象 ID 不得包含明文用户词、input code、reading 或上下文。若需要 term identity，优先放在 encrypted payload 内；如必须生成跨对象稳定 identifier，应使用同步域密钥派生的 keyed identifier，而不是公开 hash。
+
+当前 `ime-userdb` 的 `stable_hash_hex` 只用于本地 tombstone 查询，不具备同步安全属性，不能作为服务端可见对象 ID、payload hash 或跨设备安全标识。
+
+## 删除与冲突
+
+`dictionary.deleted_terms` 是 P2 对象，必须参与加密同步。
+
+规则：
+
+- 删除 tombstone 优先于旧选择事件、旧导入和旧设备上传。
+- 普通 dictionary import 不能复活 deleted tombstone。
+- 用户显式手动添加可以作为恢复意图，但需要生成新的版本并清理对应删除意图。
+- 冲突合并时必须覆盖旧设备复活、离线删除、备份恢复和重复导入场景。
+
+## 实施顺序
+
+1. 补 `ime-crypto` crate 的 envelope、key role、nonce、ciphertext hash 和错误模型测试。
+2. 补合成 plaintext payload 的加密 / 解密 / 篡改失败测试，不读取真实 userdb。
+3. 将 `ime-sync::EncryptedSyncObjectDraft` 持续对齐 `ime-crypto` envelope，保持 `ciphertext_hash` 语义不回退。
+4. 再接入 userdb 的 P2 导出迭代器，仍不连接后端。
+5. 设备授权、恢复码和设备撤销设计确认后，再进入 Go server API。
+
+## 验证口径
+
+进入真实同步前必须覆盖：
+
+- P1 / 本地审计来源不能进入 crypto payload。
+- 同一 key 下 nonce 不重复。
+- AAD 任一字段变化会导致解密失败。
+- 密文或认证标签被篡改会导致解密失败。
+- `ciphertext_hash` 不等于 plaintext hash，且不包含明文用户词。
+- 删除 tombstone 加密同步后不会被旧对象复活。
+- 设备撤销后新对象使用新 key epoch。
+
+默认验证命令后续应至少包含：
+
+```text
+cargo test -p radishlex-ime-crypto
+cargo test -p radishlex-ime-sync
+cargo test -p radishlex-ime-userdb
+./scripts/check-repo.sh
+```
+
+在 `ime-crypto` crate 落地前，当前仓库只要求文档边界、`ime-sync` payload 草案和 userdb / FFI preflight 继续保持一致。

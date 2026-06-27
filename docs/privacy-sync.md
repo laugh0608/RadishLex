@@ -61,7 +61,7 @@ SyncObject
   version
   base_version
   encrypted_payload
-  payload_hash
+  ciphertext_hash
   created_at
   updated_at
 ```
@@ -86,6 +86,8 @@ SyncObject
 该命令不得生成明文同步 payload，不连接后端，不输出用户词明文、原始事件明文或负反馈明细。它的作用是提前复验“哪些表可以进入后续加密对象，哪些表必须留在本地”。
 
 `crates/ime-sync/` 当前只定义 payload 来源分类、同步对象类型和加密对象外壳草案。真实加密、hash 计算、签名、设备授权、上传下载和冲突合并执行器仍属于后续阶段。
+
+`docs/crypto-boundary.md` 已补 `ime-crypto` 进入实现前的客户端加密边界。后续服务端可见 hash 必须是 ciphertext hash 或密文加 AAD 的 hash，不得是 plaintext payload hash。
 
 ## 设备授权
 
@@ -196,6 +198,7 @@ services:
 - 允许从其他设备撤销该设备。
 - 撤销后轮换同步密钥。
 - 后续对象不再对旧设备可解密。
+- 撤销前旧设备已经取得的历史密钥无法被技术上追回；如不重加密历史对象，管理 UI 必须明确展示该限制。
 
 ### 用户误删
 

@@ -84,6 +84,7 @@ RadishLex/
 - `docs/engine-rime-adapter.md`：`ime-engine-rime` 的 adapter 边界、构建策略和验证分层。
 - `docs/personalization-learning.md`：Phase 2 个人化学习、userdb、ranker、负反馈和 CLI 管理边界。
 - `docs/sync-payload.md`：同步 payload 草案和 P1/P2 来源分类。
+- `docs/crypto-boundary.md`：`ime-crypto` 进入实现前的客户端加密、密钥、envelope 和验证边界。
 - `docs/ffi-boundary.md`：后续 C ABI、所有权、生命周期和错误语义边界。
 - `docs/runbooks/ffi-platform-call-contract.md`：平台绑定层调用 C ABI 的错误、字符串、handle 释放和 owner-thread 调度规则。
 - `docs/runbooks/rime-native-smoke.md`：真实 `librime` 本机 smoke 操作步骤。
@@ -158,6 +159,8 @@ librime adapter：
 - 设备密钥。
 - blob 加密。
 - 签名和校验。
+
+当前已补 `docs/crypto-boundary.md`，先固定 `ime-crypto` 的 key role、object envelope、AAD、ciphertext hash、nonce、删除同步和测试边界；crate 尚未落地。
 
 ### ime-ffi
 

@@ -134,7 +134,7 @@ pub struct EncryptedSyncObjectDraft {
     pub version: u64,
     pub base_version: Option<u64>,
     pub encrypted_payload_len: usize,
-    pub payload_hash: String,
+    pub ciphertext_hash: String,
     pub created_at_ms: i64,
     pub updated_at_ms: i64,
 }
@@ -146,7 +146,7 @@ impl EncryptedSyncObjectDraft {
         owner_device_id: impl Into<String>,
         version: u64,
         encrypted_payload_len: usize,
-        payload_hash: impl Into<String>,
+        ciphertext_hash: impl Into<String>,
         timestamp_ms: i64,
     ) -> Self {
         Self {
@@ -156,7 +156,7 @@ impl EncryptedSyncObjectDraft {
             version,
             base_version: None,
             encrypted_payload_len,
-            payload_hash: payload_hash.into(),
+            ciphertext_hash: ciphertext_hash.into(),
             created_at_ms: timestamp_ms,
             updated_at_ms: timestamp_ms,
         }
@@ -170,7 +170,7 @@ impl EncryptedSyncObjectDraft {
     pub fn validate(&self) -> Result<(), SyncPayloadError> {
         validate_required("object_id", &self.object_id)?;
         validate_required("owner_device_id", &self.owner_device_id)?;
-        validate_required("payload_hash", &self.payload_hash)?;
+        validate_required("ciphertext_hash", &self.ciphertext_hash)?;
 
         if self.version == 0 {
             return Err(SyncPayloadError::InvalidField {
@@ -322,5 +322,23 @@ mod tests {
 
         let error = object.validate().expect_err("missing object id fails");
         assert!(error.to_string().contains("object_id"));
+    }
+
+    #[test]
+    fn encrypted_sync_object_draft_requires_ciphertext_hash() {
+        let object = EncryptedSyncObjectDraft::new(
+            "dictionary-user-terms-device-a",
+            SyncObjectType::DictionaryUserTerms,
+            "device-a",
+            1,
+            128,
+            "",
+            10,
+        );
+
+        let error = object
+            .validate()
+            .expect_err("missing ciphertext hash fails");
+        assert!(error.to_string().contains("ciphertext_hash"));
     }
 }
