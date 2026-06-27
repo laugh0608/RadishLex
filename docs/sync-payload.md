@@ -107,7 +107,7 @@ updated_at_ms
 未落地：
 
 - 明文 payload 字段序列化。
-- 加密、签名、hash 计算和 key management。
+- 真实 AEAD 加密、签名、KDF、hash 计算和 key management；`ime-crypto` 当前只落地本地 envelope / AAD / nonce / ciphertext hash 模型测试。
 - 设备授权、恢复码、设备撤销和密钥轮换。
 - HTTP API、Go server 存储和冲突合并执行器。
 
@@ -127,4 +127,4 @@ cargo test -p radishlex-ime-cli
 - P2 来源能映射到同步对象类型。
 - P1 来源没有同步对象类型。
 - 本地审计来源没有同步对象类型。
-- 加密对象外壳拒绝空 ID、空设备 ID、空 hash、0 版本、0 payload 大小和非法版本关系。
+- 加密对象外壳拒绝空 ID、空设备 ID、空 `ciphertext_hash`、0 版本、0 payload 大小和非法版本关系。

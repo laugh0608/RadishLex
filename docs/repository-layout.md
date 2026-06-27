@@ -79,6 +79,7 @@ RadishLex/
 - `crates/ime-engine-rime/`：Rime adapter crate，默认不启用 native 绑定。
 - `crates/ime-ffi/`：C ABI 起步 crate，覆盖 ABI contract、opaque handle、session owner-thread policy、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、sync preflight 状态摘要、userdb 管理入口、dictionary 文件管理入口和 host smoke。
 - `crates/ime-sync/`：同步 payload 来源分类、对象类型和加密对象外壳草案。
+- `crates/ime-crypto/`：客户端加密本地模型 crate，当前覆盖 key role、object envelope、AAD、nonce 和 ciphertext hash 边界测试。
 - `docs/cli.md`：`radishlex-ime-cli` 命令、输出、退出码和安全边界说明。
 - `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
 - `docs/engine-rime-adapter.md`：`ime-engine-rime` 的 adapter 边界、构建策略和验证分层。
@@ -160,7 +161,7 @@ librime adapter：
 - blob 加密。
 - 签名和校验。
 
-当前已补 `docs/crypto-boundary.md`，先固定 `ime-crypto` 的 key role、object envelope、AAD、ciphertext hash、nonce、删除同步和测试边界；crate 尚未落地。
+当前已创建 `crates/ime-crypto/`，落地 key role、object envelope、AAD、ciphertext hash、nonce、删除同步和错误模型测试；真实 AEAD、KDF、签名、设备授权和恢复码尚未落地。
 
 ### ime-ffi
 

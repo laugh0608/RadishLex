@@ -4,16 +4,16 @@
 
 ## 当前定位
 
-Phase 2 的 userdb、ranker、Rime adapter、FFI 管理入口和学习状态摘要已具备进入 `ime-crypto` 设计的证据链；但真实同步仍未开始。
+Phase 2 的 userdb、ranker、Rime adapter、FFI 管理入口和学习状态摘要已具备进入 `ime-crypto` 设计的证据链；`ime-crypto` 本地模型 crate 已落地，但真实同步仍未开始。
 
 当前结论：
 
-- 可以进入 `ime-crypto` 本地 crate 的设计与测试准备。
+- 已进入 `ime-crypto` 本地 crate 的设计与测试准备，当前覆盖 envelope、key role、AAD、nonce 和 ciphertext hash 的模型校验。
 - 不连接 Go server，不生成可上传明文 payload，不把加密入口暴露给 FFI 或平台壳。
 - 不把平台壳、Flutter manager 或 Go 后端提前压入当前主线。
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 
-第一批实现只有在能同时覆盖 envelope 校验、密钥语义、nonce 唯一性、密文 hash、AAD 绑定和篡改失败测试时再落地；不要创建只转发字节或只占位的加密 crate。
+第一批真实加密实现只有在能同时覆盖依赖许可口径、AEAD / KDF / hash 选型、nonce 唯一性、密文 hash、AAD 绑定和篡改失败测试时再落地；不要写只转发字节或只占位的加密流程。
 
 ## 职责分工
 
@@ -151,11 +151,12 @@ Plaintext payload 后续必须有稳定 schema：
 
 ## 实施顺序
 
-1. 补 `ime-crypto` crate 的 envelope、key role、nonce、ciphertext hash 和错误模型测试。
-2. 补合成 plaintext payload 的加密 / 解密 / 篡改失败测试，不读取真实 userdb。
-3. 将 `ime-sync::EncryptedSyncObjectDraft` 持续对齐 `ime-crypto` envelope，保持 `ciphertext_hash` 语义不回退。
-4. 再接入 userdb 的 P2 导出迭代器，仍不连接后端。
-5. 设备授权、恢复码和设备撤销设计确认后，再进入 Go server API。
+1. 已补 `ime-crypto` crate 的 envelope、key role、nonce、ciphertext hash、AAD 绑定和错误模型测试。
+2. 确认 AEAD / KDF / hash / 随机数依赖与许可口径。
+3. 补合成 plaintext payload 的加密 / 解密 / 篡改失败测试，不读取真实 userdb。
+4. 将 `ime-sync::EncryptedSyncObjectDraft` 持续对齐 `ime-crypto` envelope，保持 `ciphertext_hash` 语义不回退。
+5. 再接入 userdb 的 P2 导出迭代器，仍不连接后端。
+6. 设备授权、恢复码和设备撤销设计确认后，再进入 Go server API。
 
 ## 验证口径
 
@@ -178,4 +179,4 @@ cargo test -p radishlex-ime-userdb
 ./scripts/check-repo.sh
 ```
 
-在 `ime-crypto` crate 落地前，当前仓库只要求文档边界、`ime-sync` payload 草案和 userdb / FFI preflight 继续保持一致。
+在真实加密算法落地前，当前仓库只要求 `ime-crypto` 模型、`ime-sync` payload 草案和 userdb / FFI preflight 继续保持一致。
