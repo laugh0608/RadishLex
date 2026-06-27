@@ -13,15 +13,19 @@ use radishlex_ime_ffi::{
     radishlex_userdb_dictionary_import, radishlex_userdb_dictionary_inspect,
     radishlex_userdb_import_batches_count, radishlex_userdb_import_batches_free,
     radishlex_userdb_import_batches_get, radishlex_userdb_import_batches_new,
-    radishlex_userdb_terms_count, radishlex_userdb_terms_free, radishlex_userdb_terms_new,
-    RadishLexError, RadishLexFfiContract, RadishLexImportBatchView, RadishLexSession,
-    RadishLexStatusCode, RadishLexStringView, RADISHLEX_ABI_CONTRACT_VERSION,
-    RADISHLEX_DICTIONARY_FORMAT_USER_TERMS_V1, RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND,
-    RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD, RADISHLEX_SYNC_CLASS_P2_ENCRYPTED_SYNC,
+    radishlex_userdb_learning_status, radishlex_userdb_terms_count, radishlex_userdb_terms_free,
+    radishlex_userdb_terms_new, RadishLexError, RadishLexFfiContract, RadishLexImportBatchView,
+    RadishLexLearningStatusSummary, RadishLexSession, RadishLexStatusCode, RadishLexStringView,
+    RADISHLEX_ABI_CONTRACT_VERSION, RADISHLEX_DICTIONARY_FORMAT_USER_TERMS_V1,
+    RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND, RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD,
+    RADISHLEX_SYNC_CLASS_P2_ENCRYPTED_SYNC,
 };
 #[cfg(feature = "native-rime")]
 use radishlex_ime_ffi::{
     radishlex_session_new_rime, RadishLexRimeSessionOptions, RADISHLEX_RIME_SESSION_OPTIONS_VERSION,
+};
+use radishlex_ime_userdb::{
+    NegativeFeedbackDraft, NegativeFeedbackReason, SelectionEventDraft, TermSource, UserDb,
 };
 
 #[test]
@@ -244,6 +248,74 @@ fn userdb_dictionary_file_management_round_trips_p2_terms() {
     let _ = fs::remove_file(source_path);
     let _ = fs::remove_file(target_path);
     let _ = fs::remove_file(export_path);
+}
+
+#[test]
+fn userdb_learning_status_reports_read_only_counts() {
+    let db_path = temp_db_path("learning-status");
+    {
+        let mut db = UserDb::open(&db_path).expect("userdb opens");
+        db.add_term("cihe", "词核", None, TermSource::ManualAdd)
+            .expect("term is added");
+        db.record_selection(
+            SelectionEventDraft::new("session-private", "luobo", "萝卜", 0, 1)
+                .with_context_kind("chat"),
+        )
+        .expect("selection is recorded");
+        db.record_negative_feedback(
+            NegativeFeedbackDraft::new("luobo", "萝卜", NegativeFeedbackReason::ManualSuppress)
+                .with_context_kind("chat"),
+        )
+        .expect("feedback is recorded");
+    }
+
+    let db_path_c = CString::new(db_path.to_string_lossy().as_bytes()).expect("path");
+    let mut error = ptr::null_mut();
+    let mut summary = RadishLexLearningStatusSummary::empty();
+    assert_eq!(
+        radishlex_userdb_learning_status(db_path_c.as_ptr(), &mut summary, &mut error),
+        RadishLexStatusCode::Ok
+    );
+    assert!(error.is_null());
+
+    assert_eq!(summary.schema_version, 2);
+    assert_eq!(summary.plaintext_payload, 0);
+    assert_eq!(summary.p1_raw_details, 0);
+    assert_eq!(summary.context_stats, 0);
+    assert_eq!(summary.active_user_terms, 1);
+    assert_eq!(summary.suppressed_user_terms, 1);
+    assert_eq!(summary.ranker_weights, 1);
+    assert_eq!(summary.deleted_term_tombstones, 0);
+    assert_eq!(summary.selection_events, 1);
+    assert_eq!(summary.negative_feedback, 1);
+    assert_eq!(summary.import_batches, 0);
+    assert_eq!(summary.latest_user_term_updated_at_present, 1);
+    assert_eq!(summary.latest_selection_event_at_present, 1);
+    assert_eq!(summary.latest_negative_feedback_at_present, 1);
+    assert_eq!(summary.latest_deleted_term_at_present, 0);
+    assert_eq!(summary.latest_import_batch_at_present, 0);
+    assert_eq!(summary.latest_activity_at_present, 1);
+
+    let debug = format!("{summary:?}");
+    assert!(!debug.contains("session-private"));
+    assert!(!debug.contains("chat"));
+    assert!(!debug.contains("manual_suppress"));
+    assert!(!debug.contains("萝卜"));
+    assert!(!debug.contains("词核"));
+
+    assert_eq!(
+        radishlex_userdb_learning_status(db_path_c.as_ptr(), ptr::null_mut(), &mut error),
+        RadishLexStatusCode::InvalidArgument
+    );
+    assert_eq!(
+        radishlex_error_code(error),
+        RadishLexStatusCode::InvalidArgument
+    );
+    unsafe {
+        radishlex_error_free(error);
+    }
+
+    let _ = fs::remove_file(db_path);
 }
 
 #[cfg(feature = "native-rime")]

@@ -489,3 +489,66 @@ fn sync_preflight_separates_syncable_and_local_only_counts() {
     assert_eq!(summary.local_negative_feedback, 1);
     assert_eq!(summary.local_import_batches, 0);
 }
+
+#[test]
+fn learning_status_reports_only_aggregate_counts_and_timestamps() {
+    let mut db = UserDb::open_in_memory().expect("userdb opens");
+
+    let empty = db.learning_status_summary().expect("empty summary");
+    assert_eq!(empty.schema_version, 2);
+    assert_eq!(empty.active_user_terms, 0);
+    assert_eq!(empty.suppressed_user_terms, 0);
+    assert_eq!(empty.selection_events, 0);
+    assert_eq!(empty.negative_feedback, 0);
+    assert_eq!(empty.latest_activity_at_ms, None);
+
+    db.add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualAdd)
+        .expect("term is added");
+    db.record_selection(
+        SelectionEventDraft::new("session-local", "cihe", "词核", 0, 1).with_context_kind("chat"),
+    )
+    .expect("selection is recorded");
+    db.record_negative_feedback(
+        NegativeFeedbackDraft::new("cihe", "词核", NegativeFeedbackReason::ManualSuppress)
+            .with_context_kind("chat"),
+    )
+    .expect("feedback is recorded");
+    db.delete_term("luobo", "萝卜", Some("luo bo"))
+        .expect("term is deleted");
+
+    let summary = db.learning_status_summary().expect("summary");
+
+    assert_eq!(summary.schema_version, 2);
+    assert_eq!(summary.active_user_terms, 0);
+    assert_eq!(summary.suppressed_user_terms, 1);
+    assert_eq!(summary.ranker_weights, 1);
+    assert_eq!(summary.deleted_term_tombstones, 1);
+    assert_eq!(summary.selection_events, 1);
+    assert_eq!(summary.negative_feedback, 1);
+    assert_eq!(summary.import_batches, 0);
+    assert!(summary.latest_user_term_updated_at_ms.is_some());
+    assert!(summary.latest_selection_event_at_ms.is_some());
+    assert!(summary.latest_negative_feedback_at_ms.is_some());
+    assert!(summary.latest_deleted_term_at_ms.is_some());
+    assert_eq!(summary.latest_import_batch_at_ms, None);
+    assert_eq!(
+        summary.latest_activity_at_ms,
+        [
+            summary.latest_user_term_updated_at_ms,
+            summary.latest_selection_event_at_ms,
+            summary.latest_negative_feedback_at_ms,
+            summary.latest_deleted_term_at_ms,
+            summary.latest_import_batch_at_ms,
+        ]
+        .into_iter()
+        .flatten()
+        .max()
+    );
+
+    let debug = format!("{summary:?}");
+    assert!(!debug.contains("session-local"));
+    assert!(!debug.contains("chat"));
+    assert!(!debug.contains("manual_suppress"));
+    assert!(!debug.contains("萝卜"));
+    assert!(!debug.contains("词核"));
+}

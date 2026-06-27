@@ -22,6 +22,7 @@ use crate::engine::{
 };
 use crate::error::{FfiError, RadishLexError, RadishLexStatusCode};
 use crate::key::RadishLexKeyEvent;
+use crate::learning_status::{learning_status_for_path, RadishLexLearningStatusSummary};
 use crate::session::RadishLexSession;
 use crate::snapshot::{RadishLexCandidateView, RadishLexSnapshot, RadishLexStringView};
 use crate::sync_status::{sync_preflight_for_path, RadishLexSyncPreflightSummary};
@@ -247,6 +248,28 @@ pub extern "C" fn radishlex_userdb_sync_preflight(
 
         let db_path = read_utf8(db_path, "db_path")?;
         let summary = sync_preflight_for_path(db_path)?;
+        unsafe {
+            *summary_out = summary;
+        }
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_userdb_learning_status(
+    db_path: *const c_char,
+    summary_out: *mut RadishLexLearningStatusSummary,
+    error_out: *mut *mut RadishLexError,
+) -> RadishLexStatusCode {
+    ffi_status(error_out, || {
+        if summary_out.is_null() {
+            return Err(FfiError::invalid_argument(
+                "learning status summary output pointer is null",
+            ));
+        }
+
+        let db_path = read_utf8(db_path, "db_path")?;
+        let summary = learning_status_for_path(db_path)?;
         unsafe {
             *summary_out = summary;
         }

@@ -8,6 +8,7 @@ mod dictionary;
 mod engine;
 mod error;
 mod key;
+mod learning_status;
 mod session;
 mod snapshot;
 mod sync_status;
@@ -34,6 +35,7 @@ pub use engine::{
 };
 pub use error::{RadishLexError, RadishLexStatusCode};
 pub use key::*;
+pub use learning_status::RadishLexLearningStatusSummary;
 pub use session::RadishLexSession;
 pub use snapshot::{
     RadishLexCandidateView, RadishLexSnapshot, RadishLexStringView,

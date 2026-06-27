@@ -282,6 +282,24 @@ pub struct SyncPreflightSummary {
     pub local_import_batches: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LearningStatusSummary {
+    pub schema_version: i64,
+    pub active_user_terms: usize,
+    pub suppressed_user_terms: usize,
+    pub ranker_weights: usize,
+    pub deleted_term_tombstones: usize,
+    pub selection_events: usize,
+    pub negative_feedback: usize,
+    pub import_batches: usize,
+    pub latest_user_term_updated_at_ms: Option<i64>,
+    pub latest_selection_event_at_ms: Option<i64>,
+    pub latest_negative_feedback_at_ms: Option<i64>,
+    pub latest_deleted_term_at_ms: Option<i64>,
+    pub latest_import_batch_at_ms: Option<i64>,
+    pub latest_activity_at_ms: Option<i64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SelectionEventDraft {
     pub session_id: String,

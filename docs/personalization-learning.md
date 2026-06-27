@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查和同步前置检查命令。`ime-sync` 已补 payload 来源分类和加密对象外壳草案，`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、释放 panic 边界 host smoke 和 FFI 调用 runbook。下一阶段目标是复验 native 库异常路径，并根据管理 UI 需要补充学习状态只读摘要。
+当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn status/select/suppress`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查、学习状态只读摘要和同步前置检查命令。`ime-sync` 已补 payload 来源分类和加密对象外壳草案，`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、learning status 只读摘要、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、释放 panic 边界 host smoke 和 FFI 调用 runbook。下一阶段目标是继续评估更底层 native API 缺失路径和平台绑定前 smoke 口径。
 
 Phase 2 不改变底层 engine adapter 边界：
 
@@ -314,6 +314,7 @@ radishlex-ime-cli dict export --db <path> --file <path>
 radishlex-ime-cli dict inspect --file <path>
 radishlex-ime-cli dict import --db <path> --file <path> [--source <name>] [--dry-run]
 radishlex-ime-cli dict import-batches --db <path>
+radishlex-ime-cli learn status --db <path>
 radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
 radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
 radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
@@ -331,6 +332,7 @@ radishlex-ime-cli sync preflight --db <path>
 - `dict import --dry-run` 必须复用实际导入的分类逻辑，报告 `inserted`、`updated`、`skipped_deleted` 和 `skipped_duplicate`，但不得写入词条或导入批次。
 - `dict import-batches` 用于查看导入批次来源、导入数量、插入数量、更新数量、删除跳过数量、重复跳过数量和创建时间。
 - `dict inspect` 用于在不打开 userdb 的情况下检查导入文件格式版本、记录数和 CLI 输入码兼容性。
+- `learn status` 用于查看管理 UI 需要的只读学习状态摘要，只输出词条、ranker weight、deleted tombstone、P1 本地事件和本地审计批次的总量与最新活动时间，不输出 P1 选择事件明细、负反馈明细、上下文分布、用户词文本或同步明文 payload。
 - `sync preflight` 只输出 P2 可同步对象计数、P1 本地事件计数和本地审计计数，不生成明文同步 payload。
 
 ### FFI 管理入口
@@ -351,6 +353,7 @@ radishlex_userdb_import_batches_new(db_path)
 radishlex_userdb_import_batches_count(batches)
 radishlex_userdb_import_batches_get(batches, index, batch_out)
 radishlex_userdb_import_batches_free(batches)
+radishlex_userdb_learning_status(db_path, summary_out)
 radishlex_userdb_sync_preflight(db_path, summary_out)
 radishlex_ffi_contract(contract_out)
 ```
@@ -366,6 +369,7 @@ radishlex_ffi_contract(contract_out)
 - dictionary export 只导出 active / suppressed 用户词条字段，不导出 P1 原始选择事件、负反馈详细事件、上下文统计或 ranker 权重摘要。
 - dictionary import 支持 `dry_run`，dry-run 不写词条、不写 import batch；实际导入必须记录 import batch，并继续遵守 deleted tombstone。
 - import batches 通过只读 list handle 暴露来源和统计，不暴露 SQLite handle、statement 或 row 指针。
+- learning status 通过单个 `repr(C)` summary 暴露聚合计数、latest timestamp 和 `plaintext_payload / p1_raw_details / context_stats = false` 标记，不返回 string view、用户词明文、P1 事件行、负反馈 reason 列表或上下文统计。
 - 当前 FFI 不记录 selection event、negative feedback 或上下文统计，不作为学习事件入口。
 - 当前 FFI contract 明确 session 绑定创建线程，平台端不得跨线程直接操作同一 `RadishLexSession*`。
 
@@ -426,6 +430,7 @@ Phase 2 起步必须覆盖：
 - 导入 dry-run 不写数据库，实际导入记录 `import_batches`，并区分 insert、update、deleted skip 和 duplicate skip。
 - 导入格式检查能识别当前 v1 文件，并对未知未来版本返回明确不兼容错误。
 - 同步前置检查只输出分类计数，不输出明文用户词、原始事件或负反馈明细。
+- 学习状态只读摘要只输出聚合计数、latest timestamp 和隐私边界标记，不输出明文用户词、原始选择事件、负反馈 reason 明细或上下文统计。
 - `rank explain` 能说明候选排序变化原因。
 
 默认验证入口：
@@ -459,7 +464,8 @@ cargo test --workspace
 14. `ime-ffi` 已在 `native-rime` feature 下接入真实 `RimeEngine` session，并通过 ignored native smoke 覆盖 Rime FFI session 创建、按键输入、snapshot 候选读取和候选提交。
 15. `ime-ffi` 已补 ABI contract、session owner-thread policy 和释放 panic 边界，平台端跨线程误用会返回 `InvalidState`。
 16. 已补 `docs/runbooks/ffi-platform-call-contract.md`，明确平台绑定层的 `error_out`、string view、handle 释放和 owner-thread 调度规则。
-17. 下一步复验 native 库异常路径，并根据管理 UI 需要补充更细的学习状态只读摘要。
+17. 已补 userdb / CLI / FFI 学习状态只读摘要，面向后续管理 UI 查看本地学习状态；该入口只输出聚合计数、latest timestamp 和隐私边界布尔标记，不导出 P1 原始选择事件、负反馈明细、上下文统计或明文同步 payload。
+18. 下一步继续评估更底层 native API 缺失路径和平台绑定前 smoke 口径。
 
 阶段停止线：
 

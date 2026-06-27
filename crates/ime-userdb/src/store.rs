@@ -7,8 +7,8 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 use crate::error::{UserDbError, UserDbResult};
 use crate::model::{
     DictionaryImportBatch, DictionaryImportSummary, DictionaryTermRecord, DictionaryTermsDocument,
-    DictionaryTermsFormat, NegativeFeedbackDraft, PrivacyLevel, SelectionEventDraft,
-    SyncPreflightSummary, TermSource, TermStatus, UserTerm,
+    DictionaryTermsFormat, LearningStatusSummary, NegativeFeedbackDraft, PrivacyLevel,
+    SelectionEventDraft, SyncPreflightSummary, TermSource, TermStatus, UserTerm,
 };
 
 const SCHEMA_VERSION: i64 = 2;
@@ -383,11 +383,47 @@ impl UserDb {
         Ok(SyncPreflightSummary {
             schema_version: self.schema_version()?,
             syncable_user_terms: self.count_user_terms_for_sync()?,
-            syncable_ranker_weights: count_rows(&self.connection, "ranker_weights")? as usize,
-            syncable_deleted_terms: count_rows(&self.connection, "deleted_terms")? as usize,
-            local_selection_events: count_rows(&self.connection, "selection_events")? as usize,
-            local_negative_feedback: count_rows(&self.connection, "negative_feedback")? as usize,
-            local_import_batches: count_rows(&self.connection, "import_batches")? as usize,
+            syncable_ranker_weights: count_rows_usize(&self.connection, "ranker_weights")?,
+            syncable_deleted_terms: count_rows_usize(&self.connection, "deleted_terms")?,
+            local_selection_events: count_rows_usize(&self.connection, "selection_events")?,
+            local_negative_feedback: count_rows_usize(&self.connection, "negative_feedback")?,
+            local_import_batches: count_rows_usize(&self.connection, "import_batches")?,
+        })
+    }
+
+    pub fn learning_status_summary(&self) -> UserDbResult<LearningStatusSummary> {
+        let latest_user_term_updated_at_ms =
+            max_i64_column(&self.connection, "user_terms", "updated_at_ms")?;
+        let latest_selection_event_at_ms =
+            max_i64_column(&self.connection, "selection_events", "created_at_ms")?;
+        let latest_negative_feedback_at_ms =
+            max_i64_column(&self.connection, "negative_feedback", "created_at_ms")?;
+        let latest_deleted_term_at_ms =
+            max_i64_column(&self.connection, "deleted_terms", "deleted_at_ms")?;
+        let latest_import_batch_at_ms =
+            max_i64_column(&self.connection, "import_batches", "created_at_ms")?;
+
+        Ok(LearningStatusSummary {
+            schema_version: self.schema_version()?,
+            active_user_terms: self.count_user_terms_with_status(TermStatus::Active)?,
+            suppressed_user_terms: self.count_user_terms_with_status(TermStatus::Suppressed)?,
+            ranker_weights: count_rows_usize(&self.connection, "ranker_weights")?,
+            deleted_term_tombstones: count_rows_usize(&self.connection, "deleted_terms")?,
+            selection_events: count_rows_usize(&self.connection, "selection_events")?,
+            negative_feedback: count_rows_usize(&self.connection, "negative_feedback")?,
+            import_batches: count_rows_usize(&self.connection, "import_batches")?,
+            latest_user_term_updated_at_ms,
+            latest_selection_event_at_ms,
+            latest_negative_feedback_at_ms,
+            latest_deleted_term_at_ms,
+            latest_import_batch_at_ms,
+            latest_activity_at_ms: latest_ms([
+                latest_user_term_updated_at_ms,
+                latest_selection_event_at_ms,
+                latest_negative_feedback_at_ms,
+                latest_deleted_term_at_ms,
+                latest_import_batch_at_ms,
+            ]),
         })
     }
 
@@ -611,7 +647,20 @@ impl UserDb {
                 [],
                 |row| row.get::<_, i64>(0),
             )
-            .map(|count| count as usize)
+            .and_then(|count| non_negative_usize(count, "user_terms"))
+            .map_err(Into::into)
+    }
+
+    fn count_user_terms_with_status(&self, status: TermStatus) -> UserDbResult<usize> {
+        self.connection
+            .query_row(
+                "SELECT COUNT(*)
+                 FROM user_terms
+                 WHERE status = ?1",
+                params![status.as_str()],
+                |row| row.get::<_, i64>(0),
+            )
+            .and_then(|count| non_negative_usize(count, "user_terms"))
             .map_err(Into::into)
     }
 
@@ -887,6 +936,39 @@ fn count_rows(connection: &Connection, table: &str) -> UserDbResult<i64> {
     connection
         .query_row(&sql, [], |row| row.get(0))
         .map_err(Into::into)
+}
+
+fn count_rows_usize(connection: &Connection, table: &'static str) -> UserDbResult<usize> {
+    let count = count_rows(connection, table)?;
+    non_negative_usize(count, table).map_err(Into::into)
+}
+
+fn max_i64_column(
+    connection: &Connection,
+    table: &'static str,
+    column: &'static str,
+) -> UserDbResult<Option<i64>> {
+    let sql = format!("SELECT MAX({column}) FROM {table}");
+    connection
+        .query_row(&sql, [], |row| row.get(0))
+        .map_err(Into::into)
+}
+
+fn latest_ms(values: impl IntoIterator<Item = Option<i64>>) -> Option<i64> {
+    values.into_iter().flatten().max()
+}
+
+fn non_negative_usize(value: i64, field: &'static str) -> rusqlite::Result<usize> {
+    usize::try_from(value).map_err(|_| {
+        rusqlite::Error::FromSqlConversionFailure(
+            0,
+            rusqlite::types::Type::Integer,
+            Box::new(UserDbError::invalid_input(
+                field,
+                format!("expected non-negative integer, got {value}"),
+            )),
+        )
+    })
 }
 
 fn table_columns(connection: &Connection, table: &str) -> UserDbResult<BTreeSet<String>> {

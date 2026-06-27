@@ -25,6 +25,7 @@ radishlex-ime-cli dict export --db <path> --file <path>
 radishlex-ime-cli dict inspect --file <path>
 radishlex-ime-cli dict import --db <path> --file <path> [--source <name>] [--dry-run]
 radishlex-ime-cli dict import-batches --db <path>
+radishlex-ime-cli learn status --db <path>
 radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
 radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
 radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
@@ -289,7 +290,44 @@ luobo	萝卜	luo bo	manual_add	2	active
 
 ## learn 命令
 
-`learn` 命令用于向 userdb 写入本地学习事件。当前只支持合成数据和人工指定参数，适合验证排序变化，不代表平台壳已经接入真实输入事件。
+`learn` 命令用于查看本地学习状态或向 userdb 写入本地学习事件。当前只支持显式数据库路径、合成数据和人工指定参数，适合验证排序变化，不代表平台壳已经接入真实输入事件。
+
+查看学习状态只读摘要：
+
+```bash
+cargo run -p radishlex-ime-cli -- \
+  learn status \
+  --db /tmp/radishlex-userdb.sqlite
+```
+
+输出：
+
+```text
+learning_status: ready
+schema_version: 2
+plaintext_payload: false
+p1_raw_details: false
+context_stats: false
+p2_learning:
+  active_user_terms: 1
+  suppressed_user_terms: 1
+  ranker_weights: 1
+  deleted_tombstones: 0
+p1_local_only:
+  selection_events: 1
+  negative_feedback: 1
+local_audit:
+  import_batches: 0
+latest_activity:
+  user_terms_updated_at_ms: <timestamp-or-none>
+  selection_event_at_ms: <timestamp-or-none>
+  negative_feedback_at_ms: <timestamp-or-none>
+  deleted_term_at_ms: <timestamp-or-none>
+  import_batch_at_ms: <timestamp-or-none>
+  overall_at_ms: <timestamp-or-none>
+```
+
+`learn status` 面向后续管理 UI 的学习状态概览，只输出聚合计数、最新活动时间和隐私边界标记。它不输出 P1 原始选择事件、负反馈 reason 明细、上下文分布、用户词明文或同步明文 payload。
 
 记录一次候选选择：
 
@@ -417,6 +455,7 @@ cargo run -p radishlex-ime-cli -- \
 - `rime --rank-db` 必须显式指定隔离 userdb，建议使用 `/tmp` 下临时 SQLite 文件。
 - `dict`、`learn` 和 `rank explain` 必须显式指定 `--db`，不应指向真实用户生产库；本阶段建议使用 `/tmp` 下临时 SQLite 文件。
 - `dict import/export` 的文件也建议放在 `/tmp` 下，测试内容使用合成词，不应导入真实个人词库或真实输入历史。
+- `learn status` 只输出聚合学习状态，不输出用户词明文、P1 事件明细、负反馈 reason 明细或上下文统计。
 - `sync preflight` 只输出分类计数，不输出用户词明文、事件明文或加密 payload。
 - `learn` 当前没有平台 secure text entry 信号输入，CLI smoke 只应使用合成词、虚构上下文和临时数据库。
 - 本机 smoke 应使用 `/tmp` 下的隔离目录和合成输入码，不提交 schema 数据、用户目录、日志或输出中的敏感内容。

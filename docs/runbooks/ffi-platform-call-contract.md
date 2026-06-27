@@ -9,6 +9,7 @@
 - `radishlex_ffi_contract`
 - session 创建、按键、snapshot、commit 和释放
 - structured snapshot / candidate view
+- userdb learning status
 - userdb sync preflight
 - userdb add / delete / list
 - dictionary inspect / export / import
@@ -170,6 +171,7 @@ radishlex_session_free(session)
 管理入口必须显式传入 SQLite 路径或文件路径：
 
 ```text
+radishlex_userdb_learning_status(db_path, summary_out, error_out)
 radishlex_userdb_sync_preflight(db_path, summary_out, error_out)
 radishlex_userdb_add_term(db_path, input_code, text, reading, error_out)
 radishlex_userdb_delete_term(db_path, input_code, text, reading, error_out)
@@ -183,6 +185,7 @@ radishlex_userdb_import_batches_new(db_path, error_out)
 规则：
 
 - 这些入口不暴露 SQLite connection、statement 或 row 指针。
+- learning status 只返回聚合计数、latest timestamp 和 `plaintext_payload / p1_raw_details / context_stats = false` 标记；不得把 P1 原始选择事件、负反馈 reason 明细、上下文统计或用户词明文导出给管理 UI。
 - dictionary import 的 `dry_run` 使用 `0 / 1`，其他值返回 `InvalidArgument`。
 - dictionary export 只导出用户明确管理的 P2 词条，不导出 P1 原始选择事件、负反馈明细、上下文统计或 ranker 权重摘要。
 - import batches 是本地审计信息，不作为云端同步 payload。
@@ -227,7 +230,7 @@ radishlex_userdb_import_batches_new(db_path, error_out)
 - 非 UTF-8、空指针、非法 bool、候选越界能返回稳定错误码并释放 error。
 - snapshot / term list / import batch list 的 string view 能按长度复制。
 - `*_free(NULL)` 不崩溃。
-- userdb 管理入口使用显式临时 SQLite 路径，不读取真实用户输入法目录。
+- userdb 管理入口使用显式临时 SQLite 路径，不读取真实用户输入法目录；learning status smoke 需要断言 P1 明细和上下文统计标记为 false。
 
 推荐本仓库先用以下命令复验 Rust 侧基线：
 
