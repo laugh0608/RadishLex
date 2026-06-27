@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查和同步前置检查命令。`ime-sync` 已补 payload 来源分类和加密对象外壳草案，`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy 和释放 panic 边界 host smoke。下一阶段目标是围绕平台绑定层补充 FFI 调用 runbook、native 库异常路径和学习状态只读摘要。
+当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查和同步前置检查命令。`ime-sync` 已补 payload 来源分类和加密对象外壳草案，`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、释放 panic 边界 host smoke 和 FFI 调用 runbook。下一阶段目标是复验 native 库异常路径，并根据管理 UI 需要补充学习状态只读摘要。
 
 Phase 2 不改变底层 engine adapter 边界：
 
@@ -458,7 +458,8 @@ cargo test --workspace
 13. `ime-ffi` 已补 Rime session options ABI 和默认 unavailable 门禁，先固定 shared data、user data、schema、log dir 与 deploy flag 的跨语言配置形态。
 14. `ime-ffi` 已在 `native-rime` feature 下接入真实 `RimeEngine` session，并通过 ignored native smoke 覆盖 Rime FFI session 创建、按键输入、snapshot 候选读取和候选提交。
 15. `ime-ffi` 已补 ABI contract、session owner-thread policy 和释放 panic 边界，平台端跨线程误用会返回 `InvalidState`。
-16. 下一步围绕平台绑定层补充 FFI 调用 runbook、native 库异常路径，并根据管理 UI 需要补充更细的学习状态只读摘要。
+16. 已补 `docs/runbooks/ffi-platform-call-contract.md`，明确平台绑定层的 `error_out`、string view、handle 释放和 owner-thread 调度规则。
+17. 下一步复验 native 库异常路径，并根据管理 UI 需要补充更细的学习状态只读摘要。
 
 阶段停止线：
 

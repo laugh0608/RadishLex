@@ -85,6 +85,7 @@ RadishLex/
 - `docs/personalization-learning.md`：Phase 2 个人化学习、userdb、ranker、负反馈和 CLI 管理边界。
 - `docs/sync-payload.md`：同步 payload 草案和 P1/P2 来源分类。
 - `docs/ffi-boundary.md`：后续 C ABI、所有权、生命周期和错误语义边界。
+- `docs/runbooks/ffi-platform-call-contract.md`：平台绑定层调用 C ABI 的错误、字符串、handle 释放和 owner-thread 调度规则。
 - `docs/runbooks/rime-native-smoke.md`：真实 `librime` 本机 smoke 操作步骤。
 
 ## Rust crates 建议

@@ -7,6 +7,7 @@
 当前已落地 `crates/ime-ffi/` 起步验证：C ABI 已覆盖 opaque session handle、ABI contract、session owner-thread policy、session options、Rime session options ABI、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、释放函数、schema 设置、按键输入、snapshot、候选提交、userdb sync preflight 状态摘要、受控 userdb 词条管理入口、dictionary inspect / export / import 和 import batches 只读查询的 host smoke。当前 session 内部已使用 demo / Rime 可扩展 engine 封装；默认构建仍只启用 deterministic demo engine，`native-rime` feature 下 `radishlex_session_new_rime` 可通过显式 Rime 配置创建真实 `RimeEngine` session，并已通过隔离 Rime 数据目录 smoke。该状态仍不代表平台壳或系统输入法已经接入。
 
 平台壳后续只能通过 FFI 调用 Rust core，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。
+平台绑定层的具体调用清单见 `docs/runbooks/ffi-platform-call-contract.md`。
 
 ## 职责边界
 

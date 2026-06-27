@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 2 起步：`ime-core` 已具备可测试的输入会话、候选模型、提交模型和 engine interface；`ime-cli` 已能分别通过合成 demo adapter 和真实 Rime adapter 复验输入生命周期。真实 Rime adapter 已覆盖首候选、非首候选、翻页候选和候选索引异常路径 smoke。`ime-userdb` 已承载本地用户词库、选择事件、负反馈、删除 tombstone、导入导出和同步前置计数；`ime-ranker` 已具备可解释排序模型；`ime-sync` 已定义同步 payload 来源分类和加密对象外壳草案；`ime-ffi` 已完成结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy 和释放 panic 边界 host smoke。下一步应围绕平台绑定层补充 FFI 调用 runbook、native 库异常路径和学习状态只读摘要，不直接推进平台壳。
+当前处于 Phase 2 起步：`ime-core` 已具备可测试的输入会话、候选模型、提交模型和 engine interface；`ime-cli` 已能分别通过合成 demo adapter 和真实 Rime adapter 复验输入生命周期。真实 Rime adapter 已覆盖首候选、非首候选、翻页候选和候选索引异常路径 smoke。`ime-userdb` 已承载本地用户词库、选择事件、负反馈、删除 tombstone、导入导出和同步前置计数；`ime-ranker` 已具备可解释排序模型；`ime-sync` 已定义同步 payload 来源分类和加密对象外壳草案；`ime-ffi` 已完成结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、释放 panic 边界 host smoke 和 FFI 调用 runbook。下一步应复验 native 库异常路径，并根据管理 UI 需要补学习状态只读摘要，不直接推进平台壳。
 
 当前边界：
 
