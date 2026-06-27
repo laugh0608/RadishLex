@@ -11,11 +11,11 @@ RadishLex 当前处于 Phase 2 起步阶段：
 - `ime-userdb` 已落地本地 SQLite 用户词库、选择事件、负反馈、删除 tombstone、用户词库导入导出和同步前置计数。
 - `ime-ranker` 已提供可解释候选重排。
 - `ime-sync` 已提供同步 payload 来源分类和加密对象外壳草案，不连接后端、不实现加密。
-- `ime-crypto` 已落地本地模型 crate，覆盖 key role、object envelope、AAD 绑定、nonce 重复检测、ciphertext hash 和错误模型测试；真实 AEAD、KDF、签名和设备授权尚未落地。
+- `ime-crypto` 已落地本地加密 crate，覆盖 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、key role、object envelope、AAD 绑定、nonce 重复检测和篡改失败测试；签名、设备授权和恢复码尚未落地。
 - `ime-ffi` 已提供 C ABI 起步验证，覆盖 ABI contract、opaque handle、session owner-thread policy、session options、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、learning status 只读摘要、sync preflight 状态摘要、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、平台绑定式 view copy / release host smoke、释放函数 panic 边界、demo engine host smoke 和 FFI 调用 runbook。
 - `radishlex-ime-cli` 已提供 `demo`、`rime`、`dict`、`learn status`、`learn select/suppress`、`rank explain`、`rime --rank-db` 和 `sync preflight` 复验入口。
 
-当前下一步仍在 Rust 本地同步加密前置工作内，重点是确认 AEAD / KDF / hash / 随机数依赖与许可口径，然后补合成 payload 的加密、解密和篡改失败测试。现阶段不推进平台壳、Go 同步后端或 Flutter manager 主线。
+当前下一步仍在 Rust 本地同步加密前置工作内，重点是将 `ime-sync` 加密对象外壳持续对齐 `ime-crypto` envelope，并为后续 userdb P2 plaintext payload 导出迭代器做准备。现阶段不推进平台壳、Go 同步后端或 Flutter manager 主线。
 
 ## 设计原则
 

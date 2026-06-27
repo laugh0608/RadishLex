@@ -4,16 +4,23 @@
 
 ## 当前定位
 
-Phase 2 的 userdb、ranker、Rime adapter、FFI 管理入口和学习状态摘要已具备进入 `ime-crypto` 设计的证据链；`ime-crypto` 本地模型 crate 已落地，但真实同步仍未开始。
+Phase 2 的 userdb、ranker、Rime adapter、FFI 管理入口和学习状态摘要已具备进入 `ime-crypto` 设计的证据链；`ime-crypto` 本地加密 crate 已落地，但真实同步仍未开始。
 
 当前结论：
 
-- 已进入 `ime-crypto` 本地 crate 的设计与测试准备，当前覆盖 envelope、key role、AAD、nonce 和 ciphertext hash 的模型校验。
+- 已进入 `ime-crypto` 本地 crate 的设计与测试准备，当前覆盖 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、envelope、key role、AAD、nonce 和篡改失败测试。
 - 不连接 Go server，不生成可上传明文 payload，不把加密入口暴露给 FFI 或平台壳。
 - 不把平台壳、Flutter manager 或 Go 后端提前压入当前主线。
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 
-第一批真实加密实现只有在能同时覆盖依赖许可口径、AEAD / KDF / hash 选型、nonce 唯一性、密文 hash、AAD 绑定和篡改失败测试时再落地；不要写只转发字节或只占位的加密流程。
+当前真实加密实现只处理本地合成 payload，不读取真实 userdb、不连接后端、不暴露 FFI。后续接 userdb 或设备授权前，仍必须补 payload schema、设备授权、恢复码、撤销和冲突合并设计。
+
+当前依赖选型：
+
+- `chacha20poly1305`：提供 XChaCha20Poly1305 AEAD 和系统随机 nonce。
+- `hkdf` + `sha2`：提供 HKDF-SHA256 对象密钥派生和 SHA-256 ciphertext hash。
+
+上述依赖来自 RustCrypto 生态，当前采用 MIT OR Apache-2.0 许可口径；后续新增 crypto 依赖或恢复码 KDF 参数时需要再次记录许可与验证理由。
 
 ## 职责分工
 
@@ -152,8 +159,8 @@ Plaintext payload 后续必须有稳定 schema：
 ## 实施顺序
 
 1. 已补 `ime-crypto` crate 的 envelope、key role、nonce、ciphertext hash、AAD 绑定和错误模型测试。
-2. 确认 AEAD / KDF / hash / 随机数依赖与许可口径。
-3. 补合成 plaintext payload 的加密 / 解密 / 篡改失败测试，不读取真实 userdb。
+2. 已确认并落地 XChaCha20Poly1305、HKDF-SHA256、SHA-256 和系统随机数依赖。
+3. 已补合成 plaintext payload 的加密 / 解密 / 篡改失败测试，不读取真实 userdb。
 4. 将 `ime-sync::EncryptedSyncObjectDraft` 持续对齐 `ime-crypto` envelope，保持 `ciphertext_hash` 语义不回退。
 5. 再接入 userdb 的 P2 导出迭代器，仍不连接后端。
 6. 设备授权、恢复码和设备撤销设计确认后，再进入 Go server API。

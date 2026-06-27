@@ -107,8 +107,7 @@ updated_at_ms
 未落地：
 
 - 明文 payload 字段序列化。
-- 真实 AEAD 加密、签名、KDF、hash 计算和 key management；`ime-crypto` 当前只落地本地 envelope / AAD / nonce / ciphertext hash 模型测试。
-- 设备授权、恢复码、设备撤销和密钥轮换。
+- 签名、设备授权、恢复码、设备撤销、密钥轮换和 key management；`ime-crypto` 当前已落地本地 AEAD / HKDF / ciphertext hash / envelope 测试。
 - HTTP API、Go server 存储和冲突合并执行器。
 
 ## 验证口径

@@ -1,7 +1,17 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+use chacha20poly1305::{
+    aead::{Aead, AeadCore, KeyInit, OsRng, Payload},
+    XChaCha20Poly1305, XNonce,
+};
+use hkdf::Hkdf;
+use sha2::{Digest, Sha256};
+
 pub const ENVELOPE_SCHEMA_VERSION: u16 = 1;
+pub const OBJECT_KEY_LEN: usize = 32;
+pub const XCHACHA20POLY1305_NONCE_LEN: usize = 24;
+pub const ALGORITHM_XCHACHA20POLY1305_HKDF_SHA256: &str = "xchacha20poly1305-hkdf-sha256-v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CryptoObjectType {
@@ -93,6 +103,72 @@ impl KeyDescriptor {
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
+pub struct SyncMasterKeyMaterial([u8; OBJECT_KEY_LEN]);
+
+impl SyncMasterKeyMaterial {
+    pub fn new(bytes: [u8; OBJECT_KEY_LEN]) -> Result<Self, CryptoError> {
+        validate_key_material("sync_master_key", &bytes)?;
+        Ok(Self(bytes))
+    }
+
+    pub fn derive_object_key(
+        &self,
+        object_key: &KeyDescriptor,
+        object_type: CryptoObjectType,
+        object_id: &str,
+    ) -> Result<ObjectKeyMaterial, CryptoError> {
+        if object_key.role != KeyRole::ObjectKey {
+            return Err(CryptoError::invalid_field(
+                "key_role",
+                "object key derivation requires an object key descriptor",
+            ));
+        }
+        validate_required("object_id", object_id)?;
+
+        let hkdf = Hkdf::<Sha256>::new(Some(b"radishlex-sync-master-v1"), &self.0);
+        let mut output = [0u8; OBJECT_KEY_LEN];
+        hkdf.expand(
+            &object_key_info(object_key, object_type, object_id),
+            &mut output,
+        )
+        .map_err(|_| {
+            CryptoError::invalid_field("key_derivation", "failed to expand object key material")
+        })?;
+        ObjectKeyMaterial::new(output)
+    }
+
+    pub fn as_bytes(&self) -> &[u8; OBJECT_KEY_LEN] {
+        &self.0
+    }
+}
+
+impl fmt::Debug for SyncMasterKeyMaterial {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("SyncMasterKeyMaterial([redacted])")
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct ObjectKeyMaterial([u8; OBJECT_KEY_LEN]);
+
+impl ObjectKeyMaterial {
+    pub fn new(bytes: [u8; OBJECT_KEY_LEN]) -> Result<Self, CryptoError> {
+        validate_key_material("object_key", &bytes)?;
+        Ok(Self(bytes))
+    }
+
+    pub fn as_bytes(&self) -> &[u8; OBJECT_KEY_LEN] {
+        &self.0
+    }
+}
+
+impl fmt::Debug for ObjectKeyMaterial {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("ObjectKeyMaterial([redacted])")
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AlgorithmId(String);
 
@@ -115,6 +191,14 @@ impl AlgorithmId {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    pub fn xchacha20poly1305_hkdf_sha256() -> Self {
+        Self(ALGORITHM_XCHACHA20POLY1305_HKDF_SHA256.to_owned())
+    }
+
+    pub fn is_supported(&self) -> bool {
+        self.as_str() == ALGORITHM_XCHACHA20POLY1305_HKDF_SHA256
+    }
 }
 
 impl fmt::Display for AlgorithmId {
@@ -129,8 +213,11 @@ pub struct Nonce(Vec<u8>);
 impl Nonce {
     pub fn new(bytes: impl Into<Vec<u8>>) -> Result<Self, CryptoError> {
         let bytes = bytes.into();
-        if bytes.is_empty() {
-            return Err(CryptoError::invalid_field("nonce", "value cannot be empty"));
+        if bytes.len() != XCHACHA20POLY1305_NONCE_LEN {
+            return Err(CryptoError::invalid_field(
+                "nonce",
+                format!("value must be {XCHACHA20POLY1305_NONCE_LEN} bytes"),
+            ));
         }
         Ok(Self(bytes))
     }
@@ -158,6 +245,28 @@ impl CiphertextHash {
 impl fmt::Display for CiphertextHash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlaintextPayload {
+    pub object_type: CryptoObjectType,
+    pub bytes: Vec<u8>,
+}
+
+impl PlaintextPayload {
+    pub fn new(
+        object_type: CryptoObjectType,
+        bytes: impl Into<Vec<u8>>,
+    ) -> Result<Self, CryptoError> {
+        let bytes = bytes.into();
+        if bytes.is_empty() {
+            return Err(CryptoError::invalid_field(
+                "plaintext_payload",
+                "value cannot be empty",
+            ));
+        }
+        Ok(Self { object_type, bytes })
     }
 }
 
@@ -220,6 +329,124 @@ impl EncryptedObjectEnvelope {
         Ok(envelope)
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub fn encrypt_payload(
+        object_id: impl Into<String>,
+        owner_device_id: impl Into<String>,
+        object_key: &KeyDescriptor,
+        object_key_material: &ObjectKeyMaterial,
+        version: u64,
+        base_version: Option<u64>,
+        payload: PlaintextPayload,
+        timestamp_ms: i64,
+    ) -> Result<Self, CryptoError> {
+        let nonce = XChaCha20Poly1305::generate_nonce(&mut OsRng);
+        Self::encrypt_payload_with_nonce(
+            object_id,
+            owner_device_id,
+            object_key,
+            object_key_material,
+            version,
+            base_version,
+            payload,
+            timestamp_ms,
+            Nonce::new(nonce.to_vec())?,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn encrypt_payload_with_nonce(
+        object_id: impl Into<String>,
+        owner_device_id: impl Into<String>,
+        object_key: &KeyDescriptor,
+        object_key_material: &ObjectKeyMaterial,
+        version: u64,
+        base_version: Option<u64>,
+        payload: PlaintextPayload,
+        timestamp_ms: i64,
+        nonce: Nonce,
+    ) -> Result<Self, CryptoError> {
+        if object_key.role != KeyRole::ObjectKey {
+            return Err(CryptoError::invalid_field(
+                "key_role",
+                "envelope encryption requires an object key",
+            ));
+        }
+
+        let object_id = object_id.into();
+        let owner_device_id = owner_device_id.into();
+        validate_required("object_id", &object_id)?;
+        validate_required("owner_device_id", &owner_device_id)?;
+
+        let associated_data = AssociatedData {
+            schema_version: ENVELOPE_SCHEMA_VERSION,
+            object_id: object_id.clone(),
+            object_type: payload.object_type,
+            owner_device_id: owner_device_id.clone(),
+            key_id: object_key.key_id.clone(),
+            key_epoch: object_key.key_epoch,
+            version,
+            base_version,
+            created_at_ms: timestamp_ms,
+            updated_at_ms: timestamp_ms,
+        };
+        let associated_data_bytes = associated_data.to_bytes();
+        let encrypted_payload = encrypt_xchacha20poly1305(
+            object_key_material,
+            &nonce,
+            &associated_data_bytes,
+            &payload.bytes,
+        )?;
+        let ciphertext_hash = CiphertextHash::new(ciphertext_hash_hex(
+            &associated_data_bytes,
+            &encrypted_payload,
+        ))?;
+
+        let envelope = Self {
+            schema_version: ENVELOPE_SCHEMA_VERSION,
+            object_id,
+            object_type: payload.object_type,
+            owner_device_id,
+            key_id: object_key.key_id.clone(),
+            key_epoch: object_key.key_epoch,
+            algorithm: AlgorithmId::xchacha20poly1305_hkdf_sha256(),
+            nonce,
+            version,
+            base_version,
+            encrypted_payload,
+            ciphertext_hash,
+            created_at_ms: timestamp_ms,
+            updated_at_ms: timestamp_ms,
+        };
+        envelope.validate()?;
+        Ok(envelope)
+    }
+
+    pub fn decrypt_payload(
+        &self,
+        object_key_material: &ObjectKeyMaterial,
+    ) -> Result<PlaintextPayload, CryptoError> {
+        self.validate()?;
+        ensure_supported_algorithm(&self.algorithm)?;
+
+        let associated_data_bytes = self.associated_data().to_bytes();
+        let expected_hash = CiphertextHash::new(ciphertext_hash_hex(
+            &associated_data_bytes,
+            &self.encrypted_payload,
+        ))?;
+        if expected_hash != self.ciphertext_hash {
+            return Err(CryptoError::CiphertextHashMismatch);
+        }
+
+        let plaintext = decrypt_xchacha20poly1305(
+            object_key_material,
+            &self.nonce,
+            &associated_data_bytes,
+            &self.encrypted_payload,
+        )?;
+        PlaintextPayload::new(self.object_type, plaintext)
+    }
+
     pub fn with_base_version(mut self, base_version: u64) -> Self {
         self.base_version = Some(base_version);
         self
@@ -229,6 +456,7 @@ impl EncryptedObjectEnvelope {
         validate_required("object_id", &self.object_id)?;
         validate_required("owner_device_id", &self.owner_device_id)?;
         validate_required("key_id", &self.key_id)?;
+        ensure_supported_algorithm(&self.algorithm)?;
 
         if self.schema_version != ENVELOPE_SCHEMA_VERSION {
             return Err(CryptoError::invalid_field(
@@ -308,6 +536,52 @@ pub struct AssociatedData {
 }
 
 impl AssociatedData {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        push_aad_field(
+            &mut bytes,
+            "schema_version",
+            self.schema_version.to_string().as_bytes(),
+        );
+        push_aad_field(&mut bytes, "object_id", self.object_id.as_bytes());
+        push_aad_field(
+            &mut bytes,
+            "object_type",
+            self.object_type.as_str().as_bytes(),
+        );
+        push_aad_field(
+            &mut bytes,
+            "owner_device_id",
+            self.owner_device_id.as_bytes(),
+        );
+        push_aad_field(&mut bytes, "key_id", self.key_id.as_bytes());
+        push_aad_field(
+            &mut bytes,
+            "key_epoch",
+            self.key_epoch.to_string().as_bytes(),
+        );
+        push_aad_field(&mut bytes, "version", self.version.to_string().as_bytes());
+        push_aad_field(
+            &mut bytes,
+            "base_version",
+            self.base_version
+                .map(|value| value.to_string())
+                .unwrap_or_default()
+                .as_bytes(),
+        );
+        push_aad_field(
+            &mut bytes,
+            "created_at_ms",
+            self.created_at_ms.to_string().as_bytes(),
+        );
+        push_aad_field(
+            &mut bytes,
+            "updated_at_ms",
+            self.updated_at_ms.to_string().as_bytes(),
+        );
+        bytes
+    }
+
     fn matches(&self, actual: &Self) -> Result<(), CryptoError> {
         compare_aad_field("schema_version", self.schema_version, actual.schema_version)?;
         compare_aad_field("object_id", &self.object_id, &actual.object_id)?;
@@ -375,6 +649,9 @@ pub enum CryptoError {
         key_id: String,
         key_epoch: u64,
     },
+    CiphertextHashMismatch,
+    EncryptionFailed,
+    DecryptionFailed,
 }
 
 impl CryptoError {
@@ -396,6 +673,9 @@ impl fmt::Display for CryptoError {
             Self::DuplicateNonce { key_id, key_epoch } => {
                 write!(f, "duplicate nonce for key {key_id} at epoch {key_epoch}")
             }
+            Self::CiphertextHashMismatch => f.write_str("ciphertext hash mismatch"),
+            Self::EncryptionFailed => f.write_str("encryption failed"),
+            Self::DecryptionFailed => f.write_str("decryption failed"),
         }
     }
 }
@@ -407,6 +687,30 @@ fn validate_required(field: &'static str, value: &str) -> Result<(), CryptoError
         return Err(CryptoError::invalid_field(field, "value cannot be empty"));
     }
     Ok(())
+}
+
+fn validate_key_material(
+    field: &'static str,
+    bytes: &[u8; OBJECT_KEY_LEN],
+) -> Result<(), CryptoError> {
+    if bytes.iter().all(|byte| *byte == 0) {
+        return Err(CryptoError::invalid_field(
+            field,
+            "value cannot be all zeroes",
+        ));
+    }
+    Ok(())
+}
+
+fn ensure_supported_algorithm(algorithm: &AlgorithmId) -> Result<(), CryptoError> {
+    if algorithm.is_supported() {
+        Ok(())
+    } else {
+        Err(CryptoError::invalid_field(
+            "algorithm",
+            format!("unsupported algorithm {}", algorithm.as_str()),
+        ))
+    }
 }
 
 fn compare_aad_field<T: PartialEq>(
@@ -421,203 +725,89 @@ fn compare_aad_field<T: PartialEq>(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn key_roles_have_stable_identifiers() {
-        assert_eq!(KeyRole::ProfileRoot.as_str(), "profile_root");
-        assert_eq!(KeyRole::SyncMaster.as_str(), "sync_master");
-        assert_eq!(KeyRole::DeviceKeyPair.as_str(), "device_key_pair");
-        assert_eq!(KeyRole::DeviceWrapping.as_str(), "device_wrapping");
-        assert_eq!(KeyRole::ObjectKey.as_str(), "object_key");
-    }
-
-    #[test]
-    fn envelope_validates_required_metadata_and_aad() {
-        let envelope = sample_envelope();
-
-        envelope.validate().expect("envelope validates");
-        let aad = envelope.associated_data();
-
-        assert_eq!(aad.schema_version, ENVELOPE_SCHEMA_VERSION);
-        assert_eq!(aad.object_id, "dictionary-user-terms-device-a");
-        assert_eq!(aad.object_type, CryptoObjectType::DictionaryUserTerms);
-        assert_eq!(aad.key_id, "object-key-a");
-        assert_eq!(aad.key_epoch, 3);
-        envelope
-            .validate_associated_data(&aad)
-            .expect("matching AAD is accepted");
-    }
-
-    #[test]
-    fn envelope_rejects_non_object_key_roles() {
-        let sync_master = KeyDescriptor::new("sync-master-a", KeyRole::SyncMaster, 1).expect("key");
-
-        let error = EncryptedObjectEnvelope::new(
-            "dictionary-user-terms-device-a",
-            CryptoObjectType::DictionaryUserTerms,
-            "device-a",
-            &sync_master,
-            algorithm(),
-            nonce(1),
-            1,
-            b"ciphertext".to_vec(),
-            ciphertext_hash("ciphertext-hash"),
-            10,
+fn encrypt_xchacha20poly1305(
+    object_key_material: &ObjectKeyMaterial,
+    nonce: &Nonce,
+    associated_data: &[u8],
+    plaintext: &[u8],
+) -> Result<Vec<u8>, CryptoError> {
+    let cipher = XChaCha20Poly1305::new_from_slice(object_key_material.as_bytes())
+        .map_err(|_| CryptoError::EncryptionFailed)?;
+    cipher
+        .encrypt(
+            XNonce::from_slice(nonce.as_bytes()),
+            Payload {
+                msg: plaintext,
+                aad: associated_data,
+            },
         )
-        .expect_err("sync master key must not encrypt object payload directly");
-
-        assert!(error.to_string().contains("key_role"));
-    }
-
-    #[test]
-    fn envelope_rejects_plaintext_algorithm_and_empty_nonce() {
-        let algorithm = AlgorithmId::new("plaintext").expect_err("plaintext is not AEAD");
-        assert!(algorithm.to_string().contains("algorithm"));
-
-        let nonce = Nonce::new(Vec::<u8>::new()).expect_err("empty nonce fails");
-        assert!(nonce.to_string().contains("nonce"));
-    }
-
-    #[test]
-    fn envelope_rejects_invalid_versions_and_empty_ciphertext() {
-        let object_key = object_key(3);
-        let error = EncryptedObjectEnvelope::new(
-            "dictionary-user-terms-device-a",
-            CryptoObjectType::DictionaryUserTerms,
-            "device-a",
-            &object_key,
-            algorithm(),
-            nonce(1),
-            0,
-            b"ciphertext".to_vec(),
-            ciphertext_hash("ciphertext-hash"),
-            10,
-        )
-        .expect_err("zero version fails");
-        assert!(error.to_string().contains("version"));
-
-        let error = EncryptedObjectEnvelope::new(
-            "dictionary-user-terms-device-a",
-            CryptoObjectType::DictionaryUserTerms,
-            "device-a",
-            &object_key,
-            algorithm(),
-            nonce(1),
-            1,
-            Vec::<u8>::new(),
-            ciphertext_hash("ciphertext-hash"),
-            10,
-        )
-        .expect_err("empty ciphertext fails");
-        assert!(error.to_string().contains("encrypted_payload"));
-    }
-
-    #[test]
-    fn envelope_rejects_invalid_base_version_after_update() {
-        let envelope = sample_envelope().with_base_version(1);
-        envelope.validate().expect("lower base version is valid");
-
-        let envelope = sample_envelope().with_base_version(2);
-        let error = envelope.validate().expect_err("base version must be lower");
-        assert!(error.to_string().contains("base_version"));
-    }
-
-    #[test]
-    fn aad_binding_detects_metadata_changes() {
-        let envelope = sample_envelope();
-        let mut aad = envelope.associated_data();
-        aad.version += 1;
-
-        let error = envelope
-            .validate_associated_data(&aad)
-            .expect_err("changed version must fail AAD check");
-        assert_eq!(
-            error,
-            CryptoError::AssociatedDataMismatch { field: "version" }
-        );
-    }
-
-    #[test]
-    fn ciphertext_hash_is_a_required_semantic_type() {
-        let error = CiphertextHash::new("").expect_err("empty hash fails");
-        assert!(error.to_string().contains("ciphertext_hash"));
-
-        let hash = CiphertextHash::new("ciphertext-hash").expect("hash");
-        assert_eq!(hash.as_str(), "ciphertext-hash");
-    }
-
-    #[test]
-    fn nonce_tracker_rejects_duplicate_nonce_for_same_key_epoch() {
-        let mut tracker = NonceTracker::new();
-        let envelope = sample_envelope();
-        let duplicate = sample_envelope();
-
-        tracker.observe(&envelope).expect("first nonce use passes");
-        let error = tracker
-            .observe(&duplicate)
-            .expect_err("same key and nonce must fail");
-
-        assert_eq!(
-            error,
-            CryptoError::DuplicateNonce {
-                key_id: "object-key-a".to_owned(),
-                key_epoch: 3,
-            }
-        );
-    }
-
-    #[test]
-    fn nonce_tracker_allows_same_nonce_after_key_epoch_changes() {
-        let mut tracker = NonceTracker::new();
-        let current_epoch = sample_envelope();
-        let next_epoch = envelope_with_key_epoch(4, nonce(1));
-
-        tracker
-            .observe(&current_epoch)
-            .expect("first nonce use passes");
-        tracker
-            .observe(&next_epoch)
-            .expect("same nonce with different key epoch passes");
-    }
-
-    fn sample_envelope() -> EncryptedObjectEnvelope {
-        envelope_with_key_epoch(3, nonce(1))
-    }
-
-    fn envelope_with_key_epoch(key_epoch: u64, nonce: Nonce) -> EncryptedObjectEnvelope {
-        let object_key = object_key(key_epoch);
-        EncryptedObjectEnvelope::new(
-            "dictionary-user-terms-device-a",
-            CryptoObjectType::DictionaryUserTerms,
-            "device-a",
-            &object_key,
-            algorithm(),
-            nonce,
-            2,
-            b"ciphertext".to_vec(),
-            ciphertext_hash("ciphertext-hash"),
-            10,
-        )
-        .expect("valid envelope")
-        .with_base_version(1)
-    }
-
-    fn object_key(key_epoch: u64) -> KeyDescriptor {
-        KeyDescriptor::new("object-key-a", KeyRole::ObjectKey, key_epoch).expect("key")
-    }
-
-    fn algorithm() -> AlgorithmId {
-        AlgorithmId::new("radishlex.local-test-aead-v1").expect("algorithm")
-    }
-
-    fn nonce(seed: u8) -> Nonce {
-        Nonce::new(vec![seed; 24]).expect("nonce")
-    }
-
-    fn ciphertext_hash(value: &str) -> CiphertextHash {
-        CiphertextHash::new(value).expect("ciphertext hash")
-    }
+        .map_err(|_| CryptoError::EncryptionFailed)
 }
+
+fn decrypt_xchacha20poly1305(
+    object_key_material: &ObjectKeyMaterial,
+    nonce: &Nonce,
+    associated_data: &[u8],
+    ciphertext: &[u8],
+) -> Result<Vec<u8>, CryptoError> {
+    let cipher = XChaCha20Poly1305::new_from_slice(object_key_material.as_bytes())
+        .map_err(|_| CryptoError::DecryptionFailed)?;
+    cipher
+        .decrypt(
+            XNonce::from_slice(nonce.as_bytes()),
+            Payload {
+                msg: ciphertext,
+                aad: associated_data,
+            },
+        )
+        .map_err(|_| CryptoError::DecryptionFailed)
+}
+
+fn ciphertext_hash_hex(associated_data: &[u8], ciphertext: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"radishlex-ciphertext-hash-v1");
+    hasher.update((associated_data.len() as u64).to_be_bytes());
+    hasher.update(associated_data);
+    hasher.update((ciphertext.len() as u64).to_be_bytes());
+    hasher.update(ciphertext);
+    hex_lower(&hasher.finalize())
+}
+
+fn object_key_info(
+    object_key: &KeyDescriptor,
+    object_type: CryptoObjectType,
+    object_id: &str,
+) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    push_aad_field(&mut bytes, "purpose", b"radishlex-object-key-v1");
+    push_aad_field(&mut bytes, "key_id", object_key.key_id.as_bytes());
+    push_aad_field(
+        &mut bytes,
+        "key_epoch",
+        object_key.key_epoch.to_string().as_bytes(),
+    );
+    push_aad_field(&mut bytes, "object_type", object_type.as_str().as_bytes());
+    push_aad_field(&mut bytes, "object_id", object_id.as_bytes());
+    bytes
+}
+
+fn push_aad_field(output: &mut Vec<u8>, name: &str, value: &[u8]) {
+    output.extend_from_slice(name.as_bytes());
+    output.push(b'=');
+    output.extend_from_slice(&(value.len() as u64).to_be_bytes());
+    output.extend_from_slice(value);
+    output.push(0);
+}
+
+fn hex_lower(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(HEX[(byte >> 4) as usize] as char);
+        output.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    output
+}
+
+#[cfg(test)]
+mod tests;
