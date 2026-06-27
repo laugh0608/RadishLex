@@ -150,7 +150,7 @@ librime adapter：
 - 版本管理。
 - 设备状态。
 
-当前已创建 `crates/ime-sync/`，只落地 payload 来源分类、同步对象类型、P1/P2/本地审计分层和加密对象外壳元数据校验；不连接后端、不实现加密或设备授权。
+当前已创建 `crates/ime-sync/`，只落地 payload 来源分类、同步对象类型、P1/P2/本地审计分层和从 `ime-crypto` envelope 派生加密对象外壳元数据；不连接后端、不实现网络同步或设备授权。
 
 ### ime-crypto
 

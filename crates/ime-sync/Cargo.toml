@@ -10,3 +10,6 @@ description = "Sync payload boundary models for RadishLex."
 [lib]
 name = "radishlex_ime_sync"
 path = "src/lib.rs"
+
+[dependencies]
+radishlex-ime-crypto = { path = "../ime-crypto" }

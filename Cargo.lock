@@ -368,6 +368,9 @@ dependencies = [
 [[package]]
 name = "radishlex-ime-sync"
 version = "0.1.0"
+dependencies = [
+ "radishlex-ime-crypto",
+]
 
 [[package]]
 name = "radishlex-ime-userdb"

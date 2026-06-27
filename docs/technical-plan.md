@@ -10,12 +10,12 @@ RadishLex 当前处于 Phase 2 起步阶段：
 - `ime-engine-rime` 已接入真实 `librime` adapter，并通过本机隔离 Rime smoke 复验 `compose -> candidates -> commit`，同时在 `native-rime` feature 测试中覆盖必需 Rime API 缺失映射。
 - `ime-userdb` 已落地本地 SQLite 用户词库、选择事件、负反馈、删除 tombstone、用户词库导入导出和同步前置计数。
 - `ime-ranker` 已提供可解释候选重排。
-- `ime-sync` 已提供同步 payload 来源分类和加密对象外壳草案，不连接后端、不实现加密。
+- `ime-sync` 已提供同步 payload 来源分类和加密对象外壳草案，并可从 `ime-crypto` envelope 派生上传草案元数据；不连接后端、不实现网络同步。
 - `ime-crypto` 已落地本地加密 crate，覆盖 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、key role、object envelope、AAD 绑定、nonce 重复检测和篡改失败测试；签名、设备授权和恢复码尚未落地。
 - `ime-ffi` 已提供 C ABI 起步验证，覆盖 ABI contract、opaque handle、session owner-thread policy、session options、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、learning status 只读摘要、sync preflight 状态摘要、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、平台绑定式 view copy / release host smoke、释放函数 panic 边界、demo engine host smoke 和 FFI 调用 runbook。
 - `radishlex-ime-cli` 已提供 `demo`、`rime`、`dict`、`learn status`、`learn select/suppress`、`rank explain`、`rime --rank-db` 和 `sync preflight` 复验入口。
 
-当前下一步仍在 Rust 本地同步加密前置工作内，重点是将 `ime-sync` 加密对象外壳持续对齐 `ime-crypto` envelope，并为后续 userdb P2 plaintext payload 导出迭代器做准备。现阶段不推进平台壳、Go 同步后端或 Flutter manager 主线。
+当前下一步仍在 Rust 本地同步加密前置工作内，重点是准备 userdb P2 plaintext payload 导出迭代器，并继续保持 P1 原始事件、本地审计批次和 FFI 明文 payload 不进入同步路径。现阶段不推进平台壳、Go 同步后端或 Flutter manager 主线。
 
 ## 设计原则
 
@@ -151,7 +151,7 @@ RadishLex 按 `docs/privacy-sync.md` 的数据分级推进：
 - 单台设备丢失后应允许撤销设备，并在后续对象上轮换同步密钥。
 - 冲突合并应按对象类型处理：用户词按词合并，删除使用 tombstone，设置项可 last-write-wins 或显式提示。
 
-当前 `ime-sync` 只定义 payload 来源分类、同步对象类型和加密对象外壳校验。它不实现网络客户端、加密、签名、hash 计算、设备授权或冲突合并执行器。
+当前 `ime-sync` 定义 payload 来源分类、同步对象类型和加密对象外壳校验，并能从 `ime-crypto` envelope 派生上传草案元数据。它不实现网络客户端、签名、设备授权或冲突合并执行器。
 
 ## Clean-room 原则
 
