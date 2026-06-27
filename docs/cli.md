@@ -462,73 +462,12 @@ cargo run -p radishlex-ime-cli -- \
 
 ## 常见错误
 
-### `rime command requires building ... --features native-rime`
-
-原因：当前构建未启用真实 Rime feature。
-
-处理：
-
-```bash
-cargo run -p radishlex-ime-cli --features native-rime -- rime ...
-```
-
-### `missing --schema`
-
-原因：`rime` 命令缺少 schema id。
-
-处理：
-
-```bash
-radishlex-ime-cli rime --schema luna_pinyin --shared-data <path> --user-data <path> luobo
-```
-
-### `candidate index must be a non-negative integer`
-
-原因：候选索引不是非负整数。
-
-处理：使用 `0`、`1`、`2` 这类索引值。
-
-### `candidate index ... did not produce commit text`
-
-原因：底层 engine 没有接受该候选索引或未产生提交文本。
-
-处理：先用不带 `candidate-index` 的命令确认候选列表，再选择当前输出中存在的候选索引。真实 Rime 路径已用 `luobo 1`、`luobo --key page-down 0` 和 `luobo 999` 覆盖非首候选、翻页候选和越界候选索引 smoke；候选文本会受 Rime 数据版本和隔离 user data 内学习状态影响。
-
-### `unknown key name: ...`
-
-原因：`--key` 的值不是当前 CLI smoke 支持的命名键。
-
-处理：使用 `page-down`、`page-up`、`arrow-down`、`arrow-up` 等文档列出的键名。
-
-### `--context requires --rank-db for rime`
-
-原因：`rime --context` 只在 rank smoke 中有意义，不能单独使用。
-
-处理：
-
-```bash
-cargo run -p radishlex-ime-cli --features native-rime -- \
-  rime --schema luna_pinyin --shared-data <path> --user-data <path> --rank-db /tmp/radishlex-userdb.sqlite --context chat luobo
-```
-
-### `missing --db`
-
-原因：`dict`、`learn` 或 `rank explain` 命令缺少显式 SQLite 路径。
-
-处理：
-
-```bash
-cargo run -p radishlex-ime-cli -- dict list --db /tmp/radishlex-userdb.sqlite
-```
-
-### `invalid import_file`
-
-原因：`dict import` 文件缺少版本头、字段表头不匹配、字段数错误、转义不合法，或出现不允许导入的 `deleted` 状态。
-
-处理：使用 `dict export` 生成的 `radishlex-user-terms-v1` TSV 作为模板，并只保留 `active` 或 `suppressed` 词条。
-
-### `unknown negative feedback reason ...`
-
-原因：`learn suppress --reason` 不是当前支持的负反馈类型。
-
-处理：使用 `immediate_backspace`、`reselect_same_code`、`manual_suppress` 或 `manual_delete`。
+- `rime command requires building ... --features native-rime`：当前构建未启用真实 Rime feature；用 `cargo run -p radishlex-ime-cli --features native-rime -- rime ...` 复验。
+- `missing --schema`：`rime` 命令缺少 schema id；同时提供 `--schema`、`--shared-data` 和 `--user-data`。
+- `candidate index must be a non-negative integer`：候选索引必须是 `0`、`1`、`2` 这类非负整数。
+- `candidate index ... did not produce commit text`：先确认当前候选列表，再选择存在的候选索引；真实 Rime 候选文本会受数据版本和隔离 user data 学习状态影响。
+- `unknown key name: ...`：`--key` 只接受文档列出的命名键，例如 `page-down`、`page-up`、`arrow-down`、`arrow-up`。
+- `--context requires --rank-db for rime`：`rime --context` 只在 rank smoke 中有效，必须同时传入 `--rank-db`。
+- `missing --db`：`dict`、`learn` 或 `rank explain` 必须显式指定 SQLite 路径。
+- `invalid import_file`：导入文件需要符合 `radishlex-user-terms-v1` TSV，且词条状态只能是 `active` 或 `suppressed`。
+- `unknown negative feedback reason ...`：`learn suppress --reason` 只接受 `immediate_backspace`、`reselect_same_code`、`manual_suppress` 或 `manual_delete`。

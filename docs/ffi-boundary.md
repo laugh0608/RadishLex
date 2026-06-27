@@ -41,50 +41,14 @@ RadishLexError*
 
 平台端只能持有 opaque pointer，不能解引用 Rust 内部结构。跨 ABI 文本优先使用带长度的 UTF-8 view；需要 Rust 分配的 buffer 或 snapshot handle 时，必须由 Rust 提供释放函数。
 
-当前已落地函数：
+当前已落地函数按能力分组：
 
-```text
-radishlex_ffi_contract
-radishlex_session_new
-radishlex_session_new_with_options
-radishlex_session_new_rime
-radishlex_session_free
-radishlex_session_engine_kind
-radishlex_session_reset
-radishlex_session_set_schema
-radishlex_session_push_key
-radishlex_session_push_key_event
-radishlex_session_snapshot
-radishlex_session_snapshot_new
-radishlex_snapshot_schema
-radishlex_snapshot_preedit
-radishlex_snapshot_cursor
-radishlex_snapshot_candidate_count
-radishlex_snapshot_candidate
-radishlex_snapshot_free
-radishlex_session_commit_candidate
-radishlex_userdb_learning_status
-radishlex_userdb_sync_preflight
-radishlex_userdb_add_term
-radishlex_userdb_delete_term
-radishlex_userdb_terms_new
-radishlex_userdb_terms_count
-radishlex_userdb_terms_get
-radishlex_userdb_terms_free
-radishlex_userdb_dictionary_inspect
-radishlex_userdb_dictionary_export
-radishlex_userdb_dictionary_import
-radishlex_userdb_import_batches_new
-radishlex_userdb_import_batches_count
-radishlex_userdb_import_batches_get
-radishlex_userdb_import_batches_free
-radishlex_buffer_data
-radishlex_buffer_len
-radishlex_buffer_free
-radishlex_error_code
-radishlex_error_message
-radishlex_error_free
-```
+- ABI contract：`radishlex_ffi_contract`
+- session 生命周期：`radishlex_session_new`、`radishlex_session_new_with_options`、`radishlex_session_new_rime`、`radishlex_session_free`、`radishlex_session_engine_kind`、`radishlex_session_reset`、`radishlex_session_set_schema`
+- 输入与快照：`radishlex_session_push_key`、`radishlex_session_push_key_event`、`radishlex_session_snapshot`、`radishlex_session_snapshot_new`、`radishlex_snapshot_*`、`radishlex_session_commit_candidate`
+- userdb 状态与词条管理：`radishlex_userdb_learning_status`、`radishlex_userdb_sync_preflight`、`radishlex_userdb_add_term`、`radishlex_userdb_delete_term`、`radishlex_userdb_terms_*`
+- dictionary 文件与导入审计：`radishlex_userdb_dictionary_*`、`radishlex_userdb_import_batches_*`
+- Rust 分配对象读取与释放：`radishlex_buffer_*`、`radishlex_error_*`
 
 ## 当前 ABI 数据结构
 
