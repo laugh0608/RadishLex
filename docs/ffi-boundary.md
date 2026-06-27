@@ -467,7 +467,7 @@ InternalError
 - userdb 删除 tombstone、导入导出和 ranker explain 已通过测试。
 - 同步 payload 草案已区分 P1 本地和 P2 加密同步。
 - FFI 文档明确所有权、生命周期、错误语义、字符串编码和释放责任。
-- `ime-ffi` 至少有 C ABI 单元测试或 host smoke，证明字符串、数组、snapshot、candidate view、normalized key event、session options、Rime session options、learning status 只读摘要、sync preflight 状态摘要、userdb 管理入口、ABI contract、session owner-thread policy 和错误释放路径可复验。当前已完成上述 host smoke；真实平台壳前仍需继续验证平台绑定层和 native 库异常路径。
+- `ime-ffi` 至少有 C ABI 单元测试或 host smoke，证明字符串、数组、snapshot、candidate view、normalized key event、session options、Rime session options、learning status 只读摘要、sync preflight 状态摘要、userdb 管理入口、ABI contract、session owner-thread policy、平台绑定式 view copy / release 和错误释放路径可复验。当前已完成上述 host smoke；真实平台壳前仍需由具体平台 wrapper 复验线程调度、字符串复制和释放规则。
 
 ## 验证口径
 

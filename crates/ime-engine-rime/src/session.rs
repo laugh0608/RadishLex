@@ -37,6 +37,8 @@ impl RimeEngine {
         let mut traits = native_strings.traits();
         // SAFETY: api is non-null and each function pointer is checked before use.
         unsafe {
+            require_startup_api_functions(&*api, config.deploy_on_start())?;
+            require_runtime_api_functions(&*api)?;
             require_api_function((*api).setup, "setup")?(&mut traits);
 
             if config.deploy_on_start() {
@@ -375,6 +377,30 @@ fn require_api_function<T>(function: Option<T>, name: &'static str) -> RimeEngin
     function.ok_or(RimeEngineError::MissingApiFunction { name })
 }
 
+fn require_startup_api_functions(api: &RimeApi, deploy_on_start: bool) -> RimeEngineResult<()> {
+    require_api_function(api.setup, "setup")?;
+    if deploy_on_start {
+        require_api_function(api.deployer_initialize, "deployer_initialize")?;
+        require_api_function(api.deploy, "deploy")?;
+    }
+    require_api_function(api.initialize, "initialize")?;
+    require_api_function(api.create_session, "create_session")?;
+    require_api_function(api.select_schema, "select_schema")?;
+    require_api_function(api.destroy_session, "destroy_session")?;
+    Ok(())
+}
+
+fn require_runtime_api_functions(api: &RimeApi) -> RimeEngineResult<()> {
+    require_api_function(api.clear_composition, "clear_composition")?;
+    require_api_function(api.process_key, "process_key")?;
+    require_api_function(api.get_commit, "get_commit")?;
+    require_api_function(api.free_commit, "free_commit")?;
+    require_api_function(api.get_context, "get_context")?;
+    require_api_function(api.free_context, "free_context")?;
+    require_api_function(api.get_current_schema, "get_current_schema")?;
+    Ok(())
+}
+
 fn ensure_true(stage: &'static str, value: Bool) -> RimeEngineResult<()> {
     if value == TRUE {
         Ok(())
@@ -469,4 +495,169 @@ unsafe fn optional_c_string(value: *const i8) -> RimeEngineResult<Option<String>
 
 fn rime_to_core(error: RimeEngineError) -> CoreError {
     CoreError::engine(error.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ffi::{RimeCommit, RimeContext};
+    use std::os::raw::{c_char, c_int};
+
+    #[test]
+    fn startup_api_validation_reports_missing_required_functions() {
+        let cases: [(&str, fn(&mut RimeApi)); 5] = [
+            ("setup", |api| api.setup = None),
+            ("initialize", |api| api.initialize = None),
+            ("create_session", |api| api.create_session = None),
+            ("select_schema", |api| api.select_schema = None),
+            ("destroy_session", |api| api.destroy_session = None),
+        ];
+
+        for (name, remove) in cases {
+            let mut api = stub_api();
+            remove(&mut api);
+            let error = require_startup_api_functions(&api, false)
+                .expect_err("missing startup function must fail");
+            assert_eq!(error, RimeEngineError::MissingApiFunction { name });
+        }
+    }
+
+    #[test]
+    fn deploy_startup_validation_reports_deploy_functions() {
+        let cases: [(&str, fn(&mut RimeApi)); 2] = [
+            ("deployer_initialize", |api| api.deployer_initialize = None),
+            ("deploy", |api| api.deploy = None),
+        ];
+
+        for (name, remove) in cases {
+            let mut api = stub_api();
+            remove(&mut api);
+            let error = require_startup_api_functions(&api, true)
+                .expect_err("missing deploy function must fail");
+            assert_eq!(error, RimeEngineError::MissingApiFunction { name });
+        }
+    }
+
+    #[test]
+    fn runtime_api_validation_reports_missing_required_functions() {
+        let cases: [(&str, fn(&mut RimeApi)); 7] = [
+            ("clear_composition", |api| api.clear_composition = None),
+            ("process_key", |api| api.process_key = None),
+            ("get_commit", |api| api.get_commit = None),
+            ("free_commit", |api| api.free_commit = None),
+            ("get_context", |api| api.get_context = None),
+            ("free_context", |api| api.free_context = None),
+            ("get_current_schema", |api| api.get_current_schema = None),
+        ];
+
+        for (name, remove) in cases {
+            let mut api = stub_api();
+            remove(&mut api);
+            let error = require_runtime_api_functions(&api)
+                .expect_err("missing runtime function must fail");
+            assert_eq!(error, RimeEngineError::MissingApiFunction { name });
+        }
+    }
+
+    fn stub_api() -> RimeApi {
+        RimeApi {
+            data_size: 0,
+            setup: Some(stub_traits),
+            set_notification_handler: None,
+            initialize: Some(stub_traits),
+            finalize: None,
+            start_maintenance: None,
+            is_maintenance_mode: None,
+            join_maintenance_thread: None,
+            deployer_initialize: Some(stub_traits),
+            prebuild: None,
+            deploy: Some(stub_bool),
+            deploy_schema: None,
+            deploy_config_file: None,
+            sync_user_data: None,
+            create_session: Some(stub_create_session),
+            find_session: None,
+            destroy_session: Some(stub_destroy_session),
+            cleanup_stale_sessions: None,
+            cleanup_all_sessions: None,
+            process_key: Some(stub_process_key),
+            commit_composition: None,
+            clear_composition: Some(stub_clear_composition),
+            get_commit: Some(stub_get_commit),
+            free_commit: Some(stub_free_commit),
+            get_context: Some(stub_get_context),
+            free_context: Some(stub_free_context),
+            get_status: None,
+            free_status: None,
+            set_option: None,
+            get_option: None,
+            set_property: None,
+            get_property: None,
+            get_schema_list: None,
+            free_schema_list: None,
+            get_current_schema: Some(stub_get_current_schema),
+            select_schema: Some(stub_select_schema),
+        }
+    }
+
+    unsafe extern "C" fn stub_traits(_traits: *mut RimeTraits) {}
+
+    unsafe extern "C" fn stub_bool() -> Bool {
+        TRUE
+    }
+
+    unsafe extern "C" fn stub_create_session() -> RimeSessionId {
+        1
+    }
+
+    unsafe extern "C" fn stub_destroy_session(_session_id: RimeSessionId) -> Bool {
+        TRUE
+    }
+
+    unsafe extern "C" fn stub_process_key(
+        _session_id: RimeSessionId,
+        _keycode: c_int,
+        _mask: c_int,
+    ) -> Bool {
+        TRUE
+    }
+
+    unsafe extern "C" fn stub_clear_composition(_session_id: RimeSessionId) {}
+
+    unsafe extern "C" fn stub_get_commit(
+        _session_id: RimeSessionId,
+        _commit: *mut RimeCommit,
+    ) -> Bool {
+        TRUE
+    }
+
+    unsafe extern "C" fn stub_free_commit(_commit: *mut RimeCommit) -> Bool {
+        TRUE
+    }
+
+    unsafe extern "C" fn stub_get_context(
+        _session_id: RimeSessionId,
+        _context: *mut RimeContext,
+    ) -> Bool {
+        TRUE
+    }
+
+    unsafe extern "C" fn stub_free_context(_context: *mut RimeContext) -> Bool {
+        TRUE
+    }
+
+    unsafe extern "C" fn stub_get_current_schema(
+        _session_id: RimeSessionId,
+        _buffer: *mut c_char,
+        _buffer_size: usize,
+    ) -> Bool {
+        TRUE
+    }
+
+    unsafe extern "C" fn stub_select_schema(
+        _session_id: RimeSessionId,
+        _schema: *const c_char,
+    ) -> Bool {
+        TRUE
+    }
 }

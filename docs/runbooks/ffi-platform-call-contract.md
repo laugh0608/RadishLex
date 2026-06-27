@@ -14,6 +14,7 @@
 - userdb add / delete / list
 - dictionary inspect / export / import
 - import batches 查询
+- platform binding style view copy / release smoke
 - error object 读取和释放
 
 当前不表示真实平台壳已经接入。平台壳进入前，绑定层仍需要按本 runbook 写出本平台自己的 smoke 或 wrapper 测试。
@@ -228,9 +229,10 @@ radishlex_userdb_import_batches_new(db_path, error_out)
 - 创建 session 后在 owner thread 上 push key、读取 snapshot、提交候选并释放所有 handle。
 - 从非 owner thread 调用 session mutation 返回 `InvalidState`。
 - 非 UTF-8、空指针、非法 bool、候选越界能返回稳定错误码并释放 error。
-- snapshot / term list / import batch list 的 string view 能按长度复制。
+- snapshot / term list / import batch list 的 string view 能按长度复制，并在释放所属 handle 后继续使用已复制值。
 - `*_free(NULL)` 不崩溃。
 - userdb 管理入口使用显式临时 SQLite 路径，不读取真实用户输入法目录；learning status smoke 需要断言 P1 明细和上下文统计标记为 false。
+- 本仓库 Rust host smoke 已覆盖 snapshot / user term / import batch / error 的复制后释放；平台 wrapper 仍需在本语言层复验同一规则。
 
 推荐本仓库先用以下命令复验 Rust 侧基线：
 

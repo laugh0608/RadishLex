@@ -200,6 +200,7 @@ Rime candidate 转 RadishLex candidate 时只保留稳定字段：
 ## 错误和安全边界
 
 - 所有 FFI 调用集中在 `ffi.rs` / `session.rs` 的极小边界内，并配套 `unsafe` 注释说明所有权、空指针、释放责任和线程假设。
+- `native-rime` feature 测试覆盖 startup / runtime 必需 API 缺失；缺失函数必须返回带函数名的 `MissingApiFunction`。
 - 所有 Rime 分配的 context、commit、status、schema list 必须按 C API 对应 free 函数释放。
 - C string 转 Rust string 时必须处理 null、非 UTF-8 和空字符串。
 - Rime session id 只能存于 `RimeEngine` 内部，不进入 `ime-core` 模型。
@@ -271,6 +272,7 @@ RADISHLEX_RIME_SHARED_DATA=<path> RADISHLEX_RIME_USER_DATA=<path> cargo test -p 
 - 已补配置模型、错误类型、key 分类和候选转换测试。
 - 第 4 步已覆盖 `setup`、`initialize`、`create_session`、`select_schema` 和 `destroy_session` 的 FFI session 管理。
 - 已补 `process_key`、`get_context`、`get_commit`、`free_context` 和 `free_commit` 的 Rust 侧调用路径。
+- 已补必需 Rime API 校验测试，覆盖 startup 与 runtime 函数缺失时的 `MissingApiFunction` 映射。
 - 已实现 `ime-cli rime` 子命令；默认 feature 下会给出明确 `native-rime` 构建提示，启用 feature 后可构造 `RimeEngine` 并进入 `InputSession`。
 - 已在 macOS 本机 `librime` 1.17.0、`luna_pinyin` 隔离数据目录下完成真实 native smoke，`luobo` 可输出 composition、候选和默认 commit。
 - 已给 `ime-cli rime` 补充可重复的 `--key <name>` smoke 调试参数，用于在输入码后追加 `page-down`、`page-up`、方向键等命名键事件。

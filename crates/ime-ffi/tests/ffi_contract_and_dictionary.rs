@@ -7,25 +7,31 @@ use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use radishlex_ime_ffi::{
-    radishlex_error_code, radishlex_error_free, radishlex_error_message, radishlex_ffi_contract,
-    radishlex_session_engine_kind, radishlex_session_free, radishlex_session_new,
-    radishlex_session_reset, radishlex_userdb_add_term, radishlex_userdb_dictionary_export,
+    radishlex_buffer_data, radishlex_buffer_free, radishlex_buffer_len, radishlex_error_code,
+    radishlex_error_free, radishlex_error_message, radishlex_ffi_contract,
+    radishlex_session_commit_candidate, radishlex_session_engine_kind, radishlex_session_free,
+    radishlex_session_new, radishlex_session_push_key_event, radishlex_session_reset,
+    radishlex_session_snapshot_new, radishlex_snapshot_candidate,
+    radishlex_snapshot_candidate_count, radishlex_snapshot_free, radishlex_snapshot_preedit,
+    radishlex_snapshot_schema, radishlex_userdb_add_term, radishlex_userdb_dictionary_export,
     radishlex_userdb_dictionary_import, radishlex_userdb_dictionary_inspect,
     radishlex_userdb_import_batches_count, radishlex_userdb_import_batches_free,
     radishlex_userdb_import_batches_get, radishlex_userdb_import_batches_new,
     radishlex_userdb_learning_status, radishlex_userdb_terms_count, radishlex_userdb_terms_free,
-    radishlex_userdb_terms_new, RadishLexError, RadishLexFfiContract, RadishLexImportBatchView,
+    radishlex_userdb_terms_get, radishlex_userdb_terms_new, RadishLexCandidateView, RadishLexError,
+    RadishLexFfiContract, RadishLexImportBatchView, RadishLexKeyEvent,
     RadishLexLearningStatusSummary, RadishLexSession, RadishLexStatusCode, RadishLexStringView,
-    RADISHLEX_ABI_CONTRACT_VERSION, RADISHLEX_DICTIONARY_FORMAT_USER_TERMS_V1,
-    RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND, RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD,
-    RADISHLEX_SYNC_CLASS_P2_ENCRYPTED_SYNC,
+    RadishLexUserTermView, RADISHLEX_ABI_CONTRACT_VERSION,
+    RADISHLEX_DICTIONARY_FORMAT_USER_TERMS_V1, RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND,
+    RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD, RADISHLEX_SYNC_CLASS_P2_ENCRYPTED_SYNC,
 };
 #[cfg(feature = "native-rime")]
 use radishlex_ime_ffi::{
     radishlex_session_new_rime, RadishLexRimeSessionOptions, RADISHLEX_RIME_SESSION_OPTIONS_VERSION,
 };
 use radishlex_ime_userdb::{
-    NegativeFeedbackDraft, NegativeFeedbackReason, SelectionEventDraft, TermSource, UserDb,
+    DictionaryTermRecord, NegativeFeedbackDraft, NegativeFeedbackReason, SelectionEventDraft,
+    TermSource, TermStatus, UserDb,
 };
 
 #[test]
@@ -98,6 +104,122 @@ fn session_handles_reject_non_owner_thread_use() {
     unsafe {
         radishlex_session_free(session);
     }
+}
+
+#[test]
+fn platform_binding_style_copies_views_before_releasing_handles() {
+    let mut error = ptr::null_mut();
+    let session = radishlex_session_new(&mut error);
+    assert!(!session.is_null());
+
+    for ch in "luobo".chars() {
+        assert_eq!(
+            radishlex_session_push_key_event(
+                session,
+                RadishLexKeyEvent::press_char(ch),
+                &mut error
+            ),
+            RadishLexStatusCode::Ok
+        );
+    }
+
+    let snapshot = radishlex_session_snapshot_new(session, &mut error);
+    assert!(!snapshot.is_null());
+    assert_eq!(radishlex_snapshot_candidate_count(snapshot), 2);
+
+    let schema = unsafe { view_to_owned(radishlex_snapshot_schema(snapshot)) };
+    let preedit = unsafe { view_to_owned(radishlex_snapshot_preedit(snapshot)) };
+    let mut candidate = RadishLexCandidateView::empty();
+    assert_eq!(
+        radishlex_snapshot_candidate(snapshot, 0, &mut candidate, &mut error),
+        RadishLexStatusCode::Ok
+    );
+    let candidate_text = unsafe { view_to_owned(candidate.text) };
+    let candidate_reading = unsafe { view_to_owned(candidate.reading) };
+    unsafe {
+        radishlex_snapshot_free(snapshot);
+    }
+
+    assert_eq!(schema, "ffi.demo");
+    assert_eq!(preedit, "luobo");
+    assert_eq!(candidate_text, "萝卜");
+    assert_eq!(candidate_reading, "luobo");
+
+    let commit = radishlex_session_commit_candidate(session, 0, &mut error);
+    assert!(!commit.is_null());
+    let commit_text = unsafe { buffer_to_owned(commit) };
+    unsafe {
+        radishlex_buffer_free(commit);
+        radishlex_session_free(session);
+    }
+    assert_eq!(commit_text, "萝卜");
+
+    let db_path = temp_db_path("binding-style-copy");
+    let db_path_c = CString::new(db_path.to_string_lossy().as_bytes()).expect("path");
+    let input_code = CString::new("cihe").expect("input");
+    let text = CString::new("词核").expect("text");
+    assert_eq!(
+        radishlex_userdb_add_term(
+            db_path_c.as_ptr(),
+            input_code.as_ptr(),
+            text.as_ptr(),
+            ptr::null(),
+            &mut error,
+        ),
+        RadishLexStatusCode::Ok
+    );
+
+    let terms = radishlex_userdb_terms_new(db_path_c.as_ptr(), &mut error);
+    assert!(!terms.is_null());
+    let mut term = RadishLexUserTermView::empty();
+    assert_eq!(
+        radishlex_userdb_terms_get(terms, 0, &mut term, &mut error),
+        RadishLexStatusCode::Ok
+    );
+    let term_input = unsafe { view_to_owned(term.input_code) };
+    let term_text = unsafe { view_to_owned(term.text) };
+    unsafe {
+        radishlex_userdb_terms_free(terms);
+    }
+    assert_eq!(term_input, "cihe");
+    assert_eq!(term_text, "词核");
+
+    {
+        let mut db = UserDb::open(&db_path).expect("userdb opens");
+        let records = vec![DictionaryTermRecord::new(
+            "pintai",
+            "平台",
+            None::<String>,
+            TermSource::ManualImport,
+            1.0,
+            TermStatus::Active,
+        )];
+        db.import_dictionary_records(&records, "binding-smoke")
+            .expect("import batch is recorded");
+    }
+
+    let batches = radishlex_userdb_import_batches_new(db_path_c.as_ptr(), &mut error);
+    assert!(!batches.is_null());
+    let mut batch = RadishLexImportBatchView::empty();
+    assert_eq!(
+        radishlex_userdb_import_batches_get(batches, 0, &mut batch, &mut error),
+        RadishLexStatusCode::Ok
+    );
+    let batch_source = unsafe { view_to_owned(batch.source_name) };
+    assert_eq!(
+        radishlex_userdb_import_batches_get(batches, 1, &mut batch, &mut error),
+        RadishLexStatusCode::InvalidArgument
+    );
+    let error_message_copy = unsafe { error_message(error) };
+    unsafe {
+        radishlex_error_free(error);
+        radishlex_userdb_import_batches_free(batches);
+    }
+
+    assert_eq!(batch_source, "binding-smoke");
+    assert!(error_message_copy.contains("out of range"));
+
+    let _ = fs::remove_file(db_path);
 }
 
 #[test]
@@ -374,6 +496,26 @@ unsafe fn error_message(error: *const RadishLexError) -> String {
 unsafe fn view_to_string(view: RadishLexStringView) -> String {
     let bytes = slice::from_raw_parts(view.data, view.len);
     String::from_utf8(bytes.to_vec()).expect("view must be UTF-8")
+}
+
+unsafe fn view_to_owned(view: RadishLexStringView) -> String {
+    if view.len == 0 {
+        return String::new();
+    }
+    assert!(!view.data.is_null());
+    let bytes = slice::from_raw_parts(view.data, view.len);
+    String::from_utf8(bytes.to_vec()).expect("view must be UTF-8")
+}
+
+unsafe fn buffer_to_owned(buffer: *const radishlex_ime_ffi::RadishLexBuffer) -> String {
+    let data = radishlex_buffer_data(buffer);
+    let len = radishlex_buffer_len(buffer);
+    if len == 0 {
+        return String::new();
+    }
+    assert!(!data.is_null());
+    let bytes = slice::from_raw_parts(data, len);
+    String::from_utf8(bytes.to_vec()).expect("buffer must be UTF-8")
 }
 
 fn temp_db_path(name: &str) -> PathBuf {

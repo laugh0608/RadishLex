@@ -24,6 +24,7 @@ ime-ffi native smoke
 通过标准：
 
 - `native-rime` feature 能链接本机 `librime`。
+- `native-rime` feature 测试能覆盖必需 Rime API 缺失并映射为 `MissingApiFunction`。
 - CLI 能用隔离的 Rime 数据目录输出真实候选。
 - `ime-ffi` 在显式 `native-rime` feature 下能通过 Rime session options 创建真实 Rime session。
 - 不读取真实 Rime 用户目录，不使用真实输入历史或真实用户词库。
@@ -118,6 +119,14 @@ cd /Users/luobo/Code/RadishLex
 RIME_INCLUDE_DIR="$RIME_INCLUDE_DIR" \
 RIME_LIB_DIR="$RIME_LIB_DIR" \
 cargo check -p radishlex-ime-cli --features native-rime
+```
+
+再运行 Rime adapter feature 测试，确认必需 native API 表和缺失函数错误映射可复验：
+
+```bash
+RIME_INCLUDE_DIR="$RIME_INCLUDE_DIR" \
+RIME_LIB_DIR="$RIME_LIB_DIR" \
+cargo test -p radishlex-ime-engine-rime --features native-rime
 ```
 
 然后依次运行四条 smoke：
@@ -230,6 +239,7 @@ cargo test -p radishlex-ime-ffi --features native-rime \
 - schema：`luna_pinyin`
 - smoke 目录：`$SMOKE`
 - `cargo check -p radishlex-ime-cli --features native-rime` 是否通过
+- `cargo test -p radishlex-ime-engine-rime --features native-rime` 是否通过，必需 API 缺失映射是否可复验
 - 首候选、非首候选、翻页后候选是否都能按当前输出候选提交
 - 越界候选索引是否返回明确错误
 - rank smoke 是否输出 `rank_context`、`engine_index`、explain 和 `commit_engine_index`

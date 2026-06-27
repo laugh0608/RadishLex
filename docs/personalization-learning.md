@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn status/select/suppress`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查、学习状态只读摘要和同步前置检查命令。`ime-sync` 已补 payload 来源分类和加密对象外壳草案，`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、learning status 只读摘要、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、释放 panic 边界 host smoke 和 FFI 调用 runbook。下一阶段目标是继续评估更底层 native API 缺失路径和平台绑定前 smoke 口径。
+当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn status/select/suppress`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查、学习状态只读摘要和同步前置检查命令。`ime-sync` 已补 payload 来源分类和加密对象外壳草案，`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、learning status 只读摘要、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、平台绑定式 view copy / release host smoke、释放 panic 边界 host smoke 和 FFI 调用 runbook；`ime-engine-rime` 已补必需 Rime API 缺失映射测试。下一阶段目标是评估 Phase 2 退出标准和进入 `ime-crypto` / 同步加密设计前的可复验证据。
 
 Phase 2 不改变底层 engine adapter 边界：
 
@@ -465,7 +465,7 @@ cargo test --workspace
 15. `ime-ffi` 已补 ABI contract、session owner-thread policy 和释放 panic 边界，平台端跨线程误用会返回 `InvalidState`。
 16. 已补 `docs/runbooks/ffi-platform-call-contract.md`，明确平台绑定层的 `error_out`、string view、handle 释放和 owner-thread 调度规则。
 17. 已补 userdb / CLI / FFI 学习状态只读摘要，面向后续管理 UI 查看本地学习状态；该入口只输出聚合计数、latest timestamp 和隐私边界布尔标记，不导出 P1 原始选择事件、负反馈明细、上下文统计或明文同步 payload。
-18. 下一步继续评估更底层 native API 缺失路径和平台绑定前 smoke 口径。
+18. 已补 native Rime 必需 API 缺失映射测试和平台绑定式 FFI view copy / release host smoke；下一步评估 Phase 2 退出标准与进入 `ime-crypto` / 同步加密设计前的可复验证据。
 
 阶段停止线：
 
