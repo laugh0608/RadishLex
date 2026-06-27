@@ -13,7 +13,10 @@ mod sync_status;
 
 pub use abi::*;
 pub use dictionary::{
-    RadishLexUserTermList, RadishLexUserTermView, RADISHLEX_TERM_SOURCE_ENGINE_SELECTION,
+    RadishLexDictionaryExportSummary, RadishLexDictionaryImportSummary,
+    RadishLexDictionaryInspectSummary, RadishLexImportBatchList, RadishLexImportBatchView,
+    RadishLexUserTermList, RadishLexUserTermView, RADISHLEX_DICTIONARY_FORMAT_USER_TERMS_V1,
+    RADISHLEX_SYNC_CLASS_P2_ENCRYPTED_SYNC, RADISHLEX_TERM_SOURCE_ENGINE_SELECTION,
     RADISHLEX_TERM_SOURCE_MANUAL_ADD, RADISHLEX_TERM_SOURCE_MANUAL_IMPORT,
     RADISHLEX_TERM_SOURCE_PHRASE_LEARNING, RADISHLEX_TERM_STATUS_ACTIVE,
     RADISHLEX_TERM_STATUS_DELETED, RADISHLEX_TERM_STATUS_SUPPRESSED,

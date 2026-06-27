@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前已落地 `crates/ime-ffi/` 起步验证：C ABI 已覆盖 opaque session handle、session options、Rime session options ABI、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、释放函数、schema 设置、按键输入、snapshot、候选提交、userdb sync preflight 状态摘要和受控 userdb 词条管理入口的 host smoke。当前 session 内部已使用 demo / Rime 可扩展 engine 封装；默认构建仍只启用 deterministic demo engine，`native-rime` feature 下 `radishlex_session_new_rime` 可通过显式 Rime 配置创建真实 `RimeEngine` session，并已通过隔离 Rime 数据目录 smoke。该状态仍不代表平台壳或系统输入法已经接入。
+当前已落地 `crates/ime-ffi/` 起步验证：C ABI 已覆盖 opaque session handle、session options、Rime session options ABI、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、释放函数、schema 设置、按键输入、snapshot、候选提交、userdb sync preflight 状态摘要、受控 userdb 词条管理入口、dictionary inspect / export / import 和 import batches 只读查询的 host smoke。当前 session 内部已使用 demo / Rime 可扩展 engine 封装；默认构建仍只启用 deterministic demo engine，`native-rime` feature 下 `radishlex_session_new_rime` 可通过显式 Rime 配置创建真实 `RimeEngine` session，并已通过隔离 Rime 数据目录 smoke。该状态仍不代表平台壳或系统输入法已经接入。
 
 平台壳后续只能通过 FFI 调用 Rust core，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。
 
@@ -40,34 +40,6 @@ RadishLexError*
 
 平台端只能持有 opaque pointer，不能解引用 Rust 内部结构。跨 ABI 文本优先使用带长度的 UTF-8 view；需要 Rust 分配的 buffer 或 snapshot handle 时，必须由 Rust 提供释放函数。
 
-建议基本函数族：
-
-```text
-radishlex_session_new
-radishlex_session_new_with_options
-radishlex_session_new_rime
-radishlex_session_free
-radishlex_session_engine_kind
-radishlex_session_reset
-radishlex_session_set_schema
-radishlex_session_push_key
-radishlex_session_push_key_event
-radishlex_session_snapshot
-radishlex_session_snapshot_new
-radishlex_session_commit_candidate
-radishlex_userdb_sync_preflight
-radishlex_userdb_add_term
-radishlex_userdb_delete_term
-radishlex_userdb_terms_new
-radishlex_userdb_terms_count
-radishlex_userdb_terms_get
-radishlex_userdb_terms_free
-radishlex_buffer_free
-radishlex_error_code
-radishlex_error_message
-radishlex_error_free
-```
-
 当前已落地函数：
 
 ```text
@@ -96,6 +68,13 @@ radishlex_userdb_terms_new
 radishlex_userdb_terms_count
 radishlex_userdb_terms_get
 radishlex_userdb_terms_free
+radishlex_userdb_dictionary_inspect
+radishlex_userdb_dictionary_export
+radishlex_userdb_dictionary_import
+radishlex_userdb_import_batches_new
+radishlex_userdb_import_batches_count
+radishlex_userdb_import_batches_get
+radishlex_userdb_import_batches_free
 radishlex_buffer_data
 radishlex_buffer_len
 radishlex_buffer_free
@@ -322,6 +301,73 @@ deleted = 3
 
 term list 当前只返回 active / suppressed 词条。删除 tombstone 不通过 list 暴露；需要通过删除语义和 sync preflight 的 `syncable_deleted_terms` 观察。
 
+### Dictionary file summaries
+
+当前 dictionary file FFI 只处理用户明确管理的 P2 用户词条 TSV，不导出 P1 选择事件、负反馈明细、上下文统计或 ranker 权重摘要。
+
+当前常量：
+
+```text
+RADISHLEX_DICTIONARY_FORMAT_USER_TERMS_V1 = 1
+RADISHLEX_SYNC_CLASS_P2_ENCRYPTED_SYNC = 2
+```
+
+`RadishLexDictionaryInspectSummary`：
+
+```text
+format_version: u32
+record_count: usize
+sync_class: u32
+```
+
+`RadishLexDictionaryExportSummary`：
+
+```text
+format_version: u32
+exported_terms: usize
+sync_class: u32
+```
+
+`RadishLexDictionaryImportSummary`：
+
+```text
+import_batch_id: i64
+import_batch_id_present: u8
+total_records: usize
+imported_terms: usize
+inserted_terms: usize
+updated_terms: usize
+skipped_deleted_terms: usize
+skipped_duplicate_terms: usize
+dry_run: u8
+```
+
+`RadishLexImportBatchView`：
+
+```text
+id: i64
+source_name: RadishLexStringView
+total_records: usize
+imported_terms: usize
+inserted_terms: usize
+updated_terms: usize
+skipped_deleted_terms: usize
+skipped_duplicate_terms: usize
+created_at_ms: i64
+notes: RadishLexStringView
+notes_present: u8
+```
+
+规则：
+
+- `radishlex_userdb_dictionary_inspect` 只读取导入文件并返回格式版本、记录数和同步分类，不打开 userdb。
+- `radishlex_userdb_dictionary_export` 必须显式传入 SQLite 路径和输出文件路径，只导出 active / suppressed 用户词条字段。
+- `radishlex_userdb_dictionary_import` 必须显式传入 SQLite 路径、输入文件路径、可选 source name 和 `dry_run` 的 `0 / 1` 值。
+- `dry_run = 1` 时复用实际导入分类逻辑，但不写入词条或 import batch。
+- `dry_run = 0` 时写入词条并记录 import batch；导入仍遵守 deleted tombstone，不复活用户已删除词条。
+- `radishlex_userdb_import_batches_new` 返回只读 `RadishLexImportBatchList*`，由 `radishlex_userdb_import_batches_free` 释放。
+- import batch view 中的 string view 借用自 batch list handle，平台端只能在 list 释放前读取，不得缓存裸指针。
+
 `radishlex_session_push_key` 保留为字符输入便利函数；真实平台壳后续应优先使用 `radishlex_session_push_key_event`。当前 normalized key event 使用数值常量承载字符键、命名键、修饰键、按下 / 释放阶段和平台不可识别键，避免让无效 enum discriminant 在 FFI 边界形成未定义行为。
 
 Engine adapter 选择规则：
@@ -356,6 +402,7 @@ Userdb 词条管理入口规则：
 - `radishlex_userdb_terms_new` 返回只读 `RadishLexUserTermList*`，由 `radishlex_userdb_terms_free` 释放。
 - `radishlex_userdb_terms_get` 返回的 string view 借用自 term list handle，平台端只能在 list 释放前读取，不得缓存指针。
 - term list 只列出当前 active / suppressed 用户词条；deleted tombstone 不通过词条列表导出，只通过删除语义和 sync preflight 计数体现。
+- dictionary file 入口同样只处理用户明确管理的 P2 词条，不记录 P1 selection event、negative feedback 或上下文统计。
 
 ## 所有权与生命周期
 

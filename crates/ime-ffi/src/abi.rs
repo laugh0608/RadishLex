@@ -9,7 +9,11 @@ use radishlex_ime_engine_rime::RimeEngineConfig;
 
 use crate::buffer::RadishLexBuffer;
 use crate::dictionary::{
-    add_user_term, delete_user_term, list_user_terms, RadishLexUserTermList, RadishLexUserTermView,
+    add_user_term, delete_user_term, export_dictionary_file, import_dictionary_file,
+    inspect_dictionary_file, list_import_batches, list_user_terms,
+    RadishLexDictionaryExportSummary, RadishLexDictionaryImportSummary,
+    RadishLexDictionaryInspectSummary, RadishLexImportBatchList, RadishLexImportBatchView,
+    RadishLexUserTermList, RadishLexUserTermView,
 };
 use crate::engine::{
     validate_rime_session_options_version, validate_session_options, RadishLexRimeSessionOptions,
@@ -310,6 +314,128 @@ pub unsafe extern "C" fn radishlex_userdb_terms_free(terms: *mut RadishLexUserTe
 }
 
 #[no_mangle]
+pub extern "C" fn radishlex_userdb_dictionary_inspect(
+    file_path: *const c_char,
+    summary_out: *mut RadishLexDictionaryInspectSummary,
+    error_out: *mut *mut RadishLexError,
+) -> RadishLexStatusCode {
+    ffi_status(error_out, || {
+        if summary_out.is_null() {
+            return Err(FfiError::invalid_argument(
+                "dictionary inspect summary output pointer is null",
+            ));
+        }
+
+        let summary = inspect_dictionary_file(read_utf8(file_path, "file_path")?)?;
+        unsafe {
+            *summary_out = summary;
+        }
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_userdb_dictionary_export(
+    db_path: *const c_char,
+    file_path: *const c_char,
+    summary_out: *mut RadishLexDictionaryExportSummary,
+    error_out: *mut *mut RadishLexError,
+) -> RadishLexStatusCode {
+    ffi_status(error_out, || {
+        if summary_out.is_null() {
+            return Err(FfiError::invalid_argument(
+                "dictionary export summary output pointer is null",
+            ));
+        }
+
+        let summary = export_dictionary_file(
+            read_utf8(db_path, "db_path")?,
+            read_utf8(file_path, "file_path")?,
+        )?;
+        unsafe {
+            *summary_out = summary;
+        }
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_userdb_dictionary_import(
+    db_path: *const c_char,
+    file_path: *const c_char,
+    source_name: *const c_char,
+    dry_run: u8,
+    summary_out: *mut RadishLexDictionaryImportSummary,
+    error_out: *mut *mut RadishLexError,
+) -> RadishLexStatusCode {
+    ffi_status(error_out, || {
+        if summary_out.is_null() {
+            return Err(FfiError::invalid_argument(
+                "dictionary import summary output pointer is null",
+            ));
+        }
+
+        let summary = import_dictionary_file(
+            read_utf8(db_path, "db_path")?,
+            read_utf8(file_path, "file_path")?,
+            read_optional_utf8(source_name, "source_name")?,
+            read_ffi_bool(dry_run, "dry_run")?,
+        )?;
+        unsafe {
+            *summary_out = summary;
+        }
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_userdb_import_batches_new(
+    db_path: *const c_char,
+    error_out: *mut *mut RadishLexError,
+) -> *mut RadishLexImportBatchList {
+    ffi_ptr(error_out, || {
+        let batches = list_import_batches(read_utf8(db_path, "db_path")?)?;
+        Ok(Box::into_raw(Box::new(batches)))
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_userdb_import_batches_count(
+    batches: *const RadishLexImportBatchList,
+) -> usize {
+    import_batch_list_ref(batches).map_or(0, RadishLexImportBatchList::len)
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_userdb_import_batches_get(
+    batches: *const RadishLexImportBatchList,
+    index: usize,
+    batch_out: *mut RadishLexImportBatchView,
+    error_out: *mut *mut RadishLexError,
+) -> RadishLexStatusCode {
+    ffi_status(error_out, || {
+        if batch_out.is_null() {
+            return Err(FfiError::invalid_argument(
+                "import batch output pointer is null",
+            ));
+        }
+
+        let view = import_batch_list_ref(batches)?.batch_view(index)?;
+        unsafe {
+            *batch_out = view;
+        }
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn radishlex_userdb_import_batches_free(
+    batches: *mut RadishLexImportBatchList,
+) {
+    RadishLexImportBatchList::free(batches);
+}
+
+#[no_mangle]
 pub extern "C" fn radishlex_session_commit_candidate(
     session: *mut RadishLexSession,
     index: usize,
@@ -384,6 +510,17 @@ fn term_list_ref<'a>(
         return Err(FfiError::invalid_argument("user term list handle is null"));
     }
     Ok(unsafe { &*terms })
+}
+
+fn import_batch_list_ref<'a>(
+    batches: *const RadishLexImportBatchList,
+) -> Result<&'a RadishLexImportBatchList, FfiError> {
+    if batches.is_null() {
+        return Err(FfiError::invalid_argument(
+            "import batch list handle is null",
+        ));
+    }
+    Ok(unsafe { &*batches })
 }
 
 fn read_utf8<'a>(value: *const c_char, field: &'static str) -> Result<&'a str, FfiError> {
@@ -588,7 +725,12 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
-    use crate::dictionary::{RADISHLEX_TERM_SOURCE_MANUAL_ADD, RADISHLEX_TERM_STATUS_ACTIVE};
+    use crate::dictionary::{
+        RadishLexDictionaryExportSummary, RadishLexDictionaryImportSummary,
+        RadishLexDictionaryInspectSummary, RadishLexImportBatchView,
+        RADISHLEX_DICTIONARY_FORMAT_USER_TERMS_V1, RADISHLEX_SYNC_CLASS_P2_ENCRYPTED_SYNC,
+        RADISHLEX_TERM_SOURCE_MANUAL_ADD, RADISHLEX_TERM_STATUS_ACTIVE,
+    };
     use crate::engine::{
         RadishLexRimeSessionOptions, RADISHLEX_ENGINE_KIND_DEMO, RADISHLEX_ENGINE_KIND_RIME,
         RADISHLEX_RIME_SESSION_OPTIONS_VERSION, RADISHLEX_SESSION_OPTIONS_VERSION,
@@ -919,6 +1061,156 @@ mod tests {
     }
 
     #[test]
+    fn userdb_dictionary_file_management_round_trips_p2_terms() {
+        let source_path = temp_db_path("dictionary-file-source");
+        let target_path = temp_db_path("dictionary-file-target");
+        let export_path = temp_db_path("dictionary-file-export").with_extension("tsv");
+        let source_db_path = CString::new(source_path.to_string_lossy().as_bytes()).expect("path");
+        let target_db_path = CString::new(target_path.to_string_lossy().as_bytes()).expect("path");
+        let export_file_path =
+            CString::new(export_path.to_string_lossy().as_bytes()).expect("file path");
+        let input_code = CString::new("luobo").expect("input");
+        let text = CString::new("萝卜").expect("text");
+        let reading = CString::new("luo bo").expect("reading");
+        let source_name = CString::new("ffi-smoke").expect("source name");
+        let mut error = ptr::null_mut();
+
+        assert_eq!(
+            radishlex_userdb_add_term(
+                source_db_path.as_ptr(),
+                input_code.as_ptr(),
+                text.as_ptr(),
+                reading.as_ptr(),
+                &mut error,
+            ),
+            RadishLexStatusCode::Ok
+        );
+
+        let mut export_summary = RadishLexDictionaryExportSummary::empty();
+        assert_eq!(
+            radishlex_userdb_dictionary_export(
+                source_db_path.as_ptr(),
+                export_file_path.as_ptr(),
+                &mut export_summary,
+                &mut error,
+            ),
+            RadishLexStatusCode::Ok
+        );
+        assert_eq!(
+            export_summary.format_version,
+            RADISHLEX_DICTIONARY_FORMAT_USER_TERMS_V1
+        );
+        assert_eq!(export_summary.exported_terms, 1);
+        assert_eq!(
+            export_summary.sync_class,
+            RADISHLEX_SYNC_CLASS_P2_ENCRYPTED_SYNC
+        );
+
+        let exported = fs::read_to_string(&export_path).expect("export file is readable");
+        assert!(exported.contains("# radishlex-user-terms-v1"));
+        assert!(!exported.contains("session-local"));
+
+        let mut inspect_summary = RadishLexDictionaryInspectSummary::empty();
+        assert_eq!(
+            radishlex_userdb_dictionary_inspect(
+                export_file_path.as_ptr(),
+                &mut inspect_summary,
+                &mut error,
+            ),
+            RadishLexStatusCode::Ok
+        );
+        assert_eq!(inspect_summary.record_count, 1);
+        assert_eq!(
+            inspect_summary.format_version,
+            RADISHLEX_DICTIONARY_FORMAT_USER_TERMS_V1
+        );
+        assert_eq!(
+            inspect_summary.sync_class,
+            RADISHLEX_SYNC_CLASS_P2_ENCRYPTED_SYNC
+        );
+
+        let mut import_summary = RadishLexDictionaryImportSummary::empty();
+        assert_eq!(
+            radishlex_userdb_dictionary_import(
+                target_db_path.as_ptr(),
+                export_file_path.as_ptr(),
+                source_name.as_ptr(),
+                1,
+                &mut import_summary,
+                &mut error,
+            ),
+            RadishLexStatusCode::Ok
+        );
+        assert_eq!(import_summary.dry_run, 1);
+        assert_eq!(import_summary.import_batch_id_present, 0);
+        assert_eq!(import_summary.total_records, 1);
+        assert_eq!(import_summary.inserted_terms, 1);
+
+        let batches = radishlex_userdb_import_batches_new(target_db_path.as_ptr(), &mut error);
+        assert!(!batches.is_null());
+        assert_eq!(radishlex_userdb_import_batches_count(batches), 0);
+        unsafe {
+            radishlex_userdb_import_batches_free(batches);
+        }
+
+        assert_eq!(
+            radishlex_userdb_dictionary_import(
+                target_db_path.as_ptr(),
+                export_file_path.as_ptr(),
+                source_name.as_ptr(),
+                0,
+                &mut import_summary,
+                &mut error,
+            ),
+            RadishLexStatusCode::Ok
+        );
+        assert_eq!(import_summary.dry_run, 0);
+        assert_eq!(import_summary.import_batch_id_present, 1);
+        assert_eq!(import_summary.imported_terms, 1);
+
+        let batches = radishlex_userdb_import_batches_new(target_db_path.as_ptr(), &mut error);
+        assert!(!batches.is_null());
+        assert_eq!(radishlex_userdb_import_batches_count(batches), 1);
+
+        let mut batch = RadishLexImportBatchView::empty();
+        assert_eq!(
+            radishlex_userdb_import_batches_get(batches, 0, &mut batch, &mut error),
+            RadishLexStatusCode::Ok
+        );
+        assert_eq!(unsafe { view_to_string(batch.source_name) }, "ffi-smoke");
+        assert_eq!(batch.total_records, 1);
+        assert_eq!(batch.imported_terms, 1);
+        assert_eq!(batch.inserted_terms, 1);
+        assert_eq!(batch.skipped_deleted_terms, 0);
+        assert_eq!(batch.skipped_duplicate_terms, 0);
+
+        assert_eq!(
+            radishlex_userdb_import_batches_get(batches, 1, &mut batch, &mut error),
+            RadishLexStatusCode::InvalidArgument
+        );
+        assert_eq!(
+            radishlex_error_code(error),
+            RadishLexStatusCode::InvalidArgument
+        );
+        unsafe {
+            radishlex_error_free(error);
+            radishlex_userdb_import_batches_free(batches);
+        }
+
+        error = ptr::null_mut();
+        let terms = radishlex_userdb_terms_new(target_db_path.as_ptr(), &mut error);
+        assert!(!terms.is_null());
+        assert_eq!(radishlex_userdb_terms_count(terms), 1);
+        unsafe {
+            radishlex_userdb_terms_free(terms);
+        }
+
+        let _ = fs::remove_file(source_path);
+        let _ = fs::remove_file(target_path);
+        let _ = fs::remove_file(export_path);
+    }
+
+    #[test]
     fn sync_preflight_returns_counts_without_payload() {
         let path = temp_db_path("sync-preflight");
         {
@@ -1156,6 +1448,7 @@ mod tests {
             radishlex_error_free(ptr::null_mut());
             radishlex_snapshot_free(ptr::null_mut());
             radishlex_userdb_terms_free(ptr::null_mut());
+            radishlex_userdb_import_batches_free(ptr::null_mut());
         }
         assert!(radishlex_buffer_data(ptr::null()).is_null());
         assert_eq!(radishlex_buffer_len(ptr::null()), 0);
@@ -1165,6 +1458,7 @@ mod tests {
         assert!(radishlex_snapshot_schema(ptr::null()).data.is_null());
         assert_eq!(radishlex_session_engine_kind(ptr::null()), 0);
         assert_eq!(radishlex_userdb_terms_count(ptr::null()), 0);
+        assert_eq!(radishlex_userdb_import_batches_count(ptr::null()), 0);
     }
 
     unsafe fn buffer_to_string(buffer: *mut RadishLexBuffer) -> String {
