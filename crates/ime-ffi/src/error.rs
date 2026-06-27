@@ -2,6 +2,8 @@ use std::ffi::CString;
 use std::os::raw::c_char;
 
 use radishlex_ime_core::CoreError;
+#[cfg(feature = "native-rime")]
+use radishlex_ime_engine_rime::RimeEngineError;
 use radishlex_ime_userdb::UserDbError;
 
 #[repr(C)]
@@ -102,6 +104,26 @@ impl From<UserDbError> for FfiError {
             UserDbError::InvalidInput { .. } => Self::invalid_argument(error.to_string()),
             UserDbError::Sqlite(_) | UserDbError::Time(_) => {
                 Self::new(RadishLexStatusCode::UserDbError, error.to_string())
+            }
+        }
+    }
+}
+
+#[cfg(feature = "native-rime")]
+impl From<RimeEngineError> for FfiError {
+    fn from(error: RimeEngineError) -> Self {
+        match error {
+            RimeEngineError::MissingConfigPath { .. } | RimeEngineError::EncodingFailure { .. } => {
+                Self::invalid_argument(error.to_string())
+            }
+            RimeEngineError::Core(core_error) => Self::from(core_error),
+            RimeEngineError::NativeFeatureDisabled
+            | RimeEngineError::NullApi
+            | RimeEngineError::MissingApiFunction { .. }
+            | RimeEngineError::NativeProbeFailed { .. }
+            | RimeEngineError::FfiFailure { .. }
+            | RimeEngineError::EmptyCandidateText => {
+                Self::new(RadishLexStatusCode::EngineError, error.to_string())
             }
         }
     }

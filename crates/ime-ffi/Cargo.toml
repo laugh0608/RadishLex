@@ -12,6 +12,14 @@ name = "radishlex_ime_ffi"
 path = "src/lib.rs"
 crate-type = ["rlib", "staticlib", "cdylib"]
 
+[features]
+default = []
+native-rime = [
+    "dep:radishlex-ime-engine-rime",
+    "radishlex-ime-engine-rime/native-rime",
+]
+
 [dependencies]
 radishlex-ime-core = { path = "../ime-core" }
+radishlex-ime-engine-rime = { path = "../ime-engine-rime", optional = true, default-features = false }
 radishlex-ime-userdb = { path = "../ime-userdb" }

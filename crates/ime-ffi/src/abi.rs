@@ -4,6 +4,8 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
 use radishlex_ime_core::SchemaId;
+#[cfg(feature = "native-rime")]
+use radishlex_ime_engine_rime::RimeEngineConfig;
 
 use crate::buffer::RadishLexBuffer;
 use crate::dictionary::{
@@ -53,24 +55,8 @@ pub extern "C" fn radishlex_session_new_rime(
     error_out: *mut *mut RadishLexError,
 ) -> *mut RadishLexSession {
     ffi_ptr(error_out, || {
-        if options.is_null() {
-            return Err(FfiError::invalid_argument(
-                "rime session options pointer is null",
-            ));
-        }
-
-        let options = unsafe { *options };
-        validate_rime_session_options_version(options)?;
-        let _shared_data_dir = read_required_utf8(options.shared_data_dir, "shared_data_dir")?;
-        let _user_data_dir = read_required_utf8(options.user_data_dir, "user_data_dir")?;
-        let schema = read_required_utf8(options.schema, "schema")?;
-        let _schema = SchemaId::new(schema)?;
-        let _log_dir = read_optional_nonempty_utf8(options.log_dir, "log_dir")?;
-        let _deploy_on_start = read_ffi_bool(options.deploy_on_start, "deploy_on_start")?;
-
-        Err(FfiError::invalid_state(
-            "rime engine is not available through ime-ffi yet; keep using demo engine or CLI native-rime smoke",
-        ))
+        let options = parse_rime_session_options(options)?;
+        new_rime_session(options)
     })
 }
 
@@ -454,6 +440,80 @@ fn read_ffi_bool(value: u8, field: &'static str) -> Result<bool, FfiError> {
     }
 }
 
+struct ParsedRimeSessionOptions<'a> {
+    shared_data_dir: &'a str,
+    user_data_dir: &'a str,
+    schema: SchemaId,
+    log_dir: Option<&'a str>,
+    deploy_on_start: bool,
+}
+
+fn parse_rime_session_options<'a>(
+    options: *const RadishLexRimeSessionOptions,
+) -> Result<ParsedRimeSessionOptions<'a>, FfiError> {
+    if options.is_null() {
+        return Err(FfiError::invalid_argument(
+            "rime session options pointer is null",
+        ));
+    }
+
+    let options = unsafe { *options };
+    validate_rime_session_options_version(options)?;
+    let shared_data_dir = read_required_utf8(options.shared_data_dir, "shared_data_dir")?;
+    let user_data_dir = read_required_utf8(options.user_data_dir, "user_data_dir")?;
+    let schema = SchemaId::new(read_required_utf8(options.schema, "schema")?)?;
+    let log_dir = read_optional_nonempty_utf8(options.log_dir, "log_dir")?;
+    let deploy_on_start = read_ffi_bool(options.deploy_on_start, "deploy_on_start")?;
+
+    Ok(ParsedRimeSessionOptions {
+        shared_data_dir,
+        user_data_dir,
+        schema,
+        log_dir,
+        deploy_on_start,
+    })
+}
+
+#[cfg(feature = "native-rime")]
+fn new_rime_session(
+    options: ParsedRimeSessionOptions<'_>,
+) -> Result<*mut RadishLexSession, FfiError> {
+    let mut config = RimeEngineConfig::new(
+        options.shared_data_dir,
+        options.user_data_dir,
+        options.schema,
+    )?;
+    if let Some(log_dir) = options.log_dir {
+        config = config.with_log_dir(log_dir)?;
+    }
+    config = config.with_deploy_on_start(options.deploy_on_start);
+
+    Ok(Box::into_raw(Box::new(RadishLexSession::new_rime(config)?)))
+}
+
+#[cfg(not(feature = "native-rime"))]
+fn new_rime_session(
+    options: ParsedRimeSessionOptions<'_>,
+) -> Result<*mut RadishLexSession, FfiError> {
+    let ParsedRimeSessionOptions {
+        shared_data_dir,
+        user_data_dir,
+        schema,
+        log_dir,
+        deploy_on_start,
+    } = options;
+    let _ = (
+        shared_data_dir,
+        user_data_dir,
+        schema,
+        log_dir,
+        deploy_on_start,
+    );
+    Err(FfiError::invalid_state(
+        "rime engine is not available through ime-ffi; rebuild radishlex-ime-ffi with the native-rime feature",
+    ))
+}
+
 fn ffi_status<F>(error_out: *mut *mut RadishLexError, f: F) -> RadishLexStatusCode
 where
     F: FnOnce() -> Result<(), FfiError>,
@@ -518,6 +578,8 @@ fn write_error(error_out: *mut *mut RadishLexError, error: FfiError) {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "native-rime")]
+    use std::env;
     use std::ffi::{CStr, CString};
     use std::fs;
     use std::path::PathBuf;
@@ -631,7 +693,58 @@ mod tests {
     }
 
     #[test]
-    fn rime_session_options_validate_before_returning_unavailable() {
+    fn rime_session_options_reject_invalid_arguments_before_engine_selection() {
+        let shared_data_dir = CString::new("/tmp/radishlex-rime/shared").expect("shared path");
+        let user_data_dir = CString::new("/tmp/radishlex-rime/user").expect("user path");
+        let schema = CString::new("luna_pinyin").expect("schema");
+        let mut error = ptr::null_mut();
+
+        let options = RadishLexRimeSessionOptions {
+            version: RADISHLEX_RIME_SESSION_OPTIONS_VERSION,
+            shared_data_dir: shared_data_dir.as_ptr(),
+            user_data_dir: user_data_dir.as_ptr(),
+            schema: schema.as_ptr(),
+            log_dir: ptr::null(),
+            deploy_on_start: 0,
+        };
+
+        let bad_version = RadishLexRimeSessionOptions {
+            version: RADISHLEX_RIME_SESSION_OPTIONS_VERSION + 1,
+            ..options
+        };
+        let session = radishlex_session_new_rime(&bad_version, &mut error);
+        assert!(session.is_null());
+        assert_eq!(
+            radishlex_error_code(error),
+            RadishLexStatusCode::InvalidArgument
+        );
+        unsafe {
+            radishlex_error_free(error);
+        }
+
+        error = ptr::null_mut();
+        let bad_deploy_flag = RadishLexRimeSessionOptions {
+            deploy_on_start: 2,
+            ..options
+        };
+        let session = radishlex_session_new_rime(&bad_deploy_flag, &mut error);
+        assert!(session.is_null());
+        assert_eq!(
+            radishlex_error_code(error),
+            RadishLexStatusCode::InvalidArgument
+        );
+        let message = unsafe { CStr::from_ptr(radishlex_error_message(error)) }
+            .to_string_lossy()
+            .into_owned();
+        assert!(message.contains("deploy_on_start"));
+        unsafe {
+            radishlex_error_free(error);
+        }
+    }
+
+    #[cfg(not(feature = "native-rime"))]
+    #[test]
+    fn rime_session_options_return_unavailable_without_native_feature() {
         let shared_data_dir = CString::new("/tmp/radishlex-rime/shared").expect("shared path");
         let user_data_dir = CString::new("/tmp/radishlex-rime/user").expect("user path");
         let schema = CString::new("luna_pinyin").expect("schema");
@@ -655,44 +768,71 @@ mod tests {
         let message = unsafe { CStr::from_ptr(radishlex_error_message(error)) }
             .to_string_lossy()
             .into_owned();
-        assert!(message.contains("rime engine is not available"));
+        assert!(message.contains("native-rime feature"));
         unsafe {
             radishlex_error_free(error);
         }
+    }
 
-        error = ptr::null_mut();
-        let bad_version = RadishLexRimeSessionOptions {
-            version: RADISHLEX_RIME_SESSION_OPTIONS_VERSION + 1,
-            ..options
-        };
-        let session = radishlex_session_new_rime(&bad_version, &mut error);
-        assert!(session.is_null());
-        assert_eq!(
-            radishlex_error_code(error),
-            RadishLexStatusCode::InvalidArgument
-        );
-        unsafe {
-            radishlex_error_free(error);
-        }
+    #[cfg(feature = "native-rime")]
+    #[test]
+    #[ignore = "requires RADISHLEX_RIME_SHARED_DATA and RADISHLEX_RIME_USER_DATA"]
+    fn rime_session_native_smoke_uses_ffi_entrypoint() {
+        let shared_data = env::var("RADISHLEX_RIME_SHARED_DATA")
+            .expect("RADISHLEX_RIME_SHARED_DATA must point to isolated Rime shared data");
+        let user_data = env::var("RADISHLEX_RIME_USER_DATA")
+            .expect("RADISHLEX_RIME_USER_DATA must point to isolated Rime user data");
+        let schema = env::var("RADISHLEX_RIME_SCHEMA").unwrap_or_else(|_| "luna_pinyin".to_owned());
 
-        error = ptr::null_mut();
-        let bad_deploy_flag = RadishLexRimeSessionOptions {
-            deploy_on_start: 2,
+        let shared_data = CString::new(shared_data).expect("shared data path");
+        let user_data = CString::new(user_data).expect("user data path");
+        let schema = CString::new(schema).expect("schema");
+        let mut error = ptr::null_mut();
+
+        let options = RadishLexRimeSessionOptions {
+            version: RADISHLEX_RIME_SESSION_OPTIONS_VERSION,
+            shared_data_dir: shared_data.as_ptr(),
+            user_data_dir: user_data.as_ptr(),
+            schema: schema.as_ptr(),
             log_dir: ptr::null(),
-            ..options
+            deploy_on_start: 0,
         };
-        let session = radishlex_session_new_rime(&bad_deploy_flag, &mut error);
-        assert!(session.is_null());
-        assert_eq!(
-            radishlex_error_code(error),
-            RadishLexStatusCode::InvalidArgument
+        let session = radishlex_session_new_rime(&options, &mut error);
+        assert!(
+            !session.is_null(),
+            "Rime session should be created: {}",
+            unsafe { error_message(error) }
         );
-        let message = unsafe { CStr::from_ptr(radishlex_error_message(error)) }
-            .to_string_lossy()
-            .into_owned();
-        assert!(message.contains("deploy_on_start"));
+        assert_eq!(
+            radishlex_session_engine_kind(session),
+            RADISHLEX_ENGINE_KIND_RIME
+        );
+
+        for ch in "luobo".chars() {
+            assert_eq!(
+                radishlex_session_push_key(session, ch as u32, &mut error),
+                RadishLexStatusCode::Ok
+            );
+        }
+
+        let snapshot = radishlex_session_snapshot_new(session, &mut error);
+        assert!(
+            !snapshot.is_null(),
+            "snapshot should be created: {}",
+            unsafe { error_message(error) }
+        );
+        assert!(radishlex_snapshot_candidate_count(snapshot) > 0);
+
+        let commit = radishlex_session_commit_candidate(session, 0, &mut error);
+        assert!(!commit.is_null(), "candidate should commit: {}", unsafe {
+            error_message(error)
+        });
+        assert!(!unsafe { buffer_to_string(commit) }.is_empty());
+
         unsafe {
-            radishlex_error_free(error);
+            radishlex_buffer_free(commit);
+            radishlex_snapshot_free(snapshot);
+            radishlex_session_free(session);
         }
     }
 
@@ -1037,6 +1177,16 @@ mod tests {
     unsafe fn view_to_string(view: RadishLexStringView) -> String {
         let bytes = slice::from_raw_parts(view.data, view.len);
         String::from_utf8(bytes.to_vec()).expect("view must be UTF-8")
+    }
+
+    #[cfg(feature = "native-rime")]
+    unsafe fn error_message(error: *const RadishLexError) -> String {
+        if error.is_null() {
+            return "<none>".to_owned();
+        }
+        CStr::from_ptr(radishlex_error_message(error))
+            .to_string_lossy()
+            .into_owned()
     }
 
     fn temp_db_path(name: &str) -> PathBuf {

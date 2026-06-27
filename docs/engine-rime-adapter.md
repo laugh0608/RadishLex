@@ -175,7 +175,9 @@ RadishLexRimeSessionOptions
 - `log_dir` 可选，传入时也必须是非空 UTF-8 路径。
 - `deploy_on_start` 使用 `u8` 的 `0 / 1` 表示，避免跨语言 bool ABI 差异。
 - 默认 workspace 构建下，该入口只做 ABI 参数校验并返回 `InvalidState`，不会静默退回 demo engine。
-- 真正接入 `RimeEngine` 前，`ime-ffi` 仍需要 native feature 门禁、session 内部 engine 封装策略、Rime 初始化所有权和 drop 顺序测试。
+- `ime-ffi` 启用 `native-rime` feature 时，该入口会将 options 转为 `RimeEngineConfig` 并创建真实 `RimeEngine` session。
+- `ime-ffi` 内部使用 demo / Rime 可扩展 session engine 封装，平台端仍只持有 opaque `RadishLexSession*`。
+- 当前已通过 ignored native smoke 覆盖 `radishlex_session_new_rime -> push_key -> snapshot -> commit_candidate`；该 smoke 需要显式传入隔离 Rime shared / user data 目录。
 
 ## 候选转换规则
 
@@ -240,6 +242,7 @@ cargo run -p radishlex-ime-cli -- demo luobo
 cargo test -p radishlex-ime-engine-rime --features native-rime
 cargo check -p radishlex-ime-cli --features native-rime
 cargo run -p radishlex-ime-cli --features native-rime -- rime --schema <schema> --shared-data <path> --user-data <path> <input-code>
+RADISHLEX_RIME_SHARED_DATA=<path> RADISHLEX_RIME_USER_DATA=<path> cargo test -p radishlex-ime-ffi --features native-rime rime_session_native_smoke_uses_ffi_entrypoint -- --ignored
 ```
 
 本机准备步骤见 `docs/runbooks/rime-native-smoke.md`。
@@ -274,6 +277,7 @@ cargo run -p radishlex-ime-cli --features native-rime -- rime --schema <schema> 
 - 候选提交当前通过当前页 `select_keys` 模拟选择；2026-06-25 本机 native smoke 已验证首候选、非首候选、翻页后当前页候选均可提交，越界候选索引返回明确错误。
 - 已给 `ime-cli rime` 补充 `--rank-db <path>` 和 `--context <kind>`，用于把当前 Rime candidates 接入 `ime-ranker` smoke；输出包含重排后候选、原始 engine index、score、explain 和提交映射。
 - 已完成本机 Rime rank smoke 记录，并补齐用户词库导入导出、导入批次治理、导入格式检查和同步前置计数。
-- 已在 `ime-ffi` 补 `RadishLexRimeSessionOptions` 与 `radishlex_session_new_rime` 默认 unavailable 门禁，先固定 shared data、user data、schema、log dir 和 deploy flag 的 ABI 形态；真实 Rime session 尚未接入 FFI。
+- 已在 `ime-ffi` 补 `RadishLexRimeSessionOptions` 与 `radishlex_session_new_rime`，默认构建下保持 unavailable 门禁，`native-rime` feature 下已接入真实 `RimeEngine` session。
+- 已完成 `ime-ffi` ignored native smoke，覆盖从 Rime FFI session 创建、字符按键输入、snapshot 候选读取到候选提交。
 
-阶段结论：`ime-cli rime` 已满足 Phase 1 的真实 adapter 可复验要求，并具备 Phase 2 的 ranker smoke 接入口。后续不推进平台壳，应继续收口 `ime-ffi` 真实 Rime 接入策略和受控 userdb 管理入口。
+阶段结论：`ime-cli rime` 已满足 Phase 1 的真实 adapter 可复验要求，并具备 Phase 2 的 ranker smoke 接入口；`ime-ffi` 也已具备显式 native feature 下的真实 Rime session 入口。后续不推进平台壳，应继续收口受控 userdb 管理入口和平台调用层生命周期边界。
