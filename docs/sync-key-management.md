@@ -10,6 +10,8 @@
 - `ime-crypto` 已支持本地 object envelope、AAD、nonce、ciphertext hash、HKDF-SHA256 object key 派生和 XChaCha20Poly1305 加密 / 解密测试。
 - `ime-sync` 已可从 `ime-crypto::EncryptedObjectEnvelope` 派生 `EncryptedSyncObjectDraft`。
 - userdb P2 payload 已通过本地 integration test 进入 `ime-crypto` envelope，再派生 sync draft。
+- `ime-crypto` 已补 device key descriptor、device wrapping key / record、recovery material 和撤销后新 `key_epoch` 加密边界测试。
+- `ime-sync` 已补 `SyncDomain`、`SyncDevice`、`DeviceJoinRequest`、`DeviceAuthorizationPackage`、`DeviceRevocationRecord` 和 `SyncObjectVersion` 草案模型。
 
 当前仍不做：
 
@@ -18,7 +20,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步代码实现应先落 Rust 侧可测试模型，再进入后端 API。密钥和设备生命周期没有稳定前，不应启动真实远端同步主线。
+下一步代码实现应继续补客户端冲突合并、生产级 envelope 组装边界、恢复码 KDF ADR 和签名 / 设备密钥存储设计，再进入后端 API。删除、防旧设备复活和恢复语义没有稳定前，不应启动真实远端同步主线。
 
 ## 设计目标
 
@@ -219,12 +221,14 @@ updated_at_ms
 
 ## Rust 实施顺序
 
-1. 在 `ime-crypto` 补 key epoch、device key descriptor、device wrapping record、recovery material 的纯模型和验证。
-2. 在 `ime-crypto` 测试撤销后新对象使用新 `key_epoch`，旧 epoch key 不能解密新对象。
-3. 在 `ime-sync` 补同步域、设备状态、加入请求、授权包和撤销记录的草案模型。
-4. 在 `ime-sync` 测试 active / pending / revoked 设备状态转移、版本关系和冲突检测边界。
-5. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
-6. 设备授权、恢复码、撤销和冲突模型稳定后，再设计 Go server API。
+1. 已在 `ime-crypto` 补 key epoch、device key descriptor、device wrapping key / record、recovery material 的纯模型和验证。
+2. 已在 `ime-crypto` 测试撤销后新对象使用新 `key_epoch`，旧 epoch key 不能解密新对象。
+3. 已在 `ime-sync` 补同步域、设备状态、加入请求、授权包、撤销记录和对象版本冲突草案模型。
+4. 已在 `ime-sync` 测试 active / pending / revoked 设备状态转移、授权设备和接收设备都必须 active、撤销必须推进 key epoch、版本关系和 stale base version 检测边界。
+5. 后续补客户端冲突合并测试，覆盖 `dictionary.deleted_terms` tombstone 压过旧 user terms、旧 ranker weights、离线写入和旧设备上传。
+6. 后续补恢复码 KDF ADR、签名 / 设备密钥存储设计和生产级 P2 payload envelope 组装边界。
+7. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
+8. 删除、防旧设备复活、恢复码和冲突合并模型稳定后，再设计 Go server API。
 
 ## 验证口径
 
@@ -243,6 +247,6 @@ updated_at_ms
 ## 停止线
 
 - 恢复码 KDF 算法、参数和格式未通过 ADR 固化前，不实现生产恢复码。
-- 设备撤销后的 key epoch 和包装记录语义未通过测试前，不连接 Go server。
+- 生产恢复码 KDF、签名 / 设备密钥存储和历史重加密策略未固化前，不实现生产恢复流程。
 - 冲突合并语义未覆盖删除 tombstone、防旧设备复活和离线写入前，不做远端上传下载。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。

@@ -4,16 +4,16 @@
 
 ## 当前定位
 
-Phase 2 的 userdb、ranker、Rime adapter、FFI 管理入口和学习状态摘要已具备进入 `ime-crypto` 设计的证据链；`ime-crypto` 本地加密 crate 已落地，userdb `dictionary.user_terms`、`ranker.weights` 和 `dictionary.deleted_terms` P2 payload 已通过本地 envelope 装配测试，但真实同步仍未开始。
+Phase 2 的 userdb、ranker、Rime adapter、FFI 管理入口和学习状态摘要已具备进入 `ime-crypto` 设计的证据链；`ime-crypto` 本地加密 crate 已落地，userdb `dictionary.user_terms`、`ranker.weights` 和 `dictionary.deleted_terms` P2 payload 已通过本地 envelope 装配测试，设备包装密钥、设备 key 描述和恢复材料模型已补入，但真实同步仍未开始。
 
 当前结论：
 
-- 已进入 `ime-crypto` 本地 crate 的设计与测试准备，当前覆盖 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、envelope、key role、AAD、nonce 和篡改失败测试；`ime-sync` 已可从 crypto envelope 派生上传草案元数据；`ime-userdb` 已提供 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 integration test 完成本地加密、解密和 sync draft 派生。
+- 已进入 `ime-crypto` 本地 crate 的设计与测试准备，当前覆盖 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、envelope、key role、AAD、nonce、device wrapping key / record、recovery material 和篡改失败测试；`ime-sync` 已可从 crypto envelope 派生上传草案元数据；`ime-userdb` 已提供 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 integration test 完成本地加密、解密和 sync draft 派生。
 - 不连接 Go server，不生成可上传明文 payload，不把加密入口暴露给 FFI 或平台壳。
 - 不把平台壳、Flutter manager 或 Go 后端提前压入当前主线。
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 
-当前真实加密实现只处理本地合成 payload 和 userdb integration test payload，不连接后端、不暴露 FFI。`docs/sync-key-management.md` 已固定设备授权、恢复码、撤销、key epoch 和冲突合并边界；后续进入生产组装入口或 Go server 前，应先实现 Rust 侧可测试模型。
+当前真实加密实现只处理本地合成 payload、device wrapping 模型和 userdb integration test payload，不连接后端、不暴露 FFI。`docs/sync-key-management.md` 已固定设备授权、恢复码、撤销、key epoch 和冲突合并边界；后续进入生产组装入口或 Go server 前，应先补恢复码 KDF ADR、签名 / 设备密钥存储设计和客户端合并测试。
 
 当前依赖选型：
 
@@ -167,7 +167,8 @@ Plaintext payload 后续必须有稳定 schema：
 6. 已接入 `ranker.weights` P2 plaintext payload schema，来源限制为 P1 本地事件压缩后的权重摘要，不导出 selection event、negative feedback、上下文统计或本地审计明细。
 7. 已把 userdb P2 plaintext payload 接入 `ime-crypto` 本地 envelope 加密组装测试，并从 envelope 派生 `ime-sync::EncryptedSyncObjectDraft`；当前覆盖 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms`，仍不连接后端，不暴露 FFI 明文 payload。
 8. 已补 `docs/sync-key-management.md`，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突边界。
-9. 下一步在 Rust 侧补 device key、device wrapping、recovery material、key epoch 和 device authorization 草案模型；通过测试后再进入 Go server API。
+9. 已在 Rust 侧补 device key descriptor、device wrapping key / record、recovery material、key epoch 和 device authorization 草案模型；测试覆盖设备包装 key 按设备和 epoch 派生、包装密文不进入 Debug 明文、授权设备和接收设备都必须 active、撤销后新对象使用新 `key_epoch` 且旧 epoch key 不能解密。
+10. 下一步补恢复码 KDF ADR、签名 / 设备密钥存储设计、删除 tombstone 客户端合并测试和生产级 P2 payload envelope 组装边界；通过测试后再进入 Go server API。
 
 ## 验证口径
 

@@ -57,7 +57,7 @@ settings.schema
 backup.snapshot
 ```
 
-本阶段只验证类型和边界，当前已定义 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 plaintext payload 字段序列化，并已证明它们可以进入 `ime-crypto` envelope 后派生成 `EncryptedSyncObjectDraft`。`docs/sync-key-management.md` 已固定设备授权、key management 和冲突语义；真正写入服务端前，应先补 Rust 侧设备 / key epoch / recovery material 模型。服务端只能看到对象类型、设备 ID、key id、key epoch、algorithm、nonce、版本、密文大小、ciphertext hash 和时间戳。
+本阶段只验证类型和边界，当前已定义 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 plaintext payload 字段序列化，并已证明它们可以进入 `ime-crypto` envelope 后派生成 `EncryptedSyncObjectDraft`。`docs/sync-key-management.md` 已固定设备授权、key management 和冲突语义；Rust 侧已补同步域、设备状态、加入请求、授权包、撤销记录、key epoch 和对象版本冲突草案模型。服务端只能看到对象类型、设备 ID、key id、key epoch、algorithm、nonce、版本、密文大小、ciphertext hash 和时间戳。
 
 ## Plaintext Payload
 
@@ -180,6 +180,7 @@ updated_at_ms
 - `LocalDataClass`：P1 本地、P2 加密同步、本地审计分级。
 - `SyncPayloadPlan`：把本地来源分为可同步和本地保留。
 - `EncryptedSyncObjectDraft`：从 `ime-crypto::EncryptedObjectEnvelope` 派生加密对象外壳元数据，校验 `schema_version`、`key_id`、`key_epoch`、`algorithm`、`nonce`、`ciphertext_hash` 和版本关系。
+- `SyncDomain`、`SyncDevice`、`DeviceJoinRequest`、`DeviceAuthorizationPackage`、`DeviceRevocationRecord` 和 `SyncObjectVersion`：固定当前 Rust 侧设备生命周期、授权状态、撤销 epoch 推进和对象版本冲突判断。
 - `UserDb::p2_plaintext_payloads()`：导出 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 Rust 内部 plaintext payload bytes，测试固定字段顺序、JSON string escaping、空库行为和 P1 / 本地审计阻断。
 - userdb P2 payload 本地加密装配测试：用合成 key / device id 把 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` payload 加密为 `ime-crypto::EncryptedObjectEnvelope`，验证可解密回原 bytes、nonce 不重复，并派生 `ime-sync::EncryptedSyncObjectDraft` 元数据。
 
@@ -187,8 +188,8 @@ updated_at_ms
 
 - `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
 - 生产级 userdb P2 plaintext payload 与 `ime-crypto` envelope 组装入口；当前只有 integration test，不暴露 CLI / FFI / 后端入口。
-- 签名、设备授权、恢复码、设备撤销、密钥轮换和 key management；`ime-crypto` 当前已落地本地 AEAD / HKDF / ciphertext hash / envelope 测试。
-- Rust 侧 device authorization、device wrapping、recovery material、key epoch 和 conflict merge 草案模型；对应边界已在 `docs/sync-key-management.md` 固定。
+- 签名、生产恢复码 KDF、真实设备密钥存储和远端密钥轮换执行器；`ime-crypto` 当前已落地本地 AEAD / HKDF / ciphertext hash / envelope / device wrapping 模型测试。
+- 客户端冲突合并执行器；当前只固定对象版本冲突检测边界，尚未执行 `dictionary.deleted_terms` 压过旧 user terms / ranker weights 的合并流程。
 - HTTP API、Go server 存储和冲突合并执行器。
 
 ## 验证口径
@@ -211,3 +212,4 @@ cargo test -p radishlex-ime-cli
 - `EncryptedSyncObjectDraft::from_crypto_envelope` 必须先验证 `ime-crypto` envelope，损坏的 crypto envelope 不能进入同步草案。
 - userdb P2 plaintext payload 必须固定字段顺序、稳定 JSON escaping，不包含 P1 原始选择事件、负反馈 reason、上下文统计或本地 import batch 审计字段；`ranker.weights` 只能包含 P1 明细压缩后的 P2 权重摘要。
 - userdb P2 payload 本地加密装配测试必须验证 envelope 可解密回原 bytes，`EncryptedSyncObjectDraft` 只保留密文长度和 ciphertext hash 等元数据，不携带 plaintext bytes。
+- 设备生命周期模型必须验证 pending / active / revoked 状态转移，授权设备和接收设备都必须 active，撤销记录必须推进 `key_epoch`，对象版本必须能识别 stale base version。

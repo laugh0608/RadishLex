@@ -1,5 +1,9 @@
+mod device;
 mod model;
 
+pub use device::{
+    DeviceKeyDescriptor, DeviceWrappingKeyMaterial, DeviceWrappingRecord, RecoveryMaterial,
+};
 pub use model::{
     AlgorithmId, AssociatedData, CiphertextHash, CryptoError, CryptoObjectType,
     EncryptedObjectEnvelope, KeyDescriptor, KeyRole, Nonce, NonceTracker, ObjectKeyMaterial,

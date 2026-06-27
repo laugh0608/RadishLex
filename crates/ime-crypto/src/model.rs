@@ -8,6 +8,8 @@ use chacha20poly1305::{
 use hkdf::Hkdf;
 use sha2::{Digest, Sha256};
 
+use crate::device::DeviceWrappingKeyMaterial;
+
 pub const ENVELOPE_SCHEMA_VERSION: u16 = 1;
 pub const OBJECT_KEY_LEN: usize = 32;
 pub const XCHACHA20POLY1305_NONCE_LEN: usize = 24;
@@ -136,6 +138,34 @@ impl SyncMasterKeyMaterial {
             CryptoError::invalid_field("key_derivation", "failed to expand object key material")
         })?;
         ObjectKeyMaterial::new(output)
+    }
+
+    pub fn derive_device_wrapping_key(
+        &self,
+        wrapping_key: &KeyDescriptor,
+        device_id: &str,
+    ) -> Result<DeviceWrappingKeyMaterial, CryptoError> {
+        if wrapping_key.role != KeyRole::DeviceWrapping {
+            return Err(CryptoError::invalid_field(
+                "key_role",
+                "device wrapping key derivation requires a device wrapping descriptor",
+            ));
+        }
+        validate_required("device_id", device_id)?;
+
+        let hkdf = Hkdf::<Sha256>::new(Some(b"radishlex-sync-master-v1"), &self.0);
+        let mut output = [0u8; OBJECT_KEY_LEN];
+        hkdf.expand(
+            &device_wrapping_key_info(wrapping_key, device_id),
+            &mut output,
+        )
+        .map_err(|_| {
+            CryptoError::invalid_field(
+                "key_derivation",
+                "failed to expand device wrapping key material",
+            )
+        })?;
+        DeviceWrappingKeyMaterial::new(output)
     }
 
     pub fn as_bytes(&self) -> &[u8; OBJECT_KEY_LEN] {
@@ -655,7 +685,7 @@ pub enum CryptoError {
 }
 
 impl CryptoError {
-    fn invalid_field(field: &'static str, message: impl Into<String>) -> Self {
+    pub(crate) fn invalid_field(field: &'static str, message: impl Into<String>) -> Self {
         Self::InvalidField {
             field,
             message: message.into(),
@@ -682,14 +712,14 @@ impl fmt::Display for CryptoError {
 
 impl std::error::Error for CryptoError {}
 
-fn validate_required(field: &'static str, value: &str) -> Result<(), CryptoError> {
+pub(crate) fn validate_required(field: &'static str, value: &str) -> Result<(), CryptoError> {
     if value.trim().is_empty() {
         return Err(CryptoError::invalid_field(field, "value cannot be empty"));
     }
     Ok(())
 }
 
-fn validate_key_material(
+pub(crate) fn validate_key_material(
     field: &'static str,
     bytes: &[u8; OBJECT_KEY_LEN],
 ) -> Result<(), CryptoError> {
@@ -698,6 +728,16 @@ fn validate_key_material(
             field,
             "value cannot be all zeroes",
         ));
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_non_empty_bytes(
+    field: &'static str,
+    bytes: &[u8],
+) -> Result<(), CryptoError> {
+    if bytes.is_empty() {
+        return Err(CryptoError::invalid_field(field, "value cannot be empty"));
     }
     Ok(())
 }
@@ -788,6 +828,19 @@ fn object_key_info(
     );
     push_aad_field(&mut bytes, "object_type", object_type.as_str().as_bytes());
     push_aad_field(&mut bytes, "object_id", object_id.as_bytes());
+    bytes
+}
+
+fn device_wrapping_key_info(wrapping_key: &KeyDescriptor, device_id: &str) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    push_aad_field(&mut bytes, "purpose", b"radishlex-device-wrapping-key-v1");
+    push_aad_field(&mut bytes, "key_id", wrapping_key.key_id.as_bytes());
+    push_aad_field(
+        &mut bytes,
+        "key_epoch",
+        wrapping_key.key_epoch.to_string().as_bytes(),
+    );
+    push_aad_field(&mut bytes, "device_id", device_id.as_bytes());
     bytes
 }
 

@@ -1,4 +1,5 @@
 use super::*;
+use crate::device::{DeviceKeyDescriptor, DeviceWrappingRecord, RecoveryMaterial};
 
 #[test]
 fn key_roles_have_stable_identifiers() {
@@ -178,6 +179,146 @@ fn derives_object_key_material_from_sync_master_key() {
         .expect("second object key");
 
     assert_ne!(first, second);
+}
+
+#[test]
+fn derives_device_wrapping_keys_per_device_and_epoch() {
+    let master = sync_master_key();
+    let wrapping_epoch_three =
+        KeyDescriptor::new("wrapping-key-a", KeyRole::DeviceWrapping, 3).expect("wrapping key");
+    let wrapping_epoch_four =
+        KeyDescriptor::new("wrapping-key-a", KeyRole::DeviceWrapping, 4).expect("wrapping key");
+
+    let device_a = master
+        .derive_device_wrapping_key(&wrapping_epoch_three, "device-a")
+        .expect("device a wrapping key");
+    let device_b = master
+        .derive_device_wrapping_key(&wrapping_epoch_three, "device-b")
+        .expect("device b wrapping key");
+    let next_epoch = master
+        .derive_device_wrapping_key(&wrapping_epoch_four, "device-a")
+        .expect("next epoch wrapping key");
+
+    assert_ne!(device_a, device_b);
+    assert_ne!(device_a, next_epoch);
+
+    let object_key = object_key(3);
+    let error = master
+        .derive_device_wrapping_key(&object_key, "device-a")
+        .expect_err("object key must not derive device wrapping material");
+    assert!(error.to_string().contains("key_role"));
+}
+
+#[test]
+fn device_key_descriptor_requires_device_key_pair_role() {
+    let device_key =
+        KeyDescriptor::new("device-key-a", KeyRole::DeviceKeyPair, 1).expect("device key");
+    let descriptor =
+        DeviceKeyDescriptor::new("device-a", "public-key-a", &device_key).expect("descriptor");
+
+    assert_eq!(descriptor.device_id, "device-a");
+    assert_eq!(descriptor.public_key_id, "public-key-a");
+    assert_eq!(descriptor.key_id, "device-key-a");
+
+    let object_key = object_key(3);
+    let error = DeviceKeyDescriptor::new("device-a", "public-key-a", &object_key)
+        .expect_err("object key is not a device key pair");
+    assert!(error.to_string().contains("key_role"));
+}
+
+#[test]
+fn device_wrapping_record_redacts_wrapped_key_and_validates_role() {
+    let wrapping_key =
+        KeyDescriptor::new("wrapping-key-a", KeyRole::DeviceWrapping, 4).expect("wrapping key");
+    let record = DeviceWrappingRecord::new("device-b", &wrapping_key, b"wrapped-sync-key", 20)
+        .expect("wrapping record");
+
+    assert_eq!(record.recipient_device_id, "device-b");
+    assert_eq!(record.wrapping_key_id, "wrapping-key-a");
+    assert_eq!(record.key_epoch, 4);
+
+    let debug = format!("{record:?}");
+    assert!(debug.contains("[redacted]"));
+    assert!(!debug.contains("wrapped-sync-key"));
+
+    let object_key = object_key(3);
+    let error = DeviceWrappingRecord::new("device-b", &object_key, b"wrapped-sync-key", 20)
+        .expect_err("object key must not create wrapping records");
+    assert!(error.to_string().contains("key_role"));
+}
+
+#[test]
+fn recovery_material_redacts_recovery_key_and_requires_public_parameters() {
+    let material = RecoveryMaterial::new(
+        "recovery-a",
+        "argon2id-params-pending-adr",
+        b"public-salt",
+        b"encrypted-recovery-key",
+        30,
+    )
+    .expect("recovery material");
+
+    let debug = format!("{material:?}");
+    assert!(debug.contains("salt_len"));
+    assert!(debug.contains("[redacted]"));
+    assert!(!debug.contains("encrypted-recovery-key"));
+
+    let error = RecoveryMaterial::new(
+        "recovery-a",
+        "",
+        b"public-salt",
+        b"encrypted-recovery-key",
+        30,
+    )
+    .expect_err("empty KDF id fails");
+    assert!(error.to_string().contains("kdf_id"));
+}
+
+#[test]
+fn revoked_epoch_key_cannot_decrypt_next_epoch_object() {
+    let master = sync_master_key();
+    let old_object_key = object_key(3);
+    let new_object_key = object_key(4);
+    let old_material = master
+        .derive_object_key(
+            &old_object_key,
+            CryptoObjectType::DictionaryUserTerms,
+            "dictionary-user-terms-device-a",
+        )
+        .expect("old object key material");
+    let new_material = master
+        .derive_object_key(
+            &new_object_key,
+            CryptoObjectType::DictionaryUserTerms,
+            "dictionary-user-terms-device-a",
+        )
+        .expect("new object key material");
+    let payload = PlaintextPayload::new(
+        CryptoObjectType::DictionaryUserTerms,
+        b"post-revocation payload".to_vec(),
+    )
+    .expect("payload");
+    let envelope = EncryptedObjectEnvelope::encrypt_payload_with_nonce(
+        "dictionary-user-terms-device-a",
+        "device-a",
+        &new_object_key,
+        &new_material,
+        3,
+        Some(2),
+        payload.clone(),
+        40,
+        nonce(8),
+    )
+    .expect("encrypts with new epoch");
+
+    let error = envelope
+        .decrypt_payload(&old_material)
+        .expect_err("old epoch material cannot decrypt new objects");
+    assert_eq!(error, CryptoError::DecryptionFailed);
+    let decrypted = envelope
+        .decrypt_payload(&new_material)
+        .expect("new epoch material decrypts");
+    assert_eq!(decrypted, payload);
 }
 
 #[test]
