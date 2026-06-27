@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前只落地 `crates/ime-sync/` 的同步对象边界模型，不连接后端，不生成明文上传文件，也不实现网络同步。它的作用是把 `sync preflight` 已验证的本地分类边界转成可测试的 Rust API，并让上传草案元数据从 `ime-crypto` envelope 派生，避免同步层和加密层字段语义漂移：
+当前只落地 Rust 本地同步对象边界模型，不连接后端，不生成明文上传文件，也不实现网络同步。`ime-sync` 的作用是把 `sync preflight` 已验证的本地分类边界转成可测试的 Rust API，并让上传草案元数据从 `ime-crypto` envelope 派生，避免同步层和加密层字段语义漂移；`ime-userdb` 当前提供 Rust 内部 P2 plaintext payload 只读迭代器，供后续本地加密组装使用：
 
 - P2 数据可以进入后续端到端加密对象。
 - P1 明细事件默认只能留在本地。
@@ -57,7 +57,56 @@ settings.schema
 backup.snapshot
 ```
 
-本阶段只验证类型和边界，不定义完整字段序列化格式。真正写入服务端前必须先经过 `ime-crypto` 加密，服务端只能看到对象类型、设备 ID、key id、key epoch、algorithm、nonce、版本、密文大小、ciphertext hash 和时间戳。
+本阶段只验证类型和边界，当前只定义 `dictionary.user_terms` 与 `dictionary.deleted_terms` 的 plaintext payload 字段序列化。真正写入服务端前必须先经过 `ime-crypto` 加密，服务端只能看到对象类型、设备 ID、key id、key epoch、algorithm、nonce、版本、密文大小、ciphertext hash 和时间戳。
+
+## Plaintext Payload
+
+`ime-userdb` 当前提供 `UserDb::p2_plaintext_payloads()`，返回 Rust 内部只读迭代器。该入口不是 CLI / FFI / 文件导出入口，不返回 P1 原始事件、本地审计批次、SQLite handle 或可上传明文文件。
+
+通用字段顺序：
+
+```text
+payload_schema_version
+object_type
+```
+
+`dictionary.user_terms` payload：
+
+```text
+terms[]
+  input_code
+  text
+  reading
+  source
+  weight
+  status
+  created_at_ms
+  updated_at_ms
+  last_used_at_ms
+```
+
+规则：
+
+- 只包含 `active` / `suppressed` 用户词条。
+- 不包含 SQLite rowid、selection event id、session id、context kind、negative feedback reason 或 import batch source。
+- `reading` 使用稳定字符串表达，未知时为空字符串。
+
+`dictionary.deleted_terms` payload：
+
+```text
+tombstones[]
+  input_code
+  text
+  reading
+  deleted_at_ms
+  reason
+```
+
+规则：
+
+- 只表达当前 deleted term identity 和最新 tombstone 意图。
+- plaintext term identity 只允许作为加密前的本地 payload 字段，后续必须进入 `ime-crypto` envelope；不得作为服务端可见 object id、hash 或日志字段。
+- 不导出 P1 原始选择事件或负反馈明细。
 
 ## 加密对象外壳
 
@@ -110,11 +159,12 @@ updated_at_ms
 - `LocalDataClass`：P1 本地、P2 加密同步、本地审计分级。
 - `SyncPayloadPlan`：把本地来源分为可同步和本地保留。
 - `EncryptedSyncObjectDraft`：从 `ime-crypto::EncryptedObjectEnvelope` 派生加密对象外壳元数据，校验 `schema_version`、`key_id`、`key_epoch`、`algorithm`、`nonce`、`ciphertext_hash` 和版本关系。
+- `UserDb::p2_plaintext_payloads()`：导出 `dictionary.user_terms` 与 `dictionary.deleted_terms` 的 Rust 内部 plaintext payload bytes，测试固定字段顺序、JSON string escaping、空库行为和 P1 / 本地审计阻断。
 
 未落地：
 
-- 明文 payload 字段序列化。
-- userdb P2 plaintext payload 导出迭代器。
+- `ranker.weights`、`settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
+- userdb P2 plaintext payload 与 `ime-crypto` envelope 的真实组装入口。
 - 签名、设备授权、恢复码、设备撤销、密钥轮换和 key management；`ime-crypto` 当前已落地本地 AEAD / HKDF / ciphertext hash / envelope 测试。
 - HTTP API、Go server 存储和冲突合并执行器。
 
@@ -136,3 +186,4 @@ cargo test -p radishlex-ime-cli
 - 本地审计来源没有同步对象类型。
 - 加密对象外壳拒绝空 ID、空设备 ID、空 key id、未知 algorithm、非法 nonce 长度、空 `ciphertext_hash`、0 版本、0 payload 大小和非法版本关系。
 - `EncryptedSyncObjectDraft::from_crypto_envelope` 必须先验证 `ime-crypto` envelope，损坏的 crypto envelope 不能进入同步草案。
+- userdb P2 plaintext payload 必须固定字段顺序、稳定 JSON escaping，不包含 P1 原始选择事件、负反馈 reason、上下文统计或本地 import batch 审计字段。

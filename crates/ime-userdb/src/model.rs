@@ -2,6 +2,8 @@ use std::fmt;
 
 use crate::error::{UserDbError, UserDbResult};
 
+pub const USERDB_SYNC_PAYLOAD_SCHEMA_VERSION: u16 = 1;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PrivacyLevel {
     P0NeverLearn,
@@ -280,6 +282,80 @@ pub struct SyncPreflightSummary {
     pub local_selection_events: usize,
     pub local_negative_feedback: usize,
     pub local_import_batches: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UserDbSyncPayloadObjectType {
+    DictionaryUserTerms,
+    DictionaryDeletedTerms,
+}
+
+impl UserDbSyncPayloadObjectType {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::DictionaryUserTerms => "dictionary.user_terms",
+            Self::DictionaryDeletedTerms => "dictionary.deleted_terms",
+        }
+    }
+}
+
+impl fmt::Display for UserDbSyncPayloadObjectType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct UserDbSyncPlaintextPayload {
+    pub payload_schema_version: u16,
+    pub object_type: UserDbSyncPayloadObjectType,
+    pub record_count: usize,
+    pub bytes: Vec<u8>,
+}
+
+impl UserDbSyncPlaintextPayload {
+    pub fn new(
+        object_type: UserDbSyncPayloadObjectType,
+        record_count: usize,
+        bytes: Vec<u8>,
+    ) -> UserDbResult<Self> {
+        if record_count == 0 {
+            return Err(UserDbError::invalid_input(
+                "record_count",
+                "value must be greater than 0",
+            ));
+        }
+        if bytes.is_empty() {
+            return Err(UserDbError::invalid_input(
+                "plaintext_payload",
+                "value cannot be empty",
+            ));
+        }
+
+        Ok(Self {
+            payload_schema_version: USERDB_SYNC_PAYLOAD_SCHEMA_VERSION,
+            object_type,
+            record_count,
+            bytes,
+        })
+    }
+
+    pub fn as_str(&self) -> UserDbResult<&str> {
+        std::str::from_utf8(&self.bytes).map_err(|_| {
+            UserDbError::invalid_input("plaintext_payload", "payload bytes are not valid UTF-8")
+        })
+    }
+}
+
+impl fmt::Debug for UserDbSyncPlaintextPayload {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("UserDbSyncPlaintextPayload")
+            .field("payload_schema_version", &self.payload_schema_version)
+            .field("object_type", &self.object_type)
+            .field("record_count", &self.record_count)
+            .field("bytes", &"[redacted]")
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

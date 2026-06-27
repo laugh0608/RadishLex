@@ -10,7 +10,9 @@ pub use error::{UserDbError, UserDbResult};
 pub use model::{
     DictionaryImportBatch, DictionaryImportSummary, DictionaryTermRecord, DictionaryTermsDocument,
     DictionaryTermsFormat, LearningStatusSummary, NegativeFeedbackDraft, NegativeFeedbackReason,
-    PrivacyLevel, SelectionEventDraft, SyncPreflightSummary, TermSource, TermStatus, UserTerm,
+    PrivacyLevel, SelectionEventDraft, SyncPreflightSummary, TermSource, TermStatus,
+    UserDbSyncPayloadObjectType, UserDbSyncPlaintextPayload, UserTerm,
+    USERDB_SYNC_PAYLOAD_SCHEMA_VERSION,
 };
 pub use store::{
     decode_dictionary_terms_tsv, decode_dictionary_terms_tsv_document, encode_dictionary_terms_tsv,

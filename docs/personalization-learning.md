@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn status/select/suppress`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查、学习状态只读摘要和同步前置检查命令。`ime-sync` 已补 payload 来源分类和加密对象外壳草案，`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、learning status 只读摘要、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、平台绑定式 view copy / release host smoke、释放 panic 边界 host smoke 和 FFI 调用 runbook；`ime-engine-rime` 已补必需 Rime API 缺失映射测试。下一阶段目标是评估 Phase 2 退出标准和进入 `ime-crypto` / 同步加密设计前的可复验证据。
+当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn status/select/suppress`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查、学习状态只读摘要和同步前置检查命令。`ime-sync` 已补 payload 来源分类和加密对象外壳草案，`ime-crypto` 已补本地 AEAD envelope，`ime-userdb` 已补 `dictionary.user_terms` 与 `dictionary.deleted_terms` 的 P2 plaintext payload 只读迭代器；该迭代器不暴露给 FFI，不导出 P1 原始事件、负反馈明细、上下文统计或本地审计批次。`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、learning status 只读摘要、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、平台绑定式 view copy / release host smoke、释放 panic 边界 host smoke 和 FFI 调用 runbook；`ime-engine-rime` 已补必需 Rime API 缺失映射测试。下一阶段目标是把 userdb P2 payload 与 `ime-crypto` 本地 envelope 组装成可复验链路。
 
 Phase 2 不改变底层 engine adapter 边界：
 
@@ -21,6 +21,7 @@ Phase 2 仍不推进平台壳、同步后端、Flutter manager 或自研拼音 e
 - 建立本地 SQLite userdb。
 - 记录候选选择事件和必要的学习摘要。
 - 支持用户词条 CRUD、导入、导出和删除语义。
+- 支持 userdb P2 plaintext payload 只读迭代器，供本地加密组装测试使用。
 - 支持负反馈，包括提交后撤销、改选候选和手动降权。
 - 实现候选重排，且重排结果可解释。
 - 明确 P0/P1/P2 数据边界，避免敏感输入进入日志、fixture 或同步对象。
@@ -32,6 +33,7 @@ Phase 2 仍不推进平台壳、同步后端、Flutter manager 或自研拼音 e
 - 不把 Rime 内部对象 ID、内部评分或私有状态写入 userdb。
 - 不在 Phase 2 实现远端同步、设备授权或密钥轮换。
 - 不把原始选择事件默认纳入同步。
+- 不把 P2 plaintext payload 暴露给 FFI、CLI 文件导出或平台壳。
 - 不在 ranker 中读取平台私有生命周期、窗口句柄或 App 原始标题。
 - 不用真实联系人、真实输入历史、真实 App 内容作为测试数据。
 

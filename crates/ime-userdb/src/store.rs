@@ -8,8 +8,11 @@ use crate::error::{UserDbError, UserDbResult};
 use crate::model::{
     DictionaryImportBatch, DictionaryImportSummary, DictionaryTermRecord, DictionaryTermsDocument,
     DictionaryTermsFormat, LearningStatusSummary, NegativeFeedbackDraft, PrivacyLevel,
-    SelectionEventDraft, SyncPreflightSummary, TermSource, TermStatus, UserTerm,
+    SelectionEventDraft, SyncPreflightSummary, TermSource, TermStatus, UserDbSyncPlaintextPayload,
+    UserTerm,
 };
+
+mod sync_payload;
 
 const SCHEMA_VERSION: i64 = 2;
 const DICTIONARY_EXPORT_HEADER: &str = "input_code\ttext\treading\tsource\tweight\tstatus";
@@ -389,6 +392,12 @@ impl UserDb {
             local_negative_feedback: count_rows_usize(&self.connection, "negative_feedback")?,
             local_import_batches: count_rows_usize(&self.connection, "import_batches")?,
         })
+    }
+
+    pub fn p2_plaintext_payloads(
+        &self,
+    ) -> UserDbResult<impl Iterator<Item = UserDbSyncPlaintextPayload>> {
+        Ok(sync_payload::collect_p2_plaintext_payloads(self)?.into_iter())
     }
 
     pub fn learning_status_summary(&self) -> UserDbResult<LearningStatusSummary> {

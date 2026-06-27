@@ -139,7 +139,7 @@ librime adapter：
 - 学习记录。
 - 导入导出。
 
-当前已创建 `crates/ime-userdb/`，落地 SQLite schema migration、用户词条 CRUD、选择事件记录、负反馈记录、删除 tombstone 和 ranker weight 摘要起步测试；基础 CLI 管理入口已由 `ime-cli` 承接，导入导出后续补齐。
+当前已创建 `crates/ime-userdb/`，落地 SQLite schema migration、用户词条 CRUD、选择事件记录、负反馈记录、删除 tombstone、ranker weight 摘要、用户词库导入导出、同步前置计数，以及 `dictionary.user_terms` / `dictionary.deleted_terms` P2 plaintext payload 只读迭代器；基础 CLI 管理入口已由 `ime-cli` 承接。
 
 ### ime-sync
 
