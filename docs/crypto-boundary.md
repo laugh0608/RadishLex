@@ -74,13 +74,21 @@ P1 原始事件后续只能先在本机压缩为 P2 权重摘要，再由 P2 对
 
 ## 密钥模型
 
-后续实现至少需要区分：
+当前设计至少区分：
 
 - `ProfileRootKey`：本设备本地保护的根材料，用于解锁同步密钥或恢复流程。
 - `SyncMasterKey`：用户同步域的主密钥材料，用于派生对象加密密钥和设备包装密钥。
 - `DeviceKeyPair`：设备加入同步域时使用的非对称密钥对。
 - `DeviceWrappingKey`：旧设备或恢复流程为新设备包装同步密钥时使用。
 - `ObjectKey`：按对象类型、对象 ID、版本和用途派生的对象加密密钥。
+
+当前 Rust 模型边界：
+
+- `SyncMasterKeyMaterial::derive_device_wrapping_key` 已按 recipient device id、wrapping key id 和 key epoch 派生设备包装 key；同一同步域内不同设备或不同 epoch 得到不同 key。
+- `DeviceKeyDescriptor` 只记录设备 ID、公钥 ID、device key id 和 key epoch，并要求来源 key role 为 `DeviceKeyPair`；它不保存私钥，也不选择具体非对称算法。
+- `DeviceWrappingRecord` 只记录 recipient device id、wrapping key id、key epoch、包装密文和创建时间，并要求来源 key role 为 `DeviceWrapping`；Debug 输出会隐藏 `encrypted_key`。
+- `RecoveryMaterial` 只记录 recovery id、KDF id、salt、恢复密文和创建时间；Debug 输出只显示 `salt_len`，不打印 `encrypted_recovery_key`。
+- 当前模型用于固定字段、校验和日志边界；生产级设备私钥存储、非对称包装算法、签名格式和恢复码 KDF 参数仍需 ADR 固化后再实现。
 
 规则：
 
@@ -113,6 +121,8 @@ EncryptedObjectEnvelope
 ```
 
 `ciphertext_hash` 必须是密文或密文加 AAD 的 hash，不得是 plaintext payload hash。服务端可以用它做对象完整性和去重辅助，但不能通过 hash 猜测用户词。
+
+当前 integration test 中的 object id、owner device id、key id、版本号和 nonce 都是合成 fixture，用于验证 envelope、AAD、解密和 sync draft 派生。它们不代表生产对象 ID 命名、nonce 分配或设备身份策略。
 
 AAD 至少绑定：
 

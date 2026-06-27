@@ -104,6 +104,15 @@ SyncDevice
 
 服务端可以保存设备 ID、公钥、状态和时间戳，但不能保存可解密用户数据的明文密钥。
 
+当前 Rust 类型对应关系：
+
+- `SyncDomain::advance_key_epoch` 只允许向前推进 `current_key_epoch`，并要求 `active_key_id` 非空、更新时间不早于创建时间。
+- `SyncDevice::pending`、`activate` 和 `revoke` 固定 pending -> active -> revoked / lost 的状态转移；只有 `active` 设备可以接收后续 key epoch。
+- `DeviceJoinRequest` 固定 `device_id`、`public_key_id`、一次性 `challenge`、用户核对 `short_code`、创建时间和过期时间，且过期时间必须晚于创建时间。
+- `DeviceAuthorizationPackage` 要求授权设备和接收设备都为 `active`，并校验 `DeviceWrappingRecord.recipient_device_id` 与接收设备一致；该结构只保存 recipient / authorizer id、key epoch、wrapping key id、包装密文长度和创建时间，不复制包装密文本体。
+- `DeviceRevocationRecord` 要求 `new_key_epoch` 大于 `previous_key_epoch`，用于表达撤销后续对象必须进入新 epoch。
+- `SyncObjectVersion::needs_client_merge_against` 只判断 base version 是否落后于远端版本，用于触发客户端合并；它不是合并执行器。
+
 ## 新设备加入
 
 已有设备授权流程：
@@ -218,6 +227,8 @@ updated_at_ms
 - 可从公开 hash 反查用户词身份的 term identifier。
 
 `object_id` 不得包含明文用户词、input code、reading 或上下文。需要稳定身份时，应放在 encrypted payload 内，或使用同步域密钥派生的 keyed identifier。
+
+当前 Rust 草案和测试中的对象 ID、设备 ID、短码和密文长度均使用合成值。正式协议不得把这些 fixture 命名规则写入 Go server API 或平台壳绑定。
 
 ## Rust 实施顺序
 

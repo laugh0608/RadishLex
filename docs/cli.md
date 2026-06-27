@@ -428,6 +428,8 @@ cargo run -p radishlex-ime-cli -- \
 
 输出包含 `dictionary.user_terms`、`ranker.weights`、`dictionary.deleted_terms` 这类 P2 可同步计数，以及 `selection_events`、`negative_feedback` 这类 P1 本地计数。`plaintext_payload: false` 表示该命令没有输出明文同步对象。
 
+Rust 内部已经有 `UserDb::p2_plaintext_payloads()` 供 `ime-userdb` / `ime-crypto` / `ime-sync` integration test 复验本地加密装配；CLI 仍只提供 preflight 计数，不暴露该迭代器、payload bytes、envelope、hash、签名或上传草案。
+
 ## 输入限制
 
 当前 CLI 的 `<input-code>` 与 `--input <code>` 只接受：
@@ -456,7 +458,7 @@ cargo run -p radishlex-ime-cli -- \
 - `dict`、`learn` 和 `rank explain` 必须显式指定 `--db`，不应指向真实用户生产库；本阶段建议使用 `/tmp` 下临时 SQLite 文件。
 - `dict import/export` 的文件也建议放在 `/tmp` 下，测试内容使用合成词，不应导入真实个人词库或真实输入历史。
 - `learn status` 只输出聚合学习状态，不输出用户词明文、P1 事件明细、负反馈 reason 明细或上下文统计。
-- `sync preflight` 只输出分类计数，不输出用户词明文、事件明文或加密 payload。
+- `sync preflight` 只输出分类计数，不输出用户词明文、事件明文、plaintext payload、envelope、hash、签名或加密 payload。
 - `learn` 当前没有平台 secure text entry 信号输入，CLI smoke 只应使用合成词、虚构上下文和临时数据库。
 - 本机 smoke 应使用 `/tmp` 下的隔离目录和合成输入码，不提交 schema 数据、用户目录、日志或输出中的敏感内容。
 

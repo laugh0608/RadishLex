@@ -81,13 +81,15 @@ SyncObject
 
 ## 同步前置检查
 
-在 Go 后端、`ime-sync` 和 `ime-crypto` 落地前，`radishlex-ime-cli sync preflight --db <path>` 只用于检查本地 userdb 的分类边界：
+在 Go 后端真实同步、客户端冲突合并和生产级 envelope 组装落地前，`radishlex-ime-cli sync preflight --db <path>` 只用于检查本地 userdb 的分类边界：
 
 - P2 后续可加密同步：`dictionary.user_terms`、`ranker.weights`、`dictionary.deleted_terms`。
 - P1 默认本地保留：`selection_events`、`negative_feedback`。
 - 本地审计记录：`import_batches`。
 
 该命令不得生成明文同步 payload，不连接后端，不输出用户词明文、原始事件明文或负反馈明细。它的作用是提前复验“哪些表可以进入后续加密对象，哪些表必须留在本地”。
+
+`ime-userdb` 当前已有 Rust 内部 `UserDb::p2_plaintext_payloads()` 只读迭代器，供本地 integration test 把 `dictionary.user_terms`、`ranker.weights` 和 `dictionary.deleted_terms` 装入 `ime-crypto` envelope，再派生 `ime-sync::EncryptedSyncObjectDraft`。该迭代器不是 CLI / FFI / 文件导出接口，不得作为明文同步文件或平台壳调用入口。
 
 `crates/ime-sync/` 当前定义 payload 来源分类、同步对象类型、加密对象外壳草案、同步域、设备状态、加入请求、授权包、撤销记录和对象版本冲突草案模型。上传下载、Go server 存储和客户端冲突合并执行器仍属于后续阶段。
 

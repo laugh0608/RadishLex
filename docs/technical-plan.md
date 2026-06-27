@@ -40,7 +40,7 @@ Rust Core
   ime-ranker    rerank and explain
   ime-userdb    local dictionary, learning events, tombstones
   ime-sync      sync payload boundary and planned sync client
-  ime-crypto    planned client-side encryption
+  ime-crypto    client-side encryption boundary
   ime-ffi       C ABI boundary and planned platform bridge
         |
         v
@@ -144,7 +144,7 @@ RadishLex 按 `docs/privacy-sync.md` 的数据分级推进：
 
 ## 同步方向
 
-同步不是当前开发主线，但架构需要提前保持边界：
+真实远端同步不是当前开发主线，但架构需要提前保持边界：
 
 - 输入热路径不得依赖后端。
 - 服务端只看到设备 ID、加密对象 ID、密文 blob 大小、对象版本、更新时间和必要同步元数据。

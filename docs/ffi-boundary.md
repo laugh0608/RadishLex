@@ -266,6 +266,8 @@ local_import_batches: usize
 
 `plaintext_payload` 当前固定为 `0`，表示没有生成明文同步 payload，也没有连接远端服务。`syncable_*` 是后续可进入加密对象的 P2 计数，`local_*` 是不得直接同步的 P1 或本地审计计数。
 
+Rust 内部的 `UserDb::p2_plaintext_payloads()`、`ime-crypto::EncryptedObjectEnvelope` 和 `ime-sync::EncryptedSyncObjectDraft` 当前只用于 crate 内测试与 integration test。FFI 不导出这些对象，也不导出 payload bytes、密文、hash、签名、key id 或上传草案。
+
 ### User term view
 
 `RadishLexUserTermView`：
@@ -398,7 +400,7 @@ Userdb 状态入口规则：
 - `radishlex_userdb_sync_preflight` 必须显式传入 UTF-8 SQLite 路径，函数只在调用期间打开数据库并运行 migration / preflight 计数。
 - 返回结构只包含 schema version、P2 可同步对象计数、P1 本地事件计数、本地审计计数和 `plaintext_payload = false`。
 - 函数不返回用户词明文、选择事件明细、负反馈明细、导入批次内容、同步 payload、SQLite connection、statement 或 row 指针。
-- 该入口不连接 Go server，不执行加密、hash、签名、上传下载或冲突合并。
+- 该入口不连接 Go server，不执行加密、hash、签名、上传下载或冲突合并，也不暴露 Rust 内部 P2 plaintext payload 迭代器或 envelope / draft 类型。
 
 Userdb 词条管理入口规则：
 

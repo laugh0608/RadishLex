@@ -63,6 +63,13 @@ backup.snapshot
 
 `ime-userdb` 当前提供 `UserDb::p2_plaintext_payloads()`，返回 Rust 内部只读迭代器。该入口不是 CLI / FFI / 文件导出入口，不返回 P1 原始事件、本地审计批次、SQLite handle 或可上传明文文件。
 
+迭代器规则：
+
+- 只返回非空对象；空库或没有 P2 数据时返回空迭代器。
+- 对象输出顺序固定为 `dictionary.user_terms`、`ranker.weights`、`dictionary.deleted_terms`。
+- 每个 payload 记录 `object_type`、`record_count` 和 UTF-8 JSON bytes；`record_count` 只用于本地测试和后续组装前校验，不作为服务端可见用户数据明细。
+- JSON 字符串使用仓库内稳定 escaping：引号、反斜杠和控制字符转义，普通 UTF-8 文本保持直写；字段顺序由序列化函数固定，不依赖 map 遍历顺序。
+
 通用字段顺序：
 
 ```text
@@ -88,6 +95,7 @@ terms[]
 规则：
 
 - 只包含 `active` / `suppressed` 用户词条。
+- 记录排序固定为 `input_code, text, reading`。
 - 不包含 SQLite rowid、selection event id、session id、context kind、negative feedback reason 或 import batch source。
 - `reading` 使用稳定字符串表达，未知时为空字符串。
 
@@ -108,6 +116,7 @@ weights[]
 规则：
 
 - 只来自 `ranker_weights` 摘要表，该表由 P1 本地选择事件和负反馈明细压缩更新。
+- 记录排序固定为 `input_code, text, reading, context_kind`。
 - `context_kind` 是稳定场景分类，用于摘要级合并和 explain，不包含窗口标题、正文、App 原始内容或上下文统计分布。
 - 不包含 SQLite rowid、selection event id、session id、candidate index、candidate count、negative feedback reason、selection event 原始行、negative feedback 原始行或 import batch source。
 - `frequency`、`recency_score` 和 `negative_score` 必须为非负摘要值；`reading` 使用稳定字符串表达，未知时为空字符串。
@@ -126,6 +135,7 @@ tombstones[]
 规则：
 
 - 只表达当前 deleted term identity 和最新 tombstone 意图。
+- 记录排序固定为 `input_code, text, reading`；若 `deleted_terms` 表没有可匹配 tombstone，`deleted_at_ms` 回退为 deleted user term 的 `updated_at_ms`，`reason` 回退为 `manual_delete`。
 - plaintext term identity 只允许作为加密前的本地 payload 字段，后续必须进入 `ime-crypto` envelope；不得作为服务端可见 object id、hash 或日志字段。
 - 不导出 P1 原始选择事件或负反馈明细。
 
@@ -160,6 +170,7 @@ updated_at_ms
 - `updated_at_ms` 不得早于 `created_at_ms`。
 - 该结构从 `ime-crypto::EncryptedObjectEnvelope` 派生，只保存密文长度，不保存 plaintext payload 或 encrypted payload bytes。
 - 该结构不包含明文用户词、明文选择事件或明文负反馈。
+- integration test 中使用的 `dictionary-user-terms-device-a`、`ranker-weights-device-a`、`dictionary-deleted-terms-device-a` 等对象 ID 只是合成 fixture；生产对象 ID 不得包含明文 term identity、input code、reading、context 或可公开反查的 hash。
 
 ## 冲突与删除方向
 
