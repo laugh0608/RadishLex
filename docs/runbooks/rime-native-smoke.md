@@ -204,11 +204,23 @@ cargo test -p radishlex-ime-ffi --features native-rime \
   rime_session_native_smoke_uses_ffi_entrypoint -- --ignored
 ```
 
+FFI native 异常 smoke 用于确认错误 schema 会通过 C ABI 映射为稳定 `EngineError`，并保留 `select_schema` 阶段信息：
+
+```bash
+RIME_INCLUDE_DIR="$RIME_INCLUDE_DIR" \
+RIME_LIB_DIR="$RIME_LIB_DIR" \
+RADISHLEX_RIME_SHARED_DATA="$SMOKE/shared" \
+RADISHLEX_RIME_USER_DATA="$SMOKE/user" \
+cargo test -p radishlex-ime-ffi --features native-rime \
+  rime_session_native_invalid_schema_reports_engine_error -- --ignored
+```
+
 重点检查：
 
 - 测试结果为 `ok`。
 - 命令只使用 `$SMOKE/shared` 和 `$SMOKE/user`，不读取真实 Rime 用户目录。
-- 该 smoke 不验证平台壳、系统输入法候选窗或 Flutter bridge。
+- 正常 smoke 不验证平台壳、系统输入法候选窗或 Flutter bridge。
+- 异常 smoke 预期错误码为 `EngineError`，错误消息包含 `select_schema` 和缺失 schema 名。
 
 ### 6. 记录结论
 
@@ -222,6 +234,7 @@ cargo test -p radishlex-ime-ffi --features native-rime \
 - 越界候选索引是否返回明确错误
 - rank smoke 是否输出 `rank_context`、`engine_index`、explain 和 `commit_engine_index`
 - FFI native smoke 是否通过 `rime_session_native_smoke_uses_ffi_entrypoint`
+- FFI native 异常 smoke 是否通过 `rime_session_native_invalid_schema_reports_engine_error`
 - 是否发现 candidate index 或 `select_keys` 行为异常
 
 候选文本取决于 Rime 数据版本和 `$SMOKE/user` 内的学习状态。同一个 `$SMOKE` 目录内重复提交候选后，后续候选顺序可能变化；如果需要稳定复现首轮结果，重新创建一个新的 `$SMOKE` 目录。
