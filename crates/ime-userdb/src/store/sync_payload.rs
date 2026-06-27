@@ -32,6 +32,18 @@ struct SyncDeletedTermPayloadRecord {
     reason: String,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct SyncRankerWeightPayloadRecord {
+    input_code: String,
+    text: String,
+    reading: String,
+    frequency: i64,
+    recency_score: f64,
+    negative_score: f64,
+    context_kind: String,
+    updated_at_ms: i64,
+}
+
 pub(super) fn collect_p2_plaintext_payloads(
     db: &UserDb,
 ) -> UserDbResult<Vec<UserDbSyncPlaintextPayload>> {
@@ -43,6 +55,15 @@ pub(super) fn collect_p2_plaintext_payloads(
             UserDbSyncPayloadObjectType::DictionaryUserTerms,
             user_terms.len(),
             encode_user_terms_sync_payload(&user_terms).into_bytes(),
+        )?);
+    }
+
+    let ranker_weights = sync_ranker_weight_payload_records(db)?;
+    if !ranker_weights.is_empty() {
+        payloads.push(UserDbSyncPlaintextPayload::new(
+            UserDbSyncPayloadObjectType::RankerWeights,
+            ranker_weights.len(),
+            encode_ranker_weights_sync_payload(&ranker_weights).into_bytes(),
         )?);
     }
 
@@ -68,6 +89,21 @@ fn sync_user_term_payload_records(db: &UserDb) -> UserDbResult<Vec<SyncUserTermP
     )?;
     let records = statement
         .query_map([], sync_user_term_payload_record_from_row)?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(records)
+}
+
+fn sync_ranker_weight_payload_records(
+    db: &UserDb,
+) -> UserDbResult<Vec<SyncRankerWeightPayloadRecord>> {
+    let mut statement = db.connection.prepare(
+        "SELECT input_code, text, reading, frequency, recency_score, negative_score,
+                context_kind, updated_at_ms
+         FROM ranker_weights
+         ORDER BY input_code, text, reading, context_kind",
+    )?;
+    let records = statement
+        .query_map([], sync_ranker_weight_payload_record_from_row)?
         .collect::<Result<Vec<_>, _>>()?;
     Ok(records)
 }
@@ -167,6 +203,57 @@ fn sync_user_term_payload_record_from_row(
     })
 }
 
+fn sync_ranker_weight_payload_record_from_row(
+    row: &Row<'_>,
+) -> rusqlite::Result<SyncRankerWeightPayloadRecord> {
+    let frequency: i64 = row.get(3)?;
+    if frequency < 0 {
+        return Err(rusqlite::Error::FromSqlConversionFailure(
+            3,
+            rusqlite::types::Type::Integer,
+            Box::new(UserDbError::invalid_input(
+                "frequency",
+                "value must be non-negative",
+            )),
+        ));
+    }
+
+    let recency_score: f64 = row.get(4)?;
+    if !recency_score.is_finite() || recency_score < 0.0 {
+        return Err(rusqlite::Error::FromSqlConversionFailure(
+            4,
+            rusqlite::types::Type::Real,
+            Box::new(UserDbError::invalid_input(
+                "recency_score",
+                "value must be finite and non-negative",
+            )),
+        ));
+    }
+
+    let negative_score: f64 = row.get(5)?;
+    if !negative_score.is_finite() || negative_score < 0.0 {
+        return Err(rusqlite::Error::FromSqlConversionFailure(
+            5,
+            rusqlite::types::Type::Real,
+            Box::new(UserDbError::invalid_input(
+                "negative_score",
+                "value must be finite and non-negative",
+            )),
+        ));
+    }
+
+    Ok(SyncRankerWeightPayloadRecord {
+        input_code: row.get(0)?,
+        text: row.get(1)?,
+        reading: row.get(2)?,
+        frequency,
+        recency_score,
+        negative_score,
+        context_kind: row.get(6)?,
+        updated_at_ms: row.get(7)?,
+    })
+}
+
 fn encode_user_terms_sync_payload(records: &[SyncUserTermPayloadRecord]) -> String {
     let mut output = String::new();
     output.push_str("{\"payload_schema_version\":");
@@ -197,6 +284,41 @@ fn encode_user_terms_sync_payload(records: &[SyncUserTermPayloadRecord]) -> Stri
         push_json_i64_field(&mut output, "updated_at_ms", record.updated_at_ms);
         output.push(',');
         push_json_optional_i64_field(&mut output, "last_used_at_ms", record.last_used_at_ms);
+        output.push('}');
+    }
+
+    output.push_str("]}");
+    output
+}
+
+fn encode_ranker_weights_sync_payload(records: &[SyncRankerWeightPayloadRecord]) -> String {
+    let mut output = String::new();
+    output.push_str("{\"payload_schema_version\":");
+    output.push_str(&USERDB_SYNC_PAYLOAD_SCHEMA_VERSION.to_string());
+    output.push_str(",\"object_type\":\"");
+    output.push_str(UserDbSyncPayloadObjectType::RankerWeights.as_str());
+    output.push_str("\",\"weights\":[");
+
+    for (index, record) in records.iter().enumerate() {
+        if index > 0 {
+            output.push(',');
+        }
+        output.push('{');
+        push_json_string_field(&mut output, "input_code", &record.input_code);
+        output.push(',');
+        push_json_string_field(&mut output, "text", &record.text);
+        output.push(',');
+        push_json_string_field(&mut output, "reading", &record.reading);
+        output.push(',');
+        push_json_i64_field(&mut output, "frequency", record.frequency);
+        output.push(',');
+        push_json_number_field(&mut output, "recency_score", record.recency_score);
+        output.push(',');
+        push_json_number_field(&mut output, "negative_score", record.negative_score);
+        output.push(',');
+        push_json_string_field(&mut output, "context_kind", &record.context_kind);
+        output.push(',');
+        push_json_i64_field(&mut output, "updated_at_ms", record.updated_at_ms);
         output.push('}');
     }
 

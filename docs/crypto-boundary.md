@@ -4,11 +4,11 @@
 
 ## 当前定位
 
-Phase 2 的 userdb、ranker、Rime adapter、FFI 管理入口和学习状态摘要已具备进入 `ime-crypto` 设计的证据链；`ime-crypto` 本地加密 crate 已落地，userdb P2 payload 已通过本地 envelope 装配测试，但真实同步仍未开始。
+Phase 2 的 userdb、ranker、Rime adapter、FFI 管理入口和学习状态摘要已具备进入 `ime-crypto` 设计的证据链；`ime-crypto` 本地加密 crate 已落地，userdb `dictionary.user_terms`、`ranker.weights` 和 `dictionary.deleted_terms` P2 payload 已通过本地 envelope 装配测试，但真实同步仍未开始。
 
 当前结论：
 
-- 已进入 `ime-crypto` 本地 crate 的设计与测试准备，当前覆盖 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、envelope、key role、AAD、nonce 和篡改失败测试；`ime-sync` 已可从 crypto envelope 派生上传草案元数据；`ime-userdb` 已提供 `dictionary.user_terms` 与 `dictionary.deleted_terms` 的 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 integration test 完成本地加密、解密和 sync draft 派生。
+- 已进入 `ime-crypto` 本地 crate 的设计与测试准备，当前覆盖 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、envelope、key role、AAD、nonce 和篡改失败测试；`ime-sync` 已可从 crypto envelope 派生上传草案元数据；`ime-userdb` 已提供 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 integration test 完成本地加密、解密和 sync draft 派生。
 - 不连接 Go server，不生成可上传明文 payload，不把加密入口暴露给 FFI 或平台壳。
 - 不把平台壳、Flutter manager 或 Go 后端提前压入当前主线。
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
@@ -137,6 +137,7 @@ Plaintext payload 后续必须有稳定 schema：
 
 - 包含 `payload_schema_version` 和 `object_type`。
 - 字段顺序、字符串编码、空 reading 表达和时间戳单位必须稳定。
+- `ranker.weights` 只能来自 P1 本地事件压缩后的 P2 权重摘要，不得包含原始选择事件、负反馈 reason、上下文统计或本地审计批次。
 - 不依赖 SQLite rowid 作为跨设备身份。
 - 不包含测试机路径、平台窗口信息、Rime session id 或调试日志。
 - 测试 fixture 只能使用合成词和虚构设备 ID。
@@ -163,9 +164,9 @@ Plaintext payload 后续必须有稳定 schema：
 3. 已补合成 plaintext payload 的加密 / 解密 / 篡改失败测试，不读取真实 userdb。
 4. 已将 `ime-sync::EncryptedSyncObjectDraft` 对齐 `ime-crypto` envelope，保持 `schema_version`、`key_id`、`key_epoch`、`algorithm`、`nonce`、`ciphertext_hash` 和版本语义不回退。
 5. 已接入 userdb 的 `dictionary.user_terms` 与 `dictionary.deleted_terms` P2 plaintext payload 只读迭代器，仍不连接后端，不暴露 FFI 明文 payload。
-6. 已把 userdb P2 plaintext payload 接入 `ime-crypto` 本地 envelope 加密组装测试，并从 envelope 派生 `ime-sync::EncryptedSyncObjectDraft`；仍不连接后端，不暴露 FFI 明文 payload。
-7. 下一步补 `ranker.weights` P2 plaintext payload schema。
-8. 设备授权、恢复码和设备撤销设计确认后，再进入 Go server API。
+6. 已接入 `ranker.weights` P2 plaintext payload schema，来源限制为 P1 本地事件压缩后的权重摘要，不导出 selection event、negative feedback、上下文统计或本地审计明细。
+7. 已把 userdb P2 plaintext payload 接入 `ime-crypto` 本地 envelope 加密组装测试，并从 envelope 派生 `ime-sync::EncryptedSyncObjectDraft`；当前覆盖 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms`，仍不连接后端，不暴露 FFI 明文 payload。
+8. 设备授权、恢复码、设备撤销和 key management 设计确认后，再进入 Go server API。
 
 ## 验证口径
 
@@ -188,4 +189,4 @@ cargo test -p radishlex-ime-userdb
 ./scripts/check-repo.sh
 ```
 
-在真实加密算法落地前，当前仓库只要求 `ime-crypto` 模型、`ime-sync` payload 草案和 userdb / FFI preflight 继续保持一致。
+在真实设备同步落地前，当前仓库只要求 `ime-crypto` 模型、`ime-sync` payload 草案和 userdb / FFI preflight 继续保持一致。

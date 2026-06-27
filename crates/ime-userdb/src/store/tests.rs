@@ -335,6 +335,45 @@ fn p2_plaintext_payloads_export_stable_user_and_deleted_term_schema() {
 }
 
 #[test]
+fn p2_plaintext_payloads_export_stable_ranker_weight_schema() {
+    let db = UserDb::open_in_memory().expect("userdb opens");
+    db.connection
+        .execute(
+            "INSERT INTO ranker_weights (
+                input_code, text, reading, frequency, recency_score, negative_score, context_kind, updated_at_ms
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params!["luo\\bo", "萝\"卜\\词", "luo\tbo\nline", 1, 20.0, 0.0, "general", 10],
+        )
+        .expect("insert escaped ranker weight");
+    db.connection
+        .execute(
+            "INSERT INTO ranker_weights (
+                input_code, text, reading, frequency, recency_score, negative_score, context_kind, updated_at_ms
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params!["cihe", "词核", "", 2, 1000.5, 1.25, "chat", 30],
+        )
+        .expect("insert ranker weight");
+
+    let payloads: Vec<_> = db
+        .p2_plaintext_payloads()
+        .expect("payload iterator")
+        .collect();
+
+    assert_eq!(payloads.len(), 1);
+    assert_eq!(
+        payloads[0].object_type,
+        UserDbSyncPayloadObjectType::RankerWeights
+    );
+    assert_eq!(payloads[0].record_count, 2);
+    assert_eq!(
+        payloads[0].as_str().expect("utf-8 payload"),
+        r#"{"payload_schema_version":1,"object_type":"ranker.weights","weights":[{"input_code":"cihe","text":"词核","reading":"","frequency":2,"recency_score":1000.5,"negative_score":1.25,"context_kind":"chat","updated_at_ms":30},{"input_code":"luo\\bo","text":"萝\"卜\\词","reading":"luo\tbo\nline","frequency":1,"recency_score":20,"negative_score":0,"context_kind":"general","updated_at_ms":10}]}"#
+    );
+}
+
+#[test]
 fn p2_plaintext_payloads_exclude_p1_and_local_audit_sources() {
     let mut db = UserDb::open_in_memory().expect("userdb opens");
     db.add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualAdd)
@@ -379,17 +418,22 @@ fn p2_plaintext_payloads_exclude_p1_and_local_audit_sources() {
     assert!(!payload_debug.contains("萝卜"));
     assert!(payload_text.contains("dictionary.user_terms"));
     assert!(payload_text.contains("dictionary.deleted_terms"));
+    assert!(payload_text.contains("ranker.weights"));
+    assert!(payload_text.contains(r#""weights":"#));
+    assert!(payload_text.contains(r#""context_kind":"chat""#));
+    assert!(payload_text.contains(r#""frequency":"#));
+    assert!(payload_text.contains(r#""negative_score":"#));
     assert!(payload_text.contains("词核"));
     assert!(payload_text.contains("导入"));
     assert!(payload_text.contains("萝卜"));
     assert!(!payload_text.contains("session-private"));
-    assert!(!payload_text.contains("chat"));
     assert!(!payload_text.contains("manual_suppress"));
     assert!(!payload_text.contains("source-secret"));
+    assert!(!payload_text.contains("candidate_index"));
+    assert!(!payload_text.contains("candidate_count"));
     assert!(!payload_text.contains("selection_events"));
     assert!(!payload_text.contains("negative_feedback"));
     assert!(!payload_text.contains("import_batches"));
-    assert!(!payload_text.contains("ranker.weights"));
 }
 
 #[test]

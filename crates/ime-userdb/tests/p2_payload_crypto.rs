@@ -3,7 +3,10 @@ use radishlex_ime_crypto::{
     ObjectKeyMaterial, PlaintextPayload, XCHACHA20POLY1305_NONCE_LEN,
 };
 use radishlex_ime_sync::EncryptedSyncObjectDraft;
-use radishlex_ime_userdb::{TermSource, UserDb, UserDbSyncPayloadObjectType};
+use radishlex_ime_userdb::{
+    NegativeFeedbackDraft, NegativeFeedbackReason, SelectionEventDraft, TermSource, UserDb,
+    UserDbSyncPayloadObjectType,
+};
 
 const OWNER_DEVICE_ID: &str = "device-a";
 const BASE_TIMESTAMP_MS: i64 = 1_790_000_000_000;
@@ -29,6 +32,22 @@ fn userdb_p2_payloads_encrypt_into_sync_drafts_without_plaintext_leak() {
     .expect("term before delete");
     db.delete_term("deleted", "deleted-gamma", Some("del eta"))
         .expect("deleted term");
+    db.record_selection(
+        SelectionEventDraft::new("session-sensitive", "rank", "ranker-delta", 0, 2)
+            .with_reading("ran ker")
+            .with_context_kind("chat"),
+    )
+    .expect("ranker selection summary");
+    db.record_negative_feedback(
+        NegativeFeedbackDraft::new(
+            "rank",
+            "ranker-delta",
+            NegativeFeedbackReason::ManualSuppress,
+        )
+        .with_reading("ran ker")
+        .with_context_kind("chat"),
+    )
+    .expect("ranker negative summary");
 
     let payloads: Vec<_> = db
         .p2_plaintext_payloads()
@@ -41,6 +60,7 @@ fn userdb_p2_payloads_encrypt_into_sync_drafts_without_plaintext_leak() {
             .collect::<Vec<_>>(),
         vec![
             UserDbSyncPayloadObjectType::DictionaryUserTerms,
+            UserDbSyncPayloadObjectType::RankerWeights,
             UserDbSyncPayloadObjectType::DictionaryDeletedTerms,
         ]
     );
@@ -81,6 +101,9 @@ fn userdb_p2_payloads_encrypt_into_sync_drafts_without_plaintext_leak() {
         assert!(!draft_debug.contains("deleted-gamma"));
         assert!(!draft_debug.contains("rad ish"));
         assert!(!draft_debug.contains("del eta"));
+        assert!(!draft_debug.contains("ranker-delta"));
+        assert!(!draft_debug.contains("session-sensitive"));
+        assert!(!draft_debug.contains("manual_suppress"));
     }
 }
 
@@ -112,6 +135,7 @@ fn encrypt_userdb_payload(
 fn crypto_object_type(object_type: UserDbSyncPayloadObjectType) -> CryptoObjectType {
     match object_type {
         UserDbSyncPayloadObjectType::DictionaryUserTerms => CryptoObjectType::DictionaryUserTerms,
+        UserDbSyncPayloadObjectType::RankerWeights => CryptoObjectType::RankerWeights,
         UserDbSyncPayloadObjectType::DictionaryDeletedTerms => {
             CryptoObjectType::DictionaryDeletedTerms
         }
@@ -121,6 +145,7 @@ fn crypto_object_type(object_type: UserDbSyncPayloadObjectType) -> CryptoObjectT
 fn object_id(object_type: UserDbSyncPayloadObjectType) -> &'static str {
     match object_type {
         UserDbSyncPayloadObjectType::DictionaryUserTerms => "dictionary-user-terms-device-a",
+        UserDbSyncPayloadObjectType::RankerWeights => "ranker-weights-device-a",
         UserDbSyncPayloadObjectType::DictionaryDeletedTerms => "dictionary-deleted-terms-device-a",
     }
 }
@@ -128,14 +153,16 @@ fn object_id(object_type: UserDbSyncPayloadObjectType) -> &'static str {
 fn version_for(object_type: UserDbSyncPayloadObjectType) -> u64 {
     match object_type {
         UserDbSyncPayloadObjectType::DictionaryUserTerms => 1,
-        UserDbSyncPayloadObjectType::DictionaryDeletedTerms => 2,
+        UserDbSyncPayloadObjectType::RankerWeights => 2,
+        UserDbSyncPayloadObjectType::DictionaryDeletedTerms => 3,
     }
 }
 
 fn nonce_for(object_type: UserDbSyncPayloadObjectType) -> Nonce {
     let seed = match object_type {
         UserDbSyncPayloadObjectType::DictionaryUserTerms => 11,
-        UserDbSyncPayloadObjectType::DictionaryDeletedTerms => 12,
+        UserDbSyncPayloadObjectType::RankerWeights => 12,
+        UserDbSyncPayloadObjectType::DictionaryDeletedTerms => 13,
     };
     Nonce::new(vec![seed; XCHACHA20POLY1305_NONCE_LEN]).expect("nonce")
 }

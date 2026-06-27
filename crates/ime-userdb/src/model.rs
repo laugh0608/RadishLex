@@ -288,6 +288,7 @@ pub struct SyncPreflightSummary {
 pub enum UserDbSyncPayloadObjectType {
     DictionaryUserTerms,
     DictionaryDeletedTerms,
+    RankerWeights,
 }
 
 impl UserDbSyncPayloadObjectType {
@@ -295,6 +296,7 @@ impl UserDbSyncPayloadObjectType {
         match self {
             Self::DictionaryUserTerms => "dictionary.user_terms",
             Self::DictionaryDeletedTerms => "dictionary.deleted_terms",
+            Self::RankerWeights => "ranker.weights",
         }
     }
 }

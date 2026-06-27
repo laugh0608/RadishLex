@@ -57,7 +57,7 @@ settings.schema
 backup.snapshot
 ```
 
-本阶段只验证类型和边界，当前只定义 `dictionary.user_terms` 与 `dictionary.deleted_terms` 的 plaintext payload 字段序列化，并已证明它们可以进入 `ime-crypto` envelope 后派生成 `EncryptedSyncObjectDraft`。真正写入服务端前必须补齐设备授权、key management 和冲突语义，服务端只能看到对象类型、设备 ID、key id、key epoch、algorithm、nonce、版本、密文大小、ciphertext hash 和时间戳。
+本阶段只验证类型和边界，当前已定义 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 plaintext payload 字段序列化，并已证明它们可以进入 `ime-crypto` envelope 后派生成 `EncryptedSyncObjectDraft`。真正写入服务端前必须补齐设备授权、key management 和冲突语义，服务端只能看到对象类型、设备 ID、key id、key epoch、algorithm、nonce、版本、密文大小、ciphertext hash 和时间戳。
 
 ## Plaintext Payload
 
@@ -90,6 +90,27 @@ terms[]
 - 只包含 `active` / `suppressed` 用户词条。
 - 不包含 SQLite rowid、selection event id、session id、context kind、negative feedback reason 或 import batch source。
 - `reading` 使用稳定字符串表达，未知时为空字符串。
+
+`ranker.weights` payload：
+
+```text
+weights[]
+  input_code
+  text
+  reading
+  frequency
+  recency_score
+  negative_score
+  context_kind
+  updated_at_ms
+```
+
+规则：
+
+- 只来自 `ranker_weights` 摘要表，该表由 P1 本地选择事件和负反馈明细压缩更新。
+- `context_kind` 是稳定场景分类，用于摘要级合并和 explain，不包含窗口标题、正文、App 原始内容或上下文统计分布。
+- 不包含 SQLite rowid、selection event id、session id、candidate index、candidate count、negative feedback reason、selection event 原始行、negative feedback 原始行或 import batch source。
+- `frequency`、`recency_score` 和 `negative_score` 必须为非负摘要值；`reading` 使用稳定字符串表达，未知时为空字符串。
 
 `dictionary.deleted_terms` payload：
 
@@ -159,12 +180,12 @@ updated_at_ms
 - `LocalDataClass`：P1 本地、P2 加密同步、本地审计分级。
 - `SyncPayloadPlan`：把本地来源分为可同步和本地保留。
 - `EncryptedSyncObjectDraft`：从 `ime-crypto::EncryptedObjectEnvelope` 派生加密对象外壳元数据，校验 `schema_version`、`key_id`、`key_epoch`、`algorithm`、`nonce`、`ciphertext_hash` 和版本关系。
-- `UserDb::p2_plaintext_payloads()`：导出 `dictionary.user_terms` 与 `dictionary.deleted_terms` 的 Rust 内部 plaintext payload bytes，测试固定字段顺序、JSON string escaping、空库行为和 P1 / 本地审计阻断。
-- userdb P2 payload 本地加密装配测试：用合成 key / device id 把 `dictionary.user_terms` 与 `dictionary.deleted_terms` payload 加密为 `ime-crypto::EncryptedObjectEnvelope`，验证可解密回原 bytes、nonce 不重复，并派生 `ime-sync::EncryptedSyncObjectDraft` 元数据。
+- `UserDb::p2_plaintext_payloads()`：导出 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 Rust 内部 plaintext payload bytes，测试固定字段顺序、JSON string escaping、空库行为和 P1 / 本地审计阻断。
+- userdb P2 payload 本地加密装配测试：用合成 key / device id 把 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` payload 加密为 `ime-crypto::EncryptedObjectEnvelope`，验证可解密回原 bytes、nonce 不重复，并派生 `ime-sync::EncryptedSyncObjectDraft` 元数据。
 
 未落地：
 
-- `ranker.weights`、`settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
+- `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
 - 生产级 userdb P2 plaintext payload 与 `ime-crypto` envelope 组装入口；当前只有 integration test，不暴露 CLI / FFI / 后端入口。
 - 签名、设备授权、恢复码、设备撤销、密钥轮换和 key management；`ime-crypto` 当前已落地本地 AEAD / HKDF / ciphertext hash / envelope 测试。
 - HTTP API、Go server 存储和冲突合并执行器。
@@ -187,5 +208,5 @@ cargo test -p radishlex-ime-cli
 - 本地审计来源没有同步对象类型。
 - 加密对象外壳拒绝空 ID、空设备 ID、空 key id、未知 algorithm、非法 nonce 长度、空 `ciphertext_hash`、0 版本、0 payload 大小和非法版本关系。
 - `EncryptedSyncObjectDraft::from_crypto_envelope` 必须先验证 `ime-crypto` envelope，损坏的 crypto envelope 不能进入同步草案。
-- userdb P2 plaintext payload 必须固定字段顺序、稳定 JSON escaping，不包含 P1 原始选择事件、负反馈 reason、上下文统计或本地 import batch 审计字段。
+- userdb P2 plaintext payload 必须固定字段顺序、稳定 JSON escaping，不包含 P1 原始选择事件、负反馈 reason、上下文统计或本地 import batch 审计字段；`ranker.weights` 只能包含 P1 明细压缩后的 P2 权重摘要。
 - userdb P2 payload 本地加密装配测试必须验证 envelope 可解密回原 bytes，`EncryptedSyncObjectDraft` 只保留密文长度和 ciphertext hash 等元数据，不携带 plaintext bytes。
