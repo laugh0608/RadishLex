@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前已落地 `crates/ime-ffi/` 起步验证：C ABI 已覆盖 opaque session handle、session options、Rime session options ABI、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、释放函数、schema 设置、按键输入、snapshot、候选提交、userdb sync preflight 状态摘要、受控 userdb 词条管理入口、dictionary inspect / export / import 和 import batches 只读查询的 host smoke。当前 session 内部已使用 demo / Rime 可扩展 engine 封装；默认构建仍只启用 deterministic demo engine，`native-rime` feature 下 `radishlex_session_new_rime` 可通过显式 Rime 配置创建真实 `RimeEngine` session，并已通过隔离 Rime 数据目录 smoke。该状态仍不代表平台壳或系统输入法已经接入。
+当前已落地 `crates/ime-ffi/` 起步验证：C ABI 已覆盖 opaque session handle、ABI contract、session owner-thread policy、session options、Rime session options ABI、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、释放函数、schema 设置、按键输入、snapshot、候选提交、userdb sync preflight 状态摘要、受控 userdb 词条管理入口、dictionary inspect / export / import 和 import batches 只读查询的 host smoke。当前 session 内部已使用 demo / Rime 可扩展 engine 封装；默认构建仍只启用 deterministic demo engine，`native-rime` feature 下 `radishlex_session_new_rime` 可通过显式 Rime 配置创建真实 `RimeEngine` session，并已通过隔离 Rime 数据目录 smoke。该状态仍不代表平台壳或系统输入法已经接入。
 
 平台壳后续只能通过 FFI 调用 Rust core，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。
 
@@ -43,6 +43,7 @@ RadishLexError*
 当前已落地函数：
 
 ```text
+radishlex_ffi_contract
 radishlex_session_new
 radishlex_session_new_with_options
 radishlex_session_new_rime
@@ -86,6 +87,10 @@ radishlex_error_free
 ## 当前 ABI 数据结构
 
 所有 `repr(C)` 结构只承载稳定 ABI 字段，不暴露 Rust 内部对象。数值常量是 ABI 的一部分，平台绑定层应使用常量名，不应直接依赖 Rust enum discriminant。
+
+### FFI contract
+
+`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
 
 ### Status 与文本 view
 
@@ -411,7 +416,8 @@ Userdb 词条管理入口规则：
 - 创建函数返回的 handle 必须由对应 `*_free` 释放。
 - Rust 分配的字符串、数组和 snapshot buffer 必须由 Rust 释放。
 - 平台端传入的字符串只在调用期间借用，Rust 不保存裸指针。
-- FFI 不跨线程共享裸指针；如需跨线程，必须在 Rust 侧显式建模。
+- `RadishLexSession*` 绑定创建线程；平台端如需跨线程调度输入，必须在平台侧投递回创建线程，或后续在 Rust 侧显式建模线程安全队列。
+- FFI 不跨线程共享 snapshot、buffer、term list、import batch list 或 error 裸指针。
 - session drop 必须释放 engine adapter、userdb handle 和临时 buffer。
 - panic 不能跨 FFI 边界，必须转换为错误码。
 
@@ -460,7 +466,7 @@ InternalError
 - userdb 删除 tombstone、导入导出和 ranker explain 已通过测试。
 - 同步 payload 草案已区分 P1 本地和 P2 加密同步。
 - FFI 文档明确所有权、生命周期、错误语义、字符串编码和释放责任。
-- `ime-ffi` 至少有 C ABI 单元测试或 host smoke，证明字符串、数组、snapshot、candidate view、normalized key event、session options、Rime session options、sync preflight 状态摘要、userdb 词条管理入口和错误释放路径可复验。当前已完成结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime 配置 ABI 默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、sync preflight 状态入口和 userdb add / delete / list；真实平台壳前仍需补更多受控 userdb 管理入口，并继续验证平台调用层的生命周期和线程边界。
+- `ime-ffi` 至少有 C ABI 单元测试或 host smoke，证明字符串、数组、snapshot、candidate view、normalized key event、session options、Rime session options、sync preflight 状态摘要、userdb 管理入口、ABI contract、session owner-thread policy 和错误释放路径可复验。当前已完成上述 host smoke；真实平台壳前仍需继续验证平台绑定层和 native 库异常路径。
 
 ## 验证口径
 

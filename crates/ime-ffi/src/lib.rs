@@ -2,6 +2,7 @@
 
 mod abi;
 mod buffer;
+mod contract;
 mod demo_engine;
 mod dictionary;
 mod engine;
@@ -12,6 +13,11 @@ mod snapshot;
 mod sync_status;
 
 pub use abi::*;
+pub use buffer::RadishLexBuffer;
+pub use contract::{
+    RadishLexFfiContract, RADISHLEX_ABI_CONTRACT_VERSION,
+    RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND, RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD,
+};
 pub use dictionary::{
     RadishLexDictionaryExportSummary, RadishLexDictionaryImportSummary,
     RadishLexDictionaryInspectSummary, RadishLexImportBatchList, RadishLexImportBatchView,
@@ -26,8 +32,9 @@ pub use engine::{
     RADISHLEX_ENGINE_KIND_RIME, RADISHLEX_RIME_SESSION_OPTIONS_VERSION,
     RADISHLEX_SESSION_OPTIONS_VERSION,
 };
-pub use error::RadishLexStatusCode;
+pub use error::{RadishLexError, RadishLexStatusCode};
 pub use key::*;
+pub use session::RadishLexSession;
 pub use snapshot::{
     RadishLexCandidateView, RadishLexSnapshot, RadishLexStringView,
     RADISHLEX_CANDIDATE_SOURCE_ENGINE, RADISHLEX_CANDIDATE_SOURCE_PERSONALIZED,

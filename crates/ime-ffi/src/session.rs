@@ -1,3 +1,5 @@
+use std::thread::{self, ThreadId};
+
 use radishlex_ime_core::{
     Candidate, Commit, Composition, CoreResult, Engine, InputSession, KeyEvent, KeyOutcome,
     SchemaId, SessionState,
@@ -9,11 +11,11 @@ use crate::demo_engine::FfiDemoEngine;
 use crate::engine::RADISHLEX_ENGINE_KIND_DEMO;
 #[cfg(feature = "native-rime")]
 use crate::engine::RADISHLEX_ENGINE_KIND_RIME;
-#[cfg(feature = "native-rime")]
 use crate::error::FfiError;
 
 pub struct RadishLexSession {
     inner: InputSession<SessionEngine>,
+    owner_thread: ThreadId,
 }
 
 impl RadishLexSession {
@@ -25,6 +27,7 @@ impl RadishLexSession {
         debug_assert_eq!(engine_kind, RADISHLEX_ENGINE_KIND_DEMO);
         Self {
             inner: InputSession::new(SessionEngine::Demo(FfiDemoEngine::new())),
+            owner_thread: thread::current().id(),
         }
     }
 
@@ -32,7 +35,18 @@ impl RadishLexSession {
     pub fn new_rime(config: RimeEngineConfig) -> Result<Self, FfiError> {
         Ok(Self {
             inner: InputSession::new(SessionEngine::Rime(RimeEngine::new(config)?)),
+            owner_thread: thread::current().id(),
         })
+    }
+
+    pub fn ensure_owner_thread(&self) -> Result<(), FfiError> {
+        if thread::current().id() == self.owner_thread {
+            Ok(())
+        } else {
+            Err(FfiError::invalid_state(
+                "session handle must be used on the thread that created it",
+            ))
+        }
     }
 
     pub(crate) fn inner_mut(&mut self) -> &mut InputSession<SessionEngine> {
