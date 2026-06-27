@@ -376,6 +376,8 @@ dependencies = [
 name = "radishlex-ime-userdb"
 version = "0.1.0"
 dependencies = [
+ "radishlex-ime-crypto",
+ "radishlex-ime-sync",
  "rusqlite",
 ]
 

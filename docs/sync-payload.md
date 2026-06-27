@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前只落地 Rust 本地同步对象边界模型，不连接后端，不生成明文上传文件，也不实现网络同步。`ime-sync` 的作用是把 `sync preflight` 已验证的本地分类边界转成可测试的 Rust API，并让上传草案元数据从 `ime-crypto` envelope 派生，避免同步层和加密层字段语义漂移；`ime-userdb` 当前提供 Rust 内部 P2 plaintext payload 只读迭代器，供后续本地加密组装使用：
+当前只落地 Rust 本地同步对象边界模型，不连接后端，不生成明文上传文件，也不实现网络同步。`ime-sync` 的作用是把 `sync preflight` 已验证的本地分类边界转成可测试的 Rust API，并让上传草案元数据从 `ime-crypto` envelope 派生，避免同步层和加密层字段语义漂移；`ime-userdb` 当前提供 Rust 内部 P2 plaintext payload 只读迭代器，并已在 integration test 中完成本地 envelope 加密、解密和 sync draft 派生验证：
 
 - P2 数据可以进入后续端到端加密对象。
 - P1 明细事件默认只能留在本地。
@@ -57,7 +57,7 @@ settings.schema
 backup.snapshot
 ```
 
-本阶段只验证类型和边界，当前只定义 `dictionary.user_terms` 与 `dictionary.deleted_terms` 的 plaintext payload 字段序列化。真正写入服务端前必须先经过 `ime-crypto` 加密，服务端只能看到对象类型、设备 ID、key id、key epoch、algorithm、nonce、版本、密文大小、ciphertext hash 和时间戳。
+本阶段只验证类型和边界，当前只定义 `dictionary.user_terms` 与 `dictionary.deleted_terms` 的 plaintext payload 字段序列化，并已证明它们可以进入 `ime-crypto` envelope 后派生成 `EncryptedSyncObjectDraft`。真正写入服务端前必须补齐设备授权、key management 和冲突语义，服务端只能看到对象类型、设备 ID、key id、key epoch、algorithm、nonce、版本、密文大小、ciphertext hash 和时间戳。
 
 ## Plaintext Payload
 
@@ -160,11 +160,12 @@ updated_at_ms
 - `SyncPayloadPlan`：把本地来源分为可同步和本地保留。
 - `EncryptedSyncObjectDraft`：从 `ime-crypto::EncryptedObjectEnvelope` 派生加密对象外壳元数据，校验 `schema_version`、`key_id`、`key_epoch`、`algorithm`、`nonce`、`ciphertext_hash` 和版本关系。
 - `UserDb::p2_plaintext_payloads()`：导出 `dictionary.user_terms` 与 `dictionary.deleted_terms` 的 Rust 内部 plaintext payload bytes，测试固定字段顺序、JSON string escaping、空库行为和 P1 / 本地审计阻断。
+- userdb P2 payload 本地加密装配测试：用合成 key / device id 把 `dictionary.user_terms` 与 `dictionary.deleted_terms` payload 加密为 `ime-crypto::EncryptedObjectEnvelope`，验证可解密回原 bytes、nonce 不重复，并派生 `ime-sync::EncryptedSyncObjectDraft` 元数据。
 
 未落地：
 
 - `ranker.weights`、`settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
-- userdb P2 plaintext payload 与 `ime-crypto` envelope 的真实组装入口。
+- 生产级 userdb P2 plaintext payload 与 `ime-crypto` envelope 组装入口；当前只有 integration test，不暴露 CLI / FFI / 后端入口。
 - 签名、设备授权、恢复码、设备撤销、密钥轮换和 key management；`ime-crypto` 当前已落地本地 AEAD / HKDF / ciphertext hash / envelope 测试。
 - HTTP API、Go server 存储和冲突合并执行器。
 
@@ -187,3 +188,4 @@ cargo test -p radishlex-ime-cli
 - 加密对象外壳拒绝空 ID、空设备 ID、空 key id、未知 algorithm、非法 nonce 长度、空 `ciphertext_hash`、0 版本、0 payload 大小和非法版本关系。
 - `EncryptedSyncObjectDraft::from_crypto_envelope` 必须先验证 `ime-crypto` envelope，损坏的 crypto envelope 不能进入同步草案。
 - userdb P2 plaintext payload 必须固定字段顺序、稳定 JSON escaping，不包含 P1 原始选择事件、负反馈 reason、上下文统计或本地 import batch 审计字段。
+- userdb P2 payload 本地加密装配测试必须验证 envelope 可解密回原 bytes，`EncryptedSyncObjectDraft` 只保留密文长度和 ciphertext hash 等元数据，不携带 plaintext bytes。

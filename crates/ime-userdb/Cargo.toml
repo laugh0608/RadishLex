@@ -13,3 +13,7 @@ path = "src/lib.rs"
 
 [dependencies]
 rusqlite = { version = "0.32.1", features = ["bundled"] }
+
+[dev-dependencies]
+radishlex-ime-crypto = { path = "../ime-crypto" }
+radishlex-ime-sync = { path = "../ime-sync" }

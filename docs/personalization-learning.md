@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn status/select/suppress`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查、学习状态只读摘要和同步前置检查命令。`ime-sync` 已补 payload 来源分类和加密对象外壳草案，`ime-crypto` 已补本地 AEAD envelope，`ime-userdb` 已补 `dictionary.user_terms` 与 `dictionary.deleted_terms` 的 P2 plaintext payload 只读迭代器；该迭代器不暴露给 FFI，不导出 P1 原始事件、负反馈明细、上下文统计或本地审计批次。`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、learning status 只读摘要、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、平台绑定式 view copy / release host smoke、释放 panic 边界 host smoke 和 FFI 调用 runbook；`ime-engine-rime` 已补必需 Rime API 缺失映射测试。下一阶段目标是把 userdb P2 payload 与 `ime-crypto` 本地 envelope 组装成可复验链路。
+当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn status/select/suppress`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查、学习状态只读摘要和同步前置检查命令。`ime-sync` 已补 payload 来源分类和加密对象外壳草案，`ime-crypto` 已补本地 AEAD envelope，`ime-userdb` 已补 `dictionary.user_terms` 与 `dictionary.deleted_terms` 的 P2 plaintext payload 只读迭代器，并已通过 integration test 接入本地加密 / 解密 / sync draft 派生链路；该迭代器不暴露给 FFI，不导出 P1 原始事件、负反馈明细、上下文统计或本地审计批次。`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、learning status 只读摘要、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、平台绑定式 view copy / release host smoke、释放 panic 边界 host smoke 和 FFI 调用 runbook；`ime-engine-rime` 已补必需 Rime API 缺失映射测试。下一阶段目标是补 `ranker.weights` P2 plaintext payload schema，并继续把 P1 原始事件和上下文统计挡在同步路径之外。
 
 Phase 2 不改变底层 engine adapter 边界：
 
@@ -21,7 +21,7 @@ Phase 2 仍不推进平台壳、同步后端、Flutter manager 或自研拼音 e
 - 建立本地 SQLite userdb。
 - 记录候选选择事件和必要的学习摘要。
 - 支持用户词条 CRUD、导入、导出和删除语义。
-- 支持 userdb P2 plaintext payload 只读迭代器，供本地加密组装测试使用。
+- 支持 userdb P2 plaintext payload 只读迭代器，并通过本地加密组装测试证明可进入 `ime-crypto` envelope 与 `ime-sync` draft。
 - 支持负反馈，包括提交后撤销、改选候选和手动降权。
 - 实现候选重排，且重排结果可解释。
 - 明确 P0/P1/P2 数据边界，避免敏感输入进入日志、fixture 或同步对象。
@@ -467,7 +467,10 @@ cargo test --workspace
 15. `ime-ffi` 已补 ABI contract、session owner-thread policy 和释放 panic 边界，平台端跨线程误用会返回 `InvalidState`。
 16. 已补 `docs/runbooks/ffi-platform-call-contract.md`，明确平台绑定层的 `error_out`、string view、handle 释放和 owner-thread 调度规则。
 17. 已补 userdb / CLI / FFI 学习状态只读摘要，面向后续管理 UI 查看本地学习状态；该入口只输出聚合计数、latest timestamp 和隐私边界布尔标记，不导出 P1 原始选择事件、负反馈明细、上下文统计或明文同步 payload。
-18. 已补 native Rime 必需 API 缺失映射测试和平台绑定式 FFI view copy / release host smoke；下一步评估 Phase 2 退出标准与进入 `ime-crypto` / 同步加密设计前的可复验证据。
+18. 已补 native Rime 必需 API 缺失映射测试和平台绑定式 FFI view copy / release host smoke。
+19. 已补 `ime-crypto` 本地 envelope、AAD、ciphertext hash、nonce 和篡改失败测试，并让 `ime-sync::EncryptedSyncObjectDraft` 从 crypto envelope 派生上传草案元数据。
+20. 已补 userdb `dictionary.user_terms` / `dictionary.deleted_terms` P2 plaintext payload 只读迭代器，并通过 integration test 接入本地加密 / 解密 / sync draft 派生链路。
+21. 下一步补 `ranker.weights` P2 plaintext payload schema；在设备授权、恢复码、撤销和冲突合并设计稳定前，不进入远端同步或管理 UI 同步主线。
 
 阶段停止线：
 
