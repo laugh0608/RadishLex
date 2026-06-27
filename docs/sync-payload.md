@@ -57,7 +57,7 @@ settings.schema
 backup.snapshot
 ```
 
-本阶段只验证类型和边界，当前已定义 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 plaintext payload 字段序列化，并已证明它们可以进入 `ime-crypto` envelope 后派生成 `EncryptedSyncObjectDraft`。真正写入服务端前必须补齐设备授权、key management 和冲突语义，服务端只能看到对象类型、设备 ID、key id、key epoch、algorithm、nonce、版本、密文大小、ciphertext hash 和时间戳。
+本阶段只验证类型和边界，当前已定义 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 plaintext payload 字段序列化，并已证明它们可以进入 `ime-crypto` envelope 后派生成 `EncryptedSyncObjectDraft`。`docs/sync-key-management.md` 已固定设备授权、key management 和冲突语义；真正写入服务端前，应先补 Rust 侧设备 / key epoch / recovery material 模型。服务端只能看到对象类型、设备 ID、key id、key epoch、algorithm、nonce、版本、密文大小、ciphertext hash 和时间戳。
 
 ## Plaintext Payload
 
@@ -188,6 +188,7 @@ updated_at_ms
 - `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
 - 生产级 userdb P2 plaintext payload 与 `ime-crypto` envelope 组装入口；当前只有 integration test，不暴露 CLI / FFI / 后端入口。
 - 签名、设备授权、恢复码、设备撤销、密钥轮换和 key management；`ime-crypto` 当前已落地本地 AEAD / HKDF / ciphertext hash / envelope 测试。
+- Rust 侧 device authorization、device wrapping、recovery material、key epoch 和 conflict merge 草案模型；对应边界已在 `docs/sync-key-management.md` 固定。
 - HTTP API、Go server 存储和冲突合并执行器。
 
 ## 验证口径

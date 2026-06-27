@@ -78,6 +78,7 @@
 - 实现端到端加密 blob 同步；`ime-crypto` 本地 envelope、key、nonce、AAD、ciphertext hash 和篡改失败测试必须先于 Go server 上传下载。
 - 实现设备注册。
 - 实现备份恢复。
+- Go server API 前先完成同步密钥、设备授权、恢复码、撤销和 key epoch 的 Rust 模型测试。
 
 交付：
 

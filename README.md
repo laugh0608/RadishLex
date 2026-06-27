@@ -40,6 +40,7 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - [隐私与同步设计](docs/privacy-sync.md)
 - [同步 Payload 草案](docs/sync-payload.md)
 - [ime-crypto 边界设计](docs/crypto-boundary.md)
+- [同步密钥与设备生命周期设计](docs/sync-key-management.md)
 - [FFI 边界](docs/ffi-boundary.md)
 
 ## 当前可运行入口

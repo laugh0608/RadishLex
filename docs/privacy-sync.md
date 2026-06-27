@@ -89,6 +89,8 @@ SyncObject
 
 `docs/crypto-boundary.md` 已补 `ime-crypto` 进入实现前的客户端加密边界。后续服务端可见 hash 必须是 ciphertext hash 或密文加 AAD 的 hash，不得是 plaintext payload hash。
 
+`docs/sync-key-management.md` 已补真实同步前的同步密钥与设备生命周期边界，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突方向。进入 Go server 前，应先在 Rust 侧补可测试模型。
+
 ## 设备授权
 
 推荐流程：
@@ -99,6 +101,8 @@ SyncObject
 4. 旧设备扫描新设备二维码或输入配对码。
 5. 旧设备为新设备加密同步密钥。
 6. 新设备开始拉取密文对象。
+
+详细设备授权、恢复码、撤销和 key epoch 规则见 `docs/sync-key-management.md`。该专题文档是后续 Rust 模型与 Go server API 设计的前置边界。
 
 ## 删除语义
 

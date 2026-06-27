@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn status/select/suppress`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查、学习状态只读摘要和同步前置检查命令。`ime-sync` 已补 payload 来源分类和加密对象外壳草案，`ime-crypto` 已补本地 AEAD envelope，`ime-userdb` 已补 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 P2 plaintext payload 只读迭代器，并已通过 integration test 接入本地加密 / 解密 / sync draft 派生链路；该迭代器不暴露给 FFI，不导出 P1 原始事件、负反馈明细、上下文统计或本地审计批次。`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、learning status 只读摘要、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、平台绑定式 view copy / release host smoke、释放 panic 边界 host smoke 和 FFI 调用 runbook；`ime-engine-rime` 已补必需 Rime API 缺失映射测试。下一阶段目标是补设备授权、恢复码、设备撤销和 key management 设计，并继续把 P1 原始事件和上下文统计挡在同步路径之外。
+当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn status/select/suppress`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查、学习状态只读摘要和同步前置检查命令。`ime-sync` 已补 payload 来源分类和加密对象外壳草案，`ime-crypto` 已补本地 AEAD envelope，`ime-userdb` 已补 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 P2 plaintext payload 只读迭代器，并已通过 integration test 接入本地加密 / 解密 / sync draft 派生链路；该迭代器不暴露给 FFI，不导出 P1 原始事件、负反馈明细、上下文统计或本地审计批次。`docs/sync-key-management.md` 已补真实同步前的设备授权、恢复码、设备撤销、key epoch 和冲突边界。`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、learning status 只读摘要、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、平台绑定式 view copy / release host smoke、释放 panic 边界 host smoke 和 FFI 调用 runbook；`ime-engine-rime` 已补必需 Rime API 缺失映射测试。下一阶段目标是在 `ime-crypto` 和 `ime-sync` 中补同步设备与 key epoch 的 Rust 侧模型和测试，并继续把 P1 原始事件和上下文统计挡在同步路径之外。
 
 Phase 2 不改变底层 engine adapter 边界：
 
@@ -472,7 +472,8 @@ cargo test --workspace
 19. 已补 `ime-crypto` 本地 envelope、AAD、ciphertext hash、nonce 和篡改失败测试，并让 `ime-sync::EncryptedSyncObjectDraft` 从 crypto envelope 派生上传草案元数据。
 20. 已补 userdb `dictionary.user_terms` / `dictionary.deleted_terms` P2 plaintext payload 只读迭代器，并通过 integration test 接入本地加密 / 解密 / sync draft 派生链路。
 21. 已补 `ranker.weights` P2 plaintext payload schema，字段来自 `ranker_weights` 摘要表，测试覆盖字段顺序、JSON escaping、空库行为、P1 明细阻断和本地加密 / sync draft 派生链路。
-22. 下一步补设备授权、恢复码、设备撤销、key management 和冲突合并设计；在这些设计稳定前，不进入远端同步或管理 UI 同步主线。
+22. 已补 `docs/sync-key-management.md`，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突边界。
+23. 下一步补 `ime-crypto` / `ime-sync` 的设备、key epoch、device wrapping、recovery material 和授权包 Rust 模型；在模型和验证稳定前，不进入远端同步或管理 UI 同步主线。
 
 阶段停止线：
 
