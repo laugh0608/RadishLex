@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型，以及已解密 P2 payload 写回本地 SQLite 的执行器。Go server 已起步，当前 `server/sync-server` 只包含配置默认值、API request / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、local object storage staged transaction 和测试；尚未实现 HTTP handler、真实 SQLite driver-backed repository、Docker Compose 或真实远端上传下载。
+当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型，以及已解密 P2 payload 写回本地 SQLite 的执行器。Go server 已起步，当前 `server/sync-server` 已包含配置默认值、API request / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线和测试；尚未实现 HTTP handler、Docker Compose 或真实远端上传下载。SQLite driver 当前使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
 
 本阶段只固定服务端 API 和 storage 边界：
 
@@ -13,7 +13,7 @@
 - 服务端不能解密、不能解析 plaintext payload、不能合并用户词、不能读取 P1 原始事件。
 - 客户端仍是真相源：解密、冲突合并、删除 tombstone 语义、显式恢复和 userdb 写回都在客户端完成。
 
-Go 代码必须继续受本文件约束 migration、handler 和测试命名；平台私钥存储 backend capability / unavailable backend 的 Rust 模型已经落地。进入真实远端上传下载前，还必须完成本文件要求的 SQLite-backed metadata repository、metadata transaction 与 local object storage transaction 接线、签名验证、版本冲突、错误语义和平台 backend 验证。
+Go 代码必须继续受本文件约束 migration、handler 和测试命名；平台私钥存储 backend capability / unavailable backend 的 Rust 模型已经落地。进入真实远端上传下载前，还必须完成本文件要求的签名验证、HTTP API handler、错误语义、审计日志和平台 backend 验证。
 
 ## 服务端职责
 
@@ -430,10 +430,11 @@ latest_ciphertext_hash
 ## 实施顺序建议
 
 1. 已补 Go module、配置默认值、API request / error DTO、SQLite migration 文本、storage interface、storage conformance tests、内存 metadata store 和 local object storage staged transaction，字段按本文档命名。
-2. 后续补 SQLite-backed metadata repository，并把 metadata transaction 与 local object storage transaction 接起来，覆盖 blob 写入、metadata 提交、失败清理和读取 hash 复验。
-3. 再实现 domain / device / join request / recovery record 的 metadata API，并覆盖签名和设备状态校验。
-4. 再实现 encrypted object 上传下载和版本冲突检测。
-5. 最后再接 Rust `ime-sync` 远端客户端；客户端必须以已加密 envelope 和 signed manifest 为输入，不得把 plaintext payload 交给 server。
+2. 已补 SQLite-backed metadata repository，并把 metadata transaction 与 local object storage transaction 接起来，覆盖 blob 写入、metadata 提交、失败清理、读取 hash 复验和 conformance tests。
+3. 后续补签名验证抽象与测试，覆盖 object manifest、device authorization、device revocation 和 recovery record 的验签失败路径。
+4. 再实现 domain / device / join request / recovery record 的 metadata API，并覆盖设备状态校验和错误响应。
+5. 再实现 encrypted object 上传下载和版本冲突检测。
+6. 最后再接 Rust `ime-sync` 远端客户端；客户端必须以已加密 envelope 和 signed manifest 为输入，不得把 plaintext payload 交给 server。
 
 任何阶段都不应把 Flutter manager、平台壳、真实系统输入法服务或输入热路径接入 Go server。
 
