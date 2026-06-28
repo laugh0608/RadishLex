@@ -682,10 +682,35 @@ pub enum CryptoError {
     CiphertextHashMismatch,
     KeyDerivationFailed,
     SignatureVerificationFailed,
+    StorageBackendUnavailable {
+        backend: String,
+    },
+    UnsupportedStorageBackend {
+        backend: String,
+    },
+    BackendCapabilityMismatch {
+        backend: String,
+        message: String,
+    },
     PrivateKeyUnavailable {
         key_id: String,
     },
+    PrivateKeyLocked {
+        key_id: String,
+    },
+    PrivateKeyAccessDenied {
+        key_id: String,
+    },
+    PrivateKeyUserPresenceRequired {
+        key_id: String,
+    },
+    PrivateKeyRevoked {
+        key_id: String,
+    },
     PrivateKeyExportBlocked {
+        key_id: String,
+    },
+    PrivateKeyCorrupted {
         key_id: String,
     },
     EncryptionFailed,
@@ -714,11 +739,35 @@ impl fmt::Display for CryptoError {
             Self::CiphertextHashMismatch => f.write_str("ciphertext hash mismatch"),
             Self::KeyDerivationFailed => f.write_str("key derivation failed"),
             Self::SignatureVerificationFailed => f.write_str("signature verification failed"),
+            Self::StorageBackendUnavailable { backend } => {
+                write!(f, "storage backend unavailable: {backend}")
+            }
+            Self::UnsupportedStorageBackend { backend } => {
+                write!(f, "unsupported storage backend: {backend}")
+            }
+            Self::BackendCapabilityMismatch { backend, message } => {
+                write!(f, "backend capability mismatch for {backend}: {message}")
+            }
             Self::PrivateKeyUnavailable { key_id } => {
                 write!(f, "private key unavailable: {key_id}")
             }
+            Self::PrivateKeyLocked { key_id } => {
+                write!(f, "private key locked: {key_id}")
+            }
+            Self::PrivateKeyAccessDenied { key_id } => {
+                write!(f, "private key access denied: {key_id}")
+            }
+            Self::PrivateKeyUserPresenceRequired { key_id } => {
+                write!(f, "private key requires user presence: {key_id}")
+            }
+            Self::PrivateKeyRevoked { key_id } => {
+                write!(f, "private key revoked: {key_id}")
+            }
             Self::PrivateKeyExportBlocked { key_id } => {
                 write!(f, "private key export blocked: {key_id}")
+            }
+            Self::PrivateKeyCorrupted { key_id } => {
+                write!(f, "private key corrupted: {key_id}")
             }
             Self::EncryptionFailed => f.write_str("encryption failed"),
             Self::DecryptionFailed => f.write_str("decryption failed"),

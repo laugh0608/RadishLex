@@ -268,9 +268,9 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 
 1. 已完成恢复码 KDF ADR 与 Rust model。
 2. 本文档固定生产恢复流程、记录状态、轮换、撤销、恢复加入和失败处理。
-3. 后续补平台私钥存储 backend ADR，明确生产设备签名 key 如何落到系统安全存储。
+3. 已补平台私钥存储 backend ADR 与 Rust capability / unavailable backend 模型，明确生产设备签名 key 不应穿过 FFI、CLI 或 Go server。
 4. 后续 Go server 只实现恢复记录 metadata / storage / status / rate limit，不接触恢复码明文。
-5. 后续管理 UI 再接入用户可见恢复流程。
+5. 后续真实平台 backend 通过验证后，管理 UI 再接入用户可见恢复流程。
 6. 最后再接 Rust 远端同步客户端和真实上传下载。
 
 ## 验证口径

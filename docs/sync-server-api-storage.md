@@ -13,7 +13,7 @@
 - 服务端不能解密、不能解析 plaintext payload、不能合并用户词、不能读取 P1 原始事件。
 - 客户端仍是真相源：解密、冲突合并、删除 tombstone 语义、显式恢复和 userdb 写回都在客户端完成。
 
-进入 Go 代码前，应先用本文件约束 migration、handler 和测试命名；进入真实远端上传下载前，还必须完成平台私钥存储 backend capability / unavailable backend 的 Rust 模型和平台验证。
+进入 Go 代码前，应先用本文件约束 migration、handler 和测试命名；平台私钥存储 backend capability / unavailable backend 的 Rust 模型已经落地。进入真实远端上传下载前，还必须完成本文件要求的 Go server metadata / storage / 签名 / 版本冲突 / 错误语义验证和平台 backend 验证。
 
 ## 服务端职责
 
@@ -439,7 +439,7 @@ latest_ciphertext_hash
 ## 停止线
 
 - Go server migration、API handler 和 storage tests 未覆盖上述隐私字段阻断前，不实现远端客户端上传下载。
-- 平台私钥存储 backend 未完成能力模型和平台验证前，不提供用户可用同步 UI。
+- 平台私钥存储 backend 能力模型已落地；真实平台 backend 验证未完成前，不提供用户可用同步 UI。
 - 服务端能保存、打印或索引明文用户词、input code、reading、P1 原始事件或候选偏好时，必须停止并回退该设计。
 - 服务端版本冲突检测未稳定前，不允许客户端把本地合并结果自动上传到真实远端。
 - 包分发、P3 资源下载和个人 P2 同步对象必须保持独立 API 与存储边界。

@@ -12,6 +12,11 @@ use crate::model::{
 pub const SIGNATURE_SCHEMA_VERSION: u16 = 1;
 pub const SIGNATURE_ALGORITHM_ED25519_V1: &str = "ed25519-v1";
 pub const DEVICE_KEY_STORE_TEST_MEMORY_V1: &str = "test-memory-v1";
+pub const DEVICE_KEY_STORE_UNAVAILABLE: &str = "unavailable";
+pub const DEVICE_KEY_STORE_APPLE_KEYCHAIN_V1: &str = "apple-keychain-v1";
+pub const DEVICE_KEY_STORE_ANDROID_KEYSTORE_V1: &str = "android-keystore-v1";
+pub const DEVICE_KEY_STORE_WINDOWS_CNG_V1: &str = "windows-cng-v1";
+pub const DEVICE_KEY_STORE_LINUX_SECRET_SERVICE_V1: &str = "linux-secret-service-v1";
 pub const ED25519_PUBLIC_KEY_LEN: usize = 32;
 pub const ED25519_SIGNATURE_LEN: usize = 64;
 
@@ -50,14 +55,36 @@ impl fmt::Display for SignatureAlgorithmId {
 pub enum DeviceSigningStorageBackend {
     TestMemoryV1,
     Unavailable,
+    AppleKeychainV1,
+    AndroidKeystoreV1,
+    WindowsCngV1,
+    LinuxSecretServiceV1,
 }
 
 impl DeviceSigningStorageBackend {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::TestMemoryV1 => DEVICE_KEY_STORE_TEST_MEMORY_V1,
-            Self::Unavailable => "unavailable",
+            Self::Unavailable => DEVICE_KEY_STORE_UNAVAILABLE,
+            Self::AppleKeychainV1 => DEVICE_KEY_STORE_APPLE_KEYCHAIN_V1,
+            Self::AndroidKeystoreV1 => DEVICE_KEY_STORE_ANDROID_KEYSTORE_V1,
+            Self::WindowsCngV1 => DEVICE_KEY_STORE_WINDOWS_CNG_V1,
+            Self::LinuxSecretServiceV1 => DEVICE_KEY_STORE_LINUX_SECRET_SERVICE_V1,
         }
+    }
+
+    pub fn is_test_only(self) -> bool {
+        self == Self::TestMemoryV1
+    }
+
+    pub fn is_platform_backend(self) -> bool {
+        matches!(
+            self,
+            Self::AppleKeychainV1
+                | Self::AndroidKeystoreV1
+                | Self::WindowsCngV1
+                | Self::LinuxSecretServiceV1
+        )
     }
 }
 
@@ -75,28 +102,70 @@ pub struct DeviceSigningKeyHandle {
     pub storage_backend: DeviceSigningStorageBackend,
     pub exportable: bool,
     pub hardware_backed: bool,
+    pub user_presence_required: bool,
+    pub backup_migratable: bool,
     pub created_at_ms: i64,
     pub last_used_at_ms: Option<i64>,
+    pub revoked_at_ms: Option<i64>,
 }
 
 impl DeviceSigningKeyHandle {
+    pub fn new(
+        device_id: impl Into<String>,
+        signing_key_id: impl Into<String>,
+        signature_algorithm: SignatureAlgorithmId,
+        storage_backend: DeviceSigningStorageBackend,
+        capabilities: DeviceSigningBackendCapabilities,
+        created_at_ms: i64,
+    ) -> Result<Self, CryptoError> {
+        if capabilities.storage_backend != storage_backend {
+            return Err(CryptoError::BackendCapabilityMismatch {
+                backend: storage_backend.as_str().to_owned(),
+                message: "capabilities must describe the handle storage backend".to_owned(),
+            });
+        }
+        let handle = Self {
+            device_id: device_id.into(),
+            signing_key_id: signing_key_id.into(),
+            signature_algorithm,
+            storage_backend,
+            exportable: capabilities.exportable,
+            hardware_backed: capabilities.hardware_backed,
+            user_presence_required: capabilities.user_presence_required,
+            backup_migratable: capabilities.backup_migratable,
+            created_at_ms,
+            last_used_at_ms: None,
+            revoked_at_ms: None,
+        };
+        handle.validate()?;
+        Ok(handle)
+    }
+
     pub fn test_memory(
         device_id: impl Into<String>,
         signing_key_id: impl Into<String>,
         created_at_ms: i64,
     ) -> Result<Self, CryptoError> {
-        let handle = Self {
-            device_id: device_id.into(),
-            signing_key_id: signing_key_id.into(),
-            signature_algorithm: SignatureAlgorithmId::ed25519_v1(),
-            storage_backend: DeviceSigningStorageBackend::TestMemoryV1,
-            exportable: true,
-            hardware_backed: false,
+        Self::new(
+            device_id,
+            signing_key_id,
+            SignatureAlgorithmId::ed25519_v1(),
+            DeviceSigningStorageBackend::TestMemoryV1,
+            DeviceSigningBackendCapabilities::test_memory(),
             created_at_ms,
-            last_used_at_ms: None,
-        };
-        handle.validate()?;
-        Ok(handle)
+        )
+    }
+
+    pub fn revoked(mut self, revoked_at_ms: i64) -> Result<Self, CryptoError> {
+        self.revoked_at_ms = Some(revoked_at_ms);
+        self.validate()?;
+        Ok(self)
+    }
+
+    pub fn is_revoked_at(&self, timestamp_ms: i64) -> bool {
+        self.revoked_at_ms
+            .map(|revoked_at_ms| timestamp_ms >= revoked_at_ms)
+            .unwrap_or(false)
     }
 
     pub fn validate(&self) -> Result<(), CryptoError> {
@@ -113,6 +182,167 @@ impl DeviceSigningKeyHandle {
                 "storage_backend",
                 "signing key handle cannot use unavailable backend",
             ));
+        }
+        if let Some(last_used_at_ms) = self.last_used_at_ms {
+            if last_used_at_ms < self.created_at_ms {
+                return Err(CryptoError::invalid_field(
+                    "last_used_at_ms",
+                    "value must be greater than or equal to created_at_ms",
+                ));
+            }
+        }
+        if let Some(revoked_at_ms) = self.revoked_at_ms {
+            if revoked_at_ms < self.created_at_ms {
+                return Err(CryptoError::invalid_field(
+                    "revoked_at_ms",
+                    "value must be greater than or equal to created_at_ms",
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DeviceSigningBackendCapabilities {
+    pub storage_backend: DeviceSigningStorageBackend,
+    pub exportable: bool,
+    pub hardware_backed: bool,
+    pub user_presence_required: bool,
+    pub backup_migratable: bool,
+}
+
+impl DeviceSigningBackendCapabilities {
+    pub fn test_memory() -> Self {
+        Self {
+            storage_backend: DeviceSigningStorageBackend::TestMemoryV1,
+            exportable: true,
+            hardware_backed: false,
+            user_presence_required: false,
+            backup_migratable: false,
+        }
+    }
+
+    pub fn unavailable() -> Self {
+        Self {
+            storage_backend: DeviceSigningStorageBackend::Unavailable,
+            exportable: false,
+            hardware_backed: false,
+            user_presence_required: false,
+            backup_migratable: false,
+        }
+    }
+
+    pub fn platform(
+        storage_backend: DeviceSigningStorageBackend,
+        hardware_backed: bool,
+        user_presence_required: bool,
+        backup_migratable: bool,
+    ) -> Result<Self, CryptoError> {
+        if !storage_backend.is_platform_backend() {
+            return Err(CryptoError::UnsupportedStorageBackend {
+                backend: storage_backend.as_str().to_owned(),
+            });
+        }
+        Ok(Self {
+            storage_backend,
+            exportable: false,
+            hardware_backed,
+            user_presence_required,
+            backup_migratable,
+        })
+    }
+
+    pub fn allows_production_signing(self) -> bool {
+        self.storage_backend.is_platform_backend() && !self.exportable
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DevicePrivateKeyStoreStatus {
+    pub storage_backend: DeviceSigningStorageBackend,
+    pub available: bool,
+    pub can_create_signing_keys: bool,
+    pub can_sign: bool,
+    pub capabilities: DeviceSigningBackendCapabilities,
+}
+
+impl DevicePrivateKeyStoreStatus {
+    pub fn test_memory() -> Self {
+        Self {
+            storage_backend: DeviceSigningStorageBackend::TestMemoryV1,
+            available: true,
+            can_create_signing_keys: true,
+            can_sign: true,
+            capabilities: DeviceSigningBackendCapabilities::test_memory(),
+        }
+    }
+
+    pub fn unavailable() -> Self {
+        Self {
+            storage_backend: DeviceSigningStorageBackend::Unavailable,
+            available: false,
+            can_create_signing_keys: false,
+            can_sign: false,
+            capabilities: DeviceSigningBackendCapabilities::unavailable(),
+        }
+    }
+
+    pub fn platform(
+        storage_backend: DeviceSigningStorageBackend,
+        hardware_backed: bool,
+        user_presence_required: bool,
+        backup_migratable: bool,
+    ) -> Result<Self, CryptoError> {
+        let capabilities = DeviceSigningBackendCapabilities::platform(
+            storage_backend,
+            hardware_backed,
+            user_presence_required,
+            backup_migratable,
+        )?;
+        Ok(Self {
+            storage_backend,
+            available: true,
+            can_create_signing_keys: true,
+            can_sign: true,
+            capabilities,
+        })
+    }
+
+    pub fn validate(&self) -> Result<(), CryptoError> {
+        if self.storage_backend != self.capabilities.storage_backend {
+            return Err(CryptoError::BackendCapabilityMismatch {
+                backend: self.storage_backend.as_str().to_owned(),
+                message: "status capabilities must describe the status backend".to_owned(),
+            });
+        }
+        if self.storage_backend == DeviceSigningStorageBackend::Unavailable && self.available {
+            return Err(CryptoError::BackendCapabilityMismatch {
+                backend: self.storage_backend.as_str().to_owned(),
+                message: "unavailable backend cannot be marked available".to_owned(),
+            });
+        }
+        if !self.available && (self.can_create_signing_keys || self.can_sign) {
+            return Err(CryptoError::BackendCapabilityMismatch {
+                backend: self.storage_backend.as_str().to_owned(),
+                message: "unavailable status cannot create keys or sign".to_owned(),
+            });
+        }
+        Ok(())
+    }
+
+    pub fn ensure_production_signing_allowed(&self) -> Result<(), CryptoError> {
+        self.validate()?;
+        if !self.available || !self.can_sign {
+            return Err(CryptoError::StorageBackendUnavailable {
+                backend: self.storage_backend.as_str().to_owned(),
+            });
+        }
+        if !self.capabilities.allows_production_signing() {
+            return Err(CryptoError::BackendCapabilityMismatch {
+                backend: self.storage_backend.as_str().to_owned(),
+                message: "backend is not eligible for production signing".to_owned(),
+            });
         }
         Ok(())
     }
@@ -352,6 +582,10 @@ impl TestMemoryDeviceKeyStore {
         Self::default()
     }
 
+    pub fn backend_status(&self) -> DevicePrivateKeyStoreStatus {
+        DevicePrivateKeyStoreStatus::test_memory()
+    }
+
     pub fn insert_signing_key(
         &mut self,
         device_id: impl Into<String>,
@@ -421,6 +655,11 @@ impl TestMemoryDeviceKeyStore {
         handle.validate()?;
         validate_non_empty_bytes("canonical_bytes", canonical_bytes)?;
         let key = self.lookup(&handle.device_id, &handle.signing_key_id)?;
+        if key.handle.revoked_at_ms.is_some() {
+            return Err(CryptoError::PrivateKeyRevoked {
+                key_id: handle.signing_key_id.clone(),
+            });
+        }
         let signature = key.signing_key.sign(canonical_bytes);
         DeviceSignature::new(
             handle.signing_key_id.clone(),
@@ -429,11 +668,34 @@ impl TestMemoryDeviceKeyStore {
         )
     }
 
+    pub fn delete_or_revoke(
+        &mut self,
+        handle: &DeviceSigningKeyHandle,
+        revoked_at_ms: i64,
+    ) -> Result<(), CryptoError> {
+        handle.validate()?;
+        let key = self.lookup_mut(&handle.device_id, &handle.signing_key_id)?;
+        key.handle = key.handle.clone().revoked(revoked_at_ms)?;
+        key.public_key.revoked_at_ms = Some(revoked_at_ms);
+        key.public_key.validate()?;
+        Ok(())
+    }
+
     pub fn export_private_key_for_tests(
         &self,
         handle: &DeviceSigningKeyHandle,
     ) -> Result<[u8; ED25519_PUBLIC_KEY_LEN], CryptoError> {
         handle.validate()?;
+        if self
+            .lookup(&handle.device_id, &handle.signing_key_id)?
+            .handle
+            .revoked_at_ms
+            .is_some()
+        {
+            return Err(CryptoError::PrivateKeyRevoked {
+                key_id: handle.signing_key_id.clone(),
+            });
+        }
         if !handle.exportable || handle.storage_backend != DeviceSigningStorageBackend::TestMemoryV1
         {
             return Err(CryptoError::PrivateKeyExportBlocked {
@@ -457,6 +719,18 @@ impl TestMemoryDeviceKeyStore {
                 key_id: signing_key_id.to_owned(),
             })
     }
+
+    fn lookup_mut(
+        &mut self,
+        device_id: &str,
+        signing_key_id: &str,
+    ) -> Result<&mut TestMemorySigningKey, CryptoError> {
+        self.keys
+            .get_mut(&(device_id.to_owned(), signing_key_id.to_owned()))
+            .ok_or_else(|| CryptoError::PrivateKeyUnavailable {
+                key_id: signing_key_id.to_owned(),
+            })
+    }
 }
 
 impl fmt::Debug for TestMemoryDeviceKeyStore {
@@ -471,6 +745,69 @@ struct TestMemorySigningKey {
     handle: DeviceSigningKeyHandle,
     signing_key: SigningKey,
     public_key: DeviceSigningPublicKey,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct UnavailableDeviceKeyStore;
+
+impl UnavailableDeviceKeyStore {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn backend_status(&self) -> DevicePrivateKeyStoreStatus {
+        DevicePrivateKeyStoreStatus::unavailable()
+    }
+
+    pub fn create_signing_key(
+        &self,
+        _device_id: &str,
+        _signing_key_id: &str,
+        _created_at_ms: i64,
+    ) -> Result<DeviceSigningPublicKey, CryptoError> {
+        Err(CryptoError::StorageBackendUnavailable {
+            backend: DEVICE_KEY_STORE_UNAVAILABLE.to_owned(),
+        })
+    }
+
+    pub fn handle(
+        &self,
+        _device_id: &str,
+        signing_key_id: &str,
+    ) -> Result<DeviceSigningKeyHandle, CryptoError> {
+        Err(CryptoError::PrivateKeyUnavailable {
+            key_id: signing_key_id.to_owned(),
+        })
+    }
+
+    pub fn public_key(
+        &self,
+        _handle: &DeviceSigningKeyHandle,
+    ) -> Result<DeviceSigningPublicKey, CryptoError> {
+        Err(CryptoError::StorageBackendUnavailable {
+            backend: DEVICE_KEY_STORE_UNAVAILABLE.to_owned(),
+        })
+    }
+
+    pub fn sign(
+        &self,
+        _handle: &DeviceSigningKeyHandle,
+        _canonical_bytes: &[u8],
+    ) -> Result<DeviceSignature, CryptoError> {
+        Err(CryptoError::StorageBackendUnavailable {
+            backend: DEVICE_KEY_STORE_UNAVAILABLE.to_owned(),
+        })
+    }
+
+    pub fn delete_or_revoke(
+        &self,
+        _handle: &DeviceSigningKeyHandle,
+        _revoked_at_ms: i64,
+    ) -> Result<(), CryptoError> {
+        Err(CryptoError::StorageBackendUnavailable {
+            backend: DEVICE_KEY_STORE_UNAVAILABLE.to_owned(),
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

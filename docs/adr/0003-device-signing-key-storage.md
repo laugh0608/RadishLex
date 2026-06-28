@@ -201,7 +201,7 @@ SignedRecoveryRecord
 
 ## 私钥存储边界
 
-后续应引入设备私钥存储抽象，而不是把私钥字节暴露给 FFI 或管理 UI：
+已引入设备私钥存储抽象的 Rust 模型，而不是把私钥字节暴露给 FFI 或管理 UI：
 
 ```text
 DevicePrivateKeyStore
@@ -210,6 +210,7 @@ DevicePrivateKeyStore
   sign(handle, canonical_bytes) -> DeviceSignature
   public_key(handle) -> DeviceSigningPublicKey
   delete_or_revoke(handle)
+  backend_status() -> DevicePrivateKeyStoreStatus
 ```
 
 `DeviceSigningKeyHandle` 至少应记录：
@@ -221,15 +222,18 @@ signature_algorithm
 storage_backend
 exportable
 hardware_backed
+user_presence_required
+backup_migratable
 created_at_ms
 last_used_at_ms
+revoked_at_ms
 ```
 
 规则：
 
 - 生产 backend 不允许导出私钥 bytes。
 - 测试 backend 可以使用合成可导出 key，但必须标记为 `test-memory-v1`，不得进入生产配置。
-- `storage_backend` 初期只允许 `test-memory-v1` 或 `unavailable`；Apple Keychain、Android Keystore、Windows CNG、Linux Secret Service 等平台 backend 边界由 ADR 0004 固定，具体实现仍需平台验证。
+- 当前可执行本地 store 只提供 `test-memory-v1` 和 `unavailable`；Apple Keychain、Android Keystore、Windows CNG、Linux Secret Service 等 platform backend id 已进入 Rust capability metadata，具体平台 SDK 实现仍需平台验证。
 - FFI 不导出私钥、签名 handle 内部指针、canonical bytes helper 或签名 API，直到平台线程、生命周期和错误语义稳定。
 - CLI 不新增生产签名命令；测试命令若后续加入，必须只使用合成 fixture。
 
@@ -255,11 +259,11 @@ last_used_at_ms
 
 当前 Rust 实施口径：
 
-- `ime-crypto` 已新增签名基础类型、签名 key handle/public key、签名对象 canonical bytes 和纯 Rust `test-memory-v1` signer。
+- `ime-crypto` 已新增签名基础类型、签名 key handle/public key、签名对象 canonical bytes、backend capability metadata、`unavailable` 明确失败 store 和纯 Rust `test-memory-v1` signer。
 - `ime-crypto` 已覆盖 `SignedSyncObjectManifest` 与 `SignedRecoveryRecordManifest`；`ime-sync` 已覆盖 `SignedDeviceAuthorization` 与 `SignedDeviceRevocation`，并接入设备状态校验。
 - 暂不接系统 Keychain / Keystore，不引入平台 SDK，不暴露 FFI。
 - 当前签名依赖为 `ed25519-dalek = 2.2.0`，许可 `BSD-3-Clause`；当前 test-memory signer 使用合成 seed，不依赖系统 RNG 创建生产 key。
-- Go server API 与平台存储 backend 边界已分别由 `docs/sync-server-api-storage.md` 和 ADR 0004 固定；生产 key 创建流程仍需后续 Rust model 和平台验证。
+- Go server API 与平台存储 backend 边界已分别由 `docs/sync-server-api-storage.md` 和 ADR 0004 固定；生产 key 创建流程仍需后续平台 backend 实现和平台验证。
 
 ## 验证口径
 

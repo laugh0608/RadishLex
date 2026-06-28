@@ -19,9 +19,13 @@ pub use recovery::{
     RECOVERY_SALT_LEN, RECOVERY_WRAPPING_KEY_LEN,
 };
 pub use signing::{
-    canonical_signature_bytes, DeviceSignature, DeviceSigningKeyHandle, DeviceSigningPublicKey,
+    canonical_signature_bytes, DevicePrivateKeyStoreStatus, DeviceSignature,
+    DeviceSigningBackendCapabilities, DeviceSigningKeyHandle, DeviceSigningPublicKey,
     DeviceSigningStorageBackend, SignatureAlgorithmId, SignatureField,
     SignedRecoveryRecordManifest, SignedSyncObjectManifest, TestMemoryDeviceKeyStore,
-    DEVICE_KEY_STORE_TEST_MEMORY_V1, ED25519_PUBLIC_KEY_LEN, ED25519_SIGNATURE_LEN,
-    SIGNATURE_ALGORITHM_ED25519_V1, SIGNATURE_SCHEMA_VERSION,
+    UnavailableDeviceKeyStore, DEVICE_KEY_STORE_ANDROID_KEYSTORE_V1,
+    DEVICE_KEY_STORE_APPLE_KEYCHAIN_V1, DEVICE_KEY_STORE_LINUX_SECRET_SERVICE_V1,
+    DEVICE_KEY_STORE_TEST_MEMORY_V1, DEVICE_KEY_STORE_UNAVAILABLE, DEVICE_KEY_STORE_WINDOWS_CNG_V1,
+    ED25519_PUBLIC_KEY_LEN, ED25519_SIGNATURE_LEN, SIGNATURE_ALGORITHM_ED25519_V1,
+    SIGNATURE_SCHEMA_VERSION,
 };

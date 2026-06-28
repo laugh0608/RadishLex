@@ -8,7 +8,7 @@ Accepted
 
 ## 背景
 
-`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名对象、canonical bytes、Ed25519 签名模型、`DevicePrivateKeyStore` 抽象和错误语义。当前 Rust 实现只提供合成 `test-memory-v1` signing key store，用于测试 signed sync object manifest、signed recovery record、signed device authorization 和 signed device revocation。
+`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名对象、canonical bytes、Ed25519 签名模型、`DevicePrivateKeyStore` 抽象和错误语义。当前 Rust 实现已提供合成 `test-memory-v1` signing key store、`unavailable` 明确失败 store、backend capability metadata 和生产签名门禁测试，用于测试 signed sync object manifest、signed recovery record、signed device authorization 和 signed device revocation；真实平台 SDK backend 尚未实现。
 
 进入真实同步前，还需要明确生产私钥如何落到系统安全存储。否则后续平台壳、Flutter manager 或 FFI 可能为了接线方便直接持有私钥 bytes，破坏设备身份和撤销边界。
 
@@ -201,11 +201,11 @@ DevicePrivateKeyStore
 
 ## 实施顺序
 
-1. 保持当前 `test-memory-v1` signing key store 只用于测试。
-2. 在 Rust 模型中补 `DevicePrivateKeyStoreStatus` 和 backend capability metadata 测试。
-3. 为 unavailable backend 固定错误语义，确保真实同步功能在无生产 backend 时明确失败。
-4. 分平台补 backend spike / runbook，再接具体平台 SDK。
-5. 平台 backend 通过后，再允许 Go server 远端对象上传下载使用生产签名。
+1. 已保持当前 `test-memory-v1` signing key store 只用于测试，并通过生产签名门禁阻止其进入生产对象签名。
+2. 已在 Rust 模型中补 `DevicePrivateKeyStoreStatus` 和 backend capability metadata 测试。
+3. 已为 unavailable backend 固定错误语义，确保真实同步功能在无生产 backend 时明确失败。
+4. 后续分平台补 backend spike / runbook，再接具体平台 SDK。
+5. 平台 backend 通过后，再允许真实远端对象上传下载使用生产签名。
 6. 最后才把管理 UI 的设备与恢复页面接入生产 backend。
 
 ## 验证口径

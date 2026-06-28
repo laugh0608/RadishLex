@@ -7,12 +7,38 @@ use crate::{
 #[test]
 fn test_memory_key_store_signs_and_verifies_without_debug_leaks() {
     let mut store = TestMemoryDeviceKeyStore::new();
+    let status = store.backend_status();
+    status.validate().expect("test backend status");
+    assert_eq!(
+        status.storage_backend,
+        DeviceSigningStorageBackend::TestMemoryV1
+    );
+    assert_eq!(
+        status
+            .ensure_production_signing_allowed()
+            .expect_err("test backend cannot sign production objects"),
+        CryptoError::BackendCapabilityMismatch {
+            backend: DEVICE_KEY_STORE_TEST_MEMORY_V1.to_owned(),
+            message: "backend is not eligible for production signing".to_owned(),
+        }
+    );
+
     let public_key = store
         .insert_signing_key("device-a", "signing-key-a", [7u8; 32], 10)
         .expect("public key");
     let handle = store
         .handle("device-a", "signing-key-a")
         .expect("signing handle");
+    assert_eq!(
+        handle.storage_backend,
+        DeviceSigningStorageBackend::TestMemoryV1
+    );
+    assert!(handle.exportable);
+    assert!(!handle.hardware_backed);
+    assert!(!handle.user_presence_required);
+    assert!(!handle.backup_migratable);
+    assert_eq!(handle.revoked_at_ms, None);
+
     let canonical =
         canonical_signature_bytes("test_record", &[SignatureField::text("field", "value")]);
 
@@ -24,6 +50,166 @@ fn test_memory_key_store_signs_and_verifies_without_debug_leaks() {
     let debug = format!("{signature:?} {store:?}");
     assert!(debug.contains("[redacted]"));
     assert!(!debug.contains("070707"));
+}
+
+#[test]
+fn unavailable_key_store_blocks_production_signing_and_key_operations() {
+    let store = UnavailableDeviceKeyStore::new();
+    let status = store.backend_status();
+    status.validate().expect("unavailable status");
+    assert_eq!(
+        status.storage_backend,
+        DeviceSigningStorageBackend::Unavailable
+    );
+    assert_eq!(
+        status
+            .ensure_production_signing_allowed()
+            .expect_err("unavailable backend cannot sign"),
+        CryptoError::StorageBackendUnavailable {
+            backend: DEVICE_KEY_STORE_UNAVAILABLE.to_owned(),
+        }
+    );
+    assert_eq!(
+        store
+            .create_signing_key("device-a", "signing-key-a", 10)
+            .expect_err("unavailable backend cannot create signing key"),
+        CryptoError::StorageBackendUnavailable {
+            backend: DEVICE_KEY_STORE_UNAVAILABLE.to_owned(),
+        }
+    );
+    assert_eq!(
+        store
+            .handle("device-a", "signing-key-a")
+            .expect_err("unavailable backend has no handle"),
+        CryptoError::PrivateKeyUnavailable {
+            key_id: "signing-key-a".to_owned(),
+        }
+    );
+
+    let handle =
+        DeviceSigningKeyHandle::test_memory("device-a", "signing-key-a", 10).expect("handle");
+    let canonical =
+        canonical_signature_bytes("test_record", &[SignatureField::text("field", "value")]);
+    assert_eq!(
+        store
+            .public_key(&handle)
+            .expect_err("unavailable backend cannot load public key"),
+        CryptoError::StorageBackendUnavailable {
+            backend: DEVICE_KEY_STORE_UNAVAILABLE.to_owned(),
+        }
+    );
+    assert_eq!(
+        store
+            .sign(&handle, &canonical)
+            .expect_err("unavailable backend cannot sign"),
+        CryptoError::StorageBackendUnavailable {
+            backend: DEVICE_KEY_STORE_UNAVAILABLE.to_owned(),
+        }
+    );
+    assert_eq!(
+        store
+            .delete_or_revoke(&handle, 20)
+            .expect_err("unavailable backend cannot revoke local key"),
+        CryptoError::StorageBackendUnavailable {
+            backend: DEVICE_KEY_STORE_UNAVAILABLE.to_owned(),
+        }
+    );
+}
+
+#[test]
+fn test_memory_key_store_revocation_blocks_signing_and_export() {
+    let mut store = TestMemoryDeviceKeyStore::new();
+    store
+        .insert_signing_key("device-a", "signing-key-a", [7u8; 32], 10)
+        .expect("public key");
+    let handle = store
+        .handle("device-a", "signing-key-a")
+        .expect("signing handle");
+    store
+        .delete_or_revoke(&handle, 20)
+        .expect("revoke test key");
+
+    let public_key = store.public_key(&handle).expect("public key");
+    assert_eq!(public_key.revoked_at_ms, Some(20));
+    assert!(!public_key.is_active_at(20));
+
+    let canonical =
+        canonical_signature_bytes("test_record", &[SignatureField::text("field", "value")]);
+    assert_eq!(
+        store
+            .sign(&handle, &canonical)
+            .expect_err("revoked key cannot sign"),
+        CryptoError::PrivateKeyRevoked {
+            key_id: "signing-key-a".to_owned(),
+        }
+    );
+    assert_eq!(
+        store
+            .export_private_key_for_tests(&handle)
+            .expect_err("revoked key cannot be exported"),
+        CryptoError::PrivateKeyRevoked {
+            key_id: "signing-key-a".to_owned(),
+        }
+    );
+}
+
+#[test]
+fn backend_capabilities_gate_production_signing() {
+    let platform_status = DevicePrivateKeyStoreStatus::platform(
+        DeviceSigningStorageBackend::AppleKeychainV1,
+        true,
+        true,
+        false,
+    )
+    .expect("platform status");
+    platform_status.validate().expect("valid platform status");
+    platform_status
+        .ensure_production_signing_allowed()
+        .expect("platform backend can sign production objects");
+    assert_eq!(
+        platform_status.capabilities.storage_backend,
+        DeviceSigningStorageBackend::AppleKeychainV1
+    );
+    assert!(!platform_status.capabilities.exportable);
+    assert!(platform_status.capabilities.hardware_backed);
+    assert!(platform_status.capabilities.user_presence_required);
+    assert!(!platform_status.capabilities.backup_migratable);
+
+    assert_eq!(
+        DeviceSigningBackendCapabilities::platform(
+            DeviceSigningStorageBackend::TestMemoryV1,
+            false,
+            false,
+            false,
+        )
+        .expect_err("test backend is not a production platform backend"),
+        CryptoError::UnsupportedStorageBackend {
+            backend: DEVICE_KEY_STORE_TEST_MEMORY_V1.to_owned(),
+        }
+    );
+
+    let capabilities = DeviceSigningBackendCapabilities::platform(
+        DeviceSigningStorageBackend::AppleKeychainV1,
+        false,
+        false,
+        false,
+    )
+    .expect("capabilities");
+    assert_eq!(
+        DeviceSigningKeyHandle::new(
+            "device-a",
+            "signing-key-a",
+            SignatureAlgorithmId::ed25519_v1(),
+            DeviceSigningStorageBackend::AndroidKeystoreV1,
+            capabilities,
+            10,
+        )
+        .expect_err("handle backend must match capabilities"),
+        CryptoError::BackendCapabilityMismatch {
+            backend: DEVICE_KEY_STORE_ANDROID_KEYSTORE_V1.to_owned(),
+            message: "capabilities must describe the handle storage backend".to_owned(),
+        }
+    );
 }
 
 #[test]
