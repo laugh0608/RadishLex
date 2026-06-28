@@ -428,7 +428,7 @@ cargo run -p radishlex-ime-cli -- \
 
 输出包含 `dictionary.user_terms`、`ranker.weights`、`dictionary.deleted_terms` 这类 P2 可同步计数，以及 `selection_events`、`negative_feedback` 这类 P1 本地计数。`plaintext_payload: false` 表示该命令没有输出明文同步对象。
 
-Rust 内部已经有 `UserDb::p2_plaintext_payloads()` 供 `ime-userdb` / `ime-crypto` / `ime-sync` integration test 复验本地加密装配；CLI 仍只提供 preflight 计数，不暴露该迭代器、payload bytes、envelope、hash、签名或上传草案。
+Rust 内部已经有 `UserDb::p2_plaintext_payloads()` 和 `ime-sync::SyncEnvelopeAssembler` 复验本地加密装配；CLI 仍只提供 preflight 计数，不暴露该迭代器、payload bytes、envelope、hash、签名或上传草案。
 
 ## 输入限制
 

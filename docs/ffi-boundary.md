@@ -266,7 +266,7 @@ local_import_batches: usize
 
 `plaintext_payload` 当前固定为 `0`，表示没有生成明文同步 payload，也没有连接远端服务。`syncable_*` 是后续可进入加密对象的 P2 计数，`local_*` 是不得直接同步的 P1 或本地审计计数。
 
-Rust 内部的 `UserDb::p2_plaintext_payloads()`、`ime-crypto::EncryptedObjectEnvelope` 和 `ime-sync::EncryptedSyncObjectDraft` 当前只用于 crate 内测试与 integration test。FFI 不导出这些对象，也不导出 payload bytes、密文、hash、签名、key id 或上传草案。
+Rust 内部的 `UserDb::p2_plaintext_payloads()`、`ime-sync::SyncEnvelopeAssembler`、`ime-crypto::EncryptedObjectEnvelope` 和 `ime-sync::EncryptedSyncObjectDraft` 当前只用于 crate 内测试与 Rust 内部组装边界。FFI 不导出这些对象，也不导出 payload bytes、密文、hash、签名、key id 或上传草案。
 
 ### User term view
 

@@ -78,7 +78,7 @@ RadishLex/
 - `crates/ime-cli/`：基于 demo adapter、可选 Rime adapter、userdb 和 ranker 的命令行复验入口。
 - `crates/ime-engine-rime/`：Rime adapter crate，默认不启用 native 绑定。
 - `crates/ime-ffi/`：C ABI 起步 crate，覆盖 ABI contract、opaque handle、session owner-thread policy、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、sync preflight 状态摘要、userdb 管理入口、dictionary 文件管理入口和 host smoke。
-- `crates/ime-sync/`：同步 payload 来源分类、对象类型和加密对象外壳草案。
+- `crates/ime-sync/`：同步 payload 来源分类、对象类型、P2 envelope 组装、加密对象外壳草案、设备生命周期和客户端合并模型。
 - `crates/ime-crypto/`：客户端加密本地模型 crate，当前覆盖 key role、object envelope、AAD、nonce 和 ciphertext hash 边界测试。
 - `docs/cli.md`：`radishlex-ime-cli` 命令、输出、退出码和安全边界说明。
 - `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
@@ -151,7 +151,7 @@ librime adapter：
 - 版本管理。
 - 设备状态。
 
-当前已创建 `crates/ime-sync/`，落地 payload 来源分类、同步对象类型、P1/P2/本地审计分层、从 `ime-crypto` envelope 派生加密对象外壳元数据、同步域、设备状态、加入请求、授权包、撤销记录和对象版本冲突草案模型；不连接后端、不实现网络同步或客户端冲突合并执行器。
+当前已创建 `crates/ime-sync/`，落地 payload 来源分类、同步对象类型、P1/P2/本地审计分层、P2 plaintext payload 到 `ime-crypto` envelope 的 Rust 内部组装边界、从 crypto envelope 派生加密对象外壳元数据、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型和客户端解密后合并模型；不连接后端、不实现网络同步、真实 payload 解析或 userdb 写回。
 
 ### ime-crypto
 

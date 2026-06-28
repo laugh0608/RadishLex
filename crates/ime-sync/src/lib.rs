@@ -1,7 +1,11 @@
+mod assemble;
 mod device;
 mod merge;
 mod model;
 
+pub use assemble::{
+    AssembledSyncObject, PlaintextSyncPayload, SyncEnvelopeAssembler, SyncObjectAssemblySpec,
+};
 pub use device::{
     DeviceAuthorizationPackage, DeviceJoinRequest, DeviceRevocationReason, DeviceRevocationRecord,
     SyncDevice, SyncDeviceStatus, SyncDomain, SyncObjectVersion,

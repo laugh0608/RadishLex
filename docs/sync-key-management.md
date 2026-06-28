@@ -20,7 +20,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步代码实现应继续补生产级 envelope 组装边界、恢复码 KDF ADR、签名 / 设备密钥存储设计，以及客户端合并模型与真实 P2 payload / userdb 写回流程的接线，再进入后端 API。生产组装、恢复码和真实写回语义没有稳定前，不应启动真实远端同步主线。
+下一步代码实现应继续补恢复码 KDF ADR、签名 / 设备密钥存储设计，以及客户端合并模型与真实 P2 payload / userdb 写回流程的接线，再进入后端 API。恢复码、签名 / 设备密钥存储和真实写回语义没有稳定前，不应启动真实远端同步主线。
 
 ## 设计目标
 
@@ -237,9 +237,10 @@ updated_at_ms
 3. 已在 `ime-sync` 补同步域、设备状态、加入请求、授权包、撤销记录和对象版本冲突草案模型。
 4. 已在 `ime-sync` 测试 active / pending / revoked 设备状态转移、授权设备和接收设备都必须 active、撤销必须推进 key epoch、版本关系和 stale base version 检测边界。
 5. 已在 `ime-sync` 补客户端解密后合并模型和测试，覆盖 `dictionary.deleted_terms` tombstone 压过旧 user terms、旧 ranker weights、旧 epoch 上传和显式恢复语义；当前不解析真实 payload JSON、不写回 SQLite、不连接后端。
-6. 后续补生产级 P2 payload envelope 组装边界、恢复码 KDF ADR、签名 / 设备密钥存储设计，以及客户端合并模型与真实 userdb payload / 写回流程的接线。
-7. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
-8. 生产级 envelope 组装、恢复码、签名 / 设备密钥存储和真实 payload / userdb 写回接线稳定后，再设计 Go server API。
+6. 已在 `ime-sync` 补 `SyncEnvelopeAssembler`，固定 Rust 内部 P2 payload 到 envelope 的组装边界，覆盖 sync master 派生 object key、nonce 复用阻断、draft 派生和 Debug 明文阻断。
+7. 后续补恢复码 KDF ADR、签名 / 设备密钥存储设计，以及客户端合并模型与真实 userdb payload / 写回流程的接线。
+8. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
+9. 恢复码、签名 / 设备密钥存储和真实 payload / userdb 写回接线稳定后，再设计 Go server API。
 
 ## 验证口径
 
@@ -248,6 +249,7 @@ updated_at_ms
 - P1 明细和本地审计来源不能进入 crypto payload。
 - `object_id`、`ciphertext_hash` 和日志不能包含明文词条或 input code。
 - 同一 key epoch 下 nonce 不重复。
+- P2 envelope 组装必须从 sync master 派生 object key，并拒绝非 object key descriptor。
 - AAD 任一字段变化会导致解密失败。
 - 撤销设备后，新对象使用新 `key_epoch`，旧设备材料不能解密新对象。
 - 只给 `active` 设备生成新 epoch 包装记录。

@@ -284,7 +284,7 @@ pub enum SyncPayloadError {
 }
 
 impl SyncPayloadError {
-    fn from_crypto_error(error: CryptoError) -> Self {
+    pub(crate) fn from_crypto_error(error: CryptoError) -> Self {
         Self::InvalidCryptoEnvelope {
             message: error.to_string(),
         }

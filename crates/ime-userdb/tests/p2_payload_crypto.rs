@@ -1,8 +1,7 @@
-use radishlex_ime_crypto::{
-    CryptoObjectType, EncryptedObjectEnvelope, KeyDescriptor, KeyRole, Nonce, NonceTracker,
-    ObjectKeyMaterial, PlaintextPayload, XCHACHA20POLY1305_NONCE_LEN,
+use radishlex_ime_crypto::{KeyDescriptor, KeyRole, SyncMasterKeyMaterial};
+use radishlex_ime_sync::{
+    PlaintextSyncPayload, SyncEnvelopeAssembler, SyncObjectAssemblySpec, SyncObjectType,
 };
-use radishlex_ime_sync::EncryptedSyncObjectDraft;
 use radishlex_ime_userdb::{
     NegativeFeedbackDraft, NegativeFeedbackReason, SelectionEventDraft, TermSource, UserDb,
     UserDbSyncPayloadObjectType,
@@ -66,16 +65,31 @@ fn userdb_p2_payloads_encrypt_into_sync_drafts_without_plaintext_leak() {
     );
 
     let object_key = KeyDescriptor::new("object-key-a", KeyRole::ObjectKey, 3).expect("key");
-    let object_key_material = ObjectKeyMaterial::new([7u8; 32]).expect("key material");
-    let mut nonce_tracker = NonceTracker::new();
+    let sync_master_key = SyncMasterKeyMaterial::new([7u8; 32]).expect("sync master key");
+    let mut assembler = SyncEnvelopeAssembler::new();
 
     for payload in payloads {
-        let envelope = encrypt_userdb_payload(&payload, &object_key, &object_key_material);
-        nonce_tracker
-            .observe(&envelope)
-            .expect("unique nonce for object key");
+        let sync_payload = PlaintextSyncPayload::new(
+            sync_object_type(payload.object_type),
+            payload.record_count,
+            payload.bytes.clone(),
+        )
+        .expect("sync plaintext payload");
+        let spec = SyncObjectAssemblySpec::new(
+            object_id(payload.object_type),
+            OWNER_DEVICE_ID,
+            object_key.clone(),
+            version_for(payload.object_type),
+            None,
+            BASE_TIMESTAMP_MS + version_for(payload.object_type) as i64,
+        )
+        .expect("assembly spec");
+        let assembled = assembler
+            .assemble_payload(sync_payload, spec, &sync_master_key)
+            .expect("assembled sync object");
+        let envelope = &assembled.envelope;
+        let draft = &assembled.draft;
 
-        let draft = EncryptedSyncObjectDraft::from_crypto_envelope(&envelope).expect("sync draft");
         assert_eq!(draft.object_type.as_str(), payload.object_type.as_str());
         assert_eq!(draft.owner_device_id, OWNER_DEVICE_ID);
         assert_eq!(draft.key_id, object_key.key_id);
@@ -87,8 +101,12 @@ fn userdb_p2_payloads_encrypt_into_sync_drafts_without_plaintext_leak() {
         );
         assert_eq!(draft.ciphertext_hash, envelope.ciphertext_hash.as_str());
         assert_eq!(draft.nonce.as_slice(), envelope.nonce.as_bytes());
+        assert_eq!(assembled.record_count, payload.record_count);
 
         assert_ne!(envelope.encrypted_payload, payload.bytes);
+        let object_key_material = sync_master_key
+            .derive_object_key(&object_key, envelope.object_type, &envelope.object_id)
+            .expect("object key material");
         let decrypted = envelope
             .decrypt_payload(&object_key_material)
             .expect("decrypt envelope");
@@ -107,37 +125,12 @@ fn userdb_p2_payloads_encrypt_into_sync_drafts_without_plaintext_leak() {
     }
 }
 
-fn encrypt_userdb_payload(
-    payload: &radishlex_ime_userdb::UserDbSyncPlaintextPayload,
-    object_key: &KeyDescriptor,
-    object_key_material: &ObjectKeyMaterial,
-) -> EncryptedObjectEnvelope {
-    let crypto_payload = PlaintextPayload::new(
-        crypto_object_type(payload.object_type),
-        payload.bytes.clone(),
-    )
-    .expect("crypto plaintext payload");
-
-    EncryptedObjectEnvelope::encrypt_payload_with_nonce(
-        object_id(payload.object_type),
-        OWNER_DEVICE_ID,
-        object_key,
-        object_key_material,
-        version_for(payload.object_type),
-        None,
-        crypto_payload,
-        BASE_TIMESTAMP_MS + version_for(payload.object_type) as i64,
-        nonce_for(payload.object_type),
-    )
-    .expect("encrypted object envelope")
-}
-
-fn crypto_object_type(object_type: UserDbSyncPayloadObjectType) -> CryptoObjectType {
+fn sync_object_type(object_type: UserDbSyncPayloadObjectType) -> SyncObjectType {
     match object_type {
-        UserDbSyncPayloadObjectType::DictionaryUserTerms => CryptoObjectType::DictionaryUserTerms,
-        UserDbSyncPayloadObjectType::RankerWeights => CryptoObjectType::RankerWeights,
+        UserDbSyncPayloadObjectType::DictionaryUserTerms => SyncObjectType::DictionaryUserTerms,
+        UserDbSyncPayloadObjectType::RankerWeights => SyncObjectType::RankerWeights,
         UserDbSyncPayloadObjectType::DictionaryDeletedTerms => {
-            CryptoObjectType::DictionaryDeletedTerms
+            SyncObjectType::DictionaryDeletedTerms
         }
     }
 }
@@ -156,13 +149,4 @@ fn version_for(object_type: UserDbSyncPayloadObjectType) -> u64 {
         UserDbSyncPayloadObjectType::RankerWeights => 2,
         UserDbSyncPayloadObjectType::DictionaryDeletedTerms => 3,
     }
-}
-
-fn nonce_for(object_type: UserDbSyncPayloadObjectType) -> Nonce {
-    let seed = match object_type {
-        UserDbSyncPayloadObjectType::DictionaryUserTerms => 11,
-        UserDbSyncPayloadObjectType::RankerWeights => 12,
-        UserDbSyncPayloadObjectType::DictionaryDeletedTerms => 13,
-    };
-    Nonce::new(vec![seed; XCHACHA20POLY1305_NONCE_LEN]).expect("nonce")
 }
