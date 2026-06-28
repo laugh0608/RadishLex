@@ -20,7 +20,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步代码实现应继续补客户端冲突合并、生产级 envelope 组装边界、恢复码 KDF ADR 和签名 / 设备密钥存储设计，再进入后端 API。删除、防旧设备复活和恢复语义没有稳定前，不应启动真实远端同步主线。
+下一步代码实现应继续补生产级 envelope 组装边界、恢复码 KDF ADR、签名 / 设备密钥存储设计，以及客户端合并模型与真实 P2 payload / userdb 写回流程的接线，再进入后端 API。生产组装、恢复码和真实写回语义没有稳定前，不应启动真实远端同步主线。
 
 ## 设计目标
 
@@ -193,9 +193,9 @@ updated_at_ms
 
 对象合并方向：
 
-- `dictionary.user_terms`：按 `input_code + text + reading` 合并；删除 tombstone 和更新时间参与判断。
-- `dictionary.deleted_terms`：删除意图优先；较新的 tombstone 应阻止旧词条、旧导入和旧权重摘要复活。
-- `ranker.weights`：按 `input_code + text + reading + context_kind` 合并；允许做摘要级累加或按版本选择，但不能回放 P1 明细。
+- `dictionary.user_terms`：按 `input_code + text + reading` 合并；删除 tombstone、`key_epoch` 和更新时间参与判断，普通同步词条不能清除 tombstone。
+- `dictionary.deleted_terms`：删除意图优先；较新的 tombstone 应阻止旧词条、旧导入和旧权重摘要复活。当前 `ime-sync` 已用纯 Rust 合成记录模型覆盖 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词和显式恢复清理 tombstone。
+- `ranker.weights`：按 `input_code + text + reading + context_kind` 合并；active tombstone 阻断同一 term identity 下的旧摘要。显式恢复词条后，只有晚于恢复意图的权重摘要才可继续保留，不能回放 P1 明细。
 - `settings.profile` / `settings.schema`：可以先采用 last-write-wins，后续管理 UI 再提供显式冲突提示。
 - `backup.snapshot`：作为完整快照，不参与细粒度合并。
 
@@ -236,10 +236,10 @@ updated_at_ms
 2. 已在 `ime-crypto` 测试撤销后新对象使用新 `key_epoch`，旧 epoch key 不能解密新对象。
 3. 已在 `ime-sync` 补同步域、设备状态、加入请求、授权包、撤销记录和对象版本冲突草案模型。
 4. 已在 `ime-sync` 测试 active / pending / revoked 设备状态转移、授权设备和接收设备都必须 active、撤销必须推进 key epoch、版本关系和 stale base version 检测边界。
-5. 后续补客户端冲突合并测试，覆盖 `dictionary.deleted_terms` tombstone 压过旧 user terms、旧 ranker weights、离线写入和旧设备上传。
-6. 后续补恢复码 KDF ADR、签名 / 设备密钥存储设计和生产级 P2 payload envelope 组装边界。
+5. 已在 `ime-sync` 补客户端解密后合并模型和测试，覆盖 `dictionary.deleted_terms` tombstone 压过旧 user terms、旧 ranker weights、旧 epoch 上传和显式恢复语义；当前不解析真实 payload JSON、不写回 SQLite、不连接后端。
+6. 后续补生产级 P2 payload envelope 组装边界、恢复码 KDF ADR、签名 / 设备密钥存储设计，以及客户端合并模型与真实 userdb payload / 写回流程的接线。
 7. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
-8. 删除、防旧设备复活、恢复码和冲突合并模型稳定后，再设计 Go server API。
+8. 生产级 envelope 组装、恢复码、签名 / 设备密钥存储和真实 payload / userdb 写回接线稳定后，再设计 Go server API。
 
 ## 验证口径
 
@@ -252,12 +252,12 @@ updated_at_ms
 - 撤销设备后，新对象使用新 `key_epoch`，旧设备材料不能解密新对象。
 - 只给 `active` 设备生成新 epoch 包装记录。
 - 恢复码只能恢复同步域材料，不能绕过设备状态或直接解密服务端对象。
-- `dictionary.deleted_terms` tombstone 能压过旧 user terms 和旧 ranker weights。
+- `dictionary.deleted_terms` tombstone 能压过旧 user terms 和旧 ranker weights；旧 epoch 上传不能靠更晚本机时间复活删除词，显式恢复必须晚于 tombstone，且恢复前旧权重不随词条恢复一起复活。
 - 损坏的 envelope、非法 base version、未知设备状态和空 key id 必须返回明确错误。
 
 ## 停止线
 
 - 恢复码 KDF 算法、参数和格式未通过 ADR 固化前，不实现生产恢复码。
 - 生产恢复码 KDF、签名 / 设备密钥存储和历史重加密策略未固化前，不实现生产恢复流程。
-- 冲突合并语义未覆盖删除 tombstone、防旧设备复活和离线写入前，不做远端上传下载。
+- 冲突合并模型未接入真实 P2 payload 解析、userdb 写回和生产 envelope 组装边界前，不做远端上传下载。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。

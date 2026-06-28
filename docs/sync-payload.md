@@ -174,11 +174,12 @@ updated_at_ms
 
 ## 冲突与删除方向
 
-后续合并策略必须按对象类型区分：
+客户端合并策略必须按对象类型区分。当前 Rust 侧已在 `ime-sync` 中落地 `ClientSyncMergeInput` / `ClientSyncMergeResult` 纯模型，用于表达客户端解密 P2 payload 后的合并决策；该模型不解析 JSON、不写 SQLite、不连接后端。
 
-- `dictionary.user_terms`：按 `input_code + text + reading` 合并，更新时间和删除 tombstone 参与冲突判断。
-- `dictionary.deleted_terms`：删除意图优先，旧设备和旧备份不得复活用户已删除词条。
-- `ranker.weights`：按 `input_code + text + reading + context_kind` 合并，允许按版本做摘要级冲突处理。
+- `dictionary.user_terms`：按 `input_code + text + reading` 合并，更新时间、`key_epoch` 和删除 tombstone 参与冲突判断；普通同步词条不能清除 tombstone。
+- `dictionary.deleted_terms`：删除意图优先，旧设备和旧备份不得复活用户已删除词条；同一 term identity 下以较新的 `key_epoch` / 删除时间作为当前删除意图。
+- `ranker.weights`：按 `input_code + text + reading + context_kind` 合并，active tombstone 会阻断同一 term identity 下的旧权重摘要。
+- 显式恢复：用户明确重新添加词条时，必须以 `ExplicitRestore` 这类恢复意图表达，并且 `key_epoch` / 更新时间晚于 tombstone；恢复通过后才清除对应删除意图。恢复前的旧 `ranker.weights` 不随词条恢复一起复活。
 - `settings.*`：可以先使用 last-write-wins，后续管理 UI 再提供显式冲突提示。
 - `backup.snapshot`：作为完整快照，不参与细粒度合并。
 
@@ -192,6 +193,7 @@ updated_at_ms
 - `SyncPayloadPlan`：把本地来源分为可同步和本地保留。
 - `EncryptedSyncObjectDraft`：从 `ime-crypto::EncryptedObjectEnvelope` 派生加密对象外壳元数据，校验 `schema_version`、`key_id`、`key_epoch`、`algorithm`、`nonce`、`ciphertext_hash` 和版本关系。
 - `SyncDomain`、`SyncDevice`、`DeviceJoinRequest`、`DeviceAuthorizationPackage`、`DeviceRevocationRecord` 和 `SyncObjectVersion`：固定当前 Rust 侧设备生命周期、授权状态、撤销 epoch 推进和对象版本冲突判断。
+- `ClientSyncMergeInput`、`ClientSyncMergeResult`、`DictionaryUserTermMergeRecord`、`DictionaryDeletedTermMergeRecord` 和 `RankerWeightMergeRecord`：固定客户端解密后合并模型，覆盖 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词、显式恢复清理 tombstone、恢复前旧权重不复活和重复记录按 `key_epoch` / 时间收敛。
 - `UserDb::p2_plaintext_payloads()`：导出 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 Rust 内部 plaintext payload bytes，测试固定字段顺序、JSON string escaping、空库行为和 P1 / 本地审计阻断。
 - userdb P2 payload 本地加密装配测试：用合成 key / device id 把 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` payload 加密为 `ime-crypto::EncryptedObjectEnvelope`，验证可解密回原 bytes、nonce 不重复，并派生 `ime-sync::EncryptedSyncObjectDraft` 元数据。
 
@@ -200,7 +202,7 @@ updated_at_ms
 - `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
 - 生产级 userdb P2 plaintext payload 与 `ime-crypto` envelope 组装入口；当前只有 integration test，不暴露 CLI / FFI / 后端入口。
 - 签名、生产恢复码 KDF、真实设备密钥存储和远端密钥轮换执行器；`ime-crypto` 当前已落地本地 AEAD / HKDF / ciphertext hash / envelope / device wrapping 模型测试。
-- 客户端冲突合并执行器；当前只固定对象版本冲突检测边界，尚未执行 `dictionary.deleted_terms` 压过旧 user terms / ranker weights 的合并流程。
+- 客户端冲突合并与真实 payload / userdb 的接线；当前只固定解密后合成记录的合并模型，尚未解析真实 payload JSON、写回 SQLite 或生成上传补丁。
 - HTTP API、Go server 存储和冲突合并执行器。
 
 ## 验证口径
@@ -224,3 +226,4 @@ cargo test -p radishlex-ime-cli
 - userdb P2 plaintext payload 必须固定字段顺序、稳定 JSON escaping，不包含 P1 原始选择事件、负反馈 reason、上下文统计或本地 import batch 审计字段；`ranker.weights` 只能包含 P1 明细压缩后的 P2 权重摘要。
 - userdb P2 payload 本地加密装配测试必须验证 envelope 可解密回原 bytes，`EncryptedSyncObjectDraft` 只保留密文长度和 ciphertext hash 等元数据，不携带 plaintext bytes。
 - 设备生命周期模型必须验证 pending / active / revoked 状态转移，授权设备和接收设备都必须 active，撤销记录必须推进 `key_epoch`，对象版本必须能识别 stale base version。
+- 客户端合并模型必须验证 `dictionary.deleted_terms` tombstone 能压过旧 `dictionary.user_terms` 和旧 `ranker.weights`，旧 epoch 上传不能靠更晚本机时间复活删除词，显式恢复必须晚于 tombstone，且恢复前的旧权重不随词条恢复一起复活。
