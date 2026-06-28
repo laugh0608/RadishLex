@@ -41,6 +41,7 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - [同步 Payload 草案](docs/sync-payload.md)
 - [ime-crypto 边界设计](docs/crypto-boundary.md)
 - [同步密钥与设备生命周期设计](docs/sync-key-management.md)
+- [同步服务端 API 与存储边界](docs/sync-server-api-storage.md)
 - [ADR 0002: 恢复码 KDF 与同步域恢复边界](docs/adr/0002-recovery-code-kdf.md)
 - [ADR 0003: 设备签名与私钥存储边界](docs/adr/0003-device-signing-key-storage.md)
 - [FFI 边界](docs/ffi-boundary.md)

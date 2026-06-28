@@ -1,6 +1,6 @@
 # RadishLex 同步密钥与设备生命周期设计
 
-本文档定义 RadishLex 进入真实同步前必须稳定的同步密钥、设备授权、恢复码、设备撤销、key epoch 和冲突边界。读者是后续实现 `ime-crypto`、`ime-sync`、Go sync server、管理 UI 同步页面和审阅隐私边界的开发者。本文不包含 HTTP API、Go server migration、Flutter 页面设计、平台输入法接入流程、生产恢复码代码或生产密钥存储实现。
+本文档定义 RadishLex 进入真实同步前必须稳定的同步密钥、设备授权、恢复码、设备撤销、key epoch 和冲突边界。读者是后续实现 `ime-crypto`、`ime-sync`、Go sync server、管理 UI 同步页面和审阅隐私边界的开发者。本文不包含 Go server migration、Flutter 页面设计、平台输入法接入流程、生产恢复码代码或生产密钥存储实现；Go server API 与 storage 边界见 `docs/sync-server-api-storage.md`。
 
 ## 当前定位
 
@@ -20,12 +20,12 @@
 
 当前仍不做：
 
-- 不连接 Go server，不定义远端 HTTP API。
+- 不连接 Go server，不实现远端 HTTP API；API 与 storage 边界已由 `docs/sync-server-api-storage.md` 固定。
 - 不新增 CLI / FFI 明文同步 payload 入口。
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步代码实现应先补 Go server API / storage 边界设计，并继续收敛生产恢复流程和平台私钥存储 backend。生产恢复流程、平台私钥存储 backend、服务端版本边界和客户端上传下载语义没有稳定前，不应启动真实远端同步主线。
+下一步应继续收敛生产恢复流程和平台私钥存储 backend。若进入 Go server 代码，应先按 `docs/sync-server-api-storage.md` 验证 metadata、storage、签名、版本冲突和错误语义；生产恢复流程、平台私钥存储 backend 和客户端上传下载语义没有稳定前，不应启动真实远端同步主线。
 
 ## 设计目标
 
@@ -251,7 +251,7 @@ updated_at_ms
 11. 已补真实 userdb P2 payload 解析到 merge input 的接线。
 12. 已补客户端合并结果写回真实 userdb 的执行器。
 13. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
-14. 后续补 Go server API / storage 边界设计，并继续补生产恢复流程和平台私钥存储 backend。
+14. 已补 Go server API / storage 边界设计，后续继续补生产恢复流程和平台私钥存储 backend。
 
 ## 验证口径
 
@@ -274,5 +274,5 @@ updated_at_ms
 - 恢复码 KDF 算法、参数、格式和 Rust model 已落地；生产恢复流程未接入设备状态、服务端恢复记录和管理 UI 前，不实现用户可用恢复码入口。
 - 设备签名与私钥存储边界已通过 ADR 固化；Rust 签名模型、签名对象验证和私钥存储抽象未落地前，不做远端对象上传下载。
 - 生产恢复码实现、签名 / 设备密钥存储模型和历史重加密策略未固化前，不实现生产恢复流程。
-- Go server API / storage 边界、生产恢复流程和平台私钥存储 backend 未稳定前，不做远端上传下载。
+- 生产恢复流程和平台私钥存储 backend 未稳定前，不做远端上传下载；Go server 实现如启动，必须先满足 `docs/sync-server-api-storage.md` 的 metadata、storage、签名、版本冲突和错误语义验证。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。

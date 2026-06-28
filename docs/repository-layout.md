@@ -45,6 +45,11 @@ RadishLex/
     engine-boundary.md
     engine-rime-adapter.md
     personalization-learning.md
+    sync-payload.md
+    crypto-boundary.md
+    sync-key-management.md
+    sync-server-api-storage.md
+    ffi-boundary.md
     adr/
     runbooks/
     platform-notes/
@@ -88,6 +93,7 @@ RadishLex/
 - `docs/sync-payload.md`：同步 payload 草案和 P1/P2 来源分类。
 - `docs/crypto-boundary.md`：`ime-crypto` 进入实现前的客户端加密、密钥、envelope 和验证边界。
 - `docs/sync-key-management.md`：真实同步前的同步密钥、设备授权、恢复码、设备撤销、key epoch 和冲突边界。
+- `docs/sync-server-api-storage.md`：Go sync server API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和停止线。
 - `docs/adr/0002-recovery-code-kdf.md`：恢复码 Argon2id KDF、格式、恢复记录字段和生产实现验证口径。
 - `docs/adr/0003-device-signing-key-storage.md`：设备签名、签名对象、私钥存储抽象、错误语义和验证口径。
 - `docs/ffi-boundary.md`：后续 C ABI、所有权、生命周期和错误语义边界。
@@ -189,6 +195,8 @@ librime adapter：
 当前已落地基于合成 demo adapter 的 `demo <input-code> [candidate-index]` 命令，以及需要 `native-rime` feature 和本机 `librime` 依赖的 `rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] [--rank-db <path>] [--context <kind>] <input-code> [candidate-index]` 命令。`demo` 用于默认复验 `ime-core` 生命周期；它不代表真实中文输入引擎。Phase 2 起步已补 `dict list/add/delete`、`learn select/suppress`、`rank explain` 和 Rime rank smoke，通过显式 `--db` / `--rank-db` 的临时 SQLite 数据库复验用户词条、学习事件、负反馈、真实 engine candidates 重排和 explain 输出。
 
 ## Go server 建议
+
+Go server 进入实现前应以 `docs/sync-server-api-storage.md` 为 API、storage、错误语义和验证边界。服务端只保存密文对象、设备公钥、签名记录、版本和必要同步元数据，不解析 userdb payload，不接触 P1 原始事件，也不进入输入热路径。
 
 ```text
 server/sync-server/

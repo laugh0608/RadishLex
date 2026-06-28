@@ -91,11 +91,11 @@ SyncObject
 
 `ime-userdb` 当前已有 Rust 内部 `UserDb::p2_plaintext_payloads()` 只读迭代器，供本地 integration test 通过 `ime-sync::SyncEnvelopeAssembler` 把 `dictionary.user_terms`、`ranker.weights` 和 `dictionary.deleted_terms` 装入 `ime-crypto` envelope，再派生 `ime-sync::EncryptedSyncObjectDraft`。该迭代器不是 CLI / FFI / 文件导出接口，不得作为明文同步文件或平台壳调用入口。
 
-`crates/ime-sync/` 当前定义 payload 来源分类、同步对象类型、加密对象外壳草案、P2 envelope 组装边界、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型和客户端解密后合并模型。该合并模型已覆盖 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词和显式恢复语义；`ime-userdb` 已能把已解密 P2 JSON 解析为 merge input，并把被接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite。上传下载、Go server 存储和生产同步设置仍属于后续阶段。
+`crates/ime-sync/` 当前定义 payload 来源分类、同步对象类型、加密对象外壳草案、P2 envelope 组装边界、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型和客户端解密后合并模型。该合并模型已覆盖 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词和显式恢复语义；`ime-userdb` 已能把已解密 P2 JSON 解析为 merge input，并把被接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite。上传下载和生产同步设置仍属于后续阶段；Go server API / storage 边界见 `docs/sync-server-api-storage.md`，服务端只能保存密文对象、设备公钥、签名记录、版本和必要同步元数据。
 
 `docs/crypto-boundary.md` 已补 `ime-crypto` 客户端加密边界，并已落地本地 AEAD envelope、ciphertext hash、device wrapping、recovery material 和撤销后 key epoch 解密边界测试。后续服务端可见 hash 必须是 ciphertext hash 或密文加 AAD 的 hash，不得是 plaintext payload hash。
 
-`docs/sync-key-management.md` 已补真实同步前的同步密钥与设备生命周期边界，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突方向；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF、格式和恢复记录边界，`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名和私钥存储边界，`ime-crypto` 已落地恢复码 KDF Rust 模型、恢复记录解密测试、Ed25519 test-memory signing key store、signed sync object manifest 和 signed recovery record；`ime-sync` 已落地 signed device authorization / revocation。进入真实上传下载前，应先补 Go server API / storage 边界、生产恢复流程和平台私钥存储 backend。
+`docs/sync-key-management.md` 已补真实同步前的同步密钥与设备生命周期边界，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突方向；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF、格式和恢复记录边界，`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名和私钥存储边界，`docs/sync-server-api-storage.md` 已固定 Go sync server 的 API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和验证口径；`ime-crypto` 已落地恢复码 KDF Rust 模型、恢复记录解密测试、Ed25519 test-memory signing key store、signed sync object manifest 和 signed recovery record；`ime-sync` 已落地 signed device authorization / revocation。进入真实上传下载前，应继续补生产恢复流程和平台私钥存储 backend。
 
 ## 设备授权
 
@@ -108,7 +108,7 @@ SyncObject
 5. 旧设备为新设备加密同步密钥。
 6. 新设备开始拉取密文对象。
 
-详细设备授权、恢复码、撤销和 key epoch 规则见 `docs/sync-key-management.md`。该专题文档是后续 Rust 模型与 Go server API 设计的前置边界。
+详细设备授权、恢复码、撤销和 key epoch 规则见 `docs/sync-key-management.md`。Go server API、存储字段、对象上传下载边界和错误语义见 `docs/sync-server-api-storage.md`。
 
 ## 删除语义
 
@@ -170,6 +170,8 @@ radishlex-server
 sqlite
 local object storage
 ```
+
+SQLite 只保存 domain、device、join request、authorization、revocation、recovery record、object metadata、blob ref 和非敏感审计事件；local object storage 只保存 encrypted payload bytes 和 encrypted wrapped material bytes。业务删除通过 `dictionary.deleted_terms` 加密对象表达，服务端级删除只用于用户明确清空同步域密文数据或管理员清理整域数据。
 
 Docker Compose 服务：
 

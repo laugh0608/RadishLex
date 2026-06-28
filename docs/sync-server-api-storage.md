@@ -1,0 +1,444 @@
+# RadishLex 同步服务端 API 与存储边界
+
+本文档定义 Go sync server 进入实现前必须稳定的 API、存储、错误语义和验证口径。读者是后续实现 `server/sync-server`、`ime-sync` 远端客户端、同步 runbook 和审阅隐私边界的开发者。本文不包含 Go handler 代码、数据库 migration、Docker Compose 配置、Flutter 同步页面、真实远端上传下载实现或生产平台私钥存储 backend。
+
+## 当前定位
+
+当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型，以及已解密 P2 payload 写回本地 SQLite 的执行器。Go server 仍未实现。
+
+本阶段只固定服务端 API 和 storage 边界：
+
+- 服务端默认不可信，只保存密文对象、设备公钥、签名记录、版本和必要同步元数据。
+- 服务端可以验证对象 metadata、ciphertext hash、设备状态、签名、版本冲突和存储完整性。
+- 服务端不能解密、不能解析 plaintext payload、不能合并用户词、不能读取 P1 原始事件。
+- 客户端仍是真相源：解密、冲突合并、删除 tombstone 语义、显式恢复和 userdb 写回都在客户端完成。
+
+进入 Go 代码前，应先用本文件约束 migration、handler 和测试命名；进入真实远端上传下载前，还必须补齐生产恢复流程和平台私钥存储 backend。
+
+## 服务端职责
+
+允许服务端承担：
+
+- 同步域登记和单用户自部署初始化。
+- 设备登记、设备公钥保存、加入请求转发、设备授权记录保存。
+- 设备撤销记录保存，并拒绝被撤销设备继续写入新对象。
+- 恢复记录保存，包括恢复 KDF 参数、salt、密文包装材料和签名 manifest。
+- 加密对象 metadata 与 ciphertext blob 存储。
+- 对象版本、`base_version`、`key_epoch` 和 `ciphertext_hash` 校验。
+- 乐观冲突检测，返回最新远端 metadata，提示客户端拉取、解密、合并后再上传。
+- 非敏感审计日志，例如请求类型、设备 ID、对象 ID、版本、字节数、结果码和服务端时间。
+- 后续 P3 包分发，但包分发必须与个人 P2 同步对象分表、分路径、分权限。
+
+禁止服务端承担：
+
+- 每次按键、候选生成、候选排序、学习决策或输入热路径能力。
+- 明文用户词、input code、reading、候选偏好、上下文统计、原始选择事件或负反馈明细的存储、日志或索引。
+- plaintext payload hash、term identity hash，或任何可公开反查用户词身份的稳定标识。
+- `record_count`、userdb merge summary、P1 事件计数之外的明文 payload 细节。
+- 解析 `dictionary.user_terms`、`dictionary.deleted_terms`、`ranker.weights` 的 JSON 内容。
+- 根据服务端账号密码、管理 token 或恢复码明文直接解密用户数据。
+- 把对象 ID、文件路径、日志字段或错误信息设计成包含明文词条、拼音码、reading 或上下文。
+
+## 可见数据模型
+
+服务端可持久化下列记录。字段名是 API / migration 设计约束，不要求后续实现逐字照搬，但不得扩大明文可见面。
+
+`sync_domains`：
+
+```text
+domain_id
+current_key_epoch
+active_key_id
+created_at_ms
+updated_at_ms
+```
+
+`current_key_epoch` 只用于拒绝撤销后的旧 epoch 新写入；客户端合并仍是最终冲突真相源。
+
+`devices`：
+
+```text
+domain_id
+device_id
+signing_public_key_id
+signing_public_key
+key_agreement_public_key_id
+key_agreement_public_key
+status
+authorized_at_ms
+revoked_at_ms
+last_seen_at_ms
+```
+
+设备显示名如果后续需要展示，应作为用户可编辑的非敏感标签处理，不得从系统用户名、联系人或输入内容自动采集。
+
+`device_join_requests`：
+
+```text
+domain_id
+join_request_id
+device_id
+signing_public_key_id
+key_agreement_public_key_id
+challenge
+created_at_ms
+expires_at_ms
+status
+```
+
+服务端只转发待授权设备的公钥、challenge 和状态。短码应由客户端根据加入请求内容本地计算和展示，服务端不需要保存短码明文。
+
+`device_wrapping_records`：
+
+```text
+domain_id
+recipient_device_id
+authorizer_device_id
+key_epoch
+wrapping_key_id
+algorithm
+nonce
+wrapped_key_len
+ciphertext_hash
+created_at_ms
+signature
+```
+
+包装记录只保存给指定设备的密文材料和签名，不保存 `SyncMasterKey`、`DeviceWrappingKey` 或恢复码明文。
+
+`device_revocations`：
+
+```text
+domain_id
+revoked_device_id
+revoker_device_id
+previous_key_epoch
+new_key_epoch
+reason
+created_at_ms
+signature
+```
+
+撤销记录被接受后，服务端必须拒绝被撤销设备后续上传，并拒绝低于 `current_key_epoch` 的新对象版本写入。历史对象是否重加密由客户端和管理 UI 后续单独设计。
+
+`recovery_records`：
+
+```text
+domain_id
+recovery_record_id
+key_epoch
+kdf_profile
+salt
+algorithm
+nonce
+wrapped_material_len
+ciphertext_hash
+status
+created_at_ms
+revoked_at_ms
+signature
+```
+
+恢复记录只保存加密后的同步域材料和 KDF 参数。服务端可以对读取和替换恢复记录做限速，但不能依赖限速替代恢复码强度。
+
+`sync_objects`：
+
+```text
+domain_id
+object_id
+object_type
+latest_version
+latest_ciphertext_hash
+latest_key_epoch
+created_at_ms
+updated_at_ms
+```
+
+`object_id` 必须是不含业务明文的 opaque ID。需要稳定 term identity 时，只能放在 encrypted payload 内，或使用客户端持有密钥派生的不可公开反查 ID。
+
+`sync_object_versions`：
+
+```text
+domain_id
+object_id
+version
+base_version
+owner_device_id
+key_id
+key_epoch
+algorithm
+nonce
+encrypted_payload_len
+ciphertext_hash
+signature
+server_received_at_ms
+client_created_at_ms
+client_updated_at_ms
+blob_ref
+```
+
+服务端可以按 `object_type`、版本和时间分页列出 metadata；payload bytes 必须通过 blob 存储读取，不放入日志或错误响应。
+
+`audit_events`：
+
+```text
+domain_id
+event_type
+device_id
+object_id
+version
+result_code
+bytes
+server_time_ms
+```
+
+审计记录不得保存请求体、响应体、密文包装材料、恢复码、plaintext payload 或错误堆栈中的敏感字段。
+
+## HTTP API 边界
+
+首批 API 使用 `/api/v1` 前缀。metadata 使用 JSON；对象 payload 使用二进制请求体或 multipart 中的二进制 part。后续可以调整传输细节，但不能改变“metadata 可验证、payload 仍为密文”的边界。
+
+### 同步域
+
+`POST /api/v1/domains`
+
+- 用于单用户自部署初始化。
+- 请求包含客户端生成的 `domain_id`、第一台设备公钥、初始 `key_epoch`、可选恢复记录 metadata 和签名 manifest。
+- 服务端创建 domain 与第一台 `active` 设备。
+- 不接收同步主密钥、恢复码明文或任何 userdb payload。
+
+`GET /api/v1/domains/{domain_id}/state`
+
+- 返回 domain metadata、设备列表、恢复记录状态和对象 latest version 摘要。
+- 不返回对象 payload；客户端需要按对象版本显式下载密文 bytes。
+
+### 设备登记与授权
+
+`POST /api/v1/domains/{domain_id}/join-requests`
+
+- 待加入设备提交设备 ID、公钥、challenge、创建时间和过期时间。
+- 服务端保存为 `pending`，不把设备标记为可同步。
+
+`GET /api/v1/domains/{domain_id}/join-requests`
+
+- 已授权设备读取待处理加入请求。
+- 响应只包含设备公钥、challenge、过期时间和状态。
+
+`POST /api/v1/domains/{domain_id}/join-requests/{join_request_id}/authorization`
+
+- 已授权设备提交 signed authorization、接收设备包装记录和必要 metadata。
+- 服务端验证 authorizer 是 `active`，join request 未过期，recipient public key 与请求一致，签名有效。
+- 通过后将接收设备置为 `active`，并保存包装记录。
+
+`POST /api/v1/domains/{domain_id}/devices/{device_id}/revocations`
+
+- `active` 设备提交 signed revocation、`previous_key_epoch`、`new_key_epoch` 和可选新 epoch 包装记录集合。
+- 服务端验证 revoker 是 `active`，`new_key_epoch` 大于当前 epoch，签名有效。
+- 通过后标记目标设备 `revoked` / `lost`，推进 domain `current_key_epoch`。
+
+`POST /api/v1/domains/{domain_id}/devices/{device_id}/heartbeat`
+
+- 更新 `last_seen_at_ms` 和服务端可见健康状态。
+- 不上传输入状态、候选状态、学习事件或本地数据库摘要。
+
+### 加密对象
+
+`POST /api/v1/domains/{domain_id}/objects/{object_id}/versions`
+
+- 上传一个新加密对象版本。
+- 请求 metadata 必须包含 `object_type`、`version`、`base_version`、`owner_device_id`、`key_id`、`key_epoch`、`algorithm`、`nonce`、`encrypted_payload_len`、`ciphertext_hash`、客户端时间和 signed object manifest。
+- 请求 payload 只能是 encrypted bytes。
+- 服务端验证设备 active、签名有效、metadata 合法、payload 长度和 ciphertext hash 匹配。
+- 新对象要求 `version = 1` 且 `base_version = 0`。
+- 已存在对象要求 `base_version` 等于服务端 latest version，且 `version = latest_version + 1`。
+- 若 `base_version` 落后，返回 `409 conflict_stale_base_version` 和 latest metadata；客户端拉取密文、解密合并后再上传新版本。
+- 同一 `object_id + version + ciphertext_hash` 的重试可以幂等成功；同版本不同 hash 必须拒绝。
+
+`GET /api/v1/domains/{domain_id}/objects`
+
+- 按 `object_type`、`since_version`、`updated_after_ms` 和分页参数列出对象 metadata。
+- 不返回 payload bytes。
+
+`GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}`
+
+- 返回指定版本 metadata。
+
+`GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}/payload`
+
+- 返回指定版本 encrypted bytes。
+- 服务端不解密、不转码、不压缩 plaintext。
+
+业务删除不通过 HTTP 删除明文词条表达。用户词删除必须进入 `dictionary.deleted_terms` 加密对象；服务端级删除只用于用户明确清空同步域密文数据或管理员清理整域数据。
+
+### 恢复记录
+
+`PUT /api/v1/domains/{domain_id}/recovery-records/{recovery_record_id}`
+
+- 上传或替换 signed recovery record。
+- 请求包含 KDF profile、salt、nonce、wrapped material 长度、ciphertext hash、状态和签名。
+- 服务端验证签名设备 active，metadata 合法，payload hash 匹配。
+
+`GET /api/v1/domains/{domain_id}/recovery-records/latest`
+
+- 返回当前 active recovery record metadata 和 encrypted wrapped material。
+- 服务端应对该接口做基于 domain、IP、设备和时间窗的限速；限速失败返回结构化错误。
+
+`POST /api/v1/domains/{domain_id}/recovery-records/{recovery_record_id}/revoke`
+
+- 保存 signed recovery record revocation。
+- 不删除历史审计 metadata，但后续 `latest` 不再返回 revoked 记录作为 active。
+
+## 错误语义
+
+错误响应使用稳定结构：
+
+```text
+error_code
+message
+retryable
+server_time_ms
+latest_version
+latest_ciphertext_hash
+```
+
+`message` 只能包含非敏感说明；不得回显请求体、payload bytes、恢复码、签名材料或明文业务字段。
+
+首批错误码：
+
+- `invalid_request`：字段缺失、格式错误、非法对象类型、非法 nonce / hash / 版本关系。
+- `unauthenticated`：缺少自部署访问凭证或传输层认证失败。
+- `forbidden_device`：设备不是 `active`、已撤销、join request 未授权或签名公钥不匹配。
+- `not_found`：domain、device、object、version 或 recovery record 不存在。
+- `conflict_stale_base_version`：上传基于旧版本，客户端必须拉取并合并。
+- `conflict_object_version`：同一对象版本存在但 ciphertext hash 不一致。
+- `invalid_signature`：对象 manifest、授权、撤销或恢复记录验签失败。
+- `invalid_ciphertext_metadata`：payload 长度、ciphertext hash 或 algorithm metadata 与请求不一致。
+- `payload_too_large`：超过服务端配置的对象大小上限。
+- `recovery_rate_limited`：恢复记录读取或恢复尝试触发限速。
+- `storage_unavailable`：SQLite 或对象存储不可写 / 不一致。
+
+服务端不返回“词条冲突”“候选偏好冲突”或“权重合并失败”这类业务错误；这些属于客户端解密后的合并语义。
+
+## SQLite 与对象存储边界
+
+默认自部署形态是 Go server + SQLite metadata + local object storage：
+
+- SQLite 保存 domain、device、join request、authorization、revocation、recovery record、object metadata、blob ref 和审计事件。
+- local object storage 保存 encrypted payload bytes 和 encrypted wrapped material bytes。
+- `blob_ref` 使用服务端生成路径或 key，不得使用明文词条、input code、reading、上下文或用户可反查内容。
+- 对象存储路径可以包含 `domain_id`、opaque `object_id`、version 和 ciphertext hash；这些字段本身必须已经满足不含明文业务语义。
+- 后续支持 S3-compatible storage 时，S3 object key 遵循同样约束。
+
+上传写入顺序：
+
+1. 服务端先把 encrypted bytes 写入临时 blob。
+2. 计算长度和 ciphertext hash，并与 metadata 比对。
+3. 在 SQLite transaction 中验证版本、设备状态和签名，插入版本 metadata。
+4. 提交后把临时 blob 标记为正式 blob；失败时清理临时 blob。
+5. 如果 blob 已写入但 metadata 提交失败，后台清理只能依据 blob ref 和时间，不读取 payload。
+
+读取顺序：
+
+1. 先读取 SQLite metadata 并检查访问权限。
+2. 再按 `blob_ref` 读取 encrypted bytes。
+3. 返回前可重新校验长度和 ciphertext hash。
+4. 校验失败返回 `storage_unavailable`，并写入非敏感审计事件。
+
+对象版本保留策略：
+
+- 初期保留所有版本，优先保证离线设备能拉取历史冲突上下文。
+- 后续版本 GC 必须有单独策略：至少保留 latest、最近 N 个版本和未被所有 active 设备确认的版本。
+- GC 不能删除 `dictionary.deleted_terms` 的最新 tombstone 对象，也不能用服务端侧删除替代客户端加密 tombstone。
+
+## 版本冲突与客户端合并
+
+服务端只做乐观并发控制：
+
+- `base_version == latest_version`：允许写入下一版本。
+- `base_version < latest_version`：返回 409 和 latest metadata。
+- `base_version > latest_version`：返回 `invalid_request`，说明客户端本地状态与服务端不一致。
+- `version` 必须严格等于 `base_version + 1`。
+
+冲突后的流程：
+
+1. 客户端根据 409 响应拉取 latest encrypted bytes。
+2. 客户端用本地 key 解密。
+3. 客户端按 `ClientSyncMergeInput` 语义合并 user terms、deleted tombstones 和 ranker weights。
+4. 客户端写回本地 userdb。
+5. 客户端重新组装 encrypted object version 并上传。
+
+服务端不得根据 `updated_at_ms`、`key_epoch` 或对象类型自行合并业务内容。`key_epoch` 只用于拒绝撤销后的旧 epoch 新写入和辅助客户端判断。
+
+## 恢复与撤销边界
+
+恢复记录：
+
+- 服务端保存的是 signed recovery record 和 encrypted wrapped material。
+- 恢复码输入、KDF、解包同步域材料和新设备激活都在客户端完成。
+- 服务端可以限制 recovery record 读取频率，但攻击者一旦获得记录仍可能离线尝试恢复码；恢复码强度和 Argon2id 参数不能被服务端限速替代。
+
+设备撤销：
+
+- 接受撤销记录后，服务端必须立即拒绝被撤销设备上传新对象、授权新设备或替换恢复记录。
+- `current_key_epoch` 推进后，服务端拒绝低于当前 epoch 的新对象写入。
+- 历史对象仍可存在；撤销前旧设备已取得的历史密钥无法被服务端追回。
+- 后续如支持历史重加密，应作为独立客户端能力设计，不在服务端悄悄改写 ciphertext。
+
+## 日志与运维
+
+日志允许包含：
+
+- request id
+- route name
+- domain id
+- device id
+- object id
+- object type
+- version
+- encrypted byte length
+- result code
+- latency
+
+日志禁止包含：
+
+- 请求体或响应体。
+- encrypted payload bytes、wrapped material bytes 或 signature bytes。
+- 明文用户词、input code、reading、候选偏好、上下文、P1 事件、恢复码或本地文件路径中的敏感片段。
+- 由 panic / stack trace 泄漏的请求 JSON。
+
+生产配置应提供日志脱敏开关和 panic recovery。发生 `storage_unavailable` 时，日志只记录 blob ref、hash、长度和错误分类，不打印 payload。
+
+## 验证口径
+
+后续 Go server 实现至少需要覆盖：
+
+- API 层没有任何接收 plaintext user term、input code、reading、P1 event 或 ranker 明细的字段。
+- 对象上传拒绝缺失 `ciphertext_hash`、空 `object_id`、非法 `object_type`、非法 `nonce`、0 payload、错误长度和 hash mismatch。
+- 新对象必须使用 `version = 1` / `base_version = 0`；已有对象必须顺序递增。
+- stale `base_version` 返回 409，且响应不包含 payload bytes。
+- 同一 `object_id + version + ciphertext_hash` 重试幂等；同版本不同 hash 拒绝。
+- revoked / pending / unknown device 不能上传对象、授权设备或替换恢复记录。
+- 撤销后 `current_key_epoch` 推进，低于当前 epoch 的新对象写入被拒绝。
+- signed object manifest、device authorization、device revocation 和 recovery record 验签失败时拒绝写入。
+- recovery record 读取和替换遵守限速与签名校验，不接受恢复码明文。
+- SQLite transaction 失败时不留下可达 metadata；blob 写入失败时不提交 metadata。
+- 对象读取时校验 blob 长度和 ciphertext hash；不一致返回 `storage_unavailable`。
+- 审计日志和错误响应不含请求体、payload bytes、wrapped material、恢复码或明文业务字段。
+- `./scripts/check-repo.sh`、`go test ./...` 和后续 server smoke 均通过。
+
+## 实施顺序建议
+
+1. 先补 Go module、配置读取、SQLite migration 和 storage interface 的测试，字段按本文档命名。
+2. 再实现 domain / device / join request / recovery record 的 metadata API，并覆盖签名和设备状态校验。
+3. 再实现 encrypted object 上传下载和版本冲突检测。
+4. 最后再接 Rust `ime-sync` 远端客户端；客户端必须以已加密 envelope 和 signed manifest 为输入，不得把 plaintext payload 交给 server。
+
+任何阶段都不应把 Flutter manager、平台壳、真实系统输入法服务或输入热路径接入 Go server。
+
+## 停止线
+
+- Go server migration、API handler 和 storage tests 未覆盖上述隐私字段阻断前，不实现远端客户端上传下载。
+- 生产恢复流程和平台私钥存储 backend 未稳定前，不提供用户可用同步 UI。
+- 服务端能保存、打印或索引明文用户词、input code、reading、P1 原始事件或候选偏好时，必须停止并回退该设计。
+- 服务端版本冲突检测未稳定前，不允许客户端把本地合并结果自动上传到真实远端。
+- 包分发、P3 资源下载和个人 P2 同步对象必须保持独立 API 与存储边界。

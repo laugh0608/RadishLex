@@ -12,11 +12,11 @@ RadishLex 当前处于 Phase 2 起步阶段：
 - `ime-ranker` 已提供可解释候选重排。
 - `ime-sync` 已提供同步 payload 来源分类、P2 envelope 组装边界、加密对象外壳草案、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型、客户端解密后合并模型、设备授权签名和设备撤销签名模型，并可从 `ime-crypto` envelope 派生上传草案元数据；不连接后端、不实现网络同步。
 - `ime-crypto` 已落地本地加密 crate，覆盖 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、Argon2id recovery KDF、Ed25519 设备签名、test-memory signing key store、key role、object envelope、AAD 绑定、nonce 重复检测、篡改失败、device key descriptor、device wrapping key / record、recovery material、signed sync object manifest、signed recovery record，以及 userdb P2 payload 本地加密 / 解密 / sync draft 派生测试；真实平台设备私钥存储和生产恢复流程尚未落地。
-- `docs/sync-key-management.md` 已固定真实同步前的同步密钥、设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突边界；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 Argon2id KDF、格式、恢复记录字段和验证口径；`docs/adr/0003-device-signing-key-storage.md` 已固定 Ed25519 设备签名、签名对象、私钥存储抽象和验证口径。
+- `docs/sync-key-management.md` 已固定真实同步前的同步密钥、设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突边界；`docs/sync-server-api-storage.md` 已固定 Go sync server API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和验证口径；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 Argon2id KDF、格式、恢复记录字段和验证口径；`docs/adr/0003-device-signing-key-storage.md` 已固定 Ed25519 设备签名、签名对象、私钥存储抽象和验证口径。
 - `ime-ffi` 已提供 C ABI 起步验证，覆盖 ABI contract、opaque handle、session owner-thread policy、session options、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、learning status 只读摘要、sync preflight 状态摘要、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、平台绑定式 view copy / release host smoke、释放函数 panic 边界、demo engine host smoke 和 FFI 调用 runbook。
 - `radishlex-ime-cli` 已提供 `demo`、`rime`、`dict`、`learn status`、`learn select/suppress`、`rank explain`、`rime --rank-db` 和 `sync preflight` 复验入口。
 
-当前下一步仍在 Rust 本地同步加密前置工作内，重点是补齐 Go server API / storage 边界设计，并继续明确生产恢复流程和平台私钥存储 backend 的后续边界。P1 原始事件、本地审计批次和 FFI 明文 payload 继续不得进入同步路径；现阶段不推进平台壳、Flutter manager 主线，也不启动真实上传下载。
+当前下一步仍在同步前置治理内，重点是继续明确生产恢复流程和平台私钥存储 backend；后续若进入 Go server 实现，应先按 `docs/sync-server-api-storage.md` 落 metadata、storage 和 API 验证，不启动真实客户端上传下载。P1 原始事件、本地审计批次和 FFI 明文 payload 继续不得进入同步路径；现阶段不推进平台壳、Flutter manager 主线，也不启动真实上传下载。
 
 ## 设计原则
 
@@ -154,7 +154,7 @@ RadishLex 按 `docs/privacy-sync.md` 的数据分级推进：
 
 当前 `ime-userdb` 可导出 `dictionary.user_terms`、`ranker.weights` 和 `dictionary.deleted_terms` 的 Rust 内部 P2 plaintext payload bytes，并已在测试中通过 `ime-sync::SyncEnvelopeAssembler` 接入 `ime-crypto` envelope 加密、解密和 `ime-sync::EncryptedSyncObjectDraft` 派生。`ranker.weights` 只来自 P1 本地事件压缩后的 P2 权重摘要，不包含原始 selection event、负反馈明细、上下文统计或本地审计批次。`ime-sync` 定义 payload 来源分类、同步对象类型、加密对象外壳校验、P2 envelope 组装边界、设备生命周期、对象版本冲突草案模型和客户端解密后合并模型；`ime-userdb` 已能把已解密 P2 JSON 解析为该合并模型需要的记录，并把被接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite。它们都不实现网络客户端、生产恢复流程、平台私钥存储 backend 或远端上传下载。
 
-`docs/sync-key-management.md` 已补同步密钥与设备生命周期设计，当前 Rust 侧已落 key epoch、device wrapping、加入请求、授权包、撤销记录、恢复材料模型、恢复码 KDF 模型、P2 envelope 组装边界、客户端合并模型和 userdb 写回执行器，并覆盖撤销后旧 epoch key 不能解密新对象、授权设备和接收设备都必须 active、版本冲突检测边界、恢复码校验 / KDF / AAD 失败、删除 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词和显式恢复语义。签名 / 设备密钥存储边界已由 ADR 固定；后续应先补 Go server API / storage 边界设计，并继续收敛生产恢复流程和平台私钥存储 backend。
+`docs/sync-key-management.md` 已补同步密钥与设备生命周期设计，当前 Rust 侧已落 key epoch、device wrapping、加入请求、授权包、撤销记录、恢复材料模型、恢复码 KDF 模型、P2 envelope 组装边界、客户端合并模型和 userdb 写回执行器，并覆盖撤销后旧 epoch key 不能解密新对象、授权设备和接收设备都必须 active、版本冲突检测边界、恢复码校验 / KDF / AAD 失败、删除 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词和显式恢复语义。签名 / 设备密钥存储边界已由 ADR 固定；`docs/sync-server-api-storage.md` 已补 Go server API / storage 边界，服务端只做密文对象、设备公钥、签名记录、版本和必要元数据管理。后续应继续收敛生产恢复流程和平台私钥存储 backend。
 
 ## Clean-room 原则
 
@@ -198,7 +198,7 @@ MVP 至少需要证明：
 - userdb schema、删除语义、导入导出和 ranker explain 未稳定前，不接远端同步。
 - FFI 所有权、生命周期、错误语义、字符串编码、线程模型和释放责任未明确前，不推进平台壳。
 - Rime native smoke 和学习层复验未稳定前，不推进复杂平台候选窗或管理 UI。
-- 生产恢复流程、平台私钥存储 backend 和 Go server API / storage 边界未稳定前，不进入真实远端上传下载或管理 UI 同步主线。
+- 生产恢复流程和平台私钥存储 backend 未稳定前，不进入真实远端上传下载或管理 UI 同步主线；Go server 实现如启动，只能先按专题文档验证 metadata、storage、签名和版本冲突边界。
 
 ## 专题文档索引
 
@@ -209,6 +209,7 @@ MVP 至少需要证明：
 - [同步 Payload 草案](sync-payload.md)：同步对象类型、P1/P2 来源分类、加密对象外壳和验证口径。
 - [ime-crypto 边界设计](crypto-boundary.md)：客户端加密、密钥、envelope、删除同步和验证边界。
 - [同步密钥与设备生命周期设计](sync-key-management.md)：同步密钥、设备授权、恢复码、设备撤销、key epoch 和冲突边界。
+- [同步服务端 API 与存储边界](sync-server-api-storage.md)：Go sync server API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和停止线。
 - [ADR 0002: 恢复码 KDF 与同步域恢复边界](adr/0002-recovery-code-kdf.md)：恢复码格式、Argon2id KDF 参数、恢复记录字段和生产实现验证口径。
 - [ADR 0003: 设备签名与私钥存储边界](adr/0003-device-signing-key-storage.md)：设备签名、签名对象、私钥存储抽象、错误语义和测试口径。
 - [FFI 边界](ffi-boundary.md)：C ABI 职责、所有权、生命周期、错误语义和平台壳停止线。

@@ -1,6 +1,6 @@
 # RadishLex 同步 Payload 草案
 
-本文档定义当前 Rust 侧同步 payload 草案、数据分级映射和验证口径，读者是后续实现 `ime-sync`、`ime-crypto`、同步 CLI、Go server 和管理 UI 的开发者。本文不包含加密算法实现、设备授权流程完整协议、HTTP API、Go server 数据库 migration 或远端同步客户端实现；客户端加密边界见 `docs/crypto-boundary.md`。
+本文档定义当前 Rust 侧同步 payload 草案、数据分级映射和验证口径，读者是后续实现 `ime-sync`、`ime-crypto`、同步 CLI、Go server 和管理 UI 的开发者。本文不包含加密算法实现、设备授权流程完整协议、Go server 数据库 migration 或远端同步客户端实现；客户端加密边界见 `docs/crypto-boundary.md`，Go server API 与 storage 边界见 `docs/sync-server-api-storage.md`。
 
 ## 当前定位
 
@@ -57,7 +57,7 @@ settings.schema
 backup.snapshot
 ```
 
-本阶段只验证类型和边界，当前已定义 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 plaintext payload 字段序列化，并已证明它们可以进入 `ime-crypto` envelope 后派生成 `EncryptedSyncObjectDraft`。`docs/sync-key-management.md` 已固定设备授权、key management 和冲突语义；Rust 侧已补同步域、设备状态、加入请求、授权包、撤销记录、key epoch、对象版本冲突草案模型和 envelope 组装边界。服务端只能看到对象类型、设备 ID、key id、key epoch、algorithm、nonce、版本、密文大小、ciphertext hash 和时间戳。
+本阶段只验证类型和边界，当前已定义 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 plaintext payload 字段序列化，并已证明它们可以进入 `ime-crypto` envelope 后派生成 `EncryptedSyncObjectDraft`。`docs/sync-key-management.md` 已固定设备授权、key management 和冲突语义；`docs/sync-server-api-storage.md` 已固定远端 API、SQLite metadata、对象存储和版本冲突边界；Rust 侧已补同步域、设备状态、加入请求、授权包、撤销记录、key epoch、对象版本冲突草案模型和 envelope 组装边界。服务端只能看到对象类型、设备 ID、key id、key epoch、algorithm、nonce、版本、密文大小、ciphertext hash 和时间戳。
 
 ## Plaintext Payload
 
@@ -212,7 +212,7 @@ updated_at_ms
 
 - `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
 - 真实设备密钥存储、生产恢复流程和远端密钥轮换执行器。
-- 客户端上传补丁生成、远端对象拉取、HTTP API、Go server 存储和服务端版本冲突检测。
+- 客户端上传补丁生成、远端对象拉取、HTTP API handler、Go server 存储实现和服务端版本冲突检测实现。
 - 生产同步设置、备份快照、管理 UI 同步状态和平台私钥存储 backend。
 
 ## 验证口径
