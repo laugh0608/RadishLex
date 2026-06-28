@@ -19,6 +19,7 @@
 - `docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend、capability metadata、FFI 边界、错误语义、迁移和停止线。
 - `ime-crypto` 已补 Ed25519 设备签名、`test-memory-v1` signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断签名 / 导出、signed sync object manifest 和 signed recovery record；`ime-sync` 已补 signed device authorization 与 signed device revocation。
 - `ime-userdb` 已补已解密 P2 JSON 到 merge input 的解析入口，并能把合并模型接受的 user terms、deleted tombstones 和 ranker weights 写回真实 SQLite。
+- Go server storage skeleton 已保存 join request 公钥、authorization metadata、wrapping metadata、revocation metadata、recovery metadata、object metadata 和密文 blob；其中 device wrapping 目前只保存 `wrapped_key_len` / `ciphertext_hash` / signature 等 metadata，还没有 wrapped key bytes 的读取承载，进入真实 join authorization handler 前必须补齐。
 
 当前仍不做：
 
@@ -121,6 +122,13 @@ SyncDevice
 - `DeviceRevocationRecord` 要求 `new_key_epoch` 大于 `previous_key_epoch`，用于表达撤销后续对象必须进入新 epoch。
 - `SyncObjectVersion::needs_client_merge_against` 只判断 base version 是否落后于远端版本，用于触发客户端合并；它不是合并执行器。
 
+Rust 与 Go 的包装记录边界：
+
+- `ime-crypto::DeviceWrappingRecord` 持有 `encrypted_key` bytes，并在 Debug 中脱敏。
+- `ime-sync::DeviceAuthorizationPackage` 与 `SignedDeviceAuthorization` 只签 recipient、authorizer、join challenge / short code、key epoch、wrapping key id 和 `encrypted_key_len`，不复制密文本体。
+- Go server 当前只落地 authorization / wrapping metadata storage，不保存 wrapped key bytes；后续 handler 必须把 wrapped key bytes 作为密文 blob 或等价字段保存，并在读取时复验长度和 ciphertext hash。
+- 服务端永远不能从 wrapping record 推导 `SyncMasterKey`，也不能把 wrapped key bytes 写进日志、错误响应或审计 payload。
+
 ## 新设备加入
 
 已有设备授权流程：
@@ -213,7 +221,7 @@ updated_at_ms
 
 - `domain_id`
 - `device_id`
-- 设备公钥和 key id
+- 设备 signing / key agreement 公钥和 key id
 - `object_id`
 - `object_type`
 - `version`
@@ -226,6 +234,8 @@ updated_at_ms
 - `ciphertext_hash`
 - `created_at_ms`
 - `updated_at_ms`
+- device authorization / revocation / recovery / object manifest signature
+- wrapped key / recovery material / object payload 的密文长度、ciphertext hash 和 blob ref
 
 服务端不得可见：
 
@@ -256,7 +266,7 @@ updated_at_ms
 14. 已补 Go server API / storage 边界设计。
 15. 已补生产恢复流程设计和平台私钥存储 backend ADR。
 16. 已起步 Go server metadata / storage / API 验证模型，当前覆盖配置默认值、API request / error DTO、SQLite migration 文本、storage interface、storage conformance tests、内存 storage、SQLite-backed metadata repository、local object storage staged transaction、版本冲突、撤销设备阻断和隐私字段检查。
-17. 后续按 `docs/sync-server-api-storage.md` 推进 Go server 签名、metadata API、版本冲突和错误语义验证。
+17. 后续推进 Go server 签名验证抽象时，需要同步补齐 device wrapping encrypted key bytes 承载和 recovery wrapped material 读取接口；这些 storage gap 与签名、metadata API、版本冲突和错误语义验证都必须在真实 handler 前完成。
 
 ## 验证口径
 
@@ -274,10 +284,12 @@ updated_at_ms
 - 已解密 userdb P2 payload 写回必须只应用被合并模型接受的记录，并在事务内覆盖 user terms、deleted tombstones、ranker weights、显式恢复清理和旧权重阻断。
 - 损坏的 envelope、非法 base version、未知设备状态和空 key id 必须返回明确错误。
 - 平台私钥存储 backend unavailable 时，签名、授权、撤销和恢复记录轮换必须明确失败，不能回退到 `test-memory-v1`。
+- Go server 的 device authorization API 未覆盖 wrapped key bytes 密文存储 / 读取前，不能作为真实新设备加入入口。
 
 ## 停止线
 
 - 恢复码 KDF 算法、参数、格式、Rust model 和生产恢复流程设计已落地；服务端恢复记录 API 与管理 UI 未实现前，不提供用户可用恢复入口。
 - 设备签名模型、签名对象验证、私钥存储抽象和平台私钥存储 backend capability / unavailable backend Rust 模型已落地；平台 runbook 和真实 backend 未完成前，不做远端对象上传下载。
+- 服务端若只能保存 wrapping metadata 而不能保存 / 返回 wrapped key bytes，则不得开放真实设备授权 handler。
 - Go server 实现继续推进时，必须先满足 `docs/sync-server-api-storage.md` 的签名、metadata API、版本冲突和错误语义验证。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。

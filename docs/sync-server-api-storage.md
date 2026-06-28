@@ -79,7 +79,9 @@ domain_id
 join_request_id
 device_id
 signing_public_key_id
+signing_public_key
 key_agreement_public_key_id
+key_agreement_public_key
 challenge
 created_at_ms
 expires_at_ms
@@ -87,6 +89,22 @@ status
 ```
 
 服务端只转发待授权设备的公钥、challenge 和状态。短码应由客户端根据加入请求内容本地计算和展示，服务端不需要保存短码明文。
+
+`device_authorizations`：
+
+```text
+domain_id
+join_request_id
+authorizer_device_id
+recipient_device_id
+recipient_signing_public_key_id
+recipient_key_agreement_key_id
+key_epoch
+created_at_ms
+signature
+```
+
+授权记录只证明某个 active 设备接受了待加入设备的公钥和指定 key epoch，不包含同步主密钥明文或恢复码。当前 Go storage 会在同一事务中把 join request 置为 active、写入授权记录、写入 wrapping metadata，并激活接收设备。
 
 `device_wrapping_records`：
 
@@ -104,7 +122,7 @@ created_at_ms
 signature
 ```
 
-包装记录只保存给指定设备的密文材料和签名，不保存 `SyncMasterKey`、`DeviceWrappingKey` 或恢复码明文。
+包装记录只保存给指定设备的包装密文元数据和签名，不保存 `SyncMasterKey`、`DeviceWrappingKey` 或恢复码明文。当前 Go storage skeleton 只保存 `wrapped_key_len`、`ciphertext_hash`、nonce、algorithm 和 signature，还没有保存 / 读取 wrapped key bytes 的 blob ref 或等价字段；在实现真实 join authorization handler 前，必须先补齐 wrapped key bytes 的服务端承载方式，并继续保证该字段只是密文 bytes。
 
 `device_revocations`：
 
@@ -136,7 +154,9 @@ ciphertext_hash
 status
 created_at_ms
 revoked_at_ms
+signer_device_id
 signature
+blob_ref
 ```
 
 恢复记录只保存加密后的同步域材料和 KDF 参数。服务端可以对读取和替换恢复记录做限速，但不能依赖限速替代恢复码强度。
@@ -193,6 +213,16 @@ server_time_ms
 ```
 
 审计记录不得保存请求体、响应体、密文包装材料、恢复码、plaintext payload 或错误堆栈中的敏感字段。
+
+## 当前 Go storage surface
+
+当前 `server/sync-server/internal/storage.Store` 是 HTTP handler 前的内部边界，已经落地 `CreateDomain`、`Domain`、`Device`、`SaveJoinRequest`、`AuthorizeJoinRequest`、`RevokeDevice`、`PutRecoveryRecord`、`LatestRecoveryRecord`、`PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`。
+
+这组方法当前用于验证 metadata、设备状态、版本冲突、blob 写入和错误语义，不等同于完整 HTTP API。尚未暴露对象分页、join request 列表、recovery wrapped material 读取、wrapped device key bytes 读取、审计日志查询或限速器。
+
+当前 storage conformance 已覆盖：第一台设备必须为 `active`；join request 从 `pending` 授权到 `active`；revoked 设备和旧 `key_epoch` 写入被拒绝；object version 支持同 hash 幂等重试、同版本不同 hash 冲突和 stale `base_version` latest metadata；object payload 读取复验长度 / ciphertext hash；recovery record 写入校验 wrapped material 长度 / ciphertext hash 并分配 `blob_ref`。
+
+当前 storage 尚未做真实 Ed25519 验签；`signature` 字段只要求存在。下一步签名验证抽象必须在写入前覆盖 object manifest、device authorization、device revocation 和 recovery record，并使用 `devices.signing_public_key` 作为验签公钥来源。
 
 ## HTTP API 边界
 
@@ -329,13 +359,23 @@ latest_ciphertext_hash
 - 对象存储路径可以包含 `domain_id`、opaque `object_id`、version 和 ciphertext hash；这些字段本身必须已经满足不含明文业务语义。
 - 后续支持 S3-compatible storage 时，S3 object key 遵循同样约束。
 
-上传写入顺序：
+当前配置默认值：`RADISHLEX_SYNC_LISTEN=127.0.0.1:7319`、`RADISHLEX_SYNC_METADATA_PATH=data/sync-server.sqlite`、`RADISHLEX_SYNC_BLOB_DIR=data/objects`、`RADISHLEX_SYNC_MAX_OBJECT_BYTES=16 MiB`、`RADISHLEX_SYNC_RECOVERY_READS_PER_HOUR=12`。
 
-1. 服务端先把 encrypted bytes 写入临时 blob。
-2. 计算长度和 ciphertext hash，并与 metadata 比对。
-3. 在 SQLite transaction 中验证版本、设备状态和签名，插入版本 metadata。
-4. 提交后把临时 blob 标记为正式 blob；失败时清理临时 blob。
-5. 如果 blob 已写入但 metadata 提交失败，后台清理只能依据 blob ref 和时间，不读取 payload。
+当前 local object storage 的 `blob_ref` 校验规则：
+
+- 必须是安全相对路径，不允许绝对路径、反斜杠、冒号、`..`、非 canonical path 或 `.tmp` 保留命名空间。
+- 只允许 ASCII 字母、数字、`/`、`.`、`_`、`-`。
+- 当前 object / recovery blob ref 由服务端生成，并把 `domain_id`、`object_id`、`recovery_record_id`、`ciphertext_hash` 等 opaque 字段做 URL-safe base64 path component，避免路径分隔和 shell 特殊字符污染。
+
+当前对象上传写入顺序：
+
+1. 服务端先校验 metadata 与 encrypted bytes 的长度 / ciphertext hash。
+2. 在 SQLite transaction 中验证 domain、设备状态、key epoch、版本关系和对象类型。
+3. 把 encrypted bytes 写入 local object storage 临时 blob。
+4. 在 SQLite transaction 中插入或更新 object metadata 与 version metadata。
+5. 将临时 blob 提升为正式 blob；若同 ref 已存在且 bytes 相同，视为幂等成功；若 bytes 不同，返回 `conflict_object_version`。
+6. 提交 SQLite transaction；若提交失败，删除刚提升的正式 blob。
+7. 任何 metadata 失败或 hash / length mismatch 都必须清理 staged blob，不留下可达 metadata。
 
 读取顺序：
 
@@ -424,6 +464,8 @@ latest_ciphertext_hash
 - recovery record 读取和替换遵守限速与签名校验，不接受恢复码明文。
 - SQLite transaction 失败时不留下可达 metadata；blob 写入失败时不提交 metadata。
 - 对象读取时校验 blob 长度和 ciphertext hash；不一致返回 `storage_unavailable`。
+- device wrapping record 进入真实授权 handler 前，必须覆盖 wrapped key bytes 的存储和读取测试；只保存 `wrapped_key_len` / `ciphertext_hash` 不足以让新设备取得同步域材料。
+- recovery record 进入真实恢复 handler 前，必须覆盖 latest metadata 与 wrapped material bytes 一起读取，且读取响应仍不得包含恢复码、KDF 输出或同步主密钥明文。
 - 审计日志和错误响应不含请求体、payload bytes、wrapped material、恢复码或明文业务字段。
 - `./scripts/check-repo.sh`、`go test ./...` 和后续 server smoke 均通过。
 
@@ -431,10 +473,11 @@ latest_ciphertext_hash
 
 1. 已补 Go module、配置默认值、API request / error DTO、SQLite migration 文本、storage interface、storage conformance tests、内存 metadata store 和 local object storage staged transaction，字段按本文档命名。
 2. 已补 SQLite-backed metadata repository，并把 metadata transaction 与 local object storage transaction 接起来，覆盖 blob 写入、metadata 提交、失败清理、读取 hash 复验和 conformance tests。
-3. 后续补签名验证抽象与测试，覆盖 object manifest、device authorization、device revocation 和 recovery record 的验签失败路径。
-4. 再实现 domain / device / join request / recovery record 的 metadata API，并覆盖设备状态校验和错误响应。
-5. 再实现 encrypted object 上传下载和版本冲突检测。
-6. 最后再接 Rust `ime-sync` 远端客户端；客户端必须以已加密 envelope 和 signed manifest 为输入，不得把 plaintext payload 交给 server。
+3. 补齐当前 storage gap：device wrapping wrapped key bytes 的承载方式，以及 recovery wrapped material 的读取接口；这两项必须继续走密文 bytes + hash / length 校验，不引入明文 key。
+4. 后续补签名验证抽象与测试，覆盖 object manifest、device authorization、device revocation 和 recovery record 的验签失败路径。
+5. 再实现 domain / device / join request / recovery record 的 metadata API，并覆盖设备状态校验和错误响应。
+6. 再实现 encrypted object 上传下载和版本冲突检测。
+7. 最后再接 Rust `ime-sync` 远端客户端；客户端必须以已加密 envelope 和 signed manifest 为输入，不得把 plaintext payload 交给 server。
 
 任何阶段都不应把 Flutter manager、平台壳、真实系统输入法服务或输入热路径接入 Go server。
 
@@ -442,6 +485,8 @@ latest_ciphertext_hash
 
 - Go server migration、API handler 和 storage tests 未覆盖上述隐私字段阻断前，不实现远端客户端上传下载。
 - 平台私钥存储 backend 能力模型已落地；真实平台 backend 验证未完成前，不提供用户可用同步 UI。
+- device authorization handler 不能在 wrapped key bytes 没有存储 / 读取语义时对外开放；否则新设备只能看到 wrapping metadata，无法取得密文同步域材料。
+- recovery latest handler 不能在 wrapped material bytes 读取、限速和日志脱敏没有测试时对外开放。
 - 服务端能保存、打印或索引明文用户词、input code、reading、P1 原始事件或候选偏好时，必须停止并回退该设计。
 - 服务端版本冲突检测未稳定前，不允许客户端把本地合并结果自动上传到真实远端。
 - 包分发、P3 资源下载和个人 P2 同步对象必须保持独立 API 与存储边界。

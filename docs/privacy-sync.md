@@ -95,7 +95,7 @@ SyncObject
 
 `docs/crypto-boundary.md` 已补 `ime-crypto` 客户端加密边界，并已落地本地 AEAD envelope、ciphertext hash、device wrapping、recovery material 和撤销后 key epoch 解密边界测试。后续服务端可见 hash 必须是 ciphertext hash 或密文加 AAD 的 hash，不得是 plaintext payload hash。
 
-`docs/sync-key-management.md` 已补真实同步前的同步密钥与设备生命周期边界，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突方向；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF、格式和恢复记录边界，`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名和私钥存储边界，`docs/sync-server-api-storage.md` 已固定 Go sync server 的 API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和验证口径，`docs/production-recovery-flow.md` 已固定生产恢复记录创建 / 轮换 / 撤销、新设备恢复加入和失败限速，`docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend 边界；`ime-crypto` 已落地恢复码 KDF Rust 模型、恢复记录解密测试、Ed25519 test-memory signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断、signed sync object manifest 和 signed recovery record；`ime-sync` 已落地 signed device authorization / revocation；Go server 已起步 metadata / storage / API 验证模型、SQLite-backed metadata repository 和 local object storage staged transaction。进入真实上传下载前，应先完成签名验证、metadata API、版本冲突、错误语义和平台 backend 验证。
+`docs/sync-key-management.md` 已补真实同步前的同步密钥与设备生命周期边界，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突方向；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF、格式和恢复记录边界，`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名和私钥存储边界，`docs/sync-server-api-storage.md` 已固定 Go sync server 的 API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和验证口径，`docs/production-recovery-flow.md` 已固定生产恢复记录创建 / 轮换 / 撤销、新设备恢复加入和失败限速，`docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend 边界；`ime-crypto` 已落地恢复码 KDF Rust 模型、恢复记录解密测试、Ed25519 test-memory signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断、signed sync object manifest 和 signed recovery record；`ime-sync` 已落地 signed device authorization / revocation；Go server 已起步 metadata / storage / API 验证模型、SQLite-backed metadata repository 和 local object storage staged transaction。进入真实上传下载前，应先完成签名验证、device wrapping encrypted key bytes 承载、recovery wrapped material 读取、metadata API、版本冲突、错误语义和平台 backend 验证。
 
 ## 设备授权
 
@@ -173,7 +173,7 @@ sqlite
 local object storage
 ```
 
-SQLite 只保存 domain、device、join request、authorization、revocation、recovery record、object metadata、blob ref 和非敏感审计事件；local object storage 只保存 encrypted payload bytes 和 encrypted wrapped material bytes。业务删除通过 `dictionary.deleted_terms` 加密对象表达，服务端级删除只用于用户明确清空同步域密文数据或管理员清理整域数据。
+SQLite 只保存 domain、device、join request、authorization、revocation、recovery record、object metadata、blob ref 和非敏感审计事件；local object storage 只保存 encrypted object payload、recovery wrapped material，以及后续 device authorization wrapped key bytes 这类密文材料。当前 Go storage 尚未暴露 wrapped key bytes 和 recovery wrapped material 读取链路，真实设备授权 / 恢复 handler 前必须补齐并复验 hash / length。业务删除通过 `dictionary.deleted_terms` 加密对象表达，服务端级删除只用于用户明确清空同步域密文数据或管理员清理整域数据。
 
 Docker Compose 服务：
 
