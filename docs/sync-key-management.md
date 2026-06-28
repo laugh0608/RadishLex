@@ -1,6 +1,6 @@
 # RadishLex 同步密钥与设备生命周期设计
 
-本文档定义 RadishLex 进入真实同步前必须稳定的同步密钥、设备授权、恢复码、设备撤销、key epoch 和冲突边界。读者是后续实现 `ime-crypto`、`ime-sync`、Go sync server、管理 UI 同步页面和审阅隐私边界的开发者。本文不包含 Go server migration、Flutter 页面设计、平台输入法接入流程、生产恢复码代码或生产密钥存储实现；Go server API 与 storage 边界见 `docs/sync-server-api-storage.md`。
+本文档定义 RadishLex 进入真实同步前必须稳定的同步密钥、设备授权、恢复码、设备撤销、key epoch 和冲突边界。读者是后续实现 `ime-crypto`、`ime-sync`、Go sync server、管理 UI 同步页面和审阅隐私边界的开发者。本文不包含 Go server migration、Flutter 页面设计、平台输入法接入流程、生产恢复码代码或生产密钥存储实现；Go server API 与 storage 边界见 `docs/sync-server-api-storage.md`，生产恢复流程见 `docs/production-recovery-flow.md`，平台私钥存储 backend 边界见 `docs/adr/0004-platform-private-key-storage-backend.md`。
 
 ## 当前定位
 
@@ -15,6 +15,8 @@
 - `ime-sync` 已补 `SyncDomain`、`SyncDevice`、`DeviceJoinRequest`、`DeviceAuthorizationPackage`、`DeviceRevocationRecord` 和 `SyncObjectVersion` 草案模型。
 - `docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF 采用 Argon2id、`RLX1` 格式、恢复记录字段、失败限速和验证口径。
 - `docs/adr/0003-device-signing-key-storage.md` 已固定设备签名、签名对象、私钥存储抽象、错误语义和验证口径。
+- `docs/production-recovery-flow.md` 已固定生产恢复记录创建、轮换、撤销、新设备恢复加入、全部设备丢失、失败限速和停止线。
+- `docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend、capability metadata、FFI 边界、错误语义、迁移和停止线。
 - `ime-crypto` 已补 Ed25519 设备签名、`test-memory-v1` signing key store、signed sync object manifest 和 signed recovery record；`ime-sync` 已补 signed device authorization 与 signed device revocation。
 - `ime-userdb` 已补已解密 P2 JSON 到 merge input 的解析入口，并能把合并模型接受的 user terms、deleted tombstones 和 ranker weights 写回真实 SQLite。
 
@@ -25,7 +27,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步应继续收敛生产恢复流程和平台私钥存储 backend。若进入 Go server 代码，应先按 `docs/sync-server-api-storage.md` 验证 metadata、storage、签名、版本冲突和错误语义；生产恢复流程、平台私钥存储 backend 和客户端上传下载语义没有稳定前，不应启动真实远端同步主线。
+下一步若进入代码，应先补平台私钥存储 backend capability / unavailable backend 的 Rust 模型和测试，再按 `docs/sync-server-api-storage.md` 验证 Go server metadata、storage、签名、版本冲突和错误语义；平台 backend 未通过验证前，不应启动真实远端同步主线。
 
 ## 设计目标
 
@@ -150,7 +152,7 @@ SyncDevice
 
 - 恢复码只能用于恢复同步域材料，不能作为服务端登录密码。
 - 恢复参数可以公开保存，但不得降低离线攻击成本到不可接受水平。
-- 恢复码 KDF 参数、格式、校验段和失败限速策略已由 `docs/adr/0002-recovery-code-kdf.md` 固定；当前 Rust model / test 已覆盖格式解析、KDF 派生和恢复记录解密，生产恢复流程仍需管理 UI、服务端记录和设备状态接线。
+- 恢复码 KDF 参数、格式、校验段和失败限速策略已由 `docs/adr/0002-recovery-code-kdf.md` 固定；生产恢复记录创建、轮换、撤销和新设备恢复加入见 `docs/production-recovery-flow.md`。当前 Rust model / test 已覆盖格式解析、KDF 派生和恢复记录解密，管理 UI 和服务端 handler 仍未实现。
 
 ## 设备撤销与 key epoch
 
@@ -251,7 +253,9 @@ updated_at_ms
 11. 已补真实 userdb P2 payload 解析到 merge input 的接线。
 12. 已补客户端合并结果写回真实 userdb 的执行器。
 13. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
-14. 已补 Go server API / storage 边界设计，后续继续补生产恢复流程和平台私钥存储 backend。
+14. 已补 Go server API / storage 边界设计。
+15. 已补生产恢复流程设计和平台私钥存储 backend ADR。
+16. 后续补平台私钥存储 backend capability / unavailable backend 的 Rust 模型和测试。
 
 ## 验证口径
 
@@ -268,11 +272,11 @@ updated_at_ms
 - `dictionary.deleted_terms` tombstone 能压过旧 user terms 和旧 ranker weights；旧 epoch 上传不能靠更晚本机时间复活删除词，显式恢复必须晚于 tombstone，且恢复前旧权重不随词条恢复一起复活。
 - 已解密 userdb P2 payload 写回必须只应用被合并模型接受的记录，并在事务内覆盖 user terms、deleted tombstones、ranker weights、显式恢复清理和旧权重阻断。
 - 损坏的 envelope、非法 base version、未知设备状态和空 key id 必须返回明确错误。
+- 平台私钥存储 backend unavailable 时，签名、授权、撤销和恢复记录轮换必须明确失败，不能回退到 `test-memory-v1`。
 
 ## 停止线
 
-- 恢复码 KDF 算法、参数、格式和 Rust model 已落地；生产恢复流程未接入设备状态、服务端恢复记录和管理 UI 前，不实现用户可用恢复码入口。
-- 设备签名与私钥存储边界已通过 ADR 固化；Rust 签名模型、签名对象验证和私钥存储抽象未落地前，不做远端对象上传下载。
-- 生产恢复码实现、签名 / 设备密钥存储模型和历史重加密策略未固化前，不实现生产恢复流程。
-- 生产恢复流程和平台私钥存储 backend 未稳定前，不做远端上传下载；Go server 实现如启动，必须先满足 `docs/sync-server-api-storage.md` 的 metadata、storage、签名、版本冲突和错误语义验证。
+- 恢复码 KDF 算法、参数、格式、Rust model 和生产恢复流程设计已落地；服务端恢复记录 API 与管理 UI 未实现前，不提供用户可用恢复入口。
+- 设备签名模型、签名对象验证和私钥存储抽象已落地；平台私钥存储 backend capability / unavailable backend Rust 模型和平台 runbook 未完成前，不做远端对象上传下载。
+- Go server 实现如启动，必须先满足 `docs/sync-server-api-storage.md` 的 metadata、storage、签名、版本冲突和错误语义验证。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。

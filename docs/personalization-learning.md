@@ -480,9 +480,9 @@ cargo test --workspace
 26. 已补 `docs/adr/0002-recovery-code-kdf.md`，固定恢复码 KDF 算法、参数、格式、恢复记录字段和验证口径。
 27. 已补 `ime-crypto` 恢复码 KDF Rust 模型，覆盖恢复码格式 / 校验段、Argon2id profile、恢复 wrapping key、恢复记录 AAD、错误恢复码失败和 Debug 脱敏。
 28. 已补 `docs/adr/0003-device-signing-key-storage.md`，固定设备签名、签名对象、canonical bytes、私钥存储抽象、错误语义和验证口径。
-29. 已补签名 / 设备密钥存储 Rust 模型，覆盖 Ed25519 test-memory signer、signed sync object manifest、signed recovery record、signed device authorization 和 signed device revocation；在生产恢复流程和平台私钥存储 backend 稳定前，不进入远端同步或管理 UI 同步主线。
+29. 已补签名 / 设备密钥存储 Rust 模型，覆盖 Ed25519 test-memory signer、signed sync object manifest、signed recovery record、signed device authorization 和 signed device revocation；生产恢复流程和平台私钥存储 backend 边界已由文档固定，平台 backend capability / unavailable backend Rust 模型未补前，不进入远端同步或管理 UI 同步主线。
 30. 已补真实 userdb P2 payload 解析到 merge input 的接线。
-31. 已补合并结果写回真实 userdb 的事务执行器；在 Go server API / storage 边界、生产恢复流程和平台私钥存储 backend 稳定前，不进入远端上传下载或管理 UI 同步主线。
+31. 已补合并结果写回真实 userdb 的事务执行器；Go server API / storage、生产恢复流程和平台私钥存储 backend 边界已固定，真实远端上传下载仍等待平台 backend capability 模型和 Go server metadata / storage 验证。
 
 阶段停止线：
 

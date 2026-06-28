@@ -1,6 +1,6 @@
 # ADR 0002: 恢复码 KDF 与同步域恢复边界
 
-本文档用于固定 RadishLex 恢复码派生同步域恢复材料的算法、参数、数据边界和后续测试口径，读者是后续实现 `ime-crypto`、`ime-sync`、Go sync server 和管理 UI 同步恢复流程的开发者与审阅者。本文不包含生产恢复码代码、系统 Keychain / Keystore 接入、HTTP API、Flutter 页面设计或真实设备配对 UI。
+本文档用于固定 RadishLex 恢复码派生同步域恢复材料的算法、参数、数据边界和后续测试口径，读者是后续实现 `ime-crypto`、`ime-sync`、Go sync server 和管理 UI 同步恢复流程的开发者与审阅者。本文不包含生产恢复码代码、系统 Keychain / Keystore 接入、HTTP API、Flutter 页面设计或真实设备配对 UI；生产恢复记录创建、轮换、撤销和新设备恢复加入流程见 `docs/production-recovery-flow.md`。
 
 ## 状态
 
@@ -177,7 +177,7 @@ KDF 参数必须版本化：
 - 已提供 Rust 内部 `RecoveryMaterial::encrypt_sync_master_key` / `decrypt_sync_master_key` 测试路径，用合成恢复码和合成同步主密钥复验恢复记录加解密。
 - 不把 KDF 或恢复入口暴露给 FFI，直到所有权、错误语义和敏感数据清理策略固定。
 - 不新增 CLI 明文恢复码导出命令；CLI 只能在明确测试模式下使用合成恢复码 fixture。
-- 先保持纯 Rust model / test，再考虑 Go server API、管理 UI 恢复流程和系统密钥存储。
+- 生产恢复流程边界已由 `docs/production-recovery-flow.md` 固定；当前仍先保持纯 Rust model / test，再考虑 Go server API、管理 UI 恢复流程和系统密钥存储。
 
 ## 验证口径
 

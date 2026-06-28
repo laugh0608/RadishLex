@@ -1,6 +1,6 @@
 # ADR 0003: 设备签名与私钥存储边界
 
-本文档用于固定 RadishLex 真实远端同步前的设备签名、签名对象、私钥存储抽象、错误语义和测试口径，读者是后续实现 `ime-crypto`、`ime-sync`、Go sync server、管理 UI 设备页面和平台密钥存储接线的开发者与审阅者。本文不包含生产签名代码、系统 Keychain / Keystore / DPAPI / Secret Service 接入、HTTP API、Flutter 页面设计或真实平台授权交互。
+本文档用于固定 RadishLex 真实远端同步前的设备签名、签名对象、私钥存储抽象、错误语义和测试口径，读者是后续实现 `ime-crypto`、`ime-sync`、Go sync server、管理 UI 设备页面和平台密钥存储接线的开发者与审阅者。本文不包含生产签名代码、系统 Keychain / Keystore / DPAPI / Secret Service 接入、HTTP API、Flutter 页面设计或真实平台授权交互；平台私钥存储 backend 决策见 `docs/adr/0004-platform-private-key-storage-backend.md`。
 
 ## 状态
 
@@ -229,7 +229,7 @@ last_used_at_ms
 
 - 生产 backend 不允许导出私钥 bytes。
 - 测试 backend 可以使用合成可导出 key，但必须标记为 `test-memory-v1`，不得进入生产配置。
-- `storage_backend` 初期只允许 `test-memory-v1` 或 `unavailable`；Apple Keychain、Android Keystore、Windows CNG / DPAPI、Linux Secret Service 等平台 backend 后续单独设计和实机验证。
+- `storage_backend` 初期只允许 `test-memory-v1` 或 `unavailable`；Apple Keychain、Android Keystore、Windows CNG、Linux Secret Service 等平台 backend 边界由 ADR 0004 固定，具体实现仍需平台验证。
 - FFI 不导出私钥、签名 handle 内部指针、canonical bytes helper 或签名 API，直到平台线程、生命周期和错误语义稳定。
 - CLI 不新增生产签名命令；测试命令若后续加入，必须只使用合成 fixture。
 
@@ -259,7 +259,7 @@ last_used_at_ms
 - `ime-crypto` 已覆盖 `SignedSyncObjectManifest` 与 `SignedRecoveryRecordManifest`；`ime-sync` 已覆盖 `SignedDeviceAuthorization` 与 `SignedDeviceRevocation`，并接入设备状态校验。
 - 暂不接系统 Keychain / Keystore，不引入平台 SDK，不暴露 FFI。
 - 当前签名依赖为 `ed25519-dalek = 2.2.0`，许可 `BSD-3-Clause`；当前 test-memory signer 使用合成 seed，不依赖系统 RNG 创建生产 key。
-- 后续再设计 Go server API、平台存储 backend 和生产 key 创建流程。
+- Go server API 与平台存储 backend 边界已分别由 `docs/sync-server-api-storage.md` 和 ADR 0004 固定；生产 key 创建流程仍需后续 Rust model 和平台验证。
 
 ## 验证口径
 

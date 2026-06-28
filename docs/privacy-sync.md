@@ -95,7 +95,7 @@ SyncObject
 
 `docs/crypto-boundary.md` 已补 `ime-crypto` 客户端加密边界，并已落地本地 AEAD envelope、ciphertext hash、device wrapping、recovery material 和撤销后 key epoch 解密边界测试。后续服务端可见 hash 必须是 ciphertext hash 或密文加 AAD 的 hash，不得是 plaintext payload hash。
 
-`docs/sync-key-management.md` 已补真实同步前的同步密钥与设备生命周期边界，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突方向；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF、格式和恢复记录边界，`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名和私钥存储边界，`docs/sync-server-api-storage.md` 已固定 Go sync server 的 API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和验证口径；`ime-crypto` 已落地恢复码 KDF Rust 模型、恢复记录解密测试、Ed25519 test-memory signing key store、signed sync object manifest 和 signed recovery record；`ime-sync` 已落地 signed device authorization / revocation。进入真实上传下载前，应继续补生产恢复流程和平台私钥存储 backend。
+`docs/sync-key-management.md` 已补真实同步前的同步密钥与设备生命周期边界，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突方向；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF、格式和恢复记录边界，`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名和私钥存储边界，`docs/sync-server-api-storage.md` 已固定 Go sync server 的 API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和验证口径，`docs/production-recovery-flow.md` 已固定生产恢复记录创建 / 轮换 / 撤销、新设备恢复加入和失败限速，`docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend 边界；`ime-crypto` 已落地恢复码 KDF Rust 模型、恢复记录解密测试、Ed25519 test-memory signing key store、signed sync object manifest 和 signed recovery record；`ime-sync` 已落地 signed device authorization / revocation。进入真实上传下载前，应先补平台私钥存储 backend capability / unavailable backend 的 Rust 模型和平台验证。
 
 ## 设备授权
 
@@ -108,7 +108,7 @@ SyncObject
 5. 旧设备为新设备加密同步密钥。
 6. 新设备开始拉取密文对象。
 
-详细设备授权、恢复码、撤销和 key epoch 规则见 `docs/sync-key-management.md`。Go server API、存储字段、对象上传下载边界和错误语义见 `docs/sync-server-api-storage.md`。
+详细设备授权、恢复码、撤销和 key epoch 规则见 `docs/sync-key-management.md`。生产恢复流程见 `docs/production-recovery-flow.md`。Go server API、存储字段、对象上传下载边界和错误语义见 `docs/sync-server-api-storage.md`。
 
 ## 删除语义
 
@@ -146,6 +146,8 @@ DeletedTerm
 
 - 使用恢复码。
 - 或使用已有设备授权。
+
+恢复码路径只在客户端解开同步域材料，服务端只保存 signed recovery record 和包装密文；生产恢复流程的轮换、撤销、失败限速和日志边界见 `docs/production-recovery-flow.md`。
 
 ## 审计能力
 
@@ -211,6 +213,7 @@ services:
 - 撤销后轮换同步密钥。
 - 后续对象不再对旧设备可解密。
 - 撤销前旧设备已经取得的历史密钥无法被技术上追回；如不重加密历史对象，管理 UI 必须明确展示该限制。
+- 新设备恢复必须生成新的设备身份和平台私钥，不复用旧设备私钥。
 
 ### 用户误删
 

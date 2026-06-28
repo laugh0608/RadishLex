@@ -1,6 +1,6 @@
 # RadishLex 同步服务端 API 与存储边界
 
-本文档定义 Go sync server 进入实现前必须稳定的 API、存储、错误语义和验证口径。读者是后续实现 `server/sync-server`、`ime-sync` 远端客户端、同步 runbook 和审阅隐私边界的开发者。本文不包含 Go handler 代码、数据库 migration、Docker Compose 配置、Flutter 同步页面、真实远端上传下载实现或生产平台私钥存储 backend。
+本文档定义 Go sync server 进入实现前必须稳定的 API、存储、错误语义和验证口径。读者是后续实现 `server/sync-server`、`ime-sync` 远端客户端、同步 runbook 和审阅隐私边界的开发者。本文不包含 Go handler 代码、数据库 migration、Docker Compose 配置、Flutter 同步页面、真实远端上传下载实现或生产平台私钥存储 backend；生产恢复流程见 `docs/production-recovery-flow.md`，平台私钥存储 backend 边界见 `docs/adr/0004-platform-private-key-storage-backend.md`。
 
 ## 当前定位
 
@@ -13,7 +13,7 @@
 - 服务端不能解密、不能解析 plaintext payload、不能合并用户词、不能读取 P1 原始事件。
 - 客户端仍是真相源：解密、冲突合并、删除 tombstone 语义、显式恢复和 userdb 写回都在客户端完成。
 
-进入 Go 代码前，应先用本文件约束 migration、handler 和测试命名；进入真实远端上传下载前，还必须补齐生产恢复流程和平台私钥存储 backend。
+进入 Go 代码前，应先用本文件约束 migration、handler 和测试命名；进入真实远端上传下载前，还必须完成平台私钥存储 backend capability / unavailable backend 的 Rust 模型和平台验证。
 
 ## 服务端职责
 
@@ -376,6 +376,7 @@ latest_ciphertext_hash
 - 服务端保存的是 signed recovery record 和 encrypted wrapped material。
 - 恢复码输入、KDF、解包同步域材料和新设备激活都在客户端完成。
 - 服务端可以限制 recovery record 读取频率，但攻击者一旦获得记录仍可能离线尝试恢复码；恢复码强度和 Argon2id 参数不能被服务端限速替代。
+- 恢复记录创建、轮换、撤销和新设备恢复加入流程见 `docs/production-recovery-flow.md`。
 
 设备撤销：
 
@@ -438,7 +439,7 @@ latest_ciphertext_hash
 ## 停止线
 
 - Go server migration、API handler 和 storage tests 未覆盖上述隐私字段阻断前，不实现远端客户端上传下载。
-- 生产恢复流程和平台私钥存储 backend 未稳定前，不提供用户可用同步 UI。
+- 平台私钥存储 backend 未完成能力模型和平台验证前，不提供用户可用同步 UI。
 - 服务端能保存、打印或索引明文用户词、input code、reading、P1 原始事件或候选偏好时，必须停止并回退该设计。
 - 服务端版本冲突检测未稳定前，不允许客户端把本地合并结果自动上传到真实远端。
 - 包分发、P3 资源下载和个人 P2 同步对象必须保持独立 API 与存储边界。

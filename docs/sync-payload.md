@@ -211,9 +211,9 @@ updated_at_ms
 未落地：
 
 - `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
-- 真实设备密钥存储、生产恢复流程和远端密钥轮换执行器。
+- 真实平台私钥存储 backend 实现、生产恢复 UI / API 和远端密钥轮换执行器。
 - 客户端上传补丁生成、远端对象拉取、HTTP API handler、Go server 存储实现和服务端版本冲突检测实现。
-- 生产同步设置、备份快照、管理 UI 同步状态和平台私钥存储 backend。
+- 生产同步设置、备份快照、管理 UI 同步状态和平台私钥存储 backend 实现。
 
 ## 验证口径
 
