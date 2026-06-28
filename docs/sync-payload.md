@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前只落地 Rust 本地同步对象边界模型，不连接后端，不生成明文上传文件，也不实现网络同步。`ime-sync` 的作用是把 `sync preflight` 已验证的本地分类边界转成可测试的 Rust API，并让上传草案元数据从 `ime-crypto` envelope 派生，避免同步层和加密层字段语义漂移；`ime-userdb` 当前提供 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 `SyncEnvelopeAssembler` 完成本地 envelope 加密、解密和 sync draft 派生验证：
+当前只落地 Rust 本地同步对象边界模型，不连接后端，不生成明文上传文件，也不实现网络同步。`ime-sync` 的作用是把 `sync preflight` 已验证的本地分类边界转成可测试的 Rust API，并让上传草案元数据从 `ime-crypto` envelope 派生，避免同步层和加密层字段语义漂移；`ime-userdb` 当前提供 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 `SyncEnvelopeAssembler` 完成本地 envelope 加密、解密和 sync draft 派生验证；解密后的 userdb P2 JSON 已能解析为 `ClientSyncMergeInput` 所需记录：
 
 - P2 数据可以进入后续端到端加密对象。
 - P1 明细事件默认只能留在本地。
@@ -182,7 +182,7 @@ updated_at_ms
 
 ## 冲突与删除方向
 
-客户端合并策略必须按对象类型区分。当前 Rust 侧已在 `ime-sync` 中落地 `ClientSyncMergeInput` / `ClientSyncMergeResult` 纯模型，用于表达客户端解密 P2 payload 后的合并决策；该模型不解析 JSON、不写 SQLite、不连接后端。
+客户端合并策略必须按对象类型区分。当前 Rust 侧已在 `ime-sync` 中落地 `ClientSyncMergeInput` / `ClientSyncMergeResult` 纯模型，用于表达客户端解密 P2 payload 后的合并决策；`ime-userdb` 已补 `UserDbDecryptedSyncObject` 和 `decode_userdb_sync_objects()`，把已解密 P2 JSON 解析为带 `key_epoch` 的 user terms、deleted terms、ranker weights 记录，再转换为 `ClientSyncMergeInput`。当前仍不写 SQLite、不连接后端。
 
 - `dictionary.user_terms`：按 `input_code + text + reading` 合并，更新时间、`key_epoch` 和删除 tombstone 参与冲突判断；普通同步词条不能清除 tombstone。
 - `dictionary.deleted_terms`：删除意图优先，旧设备和旧备份不得复活用户已删除词条；同一 term identity 下以较新的 `key_epoch` / 删除时间作为当前删除意图。
@@ -204,13 +204,14 @@ updated_at_ms
 - `SyncDomain`、`SyncDevice`、`DeviceJoinRequest`、`DeviceAuthorizationPackage`、`DeviceRevocationRecord` 和 `SyncObjectVersion`：固定当前 Rust 侧设备生命周期、授权状态、撤销 epoch 推进和对象版本冲突判断。
 - `ClientSyncMergeInput`、`ClientSyncMergeResult`、`DictionaryUserTermMergeRecord`、`DictionaryDeletedTermMergeRecord` 和 `RankerWeightMergeRecord`：固定客户端解密后合并模型，覆盖 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词、显式恢复清理 tombstone、恢复前旧权重不复活和重复记录按 `key_epoch` / 时间收敛。
 - `UserDb::p2_plaintext_payloads()`：导出 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 Rust 内部 plaintext payload bytes，测试固定字段顺序、JSON string escaping、空库行为和 P1 / 本地审计阻断。
+- `UserDbDecryptedSyncObject`、`UserDbDecodedSyncPayloadBatch` 和 `decode_userdb_sync_objects()`：解析已解密的 userdb P2 JSON，严格校验 schema、object type、字段集合和值域，把 `manual_add` 映射为显式恢复意图，并接入 `ClientSyncMergeInput`；解析依赖 `serde_json = 1.0.150`，许可为 MIT OR Apache-2.0。
 - userdb P2 payload 本地加密装配测试：通过 `SyncEnvelopeAssembler` 用合成 sync master key / device id 把 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` payload 加密为 `ime-crypto::EncryptedObjectEnvelope`，验证可解密回原 bytes、nonce 不重复，并派生 `ime-sync::EncryptedSyncObjectDraft` 元数据。
 
 未落地：
 
 - `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
-- 恢复码 KDF ADR / Rust 模型和签名 / 设备密钥存储 ADR 已固化；签名 Rust 模型、真实设备密钥存储、生产恢复流程和远端密钥轮换执行器尚未落地。`ime-crypto` 当前已落地本地 AEAD / HKDF / ciphertext hash / envelope / device wrapping / recovery KDF 模型测试。
-- 客户端冲突合并与真实 payload / userdb 的接线；当前只固定解密后合成记录的合并模型，尚未解析真实 payload JSON、写回 SQLite 或生成上传补丁。
+- 真实设备密钥存储、生产恢复流程和远端密钥轮换执行器。
+- 客户端冲突合并写回 userdb 的执行器；当前已能解析真实 P2 payload JSON 并接入 merge input，尚未写回 SQLite 或生成上传补丁。
 - HTTP API、Go server 存储和冲突合并执行器。
 
 ## 验证口径
@@ -236,3 +237,4 @@ cargo test -p radishlex-ime-cli
 - userdb P2 payload 本地加密装配测试必须通过 `SyncEnvelopeAssembler` 验证 envelope 可解密回原 bytes，`EncryptedSyncObjectDraft` 只保留密文长度和 ciphertext hash 等元数据，不携带 plaintext bytes。
 - 设备生命周期模型必须验证 pending / active / revoked 状态转移，授权设备和接收设备都必须 active，撤销记录必须推进 `key_epoch`，对象版本必须能识别 stale base version。
 - 客户端合并模型必须验证 `dictionary.deleted_terms` tombstone 能压过旧 `dictionary.user_terms` 和旧 `ranker.weights`，旧 epoch 上传不能靠更晚本机时间复活删除词，显式恢复必须晚于 tombstone，且恢复前的旧权重不随词条恢复一起复活。
+- userdb P2 payload 解码必须拒绝 schema / object type 不匹配、未知字段、非法字段类型、`dictionary.user_terms` 中的 deleted 状态、0 key epoch 和负数 / 非有限权重摘要，并能把真实 payload bytes 转成 `ClientSyncMergeInput`。

@@ -5,6 +5,7 @@
 mod error;
 mod model;
 mod store;
+mod sync_decode;
 
 pub use error::{UserDbError, UserDbResult};
 pub use model::{
@@ -17,4 +18,8 @@ pub use model::{
 pub use store::{
     decode_dictionary_terms_tsv, decode_dictionary_terms_tsv_document, encode_dictionary_terms_tsv,
     RankerWeight, UserDb,
+};
+pub use sync_decode::{
+    decode_userdb_sync_objects, UserDbDecodedSyncPayloadBatch, UserDbDecryptedSyncObject,
+    UserDbSyncDeletedTermRecord, UserDbSyncRankerWeightRecord, UserDbSyncUserTermRecord,
 };

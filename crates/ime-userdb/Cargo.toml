@@ -12,8 +12,9 @@ name = "radishlex_ime_userdb"
 path = "src/lib.rs"
 
 [dependencies]
+radishlex-ime-sync = { path = "../ime-sync" }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
+serde_json = "1.0.150"
 
 [dev-dependencies]
 radishlex-ime-crypto = { path = "../ime-crypto" }
-radishlex-ime-sync = { path = "../ime-sync" }
