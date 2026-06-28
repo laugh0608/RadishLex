@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"regexp"
 	"sync"
@@ -658,11 +659,26 @@ func objectVersionKeyFor(domainID string, objectID string, version uint64) objec
 }
 
 func objectBlobRef(version ObjectVersion) string {
-	return fmt.Sprintf("objects/%s/%s/%d/%s", version.DomainID, version.ObjectID, version.Version, version.CiphertextHash)
+	return fmt.Sprintf(
+		"objects/%s/%s/%d/%s",
+		blobPathComponent(version.DomainID),
+		blobPathComponent(version.ObjectID),
+		version.Version,
+		blobPathComponent(version.CiphertextHash),
+	)
 }
 
 func recoveryBlobRef(record RecoveryRecord) string {
-	return fmt.Sprintf("recovery/%s/%s/%s", record.DomainID, record.RecoveryRecordID, record.CiphertextHash)
+	return fmt.Sprintf(
+		"recovery/%s/%s/%s",
+		blobPathComponent(record.DomainID),
+		blobPathComponent(record.RecoveryRecordID),
+		blobPathComponent(record.CiphertextHash),
+	)
+}
+
+func blobPathComponent(value string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(value))
 }
 
 func cloneBytes(value []byte) []byte {

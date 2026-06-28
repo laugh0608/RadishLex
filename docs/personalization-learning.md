@@ -482,7 +482,7 @@ cargo test --workspace
 28. 已补 `docs/adr/0003-device-signing-key-storage.md`，固定设备签名、签名对象、canonical bytes、私钥存储抽象、错误语义和验证口径。
 29. 已补签名 / 设备密钥存储 Rust 模型，覆盖 Ed25519 test-memory signer、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断、signed sync object manifest、signed recovery record、signed device authorization 和 signed device revocation；生产恢复流程和平台私钥存储 backend 边界已由文档固定。
 30. 已补真实 userdb P2 payload 解析到 merge input 的接线。
-31. 已补合并结果写回真实 userdb 的事务执行器；Go server API / storage、生产恢复流程和平台私钥存储 backend 边界已固定，Go server 已起步 metadata / storage / API 验证模型；真实远端上传下载仍等待 SQLite-backed repository、local object storage transaction、签名、版本冲突、错误语义和平台 backend 验证。
+31. 已补合并结果写回真实 userdb 的事务执行器；Go server API / storage、生产恢复流程和平台私钥存储 backend 边界已固定，Go server 已起步 metadata / storage / API 验证模型和 local object storage staged transaction；真实远端上传下载仍等待 SQLite-backed repository、metadata transaction 与 local object storage transaction 接线、签名、版本冲突、错误语义和平台 backend 验证。
 
 阶段停止线：
 
