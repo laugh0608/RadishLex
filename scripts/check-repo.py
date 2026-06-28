@@ -24,6 +24,9 @@ REQUIRED_FILES = [
     "CLAUDE.md",
     "Cargo.lock",
     "Cargo.toml",
+    "server/sync-server/go.mod",
+    "server/sync-server/internal/storage/store.go",
+    "server/sync-server/migrations/0001_init.sql",
     "crates/ime-cli/Cargo.toml",
     "crates/ime-cli/src/lib.rs",
     "crates/ime-cli/src/main.rs",
@@ -60,9 +63,9 @@ def run_script(script_name: str, args: list[str] | None = None) -> None:
         raise SystemExit(result.returncode)
 
 
-def run_command(command: list[str]) -> None:
+def run_command(command: list[str], cwd: Path = REPO_ROOT) -> None:
     try:
-        result = subprocess.run(command, cwd=REPO_ROOT)
+        result = subprocess.run(command, cwd=cwd)
     except FileNotFoundError as exc:
         raise SystemExit(f"{command[0]} is required to run repository baseline checks.") from exc
     if result.returncode != 0:
@@ -193,11 +196,16 @@ def check_rust_workspace() -> None:
     run_command(["cargo", "test", "--workspace"])
 
 
+def check_go_server() -> None:
+    run_command(["go", "test", "./..."], cwd=REPO_ROOT / "server" / "sync-server")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run RadishLex repository baseline checks.")
     parser.add_argument("--skip-text-files", action="store_true", help="Skip text hygiene checks.")
     parser.add_argument("--skip-docs", action="store_true", help="Skip documentation budget checks.")
     parser.add_argument("--skip-rust", action="store_true", help="Skip Rust workspace checks.")
+    parser.add_argument("--skip-go", action="store_true", help="Skip Go server checks.")
     return parser.parse_args()
 
 
@@ -214,6 +222,8 @@ def main() -> int:
     check_license_wording()
     check_ruleset_and_workflows()
     check_path_budget()
+    if not args.skip_go:
+        check_go_server()
     if not args.skip_rust:
         check_rust_workspace()
 

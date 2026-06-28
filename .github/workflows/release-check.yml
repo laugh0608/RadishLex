@@ -50,6 +50,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/sync-server/go.mod
+
       - name: Check repository baseline
         shell: bash
         run: ./scripts/check-repo.sh --skip-text-files

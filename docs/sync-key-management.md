@@ -22,12 +22,12 @@
 
 当前仍不做：
 
-- 不连接 Go server，不实现远端 HTTP API；API 与 storage 边界已由 `docs/sync-server-api-storage.md` 固定。
+- Rust 客户端不连接 Go server，不实现远端 HTTP API；API 与 storage 边界已由 `docs/sync-server-api-storage.md` 固定，Go server 当前只做 metadata / storage / API 内部验证模型。
 - 不新增 CLI / FFI 明文同步 payload 入口。
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步若进入代码，应按 `docs/sync-server-api-storage.md` 验证 Go server metadata、storage、签名、版本冲突和错误语义；真实平台 backend 未通过验证前，不应启动真实远端同步主线。
+下一步若进入代码，应按 `docs/sync-server-api-storage.md` 验证 SQLite-backed metadata repository、local object storage transaction、签名、版本冲突和错误语义；真实平台 backend 未通过验证前，不应启动真实远端同步主线。
 
 ## 设计目标
 
@@ -255,7 +255,8 @@ updated_at_ms
 13. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
 14. 已补 Go server API / storage 边界设计。
 15. 已补生产恢复流程设计和平台私钥存储 backend ADR。
-16. 后续按 `docs/sync-server-api-storage.md` 推进 Go server metadata、storage、签名、版本冲突和错误语义验证。
+16. 已起步 Go server metadata / storage / API 验证模型，当前覆盖配置默认值、API request / error DTO、SQLite migration 文本、storage interface、内存 storage、版本冲突、撤销设备阻断和隐私字段检查。
+17. 后续按 `docs/sync-server-api-storage.md` 推进 SQLite-backed metadata repository、local object storage transaction、签名、版本冲突和错误语义验证。
 
 ## 验证口径
 
@@ -278,5 +279,5 @@ updated_at_ms
 
 - 恢复码 KDF 算法、参数、格式、Rust model 和生产恢复流程设计已落地；服务端恢复记录 API 与管理 UI 未实现前，不提供用户可用恢复入口。
 - 设备签名模型、签名对象验证、私钥存储抽象和平台私钥存储 backend capability / unavailable backend Rust 模型已落地；平台 runbook 和真实 backend 未完成前，不做远端对象上传下载。
-- Go server 实现如启动，必须先满足 `docs/sync-server-api-storage.md` 的 metadata、storage、签名、版本冲突和错误语义验证。
+- Go server 实现继续推进时，必须先满足 `docs/sync-server-api-storage.md` 的 SQLite-backed metadata repository、local object storage transaction、签名、版本冲突和错误语义验证。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。

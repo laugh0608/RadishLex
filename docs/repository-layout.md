@@ -87,6 +87,7 @@ RadishLex/
 - `crates/ime-ffi/`：C ABI 起步 crate，覆盖 ABI contract、opaque handle、session owner-thread policy、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、sync preflight 状态摘要、userdb 管理入口、dictionary 文件管理入口和 host smoke。
 - `crates/ime-sync/`：同步 payload 来源分类、对象类型、P2 envelope 组装、加密对象外壳草案、设备生命周期和客户端合并模型。
 - `crates/ime-crypto/`：客户端加密本地模型 crate，当前覆盖 key role、object envelope、AAD、nonce 和 ciphertext hash 边界测试。
+- `server/sync-server/`：Go sync server 起步 module，当前覆盖配置默认值、API request / error DTO、storage interface、SQLite metadata migration 文本、内存 storage 验证模型和测试；不包含 HTTP handler、真实 SQLite driver-backed repository、生产 local object store 或真实远端上传下载。
 - `docs/cli.md`：`radishlex-ime-cli` 命令、输出、退出码和安全边界说明。
 - `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
 - `docs/engine-rime-adapter.md`：`ime-engine-rime` 的 adapter 边界、构建策略和验证分层。
@@ -221,6 +222,8 @@ server/sync-server/
 - SQLite。
 - Docker Compose。
 - 本地文件对象存储。
+
+当前已起步 `server/sync-server/`，但只实现 metadata / storage / API 验证模型。后续应先补 SQLite-backed metadata repository 和 local object storage transaction，再进入 HTTP handler；真实远端上传下载、Rust 远端客户端、Flutter manager 和平台壳继续后置。
 
 后续支持：
 

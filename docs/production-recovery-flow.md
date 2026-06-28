@@ -269,9 +269,10 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 1. 已完成恢复码 KDF ADR 与 Rust model。
 2. 本文档固定生产恢复流程、记录状态、轮换、撤销、恢复加入和失败处理。
 3. 已补平台私钥存储 backend ADR 与 Rust capability / unavailable backend 模型，明确生产设备签名 key 不应穿过 FFI、CLI 或 Go server。
-4. 后续 Go server 只实现恢复记录 metadata / storage / status / rate limit，不接触恢复码明文。
-5. 后续真实平台 backend 通过验证后，管理 UI 再接入用户可见恢复流程。
-6. 最后再接 Rust 远端同步客户端和真实上传下载。
+4. 已在 Go server storage 验证模型中覆盖 recovery record metadata 与 wrapped material hash / length 校验，不接触恢复码明文。
+5. 后续 Go server recovery API 再补签名、状态、限速和日志脱敏验证。
+6. 后续真实平台 backend 通过验证后，管理 UI 再接入用户可见恢复流程。
+7. 最后再接 Rust 远端同步客户端和真实上传下载。
 
 ## 验证口径
 
@@ -289,7 +290,7 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 
 ## 停止线
 
-- 平台私钥存储 backend capability / unavailable backend Rust 模型和平台 runbook 未完成前，不提供用户可用恢复 UI。
+- 平台私钥存储 backend 平台 runbook 和真实 backend 未完成前，不提供用户可用恢复 UI。
 - Go server 恢复记录 API 未覆盖签名、状态、限速和日志脱敏前，不接真实恢复客户端。
 - 恢复码、同步主密钥或设备私钥可能进入服务端日志、错误响应、崩溃报告或截图时，必须停止并修正设计。
 - 恢复流程不能绕过设备撤销、key epoch 或客户端合并语义。
