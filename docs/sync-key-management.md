@@ -14,6 +14,7 @@
 - `ime-crypto` 已补恢复码 KDF 纯 Rust 模型与测试，覆盖 `RLX1` 格式、Argon2id profile、恢复 wrapping key、恢复记录 AAD 和错误恢复码失败。
 - `ime-sync` 已补 `SyncDomain`、`SyncDevice`、`DeviceJoinRequest`、`DeviceAuthorizationPackage`、`DeviceRevocationRecord` 和 `SyncObjectVersion` 草案模型。
 - `docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF 采用 Argon2id、`RLX1` 格式、恢复记录字段、失败限速和验证口径。
+- `docs/adr/0003-device-signing-key-storage.md` 已固定设备签名、签名对象、私钥存储抽象、错误语义和验证口径。
 
 当前仍不做：
 
@@ -22,7 +23,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步代码实现应继续补签名 / 设备密钥存储设计，以及客户端合并模型与真实 P2 payload / userdb 写回流程的接线，再进入后端 API。生产恢复流程、签名 / 设备密钥存储和真实写回语义没有稳定前，不应启动真实远端同步主线。
+下一步代码实现应继续按 ADR 落地签名 / 设备密钥存储 Rust 模型，以及客户端合并模型与真实 P2 payload / userdb 写回流程的接线，再进入后端 API。生产恢复流程、签名 / 设备密钥存储模型和真实写回语义没有稳定前，不应启动真实远端同步主线。
 
 ## 设计目标
 
@@ -56,9 +57,10 @@
 
 `DeviceKeyPair`：
 
-- 设备加入同步域时生成的非对称密钥对。
+- 设备加入同步域时生成的非对称密钥集合。
+- 后续应拆分为 `DeviceSigningKey` 与 `DeviceKeyAgreementKey`，签名 key 只签对象和设备操作，key agreement / wrapping key 只用于包装同步域材料。
 - 公钥可以登记到服务端；私钥只在设备本地保存。
-- 旧设备授权新设备时，使用新设备公钥包装同步密钥材料或设备包装密钥。
+- 旧设备授权新设备时，使用新设备 key agreement 公钥包装同步密钥材料或设备包装密钥；签名 key 不参与加密。
 
 `DeviceWrappingKey`：
 
@@ -242,9 +244,10 @@ updated_at_ms
 6. 已在 `ime-sync` 补 `SyncEnvelopeAssembler`，固定 Rust 内部 P2 payload 到 envelope 的组装边界，覆盖 sync master 派生 object key、nonce 复用阻断、draft 派生和 Debug 明文阻断。
 7. 已补 `docs/adr/0002-recovery-code-kdf.md`，固定恢复码 Argon2id KDF、格式、恢复记录字段、失败限速和验证口径。
 8. 已按 ADR 落地恢复码 KDF 纯 Rust 模型与测试，覆盖 `RecoveryCode`、`RecoveryKdfProfile`、恢复 wrapping key 和 `RecoveryMaterial` 恢复记录加解密。
-9. 后续补签名 / 设备密钥存储设计，以及客户端合并模型与真实 userdb payload / 写回流程的接线。
-10. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
-11. 生产恢复流程、签名 / 设备密钥存储和真实 payload / userdb 写回接线稳定后，再设计 Go server API。
+9. 已补 `docs/adr/0003-device-signing-key-storage.md`，固定设备签名、签名对象、canonical bytes、私钥存储抽象、错误语义和验证口径。
+10. 后续按 ADR 落地签名 / 设备密钥存储 Rust 模型，以及客户端合并模型与真实 userdb payload / 写回流程的接线。
+11. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
+12. 生产恢复流程、签名 / 设备密钥存储模型和真实 payload / userdb 写回接线稳定后，再设计 Go server API。
 
 ## 验证口径
 
@@ -264,6 +267,7 @@ updated_at_ms
 ## 停止线
 
 - 恢复码 KDF 算法、参数、格式和 Rust model 已落地；生产恢复流程未接入设备状态、服务端恢复记录和管理 UI 前，不实现用户可用恢复码入口。
-- 生产恢复码实现、签名 / 设备密钥存储和历史重加密策略未固化前，不实现生产恢复流程。
+- 设备签名与私钥存储边界已通过 ADR 固化；Rust 签名模型、签名对象验证和私钥存储抽象未落地前，不做远端对象上传下载。
+- 生产恢复码实现、签名 / 设备密钥存储模型和历史重加密策略未固化前，不实现生产恢复流程。
 - 冲突合并模型未接入真实 P2 payload 解析、userdb 写回和生产 envelope 组装边界前，不做远端上传下载。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。
