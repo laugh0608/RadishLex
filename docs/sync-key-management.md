@@ -16,6 +16,7 @@
 - `docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF 采用 Argon2id、`RLX1` 格式、恢复记录字段、失败限速和验证口径。
 - `docs/adr/0003-device-signing-key-storage.md` 已固定设备签名、签名对象、私钥存储抽象、错误语义和验证口径。
 - `ime-crypto` 已补 Ed25519 设备签名、`test-memory-v1` signing key store、signed sync object manifest 和 signed recovery record；`ime-sync` 已补 signed device authorization 与 signed device revocation。
+- `ime-userdb` 已补已解密 P2 JSON 到 merge input 的解析入口，并能把合并模型接受的 user terms、deleted tombstones 和 ranker weights 写回真实 SQLite。
 
 当前仍不做：
 
@@ -24,7 +25,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步代码实现应继续补客户端合并结果写回真实 userdb 的执行器，再进入后端 API。生产恢复流程、平台私钥存储 backend 和真实写回语义没有稳定前，不应启动真实远端同步主线。
+下一步代码实现应先补 Go server API / storage 边界设计，并继续收敛生产恢复流程和平台私钥存储 backend。生产恢复流程、平台私钥存储 backend、服务端版本边界和客户端上传下载语义没有稳定前，不应启动真实远端同步主线。
 
 ## 设计目标
 
@@ -241,16 +242,16 @@ updated_at_ms
 2. 已在 `ime-crypto` 测试撤销后新对象使用新 `key_epoch`，旧 epoch key 不能解密新对象。
 3. 已在 `ime-sync` 补同步域、设备状态、加入请求、授权包、撤销记录和对象版本冲突草案模型。
 4. 已在 `ime-sync` 测试 active / pending / revoked 设备状态转移、授权设备和接收设备都必须 active、撤销必须推进 key epoch、版本关系和 stale base version 检测边界。
-5. 已在 `ime-sync` 补客户端解密后合并模型和测试，覆盖 `dictionary.deleted_terms` tombstone 压过旧 user terms、旧 ranker weights、旧 epoch 上传和显式恢复语义；该合并模型本身不解析 payload JSON、不写回 SQLite、不连接后端。
+5. 已在 `ime-sync` 补客户端解密后合并模型和测试，覆盖 `dictionary.deleted_terms` tombstone 压过旧 user terms、旧 ranker weights、旧 epoch 上传和显式恢复语义；该合并模型本身不解析 payload JSON、不连接后端。
 6. 已在 `ime-sync` 补 `SyncEnvelopeAssembler`，固定 Rust 内部 P2 payload 到 envelope 的组装边界，覆盖 sync master 派生 object key、nonce 复用阻断、draft 派生和 Debug 明文阻断。
 7. 已补 `docs/adr/0002-recovery-code-kdf.md`，固定恢复码 Argon2id KDF、格式、恢复记录字段、失败限速和验证口径。
 8. 已按 ADR 落地恢复码 KDF 纯 Rust 模型与测试，覆盖 `RecoveryCode`、`RecoveryKdfProfile`、恢复 wrapping key 和 `RecoveryMaterial` 恢复记录加解密。
 9. 已补 `docs/adr/0003-device-signing-key-storage.md`，固定设备签名、签名对象、canonical bytes、私钥存储抽象、错误语义和验证口径。
 10. 已按 ADR 落地签名 / 设备密钥存储 Rust 模型，当前使用合成 `test-memory-v1` key store，不接系统 Keychain / Keystore。
 11. 已补真实 userdb P2 payload 解析到 merge input 的接线。
-12. 后续补客户端合并结果写回真实 userdb 的执行器。
+12. 已补客户端合并结果写回真实 userdb 的执行器。
 13. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
-14. 生产恢复流程、平台私钥存储 backend 和真实 payload / userdb 写回接线稳定后，再设计 Go server API。
+14. 后续补 Go server API / storage 边界设计，并继续补生产恢复流程和平台私钥存储 backend。
 
 ## 验证口径
 
@@ -265,6 +266,7 @@ updated_at_ms
 - 只给 `active` 设备生成新 epoch 包装记录。
 - 恢复码只能恢复同步域材料，不能绕过设备状态或直接解密服务端对象。
 - `dictionary.deleted_terms` tombstone 能压过旧 user terms 和旧 ranker weights；旧 epoch 上传不能靠更晚本机时间复活删除词，显式恢复必须晚于 tombstone，且恢复前旧权重不随词条恢复一起复活。
+- 已解密 userdb P2 payload 写回必须只应用被合并模型接受的记录，并在事务内覆盖 user terms、deleted tombstones、ranker weights、显式恢复清理和旧权重阻断。
 - 损坏的 envelope、非法 base version、未知设备状态和空 key id 必须返回明确错误。
 
 ## 停止线
@@ -272,5 +274,5 @@ updated_at_ms
 - 恢复码 KDF 算法、参数、格式和 Rust model 已落地；生产恢复流程未接入设备状态、服务端恢复记录和管理 UI 前，不实现用户可用恢复码入口。
 - 设备签名与私钥存储边界已通过 ADR 固化；Rust 签名模型、签名对象验证和私钥存储抽象未落地前，不做远端对象上传下载。
 - 生产恢复码实现、签名 / 设备密钥存储模型和历史重加密策略未固化前，不实现生产恢复流程。
-- 冲突合并模型未接入 userdb 写回和生产 envelope 组装边界前，不做远端上传下载。
+- Go server API / storage 边界、生产恢复流程和平台私钥存储 backend 未稳定前，不做远端上传下载。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。

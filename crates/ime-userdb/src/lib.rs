@@ -17,7 +17,7 @@ pub use model::{
 };
 pub use store::{
     decode_dictionary_terms_tsv, decode_dictionary_terms_tsv_document, encode_dictionary_terms_tsv,
-    RankerWeight, UserDb,
+    RankerWeight, UserDb, UserDbSyncApplySummary,
 };
 pub use sync_decode::{
     decode_userdb_sync_objects, UserDbDecodedSyncPayloadBatch, UserDbDecryptedSyncObject,

@@ -66,7 +66,7 @@
 - Rime candidates 能进入 ranker，并输出可解释排序与提交映射。
 - 用户词库导入导出、导入检查、删除 tombstone 和同步前置计数均可复验。
 - FFI 管理入口只暴露受控 userdb、dictionary、learning status 和 sync preflight 摘要，不导出 P1 明细或明文同步 payload。
-- 进入 Phase 3 代码前，必须完成 `ime-crypto` 本地 envelope / key / hash 测试、同步密钥与设备生命周期 Rust 模型、删除合并测试、生产级 envelope 组装边界、恢复码 KDF ADR、恢复码 KDF Rust 模型、签名 / 设备密钥存储 ADR、签名 / 设备密钥存储 Rust 模型和真实 P2 payload 解析；随后补齐合并结果写回 userdb 的执行器。
+- 进入 Phase 3 代码前，必须完成 `ime-crypto` 本地 envelope / key / hash 测试、同步密钥与设备生命周期 Rust 模型、删除合并测试、生产级 envelope 组装边界、恢复码 KDF ADR、恢复码 KDF Rust 模型、签名 / 设备密钥存储 ADR、签名 / 设备密钥存储 Rust 模型、真实 P2 payload 解析和合并结果写回 userdb 的执行器。
 
 ## Phase 3: 自部署同步
 
@@ -78,8 +78,8 @@
 - 实现端到端加密 blob 同步；`ime-crypto` 本地 envelope、key、nonce、AAD、ciphertext hash 和篡改失败测试必须先于 Go server 上传下载。
 - 实现设备注册。
 - 实现备份恢复。
-- 同步密钥、设备授权、撤销、key epoch 和签名模型的 Rust 测试已经完成。
-- 下一步先补客户端合并结果写回真实 userdb 的执行器，再进入远端同步实现。
+- 同步密钥、设备授权、撤销、key epoch、签名模型和客户端合并写回 userdb 的 Rust 测试已经完成。
+- 下一步先补 Go server API / storage 边界设计、生产恢复流程和平台私钥存储 backend，再进入远端上传下载实现。
 
 交付：
 

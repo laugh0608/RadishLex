@@ -143,7 +143,7 @@ librime adapter：
 - 学习记录。
 - 导入导出。
 
-当前已创建 `crates/ime-userdb/`，落地 SQLite schema migration、用户词条 CRUD、选择事件记录、负反馈记录、删除 tombstone、ranker weight 摘要、用户词库导入导出、同步前置计数、`dictionary.user_terms` / `ranker.weights` / `dictionary.deleted_terms` P2 plaintext payload 只读迭代器，以及已解密 P2 JSON 到 `ime-sync` merge input 的解析入口；基础 CLI 管理入口已由 `ime-cli` 承接。
+当前已创建 `crates/ime-userdb/`，落地 SQLite schema migration、用户词条 CRUD、选择事件记录、负反馈记录、删除 tombstone、ranker weight 摘要、用户词库导入导出、同步前置计数、`dictionary.user_terms` / `ranker.weights` / `dictionary.deleted_terms` P2 plaintext payload 只读迭代器、已解密 P2 JSON 到 `ime-sync` merge input 的解析入口，以及合并结果写回真实 userdb 的事务执行器；基础 CLI 管理入口已由 `ime-cli` 承接。
 
 ### ime-sync
 
@@ -154,7 +154,7 @@ librime adapter：
 - 版本管理。
 - 设备状态。
 
-当前已创建 `crates/ime-sync/`，落地 payload 来源分类、同步对象类型、P1/P2/本地审计分层、P2 plaintext payload 到 `ime-crypto` envelope 的 Rust 内部组装边界、从 crypto envelope 派生加密对象外壳元数据、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型和客户端解密后合并模型；不连接后端、不实现网络同步或 userdb 写回。
+当前已创建 `crates/ime-sync/`，落地 payload 来源分类、同步对象类型、P1/P2/本地审计分层、P2 plaintext payload 到 `ime-crypto` envelope 的 Rust 内部组装边界、从 crypto envelope 派生加密对象外壳元数据、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型和客户端解密后合并模型；不连接后端、不实现网络同步。
 
 ### ime-crypto
 
@@ -165,7 +165,7 @@ librime adapter：
 - blob 加密。
 - 签名和校验。
 
-当前已创建 `crates/ime-crypto/`，落地 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、Argon2id recovery KDF、key role、object envelope、AAD、nonce、device key descriptor、device wrapping key / record、recovery material、删除同步和篡改失败测试；签名与设备私钥存储 ADR 已固定，Rust 签名模型、真实设备密钥存储和生产恢复流程尚未落地。
+当前已创建 `crates/ime-crypto/`，落地 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、Argon2id recovery KDF、key role、object envelope、AAD、nonce、device key descriptor、device wrapping key / record、recovery material、Ed25519 设备签名、test-memory signing key store、signed sync object manifest、signed recovery record、删除同步和篡改失败测试；真实设备密钥存储和生产恢复流程尚未落地。
 
 ### ime-ffi
 

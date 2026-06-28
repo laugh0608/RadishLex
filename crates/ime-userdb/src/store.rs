@@ -12,7 +12,10 @@ use crate::model::{
     UserTerm,
 };
 
+mod sync_apply;
 mod sync_payload;
+
+pub use sync_apply::UserDbSyncApplySummary;
 
 const SCHEMA_VERSION: i64 = 2;
 const DICTIONARY_EXPORT_HEADER: &str = "input_code\ttext\treading\tsource\tweight\tstatus";
@@ -398,6 +401,13 @@ impl UserDb {
         &self,
     ) -> UserDbResult<impl Iterator<Item = UserDbSyncPlaintextPayload>> {
         Ok(sync_payload::collect_p2_plaintext_payloads(self)?.into_iter())
+    }
+
+    pub fn apply_decoded_sync_payload_batch(
+        &mut self,
+        batch: &crate::sync_decode::UserDbDecodedSyncPayloadBatch,
+    ) -> UserDbResult<UserDbSyncApplySummary> {
+        sync_apply::apply_decoded_sync_payload_batch(self, batch)
     }
 
     pub fn learning_status_summary(&self) -> UserDbResult<LearningStatusSummary> {
