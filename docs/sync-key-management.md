@@ -15,6 +15,7 @@
 - `ime-sync` 已补 `SyncDomain`、`SyncDevice`、`DeviceJoinRequest`、`DeviceAuthorizationPackage`、`DeviceRevocationRecord` 和 `SyncObjectVersion` 草案模型。
 - `docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF 采用 Argon2id、`RLX1` 格式、恢复记录字段、失败限速和验证口径。
 - `docs/adr/0003-device-signing-key-storage.md` 已固定设备签名、签名对象、私钥存储抽象、错误语义和验证口径。
+- `ime-crypto` 已补 Ed25519 设备签名、`test-memory-v1` signing key store、signed sync object manifest 和 signed recovery record；`ime-sync` 已补 signed device authorization 与 signed device revocation。
 
 当前仍不做：
 
@@ -23,7 +24,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步代码实现应继续按 ADR 落地签名 / 设备密钥存储 Rust 模型，以及客户端合并模型与真实 P2 payload / userdb 写回流程的接线，再进入后端 API。生产恢复流程、签名 / 设备密钥存储模型和真实写回语义没有稳定前，不应启动真实远端同步主线。
+下一步代码实现应继续补客户端合并模型与真实 P2 payload / userdb 写回流程的接线，再进入后端 API。生产恢复流程、平台私钥存储 backend 和真实写回语义没有稳定前，不应启动真实远端同步主线。
 
 ## 设计目标
 
@@ -245,9 +246,10 @@ updated_at_ms
 7. 已补 `docs/adr/0002-recovery-code-kdf.md`，固定恢复码 Argon2id KDF、格式、恢复记录字段、失败限速和验证口径。
 8. 已按 ADR 落地恢复码 KDF 纯 Rust 模型与测试，覆盖 `RecoveryCode`、`RecoveryKdfProfile`、恢复 wrapping key 和 `RecoveryMaterial` 恢复记录加解密。
 9. 已补 `docs/adr/0003-device-signing-key-storage.md`，固定设备签名、签名对象、canonical bytes、私钥存储抽象、错误语义和验证口径。
-10. 后续按 ADR 落地签名 / 设备密钥存储 Rust 模型，以及客户端合并模型与真实 userdb payload / 写回流程的接线。
-11. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
-12. 生产恢复流程、签名 / 设备密钥存储模型和真实 payload / userdb 写回接线稳定后，再设计 Go server API。
+10. 已按 ADR 落地签名 / 设备密钥存储 Rust 模型，当前使用合成 `test-memory-v1` key store，不接系统 Keychain / Keystore。
+11. 后续补客户端合并模型与真实 userdb payload / 写回流程的接线。
+12. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
+13. 生产恢复流程、平台私钥存储 backend 和真实 payload / userdb 写回接线稳定后，再设计 Go server API。
 
 ## 验证口径
 

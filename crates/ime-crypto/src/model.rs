@@ -681,6 +681,13 @@ pub enum CryptoError {
     },
     CiphertextHashMismatch,
     KeyDerivationFailed,
+    SignatureVerificationFailed,
+    PrivateKeyUnavailable {
+        key_id: String,
+    },
+    PrivateKeyExportBlocked {
+        key_id: String,
+    },
     EncryptionFailed,
     DecryptionFailed,
 }
@@ -706,6 +713,13 @@ impl fmt::Display for CryptoError {
             }
             Self::CiphertextHashMismatch => f.write_str("ciphertext hash mismatch"),
             Self::KeyDerivationFailed => f.write_str("key derivation failed"),
+            Self::SignatureVerificationFailed => f.write_str("signature verification failed"),
+            Self::PrivateKeyUnavailable { key_id } => {
+                write!(f, "private key unavailable: {key_id}")
+            }
+            Self::PrivateKeyExportBlocked { key_id } => {
+                write!(f, "private key export blocked: {key_id}")
+            }
             Self::EncryptionFailed => f.write_str("encryption failed"),
             Self::DecryptionFailed => f.write_str("decryption failed"),
         }

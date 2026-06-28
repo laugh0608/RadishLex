@@ -2,6 +2,7 @@ mod assemble;
 mod device;
 mod merge;
 mod model;
+mod signing;
 
 pub use assemble::{
     AssembledSyncObject, PlaintextSyncPayload, SyncEnvelopeAssembler, SyncObjectAssemblySpec,
@@ -19,3 +20,4 @@ pub use model::{
     EncryptedSyncObjectDraft, LocalDataClass, PayloadSource, SyncObjectType, SyncPayloadError,
     SyncPayloadPlan, SyncPlanItem,
 };
+pub use signing::{SignedDeviceAuthorization, SignedDeviceRevocation};

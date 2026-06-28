@@ -60,7 +60,7 @@ DeviceKeyAgreementKey
   revoked_at_ms
 ```
 
-当前代码中的 `DeviceKeyDescriptor` 仍是早期泛化描述；后续实现签名模型时，应改为显式 key usage 或新增独立 signing descriptor，避免继续用 `DeviceKeyPair` 表达所有设备密钥职责。
+当前代码中的 `DeviceKeyDescriptor` 仍是早期泛化描述；签名模型已新增独立 `DeviceSigningKeyHandle` / `DeviceSigningPublicKey`，后续 key agreement 模型也应使用显式 key usage，避免继续用 `DeviceKeyPair` 表达所有设备密钥职责。
 
 服务端可保存设备签名公钥、key agreement 公钥、key id、算法、创建时间和撤销时间；不得保存私钥、可导出的私钥备份、同步主密钥或恢复码明文。
 
@@ -253,13 +253,13 @@ last_used_at_ms
 
 ## Rust 实施口径
 
-后续实现建议：
+当前 Rust 实施口径：
 
-- 在 `ime-crypto` 中新增签名基础类型、签名 key descriptor、签名对象 canonical bytes 和纯 Rust test signer。
-- 在 `ime-sync` 中把 signed manifest / authorization / revocation / recovery record 与设备状态校验接线。
+- `ime-crypto` 已新增签名基础类型、签名 key handle/public key、签名对象 canonical bytes 和纯 Rust `test-memory-v1` signer。
+- `ime-crypto` 已覆盖 `SignedSyncObjectManifest` 与 `SignedRecoveryRecordManifest`；`ime-sync` 已覆盖 `SignedDeviceAuthorization` 与 `SignedDeviceRevocation`，并接入设备状态校验。
 - 暂不接系统 Keychain / Keystore，不引入平台 SDK，不暴露 FFI。
-- 签名依赖进入代码前，需要记录 crate 许可、版本、测试覆盖和是否需要 `rand_core` / 系统 RNG。
-- 先用合成 fixture 覆盖签名边界，再设计 Go server API 和平台存储 backend。
+- 当前签名依赖为 `ed25519-dalek = 2.2.0`，许可 `BSD-3-Clause`；当前 test-memory signer 使用合成 seed，不依赖系统 RNG 创建生产 key。
+- 后续再设计 Go server API、平台存储 backend 和生产 key 创建流程。
 
 ## 验证口径
 

@@ -10,13 +10,13 @@ RadishLex 当前处于 Phase 2 起步阶段：
 - `ime-engine-rime` 已接入真实 `librime` adapter，并通过本机隔离 Rime smoke 复验 `compose -> candidates -> commit`，同时在 `native-rime` feature 测试中覆盖必需 Rime API 缺失映射。
 - `ime-userdb` 已落地本地 SQLite 用户词库、选择事件、负反馈、删除 tombstone、用户词库导入导出、同步前置计数和 `dictionary.user_terms` / `ranker.weights` / `dictionary.deleted_terms` P2 plaintext payload 只读迭代器，并通过 `ime-sync::SyncEnvelopeAssembler` 接入本地加密 envelope 装配链路。
 - `ime-ranker` 已提供可解释候选重排。
-- `ime-sync` 已提供同步 payload 来源分类、P2 envelope 组装边界、加密对象外壳草案、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型和客户端解密后合并模型，并可从 `ime-crypto` envelope 派生上传草案元数据；不连接后端、不实现网络同步。
-- `ime-crypto` 已落地本地加密 crate，覆盖 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、Argon2id recovery KDF、key role、object envelope、AAD 绑定、nonce 重复检测、篡改失败、device key descriptor、device wrapping key / record、recovery material，以及 userdb P2 payload 本地加密 / 解密 / sync draft 派生测试；签名与设备私钥存储 ADR 已固定，Rust 签名模型、真实设备密钥存储和生产恢复流程尚未落地。
+- `ime-sync` 已提供同步 payload 来源分类、P2 envelope 组装边界、加密对象外壳草案、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型、客户端解密后合并模型、设备授权签名和设备撤销签名模型，并可从 `ime-crypto` envelope 派生上传草案元数据；不连接后端、不实现网络同步。
+- `ime-crypto` 已落地本地加密 crate，覆盖 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、Argon2id recovery KDF、Ed25519 设备签名、test-memory signing key store、key role、object envelope、AAD 绑定、nonce 重复检测、篡改失败、device key descriptor、device wrapping key / record、recovery material、signed sync object manifest、signed recovery record，以及 userdb P2 payload 本地加密 / 解密 / sync draft 派生测试；真实平台设备私钥存储和生产恢复流程尚未落地。
 - `docs/sync-key-management.md` 已固定真实同步前的同步密钥、设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突边界；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 Argon2id KDF、格式、恢复记录字段和验证口径；`docs/adr/0003-device-signing-key-storage.md` 已固定 Ed25519 设备签名、签名对象、私钥存储抽象和验证口径。
 - `ime-ffi` 已提供 C ABI 起步验证，覆盖 ABI contract、opaque handle、session owner-thread policy、session options、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、learning status 只读摘要、sync preflight 状态摘要、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、平台绑定式 view copy / release host smoke、释放函数 panic 边界、demo engine host smoke 和 FFI 调用 runbook。
 - `radishlex-ime-cli` 已提供 `demo`、`rime`、`dict`、`learn status`、`learn select/suppress`、`rank explain`、`rime --rank-db` 和 `sync preflight` 复验入口。
 
-当前下一步仍在 Rust 本地同步加密前置工作内，重点是按 ADR 落地签名 / 设备密钥存储纯 Rust 模型，以及合并模型与真实 payload / userdb 写回流程的接线。P1 原始事件、本地审计批次和 FFI 明文 payload 继续不得进入同步路径；现阶段不推进平台壳、Go 同步后端或 Flutter manager 主线。
+当前下一步仍在 Rust 本地同步加密前置工作内，重点是把客户端合并模型接到真实 P2 payload 解析与 userdb 写回流程，并继续明确生产恢复流程和平台私钥存储 backend 的后续边界。P1 原始事件、本地审计批次和 FFI 明文 payload 继续不得进入同步路径；现阶段不推进平台壳、Go 同步后端或 Flutter manager 主线。
 
 ## 设计原则
 
@@ -198,7 +198,7 @@ MVP 至少需要证明：
 - userdb schema、删除语义、导入导出和 ranker explain 未稳定前，不接远端同步。
 - FFI 所有权、生命周期、错误语义、字符串编码、线程模型和释放责任未明确前，不推进平台壳。
 - Rime native smoke 和学习层复验未稳定前，不推进复杂平台候选窗或管理 UI。
-- 真实 P2 payload / userdb 写回接线、签名 / 设备密钥存储 Rust 模型和生产恢复流程未稳定前，不进入 Go server、远端同步或管理 UI 同步主线。
+- 真实 P2 payload / userdb 写回接线、生产恢复流程和平台私钥存储 backend 未稳定前，不进入 Go server、远端同步或管理 UI 同步主线。
 
 ## 专题文档索引
 
