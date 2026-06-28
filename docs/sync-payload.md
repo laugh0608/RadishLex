@@ -209,7 +209,7 @@ updated_at_ms
 未落地：
 
 - `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
-- 签名、生产恢复码 KDF、真实设备密钥存储和远端密钥轮换执行器；`ime-crypto` 当前已落地本地 AEAD / HKDF / ciphertext hash / envelope / device wrapping 模型测试。
+- 恢复码 KDF ADR 已固化；生产恢复码 KDF Rust 实现、签名、真实设备密钥存储和远端密钥轮换执行器尚未落地。`ime-crypto` 当前已落地本地 AEAD / HKDF / ciphertext hash / envelope / device wrapping 模型测试。
 - 客户端冲突合并与真实 payload / userdb 的接线；当前只固定解密后合成记录的合并模型，尚未解析真实 payload JSON、写回 SQLite 或生成上传补丁。
 - HTTP API、Go server 存储和冲突合并执行器。
 

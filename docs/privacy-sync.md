@@ -95,7 +95,7 @@ SyncObject
 
 `docs/crypto-boundary.md` 已补 `ime-crypto` 客户端加密边界，并已落地本地 AEAD envelope、ciphertext hash、device wrapping、recovery material 和撤销后 key epoch 解密边界测试。后续服务端可见 hash 必须是 ciphertext hash 或密文加 AAD 的 hash，不得是 plaintext payload hash。
 
-`docs/sync-key-management.md` 已补真实同步前的同步密钥与设备生命周期边界，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突方向。进入 Go server 前，应先补恢复码 KDF ADR、签名 / 设备密钥存储设计，以及客户端合并模型与真实 P2 payload / userdb 写回流程的接线。
+`docs/sync-key-management.md` 已补真实同步前的同步密钥与设备生命周期边界，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突方向；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF、格式和恢复记录边界。进入 Go server 前，应先按 ADR 落地恢复码 KDF Rust 模型、补签名 / 设备密钥存储设计，以及客户端合并模型与真实 P2 payload / userdb 写回流程的接线。
 
 ## 设备授权
 

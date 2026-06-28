@@ -1,6 +1,6 @@
 # RadishLex 同步密钥与设备生命周期设计
 
-本文档定义 RadishLex 进入真实同步前必须稳定的同步密钥、设备授权、恢复码、设备撤销、key epoch 和冲突边界。读者是后续实现 `ime-crypto`、`ime-sync`、Go sync server、管理 UI 同步页面和审阅隐私边界的开发者。本文不包含 HTTP API、Go server migration、Flutter 页面设计、平台输入法接入流程、完整恢复码 KDF 参数或生产密钥存储实现。
+本文档定义 RadishLex 进入真实同步前必须稳定的同步密钥、设备授权、恢复码、设备撤销、key epoch 和冲突边界。读者是后续实现 `ime-crypto`、`ime-sync`、Go sync server、管理 UI 同步页面和审阅隐私边界的开发者。本文不包含 HTTP API、Go server migration、Flutter 页面设计、平台输入法接入流程、生产恢复码代码或生产密钥存储实现。
 
 ## 当前定位
 
@@ -12,6 +12,7 @@
 - userdb P2 payload 已通过本地 integration test 进入 `ime-crypto` envelope，再派生 sync draft。
 - `ime-crypto` 已补 device key descriptor、device wrapping key / record、recovery material 和撤销后新 `key_epoch` 加密边界测试。
 - `ime-sync` 已补 `SyncDomain`、`SyncDevice`、`DeviceJoinRequest`、`DeviceAuthorizationPackage`、`DeviceRevocationRecord` 和 `SyncObjectVersion` 草案模型。
+- `docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF 采用 Argon2id、`RLX1` 格式、恢复记录字段、失败限速和验证口径。
 
 当前仍不做：
 
@@ -20,7 +21,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步代码实现应继续补恢复码 KDF ADR、签名 / 设备密钥存储设计，以及客户端合并模型与真实 P2 payload / userdb 写回流程的接线，再进入后端 API。恢复码、签名 / 设备密钥存储和真实写回语义没有稳定前，不应启动真实远端同步主线。
+下一步代码实现应按 ADR 落地恢复码 KDF 纯 Rust 模型与测试，继续补签名 / 设备密钥存储设计，以及客户端合并模型与真实 P2 payload / userdb 写回流程的接线，再进入后端 API。生产恢复流程、签名 / 设备密钥存储和真实写回语义没有稳定前，不应启动真实远端同步主线。
 
 ## 设计目标
 
@@ -68,7 +69,7 @@
 
 - 从恢复码和恢复参数派生出的恢复材料。
 - 用于在没有旧设备可用时恢复同步域材料。
-- 恢复码属于低熵人工输入，具体 KDF 算法和参数进入实现前必须用 ADR 固化；本设计只固定职责和约束。
+- 恢复码 KDF 算法、参数、格式和恢复记录字段见 `docs/adr/0002-recovery-code-kdf.md`；本设计只固定同步域职责和设备生命周期约束。
 
 ## 同步域与设备状态
 
@@ -144,7 +145,7 @@ SyncDevice
 
 - 恢复码只能用于恢复同步域材料，不能作为服务端登录密码。
 - 恢复参数可以公开保存，但不得降低离线攻击成本到不可接受水平。
-- 恢复码 KDF 参数、格式、校验词和失败限速策略进入实现前必须写 ADR。
+- 恢复码 KDF 参数、格式、校验段和失败限速策略已由 `docs/adr/0002-recovery-code-kdf.md` 固定；生产实现必须按该 ADR 补 Rust model / test。
 
 ## 设备撤销与 key epoch
 
@@ -238,9 +239,10 @@ updated_at_ms
 4. 已在 `ime-sync` 测试 active / pending / revoked 设备状态转移、授权设备和接收设备都必须 active、撤销必须推进 key epoch、版本关系和 stale base version 检测边界。
 5. 已在 `ime-sync` 补客户端解密后合并模型和测试，覆盖 `dictionary.deleted_terms` tombstone 压过旧 user terms、旧 ranker weights、旧 epoch 上传和显式恢复语义；当前不解析真实 payload JSON、不写回 SQLite、不连接后端。
 6. 已在 `ime-sync` 补 `SyncEnvelopeAssembler`，固定 Rust 内部 P2 payload 到 envelope 的组装边界，覆盖 sync master 派生 object key、nonce 复用阻断、draft 派生和 Debug 明文阻断。
-7. 后续补恢复码 KDF ADR、签名 / 设备密钥存储设计，以及客户端合并模型与真实 userdb payload / 写回流程的接线。
-8. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
-9. 恢复码、签名 / 设备密钥存储和真实 payload / userdb 写回接线稳定后，再设计 Go server API。
+7. 已补 `docs/adr/0002-recovery-code-kdf.md`，固定恢复码 Argon2id KDF、格式、恢复记录字段、失败限速和验证口径。
+8. 后续按 ADR 落地恢复码 KDF 纯 Rust 模型与测试，补签名 / 设备密钥存储设计，以及客户端合并模型与真实 userdb payload / 写回流程的接线。
+9. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
+10. 生产恢复码实现、签名 / 设备密钥存储和真实 payload / userdb 写回接线稳定后，再设计 Go server API。
 
 ## 验证口径
 
@@ -259,7 +261,7 @@ updated_at_ms
 
 ## 停止线
 
-- 恢复码 KDF 算法、参数和格式未通过 ADR 固化前，不实现生产恢复码。
-- 生产恢复码 KDF、签名 / 设备密钥存储和历史重加密策略未固化前，不实现生产恢复流程。
+- 恢复码 KDF 算法、参数和格式已通过 ADR 固化；Rust KDF model、参数校验和恢复记录解密测试未落地前，不实现生产恢复码。
+- 生产恢复码实现、签名 / 设备密钥存储和历史重加密策略未固化前，不实现生产恢复流程。
 - 冲突合并模型未接入真实 P2 payload 解析、userdb 写回和生产 envelope 组装边界前，不做远端上传下载。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。

@@ -45,6 +45,7 @@ RadishLex/
     engine-boundary.md
     engine-rime-adapter.md
     personalization-learning.md
+    adr/
     runbooks/
     platform-notes/
   scripts/
@@ -87,6 +88,7 @@ RadishLex/
 - `docs/sync-payload.md`：同步 payload 草案和 P1/P2 来源分类。
 - `docs/crypto-boundary.md`：`ime-crypto` 进入实现前的客户端加密、密钥、envelope 和验证边界。
 - `docs/sync-key-management.md`：真实同步前的同步密钥、设备授权、恢复码、设备撤销、key epoch 和冲突边界。
+- `docs/adr/0002-recovery-code-kdf.md`：恢复码 Argon2id KDF、格式、恢复记录字段和生产实现验证口径。
 - `docs/ffi-boundary.md`：后续 C ABI、所有权、生命周期和错误语义边界。
 - `docs/runbooks/ffi-platform-call-contract.md`：平台绑定层调用 C ABI 的错误、字符串、handle 释放和 owner-thread 调度规则。
 - `docs/runbooks/rime-native-smoke.md`：真实 `librime` 本机 smoke 操作步骤。
@@ -162,7 +164,7 @@ librime adapter：
 - blob 加密。
 - 签名和校验。
 
-当前已创建 `crates/ime-crypto/`，落地 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、key role、object envelope、AAD、nonce、device key descriptor、device wrapping key / record、recovery material、删除同步和篡改失败测试；签名、生产恢复码 KDF 和真实设备密钥存储尚未落地。
+当前已创建 `crates/ime-crypto/`，落地 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、key role、object envelope、AAD、nonce、device key descriptor、device wrapping key / record、recovery material、删除同步和篡改失败测试；恢复码 KDF ADR 已固定，生产恢复码 KDF Rust 实现、签名和真实设备密钥存储尚未落地。
 
 ### ime-ffi
 

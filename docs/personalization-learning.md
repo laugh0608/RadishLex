@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn status/select/suppress`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查、学习状态只读摘要和同步前置检查命令。`ime-sync` 已补 payload 来源分类、加密对象外壳草案、P2 envelope 组装边界、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突模型和客户端解密后合并模型，`ime-crypto` 已补本地 AEAD envelope、device wrapping、recovery material 和撤销后 key epoch 解密边界，`ime-userdb` 已补 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 P2 plaintext payload 只读迭代器，并已通过 `SyncEnvelopeAssembler` 接入本地加密 / 解密 / sync draft 派生链路；该迭代器不暴露给 FFI，不导出 P1 原始事件、负反馈明细、上下文统计或本地审计批次。`docs/sync-key-management.md` 已补真实同步前的设备授权、恢复码、设备撤销、key epoch 和冲突边界。`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、learning status 只读摘要、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、平台绑定式 view copy / release host smoke、释放 panic 边界 host smoke 和 FFI 调用 runbook；`ime-engine-rime` 已补必需 Rime API 缺失映射测试。下一阶段目标是补恢复码 KDF ADR、签名 / 设备密钥存储设计，以及合并模型与真实 P2 payload / userdb 写回流程的接线，并继续把 P1 原始事件和上下文统计挡在同步路径之外。
+当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn status/select/suppress`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查、学习状态只读摘要和同步前置检查命令。`ime-sync` 已补 payload 来源分类、加密对象外壳草案、P2 envelope 组装边界、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突模型和客户端解密后合并模型，`ime-crypto` 已补本地 AEAD envelope、device wrapping、recovery material 和撤销后 key epoch 解密边界，`ime-userdb` 已补 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 P2 plaintext payload 只读迭代器，并已通过 `SyncEnvelopeAssembler` 接入本地加密 / 解密 / sync draft 派生链路；该迭代器不暴露给 FFI，不导出 P1 原始事件、负反馈明细、上下文统计或本地审计批次。`docs/sync-key-management.md` 已补真实同步前的设备授权、恢复码、设备撤销、key epoch 和冲突边界，恢复码 KDF 已由 ADR 固定。`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、learning status 只读摘要、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、平台绑定式 view copy / release host smoke、释放 panic 边界 host smoke 和 FFI 调用 runbook；`ime-engine-rime` 已补必需 Rime API 缺失映射测试。下一阶段目标是按 ADR 落地恢复码 KDF Rust 模型、补签名 / 设备密钥存储设计，以及合并模型与真实 P2 payload / userdb 写回流程的接线，并继续把 P1 原始事件和上下文统计挡在同步路径之外。
 
 Phase 2 不改变底层 engine adapter 边界：
 
@@ -475,7 +475,8 @@ cargo test --workspace
 22. 已补 `docs/sync-key-management.md`，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突边界。
 23. 已补 `ime-crypto` / `ime-sync` 的设备、key epoch、device wrapping、recovery material、授权包、撤销记录和对象版本冲突 Rust 模型。
 24. 已补 `ime-sync` 客户端解密后合并模型，覆盖 deleted tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词、显式恢复清理 tombstone 和恢复前旧权重不复活。
-25. 已补 `ime-sync::SyncEnvelopeAssembler`，固定 Rust 内部 P2 payload 到 envelope 的组装边界；在恢复码 KDF、签名 / 设备密钥存储和真实 payload / userdb 写回接线稳定前，不进入远端同步或管理 UI 同步主线。
+25. 已补 `ime-sync::SyncEnvelopeAssembler`，固定 Rust 内部 P2 payload 到 envelope 的组装边界。
+26. 已补 `docs/adr/0002-recovery-code-kdf.md`，固定恢复码 KDF 算法、参数、格式、恢复记录字段和验证口径；在生产恢复码实现、签名 / 设备密钥存储和真实 payload / userdb 写回接线稳定前，不进入远端同步或管理 UI 同步主线。
 
 阶段停止线：
 
