@@ -680,6 +680,7 @@ pub enum CryptoError {
         key_epoch: u64,
     },
     CiphertextHashMismatch,
+    KeyDerivationFailed,
     EncryptionFailed,
     DecryptionFailed,
 }
@@ -704,6 +705,7 @@ impl fmt::Display for CryptoError {
                 write!(f, "duplicate nonce for key {key_id} at epoch {key_epoch}")
             }
             Self::CiphertextHashMismatch => f.write_str("ciphertext hash mismatch"),
+            Self::KeyDerivationFailed => f.write_str("key derivation failed"),
             Self::EncryptionFailed => f.write_str("encryption failed"),
             Self::DecryptionFailed => f.write_str("decryption failed"),
         }
@@ -765,14 +767,14 @@ fn compare_aad_field<T: PartialEq>(
     }
 }
 
-fn encrypt_xchacha20poly1305(
-    object_key_material: &ObjectKeyMaterial,
+pub(crate) fn encrypt_xchacha20poly1305_raw(
+    key: &[u8; OBJECT_KEY_LEN],
     nonce: &Nonce,
     associated_data: &[u8],
     plaintext: &[u8],
 ) -> Result<Vec<u8>, CryptoError> {
-    let cipher = XChaCha20Poly1305::new_from_slice(object_key_material.as_bytes())
-        .map_err(|_| CryptoError::EncryptionFailed)?;
+    let cipher =
+        XChaCha20Poly1305::new_from_slice(key).map_err(|_| CryptoError::EncryptionFailed)?;
     cipher
         .encrypt(
             XNonce::from_slice(nonce.as_bytes()),
@@ -784,14 +786,14 @@ fn encrypt_xchacha20poly1305(
         .map_err(|_| CryptoError::EncryptionFailed)
 }
 
-fn decrypt_xchacha20poly1305(
-    object_key_material: &ObjectKeyMaterial,
+pub(crate) fn decrypt_xchacha20poly1305_raw(
+    key: &[u8; OBJECT_KEY_LEN],
     nonce: &Nonce,
     associated_data: &[u8],
     ciphertext: &[u8],
 ) -> Result<Vec<u8>, CryptoError> {
-    let cipher = XChaCha20Poly1305::new_from_slice(object_key_material.as_bytes())
-        .map_err(|_| CryptoError::DecryptionFailed)?;
+    let cipher =
+        XChaCha20Poly1305::new_from_slice(key).map_err(|_| CryptoError::DecryptionFailed)?;
     cipher
         .decrypt(
             XNonce::from_slice(nonce.as_bytes()),
@@ -801,6 +803,34 @@ fn decrypt_xchacha20poly1305(
             },
         )
         .map_err(|_| CryptoError::DecryptionFailed)
+}
+
+fn encrypt_xchacha20poly1305(
+    object_key_material: &ObjectKeyMaterial,
+    nonce: &Nonce,
+    associated_data: &[u8],
+    plaintext: &[u8],
+) -> Result<Vec<u8>, CryptoError> {
+    encrypt_xchacha20poly1305_raw(
+        object_key_material.as_bytes(),
+        nonce,
+        associated_data,
+        plaintext,
+    )
+}
+
+fn decrypt_xchacha20poly1305(
+    object_key_material: &ObjectKeyMaterial,
+    nonce: &Nonce,
+    associated_data: &[u8],
+    ciphertext: &[u8],
+) -> Result<Vec<u8>, CryptoError> {
+    decrypt_xchacha20poly1305_raw(
+        object_key_material.as_bytes(),
+        nonce,
+        associated_data,
+        ciphertext,
+    )
 }
 
 fn ciphertext_hash_hex(associated_data: &[u8], ciphertext: &[u8]) -> String {
@@ -844,7 +874,7 @@ fn device_wrapping_key_info(wrapping_key: &KeyDescriptor, device_id: &str) -> Ve
     bytes
 }
 
-fn push_aad_field(output: &mut Vec<u8>, name: &str, value: &[u8]) {
+pub(crate) fn push_aad_field(output: &mut Vec<u8>, name: &str, value: &[u8]) {
     output.extend_from_slice(name.as_bytes());
     output.push(b'=');
     output.extend_from_slice(&(value.len() as u64).to_be_bytes());

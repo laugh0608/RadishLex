@@ -99,6 +99,7 @@ RecoveryRecord
   parallelism
   output_len
   envelope_algorithm
+  envelope_nonce
   encrypted_recovery_key
   created_at_ms
   updated_at_ms
@@ -126,6 +127,7 @@ iterations
 parallelism
 output_len
 envelope_algorithm
+envelope_nonce
 created_at_ms
 updated_at_ms
 ```
@@ -168,13 +170,14 @@ KDF 参数必须版本化：
 
 ## Rust 实现口径
 
-后续实现建议：
+当前 Rust 实现口径：
 
-- 在 `ime-crypto` 中新增恢复码 KDF 模型和参数校验。
-- 继续使用 `RecoveryMaterial` 表达恢复记录元数据与包装密文。
+- 已在 `ime-crypto` 中新增 `RecoveryCode`、`RecoveryKdfProfile`、`RecoveryWrappingKeyMaterial` 和恢复码 KDF 参数校验。
+- 已继续使用 `RecoveryMaterial` 表达恢复记录元数据、`envelope_nonce`、AAD 和包装密文。
+- 已提供 Rust 内部 `RecoveryMaterial::encrypt_sync_master_key` / `decrypt_sync_master_key` 测试路径，用合成恢复码和合成同步主密钥复验恢复记录加解密。
 - 不把 KDF 或恢复入口暴露给 FFI，直到所有权、错误语义和敏感数据清理策略固定。
 - 不新增 CLI 明文恢复码导出命令；CLI 只能在明确测试模式下使用合成恢复码 fixture。
-- 先实现纯 Rust model / test，再考虑 Go server API。
+- 先保持纯 Rust model / test，再考虑 Go server API、管理 UI 恢复流程和系统密钥存储。
 
 ## 验证口径
 
@@ -202,7 +205,7 @@ KDF 参数必须版本化：
 
 - 恢复码较长，用户必须离线保存。
 - 恢复流程比普通登录慢，尤其在移动设备上。
-- 后续实现需要引入 Argon2id 依赖，并在许可和平台性能上单独验证。
+- 当前已引入 RustCrypto `argon2` crate；其直接与当前锁定的主要传递依赖 `password-hash`、`blake2`、`base64ct` 均为 MIT / Apache-2.0 兼容许可口径。后续仍需要在移动端和低内存平台验证恢复耗时。
 
 ## 参考链接
 

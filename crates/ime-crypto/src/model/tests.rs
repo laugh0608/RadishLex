@@ -251,9 +251,19 @@ fn device_wrapping_record_redacts_wrapped_key_and_validates_role() {
 fn recovery_material_redacts_recovery_key_and_requires_public_parameters() {
     let material = RecoveryMaterial::new(
         "recovery-a",
-        "argon2id-params-pending-adr",
+        "domain-a",
+        3,
+        "argon2id-v1",
+        1,
         b"public-salt",
+        65_536,
+        3,
+        4,
+        32,
+        AlgorithmId::xchacha20poly1305_hkdf_sha256(),
+        nonce(9),
         b"encrypted-recovery-key",
+        30,
         30,
     )
     .expect("recovery material");
@@ -265,9 +275,19 @@ fn recovery_material_redacts_recovery_key_and_requires_public_parameters() {
 
     let error = RecoveryMaterial::new(
         "recovery-a",
+        "domain-a",
+        3,
         "",
+        1,
         b"public-salt",
+        65_536,
+        3,
+        4,
+        32,
+        AlgorithmId::xchacha20poly1305_hkdf_sha256(),
+        nonce(9),
         b"encrypted-recovery-key",
+        30,
         30,
     )
     .expect_err("empty KDF id fails");

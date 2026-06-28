@@ -4,23 +4,24 @@
 
 ## 当前定位
 
-Phase 2 的 userdb、ranker、Rime adapter、FFI 管理入口和学习状态摘要已具备进入 `ime-crypto` 设计的证据链；`ime-crypto` 本地加密 crate 已落地，userdb `dictionary.user_terms`、`ranker.weights` 和 `dictionary.deleted_terms` P2 payload 已通过本地 envelope 装配测试，设备包装密钥、设备 key 描述和恢复材料模型已补入，但真实同步仍未开始。
+Phase 2 的 userdb、ranker、Rime adapter、FFI 管理入口和学习状态摘要已具备进入 `ime-crypto` 设计的证据链；`ime-crypto` 本地加密 crate 已落地，userdb `dictionary.user_terms`、`ranker.weights` 和 `dictionary.deleted_terms` P2 payload 已通过本地 envelope 装配测试，设备包装密钥、设备 key 描述、恢复码 KDF 和恢复材料模型已补入，但真实同步仍未开始。
 
 当前结论：
 
-- 已进入 `ime-crypto` 本地 crate 的设计与测试准备，当前覆盖 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、envelope、key role、AAD、nonce、device wrapping key / record、recovery material 和篡改失败测试；`ime-sync` 已可从 crypto envelope 派生上传草案元数据，并通过 `SyncEnvelopeAssembler` 提供 Rust 内部 P2 payload envelope 组装边界；`ime-userdb` 已提供 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 integration test 完成本地加密、解密和 sync draft 派生。
+- 已进入 `ime-crypto` 本地 crate 的设计与测试准备，当前覆盖 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、Argon2id recovery KDF、envelope、key role、AAD、nonce、device wrapping key / record、recovery material 和篡改失败测试；`ime-sync` 已可从 crypto envelope 派生上传草案元数据，并通过 `SyncEnvelopeAssembler` 提供 Rust 内部 P2 payload envelope 组装边界；`ime-userdb` 已提供 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 integration test 完成本地加密、解密和 sync draft 派生。
 - 不连接 Go server，不生成可上传明文 payload，不把加密入口暴露给 FFI 或平台壳。
 - 不把平台壳、Flutter manager 或 Go 后端提前压入当前主线。
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 
-当前真实加密实现只处理本地合成 payload、device wrapping 模型和 userdb integration test payload，不连接后端、不暴露 FFI。`docs/sync-key-management.md` 已固定设备授权、恢复码、撤销、key epoch 和冲突合并边界，`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF 决策，`ime-sync` 已补客户端解密后合并模型和 P2 envelope 组装边界；后续进入 Go server 前，应先按 ADR 落地恢复码 KDF Rust 模型、补签名 / 设备密钥存储设计，以及合并模型与真实 payload / userdb 写回流程的接线。
+当前真实加密实现只处理本地合成 payload、device wrapping 模型、recovery material 模型和 userdb integration test payload，不连接后端、不暴露 FFI。`docs/sync-key-management.md` 已固定设备授权、恢复码、撤销、key epoch 和冲突合并边界，`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF 决策，`ime-sync` 已补客户端解密后合并模型和 P2 envelope 组装边界；后续进入 Go server 前，应先补签名 / 设备密钥存储设计，以及合并模型与真实 payload / userdb 写回流程的接线。
 
 当前依赖选型：
 
 - `chacha20poly1305`：提供 XChaCha20Poly1305 AEAD 和系统随机 nonce。
 - `hkdf` + `sha2`：提供 HKDF-SHA256 对象密钥派生和 SHA-256 ciphertext hash。
+- `argon2`：提供恢复码 Argon2id KDF；当前锁定版本为 `0.5.3`，主要传递依赖包括 `password-hash`、`blake2` 和 `base64ct`。
 
-上述依赖来自 RustCrypto 生态，当前采用 MIT OR Apache-2.0 许可口径；后续按恢复码 KDF ADR 引入 Argon2id 依赖时，需要再次记录许可、平台性能和验证理由。
+上述依赖来自 RustCrypto 生态，当前采用 MIT OR Apache-2.0 兼容许可口径；后续仍需要在移动端和低内存平台记录 Argon2id 恢复耗时。
 
 ## 职责分工
 
@@ -87,8 +88,10 @@ P1 原始事件后续只能先在本机压缩为 P2 权重摘要，再由 P2 对
 - `SyncMasterKeyMaterial::derive_device_wrapping_key` 已按 recipient device id、wrapping key id 和 key epoch 派生设备包装 key；同一同步域内不同设备或不同 epoch 得到不同 key。
 - `DeviceKeyDescriptor` 只记录设备 ID、公钥 ID、device key id 和 key epoch，并要求来源 key role 为 `DeviceKeyPair`；它不保存私钥，也不选择具体非对称算法。
 - `DeviceWrappingRecord` 只记录 recipient device id、wrapping key id、key epoch、包装密文和创建时间，并要求来源 key role 为 `DeviceWrapping`；Debug 输出会隐藏 `encrypted_key`。
-- `RecoveryMaterial` 只记录 recovery id、KDF id、salt、恢复密文和创建时间；Debug 输出只显示 `salt_len`，不打印 `encrypted_recovery_key`。
-- 当前模型用于固定字段、校验和日志边界；恢复码 KDF 参数已由 ADR 固化，但生产级恢复码 Rust 实现、设备私钥存储、非对称包装算法和签名格式仍需补齐后再进入远端同步。
+- `RecoveryCode` 解析 `RLX1` 恢复码、Crockford Base32 secret 和短校验段；Debug 输出不打印恢复码 secret。
+- `RecoveryKdfProfile` 固定 `argon2id-v1`、`0x13`、64 MiB memory、3 iterations、4 parallelism、16 byte salt 和 32 byte output 的当前 profile，并拒绝弱化参数。
+- `RecoveryMaterial` 记录 recovery id、domain id、key epoch、KDF 参数、salt、envelope algorithm、envelope nonce、恢复密文和时间戳；Debug 输出只显示 `salt_len` / `envelope_nonce_len`，不打印 `encrypted_recovery_key`。
+- 当前模型用于固定字段、校验、AAD 绑定、恢复记录解密和日志边界；设备私钥存储、非对称包装算法、签名格式和生产恢复 UI / API 仍需补齐后再进入远端同步。
 
 规则：
 
@@ -96,7 +99,7 @@ P1 原始事件后续只能先在本机压缩为 P2 权重摘要，再由 P2 对
 - 新设备加入必须通过已有设备授权或恢复码。
 - 撤销设备后，后续对象必须使用新同步密钥或新 key epoch；旧设备不应能解密撤销后的新对象。
 - 历史对象是否重加密是独立策略；如果不重加密，UI 和文档必须说明旧设备在被撤销前已经取得的历史密钥无法被技术上追回。
-- 恢复码必须按 `docs/adr/0002-recovery-code-kdf.md` 使用 Argon2id KDF，生产实现需要覆盖参数校验、错误码、AAD 绑定和 Debug 敏感字段阻断。
+- 恢复码必须按 `docs/adr/0002-recovery-code-kdf.md` 使用 Argon2id KDF；当前已覆盖参数校验、错误码、AAD 绑定和 Debug 敏感字段阻断。
 
 ## 加密对象 Envelope
 
@@ -181,7 +184,8 @@ Plaintext payload 后续必须有稳定 schema：
 10. 已补 `ime-sync` 客户端解密后合并模型，覆盖删除 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词、显式恢复清理 tombstone 和恢复前旧权重不复活。
 11. 已补 `ime-sync::SyncEnvelopeAssembler`，固定 Rust 内部 P2 payload 到 envelope 的组装边界，覆盖 sync master 派生 object key、nonce 复用阻断、draft 派生和 Debug 明文阻断。
 12. 已补 `docs/adr/0002-recovery-code-kdf.md`，固定恢复码 Argon2id KDF、格式、恢复记录字段、失败限速和验证口径。
-13. 下一步按 ADR 落地恢复码 KDF Rust 模型，补签名 / 设备密钥存储设计，以及合并模型与真实 payload / userdb 写回流程的接线；通过测试后再进入 Go server API。
+13. 已在 `ime-crypto` 补 `RecoveryCode`、`RecoveryKdfProfile`、`RecoveryWrappingKeyMaterial` 和 `RecoveryMaterial` 恢复记录加解密测试，覆盖恢复码格式 / 校验段、KDF 参数校验、同码同 salt 稳定派生、salt 变化、错误恢复码失败、AAD 变更失败和 Debug 脱敏。
+14. 下一步补签名 / 设备密钥存储设计，以及合并模型与真实 payload / userdb 写回流程的接线；通过测试后再进入 Go server API。
 
 ## 验证口径
 
@@ -195,6 +199,7 @@ Plaintext payload 后续必须有稳定 schema：
 - `ciphertext_hash` 不等于 plaintext hash，且不包含明文用户词。
 - 删除 tombstone 加密同步后不会被旧对象复活。
 - 设备撤销后新对象使用新 key epoch。
+- 恢复码格式校验、Argon2id 参数下限、恢复记录 AAD、错误恢复码和 Debug 脱敏必须保持测试覆盖。
 
 默认验证命令后续应至少包含：
 

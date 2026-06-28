@@ -164,7 +164,7 @@ librime adapter：
 - blob 加密。
 - 签名和校验。
 
-当前已创建 `crates/ime-crypto/`，落地 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、key role、object envelope、AAD、nonce、device key descriptor、device wrapping key / record、recovery material、删除同步和篡改失败测试；恢复码 KDF ADR 已固定，生产恢复码 KDF Rust 实现、签名和真实设备密钥存储尚未落地。
+当前已创建 `crates/ime-crypto/`，落地 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、Argon2id recovery KDF、key role、object envelope、AAD、nonce、device key descriptor、device wrapping key / record、recovery material、删除同步和篡改失败测试；签名、真实设备密钥存储和生产恢复流程尚未落地。
 
 ### ime-ffi
 

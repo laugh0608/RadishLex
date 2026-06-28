@@ -282,4 +282,4 @@ RADISHLEX_RIME_SHARED_DATA=<path> RADISHLEX_RIME_USER_DATA=<path> cargo test -p 
 - 已在 `ime-ffi` 补 `RadishLexRimeSessionOptions` 与 `radishlex_session_new_rime`，默认构建下保持 unavailable 门禁，`native-rime` feature 下已接入真实 `RimeEngine` session。
 - 已完成 `ime-ffi` ignored native smoke，覆盖从 Rime FFI session 创建、字符按键输入、snapshot 候选读取到候选提交。
 
-阶段结论：`ime-cli rime` 已满足 Phase 1 的真实 adapter 可复验要求，并具备 Phase 2 的 ranker smoke 接入口；`ime-ffi` 也已具备显式 native feature 下的真实 Rime session 入口。后续仍暂缓平台壳，当前主线优先推进恢复码 KDF Rust 模型、签名 / 设备密钥存储设计和真实 payload / userdb 写回接线。
+阶段结论：`ime-cli rime` 已满足 Phase 1 的真实 adapter 可复验要求，并具备 Phase 2 的 ranker smoke 接入口；`ime-ffi` 也已具备显式 native feature 下的真实 Rime session 入口。后续仍暂缓平台壳，当前主线优先推进签名 / 设备密钥存储设计和真实 payload / userdb 写回接线。

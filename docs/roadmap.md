@@ -66,7 +66,7 @@
 - Rime candidates 能进入 ranker，并输出可解释排序与提交映射。
 - 用户词库导入导出、导入检查、删除 tombstone 和同步前置计数均可复验。
 - FFI 管理入口只暴露受控 userdb、dictionary、learning status 和 sync preflight 摘要，不导出 P1 明细或明文同步 payload。
-- 进入 Phase 3 代码前，必须完成 `ime-crypto` 本地 envelope / key / hash 测试、同步密钥与设备生命周期 Rust 模型、删除合并测试、生产级 envelope 组装边界和恢复码 KDF ADR；随后补齐生产恢复码 KDF Rust 实现、签名 / 设备密钥存储设计，以及合并模型与真实 P2 payload / userdb 写回流程的接线。
+- 进入 Phase 3 代码前，必须完成 `ime-crypto` 本地 envelope / key / hash 测试、同步密钥与设备生命周期 Rust 模型、删除合并测试、生产级 envelope 组装边界、恢复码 KDF ADR 和恢复码 KDF Rust 模型；随后补齐签名 / 设备密钥存储设计，以及合并模型与真实 P2 payload / userdb 写回流程的接线。
 
 ## Phase 3: 自部署同步
 
@@ -79,7 +79,7 @@
 - 实现设备注册。
 - 实现备份恢复。
 - 同步密钥、设备授权、撤销和 key epoch 的 Rust 模型测试已经完成。
-- 下一步先按恢复码 KDF ADR 落地 `ime-crypto` Rust 模型与测试，补签名 / 设备密钥存储设计，以及客户端合并模型与真实 P2 payload / userdb 写回流程的接线，再进入远端同步实现。
+- 下一步先补签名 / 设备密钥存储设计，以及客户端合并模型与真实 P2 payload / userdb 写回流程的接线，再进入远端同步实现。
 
 交付：
 
