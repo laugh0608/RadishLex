@@ -20,6 +20,18 @@ type DeviceMetadata struct {
 	Status                  string `json:"status"`
 }
 
+type CreateJoinRequestRequest struct {
+	JoinRequestID           string `json:"join_request_id"`
+	DeviceID                string `json:"device_id"`
+	SigningPublicKeyID      string `json:"signing_public_key_id"`
+	SigningPublicKey        []byte `json:"signing_public_key"`
+	KeyAgreementPublicKeyID string `json:"key_agreement_public_key_id"`
+	KeyAgreementPublicKey   []byte `json:"key_agreement_public_key"`
+	Challenge               []byte `json:"challenge"`
+	CreatedAtMs             int64  `json:"created_at_ms"`
+	ExpiresAtMs             int64  `json:"expires_at_ms"`
+}
+
 type ObjectVersionUploadRequest struct {
 	ObjectType             string `json:"object_type"`
 	Version                uint64 `json:"version"`
@@ -37,6 +49,22 @@ type ObjectVersionUploadRequest struct {
 	Signature              []byte `json:"signature"`
 	ClientCreatedAtMs      int64  `json:"client_created_at_ms"`
 	ClientUpdatedAtMs      int64  `json:"client_updated_at_ms"`
+}
+
+func (r CreateJoinRequestRequest) JoinRequest(domainID string) storage.JoinRequest {
+	return storage.JoinRequest{
+		DomainID:                domainID,
+		JoinRequestID:           r.JoinRequestID,
+		DeviceID:                r.DeviceID,
+		SigningPublicKeyID:      r.SigningPublicKeyID,
+		SigningPublicKey:        r.SigningPublicKey,
+		KeyAgreementPublicKeyID: r.KeyAgreementPublicKeyID,
+		KeyAgreementPublicKey:   r.KeyAgreementPublicKey,
+		Challenge:               r.Challenge,
+		CreatedAtMs:             r.CreatedAtMs,
+		ExpiresAtMs:             r.ExpiresAtMs,
+		Status:                  storage.DevicePending,
+	}
 }
 
 func (r CreateDomainRequest) Domain() storage.Domain {

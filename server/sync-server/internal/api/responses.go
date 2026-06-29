@@ -2,6 +2,45 @@ package api
 
 import "github.com/laugh0608/RadishLex/server/sync-server/internal/storage"
 
+type DomainResponse struct {
+	DomainID        string `json:"domain_id"`
+	CurrentKeyEpoch uint64 `json:"current_key_epoch"`
+	ActiveKeyID     string `json:"active_key_id"`
+	CreatedAtMs     int64  `json:"created_at_ms"`
+	UpdatedAtMs     int64  `json:"updated_at_ms"`
+}
+
+type DomainStateResponse struct {
+	Domain DomainResponse `json:"domain"`
+}
+
+type DeviceResponse struct {
+	DomainID                string               `json:"domain_id"`
+	DeviceID                string               `json:"device_id"`
+	SigningPublicKeyID      string               `json:"signing_public_key_id"`
+	SigningPublicKey        []byte               `json:"signing_public_key"`
+	KeyAgreementPublicKeyID string               `json:"key_agreement_public_key_id"`
+	KeyAgreementPublicKey   []byte               `json:"key_agreement_public_key"`
+	Status                  storage.DeviceStatus `json:"status"`
+	AuthorizedAtMs          int64                `json:"authorized_at_ms,omitempty"`
+	RevokedAtMs             int64                `json:"revoked_at_ms,omitempty"`
+	LastSeenAtMs            int64                `json:"last_seen_at_ms,omitempty"`
+}
+
+type JoinRequestResponse struct {
+	DomainID                string               `json:"domain_id"`
+	JoinRequestID           string               `json:"join_request_id"`
+	DeviceID                string               `json:"device_id"`
+	SigningPublicKeyID      string               `json:"signing_public_key_id"`
+	SigningPublicKey        []byte               `json:"signing_public_key"`
+	KeyAgreementPublicKeyID string               `json:"key_agreement_public_key_id"`
+	KeyAgreementPublicKey   []byte               `json:"key_agreement_public_key"`
+	Challenge               []byte               `json:"challenge"`
+	CreatedAtMs             int64                `json:"created_at_ms"`
+	ExpiresAtMs             int64                `json:"expires_at_ms"`
+	Status                  storage.DeviceStatus `json:"status"`
+}
+
 type RecoveryRecordResponse struct {
 	DomainID               string                       `json:"domain_id"`
 	RecoveryRecordID       string                       `json:"recovery_record_id"`
@@ -26,6 +65,47 @@ type RecoveryRecordResponse struct {
 	SignatureKeyID         string                       `json:"signature_key_id"`
 	Signature              []byte                       `json:"signature"`
 	WrappedMaterial        []byte                       `json:"wrapped_material"`
+}
+
+func DomainResponseFrom(domain storage.Domain) DomainResponse {
+	return DomainResponse{
+		DomainID:        domain.DomainID,
+		CurrentKeyEpoch: domain.CurrentKeyEpoch,
+		ActiveKeyID:     domain.ActiveKeyID,
+		CreatedAtMs:     domain.CreatedAtMs,
+		UpdatedAtMs:     domain.UpdatedAtMs,
+	}
+}
+
+func DeviceResponseFrom(device storage.Device) DeviceResponse {
+	return DeviceResponse{
+		DomainID:                device.DomainID,
+		DeviceID:                device.DeviceID,
+		SigningPublicKeyID:      device.SigningPublicKeyID,
+		SigningPublicKey:        cloneBytes(device.SigningPublicKey),
+		KeyAgreementPublicKeyID: device.KeyAgreementPublicKeyID,
+		KeyAgreementPublicKey:   cloneBytes(device.KeyAgreementPublicKey),
+		Status:                  device.Status,
+		AuthorizedAtMs:          device.AuthorizedAtMs,
+		RevokedAtMs:             device.RevokedAtMs,
+		LastSeenAtMs:            device.LastSeenAtMs,
+	}
+}
+
+func JoinRequestResponseFrom(request storage.JoinRequest) JoinRequestResponse {
+	return JoinRequestResponse{
+		DomainID:                request.DomainID,
+		JoinRequestID:           request.JoinRequestID,
+		DeviceID:                request.DeviceID,
+		SigningPublicKeyID:      request.SigningPublicKeyID,
+		SigningPublicKey:        cloneBytes(request.SigningPublicKey),
+		KeyAgreementPublicKeyID: request.KeyAgreementPublicKeyID,
+		KeyAgreementPublicKey:   cloneBytes(request.KeyAgreementPublicKey),
+		Challenge:               cloneBytes(request.Challenge),
+		CreatedAtMs:             request.CreatedAtMs,
+		ExpiresAtMs:             request.ExpiresAtMs,
+		Status:                  request.Status,
+	}
 }
 
 func RecoveryRecordResponseFrom(record storage.RecoveryRecord, wrappedMaterial []byte) RecoveryRecordResponse {

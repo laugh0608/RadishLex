@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -11,6 +12,105 @@ import (
 
 	"github.com/laugh0608/RadishLex/server/sync-server/internal/storage"
 )
+
+func TestMetadataHandlersCreateDomainReadDeviceAndSaveJoinRequest(t *testing.T) {
+	store := storage.NewMemoryStore()
+	handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+
+	createDomain := CreateDomainRequest{
+		DomainID:        "domain-a",
+		CurrentKeyEpoch: 1,
+		ActiveKeyID:     "epoch-key-a",
+		FirstDevice: DeviceMetadata{
+			DeviceID:                "device-a",
+			SigningPublicKeyID:      "signing-key-a",
+			SigningPublicKey:        []byte("signing-public-key-a"),
+			KeyAgreementPublicKeyID: "agreement-key-a",
+			KeyAgreementPublicKey:   []byte("agreement-public-key-a"),
+			Status:                  string(storage.DeviceActive),
+		},
+		CreatedAtMs: 100,
+		UpdatedAtMs: 100,
+	}
+	createResponse := performJSONRequest(t, handler, http.MethodPost, PrefixV1+"/domains", createDomain)
+	if createResponse.Code != http.StatusCreated {
+		t.Fatalf("unexpected create domain status: %d body=%s", createResponse.Code, createResponse.Body.String())
+	}
+	var domainBody DomainStateResponse
+	decodeResponse(t, createResponse, &domainBody)
+	if domainBody.Domain.DomainID != "domain-a" || domainBody.Domain.CurrentKeyEpoch != 1 {
+		t.Fatalf("unexpected domain response: %#v", domainBody)
+	}
+
+	stateResponse := httptest.NewRecorder()
+	handler.ServeHTTP(stateResponse, httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/state", nil))
+	if stateResponse.Code != http.StatusOK {
+		t.Fatalf("unexpected domain state status: %d body=%s", stateResponse.Code, stateResponse.Body.String())
+	}
+	decodeResponse(t, stateResponse, &domainBody)
+	if domainBody.Domain.ActiveKeyID != "epoch-key-a" {
+		t.Fatalf("unexpected domain state response: %#v", domainBody)
+	}
+
+	deviceResponse := httptest.NewRecorder()
+	handler.ServeHTTP(deviceResponse, httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/devices/device-a", nil))
+	if deviceResponse.Code != http.StatusOK {
+		t.Fatalf("unexpected device status: %d body=%s", deviceResponse.Code, deviceResponse.Body.String())
+	}
+	var deviceBody DeviceResponse
+	decodeResponse(t, deviceResponse, &deviceBody)
+	if deviceBody.DeviceID != "device-a" || deviceBody.Status != storage.DeviceActive {
+		t.Fatalf("unexpected device response: %#v", deviceBody)
+	}
+
+	joinRequest := CreateJoinRequestRequest{
+		JoinRequestID:           "join-a",
+		DeviceID:                "device-b",
+		SigningPublicKeyID:      "signing-key-b",
+		SigningPublicKey:        []byte("signing-public-key-b"),
+		KeyAgreementPublicKeyID: "agreement-key-b",
+		KeyAgreementPublicKey:   []byte("agreement-public-key-b"),
+		Challenge:               []byte("join-challenge"),
+		CreatedAtMs:             110,
+		ExpiresAtMs:             210,
+	}
+	joinResponse := performJSONRequest(t, handler, http.MethodPost, PrefixV1+"/domains/domain-a/join-requests", joinRequest)
+	if joinResponse.Code != http.StatusCreated {
+		t.Fatalf("unexpected join request status: %d body=%s", joinResponse.Code, joinResponse.Body.String())
+	}
+	var joinBody JoinRequestResponse
+	decodeResponse(t, joinResponse, &joinBody)
+	if joinBody.JoinRequestID != "join-a" || joinBody.Status != storage.DevicePending {
+		t.Fatalf("unexpected join response: %#v", joinBody)
+	}
+
+	pendingDeviceResponse := httptest.NewRecorder()
+	handler.ServeHTTP(pendingDeviceResponse, httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/devices/device-b", nil))
+	if pendingDeviceResponse.Code != http.StatusOK {
+		t.Fatalf("unexpected pending device status: %d body=%s", pendingDeviceResponse.Code, pendingDeviceResponse.Body.String())
+	}
+	decodeResponse(t, pendingDeviceResponse, &deviceBody)
+	if deviceBody.DeviceID != "device-b" || deviceBody.Status != storage.DevicePending {
+		t.Fatalf("join request should create a pending device, got %#v", deviceBody)
+	}
+}
+
+func TestMetadataHandlerRejectsMalformedJSON(t *testing.T) {
+	handler := NewHandler(storage.NewMemoryStore(), HandlerConfig{Now: fixedNow})
+
+	request := httptest.NewRequest(http.MethodPost, PrefixV1+"/domains", strings.NewReader("{bad json"))
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("unexpected status: %d body=%s", response.Code, response.Body.String())
+	}
+	var body ErrorResponse
+	decodeResponse(t, response, &body)
+	if body.ErrorCode != string(storage.ErrInvalidRequest) {
+		t.Fatalf("unexpected error response: %#v", body)
+	}
+}
 
 func TestLatestRecoveryHandlerReturnsMetadataAndWrappedMaterial(t *testing.T) {
 	wrappedMaterial := []byte("encrypted wrapped material")
@@ -128,6 +228,25 @@ func TestLatestRecoveryHandlerRateLimitsBeforeStorageRead(t *testing.T) {
 
 func fixedNow() time.Time {
 	return time.UnixMilli(1234)
+}
+
+func performJSONRequest(t *testing.T, handler http.Handler, method string, path string, value any) *httptest.ResponseRecorder {
+	t.Helper()
+	body, err := json.Marshal(value)
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+	request := httptest.NewRequest(method, path, bytes.NewReader(body))
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	return response
+}
+
+func decodeResponse(t *testing.T, response *httptest.ResponseRecorder, value any) {
+	t.Helper()
+	if err := json.Unmarshal(response.Body.Bytes(), value); err != nil {
+		t.Fatalf("decode response: %v body=%s", err, response.Body.String())
+	}
 }
 
 type recoveryStoreStub struct {

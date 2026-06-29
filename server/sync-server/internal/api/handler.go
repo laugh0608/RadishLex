@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -51,20 +52,95 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, publicStorageError(storage.ErrStorageUnavailable, "storage is not configured", true))
 		return
 	}
-	route, ok := recoveryLatestRoute(r.URL.Path)
+	if r.URL.Path == PrefixV1+"/domains" {
+		h.handleDomains(w, r)
+		return
+	}
+	route, ok := domainRoute(r.URL.Path)
 	if !ok {
 		h.writeError(w, publicStorageError(storage.ErrNotFound, "api route not found", false))
 		return
 	}
-	if r.Method != http.MethodGet {
-		w.Header().Set("Allow", http.MethodGet)
-		h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "method is not allowed", false))
+	switch route.kind {
+	case domainStateRoute:
+		h.handleDomainState(w, r, route.domainID)
+	case deviceRoute:
+		h.handleDevice(w, r, route.domainID, route.deviceID)
+	case joinRequestsRoute:
+		h.handleJoinRequests(w, r, route.domainID)
+	case recoveryLatestRoute:
+		h.handleLatestRecovery(w, r, route.domainID)
+	default:
+		h.writeError(w, publicStorageError(storage.ErrNotFound, "api route not found", false))
+	}
+}
+
+func (h *Handler) handleDomains(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		h.writeMethodError(w, http.MethodPost)
 		return
 	}
-	h.handleLatestRecovery(w, r, route.domainID)
+	var request CreateDomainRequest
+	if err := decodeJSONRequest(r, &request); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	if err := h.store.CreateDomain(r.Context(), request.Domain(), request.Device()); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, DomainStateResponse{Domain: DomainResponseFrom(request.Domain())})
+}
+
+func (h *Handler) handleDomainState(w http.ResponseWriter, r *http.Request, domainID string) {
+	if r.Method != http.MethodGet {
+		h.writeMethodError(w, http.MethodGet)
+		return
+	}
+	domain, err := h.store.Domain(r.Context(), domainID)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, DomainStateResponse{Domain: DomainResponseFrom(domain)})
+}
+
+func (h *Handler) handleDevice(w http.ResponseWriter, r *http.Request, domainID string, deviceID string) {
+	if r.Method != http.MethodGet {
+		h.writeMethodError(w, http.MethodGet)
+		return
+	}
+	device, err := h.store.Device(r.Context(), domainID, deviceID)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, DeviceResponseFrom(device))
+}
+
+func (h *Handler) handleJoinRequests(w http.ResponseWriter, r *http.Request, domainID string) {
+	if r.Method != http.MethodPost {
+		h.writeMethodError(w, http.MethodPost)
+		return
+	}
+	var request CreateJoinRequestRequest
+	if err := decodeJSONRequest(r, &request); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	joinRequest := request.JoinRequest(domainID)
+	if err := h.store.SaveJoinRequest(r.Context(), joinRequest); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, JoinRequestResponseFrom(joinRequest))
 }
 
 func (h *Handler) handleLatestRecovery(w http.ResponseWriter, r *http.Request, domainID string) {
+	if r.Method != http.MethodGet {
+		h.writeMethodError(w, http.MethodGet)
+		return
+	}
 	now := h.now()
 	if h.recoveryLimiter != nil && !h.recoveryLimiter.AllowRecoveryRead(domainID, recoveryClientKey(r), now) {
 		h.writeError(w, publicStorageError(storage.ErrRecoveryRateLimited, "recovery record read rate limit exceeded", true))
@@ -82,24 +158,61 @@ func publicStorageError(code storage.ErrorCode, message string, retryable bool) 
 	return &storage.Error{Code: code, Message: message, Retryable: retryable}
 }
 
+func decodeJSONRequest(r *http.Request, value any) error {
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(value); err != nil {
+		return publicStorageError(storage.ErrInvalidRequest, "request body must be valid JSON metadata", false)
+	}
+	if decoder.Decode(&struct{}{}) != io.EOF {
+		return publicStorageError(storage.ErrInvalidRequest, "request body must contain one JSON object", false)
+	}
+	return nil
+}
+
+func (h *Handler) writeMethodError(w http.ResponseWriter, allowedMethods ...string) {
+	w.Header().Set("Allow", strings.Join(allowedMethods, ", "))
+	h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "method is not allowed", false))
+}
+
 func (h *Handler) writeError(w http.ResponseWriter, err error) {
 	writeJSON(w, statusCodeFromError(err), ErrorResponseFrom(err, h.now()))
 }
 
-type recoveryRoute struct {
+type routeKind int
+
+const (
+	domainStateRoute routeKind = iota + 1
+	deviceRoute
+	joinRequestsRoute
+	recoveryLatestRoute
+)
+
+type route struct {
+	kind     routeKind
 	domainID string
+	deviceID string
 }
 
-func recoveryLatestRoute(path string) (recoveryRoute, bool) {
+func domainRoute(path string) (route, bool) {
 	prefix := PrefixV1 + "/domains/"
 	if !strings.HasPrefix(path, prefix) {
-		return recoveryRoute{}, false
+		return route{}, false
 	}
 	parts := strings.Split(strings.TrimPrefix(path, prefix), "/")
-	if len(parts) != 3 || parts[0] == "" || parts[1] != "recovery-records" || parts[2] != "latest" {
-		return recoveryRoute{}, false
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "state" {
+		return route{kind: domainStateRoute, domainID: parts[0]}, true
 	}
-	return recoveryRoute{domainID: parts[0]}, true
+	if len(parts) == 3 && parts[0] != "" && parts[1] == "devices" && parts[2] != "" {
+		return route{kind: deviceRoute, domainID: parts[0], deviceID: parts[2]}, true
+	}
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "join-requests" {
+		return route{kind: joinRequestsRoute, domainID: parts[0]}, true
+	}
+	if len(parts) == 3 && parts[0] != "" && parts[1] == "recovery-records" && parts[2] == "latest" {
+		return route{kind: recoveryLatestRoute, domainID: parts[0]}, true
+	}
+	return route{}, false
 }
 
 func recoveryClientKey(r *http.Request) string {

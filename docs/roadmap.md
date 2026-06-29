@@ -79,7 +79,7 @@
 - 实现设备注册。
 - 实现备份恢复。
 - 同步密钥、设备授权、撤销、key epoch、签名模型和客户端合并写回 userdb 的 Rust 测试已经完成。
-- Go server API / storage、生产恢复流程和平台私钥存储 backend 边界已由专题文档固定；平台私钥存储 backend capability / unavailable backend 的 Rust 模型和测试已经落地。Go server 已起步 metadata / storage / API 验证模型，并已补 storage conformance tests、SQLite-backed repository、local object storage staged transaction 接线、Ed25519 签名验签门禁、device wrapping encrypted key bytes 承载、recovery wrapped material 读取接口和 recovery latest handler 错误 / 限速测试；下一步若进入代码，应补 domain / device / join request metadata API 和审计日志。真实远端上传下载后置。
+- Go server API / storage、生产恢复流程和平台私钥存储 backend 边界已由专题文档固定；平台私钥存储 backend capability / unavailable backend 的 Rust 模型和测试已经落地。Go server 已起步 metadata / storage / API 验证模型，并已补 storage conformance tests、SQLite-backed repository、local object storage staged transaction 接线、Ed25519 签名验签门禁、device wrapping encrypted key bytes 承载、recovery wrapped material 读取接口、recovery latest handler 和 domain / device / join request 基础 metadata handler 测试；下一步若进入代码，应补审计日志、panic recovery、request id、join request 列表和 authorization handler。真实远端上传下载后置。
 
 交付：
 
