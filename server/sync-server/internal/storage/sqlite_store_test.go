@@ -73,6 +73,45 @@ func TestSQLiteStoreDeviceWrappedKeyDetectsMissingBlob(t *testing.T) {
 	}
 }
 
+func TestSQLiteStoreLatestRecoveryWrappedMaterialDetectsMissingBlob(t *testing.T) {
+	store := newSQLiteStoreForTest(t)
+	_ = newReadyStore(t, func(t *testing.T) Store {
+		t.Helper()
+		return store
+	})
+	wrapped := []byte{0xa1, 0xa2, 0xa3}
+	record := RecoveryRecord{
+		DomainID:           "domain-a",
+		RecoveryRecordID:   "recovery-a",
+		KeyEpoch:           1,
+		KDFProfile:         "argon2id-v1",
+		KDFVersion:         1,
+		MemoryKiB:          65536,
+		Iterations:         3,
+		Parallelism:        4,
+		OutputLen:          32,
+		Salt:               []byte{0x01, 0x02},
+		Algorithm:          AlgorithmXChaCha20Poly1305HKDFSHA256,
+		Nonce:              []byte{0x03, 0x04},
+		WrappedMaterialLen: int64(len(wrapped)),
+		CiphertextHash:     CiphertextHash(wrapped),
+		Status:             RecoveryRecordActive,
+		CreatedAtMs:        40,
+		SignerDeviceID:     "device-a",
+	}
+	signRecoveryForTest(&record)
+	metadata, err := store.PutRecoveryRecord(context.Background(), RecoveryRecordUpload{Record: record, WrappedMaterial: wrapped})
+	if err != nil {
+		t.Fatalf("put recovery record: %v", err)
+	}
+	if err := store.blobs.DeleteObjectBlob(context.Background(), metadata.BlobRef); err != nil {
+		t.Fatalf("delete recovery wrapped material blob: %v", err)
+	}
+	if _, _, err := store.LatestRecoveryWrappedMaterial(context.Background(), "domain-a"); !IsCode(err, ErrStorageUnavailable) {
+		t.Fatalf("missing recovery wrapped material should be reported by blob store, got %v", err)
+	}
+}
+
 func newSQLiteStoreForTest(t *testing.T) *SQLiteStore {
 	t.Helper()
 	root := t.TempDir()

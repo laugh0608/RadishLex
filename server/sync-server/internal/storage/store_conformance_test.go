@@ -174,6 +174,16 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 		if latest.RecoveryRecordID != "recovery-a" || latest.CiphertextHash != record.CiphertextHash {
 			t.Fatalf("latest recovery record mismatch: %#v", latest)
 		}
+		metadata, material, err := store.LatestRecoveryWrappedMaterial(ctx, "domain-a")
+		if err != nil {
+			t.Fatalf("latest recovery wrapped material: %v", err)
+		}
+		if metadata.RecoveryRecordID != "recovery-a" || metadata.BlobRef == "" {
+			t.Fatalf("latest recovery wrapped material metadata mismatch: %#v", metadata)
+		}
+		if string(material) != string(wrapped) {
+			t.Fatalf("wrapped material mismatch: got %x want %x", material, wrapped)
+		}
 	})
 
 	t.Run("rejects signed object manifest tampering", func(t *testing.T) {

@@ -312,6 +312,30 @@ func (s *MemoryStore) LatestRecoveryRecord(ctx context.Context, domainID string)
 	return cloneRecoveryRecord(record), nil
 }
 
+func (s *MemoryStore) LatestRecoveryWrappedMaterial(ctx context.Context, domainID string) (RecoveryRecord, []byte, error) {
+	if err := checkContext(ctx); err != nil {
+		return RecoveryRecord{}, nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	recoveryID, ok := s.latestRecovery[domainID]
+	if !ok {
+		return RecoveryRecord{}, nil, newError(ErrNotFound, "active recovery record not found")
+	}
+	record, ok := s.recoveries[recoveryKey{domainID: domainID, recoveryRecordID: recoveryID}]
+	if !ok {
+		return RecoveryRecord{}, nil, newError(ErrStorageUnavailable, "latest recovery record metadata missing")
+	}
+	wrappedMaterial, ok := s.blobs[record.BlobRef]
+	if !ok {
+		return RecoveryRecord{}, nil, newError(ErrStorageUnavailable, "recovery wrapped material is missing")
+	}
+	if int64(len(wrappedMaterial)) != record.WrappedMaterialLen || CiphertextHash(wrappedMaterial) != record.CiphertextHash {
+		return RecoveryRecord{}, nil, newError(ErrStorageUnavailable, "recovery wrapped material metadata mismatch")
+	}
+	return cloneRecoveryRecord(record), cloneBytes(wrappedMaterial), nil
+}
+
 func (s *MemoryStore) PutObjectVersion(ctx context.Context, upload ObjectVersionUpload) (ObjectVersion, error) {
 	if err := checkContext(ctx); err != nil {
 		return ObjectVersion{}, err

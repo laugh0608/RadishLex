@@ -213,13 +213,13 @@ blob_ref
 
 ## 当前 Go storage surface
 
-当前 `server/sync-server/internal/storage.Store` 是 HTTP handler 前的内部边界，已经落地 `CreateDomain`、`Domain`、`Device`、`SaveJoinRequest`、`AuthorizeJoinRequest`、`RevokeDevice`、`PutRecoveryRecord`、`LatestRecoveryRecord`、`PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`。
+当前 `server/sync-server/internal/storage.Store` 是 HTTP handler 前的内部边界，已经落地 `CreateDomain`、`Domain`、`Device`、`SaveJoinRequest`、`AuthorizeJoinRequest`、`DeviceWrappedKey`、`RevokeDevice`、`PutRecoveryRecord`、`LatestRecoveryRecord`、`LatestRecoveryWrappedMaterial`、`PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`。
 
-这组方法当前用于验证 metadata、设备状态、版本冲突、blob 写入和错误语义，不等同于完整 HTTP API。尚未暴露对象分页、join request 列表、recovery wrapped material 读取、审计日志查询或限速器。
+这组方法当前用于验证 metadata、设备状态、版本冲突、blob 写入和错误语义，不等同于完整 HTTP API。尚未暴露对象分页、join request 列表、审计日志查询或限速器。
 
-当前 storage conformance 已覆盖：第一台设备必须为 `active`；join request 从 `pending` 授权到 `active`；wrapped device key bytes 随授权事务保存并可按 metadata 读取；revoked 设备和旧 `key_epoch` 写入被拒绝；object version 支持同 hash 幂等重试、同版本不同 hash 冲突和 stale `base_version` latest metadata；object payload 读取复验长度 / ciphertext hash；recovery record 写入校验 wrapped material 长度 / ciphertext hash 并分配 `blob_ref`；signed object manifest、device authorization、device revocation 和 recovery record 字段篡改会被 Ed25519 验签拒绝。
+当前 storage conformance 已覆盖：第一台设备必须为 `active`；join request 从 `pending` 授权到 `active`；wrapped device key bytes 随授权事务保存并可按 metadata 读取；revoked 设备和旧 `key_epoch` 写入被拒绝；object version 支持同 hash 幂等重试、同版本不同 hash 冲突和 stale `base_version` latest metadata；object payload 读取复验长度 / ciphertext hash；recovery record 写入校验 wrapped material 长度 / ciphertext hash 并分配 `blob_ref`；latest recovery metadata 与 wrapped material bytes 可一起读取并复验；signed object manifest、device authorization、device revocation 和 recovery record 字段篡改会被 Ed25519 验签拒绝。
 
-当前 storage 已在写入前使用 `devices.signing_public_key` 验证 object manifest、device authorization、device revocation 和 recovery record；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list。下一步仍需补齐 recovery wrapped material 读取接口、metadata API handler、统一错误响应和审计日志。
+当前 storage 已在写入前使用 `devices.signing_public_key` 验证 object manifest、device authorization、device revocation 和 recovery record；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list。下一步仍需补齐 metadata API handler、统一错误响应和审计日志。
 
 ## HTTP API 边界
 
@@ -462,7 +462,7 @@ latest_ciphertext_hash
 - SQLite transaction 失败时不留下可达 metadata；blob 写入失败时不提交 metadata。
 - 对象读取时校验 blob 长度和 ciphertext hash；不一致返回 `storage_unavailable`。
 - device wrapping record 已覆盖 wrapped key bytes 的存储和读取测试；真实授权 handler 仍必须只返回密文 bytes 和服务端可见 metadata，不返回同步主密钥明文。
-- recovery record 进入真实恢复 handler 前，必须覆盖 latest metadata 与 wrapped material bytes 一起读取，且读取响应仍不得包含恢复码、KDF 输出或同步主密钥明文。
+- recovery record 已覆盖 latest metadata 与 wrapped material bytes 一起读取；真实恢复 handler 的响应仍不得包含恢复码、KDF 输出或同步主密钥明文。
 - 审计日志和错误响应不含请求体、payload bytes、wrapped material、恢复码或明文业务字段。
 - `./scripts/check-repo.sh`、`go test ./...` 和后续 server smoke 均通过。
 
@@ -472,8 +472,8 @@ latest_ciphertext_hash
 2. 已补 SQLite-backed metadata repository，并把 metadata transaction 与 local object storage transaction 接起来，覆盖 blob 写入、metadata 提交、失败清理、读取 hash 复验和 conformance tests。
 3. 已补 Go storage 签名验证抽象与测试，覆盖 object manifest、device authorization、device revocation 和 recovery record 的验签失败路径。
 4. 已补 device wrapping wrapped key bytes 的承载方式和读取接口，继续走密文 bytes + hash / length 校验。
-5. 补齐 recovery wrapped material 的读取接口；该接口必须继续走密文 bytes + hash / length 校验，不引入明文 key。
-6. 再实现 domain / device / join request / recovery record 的 metadata API，并覆盖设备状态校验和错误响应。
+5. 已补 recovery wrapped material 的读取接口，继续走密文 bytes + hash / length 校验。
+6. 实现 domain / device / join request / recovery record 的 metadata API，并覆盖设备状态校验和错误响应。
 7. 再实现 encrypted object 上传下载和版本冲突检测。
 8. 最后再接 Rust `ime-sync` 远端客户端；客户端必须以已加密 envelope 和 signed manifest 为输入，不得把 plaintext payload 交给 server。
 
@@ -484,7 +484,7 @@ latest_ciphertext_hash
 - Go server migration、API handler 和 storage tests 未覆盖上述隐私字段阻断前，不实现远端客户端上传下载。
 - 平台私钥存储 backend 能力模型已落地；真实平台 backend 验证未完成前，不提供用户可用同步 UI。
 - device authorization handler 对外开放前必须继续复用 wrapped key bytes 的存储 / 读取语义，且不得返回明文同步域材料。
-- recovery latest handler 不能在 wrapped material bytes 读取、限速和日志脱敏没有测试时对外开放。
+- recovery latest handler 对外开放前必须继续复用 wrapped material bytes 读取语义，并补齐限速和日志脱敏测试。
 - 服务端能保存、打印或索引明文用户词、input code、reading、P1 原始事件或候选偏好时，必须停止并回退该设计。
 - 服务端版本冲突检测未稳定前，不允许客户端把本地合并结果自动上传到真实远端。
 - 包分发、P3 资源下载和个人 P2 同步对象必须保持独立 API 与存储边界。

@@ -12,12 +12,12 @@ RadishLex 当前处于 Phase 3 自部署同步起步阶段：
 - `ime-ranker` 已提供可解释候选重排。
 - `ime-sync` 已提供同步 payload 来源分类、P2 envelope 组装边界、加密对象外壳草案、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型、客户端解密后合并模型、设备授权签名和设备撤销签名模型，并可从 `ime-crypto` envelope 派生上传草案元数据；不连接后端、不实现网络同步。
 - `ime-crypto` 已落地本地加密 crate，覆盖 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、Argon2id recovery KDF、Ed25519 设备签名、test-memory signing key store、platform backend id / capability metadata、unavailable backend 明确失败、key 撤销后阻断签名 / 导出、key role、object envelope、AAD 绑定、nonce 重复检测、篡改失败、device key descriptor、device wrapping key / record、recovery material、signed sync object manifest、signed recovery record，以及 userdb P2 payload 本地加密 / 解密 / sync draft 派生测试；真实平台设备私钥存储 backend 尚未实现。
-- `server/sync-server` 已起步 Go module，覆盖配置默认值、API request / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试和 device wrapping encrypted key bytes 承载 / 读取测试；当前只验证服务端可见 metadata、设备状态、签名、版本冲突、密文 hash / 长度、blob ref 路径安全、staged write / commit / cleanup 和错误语义，不实现 HTTP handler 或真实远端上传下载。当前 storage 仍需在真实 handler 前补齐 recovery wrapped material 的读取接口。
+- `server/sync-server` 已起步 Go module，覆盖配置默认值、API request / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、device wrapping encrypted key bytes 承载 / 读取测试和 recovery wrapped material 读取测试；当前只验证服务端可见 metadata、设备状态、签名、版本冲突、密文 hash / 长度、blob ref 路径安全、staged write / commit / cleanup 和错误语义，不实现 HTTP handler 或真实远端上传下载。
 - `docs/sync-key-management.md` 已固定真实同步前的同步密钥、设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突边界；`docs/sync-server-api-storage.md` 已固定 Go sync server API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和验证口径；`docs/production-recovery-flow.md` 已固定生产恢复流程、恢复记录轮换 / 撤销、新设备恢复加入、失败限速和停止线；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 Argon2id KDF、格式、恢复记录字段和验证口径；`docs/adr/0003-device-signing-key-storage.md` 已固定 Ed25519 设备签名、签名对象、私钥存储抽象和验证口径；`docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend、capability metadata、错误语义和停止线。
 - `ime-ffi` 已提供 C ABI 起步验证，覆盖 ABI contract、opaque handle、session owner-thread policy、session options、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、learning status 只读摘要、sync preflight 状态摘要、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、平台绑定式 view copy / release host smoke、释放函数 panic 边界、demo engine host smoke 和 FFI 调用 runbook。
 - `radishlex-ime-cli` 已提供 `demo`、`rime`、`dict`、`learn status`、`learn select/suppress`、`rank explain`、`rime --rank-db` 和 `sync preflight` 复验入口。
 
-当前下一步仍在同步服务端前置治理内。若进入代码，应继续按 `docs/sync-server-api-storage.md` 补齐 recovery wrapped material 读取、HTTP API 前错误语义和 metadata API 验证；仍不启动真实客户端上传下载。P1 原始事件、本地审计批次和 FFI 明文 payload 继续不得进入同步路径；现阶段不推进平台壳、Flutter manager 主线，也不启动真实上传下载。
+当前下一步仍在同步服务端前置治理内。若进入代码，应继续按 `docs/sync-server-api-storage.md` 补齐 HTTP API 前错误语义和 metadata API 验证；仍不启动真实客户端上传下载。P1 原始事件、本地审计批次和 FFI 明文 payload 继续不得进入同步路径；现阶段不推进平台壳、Flutter manager 主线，也不启动真实上传下载。
 
 ## 设计原则
 
@@ -199,7 +199,7 @@ MVP 至少需要证明：
 - userdb schema、删除语义、导入导出和 ranker explain 未稳定前，不接远端同步。
 - FFI 所有权、生命周期、错误语义、字符串编码、线程模型和释放责任未明确前，不推进平台壳。
 - Rime native smoke 和学习层复验未稳定前，不推进复杂平台候选窗或管理 UI。
-- 平台私钥存储 backend 平台 runbook 和真实 backend 未完成前，不进入真实远端上传下载或管理 UI 同步主线；Go server 当前只能先按专题文档验证 metadata、storage、签名、版本冲突和错误语义边界。recovery wrapped material 读取没有测试前，不开放真实恢复 handler。
+- 平台私钥存储 backend 平台 runbook 和真实 backend 未完成前，不进入真实远端上传下载或管理 UI 同步主线；Go server 当前只能先按专题文档验证 metadata、storage、签名、版本冲突和错误语义边界。metadata API、限速和日志脱敏没有测试前，不开放真实恢复 handler。
 
 ## 专题文档索引
 

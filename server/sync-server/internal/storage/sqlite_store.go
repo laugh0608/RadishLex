@@ -398,7 +398,42 @@ func (s *SQLiteStore) LatestRecoveryRecord(ctx context.Context, domainID string)
 	if err := checkContext(ctx); err != nil {
 		return RecoveryRecord{}, err
 	}
-	row := s.db.QueryRowContext(ctx, `
+	record, err := latestRecoveryRecordQuerier(ctx, s.db, domainID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return RecoveryRecord{}, newError(ErrNotFound, "active recovery record not found")
+	}
+	if err != nil {
+		return RecoveryRecord{}, newError(ErrStorageUnavailable, "recovery metadata cannot be read")
+	}
+	return record, nil
+}
+
+func (s *SQLiteStore) LatestRecoveryWrappedMaterial(ctx context.Context, domainID string) (RecoveryRecord, []byte, error) {
+	if err := checkContext(ctx); err != nil {
+		return RecoveryRecord{}, nil, err
+	}
+	record, err := latestRecoveryRecordQuerier(ctx, s.db, domainID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return RecoveryRecord{}, nil, newError(ErrNotFound, "active recovery record not found")
+	}
+	if err != nil {
+		return RecoveryRecord{}, nil, newError(ErrStorageUnavailable, "recovery metadata cannot be read")
+	}
+	wrappedMaterial, err := s.blobs.ReadObjectBlob(ctx, record.BlobRef)
+	if err != nil {
+		if IsCode(err, ErrNotFound) {
+			return RecoveryRecord{}, nil, newError(ErrStorageUnavailable, "recovery wrapped material is missing")
+		}
+		return RecoveryRecord{}, nil, err
+	}
+	if int64(len(wrappedMaterial)) != record.WrappedMaterialLen || CiphertextHash(wrappedMaterial) != record.CiphertextHash {
+		return RecoveryRecord{}, nil, newError(ErrStorageUnavailable, "recovery wrapped material metadata mismatch")
+	}
+	return record, cloneBytes(wrappedMaterial), nil
+}
+
+func latestRecoveryRecordQuerier(ctx context.Context, querier sqlQuerier, domainID string) (RecoveryRecord, error) {
+	return scanRecoveryRecord(querier.QueryRowContext(ctx, `
 		SELECT domain_id, recovery_record_id, key_epoch, kdf_profile,
 			kdf_version, memory_kib, iterations, parallelism, output_len,
 			salt, algorithm, nonce, wrapped_material_len, ciphertext_hash,
@@ -408,15 +443,7 @@ func (s *SQLiteStore) LatestRecoveryRecord(ctx context.Context, domainID string)
 		WHERE domain_id = ? AND status = ?
 		ORDER BY created_at_ms DESC, recovery_record_id DESC
 		LIMIT 1
-	`, domainID, string(RecoveryRecordActive))
-	record, err := scanRecoveryRecord(row)
-	if errors.Is(err, sql.ErrNoRows) {
-		return RecoveryRecord{}, newError(ErrNotFound, "active recovery record not found")
-	}
-	if err != nil {
-		return RecoveryRecord{}, newError(ErrStorageUnavailable, "recovery metadata cannot be read")
-	}
-	return record, nil
+	`, domainID, string(RecoveryRecordActive)))
 }
 
 func (s *SQLiteStore) PutObjectVersion(ctx context.Context, upload ObjectVersionUpload) (ObjectVersion, error) {
