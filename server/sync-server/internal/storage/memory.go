@@ -151,7 +151,8 @@ func (s *MemoryStore) AuthorizeJoinRequest(ctx context.Context, authorization De
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, err := s.activeDeviceLocked(authorization.DomainID, authorization.AuthorizerDeviceID); err != nil {
+	authorizer, err := s.activeDeviceLocked(authorization.DomainID, authorization.AuthorizerDeviceID)
+	if err != nil {
 		return err
 	}
 	join, ok := s.joinRequests[joinKey(authorization.DomainID, authorization.JoinRequestID)]
@@ -168,6 +169,9 @@ func (s *MemoryStore) AuthorizeJoinRequest(ctx context.Context, authorization De
 		authorization.RecipientSigningPublicKeyID != join.SigningPublicKeyID ||
 		authorization.RecipientKeyAgreementKeyID != join.KeyAgreementPublicKeyID {
 		return newError(ErrForbiddenDevice, "recipient public key does not match join request")
+	}
+	if err := verifyAuthorizationSignature(authorization, wrapping, join, authorizer); err != nil {
+		return err
 	}
 
 	join.Status = DeviceActive
@@ -202,7 +206,8 @@ func (s *MemoryStore) RevokeDevice(ctx context.Context, revocation DeviceRevocat
 	if !ok {
 		return newError(ErrNotFound, "domain not found")
 	}
-	if _, err := s.activeDeviceLocked(revocation.DomainID, revocation.RevokerDeviceID); err != nil {
+	revoker, err := s.activeDeviceLocked(revocation.DomainID, revocation.RevokerDeviceID)
+	if err != nil {
 		return err
 	}
 	targetKey := deviceKey(revocation.DomainID, revocation.RevokedDeviceID)
@@ -218,6 +223,9 @@ func (s *MemoryStore) RevokeDevice(ctx context.Context, revocation DeviceRevocat
 	}
 	if revocation.NewKeyEpoch <= domain.CurrentKeyEpoch {
 		return newError(ErrInvalidRequest, "new key epoch must advance domain")
+	}
+	if err := verifyRevocationSignature(revocation, revoker); err != nil {
+		return err
 	}
 
 	target.Status = DeviceRevoked
@@ -241,7 +249,11 @@ func (s *MemoryStore) PutRecoveryRecord(ctx context.Context, upload RecoveryReco
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, err := s.activeDeviceLocked(upload.Record.DomainID, upload.Record.SignerDeviceID); err != nil {
+	signer, err := s.activeDeviceLocked(upload.Record.DomainID, upload.Record.SignerDeviceID)
+	if err != nil {
+		return RecoveryRecord{}, err
+	}
+	if err := verifyRecoverySignature(upload.Record, signer); err != nil {
 		return RecoveryRecord{}, err
 	}
 	record := cloneRecoveryRecord(upload.Record)
@@ -286,11 +298,15 @@ func (s *MemoryStore) PutObjectVersion(ctx context.Context, upload ObjectVersion
 	if !ok {
 		return ObjectVersion{}, newError(ErrNotFound, "domain not found")
 	}
-	if _, err := s.activeDeviceLocked(upload.Version.DomainID, upload.Version.OwnerDeviceID); err != nil {
+	signer, err := s.activeDeviceLocked(upload.Version.DomainID, upload.Version.OwnerDeviceID)
+	if err != nil {
 		return ObjectVersion{}, err
 	}
 	if upload.Version.KeyEpoch < domain.CurrentKeyEpoch {
 		return ObjectVersion{}, newError(ErrForbiddenDevice, "object key epoch is older than domain")
+	}
+	if err := verifyObjectSignature(upload.Version, signer); err != nil {
+		return ObjectVersion{}, err
 	}
 
 	versionKey := objectVersionKeyFor(upload.Version.DomainID, upload.Version.ObjectID, upload.Version.Version)
@@ -458,14 +474,17 @@ func validateAuthorization(authorization DeviceAuthorization) error {
 	if authorization.RecipientSigningPublicKeyID == "" || authorization.RecipientKeyAgreementKeyID == "" {
 		return newError(ErrInvalidRequest, "authorization recipient key ids are required")
 	}
+	if authorization.JoinShortCode == "" {
+		return newError(ErrInvalidRequest, "authorization join short code is required")
+	}
 	if authorization.KeyEpoch == 0 {
 		return newError(ErrInvalidRequest, "authorization key epoch must be positive")
 	}
+	if err := validateSignatureFields(authorization.SignatureSchemaVersion, authorization.SignatureAlgorithm, authorization.SignatureKeyID, authorization.Signature); err != nil {
+		return err
+	}
 	if authorization.CreatedAtMs <= 0 {
 		return newError(ErrInvalidRequest, "authorization timestamp is required")
-	}
-	if len(authorization.Signature) == 0 {
-		return newError(ErrInvalidSignature, "authorization signature is required")
 	}
 	return nil
 }
@@ -499,8 +518,8 @@ func validateRevocation(revocation DeviceRevocation) error {
 	if revocation.CreatedAtMs <= 0 {
 		return newError(ErrInvalidRequest, "revocation timestamp is required")
 	}
-	if len(revocation.Signature) == 0 {
-		return newError(ErrInvalidSignature, "revocation signature is required")
+	if err := validateSignatureFields(revocation.SignatureSchemaVersion, revocation.SignatureAlgorithm, revocation.SignatureKeyID, revocation.Signature); err != nil {
+		return err
 	}
 	return nil
 }
@@ -512,6 +531,10 @@ func validateRecoveryRecordUpload(upload RecoveryRecordUpload) error {
 	}
 	if record.KeyEpoch == 0 || record.KDFProfile == "" || record.Algorithm == "" {
 		return newError(ErrInvalidRequest, "recovery record key metadata is required")
+	}
+	if record.KDFVersion == 0 || record.MemoryKiB == 0 || record.Iterations == 0 ||
+		record.Parallelism == 0 || record.OutputLen <= 0 {
+		return newError(ErrInvalidRequest, "recovery record KDF parameters are required")
 	}
 	if len(record.Salt) == 0 || len(record.Nonce) == 0 {
 		return newError(ErrInvalidCiphertextMetadata, "recovery record public crypto parameters are required")
@@ -528,8 +551,8 @@ func validateRecoveryRecordUpload(upload RecoveryRecordUpload) error {
 	if record.CreatedAtMs <= 0 || record.RevokedAtMs < 0 {
 		return newError(ErrInvalidRequest, "recovery record timestamps are invalid")
 	}
-	if len(record.Signature) == 0 {
-		return newError(ErrInvalidSignature, "recovery record signature is required")
+	if err := validateSignatureFields(record.SignatureSchemaVersion, record.SignatureAlgorithm, record.SignatureKeyID, record.Signature); err != nil {
+		return err
 	}
 	return nil
 }
@@ -557,8 +580,24 @@ func validateObjectUpload(upload ObjectVersionUpload) error {
 	if version.ClientCreatedAtMs <= 0 || version.ClientUpdatedAtMs < version.ClientCreatedAtMs {
 		return newError(ErrInvalidRequest, "object timestamps are invalid")
 	}
-	if len(version.Signature) == 0 {
-		return newError(ErrInvalidSignature, "object manifest signature is required")
+	if err := validateSignatureFields(version.SignatureSchemaVersion, version.SignatureAlgorithm, version.SignatureKeyID, version.Signature); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateSignatureFields(schemaVersion uint16, algorithm string, keyID string, signature []byte) error {
+	if schemaVersion != signatureSchemaVersion {
+		return newError(ErrInvalidSignature, "signature schema version is unsupported")
+	}
+	if algorithm != signatureAlgorithm {
+		return newError(ErrInvalidSignature, "signature algorithm is unsupported")
+	}
+	if keyID == "" {
+		return newError(ErrInvalidSignature, "signature key id is required")
+	}
+	if len(signature) != ed25519SignatureLen {
+		return newError(ErrInvalidSignature, "signature length is invalid")
 	}
 	return nil
 }

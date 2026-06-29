@@ -83,38 +83,53 @@ type DeviceAuthorization struct {
 	RecipientDeviceID           string
 	RecipientSigningPublicKeyID string
 	RecipientKeyAgreementKeyID  string
+	JoinShortCode               string
 	KeyEpoch                    uint64
 	CreatedAtMs                 int64
+	SignatureSchemaVersion      uint16
+	SignatureAlgorithm          string
+	SignatureKeyID              string
 	Signature                   []byte
 }
 
 type DeviceRevocation struct {
-	DomainID         string
-	RevokedDeviceID  string
-	RevokerDeviceID  string
-	PreviousKeyEpoch uint64
-	NewKeyEpoch      uint64
-	Reason           string
-	CreatedAtMs      int64
-	Signature        []byte
+	DomainID               string
+	RevokedDeviceID        string
+	RevokerDeviceID        string
+	PreviousKeyEpoch       uint64
+	NewKeyEpoch            uint64
+	Reason                 string
+	CreatedAtMs            int64
+	SignatureSchemaVersion uint16
+	SignatureAlgorithm     string
+	SignatureKeyID         string
+	Signature              []byte
 }
 
 type RecoveryRecord struct {
-	DomainID           string
-	RecoveryRecordID   string
-	KeyEpoch           uint64
-	KDFProfile         string
-	Salt               []byte
-	Algorithm          string
-	Nonce              []byte
-	WrappedMaterialLen int64
-	CiphertextHash     string
-	Status             RecoveryRecordStatus
-	CreatedAtMs        int64
-	RevokedAtMs        int64
-	SignerDeviceID     string
-	Signature          []byte
-	BlobRef            string
+	DomainID               string
+	RecoveryRecordID       string
+	KeyEpoch               uint64
+	KDFProfile             string
+	KDFVersion             uint16
+	MemoryKiB              uint32
+	Iterations             uint32
+	Parallelism            uint32
+	OutputLen              int64
+	Salt                   []byte
+	Algorithm              string
+	Nonce                  []byte
+	WrappedMaterialLen     int64
+	CiphertextHash         string
+	Status                 RecoveryRecordStatus
+	CreatedAtMs            int64
+	RevokedAtMs            int64
+	SignerDeviceID         string
+	SignatureSchemaVersion uint16
+	SignatureAlgorithm     string
+	SignatureKeyID         string
+	Signature              []byte
+	BlobRef                string
 }
 
 type RecoveryRecordUpload struct {
@@ -134,23 +149,26 @@ type SyncObject struct {
 }
 
 type ObjectVersion struct {
-	DomainID            string
-	ObjectID            string
-	ObjectType          string
-	Version             uint64
-	BaseVersion         uint64
-	OwnerDeviceID       string
-	KeyID               string
-	KeyEpoch            uint64
-	Algorithm           string
-	Nonce               []byte
-	EncryptedPayloadLen int64
-	CiphertextHash      string
-	Signature           []byte
-	ServerReceivedAtMs  int64
-	ClientCreatedAtMs   int64
-	ClientUpdatedAtMs   int64
-	BlobRef             string
+	DomainID               string
+	ObjectID               string
+	ObjectType             string
+	Version                uint64
+	BaseVersion            uint64
+	OwnerDeviceID          string
+	KeyID                  string
+	KeyEpoch               uint64
+	Algorithm              string
+	Nonce                  []byte
+	EncryptedPayloadLen    int64
+	CiphertextHash         string
+	SignatureSchemaVersion uint16
+	SignatureAlgorithm     string
+	SignatureKeyID         string
+	Signature              []byte
+	ServerReceivedAtMs     int64
+	ClientCreatedAtMs      int64
+	ClientUpdatedAtMs      int64
+	BlobRef                string
 }
 
 type ObjectVersionUpload struct {

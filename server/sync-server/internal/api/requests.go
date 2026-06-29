@@ -21,19 +21,22 @@ type DeviceMetadata struct {
 }
 
 type ObjectVersionUploadRequest struct {
-	ObjectType          string `json:"object_type"`
-	Version             uint64 `json:"version"`
-	BaseVersion         uint64 `json:"base_version"`
-	OwnerDeviceID       string `json:"owner_device_id"`
-	KeyID               string `json:"key_id"`
-	KeyEpoch            uint64 `json:"key_epoch"`
-	Algorithm           string `json:"algorithm"`
-	Nonce               []byte `json:"nonce"`
-	EncryptedPayloadLen int64  `json:"encrypted_payload_len"`
-	CiphertextHash      string `json:"ciphertext_hash"`
-	Signature           []byte `json:"signature"`
-	ClientCreatedAtMs   int64  `json:"client_created_at_ms"`
-	ClientUpdatedAtMs   int64  `json:"client_updated_at_ms"`
+	ObjectType             string `json:"object_type"`
+	Version                uint64 `json:"version"`
+	BaseVersion            uint64 `json:"base_version"`
+	OwnerDeviceID          string `json:"owner_device_id"`
+	KeyID                  string `json:"key_id"`
+	KeyEpoch               uint64 `json:"key_epoch"`
+	Algorithm              string `json:"algorithm"`
+	Nonce                  []byte `json:"nonce"`
+	EncryptedPayloadLen    int64  `json:"encrypted_payload_len"`
+	CiphertextHash         string `json:"ciphertext_hash"`
+	SignatureSchemaVersion uint16 `json:"signature_schema_version"`
+	SignatureAlgorithm     string `json:"signature_algorithm"`
+	SignatureKeyID         string `json:"signature_key_id"`
+	Signature              []byte `json:"signature"`
+	ClientCreatedAtMs      int64  `json:"client_created_at_ms"`
+	ClientUpdatedAtMs      int64  `json:"client_updated_at_ms"`
 }
 
 func (r CreateDomainRequest) Domain() storage.Domain {
@@ -61,20 +64,23 @@ func (r CreateDomainRequest) Device() storage.Device {
 
 func (r ObjectVersionUploadRequest) StorageVersion(domainID string, objectID string) storage.ObjectVersion {
 	return storage.ObjectVersion{
-		DomainID:            domainID,
-		ObjectID:            objectID,
-		ObjectType:          r.ObjectType,
-		Version:             r.Version,
-		BaseVersion:         r.BaseVersion,
-		OwnerDeviceID:       r.OwnerDeviceID,
-		KeyID:               r.KeyID,
-		KeyEpoch:            r.KeyEpoch,
-		Algorithm:           r.Algorithm,
-		Nonce:               r.Nonce,
-		EncryptedPayloadLen: r.EncryptedPayloadLen,
-		CiphertextHash:      r.CiphertextHash,
-		Signature:           r.Signature,
-		ClientCreatedAtMs:   r.ClientCreatedAtMs,
-		ClientUpdatedAtMs:   r.ClientUpdatedAtMs,
+		DomainID:               domainID,
+		ObjectID:               objectID,
+		ObjectType:             r.ObjectType,
+		Version:                r.Version,
+		BaseVersion:            r.BaseVersion,
+		OwnerDeviceID:          r.OwnerDeviceID,
+		KeyID:                  r.KeyID,
+		KeyEpoch:               r.KeyEpoch,
+		Algorithm:              r.Algorithm,
+		Nonce:                  r.Nonce,
+		EncryptedPayloadLen:    r.EncryptedPayloadLen,
+		CiphertextHash:         r.CiphertextHash,
+		SignatureSchemaVersion: r.SignatureSchemaVersion,
+		SignatureAlgorithm:     r.SignatureAlgorithm,
+		SignatureKeyID:         r.SignatureKeyID,
+		Signature:              r.Signature,
+		ClientCreatedAtMs:      r.ClientCreatedAtMs,
+		ClientUpdatedAtMs:      r.ClientUpdatedAtMs,
 	}
 }

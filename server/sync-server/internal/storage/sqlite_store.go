@@ -163,7 +163,8 @@ func (s *SQLiteStore) AuthorizeJoinRequest(ctx context.Context, authorization De
 	}
 	defer rollbackTx(tx)
 
-	if _, err := activeDeviceTx(ctx, tx, authorization.DomainID, authorization.AuthorizerDeviceID); err != nil {
+	authorizer, err := activeDeviceTx(ctx, tx, authorization.DomainID, authorization.AuthorizerDeviceID)
+	if err != nil {
 		return err
 	}
 	join, err := joinRequestTx(ctx, tx, authorization.DomainID, authorization.JoinRequestID)
@@ -181,6 +182,9 @@ func (s *SQLiteStore) AuthorizeJoinRequest(ctx context.Context, authorization De
 		authorization.RecipientKeyAgreementKeyID != join.KeyAgreementPublicKeyID {
 		return newError(ErrForbiddenDevice, "recipient public key does not match join request")
 	}
+	if err := verifyAuthorizationSignature(authorization, wrapping, join, authorizer); err != nil {
+		return err
+	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE device_join_requests
 		SET status = ?
@@ -192,12 +196,14 @@ func (s *SQLiteStore) AuthorizeJoinRequest(ctx context.Context, authorization De
 		INSERT INTO device_authorizations (
 			domain_id, join_request_id, authorizer_device_id, recipient_device_id,
 			recipient_signing_public_key_id, recipient_key_agreement_key_id,
-			key_epoch, created_at_ms, signature
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			join_short_code, key_epoch, created_at_ms,
+			signature_schema_version, signature_algorithm, signature_key_id, signature
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		authorization.DomainID, authorization.JoinRequestID, authorization.AuthorizerDeviceID, authorization.RecipientDeviceID,
 		authorization.RecipientSigningPublicKeyID, authorization.RecipientKeyAgreementKeyID,
-		int64(authorization.KeyEpoch), authorization.CreatedAtMs, cloneBytes(authorization.Signature),
+		authorization.JoinShortCode, int64(authorization.KeyEpoch), authorization.CreatedAtMs,
+		int64(authorization.SignatureSchemaVersion), authorization.SignatureAlgorithm, authorization.SignatureKeyID, cloneBytes(authorization.Signature),
 	); err != nil {
 		return newError(ErrStorageUnavailable, "authorization metadata cannot be stored")
 	}
@@ -245,7 +251,8 @@ func (s *SQLiteStore) RevokeDevice(ctx context.Context, revocation DeviceRevocat
 	if err != nil {
 		return err
 	}
-	if _, err := activeDeviceTx(ctx, tx, revocation.DomainID, revocation.RevokerDeviceID); err != nil {
+	revoker, err := activeDeviceTx(ctx, tx, revocation.DomainID, revocation.RevokerDeviceID)
+	if err != nil {
 		return err
 	}
 	target, err := deviceTx(ctx, tx, revocation.DomainID, revocation.RevokedDeviceID)
@@ -260,6 +267,9 @@ func (s *SQLiteStore) RevokeDevice(ctx context.Context, revocation DeviceRevocat
 	}
 	if revocation.NewKeyEpoch <= domain.CurrentKeyEpoch {
 		return newError(ErrInvalidRequest, "new key epoch must advance domain")
+	}
+	if err := verifyRevocationSignature(revocation, revoker); err != nil {
+		return err
 	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE devices
@@ -278,12 +288,14 @@ func (s *SQLiteStore) RevokeDevice(ctx context.Context, revocation DeviceRevocat
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO device_revocations (
 			domain_id, revoked_device_id, revoker_device_id,
-			previous_key_epoch, new_key_epoch, reason, created_at_ms, signature
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			previous_key_epoch, new_key_epoch, reason, created_at_ms,
+			signature_schema_version, signature_algorithm, signature_key_id, signature
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		revocation.DomainID, revocation.RevokedDeviceID, revocation.RevokerDeviceID,
 		int64(revocation.PreviousKeyEpoch), int64(revocation.NewKeyEpoch),
-		revocation.Reason, revocation.CreatedAtMs, cloneBytes(revocation.Signature),
+		revocation.Reason, revocation.CreatedAtMs,
+		int64(revocation.SignatureSchemaVersion), revocation.SignatureAlgorithm, revocation.SignatureKeyID, cloneBytes(revocation.Signature),
 	); err != nil {
 		return newError(ErrStorageUnavailable, "revocation metadata cannot be stored")
 	}
@@ -307,7 +319,11 @@ func (s *SQLiteStore) PutRecoveryRecord(ctx context.Context, upload RecoveryReco
 	}
 	defer rollbackTx(tx)
 
-	if _, err := activeDeviceTx(ctx, tx, upload.Record.DomainID, upload.Record.SignerDeviceID); err != nil {
+	signer, err := activeDeviceTx(ctx, tx, upload.Record.DomainID, upload.Record.SignerDeviceID)
+	if err != nil {
+		return RecoveryRecord{}, err
+	}
+	if err := verifyRecoverySignature(upload.Record, signer); err != nil {
 		return RecoveryRecord{}, err
 	}
 	record := cloneRecoveryRecord(upload.Record)
@@ -321,13 +337,17 @@ func (s *SQLiteStore) PutRecoveryRecord(ctx context.Context, upload RecoveryReco
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO recovery_records (
 			domain_id, recovery_record_id, key_epoch, kdf_profile,
+			kdf_version, memory_kib, iterations, parallelism, output_len,
 			salt, algorithm, nonce, wrapped_material_len, ciphertext_hash,
-			status, created_at_ms, revoked_at_ms, signer_device_id, signature, blob_ref
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			status, created_at_ms, revoked_at_ms, signer_device_id,
+			signature_schema_version, signature_algorithm, signature_key_id, signature, blob_ref
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		record.DomainID, record.RecoveryRecordID, int64(record.KeyEpoch), record.KDFProfile,
+		int64(record.KDFVersion), int64(record.MemoryKiB), int64(record.Iterations), int64(record.Parallelism), record.OutputLen,
 		cloneBytes(record.Salt), record.Algorithm, cloneBytes(record.Nonce), record.WrappedMaterialLen, record.CiphertextHash,
-		string(record.Status), record.CreatedAtMs, record.RevokedAtMs, record.SignerDeviceID, cloneBytes(record.Signature), record.BlobRef,
+		string(record.Status), record.CreatedAtMs, record.RevokedAtMs, record.SignerDeviceID,
+		int64(record.SignatureSchemaVersion), record.SignatureAlgorithm, record.SignatureKeyID, cloneBytes(record.Signature), record.BlobRef,
 	); err != nil {
 		return RecoveryRecord{}, newError(ErrStorageUnavailable, "recovery metadata cannot be stored")
 	}
@@ -347,8 +367,10 @@ func (s *SQLiteStore) LatestRecoveryRecord(ctx context.Context, domainID string)
 	}
 	row := s.db.QueryRowContext(ctx, `
 		SELECT domain_id, recovery_record_id, key_epoch, kdf_profile,
+			kdf_version, memory_kib, iterations, parallelism, output_len,
 			salt, algorithm, nonce, wrapped_material_len, ciphertext_hash,
-			status, created_at_ms, revoked_at_ms, signer_device_id, signature, blob_ref
+			status, created_at_ms, revoked_at_ms, signer_device_id,
+			signature_schema_version, signature_algorithm, signature_key_id, signature, blob_ref
 		FROM recovery_records
 		WHERE domain_id = ? AND status = ?
 		ORDER BY created_at_ms DESC, recovery_record_id DESC
@@ -382,11 +404,15 @@ func (s *SQLiteStore) PutObjectVersion(ctx context.Context, upload ObjectVersion
 	if err != nil {
 		return ObjectVersion{}, err
 	}
-	if _, err := activeDeviceTx(ctx, tx, upload.Version.DomainID, upload.Version.OwnerDeviceID); err != nil {
+	signer, err := activeDeviceTx(ctx, tx, upload.Version.DomainID, upload.Version.OwnerDeviceID)
+	if err != nil {
 		return ObjectVersion{}, err
 	}
 	if upload.Version.KeyEpoch < domain.CurrentKeyEpoch {
 		return ObjectVersion{}, newError(ErrForbiddenDevice, "object key epoch is older than domain")
+	}
+	if err := verifyObjectSignature(upload.Version, signer); err != nil {
+		return ObjectVersion{}, err
 	}
 
 	existing, err := objectVersionTx(ctx, tx, upload.Version.DomainID, upload.Version.ObjectID, upload.Version.Version)
@@ -618,15 +644,27 @@ func joinRequestTx(ctx context.Context, tx *sql.Tx, domainID string, joinRequest
 func scanRecoveryRecord(row sqlRow) (RecoveryRecord, error) {
 	var record RecoveryRecord
 	var keyEpoch int64
+	var kdfVersion int64
+	var memoryKiB int64
+	var iterations int64
+	var parallelism int64
+	var signatureSchemaVersion int64
 	var status string
 	if err := row.Scan(
 		&record.DomainID, &record.RecoveryRecordID, &keyEpoch, &record.KDFProfile,
+		&kdfVersion, &memoryKiB, &iterations, &parallelism, &record.OutputLen,
 		&record.Salt, &record.Algorithm, &record.Nonce, &record.WrappedMaterialLen, &record.CiphertextHash,
-		&status, &record.CreatedAtMs, &record.RevokedAtMs, &record.SignerDeviceID, &record.Signature, &record.BlobRef,
+		&status, &record.CreatedAtMs, &record.RevokedAtMs, &record.SignerDeviceID,
+		&signatureSchemaVersion, &record.SignatureAlgorithm, &record.SignatureKeyID, &record.Signature, &record.BlobRef,
 	); err != nil {
 		return RecoveryRecord{}, err
 	}
 	record.KeyEpoch = uint64(keyEpoch)
+	record.KDFVersion = uint16(kdfVersion)
+	record.MemoryKiB = uint32(memoryKiB)
+	record.Iterations = uint32(iterations)
+	record.Parallelism = uint32(parallelism)
+	record.SignatureSchemaVersion = uint16(signatureSchemaVersion)
 	record.Status = RecoveryRecordStatus(status)
 	return cloneRecoveryRecord(record), nil
 }
@@ -688,7 +726,8 @@ func objectVersionQuerier(ctx context.Context, querier sqlQuerier, domainID stri
 	return objectVersionFromRow(querier.QueryRowContext(ctx, `
 		SELECT domain_id, object_id, object_type, version, base_version,
 			owner_device_id, key_id, key_epoch, algorithm, nonce,
-			encrypted_payload_len, ciphertext_hash, signature,
+			encrypted_payload_len, ciphertext_hash,
+			signature_schema_version, signature_algorithm, signature_key_id, signature,
 			server_received_at_ms, client_created_at_ms, client_updated_at_ms, blob_ref
 		FROM sync_object_versions
 		WHERE domain_id = ? AND object_id = ? AND version = ?
@@ -704,10 +743,12 @@ func objectVersionFromRow(row sqlRow) (ObjectVersion, error) {
 	var versionNumber int64
 	var baseVersion int64
 	var keyEpoch int64
+	var signatureSchemaVersion int64
 	if err := row.Scan(
 		&version.DomainID, &version.ObjectID, &version.ObjectType, &versionNumber, &baseVersion,
 		&version.OwnerDeviceID, &version.KeyID, &keyEpoch, &version.Algorithm, &version.Nonce,
-		&version.EncryptedPayloadLen, &version.CiphertextHash, &version.Signature,
+		&version.EncryptedPayloadLen, &version.CiphertextHash,
+		&signatureSchemaVersion, &version.SignatureAlgorithm, &version.SignatureKeyID, &version.Signature,
 		&version.ServerReceivedAtMs, &version.ClientCreatedAtMs, &version.ClientUpdatedAtMs, &version.BlobRef,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -718,6 +759,7 @@ func objectVersionFromRow(row sqlRow) (ObjectVersion, error) {
 	version.Version = uint64(versionNumber)
 	version.BaseVersion = uint64(baseVersion)
 	version.KeyEpoch = uint64(keyEpoch)
+	version.SignatureSchemaVersion = uint16(signatureSchemaVersion)
 	return cloneObjectVersion(version), nil
 }
 
@@ -726,13 +768,15 @@ func insertObjectVersionTx(ctx context.Context, tx *sql.Tx, version ObjectVersio
 		INSERT INTO sync_object_versions (
 			domain_id, object_id, object_type, version, base_version,
 			owner_device_id, key_id, key_epoch, algorithm, nonce,
-			encrypted_payload_len, ciphertext_hash, signature,
+			encrypted_payload_len, ciphertext_hash,
+			signature_schema_version, signature_algorithm, signature_key_id, signature,
 			server_received_at_ms, client_created_at_ms, client_updated_at_ms, blob_ref
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		version.DomainID, version.ObjectID, version.ObjectType, int64(version.Version), int64(version.BaseVersion),
 		version.OwnerDeviceID, version.KeyID, int64(version.KeyEpoch), version.Algorithm, cloneBytes(version.Nonce),
-		version.EncryptedPayloadLen, version.CiphertextHash, cloneBytes(version.Signature),
+		version.EncryptedPayloadLen, version.CiphertextHash,
+		int64(version.SignatureSchemaVersion), version.SignatureAlgorithm, version.SignatureKeyID, cloneBytes(version.Signature),
 		version.ServerReceivedAtMs, version.ClientCreatedAtMs, version.ClientUpdatedAtMs, version.BlobRef,
 	); err != nil {
 		return newError(ErrStorageUnavailable, "object version metadata cannot be stored")
