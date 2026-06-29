@@ -71,6 +71,28 @@ type RecoveryRecordResponse struct {
 	WrappedMaterial        []byte                       `json:"wrapped_material"`
 }
 
+type ObjectVersionResponse struct {
+	DomainID               string `json:"domain_id"`
+	ObjectID               string `json:"object_id"`
+	ObjectType             string `json:"object_type"`
+	Version                uint64 `json:"version"`
+	BaseVersion            uint64 `json:"base_version"`
+	OwnerDeviceID          string `json:"owner_device_id"`
+	KeyID                  string `json:"key_id"`
+	KeyEpoch               uint64 `json:"key_epoch"`
+	Algorithm              string `json:"algorithm"`
+	Nonce                  []byte `json:"nonce"`
+	EncryptedPayloadLen    int64  `json:"encrypted_payload_len"`
+	CiphertextHash         string `json:"ciphertext_hash"`
+	SignatureSchemaVersion uint16 `json:"signature_schema_version"`
+	SignatureAlgorithm     string `json:"signature_algorithm"`
+	SignatureKeyID         string `json:"signature_key_id"`
+	Signature              []byte `json:"signature"`
+	ServerReceivedAtMs     int64  `json:"server_received_at_ms"`
+	ClientCreatedAtMs      int64  `json:"client_created_at_ms"`
+	ClientUpdatedAtMs      int64  `json:"client_updated_at_ms"`
+}
+
 func DomainResponseFrom(domain storage.Domain) DomainResponse {
 	return DomainResponse{
 		DomainID:        domain.DomainID,
@@ -147,6 +169,30 @@ func RecoveryRecordResponseFrom(record storage.RecoveryRecord, wrappedMaterial [
 		SignatureKeyID:         record.SignatureKeyID,
 		Signature:              cloneBytes(record.Signature),
 		WrappedMaterial:        cloneBytes(wrappedMaterial),
+	}
+}
+
+func ObjectVersionResponseFrom(version storage.ObjectVersion) ObjectVersionResponse {
+	return ObjectVersionResponse{
+		DomainID:               version.DomainID,
+		ObjectID:               version.ObjectID,
+		ObjectType:             version.ObjectType,
+		Version:                version.Version,
+		BaseVersion:            version.BaseVersion,
+		OwnerDeviceID:          version.OwnerDeviceID,
+		KeyID:                  version.KeyID,
+		KeyEpoch:               version.KeyEpoch,
+		Algorithm:              version.Algorithm,
+		Nonce:                  cloneBytes(version.Nonce),
+		EncryptedPayloadLen:    version.EncryptedPayloadLen,
+		CiphertextHash:         version.CiphertextHash,
+		SignatureSchemaVersion: version.SignatureSchemaVersion,
+		SignatureAlgorithm:     version.SignatureAlgorithm,
+		SignatureKeyID:         version.SignatureKeyID,
+		Signature:              cloneBytes(version.Signature),
+		ServerReceivedAtMs:     version.ServerReceivedAtMs,
+		ClientCreatedAtMs:      version.ClientCreatedAtMs,
+		ClientUpdatedAtMs:      version.ClientUpdatedAtMs,
 	}
 }
 

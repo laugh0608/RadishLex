@@ -82,6 +82,7 @@ type ObjectVersionUploadRequest struct {
 	Signature              []byte `json:"signature"`
 	ClientCreatedAtMs      int64  `json:"client_created_at_ms"`
 	ClientUpdatedAtMs      int64  `json:"client_updated_at_ms"`
+	Payload                []byte `json:"payload"`
 }
 
 func (r AuthorizeJoinRequestRequest) Upload(domainID string, joinRequestID string) storage.DeviceAuthorizationUpload {
@@ -177,5 +178,12 @@ func (r ObjectVersionUploadRequest) StorageVersion(domainID string, objectID str
 		Signature:              r.Signature,
 		ClientCreatedAtMs:      r.ClientCreatedAtMs,
 		ClientUpdatedAtMs:      r.ClientUpdatedAtMs,
+	}
+}
+
+func (r ObjectVersionUploadRequest) Upload(domainID string, objectID string) storage.ObjectVersionUpload {
+	return storage.ObjectVersionUpload{
+		Version: r.StorageVersion(domainID, objectID),
+		Payload: cloneBytes(r.Payload),
 	}
 }

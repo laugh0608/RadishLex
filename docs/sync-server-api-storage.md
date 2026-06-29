@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型，以及已解密 P2 payload 写回本地 SQLite 的执行器。Go server 已起步，当前 `server/sync-server` 已包含配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、recovery latest handler、domain / device / join request metadata handler、authorization handler、API 层 request id、panic recovery、非持久审计 hook 和 SQLite `audit_events` 写入测试；尚未实现 encrypted object HTTP 上传下载、Docker Compose 或真实远端上传下载。SQLite driver 当前使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
+当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型，以及已解密 P2 payload 写回本地 SQLite 的执行器。Go server 已起步，当前 `server/sync-server` 已包含配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、API 层 request id、panic recovery、非持久审计 hook 和 SQLite `audit_events` 写入测试；尚未实现 Docker Compose、server main 或 Rust 真实远端上传下载。SQLite driver 当前使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
 
 本阶段只固定服务端 API 和 storage 边界：
 
@@ -13,7 +13,7 @@
 - 服务端不能解密、不能解析 plaintext payload、不能合并用户词、不能读取 P1 原始事件。
 - 客户端仍是真相源：解密、冲突合并、删除 tombstone 语义、显式恢复和 userdb 写回都在客户端完成。
 
-Go 代码必须继续受本文件约束 migration、handler 和测试命名；平台私钥存储 backend capability / unavailable backend 的 Rust 模型已经落地。进入真实远端上传下载前，还必须完成本文件要求的签名验证、HTTP API handler、错误语义、审计日志和平台 backend 验证。
+Go 代码必须继续受本文件约束 migration、handler 和测试命名；平台私钥存储 backend capability / unavailable backend 的 Rust 模型已经落地。进入 Rust 真实远端客户端、server main 或用户可用同步前，仍必须保持签名验证、HTTP API handler、错误语义、审计日志和平台 backend 验证彼此一致。
 
 ## 服务端职责
 
@@ -219,11 +219,11 @@ blob_ref
 
 当前 storage conformance 已覆盖：第一台设备必须为 `active`；join request 从 `pending` 授权到 `active`；wrapped device key bytes 随授权事务保存并可按 metadata 读取；revoked 设备和旧 `key_epoch` 写入被拒绝；object version 支持同 hash 幂等重试、同版本不同 hash 冲突和 stale `base_version` latest metadata；object payload 读取复验长度 / ciphertext hash；recovery record 写入校验 wrapped material 长度 / ciphertext hash 并分配 `blob_ref`；latest recovery metadata 与 wrapped material bytes 可一起读取并复验；signed object manifest、device authorization、device revocation 和 recovery record 字段篡改会被 Ed25519 验签拒绝。
 
-当前 storage 已在写入前使用 `devices.signing_public_key` 验证 object manifest、device authorization、device revocation 和 recovery record；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list。当前 API 层已补 `GET /api/v1/domains/{domain_id}/recovery-records/latest`，复用 `LatestRecoveryWrappedMaterial`，返回服务端可见 recovery metadata 与 encrypted wrapped material，并覆盖统一 JSON 错误响应、`recovery_rate_limited` 和不泄漏内部 `blob_ref`。API 层也已补 `POST /domains`、`GET /domains/{domain_id}/state`、`GET /domains/{domain_id}/devices/{device_id}`、`POST /domains/{domain_id}/join-requests`、`GET /domains/{domain_id}/join-requests` 和 `POST /domains/{domain_id}/join-requests/{join_request_id}/authorization`，覆盖创建 domain、读取 domain metadata、读取 active / pending device metadata、创建 / 列出 pending join request、authorization request 到 storage upload 的映射和非法 JSON 错误响应。当前 handler 外层已补 `X-Request-ID` 透传 / 生成、panic recovery 结构化 `storage_unavailable` 响应和非持久 `AuditSink` hook；当底层 store 实现持久审计时会写入 SQLite `audit_events`。审计事件只包含 route name / event type、domain id、device id、object id、version、result code、byte count 和 server time，不包含请求体或响应体。下一步仍需补齐 encrypted object 上传下载前错误语义。
+当前 storage 已在写入前使用 `devices.signing_public_key` 验证 object manifest、device authorization、device revocation 和 recovery record；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list。当前 API 层已补 `GET /api/v1/domains/{domain_id}/recovery-records/latest`，复用 `LatestRecoveryWrappedMaterial`，返回服务端可见 recovery metadata 与 encrypted wrapped material，并覆盖统一 JSON 错误响应、`recovery_rate_limited` 和不泄漏内部 `blob_ref`。API 层也已补 `POST /domains`、`GET /domains/{domain_id}/state`、`GET /domains/{domain_id}/devices/{device_id}`、`POST /domains/{domain_id}/join-requests`、`GET /domains/{domain_id}/join-requests` 和 `POST /domains/{domain_id}/join-requests/{join_request_id}/authorization`，覆盖创建 domain、读取 domain metadata、读取 active / pending device metadata、创建 / 列出 pending join request、authorization request 到 storage upload 的映射和非法 JSON 错误响应。对象版本 API 已补 `POST /api/v1/domains/{domain_id}/objects/{object_id}/versions`、`GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}` 和 `GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}/payload`，复用 `PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`，覆盖 encrypted payload 长度 / hash mismatch、stale base version latest metadata、同版本同 hash 幂等、同版本不同 hash 冲突、revoked / pending / unknown device 禁止上传、plaintext 字段拒绝和错误 / 审计不泄漏 payload。当前 handler 外层已补 `X-Request-ID` 透传 / 生成、panic recovery 结构化 `storage_unavailable` 响应和非持久 `AuditSink` hook；当底层 store 实现持久审计时会写入 SQLite `audit_events`。审计事件只包含 route name / event type、domain id、device id、object id、version、result code、byte count 和 server time，不包含请求体或响应体。
 
 ## HTTP API 边界
 
-首批 API 使用 `/api/v1` 前缀。metadata 使用 JSON；对象 payload 使用二进制请求体或 multipart 中的二进制 part。后续可以调整传输细节，但不能改变“metadata 可验证、payload 仍为密文”的边界。
+首批 API 使用 `/api/v1` 前缀。metadata 使用 JSON；当前对象上传使用 JSON `payload` byte 字段承载 encrypted bytes，Go JSON 编码下表现为 base64 字符串；对象 payload 下载接口返回 `application/octet-stream` 二进制密文。后续可以调整传输细节，但不能改变“metadata 可验证、payload 仍为密文”的边界。
 
 ### 同步域
 
@@ -274,7 +274,7 @@ blob_ref
 
 - 上传一个新加密对象版本。
 - 请求 metadata 必须包含 `object_type`、`version`、`base_version`、`owner_device_id`、`key_id`、`key_epoch`、`algorithm`、`nonce`、`encrypted_payload_len`、`ciphertext_hash`、客户端时间和 signed object manifest。
-- 请求 payload 只能是 encrypted bytes。
+- 当前请求体为 JSON，`payload` 字段只能是 encrypted bytes；不接受 plaintext user term、input code、reading、P1 event 或 ranker 明细字段。
 - 服务端验证设备 active、签名有效、metadata 合法、payload 长度和 ciphertext hash 匹配。
 - 新对象要求 `version = 1` 且 `base_version = 0`。
 - 已存在对象要求 `base_version` 等于服务端 latest version，且 `version = latest_version + 1`。
@@ -478,7 +478,7 @@ latest_ciphertext_hash
 8. 已补 API 层 request id、panic recovery 和非持久审计 hook，覆盖 request id header、结构化 panic error、审计事件不包含请求体字段。
 9. 已补 authorization handler，把 signed authorization、wrapping metadata 和 encrypted wrapped key bytes 映射到 storage upload；storage conformance 覆盖授权后 pending join request 不再列出、设备激活和 wrapped key bytes 读取。
 10. 已补 SQLite `audit_events` 写入，handler 会把非敏感审计事件映射到 storage audit model；测试覆盖 SQLite 行写入和 handler 自动调用持久审计 recorder。
-11. 再实现 encrypted object 上传下载和版本冲突检测。
+11. 已补 encrypted object 上传下载和版本冲突 HTTP 语义，覆盖 metadata / payload 读取、hash / length mismatch、stale latest metadata、幂等重试、同版本不同 hash 冲突、设备状态门禁、plaintext 字段拒绝和 audit / error 脱敏。
 12. 最后再接 Rust `ime-sync` 远端客户端；客户端必须以已加密 envelope 和 signed manifest 为输入，不得把 plaintext payload 交给 server。
 
 任何阶段都不应把 Flutter manager、平台壳、真实系统输入法服务或输入热路径接入 Go server。
@@ -488,7 +488,7 @@ latest_ciphertext_hash
 - Go server migration、API handler 和 storage tests 未覆盖上述隐私字段阻断前，不实现远端客户端上传下载。
 - 平台私钥存储 backend 能力模型已落地；真实平台 backend 验证未完成前，不提供用户可用同步 UI。
 - device authorization handler 对外开放前必须继续复用 wrapped key bytes 的存储 / 读取语义，且不得返回明文同步域材料。
-- recovery latest handler 已复用 wrapped material bytes 读取语义，并补齐限速与内部 `blob_ref` 不外泄测试；API handler 已补 panic recovery、request id、非持久审计 hook 和 SQLite `audit_events` 写入。接入真实 server main 前仍需补运行时日志脱敏。
+- recovery latest handler 已复用 wrapped material bytes 读取语义，并补齐限速与内部 `blob_ref` 不外泄测试；object version handler 已复用 encrypted object blob 读写语义，并补齐冲突、设备状态和脱敏测试；API handler 已补 panic recovery、request id、非持久审计 hook 和 SQLite `audit_events` 写入。接入真实 server main 前仍需补运行时日志脱敏。
 - 服务端能保存、打印或索引明文用户词、input code、reading、P1 原始事件或候选偏好时，必须停止并回退该设计。
 - 服务端版本冲突检测未稳定前，不允许客户端把本地合并结果自动上传到真实远端。
 - 包分发、P3 资源下载和个人 P2 同步对象必须保持独立 API 与存储边界。

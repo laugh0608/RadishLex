@@ -3,10 +3,13 @@ package api
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -438,6 +441,233 @@ func TestLatestRecoveryHandlerRateLimitsBeforeStorageRead(t *testing.T) {
 	}
 }
 
+func TestObjectVersionHandlersUploadReadMetadataAndPayload(t *testing.T) {
+	store := storage.NewMemoryStore()
+	createDomainForObjectHandlerTest(t, store, "domain-a", "device-a", 1)
+	handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+	payload := []byte("encrypted object payload")
+	upload := objectUploadRequestForHandlerTest("domain-a", "object-a", "device-a", 1, 0, 1, payload)
+
+	createResponse := performJSONRequest(t, handler, http.MethodPost, PrefixV1+"/domains/domain-a/objects/object-a/versions", upload)
+	if createResponse.Code != http.StatusCreated {
+		t.Fatalf("unexpected upload status: %d body=%s", createResponse.Code, createResponse.Body.String())
+	}
+	var created ObjectVersionResponse
+	decodeResponse(t, createResponse, &created)
+	if created.DomainID != "domain-a" ||
+		created.ObjectID != "object-a" ||
+		created.Version != 1 ||
+		created.CiphertextHash != storage.CiphertextHash(payload) ||
+		created.EncryptedPayloadLen != int64(len(payload)) {
+		t.Fatalf("unexpected object metadata: %#v", created)
+	}
+	if strings.Contains(createResponse.Body.String(), string(payload)) ||
+		strings.Contains(createResponse.Body.String(), "blob_ref") {
+		t.Fatalf("metadata response leaked payload or blob ref: %s", createResponse.Body.String())
+	}
+
+	metadataResponse := httptest.NewRecorder()
+	handler.ServeHTTP(metadataResponse, httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/objects/object-a/versions/1", nil))
+	if metadataResponse.Code != http.StatusOK {
+		t.Fatalf("unexpected metadata status: %d body=%s", metadataResponse.Code, metadataResponse.Body.String())
+	}
+	var metadata ObjectVersionResponse
+	decodeResponse(t, metadataResponse, &metadata)
+	if metadata.CiphertextHash != storage.CiphertextHash(payload) || metadata.SignatureKeyID != "signing-key-a" {
+		t.Fatalf("unexpected read metadata: %#v", metadata)
+	}
+	if strings.Contains(metadataResponse.Body.String(), string(payload)) {
+		t.Fatalf("metadata read leaked payload: %s", metadataResponse.Body.String())
+	}
+
+	payloadResponse := httptest.NewRecorder()
+	handler.ServeHTTP(payloadResponse, httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/objects/object-a/versions/1/payload", nil))
+	if payloadResponse.Code != http.StatusOK {
+		t.Fatalf("unexpected payload status: %d body=%s", payloadResponse.Code, payloadResponse.Body.String())
+	}
+	if payloadResponse.Header().Get("Content-Type") != "application/octet-stream" {
+		t.Fatalf("unexpected payload content type: %q", payloadResponse.Header().Get("Content-Type"))
+	}
+	if !bytes.Equal(payloadResponse.Body.Bytes(), payload) {
+		t.Fatalf("payload mismatch: got %x want %x", payloadResponse.Body.Bytes(), payload)
+	}
+}
+
+func TestObjectVersionUploadRejectsCiphertextMetadataMismatchWithoutLeakingPayload(t *testing.T) {
+	audit := &auditSinkStub{}
+	store := storage.NewMemoryStore()
+	createDomainForObjectHandlerTest(t, store, "domain-a", "device-a", 1)
+	handler := NewHandler(store, HandlerConfig{
+		Now:       fixedNow,
+		RequestID: fixedRequestID,
+		AuditSink: audit,
+	})
+	payload := []byte("sensitive encrypted payload fixture")
+	upload := objectUploadRequestForHandlerTest("domain-a", "object-a", "device-a", 1, 0, 1, payload)
+	upload.CiphertextHash = storage.CiphertextHash([]byte("different encrypted bytes"))
+	signObjectUploadRequestForHandlerTest(&upload, "domain-a", "object-a")
+
+	response := performJSONRequest(t, handler, http.MethodPost, PrefixV1+"/domains/domain-a/objects/object-a/versions", upload)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("unexpected status: %d body=%s", response.Code, response.Body.String())
+	}
+	var body ErrorResponse
+	decodeResponse(t, response, &body)
+	if body.ErrorCode != string(storage.ErrInvalidCiphertextMetadata) {
+		t.Fatalf("unexpected error response: %#v", body)
+	}
+	if strings.Contains(response.Body.String(), string(payload)) {
+		t.Fatalf("error response leaked payload: %s", response.Body.String())
+	}
+	if len(audit.events) != 1 {
+		t.Fatalf("expected one audit event, got %d", len(audit.events))
+	}
+	eventText := fmt.Sprintf("%#v", audit.events[0])
+	if strings.Contains(eventText, string(payload)) || strings.Contains(eventText, "payload") {
+		t.Fatalf("audit event leaked payload fields: %s", eventText)
+	}
+	if audit.events[0].ObjectID != "object-a" ||
+		audit.events[0].Version != 1 ||
+		audit.events[0].ResultCode != string(storage.ErrInvalidCiphertextMetadata) {
+		t.Fatalf("unexpected audit event: %#v", audit.events[0])
+	}
+}
+
+func TestObjectVersionUploadRejectsPlaintextFields(t *testing.T) {
+	store := storage.NewMemoryStore()
+	createDomainForObjectHandlerTest(t, store, "domain-a", "device-a", 1)
+	handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+	request := httptest.NewRequest(http.MethodPost, PrefixV1+"/domains/domain-a/objects/object-a/versions", strings.NewReader(`{"plaintext_user_term":"不能进入服务端"}`))
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("unexpected status: %d body=%s", response.Code, response.Body.String())
+	}
+	var body ErrorResponse
+	decodeResponse(t, response, &body)
+	if body.ErrorCode != string(storage.ErrInvalidRequest) {
+		t.Fatalf("unexpected error response: %#v", body)
+	}
+}
+
+func TestObjectVersionUploadReturnsLatestMetadataForStaleBase(t *testing.T) {
+	store := storage.NewMemoryStore()
+	createDomainForObjectHandlerTest(t, store, "domain-a", "device-a", 1)
+	handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+	first := objectUploadRequestForHandlerTest("domain-a", "object-a", "device-a", 1, 0, 1, []byte("encrypted-v1"))
+	second := objectUploadRequestForHandlerTest("domain-a", "object-a", "device-a", 2, 1, 1, []byte("encrypted-v2"))
+	for _, upload := range []ObjectVersionUploadRequest{first, second} {
+		response := performJSONRequest(t, handler, http.MethodPost, PrefixV1+"/domains/domain-a/objects/object-a/versions", upload)
+		if response.Code != http.StatusCreated {
+			t.Fatalf("setup upload failed: status=%d body=%s", response.Code, response.Body.String())
+		}
+	}
+
+	stalePayload := []byte("stale encrypted payload")
+	stale := objectUploadRequestForHandlerTest("domain-a", "object-a", "device-a", 3, 1, 1, stalePayload)
+	response := performJSONRequest(t, handler, http.MethodPost, PrefixV1+"/domains/domain-a/objects/object-a/versions", stale)
+	if response.Code != http.StatusConflict {
+		t.Fatalf("unexpected stale status: %d body=%s", response.Code, response.Body.String())
+	}
+	var body ErrorResponse
+	decodeResponse(t, response, &body)
+	if body.ErrorCode != string(storage.ErrConflictStaleBaseVersion) ||
+		body.LatestVersion != 2 ||
+		body.LatestCiphertextHash != second.CiphertextHash {
+		t.Fatalf("latest metadata missing from stale response: %#v", body)
+	}
+	if strings.Contains(response.Body.String(), string(stalePayload)) {
+		t.Fatalf("stale response leaked payload: %s", response.Body.String())
+	}
+}
+
+func TestObjectVersionUploadIsIdempotentForSameVersionHashAndRejectsDifferentHash(t *testing.T) {
+	store := storage.NewMemoryStore()
+	createDomainForObjectHandlerTest(t, store, "domain-a", "device-a", 1)
+	handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+	upload := objectUploadRequestForHandlerTest("domain-a", "object-a", "device-a", 1, 0, 1, []byte("encrypted-v1"))
+
+	first := performJSONRequest(t, handler, http.MethodPost, PrefixV1+"/domains/domain-a/objects/object-a/versions", upload)
+	if first.Code != http.StatusCreated {
+		t.Fatalf("unexpected first status: %d body=%s", first.Code, first.Body.String())
+	}
+	retry := performJSONRequest(t, handler, http.MethodPost, PrefixV1+"/domains/domain-a/objects/object-a/versions", upload)
+	if retry.Code != http.StatusCreated {
+		t.Fatalf("unexpected retry status: %d body=%s", retry.Code, retry.Body.String())
+	}
+	var retryBody ObjectVersionResponse
+	decodeResponse(t, retry, &retryBody)
+	if retryBody.CiphertextHash != upload.CiphertextHash {
+		t.Fatalf("idempotent retry returned wrong metadata: %#v", retryBody)
+	}
+
+	conflicting := objectUploadRequestForHandlerTest("domain-a", "object-a", "device-a", 1, 0, 1, []byte("encrypted-v1-conflict"))
+	response := performJSONRequest(t, handler, http.MethodPost, PrefixV1+"/domains/domain-a/objects/object-a/versions", conflicting)
+	if response.Code != http.StatusConflict {
+		t.Fatalf("unexpected conflict status: %d body=%s", response.Code, response.Body.String())
+	}
+	var body ErrorResponse
+	decodeResponse(t, response, &body)
+	if body.ErrorCode != string(storage.ErrConflictObjectVersion) {
+		t.Fatalf("unexpected conflict response: %#v", body)
+	}
+}
+
+func TestObjectVersionUploadRejectsRevokedPendingAndUnknownDevices(t *testing.T) {
+	t.Run("pending device", func(t *testing.T) {
+		store := storage.NewMemoryStore()
+		createDomainForObjectHandlerTest(t, store, "domain-a", "device-a", 1)
+		if err := store.SaveJoinRequest(context.Background(), storage.JoinRequest{
+			DomainID:                "domain-a",
+			JoinRequestID:           "join-b",
+			DeviceID:                "device-b",
+			SigningPublicKeyID:      signingKeyIDForHandlerTest("device-b"),
+			SigningPublicKey:        signingPublicKeyForHandlerTest("device-b"),
+			KeyAgreementPublicKeyID: "agreement-key-b",
+			KeyAgreementPublicKey:   []byte{0x12},
+			Challenge:               []byte{0x13},
+			CreatedAtMs:             10,
+			ExpiresAtMs:             110,
+			Status:                  storage.DevicePending,
+		}); err != nil {
+			t.Fatalf("save join request: %v", err)
+		}
+		handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+		upload := objectUploadRequestForHandlerTest("domain-a", "object-b", "device-b", 1, 0, 1, []byte("pending-device-payload"))
+		assertForbiddenObjectUpload(t, handler, PrefixV1+"/domains/domain-a/objects/object-b/versions", upload)
+	})
+
+	t.Run("unknown device", func(t *testing.T) {
+		store := storage.NewMemoryStore()
+		createDomainForObjectHandlerTest(t, store, "domain-a", "device-a", 1)
+		handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+		upload := objectUploadRequestForHandlerTest("domain-a", "object-c", "device-c", 1, 0, 1, []byte("unknown-device-payload"))
+		assertForbiddenObjectUpload(t, handler, PrefixV1+"/domains/domain-a/objects/object-c/versions", upload)
+	})
+
+	t.Run("revoked device", func(t *testing.T) {
+		store := storage.NewMemoryStore()
+		createDomainForObjectHandlerTest(t, store, "domain-b", "device-b", 1)
+		revocation := storage.DeviceRevocation{
+			DomainID:         "domain-b",
+			RevokedDeviceID:  "device-b",
+			RevokerDeviceID:  "device-b",
+			PreviousKeyEpoch: 1,
+			NewKeyEpoch:      2,
+			Reason:           "lost",
+			CreatedAtMs:      20,
+		}
+		signRevocationForHandlerTest(&revocation)
+		if err := store.RevokeDevice(context.Background(), revocation); err != nil {
+			t.Fatalf("revoke device: %v", err)
+		}
+		handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+		upload := objectUploadRequestForHandlerTest("domain-b", "object-d", "device-b", 1, 0, 2, []byte("revoked-device-payload"))
+		assertForbiddenObjectUpload(t, handler, PrefixV1+"/domains/domain-b/objects/object-d/versions", upload)
+	})
+}
+
 func fixedNow() time.Time {
 	return time.UnixMilli(1234)
 }
@@ -529,4 +759,181 @@ func (s *persistentAuditStoreStub) Domain(ctx context.Context, domainID string) 
 func (s *persistentAuditStoreStub) RecordAuditEvent(ctx context.Context, event storage.AuditEvent) error {
 	s.auditEvents = append(s.auditEvents, event)
 	return nil
+}
+
+func createDomainForObjectHandlerTest(t *testing.T, store storage.Store, domainID string, deviceID string, keyEpoch uint64) {
+	t.Helper()
+	err := store.CreateDomain(context.Background(), storage.Domain{
+		DomainID:        domainID,
+		CurrentKeyEpoch: keyEpoch,
+		ActiveKeyID:     "sync-key-" + deviceID,
+		CreatedAtMs:     1,
+		UpdatedAtMs:     1,
+	}, storage.Device{
+		DomainID:                domainID,
+		DeviceID:                deviceID,
+		SigningPublicKeyID:      signingKeyIDForHandlerTest(deviceID),
+		SigningPublicKey:        signingPublicKeyForHandlerTest(deviceID),
+		KeyAgreementPublicKeyID: "agreement-key-" + deviceID,
+		KeyAgreementPublicKey:   []byte{0x02},
+		Status:                  storage.DeviceActive,
+		AuthorizedAtMs:          1,
+	})
+	if err != nil {
+		t.Fatalf("create domain: %v", err)
+	}
+}
+
+func objectUploadRequestForHandlerTest(domainID string, objectID string, deviceID string, version uint64, baseVersion uint64, keyEpoch uint64, payload []byte) ObjectVersionUploadRequest {
+	request := ObjectVersionUploadRequest{
+		ObjectType:             storage.ObjectDictionaryUserTerms,
+		Version:                version,
+		BaseVersion:            baseVersion,
+		OwnerDeviceID:          deviceID,
+		KeyID:                  "object-key-a",
+		KeyEpoch:               keyEpoch,
+		Algorithm:              storage.AlgorithmXChaCha20Poly1305HKDFSHA256,
+		Nonce:                  []byte{byte(version), byte(baseVersion), byte(keyEpoch)},
+		EncryptedPayloadLen:    int64(len(payload)),
+		CiphertextHash:         storage.CiphertextHash(payload),
+		ClientCreatedAtMs:      100 + int64(version),
+		ClientUpdatedAtMs:      100 + int64(version),
+		Payload:                cloneBytes(payload),
+		SignatureSchemaVersion: 1,
+		SignatureAlgorithm:     "ed25519-v1",
+		SignatureKeyID:         signingKeyIDForHandlerTest(deviceID),
+	}
+	signObjectUploadRequestForHandlerTest(&request, domainID, objectID)
+	return request
+}
+
+func signObjectUploadRequestForHandlerTest(request *ObjectVersionUploadRequest, domainID string, objectID string) {
+	request.SignatureSchemaVersion = 1
+	request.SignatureAlgorithm = "ed25519-v1"
+	request.SignatureKeyID = signingKeyIDForHandlerTest(request.OwnerDeviceID)
+	request.Signature = ed25519.Sign(signingPrivateKeyForHandlerTest(request.OwnerDeviceID), canonicalSignatureBytesForHandlerTest("sync_object_manifest", []signatureFieldForHandlerTest{
+		textFieldForHandlerTest("signature_schema_version", "1"),
+		textFieldForHandlerTest("signature_algorithm", "ed25519-v1"),
+		textFieldForHandlerTest("signature_key_id", request.SignatureKeyID),
+		textFieldForHandlerTest("signer_device_id", request.OwnerDeviceID),
+		textFieldForHandlerTest("domain_id", domainID),
+		textFieldForHandlerTest("object_id", objectID),
+		textFieldForHandlerTest("object_type", request.ObjectType),
+		textFieldForHandlerTest("version", uint64StringForHandlerTest(request.Version)),
+		textFieldForHandlerTest("base_version", optionalBaseVersionStringForHandlerTest(request.BaseVersion)),
+		textFieldForHandlerTest("key_id", request.KeyID),
+		textFieldForHandlerTest("key_epoch", uint64StringForHandlerTest(request.KeyEpoch)),
+		textFieldForHandlerTest("envelope_algorithm", request.Algorithm),
+		bytesFieldForHandlerTest("nonce", request.Nonce),
+		textFieldForHandlerTest("encrypted_payload_len", int64StringForHandlerTest(request.EncryptedPayloadLen)),
+		textFieldForHandlerTest("ciphertext_hash", request.CiphertextHash),
+		textFieldForHandlerTest("created_at_ms", int64StringForHandlerTest(request.ClientCreatedAtMs)),
+		textFieldForHandlerTest("updated_at_ms", int64StringForHandlerTest(request.ClientUpdatedAtMs)),
+	}))
+}
+
+func signRevocationForHandlerTest(revocation *storage.DeviceRevocation) {
+	revocation.SignatureSchemaVersion = 1
+	revocation.SignatureAlgorithm = "ed25519-v1"
+	revocation.SignatureKeyID = signingKeyIDForHandlerTest(revocation.RevokerDeviceID)
+	revocation.Signature = ed25519.Sign(signingPrivateKeyForHandlerTest(revocation.RevokerDeviceID), canonicalSignatureBytesForHandlerTest("device_revocation", []signatureFieldForHandlerTest{
+		textFieldForHandlerTest("signature_schema_version", "1"),
+		textFieldForHandlerTest("signature_algorithm", "ed25519-v1"),
+		textFieldForHandlerTest("signature_key_id", revocation.SignatureKeyID),
+		textFieldForHandlerTest("revoked_by_device_id", revocation.RevokerDeviceID),
+		textFieldForHandlerTest("revoked_device_id", revocation.RevokedDeviceID),
+		textFieldForHandlerTest("previous_key_epoch", uint64StringForHandlerTest(revocation.PreviousKeyEpoch)),
+		textFieldForHandlerTest("new_key_epoch", uint64StringForHandlerTest(revocation.NewKeyEpoch)),
+		textFieldForHandlerTest("reason", revocation.Reason),
+		textFieldForHandlerTest("revoked_at_ms", int64StringForHandlerTest(revocation.CreatedAtMs)),
+	}))
+}
+
+func assertForbiddenObjectUpload(t *testing.T, handler http.Handler, path string, upload ObjectVersionUploadRequest) {
+	t.Helper()
+	response := performJSONRequest(t, handler, http.MethodPost, path, upload)
+	if response.Code != http.StatusForbidden {
+		t.Fatalf("unexpected forbidden status: %d body=%s", response.Code, response.Body.String())
+	}
+	var body ErrorResponse
+	decodeResponse(t, response, &body)
+	if body.ErrorCode != string(storage.ErrForbiddenDevice) {
+		t.Fatalf("unexpected forbidden response: %#v", body)
+	}
+}
+
+type signatureFieldForHandlerTest struct {
+	name  string
+	value []byte
+}
+
+func canonicalSignatureBytesForHandlerTest(recordType string, fields []signatureFieldForHandlerTest) []byte {
+	var out []byte
+	out = appendSignatureFieldForHandlerTest(out, "domain_separator", []byte("radishlex-signature-v1"))
+	out = appendSignatureFieldForHandlerTest(out, "record_type", []byte(recordType))
+	for _, field := range fields {
+		out = appendSignatureFieldForHandlerTest(out, field.name, field.value)
+	}
+	return out
+}
+
+func appendSignatureFieldForHandlerTest(out []byte, name string, value []byte) []byte {
+	out = append(out, []byte(name)...)
+	out = append(out, '=')
+	var length [8]byte
+	binary.BigEndian.PutUint64(length[:], uint64(len(value)))
+	out = append(out, length[:]...)
+	out = append(out, value...)
+	out = append(out, 0)
+	return out
+}
+
+func textFieldForHandlerTest(name string, value string) signatureFieldForHandlerTest {
+	return signatureFieldForHandlerTest{name: name, value: []byte(value)}
+}
+
+func bytesFieldForHandlerTest(name string, value []byte) signatureFieldForHandlerTest {
+	return signatureFieldForHandlerTest{name: name, value: cloneBytes(value)}
+}
+
+func signingPublicKeyForHandlerTest(deviceID string) []byte {
+	return signingPrivateKeyForHandlerTest(deviceID).Public().(ed25519.PublicKey)
+}
+
+func signingPrivateKeyForHandlerTest(deviceID string) ed25519.PrivateKey {
+	return ed25519.NewKeyFromSeed(signingSeedForHandlerTest(deviceID))
+}
+
+func signingSeedForHandlerTest(deviceID string) []byte {
+	seed := make([]byte, ed25519.SeedSize)
+	fill := byte(7)
+	if deviceID != "device-a" {
+		fill = 11
+	}
+	for index := range seed {
+		seed[index] = fill
+	}
+	return seed
+}
+
+func signingKeyIDForHandlerTest(deviceID string) string {
+	if deviceID == "device-a" {
+		return "signing-key-a"
+	}
+	return "signing-key-" + deviceID
+}
+
+func optionalBaseVersionStringForHandlerTest(value uint64) string {
+	if value == 0 {
+		return ""
+	}
+	return uint64StringForHandlerTest(value)
+}
+
+func uint64StringForHandlerTest(value uint64) string {
+	return strconv.FormatUint(value, 10)
+}
+
+func int64StringForHandlerTest(value int64) string {
+	return strconv.FormatInt(value, 10)
 }

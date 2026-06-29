@@ -136,6 +136,10 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request, audit *Audit
 	if route.deviceID != "" {
 		audit.DeviceID = route.deviceID
 	}
+	if route.objectID != "" {
+		audit.ObjectID = route.objectID
+		audit.Version = route.version
+	}
 	switch route.kind {
 	case domainStateRoute:
 		h.handleDomainState(w, r, route.domainID)
@@ -147,6 +151,12 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request, audit *Audit
 		h.handleJoinAuthorization(w, r, route.domainID, route.joinRequestID, audit)
 	case recoveryLatestRoute:
 		h.handleLatestRecovery(w, r, route.domainID)
+	case objectVersionsRoute:
+		h.handleObjectVersions(w, r, route.domainID, route.objectID, audit)
+	case objectVersionRoute:
+		h.handleObjectVersion(w, r, route.domainID, route.objectID, route.version)
+	case objectPayloadRoute:
+		h.handleObjectPayload(w, r, route.domainID, route.objectID, route.version, audit)
 	default:
 		h.writeError(w, publicStorageError(storage.ErrNotFound, "api route not found", false))
 	}
@@ -261,6 +271,61 @@ func (h *Handler) handleLatestRecovery(w http.ResponseWriter, r *http.Request, d
 	writeJSON(w, http.StatusOK, RecoveryRecordResponseFrom(record, wrappedMaterial))
 }
 
+func (h *Handler) handleObjectVersions(w http.ResponseWriter, r *http.Request, domainID string, objectID string, audit *AuditEvent) {
+	if r.Method != http.MethodPost {
+		h.writeMethodError(w, http.MethodPost)
+		return
+	}
+	var request ObjectVersionUploadRequest
+	if err := decodeJSONRequest(r, &request); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	upload := request.Upload(domainID, objectID)
+	audit.DeviceID = upload.Version.OwnerDeviceID
+	audit.ObjectID = objectID
+	audit.ObjectType = upload.Version.ObjectType
+	audit.Version = upload.Version.Version
+	audit.Bytes = upload.Version.EncryptedPayloadLen
+	metadata, err := h.store.PutObjectVersion(r.Context(), upload)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, ObjectVersionResponseFrom(metadata))
+}
+
+func (h *Handler) handleObjectVersion(w http.ResponseWriter, r *http.Request, domainID string, objectID string, version uint64) {
+	if r.Method != http.MethodGet {
+		h.writeMethodError(w, http.MethodGet)
+		return
+	}
+	metadata, err := h.store.ObjectVersion(r.Context(), domainID, objectID, version)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, ObjectVersionResponseFrom(metadata))
+}
+
+func (h *Handler) handleObjectPayload(w http.ResponseWriter, r *http.Request, domainID string, objectID string, version uint64, audit *AuditEvent) {
+	if r.Method != http.MethodGet {
+		h.writeMethodError(w, http.MethodGet)
+		return
+	}
+	payload, err := h.store.ObjectPayload(r.Context(), domainID, objectID, version)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	audit.ObjectID = objectID
+	audit.Version = version
+	audit.Bytes = int64(len(payload))
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(payload)
+}
+
 func publicStorageError(code storage.ErrorCode, message string, retryable bool) *storage.Error {
 	return &storage.Error{Code: code, Message: message, Retryable: retryable}
 }
@@ -298,6 +363,9 @@ const (
 	joinRequestsRoute
 	joinAuthorizationRoute
 	recoveryLatestRoute
+	objectVersionsRoute
+	objectVersionRoute
+	objectPayloadRoute
 )
 
 type route struct {
@@ -305,6 +373,8 @@ type route struct {
 	domainID      string
 	deviceID      string
 	joinRequestID string
+	objectID      string
+	version       uint64
 }
 
 func (r route) name() string {
@@ -319,6 +389,12 @@ func (r route) name() string {
 		return "join_requests.authorize"
 	case recoveryLatestRoute:
 		return "recovery.latest"
+	case objectVersionsRoute:
+		return "objects.versions.create"
+	case objectVersionRoute:
+		return "objects.versions.get"
+	case objectPayloadRoute:
+		return "objects.versions.payload"
 	default:
 		return "routes.unknown"
 	}
@@ -345,7 +421,29 @@ func domainRoute(path string) (route, bool) {
 	if len(parts) == 3 && parts[0] != "" && parts[1] == "recovery-records" && parts[2] == "latest" {
 		return route{kind: recoveryLatestRoute, domainID: parts[0]}, true
 	}
+	if len(parts) == 4 && parts[0] != "" && parts[1] == "objects" && parts[2] != "" && parts[3] == "versions" {
+		return route{kind: objectVersionsRoute, domainID: parts[0], objectID: parts[2]}, true
+	}
+	if len(parts) == 5 && parts[0] != "" && parts[1] == "objects" && parts[2] != "" && parts[3] == "versions" && parts[4] != "" {
+		version, ok := parseRouteVersion(parts[4])
+		if !ok {
+			return route{}, false
+		}
+		return route{kind: objectVersionRoute, domainID: parts[0], objectID: parts[2], version: version}, true
+	}
+	if len(parts) == 6 && parts[0] != "" && parts[1] == "objects" && parts[2] != "" && parts[3] == "versions" && parts[4] != "" && parts[5] == "payload" {
+		version, ok := parseRouteVersion(parts[4])
+		if !ok {
+			return route{}, false
+		}
+		return route{kind: objectPayloadRoute, domainID: parts[0], objectID: parts[2], version: version}, true
+	}
 	return route{}, false
+}
+
+func parseRouteVersion(value string) (uint64, bool) {
+	version, err := strconv.ParseUint(value, 10, 64)
+	return version, err == nil && version > 0
 }
 
 func recoveryClientKey(r *http.Request) string {
