@@ -551,6 +551,33 @@ func TestObjectVersionUploadRejectsPlaintextFields(t *testing.T) {
 	}
 }
 
+func TestObjectVersionUploadRejectsPayloadTooLarge(t *testing.T) {
+	store := storage.NewMemoryStore()
+	createDomainForObjectHandlerTest(t, store, "domain-a", "device-a", 1)
+	handler := NewHandler(store, HandlerConfig{
+		Now:            fixedNow,
+		MaxObjectBytes: 4,
+	})
+	payload := []byte("encrypted payload over limit")
+	upload := objectUploadRequestForHandlerTest("domain-a", "object-a", "device-a", 1, 0, 1, payload)
+
+	response := performJSONRequest(t, handler, http.MethodPost, PrefixV1+"/domains/domain-a/objects/object-a/versions", upload)
+	if response.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("unexpected status: %d body=%s", response.Code, response.Body.String())
+	}
+	var body ErrorResponse
+	decodeResponse(t, response, &body)
+	if body.ErrorCode != string(storage.ErrPayloadTooLarge) {
+		t.Fatalf("unexpected error response: %#v", body)
+	}
+	if strings.Contains(response.Body.String(), string(payload)) {
+		t.Fatalf("payload too large response leaked payload: %s", response.Body.String())
+	}
+	if _, err := store.ObjectVersion(context.Background(), "domain-a", "object-a", 1); !storage.IsCode(err, storage.ErrNotFound) {
+		t.Fatalf("oversized upload should not reach storage, got %v", err)
+	}
+}
+
 func TestObjectVersionUploadReturnsLatestMetadataForStaleBase(t *testing.T) {
 	store := storage.NewMemoryStore()
 	createDomainForObjectHandlerTest(t, store, "domain-a", "device-a", 1)

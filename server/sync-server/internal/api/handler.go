@@ -22,6 +22,7 @@ const requestIDHeader = "X-Request-ID"
 type HandlerConfig struct {
 	RecoveryReadLimit  int
 	RecoveryReadWindow time.Duration
+	MaxObjectBytes     int64
 	Now                func() time.Time
 	RequestID          func() string
 	AuditSink          AuditSink
@@ -60,6 +61,7 @@ type Handler struct {
 	now             func() time.Time
 	requestID       func() string
 	auditSink       AuditSink
+	maxObjectBytes  int64
 }
 
 var generatedRequestIDCounter atomic.Uint64
@@ -83,6 +85,7 @@ func NewHandler(store storage.Store, cfg HandlerConfig) *Handler {
 		now:             now,
 		requestID:       requestID,
 		auditSink:       cfg.AuditSink,
+		maxObjectBytes:  cfg.MaxObjectBytes,
 	}
 }
 
@@ -287,12 +290,26 @@ func (h *Handler) handleObjectVersions(w http.ResponseWriter, r *http.Request, d
 	audit.ObjectType = upload.Version.ObjectType
 	audit.Version = upload.Version.Version
 	audit.Bytes = upload.Version.EncryptedPayloadLen
+	if err := h.checkObjectPayloadSize(upload); err != nil {
+		h.writeError(w, err)
+		return
+	}
 	metadata, err := h.store.PutObjectVersion(r.Context(), upload)
 	if err != nil {
 		h.writeError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, ObjectVersionResponseFrom(metadata))
+}
+
+func (h *Handler) checkObjectPayloadSize(upload storage.ObjectVersionUpload) error {
+	if h.maxObjectBytes <= 0 {
+		return nil
+	}
+	if upload.Version.EncryptedPayloadLen > h.maxObjectBytes || int64(len(upload.Payload)) > h.maxObjectBytes {
+		return publicStorageError(storage.ErrPayloadTooLarge, "encrypted payload exceeds configured size limit", false)
+	}
+	return nil
 }
 
 func (h *Handler) handleObjectVersion(w http.ResponseWriter, r *http.Request, domainID string, objectID string, version uint64) {

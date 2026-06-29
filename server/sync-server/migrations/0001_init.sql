@@ -2,7 +2,7 @@
 -- This schema stores only encrypted object metadata, device public keys, signatures,
 -- recovery metadata, blob references and non-sensitive audit summaries.
 
-CREATE TABLE sync_domains (
+CREATE TABLE IF NOT EXISTS sync_domains (
     domain_id TEXT PRIMARY KEY,
     current_key_epoch INTEGER NOT NULL CHECK (current_key_epoch > 0),
     active_key_id TEXT NOT NULL,
@@ -10,7 +10,7 @@ CREATE TABLE sync_domains (
     updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= created_at_ms)
 );
 
-CREATE TABLE devices (
+CREATE TABLE IF NOT EXISTS devices (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     device_id TEXT NOT NULL,
     signing_public_key_id TEXT NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE devices (
     PRIMARY KEY (domain_id, device_id)
 );
 
-CREATE TABLE device_join_requests (
+CREATE TABLE IF NOT EXISTS device_join_requests (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     join_request_id TEXT NOT NULL,
     device_id TEXT NOT NULL,
@@ -39,7 +39,7 @@ CREATE TABLE device_join_requests (
     PRIMARY KEY (domain_id, join_request_id)
 );
 
-CREATE TABLE device_authorizations (
+CREATE TABLE IF NOT EXISTS device_authorizations (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     join_request_id TEXT NOT NULL,
     authorizer_device_id TEXT NOT NULL,
@@ -56,7 +56,7 @@ CREATE TABLE device_authorizations (
     PRIMARY KEY (domain_id, join_request_id)
 );
 
-CREATE TABLE device_wrapping_records (
+CREATE TABLE IF NOT EXISTS device_wrapping_records (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     recipient_device_id TEXT NOT NULL,
     authorizer_device_id TEXT NOT NULL,
@@ -72,7 +72,7 @@ CREATE TABLE device_wrapping_records (
     PRIMARY KEY (domain_id, recipient_device_id, key_epoch, wrapping_key_id)
 );
 
-CREATE TABLE device_revocations (
+CREATE TABLE IF NOT EXISTS device_revocations (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     revoked_device_id TEXT NOT NULL,
     revoker_device_id TEXT NOT NULL,
@@ -87,7 +87,7 @@ CREATE TABLE device_revocations (
     PRIMARY KEY (domain_id, revoked_device_id, new_key_epoch)
 );
 
-CREATE TABLE recovery_records (
+CREATE TABLE IF NOT EXISTS recovery_records (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     recovery_record_id TEXT NOT NULL,
     key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
@@ -114,7 +114,7 @@ CREATE TABLE recovery_records (
     PRIMARY KEY (domain_id, recovery_record_id)
 );
 
-CREATE TABLE sync_objects (
+CREATE TABLE IF NOT EXISTS sync_objects (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     object_id TEXT NOT NULL,
     object_type TEXT NOT NULL,
@@ -126,7 +126,7 @@ CREATE TABLE sync_objects (
     PRIMARY KEY (domain_id, object_id)
 );
 
-CREATE TABLE sync_object_versions (
+CREATE TABLE IF NOT EXISTS sync_object_versions (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     object_id TEXT NOT NULL,
     object_type TEXT NOT NULL,
@@ -150,7 +150,7 @@ CREATE TABLE sync_object_versions (
     PRIMARY KEY (domain_id, object_id, version)
 );
 
-CREATE TABLE audit_events (
+CREATE TABLE IF NOT EXISTS audit_events (
     audit_event_id INTEGER PRIMARY KEY AUTOINCREMENT,
     domain_id TEXT NOT NULL,
     event_type TEXT NOT NULL,
@@ -162,17 +162,17 @@ CREATE TABLE audit_events (
     server_time_ms INTEGER NOT NULL
 );
 
-CREATE INDEX idx_devices_domain_status
+CREATE INDEX IF NOT EXISTS idx_devices_domain_status
     ON devices(domain_id, status);
 
-CREATE INDEX idx_join_requests_domain_status
+CREATE INDEX IF NOT EXISTS idx_join_requests_domain_status
     ON device_join_requests(domain_id, status, expires_at_ms);
 
-CREATE INDEX idx_recovery_records_domain_status
+CREATE INDEX IF NOT EXISTS idx_recovery_records_domain_status
     ON recovery_records(domain_id, status, created_at_ms);
 
-CREATE INDEX idx_sync_objects_domain_type
+CREATE INDEX IF NOT EXISTS idx_sync_objects_domain_type
     ON sync_objects(domain_id, object_type, updated_at_ms);
 
-CREATE INDEX idx_audit_events_domain_time
+CREATE INDEX IF NOT EXISTS idx_audit_events_domain_time
     ON audit_events(domain_id, server_time_ms);

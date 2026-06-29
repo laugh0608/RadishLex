@@ -37,7 +37,8 @@ func TestMigrationAndModelsDoNotExposePlaintextBusinessFields(t *testing.T) {
 		"sync_object_versions",
 		"audit_events",
 	} {
-		if !strings.Contains(lowerMigration, "create table "+table) {
+		if !strings.Contains(lowerMigration, "create table "+table) &&
+			!strings.Contains(lowerMigration, "create table if not exists "+table) {
 			t.Fatalf("migration missing table %s", table)
 		}
 	}
