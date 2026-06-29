@@ -201,7 +201,7 @@ librime adapter：
 
 ## Go server 建议
 
-Go server 进入实现前应以 `docs/sync-server-api-storage.md` 为 API、storage、错误语义和验证边界。服务端只保存密文对象、设备公钥、签名记录、版本和必要同步元数据，不解析 userdb payload，不接触 P1 原始事件，也不进入输入热路径。
+Go server 当前实现继续以 `docs/sync-server-api-storage.md` 为 API、storage、错误语义和验证边界。服务端只保存密文对象、设备公钥、签名记录、版本和必要同步元数据，不解析 userdb payload，不接触 P1 原始事件，也不进入输入热路径。
 
 ```text
 server/sync-server/

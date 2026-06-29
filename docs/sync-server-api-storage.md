@@ -1,6 +1,6 @@
 # RadishLex 同步服务端 API 与存储边界
 
-本文档定义 Go sync server 进入实现前必须稳定的 API、存储、错误语义和验证口径。读者是后续实现 `server/sync-server`、`ime-sync` 远端客户端、同步 runbook 和审阅隐私边界的开发者。本文不包含 Go handler 代码、数据库 migration、Docker Compose 配置、Flutter 同步页面、真实远端上传下载实现或生产平台私钥存储 backend；生产恢复流程见 `docs/production-recovery-flow.md`，平台私钥存储 backend 边界见 `docs/adr/0004-platform-private-key-storage-backend.md`。
+本文档定义 Go sync server 实现期间必须稳定的 API、存储、错误语义和验证口径。读者是后续实现 `server/sync-server`、`ime-sync` 远端客户端、同步 runbook 和审阅隐私边界的开发者。本文不包含 Docker Compose 配置、Flutter 同步页面、真实 HTTP transport、两客户端端到端同步或生产平台私钥存储 backend；生产恢复流程见 `docs/production-recovery-flow.md`，平台私钥存储 backend 边界见 `docs/adr/0004-platform-private-key-storage-backend.md`。
 
 ## 当前定位
 
@@ -13,7 +13,7 @@
 - 服务端不能解密、不能解析 plaintext payload、不能合并用户词、不能读取 P1 原始事件。
 - 客户端仍是真相源：解密、冲突合并、删除 tombstone 语义、显式恢复和 userdb 写回都在客户端完成。
 
-Go 代码必须继续受本文件约束 migration、handler 和测试命名；平台私钥存储 backend capability / unavailable backend 的 Rust 模型已经落地。进入 Rust 真实远端客户端、server main 或用户可用同步前，仍必须保持签名验证、HTTP API handler、错误语义、审计日志和平台 backend 验证彼此一致。
+Go 代码必须继续受本文件约束 migration、handler 和测试命名；平台私钥存储 backend capability / unavailable backend 的 Rust 模型已经落地。进入 Rust 真实 HTTP transport、两客户端端到端同步、Docker Compose 或用户可用同步前，仍必须保持签名验证、HTTP API handler、错误语义、审计日志和平台 backend 验证彼此一致。
 
 ## 服务端职责
 
@@ -487,7 +487,7 @@ latest_ciphertext_hash
 
 ## 停止线
 
-- Go server migration、API handler 和 storage tests 未覆盖上述隐私字段阻断前，不实现远端客户端上传下载。
+- Go server migration、API handler、storage tests 和 Rust remote DTO 未覆盖上述隐私字段阻断前，不实现真实 HTTP transport 或两客户端端到端同步。
 - 平台私钥存储 backend 能力模型已落地；真实平台 backend 验证未完成前，不提供用户可用同步 UI。
 - device authorization handler 对外开放前必须继续复用 wrapped key bytes 的存储 / 读取语义，且不得返回明文同步域材料。
 - recovery latest handler 已复用 wrapped material bytes 读取语义，并补齐限速与内部 `blob_ref` 不外泄测试；object version handler 已复用 encrypted object blob 读写语义，并补齐冲突、设备状态和脱敏测试；API handler 已补 panic recovery、request id、非持久审计 hook 和 SQLite `audit_events` 写入；runtime 已补配置装配、脱敏 audit logger、本机 smoke runbook 和 HTTP smoke。Rust remote client 已补 DTO、transport trait 和错误映射测试；接入真实 HTTP transport 与两客户端端到端同步前仍需单独确认边界。
