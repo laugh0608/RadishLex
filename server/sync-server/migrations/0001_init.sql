@@ -68,6 +68,7 @@ CREATE TABLE device_wrapping_records (
     ciphertext_hash TEXT NOT NULL,
     created_at_ms INTEGER NOT NULL,
     signature BLOB NOT NULL,
+    blob_ref TEXT NOT NULL,
     PRIMARY KEY (domain_id, recipient_device_id, key_epoch, wrapping_key_id)
 );
 

@@ -131,14 +131,16 @@ func (s *MemoryStore) SaveJoinRequest(ctx context.Context, request JoinRequest) 
 	return nil
 }
 
-func (s *MemoryStore) AuthorizeJoinRequest(ctx context.Context, authorization DeviceAuthorization, wrapping DeviceWrappingRecord) error {
+func (s *MemoryStore) AuthorizeJoinRequest(ctx context.Context, upload DeviceAuthorizationUpload) error {
 	if err := checkContext(ctx); err != nil {
 		return err
 	}
+	authorization := upload.Authorization
+	wrapping := upload.Wrapping
 	if err := validateAuthorization(authorization); err != nil {
 		return err
 	}
-	if err := validateWrappingRecord(wrapping); err != nil {
+	if err := validateAuthorizationUpload(upload); err != nil {
 		return err
 	}
 	if wrapping.DomainID != authorization.DomainID ||
@@ -174,10 +176,12 @@ func (s *MemoryStore) AuthorizeJoinRequest(ctx context.Context, authorization De
 		return err
 	}
 
+	wrapping.BlobRef = wrappingBlobRef(wrapping)
 	join.Status = DeviceActive
 	s.joinRequests[joinKey(authorization.DomainID, authorization.JoinRequestID)] = join
 	s.authorizations[joinKey(authorization.DomainID, authorization.JoinRequestID)] = cloneAuthorization(authorization)
 	s.wrapping[wrappingRecordKey(wrapping)] = cloneWrappingRecord(wrapping)
+	s.blobs[wrapping.BlobRef] = cloneBytes(upload.WrappedKey)
 	s.devices[deviceKey(join.DomainID, join.DeviceID)] = Device{
 		DomainID:                join.DomainID,
 		DeviceID:                join.DeviceID,
@@ -189,6 +193,31 @@ func (s *MemoryStore) AuthorizeJoinRequest(ctx context.Context, authorization De
 		AuthorizedAtMs:          authorization.CreatedAtMs,
 	}
 	return nil
+}
+
+func (s *MemoryStore) DeviceWrappedKey(ctx context.Context, domainID string, recipientDeviceID string, keyEpoch uint64, wrappingKeyID string) (DeviceWrappingRecord, []byte, error) {
+	if err := checkContext(ctx); err != nil {
+		return DeviceWrappingRecord{}, nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	record, ok := s.wrapping[wrappingKey{
+		domainID:          domainID,
+		recipientDeviceID: recipientDeviceID,
+		keyEpoch:          keyEpoch,
+		wrappingKeyID:     wrappingKeyID,
+	}]
+	if !ok {
+		return DeviceWrappingRecord{}, nil, newError(ErrNotFound, "device wrapping record not found")
+	}
+	wrappedKey, ok := s.blobs[record.BlobRef]
+	if !ok {
+		return DeviceWrappingRecord{}, nil, newError(ErrStorageUnavailable, "device wrapped key is missing")
+	}
+	if int64(len(wrappedKey)) != record.WrappedKeyLen || CiphertextHash(wrappedKey) != record.CiphertextHash {
+		return DeviceWrappingRecord{}, nil, newError(ErrStorageUnavailable, "device wrapped key metadata mismatch")
+	}
+	return cloneWrappingRecord(record), cloneBytes(wrappedKey), nil
 }
 
 func (s *MemoryStore) RevokeDevice(ctx context.Context, revocation DeviceRevocation) error {
@@ -508,6 +537,20 @@ func validateWrappingRecord(record DeviceWrappingRecord) error {
 	return nil
 }
 
+func validateAuthorizationUpload(upload DeviceAuthorizationUpload) error {
+	if err := validateWrappingRecord(upload.Wrapping); err != nil {
+		return err
+	}
+	if len(upload.WrappedKey) == 0 {
+		return newError(ErrInvalidCiphertextMetadata, "device wrapped key is required")
+	}
+	if int64(len(upload.WrappedKey)) != upload.Wrapping.WrappedKeyLen ||
+		CiphertextHash(upload.WrappedKey) != upload.Wrapping.CiphertextHash {
+		return newError(ErrInvalidCiphertextMetadata, "device wrapped key metadata mismatch")
+	}
+	return nil
+}
+
 func validateRevocation(revocation DeviceRevocation) error {
 	if !validOpaqueID(revocation.DomainID) || !validOpaqueID(revocation.RevokedDeviceID) || !validOpaqueID(revocation.RevokerDeviceID) {
 		return newError(ErrInvalidRequest, "revocation ids must be opaque ids")
@@ -712,6 +755,17 @@ func recoveryBlobRef(record RecoveryRecord) string {
 		"recovery/%s/%s/%s",
 		blobPathComponent(record.DomainID),
 		blobPathComponent(record.RecoveryRecordID),
+		blobPathComponent(record.CiphertextHash),
+	)
+}
+
+func wrappingBlobRef(record DeviceWrappingRecord) string {
+	return fmt.Sprintf(
+		"wrapping/%s/%s/%d/%s/%s",
+		blobPathComponent(record.DomainID),
+		blobPathComponent(record.RecipientDeviceID),
+		record.KeyEpoch,
+		blobPathComponent(record.WrappingKeyID),
 		blobPathComponent(record.CiphertextHash),
 	)
 }

@@ -111,7 +111,7 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 		}
 	})
 
-	t.Run("join authorization activates device and stores wrapping metadata", func(t *testing.T) {
+	t.Run("join authorization activates device and stores wrapped key bytes", func(t *testing.T) {
 		ctx := context.Background()
 		store := newReadyStore(t, newStore)
 		saveJoinAndAuthorize(t, store, "domain-a", "join-b", "device-b", 20)
@@ -122,6 +122,16 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 		}
 		if device.Status != DeviceActive || device.AuthorizedAtMs != 20 {
 			t.Fatalf("device should be active after authorization: %#v", device)
+		}
+		wrapping, wrappedKey, err := store.DeviceWrappedKey(ctx, "domain-a", "device-b", 1, "wrapping-key-device-b")
+		if err != nil {
+			t.Fatalf("read wrapped key: %v", err)
+		}
+		if wrapping.BlobRef == "" {
+			t.Fatal("wrapping record should receive blob ref")
+		}
+		if string(wrappedKey) != string(wrappedKeyForTest()) {
+			t.Fatalf("wrapped key mismatch: got %x want %x", wrappedKey, wrappedKeyForTest())
 		}
 	})
 
@@ -180,13 +190,13 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 	t.Run("rejects signed authorization tampering", func(t *testing.T) {
 		ctx := context.Background()
 		store := newReadyStore(t, newStore)
-		request, authorization, wrapping := joinAuthorizationFixture("domain-a", "join-b", "device-b", 20)
+		request, upload := joinAuthorizationFixture("domain-a", "join-b", "device-b", 20)
 		if err := store.SaveJoinRequest(ctx, request); err != nil {
 			t.Fatalf("save join request: %v", err)
 		}
-		authorization.JoinShortCode = "654321"
+		upload.Authorization.JoinShortCode = "654321"
 
-		if err := store.AuthorizeJoinRequest(ctx, authorization, wrapping); !IsCode(err, ErrInvalidSignature) {
+		if err := store.AuthorizeJoinRequest(ctx, upload); !IsCode(err, ErrInvalidSignature) {
 			t.Fatalf("tampered authorization should fail signature verification, got %v", err)
 		}
 	})
@@ -275,16 +285,16 @@ func newReadyStore(t *testing.T, newStore storeFactory) Store {
 func saveJoinAndAuthorize(t *testing.T, store Store, domainID string, joinID string, deviceID string, atMs int64) {
 	t.Helper()
 	ctx := context.Background()
-	request, authorization, wrapping := joinAuthorizationFixture(domainID, joinID, deviceID, atMs)
+	request, upload := joinAuthorizationFixture(domainID, joinID, deviceID, atMs)
 	if err := store.SaveJoinRequest(ctx, request); err != nil {
 		t.Fatalf("save join request: %v", err)
 	}
-	if err := store.AuthorizeJoinRequest(ctx, authorization, wrapping); err != nil {
+	if err := store.AuthorizeJoinRequest(ctx, upload); err != nil {
 		t.Fatalf("authorize join request: %v", err)
 	}
 }
 
-func joinAuthorizationFixture(domainID string, joinID string, deviceID string, atMs int64) (JoinRequest, DeviceAuthorization, DeviceWrappingRecord) {
+func joinAuthorizationFixture(domainID string, joinID string, deviceID string, atMs int64) (JoinRequest, DeviceAuthorizationUpload) {
 	request := JoinRequest{
 		DomainID:                domainID,
 		JoinRequestID:           joinID,
@@ -298,7 +308,7 @@ func joinAuthorizationFixture(domainID string, joinID string, deviceID string, a
 		ExpiresAtMs:             atMs + 100,
 		Status:                  DevicePending,
 	}
-	wrapped := []byte{0x21, 0x22}
+	wrapped := wrappedKeyForTest()
 	authorization := DeviceAuthorization{
 		DomainID:                    domainID,
 		JoinRequestID:               joinID,
@@ -324,7 +334,15 @@ func joinAuthorizationFixture(domainID string, joinID string, deviceID string, a
 		Signature:          []byte{0x24},
 	}
 	signAuthorizationForTest(&authorization, wrapping, request)
-	return request, authorization, wrapping
+	return request, DeviceAuthorizationUpload{
+		Authorization: authorization,
+		Wrapping:      wrapping,
+		WrappedKey:    wrapped,
+	}
+}
+
+func wrappedKeyForTest() []byte {
+	return []byte{0x21, 0x22}
 }
 
 func objectUpload(domainID string, objectID string, deviceID string, version uint64, baseVersion uint64, keyEpoch uint64, payload []byte) ObjectVersionUpload {

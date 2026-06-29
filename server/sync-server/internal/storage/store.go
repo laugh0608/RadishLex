@@ -7,7 +7,8 @@ type Store interface {
 	Domain(ctx context.Context, domainID string) (Domain, error)
 	Device(ctx context.Context, domainID string, deviceID string) (Device, error)
 	SaveJoinRequest(ctx context.Context, request JoinRequest) error
-	AuthorizeJoinRequest(ctx context.Context, authorization DeviceAuthorization, wrapping DeviceWrappingRecord) error
+	AuthorizeJoinRequest(ctx context.Context, upload DeviceAuthorizationUpload) error
+	DeviceWrappedKey(ctx context.Context, domainID string, recipientDeviceID string, keyEpoch uint64, wrappingKeyID string) (DeviceWrappingRecord, []byte, error)
 	RevokeDevice(ctx context.Context, revocation DeviceRevocation) error
 	PutRecoveryRecord(ctx context.Context, upload RecoveryRecordUpload) (RecoveryRecord, error)
 	LatestRecoveryRecord(ctx context.Context, domainID string) (RecoveryRecord, error)

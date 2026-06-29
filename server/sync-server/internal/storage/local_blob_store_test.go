@@ -156,6 +156,20 @@ func TestGeneratedBlobRefsUseSafePathComponents(t *testing.T) {
 	if _, err := validateBlobRef(recoveryRef); err != nil {
 		t.Fatalf("recovery blob ref should be valid for local object storage: %v", err)
 	}
+
+	wrappingRef := wrappingBlobRef(DeviceWrappingRecord{
+		DomainID:          "domain:a",
+		RecipientDeviceID: "device:a",
+		KeyEpoch:          2,
+		WrappingKeyID:     "wrapping:key",
+		CiphertextHash:    "sha256:deadbeef",
+	})
+	if strings.Contains(wrappingRef, ":") {
+		t.Fatalf("wrapping blob ref should not contain raw hash or id separators: %q", wrappingRef)
+	}
+	if _, err := validateBlobRef(wrappingRef); err != nil {
+		t.Fatalf("wrapping blob ref should be valid for local object storage: %v", err)
+	}
 }
 
 func newLocalObjectBlobStoreForTest(t *testing.T, root string) *LocalObjectBlobStore {

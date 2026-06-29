@@ -74,6 +74,13 @@ type DeviceWrappingRecord struct {
 	CiphertextHash     string
 	CreatedAtMs        int64
 	Signature          []byte
+	BlobRef            string
+}
+
+type DeviceAuthorizationUpload struct {
+	Authorization DeviceAuthorization
+	Wrapping      DeviceWrappingRecord
+	WrappedKey    []byte
 }
 
 type DeviceAuthorization struct {

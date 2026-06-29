@@ -54,6 +54,25 @@ func TestSQLiteStoreObjectPayloadDetectsMissingBlob(t *testing.T) {
 	}
 }
 
+func TestSQLiteStoreDeviceWrappedKeyDetectsMissingBlob(t *testing.T) {
+	store := newSQLiteStoreForTest(t)
+	_ = newReadyStore(t, func(t *testing.T) Store {
+		t.Helper()
+		return store
+	})
+	saveJoinAndAuthorize(t, store, "domain-a", "join-b", "device-b", 20)
+	metadata, _, err := store.DeviceWrappedKey(context.Background(), "domain-a", "device-b", 1, "wrapping-key-device-b")
+	if err != nil {
+		t.Fatalf("read wrapped key: %v", err)
+	}
+	if err := store.blobs.DeleteObjectBlob(context.Background(), metadata.BlobRef); err != nil {
+		t.Fatalf("delete wrapped key blob: %v", err)
+	}
+	if _, _, err := store.DeviceWrappedKey(context.Background(), "domain-a", "device-b", 1, "wrapping-key-device-b"); !IsCode(err, ErrStorageUnavailable) {
+		t.Fatalf("missing wrapped key blob should be reported by blob store, got %v", err)
+	}
+}
+
 func newSQLiteStoreForTest(t *testing.T) *SQLiteStore {
 	t.Helper()
 	root := t.TempDir()

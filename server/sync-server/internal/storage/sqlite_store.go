@@ -140,14 +140,16 @@ func (s *SQLiteStore) SaveJoinRequest(ctx context.Context, request JoinRequest) 
 	return nil
 }
 
-func (s *SQLiteStore) AuthorizeJoinRequest(ctx context.Context, authorization DeviceAuthorization, wrapping DeviceWrappingRecord) error {
+func (s *SQLiteStore) AuthorizeJoinRequest(ctx context.Context, upload DeviceAuthorizationUpload) error {
 	if err := checkContext(ctx); err != nil {
 		return err
 	}
+	authorization := upload.Authorization
+	wrapping := upload.Wrapping
 	if err := validateAuthorization(authorization); err != nil {
 		return err
 	}
-	if err := validateWrappingRecord(wrapping); err != nil {
+	if err := validateAuthorizationUpload(upload); err != nil {
 		return err
 	}
 	if wrapping.DomainID != authorization.DomainID ||
@@ -185,6 +187,12 @@ func (s *SQLiteStore) AuthorizeJoinRequest(ctx context.Context, authorization De
 	if err := verifyAuthorizationSignature(authorization, wrapping, join, authorizer); err != nil {
 		return err
 	}
+	wrapping.BlobRef = wrappingBlobRef(wrapping)
+	staged, err := s.blobs.StageObjectBlob(ctx, wrapping.BlobRef, upload.WrappedKey)
+	if err != nil {
+		return err
+	}
+	defer cleanupStagedBlob(ctx, staged)
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE device_join_requests
 		SET status = ?
@@ -211,12 +219,12 @@ func (s *SQLiteStore) AuthorizeJoinRequest(ctx context.Context, authorization De
 		INSERT INTO device_wrapping_records (
 			domain_id, recipient_device_id, authorizer_device_id, key_epoch,
 			wrapping_key_id, algorithm, nonce, wrapped_key_len,
-			ciphertext_hash, created_at_ms, signature
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ciphertext_hash, created_at_ms, signature, blob_ref
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		wrapping.DomainID, wrapping.RecipientDeviceID, wrapping.AuthorizerDeviceID, int64(wrapping.KeyEpoch),
 		wrapping.WrappingKeyID, wrapping.Algorithm, cloneBytes(wrapping.Nonce), wrapping.WrappedKeyLen,
-		wrapping.CiphertextHash, wrapping.CreatedAtMs, cloneBytes(wrapping.Signature),
+		wrapping.CiphertextHash, wrapping.CreatedAtMs, cloneBytes(wrapping.Signature), wrapping.BlobRef,
 	); err != nil {
 		return newError(ErrStorageUnavailable, "wrapping metadata cannot be stored")
 	}
@@ -227,10 +235,35 @@ func (s *SQLiteStore) AuthorizeJoinRequest(ctx context.Context, authorization De
 	`, string(DeviceActive), authorization.CreatedAtMs, join.DomainID, join.DeviceID); err != nil {
 		return newError(ErrStorageUnavailable, "device metadata cannot be updated")
 	}
+	if err := staged.Commit(ctx); err != nil {
+		return err
+	}
 	if err := tx.Commit(); err != nil {
+		_ = s.blobs.DeleteObjectBlob(context.Background(), wrapping.BlobRef)
 		return newError(ErrStorageUnavailable, "sqlite transaction cannot commit")
 	}
 	return nil
+}
+
+func (s *SQLiteStore) DeviceWrappedKey(ctx context.Context, domainID string, recipientDeviceID string, keyEpoch uint64, wrappingKeyID string) (DeviceWrappingRecord, []byte, error) {
+	if err := checkContext(ctx); err != nil {
+		return DeviceWrappingRecord{}, nil, err
+	}
+	record, err := wrappingRecordQuerier(ctx, s.db, domainID, recipientDeviceID, keyEpoch, wrappingKeyID)
+	if err != nil {
+		return DeviceWrappingRecord{}, nil, err
+	}
+	wrappedKey, err := s.blobs.ReadObjectBlob(ctx, record.BlobRef)
+	if err != nil {
+		if IsCode(err, ErrNotFound) {
+			return DeviceWrappingRecord{}, nil, newError(ErrStorageUnavailable, "device wrapped key is missing")
+		}
+		return DeviceWrappingRecord{}, nil, err
+	}
+	if int64(len(wrappedKey)) != record.WrappedKeyLen || CiphertextHash(wrappedKey) != record.CiphertextHash {
+		return DeviceWrappingRecord{}, nil, newError(ErrStorageUnavailable, "device wrapped key metadata mismatch")
+	}
+	return cloneWrappingRecord(record), cloneBytes(wrappedKey), nil
 }
 
 func (s *SQLiteStore) RevokeDevice(ctx context.Context, revocation DeviceRevocation) error {
@@ -639,6 +672,30 @@ func joinRequestTx(ctx context.Context, tx *sql.Tx, domainID string, joinRequest
 	}
 	request.Status = DeviceStatus(status)
 	return cloneJoinRequest(request), nil
+}
+
+func wrappingRecordQuerier(ctx context.Context, querier sqlQuerier, domainID string, recipientDeviceID string, keyEpoch uint64, wrappingKeyID string) (DeviceWrappingRecord, error) {
+	row := querier.QueryRowContext(ctx, `
+		SELECT domain_id, recipient_device_id, authorizer_device_id, key_epoch,
+			wrapping_key_id, algorithm, nonce, wrapped_key_len,
+			ciphertext_hash, created_at_ms, signature, blob_ref
+		FROM device_wrapping_records
+		WHERE domain_id = ? AND recipient_device_id = ? AND key_epoch = ? AND wrapping_key_id = ?
+	`, domainID, recipientDeviceID, int64(keyEpoch), wrappingKeyID)
+	var record DeviceWrappingRecord
+	var keyEpochValue int64
+	if err := row.Scan(
+		&record.DomainID, &record.RecipientDeviceID, &record.AuthorizerDeviceID, &keyEpochValue,
+		&record.WrappingKeyID, &record.Algorithm, &record.Nonce, &record.WrappedKeyLen,
+		&record.CiphertextHash, &record.CreatedAtMs, &record.Signature, &record.BlobRef,
+	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return DeviceWrappingRecord{}, newError(ErrNotFound, "device wrapping record not found")
+		}
+		return DeviceWrappingRecord{}, newError(ErrStorageUnavailable, "device wrapping metadata cannot be read")
+	}
+	record.KeyEpoch = uint64(keyEpochValue)
+	return cloneWrappingRecord(record), nil
 }
 
 func scanRecoveryRecord(row sqlRow) (RecoveryRecord, error) {
