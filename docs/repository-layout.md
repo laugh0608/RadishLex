@@ -87,7 +87,7 @@ RadishLex/
 - `crates/ime-ffi/`：C ABI 起步 crate，覆盖 ABI contract、opaque handle、session owner-thread policy、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、sync preflight 状态摘要、userdb 管理入口、dictionary 文件管理入口和 host smoke。
 - `crates/ime-sync/`：同步 payload 来源分类、对象类型、P2 envelope 组装、加密对象外壳草案、设备生命周期、对象版本冲突、客户端合并模型、signed device authorization 和 signed device revocation。
 - `crates/ime-crypto/`：客户端加密本地模型 crate，当前覆盖 key role、object envelope、AAD、nonce、ciphertext hash、device wrapping、recovery material、Argon2id recovery KDF、Ed25519 signing、test-memory signing key store、platform backend capability / unavailable 模型、signed object manifest 和 signed recovery record。
-- `server/sync-server/`：Go sync server 起步 module，当前覆盖配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、device wrapping encrypted key bytes 承载、recovery wrapped material 读取接口、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、`cmd/radishlex-sync-server`、runtime 配置装配、HTTP timeout、对象大小门禁和脱敏 audit logger；不包含 Docker Compose 或 Rust 真实远端客户端。
+- `server/sync-server/`：Go sync server 起步 module，当前覆盖配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、device wrapping encrypted key bytes 承载、recovery wrapped material 读取接口、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、`cmd/radishlex-sync-server`、runtime 配置装配、HTTP timeout、对象大小门禁、脱敏 audit logger、本机 smoke runbook 和短生命周期 HTTP smoke；不包含 Docker Compose 或 Rust 真实远端客户端。
 - `docs/cli.md`：`radishlex-ime-cli` 命令、输出、退出码和安全边界说明。
 - `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
 - `docs/engine-rime-adapter.md`：`ime-engine-rime` 的 adapter 边界、构建策略和验证分层。
@@ -103,6 +103,7 @@ RadishLex/
 - `docs/ffi-boundary.md`：后续 C ABI、所有权、生命周期和错误语义边界。
 - `docs/runbooks/ffi-platform-call-contract.md`：平台绑定层调用 C ABI 的错误、字符串、handle 释放和 owner-thread 调度规则。
 - `docs/runbooks/rime-native-smoke.md`：真实 `librime` 本机 smoke 操作步骤。
+- `docs/runbooks/sync-server-local-smoke.md`：Go sync server 本机启动边界、自动化 smoke 和日志脱敏检查。
 
 ## Rust crates 建议
 
@@ -223,7 +224,7 @@ server/sync-server/
 - Docker Compose。
 - 本地文件对象存储。
 
-当前已起步 `server/sync-server/`，但只实现 metadata / storage / API / runtime 验证模型、SQLite-backed metadata repository、local object storage staged transaction、对象 payload hash / length 复验、Ed25519 签名验签门禁、device wrapping encrypted key bytes 承载、recovery wrapped material 读取、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、启动入口、runtime 配置装配和脱敏日志。真实远端客户端、Docker Compose、Flutter manager 和平台壳继续后置。
+当前已起步 `server/sync-server/`，但只实现 metadata / storage / API / runtime 验证模型、SQLite-backed metadata repository、local object storage staged transaction、对象 payload hash / length 复验、Ed25519 签名验签门禁、device wrapping encrypted key bytes 承载、recovery wrapped material 读取、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、启动入口、runtime 配置装配、脱敏日志、本机 runbook 和短生命周期 HTTP smoke。真实远端客户端、Docker Compose、Flutter manager 和平台壳继续后置。
 
 后续支持：
 
