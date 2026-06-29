@@ -11,9 +11,9 @@
 - `docs/adr/0003-device-signing-key-storage.md` 固定设备签名对象、canonical bytes、私钥存储抽象和错误语义。
 - `ime-crypto` / `ime-sync` 已覆盖 signed recovery record、signed device authorization、signed device revocation 和客户端合并写回 userdb。
 - `docs/sync-server-api-storage.md` 已固定 Go server 只保存恢复记录 metadata、包装密文、签名和必要同步元数据。
-- Go server storage skeleton 已能校验 recovery wrapped material 的长度 / ciphertext hash，并把 wrapped material 写入 local object storage，metadata 中保存 `signer_device_id`、signature 和 `blob_ref`；当前还没有给 recovery handler 使用的 wrapped material 读取接口和限速实现。
+- Go server storage / API 已能校验 recovery wrapped material 的长度 / ciphertext hash，把 wrapped material 写入 local object storage，metadata 中保存 `signer_device_id`、signature 和 `blob_ref`，并通过 recovery latest handler 返回 latest active metadata 与 encrypted wrapped material；读取路径已覆盖限速和日志脱敏测试。
 
-本阶段只固定生产恢复流程，不实现真实 UI、Go server handler、平台 Keychain / Keystore backend 或远端上传下载。
+本阶段只固定生产恢复流程，不实现真实 UI、平台 Keychain / Keystore backend、真实 HTTP transport 或两客户端端到端同步。
 
 ## 设计目标
 
@@ -249,7 +249,8 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 当前 Go storage 边界：
 
 - `PutRecoveryRecord` 接收 recovery metadata 和 wrapped material bytes，写入前校验长度与 ciphertext hash，并要求 signer device 是 `active`。
-- `LatestRecoveryRecord` 当前只返回 latest active recovery metadata；真实恢复 handler 还需要补 wrapped material bytes 读取接口、读取限速和日志脱敏测试。
+- `LatestRecoveryWrappedMaterial` 返回 latest active recovery metadata 和 encrypted wrapped material bytes，读取前复验 blob 长度和 ciphertext hash。
+- `GET /api/v1/domains/{domain_id}/recovery-records/latest` 使用读取限速，响应不暴露内部 `blob_ref`，日志不包含 wrapped material bytes。
 - 恢复记录 blob 缺失、长度不一致或 hash 不一致时，应返回 `storage_unavailable`，不能把损坏密文当作可恢复状态。
 - 服务端错误响应不得区分“恢复码接近正确”或泄漏 KDF 输出、AAD、wrapped material bytes。
 
@@ -278,9 +279,9 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 2. 本文档固定生产恢复流程、记录状态、轮换、撤销、恢复加入和失败处理。
 3. 已补平台私钥存储 backend ADR 与 Rust capability / unavailable backend 模型，明确生产设备签名 key 不应穿过 FFI、CLI 或 Go server。
 4. 已在 Go server storage 验证模型中覆盖 recovery record metadata、`blob_ref` 分配、wrapped material staged blob 写入与 hash / length 校验，不接触恢复码明文。
-5. 后续 Go server recovery API 需要先补 wrapped material 读取接口，再补签名、状态、限速和日志脱敏验证。
+5. 已补 Go server recovery latest handler，覆盖 wrapped material 读取、状态、限速和日志脱敏验证。
 6. 后续真实平台 backend 通过验证后，管理 UI 再接入用户可见恢复流程。
-7. 最后再接 Rust 远端同步客户端和真实上传下载。
+7. 最后再接 Rust 真实 HTTP transport、两客户端端到端同步和真实上传下载。
 
 ## 验证口径
 
@@ -300,6 +301,6 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 ## 停止线
 
 - 平台私钥存储 backend 平台 runbook 和真实 backend 未完成前，不提供用户可用恢复 UI。
-- Go server 恢复记录 API 未覆盖 wrapped material 读取、签名、状态、限速和日志脱敏前，不接真实恢复客户端。
+- Go server 恢复记录 API 若未持续覆盖 wrapped material 读取、签名、状态、限速和日志脱敏，不接真实恢复客户端。
 - 恢复码、同步主密钥或设备私钥可能进入服务端日志、错误响应、崩溃报告或截图时，必须停止并修正设计。
 - 恢复流程不能绕过设备撤销、key epoch 或客户端合并语义。

@@ -180,6 +180,66 @@ updated_at_ms
 - 输出 `AssembledSyncObject`，包含密文 envelope、`EncryptedSyncObjectDraft` 和本地 `record_count`。
 - `PlaintextSyncPayload` 的 Debug 输出必须隐藏 bytes；该入口不导出 CLI / FFI 明文 payload，不写文件，不连接 Go server。
 
+## 远端对象客户端边界
+
+`ime-sync` 的 remote client 只负责把本地已经组装完成的加密对象映射到 Go sync server API。它不是明文 payload 生成器，不负责真实网络栈选择，也不直接启动或管理 Go server。
+
+核心类型：
+
+```text
+SyncRemoteClient<T: SyncRemoteTransport>
+SyncRemoteTransport
+SyncRemoteRequest
+SyncRemoteResponse
+RemoteObjectVersion
+RemoteObjectPayload
+SyncRemoteError
+SyncServerErrorCode
+LatestObjectConflictMetadata
+```
+
+上传入口：
+
+```text
+upload_object_version(domain_id, AssembledSyncObject, SignedSyncObjectManifest)
+```
+
+规则：
+
+- `AssembledSyncObject` 必须来自 `SyncEnvelopeAssembler` 或等价的加密 envelope 组装路径。
+- `SignedSyncObjectManifest` 必须覆盖同一 `domain_id`、`object_id`、`object_type`、`version`、`base_version`、`key_id`、`key_epoch`、algorithm、nonce、payload length、ciphertext hash 和客户端时间戳。
+- manifest signer 必须等于 encrypted object 的 `owner_device_id`。
+- 上传请求只包含服务端可见 metadata、signature bytes 和 encrypted payload bytes，不包含 plaintext user term、input code、reading、P1 event、ranker 明细或本地 merge 记录。
+- `nonce`、`signature` 和 `payload` 在 JSON 请求中使用 Go `encoding/json` 兼容的 base64 字符串；不要改成整数数组。
+- `base_version = None` 在 HTTP JSON 中映射为 `0`，表示新对象；metadata 响应中的 `base_version = 0` 映射回 `None`。
+
+读取入口：
+
+```text
+object_version(domain_id, object_id, version)
+object_payload(domain_id, object_id, version)
+```
+
+规则：
+
+- metadata 读取返回 `RemoteObjectVersion`，不携带 payload bytes。
+- payload 读取先拉取 metadata，再拉取 `/payload` 二进制响应；客户端必须校验响应长度等于 metadata 的 `encrypted_payload_len`。
+- 后续真实 HTTP transport 仍应在解密前复验 ciphertext hash；当前 remote client 边界已阻断长度不一致的响应。
+
+错误映射：
+
+- Go server 的 `error_code` 映射为 `SyncServerErrorCode`，未知错误码保留为 `Unknown`。
+- `conflict_stale_base_version` 必须携带 `LatestObjectConflictMetadata`；该结构只包含 latest version 和 latest ciphertext hash，不包含 payload。
+- transport 层错误使用 `SyncRemoteError::Transport`，JSON 或 payload 响应结构错误使用 `SyncRemoteError::InvalidResponse`。
+- 请求构造错误使用 `SyncRemoteError::InvalidRequest`，包括 path segment 不合法、版本为 0、manifest 与 encrypted object metadata 不一致等。
+
+脱敏规则：
+
+- `SyncRemoteRequest` 的 `Debug` 不打印 body。
+- `RemoteObjectVersion` 的 `Debug` 不打印 nonce 或 signature bytes。
+- `RemoteObjectPayload` 的 `Debug` 不打印 payload bytes。
+- `SyncRemoteError` 只能包含错误分类、HTTP status、服务端 error code、非敏感 message、retryable、server time 和 latest metadata；不得保存请求体或响应 payload。
+
 ## 冲突与删除方向
 
 客户端合并策略必须按对象类型区分。当前 Rust 侧已在 `ime-sync` 中落地 `ClientSyncMergeInput` / `ClientSyncMergeResult` 纯模型，用于表达客户端解密 P2 payload 后的合并决策；`ime-userdb` 已补 `UserDbDecryptedSyncObject` 和 `decode_userdb_sync_objects()`，把已解密 P2 JSON 解析为带 `key_epoch` 的 user terms、deleted terms、ranker weights 记录，再转换为 `ClientSyncMergeInput`。`UserDb::apply_decoded_sync_payload_batch()` 会在本地 SQLite transaction 内执行合并结果写回：先用本机已有 tombstone 过滤普通同步词条和旧权重，再写入被接受的删除 tombstone、被接受的用户词条和被接受的 ranker weight；只有更新时间晚于本机 tombstone 的 `manual_add` 显式恢复可以清理本机删除意图。该入口不连接后端，不生成上传补丁，不暴露 CLI / FFI 明文同步入口。
@@ -207,6 +267,7 @@ updated_at_ms
 - `UserDbDecryptedSyncObject`、`UserDbDecodedSyncPayloadBatch` 和 `decode_userdb_sync_objects()`：解析已解密的 userdb P2 JSON，严格校验 schema、object type、字段集合和值域，把 `manual_add` 映射为显式恢复意图，并接入 `ClientSyncMergeInput`；解析依赖 `serde_json = 1.0.150`，许可为 MIT OR Apache-2.0。
 - `UserDb::apply_decoded_sync_payload_batch()` 和 `UserDbSyncApplySummary`：把已解密 P2 payload batch 经过 `ClientSyncMergeInput` 合并后写回真实 userdb，覆盖 user terms、deleted tombstones、ranker weights、payload tombstone 阻断、本机 tombstone 阻断、显式恢复清理和旧权重阻断；summary 只暴露计数，不暴露明文 term identity。
 - userdb P2 payload 本地加密装配测试：通过 `SyncEnvelopeAssembler` 用合成 sync master key / device id 把 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` payload 加密为 `ime-crypto::EncryptedObjectEnvelope`，验证可解密回原 bytes、nonce 不重复，并派生 `ime-sync::EncryptedSyncObjectDraft` 元数据。
+- `SyncRemoteClient`、`SyncRemoteTransport`、`RemoteObjectVersion`、`RemoteObjectPayload` 和 `SyncRemoteError`：固定 Rust remote client 与 Go object version API 的 DTO / transport trait 边界，覆盖 JSON base64 byte 字段、metadata 读取、binary payload 下载、stale conflict latest metadata、server error code 映射和 Debug 脱敏。
 
 未落地：
 
@@ -236,6 +297,8 @@ cargo test -p radishlex-ime-cli
 - userdb P2 plaintext payload 必须固定字段顺序、稳定 JSON escaping，不包含 P1 原始选择事件、负反馈 reason、上下文统计或本地 import batch 审计字段；`ranker.weights` 只能包含 P1 明细压缩后的 P2 权重摘要。
 - `SyncEnvelopeAssembler` 必须验证 record count、object id、device id、object key role、version / base version、object key 派生、nonce 复用阻断和 Debug 明文阻断。
 - userdb P2 payload 本地加密装配测试必须通过 `SyncEnvelopeAssembler` 验证 envelope 可解密回原 bytes，`EncryptedSyncObjectDraft` 只保留密文长度和 ciphertext hash 等元数据，不携带 plaintext bytes。
+- remote client 上传请求必须只由 `AssembledSyncObject` 和 `SignedSyncObjectManifest` 生成，不能接受 plaintext payload、P1 event 或 ranker 明细字段；JSON byte 字段必须保持 Go 兼容 base64。
+- remote client 必须拒绝 manifest 与 encrypted object metadata 不一致的上传请求，必须把 stale base version 映射为 latest metadata，且错误 / Debug 输出不得泄漏请求体、signature、nonce 或 payload bytes。
 - 设备生命周期模型必须验证 pending / active / revoked 状态转移，授权设备和接收设备都必须 active，撤销记录必须推进 `key_epoch`，对象版本必须能识别 stale base version。
 - 客户端合并模型必须验证 `dictionary.deleted_terms` tombstone 能压过旧 `dictionary.user_terms` 和旧 `ranker.weights`，旧 epoch 上传不能靠更晚本机时间复活删除词，显式恢复必须晚于 tombstone，且恢复前的旧权重不随词条恢复一起复活。
 - userdb P2 payload 解码必须拒绝 schema / object type 不匹配、未知字段、非法字段类型、`dictionary.user_terms` 中的 deleted 状态、0 key epoch 和负数 / 非有限权重摘要，并能把真实 payload bytes 转成 `ClientSyncMergeInput`。

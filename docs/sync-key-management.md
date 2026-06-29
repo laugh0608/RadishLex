@@ -19,16 +19,17 @@
 - `docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend、capability metadata、FFI 边界、错误语义、迁移和停止线。
 - `ime-crypto` 已补 Ed25519 设备签名、`test-memory-v1` signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断签名 / 导出、signed sync object manifest 和 signed recovery record；`ime-sync` 已补 signed device authorization 与 signed device revocation。
 - `ime-userdb` 已补已解密 P2 JSON 到 merge input 的解析入口，并能把合并模型接受的 user terms、deleted tombstones 和 ranker weights 写回真实 SQLite。
-- Go server storage skeleton 已保存 join request 公钥、authorization metadata、wrapping metadata、revocation metadata、recovery metadata、object metadata 和密文 blob；其中 device wrapping 目前只保存 `wrapped_key_len` / `ciphertext_hash` / signature 等 metadata，还没有 wrapped key bytes 的读取承载，进入真实 join authorization handler 前必须补齐。
+- Go server storage / API / runtime 验证模型已保存 join request 公钥、authorization metadata、wrapping metadata、revocation metadata、recovery metadata、object metadata、非敏感 audit events 和密文 blob；device wrapping encrypted key bytes、recovery wrapped material 和 encrypted object payload 都已通过 hash / length 复验与读取边界测试。
+- `ime-sync` 已补 remote object client DTO / transport trait，上传入口只接收 `AssembledSyncObject` 和 `SignedSyncObjectManifest`，不接受 plaintext payload。
 
 当前仍不做：
 
-- Rust 客户端不连接 Go server，不实现远端 HTTP API；API 与 storage 边界已由 `docs/sync-server-api-storage.md` 固定，Go server 当前只做 metadata / storage / API 内部验证模型。
+- Rust 客户端不内置真实 HTTP transport，不做两客户端端到端同步；API 与 storage 边界已由 `docs/sync-server-api-storage.md` 固定，Go server 当前只做 metadata / storage / API / runtime 验证模型。
 - 不新增 CLI / FFI 明文同步 payload 入口。
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步若进入代码，应按 `docs/sync-server-api-storage.md` 验证 Go server 签名、metadata API、版本冲突和错误语义；真实平台 backend 未通过验证前，不应启动真实远端同步主线。
+下一步若进入代码，应按 `docs/sync-server-api-storage.md` 验证 Rust 真实 HTTP transport 与 Go server 的对象上传下载、版本冲突、错误语义和日志脱敏；真实平台 backend 未通过验证前，不应开放用户可用同步主线。
 
 ## 设计目标
 
@@ -126,7 +127,7 @@ Rust 与 Go 的包装记录边界：
 
 - `ime-crypto::DeviceWrappingRecord` 持有 `encrypted_key` bytes，并在 Debug 中脱敏。
 - `ime-sync::DeviceAuthorizationPackage` 与 `SignedDeviceAuthorization` 只签 recipient、authorizer、join challenge / short code、key epoch、wrapping key id 和 `encrypted_key_len`，不复制密文本体。
-- Go server 当前只落地 authorization / wrapping metadata storage，不保存 wrapped key bytes；后续 handler 必须把 wrapped key bytes 作为密文 blob 或等价字段保存，并在读取时复验长度和 ciphertext hash。
+- Go server 当前把 wrapped key bytes 作为密文 blob 保存，并在读取时复验长度和 ciphertext hash；authorization handler 只能提交 signed authorization、wrapping metadata 和 encrypted wrapped key bytes。
 - 服务端永远不能从 wrapping record 推导 `SyncMasterKey`，也不能把 wrapped key bytes 写进日志、错误响应或审计 payload。
 
 ## 新设备加入
@@ -265,8 +266,8 @@ updated_at_ms
 13. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
 14. 已补 Go server API / storage 边界设计。
 15. 已补生产恢复流程设计和平台私钥存储 backend ADR。
-16. 已起步 Go server metadata / storage / API 验证模型，当前覆盖配置默认值、API request / error DTO、SQLite migration 文本、storage interface、storage conformance tests、内存 storage、SQLite-backed metadata repository、local object storage staged transaction、版本冲突、撤销设备阻断和隐私字段检查。
-17. 后续推进 Go server 签名验证抽象时，需要同步补齐 device wrapping encrypted key bytes 承载和 recovery wrapped material 读取接口；这些 storage gap 与签名、metadata API、版本冲突和错误语义验证都必须在真实 handler 前完成。
+16. 已起步 Go server metadata / storage / API / runtime 验证模型，当前覆盖配置默认值、API request / error DTO、SQLite migration、storage interface、storage conformance tests、内存 storage、SQLite-backed metadata repository、local object storage staged transaction、签名验证、wrapped key bytes、recovery wrapped material、object version 上传下载、版本冲突、撤销设备阻断、非敏感 audit events 和隐私字段检查。
+17. 已补 Rust remote object client DTO / transport trait，固定 encrypted object upload request、metadata 读取、binary payload 下载、stale conflict latest metadata、server error code 映射和 Debug 脱敏；真实 HTTP transport 与两客户端端到端同步仍需单独验证。
 
 ## 验证口径
 
@@ -284,12 +285,12 @@ updated_at_ms
 - 已解密 userdb P2 payload 写回必须只应用被合并模型接受的记录，并在事务内覆盖 user terms、deleted tombstones、ranker weights、显式恢复清理和旧权重阻断。
 - 损坏的 envelope、非法 base version、未知设备状态和空 key id 必须返回明确错误。
 - 平台私钥存储 backend unavailable 时，签名、授权、撤销和恢复记录轮换必须明确失败，不能回退到 `test-memory-v1`。
-- Go server 的 device authorization API 未覆盖 wrapped key bytes 密文存储 / 读取前，不能作为真实新设备加入入口。
+- 真实新设备加入入口必须持续覆盖 wrapped key bytes 密文存储 / 读取、hash / length 复验、authorization 签名验证和日志脱敏。
 
 ## 停止线
 
 - 恢复码 KDF 算法、参数、格式、Rust model 和生产恢复流程设计已落地；服务端恢复记录 API 与管理 UI 未实现前，不提供用户可用恢复入口。
 - 设备签名模型、签名对象验证、私钥存储抽象和平台私钥存储 backend capability / unavailable backend Rust 模型已落地；平台 runbook 和真实 backend 未完成前，不做远端对象上传下载。
-- 服务端若只能保存 wrapping metadata 而不能保存 / 返回 wrapped key bytes，则不得开放真实设备授权 handler。
-- Go server 实现继续推进时，必须先满足 `docs/sync-server-api-storage.md` 的签名、metadata API、版本冲突和错误语义验证。
+- 服务端若回退到只保存 wrapping metadata 而不能保存 / 返回 wrapped key bytes，则不得开放真实设备授权 handler。
+- Go server 与 Rust HTTP transport 继续推进时，必须先满足 `docs/sync-server-api-storage.md` 的签名、metadata API、版本冲突、错误语义和脱敏验证。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。

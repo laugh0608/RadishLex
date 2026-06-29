@@ -297,6 +297,40 @@ blob_ref
 
 业务删除不通过 HTTP 删除明文词条表达。用户词删除必须进入 `dictionary.deleted_terms` 加密对象；服务端级删除只用于用户明确清空同步域密文数据或管理员清理整域数据。
 
+### Rust 客户端 DTO 映射
+
+Rust `ime-sync` remote client 与上述对象版本 API 的稳定映射如下：
+
+- `SyncRemoteClient::upload_object_version()` 调用 `POST /api/v1/domains/{domain_id}/objects/{object_id}/versions`。
+- `SyncRemoteClient::object_version()` 调用 `GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}`。
+- `SyncRemoteClient::object_payload()` 先调用 metadata GET，再调用 `GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}/payload`。
+
+上传请求来源：
+
+- Rust 上传入口必须接收 `AssembledSyncObject` 和 `SignedSyncObjectManifest`。
+- `AssembledSyncObject.draft` 提供 object metadata，`AssembledSyncObject.envelope.encrypted_payload` 提供 encrypted bytes。
+- `SignedSyncObjectManifest.signature` 提供 `signature_schema_version`、`signature_algorithm`、`signature_key_id` 和 signature bytes。
+- 客户端在发送前必须验证 manifest 与 encrypted object metadata 完全一致，包括 domain、object、version、base version、key、algorithm、nonce、payload length、ciphertext hash 和时间戳。
+
+JSON byte 字段：
+
+- Go `encoding/json` 会把 `[]byte` 编码为 base64 字符串。
+- Rust DTO 必须把 `nonce`、`signature` 和上传 `payload` 编码为 base64 字符串；响应中的 `nonce` 和 `signature` 也必须按 base64 解码。
+- 不得把这些字段编码为 JSON 数字数组，也不得把 payload 改成 UTF-8 字符串。
+- `/payload` 下载响应不是 JSON，必须按 `application/octet-stream` 二进制密文处理。
+
+版本与冲突：
+
+- Rust `base_version = None` 映射为 HTTP JSON 的 `base_version = 0`；响应中的 `base_version = 0` 映射回 `None`。
+- `409 conflict_stale_base_version` 必须映射为包含 latest version 和 latest ciphertext hash 的客户端错误；该错误不包含 payload bytes。
+- `409 conflict_object_version` 表示同一 object version 已存在但 ciphertext hash 不一致，客户端不得把它当作幂等成功。
+
+客户端脱敏：
+
+- Rust request / response / payload wrapper 的 `Debug` 不打印请求体、nonce、signature 或 payload bytes。
+- 客户端错误对象不得保存原始 request body、response body、payload bytes、wrapped material 或 plaintext payload。
+- 错误 message 只能用于开发诊断，不得拼接用户词、input code、reading、P1 event 或 ranker 明细。
+
 ### 恢复记录
 
 `PUT /api/v1/domains/{domain_id}/recovery-records/{recovery_record_id}`

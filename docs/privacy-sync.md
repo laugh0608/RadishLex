@@ -91,11 +91,11 @@ SyncObject
 
 `ime-userdb` 当前已有 Rust 内部 `UserDb::p2_plaintext_payloads()` 只读迭代器，供本地 integration test 通过 `ime-sync::SyncEnvelopeAssembler` 把 `dictionary.user_terms`、`ranker.weights` 和 `dictionary.deleted_terms` 装入 `ime-crypto` envelope，再派生 `ime-sync::EncryptedSyncObjectDraft`。该迭代器不是 CLI / FFI / 文件导出接口，不得作为明文同步文件或平台壳调用入口。
 
-`crates/ime-sync/` 当前定义 payload 来源分类、同步对象类型、加密对象外壳草案、P2 envelope 组装边界、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型和客户端解密后合并模型。该合并模型已覆盖 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词和显式恢复语义；`ime-userdb` 已能把已解密 P2 JSON 解析为 merge input，并把被接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite。上传下载和生产同步设置仍属于后续阶段；Go server API / storage 边界见 `docs/sync-server-api-storage.md`，当前 Go module 只做 metadata / storage / API 验证、SQLite-backed metadata repository 与 local object storage staged transaction，服务端只能保存密文对象、设备公钥、签名记录、版本和必要同步元数据。
+`crates/ime-sync/` 当前定义 payload 来源分类、同步对象类型、加密对象外壳草案、P2 envelope 组装边界、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型、客户端解密后合并模型和 remote client DTO / transport trait。该合并模型已覆盖 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词和显式恢复语义；`ime-userdb` 已能把已解密 P2 JSON 解析为 merge input，并把被接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite。当前 remote client 只接受已加密 `AssembledSyncObject` 和 `SignedSyncObjectManifest`，不接受 plaintext payload。真实 HTTP transport、两客户端端到端同步和生产同步设置仍属于后续阶段；Go server API / storage 边界见 `docs/sync-server-api-storage.md`，当前 Go module 已覆盖 metadata / storage / API / runtime 验证、SQLite-backed metadata repository、local object storage staged transaction、encrypted object version handler、recovery latest handler、device wrapped key bytes 承载、非敏感 audit events 和短生命周期 HTTP smoke，服务端只能保存密文对象、设备公钥、签名记录、版本和必要同步元数据。
 
 `docs/crypto-boundary.md` 已补 `ime-crypto` 客户端加密边界，并已落地本地 AEAD envelope、ciphertext hash、device wrapping、recovery material 和撤销后 key epoch 解密边界测试。后续服务端可见 hash 必须是 ciphertext hash 或密文加 AAD 的 hash，不得是 plaintext payload hash。
 
-`docs/sync-key-management.md` 已补真实同步前的同步密钥与设备生命周期边界，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突方向；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF、格式和恢复记录边界，`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名和私钥存储边界，`docs/sync-server-api-storage.md` 已固定 Go sync server 的 API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和验证口径，`docs/production-recovery-flow.md` 已固定生产恢复记录创建 / 轮换 / 撤销、新设备恢复加入和失败限速，`docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend 边界；`ime-crypto` 已落地恢复码 KDF Rust 模型、恢复记录解密测试、Ed25519 test-memory signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断、signed sync object manifest 和 signed recovery record；`ime-sync` 已落地 signed device authorization / revocation；Go server 已起步 metadata / storage / API 验证模型、SQLite-backed metadata repository 和 local object storage staged transaction。进入真实上传下载前，应先完成签名验证、device wrapping encrypted key bytes 承载、recovery wrapped material 读取、metadata API、版本冲突、错误语义和平台 backend 验证。
+`docs/sync-key-management.md` 已补真实同步前的同步密钥与设备生命周期边界，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突方向；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF、格式和恢复记录边界，`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名和私钥存储边界，`docs/sync-server-api-storage.md` 已固定 Go sync server 的 API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和验证口径，`docs/production-recovery-flow.md` 已固定生产恢复记录创建 / 轮换 / 撤销、新设备恢复加入和失败限速，`docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend 边界；`ime-crypto` 已落地恢复码 KDF Rust 模型、恢复记录解密测试、Ed25519 test-memory signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断、signed sync object manifest 和 signed recovery record；`ime-sync` 已落地 signed device authorization / revocation 和 remote object client DTO；Go server 已起步 metadata / storage / API / runtime 验证模型、SQLite-backed metadata repository、local object storage staged transaction、签名验证、device wrapping encrypted key bytes 承载、recovery wrapped material 读取、metadata API、object version 上传下载、版本冲突、错误语义和非敏感 audit events。进入真实 HTTP transport 和两客户端端到端同步前，应继续复验平台 backend、日志脱敏、payload hash / length、stale conflict 和客户端解密后合并写回。
 
 ## 设备授权
 
@@ -173,7 +173,27 @@ sqlite
 local object storage
 ```
 
-SQLite 只保存 domain、device、join request、authorization、revocation、recovery record、object metadata、blob ref 和非敏感审计事件；local object storage 只保存 encrypted object payload、recovery wrapped material，以及后续 device authorization wrapped key bytes 这类密文材料。当前 Go storage 尚未暴露 wrapped key bytes 和 recovery wrapped material 读取链路，真实设备授权 / 恢复 handler 前必须补齐并复验 hash / length。业务删除通过 `dictionary.deleted_terms` 加密对象表达，服务端级删除只用于用户明确清空同步域密文数据或管理员清理整域数据。
+SQLite 只保存 domain、device、join request、authorization、revocation、recovery record、object metadata、blob ref 和非敏感审计事件；local object storage 只保存 encrypted object payload、recovery wrapped material，以及 device authorization wrapped key bytes 这类密文材料。Go storage 和 API 已覆盖 wrapped key bytes、recovery wrapped material、encrypted object payload 的 hash / length 复验和读取边界；真实用户可用同步前仍必须复验真实 HTTP transport、平台私钥 backend、两客户端合并写回和日志脱敏。业务删除通过 `dictionary.deleted_terms` 加密对象表达，服务端级删除只用于用户明确清空同步域密文数据或管理员清理整域数据。
+
+## 日志与错误脱敏
+
+服务端 audit event、runtime log、错误响应和 Rust remote client Debug 输出都属于隐私边界的一部分。
+
+允许记录：
+
+- route name / event type。
+- domain id、device id、opaque object id、object type。
+- object version、result code、HTTP status。
+- encrypted byte length、server time、latency。
+
+禁止记录：
+
+- 请求体或响应体。
+- encrypted payload bytes、base64 payload、signature bytes、wrapped material bytes、recovery material bytes。
+- 明文用户词、input code、reading、P1 原始事件、ranker 明细、窗口标题、联系人或恢复码。
+- panic / stack trace 中的请求 JSON。
+
+Rust remote client 的 `SyncRemoteRequest`、`RemoteObjectVersion` 和 `RemoteObjectPayload` Debug 输出必须继续按长度脱敏；`SyncRemoteError` 不得保存 request body、response body 或 payload bytes。
 
 Docker Compose 服务：
 
