@@ -6,35 +6,67 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/laugh0608/RadishLex/server/sync-server/internal/storage"
 )
 
 const deviceIDHeader = "X-RadishLex-Device-ID"
+const requestIDHeader = "X-Request-ID"
 
 type HandlerConfig struct {
 	RecoveryReadLimit  int
 	RecoveryReadWindow time.Duration
 	Now                func() time.Time
+	RequestID          func() string
+	AuditSink          AuditSink
 }
 
 type RecoveryReadLimiter interface {
 	AllowRecoveryRead(domainID string, clientKey string, now time.Time) bool
 }
 
+type AuditSink interface {
+	RecordAuditEvent(event AuditEvent)
+}
+
+type AuditEvent struct {
+	RequestID    string `json:"request_id"`
+	RouteName    string `json:"route_name"`
+	DomainID     string `json:"domain_id,omitempty"`
+	DeviceID     string `json:"device_id,omitempty"`
+	ObjectID     string `json:"object_id,omitempty"`
+	ObjectType   string `json:"object_type,omitempty"`
+	Version      uint64 `json:"version,omitempty"`
+	ResultCode   string `json:"result_code"`
+	StatusCode   int    `json:"status_code"`
+	Bytes        int64  `json:"bytes,omitempty"`
+	ServerTimeMs int64  `json:"server_time_ms"`
+	LatencyMs    int64  `json:"latency_ms"`
+}
+
 type Handler struct {
 	store           storage.Store
 	recoveryLimiter RecoveryReadLimiter
 	now             func() time.Time
+	requestID       func() string
+	auditSink       AuditSink
 }
+
+var generatedRequestIDCounter atomic.Uint64
 
 func NewHandler(store storage.Store, cfg HandlerConfig) *Handler {
 	now := cfg.Now
 	if now == nil {
 		now = time.Now
+	}
+	requestID := cfg.RequestID
+	if requestID == nil {
+		requestID = nextRequestID
 	}
 	var limiter RecoveryReadLimiter
 	if cfg.RecoveryReadLimit > 0 && cfg.RecoveryReadWindow > 0 {
@@ -44,22 +76,60 @@ func NewHandler(store storage.Store, cfg HandlerConfig) *Handler {
 		store:           store,
 		recoveryLimiter: limiter,
 		now:             now,
+		requestID:       requestID,
+		auditSink:       cfg.AuditSink,
 	}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	start := h.now()
+	recorder := newStatusRecorder(w)
+	audit := AuditEvent{
+		RequestID:    requestIDFor(r, h.requestID),
+		RouteName:    "unknown",
+		DeviceID:     r.Header.Get(deviceIDHeader),
+		ResultCode:   "ok",
+		ServerTimeMs: start.UnixMilli(),
+	}
+	if r.ContentLength > 0 {
+		audit.Bytes = r.ContentLength
+	}
+	recorder.Header().Set(requestIDHeader, audit.RequestID)
+
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			recorder.setResultCode(string(storage.ErrStorageUnavailable))
+			if !recorder.wroteHeader {
+				h.writeError(recorder, publicStorageError(storage.ErrStorageUnavailable, "request failed", true))
+			}
+		}
+		h.recordAuditEvent(recorder, audit, start)
+	}()
+
+	h.serveHTTP(recorder, r, &audit)
+}
+
+func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request, audit *AuditEvent) {
 	if h.store == nil {
+		audit.RouteName = "storage.unconfigured"
 		h.writeError(w, publicStorageError(storage.ErrStorageUnavailable, "storage is not configured", true))
 		return
 	}
 	if r.URL.Path == PrefixV1+"/domains" {
-		h.handleDomains(w, r)
+		audit.RouteName = "domains.create"
+		h.handleDomains(w, r, audit)
 		return
 	}
 	route, ok := domainRoute(r.URL.Path)
 	if !ok {
+		audit.RouteName = "routes.not_found"
 		h.writeError(w, publicStorageError(storage.ErrNotFound, "api route not found", false))
 		return
+	}
+	audit.RouteName = route.name()
+	audit.DomainID = route.domainID
+	if route.deviceID != "" {
+		audit.DeviceID = route.deviceID
 	}
 	switch route.kind {
 	case domainStateRoute:
@@ -67,7 +137,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case deviceRoute:
 		h.handleDevice(w, r, route.domainID, route.deviceID)
 	case joinRequestsRoute:
-		h.handleJoinRequests(w, r, route.domainID)
+		h.handleJoinRequests(w, r, route.domainID, audit)
 	case recoveryLatestRoute:
 		h.handleLatestRecovery(w, r, route.domainID)
 	default:
@@ -75,7 +145,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) handleDomains(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleDomains(w http.ResponseWriter, r *http.Request, audit *AuditEvent) {
 	if r.Method != http.MethodPost {
 		h.writeMethodError(w, http.MethodPost)
 		return
@@ -85,6 +155,8 @@ func (h *Handler) handleDomains(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
+	audit.DomainID = request.DomainID
+	audit.DeviceID = request.FirstDevice.DeviceID
 	if err := h.store.CreateDomain(r.Context(), request.Domain(), request.Device()); err != nil {
 		h.writeError(w, err)
 		return
@@ -118,7 +190,7 @@ func (h *Handler) handleDevice(w http.ResponseWriter, r *http.Request, domainID 
 	writeJSON(w, http.StatusOK, DeviceResponseFrom(device))
 }
 
-func (h *Handler) handleJoinRequests(w http.ResponseWriter, r *http.Request, domainID string) {
+func (h *Handler) handleJoinRequests(w http.ResponseWriter, r *http.Request, domainID string, audit *AuditEvent) {
 	if r.Method != http.MethodPost {
 		h.writeMethodError(w, http.MethodPost)
 		return
@@ -129,6 +201,7 @@ func (h *Handler) handleJoinRequests(w http.ResponseWriter, r *http.Request, dom
 		return
 	}
 	joinRequest := request.JoinRequest(domainID)
+	audit.DeviceID = joinRequest.DeviceID
 	if err := h.store.SaveJoinRequest(r.Context(), joinRequest); err != nil {
 		h.writeError(w, err)
 		return
@@ -176,7 +249,11 @@ func (h *Handler) writeMethodError(w http.ResponseWriter, allowedMethods ...stri
 }
 
 func (h *Handler) writeError(w http.ResponseWriter, err error) {
-	writeJSON(w, statusCodeFromError(err), ErrorResponseFrom(err, h.now()))
+	response := ErrorResponseFrom(err, h.now())
+	if recorder, ok := w.(interface{ setResultCode(string) }); ok {
+		recorder.setResultCode(response.ErrorCode)
+	}
+	writeJSON(w, statusCodeFromError(err), response)
 }
 
 type routeKind int
@@ -192,6 +269,21 @@ type route struct {
 	kind     routeKind
 	domainID string
 	deviceID string
+}
+
+func (r route) name() string {
+	switch r.kind {
+	case domainStateRoute:
+		return "domains.state"
+	case deviceRoute:
+		return "devices.get"
+	case joinRequestsRoute:
+		return "join_requests.create"
+	case recoveryLatestRoute:
+		return "recovery.latest"
+	default:
+		return "routes.unknown"
+	}
 }
 
 func domainRoute(path string) (route, bool) {
@@ -258,6 +350,65 @@ func writeJSON(w http.ResponseWriter, statusCode int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	_ = json.NewEncoder(w).Encode(value)
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	statusCode  int
+	resultCode  string
+	wroteHeader bool
+}
+
+func newStatusRecorder(w http.ResponseWriter) *statusRecorder {
+	return &statusRecorder{
+		ResponseWriter: w,
+		statusCode:     http.StatusOK,
+		resultCode:     "ok",
+	}
+}
+
+func (r *statusRecorder) WriteHeader(statusCode int) {
+	if r.wroteHeader {
+		return
+	}
+	r.statusCode = statusCode
+	r.wroteHeader = true
+	r.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (r *statusRecorder) Write(value []byte) (int, error) {
+	if !r.wroteHeader {
+		r.WriteHeader(r.statusCode)
+	}
+	return r.ResponseWriter.Write(value)
+}
+
+func (r *statusRecorder) setResultCode(resultCode string) {
+	if resultCode != "" {
+		r.resultCode = resultCode
+	}
+}
+
+func (h *Handler) recordAuditEvent(recorder *statusRecorder, event AuditEvent, start time.Time) {
+	if h.auditSink == nil {
+		return
+	}
+	event.ResultCode = recorder.resultCode
+	event.StatusCode = recorder.statusCode
+	event.LatencyMs = h.now().Sub(start).Milliseconds()
+	h.auditSink.RecordAuditEvent(event)
+}
+
+func requestIDFor(r *http.Request, generate func() string) string {
+	if value := strings.TrimSpace(r.Header.Get(requestIDHeader)); value != "" {
+		return value
+	}
+	return generate()
+}
+
+func nextRequestID() string {
+	next := generatedRequestIDCounter.Add(1)
+	return "req-" + strconv.FormatUint(uint64(time.Now().UnixNano()), 36) + "-" + strconv.FormatUint(next, 36)
 }
 
 type MemoryRecoveryReadLimiter struct {

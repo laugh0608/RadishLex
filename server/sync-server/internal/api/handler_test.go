@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -92,6 +93,131 @@ func TestMetadataHandlersCreateDomainReadDeviceAndSaveJoinRequest(t *testing.T) 
 	decodeResponse(t, pendingDeviceResponse, &deviceBody)
 	if deviceBody.DeviceID != "device-b" || deviceBody.Status != storage.DevicePending {
 		t.Fatalf("join request should create a pending device, got %#v", deviceBody)
+	}
+}
+
+func TestHandlerAddsRequestIDAndRecordsAuditEvent(t *testing.T) {
+	audit := &auditSinkStub{}
+	handler := NewHandler(storage.NewMemoryStore(), HandlerConfig{
+		Now:       fixedNow,
+		RequestID: fixedRequestID,
+		AuditSink: audit,
+	})
+
+	createDomain := CreateDomainRequest{
+		DomainID:        "domain-a",
+		CurrentKeyEpoch: 1,
+		ActiveKeyID:     "epoch-key-a",
+		FirstDevice: DeviceMetadata{
+			DeviceID:                "device-a",
+			SigningPublicKeyID:      "signing-key-a",
+			SigningPublicKey:        []byte("signing-public-key-a"),
+			KeyAgreementPublicKeyID: "agreement-key-a",
+			KeyAgreementPublicKey:   []byte("agreement-public-key-a"),
+			Status:                  string(storage.DeviceActive),
+		},
+		CreatedAtMs: 100,
+		UpdatedAtMs: 100,
+	}
+	requestBody, err := json.Marshal(createDomain)
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+	request := httptest.NewRequest(http.MethodPost, PrefixV1+"/domains", bytes.NewReader(requestBody))
+	request.Header.Set(requestIDHeader, "client-request-a")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusCreated {
+		t.Fatalf("unexpected status: %d body=%s", response.Code, response.Body.String())
+	}
+	if response.Header().Get(requestIDHeader) != "client-request-a" {
+		t.Fatalf("request id header missing: %q", response.Header().Get(requestIDHeader))
+	}
+	if len(audit.events) != 1 {
+		t.Fatalf("expected one audit event, got %d", len(audit.events))
+	}
+	event := audit.events[0]
+	if event.RequestID != "client-request-a" ||
+		event.RouteName != "domains.create" ||
+		event.DomainID != "domain-a" ||
+		event.DeviceID != "device-a" ||
+		event.ResultCode != "ok" ||
+		event.StatusCode != http.StatusCreated {
+		t.Fatalf("unexpected audit event: %#v", event)
+	}
+}
+
+func TestAuditEventDoesNotIncludeRequestBody(t *testing.T) {
+	audit := &auditSinkStub{}
+	handler := NewHandler(storage.NewMemoryStore(), HandlerConfig{
+		Now:       fixedNow,
+		RequestID: fixedRequestID,
+		AuditSink: audit,
+	})
+
+	createDomain := CreateDomainRequest{
+		DomainID:        "domain-a",
+		CurrentKeyEpoch: 1,
+		ActiveKeyID:     "epoch-key-a",
+		FirstDevice: DeviceMetadata{
+			DeviceID:                "device-a",
+			SigningPublicKeyID:      "signing-key-a",
+			SigningPublicKey:        []byte("sensitive-signing-public-key-fixture"),
+			KeyAgreementPublicKeyID: "agreement-key-a",
+			KeyAgreementPublicKey:   []byte("sensitive-agreement-public-key-fixture"),
+			Status:                  string(storage.DeviceActive),
+		},
+		CreatedAtMs: 100,
+		UpdatedAtMs: 100,
+	}
+	response := performJSONRequest(t, handler, http.MethodPost, PrefixV1+"/domains", createDomain)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("unexpected status: %d body=%s", response.Code, response.Body.String())
+	}
+	if len(audit.events) != 1 {
+		t.Fatalf("expected one audit event, got %d", len(audit.events))
+	}
+	eventText := fmt.Sprintf("%#v", audit.events[0])
+	if strings.Contains(eventText, "sensitive-signing-public-key-fixture") ||
+		strings.Contains(eventText, "sensitive-agreement-public-key-fixture") {
+		t.Fatalf("audit event leaked request body fields: %s", eventText)
+	}
+}
+
+func TestHandlerRecoversPanicWithStructuredErrorAndAudit(t *testing.T) {
+	audit := &auditSinkStub{}
+	handler := NewHandler(&panicDomainStore{}, HandlerConfig{
+		Now:       fixedNow,
+		RequestID: fixedRequestID,
+		AuditSink: audit,
+	})
+
+	request := httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/state", nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("unexpected status: %d body=%s", response.Code, response.Body.String())
+	}
+	if response.Header().Get(requestIDHeader) != "req-fixed" {
+		t.Fatalf("generated request id missing: %q", response.Header().Get(requestIDHeader))
+	}
+	var body ErrorResponse
+	decodeResponse(t, response, &body)
+	if body.ErrorCode != string(storage.ErrStorageUnavailable) {
+		t.Fatalf("unexpected error response: %#v", body)
+	}
+	if len(audit.events) != 1 {
+		t.Fatalf("expected one audit event, got %d", len(audit.events))
+	}
+	event := audit.events[0]
+	if event.RequestID != "req-fixed" ||
+		event.RouteName != "domains.state" ||
+		event.DomainID != "domain-a" ||
+		event.ResultCode != string(storage.ErrStorageUnavailable) ||
+		event.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("unexpected audit event: %#v", event)
 	}
 }
 
@@ -230,6 +356,10 @@ func fixedNow() time.Time {
 	return time.UnixMilli(1234)
 }
 
+func fixedRequestID() string {
+	return "req-fixed"
+}
+
 func performJSONRequest(t *testing.T, handler http.Handler, method string, path string, value any) *httptest.ResponseRecorder {
 	t.Helper()
 	body, err := json.Marshal(value)
@@ -265,4 +395,20 @@ func (s *recoveryStoreStub) LatestRecoveryWrappedMaterial(ctx context.Context, d
 	record := s.record
 	record.DomainID = domainID
 	return record, cloneBytes(s.material), nil
+}
+
+type auditSinkStub struct {
+	events []AuditEvent
+}
+
+func (s *auditSinkStub) RecordAuditEvent(event AuditEvent) {
+	s.events = append(s.events, event)
+}
+
+type panicDomainStore struct {
+	storage.Store
+}
+
+func (s *panicDomainStore) Domain(ctx context.Context, domainID string) (storage.Domain, error) {
+	panic("domain panic should be recovered")
 }
