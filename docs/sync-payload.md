@@ -1,10 +1,10 @@
 # RadishLex 同步 Payload 草案
 
-本文档定义当前 Rust 侧同步 payload 草案、数据分级映射和验证口径，读者是后续实现 `ime-sync`、`ime-crypto`、同步 CLI、Go server 和管理 UI 的开发者。本文不包含加密算法实现、设备授权流程完整协议、Go server 数据库 migration 或远端同步客户端实现；客户端加密边界见 `docs/crypto-boundary.md`，Go server API 与 storage 边界见 `docs/sync-server-api-storage.md`。
+本文档定义当前 Rust 侧同步 payload 草案、数据分级映射和验证口径，读者是后续实现 `ime-sync`、`ime-crypto`、同步 CLI、Go server 和管理 UI 的开发者。本文不包含加密算法实现、设备授权流程完整协议、Go server 数据库 migration、真实 HTTP transport 或两客户端端到端同步；客户端加密边界见 `docs/crypto-boundary.md`，Go server API 与 storage 边界见 `docs/sync-server-api-storage.md`。
 
 ## 当前定位
 
-当前只落地 Rust 本地同步对象边界模型，不连接后端，不生成明文上传文件，也不实现网络同步。`ime-sync` 的作用是把 `sync preflight` 已验证的本地分类边界转成可测试的 Rust API，并让上传草案元数据从 `ime-crypto` envelope 派生，避免同步层和加密层字段语义漂移；`ime-userdb` 当前提供 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 `SyncEnvelopeAssembler` 完成本地 envelope 加密、解密和 sync draft 派生验证；解密后的 userdb P2 JSON 已能解析为 `ClientSyncMergeInput` 所需记录，并可把被合并模型接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite：
+当前只落地 Rust 同步对象边界模型和 remote client DTO / transport trait，不内置真实 HTTP transport，不生成明文上传文件，也不启动后端做真实网络同步。`ime-sync` 的作用是把 `sync preflight` 已验证的本地分类边界转成可测试的 Rust API，并让上传草案元数据从 `ime-crypto` envelope 派生，避免同步层和加密层字段语义漂移；当前 remote client 上传入口只接收已加密 `AssembledSyncObject` 与 `SignedSyncObjectManifest`，不接受 plaintext payload。`ime-userdb` 当前提供 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 `SyncEnvelopeAssembler` 完成本地 envelope 加密、解密和 sync draft 派生验证；解密后的 userdb P2 JSON 已能解析为 `ClientSyncMergeInput` 所需记录，并可把被合并模型接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite：
 
 - P2 数据可以进入后续端到端加密对象。
 - P1 明细事件默认只能留在本地。
@@ -57,7 +57,7 @@ settings.schema
 backup.snapshot
 ```
 
-本阶段只验证类型和边界，当前已定义 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 plaintext payload 字段序列化，并已证明它们可以进入 `ime-crypto` envelope 后派生成 `EncryptedSyncObjectDraft`。`docs/sync-key-management.md` 已固定设备授权、key management 和冲突语义；`docs/sync-server-api-storage.md` 已固定远端 API、SQLite metadata、对象存储和版本冲突边界；Rust 侧已补同步域、设备状态、加入请求、授权包、撤销记录、key epoch、对象版本冲突草案模型和 envelope 组装边界。服务端只能看到对象类型、设备 ID、key id、key epoch、algorithm、nonce、版本、密文大小、ciphertext hash 和时间戳。
+本阶段只验证类型和边界，当前已定义 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 plaintext payload 字段序列化，并已证明它们可以进入 `ime-crypto` envelope 后派生成 `EncryptedSyncObjectDraft`。`docs/sync-key-management.md` 已固定设备授权、key management 和冲突语义；`docs/sync-server-api-storage.md` 已固定远端 API、SQLite metadata、对象存储和版本冲突边界；Rust 侧已补同步域、设备状态、加入请求、授权包、撤销记录、key epoch、对象版本冲突草案模型、envelope 组装边界和 remote client DTO / transport trait。服务端只能看到对象类型、设备 ID、key id、key epoch、algorithm、nonce、版本、密文大小、ciphertext hash 和时间戳。
 
 ## Plaintext Payload
 
@@ -212,7 +212,7 @@ updated_at_ms
 
 - `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
 - 真实平台私钥存储 backend 实现、生产恢复 UI / API 和远端密钥轮换执行器。
-- 客户端上传补丁生成、远端对象拉取、HTTP API handler、服务端签名验证和服务端对象上传下载实现。
+- 客户端上传补丁生成、真实 HTTP transport、两客户端端到端同步和部署配置。
 - 生产同步设置、备份快照、管理 UI 同步状态和平台私钥存储 backend 实现。
 
 ## 验证口径

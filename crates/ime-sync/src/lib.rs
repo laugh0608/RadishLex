@@ -2,6 +2,7 @@ mod assemble;
 mod device;
 mod merge;
 mod model;
+mod remote;
 mod signing;
 
 pub use assemble::{
@@ -19,5 +20,10 @@ pub use merge::{
 pub use model::{
     EncryptedSyncObjectDraft, LocalDataClass, PayloadSource, SyncObjectType, SyncPayloadError,
     SyncPayloadPlan, SyncPlanItem,
+};
+pub use remote::{
+    LatestObjectConflictMetadata, RemoteObjectPayload, RemoteObjectVersion, SyncRemoteClient,
+    SyncRemoteError, SyncRemoteMethod, SyncRemoteRequest, SyncRemoteResponse, SyncRemoteTransport,
+    SyncServerErrorCode,
 };
 pub use signing::{SignedDeviceAuthorization, SignedDeviceRevocation};
