@@ -26,6 +26,7 @@ type MemoryStore struct {
 	objects        map[objectKey]SyncObject
 	versions       map[objectVersionKey]ObjectVersion
 	blobs          map[string][]byte
+	auditEvents    []AuditEvent
 }
 
 func NewMemoryStore() *MemoryStore {
@@ -42,6 +43,19 @@ func NewMemoryStore() *MemoryStore {
 		versions:       make(map[objectVersionKey]ObjectVersion),
 		blobs:          make(map[string][]byte),
 	}
+}
+
+func (s *MemoryStore) RecordAuditEvent(ctx context.Context, event AuditEvent) error {
+	if err := checkContext(ctx); err != nil {
+		return err
+	}
+	if err := validateAuditEvent(event); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.auditEvents = append(s.auditEvents, event)
+	return nil
 }
 
 func (s *MemoryStore) CreateDomain(ctx context.Context, domain Domain, firstDevice Device) error {
@@ -675,6 +689,19 @@ func validateObjectUpload(upload ObjectVersionUpload) error {
 	}
 	if err := validateSignatureFields(version.SignatureSchemaVersion, version.SignatureAlgorithm, version.SignatureKeyID, version.Signature); err != nil {
 		return err
+	}
+	return nil
+}
+
+func validateAuditEvent(event AuditEvent) error {
+	if event.EventType == "" || event.ResultCode == "" {
+		return newError(ErrInvalidRequest, "audit event type and result code are required")
+	}
+	if event.Version > 0 && event.ObjectID == "" {
+		return newError(ErrInvalidRequest, "audit event object id is required for object version")
+	}
+	if event.Bytes < 0 || event.ServerTimeMs <= 0 {
+		return newError(ErrInvalidRequest, "audit event counters are invalid")
 	}
 	return nil
 }

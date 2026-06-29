@@ -112,6 +112,41 @@ func TestSQLiteStoreLatestRecoveryWrappedMaterialDetectsMissingBlob(t *testing.T
 	}
 }
 
+func TestSQLiteStoreRecordsAuditEvent(t *testing.T) {
+	store := newSQLiteStoreForTest(t)
+	event := AuditEvent{
+		DomainID:     "domain-a",
+		EventType:    "domains.create",
+		DeviceID:     "device-a",
+		ObjectID:     "",
+		Version:      0,
+		ResultCode:   "ok",
+		Bytes:        123,
+		ServerTimeMs: 456,
+	}
+
+	if err := store.RecordAuditEvent(context.Background(), event); err != nil {
+		t.Fatalf("record audit event: %v", err)
+	}
+
+	row := store.db.QueryRow(`
+		SELECT domain_id, event_type, device_id, object_id, version, result_code, bytes, server_time_ms
+		FROM audit_events
+	`)
+	var got AuditEvent
+	var version int64
+	if err := row.Scan(
+		&got.DomainID, &got.EventType, &got.DeviceID, &got.ObjectID,
+		&version, &got.ResultCode, &got.Bytes, &got.ServerTimeMs,
+	); err != nil {
+		t.Fatalf("read audit event: %v", err)
+	}
+	got.Version = uint64(version)
+	if got != event {
+		t.Fatalf("unexpected audit event: got %#v want %#v", got, event)
+	}
+}
+
 func newSQLiteStoreForTest(t *testing.T) *SQLiteStore {
 	t.Helper()
 	root := t.TempDir()

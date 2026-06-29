@@ -24,6 +24,25 @@ func NewSQLiteStore(db *sql.DB, blobs ObjectBlobStore) (*SQLiteStore, error) {
 	return &SQLiteStore{db: db, blobs: blobs}, nil
 }
 
+func (s *SQLiteStore) RecordAuditEvent(ctx context.Context, event AuditEvent) error {
+	if err := checkContext(ctx); err != nil {
+		return err
+	}
+	if err := validateAuditEvent(event); err != nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `
+		INSERT INTO audit_events (
+			domain_id, event_type, device_id, object_id, version,
+			result_code, bytes, server_time_ms
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, event.DomainID, event.EventType, event.DeviceID, event.ObjectID, int64(event.Version),
+		event.ResultCode, event.Bytes, event.ServerTimeMs); err != nil {
+		return newError(ErrStorageUnavailable, "audit event cannot be stored")
+	}
+	return nil
+}
+
 func (s *SQLiteStore) CreateDomain(ctx context.Context, domain Domain, firstDevice Device) error {
 	if err := checkContext(ctx); err != nil {
 		return err

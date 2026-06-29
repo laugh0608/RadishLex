@@ -182,3 +182,14 @@ type ObjectVersionUpload struct {
 	Version ObjectVersion
 	Payload []byte
 }
+
+type AuditEvent struct {
+	DomainID     string
+	EventType    string
+	DeviceID     string
+	ObjectID     string
+	Version      uint64
+	ResultCode   string
+	Bytes        int64
+	ServerTimeMs int64
+}

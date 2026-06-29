@@ -245,6 +245,32 @@ func TestAuditEventDoesNotIncludeRequestBody(t *testing.T) {
 	}
 }
 
+func TestHandlerRecordsPersistentAuditEventWhenStoreSupportsIt(t *testing.T) {
+	store := &persistentAuditStoreStub{}
+	handler := NewHandler(store, HandlerConfig{
+		Now:       fixedNow,
+		RequestID: fixedRequestID,
+	})
+
+	request := httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/state", nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d body=%s", response.Code, response.Body.String())
+	}
+	if len(store.auditEvents) != 1 {
+		t.Fatalf("expected one persistent audit event, got %d", len(store.auditEvents))
+	}
+	event := store.auditEvents[0]
+	if event.DomainID != "domain-a" ||
+		event.EventType != "domains.state" ||
+		event.ResultCode != "ok" ||
+		event.ServerTimeMs != 1234 {
+		t.Fatalf("unexpected persistent audit event: %#v", event)
+	}
+}
+
 func TestHandlerRecoversPanicWithStructuredErrorAndAudit(t *testing.T) {
 	audit := &auditSinkStub{}
 	handler := NewHandler(&panicDomainStore{}, HandlerConfig{
@@ -482,5 +508,25 @@ type authorizationStoreStub struct {
 func (s *authorizationStoreStub) AuthorizeJoinRequest(ctx context.Context, upload storage.DeviceAuthorizationUpload) error {
 	s.calls++
 	s.upload = upload
+	return nil
+}
+
+type persistentAuditStoreStub struct {
+	storage.Store
+	auditEvents []storage.AuditEvent
+}
+
+func (s *persistentAuditStoreStub) Domain(ctx context.Context, domainID string) (storage.Domain, error) {
+	return storage.Domain{
+		DomainID:        domainID,
+		CurrentKeyEpoch: 1,
+		ActiveKeyID:     "epoch-key-a",
+		CreatedAtMs:     100,
+		UpdatedAtMs:     100,
+	}, nil
+}
+
+func (s *persistentAuditStoreStub) RecordAuditEvent(ctx context.Context, event storage.AuditEvent) error {
+	s.auditEvents = append(s.auditEvents, event)
 	return nil
 }

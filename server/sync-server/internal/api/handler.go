@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -32,6 +33,10 @@ type RecoveryReadLimiter interface {
 
 type AuditSink interface {
 	RecordAuditEvent(event AuditEvent)
+}
+
+type persistentAuditRecorder interface {
+	RecordAuditEvent(ctx context.Context, event storage.AuditEvent) error
 }
 
 type AuditEvent struct {
@@ -426,13 +431,24 @@ func (r *statusRecorder) setResultCode(resultCode string) {
 }
 
 func (h *Handler) recordAuditEvent(recorder *statusRecorder, event AuditEvent, start time.Time) {
-	if h.auditSink == nil {
-		return
-	}
 	event.ResultCode = recorder.resultCode
 	event.StatusCode = recorder.statusCode
 	event.LatencyMs = h.now().Sub(start).Milliseconds()
-	h.auditSink.RecordAuditEvent(event)
+	if persistent, ok := h.store.(persistentAuditRecorder); ok {
+		_ = persistent.RecordAuditEvent(context.Background(), storage.AuditEvent{
+			DomainID:     event.DomainID,
+			EventType:    event.RouteName,
+			DeviceID:     event.DeviceID,
+			ObjectID:     event.ObjectID,
+			Version:      event.Version,
+			ResultCode:   event.ResultCode,
+			Bytes:        event.Bytes,
+			ServerTimeMs: event.ServerTimeMs,
+		})
+	}
+	if h.auditSink != nil {
+		h.auditSink.RecordAuditEvent(event)
+	}
 }
 
 func requestIDFor(r *http.Request, generate func() string) string {
