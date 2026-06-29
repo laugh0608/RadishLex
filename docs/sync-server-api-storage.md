@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型，以及已解密 P2 payload 写回本地 SQLite 的执行器。Go server 已起步，当前 `server/sync-server` 已包含配置默认值、API request / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象和签名篡改拒绝测试；尚未实现 HTTP handler、Docker Compose 或真实远端上传下载。SQLite driver 当前使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
+当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型，以及已解密 P2 payload 写回本地 SQLite 的执行器。Go server 已起步，当前 `server/sync-server` 已包含配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试，以及 recovery latest handler 的统一错误响应和限速测试；尚未实现 domain / device / join request metadata handler、Docker Compose 或真实远端上传下载。SQLite driver 当前使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
 
 本阶段只固定服务端 API 和 storage 边界：
 
@@ -219,7 +219,7 @@ blob_ref
 
 当前 storage conformance 已覆盖：第一台设备必须为 `active`；join request 从 `pending` 授权到 `active`；wrapped device key bytes 随授权事务保存并可按 metadata 读取；revoked 设备和旧 `key_epoch` 写入被拒绝；object version 支持同 hash 幂等重试、同版本不同 hash 冲突和 stale `base_version` latest metadata；object payload 读取复验长度 / ciphertext hash；recovery record 写入校验 wrapped material 长度 / ciphertext hash 并分配 `blob_ref`；latest recovery metadata 与 wrapped material bytes 可一起读取并复验；signed object manifest、device authorization、device revocation 和 recovery record 字段篡改会被 Ed25519 验签拒绝。
 
-当前 storage 已在写入前使用 `devices.signing_public_key` 验证 object manifest、device authorization、device revocation 和 recovery record；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list。下一步仍需补齐 metadata API handler、统一错误响应和审计日志。
+当前 storage 已在写入前使用 `devices.signing_public_key` 验证 object manifest、device authorization、device revocation 和 recovery record；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list。当前 API 层已补 `GET /api/v1/domains/{domain_id}/recovery-records/latest`，复用 `LatestRecoveryWrappedMaterial`，返回服务端可见 recovery metadata 与 encrypted wrapped material，并覆盖统一 JSON 错误响应、`recovery_rate_limited` 和不泄漏内部 `blob_ref`。下一步仍需补齐 domain / device / join request metadata handler 和审计日志。
 
 ## HTTP API 边界
 
@@ -473,9 +473,10 @@ latest_ciphertext_hash
 3. 已补 Go storage 签名验证抽象与测试，覆盖 object manifest、device authorization、device revocation 和 recovery record 的验签失败路径。
 4. 已补 device wrapping wrapped key bytes 的承载方式和读取接口，继续走密文 bytes + hash / length 校验。
 5. 已补 recovery wrapped material 的读取接口，继续走密文 bytes + hash / length 校验。
-6. 实现 domain / device / join request / recovery record 的 metadata API，并覆盖设备状态校验和错误响应。
-7. 再实现 encrypted object 上传下载和版本冲突检测。
-8. 最后再接 Rust `ime-sync` 远端客户端；客户端必须以已加密 envelope 和 signed manifest 为输入，不得把 plaintext payload 交给 server。
+6. 已补 recovery latest metadata API handler，覆盖统一错误响应、恢复读取限速和内部 `blob_ref` 不外泄。
+7. 实现 domain / device / join request 的 metadata API，并覆盖设备状态校验、授权边界和审计日志。
+8. 再实现 encrypted object 上传下载和版本冲突检测。
+9. 最后再接 Rust `ime-sync` 远端客户端；客户端必须以已加密 envelope 和 signed manifest 为输入，不得把 plaintext payload 交给 server。
 
 任何阶段都不应把 Flutter manager、平台壳、真实系统输入法服务或输入热路径接入 Go server。
 
@@ -484,7 +485,7 @@ latest_ciphertext_hash
 - Go server migration、API handler 和 storage tests 未覆盖上述隐私字段阻断前，不实现远端客户端上传下载。
 - 平台私钥存储 backend 能力模型已落地；真实平台 backend 验证未完成前，不提供用户可用同步 UI。
 - device authorization handler 对外开放前必须继续复用 wrapped key bytes 的存储 / 读取语义，且不得返回明文同步域材料。
-- recovery latest handler 对外开放前必须继续复用 wrapped material bytes 读取语义，并补齐限速和日志脱敏测试。
+- recovery latest handler 已复用 wrapped material bytes 读取语义，并补齐限速与内部 `blob_ref` 不外泄测试；接入真实 server main 前仍需补 panic recovery、request id 和审计日志脱敏。
 - 服务端能保存、打印或索引明文用户词、input code、reading、P1 原始事件或候选偏好时，必须停止并回退该设计。
 - 服务端版本冲突检测未稳定前，不允许客户端把本地合并结果自动上传到真实远端。
 - 包分发、P3 资源下载和个人 P2 同步对象必须保持独立 API 与存储边界。

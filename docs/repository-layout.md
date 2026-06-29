@@ -223,7 +223,7 @@ server/sync-server/
 - Docker Compose。
 - 本地文件对象存储。
 
-当前已起步 `server/sync-server/`，但只实现 metadata / storage / API 验证模型、SQLite-backed metadata repository、local object storage staged transaction、对象 payload hash / length 复验、Ed25519 签名验签门禁、device wrapping encrypted key bytes 承载和 recovery wrapped material 读取。后续应补齐 metadata API 和错误语义，再进入 HTTP handler；真实远端上传下载、Rust 远端客户端、Flutter manager 和平台壳继续后置。
+当前已起步 `server/sync-server/`，但只实现 metadata / storage / API 验证模型、SQLite-backed metadata repository、local object storage staged transaction、对象 payload hash / length 复验、Ed25519 签名验签门禁、device wrapping encrypted key bytes 承载、recovery wrapped material 读取和 recovery latest handler。后续应补齐 domain / device / join request metadata API 与审计日志，再进入对象上传下载；真实远端上传下载、Rust 远端客户端、Flutter manager 和平台壳继续后置。
 
 后续支持：
 
