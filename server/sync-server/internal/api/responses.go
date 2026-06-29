@@ -41,6 +41,10 @@ type JoinRequestResponse struct {
 	Status                  storage.DeviceStatus `json:"status"`
 }
 
+type JoinRequestsResponse struct {
+	JoinRequests []JoinRequestResponse `json:"join_requests"`
+}
+
 type RecoveryRecordResponse struct {
 	DomainID               string                       `json:"domain_id"`
 	RecoveryRecordID       string                       `json:"recovery_record_id"`
@@ -106,6 +110,16 @@ func JoinRequestResponseFrom(request storage.JoinRequest) JoinRequestResponse {
 		ExpiresAtMs:             request.ExpiresAtMs,
 		Status:                  request.Status,
 	}
+}
+
+func JoinRequestsResponseFrom(requests []storage.JoinRequest) JoinRequestsResponse {
+	response := JoinRequestsResponse{
+		JoinRequests: make([]JoinRequestResponse, 0, len(requests)),
+	}
+	for _, request := range requests {
+		response.JoinRequests = append(response.JoinRequests, JoinRequestResponseFrom(request))
+	}
+	return response
 }
 
 func RecoveryRecordResponseFrom(record storage.RecoveryRecord, wrappedMaterial []byte) RecoveryRecordResponse {

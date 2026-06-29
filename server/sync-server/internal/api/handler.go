@@ -138,6 +138,8 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request, audit *Audit
 		h.handleDevice(w, r, route.domainID, route.deviceID)
 	case joinRequestsRoute:
 		h.handleJoinRequests(w, r, route.domainID, audit)
+	case joinAuthorizationRoute:
+		h.handleJoinAuthorization(w, r, route.domainID, route.joinRequestID, audit)
 	case recoveryLatestRoute:
 		h.handleLatestRecovery(w, r, route.domainID)
 	default:
@@ -191,22 +193,49 @@ func (h *Handler) handleDevice(w http.ResponseWriter, r *http.Request, domainID 
 }
 
 func (h *Handler) handleJoinRequests(w http.ResponseWriter, r *http.Request, domainID string, audit *AuditEvent) {
+	switch r.Method {
+	case http.MethodGet:
+		requests, err := h.store.PendingJoinRequests(r.Context(), domainID)
+		if err != nil {
+			h.writeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, JoinRequestsResponseFrom(requests))
+	case http.MethodPost:
+		var request CreateJoinRequestRequest
+		if err := decodeJSONRequest(r, &request); err != nil {
+			h.writeError(w, err)
+			return
+		}
+		joinRequest := request.JoinRequest(domainID)
+		audit.DeviceID = joinRequest.DeviceID
+		if err := h.store.SaveJoinRequest(r.Context(), joinRequest); err != nil {
+			h.writeError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, JoinRequestResponseFrom(joinRequest))
+	default:
+		h.writeMethodError(w, http.MethodGet, http.MethodPost)
+	}
+}
+
+func (h *Handler) handleJoinAuthorization(w http.ResponseWriter, r *http.Request, domainID string, joinRequestID string, audit *AuditEvent) {
 	if r.Method != http.MethodPost {
 		h.writeMethodError(w, http.MethodPost)
 		return
 	}
-	var request CreateJoinRequestRequest
+	var request AuthorizeJoinRequestRequest
 	if err := decodeJSONRequest(r, &request); err != nil {
 		h.writeError(w, err)
 		return
 	}
-	joinRequest := request.JoinRequest(domainID)
-	audit.DeviceID = joinRequest.DeviceID
-	if err := h.store.SaveJoinRequest(r.Context(), joinRequest); err != nil {
+	upload := request.Upload(domainID, joinRequestID)
+	audit.DeviceID = upload.Authorization.RecipientDeviceID
+	if err := h.store.AuthorizeJoinRequest(r.Context(), upload); err != nil {
 		h.writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, JoinRequestResponseFrom(joinRequest))
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) handleLatestRecovery(w http.ResponseWriter, r *http.Request, domainID string) {
@@ -262,13 +291,15 @@ const (
 	domainStateRoute routeKind = iota + 1
 	deviceRoute
 	joinRequestsRoute
+	joinAuthorizationRoute
 	recoveryLatestRoute
 )
 
 type route struct {
-	kind     routeKind
-	domainID string
-	deviceID string
+	kind          routeKind
+	domainID      string
+	deviceID      string
+	joinRequestID string
 }
 
 func (r route) name() string {
@@ -278,7 +309,9 @@ func (r route) name() string {
 	case deviceRoute:
 		return "devices.get"
 	case joinRequestsRoute:
-		return "join_requests.create"
+		return "join_requests.collection"
+	case joinAuthorizationRoute:
+		return "join_requests.authorize"
 	case recoveryLatestRoute:
 		return "recovery.latest"
 	default:
@@ -300,6 +333,9 @@ func domainRoute(path string) (route, bool) {
 	}
 	if len(parts) == 2 && parts[0] != "" && parts[1] == "join-requests" {
 		return route{kind: joinRequestsRoute, domainID: parts[0]}, true
+	}
+	if len(parts) == 4 && parts[0] != "" && parts[1] == "join-requests" && parts[2] != "" && parts[3] == "authorization" {
+		return route{kind: joinAuthorizationRoute, domainID: parts[0], joinRequestID: parts[2]}, true
 	}
 	if len(parts) == 3 && parts[0] != "" && parts[1] == "recovery-records" && parts[2] == "latest" {
 		return route{kind: recoveryLatestRoute, domainID: parts[0]}, true

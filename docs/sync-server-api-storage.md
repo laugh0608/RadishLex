@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型，以及已解密 P2 payload 写回本地 SQLite 的执行器。Go server 已起步，当前 `server/sync-server` 已包含配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、recovery latest handler、domain / device / join request 基础 metadata handler，以及 API 层 request id、panic recovery 和非持久审计 hook 测试；尚未实现 join request 列表、authorization handler、SQLite audit_events 写入、Docker Compose 或真实远端上传下载。SQLite driver 当前使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
+当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型，以及已解密 P2 payload 写回本地 SQLite 的执行器。Go server 已起步，当前 `server/sync-server` 已包含配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、recovery latest handler、domain / device / join request metadata handler、authorization handler，以及 API 层 request id、panic recovery 和非持久审计 hook 测试；尚未实现 SQLite audit_events 写入、Docker Compose 或真实远端上传下载。SQLite driver 当前使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
 
 本阶段只固定服务端 API 和 storage 边界：
 
@@ -213,13 +213,13 @@ blob_ref
 
 ## 当前 Go storage surface
 
-当前 `server/sync-server/internal/storage.Store` 是 HTTP handler 前的内部边界，已经落地 `CreateDomain`、`Domain`、`Device`、`SaveJoinRequest`、`AuthorizeJoinRequest`、`DeviceWrappedKey`、`RevokeDevice`、`PutRecoveryRecord`、`LatestRecoveryRecord`、`LatestRecoveryWrappedMaterial`、`PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`。
+当前 `server/sync-server/internal/storage.Store` 是 HTTP handler 前的内部边界，已经落地 `CreateDomain`、`Domain`、`Device`、`SaveJoinRequest`、`PendingJoinRequests`、`AuthorizeJoinRequest`、`DeviceWrappedKey`、`RevokeDevice`、`PutRecoveryRecord`、`LatestRecoveryRecord`、`LatestRecoveryWrappedMaterial`、`PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`。
 
-这组方法当前用于验证 metadata、设备状态、版本冲突、blob 写入和错误语义，不等同于完整 HTTP API。尚未暴露对象分页、join request 列表、审计日志查询或限速器。
+这组方法当前用于验证 metadata、设备状态、版本冲突、blob 写入和错误语义，不等同于完整 HTTP API。尚未暴露对象分页、审计日志查询或持久限速器。
 
 当前 storage conformance 已覆盖：第一台设备必须为 `active`；join request 从 `pending` 授权到 `active`；wrapped device key bytes 随授权事务保存并可按 metadata 读取；revoked 设备和旧 `key_epoch` 写入被拒绝；object version 支持同 hash 幂等重试、同版本不同 hash 冲突和 stale `base_version` latest metadata；object payload 读取复验长度 / ciphertext hash；recovery record 写入校验 wrapped material 长度 / ciphertext hash 并分配 `blob_ref`；latest recovery metadata 与 wrapped material bytes 可一起读取并复验；signed object manifest、device authorization、device revocation 和 recovery record 字段篡改会被 Ed25519 验签拒绝。
 
-当前 storage 已在写入前使用 `devices.signing_public_key` 验证 object manifest、device authorization、device revocation 和 recovery record；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list。当前 API 层已补 `GET /api/v1/domains/{domain_id}/recovery-records/latest`，复用 `LatestRecoveryWrappedMaterial`，返回服务端可见 recovery metadata 与 encrypted wrapped material，并覆盖统一 JSON 错误响应、`recovery_rate_limited` 和不泄漏内部 `blob_ref`。API 层也已补 `POST /domains`、`GET /domains/{domain_id}/state`、`GET /domains/{domain_id}/devices/{device_id}` 和 `POST /domains/{domain_id}/join-requests`，覆盖创建 domain、读取 domain metadata、读取 active / pending device metadata、创建 pending join request 和非法 JSON 错误响应。当前 handler 外层已补 `X-Request-ID` 透传 / 生成、panic recovery 结构化 `storage_unavailable` 响应和非持久 `AuditSink` hook，审计事件只包含 route name、domain id、device id、result code、status、byte count、server time 和 latency，不包含请求体或响应体。下一步仍需补齐 join request 列表、authorization handler 和 SQLite `audit_events` 写入。
+当前 storage 已在写入前使用 `devices.signing_public_key` 验证 object manifest、device authorization、device revocation 和 recovery record；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list。当前 API 层已补 `GET /api/v1/domains/{domain_id}/recovery-records/latest`，复用 `LatestRecoveryWrappedMaterial`，返回服务端可见 recovery metadata 与 encrypted wrapped material，并覆盖统一 JSON 错误响应、`recovery_rate_limited` 和不泄漏内部 `blob_ref`。API 层也已补 `POST /domains`、`GET /domains/{domain_id}/state`、`GET /domains/{domain_id}/devices/{device_id}`、`POST /domains/{domain_id}/join-requests`、`GET /domains/{domain_id}/join-requests` 和 `POST /domains/{domain_id}/join-requests/{join_request_id}/authorization`，覆盖创建 domain、读取 domain metadata、读取 active / pending device metadata、创建 / 列出 pending join request、authorization request 到 storage upload 的映射和非法 JSON 错误响应。当前 handler 外层已补 `X-Request-ID` 透传 / 生成、panic recovery 结构化 `storage_unavailable` 响应和非持久 `AuditSink` hook，审计事件只包含 route name、domain id、device id、result code、status、byte count、server time 和 latency，不包含请求体或响应体。下一步仍需补齐 SQLite `audit_events` 写入和对象上传下载前错误语义。
 
 ## HTTP API 边界
 
@@ -474,11 +474,12 @@ latest_ciphertext_hash
 4. 已补 device wrapping wrapped key bytes 的承载方式和读取接口，继续走密文 bytes + hash / length 校验。
 5. 已补 recovery wrapped material 的读取接口，继续走密文 bytes + hash / length 校验。
 6. 已补 recovery latest metadata API handler，覆盖统一错误响应、恢复读取限速和内部 `blob_ref` 不外泄。
-7. 已补 domain / device / join request 基础 metadata API，覆盖 domain 创建 / 读取、device 读取、pending join request 创建和非法 JSON 错误响应；join request 列表与 authorization handler 后置。
+7. 已补 domain / device / join request metadata API，覆盖 domain 创建 / 读取、device 读取、pending join request 创建 / 列表和非法 JSON 错误响应。
 8. 已补 API 层 request id、panic recovery 和非持久审计 hook，覆盖 request id header、结构化 panic error、审计事件不包含请求体字段。
-9. 实现 join request 列表、authorization handler 和 SQLite `audit_events` 写入。
-10. 再实现 encrypted object 上传下载和版本冲突检测。
-11. 最后再接 Rust `ime-sync` 远端客户端；客户端必须以已加密 envelope 和 signed manifest 为输入，不得把 plaintext payload 交给 server。
+9. 已补 authorization handler，把 signed authorization、wrapping metadata 和 encrypted wrapped key bytes 映射到 storage upload；storage conformance 覆盖授权后 pending join request 不再列出、设备激活和 wrapped key bytes 读取。
+10. 实现 SQLite `audit_events` 写入。
+11. 再实现 encrypted object 上传下载和版本冲突检测。
+12. 最后再接 Rust `ime-sync` 远端客户端；客户端必须以已加密 envelope 和 signed manifest 为输入，不得把 plaintext payload 交给 server。
 
 任何阶段都不应把 Flutter manager、平台壳、真实系统输入法服务或输入热路径接入 Go server。
 

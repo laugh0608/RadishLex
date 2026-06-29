@@ -140,6 +140,41 @@ func (s *SQLiteStore) SaveJoinRequest(ctx context.Context, request JoinRequest) 
 	return nil
 }
 
+func (s *SQLiteStore) PendingJoinRequests(ctx context.Context, domainID string) ([]JoinRequest, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	if _, err := s.Domain(ctx, domainID); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT domain_id, join_request_id, device_id,
+			signing_public_key_id, signing_public_key,
+			key_agreement_public_key_id, key_agreement_public_key,
+			challenge, created_at_ms, expires_at_ms, status
+		FROM device_join_requests
+		WHERE domain_id = ? AND status = ?
+		ORDER BY created_at_ms, join_request_id
+	`, domainID, string(DevicePending))
+	if err != nil {
+		return nil, newError(ErrStorageUnavailable, "join request metadata cannot be read")
+	}
+	defer rows.Close()
+
+	var requests []JoinRequest
+	for rows.Next() {
+		request, err := scanJoinRequestRows(rows)
+		if err != nil {
+			return nil, err
+		}
+		requests = append(requests, request)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, newError(ErrStorageUnavailable, "join request metadata cannot be read")
+	}
+	return requests, nil
+}
+
 func (s *SQLiteStore) AuthorizeJoinRequest(ctx context.Context, upload DeviceAuthorizationUpload) error {
 	if err := checkContext(ctx); err != nil {
 		return err
@@ -695,6 +730,21 @@ func joinRequestTx(ctx context.Context, tx *sql.Tx, domainID string, joinRequest
 		if errors.Is(err, sql.ErrNoRows) {
 			return JoinRequest{}, newError(ErrNotFound, "join request not found")
 		}
+		return JoinRequest{}, newError(ErrStorageUnavailable, "join request metadata cannot be read")
+	}
+	request.Status = DeviceStatus(status)
+	return cloneJoinRequest(request), nil
+}
+
+func scanJoinRequestRows(rows *sql.Rows) (JoinRequest, error) {
+	var request JoinRequest
+	var status string
+	if err := rows.Scan(
+		&request.DomainID, &request.JoinRequestID, &request.DeviceID,
+		&request.SigningPublicKeyID, &request.SigningPublicKey,
+		&request.KeyAgreementPublicKeyID, &request.KeyAgreementPublicKey,
+		&request.Challenge, &request.CreatedAtMs, &request.ExpiresAtMs, &status,
+	); err != nil {
 		return JoinRequest{}, newError(ErrStorageUnavailable, "join request metadata cannot be read")
 	}
 	request.Status = DeviceStatus(status)

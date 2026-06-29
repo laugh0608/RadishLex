@@ -114,7 +114,27 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 	t.Run("join authorization activates device and stores wrapped key bytes", func(t *testing.T) {
 		ctx := context.Background()
 		store := newReadyStore(t, newStore)
-		saveJoinAndAuthorize(t, store, "domain-a", "join-b", "device-b", 20)
+		request, upload := joinAuthorizationFixture("domain-a", "join-b", "device-b", 20)
+		if err := store.SaveJoinRequest(ctx, request); err != nil {
+			t.Fatalf("save join request: %v", err)
+		}
+		pending, err := store.PendingJoinRequests(ctx, "domain-a")
+		if err != nil {
+			t.Fatalf("list pending join requests: %v", err)
+		}
+		if len(pending) != 1 || pending[0].JoinRequestID != "join-b" || pending[0].Status != DevicePending {
+			t.Fatalf("unexpected pending join requests: %#v", pending)
+		}
+		if err := store.AuthorizeJoinRequest(ctx, upload); err != nil {
+			t.Fatalf("authorize join request: %v", err)
+		}
+		pending, err = store.PendingJoinRequests(ctx, "domain-a")
+		if err != nil {
+			t.Fatalf("list pending join requests after authorization: %v", err)
+		}
+		if len(pending) != 0 {
+			t.Fatalf("authorized join request should not remain pending: %#v", pending)
+		}
 
 		device, err := store.Device(ctx, "domain-a", "device-b")
 		if err != nil {

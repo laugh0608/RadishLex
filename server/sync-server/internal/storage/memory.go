@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"regexp"
+	"sort"
 	"sync"
 )
 
@@ -129,6 +130,31 @@ func (s *MemoryStore) SaveJoinRequest(ctx context.Context, request JoinRequest) 
 		Status:                  DevicePending,
 	}
 	return nil
+}
+
+func (s *MemoryStore) PendingJoinRequests(ctx context.Context, domainID string) ([]JoinRequest, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.domains[domainID]; !ok {
+		return nil, newError(ErrNotFound, "domain not found")
+	}
+	var requests []JoinRequest
+	for key, request := range s.joinRequests {
+		if key.domainID == domainID && request.Status == DevicePending {
+			requests = append(requests, cloneJoinRequest(request))
+		}
+	}
+	sort.Slice(requests, func(i int, j int) bool {
+		if requests[i].CreatedAtMs == requests[j].CreatedAtMs {
+			return requests[i].JoinRequestID < requests[j].JoinRequestID
+		}
+		return requests[i].CreatedAtMs < requests[j].CreatedAtMs
+	})
+	return requests, nil
 }
 
 func (s *MemoryStore) AuthorizeJoinRequest(ctx context.Context, upload DeviceAuthorizationUpload) error {

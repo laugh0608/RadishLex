@@ -32,6 +32,39 @@ type CreateJoinRequestRequest struct {
 	ExpiresAtMs             int64  `json:"expires_at_ms"`
 }
 
+type AuthorizeJoinRequestRequest struct {
+	Authorization DeviceAuthorizationRequest `json:"authorization"`
+	Wrapping      DeviceWrappingRequest      `json:"wrapping"`
+	WrappedKey    []byte                     `json:"wrapped_key"`
+}
+
+type DeviceAuthorizationRequest struct {
+	AuthorizerDeviceID          string `json:"authorizer_device_id"`
+	RecipientDeviceID           string `json:"recipient_device_id"`
+	RecipientSigningPublicKeyID string `json:"recipient_signing_public_key_id"`
+	RecipientKeyAgreementKeyID  string `json:"recipient_key_agreement_key_id"`
+	JoinShortCode               string `json:"join_short_code"`
+	KeyEpoch                    uint64 `json:"key_epoch"`
+	CreatedAtMs                 int64  `json:"created_at_ms"`
+	SignatureSchemaVersion      uint16 `json:"signature_schema_version"`
+	SignatureAlgorithm          string `json:"signature_algorithm"`
+	SignatureKeyID              string `json:"signature_key_id"`
+	Signature                   []byte `json:"signature"`
+}
+
+type DeviceWrappingRequest struct {
+	AuthorizerDeviceID string `json:"authorizer_device_id"`
+	RecipientDeviceID  string `json:"recipient_device_id"`
+	KeyEpoch           uint64 `json:"key_epoch"`
+	WrappingKeyID      string `json:"wrapping_key_id"`
+	Algorithm          string `json:"algorithm"`
+	Nonce              []byte `json:"nonce"`
+	WrappedKeyLen      int64  `json:"wrapped_key_len"`
+	CiphertextHash     string `json:"ciphertext_hash"`
+	CreatedAtMs        int64  `json:"created_at_ms"`
+	Signature          []byte `json:"signature"`
+}
+
 type ObjectVersionUploadRequest struct {
 	ObjectType             string `json:"object_type"`
 	Version                uint64 `json:"version"`
@@ -49,6 +82,40 @@ type ObjectVersionUploadRequest struct {
 	Signature              []byte `json:"signature"`
 	ClientCreatedAtMs      int64  `json:"client_created_at_ms"`
 	ClientUpdatedAtMs      int64  `json:"client_updated_at_ms"`
+}
+
+func (r AuthorizeJoinRequestRequest) Upload(domainID string, joinRequestID string) storage.DeviceAuthorizationUpload {
+	return storage.DeviceAuthorizationUpload{
+		Authorization: storage.DeviceAuthorization{
+			DomainID:                    domainID,
+			JoinRequestID:               joinRequestID,
+			AuthorizerDeviceID:          r.Authorization.AuthorizerDeviceID,
+			RecipientDeviceID:           r.Authorization.RecipientDeviceID,
+			RecipientSigningPublicKeyID: r.Authorization.RecipientSigningPublicKeyID,
+			RecipientKeyAgreementKeyID:  r.Authorization.RecipientKeyAgreementKeyID,
+			JoinShortCode:               r.Authorization.JoinShortCode,
+			KeyEpoch:                    r.Authorization.KeyEpoch,
+			CreatedAtMs:                 r.Authorization.CreatedAtMs,
+			SignatureSchemaVersion:      r.Authorization.SignatureSchemaVersion,
+			SignatureAlgorithm:          r.Authorization.SignatureAlgorithm,
+			SignatureKeyID:              r.Authorization.SignatureKeyID,
+			Signature:                   r.Authorization.Signature,
+		},
+		Wrapping: storage.DeviceWrappingRecord{
+			DomainID:           domainID,
+			RecipientDeviceID:  r.Wrapping.RecipientDeviceID,
+			AuthorizerDeviceID: r.Wrapping.AuthorizerDeviceID,
+			KeyEpoch:           r.Wrapping.KeyEpoch,
+			WrappingKeyID:      r.Wrapping.WrappingKeyID,
+			Algorithm:          r.Wrapping.Algorithm,
+			Nonce:              r.Wrapping.Nonce,
+			WrappedKeyLen:      r.Wrapping.WrappedKeyLen,
+			CiphertextHash:     r.Wrapping.CiphertextHash,
+			CreatedAtMs:        r.Wrapping.CreatedAtMs,
+			Signature:          r.Wrapping.Signature,
+		},
+		WrappedKey: r.WrappedKey,
+	}
 }
 
 func (r CreateJoinRequestRequest) JoinRequest(domainID string) storage.JoinRequest {

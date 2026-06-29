@@ -84,6 +84,16 @@ func TestMetadataHandlersCreateDomainReadDeviceAndSaveJoinRequest(t *testing.T) 
 	if joinBody.JoinRequestID != "join-a" || joinBody.Status != storage.DevicePending {
 		t.Fatalf("unexpected join response: %#v", joinBody)
 	}
+	listResponse := httptest.NewRecorder()
+	handler.ServeHTTP(listResponse, httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/join-requests", nil))
+	if listResponse.Code != http.StatusOK {
+		t.Fatalf("unexpected join request list status: %d body=%s", listResponse.Code, listResponse.Body.String())
+	}
+	var listBody JoinRequestsResponse
+	decodeResponse(t, listResponse, &listBody)
+	if len(listBody.JoinRequests) != 1 || listBody.JoinRequests[0].JoinRequestID != "join-a" {
+		t.Fatalf("unexpected join request list: %#v", listBody)
+	}
 
 	pendingDeviceResponse := httptest.NewRecorder()
 	handler.ServeHTTP(pendingDeviceResponse, httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/devices/device-b", nil))
@@ -93,6 +103,56 @@ func TestMetadataHandlersCreateDomainReadDeviceAndSaveJoinRequest(t *testing.T) 
 	decodeResponse(t, pendingDeviceResponse, &deviceBody)
 	if deviceBody.DeviceID != "device-b" || deviceBody.Status != storage.DevicePending {
 		t.Fatalf("join request should create a pending device, got %#v", deviceBody)
+	}
+}
+
+func TestJoinAuthorizationHandlerPassesSignedMetadataToStorage(t *testing.T) {
+	store := &authorizationStoreStub{}
+	handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+	request := AuthorizeJoinRequestRequest{
+		Authorization: DeviceAuthorizationRequest{
+			AuthorizerDeviceID:          "device-a",
+			RecipientDeviceID:           "device-b",
+			RecipientSigningPublicKeyID: "signing-key-b",
+			RecipientKeyAgreementKeyID:  "agreement-key-b",
+			JoinShortCode:               "123456",
+			KeyEpoch:                    1,
+			CreatedAtMs:                 200,
+			SignatureSchemaVersion:      1,
+			SignatureAlgorithm:          "ed25519-v1",
+			SignatureKeyID:              "signing-key-a",
+			Signature:                   []byte("signature"),
+		},
+		Wrapping: DeviceWrappingRequest{
+			AuthorizerDeviceID: "device-a",
+			RecipientDeviceID:  "device-b",
+			KeyEpoch:           1,
+			WrappingKeyID:      "wrapping-key-b",
+			Algorithm:          storage.AlgorithmXChaCha20Poly1305HKDFSHA256,
+			Nonce:              []byte("nonce"),
+			WrappedKeyLen:      int64(len("wrapped-key")),
+			CiphertextHash:     "sha256:wrapped",
+			CreatedAtMs:        200,
+			Signature:          []byte("wrapping-signature"),
+		},
+		WrappedKey: []byte("wrapped-key"),
+	}
+	response := performJSONRequest(t, handler, http.MethodPost, PrefixV1+"/domains/domain-a/join-requests/join-a/authorization", request)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("unexpected authorization status: %d body=%s", response.Code, response.Body.String())
+	}
+	if store.calls != 1 {
+		t.Fatalf("expected one authorization call, got %d", store.calls)
+	}
+	upload := store.upload
+	if upload.Authorization.DomainID != "domain-a" ||
+		upload.Authorization.JoinRequestID != "join-a" ||
+		upload.Authorization.AuthorizerDeviceID != "device-a" ||
+		upload.Authorization.RecipientDeviceID != "device-b" ||
+		upload.Wrapping.DomainID != "domain-a" ||
+		upload.Wrapping.WrappingKeyID != "wrapping-key-b" ||
+		string(upload.WrappedKey) != "wrapped-key" {
+		t.Fatalf("unexpected authorization upload: %#v", upload)
 	}
 }
 
@@ -411,4 +471,16 @@ type panicDomainStore struct {
 
 func (s *panicDomainStore) Domain(ctx context.Context, domainID string) (storage.Domain, error) {
 	panic("domain panic should be recovered")
+}
+
+type authorizationStoreStub struct {
+	storage.Store
+	upload storage.DeviceAuthorizationUpload
+	calls  int
+}
+
+func (s *authorizationStoreStub) AuthorizeJoinRequest(ctx context.Context, upload storage.DeviceAuthorizationUpload) error {
+	s.calls++
+	s.upload = upload
+	return nil
 }
