@@ -1,0 +1,28 @@
+name: radishlex-sync
+
+services:
+  sync-server:
+    build:
+      context: ./server/sync-server
+      dockerfile: Dockerfile
+    image: radishlex-sync-server:dev
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7319:7319"
+    environment:
+      RADISHLEX_SYNC_LISTEN: "0.0.0.0:7319"
+      RADISHLEX_SYNC_METADATA_PATH: "/var/lib/radishlex/sync-server/sync-server.sqlite"
+      RADISHLEX_SYNC_BLOB_DIR: "/var/lib/radishlex/sync-server/objects"
+      RADISHLEX_SYNC_MAX_OBJECT_BYTES: "16777216"
+      RADISHLEX_SYNC_RECOVERY_READS_PER_HOUR: "12"
+    volumes:
+      - sync-server-data:/var/lib/radishlex
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  sync-server-data:

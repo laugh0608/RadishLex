@@ -1,6 +1,6 @@
 # Sync Server 本机 Smoke Runbook
 
-本文档说明如何在开发者本机复验 RadishLex Go sync server 的本地启动、脱敏日志和 encrypted object 上传下载路径。读者是准备检查 `server/sync-server` 运行时边界的维护者和协作者。本文不包含 Docker Compose、公网部署、Rust 远端客户端接线、Flutter 同步 UI、平台壳联调或真实用户数据。
+本文档说明如何在开发者本机复验 RadishLex Go sync server 的本地启动、脱敏日志和 encrypted object 上传下载路径。读者是准备检查 `server/sync-server` 运行时边界的维护者和协作者。本文不包含 Docker Compose、公网部署、Rust 远端客户端接线、Flutter 同步 UI、平台壳联调或真实用户数据；Docker Compose 本机入口见 `docs/runbooks/sync-server-compose.md`。
 
 ## 前提
 
