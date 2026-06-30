@@ -115,7 +115,7 @@ docker compose -f deploy/sync-server/docker-compose.local.yaml down -v
 
 ```dotenv
 RADISHLEX_SYNC_BIND=127.0.0.1
-RADISHLEX_SYNC_PORT=87319
+RADISHLEX_SYNC_PORT=7319
 RADISHLEX_SYNC_DATA_PATH=/srv/radishlex-sync
 RADISHLEX_SYNC_MAX_OBJECT_BYTES=33554432
 ```
@@ -137,11 +137,43 @@ go test ./...
 ./scripts/check-repo.sh
 ```
 
-如需确认容器实际可启动，由开发者人工执行：
+### 容器实际启动 smoke
+
+容器启动 smoke 需要 Docker daemon 可用。执行前确认没有其他服务占用 `127.0.0.1:7319`，执行后必须 `down`，不能保留长期运行服务。
+
+本地 HTTPS 入口：
 
 ```sh
-docker compose -f deploy/sync-server/docker-compose.local.yaml up --build
+docker compose -f deploy/sync-server/docker-compose.local.yaml up --build -d
+curl -k -i https://localhost:7319/api/v1/domains/smoke-compose/state
+docker compose -f deploy/sync-server/docker-compose.local.yaml down -v
 ```
+
+预期 `curl` 能经由 Caddy internal TLS 到达 `sync-server`，返回 sync-server 的结构化 `404 not_found` JSON，而不是 TLS 握手失败、连接拒绝或 Caddy upstream 错误。
+
+部署态 HTTP 上游可直接使用 `.env.example` 做配置解析；实际启动时建议用仓库外临时 env 覆盖 `RADISHLEX_SYNC_DATA_PATH` 到临时目录，避免在仓库中留下 `DeployData`：
+
+```sh
+tmpdir="$(mktemp -d)"
+tmpenv="$tmpdir/radishlex-sync.env"
+cp deploy/sync-server/.env.example "$tmpenv"
+printf '\nRADISHLEX_SYNC_DATA_PATH=%s\n' "$tmpdir/data" >> "$tmpenv"
+
+docker compose -f deploy/sync-server/docker-compose.yaml --env-file "$tmpenv" up --build -d
+curl -i http://127.0.0.1:7319/api/v1/domains/smoke-compose/state
+docker compose -f deploy/sync-server/docker-compose.yaml --env-file "$tmpenv" down
+rm -rf "$tmpdir"
+```
+
+预期部署态 `curl` 能直连 `sync-server` HTTP upstream，返回结构化 `404 not_found` JSON。该入口不提供 TLS；真实生产 TLS 必须由外部反代终止。
+
+如果 Docker daemon 或 Docker socket 权限不可用，不要把 `docker compose config` 写成容器启动通过。应记录：
+
+- `docker compose version`
+- `docker context ls`
+- `docker version --format '{{.Server.Version}}'` 的失败信息
+- 本地 HTTPS 和部署态 HTTP 的待复验命令
+- 是否执行过 `down` / `down -v`，以及是否留下临时 env、临时数据目录或 Compose volume
 
 当前仓库没有提交依赖 Docker daemon 的 CI 检查；Docker build / run 失败时，应先记录镜像、平台、Go 版本和日志，再判断是配置问题还是本机 Docker 环境问题。
 
