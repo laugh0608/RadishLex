@@ -32,7 +32,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步若进入代码，应按生产部署 runbook 补备份恢复演练 / 外部 TLS 验证证据，或单独调查 Apple 原生非导出 Ed25519 支持矩阵；access token 已有首个 server / transport 证据，但真实平台 smoke 未通过前，不应开放用户可用同步主线。
+进入用户可用同步前，应按生产部署 runbook 补备份恢复演练 / 外部 TLS 验证证据；Apple 原生非导出 Ed25519 支持矩阵应单独调查。access token 已有首个 server / transport 证据，但可用平台私钥 backend 停止线解除前，不应开放用户可用同步主线。
 
 ## 设计目标
 

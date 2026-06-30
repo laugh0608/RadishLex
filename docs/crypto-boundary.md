@@ -182,20 +182,22 @@ Plaintext payload 后续必须有稳定 schema：
 6. 已接入 `ranker.weights` P2 plaintext payload schema，来源限制为 P1 本地事件压缩后的权重摘要，不导出 selection event、negative feedback、上下文统计或本地审计明细。
 7. 已把 userdb P2 plaintext payload 接入 `ime-sync::SyncEnvelopeAssembler`，由该组装边界调用 `ime-crypto` 生成本地 envelope 并派生 `ime-sync::EncryptedSyncObjectDraft`；当前覆盖 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms`，仍不暴露 FFI 明文 payload。
 8. 已补 `ime-sync` remote object client DTO / transport trait 和 std-only `http://` HTTP transport，上传入口只接收 `AssembledSyncObject` 和 `SignedSyncObjectManifest`，用于验证 Go server JSON / base64 metadata、binary payload 下载、真实 HTTP request / response 传递和错误映射。
-8. 已补 `docs/sync-key-management.md`，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突边界。
-9. 已在 Rust 侧补 device key descriptor、device wrapping key / record、recovery material、key epoch 和 device authorization 草案模型；测试覆盖设备包装 key 按设备和 epoch 派生、包装密文不进入 Debug 明文、授权设备和接收设备都必须 active、撤销后新对象使用新 `key_epoch` 且旧 epoch key 不能解密。
-10. 已补 `ime-sync` 客户端解密后合并模型，覆盖删除 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词、显式恢复清理 tombstone 和恢复前旧权重不复活。
-11. 已补 `ime-sync::SyncEnvelopeAssembler`，固定 Rust 内部 P2 payload 到 envelope 的组装边界，覆盖 sync master 派生 object key、nonce 复用阻断、draft 派生和 Debug 明文阻断。
-12. 已补 `docs/adr/0002-recovery-code-kdf.md`，固定恢复码 Argon2id KDF、格式、恢复记录字段、失败限速和验证口径。
-13. 已在 `ime-crypto` 补 `RecoveryCode`、`RecoveryKdfProfile`、`RecoveryWrappingKeyMaterial` 和 `RecoveryMaterial` 恢复记录加解密测试，覆盖恢复码格式 / 校验段、KDF 参数校验、同码同 salt 稳定派生、salt 变化、错误恢复码失败、AAD 变更失败和 Debug 脱敏。
-14. 已补 `docs/adr/0003-device-signing-key-storage.md`，固定 Ed25519 设备签名、签名对象、canonical bytes、私钥存储抽象、错误语义和验证口径。
-15. 已按 ADR 落地签名 / 设备密钥存储 Rust 模型，覆盖 Ed25519 test-memory signer、signed sync object manifest、signed recovery record、signed device authorization 和 signed device revocation。
-16. 已补真实 userdb P2 payload 解析到 merge input 的接线。
-17. 已补合并结果写回真实 userdb 的执行器。
-18. 已补 Go server API / storage 边界设计、生产恢复流程设计和平台私钥存储 backend ADR。
-19. 已补平台私钥存储 backend capability / unavailable backend 的 Rust 模型和测试，覆盖生产签名门禁、backend mismatch、unavailable 不回退和 revoked key 阻断。
-20. 已按 `docs/sync-server-api-storage.md` 起步 Go server metadata / storage / API 验证模型，覆盖配置默认值、API request / error DTO、SQLite migration 文本、storage interface、storage conformance tests、内存 storage、SQLite-backed metadata repository、local object storage staged transaction、版本冲突、撤销设备阻断和隐私字段检查。
-21. 下一步继续推进 Go server 签名、metadata API、版本冲突和错误语义验证。
+9. 已补 `docs/sync-key-management.md`，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突边界。
+10. 已在 Rust 侧补 device key descriptor、device wrapping key / record、recovery material、key epoch 和 device authorization 草案模型；测试覆盖设备包装 key 按设备和 epoch 派生、包装密文不进入 Debug 明文、授权设备和接收设备都必须 active、撤销后新对象使用新 `key_epoch` 且旧 epoch key 不能解密。
+11. 已补 `ime-sync` 客户端解密后合并模型，覆盖删除 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词、显式恢复清理 tombstone 和恢复前旧权重不复活。
+12. 已补 `ime-sync::SyncEnvelopeAssembler`，固定 Rust 内部 P2 payload 到 envelope 的组装边界，覆盖 sync master 派生 object key、nonce 复用阻断、draft 派生和 Debug 明文阻断。
+13. 已补 `docs/adr/0002-recovery-code-kdf.md`，固定恢复码 Argon2id KDF、格式、恢复记录字段、失败限速和验证口径。
+14. 已在 `ime-crypto` 补 `RecoveryCode`、`RecoveryKdfProfile`、`RecoveryWrappingKeyMaterial` 和 `RecoveryMaterial` 恢复记录加解密测试，覆盖恢复码格式 / 校验段、KDF 参数校验、同码同 salt 稳定派生、salt 变化、错误恢复码失败、AAD 变更失败和 Debug 脱敏。
+15. 已补 `docs/adr/0003-device-signing-key-storage.md`，固定 Ed25519 设备签名、签名对象、canonical bytes、私钥存储抽象、错误语义和验证口径。
+16. 已按 ADR 落地签名 / 设备密钥存储 Rust 模型，覆盖 Ed25519 test-memory signer、signed sync object manifest、signed recovery record、signed device authorization 和 signed device revocation。
+17. 已补真实 userdb P2 payload 解析到 merge input 的接线。
+18. 已补合并结果写回真实 userdb 的执行器。
+19. 已补 Go server API / storage 边界设计、生产恢复流程设计和平台私钥存储 backend ADR。
+20. 已补平台私钥存储 backend capability / unavailable backend 的 Rust 模型和测试，覆盖生产签名门禁、backend mismatch、unavailable 不回退和 revoked key 阻断。
+21. 已按 `docs/sync-server-api-storage.md` 起步 Go server metadata / storage / API / runtime 验证模型，覆盖签名验签、device wrapping bytes、recovery wrapped material、object version、版本冲突、Rust envelope hash / length、错误语义、脱敏审计和单用户 bearer access token 门禁。
+22. 已补 Docker Compose 本地 / 部署态入口、生产部署 runbook、Rust HTTP transport 直连 Go server 测试和 Rust userdb 两客户端真实 Go HTTP 同步测试；这些只验证密文对象、签名、版本和日志边界，不开放用户可用同步。
+23. 已接线 `apple-keychain-v1` feature-gated macOS backend 和 smoke 入口；真实 smoke 阻塞于 `ed25519-v1` 创建，backend status 在 smoke 通过前阻断生产签名，不回退到 seed 存储或 `test-memory-v1`。
+24. 进入用户可用同步前仍需补 sync server 备份恢复演练和外部 TLS 真实验证证据；Apple 原生非导出 Ed25519 支持矩阵需单独调查。
 
 ## 验证口径
 

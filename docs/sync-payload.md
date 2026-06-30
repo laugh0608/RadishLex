@@ -1,6 +1,6 @@
 # RadishLex 同步 Payload 草案
 
-本文档定义当前 Rust 侧同步 payload 草案、数据分级映射和验证口径，读者是后续实现 `ime-sync`、`ime-crypto`、同步 CLI、Go server 和管理 UI 的开发者。本文不包含加密算法实现、设备授权流程完整协议、Go server 数据库 migration、生产部署配置或用户可用同步设置；客户端加密边界见 `docs/crypto-boundary.md`，Go server API 与 storage 边界见 `docs/sync-server-api-storage.md`。
+本文档定义当前 Rust 侧同步 payload 草案、数据分级映射和验证口径，读者是后续实现 `ime-sync`、`ime-crypto`、同步 CLI、Go server 和管理 UI 的开发者。本文不包含加密算法实现、设备授权流程完整协议、Go server 数据库 migration、生产备份恢复操作细节或用户可用同步设置；客户端加密边界见 `docs/crypto-boundary.md`，Go server API 与 storage 边界见 `docs/sync-server-api-storage.md`。
 
 ## 当前定位
 
@@ -182,7 +182,7 @@ updated_at_ms
 
 ## 远端对象客户端边界
 
-`ime-sync` 的 remote client 只负责把本地已经组装完成的加密对象映射到 Go sync server API。它不是明文 payload 生成器，不负责真实网络栈选择，也不直接启动或管理 Go server。
+`ime-sync` 的 remote client 只负责把本地已经组装完成的加密对象映射到 Go sync server API。它不是明文 payload 生成器，不决定部署网络拓扑，也不直接启动或管理 Go server。当前 `HttpSyncRemoteTransport` 是 std-only `http://` transport 实现，用于短生命周期测试、受控自部署 upstream 和跨语言验证；生产外部 TLS、反向代理和访问 token 配置仍由部署层负责。
 
 核心类型：
 
@@ -275,9 +275,8 @@ object_payload(domain_id, object_id, version)
 未落地：
 
 - `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
-- 真实平台私钥存储 backend 实现、生产恢复 UI / API 和远端密钥轮换执行器。
-- 生产部署配置和用户可用同步设置。
-- 生产同步设置、备份快照、管理 UI 同步状态和平台私钥存储 backend 实现。
+- 生产恢复 UI / API、远端密钥轮换执行器、备份快照 payload 字段序列化和用户可用同步设置。
+- 真实平台私钥存储 backend 的生产可用状态；当前 `apple-keychain-v1` 已 feature-gated 接线，但真实 smoke 阻塞于 `ed25519-v1` 创建，不能作为可用生产 backend。
 
 ## 验证口径
 
