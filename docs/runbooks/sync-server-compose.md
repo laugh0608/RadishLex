@@ -1,6 +1,6 @@
 # Sync Server Docker Compose Runbook
 
-本文档说明如何用 Docker Compose 复验 RadishLex Go sync server 的容器运行边界，读者是准备检查本地 HTTPS、部署态 HTTP 上游、SQLite / encrypted blob 持久化和日志脱敏的维护者与协作者。本文不包含完整公网部署、生产认证、备份恢复策略、Flutter 同步 UI、平台壳联调、真实平台私钥存储 backend 或真实用户数据导入。
+本文档说明如何用 Docker Compose 复验 RadishLex Go sync server 的容器运行边界，读者是准备检查本地 HTTPS、部署态 HTTP 上游、SQLite / encrypted blob 持久化和日志脱敏的维护者与协作者。本文不包含完整公网部署、生产认证、备份恢复策略、Flutter 同步 UI、平台壳联调、真实平台私钥存储 backend 或真实用户数据导入；生产部署边界见 `docs/runbooks/sync-server-production-deployment.md`。
 
 ## 前提
 
@@ -8,6 +8,7 @@
 - 本地容器验证使用 `deploy/sync-server/docker-compose.local.yaml`，默认访问 `https://localhost:7319`。
 - 部署态使用 `deploy/sync-server/docker-compose.yaml`，容器只暴露 HTTP 上游 `http://127.0.0.1:7319`，外部 `Nginx / Traefik / Caddy` 负责 TLS 终止。
 - 当前 server 仍缺少生产认证、备份策略、平台私钥 backend 和用户可用同步 UI，不应直接开放给真实用户或公网。
+- 真实用户部署前必须先按 `docs/runbooks/sync-server-production-deployment.md` 复核外部 TLS、认证 / 访问控制、冷备份、恢复演练、升级回滚和日志脱敏。
 - 不写入真实用户词、input code、reading、联系人、P1 事件、ranker 明细或真实恢复材料。
 - AI 默认不启动或保留长期运行服务；需要人工明确执行 `docker compose up`。
 
@@ -76,9 +77,9 @@ http://127.0.0.1:7319
 - `RADISHLEX_SYNC_MAX_OBJECT_BYTES`：单个 encrypted object 上限。
 - `RADISHLEX_SYNC_RECOVERY_READS_PER_HOUR`：recovery latest 读取限速。
 
-`deploy/sync-server/nginx.prod.conf` 是生产外部反代示例，默认把 `https://sync.radishlex.example.com` 转发到 `127.0.0.1:7319`。真实部署前必须替换域名、证书路径和上游地址。
+`deploy/sync-server/nginx.prod.conf` 是外部 TLS 终止骨架，默认把 `https://sync.radishlex.example.com` 转发到 `127.0.0.1:7319`。真实部署前必须替换域名、证书路径和上游地址，并补齐访问控制；该文件本身不代表完整公网生产配置。
 
-`.env.example` 不是完整生产上线方案。真实用户同步前仍必须补齐认证策略、备份恢复、升级回滚、外部 TLS 证书、监控告警、平台私钥 backend 和人工恢复演练。
+`.env.example` 不是完整生产上线方案。真实用户同步前仍必须按生产部署 runbook 补齐认证策略、备份恢复、升级回滚、外部 TLS 证书、监控告警、平台私钥 backend 和人工恢复演练。
 
 ## 日志与停止
 

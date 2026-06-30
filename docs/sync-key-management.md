@@ -23,6 +23,7 @@
 - `ime-sync` 已补 remote object client DTO / transport trait 和 std-only `http://` HTTP transport，上传入口只接收 `AssembledSyncObject` 和 `SignedSyncObjectManifest`，不接受 plaintext payload。
 - Rust 侧两客户端 userdb harness 已覆盖设备 A 生成 P2 payload 并加密上传、设备 B 下载二进制密文后解密 / 解码 / 合并写回 SQLite、stale conflict latest metadata 映射，以及基于最新 base version 重新上传 v2。
 - Rust userdb 两客户端真实 Go HTTP 测试已覆盖设备 B join / signed authorization、三类 P2 对象真实 HTTP 上传下载、客户端解密 / 解码 / SQLite 写回、stale conflict latest metadata、按最新 `base_version` 上传 v2 和 runtime 日志脱敏。
+- `docs/runbooks/sync-server-production-deployment.md` 已固定生产部署边界，覆盖外部 TLS、认证 / 访问控制、冷备份、恢复、升级回滚和真实用户开放停止线。
 
 当前仍不做：
 
@@ -30,7 +31,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步若进入代码，应按 `docs/sync-server-api-storage.md` 和 `docs/adr/0004-platform-private-key-storage-backend.md` 确认外部 TLS / 认证 / 备份部署边界或真实平台私钥 backend 验证边界；真实平台 backend 未通过验证前，不应开放用户可用同步主线。
+下一步若进入代码，应按 `docs/adr/0004-platform-private-key-storage-backend.md` 推进真实平台私钥 backend 验证，或按生产部署 runbook 补真实认证 / 备份恢复演练 / 外部 TLS 验证证据；真实平台 backend 未通过验证前，不应开放用户可用同步主线。
 
 ## 设计目标
 
