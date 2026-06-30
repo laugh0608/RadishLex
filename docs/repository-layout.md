@@ -27,7 +27,9 @@ RadishLex/
   deploy/
     sync-server/
       caddy/
-      env/
+      docker-compose.local.yaml
+      docker-compose.yaml
+      nginx.prod.conf
   apps/
     radishlex-manager/
       flutter/
@@ -86,15 +88,17 @@ RadishLex/
 ## 当前已落地
 
 - `Cargo.toml`：Rust workspace 入口。
-- `compose.yaml`：Go sync server Docker Compose 入口，包含内部 `sync-server` 和对外 `sync-gateway`，通过 env 文件切换本地 HTTPS 与部署态 HTTP。
-- `deploy/sync-server/`：Compose env 文件和 Caddy 入口配置；`local.env` 默认 `https://localhost:7443`，`production.env` 默认同机 HTTP 上游 `http://127.0.0.1:7319`。
+- `deploy/sync-server/docker-compose.local.yaml`：Go sync server 本地容器验证入口，使用 Caddy internal TLS 暴露 `https://localhost:7443`。
+- `deploy/sync-server/docker-compose.yaml`：Go sync server 部署态入口，只暴露 HTTP 上游 `http://127.0.0.1:7319`，外部反代负责 TLS。
+- `deploy/sync-server/.env.local.example` / `.env.example`：本地和部署态 env 示例。
+- `deploy/sync-server/nginx.prod.conf`：生产外部 Nginx TLS 终止示例。
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
 - `crates/ime-cli/`：基于 demo adapter、可选 Rime adapter、userdb 和 ranker 的命令行复验入口。
 - `crates/ime-engine-rime/`：Rime adapter crate，默认不启用 native 绑定。
 - `crates/ime-ffi/`：C ABI 起步 crate，覆盖 ABI contract、opaque handle、session owner-thread policy、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、sync preflight 状态摘要、userdb 管理入口、dictionary 文件管理入口和 host smoke。
 - `crates/ime-sync/`：同步 payload 来源分类、对象类型、P2 envelope 组装、加密对象外壳草案、设备生命周期、对象版本冲突、客户端合并模型、signed device authorization、signed device revocation、remote client DTO / transport trait 和 std-only `http://` HTTP transport。
 - `crates/ime-crypto/`：客户端加密本地模型 crate，当前覆盖 key role、object envelope、AAD、nonce、ciphertext hash、device wrapping、recovery material、Argon2id recovery KDF、Ed25519 signing、test-memory signing key store、platform backend capability / unavailable 模型、signed object manifest 和 signed recovery record。
-- `server/sync-server/`：Go sync server 起步 module，当前覆盖配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、device wrapping encrypted key bytes 承载、recovery wrapped material 读取接口、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、`cmd/radishlex-sync-server`、runtime 配置装配、HTTP timeout、对象大小门禁、脱敏 audit logger、本机 smoke runbook、短生命周期双设备 HTTP smoke、Dockerfile / `.dockerignore`、Compose env 切换入口，以及 Rust HTTP transport 直连 Go server 的短生命周期跨语言测试；不包含完整真实用户生产封装。
+- `server/sync-server/`：Go sync server 起步 module，当前覆盖配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、device wrapping encrypted key bytes 承载、recovery wrapped material 读取接口、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、`cmd/radishlex-sync-server`、runtime 配置装配、HTTP timeout、对象大小门禁、脱敏 audit logger、本机 smoke runbook、短生命周期双设备 HTTP smoke、Dockerfile / `.dockerignore`、Docker Compose 本地 / 部署态入口，以及 Rust HTTP transport 直连 Go server 的短生命周期跨语言测试；不包含完整真实用户生产封装。
 - `docs/cli.md`：`radishlex-ime-cli` 命令、输出、退出码和安全边界说明。
 - `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
 - `docs/engine-rime-adapter.md`：`ime-engine-rime` 的 adapter 边界、构建策略和验证分层。
@@ -111,7 +115,7 @@ RadishLex/
 - `docs/runbooks/ffi-platform-call-contract.md`：平台绑定层调用 C ABI 的错误、字符串、handle 释放和 owner-thread 调度规则。
 - `docs/runbooks/rime-native-smoke.md`：真实 `librime` 本机 smoke 操作步骤。
 - `docs/runbooks/sync-server-local-smoke.md`：Go sync server 本机启动边界、自动化 smoke 和日志脱敏检查。
-- `docs/runbooks/sync-server-compose.md`：Go sync server Docker Compose 本地 HTTPS、部署态 HTTP 上游、持久化 volume、清理和停止线 runbook。
+- `docs/runbooks/sync-server-compose.md`：Go sync server Docker Compose 本地 HTTPS、部署态 HTTP 上游、持久化目录、外部反代示例、清理和停止线 runbook。
 
 ## Rust crates 建议
 
@@ -232,7 +236,7 @@ server/sync-server/
 - Docker Compose。
 - 本地文件对象存储。
 
-当前已起步 `server/sync-server/`，但只实现 metadata / storage / API / runtime 验证模型、SQLite-backed metadata repository、local object storage staged transaction、对象 Rust envelope hash / length 复验、Ed25519 签名验签门禁、device wrapping encrypted key bytes 承载、recovery wrapped material 读取、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、启动入口、runtime 配置装配、脱敏日志、本机 runbook、Docker Compose env 切换入口和短生命周期双设备 HTTP smoke。Rust `ime-sync` 已起步 remote client DTO / transport trait 和 std-only `http://` HTTP transport，`ime-userdb` 已补两客户端 userdb harness，Rust HTTP transport 直连 Go server 的短生命周期跨语言测试已覆盖对象上传、下载和 stale conflict；完整真实用户生产封装、Flutter manager 和平台壳继续后置。
+当前已起步 `server/sync-server/`，但只实现 metadata / storage / API / runtime 验证模型、SQLite-backed metadata repository、local object storage staged transaction、对象 Rust envelope hash / length 复验、Ed25519 签名验签门禁、device wrapping encrypted key bytes 承载、recovery wrapped material 读取、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、启动入口、runtime 配置装配、脱敏日志、本机 runbook、Docker Compose 本地 / 部署态入口和短生命周期双设备 HTTP smoke。Rust `ime-sync` 已起步 remote client DTO / transport trait 和 std-only `http://` HTTP transport，`ime-userdb` 已补两客户端 userdb harness，Rust HTTP transport 直连 Go server 的短生命周期跨语言测试已覆盖对象上传、下载和 stale conflict；完整真实用户生产封装、Flutter manager 和平台壳继续后置。
 
 后续支持：
 

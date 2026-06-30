@@ -91,11 +91,11 @@ SyncObject
 
 `ime-userdb` 当前已有 Rust 内部 `UserDb::p2_plaintext_payloads()` 只读迭代器，供本地 integration test 通过 `ime-sync::SyncEnvelopeAssembler` 把 `dictionary.user_terms`、`ranker.weights` 和 `dictionary.deleted_terms` 装入 `ime-crypto` envelope，再派生 `ime-sync::EncryptedSyncObjectDraft`。该迭代器不是 CLI / FFI / 文件导出接口，不得作为明文同步文件或平台壳调用入口。
 
-`crates/ime-sync/` 当前定义 payload 来源分类、同步对象类型、加密对象外壳草案、P2 envelope 组装边界、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型、客户端解密后合并模型、remote client DTO / transport trait 和 std-only `http://` HTTP transport。该合并模型已覆盖 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词和显式恢复语义；`ime-userdb` 已能把已解密 P2 JSON 解析为 merge input，并把被接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite。当前 remote client 只接受已加密 `AssembledSyncObject` 和 `SignedSyncObjectManifest`，不接受 plaintext payload；HTTP transport 只传递 encrypted payload 和服务端可见 metadata，不记录请求体或响应体。Rust 侧两客户端 userdb harness 已覆盖 P2 payload 加密上传、另一客户端下载密文、解密、合并写回、stale conflict 和 v2 重新上传；Go server runtime smoke 已覆盖第二设备授权和跨设备 object 版本链；Rust HTTP transport 直连 Go server 的短生命周期跨语言测试已覆盖 domain 初始化、signed encrypted object 上传、metadata / payload 读取和 stale conflict。Docker Compose env 切换入口已补，本地通过 `https://localhost:7443` 验证，部署态通过同机 HTTP 上游对接外部 TLS 反代；生产认证、备份、完整部署封装和平台私钥 backend 仍属于后续阶段。Go server API / storage 边界见 `docs/sync-server-api-storage.md`，当前 Go module 已覆盖 metadata / storage / API / runtime 验证、SQLite-backed metadata repository、local object storage staged transaction、encrypted object version handler、recovery latest handler、device wrapped key bytes 承载、非敏感 audit events、短生命周期 HTTP smoke 和 Compose 运行边界，服务端只能保存密文对象、设备公钥、签名记录、版本和必要同步元数据。
+`crates/ime-sync/` 当前定义 payload 来源分类、同步对象类型、加密对象外壳草案、P2 envelope 组装边界、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型、客户端解密后合并模型、remote client DTO / transport trait 和 std-only `http://` HTTP transport。该合并模型已覆盖 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词和显式恢复语义；`ime-userdb` 已能把已解密 P2 JSON 解析为 merge input，并把被接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite。当前 remote client 只接受已加密 `AssembledSyncObject` 和 `SignedSyncObjectManifest`，不接受 plaintext payload；HTTP transport 只传递 encrypted payload 和服务端可见 metadata，不记录请求体或响应体。Rust 侧两客户端 userdb harness 已覆盖 P2 payload 加密上传、另一客户端下载密文、解密、合并写回、stale conflict 和 v2 重新上传；Go server runtime smoke 已覆盖第二设备授权和跨设备 object 版本链；Rust HTTP transport 直连 Go server 的短生命周期跨语言测试已覆盖 domain 初始化、signed encrypted object 上传、metadata / payload 读取和 stale conflict。Docker Compose 本地 / 部署态入口已补，本地通过 `https://localhost:7443` 验证，部署态通过同机 HTTP 上游对接外部 TLS 反代；生产认证、备份、完整部署封装和平台私钥 backend 仍属于后续阶段。Go server API / storage 边界见 `docs/sync-server-api-storage.md`，当前 Go module 已覆盖 metadata / storage / API / runtime 验证、SQLite-backed metadata repository、local object storage staged transaction、encrypted object version handler、recovery latest handler、device wrapped key bytes 承载、非敏感 audit events、短生命周期 HTTP smoke 和 Compose 运行边界，服务端只能保存密文对象、设备公钥、签名记录、版本和必要同步元数据。
 
 `docs/crypto-boundary.md` 已补 `ime-crypto` 客户端加密边界，并已落地本地 AEAD envelope、ciphertext hash、device wrapping、recovery material 和撤销后 key epoch 解密边界测试。对象版本服务端可见 hash 当前对齐 Rust envelope 的 AAD + encrypted payload hash；device wrapping 和 recovery wrapped material 使用裸密文 bytes 的 hash / length 校验。任何 hash 都不得是 plaintext payload hash。
 
-`docs/sync-key-management.md` 已补真实同步前的同步密钥与设备生命周期边界，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突方向；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF、格式和恢复记录边界，`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名和私钥存储边界，`docs/sync-server-api-storage.md` 已固定 Go sync server 的 API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和验证口径，`docs/production-recovery-flow.md` 已固定生产恢复记录创建 / 轮换 / 撤销、新设备恢复加入和失败限速，`docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend 边界；`ime-crypto` 已落地恢复码 KDF Rust 模型、恢复记录解密测试、Ed25519 test-memory signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断、signed sync object manifest 和 signed recovery record；`ime-sync` 已落地 signed device authorization / revocation、remote object client DTO 和 HTTP transport；`ime-userdb` 已补 Rust 侧两客户端同步边界测试；Go server 已起步 metadata / storage / API / runtime 验证模型、SQLite-backed metadata repository、local object storage staged transaction、签名验证、device wrapping encrypted key bytes 承载、recovery wrapped material 读取、metadata API、object version 上传下载、版本冲突、错误语义、非敏感 audit events、双设备 HTTP smoke、Rust HTTP transport 直连 Go server 的短生命周期跨语言测试和 Docker Compose env 切换入口。进入生产部署封装或用户可用同步前，应继续复验平台 backend、日志脱敏、payload hash / length、stale conflict 和客户端解密后合并写回。
+`docs/sync-key-management.md` 已补真实同步前的同步密钥与设备生命周期边界，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突方向；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF、格式和恢复记录边界，`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名和私钥存储边界，`docs/sync-server-api-storage.md` 已固定 Go sync server 的 API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和验证口径，`docs/production-recovery-flow.md` 已固定生产恢复记录创建 / 轮换 / 撤销、新设备恢复加入和失败限速，`docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend 边界；`ime-crypto` 已落地恢复码 KDF Rust 模型、恢复记录解密测试、Ed25519 test-memory signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断、signed sync object manifest 和 signed recovery record；`ime-sync` 已落地 signed device authorization / revocation、remote object client DTO 和 HTTP transport；`ime-userdb` 已补 Rust 侧两客户端同步边界测试；Go server 已起步 metadata / storage / API / runtime 验证模型、SQLite-backed metadata repository、local object storage staged transaction、签名验证、device wrapping encrypted key bytes 承载、recovery wrapped material 读取、metadata API、object version 上传下载、版本冲突、错误语义、非敏感 audit events、双设备 HTTP smoke、Rust HTTP transport 直连 Go server 的短生命周期跨语言测试和 Docker Compose 本地 / 部署态入口。进入生产部署封装或用户可用同步前，应继续复验平台 backend、日志脱敏、payload hash / length、stale conflict 和客户端解密后合并写回。
 
 ## 设备授权
 
@@ -198,10 +198,14 @@ Rust remote client 的 `SyncRemoteRequest`、`RemoteObjectVersion` 和 `RemoteOb
 Docker Compose 服务：
 
 ```text
-services:
+local services:
   sync-server:
   sync-gateway:
-volumes:
+
+deployment services:
+  sync-server:
+
+local volumes:
   sync-server-data:
   sync-gateway-data:
   sync-gateway-config:
