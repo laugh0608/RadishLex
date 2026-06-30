@@ -32,7 +32,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步若进入代码，应按 `docs/runbooks/apple-keychain-signing-backend.md` 推进 Apple Keychain SDK backend gated smoke，或按生产部署 runbook 补真实认证 / 备份恢复演练 / 外部 TLS 验证证据；真实平台 SDK backend 未通过验证前，不应开放用户可用同步主线。
+下一步若进入代码，应在明确批准后按 `docs/runbooks/apple-keychain-signing-backend.md` 运行 Apple Keychain gated smoke，或按生产部署 runbook 补真实认证 / 备份恢复演练 / 外部 TLS 验证证据；真实平台 smoke 未通过前，不应开放用户可用同步主线。
 
 ## 设计目标
 
@@ -263,8 +263,8 @@ updated_at_ms
 7. 已补 `docs/adr/0002-recovery-code-kdf.md`，固定恢复码 Argon2id KDF、格式、恢复记录字段、失败限速和验证口径。
 8. 已按 ADR 落地恢复码 KDF 纯 Rust 模型与测试，覆盖 `RecoveryCode`、`RecoveryKdfProfile`、恢复 wrapping key 和 `RecoveryMaterial` 恢复记录加解密。
 9. 已补 `docs/adr/0003-device-signing-key-storage.md`，固定设备签名、签名对象、canonical bytes、私钥存储抽象、错误语义和验证口径。
-10. 已按 ADR 落地签名 / 设备密钥存储 Rust 模型，当前使用合成 `test-memory-v1` key store，并补 platform backend capability metadata、unavailable backend 明确失败和 revoked key 阻断测试；不接系统 Keychain / Keystore。
-11. 已补 `apple-keychain-v1` 平台 runbook，固定 Apple Keychain 创建、加载、签名、删除、锁屏 / 权限、备份迁移和日志脱敏验证边界；真实 SDK backend 尚未实现。
+10. 已按 ADR 落地签名 / 设备密钥存储 Rust 模型，当前使用合成 `test-memory-v1` key store，并补 platform backend capability metadata、unavailable backend 明确失败和 revoked key 阻断测试。
+11. 已补 `apple-keychain-v1` 平台 runbook，固定 Apple Keychain 创建、加载、签名、删除、锁屏 / 权限、备份迁移和日志脱敏验证边界；macOS backend 已在 `apple-keychain` feature 下接线，默认测试不访问系统 Keychain，真实 smoke 尚未运行。
 12. 已补真实 userdb P2 payload 解析到 merge input 的接线。
 13. 已补客户端合并结果写回真实 userdb 的执行器。
 14. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
@@ -296,7 +296,7 @@ updated_at_ms
 ## 停止线
 
 - 恢复码 KDF 算法、参数、格式、Rust model 和生产恢复流程设计已落地；服务端恢复记录 API 与管理 UI 未实现前，不提供用户可用恢复入口。
-- 设备签名模型、签名对象验证、私钥存储抽象、平台私钥存储 backend capability / unavailable backend Rust 模型和 `apple-keychain-v1` 平台 runbook 已落地；真实 SDK backend 未完成前，不做用户可用远端对象上传下载。
+- 设备签名模型、签名对象验证、私钥存储抽象、平台私钥存储 backend capability / unavailable backend Rust 模型、`apple-keychain-v1` 平台 runbook 和 feature-gated macOS backend 已落地；真实 Keychain smoke 未通过前，不做用户可用远端对象上传下载。
 - 服务端若回退到只保存 wrapping metadata 而不能保存 / 返回 wrapped key bytes，则不得开放真实设备授权 handler。
 - Go server 与 Rust HTTP transport 继续推进时，必须先满足 `docs/sync-server-api-storage.md` 的签名、metadata API、版本冲突、错误语义和脱敏验证。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。

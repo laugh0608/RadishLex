@@ -213,6 +213,33 @@ fn backend_capabilities_gate_production_signing() {
 }
 
 #[test]
+fn apple_keychain_capabilities_are_non_exportable_without_hardware_claims() {
+    let capabilities = DeviceSigningBackendCapabilities::apple_keychain_v1();
+    assert_eq!(
+        capabilities.storage_backend,
+        DeviceSigningStorageBackend::AppleKeychainV1
+    );
+    assert!(!capabilities.exportable);
+    assert!(!capabilities.hardware_backed);
+    assert!(!capabilities.user_presence_required);
+    assert!(!capabilities.backup_migratable);
+    assert!(capabilities.allows_production_signing());
+
+    let status = DevicePrivateKeyStoreStatus::apple_keychain_v1();
+    status.validate().expect("apple keychain status");
+    status
+        .ensure_production_signing_allowed()
+        .expect("apple keychain capability can sign production objects");
+
+    let handle = DeviceSigningKeyHandle::apple_keychain("device-a", "signing-key-a", 10)
+        .expect("apple keychain handle");
+    let debug = format!("{handle:?}");
+    assert!(debug.contains("AppleKeychainV1"));
+    assert!(!debug.contains("private"));
+    assert!(!debug.contains("seed"));
+}
+
+#[test]
 fn signature_verification_rejects_wrong_key_and_revoked_key() {
     let mut store = TestMemoryDeviceKeyStore::new();
     let active_key = store

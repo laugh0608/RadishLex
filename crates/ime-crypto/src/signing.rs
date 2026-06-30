@@ -9,6 +9,12 @@ use crate::model::{
     EncryptedObjectEnvelope,
 };
 
+#[cfg(feature = "apple-keychain")]
+mod apple_keychain;
+
+#[cfg(feature = "apple-keychain")]
+pub use apple_keychain::AppleKeychainDeviceKeyStore;
+
 pub const SIGNATURE_SCHEMA_VERSION: u16 = 1;
 pub const SIGNATURE_ALGORITHM_ED25519_V1: &str = "ed25519-v1";
 pub const DEVICE_KEY_STORE_TEST_MEMORY_V1: &str = "test-memory-v1";
@@ -156,6 +162,21 @@ impl DeviceSigningKeyHandle {
         )
     }
 
+    pub fn apple_keychain(
+        device_id: impl Into<String>,
+        signing_key_id: impl Into<String>,
+        created_at_ms: i64,
+    ) -> Result<Self, CryptoError> {
+        Self::new(
+            device_id,
+            signing_key_id,
+            SignatureAlgorithmId::ed25519_v1(),
+            DeviceSigningStorageBackend::AppleKeychainV1,
+            DeviceSigningBackendCapabilities::apple_keychain_v1(),
+            created_at_ms,
+        )
+    }
+
     pub fn revoked(mut self, revoked_at_ms: i64) -> Result<Self, CryptoError> {
         self.revoked_at_ms = Some(revoked_at_ms);
         self.validate()?;
@@ -233,6 +254,16 @@ impl DeviceSigningBackendCapabilities {
         }
     }
 
+    pub fn apple_keychain_v1() -> Self {
+        Self {
+            storage_backend: DeviceSigningStorageBackend::AppleKeychainV1,
+            exportable: false,
+            hardware_backed: false,
+            user_presence_required: false,
+            backup_migratable: false,
+        }
+    }
+
     pub fn platform(
         storage_backend: DeviceSigningStorageBackend,
         hardware_backed: bool,
@@ -285,6 +316,16 @@ impl DevicePrivateKeyStoreStatus {
             can_create_signing_keys: false,
             can_sign: false,
             capabilities: DeviceSigningBackendCapabilities::unavailable(),
+        }
+    }
+
+    pub fn apple_keychain_v1() -> Self {
+        Self {
+            storage_backend: DeviceSigningStorageBackend::AppleKeychainV1,
+            available: true,
+            can_create_signing_keys: true,
+            can_sign: true,
+            capabilities: DeviceSigningBackendCapabilities::apple_keychain_v1(),
         }
     }
 

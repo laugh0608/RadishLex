@@ -11,6 +11,10 @@ description = "Client-side encryption boundary models for RadishLex."
 name = "radishlex_ime_crypto"
 path = "src/lib.rs"
 
+[features]
+default = []
+apple-keychain = []
+
 [dependencies]
 argon2 = "0.5.3"
 chacha20poly1305 = "0.10.1"

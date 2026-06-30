@@ -685,6 +685,9 @@ pub enum CryptoError {
     StorageBackendUnavailable {
         backend: String,
     },
+    UnsupportedSignatureAlgorithm {
+        algorithm: String,
+    },
     UnsupportedStorageBackend {
         backend: String,
     },
@@ -741,6 +744,9 @@ impl fmt::Display for CryptoError {
             Self::SignatureVerificationFailed => f.write_str("signature verification failed"),
             Self::StorageBackendUnavailable { backend } => {
                 write!(f, "storage backend unavailable: {backend}")
+            }
+            Self::UnsupportedSignatureAlgorithm { algorithm } => {
+                write!(f, "unsupported signature algorithm: {algorithm}")
             }
             Self::UnsupportedStorageBackend { backend } => {
                 write!(f, "unsupported storage backend: {backend}")
