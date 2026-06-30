@@ -2,7 +2,7 @@
 	admin off
 }
 
-https://{$RADISHLEX_SYNC_PUBLIC_HOST:localhost}:{$RADISHLEX_SYNC_HTTPS_PORT:7443} {
+https://{$RADISHLEX_SYNC_PUBLIC_HOST:localhost}:{$RADISHLEX_SYNC_PORT:7319} {
 	tls internal
 	reverse_proxy sync-server:7319
 }

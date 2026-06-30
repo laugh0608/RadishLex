@@ -88,9 +88,9 @@ RadishLex/
 ## 当前已落地
 
 - `Cargo.toml`：Rust workspace 入口。
-- `deploy/sync-server/docker-compose.local.yaml`：Go sync server 本地容器验证入口，使用 Caddy internal TLS 暴露 `https://localhost:7443`。
+- `deploy/sync-server/docker-compose.local.yaml`：Go sync server 本地容器验证入口，使用 Caddy internal TLS 暴露 `https://localhost:7319`。
 - `deploy/sync-server/docker-compose.yaml`：Go sync server 部署态入口，只暴露 HTTP 上游 `http://127.0.0.1:7319`，外部反代负责 TLS。
-- `deploy/sync-server/.env.local.example` / `.env.example`：本地和部署态 env 示例。
+- `deploy/sync-server/.env.example`：唯一 env 示例，真实部署复制为 `.env` 后修改。
 - `deploy/sync-server/nginx.prod.conf`：生产外部 Nginx TLS 终止示例。
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
 - `crates/ime-cli/`：基于 demo adapter、可选 Rime adapter、userdb 和 ranker 的命令行复验入口。

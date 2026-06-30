@@ -1,19 +1,19 @@
-name: ${COMPOSE_PROJECT_NAME:-radishlex-sync-local}
+name: radishlex-sync-local
 
 services:
   sync-server:
-    image: ${RADISHLEX_SYNC_IMAGE:-radishlex-sync-server:local}
+    image: radishlex-sync-server:local
     build:
       context: ../../server/sync-server
       dockerfile: Dockerfile
     init: true
     restart: unless-stopped
     environment:
-      RADISHLEX_SYNC_LISTEN: "${RADISHLEX_SYNC_LISTEN:-0.0.0.0:7319}"
-      RADISHLEX_SYNC_METADATA_PATH: "${RADISHLEX_SYNC_METADATA_PATH:-/var/lib/radishlex/sync-server/sync-server.sqlite}"
-      RADISHLEX_SYNC_BLOB_DIR: "${RADISHLEX_SYNC_BLOB_DIR:-/var/lib/radishlex/sync-server/objects}"
-      RADISHLEX_SYNC_MAX_OBJECT_BYTES: "${RADISHLEX_SYNC_MAX_OBJECT_BYTES:-16777216}"
-      RADISHLEX_SYNC_RECOVERY_READS_PER_HOUR: "${RADISHLEX_SYNC_RECOVERY_READS_PER_HOUR:-12}"
+      RADISHLEX_SYNC_LISTEN: "0.0.0.0:7319"
+      RADISHLEX_SYNC_METADATA_PATH: "/var/lib/radishlex/sync-server/sync-server.sqlite"
+      RADISHLEX_SYNC_BLOB_DIR: "/var/lib/radishlex/sync-server/objects"
+      RADISHLEX_SYNC_MAX_OBJECT_BYTES: "16777216"
+      RADISHLEX_SYNC_RECOVERY_READS_PER_HOUR: "12"
     expose:
       - "7319"
     volumes:
@@ -29,12 +29,12 @@ services:
     init: true
     restart: unless-stopped
     environment:
-      RADISHLEX_SYNC_PUBLIC_HOST: "${RADISHLEX_SYNC_PUBLIC_HOST:-localhost}"
-      RADISHLEX_SYNC_HTTPS_PORT: "${RADISHLEX_SYNC_HTTPS_PORT:-7443}"
+      RADISHLEX_SYNC_PUBLIC_HOST: "localhost"
+      RADISHLEX_SYNC_PORT: "7319"
     depends_on:
       - sync-server
     ports:
-      - "${RADISHLEX_SYNC_HTTPS_BIND:-127.0.0.1}:${RADISHLEX_SYNC_HTTPS_PORT:-7443}:${RADISHLEX_SYNC_HTTPS_PORT:-7443}"
+      - "127.0.0.1:7319:7319"
     volumes:
       - ./caddy/local.Caddyfile:/etc/caddy/Caddyfile:ro
       - sync-gateway-data:/data

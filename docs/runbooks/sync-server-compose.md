@@ -5,7 +5,7 @@
 ## 前提
 
 - Compose 只负责自部署 sync server 的容器入口，不替代 Go / Rust 自动化测试。
-- 本地容器验证使用 `deploy/sync-server/docker-compose.local.yaml`，默认访问 `https://localhost:7443`。
+- 本地容器验证使用 `deploy/sync-server/docker-compose.local.yaml`，默认访问 `https://localhost:7319`。
 - 部署态使用 `deploy/sync-server/docker-compose.yaml`，容器只暴露 HTTP 上游 `http://127.0.0.1:7319`，外部 `Nginx / Traefik / Caddy` 负责 TLS 终止。
 - 当前 server 仍缺少生产认证、备份策略、平台私钥 backend 和用户可用同步 UI，不应直接开放给真实用户或公网。
 - 不写入真实用户词、input code、reading、联系人、P1 事件、ranker 明细或真实恢复材料。
@@ -15,9 +15,8 @@
 
 - `deploy/sync-server/docker-compose.local.yaml`：本地容器验证入口，包含内部 `sync-server` 和本地 HTTPS `sync-gateway`。
 - `deploy/sync-server/docker-compose.yaml`：部署态入口，只暴露 `sync-server` HTTP 上游。
-- `deploy/sync-server/.env.local.example`：本地 HTTPS 示例 env。
-- `deploy/sync-server/.env.example`：部署态示例 env；真实部署复制为 `.env` 后修改。
-- `deploy/sync-server/caddy/local.Caddyfile`：本地 `https://localhost:7443` Caddy internal TLS 入口。
+- `deploy/sync-server/.env.example`：唯一 env 示例；真实部署复制为 `.env` 后修改。
+- `deploy/sync-server/caddy/local.Caddyfile`：本地 `https://localhost:7319` Caddy internal TLS 入口。
 - `deploy/sync-server/nginx.prod.conf`：生产外部 Nginx TLS 终止示例。
 - `server/sync-server/Dockerfile`：Go sync server 多阶段构建。
 - `server/sync-server/.dockerignore`：限制 Docker build context。
@@ -27,27 +26,21 @@
 在仓库根目录执行：
 
 ```sh
-docker compose -f deploy/sync-server/docker-compose.local.yaml \
-  --env-file deploy/sync-server/.env.local.example \
-  config
+docker compose -f deploy/sync-server/docker-compose.local.yaml config
 
-docker compose -f deploy/sync-server/docker-compose.local.yaml \
-  --env-file deploy/sync-server/.env.local.example \
-  up --build
+docker compose -f deploy/sync-server/docker-compose.local.yaml up --build
 ```
 
 后台运行：
 
 ```sh
-docker compose -f deploy/sync-server/docker-compose.local.yaml \
-  --env-file deploy/sync-server/.env.local.example \
-  up --build -d
+docker compose -f deploy/sync-server/docker-compose.local.yaml up --build -d
 ```
 
 本地入口：
 
 ```text
-https://localhost:7443
+https://localhost:7319
 ```
 
 本地 HTTPS 由 Caddy internal TLS 提供，因为 Go sync server 当前只实现 HTTP API。该 Caddy 入口只存在于本地 compose 文件中，不进入部署态 compose。Caddy internal TLS 证书默认不被宿主机信任；命令行 smoke 可使用 `curl -k`，浏览器或真实客户端验证如需无警告访问，应只在本机开发场景信任 Caddy 生成的本地 CA。
@@ -75,8 +68,8 @@ http://127.0.0.1:7319
 
 - `COMPOSE_PROJECT_NAME`：控制容器和 volume 前缀。
 - `RADISHLEX_SYNC_IMAGE`：镜像名；当前阶段默认仍支持本地 build。
-- `RADISHLEX_SYNC_HTTP_BIND`：默认 `127.0.0.1`，适合同机外部反代；如果反代不在同机，应改为受控内网地址，不要直接改成公网监听。
-- `RADISHLEX_SYNC_HTTP_PORT`：主机 HTTP 上游端口，默认 `7319`。
+- `RADISHLEX_SYNC_BIND`：默认 `127.0.0.1`，适合同机外部反代；如果反代不在同机，应改为受控内网地址，不要直接改成公网监听。
+- `RADISHLEX_SYNC_PORT`：唯一对外端口，默认 `7319`；本地 compose 在同一端口提供 HTTPS，部署态 compose 在同一端口提供 HTTP 上游。
 - `RADISHLEX_SYNC_DATA_PATH`：部署态宿主机持久化目录，默认 `../../DeployData/SyncServer`。
 - `RADISHLEX_SYNC_METADATA_PATH`：SQLite metadata 容器内路径。
 - `RADISHLEX_SYNC_BLOB_DIR`：encrypted blob 容器内目录。
@@ -92,9 +85,7 @@ http://127.0.0.1:7319
 本地查看日志：
 
 ```sh
-docker compose -f deploy/sync-server/docker-compose.local.yaml \
-  --env-file deploy/sync-server/.env.local.example \
-  logs -f sync-server sync-gateway
+docker compose -f deploy/sync-server/docker-compose.local.yaml logs -f sync-server sync-gateway
 ```
 
 部署态查看日志：
@@ -107,42 +98,36 @@ docker compose --env-file .env logs -f sync-server
 停止但保留数据：
 
 ```sh
-docker compose -f deploy/sync-server/docker-compose.local.yaml \
-  --env-file deploy/sync-server/.env.local.example \
-  down
+docker compose -f deploy/sync-server/docker-compose.local.yaml down
 ```
 
 停止并删除本地 Compose volume：
 
 ```sh
-docker compose -f deploy/sync-server/docker-compose.local.yaml \
-  --env-file deploy/sync-server/.env.local.example \
-  down -v
+docker compose -f deploy/sync-server/docker-compose.local.yaml down -v
 ```
 
 `docker compose down -v` 会删除本地 SQLite metadata、encrypted blob 数据和 Caddy internal CA，只能在确认不需要保留本机测试数据时执行。部署态使用 `RADISHLEX_SYNC_DATA_PATH` 持久化到宿主机目录，清理前必须先确认备份和恢复策略。
 
 ## 配置覆盖
 
-需要修改部署参数时优先复制 env 示例到未提交的 `.env.local` 或 `.env`，不提交包含本机绝对路径、真实域名秘密或真实数据路径的配置。示例：
+需要修改部署参数时优先复制 env 示例到未提交的 `.env`，不提交包含本机绝对路径、真实域名秘密或真实数据路径的配置。示例：
 
 ```dotenv
-RADISHLEX_SYNC_HTTP_BIND=127.0.0.1
-RADISHLEX_SYNC_HTTP_PORT=87319
+RADISHLEX_SYNC_BIND=127.0.0.1
+RADISHLEX_SYNC_PORT=87319
 RADISHLEX_SYNC_DATA_PATH=/srv/radishlex-sync
 RADISHLEX_SYNC_MAX_OBJECT_BYTES=33554432
 ```
 
-不要把 `RADISHLEX_SYNC_HTTP_BIND` 改成公网地址后直接暴露服务。公网入口应先由外部 HTTPS 反代、认证、备份和日志策略兜住，且当前阶段仍不面向真实用户开放。
+不要把 `RADISHLEX_SYNC_BIND` 改成公网地址后直接暴露服务。公网入口应先由外部 HTTPS 反代、认证、备份和日志策略兜住，且当前阶段仍不面向真实用户开放。
 
 ## 验证
 
 修改 Compose、Dockerfile、Caddyfile、env、Nginx 示例、runtime 或 storage 后至少运行：
 
 ```sh
-docker compose -f deploy/sync-server/docker-compose.local.yaml \
-  --env-file deploy/sync-server/.env.local.example \
-  config
+docker compose -f deploy/sync-server/docker-compose.local.yaml config
 
 docker compose -f deploy/sync-server/docker-compose.yaml \
   --env-file deploy/sync-server/.env.example \
@@ -155,9 +140,7 @@ go test ./...
 如需确认容器实际可启动，由开发者人工执行：
 
 ```sh
-docker compose -f deploy/sync-server/docker-compose.local.yaml \
-  --env-file deploy/sync-server/.env.local.example \
-  up --build
+docker compose -f deploy/sync-server/docker-compose.local.yaml up --build
 ```
 
 当前仓库没有提交依赖 Docker daemon 的 CI 检查；Docker build / run 失败时，应先记录镜像、平台、Go 版本和日志，再判断是配置问题还是本机 Docker 环境问题。
