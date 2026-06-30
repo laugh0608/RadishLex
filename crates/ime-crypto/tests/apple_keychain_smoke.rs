@@ -16,6 +16,7 @@ fn apple_keychain_smoke_creates_signs_verifies_and_deletes_key() -> Result<(), C
         .as_millis() as i64;
     let device_id = format!("radishlex-smoke-device-{}", std::process::id());
     let signing_key_id = format!("radishlex-smoke-signing-key-{now_ms}");
+    let _cleanup = KeychainSmokeCleanup::new(device_id.clone(), signing_key_id.clone(), now_ms);
 
     let cleanup_handle =
         DeviceSigningKeyHandle::apple_keychain(&device_id, &signing_key_id, now_ms)?;
@@ -56,4 +57,33 @@ fn apple_keychain_smoke_creates_signs_verifies_and_deletes_key() -> Result<(), C
         Err(CryptoError::PrivateKeyUnavailable { .. })
     ));
     Ok(())
+}
+
+struct KeychainSmokeCleanup {
+    device_id: String,
+    signing_key_id: String,
+    created_at_ms: i64,
+}
+
+impl KeychainSmokeCleanup {
+    fn new(device_id: String, signing_key_id: String, created_at_ms: i64) -> Self {
+        Self {
+            device_id,
+            signing_key_id,
+            created_at_ms,
+        }
+    }
+}
+
+impl Drop for KeychainSmokeCleanup {
+    fn drop(&mut self) {
+        if let Ok(handle) = DeviceSigningKeyHandle::apple_keychain(
+            &self.device_id,
+            &self.signing_key_id,
+            self.created_at_ms,
+        ) {
+            let store = AppleKeychainDeviceKeyStore::new();
+            let _ = store.delete_or_revoke(&handle, self.created_at_ms + 1);
+        }
+    }
 }

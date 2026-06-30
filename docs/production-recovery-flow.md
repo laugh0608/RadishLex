@@ -300,7 +300,7 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 
 ## 停止线
 
-- 平台私钥存储真实 smoke、权限错误和备份迁移语义未通过平台验证前，不提供用户可用恢复 UI；当前 `apple-keychain-v1` 仅完成 runbook、feature-gated macOS backend 接线和非 smoke 测试，不代表可用后端。
+- 平台私钥存储真实 smoke、权限错误和备份迁移语义未通过平台验证前，不提供用户可用恢复 UI；当前 `apple-keychain-v1` 已完成 runbook、feature-gated macOS backend 接线和非 smoke 测试，但真实 smoke 阻塞于 `ed25519-v1` 创建，不代表可用后端。
 - Go server 恢复记录 API 若未持续覆盖 wrapped material 读取、签名、状态、限速和日志脱敏，不接真实恢复客户端。
 - 恢复码、同步主密钥或设备私钥可能进入服务端日志、错误响应、崩溃报告或截图时，必须停止并修正设计。
 - 恢复流程不能绕过设备撤销、key epoch 或客户端合并语义。

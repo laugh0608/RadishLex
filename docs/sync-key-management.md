@@ -32,7 +32,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步若进入代码，应在明确批准后按 `docs/runbooks/apple-keychain-signing-backend.md` 运行 Apple Keychain gated smoke，或按生产部署 runbook 补真实认证 / 备份恢复演练 / 外部 TLS 验证证据；真实平台 smoke 未通过前，不应开放用户可用同步主线。
+下一步若进入代码，应先判断 Apple 平台签名 / Keychain 存储策略，或按生产部署 runbook 补真实认证 / 备份恢复演练 / 外部 TLS 验证证据；真实平台 smoke 未通过前，不应开放用户可用同步主线。
 
 ## 设计目标
 
@@ -264,7 +264,7 @@ updated_at_ms
 8. 已按 ADR 落地恢复码 KDF 纯 Rust 模型与测试，覆盖 `RecoveryCode`、`RecoveryKdfProfile`、恢复 wrapping key 和 `RecoveryMaterial` 恢复记录加解密。
 9. 已补 `docs/adr/0003-device-signing-key-storage.md`，固定设备签名、签名对象、canonical bytes、私钥存储抽象、错误语义和验证口径。
 10. 已按 ADR 落地签名 / 设备密钥存储 Rust 模型，当前使用合成 `test-memory-v1` key store，并补 platform backend capability metadata、unavailable backend 明确失败和 revoked key 阻断测试。
-11. 已补 `apple-keychain-v1` 平台 runbook，固定 Apple Keychain 创建、加载、签名、删除、锁屏 / 权限、备份迁移和日志脱敏验证边界；macOS backend 已在 `apple-keychain` feature 下接线，默认测试不访问系统 Keychain，真实 smoke 尚未运行。
+11. 已补 `apple-keychain-v1` 平台 runbook，固定 Apple Keychain 创建、加载、签名、删除、锁屏 / 权限、备份迁移和日志脱敏验证边界；macOS backend 已在 `apple-keychain` feature 下接线，默认测试不访问系统 Keychain，真实 smoke 已运行但阻塞于 `ed25519-v1` 创建。
 12. 已补真实 userdb P2 payload 解析到 merge input 的接线。
 13. 已补客户端合并结果写回真实 userdb 的执行器。
 14. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。

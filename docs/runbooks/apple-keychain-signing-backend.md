@@ -6,7 +6,8 @@
 
 - `apple-keychain-v1` 是第一批真实平台私钥 backend 的优先验证对象。
 - 默认 Rust workspace 继续只启用 `test-memory-v1` 和 `unavailable` backend，不访问 Keychain；macOS backend 只在显式 `apple-keychain` feature 下编译。
-- `apple-keychain-v1` 已完成 feature-gated 接线和 ignored smoke 测试骨架；真实 Keychain smoke 尚未执行，不能视为平台验证通过。
+- `apple-keychain-v1` 已完成 feature-gated 接线和 ignored smoke 测试骨架；真实 Keychain smoke 已执行但未通过，不能视为平台验证通过。
+- 2026-06-30 smoke 在沙盒和提权真实环境均阻塞于 Ed25519 Keychain key 创建阶段，错误为 `UnsupportedSignatureAlgorithm { algorithm: "ed25519-v1" }`；测试未进入签名成功或用户可用同步路径。
 - `apple-keychain-v1` 用于真实远端对象前必须通过本 runbook 的创建、加载、签名、删除 / 撤销、锁屏 / 权限、备份迁移和日志脱敏验证。
 - 未验证 Secure Enclave 前，不承诺 `hardware_backed = true`。
 - 未验证 user presence 前，不承诺 `user_presence_required = true`。
@@ -210,7 +211,7 @@ macOS 本机手动 / gated smoke：
 cargo test -p radishlex-ime-crypto --features apple-keychain --test apple_keychain_smoke -- --ignored --nocapture
 ```
 
-该 smoke 使用合成 `device_id` / `signing_key_id`，创建临时 Keychain item，完成签名验证后删除 item。失败时必须输出阻塞原因和可复验命令，不得把 skip 写成通过。运行前必须明确告知会触碰本机 macOS Keychain，并获得开发者批准。
+该 smoke 使用合成 `device_id` / `signing_key_id`，创建临时 Keychain item，完成签名验证后删除 item。测试带失败路径 cleanup guard，会在异常返回时尝试删除同一合成 item。失败时必须输出阻塞原因和可复验命令，不得把 skip 写成通过。运行前必须明确告知会触碰本机 macOS Keychain，并获得开发者批准。
 
 ## 停止线
 
