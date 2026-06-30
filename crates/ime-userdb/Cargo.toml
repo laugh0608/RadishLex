@@ -19,3 +19,4 @@ serde_json = "1.0.150"
 [dev-dependencies]
 base64ct = { version = "1.8.3", features = ["alloc"] }
 radishlex-ime-crypto = { path = "../ime-crypto" }
+sha2 = "0.10.9"

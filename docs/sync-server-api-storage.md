@@ -1,10 +1,10 @@
 # RadishLex 同步服务端 API 与存储边界
 
-本文档定义 Go sync server 实现期间必须稳定的 API、存储、错误语义和验证口径。读者是后续实现 `server/sync-server`、`ime-sync` 远端客户端、同步 runbook 和审阅隐私边界的开发者。本文不展开 Docker Compose 操作、Flutter 同步页面、Go server 两客户端真实联调或生产平台私钥存储 backend；Docker Compose runbook 见 `docs/runbooks/sync-server-compose.md`，生产恢复流程见 `docs/production-recovery-flow.md`，平台私钥存储 backend 边界见 `docs/adr/0004-platform-private-key-storage-backend.md`。
+本文档定义 Go sync server 实现期间必须稳定的 API、存储、错误语义和验证口径。读者是后续实现 `server/sync-server`、`ime-sync` 远端客户端、同步 runbook 和审阅隐私边界的开发者。本文不展开 Docker Compose 逐步操作、Flutter 同步页面、生产部署策略或生产平台私钥存储 backend；Docker Compose runbook 见 `docs/runbooks/sync-server-compose.md`，生产恢复流程见 `docs/production-recovery-flow.md`，平台私钥存储 backend 边界见 `docs/adr/0004-platform-private-key-storage-backend.md`。
 
 ## 当前定位
 
-当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型、已解密 P2 payload 写回本地 SQLite 的执行器、`ime-sync` remote client DTO / transport trait、std-only `http://` `HttpSyncRemoteTransport`，以及使用内存 remote harness 的两客户端同步边界测试。Go server 已起步，当前 `server/sync-server` 已包含配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、API 层 request id、panic recovery、非持久审计 hook、SQLite `audit_events` 写入测试、`cmd/radishlex-sync-server` 启动入口、runtime 配置装配、SQLite migration 嵌入、对象大小门禁、脱敏 audit logger、本机 smoke runbook、短生命周期 HTTP smoke 测试和 Docker Compose 本地 / 部署态入口；本地 compose 通过 Caddy internal TLS 在同一外部端口提供 `https://localhost:7319`，部署态 compose 在同一外部端口只暴露 HTTP 上游并提供外部 Nginx TLS 终止示例。runtime smoke 已覆盖第二设备 join request / authorization、active 状态复验、跨设备同一 object 的 stale conflict 与 v2 payload 读取。Rust HTTP transport 直连 Go server 的短生命周期跨语言测试已覆盖 domain 初始化、signed encrypted object 上传、metadata / payload 读取和 stale conflict 映射。尚未实现完整真实用户生产封装、认证边界、备份策略或依赖 Docker daemon 的自动化 smoke。SQLite driver 当前使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
+当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型、已解密 P2 payload 写回本地 SQLite 的执行器、`ime-sync` remote client DTO / transport trait、std-only `http://` `HttpSyncRemoteTransport`、使用内存 remote harness 的两客户端同步边界测试，以及短生命周期 Go sync server 的两客户端真实 HTTP 同步测试。Go server 已起步，当前 `server/sync-server` 已包含配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、API 层 request id、panic recovery、非持久审计 hook、SQLite `audit_events` 写入测试、`cmd/radishlex-sync-server` 启动入口、runtime 配置装配、SQLite migration 嵌入、对象大小门禁、脱敏 audit logger、本机 smoke runbook、短生命周期 HTTP smoke 测试、Docker Compose 本地 / 部署态入口和容器实际启动 smoke 证据；本地 compose 通过 Caddy internal TLS 在同一外部端口提供 `https://localhost:7319`，部署态 compose 在同一外部端口只暴露 HTTP 上游并提供外部 Nginx TLS 终止示例。runtime smoke 已覆盖第二设备 join request / authorization、active 状态复验、跨设备同一 object 的 stale conflict 与 v2 payload 读取。Rust HTTP transport 直连 Go server 的短生命周期跨语言测试已覆盖 domain 初始化、signed encrypted object 上传、metadata / payload 读取和 stale conflict 映射；Rust userdb 两客户端真实 HTTP 测试已覆盖设备授权、三类 P2 对象上传下载、客户端解密合并写回、stale conflict 和 v2 重新上传。尚未实现完整真实用户生产封装、认证边界、备份策略或平台私钥存储真实 backend。SQLite driver 当前使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
 
 本阶段只固定服务端 API 和 storage 边界：
 
@@ -13,7 +13,7 @@
 - 服务端不能解密、不能解析 plaintext payload、不能合并用户词、不能读取 P1 原始事件。
 - 客户端仍是真相源：解密、冲突合并、删除 tombstone 语义、显式恢复和 userdb 写回都在客户端完成。
 
-Go 代码必须继续受本文件约束 migration、handler 和测试命名；平台私钥存储 backend capability / unavailable backend 的 Rust 模型已经落地。进入生产部署封装或用户可用同步前，仍必须保持签名验证、HTTP API handler、Go runtime smoke、Rust HTTP transport 直连 Go server、Rust 侧两客户端 harness、Docker Compose runbook、错误语义、审计日志和平台 backend 验证彼此一致。
+Go 代码必须继续受本文件约束 migration、handler 和测试命名；平台私钥存储 backend capability / unavailable backend 的 Rust 模型已经落地。进入生产部署封装或用户可用同步前，仍必须保持签名验证、HTTP API handler、Go runtime smoke、Rust HTTP transport 直连 Go server、Rust 侧两客户端 harness、Rust userdb 两客户端真实 HTTP 测试、Docker Compose runbook、错误语义、审计日志和平台 backend 验证彼此一致。
 
 ## 服务端职责
 
@@ -392,15 +392,17 @@ latest_ciphertext_hash
 16. 已补 Rust 侧两客户端 userdb 同步边界测试，覆盖设备 A 生成 P2 payload 并加密上传、设备 B 下载密文后解密 / 解码 / 合并写回 SQLite、本机 tombstone 阻断旧远端词条、stale base version 409 latest metadata 映射，以及 B 基于最新 base version 重新组装并上传 v2。
 17. 已补 Rust `HttpSyncRemoteTransport` 直连 Go sync server 的短生命周期跨语言测试，覆盖 domain 初始化、Rust signed encrypted object 通过 Go HTTP API 上传、metadata / binary payload 读取、Go 服务端按 Rust envelope hash 复验，以及 stale conflict latest metadata 映射。
 18. 已补 Docker Compose 本地 / 部署态入口、sync server Dockerfile、Docker build context ignore、本地 Caddy HTTPS 入口、部署态 HTTP 上游、Nginx 生产反代示例和 `docs/runbooks/sync-server-compose.md`；本地默认 `https://localhost:7319`，部署态默认同机 HTTP 上游 `http://127.0.0.1:7319`，两者使用同一个对外端口，并明确生产认证 / 备份 / 平台私钥 backend 未补齐前不得开放给真实用户。
+19. 已补 Docker Compose 容器实际启动 smoke 证据；本地模式通过 Caddy internal TLS 到达 sync-server，部署态 HTTP upstream 可直达 sync-server，两种模式完成后均已 `down`，未保留运行容器、真实数据、容器生成数据或本机绝对路径。
+20. 已补 Rust userdb 两客户端真实 Go HTTP 同步测试，覆盖设备 B join / signed authorization、`dictionary.user_terms` / `ranker.weights` / `dictionary.deleted_terms` 三类 P2 对象真实 HTTP 上传下载、客户端解密 / 解码 / SQLite 写回、stale conflict latest metadata、按 `base_version = 1` 上传 v2 和 runtime 日志脱敏。
 
 任何阶段都不应把 Flutter manager、平台壳、真实系统输入法服务或输入热路径接入 Go server。
 
 ## 停止线
 
-- Rust 侧两客户端 harness 已覆盖 encrypted userdb payload 的上传、下载、解密、合并写回和 stale conflict 重新上传；Go runtime smoke 已覆盖第二设备授权和跨设备 object 版本链；Rust HTTP transport 直连 Go server 的短生命周期测试已覆盖跨语言 DTO、handler、storage、错误语义和日志脱敏边界。进入部署封装或用户可用同步前，仍必须扩展真实两客户端 HTTP 同步和平台私钥 backend 复验。
+- Rust 侧两客户端 harness 已覆盖 encrypted userdb payload 的上传、下载、解密、合并写回和 stale conflict 重新上传；Go runtime smoke 已覆盖第二设备授权和跨设备 object 版本链；Rust HTTP transport 直连 Go server 的短生命周期测试已覆盖跨语言 DTO、handler、storage、错误语义和日志脱敏边界；Rust userdb 两客户端真实 Go HTTP 测试已覆盖客户端解密合并写回和 v2 重新上传。进入部署封装或用户可用同步前，仍必须单独确认认证、备份、外部 TLS、平台私钥 backend 和运行边界。
 - 平台私钥存储 backend 能力模型已落地；真实平台 backend 验证未完成前，不提供用户可用同步 UI。
 - device authorization handler 对外开放前必须继续复用 wrapped key bytes 的存储 / 读取语义，且不得返回明文同步域材料。
-- recovery latest handler 已复用 wrapped material bytes 读取语义，并补齐限速与内部 `blob_ref` 不外泄测试；object version handler 已复用 encrypted object blob 读写语义，并补齐冲突、设备状态和脱敏测试；API handler 已补 panic recovery、request id、非持久审计 hook 和 SQLite `audit_events` 写入；runtime 已补配置装配、脱敏 audit logger、本机 smoke runbook、双设备 HTTP smoke 和 Docker Compose 本地 / 部署态入口。Rust remote client 已补 DTO、transport trait、HTTP transport、错误映射、两客户端 userdb harness 和直连 Go server 的短生命周期测试；进入真实用户部署或同步 UI 前仍需单独确认认证、备份、外部 TLS、平台私钥 backend 和运行边界。
+- recovery latest handler 已复用 wrapped material bytes 读取语义，并补齐限速与内部 `blob_ref` 不外泄测试；object version handler 已复用 encrypted object blob 读写语义，并补齐冲突、设备状态和脱敏测试；API handler 已补 panic recovery、request id、非持久审计 hook 和 SQLite `audit_events` 写入；runtime 已补配置装配、脱敏 audit logger、本机 smoke runbook、双设备 HTTP smoke、Docker Compose 本地 / 部署态入口和容器实际启动 smoke 证据。Rust remote client 已补 DTO、transport trait、HTTP transport、错误映射、两客户端 userdb harness、直连 Go server 的短生命周期测试和 userdb 两客户端真实 Go HTTP 测试；进入真实用户部署或同步 UI 前仍需单独确认认证、备份、外部 TLS、平台私钥 backend 和运行边界。
 - 服务端能保存、打印或索引明文用户词、input code、reading、P1 原始事件或候选偏好时，必须停止并回退该设计。
 - 服务端版本冲突检测未稳定前，不允许客户端把本地合并结果自动上传到真实远端。
 - 包分发、P3 资源下载和个人 P2 同步对象必须保持独立 API 与存储边界。

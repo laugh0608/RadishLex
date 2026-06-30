@@ -1,10 +1,10 @@
 # RadishLex 同步 Payload 草案
 
-本文档定义当前 Rust 侧同步 payload 草案、数据分级映射和验证口径，读者是后续实现 `ime-sync`、`ime-crypto`、同步 CLI、Go server 和管理 UI 的开发者。本文不包含加密算法实现、设备授权流程完整协议、Go server 数据库 migration、Go server 两客户端真实联调或部署配置；客户端加密边界见 `docs/crypto-boundary.md`，Go server API 与 storage 边界见 `docs/sync-server-api-storage.md`。
+本文档定义当前 Rust 侧同步 payload 草案、数据分级映射和验证口径，读者是后续实现 `ime-sync`、`ime-crypto`、同步 CLI、Go server 和管理 UI 的开发者。本文不包含加密算法实现、设备授权流程完整协议、Go server 数据库 migration、生产部署配置或用户可用同步设置；客户端加密边界见 `docs/crypto-boundary.md`，Go server API 与 storage 边界见 `docs/sync-server-api-storage.md`。
 
 ## 当前定位
 
-当前已落地 Rust 同步对象边界模型、remote client DTO / transport trait、std-only `http://` `HttpSyncRemoteTransport` 和 Rust 侧两客户端同步边界测试，不生成明文上传文件，也不启动后端或保留长期运行服务。`ime-sync` 的作用是把 `sync preflight` 已验证的本地分类边界转成可测试的 Rust API，并让上传草案元数据从 `ime-crypto` envelope 派生，避免同步层和加密层字段语义漂移；当前 remote client 上传入口只接收已加密 `AssembledSyncObject` 与 `SignedSyncObjectManifest`，不接受 plaintext payload。`ime-userdb` 当前提供 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 `SyncEnvelopeAssembler` 完成本地 envelope 加密、解密和 sync draft 派生验证；解密后的 userdb P2 JSON 已能解析为 `ClientSyncMergeInput` 所需记录，并可把被合并模型接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite；`crates/ime-userdb/tests/two_client_sync.rs` 已覆盖设备 A 加密上传到远端 harness、设备 B 下载二进制密文、解密、合并写回 SQLite、stale conflict latest metadata 和基于 base version 重新组装 v2 上传：
+当前已落地 Rust 同步对象边界模型、remote client DTO / transport trait、std-only `http://` `HttpSyncRemoteTransport`、Rust 侧两客户端同步边界测试和 Go server 两客户端真实 HTTP 同步测试，不生成明文上传文件，也不启动或保留长期运行服务。`ime-sync` 的作用是把 `sync preflight` 已验证的本地分类边界转成可测试的 Rust API，并让上传草案元数据从 `ime-crypto` envelope 派生，避免同步层和加密层字段语义漂移；当前 remote client 上传入口只接收已加密 `AssembledSyncObject` 与 `SignedSyncObjectManifest`，不接受 plaintext payload。`ime-userdb` 当前提供 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 `SyncEnvelopeAssembler` 完成本地 envelope 加密、解密和 sync draft 派生验证；解密后的 userdb P2 JSON 已能解析为 `ClientSyncMergeInput` 所需记录，并可把被合并模型接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite；`crates/ime-userdb/tests/two_client_sync.rs` 已覆盖设备 A 加密上传到远端 harness、设备 B 下载二进制密文、解密、合并写回 SQLite、stale conflict latest metadata 和基于 base version 重新组装 v2 上传；`crates/ime-userdb/tests/two_client_go_http_sync.rs` 已通过短生命周期 Go sync server 验证设备 B 授权、三类 P2 对象真实 HTTP 上传 / 下载 / 解密 / 写回、stale conflict 和 v2 重新上传：
 
 - P2 数据可以进入后续端到端加密对象。
 - P1 明细事件默认只能留在本地。
@@ -270,12 +270,13 @@ object_payload(domain_id, object_id, version)
 - userdb P2 payload 本地加密装配测试：通过 `SyncEnvelopeAssembler` 用合成 sync master key / device id 把 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` payload 加密为 `ime-crypto::EncryptedObjectEnvelope`，验证可解密回原 bytes、nonce 不重复，并派生 `ime-sync::EncryptedSyncObjectDraft` 元数据。
 - `SyncRemoteClient`、`SyncRemoteTransport`、`RemoteObjectVersion`、`RemoteObjectPayload`、`SyncRemoteError` 和 `HttpSyncRemoteTransport`：固定 Rust remote client 与 Go object version API 的 DTO / transport 边界，覆盖 JSON base64 byte 字段、metadata 读取、binary payload 下载、stale conflict latest metadata、server error code 映射、HTTP/1.1 request / response 传递、chunked response 解码、base path 拼接和 Debug 脱敏。
 - `two_client_sync` integration test：使用合成 userdb、sync master key、test-memory signing key store 和内存 remote harness，复验 P2 payload 加密上传、另一客户端下载密文后解密、解码、合并写回 SQLite、本机 tombstone 阻断旧远端词条、ranker weight 写回、stale base version 409 latest metadata 映射，以及合并后按 `base_version = 1` 重新上传 v2。
+- `two_client_go_http_sync` integration test：使用短生命周期 Go sync server、临时 SQLite metadata、临时 blob dir、真实 `HttpSyncRemoteTransport` 和 test-memory signing key store，复验 domain 创建、设备 B join / signed authorization、`dictionary.user_terms` / `ranker.weights` / `dictionary.deleted_terms` 三类 P2 对象真实 HTTP 上传、另一客户端下载密文后解密 / 解码 / 合并写回 SQLite、stale conflict latest metadata、B 端按 `base_version = 1` 上传 v2、A 端下载 v2 写回，以及 runtime 日志脱敏。
 
 未落地：
 
 - `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
 - 真实平台私钥存储 backend 实现、生产恢复 UI / API 和远端密钥轮换执行器。
-- 面向 Go server 的两客户端真实 HTTP 联调、部署配置和用户可用同步设置。
+- 生产部署配置和用户可用同步设置。
 - 生产同步设置、备份快照、管理 UI 同步状态和平台私钥存储 backend 实现。
 
 ## 验证口径
@@ -307,3 +308,4 @@ cargo test -p radishlex-ime-cli
 - userdb P2 payload 解码必须拒绝 schema / object type 不匹配、未知字段、非法字段类型、`dictionary.user_terms` 中的 deleted 状态、0 key epoch 和负数 / 非有限权重摘要，并能把真实 payload bytes 转成 `ClientSyncMergeInput`。
 - userdb P2 payload 写回必须在同一 SQLite transaction 内执行，并覆盖写入 accepted user terms、写入 accepted tombstones、写入 accepted ranker weights、payload tombstone / 本机 tombstone 阻断旧词条与旧权重、显式恢复清理 tombstone，以及 summary 不暴露明文身份。
 - Rust 侧两客户端同步边界必须覆盖设备 A 加密上传、设备 B 下载二进制密文、解密、解码、合并写回 userdb、stale conflict latest metadata 映射和基于最新 base version 重新上传；该测试不得启动长期运行 server，也不得引入 plaintext payload、P1 event 或平台壳入口。
+- Go server 两客户端真实 HTTP 同步测试必须使用短生命周期 server、临时 metadata / blob 目录和真实 HTTP transport，覆盖设备授权、三类 P2 对象上传下载、客户端解密合并写回、stale conflict、v2 重新上传和日志脱敏；测试结束必须清理 server 进程与临时目录，不保留长期运行服务。
