@@ -22,11 +22,15 @@ go test ./internal/runtime -run TestLocalServerSmokeUploadsReadsAndConflicts -co
 
 - runtime 装配 SQLite metadata store 和 local blob store。
 - `POST /api/v1/domains` 创建同步域。
+- `POST /api/v1/domains/{domain_id}/join-requests` 创建第二设备 pending join request。
+- `POST /api/v1/domains/{domain_id}/join-requests/{join_request_id}/authorization` 用已授权设备签名激活第二设备，并保存 wrapped key bytes。
+- `GET /api/v1/domains/{domain_id}/devices/{device_id}` 复验第二设备变为 active。
 - `POST /api/v1/domains/{domain_id}/objects/{object_id}/versions` 上传 encrypted object version。
 - `GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}` 读取 metadata。
 - `GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}/payload` 下载 encrypted payload。
-- stale `base_version` 返回 `409 conflict_stale_base_version` 和 latest metadata。
-- runtime audit log 不包含请求体、signature 或 encrypted payload bytes。
+- 第二设备 stale `base_version` 返回 `409 conflict_stale_base_version` 和 latest metadata。
+- 第二设备基于最新 `base_version` 上传 v2 后可读取对应 encrypted payload。
+- runtime audit log 不包含请求体、signature、wrapped key bytes 或 encrypted payload bytes。
 
 ## 人工本机启动
 

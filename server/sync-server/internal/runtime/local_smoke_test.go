@@ -49,6 +49,32 @@ func TestLocalServerSmokeUploadsReadsAndConflicts(t *testing.T) {
 		t.Fatalf("unexpected create domain status: %d body=%s", createResponse.StatusCode, string(createResponse.Body))
 	}
 
+	deviceBJoin := smokeJoinRequest("join-device-b", "device-b", 150)
+	joinResponse := doJSONSmokeRequest(t, http.MethodPost, httpServer.URL+api.PrefixV1+"/domains/domain-smoke/join-requests", deviceBJoin)
+	if joinResponse.StatusCode != http.StatusCreated {
+		t.Fatalf("unexpected join request status: %d body=%s", joinResponse.StatusCode, string(joinResponse.Body))
+	}
+	var joinBody api.JoinRequestResponse
+	decodeSmokeResponse(t, joinResponse.Body, &joinBody)
+	if joinBody.DeviceID != "device-b" || joinBody.Status != storage.DevicePending {
+		t.Fatalf("unexpected join response: %#v", joinBody)
+	}
+
+	deviceBAuthorization := smokeJoinAuthorization(deviceBJoin, 160)
+	authorizationResponse := doJSONSmokeRequest(t, http.MethodPost, httpServer.URL+api.PrefixV1+"/domains/domain-smoke/join-requests/join-device-b/authorization", deviceBAuthorization)
+	if authorizationResponse.StatusCode != http.StatusNoContent {
+		t.Fatalf("unexpected authorization status: %d body=%s", authorizationResponse.StatusCode, string(authorizationResponse.Body))
+	}
+	deviceBResponse := doSmokeRequest(t, http.MethodGet, httpServer.URL+api.PrefixV1+"/domains/domain-smoke/devices/device-b", nil)
+	if deviceBResponse.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected device-b status: %d body=%s", deviceBResponse.StatusCode, string(deviceBResponse.Body))
+	}
+	var deviceB api.DeviceResponse
+	decodeSmokeResponse(t, deviceBResponse.Body, &deviceB)
+	if deviceB.Status != storage.DeviceActive || deviceB.AuthorizedAtMs != 160 {
+		t.Fatalf("device-b should be active after authorization: %#v", deviceB)
+	}
+
 	firstPayload := []byte{0x91, 0x92, 0x93, 0x94}
 	first := smokeObjectUpload("domain-smoke", "object-smoke", "device-smoke", 1, 0, 1, firstPayload)
 	firstResponse := doJSONSmokeRequest(t, http.MethodPost, httpServer.URL+api.PrefixV1+"/domains/domain-smoke/objects/object-smoke/versions", first)
@@ -84,14 +110,8 @@ func TestLocalServerSmokeUploadsReadsAndConflicts(t *testing.T) {
 	}
 
 	secondPayload := []byte{0xa1, 0xa2, 0xa3, 0xa4}
-	second := smokeObjectUpload("domain-smoke", "object-smoke", "device-smoke", 2, 1, 1, secondPayload)
-	secondResponse := doJSONSmokeRequest(t, http.MethodPost, httpServer.URL+api.PrefixV1+"/domains/domain-smoke/objects/object-smoke/versions", second)
-	if secondResponse.StatusCode != http.StatusCreated {
-		t.Fatalf("unexpected second upload status: %d body=%s", secondResponse.StatusCode, string(secondResponse.Body))
-	}
-
 	stalePayload := []byte{0xb1, 0xb2, 0xb3, 0xb4}
-	stale := smokeObjectUpload("domain-smoke", "object-smoke", "device-smoke", 3, 1, 1, stalePayload)
+	stale := smokeObjectUpload("domain-smoke", "object-smoke", "device-b", 2, 0, 1, stalePayload)
 	staleResponse := doJSONSmokeRequest(t, http.MethodPost, httpServer.URL+api.PrefixV1+"/domains/domain-smoke/objects/object-smoke/versions", stale)
 	if staleResponse.StatusCode != http.StatusConflict {
 		t.Fatalf("unexpected stale status: %d body=%s", staleResponse.StatusCode, string(staleResponse.Body))
@@ -99,12 +119,30 @@ func TestLocalServerSmokeUploadsReadsAndConflicts(t *testing.T) {
 	var staleBody api.ErrorResponse
 	decodeSmokeResponse(t, staleResponse.Body, &staleBody)
 	if staleBody.ErrorCode != string(storage.ErrConflictStaleBaseVersion) ||
-		staleBody.LatestVersion != 2 ||
-		staleBody.LatestCiphertextHash != second.CiphertextHash {
+		staleBody.LatestVersion != 1 ||
+		staleBody.LatestCiphertextHash != first.CiphertextHash {
 		t.Fatalf("unexpected stale response: %#v", staleBody)
 	}
 	if strings.Contains(string(staleResponse.Body), string(stalePayload)) {
 		t.Fatalf("stale response leaked payload: %s", string(staleResponse.Body))
+	}
+
+	second := smokeObjectUpload("domain-smoke", "object-smoke", "device-b", 2, 1, 1, secondPayload)
+	secondResponse := doJSONSmokeRequest(t, http.MethodPost, httpServer.URL+api.PrefixV1+"/domains/domain-smoke/objects/object-smoke/versions", second)
+	if secondResponse.StatusCode != http.StatusCreated {
+		t.Fatalf("unexpected second upload status: %d body=%s", secondResponse.StatusCode, string(secondResponse.Body))
+	}
+	var secondBody api.ObjectVersionResponse
+	decodeSmokeResponse(t, secondResponse.Body, &secondBody)
+	if secondBody.Version != 2 || secondBody.BaseVersion != 1 || secondBody.OwnerDeviceID != "device-b" {
+		t.Fatalf("unexpected second metadata: %#v", secondBody)
+	}
+	secondPayloadResponse := doSmokeRequest(t, http.MethodGet, httpServer.URL+api.PrefixV1+"/domains/domain-smoke/objects/object-smoke/versions/2/payload", nil)
+	if secondPayloadResponse.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected second payload status: %d body=%s", secondPayloadResponse.StatusCode, string(secondPayloadResponse.Body))
+	}
+	if !bytes.Equal(secondPayloadResponse.Body, secondPayload) {
+		t.Fatalf("second payload mismatch: got %x want %x", secondPayloadResponse.Body, secondPayload)
 	}
 
 	logText := logs.String()
@@ -112,6 +150,7 @@ func TestLocalServerSmokeUploadsReadsAndConflicts(t *testing.T) {
 		string(firstPayload),
 		string(secondPayload),
 		string(stalePayload),
+		string(deviceBAuthorization.WrappedKey),
 		string(first.Signature),
 		string(second.Signature),
 		string(stale.Signature),
@@ -122,6 +161,9 @@ func TestLocalServerSmokeUploadsReadsAndConflicts(t *testing.T) {
 	}
 	for _, required := range []string{
 		`route="domains.create"`,
+		`route="join_requests.collection"`,
+		`route="join_requests.authorize"`,
+		`route="devices.get"`,
 		`route="objects.versions.create"`,
 		`route="objects.versions.get"`,
 		`route="objects.versions.payload"`,
@@ -131,6 +173,50 @@ func TestLocalServerSmokeUploadsReadsAndConflicts(t *testing.T) {
 			t.Fatalf("runtime audit log missing %s in %s", required, logText)
 		}
 	}
+}
+
+func smokeJoinRequest(joinRequestID string, deviceID string, createdAtMs int64) api.CreateJoinRequestRequest {
+	return api.CreateJoinRequestRequest{
+		JoinRequestID:           joinRequestID,
+		DeviceID:                deviceID,
+		SigningPublicKeyID:      smokeSigningKeyID(deviceID),
+		SigningPublicKey:        smokeSigningPublicKey(deviceID),
+		KeyAgreementPublicKeyID: "agreement-key-" + deviceID,
+		KeyAgreementPublicKey:   []byte{0x51, 0x52},
+		Challenge:               []byte{0x53, 0x54},
+		CreatedAtMs:             createdAtMs,
+		ExpiresAtMs:             createdAtMs + 600,
+	}
+}
+
+func smokeJoinAuthorization(join api.CreateJoinRequestRequest, createdAtMs int64) api.AuthorizeJoinRequestRequest {
+	wrappedKey := []byte{0x61, 0x62, 0x63}
+	request := api.AuthorizeJoinRequestRequest{
+		Authorization: api.DeviceAuthorizationRequest{
+			AuthorizerDeviceID:          "device-smoke",
+			RecipientDeviceID:           join.DeviceID,
+			RecipientSigningPublicKeyID: join.SigningPublicKeyID,
+			RecipientKeyAgreementKeyID:  join.KeyAgreementPublicKeyID,
+			JoinShortCode:               "123456",
+			KeyEpoch:                    1,
+			CreatedAtMs:                 createdAtMs,
+		},
+		Wrapping: api.DeviceWrappingRequest{
+			AuthorizerDeviceID: "device-smoke",
+			RecipientDeviceID:  join.DeviceID,
+			KeyEpoch:           1,
+			WrappingKeyID:      "wrapping-key-" + join.DeviceID,
+			Algorithm:          storage.AlgorithmXChaCha20Poly1305HKDFSHA256,
+			Nonce:              []byte{0x64, 0x65},
+			WrappedKeyLen:      int64(len(wrappedKey)),
+			CiphertextHash:     storage.CiphertextHash(wrappedKey),
+			CreatedAtMs:        createdAtMs,
+			Signature:          []byte{0x66},
+		},
+		WrappedKey: wrappedKey,
+	}
+	signSmokeJoinAuthorization(&request, join)
+	return request
 }
 
 type smokeHTTPResponse struct {
@@ -220,6 +306,27 @@ func signSmokeObjectUpload(request *api.ObjectVersionUploadRequest, domainID str
 		smokeTextField("ciphertext_hash", request.CiphertextHash),
 		smokeTextField("created_at_ms", smokeInt64String(request.ClientCreatedAtMs)),
 		smokeTextField("updated_at_ms", smokeInt64String(request.ClientUpdatedAtMs)),
+	}))
+}
+
+func signSmokeJoinAuthorization(request *api.AuthorizeJoinRequestRequest, join api.CreateJoinRequestRequest) {
+	authorization := &request.Authorization
+	authorization.SignatureSchemaVersion = 1
+	authorization.SignatureAlgorithm = "ed25519-v1"
+	authorization.SignatureKeyID = smokeSigningKeyID(authorization.AuthorizerDeviceID)
+	authorization.Signature = ed25519.Sign(smokeSigningPrivateKey(authorization.AuthorizerDeviceID), smokeCanonicalSignatureBytes("device_authorization", []smokeSignatureField{
+		smokeTextField("signature_schema_version", "1"),
+		smokeTextField("signature_algorithm", "ed25519-v1"),
+		smokeTextField("signature_key_id", authorization.SignatureKeyID),
+		smokeTextField("authorizer_device_id", authorization.AuthorizerDeviceID),
+		smokeTextField("recipient_device_id", authorization.RecipientDeviceID),
+		smokeTextField("recipient_public_key_id", authorization.RecipientSigningPublicKeyID),
+		smokeBytesField("join_challenge", join.Challenge),
+		smokeTextField("join_short_code", authorization.JoinShortCode),
+		smokeTextField("key_epoch", smokeUint64String(authorization.KeyEpoch)),
+		smokeTextField("wrapping_key_id", request.Wrapping.WrappingKeyID),
+		smokeTextField("encrypted_key_len", smokeInt64String(request.Wrapping.WrappedKeyLen)),
+		smokeTextField("created_at_ms", smokeInt64String(authorization.CreatedAtMs)),
 	}))
 }
 
