@@ -55,6 +55,7 @@ RadishLex/
     crypto-boundary.md
     sync-key-management.md
     sync-server-api-storage.md
+    sync-server-oidc-roadmap.md
     production-recovery-flow.md
     ffi-boundary.md
     adr/
@@ -107,6 +108,7 @@ RadishLex/
 - `docs/crypto-boundary.md`：`ime-crypto` 进入实现前的客户端加密、密钥、envelope 和验证边界。
 - `docs/sync-key-management.md`：真实同步前的同步密钥、设备授权、恢复码、设备撤销、key epoch 和冲突边界。
 - `docs/sync-server-api-storage.md`：Go sync server API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和停止线。
+- `docs/sync-server-oidc-roadmap.md`：后续接入 Radish 产品账号体系或兼容 OIDC IdP 的认证边界、身份映射、scope 草案和停止线。
 - `docs/production-recovery-flow.md`：生产恢复记录创建、轮换、撤销、新设备恢复加入、失败限速和停止线。
 - `docs/adr/0002-recovery-code-kdf.md`：恢复码 Argon2id KDF、格式、恢复记录字段和生产实现验证口径。
 - `docs/adr/0003-device-signing-key-storage.md`：设备签名、签名对象、私钥存储抽象、错误语义和验证口径。
@@ -236,7 +238,7 @@ server/sync-server/
 - Docker Compose。
 - 本地文件对象存储。
 
-当前已起步 `server/sync-server/`，但只实现 metadata / storage / API / runtime 验证模型、SQLite-backed metadata repository、local object storage staged transaction、对象 Rust envelope hash / length 复验、Ed25519 签名验签门禁、device wrapping encrypted key bytes 承载、recovery wrapped material 读取、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、单用户 bearer access token 门禁、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、启动入口、runtime 配置装配、脱敏日志、本机 runbook、Docker Compose 本地 / 部署态入口和短生命周期双设备 HTTP smoke。Rust `ime-sync` 已起步 remote client DTO / transport trait、std-only `http://` HTTP transport 和可选 bearer token header，`ime-userdb` 已补两客户端 userdb harness，Rust HTTP transport 直连 Go server 的短生命周期跨语言测试已覆盖对象上传、下载和 stale conflict；完整真实用户生产封装、Flutter manager 和平台壳继续后置。
+当前已起步 `server/sync-server/`，但只实现 metadata / storage / API / runtime 验证模型、SQLite-backed metadata repository、local object storage staged transaction、对象 Rust envelope hash / length 复验、Ed25519 签名验签门禁、device wrapping encrypted key bytes 承载、recovery wrapped material 读取、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、单用户 bearer access token 门禁、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、启动入口、runtime 配置装配、脱敏日志、本机 runbook、Docker Compose 本地 / 部署态入口和短生命周期双设备 HTTP smoke。Rust `ime-sync` 已起步 remote client DTO / transport trait、std-only `http://` HTTP transport 和可选 bearer token header，`ime-userdb` 已补两客户端 userdb harness，Rust HTTP transport 直连 Go server 的短生命周期跨语言测试已覆盖对象上传、下载和 stale conflict；OIDC / Radish 产品账号体系只作为后续专题规划，当前不实现账号系统；完整真实用户生产封装、Flutter manager 和平台壳继续后置。
 
 后续支持：
 

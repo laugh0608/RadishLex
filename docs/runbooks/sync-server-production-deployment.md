@@ -52,6 +52,8 @@ Client
 
 Go sync server 当前的设备签名、join request 和 object manifest 验签只证明同步域内设备身份，不等同于部署访问认证。部署访问认证由 bearer access token 和外部网络 / TLS 边界共同承担。
 
+OIDC / Radish 产品账号体系接入已记录为未来专题，见 `docs/sync-server-oidc-roadmap.md`。当前生产部署 runbook 不要求部署 Radish Auth、Gateway 或兼容 OIDC IdP；若未来改为 OIDC，必须先固定认证策略 ADR、token 验证规则、scope-route 映射、客户端 token 存储和外部 gateway header 防伪边界。
+
 当前固定的首个方案是 Go server 内建单用户 bearer access token：
 
 - 在未提交的部署 `.env` 或等价 secret 注入机制中设置 `RADISHLEX_SYNC_ACCESS_TOKEN`。
