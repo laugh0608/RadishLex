@@ -457,7 +457,7 @@ func TestObjectVersionHandlersUploadReadMetadataAndPayload(t *testing.T) {
 	if created.DomainID != "domain-a" ||
 		created.ObjectID != "object-a" ||
 		created.Version != 1 ||
-		created.CiphertextHash != storage.CiphertextHash(payload) ||
+		created.CiphertextHash != upload.CiphertextHash ||
 		created.EncryptedPayloadLen != int64(len(payload)) {
 		t.Fatalf("unexpected object metadata: %#v", created)
 	}
@@ -473,7 +473,7 @@ func TestObjectVersionHandlersUploadReadMetadataAndPayload(t *testing.T) {
 	}
 	var metadata ObjectVersionResponse
 	decodeResponse(t, metadataResponse, &metadata)
-	if metadata.CiphertextHash != storage.CiphertextHash(payload) || metadata.SignatureKeyID != "signing-key-a" {
+	if metadata.CiphertextHash != upload.CiphertextHash || metadata.SignatureKeyID != "signing-key-a" {
 		t.Fatalf("unexpected read metadata: %#v", metadata)
 	}
 	if strings.Contains(metadataResponse.Body.String(), string(payload)) {
@@ -822,7 +822,6 @@ func objectUploadRequestForHandlerTest(domainID string, objectID string, deviceI
 		Algorithm:              storage.AlgorithmXChaCha20Poly1305HKDFSHA256,
 		Nonce:                  []byte{byte(version), byte(baseVersion), byte(keyEpoch)},
 		EncryptedPayloadLen:    int64(len(payload)),
-		CiphertextHash:         storage.CiphertextHash(payload),
 		ClientCreatedAtMs:      100 + int64(version),
 		ClientUpdatedAtMs:      100 + int64(version),
 		Payload:                cloneBytes(payload),
@@ -830,6 +829,10 @@ func objectUploadRequestForHandlerTest(domainID string, objectID string, deviceI
 		SignatureAlgorithm:     "ed25519-v1",
 		SignatureKeyID:         signingKeyIDForHandlerTest(deviceID),
 	}
+	request.CiphertextHash = storage.ObjectCiphertextHash(
+		request.StorageVersion(domainID, objectID),
+		payload,
+	)
 	signObjectUploadRequestForHandlerTest(&request, domainID, objectID)
 	return request
 }

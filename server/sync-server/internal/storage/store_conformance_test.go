@@ -63,9 +63,7 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 			t.Fatalf("put second version: %v", err)
 		}
 
-		stale := objectUpload("domain-a", "object-a", "device-a", 2, 1, 1, []byte{0x94})
-		stale.Version.Version = 3
-		signObjectForTest(&stale.Version)
+		stale := objectUpload("domain-a", "object-a", "device-a", 3, 1, 1, []byte{0x94})
 		err = putExpectError(store, stale)
 		var storageErr *Error
 		if !IsCode(err, ErrConflictStaleBaseVersion) {
@@ -210,7 +208,7 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 		ctx := context.Background()
 		store := newReadyStore(t, newStore)
 		upload := objectUpload("domain-a", "object-a", "device-a", 1, 0, 1, []byte{0x91})
-		upload.Version.ObjectID = "object-replaced"
+		upload.Version.Nonce = []byte{0x99}
 
 		if _, err := store.PutObjectVersion(ctx, upload); !IsCode(err, ErrInvalidSignature) {
 			t.Fatalf("tampered object manifest should fail signature verification, got %v", err)
@@ -389,13 +387,13 @@ func objectUpload(domainID string, objectID string, deviceID string, version uin
 			Algorithm:           AlgorithmXChaCha20Poly1305HKDFSHA256,
 			Nonce:               []byte{byte(version), byte(baseVersion), byte(keyEpoch)},
 			EncryptedPayloadLen: int64(len(payload)),
-			CiphertextHash:      CiphertextHash(payload),
 			ServerReceivedAtMs:  0,
 			ClientCreatedAtMs:   100 + int64(version),
 			ClientUpdatedAtMs:   100 + int64(version),
 		},
 		Payload: payload,
 	}
+	upload.Version.CiphertextHash = ObjectCiphertextHash(upload.Version, payload)
 	signObjectForTest(&upload.Version)
 	return upload
 }

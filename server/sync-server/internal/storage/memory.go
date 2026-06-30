@@ -476,7 +476,7 @@ func (s *MemoryStore) ObjectPayload(ctx context.Context, domainID string, object
 	if !ok {
 		return nil, newError(ErrStorageUnavailable, "object payload is missing")
 	}
-	if int64(len(payload)) != metadata.EncryptedPayloadLen || CiphertextHash(payload) != metadata.CiphertextHash {
+	if int64(len(payload)) != metadata.EncryptedPayloadLen || ObjectCiphertextHash(metadata, payload) != metadata.CiphertextHash {
 		return nil, newError(ErrStorageUnavailable, "object payload metadata mismatch")
 	}
 	return cloneBytes(payload), nil
@@ -681,7 +681,7 @@ func validateObjectUpload(upload ObjectVersionUpload) error {
 	if len(upload.Payload) == 0 {
 		return newError(ErrInvalidCiphertextMetadata, "encrypted payload is required")
 	}
-	if int64(len(upload.Payload)) != version.EncryptedPayloadLen || CiphertextHash(upload.Payload) != version.CiphertextHash {
+	if int64(len(upload.Payload)) != version.EncryptedPayloadLen || ObjectCiphertextHash(version, upload.Payload) != version.CiphertextHash {
 		return newError(ErrInvalidCiphertextMetadata, "encrypted payload metadata mismatch")
 	}
 	if version.ClientCreatedAtMs <= 0 || version.ClientUpdatedAtMs < version.ClientCreatedAtMs {

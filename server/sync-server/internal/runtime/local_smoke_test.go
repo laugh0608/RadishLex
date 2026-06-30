@@ -83,7 +83,7 @@ func TestLocalServerSmokeUploadsReadsAndConflicts(t *testing.T) {
 	}
 	var firstBody api.ObjectVersionResponse
 	decodeSmokeResponse(t, firstResponse.Body, &firstBody)
-	if firstBody.CiphertextHash != storage.CiphertextHash(firstPayload) ||
+	if firstBody.CiphertextHash != first.CiphertextHash ||
 		firstBody.EncryptedPayloadLen != int64(len(firstPayload)) {
 		t.Fatalf("unexpected first metadata: %#v", firstBody)
 	}
@@ -275,11 +275,14 @@ func smokeObjectUpload(domainID string, objectID string, deviceID string, versio
 		Algorithm:           storage.AlgorithmXChaCha20Poly1305HKDFSHA256,
 		Nonce:               []byte{byte(version), byte(baseVersion), byte(keyEpoch), 0x55},
 		EncryptedPayloadLen: int64(len(payload)),
-		CiphertextHash:      storage.CiphertextHash(payload),
 		ClientCreatedAtMs:   200 + int64(version),
 		ClientUpdatedAtMs:   200 + int64(version),
 		Payload:             cloneSmokeBytes(payload),
 	}
+	request.CiphertextHash = storage.ObjectCiphertextHash(
+		request.StorageVersion(domainID, objectID),
+		payload,
+	)
 	signSmokeObjectUpload(&request, domainID, objectID)
 	return request
 }

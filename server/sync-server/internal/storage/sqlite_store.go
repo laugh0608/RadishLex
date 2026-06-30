@@ -628,7 +628,7 @@ func (s *SQLiteStore) ObjectPayload(ctx context.Context, domainID string, object
 		}
 		return nil, err
 	}
-	if int64(len(payload)) != metadata.EncryptedPayloadLen || CiphertextHash(payload) != metadata.CiphertextHash {
+	if int64(len(payload)) != metadata.EncryptedPayloadLen || ObjectCiphertextHash(metadata, payload) != metadata.CiphertextHash {
 		return nil, newError(ErrStorageUnavailable, "object payload metadata mismatch")
 	}
 	return cloneBytes(payload), nil
