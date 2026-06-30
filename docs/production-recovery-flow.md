@@ -13,7 +13,7 @@
 - `docs/sync-server-api-storage.md` 已固定 Go server 只保存恢复记录 metadata、包装密文、签名和必要同步元数据。
 - Go server storage / API 已能校验 recovery wrapped material 的长度 / ciphertext hash，把 wrapped material 写入 local object storage，metadata 中保存 `signer_device_id`、signature 和 `blob_ref`，并通过 recovery latest handler 返回 latest active metadata 与 encrypted wrapped material；读取路径已覆盖限速和日志脱敏测试。
 
-本阶段只固定生产恢复流程，不实现真实 UI、平台 Keychain / Keystore backend、真实 HTTP transport 或两客户端端到端同步。
+本阶段只固定生产恢复流程，不实现真实 UI、平台 Keychain / Keystore backend 或两客户端端到端同步。
 
 ## 设计目标
 
@@ -281,7 +281,7 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 4. 已在 Go server storage 验证模型中覆盖 recovery record metadata、`blob_ref` 分配、wrapped material staged blob 写入与 hash / length 校验，不接触恢复码明文。
 5. 已补 Go server recovery latest handler，覆盖 wrapped material 读取、状态、限速和日志脱敏验证。
 6. 后续真实平台 backend 通过验证后，管理 UI 再接入用户可见恢复流程。
-7. 最后再接 Rust 真实 HTTP transport、两客户端端到端同步和真实上传下载。
+7. 最后再接两客户端端到端同步和真实上传下载。
 
 ## 验证口径
 

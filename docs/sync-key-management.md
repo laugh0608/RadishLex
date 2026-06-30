@@ -24,12 +24,12 @@
 
 当前仍不做：
 
-- Rust 客户端不内置真实 HTTP transport，不做两客户端端到端同步；API 与 storage 边界已由 `docs/sync-server-api-storage.md` 固定，Go server 当前只做 metadata / storage / API / runtime 验证模型。
+- Rust 客户端已具备 std-only `http://` HTTP transport，但仍不做两客户端端到端同步；API 与 storage 边界已由 `docs/sync-server-api-storage.md` 固定，Go server 当前只做 metadata / storage / API / runtime 验证模型。
 - 不新增 CLI / FFI 明文同步 payload 入口。
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步若进入代码，应按 `docs/sync-server-api-storage.md` 验证 Rust 真实 HTTP transport 与 Go server 的对象上传下载、版本冲突、错误语义和日志脱敏；真实平台 backend 未通过验证前，不应开放用户可用同步主线。
+下一步若进入代码，应按 `docs/sync-server-api-storage.md` 确认两客户端端到端同步边界，覆盖对象上传下载、版本冲突、解密合并写回、错误语义和日志脱敏；真实平台 backend 未通过验证前，不应开放用户可用同步主线。
 
 ## 设计目标
 
@@ -267,7 +267,7 @@ updated_at_ms
 14. 已补 Go server API / storage 边界设计。
 15. 已补生产恢复流程设计和平台私钥存储 backend ADR。
 16. 已起步 Go server metadata / storage / API / runtime 验证模型，当前覆盖配置默认值、API request / error DTO、SQLite migration、storage interface、storage conformance tests、内存 storage、SQLite-backed metadata repository、local object storage staged transaction、签名验证、wrapped key bytes、recovery wrapped material、object version 上传下载、版本冲突、撤销设备阻断、非敏感 audit events 和隐私字段检查。
-17. 已补 Rust remote object client DTO / transport trait，固定 encrypted object upload request、metadata 读取、binary payload 下载、stale conflict latest metadata、server error code 映射和 Debug 脱敏；真实 HTTP transport 与两客户端端到端同步仍需单独验证。
+17. 已补 Rust remote object client DTO / transport trait 和 std-only `http://` HTTP transport，固定 encrypted object upload request、metadata 读取、binary payload 下载、stale conflict latest metadata、server error code 映射、真实 HTTP request / response 传递和 Debug 脱敏；两客户端端到端同步仍需单独验证。
 
 ## 验证口径
 

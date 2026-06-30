@@ -1,5 +1,6 @@
 mod assemble;
 mod device;
+mod http_transport;
 mod merge;
 mod model;
 mod remote;
@@ -12,6 +13,7 @@ pub use device::{
     DeviceAuthorizationPackage, DeviceJoinRequest, DeviceRevocationReason, DeviceRevocationRecord,
     SyncDevice, SyncDeviceStatus, SyncDomain, SyncObjectVersion,
 };
+pub use http_transport::HttpSyncRemoteTransport;
 pub use merge::{
     ClientSyncMergeInput, ClientSyncMergeResult, DictionaryDeletedTermMergeRecord,
     DictionaryUserTermMergeRecord, RankerWeightMergeRecord, SyncMergeDecision,

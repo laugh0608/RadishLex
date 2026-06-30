@@ -1,10 +1,10 @@
 # RadishLex 同步 Payload 草案
 
-本文档定义当前 Rust 侧同步 payload 草案、数据分级映射和验证口径，读者是后续实现 `ime-sync`、`ime-crypto`、同步 CLI、Go server 和管理 UI 的开发者。本文不包含加密算法实现、设备授权流程完整协议、Go server 数据库 migration、真实 HTTP transport 或两客户端端到端同步；客户端加密边界见 `docs/crypto-boundary.md`，Go server API 与 storage 边界见 `docs/sync-server-api-storage.md`。
+本文档定义当前 Rust 侧同步 payload 草案、数据分级映射和验证口径，读者是后续实现 `ime-sync`、`ime-crypto`、同步 CLI、Go server 和管理 UI 的开发者。本文不包含加密算法实现、设备授权流程完整协议、Go server 数据库 migration、两客户端端到端同步或部署配置；客户端加密边界见 `docs/crypto-boundary.md`，Go server API 与 storage 边界见 `docs/sync-server-api-storage.md`。
 
 ## 当前定位
 
-当前只落地 Rust 同步对象边界模型和 remote client DTO / transport trait，不内置真实 HTTP transport，不生成明文上传文件，也不启动后端做真实网络同步。`ime-sync` 的作用是把 `sync preflight` 已验证的本地分类边界转成可测试的 Rust API，并让上传草案元数据从 `ime-crypto` envelope 派生，避免同步层和加密层字段语义漂移；当前 remote client 上传入口只接收已加密 `AssembledSyncObject` 与 `SignedSyncObjectManifest`，不接受 plaintext payload。`ime-userdb` 当前提供 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 `SyncEnvelopeAssembler` 完成本地 envelope 加密、解密和 sync draft 派生验证；解密后的 userdb P2 JSON 已能解析为 `ClientSyncMergeInput` 所需记录，并可把被合并模型接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite：
+当前已落地 Rust 同步对象边界模型、remote client DTO / transport trait 和 std-only `http://` `HttpSyncRemoteTransport`，不生成明文上传文件，也不启动后端或保留长期运行服务。`ime-sync` 的作用是把 `sync preflight` 已验证的本地分类边界转成可测试的 Rust API，并让上传草案元数据从 `ime-crypto` envelope 派生，避免同步层和加密层字段语义漂移；当前 remote client 上传入口只接收已加密 `AssembledSyncObject` 与 `SignedSyncObjectManifest`，不接受 plaintext payload。`ime-userdb` 当前提供 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 `SyncEnvelopeAssembler` 完成本地 envelope 加密、解密和 sync draft 派生验证；解密后的 userdb P2 JSON 已能解析为 `ClientSyncMergeInput` 所需记录，并可把被合并模型接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite：
 
 - P2 数据可以进入后续端到端加密对象。
 - P1 明细事件默认只能留在本地。
@@ -57,7 +57,7 @@ settings.schema
 backup.snapshot
 ```
 
-本阶段只验证类型和边界，当前已定义 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 plaintext payload 字段序列化，并已证明它们可以进入 `ime-crypto` envelope 后派生成 `EncryptedSyncObjectDraft`。`docs/sync-key-management.md` 已固定设备授权、key management 和冲突语义；`docs/sync-server-api-storage.md` 已固定远端 API、SQLite metadata、对象存储和版本冲突边界；Rust 侧已补同步域、设备状态、加入请求、授权包、撤销记录、key epoch、对象版本冲突草案模型、envelope 组装边界和 remote client DTO / transport trait。服务端只能看到对象类型、设备 ID、key id、key epoch、algorithm、nonce、版本、密文大小、ciphertext hash 和时间戳。
+本阶段只验证类型和边界，当前已定义 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 plaintext payload 字段序列化，并已证明它们可以进入 `ime-crypto` envelope 后派生成 `EncryptedSyncObjectDraft`。`docs/sync-key-management.md` 已固定设备授权、key management 和冲突语义；`docs/sync-server-api-storage.md` 已固定远端 API、SQLite metadata、对象存储和版本冲突边界；Rust 侧已补同步域、设备状态、加入请求、授权包、撤销记录、key epoch、对象版本冲突草案模型、envelope 组装边界、remote client DTO / transport trait 和 `http://` HTTP transport。服务端只能看到对象类型、设备 ID、key id、key epoch、algorithm、nonce、版本、密文大小、ciphertext hash 和时间戳。
 
 ## Plaintext Payload
 
@@ -196,6 +196,7 @@ RemoteObjectPayload
 SyncRemoteError
 SyncServerErrorCode
 LatestObjectConflictMetadata
+HttpSyncRemoteTransport
 ```
 
 上传入口：
@@ -224,7 +225,7 @@ object_payload(domain_id, object_id, version)
 
 - metadata 读取返回 `RemoteObjectVersion`，不携带 payload bytes。
 - payload 读取先拉取 metadata，再拉取 `/payload` 二进制响应；客户端必须校验响应长度等于 metadata 的 `encrypted_payload_len`。
-- 后续真实 HTTP transport 仍应在解密前复验 ciphertext hash；当前 remote client 边界已阻断长度不一致的响应。
+- `HttpSyncRemoteTransport` 负责通过短连接 HTTP/1.1 传递 request / response bytes，不解析 plaintext，不记录请求体或响应体；客户端后续在解密前仍应复验 ciphertext hash，当前 remote client 边界已阻断长度不一致的响应。
 
 错误映射：
 
@@ -267,13 +268,13 @@ object_payload(domain_id, object_id, version)
 - `UserDbDecryptedSyncObject`、`UserDbDecodedSyncPayloadBatch` 和 `decode_userdb_sync_objects()`：解析已解密的 userdb P2 JSON，严格校验 schema、object type、字段集合和值域，把 `manual_add` 映射为显式恢复意图，并接入 `ClientSyncMergeInput`；解析依赖 `serde_json = 1.0.150`，许可为 MIT OR Apache-2.0。
 - `UserDb::apply_decoded_sync_payload_batch()` 和 `UserDbSyncApplySummary`：把已解密 P2 payload batch 经过 `ClientSyncMergeInput` 合并后写回真实 userdb，覆盖 user terms、deleted tombstones、ranker weights、payload tombstone 阻断、本机 tombstone 阻断、显式恢复清理和旧权重阻断；summary 只暴露计数，不暴露明文 term identity。
 - userdb P2 payload 本地加密装配测试：通过 `SyncEnvelopeAssembler` 用合成 sync master key / device id 把 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` payload 加密为 `ime-crypto::EncryptedObjectEnvelope`，验证可解密回原 bytes、nonce 不重复，并派生 `ime-sync::EncryptedSyncObjectDraft` 元数据。
-- `SyncRemoteClient`、`SyncRemoteTransport`、`RemoteObjectVersion`、`RemoteObjectPayload` 和 `SyncRemoteError`：固定 Rust remote client 与 Go object version API 的 DTO / transport trait 边界，覆盖 JSON base64 byte 字段、metadata 读取、binary payload 下载、stale conflict latest metadata、server error code 映射和 Debug 脱敏。
+- `SyncRemoteClient`、`SyncRemoteTransport`、`RemoteObjectVersion`、`RemoteObjectPayload`、`SyncRemoteError` 和 `HttpSyncRemoteTransport`：固定 Rust remote client 与 Go object version API 的 DTO / transport 边界，覆盖 JSON base64 byte 字段、metadata 读取、binary payload 下载、stale conflict latest metadata、server error code 映射、HTTP/1.1 request / response 传递、chunked response 解码、base path 拼接和 Debug 脱敏。
 
 未落地：
 
 - `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
 - 真实平台私钥存储 backend 实现、生产恢复 UI / API 和远端密钥轮换执行器。
-- 客户端上传补丁生成、真实 HTTP transport、两客户端端到端同步和部署配置。
+- 客户端上传补丁生成、两客户端端到端同步和部署配置。
 - 生产同步设置、备份快照、管理 UI 同步状态和平台私钥存储 backend 实现。
 
 ## 验证口径
@@ -299,6 +300,7 @@ cargo test -p radishlex-ime-cli
 - userdb P2 payload 本地加密装配测试必须通过 `SyncEnvelopeAssembler` 验证 envelope 可解密回原 bytes，`EncryptedSyncObjectDraft` 只保留密文长度和 ciphertext hash 等元数据，不携带 plaintext bytes。
 - remote client 上传请求必须只由 `AssembledSyncObject` 和 `SignedSyncObjectManifest` 生成，不能接受 plaintext payload、P1 event 或 ranker 明细字段；JSON byte 字段必须保持 Go 兼容 base64。
 - remote client 必须拒绝 manifest 与 encrypted object metadata 不一致的上传请求，必须把 stale base version 映射为 latest metadata，且错误 / Debug 输出不得泄漏请求体、signature、nonce 或 payload bytes。
+- `HttpSyncRemoteTransport` 必须只支持不含凭据、query 和 fragment 的 `http://` base URL，必须传递 JSON request 和 binary payload response，必须拒绝请求 path 中的 query / fragment，且 transport 错误不得包含请求体、payload、nonce、signature 或 plaintext payload。
 - 设备生命周期模型必须验证 pending / active / revoked 状态转移，授权设备和接收设备都必须 active，撤销记录必须推进 `key_epoch`，对象版本必须能识别 stale base version。
 - 客户端合并模型必须验证 `dictionary.deleted_terms` tombstone 能压过旧 `dictionary.user_terms` 和旧 `ranker.weights`，旧 epoch 上传不能靠更晚本机时间复活删除词，显式恢复必须晚于 tombstone，且恢复前的旧权重不随词条恢复一起复活。
 - userdb P2 payload 解码必须拒绝 schema / object type 不匹配、未知字段、非法字段类型、`dictionary.user_terms` 中的 deleted 状态、0 key epoch 和负数 / 非有限权重摘要，并能把真实 payload bytes 转成 `ClientSyncMergeInput`。
