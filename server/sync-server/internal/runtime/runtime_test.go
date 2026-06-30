@@ -142,6 +142,54 @@ func TestNewHTTPServerConfiguresHandlerTimeoutsAndRedactedAuditLog(t *testing.T)
 	}
 }
 
+func TestNewHTTPServerEnforcesConfiguredAccessToken(t *testing.T) {
+	cfg := runtimeConfigForTest(t)
+	cfg.AccessToken = testAccessToken
+	var logs bytes.Buffer
+	server, closeStore, err := NewHTTPServer(cfg, log.New(&logs, "", 0))
+	if err != nil {
+		t.Fatalf("create http server: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = closeStore()
+	})
+
+	missing := httptest.NewRequest(http.MethodGet, api.PrefixV1+"/domains/domain-a/state", nil)
+	missingResponse := httptest.NewRecorder()
+	server.Handler.ServeHTTP(missingResponse, missing)
+	if missingResponse.Code != http.StatusUnauthorized {
+		t.Fatalf("unexpected missing token status: %d body=%s", missingResponse.Code, missingResponse.Body.String())
+	}
+	var missingBody api.ErrorResponse
+	decodeResponse(t, missingResponse, &missingBody)
+	if missingBody.ErrorCode != string(storage.ErrUnauthenticated) {
+		t.Fatalf("unexpected missing token response: %#v", missingBody)
+	}
+
+	createDomain := api.CreateDomainRequest{
+		DomainID:        "domain-a",
+		CurrentKeyEpoch: 1,
+		ActiveKeyID:     "sync-key-a",
+		FirstDevice: api.DeviceMetadata{
+			DeviceID:                "device-a",
+			SigningPublicKeyID:      "signing-key-a",
+			SigningPublicKey:        []byte("signing-public-key"),
+			KeyAgreementPublicKeyID: "agreement-key-a",
+			KeyAgreementPublicKey:   []byte("agreement-public-key"),
+			Status:                  string(storage.DeviceActive),
+		},
+		CreatedAtMs: 100,
+		UpdatedAtMs: 100,
+	}
+	createResponse := performAuthorizedJSONRequest(t, server.Handler, http.MethodPost, api.PrefixV1+"/domains", testAccessToken, createDomain)
+	if createResponse.Code != http.StatusCreated {
+		t.Fatalf("unexpected authorized create domain status: %d body=%s", createResponse.Code, createResponse.Body.String())
+	}
+	if strings.Contains(logs.String(), testAccessToken) {
+		t.Fatalf("audit log leaked access token: %s", logs.String())
+	}
+}
+
 func runtimeConfigForTest(t *testing.T) config.Config {
 	t.Helper()
 	root := t.TempDir()
@@ -152,13 +200,23 @@ func runtimeConfigForTest(t *testing.T) config.Config {
 	return cfg
 }
 
+const testAccessToken = "test-access-token-12345678901234567890"
+
 func performJSONRequest(t *testing.T, handler http.Handler, method string, path string, value any) *httptest.ResponseRecorder {
+	t.Helper()
+	return performAuthorizedJSONRequest(t, handler, method, path, "", value)
+}
+
+func performAuthorizedJSONRequest(t *testing.T, handler http.Handler, method string, path string, accessToken string, value any) *httptest.ResponseRecorder {
 	t.Helper()
 	body, err := json.Marshal(value)
 	if err != nil {
 		t.Fatalf("marshal request: %v", err)
 	}
 	request := httptest.NewRequest(method, path, bytes.NewReader(body))
+	if accessToken != "" {
+		request.Header.Set("Authorization", "Bearer "+accessToken)
+	}
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	return response

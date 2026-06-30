@@ -109,6 +109,66 @@ func TestMetadataHandlersCreateDomainReadDeviceAndSaveJoinRequest(t *testing.T) 
 	}
 }
 
+func TestHandlerRequiresConfiguredAccessTokenBeforeStorageRead(t *testing.T) {
+	audit := &auditSinkStub{}
+	store := &authGateStoreStub{}
+	handler := NewHandler(store, HandlerConfig{
+		Now:         fixedNow,
+		RequestID:   fixedRequestID,
+		AuditSink:   audit,
+		AccessToken: testAccessToken,
+	})
+
+	missing := httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/state", nil)
+	missingResponse := httptest.NewRecorder()
+	handler.ServeHTTP(missingResponse, missing)
+	if missingResponse.Code != http.StatusUnauthorized {
+		t.Fatalf("unexpected missing token status: %d body=%s", missingResponse.Code, missingResponse.Body.String())
+	}
+	var missingBody ErrorResponse
+	decodeResponse(t, missingResponse, &missingBody)
+	if missingBody.ErrorCode != string(storage.ErrUnauthenticated) {
+		t.Fatalf("unexpected missing token response: %#v", missingBody)
+	}
+	if store.domainCalls != 0 {
+		t.Fatalf("unauthenticated request should not read domain storage, calls=%d", store.domainCalls)
+	}
+	if strings.Contains(missingResponse.Body.String(), testAccessToken) {
+		t.Fatalf("unauthenticated response leaked token: %s", missingResponse.Body.String())
+	}
+	if len(audit.events) != 1 ||
+		audit.events[0].RouteName != "auth.access" ||
+		audit.events[0].ResultCode != string(storage.ErrUnauthenticated) ||
+		audit.events[0].StatusCode != http.StatusUnauthorized {
+		t.Fatalf("unexpected unauthenticated audit event: %#v", audit.events)
+	}
+
+	wrong := httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/state", nil)
+	wrong.Header.Set(authorizationHeader, "Bearer wrong-access-token-12345678901234567890")
+	wrongResponse := httptest.NewRecorder()
+	handler.ServeHTTP(wrongResponse, wrong)
+	if wrongResponse.Code != http.StatusUnauthorized {
+		t.Fatalf("unexpected wrong token status: %d body=%s", wrongResponse.Code, wrongResponse.Body.String())
+	}
+	if store.domainCalls != 0 {
+		t.Fatalf("wrong token request should not read domain storage, calls=%d", store.domainCalls)
+	}
+
+	valid := httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/state", nil)
+	valid.Header.Set(authorizationHeader, "Bearer "+testAccessToken)
+	validResponse := httptest.NewRecorder()
+	handler.ServeHTTP(validResponse, valid)
+	if validResponse.Code != http.StatusOK {
+		t.Fatalf("unexpected valid token status: %d body=%s", validResponse.Code, validResponse.Body.String())
+	}
+	if store.domainCalls != 1 {
+		t.Fatalf("valid token should read domain storage once, calls=%d", store.domainCalls)
+	}
+	if eventText := fmt.Sprintf("%#v", audit.events); strings.Contains(eventText, testAccessToken) {
+		t.Fatalf("audit event leaked token: %s", eventText)
+	}
+}
+
 func TestJoinAuthorizationHandlerPassesSignedMetadataToStorage(t *testing.T) {
 	store := &authorizationStoreStub{}
 	handler := NewHandler(store, HandlerConfig{Now: fixedNow})
@@ -703,6 +763,8 @@ func fixedRequestID() string {
 	return "req-fixed"
 }
 
+const testAccessToken = "test-access-token-12345678901234567890"
+
 func performJSONRequest(t *testing.T, handler http.Handler, method string, path string, value any) *httptest.ResponseRecorder {
 	t.Helper()
 	body, err := json.Marshal(value)
@@ -786,6 +848,22 @@ func (s *persistentAuditStoreStub) Domain(ctx context.Context, domainID string) 
 func (s *persistentAuditStoreStub) RecordAuditEvent(ctx context.Context, event storage.AuditEvent) error {
 	s.auditEvents = append(s.auditEvents, event)
 	return nil
+}
+
+type authGateStoreStub struct {
+	storage.Store
+	domainCalls int
+}
+
+func (s *authGateStoreStub) Domain(ctx context.Context, domainID string) (storage.Domain, error) {
+	s.domainCalls++
+	return storage.Domain{
+		DomainID:        domainID,
+		CurrentKeyEpoch: 1,
+		ActiveKeyID:     "epoch-key-a",
+		CreatedAtMs:     100,
+		UpdatedAtMs:     100,
+	}, nil
 }
 
 func createDomainForObjectHandlerTest(t *testing.T, store storage.Store, domainID string, deviceID string, keyEpoch uint64) {

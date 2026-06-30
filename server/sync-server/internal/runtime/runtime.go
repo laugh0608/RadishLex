@@ -39,6 +39,7 @@ func NewHTTPServer(cfg config.Config, logger *log.Logger) (*http.Server, CloseFu
 		RecoveryReadLimit:  cfg.RecoveryReadPerHour,
 		RecoveryReadWindow: cfg.RecoveryReadWindow,
 		MaxObjectBytes:     cfg.MaxObjectBytes,
+		AccessToken:        cfg.AccessToken,
 		AuditSink:          NewAuditLogger(logger),
 	})
 	server := &http.Server{

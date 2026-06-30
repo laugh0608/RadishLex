@@ -5,10 +5,10 @@
 ## 当前结论
 
 - 部署态入口仍是 `deploy/sync-server/docker-compose.yaml` 加唯一 env 示例 `deploy/sync-server/.env.example`，不新增第二个 env 文件。
-- 部署态只提供同机 HTTP upstream `http://127.0.0.1:7319`，外部 TLS / 认证 / 访问控制必须在反向代理、VPN 或等价网络边界完成。
+- 部署态只提供同机 HTTP upstream `http://127.0.0.1:7319`；外部 TLS 必须在反向代理、VPN 或等价网络边界完成，Go server 通过单用户 bearer access token 执行首个内建访问门禁。
 - 本地验证入口仍是显式 `-f deploy/sync-server/docker-compose.local.yaml`，通过 Caddy internal TLS 提供 `https://localhost:7319`，不新增第二个对外端口。
 - Go server 已验证密文对象上传下载、设备授权、版本冲突、日志脱敏、Docker Compose 本地 / 部署态启动 smoke 和 Rust userdb 两客户端真实 Go HTTP 同步；这些证据仍不等于可以开放真实用户同步。
-- 真实用户同步前仍缺少生产访问认证、备份演练、升级回滚演练、平台私钥存储 backend 和用户可用同步 UI。
+- 真实用户同步前仍缺少备份演练、升级回滚演练、外部 TLS 真实验证、平台私钥存储 backend 和用户可用同步 UI；生产访问认证已有单用户 bearer token 实现证据，但部署者仍必须设置真实 token 并复验失败响应。
 
 ## 部署拓扑
 
@@ -50,25 +50,49 @@ Client
 
 ## 认证与访问控制
 
-Go sync server 当前的设备签名、join request 和 object manifest 验签只证明同步域内设备身份，不等同于部署访问认证。真实用户入口必须在 server 外层或后续 API 层补访问控制。
+Go sync server 当前的设备签名、join request 和 object manifest 验签只证明同步域内设备身份，不等同于部署访问认证。部署访问认证由 bearer access token 和外部网络 / TLS 边界共同承担。
 
-可接受方向：
+当前固定的首个方案是 Go server 内建单用户 bearer access token：
+
+- 在未提交的部署 `.env` 或等价 secret 注入机制中设置 `RADISHLEX_SYNC_ACCESS_TOKEN`。
+- token 必须随机生成，至少 32 bytes，不包含空白字符；不要使用 domain id、device id、object id、恢复码、同步主密钥或平台私钥派生。
+- 所有客户端请求必须发送 `Authorization: Bearer <token>`。Go handler 在业务 storage 前校验 token，缺失、重复、格式错误或不匹配时返回 `401 unauthenticated`。
+- Rust `HttpSyncRemoteTransport` 继续拒绝 URL credentials、query token 和 fragment token；访问启用 token 的 server 时必须通过 transport 配置 bearer token header。
+- 更换 token 只影响部署访问，不改变同步域密钥、设备授权、object version、恢复记录或 tombstone 语义。
+
+可叠加的外层控制：
 
 - 私有网络 / VPN / Tailscale / WireGuard 之类的受控网络，只允许已授权设备访问 upstream。
 - 反向代理 mTLS，并配套客户端证书管理、撤销和轮换流程。
 - 反向代理 `auth_request` / OIDC / 等价外部认证，并配套客户端支持。
-- 后续在 Go server 中实现明确的自部署访问 token 或账户层认证，并补测试和日志脱敏。
 
 当前不可接受：
 
 - 仅靠随机 URL、domain id、device id 或 object id 作为认证。
 - 仅靠服务端设备签名验签来替代访问控制。
-- 把管理 token、恢复码明文、同步主密钥或平台私钥放进 `.env`、Nginx 配置、image layer 或日志。
+- 把 access token、恢复码明文、同步主密钥或平台私钥提交进 Git、写进 image layer、写进 Nginx 示例、写入备份索引或打印进日志。
 - 在没有访问控制的情况下把 `RADISHLEX_SYNC_BIND` 改成 `0.0.0.0` 或公网 IP。
+
+部署操作要求：
+
+- `.env` 必须保持未提交，权限建议 `0600`，并排除在备份清单的“非敏感配置”之外。
+- `deploy/sync-server/.env.example` 只能保留空 token 占位，不能写真实 token。
+- 外部反代必须保留 `Authorization` header 到 upstream，或由外层认证方案明确替换 Go token 门禁；当前 Nginx 示例显式转发该 header。
+- 验证失败响应时只记录 HTTP status、`error_code` 和 route，不记录 token。
+
+最小验证：
+
+```sh
+curl -i http://127.0.0.1:7319/api/v1/domains/smoke-auth/state
+curl -i -H 'Authorization: Bearer <redacted-access-token>' \
+  http://127.0.0.1:7319/api/v1/domains/smoke-auth/state
+```
+
+预期第一条返回 `401 unauthenticated`，第二条在 domain 不存在时返回结构化 `404 not_found`。这只验证 Go token 门禁和 upstream 到达性，不替代外部 HTTPS 验证。
 
 停止线：
 
-- 认证策略没有文档、配置和验证证据前，不开放真实用户同步。
+- `RADISHLEX_SYNC_ACCESS_TOKEN` 为空、过短、含空白字符或未完成失败响应验证时，不开放真实用户同步。
 - 认证失败、签名失败、rate limit 和 storage 错误不得返回请求体、payload、signature 或恢复材料。
 
 ## 数据目录与权限

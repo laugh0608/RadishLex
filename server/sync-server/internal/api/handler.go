@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"io"
@@ -18,11 +19,14 @@ import (
 
 const deviceIDHeader = "X-RadishLex-Device-ID"
 const requestIDHeader = "X-Request-ID"
+const authorizationHeader = "Authorization"
+const bearerPrefix = "Bearer "
 
 type HandlerConfig struct {
 	RecoveryReadLimit  int
 	RecoveryReadWindow time.Duration
 	MaxObjectBytes     int64
+	AccessToken        string
 	Now                func() time.Time
 	RequestID          func() string
 	AuditSink          AuditSink
@@ -62,6 +66,7 @@ type Handler struct {
 	requestID       func() string
 	auditSink       AuditSink
 	maxObjectBytes  int64
+	accessToken     string
 }
 
 var generatedRequestIDCounter atomic.Uint64
@@ -86,6 +91,7 @@ func NewHandler(store storage.Store, cfg HandlerConfig) *Handler {
 		requestID:       requestID,
 		auditSink:       cfg.AuditSink,
 		maxObjectBytes:  cfg.MaxObjectBytes,
+		accessToken:     cfg.AccessToken,
 	}
 }
 
@@ -118,6 +124,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request, audit *AuditEvent) {
+	if !h.authorizeRequest(r) {
+		audit.RouteName = "auth.access"
+		w.Header().Set("WWW-Authenticate", `Bearer realm="radishlex-sync"`)
+		h.writeError(w, publicStorageError(storage.ErrUnauthenticated, "access token is missing or invalid", false))
+		return
+	}
 	if h.store == nil {
 		audit.RouteName = "storage.unconfigured"
 		h.writeError(w, publicStorageError(storage.ErrStorageUnavailable, "storage is not configured", true))
@@ -163,6 +175,25 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request, audit *Audit
 	default:
 		h.writeError(w, publicStorageError(storage.ErrNotFound, "api route not found", false))
 	}
+}
+
+func (h *Handler) authorizeRequest(r *http.Request) bool {
+	if h.accessToken == "" {
+		return true
+	}
+	values := r.Header.Values(authorizationHeader)
+	if len(values) != 1 {
+		return false
+	}
+	value := values[0]
+	if !strings.HasPrefix(value, bearerPrefix) {
+		return false
+	}
+	token := strings.TrimPrefix(value, bearerPrefix)
+	if token == "" {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(token), []byte(h.accessToken)) == 1
 }
 
 func (h *Handler) handleDomains(w http.ResponseWriter, r *http.Request, audit *AuditEvent) {

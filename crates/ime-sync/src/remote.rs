@@ -108,6 +108,7 @@ pub trait SyncRemoteTransport {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SyncServerErrorCode {
     InvalidRequest,
+    Unauthenticated,
     InvalidCiphertextMetadata,
     InvalidSignature,
     ForbiddenDevice,
@@ -124,6 +125,7 @@ impl SyncServerErrorCode {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::InvalidRequest => "invalid_request",
+            Self::Unauthenticated => "unauthenticated",
             Self::InvalidCiphertextMetadata => "invalid_ciphertext_metadata",
             Self::InvalidSignature => "invalid_signature",
             Self::ForbiddenDevice => "forbidden_device",
@@ -140,6 +142,7 @@ impl SyncServerErrorCode {
     fn from_server_code(value: &str) -> Self {
         match value {
             "invalid_request" => Self::InvalidRequest,
+            "unauthenticated" => Self::Unauthenticated,
             "invalid_ciphertext_metadata" => Self::InvalidCiphertextMetadata,
             "invalid_signature" => Self::InvalidSignature,
             "forbidden_device" => Self::ForbiddenDevice,
@@ -1072,8 +1075,8 @@ mod tests {
 
     #[test]
     fn server_error_codes_map_to_public_remote_errors() {
-        let transport = RecordingTransport::default();
-        transport.push_json(
+        let forbidden_transport = RecordingTransport::default();
+        forbidden_transport.push_json(
             403,
             &serde_json::json!({
                 "error_code": "forbidden_device",
@@ -1082,7 +1085,7 @@ mod tests {
                 "server_time_ms": 456
             }),
         );
-        let client = SyncRemoteClient::new(transport);
+        let client = SyncRemoteClient::new(forbidden_transport);
 
         let error = client
             .object_version("domain-a", "object-a", 1)
@@ -1100,6 +1103,38 @@ mod tests {
                 assert_eq!(code, SyncServerErrorCode::ForbiddenDevice);
                 assert!(!retryable);
                 assert_eq!(server_time_ms, Some(456));
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+
+        let unauthenticated_transport = RecordingTransport::default();
+        unauthenticated_transport.push_json(
+            401,
+            &serde_json::json!({
+                "error_code": "unauthenticated",
+                "message": "access token is missing or invalid",
+                "retryable": false,
+                "server_time_ms": 789
+            }),
+        );
+        let client = SyncRemoteClient::new(unauthenticated_transport);
+
+        let error = client
+            .object_version("domain-a", "object-a", 1)
+            .expect_err("unauthenticated");
+
+        match error {
+            SyncRemoteError::Server {
+                status,
+                code,
+                retryable,
+                server_time_ms,
+                ..
+            } => {
+                assert_eq!(status, 401);
+                assert_eq!(code, SyncServerErrorCode::Unauthenticated);
+                assert!(!retryable);
+                assert_eq!(server_time_ms, Some(789));
             }
             other => panic!("unexpected error: {other:?}"),
         }

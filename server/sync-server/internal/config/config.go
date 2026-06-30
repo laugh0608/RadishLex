@@ -5,9 +5,11 @@ import (
 	"os"
 	"strconv"
 	"time"
+	"unicode"
 )
 
 const defaultMaxObjectBytes int64 = 16 * 1024 * 1024
+const minAccessTokenBytes = 32
 
 type Config struct {
 	ListenAddress       string
@@ -16,6 +18,7 @@ type Config struct {
 	MaxObjectBytes      int64
 	RecoveryReadWindow  time.Duration
 	RecoveryReadPerHour int
+	AccessToken         string
 }
 
 func Default() Config {
@@ -34,6 +37,7 @@ func LoadFromEnv() (Config, error) {
 	cfg.ListenAddress = envOrDefault("RADISHLEX_SYNC_LISTEN", cfg.ListenAddress)
 	cfg.MetadataPath = envOrDefault("RADISHLEX_SYNC_METADATA_PATH", cfg.MetadataPath)
 	cfg.BlobDir = envOrDefault("RADISHLEX_SYNC_BLOB_DIR", cfg.BlobDir)
+	cfg.AccessToken = os.Getenv("RADISHLEX_SYNC_ACCESS_TOKEN")
 
 	if value := os.Getenv("RADISHLEX_SYNC_MAX_OBJECT_BYTES"); value != "" {
 		parsed, err := strconv.ParseInt(value, 10, 64)
@@ -74,7 +78,24 @@ func (c Config) Validate() error {
 	if c.RecoveryReadPerHour <= 0 {
 		return fmt.Errorf("recovery reads per hour must be positive")
 	}
+	if c.AccessToken != "" {
+		if len(c.AccessToken) < minAccessTokenBytes {
+			return fmt.Errorf("access token must be at least %d bytes", minAccessTokenBytes)
+		}
+		if containsWhitespace(c.AccessToken) {
+			return fmt.Errorf("access token must not contain whitespace")
+		}
+	}
 	return nil
+}
+
+func containsWhitespace(value string) bool {
+	for _, r := range value {
+		if unicode.IsSpace(r) {
+			return true
+		}
+	}
+	return false
 }
 
 func envOrDefault(name string, fallback string) string {

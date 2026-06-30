@@ -7,7 +7,7 @@
 - Compose 只负责自部署 sync server 的容器入口，不替代 Go / Rust 自动化测试。
 - 本地容器验证使用 `deploy/sync-server/docker-compose.local.yaml`，默认访问 `https://localhost:7319`。
 - 部署态使用 `deploy/sync-server/docker-compose.yaml`，容器只暴露 HTTP 上游 `http://127.0.0.1:7319`，外部 `Nginx / Traefik / Caddy` 负责 TLS 终止。
-- 当前 server 仍缺少生产认证、备份策略、平台私钥 backend 和用户可用同步 UI，不应直接开放给真实用户或公网。
+- 当前 server 已有单用户 bearer access token 门禁，但仍缺少备份策略、平台私钥 backend 和用户可用同步 UI，不应直接开放给真实用户或公网。
 - 真实用户部署前必须先按 `docs/runbooks/sync-server-production-deployment.md` 复核外部 TLS、认证 / 访问控制、冷备份、恢复演练、升级回滚和日志脱敏。
 - 不写入真实用户词、input code、reading、联系人、P1 事件、ranker 明细或真实恢复材料。
 - AI 默认不启动或保留长期运行服务；需要人工明确执行 `docker compose up`。
@@ -76,10 +76,11 @@ http://127.0.0.1:7319
 - `RADISHLEX_SYNC_BLOB_DIR`：encrypted blob 容器内目录。
 - `RADISHLEX_SYNC_MAX_OBJECT_BYTES`：单个 encrypted object 上限。
 - `RADISHLEX_SYNC_RECOVERY_READS_PER_HOUR`：recovery latest 读取限速。
+- `RADISHLEX_SYNC_ACCESS_TOKEN`：单用户自部署 bearer access token；真实部署必须设置，长度至少 32 bytes，不能包含空白字符。空值只用于本地 wiring 检查或未暴露的开发测试。
 
-`deploy/sync-server/nginx.prod.conf` 是外部 TLS 终止骨架，默认把 `https://sync.radishlex.example.com` 转发到 `127.0.0.1:7319`。真实部署前必须替换域名、证书路径和上游地址，并补齐访问控制；该文件本身不代表完整公网生产配置。
+`deploy/sync-server/nginx.prod.conf` 是外部 TLS 终止骨架，默认把 `https://sync.radishlex.example.com` 转发到 `127.0.0.1:7319`，并显式保留 `Authorization` header 给 Go bearer token 门禁。真实部署前必须替换域名、证书路径和上游地址，并复验访问控制；该文件本身不代表完整公网生产配置。
 
-`.env.example` 不是完整生产上线方案。真实用户同步前仍必须按生产部署 runbook 补齐认证策略、备份恢复、升级回滚、外部 TLS 证书、监控告警、平台私钥 backend 和人工恢复演练。
+`.env.example` 不是完整生产上线方案。真实用户同步前仍必须按生产部署 runbook 设置真实 access token，复验认证失败响应，并补齐备份恢复、升级回滚、外部 TLS 证书、监控告警、平台私钥 backend 和人工恢复演练。
 
 ## 日志与停止
 
@@ -119,6 +120,7 @@ RADISHLEX_SYNC_BIND=127.0.0.1
 RADISHLEX_SYNC_PORT=7319
 RADISHLEX_SYNC_DATA_PATH=/srv/radishlex-sync
 RADISHLEX_SYNC_MAX_OBJECT_BYTES=33554432
+RADISHLEX_SYNC_ACCESS_TOKEN=<generated-redacted-token>
 ```
 
 不要把 `RADISHLEX_SYNC_BIND` 改成公网地址后直接暴露服务。公网入口应先由外部 HTTPS 反代、认证、备份和日志策略兜住，且当前阶段仍不面向真实用户开放。
@@ -166,7 +168,7 @@ docker compose -f deploy/sync-server/docker-compose.yaml --env-file "$tmpenv" do
 rm -rf "$tmpdir"
 ```
 
-预期部署态 `curl` 能直连 `sync-server` HTTP upstream，返回结构化 `404 not_found` JSON。该入口不提供 TLS；真实生产 TLS 必须由外部反代终止。
+预期部署态 `curl` 能直连 `sync-server` HTTP upstream，返回结构化 `404 not_found` JSON。该入口不提供 TLS；真实生产 TLS 必须由外部反代终止。如果临时 env 设置了 `RADISHLEX_SYNC_ACCESS_TOKEN`，该 `curl` 必须额外带 `Authorization: Bearer <redacted-access-token>`，不应把 token 写入日志记录。
 
 如果 Docker daemon 或 Docker socket 权限不可用，不要把 `docker compose config` 写成容器启动通过。应记录：
 
@@ -210,6 +212,7 @@ rm -rf "$tmpdir"
 
 - 如果本地 HTTPS 验证必须改为公网监听才能通过，应停止并回退配置。
 - 如果部署态 HTTP 上游没有外部 TLS / 认证 / 备份边界却准备开放给真实用户，应停止并回退部署计划。
+- 如果真实部署的 `RADISHLEX_SYNC_ACCESS_TOKEN` 为空、过短、含空白字符或被写入 Git / image layer / 日志，应停止并回退配置。
 - 如果 container log、SQLite 表、blob 路径或测试 fixture 出现真实明文输入数据，应停止并回退设计。
 - 如果需要把同步主密钥、恢复码明文、平台私钥或 P1 原始事件放入 environment、volume、日志或 image layer，应停止并回退设计。
 - 如果真实用户同步需要 Docker Compose 之外的 TLS、认证、备份、恢复或平台私钥 backend，而这些边界尚未补齐，不应开放给真实用户使用。

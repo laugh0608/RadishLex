@@ -1,3 +1,4 @@
+use std::fmt;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
@@ -8,10 +9,21 @@ use crate::remote::{
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct HttpSyncRemoteTransport {
     endpoint: HttpEndpoint,
     timeout: Duration,
+    access_token: Option<BearerAccessToken>,
+}
+
+impl fmt::Debug for HttpSyncRemoteTransport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("HttpSyncRemoteTransport")
+            .field("endpoint", &self.endpoint)
+            .field("timeout", &self.timeout)
+            .field("access_token_configured", &self.access_token.is_some())
+            .finish()
+    }
 }
 
 impl HttpSyncRemoteTransport {
@@ -29,7 +41,16 @@ impl HttpSyncRemoteTransport {
         Ok(Self {
             endpoint: HttpEndpoint::parse(&base_url.into())?,
             timeout,
+            access_token: None,
         })
+    }
+
+    pub fn with_bearer_access_token(
+        mut self,
+        access_token: impl Into<String>,
+    ) -> Result<Self, SyncRemoteError> {
+        self.access_token = Some(BearerAccessToken::new(access_token.into())?);
+        Ok(self)
     }
 
     pub fn base_url(&self) -> String {
@@ -38,6 +59,10 @@ impl HttpSyncRemoteTransport {
 
     pub fn timeout(&self) -> Duration {
         self.timeout
+    }
+
+    pub fn has_bearer_access_token(&self) -> bool {
+        self.access_token.is_some()
     }
 }
 
@@ -55,12 +80,45 @@ impl SyncRemoteTransport for HttpSyncRemoteTransport {
             .set_write_timeout(Some(self.timeout))
             .map_err(|error| transport_error(format!("set write timeout failed: {error}")))?;
 
-        write_request(&mut stream, &self.endpoint, &path, &request)?;
+        write_request(
+            &mut stream,
+            &self.endpoint,
+            &path,
+            self.access_token.as_ref(),
+            &request,
+        )?;
         let mut response = Vec::new();
         stream
             .read_to_end(&mut response)
             .map_err(|error| transport_error(format!("read response failed: {error}")))?;
         parse_response(&response)
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct BearerAccessToken(String);
+
+impl BearerAccessToken {
+    fn new(access_token: String) -> Result<Self, SyncRemoteError> {
+        if access_token.len() < 32 {
+            return invalid_request("http transport bearer access token must be at least 32 bytes");
+        }
+        if access_token.chars().any(char::is_whitespace) {
+            return invalid_request(
+                "http transport bearer access token must not contain whitespace",
+            );
+        }
+        Ok(Self(access_token))
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Debug for BearerAccessToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("[redacted bearer access token]")
     }
 }
 
@@ -216,6 +274,7 @@ fn write_request(
     stream: &mut TcpStream,
     endpoint: &HttpEndpoint,
     path: &str,
+    access_token: Option<&BearerAccessToken>,
     request: &SyncRemoteRequest,
 ) -> Result<(), SyncRemoteError> {
     let method = match request.method() {
@@ -236,6 +295,10 @@ fn write_request(
     .map_err(|error| transport_error(format!("write request failed: {error}")))?;
     if let Some(content_type) = request.content_type() {
         write!(stream, "Content-Type: {content_type}\r\n")
+            .map_err(|error| transport_error(format!("write request failed: {error}")))?;
+    }
+    if let Some(token) = access_token {
+        write!(stream, "Authorization: Bearer {}\r\n", token.as_str())
             .map_err(|error| transport_error(format!("write request failed: {error}")))?;
     }
     stream
@@ -409,6 +472,8 @@ mod tests {
     use std::net::TcpListener;
     use std::thread;
 
+    const TEST_ACCESS_TOKEN: &str = "test-access-token-12345678901234567890";
+
     #[test]
     fn http_transport_sends_request_and_reads_json_response() {
         let Some(server) = TestHttpServer::try_spawn(|request| {
@@ -440,6 +505,38 @@ mod tests {
         assert_eq!(response.status, 201);
         assert_eq!(response.content_type.as_deref(), Some("application/json"));
         assert_eq!(response.body, br#"{"ok":true}"#);
+        server.join();
+    }
+
+    #[test]
+    fn http_transport_sends_bearer_access_token_without_leaking_debug() {
+        let Some(server) = TestHttpServer::try_spawn(|request| {
+            let expected = format!("Bearer {TEST_ACCESS_TOKEN}");
+            assert_eq!(request.header("authorization"), Some(expected.as_str()));
+            TestHttpResponse::json(200, br#"{"ok":true}"#)
+        }) else {
+            return;
+        };
+        let transport =
+            HttpSyncRemoteTransport::with_timeout(server.base_url(), Duration::from_secs(2))
+                .expect("transport")
+                .with_bearer_access_token(TEST_ACCESS_TOKEN)
+                .expect("access token");
+
+        let debug = format!("{transport:?}");
+        assert!(debug.contains("access_token_configured"));
+        assert!(!debug.contains(TEST_ACCESS_TOKEN));
+
+        let response = transport
+            .send(SyncRemoteRequest::new(
+                SyncRemoteMethod::Get,
+                "/api/v1/domains/domain-a/state",
+                None,
+                Vec::new(),
+            ))
+            .expect("response");
+
+        assert_eq!(response.status, 200);
         server.join();
     }
 
@@ -600,6 +697,19 @@ mod tests {
         ));
         assert!(matches!(
             HttpSyncRemoteTransport::new("http://user:pass@example.test"),
+            Err(SyncRemoteError::InvalidRequest { .. })
+        ));
+    }
+
+    #[test]
+    fn http_transport_rejects_invalid_bearer_access_token() {
+        let transport = HttpSyncRemoteTransport::new("http://example.test").expect("transport");
+        assert!(matches!(
+            transport.clone().with_bearer_access_token("short-token"),
+            Err(SyncRemoteError::InvalidRequest { .. })
+        ));
+        assert!(matches!(
+            transport.with_bearer_access_token("test-access-token-12345678901234567890\n"),
             Err(SyncRemoteError::InvalidRequest { .. })
         ));
     }
