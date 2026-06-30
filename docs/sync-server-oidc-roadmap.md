@@ -50,6 +50,26 @@ sync server 可接受两类部署形态：
 
 实现前应先把 Go handler 中当前 token 校验收敛为认证接口，例如 `AccessAuthorizer`。业务 handler 不应直接依赖 shared token、OIDC JWT 或网关 header 的具体解析方式。
 
+## Radish 接入前与测试账号处理
+
+在正式接入 Radish Auth / Gateway 前，RadishLex 不实现账号注册、密码登录、用户资料、会话或多账号管理。账号语义应先收敛为认证层返回的访问主体，而不是提前落成账号表。
+
+当前和过渡期按以下规则处理：
+
+- 单用户自部署生产 / smoke：`shared-token` 通过后，访问主体视为部署本机的 `deployment-owner`。这是部署级 owner，不是 Radish 产品账号，不跨部署稳定，不写入 object id、blob path、encrypted payload hash、恢复材料或普通日志。sync domain 内的真实写入权限仍由 device authorization、device state、key epoch 和签名校验决定。
+- 本地开发和单元测试：允许关闭 access token 或使用合成 token；如测试认证抽象需要主体，使用内存中的 `test-owner` / `test-subject` 这类合成值，不使用真实邮箱、手机号、Radish 用户 ID、第三方账号 ID 或开发者个人信息。
+- OIDC 代码进入真实 Radish 前的集成测试：只能使用本地 mock issuer / JWKS / audience / scope 和短生命周期测试 token。fixture 中的 `iss`、`sub`、`aud`、`scope` 必须是合成值；不得调用真实 Radish Auth，不提交真实 token、client secret、refresh token、用户 profile 或 JWKS 私钥。
+- Flutter manager / 客户端在 Radish 接入前只配置 sync server URL、access token 和设备授权 / 恢复流程；不要出现用户名密码登录，也不要把“Radish 账号”作为 UI 前提。需要展示身份时，只能展示本地 server profile / deployment label 之类的非账号概念。
+
+后续抽象 `AccessAuthorizer` 时，可让不同策略返回统一的 `AccessPrincipal`：
+
+- `shared-token`：返回部署本地 owner 主体。
+- `test-disabled` / `test-token`：返回只在测试进程内使用的合成主体。
+- `oidc-jwt`：返回 issuer + subject + scope 派生的主体。
+- `external-auth-gateway`：返回外部网关已验证并经过防伪边界保护的主体。
+
+业务 storage 不应直接解析这些策略来源。只有进入多账号或 Radish 产品接入阶段后，才允许在 ADR 固定规则后保存 account subject 到 sync domain 的绑定 metadata。
+
 ## Identity 映射
 
 OIDC subject 与 RadishLex 同步域必须分层：
