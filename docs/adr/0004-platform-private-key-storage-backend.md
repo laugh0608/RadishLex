@@ -1,6 +1,6 @@
 # ADR 0004: 平台私钥存储 Backend 边界
 
-本文档用于固定 RadishLex 真实远端同步前的平台私钥存储 backend 边界，读者是后续实现 `ime-crypto`、平台 bridge、Go sync server 验签接线、管理 UI 设备页面和审阅隐私边界的开发者。本文不包含平台 SDK 调用代码、FFI 导出接口、Flutter 页面、系统输入法壳接入或安装权限流程；`apple-keychain-v1` 平台验证边界见 `docs/runbooks/apple-keychain-signing-backend.md`。
+本文档用于固定 RadishLex 真实远端同步前的平台私钥存储 backend 边界，读者是后续实现 `ime-crypto`、平台 bridge、Go sync server 验签接线、管理 UI 设备页面和审阅隐私边界的开发者。本文不包含平台 SDK 调用代码、FFI 导出接口、Flutter 页面、系统输入法壳接入或安装权限流程；`apple-keychain-v1` 平台验证边界见 `docs/runbooks/apple-keychain-signing-backend.md`，Apple 签名策略见 `docs/adr/0005-apple-platform-signing-strategy.md`。
 
 ## 状态
 
@@ -8,7 +8,7 @@ Accepted
 
 ## 背景
 
-`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名对象、canonical bytes、Ed25519 签名模型、`DevicePrivateKeyStore` 抽象和错误语义。当前 Rust 实现已提供合成 `test-memory-v1` signing key store、`unavailable` 明确失败 store、backend capability metadata 和生产签名门禁测试，用于测试 signed sync object manifest、signed recovery record、signed device authorization 和 signed device revocation；`apple-keychain-v1` 平台 runbook 已固定，macOS backend 已在 `apple-keychain` feature 下接线，真实 Keychain smoke 已执行但阻塞于 `ed25519-v1` 创建。
+`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名对象、canonical bytes、Ed25519 签名模型、`DevicePrivateKeyStore` 抽象和错误语义。当前 Rust 实现已提供合成 `test-memory-v1` signing key store、`unavailable` 明确失败 store、backend capability metadata 和生产签名门禁测试，用于测试 signed sync object manifest、signed recovery record、signed device authorization 和 signed device revocation；`apple-keychain-v1` 平台 runbook 已固定，macOS backend 已在 `apple-keychain` feature 下接线，真实 Keychain smoke 已执行但阻塞于 `ed25519-v1` 创建。ADR 0005 已决定保留 `ed25519-v1` 协议，不把 Keychain seed 存储 fallback 混入 `apple-keychain-v1`，并让该 backend status 在 smoke 通过前阻断生产签名。
 
 进入真实同步前，还需要明确生产私钥如何落到系统安全存储。否则后续平台壳、Flutter manager 或 FFI 可能为了接线方便直接持有私钥 bytes，破坏设备身份和撤销边界。
 
@@ -206,9 +206,10 @@ DevicePrivateKeyStore
 3. 已为 unavailable backend 固定错误语义，确保真实同步功能在无生产 backend 时明确失败。
 4. 已补 `apple-keychain-v1` 平台 runbook，固定创建、加载、签名、删除、锁屏 / 权限、备份迁移、日志脱敏和停止线。
 5. 已在 `apple-keychain` feature 下接 macOS Keychain backend 和 ignored gated smoke，默认 workspace 不访问系统 Keychain；真实 Keychain smoke 已执行但返回 `UnsupportedSignatureAlgorithm { algorithm: "ed25519-v1" }`。
-6. 其他平台仍需先补 backend spike / runbook，再接具体平台 SDK。
-7. 平台 backend 通过后，再允许真实远端对象上传下载使用生产签名。
-8. 最后才把管理 UI 的设备与恢复页面接入生产 backend。
+6. 已补 ADR 0005，固定 Apple 平台签名策略：保持 `ed25519-v1` 协议，`apple-keychain-v1` 不做 seed 存储 fallback，status 在 smoke 通过前阻断生产签名。
+7. 其他平台仍需先补 backend spike / runbook，再接具体平台 SDK。
+8. 平台 backend 通过后，再允许真实远端对象上传下载使用生产签名。
+9. 最后才把管理 UI 的设备与恢复页面接入生产 backend。
 
 ## 验证口径
 

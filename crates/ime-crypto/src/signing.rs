@@ -320,11 +320,13 @@ impl DevicePrivateKeyStoreStatus {
     }
 
     pub fn apple_keychain_v1() -> Self {
+        // The native Apple Keychain Ed25519 path is wired for gated smoke only.
+        // It must not advertise production readiness until the platform smoke passes.
         Self {
             storage_backend: DeviceSigningStorageBackend::AppleKeychainV1,
-            available: true,
-            can_create_signing_keys: true,
-            can_sign: true,
+            available: false,
+            can_create_signing_keys: false,
+            can_sign: false,
             capabilities: DeviceSigningBackendCapabilities::apple_keychain_v1(),
         }
     }

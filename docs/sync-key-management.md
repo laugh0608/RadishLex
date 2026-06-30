@@ -17,7 +17,7 @@
 - `docs/adr/0003-device-signing-key-storage.md` 已固定设备签名、签名对象、私钥存储抽象、错误语义和验证口径。
 - `docs/production-recovery-flow.md` 已固定生产恢复记录创建、轮换、撤销、新设备恢复加入、全部设备丢失、失败限速和停止线。
 - `docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend、capability metadata、FFI 边界、错误语义、迁移和停止线。
-- `docs/runbooks/apple-keychain-signing-backend.md` 已固定 `apple-keychain-v1` 首个平台 backend 验证边界。
+- `docs/runbooks/apple-keychain-signing-backend.md` 已固定 `apple-keychain-v1` 首个平台 backend 验证边界，`docs/adr/0005-apple-platform-signing-strategy.md` 已固定 Apple 平台签名策略。
 - `ime-crypto` 已补 Ed25519 设备签名、`test-memory-v1` signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断签名 / 导出、signed sync object manifest 和 signed recovery record；`ime-sync` 已补 signed device authorization 与 signed device revocation。
 - `ime-userdb` 已补已解密 P2 JSON 到 merge input 的解析入口，并能把合并模型接受的 user terms、deleted tombstones 和 ranker weights 写回真实 SQLite。
 - Go server storage / API / runtime 验证模型已保存 join request 公钥、authorization metadata、wrapping metadata、revocation metadata、recovery metadata、object metadata、非敏感 audit events 和密文 blob；device wrapping encrypted key bytes、recovery wrapped material 和 encrypted object payload 都已通过 hash / length 复验与读取边界测试。
@@ -32,7 +32,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-下一步若进入代码，应先判断 Apple 平台签名 / Keychain 存储策略，或按生产部署 runbook 补真实认证 / 备份恢复演练 / 外部 TLS 验证证据；真实平台 smoke 未通过前，不应开放用户可用同步主线。
+下一步若进入代码，应按生产部署 runbook 补真实认证 / 备份恢复演练 / 外部 TLS 验证证据，或单独调查 Apple 原生非导出 Ed25519 支持矩阵；真实平台 smoke 未通过前，不应开放用户可用同步主线。
 
 ## 设计目标
 
@@ -264,7 +264,7 @@ updated_at_ms
 8. 已按 ADR 落地恢复码 KDF 纯 Rust 模型与测试，覆盖 `RecoveryCode`、`RecoveryKdfProfile`、恢复 wrapping key 和 `RecoveryMaterial` 恢复记录加解密。
 9. 已补 `docs/adr/0003-device-signing-key-storage.md`，固定设备签名、签名对象、canonical bytes、私钥存储抽象、错误语义和验证口径。
 10. 已按 ADR 落地签名 / 设备密钥存储 Rust 模型，当前使用合成 `test-memory-v1` key store，并补 platform backend capability metadata、unavailable backend 明确失败和 revoked key 阻断测试。
-11. 已补 `apple-keychain-v1` 平台 runbook，固定 Apple Keychain 创建、加载、签名、删除、锁屏 / 权限、备份迁移和日志脱敏验证边界；macOS backend 已在 `apple-keychain` feature 下接线，默认测试不访问系统 Keychain，真实 smoke 已运行但阻塞于 `ed25519-v1` 创建。
+11. 已补 `apple-keychain-v1` 平台 runbook 和 Apple 签名策略 ADR，固定 Apple Keychain 创建、加载、签名、删除、锁屏 / 权限、备份迁移、日志脱敏和策略停止线；macOS backend 已在 `apple-keychain` feature 下接线，默认测试不访问系统 Keychain，真实 smoke 已运行但阻塞于 `ed25519-v1` 创建，backend status 已阻断生产签名。
 12. 已补真实 userdb P2 payload 解析到 merge input 的接线。
 13. 已补客户端合并结果写回真实 userdb 的执行器。
 14. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
@@ -296,7 +296,7 @@ updated_at_ms
 ## 停止线
 
 - 恢复码 KDF 算法、参数、格式、Rust model 和生产恢复流程设计已落地；服务端恢复记录 API 与管理 UI 未实现前，不提供用户可用恢复入口。
-- 设备签名模型、签名对象验证、私钥存储抽象、平台私钥存储 backend capability / unavailable backend Rust 模型、`apple-keychain-v1` 平台 runbook 和 feature-gated macOS backend 已落地；真实 Keychain smoke 未通过前，不做用户可用远端对象上传下载。
+- 设备签名模型、签名对象验证、私钥存储抽象、平台私钥存储 backend capability / unavailable backend Rust 模型、`apple-keychain-v1` 平台 runbook、Apple 签名策略 ADR 和 feature-gated macOS backend 已落地；真实 Keychain smoke 未通过前，不做用户可用远端对象上传下载。
 - 服务端若回退到只保存 wrapping metadata 而不能保存 / 返回 wrapped key bytes，则不得开放真实设备授权 handler。
 - Go server 与 Rust HTTP transport 继续推进时，必须先满足 `docs/sync-server-api-storage.md` 的签名、metadata API、版本冲突、错误语义和脱敏验证。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。

@@ -213,7 +213,7 @@ fn backend_capabilities_gate_production_signing() {
 }
 
 #[test]
-fn apple_keychain_capabilities_are_non_exportable_without_hardware_claims() {
+fn apple_keychain_capabilities_keep_metadata_but_status_blocks_production() {
     let capabilities = DeviceSigningBackendCapabilities::apple_keychain_v1();
     assert_eq!(
         capabilities.storage_backend,
@@ -227,9 +227,17 @@ fn apple_keychain_capabilities_are_non_exportable_without_hardware_claims() {
 
     let status = DevicePrivateKeyStoreStatus::apple_keychain_v1();
     status.validate().expect("apple keychain status");
-    status
-        .ensure_production_signing_allowed()
-        .expect("apple keychain capability can sign production objects");
+    assert!(!status.available);
+    assert!(!status.can_create_signing_keys);
+    assert!(!status.can_sign);
+    assert_eq!(
+        status
+            .ensure_production_signing_allowed()
+            .expect_err("apple keychain smoke blocker keeps backend out of production signing"),
+        CryptoError::StorageBackendUnavailable {
+            backend: DEVICE_KEY_STORE_APPLE_KEYCHAIN_V1.to_owned(),
+        }
+    );
 
     let handle = DeviceSigningKeyHandle::apple_keychain("device-a", "signing-key-a", 10)
         .expect("apple keychain handle");
@@ -237,6 +245,29 @@ fn apple_keychain_capabilities_are_non_exportable_without_hardware_claims() {
     assert!(debug.contains("AppleKeychainV1"));
     assert!(!debug.contains("private"));
     assert!(!debug.contains("seed"));
+}
+
+#[cfg(feature = "apple-keychain")]
+#[test]
+fn apple_keychain_store_status_blocks_production_until_platform_strategy_is_resolved() {
+    let store = AppleKeychainDeviceKeyStore::new();
+    let status = store.backend_status();
+    status.validate().expect("apple keychain store status");
+    assert_eq!(
+        status.storage_backend,
+        DeviceSigningStorageBackend::AppleKeychainV1
+    );
+    assert!(!status.available);
+    assert!(!status.can_create_signing_keys);
+    assert!(!status.can_sign);
+    assert_eq!(
+        status
+            .ensure_production_signing_allowed()
+            .expect_err("apple keychain status must block production signing"),
+        CryptoError::StorageBackendUnavailable {
+            backend: DEVICE_KEY_STORE_APPLE_KEYCHAIN_V1.to_owned(),
+        }
+    );
 }
 
 #[test]

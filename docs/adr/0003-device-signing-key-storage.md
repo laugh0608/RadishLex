@@ -233,7 +233,7 @@ revoked_at_ms
 
 - 生产 backend 不允许导出私钥 bytes。
 - 测试 backend 可以使用合成可导出 key，但必须标记为 `test-memory-v1`，不得进入生产配置。
-- 当前可执行本地 store 只提供 `test-memory-v1` 和 `unavailable`；Apple Keychain、Android Keystore、Windows CNG、Linux Secret Service 等 platform backend id 已进入 Rust capability metadata，其中 `apple-keychain-v1` 已补齐平台 runbook，具体平台 SDK 实现仍需平台验证。
+- 当前可执行本地 store 只提供 `test-memory-v1` 和 `unavailable`；Apple Keychain、Android Keystore、Windows CNG、Linux Secret Service 等 platform backend id 已进入 Rust capability metadata，其中 `apple-keychain-v1` 已补齐平台 runbook 和策略 ADR，但真实 smoke 阻塞于 Ed25519 Keychain key 创建，backend status 在策略解决前必须阻断生产签名。
 - FFI 不导出私钥、签名 handle 内部指针、canonical bytes helper 或签名 API，直到平台线程、生命周期和错误语义稳定。
 - CLI 不新增生产签名命令；测试命令若后续加入，必须只使用合成 fixture。
 

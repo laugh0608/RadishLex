@@ -1,6 +1,6 @@
 # Apple Keychain Signing Backend Runbook
 
-本文档定义 `apple-keychain-v1` 设备签名 backend 的平台验证边界。读者是后续实现 macOS / iOS Keychain bridge、`ime-crypto` backend 接线、管理 UI 设备页面和审阅同步隐私边界的开发者。本文不包含 Swift / Objective-C 源码、FFI 导出接口、App Sandbox entitlement 配置、输入法安装流程、Flutter 页面或真实用户同步开放步骤；平台私钥抽象见 `docs/adr/0004-platform-private-key-storage-backend.md`。
+本文档定义 `apple-keychain-v1` 设备签名 backend 的平台验证边界。读者是后续实现 macOS / iOS Keychain bridge、`ime-crypto` backend 接线、管理 UI 设备页面和审阅同步隐私边界的开发者。本文不包含 Swift / Objective-C 源码、FFI 导出接口、App Sandbox entitlement 配置、输入法安装流程、Flutter 页面或真实用户同步开放步骤；平台私钥抽象见 `docs/adr/0004-platform-private-key-storage-backend.md`，当前 Apple 签名策略见 `docs/adr/0005-apple-platform-signing-strategy.md`。
 
 ## 当前结论
 
@@ -8,6 +8,8 @@
 - 默认 Rust workspace 继续只启用 `test-memory-v1` 和 `unavailable` backend，不访问 Keychain；macOS backend 只在显式 `apple-keychain` feature 下编译。
 - `apple-keychain-v1` 已完成 feature-gated 接线和 ignored smoke 测试骨架；真实 Keychain smoke 已执行但未通过，不能视为平台验证通过。
 - 2026-06-30 smoke 在沙盒和提权真实环境均阻塞于 Ed25519 Keychain key 创建阶段，错误为 `UnsupportedSignatureAlgorithm { algorithm: "ed25519-v1" }`；测试未进入签名成功或用户可用同步路径。
+- `apple-keychain-v1` 的 `backend_status` 在平台策略未解决前必须阻断生产签名；普通 feature 测试只验证编译和状态门禁，不创建 Keychain item。
+- 当前策略保留 `ed25519-v1` 设备签名协议，不把 Ed25519 seed 作为 generic password / data item 存入 Keychain 后取回 Rust 签名，也不把该软件保护方案伪装成 `apple-keychain-v1`。
 - `apple-keychain-v1` 用于真实远端对象前必须通过本 runbook 的创建、加载、签名、删除 / 撤销、锁屏 / 权限、备份迁移和日志脱敏验证。
 - 未验证 Secure Enclave 前，不承诺 `hardware_backed = true`。
 - 未验证 user presence 前，不承诺 `user_presence_required = true`。
@@ -32,6 +34,7 @@ apple-keychain-v1
 当前不做：
 
 - 不把 Apple Keychain 调用直接散落到同步、userdb、ranker 或平台壳。
+- 不在 `apple-keychain-v1` 内静默降级为 Keychain 保存 seed、Rust 取出 seed 签名的软件保护路径。
 - 不通过 `security` 命令行工具实现生产 backend。
 - 不在默认 `cargo test` 中访问用户真实 Keychain。
 - 不把 Keychain account、access group 或 label 设计成包含系统用户名、设备真实名称、词库内容、input code 或本机绝对路径。
@@ -204,6 +207,7 @@ iOS / Keyboard Extension 后续还需验证：
 
 - 继续只跑 `test-memory-v1` 和 `unavailable`，不访问系统 Keychain。
 - 测试 `apple-keychain-v1` capability metadata 构造和 Debug 脱敏。
+- 测试 `apple-keychain-v1` backend status 在当前策略下阻断生产签名。
 
 macOS 本机手动 / gated smoke：
 
