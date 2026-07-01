@@ -7,8 +7,8 @@
 - 部署态入口仍是 `deploy/sync-server/docker-compose.yaml` 加唯一 env 示例 `deploy/sync-server/.env.example`，不新增第二个 env 文件。
 - 部署态只提供同机 HTTP upstream `http://127.0.0.1:7319`；外部 TLS 必须在反向代理、VPN 或等价网络边界完成，Go server 通过单用户 bearer access token 执行首个内建访问门禁。
 - 本地验证入口仍是显式 `-f deploy/sync-server/docker-compose.local.yaml`，通过 Caddy internal TLS 提供 `https://localhost:7319`，不新增第二个对外端口。
-- Go server 已验证密文对象上传下载、设备授权、版本冲突、日志脱敏、Docker Compose 本地 / 部署态启动 smoke、Rust userdb 两客户端真实 Go HTTP 同步，以及短生命周期冷备份 / 恢复到隔离目录 smoke；这些证据仍不等于可以开放真实用户同步。
-- 真实用户同步前仍缺少目标部署上的备份恢复演练、升级回滚演练、外部 TLS 真实验证、平台私钥存储 backend 和用户可用同步 UI；生产访问认证已有单用户 bearer token 实现证据，但部署者仍必须设置真实 token 并复验失败响应。
+- Go server 已验证密文对象上传下载、设备授权、版本冲突、日志脱敏、Docker Compose 本地 / 部署态启动 smoke、Rust userdb 两客户端真实 Go HTTP 同步、短生命周期冷备份 / 恢复到隔离目录 smoke，以及短生命周期外部 TLS 反代 smoke；这些证据仍不等于可以开放真实用户同步。
+- 真实用户同步前仍缺少目标部署上的备份恢复演练、升级回滚演练、真实证书 / 域名 / 外部反代复验、平台私钥存储 backend 和用户可用同步 UI；生产访问认证已有单用户 bearer token 实现证据，但部署者仍必须设置真实 token 并复验失败响应。
 
 ## 部署拓扑
 
@@ -42,6 +42,8 @@ Client
 - `client_max_body_size` 不小于 `RADISHLEX_SYNC_MAX_OBJECT_BYTES`，且不会允许超过服务端对象大小门禁的请求通过。
 - `proxy_read_timeout` / `proxy_send_timeout` 与服务端超时策略一致，不让长时间挂起请求占满连接。
 - 反代日志不得记录请求体、响应体、encrypted payload bytes、signature bytes、wrapped material bytes 或恢复材料。
+
+当前自动化 smoke 已覆盖：短生命周期 HTTPS client 连接 TLS reverse proxy，proxy 转发到 HTTP upstream，并复验 `Authorization` header 透传、`X-Forwarded-Proto=https`、Go bearer token 门禁、encrypted object 上传下载、Go 对象大小门禁和 runtime log 脱敏。这是实现级证据，不替代目标域名证书链、真实反代配置、真实访问控制和反代日志策略的部署复验。
 
 停止线：
 
@@ -187,6 +189,8 @@ sync-server/objects/
 部署配置变更至少执行：
 
 ```sh
+go test ./internal/runtime -run TestExternalTLSProxySmokePreservesAuthAndEncryptedObjectFlow -count=1
+
 docker compose -f deploy/sync-server/docker-compose.yaml \
   --env-file deploy/sync-server/.env.example \
   config
@@ -202,6 +206,7 @@ git diff --check
 上线前人工复验：
 
 - 外部 HTTPS 证书和域名。
+- 反向代理到 HTTP upstream 的 `Authorization` header 透传和 `X-Forwarded-Proto=https`。
 - 访问控制策略和失败响应。
 - 目标部署数据目录的冷备份、恢复到隔离目录、回滚旧镜像。
 - 日志脱敏。
