@@ -158,6 +158,8 @@ sync-server/objects/
 
 ## 升级与回滚
 
+当前自动化 smoke 已覆盖：短生命周期 Go server 写入升级前数据后停止并冷备份，使用同一数据目录重启触发 idempotent migration 并复验 domain、device、recovery latest 和 v1 object，升级后写入 v2，再把升级前备份恢复到隔离目录并确认 v2 不可见、v1 payload 与 stale conflict latest metadata 仍可读，且日志不泄漏 payload、signature、wrapped material 或恢复敏感字段。这是实现级证据，不替代目标部署使用真实镜像 tag、数据目录、`.env`、外部反代和备份保留策略做人工演练。
+
 升级前：
 
 - 固定 `RADISHLEX_SYNC_IMAGE` 为明确 tag，不用浮动 `latest`。
