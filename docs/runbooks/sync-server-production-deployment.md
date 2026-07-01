@@ -7,8 +7,8 @@
 - 部署态入口仍是 `deploy/sync-server/docker-compose.yaml` 加唯一 env 示例 `deploy/sync-server/.env.example`，不新增第二个 env 文件。
 - 部署态只提供同机 HTTP upstream `http://127.0.0.1:7319`；外部 TLS 必须在反向代理、VPN 或等价网络边界完成，Go server 通过单用户 bearer access token 执行首个内建访问门禁。
 - 本地验证入口仍是显式 `-f deploy/sync-server/docker-compose.local.yaml`，通过 Caddy internal TLS 提供 `https://localhost:7319`，不新增第二个对外端口。
-- Go server 已验证密文对象上传下载、设备授权、版本冲突、日志脱敏、Docker Compose 本地 / 部署态启动 smoke 和 Rust userdb 两客户端真实 Go HTTP 同步；这些证据仍不等于可以开放真实用户同步。
-- 真实用户同步前仍缺少备份演练、升级回滚演练、外部 TLS 真实验证、平台私钥存储 backend 和用户可用同步 UI；生产访问认证已有单用户 bearer token 实现证据，但部署者仍必须设置真实 token 并复验失败响应。
+- Go server 已验证密文对象上传下载、设备授权、版本冲突、日志脱敏、Docker Compose 本地 / 部署态启动 smoke、Rust userdb 两客户端真实 Go HTTP 同步，以及短生命周期冷备份 / 恢复到隔离目录 smoke；这些证据仍不等于可以开放真实用户同步。
+- 真实用户同步前仍缺少目标部署上的备份恢复演练、升级回滚演练、外部 TLS 真实验证、平台私钥存储 backend 和用户可用同步 UI；生产访问认证已有单用户 bearer token 实现证据，但部署者仍必须设置真实 token 并复验失败响应。
 
 ## 部署拓扑
 
@@ -118,6 +118,8 @@ sync-server/objects/
 
 当前推荐冷备份，先停止服务再复制 SQLite metadata 和 encrypted blob dir，保证二者处于同一个时间点。
 
+当前自动化 smoke 已覆盖：短生命周期 Go server 创建 domain、第二设备授权、三类 P2 encrypted object、recovery record 和审计事件；停止服务后复制整个数据目录到备份目录，再恢复到隔离目录并重启验证 domain state、device state、recovery latest、object metadata、binary payload、stale conflict latest metadata 和日志脱敏。这是实现级证据，不替代真实部署对目标数据目录、镜像 tag、`.env` 和反向代理配置做人工演练。
+
 流程：
 
 1. 通知用户暂停同步写入。
@@ -201,7 +203,7 @@ git diff --check
 
 - 外部 HTTPS 证书和域名。
 - 访问控制策略和失败响应。
-- 冷备份、恢复到隔离目录、回滚旧镜像。
+- 目标部署数据目录的冷备份、恢复到隔离目录、回滚旧镜像。
 - 日志脱敏。
 - `RADISHLEX_SYNC_DATA_PATH` 权限和备份保留策略。
 - 客户端设备授权、恢复记录和对象版本冲突路径。
@@ -210,7 +212,7 @@ git diff --check
 
 - 没有外部 TLS，不开放真实用户同步。
 - 没有认证 / 访问控制，不开放真实用户同步。
-- 没有冷备份和恢复演练，不升级或开放真实用户同步。
+- 没有目标部署冷备份和恢复演练，不升级或开放真实用户同步。
 - 没有平台私钥存储真实 backend，不进入管理 UI 同步主线。
 - 日志、备份、Nginx access log 或错误响应出现明文用户词、input code、reading、P1 事件、signature bytes、wrapped material bytes、恢复码明文或密钥材料时，停止并回退。
 - 任何方案要求服务端解密 userdb payload、保存同步主密钥、保存恢复码明文或参与输入热路径时，停止并回退。
