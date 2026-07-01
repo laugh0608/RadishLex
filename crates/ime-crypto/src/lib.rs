@@ -18,6 +18,8 @@ pub use recovery::{
     RECOVERY_CODE_SECRET_LEN, RECOVERY_KDF_ID_ARGON2ID_V1, RECOVERY_KDF_VERSION_ARGON2ID_V1,
     RECOVERY_SALT_LEN, RECOVERY_WRAPPING_KEY_LEN,
 };
+#[cfg(feature = "android-keystore")]
+pub use signing::AndroidKeystoreDeviceKeyStore;
 #[cfg(feature = "apple-keychain")]
 pub use signing::AppleKeychainDeviceKeyStore;
 pub use signing::{

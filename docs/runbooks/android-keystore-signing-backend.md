@@ -7,6 +7,8 @@
 - `android-keystore-v1` 是 Apple Keychain 阻塞后优先补验证边界的下一类平台 backend。
 - Android Keystore 的目标优势是让 key material 不进入 app 进程，并在设备支持时绑定到 TEE / Secure Element；硬件支持与可用算法组合必须通过设备实测确认。
 - RadishLex Phase 3 设备签名协议仍是 `ed25519-v1`；`android-keystore-v1` 进入实现前必须证明 Android Keystore provider 能创建、加载并使用非导出 Ed25519 signing key，或明确记录 `unsupported_signature_algorithm`。
+- `ime-crypto` 已有 `android-keystore` feature、`AndroidKeystoreDeviceKeyStore`、capability metadata、生产签名门禁、ignored smoke 入口和 Rust 侧 bridge 包装层；默认 bridge 仍保持不可用，不访问 Android Keystore。
+- 当前 Rust 单元测试只使用合成 bridge 复验 `create -> load public key -> sign -> verify -> delete / revoke` 的模型语义、错误语义和 Debug 脱敏，不代表 Kotlin / JNI 或真实 Android Keystore 已可用。
 - 当前不引入 P-256，不改变 Go / Rust Ed25519 verifier，不把 seed 作为普通 secret 存入 Keystore / SharedPreferences 后取回 Rust 签名。
 - `android-keystore-v1` 未完成创建、加载、签名、删除、锁屏 / 权限、备份迁移和日志脱敏验证前，不得声明生产可用。
 - Android IME 输入热路径不调用同步签名；同步签名只允许由管理 / sync client 层在明确后台同步或用户操作中触发。
@@ -42,14 +44,15 @@ android-keystore-v1
 - 不把 Keystore alias 设计成用户可读设备名、账号、本机路径或输入内容。
 - 不把 Ed25519 seed 存入普通 app storage、SharedPreferences、SQLite、文件或可导出的 backup。
 - 不在 `android-keystore-v1` 内静默降级到 `test-memory-v1`、软件 seed 或其他签名算法。
+- 当前 feature-gated Rust store 只保留平台 bridge 插入点，不实现 Kotlin / JNI bridge，不创建 Android Keystore item，也不声明 `available = true`。
 
 ## 建议桥接边界
 
-Android bridge 首选路径：
+Android bridge 候选路径：
 
 ```text
 KeyPairGenerator.getInstance("Ed25519", "AndroidKeyStore")
-KeyGenParameterSpec.Builder(signing_key_id, PURPOSE_SIGN | PURPOSE_VERIFY)
+KeyGenParameterSpec.Builder(keystore_alias, PURPOSE_SIGN | PURPOSE_VERIFY)
 KeyStore.getInstance("AndroidKeyStore")
 Signature.getInstance("Ed25519")
 ```
@@ -57,8 +60,8 @@ Signature.getInstance("Ed25519")
 验证规则：
 
 - 如果 `Ed25519` + `AndroidKeyStore` 不可用，返回 `unsupported_signature_algorithm` 或 `unsupported_storage_backend`，不得创建 fallback key。
+- Android 官方 `KeyProperties` API 当前不提供 `KEY_ALGORITHM_ED25519` 常量；如果只能通过 provider 字符串、普通 JCA provider 或设备私有行为创建 Ed25519 key，必须在 smoke 记录中写清 API level、provider、build tools 和设备结果。
 - 如果只能通过普通 JCA provider 创建可导出 Ed25519 key，不属于 `android-keystore-v1`。
-- 如果平台要求 `KeyProperties` 常量而当前 SDK 不暴露 Ed25519 常量，应记录 API level / build tools / 设备结果，不绕过验证。
 - 如果需要切到 P-256 或其他算法，必须先补签名算法 ADR、迁移计划和 Go / Rust verifier 变更。
 
 Rust 边界仍保持：
@@ -71,6 +74,13 @@ sign(handle, canonical_bytes) -> DeviceSignature
 delete_or_revoke(handle, revoked_at_ms)
 backend_status() -> DevicePrivateKeyStoreStatus
 ```
+
+Rust bridge wrapper 当前状态：
+
+- `AndroidKeystoreDeviceKeyStore` 内部通过私有 `AndroidKeystoreBridge` trait 调用平台能力，默认实现为 unavailable bridge。
+- bridge 方法同时接收 opaque `signing_key_id` 和内部 `keystore_alias`；错误对象、Debug 和日志只能使用 opaque id 或长度信息，不打印完整 alias、canonical bytes、signature bytes 或 key material。
+- 合成 bridge 只存在于 `ime-crypto` 单元测试，用来验证 Rust 模型语义；生产代码不得把合成 bridge、`test-memory-v1` 或软件 seed 作为 `android-keystore-v1` fallback。
+- Kotlin / JNI 接线完成前，`backend_status()` 必须继续返回 `available = false`、`can_create_signing_keys = false`、`can_sign = false`。
 
 ## 能力声明
 
@@ -220,7 +230,7 @@ Android 验证矩阵：
 默认 CI：
 
 - 不访问 Android Keystore。
-- 只验证 `android-keystore-v1` backend id、capability metadata、status 门禁和 Debug 脱敏。
+- 验证 `android-keystore-v1` backend id、capability metadata、status 门禁、Debug 脱敏、Rust bridge wrapper、合成 bridge 创建 / 签名 / 删除语义、`android-keystore` feature 编译和 ignored smoke 入口。
 
 Android gated smoke：
 
@@ -228,7 +238,7 @@ Android gated smoke：
 cargo test -p radishlex-ime-crypto --features android-keystore --test android_keystore_smoke -- --ignored --nocapture
 ```
 
-或等价 Gradle instrumentation / host-driven smoke。该 smoke 必须使用合成 `device_id` / `signing_key_id`，创建临时 key，完成签名验证后删除 key。运行前必须明确告知会触碰测试设备的 Android Keystore，并获得开发者批准。
+当前 ignored smoke 只验证平台桥接完成前不能声明生产可用。接入 Kotlin / JNI 后，该 smoke 或等价 Gradle instrumentation / host-driven smoke 必须使用合成 `device_id` / `signing_key_id`，创建临时 Android Keystore key，完成签名验证后删除 key。运行前必须明确告知会触碰测试设备的 Android Keystore，并获得开发者批准。
 
 设备矩阵至少记录：
 
@@ -243,7 +253,7 @@ cargo test -p radishlex-ime-crypto --features android-keystore --test android_ke
 
 ## 停止线
 
-- Ed25519 key 不能由 Android Keystore provider 创建、加载和签名时，不接 `android-keystore-v1` 代码。
+- Ed25519 key 不能由 Android Keystore provider 创建、加载和签名时，不接可用 Kotlin / JNI bridge，不解除 `android-keystore-v1` 的生产签名门禁。
 - 如果需要导出私钥 bytes 才能完成签名，应停止并回退设计。
 - 如果 backend unavailable 时回退到 `test-memory-v1`、软件 seed 或普通 app storage，应停止并回退实现。
 - 如果只能使用 P-256 等其他算法，应先补签名算法 ADR 和协议迁移计划。

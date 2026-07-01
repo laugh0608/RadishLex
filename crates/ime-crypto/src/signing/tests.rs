@@ -247,6 +247,41 @@ fn apple_keychain_capabilities_keep_metadata_but_status_blocks_production() {
     assert!(!debug.contains("seed"));
 }
 
+#[test]
+fn android_keystore_capabilities_keep_metadata_but_status_blocks_production() {
+    let capabilities = DeviceSigningBackendCapabilities::android_keystore_v1();
+    assert_eq!(
+        capabilities.storage_backend,
+        DeviceSigningStorageBackend::AndroidKeystoreV1
+    );
+    assert!(!capabilities.exportable);
+    assert!(!capabilities.hardware_backed);
+    assert!(!capabilities.user_presence_required);
+    assert!(!capabilities.backup_migratable);
+    assert!(capabilities.allows_production_signing());
+
+    let status = DevicePrivateKeyStoreStatus::android_keystore_v1();
+    status.validate().expect("android keystore status");
+    assert!(!status.available);
+    assert!(!status.can_create_signing_keys);
+    assert!(!status.can_sign);
+    assert_eq!(
+        status
+            .ensure_production_signing_allowed()
+            .expect_err("android keystore smoke blocker keeps backend out of production signing"),
+        CryptoError::StorageBackendUnavailable {
+            backend: DEVICE_KEY_STORE_ANDROID_KEYSTORE_V1.to_owned(),
+        }
+    );
+
+    let handle = DeviceSigningKeyHandle::android_keystore("device-a", "signing-key-a", 10)
+        .expect("android keystore handle");
+    let debug = format!("{handle:?}");
+    assert!(debug.contains("AndroidKeystoreV1"));
+    assert!(!debug.contains("private"));
+    assert!(!debug.contains("seed"));
+}
+
 #[cfg(feature = "apple-keychain")]
 #[test]
 fn apple_keychain_store_status_blocks_production_until_platform_strategy_is_resolved() {
@@ -268,6 +303,41 @@ fn apple_keychain_store_status_blocks_production_until_platform_strategy_is_reso
             backend: DEVICE_KEY_STORE_APPLE_KEYCHAIN_V1.to_owned(),
         }
     );
+}
+
+#[cfg(feature = "android-keystore")]
+#[test]
+fn android_keystore_store_status_blocks_production_until_platform_bridge_is_verified() {
+    let store = AndroidKeystoreDeviceKeyStore::new();
+    let status = store.backend_status();
+    status.validate().expect("android keystore store status");
+    assert_eq!(
+        status.storage_backend,
+        DeviceSigningStorageBackend::AndroidKeystoreV1
+    );
+    assert!(!status.available);
+    assert!(!status.can_create_signing_keys);
+    assert!(!status.can_sign);
+    assert_eq!(
+        status
+            .ensure_production_signing_allowed()
+            .expect_err("android keystore status must block production signing"),
+        CryptoError::StorageBackendUnavailable {
+            backend: DEVICE_KEY_STORE_ANDROID_KEYSTORE_V1.to_owned(),
+        }
+    );
+
+    let handle = DeviceSigningKeyHandle::android_keystore("device-a", "signing-key-a", 10)
+        .expect("android keystore handle");
+    assert!(matches!(
+        store.sign(&handle, b"synthetic-canonical-bytes"),
+        Err(CryptoError::StorageBackendUnavailable { .. })
+            | Err(CryptoError::UnsupportedStorageBackend { .. })
+    ));
+    let debug = format!("{store:?}");
+    assert!(debug.contains("AndroidKeystoreDeviceKeyStore"));
+    assert!(!debug.contains("org.radishlex.sync.signing"));
+    assert!(!debug.contains("synthetic-canonical-bytes"));
 }
 
 #[test]

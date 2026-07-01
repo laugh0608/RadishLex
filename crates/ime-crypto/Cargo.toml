@@ -13,6 +13,7 @@ path = "src/lib.rs"
 
 [features]
 default = []
+android-keystore = []
 apple-keychain = []
 
 [dependencies]

@@ -12,6 +12,12 @@ use crate::model::{
 #[cfg(feature = "apple-keychain")]
 mod apple_keychain;
 
+#[cfg(feature = "android-keystore")]
+mod android_keystore;
+
+#[cfg(feature = "android-keystore")]
+pub use android_keystore::AndroidKeystoreDeviceKeyStore;
+
 #[cfg(feature = "apple-keychain")]
 pub use apple_keychain::AppleKeychainDeviceKeyStore;
 
@@ -177,6 +183,21 @@ impl DeviceSigningKeyHandle {
         )
     }
 
+    pub fn android_keystore(
+        device_id: impl Into<String>,
+        signing_key_id: impl Into<String>,
+        created_at_ms: i64,
+    ) -> Result<Self, CryptoError> {
+        Self::new(
+            device_id,
+            signing_key_id,
+            SignatureAlgorithmId::ed25519_v1(),
+            DeviceSigningStorageBackend::AndroidKeystoreV1,
+            DeviceSigningBackendCapabilities::android_keystore_v1(),
+            created_at_ms,
+        )
+    }
+
     pub fn revoked(mut self, revoked_at_ms: i64) -> Result<Self, CryptoError> {
         self.revoked_at_ms = Some(revoked_at_ms);
         self.validate()?;
@@ -264,6 +285,16 @@ impl DeviceSigningBackendCapabilities {
         }
     }
 
+    pub fn android_keystore_v1() -> Self {
+        Self {
+            storage_backend: DeviceSigningStorageBackend::AndroidKeystoreV1,
+            exportable: false,
+            hardware_backed: false,
+            user_presence_required: false,
+            backup_migratable: false,
+        }
+    }
+
     pub fn platform(
         storage_backend: DeviceSigningStorageBackend,
         hardware_backed: bool,
@@ -328,6 +359,18 @@ impl DevicePrivateKeyStoreStatus {
             can_create_signing_keys: false,
             can_sign: false,
             capabilities: DeviceSigningBackendCapabilities::apple_keychain_v1(),
+        }
+    }
+
+    pub fn android_keystore_v1() -> Self {
+        // The Android Keystore path is currently a feature-gated bridge boundary.
+        // It must not advertise production readiness before JNI and device smoke pass.
+        Self {
+            storage_backend: DeviceSigningStorageBackend::AndroidKeystoreV1,
+            available: false,
+            can_create_signing_keys: false,
+            can_sign: false,
+            capabilities: DeviceSigningBackendCapabilities::android_keystore_v1(),
         }
     }
 
