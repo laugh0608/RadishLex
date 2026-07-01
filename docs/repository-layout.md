@@ -116,6 +116,8 @@ RadishLex/
 - `docs/ffi-boundary.md`：后续 C ABI、所有权、生命周期和错误语义边界。
 - `docs/runbooks/ffi-platform-call-contract.md`：平台绑定层调用 C ABI 的错误、字符串、handle 释放和 owner-thread 调度规则。
 - `docs/runbooks/rime-native-smoke.md`：真实 `librime` 本机 smoke 操作步骤。
+- `docs/runbooks/apple-keychain-signing-backend.md`：`apple-keychain-v1` 创建、加载、签名、删除、锁屏 / 权限、备份迁移和日志脱敏验证边界。
+- `docs/runbooks/android-keystore-signing-backend.md`：`android-keystore-v1` Ed25519 创建、加载、签名、删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界。
 - `docs/runbooks/sync-server-local-smoke.md`：Go sync server 本机启动边界、自动化 smoke 和日志脱敏检查。
 - `docs/runbooks/sync-server-compose.md`：Go sync server Docker Compose 本地 HTTPS、部署态 HTTP 上游、持久化目录、外部反代示例、清理和停止线 runbook。
 
@@ -190,7 +192,7 @@ librime adapter：
 - blob 加密。
 - 签名和校验。
 
-当前已创建 `crates/ime-crypto/`，落地 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、Argon2id recovery KDF、key role、object envelope、AAD、nonce、device key descriptor、device wrapping key / record、recovery material、Ed25519 设备签名、test-memory signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断、feature-gated macOS Keychain backend、signed sync object manifest、signed recovery record、删除同步和篡改失败测试；生产恢复流程和平台私钥存储 backend 边界已由文档固定，`apple-keychain-v1` 真实 smoke 阻塞于 `ed25519-v1` 创建，status 在 blocker 解除前阻断生产签名。
+当前已创建 `crates/ime-crypto/`，落地 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、Argon2id recovery KDF、key role、object envelope、AAD、nonce、device key descriptor、device wrapping key / record、recovery material、Ed25519 设备签名、test-memory signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断、feature-gated macOS Keychain backend、signed sync object manifest、signed recovery record、删除同步和篡改失败测试；生产恢复流程和平台私钥存储 backend 边界已由文档固定，`apple-keychain-v1` 真实 smoke 阻塞于 `ed25519-v1` 创建，status 在 blocker 解除前阻断生产签名，`android-keystore-v1` 已补 runbook 但尚未接 Kotlin / JNI 或 Android gated smoke。
 
 ### ime-ffi
 
