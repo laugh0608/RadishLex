@@ -191,7 +191,9 @@ sync-server/objects/
 部署配置变更至少执行：
 
 ```sh
+go test ./internal/runtime -run TestLocalServerBackupRestorePreservesEncryptedSyncState -count=1
 go test ./internal/runtime -run TestExternalTLSProxySmokePreservesAuthAndEncryptedObjectFlow -count=1
+go test ./internal/runtime -run TestLocalServerUpgradeRollbackPreservesPreUpgradeBackup -count=1
 
 docker compose -f deploy/sync-server/docker-compose.yaml \
   --env-file deploy/sync-server/.env.example \
@@ -202,6 +204,8 @@ docker compose -f deploy/sync-server/docker-compose.local.yaml config
 git diff --check
 ./scripts/check-repo.sh
 ```
+
+三条 runtime smoke 分别验证冷备份 / 恢复、外部 TLS 反代、升级 / 回滚；它们使用短生命周期测试服务和临时数据目录，不替代目标部署人工演练。
 
 需要 Docker daemon 的 build / up / curl smoke 如果被沙盒、Docker socket 或权限限制挡住，应申请真实环境复验。不能把 `config` 通过写成容器实际启动通过。
 

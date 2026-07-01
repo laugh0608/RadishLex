@@ -85,6 +85,32 @@ Rust bridge wrapper 当前状态：
 - 合成 bridge 只存在于 `ime-crypto` 单元测试，用来验证 Rust 模型语义；生产代码不得把合成 bridge、`test-memory-v1` 或软件 seed 作为 `android-keystore-v1` fallback。
 - Kotlin / JNI 接线完成前，`backend_status()` 必须继续返回 `available = false`、`can_create_signing_keys = false`、`can_sign = false`。
 
+Kotlin / JNI bridge contract：
+
+| Rust operation | Kotlin / JNI responsibility | Return value |
+| --- | --- | --- |
+| `CreateSigningKey` | 使用 `AndroidKeyStore` provider 和 `Ed25519` 算法创建不可导出 signing key，绑定传入的 opaque `signing_key_id` 与内部 `keystore_alias`。 | 32-byte Ed25519 public key |
+| `LoadPublicKey` | 只从已存在 alias 读取 public key，不创建新 key，不返回 private material。 | 32-byte Ed25519 public key |
+| `Sign` | 只签 Rust 传入的 `radishlex-signature-v1` canonical bytes，不解析 plaintext payload、SQLite row 或 HTTP request。 | 64-byte Ed25519 signature |
+| `DeleteSigningKey` | 删除对应 alias，后续 `LoadPublicKey` 和 `Sign` 必须返回不可用类错误。 | empty success |
+
+每个 request 必须携带 `ANDROID_KEYSTORE_BRIDGE_CONTRACT_VERSION = 1`。只有 `Sign` 可以携带 canonical bytes；`CreateSigningKey`、`LoadPublicKey` 和 `DeleteSigningKey` 的 canonical bytes 必须为空。Rust 侧会校验 public key / signature 长度，并把长度错误映射为 `private_key_corrupted`。
+
+错误码映射固定如下：
+
+| Bridge error code | Rust error |
+| --- | --- |
+| `storage_backend_unavailable` | `StorageBackendUnavailable { backend: "android-keystore-v1" }` |
+| `unsupported_signature_algorithm` | `UnsupportedSignatureAlgorithm { algorithm: "ed25519-v1" }` |
+| `unsupported_storage_backend` | `UnsupportedStorageBackend { backend: "android-keystore-v1" }` |
+| `private_key_unavailable` | `PrivateKeyUnavailable { key_id: signing_key_id }` |
+| `private_key_locked` | `PrivateKeyLocked { key_id: signing_key_id }` |
+| `private_key_access_denied` | `PrivateKeyAccessDenied { key_id: signing_key_id }` |
+| `private_key_user_presence_required` | `PrivateKeyUserPresenceRequired { key_id: signing_key_id }` |
+| `private_key_corrupted` | `PrivateKeyCorrupted { key_id: signing_key_id }` |
+
+未知 contract version、未知 operation、未知 error code、非 32-byte public key、非 64-byte signature 或 alias / id 映射不一致，都应按 bridge 接线错误处理，不得降级为软件签名或继续上传到 sync server。
+
 ## 能力声明
 
 首轮 smoke 通过前，`android-keystore-v1` 不应声明可生产签名。
