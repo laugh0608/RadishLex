@@ -78,7 +78,10 @@ backend_status() -> DevicePrivateKeyStoreStatus
 Rust bridge wrapper 当前状态：
 
 - `AndroidKeystoreDeviceKeyStore` 内部通过私有 `AndroidKeystoreBridge` trait 调用平台能力，默认实现为 unavailable bridge。
+- `ime-crypto` 公开 `ANDROID_KEYSTORE_BRIDGE_CONTRACT_VERSION = 1`、`ANDROID_KEYSTORE_PROVIDER = AndroidKeyStore`、`ANDROID_KEYSTORE_SIGNATURE_ALGORITHM = Ed25519`、bridge operation、bridge error code、alias 构造和 public key / signature 校验 helper，作为 Kotlin / JNI 层接线时必须遵守的 Rust contract。
 - bridge 方法同时接收 opaque `signing_key_id` 和内部 `keystore_alias`；错误对象、Debug 和日志只能使用 opaque id 或长度信息，不打印完整 alias、canonical bytes、signature bytes 或 key material。
+- Kotlin / JNI 层返回的 public key 必须是 32-byte Ed25519 public key，signature 必须是 64-byte Ed25519 signature；长度或格式不符时映射为 `private_key_corrupted`，不得继续进入 Go server 验签路径。
+- Kotlin / JNI 层只允许返回固定 error code：`storage_backend_unavailable`、`unsupported_signature_algorithm`、`unsupported_storage_backend`、`private_key_unavailable`、`private_key_locked`、`private_key_access_denied`、`private_key_user_presence_required`、`private_key_corrupted`。错误消息和日志不应包含 alias、canonical bytes、signature bytes、KeyInfo dump 或 provider exception 原文中的敏感字段。
 - 合成 bridge 只存在于 `ime-crypto` 单元测试，用来验证 Rust 模型语义；生产代码不得把合成 bridge、`test-memory-v1` 或软件 seed 作为 `android-keystore-v1` fallback。
 - Kotlin / JNI 接线完成前，`backend_status()` 必须继续返回 `available = false`、`can_create_signing_keys = false`、`can_sign = false`。
 
@@ -230,7 +233,7 @@ Android 验证矩阵：
 默认 CI：
 
 - 不访问 Android Keystore。
-- 验证 `android-keystore-v1` backend id、capability metadata、status 门禁、Debug 脱敏、Rust bridge wrapper、合成 bridge 创建 / 签名 / 删除语义、`android-keystore` feature 编译和 ignored smoke 入口。
+- 验证 `android-keystore-v1` backend id、capability metadata、status 门禁、Debug 脱敏、Rust bridge wrapper、bridge contract request / error code / response 校验、合成 bridge 创建 / 签名 / 删除语义、`android-keystore` feature 编译和 ignored smoke 入口。
 
 Android gated smoke：
 

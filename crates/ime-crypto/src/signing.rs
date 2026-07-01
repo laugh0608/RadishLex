@@ -16,7 +16,13 @@ mod apple_keychain;
 mod android_keystore;
 
 #[cfg(feature = "android-keystore")]
-pub use android_keystore::AndroidKeystoreDeviceKeyStore;
+pub use android_keystore::{
+    android_keystore_alias, validate_android_keystore_public_key,
+    validate_android_keystore_signature, AndroidKeystoreBridgeErrorCode,
+    AndroidKeystoreBridgeOperation, AndroidKeystoreBridgeRequest, AndroidKeystoreDeviceKeyStore,
+    ANDROID_KEYSTORE_BRIDGE_CONTRACT_VERSION, ANDROID_KEYSTORE_PROVIDER,
+    ANDROID_KEYSTORE_SIGNATURE_ALGORITHM, DEFAULT_ANDROID_KEYSTORE_ALIAS_PREFIX,
+};
 
 #[cfg(feature = "apple-keychain")]
 pub use apple_keychain::AppleKeychainDeviceKeyStore;
