@@ -1,12 +1,12 @@
 # Android IME Platform Boundary
 
-本文档说明 `platforms/android-ime/` 当前用途。读者是后续实现 Android Kotlin bridge、NDK / JNI 调用层、Android 输入法薄壳和同步设备管理入口的开发者。本文不包含完整键盘 UI、`InputMethodService` 主线、Gradle 工程、系统输入法安装流程或真实设备 smoke 结果。
+本文档说明 `platforms/android-ime/` 当前用途。读者是后续实现 Android Kotlin bridge、NDK / JNI 调用层、Android 输入法薄壳和同步设备管理入口的开发者。本文不包含完整键盘 UI、`InputMethodService` 主线、系统输入法安装流程或真实设备 smoke 结果。
 
 ## 当前状态
 
-- 当前只落地 `keystore-bridge/` 仓库内接线准备。
+- 当前只落地 `keystore-bridge/` 仓库内接线准备和 Android instrumented smoke harness。
 - 该目录只服务于 `android-keystore-v1` 设备签名 backend。
-- 当前没有完整 Android app、IME service、Flutter manager 或 JNI 注册入口。
+- 当前没有完整 Android app、IME service、Flutter manager 或 Rust native JNI 注册入口。
 - 当前不创建真实 Android Keystore key，不启动模拟器，不声明 `android-keystore-v1` 可生产签名。
 
 ## 边界
@@ -14,6 +14,7 @@
 允许：
 
 - 固定 Kotlin / JNI bridge contract。
+- 提供独立 Android Gradle library harness 和 gated instrumented smoke。
 - 使用 `AndroidKeyStore` provider 和 `Ed25519` 算法表达创建、加载、公钥读取、签名和删除操作。
 - 将 Android public key 的 X.509 SubjectPublicKeyInfo 编码转换为 Rust contract 需要的 32-byte raw Ed25519 public key。
 - 将平台错误收敛到 `ime-crypto` 已定义的 bridge error code。
