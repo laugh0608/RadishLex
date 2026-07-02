@@ -8,7 +8,7 @@
 - Android Keystore 的目标优势是让 key material 不进入 app 进程，并在设备支持时绑定到 TEE / Secure Element；硬件支持与可用算法组合必须通过设备实测确认。
 - RadishLex Phase 3 设备签名协议仍是 `ed25519-v1`；`android-keystore-v1` 进入实现前必须证明 Android Keystore provider 能创建、加载并使用非导出 Ed25519 signing key，或明确记录 `unsupported_signature_algorithm`。
 - `ime-crypto` 已有 `android-keystore` feature、`AndroidKeystoreDeviceKeyStore`、capability metadata、生产签名门禁、ignored smoke 入口、Rust 侧 bridge 包装层和 raw JNI glue；非 Android host 默认 bridge 仍保持不可用，不访问 Android Keystore。
-- `platforms/android-ime/keystore-bridge` 已补仓库内 Kotlin bridge source、独立 Android Gradle library harness、JVM/JNI-callable Kotlin facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录模板，固定 `AndroidKeyStore` / `Ed25519` 的创建、加载、公钥读取、签名、删除和错误码映射；当前已补 Rust raw JNI glue，并已通过 `./scripts/check-android-target.sh` 复验 `aarch64-linux-android` target build；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，结果为 `unsupported_signature_algorithm`，不代表真实 Android Keystore 已可用。
+- `platforms/android-ime/keystore-bridge` 已补仓库内 Kotlin bridge source、独立 Android Gradle library harness、JVM/JNI-callable Kotlin facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录模板，固定 `AndroidKeyStore` / `Ed25519` 的创建、加载、公钥读取、签名、删除和错误码映射；当前已补 Rust raw JNI glue，并已通过 `./scripts/check-android-target.sh` 复验 `aarch64-linux-android` target build；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不代表真实 Android Keystore 已可用。
 - 当前 Rust 单元测试只使用合成 bridge 复验 `create -> load public key -> sign -> verify -> delete / revoke` 的模型语义、错误语义和 Debug 脱敏；raw JNI glue 已能按 contract 调用 Kotlin facade，并已具备 Android target 编译证据。
 - 当前不引入 P-256，不改变 Go / Rust Ed25519 verifier，不把 seed 作为普通 secret 存入 Keystore / SharedPreferences 后取回 Rust 签名。
 - `android-keystore-v1` 未完成创建、加载、签名、删除、锁屏 / 权限、备份迁移和日志脱敏验证前，不得声明生产可用。
@@ -330,7 +330,7 @@ cargo test -p radishlex-ime-crypto --features android-keystore --test android_ke
 - locked / user authentication 结果。
 - backup / migration 结果。
 
-矩阵记录模板位于 `platforms/android-ime/keystore-bridge/docs/device-matrix-template.md`；首条 AVD 记录位于 `platforms/android-ime/keystore-bridge/docs/device-matrix-2026-07-02-avd-api35.md`。
+矩阵记录模板位于 `platforms/android-ime/keystore-bridge/docs/device-matrix-template.md`；当前 AVD 记录包括 `platforms/android-ime/keystore-bridge/docs/device-matrix-2026-07-02-avd-api35.md` 和 `platforms/android-ime/keystore-bridge/docs/device-matrix-2026-07-02-avd-api37.md`。
 
 ## 停止线
 

@@ -13,6 +13,7 @@
 - `docs/smoke-record-2026-07-02-avd-api35.md`：Pixel 9 Pro API 35 AVD 真实 smoke 记录，结果为 `unsupported_signature_algorithm`。
 - `docs/device-matrix-template.md`
 - `docs/device-matrix-2026-07-02-avd-api35.md`：Pixel 9 Pro API 35 AVD provider / API 诊断记录，确认 factory 表面可用但生成 key 为 `EC`，Ed25519 签名失败。
+- `docs/device-matrix-2026-07-02-avd-api37.md`：Pixel 10 Pro API 37 AVD provider / API 诊断记录，确认 factory 表面可用但仍生成 key 为 `EC`，Ed25519 签名失败。
 - `docs/android-target-build-record-2026-07-02.md`：Android Rust target build 记录，确认 `ime-crypto` Android Keystore bridge wrapper / raw JNI glue 可面向 `aarch64-linux-android` 编译。
 - Kotlin contract 常量与 `ime-crypto` 的 `android-keystore` feature 保持一致：
   - `contract_version = 1`
@@ -25,7 +26,7 @@
 
 - 当前 Gradle harness 不代表完整 Android app 或 IME service。
 - Rust raw JNI glue 已接到 Kotlin facade，并已通过 Android target build；在设备矩阵证明 Android Keystore 可用前，Rust `AndroidKeystoreDeviceKeyStore::backend_status()` 仍应阻断 production signing。
-- Pixel 9 Pro API 35 AVD 的真实 smoke 与 provider diagnostics 已执行但未通过，`AndroidKeyStore` 返回 `EC` public key，直接 Ed25519 签名失败；不得解除 `android-keystore-v1` 生产签名门禁。
+- Pixel 9 Pro API 35 AVD 的真实 smoke 与 provider diagnostics 已执行但未通过；Pixel 10 Pro API 37 AVD 的 provider diagnostics 也未通过。两者均表现为 `AndroidKeyStore` 返回 `EC` public key，直接 Ed25519 签名失败；不得解除 `android-keystore-v1` 生产签名门禁。
 - 如果 `Ed25519` + `AndroidKeyStore` 无法创建、加载或签名，应返回 `unsupported_signature_algorithm` 或 `unsupported_storage_backend`，不得降级。
 
 ## 本机验证
