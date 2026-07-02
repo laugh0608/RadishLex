@@ -8,7 +8,7 @@
 - Android Keystore 的目标优势是让 key material 不进入 app 进程，并在设备支持时绑定到 TEE / Secure Element；硬件支持与可用算法组合必须通过设备实测确认。
 - RadishLex Phase 3 设备签名协议仍是 `ed25519-v1`；`android-keystore-v1` 进入实现前必须证明 Android Keystore provider 能创建、加载并使用非导出 Ed25519 signing key，或明确记录 `unsupported_signature_algorithm`。
 - `ime-crypto` 已有 `android-keystore` feature、`AndroidKeystoreDeviceKeyStore`、capability metadata、生产签名门禁、ignored smoke 入口、Rust 侧 bridge 包装层和 raw JNI glue；非 Android host 默认 bridge 仍保持不可用，不访问 Android Keystore。
-- `platforms/android-ime/keystore-bridge` 已补仓库内 Kotlin bridge source、独立 Android Gradle library harness、JVM/JNI-callable Kotlin facade、gated instrumented smoke 和 smoke 记录模板，固定 `AndroidKeyStore` / `Ed25519` 的创建、加载、公钥读取、签名、删除和错误码映射；当前已补 Rust raw JNI glue，并已通过 `./scripts/check-android-target.sh` 复验 `aarch64-linux-android` target build；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke，结果为 `unsupported_signature_algorithm`，不代表真实 Android Keystore 已可用。
+- `platforms/android-ime/keystore-bridge` 已补仓库内 Kotlin bridge source、独立 Android Gradle library harness、JVM/JNI-callable Kotlin facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录模板，固定 `AndroidKeyStore` / `Ed25519` 的创建、加载、公钥读取、签名、删除和错误码映射；当前已补 Rust raw JNI glue，并已通过 `./scripts/check-android-target.sh` 复验 `aarch64-linux-android` target build；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，结果为 `unsupported_signature_algorithm`，不代表真实 Android Keystore 已可用。
 - 当前 Rust 单元测试只使用合成 bridge 复验 `create -> load public key -> sign -> verify -> delete / revoke` 的模型语义、错误语义和 Debug 脱敏；raw JNI glue 已能按 contract 调用 Kotlin facade，并已具备 Android target 编译证据。
 - 当前不引入 P-256，不改变 Go / Rust Ed25519 verifier，不把 seed 作为普通 secret 存入 Keystore / SharedPreferences 后取回 Rust 签名。
 - `android-keystore-v1` 未完成创建、加载、签名、删除、锁屏 / 权限、备份迁移和日志脱敏验证前，不得声明生产可用。
@@ -89,6 +89,7 @@ Rust bridge wrapper 当前状态：
 - `RadishLexAndroidKeystoreJniBridge` 提供 `@JvmStatic` facade，固定 Rust raw JNI glue 可调用的参数形状。
 - `ime-crypto` raw JNI glue 通过 `JNI_OnLoad` 记录 `JavaVM`，按需 attach 当前线程，调用 Kotlin static facade，读取 `getPublicKey()` / `getSignature()` / `getErrorCode()`，清理 Java exception，并只把固定 bridge error code 映射为 Rust `CryptoError`；未知 error code 按 `private_key_corrupted` 处理，不把 provider exception 原文、完整 alias、canonical bytes 或 signature bytes 带回 Rust 错误对象。
 - `RadishLexAndroidKeystoreBridgeInstrumentedTest` 提供 gated smoke，只有传入 `-Pradishlex.runAndroidKeystoreSmoke=true` 时才会创建临时 Android Keystore item，并在 `finally` 中删除该 item。
+- `RadishLexAndroidKeystoreDiagnosticsInstrumentedTest` 提供 gated provider diagnostics，只有传入 `-Pradishlex.runAndroidKeystoreDiagnostics=true` 时才会创建合成诊断 key，并在 `finally` 中删除 diagnostics key；输出只使用 `radishlex.android_keystore.diagnostics` 前缀的非敏感字段。
 - Kotlin source 从 Android `PublicKey.encoded` 的 X.509 SubjectPublicKeyInfo 中提取 32-byte raw Ed25519 public key，再交给 Rust contract；如果 provider 实际返回 `EC` 等非 Ed25519 public key，返回 `unsupported_signature_algorithm`，不得上传到 Go server 验签路径。
 
 Kotlin / JNI bridge contract：
@@ -300,6 +301,15 @@ cd platforms/android-ime/keystore-bridge
 
 该 smoke 使用合成 `signing_key_id` 和固定产品前缀 alias，创建临时 Android Keystore key，完成 create / load / sign / verify / delete 后删除 key。运行前必须明确告知会触碰测试设备的 Android Keystore，并获得开发者批准。
 
+Android provider diagnostics：
+
+```text
+cd platforms/android-ime/keystore-bridge
+./gradlew connectedAndroidTest -Pradishlex.runAndroidKeystoreDiagnostics=true
+```
+
+该诊断使用合成 diagnostics alias，记录 Android version、API level、security patch、provider、`Signature.getInstance("Ed25519")`、`KeyPairGenerator.getInstance("Ed25519", "AndroidKeyStore")`、生成 key 的 public / private key metadata、`KeyInfo`、直接 Ed25519 签名结果、bridge create / load 错误映射和 cleanup 结果。输出不得包含完整 alias、canonical bytes、signature bytes、private material、provider exception 原文、token、真实账号或用户输入内容。
+
 Rust host smoke 仍保持：
 
 ```text
@@ -314,10 +324,13 @@ cargo test -p radishlex-ime-crypto --features android-keystore --test android_ke
 - device model。
 - security patch level。
 - provider behavior。
+- `Signature` / `KeyPairGenerator` factory behavior。
 - Ed25519 create / load / sign / delete 结果。
 - `KeyInfo` hardware / security level 结果。
 - locked / user authentication 结果。
 - backup / migration 结果。
+
+矩阵记录模板位于 `platforms/android-ime/keystore-bridge/docs/device-matrix-template.md`；首条 AVD 记录位于 `platforms/android-ime/keystore-bridge/docs/device-matrix-2026-07-02-avd-api35.md`。
 
 ## 停止线
 

@@ -14,6 +14,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["radishlex.runAndroidKeystoreSmoke"] =
             providers.gradleProperty("radishlex.runAndroidKeystoreSmoke").orElse("false").get()
+        testInstrumentationRunnerArguments["radishlex.runAndroidKeystoreDiagnostics"] =
+            providers.gradleProperty("radishlex.runAndroidKeystoreDiagnostics").orElse("false").get()
     }
 
     compileOptions {
