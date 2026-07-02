@@ -13,6 +13,7 @@ import java.security.KeyStoreException
 import java.security.NoSuchAlgorithmException
 import java.security.NoSuchProviderException
 import java.security.PrivateKey
+import java.security.PublicKey
 import java.security.ProviderException
 import java.security.Signature
 import java.security.UnrecoverableEntryException
@@ -141,8 +142,12 @@ class RadishLexAndroidKeystoreBridge(
                 KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
             ).build()
             keyPairGenerator.initialize(spec)
-            val keyPair = keyPairGenerator.generateKeyPair()
-            publicKeyResult(keyPair.public.encoded)
+            keyPairGenerator.generateKeyPair()
+            val certificate = openKeyStore().getCertificate(request.alias)
+                ?: return RadishLexAndroidKeystoreBridgeResult.failure(
+                    RadishLexAndroidKeystoreBridgeContract.ERROR_PRIVATE_KEY_UNAVAILABLE
+                )
+            publicKeyResult(certificate.publicKey)
         } catch (error: Exception) {
             RadishLexAndroidKeystoreBridgeResult.failure(mapError(error))
         }
@@ -159,7 +164,7 @@ class RadishLexAndroidKeystoreBridge(
                 ?: return RadishLexAndroidKeystoreBridgeResult.failure(
                     RadishLexAndroidKeystoreBridgeContract.ERROR_PRIVATE_KEY_UNAVAILABLE
                 )
-            publicKeyResult(certificate.publicKey.encoded)
+            publicKeyResult(certificate.publicKey)
         } catch (error: Exception) {
             RadishLexAndroidKeystoreBridgeResult.failure(mapError(error))
         }
@@ -212,32 +217,47 @@ class RadishLexAndroidKeystoreBridge(
         return (entry as? KeyStore.PrivateKeyEntry)?.privateKey
     }
 
-    private fun publicKeyResult(encodedPublicKey: ByteArray?): RadishLexAndroidKeystoreBridgeResult {
-        val rawPublicKey = rawEd25519PublicKey(encodedPublicKey)
-            ?: return RadishLexAndroidKeystoreBridgeResult.failure(
+    private fun publicKeyResult(publicKey: PublicKey): RadishLexAndroidKeystoreBridgeResult {
+        val rawPublicKey = rawEd25519PublicKey(publicKey.encoded)
+        if (rawPublicKey == null) {
+            val errorCode = if (isRequestedPublicKeyAlgorithm(publicKey)) {
                 RadishLexAndroidKeystoreBridgeContract.ERROR_PRIVATE_KEY_CORRUPTED
-            )
+            } else {
+                RadishLexAndroidKeystoreBridgeContract.ERROR_UNSUPPORTED_SIGNATURE_ALGORITHM
+            }
+            return RadishLexAndroidKeystoreBridgeResult.failure(errorCode)
+        }
         return RadishLexAndroidKeystoreBridgeResult.publicKey(rawPublicKey)
+    }
+
+    private fun isRequestedPublicKeyAlgorithm(publicKey: PublicKey): Boolean {
+        val algorithm = publicKey.algorithm
+        return algorithm.equals(signatureAlgorithm, ignoreCase = true) ||
+            algorithm.equals("EdDSA", ignoreCase = true)
     }
 
     private fun rawEd25519PublicKey(encodedPublicKey: ByteArray?): ByteArray? {
         if (encodedPublicKey == null) {
             return null
         }
-        if (encodedPublicKey.size != ED25519_SPKI_PREFIX.size +
-            RadishLexAndroidKeystoreBridgeContract.RAW_ED25519_PUBLIC_KEY_SIZE
-        ) {
-            return null
-        }
-        for (index in ED25519_SPKI_PREFIX.indices) {
-            if (encodedPublicKey[index] != ED25519_SPKI_PREFIX[index]) {
-                return null
-            }
-        }
+        val prefix = ED25519_SPKI_PREFIXES.firstOrNull {
+            encodedPublicKey.size == it.size +
+                RadishLexAndroidKeystoreBridgeContract.RAW_ED25519_PUBLIC_KEY_SIZE &&
+                hasPrefix(encodedPublicKey, it)
+        } ?: return null
         return encodedPublicKey.copyOfRange(
-            ED25519_SPKI_PREFIX.size,
+            prefix.size,
             encodedPublicKey.size
         )
+    }
+
+    private fun hasPrefix(bytes: ByteArray, prefix: ByteArray): Boolean {
+        for (index in prefix.indices) {
+            if (bytes[index] != prefix[index]) {
+                return false
+            }
+        }
+        return true
     }
 
     private fun mapError(error: Exception): String {
@@ -270,6 +290,26 @@ class RadishLexAndroidKeystoreBridge(
             0x03,
             0x21,
             0x00
+        )
+        private val ED25519_SPKI_PREFIX_WITH_NULL_PARAMS = byteArrayOf(
+            0x30,
+            0x2c,
+            0x30,
+            0x07,
+            0x06,
+            0x03,
+            0x2b,
+            0x65,
+            0x70,
+            0x05,
+            0x00,
+            0x03,
+            0x21,
+            0x00
+        )
+        private val ED25519_SPKI_PREFIXES = arrayOf(
+            ED25519_SPKI_PREFIX,
+            ED25519_SPKI_PREFIX_WITH_NULL_PARAMS
         )
     }
 }

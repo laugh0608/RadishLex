@@ -3,6 +3,7 @@ package org.radishlex.android.keystore
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.security.KeyFactory
+import java.security.KeyStore
 import java.security.Signature
 import java.security.spec.X509EncodedKeySpec
 import org.junit.Assert.assertArrayEquals
@@ -78,7 +79,10 @@ class RadishLexAndroidKeystoreBridgeInstrumentedTest {
             )
         )
         if (!result.isSuccess) {
-            fail("Android Keystore create_signing_key returned ${result.errorCode}")
+            fail(
+                "Android Keystore create_signing_key returned ${result.errorCode}; " +
+                    publicKeyMetadata(alias)
+            )
         }
         assertEquals(
             RadishLexAndroidKeystoreBridgeContract.RAW_ED25519_PUBLIC_KEY_SIZE,
@@ -148,6 +152,21 @@ class RadishLexAndroidKeystoreBridgeInstrumentedTest {
         verifier.initVerify(publicKey)
         verifier.update(canonicalBytes)
         return verifier.verify(signatureBytes)
+    }
+
+    private fun publicKeyMetadata(alias: String): String {
+        val keyStore = KeyStore.getInstance(RadishLexAndroidKeystoreBridgeContract.PROVIDER)
+            .apply { load(null) }
+        val publicKey = keyStore.getCertificate(alias)?.publicKey
+        val encodedPublicKey = publicKey?.encoded
+        val encodedHead = encodedPublicKey
+            ?.take(20)
+            ?.joinToString(separator = "") { "%02x".format(it) }
+            ?: "null"
+        return "publicKeyAlgorithm=${publicKey?.algorithm}, " +
+            "publicKeyFormat=${publicKey?.format}, " +
+            "encodedPublicKeyLen=${encodedPublicKey?.size}, " +
+            "encodedPublicKeyHead=$encodedHead"
     }
 
     companion object {

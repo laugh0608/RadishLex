@@ -11,7 +11,7 @@
 - 测试命令：
 
 ```text
-gradle connectedAndroidTest -Pradishlex.runAndroidKeystoreSmoke=true
+./gradlew connectedAndroidTest -Pradishlex.runAndroidKeystoreSmoke=true
 ```
 
 ## 设备与工具链

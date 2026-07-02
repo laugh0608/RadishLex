@@ -1,13 +1,14 @@
 # Android IME Platform Boundary
 
-本文档说明 `platforms/android-ime/` 当前用途。读者是后续实现 Android Kotlin bridge、NDK / JNI 调用层、Android 输入法薄壳和同步设备管理入口的开发者。本文不包含完整键盘 UI、`InputMethodService` 主线、系统输入法安装流程或真实设备 smoke 结果。
+本文档说明 `platforms/android-ime/` 当前用途。读者是后续实现 Android Kotlin bridge、NDK / JNI 调用层、Android 输入法薄壳和同步设备管理入口的开发者。本文不包含完整键盘 UI、`InputMethodService` 主线、系统输入法安装流程或完整设备矩阵。
 
 ## 当前状态
 
 - 当前只落地 `keystore-bridge/` 仓库内接线准备和 Android instrumented smoke harness。
 - 该目录只服务于 `android-keystore-v1` 设备签名 backend。
-- 当前没有完整 Android app、IME service、Flutter manager、Android target build 记录或真实设备 smoke 结果；Rust raw JNI glue 已在 `crates/ime-crypto` 接到 Kotlin facade。
-- 当前不创建真实 Android Keystore key，不启动模拟器，不声明 `android-keystore-v1` 可生产签名。
+- 当前没有完整 Android app、IME service、Flutter manager 或 Android target build 记录；Rust raw JNI glue 已在 `crates/ime-crypto` 接到 Kotlin facade。
+- 2026-07-02 已在 Pixel 9 Pro API 35 AVD 上执行 gated smoke；`AndroidKeyStore` 返回 `EC` 公钥，bridge 结果为 `unsupported_signature_algorithm`，不声明 `android-keystore-v1` 可生产签名。
+- 默认开发、仓库检查和 Android Gradle 编译不创建真实 Android Keystore key；只有显式传入 `radishlex.runAndroidKeystoreSmoke=true` 的 gated smoke 才允许触碰测试设备 Keystore。
 
 ## 边界
 
