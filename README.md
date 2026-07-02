@@ -10,7 +10,7 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - **中文定位**：萝卜词核
 - **核心目标**：让输入法逐步理解用户的词库、语气、场景和候选偏好，达到可解释、可删除、可自部署的个人化输入体验。
 - **技术主轴**：Rust + Go + Flutter
-- **复核日期**：2026-06-30
+- **复核日期**：2026-07-02
 
 ## 设计原则
 
@@ -51,6 +51,7 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - [ADR 0004: 平台私钥存储 Backend 边界](docs/adr/0004-platform-private-key-storage-backend.md)
 - [ADR 0005: Apple 平台签名策略](docs/adr/0005-apple-platform-signing-strategy.md)
 - [Apple Keychain Signing Backend Runbook](docs/runbooks/apple-keychain-signing-backend.md)
+- [Android Keystore Signing Backend Runbook](docs/runbooks/android-keystore-signing-backend.md)
 - [FFI 边界](docs/ffi-boundary.md)
 
 ## 当前可运行入口
@@ -94,6 +95,28 @@ docker compose -f deploy/sync-server/docker-compose.yaml --env-file deploy/sync-
 本地 Compose 测试态使用 Caddy internal TLS 暴露 `https://localhost:7319`；部署态只提供同机 HTTP upstream `http://127.0.0.1:7319`，外部 TLS 和访问控制由部署者配置。生产访问控制当前先使用 `RADISHLEX_SYNC_ACCESS_TOKEN` 单用户 bearer token；OIDC / Radish 产品账号体系已作为后续专题记录，不是当前必须部署的账号系统。
 
 Apple Keychain backend 已在 `apple-keychain` feature 下接线，但真实 smoke 阻塞于 `ed25519-v1` 创建，`apple-keychain-v1` 在该 blocker 解除前会阻断生产签名。默认测试不会触碰本机 Keychain。
+
+Android Keystore backend 已在 `android-keystore` feature 下接入 Rust bridge wrapper、raw JNI glue、仓库内 Kotlin bridge、Gradle harness、gated smoke 和 provider diagnostics。默认仓库验证不会触碰 Android Keystore；Android target build 可用仓库根命令复验：
+
+```bash
+./scripts/check-android-target.sh
+```
+
+Android Kotlin harness 位于 `platforms/android-ime/keystore-bridge/`，普通构建不创建 Keystore item：
+
+```bash
+cd platforms/android-ime/keystore-bridge
+JAVA_HOME=<Android Studio bundled JBR> ./gradlew assembleDebug
+```
+
+真实设备 / AVD 诊断或 smoke 必须显式传入 gated 参数，并在执行前确认允许触碰测试设备 Android Keystore：
+
+```bash
+JAVA_HOME=<Android Studio bundled JBR> ./gradlew connectedAndroidTest -Pradishlex.runAndroidKeystoreDiagnostics=true
+JAVA_HOME=<Android Studio bundled JBR> ./gradlew connectedAndroidTest -Pradishlex.runAndroidKeystoreSmoke=true
+```
+
+Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 当前诊断结果均为 `unsupported_signature_algorithm`：JCA factory 表面可用，但 `AndroidKeyStore` 实际生成 `EC` key，不能满足 `ed25519-v1` 设备签名协议。`android-keystore-v1` production gate 继续关闭，不切换 P-256，也不回退到 seed / app storage / `test-memory-v1`。
 
 ## MVP 边界
 

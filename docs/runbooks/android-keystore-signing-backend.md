@@ -14,6 +14,22 @@
 - `android-keystore-v1` 未完成创建、加载、签名、删除、锁屏 / 权限、备份迁移和日志脱敏验证前，不得声明生产可用。
 - Android IME 输入热路径不调用同步签名；同步签名只允许由管理 / sync client 层在明确后台同步或用户操作中触发。
 
+## 当前设备矩阵结论
+
+当前已有矩阵只覆盖 AVD，不代表真实设备或 OEM 结论：
+
+| 环境 | Android / API | `Signature` provider | `KeyPairGenerator` provider | 生成 key | 直接签名 | bridge 结果 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Pixel 9 Pro API 35 AVD | Android 15 / API 35 | `AndroidKeyStoreBCWorkaround` | `AndroidKeyStore` | `EC` / `X.509` / 91 bytes | `InvalidKeyException` | `unsupported_signature_algorithm` |
+| Pixel 10 Pro API 37 AVD | Android 17 / API 37 | `AndroidOpenSSL` | `AndroidKeyStore` | `EC` / `X.509` / 91 bytes | `InvalidKeyException` | `unsupported_signature_algorithm` |
+
+判读规则：
+
+- `Signature` 或 `KeyPairGenerator` factory success 不等于 backend 可用。
+- 只有 `AndroidKeyStore` 创建出的 public key 是 Ed25519，能返回 32-byte raw public key，并能对 RadishLex canonical bytes 生成 64-byte Ed25519 signature，才可继续评估 `android-keystore-v1` 的生产签名能力。
+- 当前两个 AVD 都生成 `EC` key，因此 bridge 返回 `unsupported_signature_algorithm` 是正确行为。
+- 在真机 / OEM / system image 矩阵证明可用前，`android-keystore-v1` 必须继续保持 `available = false`、`can_create_signing_keys = false`、`can_sign = false`。
+
 ## 官方参考入口
 
 - Android Keystore system: <https://developer.android.com/privacy-and-security/keystore>

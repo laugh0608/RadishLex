@@ -29,6 +29,19 @@
 - Pixel 9 Pro API 35 AVD 的真实 smoke 与 provider diagnostics 已执行但未通过；Pixel 10 Pro API 37 AVD 的 provider diagnostics 也未通过。两者均表现为 `AndroidKeyStore` 返回 `EC` public key，直接 Ed25519 签名失败；不得解除 `android-keystore-v1` 生产签名门禁。
 - 如果 `Ed25519` + `AndroidKeyStore` 无法创建、加载或签名，应返回 `unsupported_signature_algorithm` 或 `unsupported_storage_backend`，不得降级。
 
+## 结果解读
+
+`Signature.getInstance("Ed25519")` 或 `KeyPairGenerator.getInstance("Ed25519", "AndroidKeyStore")` 返回 success 只说明 JCA factory 能创建对象，不代表 `AndroidKeyStore` 已能保存非导出 Ed25519 signing key。判断 backend 是否可用必须同时看生成 key 的 algorithm / format / length、`KeyInfo`、直接签名结果和 bridge error code。
+
+当前矩阵结论：
+
+| 环境 | `Signature` provider | `KeyPairGenerator` provider | 生成 key | bridge 结果 |
+| --- | --- | --- | --- | --- |
+| Pixel 9 Pro API 35 AVD | `AndroidKeyStoreBCWorkaround` | `AndroidKeyStore` | `EC` / `X.509` / 91 bytes | `unsupported_signature_algorithm` |
+| Pixel 10 Pro API 37 AVD | `AndroidOpenSSL` | `AndroidKeyStore` | `EC` / `X.509` / 91 bytes | `unsupported_signature_algorithm` |
+
+这两条记录只证明对应 AVD 环境不可用；后续仍需扩展真机、不同 OEM、不同 system image 和不同 security patch 的设备矩阵。
+
 ## 本机验证
 
 不触碰真实 Android Keystore 的仓库默认验证：
@@ -54,6 +67,12 @@ Android SDK、Gradle 和依赖可用时，可在本目录执行 Kotlin 编译或
 ```
 
 诊断只输出 `radishlex.android_keystore.diagnostics` 前缀的非敏感字段，并在 `finally` 中删除合成诊断 key。记录结果时使用 `docs/device-matrix-template.md` 派生一次性记录。
+
+如果 Android Studio bundled JBR 不在全局 `PATH`，按本机实际安装路径设置 `JAVA_HOME`。例如 macOS 用户级 Android Studio 常见路径：
+
+```text
+JAVA_HOME=~/Applications/Android Studio.app/Contents/jbr/Contents/Home
+```
 
 ## 后续验证
 
