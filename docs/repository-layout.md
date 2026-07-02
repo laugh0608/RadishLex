@@ -93,7 +93,7 @@ RadishLex/
 - `deploy/sync-server/docker-compose.yaml`：Go sync server 部署态入口，只暴露 HTTP 上游 `http://127.0.0.1:7319`，外部反代负责 TLS。
 - `deploy/sync-server/.env.example`：唯一 env 示例，真实部署复制为 `.env` 后修改。
 - `deploy/sync-server/nginx.prod.conf`：生产外部 Nginx TLS 终止示例。
-- `platforms/android-ime/keystore-bridge/`：Android Keystore bridge 仓库内 Kotlin / Gradle harness，固定 `android-keystore-v1` 的 `AndroidKeyStore` / `Ed25519` 创建、加载、公钥读取、签名、删除、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke / 设备矩阵记录模板和 Pixel 9 Pro API 35 AVD 失败记录；Rust raw JNI glue 位于 `crates/ime-crypto`，该目录当前不包含完整 Android IME。
+- `platforms/android-ime/keystore-bridge/`：Android Keystore bridge 仓库内 Kotlin / Gradle harness，固定 `android-keystore-v1` 的 `AndroidKeyStore` / `Ed25519` 创建、加载、公钥读取、签名、删除、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke / 设备矩阵记录模板，以及 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 失败记录；Rust raw JNI glue 位于 `crates/ime-crypto`，该目录当前不包含完整 Android IME。
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
 - `crates/ime-cli/`：基于 demo adapter、可选 Rime adapter、userdb 和 ranker 的命令行复验入口。
 - `crates/ime-engine-rime/`：Rime adapter crate，默认不启用 native 绑定。
@@ -193,7 +193,7 @@ librime adapter：
 - blob 加密。
 - 签名和校验。
 
-当前已创建 `crates/ime-crypto/`，落地 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、Argon2id recovery KDF、key role、object envelope、AAD、nonce、device key descriptor、device wrapping key / record、recovery material、Ed25519 设备签名、test-memory signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断、feature-gated macOS Keychain backend、feature-gated Android Keystore 不可用门禁、Rust bridge wrapper 和 bridge contract、signed sync object manifest、signed recovery record、删除同步和篡改失败测试；生产恢复流程和平台私钥存储 backend 边界已由文档固定，`apple-keychain-v1` 真实 smoke 阻塞于 `ed25519-v1` 创建，status 在 blocker 解除前阻断生产签名，`android-keystore-v1` 已补 runbook、feature、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin bridge source、Gradle harness、`@JvmStatic` facade、gated instrumented smoke 和 smoke 记录模板，已补 Rust raw JNI glue，Android target build 已通过 `./scripts/check-android-target.sh`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke，结果为 `unsupported_signature_algorithm`，不解除生产签名门禁。
+当前已创建 `crates/ime-crypto/`，落地 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、Argon2id recovery KDF、key role、object envelope、AAD、nonce、device key descriptor、device wrapping key / record、recovery material、Ed25519 设备签名、test-memory signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断、feature-gated macOS Keychain backend、feature-gated Android Keystore 不可用门禁、Rust bridge wrapper 和 bridge contract、signed sync object manifest、signed recovery record、删除同步和篡改失败测试；生产恢复流程和平台私钥存储 backend 边界已由文档固定，`apple-keychain-v1` 真实 smoke 阻塞于 `ed25519-v1` 创建，status 在 blocker 解除前阻断生产签名，`android-keystore-v1` 已补 runbook、feature、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin bridge source、Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，已补 Rust raw JNI glue，Android target build 已通过 `./scripts/check-android-target.sh`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
 
 ### ime-ffi
 

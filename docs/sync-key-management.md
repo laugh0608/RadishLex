@@ -32,7 +32,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进平台壳、Flutter manager 或真实设备配对 UI。
 
-进入用户可用同步前，应按生产部署 runbook 补目标部署运行证据；Apple 原生非导出 Ed25519 支持矩阵应单独调查，Android Keystore 已补仓库内 Kotlin / Gradle harness、`@JvmStatic` facade、Rust raw JNI glue、gated instrumented smoke 和 smoke 记录模板，且 Android target build 已通过；后续仍应按真实 API / 设备矩阵继续调查 Android Keystore Ed25519 支持。access token 已有首个 server / transport 证据，但可用平台私钥 backend 停止线解除前，不应开放用户可用同步主线。
+进入用户可用同步前，应按生产部署 runbook 补目标部署运行证据；Apple 原生非导出 Ed25519 支持矩阵应单独调查，Android Keystore 已补仓库内 Kotlin / Gradle harness、`@JvmStatic` facade、Rust raw JNI glue、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，且 Android target build 已通过；当前 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 均未证明 AndroidKeyStore 可提供非导出 Ed25519 signing key，后续仍应按真实 API / 设备矩阵继续调查 Android Keystore Ed25519 支持。access token 已有首个 server / transport 证据，但可用平台私钥 backend 停止线解除前，不应开放用户可用同步主线。
 
 ## 设计目标
 
@@ -265,7 +265,7 @@ updated_at_ms
 9. 已补 `docs/adr/0003-device-signing-key-storage.md`，固定设备签名、签名对象、canonical bytes、私钥存储抽象、错误语义和验证口径。
 10. 已按 ADR 落地签名 / 设备密钥存储 Rust 模型，当前使用合成 `test-memory-v1` key store，并补 platform backend capability metadata、unavailable backend 明确失败和 revoked key 阻断测试。
 11. 已补 `apple-keychain-v1` 平台 runbook 和 Apple 签名策略 ADR，固定 Apple Keychain 创建、加载、签名、删除、锁屏 / 权限、备份迁移、日志脱敏和策略停止线；macOS backend 已在 `apple-keychain` feature 下接线，默认测试不访问系统 Keychain，真实 smoke 已运行但阻塞于 `ed25519-v1` 创建，backend status 已阻断生产签名。
-12. 已补 `android-keystore-v1` 平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、raw JNI glue、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin bridge source、Gradle harness、`@JvmStatic` facade、gated instrumented smoke 和 smoke 记录模板，固定 Android Keystore Ed25519 创建 / 加载 / 签名 / 删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke，结果为 `unsupported_signature_algorithm`，不解除生产签名门禁。
+12. 已补 `android-keystore-v1` 平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、raw JNI glue、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin bridge source、Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，固定 Android Keystore Ed25519 创建 / 加载 / 签名 / 删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
 13. 已补真实 userdb P2 payload 解析到 merge input 的接线。
 14. 已补客户端合并结果写回真实 userdb 的执行器。
 15. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
