@@ -8,7 +8,8 @@
 - Android Keystore 的目标优势是让 key material 不进入 app 进程，并在设备支持时绑定到 TEE / Secure Element；硬件支持与可用算法组合必须通过设备实测确认。
 - RadishLex Phase 3 设备签名协议仍是 `ed25519-v1`；`android-keystore-v1` 进入实现前必须证明 Android Keystore provider 能创建、加载并使用非导出 Ed25519 signing key，或明确记录 `unsupported_signature_algorithm`。
 - `ime-crypto` 已有 `android-keystore` feature、`AndroidKeystoreDeviceKeyStore`、capability metadata、生产签名门禁、ignored smoke 入口和 Rust 侧 bridge 包装层；默认 bridge 仍保持不可用，不访问 Android Keystore。
-- 当前 Rust 单元测试只使用合成 bridge 复验 `create -> load public key -> sign -> verify -> delete / revoke` 的模型语义、错误语义和 Debug 脱敏，不代表 Kotlin / JNI 或真实 Android Keystore 已可用。
+- `platforms/android-ime/keystore-bridge` 已补仓库内 Kotlin bridge source，固定 `AndroidKeyStore` / `Ed25519` 的创建、加载、公钥读取、签名、删除和错误码映射；当前仍未接 Gradle / JNI / instrumented smoke，不代表真实 Android Keystore 已可用。
+- 当前 Rust 单元测试只使用合成 bridge 复验 `create -> load public key -> sign -> verify -> delete / revoke` 的模型语义、错误语义和 Debug 脱敏，不代表 Kotlin bridge 已接入 Rust 生产路径。
 - 当前不引入 P-256，不改变 Go / Rust Ed25519 verifier，不把 seed 作为普通 secret 存入 Keystore / SharedPreferences 后取回 Rust 签名。
 - `android-keystore-v1` 未完成创建、加载、签名、删除、锁屏 / 权限、备份迁移和日志脱敏验证前，不得声明生产可用。
 - Android IME 输入热路径不调用同步签名；同步签名只允许由管理 / sync client 层在明确后台同步或用户操作中触发。
@@ -44,7 +45,7 @@ android-keystore-v1
 - 不把 Keystore alias 设计成用户可读设备名、账号、本机路径或输入内容。
 - 不把 Ed25519 seed 存入普通 app storage、SharedPreferences、SQLite、文件或可导出的 backup。
 - 不在 `android-keystore-v1` 内静默降级到 `test-memory-v1`、软件 seed 或其他签名算法。
-- 当前 feature-gated Rust store 只保留平台 bridge 插入点，不实现 Kotlin / JNI bridge，不创建 Android Keystore item，也不声明 `available = true`。
+- 当前 feature-gated Rust store 只保留平台 bridge 插入点；Kotlin source 只作为后续 JNI / instrumented smoke 的接线准备，不创建 Android Keystore item，也不声明 `available = true`。
 
 ## 建议桥接边界
 
@@ -84,6 +85,8 @@ Rust bridge wrapper 当前状态：
 - Kotlin / JNI 层只允许返回固定 error code：`storage_backend_unavailable`、`unsupported_signature_algorithm`、`unsupported_storage_backend`、`private_key_unavailable`、`private_key_locked`、`private_key_access_denied`、`private_key_user_presence_required`、`private_key_corrupted`。错误消息和日志不应包含 alias、canonical bytes、signature bytes、KeyInfo dump 或 provider exception 原文中的敏感字段。
 - 合成 bridge 只存在于 `ime-crypto` 单元测试，用来验证 Rust 模型语义；生产代码不得把合成 bridge、`test-memory-v1` 或软件 seed 作为 `android-keystore-v1` fallback。
 - Kotlin / JNI 接线完成前，`backend_status()` 必须继续返回 `available = false`、`can_create_signing_keys = false`、`can_sign = false`。
+- 当前 Kotlin source 位于 `platforms/android-ime/keystore-bridge/src/main/kotlin/org/radishlex/android/keystore/RadishLexAndroidKeystoreBridge.kt`，只保留平台调用实现和脱敏 DTO；它不包含 JNI glue、Gradle 工程或真实设备测试入口。
+- Kotlin source 从 Android `PublicKey.encoded` 的 X.509 SubjectPublicKeyInfo 中提取 32-byte raw Ed25519 public key，再交给 Rust contract；格式不匹配时返回 `private_key_corrupted`，不得上传到 Go server 验签路径。
 
 Kotlin / JNI bridge contract：
 
@@ -260,6 +263,7 @@ Android 验证矩阵：
 
 - 不访问 Android Keystore。
 - 验证 `android-keystore-v1` backend id、capability metadata、status 门禁、Debug 脱敏、Rust bridge wrapper、bridge contract request / error code / response 校验、合成 bridge 创建 / 签名 / 删除语义、`android-keystore` feature 编译和 ignored smoke 入口。
+- 当前 Kotlin source 未纳入 Gradle / Android 编译门禁；默认仓库检查只能覆盖文本卫生和 Rust contract 测试。
 
 Android gated smoke：
 
