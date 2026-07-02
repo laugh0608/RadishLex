@@ -416,9 +416,11 @@ trait AndroidKeystoreBridge: fmt::Debug + Send + Sync {
     fn delete_signing_key(&self, signing_key_id: &str, alias: &str) -> Result<(), CryptoError>;
 }
 
+#[cfg(not(target_os = "android"))]
 #[derive(Debug)]
 struct UnavailableAndroidKeystoreBridge;
 
+#[cfg(not(target_os = "android"))]
 impl AndroidKeystoreBridge for UnavailableAndroidKeystoreBridge {
     fn backend_status(&self) -> DevicePrivateKeyStoreStatus {
         DevicePrivateKeyStoreStatus::android_keystore_v1()

@@ -300,7 +300,7 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 
 ## 停止线
 
-- 平台私钥存储真实 smoke、权限错误和备份迁移语义未通过平台验证前，不提供用户可用恢复 UI；当前 `apple-keychain-v1` 已完成 runbook、Apple 签名策略 ADR、feature-gated macOS backend 接线和非 smoke 测试，但真实 smoke 阻塞于 `ed25519-v1` 创建，backend status 已阻断生产签名，不代表可用后端；`android-keystore-v1` 已完成 runbook、feature-gated Rust store、Rust bridge wrapper、bridge contract、合成 bridge 单测、ignored smoke 门禁、仓库内 Kotlin / Gradle harness、`@JvmStatic` facade 和 gated instrumented smoke，已补 Rust raw JNI glue，但尚未运行 Android target build、Android Gradle build 或真实 Android Keystore smoke。
+- 平台私钥存储真实 smoke、权限错误和备份迁移语义未通过平台验证前，不提供用户可用恢复 UI；当前 `apple-keychain-v1` 已完成 runbook、Apple 签名策略 ADR、feature-gated macOS backend 接线和非 smoke 测试，但真实 smoke 阻塞于 `ed25519-v1` 创建，backend status 已阻断生产签名，不代表可用后端；`android-keystore-v1` 已完成 runbook、feature-gated Rust store、Rust bridge wrapper、bridge contract、合成 bridge 单测、ignored smoke 门禁、仓库内 Kotlin / Gradle harness、`@JvmStatic` facade 和 gated instrumented smoke，已补 Rust raw JNI glue，Android target build 已通过 `./scripts/check-android-target.sh`，Pixel 9 Pro API 35 AVD 真实 smoke 结果为 `unsupported_signature_algorithm`。
 - Go server 恢复记录 API 若未持续覆盖 wrapped material 读取、签名、状态、限速和日志脱敏，不接真实恢复客户端。
 - 恢复码、同步主密钥或设备私钥可能进入服务端日志、错误响应、崩溃报告或截图时，必须停止并修正设计。
 - 恢复流程不能绕过设备撤销、key epoch 或客户端合并语义。

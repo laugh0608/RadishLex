@@ -6,7 +6,7 @@
 
 - 当前只落地 `keystore-bridge/` 仓库内接线准备和 Android instrumented smoke harness。
 - 该目录只服务于 `android-keystore-v1` 设备签名 backend。
-- 当前没有完整 Android app、IME service、Flutter manager 或 Android target build 记录；Rust raw JNI glue 已在 `crates/ime-crypto` 接到 Kotlin facade。
+- 当前没有完整 Android app、IME service 或 Flutter manager；Rust raw JNI glue 已在 `crates/ime-crypto` 接到 Kotlin facade，并已通过 `./scripts/check-android-target.sh` 完成 `aarch64-linux-android` target build。
 - 2026-07-02 已在 Pixel 9 Pro API 35 AVD 上执行 gated smoke；`AndroidKeyStore` 返回 `EC` 公钥，bridge 结果为 `unsupported_signature_algorithm`，不声明 `android-keystore-v1` 可生产签名。
 - 默认开发、仓库检查和 Android Gradle 编译不创建真实 Android Keystore key；只有显式传入 `radishlex.runAndroidKeystoreSmoke=true` 的 gated smoke 才允许触碰测试设备 Keystore。
 

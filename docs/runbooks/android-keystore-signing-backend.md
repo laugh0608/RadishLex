@@ -8,8 +8,8 @@
 - Android Keystore 的目标优势是让 key material 不进入 app 进程，并在设备支持时绑定到 TEE / Secure Element；硬件支持与可用算法组合必须通过设备实测确认。
 - RadishLex Phase 3 设备签名协议仍是 `ed25519-v1`；`android-keystore-v1` 进入实现前必须证明 Android Keystore provider 能创建、加载并使用非导出 Ed25519 signing key，或明确记录 `unsupported_signature_algorithm`。
 - `ime-crypto` 已有 `android-keystore` feature、`AndroidKeystoreDeviceKeyStore`、capability metadata、生产签名门禁、ignored smoke 入口、Rust 侧 bridge 包装层和 raw JNI glue；非 Android host 默认 bridge 仍保持不可用，不访问 Android Keystore。
-- `platforms/android-ime/keystore-bridge` 已补仓库内 Kotlin bridge source、独立 Android Gradle library harness、JVM/JNI-callable Kotlin facade、gated instrumented smoke 和 smoke 记录模板，固定 `AndroidKeyStore` / `Ed25519` 的创建、加载、公钥读取、签名、删除和错误码映射；当前已补 Rust raw JNI glue；本机未安装 Android Rust target，尚未运行 Android target build；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke，结果为 `unsupported_signature_algorithm`，不代表真实 Android Keystore 已可用。
-- 当前 Rust 单元测试只使用合成 bridge 复验 `create -> load public key -> sign -> verify -> delete / revoke` 的模型语义、错误语义和 Debug 脱敏；raw JNI glue 已能按 contract 调用 Kotlin facade，但尚未通过 Android target build 验证。
+- `platforms/android-ime/keystore-bridge` 已补仓库内 Kotlin bridge source、独立 Android Gradle library harness、JVM/JNI-callable Kotlin facade、gated instrumented smoke 和 smoke 记录模板，固定 `AndroidKeyStore` / `Ed25519` 的创建、加载、公钥读取、签名、删除和错误码映射；当前已补 Rust raw JNI glue，并已通过 `./scripts/check-android-target.sh` 复验 `aarch64-linux-android` target build；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke，结果为 `unsupported_signature_algorithm`，不代表真实 Android Keystore 已可用。
+- 当前 Rust 单元测试只使用合成 bridge 复验 `create -> load public key -> sign -> verify -> delete / revoke` 的模型语义、错误语义和 Debug 脱敏；raw JNI glue 已能按 contract 调用 Kotlin facade，并已具备 Android target 编译证据。
 - 当前不引入 P-256，不改变 Go / Rust Ed25519 verifier，不把 seed 作为普通 secret 存入 Keystore / SharedPreferences 后取回 Rust 签名。
 - `android-keystore-v1` 未完成创建、加载、签名、删除、锁屏 / 权限、备份迁移和日志脱敏验证前，不得声明生产可用。
 - Android IME 输入热路径不调用同步签名；同步签名只允许由管理 / sync client 层在明确后台同步或用户操作中触发。
@@ -84,7 +84,7 @@ Rust bridge wrapper 当前状态：
 - Kotlin / JNI 层返回的 public key 必须是 32-byte Ed25519 public key，signature 必须是 64-byte Ed25519 signature；provider 返回非 Ed25519 public key 时映射为 `unsupported_signature_algorithm`，声称是 Ed25519 但长度或格式不符时映射为 `private_key_corrupted`，不得继续进入 Go server 验签路径。
 - Kotlin / JNI 层只允许返回固定 error code：`storage_backend_unavailable`、`unsupported_signature_algorithm`、`unsupported_storage_backend`、`private_key_unavailable`、`private_key_locked`、`private_key_access_denied`、`private_key_user_presence_required`、`private_key_corrupted`。错误消息和日志不应包含 alias、canonical bytes、signature bytes、KeyInfo dump 或 provider exception 原文中的敏感字段。
 - 合成 bridge 只存在于 `ime-crypto` 单元测试，用来验证 Rust 模型语义；生产代码不得把合成 bridge、`test-memory-v1` 或软件 seed 作为 `android-keystore-v1` fallback。
-- 在 Android target build、Gradle build 和真实设备 smoke 通过前，`backend_status()` 必须继续返回 `available = false`、`can_create_signing_keys = false`、`can_sign = false`。
+- 在真实设备 / API / provider 矩阵证明 Android Keystore 能创建、加载并使用非导出 Ed25519 signing key 前，`backend_status()` 必须继续返回 `available = false`、`can_create_signing_keys = false`、`can_sign = false`。
 - 当前 Kotlin source 位于 `platforms/android-ime/keystore-bridge/src/main/kotlin/org/radishlex/android/keystore/RadishLexAndroidKeystoreBridge.kt`，只保留平台调用实现和脱敏 DTO。
 - `RadishLexAndroidKeystoreJniBridge` 提供 `@JvmStatic` facade，固定 Rust raw JNI glue 可调用的参数形状。
 - `ime-crypto` raw JNI glue 通过 `JNI_OnLoad` 记录 `JavaVM`，按需 attach 当前线程，调用 Kotlin static facade，读取 `getPublicKey()` / `getSignature()` / `getErrorCode()`，清理 Java exception，并只把固定 bridge error code 映射为 Rust `CryptoError`；未知 error code 按 `private_key_corrupted` 处理，不把 provider exception 原文、完整 alias、canonical bytes 或 signature bytes 带回 Rust 错误对象。
@@ -267,6 +267,20 @@ Android 验证矩阵：
 - 不访问 Android Keystore。
 - 验证 `android-keystore-v1` backend id、capability metadata、status 门禁、Debug 脱敏、Rust bridge wrapper、bridge contract request / error code / response 校验、raw JNI glue contract、合成 bridge 创建 / 签名 / 删除语义、`android-keystore` feature 编译和 ignored smoke 入口。
 - 当前 Kotlin / Gradle harness 已入仓，但默认仓库检查仍不执行 Android Gradle、instrumented test、模拟器或真实设备 smoke；默认只覆盖文本卫生、文档预算和 Rust contract 测试。
+
+Android Rust target build：
+
+```text
+./scripts/check-android-target.sh
+```
+
+该命令发现 Android SDK side-by-side NDK、选择对应 host prebuilt clang、确认 `aarch64-linux-android` Rust target 已安装，并执行：
+
+```text
+cargo check -p radishlex-ime-crypto --features android-keystore --target aarch64-linux-android
+```
+
+该命令不创建 Android Keystore item，不启动模拟器，不运行 instrumented smoke。缺少 Rust target 时会提示先执行 `rustup target add aarch64-linux-android`；该安装会修改全局 Rust toolchain，执行前需要开发者明确批准。
 
 Android Gradle 编译：
 

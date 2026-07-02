@@ -10,6 +10,7 @@
 - `src/androidTest/kotlin/org/radishlex/android/keystore/RadishLexAndroidKeystoreBridgeInstrumentedTest.kt`
 - `docs/smoke-record-template.md`
 - `docs/smoke-record-2026-07-02-avd-api35.md`：Pixel 9 Pro API 35 AVD 真实 smoke 记录，结果为 `unsupported_signature_algorithm`。
+- `docs/android-target-build-record-2026-07-02.md`：Android Rust target build 记录，确认 `ime-crypto` Android Keystore bridge wrapper / raw JNI glue 可面向 `aarch64-linux-android` 编译。
 - Kotlin contract 常量与 `ime-crypto` 的 `android-keystore` feature 保持一致：
   - `contract_version = 1`
   - `provider = AndroidKeyStore`
@@ -20,7 +21,7 @@
 ## 停止线
 
 - 当前 Gradle harness 不代表完整 Android app 或 IME service。
-- Rust raw JNI glue 已接到 Kotlin facade，但真实 Android target build 和设备矩阵通过前，Rust `AndroidKeystoreDeviceKeyStore::backend_status()` 仍应阻断 production signing。
+- Rust raw JNI glue 已接到 Kotlin facade，并已通过 Android target build；在设备矩阵证明 Android Keystore 可用前，Rust `AndroidKeystoreDeviceKeyStore::backend_status()` 仍应阻断 production signing。
 - Pixel 9 Pro API 35 AVD 的真实 smoke 已执行但未通过，`AndroidKeyStore` 返回 `EC` public key；不得解除 `android-keystore-v1` 生产签名门禁。
 - 如果 `Ed25519` + `AndroidKeyStore` 无法创建、加载或签名，应返回 `unsupported_signature_algorithm` 或 `unsupported_storage_backend`，不得降级。
 
@@ -30,6 +31,7 @@
 
 ```text
 cargo test -p radishlex-ime-crypto --features android-keystore
+./scripts/check-android-target.sh
 ./scripts/check-repo.sh
 ```
 

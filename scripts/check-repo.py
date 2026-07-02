@@ -43,6 +43,8 @@ REQUIRED_FILES = [
     "docs/repository-layout.md",
     "docs/roadmap.md",
     "docs/technical-plan.md",
+    "scripts/check-android-target.py",
+    "scripts/check-android-target.sh",
     "scripts/check-docs.py",
     "scripts/check-docs.sh",
     "scripts/check-repo.py",

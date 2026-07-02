@@ -276,7 +276,7 @@ object_payload(domain_id, object_id, version)
 
 - `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
 - 生产恢复 UI / API、远端密钥轮换执行器、备份快照 payload 字段序列化和用户可用同步设置。
-- 真实平台私钥存储 backend 的生产可用状态；当前 `apple-keychain-v1` 已 feature-gated 接线，但真实 smoke 阻塞于 `ed25519-v1` 创建，不能作为可用生产 backend；`android-keystore-v1` 已补 runbook、feature-gated Rust store、Rust bridge wrapper、bridge contract、合成 bridge 单测、ignored smoke 门禁、仓库内 Kotlin / Gradle harness、`@JvmStatic` facade、gated instrumented smoke 和 smoke 记录模板，已补 Rust raw JNI glue，但尚未运行 Android target build、Android Gradle build 或真实 Android Keystore smoke。
+- 真实平台私钥存储 backend 的生产可用状态；当前 `apple-keychain-v1` 已 feature-gated 接线，但真实 smoke 阻塞于 `ed25519-v1` 创建，不能作为可用生产 backend；`android-keystore-v1` 已补 runbook、feature-gated Rust store、Rust bridge wrapper、bridge contract、合成 bridge 单测、ignored smoke 门禁、仓库内 Kotlin / Gradle harness、`@JvmStatic` facade、gated instrumented smoke 和 smoke 记录模板，已补 Rust raw JNI glue，Android target build 已通过 `./scripts/check-android-target.sh`，Pixel 9 Pro API 35 AVD 真实 smoke 结果为 `unsupported_signature_algorithm`。
 
 ## 验证口径
 
