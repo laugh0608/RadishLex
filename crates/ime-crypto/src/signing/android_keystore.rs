@@ -10,10 +10,34 @@ use super::{
     ED25519_SIGNATURE_LEN, SIGNATURE_ALGORITHM_ED25519_V1,
 };
 
+mod jni_bridge;
+
 pub const ANDROID_KEYSTORE_BRIDGE_CONTRACT_VERSION: u16 = 1;
 pub const ANDROID_KEYSTORE_PROVIDER: &str = "AndroidKeyStore";
 pub const ANDROID_KEYSTORE_SIGNATURE_ALGORITHM: &str = "Ed25519";
 pub const DEFAULT_ANDROID_KEYSTORE_ALIAS_PREFIX: &str = "org.radishlex.sync.signing";
+
+pub const ANDROID_KEYSTORE_JNI_BRIDGE_CLASS: &str =
+    "org/radishlex/android/keystore/RadishLexAndroidKeystoreJniBridge";
+pub const ANDROID_KEYSTORE_JNI_RESULT_CLASS: &str =
+    "org/radishlex/android/keystore/RadishLexAndroidKeystoreBridgeResult";
+pub const ANDROID_KEYSTORE_JNI_CREATE_SIGNING_KEY_METHOD: &str = "createSigningKey";
+pub const ANDROID_KEYSTORE_JNI_LOAD_PUBLIC_KEY_METHOD: &str = "loadPublicKey";
+pub const ANDROID_KEYSTORE_JNI_SIGN_METHOD: &str = "sign";
+pub const ANDROID_KEYSTORE_JNI_DELETE_SIGNING_KEY_METHOD: &str = "deleteSigningKey";
+pub const ANDROID_KEYSTORE_JNI_KEY_METHOD_DESCRIPTOR: &str = concat!(
+    "(ILjava/lang/String;Ljava/lang/String;)L",
+    "org/radishlex/android/keystore/RadishLexAndroidKeystoreBridgeResult;"
+);
+pub const ANDROID_KEYSTORE_JNI_SIGN_METHOD_DESCRIPTOR: &str = concat!(
+    "(ILjava/lang/String;Ljava/lang/String;[B)L",
+    "org/radishlex/android/keystore/RadishLexAndroidKeystoreBridgeResult;"
+);
+pub const ANDROID_KEYSTORE_JNI_GET_PUBLIC_KEY_METHOD: &str = "getPublicKey";
+pub const ANDROID_KEYSTORE_JNI_GET_SIGNATURE_METHOD: &str = "getSignature";
+pub const ANDROID_KEYSTORE_JNI_GET_ERROR_CODE_METHOD: &str = "getErrorCode";
+pub const ANDROID_KEYSTORE_JNI_BYTE_ARRAY_METHOD_DESCRIPTOR: &str = "()[B";
+pub const ANDROID_KEYSTORE_JNI_ERROR_CODE_METHOD_DESCRIPTOR: &str = "()Ljava/lang/String;";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AndroidKeystoreBridgeOperation {
@@ -224,16 +248,13 @@ impl AndroidKeystoreDeviceKeyStore {
     pub fn new() -> Self {
         Self::with_bridge(
             DEFAULT_ANDROID_KEYSTORE_ALIAS_PREFIX.to_owned(),
-            Arc::new(UnavailableAndroidKeystoreBridge),
+            default_android_keystore_bridge(),
         )
         .expect("default Android Keystore alias prefix is valid")
     }
 
     pub fn with_alias_prefix(alias_prefix: impl Into<String>) -> Result<Self, CryptoError> {
-        Self::with_bridge(
-            alias_prefix.into(),
-            Arc::new(UnavailableAndroidKeystoreBridge),
-        )
+        Self::with_bridge(alias_prefix.into(), default_android_keystore_bridge())
     }
 
     fn with_bridge(
@@ -478,6 +499,49 @@ fn android_keystore_unavailable() -> CryptoError {
     }
 }
 
+fn default_android_keystore_bridge() -> Arc<dyn AndroidKeystoreBridge> {
+    #[cfg(target_os = "android")]
+    {
+        Arc::new(jni_bridge::JniAndroidKeystoreBridge::new())
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        Arc::new(UnavailableAndroidKeystoreBridge)
+    }
+}
+
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct AndroidKeystoreJniMethodSpec {
+    name: &'static str,
+    descriptor: &'static str,
+}
+
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+fn android_keystore_jni_method_spec(
+    operation: AndroidKeystoreBridgeOperation,
+) -> AndroidKeystoreJniMethodSpec {
+    match operation {
+        AndroidKeystoreBridgeOperation::CreateSigningKey => AndroidKeystoreJniMethodSpec {
+            name: ANDROID_KEYSTORE_JNI_CREATE_SIGNING_KEY_METHOD,
+            descriptor: ANDROID_KEYSTORE_JNI_KEY_METHOD_DESCRIPTOR,
+        },
+        AndroidKeystoreBridgeOperation::LoadPublicKey => AndroidKeystoreJniMethodSpec {
+            name: ANDROID_KEYSTORE_JNI_LOAD_PUBLIC_KEY_METHOD,
+            descriptor: ANDROID_KEYSTORE_JNI_KEY_METHOD_DESCRIPTOR,
+        },
+        AndroidKeystoreBridgeOperation::Sign => AndroidKeystoreJniMethodSpec {
+            name: ANDROID_KEYSTORE_JNI_SIGN_METHOD,
+            descriptor: ANDROID_KEYSTORE_JNI_SIGN_METHOD_DESCRIPTOR,
+        },
+        AndroidKeystoreBridgeOperation::DeleteSigningKey => AndroidKeystoreJniMethodSpec {
+            name: ANDROID_KEYSTORE_JNI_DELETE_SIGNING_KEY_METHOD,
+            descriptor: ANDROID_KEYSTORE_JNI_KEY_METHOD_DESCRIPTOR,
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -711,6 +775,62 @@ mod tests {
                 .expect("signature")
                 .len(),
             ED25519_SIGNATURE_LEN
+        );
+    }
+
+    #[test]
+    fn jni_contract_matches_kotlin_facade_names_and_descriptors() {
+        assert_eq!(
+            ANDROID_KEYSTORE_JNI_BRIDGE_CLASS,
+            "org/radishlex/android/keystore/RadishLexAndroidKeystoreJniBridge"
+        );
+        assert_eq!(
+            ANDROID_KEYSTORE_JNI_RESULT_CLASS,
+            "org/radishlex/android/keystore/RadishLexAndroidKeystoreBridgeResult"
+        );
+        assert_eq!(
+            android_keystore_jni_method_spec(AndroidKeystoreBridgeOperation::CreateSigningKey),
+            AndroidKeystoreJniMethodSpec {
+                name: "createSigningKey",
+                descriptor: ANDROID_KEYSTORE_JNI_KEY_METHOD_DESCRIPTOR,
+            }
+        );
+        assert_eq!(
+            android_keystore_jni_method_spec(AndroidKeystoreBridgeOperation::LoadPublicKey),
+            AndroidKeystoreJniMethodSpec {
+                name: "loadPublicKey",
+                descriptor: ANDROID_KEYSTORE_JNI_KEY_METHOD_DESCRIPTOR,
+            }
+        );
+        assert_eq!(
+            android_keystore_jni_method_spec(AndroidKeystoreBridgeOperation::Sign),
+            AndroidKeystoreJniMethodSpec {
+                name: "sign",
+                descriptor: ANDROID_KEYSTORE_JNI_SIGN_METHOD_DESCRIPTOR,
+            }
+        );
+        assert_eq!(
+            android_keystore_jni_method_spec(AndroidKeystoreBridgeOperation::DeleteSigningKey),
+            AndroidKeystoreJniMethodSpec {
+                name: "deleteSigningKey",
+                descriptor: ANDROID_KEYSTORE_JNI_KEY_METHOD_DESCRIPTOR,
+            }
+        );
+        assert_eq!(
+            ANDROID_KEYSTORE_JNI_KEY_METHOD_DESCRIPTOR,
+            "(ILjava/lang/String;Ljava/lang/String;)Lorg/radishlex/android/keystore/RadishLexAndroidKeystoreBridgeResult;"
+        );
+        assert_eq!(
+            ANDROID_KEYSTORE_JNI_SIGN_METHOD_DESCRIPTOR,
+            "(ILjava/lang/String;Ljava/lang/String;[B)Lorg/radishlex/android/keystore/RadishLexAndroidKeystoreBridgeResult;"
+        );
+        assert_eq!(ANDROID_KEYSTORE_JNI_GET_PUBLIC_KEY_METHOD, "getPublicKey");
+        assert_eq!(ANDROID_KEYSTORE_JNI_GET_SIGNATURE_METHOD, "getSignature");
+        assert_eq!(ANDROID_KEYSTORE_JNI_GET_ERROR_CODE_METHOD, "getErrorCode");
+        assert_eq!(ANDROID_KEYSTORE_JNI_BYTE_ARRAY_METHOD_DESCRIPTOR, "()[B");
+        assert_eq!(
+            ANDROID_KEYSTORE_JNI_ERROR_CODE_METHOD_DESCRIPTOR,
+            "()Ljava/lang/String;"
         );
     }
 

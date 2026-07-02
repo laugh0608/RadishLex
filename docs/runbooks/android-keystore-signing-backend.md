@@ -7,9 +7,9 @@
 - `android-keystore-v1` 是 Apple Keychain 阻塞后优先补验证边界的下一类平台 backend。
 - Android Keystore 的目标优势是让 key material 不进入 app 进程，并在设备支持时绑定到 TEE / Secure Element；硬件支持与可用算法组合必须通过设备实测确认。
 - RadishLex Phase 3 设备签名协议仍是 `ed25519-v1`；`android-keystore-v1` 进入实现前必须证明 Android Keystore provider 能创建、加载并使用非导出 Ed25519 signing key，或明确记录 `unsupported_signature_algorithm`。
-- `ime-crypto` 已有 `android-keystore` feature、`AndroidKeystoreDeviceKeyStore`、capability metadata、生产签名门禁、ignored smoke 入口和 Rust 侧 bridge 包装层；默认 bridge 仍保持不可用，不访问 Android Keystore。
-- `platforms/android-ime/keystore-bridge` 已补仓库内 Kotlin bridge source、独立 Android Gradle library harness、JVM/JNI-callable Kotlin facade、gated instrumented smoke 和 smoke 记录模板，固定 `AndroidKeyStore` / `Ed25519` 的创建、加载、公钥读取、签名、删除和错误码映射；当前仍未接 Rust native JNI，也未运行真实 Android Keystore smoke，不代表真实 Android Keystore 已可用。
-- 当前 Rust 单元测试只使用合成 bridge 复验 `create -> load public key -> sign -> verify -> delete / revoke` 的模型语义、错误语义和 Debug 脱敏，不代表 Kotlin bridge 已接入 Rust 生产路径。
+- `ime-crypto` 已有 `android-keystore` feature、`AndroidKeystoreDeviceKeyStore`、capability metadata、生产签名门禁、ignored smoke 入口、Rust 侧 bridge 包装层和 raw JNI glue；非 Android host 默认 bridge 仍保持不可用，不访问 Android Keystore。
+- `platforms/android-ime/keystore-bridge` 已补仓库内 Kotlin bridge source、独立 Android Gradle library harness、JVM/JNI-callable Kotlin facade、gated instrumented smoke 和 smoke 记录模板，固定 `AndroidKeyStore` / `Ed25519` 的创建、加载、公钥读取、签名、删除和错误码映射；当前已补 Rust raw JNI glue；本机未安装 Android Rust target，尚未运行 Android target build、Android Gradle build 或真实 Android Keystore smoke，不代表真实 Android Keystore 已可用。
+- 当前 Rust 单元测试只使用合成 bridge 复验 `create -> load public key -> sign -> verify -> delete / revoke` 的模型语义、错误语义和 Debug 脱敏；raw JNI glue 已能按 contract 调用 Kotlin facade，但尚未通过 Android target build、Android Gradle build 或真实设备 smoke 验证。
 - 当前不引入 P-256，不改变 Go / Rust Ed25519 verifier，不把 seed 作为普通 secret 存入 Keystore / SharedPreferences 后取回 Rust 签名。
 - `android-keystore-v1` 未完成创建、加载、签名、删除、锁屏 / 权限、备份迁移和日志脱敏验证前，不得声明生产可用。
 - Android IME 输入热路径不调用同步签名；同步签名只允许由管理 / sync client 层在明确后台同步或用户操作中触发。
@@ -45,7 +45,7 @@ android-keystore-v1
 - 不把 Keystore alias 设计成用户可读设备名、账号、本机路径或输入内容。
 - 不把 Ed25519 seed 存入普通 app storage、SharedPreferences、SQLite、文件或可导出的 backup。
 - 不在 `android-keystore-v1` 内静默降级到 `test-memory-v1`、软件 seed 或其他签名算法。
-- 当前 feature-gated Rust store 只保留平台 bridge 插入点；Kotlin / Gradle harness 只作为后续 Rust native JNI 和真实设备 smoke 的接线准备，默认不创建 Android Keystore item，也不声明 `available = true`。
+- 当前 feature-gated Rust store 只保留平台 bridge 插入点；raw JNI glue、Kotlin / Gradle harness 和 gated smoke 只作为真实设备验证前的接线准备，默认不创建 Android Keystore item，也不声明 `available = true`。
 
 ## 建议桥接边界
 
@@ -78,15 +78,16 @@ backend_status() -> DevicePrivateKeyStoreStatus
 
 Rust bridge wrapper 当前状态：
 
-- `AndroidKeystoreDeviceKeyStore` 内部通过私有 `AndroidKeystoreBridge` trait 调用平台能力，默认实现为 unavailable bridge。
+- `AndroidKeystoreDeviceKeyStore` 内部通过私有 `AndroidKeystoreBridge` trait 调用平台能力；非 Android host 默认实现为 unavailable bridge，Android target 默认实现为 raw JNI bridge。
 - `ime-crypto` 公开 `ANDROID_KEYSTORE_BRIDGE_CONTRACT_VERSION = 1`、`ANDROID_KEYSTORE_PROVIDER = AndroidKeyStore`、`ANDROID_KEYSTORE_SIGNATURE_ALGORITHM = Ed25519`、bridge operation、bridge error code、alias 构造和 public key / signature 校验 helper，作为 Kotlin / JNI 层接线时必须遵守的 Rust contract。
 - bridge 方法同时接收 opaque `signing_key_id` 和内部 `keystore_alias`；错误对象、Debug 和日志只能使用 opaque id 或长度信息，不打印完整 alias、canonical bytes、signature bytes 或 key material。
 - Kotlin / JNI 层返回的 public key 必须是 32-byte Ed25519 public key，signature 必须是 64-byte Ed25519 signature；长度或格式不符时映射为 `private_key_corrupted`，不得继续进入 Go server 验签路径。
 - Kotlin / JNI 层只允许返回固定 error code：`storage_backend_unavailable`、`unsupported_signature_algorithm`、`unsupported_storage_backend`、`private_key_unavailable`、`private_key_locked`、`private_key_access_denied`、`private_key_user_presence_required`、`private_key_corrupted`。错误消息和日志不应包含 alias、canonical bytes、signature bytes、KeyInfo dump 或 provider exception 原文中的敏感字段。
 - 合成 bridge 只存在于 `ime-crypto` 单元测试，用来验证 Rust 模型语义；生产代码不得把合成 bridge、`test-memory-v1` 或软件 seed 作为 `android-keystore-v1` fallback。
-- Kotlin / JNI 接线完成前，`backend_status()` 必须继续返回 `available = false`、`can_create_signing_keys = false`、`can_sign = false`。
+- 在 Android target build、Gradle build 和真实设备 smoke 通过前，`backend_status()` 必须继续返回 `available = false`、`can_create_signing_keys = false`、`can_sign = false`。
 - 当前 Kotlin source 位于 `platforms/android-ime/keystore-bridge/src/main/kotlin/org/radishlex/android/keystore/RadishLexAndroidKeystoreBridge.kt`，只保留平台调用实现和脱敏 DTO。
-- `RadishLexAndroidKeystoreJniBridge` 提供 `@JvmStatic` facade，固定后续 Rust native JNI 可调用的参数形状；它仍未接入 `ime-crypto` 的生产 backend。
+- `RadishLexAndroidKeystoreJniBridge` 提供 `@JvmStatic` facade，固定 Rust raw JNI glue 可调用的参数形状。
+- `ime-crypto` raw JNI glue 通过 `JNI_OnLoad` 记录 `JavaVM`，按需 attach 当前线程，调用 Kotlin static facade，读取 `getPublicKey()` / `getSignature()` / `getErrorCode()`，清理 Java exception，并只把固定 bridge error code 映射为 Rust `CryptoError`；未知 error code 按 `private_key_corrupted` 处理，不把 provider exception 原文、完整 alias、canonical bytes 或 signature bytes 带回 Rust 错误对象。
 - `RadishLexAndroidKeystoreBridgeInstrumentedTest` 提供 gated smoke，只有传入 `-Pradishlex.runAndroidKeystoreSmoke=true` 时才会创建临时 Android Keystore item，并在 `finally` 中删除该 item。
 - Kotlin source 从 Android `PublicKey.encoded` 的 X.509 SubjectPublicKeyInfo 中提取 32-byte raw Ed25519 public key，再交给 Rust contract；格式不匹配时返回 `private_key_corrupted`，不得上传到 Go server 验签路径。
 
@@ -264,7 +265,7 @@ Android 验证矩阵：
 默认 CI：
 
 - 不访问 Android Keystore。
-- 验证 `android-keystore-v1` backend id、capability metadata、status 门禁、Debug 脱敏、Rust bridge wrapper、bridge contract request / error code / response 校验、合成 bridge 创建 / 签名 / 删除语义、`android-keystore` feature 编译和 ignored smoke 入口。
+- 验证 `android-keystore-v1` backend id、capability metadata、status 门禁、Debug 脱敏、Rust bridge wrapper、bridge contract request / error code / response 校验、raw JNI glue contract、合成 bridge 创建 / 签名 / 删除语义、`android-keystore` feature 编译和 ignored smoke 入口。
 - 当前 Kotlin / Gradle harness 已入仓，但默认仓库检查仍不执行 Android Gradle、instrumented test、模拟器或真实设备 smoke；默认只覆盖文本卫生、文档预算和 Rust contract 测试。
 
 Android Gradle 编译：
@@ -291,7 +292,7 @@ Rust host smoke 仍保持：
 cargo test -p radishlex-ime-crypto --features android-keystore --test android_keystore_smoke -- --ignored --nocapture
 ```
 
-当前 Rust ignored smoke 只验证平台桥接完成前不能声明生产可用，不触碰 Android Keystore。
+当前 Rust ignored smoke 在非 Android host 上只验证 production status 继续阻断，不触碰 Android Keystore；在 Android target 上会走 raw JNI bridge 执行 create / load / sign / verify / delete，因此只能在获得明确批准后运行。
 
 设备矩阵至少记录：
 

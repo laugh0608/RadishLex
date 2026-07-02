@@ -1,6 +1,6 @@
 # Android Keystore Bridge
 
-本文档说明 Android Keystore bridge 仓库内代码骨架。读者是后续接 Kotlin / JNI、Android instrumented smoke 和 `ime-crypto` Android backend 的开发者。本文不包含完整 Android app、Rust native JNI glue、设备矩阵结果或系统输入法 UI。
+本文档说明 Android Keystore bridge 仓库内代码骨架。读者是后续接 Android instrumented smoke 和 `ime-crypto` Android backend 的开发者。本文不包含完整 Android app、设备矩阵结果或系统输入法 UI；Rust raw JNI glue 位于 `crates/ime-crypto`。
 
 ## 当前交付
 
@@ -19,7 +19,7 @@
 ## 停止线
 
 - 当前 Gradle harness 不代表完整 Android app 或 IME service。
-- 未接 Rust native JNI 前，Rust `AndroidKeystoreDeviceKeyStore::new()` 仍应保持 unavailable。
+- Rust raw JNI glue 已接到 Kotlin facade，但真实 Android target build、Gradle build 和设备 smoke 通过前，Rust `AndroidKeystoreDeviceKeyStore::backend_status()` 仍应阻断 production signing。
 - 未完成真实 Android API / 设备矩阵 smoke 前，不得解除 `android-keystore-v1` 生产签名门禁。
 - 如果 `Ed25519` + `AndroidKeyStore` 无法创建、加载或签名，应返回 `unsupported_signature_algorithm` 或 `unsupported_storage_backend`，不得降级。
 
@@ -42,9 +42,9 @@ gradle connectedAndroidTest -Pradishlex.runAndroidKeystoreSmoke=true
 
 ## 后续验证
 
-后续进入真实设备 smoke 前，还应补：
+后续进入真实设备 smoke 前，还应补或确认：
 
-- Rust native JNI glue 或等价平台调用层。
+- Android target Rust build 与 Android Gradle build 结果。
 - API level、security patch、provider、设备型号和失败错误码记录。
 - smoke 后清理步骤和日志脱敏检查。
 - 将一次性结果复制到 `docs/smoke-record-template.md` 派生的记录中。

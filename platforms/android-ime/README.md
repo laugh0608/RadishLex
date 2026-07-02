@@ -6,7 +6,7 @@
 
 - 当前只落地 `keystore-bridge/` 仓库内接线准备和 Android instrumented smoke harness。
 - 该目录只服务于 `android-keystore-v1` 设备签名 backend。
-- 当前没有完整 Android app、IME service、Flutter manager 或 Rust native JNI 注册入口。
+- 当前没有完整 Android app、IME service、Flutter manager、Android target build 记录或真实设备 smoke 结果；Rust raw JNI glue 已在 `crates/ime-crypto` 接到 Kotlin facade。
 - 当前不创建真实 Android Keystore key，不启动模拟器，不声明 `android-keystore-v1` 可生产签名。
 
 ## 边界
