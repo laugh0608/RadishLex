@@ -4,7 +4,7 @@
 
 ## 阶段定位
 
-当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查和同步前置检查命令。`ime-sync` 已补 payload 来源分类和加密对象外壳草案，`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、sync preflight 状态入口和 userdb add / delete / list host smoke。下一阶段目标是继续补齐 Rime adapter FFI 配置策略和更完整的受控 userdb 管理入口。
+当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn status/select/suppress`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查、学习状态只读摘要和同步前置检查命令。`ime-sync` 已补 payload 来源分类、加密对象外壳草案、P2 envelope 组装边界、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突模型、客户端解密后合并模型、signed device authorization 和 signed device revocation，`ime-crypto` 已补本地 AEAD envelope、device wrapping、recovery material、恢复码 KDF、Ed25519 设备签名、test-memory signing key store、signed sync object manifest、signed recovery record 和撤销后 key epoch 解密边界，`ime-userdb` 已补 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 P2 plaintext payload 只读迭代器、已解密 P2 JSON 到 merge input 的解析入口，以及合并结果写回真实 userdb 的事务执行器，并已通过 `SyncEnvelopeAssembler` 接入本地加密 / 解密 / sync draft 派生链路；该迭代器、解析入口和写回入口不暴露给 FFI，不导出 P1 原始事件、负反馈明细、上下文统计或本地审计批次。`docs/sync-key-management.md` 已补真实同步前的设备授权、恢复码、设备撤销、key epoch 和冲突边界，设备签名 / 私钥存储 ADR 已固定并已有 Rust 模型证据。`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、learning status 只读摘要、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、平台绑定式 view copy / release host smoke、释放 panic 边界 host smoke 和 FFI 调用 runbook；`ime-engine-rime` 已补必需 Rime API 缺失映射测试。下一阶段目标是补 Go server API / storage 边界设计，并继续把 P1 原始事件和上下文统计挡在同步路径之外。
 
 Phase 2 不改变底层 engine adapter 边界：
 
@@ -21,6 +21,8 @@ Phase 2 仍不推进平台壳、同步后端、Flutter manager 或自研拼音 e
 - 建立本地 SQLite userdb。
 - 记录候选选择事件和必要的学习摘要。
 - 支持用户词条 CRUD、导入、导出和删除语义。
+- 支持 userdb P2 plaintext payload 只读迭代器，并通过本地加密组装测试证明可进入 `ime-crypto` envelope 与 `ime-sync` draft。
+- 支持已解密 P2 payload 经客户端合并模型写回真实 userdb，保持 tombstone、显式恢复和 ranker weight 合并语义可复验。
 - 支持负反馈，包括提交后撤销、改选候选和手动降权。
 - 实现候选重排，且重排结果可解释。
 - 明确 P0/P1/P2 数据边界，避免敏感输入进入日志、fixture 或同步对象。
@@ -32,6 +34,7 @@ Phase 2 仍不推进平台壳、同步后端、Flutter manager 或自研拼音 e
 - 不把 Rime 内部对象 ID、内部评分或私有状态写入 userdb。
 - 不在 Phase 2 实现远端同步、设备授权或密钥轮换。
 - 不把原始选择事件默认纳入同步。
+- 不把 P2 plaintext payload 暴露给 FFI、CLI 文件导出或平台壳。
 - 不在 ranker 中读取平台私有生命周期、窗口句柄或 App 原始标题。
 - 不用真实联系人、真实输入历史、真实 App 内容作为测试数据。
 
@@ -49,7 +52,7 @@ Phase 2 的学习数据按 `docs/privacy-sync.md` 的分级处理：
 实现要求：
 
 - P0 输入路径必须在事件进入 userdb 前被拦截。
-- P1 事件日志可以压缩为 P2 权重摘要，但原始事件默认不进入同步。
+- P1 事件日志可以压缩为 `ranker.weights` P2 权重摘要，但原始事件、负反馈明细和上下文统计默认不进入同步。
 - P2 数据被删除时必须产生 tombstone 或等价语义，避免旧设备和旧备份复活词条。
 - 日志、测试 fixture、golden 输出和截图不得包含真实明文输入历史或敏感上下文。
 
@@ -314,6 +317,7 @@ radishlex-ime-cli dict export --db <path> --file <path>
 radishlex-ime-cli dict inspect --file <path>
 radishlex-ime-cli dict import --db <path> --file <path> [--source <name>] [--dry-run]
 radishlex-ime-cli dict import-batches --db <path>
+radishlex-ime-cli learn status --db <path>
 radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
 radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
 radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
@@ -331,6 +335,7 @@ radishlex-ime-cli sync preflight --db <path>
 - `dict import --dry-run` 必须复用实际导入的分类逻辑，报告 `inserted`、`updated`、`skipped_deleted` 和 `skipped_duplicate`，但不得写入词条或导入批次。
 - `dict import-batches` 用于查看导入批次来源、导入数量、插入数量、更新数量、删除跳过数量、重复跳过数量和创建时间。
 - `dict inspect` 用于在不打开 userdb 的情况下检查导入文件格式版本、记录数和 CLI 输入码兼容性。
+- `learn status` 用于查看管理 UI 需要的只读学习状态摘要，只输出词条、ranker weight、deleted tombstone、P1 本地事件和本地审计批次的总量与最新活动时间，不输出 P1 选择事件明细、负反馈明细、上下文分布、用户词文本或同步明文 payload。
 - `sync preflight` 只输出 P2 可同步对象计数、P1 本地事件计数和本地审计计数，不生成明文同步 payload。
 
 ### FFI 管理入口
@@ -344,7 +349,16 @@ radishlex_userdb_terms_new(db_path)
 radishlex_userdb_terms_count(terms)
 radishlex_userdb_terms_get(terms, index, term_out)
 radishlex_userdb_terms_free(terms)
+radishlex_userdb_dictionary_inspect(file_path, summary_out)
+radishlex_userdb_dictionary_export(db_path, file_path, summary_out)
+radishlex_userdb_dictionary_import(db_path, file_path, source_name, dry_run, summary_out)
+radishlex_userdb_import_batches_new(db_path)
+radishlex_userdb_import_batches_count(batches)
+radishlex_userdb_import_batches_get(batches, index, batch_out)
+radishlex_userdb_import_batches_free(batches)
+radishlex_userdb_learning_status(db_path, summary_out)
 radishlex_userdb_sync_preflight(db_path, summary_out)
+radishlex_ffi_contract(contract_out)
 ```
 
 规则：
@@ -354,8 +368,13 @@ radishlex_userdb_sync_preflight(db_path, summary_out)
 - `delete_term` 沿用 userdb tombstone 语义，删除后普通导入和旧权重不得立即复活该词。
 - `terms_new` 返回只读 list handle，平台端只能通过 `terms_get` 读取 view，并必须调用 `terms_free` 释放。
 - list view 中的字符串只在 list handle 释放前有效，平台端不得缓存裸指针。
+- dictionary inspect 只读取导入文件格式、记录数和 P2 同步分类，不打开 userdb。
+- dictionary export 只导出 active / suppressed 用户词条字段，不导出 P1 原始选择事件、负反馈详细事件、上下文统计或 ranker 权重摘要。
+- dictionary import 支持 `dry_run`，dry-run 不写词条、不写 import batch；实际导入必须记录 import batch，并继续遵守 deleted tombstone。
+- import batches 通过只读 list handle 暴露来源和统计，不暴露 SQLite handle、statement 或 row 指针。
+- learning status 通过单个 `repr(C)` summary 暴露聚合计数、latest timestamp 和 `plaintext_payload / p1_raw_details / context_stats = false` 标记，不返回 string view、用户词明文、P1 事件行、负反馈 reason 列表或上下文统计。
 - 当前 FFI 不记录 selection event、negative feedback 或上下文统计，不作为学习事件入口。
-- 当前 FFI 不提供导入导出、导入 dry-run、导入批次查询或格式 inspect；这些仍先由 CLI 承担，后续进入 FFI 前必须保持 P1 不导出和 tombstone 不复活边界。
+- 当前 FFI contract 明确 session 绑定创建线程，平台端不得跨线程直接操作同一 `RadishLexSession*`。
 
 ### 用户词库导入导出格式
 
@@ -410,10 +429,12 @@ Phase 2 起步必须覆盖：
 - 删除词条后，旧权重摘要或重新导入不能立即复活该词。
 - P0 输入事件不会写入 userdb。
 - P1 原始事件不会出现在导出文件或同步 payload 草案中。
+- `ranker.weights` payload 只包含 P2 权重摘要字段，不包含原始 selection event、负反馈 reason、上下文统计或本地审计批次。
 - 用户词库导出只包含 P2 词条字段，导入 malformed 文件返回明确错误。
 - 导入 dry-run 不写数据库，实际导入记录 `import_batches`，并区分 insert、update、deleted skip 和 duplicate skip。
 - 导入格式检查能识别当前 v1 文件，并对未知未来版本返回明确不兼容错误。
 - 同步前置检查只输出分类计数，不输出明文用户词、原始事件或负反馈明细。
+- 学习状态只读摘要只输出聚合计数、latest timestamp 和隐私边界标记，不输出明文用户词、原始选择事件、负反馈 reason 明细或上下文统计。
 - `rank explain` 能说明候选排序变化原因。
 
 默认验证入口：
@@ -442,8 +463,26 @@ cargo test --workspace
 9. `ime-ffi` 已补 C ABI 起步验证，覆盖 opaque session handle、错误对象、UTF-8 buffer 和释放函数。
 10. `ime-ffi` 已补结构化 snapshot / candidate ABI 和 normalized key event。
 11. `ime-ffi` 已补 session options、engine kind 门禁和 sync preflight 状态摘要入口，当前只允许 demo engine，Rime kind 明确返回未可用。
-12. `ime-ffi` 已补受控 userdb add / delete / list 管理入口，继续使用显式 SQLite 路径，不暴露 SQLite handle，不记录 P1 学习事件。
-13. 下一步继续补 Rime adapter FFI 配置策略和更完整的受控 userdb 管理入口。
+12. `ime-ffi` 已补受控 userdb add / delete / list、dictionary inspect / export / import 和 import batches 只读查询入口，继续使用显式 SQLite / 文件路径，不暴露 SQLite handle，不记录或导出 P1 学习事件。
+13. `ime-ffi` 已补 Rime session options ABI 和默认 unavailable 门禁，先固定 shared data、user data、schema、log dir 与 deploy flag 的跨语言配置形态。
+14. `ime-ffi` 已在 `native-rime` feature 下接入真实 `RimeEngine` session，并通过 ignored native smoke 覆盖 Rime FFI session 创建、按键输入、snapshot 候选读取和候选提交。
+15. `ime-ffi` 已补 ABI contract、session owner-thread policy 和释放 panic 边界，平台端跨线程误用会返回 `InvalidState`。
+16. 已补 `docs/runbooks/ffi-platform-call-contract.md`，明确平台绑定层的 `error_out`、string view、handle 释放和 owner-thread 调度规则。
+17. 已补 userdb / CLI / FFI 学习状态只读摘要，面向后续管理 UI 查看本地学习状态；该入口只输出聚合计数、latest timestamp 和隐私边界布尔标记，不导出 P1 原始选择事件、负反馈明细、上下文统计或明文同步 payload。
+18. 已补 native Rime 必需 API 缺失映射测试和平台绑定式 FFI view copy / release host smoke。
+19. 已补 `ime-crypto` 本地 envelope、AAD、ciphertext hash、nonce 和篡改失败测试，并让 `ime-sync::EncryptedSyncObjectDraft` 从 crypto envelope 派生上传草案元数据。
+20. 已补 userdb `dictionary.user_terms` / `dictionary.deleted_terms` P2 plaintext payload 只读迭代器，并通过 integration test 接入本地加密 / 解密 / sync draft 派生链路。
+21. 已补 `ranker.weights` P2 plaintext payload schema，字段来自 `ranker_weights` 摘要表，测试覆盖字段顺序、JSON escaping、空库行为、P1 明细阻断和本地加密 / sync draft 派生链路。
+22. 已补 `docs/sync-key-management.md`，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突边界。
+23. 已补 `ime-crypto` / `ime-sync` 的设备、key epoch、device wrapping、recovery material、授权包、撤销记录和对象版本冲突 Rust 模型。
+24. 已补 `ime-sync` 客户端解密后合并模型，覆盖 deleted tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词、显式恢复清理 tombstone 和恢复前旧权重不复活。
+25. 已补 `ime-sync::SyncEnvelopeAssembler`，固定 Rust 内部 P2 payload 到 envelope 的组装边界。
+26. 已补 `docs/adr/0002-recovery-code-kdf.md`，固定恢复码 KDF 算法、参数、格式、恢复记录字段和验证口径。
+27. 已补 `ime-crypto` 恢复码 KDF Rust 模型，覆盖恢复码格式 / 校验段、Argon2id profile、恢复 wrapping key、恢复记录 AAD、错误恢复码失败和 Debug 脱敏。
+28. 已补 `docs/adr/0003-device-signing-key-storage.md`，固定设备签名、签名对象、canonical bytes、私钥存储抽象、错误语义和验证口径。
+29. 已补签名 / 设备密钥存储 Rust 模型，覆盖 Ed25519 test-memory signer、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断、signed sync object manifest、signed recovery record、signed device authorization 和 signed device revocation；生产恢复流程和平台私钥存储 backend 边界已由文档固定。
+30. 已补真实 userdb P2 payload 解析到 merge input 的接线。
+31. 已补合并结果写回真实 userdb 的事务执行器；Go server API / storage、生产恢复流程和平台私钥存储 backend 边界已固定，Go server 已起步 metadata / storage / API 验证模型、SQLite-backed metadata repository 和 local object storage staged transaction；真实远端上传下载仍等待签名、metadata API、版本冲突、错误语义和平台 backend 验证。
 
 阶段停止线：
 

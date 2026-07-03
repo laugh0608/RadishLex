@@ -44,7 +44,7 @@
 
 默认分支 PR 的 GitHub Actions 会在 PR base/head 范围内执行 `git diff --check`，避免干净 checkout 中裸命令没有检查对象。
 
-当前仓库还没有 Rust / Go / Flutter 工作区，因此 ruleset 不把语言构建列为必需检查。后续落地 `Cargo.toml`、`go.work`、Flutter manager 或平台壳后，应同步更新 `scripts/check-repo.*`、workflow 和 `master-protection.json` required checks。
+当前 ruleset 仍只要求仓库级检查名称；`Repository Baseline` 内部已经覆盖 Rust workspace 和 Go sync-server 测试。后续落地 Flutter manager、平台壳或独立发布矩阵后，应同步更新 `scripts/check-repo.*`、workflow 和 `master-protection.json` required checks。
 
 ## 应用方式
 

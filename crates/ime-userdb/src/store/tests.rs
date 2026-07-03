@@ -1,10 +1,12 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::UserDb;
+use rusqlite::params;
+
+use super::{stable_hash_hex, UserDb};
 use crate::{
     decode_dictionary_terms_tsv, decode_dictionary_terms_tsv_document, encode_dictionary_terms_tsv,
     DictionaryTermRecord, DictionaryTermsFormat, NegativeFeedbackDraft, NegativeFeedbackReason,
-    PrivacyLevel, SelectionEventDraft, TermSource, TermStatus,
+    PrivacyLevel, SelectionEventDraft, TermSource, TermStatus, UserDbSyncPayloadObjectType,
 };
 
 fn temp_db_path(test_name: &str) -> String {
@@ -237,6 +239,235 @@ fn dictionary_export_contains_only_p2_terms() {
     assert!(!encoded.contains("session-secret"));
     assert!(!encoded.contains("chat"));
     assert!(!encoded.contains("manual_suppress"));
+}
+
+#[test]
+fn p2_plaintext_payloads_export_stable_user_and_deleted_term_schema() {
+    let db = UserDb::open_in_memory().expect("userdb opens");
+    db.connection
+        .execute(
+            "INSERT INTO user_terms (
+                text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                "词核",
+                "",
+                "cihe",
+                "manual_add",
+                2.5,
+                "active",
+                10,
+                20,
+                Option::<i64>::None
+            ],
+        )
+        .expect("insert active term");
+    db.connection
+        .execute(
+            "INSERT INTO user_terms (
+                text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![
+                "萝卜",
+                "luo bo",
+                "luobo",
+                "engine_selection",
+                4.0,
+                "suppressed",
+                30,
+                40,
+                Some(35_i64)
+            ],
+        )
+        .expect("insert suppressed term");
+    db.connection
+        .execute(
+            "INSERT INTO user_terms (
+                text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL)",
+            params!["删除", "shan chu", "shanchu", "manual_add", 0.0, "deleted", 50, 60],
+        )
+        .expect("insert deleted term");
+    db.connection
+        .execute(
+            "INSERT INTO deleted_terms (
+                term_id, text_hash, reading_hash, input_code_hash, deleted_at_ms, reason
+             )
+             VALUES (NULL, ?1, ?2, ?3, ?4, ?5)",
+            params![
+                stable_hash_hex("删除"),
+                stable_hash_hex("shan chu"),
+                stable_hash_hex("shanchu"),
+                55,
+                "manual_delete"
+            ],
+        )
+        .expect("insert tombstone");
+
+    let payloads: Vec<_> = db
+        .p2_plaintext_payloads()
+        .expect("payload iterator")
+        .collect();
+
+    assert_eq!(payloads.len(), 2);
+    assert_eq!(
+        payloads[0].object_type,
+        UserDbSyncPayloadObjectType::DictionaryUserTerms
+    );
+    assert_eq!(payloads[0].record_count, 2);
+    assert_eq!(
+        payloads[0].as_str().expect("utf-8 payload"),
+        r#"{"payload_schema_version":1,"object_type":"dictionary.user_terms","terms":[{"input_code":"cihe","text":"词核","reading":"","source":"manual_add","weight":2.5,"status":"active","created_at_ms":10,"updated_at_ms":20,"last_used_at_ms":null},{"input_code":"luobo","text":"萝卜","reading":"luo bo","source":"engine_selection","weight":4,"status":"suppressed","created_at_ms":30,"updated_at_ms":40,"last_used_at_ms":35}]}"#
+    );
+
+    assert_eq!(
+        payloads[1].object_type,
+        UserDbSyncPayloadObjectType::DictionaryDeletedTerms
+    );
+    assert_eq!(payloads[1].record_count, 1);
+    assert_eq!(
+        payloads[1].as_str().expect("utf-8 payload"),
+        r#"{"payload_schema_version":1,"object_type":"dictionary.deleted_terms","tombstones":[{"input_code":"shanchu","text":"删除","reading":"shan chu","deleted_at_ms":55,"reason":"manual_delete"}]}"#
+    );
+}
+
+#[test]
+fn p2_plaintext_payloads_export_stable_ranker_weight_schema() {
+    let db = UserDb::open_in_memory().expect("userdb opens");
+    db.connection
+        .execute(
+            "INSERT INTO ranker_weights (
+                input_code, text, reading, frequency, recency_score, negative_score, context_kind, updated_at_ms
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params!["luo\\bo", "萝\"卜\\词", "luo\tbo\nline", 1, 20.0, 0.0, "general", 10],
+        )
+        .expect("insert escaped ranker weight");
+    db.connection
+        .execute(
+            "INSERT INTO ranker_weights (
+                input_code, text, reading, frequency, recency_score, negative_score, context_kind, updated_at_ms
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params!["cihe", "词核", "", 2, 1000.5, 1.25, "chat", 30],
+        )
+        .expect("insert ranker weight");
+
+    let payloads: Vec<_> = db
+        .p2_plaintext_payloads()
+        .expect("payload iterator")
+        .collect();
+
+    assert_eq!(payloads.len(), 1);
+    assert_eq!(
+        payloads[0].object_type,
+        UserDbSyncPayloadObjectType::RankerWeights
+    );
+    assert_eq!(payloads[0].record_count, 2);
+    assert_eq!(
+        payloads[0].as_str().expect("utf-8 payload"),
+        r#"{"payload_schema_version":1,"object_type":"ranker.weights","weights":[{"input_code":"cihe","text":"词核","reading":"","frequency":2,"recency_score":1000.5,"negative_score":1.25,"context_kind":"chat","updated_at_ms":30},{"input_code":"luo\\bo","text":"萝\"卜\\词","reading":"luo\tbo\nline","frequency":1,"recency_score":20,"negative_score":0,"context_kind":"general","updated_at_ms":10}]}"#
+    );
+}
+
+#[test]
+fn p2_plaintext_payloads_exclude_p1_and_local_audit_sources() {
+    let mut db = UserDb::open_in_memory().expect("userdb opens");
+    db.add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualAdd)
+        .expect("term is added");
+    db.record_selection(
+        SelectionEventDraft::new("session-private", "cihe", "词核", 0, 1).with_context_kind("chat"),
+    )
+    .expect("selection is recorded");
+    db.record_negative_feedback(
+        NegativeFeedbackDraft::new("cihe", "词核", NegativeFeedbackReason::ManualSuppress)
+            .with_context_kind("chat"),
+    )
+    .expect("feedback is recorded");
+    db.import_dictionary_records(
+        &[DictionaryTermRecord::new(
+            "daoru",
+            "导入",
+            None::<String>,
+            TermSource::ManualImport,
+            1.0,
+            TermStatus::Active,
+        )],
+        "source-secret",
+    )
+    .expect("import records local audit batch");
+    db.delete_term("luobo", "萝卜", Some("luo bo"))
+        .expect("term is deleted");
+
+    let payloads: Vec<_> = db
+        .p2_plaintext_payloads()
+        .expect("payload iterator")
+        .collect();
+    let payload_debug = format!("{payloads:?}");
+    let payload_text = payloads
+        .iter()
+        .map(|payload| payload.as_str().expect("utf-8 payload").to_owned())
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(payload_debug.contains("[redacted]"));
+    assert!(!payload_debug.contains("词核"));
+    assert!(!payload_debug.contains("萝卜"));
+    assert!(payload_text.contains("dictionary.user_terms"));
+    assert!(payload_text.contains("dictionary.deleted_terms"));
+    assert!(payload_text.contains("ranker.weights"));
+    assert!(payload_text.contains(r#""weights":"#));
+    assert!(payload_text.contains(r#""context_kind":"chat""#));
+    assert!(payload_text.contains(r#""frequency":"#));
+    assert!(payload_text.contains(r#""negative_score":"#));
+    assert!(payload_text.contains("词核"));
+    assert!(payload_text.contains("导入"));
+    assert!(payload_text.contains("萝卜"));
+    assert!(!payload_text.contains("session-private"));
+    assert!(!payload_text.contains("manual_suppress"));
+    assert!(!payload_text.contains("source-secret"));
+    assert!(!payload_text.contains("candidate_index"));
+    assert!(!payload_text.contains("candidate_count"));
+    assert!(!payload_text.contains("selection_events"));
+    assert!(!payload_text.contains("negative_feedback"));
+    assert!(!payload_text.contains("import_batches"));
+}
+
+#[test]
+fn p2_plaintext_payloads_escape_json_strings() {
+    let mut db = UserDb::open_in_memory().expect("userdb opens");
+    db.add_term(
+        "luo\\bo",
+        "萝\"卜\\词",
+        Some("luo\tbo\nline"),
+        TermSource::ManualAdd,
+    )
+    .expect("term is added");
+
+    let payloads: Vec<_> = db
+        .p2_plaintext_payloads()
+        .expect("payload iterator")
+        .collect();
+    let payload = payloads[0].as_str().expect("utf-8 payload");
+
+    assert!(payload.contains(r#""input_code":"luo\\bo""#));
+    assert!(payload.contains(r#""text":"萝\"卜\\词""#));
+    assert!(payload.contains(r#""reading":"luo\tbo\nline""#));
+}
+
+#[test]
+fn p2_plaintext_payloads_empty_database_exports_no_payloads() {
+    let db = UserDb::open_in_memory().expect("userdb opens");
+
+    let payloads: Vec<_> = db
+        .p2_plaintext_payloads()
+        .expect("payload iterator")
+        .collect();
+
+    assert!(payloads.is_empty());
 }
 
 #[test]
@@ -488,4 +719,67 @@ fn sync_preflight_separates_syncable_and_local_only_counts() {
     assert_eq!(summary.local_selection_events, 1);
     assert_eq!(summary.local_negative_feedback, 1);
     assert_eq!(summary.local_import_batches, 0);
+}
+
+#[test]
+fn learning_status_reports_only_aggregate_counts_and_timestamps() {
+    let mut db = UserDb::open_in_memory().expect("userdb opens");
+
+    let empty = db.learning_status_summary().expect("empty summary");
+    assert_eq!(empty.schema_version, 2);
+    assert_eq!(empty.active_user_terms, 0);
+    assert_eq!(empty.suppressed_user_terms, 0);
+    assert_eq!(empty.selection_events, 0);
+    assert_eq!(empty.negative_feedback, 0);
+    assert_eq!(empty.latest_activity_at_ms, None);
+
+    db.add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualAdd)
+        .expect("term is added");
+    db.record_selection(
+        SelectionEventDraft::new("session-local", "cihe", "词核", 0, 1).with_context_kind("chat"),
+    )
+    .expect("selection is recorded");
+    db.record_negative_feedback(
+        NegativeFeedbackDraft::new("cihe", "词核", NegativeFeedbackReason::ManualSuppress)
+            .with_context_kind("chat"),
+    )
+    .expect("feedback is recorded");
+    db.delete_term("luobo", "萝卜", Some("luo bo"))
+        .expect("term is deleted");
+
+    let summary = db.learning_status_summary().expect("summary");
+
+    assert_eq!(summary.schema_version, 2);
+    assert_eq!(summary.active_user_terms, 0);
+    assert_eq!(summary.suppressed_user_terms, 1);
+    assert_eq!(summary.ranker_weights, 1);
+    assert_eq!(summary.deleted_term_tombstones, 1);
+    assert_eq!(summary.selection_events, 1);
+    assert_eq!(summary.negative_feedback, 1);
+    assert_eq!(summary.import_batches, 0);
+    assert!(summary.latest_user_term_updated_at_ms.is_some());
+    assert!(summary.latest_selection_event_at_ms.is_some());
+    assert!(summary.latest_negative_feedback_at_ms.is_some());
+    assert!(summary.latest_deleted_term_at_ms.is_some());
+    assert_eq!(summary.latest_import_batch_at_ms, None);
+    assert_eq!(
+        summary.latest_activity_at_ms,
+        [
+            summary.latest_user_term_updated_at_ms,
+            summary.latest_selection_event_at_ms,
+            summary.latest_negative_feedback_at_ms,
+            summary.latest_deleted_term_at_ms,
+            summary.latest_import_batch_at_ms,
+        ]
+        .into_iter()
+        .flatten()
+        .max()
+    );
+
+    let debug = format!("{summary:?}");
+    assert!(!debug.contains("session-local"));
+    assert!(!debug.contains("chat"));
+    assert!(!debug.contains("manual_suppress"));
+    assert!(!debug.contains("萝卜"));
+    assert!(!debug.contains("词核"));
 }

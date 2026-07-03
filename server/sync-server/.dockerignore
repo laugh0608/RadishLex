@@ -1,0 +1,8 @@
+.git
+.gitignore
+Dockerfile
+data
+tmp
+*.sqlite
+*.sqlite-*
+coverage.out

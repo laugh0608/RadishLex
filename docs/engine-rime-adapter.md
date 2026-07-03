@@ -154,6 +154,31 @@ RimeEngineConfig
 - 若需要最小 schema fixture，必须确认许可证与来源；不能从现有 Rime schema 复制数据后直接提交。
 - 用户数据目录属于本地敏感数据，不进入同步、日志、截图或 golden 输出。
 
+### FFI 配置策略
+
+真实 Rime 进入 `ime-ffi` 时必须使用独立的 Rime session options，而不是复用通用 `engine_kind` 字段承载目录和 schema：
+
+```text
+RadishLexRimeSessionOptions
+  version
+  shared_data_dir
+  user_data_dir
+  schema
+  log_dir
+  deploy_on_start
+```
+
+规则：
+
+- `radishlex_session_new_rime` 是后续真实 Rime FFI 的专用构造入口。
+- `shared_data_dir`、`user_data_dir` 和 `schema` 必须显式传入，不能隐式读取真实用户输入法目录。
+- `log_dir` 可选，传入时也必须是非空 UTF-8 路径。
+- `deploy_on_start` 使用 `u8` 的 `0 / 1` 表示，避免跨语言 bool ABI 差异。
+- 默认 workspace 构建下，该入口只做 ABI 参数校验并返回 `InvalidState`，不会静默退回 demo engine。
+- `ime-ffi` 启用 `native-rime` feature 时，该入口会将 options 转为 `RimeEngineConfig` 并创建真实 `RimeEngine` session。
+- `ime-ffi` 内部使用 demo / Rime 可扩展 session engine 封装，平台端仍只持有 opaque `RadishLexSession*`。
+- 当前已通过 ignored native smoke 覆盖 `radishlex_session_new_rime -> push_key -> snapshot -> commit_candidate`；该 smoke 需要显式传入隔离 Rime shared / user data 目录。
+
 ## 候选转换规则
 
 Rime candidate 转 RadishLex candidate 时只保留稳定字段：
@@ -175,6 +200,7 @@ Rime candidate 转 RadishLex candidate 时只保留稳定字段：
 ## 错误和安全边界
 
 - 所有 FFI 调用集中在 `ffi.rs` / `session.rs` 的极小边界内，并配套 `unsafe` 注释说明所有权、空指针、释放责任和线程假设。
+- `native-rime` feature 测试覆盖 startup / runtime 必需 API 缺失；缺失函数必须返回带函数名的 `MissingApiFunction`。
 - 所有 Rime 分配的 context、commit、status、schema list 必须按 C API 对应 free 函数释放。
 - C string 转 Rust string 时必须处理 null、非 UTF-8 和空字符串。
 - Rime session id 只能存于 `RimeEngine` 内部，不进入 `ime-core` 模型。
@@ -217,6 +243,7 @@ cargo run -p radishlex-ime-cli -- demo luobo
 cargo test -p radishlex-ime-engine-rime --features native-rime
 cargo check -p radishlex-ime-cli --features native-rime
 cargo run -p radishlex-ime-cli --features native-rime -- rime --schema <schema> --shared-data <path> --user-data <path> <input-code>
+RADISHLEX_RIME_SHARED_DATA=<path> RADISHLEX_RIME_USER_DATA=<path> cargo test -p radishlex-ime-ffi --features native-rime rime_session_native_smoke_uses_ffi_entrypoint -- --ignored
 ```
 
 本机准备步骤见 `docs/runbooks/rime-native-smoke.md`。
@@ -245,11 +272,14 @@ cargo run -p radishlex-ime-cli --features native-rime -- rime --schema <schema> 
 - 已补配置模型、错误类型、key 分类和候选转换测试。
 - 第 4 步已覆盖 `setup`、`initialize`、`create_session`、`select_schema` 和 `destroy_session` 的 FFI session 管理。
 - 已补 `process_key`、`get_context`、`get_commit`、`free_context` 和 `free_commit` 的 Rust 侧调用路径。
+- 已补必需 Rime API 校验测试，覆盖 startup 与 runtime 函数缺失时的 `MissingApiFunction` 映射。
 - 已实现 `ime-cli rime` 子命令；默认 feature 下会给出明确 `native-rime` 构建提示，启用 feature 后可构造 `RimeEngine` 并进入 `InputSession`。
 - 已在 macOS 本机 `librime` 1.17.0、`luna_pinyin` 隔离数据目录下完成真实 native smoke，`luobo` 可输出 composition、候选和默认 commit。
 - 已给 `ime-cli rime` 补充可重复的 `--key <name>` smoke 调试参数，用于在输入码后追加 `page-down`、`page-up`、方向键等命名键事件。
 - 候选提交当前通过当前页 `select_keys` 模拟选择；2026-06-25 本机 native smoke 已验证首候选、非首候选、翻页后当前页候选均可提交，越界候选索引返回明确错误。
 - 已给 `ime-cli rime` 补充 `--rank-db <path>` 和 `--context <kind>`，用于把当前 Rime candidates 接入 `ime-ranker` smoke；输出包含重排后候选、原始 engine index、score、explain 和提交映射。
 - 已完成本机 Rime rank smoke 记录，并补齐用户词库导入导出、导入批次治理、导入格式检查和同步前置计数。
+- 已在 `ime-ffi` 补 `RadishLexRimeSessionOptions` 与 `radishlex_session_new_rime`，默认构建下保持 unavailable 门禁，`native-rime` feature 下已接入真实 `RimeEngine` session。
+- 已完成 `ime-ffi` ignored native smoke，覆盖从 Rime FFI session 创建、字符按键输入、snapshot 候选读取到候选提交。
 
-阶段结论：`ime-cli rime` 已满足 Phase 1 的真实 adapter 可复验要求，并具备 Phase 2 的 ranker smoke 接入口。后续不推进平台壳，应继续收口同步 payload、FFI 边界和 `ime-ffi` 起步验证。
+阶段结论：`ime-cli rime` 已满足 Phase 1 的真实 adapter 可复验要求，并具备 Phase 2 的 ranker smoke 接入口；`ime-ffi` 也已具备显式 native feature 下的真实 Rime session 入口。后续仍暂缓平台壳，当前主线优先推进 Go server API / storage 边界设计和生产同步前置边界。

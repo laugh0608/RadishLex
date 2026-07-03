@@ -2,6 +2,8 @@ use std::ffi::CString;
 use std::os::raw::c_char;
 
 use radishlex_ime_core::CoreError;
+#[cfg(feature = "native-rime")]
+use radishlex_ime_engine_rime::RimeEngineError;
 use radishlex_ime_userdb::UserDbError;
 
 #[repr(C)]
@@ -102,6 +104,76 @@ impl From<UserDbError> for FfiError {
             UserDbError::InvalidInput { .. } => Self::invalid_argument(error.to_string()),
             UserDbError::Sqlite(_) | UserDbError::Time(_) => {
                 Self::new(RadishLexStatusCode::UserDbError, error.to_string())
+            }
+        }
+    }
+}
+
+#[cfg(feature = "native-rime")]
+impl From<RimeEngineError> for FfiError {
+    fn from(error: RimeEngineError) -> Self {
+        match error {
+            RimeEngineError::MissingConfigPath { .. } | RimeEngineError::EncodingFailure { .. } => {
+                Self::invalid_argument(error.to_string())
+            }
+            RimeEngineError::Core(core_error) => Self::from(core_error),
+            RimeEngineError::NativeFeatureDisabled
+            | RimeEngineError::NullApi
+            | RimeEngineError::MissingApiFunction { .. }
+            | RimeEngineError::NativeProbeFailed { .. }
+            | RimeEngineError::FfiFailure { .. }
+            | RimeEngineError::EmptyCandidateText => {
+                Self::new(RadishLexStatusCode::EngineError, error.to_string())
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(feature = "native-rime")]
+    mod native_rime {
+        use radishlex_ime_engine_rime::RimeEngineError;
+
+        use super::super::{FfiError, RadishLexStatusCode};
+
+        #[test]
+        fn rime_config_and_encoding_errors_are_invalid_arguments() {
+            let missing_path = FfiError::from(RimeEngineError::MissingConfigPath {
+                field: "shared_data_dir",
+            });
+            assert_eq!(missing_path.code, RadishLexStatusCode::InvalidArgument);
+            assert!(missing_path.message.contains("shared_data_dir"));
+
+            let encoding = FfiError::from(RimeEngineError::EncodingFailure {
+                field: "schema",
+                message: "interior nul".to_owned(),
+            });
+            assert_eq!(encoding.code, RadishLexStatusCode::InvalidArgument);
+            assert!(encoding.message.contains("schema"));
+        }
+
+        #[test]
+        fn native_rime_failures_are_engine_errors() {
+            let failures = [
+                RimeEngineError::NullApi,
+                RimeEngineError::MissingApiFunction {
+                    name: "select_schema",
+                },
+                RimeEngineError::NativeProbeFailed {
+                    message: "not found".to_owned(),
+                },
+                RimeEngineError::FfiFailure {
+                    stage: "select_schema",
+                    message: "failed to select schema missing".to_owned(),
+                },
+                RimeEngineError::EmptyCandidateText,
+            ];
+
+            for failure in failures {
+                let error = FfiError::from(failure);
+                assert_eq!(error.code, RadishLexStatusCode::EngineError);
+                assert!(!error.message.is_empty());
             }
         }
     }

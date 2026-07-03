@@ -12,8 +12,8 @@ use radishlex_ime_engine_rime::{RimeEngine, RimeEngineConfig};
 use radishlex_ime_ranker::{RankRequest, RankedCandidate, Ranker};
 use radishlex_ime_userdb::{
     decode_dictionary_terms_tsv_document, encode_dictionary_terms_tsv, DictionaryTermRecord,
-    NegativeFeedbackDraft, NegativeFeedbackReason, RankerWeight, SelectionEventDraft,
-    SyncPreflightSummary, TermSource, UserDb, UserDbError, UserTerm,
+    LearningStatusSummary, NegativeFeedbackDraft, NegativeFeedbackReason, RankerWeight,
+    SelectionEventDraft, SyncPreflightSummary, TermSource, UserDb, UserDbError, UserTerm,
 };
 
 use crate::DemoEngine;
@@ -29,6 +29,7 @@ Usage:
   radishlex-ime-cli dict inspect --file <path>
   radishlex-ime-cli dict import --db <path> --file <path> [--source <name>] [--dry-run]
   radishlex-ime-cli dict import-batches --db <path>
+  radishlex-ime-cli learn status --db <path>
   radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
   radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
   radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
@@ -46,6 +47,7 @@ Examples:
   radishlex-ime-cli dict import --db /tmp/radishlex-userdb.sqlite --file /tmp/radishlex-terms.tsv --dry-run
   radishlex-ime-cli dict import --db /tmp/radishlex-userdb.sqlite --file /tmp/radishlex-terms.tsv --source smoke
   radishlex-ime-cli dict import-batches --db /tmp/radishlex-userdb.sqlite
+  radishlex-ime-cli learn status --db /tmp/radishlex-userdb.sqlite
   radishlex-ime-cli learn select --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
   radishlex-ime-cli rank explain --db /tmp/radishlex-userdb.sqlite --input luobo --candidate 萝卜
   radishlex-ime-cli sync preflight --db /tmp/radishlex-userdb.sqlite
@@ -336,11 +338,20 @@ fn run_sync_preflight(args: &[String]) -> Result<String, CliError> {
 
 fn run_learn(args: &[String]) -> Result<String, CliError> {
     match args.get(2).map(String::as_str) {
+        Some("status") => run_learn_status(args),
         Some("select") => run_learn_select(args),
         Some("suppress") => run_learn_suppress(args),
         Some(other) => Err(CliError::Usage(format!("unknown learn command: {other}"))),
         None => Err(CliError::Usage("missing learn command".to_owned())),
     }
+}
+
+fn run_learn_status(args: &[String]) -> Result<String, CliError> {
+    let options = parse_named_options(args, 3, &["db"], "learn status")?;
+    let db_path = required_named_option(&options, "db")?;
+    let db = UserDb::open(db_path)?;
+    let summary = db.learning_status_summary()?;
+    Ok(render_learning_status(&summary))
 }
 
 fn run_learn_select(args: &[String]) -> Result<String, CliError> {
@@ -1133,6 +1144,72 @@ fn render_sync_preflight(summary: &SyncPreflightSummary) -> String {
         summary.local_import_batches
     ));
     output
+}
+
+fn render_learning_status(summary: &LearningStatusSummary) -> String {
+    let mut output = String::new();
+    output.push_str("learning_status: ready\n");
+    output.push_str(&format!("schema_version: {}\n", summary.schema_version));
+    output.push_str("plaintext_payload: false\n");
+    output.push_str("p1_raw_details: false\n");
+    output.push_str("context_stats: false\n");
+    output.push_str("p2_learning:\n");
+    output.push_str(&format!(
+        "  active_user_terms: {}\n",
+        summary.active_user_terms
+    ));
+    output.push_str(&format!(
+        "  suppressed_user_terms: {}\n",
+        summary.suppressed_user_terms
+    ));
+    output.push_str(&format!("  ranker_weights: {}\n", summary.ranker_weights));
+    output.push_str(&format!(
+        "  deleted_tombstones: {}\n",
+        summary.deleted_term_tombstones
+    ));
+    output.push_str("p1_local_only:\n");
+    output.push_str(&format!(
+        "  selection_events: {}\n",
+        summary.selection_events
+    ));
+    output.push_str(&format!(
+        "  negative_feedback: {}\n",
+        summary.negative_feedback
+    ));
+    output.push_str("local_audit:\n");
+    output.push_str(&format!("  import_batches: {}\n", summary.import_batches));
+    output.push_str("latest_activity:\n");
+    output.push_str(&format!(
+        "  user_terms_updated_at_ms: {}\n",
+        format_optional_ms(summary.latest_user_term_updated_at_ms)
+    ));
+    output.push_str(&format!(
+        "  selection_event_at_ms: {}\n",
+        format_optional_ms(summary.latest_selection_event_at_ms)
+    ));
+    output.push_str(&format!(
+        "  negative_feedback_at_ms: {}\n",
+        format_optional_ms(summary.latest_negative_feedback_at_ms)
+    ));
+    output.push_str(&format!(
+        "  deleted_term_at_ms: {}\n",
+        format_optional_ms(summary.latest_deleted_term_at_ms)
+    ));
+    output.push_str(&format!(
+        "  import_batch_at_ms: {}\n",
+        format_optional_ms(summary.latest_import_batch_at_ms)
+    ));
+    output.push_str(&format!(
+        "  overall_at_ms: {}\n",
+        format_optional_ms(summary.latest_activity_at_ms)
+    ));
+    output
+}
+
+fn format_optional_ms(value: Option<i64>) -> String {
+    value
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "<none>".to_owned())
 }
 
 #[cfg(test)]

@@ -25,6 +25,7 @@ radishlex-ime-cli dict export --db <path> --file <path>
 radishlex-ime-cli dict inspect --file <path>
 radishlex-ime-cli dict import --db <path> --file <path> [--source <name>] [--dry-run]
 radishlex-ime-cli dict import-batches --db <path>
+radishlex-ime-cli learn status --db <path>
 radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
 radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
 radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
@@ -289,7 +290,44 @@ luobo	萝卜	luo bo	manual_add	2	active
 
 ## learn 命令
 
-`learn` 命令用于向 userdb 写入本地学习事件。当前只支持合成数据和人工指定参数，适合验证排序变化，不代表平台壳已经接入真实输入事件。
+`learn` 命令用于查看本地学习状态或向 userdb 写入本地学习事件。当前只支持显式数据库路径、合成数据和人工指定参数，适合验证排序变化，不代表平台壳已经接入真实输入事件。
+
+查看学习状态只读摘要：
+
+```bash
+cargo run -p radishlex-ime-cli -- \
+  learn status \
+  --db /tmp/radishlex-userdb.sqlite
+```
+
+输出：
+
+```text
+learning_status: ready
+schema_version: 2
+plaintext_payload: false
+p1_raw_details: false
+context_stats: false
+p2_learning:
+  active_user_terms: 1
+  suppressed_user_terms: 1
+  ranker_weights: 1
+  deleted_tombstones: 0
+p1_local_only:
+  selection_events: 1
+  negative_feedback: 1
+local_audit:
+  import_batches: 0
+latest_activity:
+  user_terms_updated_at_ms: <timestamp-or-none>
+  selection_event_at_ms: <timestamp-or-none>
+  negative_feedback_at_ms: <timestamp-or-none>
+  deleted_term_at_ms: <timestamp-or-none>
+  import_batch_at_ms: <timestamp-or-none>
+  overall_at_ms: <timestamp-or-none>
+```
+
+`learn status` 面向后续管理 UI 的学习状态概览，只输出聚合计数、最新活动时间和隐私边界标记。它不输出 P1 原始选择事件、负反馈 reason 明细、上下文分布、用户词明文或同步明文 payload。
 
 记录一次候选选择：
 
@@ -390,6 +428,8 @@ cargo run -p radishlex-ime-cli -- \
 
 输出包含 `dictionary.user_terms`、`ranker.weights`、`dictionary.deleted_terms` 这类 P2 可同步计数，以及 `selection_events`、`negative_feedback` 这类 P1 本地计数。`plaintext_payload: false` 表示该命令没有输出明文同步对象。
 
+Rust 内部已经有 `UserDb::p2_plaintext_payloads()` 和 `ime-sync::SyncEnvelopeAssembler` 复验本地加密装配；CLI 仍只提供 preflight 计数，不暴露该迭代器、payload bytes、envelope、hash、签名或上传草案。
+
 ## 输入限制
 
 当前 CLI 的 `<input-code>` 与 `--input <code>` 只接受：
@@ -417,79 +457,19 @@ cargo run -p radishlex-ime-cli -- \
 - `rime --rank-db` 必须显式指定隔离 userdb，建议使用 `/tmp` 下临时 SQLite 文件。
 - `dict`、`learn` 和 `rank explain` 必须显式指定 `--db`，不应指向真实用户生产库；本阶段建议使用 `/tmp` 下临时 SQLite 文件。
 - `dict import/export` 的文件也建议放在 `/tmp` 下，测试内容使用合成词，不应导入真实个人词库或真实输入历史。
-- `sync preflight` 只输出分类计数，不输出用户词明文、事件明文或加密 payload。
+- `learn status` 只输出聚合学习状态，不输出用户词明文、P1 事件明细、负反馈 reason 明细或上下文统计。
+- `sync preflight` 只输出分类计数，不输出用户词明文、事件明文、plaintext payload、envelope、hash、签名或加密 payload。
 - `learn` 当前没有平台 secure text entry 信号输入，CLI smoke 只应使用合成词、虚构上下文和临时数据库。
 - 本机 smoke 应使用 `/tmp` 下的隔离目录和合成输入码，不提交 schema 数据、用户目录、日志或输出中的敏感内容。
 
 ## 常见错误
 
-### `rime command requires building ... --features native-rime`
-
-原因：当前构建未启用真实 Rime feature。
-
-处理：
-
-```bash
-cargo run -p radishlex-ime-cli --features native-rime -- rime ...
-```
-
-### `missing --schema`
-
-原因：`rime` 命令缺少 schema id。
-
-处理：
-
-```bash
-radishlex-ime-cli rime --schema luna_pinyin --shared-data <path> --user-data <path> luobo
-```
-
-### `candidate index must be a non-negative integer`
-
-原因：候选索引不是非负整数。
-
-处理：使用 `0`、`1`、`2` 这类索引值。
-
-### `candidate index ... did not produce commit text`
-
-原因：底层 engine 没有接受该候选索引或未产生提交文本。
-
-处理：先用不带 `candidate-index` 的命令确认候选列表，再选择当前输出中存在的候选索引。真实 Rime 路径已用 `luobo 1`、`luobo --key page-down 0` 和 `luobo 999` 覆盖非首候选、翻页候选和越界候选索引 smoke；候选文本会受 Rime 数据版本和隔离 user data 内学习状态影响。
-
-### `unknown key name: ...`
-
-原因：`--key` 的值不是当前 CLI smoke 支持的命名键。
-
-处理：使用 `page-down`、`page-up`、`arrow-down`、`arrow-up` 等文档列出的键名。
-
-### `--context requires --rank-db for rime`
-
-原因：`rime --context` 只在 rank smoke 中有意义，不能单独使用。
-
-处理：
-
-```bash
-cargo run -p radishlex-ime-cli --features native-rime -- \
-  rime --schema luna_pinyin --shared-data <path> --user-data <path> --rank-db /tmp/radishlex-userdb.sqlite --context chat luobo
-```
-
-### `missing --db`
-
-原因：`dict`、`learn` 或 `rank explain` 命令缺少显式 SQLite 路径。
-
-处理：
-
-```bash
-cargo run -p radishlex-ime-cli -- dict list --db /tmp/radishlex-userdb.sqlite
-```
-
-### `invalid import_file`
-
-原因：`dict import` 文件缺少版本头、字段表头不匹配、字段数错误、转义不合法，或出现不允许导入的 `deleted` 状态。
-
-处理：使用 `dict export` 生成的 `radishlex-user-terms-v1` TSV 作为模板，并只保留 `active` 或 `suppressed` 词条。
-
-### `unknown negative feedback reason ...`
-
-原因：`learn suppress --reason` 不是当前支持的负反馈类型。
-
-处理：使用 `immediate_backspace`、`reselect_same_code`、`manual_suppress` 或 `manual_delete`。
+- `rime command requires building ... --features native-rime`：当前构建未启用真实 Rime feature；用 `cargo run -p radishlex-ime-cli --features native-rime -- rime ...` 复验。
+- `missing --schema`：`rime` 命令缺少 schema id；同时提供 `--schema`、`--shared-data` 和 `--user-data`。
+- `candidate index must be a non-negative integer`：候选索引必须是 `0`、`1`、`2` 这类非负整数。
+- `candidate index ... did not produce commit text`：先确认当前候选列表，再选择存在的候选索引；真实 Rime 候选文本会受数据版本和隔离 user data 学习状态影响。
+- `unknown key name: ...`：`--key` 只接受文档列出的命名键，例如 `page-down`、`page-up`、`arrow-down`、`arrow-up`。
+- `--context requires --rank-db for rime`：`rime --context` 只在 rank smoke 中有效，必须同时传入 `--rank-db`。
+- `missing --db`：`dict`、`learn` 或 `rank explain` 必须显式指定 SQLite 路径。
+- `invalid import_file`：导入文件需要符合 `radishlex-user-terms-v1` TSV，且词条状态只能是 `active` 或 `suppressed`。
+- `unknown negative feedback reason ...`：`learn suppress --reason` 只接受 `immediate_backspace`、`reselect_same_code`、`manual_suppress` 或 `manual_delete`。

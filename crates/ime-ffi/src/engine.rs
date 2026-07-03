@@ -1,6 +1,9 @@
+use std::os::raw::c_char;
+
 use crate::error::FfiError;
 
 pub const RADISHLEX_SESSION_OPTIONS_VERSION: u32 = 1;
+pub const RADISHLEX_RIME_SESSION_OPTIONS_VERSION: u32 = 1;
 
 pub const RADISHLEX_ENGINE_KIND_DEMO: u32 = 1;
 pub const RADISHLEX_ENGINE_KIND_RIME: u32 = 2;
@@ -10,6 +13,17 @@ pub const RADISHLEX_ENGINE_KIND_RIME: u32 = 2;
 pub struct RadishLexSessionOptions {
     pub version: u32,
     pub engine_kind: u32,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RadishLexRimeSessionOptions {
+    pub version: u32,
+    pub shared_data_dir: *const c_char,
+    pub user_data_dir: *const c_char,
+    pub schema: *const c_char,
+    pub log_dir: *const c_char,
+    pub deploy_on_start: u8,
 }
 
 impl RadishLexSessionOptions {
@@ -38,4 +52,17 @@ pub fn validate_session_options(options: RadishLexSessionOptions) -> Result<u32,
             "unknown engine kind {other}"
         ))),
     }
+}
+
+pub fn validate_rime_session_options_version(
+    options: RadishLexRimeSessionOptions,
+) -> Result<(), FfiError> {
+    if options.version != RADISHLEX_RIME_SESSION_OPTIONS_VERSION {
+        return Err(FfiError::invalid_argument(format!(
+            "unsupported rime session options version {}",
+            options.version
+        )));
+    }
+
+    Ok(())
 }

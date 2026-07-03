@@ -24,6 +24,12 @@ RadishLex/
       migrations/
       configs/
       Dockerfile
+  deploy/
+    sync-server/
+      caddy/
+      docker-compose.local.yaml
+      docker-compose.yaml
+      nginx.prod.conf
   apps/
     radishlex-manager/
       flutter/
@@ -45,6 +51,14 @@ RadishLex/
     engine-boundary.md
     engine-rime-adapter.md
     personalization-learning.md
+    sync-payload.md
+    crypto-boundary.md
+    sync-key-management.md
+    sync-server-api-storage.md
+    sync-server-oidc-roadmap.md
+    production-recovery-flow.md
+    ffi-boundary.md
+    adr/
     runbooks/
     platform-notes/
   scripts/
@@ -64,6 +78,7 @@ RadishLex/
 
 - `crates/`：Rust 核心和跨端复用库。
 - `server/`：Go 自部署同步服务。
+- `deploy/`：容器部署、反向代理和环境切换配置。
 - `apps/`：Flutter 管理器和可选工程工具。
 - `platforms/`：各平台系统输入法薄壳。
 - `docs/`：项目文档真相源。
@@ -74,18 +89,38 @@ RadishLex/
 ## 当前已落地
 
 - `Cargo.toml`：Rust workspace 入口。
+- `deploy/sync-server/docker-compose.local.yaml`：Go sync server 本地容器验证入口，使用 Caddy internal TLS 暴露 `https://localhost:7319`。
+- `deploy/sync-server/docker-compose.yaml`：Go sync server 部署态入口，只暴露 HTTP 上游 `http://127.0.0.1:7319`，外部反代负责 TLS。
+- `deploy/sync-server/.env.example`：唯一 env 示例，真实部署复制为 `.env` 后修改。
+- `deploy/sync-server/nginx.prod.conf`：生产外部 Nginx TLS 终止示例。
+- `platforms/android-ime/keystore-bridge/`：Android Keystore bridge 仓库内 Kotlin / Gradle harness，固定 `android-keystore-v1` 的 `AndroidKeyStore` / `Ed25519` 创建、加载、公钥读取、签名、删除、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke / 设备矩阵记录模板，以及 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 失败记录；Rust raw JNI glue 位于 `crates/ime-crypto`，该目录当前不包含完整 Android IME。
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
 - `crates/ime-cli/`：基于 demo adapter、可选 Rime adapter、userdb 和 ranker 的命令行复验入口。
 - `crates/ime-engine-rime/`：Rime adapter crate，默认不启用 native 绑定。
-- `crates/ime-ffi/`：C ABI 起步 crate，覆盖 opaque handle、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、sync preflight 状态摘要、userdb add / delete / list 管理入口和 host smoke。
-- `crates/ime-sync/`：同步 payload 来源分类、对象类型和加密对象外壳草案。
+- `crates/ime-ffi/`：C ABI 起步 crate，覆盖 ABI contract、opaque handle、session owner-thread policy、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、sync preflight 状态摘要、userdb 管理入口、dictionary 文件管理入口和 host smoke。
+- `crates/ime-sync/`：同步 payload 来源分类、对象类型、P2 envelope 组装、加密对象外壳草案、设备生命周期、对象版本冲突、客户端合并模型、signed device authorization、signed device revocation、remote client DTO / transport trait 和 std-only `http://` HTTP transport。
+- `crates/ime-crypto/`：客户端加密本地模型 crate，当前覆盖 key role、object envelope、AAD、nonce、ciphertext hash、device wrapping、recovery material、Argon2id recovery KDF、Ed25519 signing、test-memory signing key store、platform backend capability / unavailable 模型、feature-gated macOS Keychain backend、feature-gated Android Keystore bridge wrapper / contract / raw JNI glue、signed object manifest 和 signed recovery record。
+- `server/sync-server/`：Go sync server 起步 module，当前覆盖配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、device wrapping encrypted key bytes 承载、recovery wrapped material 读取接口、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、单用户 bearer access token 门禁、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、`cmd/radishlex-sync-server`、runtime 配置装配、HTTP timeout、对象大小门禁、脱敏 audit logger、本机 smoke runbook、短生命周期双设备 HTTP smoke、Dockerfile / `.dockerignore`、Docker Compose 本地 / 部署态入口、生产部署 runbook、Rust HTTP transport 直连 Go server 的短生命周期跨语言测试，以及 Rust userdb 两客户端真实 Go HTTP 同步测试；不包含完整真实用户生产封装。
 - `docs/cli.md`：`radishlex-ime-cli` 命令、输出、退出码和安全边界说明。
 - `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
 - `docs/engine-rime-adapter.md`：`ime-engine-rime` 的 adapter 边界、构建策略和验证分层。
 - `docs/personalization-learning.md`：Phase 2 个人化学习、userdb、ranker、负反馈和 CLI 管理边界。
 - `docs/sync-payload.md`：同步 payload 草案和 P1/P2 来源分类。
+- `docs/crypto-boundary.md`：`ime-crypto` 进入实现前的客户端加密、密钥、envelope 和验证边界。
+- `docs/sync-key-management.md`：真实同步前的同步密钥、设备授权、恢复码、设备撤销、key epoch 和冲突边界。
+- `docs/sync-server-api-storage.md`：Go sync server API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和停止线。
+- `docs/sync-server-oidc-roadmap.md`：后续接入 Radish 产品账号体系或兼容 OIDC IdP 的认证边界、身份映射、scope 草案和停止线。
+- `docs/production-recovery-flow.md`：生产恢复记录创建、轮换、撤销、新设备恢复加入、失败限速和停止线。
+- `docs/adr/0002-recovery-code-kdf.md`：恢复码 Argon2id KDF、格式、恢复记录字段和生产实现验证口径。
+- `docs/adr/0003-device-signing-key-storage.md`：设备签名、签名对象、私钥存储抽象、错误语义和验证口径。
+- `docs/adr/0004-platform-private-key-storage-backend.md`：平台私钥存储 backend、capability metadata、FFI 边界、错误语义和停止线。
 - `docs/ffi-boundary.md`：后续 C ABI、所有权、生命周期和错误语义边界。
+- `docs/runbooks/ffi-platform-call-contract.md`：平台绑定层调用 C ABI 的错误、字符串、handle 释放和 owner-thread 调度规则。
 - `docs/runbooks/rime-native-smoke.md`：真实 `librime` 本机 smoke 操作步骤。
+- `docs/runbooks/apple-keychain-signing-backend.md`：`apple-keychain-v1` 创建、加载、签名、删除、锁屏 / 权限、备份迁移和日志脱敏验证边界。
+- `docs/runbooks/android-keystore-signing-backend.md`：`android-keystore-v1` Ed25519 创建、加载、签名、删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界。
+- `docs/runbooks/sync-server-local-smoke.md`：Go sync server 本机启动边界、自动化 smoke 和日志脱敏检查。
+- `docs/runbooks/sync-server-compose.md`：Go sync server Docker Compose 本地 HTTPS、部署态 HTTP 上游、持久化目录、外部反代示例、清理和停止线 runbook。
 
 ## Rust crates 建议
 
@@ -136,7 +171,7 @@ librime adapter：
 - 学习记录。
 - 导入导出。
 
-当前已创建 `crates/ime-userdb/`，落地 SQLite schema migration、用户词条 CRUD、选择事件记录、负反馈记录、删除 tombstone 和 ranker weight 摘要起步测试；基础 CLI 管理入口已由 `ime-cli` 承接，导入导出后续补齐。
+当前已创建 `crates/ime-userdb/`，落地 SQLite schema migration、用户词条 CRUD、选择事件记录、负反馈记录、删除 tombstone、ranker weight 摘要、用户词库导入导出、同步前置计数、`dictionary.user_terms` / `ranker.weights` / `dictionary.deleted_terms` P2 plaintext payload 只读迭代器、已解密 P2 JSON 到 `ime-sync` merge input 的解析入口、合并结果写回真实 userdb 的事务执行器，以及两客户端 userdb 同步边界 integration test；基础 CLI 管理入口已由 `ime-cli` 承接。
 
 ### ime-sync
 
@@ -147,7 +182,7 @@ librime adapter：
 - 版本管理。
 - 设备状态。
 
-当前已创建 `crates/ime-sync/`，只落地 payload 来源分类、同步对象类型、P1/P2/本地审计分层和加密对象外壳元数据校验；不连接后端、不实现加密或设备授权。
+当前已创建 `crates/ime-sync/`，落地 payload 来源分类、同步对象类型、P1/P2/本地审计分层、P2 plaintext payload 到 `ime-crypto` envelope 的 Rust 内部组装边界、从 crypto envelope 派生加密对象外壳元数据、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型、客户端解密后合并模型、remote client DTO / transport trait 和 std-only `http://` HTTP transport；不启动长期运行后端，不开放用户可用同步。
 
 ### ime-crypto
 
@@ -158,6 +193,8 @@ librime adapter：
 - blob 加密。
 - 签名和校验。
 
+当前已创建 `crates/ime-crypto/`，落地 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、Argon2id recovery KDF、key role、object envelope、AAD、nonce、device key descriptor、device wrapping key / record、recovery material、Ed25519 设备签名、test-memory signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断、feature-gated macOS Keychain backend、feature-gated Android Keystore 不可用门禁、Rust bridge wrapper 和 bridge contract、signed sync object manifest、signed recovery record、删除同步和篡改失败测试；生产恢复流程和平台私钥存储 backend 边界已由文档固定，`apple-keychain-v1` 真实 smoke 阻塞于 `ed25519-v1` 创建，status 在 blocker 解除前阻断生产签名，`android-keystore-v1` 已补 runbook、feature、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin bridge source、Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，已补 Rust raw JNI glue，Android target build 已通过 `./scripts/check-android-target.sh`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
+
 ### ime-ffi
 
 跨语言边界：
@@ -166,7 +203,7 @@ librime adapter：
 - Flutter bridge。
 - Swift/Kotlin/C++ 调用边界。
 
-当前已创建 `crates/ime-ffi/`，落地 C ABI 起步验证：opaque session handle、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、sync preflight 状态摘要、userdb add / delete / list 管理入口、释放函数、schema 设置、按键输入、snapshot 和候选提交。当前 host smoke 使用 deterministic demo engine，不代表真实平台壳或 Rime adapter 已接入。
+当前已创建 `crates/ime-ffi/`，落地 C ABI 起步验证：ABI contract、opaque session handle、session owner-thread policy、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、sync preflight 状态摘要、userdb 管理入口、dictionary 文件管理入口、释放函数 panic 边界、schema 设置、按键输入、snapshot 和候选提交。当前 host smoke 使用 deterministic demo engine，不代表真实平台壳已接入。
 
 ### ime-cli
 
@@ -181,9 +218,11 @@ librime adapter：
 
 ## Go server 建议
 
+Go server 当前实现继续以 `docs/sync-server-api-storage.md` 为 API、storage、错误语义和验证边界。服务端只保存密文对象、设备公钥、签名记录、版本和必要同步元数据，不解析 userdb payload，不接触 P1 原始事件，也不进入输入热路径。
+
 ```text
 server/sync-server/
-  cmd/radishlex-server/
+  cmd/radishlex-sync-server/
   internal/api/
   internal/auth/
   internal/devices/
@@ -201,6 +240,8 @@ server/sync-server/
 - SQLite。
 - Docker Compose。
 - 本地文件对象存储。
+
+当前已起步 `server/sync-server/`，但只实现 metadata / storage / API / runtime 验证模型、SQLite-backed metadata repository、local object storage staged transaction、对象 Rust envelope hash / length 复验、Ed25519 签名验签门禁、device wrapping encrypted key bytes 承载、recovery wrapped material 读取、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、单用户 bearer access token 门禁、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、启动入口、runtime 配置装配、脱敏日志、本机 runbook、Docker Compose 本地 / 部署态入口、生产部署 runbook 和短生命周期双设备 HTTP smoke。Rust `ime-sync` 已起步 remote client DTO / transport trait、std-only `http://` HTTP transport 和可选 bearer token header，`ime-userdb` 已补两客户端 userdb harness 和真实 Go HTTP 两客户端测试，Rust HTTP transport 直连 Go server 的短生命周期跨语言测试已覆盖对象上传、下载和 stale conflict；OIDC / Radish 产品账号体系只作为后续专题规划，当前不实现账号系统；完整真实用户生产封装、Flutter manager 和平台壳继续后置。
 
 后续支持：
 

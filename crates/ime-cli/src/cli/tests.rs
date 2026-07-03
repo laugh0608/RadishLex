@@ -743,6 +743,85 @@ fn learn_commands_feed_rank_explain() {
 }
 
 #[test]
+fn learn_status_reports_read_only_summary_without_p1_details() {
+    let db = temp_db_path("learn-status");
+
+    run(&args(&[
+        "radishlex-ime-cli",
+        "dict",
+        "add",
+        "--db",
+        &db,
+        "--input",
+        "cihe",
+        "--text",
+        "词核",
+    ]))
+    .expect("dict add succeeds");
+    run(&args(&[
+        "radishlex-ime-cli",
+        "learn",
+        "select",
+        "--db",
+        &db,
+        "--input",
+        "luobo",
+        "--text",
+        "萝卜",
+        "--session",
+        "session-private",
+        "--context",
+        "chat",
+    ]))
+    .expect("selection succeeds");
+    run(&args(&[
+        "radishlex-ime-cli",
+        "learn",
+        "suppress",
+        "--db",
+        &db,
+        "--input",
+        "luobo",
+        "--text",
+        "萝卜",
+        "--reason",
+        "manual_suppress",
+        "--context",
+        "chat",
+    ]))
+    .expect("feedback succeeds");
+
+    let output = run(&args(&[
+        "radishlex-ime-cli",
+        "learn",
+        "status",
+        "--db",
+        &db,
+    ]))
+    .expect("status succeeds");
+
+    assert!(output.contains("learning_status: ready"));
+    assert!(output.contains("plaintext_payload: false"));
+    assert!(output.contains("p1_raw_details: false"));
+    assert!(output.contains("context_stats: false"));
+    assert!(output.contains("active_user_terms: 1"));
+    assert!(output.contains("suppressed_user_terms: 1"));
+    assert!(output.contains("ranker_weights: 1"));
+    assert!(output.contains("deleted_tombstones: 0"));
+    assert!(output.contains("selection_events: 1"));
+    assert!(output.contains("negative_feedback: 1"));
+    assert!(output.contains("import_batches: 0"));
+    assert!(output.contains("overall_at_ms: "));
+    assert!(!output.contains("session-private"));
+    assert!(!output.contains("chat"));
+    assert!(!output.contains("manual_suppress"));
+    assert!(!output.contains("萝卜"));
+    assert!(!output.contains("词核"));
+
+    let _ = fs::remove_file(db);
+}
+
+#[test]
 fn sync_preflight_reports_syncable_and_local_only_counts() {
     let db = temp_db_path("sync-preflight");
 
