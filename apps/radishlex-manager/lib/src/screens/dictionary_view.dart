@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/manager_models.dart';
 import 'manager_widgets.dart';
 
-class DictionaryView extends StatelessWidget {
+class DictionaryView extends StatefulWidget {
   const DictionaryView({
     super.key,
     required this.snapshot,
@@ -18,7 +18,23 @@ class DictionaryView extends StatelessWidget {
   final VoidCallback onExportDictionary;
 
   @override
+  State<DictionaryView> createState() => _DictionaryViewState();
+}
+
+class _DictionaryViewState extends State<DictionaryView> {
+  final searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final searchQuery = searchController.text.trim();
+    final visibleTerms = _filterTerms(widget.snapshot.dictionaryTerms);
+
     return ManagerSection(
       title: '本地词库',
       trailing: Wrap(
@@ -26,13 +42,13 @@ class DictionaryView extends StatelessWidget {
         children: [
           OutlinedButton.icon(
             key: const Key('dictionary-import-button'),
-            onPressed: onImportDictionary,
+            onPressed: widget.onImportDictionary,
             icon: const Icon(Icons.upload_file_outlined),
             label: const Text('导入'),
           ),
           FilledButton.icon(
             key: const Key('dictionary-export-button'),
-            onPressed: onExportDictionary,
+            onPressed: widget.onExportDictionary,
             icon: const Icon(Icons.download_outlined),
             label: const Text('导出'),
           ),
@@ -41,51 +57,129 @@ class DictionaryView extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const TextField(
-            decoration: InputDecoration(
+          TextField(
+            key: const Key('dictionary-search-field'),
+            controller: searchController,
+            decoration: const InputDecoration(
               prefixIcon: Icon(Icons.search),
-              labelText: '搜索 input code / text',
+              labelText: '搜索 input code / text / reading / source',
             ),
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 14),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              headingTextStyle: Theme.of(context).textTheme.labelMedium,
-              columns: const [
-                DataColumn(label: Text('input code')),
-                DataColumn(label: Text('text')),
-                DataColumn(label: Text('reading')),
-                DataColumn(label: Text('weight')),
-                DataColumn(label: Text('source')),
-                DataColumn(label: Text('last used')),
-                DataColumn(label: Text('')),
-              ],
-              rows: snapshot.dictionaryTerms
-                  .map(
-                    (term) => DataRow(
-                      cells: [
-                        DataCell(Text(term.inputCode)),
-                        DataCell(Text(term.text)),
-                        DataCell(Text(term.reading)),
-                        DataCell(Text(term.weight.toStringAsFixed(2))),
-                        DataCell(Text(term.source)),
-                        DataCell(Text(term.lastUsed)),
-                        DataCell(
-                          IconButton(
-                            tooltip: '删除词条',
-                            onPressed: () => onDeleteTerm(term),
-                            icon: const Icon(Icons.delete_outline),
-                          ),
-                        ),
-                      ],
+          if (widget.snapshot.dictionaryTerms.isEmpty)
+            const _DictionaryEmptyState(
+              icon: Icons.library_books_outlined,
+              message: '当前本地 userdb 没有可显示词条',
+            )
+          else if (visibleTerms.isEmpty)
+            _DictionaryEmptyState(
+              icon: Icons.search_off_outlined,
+              message: '没有匹配 "$searchQuery" 的词条',
+            )
+          else
+            _DictionaryTermsTable(
+              terms: visibleTerms,
+              onDeleteTerm: widget.onDeleteTerm,
+            ),
+          const SizedBox(height: 14),
+          _DeletedTermsStrip(deletedTerms: widget.snapshot.deletedTerms),
+        ],
+      ),
+    );
+  }
+
+  List<UserTerm> _filterTerms(List<UserTerm> terms) {
+    final query = searchController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      return terms;
+    }
+
+    return terms
+        .where((term) {
+          return term.inputCode.toLowerCase().contains(query) ||
+              term.text.toLowerCase().contains(query) ||
+              term.reading.toLowerCase().contains(query) ||
+              term.source.toLowerCase().contains(query);
+        })
+        .toList(growable: false);
+  }
+}
+
+class _DictionaryTermsTable extends StatelessWidget {
+  const _DictionaryTermsTable({
+    required this.terms,
+    required this.onDeleteTerm,
+  });
+
+  final List<UserTerm> terms;
+  final ValueChanged<UserTerm> onDeleteTerm;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        headingTextStyle: Theme.of(context).textTheme.labelMedium,
+        columns: const [
+          DataColumn(label: Text('input code')),
+          DataColumn(label: Text('text')),
+          DataColumn(label: Text('reading')),
+          DataColumn(label: Text('weight')),
+          DataColumn(label: Text('source')),
+          DataColumn(label: Text('last used')),
+          DataColumn(label: Text('')),
+        ],
+        rows: terms
+            .map(
+              (term) => DataRow(
+                cells: [
+                  DataCell(Text(term.inputCode)),
+                  DataCell(Text(term.text)),
+                  DataCell(Text(term.reading)),
+                  DataCell(Text(term.weight.toStringAsFixed(2))),
+                  DataCell(Text(term.source)),
+                  DataCell(Text(term.lastUsed)),
+                  DataCell(
+                    IconButton(
+                      tooltip: '删除词条',
+                      onPressed: () => onDeleteTerm(term),
+                      icon: const Icon(Icons.delete_outline),
                     ),
-                  )
-                  .toList(),
+                  ),
+                ],
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+}
+
+class _DictionaryEmptyState extends StatelessWidget {
+  const _DictionaryEmptyState({required this.icon, required this.message});
+
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.onSurfaceVariant;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Row(
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(
+              message,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: color),
             ),
           ),
-          const SizedBox(height: 14),
-          _DeletedTermsStrip(deletedTerms: snapshot.deletedTerms),
         ],
       ),
     );
@@ -113,6 +207,45 @@ class _DeletedTermsStrip extends StatelessWidget {
             avatar: const Icon(Icons.block, size: 18),
             label: Text('${term.inputCode} / ${term.text}'),
           ),
+        ),
+        if (deletedTerms.isEmpty) const Text('暂无 deleted tombstone'),
+      ],
+    );
+  }
+}
+
+class DictionaryDeleteConfirmDialog extends StatelessWidget {
+  const DictionaryDeleteConfirmDialog({super.key, required this.term});
+
+  final UserTerm term;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('删除词条'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ManagerKeyValueRow(label: 'input code', value: term.inputCode),
+            ManagerKeyValueRow(label: 'text', value: term.text),
+            ManagerKeyValueRow(label: 'reading', value: term.reading),
+            ManagerKeyValueRow(label: 'source', value: term.source),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const Key('dictionary-delete-cancel'),
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('取消'),
+        ),
+        FilledButton.icon(
+          key: const Key('dictionary-delete-confirm'),
+          onPressed: () => Navigator.of(context).pop(true),
+          icon: const Icon(Icons.delete_outline),
+          label: const Text('删除'),
         ),
       ],
     );

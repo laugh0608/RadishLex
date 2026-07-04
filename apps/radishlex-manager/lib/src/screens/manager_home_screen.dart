@@ -69,10 +69,31 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
     });
   }
 
-  void _deleteTerm(UserTerm term) {
-    setState(() {
-      snapshotFuture = widget.bridge.deleteUserTerm(term.key);
-    });
+  Future<void> _deleteTerm(UserTerm term) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => DictionaryDeleteConfirmDialog(term: term),
+    );
+    if (!mounted || confirmed != true) {
+      return;
+    }
+
+    try {
+      final snapshot = await widget.bridge.deleteUserTerm(term.key);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        snapshotFuture = Future.value(snapshot);
+      });
+      _showBridgeMessage('已删除词条：${term.inputCode} / ${term.text}');
+    } on Object catch (error) {
+      if (mounted) {
+        _showBridgeMessage(
+          _bridgeFailureMessage(error, ManagerBridgeOperation.deleteUserTerm),
+        );
+      }
+    }
   }
 
   Future<void> _importDictionary() async {
@@ -110,11 +131,7 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
       if (!mounted) {
         return;
       }
-      _showBridgeMessage(
-        result.dryRun
-            ? '导入检查完成：${result.totalRecords} 条'
-            : '导入完成：${result.importedTerms} / ${result.totalRecords} 条',
-      );
+      _showBridgeMessage(_dictionaryImportResultMessage(result));
       _reloadSnapshot();
     } on Object catch (error) {
       if (mounted) {
@@ -137,7 +154,7 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
       if (!mounted) {
         return;
       }
-      _showBridgeMessage('导出完成：${result.exportedTerms} 条');
+      _showBridgeMessage(_dictionaryExportResultMessage(result));
     } on Object catch (error) {
       if (mounted) {
         _showBridgeMessage(
@@ -483,4 +500,15 @@ class _Header extends StatelessWidget {
 
 String _bridgeFailureMessage(Object? error, ManagerBridgeOperation operation) {
   return describeManagerBridgeFailure(error, operation).userMessage;
+}
+
+String _dictionaryImportResultMessage(DictionaryImportResult result) {
+  final skipped = result.skippedDeletedTerms + result.skippedDuplicateTerms;
+  final label = result.dryRun ? '导入检查完成' : '导入完成';
+  return '$label：${result.importedTerms} / ${result.totalRecords} 条，'
+      '新增 ${result.insertedTerms}，更新 ${result.updatedTerms}，跳过 $skipped';
+}
+
+String _dictionaryExportResultMessage(DictionaryExportResult result) {
+  return '导出完成：${result.exportedTerms} 条，${result.format} / ${result.syncClass}';
 }

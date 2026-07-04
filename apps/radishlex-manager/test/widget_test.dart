@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:radishlex_manager/src/bridge/fixture_manager_bridge.dart';
 import 'package:radishlex_manager/src/bridge/manager_bridge.dart';
+import 'package:radishlex_manager/src/data/manager_fixture.dart';
 import 'package:radishlex_manager/src/app.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
@@ -18,6 +19,55 @@ void main() {
     expect(find.text('设备签名'), findsNothing);
     expect(find.text('luobo'), findsOneWidget);
     expect(find.text('deleted tombstone'), findsOneWidget);
+  });
+
+  testWidgets(
+    'dictionary search filters local terms and shows no-match state',
+    (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(1400, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(const RadishLexManagerApp());
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('dictionary-search-field')),
+        'tong',
+      );
+      await tester.pump();
+
+      expect(find.text('tongbu'), findsOneWidget);
+      expect(find.text('bianjie'), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const Key('dictionary-search-field')),
+        'missing-term',
+      );
+      await tester.pump();
+
+      expect(find.text('没有匹配 "missing-term" 的词条'), findsOneWidget);
+      expect(find.text('tongbu'), findsNothing);
+    },
+  );
+
+  testWidgets('dictionary view exposes empty local userdb state', (
+    WidgetTester tester,
+  ) async {
+    final snapshot = createManagerFixture().copyWith(
+      dictionaryTerms: const [],
+      deletedTerms: const [],
+    );
+
+    await tester.pumpWidget(
+      RadishLexManagerApp(
+        bridge: FixtureManagerBridge(initialSnapshot: snapshot),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前本地 userdb 没有可显示词条'), findsOneWidget);
+    expect(find.text('暂无 deleted tombstone'), findsOneWidget);
+    expect(find.byTooltip('删除词条'), findsNothing);
   });
 
   testWidgets('learning view exposes aggregate explain data', (
@@ -178,9 +228,38 @@ void main() {
     await tester.tap(find.byTooltip('删除词条').first);
     await tester.pumpAndSettle();
 
+    expect(find.text('删除词条'), findsOneWidget);
+    expect(find.text('luo bo ci he'), findsWidgets);
+
+    await tester.tap(find.byKey(const Key('dictionary-delete-confirm')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('已删除词条：luobo / 萝卜词核'), findsOneWidget);
     expect(find.text('luobo'), findsNothing);
     expect(find.text('luobo / 萝卜词核'), findsOneWidget);
   });
+
+  testWidgets(
+    'delete failure stays on dictionary view with structured message',
+    (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(1400, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        RadishLexManagerApp(bridge: _DeleteFailingBridge()),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('删除词条').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('dictionary-delete-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('删除词条失败：本地 userdb 错误（userdb_error）'), findsOneWidget);
+      expect(find.text('管理端数据加载失败'), findsNothing);
+      expect(find.text('luobo'), findsOneWidget);
+    },
+  );
 
   testWidgets('dictionary import and export actions call manager bridge', (
     WidgetTester tester,
@@ -210,7 +289,7 @@ void main() {
     expect(bridge.importedPath, '/tmp/radishlex-import.json');
     expect(bridge.importedSourceName, 'manager-import');
     expect(bridge.importedDryRun, isTrue);
-    expect(find.text('导入检查完成：0 条'), findsOneWidget);
+    expect(find.text('导入检查完成：0 / 0 条，新增 0，更新 0，跳过 0'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('dictionary-export-button')));
     await tester.pumpAndSettle();
@@ -223,7 +302,38 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(bridge.exportedPath, '/tmp/radishlex-export.json');
-    expect(find.text('导出完成：3 条'), findsOneWidget);
+    expect(
+      find.text('导出完成：3 条，dictionary.user_terms.v1 / P2 encrypted sync'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('dictionary import failure shows operation category', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final bridge = _ImportInspectFailingBridge();
+    await tester.pumpWidget(RadishLexManagerApp(bridge: bridge));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('dictionary-import-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('dictionary-import-path')),
+      '/tmp/private-import.tsv',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('dictionary-import-submit')));
+    await tester.pumpAndSettle();
+
+    expect(bridge.inspectedPath, '/tmp/private-import.tsv');
+    expect(
+      find.text('检查导入词库失败：词库导入或本地 userdb 错误（invalid_argument）'),
+      findsOneWidget,
+    );
+    expect(find.text('导入检查'), findsNothing);
   });
 }
 
@@ -283,19 +393,38 @@ class _RecordingManagerBridge extends FixtureManagerBridge {
 class _FailingBridge extends FixtureManagerBridge {
   @override
   Future<ManagerSnapshot> loadSnapshot() async {
-    throw const _TestBridgeFailure();
+    throw const _TestBridgeFailure(code: 'userdb_error');
   }
 }
 
 class _TestBridgeFailure implements ManagerBridgeFailure {
-  const _TestBridgeFailure();
+  const _TestBridgeFailure({required this.code, this.statusCode = 4});
 
   @override
-  int get statusCode => 4;
+  final int statusCode;
 
   @override
-  String get code => 'userdb_error';
+  final String code;
 
   @override
   String get message => 'private path omitted';
+}
+
+class _DeleteFailingBridge extends FixtureManagerBridge {
+  @override
+  Future<ManagerSnapshot> deleteUserTerm(UserTermKey term) async {
+    throw const _TestBridgeFailure(code: 'userdb_error');
+  }
+}
+
+class _ImportInspectFailingBridge extends FixtureManagerBridge {
+  String? inspectedPath;
+
+  @override
+  Future<DictionaryImportPreview> inspectDictionaryImport(
+    String filePath,
+  ) async {
+    inspectedPath = filePath;
+    throw const _TestBridgeFailure(code: 'invalid_argument', statusCode: 2);
+  }
 }
