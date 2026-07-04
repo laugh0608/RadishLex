@@ -303,6 +303,10 @@ void main() {
     expect(find.text('fixture'), findsOneWidget);
     expect(find.text('RADISHLEX_MANAGER_DB not configured'), findsOneWidget);
     expect(find.text('not loaded'), findsOneWidget);
+    expect(find.text('同步门禁草案'), findsOneWidget);
+    expect(find.text('平台签名 backend 不可用'), findsOneWidget);
+    expect(find.text('设备 production gate 为 blocked'), findsOneWidget);
+    expect(find.text('deployment evidence missing'), findsWidgets);
   });
 
   testWidgets('load failure shows structured bridge error code', (
@@ -328,11 +332,19 @@ void main() {
     await tester.tap(find.byIcon(Icons.tune_outlined));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(
+      find.byKey(const Key('diagnostics-preview-button')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('diagnostics-preview-button')));
     await tester.pumpAndSettle();
 
     expect(find.text('诊断摘要预览'), findsOneWidget);
     expect(find.textContaining('runtime.bridge_mode: fixture'), findsOneWidget);
+    expect(
+      find.textContaining('sync.state_source: 设备 production gate 为 blocked'),
+      findsOneWidget,
+    );
     expect(
       find.textContaining('redaction.user_terms: omitted'),
       findsOneWidget,
@@ -345,6 +357,10 @@ void main() {
     await tester.tap(find.text('关闭'));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(
+      find.byKey(const Key('diagnostics-export-button')),
+    );
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('diagnostics-export-button')));
     await tester.pumpAndSettle();
     await tester.enterText(
@@ -381,6 +397,10 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('settings-privacy-mode')));
     await tester.pump();
+
+    expect(find.text('策略禁用同步'), findsOneWidget);
+    expect(find.text('设置草案启用隐私模式'), findsOneWidget);
+
     await tester.tap(find.byKey(const Key('settings-save-button')));
     await tester.pumpAndSettle();
 

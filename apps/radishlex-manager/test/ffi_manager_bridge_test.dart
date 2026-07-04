@@ -55,6 +55,12 @@ void main() {
       final text = report.toRedactedText();
       expect(text, contains('runtime.bridge_mode: ffi_injected'));
       expect(text, contains('sync.state: backend_unavailable'));
+      expect(text, contains('sync.state_label: 平台签名 backend 不可用'));
+      expect(text, contains('sync.state_source: 设备 production gate 为 blocked'));
+      expect(
+        text,
+        contains('sync.deployment_evidence: deployment evidence missing'),
+      );
       expect(text, contains('redaction.user_terms: omitted'));
       expect(text, isNot(contains('萝卜词核')));
       expect(text, isNot(contains('/tmp/radishlex-userdb.sqlite')));
@@ -240,6 +246,11 @@ void main() {
     expect(term.lastUsed, '未使用');
     expect(learning.lastUpdated, '无记录');
     expect(sync.state, SyncUiState.backendUnavailable);
+    expect(managerSyncStateLabel(sync.state), '平台签名 backend 不可用');
+    expect(
+      managerSyncStateSourceDescription(state: sync.state, device: sync.device),
+      '设备 production gate 为 blocked',
+    );
     expect(sync.syncableObjects, 10);
     expect(sync.localOnlyEvents, 31);
     expect(

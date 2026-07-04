@@ -10,6 +10,8 @@ class SyncView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final audit = managerSyncGateAudit(state: sync.state, device: sync.device);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -25,7 +27,7 @@ class SyncView extends StatelessWidget {
               ManagerKeyValueRow(label: 'reason', value: sync.reason),
               ManagerKeyValueRow(
                 label: 'state source',
-                value: _stateSourceDescription(sync),
+                value: audit.stateSource,
               ),
               ManagerKeyValueRow(
                 label: 'syncable objects',
@@ -62,7 +64,7 @@ class SyncView extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                _syncActionStopLine(sync.state),
+                audit.actionStopLine,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -128,13 +130,15 @@ class _SyncGateSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final audit = managerSyncGateAudit(state: sync.state, device: sync.device);
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
         ManagerStatusBadge(
           icon: Icons.rule_outlined,
-          label: _stateSummaryLabel(sync.state),
+          label: audit.stateLabel,
           tone: sync.state.canEnableUserSync
               ? ManagerBadgeTone.success
               : ManagerBadgeTone.warning,
@@ -186,7 +190,7 @@ class _DeviceGateExplanation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gateReady = device.productionGate == 'ready';
+    final gateReady = managerDeviceGateReady(device);
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -194,9 +198,7 @@ class _DeviceGateExplanation extends StatelessWidget {
       children: [
         ManagerStatusBadge(
           icon: gateReady ? Icons.verified_outlined : Icons.gpp_bad_outlined,
-          label: gateReady
-              ? 'production gate ready'
-              : 'production gate blocked',
+          label: managerDeviceGateLabel(device),
           tone: gateReady ? ManagerBadgeTone.success : ManagerBadgeTone.warning,
         ),
         Chip(label: Text('backend ${device.backendId}')),
@@ -233,49 +235,4 @@ class _SyncEmptyState extends StatelessWidget {
       ),
     );
   }
-}
-
-String _stateSummaryLabel(SyncUiState state) {
-  switch (state) {
-    case SyncUiState.localOnly:
-      return '仅本地管理';
-    case SyncUiState.preflightReady:
-      return '本地预检通过';
-    case SyncUiState.serverConfigured:
-      return '服务端草案已保留';
-    case SyncUiState.backendUnavailable:
-      return '平台签名 backend 不可用';
-    case SyncUiState.deploymentUnverified:
-      return '部署证据未记录';
-    case SyncUiState.syncDisabledByPolicy:
-      return '策略禁用同步';
-    case SyncUiState.readyForUserSync:
-      return '等待后续开放';
-  }
-}
-
-String _stateSourceDescription(SyncPreflightSummary sync) {
-  switch (sync.state) {
-    case SyncUiState.localOnly:
-      return '未保留自部署服务端草案';
-    case SyncUiState.syncDisabledByPolicy:
-      return '设置草案启用隐私模式';
-    case SyncUiState.backendUnavailable:
-      return '设备 production gate 为 ${sync.device.productionGate}';
-    case SyncUiState.deploymentUnverified:
-      return '设置草案缺少目标部署验证记录';
-    case SyncUiState.preflightReady:
-      return '本地对象与设置草案预检通过';
-    case SyncUiState.serverConfigured:
-      return '服务端草案已配置但仍未开放真实同步';
-    case SyncUiState.readyForUserSync:
-      return '当前 Phase 4 仍关闭用户可用同步入口';
-  }
-}
-
-String _syncActionStopLine(SyncUiState state) {
-  if (state.canEnableUserSync) {
-    return '真实远端同步入口仍等待设备授权、恢复码和生产门禁完成后开放。';
-  }
-  return '真实远端同步、恢复码和设备授权仍处于关闭状态；本页只展示本地预检和不可用原因。';
 }

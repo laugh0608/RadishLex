@@ -7,12 +7,14 @@ class SettingsView extends StatefulWidget {
   const SettingsView({
     super.key,
     required this.settings,
+    required this.sync,
     required this.onPreviewDiagnostics,
     required this.onExportDiagnostics,
     required this.onSaveSettingsDraft,
   });
 
   final ManagerSettings settings;
+  final SyncPreflightSummary sync;
   final VoidCallback onPreviewDiagnostics;
   final VoidCallback onExportDiagnostics;
   final ValueChanged<ManagerSettingsDraft> onSaveSettingsDraft;
@@ -53,6 +55,7 @@ class _SettingsViewState extends State<SettingsView> {
   Widget build(BuildContext context) {
     final settings = widget.settings;
     final diagnostics = settings.runtimeDiagnostics;
+    final currentDraft = _currentDraft().normalized();
 
     return Column(
       children: [
@@ -120,6 +123,8 @@ class _SettingsViewState extends State<SettingsView> {
           ),
         ),
         const SizedBox(height: 16),
+        _SettingsSyncGatePreview(draft: currentDraft, sync: widget.sync),
+        const SizedBox(height: 16),
         ManagerSection(
           title: '配置来源',
           trailing: Wrap(
@@ -182,6 +187,69 @@ class _SettingsViewState extends State<SettingsView> {
     privacyMode = draft.privacyMode;
     diagnosticsExport = draft.diagnosticsExport;
     deploymentEvidenceRecorded = draft.deploymentEvidenceRecorded;
+  }
+}
+
+class _SettingsSyncGatePreview extends StatelessWidget {
+  const _SettingsSyncGatePreview({required this.draft, required this.sync});
+
+  final ManagerSettingsDraft draft;
+  final SyncPreflightSummary sync;
+
+  @override
+  Widget build(BuildContext context) {
+    final audit = managerSyncGateAuditForDraft(
+      draft: draft,
+      device: sync.device,
+    );
+    final tone = audit.state.canEnableUserSync
+        ? ManagerBadgeTone.success
+        : ManagerBadgeTone.warning;
+
+    return ManagerSection(
+      title: '同步门禁草案',
+      trailing: ManagerStatusBadge(
+        icon: Icons.rule_outlined,
+        label: audit.state.code,
+        tone: tone,
+      ),
+      child: Column(
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ManagerStatusBadge(
+                icon: Icons.fact_check_outlined,
+                label: audit.stateLabel,
+                tone: tone,
+              ),
+              Chip(label: Text(managerDeploymentEvidenceLabel(draft))),
+              Chip(label: Text(audit.deviceGateLabel)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ManagerKeyValueRow(
+            label: 'server draft',
+            value: managerSyncEndpointLabel(draft),
+          ),
+          ManagerKeyValueRow(label: 'state source', value: audit.stateSource),
+          ManagerKeyValueRow(
+            label: 'deployment evidence',
+            value: managerDeploymentEvidenceLabel(draft),
+          ),
+          ManagerKeyValueRow(
+            label: 'device backend',
+            value: sync.device.backendId,
+          ),
+          ManagerKeyValueRow(
+            label: 'device gate',
+            value: sync.device.productionGate,
+          ),
+          ManagerKeyValueRow(label: 'stop line', value: audit.actionStopLine),
+        ],
+      ),
+    );
   }
 }
 

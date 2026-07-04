@@ -281,6 +281,7 @@ class _ManagerShell extends StatelessWidget {
       SyncView(sync: snapshot.sync),
       SettingsView(
         settings: snapshot.settings,
+        sync: snapshot.sync,
         onPreviewDiagnostics: onPreviewDiagnostics,
         onExportDiagnostics: onExportDiagnostics,
         onSaveSettingsDraft: onSaveSettingsDraft,
