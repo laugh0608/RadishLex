@@ -48,6 +48,7 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - [Sync Server Admin Console 远期专题](docs/sync-server-admin-console.md)
 - [生产恢复流程设计](docs/production-recovery-flow.md)
 - [管理端边界](docs/manager-ui-boundary.md)
+- [Manager Settings 与诊断报告字段参考](docs/manager-settings-diagnostics.md)
 - [ADR 0002: 恢复码 KDF 与同步域恢复边界](docs/adr/0002-recovery-code-kdf.md)
 - [ADR 0003: 设备签名与私钥存储边界](docs/adr/0003-device-signing-key-storage.md)
 - [ADR 0004: 平台私钥存储 Backend 边界](docs/adr/0004-platform-private-key-storage-backend.md)

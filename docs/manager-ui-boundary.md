@@ -84,6 +84,8 @@ Phase 4 第一批管理端功能应覆盖：
 
 当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、词库导入检查、词库导入、词库导出、设置草案保存、诊断报告预览和诊断报告导出这组受控方法。现有 `FixtureManagerBridge` 只使用合成数据验证调用边界、UI 状态更新、词库搜索 / 空态、词条 key / source / import batch / tombstone / sync 分类审计详情、词库页导入历史筛选 / 排序 / 批次联动审计、本地 sync preflight 影响摘要、学习状态聚合摘要、rank explain 筛选和候选贡献项详情、同步页 gate 状态来源 / 本地 P2 对象分类 / 设备 backend 门禁审计、设置页 gate 草案预览、部署证据来源标签、诊断报告 gate source / stop line、删除确认、导入检查对话框、导入 / 导出结果反馈、操作失败分类提示、设置草案和脱敏诊断报告；真实 Dart FFI bridge 已覆盖本地 userdb list / delete、dictionary inspect / import / export、import batches、learning status、rank explain、sync preflight 摘要、非 secret settings JSON 草案持久化和脱敏诊断报告导出。Dart 绑定层必须复制 Rust view 后释放 handle，不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层；widget 层只展示结构化错误码、错误分类和非敏感配置来源诊断。
 
+settings JSON schema、部署证据来源 allowlist、诊断报告字段索引和脱敏规则见 `docs/manager-settings-diagnostics.md`。
+
 第一批可依赖的接口方向：
 
 - session / dictionary handle 的创建与释放。
@@ -117,7 +119,7 @@ Phase 4 第一批管理端功能应覆盖：
 
 在 `ready_for_user_sync` 前，UI 可以展示配置检查和不可用原因，但不能提供会把本地 P2 数据上传到用户真实远端的主操作。
 
-设置草案中的目标部署证据只允许保存非敏感来源标签，例如本机 smoke、外部 TLS、备份恢复或升级回滚演练；不得保存日志正文、证书、token、恢复码、路径、请求 / 响应体、payload bytes 或其他运行输出。
+设置草案中的目标部署证据只允许保存非敏感来源标签，例如本机 smoke、外部 TLS、备份恢复或升级回滚演练；不得保存日志正文、证书、token、恢复码、路径、请求 / 响应体、payload bytes 或其他运行输出。字段级参考见 `docs/manager-settings-diagnostics.md`。
 
 ## 恢复码与设备授权
 
