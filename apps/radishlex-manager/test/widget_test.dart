@@ -23,6 +23,10 @@ void main() {
     expect(find.text('syncable 3'), findsOneWidget);
     expect(find.text('local-only 128'), findsOneWidget);
     expect(find.text('deleted tombstone'), findsOneWidget);
+    expect(
+      find.text('选择一个词条查看 key、来源、导入批次、tombstone 和 sync 分类'),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -76,6 +80,25 @@ void main() {
     expect(find.byTooltip('删除词条'), findsNothing);
   });
 
+  testWidgets('dictionary term audit detail explains selected local term', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(const RadishLexManagerApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('luobo'));
+    await tester.pump();
+
+    expect(find.text('active user term'), findsOneWidget);
+    expect(find.text('无匹配导入批次'), findsOneWidget);
+    expect(find.text('未删除；删除后会写入 tombstone'), findsOneWidget);
+    expect(find.text('dictionary.user_terms (1)'), findsOneWidget);
+    expect(find.text('backend_unavailable'), findsWidgets);
+  });
+
   testWidgets(
     'dictionary import history filters sorts and selects source terms',
     (WidgetTester tester) async {
@@ -122,6 +145,9 @@ void main() {
       final secondNewestTop = tester.getTopLeft(find.text('#1')).dy;
       expect(firstNewestTop, lessThan(secondNewestTop));
 
+      await tester.ensureVisible(
+        find.byKey(const Key('dictionary-import-history-sort')),
+      );
       await tester.tap(find.byKey(const Key('dictionary-import-history-sort')));
       await tester.pump();
 
@@ -150,8 +176,12 @@ void main() {
         find.byKey(const Key('dictionary-import-history-filter')),
         '',
       );
+      await tester.ensureVisible(
+        find.byKey(const Key('dictionary-import-history-sort')),
+      );
       await tester.tap(find.byKey(const Key('dictionary-import-history-sort')));
       await tester.pump();
+      await tester.ensureVisible(find.text('#2'));
       await tester.tap(find.text('#2'));
       await tester.pump();
 
@@ -159,6 +189,15 @@ void main() {
       expect(find.text('bianjie'), findsOneWidget);
       expect(find.text('luobo'), findsNothing);
       expect(find.text('tongbu'), findsNothing);
+
+      await tester.ensureVisible(find.text('bianjie'));
+      await tester.tap(find.text('bianjie'));
+      await tester.pump();
+
+      expect(
+        find.textContaining('#2 / manager-import / 40/42'),
+        findsOneWidget,
+      );
     },
   );
 
@@ -322,6 +361,8 @@ void main() {
 
     expect(find.text('删除词条'), findsOneWidget);
     expect(find.text('luo bo ci he'), findsWidgets);
+    expect(find.text('写入 deleted tombstone，避免旧设备或旧备份复活该词条'), findsOneWidget);
+    expect(find.text('dictionary.deleted_terms'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('dictionary-delete-confirm')));
     await tester.pumpAndSettle();

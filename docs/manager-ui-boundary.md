@@ -82,7 +82,7 @@ Phase 4 第一批管理端功能应覆盖：
 
 管理端应通过 `ime-ffi` 或后续受控 bridge 调用 Rust 能力，不直接读写 Rust 内部结构。
 
-当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、词库导入检查、词库导入、词库导出、设置草案保存、诊断报告预览和诊断报告导出这组受控方法。现有 `FixtureManagerBridge` 只使用合成数据验证调用边界、UI 状态更新、词库搜索 / 空态、词库页导入历史筛选 / 排序 / 批次联动审计、本地 sync preflight 影响摘要、删除确认、导入检查对话框、导入 / 导出结果反馈、操作失败分类提示、设置草案和脱敏诊断报告；真实 Dart FFI bridge 已覆盖本地 userdb list / delete、dictionary inspect / import / export、import batches、learning status、rank explain、sync preflight 摘要、非 secret settings JSON 草案持久化和脱敏诊断报告导出。Dart 绑定层必须复制 Rust view 后释放 handle，不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层；widget 层只展示结构化错误码、错误分类和非敏感配置来源诊断。
+当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、词库导入检查、词库导入、词库导出、设置草案保存、诊断报告预览和诊断报告导出这组受控方法。现有 `FixtureManagerBridge` 只使用合成数据验证调用边界、UI 状态更新、词库搜索 / 空态、词条 key / source / import batch / tombstone / sync 分类审计详情、词库页导入历史筛选 / 排序 / 批次联动审计、本地 sync preflight 影响摘要、删除确认、导入检查对话框、导入 / 导出结果反馈、操作失败分类提示、设置草案和脱敏诊断报告；真实 Dart FFI bridge 已覆盖本地 userdb list / delete、dictionary inspect / import / export、import batches、learning status、rank explain、sync preflight 摘要、非 secret settings JSON 草案持久化和脱敏诊断报告导出。Dart 绑定层必须复制 Rust view 后释放 handle，不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层；widget 层只展示结构化错误码、错误分类和非敏感配置来源诊断。
 
 第一批可依赖的接口方向：
 
@@ -153,7 +153,7 @@ Phase 4 第一批管理端功能应覆盖：
 
 1. 已固定本文档，并同步路线图、技术计划、仓库结构和周志。
 2. 已创建 `apps/radishlex-manager/` Flutter macOS 工程骨架，当前通过 `ManagerBridge` contract 接入合成 fixture。
-3. 已验证词库搜索 / 空态、导入历史筛选 / 排序 / 批次联动审计、本地 sync preflight 影响摘要、词条删除确认、词库导入检查、词库导入后刷新、词库导入 / 导出结果摘要和操作失败分类提示经由 fixture bridge 完成受控调用。
+3. 已验证词库搜索 / 空态、词条审计详情、导入历史筛选 / 排序 / 批次联动审计、本地 sync preflight 影响摘要、词条删除确认、词库导入检查、词库导入后刷新、词库导入 / 导出结果摘要和操作失败分类提示经由 fixture bridge 完成受控调用。
 4. 已补第一批真实 Dart FFI bridge：显式配置本地 SQLite userdb 与 `ime-ffi` 动态库后，可接入 userdb 词条 list / delete、用户词库 inspect / import / export、import batches、learning status 摘要、rank explain 摘要和 sync preflight 摘要。
 5. 已新增 `scripts/check-manager-ffi-smoke.sh`，构建 `radishlex-ime-ffi` 动态库并使用临时 SQLite userdb、合成 TSV 和导出文件复验真实 Dart FFI bridge 的本地 list / delete / import / export、import batches、learning status、rank explain 和 sync preflight 摘要。
 6. `rank explain` 区域已通过专用 `ime-ffi` ABI 读取单候选贡献项，Flutter 只展示复制后的非敏感摘要，不持有 Rust view 指针。

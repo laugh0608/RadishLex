@@ -25,6 +25,7 @@ class _DictionaryViewState extends State<DictionaryView> {
   final searchController = TextEditingController();
   final importFilterController = TextEditingController();
   int? selectedBatchId;
+  UserTermKey? selectedTermKey;
   bool newestImportFirst = true;
 
   @override
@@ -41,6 +42,15 @@ class _DictionaryViewState extends State<DictionaryView> {
     final visibleTerms = _filterTerms(
       widget.snapshot.dictionaryTerms,
       selectedBatch,
+    );
+    final selectedTerm = _selectedTerm(visibleTerms);
+    final selectedTermImportBatch = _importBatchForTerm(
+      selectedTerm,
+      widget.snapshot.importBatches,
+    );
+    final selectedTermTombstone = _tombstoneForTerm(
+      selectedTerm,
+      widget.snapshot.deletedTerms,
     );
     final visibleImportBatches = _filterImportBatches(
       widget.snapshot.importBatches,
@@ -107,11 +117,25 @@ class _DictionaryViewState extends State<DictionaryView> {
               else
                 _DictionaryTermsTable(
                   terms: visibleTerms,
+                  selectedTermKey: selectedTermKey,
+                  onSelectTerm: (term) => setState(() {
+                    selectedTermKey = term.key;
+                  }),
                   onDeleteTerm: widget.onDeleteTerm,
                 ),
               const SizedBox(height: 14),
               _DeletedTermsStrip(deletedTerms: widget.snapshot.deletedTerms),
             ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        ManagerSection(
+          title: '词条审计详情',
+          child: _DictionaryTermAuditPanel(
+            term: selectedTerm,
+            importBatch: selectedTermImportBatch,
+            tombstone: selectedTermTombstone,
+            sync: widget.snapshot.sync,
           ),
         ),
         const SizedBox(height: 16),
@@ -158,6 +182,51 @@ class _DictionaryViewState extends State<DictionaryView> {
     return null;
   }
 
+  UserTerm? _selectedTerm(List<UserTerm> terms) {
+    final key = selectedTermKey;
+    if (key == null) {
+      return null;
+    }
+    for (final term in terms) {
+      if (term.key == key) {
+        return term;
+      }
+    }
+    return null;
+  }
+
+  DictionaryImportBatchSummary? _importBatchForTerm(
+    UserTerm? term,
+    List<DictionaryImportBatchSummary> batches,
+  ) {
+    if (term == null) {
+      return null;
+    }
+    for (final batch in batches) {
+      if (batch.sourceName == term.source) {
+        return batch;
+      }
+    }
+    return null;
+  }
+
+  DeletedTerm? _tombstoneForTerm(
+    UserTerm? term,
+    List<DeletedTerm> deletedTerms,
+  ) {
+    if (term == null) {
+      return null;
+    }
+    for (final deletedTerm in deletedTerms) {
+      if (deletedTerm.inputCode == term.inputCode &&
+          deletedTerm.text == term.text &&
+          deletedTerm.reading == term.reading) {
+        return deletedTerm;
+      }
+    }
+    return null;
+  }
+
   List<UserTerm> _filterTerms(
     List<UserTerm> terms,
     DictionaryImportBatchSummary? selectedBatch,
@@ -198,6 +267,99 @@ class _DictionaryViewState extends State<DictionaryView> {
     });
     return filtered;
   }
+}
+
+class _DictionaryTermAuditPanel extends StatelessWidget {
+  const _DictionaryTermAuditPanel({
+    required this.term,
+    required this.importBatch,
+    required this.tombstone,
+    required this.sync,
+  });
+
+  final UserTerm? term;
+  final DictionaryImportBatchSummary? importBatch;
+  final DeletedTerm? tombstone;
+  final SyncPreflightSummary sync;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedTerm = term;
+    if (selectedTerm == null) {
+      return const _DictionaryEmptyState(
+        icon: Icons.info_outline,
+        message: '选择一个词条查看 key、来源、导入批次、tombstone 和 sync 分类',
+      );
+    }
+
+    final batch = importBatch;
+    final deletedTerm = tombstone;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ManagerStatusBadge(
+              icon: Icons.key_outlined,
+              label: 'active user term',
+              tone: ManagerBadgeTone.success,
+            ),
+            ManagerStatusBadge(
+              icon: Icons.sync_outlined,
+              label: sync.state.code,
+              tone: ManagerBadgeTone.warning,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ManagerKeyValueRow(label: 'input code', value: selectedTerm.inputCode),
+        ManagerKeyValueRow(label: 'text', value: selectedTerm.text),
+        ManagerKeyValueRow(label: 'reading', value: selectedTerm.reading),
+        ManagerKeyValueRow(label: 'source', value: selectedTerm.source),
+        ManagerKeyValueRow(
+          label: 'weight',
+          value: selectedTerm.weight.toStringAsFixed(2),
+        ),
+        ManagerKeyValueRow(label: 'last used', value: selectedTerm.lastUsed),
+        ManagerKeyValueRow(
+          label: 'import batch',
+          value: _importBatchAuditLabel(batch),
+        ),
+        ManagerKeyValueRow(
+          label: 'tombstone',
+          value: deletedTerm == null
+              ? '未删除；删除后会写入 tombstone'
+              : '已存在 tombstone：${deletedTerm.deletedAt}',
+        ),
+        ManagerKeyValueRow(
+          label: 'sync category',
+          value:
+              'dictionary.user_terms '
+              '(${_categoryCount(sync, "dictionary.user_terms")})',
+        ),
+      ],
+    );
+  }
+}
+
+String _importBatchAuditLabel(DictionaryImportBatchSummary? batch) {
+  if (batch == null) {
+    return '无匹配导入批次';
+  }
+  return '#${batch.id} / ${batch.sourceName} / '
+      '${batch.importedTerms}/${batch.totalRecords} / ${batch.createdAt}';
+}
+
+int _categoryCount(SyncPreflightSummary sync, String categoryName) {
+  for (final category in sync.categories) {
+    if (category.name == categoryName) {
+      return category.count;
+    }
+  }
+  return 0;
 }
 
 String _emptyTermsMessage(
@@ -372,10 +534,14 @@ class _DictionaryImportHistoryControls extends StatelessWidget {
 class _DictionaryTermsTable extends StatelessWidget {
   const _DictionaryTermsTable({
     required this.terms,
+    required this.selectedTermKey,
+    required this.onSelectTerm,
     required this.onDeleteTerm,
   });
 
   final List<UserTerm> terms;
+  final UserTermKey? selectedTermKey;
+  final ValueChanged<UserTerm> onSelectTerm;
   final ValueChanged<UserTerm> onDeleteTerm;
 
   @override
@@ -383,6 +549,7 @@ class _DictionaryTermsTable extends StatelessWidget {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
+        showCheckboxColumn: false,
         headingTextStyle: Theme.of(context).textTheme.labelMedium,
         columns: const [
           DataColumn(label: Text('input code')),
@@ -396,6 +563,8 @@ class _DictionaryTermsTable extends StatelessWidget {
         rows: terms
             .map(
               (term) => DataRow(
+                selected: term.key == selectedTermKey,
+                onSelectChanged: (_) => onSelectTerm(term),
                 cells: [
                   DataCell(Text(term.inputCode)),
                   DataCell(Text(term.text)),
@@ -495,6 +664,14 @@ class DictionaryDeleteConfirmDialog extends StatelessWidget {
             ManagerKeyValueRow(label: 'text', value: term.text),
             ManagerKeyValueRow(label: 'reading', value: term.reading),
             ManagerKeyValueRow(label: 'source', value: term.source),
+            const ManagerKeyValueRow(
+              label: 'delete effect',
+              value: '写入 deleted tombstone，避免旧设备或旧备份复活该词条',
+            ),
+            const ManagerKeyValueRow(
+              label: 'sync category',
+              value: 'dictionary.deleted_terms',
+            ),
           ],
         ),
       ),
