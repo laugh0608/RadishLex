@@ -35,57 +35,70 @@ class _DictionaryViewState extends State<DictionaryView> {
     final searchQuery = searchController.text.trim();
     final visibleTerms = _filterTerms(widget.snapshot.dictionaryTerms);
 
-    return ManagerSection(
-      title: '本地词库',
-      trailing: Wrap(
-        spacing: 8,
-        children: [
-          OutlinedButton.icon(
-            key: const Key('dictionary-import-button'),
-            onPressed: widget.onImportDictionary,
-            icon: const Icon(Icons.upload_file_outlined),
-            label: const Text('导入'),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ManagerSection(
+          title: '本地词库',
+          trailing: Wrap(
+            spacing: 8,
+            children: [
+              OutlinedButton.icon(
+                key: const Key('dictionary-import-button'),
+                onPressed: widget.onImportDictionary,
+                icon: const Icon(Icons.upload_file_outlined),
+                label: const Text('导入'),
+              ),
+              FilledButton.icon(
+                key: const Key('dictionary-export-button'),
+                onPressed: widget.onExportDictionary,
+                icon: const Icon(Icons.download_outlined),
+                label: const Text('导出'),
+              ),
+            ],
           ),
-          FilledButton.icon(
-            key: const Key('dictionary-export-button'),
-            onPressed: widget.onExportDictionary,
-            icon: const Icon(Icons.download_outlined),
-            label: const Text('导出'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                key: const Key('dictionary-search-field'),
+                controller: searchController,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search),
+                  labelText: '搜索 input code / text / reading / source',
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 14),
+              if (widget.snapshot.dictionaryTerms.isEmpty)
+                const _DictionaryEmptyState(
+                  icon: Icons.library_books_outlined,
+                  message: '当前本地 userdb 没有可显示词条',
+                )
+              else if (visibleTerms.isEmpty)
+                _DictionaryEmptyState(
+                  icon: Icons.search_off_outlined,
+                  message: '没有匹配 "$searchQuery" 的词条',
+                )
+              else
+                _DictionaryTermsTable(
+                  terms: visibleTerms,
+                  onDeleteTerm: widget.onDeleteTerm,
+                ),
+              const SizedBox(height: 14),
+              _DeletedTermsStrip(deletedTerms: widget.snapshot.deletedTerms),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            key: const Key('dictionary-search-field'),
-            controller: searchController,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              labelText: '搜索 input code / text / reading / source',
-            ),
-            onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 16),
+        ManagerSection(
+          title: '导入历史',
+          trailing: Text('${widget.snapshot.importBatches.length} batches'),
+          child: _DictionaryImportHistory(
+            batches: widget.snapshot.importBatches,
           ),
-          const SizedBox(height: 14),
-          if (widget.snapshot.dictionaryTerms.isEmpty)
-            const _DictionaryEmptyState(
-              icon: Icons.library_books_outlined,
-              message: '当前本地 userdb 没有可显示词条',
-            )
-          else if (visibleTerms.isEmpty)
-            _DictionaryEmptyState(
-              icon: Icons.search_off_outlined,
-              message: '没有匹配 "$searchQuery" 的词条',
-            )
-          else
-            _DictionaryTermsTable(
-              terms: visibleTerms,
-              onDeleteTerm: widget.onDeleteTerm,
-            ),
-          const SizedBox(height: 14),
-          _DeletedTermsStrip(deletedTerms: widget.snapshot.deletedTerms),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -103,6 +116,63 @@ class _DictionaryViewState extends State<DictionaryView> {
               term.source.toLowerCase().contains(query);
         })
         .toList(growable: false);
+  }
+}
+
+class _DictionaryImportHistory extends StatelessWidget {
+  const _DictionaryImportHistory({required this.batches});
+
+  final List<DictionaryImportBatchSummary> batches;
+
+  @override
+  Widget build(BuildContext context) {
+    if (batches.isEmpty) {
+      return const _DictionaryEmptyState(
+        icon: Icons.history_toggle_off_outlined,
+        message: '暂无导入历史',
+      );
+    }
+
+    return SingleChildScrollView(
+      key: const Key('dictionary-import-history'),
+      scrollDirection: Axis.horizontal,
+      child: DataTable(
+        headingTextStyle: Theme.of(context).textTheme.labelMedium,
+        columns: const [
+          DataColumn(label: Text('batch')),
+          DataColumn(label: Text('source')),
+          DataColumn(label: Text('created at')),
+          DataColumn(label: Text('records')),
+          DataColumn(label: Text('inserted')),
+          DataColumn(label: Text('updated')),
+          DataColumn(label: Text('skipped')),
+          DataColumn(label: Text('notes')),
+        ],
+        rows: batches
+            .map(
+              (batch) => DataRow(
+                cells: [
+                  DataCell(Text('#${batch.id}')),
+                  DataCell(Text(batch.sourceName)),
+                  DataCell(Text(batch.createdAt)),
+                  DataCell(
+                    Text('${batch.importedTerms}/${batch.totalRecords}'),
+                  ),
+                  DataCell(Text(batch.insertedTerms.toString())),
+                  DataCell(Text(batch.updatedTerms.toString())),
+                  DataCell(
+                    Text(
+                      'deleted ${batch.skippedDeletedTerms}, '
+                      'duplicate ${batch.skippedDuplicateTerms}',
+                    ),
+                  ),
+                  DataCell(Text(batch.notes.isEmpty ? '无' : batch.notes)),
+                ],
+              ),
+            )
+            .toList(),
+      ),
+    );
   }
 }
 

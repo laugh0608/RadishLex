@@ -43,18 +43,6 @@ class LearningView extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         ManagerSection(
-          title: 'import batches',
-          trailing: Text('${snapshot.importBatches.length} batches'),
-          child: Column(
-            children: snapshot.importBatches.isEmpty
-                ? const [Text('无导入批次')]
-                : snapshot.importBatches
-                      .map((batch) => _ImportBatchRow(batch))
-                      .toList(),
-          ),
-        ),
-        const SizedBox(height: 16),
-        ManagerSection(
           title: 'rank explain',
           trailing: Text('updated ${summary.lastUpdated}'),
           child: Column(
@@ -64,53 +52,6 @@ class LearningView extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ImportBatchRow extends StatelessWidget {
-  const _ImportBatchRow(this.batch);
-
-  final DictionaryImportBatchSummary batch;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 96,
-            child: Text(
-              '#${batch.id}',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-          ),
-          Expanded(
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(batch.sourceName),
-                Chip(label: Text('imported ${batch.importedTerms}')),
-                Chip(label: Text('inserted ${batch.insertedTerms}')),
-                Chip(label: Text('updated ${batch.updatedTerms}')),
-                if (batch.skippedDeletedTerms > 0)
-                  Chip(label: Text('deleted ${batch.skippedDeletedTerms}')),
-                if (batch.skippedDuplicateTerms > 0)
-                  Chip(label: Text('duplicate ${batch.skippedDuplicateTerms}')),
-              ],
-            ),
-          ),
-          ManagerStatusBadge(
-            icon: Icons.event_available_outlined,
-            label: batch.createdAt,
-            tone: ManagerBadgeTone.neutral,
-          ),
-        ],
-      ),
     );
   }
 }

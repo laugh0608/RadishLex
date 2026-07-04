@@ -16,8 +16,10 @@ void main() {
 
     expect(find.text('萝卜词核'), findsWidgets);
     expect(find.text('本地词库'), findsOneWidget);
+    expect(find.text('导入历史'), findsOneWidget);
     expect(find.text('设备签名'), findsNothing);
     expect(find.text('luobo'), findsOneWidget);
+    expect(find.text('manager-import'), findsOneWidget);
     expect(find.text('deleted tombstone'), findsOneWidget);
   });
 
@@ -56,6 +58,7 @@ void main() {
     final snapshot = createManagerFixture().copyWith(
       dictionaryTerms: const [],
       deletedTerms: const [],
+      importBatches: const [],
     );
 
     await tester.pumpWidget(
@@ -67,6 +70,7 @@ void main() {
 
     expect(find.text('当前本地 userdb 没有可显示词条'), findsOneWidget);
     expect(find.text('暂无 deleted tombstone'), findsOneWidget);
+    expect(find.text('暂无导入历史'), findsOneWidget);
     expect(find.byTooltip('删除词条'), findsNothing);
   });
 
@@ -80,8 +84,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('rank explain'), findsOneWidget);
-    expect(find.text('import batches'), findsOneWidget);
-    expect(find.text('manager-import'), findsOneWidget);
+    expect(find.text('导入历史'), findsNothing);
+    expect(find.text('manager-import'), findsNothing);
     expect(find.text('selection events'), findsOneWidget);
     expect(find.text('manual_user_term'), findsOneWidget);
   });
@@ -308,6 +312,45 @@ void main() {
     );
   });
 
+  testWidgets('dictionary import refreshes local import history', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final bridge = _RefreshingImportBridge();
+    await tester.pumpWidget(RadishLexManagerApp(bridge: bridge));
+    await tester.pumpAndSettle();
+
+    expect(find.text('暂无导入历史'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('dictionary-import-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('dictionary-import-path')),
+      '/tmp/radishlex-import.tsv',
+    );
+    await tester.enterText(
+      find.byKey(const Key('dictionary-import-source')),
+      'ops-import',
+    );
+    await tester.tap(find.widgetWithText(SwitchListTile, 'dry run'));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('dictionary-import-submit')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('dictionary-import-confirm')));
+    await tester.pumpAndSettle();
+
+    expect(bridge.loadCount, greaterThan(1));
+    expect(bridge.importedDryRun, isFalse);
+    expect(find.text('导入完成：5 / 5 条，新增 4，更新 1，跳过 0'), findsOneWidget);
+    expect(find.text('ops-import'), findsOneWidget);
+    expect(find.text('#7'), findsOneWidget);
+    expect(find.text('2026-07-04 11:05'), findsOneWidget);
+    expect(find.text('5/5'), findsOneWidget);
+  });
+
   testWidgets('dictionary import failure shows operation category', (
     WidgetTester tester,
   ) async {
@@ -335,6 +378,72 @@ void main() {
     );
     expect(find.text('导入检查'), findsNothing);
   });
+}
+
+class _RefreshingImportBridge extends FixtureManagerBridge {
+  _RefreshingImportBridge()
+    : _snapshot = createManagerFixture().copyWith(importBatches: const []);
+
+  ManagerSnapshot _snapshot;
+  int loadCount = 0;
+  bool? importedDryRun;
+
+  @override
+  Future<ManagerSnapshot> loadSnapshot() async {
+    loadCount += 1;
+    return _snapshot;
+  }
+
+  @override
+  Future<DictionaryImportPreview> inspectDictionaryImport(
+    String filePath,
+  ) async {
+    return DictionaryImportPreview(
+      filePath: filePath,
+      format: 'dictionary.user_terms.v1',
+      recordCount: 5,
+      syncClass: 'P2 encrypted sync',
+    );
+  }
+
+  @override
+  Future<DictionaryImportResult> importDictionaryFile({
+    required String filePath,
+    required String sourceName,
+    required bool dryRun,
+  }) async {
+    importedDryRun = dryRun;
+    if (!dryRun) {
+      _snapshot = _snapshot.copyWith(
+        importBatches: [
+          DictionaryImportBatchSummary(
+            id: 7,
+            sourceName: sourceName,
+            totalRecords: 5,
+            importedTerms: 5,
+            insertedTerms: 4,
+            updatedTerms: 1,
+            skippedDeletedTerms: 0,
+            skippedDuplicateTerms: 0,
+            createdAt: '2026-07-04 11:05',
+            notes: 'fixture import refresh',
+          ),
+          ..._snapshot.importBatches,
+        ],
+      );
+    }
+    return DictionaryImportResult(
+      filePath: filePath,
+      sourceName: sourceName,
+      totalRecords: 5,
+      importedTerms: 5,
+      insertedTerms: 4,
+      updatedTerms: 1,
+      skippedDeletedTerms: 0,
+      skippedDuplicateTerms: 0,
+      dryRun: dryRun,
+    );
+  }
 }
 
 class _RecordingManagerBridge extends FixtureManagerBridge {
