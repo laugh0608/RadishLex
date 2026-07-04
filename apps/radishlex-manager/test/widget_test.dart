@@ -19,7 +19,9 @@ void main() {
     expect(find.text('导入历史'), findsOneWidget);
     expect(find.text('设备签名'), findsNothing);
     expect(find.text('luobo'), findsOneWidget);
-    expect(find.text('manager-import'), findsOneWidget);
+    expect(find.text('manager-import'), findsWidgets);
+    expect(find.text('syncable 3'), findsOneWidget);
+    expect(find.text('local-only 128'), findsOneWidget);
     expect(find.text('deleted tombstone'), findsOneWidget);
   });
 
@@ -73,6 +75,92 @@ void main() {
     expect(find.text('暂无导入历史'), findsOneWidget);
     expect(find.byTooltip('删除词条'), findsNothing);
   });
+
+  testWidgets(
+    'dictionary import history filters sorts and selects source terms',
+    (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(1400, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final snapshot = createManagerFixture().copyWith(
+        dictionaryTerms: const [
+          UserTerm(
+            inputCode: 'luobo',
+            text: '萝卜词核',
+            reading: 'luo bo ci he',
+            weight: 0.92,
+            source: 'manual',
+            lastUsed: '2026-07-04 10:42',
+          ),
+          UserTerm(
+            inputCode: 'tongbu',
+            text: '同步预检',
+            reading: 'tong bu yu jian',
+            weight: 0.76,
+            source: 'selection',
+            lastUsed: '2026-07-03 18:12',
+          ),
+          UserTerm(
+            inputCode: 'bianjie',
+            text: '边界清晰',
+            reading: 'bian jie qing xi',
+            weight: 0.71,
+            source: 'manager-import',
+            lastUsed: '2026-07-02 21:03',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        RadishLexManagerApp(
+          bridge: FixtureManagerBridge(initialSnapshot: snapshot),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final firstNewestTop = tester.getTopLeft(find.text('#2')).dy;
+      final secondNewestTop = tester.getTopLeft(find.text('#1')).dy;
+      expect(firstNewestTop, lessThan(secondNewestTop));
+
+      await tester.tap(find.byKey(const Key('dictionary-import-history-sort')));
+      await tester.pump();
+
+      final firstOldestTop = tester.getTopLeft(find.text('#1')).dy;
+      final secondOldestTop = tester.getTopLeft(find.text('#2')).dy;
+      expect(firstOldestTop, lessThan(secondOldestTop));
+
+      await tester.enterText(
+        find.byKey(const Key('dictionary-import-history-filter')),
+        'bootstrap',
+      );
+      await tester.pump();
+
+      expect(find.text('#1'), findsOneWidget);
+      expect(find.text('#2'), findsNothing);
+
+      await tester.enterText(
+        find.byKey(const Key('dictionary-import-history-filter')),
+        'missing batch',
+      );
+      await tester.pump();
+
+      expect(find.text('没有匹配当前筛选条件的导入批次'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('dictionary-import-history-filter')),
+        '',
+      );
+      await tester.tap(find.byKey(const Key('dictionary-import-history-sort')));
+      await tester.pump();
+      await tester.tap(find.text('#2'));
+      await tester.pump();
+
+      expect(find.text('batch #2 / manager-import'), findsOneWidget);
+      expect(find.text('bianjie'), findsOneWidget);
+      expect(find.text('luobo'), findsNothing);
+      expect(find.text('tongbu'), findsNothing);
+    },
+  );
 
   testWidgets('learning view exposes aggregate explain data', (
     WidgetTester tester,

@@ -23,17 +23,28 @@ class DictionaryView extends StatefulWidget {
 
 class _DictionaryViewState extends State<DictionaryView> {
   final searchController = TextEditingController();
+  final importFilterController = TextEditingController();
+  int? selectedBatchId;
+  bool newestImportFirst = true;
 
   @override
   void dispose() {
     searchController.dispose();
+    importFilterController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final searchQuery = searchController.text.trim();
-    final visibleTerms = _filterTerms(widget.snapshot.dictionaryTerms);
+    final selectedBatch = _selectedBatch(widget.snapshot.importBatches);
+    final visibleTerms = _filterTerms(
+      widget.snapshot.dictionaryTerms,
+      selectedBatch,
+    );
+    final visibleImportBatches = _filterImportBatches(
+      widget.snapshot.importBatches,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -69,6 +80,19 @@ class _DictionaryViewState extends State<DictionaryView> {
                 ),
                 onChanged: (_) => setState(() {}),
               ),
+              if (selectedBatch != null) ...[
+                const SizedBox(height: 10),
+                InputChip(
+                  key: const Key('dictionary-selected-import-batch'),
+                  avatar: const Icon(Icons.filter_alt_outlined, size: 18),
+                  label: Text(
+                    'batch #${selectedBatch.id} / ${selectedBatch.sourceName}',
+                  ),
+                  onDeleted: () => setState(() {
+                    selectedBatchId = null;
+                  }),
+                ),
+              ],
               const SizedBox(height: 14),
               if (widget.snapshot.dictionaryTerms.isEmpty)
                 const _DictionaryEmptyState(
@@ -78,7 +102,7 @@ class _DictionaryViewState extends State<DictionaryView> {
               else if (visibleTerms.isEmpty)
                 _DictionaryEmptyState(
                   icon: Icons.search_off_outlined,
-                  message: '没有匹配 "$searchQuery" 的词条',
+                  message: _emptyTermsMessage(searchQuery, selectedBatch),
                 )
               else
                 _DictionaryTermsTable(
@@ -94,42 +118,120 @@ class _DictionaryViewState extends State<DictionaryView> {
         ManagerSection(
           title: '导入历史',
           trailing: Text('${widget.snapshot.importBatches.length} batches'),
-          child: _DictionaryImportHistory(
-            batches: widget.snapshot.importBatches,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DictionarySyncImpact(sync: widget.snapshot.sync),
+              const SizedBox(height: 14),
+              _DictionaryImportHistoryControls(
+                controller: importFilterController,
+                newestImportFirst: newestImportFirst,
+                onFilterChanged: (_) => setState(() {}),
+                onToggleSort: () => setState(() {
+                  newestImportFirst = !newestImportFirst;
+                }),
+              ),
+              const SizedBox(height: 14),
+              _DictionaryImportHistory(
+                batches: visibleImportBatches,
+                totalBatchCount: widget.snapshot.importBatches.length,
+                selectedBatchId: selectedBatchId,
+                onSelectBatch: (batch) => setState(() {
+                  selectedBatchId = batch.id;
+                }),
+              ),
+            ],
           ),
         ),
       ],
     );
   }
 
-  List<UserTerm> _filterTerms(List<UserTerm> terms) {
-    final query = searchController.text.trim().toLowerCase();
-    if (query.isEmpty) {
-      return terms;
+  DictionaryImportBatchSummary? _selectedBatch(
+    List<DictionaryImportBatchSummary> batches,
+  ) {
+    for (final batch in batches) {
+      if (batch.id == selectedBatchId) {
+        return batch;
+      }
     }
+    return null;
+  }
 
+  List<UserTerm> _filterTerms(
+    List<UserTerm> terms,
+    DictionaryImportBatchSummary? selectedBatch,
+  ) {
+    final query = searchController.text.trim().toLowerCase();
     return terms
         .where((term) {
-          return term.inputCode.toLowerCase().contains(query) ||
+          final matchesQuery =
+              query.isEmpty ||
+              term.inputCode.toLowerCase().contains(query) ||
               term.text.toLowerCase().contains(query) ||
               term.reading.toLowerCase().contains(query) ||
               term.source.toLowerCase().contains(query);
+          final matchesBatch =
+              selectedBatch == null || term.source == selectedBatch.sourceName;
+          return matchesQuery && matchesBatch;
         })
         .toList(growable: false);
   }
+
+  List<DictionaryImportBatchSummary> _filterImportBatches(
+    List<DictionaryImportBatchSummary> batches,
+  ) {
+    final query = importFilterController.text.trim().toLowerCase();
+    final filtered = batches.where((batch) {
+      return query.isEmpty ||
+          batch.id.toString().contains(query) ||
+          batch.sourceName.toLowerCase().contains(query) ||
+          batch.createdAt.toLowerCase().contains(query) ||
+          batch.notes.toLowerCase().contains(query);
+    }).toList();
+
+    filtered.sort((left, right) {
+      final createdAtCompare = left.createdAt.compareTo(right.createdAt);
+      final idCompare = left.id.compareTo(right.id);
+      final result = createdAtCompare == 0 ? idCompare : createdAtCompare;
+      return newestImportFirst ? -result : result;
+    });
+    return filtered;
+  }
+}
+
+String _emptyTermsMessage(
+  String searchQuery,
+  DictionaryImportBatchSummary? selectedBatch,
+) {
+  if (selectedBatch != null && searchQuery.isNotEmpty) {
+    return 'batch #${selectedBatch.id} 中没有匹配 "$searchQuery" 的词条';
+  }
+  if (selectedBatch != null) {
+    return 'batch #${selectedBatch.id} / ${selectedBatch.sourceName} 暂无匹配词条';
+  }
+  return '没有匹配 "$searchQuery" 的词条';
 }
 
 class _DictionaryImportHistory extends StatelessWidget {
-  const _DictionaryImportHistory({required this.batches});
+  const _DictionaryImportHistory({
+    required this.batches,
+    required this.totalBatchCount,
+    required this.selectedBatchId,
+    required this.onSelectBatch,
+  });
 
   final List<DictionaryImportBatchSummary> batches;
+  final int totalBatchCount;
+  final int? selectedBatchId;
+  final ValueChanged<DictionaryImportBatchSummary> onSelectBatch;
 
   @override
   Widget build(BuildContext context) {
     if (batches.isEmpty) {
-      return const _DictionaryEmptyState(
+      return _DictionaryEmptyState(
         icon: Icons.history_toggle_off_outlined,
-        message: '暂无导入历史',
+        message: totalBatchCount == 0 ? '暂无导入历史' : '没有匹配当前筛选条件的导入批次',
       );
     }
 
@@ -137,6 +239,7 @@ class _DictionaryImportHistory extends StatelessWidget {
       key: const Key('dictionary-import-history'),
       scrollDirection: Axis.horizontal,
       child: DataTable(
+        showCheckboxColumn: false,
         headingTextStyle: Theme.of(context).textTheme.labelMedium,
         columns: const [
           DataColumn(label: Text('batch')),
@@ -151,6 +254,8 @@ class _DictionaryImportHistory extends StatelessWidget {
         rows: batches
             .map(
               (batch) => DataRow(
+                selected: batch.id == selectedBatchId,
+                onSelectChanged: (_) => onSelectBatch(batch),
                 cells: [
                   DataCell(Text('#${batch.id}')),
                   DataCell(Text(batch.sourceName)),
@@ -172,6 +277,94 @@ class _DictionaryImportHistory extends StatelessWidget {
             )
             .toList(),
       ),
+    );
+  }
+}
+
+class _DictionarySyncImpact extends StatelessWidget {
+  const _DictionarySyncImpact({required this.sync});
+
+  final SyncPreflightSummary sync;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(
+          '本地 sync preflight 影响',
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
+        Chip(
+          avatar: const Icon(Icons.inventory_2_outlined, size: 18),
+          label: Text('syncable ${sync.syncableObjects}'),
+        ),
+        Chip(
+          avatar: const Icon(Icons.lock_clock_outlined, size: 18),
+          label: Text('local-only ${sync.localOnlyEvents}'),
+        ),
+        ...sync.categories.map(
+          (category) => Chip(label: Text('${category.name} ${category.count}')),
+        ),
+      ],
+    );
+  }
+}
+
+class _DictionaryImportHistoryControls extends StatelessWidget {
+  const _DictionaryImportHistoryControls({
+    required this.controller,
+    required this.newestImportFirst,
+    required this.onFilterChanged,
+    required this.onToggleSort,
+  });
+
+  final TextEditingController controller;
+  final bool newestImportFirst;
+  final ValueChanged<String> onFilterChanged;
+  final VoidCallback onToggleSort;
+
+  @override
+  Widget build(BuildContext context) {
+    final filterField = TextField(
+      key: const Key('dictionary-import-history-filter'),
+      controller: controller,
+      decoration: const InputDecoration(
+        prefixIcon: Icon(Icons.search),
+        labelText: '筛选 batch / source / created at / notes',
+      ),
+      onChanged: onFilterChanged,
+    );
+    final sortButton = OutlinedButton.icon(
+      key: const Key('dictionary-import-history-sort'),
+      onPressed: onToggleSort,
+      icon: const Icon(Icons.swap_vert),
+      label: Text(newestImportFirst ? '最新优先' : '最早优先'),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 560) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              filterField,
+              const SizedBox(height: 10),
+              Align(alignment: Alignment.centerLeft, child: sortButton),
+            ],
+          );
+        }
+
+        return Row(
+          children: [
+            Expanded(child: filterField),
+            const SizedBox(width: 10),
+            sortButton,
+          ],
+        );
+      },
     );
   }
 }
