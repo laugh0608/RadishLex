@@ -96,7 +96,7 @@ RadishLex/
 - `deploy/sync-server/docker-compose.yaml`：Go sync server 部署态入口，只暴露 HTTP 上游 `http://127.0.0.1:7319`，外部反代负责 TLS。
 - `deploy/sync-server/.env.example`：唯一 env 示例，真实部署复制为 `.env` 后修改。
 - `deploy/sync-server/nginx.prod.conf`：生产外部 Nginx TLS 终止示例。
-- `apps/radishlex-manager/`：Flutter manager 起步工程，通过受控 `ManagerBridge` contract 接入管理数据源；默认使用合成 fixture，显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时可切到真实 Dart FFI bridge，展示本地词库、import batches、学习摘要、rank explain 摘要、sync preflight、配置来源诊断、设备签名状态和设置草案；真实远端同步、恢复码和设备授权 UI 仍按管理端边界关闭。
+- `apps/radishlex-manager/`：Flutter manager 起步工程，通过受控 `ManagerBridge` contract 接入管理数据源；默认使用合成 fixture，显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时可切到真实 Dart FFI bridge，展示本地词库、import batches、学习摘要、rank explain 摘要、sync preflight、配置来源诊断、settings JSON 草案持久化、sync gate 状态来源、脱敏诊断报告、结构化错误分类、设备签名状态和设置草案；真实远端同步、恢复码和设备授权 UI 仍按管理端边界关闭。
 - `platforms/android-ime/keystore-bridge/`：Android Keystore bridge 仓库内 Kotlin / Gradle harness，固定 `android-keystore-v1` 的 `AndroidKeyStore` / `Ed25519` 创建、加载、公钥读取、签名、删除、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke / 设备矩阵记录模板，以及 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 失败记录；Rust raw JNI glue 位于 `crates/ime-crypto`，该目录当前不包含完整 Android IME。
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
 - `crates/ime-cli/`：基于 demo adapter、可选 Rime adapter、userdb 和 ranker 的命令行复验入口。
@@ -129,7 +129,7 @@ RadishLex/
 - `docs/runbooks/sync-server-local-smoke.md`：Go sync server 本机启动边界、自动化 smoke 和日志脱敏检查。
 - `docs/runbooks/sync-server-compose.md`：Go sync server Docker Compose 本地 HTTPS、部署态 HTTP 上游、持久化目录、外部反代示例、清理和停止线 runbook。
 - `scripts/check-manager.sh`：Flutter manager 格式、静态分析和 widget 测试入口。
-- `scripts/check-manager-ffi-smoke.sh`：Flutter manager 真实 Dart FFI bridge 的短生命周期 smoke，构建 `radishlex-ime-ffi` 动态库并使用临时 SQLite userdb、合成 TSV 和导出文件复验本地管理、import batches、rank explain 和导入导出链路。
+- `scripts/check-manager-ffi-smoke.sh`：Flutter manager 真实 Dart FFI bridge 的短生命周期 smoke，构建 `radishlex-ime-ffi` 动态库并使用临时 SQLite userdb、settings JSON、合成 TSV 和导出文件复验本地管理、import batches、rank explain、导入导出、设置草案和脱敏诊断报告链路。
 - `scripts/check-sync-server-deployment-rehearsal.sh` / `scripts/check-sync-server-deployment-rehearsal.py`：sync server 部署态 Compose 的短生命周期预演入口，使用临时 env、随机 bearer token、仓库外数据目录和冷备份恢复复验。
 
 ## Rust crates 建议
@@ -262,7 +262,7 @@ server/sync-server/
 
 ## Flutter app 建议
 
-管理端实现遵循 `docs/manager-ui-boundary.md`。当前 `apps/radishlex-manager/` 已创建 macOS Flutter 工程，第一批页面通过 `ManagerBridge` contract 展示本地 userdb 管理、import batches、学习状态摘要、rank explain 摘要、sync preflight 摘要、配置来源诊断和结构化错误码；默认仍使用合成 fixture，显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时可切到真实 Dart FFI bridge。真实远端同步、恢复码和设备授权 UI 必须等待可用平台私钥 backend 与目标部署运行证据。
+管理端实现遵循 `docs/manager-ui-boundary.md`。当前 `apps/radishlex-manager/` 已创建 macOS Flutter 工程，第一批页面通过 `ManagerBridge` contract 展示本地 userdb 管理、import batches、学习状态摘要、rank explain 摘要、sync preflight 摘要、配置来源诊断、settings JSON 草案持久化、sync gate 状态来源、脱敏诊断报告和结构化错误分类；默认仍使用合成 fixture，显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时可切到真实 Dart FFI bridge。真实远端同步、恢复码和设备授权 UI 必须等待可用平台私钥 backend 与目标部署运行证据。
 
 ```text
 apps/radishlex-manager/

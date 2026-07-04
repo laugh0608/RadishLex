@@ -10,12 +10,15 @@ Future<void> main(List<String> args) async {
   final dbPath = '${workDir.path}/radishlex-manager-ffi-smoke.sqlite';
   final importPath = '${workDir.path}/manager-import.tsv';
   final exportPath = '${workDir.path}/manager-export.tsv';
+  final diagnosticsPath = '${workDir.path}/manager-diagnostics.txt';
+  final settingsPath = '${workDir.path}/manager-settings.json';
 
   File(importPath).writeAsStringSync(_dictionaryFixture, encoding: utf8);
 
   final bridge = FfiManagerBridge(
     dbPath: dbPath,
     libraryPath: options.libraryPath,
+    settingsFilePath: settingsPath,
   );
 
   final preview = await bridge.inspectDictionaryImport(importPath);
@@ -73,6 +76,27 @@ Future<void> main(List<String> args) async {
     'rank explain final score',
   );
 
+  final settingsSnapshot = await bridge.saveSettingsDraft(
+    const ManagerSettingsDraft(
+      serverEndpoint: 'https://sync.example.invalid',
+      retainSyncConfig: true,
+      privacyMode: true,
+      diagnosticsExport: true,
+      deploymentEvidenceRecorded: true,
+    ),
+  );
+  _expect(
+    settingsSnapshot.sync.state == SyncUiState.syncDisabledByPolicy,
+    'settings privacy sync gate',
+  );
+  _expect(File(settingsPath).existsSync(), 'settings file persisted');
+  _expect(
+    File(
+      settingsPath,
+    ).readAsStringSync(encoding: utf8).contains('server_endpoint'),
+    'settings file schema',
+  );
+
   final deletedSnapshot = await bridge.deleteUserTerm(
     const UserTermKey(
       inputCode: 'luobo',
@@ -102,6 +126,47 @@ Future<void> main(List<String> args) async {
   _expect(exported.contains('input_code\ttext\treading'), 'export header');
   _expect(exported.contains('同步预检'), 'remaining synthetic term exported');
   _expect(!exported.contains('萝卜词核'), 'deleted term not exported');
+
+  final diagnostics = await bridge.loadDiagnosticsReport();
+  final diagnosticsText = diagnostics.toRedactedText();
+  _expect(
+    diagnosticsText.contains('format: manager.diagnostics.v1'),
+    'diagnostics format',
+  );
+  _expect(
+    diagnosticsText.contains('sync.state: sync_disabled_by_policy'),
+    'diagnostics sync state',
+  );
+  _expect(
+    diagnosticsText.contains('redaction.user_terms: omitted'),
+    'diagnostics redaction policy',
+  );
+  _expect(!diagnosticsText.contains(dbPath), 'diagnostics omits db path');
+  _expect(
+    !diagnosticsText.contains(settingsPath),
+    'diagnostics omits settings path',
+  );
+  _expect(
+    !diagnosticsText.contains(importPath),
+    'diagnostics omits import path',
+  );
+  _expect(!diagnosticsText.contains('萝卜词核'), 'diagnostics omits user terms');
+
+  final diagnosticsExport = await bridge.exportDiagnosticsReport(
+    diagnosticsPath,
+  );
+  _expect(diagnosticsExport.lineCount > 0, 'diagnostics export line count');
+  final exportedDiagnostics = File(
+    diagnosticsPath,
+  ).readAsStringSync(encoding: utf8);
+  _expect(
+    exportedDiagnostics.contains('manager.diagnostics.v1'),
+    'diagnostics export content',
+  );
+  _expect(
+    !exportedDiagnostics.contains(dbPath),
+    'diagnostics export omits db path',
+  );
 
   stdout.writeln('RadishLex manager FFI smoke passed.');
 }

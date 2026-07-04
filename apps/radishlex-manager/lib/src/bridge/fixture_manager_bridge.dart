@@ -1,6 +1,7 @@
 import '../data/manager_fixture.dart';
 import '../models/manager_models.dart';
 import 'manager_bridge.dart';
+import 'manager_diagnostics_export.dart';
 
 class FixtureManagerBridge implements ManagerBridge {
   FixtureManagerBridge({ManagerSnapshot? initialSnapshot})
@@ -105,6 +106,27 @@ class FixtureManagerBridge implements ManagerBridge {
       syncClass: 'P2 encrypted sync',
     );
   }
+
+  @override
+  Future<ManagerDiagnosticsReport> loadDiagnosticsReport() async {
+    return createManagerDiagnosticsReport(_snapshot);
+  }
+
+  @override
+  Future<ManagerDiagnosticsExportResult> exportDiagnosticsReport(
+    String filePath,
+  ) async {
+    return writeManagerDiagnosticsReport(
+      filePath: filePath,
+      report: await loadDiagnosticsReport(),
+    );
+  }
+
+  @override
+  Future<ManagerSnapshot> saveSettingsDraft(ManagerSettingsDraft draft) async {
+    _snapshot = _snapshotWithSettingsDraft(_snapshot, draft.normalized());
+    return _snapshot;
+  }
 }
 
 ManagerSnapshot _snapshotWithDiagnostics(
@@ -115,6 +137,44 @@ ManagerSnapshot _snapshotWithDiagnostics(
   return snapshot.copyWith(
     settings: snapshot.settings.copyWith(runtimeDiagnostics: diagnostics),
   );
+}
+
+ManagerSnapshot _snapshotWithSettingsDraft(
+  ManagerSnapshot snapshot,
+  ManagerSettingsDraft draft,
+) {
+  final state = deriveManagerSyncUiState(
+    draft: draft,
+    device: snapshot.sync.device,
+  );
+  final sync = snapshot.sync.copyWith(
+    state: state,
+    serverEndpoint: managerSyncEndpointLabel(draft),
+    reason: managerSyncGateReason(
+      state: state,
+      draft: draft,
+      device: snapshot.sync.device,
+    ),
+  );
+  final diagnostics = snapshot.settings.runtimeDiagnostics;
+  final settings = snapshot.settings.copyWith(
+    privacyMode: draft.privacyMode,
+    diagnosticsExport: draft.diagnosticsExport,
+    syncConfigured: draft.retainSyncConfig,
+    draft: draft,
+    runtimeDiagnostics: ManagerRuntimeDiagnostics(
+      bridgeMode: diagnostics.bridgeMode,
+      userDb: diagnostics.userDb,
+      nativeLibrary: diagnostics.nativeLibrary,
+      settingsStore: diagnostics.settingsStore,
+      syncEndpoint: draft.hasServerEndpoint
+          ? 'sync endpoint draft configured'
+          : 'sync endpoint draft not configured',
+      lastErrorCode: diagnostics.lastErrorCode,
+    ),
+  );
+
+  return snapshot.copyWith(sync: sync, settings: settings);
 }
 
 List<SyncCategorySummary> _replaceCategoryCount(

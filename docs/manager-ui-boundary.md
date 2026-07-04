@@ -82,7 +82,7 @@ Phase 4 第一批管理端功能应覆盖：
 
 管理端应通过 `ime-ffi` 或后续受控 bridge 调用 Rust 能力，不直接读写 Rust 内部结构。
 
-当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、词库导入检查、词库导入和词库导出这组受控方法。现有 `FixtureManagerBridge` 只使用合成数据验证调用边界、UI 状态更新、导入检查对话框和导出结果反馈；真实 Dart FFI bridge 已覆盖本地 userdb list / delete、dictionary inspect / import / export、import batches、learning status、rank explain 和 sync preflight 摘要。Dart 绑定层必须复制 Rust view 后释放 handle，不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层；widget 层只展示结构化错误码和非敏感配置来源诊断。
+当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、词库导入检查、词库导入、词库导出、设置草案保存、诊断报告预览和诊断报告导出这组受控方法。现有 `FixtureManagerBridge` 只使用合成数据验证调用边界、UI 状态更新、导入检查对话框、导出结果反馈、设置草案和脱敏诊断报告；真实 Dart FFI bridge 已覆盖本地 userdb list / delete、dictionary inspect / import / export、import batches、learning status、rank explain、sync preflight 摘要、非 secret settings JSON 草案持久化和脱敏诊断报告导出。Dart 绑定层必须复制 Rust view 后释放 handle，不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层；widget 层只展示结构化错误码、错误分类和非敏感配置来源诊断。
 
 第一批可依赖的接口方向：
 
@@ -93,6 +93,7 @@ Phase 4 第一批管理端功能应覆盖：
 - learning status 只读摘要。
 - rank explain 只读摘要。
 - sync preflight 状态摘要。
+- settings draft 保存和读取。
 - backend capability / production gate 状态摘要。
 
 后续同步 UI 需要新增 bridge 时，应遵循：
@@ -156,8 +157,8 @@ Phase 4 第一批管理端功能应覆盖：
 4. 已补第一批真实 Dart FFI bridge：显式配置本地 SQLite userdb 与 `ime-ffi` 动态库后，可接入 userdb 词条 list / delete、用户词库 inspect / import / export、import batches、learning status 摘要、rank explain 摘要和 sync preflight 摘要。
 5. 已新增 `scripts/check-manager-ffi-smoke.sh`，构建 `radishlex-ime-ffi` 动态库并使用临时 SQLite userdb、合成 TSV 和导出文件复验真实 Dart FFI bridge 的本地 list / delete / import / export、import batches、learning status、rank explain 和 sync preflight 摘要。
 6. `rank explain` 区域已通过专用 `ime-ffi` ABI 读取单候选贡献项，Flutter 只展示复制后的非敏感摘要，不持有 Rust view 指针。
-7. 已补设置页配置来源诊断和 bridge 失败结构化错误码展示；UI 不透传 native 错误明细。
-8. 同步配置页继续保持真实上传按钮禁用，显示 `local_only`、`backend_unavailable` 或 `deployment_unverified`。
+7. 已补设置页配置来源诊断、设置草案保存、脱敏诊断报告预览 / 导出和 bridge 失败结构化错误分类展示；UI 不透传 native 错误明细。
+8. 同步配置页继续保持真实上传按钮禁用，状态由设置草案、隐私模式、平台私钥 backend gate 和部署证据草案派生，可显示 `local_only`、`sync_disabled_by_policy`、`backend_unavailable` 或 `deployment_unverified`。
 9. 待可用平台私钥 backend 与目标部署运行证据齐备后，再接设备授权、恢复码和用户可用同步。
 
 ## 停止线

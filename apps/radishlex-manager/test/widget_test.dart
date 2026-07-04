@@ -58,7 +58,89 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('管理端数据加载失败'), findsOneWidget);
-    expect(find.text('管理端 bridge 调用失败：userdb_error'), findsOneWidget);
+    expect(find.text('加载管理数据失败：本地 userdb 错误（userdb_error）'), findsOneWidget);
+  });
+
+  testWidgets('settings view previews and exports diagnostics report', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final bridge = _RecordingManagerBridge();
+    await tester.pumpWidget(RadishLexManagerApp(bridge: bridge));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.tune_outlined));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('diagnostics-preview-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('诊断摘要预览'), findsOneWidget);
+    expect(find.textContaining('runtime.bridge_mode: fixture'), findsOneWidget);
+    expect(
+      find.textContaining('redaction.user_terms: omitted'),
+      findsOneWidget,
+    );
+    final reportText = tester.widget<SelectableText>(
+      find.byKey(const Key('diagnostics-report-text')),
+    );
+    expect(reportText.data, isNot(contains('萝卜词核')));
+
+    await tester.tap(find.text('关闭'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('diagnostics-export-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('diagnostics-export-path')),
+      '/tmp/radishlex-manager-diagnostics.txt',
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('diagnostics-export-submit')));
+    await tester.pumpAndSettle();
+
+    expect(
+      bridge.diagnosticsExportPath,
+      '/tmp/radishlex-manager-diagnostics.txt',
+    );
+    expect(find.text('诊断摘要导出完成：12 行'), findsOneWidget);
+  });
+
+  testWidgets('settings draft save updates sync gate source', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      RadishLexManagerApp(bridge: FixtureManagerBridge()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.tune_outlined));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('settings-server-endpoint')),
+      'https://draft.example.invalid',
+    );
+    await tester.tap(find.byKey(const Key('settings-privacy-mode')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('settings-save-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('设置草案已保存：sync_disabled_by_policy'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.sync_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('sync_disabled_by_policy'), findsWidgets);
+    expect(find.text('https://draft.example.invalid'), findsOneWidget);
+    final enableButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, '启用同步'),
+    );
+    expect(enableButton.onPressed, isNull);
   });
 
   testWidgets('sync gate keeps user sync disabled', (
@@ -151,6 +233,7 @@ class _RecordingManagerBridge extends FixtureManagerBridge {
   String? importedSourceName;
   bool? importedDryRun;
   String? exportedPath;
+  String? diagnosticsExportPath;
 
   @override
   Future<DictionaryImportPreview> inspectDictionaryImport(
@@ -180,6 +263,20 @@ class _RecordingManagerBridge extends FixtureManagerBridge {
   Future<DictionaryExportResult> exportDictionaryFile(String filePath) async {
     exportedPath = filePath;
     return super.exportDictionaryFile(filePath);
+  }
+
+  @override
+  Future<ManagerDiagnosticsExportResult> exportDiagnosticsReport(
+    String filePath,
+  ) async {
+    diagnosticsExportPath = filePath;
+    return const ManagerDiagnosticsExportResult(
+      filePath: '/tmp/radishlex-manager-diagnostics.txt',
+      format: 'manager.diagnostics.v1',
+      lineCount: 12,
+      itemCount: 24,
+      redactionPolicy: 'summary_only_no_terms_paths_tokens_or_payload_bytes',
+    );
   }
 }
 

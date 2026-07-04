@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:radishlex_manager/src/bridge/ffi_manager_bridge.dart';
 import 'package:radishlex_manager/src/bridge/fixture_manager_bridge.dart';
@@ -44,6 +46,14 @@ void main() {
       expect(native.explainReading, isNull);
       expect(native.explainContextKind, 'general');
       expect(snapshot.settings.runtimeDiagnostics.bridgeMode, 'ffi_injected');
+
+      final report = await bridge.loadDiagnosticsReport();
+      final text = report.toRedactedText();
+      expect(text, contains('runtime.bridge_mode: ffi_injected'));
+      expect(text, contains('sync.state: backend_unavailable'));
+      expect(text, contains('redaction.user_terms: omitted'));
+      expect(text, isNot(contains('萝卜词核')));
+      expect(text, isNot(contains('/tmp/radishlex-userdb.sqlite')));
     },
   );
 
@@ -75,6 +85,58 @@ void main() {
     expect(native.importedSourceName, 'manager-import');
     expect(exportResult.exportedTerms, 3);
   });
+
+  test(
+    'ffi manager bridge persists settings draft and derives sync gate',
+    () async {
+      final tempDir = Directory.systemTemp.createTempSync(
+        'radishlex-manager-settings-test-',
+      );
+      addTearDown(() {
+        if (tempDir.existsSync()) {
+          tempDir.deleteSync(recursive: true);
+        }
+      });
+      final settingsFile = '${tempDir.path}/manager-settings.json';
+
+      final bridge = FfiManagerBridge(
+        dbPath: '/tmp/radishlex-userdb.sqlite',
+        settingsFilePath: settingsFile,
+        native: _FakeNativeBinding(),
+      );
+      final saved = await bridge.saveSettingsDraft(
+        const ManagerSettingsDraft(
+          serverEndpoint: 'https://draft.example.invalid',
+          retainSyncConfig: true,
+          privacyMode: true,
+          diagnosticsExport: true,
+          deploymentEvidenceRecorded: true,
+        ),
+      );
+
+      expect(saved.settings.draft.privacyMode, isTrue);
+      expect(saved.settings.draft.diagnosticsExport, isTrue);
+      expect(
+        saved.settings.runtimeDiagnostics.settingsStore,
+        contains('configured'),
+      );
+      expect(saved.sync.state, SyncUiState.syncDisabledByPolicy);
+      expect(saved.sync.serverEndpoint, 'https://draft.example.invalid');
+      expect(
+        File(settingsFile).readAsStringSync(),
+        contains('server_endpoint'),
+      );
+
+      final reloaded = await FfiManagerBridge(
+        dbPath: '/tmp/radishlex-userdb.sqlite',
+        settingsFilePath: settingsFile,
+        native: _FakeNativeBinding(),
+      ).loadSnapshot();
+
+      expect(reloaded.settings.draft.privacyMode, isTrue);
+      expect(reloaded.sync.state, SyncUiState.syncDisabledByPolicy);
+    },
+  );
 }
 
 final class _FakeNativeBinding implements RadishLexManagerNativeBinding {

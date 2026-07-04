@@ -2,6 +2,8 @@ import '../models/manager_models.dart';
 import 'ffi_dynamic_native_binding.dart';
 import 'ffi_manager_native_models.dart';
 import 'manager_bridge.dart';
+import 'manager_diagnostics_export.dart';
+import 'manager_settings_store.dart';
 
 export 'ffi_manager_native_models.dart';
 
@@ -10,10 +12,17 @@ class FfiManagerBridge implements ManagerBridge {
     required String dbPath,
     String? libraryPath,
     String? serverEndpoint,
+    String? settingsFilePath,
     RadishLexManagerNativeBinding? native,
+    ManagerSettingsStore? settingsStore,
   }) : dbPath = dbPath.trim(),
        libraryPath = libraryPath?.trim() ?? '',
-       serverEndpoint = serverEndpoint?.trim() ?? '',
+       _settingsStore =
+           settingsStore ??
+           ManagerSettingsStore(
+             filePath: settingsFilePath,
+             fallbackDraft: _fallbackSettingsDraft(serverEndpoint),
+           ),
        _nativeInjected = native != null,
        _native =
            native ??
@@ -25,9 +34,9 @@ class FfiManagerBridge implements ManagerBridge {
 
   final String dbPath;
   final String libraryPath;
-  final String serverEndpoint;
   final bool _nativeInjected;
   final RadishLexManagerNativeBinding _native;
+  final ManagerSettingsStore _settingsStore;
 
   @override
   Future<ManagerSnapshot> loadSnapshot() async {
@@ -97,7 +106,29 @@ class FfiManagerBridge implements ManagerBridge {
     );
   }
 
+  @override
+  Future<ManagerDiagnosticsReport> loadDiagnosticsReport() async {
+    return createManagerDiagnosticsReport(_loadSnapshot());
+  }
+
+  @override
+  Future<ManagerDiagnosticsExportResult> exportDiagnosticsReport(
+    String filePath,
+  ) async {
+    return writeManagerDiagnosticsReport(
+      filePath: filePath,
+      report: await loadDiagnosticsReport(),
+    );
+  }
+
+  @override
+  Future<ManagerSnapshot> saveSettingsDraft(ManagerSettingsDraft draft) async {
+    _settingsStore.save(draft);
+    return _loadSnapshot();
+  }
+
   ManagerSnapshot _loadSnapshot() {
+    final settingsDraft = _settingsStore.load();
     final nativeTerms = _native.listUserTerms(dbPath);
     final learning = _native.learningStatus(dbPath);
     final importBatches = _native.listImportBatches(dbPath);
@@ -113,12 +144,13 @@ class FfiManagerBridge implements ManagerBridge {
           .toList(growable: false),
       learningSummary: _learningSummaryFromNative(learning),
       explanations: _rankerExplanationSummaries(terms),
-      sync: _syncSummaryFromNative(sync),
+      sync: _syncSummaryFromNative(sync, settingsDraft),
       settings: ManagerSettings(
-        privacyMode: false,
-        diagnosticsExport: false,
-        syncConfigured: serverEndpoint.isNotEmpty,
-        runtimeDiagnostics: _runtimeDiagnostics(),
+        privacyMode: settingsDraft.privacyMode,
+        diagnosticsExport: settingsDraft.diagnosticsExport,
+        syncConfigured: settingsDraft.retainSyncConfig,
+        draft: settingsDraft,
+        runtimeDiagnostics: _runtimeDiagnostics(settingsDraft),
       ),
     );
   }
@@ -169,6 +201,7 @@ class FfiManagerBridge implements ManagerBridge {
 
   SyncPreflightSummary _syncSummaryFromNative(
     NativeSyncPreflightSummary summary,
+    ManagerSettingsDraft settingsDraft,
   ) {
     final syncableObjects =
         summary.syncableUserTerms +
@@ -178,16 +211,25 @@ class FfiManagerBridge implements ManagerBridge {
         summary.localSelectionEvents +
         summary.localNegativeFeedback +
         summary.localImportBatches;
-    final state = serverEndpoint.isEmpty
-        ? SyncUiState.localOnly
-        : SyncUiState.backendUnavailable;
+    const device = DeviceSecuritySummary(
+      deviceId: 'local-manager',
+      backendId: 'unavailable',
+      capabilityStatus: 'platform_private_key_backend_unavailable',
+      productionGate: 'blocked',
+    );
+    final state = deriveManagerSyncUiState(
+      draft: settingsDraft,
+      device: device,
+    );
 
     return SyncPreflightSummary(
       state: state,
-      serverEndpoint: serverEndpoint.isEmpty ? '未配置' : serverEndpoint,
-      reason: state == SyncUiState.localOnly
-          ? '未配置自部署服务端；真实远端同步保持关闭'
-          : '平台私钥 backend 与目标部署证据未解除生产门禁',
+      serverEndpoint: managerSyncEndpointLabel(settingsDraft),
+      reason: managerSyncGateReason(
+        state: state,
+        draft: settingsDraft,
+        device: device,
+      ),
       syncableObjects: syncableObjects,
       localOnlyEvents: localOnlyEvents,
       lastUpload: '未启用',
@@ -218,12 +260,7 @@ class FfiManagerBridge implements ManagerBridge {
           count: summary.localImportBatches,
         ),
       ],
-      device: const DeviceSecuritySummary(
-        deviceId: 'local-manager',
-        backendId: 'unavailable',
-        capabilityStatus: 'platform_private_key_backend_unavailable',
-        productionGate: 'blocked',
-      ),
+      device: device,
     );
   }
 
@@ -248,7 +285,7 @@ class FfiManagerBridge implements ManagerBridge {
         .toList(growable: false);
   }
 
-  ManagerRuntimeDiagnostics _runtimeDiagnostics() {
+  ManagerRuntimeDiagnostics _runtimeDiagnostics(ManagerSettingsDraft draft) {
     return ManagerRuntimeDiagnostics(
       bridgeMode: _nativeInjected ? 'ffi_injected' : 'dart_ffi',
       userDb: 'RADISHLEX_MANAGER_DB configured',
@@ -257,12 +294,24 @@ class FfiManagerBridge implements ManagerBridge {
           : libraryPath.isEmpty
           ? 'default dynamic library lookup'
           : 'RADISHLEX_MANAGER_FFI_LIBRARY configured',
-      syncEndpoint: serverEndpoint.isEmpty
-          ? 'RADISHLEX_MANAGER_SYNC_SERVER not configured'
-          : 'RADISHLEX_MANAGER_SYNC_SERVER configured',
+      settingsStore: _settingsStore.sourceLabel,
+      syncEndpoint: draft.hasServerEndpoint
+          ? 'sync endpoint draft configured'
+          : 'sync endpoint draft not configured',
       lastErrorCode: 'none',
     );
   }
+}
+
+ManagerSettingsDraft _fallbackSettingsDraft(String? serverEndpoint) {
+  final endpoint = serverEndpoint?.trim() ?? '';
+  return ManagerSettingsDraft(
+    serverEndpoint: endpoint,
+    retainSyncConfig: endpoint.isNotEmpty,
+    privacyMode: false,
+    diagnosticsExport: false,
+    deploymentEvidenceRecorded: false,
+  );
 }
 
 List<String> _rankExplainSignals(NativeRankExplainSummary explanation) {

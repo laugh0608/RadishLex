@@ -44,6 +44,9 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
           onDeleteTerm: _deleteTerm,
           onImportDictionary: _importDictionary,
           onExportDictionary: _exportDictionary,
+          onPreviewDiagnostics: _previewDiagnostics,
+          onExportDiagnostics: _exportDiagnostics,
+          onSaveSettingsDraft: _saveSettingsDraft,
         );
       },
     );
@@ -76,6 +79,7 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
       return;
     }
 
+    var operation = ManagerBridgeOperation.inspectDictionaryImport;
     try {
       final preview = await widget.bridge.inspectDictionaryImport(
         request.filePath,
@@ -92,6 +96,7 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
         return;
       }
 
+      operation = ManagerBridgeOperation.importDictionaryFile;
       final result = await widget.bridge.importDictionaryFile(
         filePath: request.filePath,
         sourceName: request.sourceName,
@@ -108,7 +113,7 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
       _reloadSnapshot();
     } on Object catch (error) {
       if (mounted) {
-        _showBridgeMessage(_bridgeFailureMessage(error));
+        _showBridgeMessage(_bridgeFailureMessage(error, operation));
       }
     }
   }
@@ -130,7 +135,83 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
       _showBridgeMessage('导出完成：${result.exportedTerms} 条');
     } on Object catch (error) {
       if (mounted) {
-        _showBridgeMessage(_bridgeFailureMessage(error));
+        _showBridgeMessage(
+          _bridgeFailureMessage(
+            error,
+            ManagerBridgeOperation.exportDictionaryFile,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _previewDiagnostics() async {
+    try {
+      final report = await widget.bridge.loadDiagnosticsReport();
+      if (!mounted) {
+        return;
+      }
+      await showDialog<void>(
+        context: context,
+        builder: (context) => _DiagnosticsReportDialog(report: report),
+      );
+    } on Object catch (error) {
+      if (mounted) {
+        _showBridgeMessage(
+          _bridgeFailureMessage(
+            error,
+            ManagerBridgeOperation.previewDiagnostics,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportDiagnostics() async {
+    final filePath = await showDialog<String>(
+      context: context,
+      builder: (context) => const _DiagnosticsExportDialog(),
+    );
+    if (!mounted || filePath == null) {
+      return;
+    }
+
+    try {
+      final result = await widget.bridge.exportDiagnosticsReport(filePath);
+      if (!mounted) {
+        return;
+      }
+      _showBridgeMessage('诊断摘要导出完成：${result.lineCount} 行');
+    } on Object catch (error) {
+      if (mounted) {
+        _showBridgeMessage(
+          _bridgeFailureMessage(
+            error,
+            ManagerBridgeOperation.exportDiagnostics,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveSettingsDraft(ManagerSettingsDraft draft) async {
+    try {
+      final snapshot = await widget.bridge.saveSettingsDraft(draft);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        snapshotFuture = Future.value(snapshot);
+      });
+      _showBridgeMessage('设置草案已保存：${snapshot.sync.state.code}');
+    } on Object catch (error) {
+      if (mounted) {
+        _showBridgeMessage(
+          _bridgeFailureMessage(
+            error,
+            ManagerBridgeOperation.saveSettingsDraft,
+          ),
+        );
       }
     }
   }
@@ -150,6 +231,9 @@ class _ManagerShell extends StatelessWidget {
     required this.onDeleteTerm,
     required this.onImportDictionary,
     required this.onExportDictionary,
+    required this.onPreviewDiagnostics,
+    required this.onExportDiagnostics,
+    required this.onSaveSettingsDraft,
   });
 
   final ManagerSnapshot snapshot;
@@ -158,6 +242,9 @@ class _ManagerShell extends StatelessWidget {
   final ValueChanged<UserTerm> onDeleteTerm;
   final VoidCallback onImportDictionary;
   final VoidCallback onExportDictionary;
+  final VoidCallback onPreviewDiagnostics;
+  final VoidCallback onExportDiagnostics;
+  final ValueChanged<ManagerSettingsDraft> onSaveSettingsDraft;
 
   @override
   Widget build(BuildContext context) {
@@ -170,7 +257,12 @@ class _ManagerShell extends StatelessWidget {
       ),
       _LearningView(snapshot: snapshot),
       _SyncView(sync: snapshot.sync),
-      _SettingsView(settings: snapshot.settings),
+      _SettingsView(
+        settings: snapshot.settings,
+        onPreviewDiagnostics: onPreviewDiagnostics,
+        onExportDiagnostics: onExportDiagnostics,
+        onSaveSettingsDraft: onSaveSettingsDraft,
+      ),
     ];
 
     return LayoutBuilder(
@@ -264,7 +356,12 @@ class _ManagerLoadFailure extends StatelessWidget {
                 const SizedBox(height: 12),
                 const Text('管理端数据加载失败'),
                 const SizedBox(height: 6),
-                Text(_bridgeFailureMessage(error)),
+                Text(
+                  _bridgeFailureMessage(
+                    error,
+                    ManagerBridgeOperation.loadSnapshot,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 FilledButton.icon(
                   onPressed: onRetry,
@@ -936,45 +1033,117 @@ class _SyncView extends StatelessWidget {
   }
 }
 
-class _SettingsView extends StatelessWidget {
-  const _SettingsView({required this.settings});
+class _SettingsView extends StatefulWidget {
+  const _SettingsView({
+    required this.settings,
+    required this.onPreviewDiagnostics,
+    required this.onExportDiagnostics,
+    required this.onSaveSettingsDraft,
+  });
 
   final ManagerSettings settings;
+  final VoidCallback onPreviewDiagnostics;
+  final VoidCallback onExportDiagnostics;
+  final ValueChanged<ManagerSettingsDraft> onSaveSettingsDraft;
+
+  @override
+  State<_SettingsView> createState() => _SettingsViewState();
+}
+
+class _SettingsViewState extends State<_SettingsView> {
+  late final TextEditingController serverEndpointController;
+  late bool retainSyncConfig;
+  late bool privacyMode;
+  late bool diagnosticsExport;
+  late bool deploymentEvidenceRecorded;
+
+  @override
+  void initState() {
+    super.initState();
+    serverEndpointController = TextEditingController();
+    _loadDraft(widget.settings.draft);
+  }
+
+  @override
+  void didUpdateWidget(_SettingsView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_sameDraft(oldWidget.settings.draft, widget.settings.draft)) {
+      _loadDraft(widget.settings.draft);
+    }
+  }
+
+  @override
+  void dispose() {
+    serverEndpointController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final settings = widget.settings;
     final diagnostics = settings.runtimeDiagnostics;
 
     return Column(
       children: [
         _Section(
-          title: '设置',
+          title: '设置草案',
           child: Column(
             children: [
-              const TextField(
-                decoration: InputDecoration(
+              TextField(
+                key: const Key('settings-server-endpoint'),
+                controller: serverEndpointController,
+                decoration: const InputDecoration(
                   prefixIcon: Icon(Icons.dns_outlined),
                   labelText: '自部署服务端',
                 ),
+                onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 12),
               SwitchListTile(
-                value: settings.privacyMode,
-                onChanged: (_) {},
+                key: const Key('settings-privacy-mode'),
+                value: privacyMode,
+                onChanged: (value) => setState(() {
+                  privacyMode = value;
+                }),
                 secondary: const Icon(Icons.privacy_tip_outlined),
                 title: const Text('隐私模式'),
               ),
               SwitchListTile(
-                value: settings.diagnosticsExport,
-                onChanged: (_) {},
+                key: const Key('settings-diagnostics-export'),
+                value: diagnosticsExport,
+                onChanged: (value) => setState(() {
+                  diagnosticsExport = value;
+                }),
                 secondary: const Icon(Icons.bug_report_outlined),
                 title: const Text('诊断摘要导出'),
               ),
               CheckboxListTile(
-                value: settings.syncConfigured,
-                onChanged: (_) {},
+                key: const Key('settings-retain-sync-config'),
+                value: retainSyncConfig,
+                onChanged: (value) => setState(() {
+                  retainSyncConfig = value ?? false;
+                }),
                 secondary: const Icon(Icons.cloud_done_outlined),
                 title: const Text('保留同步配置草案'),
+              ),
+              CheckboxListTile(
+                key: const Key('settings-deployment-evidence'),
+                value: deploymentEvidenceRecorded,
+                onChanged: (value) => setState(() {
+                  deploymentEvidenceRecorded = value ?? false;
+                }),
+                secondary: const Icon(Icons.verified_outlined),
+                title: const Text('记录目标部署验证草案'),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  key: const Key('settings-save-button'),
+                  onPressed: () => widget.onSaveSettingsDraft(_currentDraft()),
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('保存草案'),
+                ),
               ),
             ],
           ),
@@ -982,6 +1151,24 @@ class _SettingsView extends StatelessWidget {
         const SizedBox(height: 16),
         _Section(
           title: '配置来源',
+          trailing: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                key: const Key('diagnostics-preview-button'),
+                onPressed: widget.onPreviewDiagnostics,
+                icon: const Icon(Icons.visibility_outlined),
+                label: const Text('预览'),
+              ),
+              FilledButton.icon(
+                key: const Key('diagnostics-export-button'),
+                onPressed: widget.onExportDiagnostics,
+                icon: const Icon(Icons.ios_share_outlined),
+                label: const Text('导出'),
+              ),
+            ],
+          ),
           child: Column(
             children: [
               _KeyValueRow(label: 'bridge', value: diagnostics.bridgeMode),
@@ -1004,13 +1191,121 @@ class _SettingsView extends StatelessWidget {
       ],
     );
   }
+
+  ManagerSettingsDraft _currentDraft() {
+    return ManagerSettingsDraft(
+      serverEndpoint: serverEndpointController.text,
+      retainSyncConfig: retainSyncConfig,
+      privacyMode: privacyMode,
+      diagnosticsExport: diagnosticsExport,
+      deploymentEvidenceRecorded: deploymentEvidenceRecorded,
+    );
+  }
+
+  void _loadDraft(ManagerSettingsDraft draft) {
+    serverEndpointController.text = draft.serverEndpoint;
+    retainSyncConfig = draft.retainSyncConfig;
+    privacyMode = draft.privacyMode;
+    diagnosticsExport = draft.diagnosticsExport;
+    deploymentEvidenceRecorded = draft.deploymentEvidenceRecorded;
+  }
 }
 
-String _bridgeFailureMessage(Object? error) {
-  if (error is ManagerBridgeFailure) {
-    return '管理端 bridge 调用失败：${error.code}';
+bool _sameDraft(ManagerSettingsDraft left, ManagerSettingsDraft right) {
+  return left.serverEndpoint == right.serverEndpoint &&
+      left.retainSyncConfig == right.retainSyncConfig &&
+      left.privacyMode == right.privacyMode &&
+      left.diagnosticsExport == right.diagnosticsExport &&
+      left.deploymentEvidenceRecorded == right.deploymentEvidenceRecorded;
+}
+
+class _DiagnosticsReportDialog extends StatelessWidget {
+  const _DiagnosticsReportDialog({required this.report});
+
+  final ManagerDiagnosticsReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('诊断摘要预览'),
+      content: SizedBox(
+        width: 560,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 420),
+          child: SingleChildScrollView(
+            child: SelectableText(
+              report.toRedactedText(),
+              key: const Key('diagnostics-report-text'),
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        FilledButton.icon(
+          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.check),
+          label: const Text('关闭'),
+        ),
+      ],
+    );
   }
-  return '管理端 bridge 调用失败';
+}
+
+class _DiagnosticsExportDialog extends StatefulWidget {
+  const _DiagnosticsExportDialog();
+
+  @override
+  State<_DiagnosticsExportDialog> createState() =>
+      _DiagnosticsExportDialogState();
+}
+
+class _DiagnosticsExportDialogState extends State<_DiagnosticsExportDialog> {
+  final filePathController = TextEditingController();
+
+  @override
+  void dispose() {
+    filePathController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filePath = filePathController.text.trim();
+
+    return AlertDialog(
+      title: const Text('导出诊断摘要'),
+      content: SizedBox(
+        width: 420,
+        child: TextField(
+          key: const Key('diagnostics-export-path'),
+          controller: filePathController,
+          decoration: const InputDecoration(
+            prefixIcon: Icon(Icons.description_outlined),
+            labelText: '文件路径',
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton.icon(
+          key: const Key('diagnostics-export-submit'),
+          onPressed: filePath.isNotEmpty
+              ? () => Navigator.of(context).pop(filePath)
+              : null,
+          icon: const Icon(Icons.ios_share_outlined),
+          label: const Text('导出'),
+        ),
+      ],
+    );
+  }
+}
+
+String _bridgeFailureMessage(Object? error, ManagerBridgeOperation operation) {
+  return describeManagerBridgeFailure(error, operation).userMessage;
 }
 
 class _Section extends StatelessWidget {
