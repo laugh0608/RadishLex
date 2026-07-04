@@ -58,6 +58,18 @@
 
 Manager UI 预览会保留完整脱敏文本，并额外按 `runtime`、`settings_draft`、`local_data`、`latest_import_batch`、`sync_gate` 和 `redaction` 分组展示字段。预览筛选只作用于本地 UI，不改变 `ManagerDiagnosticsReport` 数据模型、导出格式或 `ManagerBridge` contract。
 
+## 预览、筛选、复制与导出一致性
+
+诊断报告预览是同一份脱敏报告的可读索引，不是新的报告格式：
+
+- section 筛选只在 `runtime`、`settings_draft`、`local_data`、`latest_import_batch`、`sync_gate` 和 `redaction` 分组之间切换可见字段。
+- 关键字筛选只匹配 section title、字段 key、字段 value 和字段 kind，用于快速定位字段；筛选不删除报告内容。
+- `脱敏文本` 区域始终显示 `ManagerDiagnosticsReport.toRedactedText()` 的完整结果。
+- 复制按钮始终复制完整 `toRedactedText()`，不受当前 section 或关键字筛选影响。
+- 导出入口必须导出与 `toRedactedText()` 同语义的脱敏摘要，不允许因为当前筛选状态导出字段子集。
+- 预览、复制和导出都不得输出用户词、导入 / 导出文件内容、真实路径、token、恢复码、私钥、signature bytes、wrapped material bytes 或 encrypted payload bytes。
+- 如果后续新增诊断字段，必须先补本文字段索引、脱敏说明和 widget / smoke 覆盖，再接入预览或导出。
+
 报告头：
 
 | 字段 | 说明 |

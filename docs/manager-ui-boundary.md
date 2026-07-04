@@ -1,6 +1,6 @@
 # RadishLex 管理端边界
 
-本文档定义 Phase 4 Flutter manager 进入实现前必须稳定的职责边界、数据可见性、同步 UI 停止线和第一批功能顺序。读者是后续实现 `apps/radishlex-manager`、`ime-ffi` 管理接口、同步设置页面和审阅隐私边界的开发者。本文不包含 Flutter 页面视觉稿、widget 目录结构、平台输入法壳接入、完整账号系统、OIDC 实现或真实平台私钥 backend 实现。
+本文档定义 Phase 4 Flutter manager 实现和后续演进必须稳定的职责边界、数据可见性、同步 UI 停止线和第一批功能顺序。读者是后续实现 `apps/radishlex-manager`、`ime-ffi` 管理接口、同步设置页面和审阅隐私边界的开发者。本文不包含 Flutter 页面视觉稿、widget 目录结构、平台输入法壳接入、完整账号系统、OIDC 实现或真实平台私钥 backend 实现。
 
 ## 当前定位
 
@@ -27,9 +27,13 @@ Phase 4 第一批管理端功能应覆盖：
 - 查看本地学习状态摘要。
 - 查看 ranker explain 的非敏感摘要。
 - 查看 sync preflight 摘要。
+- 查看 import batches、词条 tombstone 和本地 sync 影响摘要。
 - 配置自部署服务端地址和本地连接参数草案。
 - 显示同步能力是否可用，以及不可用原因。
 - 查看本机设备身份、backend capability 和 production gate 状态摘要。
+- 保存非 secret settings draft，并从草案、隐私模式、平台私钥 backend gate 和部署证据来源标签派生 sync gate。
+- 预览、复制和导出脱敏诊断摘要。
+- 以结构化错误分类展示 bridge 操作失败，不把 native 错误明细透传给 widget 层。
 
 后续同步能力成熟后，管理端可以继续提供：
 
@@ -66,6 +70,8 @@ Phase 4 第一批管理端功能应覆盖：
 - 服务端地址、连接状态、HTTP 错误分类和认证缺失状态。
 - 设备 ID、backend id、backend capability、production gate 状态和不可用原因。
 - 最近同步对象数量、对象类型、版本号、上传 / 下载时间和错误分类。
+- settings draft 中的非 secret 草案字段和部署证据来源 allowlist 标签。
+- 脱敏诊断摘要字段索引、状态来源、停止线、聚合计数和脱敏策略。
 
 管理端不得展示或持久化的数据：
 
@@ -77,6 +83,15 @@ Phase 4 第一批管理端功能应覆盖：
 - Go server 内部 `blob_ref`、本机真实绝对部署路径、真实 token、证书私钥或用户账号 secret。
 
 如果管理端需要导出诊断信息，默认只能导出非敏感摘要；任何包含本地词条的导出都必须是用户显式触发，并清楚标注导出内容。
+
+## 用户可见行为约束
+
+- 词库导入必须先展示导入检查摘要，再由用户确认写入；普通导入不得复活 tombstone，dry run 不写入 userdb。
+- 词库导出只导出用户显式请求的 P2 用户词条视图，不作为诊断报告的一部分混入。
+- 学习页、同步页和诊断报告只能展示聚合计数、状态码、来源标签和解释性摘要，不展示 P1 原始事件或明文同步 payload。
+- 设置页保存的是本地草案；`retain_sync_config`、`server_endpoint`、`privacy_mode`、`diagnostics_export` 和部署证据来源只用于派生 UI 状态，不启用真实上传。
+- 诊断报告预览的 section 筛选和关键字筛选只影响当前对话框字段列表，不改变 `ManagerDiagnosticsReport` 数据模型、脱敏文本、剪贴板内容或导出内容。
+- 复制诊断摘要必须复制完整脱敏文本；导出诊断摘要必须保持同一份脱敏摘要语义，不因当前筛选状态输出字段子集。
 
 ## FFI 与 Bridge 边界
 
