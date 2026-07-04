@@ -140,6 +140,38 @@ go test ./...
 ./scripts/check-repo.sh
 ```
 
+### 部署预演脚本
+
+仓库提供短生命周期部署预演入口：
+
+```sh
+./scripts/check-sync-server-deployment-rehearsal.sh
+```
+
+脚本会：
+
+- 在仓库外创建临时 env 和临时持久化数据目录。
+- 生成随机 `RADISHLEX_SYNC_ACCESS_TOKEN`，并在输出中脱敏。
+- 使用部署态 `docker-compose.yaml` 启动 HTTP upstream，不使用本地 Caddy HTTPS 文件。
+- 验证无 token 请求返回 `401 unauthenticated`，带 token 请求返回结构化业务响应。
+- 检查 SQLite metadata、encrypted blob dir 和 runtime log 脱敏。
+- 执行一次冷备份到临时目录，再恢复到隔离数据目录并复验 auth gate。
+- 结束后执行 `docker compose down` 并删除临时 env / 数据目录。
+
+只验证配置解析，不启动容器：
+
+```sh
+./scripts/check-sync-server-deployment-rehearsal.sh --config-only
+```
+
+打印 Compose 配置时必须使用脚本脱敏输出：
+
+```sh
+./scripts/check-sync-server-deployment-rehearsal.sh --config-only --print-config
+```
+
+该脚本不进入默认 `./scripts/check-repo.sh`，因为完整预演需要 Docker daemon、空闲本机端口和本机容器权限。Docker daemon 不可用时，应记录 `docker compose version`、`docker context ls` 和 `docker version --format '{{.Server.Version}}'` 的结果，不能把 `--config-only` 通过写成容器启动通过。
+
 ### 容器实际启动 smoke
 
 容器启动 smoke 需要 Docker daemon 可用。执行前确认没有其他服务占用 `127.0.0.1:7319`，执行后必须 `down`，不能保留长期运行服务。

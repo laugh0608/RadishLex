@@ -191,6 +191,8 @@ sync-server/objects/
 部署配置变更至少执行：
 
 ```sh
+./scripts/check-sync-server-deployment-rehearsal.sh --config-only
+
 go test ./internal/runtime -run TestLocalServerBackupRestorePreservesEncryptedSyncState -count=1
 go test ./internal/runtime -run TestExternalTLSProxySmokePreservesAuthAndEncryptedObjectFlow -count=1
 go test ./internal/runtime -run TestLocalServerUpgradeRollbackPreservesPreUpgradeBackup -count=1
@@ -206,6 +208,8 @@ git diff --check
 ```
 
 三条 runtime smoke 分别验证冷备份 / 恢复、外部 TLS 反代、升级 / 回滚；它们使用短生命周期测试服务和临时数据目录，不替代目标部署人工演练。
+
+`./scripts/check-sync-server-deployment-rehearsal.sh` 使用部署态 Compose 文件、临时 env、随机 bearer token 和仓库外数据目录执行短生命周期预演。完整模式会启动容器、验证 token 门禁、检查日志脱敏，并做一次冷备份 / 恢复到隔离目录；`--config-only` 只验证临时 env 与 Compose 解析，不代表容器启动通过。
 
 需要 Docker daemon 的 build / up / curl smoke 如果被沙盒、Docker socket 或权限限制挡住，应申请真实环境复验。不能把 `config` 通过写成容器实际启动通过。
 

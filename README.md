@@ -91,9 +91,12 @@ cargo test -p radishlex-ime-sync
 cargo test -p radishlex-ime-userdb --test two_client_go_http_sync
 docker compose -f deploy/sync-server/docker-compose.local.yaml config
 docker compose -f deploy/sync-server/docker-compose.yaml --env-file deploy/sync-server/.env.example config
+./scripts/check-sync-server-deployment-rehearsal.sh --config-only
 ```
 
 本地 Compose 测试态使用 Caddy internal TLS 暴露 `https://localhost:7319`；部署态只提供同机 HTTP upstream `http://127.0.0.1:7319`，外部 TLS 和访问控制由部署者配置。生产访问控制当前先使用 `RADISHLEX_SYNC_ACCESS_TOKEN` 单用户 bearer token；OIDC / Radish 产品账号体系已作为后续专题记录，不是当前必须部署的账号系统。
+
+完整部署预演可执行 `./scripts/check-sync-server-deployment-rehearsal.sh`，它会用临时 env、随机 bearer token 和仓库外数据目录短生命周期启动部署态 Compose，验证 token 门禁、日志脱敏和冷备份恢复；该命令需要 Docker daemon 可用，默认仓库检查不运行。
 
 Apple Keychain backend 已在 `apple-keychain` feature 下接线，但真实 smoke 阻塞于 `ed25519-v1` 创建，`apple-keychain-v1` 在该 blocker 解除前会阻断生产签名。默认测试不会触碰本机 Keychain。
 
