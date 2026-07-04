@@ -58,6 +58,7 @@ RadishLex/
     sync-server-oidc-roadmap.md
     production-recovery-flow.md
     platform-private-key-backend-strategy.md
+    manager-ui-boundary.md
     ffi-boundary.md
     adr/
     runbooks/
@@ -113,6 +114,7 @@ RadishLex/
 - `docs/sync-server-oidc-roadmap.md`：后续接入 Radish 产品账号体系或兼容 OIDC IdP 的认证边界、身份映射、scope 草案和停止线。
 - `docs/production-recovery-flow.md`：生产恢复记录创建、轮换、撤销、新设备恢复加入、失败限速和停止线。
 - `docs/platform-private-key-backend-strategy.md`：平台私钥 backend 当前证据、禁止 fallback、生产合格条件和无新设备时的推进路径。
+- `docs/manager-ui-boundary.md`：Phase 4 Flutter manager 的职责、数据可见性、同步 UI 状态、恢复码 / 设备授权停止线和第一批功能顺序。
 - `docs/adr/0002-recovery-code-kdf.md`：恢复码 Argon2id KDF、格式、恢复记录字段和生产实现验证口径。
 - `docs/adr/0003-device-signing-key-storage.md`：设备签名、签名对象、私钥存储抽象、错误语义和验证口径。
 - `docs/adr/0004-platform-private-key-storage-backend.md`：平台私钥存储 backend、capability metadata、FFI 边界、错误语义和停止线。
@@ -254,6 +256,8 @@ server/sync-server/
 - OIDC。
 
 ## Flutter app 建议
+
+管理端实现前先遵循 `docs/manager-ui-boundary.md`：第一批页面优先覆盖本地 userdb 管理、学习状态摘要、rank explain 摘要和 sync preflight 摘要；真实远端同步、恢复码和设备授权 UI 必须等待可用平台私钥 backend 与目标部署运行证据。
 
 ```text
 apps/radishlex-manager/

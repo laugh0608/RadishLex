@@ -1,0 +1,163 @@
+# RadishLex 管理端边界
+
+本文档定义 Phase 4 Flutter manager 进入实现前必须稳定的职责边界、数据可见性、同步 UI 停止线和第一批功能顺序。读者是后续实现 `apps/radishlex-manager`、`ime-ffi` 管理接口、同步设置页面和审阅隐私边界的开发者。本文不包含 Flutter 页面视觉稿、widget 目录结构、平台输入法壳接入、完整账号系统、OIDC 实现或真实平台私钥 backend 实现。
+
+## 当前定位
+
+Flutter manager 是 RadishLex 的管理界面，不进入输入热路径，不承担候选生成、候选排序、用户词库真相源、同步合并真相源或隐私策略真相源。
+
+管理端的职责是把 Rust core 和本地 userdb 已经具备的能力以可审计、可删除、可解释的方式呈现给用户，并在同步能力具备生产条件前清楚显示不可用原因。
+
+当前仓库还没有 `apps/radishlex-manager/`。Phase 4 进入代码前，先以本文档固定以下边界：
+
+- 本地 userdb 管理优先于远端同步开关。
+- 学习记录摘要优先于 P1 原始事件明细。
+- 同步预检和部署配置检查优先于真实远端启用。
+- 恢复码和设备授权 UI 必须等待可用平台私钥 backend。
+- 用户可见同步 UI 必须等待目标部署运行证据和可用平台私钥 backend。
+
+## 职责范围
+
+Phase 4 第一批管理端功能应覆盖：
+
+- 查看本地用户词条。
+- 删除用户词条，并写入 tombstone。
+- 导入用户词库，并显示导入检查结果。
+- 导出用户词库。
+- 查看本地学习状态摘要。
+- 查看 ranker explain 的非敏感摘要。
+- 查看 sync preflight 摘要。
+- 配置自部署服务端地址和本地连接参数草案。
+- 显示同步能力是否可用，以及不可用原因。
+- 查看本机设备身份、backend capability 和 production gate 状态摘要。
+
+后续同步能力成熟后，管理端可以继续提供：
+
+- 当前设备列表。
+- 加入请求审批。
+- 设备撤销。
+- 恢复码生成、确认保存、轮换和撤销。
+- 最近同步对象数量、最近上传时间和最近下载时间。
+- 一键停止同步。
+- 一键删除本机学习数据。
+- 一键从服务端删除当前同步域密文数据。
+
+## 非职责范围
+
+管理端不应：
+
+- 处理每次按键、composition、候选生成、候选排序或文本提交。
+- 绕过 Rust core 直接修改 userdb SQLite schema。
+- 生成、保存、上传或记录明文同步 payload。
+- 展示 P1 原始选择事件、原始负反馈事件、窗口标题、联系人、密码、证件、支付或其他敏感上下文。
+- 把恢复码、同步主密钥、设备私钥、wrapped material 明文或 bearer token 写入普通日志、崩溃报告、截图、analytics 或测试 fixture。
+- 把 Go server 当作候选排序服务、在线转换服务或明文词库服务。
+- 在平台私钥 backend 不可用时提供用户可用同步开关。
+- 在目标部署证据不足时把同步状态显示为生产可用。
+- 把 OIDC / Radish 产品账号登录提前做成 Phase 4 的前置条件。
+
+## 数据可见性
+
+管理端可以展示的数据：
+
+- 本地用户词条、权重摘要和删除 tombstone 的用户可读视图。
+- 导入批次结果、导入错误分类和被跳过条目计数。
+- 学习状态摘要、候选 explain 摘要和 sync preflight 摘要。
+- 服务端地址、连接状态、HTTP 错误分类和认证缺失状态。
+- 设备 ID、backend id、backend capability、production gate 状态和不可用原因。
+- 最近同步对象数量、对象类型、版本号、上传 / 下载时间和错误分类。
+
+管理端不得展示或持久化的数据：
+
+- P0 数据。
+- P1 原始事件明细。
+- 明文同步 payload。
+- encrypted payload bytes、signature bytes、wrapped key bytes、recovery wrapped material bytes。
+- 恢复码明文、KDF 输出、同步主密钥、设备私钥和 bearer token。
+- Go server 内部 `blob_ref`、本机真实绝对部署路径、真实 token、证书私钥或用户账号 secret。
+
+如果管理端需要导出诊断信息，默认只能导出非敏感摘要；任何包含本地词条的导出都必须是用户显式触发，并清楚标注导出内容。
+
+## FFI 与 Bridge 边界
+
+管理端应通过 `ime-ffi` 或后续受控 bridge 调用 Rust 能力，不直接读写 Rust 内部结构。
+
+第一批可依赖的接口方向：
+
+- session / dictionary handle 的创建与释放。
+- userdb 词条 list / add / delete。
+- dictionary inspect / import / export。
+- import batches 只读查询。
+- learning status 只读摘要。
+- sync preflight 状态摘要。
+- backend capability / production gate 状态摘要。
+
+后续同步 UI 需要新增 bridge 时，应遵循：
+
+- bridge 入参不接受明文同步 payload。
+- bridge 返回值不包含 P1 原始事件、wrapped material bytes、signature bytes 或 token。
+- 错误必须结构化，至少区分配置缺失、认证失败、平台 backend 不可用、目标部署证据不足、网络不可达、版本冲突和本地数据不一致。
+- Rust 错误对象、字符串 buffer、handle 释放和 owner-thread 规则继续遵守 `docs/ffi-boundary.md` 与 `docs/runbooks/ffi-platform-call-contract.md`。
+
+## 同步 UI 状态模型
+
+管理端同步相关 UI 至少应区分以下状态：
+
+- `local_only`：仅本地管理，未配置自部署服务端。
+- `preflight_ready`：本地 P2 对象、加密组装和 sync preflight 通过，但未启用远端。
+- `server_configured`：已配置服务端地址和访问 token，但未完成生产条件验证。
+- `backend_unavailable`：平台私钥 backend 不可用于生产签名。
+- `deployment_unverified`：目标部署运行证据不足。
+- `sync_disabled_by_policy`：隐私模式、用户禁用或策略要求停止同步。
+- `ready_for_user_sync`：平台私钥 backend 可用，目标部署证据齐备，用户明确开启同步。
+
+在 `ready_for_user_sync` 前，UI 可以展示配置检查和不可用原因，但不能提供会把本地 P2 数据上传到用户真实远端的主操作。
+
+## 恢复码与设备授权
+
+恢复码 UI 必须等到以下条件同时满足：
+
+- 可用平台私钥 backend 已通过真实平台验证。
+- 恢复记录创建、轮换、撤销和读取已有端到端验证。
+- 管理端已实现恢复码只显示一次、用户确认保存和日志脱敏约束。
+- 失败原因按非敏感分类展示，不输出恢复码、KDF 输出或 wrapped material bytes。
+
+设备授权 UI 必须等到以下条件同时满足：
+
+- 设备签名和授权包验证链路已稳定。
+- 设备列表、join request 列表和 authorization handler 的错误语义已映射到 UI。
+- 撤销设备后 UI 能解释历史对象无法被技术上追回的限制。
+- key epoch、撤销状态和后续对象签名门禁能被用户理解和复验。
+
+## 日志、截图与测试数据
+
+管理端日志允许记录：
+
+- 页面名称、操作类型、非敏感错误码、对象类型、对象数量、时间和耗时。
+- backend id、capability status、production gate status。
+- 服务端 host 的用户可见配置摘要。
+
+管理端日志禁止记录：
+
+- 用户输入历史、候选明细、联系人、窗口标题、恢复码、token、私钥、签名 bytes、wrapped material bytes、encrypted payload bytes。
+- 导入文件原文、导出文件内容或完整 userdb dump。
+- Go server 请求体、响应体或内部 `blob_ref`。
+
+测试 fixture 应使用合成词、虚构设备、虚构服务端地址和合成错误码。截图测试不得包含真实用户词、真实账号、真实 token、真实域名证书细节或真实设备序列号。
+
+## Phase 4 起步顺序
+
+1. 固定本文档，并同步路线图、技术计划、仓库结构和周志。
+2. 创建 `apps/radishlex-manager/` Flutter 工程骨架，但默认只接本地 mock / fixture 数据和受控 bridge contract。
+3. 接入本地 userdb 词条 list / delete / import / export。
+4. 接入 learning status、rank explain 摘要和 sync preflight 摘要。
+5. 增加同步配置页，但真实上传按钮保持禁用，显示 `backend_unavailable` 或 `deployment_unverified`。
+6. 待可用平台私钥 backend 与目标部署运行证据齐备后，再接设备授权、恢复码和用户可用同步。
+
+## 停止线
+
+- 没有可用平台私钥 backend 前，不提供用户可用同步开关、恢复码创建 UI 或设备授权成功路径。
+- 没有目标部署运行证据前，不把远端同步展示为生产可用。
+- 没有 FFI / bridge 明确错误语义前，不让 Flutter 直接解析 Rust 内部错误字符串。
+- 任何会展示、记录、上传或导出 P0、P1 原始事件、恢复码、token、私钥或明文同步 payload 的设计都必须停止并回退。
+- 如果 UI 需要新增 Go server API，必须先更新 `docs/sync-server-api-storage.md` 或对应 ADR，不能让管理端绕过现有 encrypted object / metadata 边界。
