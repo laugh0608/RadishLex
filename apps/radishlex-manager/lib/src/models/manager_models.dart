@@ -36,6 +36,7 @@ class ManagerSnapshot {
     required this.generatedAt,
     required this.dictionaryTerms,
     required this.deletedTerms,
+    required this.importBatches,
     required this.learningSummary,
     required this.explanations,
     required this.sync,
@@ -45,6 +46,7 @@ class ManagerSnapshot {
   final String generatedAt;
   final List<UserTerm> dictionaryTerms;
   final List<DeletedTerm> deletedTerms;
+  final List<DictionaryImportBatchSummary> importBatches;
   final LearningSummary learningSummary;
   final List<RankerExplanation> explanations;
   final SyncPreflightSummary sync;
@@ -54,6 +56,7 @@ class ManagerSnapshot {
     String? generatedAt,
     List<UserTerm>? dictionaryTerms,
     List<DeletedTerm>? deletedTerms,
+    List<DictionaryImportBatchSummary>? importBatches,
     LearningSummary? learningSummary,
     List<RankerExplanation>? explanations,
     SyncPreflightSummary? sync,
@@ -63,6 +66,7 @@ class ManagerSnapshot {
       generatedAt: generatedAt ?? this.generatedAt,
       dictionaryTerms: dictionaryTerms ?? this.dictionaryTerms,
       deletedTerms: deletedTerms ?? this.deletedTerms,
+      importBatches: importBatches ?? this.importBatches,
       learningSummary: learningSummary ?? this.learningSummary,
       explanations: explanations ?? this.explanations,
       sync: sync ?? this.sync,
@@ -127,6 +131,32 @@ class DeletedTerm {
   final String text;
   final String reading;
   final String deletedAt;
+}
+
+class DictionaryImportBatchSummary {
+  const DictionaryImportBatchSummary({
+    required this.id,
+    required this.sourceName,
+    required this.totalRecords,
+    required this.importedTerms,
+    required this.insertedTerms,
+    required this.updatedTerms,
+    required this.skippedDeletedTerms,
+    required this.skippedDuplicateTerms,
+    required this.createdAt,
+    required this.notes,
+  });
+
+  final int id;
+  final String sourceName;
+  final int totalRecords;
+  final int importedTerms;
+  final int insertedTerms;
+  final int updatedTerms;
+  final int skippedDeletedTerms;
+  final int skippedDuplicateTerms;
+  final String createdAt;
+  final String notes;
 }
 
 class LearningSummary {
@@ -249,11 +279,43 @@ class ManagerSettings {
     required this.privacyMode,
     required this.diagnosticsExport,
     required this.syncConfigured,
+    required this.runtimeDiagnostics,
   });
 
   final bool privacyMode;
   final bool diagnosticsExport;
   final bool syncConfigured;
+  final ManagerRuntimeDiagnostics runtimeDiagnostics;
+
+  ManagerSettings copyWith({
+    bool? privacyMode,
+    bool? diagnosticsExport,
+    bool? syncConfigured,
+    ManagerRuntimeDiagnostics? runtimeDiagnostics,
+  }) {
+    return ManagerSettings(
+      privacyMode: privacyMode ?? this.privacyMode,
+      diagnosticsExport: diagnosticsExport ?? this.diagnosticsExport,
+      syncConfigured: syncConfigured ?? this.syncConfigured,
+      runtimeDiagnostics: runtimeDiagnostics ?? this.runtimeDiagnostics,
+    );
+  }
+}
+
+class ManagerRuntimeDiagnostics {
+  const ManagerRuntimeDiagnostics({
+    required this.bridgeMode,
+    required this.userDb,
+    required this.nativeLibrary,
+    required this.syncEndpoint,
+    required this.lastErrorCode,
+  });
+
+  final String bridgeMode;
+  final String userDb;
+  final String nativeLibrary;
+  final String syncEndpoint;
+  final String lastErrorCode;
 }
 
 class DictionaryImportPreview {

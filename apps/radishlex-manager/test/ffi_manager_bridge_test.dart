@@ -29,18 +29,21 @@ void main() {
       expect(snapshot.learningSummary.userTerms, 1);
       expect(snapshot.learningSummary.deletedTerms, 2);
       expect(snapshot.learningSummary.selectionEvents, 4);
+      expect(native.listedBatchesDbPath, '/tmp/radishlex-userdb.sqlite');
+      expect(snapshot.importBatches.single.sourceName, 'manager-import');
+      expect(snapshot.importBatches.single.importedTerms, 2);
       expect(snapshot.sync.state, SyncUiState.backendUnavailable);
       expect(snapshot.sync.syncableObjects, 4);
       expect(snapshot.sync.localOnlyEvents, 7);
       expect(snapshot.sync.device.productionGate, 'blocked');
-      expect(
-        snapshot.explanations.single.signals,
-        contains('ffi_userdb_weight'),
-      );
-      expect(
-        snapshot.explanations.single.signals,
-        contains('selection_summary'),
-      );
+      expect(snapshot.explanations.single.signals, contains('user=2.000'));
+      expect(snapshot.explanations.single.signals, contains('freq=0.350'));
+      expect(snapshot.explanations.single.score, 2.9);
+      expect(native.explainInputCode, 'luobo');
+      expect(native.explainCandidateText, '萝卜词核');
+      expect(native.explainReading, isNull);
+      expect(native.explainContextKind, 'general');
+      expect(snapshot.settings.runtimeDiagnostics.bridgeMode, 'ffi_injected');
     },
   );
 
@@ -80,6 +83,11 @@ final class _FakeNativeBinding implements RadishLexManagerNativeBinding {
   String? deletedText;
   String? deletedReading;
   String? importedSourceName;
+  String? explainInputCode;
+  String? explainCandidateText;
+  String? explainReading;
+  String? explainContextKind;
+  String? listedBatchesDbPath;
 
   @override
   List<NativeUserTermRecord> listUserTerms(String dbPath) {
@@ -185,6 +193,26 @@ final class _FakeNativeBinding implements RadishLexManagerNativeBinding {
   }
 
   @override
+  List<NativeImportBatchRecord> listImportBatches(String dbPath) {
+    listedBatchesDbPath = dbPath;
+    return const [
+      NativeImportBatchRecord(
+        id: 7,
+        sourceName: 'manager-import',
+        totalRecords: 2,
+        importedTerms: 2,
+        insertedTerms: 1,
+        updatedTerms: 1,
+        skippedDeletedTerms: 0,
+        skippedDuplicateTerms: 0,
+        createdAtMs: 1783123260000,
+        notes: null,
+        notesPresent: false,
+      ),
+    ];
+  }
+
+  @override
   NativeSyncPreflightSummary syncPreflight(String dbPath) {
     return const NativeSyncPreflightSummary(
       schemaVersion: 1,
@@ -195,6 +223,37 @@ final class _FakeNativeBinding implements RadishLexManagerNativeBinding {
       localSelectionEvents: 4,
       localNegativeFeedback: 1,
       localImportBatches: 2,
+    );
+  }
+
+  @override
+  NativeRankExplainSummary rankExplain({
+    required String dbPath,
+    required String inputCode,
+    required String candidateText,
+    required String? reading,
+    required String contextKind,
+  }) {
+    explainInputCode = inputCode;
+    explainCandidateText = candidateText;
+    explainReading = reading;
+    explainContextKind = contextKind;
+    return const NativeRankExplainSummary(
+      inputCode: 'luobo',
+      candidateText: '萝卜词核',
+      reading: null,
+      readingPresent: false,
+      contextKind: 'general',
+      originalIndex: 0,
+      finalScore: 2.9,
+      engineOrderFactor: 0.0,
+      userTermBoost: 2.0,
+      frequencyBoost: 0.35,
+      recencyBoost: 0.25,
+      contextBoost: 0.3,
+      negativeFeedbackPenalty: 0.0,
+      suppressedPenalty: 0.0,
+      deletedPenalty: 0.0,
     );
   }
 }

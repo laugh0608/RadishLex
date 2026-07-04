@@ -23,6 +23,7 @@ use crate::engine::{
 use crate::error::{FfiError, RadishLexError, RadishLexStatusCode};
 use crate::key::RadishLexKeyEvent;
 use crate::learning_status::{learning_status_for_path, RadishLexLearningStatusSummary};
+use crate::rank_explain::{rank_explain_for_path, RadishLexRankExplain, RadishLexRankExplainView};
 use crate::session::RadishLexSession;
 use crate::snapshot::{RadishLexCandidateView, RadishLexSnapshot, RadishLexStringView};
 use crate::sync_status::{sync_preflight_for_path, RadishLexSyncPreflightSummary};
@@ -275,6 +276,55 @@ pub extern "C" fn radishlex_userdb_learning_status(
         }
         Ok(())
     })
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_userdb_rank_explain_new(
+    db_path: *const c_char,
+    input_code: *const c_char,
+    candidate_text: *const c_char,
+    reading: *const c_char,
+    context_kind: *const c_char,
+    error_out: *mut *mut RadishLexError,
+) -> *mut RadishLexRankExplain {
+    ffi_ptr(error_out, || {
+        let explain = rank_explain_for_path(
+            read_utf8(db_path, "db_path")?,
+            read_utf8(input_code, "input_code")?,
+            read_utf8(candidate_text, "candidate_text")?,
+            read_optional_utf8(reading, "reading")?,
+            read_optional_utf8(context_kind, "context_kind")?,
+        )?;
+        Ok(Box::into_raw(Box::new(explain)))
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_userdb_rank_explain_view(
+    explain: *const RadishLexRankExplain,
+    view_out: *mut RadishLexRankExplainView,
+    error_out: *mut *mut RadishLexError,
+) -> RadishLexStatusCode {
+    ffi_status(error_out, || {
+        if view_out.is_null() {
+            return Err(FfiError::invalid_argument(
+                "rank explain view output pointer is null",
+            ));
+        }
+
+        let view = rank_explain_ref(explain)?.view();
+        unsafe {
+            *view_out = view;
+        }
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn radishlex_userdb_rank_explain_free(explain: *mut RadishLexRankExplain) {
+    ffi_release(|| {
+        RadishLexRankExplain::free(explain);
+    });
 }
 
 #[no_mangle]
@@ -583,6 +633,15 @@ fn import_batch_list_ref<'a>(
         ));
     }
     Ok(unsafe { &*batches })
+}
+
+fn rank_explain_ref<'a>(
+    explain: *const RadishLexRankExplain,
+) -> Result<&'a RadishLexRankExplain, FfiError> {
+    if explain.is_null() {
+        return Err(FfiError::invalid_argument("rank explain handle is null"));
+    }
+    Ok(unsafe { &*explain })
 }
 
 fn read_utf8<'a>(value: *const c_char, field: &'static str) -> Result<&'a str, FfiError> {
@@ -1363,6 +1422,7 @@ mod tests {
             radishlex_snapshot_free(ptr::null_mut());
             radishlex_userdb_terms_free(ptr::null_mut());
             radishlex_userdb_import_batches_free(ptr::null_mut());
+            radishlex_userdb_rank_explain_free(ptr::null_mut());
         }
         assert!(radishlex_buffer_data(ptr::null()).is_null());
         assert_eq!(radishlex_buffer_len(ptr::null()), 0);

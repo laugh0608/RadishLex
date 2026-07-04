@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前已落地 `crates/ime-ffi/` 起步验证：C ABI 已覆盖 opaque session handle、ABI contract、session owner-thread policy、session options、Rime session options ABI、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、释放函数、schema 设置、按键输入、snapshot、候选提交、userdb learning status 只读摘要、userdb sync preflight 状态摘要、受控 userdb 词条管理入口、dictionary inspect / export / import 和 import batches 只读查询的 host smoke。当前 session 内部已使用 demo / Rime 可扩展 engine 封装；默认构建仍只启用 deterministic demo engine，`native-rime` feature 下 `radishlex_session_new_rime` 可通过显式 Rime 配置创建真实 `RimeEngine` session，并已通过隔离 Rime 数据目录 smoke。该状态仍不代表平台壳或系统输入法已经接入。
+当前已落地 `crates/ime-ffi/` 起步验证：C ABI 已覆盖 opaque session handle、ABI contract、session owner-thread policy、session options、Rime session options ABI、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、释放函数、schema 设置、按键输入、snapshot、候选提交、userdb learning status 只读摘要、userdb sync preflight 状态摘要、rank explain 只读摘要、受控 userdb 词条管理入口、dictionary inspect / export / import 和 import batches 只读查询的 host smoke。当前 session 内部已使用 demo / Rime 可扩展 engine 封装；默认构建仍只启用 deterministic demo engine，`native-rime` feature 下 `radishlex_session_new_rime` 可通过显式 Rime 配置创建真实 `RimeEngine` session，并已通过隔离 Rime 数据目录 smoke。该状态仍不代表平台壳或系统输入法已经接入。
 
 平台壳后续只能通过 FFI 调用 Rust core，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。
 平台绑定层的具体调用清单见 `docs/runbooks/ffi-platform-call-contract.md`。
@@ -36,6 +36,7 @@ RadishLexSession*
 RadishLexBuffer*
 RadishLexSnapshot*
 RadishLexUserTermList*
+RadishLexRankExplain*
 RadishLexError*
 ```
 
@@ -46,9 +47,9 @@ RadishLexError*
 - ABI contract：`radishlex_ffi_contract`
 - session 生命周期：`radishlex_session_new`、`radishlex_session_new_with_options`、`radishlex_session_new_rime`、`radishlex_session_free`、`radishlex_session_engine_kind`、`radishlex_session_reset`、`radishlex_session_set_schema`
 - 输入与快照：`radishlex_session_push_key`、`radishlex_session_push_key_event`、`radishlex_session_snapshot`、`radishlex_session_snapshot_new`、`radishlex_snapshot_*`、`radishlex_session_commit_candidate`
-- userdb 状态与词条管理：`radishlex_userdb_learning_status`、`radishlex_userdb_sync_preflight`、`radishlex_userdb_add_term`、`radishlex_userdb_delete_term`、`radishlex_userdb_terms_*`
+- userdb 状态与词条管理：`radishlex_userdb_learning_status`、`radishlex_userdb_sync_preflight`、`radishlex_userdb_rank_explain_*`、`radishlex_userdb_add_term`、`radishlex_userdb_delete_term`、`radishlex_userdb_terms_*`
 - dictionary 文件与导入审计：`radishlex_userdb_dictionary_*`、`radishlex_userdb_import_batches_*`
-- Rust 分配对象读取与释放：`radishlex_buffer_*`、`radishlex_error_*`
+- Rust 分配对象读取与释放：`radishlex_buffer_*`、`radishlex_error_*`、`radishlex_userdb_rank_explain_free`
 
 ## 当前 ABI 数据结构
 
@@ -268,6 +269,17 @@ local_import_batches: usize
 
 Rust 内部的 `UserDb::p2_plaintext_payloads()`、`ime-sync::SyncEnvelopeAssembler`、`ime-crypto::EncryptedObjectEnvelope` 和 `ime-sync::EncryptedSyncObjectDraft` 当前只用于 crate 内测试与 Rust 内部组装边界。FFI 不导出这些对象，也不导出 payload bytes、密文、hash、签名、key id 或上传草案。
 
+### Rank explain view
+
+`RadishLexRankExplainView` 字段：`input_code`、`candidate_text`、`reading`、`reading_present`、`context_kind`、`original_index`、`final_score`、`engine_order_factor`、`user_term_boost`、`frequency_boost`、`recency_boost`、`context_boost`、`negative_feedback_penalty`、`suppressed_penalty`、`deleted_penalty`。
+规则：
+
+- `radishlex_userdb_rank_explain_new` 必须显式传入 UTF-8 SQLite 路径、输入码、候选文本、可选 reading 和可选 context kind。
+- 输入码和候选文本不能为空；reading 为空或空白时按无 reading 处理，context kind 为空或空白时按 `general`。
+- 该入口只对单个候选返回稳定贡献项摘要，用 userdb 中匹配的用户词条、ranker weight 和删除 tombstone 调用 `ime-ranker`；不返回选择事件明细、负反馈 reason 明细、上下文统计分布、SQLite connection、statement、row 指针或同步 payload。
+- 返回的 `RadishLexRankExplain*` 由 `radishlex_userdb_rank_explain_free` 释放；`radishlex_userdb_rank_explain_view` 返回的 string view 借用自该 handle，平台端必须在释放前复制。
+- `final_score` 是 `ime-ranker` 对该候选的当前解释分数；平台 UI 可以展示摘要，但不得把这些字段作为输入热路径之外的业务真相源。
+
 ### User term view
 
 `RadishLexUserTermView`：
@@ -401,6 +413,8 @@ Userdb 状态入口规则：
 - 返回结构只包含 schema version、P2 可同步对象计数、P1 本地事件计数、本地审计计数和 `plaintext_payload = false`。
 - 函数不返回用户词明文、选择事件明细、负反馈明细、导入批次内容、同步 payload、SQLite connection、statement 或 row 指针。
 - 该入口不连接 Go server，不执行加密、hash、签名、上传下载或冲突合并，也不暴露 Rust 内部 P2 plaintext payload 迭代器或 envelope / draft 类型。
+- `radishlex_userdb_rank_explain_new` / `radishlex_userdb_rank_explain_view` 只返回单候选 ranker explain 摘要；view 字符串借用自 explain handle，平台绑定层必须复制后再释放 handle。
+- rank explain 摘要允许包含候选文本和 reading，因为它面向用户正在管理的本地词条；不得扩展为 P1 原始事件明细、上下文分布、同步 payload 或 ranker 内部可变对象导出。
 
 Userdb 词条管理入口规则：
 
@@ -469,7 +483,7 @@ InternalError
 - userdb 删除 tombstone、导入导出和 ranker explain 已通过测试。
 - 同步 payload 草案已区分 P1 本地和 P2 加密同步。
 - FFI 文档明确所有权、生命周期、错误语义、字符串编码和释放责任。
-- `ime-ffi` 至少有 C ABI 单元测试或 host smoke，证明字符串、数组、snapshot、candidate view、normalized key event、session options、Rime session options、learning status 只读摘要、sync preflight 状态摘要、userdb 管理入口、ABI contract、session owner-thread policy、平台绑定式 view copy / release 和错误释放路径可复验。当前已完成上述 host smoke；真实平台壳前仍需由具体平台 wrapper 复验线程调度、字符串复制和释放规则。
+- `ime-ffi` 至少有 C ABI 单元测试或 host smoke，证明字符串、数组、snapshot、candidate view、normalized key event、session options、Rime session options、learning status 只读摘要、sync preflight 状态摘要、rank explain 只读摘要、userdb 管理入口、ABI contract、session owner-thread policy、平台绑定式 view copy / release 和错误释放路径可复验。当前已完成上述 host smoke；真实平台壳前仍需由具体平台 wrapper 复验线程调度、字符串复制和释放规则。
 
 ## 验证口径
 

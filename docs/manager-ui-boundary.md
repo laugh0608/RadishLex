@@ -8,7 +8,7 @@ Flutter manager 是 RadishLex 的管理界面，不进入输入热路径，不�
 
 管理端的职责是把 Rust core 和本地 userdb 已经具备的能力以可审计、可删除、可解释的方式呈现给用户，并在同步能力具备生产条件前清楚显示不可用原因。
 
-当前仓库已新增 `apps/radishlex-manager/` Flutter macOS 起步工程，先通过受控 `ManagerBridge` contract 接入合成 fixture 展示本地管理台。Dart FFI bridge、真实远端同步、恢复码和设备授权仍未开放。Phase 4 后续代码继续遵守以下边界：
+当前仓库已新增 `apps/radishlex-manager/` Flutter macOS 起步工程，通过受控 `ManagerBridge` contract 接入合成 fixture，并在显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时切到真实 Dart FFI bridge。真实远端同步、恢复码和设备授权仍未开放。Phase 4 后续代码继续遵守以下边界：
 
 - 本地 userdb 管理优先于远端同步开关。
 - 学习记录摘要优先于 P1 原始事件明细。
@@ -82,7 +82,7 @@ Phase 4 第一批管理端功能应覆盖：
 
 管理端应通过 `ime-ffi` 或后续受控 bridge 调用 Rust 能力，不直接读写 Rust 内部结构。
 
-当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、词库导入检查、词库导入和词库导出这组受控方法。现有 `FixtureManagerBridge` 只使用合成数据验证调用边界、UI 状态更新、导入检查对话框和导出结果反馈；后续 Dart FFI bridge 替换 fixture 时必须保持同一类结构化返回值和错误分类，不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层。
+当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、词库导入检查、词库导入和词库导出这组受控方法。现有 `FixtureManagerBridge` 只使用合成数据验证调用边界、UI 状态更新、导入检查对话框和导出结果反馈；真实 Dart FFI bridge 已覆盖本地 userdb list / delete、dictionary inspect / import / export、import batches、learning status、rank explain 和 sync preflight 摘要。Dart 绑定层必须复制 Rust view 后释放 handle，不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层；widget 层只展示结构化错误码和非敏感配置来源诊断。
 
 第一批可依赖的接口方向：
 
@@ -91,6 +91,7 @@ Phase 4 第一批管理端功能应覆盖：
 - dictionary inspect / import / export。
 - import batches 只读查询。
 - learning status 只读摘要。
+- rank explain 只读摘要。
 - sync preflight 状态摘要。
 - backend capability / production gate 状态摘要。
 
@@ -152,11 +153,12 @@ Phase 4 第一批管理端功能应覆盖：
 1. 已固定本文档，并同步路线图、技术计划、仓库结构和周志。
 2. 已创建 `apps/radishlex-manager/` Flutter macOS 工程骨架，当前通过 `ManagerBridge` contract 接入合成 fixture。
 3. 已验证词条删除、词库导入检查、词库导入和词库导出动作经由 fixture bridge 完成受控调用。
-4. 已补第一批真实 Dart FFI bridge：显式配置本地 SQLite userdb 与 `ime-ffi` 动态库后，可接入 userdb 词条 list / delete、用户词库 inspect / import / export、learning status 摘要和 sync preflight 摘要。
-5. 已新增 `scripts/check-manager-ffi-smoke.sh`，构建 `radishlex-ime-ffi` 动态库并使用临时 SQLite userdb、合成 TSV 和导出文件复验真实 Dart FFI bridge 的本地 list / delete / import / export、learning status 和 sync preflight 摘要。
-6. `rank explain` 区域当前只展示由 userdb term 和摘要计数派生的非敏感接线摘要；后续若需要真实 ranker explain，应先补专用 ABI。
-7. 同步配置页继续保持真实上传按钮禁用，显示 `local_only`、`backend_unavailable` 或 `deployment_unverified`。
-8. 待可用平台私钥 backend 与目标部署运行证据齐备后，再接设备授权、恢复码和用户可用同步。
+4. 已补第一批真实 Dart FFI bridge：显式配置本地 SQLite userdb 与 `ime-ffi` 动态库后，可接入 userdb 词条 list / delete、用户词库 inspect / import / export、import batches、learning status 摘要、rank explain 摘要和 sync preflight 摘要。
+5. 已新增 `scripts/check-manager-ffi-smoke.sh`，构建 `radishlex-ime-ffi` 动态库并使用临时 SQLite userdb、合成 TSV 和导出文件复验真实 Dart FFI bridge 的本地 list / delete / import / export、import batches、learning status、rank explain 和 sync preflight 摘要。
+6. `rank explain` 区域已通过专用 `ime-ffi` ABI 读取单候选贡献项，Flutter 只展示复制后的非敏感摘要，不持有 Rust view 指针。
+7. 已补设置页配置来源诊断和 bridge 失败结构化错误码展示；UI 不透传 native 错误明细。
+8. 同步配置页继续保持真实上传按钮禁用，显示 `local_only`、`backend_unavailable` 或 `deployment_unverified`。
+9. 待可用平台私钥 backend 与目标部署运行证据齐备后，再接设备授权、恢复码和用户可用同步。
 
 ## 停止线
 

@@ -37,6 +37,32 @@ ManagerSnapshot createManagerFixture() {
         deletedAt: '2026-07-03',
       ),
     ],
+    importBatches: const [
+      DictionaryImportBatchSummary(
+        id: 2,
+        sourceName: 'manager-import',
+        totalRecords: 42,
+        importedTerms: 40,
+        insertedTerms: 28,
+        updatedTerms: 12,
+        skippedDeletedTerms: 1,
+        skippedDuplicateTerms: 1,
+        createdAt: '2026-07-04 10:36',
+        notes: '',
+      ),
+      DictionaryImportBatchSummary(
+        id: 1,
+        sourceName: 'bootstrap-fixture',
+        totalRecords: 8,
+        importedTerms: 8,
+        insertedTerms: 8,
+        updatedTerms: 0,
+        skippedDeletedTerms: 0,
+        skippedDuplicateTerms: 0,
+        createdAt: '2026-07-03 18:02',
+        notes: '',
+      ),
+    ],
     learningSummary: const LearningSummary(
       userTerms: 3,
       deletedTerms: 1,
@@ -82,6 +108,13 @@ ManagerSnapshot createManagerFixture() {
       privacyMode: false,
       diagnosticsExport: false,
       syncConfigured: true,
+      runtimeDiagnostics: ManagerRuntimeDiagnostics(
+        bridgeMode: 'fixture',
+        userDb: 'RADISHLEX_MANAGER_DB not configured',
+        nativeLibrary: 'not loaded',
+        syncEndpoint: 'fixture endpoint',
+        lastErrorCode: 'none',
+      ),
     ),
   );
 }

@@ -169,6 +169,40 @@ final class DynamicRadishLexManagerNativeBinding
   }
 
   @override
+  List<NativeImportBatchRecord> listImportBatches(String dbPath) {
+    return _withNativeString(dbPath, (dbPathPointer) {
+      final batchesHandle = _callPointer<_RadishLexImportBatchList>(
+        _api,
+        (errorOut) => _api.userdbImportBatchesNew(dbPathPointer, errorOut),
+      );
+      try {
+        final count = _api.userdbImportBatchesCount(batchesHandle);
+        final batches = <NativeImportBatchRecord>[];
+        for (var index = 0; index < count; index += 1) {
+          final batchOut = calloc<_RadishLexImportBatchView>();
+          try {
+            _callStatus(
+              _api,
+              (errorOut) => _api.userdbImportBatchesGet(
+                batchesHandle,
+                index,
+                batchOut,
+                errorOut,
+              ),
+            );
+            batches.add(_copyImportBatchView(batchOut.ref));
+          } finally {
+            calloc.free(batchOut);
+          }
+        }
+        return List.unmodifiable(batches);
+      } finally {
+        _api.userdbImportBatchesFree(batchesHandle);
+      }
+    });
+  }
+
+  @override
   NativeLearningStatusSummary learningStatus(String dbPath) {
     return _withNativeString(dbPath, (dbPathPointer) {
       final summaryOut = calloc<_RadishLexLearningStatusSummary>();
@@ -209,6 +243,55 @@ final class DynamicRadishLexManagerNativeBinding
       } finally {
         calloc.free(summaryOut);
       }
+    });
+  }
+
+  @override
+  NativeRankExplainSummary rankExplain({
+    required String dbPath,
+    required String inputCode,
+    required String candidateText,
+    required String? reading,
+    required String contextKind,
+  }) {
+    return _withNativeString(dbPath, (dbPathPointer) {
+      return _withNativeString(inputCode, (inputCodePointer) {
+        return _withNativeString(candidateText, (candidateTextPointer) {
+          return _withOptionalNativeString(reading, (readingPointer) {
+            return _withNativeString(contextKind, (contextKindPointer) {
+              final explainHandle = _callPointer<_RadishLexRankExplain>(
+                _api,
+                (errorOut) => _api.userdbRankExplainNew(
+                  dbPathPointer,
+                  inputCodePointer,
+                  candidateTextPointer,
+                  readingPointer,
+                  contextKindPointer,
+                  errorOut,
+                ),
+              );
+              try {
+                final viewOut = calloc<_RadishLexRankExplainView>();
+                try {
+                  _callStatus(
+                    _api,
+                    (errorOut) => _api.userdbRankExplainView(
+                      explainHandle,
+                      viewOut,
+                      errorOut,
+                    ),
+                  );
+                  return _copyRankExplainView(viewOut.ref);
+                } finally {
+                  calloc.free(viewOut);
+                }
+              } finally {
+                _api.userdbRankExplainFree(explainHandle);
+              }
+            });
+          });
+        });
+      });
     });
   }
 }
@@ -273,6 +356,42 @@ NativeLearningStatusSummary _copyLearningStatusSummary(
     latestImportBatchAtPresent: summary.latestImportBatchAtPresent != 0,
     latestActivityAtMs: summary.latestActivityAtMs,
     latestActivityAtPresent: summary.latestActivityAtPresent != 0,
+  );
+}
+
+NativeImportBatchRecord _copyImportBatchView(_RadishLexImportBatchView batch) {
+  return NativeImportBatchRecord(
+    id: batch.id,
+    sourceName: _readStringView(batch.sourceName),
+    totalRecords: batch.totalRecords,
+    importedTerms: batch.importedTerms,
+    insertedTerms: batch.insertedTerms,
+    updatedTerms: batch.updatedTerms,
+    skippedDeletedTerms: batch.skippedDeletedTerms,
+    skippedDuplicateTerms: batch.skippedDuplicateTerms,
+    createdAtMs: batch.createdAtMs,
+    notes: _readOptionalStringView(batch.notes, batch.notesPresent),
+    notesPresent: batch.notesPresent != 0,
+  );
+}
+
+NativeRankExplainSummary _copyRankExplainView(_RadishLexRankExplainView view) {
+  return NativeRankExplainSummary(
+    inputCode: _readStringView(view.inputCode),
+    candidateText: _readStringView(view.candidateText),
+    reading: _readOptionalStringView(view.reading, view.readingPresent),
+    readingPresent: view.readingPresent != 0,
+    contextKind: _readStringView(view.contextKind),
+    originalIndex: view.originalIndex,
+    finalScore: view.finalScore,
+    engineOrderFactor: view.engineOrderFactor,
+    userTermBoost: view.userTermBoost,
+    frequencyBoost: view.frequencyBoost,
+    recencyBoost: view.recencyBoost,
+    contextBoost: view.contextBoost,
+    negativeFeedbackPenalty: view.negativeFeedbackPenalty,
+    suppressedPenalty: view.suppressedPenalty,
+    deletedPenalty: view.deletedPenalty,
   );
 }
 

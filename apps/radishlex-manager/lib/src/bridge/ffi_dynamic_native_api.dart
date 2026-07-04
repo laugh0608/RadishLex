@@ -104,6 +104,42 @@ final class _RadishLexNativeApi {
               ffi.Pointer<ffi.Pointer<_RadishLexError>>,
             )
           >('radishlex_userdb_dictionary_export'),
+      userdbImportBatchesNew = library
+          .lookupFunction<
+            ffi.Pointer<_RadishLexImportBatchList> Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            ),
+            ffi.Pointer<_RadishLexImportBatchList> Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            )
+          >('radishlex_userdb_import_batches_new'),
+      userdbImportBatchesCount = library
+          .lookupFunction<
+            ffi.Size Function(ffi.Pointer<_RadishLexImportBatchList>),
+            int Function(ffi.Pointer<_RadishLexImportBatchList>)
+          >('radishlex_userdb_import_batches_count'),
+      userdbImportBatchesGet = library
+          .lookupFunction<
+            ffi.Int32 Function(
+              ffi.Pointer<_RadishLexImportBatchList>,
+              ffi.Size,
+              ffi.Pointer<_RadishLexImportBatchView>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            ),
+            int Function(
+              ffi.Pointer<_RadishLexImportBatchList>,
+              int,
+              ffi.Pointer<_RadishLexImportBatchView>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            )
+          >('radishlex_userdb_import_batches_get'),
+      userdbImportBatchesFree = library
+          .lookupFunction<
+            ffi.Void Function(ffi.Pointer<_RadishLexImportBatchList>),
+            void Function(ffi.Pointer<_RadishLexImportBatchList>)
+          >('radishlex_userdb_import_batches_free'),
       userdbLearningStatus = library
           .lookupFunction<
             ffi.Int32 Function(
@@ -130,6 +166,43 @@ final class _RadishLexNativeApi {
               ffi.Pointer<ffi.Pointer<_RadishLexError>>,
             )
           >('radishlex_userdb_sync_preflight'),
+      userdbRankExplainNew = library
+          .lookupFunction<
+            ffi.Pointer<_RadishLexRankExplain> Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            ),
+            ffi.Pointer<_RadishLexRankExplain> Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            )
+          >('radishlex_userdb_rank_explain_new'),
+      userdbRankExplainView = library
+          .lookupFunction<
+            ffi.Int32 Function(
+              ffi.Pointer<_RadishLexRankExplain>,
+              ffi.Pointer<_RadishLexRankExplainView>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            ),
+            int Function(
+              ffi.Pointer<_RadishLexRankExplain>,
+              ffi.Pointer<_RadishLexRankExplainView>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            )
+          >('radishlex_userdb_rank_explain_view'),
+      userdbRankExplainFree = library
+          .lookupFunction<
+            ffi.Void Function(ffi.Pointer<_RadishLexRankExplain>),
+            void Function(ffi.Pointer<_RadishLexRankExplain>)
+          >('radishlex_userdb_rank_explain_free'),
       errorCode = library
           .lookupFunction<
             ffi.Int32 Function(ffi.Pointer<_RadishLexError>),
@@ -190,6 +263,22 @@ final class _RadishLexNativeApi {
     ffi.Pointer<ffi.Pointer<_RadishLexError>>,
   )
   userdbDictionaryExport;
+  final ffi.Pointer<_RadishLexImportBatchList> Function(
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+  )
+  userdbImportBatchesNew;
+  final int Function(ffi.Pointer<_RadishLexImportBatchList>)
+  userdbImportBatchesCount;
+  final int Function(
+    ffi.Pointer<_RadishLexImportBatchList>,
+    int,
+    ffi.Pointer<_RadishLexImportBatchView>,
+    ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+  )
+  userdbImportBatchesGet;
+  final void Function(ffi.Pointer<_RadishLexImportBatchList>)
+  userdbImportBatchesFree;
   final int Function(
     ffi.Pointer<ffi.Char>,
     ffi.Pointer<_RadishLexLearningStatusSummary>,
@@ -202,6 +291,22 @@ final class _RadishLexNativeApi {
     ffi.Pointer<ffi.Pointer<_RadishLexError>>,
   )
   userdbSyncPreflight;
+  final ffi.Pointer<_RadishLexRankExplain> Function(
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+  )
+  userdbRankExplainNew;
+  final int Function(
+    ffi.Pointer<_RadishLexRankExplain>,
+    ffi.Pointer<_RadishLexRankExplainView>,
+    ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+  )
+  userdbRankExplainView;
+  final void Function(ffi.Pointer<_RadishLexRankExplain>) userdbRankExplainFree;
   final int Function(ffi.Pointer<_RadishLexError>) errorCode;
   final ffi.Pointer<ffi.Char> Function(ffi.Pointer<_RadishLexError>)
   errorMessage;

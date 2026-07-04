@@ -55,9 +55,22 @@ Future<void> main(List<String> args) async {
   _expect(importedSnapshot.sync.syncableObjects == 2, 'syncable objects');
   _expect(importedSnapshot.sync.localOnlyEvents == 1, 'local import batch');
   _expect(importedSnapshot.explanations.length == 2, 'explain summaries');
+  _expect(importedSnapshot.importBatches.length == 1, 'import batch count');
   _expect(
-    importedSnapshot.explanations.first.signals.contains('ffi_userdb_weight'),
-    'explain bridge signal',
+    importedSnapshot.importBatches.single.sourceName == 'manager-ffi-smoke',
+    'import batch source name',
+  );
+  _expect(
+    importedSnapshot.importBatches.single.importedTerms == 2,
+    'import batch imported terms',
+  );
+  _expect(
+    importedSnapshot.explanations.first.signals.contains('user=2.500'),
+    'rank explain user term boost',
+  );
+  _expect(
+    (importedSnapshot.explanations.first.score - 2.5).abs() < 0.000001,
+    'rank explain final score',
   );
 
   final deletedSnapshot = await bridge.deleteUserTerm(

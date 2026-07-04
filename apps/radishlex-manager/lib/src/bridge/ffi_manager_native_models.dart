@@ -1,3 +1,5 @@
+import 'manager_bridge.dart';
+
 const nativeTermSourceEngineSelection = 1;
 const nativeTermSourceManualImport = 2;
 const nativeTermSourceManualAdd = 3;
@@ -31,7 +33,17 @@ abstract interface class RadishLexManagerNativeBinding {
 
   NativeLearningStatusSummary learningStatus(String dbPath);
 
+  List<NativeImportBatchRecord> listImportBatches(String dbPath);
+
   NativeSyncPreflightSummary syncPreflight(String dbPath);
+
+  NativeRankExplainSummary rankExplain({
+    required String dbPath,
+    required String inputCode,
+    required String candidateText,
+    required String? reading,
+    required String contextKind,
+  });
 }
 
 final class NativeUserTermRecord {
@@ -162,6 +174,34 @@ final class NativeLearningStatusSummary {
   final bool latestActivityAtPresent;
 }
 
+final class NativeImportBatchRecord {
+  const NativeImportBatchRecord({
+    required this.id,
+    required this.sourceName,
+    required this.totalRecords,
+    required this.importedTerms,
+    required this.insertedTerms,
+    required this.updatedTerms,
+    required this.skippedDeletedTerms,
+    required this.skippedDuplicateTerms,
+    required this.createdAtMs,
+    required this.notes,
+    required this.notesPresent,
+  });
+
+  final int id;
+  final String sourceName;
+  final int totalRecords;
+  final int importedTerms;
+  final int insertedTerms;
+  final int updatedTerms;
+  final int skippedDeletedTerms;
+  final int skippedDuplicateTerms;
+  final int createdAtMs;
+  final String? notes;
+  final bool notesPresent;
+}
+
 final class NativeSyncPreflightSummary {
   const NativeSyncPreflightSummary({
     required this.schemaVersion,
@@ -184,15 +224,54 @@ final class NativeSyncPreflightSummary {
   final int localImportBatches;
 }
 
-class FfiManagerBridgeException implements Exception {
+final class NativeRankExplainSummary {
+  const NativeRankExplainSummary({
+    required this.inputCode,
+    required this.candidateText,
+    required this.reading,
+    required this.readingPresent,
+    required this.contextKind,
+    required this.originalIndex,
+    required this.finalScore,
+    required this.engineOrderFactor,
+    required this.userTermBoost,
+    required this.frequencyBoost,
+    required this.recencyBoost,
+    required this.contextBoost,
+    required this.negativeFeedbackPenalty,
+    required this.suppressedPenalty,
+    required this.deletedPenalty,
+  });
+
+  final String inputCode;
+  final String candidateText;
+  final String? reading;
+  final bool readingPresent;
+  final String contextKind;
+  final int originalIndex;
+  final double finalScore;
+  final double engineOrderFactor;
+  final double userTermBoost;
+  final double frequencyBoost;
+  final double recencyBoost;
+  final double contextBoost;
+  final double negativeFeedbackPenalty;
+  final double suppressedPenalty;
+  final double deletedPenalty;
+}
+
+class FfiManagerBridgeException implements ManagerBridgeFailure {
   const FfiManagerBridgeException({
     required this.statusCode,
     required this.code,
     required this.message,
   });
 
+  @override
   final int statusCode;
+  @override
   final String code;
+  @override
   final String message;
 
   @override

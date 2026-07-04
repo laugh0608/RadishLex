@@ -6,6 +6,11 @@ class FixtureManagerBridge implements ManagerBridge {
   FixtureManagerBridge({ManagerSnapshot? initialSnapshot})
     : _snapshot = initialSnapshot ?? createManagerFixture();
 
+  FixtureManagerBridge.withDiagnostics({
+    required ManagerRuntimeDiagnostics diagnostics,
+    ManagerSnapshot? initialSnapshot,
+  }) : _snapshot = _snapshotWithDiagnostics(initialSnapshot, diagnostics);
+
   ManagerSnapshot _snapshot;
 
   @override
@@ -100,6 +105,16 @@ class FixtureManagerBridge implements ManagerBridge {
       syncClass: 'P2 encrypted sync',
     );
   }
+}
+
+ManagerSnapshot _snapshotWithDiagnostics(
+  ManagerSnapshot? initialSnapshot,
+  ManagerRuntimeDiagnostics diagnostics,
+) {
+  final snapshot = initialSnapshot ?? createManagerFixture();
+  return snapshot.copyWith(
+    settings: snapshot.settings.copyWith(runtimeDiagnostics: diagnostics),
+  );
 }
 
 List<SyncCategorySummary> _replaceCategoryCount(

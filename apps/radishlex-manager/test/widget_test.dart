@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:radishlex_manager/src/bridge/fixture_manager_bridge.dart';
+import 'package:radishlex_manager/src/bridge/manager_bridge.dart';
 import 'package:radishlex_manager/src/app.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
@@ -29,8 +30,35 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('rank explain'), findsOneWidget);
+    expect(find.text('import batches'), findsOneWidget);
+    expect(find.text('manager-import'), findsOneWidget);
     expect(find.text('selection events'), findsOneWidget);
     expect(find.text('manual_user_term'), findsOneWidget);
+  });
+
+  testWidgets('settings view exposes configuration diagnostics', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const RadishLexManagerApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.tune_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('配置来源'), findsOneWidget);
+    expect(find.text('fixture'), findsOneWidget);
+    expect(find.text('RADISHLEX_MANAGER_DB not configured'), findsOneWidget);
+    expect(find.text('not loaded'), findsOneWidget);
+  });
+
+  testWidgets('load failure shows structured bridge error code', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(RadishLexManagerApp(bridge: _FailingBridge()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('管理端数据加载失败'), findsOneWidget);
+    expect(find.text('管理端 bridge 调用失败：userdb_error'), findsOneWidget);
   });
 
   testWidgets('sync gate keeps user sync disabled', (
@@ -153,4 +181,24 @@ class _RecordingManagerBridge extends FixtureManagerBridge {
     exportedPath = filePath;
     return super.exportDictionaryFile(filePath);
   }
+}
+
+class _FailingBridge extends FixtureManagerBridge {
+  @override
+  Future<ManagerSnapshot> loadSnapshot() async {
+    throw const _TestBridgeFailure();
+  }
+}
+
+class _TestBridgeFailure implements ManagerBridgeFailure {
+  const _TestBridgeFailure();
+
+  @override
+  int get statusCode => 4;
+
+  @override
+  String get code => 'userdb_error';
+
+  @override
+  String get message => 'private path omitted';
 }

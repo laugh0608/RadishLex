@@ -12,7 +12,9 @@ class FfiManagerBridge implements ManagerBridge {
     String? serverEndpoint,
     RadishLexManagerNativeBinding? native,
   }) : dbPath = dbPath.trim(),
+       libraryPath = libraryPath?.trim() ?? '',
        serverEndpoint = serverEndpoint?.trim() ?? '',
+       _nativeInjected = native != null,
        _native =
            native ??
            DynamicRadishLexManagerNativeBinding.open(libraryPath: libraryPath) {
@@ -22,7 +24,9 @@ class FfiManagerBridge implements ManagerBridge {
   }
 
   final String dbPath;
+  final String libraryPath;
   final String serverEndpoint;
+  final bool _nativeInjected;
   final RadishLexManagerNativeBinding _native;
 
   @override
@@ -96,6 +100,7 @@ class FfiManagerBridge implements ManagerBridge {
   ManagerSnapshot _loadSnapshot() {
     final nativeTerms = _native.listUserTerms(dbPath);
     final learning = _native.learningStatus(dbPath);
+    final importBatches = _native.listImportBatches(dbPath);
     final sync = _native.syncPreflight(dbPath);
     final terms = nativeTerms.map(_userTermFromNative).toList(growable: false);
 
@@ -103,13 +108,17 @@ class FfiManagerBridge implements ManagerBridge {
       generatedAt: _formatTimestampMs(DateTime.now().millisecondsSinceEpoch),
       dictionaryTerms: terms,
       deletedTerms: const [],
+      importBatches: importBatches
+          .map(_importBatchFromNative)
+          .toList(growable: false),
       learningSummary: _learningSummaryFromNative(learning),
-      explanations: _rankerExplanationSummaries(terms, learning),
+      explanations: _rankerExplanationSummaries(terms),
       sync: _syncSummaryFromNative(sync),
       settings: ManagerSettings(
         privacyMode: false,
         diagnosticsExport: false,
         syncConfigured: serverEndpoint.isNotEmpty,
+        runtimeDiagnostics: _runtimeDiagnostics(),
       ),
     );
   }
@@ -124,6 +133,23 @@ class FfiManagerBridge implements ManagerBridge {
       lastUsed: term.lastUsedAtPresent
           ? _formatTimestampMs(term.lastUsedAtMs)
           : '未使用',
+    );
+  }
+
+  DictionaryImportBatchSummary _importBatchFromNative(
+    NativeImportBatchRecord batch,
+  ) {
+    return DictionaryImportBatchSummary(
+      id: batch.id,
+      sourceName: batch.sourceName,
+      totalRecords: batch.totalRecords,
+      importedTerms: batch.importedTerms,
+      insertedTerms: batch.insertedTerms,
+      updatedTerms: batch.updatedTerms,
+      skippedDeletedTerms: batch.skippedDeletedTerms,
+      skippedDuplicateTerms: batch.skippedDuplicateTerms,
+      createdAt: _formatTimestampMs(batch.createdAtMs),
+      notes: batch.notes ?? '',
     );
   }
 
@@ -201,30 +227,59 @@ class FfiManagerBridge implements ManagerBridge {
     );
   }
 
-  List<RankerExplanation> _rankerExplanationSummaries(
-    List<UserTerm> terms,
-    NativeLearningStatusSummary summary,
-  ) {
+  List<RankerExplanation> _rankerExplanationSummaries(List<UserTerm> terms) {
     return terms
         .take(6)
         .map((term) {
-          final signals = <String>[
-            'ffi_userdb_weight',
-            'source:${term.source}',
-            if (summary.rankerWeights > 0) 'ranker_weight_summary',
-            if (summary.selectionEvents > 0) 'selection_summary',
-            if (summary.negativeFeedback > 0) 'negative_feedback_summary',
-            if (summary.deletedTermTombstones > 0) 'deleted_tombstone_gate',
-          ];
-          return RankerExplanation(
+          final explanation = _native.rankExplain(
+            dbPath: dbPath,
             inputCode: term.inputCode,
-            candidate: term.text,
-            score: term.weight,
-            signals: signals,
+            candidateText: term.text,
+            reading: term.reading.trim().isEmpty ? null : term.reading,
+            contextKind: 'general',
+          );
+          return RankerExplanation(
+            inputCode: explanation.inputCode,
+            candidate: explanation.candidateText,
+            score: explanation.finalScore,
+            signals: _rankExplainSignals(explanation),
           );
         })
         .toList(growable: false);
   }
+
+  ManagerRuntimeDiagnostics _runtimeDiagnostics() {
+    return ManagerRuntimeDiagnostics(
+      bridgeMode: _nativeInjected ? 'ffi_injected' : 'dart_ffi',
+      userDb: 'RADISHLEX_MANAGER_DB configured',
+      nativeLibrary: _nativeInjected
+          ? 'injected native binding'
+          : libraryPath.isEmpty
+          ? 'default dynamic library lookup'
+          : 'RADISHLEX_MANAGER_FFI_LIBRARY configured',
+      syncEndpoint: serverEndpoint.isEmpty
+          ? 'RADISHLEX_MANAGER_SYNC_SERVER not configured'
+          : 'RADISHLEX_MANAGER_SYNC_SERVER configured',
+      lastErrorCode: 'none',
+    );
+  }
+}
+
+List<String> _rankExplainSignals(NativeRankExplainSummary explanation) {
+  return [
+    _rankSignal('engine', explanation.engineOrderFactor),
+    _rankSignal('user', explanation.userTermBoost),
+    _rankSignal('freq', explanation.frequencyBoost),
+    _rankSignal('recent', explanation.recencyBoost),
+    _rankSignal('context', explanation.contextBoost),
+    _rankSignal('negative', explanation.negativeFeedbackPenalty),
+    _rankSignal('suppressed', explanation.suppressedPenalty),
+    _rankSignal('deleted', explanation.deletedPenalty),
+  ];
+}
+
+String _rankSignal(String name, double value) {
+  return '$name=${value.toStringAsFixed(3)}';
 }
 
 String _termSourceLabel(int source) {

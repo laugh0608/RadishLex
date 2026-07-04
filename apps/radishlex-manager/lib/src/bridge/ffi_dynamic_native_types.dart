@@ -4,6 +4,10 @@ final class _RadishLexError extends ffi.Opaque {}
 
 final class _RadishLexUserTermList extends ffi.Opaque {}
 
+final class _RadishLexImportBatchList extends ffi.Opaque {}
+
+final class _RadishLexRankExplain extends ffi.Opaque {}
+
 final class _RadishLexStringView extends ffi.Struct {
   external ffi.Pointer<ffi.Uint8> data;
 
@@ -93,6 +97,39 @@ final class _RadishLexDictionaryImportSummary extends ffi.Struct {
 
   @ffi.Uint8()
   external int dryRun;
+}
+
+final class _RadishLexImportBatchView extends ffi.Struct {
+  @ffi.Int64()
+  external int id;
+
+  external _RadishLexStringView sourceName;
+
+  @ffi.Size()
+  external int totalRecords;
+
+  @ffi.Size()
+  external int importedTerms;
+
+  @ffi.Size()
+  external int insertedTerms;
+
+  @ffi.Size()
+  external int updatedTerms;
+
+  @ffi.Size()
+  external int skippedDeletedTerms;
+
+  @ffi.Size()
+  external int skippedDuplicateTerms;
+
+  @ffi.Int64()
+  external int createdAtMs;
+
+  external _RadishLexStringView notes;
+
+  @ffi.Uint8()
+  external int notesPresent;
 }
 
 final class _RadishLexLearningStatusSummary extends ffi.Struct {
@@ -190,4 +227,45 @@ final class _RadishLexSyncPreflightSummary extends ffi.Struct {
 
   @ffi.Size()
   external int localImportBatches;
+}
+
+final class _RadishLexRankExplainView extends ffi.Struct {
+  external _RadishLexStringView inputCode;
+  external _RadishLexStringView candidateText;
+  external _RadishLexStringView reading;
+
+  @ffi.Uint8()
+  external int readingPresent;
+
+  external _RadishLexStringView contextKind;
+
+  @ffi.Size()
+  external int originalIndex;
+
+  @ffi.Double()
+  external double finalScore;
+
+  @ffi.Double()
+  external double engineOrderFactor;
+
+  @ffi.Double()
+  external double userTermBoost;
+
+  @ffi.Double()
+  external double frequencyBoost;
+
+  @ffi.Double()
+  external double recencyBoost;
+
+  @ffi.Double()
+  external double contextBoost;
+
+  @ffi.Double()
+  external double negativeFeedbackPenalty;
+
+  @ffi.Double()
+  external double suppressedPenalty;
+
+  @ffi.Double()
+  external double deletedPenalty;
 }

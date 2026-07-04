@@ -28,7 +28,10 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
       future: snapshotFuture,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return _ManagerLoadFailure(onRetry: _reloadSnapshot);
+          return _ManagerLoadFailure(
+            error: snapshot.error,
+            onRetry: _reloadSnapshot,
+          );
         }
         final data = snapshot.data;
         if (data == null) {
@@ -103,9 +106,9 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
             : '导入完成：${result.importedTerms} / ${result.totalRecords} 条',
       );
       _reloadSnapshot();
-    } on Object {
+    } on Object catch (error) {
       if (mounted) {
-        _showBridgeMessage('管理端 bridge 调用失败');
+        _showBridgeMessage(_bridgeFailureMessage(error));
       }
     }
   }
@@ -125,9 +128,9 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
         return;
       }
       _showBridgeMessage('导出完成：${result.exportedTerms} 条');
-    } on Object {
+    } on Object catch (error) {
       if (mounted) {
-        _showBridgeMessage('管理端 bridge 调用失败');
+        _showBridgeMessage(_bridgeFailureMessage(error));
       }
     }
   }
@@ -242,8 +245,9 @@ class _ManagerLoading extends StatelessWidget {
 }
 
 class _ManagerLoadFailure extends StatelessWidget {
-  const _ManagerLoadFailure({required this.onRetry});
+  const _ManagerLoadFailure({required this.error, required this.onRetry});
 
+  final Object? error;
   final VoidCallback onRetry;
 
   @override
@@ -259,6 +263,8 @@ class _ManagerLoadFailure extends StatelessWidget {
                 const Icon(Icons.error_outline),
                 const SizedBox(height: 12),
                 const Text('管理端数据加载失败'),
+                const SizedBox(height: 6),
+                Text(_bridgeFailureMessage(error)),
                 const SizedBox(height: 12),
                 FilledButton.icon(
                   onPressed: onRetry,
@@ -729,6 +735,18 @@ class _LearningView extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         _Section(
+          title: 'import batches',
+          trailing: Text('${snapshot.importBatches.length} batches'),
+          child: Column(
+            children: snapshot.importBatches.isEmpty
+                ? const [Text('无导入批次')]
+                : snapshot.importBatches
+                      .map((batch) => _ImportBatchRow(batch))
+                      .toList(),
+          ),
+        ),
+        const SizedBox(height: 16),
+        _Section(
           title: 'rank explain',
           trailing: Text('updated ${summary.lastUpdated}'),
           child: Column(
@@ -738,6 +756,53 @@ class _LearningView extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ImportBatchRow extends StatelessWidget {
+  const _ImportBatchRow(this.batch);
+
+  final DictionaryImportBatchSummary batch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 96,
+            child: Text(
+              '#${batch.id}',
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+          ),
+          Expanded(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text(batch.sourceName),
+                Chip(label: Text('imported ${batch.importedTerms}')),
+                Chip(label: Text('inserted ${batch.insertedTerms}')),
+                Chip(label: Text('updated ${batch.updatedTerms}')),
+                if (batch.skippedDeletedTerms > 0)
+                  Chip(label: Text('deleted ${batch.skippedDeletedTerms}')),
+                if (batch.skippedDuplicateTerms > 0)
+                  Chip(label: Text('duplicate ${batch.skippedDuplicateTerms}')),
+              ],
+            ),
+          ),
+          _StatusBadge(
+            icon: Icons.event_available_outlined,
+            label: batch.createdAt,
+            tone: _BadgeTone.neutral,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -878,39 +943,74 @@ class _SettingsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Section(
-      title: '设置',
-      child: Column(
-        children: [
-          const TextField(
-            decoration: InputDecoration(
-              prefixIcon: Icon(Icons.dns_outlined),
-              labelText: '自部署服务端',
-            ),
+    final diagnostics = settings.runtimeDiagnostics;
+
+    return Column(
+      children: [
+        _Section(
+          title: '设置',
+          child: Column(
+            children: [
+              const TextField(
+                decoration: InputDecoration(
+                  prefixIcon: Icon(Icons.dns_outlined),
+                  labelText: '自部署服务端',
+                ),
+              ),
+              const SizedBox(height: 12),
+              SwitchListTile(
+                value: settings.privacyMode,
+                onChanged: (_) {},
+                secondary: const Icon(Icons.privacy_tip_outlined),
+                title: const Text('隐私模式'),
+              ),
+              SwitchListTile(
+                value: settings.diagnosticsExport,
+                onChanged: (_) {},
+                secondary: const Icon(Icons.bug_report_outlined),
+                title: const Text('诊断摘要导出'),
+              ),
+              CheckboxListTile(
+                value: settings.syncConfigured,
+                onChanged: (_) {},
+                secondary: const Icon(Icons.cloud_done_outlined),
+                title: const Text('保留同步配置草案'),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          SwitchListTile(
-            value: settings.privacyMode,
-            onChanged: (_) {},
-            secondary: const Icon(Icons.privacy_tip_outlined),
-            title: const Text('隐私模式'),
+        ),
+        const SizedBox(height: 16),
+        _Section(
+          title: '配置来源',
+          child: Column(
+            children: [
+              _KeyValueRow(label: 'bridge', value: diagnostics.bridgeMode),
+              _KeyValueRow(label: 'userdb', value: diagnostics.userDb),
+              _KeyValueRow(
+                label: 'native library',
+                value: diagnostics.nativeLibrary,
+              ),
+              _KeyValueRow(
+                label: 'sync endpoint',
+                value: diagnostics.syncEndpoint,
+              ),
+              _KeyValueRow(
+                label: 'last error',
+                value: diagnostics.lastErrorCode,
+              ),
+            ],
           ),
-          SwitchListTile(
-            value: settings.diagnosticsExport,
-            onChanged: (_) {},
-            secondary: const Icon(Icons.bug_report_outlined),
-            title: const Text('诊断摘要导出'),
-          ),
-          CheckboxListTile(
-            value: settings.syncConfigured,
-            onChanged: (_) {},
-            secondary: const Icon(Icons.cloud_done_outlined),
-            title: const Text('保留同步配置草案'),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
+}
+
+String _bridgeFailureMessage(Object? error) {
+  if (error is ManagerBridgeFailure) {
+    return '管理端 bridge 调用失败：${error.code}';
+  }
+  return '管理端 bridge 调用失败';
 }
 
 class _Section extends StatelessWidget {
@@ -1013,7 +1113,7 @@ class _KeyValueRow extends StatelessWidget {
   }
 }
 
-enum _BadgeTone { success, warning }
+enum _BadgeTone { success, warning, neutral }
 
 class _StatusBadge extends StatelessWidget {
   const _StatusBadge({
@@ -1029,12 +1129,11 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final background = tone == _BadgeTone.success
-        ? const Color(0xFFE7F3EC)
-        : const Color(0xFFFFF1D8);
-    final foreground = tone == _BadgeTone.success
-        ? const Color(0xFF1F6B45)
-        : const Color(0xFF8A4F00);
+    final (background, foreground) = switch (tone) {
+      _BadgeTone.success => (const Color(0xFFE7F3EC), const Color(0xFF1F6B45)),
+      _BadgeTone.warning => (const Color(0xFFFFF1D8), const Color(0xFF8A4F00)),
+      _BadgeTone.neutral => (const Color(0xFFEFF2F5), const Color(0xFF45515E)),
+    };
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

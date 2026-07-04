@@ -15,3 +15,11 @@ abstract interface class ManagerBridge {
 
   Future<DictionaryExportResult> exportDictionaryFile(String filePath);
 }
+
+abstract interface class ManagerBridgeFailure implements Exception {
+  int get statusCode;
+
+  String get code;
+
+  String get message;
+}
