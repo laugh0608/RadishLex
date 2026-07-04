@@ -133,7 +133,7 @@ SyncUiState deriveManagerSyncUiState({
   if (device.productionGate != 'ready') {
     return SyncUiState.backendUnavailable;
   }
-  if (!draft.deploymentEvidenceRecorded) {
+  if (!draft.hasDeploymentEvidence) {
     return SyncUiState.deploymentUnverified;
   }
   return SyncUiState.preflightReady;
@@ -225,8 +225,8 @@ String managerDeviceGateLabel(DeviceSecuritySummary device) {
 }
 
 String managerDeploymentEvidenceLabel(ManagerSettingsDraft draft) {
-  return draft.deploymentEvidenceRecorded
-      ? 'deployment evidence recorded'
+  return draft.hasDeploymentEvidence
+      ? 'deployment evidence ${managerDeploymentEvidenceSourceLabel(draft.deploymentEvidenceSource)}'
       : 'deployment evidence missing';
 }
 

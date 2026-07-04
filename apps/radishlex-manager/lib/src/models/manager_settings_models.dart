@@ -37,6 +37,7 @@ class ManagerSettingsDraft {
     required this.privacyMode,
     required this.diagnosticsExport,
     required this.deploymentEvidenceRecorded,
+    this.deploymentEvidenceSource = '',
   });
 
   const ManagerSettingsDraft.empty()
@@ -44,16 +45,22 @@ class ManagerSettingsDraft {
       retainSyncConfig = false,
       privacyMode = false,
       diagnosticsExport = false,
-      deploymentEvidenceRecorded = false;
+      deploymentEvidenceRecorded = false,
+      deploymentEvidenceSource = '';
 
   final String serverEndpoint;
   final bool retainSyncConfig;
   final bool privacyMode;
   final bool diagnosticsExport;
   final bool deploymentEvidenceRecorded;
+  final String deploymentEvidenceSource;
 
   bool get hasServerEndpoint =>
       retainSyncConfig && serverEndpoint.trim().isNotEmpty;
+
+  bool get hasDeploymentEvidence =>
+      deploymentEvidenceRecorded &&
+      isValidManagerDeploymentEvidenceSource(deploymentEvidenceSource);
 
   ManagerSettingsDraft copyWith({
     String? serverEndpoint,
@@ -61,6 +68,7 @@ class ManagerSettingsDraft {
     bool? privacyMode,
     bool? diagnosticsExport,
     bool? deploymentEvidenceRecorded,
+    String? deploymentEvidenceSource,
   }) {
     return ManagerSettingsDraft(
       serverEndpoint: serverEndpoint ?? this.serverEndpoint,
@@ -69,12 +77,49 @@ class ManagerSettingsDraft {
       diagnosticsExport: diagnosticsExport ?? this.diagnosticsExport,
       deploymentEvidenceRecorded:
           deploymentEvidenceRecorded ?? this.deploymentEvidenceRecorded,
+      deploymentEvidenceSource:
+          deploymentEvidenceSource ?? this.deploymentEvidenceSource,
     );
   }
 
   ManagerSettingsDraft normalized() {
-    return copyWith(serverEndpoint: serverEndpoint.trim());
+    return copyWith(
+      serverEndpoint: serverEndpoint.trim(),
+      deploymentEvidenceSource: deploymentEvidenceRecorded
+          ? deploymentEvidenceSource.trim()
+          : '',
+    );
   }
+}
+
+const managerDeploymentEvidenceLocalSmoke = 'local_smoke';
+const managerDeploymentEvidenceExternalTls = 'external_tls';
+const managerDeploymentEvidenceBackupRestore = 'backup_restore';
+const managerDeploymentEvidenceUpgradeRollback = 'upgrade_rollback';
+
+const managerDeploymentEvidenceSources = [
+  managerDeploymentEvidenceLocalSmoke,
+  managerDeploymentEvidenceExternalTls,
+  managerDeploymentEvidenceBackupRestore,
+  managerDeploymentEvidenceUpgradeRollback,
+];
+
+bool isValidManagerDeploymentEvidenceSource(String source) {
+  return managerDeploymentEvidenceSources.contains(source.trim());
+}
+
+String managerDeploymentEvidenceSourceLabel(String source) {
+  switch (source.trim()) {
+    case managerDeploymentEvidenceLocalSmoke:
+      return 'local smoke';
+    case managerDeploymentEvidenceExternalTls:
+      return 'external TLS';
+    case managerDeploymentEvidenceBackupRestore:
+      return 'backup restore';
+    case managerDeploymentEvidenceUpgradeRollback:
+      return 'upgrade rollback';
+  }
+  return 'not recorded';
 }
 
 class ManagerRuntimeDiagnostics {

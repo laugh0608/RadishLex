@@ -8,6 +8,7 @@ import 'package:radishlex_manager/src/bridge/ffi_manager_runtime_diagnostics.dar
 import 'package:radishlex_manager/src/bridge/ffi_manager_sync_mapper.dart';
 import 'package:radishlex_manager/src/bridge/fixture_manager_bridge.dart';
 import 'package:radishlex_manager/src/bridge/manager_bridge_factory.dart';
+import 'package:radishlex_manager/src/bridge/manager_settings_store.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
 void main() {
@@ -121,6 +122,7 @@ void main() {
           privacyMode: true,
           diagnosticsExport: true,
           deploymentEvidenceRecorded: true,
+          deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
         ),
       );
 
@@ -147,6 +149,128 @@ void main() {
       expect(reloaded.sync.state, SyncUiState.syncDisabledByPolicy);
     },
   );
+
+  test('settings store persists versioned deployment evidence draft', () {
+    final tempDir = Directory.systemTemp.createTempSync(
+      'radishlex-manager-settings-format-test-',
+    );
+    addTearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+    final settingsFile = '${tempDir.path}/manager-settings.json';
+
+    final store = ManagerSettingsStore(filePath: settingsFile);
+    final saved = store.save(
+      const ManagerSettingsDraft(
+        serverEndpoint: ' https://sync.example.invalid ',
+        retainSyncConfig: true,
+        privacyMode: false,
+        diagnosticsExport: true,
+        deploymentEvidenceRecorded: true,
+        deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
+      ),
+    );
+
+    expect(saved.serverEndpoint, 'https://sync.example.invalid');
+    expect(saved.hasDeploymentEvidence, isTrue);
+    final encoded = File(settingsFile).readAsStringSync();
+    expect(encoded, contains('"format_version": 1'));
+    expect(encoded, contains('"deployment_evidence_source": "external_tls"'));
+
+    final reloaded = ManagerSettingsStore(filePath: settingsFile).load();
+    expect(reloaded.hasDeploymentEvidence, isTrue);
+    expect(
+      managerDeploymentEvidenceLabel(reloaded),
+      'deployment evidence external TLS',
+    );
+
+    final legacySettingsFile = '${tempDir.path}/legacy-settings.json';
+    File(legacySettingsFile).writeAsStringSync('''
+{
+  "format_version": 1,
+  "server_endpoint": "https://legacy.example.invalid",
+  "retain_sync_config": true,
+  "privacy_mode": false,
+  "diagnostics_export": false,
+  "deployment_evidence_recorded": true
+}
+''');
+    final legacy = ManagerSettingsStore(filePath: legacySettingsFile).load();
+    expect(legacy.deploymentEvidenceRecorded, isFalse);
+    expect(legacy.deploymentEvidenceSource, isEmpty);
+    expect(legacy.hasDeploymentEvidence, isFalse);
+  });
+
+  test('settings store rejects unsupported or unsafe draft input', () {
+    final tempDir = Directory.systemTemp.createTempSync(
+      'radishlex-manager-settings-invalid-test-',
+    );
+    addTearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+    final settingsFile = '${tempDir.path}/manager-settings.json';
+    final store = ManagerSettingsStore(filePath: settingsFile);
+
+    File(settingsFile).writeAsStringSync('''
+{
+  "format_version": 99,
+  "server_endpoint": "https://sync.example.invalid"
+}
+''');
+    expect(
+      store.load,
+      throwsA(
+        isA<ManagerSettingsStoreException>().having(
+          (error) => error.code,
+          'code',
+          'settings_store_error',
+        ),
+      ),
+    );
+
+    expect(
+      () => store.save(
+        const ManagerSettingsDraft(
+          serverEndpoint: 'https://sync.example.invalid',
+          retainSyncConfig: true,
+          privacyMode: false,
+          diagnosticsExport: false,
+          deploymentEvidenceRecorded: true,
+          deploymentEvidenceSource: 'raw-log-path',
+        ),
+      ),
+      throwsA(
+        isA<ManagerSettingsStoreException>().having(
+          (error) => error.code,
+          'code',
+          'invalid_argument',
+        ),
+      ),
+    );
+
+    expect(
+      () => store.save(
+        const ManagerSettingsDraft(
+          serverEndpoint: 'https://user:token@sync.example.invalid',
+          retainSyncConfig: true,
+          privacyMode: false,
+          diagnosticsExport: false,
+          deploymentEvidenceRecorded: false,
+        ),
+      ),
+      throwsA(
+        isA<ManagerSettingsStoreException>().having(
+          (error) => error.code,
+          'code',
+          'invalid_argument',
+        ),
+      ),
+    );
+  });
 
   test('ffi manager mappers keep native DTO conversion explicit', () {
     final term = managerUserTermFromNative(
@@ -208,6 +332,7 @@ void main() {
         privacyMode: false,
         diagnosticsExport: false,
         deploymentEvidenceRecorded: true,
+        deploymentEvidenceSource: managerDeploymentEvidenceBackupRestore,
       ),
     );
     final explanation = managerRankerExplanationFromNative(
@@ -239,6 +364,7 @@ void main() {
         privacyMode: false,
         diagnosticsExport: true,
         deploymentEvidenceRecorded: true,
+        deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
       ),
     );
 

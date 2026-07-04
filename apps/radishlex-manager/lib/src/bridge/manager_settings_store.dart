@@ -95,16 +95,20 @@ ManagerSettingsDraft _draftFromJson(Map<String, Object?> json) {
       message: 'unsupported manager settings draft format',
     );
   }
+  final deploymentEvidenceSource = _stringValue(
+    json,
+    'deployment_evidence_source',
+  );
 
   return ManagerSettingsDraft(
     serverEndpoint: _stringValue(json, 'server_endpoint'),
     retainSyncConfig: _boolValue(json, 'retain_sync_config'),
     privacyMode: _boolValue(json, 'privacy_mode'),
     diagnosticsExport: _boolValue(json, 'diagnostics_export'),
-    deploymentEvidenceRecorded: _boolValue(
-      json,
-      'deployment_evidence_recorded',
-    ),
+    deploymentEvidenceRecorded:
+        _boolValue(json, 'deployment_evidence_recorded') &&
+        deploymentEvidenceSource.trim().isNotEmpty,
+    deploymentEvidenceSource: deploymentEvidenceSource,
   );
 }
 
@@ -116,10 +120,19 @@ Map<String, Object?> _draftToJson(ManagerSettingsDraft draft) {
     'privacy_mode': draft.privacyMode,
     'diagnostics_export': draft.diagnosticsExport,
     'deployment_evidence_recorded': draft.deploymentEvidenceRecorded,
+    'deployment_evidence_source': draft.deploymentEvidenceSource,
   };
 }
 
 ManagerSettingsDraft _validateDraft(ManagerSettingsDraft draft) {
+  if (draft.deploymentEvidenceRecorded &&
+      !isValidManagerDeploymentEvidenceSource(draft.deploymentEvidenceSource)) {
+    throw const ManagerSettingsStoreException(
+      code: 'invalid_argument',
+      message: 'deployment evidence source must be a known non-secret label',
+    );
+  }
+
   final endpoint = draft.serverEndpoint.trim();
   if (endpoint.isEmpty) {
     return draft.copyWith(serverEndpoint: '');

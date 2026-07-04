@@ -83,6 +83,7 @@ Future<void> main(List<String> args) async {
       privacyMode: true,
       diagnosticsExport: true,
       deploymentEvidenceRecorded: true,
+      deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
     ),
   );
   _expect(
@@ -95,6 +96,12 @@ Future<void> main(List<String> args) async {
       settingsPath,
     ).readAsStringSync(encoding: utf8).contains('server_endpoint'),
     'settings file schema',
+  );
+  _expect(
+    File(settingsPath)
+        .readAsStringSync(encoding: utf8)
+        .contains('"deployment_evidence_source": "external_tls"'),
+    'settings evidence source persisted',
   );
 
   final deletedSnapshot = await bridge.deleteUserTerm(

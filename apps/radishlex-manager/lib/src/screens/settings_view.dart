@@ -29,6 +29,7 @@ class _SettingsViewState extends State<SettingsView> {
   late bool privacyMode;
   late bool diagnosticsExport;
   late bool deploymentEvidenceRecorded;
+  late String deploymentEvidenceSource;
 
   @override
   void initState() {
@@ -105,9 +106,41 @@ class _SettingsViewState extends State<SettingsView> {
                 value: deploymentEvidenceRecorded,
                 onChanged: (value) => setState(() {
                   deploymentEvidenceRecorded = value ?? false;
+                  deploymentEvidenceSource = deploymentEvidenceRecorded
+                      ? _deploymentEvidenceSourceOrDefault(
+                          deploymentEvidenceSource,
+                        )
+                      : '';
                 }),
                 secondary: const Icon(Icons.verified_outlined),
                 title: const Text('记录目标部署验证草案'),
+              ),
+              DropdownButtonFormField<String>(
+                key: const Key('settings-deployment-evidence-source'),
+                initialValue: deploymentEvidenceRecorded
+                    ? _deploymentEvidenceSourceOrDefault(
+                        deploymentEvidenceSource,
+                      )
+                    : null,
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.fact_check_outlined),
+                  labelText: '部署证据来源',
+                ),
+                items: managerDeploymentEvidenceSources
+                    .map(
+                      (source) => DropdownMenuItem(
+                        value: source,
+                        child: Text(
+                          managerDeploymentEvidenceSourceLabel(source),
+                        ),
+                      ),
+                    )
+                    .toList(),
+                onChanged: deploymentEvidenceRecorded
+                    ? (source) => setState(() {
+                        deploymentEvidenceSource = source ?? '';
+                      })
+                    : null,
               ),
               const SizedBox(height: 12),
               Align(
@@ -178,6 +211,7 @@ class _SettingsViewState extends State<SettingsView> {
       privacyMode: privacyMode,
       diagnosticsExport: diagnosticsExport,
       deploymentEvidenceRecorded: deploymentEvidenceRecorded,
+      deploymentEvidenceSource: deploymentEvidenceSource,
     );
   }
 
@@ -187,6 +221,7 @@ class _SettingsViewState extends State<SettingsView> {
     privacyMode = draft.privacyMode;
     diagnosticsExport = draft.diagnosticsExport;
     deploymentEvidenceRecorded = draft.deploymentEvidenceRecorded;
+    deploymentEvidenceSource = draft.deploymentEvidenceSource;
   }
 }
 
@@ -258,7 +293,14 @@ bool _sameDraft(ManagerSettingsDraft left, ManagerSettingsDraft right) {
       left.retainSyncConfig == right.retainSyncConfig &&
       left.privacyMode == right.privacyMode &&
       left.diagnosticsExport == right.diagnosticsExport &&
-      left.deploymentEvidenceRecorded == right.deploymentEvidenceRecorded;
+      left.deploymentEvidenceRecorded == right.deploymentEvidenceRecorded &&
+      left.deploymentEvidenceSource == right.deploymentEvidenceSource;
+}
+
+String _deploymentEvidenceSourceOrDefault(String source) {
+  return isValidManagerDeploymentEvidenceSource(source)
+      ? source
+      : managerDeploymentEvidenceLocalSmoke;
 }
 
 class DiagnosticsReportDialog extends StatelessWidget {

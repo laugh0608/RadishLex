@@ -151,7 +151,14 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
           ),
           _diagnosticsItem(
             'settings.deployment_evidence',
-            snapshot.settings.draft.deploymentEvidenceRecorded.toString(),
+            managerDeploymentEvidenceLabel(snapshot.settings.draft),
+            'configuration',
+          ),
+          _diagnosticsItem(
+            'settings.deployment_evidence_source',
+            snapshot.settings.draft.hasDeploymentEvidence
+                ? snapshot.settings.draft.deploymentEvidenceSource
+                : 'not_recorded',
             'configuration',
           ),
         ],
