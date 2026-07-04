@@ -5,6 +5,8 @@ import '../models/manager_models.dart';
 import 'dictionary_view.dart';
 import 'learning_view.dart';
 import 'manager_widgets.dart';
+import 'settings/diagnostics_export_dialog.dart';
+import 'settings/diagnostics_report_dialog.dart';
 import 'settings_view.dart';
 import 'sync_view.dart';
 
