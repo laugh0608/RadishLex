@@ -96,7 +96,7 @@ RadishLex/
 - `deploy/sync-server/docker-compose.yaml`：Go sync server 部署态入口，只暴露 HTTP 上游 `http://127.0.0.1:7319`，外部反代负责 TLS。
 - `deploy/sync-server/.env.example`：唯一 env 示例，真实部署复制为 `.env` 后修改。
 - `deploy/sync-server/nginx.prod.conf`：生产外部 Nginx TLS 终止示例。
-- `apps/radishlex-manager/`：Flutter manager 起步工程，当前通过受控 `ManagerBridge` contract 接入合成 fixture，展示本地词库、学习摘要、rank explain、sync preflight、设备签名状态和设置草案；真实远端同步、恢复码和设备授权 UI 仍按管理端边界关闭。
+- `apps/radishlex-manager/`：Flutter manager 起步工程，通过受控 `ManagerBridge` contract 接入管理数据源；默认使用合成 fixture，显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时可切到真实 Dart FFI bridge，展示本地词库、学习摘要、rank explain 接线摘要、sync preflight、设备签名状态和设置草案；真实远端同步、恢复码和设备授权 UI 仍按管理端边界关闭。
 - `platforms/android-ime/keystore-bridge/`：Android Keystore bridge 仓库内 Kotlin / Gradle harness，固定 `android-keystore-v1` 的 `AndroidKeyStore` / `Ed25519` 创建、加载、公钥读取、签名、删除、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke / 设备矩阵记录模板，以及 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 失败记录；Rust raw JNI glue 位于 `crates/ime-crypto`，该目录当前不包含完整 Android IME。
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
 - `crates/ime-cli/`：基于 demo adapter、可选 Rime adapter、userdb 和 ranker 的命令行复验入口。
@@ -261,7 +261,7 @@ server/sync-server/
 
 ## Flutter app 建议
 
-管理端实现遵循 `docs/manager-ui-boundary.md`。当前 `apps/radishlex-manager/` 已创建 macOS Flutter 工程，第一批页面通过 `ManagerBridge` contract 接入合成 fixture，展示本地 userdb 管理、学习状态摘要、rank explain 摘要和 sync preflight 摘要；真实远端同步、恢复码和设备授权 UI 必须等待可用平台私钥 backend 与目标部署运行证据。
+管理端实现遵循 `docs/manager-ui-boundary.md`。当前 `apps/radishlex-manager/` 已创建 macOS Flutter 工程，第一批页面通过 `ManagerBridge` contract 展示本地 userdb 管理、学习状态摘要、rank explain 摘要和 sync preflight 摘要；默认仍使用合成 fixture，显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时可切到真实 Dart FFI bridge。真实远端同步、恢复码和设备授权 UI 必须等待可用平台私钥 backend 与目标部署运行证据。
 
 ```text
 apps/radishlex-manager/

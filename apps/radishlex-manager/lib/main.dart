@@ -1,7 +1,8 @@
 import 'package:flutter/widgets.dart';
 
+import 'src/bridge/manager_bridge_factory.dart';
 import 'src/app.dart';
 
 void main() {
-  runApp(const RadishLexManagerApp());
+  runApp(RadishLexManagerApp(bridge: createDefaultManagerBridge()));
 }
