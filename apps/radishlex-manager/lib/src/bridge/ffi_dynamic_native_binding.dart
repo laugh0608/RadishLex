@@ -6,7 +6,10 @@ import 'package:ffi/ffi.dart';
 import 'ffi_manager_native_models.dart';
 
 part 'ffi_dynamic_native_api.dart';
+part 'ffi_dynamic_native_calls.dart';
+part 'ffi_dynamic_native_symbols.dart';
 part 'ffi_dynamic_native_types.dart';
+part 'ffi_dynamic_native_views.dart';
 
 final class DynamicRadishLexManagerNativeBinding
     implements RadishLexManagerNativeBinding {
@@ -27,19 +30,19 @@ final class DynamicRadishLexManagerNativeBinding
   List<NativeUserTermRecord> listUserTerms(String dbPath) {
     return _withNativeString(dbPath, (dbPathPointer) {
       final termsHandle = _callPointer<_RadishLexUserTermList>(
-        _api,
-        (errorOut) => _api.userdbTermsNew(dbPathPointer, errorOut),
+        _api.errors,
+        (errorOut) => _api.userTerms.newList(dbPathPointer, errorOut),
       );
       try {
-        final count = _api.userdbTermsCount(termsHandle);
+        final count = _api.userTerms.count(termsHandle);
         final terms = <NativeUserTermRecord>[];
         for (var index = 0; index < count; index += 1) {
           final termOut = calloc<_RadishLexUserTermView>();
           try {
             _callStatus(
-              _api,
+              _api.errors,
               (errorOut) =>
-                  _api.userdbTermsGet(termsHandle, index, termOut, errorOut),
+                  _api.userTerms.get(termsHandle, index, termOut, errorOut),
             );
             terms.add(_copyTermView(termOut.ref));
           } finally {
@@ -48,7 +51,7 @@ final class DynamicRadishLexManagerNativeBinding
         }
         return List.unmodifiable(terms);
       } finally {
-        _api.userdbTermsFree(termsHandle);
+        _api.userTerms.free(termsHandle);
       }
     });
   }
@@ -65,8 +68,8 @@ final class DynamicRadishLexManagerNativeBinding
         _withNativeString(text, (textPointer) {
           _withOptionalNativeString(reading, (readingPointer) {
             _callStatus(
-              _api,
-              (errorOut) => _api.userdbDeleteTerm(
+              _api.errors,
+              (errorOut) => _api.userTerms.deleteTerm(
                 dbPathPointer,
                 inputCodePointer,
                 textPointer,
@@ -86,12 +89,9 @@ final class DynamicRadishLexManagerNativeBinding
       final summaryOut = calloc<_RadishLexDictionaryInspectSummary>();
       try {
         _callStatus(
-          _api,
-          (errorOut) => _api.userdbDictionaryInspect(
-            filePathPointer,
-            summaryOut,
-            errorOut,
-          ),
+          _api.errors,
+          (errorOut) =>
+              _api.dictionary.inspect(filePathPointer, summaryOut, errorOut),
         );
         final summary = summaryOut.ref;
         return NativeDictionaryInspectSummary(
@@ -118,8 +118,8 @@ final class DynamicRadishLexManagerNativeBinding
           final summaryOut = calloc<_RadishLexDictionaryImportSummary>();
           try {
             _callStatus(
-              _api,
-              (errorOut) => _api.userdbDictionaryImport(
+              _api.errors,
+              (errorOut) => _api.dictionary.importFile(
                 dbPathPointer,
                 filePathPointer,
                 sourceNamePointer,
@@ -147,8 +147,8 @@ final class DynamicRadishLexManagerNativeBinding
         final summaryOut = calloc<_RadishLexDictionaryExportSummary>();
         try {
           _callStatus(
-            _api,
-            (errorOut) => _api.userdbDictionaryExport(
+            _api.errors,
+            (errorOut) => _api.dictionary.exportFile(
               dbPathPointer,
               filePathPointer,
               summaryOut,
@@ -172,18 +172,18 @@ final class DynamicRadishLexManagerNativeBinding
   List<NativeImportBatchRecord> listImportBatches(String dbPath) {
     return _withNativeString(dbPath, (dbPathPointer) {
       final batchesHandle = _callPointer<_RadishLexImportBatchList>(
-        _api,
-        (errorOut) => _api.userdbImportBatchesNew(dbPathPointer, errorOut),
+        _api.errors,
+        (errorOut) => _api.importBatches.newList(dbPathPointer, errorOut),
       );
       try {
-        final count = _api.userdbImportBatchesCount(batchesHandle);
+        final count = _api.importBatches.count(batchesHandle);
         final batches = <NativeImportBatchRecord>[];
         for (var index = 0; index < count; index += 1) {
           final batchOut = calloc<_RadishLexImportBatchView>();
           try {
             _callStatus(
-              _api,
-              (errorOut) => _api.userdbImportBatchesGet(
+              _api.errors,
+              (errorOut) => _api.importBatches.get(
                 batchesHandle,
                 index,
                 batchOut,
@@ -197,7 +197,7 @@ final class DynamicRadishLexManagerNativeBinding
         }
         return List.unmodifiable(batches);
       } finally {
-        _api.userdbImportBatchesFree(batchesHandle);
+        _api.importBatches.free(batchesHandle);
       }
     });
   }
@@ -208,9 +208,9 @@ final class DynamicRadishLexManagerNativeBinding
       final summaryOut = calloc<_RadishLexLearningStatusSummary>();
       try {
         _callStatus(
-          _api,
+          _api.errors,
           (errorOut) =>
-              _api.userdbLearningStatus(dbPathPointer, summaryOut, errorOut),
+              _api.learning.status(dbPathPointer, summaryOut, errorOut),
         );
         return _copyLearningStatusSummary(summaryOut.ref);
       } finally {
@@ -225,9 +225,9 @@ final class DynamicRadishLexManagerNativeBinding
       final summaryOut = calloc<_RadishLexSyncPreflightSummary>();
       try {
         _callStatus(
-          _api,
+          _api.errors,
           (errorOut) =>
-              _api.userdbSyncPreflight(dbPathPointer, summaryOut, errorOut),
+              _api.sync.preflight(dbPathPointer, summaryOut, errorOut),
         );
         final summary = summaryOut.ref;
         return NativeSyncPreflightSummary(
@@ -260,8 +260,8 @@ final class DynamicRadishLexManagerNativeBinding
           return _withOptionalNativeString(reading, (readingPointer) {
             return _withNativeString(contextKind, (contextKindPointer) {
               final explainHandle = _callPointer<_RadishLexRankExplain>(
-                _api,
-                (errorOut) => _api.userdbRankExplainNew(
+                _api.errors,
+                (errorOut) => _api.rank.newExplain(
                   dbPathPointer,
                   inputCodePointer,
                   candidateTextPointer,
@@ -274,19 +274,16 @@ final class DynamicRadishLexManagerNativeBinding
                 final viewOut = calloc<_RadishLexRankExplainView>();
                 try {
                   _callStatus(
-                    _api,
-                    (errorOut) => _api.userdbRankExplainView(
-                      explainHandle,
-                      viewOut,
-                      errorOut,
-                    ),
+                    _api.errors,
+                    (errorOut) =>
+                        _api.rank.view(explainHandle, viewOut, errorOut),
                   );
                   return _copyRankExplainView(viewOut.ref);
                 } finally {
                   calloc.free(viewOut);
                 }
               } finally {
-                _api.userdbRankExplainFree(explainHandle);
+                _api.rank.free(explainHandle);
               }
             });
           });
@@ -294,105 +291,6 @@ final class DynamicRadishLexManagerNativeBinding
       });
     });
   }
-}
-
-NativeUserTermRecord _copyTermView(_RadishLexUserTermView term) {
-  return NativeUserTermRecord(
-    id: term.id,
-    inputCode: _readStringView(term.inputCode),
-    text: _readStringView(term.text),
-    reading: _readOptionalStringView(term.reading, term.readingPresent),
-    source: term.source,
-    status: term.status,
-    weight: term.weight,
-    createdAtMs: term.createdAtMs,
-    updatedAtMs: term.updatedAtMs,
-    lastUsedAtMs: term.lastUsedAtMs,
-    lastUsedAtPresent: term.lastUsedAtPresent != 0,
-  );
-}
-
-NativeDictionaryImportSummary _copyDictionaryImportSummary(
-  _RadishLexDictionaryImportSummary summary,
-) {
-  return NativeDictionaryImportSummary(
-    importBatchId: summary.importBatchId,
-    importBatchIdPresent: summary.importBatchIdPresent != 0,
-    totalRecords: summary.totalRecords,
-    importedTerms: summary.importedTerms,
-    insertedTerms: summary.insertedTerms,
-    updatedTerms: summary.updatedTerms,
-    skippedDeletedTerms: summary.skippedDeletedTerms,
-    skippedDuplicateTerms: summary.skippedDuplicateTerms,
-    dryRun: summary.dryRun != 0,
-  );
-}
-
-NativeLearningStatusSummary _copyLearningStatusSummary(
-  _RadishLexLearningStatusSummary summary,
-) {
-  return NativeLearningStatusSummary(
-    schemaVersion: summary.schemaVersion,
-    plaintextPayload: summary.plaintextPayload != 0,
-    p1RawDetails: summary.p1RawDetails != 0,
-    contextStats: summary.contextStats != 0,
-    activeUserTerms: summary.activeUserTerms,
-    suppressedUserTerms: summary.suppressedUserTerms,
-    rankerWeights: summary.rankerWeights,
-    deletedTermTombstones: summary.deletedTermTombstones,
-    selectionEvents: summary.selectionEvents,
-    negativeFeedback: summary.negativeFeedback,
-    importBatches: summary.importBatches,
-    latestUserTermUpdatedAtMs: summary.latestUserTermUpdatedAtMs,
-    latestUserTermUpdatedAtPresent: summary.latestUserTermUpdatedAtPresent != 0,
-    latestSelectionEventAtMs: summary.latestSelectionEventAtMs,
-    latestSelectionEventAtPresent: summary.latestSelectionEventAtPresent != 0,
-    latestNegativeFeedbackAtMs: summary.latestNegativeFeedbackAtMs,
-    latestNegativeFeedbackAtPresent:
-        summary.latestNegativeFeedbackAtPresent != 0,
-    latestDeletedTermAtMs: summary.latestDeletedTermAtMs,
-    latestDeletedTermAtPresent: summary.latestDeletedTermAtPresent != 0,
-    latestImportBatchAtMs: summary.latestImportBatchAtMs,
-    latestImportBatchAtPresent: summary.latestImportBatchAtPresent != 0,
-    latestActivityAtMs: summary.latestActivityAtMs,
-    latestActivityAtPresent: summary.latestActivityAtPresent != 0,
-  );
-}
-
-NativeImportBatchRecord _copyImportBatchView(_RadishLexImportBatchView batch) {
-  return NativeImportBatchRecord(
-    id: batch.id,
-    sourceName: _readStringView(batch.sourceName),
-    totalRecords: batch.totalRecords,
-    importedTerms: batch.importedTerms,
-    insertedTerms: batch.insertedTerms,
-    updatedTerms: batch.updatedTerms,
-    skippedDeletedTerms: batch.skippedDeletedTerms,
-    skippedDuplicateTerms: batch.skippedDuplicateTerms,
-    createdAtMs: batch.createdAtMs,
-    notes: _readOptionalStringView(batch.notes, batch.notesPresent),
-    notesPresent: batch.notesPresent != 0,
-  );
-}
-
-NativeRankExplainSummary _copyRankExplainView(_RadishLexRankExplainView view) {
-  return NativeRankExplainSummary(
-    inputCode: _readStringView(view.inputCode),
-    candidateText: _readStringView(view.candidateText),
-    reading: _readOptionalStringView(view.reading, view.readingPresent),
-    readingPresent: view.readingPresent != 0,
-    contextKind: _readStringView(view.contextKind),
-    originalIndex: view.originalIndex,
-    finalScore: view.finalScore,
-    engineOrderFactor: view.engineOrderFactor,
-    userTermBoost: view.userTermBoost,
-    frequencyBoost: view.frequencyBoost,
-    recencyBoost: view.recencyBoost,
-    contextBoost: view.contextBoost,
-    negativeFeedbackPenalty: view.negativeFeedbackPenalty,
-    suppressedPenalty: view.suppressedPenalty,
-    deletedPenalty: view.deletedPenalty,
-  );
 }
 
 String _defaultLibraryName() {

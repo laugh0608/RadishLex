@@ -20,6 +20,7 @@ RadishLex Manager 是萝卜词核的 Flutter 管理端起步工程。
 - `lib/src/screens/dictionary_view.dart`、`learning_view.dart`、`sync_view.dart` 和 `settings_view.dart` 分别承载词库、学习、同步和设置页面。
 - `lib/src/screens/manager_widgets.dart` 收纳页面共享的 section、metric、key-value row 和状态 badge 组件。
 - `lib/src/models/manager_models.dart` 作为模型 barrel 入口；具体模型按 `dictionary`、`learning`、`sync`、`settings`、`diagnostics` 和 `snapshot` 拆分到同目录文件。
+- `lib/src/bridge/ffi_dynamic_native_binding.dart` 是真实 Dart FFI bridge 主实现；动态符号加载、status/error 调用规则、ABI struct types 和 Rust view 复制分别拆在同目录的 `ffi_dynamic_native_*` 文件中。
 
 ## FFI bridge
 
