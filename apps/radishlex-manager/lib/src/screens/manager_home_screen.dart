@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../bridge/manager_bridge.dart';
 import '../models/manager_models.dart';
+import 'dictionary/dictionary_dialogs.dart';
 import 'dictionary_view.dart';
 import 'learning_view.dart';
 import 'manager_widgets.dart';
