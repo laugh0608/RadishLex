@@ -129,6 +129,7 @@ RadishLex/
 - `docs/runbooks/sync-server-local-smoke.md`：Go sync server 本机启动边界、自动化 smoke 和日志脱敏检查。
 - `docs/runbooks/sync-server-compose.md`：Go sync server Docker Compose 本地 HTTPS、部署态 HTTP 上游、持久化目录、外部反代示例、清理和停止线 runbook。
 - `scripts/check-manager.sh`：Flutter manager 格式、静态分析和 widget 测试入口。
+- `scripts/check-manager-ffi-smoke.sh`：Flutter manager 真实 Dart FFI bridge 的短生命周期 smoke，构建 `radishlex-ime-ffi` 动态库并使用临时 SQLite userdb、合成 TSV 和导出文件复验本地管理链路。
 - `scripts/check-sync-server-deployment-rehearsal.sh` / `scripts/check-sync-server-deployment-rehearsal.py`：sync server 部署态 Compose 的短生命周期预演入口，使用临时 env、随机 bearer token、仓库外数据目录和冷备份恢复复验。
 
 ## Rust crates 建议

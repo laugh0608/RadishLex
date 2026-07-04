@@ -104,7 +104,10 @@ Flutter manager 当前已在 `apps/radishlex-manager/` 起步，通过受控 `Ma
 
 ```bash
 ./scripts/check-manager.sh
+./scripts/check-manager-ffi-smoke.sh
 ```
+
+`check-manager-ffi-smoke.sh` 会构建 `radishlex-ime-ffi` 动态库，并用临时 SQLite userdb 与合成词库文件复验 Dart FFI bridge 的本地 list / delete / import / export、learning status 和 sync preflight 摘要；该命令不连接真实同步后端，不读取真实输入法目录。
 
 Apple Keychain backend 已在 `apple-keychain` feature 下接线，但真实 smoke 阻塞于 `ed25519-v1` 创建，`apple-keychain-v1` 在该 blocker 解除前会阻断生产签名。默认测试不会触碰本机 Keychain。
 

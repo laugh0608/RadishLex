@@ -47,6 +47,7 @@ REQUIRED_FILES = [
     "scripts/check-android-target.sh",
     "scripts/check-docs.py",
     "scripts/check-docs.sh",
+    "scripts/check-manager-ffi-smoke.sh",
     "scripts/check-manager.sh",
     "scripts/check-repo.py",
     "scripts/check-repo.sh",
@@ -55,6 +56,7 @@ REQUIRED_FILES = [
     "apps/radishlex-manager/README.md",
     "apps/radishlex-manager/pubspec.yaml",
     "apps/radishlex-manager/lib/main.dart",
+    "apps/radishlex-manager/tool/ffi_bridge_smoke.dart",
     "apps/radishlex-manager/test/widget_test.dart",
 ]
 REQUIRED_STATUS_CHECKS = {"Repo Hygiene", "Repository Baseline"}

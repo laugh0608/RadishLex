@@ -153,9 +153,10 @@ Phase 4 第一批管理端功能应覆盖：
 2. 已创建 `apps/radishlex-manager/` Flutter macOS 工程骨架，当前通过 `ManagerBridge` contract 接入合成 fixture。
 3. 已验证词条删除、词库导入检查、词库导入和词库导出动作经由 fixture bridge 完成受控调用。
 4. 已补第一批真实 Dart FFI bridge：显式配置本地 SQLite userdb 与 `ime-ffi` 动态库后，可接入 userdb 词条 list / delete、用户词库 inspect / import / export、learning status 摘要和 sync preflight 摘要。
-5. `rank explain` 区域当前只展示由 userdb term 和摘要计数派生的非敏感接线摘要；后续若需要真实 ranker explain，应先补专用 ABI。
-6. 同步配置页继续保持真实上传按钮禁用，显示 `local_only`、`backend_unavailable` 或 `deployment_unverified`。
-7. 待可用平台私钥 backend 与目标部署运行证据齐备后，再接设备授权、恢复码和用户可用同步。
+5. 已新增 `scripts/check-manager-ffi-smoke.sh`，构建 `radishlex-ime-ffi` 动态库并使用临时 SQLite userdb、合成 TSV 和导出文件复验真实 Dart FFI bridge 的本地 list / delete / import / export、learning status 和 sync preflight 摘要。
+6. `rank explain` 区域当前只展示由 userdb term 和摘要计数派生的非敏感接线摘要；后续若需要真实 ranker explain，应先补专用 ABI。
+7. 同步配置页继续保持真实上传按钮禁用，显示 `local_only`、`backend_unavailable` 或 `deployment_unverified`。
+8. 待可用平台私钥 backend 与目标部署运行证据齐备后，再接设备授权、恢复码和用户可用同步。
 
 ## 停止线
 

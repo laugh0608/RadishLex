@@ -36,7 +36,10 @@ flutter run -d macos
 
 ```bash
 ../../scripts/check-manager.sh
+../../scripts/check-manager-ffi-smoke.sh
 ```
+
+`check-manager-ffi-smoke.sh` 会构建 `radishlex-ime-ffi` 动态库，在仓库外临时目录创建 SQLite userdb、导入 TSV、删除词条并导出词库，用真实 Dart FFI bridge 复验本地管理链路。该 smoke 只使用合成词条，不连接真实同步后端，也不读取真实输入法目录。
 
 如需在 macOS 桌面运行 fixture 版本：
 
