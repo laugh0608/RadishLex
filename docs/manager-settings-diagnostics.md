@@ -7,6 +7,7 @@
 - `ManagerBridge` contract 不暴露 settings JSON 字段级接口；UI 通过 `saveSettingsDraft` 保存完整草案。
 - settings draft 只保存本地管理端非 secret 草案，不保存 token、恢复码、私钥、signature bytes、wrapped material、payload bytes、证书、运行日志、文件路径或用户词条。
 - 诊断报告只输出聚合计数、状态码、非敏感来源标签和脱敏策略，不输出用户词、导入 / 导出文件内容、本机真实路径、请求 / 响应体或 native 原始错误明细。
+- 诊断报告预览按本文字段索引展示分组、字段筛选和脱敏文本复制入口；复制内容与导出文本一致，仍只包含脱敏摘要。
 - 真实远端同步、恢复码和设备授权 UI 继续关闭；`preflight_ready` 只表示本地草案和预检条件可解释，不代表用户可用同步入口已开放。
 
 ## Settings Draft JSON
@@ -54,6 +55,8 @@
 ## 诊断报告格式
 
 当前诊断报告文本格式为 `manager.diagnostics.v1`，`redaction_policy` 固定为 `summary_only_no_terms_paths_tokens_or_payload_bytes`。
+
+Manager UI 预览会保留完整脱敏文本，并额外按 `runtime`、`settings_draft`、`local_data`、`latest_import_batch`、`sync_gate` 和 `redaction` 分组展示字段。预览筛选只作用于本地 UI，不改变 `ManagerDiagnosticsReport` 数据模型、导出格式或 `ManagerBridge` contract。
 
 报告头：
 

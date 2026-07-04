@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:radishlex_manager/src/bridge/fixture_manager_bridge.dart';
@@ -340,6 +341,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('诊断摘要预览'), findsOneWidget);
+    expect(find.text('分组 6'), findsOneWidget);
+    expect(find.text('字段 39'), findsOneWidget);
+    expect(
+      find.byKey(const Key('diagnostics-section-sync_gate')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('diagnostics-item-sync.state_source')),
+      findsOneWidget,
+    );
     expect(find.textContaining('runtime.bridge_mode: fixture'), findsOneWidget);
     expect(
       find.textContaining('sync.state_source: 设备 production gate 为 blocked'),
@@ -353,6 +364,64 @@ void main() {
       find.byKey(const Key('diagnostics-report-text')),
     );
     expect(reportText.data, isNot(contains('萝卜词核')));
+
+    await tester.tap(find.byKey(const Key('diagnostics-section-sync_gate')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('diagnostics-item-sync.state_source')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('diagnostics-item-runtime.bridge_mode')),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const Key('diagnostics-section-all')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('diagnostics-report-filter')),
+      'redaction.tokens',
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('diagnostics-item-redaction.tokens')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('diagnostics-item-sync.state_source')),
+      findsNothing,
+    );
+
+    final clipboardCalls = <MethodCall>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        clipboardCalls.add(call);
+        return null;
+      },
+    );
+    addTearDown(() {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      );
+    });
+
+    await tester.tap(find.byKey(const Key('diagnostics-copy-button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.text('诊断摘要已复制'), findsOneWidget);
+    final clipboardSetDataCalls = clipboardCalls
+        .where((call) => call.method == 'Clipboard.setData')
+        .toList();
+    expect(clipboardSetDataCalls, hasLength(1));
+    expect(
+      clipboardSetDataCalls.single.arguments,
+      containsPair('text', contains('sync.state_source')),
+    );
 
     await tester.tap(find.text('关闭'));
     await tester.pumpAndSettle();
