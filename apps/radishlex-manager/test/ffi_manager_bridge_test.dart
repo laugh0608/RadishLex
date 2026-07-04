@@ -1,7 +1,11 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:radishlex_manager/src/bridge/ffi_manager_dictionary_mapper.dart';
 import 'package:radishlex_manager/src/bridge/ffi_manager_bridge.dart';
+import 'package:radishlex_manager/src/bridge/ffi_manager_learning_mapper.dart';
+import 'package:radishlex_manager/src/bridge/ffi_manager_runtime_diagnostics.dart';
+import 'package:radishlex_manager/src/bridge/ffi_manager_sync_mapper.dart';
 import 'package:radishlex_manager/src/bridge/fixture_manager_bridge.dart';
 import 'package:radishlex_manager/src/bridge/manager_bridge_factory.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
@@ -137,6 +141,132 @@ void main() {
       expect(reloaded.sync.state, SyncUiState.syncDisabledByPolicy);
     },
   );
+
+  test('ffi manager mappers keep native DTO conversion explicit', () {
+    final term = managerUserTermFromNative(
+      const NativeUserTermRecord(
+        id: 1,
+        inputCode: 'luobo',
+        text: '萝卜词核',
+        reading: '',
+        source: nativeTermSourceManualImport,
+        status: 1,
+        weight: 1.25,
+        createdAtMs: 0,
+        updatedAtMs: 0,
+        lastUsedAtMs: 0,
+        lastUsedAtPresent: false,
+      ),
+    );
+    final learning = managerLearningSummaryFromNative(
+      const NativeLearningStatusSummary(
+        schemaVersion: 1,
+        plaintextPayload: false,
+        p1RawDetails: false,
+        contextStats: false,
+        activeUserTerms: 3,
+        suppressedUserTerms: 2,
+        rankerWeights: 5,
+        deletedTermTombstones: 7,
+        selectionEvents: 11,
+        negativeFeedback: 13,
+        importBatches: 17,
+        latestUserTermUpdatedAtMs: 0,
+        latestUserTermUpdatedAtPresent: false,
+        latestSelectionEventAtMs: 0,
+        latestSelectionEventAtPresent: false,
+        latestNegativeFeedbackAtMs: 0,
+        latestNegativeFeedbackAtPresent: false,
+        latestDeletedTermAtMs: 0,
+        latestDeletedTermAtPresent: false,
+        latestImportBatchAtMs: 0,
+        latestImportBatchAtPresent: false,
+        latestActivityAtMs: 0,
+        latestActivityAtPresent: false,
+      ),
+    );
+    final sync = managerSyncSummaryFromNative(
+      summary: const NativeSyncPreflightSummary(
+        schemaVersion: 1,
+        plaintextPayload: false,
+        syncableUserTerms: 2,
+        syncableRankerWeights: 3,
+        syncableDeletedTerms: 5,
+        localSelectionEvents: 7,
+        localNegativeFeedback: 11,
+        localImportBatches: 13,
+      ),
+      settingsDraft: const ManagerSettingsDraft(
+        serverEndpoint: 'https://sync.example.invalid',
+        retainSyncConfig: true,
+        privacyMode: false,
+        diagnosticsExport: false,
+        deploymentEvidenceRecorded: true,
+      ),
+    );
+    final explanation = managerRankerExplanationFromNative(
+      const NativeRankExplainSummary(
+        inputCode: 'luobo',
+        candidateText: '萝卜词核',
+        reading: null,
+        readingPresent: false,
+        contextKind: 'general',
+        originalIndex: 0,
+        finalScore: 2.5,
+        engineOrderFactor: 0.1,
+        userTermBoost: 1.0,
+        frequencyBoost: 0.2,
+        recencyBoost: 0.3,
+        contextBoost: 0.4,
+        negativeFeedbackPenalty: -0.5,
+        suppressedPenalty: 0.0,
+        deletedPenalty: 0.0,
+      ),
+    );
+    final diagnostics = managerRuntimeDiagnosticsFromFfi(
+      nativeInjected: false,
+      libraryPath: '/tmp/libradishlex_ime_ffi.dylib',
+      settingsStoreSourceLabel: 'settings file configured',
+      draft: const ManagerSettingsDraft(
+        serverEndpoint: 'https://sync.example.invalid',
+        retainSyncConfig: true,
+        privacyMode: false,
+        diagnosticsExport: true,
+        deploymentEvidenceRecorded: true,
+      ),
+    );
+
+    expect(term.source, 'import');
+    expect(term.lastUsed, '未使用');
+    expect(learning.lastUpdated, '无记录');
+    expect(sync.state, SyncUiState.backendUnavailable);
+    expect(sync.syncableObjects, 10);
+    expect(sync.localOnlyEvents, 31);
+    expect(
+      sync.categories.map((category) => '${category.name}:${category.count}'),
+      containsAll([
+        'dictionary.user_terms:2',
+        'dictionary.deleted_terms:5',
+        'ranker.weights:3',
+        'learning.selection_events:7',
+        'learning.negative_feedback:11',
+        'dictionary.import_batches:13',
+      ]),
+    );
+    expect(explanation.signals, contains('negative=-0.500'));
+    expect(managerRankExplainReading(term), isNull);
+    expect(
+      diagnostics.nativeLibrary,
+      'RADISHLEX_MANAGER_FFI_LIBRARY configured',
+    );
+    expect(diagnostics.syncEndpoint, 'sync endpoint draft configured');
+    expect(
+      fallbackFfiManagerSettingsDraft(
+        ' https://draft.example.invalid ',
+      ).serverEndpoint,
+      'https://draft.example.invalid',
+    );
+  });
 }
 
 final class _FakeNativeBinding implements RadishLexManagerNativeBinding {

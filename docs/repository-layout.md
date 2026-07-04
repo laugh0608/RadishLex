@@ -96,7 +96,7 @@ RadishLex/
 - `deploy/sync-server/docker-compose.yaml`：Go sync server 部署态入口，只暴露 HTTP 上游 `http://127.0.0.1:7319`，外部反代负责 TLS。
 - `deploy/sync-server/.env.example`：唯一 env 示例，真实部署复制为 `.env` 后修改。
 - `deploy/sync-server/nginx.prod.conf`：生产外部 Nginx TLS 终止示例。
-- `apps/radishlex-manager/`：Flutter manager 起步工程，通过受控 `ManagerBridge` contract 接入管理数据源；默认使用合成 fixture，显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时可切到真实 Dart FFI bridge，展示本地词库、import batches、学习摘要、rank explain 摘要、sync preflight、配置来源诊断、settings JSON 草案持久化、sync gate 状态来源、脱敏诊断报告、结构化错误分类、设备签名状态和设置草案；UI 代码已按 manager shell、词库、学习、同步、设置和共享组件拆分，Dart model 已按 dictionary、learning、sync、settings、diagnostics 和 snapshot 分组，动态 FFI bridge 已按符号加载、调用规则、ABI struct types 和 view copy 边界拆分；真实远端同步、恢复码和设备授权 UI 仍按管理端边界关闭。
+- `apps/radishlex-manager/`：Flutter manager 起步工程，通过受控 `ManagerBridge` contract 接入管理数据源；默认使用合成 fixture，显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时可切到真实 Dart FFI bridge，展示本地词库、import batches、学习摘要、rank explain 摘要、sync preflight、配置来源诊断、settings JSON 草案持久化、sync gate 状态来源、脱敏诊断报告、结构化错误分类、设备签名状态和设置草案；UI 代码已按 manager shell、词库、学习、同步、设置和共享组件拆分，Dart model 已按 dictionary、learning、sync、settings、diagnostics 和 snapshot 分组，动态 FFI bridge 已按符号加载、调用规则、ABI struct types、view copy 和高层 manager model mapper 边界拆分；真实远端同步、恢复码和设备授权 UI 仍按管理端边界关闭。
 - `platforms/android-ime/keystore-bridge/`：Android Keystore bridge 仓库内 Kotlin / Gradle harness，固定 `android-keystore-v1` 的 `AndroidKeyStore` / `Ed25519` 创建、加载、公钥读取、签名、删除、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke / 设备矩阵记录模板，以及 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 失败记录；Rust raw JNI glue 位于 `crates/ime-crypto`，该目录当前不包含完整 Android IME。
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
 - `crates/ime-cli/`：基于 demo adapter、可选 Rime adapter、userdb 和 ranker 的命令行复验入口。
