@@ -56,6 +56,7 @@ RadishLex/
     sync-key-management.md
     sync-server-api-storage.md
     sync-server-oidc-roadmap.md
+    sync-server-admin-console.md
     production-recovery-flow.md
     platform-private-key-backend-strategy.md
     manager-ui-boundary.md
@@ -95,6 +96,7 @@ RadishLex/
 - `deploy/sync-server/docker-compose.yaml`：Go sync server 部署态入口，只暴露 HTTP 上游 `http://127.0.0.1:7319`，外部反代负责 TLS。
 - `deploy/sync-server/.env.example`：唯一 env 示例，真实部署复制为 `.env` 后修改。
 - `deploy/sync-server/nginx.prod.conf`：生产外部 Nginx TLS 终止示例。
+- `apps/radishlex-manager/`：Flutter manager 起步工程，当前通过受控 `ManagerBridge` contract 接入合成 fixture，展示本地词库、学习摘要、rank explain、sync preflight、设备签名状态和设置草案；真实远端同步、恢复码和设备授权 UI 仍按管理端边界关闭。
 - `platforms/android-ime/keystore-bridge/`：Android Keystore bridge 仓库内 Kotlin / Gradle harness，固定 `android-keystore-v1` 的 `AndroidKeyStore` / `Ed25519` 创建、加载、公钥读取、签名、删除、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke / 设备矩阵记录模板，以及 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 失败记录；Rust raw JNI glue 位于 `crates/ime-crypto`，该目录当前不包含完整 Android IME。
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
 - `crates/ime-cli/`：基于 demo adapter、可选 Rime adapter、userdb 和 ranker 的命令行复验入口。
@@ -112,6 +114,7 @@ RadishLex/
 - `docs/sync-key-management.md`：真实同步前的同步密钥、设备授权、恢复码、设备撤销、key epoch 和冲突边界。
 - `docs/sync-server-api-storage.md`：Go sync server API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和停止线。
 - `docs/sync-server-oidc-roadmap.md`：后续接入 Radish 产品账号体系或兼容 OIDC IdP 的认证边界、身份映射、scope 草案和停止线。
+- `docs/sync-server-admin-console.md`：Docker 部署后端未来可选 WebUI / 管理控制台的运维定位、权限边界、可见数据、禁止字段和停止线；不影响当前管理端近期计划。
 - `docs/production-recovery-flow.md`：生产恢复记录创建、轮换、撤销、新设备恢复加入、失败限速和停止线。
 - `docs/platform-private-key-backend-strategy.md`：平台私钥 backend 当前证据、禁止 fallback、生产合格条件和无新设备时的推进路径。
 - `docs/manager-ui-boundary.md`：Phase 4 Flutter manager 的职责、数据可见性、同步 UI 状态、恢复码 / 设备授权停止线和第一批功能顺序。
@@ -125,6 +128,7 @@ RadishLex/
 - `docs/runbooks/android-keystore-signing-backend.md`：`android-keystore-v1` Ed25519 创建、加载、签名、删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界。
 - `docs/runbooks/sync-server-local-smoke.md`：Go sync server 本机启动边界、自动化 smoke 和日志脱敏检查。
 - `docs/runbooks/sync-server-compose.md`：Go sync server Docker Compose 本地 HTTPS、部署态 HTTP 上游、持久化目录、外部反代示例、清理和停止线 runbook。
+- `scripts/check-manager.sh`：Flutter manager 格式、静态分析和 widget 测试入口。
 - `scripts/check-sync-server-deployment-rehearsal.sh` / `scripts/check-sync-server-deployment-rehearsal.py`：sync server 部署态 Compose 的短生命周期预演入口，使用临时 env、随机 bearer token、仓库外数据目录和冷备份恢复复验。
 
 ## Rust crates 建议
@@ -257,7 +261,7 @@ server/sync-server/
 
 ## Flutter app 建议
 
-管理端实现前先遵循 `docs/manager-ui-boundary.md`：第一批页面优先覆盖本地 userdb 管理、学习状态摘要、rank explain 摘要和 sync preflight 摘要；真实远端同步、恢复码和设备授权 UI 必须等待可用平台私钥 backend 与目标部署运行证据。
+管理端实现遵循 `docs/manager-ui-boundary.md`。当前 `apps/radishlex-manager/` 已创建 macOS Flutter 工程，第一批页面通过 `ManagerBridge` contract 接入合成 fixture，展示本地 userdb 管理、学习状态摘要、rank explain 摘要和 sync preflight 摘要；真实远端同步、恢复码和设备授权 UI 必须等待可用平台私钥 backend 与目标部署运行证据。
 
 ```text
 apps/radishlex-manager/

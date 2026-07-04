@@ -45,6 +45,7 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - [Sync Server Compose Runbook](docs/runbooks/sync-server-compose.md)
 - [Sync Server Production Deployment Runbook](docs/runbooks/sync-server-production-deployment.md)
 - [Sync Server OIDC 未来接入规划](docs/sync-server-oidc-roadmap.md)
+- [Sync Server Admin Console 远期专题](docs/sync-server-admin-console.md)
 - [生产恢复流程设计](docs/production-recovery-flow.md)
 - [管理端边界](docs/manager-ui-boundary.md)
 - [ADR 0002: 恢复码 KDF 与同步域恢复边界](docs/adr/0002-recovery-code-kdf.md)
@@ -98,6 +99,12 @@ docker compose -f deploy/sync-server/docker-compose.yaml --env-file deploy/sync-
 本地 Compose 测试态使用 Caddy internal TLS 暴露 `https://localhost:7319`；部署态只提供同机 HTTP upstream `http://127.0.0.1:7319`，外部 TLS 和访问控制由部署者配置。生产访问控制当前先使用 `RADISHLEX_SYNC_ACCESS_TOKEN` 单用户 bearer token；OIDC / Radish 产品账号体系已作为后续专题记录，不是当前必须部署的账号系统。
 
 完整部署预演可执行 `./scripts/check-sync-server-deployment-rehearsal.sh`，它会用临时 env、随机 bearer token 和仓库外数据目录短生命周期启动部署态 Compose，验证 token 门禁、日志脱敏和冷备份恢复；该命令需要 Docker daemon 可用，默认仓库检查不运行。
+
+Flutter manager 当前已在 `apps/radishlex-manager/` 起步，通过受控 `ManagerBridge` contract 接入合成 fixture，展示本地词库、学习摘要、`rank explain` 和 `sync preflight` 状态；真实远端同步、恢复码和设备授权 UI 仍按管理端边界保持关闭：
+
+```bash
+./scripts/check-manager.sh
+```
 
 Apple Keychain backend 已在 `apple-keychain` feature 下接线，但真实 smoke 阻塞于 `ed25519-v1` 创建，`apple-keychain-v1` 在该 blocker 解除前会阻断生产签名。默认测试不会触碰本机 Keychain。
 

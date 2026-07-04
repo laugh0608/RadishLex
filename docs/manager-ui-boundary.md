@@ -8,7 +8,7 @@ Flutter manager 是 RadishLex 的管理界面，不进入输入热路径，不�
 
 管理端的职责是把 Rust core 和本地 userdb 已经具备的能力以可审计、可删除、可解释的方式呈现给用户，并在同步能力具备生产条件前清楚显示不可用原因。
 
-当前仓库还没有 `apps/radishlex-manager/`。Phase 4 进入代码前，先以本文档固定以下边界：
+当前仓库已新增 `apps/radishlex-manager/` Flutter macOS 起步工程，先通过受控 `ManagerBridge` contract 接入合成 fixture 展示本地管理台。Dart FFI bridge、真实远端同步、恢复码和设备授权仍未开放。Phase 4 后续代码继续遵守以下边界：
 
 - 本地 userdb 管理优先于远端同步开关。
 - 学习记录摘要优先于 P1 原始事件明细。
@@ -82,6 +82,8 @@ Phase 4 第一批管理端功能应覆盖：
 
 管理端应通过 `ime-ffi` 或后续受控 bridge 调用 Rust 能力，不直接读写 Rust 内部结构。
 
+当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、词库导入检查、词库导入和词库导出这组受控方法。现有 `FixtureManagerBridge` 只使用合成数据验证调用边界、UI 状态更新、导入检查对话框和导出结果反馈；后续 Dart FFI bridge 替换 fixture 时必须保持同一类结构化返回值和错误分类，不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层。
+
 第一批可依赖的接口方向：
 
 - session / dictionary handle 的创建与释放。
@@ -147,11 +149,11 @@ Phase 4 第一批管理端功能应覆盖：
 
 ## Phase 4 起步顺序
 
-1. 固定本文档，并同步路线图、技术计划、仓库结构和周志。
-2. 创建 `apps/radishlex-manager/` Flutter 工程骨架，但默认只接本地 mock / fixture 数据和受控 bridge contract。
-3. 接入本地 userdb 词条 list / delete / import / export。
-4. 接入 learning status、rank explain 摘要和 sync preflight 摘要。
-5. 增加同步配置页，但真实上传按钮保持禁用，显示 `backend_unavailable` 或 `deployment_unverified`。
+1. 已固定本文档，并同步路线图、技术计划、仓库结构和周志。
+2. 已创建 `apps/radishlex-manager/` Flutter macOS 工程骨架，当前通过 `ManagerBridge` contract 接入合成 fixture。
+3. 已验证词条删除、词库导入检查、词库导入和词库导出动作经由 fixture bridge 完成受控调用；后续接入本地 userdb 词条 list / delete / import / export 的真实 Dart FFI bridge。
+4. 后续接入 learning status、rank explain 摘要和 sync preflight 摘要的真实 Dart FFI bridge。
+5. 同步配置页继续保持真实上传按钮禁用，显示 `backend_unavailable` 或 `deployment_unverified`。
 6. 待可用平台私钥 backend 与目标部署运行证据齐备后，再接设备授权、恢复码和用户可用同步。
 
 ## 停止线

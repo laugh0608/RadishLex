@@ -47,10 +47,15 @@ REQUIRED_FILES = [
     "scripts/check-android-target.sh",
     "scripts/check-docs.py",
     "scripts/check-docs.sh",
+    "scripts/check-manager.sh",
     "scripts/check-repo.py",
     "scripts/check-repo.sh",
     "scripts/check-text-files.py",
     "scripts/check-text-files.sh",
+    "apps/radishlex-manager/README.md",
+    "apps/radishlex-manager/pubspec.yaml",
+    "apps/radishlex-manager/lib/main.dart",
+    "apps/radishlex-manager/test/widget_test.dart",
 ]
 REQUIRED_STATUS_CHECKS = {"Repo Hygiene", "Repository Baseline"}
 CONVENTIONAL_COMMIT_PATTERN = "^(feat|fix|docs|refactor|test|chore|ci|build|perf|revert)(\\([a-z0-9._/-]+\\))?!?: .+"
