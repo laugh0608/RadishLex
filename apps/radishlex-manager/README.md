@@ -16,7 +16,8 @@ RadishLex Manager 是萝卜词核的 Flutter 管理端起步工程。
 
 ## 代码结构
 
-- `lib/src/screens/manager_home_screen.dart` 保留 snapshot 加载、导航壳层、跨页 bridge 操作调度和统一错误提示。
+- `lib/src/screens/manager_home_screen.dart` 保留 snapshot 加载、导航壳层、页面选择和统一提示入口。
+- `lib/src/screens/manager/manager_home_actions.dart` 收纳跨页 bridge 操作编排、对话框调用和结构化结果文案。
 - `lib/src/screens/dictionary_view.dart`、`learning_view.dart`、`sync_view.dart` 和 `settings_view.dart` 分别承载词库、学习、同步和设置页面。
 - `lib/src/screens/dictionary/` 收纳词库页导入历史区域、删除确认、导入检查和导出对话框，避免继续扩大 `dictionary_view.dart`。
 - `lib/src/screens/settings/` 收纳设置页诊断报告预览和诊断导出对话框，避免继续扩大 `settings_view.dart`。

@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../bridge/manager_bridge.dart';
 import '../models/manager_models.dart';
-import 'dictionary/dictionary_dialogs.dart';
 import 'dictionary_view.dart';
 import 'learning_view.dart';
+import 'manager/manager_home_actions.dart';
 import 'manager_widgets.dart';
-import 'settings/diagnostics_export_dialog.dart';
-import 'settings/diagnostics_report_dialog.dart';
 import 'settings_view.dart';
 import 'sync_view.dart';
 
@@ -45,16 +43,23 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
         if (data == null) {
           return const _ManagerLoading();
         }
+        final actions = ManagerHomeActions(
+          context: context,
+          bridge: widget.bridge,
+          onSnapshotChanged: _setSnapshot,
+          reloadSnapshot: _reloadSnapshot,
+          showMessage: _showBridgeMessage,
+        );
         return _ManagerShell(
           snapshot: data,
           selectedIndex: selectedIndex,
           onSelectPage: _selectPage,
-          onDeleteTerm: _deleteTerm,
-          onImportDictionary: _importDictionary,
-          onExportDictionary: _exportDictionary,
-          onPreviewDiagnostics: _previewDiagnostics,
-          onExportDiagnostics: _exportDiagnostics,
-          onSaveSettingsDraft: _saveSettingsDraft,
+          onDeleteTerm: actions.deleteTerm,
+          onImportDictionary: actions.importDictionary,
+          onExportDictionary: actions.exportDictionary,
+          onPreviewDiagnostics: actions.previewDiagnostics,
+          onExportDiagnostics: actions.exportDiagnostics,
+          onSaveSettingsDraft: actions.saveSettingsDraft,
         );
       },
     );
@@ -72,173 +77,10 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
     });
   }
 
-  Future<void> _deleteTerm(UserTerm term) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => DictionaryDeleteConfirmDialog(term: term),
-    );
-    if (!mounted || confirmed != true) {
-      return;
-    }
-
-    try {
-      final snapshot = await widget.bridge.deleteUserTerm(term.key);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        snapshotFuture = Future.value(snapshot);
-      });
-      _showBridgeMessage('已删除词条：${term.inputCode} / ${term.text}');
-    } on Object catch (error) {
-      if (mounted) {
-        _showBridgeMessage(
-          _bridgeFailureMessage(error, ManagerBridgeOperation.deleteUserTerm),
-        );
-      }
-    }
-  }
-
-  Future<void> _importDictionary() async {
-    final request = await showDialog<DictionaryImportRequest>(
-      context: context,
-      builder: (context) => const DictionaryImportDialog(),
-    );
-    if (!mounted || request == null) {
-      return;
-    }
-
-    var operation = ManagerBridgeOperation.inspectDictionaryImport;
-    try {
-      final preview = await widget.bridge.inspectDictionaryImport(
-        request.filePath,
-      );
-      if (!mounted) {
-        return;
-      }
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) =>
-            DictionaryImportPreviewDialog(preview: preview, request: request),
-      );
-      if (!mounted || confirmed != true) {
-        return;
-      }
-
-      operation = ManagerBridgeOperation.importDictionaryFile;
-      final result = await widget.bridge.importDictionaryFile(
-        filePath: request.filePath,
-        sourceName: request.sourceName,
-        dryRun: request.dryRun,
-      );
-      if (!mounted) {
-        return;
-      }
-      _showBridgeMessage(_dictionaryImportResultMessage(result));
-      _reloadSnapshot();
-    } on Object catch (error) {
-      if (mounted) {
-        _showBridgeMessage(_bridgeFailureMessage(error, operation));
-      }
-    }
-  }
-
-  Future<void> _exportDictionary() async {
-    final filePath = await showDialog<String>(
-      context: context,
-      builder: (context) => const DictionaryExportDialog(),
-    );
-    if (!mounted || filePath == null) {
-      return;
-    }
-
-    try {
-      final result = await widget.bridge.exportDictionaryFile(filePath);
-      if (!mounted) {
-        return;
-      }
-      _showBridgeMessage(_dictionaryExportResultMessage(result));
-    } on Object catch (error) {
-      if (mounted) {
-        _showBridgeMessage(
-          _bridgeFailureMessage(
-            error,
-            ManagerBridgeOperation.exportDictionaryFile,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _previewDiagnostics() async {
-    try {
-      final report = await widget.bridge.loadDiagnosticsReport();
-      if (!mounted) {
-        return;
-      }
-      await showDialog<void>(
-        context: context,
-        builder: (context) => DiagnosticsReportDialog(report: report),
-      );
-    } on Object catch (error) {
-      if (mounted) {
-        _showBridgeMessage(
-          _bridgeFailureMessage(
-            error,
-            ManagerBridgeOperation.previewDiagnostics,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _exportDiagnostics() async {
-    final filePath = await showDialog<String>(
-      context: context,
-      builder: (context) => const DiagnosticsExportDialog(),
-    );
-    if (!mounted || filePath == null) {
-      return;
-    }
-
-    try {
-      final result = await widget.bridge.exportDiagnosticsReport(filePath);
-      if (!mounted) {
-        return;
-      }
-      _showBridgeMessage('诊断摘要导出完成：${result.lineCount} 行');
-    } on Object catch (error) {
-      if (mounted) {
-        _showBridgeMessage(
-          _bridgeFailureMessage(
-            error,
-            ManagerBridgeOperation.exportDiagnostics,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _saveSettingsDraft(ManagerSettingsDraft draft) async {
-    try {
-      final snapshot = await widget.bridge.saveSettingsDraft(draft);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        snapshotFuture = Future.value(snapshot);
-      });
-      _showBridgeMessage('设置草案已保存：${snapshot.sync.state.code}');
-    } on Object catch (error) {
-      if (mounted) {
-        _showBridgeMessage(
-          _bridgeFailureMessage(
-            error,
-            ManagerBridgeOperation.saveSettingsDraft,
-          ),
-        );
-      }
-    }
+  void _setSnapshot(ManagerSnapshot snapshot) {
+    setState(() {
+      snapshotFuture = Future.value(snapshot);
+    });
   }
 
   void _showBridgeMessage(String message) {
@@ -383,7 +225,7 @@ class _ManagerLoadFailure extends StatelessWidget {
                 const Text('管理端数据加载失败'),
                 const SizedBox(height: 6),
                 Text(
-                  _bridgeFailureMessage(
+                  managerBridgeFailureMessage(
                     error,
                     ManagerBridgeOperation.loadSnapshot,
                   ),
@@ -500,19 +342,4 @@ class _Header extends StatelessWidget {
       ],
     );
   }
-}
-
-String _bridgeFailureMessage(Object? error, ManagerBridgeOperation operation) {
-  return describeManagerBridgeFailure(error, operation).userMessage;
-}
-
-String _dictionaryImportResultMessage(DictionaryImportResult result) {
-  final skipped = result.skippedDeletedTerms + result.skippedDuplicateTerms;
-  final label = result.dryRun ? '导入检查完成' : '导入完成';
-  return '$label：${result.importedTerms} / ${result.totalRecords} 条，'
-      '新增 ${result.insertedTerms}，更新 ${result.updatedTerms}，跳过 $skipped';
-}
-
-String _dictionaryExportResultMessage(DictionaryExportResult result) {
-  return '导出完成：${result.exportedTerms} 条，${result.format} / ${result.syncClass}';
 }
