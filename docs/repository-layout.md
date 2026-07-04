@@ -57,6 +57,7 @@ RadishLex/
     sync-server-api-storage.md
     sync-server-oidc-roadmap.md
     production-recovery-flow.md
+    platform-private-key-backend-strategy.md
     ffi-boundary.md
     adr/
     runbooks/
@@ -111,6 +112,7 @@ RadishLex/
 - `docs/sync-server-api-storage.md`：Go sync server API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和停止线。
 - `docs/sync-server-oidc-roadmap.md`：后续接入 Radish 产品账号体系或兼容 OIDC IdP 的认证边界、身份映射、scope 草案和停止线。
 - `docs/production-recovery-flow.md`：生产恢复记录创建、轮换、撤销、新设备恢复加入、失败限速和停止线。
+- `docs/platform-private-key-backend-strategy.md`：平台私钥 backend 当前证据、禁止 fallback、生产合格条件和无新设备时的推进路径。
 - `docs/adr/0002-recovery-code-kdf.md`：恢复码 Argon2id KDF、格式、恢复记录字段和生产实现验证口径。
 - `docs/adr/0003-device-signing-key-storage.md`：设备签名、签名对象、私钥存储抽象、错误语义和验证口径。
 - `docs/adr/0004-platform-private-key-storage-backend.md`：平台私钥存储 backend、capability metadata、FFI 边界、错误语义和停止线。

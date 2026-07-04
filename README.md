@@ -50,6 +50,7 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - [ADR 0003: 设备签名与私钥存储边界](docs/adr/0003-device-signing-key-storage.md)
 - [ADR 0004: 平台私钥存储 Backend 边界](docs/adr/0004-platform-private-key-storage-backend.md)
 - [ADR 0005: Apple 平台签名策略](docs/adr/0005-apple-platform-signing-strategy.md)
+- [平台私钥 Backend 策略](docs/platform-private-key-backend-strategy.md)
 - [Apple Keychain Signing Backend Runbook](docs/runbooks/apple-keychain-signing-backend.md)
 - [Android Keystore Signing Backend Runbook](docs/runbooks/android-keystore-signing-backend.md)
 - [FFI 边界](docs/ffi-boundary.md)
@@ -117,6 +118,8 @@ JAVA_HOME=<Android Studio bundled JBR> ./gradlew connectedAndroidTest -Pradishle
 ```
 
 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 当前诊断结果均为 `unsupported_signature_algorithm`：JCA factory 表面可用，但 `AndroidKeyStore` 实际生成 `EC` key，不能满足 `ed25519-v1` 设备签名协议。`android-keystore-v1` production gate 继续关闭，不切换 P-256，也不回退到 seed / app storage / `test-memory-v1`。
+
+无新增 Android 真机或不同系统镜像时，平台私钥 backend 推进以 [平台私钥 Backend 策略](docs/platform-private-key-backend-strategy.md) 为准：保留 `ed25519-v1`，不在现有 backend 内降级，优先补目标部署运行证据或准备新的平台 spike / ADR 输入。
 
 ## MVP 边界
 
