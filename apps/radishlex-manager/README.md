@@ -14,6 +14,12 @@ RadishLex Manager 是萝卜词核的 Flutter 管理端起步工程。
 真实远端同步、恢复码、设备授权和平台私钥 backend 成功路径尚未开放。相关停止线见仓库根 `docs/manager-ui-boundary.md`。
 当前 FFI bridge 覆盖本地 userdb 词条 list / delete、用户词库 inspect / import / export、import batches、learning status 摘要、rank explain 摘要、sync preflight 摘要、设置草案持久化和脱敏诊断报告导出。`rank explain` 区域通过专用 `ime-ffi` ABI 读取单候选贡献项，Flutter 只展示复制后的非敏感摘要。设置页会显示配置来源诊断，并可预览 / 导出不含用户词、文件路径、token 或 payload bytes 的诊断摘要；bridge 失败按操作和分类展示结构化错误码，不把 native 错误明细透传给 widget 层。sync gate 状态由设置草案、隐私模式、平台私钥 backend gate 和部署证据草案共同派生；真实远端同步、恢复码和设备授权 UI 继续关闭。
 
+## 代码结构
+
+- `lib/src/screens/manager_home_screen.dart` 保留 snapshot 加载、导航壳层、跨页 bridge 操作调度和统一错误提示。
+- `lib/src/screens/dictionary_view.dart`、`learning_view.dart`、`sync_view.dart` 和 `settings_view.dart` 分别承载词库、学习、同步和设置页面。
+- `lib/src/screens/manager_widgets.dart` 收纳页面共享的 section、metric、key-value row 和状态 badge 组件。
+
 ## FFI bridge
 
 默认启动不加载 native library：
