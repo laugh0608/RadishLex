@@ -65,7 +65,7 @@ settings draft 不得保存：
 
 `sync.entry_blocker` 记录当前第一阻塞码，`sync.production_blockers` 记录聚合阻塞码。即使状态进入 `preflight_ready`，同步页的 `启用同步` 主按钮仍保持禁用。用户可用同步入口必须等待可用平台私钥 backend、发布级目标部署运行证据、恢复码和设备授权链路满足对应停止线。
 
-当前 `sync.production_blockers` 还会聚合恢复码保存确认、恢复记录、授权包前置条件、设备撤销、丢失设备风险提示和 key epoch 状态，例如 `recovery_record_not_created`、`recovery_code_save_confirmation_required`、`authorization_package_prerequisites_blocked`、`lost_device_risk_notice_required` 和 `key_epoch_rotation_not_started`。恢复码 setup / restore 与设备 join / revocation 的 readiness 摘要只输出状态码、前置条件和错误分类，并通过 `SyncReadinessFlowSummary` 聚合为 blocked flows、issue codes、next required evidence、source tags 和 user sync blocked；这些值只用于解释入口阻塞，不代表已创建恢复记录、join request、授权包或撤销记录。
+当前 `sync.production_blockers` 还会聚合恢复码保存确认、恢复记录、授权包前置条件、设备撤销、丢失设备风险提示和 key epoch 状态，例如 `recovery_record_not_created`、`recovery_code_save_confirmation_required`、`authorization_package_prerequisites_blocked`、`lost_device_risk_notice_required` 和 `key_epoch_rotation_not_started`。恢复码 setup / restore 与设备 join / revocation 的 readiness 摘要只输出状态码、前置条件和错误分类，并通过 `SyncReadinessFlowSummary` 聚合为 blocked flows、issue codes、next required evidence、source tags 和 user sync blocked；这些值只用于解释入口阻塞，不代表已创建恢复记录、join request、授权包或撤销记录。Dart 侧 `manager_sync_readiness.v1` mapper 只接受 allowlist 状态码和来源标签，未知值降级为 `unexpected_bridge_error_code` / `unexpected_bridge_required_evidence`，不把原始 bridge 异常、路径、token、恢复码、短码或 payload 写入 UI、settings draft 或诊断报告。
 
 ## 连接健康摘要
 
@@ -179,6 +179,7 @@ Manager UI 预览会保留完整脱敏文本，并额外按 `runtime`、`setting
 | `sync.readiness_issue_codes` | `error_code` | 四条 readiness flow 的 blocker 与错误分类去重摘要。 |
 | `sync.readiness_next_required_evidence` | `gate` | 四条 readiness flow 的下一步前置条件 / 状态证据去重摘要。 |
 | `sync.readiness_source_tags` | `gate` | readiness flow 摘要来源标签，只包含 Manager 内部只读 model source。 |
+| `sync.readiness_bridge_source` | `gate` | readiness bridge snapshot 来源标签；默认 `manager_default_closed_readiness`，未来 bridge 输入只能使用 allowlist 或安全降级标签。 |
 | `sync.readiness_user_sync_blocked` | `gate` | readiness flow 是否仍阻断用户可用同步入口。 |
 | `sync.user_sync_enabled` | `gate` | 当前用户可用真实同步入口是否开放；当前阶段应为 `false`。 |
 | `sync.recovery_status` | `gate` | 恢复码流程结构化状态；当前为 `recovery_code_flow_closed`。 |

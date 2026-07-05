@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:radishlex_manager/src/bridge/ffi_manager_sync_readiness_mapper.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
 void main() {
@@ -510,4 +511,183 @@ void main() {
     expect(audit.entryGate.readinessUserSyncBlocked, isTrue);
     expect(audit.entryGate.userSyncEnabled, isFalse);
   });
+
+  test('bridge readiness mapper feeds gate without opening user sync', () {
+    const draft = ManagerSettingsDraft(
+      serverEndpoint: 'https://sync.example.invalid',
+      retainSyncConfig: true,
+      privacyMode: false,
+      diagnosticsExport: false,
+      deploymentEvidenceRecorded: true,
+      accessTokenConfigured: true,
+      deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
+    );
+    final readiness = managerSyncReadinessBridgeSnapshotFromJson(
+      _readyBridgeReadinessJson(),
+    );
+
+    final gate = deriveManagerSyncEntryGate(
+      draft: draft,
+      device: readyDevice,
+      readinessBridgeSnapshot: readiness,
+    );
+
+    expect(gate.entryState, SyncEntryState.blockedBeforeUserSync);
+    expect(gate.entryBlocker, 'user_sync_entry_closed_current_phase');
+    expect(gate.readinessBridgeSource, 'ffi_native_readiness');
+    expect(gate.readinessBlockedFlowSummary, 'none');
+    expect(gate.readinessIssueCodeSummary, 'none');
+    expect(
+      gate.readinessSourceTagSummary,
+      'bridge_recovery_setup_readiness, bridge_recovery_restore_readiness, bridge_device_join_readiness, bridge_device_revocation_readiness',
+    );
+    expect(gate.readinessUserSyncBlocked, isFalse);
+    expect(gate.userSyncEnabled, isFalse);
+    expect(gate.recovery.status, RecoveryEntryStatus.ready);
+    expect(gate.recovery.canGenerateCode, isFalse);
+    expect(
+      gate.deviceAuthorization.status,
+      DeviceAuthorizationEntryStatus.ready,
+    );
+    expect(gate.deviceAuthorization.canCreateJoinRequest, isFalse);
+    expect(
+      gate.productionBlockers,
+      contains('user_sync_entry_closed_current_phase'),
+    );
+    expect(
+      gate.productionBlockers,
+      isNot(contains('recovery_code_flow_closed')),
+    );
+  });
+
+  test('bridge readiness mapper sanitizes unknown and unsafe fields', () {
+    final readiness = managerSyncReadinessBridgeSnapshotFromJson({
+      'format': managerSyncReadinessBridgeSummaryFormat,
+      'redaction_policy': managerSyncReadinessBridgeRedactionPolicy,
+      'source': 'unexpected_native_source_detail',
+      'recovery_setup': {
+        'status': 'unexpected_native_status_detail',
+        'blocker': 'recovery_record_missing',
+        'required_prerequisites': [
+          'platform_private_key_backend_ready',
+          'unexpected_prerequisite_detail',
+        ],
+        'error_codes': ['recovery_record_missing', 'unexpected_error_detail'],
+      },
+      'device_join': {
+        'authorization_package_preconditions':
+            'active_existing_device_required, unexpected_join_detail',
+        'error_codes': ['network_unreachable', 'unexpected_error_detail'],
+      },
+    });
+
+    final gate = deriveManagerSyncEntryGate(
+      draft: const ManagerSettingsDraft(
+        serverEndpoint: 'https://sync.example.invalid',
+        retainSyncConfig: true,
+        privacyMode: false,
+        diagnosticsExport: false,
+        deploymentEvidenceRecorded: true,
+        accessTokenConfigured: true,
+        deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
+      ),
+      device: readyDevice,
+      readinessBridgeSnapshot: readiness,
+    );
+
+    expect(readiness.source, 'unknown_bridge_readiness_source');
+    expect(gate.recovery.setupReadiness.status, 'recovery_setup_flow_closed');
+    expect(gate.recovery.setupReadiness.blocker, 'recovery_record_missing');
+    expect(
+      gate.recovery.setupReadiness.prerequisiteSummary,
+      'platform_private_key_backend_ready, unexpected_bridge_required_evidence',
+    );
+    expect(
+      gate.readinessIssueCodeSummary,
+      contains('unexpected_bridge_error_code'),
+    );
+    expect(
+      gate.deviceAuthorization.joinReadiness.authorizationPackagePreconditions,
+      'active_existing_device_required, unexpected_bridge_required_evidence',
+    );
+    expect(
+      gate.readinessIssueCodeSummary,
+      isNot(contains('unexpected_native')),
+    );
+    expect(
+      gate.readinessIssueCodeSummary,
+      isNot(contains('unexpected_error_detail')),
+    );
+    expect(
+      gate.readinessNextRequiredEvidenceSummary,
+      isNot(contains('unexpected_prerequisite_detail')),
+    );
+    expect(
+      gate.deviceAuthorization.joinReadiness.errorCodeSummary,
+      isNot(contains('unexpected_error_detail')),
+    );
+
+    final invalid = managerSyncReadinessBridgeSnapshotFromJson({
+      'format': 'unsupported',
+      'redaction_policy': managerSyncReadinessBridgeRedactionPolicy,
+    });
+    expect(invalid.source, 'bridge_readiness_summary_invalid');
+    expect(
+      invalid.recoveryEntryGate.readinessBlockerSummary,
+      contains('recovery_code_generation_closed'),
+    );
+    expect(
+      invalid.recoveryEntryGate.setupReadiness.errorCodeSummary,
+      'bridge_readiness_summary_invalid',
+    );
+  });
+}
+
+Map<String, Object?> _readyBridgeReadinessJson() {
+  return {
+    'format': managerSyncReadinessBridgeSummaryFormat,
+    'redaction_policy': managerSyncReadinessBridgeRedactionPolicy,
+    'source': 'ffi_native_readiness',
+    'recovery_setup': {
+      'status': 'recovery_setup_ready',
+      'blocker': 'none',
+      'entry_action_status': 'available',
+      'generated_code_status': 'generated_once',
+      'save_confirmation_status': 'confirmed',
+      'recovery_record_status': 'recovery_record_active',
+      'first_upload_gate': 'ready_for_encrypted_p2_upload',
+      'required_prerequisites': <String>[],
+      'error_codes': <String>[],
+    },
+    'recovery_restore': {
+      'status': 'recovery_restore_ready',
+      'blocker': 'none',
+      'entry_action_status': 'available',
+      'code_input_status': 'validated',
+      'recovery_record_lookup_status': 'recovery_record_active',
+      'attempt_limit_status': 'available',
+      'device_registration_status': 'ready_after_recovery_success',
+      'error_codes': <String>[],
+    },
+    'device_join': {
+      'status': 'device_join_ready',
+      'blocker': 'none',
+      'entry_action_status': 'available',
+      'join_request_status': 'join_request_authorized',
+      'short_code_verification_status': 'verified',
+      'authorization_package_status': 'authorization_package_ready',
+      'authorization_package_preconditions': 'satisfied',
+      'error_codes': <String>[],
+    },
+    'device_revocation': {
+      'status': 'device_revocation_ready',
+      'blocker': 'none',
+      'entry_action_status': 'available',
+      'revoke_device_status': 'available',
+      'active_device_requirement': 'satisfied',
+      'lost_device_risk_notice': 'acknowledged',
+      'key_epoch_status': 'key_epoch_ready',
+      'error_codes': <String>[],
+    },
+  };
 }

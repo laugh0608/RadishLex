@@ -60,6 +60,10 @@ class SyncPreflightSection extends StatelessWidget {
             value: audit.entryGate.readinessSourceTagSummary,
           ),
           ManagerKeyValueRow(
+            label: 'readiness bridge source',
+            value: audit.entryGate.readinessBridgeSource,
+          ),
+          ManagerKeyValueRow(
             label: 'readiness user sync blocked',
             value: audit.entryGate.readinessUserSyncBlocked.toString(),
           ),

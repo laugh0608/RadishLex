@@ -29,7 +29,7 @@ void main() {
 
     expect(find.text('诊断摘要预览'), findsOneWidget);
     expect(find.text('分组 6'), findsOneWidget);
-    expect(find.text('字段 98'), findsOneWidget);
+    expect(find.text('字段 99'), findsOneWidget);
     expect(
       find.byKey(const Key('diagnostics-section-sync_gate')),
       findsOneWidget,
@@ -76,6 +76,12 @@ void main() {
     expect(
       find.textContaining(
         'sync.readiness_source_tags: recovery_setup_readiness, recovery_restore_readiness, device_join_readiness, device_revocation_readiness',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.readiness_bridge_source: manager_default_closed_readiness',
       ),
       findsOneWidget,
     );

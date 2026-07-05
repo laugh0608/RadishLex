@@ -414,6 +414,7 @@ class _SettingsSyncGatePreview extends StatelessWidget {
     final audit = managerSyncGateAuditForDraft(
       draft: draft,
       device: sync.device,
+      readinessBridgeSnapshot: sync.readinessBridgeSnapshot,
     );
     final connection = audit.entryGate.connectionHealth;
     final tone = audit.entryGate.userSyncEnabled
@@ -483,6 +484,10 @@ class _SettingsSyncGatePreview extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'readiness source tags',
             value: audit.entryGate.readinessSourceTagSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'readiness bridge source',
+            value: audit.entryGate.readinessBridgeSource,
           ),
           ManagerKeyValueRow(
             label: 'readiness user sync blocked',

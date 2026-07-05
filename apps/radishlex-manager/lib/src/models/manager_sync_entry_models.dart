@@ -198,6 +198,7 @@ class RecoverySetupReadiness {
     required this.firstUploadGate,
     required this.requiredPrerequisites,
     required this.errorCodes,
+    this.sourceTag = 'recovery_setup_readiness',
   });
 
   final String status;
@@ -209,6 +210,7 @@ class RecoverySetupReadiness {
   final String firstUploadGate;
   final List<String> requiredPrerequisites;
   final List<String> errorCodes;
+  final String sourceTag;
 
   String get prerequisiteSummary {
     return requiredPrerequisites.isEmpty
@@ -229,7 +231,7 @@ class RecoverySetupReadiness {
       requiredEvidenceCodes: requiredPrerequisites,
       errorCodes: errorCodes,
       blocksUserSync: blocker != 'none',
-      sourceTag: 'recovery_setup_readiness',
+      sourceTag: sourceTag,
     );
   }
 }
@@ -244,6 +246,7 @@ class RecoveryRestoreReadiness {
     required this.attemptLimitStatus,
     required this.deviceRegistrationStatus,
     required this.errorCodes,
+    this.sourceTag = 'recovery_restore_readiness',
   });
 
   final String status;
@@ -254,6 +257,7 @@ class RecoveryRestoreReadiness {
   final String attemptLimitStatus;
   final String deviceRegistrationStatus;
   final List<String> errorCodes;
+  final String sourceTag;
 
   String get errorCodeSummary {
     return errorCodes.isEmpty ? 'none' : errorCodes.join(', ');
@@ -272,7 +276,7 @@ class RecoveryRestoreReadiness {
       ],
       errorCodes: errorCodes,
       blocksUserSync: blocker != 'none',
-      sourceTag: 'recovery_restore_readiness',
+      sourceTag: sourceTag,
     );
   }
 }
@@ -341,6 +345,7 @@ class DeviceJoinReadiness {
     required this.authorizationPackageStatus,
     required this.authorizationPackagePreconditions,
     required this.errorCodes,
+    this.sourceTag = 'device_join_readiness',
   });
 
   final String status;
@@ -351,6 +356,7 @@ class DeviceJoinReadiness {
   final String authorizationPackageStatus;
   final String authorizationPackagePreconditions;
   final List<String> errorCodes;
+  final String sourceTag;
 
   String get errorCodeSummary {
     return errorCodes.isEmpty ? 'none' : errorCodes.join(', ');
@@ -369,7 +375,7 @@ class DeviceJoinReadiness {
       ],
       errorCodes: errorCodes,
       blocksUserSync: blocker != 'none',
-      sourceTag: 'device_join_readiness',
+      sourceTag: sourceTag,
     );
   }
 }
@@ -384,6 +390,7 @@ class DeviceRevocationReadiness {
     required this.lostDeviceRiskNotice,
     required this.keyEpochStatus,
     required this.errorCodes,
+    this.sourceTag = 'device_revocation_readiness',
   });
 
   final String status;
@@ -394,6 +401,7 @@ class DeviceRevocationReadiness {
   final String lostDeviceRiskNotice;
   final String keyEpochStatus;
   final List<String> errorCodes;
+  final String sourceTag;
 
   String get errorCodeSummary {
     return errorCodes.isEmpty ? 'none' : errorCodes.join(', ');
@@ -412,7 +420,7 @@ class DeviceRevocationReadiness {
       ],
       errorCodes: errorCodes,
       blocksUserSync: blocker != 'none',
-      sourceTag: 'device_revocation_readiness',
+      sourceTag: sourceTag,
     );
   }
 }
@@ -433,6 +441,186 @@ String managerSyncCodeSummary(Iterable<String> codes) {
     }
   }
   return uniqueCodes.isEmpty ? 'none' : uniqueCodes.join(', ');
+}
+
+RecoveryEntryGate managerRecoveryEntryGateFromReadiness({
+  required RecoverySetupReadiness setupReadiness,
+  required RecoveryRestoreReadiness restoreReadiness,
+}) {
+  final blocker = _firstSyncCode([
+    setupReadiness.blocker,
+    restoreReadiness.blocker,
+  ]);
+  return RecoveryEntryGate(
+    status: _recoveryEntryStatusFromReadiness(
+      setupReadiness: setupReadiness,
+      restoreReadiness: restoreReadiness,
+      blocker: blocker,
+    ),
+    blocker: blocker,
+    canGenerateCode: false,
+    canRestoreDevice: false,
+    requiresSaveConfirmation:
+        setupReadiness.saveConfirmationStatus == 'required_before_first_upload',
+    saveConfirmationRequirement: setupReadiness.saveConfirmationStatus,
+    recoveryRecordStatus: setupReadiness.recoveryRecordStatus,
+    recoveryRecordBlocker: _recoveryRecordBlocker(
+      setupReadiness.recoveryRecordStatus,
+    ),
+    firstUploadGate: setupReadiness.firstUploadGate,
+    readinessBlockers: _recoveryReadinessBlockers(
+      setupReadiness: setupReadiness,
+      restoreReadiness: restoreReadiness,
+    ),
+    setupReadiness: setupReadiness,
+    restoreReadiness: restoreReadiness,
+  );
+}
+
+DeviceAuthorizationEntryGate managerDeviceAuthorizationEntryGateFromReadiness({
+  required DeviceJoinReadiness joinReadiness,
+  required DeviceRevocationReadiness revocationReadiness,
+}) {
+  final blocker = _firstSyncCode([
+    joinReadiness.blocker,
+    revocationReadiness.blocker,
+  ]);
+  return DeviceAuthorizationEntryGate(
+    status: _deviceAuthorizationEntryStatusFromReadiness(
+      joinReadiness: joinReadiness,
+      revocationReadiness: revocationReadiness,
+      blocker: blocker,
+    ),
+    blocker: blocker,
+    joinRequestStatus: joinReadiness.joinRequestStatus,
+    canCreateJoinRequest: false,
+    canApproveJoinRequest: false,
+    canRevokeDevice: false,
+    authorizationPackageStatus: joinReadiness.authorizationPackageStatus,
+    authorizationPackageBlocker: _authorizationPackageBlocker(joinReadiness),
+    authorizationPackagePreconditions:
+        joinReadiness.authorizationPackagePreconditions,
+    lostDeviceRiskNotice: revocationReadiness.lostDeviceRiskNotice,
+    keyEpochStatus: revocationReadiness.keyEpochStatus,
+    readinessBlockers: _deviceAuthorizationReadinessBlockers(
+      joinReadiness: joinReadiness,
+      revocationReadiness: revocationReadiness,
+    ),
+    joinReadiness: joinReadiness,
+    revocationReadiness: revocationReadiness,
+  );
+}
+
+RecoveryEntryStatus _recoveryEntryStatusFromReadiness({
+  required RecoverySetupReadiness setupReadiness,
+  required RecoveryRestoreReadiness restoreReadiness,
+  required String blocker,
+}) {
+  if (blocker == 'none') {
+    return RecoveryEntryStatus.ready;
+  }
+  if (setupReadiness.status == 'recovery_setup_flow_closed' ||
+      restoreReadiness.status == 'recovery_restore_flow_closed') {
+    return RecoveryEntryStatus.flowClosed;
+  }
+  if (setupReadiness.saveConfirmationStatus != 'confirmed') {
+    return RecoveryEntryStatus.saveConfirmationRequired;
+  }
+  if (setupReadiness.errorCodes.contains('recovery_code_required') ||
+      restoreReadiness.errorCodes.contains('recovery_code_required')) {
+    return RecoveryEntryStatus.recoveryCodeRequired;
+  }
+  return RecoveryEntryStatus.flowClosed;
+}
+
+DeviceAuthorizationEntryStatus _deviceAuthorizationEntryStatusFromReadiness({
+  required DeviceJoinReadiness joinReadiness,
+  required DeviceRevocationReadiness revocationReadiness,
+  required String blocker,
+}) {
+  if (blocker == 'none') {
+    return DeviceAuthorizationEntryStatus.ready;
+  }
+  if (joinReadiness.status == 'device_join_flow_closed' ||
+      revocationReadiness.status == 'device_revocation_flow_closed') {
+    return DeviceAuthorizationEntryStatus.flowClosed;
+  }
+  if (joinReadiness.joinRequestStatus == JoinRequestStatus.unavailable) {
+    return DeviceAuthorizationEntryStatus.joinRequestUnavailable;
+  }
+  return DeviceAuthorizationEntryStatus.authorizationUnavailable;
+}
+
+String _firstSyncCode(Iterable<String> codes) {
+  for (final code in codes) {
+    final normalized = managerSyncCodeSummary([code]);
+    if (normalized != 'none') {
+      return normalized;
+    }
+  }
+  return 'none';
+}
+
+String _recoveryRecordBlocker(String recoveryRecordStatus) {
+  switch (recoveryRecordStatus) {
+    case 'recovery_record_active':
+      return 'none';
+    case 'recovery_record_missing':
+      return 'recovery_record_missing';
+    case 'recovery_record_revoked':
+      return 'recovery_record_revoked';
+    default:
+      return 'recovery_record_creation_closed';
+  }
+}
+
+String _authorizationPackageBlocker(DeviceJoinReadiness joinReadiness) {
+  if (joinReadiness.authorizationPackageStatus ==
+      'authorization_package_ready') {
+    return 'none';
+  }
+  if (joinReadiness.authorizationPackagePreconditions == 'satisfied') {
+    return joinReadiness.blocker == 'none' ? 'none' : joinReadiness.blocker;
+  }
+  return 'authorization_package_prerequisites_blocked';
+}
+
+List<String> _recoveryReadinessBlockers({
+  required RecoverySetupReadiness setupReadiness,
+  required RecoveryRestoreReadiness restoreReadiness,
+}) {
+  return _syncCodes([
+    setupReadiness.blocker,
+    restoreReadiness.blocker,
+    if (setupReadiness.recoveryRecordStatus != 'recovery_record_active')
+      setupReadiness.recoveryRecordStatus,
+    if (setupReadiness.saveConfirmationStatus == 'required_before_first_upload')
+      'recovery_code_save_confirmation_required',
+  ]);
+}
+
+List<String> _deviceAuthorizationReadinessBlockers({
+  required DeviceJoinReadiness joinReadiness,
+  required DeviceRevocationReadiness revocationReadiness,
+}) {
+  return _syncCodes([
+    joinReadiness.blocker,
+    if (joinReadiness.joinRequestStatus != JoinRequestStatus.authorized)
+      joinReadiness.joinRequestStatus.code,
+    _authorizationPackageBlocker(joinReadiness),
+    revocationReadiness.blocker,
+    if (revocationReadiness.lostDeviceRiskNotice != 'acknowledged')
+      'lost_device_risk_notice_required',
+    if (revocationReadiness.keyEpochStatus != 'key_epoch_ready')
+      revocationReadiness.keyEpochStatus,
+  ]);
+}
+
+List<String> _syncCodes(Iterable<String> codes) {
+  final summary = managerSyncCodeSummary(codes);
+  return summary == 'none'
+      ? const []
+      : summary.split(', ').toList(growable: false);
 }
 
 const managerClosedRecoverySetupReadiness = RecoverySetupReadiness(

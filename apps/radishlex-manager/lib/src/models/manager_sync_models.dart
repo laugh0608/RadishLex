@@ -306,6 +306,54 @@ const managerUnconfiguredSyncConnectionHealth = SyncConnectionHealth(
   lastRemoteErrorCode: 'none',
 );
 
+const managerSyncReadinessBridgeSourceDefault =
+    'manager_default_closed_readiness';
+
+class ManagerSyncReadinessBridgeSnapshot {
+  const ManagerSyncReadinessBridgeSnapshot({
+    required this.source,
+    required this.recoverySetupReadiness,
+    required this.recoveryRestoreReadiness,
+    required this.deviceJoinReadiness,
+    required this.deviceRevocationReadiness,
+  });
+
+  final String source;
+  final RecoverySetupReadiness recoverySetupReadiness;
+  final RecoveryRestoreReadiness recoveryRestoreReadiness;
+  final DeviceJoinReadiness deviceJoinReadiness;
+  final DeviceRevocationReadiness deviceRevocationReadiness;
+
+  RecoveryEntryGate get recoveryEntryGate {
+    if (source == managerSyncReadinessBridgeSourceDefault) {
+      return managerClosedRecoveryEntryGate;
+    }
+    return managerRecoveryEntryGateFromReadiness(
+      setupReadiness: recoverySetupReadiness,
+      restoreReadiness: recoveryRestoreReadiness,
+    );
+  }
+
+  DeviceAuthorizationEntryGate get deviceAuthorizationEntryGate {
+    if (source == managerSyncReadinessBridgeSourceDefault) {
+      return managerClosedDeviceAuthorizationEntryGate;
+    }
+    return managerDeviceAuthorizationEntryGateFromReadiness(
+      joinReadiness: deviceJoinReadiness,
+      revocationReadiness: deviceRevocationReadiness,
+    );
+  }
+}
+
+const managerDefaultSyncReadinessBridgeSnapshot =
+    ManagerSyncReadinessBridgeSnapshot(
+      source: managerSyncReadinessBridgeSourceDefault,
+      recoverySetupReadiness: managerClosedRecoverySetupReadiness,
+      recoveryRestoreReadiness: managerClosedRecoveryRestoreReadiness,
+      deviceJoinReadiness: managerClosedDeviceJoinReadiness,
+      deviceRevocationReadiness: managerClosedDeviceRevocationReadiness,
+    );
+
 class ManagerSyncEntryGate {
   const ManagerSyncEntryGate({
     required this.entryState,
@@ -313,6 +361,7 @@ class ManagerSyncEntryGate {
     required this.localEvidenceSource,
     required this.productionBlockers,
     this.connectionHealth = managerUnconfiguredSyncConnectionHealth,
+    this.readinessBridgeSource = managerSyncReadinessBridgeSourceDefault,
     required this.recovery,
     required this.deviceAuthorization,
     required this.userSyncEnabled,
@@ -323,6 +372,7 @@ class ManagerSyncEntryGate {
   final String localEvidenceSource;
   final List<String> productionBlockers;
   final SyncConnectionHealth connectionHealth;
+  final String readinessBridgeSource;
   final RecoveryEntryGate recovery;
   final DeviceAuthorizationEntryGate deviceAuthorization;
   final bool userSyncEnabled;
@@ -422,6 +472,7 @@ class SyncPreflightSummary {
     required this.lastDownload,
     required this.categories,
     required this.device,
+    this.readinessBridgeSnapshot = managerDefaultSyncReadinessBridgeSnapshot,
   });
 
   final SyncUiState state;
@@ -433,6 +484,7 @@ class SyncPreflightSummary {
   final String lastDownload;
   final List<SyncCategorySummary> categories;
   final DeviceSecuritySummary device;
+  final ManagerSyncReadinessBridgeSnapshot readinessBridgeSnapshot;
 
   SyncPreflightSummary copyWith({
     SyncUiState? state,
@@ -444,6 +496,7 @@ class SyncPreflightSummary {
     String? lastDownload,
     List<SyncCategorySummary>? categories,
     DeviceSecuritySummary? device,
+    ManagerSyncReadinessBridgeSnapshot? readinessBridgeSnapshot,
   }) {
     return SyncPreflightSummary(
       state: state ?? this.state,
@@ -455,6 +508,8 @@ class SyncPreflightSummary {
       lastDownload: lastDownload ?? this.lastDownload,
       categories: categories ?? this.categories,
       device: device ?? this.device,
+      readinessBridgeSnapshot:
+          readinessBridgeSnapshot ?? this.readinessBridgeSnapshot,
     );
   }
 }
@@ -483,8 +538,14 @@ class DeviceSecuritySummary {
 SyncUiState deriveManagerSyncUiState({
   required ManagerSettingsDraft draft,
   required DeviceSecuritySummary device,
+  ManagerSyncReadinessBridgeSnapshot readinessBridgeSnapshot =
+      managerDefaultSyncReadinessBridgeSnapshot,
 }) {
-  return deriveManagerSyncEntryGate(draft: draft, device: device).uiState;
+  return deriveManagerSyncEntryGate(
+    draft: draft,
+    device: device,
+    readinessBridgeSnapshot: readinessBridgeSnapshot,
+  ).uiState;
 }
 
 SyncConnectionHealth deriveManagerSyncConnectionHealth(
@@ -690,13 +751,20 @@ String managerSyncConnectionProbeSourceForSummary(
 ManagerSyncEntryGate deriveManagerSyncEntryGate({
   required ManagerSettingsDraft draft,
   required DeviceSecuritySummary device,
+  ManagerSyncReadinessBridgeSnapshot readinessBridgeSnapshot =
+      managerDefaultSyncReadinessBridgeSnapshot,
 }) {
   final normalized = draft.normalized();
   final localEvidenceSource = managerSyncLocalEvidenceSource(normalized);
   final connectionHealth = deriveManagerSyncConnectionHealth(normalized);
+  final recovery = readinessBridgeSnapshot.recoveryEntryGate;
+  final deviceAuthorization =
+      readinessBridgeSnapshot.deviceAuthorizationEntryGate;
   final productionBlockers = managerSyncProductionBlockers(
     draft: normalized,
     device: device,
+    recovery: recovery,
+    deviceAuthorization: deviceAuthorization,
   );
 
   if (normalized.privacyMode) {
@@ -706,8 +774,9 @@ ManagerSyncEntryGate deriveManagerSyncEntryGate({
       localEvidenceSource: localEvidenceSource,
       productionBlockers: productionBlockers,
       connectionHealth: connectionHealth,
-      recovery: managerClosedRecoveryEntryGate,
-      deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
+      readinessBridgeSource: readinessBridgeSnapshot.source,
+      recovery: recovery,
+      deviceAuthorization: deviceAuthorization,
       userSyncEnabled: false,
     );
   }
@@ -718,8 +787,9 @@ ManagerSyncEntryGate deriveManagerSyncEntryGate({
       localEvidenceSource: localEvidenceSource,
       productionBlockers: productionBlockers,
       connectionHealth: connectionHealth,
-      recovery: managerClosedRecoveryEntryGate,
-      deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
+      readinessBridgeSource: readinessBridgeSnapshot.source,
+      recovery: recovery,
+      deviceAuthorization: deviceAuthorization,
       userSyncEnabled: false,
     );
   }
@@ -730,8 +800,9 @@ ManagerSyncEntryGate deriveManagerSyncEntryGate({
       localEvidenceSource: localEvidenceSource,
       productionBlockers: productionBlockers,
       connectionHealth: connectionHealth,
-      recovery: managerClosedRecoveryEntryGate,
-      deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
+      readinessBridgeSource: readinessBridgeSnapshot.source,
+      recovery: recovery,
+      deviceAuthorization: deviceAuthorization,
       userSyncEnabled: false,
     );
   }
@@ -742,8 +813,9 @@ ManagerSyncEntryGate deriveManagerSyncEntryGate({
       localEvidenceSource: localEvidenceSource,
       productionBlockers: productionBlockers,
       connectionHealth: connectionHealth,
-      recovery: managerClosedRecoveryEntryGate,
-      deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
+      readinessBridgeSource: readinessBridgeSnapshot.source,
+      recovery: recovery,
+      deviceAuthorization: deviceAuthorization,
       userSyncEnabled: false,
     );
   }
@@ -755,20 +827,25 @@ ManagerSyncEntryGate deriveManagerSyncEntryGate({
       localEvidenceSource: localEvidenceSource,
       productionBlockers: productionBlockers,
       connectionHealth: connectionHealth,
-      recovery: managerClosedRecoveryEntryGate,
-      deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
+      readinessBridgeSource: readinessBridgeSnapshot.source,
+      recovery: recovery,
+      deviceAuthorization: deviceAuthorization,
       userSyncEnabled: false,
     );
   }
 
   return ManagerSyncEntryGate(
     entryState: SyncEntryState.blockedBeforeUserSync,
-    entryBlocker: managerClosedRecoveryEntryGate.blocker,
+    entryBlocker: _syncEntryBlockerBeforeUserSync(
+      recovery: recovery,
+      deviceAuthorization: deviceAuthorization,
+    ),
     localEvidenceSource: localEvidenceSource,
     productionBlockers: productionBlockers,
     connectionHealth: connectionHealth,
-    recovery: managerClosedRecoveryEntryGate,
-    deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
+    readinessBridgeSource: readinessBridgeSnapshot.source,
+    recovery: recovery,
+    deviceAuthorization: deviceAuthorization,
     userSyncEnabled: false,
   );
 }
@@ -777,10 +854,20 @@ ManagerSyncGateAudit managerSyncGateAudit({
   required SyncUiState state,
   required DeviceSecuritySummary device,
   ManagerSettingsDraft? draft,
+  ManagerSyncReadinessBridgeSnapshot readinessBridgeSnapshot =
+      managerDefaultSyncReadinessBridgeSnapshot,
 }) {
   final entryGate = draft == null
-      ? _managerSyncEntryGateFromState(state: state, device: device)
-      : deriveManagerSyncEntryGate(draft: draft, device: device);
+      ? _managerSyncEntryGateFromState(
+          state: state,
+          device: device,
+          readinessBridgeSnapshot: readinessBridgeSnapshot,
+        )
+      : deriveManagerSyncEntryGate(
+          draft: draft,
+          device: device,
+          readinessBridgeSnapshot: readinessBridgeSnapshot,
+        );
   return ManagerSyncGateAudit(
     state: state,
     entryGate: entryGate,
@@ -790,6 +877,7 @@ ManagerSyncGateAudit managerSyncGateAudit({
         : managerSyncStateSourceDescriptionForDraft(
             draft: draft,
             device: device,
+            readinessBridgeSnapshot: readinessBridgeSnapshot,
           ),
     actionStopLine: managerSyncActionStopLine(state, entryGate: entryGate),
     deviceGateLabel: managerDeviceGateLabel(device),
@@ -800,12 +888,19 @@ ManagerSyncGateAudit managerSyncGateAudit({
 ManagerSyncGateAudit managerSyncGateAuditForDraft({
   required ManagerSettingsDraft draft,
   required DeviceSecuritySummary device,
+  ManagerSyncReadinessBridgeSnapshot readinessBridgeSnapshot =
+      managerDefaultSyncReadinessBridgeSnapshot,
 }) {
-  final entryGate = deriveManagerSyncEntryGate(draft: draft, device: device);
+  final entryGate = deriveManagerSyncEntryGate(
+    draft: draft,
+    device: device,
+    readinessBridgeSnapshot: readinessBridgeSnapshot,
+  );
   return managerSyncGateAudit(
     state: entryGate.uiState,
     device: device,
     draft: draft,
+    readinessBridgeSnapshot: readinessBridgeSnapshot,
   );
 }
 
@@ -853,8 +948,14 @@ String managerSyncStateSourceDescription({
 String managerSyncStateSourceDescriptionForDraft({
   required ManagerSettingsDraft draft,
   required DeviceSecuritySummary device,
+  ManagerSyncReadinessBridgeSnapshot readinessBridgeSnapshot =
+      managerDefaultSyncReadinessBridgeSnapshot,
 }) {
-  final entryGate = deriveManagerSyncEntryGate(draft: draft, device: device);
+  final entryGate = deriveManagerSyncEntryGate(
+    draft: draft,
+    device: device,
+    readinessBridgeSnapshot: readinessBridgeSnapshot,
+  );
   switch (entryGate.entryState) {
     case SyncEntryState.localOnly:
       return '未保留自部署服务端草案';
@@ -869,6 +970,9 @@ String managerSyncStateSourceDescriptionForDraft({
     case SyncEntryState.preflightReady:
       return '本地对象、设置草案和部署来源预检通过';
     case SyncEntryState.blockedBeforeUserSync:
+      if (entryGate.readinessBlockedFlowSummary == 'none') {
+        return '本地预检通过，真实同步入口仍按当前阶段关闭';
+      }
       return '本地预检通过，真实同步入口仍等待恢复码和设备授权';
     case SyncEntryState.readyForUserSync:
       return '用户可用同步入口已满足前置门禁';
@@ -916,10 +1020,11 @@ String managerSyncLocalEvidenceSource(ManagerSettingsDraft draft) {
 List<String> managerSyncProductionBlockers({
   required ManagerSettingsDraft draft,
   required DeviceSecuritySummary device,
+  RecoveryEntryGate recovery = managerClosedRecoveryEntryGate,
+  DeviceAuthorizationEntryGate deviceAuthorization =
+      managerClosedDeviceAuthorizationEntryGate,
 }) {
   final normalized = draft.normalized();
-  const recovery = managerClosedRecoveryEntryGate;
-  const deviceAuthorization = managerClosedDeviceAuthorizationEntryGate;
   final blockers = <String>[];
   if (normalized.privacyMode) {
     blockers.add('sync_disabled_by_policy');
@@ -952,8 +1057,14 @@ String managerSyncGateReason({
   required SyncUiState state,
   required ManagerSettingsDraft draft,
   required DeviceSecuritySummary device,
+  ManagerSyncReadinessBridgeSnapshot readinessBridgeSnapshot =
+      managerDefaultSyncReadinessBridgeSnapshot,
 }) {
-  final entryGate = deriveManagerSyncEntryGate(draft: draft, device: device);
+  final entryGate = deriveManagerSyncEntryGate(
+    draft: draft,
+    device: device,
+    readinessBridgeSnapshot: readinessBridgeSnapshot,
+  );
   switch (entryGate.entryState) {
     case SyncEntryState.localOnly:
       return '未保留自部署服务端草案；真实远端同步保持关闭';
@@ -968,6 +1079,9 @@ String managerSyncGateReason({
     case SyncEntryState.preflightReady:
       return '本地预检通过；用户可用同步入口仍等待后续阶段开放';
     case SyncEntryState.blockedBeforeUserSync:
+      if (entryGate.readinessBlockedFlowSummary == 'none') {
+        return '本地预检通过；用户可用同步入口仍按当前阶段关闭';
+      }
       return '本地预检通过；真实同步入口仍等待恢复码和设备授权';
     case SyncEntryState.readyForUserSync:
       return '用户可用同步入口尚未在当前阶段开放';
@@ -1241,6 +1355,19 @@ bool _isLocalSyncHost(String host) {
       host == '[::1]';
 }
 
+String _syncEntryBlockerBeforeUserSync({
+  required RecoveryEntryGate recovery,
+  required DeviceAuthorizationEntryGate deviceAuthorization,
+}) {
+  if (recovery.blocker != 'none') {
+    return recovery.blocker;
+  }
+  if (deviceAuthorization.blocker != 'none') {
+    return deviceAuthorization.blocker;
+  }
+  return 'user_sync_entry_closed_current_phase';
+}
+
 class _SyncEndpointClassification {
   const _SyncEndpointClassification({
     required this.status,
@@ -1256,12 +1383,17 @@ class _SyncEndpointClassification {
 ManagerSyncEntryGate _managerSyncEntryGateFromState({
   required SyncUiState state,
   required DeviceSecuritySummary device,
+  ManagerSyncReadinessBridgeSnapshot readinessBridgeSnapshot =
+      managerDefaultSyncReadinessBridgeSnapshot,
 }) {
+  final recovery = readinessBridgeSnapshot.recoveryEntryGate;
+  final deviceAuthorization =
+      readinessBridgeSnapshot.deviceAuthorizationEntryGate;
   final productionBlockers = <String>[
     if (!managerDeviceGateReady(device))
       'platform_private_key_backend_${device.productionGate}',
-    managerClosedRecoveryEntryGate.blocker,
-    managerClosedDeviceAuthorizationEntryGate.blocker,
+    ...recovery.readinessBlockers,
+    ...deviceAuthorization.readinessBlockers,
     'user_sync_entry_closed_current_phase',
   ];
 
@@ -1272,8 +1404,9 @@ ManagerSyncEntryGate _managerSyncEntryGateFromState({
         entryBlocker: 'server_endpoint_missing',
         localEvidenceSource: 'unknown',
         productionBlockers: productionBlockers,
-        recovery: managerClosedRecoveryEntryGate,
-        deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
+        readinessBridgeSource: readinessBridgeSnapshot.source,
+        recovery: recovery,
+        deviceAuthorization: deviceAuthorization,
         userSyncEnabled: false,
       );
     case SyncUiState.syncDisabledByPolicy:
@@ -1282,8 +1415,9 @@ ManagerSyncEntryGate _managerSyncEntryGateFromState({
         entryBlocker: 'sync_disabled_by_policy',
         localEvidenceSource: 'unknown',
         productionBlockers: productionBlockers,
-        recovery: managerClosedRecoveryEntryGate,
-        deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
+        readinessBridgeSource: readinessBridgeSnapshot.source,
+        recovery: recovery,
+        deviceAuthorization: deviceAuthorization,
         userSyncEnabled: false,
       );
     case SyncUiState.backendUnavailable:
@@ -1292,8 +1426,9 @@ ManagerSyncEntryGate _managerSyncEntryGateFromState({
         entryBlocker: 'backend_unavailable',
         localEvidenceSource: 'unknown',
         productionBlockers: productionBlockers,
-        recovery: managerClosedRecoveryEntryGate,
-        deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
+        readinessBridgeSource: readinessBridgeSnapshot.source,
+        recovery: recovery,
+        deviceAuthorization: deviceAuthorization,
         userSyncEnabled: false,
       );
     case SyncUiState.deploymentUnverified:
@@ -1302,19 +1437,24 @@ ManagerSyncEntryGate _managerSyncEntryGateFromState({
         entryBlocker: 'deployment_unverified',
         localEvidenceSource: 'unknown',
         productionBlockers: productionBlockers,
-        recovery: managerClosedRecoveryEntryGate,
-        deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
+        readinessBridgeSource: readinessBridgeSnapshot.source,
+        recovery: recovery,
+        deviceAuthorization: deviceAuthorization,
         userSyncEnabled: false,
       );
     case SyncUiState.preflightReady:
     case SyncUiState.serverConfigured:
       return ManagerSyncEntryGate(
         entryState: SyncEntryState.preflightReady,
-        entryBlocker: managerClosedRecoveryEntryGate.blocker,
+        entryBlocker: _syncEntryBlockerBeforeUserSync(
+          recovery: recovery,
+          deviceAuthorization: deviceAuthorization,
+        ),
         localEvidenceSource: 'unknown',
         productionBlockers: productionBlockers,
-        recovery: managerClosedRecoveryEntryGate,
-        deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
+        readinessBridgeSource: readinessBridgeSnapshot.source,
+        recovery: recovery,
+        deviceAuthorization: deviceAuthorization,
         userSyncEnabled: false,
       );
     case SyncUiState.readyForUserSync:

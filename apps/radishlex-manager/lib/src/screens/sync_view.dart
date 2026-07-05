@@ -18,6 +18,7 @@ class SyncView extends StatelessWidget {
     final audit = managerSyncGateAuditForDraft(
       draft: settingsDraft,
       device: sync.device,
+      readinessBridgeSnapshot: sync.readinessBridgeSnapshot,
     );
 
     return Column(

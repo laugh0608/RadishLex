@@ -82,6 +82,7 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
   final syncGateAudit = managerSyncGateAuditForDraft(
     draft: snapshot.settings.draft,
     device: snapshot.sync.device,
+    readinessBridgeSnapshot: snapshot.sync.readinessBridgeSnapshot,
   );
 
   return ManagerDiagnosticsReport(
@@ -290,6 +291,11 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
           _diagnosticsItem(
             'sync.readiness_source_tags',
             syncGateAudit.entryGate.readinessSourceTagSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.readiness_bridge_source',
+            syncGateAudit.entryGate.readinessBridgeSource,
             'gate',
           ),
           _diagnosticsItem(

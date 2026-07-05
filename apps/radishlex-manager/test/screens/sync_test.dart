@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:radishlex_manager/src/app.dart';
+import 'package:radishlex_manager/src/bridge/ffi_manager_sync_readiness_mapper.dart';
 import 'package:radishlex_manager/src/bridge/fixture_manager_bridge.dart';
 import 'package:radishlex_manager/src/data/manager_fixture.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
@@ -39,6 +40,7 @@ void main() {
     );
     expect(find.textContaining('join_request_creation_closed'), findsWidgets);
     expect(find.textContaining('recovery_setup_readiness'), findsOneWidget);
+    expect(find.text('manager_default_closed_readiness'), findsOneWidget);
     expect(find.text('true'), findsOneWidget);
     expect(find.text('false'), findsOneWidget);
     expect(find.text('syncable 3'), findsOneWidget);
@@ -144,6 +146,84 @@ void main() {
     expect(enableButton.onPressed, isNull);
   });
 
+  testWidgets('sync view uses bridge readiness as read-only source', (
+    WidgetTester tester,
+  ) async {
+    final fixture = createManagerFixture();
+    const readyDevice = DeviceSecuritySummary(
+      deviceId: 'device-ready-01',
+      backendId: 'test-production-ready',
+      capabilityStatus: 'ready_for_test',
+      productionGate: 'ready',
+    );
+    const draft = ManagerSettingsDraft(
+      serverEndpoint: 'https://sync.example.invalid',
+      retainSyncConfig: true,
+      privacyMode: false,
+      diagnosticsExport: false,
+      deploymentEvidenceRecorded: true,
+      accessTokenConfigured: true,
+      deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
+    );
+    final readiness = managerSyncReadinessBridgeSnapshotFromJson(
+      _readyBridgeReadinessJson(),
+    );
+    final state = deriveManagerSyncUiState(
+      draft: draft,
+      device: readyDevice,
+      readinessBridgeSnapshot: readiness,
+    );
+    final snapshot = fixture.copyWith(
+      sync: fixture.sync.copyWith(
+        state: state,
+        device: readyDevice,
+        serverEndpoint: managerSyncEndpointLabel(draft),
+        reason: managerSyncGateReason(
+          state: state,
+          draft: draft,
+          device: readyDevice,
+          readinessBridgeSnapshot: readiness,
+        ),
+        readinessBridgeSnapshot: readiness,
+      ),
+      settings: fixture.settings.copyWith(draft: draft, syncConfigured: true),
+    );
+
+    await tester.pumpWidget(
+      RadishLexManagerApp(
+        bridge: FixtureManagerBridge(initialSnapshot: snapshot),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.sync_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('blocked_before_user_sync'), findsWidgets);
+    expect(find.text('user_sync_entry_closed_current_phase'), findsWidgets);
+    expect(find.text('ffi_native_readiness'), findsOneWidget);
+    expect(
+      find.text(
+        'bridge_recovery_setup_readiness, bridge_recovery_restore_readiness, bridge_device_join_readiness, bridge_device_revocation_readiness',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('recovery_ready'), findsOneWidget);
+    expect(find.text('device_authorization_ready'), findsOneWidget);
+    expect(find.text('none'), findsWidgets);
+    expect(
+      find.textContaining('recovery_code_generation_closed'),
+      findsNothing,
+    );
+    expect(find.text('本地预检通过，真实同步入口仍按当前阶段关闭'), findsOneWidget);
+    expect(find.text('本地预检通过；用户可用同步入口仍按当前阶段关闭'), findsOneWidget);
+
+    final enableButton = tester.widget<FilledButton>(
+      find.byKey(const Key('sync-enable-button')),
+    );
+    expect(enableButton.onPressed, isNull);
+  });
+
   testWidgets('sync view exposes local-only empty category state', (
     WidgetTester tester,
   ) async {
@@ -190,4 +270,53 @@ void main() {
     );
     expect(enableButton.onPressed, isNull);
   });
+}
+
+Map<String, Object?> _readyBridgeReadinessJson() {
+  return {
+    'format': managerSyncReadinessBridgeSummaryFormat,
+    'redaction_policy': managerSyncReadinessBridgeRedactionPolicy,
+    'source': 'ffi_native_readiness',
+    'recovery_setup': {
+      'status': 'recovery_setup_ready',
+      'blocker': 'none',
+      'entry_action_status': 'available',
+      'generated_code_status': 'generated_once',
+      'save_confirmation_status': 'confirmed',
+      'recovery_record_status': 'recovery_record_active',
+      'first_upload_gate': 'ready_for_encrypted_p2_upload',
+      'required_prerequisites': <String>[],
+      'error_codes': <String>[],
+    },
+    'recovery_restore': {
+      'status': 'recovery_restore_ready',
+      'blocker': 'none',
+      'entry_action_status': 'available',
+      'code_input_status': 'validated',
+      'recovery_record_lookup_status': 'recovery_record_active',
+      'attempt_limit_status': 'available',
+      'device_registration_status': 'ready_after_recovery_success',
+      'error_codes': <String>[],
+    },
+    'device_join': {
+      'status': 'device_join_ready',
+      'blocker': 'none',
+      'entry_action_status': 'available',
+      'join_request_status': 'join_request_authorized',
+      'short_code_verification_status': 'verified',
+      'authorization_package_status': 'authorization_package_ready',
+      'authorization_package_preconditions': 'satisfied',
+      'error_codes': <String>[],
+    },
+    'device_revocation': {
+      'status': 'device_revocation_ready',
+      'blocker': 'none',
+      'entry_action_status': 'available',
+      'revoke_device_status': 'available',
+      'active_device_requirement': 'satisfied',
+      'lost_device_risk_notice': 'acknowledged',
+      'key_epoch_status': 'key_epoch_ready',
+      'error_codes': <String>[],
+    },
+  };
 }
