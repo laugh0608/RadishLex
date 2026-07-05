@@ -2,6 +2,8 @@
 
 本文档定义 Phase 4 Flutter manager 实现和后续演进必须稳定的职责边界、数据可见性、同步 UI 停止线和第一批功能顺序。读者是后续实现 `apps/radishlex-manager`、`ime-ffi` 管理接口、同步设置页面和审阅隐私边界的开发者。本文不包含 Flutter 页面视觉稿、widget 目录结构、平台输入法壳接入、完整账号系统、OIDC 实现或真实平台私钥 backend 实现。
 
+Phase 4 本地能力是否满足当前退出标准，由 `docs/manager-local-acceptance.md` 记录验收范围、证据入口和停止线；本文只定义长期职责边界。
+
 ## 当前定位
 
 Flutter manager 是 RadishLex 的管理界面，不进入输入热路径，不承担候选生成、候选排序、用户词库真相源、同步合并真相源或隐私策略真相源。

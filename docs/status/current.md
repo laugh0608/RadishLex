@@ -6,17 +6,18 @@
 
 - 日期：2026-07-05
 - 常态分支：`dev`
-- 当前主题：Phase 3 自部署同步出口治理已形成证据链，Phase 4 Flutter manager 本地管理能力正在质量治理。
+- 当前主题：Phase 3 自部署同步出口治理已形成证据链，Phase 4 Flutter manager 本地管理能力进入验收收口。
 
 ## 当前阶段
 
-RadishLex 已完成 Rust core、Rime adapter、userdb、ranker、crypto、sync client 边界、Go sync server 和第一批 Flutter manager 本地 FFI bridge 的起步证据。当前推进重点不是打开真实远端同步，而是让管理端本地能力、诊断、settings draft、测试结构和文档入口保持可审计、可复验、低阅读成本。
+RadishLex 已完成 Rust core、Rime adapter、userdb、ranker、crypto、sync client 边界、Go sync server 和第一批 Flutter manager 本地 FFI bridge 的起步证据。当前推进重点不是打开真实远端同步，而是按 Phase 4 退出标准验收管理端本地能力、诊断、settings draft、测试结构和文档入口。
 
 近期默认先读本文，再按任务选读：
 
 - 总体架构和阶段边界：`docs/technical-plan.md`
 - 阶段顺序和退出标准：`docs/roadmap.md`
 - 管理端职责和停止线：`docs/manager-ui-boundary.md`
+- 管理端本地验收口径：`docs/manager-local-acceptance.md`
 - settings draft 与诊断字段：`docs/manager-settings-diagnostics.md`
 - 同步服务端 API / 存储：`docs/sync-server-api-storage.md`
 - 平台私钥 backend 停止线：`docs/platform-private-key-backend-strategy.md`
@@ -42,6 +43,7 @@ Flutter manager：
 - `apps/radishlex-manager` 已提供 macOS Flutter 起步工程，默认使用合成 fixture。
 - 显式配置本地 SQLite userdb 与 `ime-ffi` 动态库后，可通过真实 Dart FFI bridge 管理本地词库、导入导出、import batches、learning status、rank explain、sync preflight、settings draft 和脱敏诊断报告。
 - UI 已拆分 manager shell、跨页 action 编排、词库子组件、学习子组件、同步子组件、设置诊断子组件、页面级 widget tests、action helper 回归测试、Dart model 分组和动态 FFI bridge 分层。
+- `docs/manager-local-acceptance.md` 已将 Phase 4 本地验收范围、退出标准映射、验证命令、隐私检查和真实同步停止线整理为可复验入口。
 - 同步页当前只展示 gate 状态、本地 P2 对象分类、设备 backend 状态和生产不可用原因，真实同步按钮保持关闭。
 
 平台私钥 backend：
@@ -83,6 +85,6 @@ Sync server 部署预演：
 ## 近期推进顺位
 
 1. 维护本文短入口，避免新会话默认阅读长周志。
-2. 继续 Phase 4 manager 本地质量治理；学习页、同步页子组件和 `manager_home_actions.dart` helper 级回归测试已补齐，后续只有 action 编排继续增长时再按职责拆分。
-3. 保持 `ManagerBridge` contract、C ABI、settings draft 和诊断字段稳定；只有真实需求要求新增能力时，先补边界文档和测试。
+2. 按 `docs/manager-local-acceptance.md` 复查 Phase 4 manager 本地验收证据；若缺口影响退出标准，再补精准 widget / helper / smoke 覆盖。
+3. 保持 `ManagerBridge` contract、C ABI、settings draft 和诊断字段稳定；只有真实需求要求新增能力时，先补边界文档、验收口径和测试。
 4. 平台私钥 backend 没有新增可用证据前，不把真实同步、恢复码和设备授权 UI 放入主线。

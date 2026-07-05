@@ -110,7 +110,7 @@
 - 本地学习状态、import batches、rank explain 摘要和 sync preflight 摘要。
 - 同步 UI 按 `docs/manager-ui-boundary.md` 显示不可用原因，不绕过平台私钥 backend 和目标部署停止线。
 - 当前 `apps/radishlex-manager` 已起步 macOS Flutter 工程，默认用合成 fixture 验证本地管理台结构；显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时，可通过真实 Dart FFI bridge 读取 / 删除 / 导入 / 导出本地 userdb，并展示 import batches、learning status、rank explain、sync preflight 摘要、配置来源诊断、非 secret settings JSON 草案持久化、sync gate 状态来源、设置页 gate 草案预览、部署证据来源标签、settings draft 格式演进测试、settings / diagnostics 字段参考、脱敏诊断报告和结构化错误分类。诊断报告预览已支持字段分组、筛选和复制与导出一致的脱敏文本，UI 与 widget tests 已按 manager action 编排、词库子组件、学习子组件、同步子组件、设置诊断子组件和页面级测试拆分，并补充 action helper 级结果文案和 failure 分类回归测试。
-- Phase 4 当前已补 `docs/status/current.md` 作为短入口，记录 manager 本地能力、验证基线和停止线；学习页、同步页子组件和 action helper 级回归测试已补齐，后续只有 action 编排继续增长时再按职责拆分，不在可用平台私钥 backend 与目标部署运行证据齐备前打开真实远端同步、恢复码或设备授权 UI。
+- Phase 4 当前已补 `docs/status/current.md` 作为短入口，并新增 `docs/manager-local-acceptance.md` 映射本地验收范围、退出标准、验证入口、隐私检查和停止线；后续按该验收口径复查证据缺口，不在可用平台私钥 backend 与目标部署运行证据齐备前打开真实远端同步、恢复码或设备授权 UI。
 
 交付：
 
@@ -118,6 +118,7 @@
 - Flutter desktop/mobile 基础页面
 - Rust core bridge
 - 管理端边界文档
+- 管理端本地验收口径
 
 退出标准：
 

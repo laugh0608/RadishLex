@@ -11,7 +11,7 @@ RadishLex Manager 是萝卜词核的 Flutter 管理端起步工程。
 - 脱敏诊断摘要预览 / 导出，预览支持字段分组、筛选和复制脱敏文本。
 - 自部署服务端配置草案、sync gate 草案预览和状态来源。
 
-真实远端同步、恢复码、设备授权和平台私钥 backend 成功路径尚未开放。相关停止线见仓库根 `docs/manager-ui-boundary.md`；settings JSON 与诊断报告字段见 `docs/manager-settings-diagnostics.md`。
+真实远端同步、恢复码、设备授权和平台私钥 backend 成功路径尚未开放。相关停止线见仓库根 `docs/manager-ui-boundary.md`；本地验收口径见 `docs/manager-local-acceptance.md`；settings JSON 与诊断报告字段见 `docs/manager-settings-diagnostics.md`。
 当前 FFI bridge 覆盖本地 userdb 词条 list / delete、用户词库 inspect / import / export、import batches、learning status 摘要、rank explain 摘要、sync preflight 摘要、设置草案持久化和脱敏诊断报告导出。`rank explain` 区域通过专用 `ime-ffi` ABI 读取单候选贡献项，Flutter 只展示复制后的非敏感摘要，并支持筛选和候选详情；学习页只展示聚合计数和贡献信号，不展示 P1 原始选择事件、原始输入历史或应用窗口信息。词库页会显示导入检查、词条 key / source / import batch / tombstone / sync 分类审计详情、导入历史筛选 / 排序 / 批次联动审计、本地 sync preflight 影响摘要、导入 / 导出结果摘要、删除确认和操作失败分类提示；同步页会显示 sync gate 状态来源、本地 P2 对象分类、local-only 事件计数、设备 backend capability 和 production gate 阻断原因，真实同步按钮继续禁用；设置页会显示配置来源诊断和同步门禁草案预览，可记录 allowlist 形式的部署证据来源标签，并可按诊断字段索引分组预览、筛选、复制和导出包含 gate source / stop line 但不含用户词、文件路径、token 或 payload bytes 的诊断摘要。bridge 失败按操作和分类展示结构化错误码，不把 native 错误明细透传给 widget 层。sync gate 状态由设置草案、隐私模式、平台私钥 backend gate 和部署证据来源草案共同派生；真实远端同步、恢复码和设备授权 UI 继续关闭。
 
 ## 页面与操作说明
@@ -65,6 +65,8 @@ flutter run -d macos
 ../../scripts/check-manager.sh
 ../../scripts/check-manager-ffi-smoke.sh
 ```
+
+Phase 4 本地能力验收范围、退出标准映射和隐私检查见仓库根 `docs/manager-local-acceptance.md`。
 
 `check-manager-ffi-smoke.sh` 会构建 `radishlex-ime-ffi` 动态库，在仓库外临时目录创建 SQLite userdb、settings JSON、导入 TSV、读取 import batches 与 rank explain、保存包含部署证据来源标签的设置草案、删除词条、导出词库并导出脱敏诊断报告，用真实 Dart FFI bridge 复验本地管理链路。该 smoke 只使用合成词条，不连接真实同步后端，也不读取真实输入法目录。
 
