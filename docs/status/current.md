@@ -104,5 +104,5 @@ Sync server 本地部署 / 联调：
 
 1. 维护本文短入口，避免新会话默认阅读长周志。
 2. 保持 Phase 4 manager 本地验收证据稳定；若后续改动触及验收范围，再按 `docs/manager-local-acceptance.md` 补精准 widget / helper / smoke 覆盖。
-3. 下一批产品开发继续围绕本地 Docker / 本地 HTTPS 联调，维护恢复码 setup / restore、设备 join / revocation 的只读状态机、readiness 聚合摘要、bridge readiness mapper、只读 action intent 进入计划、诊断脱敏和错误分类测试；真实同步、恢复码生成 / 输入、join request 创建、授权成功和设备撤销路径继续关闭。
+3. 下一批产品开发继续围绕本地 Docker / 本地 HTTPS 联调，维护恢复码 setup / restore、设备 join / revocation 的只读状态机、readiness 聚合摘要、bridge readiness mapper、只读 action intent 进入计划、诊断脱敏和错误分类测试；优先准备真实恢复 / 授权交互实现前的非敏感协议、错误语义和 fixture 输入，不改变 `ManagerBridge` contract、不新增 C ABI、不打开真实同步、恢复码生成 / 输入、join request 创建、授权成功或设备撤销路径。
 4. 同步联调用本地 Docker / 本地 HTTPS 和短生命周期数据目录；正式发布或真实用户开放前，再补真实目标环境的非敏感 `deployment_evidence.v1` 并导出 `deployment_evidence_summary.v1`。
