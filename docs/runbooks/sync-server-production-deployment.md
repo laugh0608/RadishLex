@@ -10,6 +10,50 @@
 - Go server 已验证密文对象上传下载、设备授权、版本冲突、日志脱敏、Docker Compose 本地 / 部署态启动 smoke、Rust userdb 两客户端真实 Go HTTP 同步、短生命周期冷备份 / 恢复到隔离目录 smoke，以及短生命周期外部 TLS 反代 smoke；这些证据仍不等于可以开放真实用户同步。
 - 真实用户同步前仍缺少目标部署上的备份恢复演练、升级回滚演练、真实证书 / 域名 / 外部反代复验、平台私钥存储 backend 和用户可用同步 UI；生产访问认证已有单用户 bearer token 实现证据，但部署者仍必须设置真实 token 并复验失败响应。
 
+## 目标部署证据包
+
+目标部署证据包用于判断某个实际部署是否可以进入 manager 的真实同步入口准备状态。它不是 settings JSON，不是诊断报告，也不是服务器自动上传的运行日志；它是部署者在目标环境完成复验后保留的非敏感记录。
+
+证据包至少记录：
+
+- 复验日期、操作者或维护者标识、目标环境别名和 RadishLex Git commit / 镜像 tag。
+- 使用的 Compose 文件、镜像 tag、`RADISHLEX_SYNC_BIND` / `RADISHLEX_SYNC_PORT` / `RADISHLEX_SYNC_PUBLIC_URL` 的非敏感摘要。
+- `RADISHLEX_SYNC_ACCESS_TOKEN` 是否已配置并通过失败响应复验；不得记录 token 明文、长度原文或派生材料。
+- 外部 TLS / 反代、访问控制、冷备份 / 恢复、升级 / 回滚和日志脱敏的结论。
+- 每项复验的命令类别、结果、时间和非敏感错误码；不得记录请求体、响应体、证书私钥、token、payload bytes、signature bytes、wrapped material bytes 或恢复材料。
+
+证据包可以引用以下非敏感 `deployment_evidence_source` 标签：
+
+| 标签 | 允许含义 | 不能代表 |
+| --- | --- | --- |
+| `local_smoke` | 本机或短生命周期环境 smoke 通过，适合证明实现级路径仍可复验。 | 真实目标部署可开放给用户。 |
+| `external_tls` | 目标部署外部 HTTPS、反代到 HTTP upstream、`Authorization` header 透传、TLS 1.2+ 和反代日志脱敏通过。 | 备份恢复、升级回滚或平台私钥 backend 可用。 |
+| `backup_restore` | 目标数据目录完成冷备份，并恢复到隔离目录后可读取 domain / device / recovery / object payload metadata。 | 线上原目录可以随意回滚，或能追回已同步到旧设备的数据。 |
+| `upgrade_rollback` | 目标部署使用明确镜像 tag 完成升级前备份、升级验证和旧备份回滚演练。 | 支持 down migration，或可以无备份升级。 |
+
+目标部署进入真实用户同步前，`external_tls`、`backup_restore`、`upgrade_rollback` 和访问控制失败响应都必须在目标环境有记录；`local_smoke` 只能作为实现级辅证。manager v1 settings draft 只能保存一个 allowlist 来源标签用于解释本地 gate，不保存完整证据包，也不因此证明真实用户同步已经开放。
+
+证据包模板：
+
+```text
+deployment_evidence.v1
+reviewed_at: <Asia/Shanghai timestamp>
+target_alias: <non-secret deployment alias>
+git_commit: <commit>
+image_tag: <explicit image tag>
+compose_file: deploy/sync-server/docker-compose.yaml
+public_url_status: configured | not_configured
+access_token_status: configured_and_401_verified | missing | failed
+access_control: passed | failed | not_run
+external_tls: passed | failed | not_run
+backup_restore: passed | failed | not_run
+upgrade_rollback: passed | failed | not_run
+log_redaction: passed | failed | not_run
+notes: <non-sensitive summary only>
+```
+
+禁止把真实域名证书正文、证书私钥、token、`.env` 内容、宿主机绝对路径、请求 / 响应体、payload bytes、signature bytes、wrapped material bytes、恢复码、同步主密钥、平台私钥、用户词、input code、reading 或 P1 原始事件写入证据包、settings draft、诊断报告或 committed 文档。
+
 ## 部署拓扑
 
 推荐拓扑：

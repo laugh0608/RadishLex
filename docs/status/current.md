@@ -6,11 +6,11 @@
 
 - 日期：2026-07-05
 - 常态分支：`dev`
-- 当前主题：Phase 3 自部署同步出口治理已形成证据链，Phase 4 Flutter manager 本地管理能力验收复查已完成；真实同步入口前置交互边界已固定为文档证据。
+- 当前主题：Phase 3 自部署同步出口治理已形成证据链，Phase 4 Flutter manager 本地管理能力验收复查已完成；真实同步入口前置交互边界和目标部署证据包口径已固定为文档证据。
 
 ## 当前阶段
 
-RadishLex 已完成 Rust core、Rime adapter、userdb、ranker、crypto、sync client 边界、Go sync server 和第一批 Flutter manager 本地 FFI bridge 的起步证据。当前推进重点不是打开真实远端同步，而是保持 Phase 4 manager 本地验收证据可复查，并继续补齐后续真实同步入口所需的平台私钥 backend 与目标部署运行证据。
+RadishLex 已完成 Rust core、Rime adapter、userdb、ranker、crypto、sync client 边界、Go sync server 和第一批 Flutter manager 本地 FFI bridge 的起步证据。当前推进重点不是打开真实远端同步，而是保持 Phase 4 manager 本地验收证据可复查，并继续补齐后续真实同步入口所需的平台私钥 backend 与真实目标部署运行证据。
 
 近期默认先读本文，再按任务选读：
 
@@ -20,6 +20,7 @@ RadishLex 已完成 Rust core、Rime adapter、userdb、ranker、crypto、sync c
 - 管理端本地验收口径：`docs/manager-local-acceptance.md`
 - 真实同步入口前置边界：`docs/manager-sync-entry-boundary.md`
 - settings draft 与诊断字段：`docs/manager-settings-diagnostics.md`
+- 目标部署证据包与生产部署停止线：`docs/runbooks/sync-server-production-deployment.md`
 - 同步服务端 API / 存储：`docs/sync-server-api-storage.md`
 - 平台私钥 backend 停止线：`docs/platform-private-key-backend-strategy.md`
 
@@ -37,6 +38,7 @@ Rust 输入与学习链路：
 - `ime-crypto` 已覆盖本地 envelope、AAD、nonce、ciphertext hash、恢复码 KDF、Ed25519 签名、device wrapping、recovery material 和平台 backend capability / unavailable 模型。
 - `ime-sync` 已覆盖 P2 envelope 组装、设备生命周期、对象版本冲突、客户端合并模型、remote client DTO、std-only `http://` transport 和 bearer token header。
 - `server/sync-server` 已覆盖 SQLite metadata、local blob storage、签名验签、device wrapping 密文承载、recovery latest、对象版本上传 / 下载、bearer token 门禁、request id、panic recovery、审计日志、Docker Compose、本地 / 部署态 runbook、备份恢复、外部 TLS 反代和升级回滚 smoke。
+- `docs/runbooks/sync-server-production-deployment.md` 已固定目标部署证据包模板，明确外部 TLS、访问控制失败响应、备份恢复、升级回滚和日志脱敏的非敏感记录口径。
 - Rust userdb 两客户端真实 Go HTTP 测试已覆盖设备授权、三类 P2 对象上传下载、解密写回、stale conflict 和 v2 重新上传。
 
 Flutter manager：
@@ -55,7 +57,7 @@ Flutter manager：
 
 ## 当前停止线
 
-- 不打开真实远端同步、恢复码 UI 或设备授权成功路径，直到可用平台私钥 backend、目标部署运行证据和对应实现测试齐备；恢复 / 授权交互边界目前只作为文档证据存在。
+- 不打开真实远端同步、恢复码 UI 或设备授权成功路径，直到可用平台私钥 backend、真实目标部署运行证据和对应实现测试齐备；恢复 / 授权交互边界与目标部署证据包目前只作为文档证据存在。
 - 不新增明文同步 payload、P1 原始事件导出、token / 恢复码 / 私钥 / wrapped material / payload bytes 日志或诊断字段。
 - 不让 Flutter manager 绕过 `ManagerBridge` / `ime-ffi` 直接读写 Rust 内部结构或 SQLite schema。
 - 不把 Go server 做成候选排序服务、在线转换服务或明文词库服务。
@@ -89,4 +91,4 @@ Sync server 部署预演：
 1. 维护本文短入口，避免新会话默认阅读长周志。
 2. 保持 Phase 4 manager 本地验收证据稳定；若后续改动触及验收范围，再按 `docs/manager-local-acceptance.md` 补精准 widget / helper / smoke 覆盖。
 3. 真实同步入口后续 UI / bridge 必须遵守 `docs/manager-sync-entry-boundary.md`，在条件齐备前只能展示准备状态和不可用原因。
-4. 下一批真实同步前置工作优先补目标部署运行证据或平台私钥 backend 证据，再考虑 sync entry state helper / UI gate 实现。
+4. 下一批真实同步前置工作优先获取真实目标部署运行证据或平台私钥 backend 证据，再考虑 sync entry state helper / UI gate 实现。

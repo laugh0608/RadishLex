@@ -33,6 +33,16 @@
 | `backup_restore` | `backup restore` | 备份恢复演练证据已记录。 |
 | `upgrade_rollback` | `upgrade rollback` | 升级 / 回滚演练证据已记录。 |
 
+部署证据来源标签与 `docs/runbooks/sync-server-production-deployment.md` 的目标部署证据包对齐，但 settings draft 只保存一个非敏感 allowlist 标签，不保存证据包正文。`local_smoke` 只表示实现级短生命周期 smoke 可复验，不能代表目标部署可开放给真实用户；真实同步入口仍需要目标环境的外部 TLS、访问控制失败响应、备份恢复、升级回滚、日志脱敏和平台私钥 backend 证据齐备。
+
+settings draft 不得保存：
+
+- 证据包全文、运行日志、curl 输出、请求体、响应体或 Nginx access log。
+- 真实 token、恢复码、私钥、signature bytes、wrapped material bytes、encrypted payload bytes。
+- 证书正文、证书私钥、宿主机绝对路径、真实账号、真实用户词或完整服务端 URL 中的 credential。
+
+诊断报告只能展示 `deployment_evidence_source` 的 allowlist 值或 `not_recorded`，以及 `deployment evidence missing` / `deployment evidence <label>` 这类摘要。诊断报告不得把目标部署证据包展开成逐项运行记录。
+
 兼容规则：
 
 - 旧 v1 文件如果缺少 `deployment_evidence_source`，即使 `deployment_evidence_recorded` 为 `true`，读取后也降级为未记录部署证据。

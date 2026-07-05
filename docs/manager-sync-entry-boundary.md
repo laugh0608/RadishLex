@@ -39,13 +39,15 @@ Phase 4 manager 本地验收已经有可复验证据，真实同步入口的下�
 | 证据 | 要求 | 当前状态 |
 | --- | --- | --- |
 | 平台私钥 backend | 生产签名 backend 可在目标平台创建、加载、签名和删除非导出设备签名 key，且 capability / production gate 可被 manager 读取。 | 未满足；Apple 与 Android backend 均未解除 production gate。 |
-| 目标部署运行证据 | 目标部署完成外部 TLS、访问控制、备份恢复、升级回滚和日志脱敏复验，并有非敏感来源标签进入 settings draft。 | 部署 runbook 和预演入口已存在，真实目标部署证据仍未作为用户可用同步条件闭合。 |
+| 目标部署运行证据 | 目标部署完成外部 TLS、访问控制失败响应、备份恢复、升级回滚和日志脱敏复验，并按 `docs/runbooks/sync-server-production-deployment.md` 保留非敏感证据包；settings draft 只保存 allowlist 来源标签。 | 部署 runbook、证据包模板和预演入口已存在，真实目标部署证据仍未作为用户可用同步条件闭合。 |
 | 恢复码交互边界 | 恢复码只显示一次、用户确认保存、恢复记录创建 / 轮换 / 撤销、失败限速和日志脱敏测试齐备。 | 本文固定 UI / bridge 边界；产品实现仍未开始。 |
 | 设备授权交互边界 | join request、短码核对、授权包、设备撤销、lost device 和 key epoch 说明能被 UI 表达并测试。 | 本文固定 UI / bridge 边界；产品实现仍未开始。 |
 | 客户端同步操作 | Flutter 只调用结构化 bridge；Rust 侧只接收 encrypted object 与 signed manifest，不暴露 plaintext payload。 | Rust / Go 侧已有底层证据；manager 真实远端操作入口未接。 |
 | 诊断脱敏 | 诊断报告只输出状态、来源标签、聚合计数和脱敏策略，不输出 secret 或 payload bytes。 | 本地验收已覆盖；真实同步字段新增前仍需补测试。 |
 
 任一证据缺失时，manager 只能展示准备状态、不可用原因和本地预检摘要，不得提供会上传真实 P2 数据的主操作。
+
+目标部署证据包不进入 Flutter widget 状态、settings JSON 或诊断报告。manager 只能展示 `local_smoke`、`external_tls`、`backup_restore`、`upgrade_rollback` 这类 allowlist 标签和聚合状态；证书、token、日志正文、请求 / 响应体、真实路径和 payload bytes 都必须留在 UI / bridge / 诊断之外。`local_smoke` 只能证明实现级路径，不足以开放用户可用同步。
 
 ## 状态门禁
 
@@ -209,7 +211,7 @@ Phase 4 manager 本地验收已经有可复验证据，真实同步入口的下�
 后续实现应按以下顺序推进：
 
 1. 保持 Phase 4 本地验收证据稳定。
-2. 补目标部署运行证据的非敏感记录口径和复验入口。
+2. 按生产部署 runbook 补目标部署运行证据包，并保持 settings draft 只记录非敏感来源标签。
 3. 取得至少一个可用平台私钥 backend 的生产签名证据，或补新的平台 / 算法 ADR 输入。
 4. 在 manager 中只接入 sync entry state 派生和阻塞说明，仍不上传数据。
 5. 补恢复码和设备授权 bridge 的结构化状态与错误测试。
