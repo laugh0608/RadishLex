@@ -51,8 +51,11 @@ REQUIRED_FILES = [
     "scripts/check-manager.sh",
     "scripts/check-repo.py",
     "scripts/check-repo.sh",
+    "scripts/check-sync-deployment-evidence.py",
+    "scripts/check-sync-deployment-evidence.sh",
     "scripts/check-text-files.py",
     "scripts/check-text-files.sh",
+    "tests/fixtures/sync-deployment-evidence-valid.txt",
     "apps/radishlex-manager/README.md",
     "apps/radishlex-manager/pubspec.yaml",
     "apps/radishlex-manager/lib/main.dart",
@@ -209,6 +212,10 @@ def check_go_server() -> None:
     run_command(["go", "test", "./..."], cwd=REPO_ROOT / "server" / "sync-server")
 
 
+def check_deployment_evidence() -> None:
+    run_script("check-sync-deployment-evidence.py", ["--self-test"])
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run RadishLex repository baseline checks.")
     parser.add_argument("--skip-text-files", action="store_true", help="Skip text hygiene checks.")
@@ -231,6 +238,7 @@ def main() -> int:
     check_license_wording()
     check_ruleset_and_workflows()
     check_path_budget()
+    check_deployment_evidence()
     if not args.skip_go:
         check_go_server()
     if not args.skip_rust:

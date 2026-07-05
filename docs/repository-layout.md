@@ -142,6 +142,8 @@ RadishLex/
 - `scripts/check-manager.sh`：Flutter manager 格式、静态分析和 widget 测试入口。
 - `scripts/check-manager-ffi-smoke.sh`：Flutter manager 真实 Dart FFI bridge 的短生命周期 smoke，构建 `radishlex-ime-ffi` 动态库并使用临时 SQLite userdb、settings JSON、合成 TSV 和导出文件复验本地管理、import batches、rank explain、导入导出、设置草案和脱敏诊断报告链路。
 - `scripts/check-sync-server-deployment-rehearsal.sh` / `scripts/check-sync-server-deployment-rehearsal.py`：sync server 部署态 Compose 的短生命周期预演入口，使用临时 env、随机 bearer token、仓库外数据目录和冷备份恢复复验。
+- `scripts/check-sync-deployment-evidence.sh` / `scripts/check-sync-deployment-evidence.py`：目标部署证据包校验入口，验证 `deployment_evidence.v1` 字段、状态枚举、固定 Compose 文件、时间戳、目标别名、commit、image tag 和敏感内容黑名单。
+- `tests/fixtures/sync-deployment-evidence-valid.txt`：目标部署证据包校验器使用的合成非敏感 fixture，不代表真实部署。
 
 ## Rust crates 建议
 

@@ -33,7 +33,7 @@
 | `backup_restore` | `backup restore` | 备份恢复演练证据已记录。 |
 | `upgrade_rollback` | `upgrade rollback` | 升级 / 回滚演练证据已记录。 |
 
-部署证据来源标签与 `docs/runbooks/sync-server-production-deployment.md` 的目标部署证据包对齐，但 settings draft 只保存一个非敏感 allowlist 标签，不保存证据包正文。`local_smoke` 只表示实现级短生命周期 smoke 可复验，不能代表目标部署可开放给真实用户；真实同步入口仍需要目标环境的外部 TLS、访问控制失败响应、备份恢复、升级回滚、日志脱敏和平台私钥 backend 证据齐备。
+部署证据来源标签与 `docs/runbooks/sync-server-production-deployment.md` 的目标部署证据包对齐，但 settings draft 只保存一个非敏感 allowlist 标签，不保存证据包正文。证据包正文进入交接材料前可用 `./scripts/check-sync-deployment-evidence.sh <evidence-file>` 校验格式和脱敏规则；该校验不改变 settings draft 只保存标签的边界。`local_smoke` 只表示实现级短生命周期 smoke 可复验，不能代表目标部署可开放给真实用户；真实同步入口仍需要目标环境的外部 TLS、访问控制失败响应、备份恢复、升级回滚、日志脱敏和平台私钥 backend 证据齐备。
 
 settings draft 不得保存：
 
@@ -185,3 +185,5 @@ git diff --check
 - 设置页 deployment evidence source 下拉、`deployment_unverified` 到 `preflight_ready` 的本地草案派生、真实同步按钮继续禁用。
 - 诊断报告包含 gate source / stop line / evidence source 摘要，并保持用户词、路径、token 和 payload bytes 脱敏。
 - FFI smoke 使用临时 SQLite userdb、临时 settings JSON 和合成数据复验真实 Dart FFI bridge，不连接真实同步后端。
+
+涉及目标部署证据包格式或交接材料时，追加 `./scripts/check-sync-deployment-evidence.sh --self-test` 和对应证据文件校验。

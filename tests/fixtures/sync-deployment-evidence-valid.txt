@@ -1,0 +1,14 @@
+deployment_evidence.v1
+reviewed_at: 2026-07-05T20:30:00+08:00
+target_alias: synthetic-target
+git_commit: 809acf0
+image_tag: radishlex-sync-server:synthetic
+compose_file: deploy/sync-server/docker-compose.yaml
+public_url_status: configured
+access_token_status: configured_and_401_verified
+access_control: passed
+external_tls: passed
+backup_restore: passed
+upgrade_rollback: passed
+log_redaction: passed
+notes: synthetic deployment evidence only
