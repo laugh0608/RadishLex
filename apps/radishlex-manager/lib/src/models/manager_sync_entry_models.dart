@@ -137,6 +137,102 @@ class SyncReadinessFlowSummary {
   }
 }
 
+class SyncInteractionActionIntent {
+  const SyncInteractionActionIntent({
+    required this.actionId,
+    required this.visibilityStatus,
+    required this.intentStatus,
+    required this.blocker,
+    required this.requiredEvidenceCodes,
+    required this.sourceTag,
+  });
+
+  final String actionId;
+  final String visibilityStatus;
+  final String intentStatus;
+  final String blocker;
+  final List<String> requiredEvidenceCodes;
+  final String sourceTag;
+
+  String get requiredEvidenceSummary {
+    return managerSyncCodeSummary(requiredEvidenceCodes);
+  }
+
+  String get summary {
+    return '$actionId=$intentStatus';
+  }
+}
+
+class SyncInteractionEntryPlan {
+  const SyncInteractionEntryPlan({required this.intents});
+
+  final List<SyncInteractionActionIntent> intents;
+
+  List<SyncInteractionActionIntent> get recoveryIntents {
+    return intents
+        .where((intent) => intent.actionId.startsWith('recovery_'))
+        .toList(growable: false);
+  }
+
+  List<SyncInteractionActionIntent> get deviceAuthorizationIntents {
+    return intents
+        .where(
+          (intent) =>
+              intent.actionId.startsWith('device_') ||
+              intent.actionId == 'join_request_authorization',
+        )
+        .toList(growable: false);
+  }
+
+  SyncInteractionActionIntent intentFor(String actionId) {
+    return intents.firstWhere(
+      (intent) => intent.actionId == actionId,
+      orElse: () => SyncInteractionActionIntent(
+        actionId: actionId,
+        visibilityStatus: 'hidden',
+        intentStatus: 'blocked',
+        blocker: 'interaction_intent_missing',
+        requiredEvidenceCodes: const ['interaction_intent_missing'],
+        sourceTag: 'manager_interaction_entry_plan',
+      ),
+    );
+  }
+
+  String get actionIdSummary {
+    return managerSyncCodeSummary(intents.map((intent) => intent.actionId));
+  }
+
+  String get visibilitySummary {
+    if (intents.isEmpty) {
+      return 'none';
+    }
+    return intents
+        .map((intent) => '${intent.actionId}=${intent.visibilityStatus}')
+        .join(', ');
+  }
+
+  String get intentStatusSummary {
+    if (intents.isEmpty) {
+      return 'none';
+    }
+    return intents.map((intent) => intent.summary).join(', ');
+  }
+
+  String get blockerSummary {
+    return managerSyncCodeSummary(intents.map((intent) => intent.blocker));
+  }
+
+  String get requiredEvidenceSummary {
+    return managerSyncCodeSummary(
+      intents.expand((intent) => intent.requiredEvidenceCodes),
+    );
+  }
+
+  String get sourceTagSummary {
+    return managerSyncCodeSummary(intents.map((intent) => intent.sourceTag));
+  }
+}
+
 class RecoveryEntryGate {
   const RecoveryEntryGate({
     required this.status,
@@ -425,6 +521,22 @@ class DeviceRevocationReadiness {
   }
 }
 
+SyncInteractionEntryPlan managerSyncInteractionEntryPlanFromReadinessFlows({
+  required Iterable<SyncReadinessFlowSummary> readinessFlows,
+  required bool userSyncEnabled,
+}) {
+  return SyncInteractionEntryPlan(
+    intents: readinessFlows
+        .map(
+          (flow) => _syncInteractionActionIntentFromFlow(
+            flow: flow,
+            userSyncEnabled: userSyncEnabled,
+          ),
+        )
+        .toList(growable: false),
+  );
+}
+
 String managerSyncCodeSummary(Iterable<String> codes) {
   final uniqueCodes = <String>{};
   for (final code in codes) {
@@ -621,6 +733,100 @@ List<String> _syncCodes(Iterable<String> codes) {
   return summary == 'none'
       ? const []
       : summary.split(', ').toList(growable: false);
+}
+
+SyncInteractionActionIntent _syncInteractionActionIntentFromFlow({
+  required SyncReadinessFlowSummary flow,
+  required bool userSyncEnabled,
+}) {
+  final intentStatus = _syncInteractionIntentStatus(
+    flow: flow,
+    userSyncEnabled: userSyncEnabled,
+  );
+  return SyncInteractionActionIntent(
+    actionId: _syncInteractionActionId(flow.flowId),
+    visibilityStatus: 'visible',
+    intentStatus: intentStatus,
+    blocker: _syncInteractionIntentBlocker(
+      flow: flow,
+      intentStatus: intentStatus,
+    ),
+    requiredEvidenceCodes: _syncInteractionRequiredEvidence(
+      flow: flow,
+      intentStatus: intentStatus,
+    ),
+    sourceTag: flow.sourceTag,
+  );
+}
+
+String _syncInteractionActionId(String flowId) {
+  switch (flowId) {
+    case 'device_join':
+      return 'join_request_authorization';
+    default:
+      return flowId;
+  }
+}
+
+String _syncInteractionIntentStatus({
+  required SyncReadinessFlowSummary flow,
+  required bool userSyncEnabled,
+}) {
+  if (_flowIsClosedCurrentPhase(flow)) {
+    return 'closed_current_phase';
+  }
+  if (!userSyncEnabled && flow.blocker == 'none') {
+    return 'closed_current_phase';
+  }
+  if (_flowRequiresConfirmation(flow)) {
+    return 'requires_confirmation';
+  }
+  if (flow.blocker != 'none') {
+    return 'blocked';
+  }
+  return 'ready';
+}
+
+bool _flowIsClosedCurrentPhase(SyncReadinessFlowSummary flow) {
+  return flow.actionStatus == 'read_only_current_phase' ||
+      flow.actionStatus == 'closed_current_phase' ||
+      flow.status.endsWith('_flow_closed');
+}
+
+bool _flowRequiresConfirmation(SyncReadinessFlowSummary flow) {
+  return flow.requiredEvidenceCodes.contains(
+        'blocked_until_recovery_code_saved',
+      ) ||
+      flow.requiredEvidenceCodes.contains(
+        'lost_device_prior_material_not_recallable',
+      );
+}
+
+String _syncInteractionIntentBlocker({
+  required SyncReadinessFlowSummary flow,
+  required String intentStatus,
+}) {
+  if (intentStatus == 'closed_current_phase' && flow.blocker == 'none') {
+    return 'user_sync_entry_closed_current_phase';
+  }
+  if (intentStatus == 'requires_confirmation' && flow.blocker == 'none') {
+    return 'user_confirmation_required';
+  }
+  return flow.blocker;
+}
+
+List<String> _syncInteractionRequiredEvidence({
+  required SyncReadinessFlowSummary flow,
+  required String intentStatus,
+}) {
+  if (intentStatus == 'closed_current_phase' && flow.blocker == 'none') {
+    return const ['user_sync_entry_current_phase_open_required'];
+  }
+  final evidence = <String>{...flow.requiredEvidenceCodes};
+  if (intentStatus == 'requires_confirmation') {
+    evidence.add('explicit_user_confirmation_required');
+  }
+  return evidence.toList(growable: false);
 }
 
 const managerClosedRecoverySetupReadiness = RecoverySetupReadiness(

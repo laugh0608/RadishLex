@@ -417,6 +417,7 @@ class _SettingsSyncGatePreview extends StatelessWidget {
       readinessBridgeSnapshot: sync.readinessBridgeSnapshot,
     );
     final connection = audit.entryGate.connectionHealth;
+    final interactionPlan = audit.entryGate.interactionEntryPlan;
     final tone = audit.entryGate.userSyncEnabled
         ? ManagerBadgeTone.success
         : ManagerBadgeTone.warning;
@@ -492,6 +493,30 @@ class _SettingsSyncGatePreview extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'readiness user sync blocked',
             value: audit.entryGate.readinessUserSyncBlocked.toString(),
+          ),
+          ManagerKeyValueRow(
+            label: 'interaction actions',
+            value: interactionPlan.actionIdSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'interaction visibility',
+            value: interactionPlan.visibilitySummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'interaction status',
+            value: interactionPlan.intentStatusSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'interaction blockers',
+            value: interactionPlan.blockerSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'interaction evidence',
+            value: interactionPlan.requiredEvidenceSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'interaction sources',
+            value: interactionPlan.sourceTagSummary,
           ),
           ManagerKeyValueRow(
             label: 'user sync enabled',

@@ -29,7 +29,7 @@ void main() {
 
     expect(find.text('诊断摘要预览'), findsOneWidget);
     expect(find.text('分组 6'), findsOneWidget);
-    expect(find.text('字段 99'), findsOneWidget);
+    expect(find.text('字段 105'), findsOneWidget);
     expect(
       find.byKey(const Key('diagnostics-section-sync_gate')),
       findsOneWidget,
@@ -87,6 +87,42 @@ void main() {
     );
     expect(
       find.textContaining('sync.readiness_user_sync_blocked: true'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.interaction_actions: recovery_setup, recovery_restore, join_request_authorization, device_revocation',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.interaction_visibility: recovery_setup=visible, recovery_restore=visible, join_request_authorization=visible, device_revocation=visible',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.interaction_statuses: recovery_setup=closed_current_phase, recovery_restore=closed_current_phase, join_request_authorization=closed_current_phase, device_revocation=closed_current_phase',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.interaction_blockers: recovery_code_generation_closed, recovery_code_input_closed, join_request_creation_closed, device_revocation_flow_closed',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.interaction_required_evidence: platform_private_key_backend_ready, release_deployment_evidence_summary_required, explicit_user_start_required, input_not_available_current_phase, not_checked_current_phase, blocked_until_recovery_success, join_request_unavailable, short_code_verification_not_started, active_existing_device_required, join_request_pending_required, short_code_match_required, lost_device_prior_material_not_recallable, key_epoch_rotation_not_started',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.interaction_source_tags: recovery_setup_readiness, recovery_restore_readiness, device_join_readiness, device_revocation_readiness',
+      ),
       findsOneWidget,
     );
     expect(

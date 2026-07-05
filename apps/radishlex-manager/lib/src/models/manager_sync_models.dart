@@ -396,16 +396,17 @@ class ManagerSyncEntryGate {
     }
   }
 
-  String get productionBlockerSummary {
-    return productionBlockers.isEmpty ? 'none' : productionBlockers.join(', ');
-  }
-
-  List<SyncReadinessFlowSummary> get readinessFlowSummaries {
-    return [
-      ...recovery.readinessFlowSummaries,
-      ...deviceAuthorization.readinessFlowSummaries,
-    ];
-  }
+  String get productionBlockerSummary =>
+      productionBlockers.isEmpty ? 'none' : productionBlockers.join(', ');
+  List<SyncReadinessFlowSummary> get readinessFlowSummaries => [
+    ...recovery.readinessFlowSummaries,
+    ...deviceAuthorization.readinessFlowSummaries,
+  ];
+  SyncInteractionEntryPlan get interactionEntryPlan =>
+      managerSyncInteractionEntryPlanFromReadinessFlows(
+        readinessFlows: readinessFlowSummaries,
+        userSyncEnabled: userSyncEnabled,
+      );
 
   String get readinessBlockedFlowSummary {
     return managerSyncCodeSummary(

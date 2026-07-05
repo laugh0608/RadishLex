@@ -28,10 +28,14 @@ class SyncView extends StatelessWidget {
         const SizedBox(height: 16),
         SyncConnectionHealthSection(health: audit.entryGate.connectionHealth),
         const SizedBox(height: 16),
-        SyncRecoverySection(recovery: audit.entryGate.recovery),
+        SyncRecoverySection(
+          recovery: audit.entryGate.recovery,
+          interactionPlan: audit.entryGate.interactionEntryPlan,
+        ),
         const SizedBox(height: 16),
         SyncDeviceAuthorizationSection(
           authorization: audit.entryGate.deviceAuthorization,
+          interactionPlan: audit.entryGate.interactionEntryPlan,
         ),
         const SizedBox(height: 16),
         DeviceSignatureSection(device: sync.device),

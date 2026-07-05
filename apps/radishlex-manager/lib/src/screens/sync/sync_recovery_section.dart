@@ -4,12 +4,20 @@ import '../../models/manager_models.dart';
 import '../manager_widgets.dart';
 
 class SyncRecoverySection extends StatelessWidget {
-  const SyncRecoverySection({super.key, required this.recovery});
+  const SyncRecoverySection({
+    super.key,
+    required this.recovery,
+    required this.interactionPlan,
+  });
 
   final RecoveryEntryGate recovery;
+  final SyncInteractionEntryPlan interactionPlan;
 
   @override
   Widget build(BuildContext context) {
+    final setupIntent = interactionPlan.intentFor('recovery_setup');
+    final restoreIntent = interactionPlan.intentFor('recovery_restore');
+
     return ManagerSection(
       key: const Key('sync-recovery-readiness-section'),
       title: '恢复码准备态',
@@ -53,6 +61,30 @@ class SyncRecoverySection extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'readiness blockers',
             value: recovery.readinessBlockerSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'setup intent',
+            value: setupIntent.intentStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'setup intent blocker',
+            value: setupIntent.blocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'setup intent evidence',
+            value: setupIntent.requiredEvidenceSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore intent',
+            value: restoreIntent.intentStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore intent blocker',
+            value: restoreIntent.blocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore intent evidence',
+            value: restoreIntent.requiredEvidenceSummary,
           ),
           ManagerKeyValueRow(
             label: 'setup flow',

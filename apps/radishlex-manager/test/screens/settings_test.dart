@@ -41,8 +41,32 @@ void main() {
       find.textContaining('recovery_code_generation_closed'),
       findsWidgets,
     );
-    expect(find.textContaining('recovery_setup_readiness'), findsOneWidget);
+    expect(find.textContaining('recovery_setup_readiness'), findsWidgets);
     expect(find.text('manager_default_closed_readiness'), findsOneWidget);
+    expect(
+      find.text(
+        'recovery_setup, recovery_restore, join_request_authorization, device_revocation',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'recovery_setup=visible, recovery_restore=visible, join_request_authorization=visible, device_revocation=visible',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'recovery_setup=closed_current_phase, recovery_restore=closed_current_phase, join_request_authorization=closed_current_phase, device_revocation=closed_current_phase',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'recovery_code_generation_closed, recovery_code_input_closed, join_request_creation_closed, device_revocation_flow_closed',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('true'), findsOneWidget);
     expect(find.text('required_before_first_upload'), findsOneWidget);
     expect(find.text('recovery_record_not_created'), findsWidgets);
@@ -134,10 +158,20 @@ void main() {
       find.text(
         'bridge_recovery_setup_readiness, bridge_recovery_restore_readiness, bridge_device_join_readiness, bridge_device_revocation_readiness',
       ),
-      findsOneWidget,
+      findsWidgets,
     );
     expect(find.text('recovery_ready'), findsWidgets);
     expect(find.text('device_authorization_ready'), findsWidgets);
+    expect(
+      find.text(
+        'recovery_setup=closed_current_phase, recovery_restore=closed_current_phase, join_request_authorization=closed_current_phase, device_revocation=closed_current_phase',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text('user_sync_entry_current_phase_open_required'),
+      findsOneWidget,
+    );
     expect(
       find.textContaining('recovery_code_generation_closed'),
       findsNothing,

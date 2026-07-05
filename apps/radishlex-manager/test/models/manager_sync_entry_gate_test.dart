@@ -184,53 +184,143 @@ void main() {
       'recovery_setup_readiness, recovery_restore_readiness, device_join_readiness, device_revocation_readiness',
     );
     expect(gate.readinessUserSyncBlocked, isTrue);
+    expect(
+      gate.interactionEntryPlan.actionIdSummary,
+      'recovery_setup, recovery_restore, join_request_authorization, device_revocation',
+    );
+    expect(
+      gate.interactionEntryPlan.visibilitySummary,
+      'recovery_setup=visible, recovery_restore=visible, join_request_authorization=visible, device_revocation=visible',
+    );
+    expect(
+      gate.interactionEntryPlan.intentStatusSummary,
+      'recovery_setup=closed_current_phase, recovery_restore=closed_current_phase, join_request_authorization=closed_current_phase, device_revocation=closed_current_phase',
+    );
+    expect(
+      gate.interactionEntryPlan.blockerSummary,
+      'recovery_code_generation_closed, recovery_code_input_closed, join_request_creation_closed, device_revocation_flow_closed',
+    );
+    expect(
+      gate.interactionEntryPlan.requiredEvidenceSummary,
+      contains('blocked_until_recovery_success'),
+    );
+    expect(
+      gate.interactionEntryPlan.sourceTagSummary,
+      'recovery_setup_readiness, recovery_restore_readiness, device_join_readiness, device_revocation_readiness',
+    );
   });
 
-  test(
-    'entry gate reports blocked platform backend before evidence checks',
-    () {
-      const draft = ManagerSettingsDraft(
+  test('entry gate reports blocked platform backend before evidence checks', () {
+    const draft = ManagerSettingsDraft(
+      serverEndpoint: 'https://sync.example.invalid',
+      retainSyncConfig: true,
+      privacyMode: false,
+      diagnosticsExport: false,
+      deploymentEvidenceRecorded: true,
+      deploymentEvidenceSource: managerDeploymentEvidenceLocalSmoke,
+    );
+
+    final audit = managerSyncGateAuditForDraft(
+      draft: draft,
+      device: blockedDevice,
+    );
+
+    expect(audit.state, SyncUiState.backendUnavailable);
+    expect(audit.entryGate.entryState, SyncEntryState.backendUnavailable);
+    expect(audit.entryGate.entryBlocker, 'backend_unavailable');
+    expect(audit.entryGate.recovery.status.code, 'recovery_code_flow_closed');
+    expect(
+      audit.entryGate.deviceAuthorization.status.code,
+      'device_authorization_flow_closed',
+    );
+    expect(
+      audit.entryGate.productionBlockers,
+      contains('platform_private_key_backend_blocked'),
+    );
+    expect(
+      audit.entryGate.connectionHealth.status,
+      SyncConnectionStatus.accessTokenMissing,
+    );
+    expect(
+      audit.entryGate.connectionHealth.connectionBlocker,
+      'access_token_missing',
+    );
+    expect(audit.entryGate.userSyncEnabled, isFalse);
+    expect(
+      audit.entryGate.readinessBlockedFlowSummary,
+      'recovery_setup, recovery_restore, device_join, device_revocation',
+    );
+    expect(
+      audit.entryGate.interactionEntryPlan.intentStatusSummary,
+      'recovery_setup=closed_current_phase, recovery_restore=closed_current_phase, join_request_authorization=closed_current_phase, device_revocation=closed_current_phase',
+    );
+    expect(audit.entryGate.readinessUserSyncBlocked, isTrue);
+  });
+
+  test('entry plan reports blocked future action intent', () {
+    final readiness = managerSyncReadinessBridgeSnapshotFromJson({
+      'format': managerSyncReadinessBridgeSummaryFormat,
+      'redaction_policy': managerSyncReadinessBridgeRedactionPolicy,
+      'source': 'ffi_native_readiness',
+      'recovery_setup': {
+        'status': 'recovery_setup_blocked',
+        'blocker': 'backend_unavailable',
+        'entry_action_status': 'blocked_by_backend',
+        'required_prerequisites': ['platform_private_key_backend_ready'],
+        'error_codes': ['backend_unavailable'],
+      },
+    });
+
+    final gate = deriveManagerSyncEntryGate(
+      draft: const ManagerSettingsDraft(
         serverEndpoint: 'https://sync.example.invalid',
         retainSyncConfig: true,
         privacyMode: false,
         diagnosticsExport: false,
         deploymentEvidenceRecorded: true,
-        deploymentEvidenceSource: managerDeploymentEvidenceLocalSmoke,
-      );
+        accessTokenConfigured: true,
+        deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
+      ),
+      device: readyDevice,
+      readinessBridgeSnapshot: readiness,
+    );
 
-      final audit = managerSyncGateAuditForDraft(
-        draft: draft,
-        device: blockedDevice,
-      );
+    final intent = gate.interactionEntryPlan.intentFor('recovery_setup');
+    expect(intent.visibilityStatus, 'visible');
+    expect(intent.intentStatus, 'blocked');
+    expect(intent.blocker, 'backend_unavailable');
+    expect(
+      intent.requiredEvidenceSummary,
+      'platform_private_key_backend_ready',
+    );
+  });
 
-      expect(audit.state, SyncUiState.backendUnavailable);
-      expect(audit.entryGate.entryState, SyncEntryState.backendUnavailable);
-      expect(audit.entryGate.entryBlocker, 'backend_unavailable');
-      expect(audit.entryGate.recovery.status.code, 'recovery_code_flow_closed');
-      expect(
-        audit.entryGate.deviceAuthorization.status.code,
-        'device_authorization_flow_closed',
-      );
-      expect(
-        audit.entryGate.productionBlockers,
-        contains('platform_private_key_backend_blocked'),
-      );
-      expect(
-        audit.entryGate.connectionHealth.status,
-        SyncConnectionStatus.accessTokenMissing,
-      );
-      expect(
-        audit.entryGate.connectionHealth.connectionBlocker,
-        'access_token_missing',
-      );
-      expect(audit.entryGate.userSyncEnabled, isFalse);
-      expect(
-        audit.entryGate.readinessBlockedFlowSummary,
-        'recovery_setup, recovery_restore, device_join, device_revocation',
-      );
-      expect(audit.entryGate.readinessUserSyncBlocked, isTrue);
-    },
-  );
+  test('entry plan supports confirmation-only future action intent', () {
+    final plan = managerSyncInteractionEntryPlanFromReadinessFlows(
+      readinessFlows: const [
+        SyncReadinessFlowSummary(
+          flowId: 'recovery_setup',
+          status: 'recovery_setup_blocked',
+          blocker: 'none',
+          actionStatus: 'available',
+          requiredEvidenceCodes: ['blocked_until_recovery_code_saved'],
+          errorCodes: [],
+          blocksUserSync: true,
+          sourceTag: 'unit_test_readiness',
+        ),
+      ],
+      userSyncEnabled: true,
+    );
+
+    final intent = plan.intentFor('recovery_setup');
+    expect(intent.visibilityStatus, 'visible');
+    expect(intent.intentStatus, 'requires_confirmation');
+    expect(intent.blocker, 'user_confirmation_required');
+    expect(
+      intent.requiredEvidenceSummary,
+      'blocked_until_recovery_code_saved, explicit_user_confirmation_required',
+    );
+  });
 
   test('local smoke supports development preflight without user sync', () {
     const draft = ManagerSettingsDraft(
@@ -550,6 +640,18 @@ void main() {
       DeviceAuthorizationEntryStatus.ready,
     );
     expect(gate.deviceAuthorization.canCreateJoinRequest, isFalse);
+    expect(
+      gate.interactionEntryPlan.intentStatusSummary,
+      'recovery_setup=closed_current_phase, recovery_restore=closed_current_phase, join_request_authorization=closed_current_phase, device_revocation=closed_current_phase',
+    );
+    expect(
+      gate.interactionEntryPlan.blockerSummary,
+      'user_sync_entry_closed_current_phase',
+    );
+    expect(
+      gate.interactionEntryPlan.requiredEvidenceSummary,
+      'user_sync_entry_current_phase_open_required',
+    );
     expect(
       gate.productionBlockers,
       contains('user_sync_entry_closed_current_phase'),

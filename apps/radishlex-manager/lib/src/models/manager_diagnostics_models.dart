@@ -84,6 +84,7 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
     device: snapshot.sync.device,
     readinessBridgeSnapshot: snapshot.sync.readinessBridgeSnapshot,
   );
+  final interactionPlan = syncGateAudit.entryGate.interactionEntryPlan;
 
   return ManagerDiagnosticsReport(
     generatedAt: snapshot.generatedAt,
@@ -301,6 +302,36 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
           _diagnosticsItem(
             'sync.readiness_user_sync_blocked',
             syncGateAudit.entryGate.readinessUserSyncBlocked.toString(),
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.interaction_actions',
+            interactionPlan.actionIdSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.interaction_visibility',
+            interactionPlan.visibilitySummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.interaction_statuses',
+            interactionPlan.intentStatusSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.interaction_blockers',
+            interactionPlan.blockerSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.interaction_required_evidence',
+            interactionPlan.requiredEvidenceSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.interaction_source_tags',
+            interactionPlan.sourceTagSummary,
             'gate',
           ),
           _diagnosticsItem(

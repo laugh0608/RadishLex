@@ -7,12 +7,17 @@ class SyncDeviceAuthorizationSection extends StatelessWidget {
   const SyncDeviceAuthorizationSection({
     super.key,
     required this.authorization,
+    required this.interactionPlan,
   });
 
   final DeviceAuthorizationEntryGate authorization;
+  final SyncInteractionEntryPlan interactionPlan;
 
   @override
   Widget build(BuildContext context) {
+    final joinIntent = interactionPlan.intentFor('join_request_authorization');
+    final revocationIntent = interactionPlan.intentFor('device_revocation');
+
     return ManagerSection(
       key: const Key('sync-device-authorization-readiness-section'),
       title: '设备授权准备态',
@@ -67,6 +72,30 @@ class SyncDeviceAuthorizationSection extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'readiness blockers',
             value: authorization.readinessBlockerSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'join intent',
+            value: joinIntent.intentStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'join intent blocker',
+            value: joinIntent.blocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'join intent evidence',
+            value: joinIntent.requiredEvidenceSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation intent',
+            value: revocationIntent.intentStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation intent blocker',
+            value: revocationIntent.blocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation intent evidence',
+            value: revocationIntent.requiredEvidenceSummary,
           ),
           ManagerKeyValueRow(
             label: 'join flow',

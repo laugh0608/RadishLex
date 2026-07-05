@@ -65,7 +65,7 @@ settings draft 不得保存：
 
 `sync.entry_blocker` 记录当前第一阻塞码，`sync.production_blockers` 记录聚合阻塞码。即使状态进入 `preflight_ready`，同步页的 `启用同步` 主按钮仍保持禁用。用户可用同步入口必须等待可用平台私钥 backend、发布级目标部署运行证据、恢复码和设备授权链路满足对应停止线。
 
-当前 `sync.production_blockers` 还会聚合恢复码保存确认、恢复记录、授权包前置条件、设备撤销、丢失设备风险提示和 key epoch 状态，例如 `recovery_record_not_created`、`recovery_code_save_confirmation_required`、`authorization_package_prerequisites_blocked`、`lost_device_risk_notice_required` 和 `key_epoch_rotation_not_started`。恢复码 setup / restore 与设备 join / revocation 的 readiness 摘要只输出状态码、前置条件和错误分类，并通过 `SyncReadinessFlowSummary` 聚合为 blocked flows、issue codes、next required evidence、source tags 和 user sync blocked；这些值只用于解释入口阻塞，不代表已创建恢复记录、join request、授权包或撤销记录。Dart 侧 `manager_sync_readiness.v1` mapper 只接受 allowlist 状态码和来源标签，未知值降级为 `unexpected_bridge_error_code` / `unexpected_bridge_required_evidence`，不把原始 bridge 异常、路径、token、恢复码、短码或 payload 写入 UI、settings draft 或诊断报告。
+当前 `sync.production_blockers` 还会聚合恢复码保存确认、恢复记录、授权包前置条件、设备撤销、丢失设备风险提示和 key epoch 状态，例如 `recovery_record_not_created`、`recovery_code_save_confirmation_required`、`authorization_package_prerequisites_blocked`、`lost_device_risk_notice_required` 和 `key_epoch_rotation_not_started`。恢复码 setup / restore 与设备 join / revocation 的 readiness 摘要只输出状态码、前置条件和错误分类，并通过 `SyncReadinessFlowSummary` 聚合为 blocked flows、issue codes、next required evidence、source tags 和 user sync blocked；这些值只用于解释入口阻塞，不代表已创建恢复记录、join request、授权包或撤销记录。`SyncInteractionEntryPlan` / `SyncInteractionActionIntent` 会把四条未来操作入口额外汇总为 action id、visibility、intent status、blocker、required evidence 和 source tag；这些字段只描述非执行进入计划，不代表按钮可点击或 bridge 操作已开放。Dart 侧 `manager_sync_readiness.v1` mapper 只接受 allowlist 状态码和来源标签，未知值降级为 `unexpected_bridge_error_code` / `unexpected_bridge_required_evidence`，不把原始 bridge 异常、路径、token、恢复码、短码或 payload 写入 UI、settings draft 或诊断报告。
 
 ## 连接健康摘要
 
@@ -181,6 +181,12 @@ Manager UI 预览会保留完整脱敏文本，并额外按 `runtime`、`setting
 | `sync.readiness_source_tags` | `gate` | readiness flow 摘要来源标签，只包含 Manager 内部只读 model source。 |
 | `sync.readiness_bridge_source` | `gate` | readiness bridge snapshot 来源标签；默认 `manager_default_closed_readiness`，未来 bridge 输入只能使用 allowlist 或安全降级标签。 |
 | `sync.readiness_user_sync_blocked` | `gate` | readiness flow 是否仍阻断用户可用同步入口。 |
+| `sync.interaction_actions` | `gate` | 四条未来交互入口 action id 摘要：`recovery_setup`、`recovery_restore`、`join_request_authorization` 和 `device_revocation`。 |
+| `sync.interaction_visibility` | `gate` | action intent 可见性摘要；当前均为只读可见的 `visible`。 |
+| `sync.interaction_statuses` | `gate` | action intent 状态摘要，例如 `closed_current_phase`、`blocked` 或 `requires_confirmation`；当前不表示可执行操作。 |
+| `sync.interaction_blockers` | `gate` | action intent 阻塞码摘要，例如 `recovery_code_generation_closed` 或 `user_sync_entry_closed_current_phase`。 |
+| `sync.interaction_required_evidence` | `gate` | action intent 下一步前置条件 / 停止线摘要；不包含恢复码、短码、token 或 payload。 |
+| `sync.interaction_source_tags` | `gate` | action intent 来源标签，来自同一组 readiness source tag。 |
 | `sync.user_sync_enabled` | `gate` | 当前用户可用真实同步入口是否开放；当前阶段应为 `false`。 |
 | `sync.recovery_status` | `gate` | 恢复码流程结构化状态；当前为 `recovery_code_flow_closed`。 |
 | `sync.recovery_blocker` | `gate` | 恢复码流程当前阻塞码；当前为 `recovery_code_flow_closed`。 |
@@ -271,11 +277,11 @@ git diff --check
 关键测试覆盖：
 
 - settings draft v1 写入 / 读取、access token 存在性持久化、旧 v1 缺 `deployment_evidence_source` 降级、未知格式拒绝、非法 URL 和非法 evidence source 拒绝。
-- Dart helper 覆盖隐私策略、backend gate、本地 `local_smoke`、非本地 evidence source、恢复码关闭状态、setup / restore readiness、保存确认要求、恢复记录未创建、设备授权关闭状态、join / revocation readiness、join request 不可用、授权包前置条件、撤销 / 丢失设备和 key epoch 风险提示派生。
+- Dart helper 覆盖隐私策略、backend gate、本地 `local_smoke`、非本地 evidence source、恢复码关闭状态、setup / restore readiness、保存确认要求、恢复记录未创建、设备授权关闭状态、join / revocation readiness、join request 不可用、授权包前置条件、撤销 / 丢失设备、key epoch 风险提示和只读 action intent 进入计划派生。
 - 连接健康 helper 覆盖 endpoint 缺失、URL userinfo 拒绝、access token 缺失、本地 HTTPS 可探测、外部 HTTPS 探测后置、`sync_connection_health.v1` 摘要回填、未知远端错误码净化和 settings draft 持久化。
 - 设置页 deployment evidence source 下拉、`deployment_unverified` 到 `preflight_ready` 的本地草案派生、真实同步按钮继续禁用。
-- 同步页展示 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers`、readiness 聚合摘要、`sync.user_sync_enabled`、服务连接健康、恢复码 setup / restore、恢复记录、保存确认、设备 join / revocation、授权包前置条件、丢失设备风险和 key epoch 状态，真实同步按钮继续禁用。
-- 诊断报告包含 gate source / stop line / evidence source / entry gate / readiness 聚合摘要 / connection health / recovery setup / recovery restore / device join / device revocation / authorization package / lost device / key epoch 摘要，并保持用户词、路径、token 和 payload bytes 脱敏。
+- 同步页展示 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers`、readiness 聚合摘要、只读 action intent 进入计划、`sync.user_sync_enabled`、服务连接健康、恢复码 setup / restore、恢复记录、保存确认、设备 join / revocation、授权包前置条件、丢失设备风险和 key epoch 状态，真实同步按钮继续禁用。
+- 诊断报告包含 gate source / stop line / evidence source / entry gate / readiness 聚合摘要 / interaction intent 摘要 / connection health / recovery setup / recovery restore / device join / device revocation / authorization package / lost device / key epoch 摘要，并保持用户词、路径、token 和 payload bytes 脱敏。
 - FFI smoke 使用临时 SQLite userdb、临时 settings JSON 和合成数据复验真实 Dart FFI bridge，不连接真实同步后端。
 
 涉及目标部署证据包格式、摘要或交接材料时，追加 `./scripts/check-sync-deployment-evidence.sh --self-test`、对应证据文件校验和 `--summary-json` 摘要输出检查。

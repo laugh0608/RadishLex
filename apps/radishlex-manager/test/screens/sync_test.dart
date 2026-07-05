@@ -68,12 +68,12 @@ void main() {
     expect(find.text('recovery_record_creation_closed'), findsOneWidget);
     expect(find.text('blocked_until_recovery_code_saved'), findsOneWidget);
     expect(find.text('recovery_setup_flow_closed'), findsOneWidget);
-    expect(find.text('recovery_code_generation_closed'), findsOneWidget);
+    expect(find.text('recovery_code_generation_closed'), findsWidgets);
     expect(
       find.text(
         'platform_private_key_backend_ready, release_deployment_evidence_summary_required, explicit_user_start_required',
       ),
-      findsOneWidget,
+      findsWidgets,
     );
     expect(
       find.text(
@@ -81,8 +81,11 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(find.text('setup intent'), findsOneWidget);
+    expect(find.text('setup intent blocker'), findsOneWidget);
+    expect(find.text('setup intent evidence'), findsOneWidget);
     expect(find.text('recovery_restore_flow_closed'), findsOneWidget);
-    expect(find.text('recovery_code_input_closed'), findsOneWidget);
+    expect(find.text('recovery_code_input_closed'), findsWidgets);
     expect(find.text('input_not_available_current_phase'), findsOneWidget);
     expect(
       find.text(
@@ -113,7 +116,10 @@ void main() {
     );
     expect(find.text('closed_current_phase'), findsWidgets);
     expect(find.text('device_join_flow_closed'), findsOneWidget);
-    expect(find.text('join_request_creation_closed'), findsOneWidget);
+    expect(find.text('join_request_creation_closed'), findsWidgets);
+    expect(find.text('join intent'), findsOneWidget);
+    expect(find.text('join intent blocker'), findsOneWidget);
+    expect(find.text('join intent evidence'), findsOneWidget);
     expect(find.text('short_code_verification_not_started'), findsOneWidget);
     expect(
       find.text(
@@ -122,6 +128,9 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('device_revocation_flow_closed'), findsWidgets);
+    expect(find.text('revocation intent'), findsOneWidget);
+    expect(find.text('revocation intent blocker'), findsOneWidget);
+    expect(find.text('revocation intent evidence'), findsOneWidget);
     expect(find.text('active_existing_device_required'), findsOneWidget);
     expect(
       find.text(
@@ -210,6 +219,16 @@ void main() {
     );
     expect(find.text('recovery_ready'), findsOneWidget);
     expect(find.text('device_authorization_ready'), findsOneWidget);
+    expect(
+      find.text(
+        'recovery_setup=closed_current_phase, recovery_restore=closed_current_phase, join_request_authorization=closed_current_phase, device_revocation=closed_current_phase',
+      ),
+      findsNothing,
+    );
+    expect(
+      find.text('user_sync_entry_current_phase_open_required'),
+      findsWidgets,
+    );
     expect(find.text('none'), findsWidgets);
     expect(
       find.textContaining('recovery_code_generation_closed'),
