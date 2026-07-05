@@ -8,6 +8,8 @@ Flutter manager 当前进入本地能力验收收口阶段。已落地能力覆�
 
 本阶段验收只证明管理端可以安全、可审计地管理本机数据和解释同步不可用原因；不证明用户可用远端同步已经开放。
 
+2026-07-05 复查结论：按下方退出标准逐项核对后，Phase 4 Flutter manager 本地验收当前没有影响退出标准的证据缺口。后续缺口集中在真实同步入口所需的平台私钥 backend、目标部署运行证据、恢复码交互和设备授权链路，不阻塞本地管理能力验收。
+
 ## 验收范围
 
 纳入验收：
@@ -41,6 +43,17 @@ Flutter manager 当前进入本地能力验收收口阶段。已落地能力覆�
 | 用户能配置自部署后端 | 设置页保存非 secret `settings draft`，校验 `server_endpoint`、`retain_sync_config`、`privacy_mode`、`diagnostics_export` 和部署证据来源标签；配置只派生本地 sync gate，不连接真实远端。 | `test/screens/settings_test.dart`、`test/ffi_manager_bridge_test.dart`、`docs/manager-settings-diagnostics.md` |
 | 用户能看到同步预检状态和生产不可用原因 | 同步页展示 sync gate、P2 对象分类、local-only 事件、设备 backend capability、production gate 和停止线；诊断报告也输出 gate source / stop line 的脱敏摘要。 | `test/screens/sync_test.dart`、`test/screens/settings_diagnostics_test.dart`、`./scripts/check-manager.sh` |
 | 用户可用同步开关在条件齐备前保持关闭 | `启用同步` 按钮保持禁用；`preflight_ready` 只表示本地草案可解释，不代表远端同步开放。 | `test/screens/sync_test.dart`、`test/screens/settings_test.dart`、`docs/manager-ui-boundary.md` |
+
+## 复查记录
+
+| 复查项 | 结论 | 说明 |
+| --- | --- | --- |
+| 本地词库管理 | 通过 | `dictionary_test.dart` 覆盖查看、搜索、空态、词条审计、删除确认、导入检查、确认导入、导入历史和导出；`manager_home_actions_test.dart` 固定结果文案与失败分类；FFI smoke 覆盖临时 userdb 的 inspect / import / delete / export。 |
+| 自部署后端配置草案 | 通过 | `settings_test.dart` 覆盖 server endpoint 草案、隐私模式、部署证据来源和 sync gate 派生；`ffi_manager_bridge_test.dart` 覆盖 settings JSON v1 持久化、旧字段降级、非法版本 / URL / evidence source 拒绝。 |
+| 同步预检与生产不可用原因 | 通过 | `sync_test.dart` 覆盖 `backend_unavailable`、`local_only`、P2 对象分类、local-only 计数、backend capability 和 production gate；`settings_diagnostics_test.dart` 覆盖 gate source / stop line 脱敏诊断展示。 |
+| 同步开关关闭 | 通过 | `sync_test.dart` 和 `settings_test.dart` 均断言 `sync-enable-button` 处于禁用态，包括 `preflight_ready` 草案状态。 |
+| 隐私与脱敏 | 通过 | `settings_diagnostics_test.dart` 和 `ffi_manager_bridge_test.dart` 断言诊断文本不包含用户词和本地路径；FFI smoke 断言诊断报告不包含临时 db、settings、导入路径或用户词。 |
+| 真实 Dart FFI bridge | 通过 | `check-manager-ffi-smoke.sh` 构建真实 `radishlex-ime-ffi` 动态库，并用临时 SQLite userdb、临时 settings JSON 和合成 TSV 复验本地管理链路。 |
 
 ## 验证入口
 
