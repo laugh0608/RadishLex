@@ -49,6 +49,8 @@ Phase 4 manager 本地验收已经有可复验证据，真实同步入口的下�
 
 目标部署证据包应先通过 `./scripts/check-sync-deployment-evidence.sh <evidence-file>`，并只通过 `deployment_evidence_summary.v1` 非敏感摘要交接给后续 UI / bridge 设计；证据包正文仍不进入 Flutter widget 状态、settings JSON 或诊断报告。manager 只能展示来自已校验证据包摘要的 `local_smoke`、`external_tls`、`backup_restore`、`upgrade_rollback` 这类 allowlist 标签和聚合状态；证书、token、日志正文、请求 / 响应体、真实路径、`notes` 和 payload bytes 都必须留在 UI / bridge / 诊断之外。`local_smoke` 只能证明实现级路径，不足以开放用户可用同步。
 
+2026-07-05 复查确认当前仓库内没有真实目标环境产生的 `deployment_evidence.v1`，只有合成 fixture 和校验 / 摘要工具。本状态只能记录为目标部署证据缺失；不得把 fixture 摘要映射为 manager 可用同步证据，也不得为此打开真实同步入口。
+
 ## 状态门禁
 
 现有 manager sync gate 状态继续保留，并按以下含义约束：

@@ -6,11 +6,13 @@
 
 - 日期：2026-07-05
 - 常态分支：`dev`
-- 当前主题：Phase 3 自部署同步出口治理已形成证据链，Phase 4 Flutter manager 本地管理能力验收复查已完成；真实同步入口前置交互边界和目标部署证据包口径 / 校验 / 摘要入口已固定为文档和工具证据。
+- 当前主题：Phase 3 自部署同步出口治理已形成证据链，Phase 4 Flutter manager 本地管理能力验收复查已完成；真实同步入口前置交互边界和目标部署证据包口径 / 校验 / 摘要入口已固定为文档和工具证据。2026-07-05 复查确认仓库内没有真实目标环境产生的 `deployment_evidence.v1`，当前仍阻塞于部署者提供非敏感证据包。
 
 ## 当前阶段
 
 RadishLex 已完成 Rust core、Rime adapter、userdb、ranker、crypto、sync client 边界、Go sync server 和第一批 Flutter manager 本地 FFI bridge 的起步证据。当前推进重点不是打开真实远端同步，而是保持 Phase 4 manager 本地验收证据可复查，并继续补齐后续真实同步入口所需的平台私钥 backend 与真实目标部署运行证据。
+
+目标部署运行证据采集当前状态：仓库内只有 `tests/fixtures/sync-deployment-evidence-valid.txt` 合成 fixture 和校验 / 摘要脚本，没有用户提供或目标环境产生的真实证据包。本轮不把合成 fixture 冒充真实部署证据；真实部署仍未验证，manager 继续保持 `deployment_unverified` / 不可用口径。
 
 近期默认先读本文，再按任务选读：
 
@@ -58,6 +60,7 @@ Flutter manager：
 ## 当前停止线
 
 - 不打开真实远端同步、恢复码 UI 或设备授权成功路径，直到可用平台私钥 backend、真实目标部署运行证据和对应实现测试齐备；恢复 / 授权交互边界与目标部署证据包目前只作为文档和校验工具证据存在。
+- 没有真实目标环境的 `deployment_evidence.v1` 通过校验并导出 `deployment_evidence_summary.v1` 前，不把目标部署状态写成完整通过，也不把合成 fixture 结论交接给 manager UI / bridge。
 - 不新增明文同步 payload、P1 原始事件导出、token / 恢复码 / 私钥 / wrapped material / payload bytes 日志或诊断字段。
 - 不让 Flutter manager 绕过 `ManagerBridge` / `ime-ffi` 直接读写 Rust 内部结构或 SQLite schema。
 - 不把 Go server 做成候选排序服务、在线转换服务或明文词库服务。
@@ -99,4 +102,4 @@ Sync server 部署预演：
 1. 维护本文短入口，避免新会话默认阅读长周志。
 2. 保持 Phase 4 manager 本地验收证据稳定；若后续改动触及验收范围，再按 `docs/manager-local-acceptance.md` 补精准 widget / helper / smoke 覆盖。
 3. 真实同步入口后续 UI / bridge 必须遵守 `docs/manager-sync-entry-boundary.md`，在条件齐备前只能展示准备状态和不可用原因。
-4. 下一批真实同步前置工作优先使用证据包校验 / 摘要入口获取真实目标部署运行证据，或继续补平台私钥 backend 证据，再考虑 sync entry state helper / UI gate 实现。
+4. 下一批真实同步前置工作优先由部署者提供真实目标环境的非敏感 `deployment_evidence.v1`，通过 `./scripts/check-sync-deployment-evidence.sh <evidence-file>` 和 `--summary-json` 导出 `deployment_evidence_summary.v1`；没有真实证据包时只记录阻塞，不推进 sync entry state helper / UI gate 实现。

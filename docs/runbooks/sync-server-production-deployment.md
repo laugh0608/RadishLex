@@ -65,6 +65,32 @@ notes: <non-sensitive summary only>
 
 禁止把真实域名证书正文、证书私钥、token、`.env` 内容、宿主机绝对路径、请求 / 响应体、payload bytes、signature bytes、wrapped material bytes、恢复码、同步主密钥、平台私钥、用户词、input code、reading 或 P1 原始事件写入证据包、settings draft、诊断报告或 committed 文档。
 
+### 无真实证据包时的阻塞记录
+
+如果当前会话没有用户提供或目标环境产生的真实 `deployment_evidence.v1`，不得使用仓库内合成 fixture 冒充真实部署证据，也不得从未通过校验的草稿中提取摘要。交接记录只写阻塞结论：真实目标部署未验证，manager 继续保持 `deployment_unverified`，真实同步、恢复码和设备授权入口继续关闭。
+
+部署者需要提供的非敏感字段清单：
+
+- `reviewed_at`：Asia/Shanghai `+08:00` 或 `Z` 时区的复验时间。
+- `target_alias`：不含真实域名、宿主机路径或用户信息的目标环境别名。
+- `git_commit`：部署对应的 RadishLex Git commit。
+- `image_tag`：明确镜像 tag，不使用浮动 `latest` 作为生产证据。
+- `compose_file`：固定为 `deploy/sync-server/docker-compose.yaml`。
+- `public_url_status`：只填 `configured` 或 `not_configured`，不写真实 URL。
+- `access_token_status`：只填 `configured_and_401_verified`、`missing` 或 `failed`，不写 token、长度、派生材料或请求头。
+- `access_control`、`external_tls`、`backup_restore`、`upgrade_rollback`、`log_redaction`：只填 `passed`、`failed` 或 `not_run`。
+- `notes`：只写非敏感摘要和阻塞原因，不写日志正文、命令输出、请求 / 响应体、证书、真实路径或 payload bytes。
+
+字段齐备后，先在本地未提交位置保存证据包，再执行：
+
+```sh
+./scripts/check-sync-deployment-evidence.sh <evidence-file>
+./scripts/check-sync-deployment-evidence.sh --summary-json <evidence-file>
+./scripts/check-sync-deployment-evidence.sh --summary-text <evidence-file>
+```
+
+只有通过校验后，才可以把 `deployment_evidence_summary.v1` 的非敏感摘要结论写入交接记录；证据包正文和证据文件路径不进入 committed 文档。
+
 ## 部署拓扑
 
 推荐拓扑：
