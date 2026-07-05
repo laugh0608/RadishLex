@@ -27,6 +27,19 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(
+      find.text(
+        'recovery_setup, recovery_restore, device_join, device_revocation',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('recovery_code_generation_closed'),
+      findsWidgets,
+    );
+    expect(find.textContaining('join_request_creation_closed'), findsWidgets);
+    expect(find.textContaining('recovery_setup_readiness'), findsOneWidget);
+    expect(find.text('true'), findsOneWidget);
     expect(find.text('false'), findsOneWidget);
     expect(find.text('syncable 3'), findsOneWidget);
     expect(find.text('local-only 128'), findsOneWidget);

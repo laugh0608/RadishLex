@@ -11,7 +11,7 @@
 - `DeviceJoinReadiness`：新设备 join request、短码核对和授权包前置条件。
 - `DeviceRevocationReadiness`：设备撤销、丢失设备风险提示和后续 key epoch 推进条件。
 
-这些模型只输出状态码、阻塞码、前置条件摘要和错误分类；不得输出恢复码、短码、token、私钥、signature bytes、wrapped material、payload bytes、请求 / 响应体、真实路径或证据包正文。
+这些模型会被汇总为 `SyncReadinessFlowSummary`，用于同步页、设置页和诊断报告输出同一组 blocked flows、issue codes、next required evidence、source tags 和 user sync blocked 摘要。所有模型只输出状态码、阻塞码、前置条件摘要和错误分类；不得输出恢复码、短码、token、私钥、signature bytes、wrapped material、payload bytes、请求 / 响应体、真实路径或证据包正文。
 
 ## 首台设备恢复码设置
 
@@ -109,8 +109,8 @@
 ## UI 与诊断要求
 
 - 同步页展示四条流程的 status、blocker 和错误分类摘要。
-- 设置页 gate preview 展示同一组字段，不提供操作按钮。
-- 诊断报告输出字段必须保留在 `sync_gate` 分组，只输出状态码和错误码。
+- 同步页和设置页 gate preview 展示同一组 readiness 聚合摘要，不提供操作按钮。
+- 诊断报告输出字段必须保留在 `sync_gate` 分组，只输出状态码、来源标签、前置条件码和错误码。
 - settings draft 不新增 secret 字段，不保存恢复码、短码、token、签名、wrapped material 或 payload bytes。
 - widget fixture 必须使用合成设备、合成 endpoint 和状态码，不嵌入真实账号、真实路径、真实服务端响应或截图中的敏感内容。
 

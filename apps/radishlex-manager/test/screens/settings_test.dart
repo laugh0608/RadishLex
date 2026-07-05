@@ -30,6 +30,18 @@ void main() {
     expect(find.text('not_recorded'), findsWidgets);
     expect(find.text('access_token_missing'), findsWidgets);
     expect(find.text('not_checked_access_token_missing'), findsOneWidget);
+    expect(
+      find.text(
+        'recovery_setup, recovery_restore, device_join, device_revocation',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('recovery_code_generation_closed'),
+      findsWidgets,
+    );
+    expect(find.textContaining('recovery_setup_readiness'), findsOneWidget);
+    expect(find.text('true'), findsOneWidget);
     expect(find.text('required_before_first_upload'), findsOneWidget);
     expect(find.text('recovery_record_not_created'), findsWidgets);
     expect(find.text('authorization_package_not_created'), findsOneWidget);
@@ -47,14 +59,14 @@ void main() {
     expect(find.text('recovery_code_input_closed'), findsOneWidget);
     expect(
       find.textContaining('platform_private_key_backend_ready'),
-      findsOneWidget,
+      findsWidgets,
     );
     expect(find.textContaining('recovery_code_required'), findsWidgets);
     expect(find.text('device_join_flow_closed'), findsOneWidget);
     expect(find.text('short_code_verification_not_started'), findsOneWidget);
     expect(find.text('device_revocation_flow_closed'), findsWidgets);
     expect(find.text('active_existing_device_required'), findsWidgets);
-    expect(find.textContaining('key_epoch_rotation_required'), findsOneWidget);
+    expect(find.textContaining('key_epoch_rotation_required'), findsWidgets);
   });
 
   testWidgets('settings draft save updates sync gate source', (
@@ -173,6 +185,13 @@ void main() {
     expect(find.text('device_authorization_flow_closed'), findsWidgets);
     expect(find.text('join_request_unavailable'), findsWidgets);
     expect(find.text('authorization_package_not_created'), findsWidgets);
+    expect(
+      find.text(
+        'recovery_setup, recovery_restore, device_join, device_revocation',
+      ),
+      findsWidgets,
+    );
+    expect(find.textContaining('recovery_setup_readiness'), findsWidgets);
     expect(find.text('recovery_setup_flow_closed'), findsWidgets);
     expect(find.text('recovery_restore_flow_closed'), findsWidgets);
     expect(find.text('device_join_flow_closed'), findsWidgets);

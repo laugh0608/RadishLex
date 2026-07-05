@@ -166,6 +166,23 @@ void main() {
         'network_unreachable',
       ]),
     );
+    expect(
+      gate.readinessBlockedFlowSummary,
+      'recovery_setup, recovery_restore, device_join, device_revocation',
+    );
+    expect(
+      gate.readinessIssueCodeSummary,
+      'recovery_code_generation_closed, recovery_code_required, recovery_record_missing, recovery_record_revoked, local_data_inconsistent, recovery_code_input_closed, recovery_code_invalid, authentication_required, network_unreachable, join_request_creation_closed, join_request_expired, authorization_rejected, device_revoked, backend_unavailable, device_revocation_flow_closed, key_epoch_rotation_required',
+    );
+    expect(
+      gate.readinessNextRequiredEvidenceSummary,
+      'platform_private_key_backend_ready, release_deployment_evidence_summary_required, explicit_user_start_required, input_not_available_current_phase, not_checked_current_phase, blocked_until_recovery_success, join_request_unavailable, short_code_verification_not_started, active_existing_device_required, join_request_pending_required, short_code_match_required, lost_device_prior_material_not_recallable, key_epoch_rotation_not_started',
+    );
+    expect(
+      gate.readinessSourceTagSummary,
+      'recovery_setup_readiness, recovery_restore_readiness, device_join_readiness, device_revocation_readiness',
+    );
+    expect(gate.readinessUserSyncBlocked, isTrue);
   });
 
   test(
@@ -206,6 +223,11 @@ void main() {
         'access_token_missing',
       );
       expect(audit.entryGate.userSyncEnabled, isFalse);
+      expect(
+        audit.entryGate.readinessBlockedFlowSummary,
+        'recovery_setup, recovery_restore, device_join, device_revocation',
+      );
+      expect(audit.entryGate.readinessUserSyncBlocked, isTrue);
     },
   );
 
@@ -246,6 +268,11 @@ void main() {
     expect(
       gate.deviceAuthorization.revocationReadiness.errorCodeSummary,
       contains('key_epoch_rotation_required'),
+    );
+    expect(gate.readinessIssueCodeSummary, contains('authorization_rejected'));
+    expect(
+      gate.readinessNextRequiredEvidenceSummary,
+      contains('release_deployment_evidence_summary_required'),
     );
     expect(
       gate.productionBlockers,
@@ -446,39 +473,41 @@ void main() {
     expect(health.lastRemoteErrorCode, 'configuration_invalid');
   });
 
-  test(
-    'external evidence remains blocked before recovery and authorization',
-    () {
-      const draft = ManagerSettingsDraft(
-        serverEndpoint: 'https://sync.example.invalid',
-        retainSyncConfig: true,
-        privacyMode: false,
-        diagnosticsExport: false,
-        deploymentEvidenceRecorded: true,
-        deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
-      );
+  test('external evidence remains blocked before recovery and authorization', () {
+    const draft = ManagerSettingsDraft(
+      serverEndpoint: 'https://sync.example.invalid',
+      retainSyncConfig: true,
+      privacyMode: false,
+      diagnosticsExport: false,
+      deploymentEvidenceRecorded: true,
+      deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
+    );
 
-      final audit = managerSyncGateAuditForDraft(
-        draft: draft,
-        device: readyDevice,
-      );
+    final audit = managerSyncGateAuditForDraft(
+      draft: draft,
+      device: readyDevice,
+    );
 
-      expect(audit.state, SyncUiState.preflightReady);
-      expect(audit.entryGate.entryState, SyncEntryState.blockedBeforeUserSync);
-      expect(audit.entryGate.entryBlocker, 'recovery_code_flow_closed');
-      expect(
-        audit.entryGate.localEvidenceSource,
-        managerDeploymentEvidenceExternalTls,
-      );
-      expect(
-        audit.entryGate.deviceAuthorization.joinRequestStatus.code,
-        'join_request_unavailable',
-      );
-      expect(
-        audit.entryGate.productionBlockers,
-        contains('release_deployment_evidence_summary_required'),
-      );
-      expect(audit.entryGate.userSyncEnabled, isFalse);
-    },
-  );
+    expect(audit.state, SyncUiState.preflightReady);
+    expect(audit.entryGate.entryState, SyncEntryState.blockedBeforeUserSync);
+    expect(audit.entryGate.entryBlocker, 'recovery_code_flow_closed');
+    expect(
+      audit.entryGate.localEvidenceSource,
+      managerDeploymentEvidenceExternalTls,
+    );
+    expect(
+      audit.entryGate.deviceAuthorization.joinRequestStatus.code,
+      'join_request_unavailable',
+    );
+    expect(
+      audit.entryGate.productionBlockers,
+      contains('release_deployment_evidence_summary_required'),
+    );
+    expect(
+      audit.entryGate.readinessSourceTagSummary,
+      'recovery_setup_readiness, recovery_restore_readiness, device_join_readiness, device_revocation_readiness',
+    );
+    expect(audit.entryGate.readinessUserSyncBlocked, isTrue);
+    expect(audit.entryGate.userSyncEnabled, isFalse);
+  });
 }

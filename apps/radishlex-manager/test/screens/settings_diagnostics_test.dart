@@ -29,7 +29,7 @@ void main() {
 
     expect(find.text('诊断摘要预览'), findsOneWidget);
     expect(find.text('分组 6'), findsOneWidget);
-    expect(find.text('字段 93'), findsOneWidget);
+    expect(find.text('字段 98'), findsOneWidget);
     expect(
       find.byKey(const Key('diagnostics-section-sync_gate')),
       findsOneWidget,
@@ -53,6 +53,34 @@ void main() {
     );
     expect(
       find.textContaining('sync.local_evidence_source: not_recorded'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.readiness_blocked_flows: recovery_setup, recovery_restore, device_join, device_revocation',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.readiness_issue_codes: recovery_code_generation_closed, recovery_code_required, recovery_record_missing, recovery_record_revoked, local_data_inconsistent, recovery_code_input_closed, recovery_code_invalid, authentication_required, network_unreachable, join_request_creation_closed, join_request_expired, authorization_rejected, device_revoked, backend_unavailable, device_revocation_flow_closed, key_epoch_rotation_required',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.readiness_next_required_evidence: platform_private_key_backend_ready, release_deployment_evidence_summary_required, explicit_user_start_required, input_not_available_current_phase, not_checked_current_phase, blocked_until_recovery_success, join_request_unavailable, short_code_verification_not_started, active_existing_device_required, join_request_pending_required, short_code_match_required, lost_device_prior_material_not_recallable, key_epoch_rotation_not_started',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.readiness_source_tags: recovery_setup_readiness, recovery_restore_readiness, device_join_readiness, device_revocation_readiness',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('sync.readiness_user_sync_blocked: true'),
       findsOneWidget,
     );
     expect(

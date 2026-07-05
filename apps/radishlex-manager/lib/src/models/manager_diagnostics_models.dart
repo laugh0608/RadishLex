@@ -273,6 +273,31 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
             'gate',
           ),
           _diagnosticsItem(
+            'sync.readiness_blocked_flows',
+            syncGateAudit.entryGate.readinessBlockedFlowSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.readiness_issue_codes',
+            syncGateAudit.entryGate.readinessIssueCodeSummary,
+            'error_code',
+          ),
+          _diagnosticsItem(
+            'sync.readiness_next_required_evidence',
+            syncGateAudit.entryGate.readinessNextRequiredEvidenceSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.readiness_source_tags',
+            syncGateAudit.entryGate.readinessSourceTagSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.readiness_user_sync_blocked',
+            syncGateAudit.entryGate.readinessUserSyncBlocked.toString(),
+            'gate',
+          ),
+          _diagnosticsItem(
             'sync.user_sync_enabled',
             syncGateAudit.entryGate.userSyncEnabled.toString(),
             'gate',

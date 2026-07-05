@@ -99,6 +99,44 @@ extension JoinRequestStatusLabel on JoinRequestStatus {
   }
 }
 
+class SyncReadinessFlowSummary {
+  const SyncReadinessFlowSummary({
+    required this.flowId,
+    required this.status,
+    required this.blocker,
+    required this.actionStatus,
+    required this.requiredEvidenceCodes,
+    required this.errorCodes,
+    required this.blocksUserSync,
+    required this.sourceTag,
+  });
+
+  final String flowId;
+  final String status;
+  final String blocker;
+  final String actionStatus;
+  final List<String> requiredEvidenceCodes;
+  final List<String> errorCodes;
+  final bool blocksUserSync;
+  final String sourceTag;
+
+  String get requiredEvidenceSummary {
+    return managerSyncCodeSummary(requiredEvidenceCodes);
+  }
+
+  String get errorCodeSummary {
+    return managerSyncCodeSummary(errorCodes);
+  }
+
+  List<String> get issueCodes {
+    return [if (blocker != 'none') blocker, ...errorCodes];
+  }
+
+  String get issueCodeSummary {
+    return managerSyncCodeSummary(issueCodes);
+  }
+}
+
 class RecoveryEntryGate {
   const RecoveryEntryGate({
     required this.status,
@@ -143,6 +181,10 @@ class RecoveryEntryGate {
   String get readinessBlockerSummary {
     return readinessBlockers.isEmpty ? 'none' : readinessBlockers.join(', ');
   }
+
+  List<SyncReadinessFlowSummary> get readinessFlowSummaries {
+    return [setupReadiness.toFlowSummary(), restoreReadiness.toFlowSummary()];
+  }
 }
 
 class RecoverySetupReadiness {
@@ -177,6 +219,19 @@ class RecoverySetupReadiness {
   String get errorCodeSummary {
     return errorCodes.isEmpty ? 'none' : errorCodes.join(', ');
   }
+
+  SyncReadinessFlowSummary toFlowSummary() {
+    return SyncReadinessFlowSummary(
+      flowId: 'recovery_setup',
+      status: status,
+      blocker: blocker,
+      actionStatus: entryActionStatus,
+      requiredEvidenceCodes: requiredPrerequisites,
+      errorCodes: errorCodes,
+      blocksUserSync: blocker != 'none',
+      sourceTag: 'recovery_setup_readiness',
+    );
+  }
 }
 
 class RecoveryRestoreReadiness {
@@ -202,6 +257,23 @@ class RecoveryRestoreReadiness {
 
   String get errorCodeSummary {
     return errorCodes.isEmpty ? 'none' : errorCodes.join(', ');
+  }
+
+  SyncReadinessFlowSummary toFlowSummary() {
+    return SyncReadinessFlowSummary(
+      flowId: 'recovery_restore',
+      status: status,
+      blocker: blocker,
+      actionStatus: entryActionStatus,
+      requiredEvidenceCodes: [
+        codeInputStatus,
+        recoveryRecordLookupStatus,
+        deviceRegistrationStatus,
+      ],
+      errorCodes: errorCodes,
+      blocksUserSync: blocker != 'none',
+      sourceTag: 'recovery_restore_readiness',
+    );
   }
 }
 
@@ -253,6 +325,10 @@ class DeviceAuthorizationEntryGate {
   String get readinessBlockerSummary {
     return readinessBlockers.isEmpty ? 'none' : readinessBlockers.join(', ');
   }
+
+  List<SyncReadinessFlowSummary> get readinessFlowSummaries {
+    return [joinReadiness.toFlowSummary(), revocationReadiness.toFlowSummary()];
+  }
 }
 
 class DeviceJoinReadiness {
@@ -278,6 +354,23 @@ class DeviceJoinReadiness {
 
   String get errorCodeSummary {
     return errorCodes.isEmpty ? 'none' : errorCodes.join(', ');
+  }
+
+  SyncReadinessFlowSummary toFlowSummary() {
+    return SyncReadinessFlowSummary(
+      flowId: 'device_join',
+      status: status,
+      blocker: blocker,
+      actionStatus: entryActionStatus,
+      requiredEvidenceCodes: [
+        joinRequestStatus.code,
+        shortCodeVerificationStatus,
+        authorizationPackagePreconditions,
+      ],
+      errorCodes: errorCodes,
+      blocksUserSync: blocker != 'none',
+      sourceTag: 'device_join_readiness',
+    );
   }
 }
 
@@ -305,6 +398,41 @@ class DeviceRevocationReadiness {
   String get errorCodeSummary {
     return errorCodes.isEmpty ? 'none' : errorCodes.join(', ');
   }
+
+  SyncReadinessFlowSummary toFlowSummary() {
+    return SyncReadinessFlowSummary(
+      flowId: 'device_revocation',
+      status: status,
+      blocker: blocker,
+      actionStatus: entryActionStatus,
+      requiredEvidenceCodes: [
+        activeDeviceRequirement,
+        lostDeviceRiskNotice,
+        keyEpochStatus,
+      ],
+      errorCodes: errorCodes,
+      blocksUserSync: blocker != 'none',
+      sourceTag: 'device_revocation_readiness',
+    );
+  }
+}
+
+String managerSyncCodeSummary(Iterable<String> codes) {
+  final uniqueCodes = <String>{};
+  for (final code in codes) {
+    final trimmed = code.trim();
+    if (trimmed.isEmpty || trimmed == 'none') {
+      continue;
+    }
+    for (final part in trimmed.split(',')) {
+      final normalized = part.trim();
+      if (normalized.isEmpty || normalized == 'none') {
+        continue;
+      }
+      uniqueCodes.add(normalized);
+    }
+  }
+  return uniqueCodes.isEmpty ? 'none' : uniqueCodes.join(', ');
 }
 
 const managerClosedRecoverySetupReadiness = RecoverySetupReadiness(

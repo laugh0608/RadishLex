@@ -44,6 +44,26 @@ class SyncPreflightSection extends StatelessWidget {
             value: audit.entryGate.productionBlockerSummary,
           ),
           ManagerKeyValueRow(
+            label: 'readiness blocked flows',
+            value: audit.entryGate.readinessBlockedFlowSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'readiness issue codes',
+            value: audit.entryGate.readinessIssueCodeSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'readiness next evidence',
+            value: audit.entryGate.readinessNextRequiredEvidenceSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'readiness source tags',
+            value: audit.entryGate.readinessSourceTagSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'readiness user sync blocked',
+            value: audit.entryGate.readinessUserSyncBlocked.toString(),
+          ),
+          ManagerKeyValueRow(
             label: 'user sync enabled',
             value: audit.entryGate.userSyncEnabled.toString(),
           ),

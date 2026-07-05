@@ -349,6 +349,46 @@ class ManagerSyncEntryGate {
   String get productionBlockerSummary {
     return productionBlockers.isEmpty ? 'none' : productionBlockers.join(', ');
   }
+
+  List<SyncReadinessFlowSummary> get readinessFlowSummaries {
+    return [
+      ...recovery.readinessFlowSummaries,
+      ...deviceAuthorization.readinessFlowSummaries,
+    ];
+  }
+
+  String get readinessBlockedFlowSummary {
+    return managerSyncCodeSummary(
+      readinessFlowSummaries
+          .where((flow) => flow.blocksUserSync)
+          .map((flow) => flow.flowId),
+    );
+  }
+
+  String get readinessIssueCodeSummary {
+    return managerSyncCodeSummary(
+      readinessFlowSummaries.expand((flow) => flow.issueCodes),
+    );
+  }
+
+  bool get readinessUserSyncBlocked {
+    return !userSyncEnabled &&
+        readinessFlowSummaries.any((flow) => flow.blocksUserSync);
+  }
+
+  String get readinessNextRequiredEvidenceSummary {
+    return managerSyncCodeSummary(
+      readinessFlowSummaries
+          .where((flow) => flow.blocksUserSync)
+          .expand((flow) => flow.requiredEvidenceCodes),
+    );
+  }
+
+  String get readinessSourceTagSummary {
+    return managerSyncCodeSummary(
+      readinessFlowSummaries.map((flow) => flow.sourceTag),
+    );
+  }
 }
 
 class ManagerSyncGateAudit {
