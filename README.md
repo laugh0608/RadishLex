@@ -51,6 +51,7 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - [管理端边界](docs/manager-ui-boundary.md)
 - [Flutter manager 本地验收口径](docs/manager-local-acceptance.md)
 - [Flutter manager 真实同步入口前置边界](docs/manager-sync-entry-boundary.md)
+- [Manager 恢复码与设备授权交互进入条件](docs/manager-recovery-device-auth-flow.md)
 - [Manager Settings 与诊断报告字段参考](docs/manager-settings-diagnostics.md)
 - [ADR 0002: 恢复码 KDF 与同步域恢复边界](docs/adr/0002-recovery-code-kdf.md)
 - [ADR 0003: 设备签名与私钥存储边界](docs/adr/0003-device-signing-key-storage.md)
@@ -98,6 +99,7 @@ cargo test -p radishlex-ime-userdb --test two_client_go_http_sync
 docker compose -f deploy/sync-server/docker-compose.local.yaml config
 docker compose -f deploy/sync-server/docker-compose.yaml --env-file deploy/sync-server/.env.example config
 ./scripts/check-sync-server-deployment-rehearsal.sh --config-only
+./scripts/check-sync-server-connection-health.sh --self-test
 ./scripts/check-sync-deployment-evidence.sh tests/fixtures/sync-deployment-evidence-valid.txt
 ./scripts/check-sync-deployment-evidence.sh --summary-json tests/fixtures/sync-deployment-evidence-valid.txt
 ```
@@ -106,9 +108,9 @@ docker compose -f deploy/sync-server/docker-compose.yaml --env-file deploy/sync-
 
 完整部署预演可执行 `./scripts/check-sync-server-deployment-rehearsal.sh`，它会用临时 env、随机 bearer token 和仓库外数据目录短生命周期启动部署态 Compose，验证 token 门禁、日志脱敏和冷备份恢复；该命令需要 Docker daemon 可用，默认仓库检查不运行。
 
-目标部署证据包格式和脱敏规则可用 `./scripts/check-sync-deployment-evidence.sh <evidence-file>` 复验；通过后可用 `--summary-json` 或 `--summary-text` 导出非敏感交接摘要。该命令只验证证据文件结构、敏感内容黑名单和摘要字段，不证明目标环境已经部署成功。
+本地同步服务连接健康摘要可用 `./scripts/check-sync-server-connection-health.sh` 采集，脚本只输出 `sync_connection_health.v1` 非敏感状态码、来源标签、HTTP 状态分类和错误分类，不输出 token、请求 / 响应体、证书内容、真实路径或 payload bytes。目标部署证据包格式和脱敏规则可用 `./scripts/check-sync-deployment-evidence.sh <evidence-file>` 复验；通过后可用 `--summary-json` 或 `--summary-text` 导出非敏感交接摘要。该命令只验证证据文件结构、敏感内容黑名单和摘要字段，不证明目标环境已经部署成功。
 
-Flutter manager 当前已在 `apps/radishlex-manager/` 起步，通过受控 `ManagerBridge` contract 接入合成 fixture，并可在显式配置本地 SQLite userdb 与 `ime-ffi` 动态库后切到真实 Dart FFI bridge。当前管理端展示本地词库、import batches、学习摘要、`rank explain`、`sync preflight`、settings draft、sync gate 草案和脱敏诊断摘要预览 / 导出；本地验收口径见 [Flutter manager 本地验收口径](docs/manager-local-acceptance.md)，真实同步入口进入 UI / bridge 前的交互边界见 [Flutter manager 真实同步入口前置边界](docs/manager-sync-entry-boundary.md)。真实远端同步、恢复码和设备授权 UI 仍按管理端边界保持关闭：
+Flutter manager 当前已在 `apps/radishlex-manager/` 起步，通过受控 `ManagerBridge` contract 接入合成 fixture，并可在显式配置本地 SQLite userdb 与 `ime-ffi` 动态库后切到真实 Dart FFI bridge。当前管理端展示本地词库、import batches、学习摘要、`rank explain`、`sync preflight`、settings draft、sync gate 草案、服务连接健康、恢复码 / 设备授权只读准备态、readiness 聚合摘要、只读交互进入计划和脱敏诊断摘要预览 / 导出；本地验收口径见 [Flutter manager 本地验收口径](docs/manager-local-acceptance.md)，真实同步入口进入 UI / bridge 前的交互边界见 [Flutter manager 真实同步入口前置边界](docs/manager-sync-entry-boundary.md)，恢复码与设备授权只读流程见 [Manager 恢复码与设备授权交互进入条件](docs/manager-recovery-device-auth-flow.md)。真实远端同步、恢复码生成 / 输入、join request 创建、设备授权成功和设备撤销 UI 仍按管理端边界保持关闭：
 
 ```bash
 ./scripts/check-manager.sh

@@ -116,6 +116,8 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 - settings draft 保存和读取。
 - backend capability / production gate 状态摘要。
 
+当前 Dart 侧 `manager_sync_readiness.v1` mapper 只定义 future bridge readiness 摘要到 Manager 只读 readiness model 的准备层映射，不改变 `ManagerBridge` contract，也不新增 C ABI。该 mapper 只能接受 allowlist 状态码、来源标签、前置条件和错误分类；未知值必须降级为安全分类，不能把 provider 原始异常、路径、token、恢复码、短码、signature bytes、wrapped material 或 payload bytes 传播到 UI、settings draft 或诊断报告。
+
 后续同步 UI 需要新增 bridge 时，应遵循：
 
 - bridge 入参不接受明文同步 payload。
@@ -139,13 +141,13 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 
 设置草案中的目标部署证据只允许保存非敏感来源标签，例如本机 smoke、外部 TLS、备份恢复或升级回滚演练；不得保存日志正文、证书、token、恢复码、路径、请求 / 响应体、payload bytes 或其他运行输出。字段级参考见 `docs/manager-settings-diagnostics.md`。
 
-同步服务连接健康只允许展示 `connection_status`、`connection_blocker`、`endpoint_status`、`access_token_status`、`transport_mode`、`server_state_status` 和 `last_remote_error_code` 这类摘要；access token 只能以存在性表示，URL credential、query token、请求 / 响应体和日志正文不得进入 widget、settings draft 或诊断报告。
+同步服务连接健康只允许展示 `connection_status`、`connection_blocker`、`endpoint_status`、`access_token_status`、`transport_mode`、`server_state_status`、`connection_probe_source`、`connection_probe_recorded_at`、`auth_status`、`http_status`、`http_status_class`、`local_insecure_tls` 和 `last_remote_error_code` 这类摘要；access token 只能以存在性表示，URL credential、query token、请求 / 响应体、证书内容、真实路径和日志正文不得进入 widget、settings draft 或诊断报告。
 
 ## 恢复码与设备授权
 
 恢复码、设备授权、设备撤销和真实同步入口状态进入产品实现前，必须先遵守 `docs/manager-sync-entry-boundary.md` 中的进入条件、bridge 边界、诊断脱敏和测试计划。
 
-当前 Flutter manager 已能展示服务连接健康、恢复码准备态、设备授权准备态和 join request 状态的只读摘要，默认仍不上传真实 P2 数据；恢复码 / 设备授权默认状态为 `recovery_code_flow_closed`、`device_authorization_flow_closed` 和 `join_request_unavailable`。这些状态只用于解释阻塞和诊断脱敏，不提供恢复码生成 / 输入、join request 创建、授权成功、设备撤销或真实同步上传入口。
+当前 Flutter manager 已能展示服务连接健康、恢复码准备态、设备授权准备态和 join request 状态的只读摘要，默认仍不上传真实 P2 数据；恢复码 / 设备授权默认状态为 `recovery_code_flow_closed`、`device_authorization_flow_closed` 和 `join_request_unavailable`。恢复码 setup / restore 与设备 join / revocation 已拆成四条 readiness，并通过 `SyncReadinessFlowSummary` 与 `SyncInteractionEntryPlan` 输出同一组聚合阻塞、错误分类、下一项证据、来源标签和非执行操作进入计划。这些状态只用于解释阻塞和诊断脱敏，不提供恢复码生成 / 输入、join request 创建、授权成功、设备撤销或真实同步上传入口。
 
 恢复码 UI 必须等到以下条件同时满足：
 
@@ -187,7 +189,7 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 6. `rank explain` 区域已通过专用 `ime-ffi` ABI 读取单候选贡献项，Flutter 只展示复制后的非敏感摘要，不持有 Rust view 指针。
 7. 已补设置页配置来源诊断、sync gate 草案预览、部署证据来源标签、设置草案保存、脱敏诊断报告分组预览 / 筛选 / 复制 / 导出和 bridge 失败结构化错误分类展示；UI 不透传 native 错误明细。
 8. 同步配置页继续保持真实上传按钮禁用，状态由设置草案、隐私模式、平台私钥 backend gate 和部署证据来源草案派生，可显示 `local_only`、`sync_disabled_by_policy`、`backend_unavailable`、`deployment_unverified` 或 `preflight_ready`。
-9. 已接入 sync entry state、恢复码 / 设备授权准备态和服务连接健康的非上传实现；后续在本地 Docker / 本地 HTTPS 服务启动时采集只读连接健康摘要，并继续推进恢复 / 授权交互设计。待可用平台私钥 backend、恢复 / 授权实现测试和发布级部署证据齐备后，再接设备授权成功路径、恢复码和用户可用同步。
+9. 已接入 sync entry state、服务连接健康、`sync_connection_health.v1` 摘要回填、恢复码 / 设备授权准备态、四条 readiness 聚合、future bridge readiness mapper 和只读交互进入计划的非上传实现；待可用平台私钥 backend、恢复 / 授权实现测试和发布级部署证据齐备后，再接设备授权成功路径、恢复码和用户可用同步。
 
 ## 停止线
 

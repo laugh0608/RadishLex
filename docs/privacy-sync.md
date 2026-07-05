@@ -163,7 +163,7 @@ DeletedTerm
 - 一键删除本机学习数据。
 - 一键从服务端删除当前账号密文数据。
 
-管理端详细边界见 `docs/manager-ui-boundary.md`。Phase 4 第一批实现应先覆盖本地 userdb 管理、学习状态摘要、rank explain 摘要和 sync preflight 摘要；下一步可以用本地 Docker / 本地 HTTPS 推进同步入口状态派生和阻塞说明。恢复码、设备授权成功路径和用户可用远端同步 UI 必须等待可用平台私钥 backend、恢复 / 授权实现测试与发布级目标部署运行证据。
+管理端详细边界见 `docs/manager-ui-boundary.md`。Phase 4 管理端当前覆盖本地 userdb 管理、学习状态摘要、rank explain 摘要、sync preflight 摘要、连接健康、settings draft、同步入口门禁、恢复码 / 设备授权只读准备态、readiness 聚合摘要、只读交互进入计划和诊断脱敏。`sync_connection_health.v1` 摘要只允许把 endpoint 状态、access token 存在性、transport 分类、server state 摘要、HTTP 状态分类、来源标签和结构化错误码映射到 settings draft / 诊断报告，不得携带 token、完整 URL credential、请求 / 响应体、证书内容、真实路径或 payload bytes。恢复码生成 / 输入、join request 创建、设备授权成功、设备撤销和用户可用远端同步 UI 必须等待可用平台私钥 backend、恢复 / 授权实现测试与发布级目标部署运行证据。
 
 ## 后端部署
 
