@@ -146,12 +146,14 @@ void main() {
           privacyMode: true,
           diagnosticsExport: true,
           deploymentEvidenceRecorded: true,
+          accessTokenConfigured: true,
           deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
         ),
       );
 
       expect(saved.settings.draft.privacyMode, isTrue);
       expect(saved.settings.draft.diagnosticsExport, isTrue);
+      expect(saved.settings.draft.accessTokenConfigured, isTrue);
       expect(
         saved.settings.runtimeDiagnostics.settingsStore,
         contains('configured'),
@@ -170,6 +172,7 @@ void main() {
       ).loadSnapshot();
 
       expect(reloaded.settings.draft.privacyMode, isTrue);
+      expect(reloaded.settings.draft.accessTokenConfigured, isTrue);
       expect(reloaded.sync.state, SyncUiState.syncDisabledByPolicy);
     },
   );
@@ -193,18 +196,22 @@ void main() {
         privacyMode: false,
         diagnosticsExport: true,
         deploymentEvidenceRecorded: true,
+        accessTokenConfigured: true,
         deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
       ),
     );
 
     expect(saved.serverEndpoint, 'https://sync.example.invalid');
     expect(saved.hasDeploymentEvidence, isTrue);
+    expect(saved.hasAccessToken, isTrue);
     final encoded = File(settingsFile).readAsStringSync();
     expect(encoded, contains('"format_version": 1'));
+    expect(encoded, contains('"access_token_configured": true'));
     expect(encoded, contains('"deployment_evidence_source": "external_tls"'));
 
     final reloaded = ManagerSettingsStore(filePath: settingsFile).load();
     expect(reloaded.hasDeploymentEvidence, isTrue);
+    expect(reloaded.hasAccessToken, isTrue);
     expect(
       managerDeploymentEvidenceLabel(reloaded),
       'deployment evidence external TLS',
@@ -280,6 +287,25 @@ void main() {
       () => store.save(
         const ManagerSettingsDraft(
           serverEndpoint: 'https://user:token@sync.example.invalid',
+          retainSyncConfig: true,
+          privacyMode: false,
+          diagnosticsExport: false,
+          deploymentEvidenceRecorded: false,
+        ),
+      ),
+      throwsA(
+        isA<ManagerSettingsStoreException>().having(
+          (error) => error.code,
+          'code',
+          'invalid_argument',
+        ),
+      ),
+    );
+
+    expect(
+      () => store.save(
+        const ManagerSettingsDraft(
+          serverEndpoint: 'https://sync.example.invalid?token=secret',
           retainSyncConfig: true,
           privacyMode: false,
           diagnosticsExport: false,

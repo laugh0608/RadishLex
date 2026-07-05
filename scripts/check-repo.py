@@ -53,6 +53,8 @@ REQUIRED_FILES = [
     "scripts/check-repo.sh",
     "scripts/check-sync-deployment-evidence.py",
     "scripts/check-sync-deployment-evidence.sh",
+    "scripts/check-sync-server-connection-health.py",
+    "scripts/check-sync-server-connection-health.sh",
     "scripts/check-text-files.py",
     "scripts/check-text-files.sh",
     "tests/fixtures/sync-deployment-evidence-valid.txt",
@@ -216,6 +218,10 @@ def check_deployment_evidence() -> None:
     run_script("check-sync-deployment-evidence.py", ["--self-test"])
 
 
+def check_sync_connection_health() -> None:
+    run_script("check-sync-server-connection-health.py", ["--self-test"])
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run RadishLex repository baseline checks.")
     parser.add_argument("--skip-text-files", action="store_true", help="Skip text hygiene checks.")
@@ -239,6 +245,7 @@ def main() -> int:
     check_ruleset_and_workflows()
     check_path_budget()
     check_deployment_evidence()
+    check_sync_connection_health()
     if not args.skip_go:
         check_go_server()
     if not args.skip_rust:

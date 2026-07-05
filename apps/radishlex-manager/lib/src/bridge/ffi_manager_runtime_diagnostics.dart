@@ -8,6 +8,7 @@ ManagerSettingsDraft fallbackFfiManagerSettingsDraft(String? serverEndpoint) {
     privacyMode: false,
     diagnosticsExport: false,
     deploymentEvidenceRecorded: false,
+    accessTokenConfigured: false,
   );
 }
 

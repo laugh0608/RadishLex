@@ -37,6 +37,7 @@ class ManagerSettingsDraft {
     required this.privacyMode,
     required this.diagnosticsExport,
     required this.deploymentEvidenceRecorded,
+    this.accessTokenConfigured = false,
     this.deploymentEvidenceSource = '',
   });
 
@@ -46,6 +47,7 @@ class ManagerSettingsDraft {
       privacyMode = false,
       diagnosticsExport = false,
       deploymentEvidenceRecorded = false,
+      accessTokenConfigured = false,
       deploymentEvidenceSource = '';
 
   final String serverEndpoint;
@@ -53,10 +55,13 @@ class ManagerSettingsDraft {
   final bool privacyMode;
   final bool diagnosticsExport;
   final bool deploymentEvidenceRecorded;
+  final bool accessTokenConfigured;
   final String deploymentEvidenceSource;
 
   bool get hasServerEndpoint =>
       retainSyncConfig && serverEndpoint.trim().isNotEmpty;
+
+  bool get hasAccessToken => retainSyncConfig && accessTokenConfigured;
 
   bool get hasDeploymentEvidence =>
       deploymentEvidenceRecorded &&
@@ -68,6 +73,7 @@ class ManagerSettingsDraft {
     bool? privacyMode,
     bool? diagnosticsExport,
     bool? deploymentEvidenceRecorded,
+    bool? accessTokenConfigured,
     String? deploymentEvidenceSource,
   }) {
     return ManagerSettingsDraft(
@@ -77,6 +83,8 @@ class ManagerSettingsDraft {
       diagnosticsExport: diagnosticsExport ?? this.diagnosticsExport,
       deploymentEvidenceRecorded:
           deploymentEvidenceRecorded ?? this.deploymentEvidenceRecorded,
+      accessTokenConfigured:
+          accessTokenConfigured ?? this.accessTokenConfigured,
       deploymentEvidenceSource:
           deploymentEvidenceSource ?? this.deploymentEvidenceSource,
     );

@@ -29,7 +29,7 @@ void main() {
 
     expect(find.text('诊断摘要预览'), findsOneWidget);
     expect(find.text('分组 6'), findsOneWidget);
-    expect(find.text('字段 49'), findsOneWidget);
+    expect(find.text('字段 57'), findsOneWidget);
     expect(
       find.byKey(const Key('diagnostics-section-sync_gate')),
       findsOneWidget,
@@ -67,6 +67,24 @@ void main() {
     );
     expect(
       find.textContaining('sync.join_request_status: join_request_unavailable'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('settings.access_token: not_configured'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('sync.connection_status: access_token_missing'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.server_state_status: not_checked_access_token_missing',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('sync.last_remote_error_code: none'),
       findsOneWidget,
     );
     expect(

@@ -29,6 +29,7 @@ class _SettingsViewState extends State<SettingsView> {
   late bool privacyMode;
   late bool diagnosticsExport;
   late bool deploymentEvidenceRecorded;
+  late bool accessTokenConfigured;
   late String deploymentEvidenceSource;
 
   @override
@@ -100,6 +101,16 @@ class _SettingsViewState extends State<SettingsView> {
                 }),
                 secondary: const Icon(Icons.cloud_done_outlined),
                 title: const Text('保留同步配置草案'),
+              ),
+              CheckboxListTile(
+                key: const Key('settings-access-token-configured'),
+                value: accessTokenConfigured,
+                onChanged: (value) => setState(() {
+                  accessTokenConfigured = value ?? false;
+                }),
+                secondary: const Icon(Icons.password_outlined),
+                title: const Text('access token 已配置'),
+                subtitle: const Text('仅记录存在性，不保存 token 文本。'),
               ),
               CheckboxListTile(
                 key: const Key('settings-deployment-evidence'),
@@ -211,6 +222,7 @@ class _SettingsViewState extends State<SettingsView> {
       privacyMode: privacyMode,
       diagnosticsExport: diagnosticsExport,
       deploymentEvidenceRecorded: deploymentEvidenceRecorded,
+      accessTokenConfigured: accessTokenConfigured,
       deploymentEvidenceSource: deploymentEvidenceSource,
     );
   }
@@ -221,6 +233,7 @@ class _SettingsViewState extends State<SettingsView> {
     privacyMode = draft.privacyMode;
     diagnosticsExport = draft.diagnosticsExport;
     deploymentEvidenceRecorded = draft.deploymentEvidenceRecorded;
+    accessTokenConfigured = draft.accessTokenConfigured;
     deploymentEvidenceSource = draft.deploymentEvidenceSource;
   }
 }
@@ -237,6 +250,7 @@ class _SettingsSyncGatePreview extends StatelessWidget {
       draft: draft,
       device: sync.device,
     );
+    final connection = audit.entryGate.connectionHealth;
     final tone = audit.entryGate.userSyncEnabled
         ? ManagerBadgeTone.success
         : ManagerBadgeTone.warning;
@@ -267,6 +281,10 @@ class _SettingsSyncGatePreview extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'server draft',
             value: managerSyncEndpointLabel(draft),
+          ),
+          ManagerKeyValueRow(
+            label: 'access token',
+            value: managerSyncAccessTokenStatus(draft),
           ),
           ManagerKeyValueRow(label: 'state source', value: audit.stateSource),
           ManagerKeyValueRow(
@@ -310,6 +328,26 @@ class _SettingsSyncGatePreview extends StatelessWidget {
             value: audit.entryGate.deviceAuthorization.joinRequestStatus.code,
           ),
           ManagerKeyValueRow(
+            label: 'connection status',
+            value: connection.status.code,
+          ),
+          ManagerKeyValueRow(
+            label: 'connection blocker',
+            value: connection.connectionBlocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'transport mode',
+            value: connection.transportMode,
+          ),
+          ManagerKeyValueRow(
+            label: 'server state',
+            value: connection.serverStateStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'last remote error',
+            value: connection.lastRemoteErrorCode,
+          ),
+          ManagerKeyValueRow(
             label: 'deployment evidence',
             value: managerDeploymentEvidenceLabel(draft),
           ),
@@ -334,6 +372,7 @@ bool _sameDraft(ManagerSettingsDraft left, ManagerSettingsDraft right) {
       left.privacyMode == right.privacyMode &&
       left.diagnosticsExport == right.diagnosticsExport &&
       left.deploymentEvidenceRecorded == right.deploymentEvidenceRecorded &&
+      left.accessTokenConfigured == right.accessTokenConfigured &&
       left.deploymentEvidenceSource == right.deploymentEvidenceSource;
 }
 

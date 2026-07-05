@@ -108,6 +108,7 @@ ManagerSettingsDraft _draftFromJson(Map<String, Object?> json) {
     deploymentEvidenceRecorded:
         _boolValue(json, 'deployment_evidence_recorded') &&
         deploymentEvidenceSource.trim().isNotEmpty,
+    accessTokenConfigured: _boolValue(json, 'access_token_configured'),
     deploymentEvidenceSource: deploymentEvidenceSource,
   );
 }
@@ -120,6 +121,7 @@ Map<String, Object?> _draftToJson(ManagerSettingsDraft draft) {
     'privacy_mode': draft.privacyMode,
     'diagnostics_export': draft.diagnosticsExport,
     'deployment_evidence_recorded': draft.deploymentEvidenceRecorded,
+    'access_token_configured': draft.accessTokenConfigured,
     'deployment_evidence_source': draft.deploymentEvidenceSource,
   };
 }
@@ -143,10 +145,13 @@ ManagerSettingsDraft _validateDraft(ManagerSettingsDraft draft) {
       !uri.hasScheme ||
       (uri.scheme != 'https' && uri.scheme != 'http') ||
       uri.host.isEmpty ||
-      uri.userInfo.isNotEmpty) {
+      uri.userInfo.isNotEmpty ||
+      uri.query.isNotEmpty ||
+      uri.fragment.isNotEmpty) {
     throw const ManagerSettingsStoreException(
       code: 'invalid_argument',
-      message: 'server endpoint must be http(s) without user info',
+      message:
+          'server endpoint must be http(s) without user info, query, or fragment',
     );
   }
 

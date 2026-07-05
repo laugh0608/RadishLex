@@ -75,6 +75,14 @@ void main() {
         audit.entryGate.productionBlockers,
         contains('platform_private_key_backend_blocked'),
       );
+      expect(
+        audit.entryGate.connectionHealth.status,
+        SyncConnectionStatus.accessTokenMissing,
+      );
+      expect(
+        audit.entryGate.connectionHealth.connectionBlocker,
+        'access_token_missing',
+      );
       expect(audit.entryGate.userSyncEnabled, isFalse);
     },
   );
@@ -86,6 +94,7 @@ void main() {
       privacyMode: false,
       diagnosticsExport: false,
       deploymentEvidenceRecorded: true,
+      accessTokenConfigured: true,
       deploymentEvidenceSource: managerDeploymentEvidenceLocalSmoke,
     );
 
@@ -94,6 +103,10 @@ void main() {
     expect(gate.entryState, SyncEntryState.localSmokeReady);
     expect(gate.entryBlocker, 'release_deployment_evidence_required');
     expect(gate.localEvidenceSource, managerDeploymentEvidenceLocalSmoke);
+    expect(
+      gate.connectionHealth.status,
+      SyncConnectionStatus.externalProbeDeferred,
+    );
     expect(gate.uiState, SyncUiState.preflightReady);
     expect(gate.userSyncEnabled, isFalse);
     expect(
@@ -105,6 +118,47 @@ void main() {
         'user_sync_entry_closed_current_phase',
       ]),
     );
+  });
+
+  test('local https endpoint with token is ready for read-only probe', () {
+    const draft = ManagerSettingsDraft(
+      serverEndpoint: 'https://localhost:7319',
+      retainSyncConfig: true,
+      privacyMode: false,
+      diagnosticsExport: false,
+      deploymentEvidenceRecorded: true,
+      accessTokenConfigured: true,
+      deploymentEvidenceSource: managerDeploymentEvidenceLocalSmoke,
+    );
+
+    final gate = deriveManagerSyncEntryGate(draft: draft, device: readyDevice);
+
+    expect(
+      gate.connectionHealth.status,
+      SyncConnectionStatus.localHttpsReadyForProbe,
+    );
+    expect(gate.connectionHealth.transportMode, 'local_https');
+    expect(gate.connectionHealth.accessTokenStatus, 'configured');
+    expect(gate.connectionHealth.serverStateStatus, 'read_only_probe_pending');
+    expect(gate.connectionHealth.canRunReadOnlyProbe, isTrue);
+  });
+
+  test('connection health rejects unsafe endpoint material', () {
+    const draft = ManagerSettingsDraft(
+      serverEndpoint: 'https://user:token@localhost:7319',
+      retainSyncConfig: true,
+      privacyMode: false,
+      diagnosticsExport: false,
+      deploymentEvidenceRecorded: false,
+      accessTokenConfigured: true,
+    );
+
+    final health = deriveManagerSyncConnectionHealth(draft);
+
+    expect(health.status, SyncConnectionStatus.endpointInvalid);
+    expect(health.connectionBlocker, 'server_endpoint_userinfo_forbidden');
+    expect(health.serverStateStatus, 'not_checked_endpoint_invalid');
+    expect(health.lastRemoteErrorCode, 'configuration_invalid');
   });
 
   test(

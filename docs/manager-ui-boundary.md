@@ -31,6 +31,7 @@ Phase 4 第一批管理端功能应覆盖：
 - 查看 sync preflight 摘要。
 - 查看 import batches、词条 tombstone 和本地 sync 影响摘要。
 - 配置自部署服务端地址和本地连接参数草案。
+- 查看本地同步服务连接健康摘要，只展示 endpoint 状态、access token 存在性、transport 分类、server state 摘要和结构化错误码。
 - 显示同步能力是否可用，以及不可用原因。
 - 查看本机设备身份、backend capability 和 production gate 状态摘要。
 - 保存非 secret settings draft，并从草案、隐私模式、平台私钥 backend gate 和部署证据来源标签派生 sync gate。
@@ -91,7 +92,7 @@ Phase 4 第一批管理端功能应覆盖：
 - 词库导入必须先展示导入检查摘要，再由用户确认写入；普通导入不得复活 tombstone，dry run 不写入 userdb。
 - 词库导出只导出用户显式请求的 P2 用户词条视图，不作为诊断报告的一部分混入。
 - 学习页、同步页和诊断报告只能展示聚合计数、状态码、来源标签和解释性摘要，不展示 P1 原始事件或明文同步 payload。
-- 设置页保存的是本地草案；`retain_sync_config`、`server_endpoint`、`privacy_mode`、`diagnostics_export` 和部署证据来源只用于派生 UI 状态，不启用真实上传。
+- 设置页保存的是本地草案；`retain_sync_config`、`server_endpoint`、`access_token_configured`、`privacy_mode`、`diagnostics_export` 和部署证据来源只用于派生 UI 状态，不启用真实上传。
 - 诊断报告预览的 section 筛选和关键字筛选只影响当前对话框字段列表，不改变 `ManagerDiagnosticsReport` 数据模型、脱敏文本、剪贴板内容或导出内容。
 - 复制诊断摘要必须复制完整脱敏文本；导出诊断摘要必须保持同一份脱敏摘要语义，不因当前筛选状态输出字段子集。
 
@@ -99,7 +100,7 @@ Phase 4 第一批管理端功能应覆盖：
 
 管理端应通过 `ime-ffi` 或后续受控 bridge 调用 Rust 能力，不直接读写 Rust 内部结构。
 
-当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、词库导入检查、词库导入、词库导出、设置草案保存、诊断报告预览和诊断报告导出这组受控方法。现有 `FixtureManagerBridge` 只使用合成数据验证调用边界、UI 状态更新、词库搜索 / 空态、词条 key / source / import batch / tombstone / sync 分类审计详情、词库页导入历史筛选 / 排序 / 批次联动审计、本地 sync preflight 影响摘要、学习状态聚合摘要、rank explain 筛选和候选贡献项详情、同步页 gate 状态来源 / 本地 P2 对象分类 / 设备 backend 门禁审计、设置页 gate 草案预览、部署证据来源标签、诊断报告字段分组 / 筛选 / 脱敏文本复制、诊断报告 gate source / stop line、删除确认、导入检查对话框、导入 / 导出结果反馈、操作失败分类提示、设置草案和脱敏诊断报告；真实 Dart FFI bridge 已覆盖本地 userdb list / delete、dictionary inspect / import / export、import batches、learning status、rank explain、sync preflight 摘要、非 secret settings JSON 草案持久化和脱敏诊断报告导出。Dart 绑定层必须复制 Rust view 后释放 handle，不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层；widget 层只展示结构化错误码、错误分类和非敏感配置来源诊断。
+当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、词库导入检查、词库导入、词库导出、设置草案保存、诊断报告预览和诊断报告导出这组受控方法。现有 `FixtureManagerBridge` 只使用合成数据验证调用边界、UI 状态更新、词库搜索 / 空态、词条 key / source / import batch / tombstone / sync 分类审计详情、词库页导入历史筛选 / 排序 / 批次联动审计、本地 sync preflight 影响摘要、学习状态聚合摘要、rank explain 筛选和候选贡献项详情、同步页 gate 状态来源 / 本地 P2 对象分类 / 连接健康 / 设备 backend 门禁审计、设置页 gate 草案预览、部署证据来源标签、诊断报告字段分组 / 筛选 / 脱敏文本复制、诊断报告 gate source / stop line、删除确认、导入检查对话框、导入 / 导出结果反馈、操作失败分类提示、设置草案和脱敏诊断报告；真实 Dart FFI bridge 已覆盖本地 userdb list / delete、dictionary inspect / import / export、import batches、learning status、rank explain、sync preflight 摘要、非 secret settings JSON 草案持久化和脱敏诊断报告导出。Dart 绑定层必须复制 Rust view 后释放 handle，不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层；widget 层只展示结构化错误码、错误分类和非敏感配置来源诊断。
 
 settings JSON schema、部署证据来源 allowlist、诊断报告字段索引和脱敏规则见 `docs/manager-settings-diagnostics.md`。
 
@@ -138,11 +139,13 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 
 设置草案中的目标部署证据只允许保存非敏感来源标签，例如本机 smoke、外部 TLS、备份恢复或升级回滚演练；不得保存日志正文、证书、token、恢复码、路径、请求 / 响应体、payload bytes 或其他运行输出。字段级参考见 `docs/manager-settings-diagnostics.md`。
 
+同步服务连接健康只允许展示 `connection_status`、`connection_blocker`、`endpoint_status`、`access_token_status`、`transport_mode`、`server_state_status` 和 `last_remote_error_code` 这类摘要；access token 只能以存在性表示，URL credential、query token、请求 / 响应体和日志正文不得进入 widget、settings draft 或诊断报告。
+
 ## 恢复码与设备授权
 
 恢复码、设备授权、设备撤销和真实同步入口状态进入产品实现前，必须先遵守 `docs/manager-sync-entry-boundary.md` 中的进入条件、bridge 边界、诊断脱敏和测试计划。
 
-当前 Flutter manager 已能展示恢复码准备态、设备授权准备态和 join request 状态的只读摘要，默认状态为 `recovery_code_flow_closed`、`device_authorization_flow_closed` 和 `join_request_unavailable`。这些状态只用于解释阻塞和诊断脱敏，不提供恢复码生成 / 输入、join request 创建、授权成功、设备撤销或真实同步上传入口。
+当前 Flutter manager 已能展示服务连接健康、恢复码准备态、设备授权准备态和 join request 状态的只读摘要，默认仍不上传真实 P2 数据；恢复码 / 设备授权默认状态为 `recovery_code_flow_closed`、`device_authorization_flow_closed` 和 `join_request_unavailable`。这些状态只用于解释阻塞和诊断脱敏，不提供恢复码生成 / 输入、join request 创建、授权成功、设备撤销或真实同步上传入口。
 
 恢复码 UI 必须等到以下条件同时满足：
 
@@ -178,13 +181,13 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 
 1. 已固定本文档，并同步路线图、技术计划、仓库结构和周志。
 2. 已创建 `apps/radishlex-manager/` Flutter macOS 工程骨架，当前通过 `ManagerBridge` contract 接入合成 fixture。
-3. 已验证词库搜索 / 空态、词条审计详情、导入历史筛选 / 排序 / 批次联动审计、本地 sync preflight 影响摘要、学习状态聚合摘要、rank explain 筛选和候选贡献项详情、同步页 gate 状态来源 / 本地 P2 对象分类 / 设备 backend 门禁审计、设置页 gate 草案预览、部署证据来源标签、诊断报告 gate source / stop line、词条删除确认、词库导入检查、词库导入后刷新、词库导入 / 导出结果摘要和操作失败分类提示经由 fixture bridge 完成受控调用。
+3. 已验证词库搜索 / 空态、词条审计详情、导入历史筛选 / 排序 / 批次联动审计、本地 sync preflight 影响摘要、学习状态聚合摘要、rank explain 筛选和候选贡献项详情、同步页 gate 状态来源 / 本地 P2 对象分类 / 连接健康 / 设备 backend 门禁审计、设置页 gate 草案预览、部署证据来源标签、诊断报告 gate source / stop line、词条删除确认、词库导入检查、词库导入后刷新、词库导入 / 导出结果摘要和操作失败分类提示经由 fixture bridge 完成受控调用。
 4. 已补第一批真实 Dart FFI bridge：显式配置本地 SQLite userdb 与 `ime-ffi` 动态库后，可接入 userdb 词条 list / delete、用户词库 inspect / import / export、import batches、learning status 摘要、rank explain 摘要和 sync preflight 摘要。
 5. 已新增 `scripts/check-manager-ffi-smoke.sh`，构建 `radishlex-ime-ffi` 动态库并使用临时 SQLite userdb、合成 TSV 和导出文件复验真实 Dart FFI bridge 的本地 list / delete / import / export、import batches、learning status、rank explain 和 sync preflight 摘要。
 6. `rank explain` 区域已通过专用 `ime-ffi` ABI 读取单候选贡献项，Flutter 只展示复制后的非敏感摘要，不持有 Rust view 指针。
 7. 已补设置页配置来源诊断、sync gate 草案预览、部署证据来源标签、设置草案保存、脱敏诊断报告分组预览 / 筛选 / 复制 / 导出和 bridge 失败结构化错误分类展示；UI 不透传 native 错误明细。
 8. 同步配置页继续保持真实上传按钮禁用，状态由设置草案、隐私模式、平台私钥 backend gate 和部署证据来源草案派生，可显示 `local_only`、`sync_disabled_by_policy`、`backend_unavailable`、`deployment_unverified` 或 `preflight_ready`。
-9. 下一步可以接 sync entry state helper / UI gate 的非上传实现；待可用平台私钥 backend、恢复 / 授权实现测试和发布级部署证据齐备后，再接设备授权成功路径、恢复码和用户可用同步。
+9. 已接入 sync entry state、恢复码 / 设备授权准备态和服务连接健康的非上传实现；后续在本地 Docker / 本地 HTTPS 服务启动时采集只读连接健康摘要，并继续推进恢复 / 授权交互设计。待可用平台私钥 backend、恢复 / 授权实现测试和发布级部署证据齐备后，再接设备授权成功路径、恢复码和用户可用同步。
 
 ## 停止线
 

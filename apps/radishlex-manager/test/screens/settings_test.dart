@@ -26,6 +26,8 @@ void main() {
     expect(find.text('deployment evidence missing'), findsWidgets);
     expect(find.text('backend_unavailable'), findsWidgets);
     expect(find.text('not_recorded'), findsOneWidget);
+    expect(find.text('access_token_missing'), findsWidgets);
+    expect(find.text('not_checked_access_token_missing'), findsOneWidget);
   });
 
   testWidgets('settings draft save updates sync gate source', (
@@ -47,6 +49,8 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('settings-privacy-mode')));
     await tester.pump();
+    await tester.tap(find.byKey(const Key('settings-access-token-configured')));
+    await tester.pump();
 
     expect(find.text('策略禁用同步'), findsOneWidget);
     expect(find.text('设置草案启用隐私模式'), findsOneWidget);
@@ -63,6 +67,7 @@ void main() {
     expect(find.text('策略禁用同步'), findsOneWidget);
     expect(find.text('设置草案启用隐私模式'), findsOneWidget);
     expect(find.text('https://draft.example.invalid'), findsOneWidget);
+    expect(find.text('not_checked_policy_disabled'), findsWidgets);
     final enableButton = tester.widget<FilledButton>(
       find.byKey(const Key('sync-enable-button')),
     );

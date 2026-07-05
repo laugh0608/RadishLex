@@ -46,6 +46,17 @@ https://localhost:7319
 
 本地 HTTPS 由 Caddy internal TLS 提供，因为 Go sync server 当前只实现 HTTP API。该 Caddy 入口只存在于本地 compose 文件中，不进入部署态 compose。Caddy internal TLS 证书默认不被宿主机信任；命令行 smoke 可使用 `curl -k`，浏览器或真实客户端验证如需无警告访问，应只在本机开发场景信任 Caddy 生成的本地 CA。
 
+本地服务启动后，可以用只读连接健康脚本输出非敏感摘要：
+
+```sh
+./scripts/check-sync-server-connection-health.sh \
+  --endpoint https://localhost:7319 \
+  --allow-local-insecure-tls \
+  --summary-text
+```
+
+该脚本只执行 `GET /api/v1/domains/<probe>/state` 读请求。未配置 token 的本地 compose 预期返回 `404 not_found` 并归类为 `domain_missing_expected`；启用 `RADISHLEX_SYNC_ACCESS_TOKEN` 后可通过 `--access-token-env RADISHLEX_SYNC_ACCESS_TOKEN` 读取本机环境变量。脚本输出 `sync_connection_health.v1` 摘要，不打印 token、完整响应体或请求体。
+
 ## 部署态 HTTP 上游
 
 部署态与兄弟 Radish 项目保持同类边界：容器入口只提供 HTTP，上游 TLS 由外部反向代理终止。

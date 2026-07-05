@@ -140,6 +140,11 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
             'configuration',
           ),
           _diagnosticsItem(
+            'settings.access_token',
+            managerSyncAccessTokenStatus(snapshot.settings.draft),
+            'configuration',
+          ),
+          _diagnosticsItem(
             'settings.privacy_mode',
             snapshot.settings.draft.privacyMode.toString(),
             'configuration',
@@ -296,6 +301,41 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
             'sync.join_request_status',
             syncGateAudit.entryGate.deviceAuthorization.joinRequestStatus.code,
             'gate',
+          ),
+          _diagnosticsItem(
+            'sync.connection_status',
+            syncGateAudit.entryGate.connectionHealth.status.code,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.connection_blocker',
+            syncGateAudit.entryGate.connectionHealth.connectionBlocker,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.endpoint_status',
+            syncGateAudit.entryGate.connectionHealth.endpointStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.access_token_status',
+            syncGateAudit.entryGate.connectionHealth.accessTokenStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.transport_mode',
+            syncGateAudit.entryGate.connectionHealth.transportMode,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.server_state_status',
+            syncGateAudit.entryGate.connectionHealth.serverStateStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.last_remote_error_code',
+            syncGateAudit.entryGate.connectionHealth.lastRemoteErrorCode,
+            'error_code',
           ),
           _diagnosticsItem(
             'sync.action_stop_line',

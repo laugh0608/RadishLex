@@ -23,7 +23,7 @@ void main() {
     expect(find.text('not_recorded'), findsOneWidget);
     expect(
       find.text(
-        'platform_private_key_backend_blocked, deployment_evidence_missing, recovery_code_flow_closed, device_authorization_flow_closed, user_sync_entry_closed_current_phase',
+        'access_token_missing, platform_private_key_backend_blocked, deployment_evidence_missing, recovery_code_flow_closed, device_authorization_flow_closed, user_sync_entry_closed_current_phase',
       ),
       findsOneWidget,
     );
@@ -31,6 +31,16 @@ void main() {
     expect(find.text('syncable 3'), findsOneWidget);
     expect(find.text('local-only 128'), findsOneWidget);
     expect(find.text('unsupported_signature_algorithm'), findsOneWidget);
+    expect(
+      find.byKey(const Key('sync-connection-health-section')),
+      findsOneWidget,
+    );
+    expect(find.text('服务连接健康'), findsOneWidget);
+    expect(find.text('access_token_missing'), findsWidgets);
+    expect(find.text('access token 未记录'), findsOneWidget);
+    expect(find.text('external_https'), findsOneWidget);
+    expect(find.text('not_checked_access_token_missing'), findsOneWidget);
+    expect(find.text('只读检查不上传 P2 对象，不生成恢复码，不打开设备授权成功路径。'), findsOneWidget);
     expect(
       find.byKey(const Key('sync-recovery-readiness-section')),
       findsOneWidget,
@@ -95,6 +105,8 @@ void main() {
     expect(find.text('local_only'), findsWidgets);
     expect(find.text('仅本地管理'), findsOneWidget);
     expect(find.text('未保留自部署服务端草案'), findsOneWidget);
+    expect(find.text('连接未配置'), findsOneWidget);
+    expect(find.text('not_checked_endpoint_missing'), findsOneWidget);
     expect(find.text('暂无本地 P2 对象分类摘要'), findsOneWidget);
     expect(find.text('syncable 0'), findsOneWidget);
     expect(find.text('local-only 0'), findsOneWidget);

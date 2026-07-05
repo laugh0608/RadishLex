@@ -168,6 +168,85 @@ extension JoinRequestStatusLabel on JoinRequestStatus {
   }
 }
 
+enum SyncConnectionStatus {
+  notConfigured,
+  syncDisabledByPolicy,
+  endpointInvalid,
+  accessTokenMissing,
+  localHttpsReadyForProbe,
+  localHttpReadyForProbe,
+  externalProbeDeferred,
+  unsupportedTransport,
+}
+
+extension SyncConnectionStatusLabel on SyncConnectionStatus {
+  String get code {
+    switch (this) {
+      case SyncConnectionStatus.notConfigured:
+        return 'not_configured';
+      case SyncConnectionStatus.syncDisabledByPolicy:
+        return 'sync_disabled_by_policy';
+      case SyncConnectionStatus.endpointInvalid:
+        return 'endpoint_invalid';
+      case SyncConnectionStatus.accessTokenMissing:
+        return 'access_token_missing';
+      case SyncConnectionStatus.localHttpsReadyForProbe:
+        return 'local_https_ready_for_probe';
+      case SyncConnectionStatus.localHttpReadyForProbe:
+        return 'local_http_ready_for_probe';
+      case SyncConnectionStatus.externalProbeDeferred:
+        return 'external_probe_deferred';
+      case SyncConnectionStatus.unsupportedTransport:
+        return 'unsupported_transport';
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case SyncConnectionStatus.notConfigured:
+        return '连接未配置';
+      case SyncConnectionStatus.syncDisabledByPolicy:
+        return '策略禁用连接检查';
+      case SyncConnectionStatus.endpointInvalid:
+        return 'endpoint 草案不可用';
+      case SyncConnectionStatus.accessTokenMissing:
+        return 'access token 未记录';
+      case SyncConnectionStatus.localHttpsReadyForProbe:
+        return '本地 HTTPS 可执行只读探测';
+      case SyncConnectionStatus.localHttpReadyForProbe:
+        return '本地 HTTP 可执行只读探测';
+      case SyncConnectionStatus.externalProbeDeferred:
+        return '外部目标探测后置';
+      case SyncConnectionStatus.unsupportedTransport:
+        return '连接传输模式不受支持';
+    }
+  }
+}
+
+class SyncConnectionHealth {
+  const SyncConnectionHealth({
+    required this.status,
+    required this.connectionBlocker,
+    required this.endpointStatus,
+    required this.accessTokenStatus,
+    required this.transportMode,
+    required this.serverStateStatus,
+    required this.lastRemoteErrorCode,
+  });
+
+  final SyncConnectionStatus status;
+  final String connectionBlocker;
+  final String endpointStatus;
+  final String accessTokenStatus;
+  final String transportMode;
+  final String serverStateStatus;
+  final String lastRemoteErrorCode;
+
+  bool get canRunReadOnlyProbe =>
+      status == SyncConnectionStatus.localHttpsReadyForProbe ||
+      status == SyncConnectionStatus.localHttpReadyForProbe;
+}
+
 class RecoveryEntryGate {
   const RecoveryEntryGate({
     required this.status,
@@ -243,12 +322,23 @@ const managerClosedDeviceAuthorizationEntryGate = DeviceAuthorizationEntryGate(
   canRevokeDevice: false,
 );
 
+const managerUnconfiguredSyncConnectionHealth = SyncConnectionHealth(
+  status: SyncConnectionStatus.notConfigured,
+  connectionBlocker: 'server_endpoint_missing',
+  endpointStatus: 'not_configured',
+  accessTokenStatus: 'not_configured',
+  transportMode: 'not_configured',
+  serverStateStatus: 'not_checked_endpoint_missing',
+  lastRemoteErrorCode: 'none',
+);
+
 class ManagerSyncEntryGate {
   const ManagerSyncEntryGate({
     required this.entryState,
     required this.entryBlocker,
     required this.localEvidenceSource,
     required this.productionBlockers,
+    this.connectionHealth = managerUnconfiguredSyncConnectionHealth,
     required this.recovery,
     required this.deviceAuthorization,
     required this.userSyncEnabled,
@@ -258,6 +348,7 @@ class ManagerSyncEntryGate {
   final String entryBlocker;
   final String localEvidenceSource;
   final List<String> productionBlockers;
+  final SyncConnectionHealth connectionHealth;
   final RecoveryEntryGate recovery;
   final DeviceAuthorizationEntryGate deviceAuthorization;
   final bool userSyncEnabled;
@@ -382,12 +473,101 @@ SyncUiState deriveManagerSyncUiState({
   return deriveManagerSyncEntryGate(draft: draft, device: device).uiState;
 }
 
+SyncConnectionHealth deriveManagerSyncConnectionHealth(
+  ManagerSettingsDraft draft,
+) {
+  final normalized = draft.normalized();
+  if (normalized.privacyMode) {
+    return const SyncConnectionHealth(
+      status: SyncConnectionStatus.syncDisabledByPolicy,
+      connectionBlocker: 'sync_disabled_by_policy',
+      endpointStatus: 'not_checked_policy_disabled',
+      accessTokenStatus: 'not_checked_policy_disabled',
+      transportMode: 'not_checked',
+      serverStateStatus: 'not_checked_policy_disabled',
+      lastRemoteErrorCode: 'none',
+    );
+  }
+  if (!normalized.hasServerEndpoint) {
+    return managerUnconfiguredSyncConnectionHealth;
+  }
+
+  final endpoint = _classifySyncEndpoint(normalized.serverEndpoint);
+  final accessTokenStatus = managerSyncAccessTokenStatus(normalized);
+  if (endpoint.blocker != 'none') {
+    return SyncConnectionHealth(
+      status: SyncConnectionStatus.endpointInvalid,
+      connectionBlocker: endpoint.blocker,
+      endpointStatus: endpoint.status,
+      accessTokenStatus: accessTokenStatus,
+      transportMode: endpoint.transportMode,
+      serverStateStatus: 'not_checked_endpoint_invalid',
+      lastRemoteErrorCode: 'configuration_invalid',
+    );
+  }
+  if (!normalized.hasAccessToken) {
+    return SyncConnectionHealth(
+      status: SyncConnectionStatus.accessTokenMissing,
+      connectionBlocker: 'access_token_missing',
+      endpointStatus: endpoint.status,
+      accessTokenStatus: accessTokenStatus,
+      transportMode: endpoint.transportMode,
+      serverStateStatus: 'not_checked_access_token_missing',
+      lastRemoteErrorCode: 'none',
+    );
+  }
+
+  switch (endpoint.transportMode) {
+    case 'local_https':
+      return SyncConnectionHealth(
+        status: SyncConnectionStatus.localHttpsReadyForProbe,
+        connectionBlocker: 'read_only_probe_not_run',
+        endpointStatus: endpoint.status,
+        accessTokenStatus: accessTokenStatus,
+        transportMode: endpoint.transportMode,
+        serverStateStatus: 'read_only_probe_pending',
+        lastRemoteErrorCode: 'none',
+      );
+    case 'local_http':
+      return SyncConnectionHealth(
+        status: SyncConnectionStatus.localHttpReadyForProbe,
+        connectionBlocker: 'read_only_probe_not_run',
+        endpointStatus: endpoint.status,
+        accessTokenStatus: accessTokenStatus,
+        transportMode: endpoint.transportMode,
+        serverStateStatus: 'read_only_probe_pending',
+        lastRemoteErrorCode: 'none',
+      );
+    case 'external_https':
+      return SyncConnectionHealth(
+        status: SyncConnectionStatus.externalProbeDeferred,
+        connectionBlocker: 'external_target_probe_deferred',
+        endpointStatus: endpoint.status,
+        accessTokenStatus: accessTokenStatus,
+        transportMode: endpoint.transportMode,
+        serverStateStatus: 'not_checked_release_probe_deferred',
+        lastRemoteErrorCode: 'none',
+      );
+    default:
+      return SyncConnectionHealth(
+        status: SyncConnectionStatus.unsupportedTransport,
+        connectionBlocker: 'remote_plain_http_forbidden',
+        endpointStatus: endpoint.status,
+        accessTokenStatus: accessTokenStatus,
+        transportMode: endpoint.transportMode,
+        serverStateStatus: 'not_checked_unsupported_transport',
+        lastRemoteErrorCode: 'configuration_invalid',
+      );
+  }
+}
+
 ManagerSyncEntryGate deriveManagerSyncEntryGate({
   required ManagerSettingsDraft draft,
   required DeviceSecuritySummary device,
 }) {
   final normalized = draft.normalized();
   final localEvidenceSource = managerSyncLocalEvidenceSource(normalized);
+  final connectionHealth = deriveManagerSyncConnectionHealth(normalized);
   final productionBlockers = managerSyncProductionBlockers(
     draft: normalized,
     device: device,
@@ -399,6 +579,7 @@ ManagerSyncEntryGate deriveManagerSyncEntryGate({
       entryBlocker: 'sync_disabled_by_policy',
       localEvidenceSource: localEvidenceSource,
       productionBlockers: productionBlockers,
+      connectionHealth: connectionHealth,
       recovery: managerClosedRecoveryEntryGate,
       deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
       userSyncEnabled: false,
@@ -410,6 +591,7 @@ ManagerSyncEntryGate deriveManagerSyncEntryGate({
       entryBlocker: 'server_endpoint_missing',
       localEvidenceSource: localEvidenceSource,
       productionBlockers: productionBlockers,
+      connectionHealth: connectionHealth,
       recovery: managerClosedRecoveryEntryGate,
       deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
       userSyncEnabled: false,
@@ -421,6 +603,7 @@ ManagerSyncEntryGate deriveManagerSyncEntryGate({
       entryBlocker: 'backend_unavailable',
       localEvidenceSource: localEvidenceSource,
       productionBlockers: productionBlockers,
+      connectionHealth: connectionHealth,
       recovery: managerClosedRecoveryEntryGate,
       deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
       userSyncEnabled: false,
@@ -432,6 +615,7 @@ ManagerSyncEntryGate deriveManagerSyncEntryGate({
       entryBlocker: 'deployment_unverified',
       localEvidenceSource: localEvidenceSource,
       productionBlockers: productionBlockers,
+      connectionHealth: connectionHealth,
       recovery: managerClosedRecoveryEntryGate,
       deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
       userSyncEnabled: false,
@@ -444,6 +628,7 @@ ManagerSyncEntryGate deriveManagerSyncEntryGate({
       entryBlocker: 'release_deployment_evidence_required',
       localEvidenceSource: localEvidenceSource,
       productionBlockers: productionBlockers,
+      connectionHealth: connectionHealth,
       recovery: managerClosedRecoveryEntryGate,
       deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
       userSyncEnabled: false,
@@ -455,6 +640,7 @@ ManagerSyncEntryGate deriveManagerSyncEntryGate({
     entryBlocker: managerClosedRecoveryEntryGate.blocker,
     localEvidenceSource: localEvidenceSource,
     productionBlockers: productionBlockers,
+    connectionHealth: connectionHealth,
     recovery: managerClosedRecoveryEntryGate,
     deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
     userSyncEnabled: false,
@@ -615,6 +801,9 @@ List<String> managerSyncProductionBlockers({
   if (!normalized.hasServerEndpoint) {
     blockers.add('server_endpoint_missing');
   }
+  if (normalized.hasServerEndpoint && !normalized.hasAccessToken) {
+    blockers.add('access_token_missing');
+  }
   if (!managerDeviceGateReady(device)) {
     blockers.add('platform_private_key_backend_${device.productionGate}');
   }
@@ -661,6 +850,97 @@ String managerSyncGateReason({
 
 String managerSyncEndpointLabel(ManagerSettingsDraft draft) {
   return draft.hasServerEndpoint ? draft.serverEndpoint.trim() : '未配置';
+}
+
+String managerSyncAccessTokenStatus(ManagerSettingsDraft draft) {
+  return draft.hasAccessToken ? 'configured' : 'not_configured';
+}
+
+_SyncEndpointClassification _classifySyncEndpoint(String endpoint) {
+  final uri = Uri.tryParse(endpoint.trim());
+  if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+    return const _SyncEndpointClassification(
+      status: 'invalid',
+      transportMode: 'invalid_endpoint',
+      blocker: 'server_endpoint_invalid',
+    );
+  }
+  if (uri.userInfo.isNotEmpty) {
+    return const _SyncEndpointClassification(
+      status: 'invalid_userinfo',
+      transportMode: 'invalid_endpoint',
+      blocker: 'server_endpoint_userinfo_forbidden',
+    );
+  }
+  if (uri.query.isNotEmpty) {
+    return const _SyncEndpointClassification(
+      status: 'invalid_query',
+      transportMode: 'invalid_endpoint',
+      blocker: 'server_endpoint_query_forbidden',
+    );
+  }
+  if (uri.fragment.isNotEmpty) {
+    return const _SyncEndpointClassification(
+      status: 'invalid_fragment',
+      transportMode: 'invalid_endpoint',
+      blocker: 'server_endpoint_fragment_forbidden',
+    );
+  }
+  if (uri.scheme != 'https' && uri.scheme != 'http') {
+    return const _SyncEndpointClassification(
+      status: 'invalid_scheme',
+      transportMode: 'invalid_endpoint',
+      blocker: 'server_endpoint_scheme_unsupported',
+    );
+  }
+
+  final host = uri.host.toLowerCase();
+  final isLocal = _isLocalSyncHost(host);
+  if (isLocal && uri.scheme == 'https') {
+    return const _SyncEndpointClassification(
+      status: 'configured',
+      transportMode: 'local_https',
+      blocker: 'none',
+    );
+  }
+  if (isLocal && uri.scheme == 'http') {
+    return const _SyncEndpointClassification(
+      status: 'configured',
+      transportMode: 'local_http',
+      blocker: 'none',
+    );
+  }
+  if (uri.scheme == 'https') {
+    return const _SyncEndpointClassification(
+      status: 'configured',
+      transportMode: 'external_https',
+      blocker: 'none',
+    );
+  }
+  return const _SyncEndpointClassification(
+    status: 'configured',
+    transportMode: 'remote_http',
+    blocker: 'none',
+  );
+}
+
+bool _isLocalSyncHost(String host) {
+  return host == 'localhost' ||
+      host == '127.0.0.1' ||
+      host == '::1' ||
+      host == '[::1]';
+}
+
+class _SyncEndpointClassification {
+  const _SyncEndpointClassification({
+    required this.status,
+    required this.transportMode,
+    required this.blocker,
+  });
+
+  final String status;
+  final String transportMode;
+  final String blocker;
 }
 
 ManagerSyncEntryGate _managerSyncEntryGateFromState({

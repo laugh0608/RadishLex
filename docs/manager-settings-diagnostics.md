@@ -5,7 +5,7 @@
 ## 当前边界
 
 - `ManagerBridge` contract 不暴露 settings JSON 字段级接口；UI 通过 `saveSettingsDraft` 保存完整草案。
-- settings draft 只保存本地管理端非 secret 草案，不保存 token、恢复码、私钥、signature bytes、wrapped material、payload bytes、证书、运行日志、文件路径或用户词条。
+- settings draft 只保存本地管理端非 secret 草案和 access token 存在性，不保存 token 文本、恢复码、私钥、signature bytes、wrapped material、payload bytes、证书、运行日志、文件路径或用户词条。
 - 诊断报告只输出聚合计数、状态码、非敏感来源标签、聚合阻塞码和脱敏策略，不输出用户词、导入 / 导出文件内容、本机真实路径、请求 / 响应体或 native 原始错误明细。
 - 诊断报告预览按本文字段索引展示分组、字段筛选和脱敏文本复制入口；复制内容与导出文本一致，仍只包含脱敏摘要。
 - 真实远端同步、恢复码和设备授权 UI 继续关闭；`preflight_ready` 只表示本地草案和预检条件可解释，不代表用户可用同步入口已开放。
@@ -17,8 +17,9 @@
 | 字段 | 类型 | 默认值 | 写入规则 | 说明 |
 | --- | --- | --- | --- | --- |
 | `format_version` | number | 必填 | 固定 `1` | settings draft 格式版本。 |
-| `server_endpoint` | string | `""` | trim 后写入 | 自部署服务端草案。只接受 `http` / `https` URL，必须有 host，禁止 URL userinfo。 |
+| `server_endpoint` | string | `""` | trim 后写入 | 自部署服务端草案。只接受 `http` / `https` URL，必须有 host，禁止 URL userinfo、query 和 fragment。 |
 | `retain_sync_config` | bool | `false` | 原样写入 | 是否保留同步配置草案；为 `false` 时 `server_endpoint` 不参与 sync gate。 |
+| `access_token_configured` | bool | `false` | 原样写入 | 是否已在本机安全位置配置 access token。只记录存在性，不保存 token 文本。 |
 | `privacy_mode` | bool | `false` | 原样写入 | 为 `true` 时 sync gate 派生为 `sync_disabled_by_policy`。 |
 | `diagnostics_export` | bool | `false` | 原样写入 | 是否允许管理端导出脱敏诊断摘要。 |
 | `deployment_evidence_recorded` | bool | `false` | 原样写入 | 是否记录目标部署验证草案。必须与有效 `deployment_evidence_source` 同时成立才视为有部署证据。 |
@@ -39,7 +40,7 @@ settings draft 不得保存：
 
 - 证据包全文、运行日志、curl 输出、请求体、响应体或 Nginx access log。
 - `deployment_evidence_summary.v1` 之外的自由文本摘要、证据文件路径或 `notes`。
-- 真实 token、恢复码、私钥、signature bytes、wrapped material bytes、encrypted payload bytes。
+- 真实 token、URL query token、恢复码、私钥、signature bytes、wrapped material bytes、encrypted payload bytes。
 - 证书正文、证书私钥、宿主机绝对路径、真实账号、真实用户词或完整服务端 URL 中的 credential。
 
 诊断报告只能展示 `deployment_evidence_source` 的 allowlist 值或 `not_recorded`，以及 `deployment evidence missing` / `deployment evidence <label>` 这类摘要。诊断报告不得把目标部署证据包展开成逐项运行记录。
@@ -49,7 +50,7 @@ settings draft 不得保存：
 - 旧 v1 文件如果缺少 `deployment_evidence_source`，即使 `deployment_evidence_recorded` 为 `true`，读取后也降级为未记录部署证据。
 - 未知字段当前忽略；新增字段前必须先更新本文档和对应测试。
 - 非 bool / 非 string 字段类型会返回 `settings_store_error`。
-- 非 allowlist evidence source、带 userinfo 的 URL、缺少 scheme / host 的 URL 会返回 `invalid_argument`。
+- 非 allowlist evidence source、带 userinfo / query / fragment 的 URL、缺少 scheme / host 的 URL 会返回 `invalid_argument`。
 
 ## Sync Gate 派生
 
@@ -63,6 +64,23 @@ settings draft 不得保存：
 6. 非本地 evidence source 且前置项通过：`entry_state = blocked_before_user_sync`，`sync.state = preflight_ready`。
 
 `sync.entry_blocker` 记录当前第一阻塞码，`sync.production_blockers` 记录聚合阻塞码。即使状态进入 `preflight_ready`，同步页的 `启用同步` 主按钮仍保持禁用。用户可用同步入口必须等待可用平台私钥 backend、发布级目标部署运行证据、恢复码和设备授权链路满足对应停止线。
+
+## 连接健康摘要
+
+Manager 当前只派生和展示本地连接健康摘要，不在 UI 中发起远端上传 / 下载。连接健康模型从 settings draft 读取 endpoint 和 access token 存在性，输出状态码：
+
+- `not_configured`：未保留同步配置或 endpoint 为空。
+- `sync_disabled_by_policy`：隐私模式禁用连接检查。
+- `endpoint_invalid`：endpoint 缺少 scheme / host，或包含 userinfo、query、fragment、非 http(s) scheme。
+- `access_token_missing`：endpoint 已配置但未记录 access token 存在性。
+- `local_https_ready_for_probe`：本地 HTTPS endpoint 与 access token 存在性已满足，可执行只读探测。
+- `local_http_ready_for_probe`：本地 HTTP endpoint 与 access token 存在性已满足，仅用于短生命周期本地开发探测。
+- `external_probe_deferred`：外部 HTTPS 目标探测后置到正式发布 / 真实用户开放前。
+- `unsupported_transport`：非本地 HTTP 被拒绝。
+
+同步页的“服务连接健康”和设置页的“同步门禁草案”只展示 `connection_status`、`connection_blocker`、`endpoint_status`、`access_token_status`、`transport_mode`、`server_state_status` 和 `last_remote_error_code`。这些字段不得包含完整 endpoint、token、请求 / 响应体、证书、真实路径或 payload bytes。
+
+本地 Docker / 本地 HTTPS 服务启动后，可使用 `./scripts/check-sync-server-connection-health.sh` 采集 `sync_connection_health.v1` 非敏感摘要。脚本只执行 `GET /api/v1/domains/<probe>/state` 读请求：`404 not_found` 表示服务和认证路径可达且 probe domain 不存在，`401 unauthenticated` 表示访问控制门禁可达但 token 缺失或失败。脚本输出不得写入 token、endpoint credential 或响应体正文。
 
 ## 诊断报告格式
 
@@ -109,6 +127,7 @@ Manager UI 预览会保留完整脱敏文本，并额外按 `runtime`、`setting
 | --- | --- | --- |
 | `settings.retain_sync_config` | `configuration` | 是否保留同步配置草案。 |
 | `settings.server_endpoint` | `configuration` | `configured` 或 `not_configured`，不输出完整 endpoint。 |
+| `settings.access_token` | `configuration` | `configured` 或 `not_configured`，只表示 access token 存在性。 |
 | `settings.privacy_mode` | `configuration` | 隐私模式草案。 |
 | `settings.diagnostics_export` | `configuration` | 诊断导出草案。 |
 | `settings.deployment_evidence` | `configuration` | 部署证据标签摘要，例如 `deployment evidence external TLS` 或 `deployment evidence missing`。 |
@@ -153,6 +172,13 @@ Manager UI 预览会保留完整脱敏文本，并额外按 `runtime`、`setting
 | `sync.device_authorization_status` | `gate` | 设备授权流程结构化状态；当前为 `device_authorization_flow_closed`。 |
 | `sync.device_authorization_blocker` | `gate` | 设备授权流程当前阻塞码；当前为 `device_authorization_flow_closed`。 |
 | `sync.join_request_status` | `gate` | 加入请求结构化状态；当前为 `join_request_unavailable`。 |
+| `sync.connection_status` | `gate` | 服务连接健康状态码，例如 `access_token_missing`、`local_https_ready_for_probe` 或 `external_probe_deferred`。 |
+| `sync.connection_blocker` | `gate` | 服务连接健康阻塞码，例如 `access_token_missing` 或 `read_only_probe_not_run`。 |
+| `sync.endpoint_status` | `gate` | endpoint 配置状态，例如 `configured`、`not_configured`、`invalid_userinfo`。 |
+| `sync.access_token_status` | `gate` | access token 存在性，`configured` 或 `not_configured`。 |
+| `sync.transport_mode` | `gate` | endpoint 传输分类，例如 `local_https`、`local_http`、`external_https` 或 `remote_http`。 |
+| `sync.server_state_status` | `gate` | 服务状态摘要，例如 `read_only_probe_pending`、`not_checked_access_token_missing` 或脚本输出的 `domain_missing_expected`。 |
+| `sync.last_remote_error_code` | `error_code` | 最近一次远端错误分类；未探测时为 `none` 或配置类错误码。 |
 | `sync.action_stop_line` | `gate` | 当前真实同步入口停止线。 |
 | `sync.deployment_evidence` | `gate` | 部署证据标签摘要。 |
 | `sync.syncable_objects` | `aggregate_count` | 可同步 P2 对象聚合计数。 |
@@ -193,11 +219,12 @@ git diff --check
 
 关键测试覆盖：
 
-- settings draft v1 写入 / 读取、旧 v1 缺 `deployment_evidence_source` 降级、未知格式拒绝、非法 URL 和非法 evidence source 拒绝。
+- settings draft v1 写入 / 读取、access token 存在性持久化、旧 v1 缺 `deployment_evidence_source` 降级、未知格式拒绝、非法 URL 和非法 evidence source 拒绝。
 - Dart helper 覆盖隐私策略、backend gate、本地 `local_smoke`、非本地 evidence source、恢复码关闭状态、设备授权关闭状态和 join request 不可用状态派生。
+- 连接健康 helper 覆盖 endpoint 缺失、URL userinfo 拒绝、access token 缺失、本地 HTTPS 可探测和外部 HTTPS 探测后置。
 - 设置页 deployment evidence source 下拉、`deployment_unverified` 到 `preflight_ready` 的本地草案派生、真实同步按钮继续禁用。
-- 同步页展示 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers`、`sync.user_sync_enabled`、恢复码准备态和设备授权准备态，真实同步按钮继续禁用。
-- 诊断报告包含 gate source / stop line / evidence source / entry gate / recovery / device authorization / join request 摘要，并保持用户词、路径、token 和 payload bytes 脱敏。
+- 同步页展示 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers`、`sync.user_sync_enabled`、服务连接健康、恢复码准备态和设备授权准备态，真实同步按钮继续禁用。
+- 诊断报告包含 gate source / stop line / evidence source / entry gate / connection health / recovery / device authorization / join request 摘要，并保持用户词、路径、token 和 payload bytes 脱敏。
 - FFI smoke 使用临时 SQLite userdb、临时 settings JSON 和合成数据复验真实 Dart FFI bridge，不连接真实同步后端。
 
 涉及目标部署证据包格式、摘要或交接材料时，追加 `./scripts/check-sync-deployment-evidence.sh --self-test`、对应证据文件校验和 `--summary-json` 摘要输出检查。
