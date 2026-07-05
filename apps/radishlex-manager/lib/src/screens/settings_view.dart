@@ -290,6 +290,26 @@ class _SettingsSyncGatePreview extends StatelessWidget {
             value: audit.entryGate.userSyncEnabled.toString(),
           ),
           ManagerKeyValueRow(
+            label: 'recovery status',
+            value: audit.entryGate.recovery.status.code,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery blocker',
+            value: audit.entryGate.recovery.blocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'authorization status',
+            value: audit.entryGate.deviceAuthorization.status.code,
+          ),
+          ManagerKeyValueRow(
+            label: 'authorization blocker',
+            value: audit.entryGate.deviceAuthorization.blocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'join request',
+            value: audit.entryGate.deviceAuthorization.joinRequestStatus.code,
+          ),
+          ManagerKeyValueRow(
             label: 'deployment evidence',
             value: managerDeploymentEvidenceLabel(draft),
           ),

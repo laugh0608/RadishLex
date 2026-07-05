@@ -32,6 +32,24 @@ void main() {
     expect(find.text('local-only 128'), findsOneWidget);
     expect(find.text('unsupported_signature_algorithm'), findsOneWidget);
     expect(
+      find.byKey(const Key('sync-recovery-readiness-section')),
+      findsOneWidget,
+    );
+    expect(find.text('恢复码准备态'), findsOneWidget);
+    expect(find.text('恢复码流程关闭'), findsOneWidget);
+    expect(find.text('recovery_code_flow_closed'), findsWidgets);
+    expect(find.text('not_started'), findsOneWidget);
+    expect(find.text('恢复码生成、输入、轮换和撤销仍未开放。'), findsOneWidget);
+    expect(
+      find.byKey(const Key('sync-device-authorization-readiness-section')),
+      findsOneWidget,
+    );
+    expect(find.text('设备授权准备态'), findsOneWidget);
+    expect(find.text('设备授权流程关闭'), findsOneWidget);
+    expect(find.text('device_authorization_flow_closed'), findsWidgets);
+    expect(find.text('join_request_unavailable'), findsOneWidget);
+    expect(find.text('设备加入审批、授权成功和撤销操作仍未开放。'), findsOneWidget);
+    expect(
       find.text('真实远端同步、恢复码和设备授权仍处于关闭状态；本页只展示本地预检和不可用原因。'),
       findsOneWidget,
     );

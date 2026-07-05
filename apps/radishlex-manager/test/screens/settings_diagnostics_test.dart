@@ -29,7 +29,7 @@ void main() {
 
     expect(find.text('诊断摘要预览'), findsOneWidget);
     expect(find.text('分组 6'), findsOneWidget);
-    expect(find.text('字段 46'), findsOneWidget);
+    expect(find.text('字段 49'), findsOneWidget);
     expect(
       find.byKey(const Key('diagnostics-section-sync_gate')),
       findsOneWidget,
@@ -53,6 +53,20 @@ void main() {
     );
     expect(
       find.textContaining('sync.local_evidence_source: not_recorded'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('sync.recovery_blocker: recovery_code_flow_closed'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.device_authorization_blocker: device_authorization_flow_closed',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('sync.join_request_status: join_request_unavailable'),
       findsOneWidget,
     );
     expect(

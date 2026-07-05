@@ -132,6 +132,9 @@ void main() {
     expect(find.text('preflight_ready'), findsWidgets);
     expect(find.text('本地预检通过'), findsOneWidget);
     expect(find.text('blocked_before_user_sync'), findsWidgets);
+    expect(find.text('recovery_code_flow_closed'), findsWidgets);
+    expect(find.text('device_authorization_flow_closed'), findsWidgets);
+    expect(find.text('join_request_unavailable'), findsWidgets);
     expect(find.text('deployment evidence external TLS'), findsWidgets);
 
     await tester.ensureVisible(find.byKey(const Key('settings-save-button')));

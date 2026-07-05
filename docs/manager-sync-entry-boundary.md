@@ -13,7 +13,7 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 - 不提供设备加入请求审批、授权成功路径或设备撤销 UI。
 - 不新增明文同步 payload、恢复码、私钥、signature bytes、wrapped material bytes、encrypted payload bytes 的日志、诊断字段或 widget 可见数据。
 
-2026-07-05 已落地 manager 侧 `SyncEntryState` / `ManagerSyncEntryGate` 的非上传实现。同步页、设置页草案预览和诊断报告现在可以从 settings draft、本地 `local_smoke` 来源、平台 backend gate、恢复码关闭状态和设备授权关闭状态派生阻塞说明；真实上传、恢复码生成和设备授权成功路径仍关闭。
+2026-07-05 已落地 manager 侧 `SyncEntryState` / `ManagerSyncEntryGate` 的非上传实现，并补齐恢复码准备态、设备授权准备态和 join request 状态的只读模型 / UI。同步页、设置页草案预览和诊断报告现在可以从 settings draft、本地 `local_smoke` 来源、平台 backend gate、恢复码关闭状态和设备授权关闭状态派生阻塞说明；真实上传、恢复码生成、恢复码输入、join request 创建、授权成功和设备撤销路径仍关闭。
 
 ## 适用范围
 
@@ -42,8 +42,8 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 | --- | --- | --- |
 | 平台私钥 backend | 生产签名 backend 可在目标平台创建、加载、签名和删除非导出设备签名 key，且 capability / production gate 可被 manager 读取。 | 未满足；Apple 与 Android backend 均未解除 production gate。 |
 | 部署运行证据 | 当前开发联调用本地 Docker、本地 HTTPS、短生命周期数据目录和 `local_smoke` 来源；正式发布 / 真实用户开放前再补目标环境外部 TLS、访问控制失败响应、备份恢复、升级回滚和日志脱敏复验。 | 本地 Docker / 本地 HTTPS 和多类 runtime smoke 已有证据；真实目标部署证据未形成，但不再阻塞 sync entry state helper / UI gate 的非上传开发。 |
-| 恢复码交互边界 | 恢复码只显示一次、用户确认保存、恢复记录创建 / 轮换 / 撤销、失败限速和日志脱敏测试齐备。 | 本文固定 UI / bridge 边界；产品实现仍未开始。 |
-| 设备授权交互边界 | join request、短码核对、授权包、设备撤销、lost device 和 key epoch 说明能被 UI 表达并测试。 | 本文固定 UI / bridge 边界；产品实现仍未开始。 |
+| 恢复码交互边界 | 恢复码只显示一次、用户确认保存、恢复记录创建 / 轮换 / 撤销、失败限速和日志脱敏测试齐备。 | 只读准备态已展示 `recovery_code_flow_closed`；生成、输入、轮换和撤销交互仍未开始。 |
+| 设备授权交互边界 | join request、短码核对、授权包、设备撤销、lost device 和 key epoch 说明能被 UI 表达并测试。 | 只读准备态已展示 `device_authorization_flow_closed` 和 `join_request_unavailable`；加入请求、授权成功和撤销交互仍未开始。 |
 | 客户端同步操作 | Flutter 只调用结构化 bridge；Rust 侧只接收 encrypted object 与 signed manifest，不暴露 plaintext payload。 | Rust / Go 侧已有底层证据；manager 真实远端操作入口未接。 |
 | 诊断脱敏 | 诊断报告只输出状态、来源标签、聚合计数和脱敏策略，不输出 secret 或 payload bytes。 | sync entry gate 摘要字段已接入并有 widget / bridge 测试覆盖；后续真实同步字段新增前仍需补测试。 |
 
@@ -200,14 +200,17 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 - `sync.production_blockers`
 - `sync.user_sync_enabled`
 - `sync.recovery_status`
+- `sync.recovery_blocker`
 - `sync.device_authorization_status`
+- `sync.device_authorization_blocker`
+- `sync.join_request_status`
 - `sync.last_remote_error_code`
 - `sync.last_object_counts`
 - `device.active_count`
 - `device.pending_count`
 - `device.revoked_count`
 
-当前已接入 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers`、`sync.user_sync_enabled`、`sync.recovery_status` 和 `sync.device_authorization_status`。这些字段只能输出状态码、聚合计数、时间摘要和 allowlist 来源标签。不得输出恢复码、token、请求 / 响应体、签名、wrapped material、payload bytes、用户词、真实路径或 provider exception 原文。
+当前已接入 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers`、`sync.user_sync_enabled`、`sync.recovery_status`、`sync.recovery_blocker`、`sync.device_authorization_status`、`sync.device_authorization_blocker` 和 `sync.join_request_status`。这些字段只能输出状态码、聚合计数、时间摘要和 allowlist 来源标签。不得输出恢复码、token、短码、请求 / 响应体、签名、wrapped material、payload bytes、用户词、真实路径或 provider exception 原文。
 
 日志允许记录操作类型、状态码、聚合计数、耗时和非敏感错误码。截图和测试 fixture 必须使用合成词、虚构设备、虚构服务端和合成短码。
 
@@ -233,8 +236,8 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 
 1. 保持 Phase 4 本地验收证据稳定。
 2. 用本地 Docker / 本地 HTTPS 和现有 smoke 作为开发期同步证据，保持 settings draft 只记录非敏感来源标签。
-3. manager sync entry state 派生和阻塞说明已经以非上传形式接入，继续不上传真实用户数据。
-4. 补恢复码和设备授权的结构化状态模型、只读准备态 UI 与错误测试。
+3. manager sync entry state 派生、恢复码准备态和设备授权准备态已经以非上传形式接入，继续不上传真实用户数据。
+4. 用本地 Docker / 本地 HTTPS 推进同步服务连接健康和错误分类的只读联调，只读取 endpoint / access token / server state 摘要。
 5. 取得至少一个可用平台私钥 backend 的生产签名证据，或补新的平台 / 算法 ADR 输入。
 6. 正式发布 / 真实用户开放前，按生产部署 runbook 补目标部署运行证据包，导出 `deployment_evidence_summary.v1` 非敏感摘要。
 7. 在恢复码确认、设备授权、发布级部署证据和 backend gate 全部满足后，再开放用户可用同步入口。

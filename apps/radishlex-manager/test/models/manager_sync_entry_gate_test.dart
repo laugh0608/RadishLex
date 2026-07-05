@@ -34,6 +34,16 @@ void main() {
     expect(gate.userSyncEnabled, isFalse);
     expect(gate.uiState, SyncUiState.syncDisabledByPolicy);
     expect(gate.productionBlockers, contains('sync_disabled_by_policy'));
+    expect(gate.recovery.status, RecoveryEntryStatus.flowClosed);
+    expect(gate.recovery.blocker, 'recovery_code_flow_closed');
+    expect(
+      gate.deviceAuthorization.status,
+      DeviceAuthorizationEntryStatus.flowClosed,
+    );
+    expect(
+      gate.deviceAuthorization.joinRequestStatus,
+      JoinRequestStatus.unavailable,
+    );
   });
 
   test(
@@ -56,6 +66,11 @@ void main() {
       expect(audit.state, SyncUiState.backendUnavailable);
       expect(audit.entryGate.entryState, SyncEntryState.backendUnavailable);
       expect(audit.entryGate.entryBlocker, 'backend_unavailable');
+      expect(audit.entryGate.recovery.status.code, 'recovery_code_flow_closed');
+      expect(
+        audit.entryGate.deviceAuthorization.status.code,
+        'device_authorization_flow_closed',
+      );
       expect(
         audit.entryGate.productionBlockers,
         contains('platform_private_key_backend_blocked'),
@@ -111,10 +126,14 @@ void main() {
 
       expect(audit.state, SyncUiState.preflightReady);
       expect(audit.entryGate.entryState, SyncEntryState.blockedBeforeUserSync);
-      expect(audit.entryGate.entryBlocker, 'blocked_before_user_sync');
+      expect(audit.entryGate.entryBlocker, 'recovery_code_flow_closed');
       expect(
         audit.entryGate.localEvidenceSource,
         managerDeploymentEvidenceExternalTls,
+      );
+      expect(
+        audit.entryGate.deviceAuthorization.joinRequestStatus.code,
+        'join_request_unavailable',
       );
       expect(
         audit.entryGate.productionBlockers,

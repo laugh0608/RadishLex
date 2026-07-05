@@ -274,12 +274,27 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
           ),
           _diagnosticsItem(
             'sync.recovery_status',
-            'recovery_code_flow_closed',
+            syncGateAudit.entryGate.recovery.status.code,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_blocker',
+            syncGateAudit.entryGate.recovery.blocker,
             'gate',
           ),
           _diagnosticsItem(
             'sync.device_authorization_status',
-            'device_authorization_flow_closed',
+            syncGateAudit.entryGate.deviceAuthorization.status.code,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.device_authorization_blocker',
+            syncGateAudit.entryGate.deviceAuthorization.blocker,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.join_request_status',
+            syncGateAudit.entryGate.deviceAuthorization.joinRequestStatus.code,
             'gate',
           ),
           _diagnosticsItem(

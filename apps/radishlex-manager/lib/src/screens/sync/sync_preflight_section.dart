@@ -8,19 +8,14 @@ class SyncPreflightSection extends StatelessWidget {
   const SyncPreflightSection({
     super.key,
     required this.sync,
-    required this.settingsDraft,
+    required this.audit,
   });
 
   final SyncPreflightSummary sync;
-  final ManagerSettingsDraft settingsDraft;
+  final ManagerSyncGateAudit audit;
 
   @override
   Widget build(BuildContext context) {
-    final audit = managerSyncGateAuditForDraft(
-      draft: settingsDraft,
-      device: sync.device,
-    );
-
     return ManagerSection(
       title: '同步预检',
       trailing: _SyncStateBadge(audit: audit),

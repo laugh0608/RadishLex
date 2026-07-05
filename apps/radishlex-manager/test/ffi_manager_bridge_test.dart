@@ -61,6 +61,27 @@ void main() {
       expect(text, contains('sync.entry_state: backend_unavailable'));
       expect(text, contains('sync.entry_blocker: backend_unavailable'));
       expect(text, contains('sync.local_evidence_source: not_recorded'));
+      expect(text, contains('sync.recovery_status: recovery_code_flow_closed'));
+      expect(
+        text,
+        contains('sync.recovery_blocker: recovery_code_flow_closed'),
+      );
+      expect(
+        text,
+        contains(
+          'sync.device_authorization_status: device_authorization_flow_closed',
+        ),
+      );
+      expect(
+        text,
+        contains(
+          'sync.device_authorization_blocker: device_authorization_flow_closed',
+        ),
+      );
+      expect(
+        text,
+        contains('sync.join_request_status: join_request_unavailable'),
+      );
       expect(
         text,
         contains('sync.deployment_evidence: deployment evidence missing'),

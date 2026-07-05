@@ -142,6 +142,8 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 
 恢复码、设备授权、设备撤销和真实同步入口状态进入产品实现前，必须先遵守 `docs/manager-sync-entry-boundary.md` 中的进入条件、bridge 边界、诊断脱敏和测试计划。
 
+当前 Flutter manager 已能展示恢复码准备态、设备授权准备态和 join request 状态的只读摘要，默认状态为 `recovery_code_flow_closed`、`device_authorization_flow_closed` 和 `join_request_unavailable`。这些状态只用于解释阻塞和诊断脱敏，不提供恢复码生成 / 输入、join request 创建、授权成功、设备撤销或真实同步上传入口。
+
 恢复码 UI 必须等到以下条件同时满足：
 
 - 可用平台私钥 backend 已通过真实平台验证。

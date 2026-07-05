@@ -144,12 +144,15 @@ Manager UI 预览会保留完整脱敏文本，并额外按 `runtime`、`setting
 | `sync.state_label` | `gate` | 用户可见状态标签。 |
 | `sync.state_source` | `gate` | 状态来源说明。 |
 | `sync.entry_state` | `gate` | 细分入口状态码，例如 `backend_unavailable`、`local_smoke_ready` 或 `blocked_before_user_sync`。 |
-| `sync.entry_blocker` | `gate` | 当前第一阻塞码，例如 `backend_unavailable`、`release_deployment_evidence_required` 或 `blocked_before_user_sync`。 |
+| `sync.entry_blocker` | `gate` | 当前第一阻塞码，例如 `backend_unavailable`、`release_deployment_evidence_required` 或 `recovery_code_flow_closed`。 |
 | `sync.local_evidence_source` | `gate` | deployment evidence allowlist source 或 `not_recorded`。 |
 | `sync.production_blockers` | `gate` | 聚合阻塞码列表，不含证据包正文、token、恢复码、签名或 payload bytes。 |
 | `sync.user_sync_enabled` | `gate` | 当前用户可用真实同步入口是否开放；当前阶段应为 `false`。 |
 | `sync.recovery_status` | `gate` | 恢复码流程结构化状态；当前为 `recovery_code_flow_closed`。 |
+| `sync.recovery_blocker` | `gate` | 恢复码流程当前阻塞码；当前为 `recovery_code_flow_closed`。 |
 | `sync.device_authorization_status` | `gate` | 设备授权流程结构化状态；当前为 `device_authorization_flow_closed`。 |
+| `sync.device_authorization_blocker` | `gate` | 设备授权流程当前阻塞码；当前为 `device_authorization_flow_closed`。 |
+| `sync.join_request_status` | `gate` | 加入请求结构化状态；当前为 `join_request_unavailable`。 |
 | `sync.action_stop_line` | `gate` | 当前真实同步入口停止线。 |
 | `sync.deployment_evidence` | `gate` | 部署证据标签摘要。 |
 | `sync.syncable_objects` | `aggregate_count` | 可同步 P2 对象聚合计数。 |
@@ -191,10 +194,10 @@ git diff --check
 关键测试覆盖：
 
 - settings draft v1 写入 / 读取、旧 v1 缺 `deployment_evidence_source` 降级、未知格式拒绝、非法 URL 和非法 evidence source 拒绝。
-- Dart helper 覆盖隐私策略、backend gate、本地 `local_smoke`、非本地 evidence source 与 `blocked_before_user_sync` 派生。
+- Dart helper 覆盖隐私策略、backend gate、本地 `local_smoke`、非本地 evidence source、恢复码关闭状态、设备授权关闭状态和 join request 不可用状态派生。
 - 设置页 deployment evidence source 下拉、`deployment_unverified` 到 `preflight_ready` 的本地草案派生、真实同步按钮继续禁用。
-- 同步页展示 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers` 和 `sync.user_sync_enabled`，真实同步按钮继续禁用。
-- 诊断报告包含 gate source / stop line / evidence source / entry gate 摘要，并保持用户词、路径、token 和 payload bytes 脱敏。
+- 同步页展示 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers`、`sync.user_sync_enabled`、恢复码准备态和设备授权准备态，真实同步按钮继续禁用。
+- 诊断报告包含 gate source / stop line / evidence source / entry gate / recovery / device authorization / join request 摘要，并保持用户词、路径、token 和 payload bytes 脱敏。
 - FFI smoke 使用临时 SQLite userdb、临时 settings JSON 和合成数据复验真实 Dart FFI bridge，不连接真实同步后端。
 
 涉及目标部署证据包格式、摘要或交接材料时，追加 `./scripts/check-sync-deployment-evidence.sh --self-test`、对应证据文件校验和 `--summary-json` 摘要输出检查。

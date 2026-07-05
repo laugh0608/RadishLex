@@ -67,12 +67,190 @@ extension SyncEntryStateLabel on SyncEntryState {
   }
 }
 
+enum RecoveryEntryStatus {
+  flowClosed,
+  recoveryCodeRequired,
+  saveConfirmationRequired,
+  ready,
+}
+
+extension RecoveryEntryStatusLabel on RecoveryEntryStatus {
+  String get code {
+    switch (this) {
+      case RecoveryEntryStatus.flowClosed:
+        return 'recovery_code_flow_closed';
+      case RecoveryEntryStatus.recoveryCodeRequired:
+        return 'recovery_code_required';
+      case RecoveryEntryStatus.saveConfirmationRequired:
+        return 'recovery_code_save_confirmation_required';
+      case RecoveryEntryStatus.ready:
+        return 'recovery_ready';
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case RecoveryEntryStatus.flowClosed:
+        return '恢复码流程关闭';
+      case RecoveryEntryStatus.recoveryCodeRequired:
+        return '等待恢复码';
+      case RecoveryEntryStatus.saveConfirmationRequired:
+        return '等待保存确认';
+      case RecoveryEntryStatus.ready:
+        return '恢复码准备完成';
+    }
+  }
+}
+
+enum DeviceAuthorizationEntryStatus {
+  flowClosed,
+  joinRequestUnavailable,
+  authorizationUnavailable,
+  ready,
+}
+
+extension DeviceAuthorizationEntryStatusLabel
+    on DeviceAuthorizationEntryStatus {
+  String get code {
+    switch (this) {
+      case DeviceAuthorizationEntryStatus.flowClosed:
+        return 'device_authorization_flow_closed';
+      case DeviceAuthorizationEntryStatus.joinRequestUnavailable:
+        return 'join_request_unavailable';
+      case DeviceAuthorizationEntryStatus.authorizationUnavailable:
+        return 'authorization_unavailable';
+      case DeviceAuthorizationEntryStatus.ready:
+        return 'device_authorization_ready';
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case DeviceAuthorizationEntryStatus.flowClosed:
+        return '设备授权流程关闭';
+      case DeviceAuthorizationEntryStatus.joinRequestUnavailable:
+        return '加入请求不可用';
+      case DeviceAuthorizationEntryStatus.authorizationUnavailable:
+        return '授权不可用';
+      case DeviceAuthorizationEntryStatus.ready:
+        return '设备授权准备完成';
+    }
+  }
+}
+
+enum JoinRequestStatus { unavailable, pending, expired, authorized }
+
+extension JoinRequestStatusLabel on JoinRequestStatus {
+  String get code {
+    switch (this) {
+      case JoinRequestStatus.unavailable:
+        return 'join_request_unavailable';
+      case JoinRequestStatus.pending:
+        return 'join_request_pending';
+      case JoinRequestStatus.expired:
+        return 'join_request_expired';
+      case JoinRequestStatus.authorized:
+        return 'join_request_authorized';
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case JoinRequestStatus.unavailable:
+        return '加入请求不可用';
+      case JoinRequestStatus.pending:
+        return '加入请求待处理';
+      case JoinRequestStatus.expired:
+        return '加入请求已过期';
+      case JoinRequestStatus.authorized:
+        return '加入请求已授权';
+    }
+  }
+}
+
+class RecoveryEntryGate {
+  const RecoveryEntryGate({
+    required this.status,
+    required this.blocker,
+    required this.canGenerateCode,
+    required this.canRestoreDevice,
+    required this.requiresSaveConfirmation,
+  });
+
+  final RecoveryEntryStatus status;
+  final String blocker;
+  final bool canGenerateCode;
+  final bool canRestoreDevice;
+  final bool requiresSaveConfirmation;
+
+  String get generateStatus {
+    return canGenerateCode ? 'available' : 'closed_current_phase';
+  }
+
+  String get restoreStatus {
+    return canRestoreDevice ? 'available' : 'closed_current_phase';
+  }
+
+  String get confirmationStatus {
+    return requiresSaveConfirmation ? 'required' : 'not_started';
+  }
+}
+
+class DeviceAuthorizationEntryGate {
+  const DeviceAuthorizationEntryGate({
+    required this.status,
+    required this.blocker,
+    required this.joinRequestStatus,
+    required this.canCreateJoinRequest,
+    required this.canApproveJoinRequest,
+    required this.canRevokeDevice,
+  });
+
+  final DeviceAuthorizationEntryStatus status;
+  final String blocker;
+  final JoinRequestStatus joinRequestStatus;
+  final bool canCreateJoinRequest;
+  final bool canApproveJoinRequest;
+  final bool canRevokeDevice;
+
+  String get createJoinRequestStatus {
+    return canCreateJoinRequest ? 'available' : 'closed_current_phase';
+  }
+
+  String get approveJoinRequestStatus {
+    return canApproveJoinRequest ? 'available' : 'closed_current_phase';
+  }
+
+  String get revokeDeviceStatus {
+    return canRevokeDevice ? 'available' : 'closed_current_phase';
+  }
+}
+
+const managerClosedRecoveryEntryGate = RecoveryEntryGate(
+  status: RecoveryEntryStatus.flowClosed,
+  blocker: 'recovery_code_flow_closed',
+  canGenerateCode: false,
+  canRestoreDevice: false,
+  requiresSaveConfirmation: false,
+);
+
+const managerClosedDeviceAuthorizationEntryGate = DeviceAuthorizationEntryGate(
+  status: DeviceAuthorizationEntryStatus.flowClosed,
+  blocker: 'device_authorization_flow_closed',
+  joinRequestStatus: JoinRequestStatus.unavailable,
+  canCreateJoinRequest: false,
+  canApproveJoinRequest: false,
+  canRevokeDevice: false,
+);
+
 class ManagerSyncEntryGate {
   const ManagerSyncEntryGate({
     required this.entryState,
     required this.entryBlocker,
     required this.localEvidenceSource,
     required this.productionBlockers,
+    required this.recovery,
+    required this.deviceAuthorization,
     required this.userSyncEnabled,
   });
 
@@ -80,6 +258,8 @@ class ManagerSyncEntryGate {
   final String entryBlocker;
   final String localEvidenceSource;
   final List<String> productionBlockers;
+  final RecoveryEntryGate recovery;
+  final DeviceAuthorizationEntryGate deviceAuthorization;
   final bool userSyncEnabled;
 
   SyncUiState get uiState {
@@ -219,6 +399,8 @@ ManagerSyncEntryGate deriveManagerSyncEntryGate({
       entryBlocker: 'sync_disabled_by_policy',
       localEvidenceSource: localEvidenceSource,
       productionBlockers: productionBlockers,
+      recovery: managerClosedRecoveryEntryGate,
+      deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
       userSyncEnabled: false,
     );
   }
@@ -228,6 +410,8 @@ ManagerSyncEntryGate deriveManagerSyncEntryGate({
       entryBlocker: 'server_endpoint_missing',
       localEvidenceSource: localEvidenceSource,
       productionBlockers: productionBlockers,
+      recovery: managerClosedRecoveryEntryGate,
+      deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
       userSyncEnabled: false,
     );
   }
@@ -237,6 +421,8 @@ ManagerSyncEntryGate deriveManagerSyncEntryGate({
       entryBlocker: 'backend_unavailable',
       localEvidenceSource: localEvidenceSource,
       productionBlockers: productionBlockers,
+      recovery: managerClosedRecoveryEntryGate,
+      deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
       userSyncEnabled: false,
     );
   }
@@ -246,6 +432,8 @@ ManagerSyncEntryGate deriveManagerSyncEntryGate({
       entryBlocker: 'deployment_unverified',
       localEvidenceSource: localEvidenceSource,
       productionBlockers: productionBlockers,
+      recovery: managerClosedRecoveryEntryGate,
+      deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
       userSyncEnabled: false,
     );
   }
@@ -256,15 +444,19 @@ ManagerSyncEntryGate deriveManagerSyncEntryGate({
       entryBlocker: 'release_deployment_evidence_required',
       localEvidenceSource: localEvidenceSource,
       productionBlockers: productionBlockers,
+      recovery: managerClosedRecoveryEntryGate,
+      deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
       userSyncEnabled: false,
     );
   }
 
   return ManagerSyncEntryGate(
     entryState: SyncEntryState.blockedBeforeUserSync,
-    entryBlocker: 'blocked_before_user_sync',
+    entryBlocker: managerClosedRecoveryEntryGate.blocker,
     localEvidenceSource: localEvidenceSource,
     productionBlockers: productionBlockers,
+    recovery: managerClosedRecoveryEntryGate,
+    deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
     userSyncEnabled: false,
   );
 }
@@ -414,6 +606,8 @@ List<String> managerSyncProductionBlockers({
   required DeviceSecuritySummary device,
 }) {
   final normalized = draft.normalized();
+  const recovery = managerClosedRecoveryEntryGate;
+  const deviceAuthorization = managerClosedDeviceAuthorizationEntryGate;
   final blockers = <String>[];
   if (normalized.privacyMode) {
     blockers.add('sync_disabled_by_policy');
@@ -433,8 +627,8 @@ List<String> managerSyncProductionBlockers({
     blockers.add('release_deployment_evidence_summary_required');
   }
   blockers
-    ..add('recovery_code_flow_closed')
-    ..add('device_authorization_flow_closed')
+    ..add(recovery.blocker)
+    ..add(deviceAuthorization.blocker)
     ..add('user_sync_entry_closed_current_phase');
   return List.unmodifiable(blockers);
 }
@@ -476,8 +670,8 @@ ManagerSyncEntryGate _managerSyncEntryGateFromState({
   final productionBlockers = <String>[
     if (!managerDeviceGateReady(device))
       'platform_private_key_backend_${device.productionGate}',
-    'recovery_code_flow_closed',
-    'device_authorization_flow_closed',
+    managerClosedRecoveryEntryGate.blocker,
+    managerClosedDeviceAuthorizationEntryGate.blocker,
     'user_sync_entry_closed_current_phase',
   ];
 
@@ -488,6 +682,8 @@ ManagerSyncEntryGate _managerSyncEntryGateFromState({
         entryBlocker: 'server_endpoint_missing',
         localEvidenceSource: 'unknown',
         productionBlockers: productionBlockers,
+        recovery: managerClosedRecoveryEntryGate,
+        deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
         userSyncEnabled: false,
       );
     case SyncUiState.syncDisabledByPolicy:
@@ -496,6 +692,8 @@ ManagerSyncEntryGate _managerSyncEntryGateFromState({
         entryBlocker: 'sync_disabled_by_policy',
         localEvidenceSource: 'unknown',
         productionBlockers: productionBlockers,
+        recovery: managerClosedRecoveryEntryGate,
+        deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
         userSyncEnabled: false,
       );
     case SyncUiState.backendUnavailable:
@@ -504,6 +702,8 @@ ManagerSyncEntryGate _managerSyncEntryGateFromState({
         entryBlocker: 'backend_unavailable',
         localEvidenceSource: 'unknown',
         productionBlockers: productionBlockers,
+        recovery: managerClosedRecoveryEntryGate,
+        deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
         userSyncEnabled: false,
       );
     case SyncUiState.deploymentUnverified:
@@ -512,15 +712,19 @@ ManagerSyncEntryGate _managerSyncEntryGateFromState({
         entryBlocker: 'deployment_unverified',
         localEvidenceSource: 'unknown',
         productionBlockers: productionBlockers,
+        recovery: managerClosedRecoveryEntryGate,
+        deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
         userSyncEnabled: false,
       );
     case SyncUiState.preflightReady:
     case SyncUiState.serverConfigured:
       return ManagerSyncEntryGate(
         entryState: SyncEntryState.preflightReady,
-        entryBlocker: 'blocked_before_user_sync',
+        entryBlocker: managerClosedRecoveryEntryGate.blocker,
         localEvidenceSource: 'unknown',
         productionBlockers: productionBlockers,
+        recovery: managerClosedRecoveryEntryGate,
+        deviceAuthorization: managerClosedDeviceAuthorizationEntryGate,
         userSyncEnabled: false,
       );
     case SyncUiState.readyForUserSync:
@@ -529,6 +733,21 @@ ManagerSyncEntryGate _managerSyncEntryGateFromState({
         entryBlocker: 'none',
         localEvidenceSource: 'unknown',
         productionBlockers: const [],
+        recovery: const RecoveryEntryGate(
+          status: RecoveryEntryStatus.ready,
+          blocker: 'none',
+          canGenerateCode: true,
+          canRestoreDevice: true,
+          requiresSaveConfirmation: false,
+        ),
+        deviceAuthorization: const DeviceAuthorizationEntryGate(
+          status: DeviceAuthorizationEntryStatus.ready,
+          blocker: 'none',
+          joinRequestStatus: JoinRequestStatus.authorized,
+          canCreateJoinRequest: true,
+          canApproveJoinRequest: true,
+          canRevokeDevice: true,
+        ),
         userSyncEnabled: true,
       );
   }
