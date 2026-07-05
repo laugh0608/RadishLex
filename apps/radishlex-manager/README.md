@@ -38,7 +38,7 @@ RadishLex Manager 是萝卜词核的 Flutter 管理端起步工程。
 - `lib/src/bridge/ffi_dynamic_native_binding.dart` 是真实 Dart FFI bridge 主实现；动态符号加载、status/error 调用规则、ABI struct types 和 Rust view 复制分别拆在同目录的 `ffi_dynamic_native_*` 文件中。
 - `lib/src/bridge/ffi_manager_bridge.dart` 保留 `ManagerBridge` 编排；snapshot、dictionary、learning、sync 和 runtime diagnostics 映射拆在 `ffi_manager_*_mapper.dart` helper 中。
 - `lib/src/bridge/ffi_manager_native_models.dart` 作为 native DTO barrel 入口；contract、dictionary、learning、sync 和 rank DTO 已按能力拆分。
-- `test/screens/` 按页面拆分 dictionary、learning、settings、sync 和 settings diagnostics widget 覆盖；`test/widget_test.dart` 只保留 app shell 级加载失败覆盖。
+- `test/screens/` 按页面拆分 dictionary、learning、settings、sync 和 settings diagnostics widget 覆盖；`manager_home_actions_test.dart` 固定跨页 action helper 的结构化结果文案和 failure 分类；`test/widget_test.dart` 只保留 app shell 级加载失败覆盖。
 
 ## FFI bridge
 
