@@ -6,7 +6,7 @@
 
 - `ManagerBridge` contract 不暴露 settings JSON 字段级接口；UI 通过 `saveSettingsDraft` 保存完整草案。
 - settings draft 只保存本地管理端非 secret 草案，不保存 token、恢复码、私钥、signature bytes、wrapped material、payload bytes、证书、运行日志、文件路径或用户词条。
-- 诊断报告只输出聚合计数、状态码、非敏感来源标签和脱敏策略，不输出用户词、导入 / 导出文件内容、本机真实路径、请求 / 响应体或 native 原始错误明细。
+- 诊断报告只输出聚合计数、状态码、非敏感来源标签、聚合阻塞码和脱敏策略，不输出用户词、导入 / 导出文件内容、本机真实路径、请求 / 响应体或 native 原始错误明细。
 - 诊断报告预览按本文字段索引展示分组、字段筛选和脱敏文本复制入口；复制内容与导出文本一致，仍只包含脱敏摘要。
 - 真实远端同步、恢复码和设备授权 UI 继续关闭；`preflight_ready` 只表示本地草案和预检条件可解释，不代表用户可用同步入口已开放。
 
@@ -53,15 +53,16 @@ settings draft 不得保存：
 
 ## Sync Gate 派生
 
-当前 manager UI 从 settings draft 与设备签名摘要派生同步状态：
+当前 manager UI 先从 settings draft 与设备签名摘要派生 `SyncEntryState`，再映射到既有 `SyncUiState`：
 
-1. `privacy_mode == true`：`sync_disabled_by_policy`。
-2. `retain_sync_config == false` 或 `server_endpoint` 为空：`local_only`。
-3. `device.production_gate != "ready"`：`backend_unavailable`。
-4. `deployment_evidence_recorded` 未与有效 `deployment_evidence_source` 同时成立：`deployment_unverified`。
-5. 以上均通过：`preflight_ready`。
+1. `privacy_mode == true`：`entry_state = sync_disabled_by_policy`，`sync.state = sync_disabled_by_policy`。
+2. `retain_sync_config == false` 或 `server_endpoint` 为空：`entry_state = local_only`，`sync.state = local_only`。
+3. `device.production_gate != "ready"`：`entry_state = backend_unavailable`，`sync.state = backend_unavailable`。
+4. `deployment_evidence_recorded` 未与有效 `deployment_evidence_source` 同时成立：`entry_state = deployment_unverified`，`sync.state = deployment_unverified`。
+5. `deployment_evidence_source == local_smoke` 且前置项通过：`entry_state = local_smoke_ready`，`sync.state = preflight_ready`。
+6. 非本地 evidence source 且前置项通过：`entry_state = blocked_before_user_sync`，`sync.state = preflight_ready`。
 
-即使状态进入 `preflight_ready`，同步页的 `启用同步` 主按钮仍保持禁用。用户可用同步入口必须等待可用平台私钥 backend、发布级目标部署运行证据、恢复码和设备授权链路满足对应停止线。
+`sync.entry_blocker` 记录当前第一阻塞码，`sync.production_blockers` 记录聚合阻塞码。即使状态进入 `preflight_ready`，同步页的 `启用同步` 主按钮仍保持禁用。用户可用同步入口必须等待可用平台私钥 backend、发布级目标部署运行证据、恢复码和设备授权链路满足对应停止线。
 
 ## 诊断报告格式
 
@@ -142,6 +143,13 @@ Manager UI 预览会保留完整脱敏文本，并额外按 `runtime`、`setting
 | `sync.state` | `gate` | 当前 sync UI 状态码。 |
 | `sync.state_label` | `gate` | 用户可见状态标签。 |
 | `sync.state_source` | `gate` | 状态来源说明。 |
+| `sync.entry_state` | `gate` | 细分入口状态码，例如 `backend_unavailable`、`local_smoke_ready` 或 `blocked_before_user_sync`。 |
+| `sync.entry_blocker` | `gate` | 当前第一阻塞码，例如 `backend_unavailable`、`release_deployment_evidence_required` 或 `blocked_before_user_sync`。 |
+| `sync.local_evidence_source` | `gate` | deployment evidence allowlist source 或 `not_recorded`。 |
+| `sync.production_blockers` | `gate` | 聚合阻塞码列表，不含证据包正文、token、恢复码、签名或 payload bytes。 |
+| `sync.user_sync_enabled` | `gate` | 当前用户可用真实同步入口是否开放；当前阶段应为 `false`。 |
+| `sync.recovery_status` | `gate` | 恢复码流程结构化状态；当前为 `recovery_code_flow_closed`。 |
+| `sync.device_authorization_status` | `gate` | 设备授权流程结构化状态；当前为 `device_authorization_flow_closed`。 |
 | `sync.action_stop_line` | `gate` | 当前真实同步入口停止线。 |
 | `sync.deployment_evidence` | `gate` | 部署证据标签摘要。 |
 | `sync.syncable_objects` | `aggregate_count` | 可同步 P2 对象聚合计数。 |
@@ -183,8 +191,10 @@ git diff --check
 关键测试覆盖：
 
 - settings draft v1 写入 / 读取、旧 v1 缺 `deployment_evidence_source` 降级、未知格式拒绝、非法 URL 和非法 evidence source 拒绝。
+- Dart helper 覆盖隐私策略、backend gate、本地 `local_smoke`、非本地 evidence source 与 `blocked_before_user_sync` 派生。
 - 设置页 deployment evidence source 下拉、`deployment_unverified` 到 `preflight_ready` 的本地草案派生、真实同步按钮继续禁用。
-- 诊断报告包含 gate source / stop line / evidence source 摘要，并保持用户词、路径、token 和 payload bytes 脱敏。
+- 同步页展示 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers` 和 `sync.user_sync_enabled`，真实同步按钮继续禁用。
+- 诊断报告包含 gate source / stop line / evidence source / entry gate 摘要，并保持用户词、路径、token 和 payload bytes 脱敏。
 - FFI smoke 使用临时 SQLite userdb、临时 settings JSON 和合成数据复验真实 Dart FFI bridge，不连接真实同步后端。
 
 涉及目标部署证据包格式、摘要或交接材料时，追加 `./scripts/check-sync-deployment-evidence.sh --self-test`、对应证据文件校验和 `--summary-json` 摘要输出检查。

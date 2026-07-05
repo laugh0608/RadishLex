@@ -29,7 +29,7 @@ void main() {
 
     expect(find.text('诊断摘要预览'), findsOneWidget);
     expect(find.text('分组 6'), findsOneWidget);
-    expect(find.text('字段 39'), findsOneWidget);
+    expect(find.text('字段 46'), findsOneWidget);
     expect(
       find.byKey(const Key('diagnostics-section-sync_gate')),
       findsOneWidget,
@@ -38,9 +38,21 @@ void main() {
       find.byKey(const Key('diagnostics-item-sync.state_source')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const Key('diagnostics-item-sync.entry_state')),
+      findsOneWidget,
+    );
     expect(find.textContaining('runtime.bridge_mode: fixture'), findsOneWidget);
     expect(
       find.textContaining('sync.state_source: 设备 production gate 为 blocked'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('sync.entry_state: backend_unavailable'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('sync.local_evidence_source: not_recorded'),
       findsOneWidget,
     );
     expect(
@@ -107,7 +119,7 @@ void main() {
     expect(clipboardSetDataCalls, hasLength(1));
     expect(
       clipboardSetDataCalls.single.arguments,
-      containsPair('text', contains('sync.state_source')),
+      containsPair('text', contains('sync.entry_blocker')),
     );
 
     await tester.tap(find.text('关闭'));

@@ -33,9 +33,83 @@ extension SyncUiStateLabel on SyncUiState {
   bool get canEnableUserSync => this == SyncUiState.readyForUserSync;
 }
 
+enum SyncEntryState {
+  localOnly,
+  syncDisabledByPolicy,
+  backendUnavailable,
+  deploymentUnverified,
+  localSmokeReady,
+  preflightReady,
+  blockedBeforeUserSync,
+  readyForUserSync,
+}
+
+extension SyncEntryStateLabel on SyncEntryState {
+  String get code {
+    switch (this) {
+      case SyncEntryState.localOnly:
+        return 'local_only';
+      case SyncEntryState.syncDisabledByPolicy:
+        return 'sync_disabled_by_policy';
+      case SyncEntryState.backendUnavailable:
+        return 'backend_unavailable';
+      case SyncEntryState.deploymentUnverified:
+        return 'deployment_unverified';
+      case SyncEntryState.localSmokeReady:
+        return 'local_smoke_ready';
+      case SyncEntryState.preflightReady:
+        return 'preflight_ready';
+      case SyncEntryState.blockedBeforeUserSync:
+        return 'blocked_before_user_sync';
+      case SyncEntryState.readyForUserSync:
+        return 'ready_for_user_sync';
+    }
+  }
+}
+
+class ManagerSyncEntryGate {
+  const ManagerSyncEntryGate({
+    required this.entryState,
+    required this.entryBlocker,
+    required this.localEvidenceSource,
+    required this.productionBlockers,
+    required this.userSyncEnabled,
+  });
+
+  final SyncEntryState entryState;
+  final String entryBlocker;
+  final String localEvidenceSource;
+  final List<String> productionBlockers;
+  final bool userSyncEnabled;
+
+  SyncUiState get uiState {
+    switch (entryState) {
+      case SyncEntryState.localOnly:
+        return SyncUiState.localOnly;
+      case SyncEntryState.syncDisabledByPolicy:
+        return SyncUiState.syncDisabledByPolicy;
+      case SyncEntryState.backendUnavailable:
+        return SyncUiState.backendUnavailable;
+      case SyncEntryState.deploymentUnverified:
+        return SyncUiState.deploymentUnverified;
+      case SyncEntryState.localSmokeReady:
+      case SyncEntryState.preflightReady:
+      case SyncEntryState.blockedBeforeUserSync:
+        return SyncUiState.preflightReady;
+      case SyncEntryState.readyForUserSync:
+        return SyncUiState.readyForUserSync;
+    }
+  }
+
+  String get productionBlockerSummary {
+    return productionBlockers.isEmpty ? 'none' : productionBlockers.join(', ');
+  }
+}
+
 class ManagerSyncGateAudit {
   const ManagerSyncGateAudit({
     required this.state,
+    required this.entryGate,
     required this.stateLabel,
     required this.stateSource,
     required this.actionStopLine,
@@ -44,6 +118,7 @@ class ManagerSyncGateAudit {
   });
 
   final SyncUiState state;
+  final ManagerSyncEntryGate entryGate;
   final String stateLabel;
   final String stateSource;
   final String actionStopLine;
@@ -124,33 +199,95 @@ SyncUiState deriveManagerSyncUiState({
   required ManagerSettingsDraft draft,
   required DeviceSecuritySummary device,
 }) {
-  if (draft.privacyMode) {
-    return SyncUiState.syncDisabledByPolicy;
+  return deriveManagerSyncEntryGate(draft: draft, device: device).uiState;
+}
+
+ManagerSyncEntryGate deriveManagerSyncEntryGate({
+  required ManagerSettingsDraft draft,
+  required DeviceSecuritySummary device,
+}) {
+  final normalized = draft.normalized();
+  final localEvidenceSource = managerSyncLocalEvidenceSource(normalized);
+  final productionBlockers = managerSyncProductionBlockers(
+    draft: normalized,
+    device: device,
+  );
+
+  if (normalized.privacyMode) {
+    return ManagerSyncEntryGate(
+      entryState: SyncEntryState.syncDisabledByPolicy,
+      entryBlocker: 'sync_disabled_by_policy',
+      localEvidenceSource: localEvidenceSource,
+      productionBlockers: productionBlockers,
+      userSyncEnabled: false,
+    );
   }
-  if (!draft.hasServerEndpoint) {
-    return SyncUiState.localOnly;
+  if (!normalized.hasServerEndpoint) {
+    return ManagerSyncEntryGate(
+      entryState: SyncEntryState.localOnly,
+      entryBlocker: 'server_endpoint_missing',
+      localEvidenceSource: localEvidenceSource,
+      productionBlockers: productionBlockers,
+      userSyncEnabled: false,
+    );
   }
-  if (device.productionGate != 'ready') {
-    return SyncUiState.backendUnavailable;
+  if (!managerDeviceGateReady(device)) {
+    return ManagerSyncEntryGate(
+      entryState: SyncEntryState.backendUnavailable,
+      entryBlocker: 'backend_unavailable',
+      localEvidenceSource: localEvidenceSource,
+      productionBlockers: productionBlockers,
+      userSyncEnabled: false,
+    );
   }
-  if (!draft.hasDeploymentEvidence) {
-    return SyncUiState.deploymentUnverified;
+  if (!normalized.hasDeploymentEvidence) {
+    return ManagerSyncEntryGate(
+      entryState: SyncEntryState.deploymentUnverified,
+      entryBlocker: 'deployment_unverified',
+      localEvidenceSource: localEvidenceSource,
+      productionBlockers: productionBlockers,
+      userSyncEnabled: false,
+    );
   }
-  return SyncUiState.preflightReady;
+  if (normalized.deploymentEvidenceSource ==
+      managerDeploymentEvidenceLocalSmoke) {
+    return ManagerSyncEntryGate(
+      entryState: SyncEntryState.localSmokeReady,
+      entryBlocker: 'release_deployment_evidence_required',
+      localEvidenceSource: localEvidenceSource,
+      productionBlockers: productionBlockers,
+      userSyncEnabled: false,
+    );
+  }
+
+  return ManagerSyncEntryGate(
+    entryState: SyncEntryState.blockedBeforeUserSync,
+    entryBlocker: 'blocked_before_user_sync',
+    localEvidenceSource: localEvidenceSource,
+    productionBlockers: productionBlockers,
+    userSyncEnabled: false,
+  );
 }
 
 ManagerSyncGateAudit managerSyncGateAudit({
   required SyncUiState state,
   required DeviceSecuritySummary device,
+  ManagerSettingsDraft? draft,
 }) {
+  final entryGate = draft == null
+      ? _managerSyncEntryGateFromState(state: state, device: device)
+      : deriveManagerSyncEntryGate(draft: draft, device: device);
   return ManagerSyncGateAudit(
     state: state,
+    entryGate: entryGate,
     stateLabel: managerSyncStateLabel(state),
-    stateSource: managerSyncStateSourceDescription(
-      state: state,
-      device: device,
-    ),
-    actionStopLine: managerSyncActionStopLine(state),
+    stateSource: draft == null
+        ? managerSyncStateSourceDescription(state: state, device: device)
+        : managerSyncStateSourceDescriptionForDraft(
+            draft: draft,
+            device: device,
+          ),
+    actionStopLine: managerSyncActionStopLine(state, entryGate: entryGate),
     deviceGateLabel: managerDeviceGateLabel(device),
     deviceGateReady: managerDeviceGateReady(device),
   );
@@ -160,9 +297,11 @@ ManagerSyncGateAudit managerSyncGateAuditForDraft({
   required ManagerSettingsDraft draft,
   required DeviceSecuritySummary device,
 }) {
+  final entryGate = deriveManagerSyncEntryGate(draft: draft, device: device);
   return managerSyncGateAudit(
-    state: deriveManagerSyncUiState(draft: draft, device: device),
+    state: entryGate.uiState,
     device: device,
+    draft: draft,
   );
 }
 
@@ -207,7 +346,41 @@ String managerSyncStateSourceDescription({
   }
 }
 
-String managerSyncActionStopLine(SyncUiState state) {
+String managerSyncStateSourceDescriptionForDraft({
+  required ManagerSettingsDraft draft,
+  required DeviceSecuritySummary device,
+}) {
+  final entryGate = deriveManagerSyncEntryGate(draft: draft, device: device);
+  switch (entryGate.entryState) {
+    case SyncEntryState.localOnly:
+      return '未保留自部署服务端草案';
+    case SyncEntryState.syncDisabledByPolicy:
+      return '设置草案启用隐私模式';
+    case SyncEntryState.backendUnavailable:
+      return '设备 production gate 为 ${device.productionGate}';
+    case SyncEntryState.deploymentUnverified:
+      return '设置草案缺少目标部署验证记录';
+    case SyncEntryState.localSmokeReady:
+      return '本地 Docker / 本地 HTTPS smoke 已记录，真实用户同步仍等待发布级证据';
+    case SyncEntryState.preflightReady:
+      return '本地对象、设置草案和部署来源预检通过';
+    case SyncEntryState.blockedBeforeUserSync:
+      return '本地预检通过，真实同步入口仍等待恢复码和设备授权';
+    case SyncEntryState.readyForUserSync:
+      return '用户可用同步入口已满足前置门禁';
+  }
+}
+
+String managerSyncActionStopLine(
+  SyncUiState state, {
+  ManagerSyncEntryGate? entryGate,
+}) {
+  if (entryGate?.entryState == SyncEntryState.localSmokeReady) {
+    return '本地 Docker / 本地 HTTPS 证据只支撑开发联调；真实远端同步、恢复码和设备授权仍处于关闭状态。';
+  }
+  if (entryGate != null && !entryGate.userSyncEnabled) {
+    return '真实远端同步、恢复码和设备授权仍处于关闭状态；本页只展示本地预检和不可用原因。';
+  }
   if (state.canEnableUserSync) {
     return '真实远端同步入口仍等待设备授权、恢复码和生产门禁完成后开放。';
   }
@@ -230,29 +403,133 @@ String managerDeploymentEvidenceLabel(ManagerSettingsDraft draft) {
       : 'deployment evidence missing';
 }
 
+String managerSyncLocalEvidenceSource(ManagerSettingsDraft draft) {
+  return draft.hasDeploymentEvidence
+      ? draft.deploymentEvidenceSource
+      : 'not_recorded';
+}
+
+List<String> managerSyncProductionBlockers({
+  required ManagerSettingsDraft draft,
+  required DeviceSecuritySummary device,
+}) {
+  final normalized = draft.normalized();
+  final blockers = <String>[];
+  if (normalized.privacyMode) {
+    blockers.add('sync_disabled_by_policy');
+  }
+  if (!normalized.hasServerEndpoint) {
+    blockers.add('server_endpoint_missing');
+  }
+  if (!managerDeviceGateReady(device)) {
+    blockers.add('platform_private_key_backend_${device.productionGate}');
+  }
+  if (!normalized.hasDeploymentEvidence) {
+    blockers.add('deployment_evidence_missing');
+  } else if (normalized.deploymentEvidenceSource ==
+      managerDeploymentEvidenceLocalSmoke) {
+    blockers.add('release_deployment_evidence_required');
+  } else {
+    blockers.add('release_deployment_evidence_summary_required');
+  }
+  blockers
+    ..add('recovery_code_flow_closed')
+    ..add('device_authorization_flow_closed')
+    ..add('user_sync_entry_closed_current_phase');
+  return List.unmodifiable(blockers);
+}
+
 String managerSyncGateReason({
   required SyncUiState state,
   required ManagerSettingsDraft draft,
   required DeviceSecuritySummary device,
 }) {
-  switch (state) {
-    case SyncUiState.localOnly:
+  final entryGate = deriveManagerSyncEntryGate(draft: draft, device: device);
+  switch (entryGate.entryState) {
+    case SyncEntryState.localOnly:
       return '未保留自部署服务端草案；真实远端同步保持关闭';
-    case SyncUiState.syncDisabledByPolicy:
+    case SyncEntryState.syncDisabledByPolicy:
       return '隐私模式已启用；真实远端同步保持关闭';
-    case SyncUiState.backendUnavailable:
+    case SyncEntryState.backendUnavailable:
       return '平台私钥 backend 未解除生产门禁：${device.productionGate}';
-    case SyncUiState.deploymentUnverified:
+    case SyncEntryState.deploymentUnverified:
       return '目标部署运行证据未记录；真实远端同步保持关闭';
-    case SyncUiState.preflightReady:
+    case SyncEntryState.localSmokeReady:
+      return '本地 smoke 已记录；真实用户同步仍等待发布级部署证据、恢复码和设备授权';
+    case SyncEntryState.preflightReady:
       return '本地预检通过；用户可用同步入口仍等待后续阶段开放';
-    case SyncUiState.serverConfigured:
-      return '已保留服务端草案；仍未进入生产可用同步';
-    case SyncUiState.readyForUserSync:
+    case SyncEntryState.blockedBeforeUserSync:
+      return '本地预检通过；真实同步入口仍等待恢复码和设备授权';
+    case SyncEntryState.readyForUserSync:
       return '用户可用同步入口尚未在当前阶段开放';
   }
 }
 
 String managerSyncEndpointLabel(ManagerSettingsDraft draft) {
   return draft.hasServerEndpoint ? draft.serverEndpoint.trim() : '未配置';
+}
+
+ManagerSyncEntryGate _managerSyncEntryGateFromState({
+  required SyncUiState state,
+  required DeviceSecuritySummary device,
+}) {
+  final productionBlockers = <String>[
+    if (!managerDeviceGateReady(device))
+      'platform_private_key_backend_${device.productionGate}',
+    'recovery_code_flow_closed',
+    'device_authorization_flow_closed',
+    'user_sync_entry_closed_current_phase',
+  ];
+
+  switch (state) {
+    case SyncUiState.localOnly:
+      return ManagerSyncEntryGate(
+        entryState: SyncEntryState.localOnly,
+        entryBlocker: 'server_endpoint_missing',
+        localEvidenceSource: 'unknown',
+        productionBlockers: productionBlockers,
+        userSyncEnabled: false,
+      );
+    case SyncUiState.syncDisabledByPolicy:
+      return ManagerSyncEntryGate(
+        entryState: SyncEntryState.syncDisabledByPolicy,
+        entryBlocker: 'sync_disabled_by_policy',
+        localEvidenceSource: 'unknown',
+        productionBlockers: productionBlockers,
+        userSyncEnabled: false,
+      );
+    case SyncUiState.backendUnavailable:
+      return ManagerSyncEntryGate(
+        entryState: SyncEntryState.backendUnavailable,
+        entryBlocker: 'backend_unavailable',
+        localEvidenceSource: 'unknown',
+        productionBlockers: productionBlockers,
+        userSyncEnabled: false,
+      );
+    case SyncUiState.deploymentUnverified:
+      return ManagerSyncEntryGate(
+        entryState: SyncEntryState.deploymentUnverified,
+        entryBlocker: 'deployment_unverified',
+        localEvidenceSource: 'unknown',
+        productionBlockers: productionBlockers,
+        userSyncEnabled: false,
+      );
+    case SyncUiState.preflightReady:
+    case SyncUiState.serverConfigured:
+      return ManagerSyncEntryGate(
+        entryState: SyncEntryState.preflightReady,
+        entryBlocker: 'blocked_before_user_sync',
+        localEvidenceSource: 'unknown',
+        productionBlockers: productionBlockers,
+        userSyncEnabled: false,
+      );
+    case SyncUiState.readyForUserSync:
+      return ManagerSyncEntryGate(
+        entryState: SyncEntryState.readyForUserSync,
+        entryBlocker: 'none',
+        localEvidenceSource: 'unknown',
+        productionBlockers: const [],
+        userSyncEnabled: true,
+      );
+  }
 }

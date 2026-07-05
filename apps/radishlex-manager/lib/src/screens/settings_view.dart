@@ -237,7 +237,7 @@ class _SettingsSyncGatePreview extends StatelessWidget {
       draft: draft,
       device: sync.device,
     );
-    final tone = audit.state.canEnableUserSync
+    final tone = audit.entryGate.userSyncEnabled
         ? ManagerBadgeTone.success
         : ManagerBadgeTone.warning;
 
@@ -269,6 +269,26 @@ class _SettingsSyncGatePreview extends StatelessWidget {
             value: managerSyncEndpointLabel(draft),
           ),
           ManagerKeyValueRow(label: 'state source', value: audit.stateSource),
+          ManagerKeyValueRow(
+            label: 'entry state',
+            value: audit.entryGate.entryState.code,
+          ),
+          ManagerKeyValueRow(
+            label: 'entry blocker',
+            value: audit.entryGate.entryBlocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'local evidence',
+            value: audit.entryGate.localEvidenceSource,
+          ),
+          ManagerKeyValueRow(
+            label: 'production blockers',
+            value: audit.entryGate.productionBlockerSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'user sync enabled',
+            value: audit.entryGate.userSyncEnabled.toString(),
+          ),
           ManagerKeyValueRow(
             label: 'deployment evidence',
             value: managerDeploymentEvidenceLabel(draft),

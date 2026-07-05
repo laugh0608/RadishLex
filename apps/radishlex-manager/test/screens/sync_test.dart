@@ -20,6 +20,14 @@ void main() {
     expect(find.text('平台签名 backend 不可用'), findsOneWidget);
     expect(find.text('设备 production gate 为 blocked'), findsOneWidget);
     expect(find.text('production gate blocked'), findsOneWidget);
+    expect(find.text('not_recorded'), findsOneWidget);
+    expect(
+      find.text(
+        'platform_private_key_backend_blocked, deployment_evidence_missing, recovery_code_flow_closed, device_authorization_flow_closed, user_sync_entry_closed_current_phase',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('false'), findsOneWidget);
     expect(find.text('syncable 3'), findsOneWidget);
     expect(find.text('local-only 128'), findsOneWidget);
     expect(find.text('unsupported_signature_algorithm'), findsOneWidget);
@@ -38,6 +46,12 @@ void main() {
     WidgetTester tester,
   ) async {
     final fixture = createManagerFixture();
+    final draft = fixture.settings.draft.copyWith(
+      serverEndpoint: '',
+      retainSyncConfig: false,
+      deploymentEvidenceRecorded: false,
+      deploymentEvidenceSource: '',
+    );
     final snapshot = fixture.copyWith(
       sync: fixture.sync.copyWith(
         state: SyncUiState.localOnly,
@@ -47,6 +61,7 @@ void main() {
         localOnlyEvents: 0,
         categories: const [],
       ),
+      settings: fixture.settings.copyWith(syncConfigured: false, draft: draft),
     );
 
     await tester.pumpWidget(

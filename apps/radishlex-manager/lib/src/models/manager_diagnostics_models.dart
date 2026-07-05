@@ -79,8 +79,8 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
   final latestImportBatch = snapshot.importBatches.isEmpty
       ? null
       : snapshot.importBatches.first;
-  final syncGateAudit = managerSyncGateAudit(
-    state: snapshot.sync.state,
+  final syncGateAudit = managerSyncGateAuditForDraft(
+    draft: snapshot.settings.draft,
     device: snapshot.sync.device,
   );
 
@@ -245,6 +245,41 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
           _diagnosticsItem(
             'sync.state_source',
             syncGateAudit.stateSource,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.entry_state',
+            syncGateAudit.entryGate.entryState.code,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.entry_blocker',
+            syncGateAudit.entryGate.entryBlocker,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.local_evidence_source',
+            syncGateAudit.entryGate.localEvidenceSource,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.production_blockers',
+            syncGateAudit.entryGate.productionBlockerSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.user_sync_enabled',
+            syncGateAudit.entryGate.userSyncEnabled.toString(),
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_status',
+            'recovery_code_flow_closed',
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.device_authorization_status',
+            'device_authorization_flow_closed',
             'gate',
           ),
           _diagnosticsItem(

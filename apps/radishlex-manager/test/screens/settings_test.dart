@@ -24,6 +24,8 @@ void main() {
     expect(find.text('平台签名 backend 不可用'), findsOneWidget);
     expect(find.text('设备 production gate 为 blocked'), findsOneWidget);
     expect(find.text('deployment evidence missing'), findsWidgets);
+    expect(find.text('backend_unavailable'), findsWidgets);
+    expect(find.text('not_recorded'), findsOneWidget);
   });
 
   testWidgets('settings draft save updates sync gate source', (
@@ -129,6 +131,7 @@ void main() {
 
     expect(find.text('preflight_ready'), findsWidgets);
     expect(find.text('本地预检通过'), findsOneWidget);
+    expect(find.text('blocked_before_user_sync'), findsWidgets);
     expect(find.text('deployment evidence external TLS'), findsWidgets);
 
     await tester.ensureVisible(find.byKey(const Key('settings-save-button')));
@@ -141,7 +144,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('preflight_ready'), findsWidgets);
-    expect(find.text('本地对象与设置草案预检通过'), findsOneWidget);
+    expect(find.text('本地预检通过，真实同步入口仍等待恢复码和设备授权'), findsOneWidget);
+    expect(find.text('blocked_before_user_sync'), findsWidgets);
     final enableButton = tester.widget<FilledButton>(
       find.byKey(const Key('sync-enable-button')),
     );

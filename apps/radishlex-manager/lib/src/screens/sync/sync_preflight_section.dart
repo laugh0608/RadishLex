@@ -5,25 +5,53 @@ import '../manager_widgets.dart';
 import 'sync_empty_state.dart';
 
 class SyncPreflightSection extends StatelessWidget {
-  const SyncPreflightSection({super.key, required this.sync});
+  const SyncPreflightSection({
+    super.key,
+    required this.sync,
+    required this.settingsDraft,
+  });
 
   final SyncPreflightSummary sync;
+  final ManagerSettingsDraft settingsDraft;
 
   @override
   Widget build(BuildContext context) {
-    final audit = managerSyncGateAudit(state: sync.state, device: sync.device);
+    final audit = managerSyncGateAuditForDraft(
+      draft: settingsDraft,
+      device: sync.device,
+    );
 
     return ManagerSection(
       title: '同步预检',
-      trailing: _SyncStateBadge(state: sync.state),
+      trailing: _SyncStateBadge(audit: audit),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SyncGateSummary(sync: sync),
+          _SyncGateSummary(sync: sync, audit: audit),
           const SizedBox(height: 14),
           ManagerKeyValueRow(label: 'server', value: sync.serverEndpoint),
           ManagerKeyValueRow(label: 'reason', value: sync.reason),
           ManagerKeyValueRow(label: 'state source', value: audit.stateSource),
+          ManagerKeyValueRow(
+            label: 'entry state',
+            value: audit.entryGate.entryState.code,
+          ),
+          ManagerKeyValueRow(
+            label: 'entry blocker',
+            value: audit.entryGate.entryBlocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'local evidence',
+            value: audit.entryGate.localEvidenceSource,
+          ),
+          ManagerKeyValueRow(
+            label: 'production blockers',
+            value: audit.entryGate.productionBlockerSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'user sync enabled',
+            value: audit.entryGate.userSyncEnabled.toString(),
+          ),
           ManagerKeyValueRow(
             label: 'syncable objects',
             value: sync.syncableObjects.toString(),
@@ -52,18 +80,18 @@ class SyncPreflightSection extends StatelessWidget {
 }
 
 class _SyncStateBadge extends StatelessWidget {
-  const _SyncStateBadge({required this.state});
+  const _SyncStateBadge({required this.audit});
 
-  final SyncUiState state;
+  final ManagerSyncGateAudit audit;
 
   @override
   Widget build(BuildContext context) {
     return ManagerStatusBadge(
-      icon: state.canEnableUserSync
+      icon: audit.entryGate.userSyncEnabled
           ? Icons.cloud_done_outlined
           : Icons.cloud_off_outlined,
-      label: state.code,
-      tone: state.canEnableUserSync
+      label: audit.state.code,
+      tone: audit.entryGate.userSyncEnabled
           ? ManagerBadgeTone.success
           : ManagerBadgeTone.warning,
     );
@@ -71,14 +99,13 @@ class _SyncStateBadge extends StatelessWidget {
 }
 
 class _SyncGateSummary extends StatelessWidget {
-  const _SyncGateSummary({required this.sync});
+  const _SyncGateSummary({required this.sync, required this.audit});
 
   final SyncPreflightSummary sync;
+  final ManagerSyncGateAudit audit;
 
   @override
   Widget build(BuildContext context) {
-    final audit = managerSyncGateAudit(state: sync.state, device: sync.device);
-
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -86,9 +113,13 @@ class _SyncGateSummary extends StatelessWidget {
         ManagerStatusBadge(
           icon: Icons.rule_outlined,
           label: audit.stateLabel,
-          tone: sync.state.canEnableUserSync
+          tone: audit.entryGate.userSyncEnabled
               ? ManagerBadgeTone.success
               : ManagerBadgeTone.warning,
+        ),
+        Chip(
+          avatar: const Icon(Icons.fact_check_outlined, size: 18),
+          label: Text(audit.entryGate.entryState.code),
         ),
         Chip(
           avatar: const Icon(Icons.inventory_2_outlined, size: 18),

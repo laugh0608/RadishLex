@@ -58,6 +58,9 @@ void main() {
       expect(text, contains('sync.state: backend_unavailable'));
       expect(text, contains('sync.state_label: 平台签名 backend 不可用'));
       expect(text, contains('sync.state_source: 设备 production gate 为 blocked'));
+      expect(text, contains('sync.entry_state: backend_unavailable'));
+      expect(text, contains('sync.entry_blocker: backend_unavailable'));
+      expect(text, contains('sync.local_evidence_source: not_recorded'));
       expect(
         text,
         contains('sync.deployment_evidence: deployment evidence missing'),

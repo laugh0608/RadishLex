@@ -123,7 +123,7 @@ class _ManagerShell extends StatelessWidget {
         onExportDictionary: onExportDictionary,
       ),
       LearningView(snapshot: snapshot),
-      SyncView(sync: snapshot.sync),
+      SyncView(sync: snapshot.sync, settingsDraft: snapshot.settings.draft),
       SettingsView(
         settings: snapshot.settings,
         sync: snapshot.sync,
