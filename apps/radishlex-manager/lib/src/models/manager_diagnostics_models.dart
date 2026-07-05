@@ -288,6 +288,31 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
             'gate',
           ),
           _diagnosticsItem(
+            'sync.recovery_save_confirmation',
+            syncGateAudit.entryGate.recovery.saveConfirmationRequirement,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_record_status',
+            syncGateAudit.entryGate.recovery.recoveryRecordStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_record_blocker',
+            syncGateAudit.entryGate.recovery.recoveryRecordBlocker,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_first_upload_gate',
+            syncGateAudit.entryGate.recovery.firstUploadGate,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_readiness_blockers',
+            syncGateAudit.entryGate.recovery.readinessBlockerSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
             'sync.device_authorization_status',
             syncGateAudit.entryGate.deviceAuthorization.status.code,
             'gate',
@@ -300,6 +325,50 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
           _diagnosticsItem(
             'sync.join_request_status',
             syncGateAudit.entryGate.deviceAuthorization.joinRequestStatus.code,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.authorization_package_status',
+            syncGateAudit
+                .entryGate
+                .deviceAuthorization
+                .authorizationPackageStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.authorization_package_blocker',
+            syncGateAudit
+                .entryGate
+                .deviceAuthorization
+                .authorizationPackageBlocker,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.authorization_package_preconditions',
+            syncGateAudit
+                .entryGate
+                .deviceAuthorization
+                .authorizationPackagePreconditions,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.device_revocation_status',
+            syncGateAudit.entryGate.deviceAuthorization.revokeDeviceStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.lost_device_risk',
+            syncGateAudit.entryGate.deviceAuthorization.lostDeviceRiskNotice,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.key_epoch_status',
+            syncGateAudit.entryGate.deviceAuthorization.keyEpochStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.device_authorization_readiness_blockers',
+            syncGateAudit.entryGate.deviceAuthorization.readinessBlockerSummary,
             'gate',
           ),
           _diagnosticsItem(

@@ -37,12 +37,61 @@ void main() {
     expect(gate.recovery.status, RecoveryEntryStatus.flowClosed);
     expect(gate.recovery.blocker, 'recovery_code_flow_closed');
     expect(
+      gate.recovery.saveConfirmationRequirement,
+      'required_before_first_upload',
+    );
+    expect(gate.recovery.recoveryRecordStatus, 'recovery_record_not_created');
+    expect(
+      gate.recovery.recoveryRecordBlocker,
+      'recovery_record_creation_closed',
+    );
+    expect(gate.recovery.firstUploadGate, 'blocked_until_recovery_code_saved');
+    expect(
+      gate.recovery.readinessBlockers,
+      containsAll([
+        'recovery_code_flow_closed',
+        'recovery_record_not_created',
+        'recovery_code_save_confirmation_required',
+      ]),
+    );
+    expect(
       gate.deviceAuthorization.status,
       DeviceAuthorizationEntryStatus.flowClosed,
     );
     expect(
       gate.deviceAuthorization.joinRequestStatus,
       JoinRequestStatus.unavailable,
+    );
+    expect(
+      gate.deviceAuthorization.authorizationPackageStatus,
+      'authorization_package_not_created',
+    );
+    expect(
+      gate.deviceAuthorization.authorizationPackageBlocker,
+      'authorization_package_prerequisites_blocked',
+    );
+    expect(
+      gate.deviceAuthorization.authorizationPackagePreconditions,
+      contains('join_request_pending_required'),
+    );
+    expect(
+      gate.deviceAuthorization.lostDeviceRiskNotice,
+      'lost_device_prior_material_not_recallable',
+    );
+    expect(
+      gate.deviceAuthorization.keyEpochStatus,
+      'key_epoch_rotation_not_started',
+    );
+    expect(
+      gate.deviceAuthorization.readinessBlockers,
+      containsAll([
+        'device_authorization_flow_closed',
+        'join_request_unavailable',
+        'authorization_package_prerequisites_blocked',
+        'device_revocation_flow_closed',
+        'lost_device_risk_notice_required',
+        'key_epoch_rotation_not_started',
+      ]),
     );
   });
 
@@ -114,7 +163,14 @@ void main() {
       containsAll([
         'release_deployment_evidence_required',
         'recovery_code_flow_closed',
+        'recovery_record_not_created',
+        'recovery_code_save_confirmation_required',
         'device_authorization_flow_closed',
+        'join_request_unavailable',
+        'authorization_package_prerequisites_blocked',
+        'device_revocation_flow_closed',
+        'lost_device_risk_notice_required',
+        'key_epoch_rotation_not_started',
         'user_sync_entry_closed_current_phase',
       ]),
     );

@@ -30,6 +30,18 @@ void main() {
     expect(find.text('not_recorded'), findsWidgets);
     expect(find.text('access_token_missing'), findsWidgets);
     expect(find.text('not_checked_access_token_missing'), findsOneWidget);
+    expect(find.text('required_before_first_upload'), findsOneWidget);
+    expect(find.text('recovery_record_not_created'), findsWidgets);
+    expect(find.text('authorization_package_not_created'), findsOneWidget);
+    expect(
+      find.text('authorization_package_prerequisites_blocked'),
+      findsWidgets,
+    );
+    expect(
+      find.text('lost_device_prior_material_not_recallable'),
+      findsOneWidget,
+    );
+    expect(find.text('key_epoch_rotation_not_started'), findsWidgets);
   });
 
   testWidgets('settings draft save updates sync gate source', (
@@ -140,8 +152,19 @@ void main() {
     expect(find.text('本地预检通过'), findsOneWidget);
     expect(find.text('blocked_before_user_sync'), findsWidgets);
     expect(find.text('recovery_code_flow_closed'), findsWidgets);
+    expect(
+      find.textContaining('recovery_code_save_confirmation_required'),
+      findsWidgets,
+    );
+    expect(find.text('blocked_until_recovery_code_saved'), findsWidgets);
     expect(find.text('device_authorization_flow_closed'), findsWidgets);
     expect(find.text('join_request_unavailable'), findsWidgets);
+    expect(find.text('authorization_package_not_created'), findsWidgets);
+    expect(
+      find.text('lost_device_prior_material_not_recallable'),
+      findsWidgets,
+    );
+    expect(find.text('key_epoch_rotation_not_started'), findsWidgets);
     expect(find.text('deployment evidence external TLS'), findsWidgets);
 
     await tester.ensureVisible(find.byKey(const Key('settings-save-button')));

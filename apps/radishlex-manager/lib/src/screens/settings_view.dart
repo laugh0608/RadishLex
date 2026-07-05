@@ -481,6 +481,26 @@ class _SettingsSyncGatePreview extends StatelessWidget {
             value: audit.entryGate.recovery.blocker,
           ),
           ManagerKeyValueRow(
+            label: 'recovery save confirmation',
+            value: audit.entryGate.recovery.saveConfirmationRequirement,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery record',
+            value: audit.entryGate.recovery.recoveryRecordStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery record blocker',
+            value: audit.entryGate.recovery.recoveryRecordBlocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery first upload',
+            value: audit.entryGate.recovery.firstUploadGate,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery blockers',
+            value: audit.entryGate.recovery.readinessBlockerSummary,
+          ),
+          ManagerKeyValueRow(
             label: 'authorization status',
             value: audit.entryGate.deviceAuthorization.status.code,
           ),
@@ -491,6 +511,39 @@ class _SettingsSyncGatePreview extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'join request',
             value: audit.entryGate.deviceAuthorization.joinRequestStatus.code,
+          ),
+          ManagerKeyValueRow(
+            label: 'authorization package',
+            value:
+                audit.entryGate.deviceAuthorization.authorizationPackageStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'package blocker',
+            value:
+                audit.entryGate.deviceAuthorization.authorizationPackageBlocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'package preconditions',
+            value: audit
+                .entryGate
+                .deviceAuthorization
+                .authorizationPackagePreconditions,
+          ),
+          ManagerKeyValueRow(
+            label: 'device revocation',
+            value: audit.entryGate.deviceAuthorization.revokeDeviceStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'lost device risk',
+            value: audit.entryGate.deviceAuthorization.lostDeviceRiskNotice,
+          ),
+          ManagerKeyValueRow(
+            label: 'key epoch',
+            value: audit.entryGate.deviceAuthorization.keyEpochStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'authorization blockers',
+            value: audit.entryGate.deviceAuthorization.readinessBlockerSummary,
           ),
           ManagerKeyValueRow(
             label: 'connection status',

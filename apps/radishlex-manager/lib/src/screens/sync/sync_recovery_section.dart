@@ -34,6 +34,26 @@ class SyncRecoverySection extends StatelessWidget {
             label: 'confirmation',
             value: recovery.confirmationStatus,
           ),
+          ManagerKeyValueRow(
+            label: 'save confirmation',
+            value: recovery.saveConfirmationRequirement,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery record',
+            value: recovery.recoveryRecordStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'record blocker',
+            value: recovery.recoveryRecordBlocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'first upload gate',
+            value: recovery.firstUploadGate,
+          ),
+          ManagerKeyValueRow(
+            label: 'readiness blockers',
+            value: recovery.readinessBlockerSummary,
+          ),
           const ManagerKeyValueRow(
             label: 'stop line',
             value: '恢复码生成、输入、轮换和撤销仍未开放。',

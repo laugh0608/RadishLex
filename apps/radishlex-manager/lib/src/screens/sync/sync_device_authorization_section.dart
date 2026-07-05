@@ -41,8 +41,32 @@ class SyncDeviceAuthorizationSection extends StatelessWidget {
             value: authorization.approveJoinRequestStatus,
           ),
           ManagerKeyValueRow(
+            label: 'authorization package',
+            value: authorization.authorizationPackageStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'package blocker',
+            value: authorization.authorizationPackageBlocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'package preconditions',
+            value: authorization.authorizationPackagePreconditions,
+          ),
+          ManagerKeyValueRow(
             label: 'revoke device',
             value: authorization.revokeDeviceStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'lost device risk',
+            value: authorization.lostDeviceRiskNotice,
+          ),
+          ManagerKeyValueRow(
+            label: 'key epoch',
+            value: authorization.keyEpochStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'readiness blockers',
+            value: authorization.readinessBlockerSummary,
           ),
           const ManagerKeyValueRow(
             label: 'stop line',

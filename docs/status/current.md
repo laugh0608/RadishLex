@@ -6,11 +6,11 @@
 
 - 日期：2026-07-05
 - 常态分支：`dev`
-- 当前主题：Phase 3 自部署同步出口治理已形成证据链，Phase 4 Flutter manager 本地管理能力验收复查已完成；真实同步入口前置交互边界、目标部署证据包口径 / 校验 / 摘要入口、manager sync entry gate 非上传实现、恢复码 / 设备授权只读准备态、本地同步服务连接健康摘要模型、本地 Docker / 本地 HTTPS 只读连接健康摘要和 Manager 摘要回填入口已形成文档和测试证据。2026-07-05 复查后调整阶段口径：真实域名、正式证书和外部反代复验属于正式发布 / 真实用户开放前门禁，不作为当前产品开发阻塞项；当前同步开发和联调以本地 Docker、本地 HTTPS、短生命周期数据目录和现有 smoke 为主。
+- 当前主题：Phase 3 自部署同步出口治理已形成证据链，Phase 4 Flutter manager 本地管理能力验收复查已完成；真实同步入口前置交互边界、目标部署证据包口径 / 校验 / 摘要入口、manager sync entry gate 非上传实现、恢复码 / 设备授权只读准备态、本地同步服务连接健康摘要模型、本地 Docker / 本地 HTTPS 只读连接健康摘要、Manager 摘要回填入口，以及恢复码保存确认 / 恢复记录 / 授权包前置条件 / 撤销与 key epoch 风险提示的只读清单已形成文档和测试证据。2026-07-05 复查后调整阶段口径：真实域名、正式证书和外部反代复验属于正式发布 / 真实用户开放前门禁，不作为当前产品开发阻塞项；当前同步开发和联调以本地 Docker、本地 HTTPS、短生命周期数据目录和现有 smoke 为主。
 
 ## 当前阶段
 
-RadishLex 已完成 Rust core、Rime adapter、userdb、ranker、crypto、sync client 边界、Go sync server 和第一批 Flutter manager 本地 FFI bridge 的起步证据。当前推进重点是保持 Phase 4 manager 本地验收证据可复查，并在本地 Docker / 本地 HTTPS 证据支撑下继续推进恢复码和设备授权的只读交互设计、错误分类和诊断脱敏；真实用户同步开放仍等待平台私钥 backend、恢复 / 授权交互和发布级部署证据。
+RadishLex 已完成 Rust core、Rime adapter、userdb、ranker、crypto、sync client 边界、Go sync server 和第一批 Flutter manager 本地 FFI bridge 的起步证据。当前推进重点是保持 Phase 4 manager 本地验收证据可复查，并在本地 Docker / 本地 HTTPS 证据支撑下维护恢复码和设备授权只读清单、错误分类和诊断脱敏；真实用户同步开放仍等待平台私钥 backend、恢复 / 授权交互和发布级部署证据。
 
 部署证据当前状态：仓库内已有本地 Docker / 本地 HTTPS、短生命周期 HTTP、备份恢复、外部 TLS 反代和升级回滚实现级 smoke；`tests/fixtures/sync-deployment-evidence-valid.txt` 只是合成 fixture。没有真实目标环境 `deployment_evidence.v1` 时，不记录发布级部署通过，但这不阻止继续开发 manager 同步入口的非上传状态、说明和本地联调路径。
 
@@ -50,7 +50,7 @@ Flutter manager：
 - UI 已拆分 manager shell、跨页 action 编排、词库子组件、学习子组件、同步子组件、设置诊断子组件、页面级 widget tests、action helper 回归测试、Dart model 分组和动态 FFI bridge 分层。
 - `docs/manager-local-acceptance.md` 已将 Phase 4 本地验收范围、退出标准映射、验证命令、隐私检查和真实同步停止线整理为可复验入口；2026-07-05 复查确认当前本地验收无影响退出标准的证据缺口。
 - `docs/manager-sync-entry-boundary.md` 已固定真实同步入口进入 UI / bridge 前的恢复码、设备授权、状态门禁、错误分类、诊断脱敏和测试计划。
-- 同步页和设置页已通过 `SyncEntryState` / `ManagerSyncEntryGate` 从 settings draft、本地 smoke 来源、backend gate、连接健康、恢复码关闭状态和设备授权关闭状态派生非上传阻塞说明；同步页已展示服务连接健康、恢复码准备态和设备授权准备态三个只读 section，诊断报告新增 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers`、`sync.connection_*`、`sync.server_state_status`、`sync.recovery_*`、`sync.device_authorization_*` 和 `sync.join_request_status` 摘要。`sync_connection_health.v1` 本地摘要已可通过设置页回填到 settings draft 的非敏感 `sync_connection_health_summary`，同步页、设置页和诊断报告会展示净化后的结果；真实同步按钮保持关闭。
+- 同步页和设置页已通过 `SyncEntryState` / `ManagerSyncEntryGate` 从 settings draft、本地 smoke 来源、backend gate、连接健康、恢复码关闭状态和设备授权关闭状态派生非上传阻塞说明；同步页已展示服务连接健康、恢复码准备态和设备授权准备态三个只读 section，恢复码保存确认、恢复记录状态、join request 状态、授权包前置条件、设备撤销、丢失设备风险和 key epoch 状态均以状态码展示。诊断报告新增 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers`、`sync.connection_*`、`sync.server_state_status`、`sync.recovery_*`、`sync.authorization_package_*`、`sync.device_authorization_*`、`sync.join_request_status`、`sync.lost_device_risk` 和 `sync.key_epoch_status` 摘要。`sync_connection_health.v1` 本地摘要已可通过设置页回填到 settings draft 的非敏感 `sync_connection_health_summary`，同步页、设置页和诊断报告会展示净化后的结果；真实同步按钮保持关闭。
 
 平台私钥 backend：
 
@@ -103,5 +103,5 @@ Sync server 本地部署 / 联调：
 
 1. 维护本文短入口，避免新会话默认阅读长周志。
 2. 保持 Phase 4 manager 本地验收证据稳定；若后续改动触及验收范围，再按 `docs/manager-local-acceptance.md` 补精准 widget / helper / smoke 覆盖。
-3. 下一批产品开发继续围绕本地 Docker / 本地 HTTPS 联调，推进恢复码和设备授权的只读交互设计与测试，保持真实同步、恢复码生成和设备授权成功路径关闭。
+3. 下一批产品开发继续围绕本地 Docker / 本地 HTTPS 联调，维护恢复码和设备授权只读清单、诊断脱敏和错误分类测试；真实同步、恢复码生成和设备授权成功路径继续关闭。
 4. 同步联调用本地 Docker / 本地 HTTPS 和短生命周期数据目录；正式发布或真实用户开放前，再补真实目标环境的非敏感 `deployment_evidence.v1` 并导出 `deployment_evidence_summary.v1`。

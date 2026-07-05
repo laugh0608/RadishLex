@@ -23,7 +23,7 @@ void main() {
     expect(find.text('not_recorded'), findsWidgets);
     expect(
       find.text(
-        'access_token_missing, platform_private_key_backend_blocked, deployment_evidence_missing, recovery_code_flow_closed, device_authorization_flow_closed, user_sync_entry_closed_current_phase',
+        'access_token_missing, platform_private_key_backend_blocked, deployment_evidence_missing, recovery_code_flow_closed, recovery_record_not_created, recovery_code_save_confirmation_required, device_authorization_flow_closed, join_request_unavailable, authorization_package_prerequisites_blocked, device_revocation_flow_closed, lost_device_risk_notice_required, key_epoch_rotation_not_started, user_sync_entry_closed_current_phase',
       ),
       findsOneWidget,
     );
@@ -48,6 +48,10 @@ void main() {
     expect(find.text('恢复码准备态'), findsOneWidget);
     expect(find.text('恢复码流程关闭'), findsOneWidget);
     expect(find.text('recovery_code_flow_closed'), findsWidgets);
+    expect(find.text('required_before_first_upload'), findsOneWidget);
+    expect(find.text('recovery_record_not_created'), findsWidgets);
+    expect(find.text('recovery_record_creation_closed'), findsOneWidget);
+    expect(find.text('blocked_until_recovery_code_saved'), findsOneWidget);
     expect(find.text('not_started'), findsOneWidget);
     expect(find.text('恢复码生成、输入、轮换和撤销仍未开放。'), findsOneWidget);
     expect(
@@ -57,7 +61,24 @@ void main() {
     expect(find.text('设备授权准备态'), findsOneWidget);
     expect(find.text('设备授权流程关闭'), findsOneWidget);
     expect(find.text('device_authorization_flow_closed'), findsWidgets);
-    expect(find.text('join_request_unavailable'), findsOneWidget);
+    expect(find.text('join_request_unavailable'), findsWidgets);
+    expect(find.text('authorization_package_not_created'), findsWidgets);
+    expect(
+      find.text('authorization_package_prerequisites_blocked'),
+      findsWidgets,
+    );
+    expect(
+      find.text(
+        'active_existing_device_required, join_request_pending_required, short_code_match_required',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('closed_current_phase'), findsWidgets);
+    expect(
+      find.text('lost_device_prior_material_not_recallable'),
+      findsOneWidget,
+    );
+    expect(find.text('key_epoch_rotation_not_started'), findsWidgets);
     expect(find.text('设备加入审批、授权成功和撤销操作仍未开放。'), findsOneWidget);
     expect(
       find.text('真实远端同步、恢复码和设备授权仍处于关闭状态；本页只展示本地预检和不可用原因。'),

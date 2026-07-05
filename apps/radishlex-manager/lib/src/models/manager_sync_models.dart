@@ -1,4 +1,7 @@
+import 'manager_sync_entry_models.dart';
 import 'manager_settings_models.dart';
+
+export 'manager_sync_entry_models.dart';
 
 enum SyncUiState {
   localOnly,
@@ -63,107 +66,6 @@ extension SyncEntryStateLabel on SyncEntryState {
         return 'blocked_before_user_sync';
       case SyncEntryState.readyForUserSync:
         return 'ready_for_user_sync';
-    }
-  }
-}
-
-enum RecoveryEntryStatus {
-  flowClosed,
-  recoveryCodeRequired,
-  saveConfirmationRequired,
-  ready,
-}
-
-extension RecoveryEntryStatusLabel on RecoveryEntryStatus {
-  String get code {
-    switch (this) {
-      case RecoveryEntryStatus.flowClosed:
-        return 'recovery_code_flow_closed';
-      case RecoveryEntryStatus.recoveryCodeRequired:
-        return 'recovery_code_required';
-      case RecoveryEntryStatus.saveConfirmationRequired:
-        return 'recovery_code_save_confirmation_required';
-      case RecoveryEntryStatus.ready:
-        return 'recovery_ready';
-    }
-  }
-
-  String get label {
-    switch (this) {
-      case RecoveryEntryStatus.flowClosed:
-        return '恢复码流程关闭';
-      case RecoveryEntryStatus.recoveryCodeRequired:
-        return '等待恢复码';
-      case RecoveryEntryStatus.saveConfirmationRequired:
-        return '等待保存确认';
-      case RecoveryEntryStatus.ready:
-        return '恢复码准备完成';
-    }
-  }
-}
-
-enum DeviceAuthorizationEntryStatus {
-  flowClosed,
-  joinRequestUnavailable,
-  authorizationUnavailable,
-  ready,
-}
-
-extension DeviceAuthorizationEntryStatusLabel
-    on DeviceAuthorizationEntryStatus {
-  String get code {
-    switch (this) {
-      case DeviceAuthorizationEntryStatus.flowClosed:
-        return 'device_authorization_flow_closed';
-      case DeviceAuthorizationEntryStatus.joinRequestUnavailable:
-        return 'join_request_unavailable';
-      case DeviceAuthorizationEntryStatus.authorizationUnavailable:
-        return 'authorization_unavailable';
-      case DeviceAuthorizationEntryStatus.ready:
-        return 'device_authorization_ready';
-    }
-  }
-
-  String get label {
-    switch (this) {
-      case DeviceAuthorizationEntryStatus.flowClosed:
-        return '设备授权流程关闭';
-      case DeviceAuthorizationEntryStatus.joinRequestUnavailable:
-        return '加入请求不可用';
-      case DeviceAuthorizationEntryStatus.authorizationUnavailable:
-        return '授权不可用';
-      case DeviceAuthorizationEntryStatus.ready:
-        return '设备授权准备完成';
-    }
-  }
-}
-
-enum JoinRequestStatus { unavailable, pending, expired, authorized }
-
-extension JoinRequestStatusLabel on JoinRequestStatus {
-  String get code {
-    switch (this) {
-      case JoinRequestStatus.unavailable:
-        return 'join_request_unavailable';
-      case JoinRequestStatus.pending:
-        return 'join_request_pending';
-      case JoinRequestStatus.expired:
-        return 'join_request_expired';
-      case JoinRequestStatus.authorized:
-        return 'join_request_authorized';
-    }
-  }
-
-  String get label {
-    switch (this) {
-      case JoinRequestStatus.unavailable:
-        return '加入请求不可用';
-      case JoinRequestStatus.pending:
-        return '加入请求待处理';
-      case JoinRequestStatus.expired:
-        return '加入请求已过期';
-      case JoinRequestStatus.authorized:
-        return '加入请求已授权';
     }
   }
 }
@@ -393,81 +295,6 @@ class SyncConnectionProbeSummary {
       format == managerSyncConnectionHealthSummaryFormat &&
       redactionPolicy == managerSyncConnectionHealthSummaryRedactionPolicy;
 }
-
-class RecoveryEntryGate {
-  const RecoveryEntryGate({
-    required this.status,
-    required this.blocker,
-    required this.canGenerateCode,
-    required this.canRestoreDevice,
-    required this.requiresSaveConfirmation,
-  });
-
-  final RecoveryEntryStatus status;
-  final String blocker;
-  final bool canGenerateCode;
-  final bool canRestoreDevice;
-  final bool requiresSaveConfirmation;
-
-  String get generateStatus {
-    return canGenerateCode ? 'available' : 'closed_current_phase';
-  }
-
-  String get restoreStatus {
-    return canRestoreDevice ? 'available' : 'closed_current_phase';
-  }
-
-  String get confirmationStatus {
-    return requiresSaveConfirmation ? 'required' : 'not_started';
-  }
-}
-
-class DeviceAuthorizationEntryGate {
-  const DeviceAuthorizationEntryGate({
-    required this.status,
-    required this.blocker,
-    required this.joinRequestStatus,
-    required this.canCreateJoinRequest,
-    required this.canApproveJoinRequest,
-    required this.canRevokeDevice,
-  });
-
-  final DeviceAuthorizationEntryStatus status;
-  final String blocker;
-  final JoinRequestStatus joinRequestStatus;
-  final bool canCreateJoinRequest;
-  final bool canApproveJoinRequest;
-  final bool canRevokeDevice;
-
-  String get createJoinRequestStatus {
-    return canCreateJoinRequest ? 'available' : 'closed_current_phase';
-  }
-
-  String get approveJoinRequestStatus {
-    return canApproveJoinRequest ? 'available' : 'closed_current_phase';
-  }
-
-  String get revokeDeviceStatus {
-    return canRevokeDevice ? 'available' : 'closed_current_phase';
-  }
-}
-
-const managerClosedRecoveryEntryGate = RecoveryEntryGate(
-  status: RecoveryEntryStatus.flowClosed,
-  blocker: 'recovery_code_flow_closed',
-  canGenerateCode: false,
-  canRestoreDevice: false,
-  requiresSaveConfirmation: false,
-);
-
-const managerClosedDeviceAuthorizationEntryGate = DeviceAuthorizationEntryGate(
-  status: DeviceAuthorizationEntryStatus.flowClosed,
-  blocker: 'device_authorization_flow_closed',
-  joinRequestStatus: JoinRequestStatus.unavailable,
-  canCreateJoinRequest: false,
-  canApproveJoinRequest: false,
-  canRevokeDevice: false,
-);
 
 const managerUnconfiguredSyncConnectionHealth = SyncConnectionHealth(
   status: SyncConnectionStatus.notConfigured,
@@ -1075,8 +902,8 @@ List<String> managerSyncProductionBlockers({
     blockers.add('release_deployment_evidence_summary_required');
   }
   blockers
-    ..add(recovery.blocker)
-    ..add(deviceAuthorization.blocker)
+    ..addAll(recovery.readinessBlockers)
+    ..addAll(deviceAuthorization.readinessBlockers)
     ..add('user_sync_entry_closed_current_phase');
   return List.unmodifiable(blockers);
 }
@@ -1462,6 +1289,11 @@ ManagerSyncEntryGate _managerSyncEntryGateFromState({
           canGenerateCode: true,
           canRestoreDevice: true,
           requiresSaveConfirmation: false,
+          saveConfirmationRequirement: 'confirmed',
+          recoveryRecordStatus: 'recovery_record_active',
+          recoveryRecordBlocker: 'none',
+          firstUploadGate: 'ready_for_encrypted_p2_upload',
+          readinessBlockers: [],
         ),
         deviceAuthorization: const DeviceAuthorizationEntryGate(
           status: DeviceAuthorizationEntryStatus.ready,
@@ -1470,6 +1302,12 @@ ManagerSyncEntryGate _managerSyncEntryGateFromState({
           canCreateJoinRequest: true,
           canApproveJoinRequest: true,
           canRevokeDevice: true,
+          authorizationPackageStatus: 'authorization_package_ready',
+          authorizationPackageBlocker: 'none',
+          authorizationPackagePreconditions: 'satisfied',
+          lostDeviceRiskNotice: 'acknowledged',
+          keyEpochStatus: 'key_epoch_ready',
+          readinessBlockers: [],
         ),
         userSyncEnabled: true,
       );

@@ -29,7 +29,7 @@ void main() {
 
     expect(find.text('诊断摘要预览'), findsOneWidget);
     expect(find.text('分组 6'), findsOneWidget);
-    expect(find.text('字段 63'), findsOneWidget);
+    expect(find.text('字段 75'), findsOneWidget);
     expect(
       find.byKey(const Key('diagnostics-section-sync_gate')),
       findsOneWidget,
@@ -61,12 +61,66 @@ void main() {
     );
     expect(
       find.textContaining(
+        'sync.recovery_save_confirmation: required_before_first_upload',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.recovery_record_status: recovery_record_not_created',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.recovery_record_blocker: recovery_record_creation_closed',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.recovery_first_upload_gate: blocked_until_recovery_code_saved',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
         'sync.device_authorization_blocker: device_authorization_flow_closed',
       ),
       findsOneWidget,
     );
     expect(
       find.textContaining('sync.join_request_status: join_request_unavailable'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.authorization_package_status: authorization_package_not_created',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.authorization_package_blocker: authorization_package_prerequisites_blocked',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.device_revocation_status: closed_current_phase',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.lost_device_risk: lost_device_prior_material_not_recallable',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.key_epoch_status: key_epoch_rotation_not_started',
+      ),
       findsOneWidget,
     );
     expect(
