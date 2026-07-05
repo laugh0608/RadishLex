@@ -2,16 +2,19 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VALID_FIXTURE = REPO_ROOT / "tests" / "fixtures" / "sync-deployment-evidence-valid.txt"
 
 HEADER = "deployment_evidence.v1"
+SUMMARY_HEADER = "deployment_evidence_summary.v1"
 REQUIRED_FIELDS = [
     "reviewed_at",
     "target_alias",
@@ -37,6 +40,20 @@ ALLOWED_VALUES = {
     "log_redaction": {"passed", "failed", "not_run"},
 }
 ALLOWED_COMPOSE_FILE = "deploy/sync-server/docker-compose.yaml"
+SUMMARY_STATUS_FIELDS = [
+    "public_url_status",
+    "access_token_status",
+    "access_control",
+    "external_tls",
+    "backup_restore",
+    "upgrade_rollback",
+    "log_redaction",
+]
+DEPLOYMENT_EVIDENCE_SOURCE_FIELDS = [
+    "external_tls",
+    "backup_restore",
+    "upgrade_rollback",
+]
 ABSOLUTE_PATH_PATTERN = re.compile(r"(^|\s)(/Users/|/home/|/private/|/var/|/etc/|[A-Za-z]:\\)")
 GIT_COMMIT_PATTERN = re.compile(r"^[0-9a-f]{7,40}$")
 SAFE_ALIAS_PATTERN = re.compile(r"^[A-Za-z0-9._-]{3,64}$")
@@ -174,12 +191,84 @@ def validate_evidence_text(content: str, path_label: str = "<memory>") -> Valida
     return ValidationResult(path_label, errors)
 
 
-def validate_file(path: Path) -> ValidationResult:
+def load_evidence_file(path: Path) -> tuple[Optional[str], ValidationResult]:
     try:
         content = path.read_text(encoding="utf-8")
     except OSError as exc:
-        return ValidationResult(path.as_posix(), [f"failed to read file: {exc}"])
-    return validate_evidence_text(content, path.as_posix())
+        return None, ValidationResult(path.as_posix(), [f"failed to read file: {exc}"])
+    return content, validate_evidence_text(content, path.as_posix())
+
+
+def validate_file(path: Path) -> ValidationResult:
+    _content, result = load_evidence_file(path)
+    return result
+
+
+def target_evidence_complete(fields: dict[str, str]) -> bool:
+    return (
+        fields["public_url_status"] == "configured"
+        and fields["access_token_status"] == "configured_and_401_verified"
+        and fields["access_control"] == "passed"
+        and fields["external_tls"] == "passed"
+        and fields["backup_restore"] == "passed"
+        and fields["upgrade_rollback"] == "passed"
+        and fields["log_redaction"] == "passed"
+    )
+
+
+def deployment_evidence_sources(fields: dict[str, str]) -> list[str]:
+    return [field for field in DEPLOYMENT_EVIDENCE_SOURCE_FIELDS if fields[field] == "passed"]
+
+
+def build_summary(fields: dict[str, str]) -> dict[str, object]:
+    return {
+        "schema": SUMMARY_HEADER,
+        "target_alias": fields["target_alias"],
+        "reviewed_at": fields["reviewed_at"],
+        "git_commit": fields["git_commit"],
+        "image_tag": fields["image_tag"],
+        "compose_file": fields["compose_file"],
+        "target_evidence_complete": target_evidence_complete(fields),
+        "deployment_evidence_sources": deployment_evidence_sources(fields),
+        "statuses": {field: fields[field] for field in SUMMARY_STATUS_FIELDS},
+    }
+
+
+def summary_from_text(content: str, path_label: str = "<memory>") -> dict[str, object]:
+    _header, fields, errors = parse_evidence(content)
+    errors.extend(validate_fields(fields))
+    errors.extend(validate_redaction(content, fields))
+    if errors:
+        raise EvidenceValidationError(f"{path_label} is not valid: {errors}")
+    return build_summary(fields)
+
+
+def format_summary_text(summary: dict[str, object]) -> str:
+    statuses = summary["statuses"]
+    if not isinstance(statuses, dict):
+        raise EvidenceValidationError("summary statuses must be a dictionary")
+    source_labels = summary["deployment_evidence_sources"]
+    if not isinstance(source_labels, list):
+        raise EvidenceValidationError("summary deployment evidence sources must be a list")
+
+    source_value = ", ".join(str(label) for label in source_labels) if source_labels else "none"
+    lines = [
+        SUMMARY_HEADER,
+        f"target_alias: {summary['target_alias']}",
+        f"reviewed_at: {summary['reviewed_at']}",
+        f"git_commit: {summary['git_commit']}",
+        f"image_tag: {summary['image_tag']}",
+        f"compose_file: {summary['compose_file']}",
+        f"target_evidence_complete: {str(summary['target_evidence_complete']).lower()}",
+        f"deployment_evidence_sources: {source_value}",
+    ]
+    for field in SUMMARY_STATUS_FIELDS:
+        lines.append(f"{field}: {statuses[field]}")
+    return "\n".join(lines)
+
+
+def format_summary_json(summary: dict[str, object]) -> str:
+    return json.dumps(summary, indent=2, sort_keys=True)
 
 
 def assert_valid(content: str, label: str) -> None:
@@ -203,6 +292,27 @@ def valid_fixture_text() -> str:
 def run_self_test() -> None:
     valid = valid_fixture_text()
     assert_valid(valid, "valid fixture")
+    summary = summary_from_text(valid, "valid summary")
+    if summary["schema"] != SUMMARY_HEADER:
+        raise EvidenceValidationError(f"summary schema mismatch: {summary['schema']!r}")
+    if summary["target_evidence_complete"] is not True:
+        raise EvidenceValidationError("valid fixture should produce a complete target evidence summary")
+    if summary["deployment_evidence_sources"] != ["external_tls", "backup_restore", "upgrade_rollback"]:
+        raise EvidenceValidationError(f"unexpected evidence source labels: {summary['deployment_evidence_sources']!r}")
+    summary_json = format_summary_json(summary)
+    summary_text = format_summary_text(summary)
+    for rendered in (summary_json, summary_text):
+        if "notes" in rendered or "synthetic deployment evidence only" in rendered:
+            raise EvidenceValidationError("summary output must not include free-form notes")
+        if "Authorization" in rendered or "Bearer" in rendered or "payload" in rendered:
+            raise EvidenceValidationError("summary output contains a forbidden sensitive marker")
+
+    incomplete_summary = summary_from_text(valid.replace("external_tls: passed", "external_tls: not_run"), "incomplete summary")
+    if incomplete_summary["target_evidence_complete"] is not False:
+        raise EvidenceValidationError("incomplete evidence should not produce a complete target evidence summary")
+    if "external_tls" in incomplete_summary["deployment_evidence_sources"]:
+        raise EvidenceValidationError("incomplete evidence should not expose external_tls as a source label")
+
     assert_invalid(valid.replace("access_control: passed\n", ""), "missing field", "missing required fields")
     assert_invalid(valid.replace("external_tls: passed", "external_tls: maybe"), "invalid status", "external_tls")
     assert_invalid(valid.replace("notes: synthetic deployment evidence only", "notes: Authorization: Bearer abc"), "bearer", "Authorization")
@@ -213,6 +323,13 @@ def run_self_test() -> None:
         "token-like",
         "long token-like",
     )
+    try:
+        summary_from_text(valid.replace("notes: synthetic deployment evidence only", "notes: Authorization: Bearer abc"), "invalid summary")
+    except EvidenceValidationError as exc:
+        if "Authorization" not in str(exc):
+            raise EvidenceValidationError(f"invalid summary did not report the sensitive marker: {exc}") from exc
+    else:
+        raise EvidenceValidationError("invalid evidence should not produce summary output")
 
 
 def print_result(result: ValidationResult) -> None:
@@ -228,11 +345,19 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate RadishLex sync deployment evidence packages.")
     parser.add_argument("paths", nargs="*", type=Path, help="Evidence package files to validate.")
     parser.add_argument("--self-test", action="store_true", help="Run built-in validation tests and the repository fixture.")
+    summary_group = parser.add_mutually_exclusive_group()
+    summary_group.add_argument("--summary-json", action="store_true", help="Print a non-sensitive JSON summary for one valid evidence package.")
+    summary_group.add_argument("--summary-text", action="store_true", help="Print a non-sensitive text summary for one valid evidence package.")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    summary_mode = args.summary_json or args.summary_text
+    if args.self_test and summary_mode:
+        print("--self-test cannot be combined with summary output.", file=sys.stderr)
+        return 2
+
     if args.self_test:
         try:
             run_self_test()
@@ -240,6 +365,26 @@ def main() -> int:
             print(f"deployment evidence self-test failed: {exc}", file=sys.stderr)
             return 1
         print("Deployment evidence self-test passed.")
+
+    if summary_mode:
+        if len(args.paths) != 1:
+            print("summary output requires exactly one evidence package path.", file=sys.stderr)
+            return 2
+        content, result = load_evidence_file(args.paths[0])
+        if not result.ok or content is None:
+            print_result(result)
+            return 1
+        try:
+            summary = summary_from_text(content, result.path)
+        except EvidenceValidationError as exc:
+            print(f"{result.path}: deployment evidence summary failed.", file=sys.stderr)
+            print(f"- {exc}", file=sys.stderr)
+            return 1
+        if args.summary_json:
+            print(format_summary_json(summary))
+        else:
+            print(format_summary_text(summary))
+        return 0
 
     if not args.paths:
         return 0 if args.self_test else 2

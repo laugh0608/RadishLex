@@ -99,13 +99,14 @@ docker compose -f deploy/sync-server/docker-compose.local.yaml config
 docker compose -f deploy/sync-server/docker-compose.yaml --env-file deploy/sync-server/.env.example config
 ./scripts/check-sync-server-deployment-rehearsal.sh --config-only
 ./scripts/check-sync-deployment-evidence.sh tests/fixtures/sync-deployment-evidence-valid.txt
+./scripts/check-sync-deployment-evidence.sh --summary-json tests/fixtures/sync-deployment-evidence-valid.txt
 ```
 
 本地 Compose 测试态使用 Caddy internal TLS 暴露 `https://localhost:7319`；部署态只提供同机 HTTP upstream `http://127.0.0.1:7319`，外部 TLS 和访问控制由部署者配置。生产访问控制当前先使用 `RADISHLEX_SYNC_ACCESS_TOKEN` 单用户 bearer token；OIDC / Radish 产品账号体系已作为后续专题记录，不是当前必须部署的账号系统。
 
 完整部署预演可执行 `./scripts/check-sync-server-deployment-rehearsal.sh`，它会用临时 env、随机 bearer token 和仓库外数据目录短生命周期启动部署态 Compose，验证 token 门禁、日志脱敏和冷备份恢复；该命令需要 Docker daemon 可用，默认仓库检查不运行。
 
-目标部署证据包格式和脱敏规则可用 `./scripts/check-sync-deployment-evidence.sh <evidence-file>` 复验；该命令只验证证据文件结构和敏感内容黑名单，不证明目标环境已经部署成功。
+目标部署证据包格式和脱敏规则可用 `./scripts/check-sync-deployment-evidence.sh <evidence-file>` 复验；通过后可用 `--summary-json` 或 `--summary-text` 导出非敏感交接摘要。该命令只验证证据文件结构、敏感内容黑名单和摘要字段，不证明目标环境已经部署成功。
 
 Flutter manager 当前已在 `apps/radishlex-manager/` 起步，通过受控 `ManagerBridge` contract 接入合成 fixture，并可在显式配置本地 SQLite userdb 与 `ime-ffi` 动态库后切到真实 Dart FFI bridge。当前管理端展示本地词库、import batches、学习摘要、`rank explain`、`sync preflight`、settings draft、sync gate 草案和脱敏诊断摘要预览 / 导出；本地验收口径见 [Flutter manager 本地验收口径](docs/manager-local-acceptance.md)，真实同步入口进入 UI / bridge 前的交互边界见 [Flutter manager 真实同步入口前置边界](docs/manager-sync-entry-boundary.md)。真实远端同步、恢复码和设备授权 UI 仍按管理端边界保持关闭：
 

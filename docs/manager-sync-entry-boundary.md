@@ -39,7 +39,7 @@ Phase 4 manager 本地验收已经有可复验证据，真实同步入口的下�
 | 证据 | 要求 | 当前状态 |
 | --- | --- | --- |
 | 平台私钥 backend | 生产签名 backend 可在目标平台创建、加载、签名和删除非导出设备签名 key，且 capability / production gate 可被 manager 读取。 | 未满足；Apple 与 Android backend 均未解除 production gate。 |
-| 目标部署运行证据 | 目标部署完成外部 TLS、访问控制失败响应、备份恢复、升级回滚和日志脱敏复验，并按 `docs/runbooks/sync-server-production-deployment.md` 保留非敏感证据包；settings draft 只保存 allowlist 来源标签。 | 部署 runbook、证据包模板、预演入口和证据包校验脚本已存在，真实目标部署证据仍未作为用户可用同步条件闭合。 |
+| 目标部署运行证据 | 目标部署完成外部 TLS、访问控制失败响应、备份恢复、升级回滚和日志脱敏复验，并按 `docs/runbooks/sync-server-production-deployment.md` 保留非敏感证据包；settings draft 只保存 allowlist 来源标签。 | 部署 runbook、证据包模板、预演入口、证据包校验脚本和非敏感摘要导出已存在，真实目标部署证据仍未作为用户可用同步条件闭合。 |
 | 恢复码交互边界 | 恢复码只显示一次、用户确认保存、恢复记录创建 / 轮换 / 撤销、失败限速和日志脱敏测试齐备。 | 本文固定 UI / bridge 边界；产品实现仍未开始。 |
 | 设备授权交互边界 | join request、短码核对、授权包、设备撤销、lost device 和 key epoch 说明能被 UI 表达并测试。 | 本文固定 UI / bridge 边界；产品实现仍未开始。 |
 | 客户端同步操作 | Flutter 只调用结构化 bridge；Rust 侧只接收 encrypted object 与 signed manifest，不暴露 plaintext payload。 | Rust / Go 侧已有底层证据；manager 真实远端操作入口未接。 |
@@ -47,7 +47,7 @@ Phase 4 manager 本地验收已经有可复验证据，真实同步入口的下�
 
 任一证据缺失时，manager 只能展示准备状态、不可用原因和本地预检摘要，不得提供会上传真实 P2 数据的主操作。
 
-目标部署证据包应先通过 `./scripts/check-sync-deployment-evidence.sh <evidence-file>`，但证据包正文仍不进入 Flutter widget 状态、settings JSON 或诊断报告。manager 只能展示来自已校验证据包摘要的 `local_smoke`、`external_tls`、`backup_restore`、`upgrade_rollback` 这类 allowlist 标签和聚合状态；证书、token、日志正文、请求 / 响应体、真实路径和 payload bytes 都必须留在 UI / bridge / 诊断之外。`local_smoke` 只能证明实现级路径，不足以开放用户可用同步。
+目标部署证据包应先通过 `./scripts/check-sync-deployment-evidence.sh <evidence-file>`，并只通过 `deployment_evidence_summary.v1` 非敏感摘要交接给后续 UI / bridge 设计；证据包正文仍不进入 Flutter widget 状态、settings JSON 或诊断报告。manager 只能展示来自已校验证据包摘要的 `local_smoke`、`external_tls`、`backup_restore`、`upgrade_rollback` 这类 allowlist 标签和聚合状态；证书、token、日志正文、请求 / 响应体、真实路径、`notes` 和 payload bytes 都必须留在 UI / bridge / 诊断之外。`local_smoke` 只能证明实现级路径，不足以开放用户可用同步。
 
 ## 状态门禁
 
@@ -196,22 +196,22 @@ Phase 4 manager 本地验收已经有可复验证据，真实同步入口的下�
 
 | 层级 | 测试重点 |
 | --- | --- |
-| Dart helper | 从 settings draft、backend gate、部署证据、恢复码状态和设备授权状态派生 sync entry state。 |
+| Dart helper | 从 settings draft、backend gate、部署证据摘要、恢复码状态和设备授权状态派生 sync entry state。 |
 | Widget tests | 每个阻塞状态的按钮禁用、文案、诊断入口和下一步提示；`preflight_ready` 下仍不能启用真实同步。 |
 | Bridge mapper tests | native 状态和错误分类映射到 Dart model，不透传原始错误字符串或 secret 字段。 |
 | FFI smoke | 使用临时 SQLite、临时 settings、合成设备和短生命周期 bridge 复验本地状态读取，不连接真实用户后端。 |
 | Rust tests | 恢复记录创建 / 撤销、join request 过期、授权签名、设备撤销后 key epoch 推进和旧设备阻断。 |
 | Go / Rust integration | 真实 HTTP handler 只传 metadata 和密文；错误响应、audit log 和 Debug 输出脱敏。 |
-| 诊断测试 | 新增诊断字段不包含用户词、路径、token、恢复码、signature bytes、wrapped material bytes 或 payload bytes。 |
+| 诊断测试 | 新增诊断字段不包含用户词、路径、token、恢复码、signature bytes、wrapped material bytes、payload bytes、证据包正文或 `notes`。 |
 
-文档或 UI 只改变本地展示口径时，可以先跑 `./scripts/check-manager.sh`、`git diff --check` 和 `./scripts/check-repo.sh`。涉及目标部署证据包格式或交接材料时，应追加 `./scripts/check-sync-deployment-evidence.sh --self-test`，并对实际证据文件执行 `./scripts/check-sync-deployment-evidence.sh <evidence-file>`。涉及真实 Dart FFI bridge、同步状态读取或诊断导出时，应追加 `./scripts/check-manager-ffi-smoke.sh`。涉及 Rust / Go 同步客户端或 server handler 时，应按对应 crate / server 测试扩大验证。
+文档或 UI 只改变本地展示口径时，可以先跑 `./scripts/check-manager.sh`、`git diff --check` 和 `./scripts/check-repo.sh`。涉及目标部署证据包格式、摘要或交接材料时，应追加 `./scripts/check-sync-deployment-evidence.sh --self-test`，并对实际证据文件执行 `./scripts/check-sync-deployment-evidence.sh <evidence-file>` 和 `./scripts/check-sync-deployment-evidence.sh --summary-json <evidence-file>`。涉及真实 Dart FFI bridge、同步状态读取或诊断导出时，应追加 `./scripts/check-manager-ffi-smoke.sh`。涉及 Rust / Go 同步客户端或 server handler 时，应按对应 crate / server 测试扩大验证。
 
 ## 推进顺序
 
 后续实现应按以下顺序推进：
 
 1. 保持 Phase 4 本地验收证据稳定。
-2. 按生产部署 runbook 补目标部署运行证据包，并保持 settings draft 只记录非敏感来源标签。
+2. 按生产部署 runbook 补目标部署运行证据包，导出 `deployment_evidence_summary.v1` 非敏感摘要，并保持 settings draft 只记录非敏感来源标签。
 3. 取得至少一个可用平台私钥 backend 的生产签名证据，或补新的平台 / 算法 ADR 输入。
 4. 在 manager 中只接入 sync entry state 派生和阻塞说明，仍不上传数据。
 5. 补恢复码和设备授权 bridge 的结构化状态与错误测试。
