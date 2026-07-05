@@ -8,7 +8,7 @@ Flutter manager 当前进入本地能力验收收口阶段。已落地能力覆�
 
 本阶段验收只证明管理端可以安全、可审计地管理本机数据和解释同步不可用原因；不证明用户可用远端同步已经开放。
 
-2026-07-05 复查结论：按下方退出标准逐项核对后，Phase 4 Flutter manager 本地验收当前没有影响退出标准的证据缺口。后续缺口集中在真实同步入口所需的平台私钥 backend、目标部署运行证据、恢复码交互和设备授权链路，不阻塞本地管理能力验收。
+2026-07-05 复查结论：按下方退出标准逐项核对后，Phase 4 Flutter manager 本地验收当前没有影响退出标准的证据缺口。后续缺口集中在真实同步入口所需的平台私钥 backend、目标部署运行证据、恢复码 / 设备授权产品实现和对应测试，不阻塞本地管理能力验收。
 
 ## 验收范围
 
@@ -91,7 +91,7 @@ git diff --check
 
 - `apple-keychain-v1` 真实 Keychain smoke 仍阻塞于 `ed25519-v1` 创建。
 - `android-keystore-v1` 在 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 上仍为 `unsupported_signature_algorithm`。
-- 目标部署运行证据、恢复码交互边界和设备授权 UI 错误语义还没有形成可用产品链路。
+- `docs/manager-sync-entry-boundary.md` 已固定恢复码 / 设备授权交互边界、UI 状态门禁、bridge 错误分类、诊断脱敏和测试计划，但目标部署运行证据、平台私钥 backend 生产可用性和真实 UI / bridge 实现仍未形成可用产品链路。
 - manager 没有真实远端 sync client 操作入口，当前只做本地 preflight 和不可用原因解释。
 
 ## 后续推进
@@ -99,5 +99,5 @@ git diff --check
 验收文档稳定后，近期推进顺位应从继续拆分现有 manager UI，转为按退出标准复查缺口：
 
 1. 若 manager 本地验收缺证据，补精准 widget / helper / smoke 覆盖。
-2. 若真实同步入口要进入设计，先补恢复码 / 设备授权交互边界和平台私钥 backend 证据，不直接改 UI 开关。
+2. 若真实同步入口要进入实现，先按 `docs/manager-sync-entry-boundary.md` 补目标部署运行证据、平台私钥 backend 证据和对应测试，不直接改 UI 开关。
 3. 若继续优化 manager 代码结构，只在文件职责继续增长或测试边界变弱时拆分，不为目录整齐新增无实际职责的层。

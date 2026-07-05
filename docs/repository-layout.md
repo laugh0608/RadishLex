@@ -66,6 +66,7 @@ RadishLex/
     platform-private-key-backend-strategy.md
     manager-ui-boundary.md
     manager-local-acceptance.md
+    manager-sync-entry-boundary.md
     ffi-boundary.md
     adr/
     runbooks/
@@ -102,7 +103,7 @@ RadishLex/
 - `deploy/sync-server/docker-compose.yaml`：Go sync server 部署态入口，只暴露 HTTP 上游 `http://127.0.0.1:7319`，外部反代负责 TLS。
 - `deploy/sync-server/.env.example`：唯一 env 示例，真实部署复制为 `.env` 后修改。
 - `deploy/sync-server/nginx.prod.conf`：生产外部 Nginx TLS 终止示例。
-- `apps/radishlex-manager/`：Flutter manager 起步工程，通过受控 `ManagerBridge` contract 接入管理数据源；默认使用合成 fixture，显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时可切到真实 Dart FFI bridge，展示本地词库、import batches、学习摘要、rank explain 摘要、sync preflight、配置来源诊断、settings JSON 草案持久化、sync gate 状态来源、脱敏诊断报告、结构化错误分类、设备签名状态和设置草案；UI 代码已按 manager shell、跨页 action 编排、词库、学习、同步、设置、词库子组件、学习子组件、同步子组件、设置诊断子组件和共享组件拆分，widget tests 已按页面迁入 `test/screens/`，action helper 结果文案和 failure 分类已有回归测试，Dart model 已按 dictionary、learning、sync、settings、diagnostics 和 snapshot 分组，动态 FFI bridge 已按符号加载、调用规则、ABI struct types、view copy、高层 manager model mapper 和 native DTO 能力分组边界拆分；本地验收口径已由 `docs/manager-local-acceptance.md` 固定，真实远端同步、恢复码和设备授权 UI 仍按管理端边界关闭。
+- `apps/radishlex-manager/`：Flutter manager 起步工程，通过受控 `ManagerBridge` contract 接入管理数据源；默认使用合成 fixture，显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时可切到真实 Dart FFI bridge，展示本地词库、import batches、学习摘要、rank explain 摘要、sync preflight、配置来源诊断、settings JSON 草案持久化、sync gate 状态来源、脱敏诊断报告、结构化错误分类、设备签名状态和设置草案；UI 代码已按 manager shell、跨页 action 编排、词库、学习、同步、设置、词库子组件、学习子组件、同步子组件、设置诊断子组件和共享组件拆分，widget tests 已按页面迁入 `test/screens/`，action helper 结果文案和 failure 分类已有回归测试，Dart model 已按 dictionary、learning、sync、settings、diagnostics 和 snapshot 分组，动态 FFI bridge 已按符号加载、调用规则、ABI struct types、view copy、高层 manager model mapper 和 native DTO 能力分组边界拆分；本地验收口径已由 `docs/manager-local-acceptance.md` 固定，真实同步入口前置边界已由 `docs/manager-sync-entry-boundary.md` 固定，真实远端同步、恢复码和设备授权 UI 仍按管理端边界关闭。
 - `platforms/android-ime/keystore-bridge/`：Android Keystore bridge 仓库内 Kotlin / Gradle harness，固定 `android-keystore-v1` 的 `AndroidKeyStore` / `Ed25519` 创建、加载、公钥读取、签名、删除、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke / 设备矩阵记录模板，以及 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 失败记录；Rust raw JNI glue 位于 `crates/ime-crypto`，该目录当前不包含完整 Android IME。
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
 - `crates/ime-cli/`：基于 demo adapter、可选 Rime adapter、userdb 和 ranker 的命令行复验入口。
@@ -127,6 +128,7 @@ RadishLex/
 - `docs/platform-private-key-backend-strategy.md`：平台私钥 backend 当前证据、禁止 fallback、生产合格条件和无新设备时的推进路径。
 - `docs/manager-ui-boundary.md`：Phase 4 Flutter manager 的职责、数据可见性、同步 UI 状态、恢复码 / 设备授权停止线和第一批功能顺序。
 - `docs/manager-local-acceptance.md`：Phase 4 Flutter manager 本地管理能力的验收范围、退出标准映射、验证入口、隐私检查和真实同步停止线。
+- `docs/manager-sync-entry-boundary.md`：真实同步入口进入 UI / bridge 前的恢复码、设备授权、状态门禁、错误分类、诊断脱敏和测试计划。
 - `docs/adr/0002-recovery-code-kdf.md`：恢复码 Argon2id KDF、格式、恢复记录字段和生产实现验证口径。
 - `docs/adr/0003-device-signing-key-storage.md`：设备签名、签名对象、私钥存储抽象、错误语义和验证口径。
 - `docs/adr/0004-platform-private-key-storage-backend.md`：平台私钥存储 backend、capability metadata、FFI 边界、错误语义和停止线。
@@ -271,7 +273,7 @@ server/sync-server/
 
 ## Flutter app 建议
 
-管理端实现遵循 `docs/manager-ui-boundary.md`，本地验收口径见 `docs/manager-local-acceptance.md`。当前 `apps/radishlex-manager/` 已创建 macOS Flutter 工程，第一批页面通过 `ManagerBridge` contract 展示本地 userdb 管理、import batches、学习状态摘要、rank explain 摘要、sync preflight 摘要、配置来源诊断、settings JSON 草案持久化、sync gate 状态来源、脱敏诊断报告和结构化错误分类；默认仍使用合成 fixture，显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时可切到真实 Dart FFI bridge。页面结构已拆出 manager action 编排、词库子组件、学习子组件、同步子组件、设置诊断子组件和页面级 widget tests，并已补 action helper 级结果文案和 failure 分类回归测试，避免继续扩大单个 screen 或根 `widget_test.dart`。真实远端同步、恢复码和设备授权 UI 必须等待可用平台私钥 backend 与目标部署运行证据。
+管理端实现遵循 `docs/manager-ui-boundary.md`，本地验收口径见 `docs/manager-local-acceptance.md`，真实同步入口前置边界见 `docs/manager-sync-entry-boundary.md`。当前 `apps/radishlex-manager/` 已创建 macOS Flutter 工程，第一批页面通过 `ManagerBridge` contract 展示本地 userdb 管理、import batches、学习状态摘要、rank explain 摘要、sync preflight 摘要、配置来源诊断、settings JSON 草案持久化、sync gate 状态来源、脱敏诊断报告和结构化错误分类；默认仍使用合成 fixture，显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时可切到真实 Dart FFI bridge。页面结构已拆出 manager action 编排、词库子组件、学习子组件、同步子组件、设置诊断子组件和页面级 widget tests，并已补 action helper 级结果文案和 failure 分类回归测试，避免继续扩大单个 screen 或根 `widget_test.dart`。真实远端同步、恢复码和设备授权 UI 必须等待可用平台私钥 backend、目标部署运行证据和对应实现测试。
 
 ```text
 apps/radishlex-manager/

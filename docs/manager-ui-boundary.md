@@ -2,7 +2,7 @@
 
 本文档定义 Phase 4 Flutter manager 实现和后续演进必须稳定的职责边界、数据可见性、同步 UI 停止线和第一批功能顺序。读者是后续实现 `apps/radishlex-manager`、`ime-ffi` 管理接口、同步设置页面和审阅隐私边界的开发者。本文不包含 Flutter 页面视觉稿、widget 目录结构、平台输入法壳接入、完整账号系统、OIDC 实现或真实平台私钥 backend 实现。
 
-Phase 4 本地能力是否满足当前退出标准，由 `docs/manager-local-acceptance.md` 记录验收范围、证据入口和停止线；本文只定义长期职责边界。
+Phase 4 本地能力是否满足当前退出标准，由 `docs/manager-local-acceptance.md` 记录验收范围、证据入口和停止线；真实同步入口进入 UI / bridge 前的交互边界、错误分类和测试计划见 `docs/manager-sync-entry-boundary.md`；本文只定义长期职责边界。
 
 ## 当前定位
 
@@ -139,6 +139,8 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 设置草案中的目标部署证据只允许保存非敏感来源标签，例如本机 smoke、外部 TLS、备份恢复或升级回滚演练；不得保存日志正文、证书、token、恢复码、路径、请求 / 响应体、payload bytes 或其他运行输出。字段级参考见 `docs/manager-settings-diagnostics.md`。
 
 ## 恢复码与设备授权
+
+恢复码、设备授权、设备撤销和真实同步入口状态进入产品实现前，必须先遵守 `docs/manager-sync-entry-boundary.md` 中的进入条件、bridge 边界、诊断脱敏和测试计划。
 
 恢复码 UI 必须等到以下条件同时满足：
 
