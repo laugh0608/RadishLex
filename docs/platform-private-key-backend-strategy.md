@@ -12,7 +12,7 @@ RadishLex Phase 3 继续保留 `ed25519-v1` 作为设备签名协议。当前证
 - `android-keystore-v1` 已有 Kotlin / Gradle harness、JNI glue、gated smoke 和 provider diagnostics；Pixel 9 Pro API 35 AVD 与 Pixel 10 Pro API 37 AVD 均返回 `unsupported_signature_algorithm`。
 - `windows-cng-v1`、`linux-secret-service-v1` 仍只是能力边界标识，未进入实现。
 
-没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。可推进的工作是固定策略证据、收敛停止线、补目标部署运行证据，或准备新的平台 spike / ADR 输入。
+没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。可推进的工作是固定策略证据、收敛停止线、推进 manager 同步入口的非上传产品开发，或准备新的平台 spike / ADR 输入。发布级目标部署运行证据保留为正式发布前门禁，不作为当前开发阻塞项。
 
 ## 策略目标
 
@@ -111,21 +111,21 @@ RadishLex Phase 3 继续保留 `ed25519-v1` 作为设备签名协议。当前证
 
 在该 ADR 完成前，不允许把 seed 存储 fallback 混入现有平台 backend。
 
-### 路径 D：先补目标部署运行证据
+### 路径 D：继续本地同步产品开发
 
 适用条件：
 
 - 当前没有新 Android 真机或 Apple 平台调查条件。
-- 仍希望推进 Phase 3 自部署同步证据链。
+- 仍希望推进 Phase 4 manager 同步入口和本地联调能力。
 
 可推进内容：
 
-- 真实证书 / 域名 / 外部反代复验。
-- 目标数据目录冷备份、恢复到隔离目录、升级回滚演练。
-- 生产 `.env` secret 注入和 bearer token 失败响应复验。
-- 日志脱敏、数据目录权限和备份保留策略检查。
+- 使用本地 Docker / 本地 HTTPS 复验 sync server 到达性、bearer token 失败响应、密文对象路径和日志脱敏。
+- 在 manager 中实现 sync entry state helper / UI gate，只展示本地联调来源、阻塞原因和下一步，不上传真实用户 P2 数据。
+- 为 settings draft、backend gate、部署证据来源、恢复码状态和设备授权状态补 Dart helper / widget / 诊断脱敏测试。
+- 保持正式发布前再补真实证书 / 域名 / 外部反代、目标数据目录备份恢复、升级回滚和日志策略复验。
 
-该路径不解除平台私钥 backend 门禁，但能补齐真实用户同步前的另一条停止线。
+该路径不解除平台私钥 backend 门禁，也不解除真实用户同步开放门禁；它用于避免当前产品开发被发布级部署环境长期阻塞。
 
 ## 当前不做
 
@@ -144,7 +144,7 @@ RadishLex Phase 3 继续保留 `ed25519-v1` 作为设备签名协议。当前证
 1. 固定本策略文档，并同步入口文档。
 2. 保持 `apple-keychain-v1` 和 `android-keystore-v1` production gate 关闭。
 3. 记录“无新设备时不继续等待真机矩阵”的阶段判断。
-4. 后续若继续开发，优先选择目标部署运行证据，或准备 Apple 原生非导出 Ed25519 spike；不进入 Flutter manager 同步 UI。
+4. 后续若继续开发，优先推进 manager sync entry state helper / UI gate 的非上传实现，或准备 Apple 原生非导出 Ed25519 spike；不打开真实用户同步主操作。
 
 ## 验证口径
 

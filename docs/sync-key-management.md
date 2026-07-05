@@ -30,9 +30,9 @@
 
 - 不新增 CLI / FFI 明文同步 payload 入口。
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
-- 不推进平台壳、Flutter manager 或真实设备配对 UI。
+- 不推进平台壳或真实设备配对成功路径；Flutter manager 可以推进非上传的同步入口状态、阻塞说明和本地联调展示。
 
-进入用户可用同步前，应按生产部署 runbook 补目标部署运行证据；Apple 原生非导出 Ed25519 支持矩阵应单独调查，Android Keystore 已补仓库内 Kotlin / Gradle harness、`@JvmStatic` facade、Rust raw JNI glue、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，且 Android target build 已通过；当前 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 均未证明 AndroidKeyStore 可提供非导出 Ed25519 signing key。无新增 Android 真机或不同 system image 时，按 `docs/platform-private-key-backend-strategy.md` 继续推进策略证据、目标部署运行证据或新的平台 spike / ADR 输入，不把真机矩阵作为硬阻塞。access token 已有首个 server / transport 证据，但可用平台私钥 backend 停止线解除前，不应开放用户可用同步主线。
+进入用户可用同步前，应按生产部署 runbook 补发布级目标部署运行证据；Apple 原生非导出 Ed25519 支持矩阵应单独调查，Android Keystore 已补仓库内 Kotlin / Gradle harness、`@JvmStatic` facade、Rust raw JNI glue、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，且 Android target build 已通过；当前 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 均未证明 AndroidKeyStore 可提供非导出 Ed25519 signing key。无新增 Android 真机或不同 system image 时，按 `docs/platform-private-key-backend-strategy.md` 继续推进 manager 同步入口非上传开发、策略证据或新的平台 spike / ADR 输入，不把真机矩阵作为硬阻塞。access token 已有首个 server / transport 证据，但可用平台私钥 backend 停止线解除前，不应开放用户可用同步主线。
 
 ## 设计目标
 

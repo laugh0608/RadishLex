@@ -33,7 +33,7 @@
 | `backup_restore` | `backup restore` | 备份恢复演练证据已记录。 |
 | `upgrade_rollback` | `upgrade rollback` | 升级 / 回滚演练证据已记录。 |
 
-部署证据来源标签与 `docs/runbooks/sync-server-production-deployment.md` 的目标部署证据包对齐，但 settings draft 只保存一个非敏感 allowlist 标签，不保存证据包正文。证据包正文进入交接材料前可用 `./scripts/check-sync-deployment-evidence.sh <evidence-file>` 校验格式和脱敏规则；通过后只能交接 `--summary-json` / `--summary-text` 导出的 `deployment_evidence_summary.v1` 非敏感摘要。该校验和摘要不改变 settings draft 只保存标签的边界。`local_smoke` 只表示实现级短生命周期 smoke 可复验，不能代表目标部署可开放给真实用户；真实同步入口仍需要目标环境的外部 TLS、访问控制失败响应、备份恢复、升级回滚、日志脱敏和平台私钥 backend 证据齐备。
+部署证据来源标签与 `docs/runbooks/sync-server-production-deployment.md` 的目标部署证据包对齐，但 settings draft 只保存一个非敏感 allowlist 标签，不保存证据包正文。证据包正文进入交接材料前可用 `./scripts/check-sync-deployment-evidence.sh <evidence-file>` 校验格式和脱敏规则；通过后只能交接 `--summary-json` / `--summary-text` 导出的 `deployment_evidence_summary.v1` 非敏感摘要。该校验和摘要不改变 settings draft 只保存标签的边界。`local_smoke` 足以支撑当前开发期同步入口状态、阻塞说明和本地联调展示，不能代表目标部署可开放给真实用户；用户可用同步仍需要发布级部署证据、平台私钥 backend、恢复码和设备授权链路齐备。
 
 settings draft 不得保存：
 
@@ -61,7 +61,7 @@ settings draft 不得保存：
 4. `deployment_evidence_recorded` 未与有效 `deployment_evidence_source` 同时成立：`deployment_unverified`。
 5. 以上均通过：`preflight_ready`。
 
-即使状态进入 `preflight_ready`，同步页的 `启用同步` 主按钮仍保持禁用。用户可用同步入口必须等待可用平台私钥 backend、目标部署运行证据、恢复码和设备授权链路满足对应停止线。
+即使状态进入 `preflight_ready`，同步页的 `启用同步` 主按钮仍保持禁用。用户可用同步入口必须等待可用平台私钥 backend、发布级目标部署运行证据、恢复码和设备授权链路满足对应停止线。
 
 ## 诊断报告格式
 

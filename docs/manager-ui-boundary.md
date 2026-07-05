@@ -14,9 +14,9 @@ Flutter manager 是 RadishLex 的管理界面，不进入输入热路径，不�
 
 - 本地 userdb 管理优先于远端同步开关。
 - 学习记录摘要优先于 P1 原始事件明细。
-- 同步预检和部署配置检查优先于真实远端启用。
+- 同步预检、本地 Docker / 本地 HTTPS 联调状态和部署配置检查优先于真实远端启用。
 - 恢复码和设备授权 UI 必须等待可用平台私钥 backend。
-- 用户可见同步 UI 必须等待目标部署运行证据和可用平台私钥 backend。
+- 用户可用同步主操作必须等待发布级部署证据和可用平台私钥 backend；非上传的同步入口状态、阻塞说明和本地联调展示可以继续推进。
 
 ## 职责范围
 
@@ -59,7 +59,7 @@ Phase 4 第一批管理端功能应覆盖：
 - 把恢复码、同步主密钥、设备私钥、wrapped material 明文或 bearer token 写入普通日志、崩溃报告、截图、analytics 或测试 fixture。
 - 把 Go server 当作候选排序服务、在线转换服务或明文词库服务。
 - 在平台私钥 backend 不可用时提供用户可用同步开关。
-- 在目标部署证据不足时把同步状态显示为生产可用。
+- 在发布级目标部署证据不足时把同步状态显示为生产可用。
 - 把 OIDC / Radish 产品账号登录提前做成 Phase 4 的前置条件。
 
 ## 数据可见性
@@ -127,12 +127,12 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 管理端同步相关 UI 至少应区分以下状态：
 
 - `local_only`：仅本地管理，未配置自部署服务端。
-- `preflight_ready`：本地 P2 对象、加密组装和 sync preflight 通过，但未启用远端。
+- `preflight_ready`：本地 P2 对象、加密组装、local smoke 来源和 sync preflight 通过，但未启用真实远端。
 - `server_configured`：已配置服务端地址和访问 token，但未完成生产条件验证。
 - `backend_unavailable`：平台私钥 backend 不可用于生产签名。
-- `deployment_unverified`：目标部署运行证据不足。
+- `deployment_unverified`：发布级目标部署运行证据不足，或当前只有本地 `local_smoke`。
 - `sync_disabled_by_policy`：隐私模式、用户禁用或策略要求停止同步。
-- `ready_for_user_sync`：平台私钥 backend 可用，目标部署证据齐备，用户明确开启同步。
+- `ready_for_user_sync`：平台私钥 backend 可用，发布级部署证据、恢复码和设备授权链路齐备，用户明确开启同步。
 
 在 `ready_for_user_sync` 前，UI 可以展示配置检查和不可用原因，但不能提供会把本地 P2 数据上传到用户真实远端的主操作。
 
@@ -182,12 +182,12 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 6. `rank explain` 区域已通过专用 `ime-ffi` ABI 读取单候选贡献项，Flutter 只展示复制后的非敏感摘要，不持有 Rust view 指针。
 7. 已补设置页配置来源诊断、sync gate 草案预览、部署证据来源标签、设置草案保存、脱敏诊断报告分组预览 / 筛选 / 复制 / 导出和 bridge 失败结构化错误分类展示；UI 不透传 native 错误明细。
 8. 同步配置页继续保持真实上传按钮禁用，状态由设置草案、隐私模式、平台私钥 backend gate 和部署证据来源草案派生，可显示 `local_only`、`sync_disabled_by_policy`、`backend_unavailable`、`deployment_unverified` 或 `preflight_ready`。
-9. 待可用平台私钥 backend 与目标部署运行证据齐备后，再接设备授权、恢复码和用户可用同步。
+9. 下一步可以接 sync entry state helper / UI gate 的非上传实现；待可用平台私钥 backend、恢复 / 授权实现测试和发布级部署证据齐备后，再接设备授权成功路径、恢复码和用户可用同步。
 
 ## 停止线
 
 - 没有可用平台私钥 backend 前，不提供用户可用同步开关、恢复码创建 UI 或设备授权成功路径。
-- 没有目标部署运行证据前，不把远端同步展示为生产可用。
+- 没有发布级目标部署运行证据前，不把远端同步展示为生产可用；本地 Docker / 本地 HTTPS 联调状态可以作为非生产证据展示。
 - 没有 FFI / bridge 明确错误语义前，不让 Flutter 直接解析 Rust 内部错误字符串。
 - 任何会展示、记录、上传或导出 P0、P1 原始事件、恢复码、token、私钥或明文同步 payload 的设计都必须停止并回退。
 - 如果 UI 需要新增 Go server API，必须先更新 `docs/sync-server-api-storage.md` 或对应 ADR，不能让管理端绕过现有 encrypted object / metadata 边界。

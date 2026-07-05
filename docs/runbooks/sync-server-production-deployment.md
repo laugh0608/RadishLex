@@ -8,7 +8,13 @@
 - 部署态只提供同机 HTTP upstream `http://127.0.0.1:7319`；外部 TLS 必须在反向代理、VPN 或等价网络边界完成，Go server 通过单用户 bearer access token 执行首个内建访问门禁。
 - 本地验证入口仍是显式 `-f deploy/sync-server/docker-compose.local.yaml`，通过 Caddy internal TLS 提供 `https://localhost:7319`，不新增第二个对外端口。
 - Go server 已验证密文对象上传下载、设备授权、版本冲突、日志脱敏、Docker Compose 本地 / 部署态启动 smoke、Rust userdb 两客户端真实 Go HTTP 同步、短生命周期冷备份 / 恢复到隔离目录 smoke，以及短生命周期外部 TLS 反代 smoke；这些证据仍不等于可以开放真实用户同步。
-- 真实用户同步前仍缺少目标部署上的备份恢复演练、升级回滚演练、真实证书 / 域名 / 外部反代复验、平台私钥存储 backend 和用户可用同步 UI；生产访问认证已有单用户 bearer token 实现证据，目标部署证据包已有本地格式 / 脱敏校验和非敏感摘要导出入口，但部署者仍必须设置真实 token 并复验失败响应。
+- 真实用户同步或正式发布前仍缺少目标部署上的备份恢复演练、升级回滚演练、真实证书 / 域名 / 外部反代复验、平台私钥存储 backend 和用户可用同步 UI；这些不作为当前产品开发阻塞项。开发期同步测试以本地 Docker、本地 HTTPS、短生命周期数据目录和现有 smoke 为准。
+
+## 阶段边界
+
+本文档的目标部署证据包面向正式发布、真实用户开放或长期自部署交接。当前产品开发不要求准备真实域名、正式证书或外部反代；需要测试同步链路时，优先使用 `deploy/sync-server/docker-compose.local.yaml` 提供的本地 HTTPS、短生命周期数据目录和自动化 smoke。
+
+本地 Docker / 本地 HTTPS 通过可以记录为 `local_smoke`，用于支撑 manager 同步入口的状态派生、阻塞说明、诊断脱敏和本地联调。它不能代表发布级外部 TLS、备份恢复、升级回滚和日志策略已在目标环境通过，也不能单独解除真实用户同步开放门禁。
 
 ## 目标部署证据包
 
@@ -67,7 +73,7 @@ notes: <non-sensitive summary only>
 
 ### 无真实证据包时的阻塞记录
 
-如果当前会话没有用户提供或目标环境产生的真实 `deployment_evidence.v1`，不得使用仓库内合成 fixture 冒充真实部署证据，也不得从未通过校验的草稿中提取摘要。交接记录只写阻塞结论：真实目标部署未验证，manager 继续保持 `deployment_unverified`，真实同步、恢复码和设备授权入口继续关闭。
+如果当前会话没有用户提供或目标环境产生的真实 `deployment_evidence.v1`，不得使用仓库内合成 fixture 冒充发布级部署证据，也不得从未通过校验的草稿中提取摘要。交接记录只写阶段结论：发布级目标部署未验证；manager 可以继续推进本地 `local_smoke` 支撑的状态派生和阻塞说明，真实用户同步、恢复码和设备授权成功路径继续关闭。
 
 部署者需要提供的非敏感字段清单：
 

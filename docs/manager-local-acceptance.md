@@ -91,7 +91,7 @@ git diff --check
 
 - `apple-keychain-v1` 真实 Keychain smoke 仍阻塞于 `ed25519-v1` 创建。
 - `android-keystore-v1` 在 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 上仍为 `unsupported_signature_algorithm`。
-- `docs/manager-sync-entry-boundary.md` 已固定恢复码 / 设备授权交互边界、UI 状态门禁、bridge 错误分类、诊断脱敏和测试计划，但目标部署运行证据、平台私钥 backend 生产可用性和真实 UI / bridge 实现仍未形成可用产品链路。
+- `docs/manager-sync-entry-boundary.md` 已固定恢复码 / 设备授权交互边界、UI 状态门禁、bridge 错误分类、诊断脱敏和测试计划；发布级目标部署运行证据、平台私钥 backend 生产可用性和真实用户同步 UI / bridge 仍未形成可用产品链路，但本地 Docker / 本地 HTTPS 足以支撑下一步非上传状态开发。
 - manager 没有真实远端 sync client 操作入口，当前只做本地 preflight 和不可用原因解释。
 
 ## 后续推进
@@ -99,5 +99,5 @@ git diff --check
 验收文档稳定后，近期推进顺位应从继续拆分现有 manager UI，转为按退出标准复查缺口：
 
 1. 若 manager 本地验收缺证据，补精准 widget / helper / smoke 覆盖。
-2. 若真实同步入口要进入实现，先按 `docs/manager-sync-entry-boundary.md` 补目标部署运行证据、平台私钥 backend 证据和对应测试，不直接改 UI 开关。
+2. 若真实同步入口要进入实现，先按 `docs/manager-sync-entry-boundary.md` 推进 sync entry state helper / UI gate 的非上传状态派生和本地联调测试；发布级部署证据、平台私钥 backend 证据齐备前，不打开真实用户同步开关。
 3. 若继续优化 manager 代码结构，只在文件职责继续增长或测试边界变弱时拆分，不为目录整齐新增无实际职责的层。

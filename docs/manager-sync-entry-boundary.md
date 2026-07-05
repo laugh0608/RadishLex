@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-Phase 4 manager 本地验收已经有可复验证据，真实同步入口的下一步不是直接启用上传 / 下载按钮，而是先把恢复码、设备授权、目标部署证据和平台私钥 backend 的进入条件固定为可测试的 UI / bridge 边界。
+Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径调整后，真实域名、正式证书和外部反代复验不再阻塞当前产品开发；它们保留为正式发布 / 真实用户开放前门禁。真实同步入口的下一步不是直接启用上传 / 下载按钮，而是在本地 Docker / 本地 HTTPS 证据支撑下，先把恢复码、设备授权、部署证据来源和平台私钥 backend 的进入条件固定为可测试的 UI / bridge 边界。
 
 当前仍保持：
 
@@ -39,17 +39,17 @@ Phase 4 manager 本地验收已经有可复验证据，真实同步入口的下�
 | 证据 | 要求 | 当前状态 |
 | --- | --- | --- |
 | 平台私钥 backend | 生产签名 backend 可在目标平台创建、加载、签名和删除非导出设备签名 key，且 capability / production gate 可被 manager 读取。 | 未满足；Apple 与 Android backend 均未解除 production gate。 |
-| 目标部署运行证据 | 目标部署完成外部 TLS、访问控制失败响应、备份恢复、升级回滚和日志脱敏复验，并按 `docs/runbooks/sync-server-production-deployment.md` 保留非敏感证据包；settings draft 只保存 allowlist 来源标签。 | 部署 runbook、证据包模板、预演入口、证据包校验脚本和非敏感摘要导出已存在，真实目标部署证据仍未作为用户可用同步条件闭合。 |
+| 部署运行证据 | 当前开发联调用本地 Docker、本地 HTTPS、短生命周期数据目录和 `local_smoke` 来源；正式发布 / 真实用户开放前再补目标环境外部 TLS、访问控制失败响应、备份恢复、升级回滚和日志脱敏复验。 | 本地 Docker / 本地 HTTPS 和多类 runtime smoke 已有证据；真实目标部署证据未形成，但不再阻塞 sync entry state helper / UI gate 的非上传开发。 |
 | 恢复码交互边界 | 恢复码只显示一次、用户确认保存、恢复记录创建 / 轮换 / 撤销、失败限速和日志脱敏测试齐备。 | 本文固定 UI / bridge 边界；产品实现仍未开始。 |
 | 设备授权交互边界 | join request、短码核对、授权包、设备撤销、lost device 和 key epoch 说明能被 UI 表达并测试。 | 本文固定 UI / bridge 边界；产品实现仍未开始。 |
 | 客户端同步操作 | Flutter 只调用结构化 bridge；Rust 侧只接收 encrypted object 与 signed manifest，不暴露 plaintext payload。 | Rust / Go 侧已有底层证据；manager 真实远端操作入口未接。 |
 | 诊断脱敏 | 诊断报告只输出状态、来源标签、聚合计数和脱敏策略，不输出 secret 或 payload bytes。 | 本地验收已覆盖；真实同步字段新增前仍需补测试。 |
 
-任一证据缺失时，manager 只能展示准备状态、不可用原因和本地预检摘要，不得提供会上传真实 P2 数据的主操作。
+任一生产证据缺失时，manager 只能展示准备状态、不可用原因和本地预检摘要，不得提供会上传真实 P2 数据的主操作。部署证据缺失不阻止本地开发期状态派生、阻塞说明、诊断脱敏和本地联调入口。
 
-目标部署证据包应先通过 `./scripts/check-sync-deployment-evidence.sh <evidence-file>`，并只通过 `deployment_evidence_summary.v1` 非敏感摘要交接给后续 UI / bridge 设计；证据包正文仍不进入 Flutter widget 状态、settings JSON 或诊断报告。manager 只能展示来自已校验证据包摘要的 `local_smoke`、`external_tls`、`backup_restore`、`upgrade_rollback` 这类 allowlist 标签和聚合状态；证书、token、日志正文、请求 / 响应体、真实路径、`notes` 和 payload bytes 都必须留在 UI / bridge / 诊断之外。`local_smoke` 只能证明实现级路径，不足以开放用户可用同步。
+目标部署证据包应先通过 `./scripts/check-sync-deployment-evidence.sh <evidence-file>`，并只通过 `deployment_evidence_summary.v1` 非敏感摘要交接给后续 UI / bridge 设计；证据包正文仍不进入 Flutter widget 状态、settings JSON 或诊断报告。manager 可以展示本地开发期 `local_smoke`，以及发布前已校验证据摘要中的 `external_tls`、`backup_restore`、`upgrade_rollback` 这类 allowlist 标签和聚合状态；证书、token、日志正文、请求 / 响应体、真实路径、`notes` 和 payload bytes 都必须留在 UI / bridge / 诊断之外。`local_smoke` 足以支撑本地同步开发和联调，不足以开放真实用户同步。
 
-2026-07-05 复查确认当前仓库内没有真实目标环境产生的 `deployment_evidence.v1`，只有合成 fixture 和校验 / 摘要工具。本状态只能记录为目标部署证据缺失；不得把 fixture 摘要映射为 manager 可用同步证据，也不得为此打开真实同步入口。
+2026-07-05 复查确认当前仓库内没有真实目标环境产生的 `deployment_evidence.v1`，只有合成 fixture 和校验 / 摘要工具。本状态只能记录为发布级目标部署证据缺失；不得把 fixture 摘要映射为真实用户同步证据，但可以继续推进本地 `sync entry state` 派生、阻塞说明和 UI gate。
 
 ## 状态门禁
 
@@ -60,8 +60,8 @@ Phase 4 manager 本地验收已经有可复验证据，真实同步入口的下�
 | `local_only` | 未保留同步配置或未配置 server endpoint。 | 管理本地词库、查看本地预检。 | 上传 / 下载、恢复码、设备授权。 |
 | `sync_disabled_by_policy` | 隐私模式或策略禁用同步。 | 查看禁用原因、继续本地管理。 | 任何远端同步主操作。 |
 | `backend_unavailable` | 平台私钥 backend 不可用于生产签名。 | 查看 backend id、capability 和 production gate 原因。 | 生成恢复码、签名授权包、上传对象。 |
-| `deployment_unverified` | 自部署目标尚无可用运行证据。 | 补充非敏感部署证据来源标签。 | 把远端同步显示为生产可用。 |
-| `preflight_ready` | 本地 P2 对象、settings draft 和预检解释齐备，但真实同步入口仍未开放。 | 查看下一项阻塞证据。 | 启用同步主操作、恢复码和设备授权成功路径。 |
+| `deployment_unverified` | 自部署目标尚无发布级运行证据，或只有本地 `local_smoke`。 | 查看本地联调来源和发布前缺口。 | 把远端同步显示为生产可用。 |
+| `preflight_ready` | 本地 P2 对象、settings draft、本地 smoke 来源和预检解释齐备，但真实同步入口仍未开放。 | 查看下一项阻塞证据，执行本地联调范围内的非上传检查。 | 启用真实同步主操作、恢复码和设备授权成功路径。 |
 | `ready_for_user_sync` | 平台 backend、目标部署、恢复码、设备授权和测试证据都满足。 | 后续可进入真实同步设置流程。 | 跳过恢复码确认、跳过设备授权、绕过 bridge。 |
 
 `preflight_ready` 不是用户可用同步状态。它只说明本地草案和预检可以解释，不代表可以对真实远端上传数据。
@@ -213,18 +213,19 @@ Phase 4 manager 本地验收已经有可复验证据，真实同步入口的下�
 后续实现应按以下顺序推进：
 
 1. 保持 Phase 4 本地验收证据稳定。
-2. 按生产部署 runbook 补目标部署运行证据包，导出 `deployment_evidence_summary.v1` 非敏感摘要，并保持 settings draft 只记录非敏感来源标签。
-3. 取得至少一个可用平台私钥 backend 的生产签名证据，或补新的平台 / 算法 ADR 输入。
-4. 在 manager 中只接入 sync entry state 派生和阻塞说明，仍不上传数据。
+2. 用本地 Docker / 本地 HTTPS 和现有 smoke 作为开发期同步证据，保持 settings draft 只记录非敏感来源标签。
+3. 在 manager 中只接入 sync entry state 派生和阻塞说明，仍不上传真实用户数据。
+4. 取得至少一个可用平台私钥 backend 的生产签名证据，或补新的平台 / 算法 ADR 输入。
 5. 补恢复码和设备授权 bridge 的结构化状态与错误测试。
-6. 在恢复码确认、设备授权、部署证据和 backend gate 全部满足后，再开放用户可用同步入口。
+6. 正式发布 / 真实用户开放前，按生产部署 runbook 补目标部署运行证据包，导出 `deployment_evidence_summary.v1` 非敏感摘要。
+7. 在恢复码确认、设备授权、发布级部署证据和 backend gate 全部满足后，再开放用户可用同步入口。
 
 任何一步如果需要新增 Go server API、C ABI、settings 字段、诊断字段或同步对象类型，必须先更新对应专题文档和测试口径。
 
 ## 当前停止线
 
 - 平台私钥 backend 未解除 production gate 前，不提供恢复码创建、设备授权成功路径或真实同步主操作。
-- 目标部署证据未形成前，不把远端同步展示为生产可用。
+- 发布级目标部署证据未形成前，不把远端同步展示为生产可用；但不阻止本地 Docker / 本地 HTTPS 下的开发联调。
 - 恢复码确认保存流程未完成前，不上传真实用户 P2 对象。
 - join request、授权包、撤销和 key epoch 错误语义未映射前，不开放设备授权 UI。
 - 任何明文 payload、P1 原始事件、恢复码、token、私钥、signature bytes、wrapped material bytes 或 encrypted payload bytes 进入 widget、日志、诊断或 fixture，都必须停止并回退。

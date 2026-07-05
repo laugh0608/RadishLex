@@ -141,7 +141,7 @@ JAVA_HOME=<Android Studio bundled JBR> ./gradlew connectedAndroidTest -Pradishle
 
 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 当前诊断结果均为 `unsupported_signature_algorithm`：JCA factory 表面可用，但 `AndroidKeyStore` 实际生成 `EC` key，不能满足 `ed25519-v1` 设备签名协议。`android-keystore-v1` production gate 继续关闭，不切换 P-256，也不回退到 seed / app storage / `test-memory-v1`。
 
-无新增 Android 真机或不同系统镜像时，平台私钥 backend 推进以 [平台私钥 Backend 策略](docs/platform-private-key-backend-strategy.md) 为准：保留 `ed25519-v1`，不在现有 backend 内降级，优先补目标部署运行证据或准备新的平台 spike / ADR 输入。
+无新增 Android 真机或不同系统镜像时，平台私钥 backend 推进以 [平台私钥 Backend 策略](docs/platform-private-key-backend-strategy.md) 为准：保留 `ed25519-v1`，不在现有 backend 内降级；当前产品开发优先推进 manager 同步入口的非上传状态派生和本地 Docker / 本地 HTTPS 联调，发布级目标部署运行证据留到正式发布或真实用户开放前补齐。
 
 ## MVP 边界
 
