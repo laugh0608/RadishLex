@@ -109,8 +109,8 @@
 - 隐私模式开关。
 - 本地学习状态、import batches、rank explain 摘要和 sync preflight 摘要。
 - 同步 UI 按 `docs/manager-ui-boundary.md` 显示不可用原因，不绕过平台私钥 backend 和目标部署停止线。
-- 当前 `apps/radishlex-manager` 已起步 macOS Flutter 工程，默认用合成 fixture 验证本地管理台结构；显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时，可通过真实 Dart FFI bridge 读取 / 删除 / 导入 / 导出本地 userdb，并展示 import batches、learning status、rank explain、sync preflight 摘要、配置来源诊断、非 secret settings JSON 草案持久化、sync gate 状态来源、设置页 gate 草案预览、部署证据来源标签、settings draft 格式演进测试、settings / diagnostics 字段参考、脱敏诊断报告和结构化错误分类。诊断报告预览已支持字段分组、筛选和复制与导出一致的脱敏文本，UI 与 widget tests 已按 manager action 编排、词库子组件、学习子组件、设置诊断子组件和页面级测试拆分。
-- Phase 4 当前已补 `docs/status/current.md` 作为短入口，记录 manager 本地能力、验证基线和停止线；学习页子组件已拆分，下一步继续审视 sync 页面职责和 action 编排测试覆盖，不在可用平台私钥 backend 与目标部署运行证据齐备前打开真实远端同步、恢复码或设备授权 UI。
+- 当前 `apps/radishlex-manager` 已起步 macOS Flutter 工程，默认用合成 fixture 验证本地管理台结构；显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时，可通过真实 Dart FFI bridge 读取 / 删除 / 导入 / 导出本地 userdb，并展示 import batches、learning status、rank explain、sync preflight 摘要、配置来源诊断、非 secret settings JSON 草案持久化、sync gate 状态来源、设置页 gate 草案预览、部署证据来源标签、settings draft 格式演进测试、settings / diagnostics 字段参考、脱敏诊断报告和结构化错误分类。诊断报告预览已支持字段分组、筛选和复制与导出一致的脱敏文本，UI 与 widget tests 已按 manager action 编排、词库子组件、学习子组件、同步子组件、设置诊断子组件和页面级测试拆分。
+- Phase 4 当前已补 `docs/status/current.md` 作为短入口，记录 manager 本地能力、验证基线和停止线；学习页和同步页子组件已拆分，下一步继续审视 action 编排测试覆盖，不在可用平台私钥 backend 与目标部署运行证据齐备前打开真实远端同步、恢复码或设备授权 UI。
 
 交付：
 
