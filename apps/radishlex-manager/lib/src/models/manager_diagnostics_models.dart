@@ -313,6 +313,51 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
             'gate',
           ),
           _diagnosticsItem(
+            'sync.recovery_setup_status',
+            syncGateAudit.entryGate.recovery.setupReadiness.status,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_setup_blocker',
+            syncGateAudit.entryGate.recovery.setupReadiness.blocker,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_setup_action_status',
+            syncGateAudit.entryGate.recovery.setupReadiness.entryActionStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_setup_prerequisites',
+            syncGateAudit.entryGate.recovery.setupReadiness.prerequisiteSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_setup_error_codes',
+            syncGateAudit.entryGate.recovery.setupReadiness.errorCodeSummary,
+            'error_code',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_restore_status',
+            syncGateAudit.entryGate.recovery.restoreReadiness.status,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_restore_blocker',
+            syncGateAudit.entryGate.recovery.restoreReadiness.blocker,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_restore_code_input',
+            syncGateAudit.entryGate.recovery.restoreReadiness.codeInputStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_restore_error_codes',
+            syncGateAudit.entryGate.recovery.restoreReadiness.errorCodeSummary,
+            'error_code',
+          ),
+          _diagnosticsItem(
             'sync.device_authorization_status',
             syncGateAudit.entryGate.deviceAuthorization.status.code,
             'gate',
@@ -370,6 +415,79 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
             'sync.device_authorization_readiness_blockers',
             syncGateAudit.entryGate.deviceAuthorization.readinessBlockerSummary,
             'gate',
+          ),
+          _diagnosticsItem(
+            'sync.device_join_status',
+            syncGateAudit.entryGate.deviceAuthorization.joinReadiness.status,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.device_join_blocker',
+            syncGateAudit.entryGate.deviceAuthorization.joinReadiness.blocker,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.device_join_action_status',
+            syncGateAudit
+                .entryGate
+                .deviceAuthorization
+                .joinReadiness
+                .entryActionStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.device_join_short_code',
+            syncGateAudit
+                .entryGate
+                .deviceAuthorization
+                .joinReadiness
+                .shortCodeVerificationStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.device_join_error_codes',
+            syncGateAudit
+                .entryGate
+                .deviceAuthorization
+                .joinReadiness
+                .errorCodeSummary,
+            'error_code',
+          ),
+          _diagnosticsItem(
+            'sync.device_revocation_flow_status',
+            syncGateAudit
+                .entryGate
+                .deviceAuthorization
+                .revocationReadiness
+                .status,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.device_revocation_blocker',
+            syncGateAudit
+                .entryGate
+                .deviceAuthorization
+                .revocationReadiness
+                .blocker,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.device_revocation_active_requirement',
+            syncGateAudit
+                .entryGate
+                .deviceAuthorization
+                .revocationReadiness
+                .activeDeviceRequirement,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.device_revocation_error_codes',
+            syncGateAudit
+                .entryGate
+                .deviceAuthorization
+                .revocationReadiness
+                .errorCodeSummary,
+            'error_code',
           ),
           _diagnosticsItem(
             'sync.connection_status',

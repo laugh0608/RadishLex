@@ -54,6 +54,40 @@ void main() {
         'recovery_code_save_confirmation_required',
       ]),
     );
+    expect(gate.recovery.setupReadiness.status, 'recovery_setup_flow_closed');
+    expect(
+      gate.recovery.setupReadiness.blocker,
+      'recovery_code_generation_closed',
+    );
+    expect(
+      gate.recovery.setupReadiness.prerequisiteSummary,
+      contains('platform_private_key_backend_ready'),
+    );
+    expect(
+      gate.recovery.setupReadiness.errorCodes,
+      containsAll([
+        'recovery_code_required',
+        'recovery_record_missing',
+        'recovery_record_revoked',
+        'local_data_inconsistent',
+      ]),
+    );
+    expect(
+      gate.recovery.restoreReadiness.status,
+      'recovery_restore_flow_closed',
+    );
+    expect(
+      gate.recovery.restoreReadiness.blocker,
+      'recovery_code_input_closed',
+    );
+    expect(
+      gate.recovery.restoreReadiness.errorCodes,
+      containsAll([
+        'recovery_code_invalid',
+        'authentication_required',
+        'network_unreachable',
+      ]),
+    );
     expect(
       gate.deviceAuthorization.status,
       DeviceAuthorizationEntryStatus.flowClosed,
@@ -91,6 +125,45 @@ void main() {
         'device_revocation_flow_closed',
         'lost_device_risk_notice_required',
         'key_epoch_rotation_not_started',
+      ]),
+    );
+    expect(
+      gate.deviceAuthorization.joinReadiness.status,
+      'device_join_flow_closed',
+    );
+    expect(
+      gate.deviceAuthorization.joinReadiness.blocker,
+      'join_request_creation_closed',
+    );
+    expect(
+      gate.deviceAuthorization.joinReadiness.shortCodeVerificationStatus,
+      'short_code_verification_not_started',
+    );
+    expect(
+      gate.deviceAuthorization.joinReadiness.errorCodes,
+      containsAll([
+        'join_request_expired',
+        'authorization_rejected',
+        'device_revoked',
+        'backend_unavailable',
+        'network_unreachable',
+      ]),
+    );
+    expect(
+      gate.deviceAuthorization.revocationReadiness.status,
+      'device_revocation_flow_closed',
+    );
+    expect(
+      gate.deviceAuthorization.revocationReadiness.activeDeviceRequirement,
+      'active_existing_device_required',
+    );
+    expect(
+      gate.deviceAuthorization.revocationReadiness.errorCodes,
+      containsAll([
+        'device_revoked',
+        'key_epoch_rotation_required',
+        'local_data_inconsistent',
+        'network_unreachable',
       ]),
     );
   });
@@ -158,6 +231,22 @@ void main() {
     );
     expect(gate.uiState, SyncUiState.preflightReady);
     expect(gate.userSyncEnabled, isFalse);
+    expect(
+      gate.recovery.setupReadiness.entryActionStatus,
+      'read_only_current_phase',
+    );
+    expect(
+      gate.recovery.restoreReadiness.codeInputStatus,
+      'input_not_available_current_phase',
+    );
+    expect(
+      gate.deviceAuthorization.joinReadiness.errorCodeSummary,
+      contains('authorization_rejected'),
+    );
+    expect(
+      gate.deviceAuthorization.revocationReadiness.errorCodeSummary,
+      contains('key_epoch_rotation_required'),
+    );
     expect(
       gate.productionBlockers,
       containsAll([

@@ -42,6 +42,19 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('key_epoch_rotation_not_started'), findsWidgets);
+    expect(find.text('recovery_setup_flow_closed'), findsOneWidget);
+    expect(find.text('recovery_restore_flow_closed'), findsOneWidget);
+    expect(find.text('recovery_code_input_closed'), findsOneWidget);
+    expect(
+      find.textContaining('platform_private_key_backend_ready'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('recovery_code_required'), findsWidgets);
+    expect(find.text('device_join_flow_closed'), findsOneWidget);
+    expect(find.text('short_code_verification_not_started'), findsOneWidget);
+    expect(find.text('device_revocation_flow_closed'), findsWidgets);
+    expect(find.text('active_existing_device_required'), findsWidgets);
+    expect(find.textContaining('key_epoch_rotation_required'), findsOneWidget);
   });
 
   testWidgets('settings draft save updates sync gate source', (
@@ -160,6 +173,14 @@ void main() {
     expect(find.text('device_authorization_flow_closed'), findsWidgets);
     expect(find.text('join_request_unavailable'), findsWidgets);
     expect(find.text('authorization_package_not_created'), findsWidgets);
+    expect(find.text('recovery_setup_flow_closed'), findsWidgets);
+    expect(find.text('recovery_restore_flow_closed'), findsWidgets);
+    expect(find.text('device_join_flow_closed'), findsWidgets);
+    expect(find.text('join_request_creation_closed'), findsWidgets);
+    expect(find.text('short_code_verification_not_started'), findsWidgets);
+    expect(find.text('device_revocation_flow_closed'), findsWidgets);
+    expect(find.text('active_existing_device_required'), findsWidgets);
+    expect(find.textContaining('authorization_rejected'), findsWidgets);
     expect(
       find.text('lost_device_prior_material_not_recallable'),
       findsWidgets,

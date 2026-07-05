@@ -111,6 +111,8 @@ class RecoveryEntryGate {
     required this.recoveryRecordBlocker,
     required this.firstUploadGate,
     required this.readinessBlockers,
+    required this.setupReadiness,
+    required this.restoreReadiness,
   });
 
   final RecoveryEntryStatus status;
@@ -123,6 +125,8 @@ class RecoveryEntryGate {
   final String recoveryRecordBlocker;
   final String firstUploadGate;
   final List<String> readinessBlockers;
+  final RecoverySetupReadiness setupReadiness;
+  final RecoveryRestoreReadiness restoreReadiness;
 
   String get generateStatus {
     return canGenerateCode ? 'available' : 'closed_current_phase';
@@ -141,6 +145,66 @@ class RecoveryEntryGate {
   }
 }
 
+class RecoverySetupReadiness {
+  const RecoverySetupReadiness({
+    required this.status,
+    required this.blocker,
+    required this.entryActionStatus,
+    required this.generatedCodeStatus,
+    required this.saveConfirmationStatus,
+    required this.recoveryRecordStatus,
+    required this.firstUploadGate,
+    required this.requiredPrerequisites,
+    required this.errorCodes,
+  });
+
+  final String status;
+  final String blocker;
+  final String entryActionStatus;
+  final String generatedCodeStatus;
+  final String saveConfirmationStatus;
+  final String recoveryRecordStatus;
+  final String firstUploadGate;
+  final List<String> requiredPrerequisites;
+  final List<String> errorCodes;
+
+  String get prerequisiteSummary {
+    return requiredPrerequisites.isEmpty
+        ? 'none'
+        : requiredPrerequisites.join(', ');
+  }
+
+  String get errorCodeSummary {
+    return errorCodes.isEmpty ? 'none' : errorCodes.join(', ');
+  }
+}
+
+class RecoveryRestoreReadiness {
+  const RecoveryRestoreReadiness({
+    required this.status,
+    required this.blocker,
+    required this.entryActionStatus,
+    required this.codeInputStatus,
+    required this.recoveryRecordLookupStatus,
+    required this.attemptLimitStatus,
+    required this.deviceRegistrationStatus,
+    required this.errorCodes,
+  });
+
+  final String status;
+  final String blocker;
+  final String entryActionStatus;
+  final String codeInputStatus;
+  final String recoveryRecordLookupStatus;
+  final String attemptLimitStatus;
+  final String deviceRegistrationStatus;
+  final List<String> errorCodes;
+
+  String get errorCodeSummary {
+    return errorCodes.isEmpty ? 'none' : errorCodes.join(', ');
+  }
+}
+
 class DeviceAuthorizationEntryGate {
   const DeviceAuthorizationEntryGate({
     required this.status,
@@ -155,6 +219,8 @@ class DeviceAuthorizationEntryGate {
     required this.lostDeviceRiskNotice,
     required this.keyEpochStatus,
     required this.readinessBlockers,
+    required this.joinReadiness,
+    required this.revocationReadiness,
   });
 
   final DeviceAuthorizationEntryStatus status;
@@ -169,6 +235,8 @@ class DeviceAuthorizationEntryGate {
   final String lostDeviceRiskNotice;
   final String keyEpochStatus;
   final List<String> readinessBlockers;
+  final DeviceJoinReadiness joinReadiness;
+  final DeviceRevocationReadiness revocationReadiness;
 
   String get createJoinRequestStatus {
     return canCreateJoinRequest ? 'available' : 'closed_current_phase';
@@ -187,6 +255,176 @@ class DeviceAuthorizationEntryGate {
   }
 }
 
+class DeviceJoinReadiness {
+  const DeviceJoinReadiness({
+    required this.status,
+    required this.blocker,
+    required this.entryActionStatus,
+    required this.joinRequestStatus,
+    required this.shortCodeVerificationStatus,
+    required this.authorizationPackageStatus,
+    required this.authorizationPackagePreconditions,
+    required this.errorCodes,
+  });
+
+  final String status;
+  final String blocker;
+  final String entryActionStatus;
+  final JoinRequestStatus joinRequestStatus;
+  final String shortCodeVerificationStatus;
+  final String authorizationPackageStatus;
+  final String authorizationPackagePreconditions;
+  final List<String> errorCodes;
+
+  String get errorCodeSummary {
+    return errorCodes.isEmpty ? 'none' : errorCodes.join(', ');
+  }
+}
+
+class DeviceRevocationReadiness {
+  const DeviceRevocationReadiness({
+    required this.status,
+    required this.blocker,
+    required this.entryActionStatus,
+    required this.revokeDeviceStatus,
+    required this.activeDeviceRequirement,
+    required this.lostDeviceRiskNotice,
+    required this.keyEpochStatus,
+    required this.errorCodes,
+  });
+
+  final String status;
+  final String blocker;
+  final String entryActionStatus;
+  final String revokeDeviceStatus;
+  final String activeDeviceRequirement;
+  final String lostDeviceRiskNotice;
+  final String keyEpochStatus;
+  final List<String> errorCodes;
+
+  String get errorCodeSummary {
+    return errorCodes.isEmpty ? 'none' : errorCodes.join(', ');
+  }
+}
+
+const managerClosedRecoverySetupReadiness = RecoverySetupReadiness(
+  status: 'recovery_setup_flow_closed',
+  blocker: 'recovery_code_generation_closed',
+  entryActionStatus: 'read_only_current_phase',
+  generatedCodeStatus: 'not_generated',
+  saveConfirmationStatus: 'required_before_first_upload',
+  recoveryRecordStatus: 'recovery_record_not_created',
+  firstUploadGate: 'blocked_until_recovery_code_saved',
+  requiredPrerequisites: [
+    'platform_private_key_backend_ready',
+    'release_deployment_evidence_summary_required',
+    'explicit_user_start_required',
+  ],
+  errorCodes: [
+    'recovery_code_required',
+    'recovery_record_missing',
+    'recovery_record_revoked',
+    'local_data_inconsistent',
+  ],
+);
+
+const managerClosedRecoveryRestoreReadiness = RecoveryRestoreReadiness(
+  status: 'recovery_restore_flow_closed',
+  blocker: 'recovery_code_input_closed',
+  entryActionStatus: 'read_only_current_phase',
+  codeInputStatus: 'input_not_available_current_phase',
+  recoveryRecordLookupStatus: 'not_checked_current_phase',
+  attemptLimitStatus: 'not_started',
+  deviceRegistrationStatus: 'blocked_until_recovery_success',
+  errorCodes: [
+    'recovery_code_required',
+    'recovery_code_invalid',
+    'recovery_record_missing',
+    'recovery_record_revoked',
+    'authentication_required',
+    'network_unreachable',
+  ],
+);
+
+const managerClosedDeviceJoinReadiness = DeviceJoinReadiness(
+  status: 'device_join_flow_closed',
+  blocker: 'join_request_creation_closed',
+  entryActionStatus: 'read_only_current_phase',
+  joinRequestStatus: JoinRequestStatus.unavailable,
+  shortCodeVerificationStatus: 'short_code_verification_not_started',
+  authorizationPackageStatus: 'authorization_package_not_created',
+  authorizationPackagePreconditions:
+      'active_existing_device_required, join_request_pending_required, short_code_match_required',
+  errorCodes: [
+    'join_request_expired',
+    'authorization_rejected',
+    'device_revoked',
+    'backend_unavailable',
+    'network_unreachable',
+  ],
+);
+
+const managerClosedDeviceRevocationReadiness = DeviceRevocationReadiness(
+  status: 'device_revocation_flow_closed',
+  blocker: 'device_revocation_flow_closed',
+  entryActionStatus: 'read_only_current_phase',
+  revokeDeviceStatus: 'closed_current_phase',
+  activeDeviceRequirement: 'active_existing_device_required',
+  lostDeviceRiskNotice: 'lost_device_prior_material_not_recallable',
+  keyEpochStatus: 'key_epoch_rotation_not_started',
+  errorCodes: [
+    'device_revoked',
+    'key_epoch_rotation_required',
+    'local_data_inconsistent',
+    'network_unreachable',
+  ],
+);
+
+const managerReadyRecoverySetupReadiness = RecoverySetupReadiness(
+  status: 'recovery_setup_ready',
+  blocker: 'none',
+  entryActionStatus: 'available',
+  generatedCodeStatus: 'generated_once',
+  saveConfirmationStatus: 'confirmed',
+  recoveryRecordStatus: 'recovery_record_active',
+  firstUploadGate: 'ready_for_encrypted_p2_upload',
+  requiredPrerequisites: [],
+  errorCodes: [],
+);
+
+const managerReadyRecoveryRestoreReadiness = RecoveryRestoreReadiness(
+  status: 'recovery_restore_ready',
+  blocker: 'none',
+  entryActionStatus: 'available',
+  codeInputStatus: 'available',
+  recoveryRecordLookupStatus: 'available',
+  attemptLimitStatus: 'available',
+  deviceRegistrationStatus: 'ready_after_recovery_success',
+  errorCodes: [],
+);
+
+const managerReadyDeviceJoinReadiness = DeviceJoinReadiness(
+  status: 'device_join_ready',
+  blocker: 'none',
+  entryActionStatus: 'available',
+  joinRequestStatus: JoinRequestStatus.authorized,
+  shortCodeVerificationStatus: 'verified',
+  authorizationPackageStatus: 'authorization_package_ready',
+  authorizationPackagePreconditions: 'satisfied',
+  errorCodes: [],
+);
+
+const managerReadyDeviceRevocationReadiness = DeviceRevocationReadiness(
+  status: 'device_revocation_ready',
+  blocker: 'none',
+  entryActionStatus: 'available',
+  revokeDeviceStatus: 'available',
+  activeDeviceRequirement: 'satisfied',
+  lostDeviceRiskNotice: 'acknowledged',
+  keyEpochStatus: 'key_epoch_ready',
+  errorCodes: [],
+);
+
 const managerClosedRecoveryEntryGate = RecoveryEntryGate(
   status: RecoveryEntryStatus.flowClosed,
   blocker: 'recovery_code_flow_closed',
@@ -202,6 +440,8 @@ const managerClosedRecoveryEntryGate = RecoveryEntryGate(
     'recovery_record_not_created',
     'recovery_code_save_confirmation_required',
   ],
+  setupReadiness: managerClosedRecoverySetupReadiness,
+  restoreReadiness: managerClosedRecoveryRestoreReadiness,
 );
 
 const managerClosedDeviceAuthorizationEntryGate = DeviceAuthorizationEntryGate(
@@ -225,4 +465,6 @@ const managerClosedDeviceAuthorizationEntryGate = DeviceAuthorizationEntryGate(
     'lost_device_risk_notice_required',
     'key_epoch_rotation_not_started',
   ],
+  joinReadiness: managerClosedDeviceJoinReadiness,
+  revocationReadiness: managerClosedDeviceRevocationReadiness,
 );

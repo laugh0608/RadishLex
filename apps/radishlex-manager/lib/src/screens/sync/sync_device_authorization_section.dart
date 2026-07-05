@@ -68,6 +68,38 @@ class SyncDeviceAuthorizationSection extends StatelessWidget {
             label: 'readiness blockers',
             value: authorization.readinessBlockerSummary,
           ),
+          ManagerKeyValueRow(
+            label: 'join flow',
+            value: authorization.joinReadiness.status,
+          ),
+          ManagerKeyValueRow(
+            label: 'join blocker',
+            value: authorization.joinReadiness.blocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'short code',
+            value: authorization.joinReadiness.shortCodeVerificationStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'join errors',
+            value: authorization.joinReadiness.errorCodeSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation flow',
+            value: authorization.revocationReadiness.status,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation blocker',
+            value: authorization.revocationReadiness.blocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'active device',
+            value: authorization.revocationReadiness.activeDeviceRequirement,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation errors',
+            value: authorization.revocationReadiness.errorCodeSummary,
+          ),
           const ManagerKeyValueRow(
             label: 'stop line',
             value: '设备加入审批、授权成功和撤销操作仍未开放。',

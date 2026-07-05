@@ -29,7 +29,7 @@ void main() {
 
     expect(find.text('诊断摘要预览'), findsOneWidget);
     expect(find.text('分组 6'), findsOneWidget);
-    expect(find.text('字段 75'), findsOneWidget);
+    expect(find.text('字段 93'), findsOneWidget);
     expect(
       find.byKey(const Key('diagnostics-section-sync_gate')),
       findsOneWidget,
@@ -85,6 +85,42 @@ void main() {
     );
     expect(
       find.textContaining(
+        'sync.recovery_setup_status: recovery_setup_flow_closed',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.recovery_setup_blocker: recovery_code_generation_closed',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.recovery_setup_action_status: read_only_current_phase',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.recovery_setup_error_codes: recovery_code_required, recovery_record_missing, recovery_record_revoked, local_data_inconsistent',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.recovery_restore_status: recovery_restore_flow_closed',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.recovery_restore_error_codes: recovery_code_required, recovery_code_invalid, recovery_record_missing, recovery_record_revoked, authentication_required, network_unreachable',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
         'sync.device_authorization_blocker: device_authorization_flow_closed',
       ),
       findsOneWidget,
@@ -120,6 +156,40 @@ void main() {
     expect(
       find.textContaining(
         'sync.key_epoch_status: key_epoch_rotation_not_started',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('sync.device_join_status: device_join_flow_closed'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.device_join_blocker: join_request_creation_closed',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.device_join_short_code: short_code_verification_not_started',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.device_join_error_codes: join_request_expired, authorization_rejected, device_revoked, backend_unavailable, network_unreachable',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.device_revocation_flow_status: device_revocation_flow_closed',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.device_revocation_error_codes: device_revoked, key_epoch_rotation_required, local_data_inconsistent, network_unreachable',
       ),
       findsOneWidget,
     );

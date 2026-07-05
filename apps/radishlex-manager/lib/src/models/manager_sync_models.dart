@@ -1294,6 +1294,8 @@ ManagerSyncEntryGate _managerSyncEntryGateFromState({
           recoveryRecordBlocker: 'none',
           firstUploadGate: 'ready_for_encrypted_p2_upload',
           readinessBlockers: [],
+          setupReadiness: managerReadyRecoverySetupReadiness,
+          restoreReadiness: managerReadyRecoveryRestoreReadiness,
         ),
         deviceAuthorization: const DeviceAuthorizationEntryGate(
           status: DeviceAuthorizationEntryStatus.ready,
@@ -1308,6 +1310,8 @@ ManagerSyncEntryGate _managerSyncEntryGateFromState({
           lostDeviceRiskNotice: 'acknowledged',
           keyEpochStatus: 'key_epoch_ready',
           readinessBlockers: [],
+          joinReadiness: managerReadyDeviceJoinReadiness,
+          revocationReadiness: managerReadyDeviceRevocationReadiness,
         ),
         userSyncEnabled: true,
       );

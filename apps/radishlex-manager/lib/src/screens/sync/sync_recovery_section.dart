@@ -54,6 +54,38 @@ class SyncRecoverySection extends StatelessWidget {
             label: 'readiness blockers',
             value: recovery.readinessBlockerSummary,
           ),
+          ManagerKeyValueRow(
+            label: 'setup flow',
+            value: recovery.setupReadiness.status,
+          ),
+          ManagerKeyValueRow(
+            label: 'setup blocker',
+            value: recovery.setupReadiness.blocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'setup prerequisites',
+            value: recovery.setupReadiness.prerequisiteSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'setup errors',
+            value: recovery.setupReadiness.errorCodeSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore flow',
+            value: recovery.restoreReadiness.status,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore blocker',
+            value: recovery.restoreReadiness.blocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'code input',
+            value: recovery.restoreReadiness.codeInputStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore errors',
+            value: recovery.restoreReadiness.errorCodeSummary,
+          ),
           const ManagerKeyValueRow(
             label: 'stop line',
             value: '恢复码生成、输入、轮换和撤销仍未开放。',

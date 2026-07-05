@@ -501,6 +501,38 @@ class _SettingsSyncGatePreview extends StatelessWidget {
             value: audit.entryGate.recovery.readinessBlockerSummary,
           ),
           ManagerKeyValueRow(
+            label: 'recovery setup flow',
+            value: audit.entryGate.recovery.setupReadiness.status,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery setup blocker',
+            value: audit.entryGate.recovery.setupReadiness.blocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery setup prerequisites',
+            value: audit.entryGate.recovery.setupReadiness.prerequisiteSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery setup errors',
+            value: audit.entryGate.recovery.setupReadiness.errorCodeSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery restore flow',
+            value: audit.entryGate.recovery.restoreReadiness.status,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery restore blocker',
+            value: audit.entryGate.recovery.restoreReadiness.blocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery restore code input',
+            value: audit.entryGate.recovery.restoreReadiness.codeInputStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery restore errors',
+            value: audit.entryGate.recovery.restoreReadiness.errorCodeSummary,
+          ),
+          ManagerKeyValueRow(
             label: 'authorization status',
             value: audit.entryGate.deviceAuthorization.status.code,
           ),
@@ -544,6 +576,56 @@ class _SettingsSyncGatePreview extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'authorization blockers',
             value: audit.entryGate.deviceAuthorization.readinessBlockerSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'device join flow',
+            value: audit.entryGate.deviceAuthorization.joinReadiness.status,
+          ),
+          ManagerKeyValueRow(
+            label: 'device join blocker',
+            value: audit.entryGate.deviceAuthorization.joinReadiness.blocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'device join short code',
+            value: audit
+                .entryGate
+                .deviceAuthorization
+                .joinReadiness
+                .shortCodeVerificationStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'device join errors',
+            value: audit
+                .entryGate
+                .deviceAuthorization
+                .joinReadiness
+                .errorCodeSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'device revocation flow',
+            value:
+                audit.entryGate.deviceAuthorization.revocationReadiness.status,
+          ),
+          ManagerKeyValueRow(
+            label: 'device revocation blocker',
+            value:
+                audit.entryGate.deviceAuthorization.revocationReadiness.blocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'device revocation active device',
+            value: audit
+                .entryGate
+                .deviceAuthorization
+                .revocationReadiness
+                .activeDeviceRequirement,
+          ),
+          ManagerKeyValueRow(
+            label: 'device revocation errors',
+            value: audit
+                .entryGate
+                .deviceAuthorization
+                .revocationReadiness
+                .errorCodeSummary,
           ),
           ManagerKeyValueRow(
             label: 'connection status',
