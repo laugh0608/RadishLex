@@ -42,7 +42,7 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 | --- | --- | --- |
 | 平台私钥 backend | 生产签名 backend 可在目标平台创建、加载、签名和删除非导出设备签名 key，且 capability / production gate 可被 manager 读取。 | 未满足；Apple 与 Android backend 均未解除 production gate。 |
 | 部署运行证据 | 当前开发联调用本地 Docker、本地 HTTPS、短生命周期数据目录和 `local_smoke` 来源；正式发布 / 真实用户开放前再补目标环境外部 TLS、访问控制失败响应、备份恢复、升级回滚和日志脱敏复验。 | 本地 Docker / 本地 HTTPS 和多类 runtime smoke 已有证据；真实目标部署证据未形成，但不再阻塞 sync entry state helper / UI gate 的非上传开发。 |
-| 连接健康 | Manager 只记录 endpoint 配置状态、access token 存在性、transport 分类、server state 摘要和非敏感错误码；本地服务启动后可用脚本采集 `sync_connection_health.v1`。 | 只读模型、同步页 section、settings 预览、诊断字段和脚本自测已接入；本轮未启动本地 Docker 服务，未采集真实本地运行摘要。 |
+| 连接健康 | Manager 只记录 endpoint 配置状态、access token 存在性、transport 分类、server state 摘要和非敏感错误码；本地服务启动后可用脚本采集 `sync_connection_health.v1`。 | 只读模型、同步页 section、settings 预览、诊断字段、脚本自测和 `sync_connection_health.v1` 摘要映射已接入；2026-07-05 已启动本地 Docker / 本地 HTTPS 服务采集非敏感本地运行摘要。 |
 | 恢复码交互边界 | 恢复码只显示一次、用户确认保存、恢复记录创建 / 轮换 / 撤销、失败限速和日志脱敏测试齐备。 | 只读准备态已展示 `recovery_code_flow_closed`；生成、输入、轮换和撤销交互仍未开始。 |
 | 设备授权交互边界 | join request、短码核对、授权包、设备撤销、lost device 和 key epoch 说明能被 UI 表达并测试。 | 只读准备态已展示 `device_authorization_flow_closed` 和 `join_request_unavailable`；加入请求、授权成功和撤销交互仍未开始。 |
 | 客户端同步操作 | Flutter 只调用结构化 bridge；Rust 侧只接收 encrypted object 与 signed manifest，不暴露 plaintext payload。 | Rust / Go 侧已有底层证据；manager 真实远端操作入口未接。 |
@@ -88,6 +88,7 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 连接健康只读联调由两部分组成：
 
 - Flutter manager 从 settings draft 派生 `SyncConnectionHealth`，展示 `connection_status`、`connection_blocker`、`endpoint_status`、`access_token_status`、`transport_mode`、`server_state_status` 和 `last_remote_error_code`。
+- `SyncConnectionProbeSummary` 可从 `sync_connection_health.v1` 摘要映射回 Manager 连接健康模型；映射只接受 allowlist 状态码，未知 `last_remote_error_code` 会降为 `unexpected_remote_error_code`，不会把任意脚本字段直接传播到 UI 或诊断。
 - `./scripts/check-sync-server-connection-health.sh` 对本地 Docker / 本地 HTTPS 或短生命周期 HTTP 服务执行 `GET /api/v1/domains/<probe>/state`，输出 `sync_connection_health.v1` 非敏感摘要。
 
 允许展示和记录：
@@ -97,6 +98,8 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 - transport 分类：`local_https`、`local_http`、`external_https`、`remote_http` 或 `invalid_endpoint`。
 - server state 摘要：`read_only_probe_pending`、`auth_gate_reachable`、`domain_missing_expected`、`domain_state_returned`、`not_checked_*`。
 - 远端错误码：`unauthenticated`、`not_found`、`network_unreachable`、`tls_error` 等结构化码。
+
+2026-07-05 本地 Docker / 本地 HTTPS 只读探测记录为开发联调摘要：`connection_status=reachable`、`server_state_status=domain_missing_expected`、`auth_status=not_required_for_local_probe`、`http_status=404`、`last_remote_error_code=not_found`、`local_insecure_tls=allowed`。这说明本地 Caddy internal TLS 能到达 Go sync server 并返回预期空 domain 状态，不构成发布级目标部署证据。
 
 禁止展示和记录：
 
@@ -268,7 +271,7 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 1. 保持 Phase 4 本地验收证据稳定。
 2. 用本地 Docker / 本地 HTTPS 和现有 smoke 作为开发期同步证据，保持 settings draft 只记录非敏感来源标签。
 3. manager sync entry state 派生、恢复码准备态和设备授权准备态已经以非上传形式接入，继续不上传真实用户数据。
-4. 同步服务连接健康和错误分类已经以只读模型、UI、诊断字段和脚本自测接入；本地 Docker / 本地 HTTPS 服务启动后再运行脚本采集 `sync_connection_health.v1` 摘要。
+4. 同步服务连接健康和错误分类已经以只读模型、UI、诊断字段、脚本自测、本地 Docker / 本地 HTTPS 运行摘要和 Manager 摘要映射接入；后续只读回填入口必须继续使用 `sync_connection_health.v1` 非敏感字段。
 5. 取得至少一个可用平台私钥 backend 的生产签名证据，或补新的平台 / 算法 ADR 输入。
 6. 正式发布 / 真实用户开放前，按生产部署 runbook 补目标部署运行证据包，导出 `deployment_evidence_summary.v1` 非敏感摘要。
 7. 在恢复码确认、设备授权、发布级部署证据和 backend gate 全部满足后，再开放用户可用同步入口。

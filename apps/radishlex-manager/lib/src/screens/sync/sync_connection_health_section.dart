@@ -14,11 +14,15 @@ class SyncConnectionHealthSection extends StatelessWidget {
       key: const Key('sync-connection-health-section'),
       title: '服务连接健康',
       trailing: ManagerStatusBadge(
-        icon: health.canRunReadOnlyProbe
+        icon: health.isConnectionHealthy
+            ? Icons.cloud_done_outlined
+            : health.canRunReadOnlyProbe
             ? Icons.cloud_queue_outlined
             : Icons.cloud_off_outlined,
         label: health.status.code,
-        tone: health.canRunReadOnlyProbe
+        tone: health.isConnectionHealthy
+            ? ManagerBadgeTone.success
+            : health.canRunReadOnlyProbe
             ? ManagerBadgeTone.neutral
             : ManagerBadgeTone.warning,
       ),

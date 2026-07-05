@@ -143,6 +143,105 @@ void main() {
     expect(gate.connectionHealth.canRunReadOnlyProbe, isTrue);
   });
 
+  test('connection health imports local docker probe summary', () {
+    final summary = SyncConnectionProbeSummary.fromJson({
+      'format': managerSyncConnectionHealthSummaryFormat,
+      'redaction_policy': managerSyncConnectionHealthSummaryRedactionPolicy,
+      'endpoint_status': 'configured',
+      'transport_mode': 'local_https',
+      'access_token_status': 'not_configured',
+      'connection_status': 'reachable',
+      'auth_status': 'not_required_for_local_probe',
+      'server_state_status': 'domain_missing_expected',
+      'http_status': 404,
+      'http_status_class': 'client_error',
+      'last_remote_error_code': 'not_found',
+      'local_insecure_tls': 'allowed',
+    });
+
+    final health = managerSyncConnectionHealthFromProbeSummary(summary);
+
+    expect(health.status, SyncConnectionStatus.readOnlyProbeReachable);
+    expect(health.status.code, 'reachable');
+    expect(health.connectionBlocker, 'none');
+    expect(health.endpointStatus, 'configured');
+    expect(health.accessTokenStatus, 'not_configured');
+    expect(health.transportMode, 'local_https');
+    expect(health.serverStateStatus, 'domain_missing_expected');
+    expect(health.lastRemoteErrorCode, 'not_found');
+    expect(health.isConnectionHealthy, isTrue);
+    expect(health.hasReadOnlyProbeResult, isTrue);
+    expect(health.canRunReadOnlyProbe, isFalse);
+  });
+
+  test('connection health imports network failure probe summary', () {
+    final summary = SyncConnectionProbeSummary.fromJson({
+      'format': managerSyncConnectionHealthSummaryFormat,
+      'redaction_policy': managerSyncConnectionHealthSummaryRedactionPolicy,
+      'endpoint_status': 'configured',
+      'transport_mode': 'local_https',
+      'access_token_status': 'not_configured',
+      'connection_status': 'network_unreachable',
+      'auth_status': 'not_checked',
+      'server_state_status': 'not_checked_network_unreachable',
+      'http_status': 0,
+      'http_status_class': 'network_error',
+      'last_remote_error_code': 'network_unreachable',
+      'local_insecure_tls': 'allowed',
+    });
+
+    final health = managerSyncConnectionHealthFromProbeSummary(summary);
+
+    expect(health.status, SyncConnectionStatus.readOnlyProbeNetworkUnavailable);
+    expect(health.connectionBlocker, 'network_unreachable');
+    expect(health.serverStateStatus, 'not_checked_network_unreachable');
+    expect(health.isConnectionHealthy, isFalse);
+    expect(health.hasReadOnlyProbeResult, isTrue);
+  });
+
+  test('connection health rejects unsupported probe summary fields', () {
+    final summary = SyncConnectionProbeSummary.fromJson({
+      'format': managerSyncConnectionHealthSummaryFormat,
+      'redaction_policy': managerSyncConnectionHealthSummaryRedactionPolicy,
+      'endpoint_status': 'configured',
+      'transport_mode': 'local_https',
+      'access_token_status': 'not_configured',
+      'connection_status': 'reachable',
+      'auth_status': 'accepted',
+      'server_state_status': 'domain_missing_expected',
+      'http_status': 404,
+      'http_status_class': 'client_error',
+      'last_remote_error_code': 'new_error_shape',
+      'local_insecure_tls': 'allowed',
+    });
+
+    final health = managerSyncConnectionHealthFromProbeSummary(summary);
+
+    expect(health.status, SyncConnectionStatus.readOnlyProbeReachable);
+    expect(health.connectionBlocker, 'none');
+    expect(health.lastRemoteErrorCode, 'unexpected_remote_error_code');
+
+    final invalid = managerSyncConnectionHealthFromProbeSummary(
+      SyncConnectionProbeSummary.fromJson({
+        'format': 'unsupported_format',
+        'redaction_policy': managerSyncConnectionHealthSummaryRedactionPolicy,
+        'endpoint_status': 'configured',
+        'transport_mode': 'local_https',
+        'access_token_status': 'not_configured',
+        'connection_status': 'reachable',
+        'auth_status': 'accepted',
+        'server_state_status': 'domain_missing_expected',
+        'http_status': 404,
+        'http_status_class': 'client_error',
+        'last_remote_error_code': 'not_found',
+        'local_insecure_tls': 'allowed',
+      }),
+    );
+
+    expect(invalid.status, SyncConnectionStatus.readOnlyProbeSummaryInvalid);
+    expect(invalid.connectionBlocker, 'probe_summary_format_unsupported');
+  });
+
   test('connection health rejects unsafe endpoint material', () {
     const draft = ManagerSettingsDraft(
       serverEndpoint: 'https://user:token@localhost:7319',

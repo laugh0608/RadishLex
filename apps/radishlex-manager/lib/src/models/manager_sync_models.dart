@@ -177,6 +177,11 @@ enum SyncConnectionStatus {
   localHttpReadyForProbe,
   externalProbeDeferred,
   unsupportedTransport,
+  readOnlyProbeReachable,
+  readOnlyProbeNetworkUnavailable,
+  readOnlyProbeTlsError,
+  readOnlyProbeUnexpectedStatus,
+  readOnlyProbeSummaryInvalid,
 }
 
 extension SyncConnectionStatusLabel on SyncConnectionStatus {
@@ -198,6 +203,16 @@ extension SyncConnectionStatusLabel on SyncConnectionStatus {
         return 'external_probe_deferred';
       case SyncConnectionStatus.unsupportedTransport:
         return 'unsupported_transport';
+      case SyncConnectionStatus.readOnlyProbeReachable:
+        return 'reachable';
+      case SyncConnectionStatus.readOnlyProbeNetworkUnavailable:
+        return 'network_unreachable';
+      case SyncConnectionStatus.readOnlyProbeTlsError:
+        return 'tls_error';
+      case SyncConnectionStatus.readOnlyProbeUnexpectedStatus:
+        return 'reachable_with_unexpected_status';
+      case SyncConnectionStatus.readOnlyProbeSummaryInvalid:
+        return 'probe_summary_invalid';
     }
   }
 
@@ -219,9 +234,23 @@ extension SyncConnectionStatusLabel on SyncConnectionStatus {
         return '外部目标探测后置';
       case SyncConnectionStatus.unsupportedTransport:
         return '连接传输模式不受支持';
+      case SyncConnectionStatus.readOnlyProbeReachable:
+        return '只读探测已到达服务';
+      case SyncConnectionStatus.readOnlyProbeNetworkUnavailable:
+        return '只读探测网络不可达';
+      case SyncConnectionStatus.readOnlyProbeTlsError:
+        return '只读探测 TLS 不可用';
+      case SyncConnectionStatus.readOnlyProbeUnexpectedStatus:
+        return '只读探测返回非预期状态';
+      case SyncConnectionStatus.readOnlyProbeSummaryInvalid:
+        return '只读探测摘要不可用';
     }
   }
 }
+
+const managerSyncConnectionHealthSummaryFormat = 'sync_connection_health.v1';
+const managerSyncConnectionHealthSummaryRedactionPolicy =
+    'summary_only_no_endpoint_tokens_or_response_body';
 
 class SyncConnectionHealth {
   const SyncConnectionHealth({
@@ -245,6 +274,112 @@ class SyncConnectionHealth {
   bool get canRunReadOnlyProbe =>
       status == SyncConnectionStatus.localHttpsReadyForProbe ||
       status == SyncConnectionStatus.localHttpReadyForProbe;
+
+  bool get hasReadOnlyProbeResult =>
+      status == SyncConnectionStatus.readOnlyProbeReachable ||
+      status == SyncConnectionStatus.readOnlyProbeNetworkUnavailable ||
+      status == SyncConnectionStatus.readOnlyProbeTlsError ||
+      status == SyncConnectionStatus.readOnlyProbeUnexpectedStatus;
+
+  bool get isConnectionHealthy =>
+      status == SyncConnectionStatus.readOnlyProbeReachable &&
+      connectionBlocker == 'none';
+}
+
+class SyncConnectionProbeSummary {
+  const SyncConnectionProbeSummary._({
+    required this.format,
+    required this.redactionPolicy,
+    required this.endpointStatus,
+    required this.transportMode,
+    required this.accessTokenStatus,
+    required this.connectionStatus,
+    required this.authStatus,
+    required this.serverStateStatus,
+    required this.httpStatus,
+    required this.httpStatusClass,
+    required this.lastRemoteErrorCode,
+    required this.localInsecureTls,
+  });
+
+  factory SyncConnectionProbeSummary.fromJson(Map<String, Object?> json) {
+    return SyncConnectionProbeSummary._(
+      format: _summaryString(json, 'format', const {
+        managerSyncConnectionHealthSummaryFormat,
+      }, 'unsupported_format'),
+      redactionPolicy: _summaryString(json, 'redaction_policy', const {
+        managerSyncConnectionHealthSummaryRedactionPolicy,
+      }, 'unsupported_redaction_policy'),
+      endpointStatus: _summaryString(
+        json,
+        'endpoint_status',
+        _syncConnectionEndpointStatuses,
+        'unknown_endpoint_status',
+      ),
+      transportMode: _summaryString(
+        json,
+        'transport_mode',
+        _syncConnectionTransportModes,
+        'unknown_transport_mode',
+      ),
+      accessTokenStatus: _summaryString(json, 'access_token_status', const {
+        'configured',
+        'not_configured',
+      }, 'unknown_access_token_status'),
+      connectionStatus: _summaryString(
+        json,
+        'connection_status',
+        _syncConnectionProbeStatuses,
+        'unknown_connection_status',
+      ),
+      authStatus: _summaryString(
+        json,
+        'auth_status',
+        _syncConnectionAuthStatuses,
+        'unknown_auth_status',
+      ),
+      serverStateStatus: _summaryString(
+        json,
+        'server_state_status',
+        _syncConnectionServerStateStatuses,
+        'unknown_server_state_status',
+      ),
+      httpStatus: _summaryHttpStatus(json['http_status']),
+      httpStatusClass: _summaryString(
+        json,
+        'http_status_class',
+        _syncConnectionHttpStatusClasses,
+        'unknown_http_status_class',
+      ),
+      lastRemoteErrorCode: _summaryString(
+        json,
+        'last_remote_error_code',
+        _syncConnectionRemoteErrorCodes,
+        'unexpected_remote_error_code',
+      ),
+      localInsecureTls: _summaryString(json, 'local_insecure_tls', const {
+        'allowed',
+        'system_trust',
+      }, 'unknown_tls_policy'),
+    );
+  }
+
+  final String format;
+  final String redactionPolicy;
+  final String endpointStatus;
+  final String transportMode;
+  final String accessTokenStatus;
+  final String connectionStatus;
+  final String authStatus;
+  final String serverStateStatus;
+  final int httpStatus;
+  final String httpStatusClass;
+  final String lastRemoteErrorCode;
+  final String localInsecureTls;
+
+  bool get hasSupportedFormat =>
+      format == managerSyncConnectionHealthSummaryFormat &&
+      redactionPolicy == managerSyncConnectionHealthSummaryRedactionPolicy;
 }
 
 class RecoveryEntryGate {
@@ -561,6 +696,32 @@ SyncConnectionHealth deriveManagerSyncConnectionHealth(
   }
 }
 
+SyncConnectionHealth managerSyncConnectionHealthFromProbeSummary(
+  SyncConnectionProbeSummary summary,
+) {
+  if (!summary.hasSupportedFormat) {
+    return const SyncConnectionHealth(
+      status: SyncConnectionStatus.readOnlyProbeSummaryInvalid,
+      connectionBlocker: 'probe_summary_format_unsupported',
+      endpointStatus: 'not_checked_probe_summary_invalid',
+      accessTokenStatus: 'not_checked_probe_summary_invalid',
+      transportMode: 'not_checked_probe_summary_invalid',
+      serverStateStatus: 'not_checked_probe_summary_invalid',
+      lastRemoteErrorCode: 'probe_summary_invalid',
+    );
+  }
+
+  return SyncConnectionHealth(
+    status: _syncConnectionStatusFromProbeSummary(summary),
+    connectionBlocker: _syncConnectionBlockerFromProbeSummary(summary),
+    endpointStatus: summary.endpointStatus,
+    accessTokenStatus: summary.accessTokenStatus,
+    transportMode: summary.transportMode,
+    serverStateStatus: summary.serverStateStatus,
+    lastRemoteErrorCode: summary.lastRemoteErrorCode,
+  );
+}
+
 ManagerSyncEntryGate deriveManagerSyncEntryGate({
   required ManagerSettingsDraft draft,
   required DeviceSecuritySummary device,
@@ -854,6 +1015,152 @@ String managerSyncEndpointLabel(ManagerSettingsDraft draft) {
 
 String managerSyncAccessTokenStatus(ManagerSettingsDraft draft) {
   return draft.hasAccessToken ? 'configured' : 'not_configured';
+}
+
+const _syncConnectionEndpointStatuses = {
+  'not_configured',
+  'invalid',
+  'invalid_userinfo',
+  'invalid_query',
+  'invalid_fragment',
+  'invalid_scheme',
+  'configured',
+};
+
+const _syncConnectionTransportModes = {
+  'not_configured',
+  'invalid_endpoint',
+  'local_https',
+  'local_http',
+  'external_https',
+  'remote_http',
+};
+
+const _syncConnectionProbeStatuses = {
+  'not_configured',
+  'configuration_invalid',
+  'network_unreachable',
+  'tls_error',
+  'reachable',
+  'reachable_with_unexpected_status',
+};
+
+const _syncConnectionAuthStatuses = {
+  'not_checked',
+  'required',
+  'failed',
+  'accepted',
+  'not_required_for_local_probe',
+  'unknown',
+};
+
+const _syncConnectionServerStateStatuses = {
+  'not_checked_configuration_blocked',
+  'not_checked_unsupported_transport',
+  'not_checked_network_unreachable',
+  'auth_gate_reachable',
+  'domain_missing_expected',
+  'domain_state_returned',
+  'unexpected_response_status',
+};
+
+const _syncConnectionHttpStatusClasses = {
+  'not_checked',
+  'network_error',
+  'success',
+  'redirect',
+  'client_error',
+  'server_error',
+  'unexpected_status',
+};
+
+const _syncConnectionRemoteErrorCodes = {
+  'none',
+  'network_unreachable',
+  'tls_error',
+  'not_found',
+  'unauthenticated',
+  'server_endpoint_missing',
+  'server_endpoint_invalid',
+  'server_endpoint_userinfo_forbidden',
+  'server_endpoint_query_forbidden',
+  'server_endpoint_fragment_forbidden',
+  'server_endpoint_scheme_unsupported',
+  'remote_plain_http_forbidden',
+  'configuration_invalid',
+};
+
+String _summaryString(
+  Map<String, Object?> json,
+  String key,
+  Set<String> allowedValues,
+  String fallback,
+) {
+  final value = json[key];
+  return value is String && allowedValues.contains(value) ? value : fallback;
+}
+
+int _summaryHttpStatus(Object? value) {
+  if (value is int && value >= 0 && value <= 599) {
+    return value;
+  }
+  return 0;
+}
+
+SyncConnectionStatus _syncConnectionStatusFromProbeSummary(
+  SyncConnectionProbeSummary summary,
+) {
+  switch (summary.connectionStatus) {
+    case 'not_configured':
+      return SyncConnectionStatus.notConfigured;
+    case 'configuration_invalid':
+      return SyncConnectionStatus.endpointInvalid;
+    case 'network_unreachable':
+      return SyncConnectionStatus.readOnlyProbeNetworkUnavailable;
+    case 'tls_error':
+      return SyncConnectionStatus.readOnlyProbeTlsError;
+    case 'reachable':
+      return SyncConnectionStatus.readOnlyProbeReachable;
+    case 'reachable_with_unexpected_status':
+      return SyncConnectionStatus.readOnlyProbeUnexpectedStatus;
+    default:
+      return SyncConnectionStatus.readOnlyProbeSummaryInvalid;
+  }
+}
+
+String _syncConnectionBlockerFromProbeSummary(
+  SyncConnectionProbeSummary summary,
+) {
+  switch (summary.connectionStatus) {
+    case 'not_configured':
+      return 'server_endpoint_missing';
+    case 'configuration_invalid':
+      return summary.lastRemoteErrorCode;
+    case 'network_unreachable':
+      return 'network_unreachable';
+    case 'tls_error':
+      return 'tls_error';
+    case 'reachable_with_unexpected_status':
+      return 'unexpected_response_status';
+    case 'reachable':
+      return _syncConnectionReachableBlocker(summary.authStatus);
+    default:
+      return 'probe_summary_invalid';
+  }
+}
+
+String _syncConnectionReachableBlocker(String authStatus) {
+  switch (authStatus) {
+    case 'accepted':
+    case 'not_required_for_local_probe':
+      return 'none';
+    case 'required':
+      return 'access_token_required';
+    case 'failed':
+      return 'access_token_rejected';
+    default:
+      return 'auth_status_unknown';
+  }
 }
 
 _SyncEndpointClassification _classifySyncEndpoint(String endpoint) {

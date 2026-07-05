@@ -6,11 +6,11 @@
 
 - 日期：2026-07-05
 - 常态分支：`dev`
-- 当前主题：Phase 3 自部署同步出口治理已形成证据链，Phase 4 Flutter manager 本地管理能力验收复查已完成；真实同步入口前置交互边界、目标部署证据包口径 / 校验 / 摘要入口、manager sync entry gate 非上传实现、恢复码 / 设备授权只读准备态，以及本地同步服务连接健康摘要模型已形成文档和测试证据。2026-07-05 复查后调整阶段口径：真实域名、正式证书和外部反代复验属于正式发布 / 真实用户开放前门禁，不作为当前产品开发阻塞项；当前同步开发和联调以本地 Docker、本地 HTTPS、短生命周期数据目录和现有 smoke 为主。
+- 当前主题：Phase 3 自部署同步出口治理已形成证据链，Phase 4 Flutter manager 本地管理能力验收复查已完成；真实同步入口前置交互边界、目标部署证据包口径 / 校验 / 摘要入口、manager sync entry gate 非上传实现、恢复码 / 设备授权只读准备态、本地同步服务连接健康摘要模型和本地 Docker / 本地 HTTPS 只读连接健康摘要已形成文档和测试证据。2026-07-05 复查后调整阶段口径：真实域名、正式证书和外部反代复验属于正式发布 / 真实用户开放前门禁，不作为当前产品开发阻塞项；当前同步开发和联调以本地 Docker、本地 HTTPS、短生命周期数据目录和现有 smoke 为主。
 
 ## 当前阶段
 
-RadishLex 已完成 Rust core、Rime adapter、userdb、ranker、crypto、sync client 边界、Go sync server 和第一批 Flutter manager 本地 FFI bridge 的起步证据。当前推进重点是保持 Phase 4 manager 本地验收证据可复查，并在本地 Docker / 本地 HTTPS 证据支撑下继续推进同步本地联调的只读连接健康、错误分类和诊断脱敏；真实用户同步开放仍等待平台私钥 backend、恢复 / 授权交互和发布级部署证据。
+RadishLex 已完成 Rust core、Rime adapter、userdb、ranker、crypto、sync client 边界、Go sync server 和第一批 Flutter manager 本地 FFI bridge 的起步证据。当前推进重点是保持 Phase 4 manager 本地验收证据可复查，并在本地 Docker / 本地 HTTPS 证据支撑下继续推进同步本地联调的只读连接健康、错误分类、摘要回填和诊断脱敏；真实用户同步开放仍等待平台私钥 backend、恢复 / 授权交互和发布级部署证据。
 
 部署证据当前状态：仓库内已有本地 Docker / 本地 HTTPS、短生命周期 HTTP、备份恢复、外部 TLS 反代和升级回滚实现级 smoke；`tests/fixtures/sync-deployment-evidence-valid.txt` 只是合成 fixture。没有真实目标环境 `deployment_evidence.v1` 时，不记录发布级部署通过，但这不阻止继续开发 manager 同步入口的非上传状态、说明和本地联调路径。
 
@@ -50,7 +50,7 @@ Flutter manager：
 - UI 已拆分 manager shell、跨页 action 编排、词库子组件、学习子组件、同步子组件、设置诊断子组件、页面级 widget tests、action helper 回归测试、Dart model 分组和动态 FFI bridge 分层。
 - `docs/manager-local-acceptance.md` 已将 Phase 4 本地验收范围、退出标准映射、验证命令、隐私检查和真实同步停止线整理为可复验入口；2026-07-05 复查确认当前本地验收无影响退出标准的证据缺口。
 - `docs/manager-sync-entry-boundary.md` 已固定真实同步入口进入 UI / bridge 前的恢复码、设备授权、状态门禁、错误分类、诊断脱敏和测试计划。
-- 同步页和设置页已通过 `SyncEntryState` / `ManagerSyncEntryGate` 从 settings draft、本地 smoke 来源、backend gate、连接健康、恢复码关闭状态和设备授权关闭状态派生非上传阻塞说明；同步页已展示服务连接健康、恢复码准备态和设备授权准备态三个只读 section，诊断报告新增 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers`、`sync.connection_*`、`sync.server_state_status`、`sync.recovery_*`、`sync.device_authorization_*` 和 `sync.join_request_status` 摘要，真实同步按钮保持关闭。
+- 同步页和设置页已通过 `SyncEntryState` / `ManagerSyncEntryGate` 从 settings draft、本地 smoke 来源、backend gate、连接健康、恢复码关闭状态和设备授权关闭状态派生非上传阻塞说明；同步页已展示服务连接健康、恢复码准备态和设备授权准备态三个只读 section，诊断报告新增 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers`、`sync.connection_*`、`sync.server_state_status`、`sync.recovery_*`、`sync.device_authorization_*` 和 `sync.join_request_status` 摘要。`sync_connection_health.v1` 本地摘要已可映射为 Manager 连接健康模型；真实同步按钮保持关闭。
 
 平台私钥 backend：
 
@@ -97,11 +97,11 @@ Sync server 本地部署 / 联调：
 ./scripts/check-sync-deployment-evidence.sh --summary-json tests/fixtures/sync-deployment-evidence-valid.txt
 ```
 
-完整部署预演会启动短生命周期 Docker 容器，适合当前同步开发联调；如本机 Docker 不可用，应记录阻塞。连接健康脚本默认只输出 `sync_connection_health.v1` 非敏感摘要，实际本地服务未启动时只记录不可达，不写入 token、endpoint credential、请求 / 响应体或 payload bytes。Apple Keychain smoke、Android connected smoke、真实平台输入法操作和正式发布级部署复验需要明确授权或人工环境准备；默认不在普通仓库检查中运行。
+完整部署预演会启动短生命周期 Docker 容器，适合当前同步开发联调；如本机 Docker 不可用，应记录阻塞。连接健康脚本默认只输出 `sync_connection_health.v1` 非敏感摘要，实际本地服务未启动时只记录不可达，不写入 token、endpoint credential、请求 / 响应体或 payload bytes。2026-07-05 本地 Docker / 本地 HTTPS 只读探测在宿主网络环境返回 `connection_status=reachable`、`server_state_status=domain_missing_expected`、`auth_status=not_required_for_local_probe`、`http_status=404`、`last_remote_error_code=not_found`，只作为开发联调摘要，不作为发布级目标部署证据。Apple Keychain smoke、Android connected smoke、真实平台输入法操作和正式发布级部署复验需要明确授权或人工环境准备；默认不在普通仓库检查中运行。
 
 ## 近期推进顺位
 
 1. 维护本文短入口，避免新会话默认阅读长周志。
 2. 保持 Phase 4 manager 本地验收证据稳定；若后续改动触及验收范围，再按 `docs/manager-local-acceptance.md` 补精准 widget / helper / smoke 覆盖。
-3. 下一批产品开发优先在本地 Docker / 本地 HTTPS 服务启动后运行只读连接健康脚本，采集 `sync_connection_health.v1` 非敏感摘要，并把 Manager 连接健康 UI 与脚本结果口径保持一致。
+3. 下一批产品开发继续把本地 Docker / 本地 HTTPS `sync_connection_health.v1` 摘要映射到 Manager 连接健康 UI、诊断和后续只读回填入口，保持脚本结果与产品状态口径一致。
 4. 同步联调用本地 Docker / 本地 HTTPS 和短生命周期数据目录；正式发布或真实用户开放前，再补真实目标环境的非敏感 `deployment_evidence.v1` 并导出 `deployment_evidence_summary.v1`。

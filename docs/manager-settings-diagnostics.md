@@ -67,7 +67,7 @@ settings draft 不得保存：
 
 ## 连接健康摘要
 
-Manager 当前只派生和展示本地连接健康摘要，不在 UI 中发起远端上传 / 下载。连接健康模型从 settings draft 读取 endpoint 和 access token 存在性，输出状态码：
+Manager 当前只派生和展示本地连接健康摘要，不在 UI 中发起远端上传 / 下载。连接健康模型从 settings draft 读取 endpoint 和 access token 存在性，也可以从 `sync_connection_health.v1` 非敏感摘要映射只读探测结果。输出状态码：
 
 - `not_configured`：未保留同步配置或 endpoint 为空。
 - `sync_disabled_by_policy`：隐私模式禁用连接检查。
@@ -77,10 +77,15 @@ Manager 当前只派生和展示本地连接健康摘要，不在 UI 中发起�
 - `local_http_ready_for_probe`：本地 HTTP endpoint 与 access token 存在性已满足，仅用于短生命周期本地开发探测。
 - `external_probe_deferred`：外部 HTTPS 目标探测后置到正式发布 / 真实用户开放前。
 - `unsupported_transport`：非本地 HTTP 被拒绝。
+- `reachable`：只读探测已到达服务；若 `connection_blocker = none`，表示连接健康摘要可用于本地联调展示。
+- `network_unreachable`：只读探测无法连接到目标端口或网络。
+- `tls_error`：只读探测遇到 TLS 握手或信任链错误。
+- `reachable_with_unexpected_status`：只读探测到达服务但返回了非预期 HTTP 状态。
+- `probe_summary_invalid`：摘要格式或脱敏策略不符合 Manager allowlist。
 
 同步页的“服务连接健康”和设置页的“同步门禁草案”只展示 `connection_status`、`connection_blocker`、`endpoint_status`、`access_token_status`、`transport_mode`、`server_state_status` 和 `last_remote_error_code`。这些字段不得包含完整 endpoint、token、请求 / 响应体、证书、真实路径或 payload bytes。
 
-本地 Docker / 本地 HTTPS 服务启动后，可使用 `./scripts/check-sync-server-connection-health.sh` 采集 `sync_connection_health.v1` 非敏感摘要。脚本只执行 `GET /api/v1/domains/<probe>/state` 读请求：`404 not_found` 表示服务和认证路径可达且 probe domain 不存在，`401 unauthenticated` 表示访问控制门禁可达但 token 缺失或失败。脚本输出不得写入 token、endpoint credential 或响应体正文。
+本地 Docker / 本地 HTTPS 服务启动后，可使用 `./scripts/check-sync-server-connection-health.sh` 采集 `sync_connection_health.v1` 非敏感摘要。脚本只执行 `GET /api/v1/domains/<probe>/state` 读请求：`404 not_found` 表示服务和认证路径可达且 probe domain 不存在，`401 unauthenticated` 表示访问控制门禁可达但 token 缺失或失败。脚本输出不得写入 token、endpoint credential 或响应体正文。Manager 只接受约定 allowlist 字段；未知远端错误码会降为 `unexpected_remote_error_code`。
 
 ## 诊断报告格式
 
