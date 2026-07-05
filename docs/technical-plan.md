@@ -2,6 +2,8 @@
 
 本文档是 RadishLex 当前技术方向的入口摘要，读者是需要快速判断架构边界、阶段顺序和后续开发重点的维护者与协作者。本文不包含完整 trait 字段、SQLite migration、同步协议细节、平台安装流程、长期推演或验证流水；这些内容应放在对应专题文档、runbook 或 devlog 中。
 
+日常新会话优先读取 [当前状态短入口](status/current.md)，再按任务选读本文和对应专题文档。
+
 ## 当前阶段
 
 RadishLex 当前处于 Phase 3 自部署同步出口治理，并推进 Phase 4 Flutter manager 第一批本地 FFI 接线：
@@ -19,7 +21,7 @@ RadishLex 当前处于 Phase 3 自部署同步出口治理，并推进 Phase 4 F
 - `apps/radishlex-manager` 已创建 Flutter macOS 起步工程，通过受控 `ManagerBridge` contract 接入管理数据源；默认仍使用合成 fixture，显式配置 `RADISHLEX_MANAGER_DB` 与 `RADISHLEX_MANAGER_FFI_LIBRARY` 时可切到第一批真实 Dart FFI bridge。当前 FFI bridge 覆盖本地 userdb 词条 list / delete、用户词库 inspect / import / export、import batches、learning status 摘要、rank explain 摘要、sync preflight 摘要、非 secret settings JSON 草案持久化和脱敏诊断报告导出；`rank explain` 区域通过专用 `ime-ffi` ABI 读取单候选贡献项，Flutter 只展示复制后的非敏感摘要。设置页已显示配置来源诊断、sync gate 草案预览和部署证据来源标签，settings JSON 当前为 `format_version: 1` 并覆盖旧 v1 缺字段降级、非法版本 / 非法 URL / 非 allowlist evidence source 拒绝；诊断报告包含 gate source / stop line 但不含用户词、文件路径、token 或 payload bytes，支持按字段分组预览、筛选、复制与导出一致的脱敏文本。manager UI 结构已拆出跨页 action 编排、词库子组件、设置诊断子组件和页面级 widget tests；bridge 失败按操作和分类展示结构化错误码。sync gate 状态由设置草案、隐私模式、平台私钥 backend gate 和部署证据来源草案派生；同步启用按钮在非生产状态下保持关闭，不接真实远端、恢复码或设备授权。
 - `radishlex-ime-cli` 已提供 `demo`、`rime`、`dict`、`learn status`、`learn select/suppress`、`rank explain`、`rime --rank-db` 和 `sync preflight` 复验入口。
 
-当前下一步继续沿 Phase 4 管理端本地质量治理推进：真实 Dart FFI bridge、manager 页面行为、诊断预览 / 导出、settings draft 和页面级 widget tests 已覆盖第一批本地管理路径，后续应先补短入口状态文档或索引，把当前阶段、验证基线和停止线从长周志中抽出；随后审视 `learning_view.dart`、`sync_view.dart` 和 action 编排测试是否需要继续按职责拆分或补针对性回归覆盖。真实远端同步、恢复码和设备授权 UI 继续关闭，直到可用平台私钥 backend、目标部署运行证据、恢复 / 授权交互边界和对应文档证据齐备。encrypted object 上传下载、版本冲突 HTTP 语义、runtime 配置装配、对象大小门禁、脱敏 audit logger、本机 smoke runbook、双设备 HTTP smoke、Docker Compose 本地 / 部署态入口、Docker Compose 容器实际启动 smoke、Rust remote client DTO / transport trait、std-only `http://` HTTP transport、Rust HTTP transport 直连 Go server 的短生命周期跨语言测试、Rust 侧两客户端 userdb harness、Rust userdb 两客户端真实 Go HTTP 同步测试、生产部署边界 runbook、单用户 bearer access token 门禁、备份恢复演练运行证据、外部 TLS 反代实现级验证证据、升级回滚演练运行证据、部署态 Compose 预演入口、OIDC 未来接入规划、`apple-keychain-v1` 平台 backend runbook、Apple 平台签名策略 ADR、`android-keystore-v1` 平台 backend runbook、`android-keystore` feature 门禁、Android Rust bridge wrapper、bridge contract、仓库内 Kotlin bridge source、Android Gradle library harness、gated instrumented smoke、provider diagnostics 和 feature-gated macOS backend 编译验证已经补齐；真实 Apple Keychain smoke 已执行但未通过，backend status 已阻断生产签名，Android Keystore 已接不可用状态门禁、bridge contract、合成 bridge 单测、ignored smoke 入口、Kotlin source、Gradle harness、gated smoke 和 provider diagnostics，并已补 Rust raw JNI glue；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。OIDC 不进入当前核心实现，接入前应先补认证策略 ADR 并把 Go handler 认证层收敛为可插拔接口。P1 原始事件、本地审计批次和 FFI 明文 payload 继续不得进入同步路径；现阶段不推进完整平台壳，也不启动长期运行 server 做客户端上传下载。
+当前下一步继续沿 Phase 4 管理端本地质量治理推进：当前状态短入口已补到 `docs/status/current.md`，用于把当前阶段、验证基线和停止线从长周志中抽出；随后审视 `learning_view.dart`、`sync_view.dart` 和 action 编排测试是否需要继续按职责拆分或补针对性回归覆盖。真实远端同步、恢复码和设备授权 UI 继续关闭，直到可用平台私钥 backend、目标部署运行证据、恢复 / 授权交互边界和对应文档证据齐备。encrypted object 上传下载、版本冲突 HTTP 语义、runtime 配置装配、对象大小门禁、脱敏 audit logger、本机 smoke runbook、双设备 HTTP smoke、Docker Compose 本地 / 部署态入口、Docker Compose 容器实际启动 smoke、Rust remote client DTO / transport trait、std-only `http://` HTTP transport、Rust HTTP transport 直连 Go server 的短生命周期跨语言测试、Rust 侧两客户端 userdb harness、Rust userdb 两客户端真实 Go HTTP 同步测试、生产部署边界 runbook、单用户 bearer access token 门禁、备份恢复演练运行证据、外部 TLS 反代实现级验证证据、升级回滚演练运行证据、部署态 Compose 预演入口、OIDC 未来接入规划、`apple-keychain-v1` 平台 backend runbook、Apple 平台签名策略 ADR、`android-keystore-v1` 平台 backend runbook、`android-keystore` feature 门禁、Android Rust bridge wrapper、bridge contract、仓库内 Kotlin bridge source、Android Gradle library harness、gated instrumented smoke、provider diagnostics 和 feature-gated macOS backend 编译验证已经补齐；真实 Apple Keychain smoke 已执行但未通过，backend status 已阻断生产签名，Android Keystore 已接不可用状态门禁、bridge contract、合成 bridge 单测、ignored smoke 入口、Kotlin source、Gradle harness、gated smoke 和 provider diagnostics，并已补 Rust raw JNI glue；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。OIDC 不进入当前核心实现，接入前应先补认证策略 ADR 并把 Go handler 认证层收敛为可插拔接口。P1 原始事件、本地审计批次和 FFI 明文 payload 继续不得进入同步路径；现阶段不推进完整平台壳，也不启动长期运行 server 做客户端上传下载。
 
 ## 设计原则
 
@@ -205,6 +207,7 @@ MVP 至少需要证明：
 
 ## 专题文档索引
 
+- [当前状态短入口](status/current.md)：当前阶段、已落地能力、停止线、验证基线和近期推进顺位。
 - [Engine Boundary](engine-boundary.md)：engine trait、核心模型、adapter 职责、错误语义和 clean-room 边界。
 - [ime-engine-rime Adapter 设计](engine-rime-adapter.md)：Rime adapter 构建、FFI 生命周期、数据目录和 native smoke。
 - [个人化学习设计](personalization-learning.md)：userdb、ranker、学习事件、负反馈、删除 tombstone、导入导出和 CLI 管理入口。

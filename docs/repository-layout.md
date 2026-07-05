@@ -43,6 +43,11 @@ RadishLex/
     android-ime/
     ios-keyboard/
   docs/
+    status/
+      current.md
+    devlogs/
+      2026-W27.md
+      2026-W27/
     technical-plan.md
     roadmap.md
     repository-layout.md
@@ -106,6 +111,8 @@ RadishLex/
 - `crates/ime-crypto/`：客户端加密本地模型 crate，当前覆盖 key role、object envelope、AAD、nonce、ciphertext hash、device wrapping、recovery material、Argon2id recovery KDF、Ed25519 signing、test-memory signing key store、platform backend capability / unavailable 模型、feature-gated macOS Keychain backend、feature-gated Android Keystore bridge wrapper / contract / raw JNI glue、signed object manifest 和 signed recovery record。
 - `server/sync-server/`：Go sync server 起步 module，当前覆盖配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、device wrapping encrypted key bytes 承载、recovery wrapped material 读取接口、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、单用户 bearer access token 门禁、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、`cmd/radishlex-sync-server`、runtime 配置装配、HTTP timeout、对象大小门禁、脱敏 audit logger、本机 smoke runbook、短生命周期双设备 HTTP smoke、Dockerfile / `.dockerignore`、Docker Compose 本地 / 部署态入口、生产部署 runbook、Rust HTTP transport 直连 Go server 的短生命周期跨语言测试，以及 Rust userdb 两客户端真实 Go HTTP 同步测试；不包含完整真实用户生产封装。
 - `docs/cli.md`：`radishlex-ime-cli` 命令、输出、退出码和安全边界说明。
+- `docs/status/current.md`：新会话短入口，记录当前阶段、已落地能力、验证基线、停止线和近期推进顺位。
+- `docs/devlogs/2026-W27.md`：2026-W27 周志索引；历史流水已按天拆到 `docs/devlogs/2026-W27/`。
 - `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
 - `docs/engine-rime-adapter.md`：`ime-engine-rime` 的 adapter 边界、构建策略和验证分层。
 - `docs/personalization-learning.md`：Phase 2 个人化学习、userdb、ranker、负反馈和 CLI 管理边界。
