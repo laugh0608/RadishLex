@@ -41,7 +41,7 @@ Flutter manager：
 
 - `apps/radishlex-manager` 已提供 macOS Flutter 起步工程，默认使用合成 fixture。
 - 显式配置本地 SQLite userdb 与 `ime-ffi` 动态库后，可通过真实 Dart FFI bridge 管理本地词库、导入导出、import batches、learning status、rank explain、sync preflight、settings draft 和脱敏诊断报告。
-- UI 已拆分 manager shell、跨页 action 编排、词库子组件、设置诊断子组件、页面级 widget tests、Dart model 分组和动态 FFI bridge 分层。
+- UI 已拆分 manager shell、跨页 action 编排、词库子组件、学习子组件、设置诊断子组件、页面级 widget tests、Dart model 分组和动态 FFI bridge 分层。
 - 同步页当前只展示 gate 状态、本地 P2 对象分类、设备 backend 状态和生产不可用原因，真实同步按钮保持关闭。
 
 平台私钥 backend：
@@ -83,6 +83,6 @@ Sync server 部署预演：
 ## 近期推进顺位
 
 1. 维护本文短入口，避免新会话默认阅读长周志。
-2. 继续 Phase 4 manager 本地质量治理，优先审视 `learning_view.dart`、`sync_view.dart` 和 `manager_home_actions.dart` 是否需要继续按职责拆分或补针对性回归测试。
+2. 继续 Phase 4 manager 本地质量治理；学习页子组件已拆分，下一步优先审视 `sync_view.dart` 和 `manager_home_actions.dart` 是否需要继续按职责拆分或补针对性回归测试。
 3. 保持 `ManagerBridge` contract、C ABI、settings draft 和诊断字段稳定；只有真实需求要求新增能力时，先补边界文档和测试。
 4. 平台私钥 backend 没有新增可用证据前，不把真实同步、恢复码和设备授权 UI 放入主线。
