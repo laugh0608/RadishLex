@@ -174,6 +174,47 @@ void main() {
     expect(health.canRunReadOnlyProbe, isFalse);
   });
 
+  test('connection health draft uses imported probe record', () {
+    const draft = ManagerSettingsDraft(
+      serverEndpoint: 'https://localhost:7319',
+      retainSyncConfig: true,
+      privacyMode: false,
+      diagnosticsExport: false,
+      deploymentEvidenceRecorded: true,
+      deploymentEvidenceSource: managerDeploymentEvidenceLocalSmoke,
+      syncConnectionProbeRecord: ManagerSyncConnectionProbeRecord(
+        source: managerSyncConnectionProbeSourceLocalDockerHttps,
+        recordedAt: '2026-07-05T00:00:00Z',
+        format: managerSyncConnectionHealthSummaryFormat,
+        redactionPolicy: managerSyncConnectionHealthSummaryRedactionPolicy,
+        endpointStatus: 'configured',
+        transportMode: 'local_https',
+        accessTokenStatus: 'not_configured',
+        connectionStatus: 'reachable',
+        authStatus: 'not_required_for_local_probe',
+        serverStateStatus: 'domain_missing_expected',
+        httpStatus: 404,
+        httpStatusClass: 'client_error',
+        lastRemoteErrorCode: 'not_found',
+        localInsecureTls: 'allowed',
+      ),
+    );
+
+    final health = deriveManagerSyncConnectionHealth(draft);
+
+    expect(health.status, SyncConnectionStatus.readOnlyProbeReachable);
+    expect(health.connectionBlocker, 'none');
+    expect(
+      health.probeSource,
+      managerSyncConnectionProbeSourceLocalDockerHttps,
+    );
+    expect(health.probeRecordedAt, '2026-07-05T00:00:00.000Z');
+    expect(health.authStatus, 'not_required_for_local_probe');
+    expect(health.httpStatus, 404);
+    expect(health.httpStatusClass, 'client_error');
+    expect(health.localInsecureTls, 'allowed');
+  });
+
   test('connection health imports network failure probe summary', () {
     final summary = SyncConnectionProbeSummary.fromJson({
       'format': managerSyncConnectionHealthSummaryFormat,

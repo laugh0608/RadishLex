@@ -30,6 +30,11 @@ class SyncConnectionHealthSection extends StatelessWidget {
         children: [
           ManagerKeyValueRow(label: 'status', value: health.status.label),
           ManagerKeyValueRow(label: 'blocker', value: health.connectionBlocker),
+          ManagerKeyValueRow(label: 'source', value: health.probeSource),
+          ManagerKeyValueRow(
+            label: 'recorded at',
+            value: health.probeRecordedAt,
+          ),
           ManagerKeyValueRow(label: 'endpoint', value: health.endpointStatus),
           ManagerKeyValueRow(
             label: 'access token',
@@ -39,6 +44,15 @@ class SyncConnectionHealthSection extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'server state',
             value: health.serverStateStatus,
+          ),
+          ManagerKeyValueRow(label: 'auth', value: health.authStatus),
+          ManagerKeyValueRow(
+            label: 'http',
+            value: '${health.httpStatus} ${health.httpStatusClass}',
+          ),
+          ManagerKeyValueRow(
+            label: 'TLS policy',
+            value: health.localInsecureTls,
           ),
           ManagerKeyValueRow(
             label: 'last remote error',

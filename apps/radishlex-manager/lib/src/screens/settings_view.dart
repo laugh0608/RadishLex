@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../models/manager_models.dart';
@@ -31,11 +33,15 @@ class _SettingsViewState extends State<SettingsView> {
   late bool deploymentEvidenceRecorded;
   late bool accessTokenConfigured;
   late String deploymentEvidenceSource;
+  late ManagerSyncConnectionProbeRecord syncConnectionProbeRecord;
+  late final TextEditingController connectionSummaryController;
+  String connectionSummaryError = '';
 
   @override
   void initState() {
     super.initState();
     serverEndpointController = TextEditingController();
+    connectionSummaryController = TextEditingController();
     _loadDraft(widget.settings.draft);
   }
 
@@ -50,6 +56,7 @@ class _SettingsViewState extends State<SettingsView> {
   @override
   void dispose() {
     serverEndpointController.dispose();
+    connectionSummaryController.dispose();
     super.dispose();
   }
 
@@ -169,6 +176,14 @@ class _SettingsViewState extends State<SettingsView> {
         const SizedBox(height: 16),
         _SettingsSyncGatePreview(draft: currentDraft, sync: widget.sync),
         const SizedBox(height: 16),
+        _ConnectionHealthSummaryImportSection(
+          record: syncConnectionProbeRecord,
+          controller: connectionSummaryController,
+          error: connectionSummaryError,
+          onImport: _importConnectionSummary,
+          onClear: _clearConnectionSummary,
+        ),
+        const SizedBox(height: 16),
         ManagerSection(
           title: '配置来源',
           trailing: Wrap(
@@ -224,6 +239,7 @@ class _SettingsViewState extends State<SettingsView> {
       deploymentEvidenceRecorded: deploymentEvidenceRecorded,
       accessTokenConfigured: accessTokenConfigured,
       deploymentEvidenceSource: deploymentEvidenceSource,
+      syncConnectionProbeRecord: syncConnectionProbeRecord,
     );
   }
 
@@ -235,6 +251,155 @@ class _SettingsViewState extends State<SettingsView> {
     deploymentEvidenceRecorded = draft.deploymentEvidenceRecorded;
     accessTokenConfigured = draft.accessTokenConfigured;
     deploymentEvidenceSource = draft.deploymentEvidenceSource;
+    syncConnectionProbeRecord = draft.syncConnectionProbeRecord;
+    connectionSummaryError = '';
+    connectionSummaryController.clear();
+  }
+
+  void _importConnectionSummary() {
+    try {
+      final decoded = jsonDecode(connectionSummaryController.text);
+      if (decoded is! Map) {
+        throw const FormatException('summary root must be an object');
+      }
+
+      final json = <String, Object?>{};
+      for (final entry in decoded.entries) {
+        final key = entry.key;
+        if (key is! String) {
+          throw const FormatException('summary keys must be strings');
+        }
+        json[key] = entry.value;
+      }
+
+      final summary = SyncConnectionProbeSummary.fromJson(json);
+      setState(() {
+        syncConnectionProbeRecord = managerSyncConnectionProbeRecordFromSummary(
+          summary,
+          source: managerSyncConnectionProbeSourceForSummary(summary),
+          recordedAt: DateTime.now().toUtc().toIso8601String(),
+        );
+        connectionSummaryError = '';
+        connectionSummaryController.clear();
+      });
+    } on FormatException {
+      setState(() {
+        connectionSummaryError = 'probe_summary_json_invalid';
+      });
+    } on Object {
+      setState(() {
+        connectionSummaryError = 'probe_summary_import_failed';
+      });
+    }
+  }
+
+  void _clearConnectionSummary() {
+    setState(() {
+      syncConnectionProbeRecord =
+          const ManagerSyncConnectionProbeRecord.empty();
+      connectionSummaryError = '';
+      connectionSummaryController.clear();
+    });
+  }
+}
+
+class _ConnectionHealthSummaryImportSection extends StatelessWidget {
+  const _ConnectionHealthSummaryImportSection({
+    required this.record,
+    required this.controller,
+    required this.error,
+    required this.onImport,
+    required this.onClear,
+  });
+
+  final ManagerSyncConnectionProbeRecord record;
+  final TextEditingController controller;
+  final String error;
+  final VoidCallback onImport;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasRecord = record.isRecorded;
+    return ManagerSection(
+      key: const Key('settings-connection-health-summary-section'),
+      title: '连接健康摘要回填',
+      trailing: ManagerStatusBadge(
+        icon: hasRecord
+            ? Icons.cloud_done_outlined
+            : Icons.cloud_upload_outlined,
+        label: hasRecord ? record.connectionStatus : 'not_recorded',
+        tone: hasRecord ? ManagerBadgeTone.neutral : ManagerBadgeTone.warning,
+      ),
+      child: Column(
+        children: [
+          ManagerKeyValueRow(
+            label: 'source',
+            value: hasRecord ? record.source : 'not_recorded',
+          ),
+          ManagerKeyValueRow(
+            label: 'recorded at',
+            value: hasRecord ? record.recordedAt : 'not_recorded',
+          ),
+          ManagerKeyValueRow(
+            label: 'connection',
+            value: hasRecord ? record.connectionStatus : 'not_recorded',
+          ),
+          ManagerKeyValueRow(
+            label: 'server state',
+            value: hasRecord ? record.serverStateStatus : 'not_recorded',
+          ),
+          ManagerKeyValueRow(
+            label: 'auth',
+            value: hasRecord ? record.authStatus : 'not_recorded',
+          ),
+          ManagerKeyValueRow(
+            label: 'http',
+            value: hasRecord
+                ? '${record.httpStatus} ${record.httpStatusClass}'
+                : 'not_recorded',
+          ),
+          ManagerKeyValueRow(
+            label: 'last remote error',
+            value: hasRecord ? record.lastRemoteErrorCode : 'not_recorded',
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('settings-connection-health-summary-json'),
+            controller: controller,
+            minLines: 3,
+            maxLines: 6,
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.data_object_outlined),
+              labelText: 'sync_connection_health.v1 JSON',
+              errorText: error.isEmpty ? null : error,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  key: const Key('settings-clear-connection-summary'),
+                  onPressed: hasRecord ? onClear : null,
+                  icon: const Icon(Icons.backspace_outlined),
+                  label: const Text('清除摘要'),
+                ),
+                FilledButton.icon(
+                  key: const Key('settings-import-connection-summary'),
+                  onPressed: onImport,
+                  icon: const Icon(Icons.input_outlined),
+                  label: const Text('导入摘要'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -332,6 +497,14 @@ class _SettingsSyncGatePreview extends StatelessWidget {
             value: connection.status.code,
           ),
           ManagerKeyValueRow(
+            label: 'connection source',
+            value: connection.probeSource,
+          ),
+          ManagerKeyValueRow(
+            label: 'connection recorded',
+            value: connection.probeRecordedAt,
+          ),
+          ManagerKeyValueRow(
             label: 'connection blocker',
             value: connection.connectionBlocker,
           ),
@@ -342,6 +515,14 @@ class _SettingsSyncGatePreview extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'server state',
             value: connection.serverStateStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'auth status',
+            value: connection.authStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'http status',
+            value: '${connection.httpStatus} ${connection.httpStatusClass}',
           ),
           ManagerKeyValueRow(
             label: 'last remote error',
@@ -373,7 +554,8 @@ bool _sameDraft(ManagerSettingsDraft left, ManagerSettingsDraft right) {
       left.diagnosticsExport == right.diagnosticsExport &&
       left.deploymentEvidenceRecorded == right.deploymentEvidenceRecorded &&
       left.accessTokenConfigured == right.accessTokenConfigured &&
-      left.deploymentEvidenceSource == right.deploymentEvidenceSource;
+      left.deploymentEvidenceSource == right.deploymentEvidenceSource &&
+      left.syncConnectionProbeRecord == right.syncConnectionProbeRecord;
 }
 
 String _deploymentEvidenceSourceOrDefault(String source) {

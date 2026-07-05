@@ -261,6 +261,12 @@ class SyncConnectionHealth {
     required this.transportMode,
     required this.serverStateStatus,
     required this.lastRemoteErrorCode,
+    this.probeSource = 'not_recorded',
+    this.probeRecordedAt = 'not_recorded',
+    this.authStatus = 'not_checked',
+    this.httpStatus = 0,
+    this.httpStatusClass = 'not_checked',
+    this.localInsecureTls = 'not_checked',
   });
 
   final SyncConnectionStatus status;
@@ -270,6 +276,12 @@ class SyncConnectionHealth {
   final String transportMode;
   final String serverStateStatus;
   final String lastRemoteErrorCode;
+  final String probeSource;
+  final String probeRecordedAt;
+  final String authStatus;
+  final int httpStatus;
+  final String httpStatusClass;
+  final String localInsecureTls;
 
   bool get canRunReadOnlyProbe =>
       status == SyncConnectionStatus.localHttpsReadyForProbe ||
@@ -640,6 +652,11 @@ SyncConnectionHealth deriveManagerSyncConnectionHealth(
       lastRemoteErrorCode: 'configuration_invalid',
     );
   }
+  if (normalized.hasSyncConnectionProbeRecord) {
+    return managerSyncConnectionHealthFromProbeRecord(
+      normalized.syncConnectionProbeRecord,
+    );
+  }
   if (!normalized.hasAccessToken) {
     return SyncConnectionHealth(
       status: SyncConnectionStatus.accessTokenMissing,
@@ -700,7 +717,7 @@ SyncConnectionHealth managerSyncConnectionHealthFromProbeSummary(
   SyncConnectionProbeSummary summary,
 ) {
   if (!summary.hasSupportedFormat) {
-    return const SyncConnectionHealth(
+    return SyncConnectionHealth(
       status: SyncConnectionStatus.readOnlyProbeSummaryInvalid,
       connectionBlocker: 'probe_summary_format_unsupported',
       endpointStatus: 'not_checked_probe_summary_invalid',
@@ -708,6 +725,10 @@ SyncConnectionHealth managerSyncConnectionHealthFromProbeSummary(
       transportMode: 'not_checked_probe_summary_invalid',
       serverStateStatus: 'not_checked_probe_summary_invalid',
       lastRemoteErrorCode: 'probe_summary_invalid',
+      authStatus: summary.authStatus,
+      httpStatus: summary.httpStatus,
+      httpStatusClass: summary.httpStatusClass,
+      localInsecureTls: summary.localInsecureTls,
     );
   }
 
@@ -719,7 +740,84 @@ SyncConnectionHealth managerSyncConnectionHealthFromProbeSummary(
     transportMode: summary.transportMode,
     serverStateStatus: summary.serverStateStatus,
     lastRemoteErrorCode: summary.lastRemoteErrorCode,
+    authStatus: summary.authStatus,
+    httpStatus: summary.httpStatus,
+    httpStatusClass: summary.httpStatusClass,
+    localInsecureTls: summary.localInsecureTls,
   );
+}
+
+SyncConnectionHealth managerSyncConnectionHealthFromProbeRecord(
+  ManagerSyncConnectionProbeRecord record,
+) {
+  final summary = _syncConnectionProbeSummaryFromRecord(record);
+  final health = managerSyncConnectionHealthFromProbeSummary(summary);
+  return SyncConnectionHealth(
+    status: health.status,
+    connectionBlocker: health.connectionBlocker,
+    endpointStatus: health.endpointStatus,
+    accessTokenStatus: health.accessTokenStatus,
+    transportMode: health.transportMode,
+    serverStateStatus: health.serverStateStatus,
+    lastRemoteErrorCode: health.lastRemoteErrorCode,
+    probeSource: _sanitizedSyncConnectionProbeSource(record.source),
+    probeRecordedAt: _sanitizedSyncConnectionProbeRecordedAt(record.recordedAt),
+    authStatus: health.authStatus,
+    httpStatus: health.httpStatus,
+    httpStatusClass: health.httpStatusClass,
+    localInsecureTls: health.localInsecureTls,
+  );
+}
+
+ManagerSyncConnectionProbeRecord managerSyncConnectionProbeRecordFromSummary(
+  SyncConnectionProbeSummary summary, {
+  required String source,
+  required String recordedAt,
+}) {
+  return ManagerSyncConnectionProbeRecord(
+    source: _sanitizedSyncConnectionProbeSource(source),
+    recordedAt: _sanitizedSyncConnectionProbeRecordedAt(recordedAt),
+    format: summary.format,
+    redactionPolicy: summary.redactionPolicy,
+    endpointStatus: summary.endpointStatus,
+    transportMode: summary.transportMode,
+    accessTokenStatus: summary.accessTokenStatus,
+    connectionStatus: summary.connectionStatus,
+    authStatus: summary.authStatus,
+    serverStateStatus: summary.serverStateStatus,
+    httpStatus: summary.httpStatus,
+    httpStatusClass: summary.httpStatusClass,
+    lastRemoteErrorCode: summary.lastRemoteErrorCode,
+    localInsecureTls: summary.localInsecureTls,
+  );
+}
+
+ManagerSyncConnectionProbeRecord managerSanitizeSyncConnectionProbeRecord(
+  ManagerSyncConnectionProbeRecord record,
+) {
+  if (!record.isRecorded) {
+    return const ManagerSyncConnectionProbeRecord.empty();
+  }
+  return managerSyncConnectionProbeRecordFromSummary(
+    _syncConnectionProbeSummaryFromRecord(record),
+    source: record.source,
+    recordedAt: record.recordedAt,
+  );
+}
+
+String managerSyncConnectionProbeSourceForSummary(
+  SyncConnectionProbeSummary summary,
+) {
+  switch (summary.transportMode) {
+    case 'local_https':
+      return managerSyncConnectionProbeSourceLocalDockerHttps;
+    case 'local_http':
+      return managerSyncConnectionProbeSourceLocalHttp;
+    case 'external_https':
+      return managerSyncConnectionProbeSourceExternalHttps;
+    default:
+      return managerSyncConnectionProbeSourceImportedSummary;
+  }
 }
 
 ManagerSyncEntryGate deriveManagerSyncEntryGate({
@@ -1015,6 +1113,44 @@ String managerSyncEndpointLabel(ManagerSettingsDraft draft) {
 
 String managerSyncAccessTokenStatus(ManagerSettingsDraft draft) {
   return draft.hasAccessToken ? 'configured' : 'not_configured';
+}
+
+SyncConnectionProbeSummary _syncConnectionProbeSummaryFromRecord(
+  ManagerSyncConnectionProbeRecord record,
+) {
+  return SyncConnectionProbeSummary.fromJson({
+    'format': record.format,
+    'redaction_policy': record.redactionPolicy,
+    'endpoint_status': record.endpointStatus,
+    'transport_mode': record.transportMode,
+    'access_token_status': record.accessTokenStatus,
+    'connection_status': record.connectionStatus,
+    'auth_status': record.authStatus,
+    'server_state_status': record.serverStateStatus,
+    'http_status': record.httpStatus,
+    'http_status_class': record.httpStatusClass,
+    'last_remote_error_code': record.lastRemoteErrorCode,
+    'local_insecure_tls': record.localInsecureTls,
+  });
+}
+
+String _sanitizedSyncConnectionProbeSource(String source) {
+  final candidate = source.trim();
+  return managerSyncConnectionProbeSources.contains(candidate)
+      ? candidate
+      : managerSyncConnectionProbeSourceUnknown;
+}
+
+String _sanitizedSyncConnectionProbeRecordedAt(String recordedAt) {
+  final candidate = recordedAt.trim();
+  if (candidate.isEmpty) {
+    return 'unknown_time';
+  }
+  final parsed = DateTime.tryParse(candidate);
+  if (parsed == null) {
+    return 'unknown_time';
+  }
+  return parsed.toUtc().toIso8601String();
 }
 
 const _syncConnectionEndpointStatuses = {

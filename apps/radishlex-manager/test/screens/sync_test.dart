@@ -20,7 +20,7 @@ void main() {
     expect(find.text('平台签名 backend 不可用'), findsOneWidget);
     expect(find.text('设备 production gate 为 blocked'), findsOneWidget);
     expect(find.text('production gate blocked'), findsOneWidget);
-    expect(find.text('not_recorded'), findsOneWidget);
+    expect(find.text('not_recorded'), findsWidgets);
     expect(
       find.text(
         'access_token_missing, platform_private_key_backend_blocked, deployment_evidence_missing, recovery_code_flow_closed, device_authorization_flow_closed, user_sync_entry_closed_current_phase',

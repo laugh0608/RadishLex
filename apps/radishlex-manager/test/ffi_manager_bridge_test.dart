@@ -191,30 +191,55 @@ void main() {
     final store = ManagerSettingsStore(filePath: settingsFile);
     final saved = store.save(
       const ManagerSettingsDraft(
-        serverEndpoint: ' https://sync.example.invalid ',
+        serverEndpoint: ' https://localhost:7319 ',
         retainSyncConfig: true,
         privacyMode: false,
         diagnosticsExport: true,
         deploymentEvidenceRecorded: true,
         accessTokenConfigured: true,
-        deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
+        deploymentEvidenceSource: managerDeploymentEvidenceLocalSmoke,
+        syncConnectionProbeRecord: ManagerSyncConnectionProbeRecord(
+          source: managerSyncConnectionProbeSourceLocalDockerHttps,
+          recordedAt: '2026-07-05T00:00:00Z',
+          format: managerSyncConnectionHealthSummaryFormat,
+          redactionPolicy: managerSyncConnectionHealthSummaryRedactionPolicy,
+          endpointStatus: 'configured',
+          transportMode: 'local_https',
+          accessTokenStatus: 'not_configured',
+          connectionStatus: 'reachable',
+          authStatus: 'not_required_for_local_probe',
+          serverStateStatus: 'domain_missing_expected',
+          httpStatus: 404,
+          httpStatusClass: 'client_error',
+          lastRemoteErrorCode: 'not_found',
+          localInsecureTls: 'allowed',
+        ),
       ),
     );
 
-    expect(saved.serverEndpoint, 'https://sync.example.invalid');
+    expect(saved.serverEndpoint, 'https://localhost:7319');
     expect(saved.hasDeploymentEvidence, isTrue);
     expect(saved.hasAccessToken, isTrue);
+    expect(saved.hasSyncConnectionProbeRecord, isTrue);
     final encoded = File(settingsFile).readAsStringSync();
     expect(encoded, contains('"format_version": 1'));
     expect(encoded, contains('"access_token_configured": true'));
-    expect(encoded, contains('"deployment_evidence_source": "external_tls"'));
+    expect(encoded, contains('"deployment_evidence_source": "local_smoke"'));
+    expect(encoded, contains('"sync_connection_health_summary"'));
+    expect(encoded, contains('"connection_status": "reachable"'));
+    expect(encoded, contains('"last_remote_error_code": "not_found"'));
 
     final reloaded = ManagerSettingsStore(filePath: settingsFile).load();
     expect(reloaded.hasDeploymentEvidence, isTrue);
     expect(reloaded.hasAccessToken, isTrue);
+    expect(reloaded.hasSyncConnectionProbeRecord, isTrue);
+    expect(
+      deriveManagerSyncConnectionHealth(reloaded).status,
+      SyncConnectionStatus.readOnlyProbeReachable,
+    );
     expect(
       managerDeploymentEvidenceLabel(reloaded),
-      'deployment evidence external TLS',
+      'deployment evidence local smoke',
     );
 
     final legacySettingsFile = '${tempDir.path}/legacy-settings.json';

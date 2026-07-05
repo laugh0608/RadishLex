@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -25,7 +27,7 @@ void main() {
     expect(find.text('设备 production gate 为 blocked'), findsOneWidget);
     expect(find.text('deployment evidence missing'), findsWidgets);
     expect(find.text('backend_unavailable'), findsWidgets);
-    expect(find.text('not_recorded'), findsOneWidget);
+    expect(find.text('not_recorded'), findsWidgets);
     expect(find.text('access_token_missing'), findsWidgets);
     expect(find.text('not_checked_access_token_missing'), findsOneWidget);
   });
@@ -154,6 +156,105 @@ void main() {
     expect(find.text('preflight_ready'), findsWidgets);
     expect(find.text('本地预检通过，真实同步入口仍等待恢复码和设备授权'), findsOneWidget);
     expect(find.text('blocked_before_user_sync'), findsWidgets);
+    final enableButton = tester.widget<FilledButton>(
+      find.byKey(const Key('sync-enable-button')),
+    );
+    expect(enableButton.onPressed, isNull);
+  });
+
+  testWidgets('settings imports connection health summary into sync gate', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final fixture = createManagerFixture();
+    const readyDevice = DeviceSecuritySummary(
+      deviceId: 'device-ready-01',
+      backendId: 'test-production-ready',
+      capabilityStatus: 'ready_for_test',
+      productionGate: 'ready',
+    );
+    final draft = fixture.settings.draft.copyWith(
+      serverEndpoint: 'https://localhost:7319',
+      retainSyncConfig: true,
+      accessTokenConfigured: false,
+      deploymentEvidenceRecorded: true,
+      deploymentEvidenceSource: managerDeploymentEvidenceLocalSmoke,
+    );
+    final snapshot = fixture.copyWith(
+      sync: fixture.sync.copyWith(
+        state: deriveManagerSyncUiState(draft: draft, device: readyDevice),
+        device: readyDevice,
+        serverEndpoint: managerSyncEndpointLabel(draft),
+        reason: managerSyncGateReason(
+          state: deriveManagerSyncUiState(draft: draft, device: readyDevice),
+          draft: draft,
+          device: readyDevice,
+        ),
+      ),
+      settings: fixture.settings.copyWith(draft: draft, syncConfigured: true),
+    );
+
+    await tester.pumpWidget(
+      RadishLexManagerApp(
+        bridge: FixtureManagerBridge(initialSnapshot: snapshot),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.tune_outlined));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('settings-connection-health-summary-json')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('settings-connection-health-summary-json')),
+      jsonEncode({
+        'format': managerSyncConnectionHealthSummaryFormat,
+        'redaction_policy': managerSyncConnectionHealthSummaryRedactionPolicy,
+        'endpoint_status': 'configured',
+        'transport_mode': 'local_https',
+        'access_token_status': 'not_configured',
+        'connection_status': 'reachable',
+        'auth_status': 'not_required_for_local_probe',
+        'server_state_status': 'domain_missing_expected',
+        'http_status': 404,
+        'http_status_class': 'client_error',
+        'last_remote_error_code': 'not_found',
+        'local_insecure_tls': 'allowed',
+      }),
+    );
+    await tester.tap(
+      find.byKey(const Key('settings-import-connection-summary')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(managerSyncConnectionProbeSourceLocalDockerHttps),
+      findsWidgets,
+    );
+    expect(find.text('domain_missing_expected'), findsWidgets);
+    expect(find.text('not_required_for_local_probe'), findsWidgets);
+    expect(find.text('404 client_error'), findsWidgets);
+
+    await tester.ensureVisible(find.byKey(const Key('settings-save-button')));
+    await tester.tap(find.byKey(const Key('settings-save-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('设置草案已保存：preflight_ready'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.sync_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('只读探测已到达服务'), findsOneWidget);
+    expect(
+      find.text(managerSyncConnectionProbeSourceLocalDockerHttps),
+      findsWidgets,
+    );
+    expect(find.text('domain_missing_expected'), findsOneWidget);
+    expect(find.text('not_found'), findsOneWidget);
     final enableButton = tester.widget<FilledButton>(
       find.byKey(const Key('sync-enable-button')),
     );

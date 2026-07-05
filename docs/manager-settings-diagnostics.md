@@ -83,9 +83,11 @@ Manager 当前只派生和展示本地连接健康摘要，不在 UI 中发起�
 - `reachable_with_unexpected_status`：只读探测到达服务但返回了非预期 HTTP 状态。
 - `probe_summary_invalid`：摘要格式或脱敏策略不符合 Manager allowlist。
 
-同步页的“服务连接健康”和设置页的“同步门禁草案”只展示 `connection_status`、`connection_blocker`、`endpoint_status`、`access_token_status`、`transport_mode`、`server_state_status` 和 `last_remote_error_code`。这些字段不得包含完整 endpoint、token、请求 / 响应体、证书、真实路径或 payload bytes。
+同步页的“服务连接健康”和设置页的“同步门禁草案”只展示 `connection_status`、`connection_blocker`、`endpoint_status`、`access_token_status`、`transport_mode`、`server_state_status`、`last_remote_error_code`、`connection_probe_source`、`connection_probe_recorded_at`、`auth_status`、`http_status`、`http_status_class` 和 `local_insecure_tls`。这些字段不得包含完整 endpoint、token、请求 / 响应体、证书、真实路径或 payload bytes。
 
 本地 Docker / 本地 HTTPS 服务启动后，可使用 `./scripts/check-sync-server-connection-health.sh` 采集 `sync_connection_health.v1` 非敏感摘要。脚本只执行 `GET /api/v1/domains/<probe>/state` 读请求：`404 not_found` 表示服务和认证路径可达且 probe domain 不存在，`401 unauthenticated` 表示访问控制门禁可达但 token 缺失或失败。脚本输出不得写入 token、endpoint credential 或响应体正文。Manager 只接受约定 allowlist 字段；未知远端错误码会降为 `unexpected_remote_error_code`。
+
+设置页提供开发期“连接健康摘要回填”入口，接受 `sync_connection_health.v1` JSON 摘要并只保存净化后的 `sync_connection_health_summary` 子对象。该对象不保存原始 JSON、完整 endpoint、token、请求 / 响应体、证书或 payload bytes；非法 JSON 只显示结构化错误码，不进入 settings draft。
 
 ## 诊断报告格式
 
@@ -179,10 +181,16 @@ Manager UI 预览会保留完整脱敏文本，并额外按 `runtime`、`setting
 | `sync.join_request_status` | `gate` | 加入请求结构化状态；当前为 `join_request_unavailable`。 |
 | `sync.connection_status` | `gate` | 服务连接健康状态码，例如 `access_token_missing`、`local_https_ready_for_probe` 或 `external_probe_deferred`。 |
 | `sync.connection_blocker` | `gate` | 服务连接健康阻塞码，例如 `access_token_missing` 或 `read_only_probe_not_run`。 |
+| `sync.connection_probe_source` | `gate` | 回填摘要来源，例如 `local_docker_https`、`local_http`、`external_https_probe` 或 `not_recorded`。 |
+| `sync.connection_probe_recorded_at` | `timestamp` | 回填摘要记录时间；未回填时为 `not_recorded`。 |
 | `sync.endpoint_status` | `gate` | endpoint 配置状态，例如 `configured`、`not_configured`、`invalid_userinfo`。 |
 | `sync.access_token_status` | `gate` | access token 存在性，`configured` 或 `not_configured`。 |
 | `sync.transport_mode` | `gate` | endpoint 传输分类，例如 `local_https`、`local_http`、`external_https` 或 `remote_http`。 |
 | `sync.server_state_status` | `gate` | 服务状态摘要，例如 `read_only_probe_pending`、`not_checked_access_token_missing` 或脚本输出的 `domain_missing_expected`。 |
+| `sync.connection_auth_status` | `gate` | 只读探测认证摘要，例如 `not_required_for_local_probe`、`required`、`accepted` 或 `not_checked`。 |
+| `sync.connection_http_status` | `status_code` | 只读探测 HTTP 状态码；未探测时为 `0`。 |
+| `sync.connection_http_status_class` | `gate` | 只读探测 HTTP 状态分类，例如 `client_error`、`network_error` 或 `not_checked`。 |
+| `sync.connection_local_insecure_tls` | `gate` | 本地 TLS 信任策略摘要，例如 `allowed` 或 `system_trust`。 |
 | `sync.last_remote_error_code` | `error_code` | 最近一次远端错误分类；未探测时为 `none` 或配置类错误码。 |
 | `sync.action_stop_line` | `gate` | 当前真实同步入口停止线。 |
 | `sync.deployment_evidence` | `gate` | 部署证据标签摘要。 |
@@ -226,7 +234,7 @@ git diff --check
 
 - settings draft v1 写入 / 读取、access token 存在性持久化、旧 v1 缺 `deployment_evidence_source` 降级、未知格式拒绝、非法 URL 和非法 evidence source 拒绝。
 - Dart helper 覆盖隐私策略、backend gate、本地 `local_smoke`、非本地 evidence source、恢复码关闭状态、设备授权关闭状态和 join request 不可用状态派生。
-- 连接健康 helper 覆盖 endpoint 缺失、URL userinfo 拒绝、access token 缺失、本地 HTTPS 可探测和外部 HTTPS 探测后置。
+- 连接健康 helper 覆盖 endpoint 缺失、URL userinfo 拒绝、access token 缺失、本地 HTTPS 可探测、外部 HTTPS 探测后置、`sync_connection_health.v1` 摘要回填、未知远端错误码净化和 settings draft 持久化。
 - 设置页 deployment evidence source 下拉、`deployment_unverified` 到 `preflight_ready` 的本地草案派生、真实同步按钮继续禁用。
 - 同步页展示 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers`、`sync.user_sync_enabled`、服务连接健康、恢复码准备态和设备授权准备态，真实同步按钮继续禁用。
 - 诊断报告包含 gate source / stop line / evidence source / entry gate / connection health / recovery / device authorization / join request 摘要，并保持用户词、路径、token 和 payload bytes 脱敏。

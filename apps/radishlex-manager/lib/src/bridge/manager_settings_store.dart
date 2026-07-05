@@ -110,11 +110,14 @@ ManagerSettingsDraft _draftFromJson(Map<String, Object?> json) {
         deploymentEvidenceSource.trim().isNotEmpty,
     accessTokenConfigured: _boolValue(json, 'access_token_configured'),
     deploymentEvidenceSource: deploymentEvidenceSource,
+    syncConnectionProbeRecord: _syncConnectionProbeRecordFromJson(
+      json['sync_connection_health_summary'],
+    ),
   );
 }
 
 Map<String, Object?> _draftToJson(ManagerSettingsDraft draft) {
-  return {
+  final json = <String, Object?>{
     'format_version': 1,
     'server_endpoint': draft.serverEndpoint,
     'retain_sync_config': draft.retainSyncConfig,
@@ -124,9 +127,18 @@ Map<String, Object?> _draftToJson(ManagerSettingsDraft draft) {
     'access_token_configured': draft.accessTokenConfigured,
     'deployment_evidence_source': draft.deploymentEvidenceSource,
   };
+  if (draft.syncConnectionProbeRecord.isRecorded) {
+    json['sync_connection_health_summary'] = _syncConnectionProbeRecordToJson(
+      draft.syncConnectionProbeRecord,
+    );
+  }
+  return json;
 }
 
 ManagerSettingsDraft _validateDraft(ManagerSettingsDraft draft) {
+  final probeRecord = managerSanitizeSyncConnectionProbeRecord(
+    draft.syncConnectionProbeRecord,
+  );
   if (draft.deploymentEvidenceRecorded &&
       !isValidManagerDeploymentEvidenceSource(draft.deploymentEvidenceSource)) {
     throw const ManagerSettingsStoreException(
@@ -137,7 +149,10 @@ ManagerSettingsDraft _validateDraft(ManagerSettingsDraft draft) {
 
   final endpoint = draft.serverEndpoint.trim();
   if (endpoint.isEmpty) {
-    return draft.copyWith(serverEndpoint: '');
+    return draft.copyWith(
+      serverEndpoint: '',
+      syncConnectionProbeRecord: const ManagerSyncConnectionProbeRecord.empty(),
+    );
   }
 
   final uri = Uri.tryParse(endpoint);
@@ -155,7 +170,65 @@ ManagerSettingsDraft _validateDraft(ManagerSettingsDraft draft) {
     );
   }
 
-  return draft.copyWith(serverEndpoint: endpoint);
+  return draft.copyWith(
+    serverEndpoint: endpoint,
+    syncConnectionProbeRecord: probeRecord,
+  );
+}
+
+ManagerSyncConnectionProbeRecord _syncConnectionProbeRecordFromJson(
+  Object? value,
+) {
+  if (value == null) {
+    return const ManagerSyncConnectionProbeRecord.empty();
+  }
+  if (value is! Map) {
+    throw const ManagerSettingsStoreException(
+      code: 'settings_store_error',
+      message: 'sync_connection_health_summary must be an object',
+    );
+  }
+
+  final json = <String, Object?>{};
+  for (final entry in value.entries) {
+    final key = entry.key;
+    if (key is! String) {
+      throw const ManagerSettingsStoreException(
+        code: 'settings_store_error',
+        message: 'sync_connection_health_summary keys must be strings',
+      );
+    }
+    json[key] = entry.value;
+  }
+
+  final summary = SyncConnectionProbeSummary.fromJson(json);
+  return managerSyncConnectionProbeRecordFromSummary(
+    summary,
+    source: _stringValue(json, 'source'),
+    recordedAt: _stringValue(json, 'recorded_at'),
+  );
+}
+
+Map<String, Object?> _syncConnectionProbeRecordToJson(
+  ManagerSyncConnectionProbeRecord record,
+) {
+  final sanitized = managerSanitizeSyncConnectionProbeRecord(record);
+  return {
+    'source': sanitized.source,
+    'recorded_at': sanitized.recordedAt,
+    'format': sanitized.format,
+    'redaction_policy': sanitized.redactionPolicy,
+    'endpoint_status': sanitized.endpointStatus,
+    'transport_mode': sanitized.transportMode,
+    'access_token_status': sanitized.accessTokenStatus,
+    'connection_status': sanitized.connectionStatus,
+    'auth_status': sanitized.authStatus,
+    'server_state_status': sanitized.serverStateStatus,
+    'http_status': sanitized.httpStatus,
+    'http_status_class': sanitized.httpStatusClass,
+    'last_remote_error_code': sanitized.lastRemoteErrorCode,
+    'local_insecure_tls': sanitized.localInsecureTls,
+  };
 }
 
 String _stringValue(Map<String, Object?> json, String key) {

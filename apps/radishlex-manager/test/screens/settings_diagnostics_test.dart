@@ -29,7 +29,7 @@ void main() {
 
     expect(find.text('诊断摘要预览'), findsOneWidget);
     expect(find.text('分组 6'), findsOneWidget);
-    expect(find.text('字段 57'), findsOneWidget);
+    expect(find.text('字段 63'), findsOneWidget);
     expect(
       find.byKey(const Key('diagnostics-section-sync_gate')),
       findsOneWidget,
@@ -78,9 +78,33 @@ void main() {
       findsOneWidget,
     );
     expect(
+      find.textContaining('sync.connection_probe_source: not_recorded'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('sync.connection_probe_recorded_at: not_recorded'),
+      findsOneWidget,
+    );
+    expect(
       find.textContaining(
         'sync.server_state_status: not_checked_access_token_missing',
       ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('sync.connection_auth_status: not_checked'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('sync.connection_http_status: 0'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('sync.connection_http_status_class: not_checked'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('sync.connection_local_insecure_tls: not_checked'),
       findsOneWidget,
     );
     expect(

@@ -313,6 +313,16 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
             'gate',
           ),
           _diagnosticsItem(
+            'sync.connection_probe_source',
+            syncGateAudit.entryGate.connectionHealth.probeSource,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.connection_probe_recorded_at',
+            syncGateAudit.entryGate.connectionHealth.probeRecordedAt,
+            'timestamp',
+          ),
+          _diagnosticsItem(
             'sync.endpoint_status',
             syncGateAudit.entryGate.connectionHealth.endpointStatus,
             'gate',
@@ -330,6 +340,26 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
           _diagnosticsItem(
             'sync.server_state_status',
             syncGateAudit.entryGate.connectionHealth.serverStateStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.connection_auth_status',
+            syncGateAudit.entryGate.connectionHealth.authStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.connection_http_status',
+            syncGateAudit.entryGate.connectionHealth.httpStatus.toString(),
+            'status_code',
+          ),
+          _diagnosticsItem(
+            'sync.connection_http_status_class',
+            syncGateAudit.entryGate.connectionHealth.httpStatusClass,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.connection_local_insecure_tls',
+            syncGateAudit.entryGate.connectionHealth.localInsecureTls,
             'gate',
           ),
           _diagnosticsItem(
