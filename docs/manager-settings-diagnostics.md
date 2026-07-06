@@ -306,11 +306,11 @@ git diff --check
 关键测试覆盖：
 
 - settings draft v1 写入 / 读取、access token 存在性持久化、旧 v1 缺 `deployment_evidence_source` 降级、未知格式拒绝、非法 URL 和非法 evidence source 拒绝。
-- Dart helper 覆盖隐私策略、backend gate、本地 `local_smoke`、非本地 evidence source、恢复码关闭状态、setup / restore readiness、保存确认要求、恢复记录未创建、设备授权关闭状态、join / revocation readiness、join request 不可用、授权包前置条件、撤销 / 丢失设备、key epoch 风险提示和只读 action intent 进入计划派生。
+- Dart helper 覆盖隐私策略、backend gate、本地 `local_smoke`、非本地 evidence source、恢复码关闭状态、setup / restore readiness、保存确认要求、恢复记录未创建、设备授权关闭状态、join / revocation readiness、join request 不可用、授权包前置条件、撤销 / 丢失设备、key epoch 风险提示、只读 action intent 进入计划、action command preview 和 request / result preview 派生。
 - 连接健康 helper 覆盖 endpoint 缺失、URL userinfo 拒绝、access token 缺失、本地 HTTPS 可探测、外部 HTTPS 探测后置、`sync_connection_health.v1` 摘要回填、未知远端错误码净化和 settings draft 持久化。
 - 设置页 deployment evidence source 下拉、`deployment_unverified` 到 `preflight_ready` 的本地草案派生、真实同步按钮继续禁用。
-- 同步页展示 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers`、readiness 聚合摘要、只读 action intent 进入计划、`sync.user_sync_enabled`、服务连接健康、恢复码 setup / restore、恢复记录、保存确认、设备 join / revocation、授权包前置条件、丢失设备风险和 key epoch 状态，真实同步按钮继续禁用。
-- 诊断报告包含 gate source / stop line / evidence source / entry gate / readiness 聚合摘要 / interaction intent 摘要 / connection health / recovery setup / recovery restore / device join / device revocation / authorization package / lost device / key epoch 摘要，并保持用户词、路径、token 和 payload bytes 脱敏。
+- 同步页展示 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers`、readiness 聚合摘要、只读 action intent 进入计划、action command preview、request / result preview、`sync.user_sync_enabled`、服务连接健康、恢复码 setup / restore、恢复记录、保存确认、设备 join / revocation、授权包前置条件、丢失设备风险和 key epoch 状态，真实同步按钮继续禁用。
+- 诊断报告包含 gate source / stop line / evidence source / entry gate / readiness 聚合摘要 / interaction intent 摘要 / action command preview / request preview / result preview / connection health / recovery setup / recovery restore / device join / device revocation / authorization package / lost device / key epoch 摘要，并保持用户词、路径、token、恢复码、短码和 payload bytes 脱敏。
 - FFI smoke 使用临时 SQLite userdb、临时 settings JSON 和合成数据复验真实 Dart FFI bridge，不连接真实同步后端。
 
 涉及目标部署证据包格式、摘要或交接材料时，追加 `./scripts/check-sync-deployment-evidence.sh --self-test`、对应证据文件校验和 `--summary-json` 摘要输出检查。

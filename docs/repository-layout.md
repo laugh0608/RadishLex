@@ -68,6 +68,9 @@ RadishLex/
     manager-local-acceptance.md
     manager-sync-entry-boundary.md
     manager-recovery-device-auth-flow.md
+    manager-readiness-scenarios.md
+    manager-sync-action-protocol-preview.md
+    manager-sync-action-acceptance-matrix.md
     manager-settings-diagnostics.md
     ffi-boundary.md
     adr/
@@ -105,7 +108,7 @@ RadishLex/
 - `deploy/sync-server/docker-compose.yaml`：Go sync server 部署态入口，只暴露 HTTP 上游 `http://127.0.0.1:7319`，外部反代负责 TLS。
 - `deploy/sync-server/.env.example`：唯一 env 示例，真实部署复制为 `.env` 后修改。
 - `deploy/sync-server/nginx.prod.conf`：生产外部 Nginx TLS 终止示例。
-- `apps/radishlex-manager/`：Flutter manager 起步工程，通过受控 `ManagerBridge` contract 接入管理数据源；默认使用合成 fixture，显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时可切到真实 Dart FFI bridge，展示本地词库、import batches、学习摘要、rank explain 摘要、sync preflight、配置来源诊断、settings JSON 草案持久化、sync gate 状态来源、连接健康、`sync_connection_health.v1` 摘要回填、恢复码 / 设备授权只读准备态、readiness 聚合、只读交互进入计划、脱敏诊断报告、结构化错误分类、设备签名状态和设置草案；UI 代码已按 manager shell、跨页 action 编排、词库、学习、同步、设置、词库子组件、学习子组件、同步子组件、设置诊断子组件和共享组件拆分，widget tests 已按页面迁入 `test/screens/`，action helper 结果文案和 failure 分类已有回归测试，Dart model 已按 dictionary、learning、sync、sync entry、settings、diagnostics 和 snapshot 分组，动态 FFI bridge 已按符号加载、调用规则、ABI struct types、view copy、高层 manager model mapper、readiness mapper 和 native DTO 能力分组边界拆分；本地验收口径已由 `docs/manager-local-acceptance.md` 固定，真实同步入口前置边界已由 `docs/manager-sync-entry-boundary.md` 固定，恢复码与设备授权只读流程已由 `docs/manager-recovery-device-auth-flow.md` 固定，真实远端同步、恢复码生成 / 输入、join request 创建、设备授权成功和设备撤销 UI 仍按管理端边界关闭。
+- `apps/radishlex-manager/`：Flutter manager 起步工程，通过受控 `ManagerBridge` contract 接入管理数据源；默认使用合成 fixture，显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时可切到真实 Dart FFI bridge，展示本地词库、import batches、学习摘要、rank explain 摘要、sync preflight、配置来源诊断、settings JSON 草案持久化、sync gate 状态来源、连接健康、`sync_connection_health.v1` 摘要回填、恢复码 / 设备授权只读准备态、`manager_sync_readiness.v1` 内存态导入、readiness 聚合、开发期 evidence bundle 同源回归、只读交互进入计划、`manager_sync_action_command_preview.v1` 非执行命令预演、request / result preview、脱敏诊断报告、结构化错误分类、设备签名状态和设置草案；UI 代码已按 manager shell、跨页 action 编排、词库、学习、同步、设置、词库子组件、学习子组件、同步子组件、设置诊断子组件和共享组件拆分，widget tests 已按页面迁入 `test/screens/`，action helper 结果文案和 failure 分类已有回归测试，Dart model 已按 dictionary、learning、sync、sync entry、sync action preview、settings、diagnostics 和 snapshot 分组，动态 FFI bridge 已按符号加载、调用规则、ABI struct types、view copy、高层 manager model mapper、readiness mapper 和 native DTO 能力分组边界拆分；本地验收口径已由 `docs/manager-local-acceptance.md` 固定，真实同步入口前置边界已由 `docs/manager-sync-entry-boundary.md` 固定，恢复码与设备授权只读流程已由 `docs/manager-recovery-device-auth-flow.md` 固定，readiness 场景目录和 action 协议预演边界已由 `docs/manager-readiness-scenarios.md`、`docs/manager-sync-action-protocol-preview.md` 与 `docs/manager-sync-action-acceptance-matrix.md` 固定，真实远端同步、恢复码生成 / 输入、join request 创建、设备授权成功和设备撤销 UI 仍按管理端边界关闭。
 - `platforms/android-ime/keystore-bridge/`：Android Keystore bridge 仓库内 Kotlin / Gradle harness，固定 `android-keystore-v1` 的 `AndroidKeyStore` / `Ed25519` 创建、加载、公钥读取、签名、删除、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke / 设备矩阵记录模板，以及 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 失败记录；Rust raw JNI glue 位于 `crates/ime-crypto`，该目录当前不包含完整 Android IME。
 - `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
 - `crates/ime-cli/`：基于 demo adapter、可选 Rime adapter、userdb 和 ranker 的命令行复验入口。
@@ -131,7 +134,10 @@ RadishLex/
 - `docs/manager-ui-boundary.md`：Phase 4 Flutter manager 的职责、数据可见性、同步 UI 状态、恢复码 / 设备授权停止线和第一批功能顺序。
 - `docs/manager-local-acceptance.md`：Phase 4 Flutter manager 本地管理能力的验收范围、退出标准映射、验证入口、隐私检查和真实同步停止线。
 - `docs/manager-sync-entry-boundary.md`：真实同步入口进入 UI / bridge 前的恢复码、设备授权、状态门禁、错误分类、诊断脱敏和测试计划。
-- `docs/manager-recovery-device-auth-flow.md`：恢复码 setup / restore、设备 join / revocation 四条只读交互状态机、readiness 聚合和只读 action intent 进入计划。
+- `docs/manager-recovery-device-auth-flow.md`：恢复码 setup / restore、设备 join / revocation 四条只读交互状态机、readiness 聚合、只读 action intent 进入计划和 action command preview 停止线。
+- `docs/manager-readiness-scenarios.md`：`manager_sync_readiness.v1`、开发期 `manager_sync_evidence_bundle.v1`、settings / sync / diagnostics 同源回归和 action preview 场景目录。
+- `docs/manager-sync-action-protocol-preview.md`：`manager_sync_action_command_preview.v1` 的 request / result boundary、allowed fields、forbidden material、data policy、stop line 和错误分类。
+- `docs/manager-sync-action-acceptance-matrix.md`：四条 action 的 execution / request / result status 矩阵、fixture 真相源和验证入口。
 - `docs/manager-settings-diagnostics.md`：settings draft JSON、连接健康摘要、诊断报告字段索引和脱敏边界。
 - `docs/adr/0002-recovery-code-kdf.md`：恢复码 Argon2id KDF、格式、恢复记录字段和生产实现验证口径。
 - `docs/adr/0003-device-signing-key-storage.md`：设备签名、签名对象、私钥存储抽象、错误语义和验证口径。
