@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../bridge/ffi_manager_sync_readiness_mapper.dart';
 import '../models/manager_models.dart';
 import 'manager_widgets.dart';
 
@@ -13,6 +14,7 @@ class SettingsView extends StatefulWidget {
     required this.onPreviewDiagnostics,
     required this.onExportDiagnostics,
     required this.onSaveSettingsDraft,
+    required this.onImportSyncReadinessSummary,
   });
 
   final ManagerSettings settings;
@@ -20,6 +22,8 @@ class SettingsView extends StatefulWidget {
   final VoidCallback onPreviewDiagnostics;
   final VoidCallback onExportDiagnostics;
   final ValueChanged<ManagerSettingsDraft> onSaveSettingsDraft;
+  final ValueChanged<ManagerSyncReadinessBridgeSnapshot>
+  onImportSyncReadinessSummary;
 
   @override
   State<SettingsView> createState() => _SettingsViewState();
@@ -36,12 +40,17 @@ class _SettingsViewState extends State<SettingsView> {
   late ManagerSyncConnectionProbeRecord syncConnectionProbeRecord;
   late final TextEditingController connectionSummaryController;
   String connectionSummaryError = '';
+  late ManagerSyncReadinessBridgeSnapshot syncReadinessBridgeSnapshot;
+  late final TextEditingController readinessSummaryController;
+  String readinessSummaryError = '';
 
   @override
   void initState() {
     super.initState();
     serverEndpointController = TextEditingController();
     connectionSummaryController = TextEditingController();
+    readinessSummaryController = TextEditingController();
+    syncReadinessBridgeSnapshot = widget.sync.readinessBridgeSnapshot;
     _loadDraft(widget.settings.draft);
   }
 
@@ -51,12 +60,19 @@ class _SettingsViewState extends State<SettingsView> {
     if (!_sameDraft(oldWidget.settings.draft, widget.settings.draft)) {
       _loadDraft(widget.settings.draft);
     }
+    if (oldWidget.sync.readinessBridgeSnapshot !=
+        widget.sync.readinessBridgeSnapshot) {
+      syncReadinessBridgeSnapshot = widget.sync.readinessBridgeSnapshot;
+      readinessSummaryError = '';
+      readinessSummaryController.clear();
+    }
   }
 
   @override
   void dispose() {
     serverEndpointController.dispose();
     connectionSummaryController.dispose();
+    readinessSummaryController.dispose();
     super.dispose();
   }
 
@@ -174,7 +190,11 @@ class _SettingsViewState extends State<SettingsView> {
           ),
         ),
         const SizedBox(height: 16),
-        _SettingsSyncGatePreview(draft: currentDraft, sync: widget.sync),
+        _SettingsSyncGatePreview(
+          draft: currentDraft,
+          sync: widget.sync,
+          readinessBridgeSnapshot: syncReadinessBridgeSnapshot,
+        ),
         const SizedBox(height: 16),
         _ConnectionHealthSummaryImportSection(
           record: syncConnectionProbeRecord,
@@ -182,6 +202,16 @@ class _SettingsViewState extends State<SettingsView> {
           error: connectionSummaryError,
           onImport: _importConnectionSummary,
           onClear: _clearConnectionSummary,
+        ),
+        const SizedBox(height: 16),
+        _SyncReadinessSummaryImportSection(
+          draft: currentDraft,
+          sync: widget.sync,
+          readinessBridgeSnapshot: syncReadinessBridgeSnapshot,
+          controller: readinessSummaryController,
+          error: readinessSummaryError,
+          onImport: _importSyncReadinessSummary,
+          onClear: _clearSyncReadinessSummary,
         ),
         const SizedBox(height: 16),
         ManagerSection(
@@ -258,20 +288,7 @@ class _SettingsViewState extends State<SettingsView> {
 
   void _importConnectionSummary() {
     try {
-      final decoded = jsonDecode(connectionSummaryController.text);
-      if (decoded is! Map) {
-        throw const FormatException('summary root must be an object');
-      }
-
-      final json = <String, Object?>{};
-      for (final entry in decoded.entries) {
-        final key = entry.key;
-        if (key is! String) {
-          throw const FormatException('summary keys must be strings');
-        }
-        json[key] = entry.value;
-      }
-
+      final json = _decodeSummaryObject(connectionSummaryController.text);
       final summary = SyncConnectionProbeSummary.fromJson(json);
       setState(() {
         syncConnectionProbeRecord = managerSyncConnectionProbeRecordFromSummary(
@@ -301,6 +318,76 @@ class _SettingsViewState extends State<SettingsView> {
       connectionSummaryController.clear();
     });
   }
+
+  void _importSyncReadinessSummary() {
+    try {
+      final json = _decodeSummaryObject(readinessSummaryController.text);
+      final format = _summaryString(json, 'format');
+      if (format != managerSyncReadinessBridgeSummaryFormat) {
+        setState(() {
+          readinessSummaryError = 'readiness_summary_format_unsupported';
+        });
+        return;
+      }
+      final redactionPolicy = _summaryString(json, 'redaction_policy');
+      if (redactionPolicy != managerSyncReadinessBridgeRedactionPolicy) {
+        setState(() {
+          readinessSummaryError =
+              'readiness_summary_redaction_policy_unsupported';
+        });
+        return;
+      }
+
+      final snapshot = managerSyncReadinessBridgeSnapshotFromJson(json);
+      setState(() {
+        syncReadinessBridgeSnapshot = snapshot;
+        readinessSummaryError = '';
+        readinessSummaryController.clear();
+      });
+      widget.onImportSyncReadinessSummary(snapshot);
+    } on FormatException {
+      setState(() {
+        readinessSummaryError = 'readiness_summary_json_invalid';
+      });
+    } on Object {
+      setState(() {
+        readinessSummaryError = 'readiness_summary_import_failed';
+      });
+    }
+  }
+
+  void _clearSyncReadinessSummary() {
+    setState(() {
+      syncReadinessBridgeSnapshot = managerDefaultSyncReadinessBridgeSnapshot;
+      readinessSummaryError = '';
+      readinessSummaryController.clear();
+    });
+    widget.onImportSyncReadinessSummary(
+      managerDefaultSyncReadinessBridgeSnapshot,
+    );
+  }
+}
+
+Map<String, Object?> _decodeSummaryObject(String text) {
+  final decoded = jsonDecode(text);
+  if (decoded is! Map) {
+    throw const FormatException('summary root must be an object');
+  }
+
+  final json = <String, Object?>{};
+  for (final entry in decoded.entries) {
+    final key = entry.key;
+    if (key is! String) {
+      throw const FormatException('summary keys must be strings');
+    }
+    json[key] = entry.value;
+  }
+  return json;
+}
+
+String _summaryString(Map<String, Object?> json, String key) {
+  final value = json[key];
+  return value is String ? value.trim() : '';
 }
 
 class _ConnectionHealthSummaryImportSection extends StatelessWidget {
@@ -403,18 +490,131 @@ class _ConnectionHealthSummaryImportSection extends StatelessWidget {
   }
 }
 
-class _SettingsSyncGatePreview extends StatelessWidget {
-  const _SettingsSyncGatePreview({required this.draft, required this.sync});
+class _SyncReadinessSummaryImportSection extends StatelessWidget {
+  const _SyncReadinessSummaryImportSection({
+    required this.draft,
+    required this.sync,
+    required this.readinessBridgeSnapshot,
+    required this.controller,
+    required this.error,
+    required this.onImport,
+    required this.onClear,
+  });
 
   final ManagerSettingsDraft draft;
   final SyncPreflightSummary sync;
+  final ManagerSyncReadinessBridgeSnapshot readinessBridgeSnapshot;
+  final TextEditingController controller;
+  final String error;
+  final VoidCallback onImport;
+  final VoidCallback onClear;
 
   @override
   Widget build(BuildContext context) {
     final audit = managerSyncGateAuditForDraft(
       draft: draft,
       device: sync.device,
-      readinessBridgeSnapshot: sync.readinessBridgeSnapshot,
+      readinessBridgeSnapshot: readinessBridgeSnapshot,
+    );
+    final hasImported =
+        readinessBridgeSnapshot.source !=
+        managerSyncReadinessBridgeSourceDefault;
+
+    return ManagerSection(
+      key: const Key('settings-sync-readiness-summary-section'),
+      title: '同步 readiness 摘要导入',
+      trailing: ManagerStatusBadge(
+        icon: hasImported ? Icons.rule_folder_outlined : Icons.rule_outlined,
+        label: readinessBridgeSnapshot.source,
+        tone: hasImported ? ManagerBadgeTone.neutral : ManagerBadgeTone.warning,
+      ),
+      child: Column(
+        children: [
+          ManagerKeyValueRow(
+            label: 'source',
+            value: readinessBridgeSnapshot.source,
+          ),
+          ManagerKeyValueRow(
+            label: 'blocked flows',
+            value: audit.entryGate.readinessBlockedFlowSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'issue codes',
+            value: audit.entryGate.readinessIssueCodeSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'next evidence',
+            value: audit.entryGate.readinessNextRequiredEvidenceSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'interaction status',
+            value: audit.entryGate.interactionEntryPlan.intentStatusSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'interaction blockers',
+            value: audit.entryGate.interactionEntryPlan.blockerSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'user sync enabled',
+            value: audit.entryGate.userSyncEnabled.toString(),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            key: const Key('settings-sync-readiness-summary-json'),
+            controller: controller,
+            minLines: 3,
+            maxLines: 6,
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.rule_folder_outlined),
+              labelText: 'manager_sync_readiness.v1 JSON',
+              errorText: error.isEmpty ? null : error,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  key: const Key('settings-clear-readiness-summary'),
+                  onPressed: hasImported ? onClear : null,
+                  icon: const Icon(Icons.backspace_outlined),
+                  label: const Text('清除摘要'),
+                ),
+                FilledButton.icon(
+                  key: const Key('settings-import-readiness-summary'),
+                  onPressed: onImport,
+                  icon: const Icon(Icons.input_outlined),
+                  label: const Text('导入摘要'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsSyncGatePreview extends StatelessWidget {
+  const _SettingsSyncGatePreview({
+    required this.draft,
+    required this.sync,
+    required this.readinessBridgeSnapshot,
+  });
+
+  final ManagerSettingsDraft draft;
+  final SyncPreflightSummary sync;
+  final ManagerSyncReadinessBridgeSnapshot readinessBridgeSnapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    final audit = managerSyncGateAuditForDraft(
+      draft: draft,
+      device: sync.device,
+      readinessBridgeSnapshot: readinessBridgeSnapshot,
     );
     final connection = audit.entryGate.connectionHealth;
     final interactionPlan = audit.entryGate.interactionEntryPlan;

@@ -46,3 +46,28 @@ class ManagerSnapshot {
     );
   }
 }
+
+ManagerSnapshot managerSnapshotWithSyncReadiness(
+  ManagerSnapshot snapshot,
+  ManagerSyncReadinessBridgeSnapshot readinessBridgeSnapshot,
+) {
+  final draft = snapshot.settings.draft;
+  final state = deriveManagerSyncUiState(
+    draft: draft,
+    device: snapshot.sync.device,
+    readinessBridgeSnapshot: readinessBridgeSnapshot,
+  );
+  return snapshot.copyWith(
+    sync: snapshot.sync.copyWith(
+      state: state,
+      serverEndpoint: managerSyncEndpointLabel(draft),
+      reason: managerSyncGateReason(
+        state: state,
+        draft: draft,
+        device: snapshot.sync.device,
+        readinessBridgeSnapshot: readinessBridgeSnapshot,
+      ),
+      readinessBridgeSnapshot: readinessBridgeSnapshot,
+    ),
+  );
+}

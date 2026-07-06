@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../bridge/manager_diagnostics_export.dart';
 import '../../bridge/manager_bridge.dart';
 import '../../models/manager_models.dart';
 import '../dictionary/dictionary_dialogs.dart';
@@ -10,6 +11,7 @@ class ManagerHomeActions {
   const ManagerHomeActions({
     required this.context,
     required this.bridge,
+    required this.currentSnapshot,
     required this.onSnapshotChanged,
     required this.reloadSnapshot,
     required this.showMessage,
@@ -17,6 +19,7 @@ class ManagerHomeActions {
 
   final BuildContext context;
   final ManagerBridge bridge;
+  final ManagerSnapshot Function() currentSnapshot;
   final ValueChanged<ManagerSnapshot> onSnapshotChanged;
   final VoidCallback reloadSnapshot;
   final ValueChanged<String> showMessage;
@@ -120,7 +123,7 @@ class ManagerHomeActions {
 
   Future<void> previewDiagnostics() async {
     try {
-      final report = await bridge.loadDiagnosticsReport();
+      final report = createManagerDiagnosticsReport(currentSnapshot());
       if (!context.mounted) {
         return;
       }
@@ -150,7 +153,15 @@ class ManagerHomeActions {
     }
 
     try {
-      final result = await bridge.exportDiagnosticsReport(filePath);
+      final snapshot = currentSnapshot();
+      final result =
+          snapshot.sync.readinessBridgeSnapshot.source ==
+              managerSyncReadinessBridgeSourceDefault
+          ? await bridge.exportDiagnosticsReport(filePath)
+          : writeManagerDiagnosticsReport(
+              filePath: filePath,
+              report: createManagerDiagnosticsReport(snapshot),
+            );
       if (!context.mounted) {
         return;
       }
@@ -169,7 +180,11 @@ class ManagerHomeActions {
 
   Future<void> saveSettingsDraft(ManagerSettingsDraft draft) async {
     try {
-      final snapshot = await bridge.saveSettingsDraft(draft);
+      final currentReadiness = currentSnapshot().sync.readinessBridgeSnapshot;
+      var snapshot = await bridge.saveSettingsDraft(draft);
+      if (currentReadiness.source != managerSyncReadinessBridgeSourceDefault) {
+        snapshot = managerSnapshotWithSyncReadiness(snapshot, currentReadiness);
+      }
       if (!context.mounted) {
         return;
       }

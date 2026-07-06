@@ -46,6 +46,7 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
         final actions = ManagerHomeActions(
           context: context,
           bridge: widget.bridge,
+          currentSnapshot: () => data,
           onSnapshotChanged: _setSnapshot,
           reloadSnapshot: _reloadSnapshot,
           showMessage: _showBridgeMessage,
@@ -60,6 +61,10 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
           onPreviewDiagnostics: actions.previewDiagnostics,
           onExportDiagnostics: actions.exportDiagnostics,
           onSaveSettingsDraft: actions.saveSettingsDraft,
+          onImportSyncReadinessSummary: (readinessBridgeSnapshot) =>
+              _setSnapshot(
+                managerSnapshotWithSyncReadiness(data, readinessBridgeSnapshot),
+              ),
         );
       },
     );
@@ -101,6 +106,7 @@ class _ManagerShell extends StatelessWidget {
     required this.onPreviewDiagnostics,
     required this.onExportDiagnostics,
     required this.onSaveSettingsDraft,
+    required this.onImportSyncReadinessSummary,
   });
 
   final ManagerSnapshot snapshot;
@@ -112,6 +118,8 @@ class _ManagerShell extends StatelessWidget {
   final VoidCallback onPreviewDiagnostics;
   final VoidCallback onExportDiagnostics;
   final ValueChanged<ManagerSettingsDraft> onSaveSettingsDraft;
+  final ValueChanged<ManagerSyncReadinessBridgeSnapshot>
+  onImportSyncReadinessSummary;
 
   @override
   Widget build(BuildContext context) {
@@ -130,6 +138,7 @@ class _ManagerShell extends StatelessWidget {
         onPreviewDiagnostics: onPreviewDiagnostics,
         onExportDiagnostics: onExportDiagnostics,
         onSaveSettingsDraft: onSaveSettingsDraft,
+        onImportSyncReadinessSummary: onImportSyncReadinessSummary,
       ),
     ];
 

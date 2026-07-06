@@ -8,6 +8,7 @@
 - settings draft 只保存本地管理端非 secret 草案和 access token 存在性，不保存 token 文本、恢复码、私钥、signature bytes、wrapped material、payload bytes、证书、运行日志、文件路径或用户词条。
 - 诊断报告只输出聚合计数、状态码、非敏感来源标签、聚合阻塞码和脱敏策略，不输出用户词、导入 / 导出文件内容、本机真实路径、请求 / 响应体或 native 原始错误明细。
 - 诊断报告预览按本文字段索引展示分组、字段筛选和脱敏文本复制入口；复制内容与导出文本一致，仍只包含脱敏摘要。
+- 设置页可以导入 `manager_sync_readiness.v1` 非敏感摘要用于本地开发联调；该摘要只保存在当前 manager 内存态，驱动同步页、设置页 gate preview 和诊断报告的派生字段，不写入 settings draft，也不改变 `ManagerBridge` contract 或 C ABI。
 - 真实远端同步、恢复码和设备授权 UI 继续关闭；`preflight_ready` 只表示本地草案和预检条件可解释，不代表用户可用同步入口已开放。
 
 ## Settings Draft JSON
@@ -67,6 +68,8 @@ settings draft 不得保存：
 
 当前 `sync.production_blockers` 还会聚合恢复码保存确认、恢复记录、授权包前置条件、设备撤销、丢失设备风险提示和 key epoch 状态，例如 `recovery_record_not_created`、`recovery_code_save_confirmation_required`、`authorization_package_prerequisites_blocked`、`lost_device_risk_notice_required` 和 `key_epoch_rotation_not_started`。恢复码 setup / restore 与设备 join / revocation 的 readiness 摘要只输出状态码、前置条件和错误分类，并通过 `SyncReadinessFlowSummary` 聚合为 blocked flows、issue codes、next required evidence、source tags 和 user sync blocked；这些值只用于解释入口阻塞，不代表已创建恢复记录、join request、授权包或撤销记录。`SyncInteractionEntryPlan` / `SyncInteractionActionIntent` 会把四条未来操作入口额外汇总为 action id、visibility、intent status、blocker、required evidence 和 source tag；这些字段只描述非执行进入计划，不代表按钮可点击或 bridge 操作已开放。Dart 侧 `manager_sync_readiness.v1` mapper 只接受 allowlist 状态码和来源标签，未知值降级为 `unexpected_bridge_error_code` / `unexpected_bridge_required_evidence`，不把原始 bridge 异常、路径、token、恢复码、短码或 payload 写入 UI、settings draft 或诊断报告。
 
+设置页提供开发期“同步 readiness 摘要导入”入口，接受 `manager_sync_readiness.v1` JSON 摘要并只保留映射后的 `ManagerSyncReadinessBridgeSnapshot` 内存态。导入前必须检查 `format == manager_sync_readiness.v1` 和 `redaction_policy == summary_only_no_tokens_recovery_secret_or_payload_bytes`；不符合时只显示结构化错误码，例如 `readiness_summary_format_unsupported` 或 `readiness_summary_redaction_policy_unsupported`，不得应用到 UI 状态。导入成功后，设置页、同步页和诊断报告只展示派生后的 readiness source、blocked flows、issue codes、next evidence、interaction plan 和 user sync blocked，不展示原始 JSON，也不持久化恢复码、短码、token、私钥、签名、wrapped material、payload bytes、请求 / 响应体或路径。清除导入摘要后回到 `manager_default_closed_readiness`。
+
 ## 连接健康摘要
 
 Manager 当前只派生和展示本地连接健康摘要，不在 UI 中发起远端上传 / 下载。连接健康模型从 settings draft 读取 endpoint 和 access token 存在性，也可以从 `sync_connection_health.v1` 非敏感摘要映射只读探测结果。输出状态码：
@@ -108,6 +111,7 @@ Manager UI 预览会保留完整脱敏文本，并额外按 `runtime`、`setting
 - 导出入口必须导出与 `toRedactedText()` 同语义的脱敏摘要，不允许因为当前筛选状态导出字段子集。
 - 预览、复制和导出都不得输出用户词、导入 / 导出文件内容、真实路径、token、恢复码、私钥、signature bytes、wrapped material bytes 或 encrypted payload bytes。
 - 如果后续新增诊断字段，必须先补本文字段索引、脱敏说明和 widget / smoke 覆盖，再接入预览或导出。
+- 如果 settings 页导入了 `manager_sync_readiness.v1` 摘要，预览和导出必须使用当前内存态 snapshot 生成同一份派生诊断摘要；没有导入摘要时仍可使用 bridge 默认诊断出口。
 
 报告头：
 

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -37,14 +38,14 @@ void main() {
       find.text(
         'recovery_setup, recovery_restore, device_join, device_revocation',
       ),
-      findsOneWidget,
+      findsWidgets,
     );
     expect(
       find.textContaining('recovery_code_generation_closed'),
       findsWidgets,
     );
     expect(find.textContaining('recovery_setup_readiness'), findsWidgets);
-    expect(find.text('manager_default_closed_readiness'), findsOneWidget);
+    expect(find.text('manager_default_closed_readiness'), findsWidgets);
     expect(
       find.text(
         'recovery_setup, recovery_restore, join_request_authorization, device_revocation',
@@ -61,13 +62,13 @@ void main() {
       find.text(
         'recovery_setup=closed_current_phase, recovery_restore=closed_current_phase, join_request_authorization=closed_current_phase, device_revocation=closed_current_phase',
       ),
-      findsOneWidget,
+      findsWidgets,
     );
     expect(
       find.text(
         'recovery_code_generation_closed, recovery_code_input_closed, join_request_creation_closed, device_revocation_flow_closed',
       ),
-      findsOneWidget,
+      findsWidgets,
     );
     expect(find.text('true'), findsOneWidget);
     expect(find.text('required_before_first_upload'), findsOneWidget);
@@ -155,7 +156,7 @@ void main() {
 
     expect(find.text('blocked_before_user_sync'), findsWidgets);
     expect(find.text('user_sync_entry_closed_current_phase'), findsWidgets);
-    expect(find.text('ffi_native_readiness'), findsOneWidget);
+    expect(find.text('ffi_native_readiness'), findsWidgets);
     expect(
       find.text(
         'bridge_recovery_setup_readiness, bridge_recovery_restore_readiness, bridge_device_join_readiness, bridge_device_revocation_readiness',
@@ -168,7 +169,7 @@ void main() {
       find.text(
         'recovery_setup=closed_current_phase, recovery_restore=closed_current_phase, join_request_authorization=closed_current_phase, device_revocation=closed_current_phase',
       ),
-      findsOneWidget,
+      findsWidgets,
     );
     expect(
       find.text('user_sync_entry_current_phase_open_required'),
@@ -435,4 +436,195 @@ void main() {
     );
     expect(enableButton.onPressed, isNull);
   });
+
+  testWidgets('settings imports readiness summary into sync and diagnostics', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final fixture = createManagerFixture();
+    const readyDevice = DeviceSecuritySummary(
+      deviceId: 'device-ready-01',
+      backendId: 'test-production-ready',
+      capabilityStatus: 'ready_for_test',
+      productionGate: 'ready',
+    );
+    const draft = ManagerSettingsDraft(
+      serverEndpoint: 'https://sync.example.invalid',
+      retainSyncConfig: true,
+      privacyMode: false,
+      diagnosticsExport: false,
+      deploymentEvidenceRecorded: true,
+      accessTokenConfigured: true,
+      deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
+    );
+    final snapshot = fixture.copyWith(
+      sync: fixture.sync.copyWith(
+        state: deriveManagerSyncUiState(draft: draft, device: readyDevice),
+        device: readyDevice,
+        serverEndpoint: managerSyncEndpointLabel(draft),
+        reason: managerSyncGateReason(
+          state: deriveManagerSyncUiState(draft: draft, device: readyDevice),
+          draft: draft,
+          device: readyDevice,
+        ),
+      ),
+      settings: fixture.settings.copyWith(draft: draft, syncConfigured: true),
+    );
+
+    await tester.pumpWidget(
+      RadishLexManagerApp(
+        bridge: FixtureManagerBridge(initialSnapshot: snapshot),
+      ),
+    );
+    await _pumpUi(tester);
+
+    await tester.tap(find.byIcon(Icons.tune_outlined));
+    await _pumpUi(tester);
+    await tester.ensureVisible(
+      find.byKey(const Key('settings-sync-readiness-summary-json')),
+    );
+    await _pumpUi(tester);
+    await tester.enterText(
+      find.byKey(const Key('settings-sync-readiness-summary-json')),
+      jsonEncode(partiallyBlockedSyncReadinessBridgeJson()),
+    );
+    await tester.tap(
+      find.byKey(const Key('settings-import-readiness-summary')),
+    );
+    await _pumpUi(tester);
+
+    expect(find.text('fixture_readiness'), findsWidgets);
+    expect(find.text('recovery_setup, device_join'), findsWidgets);
+    expect(find.textContaining('recovery_record_missing'), findsWidgets);
+    expect(find.textContaining('join_request_expired'), findsWidgets);
+    expect(
+      find.text(
+        'recovery_setup=blocked, recovery_restore=closed_current_phase, join_request_authorization=blocked, device_revocation=closed_current_phase',
+      ),
+      findsWidgets,
+    );
+    expect(find.text('false'), findsWidgets);
+
+    await tester.tap(find.byIcon(Icons.sync_outlined));
+    await _pumpUi(tester);
+
+    expect(find.text('fixture_readiness'), findsWidgets);
+    expect(find.text('recovery_setup, device_join'), findsWidgets);
+    final enableButton = tester.widget<FilledButton>(
+      find.byKey(const Key('sync-enable-button')),
+    );
+    expect(enableButton.onPressed, isNull);
+
+    await tester.tap(find.byIcon(Icons.tune_outlined));
+    await _pumpUi(tester);
+    await tester.ensureVisible(
+      find.byKey(const Key('diagnostics-preview-button')),
+    );
+    await tester.tap(find.byKey(const Key('diagnostics-preview-button')));
+    await _pumpUi(tester);
+
+    expect(
+      find.textContaining('sync.readiness_bridge_source: fixture_readiness'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.readiness_blocked_flows: recovery_setup, device_join',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('sync.entry_blocker: recovery_record_missing'),
+      findsOneWidget,
+    );
+    final reportText = tester.widget<SelectableText>(
+      find.byKey(const Key('diagnostics-report-text')),
+    );
+    expect(reportText.data, isNot(contains('secret-token')));
+    expect(reportText.data, isNot(contains('RADISHLEX-RECOVERY-CODE-SECRET')));
+    expect(reportText.data, isNot(contains('payload_bytes=abcdef')));
+
+    await tester.tap(find.text('关闭'));
+    await _pumpUi(tester);
+
+    final exportFile = File(
+      '${Directory.systemTemp.path}/radishlex-manager-readiness-${DateTime.now().microsecondsSinceEpoch}.txt',
+    );
+    addTearDown(() {
+      if (exportFile.existsSync()) {
+        exportFile.deleteSync();
+      }
+    });
+
+    await tester.ensureVisible(
+      find.byKey(const Key('diagnostics-export-button')),
+    );
+    await tester.tap(find.byKey(const Key('diagnostics-export-button')));
+    await _pumpUi(tester);
+    await tester.enterText(
+      find.byKey(const Key('diagnostics-export-path')),
+      exportFile.path,
+    );
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('diagnostics-export-submit')));
+    await _pumpUi(tester);
+
+    expect(find.textContaining('诊断摘要导出完成'), findsOneWidget);
+    final exported = exportFile.readAsStringSync();
+    expect(
+      exported,
+      contains('sync.readiness_bridge_source: fixture_readiness'),
+    );
+    expect(
+      exported,
+      contains('sync.readiness_blocked_flows: recovery_setup, device_join'),
+    );
+    expect(exported, isNot(contains('secret-token')));
+    expect(exported, isNot(contains('RADISHLEX-RECOVERY-CODE-SECRET')));
+    expect(exported, isNot(contains('payload_bytes=abcdef')));
+  });
+
+  testWidgets('settings rejects unsafe readiness redaction policy', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      RadishLexManagerApp(bridge: FixtureManagerBridge()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.tune_outlined));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const Key('settings-sync-readiness-summary-json')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('settings-sync-readiness-summary-json')),
+      jsonEncode({
+        ...readySyncReadinessBridgeJson(),
+        'redaction_policy': 'raw_native_payload_with_secret_fields',
+      }),
+    );
+    await tester.tap(
+      find.byKey(const Key('settings-import-readiness-summary')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('readiness_summary_redaction_policy_unsupported'),
+      findsOneWidget,
+    );
+    expect(find.text('manager_default_closed_readiness'), findsWidgets);
+    expect(find.text('ffi_native_readiness'), findsNothing);
+  });
+}
+
+Future<void> _pumpUi(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 250));
 }
