@@ -9,7 +9,7 @@
 - 场景不得包含或传播 token、恢复码、短码、私钥、signature bytes、wrapped material、payload bytes、请求 / 响应体、真实路径或 provider exception 原文。
 - 即便场景显示四条 readiness 全部 ready，当前 Phase 4 仍派生 `user_sync_entry_closed_current_phase`，不打开真实远端同步、恢复码或设备授权操作。
 - 场景目录是 future bridge mapper 的验收输入，不是新增 `ManagerBridge` contract，也不是 C ABI。
-- 场景目录同时驱动模型、诊断报告和同步页代表场景回归，避免 settings / sync / diagnostics 对同一份 readiness 摘要派生出不同口径。
+- 场景目录同时驱动模型、settings gate preview、诊断报告和同步页代表场景回归，避免 settings / sync / diagnostics 对同一份 readiness 摘要派生出不同口径。
 
 ## 场景表
 
@@ -32,8 +32,8 @@
 主要覆盖：
 
 - `apps/radishlex-manager/test/fixtures/sync_readiness_bridge_fixtures.dart`：场景输入、预期来源和预期派生摘要。
-- `apps/radishlex-manager/test/models/manager_sync_entry_gate_test.dart`：遍历场景目录，校验 import result、entry gate、readiness 摘要、interaction intent 和脱敏边界。
-- `apps/radishlex-manager/test/screens/settings_test.dart`：验证 settings 导入、清除、同步页状态和诊断导出一致性。
+- `apps/radishlex-manager/test/models/manager_sync_entry_gate_test.dart`：遍历场景目录，校验 import result、entry gate、readiness 摘要、interaction intent、envelope schema 和脱敏边界。
+- `apps/radishlex-manager/test/screens/settings_test.dart`：验证 settings 导入、清除、同步页状态和诊断导出一致性，并固定 settings gate preview 的代表场景可见层回归。
 - `apps/radishlex-manager/test/screens/settings_diagnostics_test.dart`：遍历场景目录，校验诊断报告中的 `sync.readiness_*`、`sync.interaction_*`、`sync.user_sync_enabled` 和脱敏文本。
 - `apps/radishlex-manager/test/screens/sync_test.dart`：固定 ready 但当前阶段关闭、恢复记录缺失、join request 过期、未知 native 状态清洗和 unsafe redaction 拒绝等代表场景，校验同步页预检区可见字段和入口按钮关闭状态。
 - `apps/radishlex-manager/test/screens/manager_home_actions_test.dart`：验证 settings draft 保存后保留导入 readiness，导入态诊断使用当前 snapshot。

@@ -9,14 +9,6 @@ import 'package:radishlex_manager/src/models/manager_models.dart';
 
 import '../fixtures/sync_readiness_bridge_fixtures.dart';
 
-const _representativeSyncReadinessScenarioIds = [
-  'all_ready_current_phase_closed',
-  'recovery_record_missing',
-  'join_request_expired',
-  'unknown_native_status_sanitized',
-  'unsafe_redaction_rejected',
-];
-
 void main() {
   testWidgets('sync gate keeps user sync disabled', (
     WidgetTester tester,
@@ -253,11 +245,11 @@ void main() {
     expect(enableButton.onPressed, isNull);
   });
 
-  for (final scenarioId in _representativeSyncReadinessScenarioIds) {
+  for (final scenarioId in representativeSyncReadinessScenarioIds) {
     testWidgets('sync view renders readiness scenario $scenarioId', (
       WidgetTester tester,
     ) async {
-      final scenario = _syncReadinessScenario(scenarioId);
+      final scenario = syncReadinessScenarioById(scenarioId);
 
       await tester.pumpWidget(
         RadishLexManagerApp(
@@ -328,12 +320,6 @@ void main() {
   });
 }
 
-SyncReadinessScenario _syncReadinessScenario(String id) {
-  return syncReadinessScenarioCatalog().firstWhere(
-    (scenario) => scenario.id == id,
-  );
-}
-
 void _expectVisibleSyncReadinessScenario(SyncReadinessScenario scenario) {
   expect(find.text(scenario.expectedEntryState.code), findsWidgets);
   expect(find.text(scenario.expectedEntryBlocker), findsWidgets);
@@ -367,40 +353,7 @@ void _expectVisibleSyncReadinessScenario(SyncReadinessScenario scenario) {
     expect(find.textContaining(code), findsWidgets, reason: scenario.id);
   }
 
-  expect(
-    find.textContaining('secret-token'),
-    findsNothing,
-    reason: scenario.id,
-  );
-  expect(
-    find.textContaining('RADISHLEX-RECOVERY-CODE-SECRET'),
-    findsNothing,
-    reason: scenario.id,
-  );
-  expect(
-    find.textContaining('/synthetic/private'),
-    findsNothing,
-    reason: scenario.id,
-  );
-  expect(
-    find.textContaining('payload_bytes=abcdef'),
-    findsNothing,
-    reason: scenario.id,
-  );
-  expect(
-    find.textContaining('wrapped_material_bytes=abcdef'),
-    findsNothing,
-    reason: scenario.id,
-  );
-  expect(
-    find.textContaining('signature_bytes=abcdef'),
-    findsNothing,
-    reason: scenario.id,
-  );
-  expect(
-    find.textContaining('private_key=abcdef'),
-    findsNothing,
-    reason: scenario.id,
-  );
-  expect(find.textContaining('short_code='), findsNothing, reason: scenario.id);
+  for (final fragment in syncReadinessSensitiveLeakFragments) {
+    expect(find.textContaining(fragment), findsNothing, reason: scenario.id);
+  }
 }

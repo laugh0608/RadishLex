@@ -60,6 +60,25 @@ const syncReadinessClosedInteractionStatuses =
 const syncReadinessClosedInteractionBlockers =
     'recovery_code_generation_closed, recovery_code_input_closed, join_request_creation_closed, device_revocation_flow_closed';
 
+const representativeSyncReadinessScenarioIds = [
+  'all_ready_current_phase_closed',
+  'recovery_record_missing',
+  'join_request_expired',
+  'unknown_native_status_sanitized',
+  'unsafe_redaction_rejected',
+];
+
+const syncReadinessSensitiveLeakFragments = [
+  'secret-token',
+  'RADISHLEX-RECOVERY-CODE-SECRET',
+  '/synthetic/private',
+  'payload_bytes=abcdef',
+  'wrapped_material_bytes=abcdef',
+  'signature_bytes=abcdef',
+  'private_key=abcdef',
+  'short_code=',
+];
+
 class SyncReadinessScenario {
   const SyncReadinessScenario({
     required this.id,
@@ -326,6 +345,12 @@ List<SyncReadinessScenario> syncReadinessScenarioCatalog() {
       expectedUserSyncEnabled: false,
     ),
   ];
+}
+
+SyncReadinessScenario syncReadinessScenarioById(String id) {
+  return syncReadinessScenarioCatalog().firstWhere(
+    (scenario) => scenario.id == id,
+  );
 }
 
 Map<String, Object?> readySyncReadinessBridgeJson() {

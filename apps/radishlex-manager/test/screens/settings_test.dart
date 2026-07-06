@@ -182,6 +182,33 @@ void main() {
     expect(find.text('false'), findsWidgets);
   });
 
+  for (final scenarioId in representativeSyncReadinessScenarioIds) {
+    testWidgets(
+      'settings gate preview renders readiness scenario $scenarioId',
+      (WidgetTester tester) async {
+        await tester.binding.setSurfaceSize(const Size(1400, 1000));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final scenario = syncReadinessScenarioById(scenarioId);
+
+        await tester.pumpWidget(
+          RadishLexManagerApp(
+            bridge: FixtureManagerBridge(
+              initialSnapshot: managerSnapshotForSyncReadinessScenario(
+                scenario,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byIcon(Icons.tune_outlined));
+        await tester.pumpAndSettle();
+
+        _expectSettingsGatePreviewReadinessScenario(scenario);
+      },
+    );
+  }
+
   testWidgets('settings draft save updates sync gate source', (
     WidgetTester tester,
   ) async {
@@ -645,4 +672,46 @@ void main() {
 Future<void> _pumpUi(WidgetTester tester) async {
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 250));
+}
+
+void _expectSettingsGatePreviewReadinessScenario(
+  SyncReadinessScenario scenario,
+) {
+  expect(find.text(scenario.expectedEntryState.code), findsWidgets);
+  expect(find.text(scenario.expectedEntryBlocker), findsWidgets);
+  expect(find.text(scenario.expectedBlockedFlows), findsWidgets);
+  expect(find.text(scenario.expectedBridgeSource), findsWidgets);
+  expect(find.text(scenario.expectedInteractionStatuses), findsWidgets);
+  expect(find.text(scenario.expectedInteractionBlockers), findsWidgets);
+  expect(
+    find.text(scenario.expectedUserSyncEnabled.toString()),
+    findsWidgets,
+    reason: scenario.id,
+  );
+
+  if (scenario.expectedIssueCodes != null) {
+    expect(
+      find.text(scenario.expectedIssueCodes!),
+      findsWidgets,
+      reason: scenario.id,
+    );
+  }
+  for (final code in scenario.expectedIssueCodeContains) {
+    expect(find.textContaining(code), findsWidgets, reason: scenario.id);
+  }
+
+  if (scenario.expectedNextEvidence != null) {
+    expect(
+      find.text(scenario.expectedNextEvidence!),
+      findsWidgets,
+      reason: scenario.id,
+    );
+  }
+  for (final code in scenario.expectedNextEvidenceContains) {
+    expect(find.textContaining(code), findsWidgets, reason: scenario.id);
+  }
+
+  for (final fragment in syncReadinessSensitiveLeakFragments) {
+    expect(find.textContaining(fragment), findsNothing, reason: scenario.id);
+  }
 }

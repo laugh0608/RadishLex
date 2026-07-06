@@ -112,6 +112,7 @@
 
 - 同步页展示四条流程的 status、blocker 和错误分类摘要。
 - 同步页和设置页 gate preview 展示同一组 readiness 聚合摘要、只读 action intent 进入计划和 `readiness_bridge_source` 来源标签，不提供操作按钮。
+- 设置页 gate preview、同步页和诊断报告必须使用同一份 readiness 场景目录做代表场景回归，至少覆盖全部 ready 但当前阶段关闭、恢复记录缺失、join request 过期、未知 native 状态清洗和 unsafe redaction 拒绝。
 - 诊断报告输出字段必须保留在 `sync_gate` 分组，只输出状态码、来源标签、前置条件码和错误码。
 - `manager_sync_readiness.v1` 只作为 future bridge mapper 的非敏感输入形状，不改变 `ManagerBridge` contract，不新增 C ABI。
 - settings draft 不新增 secret 字段，不保存恢复码、短码、token、签名、wrapped material 或 payload bytes。

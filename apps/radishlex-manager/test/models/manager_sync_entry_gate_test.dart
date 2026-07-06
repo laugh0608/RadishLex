@@ -65,6 +65,43 @@ void main() {
     );
   });
 
+  test('readiness summary import enforces envelope schema', () {
+    final cases = [
+      const _RejectedReadinessImportCase(
+        json: {},
+        errorCode: 'readiness_summary_format_unsupported',
+      ),
+      const _RejectedReadinessImportCase(
+        json: {'format': managerSyncReadinessBridgeSummaryFormat},
+        errorCode: 'readiness_summary_redaction_policy_unsupported',
+      ),
+      const _RejectedReadinessImportCase(
+        json: {
+          'format': 1,
+          'redaction_policy': managerSyncReadinessBridgeRedactionPolicy,
+        },
+        errorCode: 'readiness_summary_format_unsupported',
+      ),
+      const _RejectedReadinessImportCase(
+        json: {
+          'format': managerSyncReadinessBridgeSummaryFormat,
+          'redaction_policy': ['raw_native_payload'],
+        },
+        errorCode: 'readiness_summary_redaction_policy_unsupported',
+      ),
+    ];
+
+    for (final importCase in cases) {
+      final imported = importManagerSyncReadinessBridgeSummaryFromJson(
+        importCase.json,
+      );
+
+      expect(imported.accepted, isFalse, reason: importCase.errorCode);
+      expect(imported.errorCode, importCase.errorCode);
+      expect(imported.snapshot.source, managerSyncReadinessBridgeSourceDefault);
+    }
+  });
+
   test('readiness summary import accepts and sanitizes unknown fields', () {
     final imported = importManagerSyncReadinessBridgeSummaryFromJson(
       unsafeSyncReadinessBridgeJson(),
@@ -88,6 +125,33 @@ void main() {
       imported.snapshot.deviceJoinReadiness.errorCodeSummary,
       contains('unexpected_bridge_error_code'),
     );
+  });
+
+  test('readiness summary import strips payload-shaped fields', () {
+    final scenario = syncReadinessScenarioById(
+      'unknown_native_status_sanitized',
+    );
+    final imported = importManagerSyncReadinessBridgeSummaryFromJson(
+      scenario.summaryJson!(),
+    );
+    final snapshot = managerSnapshotForSyncReadinessScenario(scenario);
+    final gate = deriveManagerSyncEntryGate(
+      draft: snapshot.settings.draft,
+      device: snapshot.sync.device,
+      readinessBridgeSnapshot: snapshot.sync.readinessBridgeSnapshot,
+    );
+    final summary = [
+      _readinessSnapshotSummary(imported.snapshot),
+      _entryGateSummary(gate),
+      createManagerDiagnosticsReport(snapshot).toRedactedText(),
+    ].join('\n');
+
+    expect(imported.accepted, isTrue);
+    expect(summary, contains('unexpected_bridge_error_code'));
+    expect(summary, contains('unexpected_bridge_required_evidence'));
+    for (final fragment in syncReadinessSensitiveLeakFragments) {
+      expect(summary, isNot(contains(fragment)), reason: fragment);
+    }
   });
 
   test('readiness scenario catalog maps to stable gate summaries', () {
@@ -155,14 +219,9 @@ void main() {
       expect(gate.userSyncEnabled, scenario.expectedUserSyncEnabled);
 
       final summary = _entryGateSummary(gate);
-      expect(summary, isNot(contains('secret-token')), reason: scenario.id);
-      expect(
-        summary,
-        isNot(contains('RADISHLEX-RECOVERY-CODE-SECRET')),
-        reason: scenario.id,
-      );
-      expect(summary, isNot(contains('/synthetic/private')));
-      expect(summary, isNot(contains('payload_bytes=abcdef')));
+      for (final fragment in syncReadinessSensitiveLeakFragments) {
+        expect(summary, isNot(contains(fragment)), reason: scenario.id);
+      }
     }
   });
 
@@ -992,4 +1051,53 @@ String _entryGateSummary(ManagerSyncEntryGate gate) {
     gate.deviceAuthorization.joinReadiness.errorCodeSummary,
     gate.deviceAuthorization.revocationReadiness.errorCodeSummary,
   ].join('\n');
+}
+
+String _readinessSnapshotSummary(ManagerSyncReadinessBridgeSnapshot snapshot) {
+  return [
+    snapshot.source,
+    snapshot.recoverySetupReadiness.status,
+    snapshot.recoverySetupReadiness.blocker,
+    snapshot.recoverySetupReadiness.entryActionStatus,
+    snapshot.recoverySetupReadiness.generatedCodeStatus,
+    snapshot.recoverySetupReadiness.saveConfirmationStatus,
+    snapshot.recoverySetupReadiness.recoveryRecordStatus,
+    snapshot.recoverySetupReadiness.firstUploadGate,
+    snapshot.recoverySetupReadiness.prerequisiteSummary,
+    snapshot.recoverySetupReadiness.errorCodeSummary,
+    snapshot.recoveryRestoreReadiness.status,
+    snapshot.recoveryRestoreReadiness.blocker,
+    snapshot.recoveryRestoreReadiness.entryActionStatus,
+    snapshot.recoveryRestoreReadiness.codeInputStatus,
+    snapshot.recoveryRestoreReadiness.recoveryRecordLookupStatus,
+    snapshot.recoveryRestoreReadiness.attemptLimitStatus,
+    snapshot.recoveryRestoreReadiness.deviceRegistrationStatus,
+    snapshot.recoveryRestoreReadiness.errorCodeSummary,
+    snapshot.deviceJoinReadiness.status,
+    snapshot.deviceJoinReadiness.blocker,
+    snapshot.deviceJoinReadiness.entryActionStatus,
+    snapshot.deviceJoinReadiness.joinRequestStatus.code,
+    snapshot.deviceJoinReadiness.shortCodeVerificationStatus,
+    snapshot.deviceJoinReadiness.authorizationPackageStatus,
+    snapshot.deviceJoinReadiness.authorizationPackagePreconditions,
+    snapshot.deviceJoinReadiness.errorCodeSummary,
+    snapshot.deviceRevocationReadiness.status,
+    snapshot.deviceRevocationReadiness.blocker,
+    snapshot.deviceRevocationReadiness.entryActionStatus,
+    snapshot.deviceRevocationReadiness.revokeDeviceStatus,
+    snapshot.deviceRevocationReadiness.activeDeviceRequirement,
+    snapshot.deviceRevocationReadiness.lostDeviceRiskNotice,
+    snapshot.deviceRevocationReadiness.keyEpochStatus,
+    snapshot.deviceRevocationReadiness.errorCodeSummary,
+  ].join('\n');
+}
+
+class _RejectedReadinessImportCase {
+  const _RejectedReadinessImportCase({
+    required this.json,
+    required this.errorCode,
+  });
+
+  final Map<String, Object?> json;
+  final String errorCode;
 }

@@ -196,6 +196,14 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 
 当前 Dart 准备层接受的 readiness bridge 摘要格式为 `manager_sync_readiness.v1`，redaction policy 为 `summary_only_no_tokens_recovery_secret_or_payload_bytes`。该摘要只作为 future bridge mapper 的输入形状，不是新增 `ManagerBridge` contract，也不是 C ABI。摘要字段必须按 allowlist 映射到 `RecoverySetupReadiness`、`RecoveryRestoreReadiness`、`DeviceJoinReadiness` 和 `DeviceRevocationReadiness`；未知状态、未知前置条件或未知错误码必须降级为安全分类，不能进入 UI、settings draft 或诊断报告原文。即便四条 readiness 都映射为 ready，当前 UI 仍只显示 `user_sync_entry_closed_current_phase`，不打开真实同步按钮或任何恢复码 / 设备授权操作。
 
+`manager_sync_readiness.v1` 接线前验收包按以下规则治理：
+
+- envelope 必须同时包含 `format == manager_sync_readiness.v1` 和 `redaction_policy == summary_only_no_tokens_recovery_secret_or_payload_bytes`；缺失、类型错误或版本不匹配时，settings 导入入口只能返回结构化错误码，并回退到 `manager_default_closed_readiness`。
+- 摘要只接受 `source`、`recovery_setup`、`recovery_restore`、`device_join` 和 `device_revocation` 五类输入；各 section 只映射状态码、阻塞码、前置证据码、来源标签和错误分类。
+- 未知 `source` 降级为 `unknown_bridge_readiness_source`；未知状态、未知前置证据和未知错误分类分别降级为既有关闭态或 `unexpected_bridge_required_evidence` / `unexpected_bridge_error_code`，不透传 native 原文。
+- 不允许 token、恢复码、短码、私钥、signature bytes、wrapped material、payload bytes、请求 / 响应体、真实路径或 provider exception 原文进入 snapshot、settings gate preview、同步页、诊断报告或测试 fixture 预期。
+- 场景目录必须同时覆盖 model、settings gate preview、sync page 和 diagnostics；未来新增 bridge readiness 返回字段前，应先补场景、mapper allowlist、脱敏断言和文档字段说明。
+
 禁止返回：
 
 - P1 原始事件。
