@@ -6,10 +6,11 @@
 
 - 这些场景只用于本地开发、fixture、widget / helper / model 测试和人工复核。
 - 场景输入必须是非敏感摘要，只允许状态码、阻塞码、前置证据码、来源标签和错误分类。
-- 场景不得包含或传播 token、恢复码、短码、私钥、signature bytes、wrapped material、payload bytes、请求 / 响应体、真实路径或 provider exception 原文。
+- 场景不得包含真实 token、恢复码、短码、私钥、signature bytes、wrapped material、payload bytes、请求 / 响应体、真实路径或 provider exception 原文；用于验证拒绝 / 降级路径的合成 leak fragment 只能停留在不安全输入 fixture，预期输出、UI 和诊断文本不得传播。
 - 即便场景显示四条 readiness 全部 ready，当前 Phase 4 仍派生 `user_sync_entry_closed_current_phase`，不打开真实远端同步、恢复码或设备授权操作。
 - 场景目录是 future bridge mapper 的验收输入，不是新增 `ManagerBridge` contract，也不是 C ABI。
 - 场景目录同时驱动模型、settings gate preview、诊断报告和同步页代表场景回归，避免 settings / sync / diagnostics 对同一份 readiness 摘要派生出不同口径。
+- 开发期 `manager_sync_evidence_bundle.v1` 只在测试 fixture 中组合 readiness 摘要、连接健康摘要、部署证据来源和设备 production gate；它不新增生产 bridge，也不改变 settings draft 持久化格式。
 
 ## 场景表
 
@@ -27,11 +28,27 @@
 
 默认关闭态 issue codes 和 next evidence 的完整字符串以 `apps/radishlex-manager/test/fixtures/sync_readiness_bridge_fixtures.dart` 中 `syncReadinessDefaultIssueCodes` 和 `syncReadinessDefaultNextEvidence` 为测试真相源，避免文档复制超长字段后漂移。
 
+## Evidence Bundle 预演场景
+
+`manager_sync_evidence_bundle.v1` 的测试目录用于把 readiness、`sync_connection_health.v1`、部署证据来源和设备 gate 放在同一个 snapshot 中复验。bundle 的 redaction policy 为 `summary_only_no_endpoint_tokens_recovery_secret_or_payload_bytes`，只允许摘要字段，不允许 endpoint credential、token、恢复码、短码、请求 / 响应体、真实路径、signature bytes、wrapped material 或 payload bytes。
+
+| 场景 ID | 组合输入 | 预期 entry blocker | 连接状态 | 连接 blocker | readiness source | user sync |
+| --- | --- | --- | --- | --- | --- | --- |
+| `all_ready_external_probe_current_phase_closed` | 四条 readiness ready，外部 HTTPS 探测可达 | `user_sync_entry_closed_current_phase` | `reachable` | `none` | `ffi_native_readiness` | `false` |
+| `local_https_reachable_recovery_record_missing` | 本地 HTTPS 探测可达，恢复记录缺失 | `recovery_record_missing` | `reachable` | `none` | `fixture_readiness` | `false` |
+| `network_unreachable_all_ready_current_phase_closed` | 四条 readiness ready，本地 HTTPS 探测网络不可达 | `user_sync_entry_closed_current_phase` | `network_unreachable` | `network_unreachable` | `ffi_native_readiness` | `false` |
+| `unsafe_connection_summary_rejected` | connection summary redaction policy 不安全 | `user_sync_entry_closed_current_phase` | `probe_summary_invalid` | `probe_summary_format_unsupported` | `ffi_native_readiness` | `false` |
+| `unsafe_readiness_summary_rejected` | readiness redaction policy 不安全 | `recovery_code_flow_closed` | `reachable` | `none` | `manager_default_closed_readiness` | `false` |
+| `unsafe_readiness_summary_downgraded` | readiness 摘要合法但含未知状态和敏感形态字段 | `recovery_record_missing` | `reachable` | `none` | `unknown_bridge_readiness_source` | `false` |
+
+这些场景确认连接健康是解释性证据：可达、不可达或摘要被拒绝都不会打开 `启用同步`、恢复码、join request、授权成功或设备撤销路径。
+
 ## 复验入口
 
 主要覆盖：
 
 - `apps/radishlex-manager/test/fixtures/sync_readiness_bridge_fixtures.dart`：场景输入、预期来源和预期派生摘要。
+- `apps/radishlex-manager/test/fixtures/sync_evidence_bundle_fixtures.dart`：组合 readiness、connection health、部署证据来源和设备 gate 的预演输入。
 - `apps/radishlex-manager/test/models/manager_sync_entry_gate_test.dart`：遍历场景目录，校验 import result、entry gate、readiness 摘要、interaction intent、envelope schema 和脱敏边界。
 - `apps/radishlex-manager/test/screens/settings_test.dart`：验证 settings 导入、清除、同步页状态和诊断导出一致性，并固定 settings gate preview 的代表场景可见层回归。
 - `apps/radishlex-manager/test/screens/settings_diagnostics_test.dart`：遍历场景目录，校验诊断报告中的 `sync.readiness_*`、`sync.interaction_*`、`sync.user_sync_enabled` 和脱敏文本。

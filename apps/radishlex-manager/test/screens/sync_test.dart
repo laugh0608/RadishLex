@@ -7,6 +7,7 @@ import 'package:radishlex_manager/src/bridge/fixture_manager_bridge.dart';
 import 'package:radishlex_manager/src/data/manager_fixture.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
+import '../fixtures/sync_evidence_bundle_fixtures.dart';
 import '../fixtures/sync_readiness_bridge_fixtures.dart';
 
 void main() {
@@ -272,6 +273,35 @@ void main() {
     });
   }
 
+  for (final scenarioId in representativeSyncEvidenceBundleScenarioIds) {
+    testWidgets('sync view renders sync evidence bundle $scenarioId', (
+      WidgetTester tester,
+    ) async {
+      final scenario = syncEvidenceBundleScenarioById(scenarioId);
+
+      await tester.pumpWidget(
+        RadishLexManagerApp(
+          bridge: FixtureManagerBridge(
+            initialSnapshot: managerSnapshotForSyncEvidenceBundleScenario(
+              scenario,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.sync_outlined));
+      await tester.pumpAndSettle();
+
+      _expectVisibleSyncEvidenceBundleScenario(scenario);
+
+      final enableButton = tester.widget<FilledButton>(
+        find.byKey(const Key('sync-enable-button')),
+      );
+      expect(enableButton.onPressed, isNull, reason: scenario.id);
+    });
+  }
+
   testWidgets('sync view exposes local-only empty category state', (
     WidgetTester tester,
   ) async {
@@ -354,6 +384,32 @@ void _expectVisibleSyncReadinessScenario(SyncReadinessScenario scenario) {
   }
 
   for (final fragment in syncReadinessSensitiveLeakFragments) {
+    expect(find.textContaining(fragment), findsNothing, reason: scenario.id);
+  }
+}
+
+void _expectVisibleSyncEvidenceBundleScenario(
+  SyncEvidenceBundleScenario scenario,
+) {
+  expect(find.text(scenario.expectedEntryState.code), findsWidgets);
+  expect(find.text(scenario.expectedEntryBlocker), findsWidgets);
+  expect(find.text(scenario.expectedBlockedFlows), findsWidgets);
+  expect(find.text(scenario.expectedBridgeSource), findsWidgets);
+  expect(find.text(scenario.expectedConnectionStatusCode), findsWidgets);
+  expect(find.text(scenario.expectedConnectionBlocker), findsWidgets);
+  expect(find.text(scenario.expectedConnectionProbeSource), findsWidgets);
+  expect(find.text(syncEvidenceBundleRecordedAt), findsOneWidget);
+  expect(find.text(scenario.expectedEndpointStatus), findsWidgets);
+  expect(find.text(scenario.expectedAccessTokenStatus), findsWidgets);
+  expect(find.text(scenario.expectedTransportMode), findsWidgets);
+  expect(find.text(scenario.expectedServerStateStatus), findsWidgets);
+  expect(find.text(scenario.expectedAuthStatus), findsWidgets);
+  expect(find.text(scenario.expectedHttpStatusText), findsOneWidget);
+  expect(find.text(scenario.expectedLocalInsecureTls), findsWidgets);
+  expect(find.text(scenario.expectedLastRemoteErrorCode), findsWidgets);
+  expect(find.text(scenario.expectedUserSyncEnabled.toString()), findsWidgets);
+
+  for (final fragment in syncEvidenceBundleSensitiveLeakFragments) {
     expect(find.textContaining(fragment), findsNothing, reason: scenario.id);
   }
 }

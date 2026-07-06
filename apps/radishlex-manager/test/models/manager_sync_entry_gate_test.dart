@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:radishlex_manager/src/bridge/ffi_manager_sync_readiness_mapper.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
+import '../fixtures/sync_evidence_bundle_fixtures.dart';
 import '../fixtures/sync_readiness_bridge_fixtures.dart';
 
 void main() {
@@ -221,6 +222,131 @@ void main() {
       final summary = _entryGateSummary(gate);
       for (final fragment in syncReadinessSensitiveLeakFragments) {
         expect(summary, isNot(contains(fragment)), reason: scenario.id);
+      }
+    }
+  });
+
+  test('sync evidence bundle scenarios map to stable gate diagnostics', () {
+    for (final scenario in syncEvidenceBundleScenarioCatalog()) {
+      final readinessImport = importManagerSyncReadinessBridgeSummaryFromJson(
+        scenario.readinessSummaryJson(),
+      );
+      expect(
+        readinessImport.accepted,
+        scenario.expectedReadinessImportAccepted,
+        reason: scenario.id,
+      );
+      expect(
+        readinessImport.errorCode,
+        scenario.expectedReadinessImportErrorCode,
+        reason: scenario.id,
+      );
+
+      final bundle = syncEvidenceBundleJsonForScenario(scenario);
+      expect(bundle['format'], managerSyncEvidenceBundleFormat);
+      expect(
+        bundle['redaction_policy'],
+        managerSyncEvidenceBundleRedactionPolicy,
+      );
+
+      final snapshot = managerSnapshotForSyncEvidenceBundleScenario(scenario);
+      final gate = deriveManagerSyncEntryGate(
+        draft: snapshot.settings.draft,
+        device: snapshot.sync.device,
+        readinessBridgeSnapshot: snapshot.sync.readinessBridgeSnapshot,
+      );
+      final health = gate.connectionHealth;
+
+      expect(gate.readinessBridgeSource, scenario.expectedBridgeSource);
+      expect(gate.entryState, scenario.expectedEntryState);
+      expect(gate.entryBlocker, scenario.expectedEntryBlocker);
+      expect(gate.readinessBlockedFlowSummary, scenario.expectedBlockedFlows);
+      expect(
+        gate.interactionEntryPlan.intentStatusSummary,
+        scenario.expectedInteractionStatuses,
+      );
+      expect(
+        gate.interactionEntryPlan.blockerSummary,
+        scenario.expectedInteractionBlockers,
+      );
+      expect(gate.userSyncEnabled, scenario.expectedUserSyncEnabled);
+      expect(
+        snapshot.settings.draft.syncConnectionProbeRecord.isRecorded,
+        isTrue,
+      );
+
+      expect(health.status.code, scenario.expectedConnectionStatusCode);
+      expect(health.connectionBlocker, scenario.expectedConnectionBlocker);
+      expect(health.probeSource, scenario.expectedConnectionProbeSource);
+      expect(health.probeRecordedAt, syncEvidenceBundleRecordedAt);
+      expect(health.endpointStatus, scenario.expectedEndpointStatus);
+      expect(health.accessTokenStatus, scenario.expectedAccessTokenStatus);
+      expect(health.transportMode, scenario.expectedTransportMode);
+      expect(health.serverStateStatus, scenario.expectedServerStateStatus);
+      expect(health.authStatus, scenario.expectedAuthStatus);
+      expect(
+        '${health.httpStatus} ${health.httpStatusClass}',
+        scenario.expectedHttpStatusText,
+      );
+      expect(health.lastRemoteErrorCode, scenario.expectedLastRemoteErrorCode);
+      expect(health.localInsecureTls, scenario.expectedLocalInsecureTls);
+      if (scenario.expectedConnectionBlocker != 'none') {
+        expect(
+          gate.productionBlockers,
+          isNot(contains(scenario.expectedConnectionBlocker)),
+          reason: scenario.id,
+        );
+      }
+      expect(
+        gate.productionBlockers,
+        contains('user_sync_entry_closed_current_phase'),
+      );
+
+      final diagnostics = createManagerDiagnosticsReport(
+        snapshot,
+      ).toRedactedText();
+      expect(
+        diagnostics,
+        contains('sync.entry_blocker: ${scenario.expectedEntryBlocker}'),
+      );
+      expect(
+        diagnostics,
+        contains(
+          'sync.readiness_bridge_source: ${scenario.expectedBridgeSource}',
+        ),
+      );
+      expect(
+        diagnostics,
+        contains(
+          'sync.connection_status: ${scenario.expectedConnectionStatusCode}',
+        ),
+      );
+      expect(
+        diagnostics,
+        contains(
+          'sync.connection_blocker: ${scenario.expectedConnectionBlocker}',
+        ),
+      );
+      expect(
+        diagnostics,
+        contains(
+          'sync.connection_probe_source: ${scenario.expectedConnectionProbeSource}',
+        ),
+      );
+      expect(
+        diagnostics,
+        contains(
+          'sync.server_state_status: ${scenario.expectedServerStateStatus}',
+        ),
+      );
+
+      final redactedSummary = [
+        _entryGateSummary(gate),
+        _connectionHealthSummary(health),
+        diagnostics,
+      ].join('\n');
+      for (final fragment in syncEvidenceBundleSensitiveLeakFragments) {
+        expect(redactedSummary, isNot(contains(fragment)), reason: scenario.id);
       }
     }
   });
@@ -1050,6 +1176,24 @@ String _entryGateSummary(ManagerSyncEntryGate gate) {
     gate.deviceAuthorization.joinReadiness.authorizationPackagePreconditions,
     gate.deviceAuthorization.joinReadiness.errorCodeSummary,
     gate.deviceAuthorization.revocationReadiness.errorCodeSummary,
+  ].join('\n');
+}
+
+String _connectionHealthSummary(SyncConnectionHealth health) {
+  return [
+    health.status.code,
+    health.connectionBlocker,
+    health.probeSource,
+    health.probeRecordedAt,
+    health.endpointStatus,
+    health.accessTokenStatus,
+    health.transportMode,
+    health.serverStateStatus,
+    health.authStatus,
+    health.httpStatus.toString(),
+    health.httpStatusClass,
+    health.lastRemoteErrorCode,
+    health.localInsecureTls,
   ].join('\n');
 }
 

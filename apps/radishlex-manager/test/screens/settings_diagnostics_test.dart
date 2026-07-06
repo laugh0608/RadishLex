@@ -6,6 +6,7 @@ import 'package:radishlex_manager/src/app.dart';
 import 'package:radishlex_manager/src/bridge/fixture_manager_bridge.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
+import '../fixtures/sync_evidence_bundle_fixtures.dart';
 import '../fixtures/sync_readiness_bridge_fixtures.dart';
 
 void main() {
@@ -112,6 +113,110 @@ void main() {
       );
       expect(text, isNot(contains('private_key=abcdef')), reason: scenario.id);
       expect(text, isNot(contains('short_code=')), reason: scenario.id);
+    }
+  });
+
+  test('sync evidence bundle catalog drives diagnostics summaries', () {
+    for (final scenario in syncEvidenceBundleScenarioCatalog()) {
+      final report = createManagerDiagnosticsReport(
+        managerSnapshotForSyncEvidenceBundleScenario(scenario),
+      );
+      final text = report.toRedactedText();
+
+      expect(
+        _diagnosticsValue(report, 'sync.entry_state'),
+        scenario.expectedEntryState.code,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.entry_blocker'),
+        scenario.expectedEntryBlocker,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.readiness_bridge_source'),
+        scenario.expectedBridgeSource,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.readiness_blocked_flows'),
+        scenario.expectedBlockedFlows,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.interaction_statuses'),
+        scenario.expectedInteractionStatuses,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.interaction_blockers'),
+        scenario.expectedInteractionBlockers,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.user_sync_enabled'),
+        scenario.expectedUserSyncEnabled.toString(),
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.connection_status'),
+        scenario.expectedConnectionStatusCode,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.connection_blocker'),
+        scenario.expectedConnectionBlocker,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.connection_probe_source'),
+        scenario.expectedConnectionProbeSource,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.connection_probe_recorded_at'),
+        syncEvidenceBundleRecordedAt,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.endpoint_status'),
+        scenario.expectedEndpointStatus,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.access_token_status'),
+        scenario.expectedAccessTokenStatus,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.transport_mode'),
+        scenario.expectedTransportMode,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.server_state_status'),
+        scenario.expectedServerStateStatus,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.connection_auth_status'),
+        scenario.expectedAuthStatus,
+        reason: scenario.id,
+      );
+      expect(
+        '${_diagnosticsValue(report, 'sync.connection_http_status')} '
+        '${_diagnosticsValue(report, 'sync.connection_http_status_class')}',
+        scenario.expectedHttpStatusText,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.last_remote_error_code'),
+        scenario.expectedLastRemoteErrorCode,
+        reason: scenario.id,
+      );
+      for (final fragment in syncEvidenceBundleSensitiveLeakFragments) {
+        expect(text, isNot(contains(fragment)), reason: scenario.id);
+      }
     }
   });
 

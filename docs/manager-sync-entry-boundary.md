@@ -204,6 +204,8 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 - 不允许 token、恢复码、短码、私钥、signature bytes、wrapped material、payload bytes、请求 / 响应体、真实路径或 provider exception 原文进入 snapshot、settings gate preview、同步页、诊断报告或测试 fixture 预期。
 - 场景目录必须同时覆盖 model、settings gate preview、sync page 和 diagnostics；未来新增 bridge readiness 返回字段前，应先补场景、mapper allowlist、脱敏断言和文档字段说明。
 
+`manager_sync_evidence_bundle.v1` 是开发期预演层，不是新的 `ManagerBridge` contract、C ABI 或 settings draft 字段。它只在测试 fixture 中把 `manager_sync_readiness.v1`、`sync_connection_health.v1`、部署证据来源标签和设备 production gate 汇总成同一组可复验输入；导入时仍分别复用 readiness mapper 与 connection health summary 的既有清洗路径。该 bundle 用于确认 settings gate preview、同步页和诊断报告对同一份 evidence 的派生结果一致，尤其确认连接可达、连接不可达或探测摘要不可用都不能绕过恢复码、设备授权、发布级证据和当前阶段关闭门禁。
+
 禁止返回：
 
 - P1 原始事件。
@@ -309,6 +311,7 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 | --- | --- |
 | Dart sync gate helper | 从 settings draft、backend gate、部署证据摘要、恢复码 setup / restore 状态和设备 join / revocation 状态派生 sync entry state、readiness 聚合摘要和只读 action intent 进入计划。 |
 | Dart connection helper | 从 endpoint、access token 存在性、transport 分类和 `sync_connection_health.v1` 回填摘要派生连接健康摘要。 |
+| Evidence bundle scenarios | 用开发期 `manager_sync_evidence_bundle.v1` fixture 组合 readiness、connection health、部署证据和设备 gate，校验 settings / sync / diagnostics 同源派生和脱敏边界。 |
 | Widget tests | 每个阻塞状态的按钮禁用、文案、诊断入口、连接健康 section、恢复码 / 设备授权四条只读流程摘要和下一步提示；`preflight_ready` 下仍不能启用真实同步。 |
 | Bridge mapper tests | `manager_sync_readiness.v1` 非敏感摘要映射到 Dart readiness model，不透传原始错误字符串、真实路径、token、恢复码、短码或 secret 字段；未知错误降级为安全分类。 |
 | FFI smoke | 使用临时 SQLite、临时 settings、合成设备和短生命周期 bridge 复验本地状态读取，不连接真实用户后端。 |
