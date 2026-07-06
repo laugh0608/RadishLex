@@ -720,6 +720,20 @@ void _expectSettingsGatePreviewReadinessScenario(
     findsWidgets,
     reason: scenario.id,
   );
+  expect(
+    find.text(
+      _expectedActionRequestStatusSummary(scenario.expectedInteractionStatuses),
+    ),
+    findsWidgets,
+    reason: scenario.id,
+  );
+  expect(
+    find.text(
+      _expectedActionResultStatusSummary(scenario.expectedInteractionStatuses),
+    ),
+    findsWidgets,
+    reason: scenario.id,
+  );
   _expectActionCommandProtocolPreview(
     reason: scenario.id,
     expectedRequestBoundarySummary:
@@ -727,6 +741,11 @@ void _expectSettingsGatePreviewReadinessScenario(
     expectedResultBoundarySummary:
         scenario.expectedActionCommandResultBoundaries,
     expectedErrorCodeSummary: scenario.expectedActionCommandErrorCodes,
+    expectedRequestAllowedFieldSummary:
+        scenario.expectedActionRequestAllowedFields,
+    expectedResultAllowedFieldSummary:
+        scenario.expectedActionResultAllowedFields,
+    expectedForbiddenMaterialSummary: scenario.expectedActionForbiddenMaterials,
   );
   expect(
     find.text(scenario.expectedUserSyncEnabled.toString()),
@@ -779,6 +798,20 @@ void _expectSettingsGatePreviewEvidenceBundleScenario(
     findsWidgets,
     reason: scenario.id,
   );
+  expect(
+    find.text(
+      _expectedActionRequestStatusSummary(scenario.expectedInteractionStatuses),
+    ),
+    findsWidgets,
+    reason: scenario.id,
+  );
+  expect(
+    find.text(
+      _expectedActionResultStatusSummary(scenario.expectedInteractionStatuses),
+    ),
+    findsWidgets,
+    reason: scenario.id,
+  );
   _expectActionCommandProtocolPreview(
     reason: scenario.id,
     expectedRequestBoundarySummary:
@@ -786,6 +819,11 @@ void _expectSettingsGatePreviewEvidenceBundleScenario(
     expectedResultBoundarySummary:
         scenario.expectedActionCommandResultBoundaries,
     expectedErrorCodeSummary: scenario.expectedActionCommandErrorCodes,
+    expectedRequestAllowedFieldSummary:
+        scenario.expectedActionRequestAllowedFields,
+    expectedResultAllowedFieldSummary:
+        scenario.expectedActionResultAllowedFields,
+    expectedForbiddenMaterialSummary: scenario.expectedActionForbiddenMaterials,
   );
   expect(find.text(scenario.expectedConnectionStatusCode), findsWidgets);
   expect(find.text(scenario.expectedConnectionProbeSource), findsWidgets);
@@ -808,6 +846,9 @@ void _expectActionCommandProtocolPreview({
   required String expectedRequestBoundarySummary,
   required String expectedResultBoundarySummary,
   required String expectedErrorCodeSummary,
+  required String expectedRequestAllowedFieldSummary,
+  required String expectedResultAllowedFieldSummary,
+  required String expectedForbiddenMaterialSummary,
 }) {
   for (final value in [
     syncActionCommandDataPolicySummary,
@@ -815,6 +856,9 @@ void _expectActionCommandProtocolPreview({
     expectedRequestBoundarySummary,
     expectedResultBoundarySummary,
     expectedErrorCodeSummary,
+    expectedRequestAllowedFieldSummary,
+    expectedResultAllowedFieldSummary,
+    expectedForbiddenMaterialSummary,
   ]) {
     expect(find.text(value), findsWidgets, reason: reason);
   }
@@ -847,5 +891,67 @@ String _expectedActionCommandExecutionStatus(String intentStatus) {
       return 'not_executable_current_phase';
     default:
       return 'blocked_by_unknown_intent_status';
+  }
+}
+
+String _expectedActionRequestStatusSummary(String intentStatusSummary) {
+  return _expectedActionStatusSummary(
+    intentStatusSummary,
+    _expectedActionRequestStatus,
+  );
+}
+
+String _expectedActionResultStatusSummary(String intentStatusSummary) {
+  return _expectedActionStatusSummary(
+    intentStatusSummary,
+    _expectedActionResultStatus,
+  );
+}
+
+String _expectedActionStatusSummary(
+  String intentStatusSummary,
+  String Function(String intentStatus) mapStatus,
+) {
+  if (intentStatusSummary == 'none') {
+    return 'none';
+  }
+  return intentStatusSummary
+      .split(', ')
+      .map((entry) {
+        final separator = entry.indexOf('=');
+        final actionId = entry.substring(0, separator);
+        final intentStatus = entry.substring(separator + 1);
+        return '$actionId=${mapStatus(intentStatus)}';
+      })
+      .join(', ');
+}
+
+String _expectedActionRequestStatus(String intentStatus) {
+  switch (_expectedActionCommandExecutionStatus(intentStatus)) {
+    case 'ready_for_future_bridge_command':
+      return 'request_shape_ready_for_future_bridge';
+    case 'blocked_until_user_confirmation':
+      return 'request_blocked_until_user_confirmation';
+    case 'blocked_by_readiness':
+      return 'request_blocked_by_readiness';
+    case 'not_executable_current_phase':
+      return 'request_not_built_current_phase';
+    default:
+      return 'request_blocked_by_unknown_execution_status';
+  }
+}
+
+String _expectedActionResultStatus(String intentStatus) {
+  switch (_expectedActionCommandExecutionStatus(intentStatus)) {
+    case 'ready_for_future_bridge_command':
+      return 'result_shape_ready_for_future_bridge';
+    case 'blocked_until_user_confirmation':
+      return 'result_blocked_until_user_confirmation';
+    case 'blocked_by_readiness':
+      return 'result_blocked_by_readiness';
+    case 'not_executable_current_phase':
+      return 'result_not_available_current_phase';
+    default:
+      return 'result_blocked_by_unknown_execution_status';
   }
 }

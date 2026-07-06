@@ -93,6 +93,12 @@ void main() {
         expectedResultBoundarySummary:
             scenario.expectedActionCommandResultBoundaries,
         expectedErrorCodeSummary: scenario.expectedActionCommandErrorCodes,
+        expectedRequestAllowedFieldSummary:
+            scenario.expectedActionRequestAllowedFields,
+        expectedResultAllowedFieldSummary:
+            scenario.expectedActionResultAllowedFields,
+        expectedForbiddenMaterialSummary:
+            scenario.expectedActionForbiddenMaterials,
         reason: scenario.id,
       );
       expect(
@@ -259,7 +265,7 @@ void main() {
 
     expect(find.text('诊断摘要预览'), findsOneWidget);
     expect(find.text('分组 6'), findsOneWidget);
-    expect(find.text('字段 118'), findsOneWidget);
+    expect(find.text('字段 124'), findsOneWidget);
     expect(
       find.byKey(const Key('diagnostics-section-sync_gate')),
       findsOneWidget,
@@ -400,6 +406,42 @@ void main() {
     expect(
       find.textContaining(
         'sync.action_command_error_codes: $syncActionCommandErrorCodeSummary',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.action_request_statuses: ${_expectedActionRequestStatusSummary(syncReadinessClosedInteractionStatuses)}',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.action_request_allowed_fields: $syncActionRequestAllowedFieldSummary',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.action_request_forbidden_material: $syncActionForbiddenMaterialSummary',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.action_result_statuses: ${_expectedActionResultStatusSummary(syncReadinessClosedInteractionStatuses)}',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.action_result_allowed_fields: $syncActionResultAllowedFieldSummary',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.action_result_forbidden_material: $syncActionForbiddenMaterialSummary',
       ),
       findsOneWidget,
     );
@@ -694,6 +736,11 @@ void _expectDiagnosticsActionCommandPreview(
       syncActionCommandRequestBoundarySummary,
   String expectedResultBoundarySummary = syncActionCommandResultBoundarySummary,
   String expectedErrorCodeSummary = syncActionCommandErrorCodeSummary,
+  String expectedRequestAllowedFieldSummary =
+      syncActionRequestAllowedFieldSummary,
+  String expectedResultAllowedFieldSummary =
+      syncActionResultAllowedFieldSummary,
+  String expectedForbiddenMaterialSummary = syncActionForbiddenMaterialSummary,
   required String reason,
 }) {
   expect(
@@ -746,6 +793,36 @@ void _expectDiagnosticsActionCommandPreview(
     expectedErrorCodeSummary,
     reason: reason,
   );
+  expect(
+    _diagnosticsValue(report, 'sync.action_request_statuses'),
+    _expectedActionRequestStatusSummary(expectedIntentStatusSummary),
+    reason: reason,
+  );
+  expect(
+    _diagnosticsValue(report, 'sync.action_request_allowed_fields'),
+    expectedRequestAllowedFieldSummary,
+    reason: reason,
+  );
+  expect(
+    _diagnosticsValue(report, 'sync.action_request_forbidden_material'),
+    expectedForbiddenMaterialSummary,
+    reason: reason,
+  );
+  expect(
+    _diagnosticsValue(report, 'sync.action_result_statuses'),
+    _expectedActionResultStatusSummary(expectedIntentStatusSummary),
+    reason: reason,
+  );
+  expect(
+    _diagnosticsValue(report, 'sync.action_result_allowed_fields'),
+    expectedResultAllowedFieldSummary,
+    reason: reason,
+  );
+  expect(
+    _diagnosticsValue(report, 'sync.action_result_forbidden_material'),
+    expectedForbiddenMaterialSummary,
+    reason: reason,
+  );
 }
 
 String _expectedActionCommandExecutionSummary(String intentStatusSummary) {
@@ -775,6 +852,68 @@ String _expectedActionCommandExecutionStatus(String intentStatus) {
       return 'not_executable_current_phase';
     default:
       return 'blocked_by_unknown_intent_status';
+  }
+}
+
+String _expectedActionRequestStatusSummary(String intentStatusSummary) {
+  return _expectedActionStatusSummary(
+    intentStatusSummary,
+    _expectedActionRequestStatus,
+  );
+}
+
+String _expectedActionResultStatusSummary(String intentStatusSummary) {
+  return _expectedActionStatusSummary(
+    intentStatusSummary,
+    _expectedActionResultStatus,
+  );
+}
+
+String _expectedActionStatusSummary(
+  String intentStatusSummary,
+  String Function(String intentStatus) mapStatus,
+) {
+  if (intentStatusSummary == 'none') {
+    return 'none';
+  }
+  return intentStatusSummary
+      .split(', ')
+      .map((entry) {
+        final separator = entry.indexOf('=');
+        final actionId = entry.substring(0, separator);
+        final intentStatus = entry.substring(separator + 1);
+        return '$actionId=${mapStatus(intentStatus)}';
+      })
+      .join(', ');
+}
+
+String _expectedActionRequestStatus(String intentStatus) {
+  switch (_expectedActionCommandExecutionStatus(intentStatus)) {
+    case 'ready_for_future_bridge_command':
+      return 'request_shape_ready_for_future_bridge';
+    case 'blocked_until_user_confirmation':
+      return 'request_blocked_until_user_confirmation';
+    case 'blocked_by_readiness':
+      return 'request_blocked_by_readiness';
+    case 'not_executable_current_phase':
+      return 'request_not_built_current_phase';
+    default:
+      return 'request_blocked_by_unknown_execution_status';
+  }
+}
+
+String _expectedActionResultStatus(String intentStatus) {
+  switch (_expectedActionCommandExecutionStatus(intentStatus)) {
+    case 'ready_for_future_bridge_command':
+      return 'result_shape_ready_for_future_bridge';
+    case 'blocked_until_user_confirmation':
+      return 'result_blocked_until_user_confirmation';
+    case 'blocked_by_readiness':
+      return 'result_blocked_by_readiness';
+    case 'not_executable_current_phase':
+      return 'result_not_available_current_phase';
+    default:
+      return 'result_blocked_by_unknown_execution_status';
   }
 }
 

@@ -58,6 +58,11 @@ class SyncEvidenceBundleScenario {
     this.expectedActionCommandResultBoundaries =
         syncActionCommandResultBoundarySummary,
     this.expectedActionCommandErrorCodes = syncActionCommandErrorCodeSummary,
+    this.expectedActionRequestAllowedFields =
+        syncActionRequestAllowedFieldSummary,
+    this.expectedActionResultAllowedFields =
+        syncActionResultAllowedFieldSummary,
+    this.expectedActionForbiddenMaterials = syncActionForbiddenMaterialSummary,
     required this.expectedUserSyncEnabled,
     required this.expectedConnectionStatusCode,
     required this.expectedConnectionBlocker,
@@ -89,6 +94,9 @@ class SyncEvidenceBundleScenario {
   final String expectedActionCommandRequestBoundaries;
   final String expectedActionCommandResultBoundaries;
   final String expectedActionCommandErrorCodes;
+  final String expectedActionRequestAllowedFields;
+  final String expectedActionResultAllowedFields;
+  final String expectedActionForbiddenMaterials;
   final bool expectedUserSyncEnabled;
   final String expectedConnectionStatusCode;
   final String expectedConnectionBlocker;

@@ -13,7 +13,7 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 - 不提供设备加入请求审批、授权成功路径或设备撤销 UI。
 - 不新增明文同步 payload、恢复码、私钥、signature bytes、wrapped material bytes、encrypted payload bytes 的日志、诊断字段或 widget 可见数据。
 
-2026-07-05 已落地 manager 侧 `SyncEntryState` / `ManagerSyncEntryGate` 的非上传实现，并补齐连接健康、`sync_connection_health.v1` 摘要回填、恢复码准备态、设备授权准备态、join request 状态、恢复码保存确认、恢复记录状态、授权包前置条件、设备撤销 / 丢失设备和 key epoch 风险提示的只读模型 / UI。恢复码 setup / restore 与设备 join / revocation 已拆成 `RecoverySetupReadiness`、`RecoveryRestoreReadiness`、`DeviceJoinReadiness` 和 `DeviceRevocationReadiness` 四组只读摘要，并通过 `SyncReadinessFlowSummary` 聚合为同一组 blocked flows、issue codes、next required evidence、source tags 和 user sync blocked 字段。Dart 侧已新增 `ManagerSyncReadinessBridgeSnapshot` 和 `manager_sync_readiness.v1` mapper，把未来 bridge 可返回的非敏感 readiness 状态码、前置条件和错误分类映射回同一组只读 model；未知值降级为 `unexpected_bridge_error_code` / `unexpected_bridge_required_evidence`，不透传 provider 原始异常、路径、token、恢复码、短码或 payload。`SyncInteractionEntryPlan` / `SyncInteractionActionIntent` 已把四条未来交互入口整理为可见性、intent status、blocker、required evidence 和 source tag 的非执行计划；`manager_sync_action_command_preview.v1` / `SyncActionCommandPreviewPlan` 在其上派生非执行命令预演，固定 action id、execution status、data policy、stop line、request boundary、result boundary 和错误分类。该计划只用于同步页、设置页和诊断摘要展示，不创建恢复码、join request、授权包或撤销记录。同步页、设置页草案预览和诊断报告现在可以从 settings draft、本地 `local_smoke` 来源、平台 backend gate、endpoint / access token 存在性、连接健康回填摘要、恢复码关闭状态、设备授权关闭状态和可选 bridge readiness snapshot 派生阻塞说明；真实上传、恢复码生成、恢复码输入、join request 创建、授权成功和设备撤销路径仍关闭。
+2026-07-05 已落地 manager 侧 `SyncEntryState` / `ManagerSyncEntryGate` 的非上传实现，并补齐连接健康、`sync_connection_health.v1` 摘要回填、恢复码准备态、设备授权准备态、join request 状态、恢复码保存确认、恢复记录状态、授权包前置条件、设备撤销 / 丢失设备和 key epoch 风险提示的只读模型 / UI。恢复码 setup / restore 与设备 join / revocation 已拆成 `RecoverySetupReadiness`、`RecoveryRestoreReadiness`、`DeviceJoinReadiness` 和 `DeviceRevocationReadiness` 四组只读摘要，并通过 `SyncReadinessFlowSummary` 聚合为同一组 blocked flows、issue codes、next required evidence、source tags 和 user sync blocked 字段。Dart 侧已新增 `ManagerSyncReadinessBridgeSnapshot` 和 `manager_sync_readiness.v1` mapper，把未来 bridge 可返回的非敏感 readiness 状态码、前置条件和错误分类映射回同一组只读 model；未知值降级为 `unexpected_bridge_error_code` / `unexpected_bridge_required_evidence`，不透传 provider 原始异常、路径、token、恢复码、短码或 payload。`SyncInteractionEntryPlan` / `SyncInteractionActionIntent` 已把四条未来交互入口整理为可见性、intent status、blocker、required evidence 和 source tag 的非执行计划；`manager_sync_action_command_preview.v1` / `SyncActionCommandPreviewPlan` 在其上派生非执行命令预演，固定 action id、execution status、data policy、stop line、request boundary、result boundary、request / result allowed fields、forbidden material policy 和错误分类。该计划只用于同步页、设置页和诊断摘要展示，不创建恢复码、join request、授权包或撤销记录。同步页、设置页草案预览和诊断报告现在可以从 settings draft、本地 `local_smoke` 来源、平台 backend gate、endpoint / access token 存在性、连接健康回填摘要、恢复码关闭状态、设备授权关闭状态和可选 bridge readiness snapshot 派生阻塞说明；真实上传、恢复码生成、恢复码输入、join request 创建、授权成功和设备撤销路径仍关闭。
 
 ## 适用范围
 
@@ -194,7 +194,7 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 - 最近同步对象数量、对象类型、版本和时间摘要。
 - 错误分类和用户可读非敏感文案。
 
-当前 Dart 准备层接受的 readiness bridge 摘要格式为 `manager_sync_readiness.v1`，redaction policy 为 `summary_only_no_tokens_recovery_secret_or_payload_bytes`。该摘要只作为 future bridge mapper 的输入形状，不是新增 `ManagerBridge` contract，也不是 C ABI。摘要字段必须按 allowlist 映射到 `RecoverySetupReadiness`、`RecoveryRestoreReadiness`、`DeviceJoinReadiness` 和 `DeviceRevocationReadiness`；未知状态、未知前置条件或未知错误码必须降级为安全分类，不能进入 UI、settings draft 或诊断报告原文。即便四条 readiness 都映射为 ready，当前 UI 仍只显示 `user_sync_entry_closed_current_phase`，不打开真实同步按钮或任何恢复码 / 设备授权操作。`manager_sync_action_command_preview.v1` 在此基础上只输出 future action 的非执行 command preview，包括 request / result boundary 和错误分类摘要；它不是 bridge DTO，也不能携带真实 request payload 或 result material。
+当前 Dart 准备层接受的 readiness bridge 摘要格式为 `manager_sync_readiness.v1`，redaction policy 为 `summary_only_no_tokens_recovery_secret_or_payload_bytes`。该摘要只作为 future bridge mapper 的输入形状，不是新增 `ManagerBridge` contract，也不是 C ABI。摘要字段必须按 allowlist 映射到 `RecoverySetupReadiness`、`RecoveryRestoreReadiness`、`DeviceJoinReadiness` 和 `DeviceRevocationReadiness`；未知状态、未知前置条件或未知错误码必须降级为安全分类，不能进入 UI、settings draft 或诊断报告原文。即便四条 readiness 都映射为 ready，当前 UI 仍只显示 `user_sync_entry_closed_current_phase`，不打开真实同步按钮或任何恢复码 / 设备授权操作。`manager_sync_action_command_preview.v1` 在此基础上只输出 future action 的非执行 command preview，包括 request / result boundary、allowed fields、forbidden material policy 和错误分类摘要；它不是 bridge DTO，也不能携带真实 request payload 或 result material。
 
 `manager_sync_readiness.v1` 接线前验收包按以下规则治理：
 
@@ -264,6 +264,12 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 - `sync.action_command_request_boundaries`
 - `sync.action_command_result_boundaries`
 - `sync.action_command_error_codes`
+- `sync.action_request_statuses`
+- `sync.action_request_allowed_fields`
+- `sync.action_request_forbidden_material`
+- `sync.action_result_statuses`
+- `sync.action_result_allowed_fields`
+- `sync.action_result_forbidden_material`
 - `sync.user_sync_enabled`
 - `sync.recovery_status`
 - `sync.recovery_blocker`
@@ -312,7 +318,7 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 - `device.pending_count`
 - `device.revoked_count`
 
-当前已接入 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers`、`sync.readiness_*`、`sync.interaction_*`、`sync.action_command_*`、`sync.user_sync_enabled`、`sync.connection_status`、`sync.connection_blocker`、`sync.endpoint_status`、`sync.access_token_status`、`sync.transport_mode`、`sync.server_state_status`、`sync.last_remote_error_code`、`sync.recovery_status`、`sync.recovery_blocker`、`sync.recovery_save_confirmation`、`sync.recovery_record_status`、`sync.recovery_record_blocker`、`sync.recovery_first_upload_gate`、`sync.recovery_readiness_blockers`、`sync.recovery_setup_*`、`sync.recovery_restore_*`、`sync.device_authorization_status`、`sync.device_authorization_blocker`、`sync.join_request_status`、`sync.authorization_package_status`、`sync.authorization_package_blocker`、`sync.authorization_package_preconditions`、`sync.device_revocation_status`、`sync.lost_device_risk`、`sync.key_epoch_status`、`sync.device_authorization_readiness_blockers`、`sync.device_join_*` 和 `sync.device_revocation_*`。这些字段只能输出状态码、聚合计数、时间摘要、action id、intent status、execution status、data policy、stop line、request boundary、result boundary、错误分类、前置条件码和 allowlist 来源标签。`sync.readiness_bridge_source` 只能记录 `manager_default_closed_readiness`、`ffi_native_readiness`、`fixture_readiness`、`injected_test_readiness`、`unknown_bridge_readiness_source` 或 `bridge_readiness_summary_invalid` 这类来源标签。不得输出恢复码、token、短码、请求 / 响应体、签名、wrapped material、payload bytes、用户词、真实路径或 provider exception 原文。
+当前已接入 `sync.entry_state`、`sync.entry_blocker`、`sync.local_evidence_source`、`sync.production_blockers`、`sync.readiness_*`、`sync.interaction_*`、`sync.action_command_*`、`sync.action_request_*`、`sync.action_result_*`、`sync.user_sync_enabled`、`sync.connection_status`、`sync.connection_blocker`、`sync.endpoint_status`、`sync.access_token_status`、`sync.transport_mode`、`sync.server_state_status`、`sync.last_remote_error_code`、`sync.recovery_status`、`sync.recovery_blocker`、`sync.recovery_save_confirmation`、`sync.recovery_record_status`、`sync.recovery_record_blocker`、`sync.recovery_first_upload_gate`、`sync.recovery_readiness_blockers`、`sync.recovery_setup_*`、`sync.recovery_restore_*`、`sync.device_authorization_status`、`sync.device_authorization_blocker`、`sync.join_request_status`、`sync.authorization_package_status`、`sync.authorization_package_blocker`、`sync.authorization_package_preconditions`、`sync.device_revocation_status`、`sync.lost_device_risk`、`sync.key_epoch_status`、`sync.device_authorization_readiness_blockers`、`sync.device_join_*` 和 `sync.device_revocation_*`。这些字段只能输出状态码、聚合计数、时间摘要、action id、intent status、execution status、data policy、stop line、request boundary、result boundary、allowed fields、forbidden material policy、错误分类、前置条件码和 allowlist 来源标签。`sync.readiness_bridge_source` 只能记录 `manager_default_closed_readiness`、`ffi_native_readiness`、`fixture_readiness`、`injected_test_readiness`、`unknown_bridge_readiness_source` 或 `bridge_readiness_summary_invalid` 这类来源标签。不得输出恢复码、token、短码、请求 / 响应体、签名、wrapped material、payload bytes、用户词、真实路径或 provider exception 原文。
 
 日志允许记录操作类型、状态码、聚合计数、耗时和非敏感错误码。截图和测试 fixture 必须使用合成词、虚构设备、虚构服务端和合成短码。
 
@@ -323,7 +329,7 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 | 层级 | 测试重点 |
 | --- | --- |
 | Dart sync gate helper | 从 settings draft、backend gate、部署证据摘要、恢复码 setup / restore 状态和设备 join / revocation 状态派生 sync entry state、readiness 聚合摘要和只读 action intent 进入计划。 |
-| Dart action command preview | 从只读 action intent 派生 `manager_sync_action_command_preview.v1` 摘要，校验 execution status、data policy、stop line、request boundary、result boundary 和错误分类不会变成可执行 bridge 命令。 |
+| Dart action command preview | 从只读 action intent 派生 `manager_sync_action_command_preview.v1` 摘要，校验 execution status、data policy、stop line、request boundary、result boundary、request / result allowed fields、forbidden material policy 和错误分类不会变成可执行 bridge 命令。 |
 | Dart connection helper | 从 endpoint、access token 存在性、transport 分类和 `sync_connection_health.v1` 回填摘要派生连接健康摘要。 |
 | Evidence bundle scenarios | 用开发期 `manager_sync_evidence_bundle.v1` fixture 组合 readiness、connection health、部署证据和设备 gate，校验 settings / sync / diagnostics 同源派生和脱敏边界。 |
 | Widget tests | 每个阻塞状态的按钮禁用、文案、诊断入口、连接健康 section、恢复码 / 设备授权四条只读流程摘要和下一步提示；`preflight_ready` 下仍不能启用真实同步。 |

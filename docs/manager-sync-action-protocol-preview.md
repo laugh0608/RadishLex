@@ -12,6 +12,8 @@
 - blocker、required evidence、source tag。
 - data policy、stop line。
 - request boundary、result boundary。
+- request status、request allowed fields、result status、result allowed fields。
+- forbidden material policy。
 - allowlist 错误分类。
 
 禁止展示：
@@ -30,6 +32,46 @@
 | `device_revocation` | `request_summary_only_no_device_signature_or_key_epoch` | `result_summary_only_no_revocation_record_or_key_epoch_material` | `no_signature_key_epoch_or_wrapped_material` | `no_device_revocation_current_phase` |
 
 这些边界的含义是：UI、fixture、settings preview 和 diagnostics 只能描述未来 request / result 的安全外壳，不能携带真实命令 payload。后续真实 bridge contract 设计时，应重新定义结构化请求 / 响应，并复用这些停止线作为验收前置，而不是把 preview 字段直接当作 bridge DTO。
+
+## Request / Result 预演字段
+
+当前 Dart 层新增 `SyncActionRequestPreview` 和 `SyncActionResultPreview`，由 `SyncActionCommandPreviewPlan` 派生。它们只表达 future bridge command 的验收形状，不创建 request，不接收 result，不写 settings draft，也不调用 `ManagerBridge`。
+
+request status 只允许：
+
+- `request_not_built_current_phase`
+- `request_blocked_by_readiness`
+- `request_blocked_until_user_confirmation`
+- `request_shape_ready_for_future_bridge`
+- `request_blocked_by_missing_intent`
+- `request_blocked_by_unknown_execution_status`
+
+result status 只允许：
+
+- `result_not_available_current_phase`
+- `result_blocked_by_readiness`
+- `result_blocked_until_user_confirmation`
+- `result_shape_ready_for_future_bridge`
+- `result_blocked_by_missing_intent`
+- `result_blocked_by_unknown_execution_status`
+
+当前 Phase 4 默认场景中，即使 readiness 全部 ready，仍输出 `request_not_built_current_phase` 和 `result_not_available_current_phase`；readiness 阻塞时输出 `request_blocked_by_readiness` 和 `result_blocked_by_readiness`。
+
+| Action | Request allowed fields | Result allowed fields |
+| --- | --- | --- |
+| `recovery_setup` | `deployment_evidence_source_tag`, `device_backend_gate`, `explicit_user_start`, `save_confirmation_status` | `status_code`, `recovery_record_status`, `first_upload_gate`, `next_required_evidence` |
+| `recovery_restore` | `deployment_evidence_source_tag`, `restore_attempt_status`, `recovery_record_lookup_status`, `device_registration_status` | `status_code`, `restore_result_status`, `device_registration_status`, `next_required_evidence` |
+| `join_request_authorization` | `join_request_status`, `short_code_verification_status`, `active_device_requirement`, `authorization_package_preconditions` | `status_code`, `authorization_package_status`, `device_state_status`, `next_required_evidence` |
+| `device_revocation` | `target_device_status_summary`, `active_device_requirement`, `lost_device_risk_acknowledgement`, `key_epoch_status` | `status_code`, `revocation_record_status`, `key_epoch_status`, `next_required_evidence` |
+
+所有 action 的 request / result preview 都必须携带同一组 forbidden material policy：
+
+- `recovery_secret_material`
+- `join_verifier_material`
+- `bearer_credential_material`
+- `signature_material`
+- `wrapped_sync_material`
+- `opaque_transport_content`
 
 ## 错误分类
 
@@ -53,6 +95,12 @@
 - `sync.action_command_request_boundaries`
 - `sync.action_command_result_boundaries`
 - `sync.action_command_error_codes`
+- `sync.action_request_statuses`
+- `sync.action_request_allowed_fields`
+- `sync.action_request_forbidden_material`
+- `sync.action_result_statuses`
+- `sync.action_result_allowed_fields`
+- `sync.action_result_forbidden_material`
 
 同步页可以把四条 action 拆成单行展示；设置页和诊断报告可以展示聚合摘要。两者都不得新增按钮、点击回调、bridge 调用或 settings draft 持久化字段。
 
@@ -69,9 +117,10 @@
 
 测试必须覆盖：
 
-- 四条 action 的 request boundary、result boundary、data policy、stop line 和错误分类摘要稳定。
+- 四条 action 的 request boundary、result boundary、request allowed fields、result allowed fields、forbidden material policy、data policy、stop line 和错误分类摘要稳定。
 - readiness ready 但当前阶段关闭时仍输出 `not_executable_current_phase`。
 - readiness 阻塞时只输出 `blocked_by_readiness`。
+- request / result status 与 execution status 的派生关系稳定。
 - unsafe redaction、未知 native 状态、payload-shaped 字段和 secret-shaped 字段不进入 UI、settings preview、diagnostics 或 fixture 预期输出。
 
 ## 进入真实 bridge 前的停止线

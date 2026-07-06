@@ -113,6 +113,30 @@ class SyncDeviceAuthorizationSection extends StatelessWidget {
             value: joinCommand.errorCodeSummary,
           ),
           ManagerKeyValueRow(
+            label: 'join request status',
+            value: joinCommand.requestPreview.requestStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'join request fields',
+            value: joinCommand.requestPreview.allowedFieldSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'join request forbidden',
+            value: joinCommand.requestPreview.forbiddenMaterialSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'join result status',
+            value: joinCommand.resultPreview.resultStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'join result fields',
+            value: joinCommand.resultPreview.allowedFieldSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'join result forbidden',
+            value: joinCommand.resultPreview.forbiddenMaterialSummary,
+          ),
+          ManagerKeyValueRow(
             label: 'revocation intent',
             value: revocationIntent.intentStatus,
           ),
@@ -147,6 +171,30 @@ class SyncDeviceAuthorizationSection extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'revocation command errors',
             value: revocationCommand.errorCodeSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation request status',
+            value: revocationCommand.requestPreview.requestStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation request fields',
+            value: revocationCommand.requestPreview.allowedFieldSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation request forbidden',
+            value: revocationCommand.requestPreview.forbiddenMaterialSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation result status',
+            value: revocationCommand.resultPreview.resultStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation result fields',
+            value: revocationCommand.resultPreview.allowedFieldSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation result forbidden',
+            value: revocationCommand.resultPreview.forbiddenMaterialSummary,
           ),
           ManagerKeyValueRow(
             label: 'join flow',

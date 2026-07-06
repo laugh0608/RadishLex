@@ -102,6 +102,30 @@ class SyncRecoverySection extends StatelessWidget {
             value: setupCommand.errorCodeSummary,
           ),
           ManagerKeyValueRow(
+            label: 'setup request status',
+            value: setupCommand.requestPreview.requestStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'setup request fields',
+            value: setupCommand.requestPreview.allowedFieldSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'setup request forbidden',
+            value: setupCommand.requestPreview.forbiddenMaterialSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'setup result status',
+            value: setupCommand.resultPreview.resultStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'setup result fields',
+            value: setupCommand.resultPreview.allowedFieldSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'setup result forbidden',
+            value: setupCommand.resultPreview.forbiddenMaterialSummary,
+          ),
+          ManagerKeyValueRow(
             label: 'restore intent',
             value: restoreIntent.intentStatus,
           ),
@@ -136,6 +160,30 @@ class SyncRecoverySection extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'restore command errors',
             value: restoreCommand.errorCodeSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore request status',
+            value: restoreCommand.requestPreview.requestStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore request fields',
+            value: restoreCommand.requestPreview.allowedFieldSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore request forbidden',
+            value: restoreCommand.requestPreview.forbiddenMaterialSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore result status',
+            value: restoreCommand.resultPreview.resultStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore result fields',
+            value: restoreCommand.resultPreview.allowedFieldSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore result forbidden',
+            value: restoreCommand.resultPreview.forbiddenMaterialSummary,
           ),
           ManagerKeyValueRow(
             label: 'setup flow',

@@ -10,7 +10,7 @@
 - 诊断报告预览按本文字段索引展示分组、字段筛选和脱敏文本复制入口；复制内容与导出文本一致，仍只包含脱敏摘要。
 - 设置页可以导入 `manager_sync_readiness.v1` 非敏感摘要用于本地开发联调；该摘要只保存在当前 manager 内存态，驱动同步页、设置页 gate preview 和诊断报告的派生字段，不写入 settings draft，也不改变 `ManagerBridge` contract 或 C ABI。
 - 开发期 `manager_sync_evidence_bundle.v1` 只作为测试 fixture，把 readiness 摘要、connection health 摘要、部署证据来源和设备 production gate 组合成同一份预演输入；settings draft 仍只保存非敏感草案和净化后的 connection probe record，不保存 bundle 原文。
-- `manager_sync_action_command_preview.v1` 只从当前只读 action intent 派生非执行命令摘要，用于 settings gate preview、同步页和诊断报告展示 execution status、data policy、stop line、request boundary、result boundary 和错误分类；它不写 settings draft，不创建 bridge 请求，也不携带命令 payload。
+- `manager_sync_action_command_preview.v1` 只从当前只读 action intent 派生非执行命令摘要，用于 settings gate preview、同步页和诊断报告展示 execution status、data policy、stop line、request boundary、result boundary、request / result allowed fields、forbidden material policy 和错误分类；它不写 settings draft，不创建 bridge 请求，也不携带命令 payload。
 - 真实远端同步、恢复码和设备授权 UI 继续关闭；`preflight_ready` 只表示本地草案和预检条件可解释，不代表用户可用同步入口已开放。
 
 ## Settings Draft JSON
@@ -74,7 +74,7 @@ settings draft 不得保存：
 
 `manager_sync_evidence_bundle.v1` 预演场景在测试中同时注入 readiness snapshot 和 connection probe record，用于确认 settings gate preview、同步页和诊断报告对同一份证据派生一致。bundle 不通过 UI 导入，不写 settings JSON，也不替代 `manager_sync_readiness.v1` 或 `sync_connection_health.v1` 的 envelope 校验；不安全 readiness redaction 会回退默认关闭 readiness，不安全 connection redaction 会显示 `probe_summary_invalid`，两者都不能改变用户同步入口关闭状态。
 
-`manager_sync_action_command_preview.v1` 当前字段固定为摘要层：`format`、`action_id`、`visibility_status`、`intent_status`、`execution_status`、`blocker`、`required_evidence`、`source_tag`、`data_policy`、`stop_line`、`request_boundary`、`result_boundary` 和 `error_codes`。其中 `execution_status` 只允许表达 `not_executable_current_phase`、`blocked_by_readiness`、`blocked_until_user_confirmation` 或后续显式开放后的 `ready_for_future_bridge_command`；当前 UI 不会把这些 preview 转换成按钮点击或 bridge 调用。四条 action 的 request / result 边界和错误分类见 [`docs/manager-sync-action-protocol-preview.md`](manager-sync-action-protocol-preview.md)。
+`manager_sync_action_command_preview.v1` 当前字段固定为摘要层：`format`、`action_id`、`visibility_status`、`intent_status`、`execution_status`、`blocker`、`required_evidence`、`source_tag`、`data_policy`、`stop_line`、`request_boundary`、`result_boundary`、`request_status`、`request_allowed_fields`、`result_status`、`result_allowed_fields`、`forbidden_material` 和 `error_codes`。其中 `execution_status` 只允许表达 `not_executable_current_phase`、`blocked_by_readiness`、`blocked_until_user_confirmation` 或后续显式开放后的 `ready_for_future_bridge_command`；当前 UI 不会把这些 preview 转换成按钮点击或 bridge 调用。四条 action 的 request / result 边界和错误分类见 [`docs/manager-sync-action-protocol-preview.md`](manager-sync-action-protocol-preview.md)。
 
 ## 连接健康摘要
 
@@ -210,6 +210,12 @@ Manager UI 预览会保留完整脱敏文本，并额外按 `runtime`、`setting
 | `sync.action_command_request_boundaries` | `gate` | 四条 action 的 request 摘要边界，不代表 bridge request DTO。 |
 | `sync.action_command_result_boundaries` | `gate` | 四条 action 的 result 摘要边界，不代表 bridge result DTO。 |
 | `sync.action_command_error_codes` | `error_code` | 四条 action 的 allowlist 错误分类摘要。 |
+| `sync.action_request_statuses` | `gate` | 四条 action 的 request preview 状态；当前默认不构建真实 request。 |
+| `sync.action_request_allowed_fields` | `gate` | 四条 action 未来 request 允许出现的非敏感字段码，不包含真实 payload。 |
+| `sync.action_request_forbidden_material` | `policy` | request preview 禁止携带的敏感材料策略码。 |
+| `sync.action_result_statuses` | `gate` | 四条 action 的 result preview 状态；当前默认没有真实 result。 |
+| `sync.action_result_allowed_fields` | `gate` | 四条 action 未来 result 允许出现的非敏感字段码，不包含密文材料或签名 bytes。 |
+| `sync.action_result_forbidden_material` | `policy` | result preview 禁止携带的敏感材料策略码。 |
 | `sync.user_sync_enabled` | `gate` | 当前用户可用真实同步入口是否开放；当前阶段应为 `false`。 |
 | `sync.recovery_status` | `gate` | 恢复码流程结构化状态；当前为 `recovery_code_flow_closed`。 |
 | `sync.recovery_blocker` | `gate` | 恢复码流程当前阻塞码；当前为 `recovery_code_flow_closed`。 |

@@ -402,6 +402,36 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
             'error_code',
           ),
           _diagnosticsItem(
+            'sync.action_request_statuses',
+            actionCommandPlan.requestStatusSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.action_request_allowed_fields',
+            actionCommandPlan.requestAllowedFieldSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.action_request_forbidden_material',
+            actionCommandPlan.requestForbiddenMaterialSummary,
+            'policy',
+          ),
+          _diagnosticsItem(
+            'sync.action_result_statuses',
+            actionCommandPlan.resultStatusSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.action_result_allowed_fields',
+            actionCommandPlan.resultAllowedFieldSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.action_result_forbidden_material',
+            actionCommandPlan.resultForbiddenMaterialSummary,
+            'policy',
+          ),
+          _diagnosticsItem(
             'sync.user_sync_enabled',
             syncGateAudit.entryGate.userSyncEnabled.toString(),
             'gate',

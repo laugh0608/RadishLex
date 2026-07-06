@@ -781,6 +781,30 @@ class _SettingsSyncGatePreview extends StatelessWidget {
             value: actionCommandPlan.errorCodeSummary,
           ),
           ManagerKeyValueRow(
+            label: 'request status',
+            value: actionCommandPlan.requestStatusSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'request fields',
+            value: actionCommandPlan.requestAllowedFieldSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'request forbidden material',
+            value: actionCommandPlan.requestForbiddenMaterialSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'result status',
+            value: actionCommandPlan.resultStatusSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'result fields',
+            value: actionCommandPlan.resultAllowedFieldSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'result forbidden material',
+            value: actionCommandPlan.resultForbiddenMaterialSummary,
+          ),
+          ManagerKeyValueRow(
             label: 'user sync enabled',
             value: audit.entryGate.userSyncEnabled.toString(),
           ),

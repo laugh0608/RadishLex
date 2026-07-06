@@ -75,6 +75,15 @@ const syncActionCommandResultBoundarySummary =
 const syncActionCommandErrorCodeSummary =
     'configuration_missing, backend_unavailable, deployment_unverified, recovery_code_required, recovery_record_missing, recovery_record_revoked, local_data_inconsistent, authentication_required, recovery_code_invalid, network_unreachable, join_request_expired, authorization_rejected, device_revoked, key_epoch_rotation_required';
 
+const syncActionRequestAllowedFieldSummary =
+    'deployment_evidence_source_tag, device_backend_gate, explicit_user_start, save_confirmation_status, restore_attempt_status, recovery_record_lookup_status, device_registration_status, join_request_status, short_code_verification_status, active_device_requirement, authorization_package_preconditions, target_device_status_summary, lost_device_risk_acknowledgement, key_epoch_status';
+
+const syncActionResultAllowedFieldSummary =
+    'status_code, recovery_record_status, first_upload_gate, next_required_evidence, restore_result_status, device_registration_status, authorization_package_status, device_state_status, revocation_record_status, key_epoch_status';
+
+const syncActionForbiddenMaterialSummary =
+    'recovery_secret_material, join_verifier_material, bearer_credential_material, signature_material, wrapped_sync_material, opaque_transport_content';
+
 const representativeSyncReadinessScenarioIds = [
   'all_ready_current_phase_closed',
   'recovery_record_missing',
@@ -120,6 +129,11 @@ class SyncReadinessScenario {
     this.expectedActionCommandResultBoundaries =
         syncActionCommandResultBoundarySummary,
     this.expectedActionCommandErrorCodes = syncActionCommandErrorCodeSummary,
+    this.expectedActionRequestAllowedFields =
+        syncActionRequestAllowedFieldSummary,
+    this.expectedActionResultAllowedFields =
+        syncActionResultAllowedFieldSummary,
+    this.expectedActionForbiddenMaterials = syncActionForbiddenMaterialSummary,
     required this.expectedUserSyncEnabled,
   });
 
@@ -145,6 +159,9 @@ class SyncReadinessScenario {
   final String expectedActionCommandRequestBoundaries;
   final String expectedActionCommandResultBoundaries;
   final String expectedActionCommandErrorCodes;
+  final String expectedActionRequestAllowedFields;
+  final String expectedActionResultAllowedFields;
+  final String expectedActionForbiddenMaterials;
   final bool expectedUserSyncEnabled;
 }
 
