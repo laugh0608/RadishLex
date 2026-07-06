@@ -87,6 +87,14 @@ void main() {
     expect(find.text('setup intent'), findsOneWidget);
     expect(find.text('setup intent blocker'), findsOneWidget);
     expect(find.text('setup intent evidence'), findsOneWidget);
+    expect(find.text('setup command'), findsOneWidget);
+    expect(find.text('setup command policy'), findsOneWidget);
+    expect(find.text('setup command stop'), findsOneWidget);
+    expect(find.text('no_recovery_code_or_wrapped_material'), findsWidgets);
+    expect(
+      find.text('no_recovery_code_generation_current_phase'),
+      findsWidgets,
+    );
     expect(find.text('recovery_restore_flow_closed'), findsOneWidget);
     expect(find.text('recovery_code_input_closed'), findsWidgets);
     expect(find.text('input_not_available_current_phase'), findsOneWidget);
@@ -123,6 +131,17 @@ void main() {
     expect(find.text('join intent'), findsOneWidget);
     expect(find.text('join intent blocker'), findsOneWidget);
     expect(find.text('join intent evidence'), findsOneWidget);
+    expect(find.text('join command'), findsOneWidget);
+    expect(find.text('join command policy'), findsOneWidget);
+    expect(find.text('join command stop'), findsOneWidget);
+    expect(
+      find.text('no_short_code_signature_or_wrapped_material'),
+      findsWidgets,
+    );
+    expect(
+      find.text('no_join_request_or_authorization_package_current_phase'),
+      findsWidgets,
+    );
     expect(find.text('short_code_verification_not_started'), findsOneWidget);
     expect(
       find.text(
@@ -134,6 +153,14 @@ void main() {
     expect(find.text('revocation intent'), findsOneWidget);
     expect(find.text('revocation intent blocker'), findsOneWidget);
     expect(find.text('revocation intent evidence'), findsOneWidget);
+    expect(find.text('revocation command'), findsOneWidget);
+    expect(find.text('revocation command policy'), findsOneWidget);
+    expect(find.text('revocation command stop'), findsOneWidget);
+    expect(
+      find.text('no_signature_key_epoch_or_wrapped_material'),
+      findsWidgets,
+    );
+    expect(find.text('no_device_revocation_current_phase'), findsWidgets);
     expect(find.text('active_existing_device_required'), findsOneWidget);
     expect(
       find.text(
@@ -360,6 +387,12 @@ void _expectVisibleSyncReadinessScenario(SyncReadinessScenario scenario) {
     findsWidgets,
     reason: scenario.id,
   );
+  for (final executionStatus in _expectedActionCommandExecutionStatuses(
+    scenario.expectedInteractionStatuses,
+  )) {
+    expect(find.text(executionStatus), findsWidgets, reason: scenario.id);
+  }
+  _expectActionCommandPolicyAndStopLines(scenario.id);
 
   if (scenario.expectedIssueCodes != null) {
     expect(
@@ -408,8 +441,58 @@ void _expectVisibleSyncEvidenceBundleScenario(
   expect(find.text(scenario.expectedLocalInsecureTls), findsWidgets);
   expect(find.text(scenario.expectedLastRemoteErrorCode), findsWidgets);
   expect(find.text(scenario.expectedUserSyncEnabled.toString()), findsWidgets);
+  for (final executionStatus in _expectedActionCommandExecutionStatuses(
+    scenario.expectedInteractionStatuses,
+  )) {
+    expect(find.text(executionStatus), findsWidgets, reason: scenario.id);
+  }
+  _expectActionCommandPolicyAndStopLines(scenario.id);
 
   for (final fragment in syncEvidenceBundleSensitiveLeakFragments) {
     expect(find.textContaining(fragment), findsNothing, reason: scenario.id);
+  }
+}
+
+void _expectActionCommandPolicyAndStopLines(String reason) {
+  for (final value in const [
+    'no_recovery_code_or_wrapped_material',
+    'no_recovery_code_input_or_device_secret',
+    'no_short_code_signature_or_wrapped_material',
+    'no_signature_key_epoch_or_wrapped_material',
+    'no_recovery_code_generation_current_phase',
+    'no_recovery_code_input_current_phase',
+    'no_join_request_or_authorization_package_current_phase',
+    'no_device_revocation_current_phase',
+  ]) {
+    expect(find.text(value), findsWidgets, reason: reason);
+  }
+}
+
+List<String> _expectedActionCommandExecutionStatuses(
+  String intentStatusSummary,
+) {
+  if (intentStatusSummary == 'none') {
+    return const ['none'];
+  }
+  return intentStatusSummary
+      .split(', ')
+      .map((entry) => entry.substring(entry.indexOf('=') + 1))
+      .map(_expectedActionCommandExecutionStatus)
+      .toSet()
+      .toList(growable: false);
+}
+
+String _expectedActionCommandExecutionStatus(String intentStatus) {
+  switch (intentStatus) {
+    case 'ready':
+      return 'ready_for_future_bridge_command';
+    case 'requires_confirmation':
+      return 'blocked_until_user_confirmation';
+    case 'blocked':
+      return 'blocked_by_readiness';
+    case 'closed_current_phase':
+      return 'not_executable_current_phase';
+    default:
+      return 'blocked_by_unknown_intent_status';
   }
 }

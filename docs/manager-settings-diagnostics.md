@@ -10,6 +10,7 @@
 - 诊断报告预览按本文字段索引展示分组、字段筛选和脱敏文本复制入口；复制内容与导出文本一致，仍只包含脱敏摘要。
 - 设置页可以导入 `manager_sync_readiness.v1` 非敏感摘要用于本地开发联调；该摘要只保存在当前 manager 内存态，驱动同步页、设置页 gate preview 和诊断报告的派生字段，不写入 settings draft，也不改变 `ManagerBridge` contract 或 C ABI。
 - 开发期 `manager_sync_evidence_bundle.v1` 只作为测试 fixture，把 readiness 摘要、connection health 摘要、部署证据来源和设备 production gate 组合成同一份预演输入；settings draft 仍只保存非敏感草案和净化后的 connection probe record，不保存 bundle 原文。
+- `manager_sync_action_command_preview.v1` 只从当前只读 action intent 派生非执行命令摘要，用于 settings gate preview、同步页和诊断报告展示 execution status、data policy 和 stop line；它不写 settings draft，不创建 bridge 请求，也不携带命令 payload。
 - 真实远端同步、恢复码和设备授权 UI 继续关闭；`preflight_ready` 只表示本地草案和预检条件可解释，不代表用户可用同步入口已开放。
 
 ## Settings Draft JSON
@@ -67,11 +68,13 @@ settings draft 不得保存：
 
 `sync.entry_blocker` 记录当前第一阻塞码，`sync.production_blockers` 记录聚合阻塞码。即使状态进入 `preflight_ready`，同步页的 `启用同步` 主按钮仍保持禁用。用户可用同步入口必须等待可用平台私钥 backend、发布级目标部署运行证据、恢复码和设备授权链路满足对应停止线。
 
-当前 `sync.production_blockers` 还会聚合恢复码保存确认、恢复记录、授权包前置条件、设备撤销、丢失设备风险提示和 key epoch 状态，例如 `recovery_record_not_created`、`recovery_code_save_confirmation_required`、`authorization_package_prerequisites_blocked`、`lost_device_risk_notice_required` 和 `key_epoch_rotation_not_started`。恢复码 setup / restore 与设备 join / revocation 的 readiness 摘要只输出状态码、前置条件和错误分类，并通过 `SyncReadinessFlowSummary` 聚合为 blocked flows、issue codes、next required evidence、source tags 和 user sync blocked；这些值只用于解释入口阻塞，不代表已创建恢复记录、join request、授权包或撤销记录。`SyncInteractionEntryPlan` / `SyncInteractionActionIntent` 会把四条未来操作入口额外汇总为 action id、visibility、intent status、blocker、required evidence 和 source tag；这些字段只描述非执行进入计划，不代表按钮可点击或 bridge 操作已开放。Dart 侧 `manager_sync_readiness.v1` mapper 只接受 allowlist 状态码和来源标签，未知值降级为 `unexpected_bridge_error_code` / `unexpected_bridge_required_evidence`，不把原始 bridge 异常、路径、token、恢复码、短码或 payload 写入 UI、settings draft 或诊断报告。
+当前 `sync.production_blockers` 还会聚合恢复码保存确认、恢复记录、授权包前置条件、设备撤销、丢失设备风险提示和 key epoch 状态，例如 `recovery_record_not_created`、`recovery_code_save_confirmation_required`、`authorization_package_prerequisites_blocked`、`lost_device_risk_notice_required` 和 `key_epoch_rotation_not_started`。恢复码 setup / restore 与设备 join / revocation 的 readiness 摘要只输出状态码、前置条件和错误分类，并通过 `SyncReadinessFlowSummary` 聚合为 blocked flows、issue codes、next required evidence、source tags 和 user sync blocked；这些值只用于解释入口阻塞，不代表已创建恢复记录、join request、授权包或撤销记录。`SyncInteractionEntryPlan` / `SyncInteractionActionIntent` 会把四条未来操作入口额外汇总为 action id、visibility、intent status、blocker、required evidence 和 source tag；`SyncActionCommandPreviewPlan` 再汇总 action id、execution status、data policy 和 stop line。这些字段只描述非执行进入计划和命令预演，不代表按钮可点击或 bridge 操作已开放。Dart 侧 `manager_sync_readiness.v1` mapper 只接受 allowlist 状态码和来源标签，未知值降级为 `unexpected_bridge_error_code` / `unexpected_bridge_required_evidence`，不把原始 bridge 异常、路径、token、恢复码、短码或 payload 写入 UI、settings draft 或诊断报告。
 
 设置页提供开发期“同步 readiness 摘要导入”入口，接受 `manager_sync_readiness.v1` JSON 摘要并只保留映射后的 `ManagerSyncReadinessBridgeSnapshot` 内存态。导入前必须检查 `format == manager_sync_readiness.v1` 和 `redaction_policy == summary_only_no_tokens_recovery_secret_or_payload_bytes`；不符合时只显示结构化错误码，例如 `readiness_summary_format_unsupported` 或 `readiness_summary_redaction_policy_unsupported`，不得应用到 UI 状态。Dart mapper 暴露同一套导入校验结果，合法样本、不支持格式、不安全 redaction、envelope 类型错误和未知状态码降级都应有 fixture / helper 覆盖，避免未来 bridge 接线时绕过 UI 预检；开发期场景目录见 [`docs/manager-readiness-scenarios.md`](manager-readiness-scenarios.md)。导入成功后，设置页、同步页和诊断报告只展示派生后的 readiness source、blocked flows、issue codes、next evidence、interaction plan 和 user sync blocked，不展示原始 JSON，也不持久化恢复码、短码、token、私钥、签名、wrapped material、payload bytes、请求 / 响应体或路径。settings gate preview、同步页和诊断报告字段回归应遍历同一份 readiness 场景目录，确认 `sync.readiness_*`、`sync.interaction_*` 和 `sync.user_sync_enabled` 不分叉。清除导入摘要后回到 `manager_default_closed_readiness`。
 
 `manager_sync_evidence_bundle.v1` 预演场景在测试中同时注入 readiness snapshot 和 connection probe record，用于确认 settings gate preview、同步页和诊断报告对同一份证据派生一致。bundle 不通过 UI 导入，不写 settings JSON，也不替代 `manager_sync_readiness.v1` 或 `sync_connection_health.v1` 的 envelope 校验；不安全 readiness redaction 会回退默认关闭 readiness，不安全 connection redaction 会显示 `probe_summary_invalid`，两者都不能改变用户同步入口关闭状态。
+
+`manager_sync_action_command_preview.v1` 当前字段固定为摘要层：`format`、`action_id`、`visibility_status`、`intent_status`、`execution_status`、`blocker`、`required_evidence`、`source_tag`、`data_policy` 和 `stop_line`。其中 `execution_status` 只允许表达 `not_executable_current_phase`、`blocked_by_readiness`、`blocked_until_user_confirmation` 或后续显式开放后的 `ready_for_future_bridge_command`；当前 UI 不会把这些 preview 转换成按钮点击或 bridge 调用。
 
 ## 连接健康摘要
 

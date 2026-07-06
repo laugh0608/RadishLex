@@ -17,6 +17,9 @@ class SyncDeviceAuthorizationSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final joinIntent = interactionPlan.intentFor('join_request_authorization');
     final revocationIntent = interactionPlan.intentFor('device_revocation');
+    final commandPlan = interactionPlan.actionCommandPreviewPlan;
+    final joinCommand = commandPlan.previewFor('join_request_authorization');
+    final revocationCommand = commandPlan.previewFor('device_revocation');
 
     return ManagerSection(
       key: const Key('sync-device-authorization-readiness-section'),
@@ -86,6 +89,18 @@ class SyncDeviceAuthorizationSection extends StatelessWidget {
             value: joinIntent.requiredEvidenceSummary,
           ),
           ManagerKeyValueRow(
+            label: 'join command',
+            value: joinCommand.executionStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'join command policy',
+            value: joinCommand.dataPolicy,
+          ),
+          ManagerKeyValueRow(
+            label: 'join command stop',
+            value: joinCommand.stopLine,
+          ),
+          ManagerKeyValueRow(
             label: 'revocation intent',
             value: revocationIntent.intentStatus,
           ),
@@ -96,6 +111,18 @@ class SyncDeviceAuthorizationSection extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'revocation intent evidence',
             value: revocationIntent.requiredEvidenceSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation command',
+            value: revocationCommand.executionStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation command policy',
+            value: revocationCommand.dataPolicy,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation command stop',
+            value: revocationCommand.stopLine,
           ),
           ManagerKeyValueRow(
             label: 'join flow',

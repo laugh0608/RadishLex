@@ -407,7 +407,6 @@ class ManagerSyncEntryGate {
         readinessFlows: readinessFlowSummaries,
         userSyncEnabled: userSyncEnabled,
       );
-
   String get readinessBlockedFlowSummary {
     return managerSyncCodeSummary(
       readinessFlowSummaries

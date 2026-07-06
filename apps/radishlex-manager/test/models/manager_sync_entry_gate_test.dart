@@ -217,6 +217,11 @@ void main() {
         gate.interactionEntryPlan.blockerSummary,
         scenario.expectedInteractionBlockers,
       );
+      _expectActionCommandPreviewPlan(
+        gate.interactionEntryPlan.actionCommandPreviewPlan,
+        expectedIntentStatusSummary: scenario.expectedInteractionStatuses,
+        expectedBlockerSummary: scenario.expectedInteractionBlockers,
+      );
       expect(gate.userSyncEnabled, scenario.expectedUserSyncEnabled);
 
       final summary = _entryGateSummary(gate);
@@ -268,6 +273,11 @@ void main() {
       expect(
         gate.interactionEntryPlan.blockerSummary,
         scenario.expectedInteractionBlockers,
+      );
+      _expectActionCommandPreviewPlan(
+        gate.interactionEntryPlan.actionCommandPreviewPlan,
+        expectedIntentStatusSummary: scenario.expectedInteractionStatuses,
+        expectedBlockerSummary: scenario.expectedInteractionBlockers,
       );
       expect(gate.userSyncEnabled, scenario.expectedUserSyncEnabled);
       expect(
@@ -337,6 +347,30 @@ void main() {
         diagnostics,
         contains(
           'sync.server_state_status: ${scenario.expectedServerStateStatus}',
+        ),
+      );
+      expect(
+        diagnostics,
+        contains(
+          'sync.action_command_format: $managerSyncActionCommandPreviewFormat',
+        ),
+      );
+      expect(
+        diagnostics,
+        contains(
+          'sync.action_command_intent_statuses: ${scenario.expectedInteractionStatuses}',
+        ),
+      );
+      expect(
+        diagnostics,
+        contains(
+          'sync.action_command_execution_statuses: ${_expectedActionCommandExecutionSummary(scenario.expectedInteractionStatuses)}',
+        ),
+      );
+      expect(
+        diagnostics,
+        contains(
+          'sync.action_command_blockers: ${scenario.expectedInteractionBlockers}',
         ),
       );
 
@@ -627,6 +661,18 @@ void main() {
       intent.requiredEvidenceSummary,
       'platform_private_key_backend_ready',
     );
+
+    final command = gate.interactionEntryPlan.actionCommandPreviewPlan
+        .previewFor('recovery_setup');
+    expect(command.intentStatus, 'blocked');
+    expect(command.executionStatus, 'blocked_by_readiness');
+    expect(command.blocker, 'backend_unavailable');
+    expect(
+      command.requiredEvidenceSummary,
+      'platform_private_key_backend_ready',
+    );
+    expect(command.dataPolicy, 'no_recovery_code_or_wrapped_material');
+    expect(command.stopLine, 'no_recovery_code_generation_current_phase');
   });
 
   test('entry plan supports confirmation-only future action intent', () {
@@ -654,6 +700,16 @@ void main() {
       intent.requiredEvidenceSummary,
       'blocked_until_recovery_code_saved, explicit_user_confirmation_required',
     );
+
+    final command = plan.actionCommandPreviewPlan.previewFor('recovery_setup');
+    expect(command.intentStatus, 'requires_confirmation');
+    expect(command.executionStatus, 'blocked_until_user_confirmation');
+    expect(command.blocker, 'user_confirmation_required');
+    expect(
+      command.requiredEvidenceSummary,
+      'blocked_until_recovery_code_saved, explicit_user_confirmation_required',
+    );
+    expect(command.stopLine, 'no_recovery_code_generation_current_phase');
   });
 
   test('local smoke supports development preflight without user sync', () {
@@ -1168,6 +1224,11 @@ String _entryGateSummary(ManagerSyncEntryGate gate) {
     gate.readinessSourceTagSummary,
     gate.interactionEntryPlan.blockerSummary,
     gate.interactionEntryPlan.requiredEvidenceSummary,
+    gate.interactionEntryPlan.actionCommandPreviewPlan.executionStatusSummary,
+    gate.interactionEntryPlan.actionCommandPreviewPlan.blockerSummary,
+    gate.interactionEntryPlan.actionCommandPreviewPlan.requiredEvidenceSummary,
+    gate.interactionEntryPlan.actionCommandPreviewPlan.dataPolicySummary,
+    gate.interactionEntryPlan.actionCommandPreviewPlan.stopLineSummary,
     gate.recovery.readinessBlockerSummary,
     gate.recovery.setupReadiness.prerequisiteSummary,
     gate.recovery.setupReadiness.errorCodeSummary,
@@ -1177,6 +1238,65 @@ String _entryGateSummary(ManagerSyncEntryGate gate) {
     gate.deviceAuthorization.joinReadiness.errorCodeSummary,
     gate.deviceAuthorization.revocationReadiness.errorCodeSummary,
   ].join('\n');
+}
+
+void _expectActionCommandPreviewPlan(
+  SyncActionCommandPreviewPlan plan, {
+  required String expectedIntentStatusSummary,
+  required String expectedBlockerSummary,
+}) {
+  expect(
+    plan.actionIdSummary,
+    'recovery_setup, recovery_restore, join_request_authorization, device_revocation',
+  );
+  expect(
+    plan.visibilitySummary,
+    'recovery_setup=visible, recovery_restore=visible, join_request_authorization=visible, device_revocation=visible',
+  );
+  expect(plan.intentStatusSummary, expectedIntentStatusSummary);
+  expect(
+    plan.executionStatusSummary,
+    _expectedActionCommandExecutionSummary(expectedIntentStatusSummary),
+  );
+  expect(plan.blockerSummary, expectedBlockerSummary);
+  expect(
+    plan.dataPolicySummary,
+    'no_recovery_code_or_wrapped_material, no_recovery_code_input_or_device_secret, no_short_code_signature_or_wrapped_material, no_signature_key_epoch_or_wrapped_material',
+  );
+  expect(
+    plan.stopLineSummary,
+    'no_recovery_code_generation_current_phase, no_recovery_code_input_current_phase, no_join_request_or_authorization_package_current_phase, no_device_revocation_current_phase',
+  );
+}
+
+String _expectedActionCommandExecutionSummary(String intentStatusSummary) {
+  if (intentStatusSummary == 'none') {
+    return 'none';
+  }
+  return intentStatusSummary
+      .split(', ')
+      .map((entry) {
+        final separator = entry.indexOf('=');
+        final actionId = entry.substring(0, separator);
+        final intentStatus = entry.substring(separator + 1);
+        return '$actionId=${_expectedActionCommandExecutionStatus(intentStatus)}';
+      })
+      .join(', ');
+}
+
+String _expectedActionCommandExecutionStatus(String intentStatus) {
+  switch (intentStatus) {
+    case 'ready':
+      return 'ready_for_future_bridge_command';
+    case 'requires_confirmation':
+      return 'blocked_until_user_confirmation';
+    case 'blocked':
+      return 'blocked_by_readiness';
+    case 'closed_current_phase':
+      return 'not_executable_current_phase';
+    default:
+      return 'blocked_by_unknown_intent_status';
+  }
 }
 
 String _connectionHealthSummary(SyncConnectionHealth health) {

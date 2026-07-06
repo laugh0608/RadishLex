@@ -163,6 +163,123 @@ class SyncInteractionActionIntent {
   }
 }
 
+const managerSyncActionCommandPreviewFormat =
+    'manager_sync_action_command_preview.v1';
+const managerSyncActionCommandPreviewDataPolicy =
+    'summary_only_no_secret_material_or_payload';
+
+class SyncActionCommandPreview {
+  const SyncActionCommandPreview({
+    required this.actionId,
+    required this.visibilityStatus,
+    required this.intentStatus,
+    required this.executionStatus,
+    required this.blocker,
+    required this.requiredEvidenceCodes,
+    required this.sourceTag,
+    required this.dataPolicy,
+    required this.stopLine,
+  });
+
+  final String actionId;
+  final String visibilityStatus;
+  final String intentStatus;
+  final String executionStatus;
+  final String blocker;
+  final List<String> requiredEvidenceCodes;
+  final String sourceTag;
+  final String dataPolicy;
+  final String stopLine;
+
+  String get requiredEvidenceSummary {
+    return managerSyncCodeSummary(requiredEvidenceCodes);
+  }
+
+  String get visibilitySummary {
+    return '$actionId=$visibilityStatus';
+  }
+
+  String get intentSummary {
+    return '$actionId=$intentStatus';
+  }
+
+  String get executionSummary {
+    return '$actionId=$executionStatus';
+  }
+}
+
+class SyncActionCommandPreviewPlan {
+  const SyncActionCommandPreviewPlan({required this.previews});
+
+  final List<SyncActionCommandPreview> previews;
+
+  SyncActionCommandPreview previewFor(String actionId) {
+    return previews.firstWhere(
+      (preview) => preview.actionId == actionId,
+      orElse: () => SyncActionCommandPreview(
+        actionId: actionId,
+        visibilityStatus: 'hidden',
+        intentStatus: 'blocked',
+        executionStatus: 'blocked_by_missing_intent',
+        blocker: 'interaction_intent_missing',
+        requiredEvidenceCodes: const ['interaction_intent_missing'],
+        sourceTag: 'manager_sync_action_command_preview',
+        dataPolicy: managerSyncActionCommandPreviewDataPolicy,
+        stopLine: 'no_bridge_command_without_interaction_intent',
+      ),
+    );
+  }
+
+  String get actionIdSummary {
+    return managerSyncCodeSummary(previews.map((preview) => preview.actionId));
+  }
+
+  String get visibilitySummary {
+    if (previews.isEmpty) {
+      return 'none';
+    }
+    return previews.map((preview) => preview.visibilitySummary).join(', ');
+  }
+
+  String get intentStatusSummary {
+    if (previews.isEmpty) {
+      return 'none';
+    }
+    return previews.map((preview) => preview.intentSummary).join(', ');
+  }
+
+  String get executionStatusSummary {
+    if (previews.isEmpty) {
+      return 'none';
+    }
+    return previews.map((preview) => preview.executionSummary).join(', ');
+  }
+
+  String get blockerSummary {
+    return managerSyncCodeSummary(previews.map((preview) => preview.blocker));
+  }
+
+  String get requiredEvidenceSummary {
+    return managerSyncCodeSummary(
+      previews.expand((preview) => preview.requiredEvidenceCodes),
+    );
+  }
+
+  String get sourceTagSummary {
+    return managerSyncCodeSummary(previews.map((preview) => preview.sourceTag));
+  }
+
+  String get dataPolicySummary {
+    return managerSyncCodeSummary(
+      previews.map((preview) => preview.dataPolicy),
+    );
+  }
+
+  String get stopLineSummary {
+    return managerSyncCodeSummary(previews.map((preview) => preview.stopLine));
+  }
+}
+
 class SyncInteractionEntryPlan {
   const SyncInteractionEntryPlan({required this.intents});
 
@@ -230,6 +347,10 @@ class SyncInteractionEntryPlan {
 
   String get sourceTagSummary {
     return managerSyncCodeSummary(intents.map((intent) => intent.sourceTag));
+  }
+
+  SyncActionCommandPreviewPlan get actionCommandPreviewPlan {
+    return managerSyncActionCommandPreviewPlanFromInteractionPlan(this);
   }
 }
 
@@ -537,6 +658,17 @@ SyncInteractionEntryPlan managerSyncInteractionEntryPlanFromReadinessFlows({
   );
 }
 
+SyncActionCommandPreviewPlan
+managerSyncActionCommandPreviewPlanFromInteractionPlan(
+  SyncInteractionEntryPlan interactionPlan,
+) {
+  return SyncActionCommandPreviewPlan(
+    previews: interactionPlan.intents
+        .map(_syncActionCommandPreviewFromIntent)
+        .toList(growable: false),
+  );
+}
+
 String managerSyncCodeSummary(Iterable<String> codes) {
   final uniqueCodes = <String>{};
   for (final code in codes) {
@@ -827,6 +959,67 @@ List<String> _syncInteractionRequiredEvidence({
     evidence.add('explicit_user_confirmation_required');
   }
   return evidence.toList(growable: false);
+}
+
+SyncActionCommandPreview _syncActionCommandPreviewFromIntent(
+  SyncInteractionActionIntent intent,
+) {
+  return SyncActionCommandPreview(
+    actionId: intent.actionId,
+    visibilityStatus: intent.visibilityStatus,
+    intentStatus: intent.intentStatus,
+    executionStatus: _syncActionCommandExecutionStatus(intent.intentStatus),
+    blocker: intent.blocker,
+    requiredEvidenceCodes: intent.requiredEvidenceCodes,
+    sourceTag: intent.sourceTag,
+    dataPolicy: _syncActionCommandDataPolicy(intent.actionId),
+    stopLine: _syncActionCommandStopLine(intent.actionId),
+  );
+}
+
+String _syncActionCommandExecutionStatus(String intentStatus) {
+  switch (intentStatus) {
+    case 'ready':
+      return 'ready_for_future_bridge_command';
+    case 'requires_confirmation':
+      return 'blocked_until_user_confirmation';
+    case 'blocked':
+      return 'blocked_by_readiness';
+    case 'closed_current_phase':
+      return 'not_executable_current_phase';
+    default:
+      return 'blocked_by_unknown_intent_status';
+  }
+}
+
+String _syncActionCommandDataPolicy(String actionId) {
+  switch (actionId) {
+    case 'recovery_setup':
+      return 'no_recovery_code_or_wrapped_material';
+    case 'recovery_restore':
+      return 'no_recovery_code_input_or_device_secret';
+    case 'join_request_authorization':
+      return 'no_short_code_signature_or_wrapped_material';
+    case 'device_revocation':
+      return 'no_signature_key_epoch_or_wrapped_material';
+    default:
+      return managerSyncActionCommandPreviewDataPolicy;
+  }
+}
+
+String _syncActionCommandStopLine(String actionId) {
+  switch (actionId) {
+    case 'recovery_setup':
+      return 'no_recovery_code_generation_current_phase';
+    case 'recovery_restore':
+      return 'no_recovery_code_input_current_phase';
+    case 'join_request_authorization':
+      return 'no_join_request_or_authorization_package_current_phase';
+    case 'device_revocation':
+      return 'no_device_revocation_current_phase';
+    default:
+      return 'no_unknown_bridge_command_current_phase';
+  }
 }
 
 const managerClosedRecoverySetupReadiness = RecoverySetupReadiness(

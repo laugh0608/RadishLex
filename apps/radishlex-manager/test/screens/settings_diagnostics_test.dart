@@ -84,6 +84,12 @@ void main() {
         scenario.expectedInteractionBlockers,
         reason: scenario.id,
       );
+      _expectDiagnosticsActionCommandPreview(
+        report,
+        expectedIntentStatusSummary: scenario.expectedInteractionStatuses,
+        expectedBlockerSummary: scenario.expectedInteractionBlockers,
+        reason: scenario.id,
+      );
       expect(
         _diagnosticsValue(report, 'sync.user_sync_enabled'),
         scenario.expectedUserSyncEnabled.toString(),
@@ -151,6 +157,12 @@ void main() {
       expect(
         _diagnosticsValue(report, 'sync.interaction_blockers'),
         scenario.expectedInteractionBlockers,
+        reason: scenario.id,
+      );
+      _expectDiagnosticsActionCommandPreview(
+        report,
+        expectedIntentStatusSummary: scenario.expectedInteractionStatuses,
+        expectedBlockerSummary: scenario.expectedInteractionBlockers,
         reason: scenario.id,
       );
       expect(
@@ -242,7 +254,7 @@ void main() {
 
     expect(find.text('诊断摘要预览'), findsOneWidget);
     expect(find.text('分组 6'), findsOneWidget);
-    expect(find.text('字段 105'), findsOneWidget);
+    expect(find.text('字段 115'), findsOneWidget);
     expect(
       find.byKey(const Key('diagnostics-section-sync_gate')),
       findsOneWidget,
@@ -335,6 +347,36 @@ void main() {
     expect(
       find.textContaining(
         'sync.interaction_source_tags: recovery_setup_readiness, recovery_restore_readiness, device_join_readiness, device_revocation_readiness',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.action_command_format: manager_sync_action_command_preview.v1',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.action_command_intent_statuses: recovery_setup=closed_current_phase, recovery_restore=closed_current_phase, join_request_authorization=closed_current_phase, device_revocation=closed_current_phase',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.action_command_execution_statuses: recovery_setup=not_executable_current_phase, recovery_restore=not_executable_current_phase, join_request_authorization=not_executable_current_phase, device_revocation=not_executable_current_phase',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.action_command_data_policy: no_recovery_code_or_wrapped_material, no_recovery_code_input_or_device_secret, no_short_code_signature_or_wrapped_material, no_signature_key_epoch_or_wrapped_material',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.action_command_stop_lines: no_recovery_code_generation_current_phase, no_recovery_code_input_current_phase, no_join_request_or_authorization_package_current_phase, no_device_revocation_current_phase',
       ),
       findsOneWidget,
     );
@@ -619,6 +661,79 @@ String _diagnosticsValue(ManagerDiagnosticsReport report, String key) {
     }
   }
   throw StateError('diagnostics item missing: $key');
+}
+
+void _expectDiagnosticsActionCommandPreview(
+  ManagerDiagnosticsReport report, {
+  required String expectedIntentStatusSummary,
+  required String expectedBlockerSummary,
+  required String reason,
+}) {
+  expect(
+    _diagnosticsValue(report, 'sync.action_command_format'),
+    managerSyncActionCommandPreviewFormat,
+    reason: reason,
+  );
+  expect(
+    _diagnosticsValue(report, 'sync.action_command_actions'),
+    'recovery_setup, recovery_restore, join_request_authorization, device_revocation',
+    reason: reason,
+  );
+  expect(
+    _diagnosticsValue(report, 'sync.action_command_intent_statuses'),
+    expectedIntentStatusSummary,
+    reason: reason,
+  );
+  expect(
+    _diagnosticsValue(report, 'sync.action_command_execution_statuses'),
+    _expectedActionCommandExecutionSummary(expectedIntentStatusSummary),
+    reason: reason,
+  );
+  expect(
+    _diagnosticsValue(report, 'sync.action_command_blockers'),
+    expectedBlockerSummary,
+    reason: reason,
+  );
+  expect(
+    _diagnosticsValue(report, 'sync.action_command_data_policy'),
+    'no_recovery_code_or_wrapped_material, no_recovery_code_input_or_device_secret, no_short_code_signature_or_wrapped_material, no_signature_key_epoch_or_wrapped_material',
+    reason: reason,
+  );
+  expect(
+    _diagnosticsValue(report, 'sync.action_command_stop_lines'),
+    'no_recovery_code_generation_current_phase, no_recovery_code_input_current_phase, no_join_request_or_authorization_package_current_phase, no_device_revocation_current_phase',
+    reason: reason,
+  );
+}
+
+String _expectedActionCommandExecutionSummary(String intentStatusSummary) {
+  if (intentStatusSummary == 'none') {
+    return 'none';
+  }
+  return intentStatusSummary
+      .split(', ')
+      .map((entry) {
+        final separator = entry.indexOf('=');
+        final actionId = entry.substring(0, separator);
+        final intentStatus = entry.substring(separator + 1);
+        return '$actionId=${_expectedActionCommandExecutionStatus(intentStatus)}';
+      })
+      .join(', ');
+}
+
+String _expectedActionCommandExecutionStatus(String intentStatus) {
+  switch (intentStatus) {
+    case 'ready':
+      return 'ready_for_future_bridge_command';
+    case 'requires_confirmation':
+      return 'blocked_until_user_confirmation';
+    case 'blocked':
+      return 'blocked_by_readiness';
+    case 'closed_current_phase':
+      return 'not_executable_current_phase';
+    default:
+      return 'blocked_by_unknown_intent_status';
+  }
 }
 
 class _DiagnosticsRecordingBridge extends FixtureManagerBridge {

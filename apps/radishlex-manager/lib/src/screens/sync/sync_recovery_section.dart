@@ -17,6 +17,9 @@ class SyncRecoverySection extends StatelessWidget {
   Widget build(BuildContext context) {
     final setupIntent = interactionPlan.intentFor('recovery_setup');
     final restoreIntent = interactionPlan.intentFor('recovery_restore');
+    final commandPlan = interactionPlan.actionCommandPreviewPlan;
+    final setupCommand = commandPlan.previewFor('recovery_setup');
+    final restoreCommand = commandPlan.previewFor('recovery_restore');
 
     return ManagerSection(
       key: const Key('sync-recovery-readiness-section'),
@@ -75,6 +78,18 @@ class SyncRecoverySection extends StatelessWidget {
             value: setupIntent.requiredEvidenceSummary,
           ),
           ManagerKeyValueRow(
+            label: 'setup command',
+            value: setupCommand.executionStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'setup command policy',
+            value: setupCommand.dataPolicy,
+          ),
+          ManagerKeyValueRow(
+            label: 'setup command stop',
+            value: setupCommand.stopLine,
+          ),
+          ManagerKeyValueRow(
             label: 'restore intent',
             value: restoreIntent.intentStatus,
           ),
@@ -85,6 +100,18 @@ class SyncRecoverySection extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'restore intent evidence',
             value: restoreIntent.requiredEvidenceSummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore command',
+            value: restoreCommand.executionStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore command policy',
+            value: restoreCommand.dataPolicy,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore command stop',
+            value: restoreCommand.stopLine,
           ),
           ManagerKeyValueRow(
             label: 'setup flow',

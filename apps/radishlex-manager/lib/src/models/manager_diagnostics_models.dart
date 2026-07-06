@@ -85,6 +85,8 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
     readinessBridgeSnapshot: snapshot.sync.readinessBridgeSnapshot,
   );
   final interactionPlan = syncGateAudit.entryGate.interactionEntryPlan;
+  final actionCommandPlan =
+      syncGateAudit.entryGate.interactionEntryPlan.actionCommandPreviewPlan;
 
   return ManagerDiagnosticsReport(
     generatedAt: snapshot.generatedAt,
@@ -332,6 +334,56 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
           _diagnosticsItem(
             'sync.interaction_source_tags',
             interactionPlan.sourceTagSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.action_command_format',
+            managerSyncActionCommandPreviewFormat,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.action_command_actions',
+            actionCommandPlan.actionIdSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.action_command_visibility',
+            actionCommandPlan.visibilitySummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.action_command_intent_statuses',
+            actionCommandPlan.intentStatusSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.action_command_execution_statuses',
+            actionCommandPlan.executionStatusSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.action_command_blockers',
+            actionCommandPlan.blockerSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.action_command_required_evidence',
+            actionCommandPlan.requiredEvidenceSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.action_command_source_tags',
+            actionCommandPlan.sourceTagSummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.action_command_data_policy',
+            actionCommandPlan.dataPolicySummary,
+            'policy',
+          ),
+          _diagnosticsItem(
+            'sync.action_command_stop_lines',
+            actionCommandPlan.stopLineSummary,
             'gate',
           ),
           _diagnosticsItem(

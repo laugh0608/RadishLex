@@ -51,7 +51,7 @@ void main() {
       find.text(
         'recovery_setup, recovery_restore, join_request_authorization, device_revocation',
       ),
-      findsOneWidget,
+      findsWidgets,
     );
     expect(
       find.text(
@@ -174,7 +174,7 @@ void main() {
     );
     expect(
       find.text('user_sync_entry_current_phase_open_required'),
-      findsOneWidget,
+      findsWidgets,
     );
     expect(
       find.textContaining('recovery_code_generation_closed'),
@@ -712,6 +712,16 @@ void _expectSettingsGatePreviewReadinessScenario(
   expect(find.text(scenario.expectedInteractionStatuses), findsWidgets);
   expect(find.text(scenario.expectedInteractionBlockers), findsWidgets);
   expect(
+    find.text(
+      _expectedActionCommandExecutionSummary(
+        scenario.expectedInteractionStatuses,
+      ),
+    ),
+    findsWidgets,
+    reason: scenario.id,
+  );
+  _expectActionCommandPolicyAndStopLines(scenario.id);
+  expect(
     find.text(scenario.expectedUserSyncEnabled.toString()),
     findsWidgets,
     reason: scenario.id,
@@ -753,6 +763,16 @@ void _expectSettingsGatePreviewEvidenceBundleScenario(
   expect(find.text(scenario.expectedBridgeSource), findsWidgets);
   expect(find.text(scenario.expectedInteractionStatuses), findsWidgets);
   expect(find.text(scenario.expectedInteractionBlockers), findsWidgets);
+  expect(
+    find.text(
+      _expectedActionCommandExecutionSummary(
+        scenario.expectedInteractionStatuses,
+      ),
+    ),
+    findsWidgets,
+    reason: scenario.id,
+  );
+  _expectActionCommandPolicyAndStopLines(scenario.id);
   expect(find.text(scenario.expectedConnectionStatusCode), findsWidgets);
   expect(find.text(scenario.expectedConnectionProbeSource), findsWidgets);
   expect(find.text(syncEvidenceBundleRecordedAt), findsWidgets);
@@ -766,5 +786,44 @@ void _expectSettingsGatePreviewEvidenceBundleScenario(
 
   for (final fragment in syncEvidenceBundleSensitiveLeakFragments) {
     expect(find.textContaining(fragment), findsNothing, reason: scenario.id);
+  }
+}
+
+void _expectActionCommandPolicyAndStopLines(String reason) {
+  for (final value in const [
+    'no_recovery_code_or_wrapped_material, no_recovery_code_input_or_device_secret, no_short_code_signature_or_wrapped_material, no_signature_key_epoch_or_wrapped_material',
+    'no_recovery_code_generation_current_phase, no_recovery_code_input_current_phase, no_join_request_or_authorization_package_current_phase, no_device_revocation_current_phase',
+  ]) {
+    expect(find.text(value), findsWidgets, reason: reason);
+  }
+}
+
+String _expectedActionCommandExecutionSummary(String intentStatusSummary) {
+  if (intentStatusSummary == 'none') {
+    return 'none';
+  }
+  return intentStatusSummary
+      .split(', ')
+      .map((entry) {
+        final separator = entry.indexOf('=');
+        final actionId = entry.substring(0, separator);
+        final intentStatus = entry.substring(separator + 1);
+        return '$actionId=${_expectedActionCommandExecutionStatus(intentStatus)}';
+      })
+      .join(', ');
+}
+
+String _expectedActionCommandExecutionStatus(String intentStatus) {
+  switch (intentStatus) {
+    case 'ready':
+      return 'ready_for_future_bridge_command';
+    case 'requires_confirmation':
+      return 'blocked_until_user_confirmation';
+    case 'blocked':
+      return 'blocked_by_readiness';
+    case 'closed_current_phase':
+      return 'not_executable_current_phase';
+    default:
+      return 'blocked_by_unknown_intent_status';
   }
 }
