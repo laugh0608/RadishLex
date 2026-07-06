@@ -6,7 +6,115 @@ import 'package:radishlex_manager/src/app.dart';
 import 'package:radishlex_manager/src/bridge/fixture_manager_bridge.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
+import '../fixtures/sync_readiness_bridge_fixtures.dart';
+
 void main() {
+  test('readiness scenario catalog drives diagnostics summaries', () {
+    for (final scenario in syncReadinessScenarioCatalog()) {
+      final report = createManagerDiagnosticsReport(
+        managerSnapshotForSyncReadinessScenario(scenario),
+      );
+      final text = report.toRedactedText();
+
+      expect(
+        _diagnosticsValue(report, 'sync.readiness_bridge_source'),
+        scenario.expectedBridgeSource,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.entry_blocker'),
+        scenario.expectedEntryBlocker,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.readiness_blocked_flows'),
+        scenario.expectedBlockedFlows,
+        reason: scenario.id,
+      );
+      if (scenario.expectedIssueCodes != null) {
+        expect(
+          _diagnosticsValue(report, 'sync.readiness_issue_codes'),
+          scenario.expectedIssueCodes,
+          reason: scenario.id,
+        );
+      }
+      for (final code in scenario.expectedIssueCodeContains) {
+        expect(
+          _diagnosticsValue(report, 'sync.readiness_issue_codes'),
+          contains(code),
+          reason: scenario.id,
+        );
+      }
+      for (final fragment in scenario.forbiddenIssueCodeFragments) {
+        expect(
+          _diagnosticsValue(report, 'sync.readiness_issue_codes'),
+          isNot(contains(fragment)),
+          reason: scenario.id,
+        );
+      }
+      if (scenario.expectedNextEvidence != null) {
+        expect(
+          _diagnosticsValue(report, 'sync.readiness_next_required_evidence'),
+          scenario.expectedNextEvidence,
+          reason: scenario.id,
+        );
+      }
+      for (final code in scenario.expectedNextEvidenceContains) {
+        expect(
+          _diagnosticsValue(report, 'sync.readiness_next_required_evidence'),
+          contains(code),
+          reason: scenario.id,
+        );
+      }
+      for (final fragment in scenario.forbiddenNextEvidenceFragments) {
+        expect(
+          _diagnosticsValue(report, 'sync.readiness_next_required_evidence'),
+          isNot(contains(fragment)),
+          reason: scenario.id,
+        );
+      }
+      expect(
+        _diagnosticsValue(report, 'sync.interaction_statuses'),
+        scenario.expectedInteractionStatuses,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.interaction_blockers'),
+        scenario.expectedInteractionBlockers,
+        reason: scenario.id,
+      );
+      expect(
+        _diagnosticsValue(report, 'sync.user_sync_enabled'),
+        scenario.expectedUserSyncEnabled.toString(),
+        reason: scenario.id,
+      );
+      expect(text, isNot(contains('secret-token')), reason: scenario.id);
+      expect(
+        text,
+        isNot(contains('RADISHLEX-RECOVERY-CODE-SECRET')),
+        reason: scenario.id,
+      );
+      expect(text, isNot(contains('/synthetic/private')), reason: scenario.id);
+      expect(
+        text,
+        isNot(contains('payload_bytes=abcdef')),
+        reason: scenario.id,
+      );
+      expect(
+        text,
+        isNot(contains('wrapped_material_bytes=abcdef')),
+        reason: scenario.id,
+      );
+      expect(
+        text,
+        isNot(contains('signature_bytes=abcdef')),
+        reason: scenario.id,
+      );
+      expect(text, isNot(contains('private_key=abcdef')), reason: scenario.id);
+      expect(text, isNot(contains('short_code=')), reason: scenario.id);
+    }
+  });
+
   testWidgets('settings view previews and exports diagnostics report', (
     WidgetTester tester,
   ) async {
@@ -395,6 +503,17 @@ void main() {
     );
     expect(find.text('诊断摘要导出完成：12 行'), findsOneWidget);
   });
+}
+
+String _diagnosticsValue(ManagerDiagnosticsReport report, String key) {
+  for (final section in report.sections) {
+    for (final item in section.items) {
+      if (item.key == key) {
+        return item.value;
+      }
+    }
+  }
+  throw StateError('diagnostics item missing: $key');
 }
 
 class _DiagnosticsRecordingBridge extends FixtureManagerBridge {

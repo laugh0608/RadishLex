@@ -9,6 +9,14 @@ import 'package:radishlex_manager/src/models/manager_models.dart';
 
 import '../fixtures/sync_readiness_bridge_fixtures.dart';
 
+const _representativeSyncReadinessScenarioIds = [
+  'all_ready_current_phase_closed',
+  'recovery_record_missing',
+  'join_request_expired',
+  'unknown_native_status_sanitized',
+  'unsafe_redaction_rejected',
+];
+
 void main() {
   testWidgets('sync gate keeps user sync disabled', (
     WidgetTester tester,
@@ -245,6 +253,33 @@ void main() {
     expect(enableButton.onPressed, isNull);
   });
 
+  for (final scenarioId in _representativeSyncReadinessScenarioIds) {
+    testWidgets('sync view renders readiness scenario $scenarioId', (
+      WidgetTester tester,
+    ) async {
+      final scenario = _syncReadinessScenario(scenarioId);
+
+      await tester.pumpWidget(
+        RadishLexManagerApp(
+          bridge: FixtureManagerBridge(
+            initialSnapshot: managerSnapshotForSyncReadinessScenario(scenario),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.sync_outlined));
+      await tester.pumpAndSettle();
+
+      _expectVisibleSyncReadinessScenario(scenario);
+
+      final enableButton = tester.widget<FilledButton>(
+        find.byKey(const Key('sync-enable-button')),
+      );
+      expect(enableButton.onPressed, isNull, reason: scenario.id);
+    });
+  }
+
   testWidgets('sync view exposes local-only empty category state', (
     WidgetTester tester,
   ) async {
@@ -291,4 +326,81 @@ void main() {
     );
     expect(enableButton.onPressed, isNull);
   });
+}
+
+SyncReadinessScenario _syncReadinessScenario(String id) {
+  return syncReadinessScenarioCatalog().firstWhere(
+    (scenario) => scenario.id == id,
+  );
+}
+
+void _expectVisibleSyncReadinessScenario(SyncReadinessScenario scenario) {
+  expect(find.text(scenario.expectedEntryState.code), findsWidgets);
+  expect(find.text(scenario.expectedEntryBlocker), findsWidgets);
+  expect(find.text(scenario.expectedBlockedFlows), findsWidgets);
+  expect(find.text(scenario.expectedBridgeSource), findsWidgets);
+  expect(
+    find.text(scenario.expectedUserSyncEnabled.toString()),
+    findsWidgets,
+    reason: scenario.id,
+  );
+
+  if (scenario.expectedIssueCodes != null) {
+    expect(
+      find.text(scenario.expectedIssueCodes!),
+      findsWidgets,
+      reason: scenario.id,
+    );
+  }
+  for (final code in scenario.expectedIssueCodeContains) {
+    expect(find.textContaining(code), findsWidgets, reason: scenario.id);
+  }
+
+  if (scenario.expectedNextEvidence != null) {
+    expect(
+      find.text(scenario.expectedNextEvidence!),
+      findsWidgets,
+      reason: scenario.id,
+    );
+  }
+  for (final code in scenario.expectedNextEvidenceContains) {
+    expect(find.textContaining(code), findsWidgets, reason: scenario.id);
+  }
+
+  expect(
+    find.textContaining('secret-token'),
+    findsNothing,
+    reason: scenario.id,
+  );
+  expect(
+    find.textContaining('RADISHLEX-RECOVERY-CODE-SECRET'),
+    findsNothing,
+    reason: scenario.id,
+  );
+  expect(
+    find.textContaining('/synthetic/private'),
+    findsNothing,
+    reason: scenario.id,
+  );
+  expect(
+    find.textContaining('payload_bytes=abcdef'),
+    findsNothing,
+    reason: scenario.id,
+  );
+  expect(
+    find.textContaining('wrapped_material_bytes=abcdef'),
+    findsNothing,
+    reason: scenario.id,
+  );
+  expect(
+    find.textContaining('signature_bytes=abcdef'),
+    findsNothing,
+    reason: scenario.id,
+  );
+  expect(
+    find.textContaining('private_key=abcdef'),
+    findsNothing,
+    reason: scenario.id,
+  );
+  expect(find.textContaining('short_code='), findsNothing, reason: scenario.id);
 }

@@ -1,4 +1,5 @@
 import 'package:radishlex_manager/src/bridge/ffi_manager_sync_readiness_mapper.dart';
+import 'package:radishlex_manager/src/data/manager_fixture.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
 const syncReadinessScenarioReadyDevice = DeviceSecuritySummary(
@@ -103,6 +104,47 @@ class SyncReadinessScenario {
   final String expectedInteractionStatuses;
   final String expectedInteractionBlockers;
   final bool expectedUserSyncEnabled;
+}
+
+ManagerSyncReadinessBridgeSnapshot syncReadinessSnapshotForScenario(
+  SyncReadinessScenario scenario,
+) {
+  if (scenario.summaryJson == null) {
+    return managerDefaultSyncReadinessBridgeSnapshot;
+  }
+  return importManagerSyncReadinessBridgeSummaryFromJson(
+    scenario.summaryJson!(),
+  ).snapshot;
+}
+
+ManagerSnapshot managerSnapshotForSyncReadinessScenario(
+  SyncReadinessScenario scenario,
+) {
+  final fixture = createManagerFixture();
+  final readinessBridgeSnapshot = syncReadinessSnapshotForScenario(scenario);
+  final state = deriveManagerSyncUiState(
+    draft: scenario.draft,
+    device: scenario.device,
+    readinessBridgeSnapshot: readinessBridgeSnapshot,
+  );
+  return fixture.copyWith(
+    sync: fixture.sync.copyWith(
+      state: state,
+      device: scenario.device,
+      serverEndpoint: managerSyncEndpointLabel(scenario.draft),
+      reason: managerSyncGateReason(
+        state: state,
+        draft: scenario.draft,
+        device: scenario.device,
+        readinessBridgeSnapshot: readinessBridgeSnapshot,
+      ),
+      readinessBridgeSnapshot: readinessBridgeSnapshot,
+    ),
+    settings: fixture.settings.copyWith(
+      draft: scenario.draft,
+      syncConfigured: scenario.draft.retainSyncConfig,
+    ),
+  );
 }
 
 List<SyncReadinessScenario> syncReadinessScenarioCatalog() {
