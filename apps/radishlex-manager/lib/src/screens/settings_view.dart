@@ -322,29 +322,20 @@ class _SettingsViewState extends State<SettingsView> {
   void _importSyncReadinessSummary() {
     try {
       final json = _decodeSummaryObject(readinessSummaryController.text);
-      final format = _summaryString(json, 'format');
-      if (format != managerSyncReadinessBridgeSummaryFormat) {
+      final imported = importManagerSyncReadinessBridgeSummaryFromJson(json);
+      if (!imported.accepted) {
         setState(() {
-          readinessSummaryError = 'readiness_summary_format_unsupported';
-        });
-        return;
-      }
-      final redactionPolicy = _summaryString(json, 'redaction_policy');
-      if (redactionPolicy != managerSyncReadinessBridgeRedactionPolicy) {
-        setState(() {
-          readinessSummaryError =
-              'readiness_summary_redaction_policy_unsupported';
+          readinessSummaryError = imported.errorCode;
         });
         return;
       }
 
-      final snapshot = managerSyncReadinessBridgeSnapshotFromJson(json);
       setState(() {
-        syncReadinessBridgeSnapshot = snapshot;
+        syncReadinessBridgeSnapshot = imported.snapshot;
         readinessSummaryError = '';
         readinessSummaryController.clear();
       });
-      widget.onImportSyncReadinessSummary(snapshot);
+      widget.onImportSyncReadinessSummary(imported.snapshot);
     } on FormatException {
       setState(() {
         readinessSummaryError = 'readiness_summary_json_invalid';
@@ -383,11 +374,6 @@ Map<String, Object?> _decodeSummaryObject(String text) {
     json[key] = entry.value;
   }
   return json;
-}
-
-String _summaryString(Map<String, Object?> json, String key) {
-  final value = json[key];
-  return value is String ? value.trim() : '';
 }
 
 class _ConnectionHealthSummaryImportSection extends StatelessWidget {
@@ -533,6 +519,16 @@ class _SyncReadinessSummaryImportSection extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'source',
             value: readinessBridgeSnapshot.source,
+          ),
+          ManagerKeyValueRow(
+            label: 'import mode',
+            value: hasImported
+                ? 'readiness_summary_in_memory'
+                : 'default_closed_readiness',
+          ),
+          ManagerKeyValueRow(
+            label: 'clear target',
+            value: managerSyncReadinessBridgeSourceDefault,
           ),
           ManagerKeyValueRow(
             label: 'blocked flows',

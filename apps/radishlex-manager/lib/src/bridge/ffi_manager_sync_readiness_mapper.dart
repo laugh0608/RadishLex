@@ -4,6 +4,38 @@ const managerSyncReadinessBridgeSummaryFormat = 'manager_sync_readiness.v1';
 const managerSyncReadinessBridgeRedactionPolicy =
     'summary_only_no_tokens_recovery_secret_or_payload_bytes';
 
+class ManagerSyncReadinessBridgeSummaryImport {
+  const ManagerSyncReadinessBridgeSummaryImport._({
+    required this.snapshot,
+    required this.errorCode,
+  });
+
+  final ManagerSyncReadinessBridgeSnapshot snapshot;
+  final String errorCode;
+
+  bool get accepted => errorCode.isEmpty;
+}
+
+ManagerSyncReadinessBridgeSummaryImport
+importManagerSyncReadinessBridgeSummaryFromJson(Map<String, Object?> json) {
+  final format = _summaryString(json, 'format');
+  if (format != managerSyncReadinessBridgeSummaryFormat) {
+    return _rejectedSummaryImport('readiness_summary_format_unsupported');
+  }
+
+  final redactionPolicy = _summaryString(json, 'redaction_policy');
+  if (redactionPolicy != managerSyncReadinessBridgeRedactionPolicy) {
+    return _rejectedSummaryImport(
+      'readiness_summary_redaction_policy_unsupported',
+    );
+  }
+
+  return ManagerSyncReadinessBridgeSummaryImport._(
+    snapshot: managerSyncReadinessBridgeSnapshotFromJson(json),
+    errorCode: '',
+  );
+}
+
 ManagerSyncReadinessBridgeSnapshot managerSyncReadinessBridgeSnapshotFromJson(
   Map<String, Object?> json,
 ) {
@@ -267,6 +299,20 @@ DeviceRevocationReadiness _deviceRevocationReadinessFromBridge(
     ),
     sourceTag: 'bridge_device_revocation_readiness',
   );
+}
+
+ManagerSyncReadinessBridgeSummaryImport _rejectedSummaryImport(
+  String errorCode,
+) {
+  return ManagerSyncReadinessBridgeSummaryImport._(
+    snapshot: managerDefaultSyncReadinessBridgeSnapshot,
+    errorCode: errorCode,
+  );
+}
+
+String _summaryString(Map<String, Object?> json, String key) {
+  final value = json[key];
+  return value is String ? value.trim() : '';
 }
 
 ManagerSyncReadinessBridgeSnapshot _invalidBridgeSnapshot() {

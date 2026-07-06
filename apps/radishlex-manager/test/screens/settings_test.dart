@@ -496,6 +496,8 @@ void main() {
     await _pumpUi(tester);
 
     expect(find.text('fixture_readiness'), findsWidgets);
+    expect(find.text('readiness_summary_in_memory'), findsWidgets);
+    expect(find.text('manager_default_closed_readiness'), findsWidgets);
     expect(find.text('recovery_setup, device_join'), findsWidgets);
     expect(find.textContaining('recovery_record_missing'), findsWidgets);
     expect(find.textContaining('join_request_expired'), findsWidgets);
@@ -584,6 +586,22 @@ void main() {
     expect(exported, isNot(contains('secret-token')));
     expect(exported, isNot(contains('RADISHLEX-RECOVERY-CODE-SECRET')));
     expect(exported, isNot(contains('payload_bytes=abcdef')));
+
+    await tester.ensureVisible(
+      find.byKey(const Key('settings-clear-readiness-summary')),
+    );
+    await tester.tap(find.byKey(const Key('settings-clear-readiness-summary')));
+    await _pumpUi(tester);
+
+    expect(find.text('default_closed_readiness'), findsWidgets);
+    expect(find.text('manager_default_closed_readiness'), findsWidgets);
+    expect(find.text('fixture_readiness'), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.sync_outlined));
+    await _pumpUi(tester);
+
+    expect(find.text('manager_default_closed_readiness'), findsWidgets);
+    expect(find.text('fixture_readiness'), findsNothing);
   });
 
   testWidgets('settings rejects unsafe readiness redaction policy', (

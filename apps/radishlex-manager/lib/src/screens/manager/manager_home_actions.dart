@@ -154,14 +154,12 @@ class ManagerHomeActions {
 
     try {
       final snapshot = currentSnapshot();
-      final result =
-          snapshot.sync.readinessBridgeSnapshot.source ==
-              managerSyncReadinessBridgeSourceDefault
-          ? await bridge.exportDiagnosticsReport(filePath)
-          : writeManagerDiagnosticsReport(
+      final result = managerShouldExportDiagnosticsFromCurrentSnapshot(snapshot)
+          ? exportManagerDiagnosticsFromCurrentSnapshot(
               filePath: filePath,
-              report: createManagerDiagnosticsReport(snapshot),
-            );
+              snapshot: snapshot,
+            )
+          : await bridge.exportDiagnosticsReport(filePath);
       if (!context.mounted) {
         return;
       }
@@ -181,10 +179,10 @@ class ManagerHomeActions {
   Future<void> saveSettingsDraft(ManagerSettingsDraft draft) async {
     try {
       final currentReadiness = currentSnapshot().sync.readinessBridgeSnapshot;
-      var snapshot = await bridge.saveSettingsDraft(draft);
-      if (currentReadiness.source != managerSyncReadinessBridgeSourceDefault) {
-        snapshot = managerSnapshotWithSyncReadiness(snapshot, currentReadiness);
-      }
+      final snapshot = managerSnapshotAfterSettingsDraftSave(
+        bridgeSnapshot: await bridge.saveSettingsDraft(draft),
+        currentReadiness: currentReadiness,
+      );
       if (!context.mounted) {
         return;
       }
@@ -201,6 +199,33 @@ class ManagerHomeActions {
       }
     }
   }
+}
+
+bool managerShouldExportDiagnosticsFromCurrentSnapshot(
+  ManagerSnapshot snapshot,
+) {
+  return snapshot.sync.readinessBridgeSnapshot.source !=
+      managerSyncReadinessBridgeSourceDefault;
+}
+
+ManagerDiagnosticsExportResult exportManagerDiagnosticsFromCurrentSnapshot({
+  required String filePath,
+  required ManagerSnapshot snapshot,
+}) {
+  return writeManagerDiagnosticsReport(
+    filePath: filePath,
+    report: createManagerDiagnosticsReport(snapshot),
+  );
+}
+
+ManagerSnapshot managerSnapshotAfterSettingsDraftSave({
+  required ManagerSnapshot bridgeSnapshot,
+  required ManagerSyncReadinessBridgeSnapshot currentReadiness,
+}) {
+  if (currentReadiness.source == managerSyncReadinessBridgeSourceDefault) {
+    return bridgeSnapshot;
+  }
+  return managerSnapshotWithSyncReadiness(bridgeSnapshot, currentReadiness);
 }
 
 String managerBridgeFailureMessage(

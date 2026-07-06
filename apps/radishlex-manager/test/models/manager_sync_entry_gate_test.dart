@@ -19,6 +19,77 @@ void main() {
     productionGate: 'blocked',
   );
 
+  test('readiness summary import accepts safe v1 summaries', () {
+    final imported = importManagerSyncReadinessBridgeSummaryFromJson(
+      readySyncReadinessBridgeJson(),
+    );
+
+    expect(imported.accepted, isTrue);
+    expect(imported.errorCode, isEmpty);
+    expect(imported.snapshot.source, 'ffi_native_readiness');
+    expect(
+      imported.snapshot.recoverySetupReadiness.status,
+      'recovery_setup_ready',
+    );
+    expect(
+      imported.snapshot.deviceJoinReadiness.authorizationPackagePreconditions,
+      'satisfied',
+    );
+  });
+
+  test('readiness summary import rejects unsupported format and redaction', () {
+    final unsupportedFormat = importManagerSyncReadinessBridgeSummaryFromJson({
+      ...readySyncReadinessBridgeJson(),
+      'format': 'manager_sync_readiness.v2',
+    });
+    final unsupportedRedaction =
+        importManagerSyncReadinessBridgeSummaryFromJson({
+          ...readySyncReadinessBridgeJson(),
+          'redaction_policy': 'raw_native_payload_with_secret_fields',
+        });
+
+    expect(unsupportedFormat.accepted, isFalse);
+    expect(unsupportedFormat.errorCode, 'readiness_summary_format_unsupported');
+    expect(
+      unsupportedFormat.snapshot.source,
+      managerSyncReadinessBridgeSourceDefault,
+    );
+    expect(unsupportedRedaction.accepted, isFalse);
+    expect(
+      unsupportedRedaction.errorCode,
+      'readiness_summary_redaction_policy_unsupported',
+    );
+    expect(
+      unsupportedRedaction.snapshot.source,
+      managerSyncReadinessBridgeSourceDefault,
+    );
+  });
+
+  test('readiness summary import accepts and sanitizes unknown fields', () {
+    final imported = importManagerSyncReadinessBridgeSummaryFromJson(
+      unsafeSyncReadinessBridgeJson(),
+    );
+
+    expect(imported.accepted, isTrue);
+    expect(imported.snapshot.source, 'unknown_bridge_readiness_source');
+    expect(
+      imported.snapshot.recoverySetupReadiness.status,
+      managerClosedRecoverySetupReadiness.status,
+    );
+    expect(
+      imported.snapshot.recoverySetupReadiness.prerequisiteSummary,
+      'platform_private_key_backend_ready, unexpected_bridge_required_evidence',
+    );
+    expect(
+      imported.snapshot.recoverySetupReadiness.errorCodeSummary,
+      contains('unexpected_bridge_error_code'),
+    );
+    expect(
+      imported.snapshot.deviceJoinReadiness.errorCodeSummary,
+      contains('unexpected_bridge_error_code'),
+    );
+  });
+
   test('entry gate keeps privacy mode ahead of deployment evidence', () {
     const draft = ManagerSettingsDraft(
       serverEndpoint: 'https://sync.example.invalid',
