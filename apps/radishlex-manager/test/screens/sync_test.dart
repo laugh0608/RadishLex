@@ -439,17 +439,17 @@ void _expectVisibleSyncReadinessScenario(SyncReadinessScenario scenario) {
     findsWidgets,
     reason: scenario.id,
   );
-  for (final executionStatus in _expectedActionCommandExecutionStatuses(
+  for (final executionStatus in syncActionExpectedExecutionStatuses(
     scenario.expectedInteractionStatuses,
   )) {
     expect(find.text(executionStatus), findsWidgets, reason: scenario.id);
   }
-  for (final requestStatus in _expectedActionRequestStatuses(
+  for (final requestStatus in syncActionExpectedRequestStatuses(
     scenario.expectedInteractionStatuses,
   )) {
     expect(find.text(requestStatus), findsWidgets, reason: scenario.id);
   }
-  for (final resultStatus in _expectedActionResultStatuses(
+  for (final resultStatus in syncActionExpectedResultStatuses(
     scenario.expectedInteractionStatuses,
   )) {
     expect(find.text(resultStatus), findsWidgets, reason: scenario.id);
@@ -515,17 +515,17 @@ void _expectVisibleSyncEvidenceBundleScenario(
   expect(find.text(scenario.expectedLocalInsecureTls), findsWidgets);
   expect(find.text(scenario.expectedLastRemoteErrorCode), findsWidgets);
   expect(find.text(scenario.expectedUserSyncEnabled.toString()), findsWidgets);
-  for (final executionStatus in _expectedActionCommandExecutionStatuses(
+  for (final executionStatus in syncActionExpectedExecutionStatuses(
     scenario.expectedInteractionStatuses,
   )) {
     expect(find.text(executionStatus), findsWidgets, reason: scenario.id);
   }
-  for (final requestStatus in _expectedActionRequestStatuses(
+  for (final requestStatus in syncActionExpectedRequestStatuses(
     scenario.expectedInteractionStatuses,
   )) {
     expect(find.text(requestStatus), findsWidgets, reason: scenario.id);
   }
-  for (final resultStatus in _expectedActionResultStatuses(
+  for (final resultStatus in syncActionExpectedResultStatuses(
     scenario.expectedInteractionStatuses,
   )) {
     expect(find.text(resultStatus), findsWidgets, reason: scenario.id);
@@ -577,93 +577,5 @@ void _expectActionCommandProtocolPreview({
     for (final part in value.split(', ')) {
       expect(find.textContaining(part), findsWidgets, reason: reason);
     }
-  }
-}
-
-List<String> _expectedActionCommandExecutionStatuses(
-  String intentStatusSummary,
-) {
-  if (intentStatusSummary == 'none') {
-    return const ['none'];
-  }
-  return intentStatusSummary
-      .split(', ')
-      .map((entry) => entry.substring(entry.indexOf('=') + 1))
-      .map(_expectedActionCommandExecutionStatus)
-      .toSet()
-      .toList(growable: false);
-}
-
-List<String> _expectedActionRequestStatuses(String intentStatusSummary) {
-  return _expectedActionStatuses(
-    intentStatusSummary,
-    _expectedActionRequestStatus,
-  );
-}
-
-List<String> _expectedActionResultStatuses(String intentStatusSummary) {
-  return _expectedActionStatuses(
-    intentStatusSummary,
-    _expectedActionResultStatus,
-  );
-}
-
-List<String> _expectedActionStatuses(
-  String intentStatusSummary,
-  String Function(String intentStatus) mapStatus,
-) {
-  if (intentStatusSummary == 'none') {
-    return const ['none'];
-  }
-  return intentStatusSummary
-      .split(', ')
-      .map((entry) => entry.substring(entry.indexOf('=') + 1))
-      .map(mapStatus)
-      .toSet()
-      .toList(growable: false);
-}
-
-String _expectedActionCommandExecutionStatus(String intentStatus) {
-  switch (intentStatus) {
-    case 'ready':
-      return 'ready_for_future_bridge_command';
-    case 'requires_confirmation':
-      return 'blocked_until_user_confirmation';
-    case 'blocked':
-      return 'blocked_by_readiness';
-    case 'closed_current_phase':
-      return 'not_executable_current_phase';
-    default:
-      return 'blocked_by_unknown_intent_status';
-  }
-}
-
-String _expectedActionRequestStatus(String intentStatus) {
-  switch (_expectedActionCommandExecutionStatus(intentStatus)) {
-    case 'ready_for_future_bridge_command':
-      return 'request_shape_ready_for_future_bridge';
-    case 'blocked_until_user_confirmation':
-      return 'request_blocked_until_user_confirmation';
-    case 'blocked_by_readiness':
-      return 'request_blocked_by_readiness';
-    case 'not_executable_current_phase':
-      return 'request_not_built_current_phase';
-    default:
-      return 'request_blocked_by_unknown_execution_status';
-  }
-}
-
-String _expectedActionResultStatus(String intentStatus) {
-  switch (_expectedActionCommandExecutionStatus(intentStatus)) {
-    case 'ready_for_future_bridge_command':
-      return 'result_shape_ready_for_future_bridge';
-    case 'blocked_until_user_confirmation':
-      return 'result_blocked_until_user_confirmation';
-    case 'blocked_by_readiness':
-      return 'result_blocked_by_readiness';
-    case 'not_executable_current_phase':
-      return 'result_not_available_current_phase';
-    default:
-      return 'result_blocked_by_unknown_execution_status';
   }
 }

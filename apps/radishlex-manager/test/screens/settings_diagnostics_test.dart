@@ -411,7 +411,7 @@ void main() {
     );
     expect(
       find.textContaining(
-        'sync.action_request_statuses: ${_expectedActionRequestStatusSummary(syncReadinessClosedInteractionStatuses)}',
+        'sync.action_request_statuses: ${syncActionExpectedRequestStatusSummary(syncReadinessClosedInteractionStatuses)}',
       ),
       findsOneWidget,
     );
@@ -429,7 +429,7 @@ void main() {
     );
     expect(
       find.textContaining(
-        'sync.action_result_statuses: ${_expectedActionResultStatusSummary(syncReadinessClosedInteractionStatuses)}',
+        'sync.action_result_statuses: ${syncActionExpectedResultStatusSummary(syncReadinessClosedInteractionStatuses)}',
       ),
       findsOneWidget,
     );
@@ -760,7 +760,7 @@ void _expectDiagnosticsActionCommandPreview(
   );
   expect(
     _diagnosticsValue(report, 'sync.action_command_execution_statuses'),
-    _expectedActionCommandExecutionSummary(expectedIntentStatusSummary),
+    syncActionExpectedExecutionSummary(expectedIntentStatusSummary),
     reason: reason,
   );
   expect(
@@ -795,7 +795,7 @@ void _expectDiagnosticsActionCommandPreview(
   );
   expect(
     _diagnosticsValue(report, 'sync.action_request_statuses'),
-    _expectedActionRequestStatusSummary(expectedIntentStatusSummary),
+    syncActionExpectedRequestStatusSummary(expectedIntentStatusSummary),
     reason: reason,
   );
   expect(
@@ -810,7 +810,7 @@ void _expectDiagnosticsActionCommandPreview(
   );
   expect(
     _diagnosticsValue(report, 'sync.action_result_statuses'),
-    _expectedActionResultStatusSummary(expectedIntentStatusSummary),
+    syncActionExpectedResultStatusSummary(expectedIntentStatusSummary),
     reason: reason,
   );
   expect(
@@ -823,98 +823,6 @@ void _expectDiagnosticsActionCommandPreview(
     expectedForbiddenMaterialSummary,
     reason: reason,
   );
-}
-
-String _expectedActionCommandExecutionSummary(String intentStatusSummary) {
-  if (intentStatusSummary == 'none') {
-    return 'none';
-  }
-  return intentStatusSummary
-      .split(', ')
-      .map((entry) {
-        final separator = entry.indexOf('=');
-        final actionId = entry.substring(0, separator);
-        final intentStatus = entry.substring(separator + 1);
-        return '$actionId=${_expectedActionCommandExecutionStatus(intentStatus)}';
-      })
-      .join(', ');
-}
-
-String _expectedActionCommandExecutionStatus(String intentStatus) {
-  switch (intentStatus) {
-    case 'ready':
-      return 'ready_for_future_bridge_command';
-    case 'requires_confirmation':
-      return 'blocked_until_user_confirmation';
-    case 'blocked':
-      return 'blocked_by_readiness';
-    case 'closed_current_phase':
-      return 'not_executable_current_phase';
-    default:
-      return 'blocked_by_unknown_intent_status';
-  }
-}
-
-String _expectedActionRequestStatusSummary(String intentStatusSummary) {
-  return _expectedActionStatusSummary(
-    intentStatusSummary,
-    _expectedActionRequestStatus,
-  );
-}
-
-String _expectedActionResultStatusSummary(String intentStatusSummary) {
-  return _expectedActionStatusSummary(
-    intentStatusSummary,
-    _expectedActionResultStatus,
-  );
-}
-
-String _expectedActionStatusSummary(
-  String intentStatusSummary,
-  String Function(String intentStatus) mapStatus,
-) {
-  if (intentStatusSummary == 'none') {
-    return 'none';
-  }
-  return intentStatusSummary
-      .split(', ')
-      .map((entry) {
-        final separator = entry.indexOf('=');
-        final actionId = entry.substring(0, separator);
-        final intentStatus = entry.substring(separator + 1);
-        return '$actionId=${mapStatus(intentStatus)}';
-      })
-      .join(', ');
-}
-
-String _expectedActionRequestStatus(String intentStatus) {
-  switch (_expectedActionCommandExecutionStatus(intentStatus)) {
-    case 'ready_for_future_bridge_command':
-      return 'request_shape_ready_for_future_bridge';
-    case 'blocked_until_user_confirmation':
-      return 'request_blocked_until_user_confirmation';
-    case 'blocked_by_readiness':
-      return 'request_blocked_by_readiness';
-    case 'not_executable_current_phase':
-      return 'request_not_built_current_phase';
-    default:
-      return 'request_blocked_by_unknown_execution_status';
-  }
-}
-
-String _expectedActionResultStatus(String intentStatus) {
-  switch (_expectedActionCommandExecutionStatus(intentStatus)) {
-    case 'ready_for_future_bridge_command':
-      return 'result_shape_ready_for_future_bridge';
-    case 'blocked_until_user_confirmation':
-      return 'result_blocked_until_user_confirmation';
-    case 'blocked_by_readiness':
-      return 'result_blocked_by_readiness';
-    case 'not_executable_current_phase':
-      return 'result_not_available_current_phase';
-    default:
-      return 'result_blocked_by_unknown_execution_status';
-  }
 }
 
 class _DiagnosticsRecordingBridge extends FixtureManagerBridge {

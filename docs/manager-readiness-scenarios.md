@@ -59,14 +59,16 @@
 | forbidden material | `recovery_secret_material`, `join_verifier_material`, `bearer_credential_material`, `signature_material`, `wrapped_sync_material`, `opaque_transport_content` |
 | error codes | `configuration_missing`, `backend_unavailable`, `deployment_unverified`, `recovery_code_required`, `recovery_record_missing`, `recovery_record_revoked`, `local_data_inconsistent`, `authentication_required`, `recovery_code_invalid`, `network_unreachable`, `join_request_expired`, `authorization_rejected`, `device_revoked`, `key_epoch_rotation_required` |
 
-完整 action 级边界见 [`docs/manager-sync-action-protocol-preview.md`](manager-sync-action-protocol-preview.md)。场景 fixture 中的 `expectedActionCommandRequestBoundaries`、`expectedActionCommandResultBoundaries`、`expectedActionRequestAllowedFields`、`expectedActionResultAllowedFields`、`expectedActionForbiddenMaterials` 和 `expectedActionCommandErrorCodes` 是测试真相源；未来新增 action、字段码或错误分类前必须先更新该专题文档、fixture 和 settings / sync / diagnostics 回归。
+完整 action 级边界见 [`docs/manager-sync-action-protocol-preview.md`](manager-sync-action-protocol-preview.md)，状态矩阵见 [`docs/manager-sync-action-acceptance-matrix.md`](manager-sync-action-acceptance-matrix.md)。`sync_action_protocol_fixtures.dart` 中的 `syncActionProtocolExpectations`、`syncActionProtocolStatusScenarios` 和 `syncActionExpected*` helper 是 action protocol 的测试真相源；readiness / evidence bundle 场景中的 `expectedActionCommandRequestBoundaries`、`expectedActionCommandResultBoundaries`、`expectedActionRequestAllowedFields`、`expectedActionResultAllowedFields`、`expectedActionForbiddenMaterials` 和 `expectedActionCommandErrorCodes` 继续用于确认 settings / sync / diagnostics 对同一组 action protocol 摘要不分叉。未来新增 action、字段码或错误分类前必须先更新专题文档、fixture 和回归测试。
 
 ## 复验入口
 
 主要覆盖：
 
+- `apps/radishlex-manager/test/fixtures/sync_action_protocol_fixtures.dart`：action 级边界、状态矩阵、聚合摘要和 request / result status 派生 helper。
 - `apps/radishlex-manager/test/fixtures/sync_readiness_bridge_fixtures.dart`：场景输入、预期来源、预期派生摘要和 action request / result protocol preview 预期。
 - `apps/radishlex-manager/test/fixtures/sync_evidence_bundle_fixtures.dart`：组合 readiness、connection health、部署证据来源、设备 gate 和 action request / result protocol preview 的预演输入。
+- `apps/radishlex-manager/test/models/manager_sync_action_preview_test.dart`：遍历 action protocol 矩阵，校验四条 action 在当前阶段关闭、readiness 阻塞、用户确认、future ready shape、missing intent 和未知 intent status 下的 request / result 预演。
 - `apps/radishlex-manager/test/models/manager_sync_entry_gate_test.dart`：遍历场景目录，校验 import result、entry gate、readiness 摘要、interaction intent、action command preview、request / result status、request / result allowed fields、错误分类、envelope schema 和脱敏边界。
 - `apps/radishlex-manager/test/screens/settings_test.dart`：验证 settings 导入、清除、同步页状态和诊断导出一致性，并固定 settings gate preview 的代表场景可见层和 command preview 回归。
 - `apps/radishlex-manager/test/screens/settings_diagnostics_test.dart`：遍历场景目录，校验诊断报告中的 `sync.readiness_*`、`sync.interaction_*`、`sync.action_command_*`、`sync.user_sync_enabled` 和脱敏文本。
@@ -76,7 +78,7 @@
 建议命令：
 
 ```bash
-flutter test test/models/manager_sync_entry_gate_test.dart test/screens/manager_home_actions_test.dart test/screens/settings_test.dart test/screens/settings_diagnostics_test.dart test/screens/sync_test.dart
+flutter test test/models/manager_sync_action_preview_test.dart test/models/manager_sync_entry_gate_test.dart test/screens/manager_home_actions_test.dart test/screens/settings_test.dart test/screens/settings_diagnostics_test.dart test/screens/sync_test.dart
 ./scripts/check-manager.sh
 git diff --check
 ./scripts/check-repo.sh

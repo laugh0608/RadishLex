@@ -32,7 +32,7 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 - 真实平台输入法壳或输入热路径。
 - OIDC / Radish 产品账号体系。
 
-协议和存储细节继续以 `docs/sync-key-management.md`、`docs/production-recovery-flow.md`、`docs/sync-server-api-storage.md`、`docs/crypto-boundary.md` 和相关 ADR 为准。恢复码与设备授权只读交互状态机见 `docs/manager-recovery-device-auth-flow.md`；四条 action 的非敏感 request / result 边界、错误分类、data policy 和 stop line 见 `docs/manager-sync-action-protocol-preview.md`。
+协议和存储细节继续以 `docs/sync-key-management.md`、`docs/production-recovery-flow.md`、`docs/sync-server-api-storage.md`、`docs/crypto-boundary.md` 和相关 ADR 为准。恢复码与设备授权只读交互状态机见 `docs/manager-recovery-device-auth-flow.md`；四条 action 的非敏感 request / result 边界、错误分类、data policy 和 stop line 见 `docs/manager-sync-action-protocol-preview.md`；action 状态组合、missing intent 和 unknown intent status 的验收矩阵见 `docs/manager-sync-action-acceptance-matrix.md`。
 
 ## 进入条件
 
@@ -329,7 +329,7 @@ Phase 4 manager 本地验收已经有可复验证据。2026-07-05 阶段口径�
 | 层级 | 测试重点 |
 | --- | --- |
 | Dart sync gate helper | 从 settings draft、backend gate、部署证据摘要、恢复码 setup / restore 状态和设备 join / revocation 状态派生 sync entry state、readiness 聚合摘要和只读 action intent 进入计划。 |
-| Dart action command preview | 从只读 action intent 派生 `manager_sync_action_command_preview.v1` 摘要，校验 execution status、data policy、stop line、request boundary、result boundary、request / result allowed fields、forbidden material policy 和错误分类不会变成可执行 bridge 命令。 |
+| Dart action command preview | 从只读 action intent 派生 `manager_sync_action_command_preview.v1` 摘要，校验 execution status、data policy、stop line、request boundary、result boundary、request / result allowed fields、forbidden material policy、missing intent、unknown intent status 和错误分类不会变成可执行 bridge 命令。 |
 | Dart connection helper | 从 endpoint、access token 存在性、transport 分类和 `sync_connection_health.v1` 回填摘要派生连接健康摘要。 |
 | Evidence bundle scenarios | 用开发期 `manager_sync_evidence_bundle.v1` fixture 组合 readiness、connection health、部署证据和设备 gate，校验 settings / sync / diagnostics 同源派生和脱敏边界。 |
 | Widget tests | 每个阻塞状态的按钮禁用、文案、诊断入口、连接健康 section、恢复码 / 设备授权四条只读流程摘要和下一步提示；`preflight_ready` 下仍不能启用真实同步。 |

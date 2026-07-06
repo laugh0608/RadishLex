@@ -31,7 +31,7 @@
 | `join_request_authorization` | `request_summary_only_no_join_request_or_short_code` | `result_summary_only_no_authorization_package_or_signature` | `no_short_code_signature_or_wrapped_material` | `no_join_request_or_authorization_package_current_phase` |
 | `device_revocation` | `request_summary_only_no_device_signature_or_key_epoch` | `result_summary_only_no_revocation_record_or_key_epoch_material` | `no_signature_key_epoch_or_wrapped_material` | `no_device_revocation_current_phase` |
 
-这些边界的含义是：UI、fixture、settings preview 和 diagnostics 只能描述未来 request / result 的安全外壳，不能携带真实命令 payload。后续真实 bridge contract 设计时，应重新定义结构化请求 / 响应，并复用这些停止线作为验收前置，而不是把 preview 字段直接当作 bridge DTO。
+这些边界的含义是：UI、fixture、settings preview 和 diagnostics 只能描述未来 request / result 的安全外壳，不能携带真实命令 payload。后续真实 bridge contract 设计时，应重新定义结构化请求 / 响应，并复用这些停止线作为验收前置，而不是把 preview 字段直接当作 bridge DTO。状态组合和测试矩阵见 [`docs/manager-sync-action-acceptance-matrix.md`](manager-sync-action-acceptance-matrix.md)。
 
 ## Request / Result 预演字段
 
@@ -106,10 +106,12 @@ result status 只允许：
 
 ## Fixture 与测试验收
 
-场景目录中的 readiness 和 evidence bundle fixture 必须同时携带 action command preview 的 request boundary、result boundary 和 error code 预期。当前验收入口：
+场景目录中的 readiness 和 evidence bundle fixture 必须同时携带 action command preview 的 request boundary、result boundary 和 error code 预期。action protocol 的状态矩阵和 action 级预期由单独 fixture 维护。当前验收入口：
 
+- `apps/radishlex-manager/test/fixtures/sync_action_protocol_fixtures.dart`
 - `apps/radishlex-manager/test/fixtures/sync_readiness_bridge_fixtures.dart`
 - `apps/radishlex-manager/test/fixtures/sync_evidence_bundle_fixtures.dart`
+- `apps/radishlex-manager/test/models/manager_sync_action_preview_test.dart`
 - `apps/radishlex-manager/test/models/manager_sync_entry_gate_test.dart`
 - `apps/radishlex-manager/test/screens/settings_test.dart`
 - `apps/radishlex-manager/test/screens/settings_diagnostics_test.dart`
