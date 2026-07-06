@@ -101,6 +101,18 @@ class SyncDeviceAuthorizationSection extends StatelessWidget {
             value: joinCommand.stopLine,
           ),
           ManagerKeyValueRow(
+            label: 'join request boundary',
+            value: joinCommand.requestBoundary,
+          ),
+          ManagerKeyValueRow(
+            label: 'join result boundary',
+            value: joinCommand.resultBoundary,
+          ),
+          ManagerKeyValueRow(
+            label: 'join command errors',
+            value: joinCommand.errorCodeSummary,
+          ),
+          ManagerKeyValueRow(
             label: 'revocation intent',
             value: revocationIntent.intentStatus,
           ),
@@ -123,6 +135,18 @@ class SyncDeviceAuthorizationSection extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'revocation command stop',
             value: revocationCommand.stopLine,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation request boundary',
+            value: revocationCommand.requestBoundary,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation result boundary',
+            value: revocationCommand.resultBoundary,
+          ),
+          ManagerKeyValueRow(
+            label: 'revocation command errors',
+            value: revocationCommand.errorCodeSummary,
           ),
           ManagerKeyValueRow(
             label: 'join flow',

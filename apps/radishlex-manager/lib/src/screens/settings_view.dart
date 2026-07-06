@@ -769,6 +769,18 @@ class _SettingsSyncGatePreview extends StatelessWidget {
             value: actionCommandPlan.stopLineSummary,
           ),
           ManagerKeyValueRow(
+            label: 'command request boundary',
+            value: actionCommandPlan.requestBoundarySummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'command result boundary',
+            value: actionCommandPlan.resultBoundarySummary,
+          ),
+          ManagerKeyValueRow(
+            label: 'command errors',
+            value: actionCommandPlan.errorCodeSummary,
+          ),
+          ManagerKeyValueRow(
             label: 'user sync enabled',
             value: audit.entryGate.userSyncEnabled.toString(),
           ),

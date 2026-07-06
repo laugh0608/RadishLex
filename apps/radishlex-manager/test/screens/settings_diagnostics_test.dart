@@ -88,6 +88,11 @@ void main() {
         report,
         expectedIntentStatusSummary: scenario.expectedInteractionStatuses,
         expectedBlockerSummary: scenario.expectedInteractionBlockers,
+        expectedRequestBoundarySummary:
+            scenario.expectedActionCommandRequestBoundaries,
+        expectedResultBoundarySummary:
+            scenario.expectedActionCommandResultBoundaries,
+        expectedErrorCodeSummary: scenario.expectedActionCommandErrorCodes,
         reason: scenario.id,
       );
       expect(
@@ -254,7 +259,7 @@ void main() {
 
     expect(find.text('诊断摘要预览'), findsOneWidget);
     expect(find.text('分组 6'), findsOneWidget);
-    expect(find.text('字段 115'), findsOneWidget);
+    expect(find.text('字段 118'), findsOneWidget);
     expect(
       find.byKey(const Key('diagnostics-section-sync_gate')),
       findsOneWidget,
@@ -370,13 +375,31 @@ void main() {
     );
     expect(
       find.textContaining(
-        'sync.action_command_data_policy: no_recovery_code_or_wrapped_material, no_recovery_code_input_or_device_secret, no_short_code_signature_or_wrapped_material, no_signature_key_epoch_or_wrapped_material',
+        'sync.action_command_data_policy: $syncActionCommandDataPolicySummary',
       ),
       findsOneWidget,
     );
     expect(
       find.textContaining(
-        'sync.action_command_stop_lines: no_recovery_code_generation_current_phase, no_recovery_code_input_current_phase, no_join_request_or_authorization_package_current_phase, no_device_revocation_current_phase',
+        'sync.action_command_stop_lines: $syncActionCommandStopLineSummary',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.action_command_request_boundaries: $syncActionCommandRequestBoundarySummary',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.action_command_result_boundaries: $syncActionCommandResultBoundarySummary',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.action_command_error_codes: $syncActionCommandErrorCodeSummary',
       ),
       findsOneWidget,
     );
@@ -667,6 +690,10 @@ void _expectDiagnosticsActionCommandPreview(
   ManagerDiagnosticsReport report, {
   required String expectedIntentStatusSummary,
   required String expectedBlockerSummary,
+  String expectedRequestBoundarySummary =
+      syncActionCommandRequestBoundarySummary,
+  String expectedResultBoundarySummary = syncActionCommandResultBoundarySummary,
+  String expectedErrorCodeSummary = syncActionCommandErrorCodeSummary,
   required String reason,
 }) {
   expect(
@@ -696,12 +723,27 @@ void _expectDiagnosticsActionCommandPreview(
   );
   expect(
     _diagnosticsValue(report, 'sync.action_command_data_policy'),
-    'no_recovery_code_or_wrapped_material, no_recovery_code_input_or_device_secret, no_short_code_signature_or_wrapped_material, no_signature_key_epoch_or_wrapped_material',
+    syncActionCommandDataPolicySummary,
     reason: reason,
   );
   expect(
     _diagnosticsValue(report, 'sync.action_command_stop_lines'),
-    'no_recovery_code_generation_current_phase, no_recovery_code_input_current_phase, no_join_request_or_authorization_package_current_phase, no_device_revocation_current_phase',
+    syncActionCommandStopLineSummary,
+    reason: reason,
+  );
+  expect(
+    _diagnosticsValue(report, 'sync.action_command_request_boundaries'),
+    expectedRequestBoundarySummary,
+    reason: reason,
+  );
+  expect(
+    _diagnosticsValue(report, 'sync.action_command_result_boundaries'),
+    expectedResultBoundarySummary,
+    reason: reason,
+  );
+  expect(
+    _diagnosticsValue(report, 'sync.action_command_error_codes'),
+    expectedErrorCodeSummary,
     reason: reason,
   );
 }

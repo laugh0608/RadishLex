@@ -90,6 +90,18 @@ class SyncRecoverySection extends StatelessWidget {
             value: setupCommand.stopLine,
           ),
           ManagerKeyValueRow(
+            label: 'setup request boundary',
+            value: setupCommand.requestBoundary,
+          ),
+          ManagerKeyValueRow(
+            label: 'setup result boundary',
+            value: setupCommand.resultBoundary,
+          ),
+          ManagerKeyValueRow(
+            label: 'setup command errors',
+            value: setupCommand.errorCodeSummary,
+          ),
+          ManagerKeyValueRow(
             label: 'restore intent',
             value: restoreIntent.intentStatus,
           ),
@@ -112,6 +124,18 @@ class SyncRecoverySection extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'restore command stop',
             value: restoreCommand.stopLine,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore request boundary',
+            value: restoreCommand.requestBoundary,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore result boundary',
+            value: restoreCommand.resultBoundary,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore command errors',
+            value: restoreCommand.errorCodeSummary,
           ),
           ManagerKeyValueRow(
             label: 'setup flow',

@@ -60,6 +60,21 @@ const syncReadinessClosedInteractionStatuses =
 const syncReadinessClosedInteractionBlockers =
     'recovery_code_generation_closed, recovery_code_input_closed, join_request_creation_closed, device_revocation_flow_closed';
 
+const syncActionCommandDataPolicySummary =
+    'no_recovery_code_or_wrapped_material, no_recovery_code_input_or_device_secret, no_short_code_signature_or_wrapped_material, no_signature_key_epoch_or_wrapped_material';
+
+const syncActionCommandStopLineSummary =
+    'no_recovery_code_generation_current_phase, no_recovery_code_input_current_phase, no_join_request_or_authorization_package_current_phase, no_device_revocation_current_phase';
+
+const syncActionCommandRequestBoundarySummary =
+    'request_summary_only_no_recovery_code_generation, request_summary_only_no_recovery_code_input, request_summary_only_no_join_request_or_short_code, request_summary_only_no_device_signature_or_key_epoch';
+
+const syncActionCommandResultBoundarySummary =
+    'result_summary_only_no_recovery_record_or_wrapped_material, result_summary_only_no_unwrapped_device_material, result_summary_only_no_authorization_package_or_signature, result_summary_only_no_revocation_record_or_key_epoch_material';
+
+const syncActionCommandErrorCodeSummary =
+    'configuration_missing, backend_unavailable, deployment_unverified, recovery_code_required, recovery_record_missing, recovery_record_revoked, local_data_inconsistent, authentication_required, recovery_code_invalid, network_unreachable, join_request_expired, authorization_rejected, device_revoked, key_epoch_rotation_required';
+
 const representativeSyncReadinessScenarioIds = [
   'all_ready_current_phase_closed',
   'recovery_record_missing',
@@ -100,6 +115,11 @@ class SyncReadinessScenario {
     this.forbiddenNextEvidenceFragments = const [],
     required this.expectedInteractionStatuses,
     required this.expectedInteractionBlockers,
+    this.expectedActionCommandRequestBoundaries =
+        syncActionCommandRequestBoundarySummary,
+    this.expectedActionCommandResultBoundaries =
+        syncActionCommandResultBoundarySummary,
+    this.expectedActionCommandErrorCodes = syncActionCommandErrorCodeSummary,
     required this.expectedUserSyncEnabled,
   });
 
@@ -122,6 +142,9 @@ class SyncReadinessScenario {
   final List<String> forbiddenNextEvidenceFragments;
   final String expectedInteractionStatuses;
   final String expectedInteractionBlockers;
+  final String expectedActionCommandRequestBoundaries;
+  final String expectedActionCommandResultBoundaries;
+  final String expectedActionCommandErrorCodes;
   final bool expectedUserSyncEnabled;
 }
 

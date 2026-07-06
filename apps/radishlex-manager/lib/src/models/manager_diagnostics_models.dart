@@ -387,6 +387,21 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
             'gate',
           ),
           _diagnosticsItem(
+            'sync.action_command_request_boundaries',
+            actionCommandPlan.requestBoundarySummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.action_command_result_boundaries',
+            actionCommandPlan.resultBoundarySummary,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.action_command_error_codes',
+            actionCommandPlan.errorCodeSummary,
+            'error_code',
+          ),
+          _diagnosticsItem(
             'sync.user_sync_enabled',
             syncGateAudit.entryGate.userSyncEnabled.toString(),
             'gate',

@@ -179,6 +179,9 @@ class SyncActionCommandPreview {
     required this.sourceTag,
     required this.dataPolicy,
     required this.stopLine,
+    required this.requestBoundary,
+    required this.resultBoundary,
+    required this.errorCodes,
   });
 
   final String actionId;
@@ -190,9 +193,16 @@ class SyncActionCommandPreview {
   final String sourceTag;
   final String dataPolicy;
   final String stopLine;
+  final String requestBoundary;
+  final String resultBoundary;
+  final List<String> errorCodes;
 
   String get requiredEvidenceSummary {
     return managerSyncCodeSummary(requiredEvidenceCodes);
+  }
+
+  String get errorCodeSummary {
+    return managerSyncCodeSummary(errorCodes);
   }
 
   String get visibilitySummary {
@@ -226,6 +236,9 @@ class SyncActionCommandPreviewPlan {
         sourceTag: 'manager_sync_action_command_preview',
         dataPolicy: managerSyncActionCommandPreviewDataPolicy,
         stopLine: 'no_bridge_command_without_interaction_intent',
+        requestBoundary: 'no_request_without_interaction_intent',
+        resultBoundary: 'no_result_without_interaction_intent',
+        errorCodes: const ['interaction_intent_missing'],
       ),
     );
   }
@@ -277,6 +290,24 @@ class SyncActionCommandPreviewPlan {
 
   String get stopLineSummary {
     return managerSyncCodeSummary(previews.map((preview) => preview.stopLine));
+  }
+
+  String get requestBoundarySummary {
+    return managerSyncCodeSummary(
+      previews.map((preview) => preview.requestBoundary),
+    );
+  }
+
+  String get resultBoundarySummary {
+    return managerSyncCodeSummary(
+      previews.map((preview) => preview.resultBoundary),
+    );
+  }
+
+  String get errorCodeSummary {
+    return managerSyncCodeSummary(
+      previews.expand((preview) => preview.errorCodes),
+    );
   }
 }
 
@@ -974,6 +1005,9 @@ SyncActionCommandPreview _syncActionCommandPreviewFromIntent(
     sourceTag: intent.sourceTag,
     dataPolicy: _syncActionCommandDataPolicy(intent.actionId),
     stopLine: _syncActionCommandStopLine(intent.actionId),
+    requestBoundary: _syncActionCommandRequestBoundary(intent.actionId),
+    resultBoundary: _syncActionCommandResultBoundary(intent.actionId),
+    errorCodes: _syncActionCommandErrorCodes(intent.actionId),
   );
 }
 
@@ -1019,6 +1053,88 @@ String _syncActionCommandStopLine(String actionId) {
       return 'no_device_revocation_current_phase';
     default:
       return 'no_unknown_bridge_command_current_phase';
+  }
+}
+
+String _syncActionCommandRequestBoundary(String actionId) {
+  switch (actionId) {
+    case 'recovery_setup':
+      return 'request_summary_only_no_recovery_code_generation';
+    case 'recovery_restore':
+      return 'request_summary_only_no_recovery_code_input';
+    case 'join_request_authorization':
+      return 'request_summary_only_no_join_request_or_short_code';
+    case 'device_revocation':
+      return 'request_summary_only_no_device_signature_or_key_epoch';
+    default:
+      return 'request_summary_only_no_unknown_bridge_command';
+  }
+}
+
+String _syncActionCommandResultBoundary(String actionId) {
+  switch (actionId) {
+    case 'recovery_setup':
+      return 'result_summary_only_no_recovery_record_or_wrapped_material';
+    case 'recovery_restore':
+      return 'result_summary_only_no_unwrapped_device_material';
+    case 'join_request_authorization':
+      return 'result_summary_only_no_authorization_package_or_signature';
+    case 'device_revocation':
+      return 'result_summary_only_no_revocation_record_or_key_epoch_material';
+    default:
+      return 'result_summary_only_no_unknown_bridge_command';
+  }
+}
+
+List<String> _syncActionCommandErrorCodes(String actionId) {
+  switch (actionId) {
+    case 'recovery_setup':
+      return const [
+        'configuration_missing',
+        'backend_unavailable',
+        'deployment_unverified',
+        'recovery_code_required',
+        'recovery_record_missing',
+        'recovery_record_revoked',
+        'local_data_inconsistent',
+      ];
+    case 'recovery_restore':
+      return const [
+        'configuration_missing',
+        'authentication_required',
+        'deployment_unverified',
+        'recovery_code_required',
+        'recovery_code_invalid',
+        'recovery_record_missing',
+        'recovery_record_revoked',
+        'network_unreachable',
+        'local_data_inconsistent',
+      ];
+    case 'join_request_authorization':
+      return const [
+        'configuration_missing',
+        'authentication_required',
+        'backend_unavailable',
+        'deployment_unverified',
+        'join_request_expired',
+        'authorization_rejected',
+        'device_revoked',
+        'network_unreachable',
+        'local_data_inconsistent',
+      ];
+    case 'device_revocation':
+      return const [
+        'configuration_missing',
+        'authentication_required',
+        'backend_unavailable',
+        'deployment_unverified',
+        'device_revoked',
+        'key_epoch_rotation_required',
+        'network_unreachable',
+        'local_data_inconsistent',
+      ];
+    default:
+      return const ['unknown_action_id'];
   }
 }
 

@@ -53,6 +53,11 @@ class SyncEvidenceBundleScenario {
     required this.expectedBlockedFlows,
     required this.expectedInteractionStatuses,
     required this.expectedInteractionBlockers,
+    this.expectedActionCommandRequestBoundaries =
+        syncActionCommandRequestBoundarySummary,
+    this.expectedActionCommandResultBoundaries =
+        syncActionCommandResultBoundarySummary,
+    this.expectedActionCommandErrorCodes = syncActionCommandErrorCodeSummary,
     required this.expectedUserSyncEnabled,
     required this.expectedConnectionStatusCode,
     required this.expectedConnectionBlocker,
@@ -81,6 +86,9 @@ class SyncEvidenceBundleScenario {
   final String expectedBlockedFlows;
   final String expectedInteractionStatuses;
   final String expectedInteractionBlockers;
+  final String expectedActionCommandRequestBoundaries;
+  final String expectedActionCommandResultBoundaries;
+  final String expectedActionCommandErrorCodes;
   final bool expectedUserSyncEnabled;
   final String expectedConnectionStatusCode;
   final String expectedConnectionBlocker;

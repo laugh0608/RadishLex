@@ -720,7 +720,14 @@ void _expectSettingsGatePreviewReadinessScenario(
     findsWidgets,
     reason: scenario.id,
   );
-  _expectActionCommandPolicyAndStopLines(scenario.id);
+  _expectActionCommandProtocolPreview(
+    reason: scenario.id,
+    expectedRequestBoundarySummary:
+        scenario.expectedActionCommandRequestBoundaries,
+    expectedResultBoundarySummary:
+        scenario.expectedActionCommandResultBoundaries,
+    expectedErrorCodeSummary: scenario.expectedActionCommandErrorCodes,
+  );
   expect(
     find.text(scenario.expectedUserSyncEnabled.toString()),
     findsWidgets,
@@ -772,7 +779,14 @@ void _expectSettingsGatePreviewEvidenceBundleScenario(
     findsWidgets,
     reason: scenario.id,
   );
-  _expectActionCommandPolicyAndStopLines(scenario.id);
+  _expectActionCommandProtocolPreview(
+    reason: scenario.id,
+    expectedRequestBoundarySummary:
+        scenario.expectedActionCommandRequestBoundaries,
+    expectedResultBoundarySummary:
+        scenario.expectedActionCommandResultBoundaries,
+    expectedErrorCodeSummary: scenario.expectedActionCommandErrorCodes,
+  );
   expect(find.text(scenario.expectedConnectionStatusCode), findsWidgets);
   expect(find.text(scenario.expectedConnectionProbeSource), findsWidgets);
   expect(find.text(syncEvidenceBundleRecordedAt), findsWidgets);
@@ -789,10 +803,18 @@ void _expectSettingsGatePreviewEvidenceBundleScenario(
   }
 }
 
-void _expectActionCommandPolicyAndStopLines(String reason) {
-  for (final value in const [
-    'no_recovery_code_or_wrapped_material, no_recovery_code_input_or_device_secret, no_short_code_signature_or_wrapped_material, no_signature_key_epoch_or_wrapped_material',
-    'no_recovery_code_generation_current_phase, no_recovery_code_input_current_phase, no_join_request_or_authorization_package_current_phase, no_device_revocation_current_phase',
+void _expectActionCommandProtocolPreview({
+  required String reason,
+  required String expectedRequestBoundarySummary,
+  required String expectedResultBoundarySummary,
+  required String expectedErrorCodeSummary,
+}) {
+  for (final value in [
+    syncActionCommandDataPolicySummary,
+    syncActionCommandStopLineSummary,
+    expectedRequestBoundarySummary,
+    expectedResultBoundarySummary,
+    expectedErrorCodeSummary,
   ]) {
     expect(find.text(value), findsWidgets, reason: reason);
   }

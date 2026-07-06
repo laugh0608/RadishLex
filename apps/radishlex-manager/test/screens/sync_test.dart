@@ -90,9 +90,26 @@ void main() {
     expect(find.text('setup command'), findsOneWidget);
     expect(find.text('setup command policy'), findsOneWidget);
     expect(find.text('setup command stop'), findsOneWidget);
+    expect(find.text('setup request boundary'), findsOneWidget);
+    expect(find.text('setup result boundary'), findsOneWidget);
+    expect(find.text('setup command errors'), findsOneWidget);
     expect(find.text('no_recovery_code_or_wrapped_material'), findsWidgets);
     expect(
       find.text('no_recovery_code_generation_current_phase'),
+      findsWidgets,
+    );
+    expect(
+      find.text('request_summary_only_no_recovery_code_generation'),
+      findsWidgets,
+    );
+    expect(
+      find.text('result_summary_only_no_recovery_record_or_wrapped_material'),
+      findsWidgets,
+    );
+    expect(
+      find.text(
+        'configuration_missing, backend_unavailable, deployment_unverified, recovery_code_required, recovery_record_missing, recovery_record_revoked, local_data_inconsistent',
+      ),
       findsWidgets,
     );
     expect(find.text('recovery_restore_flow_closed'), findsOneWidget);
@@ -105,6 +122,17 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('not_started'), findsOneWidget);
+    expect(find.text('restore request boundary'), findsOneWidget);
+    expect(find.text('restore result boundary'), findsOneWidget);
+    expect(find.text('restore command errors'), findsOneWidget);
+    expect(
+      find.text('request_summary_only_no_recovery_code_input'),
+      findsWidgets,
+    );
+    expect(
+      find.text('result_summary_only_no_unwrapped_device_material'),
+      findsWidgets,
+    );
     expect(find.text('恢复码生成、输入、轮换和撤销仍未开放。'), findsOneWidget);
     expect(
       find.byKey(const Key('sync-device-authorization-readiness-section')),
@@ -134,12 +162,23 @@ void main() {
     expect(find.text('join command'), findsOneWidget);
     expect(find.text('join command policy'), findsOneWidget);
     expect(find.text('join command stop'), findsOneWidget);
+    expect(find.text('join request boundary'), findsOneWidget);
+    expect(find.text('join result boundary'), findsOneWidget);
+    expect(find.text('join command errors'), findsOneWidget);
     expect(
       find.text('no_short_code_signature_or_wrapped_material'),
       findsWidgets,
     );
     expect(
       find.text('no_join_request_or_authorization_package_current_phase'),
+      findsWidgets,
+    );
+    expect(
+      find.text('request_summary_only_no_join_request_or_short_code'),
+      findsWidgets,
+    );
+    expect(
+      find.text('result_summary_only_no_authorization_package_or_signature'),
       findsWidgets,
     );
     expect(find.text('short_code_verification_not_started'), findsOneWidget);
@@ -156,11 +195,24 @@ void main() {
     expect(find.text('revocation command'), findsOneWidget);
     expect(find.text('revocation command policy'), findsOneWidget);
     expect(find.text('revocation command stop'), findsOneWidget);
+    expect(find.text('revocation request boundary'), findsOneWidget);
+    expect(find.text('revocation result boundary'), findsOneWidget);
+    expect(find.text('revocation command errors'), findsOneWidget);
     expect(
       find.text('no_signature_key_epoch_or_wrapped_material'),
       findsWidgets,
     );
     expect(find.text('no_device_revocation_current_phase'), findsWidgets);
+    expect(
+      find.text('request_summary_only_no_device_signature_or_key_epoch'),
+      findsWidgets,
+    );
+    expect(
+      find.text(
+        'result_summary_only_no_revocation_record_or_key_epoch_material',
+      ),
+      findsWidgets,
+    );
     expect(find.text('active_existing_device_required'), findsOneWidget);
     expect(
       find.text(
@@ -392,7 +444,14 @@ void _expectVisibleSyncReadinessScenario(SyncReadinessScenario scenario) {
   )) {
     expect(find.text(executionStatus), findsWidgets, reason: scenario.id);
   }
-  _expectActionCommandPolicyAndStopLines(scenario.id);
+  _expectActionCommandProtocolPreview(
+    reason: scenario.id,
+    expectedRequestBoundarySummary:
+        scenario.expectedActionCommandRequestBoundaries,
+    expectedResultBoundarySummary:
+        scenario.expectedActionCommandResultBoundaries,
+    expectedErrorCodeSummary: scenario.expectedActionCommandErrorCodes,
+  );
 
   if (scenario.expectedIssueCodes != null) {
     expect(
@@ -446,15 +505,27 @@ void _expectVisibleSyncEvidenceBundleScenario(
   )) {
     expect(find.text(executionStatus), findsWidgets, reason: scenario.id);
   }
-  _expectActionCommandPolicyAndStopLines(scenario.id);
+  _expectActionCommandProtocolPreview(
+    reason: scenario.id,
+    expectedRequestBoundarySummary:
+        scenario.expectedActionCommandRequestBoundaries,
+    expectedResultBoundarySummary:
+        scenario.expectedActionCommandResultBoundaries,
+    expectedErrorCodeSummary: scenario.expectedActionCommandErrorCodes,
+  );
 
   for (final fragment in syncEvidenceBundleSensitiveLeakFragments) {
     expect(find.textContaining(fragment), findsNothing, reason: scenario.id);
   }
 }
 
-void _expectActionCommandPolicyAndStopLines(String reason) {
-  for (final value in const [
+void _expectActionCommandProtocolPreview({
+  required String reason,
+  required String expectedRequestBoundarySummary,
+  required String expectedResultBoundarySummary,
+  required String expectedErrorCodeSummary,
+}) {
+  for (final value in [
     'no_recovery_code_or_wrapped_material',
     'no_recovery_code_input_or_device_secret',
     'no_short_code_signature_or_wrapped_material',
@@ -463,8 +534,13 @@ void _expectActionCommandPolicyAndStopLines(String reason) {
     'no_recovery_code_input_current_phase',
     'no_join_request_or_authorization_package_current_phase',
     'no_device_revocation_current_phase',
+    expectedRequestBoundarySummary,
+    expectedResultBoundarySummary,
+    expectedErrorCodeSummary,
   ]) {
-    expect(find.text(value), findsWidgets, reason: reason);
+    for (final part in value.split(', ')) {
+      expect(find.textContaining(part), findsWidgets, reason: reason);
+    }
   }
 }
 

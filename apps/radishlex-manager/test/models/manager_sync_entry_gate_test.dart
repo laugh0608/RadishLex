@@ -221,6 +221,11 @@ void main() {
         gate.interactionEntryPlan.actionCommandPreviewPlan,
         expectedIntentStatusSummary: scenario.expectedInteractionStatuses,
         expectedBlockerSummary: scenario.expectedInteractionBlockers,
+        expectedRequestBoundarySummary:
+            scenario.expectedActionCommandRequestBoundaries,
+        expectedResultBoundarySummary:
+            scenario.expectedActionCommandResultBoundaries,
+        expectedErrorCodeSummary: scenario.expectedActionCommandErrorCodes,
       );
       expect(gate.userSyncEnabled, scenario.expectedUserSyncEnabled);
 
@@ -371,6 +376,24 @@ void main() {
         diagnostics,
         contains(
           'sync.action_command_blockers: ${scenario.expectedInteractionBlockers}',
+        ),
+      );
+      expect(
+        diagnostics,
+        contains(
+          'sync.action_command_request_boundaries: ${scenario.expectedActionCommandRequestBoundaries}',
+        ),
+      );
+      expect(
+        diagnostics,
+        contains(
+          'sync.action_command_result_boundaries: ${scenario.expectedActionCommandResultBoundaries}',
+        ),
+      );
+      expect(
+        diagnostics,
+        contains(
+          'sync.action_command_error_codes: ${scenario.expectedActionCommandErrorCodes}',
         ),
       );
 
@@ -673,6 +696,18 @@ void main() {
     );
     expect(command.dataPolicy, 'no_recovery_code_or_wrapped_material');
     expect(command.stopLine, 'no_recovery_code_generation_current_phase');
+    expect(
+      command.requestBoundary,
+      'request_summary_only_no_recovery_code_generation',
+    );
+    expect(
+      command.resultBoundary,
+      'result_summary_only_no_recovery_record_or_wrapped_material',
+    );
+    expect(
+      command.errorCodeSummary,
+      'configuration_missing, backend_unavailable, deployment_unverified, recovery_code_required, recovery_record_missing, recovery_record_revoked, local_data_inconsistent',
+    );
   });
 
   test('entry plan supports confirmation-only future action intent', () {
@@ -710,6 +745,18 @@ void main() {
       'blocked_until_recovery_code_saved, explicit_user_confirmation_required',
     );
     expect(command.stopLine, 'no_recovery_code_generation_current_phase');
+    expect(
+      command.requestBoundary,
+      'request_summary_only_no_recovery_code_generation',
+    );
+    expect(
+      command.resultBoundary,
+      'result_summary_only_no_recovery_record_or_wrapped_material',
+    );
+    expect(
+      command.errorCodeSummary,
+      'configuration_missing, backend_unavailable, deployment_unverified, recovery_code_required, recovery_record_missing, recovery_record_revoked, local_data_inconsistent',
+    );
   });
 
   test('local smoke supports development preflight without user sync', () {
@@ -1229,6 +1276,9 @@ String _entryGateSummary(ManagerSyncEntryGate gate) {
     gate.interactionEntryPlan.actionCommandPreviewPlan.requiredEvidenceSummary,
     gate.interactionEntryPlan.actionCommandPreviewPlan.dataPolicySummary,
     gate.interactionEntryPlan.actionCommandPreviewPlan.stopLineSummary,
+    gate.interactionEntryPlan.actionCommandPreviewPlan.requestBoundarySummary,
+    gate.interactionEntryPlan.actionCommandPreviewPlan.resultBoundarySummary,
+    gate.interactionEntryPlan.actionCommandPreviewPlan.errorCodeSummary,
     gate.recovery.readinessBlockerSummary,
     gate.recovery.setupReadiness.prerequisiteSummary,
     gate.recovery.setupReadiness.errorCodeSummary,
@@ -1244,6 +1294,10 @@ void _expectActionCommandPreviewPlan(
   SyncActionCommandPreviewPlan plan, {
   required String expectedIntentStatusSummary,
   required String expectedBlockerSummary,
+  String expectedRequestBoundarySummary =
+      syncActionCommandRequestBoundarySummary,
+  String expectedResultBoundarySummary = syncActionCommandResultBoundarySummary,
+  String expectedErrorCodeSummary = syncActionCommandErrorCodeSummary,
 }) {
   expect(
     plan.actionIdSummary,
@@ -1259,14 +1313,11 @@ void _expectActionCommandPreviewPlan(
     _expectedActionCommandExecutionSummary(expectedIntentStatusSummary),
   );
   expect(plan.blockerSummary, expectedBlockerSummary);
-  expect(
-    plan.dataPolicySummary,
-    'no_recovery_code_or_wrapped_material, no_recovery_code_input_or_device_secret, no_short_code_signature_or_wrapped_material, no_signature_key_epoch_or_wrapped_material',
-  );
-  expect(
-    plan.stopLineSummary,
-    'no_recovery_code_generation_current_phase, no_recovery_code_input_current_phase, no_join_request_or_authorization_package_current_phase, no_device_revocation_current_phase',
-  );
+  expect(plan.dataPolicySummary, syncActionCommandDataPolicySummary);
+  expect(plan.stopLineSummary, syncActionCommandStopLineSummary);
+  expect(plan.requestBoundarySummary, expectedRequestBoundarySummary);
+  expect(plan.resultBoundarySummary, expectedResultBoundarySummary);
+  expect(plan.errorCodeSummary, expectedErrorCodeSummary);
 }
 
 String _expectedActionCommandExecutionSummary(String intentStatusSummary) {

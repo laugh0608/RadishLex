@@ -11,7 +11,7 @@
 - 场景目录是 future bridge mapper 的验收输入，不是新增 `ManagerBridge` contract，也不是 C ABI。
 - 场景目录同时驱动模型、settings gate preview、诊断报告和同步页代表场景回归，避免 settings / sync / diagnostics 对同一份 readiness 摘要派生出不同口径。
 - 开发期 `manager_sync_evidence_bundle.v1` 只在测试 fixture 中组合 readiness 摘要、连接健康摘要、部署证据来源和设备 production gate；它不新增生产 bridge，也不改变 settings draft 持久化格式。
-- `manager_sync_action_command_preview.v1` 由同一份场景目录派生非执行命令预演，用于确认 action intent 只产生 execution status、data policy 和 stop line，不创建 bridge 命令。
+- `manager_sync_action_command_preview.v1` 由同一份场景目录派生非执行命令预演，用于确认 action intent 只产生 execution status、data policy、stop line、request boundary、result boundary 和错误分类，不创建 bridge 命令。
 
 ## 场景表
 
@@ -42,15 +42,29 @@
 | `unsafe_readiness_summary_rejected` | readiness redaction policy 不安全 | `recovery_code_flow_closed` | `reachable` | `none` | `manager_default_closed_readiness` | `false` |
 | `unsafe_readiness_summary_downgraded` | readiness 摘要合法但含未知状态和敏感形态字段 | `recovery_record_missing` | `reachable` | `none` | `unknown_bridge_readiness_source` | `false` |
 
-这些场景确认连接健康是解释性证据：可达、不可达或摘要被拒绝都不会打开 `启用同步`、恢复码、join request、授权成功或设备撤销路径。command preview 也必须保持非执行：ready 但阶段关闭时只显示 `not_executable_current_phase`，readiness 阻塞时只显示 `blocked_by_readiness`。
+这些场景确认连接健康是解释性证据：可达、不可达或摘要被拒绝都不会打开 `启用同步`、恢复码、join request、授权成功或设备撤销路径。command preview 也必须保持非执行：ready 但阶段关闭时只显示 `not_executable_current_phase`，readiness 阻塞时只显示 `blocked_by_readiness`，request / result boundary 只显示摘要边界，错误分类只显示 allowlist 码。
+
+## Action Command Protocol 预期
+
+`manager_sync_action_command_preview.v1` 的场景预期由 fixture 常量维护，避免 settings、sync 和 diagnostics 三处漂移。
+
+| 摘要 | 预期 |
+| --- | --- |
+| data policy | `no_recovery_code_or_wrapped_material`, `no_recovery_code_input_or_device_secret`, `no_short_code_signature_or_wrapped_material`, `no_signature_key_epoch_or_wrapped_material` |
+| stop line | `no_recovery_code_generation_current_phase`, `no_recovery_code_input_current_phase`, `no_join_request_or_authorization_package_current_phase`, `no_device_revocation_current_phase` |
+| request boundary | `request_summary_only_no_recovery_code_generation`, `request_summary_only_no_recovery_code_input`, `request_summary_only_no_join_request_or_short_code`, `request_summary_only_no_device_signature_or_key_epoch` |
+| result boundary | `result_summary_only_no_recovery_record_or_wrapped_material`, `result_summary_only_no_unwrapped_device_material`, `result_summary_only_no_authorization_package_or_signature`, `result_summary_only_no_revocation_record_or_key_epoch_material` |
+| error codes | `configuration_missing`, `backend_unavailable`, `deployment_unverified`, `recovery_code_required`, `recovery_record_missing`, `recovery_record_revoked`, `local_data_inconsistent`, `authentication_required`, `recovery_code_invalid`, `network_unreachable`, `join_request_expired`, `authorization_rejected`, `device_revoked`, `key_epoch_rotation_required` |
+
+完整 action 级边界见 [`docs/manager-sync-action-protocol-preview.md`](manager-sync-action-protocol-preview.md)。场景 fixture 中的 `expectedActionCommandRequestBoundaries`、`expectedActionCommandResultBoundaries` 和 `expectedActionCommandErrorCodes` 是测试真相源；未来新增 action 或错误分类前必须先更新该专题文档、fixture 和 settings / sync / diagnostics 回归。
 
 ## 复验入口
 
 主要覆盖：
 
-- `apps/radishlex-manager/test/fixtures/sync_readiness_bridge_fixtures.dart`：场景输入、预期来源和预期派生摘要。
-- `apps/radishlex-manager/test/fixtures/sync_evidence_bundle_fixtures.dart`：组合 readiness、connection health、部署证据来源和设备 gate 的预演输入。
-- `apps/radishlex-manager/test/models/manager_sync_entry_gate_test.dart`：遍历场景目录，校验 import result、entry gate、readiness 摘要、interaction intent、action command preview、envelope schema 和脱敏边界。
+- `apps/radishlex-manager/test/fixtures/sync_readiness_bridge_fixtures.dart`：场景输入、预期来源、预期派生摘要和 action command protocol preview 预期。
+- `apps/radishlex-manager/test/fixtures/sync_evidence_bundle_fixtures.dart`：组合 readiness、connection health、部署证据来源、设备 gate 和 action command protocol preview 的预演输入。
+- `apps/radishlex-manager/test/models/manager_sync_entry_gate_test.dart`：遍历场景目录，校验 import result、entry gate、readiness 摘要、interaction intent、action command preview、request / result boundary、错误分类、envelope schema 和脱敏边界。
 - `apps/radishlex-manager/test/screens/settings_test.dart`：验证 settings 导入、清除、同步页状态和诊断导出一致性，并固定 settings gate preview 的代表场景可见层和 command preview 回归。
 - `apps/radishlex-manager/test/screens/settings_diagnostics_test.dart`：遍历场景目录，校验诊断报告中的 `sync.readiness_*`、`sync.interaction_*`、`sync.action_command_*`、`sync.user_sync_enabled` 和脱敏文本。
 - `apps/radishlex-manager/test/screens/sync_test.dart`：固定 ready 但当前阶段关闭、恢复记录缺失、join request 过期、未知 native 状态清洗和 unsafe redaction 拒绝等代表场景，校验同步页预检区、command preview 可见字段和入口按钮关闭状态。

@@ -11,7 +11,7 @@
 - `DeviceJoinReadiness`：新设备 join request、短码核对和授权包前置条件。
 - `DeviceRevocationReadiness`：设备撤销、丢失设备风险提示和后续 key epoch 推进条件。
 
-这些模型会被汇总为 `SyncReadinessFlowSummary`，用于同步页、设置页和诊断报告输出同一组 blocked flows、issue codes、next required evidence、source tags 和 user sync blocked 摘要。`SyncInteractionEntryPlan` / `SyncInteractionActionIntent` 在 readiness 之上派生四个未来操作入口：`recovery_setup`、`recovery_restore`、`join_request_authorization` 和 `device_revocation`，只输出 `visibility_status`、`intent_status`、`blocker`、`required_evidence` 和 `source_tag`，用于说明操作为何仍不可执行。`manager_sync_action_command_preview.v1` / `SyncActionCommandPreviewPlan` 再从 action intent 派生非执行命令预演，只输出 action id、intent status、execution status、blocker、required evidence、source tag、data policy 和 stop line；它不创建 bridge 请求，不保存 settings 字段，也不携带任何命令 payload。Dart 侧 `ManagerSyncReadinessBridgeSnapshot` / `manager_sync_readiness.v1` mapper 已可把未来 bridge 的非敏感状态码映射回这四条 readiness；未知状态、未知前置条件和未知错误码必须降级为安全分类，不能透传原始异常或 secret。所有模型只输出状态码、阻塞码、前置条件摘要、来源标签、策略码和错误分类；不得输出恢复码、短码、token、私钥、signature bytes、wrapped material、payload bytes、请求 / 响应体、真实路径或证据包正文。
+这些模型会被汇总为 `SyncReadinessFlowSummary`，用于同步页、设置页和诊断报告输出同一组 blocked flows、issue codes、next required evidence、source tags 和 user sync blocked 摘要。`SyncInteractionEntryPlan` / `SyncInteractionActionIntent` 在 readiness 之上派生四个未来操作入口：`recovery_setup`、`recovery_restore`、`join_request_authorization` 和 `device_revocation`，只输出 `visibility_status`、`intent_status`、`blocker`、`required_evidence` 和 `source_tag`，用于说明操作为何仍不可执行。`manager_sync_action_command_preview.v1` / `SyncActionCommandPreviewPlan` 再从 action intent 派生非执行命令预演，只输出 action id、intent status、execution status、blocker、required evidence、source tag、data policy、stop line、request boundary、result boundary 和 action 级错误分类；它不创建 bridge 请求，不保存 settings 字段，也不携带任何命令 payload。Dart 侧 `ManagerSyncReadinessBridgeSnapshot` / `manager_sync_readiness.v1` mapper 已可把未来 bridge 的非敏感状态码映射回这四条 readiness；未知状态、未知前置条件和未知错误码必须降级为安全分类，不能透传原始异常或 secret。所有模型只输出状态码、阻塞码、前置条件摘要、来源标签、策略码、request / result 边界和错误分类；不得输出恢复码、短码、token、私钥、signature bytes、wrapped material、payload bytes、请求 / 响应体、真实路径或证据包正文。四条 action 的协议预演字段见 `docs/manager-sync-action-protocol-preview.md`。
 
 即便未来 bridge snapshot 把四条 readiness 都映射为 ready，当前阶段的 action intent 仍派生为 `closed_current_phase`，`blocker` 为 `user_sync_entry_closed_current_phase`，`required_evidence` 为 `user_sync_entry_current_phase_open_required`。这条规则确保只读准备态不会被误解为真实恢复码生成、恢复码输入、join request 创建、设备授权成功或设备撤销入口已经开放。
 
@@ -113,10 +113,11 @@ command preview 的 `execution_status` 同样不会打开操作：`closed_curren
 ## UI 与诊断要求
 
 - 同步页展示四条流程的 status、blocker 和错误分类摘要。
-- 同步页和设置页 gate preview 展示同一组 readiness 聚合摘要、只读 action intent 进入计划、action command preview 和 `readiness_bridge_source` 来源标签，不提供操作按钮。
+- 同步页和设置页 gate preview 展示同一组 readiness 聚合摘要、只读 action intent 进入计划、action command preview、request / result boundary、错误分类和 `readiness_bridge_source` 来源标签，不提供操作按钮。
 - 设置页 gate preview、同步页和诊断报告必须使用同一份 readiness 场景目录做代表场景回归，至少覆盖全部 ready 但当前阶段关闭、恢复记录缺失、join request 过期、未知 native 状态清洗和 unsafe redaction 拒绝。
 - 诊断报告输出字段必须保留在 `sync_gate` 分组，只输出状态码、来源标签、前置条件码和错误码。
 - `manager_sync_readiness.v1` 只作为 future bridge mapper 的非敏感输入形状，不改变 `ManagerBridge` contract，不新增 C ABI。
+- `manager_sync_action_command_preview.v1` 只作为 future bridge 命令前的非执行协议预演，不改变 `ManagerBridge` contract，不新增 C ABI，不生成 request payload 或 result material。
 - settings draft 不新增 secret 字段，不保存恢复码、短码、token、签名、wrapped material 或 payload bytes。
 - widget fixture 必须使用合成设备、合成 endpoint 和状态码，不嵌入真实账号、真实路径、真实服务端响应或截图中的敏感内容。
 
