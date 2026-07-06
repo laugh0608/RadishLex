@@ -7,6 +7,8 @@ import 'package:radishlex_manager/src/bridge/fixture_manager_bridge.dart';
 import 'package:radishlex_manager/src/data/manager_fixture.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
+import '../fixtures/sync_readiness_bridge_fixtures.dart';
+
 void main() {
   testWidgets('sync gate keeps user sync disabled', (
     WidgetTester tester,
@@ -175,7 +177,7 @@ void main() {
       deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
     );
     final readiness = managerSyncReadinessBridgeSnapshotFromJson(
-      _readyBridgeReadinessJson(),
+      readySyncReadinessBridgeJson(),
     );
     final state = deriveManagerSyncUiState(
       draft: draft,
@@ -289,53 +291,4 @@ void main() {
     );
     expect(enableButton.onPressed, isNull);
   });
-}
-
-Map<String, Object?> _readyBridgeReadinessJson() {
-  return {
-    'format': managerSyncReadinessBridgeSummaryFormat,
-    'redaction_policy': managerSyncReadinessBridgeRedactionPolicy,
-    'source': 'ffi_native_readiness',
-    'recovery_setup': {
-      'status': 'recovery_setup_ready',
-      'blocker': 'none',
-      'entry_action_status': 'available',
-      'generated_code_status': 'generated_once',
-      'save_confirmation_status': 'confirmed',
-      'recovery_record_status': 'recovery_record_active',
-      'first_upload_gate': 'ready_for_encrypted_p2_upload',
-      'required_prerequisites': <String>[],
-      'error_codes': <String>[],
-    },
-    'recovery_restore': {
-      'status': 'recovery_restore_ready',
-      'blocker': 'none',
-      'entry_action_status': 'available',
-      'code_input_status': 'validated',
-      'recovery_record_lookup_status': 'recovery_record_active',
-      'attempt_limit_status': 'available',
-      'device_registration_status': 'ready_after_recovery_success',
-      'error_codes': <String>[],
-    },
-    'device_join': {
-      'status': 'device_join_ready',
-      'blocker': 'none',
-      'entry_action_status': 'available',
-      'join_request_status': 'join_request_authorized',
-      'short_code_verification_status': 'verified',
-      'authorization_package_status': 'authorization_package_ready',
-      'authorization_package_preconditions': 'satisfied',
-      'error_codes': <String>[],
-    },
-    'device_revocation': {
-      'status': 'device_revocation_ready',
-      'blocker': 'none',
-      'entry_action_status': 'available',
-      'revoke_device_status': 'available',
-      'active_device_requirement': 'satisfied',
-      'lost_device_risk_notice': 'acknowledged',
-      'key_epoch_status': 'key_epoch_ready',
-      'error_codes': <String>[],
-    },
-  };
 }

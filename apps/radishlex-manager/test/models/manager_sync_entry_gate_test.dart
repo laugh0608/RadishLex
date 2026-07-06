@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:radishlex_manager/src/bridge/ffi_manager_sync_readiness_mapper.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
+import '../fixtures/sync_readiness_bridge_fixtures.dart';
+
 void main() {
   const readyDevice = DeviceSecuritySummary(
     deviceId: 'device-ready-01',
@@ -613,7 +615,7 @@ void main() {
       deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
     );
     final readiness = managerSyncReadinessBridgeSnapshotFromJson(
-      _readyBridgeReadinessJson(),
+      readySyncReadinessBridgeJson(),
     );
 
     final gate = deriveManagerSyncEntryGate(
@@ -663,25 +665,9 @@ void main() {
   });
 
   test('bridge readiness mapper sanitizes unknown and unsafe fields', () {
-    final readiness = managerSyncReadinessBridgeSnapshotFromJson({
-      'format': managerSyncReadinessBridgeSummaryFormat,
-      'redaction_policy': managerSyncReadinessBridgeRedactionPolicy,
-      'source': 'unexpected_native_source_detail',
-      'recovery_setup': {
-        'status': 'unexpected_native_status_detail',
-        'blocker': 'recovery_record_missing',
-        'required_prerequisites': [
-          'platform_private_key_backend_ready',
-          'unexpected_prerequisite_detail',
-        ],
-        'error_codes': ['recovery_record_missing', 'unexpected_error_detail'],
-      },
-      'device_join': {
-        'authorization_package_preconditions':
-            'active_existing_device_required, unexpected_join_detail',
-        'error_codes': ['network_unreachable', 'unexpected_error_detail'],
-      },
-    });
+    final readiness = managerSyncReadinessBridgeSnapshotFromJson(
+      unsafeSyncReadinessBridgeJson(),
+    );
 
     final gate = deriveManagerSyncEntryGate(
       draft: const ManagerSettingsDraft(
@@ -712,22 +698,26 @@ void main() {
       gate.deviceAuthorization.joinReadiness.authorizationPackagePreconditions,
       'active_existing_device_required, unexpected_bridge_required_evidence',
     );
-    expect(
-      gate.readinessIssueCodeSummary,
-      isNot(contains('unexpected_native')),
-    );
-    expect(
-      gate.readinessIssueCodeSummary,
-      isNot(contains('unexpected_error_detail')),
-    );
+    expect(gate.readinessIssueCodeSummary, isNot(contains('secret-token')));
+    expect(gate.readinessIssueCodeSummary, isNot(contains('signature_bytes')));
     expect(
       gate.readinessNextRequiredEvidenceSummary,
-      isNot(contains('unexpected_prerequisite_detail')),
+      isNot(contains('wrapped_material_bytes')),
     );
     expect(
       gate.deviceAuthorization.joinReadiness.errorCodeSummary,
-      isNot(contains('unexpected_error_detail')),
+      isNot(contains('payload_bytes')),
     );
+
+    final gateSummary = _entryGateSummary(gate);
+    expect(gateSummary, isNot(contains('RADISHLEX-RECOVERY-CODE-SECRET')));
+    expect(gateSummary, isNot(contains('secret-token')));
+    expect(gateSummary, isNot(contains('/synthetic/private')));
+    expect(gateSummary, isNot(contains('short_code=123456')));
+    expect(gateSummary, isNot(contains('signature_bytes')));
+    expect(gateSummary, isNot(contains('wrapped_material_bytes')));
+    expect(gateSummary, isNot(contains('payload_bytes')));
+    expect(gateSummary, isNot(contains('private_key=abcdef')));
 
     final invalid = managerSyncReadinessBridgeSnapshotFromJson({
       'format': 'unsupported',
@@ -743,53 +733,116 @@ void main() {
       'bridge_readiness_summary_invalid',
     );
   });
+
+  test('bridge readiness partial blockers preserve flow-specific evidence', () {
+    final readiness = managerSyncReadinessBridgeSnapshotFromJson(
+      partiallyBlockedSyncReadinessBridgeJson(),
+    );
+
+    final gate = deriveManagerSyncEntryGate(
+      draft: const ManagerSettingsDraft(
+        serverEndpoint: 'https://sync.example.invalid',
+        retainSyncConfig: true,
+        privacyMode: false,
+        diagnosticsExport: false,
+        deploymentEvidenceRecorded: true,
+        accessTokenConfigured: true,
+        deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
+      ),
+      device: readyDevice,
+      readinessBridgeSnapshot: readiness,
+    );
+
+    expect(readiness.source, 'fixture_readiness');
+    expect(gate.entryState, SyncEntryState.blockedBeforeUserSync);
+    expect(gate.entryBlocker, 'recovery_record_missing');
+    expect(gate.recovery.status, RecoveryEntryStatus.saveConfirmationRequired);
+    expect(gate.recovery.recoveryRecordBlocker, 'recovery_record_missing');
+    expect(
+      gate.deviceAuthorization.status,
+      DeviceAuthorizationEntryStatus.authorizationUnavailable,
+    );
+    expect(
+      gate.deviceAuthorization.authorizationPackageBlocker,
+      'authorization_package_prerequisites_blocked',
+    );
+    expect(gate.readinessBlockedFlowSummary, 'recovery_setup, device_join');
+    expect(
+      gate.readinessIssueCodeSummary,
+      'recovery_record_missing, network_unreachable, join_request_expired, authorization_rejected',
+    );
+    expect(
+      gate.readinessNextRequiredEvidenceSummary,
+      'platform_private_key_backend_ready, release_deployment_evidence_summary_required, explicit_user_start_required, join_request_expired, short_code_match_required, join_request_pending_required',
+    );
+    expect(
+      gate.interactionEntryPlan.intentStatusSummary,
+      'recovery_setup=blocked, recovery_restore=closed_current_phase, join_request_authorization=blocked, device_revocation=closed_current_phase',
+    );
+    expect(
+      gate.interactionEntryPlan.blockerSummary,
+      'recovery_record_missing, user_sync_entry_closed_current_phase, join_request_expired',
+    );
+    expect(gate.userSyncEnabled, isFalse);
+  });
+
+  test('bridge readiness invalid redaction policy falls back closed', () {
+    final readiness = managerSyncReadinessBridgeSnapshotFromJson({
+      'format': managerSyncReadinessBridgeSummaryFormat,
+      'redaction_policy': 'raw_native_payload_with_secret_fields',
+      'source': 'ffi_native_readiness',
+      'recovery_setup': {'status': 'recovery_setup_ready', 'blocker': 'none'},
+    });
+
+    final gate = deriveManagerSyncEntryGate(
+      draft: const ManagerSettingsDraft(
+        serverEndpoint: 'https://sync.example.invalid',
+        retainSyncConfig: true,
+        privacyMode: false,
+        diagnosticsExport: false,
+        deploymentEvidenceRecorded: true,
+        accessTokenConfigured: true,
+        deploymentEvidenceSource: managerDeploymentEvidenceExternalTls,
+      ),
+      device: readyDevice,
+      readinessBridgeSnapshot: readiness,
+    );
+
+    expect(readiness.source, 'bridge_readiness_summary_invalid');
+    expect(gate.readinessBridgeSource, 'bridge_readiness_summary_invalid');
+    expect(
+      gate.readinessBlockedFlowSummary,
+      'recovery_setup, recovery_restore, device_join, device_revocation',
+    );
+    expect(
+      gate.readinessIssueCodeSummary,
+      contains('bridge_readiness_summary_invalid'),
+    );
+    expect(gate.userSyncEnabled, isFalse);
+    expect(
+      gate.interactionEntryPlan.intentStatusSummary,
+      'recovery_setup=closed_current_phase, recovery_restore=closed_current_phase, join_request_authorization=closed_current_phase, device_revocation=closed_current_phase',
+    );
+  });
 }
 
-Map<String, Object?> _readyBridgeReadinessJson() {
-  return {
-    'format': managerSyncReadinessBridgeSummaryFormat,
-    'redaction_policy': managerSyncReadinessBridgeRedactionPolicy,
-    'source': 'ffi_native_readiness',
-    'recovery_setup': {
-      'status': 'recovery_setup_ready',
-      'blocker': 'none',
-      'entry_action_status': 'available',
-      'generated_code_status': 'generated_once',
-      'save_confirmation_status': 'confirmed',
-      'recovery_record_status': 'recovery_record_active',
-      'first_upload_gate': 'ready_for_encrypted_p2_upload',
-      'required_prerequisites': <String>[],
-      'error_codes': <String>[],
-    },
-    'recovery_restore': {
-      'status': 'recovery_restore_ready',
-      'blocker': 'none',
-      'entry_action_status': 'available',
-      'code_input_status': 'validated',
-      'recovery_record_lookup_status': 'recovery_record_active',
-      'attempt_limit_status': 'available',
-      'device_registration_status': 'ready_after_recovery_success',
-      'error_codes': <String>[],
-    },
-    'device_join': {
-      'status': 'device_join_ready',
-      'blocker': 'none',
-      'entry_action_status': 'available',
-      'join_request_status': 'join_request_authorized',
-      'short_code_verification_status': 'verified',
-      'authorization_package_status': 'authorization_package_ready',
-      'authorization_package_preconditions': 'satisfied',
-      'error_codes': <String>[],
-    },
-    'device_revocation': {
-      'status': 'device_revocation_ready',
-      'blocker': 'none',
-      'entry_action_status': 'available',
-      'revoke_device_status': 'available',
-      'active_device_requirement': 'satisfied',
-      'lost_device_risk_notice': 'acknowledged',
-      'key_epoch_status': 'key_epoch_ready',
-      'error_codes': <String>[],
-    },
-  };
+String _entryGateSummary(ManagerSyncEntryGate gate) {
+  return [
+    gate.entryBlocker,
+    gate.productionBlockerSummary,
+    gate.readinessBlockedFlowSummary,
+    gate.readinessIssueCodeSummary,
+    gate.readinessNextRequiredEvidenceSummary,
+    gate.readinessSourceTagSummary,
+    gate.interactionEntryPlan.blockerSummary,
+    gate.interactionEntryPlan.requiredEvidenceSummary,
+    gate.recovery.readinessBlockerSummary,
+    gate.recovery.setupReadiness.prerequisiteSummary,
+    gate.recovery.setupReadiness.errorCodeSummary,
+    gate.recovery.restoreReadiness.errorCodeSummary,
+    gate.deviceAuthorization.readinessBlockerSummary,
+    gate.deviceAuthorization.joinReadiness.authorizationPackagePreconditions,
+    gate.deviceAuthorization.joinReadiness.errorCodeSummary,
+    gate.deviceAuthorization.revocationReadiness.errorCodeSummary,
+  ].join('\n');
 }
