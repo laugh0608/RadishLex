@@ -90,6 +90,82 @@ void main() {
     );
   });
 
+  test('readiness scenario catalog maps to stable gate summaries', () {
+    for (final scenario in syncReadinessScenarioCatalog()) {
+      var readinessBridgeSnapshot = managerDefaultSyncReadinessBridgeSnapshot;
+      if (scenario.summaryJson != null) {
+        final imported = importManagerSyncReadinessBridgeSummaryFromJson(
+          scenario.summaryJson!(),
+        );
+        expect(
+          imported.accepted,
+          scenario.expectedImportAccepted,
+          reason: scenario.id,
+        );
+        expect(
+          imported.errorCode,
+          scenario.expectedImportErrorCode,
+          reason: scenario.id,
+        );
+        readinessBridgeSnapshot = imported.snapshot;
+      }
+
+      final gate = deriveManagerSyncEntryGate(
+        draft: scenario.draft,
+        device: scenario.device,
+        readinessBridgeSnapshot: readinessBridgeSnapshot,
+      );
+
+      expect(gate.readinessBridgeSource, scenario.expectedBridgeSource);
+      expect(gate.entryState, scenario.expectedEntryState);
+      expect(gate.entryBlocker, scenario.expectedEntryBlocker);
+      expect(gate.readinessBlockedFlowSummary, scenario.expectedBlockedFlows);
+      if (scenario.expectedIssueCodes != null) {
+        expect(gate.readinessIssueCodeSummary, scenario.expectedIssueCodes);
+      }
+      for (final code in scenario.expectedIssueCodeContains) {
+        expect(gate.readinessIssueCodeSummary, contains(code));
+      }
+      for (final fragment in scenario.forbiddenIssueCodeFragments) {
+        expect(gate.readinessIssueCodeSummary, isNot(contains(fragment)));
+      }
+      if (scenario.expectedNextEvidence != null) {
+        expect(
+          gate.readinessNextRequiredEvidenceSummary,
+          scenario.expectedNextEvidence,
+        );
+      }
+      for (final code in scenario.expectedNextEvidenceContains) {
+        expect(gate.readinessNextRequiredEvidenceSummary, contains(code));
+      }
+      for (final fragment in scenario.forbiddenNextEvidenceFragments) {
+        expect(
+          gate.readinessNextRequiredEvidenceSummary,
+          isNot(contains(fragment)),
+        );
+      }
+      expect(
+        gate.interactionEntryPlan.intentStatusSummary,
+        scenario.expectedInteractionStatuses,
+      );
+      expect(
+        gate.interactionEntryPlan.blockerSummary,
+        scenario.expectedInteractionBlockers,
+      );
+      expect(gate.userSyncEnabled, scenario.expectedUserSyncEnabled);
+
+      final summary = _entryGateSummary(gate);
+      expect(summary, isNot(contains('secret-token')), reason: scenario.id);
+      expect(
+        summary,
+        isNot(contains('RADISHLEX-RECOVERY-CODE-SECRET')),
+        reason: scenario.id,
+      );
+      expect(summary, isNot(contains('/synthetic/private')));
+      expect(summary, isNot(contains('payload_bytes=abcdef')));
+    }
+  });
+
   test('entry gate keeps privacy mode ahead of deployment evidence', () {
     const draft = ManagerSettingsDraft(
       serverEndpoint: 'https://sync.example.invalid',

@@ -1,0 +1,45 @@
+# Manager Readiness 场景目录
+
+本文档定义 Flutter manager 开发期 `manager_sync_readiness.v1` 联调场景。读者是维护 settings / sync / diagnostics 状态派生、准备未来 `ManagerBridge` readiness 接线和审阅真实同步入口停止线的协作者。本文不定义 C ABI、真实恢复码生成、join request 创建、设备授权成功、设备撤销操作或 Go server 新 API。
+
+## 当前边界
+
+- 这些场景只用于本地开发、fixture、widget / helper / model 测试和人工复核。
+- 场景输入必须是非敏感摘要，只允许状态码、阻塞码、前置证据码、来源标签和错误分类。
+- 场景不得包含或传播 token、恢复码、短码、私钥、signature bytes、wrapped material、payload bytes、请求 / 响应体、真实路径或 provider exception 原文。
+- 即便场景显示四条 readiness 全部 ready，当前 Phase 4 仍派生 `user_sync_entry_closed_current_phase`，不打开真实远端同步、恢复码或设备授权操作。
+- 场景目录是 future bridge mapper 的验收输入，不是新增 `ManagerBridge` contract，也不是 C ABI。
+
+## 场景表
+
+| 场景 ID | 输入 | 预期来源 | entry blocker | blocked flows | issue codes | next evidence | interaction statuses | user sync |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `all_ready_current_phase_closed` | `manager_sync_readiness.v1` ready 摘要 | `ffi_native_readiness` | `user_sync_entry_closed_current_phase` | `none` | `none` | `none` | 四条 action 均为 `closed_current_phase` | `false` |
+| `recovery_record_missing` | 恢复 setup 阻塞，其他 readiness ready | `fixture_readiness` | `recovery_record_missing` | `recovery_setup` | `recovery_record_missing` | `platform_private_key_backend_ready`, `release_deployment_evidence_summary_required`, `explicit_user_start_required` | `recovery_setup=blocked`，其余 action 为 `closed_current_phase` | `false` |
+| `join_request_expired` | 设备 join 阻塞，其他 readiness ready | `fixture_readiness` | `join_request_expired` | `device_join` | `join_request_expired`, `authorization_rejected` | `join_request_expired`, `short_code_match_required`, `join_request_pending_required` | `join_request_authorization=blocked`，其余 action 为 `closed_current_phase` | `false` |
+| `platform_backend_blocked` | 设备 production gate 为 `blocked`，无导入 readiness | `manager_default_closed_readiness` | `backend_unavailable` | 四条 readiness 均阻塞 | 默认关闭态 issue codes | 默认关闭态 next evidence | 四条 action 均为 `closed_current_phase` | `false` |
+| `deployment_evidence_local_smoke_only` | 只有 `local_smoke` 证据，发布级证据不足 | `manager_default_closed_readiness` | `release_deployment_evidence_required` | 四条 readiness 均阻塞 | 默认关闭态 issue codes | 默认关闭态 next evidence | 四条 action 均为 `closed_current_phase` | `false` |
+| `deployment_evidence_missing` | 未记录目标部署证据 | `manager_default_closed_readiness` | `deployment_unverified` | 四条 readiness 均阻塞 | 默认关闭态 issue codes | 默认关闭态 next evidence | 四条 action 均为 `closed_current_phase` | `false` |
+| `unknown_native_status_sanitized` | 摘要 format / redaction 合法，但包含未知 native 状态和敏感形态字段 | `unknown_bridge_readiness_source` | `recovery_record_missing` | 四条 readiness 均阻塞 | 只保留 allowlist 错误和 `unexpected_bridge_error_code` | 只保留 allowlist evidence 和 `unexpected_bridge_required_evidence` | 未知 setup 状态降级为 `closed_current_phase`，其余明确阻塞 action 为 `blocked` | `false` |
+| `unsupported_format_rejected` | `format != manager_sync_readiness.v1` | `manager_default_closed_readiness` | `recovery_code_flow_closed` | 四条 readiness 均阻塞 | 默认关闭态 issue codes | 默认关闭态 next evidence | 四条 action 均为 `closed_current_phase` | `false` |
+| `unsafe_redaction_rejected` | `redaction_policy` 不是安全摘要策略 | `manager_default_closed_readiness` | `recovery_code_flow_closed` | 四条 readiness 均阻塞 | 默认关闭态 issue codes | 默认关闭态 next evidence | 四条 action 均为 `closed_current_phase` | `false` |
+
+默认关闭态 issue codes 和 next evidence 的完整字符串以 `apps/radishlex-manager/test/fixtures/sync_readiness_bridge_fixtures.dart` 中 `syncReadinessDefaultIssueCodes` 和 `syncReadinessDefaultNextEvidence` 为测试真相源，避免文档复制超长字段后漂移。
+
+## 复验入口
+
+主要覆盖：
+
+- `apps/radishlex-manager/test/fixtures/sync_readiness_bridge_fixtures.dart`：场景输入、预期来源和预期派生摘要。
+- `apps/radishlex-manager/test/models/manager_sync_entry_gate_test.dart`：遍历场景目录，校验 import result、entry gate、readiness 摘要、interaction intent 和脱敏边界。
+- `apps/radishlex-manager/test/screens/settings_test.dart`：验证 settings 导入、清除、同步页状态和诊断导出一致性。
+- `apps/radishlex-manager/test/screens/manager_home_actions_test.dart`：验证 settings draft 保存后保留导入 readiness，导入态诊断使用当前 snapshot。
+
+建议命令：
+
+```bash
+flutter test test/models/manager_sync_entry_gate_test.dart test/screens/manager_home_actions_test.dart test/screens/settings_test.dart test/screens/settings_diagnostics_test.dart test/screens/sync_test.dart
+./scripts/check-manager.sh
+git diff --check
+./scripts/check-repo.sh
+```
