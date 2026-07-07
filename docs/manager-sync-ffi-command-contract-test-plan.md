@@ -11,6 +11,8 @@
 - `apps/radishlex-manager/test/fixtures/sync_ffi_command_boundary_fixtures.dart`
 - `apps/radishlex-manager/test/models/manager_sync_ffi_command_boundary_test.dart`
 - `apps/radishlex-manager/test/models/manager_sync_ffi_binding_contract_test.dart`
+- `apps/radishlex-manager/test/fixtures/sync_transient_secret_interaction_fixtures.dart`
+- `apps/radishlex-manager/test/models/manager_sync_transient_secret_interaction_test.dart`
 - `apps/radishlex-manager/test/ffi_manager_bridge_test.dart` 中 fake native capability missing 回归
 - `apps/radishlex-manager/tool/ffi_bridge_smoke.dart` 中真实 dynamic library future sync command symbol 缺席检查
 - `docs/manager-sync-ffi-command-boundary.md`
@@ -111,6 +113,8 @@ Dart FFI binding test 的实现顺序：
 2. 再用真实 dynamic library 做 capability missing smoke，确认当前没有 sync command symbol 时 UI 保持关闭；当前 `ffi_bridge_smoke.dart` 已检查 `radishlex_manager_sync_command_execute_v1` 和 result accessor / free 候选 symbol 均未导出。
 3. 只有真实 C ABI symbol 评审通过后，才把 dynamic library smoke 扩展到 result handle 读取和释放。
 
+恢复码一次性展示、恢复码输入、短码核对和显式授权 / 撤销确认的 transient secret 生命周期已由 `docs/manager-recovery-device-auth-flow.md`、`sync_transient_secret_interaction_fixtures.dart` 和 `manager_sync_transient_secret_interaction_test.dart` 固定。当前仍不显示、输入、复制、保存或传递真实 secret。
+
 ## Manager 可见层回归
 
 每次扩展 command contract、FFI boundary 或 fake native mapper 时，至少复验：
@@ -138,6 +142,7 @@ Dart FFI binding test 的实现顺序：
 flutter test test/models/manager_sync_ffi_command_boundary_test.dart test/models/manager_sync_bridge_command_contract_test.dart
 flutter test test/ffi_manager_bridge_test.dart test/models/manager_sync_ffi_command_boundary_test.dart
 flutter test test/models/manager_sync_ffi_binding_contract_test.dart
+flutter test test/models/manager_sync_transient_secret_interaction_test.dart
 ./scripts/check-manager-ffi-smoke.sh
 ./scripts/check-manager.sh
 git diff --check

@@ -17,6 +17,45 @@
 
 command preview 的 `execution_status` 同样不会打开操作：`closed_current_phase` 映射为 `not_executable_current_phase`，`blocked` 映射为 `blocked_by_readiness`，`requires_confirmation` 映射为 `blocked_until_user_confirmation`。只有后续真实 bridge contract、恢复 / 授权实现测试、发布级部署证据和平台私钥 backend 全部齐备后，才允许把相关 action 推进到可执行命令设计。
 
+## Transient Secret 交互生命周期
+
+恢复码一次性展示、恢复码输入、短码核对和显式授权 / 撤销确认必须先满足独立生命周期约束，才能进入真实 UI 或 bridge 实现。当前阶段只固定交互边界，不显示、输入、复制、保存或传递真实 secret。
+
+当前设计证据：
+
+- `apps/radishlex-manager/test/fixtures/sync_transient_secret_interaction_fixtures.dart`
+- `apps/radishlex-manager/test/models/manager_sync_transient_secret_interaction_test.dart`
+
+覆盖的 transient 交互面：
+
+| 交互面 | 绑定 action | 当前状态 | 允许输出 |
+| --- | --- | --- | --- |
+| 一次性恢复码展示占位 | `recovery_setup` | `display_not_available_current_phase` | 展示占位状态、保存确认状态、恢复记录状态和首次上传 gate 摘要。 |
+| 恢复码输入占位 | `recovery_restore` | `input_not_available_current_phase` | 恢复尝试状态、恢复记录查询状态、失败限速状态和设备登记状态码。 |
+| 短码核对输入占位 | `join_request_authorization` | `input_not_available_current_phase` | join request 状态、短码核对状态和授权包前置条件摘要。 |
+| 授权显式确认 | `join_request_authorization` | `confirmation_not_available_current_phase` | 用户确认状态码和授权包状态摘要。 |
+| 撤销显式确认 | `device_revocation` | `confirmation_not_available_current_phase` | 用户确认状态码、撤销记录状态和 key epoch 摘要。 |
+
+生命周期规则：
+
+- 只能由用户显式操作触发，不能由页面加载、settings draft 保存、连接健康探测或 diagnostics export 自动触发。
+- 明文值只允许存在于调用期或可见 modal 期，提交、取消、导航离开或超时后必须清除。
+- 不启用自动填充、输入建议、自动复制到剪贴板或把 secret 放入路由参数。
+- 不写入 settings JSON、诊断报告、日志、widget golden、crash report、analytics event 或异步 snapshot state。
+- UI 和 diagnostics 只能记录状态码、确认码、阻塞码、attempt / lookup / gate 摘要和下一步 evidence code。
+- 完成证据只能是 `*_ack_code_only`、`*_status_summary` 或同类非敏感状态码，不能包含恢复码、短码、signature、wrapped material 或 payload bytes。
+
+当前阶段继续禁止：
+
+- `generate_recovery_code`
+- `persist_recovery_code`
+- `input_recovery_code`
+- `unwrap_device_material`
+- `sign_authorization_package`
+- `write_wrapped_material`
+- `revoke_device`
+- `advance_key_epoch`
+
 ## 首台设备恢复码设置
 
 当前关闭态：
