@@ -2,7 +2,7 @@
 
 本文档是 future `ManagerBridge` 同步命令 contract 的设计草案和审阅检查清单。读者是准备把 `recovery_setup`、`recovery_restore`、`join_request_authorization` 和 `device_revocation` 从非执行 preview 推进到真实 bridge 命令的维护者。本文不定义真实 Dart interface、C ABI、Rust FFI 函数、Go server API、加密 payload 字段、恢复码格式或设备授权包格式。
 
-future contract 草案见 `docs/manager-sync-bridge-command-contract.md`。本文继续作为审阅检查清单和停止线，不替代草案文档。
+future contract 草案见 `docs/manager-sync-bridge-command-contract.md`。FFI / C ABI ownership 与 host smoke 设计见 `docs/manager-sync-ffi-command-boundary.md`。本文继续作为审阅检查清单和停止线，不替代草案文档。
 
 ## 当前结论
 
@@ -27,6 +27,7 @@ future contract 草案见 `docs/manager-sync-bridge-command-contract.md`。本�
 - `apps/radishlex-manager/test/fixtures/sync_bridge_command_contract_fixtures.dart`
 - `apps/radishlex-manager/test/models/manager_sync_bridge_command_contract_test.dart`
 - `docs/manager-sync-bridge-command-contract.md`
+- `docs/manager-sync-ffi-command-boundary.md`
 
 这组 fixture / 测试只验证 future contract 的安全形状、错误 envelope、幂等性状态码、forbidden material 拒绝样本和 diagnostics 不泄漏；它不定义真实 `ManagerBridge` 方法或 `ime-ffi` symbol。
 
@@ -210,7 +211,7 @@ preview 字段不能直接改名后当作 bridge DTO。真实 contract 设计完
 - 平台私钥 backend 在目标平台解除 production gate，并有 smoke 或等价证据。
 - 恢复码 setup / restore 与设备 join / revocation 的真实交互测试设计完成。
 - 发布级目标部署证据通过校验，并只以 `deployment_evidence_summary.v1` 摘要进入 manager。
-- `ManagerBridge` contract、C ABI、Rust FFI ownership 和错误 envelope 已有专题文档或 ADR。
+- `ManagerBridge` contract、C ABI、Rust FFI ownership、host smoke 设计和错误 envelope 已有专题文档或 ADR。
 - settings / sync / diagnostics 对新增 command 状态的可见层回归已准备。
 - forbidden material 的拒绝测试已覆盖 token、恢复码、短码、signature bytes、wrapped material、payload bytes、请求 / 响应体和真实路径。
 

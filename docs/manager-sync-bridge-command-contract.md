@@ -19,6 +19,7 @@
 - `docs/manager-sync-bridge-command-contract-checklist.md`
 - `docs/manager-sync-action-protocol-preview.md`
 - `docs/manager-sync-entry-boundary.md`
+- `docs/manager-sync-ffi-command-boundary.md`
 - `apps/radishlex-manager/test/fixtures/sync_bridge_command_contract_fixtures.dart`
 - `apps/radishlex-manager/test/models/manager_sync_bridge_command_contract_test.dart`
 
@@ -291,9 +292,9 @@ result `safe_summary`：
 
 ## FFI 与 C ABI 问题清单
 
-真实实现前必须另行解决：
+真实实现前必须按 `docs/manager-sync-ffi-command-boundary.md` 另行解决：
 
-- 是否采用四个专用 C ABI symbol，还是一个 versioned command envelope 入口。
+- 是否采用四个专用 C ABI symbol，还是一个 versioned command envelope 入口；当前建议优先评审单一 versioned executor，但不得把它做成任意 JSON tunnel。
 - 如果采用专用 symbol，每个 symbol 的 request / result 结构、版本号和释放函数如何命名。
 - 如果采用 envelope，如何避免把 JSON request / response body、payload bytes 或 secret 字段传到 Flutter 可见层。
 - Rust 分配 result / error buffer 的所有权、释放函数、空指针规则和 `*_free(NULL)` 行为。

@@ -19,6 +19,8 @@
 
 当前不表示真实平台壳已经接入。平台壳进入前，绑定层仍需要按本 runbook 写出本平台自己的 smoke 或 wrapper 测试。
 
+future manager 同步命令的 C ABI / ownership / host smoke 设计见 `docs/manager-sync-ffi-command-boundary.md`。该专题不改变当前 runbook 适用范围；当前仍没有恢复码、设备授权或设备撤销的 native command symbol。
+
 ## 调用顺序
 
 ### 1. 进程启动后读取 ABI contract
