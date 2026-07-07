@@ -25,11 +25,13 @@ future contract 草案见 `docs/manager-sync-bridge-command-contract.md`。FFI /
 当前可复验证据：
 
 - `apps/radishlex-manager/test/fixtures/sync_bridge_command_contract_fixtures.dart`
+- `apps/radishlex-manager/test/fixtures/sync_ffi_command_boundary_fixtures.dart`
 - `apps/radishlex-manager/test/models/manager_sync_bridge_command_contract_test.dart`
+- `apps/radishlex-manager/test/models/manager_sync_ffi_command_boundary_test.dart`
 - `docs/manager-sync-bridge-command-contract.md`
 - `docs/manager-sync-ffi-command-boundary.md`
 
-这组 fixture / 测试只验证 future contract 的安全形状、错误 envelope、幂等性状态码、forbidden material 拒绝样本和 diagnostics 不泄漏；它不定义真实 `ManagerBridge` 方法或 `ime-ffi` symbol。
+这组 fixture / 测试只验证 future contract 的安全形状、错误 envelope、幂等性状态码、FFI ownership、host smoke 计划、forbidden material 拒绝样本和 diagnostics 不泄漏；它不定义真实 `ManagerBridge` 方法或 `ime-ffi` symbol。
 
 ## 与现有 Preview 的关系
 

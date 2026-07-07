@@ -22,6 +22,8 @@
 - `docs/manager-sync-action-protocol-preview.md`
 - `docs/manager-sync-bridge-command-contract-checklist.md`
 - `docs/manager-sync-bridge-command-contract.md`
+- `apps/radishlex-manager/test/fixtures/sync_ffi_command_boundary_fixtures.dart`
+- `apps/radishlex-manager/test/models/manager_sync_ffi_command_boundary_test.dart`
 
 ## 推荐 ABI 策略
 
@@ -209,6 +211,8 @@ command result envelope 使用 allowlist 错误码：
 
 真实 C ABI symbol 前，先补 Rust host smoke 设计和 Dart FFI smoke 设计。两者都不连接真实远端同步，不读取真实输入法目录，不触碰真实 Keychain / Keystore，除非单独进入 gated 平台 smoke。
 
+当前这组 smoke 仍是 design fixture / model test 证据，不是已落地的 Rust C ABI smoke。测试真相源位于 `sync_ffi_command_boundary_fixtures.dart`，用于固定推荐 ABI 策略、候选 symbol 名称、request / result field policy、ownership rule、ABI status 分层、Rust host smoke 项和 Dart FFI smoke 项。
+
 Rust host smoke 至少覆盖：
 
 - ABI contract 版本识别和 sync command capability 未启用时的 `InvalidState`。
@@ -261,7 +265,7 @@ Dart 层允许：
 
 - 本文的 ABI strategy、ownership、secret 生命周期、错误分层和 host smoke 设计已经评审。
 - `docs/manager-sync-bridge-command-contract.md` 的 DTO 分类与本文一致。
-- Dart contract model 测试覆盖 unknown schema、unknown status、unknown error code、unsafe redaction 和 forbidden material。
+- Dart contract model 测试覆盖 ABI strategy、unknown schema、unknown status、unknown error code、unsafe redaction、ownership、host smoke 计划和 forbidden material。
 - Rust FFI ownership test 和 Dart FFI smoke 设计完成。
 - 平台私钥 backend、恢复 / 授权交互测试和发布级部署证据的停止线仍清晰。
 - settings / sync / diagnostics 可见层回归能够证明真实 command 不会泄漏 secret 或 payload。
