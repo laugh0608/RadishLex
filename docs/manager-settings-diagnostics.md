@@ -77,6 +77,19 @@ settings draft 不得保存：
 
 `manager_sync_action_command_preview.v1` 当前字段固定为摘要层：`format`、`action_id`、`visibility_status`、`intent_status`、`execution_status`、`blocker`、`required_evidence`、`source_tag`、`data_policy`、`stop_line`、`request_boundary`、`result_boundary`、`request_status`、`request_allowed_fields`、`result_status`、`result_allowed_fields`、`forbidden_material` 和 `error_codes`。其中 `execution_status` 只允许表达 `not_executable_current_phase`、`blocked_by_readiness`、`blocked_until_user_confirmation` 或后续显式开放后的 `ready_for_future_bridge_command`；当前 UI 不会把这些 preview 转换成按钮点击或 bridge 调用。四条 action 的 request / result 边界和错误分类见 [`docs/manager-sync-action-protocol-preview.md`](manager-sync-action-protocol-preview.md)。
 
+## 同步入口诊断层级
+
+当前 `sync_gate` 字段按四层来源组织，便于后续审阅 UI、diagnostics 和 fixture 是否分叉：
+
+| 层级 | 代表字段 | 来源 | 使用边界 |
+| --- | --- | --- | --- |
+| 入口门禁 | `sync.entry_*`、`sync.production_blockers`、`sync.user_sync_enabled` | settings draft、设备 backend、部署证据来源、readiness 聚合 | 只说明用户可用同步是否被阻塞；当前不得解锁真实上传 / 下载。 |
+| readiness 与交互计划 | `sync.readiness_*`、`sync.interaction_*` | `RecoverySetupReadiness`、`RecoveryRestoreReadiness`、`DeviceJoinReadiness`、`DeviceRevocationReadiness` 和 `SyncInteractionEntryPlan` | 只输出 flow、blocker、required evidence、source tag 和 intent status；不创建恢复码、join request、授权包或撤销记录。 |
+| command preview | `sync.action_command_*`、`sync.action_request_*`、`sync.action_result_*` | `manager_sync_action_command_preview.v1` 和 request / result preview | 只描述 future bridge command 的安全外壳、allowed fields、forbidden material 和错误分类；不构造 request payload 或接收 result material。 |
+| visible-layer detail | `sync.recovery_setup_*`、`sync.recovery_restore_*`、`sync.device_join_*`、`sync.device_revocation_*` | 同步页可见层状态、transient secret 交互 fixture 和当前 readiness model | 只展示状态码、确认边界和前置条件；不显示、输入、保存或传递恢复码、短码、签名、wrapped material 或 payload bytes。 |
+
+recovery setup / restore 当前已补 visible-layer detail：一次性展示占位、保存确认、恢复输入占位、恢复记录查询、失败限速和设备登记状态必须在 UI / diagnostics 中保持同源。join request 授权和设备撤销当前仍停留在 readiness、interaction intent 和 command preview 层；后续补确认细节时，应复用 `sync.device_join_*`、`sync.device_revocation_*`、`sync.authorization_package_*`、`sync.lost_device_risk` 和 `sync.key_epoch_status` 这些非敏感字段，而不是新增 settings action payload。
+
 ## 连接健康摘要
 
 Manager 当前只派生和展示本地连接健康摘要，不在 UI 中发起远端上传 / 下载。连接健康模型从 settings draft 读取 endpoint 和 access token 存在性，也可以从 `sync_connection_health.v1` 非敏感摘要映射只读探测结果。输出状态码：

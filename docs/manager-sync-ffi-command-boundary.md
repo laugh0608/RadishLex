@@ -218,6 +218,20 @@ command result envelope 使用 allowlist 错误码：
 
 当前 Rust host review catalog 已进一步把每个 host contract case 绑定到既有 `ime-ffi` 模式和非敏感评审证据：`radishlex_ffi_contract` 版本检查、`ffi_status` / `ffi_ptr` / `ffi_release` 的 panic boundary 与释放路径、UTF-8 和 bool 输入校验、error handle read / free、summary output pointer guard、平台 binding copy-before-release 测试、sync preflight summary 输出和 owner-thread `InvalidState` 策略。该 review catalog 的状态为 `review_ready_no_native_symbol`，只说明后续 Rust host test 应复用哪些既有模式和停止线，不代表真实 C ABI 或 command context 已落地。
 
+review catalog 的 source-level 映射如下，后续写真实 Rust host test 前应先逐项确认这些模式是否仍成立：
+
+| Host contract case | 现有 `ime-ffi` 模式 | 评审重点 |
+| --- | --- | --- |
+| `contract_reports_command_capability_closed` | `radishlex_ffi_contract` current version、`ffi_status` panic boundary、当前 sync command symbol 缺席 smoke | contract 版本、capability closed 状态和 native symbol 缺席必须同时可复验。 |
+| `invalid_request_inputs_return_stable_status` | `read_utf8`、`read_ffi_bool`、summary output pointer guard、error handle read / free | unknown schema/action、非法 bool、非法 UTF-8 和空指针都必须停在 ABI 输入层。 |
+| `result_handle_copy_then_free` | `ffi_ptr` error path、`ffi_release` / `free(NULL)`、platform binding copy-before-release 测试 | Dart 只能复制 summary view 后释放 Rust-owned handle，不持有 native pointer。 |
+| `envelope_allowlist_only` | sync preflight summary output、summary output pointer guard、error handle read / free | command result envelope 只能包含 allowlist status、error、retry 和 evidence 摘要。 |
+| `forbidden_material_absent_from_native_outputs` | error handle read / free、sync preflight summary output、当前 native symbol 缺席 smoke | result、error message、Debug 和 diagnostics 只能使用安全类别或状态码。 |
+| `panic_boundary_returns_internal_error` | `ffi_status` catch-unwind、`ffi_ptr` null-on-error、`RadishLexStatusCode::InternalError` | panic 不穿过 C ABI，必须映射为稳定内部错误状态。 |
+| `sync_domain_command_serialization` | owner-thread `InvalidState` 策略、summary output pointer guard、当前 native symbol 缺席 smoke | 后续 command context 必须定义同一 sync domain 写入互斥或串行化规则，operation id 仍为非敏感摘要。 |
+
+review catalog 的停止线固定为：不新增 C ABI symbol，不新增 `ManagerBridge` 可执行方法，不执行远端同步，不写 settings action，不创建 setup / authorization material，不连接 Go server，不触碰平台 key backend。
+
 当前 Dart fake native binding 已用该 catalog 做非执行 replay：逐个 host input sample 生成测试侧 request / result 摘要，反查 ABI status、input case、required evidence、copy -> free 顺序和 command error allowlist。该 replay 只验证 Dart mapper 的脱敏与降级边界，不代表真实 native command 已存在。
 
 Rust host smoke 至少覆盖：

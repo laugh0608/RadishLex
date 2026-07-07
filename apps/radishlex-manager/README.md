@@ -11,6 +11,8 @@ RadishLex Manager 是萝卜词核的 Flutter 管理端起步工程。
 - 同步服务连接健康摘要，包含 endpoint 状态、access token 存在性、transport 分类、server state 摘要、只读探测来源和错误分类。
 - 恢复码与设备授权只读准备态，包含恢复码保存确认、恢复记录、join request、授权包前置条件、设备撤销、丢失设备风险提示和 key epoch 状态。
 - 恢复码 setup / restore、设备 join / revocation 的 readiness 聚合摘要，以及 `SyncInteractionEntryPlan` 派生的非执行操作进入计划。
+- `manager_sync_action_command_preview.v1` 非执行命令预演、request / result preview 和错误分类摘要，用于解释未来 bridge command 的安全外壳，不创建 request payload 或 result material。
+- recovery setup / restore 的可见层状态码，包含一次性展示占位、保存确认、恢复输入占位、恢复记录查询、失败限速和设备登记状态；这些状态只用于 UI / diagnostics 说明，不显示、输入、保存或传递真实 secret。
 - 脱敏诊断摘要预览 / 导出，预览支持字段分组、筛选和复制脱敏文本。
 - 自部署服务端配置草案、sync gate 草案预览和状态来源。
 
@@ -23,7 +25,7 @@ RadishLex Manager 是萝卜词核的 Flutter 管理端起步工程。
 
 - 词库页用于查看本地 userdb 词条、按输入码 / 文本 / 来源筛选、查看词条审计详情、执行删除确认、预览导入检查、导入用户词库、导出用户词库，并查看 import batches 与本地 sync preflight 影响摘要。导入和导出都必须由用户显式触发；导入错误、删除失败和文件操作失败按结构化分类显示。
 - 学习页只展示聚合学习状态和 `rank explain` 非敏感贡献信号。页面不得展示 P1 原始 selection event、原始输入历史、窗口标题或应用上下文明细。
-- 同步页只展示本地 sync preflight、P2 对象分类、local-only 事件计数、连接健康、设备 backend capability、production gate 阻断原因、恢复码 / 设备授权准备清单和只读操作进入计划。`preflight_ready` 只表示本地草案可解释，不代表真实远端同步已开放。
+- 同步页只展示本地 sync preflight、P2 对象分类、local-only 事件计数、连接健康、设备 backend capability、production gate 阻断原因、恢复码 / 设备授权准备清单、只读操作进入计划、非执行 command preview、request / result preview 和 recovery visible-layer 状态码。`preflight_ready` 只表示本地草案可解释，不代表真实远端同步已开放。
 - 设置页保存非 secret settings draft，包含自部署服务端地址草案、隐私模式、诊断导出草案、保留同步配置草案、部署证据来源标签和净化后的连接健康摘要。保存草案会重新派生 sync gate 状态，但不会连接真实远端。
 - 设置页诊断摘要预览只展示脱敏字段索引和完整脱敏文本。section 筛选和关键字筛选只影响对话框里的字段列表；复制按钮始终复制完整 `manager.diagnostics.v1` 脱敏文本，导出也必须保持同一份脱敏摘要语义。
 
@@ -64,6 +66,8 @@ flutter run -d macos
 可选 `RADISHLEX_MANAGER_SYNC_SERVER` 会作为首次启动的服务端草案；可选 `RADISHLEX_MANAGER_SETTINGS_FILE` 指向本地 settings JSON，用于保存非 secret 的设置草案。settings JSON 当前写入 `format_version: 1`，部署证据只保存 `local_smoke`、`external_tls`、`backup_restore` 或 `upgrade_rollback` 这类来源标签，不保存日志、证书、token、恢复码、payload bytes 或运行输出。两者都不会启用真实上传、恢复码或设备授权。
 
 本地同步服务启动后，可用仓库根 `scripts/check-sync-server-connection-health.sh` 生成 `sync_connection_health.v1` 摘要，再在设置页回填。Manager 只保存净化后的 `sync_connection_health_summary` 子对象，不保存原始 JSON、完整 endpoint、token、请求 / 响应体、证书或 payload bytes。
+
+当前 dynamic library smoke 还会确认 `radishlex-ime-ffi` 未导出 future sync command symbol。真实 `ManagerBridge` 同步方法、C ABI executor、恢复码生成 / 输入、join request 创建、授权成功和设备撤销路径仍保持关闭；相关设计只存在于 fixture、model test 和 `docs/manager-sync-ffi-command-boundary.md` / `docs/manager-sync-ffi-command-contract-test-plan.md` 的评审材料中。
 
 ## 验证
 

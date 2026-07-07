@@ -34,6 +34,21 @@
 
 本文描述 future `ManagerBridge` contract 应如何从这些摘要进入真实命令审阅。preview 字段不能直接改名后成为 bridge DTO；真实 DTO 必须重新定义版本、字段分类、生命周期、错误 envelope、幂等性、并发和脱敏规则。
 
+## 可见层与 Fixture 证据
+
+当前已有多组 fixture / model test 证据，它们分别固定不同层级的安全形状，不能互相替代：
+
+| 层级 | 代表 fixture / model | 证明内容 | 不能证明 |
+| --- | --- | --- | --- |
+| action protocol preview | `sync_action_protocol_fixtures.dart`、`manager_sync_action_preview_test.dart` | 四条 action 的 request / result boundary、allowed fields、forbidden material、错误分类和 execution status 派生稳定。 | 真实 `ManagerBridge` request / result DTO 已定义。 |
+| bridge command contract draft | `sync_bridge_command_contract_fixtures.dart`、`manager_sync_bridge_command_contract_test.dart` | future bridge 字段能按 `safe_summary`、`transient_secret`、`opaque_crypto_material` 和 `transport_payload` 分类，且 diagnostics 只保留安全摘要。 | Dart interface、native binding 或 Rust executor 已实现。 |
+| transient secret interaction | `sync_transient_secret_interaction_fixtures.dart`、`manager_sync_transient_secret_interaction_test.dart` | 恢复码一次性展示、恢复码输入、短码核对、授权确认和撤销确认的生命周期、禁止持久化目标和完成证据码可复验。 | 真实 secret 显示、输入、复制、保存或传递已开放。 |
+| recovery visible-layer detail | `syncRecoveryVisibleLayerFixtures`、`syncRecoveryFutureConfirmationDetailFixtures` | recovery setup / restore 的展示占位、保存确认、输入占位、查询、失败限速和设备登记状态已绑定 UI / diagnostics 非敏感字段。 | join request 授权或设备撤销确认 detail 已补齐。 |
+| FFI command boundary | `sync_ffi_command_boundary_fixtures.dart`、`manager_sync_ffi_command_boundary_test.dart` | 推荐 ABI strategy、ownership、error status、host catalog、review catalog 和 forbidden material policy 可复验。 | C ABI symbol、Rust host test 文件或真实 command context 已存在。 |
+| Dart fake binding replay | `manager_sync_ffi_binding_contract_test.dart`、`ffi_manager_bridge_test.dart` | fake native binding 能消费 host catalog 摘要，验证 copy / free、unknown status 降级和 capability missing 时 UI 关闭。 | 真实 dynamic library 已导出 future sync command symbol。 |
+
+真实 contract 设计时应按这个顺序提升证据强度：先补可见层和 fixture，确认状态码、生命周期和 forbidden material policy；再补 Dart contract / binding 测试；最后在 C ABI 评审通过后补 Rust host test 和真实 native symbol。任一层新增字段时，都必须同步更新 `docs/manager-settings-diagnostics.md`、本文件和对应 fixture，不应只修改 UI 文案或测试断言。
+
 ## 候选 Dart Interface
 
 以下只是候选形状，不是当前代码接口。真实接线前必须另行评审命名、错误类型、返回模型、测试和 C ABI 映射。

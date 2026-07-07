@@ -83,6 +83,12 @@ future confirmation detail 当前固定为：
 
 这两条 detail 必须继续绑定当前 diagnostics 字段：`sync.recovery_setup_display_status`、`sync.recovery_setup_save_confirmation`、`sync.recovery_first_upload_gate`、`sync.recovery_restore_code_input`、`sync.recovery_restore_lookup_status`、`sync.recovery_restore_attempt_limit` 和 `sync.recovery_restore_device_registration`。它们只能输出状态码，不输出恢复码、短码、token、signature、wrapped material、payload bytes、请求 / 响应体或真实路径。
 
+设备 join / revocation 当前仍只固定到 readiness、interaction intent 和 action command preview 层。后续补齐确认 detail 时，应沿用同一套状态码边界：
+
+- join request 授权只能表达 `join_request_status`、`short_code_verification_status`、`authorization_package_preconditions`、显式确认状态和授权包状态摘要；不得显示短码内容、创建 join request、签名授权包或写入 wrapped material。
+- 设备撤销只能表达 `target_device_status_summary`、`active_device_requirement`、`lost_device_risk_acknowledgement`、显式确认状态、撤销记录状态和 key epoch 状态摘要；不得执行撤销、签名 revocation record 或推进 key epoch。
+- UI / diagnostics 字段应复用 `sync.device_join_*`、`sync.authorization_package_*`、`sync.device_revocation_*`、`sync.lost_device_risk` 和 `sync.key_epoch_status`，并只输出状态码、前置条件码、确认码和错误分类。
+
 ## 首台设备恢复码设置
 
 当前关闭态：
