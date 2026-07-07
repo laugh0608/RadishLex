@@ -216,6 +216,8 @@ command result envelope 使用 allowlist 错误码：
 
 当前 host contract catalog 已固定目标测试文件 `crates/ime-ffi/tests/manager_sync_command_boundary.rs`、建议 test name、样本 id、ABI input case、expected status、required evidence 和 `planned_no_native_symbol` 状态。覆盖样本包括 current-phase capability closed、unknown schema version、unknown action、invalid bool、null pointer、invalid UTF-8、unenveloped sync error、panic boundary 和 same-domain concurrent command。该 catalog 只用于评审后续 Rust host contract test 输入，不新增 symbol，不连接 Go server，不触碰平台 key backend。
 
+当前 Rust host review catalog 已进一步把每个 host contract case 绑定到既有 `ime-ffi` 模式和非敏感评审证据：`radishlex_ffi_contract` 版本检查、`ffi_status` / `ffi_ptr` / `ffi_release` 的 panic boundary 与释放路径、UTF-8 和 bool 输入校验、error handle read / free、summary output pointer guard、平台 binding copy-before-release 测试、sync preflight summary 输出和 owner-thread `InvalidState` 策略。该 review catalog 的状态为 `review_ready_no_native_symbol`，只说明后续 Rust host test 应复用哪些既有模式和停止线，不代表真实 C ABI 或 command context 已落地。
+
 当前 Dart fake native binding 已用该 catalog 做非执行 replay：逐个 host input sample 生成测试侧 request / result 摘要，反查 ABI status、input case、required evidence、copy -> free 顺序和 command error allowlist。该 replay 只验证 Dart mapper 的脱敏与降级边界，不代表真实 native command 已存在。
 
 Rust host smoke 至少覆盖：

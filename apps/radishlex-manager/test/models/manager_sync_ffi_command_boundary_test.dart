@@ -350,6 +350,147 @@ void main() {
     expect(encodedHostCatalog, isNot(contains('remote_response_body')));
   });
 
+  test('rust host review items bind contract cases to ffi patterns', () {
+    const knownExistingPatterns = {
+      'radishlex_ffi_contract_current_version',
+      'ffi_status_catch_unwind',
+      'ffi_ptr_null_on_error',
+      'ffi_release_free_null',
+      'read_utf8_rejects_null_and_invalid',
+      'read_ffi_bool_rejects_unknown',
+      'summary_output_pointer_invalid_argument',
+      'error_handle_read_then_free',
+      'platform_binding_copies_views_before_release',
+      'sync_preflight_summary_output',
+      'current_native_symbol_absent',
+      'radishlex_status_internal_error',
+      'session_owner_thread_invalid_state',
+    };
+    final contractCaseIds = syncFfiCommandBoundaryRustHostContractCaseIds()
+        .toSet();
+    final reviewByContractCaseId = {
+      for (final item in syncFfiCommandBoundaryRustHostReviewItems)
+        item.contractCaseId: item,
+    };
+
+    expect(
+      syncFfiCommandBoundaryRustHostReviewItemIds(),
+      containsAll([
+        'contract_reports_command_capability_closed_review',
+        'invalid_request_inputs_return_stable_status_review',
+        'result_handle_copy_then_free_review',
+        'envelope_allowlist_only_review',
+        'forbidden_material_absent_from_native_outputs_review',
+        'panic_boundary_returns_internal_error_review',
+        'sync_domain_command_serialization_review',
+      ]),
+    );
+    expect(reviewByContractCaseId.keys.toSet(), contractCaseIds);
+    expect(
+      syncFfiCommandBoundaryRustHostReviewStopLines,
+      containsAll([
+        'add_c_abi_symbol',
+        'add_manager_bridge_method',
+        'execute_remote_sync',
+        'write_settings_action',
+        'create_setup_or_authorization_material',
+        'connect_go_server',
+        'touch_platform_key_backend',
+      ]),
+    );
+
+    for (final item in syncFfiCommandBoundaryRustHostReviewItems) {
+      final shape = syncFfiCommandBoundaryRustHostReviewItemShape(item);
+
+      expect(shape['format'], syncFfiCommandBoundaryRustHostReviewFormat);
+      expect(
+        shape['review_status'],
+        syncFfiCommandBoundaryRustHostReviewStatus,
+      );
+      expect(
+        shape['target_test_file'],
+        syncFfiCommandBoundaryRustHostContractTargetTestFile,
+      );
+      expect(contractCaseIds, contains(item.contractCaseId), reason: item.id);
+      expect(
+        item.implementationStatus,
+        'review_ready_no_native_symbol',
+        reason: item.id,
+      );
+      expect(item.reviewTopicSummary, isNot('none'), reason: item.id);
+      expect(item.existingPatternSummary, isNot('none'), reason: item.id);
+      expect(item.evidenceSummary, isNot('none'), reason: item.id);
+      expect(
+        knownExistingPatterns,
+        containsAll(item.requiredExistingPatterns),
+        reason: item.id,
+      );
+      expect(
+        shape['stop_lines'],
+        syncFfiCommandBoundaryRustHostReviewStopLines,
+        reason: item.id,
+      );
+    }
+
+    expect(
+      reviewByContractCaseId['invalid_request_inputs_return_stable_status']!
+          .requiredExistingPatterns,
+      containsAll([
+        'read_utf8_rejects_null_and_invalid',
+        'read_ffi_bool_rejects_unknown',
+        'summary_output_pointer_invalid_argument',
+      ]),
+    );
+    expect(
+      reviewByContractCaseId['result_handle_copy_then_free']!
+          .requiredExistingPatterns,
+      containsAll([
+        'ffi_ptr_null_on_error',
+        'ffi_release_free_null',
+        'platform_binding_copies_views_before_release',
+      ]),
+    );
+    expect(
+      reviewByContractCaseId['panic_boundary_returns_internal_error']!
+          .requiredExistingPatterns,
+      containsAll(['ffi_status_catch_unwind']),
+    );
+    expect(
+      reviewByContractCaseId['sync_domain_command_serialization']!
+          .requiredReviewTopics,
+      containsAll([
+        'sync_domain_serialization_guard',
+        'operation_id_non_sensitive',
+      ]),
+    );
+  });
+
+  test('rust host review items remain review-only and non-sensitive', () {
+    final encodedReviewCatalog = [
+      for (final item in syncFfiCommandBoundaryRustHostReviewItems)
+        jsonEncode(syncFfiCommandBoundaryRustHostReviewItemShape(item)),
+    ].join('\n');
+
+    expect(syncFfiCommandBoundaryCurrentNativeSymbols, isEmpty);
+    expect(encodedReviewCatalog, contains('no_native_symbol'));
+    for (final symbol in syncFfiCommandBoundaryCandidateSymbols) {
+      expect(encodedReviewCatalog, isNot(contains(symbol)), reason: symbol);
+    }
+    for (final rejected in syncBridgeCommandContractRejectedSamples) {
+      expect(
+        encodedReviewCatalog,
+        isNot(contains(rejected.forbiddenFragment)),
+        reason: rejected.id,
+      );
+    }
+    for (final fragment in syncBridgeCommandContractForbiddenFragments) {
+      expect(encodedReviewCatalog, isNot(contains(fragment)));
+    }
+    for (final stopLine in syncFfiCommandBoundaryRustHostReviewStopLines) {
+      expect(encodedReviewCatalog, contains(stopLine), reason: stopLine);
+    }
+  });
+
   test('rust and dart smoke plans cover ownership and redaction evidence', () {
     expect(
       syncFfiCommandBoundaryAllSmokeCaseIds(),

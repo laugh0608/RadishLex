@@ -16,6 +16,7 @@
 - `apps/radishlex-manager/test/ffi_manager_bridge_test.dart` 中 fake native capability missing 回归
 - settings gate preview、同步页和诊断报告中的 recovery visible-layer 状态码回归
 - `syncFfiCommandBoundaryRustHostContractCases` host contract catalog fixture
+- `syncFfiCommandBoundaryRustHostReviewItems` Rust host review fixture
 - Dart fake native binding 对 host catalog 的非执行 replay 回归
 - `apps/radishlex-manager/tool/ffi_bridge_smoke.dart` 中真实 dynamic library future sync command symbol 缺席检查
 - `docs/manager-sync-ffi-command-boundary.md`
@@ -28,7 +29,7 @@
 | --- | --- | --- | --- |
 | L0 | 文档边界 | 已完成 | 固定 ABI strategy、ownership、secret 生命周期、错误分层、host smoke 和停止线。 |
 | L1 | Dart design fixture / model test | 已完成 | 用合成 fixture 验证当前没有 native symbol，future request / result 只含安全摘要，forbidden material 不进入输出。 |
-| L2 | Rust host contract test 计划 | 已固定 host catalog fixture | 在新增 symbol 前先明确测试文件、输入样本、错误码、释放责任和 forbidden material 断言。 |
+| L2 | Rust host contract test 计划 | 已补评审材料 fixture | 在新增 symbol 前先明确测试文件、输入样本、错误码、释放责任、既有 FFI 模式映射和 forbidden material 断言。 |
 | L3 | Dart FFI binding contract test 计划 | 已接入 host catalog replay | 在 Dart native binding 扩展前先明确 capability missing、copy / free、unknown status、host catalog 状态重放和错误映射测试。 |
 | L4 | Manager 可见层回归 | 部分已有 | 确认 settings / sync / diagnostics 不展示 secret、不写 settings draft、不打开按钮。 |
 | L5 | Gated platform / deployment smoke | 后续阶段 | 平台私钥 backend、真实 Keychain / Keystore、目标部署证据和真实端到端同步必须单独授权或人工准备。 |
@@ -51,6 +52,7 @@ L2 / L3 只在 L0 / L1 继续通过、且 contract 文档没有未解决分歧�
 - Rust host smoke 项和 Dart FFI smoke 项
 - forbidden material 拒绝样本复用 `sync_bridge_command_contract_fixtures.dart`
 - Rust host contract catalog：目标测试文件、target test name、sample id、ABI input case、expected status、required evidence 和当前 `planned_no_native_symbol` 状态
+- Rust host review catalog：把每个 host contract case 绑定到既有 `ime-ffi` 模式、评审主题、非敏感证据码、停止线和当前 `review_ready_no_native_symbol` 状态
 
 新增或修改 future command 字段时，应先更新这份 fixture，再更新文档和测试。不要让文档表格、Dart fixture 和未来 Rust contract test 各自维护不同字段列表。
 
@@ -82,7 +84,11 @@ Rust host contract test 的 fixture 输入只能使用合成值：
 - 合成 backend gate：`blocked` / `ready_for_contract_test`
 - 合成 forbidden material 样本来自 `sync_bridge_command_contract_fixtures.dart` 的字符串类别，不使用真实 token、真实恢复码、真实路径或真实 payload。
 
-当前 `syncFfiCommandBoundaryRustHostInputSamples` 已固定第一批 Rust host 输入样本，覆盖 current-phase capability closed、unknown schema version、unknown action、invalid bool、null pointer、invalid UTF-8、unenveloped sync error、panic boundary 和 same-domain concurrent command，预期状态分别映射到 `InvalidState`、`InvalidArgument`、`SyncError` 和 `InternalError`。`syncFfiCommandBoundaryRustHostContractCases` 再把这些样本绑定到建议的 Rust host test name、host smoke case、required evidence 和 `planned_no_native_symbol` 实现状态。这些仍是 design fixture，不新增真实 symbol。
+当前 `syncFfiCommandBoundaryRustHostInputSamples` 已固定第一批 Rust host 输入样本，覆盖 current-phase capability closed、unknown schema version、unknown action、invalid bool、null pointer、invalid UTF-8、unenveloped sync error、panic boundary 和 same-domain concurrent command，预期状态分别映射到 `InvalidState`、`InvalidArgument`、`SyncError` 和 `InternalError`。`syncFfiCommandBoundaryRustHostContractCases` 再把这些样本绑定到建议的 Rust host test name、host smoke case、required evidence 和 `planned_no_native_symbol` 实现状态。
+
+`syncFfiCommandBoundaryRustHostReviewItems` 是进入真实 Rust host test 之前的评审材料包，逐项绑定 host contract case 与现有 `ime-ffi` 模式，包括 `radishlex_ffi_contract` 版本检查、`ffi_status` / `ffi_ptr` / `ffi_release` panic boundary 与释放路径、UTF-8 和 bool 输入校验、error handle read / free、summary output pointer guard、平台 binding copy-before-release 测试、sync preflight summary 输出和 session owner-thread `InvalidState` 策略。该 review catalog 还固定 `add_c_abi_symbol`、`add_manager_bridge_method`、`execute_remote_sync`、`write_settings_action`、`create_setup_or_authorization_material`、`connect_go_server` 和 `touch_platform_key_backend` 停止线；状态为 `review_ready_no_native_symbol`，仍不创建真实 Rust test 文件或 symbol。
+
+这些仍是 design fixture，不新增真实 symbol。
 
 Rust test 不应：
 
@@ -177,7 +183,7 @@ cargo test -p radishlex-ime-ffi --test manager_sync_command_boundary
 满足以下条件前，不允许新增 sync command C ABI symbol 或 `ManagerBridge` 可执行方法：
 
 - L0 / L1 继续通过，且本文测试计划已同步到 contract checklist、FFI boundary 和 current status。
-- Rust host contract test 的输入、错误、ownership、panic boundary 和 forbidden material 断言已完成评审。
+- Rust host contract test 的输入、错误、ownership、panic boundary、既有 FFI 模式映射和 forbidden material 断言已完成评审。
 - Dart FFI binding contract test 已能覆盖 capability missing、copy / free、unknown status、host catalog replay、错误分类和可见层关闭态。
 - 一次性恢复码展示材料和恢复码 / 短码输入的 transient secret 生命周期已有独立交互设计。
 - 平台私钥 backend、恢复 / 授权交互测试和发布级部署证据的停止线仍清晰。

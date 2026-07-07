@@ -11,8 +11,14 @@ const syncFfiCommandBoundaryFormat =
 const syncFfiCommandBoundaryRustHostContractFormat =
     'future_manager_sync_ffi_rust_host_contract_catalog.v1_draft';
 
+const syncFfiCommandBoundaryRustHostReviewFormat =
+    'future_manager_sync_ffi_rust_host_review.v1_draft';
+
 const syncFfiCommandBoundaryRustHostContractReviewStatus =
     'future_rust_host_contract_review_only_no_native_symbol';
+
+const syncFfiCommandBoundaryRustHostReviewStatus =
+    'rust_host_contract_review_ready_no_native_symbol';
 
 const syncFfiCommandBoundaryRustHostContractTargetTestFile =
     'crates/ime-ffi/tests/manager_sync_command_boundary.rs';
@@ -33,6 +39,16 @@ const syncFfiCommandBoundaryCandidateSymbols = [
   'radishlex_manager_sync_command_execute_v1',
   'radishlex_manager_sync_command_result_*',
   'radishlex_manager_sync_command_result_free',
+];
+
+const syncFfiCommandBoundaryRustHostReviewStopLines = [
+  'add_c_abi_symbol',
+  'add_manager_bridge_method',
+  'execute_remote_sync',
+  'write_settings_action',
+  'create_setup_or_authorization_material',
+  'connect_go_server',
+  'touch_platform_key_backend',
 ];
 
 const syncFfiCommandBoundaryRequestCommonFields = [
@@ -642,6 +658,182 @@ class SyncFfiCommandBoundaryRustHostContractCase {
   }
 }
 
+const syncFfiCommandBoundaryRustHostReviewItems = [
+  SyncFfiCommandBoundaryRustHostReviewItem(
+    id: 'contract_reports_command_capability_closed_review',
+    contractCaseId: 'contract_reports_command_capability_closed',
+    requiredReviewTopics: [
+      'contract_version_check',
+      'current_phase_capability_gate',
+      'native_symbol_absence',
+    ],
+    requiredExistingPatterns: [
+      'radishlex_ffi_contract_current_version',
+      'ffi_status_catch_unwind',
+      'current_native_symbol_absent',
+    ],
+    requiredReviewEvidence: [
+      'contract_version_checked',
+      'capability_closed_status_stable',
+      'no_native_symbol_exported',
+    ],
+    implementationStatus: 'review_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostReviewItem(
+    id: 'invalid_request_inputs_return_stable_status_review',
+    contractCaseId: 'invalid_request_inputs_return_stable_status',
+    requiredReviewTopics: [
+      'request_struct_version_field',
+      'borrowed_utf8_validation',
+      'u8_bool_validation',
+      'output_pointer_guard',
+    ],
+    requiredExistingPatterns: [
+      'read_utf8_rejects_null_and_invalid',
+      'read_ffi_bool_rejects_unknown',
+      'summary_output_pointer_invalid_argument',
+      'error_handle_read_then_free',
+    ],
+    requiredReviewEvidence: [
+      'invalid_input_status_stable',
+      'error_handle_lifecycle_checked',
+      'no_unchecked_input_enters_command',
+    ],
+    implementationStatus: 'review_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostReviewItem(
+    id: 'result_handle_copy_then_free_review',
+    contractCaseId: 'result_handle_copy_then_free',
+    requiredReviewTopics: [
+      'rust_owned_result_handle',
+      'result_accessor_copy_before_free',
+      'release_function_null_safe',
+    ],
+    requiredExistingPatterns: [
+      'ffi_ptr_null_on_error',
+      'ffi_release_free_null',
+      'platform_binding_copies_views_before_release',
+    ],
+    requiredReviewEvidence: [
+      'result_handle_lifecycle_checked',
+      'view_copy_before_release_checked',
+      'free_null_noop_checked',
+    ],
+    implementationStatus: 'review_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostReviewItem(
+    id: 'envelope_allowlist_only_review',
+    contractCaseId: 'envelope_allowlist_only',
+    requiredReviewTopics: [
+      'status_code_allowlist',
+      'error_code_allowlist',
+      'retry_policy_allowlist',
+      'next_evidence_allowlist',
+    ],
+    requiredExistingPatterns: [
+      'sync_preflight_summary_output',
+      'summary_output_pointer_invalid_argument',
+      'error_handle_read_then_free',
+    ],
+    requiredReviewEvidence: [
+      'summary_fields_allowlisted',
+      'native_error_text_not_authoritative',
+      'unexpected_code_blocks_command',
+    ],
+    implementationStatus: 'review_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostReviewItem(
+    id: 'forbidden_material_absent_from_native_outputs_review',
+    contractCaseId: 'forbidden_material_absent_from_native_outputs',
+    requiredReviewTopics: [
+      'summary_only_result',
+      'diagnostic_redaction',
+      'debug_output_redaction',
+    ],
+    requiredExistingPatterns: [
+      'error_handle_read_then_free',
+      'sync_preflight_summary_output',
+      'current_native_symbol_absent',
+    ],
+    requiredReviewEvidence: [
+      'native_output_uses_safe_categories',
+      'diagnostic_summary_redacted',
+      'debug_summary_redacted',
+    ],
+    implementationStatus: 'review_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostReviewItem(
+    id: 'panic_boundary_returns_internal_error_review',
+    contractCaseId: 'panic_boundary_returns_internal_error',
+    requiredReviewTopics: [
+      'panic_boundary_catch_unwind',
+      'internal_error_mapping',
+      'panic_does_not_cross_abi',
+    ],
+    requiredExistingPatterns: [
+      'ffi_status_catch_unwind',
+      'ffi_ptr_null_on_error',
+      'radishlex_status_internal_error',
+    ],
+    requiredReviewEvidence: [
+      'panic_boundary_checked',
+      'internal_error_status_stable',
+      'release_path_still_safe_after_error',
+    ],
+    implementationStatus: 'review_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostReviewItem(
+    id: 'sync_domain_command_serialization_review',
+    contractCaseId: 'sync_domain_command_serialization',
+    requiredReviewTopics: [
+      'sync_domain_serialization_guard',
+      'operation_id_non_sensitive',
+      'owner_context_invalid_state',
+    ],
+    requiredExistingPatterns: [
+      'session_owner_thread_invalid_state',
+      'summary_output_pointer_invalid_argument',
+      'current_native_symbol_absent',
+    ],
+    requiredReviewEvidence: [
+      'same_domain_mutation_serialized',
+      'concurrent_command_status_stable',
+      'operation_id_non_sensitive',
+    ],
+    implementationStatus: 'review_ready_no_native_symbol',
+  ),
+];
+
+class SyncFfiCommandBoundaryRustHostReviewItem {
+  const SyncFfiCommandBoundaryRustHostReviewItem({
+    required this.id,
+    required this.contractCaseId,
+    required this.requiredReviewTopics,
+    required this.requiredExistingPatterns,
+    required this.requiredReviewEvidence,
+    required this.implementationStatus,
+  });
+
+  final String id;
+  final String contractCaseId;
+  final List<String> requiredReviewTopics;
+  final List<String> requiredExistingPatterns;
+  final List<String> requiredReviewEvidence;
+  final String implementationStatus;
+
+  String get reviewTopicSummary {
+    return managerSyncCodeSummary(requiredReviewTopics);
+  }
+
+  String get existingPatternSummary {
+    return managerSyncCodeSummary(requiredExistingPatterns);
+  }
+
+  String get evidenceSummary {
+    return managerSyncCodeSummary(requiredReviewEvidence);
+  }
+}
+
 Map<String, Object?> syncFfiCommandBoundaryStrategyShape() {
   return {
     'format': syncFfiCommandBoundaryFormat,
@@ -709,6 +901,14 @@ List<String> syncFfiCommandBoundaryRustHostContractCaseIds() {
   );
 }
 
+List<String> syncFfiCommandBoundaryRustHostReviewItemIds() {
+  return List.unmodifiable(
+    syncFfiCommandBoundaryRustHostReviewItems
+        .map((fixture) => fixture.id)
+        .toList(),
+  );
+}
+
 Map<String, Object?> syncFfiCommandBoundaryRustHostInputSampleShape(
   SyncFfiCommandBoundaryRustHostInputSample sample,
 ) {
@@ -743,6 +943,23 @@ Map<String, Object?> syncFfiCommandBoundaryRustHostContractCaseShape(
     'required_abi_input_cases': fixture.requiredAbiInputCases,
     'expected_status_codes': fixture.expectedStatusCodes,
     'required_evidence': fixture.requiredEvidence,
+    'implementation_status': fixture.implementationStatus,
+  };
+}
+
+Map<String, Object?> syncFfiCommandBoundaryRustHostReviewItemShape(
+  SyncFfiCommandBoundaryRustHostReviewItem fixture,
+) {
+  return {
+    'format': syncFfiCommandBoundaryRustHostReviewFormat,
+    'review_status': syncFfiCommandBoundaryRustHostReviewStatus,
+    'target_test_file': syncFfiCommandBoundaryRustHostContractTargetTestFile,
+    'id': fixture.id,
+    'contract_case_id': fixture.contractCaseId,
+    'required_review_topics': fixture.requiredReviewTopics,
+    'required_existing_patterns': fixture.requiredExistingPatterns,
+    'required_review_evidence': fixture.requiredReviewEvidence,
+    'stop_lines': syncFfiCommandBoundaryRustHostReviewStopLines,
     'implementation_status': fixture.implementationStatus,
   };
 }
