@@ -10,6 +10,7 @@
 
 - `apps/radishlex-manager/test/fixtures/sync_ffi_command_boundary_fixtures.dart`
 - `apps/radishlex-manager/test/models/manager_sync_ffi_command_boundary_test.dart`
+- `apps/radishlex-manager/test/models/manager_sync_ffi_binding_contract_test.dart`
 - `apps/radishlex-manager/test/ffi_manager_bridge_test.dart` 中 fake native capability missing 回归
 - `docs/manager-sync-ffi-command-boundary.md`
 
@@ -22,7 +23,7 @@
 | L0 | 文档边界 | 已完成 | 固定 ABI strategy、ownership、secret 生命周期、错误分层、host smoke 和停止线。 |
 | L1 | Dart design fixture / model test | 已完成 | 用合成 fixture 验证当前没有 native symbol，future request / result 只含安全摘要，forbidden material 不进入输出。 |
 | L2 | Rust host contract test 计划 | 本文固定 | 在新增 symbol 前先明确测试文件、输入样本、错误码、释放责任和 forbidden material 断言。 |
-| L3 | Dart FFI binding contract test 计划 | 已起步 | 在 Dart native binding 扩展前先明确 capability missing、copy / free、unknown status 和错误映射测试。 |
+| L3 | Dart FFI binding contract test 计划 | 已扩展 | 在 Dart native binding 扩展前先明确 capability missing、copy / free、unknown status 和错误映射测试。 |
 | L4 | Manager 可见层回归 | 部分已有 | 确认 settings / sync / diagnostics 不展示 secret、不写 settings draft、不打开按钮。 |
 | L5 | Gated platform / deployment smoke | 后续阶段 | 平台私钥 backend、真实 Keychain / Keystore、目标部署证据和真实端到端同步必须单独授权或人工准备。 |
 
@@ -103,7 +104,7 @@ apps/radishlex-manager/test/
 
 Dart FFI binding test 的实现顺序：
 
-1. 先用 fake native binding 验证 mapper、copy / free 调用记录和错误分类；当前已覆盖 capability missing 时 manager 继续保持当前阶段关闭、settings 不写 action payload、diagnostics 不出现 future command request / result 或 forbidden material。
+1. 先用 fake native binding 验证 mapper、copy / free 调用记录和错误分类；当前已覆盖 capability missing 时 manager 继续保持当前阶段关闭、settings 不写 action payload、diagnostics 不出现 future command request / result 或 forbidden material，并用测试侧 binding harness 覆盖 summary copy -> free 顺序、unknown native status 安全降级、`ffi_library_load_failed` / `invalid_argument` / `sync_error` 分类和 command error allowlist。
 2. 再用真实 dynamic library 做 capability missing smoke，确认当前没有 sync command symbol 时 UI 保持关闭。
 3. 只有真实 C ABI symbol 评审通过后，才把 dynamic library smoke 扩展到 result handle 读取和释放。
 
@@ -133,6 +134,7 @@ Dart FFI binding test 的实现顺序：
 ```bash
 flutter test test/models/manager_sync_ffi_command_boundary_test.dart test/models/manager_sync_bridge_command_contract_test.dart
 flutter test test/ffi_manager_bridge_test.dart test/models/manager_sync_ffi_command_boundary_test.dart
+flutter test test/models/manager_sync_ffi_binding_contract_test.dart
 ./scripts/check-manager.sh
 git diff --check
 ./scripts/check-docs.sh
