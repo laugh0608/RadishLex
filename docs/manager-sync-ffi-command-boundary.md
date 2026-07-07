@@ -22,6 +22,7 @@
 - `docs/manager-sync-action-protocol-preview.md`
 - `docs/manager-sync-bridge-command-contract-checklist.md`
 - `docs/manager-sync-bridge-command-contract.md`
+- `docs/manager-sync-ffi-command-contract-test-plan.md`
 - `apps/radishlex-manager/test/fixtures/sync_ffi_command_boundary_fixtures.dart`
 - `apps/radishlex-manager/test/models/manager_sync_ffi_command_boundary_test.dart`
 
@@ -211,7 +212,7 @@ command result envelope 使用 allowlist 错误码：
 
 真实 C ABI symbol 前，先补 Rust host smoke 设计和 Dart FFI smoke 设计。两者都不连接真实远端同步，不读取真实输入法目录，不触碰真实 Keychain / Keystore，除非单独进入 gated 平台 smoke。
 
-当前这组 smoke 仍是 design fixture / model test 证据，不是已落地的 Rust C ABI smoke。测试真相源位于 `sync_ffi_command_boundary_fixtures.dart`，用于固定推荐 ABI 策略、候选 symbol 名称、request / result field policy、ownership rule、ABI status 分层、Rust host smoke 项和 Dart FFI smoke 项。
+当前这组 smoke 仍是 design fixture / model test 证据，不是已落地的 Rust C ABI smoke。测试真相源位于 `sync_ffi_command_boundary_fixtures.dart`，用于固定推荐 ABI 策略、候选 symbol 名称、request / result field policy、ownership rule、ABI status 分层、Rust host smoke 项和 Dart FFI smoke 项；进入 Rust / Dart contract test 的分层计划见 `docs/manager-sync-ffi-command-contract-test-plan.md`。
 
 Rust host smoke 至少覆盖：
 

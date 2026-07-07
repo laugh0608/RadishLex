@@ -58,6 +58,7 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - [Manager 同步 Bridge 命令 Contract 检查清单](docs/manager-sync-bridge-command-contract-checklist.md)
 - [Manager 同步 Bridge 命令 Contract 草案](docs/manager-sync-bridge-command-contract.md)
 - [Manager 同步 FFI 命令边界](docs/manager-sync-ffi-command-boundary.md)
+- [Manager 同步 FFI 命令 Contract 测试计划](docs/manager-sync-ffi-command-contract-test-plan.md)
 - [Manager Settings 与诊断报告字段参考](docs/manager-settings-diagnostics.md)
 - [ADR 0002: 恢复码 KDF 与同步域恢复边界](docs/adr/0002-recovery-code-kdf.md)
 - [ADR 0003: 设备签名与私钥存储边界](docs/adr/0003-device-signing-key-storage.md)

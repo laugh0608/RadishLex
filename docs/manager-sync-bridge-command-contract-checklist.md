@@ -2,7 +2,7 @@
 
 本文档是 future `ManagerBridge` 同步命令 contract 的设计草案和审阅检查清单。读者是准备把 `recovery_setup`、`recovery_restore`、`join_request_authorization` 和 `device_revocation` 从非执行 preview 推进到真实 bridge 命令的维护者。本文不定义真实 Dart interface、C ABI、Rust FFI 函数、Go server API、加密 payload 字段、恢复码格式或设备授权包格式。
 
-future contract 草案见 `docs/manager-sync-bridge-command-contract.md`。FFI / C ABI ownership 与 host smoke 设计见 `docs/manager-sync-ffi-command-boundary.md`。本文继续作为审阅检查清单和停止线，不替代草案文档。
+future contract 草案见 `docs/manager-sync-bridge-command-contract.md`。FFI / C ABI ownership 与 host smoke 设计见 `docs/manager-sync-ffi-command-boundary.md`，Rust / Dart contract test 分层见 `docs/manager-sync-ffi-command-contract-test-plan.md`。本文继续作为审阅检查清单和停止线，不替代草案文档。
 
 ## 当前结论
 
@@ -30,8 +30,9 @@ future contract 草案见 `docs/manager-sync-bridge-command-contract.md`。FFI /
 - `apps/radishlex-manager/test/models/manager_sync_ffi_command_boundary_test.dart`
 - `docs/manager-sync-bridge-command-contract.md`
 - `docs/manager-sync-ffi-command-boundary.md`
+- `docs/manager-sync-ffi-command-contract-test-plan.md`
 
-这组 fixture / 测试只验证 future contract 的安全形状、错误 envelope、幂等性状态码、FFI ownership、host smoke 计划、forbidden material 拒绝样本和 diagnostics 不泄漏；它不定义真实 `ManagerBridge` 方法或 `ime-ffi` symbol。
+这组 fixture / 测试只验证 future contract 的安全形状、错误 envelope、幂等性状态码、FFI ownership、host smoke 计划、contract test 分层、forbidden material 拒绝样本和 diagnostics 不泄漏；它不定义真实 `ManagerBridge` 方法或 `ime-ffi` symbol。
 
 ## 与现有 Preview 的关系
 
