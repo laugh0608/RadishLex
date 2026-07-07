@@ -14,6 +14,7 @@
 - `apps/radishlex-manager/test/fixtures/sync_transient_secret_interaction_fixtures.dart`
 - `apps/radishlex-manager/test/models/manager_sync_transient_secret_interaction_test.dart`
 - `apps/radishlex-manager/test/ffi_manager_bridge_test.dart` 中 fake native capability missing 回归
+- settings gate preview、同步页和诊断报告中的 recovery visible-layer 状态码回归
 - `apps/radishlex-manager/tool/ffi_bridge_smoke.dart` 中真实 dynamic library future sync command symbol 缺席检查
 - `docs/manager-sync-ffi-command-boundary.md`
 
@@ -115,6 +116,8 @@ Dart FFI binding test 的实现顺序：
 
 恢复码一次性展示、恢复码输入、短码核对和显式授权 / 撤销确认的 transient secret 生命周期已由 `docs/manager-recovery-device-auth-flow.md`、`sync_transient_secret_interaction_fixtures.dart` 和 `manager_sync_transient_secret_interaction_test.dart` 固定。当前仍不显示、输入、复制、保存或传递真实 secret。
 
+`syncRecoveryVisibleLayerFixtures` 进一步固定 recovery setup / restore 的可见层文案和确认占位：一次性展示状态、保存确认、恢复输入、恢复记录查询、失败限速和设备登记状态必须在 UI / diagnostics 中输出同一组非敏感状态码，且不写 settings action payload、不创建 bridge request payload、不暴露请求 / 响应体或真实路径。
+
 ## Manager 可见层回归
 
 每次扩展 command contract、FFI boundary 或 fake native mapper 时，至少复验：
@@ -133,6 +136,7 @@ Dart FFI binding test 的实现顺序：
 - 不写 settings draft action payload。
 - 不在 diagnostics 中输出 token、恢复码、短码、signature bytes、wrapped material、payload bytes、请求 / 响应体、provider exception 或真实路径。
 - 即便 readiness 和 future shape 都 ready，当前阶段仍输出 `not_executable_current_phase` / `user_sync_entry_closed_current_phase`。
+- recovery setup / restore 可见层只展示 `display_not_available_current_phase`、`required_before_first_upload`、`input_not_available_current_phase`、`not_checked_current_phase`、`not_started` 和 `blocked_until_recovery_success` 等状态码，不展示或输入真实 secret。
 
 ## 验证命令
 
@@ -143,6 +147,7 @@ flutter test test/models/manager_sync_ffi_command_boundary_test.dart test/models
 flutter test test/ffi_manager_bridge_test.dart test/models/manager_sync_ffi_command_boundary_test.dart
 flutter test test/models/manager_sync_ffi_binding_contract_test.dart
 flutter test test/models/manager_sync_transient_secret_interaction_test.dart
+flutter test test/screens/sync_test.dart test/screens/settings_test.dart test/screens/settings_diagnostics_test.dart
 ./scripts/check-manager-ffi-smoke.sh
 ./scripts/check-manager.sh
 git diff --check

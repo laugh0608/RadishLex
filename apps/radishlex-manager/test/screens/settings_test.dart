@@ -72,7 +72,7 @@ void main() {
       findsWidgets,
     );
     expect(find.text('true'), findsOneWidget);
-    expect(find.text('required_before_first_upload'), findsOneWidget);
+    expect(find.text('required_before_first_upload'), findsWidgets);
     expect(find.text('recovery_record_not_created'), findsWidgets);
     expect(find.text('authorization_package_not_created'), findsOneWidget);
     expect(
@@ -361,7 +361,10 @@ void main() {
     );
     expect(find.textContaining('recovery_setup_readiness'), findsWidgets);
     expect(find.text('recovery_setup_flow_closed'), findsWidgets);
+    expect(find.text('display_not_available_current_phase'), findsWidgets);
     expect(find.text('recovery_restore_flow_closed'), findsWidgets);
+    expect(find.text('not_checked_current_phase'), findsWidgets);
+    expect(find.text('blocked_until_recovery_success'), findsWidgets);
     expect(find.text('device_join_flow_closed'), findsWidgets);
     expect(find.text('join_request_creation_closed'), findsWidgets);
     expect(find.text('short_code_verification_not_started'), findsWidgets);

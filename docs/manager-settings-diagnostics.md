@@ -11,6 +11,7 @@
 - 设置页可以导入 `manager_sync_readiness.v1` 非敏感摘要用于本地开发联调；该摘要只保存在当前 manager 内存态，驱动同步页、设置页 gate preview 和诊断报告的派生字段，不写入 settings draft，也不改变 `ManagerBridge` contract 或 C ABI。
 - 开发期 `manager_sync_evidence_bundle.v1` 只作为测试 fixture，把 readiness 摘要、connection health 摘要、部署证据来源和设备 production gate 组合成同一份预演输入；settings draft 仍只保存非敏感草案和净化后的 connection probe record，不保存 bundle 原文。
 - `manager_sync_action_command_preview.v1` 只从当前只读 action intent 派生非执行命令摘要，用于 settings gate preview、同步页和诊断报告展示 execution status、data policy、stop line、request boundary、result boundary、request / result allowed fields、forbidden material policy 和错误分类；它不写 settings draft，不创建 bridge 请求，也不携带命令 payload。
+- recovery setup / restore 的可见层文案占位只展示状态码：一次性展示状态、保存确认、恢复输入、恢复记录查询、失败限速和设备登记状态会同步进入 settings gate preview、同步页和诊断报告；这些字段不携带恢复码、settings action payload、bridge request payload 或请求 / 响应体。
 - 真实远端同步、恢复码和设备授权 UI 继续关闭；`preflight_ready` 只表示本地草案和预检条件可解释，不代表用户可用同步入口已开放。
 
 ## Settings Draft JSON
@@ -225,13 +226,18 @@ Manager UI 预览会保留完整脱敏文本，并额外按 `runtime`、`setting
 | `sync.recovery_first_upload_gate` | `gate` | 首次上传 P2 对象前的恢复码门禁；当前为 `blocked_until_recovery_code_saved`。 |
 | `sync.recovery_readiness_blockers` | `gate` | 恢复码准备清单聚合阻塞码，不含恢复码明文或恢复材料。 |
 | `sync.recovery_setup_status` | `gate` | 首台设备恢复码设置流程状态；当前为 `recovery_setup_flow_closed`。 |
+| `sync.recovery_setup_display_status` | `gate` | 一次性恢复码展示占位状态；当前为 `display_not_available_current_phase`，不展示恢复码。 |
 | `sync.recovery_setup_blocker` | `gate` | 首台设备恢复码设置阻塞码；当前为 `recovery_code_generation_closed`。 |
 | `sync.recovery_setup_action_status` | `gate` | 恢复码设置入口动作状态；当前为 `read_only_current_phase`。 |
+| `sync.recovery_setup_save_confirmation` | `gate` | 恢复码离线保存确认占位状态；当前为 `required_before_first_upload`。 |
 | `sync.recovery_setup_prerequisites` | `gate` | 恢复码设置前置条件摘要，不含恢复码或私钥材料。 |
 | `sync.recovery_setup_error_codes` | `error_code` | 恢复码设置需要覆盖的错误分类摘要。 |
 | `sync.recovery_restore_status` | `gate` | 恢复码恢复新设备流程状态；当前为 `recovery_restore_flow_closed`。 |
 | `sync.recovery_restore_blocker` | `gate` | 恢复码恢复新设备阻塞码；当前为 `recovery_code_input_closed`。 |
 | `sync.recovery_restore_code_input` | `gate` | 恢复码输入入口状态；当前为 `input_not_available_current_phase`。 |
+| `sync.recovery_restore_lookup_status` | `gate` | 恢复记录查询占位状态；当前为 `not_checked_current_phase`。 |
+| `sync.recovery_restore_attempt_limit` | `gate` | 恢复失败限速占位状态；当前为 `not_started`。 |
+| `sync.recovery_restore_device_registration` | `gate` | 恢复成功后的设备登记占位状态；当前为 `blocked_until_recovery_success`。 |
 | `sync.recovery_restore_error_codes` | `error_code` | 恢复码恢复新设备需要覆盖的错误分类摘要。 |
 | `sync.device_authorization_status` | `gate` | 设备授权流程结构化状态；当前为 `device_authorization_flow_closed`。 |
 | `sync.device_authorization_blocker` | `gate` | 设备授权流程当前阻塞码；当前为 `device_authorization_flow_closed`。 |

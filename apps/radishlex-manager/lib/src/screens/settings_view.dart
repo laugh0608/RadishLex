@@ -841,8 +841,17 @@ class _SettingsSyncGatePreview extends StatelessWidget {
             value: audit.entryGate.recovery.setupReadiness.status,
           ),
           ManagerKeyValueRow(
+            label: 'recovery setup display',
+            value: audit.entryGate.recovery.setupReadiness.oneTimeDisplayStatus,
+          ),
+          ManagerKeyValueRow(
             label: 'recovery setup blocker',
             value: audit.entryGate.recovery.setupReadiness.blocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery setup save confirmation',
+            value:
+                audit.entryGate.recovery.setupReadiness.saveConfirmationStatus,
           ),
           ManagerKeyValueRow(
             label: 'recovery setup prerequisites',
@@ -863,6 +872,26 @@ class _SettingsSyncGatePreview extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'recovery restore code input',
             value: audit.entryGate.recovery.restoreReadiness.codeInputStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery restore lookup',
+            value: audit
+                .entryGate
+                .recovery
+                .restoreReadiness
+                .recoveryRecordLookupStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery restore attempt limit',
+            value: audit.entryGate.recovery.restoreReadiness.attemptLimitStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'recovery restore device registration',
+            value: audit
+                .entryGate
+                .recovery
+                .restoreReadiness
+                .deviceRegistrationStatus,
           ),
           ManagerKeyValueRow(
             label: 'recovery restore errors',

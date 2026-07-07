@@ -26,6 +26,8 @@ command preview 的 `execution_status` 同样不会打开操作：`closed_curren
 - `apps/radishlex-manager/test/fixtures/sync_transient_secret_interaction_fixtures.dart`
 - `apps/radishlex-manager/test/models/manager_sync_transient_secret_interaction_test.dart`
 
+其中 `syncRecoveryVisibleLayerFixtures` 固定 recovery setup / restore 的可见层文案和确认占位边界。这里的 copy 指 UI 文案，不是剪贴板复制动作；当前仍禁止自动复制、真实输入、保存或传递 secret。
+
 覆盖的 transient 交互面：
 
 | 交互面 | 绑定 action | 当前状态 | 允许输出 |
@@ -56,6 +58,20 @@ command preview 的 `execution_status` 同样不会打开操作：`closed_curren
 - `revoke_device`
 - `advance_key_epoch`
 
+可见层状态码：
+
+| 作用面 | UI 状态字段 | diagnostics 字段 | 当前状态码 |
+| --- | --- | --- | --- |
+| setup 一次性展示占位 | `setup display status` | `sync.recovery_setup_display_status` | `display_not_available_current_phase` |
+| setup 保存确认占位 | `setup save confirmation` | `sync.recovery_setup_save_confirmation` | `required_before_first_upload` |
+| setup 恢复记录 / 首次上传 gate | `recovery record`, `first upload gate` | `sync.recovery_record_status`, `sync.recovery_first_upload_gate` | `recovery_record_not_created`, `blocked_until_recovery_code_saved` |
+| restore 输入占位 | `code input` | `sync.recovery_restore_code_input` | `input_not_available_current_phase` |
+| restore 记录查询占位 | `restore lookup` | `sync.recovery_restore_lookup_status` | `not_checked_current_phase` |
+| restore 失败限速占位 | `restore attempt limit` | `sync.recovery_restore_attempt_limit` | `not_started` |
+| restore 设备登记占位 | `restore device registration` | `sync.recovery_restore_device_registration` | `blocked_until_recovery_success` |
+
+这些字段只允许输出状态码和确认边界码，例如 `setup_visible_text_status_codes_only`、`save_confirmation_ack_code_only` 和 `restore_visible_text_status_codes_only`。测试会用 fixture 反查当前 UI / diagnostics 字段，确认它们不包含 settings action payload、bridge request payload、请求 / 响应体、真实路径或 secret material。
+
 ## 首台设备恢复码设置
 
 当前关闭态：
@@ -66,6 +82,7 @@ command preview 的 `execution_status` 同样不会打开操作：`closed_curren
 | `blocker` | `recovery_code_generation_closed` | 不允许生成恢复码。 |
 | `entry_action_status` | `read_only_current_phase` | UI 只展示准备状态。 |
 | `generated_code_status` | `not_generated` | 当前没有生成恢复码。 |
+| `one_time_display_status` | `display_not_available_current_phase` | 当前不展示一次性恢复码，只展示状态码。 |
 | `save_confirmation_status` | `required_before_first_upload` | 后续真实上传前必须确认已离线保存恢复码。 |
 | `recovery_record_status` | `recovery_record_not_created` | 当前未创建恢复记录。 |
 | `first_upload_gate` | `blocked_until_recovery_code_saved` | 恢复码确认前不得上传 P2 对象。 |

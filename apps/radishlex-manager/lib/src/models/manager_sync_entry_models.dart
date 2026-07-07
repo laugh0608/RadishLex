@@ -324,6 +324,17 @@ class RecoverySetupReadiness {
     return errorCodes.isEmpty ? 'none' : errorCodes.join(', ');
   }
 
+  String get oneTimeDisplayStatus {
+    if (status == 'recovery_setup_flow_closed' ||
+        entryActionStatus == 'read_only_current_phase') {
+      return 'display_not_available_current_phase';
+    }
+    if (generatedCodeStatus == 'generated_once') {
+      return 'display_available_once';
+    }
+    return generatedCodeStatus;
+  }
+
   SyncReadinessFlowSummary toFlowSummary() {
     return SyncReadinessFlowSummary(
       flowId: 'recovery_setup',

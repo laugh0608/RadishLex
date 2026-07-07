@@ -477,6 +477,15 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
             'gate',
           ),
           _diagnosticsItem(
+            'sync.recovery_setup_display_status',
+            syncGateAudit
+                .entryGate
+                .recovery
+                .setupReadiness
+                .oneTimeDisplayStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
             'sync.recovery_setup_blocker',
             syncGateAudit.entryGate.recovery.setupReadiness.blocker,
             'gate',
@@ -484,6 +493,15 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
           _diagnosticsItem(
             'sync.recovery_setup_action_status',
             syncGateAudit.entryGate.recovery.setupReadiness.entryActionStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_setup_save_confirmation',
+            syncGateAudit
+                .entryGate
+                .recovery
+                .setupReadiness
+                .saveConfirmationStatus,
             'gate',
           ),
           _diagnosticsItem(
@@ -509,6 +527,33 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
           _diagnosticsItem(
             'sync.recovery_restore_code_input',
             syncGateAudit.entryGate.recovery.restoreReadiness.codeInputStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_restore_lookup_status',
+            syncGateAudit
+                .entryGate
+                .recovery
+                .restoreReadiness
+                .recoveryRecordLookupStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_restore_attempt_limit',
+            syncGateAudit
+                .entryGate
+                .recovery
+                .restoreReadiness
+                .attemptLimitStatus,
+            'gate',
+          ),
+          _diagnosticsItem(
+            'sync.recovery_restore_device_registration',
+            syncGateAudit
+                .entryGate
+                .recovery
+                .restoreReadiness
+                .deviceRegistrationStatus,
             'gate',
           ),
           _diagnosticsItem(

@@ -190,8 +190,16 @@ class SyncRecoverySection extends StatelessWidget {
             value: recovery.setupReadiness.status,
           ),
           ManagerKeyValueRow(
+            label: 'setup display status',
+            value: recovery.setupReadiness.oneTimeDisplayStatus,
+          ),
+          ManagerKeyValueRow(
             label: 'setup blocker',
             value: recovery.setupReadiness.blocker,
+          ),
+          ManagerKeyValueRow(
+            label: 'setup save confirmation',
+            value: recovery.setupReadiness.saveConfirmationStatus,
           ),
           ManagerKeyValueRow(
             label: 'setup prerequisites',
@@ -212,6 +220,18 @@ class SyncRecoverySection extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'code input',
             value: recovery.restoreReadiness.codeInputStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore lookup',
+            value: recovery.restoreReadiness.recoveryRecordLookupStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore attempt limit',
+            value: recovery.restoreReadiness.attemptLimitStatus,
+          ),
+          ManagerKeyValueRow(
+            label: 'restore device registration',
+            value: recovery.restoreReadiness.deviceRegistrationStatus,
           ),
           ManagerKeyValueRow(
             label: 'restore errors',

@@ -469,8 +469,16 @@ void main() {
     );
     expect(gate.recovery.setupReadiness.status, 'recovery_setup_flow_closed');
     expect(
+      gate.recovery.setupReadiness.oneTimeDisplayStatus,
+      'display_not_available_current_phase',
+    );
+    expect(
       gate.recovery.setupReadiness.blocker,
       'recovery_code_generation_closed',
+    );
+    expect(
+      gate.recovery.setupReadiness.saveConfirmationStatus,
+      'required_before_first_upload',
     );
     expect(
       gate.recovery.setupReadiness.prerequisiteSummary,
@@ -492,6 +500,15 @@ void main() {
     expect(
       gate.recovery.restoreReadiness.blocker,
       'recovery_code_input_closed',
+    );
+    expect(
+      gate.recovery.restoreReadiness.recoveryRecordLookupStatus,
+      'not_checked_current_phase',
+    );
+    expect(gate.recovery.restoreReadiness.attemptLimitStatus, 'not_started');
+    expect(
+      gate.recovery.restoreReadiness.deviceRegistrationStatus,
+      'blocked_until_recovery_success',
     );
     expect(
       gate.recovery.restoreReadiness.errorCodes,

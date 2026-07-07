@@ -35,6 +35,90 @@ const syncTransientSecretForbiddenPersistenceTargets = [
   'analytics_event',
 ];
 
+const syncRecoveryVisibleLayerFormat =
+    'future_manager_sync_recovery_visible_layer.v1_draft';
+
+const syncRecoveryVisibleLayerReviewStatus =
+    'visible_copy_confirmation_placeholder_only';
+
+const syncRecoveryVisibleLayerFixtures = [
+  SyncRecoveryVisibleLayerFixture(
+    id: 'recovery_setup_visible_copy_confirmation_placeholder',
+    actionId: 'recovery_setup',
+    interactionFixtureId: 'recovery_setup_one_time_display',
+    visibleTextBoundaryCode: 'setup_visible_text_status_codes_only',
+    confirmationBoundaryCode: 'save_confirmation_ack_code_only',
+    uiStateFields: [
+      'display_placeholder_status',
+      'save_confirmation_status',
+      'recovery_record_status',
+      'first_upload_gate',
+    ],
+    uiExpectedStatusCodes: [
+      'display_not_available_current_phase',
+      'required_before_first_upload',
+      'recovery_record_not_created',
+      'blocked_until_recovery_code_saved',
+    ],
+    diagnosticsKeys: [
+      'sync.recovery_setup_display_status',
+      'sync.recovery_setup_save_confirmation',
+      'sync.recovery_record_status',
+      'sync.recovery_first_upload_gate',
+    ],
+    diagnosticsExpectedStatusCodes: [
+      'display_not_available_current_phase',
+      'required_before_first_upload',
+      'recovery_record_not_created',
+      'blocked_until_recovery_code_saved',
+    ],
+    blockedOperationCodes: [
+      'render_secret_value',
+      'copy_secret_value_to_clipboard',
+      'save_secret_value_to_settings',
+      'unlock_first_upload',
+    ],
+  ),
+  SyncRecoveryVisibleLayerFixture(
+    id: 'recovery_restore_visible_input_rate_device_placeholder',
+    actionId: 'recovery_restore',
+    interactionFixtureId: 'recovery_restore_code_input',
+    visibleTextBoundaryCode: 'restore_visible_text_status_codes_only',
+    confirmationBoundaryCode:
+        'restore_confirmation_not_available_current_phase',
+    uiStateFields: [
+      'code_input_status',
+      'recovery_record_lookup_status',
+      'attempt_limit_status',
+      'device_registration_status',
+    ],
+    uiExpectedStatusCodes: [
+      'input_not_available_current_phase',
+      'not_checked_current_phase',
+      'not_started',
+      'blocked_until_recovery_success',
+    ],
+    diagnosticsKeys: [
+      'sync.recovery_restore_code_input',
+      'sync.recovery_restore_lookup_status',
+      'sync.recovery_restore_attempt_limit',
+      'sync.recovery_restore_device_registration',
+    ],
+    diagnosticsExpectedStatusCodes: [
+      'input_not_available_current_phase',
+      'not_checked_current_phase',
+      'not_started',
+      'blocked_until_recovery_success',
+    ],
+    blockedOperationCodes: [
+      'accept_secret_input',
+      'submit_secret_input',
+      'unwrap_device_material',
+      'register_restored_device',
+    ],
+  ),
+];
+
 const syncTransientSecretInteractionFixtures = [
   SyncTransientSecretInteractionFixture(
     id: 'recovery_setup_one_time_display',
@@ -225,6 +309,52 @@ class SyncTransientSecretInteractionFixture {
   }
 }
 
+class SyncRecoveryVisibleLayerFixture {
+  const SyncRecoveryVisibleLayerFixture({
+    required this.id,
+    required this.actionId,
+    required this.interactionFixtureId,
+    required this.visibleTextBoundaryCode,
+    required this.confirmationBoundaryCode,
+    required this.uiStateFields,
+    required this.uiExpectedStatusCodes,
+    required this.diagnosticsKeys,
+    required this.diagnosticsExpectedStatusCodes,
+    required this.blockedOperationCodes,
+  });
+
+  final String id;
+  final String actionId;
+  final String interactionFixtureId;
+  final String visibleTextBoundaryCode;
+  final String confirmationBoundaryCode;
+  final List<String> uiStateFields;
+  final List<String> uiExpectedStatusCodes;
+  final List<String> diagnosticsKeys;
+  final List<String> diagnosticsExpectedStatusCodes;
+  final List<String> blockedOperationCodes;
+
+  String get uiStateSummary {
+    return managerSyncCodeSummary(uiStateFields);
+  }
+
+  String get uiStatusSummary {
+    return managerSyncCodeSummary(uiExpectedStatusCodes);
+  }
+
+  String get diagnosticsKeySummary {
+    return managerSyncCodeSummary(diagnosticsKeys);
+  }
+
+  String get diagnosticsStatusSummary {
+    return managerSyncCodeSummary(diagnosticsExpectedStatusCodes);
+  }
+
+  String get blockedOperationSummary {
+    return managerSyncCodeSummary(blockedOperationCodes);
+  }
+}
+
 Map<String, Object?> syncTransientSecretInteractionShape(
   SyncTransientSecretInteractionFixture fixture,
 ) {
@@ -246,6 +376,38 @@ Map<String, Object?> syncTransientSecretInteractionShape(
     'prohibited_operations': fixture.prohibitedOperations,
     'contract_transient_fields': fixture.contractTransientFields,
   };
+}
+
+Map<String, Object?> syncRecoveryVisibleLayerShape(
+  SyncRecoveryVisibleLayerFixture fixture,
+) {
+  return {
+    'format': syncRecoveryVisibleLayerFormat,
+    'review_status': syncRecoveryVisibleLayerReviewStatus,
+    'current_phase': syncTransientSecretInteractionCurrentPhaseStatus,
+    'id': fixture.id,
+    'action_id': fixture.actionId,
+    'interaction_fixture_id': fixture.interactionFixtureId,
+    'visible_text_boundary_code': fixture.visibleTextBoundaryCode,
+    'confirmation_boundary_code': fixture.confirmationBoundaryCode,
+    'ui_state_fields': fixture.uiStateFields,
+    'ui_expected_status_codes': fixture.uiExpectedStatusCodes,
+    'diagnostics_keys': fixture.diagnosticsKeys,
+    'diagnostics_expected_status_codes': fixture.diagnosticsExpectedStatusCodes,
+    'blocked_operation_codes': fixture.blockedOperationCodes,
+    'lifecycle_rules': syncTransientSecretLifecycleRules,
+    'forbidden_persistence_targets':
+        syncTransientSecretForbiddenPersistenceTargets,
+  };
+}
+
+List<String> syncRecoveryVisibleLayerDiagnosticsKeys() {
+  return List.unmodifiable(
+    {
+      for (final fixture in syncRecoveryVisibleLayerFixtures)
+        ...fixture.diagnosticsKeys,
+    }.toList()..sort(),
+  );
 }
 
 List<String> syncTransientSecretCoveredContractFields() {

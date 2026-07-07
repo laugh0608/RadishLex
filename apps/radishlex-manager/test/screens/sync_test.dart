@@ -66,12 +66,15 @@ void main() {
     expect(find.text('恢复码准备态'), findsOneWidget);
     expect(find.text('恢复码流程关闭'), findsOneWidget);
     expect(find.text('recovery_code_flow_closed'), findsWidgets);
-    expect(find.text('required_before_first_upload'), findsOneWidget);
+    expect(find.text('required_before_first_upload'), findsWidgets);
     expect(find.text('recovery_record_not_created'), findsWidgets);
     expect(find.text('recovery_record_creation_closed'), findsOneWidget);
     expect(find.text('blocked_until_recovery_code_saved'), findsOneWidget);
     expect(find.text('recovery_setup_flow_closed'), findsOneWidget);
+    expect(find.text('setup display status'), findsOneWidget);
+    expect(find.text('display_not_available_current_phase'), findsOneWidget);
     expect(find.text('recovery_code_generation_closed'), findsWidgets);
+    expect(find.text('setup save confirmation'), findsOneWidget);
     expect(
       find.text(
         'platform_private_key_backend_ready, release_deployment_evidence_summary_required, explicit_user_start_required',
@@ -115,13 +118,18 @@ void main() {
     expect(find.text('recovery_restore_flow_closed'), findsOneWidget);
     expect(find.text('recovery_code_input_closed'), findsWidgets);
     expect(find.text('input_not_available_current_phase'), findsOneWidget);
+    expect(find.text('restore lookup'), findsOneWidget);
+    expect(find.text('not_checked_current_phase'), findsOneWidget);
+    expect(find.text('restore attempt limit'), findsOneWidget);
+    expect(find.text('restore device registration'), findsOneWidget);
+    expect(find.text('blocked_until_recovery_success'), findsOneWidget);
     expect(
       find.text(
         'recovery_code_required, recovery_code_invalid, recovery_record_missing, recovery_record_revoked, authentication_required, network_unreachable',
       ),
       findsOneWidget,
     );
-    expect(find.text('not_started'), findsOneWidget);
+    expect(find.text('not_started'), findsWidgets);
     expect(find.text('restore request boundary'), findsOneWidget);
     expect(find.text('restore result boundary'), findsOneWidget);
     expect(find.text('restore command errors'), findsOneWidget);

@@ -265,7 +265,7 @@ void main() {
 
     expect(find.text('诊断摘要预览'), findsOneWidget);
     expect(find.text('分组 6'), findsOneWidget);
-    expect(find.text('字段 124'), findsOneWidget);
+    expect(find.text('字段 129'), findsOneWidget);
     expect(
       find.byKey(const Key('diagnostics-section-sync_gate')),
       findsOneWidget,
@@ -481,6 +481,12 @@ void main() {
     );
     expect(
       find.textContaining(
+        'sync.recovery_setup_display_status: display_not_available_current_phase',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
         'sync.recovery_setup_blocker: recovery_code_generation_closed',
       ),
       findsOneWidget,
@@ -493,6 +499,12 @@ void main() {
     );
     expect(
       find.textContaining(
+        'sync.recovery_setup_save_confirmation: required_before_first_upload',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
         'sync.recovery_setup_error_codes: recovery_code_required, recovery_record_missing, recovery_record_revoked, local_data_inconsistent',
       ),
       findsOneWidget,
@@ -500,6 +512,22 @@ void main() {
     expect(
       find.textContaining(
         'sync.recovery_restore_status: recovery_restore_flow_closed',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.recovery_restore_lookup_status: not_checked_current_phase',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('sync.recovery_restore_attempt_limit: not_started'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining(
+        'sync.recovery_restore_device_registration: blocked_until_recovery_success',
       ),
       findsOneWidget,
     );
