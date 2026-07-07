@@ -28,6 +28,8 @@ command preview 的 `execution_status` 同样不会打开操作：`closed_curren
 
 其中 `syncRecoveryVisibleLayerFixtures` 固定 recovery setup / restore 的可见层文案和确认占位边界。这里的 copy 指 UI 文案，不是剪贴板复制动作；当前仍禁止自动复制、真实输入、保存或传递 secret。
 
+`syncRecoveryFutureConfirmationDetailFixtures` 进一步固定 recovery setup / restore 的 future confirmation detail：setup 只允许表达保存确认仍缺失、首次上传仍被阻塞和后续必须满足的平台 / 部署 / 显式启动前置条件；restore 只允许表达输入仍关闭、恢复记录未查询、失败限速未开始和设备登记等待恢复成功。该 detail 只作为 fixture / model test 证据，不创建 settings action，不生成 bridge request，不渲染 secret，也不允许自动复制到剪贴板。
+
 覆盖的 transient 交互面：
 
 | 交互面 | 绑定 action | 当前状态 | 允许输出 |
@@ -71,6 +73,15 @@ command preview 的 `execution_status` 同样不会打开操作：`closed_curren
 | restore 设备登记占位 | `restore device registration` | `sync.recovery_restore_device_registration` | `blocked_until_recovery_success` |
 
 这些字段只允许输出状态码和确认边界码，例如 `setup_visible_text_status_codes_only`、`save_confirmation_ack_code_only` 和 `restore_visible_text_status_codes_only`。测试会用 fixture 反查当前 UI / diagnostics 字段，确认它们不包含 settings action payload、bridge request payload、请求 / 响应体、真实路径或 secret material。
+
+future confirmation detail 当前固定为：
+
+| detail | 绑定 action | 当前决策状态 | 允许证据 |
+| --- | --- | --- | --- |
+| `recovery_setup_save_confirmation_detail` | `recovery_setup` | `confirmation_not_available_current_phase` | `save_confirmation_ack_code_only`、`recovery_record_status_summary`、`first_upload_gate_summary` |
+| `recovery_restore_attempt_confirmation_detail` | `recovery_restore` | `confirmation_not_available_current_phase` | `restore_attempt_status_code`、`recovery_record_lookup_summary`、`attempt_limit_status_summary`、`device_registration_status_summary` |
+
+这两条 detail 必须继续绑定当前 diagnostics 字段：`sync.recovery_setup_display_status`、`sync.recovery_setup_save_confirmation`、`sync.recovery_first_upload_gate`、`sync.recovery_restore_code_input`、`sync.recovery_restore_lookup_status`、`sync.recovery_restore_attempt_limit` 和 `sync.recovery_restore_device_registration`。它们只能输出状态码，不输出恢复码、短码、token、signature、wrapped material、payload bytes、请求 / 响应体或真实路径。
 
 ## 首台设备恢复码设置
 

@@ -41,6 +41,12 @@ const syncRecoveryVisibleLayerFormat =
 const syncRecoveryVisibleLayerReviewStatus =
     'visible_copy_confirmation_placeholder_only';
 
+const syncRecoveryFutureConfirmationDetailFormat =
+    'future_manager_sync_recovery_confirmation_detail.v1_draft';
+
+const syncRecoveryFutureConfirmationDetailReviewStatus =
+    'future_confirmation_detail_review_only_no_secret_capture';
+
 const syncRecoveryVisibleLayerFixtures = [
   SyncRecoveryVisibleLayerFixture(
     id: 'recovery_setup_visible_copy_confirmation_placeholder',
@@ -174,6 +180,7 @@ const syncTransientSecretInteractionFixtures = [
     completionEvidenceCodes: [
       'restore_attempt_status_code',
       'recovery_record_lookup_summary',
+      'attempt_limit_status_summary',
       'device_registration_status_summary',
     ],
     prohibitedOperations: [
@@ -271,6 +278,109 @@ const syncTransientSecretInteractionFixtures = [
   ),
 ];
 
+const syncRecoveryFutureConfirmationDetailFixtures = [
+  SyncRecoveryFutureConfirmationDetailFixture(
+    id: 'recovery_setup_save_confirmation_detail',
+    actionId: 'recovery_setup',
+    visibleLayerFixtureId:
+        'recovery_setup_visible_copy_confirmation_placeholder',
+    interactionFixtureId: 'recovery_setup_one_time_display',
+    detailBoundaryCode: 'setup_save_confirmation_detail_status_only',
+    entryStatusCode: 'read_only_current_phase',
+    userDecisionStatusCode: 'confirmation_not_available_current_phase',
+    preconditionStatusCodes: [
+      'platform_private_key_backend_ready',
+      'release_deployment_evidence_summary_required',
+      'explicit_user_start_required',
+    ],
+    confirmationStateCodes: [
+      'display_not_available_current_phase',
+      'required_before_first_upload',
+      'blocked_until_recovery_code_saved',
+    ],
+    diagnosticsKeys: [
+      'sync.recovery_setup_display_status',
+      'sync.recovery_setup_save_confirmation',
+      'sync.recovery_first_upload_gate',
+    ],
+    diagnosticsExpectedStatusCodes: [
+      'display_not_available_current_phase',
+      'required_before_first_upload',
+      'blocked_until_recovery_code_saved',
+    ],
+    allowedEvidenceCodes: [
+      'save_confirmation_ack_code_only',
+      'recovery_record_status_summary',
+      'first_upload_gate_summary',
+    ],
+    prohibitedOperationCodes: [
+      'render_secret_value',
+      'copy_secret_value_to_clipboard',
+      'save_secret_value_to_settings',
+      'unlock_first_upload',
+    ],
+    persistencePolicyCodes: [
+      'settings_action_absent',
+      'diagnostics_status_codes_only',
+      'widget_text_status_codes_only',
+      'route_argument_absent',
+      'clipboard_auto_copy_blocked',
+    ],
+  ),
+  SyncRecoveryFutureConfirmationDetailFixture(
+    id: 'recovery_restore_attempt_confirmation_detail',
+    actionId: 'recovery_restore',
+    visibleLayerFixtureId:
+        'recovery_restore_visible_input_rate_device_placeholder',
+    interactionFixtureId: 'recovery_restore_code_input',
+    detailBoundaryCode: 'restore_attempt_confirmation_detail_status_only',
+    entryStatusCode: 'read_only_current_phase',
+    userDecisionStatusCode: 'confirmation_not_available_current_phase',
+    preconditionStatusCodes: [
+      'release_deployment_evidence_summary_required',
+      'recovery_record_lookup_required',
+      'explicit_user_start_required',
+    ],
+    confirmationStateCodes: [
+      'input_not_available_current_phase',
+      'not_checked_current_phase',
+      'not_started',
+      'blocked_until_recovery_success',
+    ],
+    diagnosticsKeys: [
+      'sync.recovery_restore_code_input',
+      'sync.recovery_restore_lookup_status',
+      'sync.recovery_restore_attempt_limit',
+      'sync.recovery_restore_device_registration',
+    ],
+    diagnosticsExpectedStatusCodes: [
+      'input_not_available_current_phase',
+      'not_checked_current_phase',
+      'not_started',
+      'blocked_until_recovery_success',
+    ],
+    allowedEvidenceCodes: [
+      'restore_attempt_status_code',
+      'recovery_record_lookup_summary',
+      'attempt_limit_status_summary',
+      'device_registration_status_summary',
+    ],
+    prohibitedOperationCodes: [
+      'accept_secret_input',
+      'submit_secret_input',
+      'unwrap_device_material',
+      'register_restored_device',
+    ],
+    persistencePolicyCodes: [
+      'settings_action_absent',
+      'diagnostics_status_codes_only',
+      'widget_text_status_codes_only',
+      'route_argument_absent',
+      'clipboard_auto_copy_blocked',
+    ],
+  ),
+];
+
 class SyncTransientSecretInteractionFixture {
   const SyncTransientSecretInteractionFixture({
     required this.id,
@@ -355,6 +465,68 @@ class SyncRecoveryVisibleLayerFixture {
   }
 }
 
+class SyncRecoveryFutureConfirmationDetailFixture {
+  const SyncRecoveryFutureConfirmationDetailFixture({
+    required this.id,
+    required this.actionId,
+    required this.visibleLayerFixtureId,
+    required this.interactionFixtureId,
+    required this.detailBoundaryCode,
+    required this.entryStatusCode,
+    required this.userDecisionStatusCode,
+    required this.preconditionStatusCodes,
+    required this.confirmationStateCodes,
+    required this.diagnosticsKeys,
+    required this.diagnosticsExpectedStatusCodes,
+    required this.allowedEvidenceCodes,
+    required this.prohibitedOperationCodes,
+    required this.persistencePolicyCodes,
+  });
+
+  final String id;
+  final String actionId;
+  final String visibleLayerFixtureId;
+  final String interactionFixtureId;
+  final String detailBoundaryCode;
+  final String entryStatusCode;
+  final String userDecisionStatusCode;
+  final List<String> preconditionStatusCodes;
+  final List<String> confirmationStateCodes;
+  final List<String> diagnosticsKeys;
+  final List<String> diagnosticsExpectedStatusCodes;
+  final List<String> allowedEvidenceCodes;
+  final List<String> prohibitedOperationCodes;
+  final List<String> persistencePolicyCodes;
+
+  String get preconditionSummary {
+    return managerSyncCodeSummary(preconditionStatusCodes);
+  }
+
+  String get confirmationStateSummary {
+    return managerSyncCodeSummary(confirmationStateCodes);
+  }
+
+  String get diagnosticsKeySummary {
+    return managerSyncCodeSummary(diagnosticsKeys);
+  }
+
+  String get diagnosticsStatusSummary {
+    return managerSyncCodeSummary(diagnosticsExpectedStatusCodes);
+  }
+
+  String get allowedEvidenceSummary {
+    return managerSyncCodeSummary(allowedEvidenceCodes);
+  }
+
+  String get prohibitedOperationSummary {
+    return managerSyncCodeSummary(prohibitedOperationCodes);
+  }
+
+  String get persistencePolicySummary {
+    return managerSyncCodeSummary(persistencePolicyCodes);
+  }
+}
+
 Map<String, Object?> syncTransientSecretInteractionShape(
   SyncTransientSecretInteractionFixture fixture,
 ) {
@@ -401,12 +573,47 @@ Map<String, Object?> syncRecoveryVisibleLayerShape(
   };
 }
 
+Map<String, Object?> syncRecoveryFutureConfirmationDetailShape(
+  SyncRecoveryFutureConfirmationDetailFixture fixture,
+) {
+  return {
+    'format': syncRecoveryFutureConfirmationDetailFormat,
+    'review_status': syncRecoveryFutureConfirmationDetailReviewStatus,
+    'current_phase': syncTransientSecretInteractionCurrentPhaseStatus,
+    'id': fixture.id,
+    'action_id': fixture.actionId,
+    'visible_layer_fixture_id': fixture.visibleLayerFixtureId,
+    'interaction_fixture_id': fixture.interactionFixtureId,
+    'detail_boundary_code': fixture.detailBoundaryCode,
+    'entry_status_code': fixture.entryStatusCode,
+    'user_decision_status_code': fixture.userDecisionStatusCode,
+    'precondition_status_codes': fixture.preconditionStatusCodes,
+    'confirmation_state_codes': fixture.confirmationStateCodes,
+    'diagnostics_keys': fixture.diagnosticsKeys,
+    'diagnostics_expected_status_codes': fixture.diagnosticsExpectedStatusCodes,
+    'allowed_evidence_codes': fixture.allowedEvidenceCodes,
+    'prohibited_operation_codes': fixture.prohibitedOperationCodes,
+    'persistence_policy_codes': fixture.persistencePolicyCodes,
+    'lifecycle_rules': syncTransientSecretLifecycleRules,
+    'forbidden_persistence_targets':
+        syncTransientSecretForbiddenPersistenceTargets,
+  };
+}
+
 List<String> syncRecoveryVisibleLayerDiagnosticsKeys() {
   return List.unmodifiable(
     {
       for (final fixture in syncRecoveryVisibleLayerFixtures)
         ...fixture.diagnosticsKeys,
     }.toList()..sort(),
+  );
+}
+
+List<String> syncRecoveryFutureConfirmationDetailIds() {
+  return List.unmodifiable(
+    syncRecoveryFutureConfirmationDetailFixtures
+        .map((fixture) => fixture.id)
+        .toList(),
   );
 }
 

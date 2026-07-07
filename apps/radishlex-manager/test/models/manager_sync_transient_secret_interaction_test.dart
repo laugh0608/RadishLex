@@ -233,6 +233,119 @@ void main() {
       );
     }
   });
+
+  test('recovery future confirmation details stay non executable', () {
+    final visibleById = {
+      for (final fixture in syncRecoveryVisibleLayerFixtures)
+        fixture.id: fixture,
+    };
+    final interactionById = {
+      for (final fixture in syncTransientSecretInteractionFixtures)
+        fixture.id: fixture,
+    };
+    final encoded = [
+      for (final fixture in syncRecoveryFutureConfirmationDetailFixtures)
+        jsonEncode(syncRecoveryFutureConfirmationDetailShape(fixture)),
+    ].join('\n');
+
+    expect(syncRecoveryFutureConfirmationDetailIds(), [
+      'recovery_setup_save_confirmation_detail',
+      'recovery_restore_attempt_confirmation_detail',
+    ]);
+    expect(encoded, contains(syncRecoveryFutureConfirmationDetailFormat));
+    expect(encoded, contains(syncRecoveryFutureConfirmationDetailReviewStatus));
+    expect(encoded, contains('confirmation_not_available_current_phase'));
+    expect(encoded, contains('settings_action_absent'));
+    expect(encoded, contains('clipboard_auto_copy_blocked'));
+    expect(encoded, isNot(contains('settings_action_payload')));
+    expect(encoded, isNot(contains('bridge_request_payload')));
+    expect(encoded, isNot(contains('request_body')));
+    expect(encoded, isNot(contains('response_body')));
+
+    for (final rejected in syncBridgeCommandContractRejectedSamples) {
+      expect(
+        encoded,
+        isNot(contains(rejected.forbiddenFragment)),
+        reason: rejected.id,
+      );
+    }
+
+    for (final fixture in syncRecoveryFutureConfirmationDetailFixtures) {
+      final visible = visibleById[fixture.visibleLayerFixtureId];
+      final interaction = interactionById[fixture.interactionFixtureId];
+      expect(visible, isNotNull, reason: fixture.id);
+      expect(interaction, isNotNull, reason: fixture.id);
+      expect(visible!.actionId, fixture.actionId, reason: fixture.id);
+      expect(interaction!.actionId, fixture.actionId, reason: fixture.id);
+      expect(
+        visible.diagnosticsKeys,
+        containsAll(fixture.diagnosticsKeys),
+        reason: fixture.id,
+      );
+      expect(
+        visible.diagnosticsExpectedStatusCodes,
+        containsAll(fixture.diagnosticsExpectedStatusCodes),
+        reason: fixture.id,
+      );
+      expect(
+        visible.blockedOperationCodes,
+        containsAll(fixture.prohibitedOperationCodes),
+        reason: fixture.id,
+      );
+      expect(
+        interaction.completionEvidenceCodes,
+        containsAll(fixture.allowedEvidenceCodes),
+        reason: fixture.id,
+      );
+      expect(fixture.preconditionSummary, isNot('none'), reason: fixture.id);
+      expect(
+        fixture.confirmationStateSummary,
+        isNot('none'),
+        reason: fixture.id,
+      );
+      expect(
+        fixture.allowedEvidenceSummary,
+        isNot(contains('secret')),
+        reason: fixture.id,
+      );
+      expect(
+        fixture.persistencePolicySummary,
+        isNot(contains('payload')),
+        reason: fixture.id,
+      );
+    }
+  });
+
+  test('recovery future confirmation details match diagnostics today', () {
+    final snapshot = createManagerFixture();
+    final report = createManagerDiagnosticsReport(snapshot);
+    final diagnostics = _diagnosticsByKey(report);
+
+    for (final fixture in syncRecoveryFutureConfirmationDetailFixtures) {
+      for (final key in fixture.diagnosticsKeys) {
+        expect(diagnostics, contains(key), reason: '${fixture.id}: $key');
+      }
+      for (final status in fixture.diagnosticsExpectedStatusCodes) {
+        expect(diagnostics.values, contains(status), reason: fixture.id);
+      }
+      expect(fixture.entryStatusCode, 'read_only_current_phase');
+      expect(
+        fixture.userDecisionStatusCode,
+        'confirmation_not_available_current_phase',
+      );
+    }
+
+    final text = report.toRedactedText();
+    for (final fixture in syncRecoveryFutureConfirmationDetailFixtures) {
+      expect(text, contains(fixture.diagnosticsKeys.first));
+      expect(text, contains(fixture.diagnosticsExpectedStatusCodes.first));
+    }
+    for (final rejected in syncBridgeCommandContractRejectedSamples) {
+      expect(text, isNot(contains(rejected.forbiddenFragment)));
+    }
+    expect(text, isNot(contains('settings_action_payload')));
+    expect(text, isNot(contains('bridge_request_payload')));
+  });
 }
 
 Map<String, String> _diagnosticsByKey(ManagerDiagnosticsReport report) {
