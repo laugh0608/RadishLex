@@ -1,6 +1,6 @@
 # Manager 同步 Action 协议预演边界
 
-本文档定义 Flutter manager 在真实 bridge 命令开放前，对 `recovery_setup`、`recovery_restore`、`join_request_authorization` 和 `device_revocation` 四条 action 允许展示的非敏感 request / result 边界、错误分类、data policy 与 stop line。读者是维护 manager sync/settings/diagnostics、future `ManagerBridge` readiness 接线和后续真实同步交互设计的人。本文不定义真实 `ManagerBridge` contract、C ABI、Go server API、恢复码 KDF、签名格式、授权包 payload 或设备撤销执行逻辑。
+本文档定义 Flutter manager 在真实 bridge 命令开放前，对 `recovery_setup`、`recovery_restore`、`join_request_authorization` 和 `device_revocation` 四条 action 允许展示的非敏感 request / result 边界、错误分类、data policy 与 stop line。读者是维护 manager sync/settings/diagnostics、future `ManagerBridge` readiness 接线和后续真实同步交互设计的人。本文不定义真实 `ManagerBridge` contract、C ABI、Go server API、恢复码 KDF、签名格式、授权包 payload 或设备撤销执行逻辑；真实命令前的 contract 审阅项见 [`docs/manager-sync-bridge-command-contract-checklist.md`](manager-sync-bridge-command-contract-checklist.md)。
 
 ## 当前结论
 
@@ -31,7 +31,7 @@
 | `join_request_authorization` | `request_summary_only_no_join_request_or_short_code` | `result_summary_only_no_authorization_package_or_signature` | `no_short_code_signature_or_wrapped_material` | `no_join_request_or_authorization_package_current_phase` |
 | `device_revocation` | `request_summary_only_no_device_signature_or_key_epoch` | `result_summary_only_no_revocation_record_or_key_epoch_material` | `no_signature_key_epoch_or_wrapped_material` | `no_device_revocation_current_phase` |
 
-这些边界的含义是：UI、fixture、settings preview 和 diagnostics 只能描述未来 request / result 的安全外壳，不能携带真实命令 payload。后续真实 bridge contract 设计时，应重新定义结构化请求 / 响应，并复用这些停止线作为验收前置，而不是把 preview 字段直接当作 bridge DTO。状态组合和测试矩阵见 [`docs/manager-sync-action-acceptance-matrix.md`](manager-sync-action-acceptance-matrix.md)。
+这些边界的含义是：UI、fixture、settings preview 和 diagnostics 只能描述未来 request / result 的安全外壳，不能携带真实命令 payload。后续真实 bridge contract 设计时，应按 [`docs/manager-sync-bridge-command-contract-checklist.md`](manager-sync-bridge-command-contract-checklist.md) 重新定义结构化请求 / 响应，并复用这些停止线作为验收前置，而不是把 preview 字段直接当作 bridge DTO。状态组合和测试矩阵见 [`docs/manager-sync-action-acceptance-matrix.md`](manager-sync-action-acceptance-matrix.md)。
 
 ## Request / Result 预演字段
 
@@ -127,7 +127,7 @@ result status 只允许：
 
 ## 进入真实 bridge 前的停止线
 
-- 没有真实 bridge contract、恢复 / 授权实现测试、发布级部署证据和平台私钥 backend 前，不允许把 preview 转成可执行命令。
+- 没有真实 bridge contract、contract 检查清单评审、恢复 / 授权实现测试、发布级部署证据和平台私钥 backend 前，不允许把 preview 转成可执行命令。
 - request boundary 和 result boundary 只描述安全摘要，不能承载恢复码、短码、签名、wrapped material、payload bytes 或请求 / 响应体。
 - 错误分类必须是 allowlist 码；任何 provider 原始异常、真实路径、token、恢复码或 payload-shaped 字段进入 preview，必须停止并回退。
 - settings draft 不新增 action payload 字段；diagnostics 只输出聚合状态码和策略码。

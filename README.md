@@ -55,6 +55,7 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 - [Manager Readiness 场景目录](docs/manager-readiness-scenarios.md)
 - [Manager 同步 Action 协议预演边界](docs/manager-sync-action-protocol-preview.md)
 - [Manager 同步 Action 验收矩阵](docs/manager-sync-action-acceptance-matrix.md)
+- [Manager 同步 Bridge 命令 Contract 检查清单](docs/manager-sync-bridge-command-contract-checklist.md)
 - [Manager Settings 与诊断报告字段参考](docs/manager-settings-diagnostics.md)
 - [ADR 0002: 恢复码 KDF 与同步域恢复边界](docs/adr/0002-recovery-code-kdf.md)
 - [ADR 0003: 设备签名与私钥存储边界](docs/adr/0003-device-signing-key-storage.md)
@@ -113,7 +114,7 @@ docker compose -f deploy/sync-server/docker-compose.yaml --env-file deploy/sync-
 
 本地同步服务连接健康摘要可用 `./scripts/check-sync-server-connection-health.sh` 采集，脚本只输出 `sync_connection_health.v1` 非敏感状态码、来源标签、HTTP 状态分类和错误分类，不输出 token、请求 / 响应体、证书内容、真实路径或 payload bytes。目标部署证据包格式和脱敏规则可用 `./scripts/check-sync-deployment-evidence.sh <evidence-file>` 复验；通过后可用 `--summary-json` 或 `--summary-text` 导出非敏感交接摘要。该命令只验证证据文件结构、敏感内容黑名单和摘要字段，不证明目标环境已经部署成功。
 
-Flutter manager 当前已在 `apps/radishlex-manager/` 起步，通过受控 `ManagerBridge` contract 接入合成 fixture，并可在显式配置本地 SQLite userdb 与 `ime-ffi` 动态库后切到真实 Dart FFI bridge。当前管理端展示本地词库、import batches、学习摘要、`rank explain`、`sync preflight`、settings draft、sync gate 草案、服务连接健康、恢复码 / 设备授权只读准备态、readiness 聚合摘要、`manager_sync_readiness.v1` 非敏感摘要导入、开发期 evidence bundle 同源回归、只读交互进入计划、`manager_sync_action_command_preview.v1` 非执行命令预演、request / result preview 和脱敏诊断摘要预览 / 导出；本地验收口径见 [Flutter manager 本地验收口径](docs/manager-local-acceptance.md)，真实同步入口进入 UI / bridge 前的交互边界见 [Flutter manager 真实同步入口前置边界](docs/manager-sync-entry-boundary.md)，恢复码与设备授权只读流程见 [Manager 恢复码与设备授权交互进入条件](docs/manager-recovery-device-auth-flow.md)，action 预演边界见 [Manager 同步 Action 协议预演边界](docs/manager-sync-action-protocol-preview.md)。真实远端同步、恢复码生成 / 输入、join request 创建、设备授权成功和设备撤销 UI 仍按管理端边界保持关闭：
+Flutter manager 当前已在 `apps/radishlex-manager/` 起步，通过受控 `ManagerBridge` contract 接入合成 fixture，并可在显式配置本地 SQLite userdb 与 `ime-ffi` 动态库后切到真实 Dart FFI bridge。当前管理端展示本地词库、import batches、学习摘要、`rank explain`、`sync preflight`、settings draft、sync gate 草案、服务连接健康、恢复码 / 设备授权只读准备态、readiness 聚合摘要、`manager_sync_readiness.v1` 非敏感摘要导入、开发期 evidence bundle 同源回归、只读交互进入计划、`manager_sync_action_command_preview.v1` 非执行命令预演、request / result preview、future bridge command contract 检查清单和脱敏诊断摘要预览 / 导出；本地验收口径见 [Flutter manager 本地验收口径](docs/manager-local-acceptance.md)，真实同步入口进入 UI / bridge 前的交互边界见 [Flutter manager 真实同步入口前置边界](docs/manager-sync-entry-boundary.md)，恢复码与设备授权只读流程见 [Manager 恢复码与设备授权交互进入条件](docs/manager-recovery-device-auth-flow.md)，action 预演边界见 [Manager 同步 Action 协议预演边界](docs/manager-sync-action-protocol-preview.md)，真实 bridge 命令前检查清单见 [Manager 同步 Bridge 命令 Contract 检查清单](docs/manager-sync-bridge-command-contract-checklist.md)。真实远端同步、恢复码生成 / 输入、join request 创建、设备授权成功和设备撤销 UI 仍按管理端边界保持关闭：
 
 ```bash
 ./scripts/check-manager.sh
