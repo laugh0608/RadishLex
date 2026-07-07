@@ -16,6 +16,7 @@
 - `apps/radishlex-manager/test/ffi_manager_bridge_test.dart` 中 fake native capability missing 回归
 - settings gate preview、同步页和诊断报告中的 recovery visible-layer 状态码回归
 - `syncFfiCommandBoundaryRustHostContractCases` host contract catalog fixture
+- Dart fake native binding 对 host catalog 的非执行 replay 回归
 - `apps/radishlex-manager/tool/ffi_bridge_smoke.dart` 中真实 dynamic library future sync command symbol 缺席检查
 - `docs/manager-sync-ffi-command-boundary.md`
 
@@ -28,7 +29,7 @@
 | L0 | 文档边界 | 已完成 | 固定 ABI strategy、ownership、secret 生命周期、错误分层、host smoke 和停止线。 |
 | L1 | Dart design fixture / model test | 已完成 | 用合成 fixture 验证当前没有 native symbol，future request / result 只含安全摘要，forbidden material 不进入输出。 |
 | L2 | Rust host contract test 计划 | 已固定 host catalog fixture | 在新增 symbol 前先明确测试文件、输入样本、错误码、释放责任和 forbidden material 断言。 |
-| L3 | Dart FFI binding contract test 计划 | 已扩展 | 在 Dart native binding 扩展前先明确 capability missing、copy / free、unknown status 和错误映射测试。 |
+| L3 | Dart FFI binding contract test 计划 | 已接入 host catalog replay | 在 Dart native binding 扩展前先明确 capability missing、copy / free、unknown status、host catalog 状态重放和错误映射测试。 |
 | L4 | Manager 可见层回归 | 部分已有 | 确认 settings / sync / diagnostics 不展示 secret、不写 settings draft、不打开按钮。 |
 | L5 | Gated platform / deployment smoke | 后续阶段 | 平台私钥 backend、真实 Keychain / Keystore、目标部署证据和真实端到端同步必须单独授权或人工准备。 |
 
@@ -112,7 +113,7 @@ apps/radishlex-manager/test/
 
 Dart FFI binding test 的实现顺序：
 
-1. 先用 fake native binding 验证 mapper、copy / free 调用记录和错误分类；当前已覆盖 capability missing 时 manager 继续保持当前阶段关闭、settings 不写 action payload、diagnostics 不出现 future command request / result 或 forbidden material，并用测试侧 binding harness 覆盖 summary copy -> free 顺序、unknown native status 安全降级、`ffi_library_load_failed` / `invalid_argument` / `sync_error` 分类和 command error allowlist。
+1. 先用 fake native binding 验证 mapper、copy / free 调用记录和错误分类；当前已覆盖 capability missing 时 manager 继续保持当前阶段关闭、settings 不写 action payload、diagnostics 不出现 future command request / result 或 forbidden material，并用测试侧 binding harness 覆盖 summary copy -> free 顺序、unknown native status 安全降级、`ffi_library_load_failed` / `invalid_argument` / `sync_error` 分类、command error allowlist，以及从 `syncFfiCommandBoundaryRustHostContractCases` 和 host input sample 重放出的 ABI status / input case / required evidence 非敏感摘要。
 2. 再用真实 dynamic library 做 capability missing smoke，确认当前没有 sync command symbol 时 UI 保持关闭；当前 `ffi_bridge_smoke.dart` 已检查 `radishlex_manager_sync_command_execute_v1` 和 result accessor / free 候选 symbol 均未导出。
 3. 只有真实 C ABI symbol 评审通过后，才把 dynamic library smoke 扩展到 result handle 读取和释放。
 
@@ -177,7 +178,7 @@ cargo test -p radishlex-ime-ffi --test manager_sync_command_boundary
 
 - L0 / L1 继续通过，且本文测试计划已同步到 contract checklist、FFI boundary 和 current status。
 - Rust host contract test 的输入、错误、ownership、panic boundary 和 forbidden material 断言已完成评审。
-- Dart FFI binding contract test 已能覆盖 capability missing、copy / free、unknown status、错误分类和可见层关闭态。
+- Dart FFI binding contract test 已能覆盖 capability missing、copy / free、unknown status、host catalog replay、错误分类和可见层关闭态。
 - 一次性恢复码展示材料和恢复码 / 短码输入的 transient secret 生命周期已有独立交互设计。
 - 平台私钥 backend、恢复 / 授权交互测试和发布级部署证据的停止线仍清晰。
 - 实现方案不要求 Flutter 长期持有同步材料、授权包材料、signature bytes、wrapped material、payload bytes 或 Go server 请求 / 响应体。

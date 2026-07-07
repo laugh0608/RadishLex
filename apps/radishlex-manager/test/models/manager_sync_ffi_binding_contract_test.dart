@@ -169,6 +169,97 @@ void main() {
     expect(commandError.diagnosticsText, isNot(contains('signature_bytes')));
     expect(commandError.diagnosticsText, isNot(contains('response_body')));
   });
+
+  test('fake native binding replays rust host catalog status evidence', () {
+    final abiStatusByInput = {
+      for (final fixture in syncFfiCommandBoundaryAbiStatusCases)
+        fixture.input: fixture.statusCode,
+    };
+    final exercisedSampleIds = <String>{};
+    final exercisedContractCaseIds = <String>{};
+
+    for (final sample in syncFfiCommandBoundaryRustHostInputSamples) {
+      final contractCases = syncFfiCommandBoundaryRustHostContractCases
+          .where((fixture) => fixture.sampleIds.contains(sample.id))
+          .toList(growable: false);
+
+      expect(contractCases, isNotEmpty, reason: sample.id);
+      expect(
+        abiStatusByInput[sample.abiInputCase],
+        sample.expectedStatusCode,
+        reason: sample.id,
+      );
+
+      for (final contractCase in contractCases) {
+        final native = _FakeSyncCommandNativeBinding(
+          result: _fakeNativeResultForHostCatalog(sample, contractCase),
+        );
+        final summary = _executeAndCopySyncCommandSummary(
+          native,
+          _FakeSyncCommandRequest.fromHostSample(sample),
+        );
+
+        exercisedSampleIds.add(sample.id);
+        exercisedContractCaseIds.add(contractCase.id);
+
+        expect(native.events, [
+          'execute:${sample.actionId}',
+          'copy:1',
+          'free:1',
+        ]);
+        expect(native.openHandleCount, 0);
+        expect(summary.actionId, sample.actionId);
+        expect(summary.abiStatusCode, sample.expectedStatusCode);
+        expect(summary.abiInputCase, sample.abiInputCase);
+        expect(summary.hostSampleId, sample.id);
+        expect(summary.hostContractCaseId, contractCase.id);
+        expect(
+          summary.commandStatus,
+          _commandStatusForAbiStatus(sample.expectedStatusCode),
+        );
+        expect(
+          contractCase.requiredAbiInputCases,
+          contains(sample.abiInputCase),
+          reason: contractCase.id,
+        );
+        expect(
+          contractCase.expectedStatusCodes,
+          contains(sample.expectedStatusCode),
+          reason: contractCase.id,
+        );
+        expect(
+          syncFfiCommandBoundaryAllCommandErrorCodes(),
+          contains(summary.errorCode),
+        );
+        expect(summary.commandErrorCategory, 'future_action_error_allowlist');
+
+        final diagnostics = summary.diagnosticsText;
+        expect(diagnostics, contains(sample.abiInputCase));
+        expect(diagnostics, contains(sample.expectedStatusCode));
+        expect(diagnostics, contains(contractCase.id));
+        for (final evidence in sample.expectedEvidence) {
+          expect(diagnostics, contains(evidence), reason: sample.id);
+        }
+        for (final evidence in contractCase.requiredEvidence) {
+          expect(diagnostics, contains(evidence), reason: contractCase.id);
+        }
+        for (final fragment in syncBridgeCommandContractForbiddenFragments) {
+          expect(diagnostics, isNot(contains(fragment)), reason: sample.id);
+        }
+      }
+    }
+
+    expect(
+      exercisedSampleIds,
+      syncFfiCommandBoundaryRustHostInputSamples
+          .map((sample) => sample.id)
+          .toSet(),
+    );
+    expect(
+      exercisedContractCaseIds,
+      syncFfiCommandBoundaryRustHostContractCaseIds().toSet(),
+    );
+  });
 }
 
 _DartOwnedSyncCommandSummary _executeAndCopySyncCommandSummary(
@@ -192,7 +283,24 @@ final class _FakeSyncCommandRequest {
     required this.sourceTag,
     required this.deviceBackendGate,
     required this.explicitUserStart,
+    this.abiInputCase = 'none',
+    this.hostSampleId = 'none',
   });
+
+  factory _FakeSyncCommandRequest.fromHostSample(
+    SyncFfiCommandBoundaryRustHostInputSample sample,
+  ) {
+    return _FakeSyncCommandRequest(
+      actionId: sample.actionId,
+      operationId: sample.operationId,
+      readinessSnapshotId: sample.readinessSnapshotId,
+      sourceTag: sample.sourceTag,
+      deviceBackendGate: sample.deviceBackendGate,
+      explicitUserStart: sample.explicitUserStart,
+      abiInputCase: sample.abiInputCase,
+      hostSampleId: sample.id,
+    );
+  }
 
   final String actionId;
   final String operationId;
@@ -200,6 +308,8 @@ final class _FakeSyncCommandRequest {
   final String sourceTag;
   final String deviceBackendGate;
   final bool explicitUserStart;
+  final String abiInputCase;
+  final String hostSampleId;
 }
 
 final class _FakeNativeSyncCommandResult {
@@ -216,6 +326,10 @@ final class _FakeNativeSyncCommandResult {
     required this.objectVersionSummary,
     required this.recordedAtSummary,
     required this.nativeDebugText,
+    this.abiStatusCode = 'not_recorded',
+    this.abiInputCase = 'none',
+    this.hostSampleId = 'none',
+    this.hostContractCaseId = 'none',
   });
 
   final String actionId;
@@ -230,6 +344,10 @@ final class _FakeNativeSyncCommandResult {
   final String objectVersionSummary;
   final String recordedAtSummary;
   final String nativeDebugText;
+  final String abiStatusCode;
+  final String abiInputCase;
+  final String hostSampleId;
+  final String hostContractCaseId;
 }
 
 final class _FakeSyncCommandNativeBinding {
@@ -278,6 +396,10 @@ final class _DartOwnedSyncCommandSummary {
     required this.objectCountSummary,
     required this.objectVersionSummary,
     required this.recordedAtSummary,
+    required this.abiStatusCode,
+    required this.abiInputCase,
+    required this.hostSampleId,
+    required this.hostContractCaseId,
   });
 
   factory _DartOwnedSyncCommandSummary.fromNative(
@@ -297,6 +419,10 @@ final class _DartOwnedSyncCommandSummary {
         objectCountSummary: 'none',
         objectVersionSummary: 'none',
         recordedAtSummary: 'none',
+        abiStatusCode: _safeAbiStatusCode(result.abiStatusCode),
+        abiInputCase: _safeAbiInputCase(result.abiInputCase),
+        hostSampleId: _safeHostSampleId(result.hostSampleId),
+        hostContractCaseId: _safeHostContractCaseId(result.hostContractCaseId),
       );
     }
 
@@ -316,6 +442,10 @@ final class _DartOwnedSyncCommandSummary {
       objectCountSummary: _safeSummaryCode(result.objectCountSummary),
       objectVersionSummary: _safeSummaryCode(result.objectVersionSummary),
       recordedAtSummary: _safeSummaryCode(result.recordedAtSummary),
+      abiStatusCode: _safeAbiStatusCode(result.abiStatusCode),
+      abiInputCase: _safeAbiInputCase(result.abiInputCase),
+      hostSampleId: _safeHostSampleId(result.hostSampleId),
+      hostContractCaseId: _safeHostContractCaseId(result.hostContractCaseId),
     );
   }
 
@@ -330,6 +460,10 @@ final class _DartOwnedSyncCommandSummary {
   final String objectCountSummary;
   final String objectVersionSummary;
   final String recordedAtSummary;
+  final String abiStatusCode;
+  final String abiInputCase;
+  final String hostSampleId;
+  final String hostContractCaseId;
 
   String get commandErrorCategory {
     return syncFfiCommandBoundaryAllCommandErrorCodes().contains(errorCode)
@@ -350,8 +484,72 @@ final class _DartOwnedSyncCommandSummary {
       'object_count_summary': objectCountSummary,
       'object_version_summary': objectVersionSummary,
       'recorded_at_summary': recordedAtSummary,
+      'abi_status_code': abiStatusCode,
+      'abi_input_case': abiInputCase,
+      'host_sample_id': hostSampleId,
+      'host_contract_case_id': hostContractCaseId,
     });
   }
+}
+
+_FakeNativeSyncCommandResult _fakeNativeResultForHostCatalog(
+  SyncFfiCommandBoundaryRustHostInputSample sample,
+  SyncFfiCommandBoundaryRustHostContractCase contractCase,
+) {
+  final actionFixture = syncBridgeCommandContractFixtureFor(sample.actionId);
+  return _FakeNativeSyncCommandResult(
+    actionId: sample.actionId,
+    commandStatus: _commandStatusForAbiStatus(sample.expectedStatusCode),
+    errorCode: _errorCodeForAbiStatus(sample.expectedStatusCode, actionFixture),
+    retryPolicy: _retryPolicyForAbiStatus(sample.expectedStatusCode),
+    userVisibleSummaryCode: actionFixture.errorCodes.first,
+    diagnosticsSummaryCode: actionFixture.errorCodes.first,
+    nextRequiredEvidence: sample.expectedEvidenceSummary,
+    objectTypeSummary: sample.abiInputCase,
+    objectCountSummary: '0',
+    objectVersionSummary: contractCase.evidenceSummary,
+    recordedAtSummary: 'not_recorded',
+    nativeDebugText: syncBridgeCommandContractForbiddenFragments.join(' '),
+    abiStatusCode: sample.expectedStatusCode,
+    abiInputCase: sample.abiInputCase,
+    hostSampleId: sample.id,
+    hostContractCaseId: contractCase.id,
+  );
+}
+
+String _commandStatusForAbiStatus(String statusCode) {
+  switch (statusCode) {
+    case 'InvalidState':
+      return 'blocked_by_readiness';
+    case 'InvalidArgument':
+    case 'InternalError':
+      return 'fatal_failure';
+    case 'SyncError':
+      return 'retryable_failure';
+    default:
+      return 'unexpected_bridge_error';
+  }
+}
+
+String _errorCodeForAbiStatus(
+  String statusCode,
+  SyncBridgeCommandContractActionFixture actionFixture,
+) {
+  if (statusCode == 'SyncError' &&
+      actionFixture.errorCodes.contains('network_unreachable')) {
+    return 'network_unreachable';
+  }
+  if (statusCode == 'InvalidState' &&
+      actionFixture.errorCodes.contains('backend_unavailable')) {
+    return 'backend_unavailable';
+  }
+  return actionFixture.errorCodes.first;
+}
+
+String _retryPolicyForAbiStatus(String statusCode) {
+  return statusCode == 'SyncError'
+      ? 'retry_after_network_recovery'
+      : 'not_retryable';
 }
 
 String _safeActionId(String value) {
@@ -387,6 +585,45 @@ String _safeSummaryCode(String value) {
     }
   }
   return value.trim().isEmpty ? 'none' : value;
+}
+
+String _safeAbiStatusCode(String value) {
+  if (value == 'not_recorded') {
+    return value;
+  }
+  final knownStatusCodes = {
+    for (final fixture in syncFfiCommandBoundaryAbiStatusCases)
+      fixture.statusCode,
+  };
+  return knownStatusCodes.contains(value) ? value : 'InternalError';
+}
+
+String _safeAbiInputCase(String value) {
+  if (value == 'none') {
+    return value;
+  }
+  final knownInputs = {
+    for (final fixture in syncFfiCommandBoundaryAbiStatusCases) fixture.input,
+  };
+  return knownInputs.contains(value) ? value : 'unknown_input';
+}
+
+String _safeHostSampleId(String value) {
+  if (value == 'none') {
+    return value;
+  }
+  final knownSampleIds = {
+    for (final sample in syncFfiCommandBoundaryRustHostInputSamples) sample.id,
+  };
+  return knownSampleIds.contains(value) ? value : 'unknown_sample';
+}
+
+String _safeHostContractCaseId(String value) {
+  if (value == 'none') {
+    return value;
+  }
+  final knownCaseIds = syncFfiCommandBoundaryRustHostContractCaseIds().toSet();
+  return knownCaseIds.contains(value) ? value : 'unknown_contract_case';
 }
 
 final class _BridgeFailureCategoryCase {
