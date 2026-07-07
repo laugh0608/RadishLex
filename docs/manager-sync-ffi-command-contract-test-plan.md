@@ -15,6 +15,7 @@
 - `apps/radishlex-manager/test/models/manager_sync_transient_secret_interaction_test.dart`
 - `apps/radishlex-manager/test/ffi_manager_bridge_test.dart` 中 fake native capability missing 回归
 - settings gate preview、同步页和诊断报告中的 recovery visible-layer 状态码回归
+- `syncFfiCommandBoundaryRustHostContractCases` host contract catalog fixture
 - `apps/radishlex-manager/tool/ffi_bridge_smoke.dart` 中真实 dynamic library future sync command symbol 缺席检查
 - `docs/manager-sync-ffi-command-boundary.md`
 
@@ -26,7 +27,7 @@
 | --- | --- | --- | --- |
 | L0 | 文档边界 | 已完成 | 固定 ABI strategy、ownership、secret 生命周期、错误分层、host smoke 和停止线。 |
 | L1 | Dart design fixture / model test | 已完成 | 用合成 fixture 验证当前没有 native symbol，future request / result 只含安全摘要，forbidden material 不进入输出。 |
-| L2 | Rust host contract test 计划 | 已起步 | 在新增 symbol 前先明确测试文件、输入样本、错误码、释放责任和 forbidden material 断言。 |
+| L2 | Rust host contract test 计划 | 已固定 host catalog fixture | 在新增 symbol 前先明确测试文件、输入样本、错误码、释放责任和 forbidden material 断言。 |
 | L3 | Dart FFI binding contract test 计划 | 已扩展 | 在 Dart native binding 扩展前先明确 capability missing、copy / free、unknown status 和错误映射测试。 |
 | L4 | Manager 可见层回归 | 部分已有 | 确认 settings / sync / diagnostics 不展示 secret、不写 settings draft、不打开按钮。 |
 | L5 | Gated platform / deployment smoke | 后续阶段 | 平台私钥 backend、真实 Keychain / Keystore、目标部署证据和真实端到端同步必须单独授权或人工准备。 |
@@ -48,6 +49,7 @@ L2 / L3 只在 L0 / L1 继续通过、且 contract 文档没有未解决分歧�
 - ABI status 分层：`InvalidArgument`、`InvalidState`、`SyncError`、`InternalError`
 - Rust host smoke 项和 Dart FFI smoke 项
 - forbidden material 拒绝样本复用 `sync_bridge_command_contract_fixtures.dart`
+- Rust host contract catalog：目标测试文件、target test name、sample id、ABI input case、expected status、required evidence 和当前 `planned_no_native_symbol` 状态
 
 新增或修改 future command 字段时，应先更新这份 fixture，再更新文档和测试。不要让文档表格、Dart fixture 和未来 Rust contract test 各自维护不同字段列表。
 
@@ -79,7 +81,7 @@ Rust host contract test 的 fixture 输入只能使用合成值：
 - 合成 backend gate：`blocked` / `ready_for_contract_test`
 - 合成 forbidden material 样本来自 `sync_bridge_command_contract_fixtures.dart` 的字符串类别，不使用真实 token、真实恢复码、真实路径或真实 payload。
 
-当前 `syncFfiCommandBoundaryRustHostInputSamples` 已固定第一批 Rust host 输入样本，覆盖 current-phase capability closed、unknown schema version、unknown action、invalid bool、unenveloped sync error 和 panic boundary，预期状态分别映射到 `InvalidState`、`InvalidArgument`、`SyncError` 和 `InternalError`。这些样本仍是 design fixture，不新增真实 symbol。
+当前 `syncFfiCommandBoundaryRustHostInputSamples` 已固定第一批 Rust host 输入样本，覆盖 current-phase capability closed、unknown schema version、unknown action、invalid bool、null pointer、invalid UTF-8、unenveloped sync error、panic boundary 和 same-domain concurrent command，预期状态分别映射到 `InvalidState`、`InvalidArgument`、`SyncError` 和 `InternalError`。`syncFfiCommandBoundaryRustHostContractCases` 再把这些样本绑定到建议的 Rust host test name、host smoke case、required evidence 和 `planned_no_native_symbol` 实现状态。这些仍是 design fixture，不新增真实 symbol。
 
 Rust test 不应：
 

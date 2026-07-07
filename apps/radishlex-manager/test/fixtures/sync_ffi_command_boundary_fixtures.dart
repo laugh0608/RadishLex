@@ -8,6 +8,15 @@ const syncFfiCommandBoundaryReviewStatus =
 const syncFfiCommandBoundaryFormat =
     'future_manager_sync_ffi_command_boundary.v1_draft';
 
+const syncFfiCommandBoundaryRustHostContractFormat =
+    'future_manager_sync_ffi_rust_host_contract_catalog.v1_draft';
+
+const syncFfiCommandBoundaryRustHostContractReviewStatus =
+    'future_rust_host_contract_review_only_no_native_symbol';
+
+const syncFfiCommandBoundaryRustHostContractTargetTestFile =
+    'crates/ime-ffi/tests/manager_sync_command_boundary.rs';
+
 const syncFfiCommandBoundaryRecommendedStrategy =
     'single_versioned_manager_sync_command_executor';
 
@@ -105,6 +114,11 @@ const syncFfiCommandBoundaryAbiStatusCases = [
     boundary: 'abi_error',
   ),
   SyncFfiCommandBoundaryStatusCase(
+    input: 'same_domain_concurrent_command',
+    statusCode: 'InvalidState',
+    boundary: 'abi_error',
+  ),
+  SyncFfiCommandBoundaryStatusCase(
     input: 'sync_command_internal_unenveloped_failure',
     statusCode: 'SyncError',
     boundary: 'abi_error',
@@ -198,6 +212,40 @@ const syncFfiCommandBoundaryRustHostInputSamples = [
     ],
   ),
   SyncFfiCommandBoundaryRustHostInputSample(
+    id: 'null_pointer_rejected',
+    actionId: 'recovery_setup',
+    operationId: 'op_test_non_secret_007',
+    readinessSnapshotId: 'readiness_snapshot_test_007',
+    sourceTag: 'local_smoke',
+    deviceBackendGate: 'blocked',
+    explicitUserStart: false,
+    abiInputCase: 'null_pointer',
+    expectedStatusCode: 'InvalidArgument',
+    forbiddenMaterialCategory: 'none',
+    expectedEvidence: [
+      'null_pointer_invalid_argument',
+      'error_read_then_free',
+      'free_null_is_noop',
+    ],
+  ),
+  SyncFfiCommandBoundaryRustHostInputSample(
+    id: 'invalid_utf8_rejected',
+    actionId: 'recovery_restore',
+    operationId: 'op_test_non_secret_008',
+    readinessSnapshotId: 'readiness_snapshot_test_008',
+    sourceTag: 'local_smoke',
+    deviceBackendGate: 'blocked',
+    explicitUserStart: true,
+    abiInputCase: 'invalid_utf8',
+    expectedStatusCode: 'InvalidArgument',
+    forbiddenMaterialCategory: 'none',
+    expectedEvidence: [
+      'invalid_utf8_invalid_argument',
+      'error_read_then_free',
+      'borrowed_utf8_view_rejected_before_copy',
+    ],
+  ),
+  SyncFfiCommandBoundaryRustHostInputSample(
     id: 'sync_unenveloped_failure_maps_to_sync_error',
     actionId: 'device_revocation',
     operationId: 'op_test_non_secret_005',
@@ -212,6 +260,23 @@ const syncFfiCommandBoundaryRustHostInputSamples = [
       'sync_error_status',
       'no_payload_in_error_message',
       'no_provider_exception_in_debug',
+    ],
+  ),
+  SyncFfiCommandBoundaryRustHostInputSample(
+    id: 'same_domain_concurrent_command_blocked_or_serialized',
+    actionId: 'device_revocation',
+    operationId: 'op_test_non_secret_009',
+    readinessSnapshotId: 'readiness_snapshot_test_009',
+    sourceTag: 'local_smoke',
+    deviceBackendGate: 'ready_for_contract_test',
+    explicitUserStart: true,
+    abiInputCase: 'same_domain_concurrent_command',
+    expectedStatusCode: 'InvalidState',
+    forbiddenMaterialCategory: 'none',
+    expectedEvidence: [
+      'same_domain_mutation_serialized',
+      'concurrent_command_conflict_or_queue',
+      'operation_id_non_sensitive',
     ],
   ),
   SyncFfiCommandBoundaryRustHostInputSample(
@@ -411,6 +476,172 @@ class SyncFfiCommandBoundarySmokeCase {
   }
 }
 
+const syncFfiCommandBoundaryRustHostContractCases = [
+  SyncFfiCommandBoundaryRustHostContractCase(
+    id: 'contract_reports_command_capability_closed',
+    targetTestName: 'contract_reports_command_capability_closed',
+    sampleIds: ['current_phase_capability_closed_recovery_setup'],
+    smokeCaseId: 'contract_reports_command_capability_closed',
+    requiredAbiInputCases: ['sync_command_not_enabled_current_phase'],
+    expectedStatusCodes: ['InvalidState'],
+    requiredEvidence: [
+      'abi_contract_version_checked',
+      'sync_command_capability_closed_current_phase',
+      'invalid_state_without_native_symbol',
+    ],
+    implementationStatus: 'planned_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostContractCase(
+    id: 'invalid_request_inputs_return_stable_status',
+    targetTestName: 'invalid_request_inputs_return_stable_status',
+    sampleIds: [
+      'invalid_schema_version_rejected',
+      'invalid_action_rejected',
+      'invalid_bool_rejected',
+      'null_pointer_rejected',
+      'invalid_utf8_rejected',
+    ],
+    smokeCaseId: 'invalid_request_inputs_return_stable_status',
+    requiredAbiInputCases: [
+      'unknown_schema_version',
+      'unknown_action',
+      'invalid_bool',
+      'null_pointer',
+      'invalid_utf8',
+    ],
+    expectedStatusCodes: ['InvalidArgument'],
+    requiredEvidence: [
+      'invalid_inputs_rejected_before_command_execution',
+      'error_read_then_free',
+      'no_secret_or_payload_in_error',
+    ],
+    implementationStatus: 'planned_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostContractCase(
+    id: 'result_handle_copy_then_free',
+    targetTestName: 'result_handle_copy_then_free',
+    sampleIds: ['current_phase_capability_closed_recovery_setup'],
+    smokeCaseId: 'result_handle_copy_then_free',
+    requiredAbiInputCases: ['sync_command_not_enabled_current_phase'],
+    expectedStatusCodes: ['InvalidState'],
+    requiredEvidence: [
+      'rust_owned_result_handle',
+      'borrowed_string_view_copied',
+      'result_free_invalidates_views',
+      'free_null_is_noop',
+    ],
+    implementationStatus: 'planned_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostContractCase(
+    id: 'envelope_allowlist_only',
+    targetTestName: 'envelope_allowlist_only',
+    sampleIds: ['sync_unenveloped_failure_maps_to_sync_error'],
+    smokeCaseId: 'envelope_allowlist_only',
+    requiredAbiInputCases: ['sync_command_internal_unenveloped_failure'],
+    expectedStatusCodes: ['SyncError'],
+    requiredEvidence: [
+      'command_status_allowlist',
+      'command_error_allowlist',
+      'retry_policy_allowlist',
+      'next_evidence_allowlist',
+    ],
+    implementationStatus: 'planned_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostContractCase(
+    id: 'forbidden_material_absent_from_native_outputs',
+    targetTestName: 'forbidden_material_absent_from_native_outputs',
+    sampleIds: [
+      'invalid_schema_version_rejected',
+      'invalid_action_rejected',
+      'invalid_bool_rejected',
+      'sync_unenveloped_failure_maps_to_sync_error',
+      'panic_boundary_maps_to_internal_error',
+    ],
+    smokeCaseId: 'forbidden_material_absent_from_native_outputs',
+    requiredAbiInputCases: [
+      'unknown_schema_version',
+      'unknown_action',
+      'invalid_bool',
+      'sync_command_internal_unenveloped_failure',
+      'panic_boundary_caught',
+    ],
+    expectedStatusCodes: ['InvalidArgument', 'SyncError', 'InternalError'],
+    requiredEvidence: [
+      'no_secret_in_result',
+      'no_payload_in_error_message',
+      'no_provider_exception_in_debug',
+      'no_real_path_in_summary',
+    ],
+    implementationStatus: 'planned_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostContractCase(
+    id: 'panic_boundary_returns_internal_error',
+    targetTestName: 'panic_boundary_returns_internal_error',
+    sampleIds: ['panic_boundary_maps_to_internal_error'],
+    smokeCaseId: 'panic_boundary_returns_internal_error',
+    requiredAbiInputCases: ['panic_boundary_caught'],
+    expectedStatusCodes: ['InternalError'],
+    requiredEvidence: [
+      'panic_caught',
+      'internal_error_status',
+      'no_panic_crosses_c_abi',
+    ],
+    implementationStatus: 'planned_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostContractCase(
+    id: 'sync_domain_command_serialization',
+    targetTestName: 'sync_domain_command_serialization',
+    sampleIds: ['same_domain_concurrent_command_blocked_or_serialized'],
+    smokeCaseId: 'sync_domain_command_serialization',
+    requiredAbiInputCases: ['same_domain_concurrent_command'],
+    expectedStatusCodes: ['InvalidState'],
+    requiredEvidence: [
+      'same_domain_mutation_serialized',
+      'concurrent_command_conflict_or_queue',
+      'operation_id_non_sensitive',
+    ],
+    implementationStatus: 'planned_no_native_symbol',
+  ),
+];
+
+class SyncFfiCommandBoundaryRustHostContractCase {
+  const SyncFfiCommandBoundaryRustHostContractCase({
+    required this.id,
+    required this.targetTestName,
+    required this.sampleIds,
+    required this.smokeCaseId,
+    required this.requiredAbiInputCases,
+    required this.expectedStatusCodes,
+    required this.requiredEvidence,
+    required this.implementationStatus,
+  });
+
+  final String id;
+  final String targetTestName;
+  final List<String> sampleIds;
+  final String smokeCaseId;
+  final List<String> requiredAbiInputCases;
+  final List<String> expectedStatusCodes;
+  final List<String> requiredEvidence;
+  final String implementationStatus;
+
+  String get sampleIdSummary {
+    return managerSyncCodeSummary(sampleIds);
+  }
+
+  String get requiredAbiInputSummary {
+    return managerSyncCodeSummary(requiredAbiInputCases);
+  }
+
+  String get expectedStatusSummary {
+    return managerSyncCodeSummary(expectedStatusCodes);
+  }
+
+  String get evidenceSummary {
+    return managerSyncCodeSummary(requiredEvidence);
+  }
+}
+
 Map<String, Object?> syncFfiCommandBoundaryStrategyShape() {
   return {
     'format': syncFfiCommandBoundaryFormat,
@@ -470,6 +701,14 @@ List<String> syncFfiCommandBoundaryAllSmokeCaseIds() {
   ]);
 }
 
+List<String> syncFfiCommandBoundaryRustHostContractCaseIds() {
+  return List.unmodifiable(
+    syncFfiCommandBoundaryRustHostContractCases
+        .map((fixture) => fixture.id)
+        .toList(),
+  );
+}
+
 Map<String, Object?> syncFfiCommandBoundaryRustHostInputSampleShape(
   SyncFfiCommandBoundaryRustHostInputSample sample,
 ) {
@@ -487,6 +726,24 @@ Map<String, Object?> syncFfiCommandBoundaryRustHostInputSampleShape(
     'expected_status_code': sample.expectedStatusCode,
     'forbidden_material_category': sample.forbiddenMaterialCategory,
     'expected_evidence': sample.expectedEvidence,
+  };
+}
+
+Map<String, Object?> syncFfiCommandBoundaryRustHostContractCaseShape(
+  SyncFfiCommandBoundaryRustHostContractCase fixture,
+) {
+  return {
+    'format': syncFfiCommandBoundaryRustHostContractFormat,
+    'review_status': syncFfiCommandBoundaryRustHostContractReviewStatus,
+    'target_test_file': syncFfiCommandBoundaryRustHostContractTargetTestFile,
+    'id': fixture.id,
+    'target_test_name': fixture.targetTestName,
+    'sample_ids': fixture.sampleIds,
+    'smoke_case_id': fixture.smokeCaseId,
+    'required_abi_input_cases': fixture.requiredAbiInputCases,
+    'expected_status_codes': fixture.expectedStatusCodes,
+    'required_evidence': fixture.requiredEvidence,
+    'implementation_status': fixture.implementationStatus,
   };
 }
 

@@ -166,7 +166,7 @@ void main() {
         jsonEncode(syncFfiCommandBoundaryRustHostInputSampleShape(sample)),
     ].join('\n');
 
-    expect(syncFfiCommandBoundaryRustHostInputSamples.length, 6);
+    expect(syncFfiCommandBoundaryRustHostInputSamples.length, 9);
     expect(
       syncFfiCommandBoundaryRustHostInputSamples.map(
         (sample) => sample.expectedStatusCode,
@@ -200,6 +200,16 @@ void main() {
       );
       expect(sample.expectedEvidenceSummary, isNot('none'), reason: sample.id);
     }
+    expect(
+      syncFfiCommandBoundaryRustHostInputSamples.map(
+        (sample) => sample.abiInputCase,
+      ),
+      containsAll([
+        'null_pointer',
+        'invalid_utf8',
+        'same_domain_concurrent_command',
+      ]),
+    );
 
     for (final sample in syncBridgeCommandContractRejectedSamples) {
       expect(
@@ -212,6 +222,132 @@ void main() {
     expect(encodedSamples, isNot(contains('real_keystore')));
     expect(encodedSamples, isNot(contains('remote_payload')));
     expect(encodedSamples, isNot(contains('production_upload')));
+  });
+
+  test('rust host contract catalog binds samples to smoke plan', () {
+    final sampleById = {
+      for (final sample in syncFfiCommandBoundaryRustHostInputSamples)
+        sample.id: sample,
+    };
+    final smokeCaseIds = {
+      for (final smokeCase in syncFfiCommandBoundaryRustHostSmokeCases)
+        smokeCase.id,
+    };
+    final abiStatusByInput = {
+      for (final fixture in syncFfiCommandBoundaryAbiStatusCases)
+        fixture.input: fixture.statusCode,
+    };
+    final validStatusCodes = abiStatusByInput.values.toSet();
+    final catalogSmokeCaseIds = {
+      for (final fixture in syncFfiCommandBoundaryRustHostContractCases)
+        fixture.smokeCaseId,
+    };
+    final catalogSampleIds = {
+      for (final fixture in syncFfiCommandBoundaryRustHostContractCases)
+        ...fixture.sampleIds,
+    };
+
+    expect(
+      syncFfiCommandBoundaryRustHostContractCaseIds(),
+      containsAll([
+        'contract_reports_command_capability_closed',
+        'invalid_request_inputs_return_stable_status',
+        'result_handle_copy_then_free',
+        'envelope_allowlist_only',
+        'forbidden_material_absent_from_native_outputs',
+        'panic_boundary_returns_internal_error',
+        'sync_domain_command_serialization',
+      ]),
+    );
+    expect(catalogSmokeCaseIds, smokeCaseIds);
+    expect(catalogSampleIds, containsAll(sampleById.keys));
+
+    for (final fixture in syncFfiCommandBoundaryRustHostContractCases) {
+      final shape = syncFfiCommandBoundaryRustHostContractCaseShape(fixture);
+
+      expect(shape['format'], syncFfiCommandBoundaryRustHostContractFormat);
+      expect(
+        shape['review_status'],
+        syncFfiCommandBoundaryRustHostContractReviewStatus,
+      );
+      expect(
+        shape['target_test_file'],
+        syncFfiCommandBoundaryRustHostContractTargetTestFile,
+      );
+      expect(fixture.targetTestName, fixture.id, reason: fixture.id);
+      expect(smokeCaseIds, contains(fixture.smokeCaseId), reason: fixture.id);
+      expect(
+        fixture.implementationStatus,
+        'planned_no_native_symbol',
+        reason: fixture.id,
+      );
+      expect(fixture.sampleIdSummary, isNot('none'), reason: fixture.id);
+      expect(
+        fixture.requiredAbiInputSummary,
+        isNot('none'),
+        reason: fixture.id,
+      );
+      expect(fixture.expectedStatusSummary, isNot('none'), reason: fixture.id);
+      expect(fixture.evidenceSummary, isNot('none'), reason: fixture.id);
+
+      for (final inputCase in fixture.requiredAbiInputCases) {
+        expect(abiStatusByInput, contains(inputCase), reason: fixture.id);
+      }
+      for (final statusCode in fixture.expectedStatusCodes) {
+        expect(validStatusCodes, contains(statusCode), reason: fixture.id);
+      }
+      for (final sampleId in fixture.sampleIds) {
+        final sample = sampleById[sampleId];
+        expect(sample, isNotNull, reason: '${fixture.id}: $sampleId');
+        expect(
+          fixture.requiredAbiInputCases,
+          contains(sample!.abiInputCase),
+          reason: '${fixture.id}: $sampleId',
+        );
+        expect(
+          fixture.expectedStatusCodes,
+          contains(sample.expectedStatusCode),
+          reason: '${fixture.id}: $sampleId',
+        );
+      }
+      for (final fragment in syncBridgeCommandContractForbiddenFragments) {
+        expect(fixture.evidenceSummary, isNot(contains(fragment)));
+        expect(jsonEncode(shape), isNot(contains(fragment)));
+      }
+    }
+  });
+
+  test('rust host catalog keeps rejected material as categories only', () {
+    final rejectedCategories = {
+      for (final sample in syncBridgeCommandContractRejectedSamples)
+        sample.expectedReason,
+    };
+    final allowedCategories = {'none', ...rejectedCategories};
+    final encodedHostCatalog = [
+      for (final sample in syncFfiCommandBoundaryRustHostInputSamples)
+        jsonEncode(syncFfiCommandBoundaryRustHostInputSampleShape(sample)),
+      for (final fixture in syncFfiCommandBoundaryRustHostContractCases)
+        jsonEncode(syncFfiCommandBoundaryRustHostContractCaseShape(fixture)),
+    ].join('\n');
+
+    for (final sample in syncFfiCommandBoundaryRustHostInputSamples) {
+      expect(
+        allowedCategories,
+        contains(sample.forbiddenMaterialCategory),
+        reason: sample.id,
+      );
+    }
+    for (final rejected in syncBridgeCommandContractRejectedSamples) {
+      expect(
+        encodedHostCatalog,
+        isNot(contains(rejected.forbiddenFragment)),
+        reason: rejected.id,
+      );
+    }
+    expect(encodedHostCatalog, isNot(contains('settings_action_payload')));
+    expect(encodedHostCatalog, isNot(contains('bridge_request_payload')));
+    expect(encodedHostCatalog, isNot(contains('remote_request_body')));
+    expect(encodedHostCatalog, isNot(contains('remote_response_body')));
   });
 
   test('rust and dart smoke plans cover ownership and redaction evidence', () {

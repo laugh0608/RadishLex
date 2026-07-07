@@ -212,7 +212,9 @@ command result envelope 使用 allowlist 错误码：
 
 真实 C ABI symbol 前，先补 Rust host smoke 设计和 Dart FFI smoke 设计。两者都不连接真实远端同步，不读取真实输入法目录，不触碰真实 Keychain / Keystore，除非单独进入 gated 平台 smoke。
 
-当前这组 smoke 仍是 design fixture / model test 证据，不是已落地的 Rust C ABI smoke。测试真相源位于 `sync_ffi_command_boundary_fixtures.dart`，用于固定推荐 ABI 策略、候选 symbol 名称、request / result field policy、ownership rule、ABI status 分层、Rust host smoke 项和 Dart FFI smoke 项；进入 Rust / Dart contract test 的分层计划见 `docs/manager-sync-ffi-command-contract-test-plan.md`。
+当前这组 smoke 仍是 design fixture / model test 证据，不是已落地的 Rust C ABI smoke。测试真相源位于 `sync_ffi_command_boundary_fixtures.dart`，用于固定推荐 ABI 策略、候选 symbol 名称、request / result field policy、ownership rule、ABI status 分层、Rust host smoke 项、Dart FFI smoke 项和 Rust host contract catalog；进入 Rust / Dart contract test 的分层计划见 `docs/manager-sync-ffi-command-contract-test-plan.md`。
+
+当前 host contract catalog 已固定目标测试文件 `crates/ime-ffi/tests/manager_sync_command_boundary.rs`、建议 test name、样本 id、ABI input case、expected status、required evidence 和 `planned_no_native_symbol` 状态。覆盖样本包括 current-phase capability closed、unknown schema version、unknown action、invalid bool、null pointer、invalid UTF-8、unenveloped sync error、panic boundary 和 same-domain concurrent command。该 catalog 只用于评审后续 Rust host contract test 输入，不新增 symbol，不连接 Go server，不触碰平台 key backend。
 
 Rust host smoke 至少覆盖：
 
