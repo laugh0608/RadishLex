@@ -152,6 +152,68 @@ void main() {
     expect(commandErrorCodes, isNot(contains('http_response_body')));
   });
 
+  test('rust host input samples stay synthetic and status-mapped', () {
+    final abiStatusByInput = {
+      for (final fixture in syncFfiCommandBoundaryAbiStatusCases)
+        fixture.input: fixture.statusCode,
+    };
+    final knownActionIds = {
+      for (final fixture in syncBridgeCommandContractActionFixtures)
+        fixture.actionId,
+    };
+    final encodedSamples = [
+      for (final sample in syncFfiCommandBoundaryRustHostInputSamples)
+        jsonEncode(syncFfiCommandBoundaryRustHostInputSampleShape(sample)),
+    ].join('\n');
+
+    expect(syncFfiCommandBoundaryRustHostInputSamples.length, 6);
+    expect(
+      syncFfiCommandBoundaryRustHostInputSamples.map(
+        (sample) => sample.expectedStatusCode,
+      ),
+      containsAll(['InvalidArgument', 'InvalidState', 'SyncError']),
+    );
+    expect(
+      syncFfiCommandBoundaryRustHostInputSamples.map(
+        (sample) => sample.expectedStatusCode,
+      ),
+      contains('InternalError'),
+    );
+
+    for (final sample in syncFfiCommandBoundaryRustHostInputSamples) {
+      expect(knownActionIds, contains(sample.actionId), reason: sample.id);
+      expect(
+        sample.operationId,
+        startsWith('op_test_non_secret_'),
+        reason: sample.id,
+      );
+      expect(
+        sample.readinessSnapshotId,
+        startsWith('readiness_snapshot_test_'),
+        reason: sample.id,
+      );
+      expect(sample.sourceTag, 'local_smoke', reason: sample.id);
+      expect(
+        abiStatusByInput[sample.abiInputCase],
+        sample.expectedStatusCode,
+        reason: sample.id,
+      );
+      expect(sample.expectedEvidenceSummary, isNot('none'), reason: sample.id);
+    }
+
+    for (final sample in syncBridgeCommandContractRejectedSamples) {
+      expect(
+        encodedSamples,
+        isNot(contains(sample.forbiddenFragment)),
+        reason: sample.id,
+      );
+    }
+    expect(encodedSamples, isNot(contains('real_keychain')));
+    expect(encodedSamples, isNot(contains('real_keystore')));
+    expect(encodedSamples, isNot(contains('remote_payload')));
+    expect(encodedSamples, isNot(contains('production_upload')));
+  });
+
   test('rust and dart smoke plans cover ownership and redaction evidence', () {
     expect(
       syncFfiCommandBoundaryAllSmokeCaseIds(),

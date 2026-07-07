@@ -58,7 +58,7 @@ Flutter manager 当前进入本地能力验收收口阶段。已落地能力覆�
 | 同步预检与生产不可用原因 | 通过 | `sync_test.dart` 覆盖 `backend_unavailable`、`local_only`、P2 对象分类、local-only 计数、backend capability、production gate、连接健康、readiness 代表场景和 action preview 可见层；`settings_diagnostics_test.dart` 覆盖 gate source / stop line、readiness、interaction plan、action command preview、request / result preview 的脱敏诊断展示。 |
 | 同步开关关闭 | 通过 | `sync_test.dart` 和 `settings_test.dart` 均断言 `sync-enable-button` 处于禁用态，包括 `preflight_ready` 草案状态。 |
 | 隐私与脱敏 | 通过 | `settings_diagnostics_test.dart` 和 `ffi_manager_bridge_test.dart` 断言诊断文本不包含用户词和本地路径；FFI smoke 断言诊断报告不包含临时 db、settings、导入路径或用户词。 |
-| 真实 Dart FFI bridge | 通过 | `check-manager-ffi-smoke.sh` 构建真实 `radishlex-ime-ffi` 动态库，并用临时 SQLite userdb、临时 settings JSON 和合成 TSV 复验本地管理链路。 |
+| 真实 Dart FFI bridge | 通过 | `check-manager-ffi-smoke.sh` 构建真实 `radishlex-ime-ffi` 动态库，并用临时 SQLite userdb、临时 settings JSON 和合成 TSV 复验本地管理链路，同时确认 future sync command symbol 仍未导出。 |
 
 ## 验证入口
 
@@ -74,7 +74,7 @@ git diff --check
 各命令覆盖：
 
 - `./scripts/check-manager.sh`：执行 `dart format --set-exit-if-changed .`、`flutter analyze` 和 `flutter test`，覆盖 manager 默认 fixture、页面级 widget tests、action helper tests、Dart model / mapper tests、action preview tests 和 settings store tests。
-- `./scripts/check-manager-ffi-smoke.sh`：构建 `radishlex-ime-ffi` 动态库，并用临时 SQLite userdb、临时 settings JSON、合成 TSV 和导出文件复验真实 Dart FFI bridge 的本地管理链路。
+- `./scripts/check-manager-ffi-smoke.sh`：构建 `radishlex-ime-ffi` 动态库，并用临时 SQLite userdb、临时 settings JSON、合成 TSV 和导出文件复验真实 Dart FFI bridge 的本地管理链路，同时检查 future sync command symbol 缺席。
 - `git diff --check`：检查空白、尾随空格和补丁文本问题。
 - `./scripts/check-repo.sh`：执行仓库 text hygiene、文档预算、Go server 测试、Rust workspace 测试和 doc-tests，确认 manager 文档变更没有破坏仓库基线。
 

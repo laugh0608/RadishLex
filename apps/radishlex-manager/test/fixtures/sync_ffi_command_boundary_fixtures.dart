@@ -128,6 +128,143 @@ class SyncFfiCommandBoundaryStatusCase {
   final String boundary;
 }
 
+const syncFfiCommandBoundaryRustHostInputSamples = [
+  SyncFfiCommandBoundaryRustHostInputSample(
+    id: 'current_phase_capability_closed_recovery_setup',
+    actionId: 'recovery_setup',
+    operationId: 'op_test_non_secret_001',
+    readinessSnapshotId: 'readiness_snapshot_test_001',
+    sourceTag: 'local_smoke',
+    deviceBackendGate: 'blocked',
+    explicitUserStart: true,
+    abiInputCase: 'sync_command_not_enabled_current_phase',
+    expectedStatusCode: 'InvalidState',
+    forbiddenMaterialCategory: 'none',
+    expectedEvidence: [
+      'sync_command_capability_closed_current_phase',
+      'invalid_state_without_native_symbol',
+      'user_sync_entry_closed_current_phase',
+    ],
+  ),
+  SyncFfiCommandBoundaryRustHostInputSample(
+    id: 'invalid_schema_version_rejected',
+    actionId: 'recovery_restore',
+    operationId: 'op_test_non_secret_002',
+    readinessSnapshotId: 'readiness_snapshot_test_002',
+    sourceTag: 'local_smoke',
+    deviceBackendGate: 'blocked',
+    explicitUserStart: true,
+    abiInputCase: 'unknown_schema_version',
+    expectedStatusCode: 'InvalidArgument',
+    forbiddenMaterialCategory: 'recovery_secret_material',
+    expectedEvidence: [
+      'unknown_schema_version_invalid_argument',
+      'error_read_then_free',
+      'no_recovery_secret_in_error',
+    ],
+  ),
+  SyncFfiCommandBoundaryRustHostInputSample(
+    id: 'invalid_action_rejected',
+    actionId: 'join_request_authorization',
+    operationId: 'op_test_non_secret_003',
+    readinessSnapshotId: 'readiness_snapshot_test_003',
+    sourceTag: 'local_smoke',
+    deviceBackendGate: 'blocked',
+    explicitUserStart: true,
+    abiInputCase: 'unknown_action',
+    expectedStatusCode: 'InvalidArgument',
+    forbiddenMaterialCategory: 'join_verifier_material',
+    expectedEvidence: [
+      'unknown_action_invalid_argument',
+      'error_read_then_free',
+      'no_short_code_in_error',
+    ],
+  ),
+  SyncFfiCommandBoundaryRustHostInputSample(
+    id: 'invalid_bool_rejected',
+    actionId: 'device_revocation',
+    operationId: 'op_test_non_secret_004',
+    readinessSnapshotId: 'readiness_snapshot_test_004',
+    sourceTag: 'local_smoke',
+    deviceBackendGate: 'blocked',
+    explicitUserStart: false,
+    abiInputCase: 'invalid_bool',
+    expectedStatusCode: 'InvalidArgument',
+    forbiddenMaterialCategory: 'signature_or_wrapped_sync_material',
+    expectedEvidence: [
+      'invalid_bool_invalid_argument',
+      'error_read_then_free',
+      'no_signature_or_wrapped_material_in_error',
+    ],
+  ),
+  SyncFfiCommandBoundaryRustHostInputSample(
+    id: 'sync_unenveloped_failure_maps_to_sync_error',
+    actionId: 'device_revocation',
+    operationId: 'op_test_non_secret_005',
+    readinessSnapshotId: 'readiness_snapshot_test_005',
+    sourceTag: 'local_smoke',
+    deviceBackendGate: 'ready_for_contract_test',
+    explicitUserStart: true,
+    abiInputCase: 'sync_command_internal_unenveloped_failure',
+    expectedStatusCode: 'SyncError',
+    forbiddenMaterialCategory: 'opaque_transport_content',
+    expectedEvidence: [
+      'sync_error_status',
+      'no_payload_in_error_message',
+      'no_provider_exception_in_debug',
+    ],
+  ),
+  SyncFfiCommandBoundaryRustHostInputSample(
+    id: 'panic_boundary_maps_to_internal_error',
+    actionId: 'recovery_setup',
+    operationId: 'op_test_non_secret_006',
+    readinessSnapshotId: 'readiness_snapshot_test_006',
+    sourceTag: 'local_smoke',
+    deviceBackendGate: 'blocked',
+    explicitUserStart: true,
+    abiInputCase: 'panic_boundary_caught',
+    expectedStatusCode: 'InternalError',
+    forbiddenMaterialCategory: 'local_path_material',
+    expectedEvidence: [
+      'panic_caught',
+      'internal_error_status',
+      'no_panic_crosses_c_abi',
+    ],
+  ),
+];
+
+class SyncFfiCommandBoundaryRustHostInputSample {
+  const SyncFfiCommandBoundaryRustHostInputSample({
+    required this.id,
+    required this.actionId,
+    required this.operationId,
+    required this.readinessSnapshotId,
+    required this.sourceTag,
+    required this.deviceBackendGate,
+    required this.explicitUserStart,
+    required this.abiInputCase,
+    required this.expectedStatusCode,
+    required this.forbiddenMaterialCategory,
+    required this.expectedEvidence,
+  });
+
+  final String id;
+  final String actionId;
+  final String operationId;
+  final String readinessSnapshotId;
+  final String sourceTag;
+  final String deviceBackendGate;
+  final bool explicitUserStart;
+  final String abiInputCase;
+  final String expectedStatusCode;
+  final String forbiddenMaterialCategory;
+  final List<String> expectedEvidence;
+
+  String get expectedEvidenceSummary {
+    return managerSyncCodeSummary(expectedEvidence);
+  }
+}
+
 const syncFfiCommandBoundaryRustHostSmokeCases = [
   SyncFfiCommandBoundarySmokeCase(
     id: 'contract_reports_command_capability_closed',
@@ -331,6 +468,26 @@ List<String> syncFfiCommandBoundaryAllSmokeCaseIds() {
     ...syncFfiCommandBoundaryRustHostSmokeCases.map((fixture) => fixture.id),
     ...syncFfiCommandBoundaryDartFfiSmokeCases.map((fixture) => fixture.id),
   ]);
+}
+
+Map<String, Object?> syncFfiCommandBoundaryRustHostInputSampleShape(
+  SyncFfiCommandBoundaryRustHostInputSample sample,
+) {
+  return {
+    'id': sample.id,
+    'format': 'future_manager_sync_ffi_rust_host_input.v1_draft',
+    'review_status': syncFfiCommandBoundaryReviewStatus,
+    'action_id': sample.actionId,
+    'operation_id': sample.operationId,
+    'readiness_snapshot_id': sample.readinessSnapshotId,
+    'source_tag': sample.sourceTag,
+    'device_backend_gate': sample.deviceBackendGate,
+    'explicit_user_start': sample.explicitUserStart,
+    'abi_input_case': sample.abiInputCase,
+    'expected_status_code': sample.expectedStatusCode,
+    'forbidden_material_category': sample.forbiddenMaterialCategory,
+    'expected_evidence': sample.expectedEvidence,
+  };
 }
 
 String _requestFieldPolicy(String field) {

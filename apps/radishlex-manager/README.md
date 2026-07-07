@@ -74,7 +74,7 @@ flutter run -d macos
 
 Phase 4 本地能力验收范围、退出标准映射和隐私检查见仓库根 `docs/manager-local-acceptance.md`。
 
-`check-manager-ffi-smoke.sh` 会构建 `radishlex-ime-ffi` 动态库，在仓库外临时目录创建 SQLite userdb、settings JSON、导入 TSV、读取 import batches 与 rank explain、保存包含部署证据来源标签的设置草案、删除词条、导出词库并导出脱敏诊断报告，用真实 Dart FFI bridge 复验本地管理链路。该 smoke 只使用合成词条，不连接真实同步后端，也不读取真实输入法目录。
+`check-manager-ffi-smoke.sh` 会构建 `radishlex-ime-ffi` 动态库，在仓库外临时目录创建 SQLite userdb、settings JSON、导入 TSV、读取 import batches 与 rank explain、保存包含部署证据来源标签的设置草案、删除词条、导出词库并导出脱敏诊断报告，用真实 Dart FFI bridge 复验本地管理链路；同时确认当前动态库未导出 future sync command symbol。该 smoke 只使用合成词条，不连接真实同步后端，也不读取真实输入法目录。
 
 如需在 macOS 桌面运行 fixture 版本：
 

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ffi' as ffi;
 import 'dart:io';
 
 import 'package:radishlex_manager/src/bridge/ffi_manager_bridge.dart';
@@ -14,6 +15,7 @@ Future<void> main(List<String> args) async {
   final settingsPath = '${workDir.path}/manager-settings.json';
 
   File(importPath).writeAsStringSync(_dictionaryFixture, encoding: utf8);
+  _expectFutureSyncCommandSymbolsAbsent(options.libraryPath);
 
   final bridge = FfiManagerBridge(
     dbPath: dbPath,
@@ -185,9 +187,34 @@ luobo\t萝卜词核\tluo bo ci he\tmanual_import\t2.5\tactive
 tongbu\t同步预检\t\tmanual_import\t1.5\tactive
 ''';
 
+const _futureSyncCommandSymbols = [
+  'radishlex_manager_sync_command_execute_v1',
+  'radishlex_manager_sync_command_result_action_id',
+  'radishlex_manager_sync_command_result_status',
+  'radishlex_manager_sync_command_result_error_code',
+  'radishlex_manager_sync_command_result_retry_policy',
+  'radishlex_manager_sync_command_result_summary',
+  'radishlex_manager_sync_command_result_free',
+];
+
 void _expect(bool condition, String label) {
   if (!condition) {
     throw StateError('manager FFI smoke assertion failed: $label');
+  }
+}
+
+void _expectFutureSyncCommandSymbolsAbsent(String libraryPath) {
+  final library = ffi.DynamicLibrary.open(libraryPath);
+  for (final symbol in _futureSyncCommandSymbols) {
+    try {
+      library.lookup<ffi.NativeFunction<ffi.Void Function()>>(symbol);
+      throw StateError(
+        'manager FFI smoke assertion failed: future sync command symbol '
+        'unexpectedly exported: $symbol',
+      );
+    } on ArgumentError {
+      // Missing symbols are the expected current-phase capability state.
+    }
   }
 }
 
