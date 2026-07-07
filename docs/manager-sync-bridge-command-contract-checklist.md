@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-当前阶段只允许把真实命令前的 contract 约束写成可审阅清单。`manager_sync_action_command_preview.v1`、`SyncActionRequestPreview` 和 `SyncActionResultPreview` 仍是非执行预演层，不是 bridge DTO，也不能被包装成真实请求。
+当前阶段只允许把真实命令前的 contract 约束写成可审阅清单和 design fixture。`manager_sync_action_command_preview.v1`、`SyncActionRequestPreview` 和 `SyncActionResultPreview` 仍是非执行预演层，不是 bridge DTO，也不能被包装成真实请求。
 
 本检查清单的作用：
 
@@ -19,6 +19,13 @@
 - 不新增同步页按钮、点击回调或 settings draft action payload。
 - 不生成恢复码、不输入恢复码、不创建 join request、不签名授权包、不撤销设备。
 - 不上传、下载或合并真实远端 P2 对象。
+
+当前可复验证据：
+
+- `apps/radishlex-manager/test/fixtures/sync_bridge_command_contract_fixtures.dart`
+- `apps/radishlex-manager/test/models/manager_sync_bridge_command_contract_test.dart`
+
+这组 fixture / 测试只验证 future contract 的安全形状、错误 envelope、幂等性状态码、forbidden material 拒绝样本和 diagnostics 不泄漏；它不定义真实 `ManagerBridge` 方法或 `ime-ffi` symbol。
 
 ## 与现有 Preview 的关系
 
@@ -191,7 +198,7 @@ preview 字段不能直接改名后当作 bridge DTO。真实 contract 设计完
 4. 再补 Rust FFI contract test，确认 buffer ownership、错误 envelope、字符串编码和释放责任。
 5. 再补端到端 smoke；涉及真实平台私钥 backend、系统 Keychain / Keystore 或真实部署环境时，必须单独获得授权。
 
-当前阶段只执行第 1 到第 3 步的设计准备，不进入真实 command code。
+当前阶段已起步第 1 到第 3 步的设计准备：design fixture 覆盖四条 action 的安全 request / result 样本、transient secret 替代占位、forbidden material 拒绝样本、allowlist 错误 envelope、幂等性状态和代表 diagnostics 场景。后续仍不进入真实 command code，直到本文停止线齐备。
 
 ## 进入真实实现前的停止线
 

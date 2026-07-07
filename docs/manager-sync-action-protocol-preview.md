@@ -109,8 +109,10 @@ result status 只允许：
 场景目录中的 readiness 和 evidence bundle fixture 必须同时携带 action command preview 的 request boundary、result boundary 和 error code 预期。action protocol 的状态矩阵和 action 级预期由单独 fixture 维护。当前验收入口：
 
 - `apps/radishlex-manager/test/fixtures/sync_action_protocol_fixtures.dart`
+- `apps/radishlex-manager/test/fixtures/sync_bridge_command_contract_fixtures.dart`
 - `apps/radishlex-manager/test/fixtures/sync_readiness_bridge_fixtures.dart`
 - `apps/radishlex-manager/test/fixtures/sync_evidence_bundle_fixtures.dart`
+- `apps/radishlex-manager/test/models/manager_sync_bridge_command_contract_test.dart`
 - `apps/radishlex-manager/test/models/manager_sync_action_preview_test.dart`
 - `apps/radishlex-manager/test/models/manager_sync_entry_gate_test.dart`
 - `apps/radishlex-manager/test/screens/settings_test.dart`
