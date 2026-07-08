@@ -47,7 +47,7 @@ radishlex_manager_sync_command_result_free
 
 - 后续 Rust 侧可能需要的 `manager_sync_command.rs::*Draft` 类型 / 函数草案。
 - 当前可复用的 `ime-ffi` 源码模式，例如 `ffi_status`、`ffi_ptr`、`ffi_release`、`read_utf8`、`read_ffi_bool`、error handle 和 sync preflight summary。
-- 进入真实 Rust host test 前仍需确认的实现问题，例如 action id 数值、action-specific section layout、result accessor field set、domain guard storage scope 和 Debug redaction test shape。
+- 进入真实 Rust host test 前仍需确认的实现问题，例如 action id 数值、真实 C ABI action section encoding、result accessor field set、domain guard storage scope 和 Debug redaction test shape。
 
 该包的状态为 `rust_host_implementation_review_ready_no_native_symbol`。它已经驱动 `crates/ime-ffi/src/manager_sync_command.rs` 落地为内部非导出草案模块，但不代表 C ABI symbol、Dart native binding、`ManagerBridge` 可执行方法或 `crates/ime-ffi/tests/manager_sync_command_boundary.rs` 已经落地。
 
@@ -59,15 +59,17 @@ radishlex_manager_sync_command_result_free
 
 - versioned raw request draft、action id allowlist、borrowed UTF-8 view 读取、`u8` bool 校验和 forbidden material 拒绝。
 - current-phase capability closed 结果摘要，返回稳定 `InvalidState`，只包含 allowlist summary code。
+- action-specific section draft，按 action id 绑定当前阶段允许的确认状态码、前置证据码和 transient material 状态码；不接受短码值、恢复码值或 payload-shaped 字段。
 - Rust-owned result handle draft、summary view draft、copy-before-release 断言、release 后 view 失效和 `release(None)` 无效果。
+- error handle draft，覆盖 read -> copy -> release 生命周期、release 后失效、`release(None)` 无效果和 forbidden provider message 拒绝。
 - 内部 panic boundary helper，将 unwind 映射为稳定 `InternalError`，不回显 panic payload。
 - manager sync command context draft，同一 sync domain 重入返回结构化 `InvalidState`，guard drop 后释放 domain。
 - Debug / error message / result summary 不回显 operation id、readiness snapshot、source tag、backend gate 或 secret-shaped 片段。
 
 当前内部草案不覆盖：
 
-- C ABI `extern "C"` wrapper、真实 result accessor symbol、真实 release function symbol 或 error handle read / free lifecycle。
-- action-specific section layout、跨线程 / 异步 command worker、Rust sync / crypto 接线或远端 transport。
+- C ABI `extern "C"` wrapper、真实 result accessor symbol、真实 release function symbol 或真实 error handle read / free symbol。
+- 跨线程 / 异步 command worker、Rust sync / crypto 接线或远端 transport。
 - `ManagerBridge` 方法、Flutter 可见操作按钮、settings action payload、恢复码生成 / 输入、join request 创建、授权成功或设备撤销。
 
 ## Request Struct 规则

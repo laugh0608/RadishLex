@@ -19,10 +19,37 @@ const CURRENT_PHASE_COMMAND_ERROR: &str = "sync_command_not_enabled_current_phas
 const CURRENT_PHASE_USER_SUMMARY: &str = "user_sync_entry_closed_current_phase";
 const CURRENT_PHASE_DIAGNOSTICS_SUMMARY: &str = "not_executable_current_phase";
 const RESULT_HANDLE_RELEASED_ERROR: &str = "manager_sync_command_result_handle_released";
+const ERROR_HANDLE_RELEASED_ERROR: &str = "manager_sync_command_error_handle_released";
+const ERROR_HANDLE_FORBIDDEN_MESSAGE: &str =
+    "manager_sync_command_error_contains_forbidden_material";
 const PANIC_BOUNDARY_ERROR: &str = "manager_sync_command_panic_boundary";
 const SYNC_COMMAND_CONTEXT_LOCK_ERROR: &str = "manager_sync_command_context_lock_poisoned";
 const SYNC_COMMAND_DOMAIN_DRAFT: &str = "manager_sync_write_domain";
 const SYNC_COMMAND_DOMAIN_BUSY_ERROR: &str = "sync_domain_command_in_progress";
+const ACTION_SECTION_MISMATCH_ERROR: &str = "manager_sync_action_section_mismatch";
+const ACTION_SECTION_VALUE_ERROR: &str = "manager_sync_action_section_value_not_allowed";
+const ACTION_CONFIRMATION_UNAVAILABLE_ERROR: &str =
+    "manager_sync_action_confirmation_not_available_current_phase";
+
+pub(crate) const MANAGER_SYNC_SECTION_RECOVERY_SETUP: u32 = 1;
+pub(crate) const MANAGER_SYNC_SECTION_RECOVERY_RESTORE: u32 = 2;
+pub(crate) const MANAGER_SYNC_SECTION_JOIN_REQUEST_AUTHORIZATION: u32 = 3;
+pub(crate) const MANAGER_SYNC_SECTION_DEVICE_REVOCATION: u32 = 4;
+
+const SETUP_CONFIRMATION_UNAVAILABLE: &str = "setup_save_confirmation_not_available_current_phase";
+const SETUP_REQUIRED_BEFORE_UPLOAD: &str = "required_before_first_upload";
+const SETUP_DISPLAY_UNAVAILABLE: &str = "display_not_available_current_phase";
+const RESTORE_CONFIRMATION_UNAVAILABLE: &str = "restore_confirmation_not_available_current_phase";
+const RESTORE_RECORD_NOT_CHECKED: &str = "recovery_record_not_checked_current_phase";
+const RESTORE_INPUT_UNAVAILABLE: &str = "input_not_available_current_phase";
+const JOIN_CONFIRMATION_UNAVAILABLE: &str =
+    "join_authorization_confirmation_not_available_current_phase";
+const JOIN_REQUEST_NOT_CREATED: &str = "join_request_not_created_current_phase";
+const JOIN_SHORT_CODE_UNAVAILABLE: &str = "short_code_not_available_current_phase";
+const REVOCATION_CONFIRMATION_UNAVAILABLE: &str =
+    "device_revocation_confirmation_not_available_current_phase";
+const REVOCATION_ACTIVE_DEVICE_REQUIRED: &str = "active_device_required_current_phase";
+const REVOCATION_KEY_EPOCH_NOT_ROTATED: &str = "key_epoch_not_rotated_current_phase";
 
 const FORBIDDEN_SUMMARY_FRAGMENTS: &[&str] = &[
     "secret-token",
@@ -47,6 +74,17 @@ pub(crate) struct ManagerSyncCommandRequestRawDraft {
     pub deployment_evidence_source_tag: RadishLexStringView,
     pub device_backend_gate: RadishLexStringView,
     pub explicit_user_start: u8,
+    pub action_section: ManagerSyncActionSectionRawDraft,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub(crate) struct ManagerSyncActionSectionRawDraft {
+    pub section_id: u32,
+    pub confirmation_status_code: RadishLexStringView,
+    pub prerequisite_evidence_code: RadishLexStringView,
+    pub transient_material_status_code: RadishLexStringView,
+    pub user_confirmation_present: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -76,12 +114,143 @@ impl ManagerSyncCommandActionDraft {
             Self::DeviceRevocation => "device_revocation",
         }
     }
+
+    fn section_kind(self) -> ManagerSyncActionSectionKindDraft {
+        match self {
+            Self::RecoverySetup => ManagerSyncActionSectionKindDraft::RecoverySetup,
+            Self::RecoveryRestore => ManagerSyncActionSectionKindDraft::RecoveryRestore,
+            Self::JoinRequestAuthorization => {
+                ManagerSyncActionSectionKindDraft::JoinRequestAuthorization
+            }
+            Self::DeviceRevocation => ManagerSyncActionSectionKindDraft::DeviceRevocation,
+        }
+    }
+
+    fn section_profile(self) -> ManagerSyncActionSectionProfileDraft {
+        match self {
+            Self::RecoverySetup => ManagerSyncActionSectionProfileDraft {
+                confirmation_status_code: SETUP_CONFIRMATION_UNAVAILABLE,
+                prerequisite_evidence_code: SETUP_REQUIRED_BEFORE_UPLOAD,
+                transient_material_status_code: SETUP_DISPLAY_UNAVAILABLE,
+            },
+            Self::RecoveryRestore => ManagerSyncActionSectionProfileDraft {
+                confirmation_status_code: RESTORE_CONFIRMATION_UNAVAILABLE,
+                prerequisite_evidence_code: RESTORE_RECORD_NOT_CHECKED,
+                transient_material_status_code: RESTORE_INPUT_UNAVAILABLE,
+            },
+            Self::JoinRequestAuthorization => ManagerSyncActionSectionProfileDraft {
+                confirmation_status_code: JOIN_CONFIRMATION_UNAVAILABLE,
+                prerequisite_evidence_code: JOIN_REQUEST_NOT_CREATED,
+                transient_material_status_code: JOIN_SHORT_CODE_UNAVAILABLE,
+            },
+            Self::DeviceRevocation => ManagerSyncActionSectionProfileDraft {
+                confirmation_status_code: REVOCATION_CONFIRMATION_UNAVAILABLE,
+                prerequisite_evidence_code: REVOCATION_ACTIVE_DEVICE_REQUIRED,
+                transient_material_status_code: REVOCATION_KEY_EPOCH_NOT_ROTATED,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ManagerSyncActionSectionKindDraft {
+    RecoverySetup,
+    RecoveryRestore,
+    JoinRequestAuthorization,
+    DeviceRevocation,
+}
+
+impl ManagerSyncActionSectionKindDraft {
+    fn from_id(section_id: u32) -> Result<Self, FfiError> {
+        match section_id {
+            MANAGER_SYNC_SECTION_RECOVERY_SETUP => Ok(Self::RecoverySetup),
+            MANAGER_SYNC_SECTION_RECOVERY_RESTORE => Ok(Self::RecoveryRestore),
+            MANAGER_SYNC_SECTION_JOIN_REQUEST_AUTHORIZATION => Ok(Self::JoinRequestAuthorization),
+            MANAGER_SYNC_SECTION_DEVICE_REVOCATION => Ok(Self::DeviceRevocation),
+            _ => Err(FfiError::invalid_argument(
+                "unknown manager sync action section id",
+            )),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ManagerSyncActionSectionProfileDraft {
+    confirmation_status_code: &'static str,
+    prerequisite_evidence_code: &'static str,
+    transient_material_status_code: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagerSyncActionSectionDraft {
+    kind: ManagerSyncActionSectionKindDraft,
+    confirmation_status_code: &'static str,
+    prerequisite_evidence_code: &'static str,
+    transient_material_status_code: &'static str,
+    user_confirmation_present: bool,
+}
+
+impl ManagerSyncActionSectionDraft {
+    fn from_raw(
+        action: ManagerSyncCommandActionDraft,
+        raw: ManagerSyncActionSectionRawDraft,
+    ) -> Result<Self, FfiError> {
+        let kind = ManagerSyncActionSectionKindDraft::from_id(raw.section_id)?;
+        if kind != action.section_kind() {
+            return Err(FfiError::invalid_argument(ACTION_SECTION_MISMATCH_ERROR));
+        }
+
+        let user_confirmation_present =
+            read_ffi_bool(raw.user_confirmation_present, "user_confirmation_present")?;
+        if user_confirmation_present {
+            return Err(FfiError::invalid_state(
+                ACTION_CONFIRMATION_UNAVAILABLE_ERROR,
+            ));
+        }
+
+        let profile = action.section_profile();
+        let confirmation_status_code = read_expected_action_section_code(
+            raw.confirmation_status_code,
+            "confirmation_status_code",
+            profile.confirmation_status_code,
+        )?;
+        let prerequisite_evidence_code = read_expected_action_section_code(
+            raw.prerequisite_evidence_code,
+            "prerequisite_evidence_code",
+            profile.prerequisite_evidence_code,
+        )?;
+        let transient_material_status_code = read_expected_action_section_code(
+            raw.transient_material_status_code,
+            "transient_material_status_code",
+            profile.transient_material_status_code,
+        )?;
+
+        Ok(Self {
+            kind,
+            confirmation_status_code,
+            prerequisite_evidence_code,
+            transient_material_status_code,
+            user_confirmation_present,
+        })
+    }
+
+    fn current_phase_for_action(action: ManagerSyncCommandActionDraft) -> Self {
+        let profile = action.section_profile();
+        Self {
+            kind: action.section_kind(),
+            confirmation_status_code: profile.confirmation_status_code,
+            prerequisite_evidence_code: profile.prerequisite_evidence_code,
+            transient_material_status_code: profile.transient_material_status_code,
+            user_confirmation_present: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ManagerSyncCommandRequestDraft {
     schema_version: u32,
     action: ManagerSyncCommandActionDraft,
+    action_section: ManagerSyncActionSectionDraft,
     operation_id: String,
     readiness_snapshot_id: String,
     deployment_evidence_source_tag: String,
@@ -98,6 +267,7 @@ impl ManagerSyncCommandRequestDraft {
         }
 
         let action = ManagerSyncCommandActionDraft::from_id(raw.action_id)?;
+        let action_section = ManagerSyncActionSectionDraft::from_raw(action, raw.action_section)?;
         let explicit_user_start = read_ffi_bool(raw.explicit_user_start, "explicit_user_start")?;
         let operation_id = read_required_safe_utf8_view(raw.operation_id, "operation_id")?;
         let readiness_snapshot_id =
@@ -112,6 +282,7 @@ impl ManagerSyncCommandRequestDraft {
         Ok(Self {
             schema_version: raw.schema_version,
             action,
+            action_section,
             operation_id,
             readiness_snapshot_id,
             deployment_evidence_source_tag,
@@ -122,6 +293,10 @@ impl ManagerSyncCommandRequestDraft {
 
     pub(crate) fn action(&self) -> ManagerSyncCommandActionDraft {
         self.action
+    }
+
+    pub(crate) fn action_section(&self) -> ManagerSyncActionSectionDraft {
+        self.action_section
     }
 }
 
@@ -167,7 +342,10 @@ pub(crate) struct ManagerSyncCommandEnvelopeDraft {
 }
 
 impl ManagerSyncCommandEnvelopeDraft {
-    fn current_phase_closed(action: ManagerSyncCommandActionDraft) -> Self {
+    fn current_phase_closed(
+        action: ManagerSyncCommandActionDraft,
+        action_section: ManagerSyncActionSectionDraft,
+    ) -> Self {
         Self {
             action_summary_code: action.as_summary_code(),
             command_status: ManagerSyncCommandStatusDraft::BlockedByReadiness.as_summary_code(),
@@ -175,7 +353,7 @@ impl ManagerSyncCommandEnvelopeDraft {
             retry_policy: ManagerSyncRetryPolicyDraft::NotRetryable.as_summary_code(),
             user_visible_summary_code: CURRENT_PHASE_USER_SUMMARY,
             diagnostics_summary_code: CURRENT_PHASE_DIAGNOSTICS_SUMMARY,
-            next_required_evidence: CURRENT_PHASE_USER_SUMMARY,
+            next_required_evidence: action_section.prerequisite_evidence_code,
             object_type_summary: "none",
             object_count_summary: 0,
             object_version_summary: "none",
@@ -207,9 +385,19 @@ pub(crate) struct ManagerSyncCommandResultDraft {
 
 impl ManagerSyncCommandResultDraft {
     pub(crate) fn current_phase_closed(action: ManagerSyncCommandActionDraft) -> Self {
+        Self::current_phase_closed_with_section(
+            action,
+            ManagerSyncActionSectionDraft::current_phase_for_action(action),
+        )
+    }
+
+    pub(crate) fn current_phase_closed_with_section(
+        action: ManagerSyncCommandActionDraft,
+        action_section: ManagerSyncActionSectionDraft,
+    ) -> Self {
         Self {
             abi_status: RadishLexStatusCode::InvalidState,
-            envelope: ManagerSyncCommandEnvelopeDraft::current_phase_closed(action),
+            envelope: ManagerSyncCommandEnvelopeDraft::current_phase_closed(action, action_section),
         }
     }
 
@@ -290,6 +478,49 @@ pub(crate) fn release_manager_sync_command_result_handle_draft(
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagerSyncCommandErrorViewDraft<'a> {
+    pub status_code: RadishLexStatusCode,
+    pub message: &'a str,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ManagerSyncCommandErrorHandleDraft {
+    error: Option<FfiError>,
+}
+
+impl ManagerSyncCommandErrorHandleDraft {
+    pub(crate) fn new(error: FfiError) -> Result<Self, FfiError> {
+        if contains_forbidden_material(&error.message) {
+            return Err(FfiError::invalid_argument(ERROR_HANDLE_FORBIDDEN_MESSAGE));
+        }
+        Ok(Self { error: Some(error) })
+    }
+
+    pub(crate) fn view(&self) -> Result<ManagerSyncCommandErrorViewDraft<'_>, FfiError> {
+        let error = self
+            .error
+            .as_ref()
+            .ok_or_else(|| FfiError::invalid_state(ERROR_HANDLE_RELEASED_ERROR))?;
+        Ok(ManagerSyncCommandErrorViewDraft {
+            status_code: error.code,
+            message: error.message.as_str(),
+        })
+    }
+
+    pub(crate) fn release(&mut self) {
+        self.error = None;
+    }
+}
+
+pub(crate) fn release_manager_sync_command_error_handle_draft(
+    handle: Option<&mut ManagerSyncCommandErrorHandleDraft>,
+) {
+    if let Some(handle) = handle {
+        handle.release();
+    }
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct ManagerSyncCommandContextDraft {
     active_domains: Mutex<HashSet<&'static str>>,
@@ -325,7 +556,10 @@ impl ManagerSyncCommandContextDraft {
     ) -> Result<ManagerSyncCommandResultDraft, FfiError> {
         let request = ManagerSyncCommandRequestDraft::from_raw(raw)?;
         let _domain_guard = self.enter_write_domain()?;
-        let result = ManagerSyncCommandResultDraft::current_phase_closed(request.action());
+        let result = ManagerSyncCommandResultDraft::current_phase_closed_with_section(
+            request.action(),
+            request.action_section(),
+        );
         result.assert_safe_summary()?;
         Ok(result)
     }
@@ -369,9 +603,24 @@ pub(crate) fn evaluate_manager_sync_command_current_phase_draft(
     raw: ManagerSyncCommandRequestRawDraft,
 ) -> Result<ManagerSyncCommandResultDraft, FfiError> {
     let request = ManagerSyncCommandRequestDraft::from_raw(raw)?;
-    let result = ManagerSyncCommandResultDraft::current_phase_closed(request.action());
+    let result = ManagerSyncCommandResultDraft::current_phase_closed_with_section(
+        request.action(),
+        request.action_section(),
+    );
     result.assert_safe_summary()?;
     Ok(result)
+}
+
+fn read_expected_action_section_code(
+    view: RadishLexStringView,
+    field: &'static str,
+    expected: &'static str,
+) -> Result<&'static str, FfiError> {
+    let value = read_required_safe_utf8_view(view, field)?;
+    if value != expected {
+        return Err(FfiError::invalid_argument(ACTION_SECTION_VALUE_ERROR));
+    }
+    Ok(expected)
 }
 
 fn read_required_safe_utf8_view(
@@ -414,10 +663,7 @@ fn read_ffi_bool(value: u8, field: &'static str) -> Result<bool, FfiError> {
 }
 
 fn ensure_safe_summary_value(value: &str, field: &'static str) -> Result<(), FfiError> {
-    if FORBIDDEN_SUMMARY_FRAGMENTS
-        .iter()
-        .any(|fragment| value.contains(fragment))
-    {
+    if contains_forbidden_material(value) {
         return Err(FfiError::invalid_argument(format!(
             "{field} contains forbidden material"
         )));
@@ -425,202 +671,11 @@ fn ensure_safe_summary_value(value: &str, field: &'static str) -> Result<(), Ffi
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn view(value: &str) -> RadishLexStringView {
-        RadishLexStringView {
-            data: value.as_ptr(),
-            len: value.len(),
-        }
-    }
-
-    fn bytes_view(bytes: &[u8]) -> RadishLexStringView {
-        RadishLexStringView {
-            data: bytes.as_ptr(),
-            len: bytes.len(),
-        }
-    }
-
-    fn valid_raw(action_id: u32) -> ManagerSyncCommandRequestRawDraft {
-        ManagerSyncCommandRequestRawDraft {
-            schema_version: MANAGER_SYNC_COMMAND_SCHEMA_VERSION_V1,
-            action_id,
-            operation_id: view("op_test_non_secret_001"),
-            readiness_snapshot_id: view("readiness_snapshot_test_001"),
-            deployment_evidence_source_tag: view("local_smoke"),
-            device_backend_gate: view("blocked"),
-            explicit_user_start: 1,
-        }
-    }
-
-    #[test]
-    fn rejects_unknown_schema_before_command_context() {
-        let raw = ManagerSyncCommandRequestRawDraft {
-            schema_version: 999,
-            ..valid_raw(MANAGER_SYNC_ACTION_RECOVERY_SETUP)
-        };
-
-        let error = ManagerSyncCommandRequestDraft::from_raw(raw).unwrap_err();
-
-        assert_eq!(error.code, RadishLexStatusCode::InvalidArgument);
-        assert_eq!(error.message, "unknown manager sync command schema version");
-    }
-
-    #[test]
-    fn rejects_unknown_action_before_command_context() {
-        let raw = ManagerSyncCommandRequestRawDraft {
-            action_id: 999,
-            ..valid_raw(MANAGER_SYNC_ACTION_RECOVERY_SETUP)
-        };
-
-        let error = ManagerSyncCommandRequestDraft::from_raw(raw).unwrap_err();
-
-        assert_eq!(error.code, RadishLexStatusCode::InvalidArgument);
-        assert_eq!(error.message, "unknown manager sync action id");
-    }
-
-    #[test]
-    fn rejects_invalid_bool_and_utf8_without_echoing_input() {
-        let invalid_bool = ManagerSyncCommandRequestRawDraft {
-            explicit_user_start: 7,
-            ..valid_raw(MANAGER_SYNC_ACTION_RECOVERY_SETUP)
-        };
-        let invalid_bool_error =
-            ManagerSyncCommandRequestDraft::from_raw(invalid_bool).unwrap_err();
-        assert_eq!(
-            invalid_bool_error.code,
-            RadishLexStatusCode::InvalidArgument
-        );
-        assert_eq!(
-            invalid_bool_error.message,
-            "explicit_user_start must be 0 or 1"
-        );
-
-        let invalid_utf8_bytes = [0xff, 0xfe, 0xfd];
-        let invalid_utf8 = ManagerSyncCommandRequestRawDraft {
-            operation_id: bytes_view(&invalid_utf8_bytes),
-            ..valid_raw(MANAGER_SYNC_ACTION_RECOVERY_SETUP)
-        };
-        let invalid_utf8_error =
-            ManagerSyncCommandRequestDraft::from_raw(invalid_utf8).unwrap_err();
-        assert_eq!(
-            invalid_utf8_error.code,
-            RadishLexStatusCode::InvalidArgument
-        );
-        assert_eq!(
-            invalid_utf8_error.message,
-            "operation_id must be valid UTF-8"
-        );
-    }
-
-    #[test]
-    fn current_phase_gate_returns_stable_invalid_state_summary() {
-        let result = evaluate_manager_sync_command_current_phase_draft(valid_raw(
-            MANAGER_SYNC_ACTION_JOIN_REQUEST_AUTHORIZATION,
-        ))
-        .unwrap();
-
-        assert_eq!(result.abi_status, RadishLexStatusCode::InvalidState);
-        assert_eq!(
-            result.envelope.action_summary_code,
-            "join_request_authorization"
-        );
-        assert_eq!(result.envelope.command_status, "blocked_by_readiness");
-        assert_eq!(result.envelope.error_code, CURRENT_PHASE_COMMAND_ERROR);
-        assert_eq!(result.envelope.retry_policy, "not_retryable");
-        assert_eq!(
-            result.envelope.diagnostics_summary_code,
-            CURRENT_PHASE_DIAGNOSTICS_SUMMARY
-        );
-        assert_eq!(result.envelope.object_type_summary, "none");
-        assert_eq!(result.envelope.object_count_summary, 0);
-        result.assert_safe_summary().unwrap();
-    }
-
-    #[test]
-    fn result_handle_views_are_copyable_until_release() {
-        let context = ManagerSyncCommandContextDraft::new();
-        let mut handle = execute_manager_sync_command_current_phase_with_context_draft(
-            &context,
-            valid_raw(MANAGER_SYNC_ACTION_RECOVERY_RESTORE),
-        )
-        .unwrap();
-
-        let view = handle.view().unwrap();
-        assert_eq!(view.abi_status, RadishLexStatusCode::InvalidState);
-        assert_eq!(view.action_summary_code, "recovery_restore");
-        assert_eq!(view.command_status, "blocked_by_readiness");
-        assert_eq!(view.error_code, CURRENT_PHASE_COMMAND_ERROR);
-        assert_eq!(view.retry_policy, "not_retryable");
-        assert_eq!(view.object_count_summary, 0);
-        let copied_summary = view.user_visible_summary_code.to_owned();
-
-        release_manager_sync_command_result_handle_draft(Some(&mut handle));
-        let released_error = handle.view().unwrap_err();
-        assert_eq!(released_error.code, RadishLexStatusCode::InvalidState);
-        assert_eq!(released_error.message, RESULT_HANDLE_RELEASED_ERROR);
-        assert_eq!(copied_summary, CURRENT_PHASE_USER_SUMMARY);
-
-        release_manager_sync_command_result_handle_draft(None);
-    }
-
-    #[test]
-    fn panic_boundary_maps_unwind_to_internal_error() {
-        let error = capture_manager_sync_command_panic_boundary_draft(|| {
-            panic!("synthetic manager sync panic with secret-token")
-        })
-        .unwrap_err();
-
-        assert_eq!(error.code, RadishLexStatusCode::InternalError);
-        assert_eq!(error.message, PANIC_BOUNDARY_ERROR);
-        assert!(!error.message.contains("secret-token"));
-    }
-
-    #[test]
-    fn command_context_rejects_same_domain_overlap_and_releases_guard() {
-        let context = ManagerSyncCommandContextDraft::new();
-        let first_guard = context.enter_write_domain().unwrap();
-
-        let busy_error = context.enter_write_domain().unwrap_err();
-        assert_eq!(busy_error.code, RadishLexStatusCode::InvalidState);
-        assert_eq!(busy_error.message, SYNC_COMMAND_DOMAIN_BUSY_ERROR);
-
-        drop(first_guard);
-        let released_guard = context.enter_write_domain().unwrap();
-        drop(released_guard);
-    }
-
-    #[test]
-    fn forbidden_material_is_rejected_without_echoing_value() {
-        for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
-            let raw = ManagerSyncCommandRequestRawDraft {
-                operation_id: view(forbidden),
-                ..valid_raw(MANAGER_SYNC_ACTION_RECOVERY_SETUP)
-            };
-            let error = ManagerSyncCommandRequestDraft::from_raw(raw).unwrap_err();
-
-            assert_eq!(error.code, RadishLexStatusCode::InvalidArgument);
-            assert_eq!(error.message, "operation_id contains forbidden material");
-            assert!(!error.message.contains(forbidden));
-        }
-    }
-
-    #[test]
-    fn result_debug_does_not_include_request_fields_or_forbidden_material() {
-        let result = evaluate_manager_sync_command_current_phase_draft(valid_raw(
-            MANAGER_SYNC_ACTION_DEVICE_REVOCATION,
-        ))
-        .unwrap();
-        let debug = format!("{result:?}");
-
-        assert!(!debug.contains("op_test_non_secret_001"));
-        assert!(!debug.contains("readiness_snapshot_test_001"));
-        assert!(!debug.contains("local_smoke"));
-        assert!(!debug.contains("blocked\""));
-        for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
-            assert!(!debug.contains(forbidden), "{forbidden}");
-        }
-    }
+fn contains_forbidden_material(value: &str) -> bool {
+    FORBIDDEN_SUMMARY_FRAGMENTS
+        .iter()
+        .any(|fragment| value.contains(fragment))
 }
+
+#[cfg(test)]
+mod tests;
