@@ -5,6 +5,7 @@ import 'package:radishlex_manager/src/models/manager_models.dart';
 
 import '../fixtures/sync_bridge_command_contract_fixtures.dart';
 import '../fixtures/sync_ffi_command_boundary_fixtures.dart';
+import '../fixtures/sync_ffi_rust_host_contract_review_fixtures.dart';
 
 void main() {
   test('ffi boundary fixture keeps sync commands design-only', () {
@@ -723,6 +724,98 @@ void main() {
     expect(encodedDesign, isNot(contains('bridge_request_payload')));
     expect(encodedDesign, isNot(contains('connect_go_server_now')));
     expect(encodedDesign, isNot(contains('touch_platform_key_backend_now')));
+  });
+
+  test('rust host c abi review matrix covers test design items', () {
+    final testDesignItemIds = syncFfiCommandBoundaryRustHostTestDesignItemIds()
+        .toSet();
+    final sourceChecklistItemIds =
+        syncFfiCommandBoundaryRustHostSourceChecklistItemIds().toSet();
+    final reviewDesignItemIds = {
+      for (final item in syncFfiRustHostContractReviewItems)
+        ...item.testDesignItemIds,
+    };
+
+    expect(
+      syncFfiRustHostContractReviewItemIds(),
+      containsAll([
+        'request_struct_layout_review',
+        'result_struct_layout_review',
+        'release_and_error_lifecycle_review',
+        'panic_and_status_boundary_review',
+        'command_context_serialization_review',
+        'forbidden_material_contract_review',
+      ]),
+    );
+    expect(reviewDesignItemIds, containsAll(testDesignItemIds));
+
+    for (final item in syncFfiRustHostContractReviewItems) {
+      final shape = syncFfiRustHostContractReviewItemShape(item);
+
+      expect(shape['format'], syncFfiRustHostContractReviewFormat);
+      expect(shape['review_status'], syncFfiRustHostContractReviewStatus);
+      expect(
+        shape['target_test_file'],
+        syncFfiCommandBoundaryRustHostContractTargetTestFile,
+      );
+      expect(
+        item.implementationStatus,
+        syncFfiRustHostContractReviewImplementationStatus,
+        reason: item.id,
+      );
+      expect(
+        item.implementationGuards,
+        syncFfiCommandBoundaryRustHostReviewStopLines,
+        reason: item.id,
+      );
+      expect(item.testDesignSummary, isNot('none'), reason: item.id);
+      expect(item.sourceChecklistSummary, isNot('none'), reason: item.id);
+      expect(item.decisionSummary, isNot('none'), reason: item.id);
+      expect(item.evidenceSummary, isNot('none'), reason: item.id);
+      expect(item.forbiddenOutputSummary, isNot('none'), reason: item.id);
+      expect(item.guardSummary, isNot('none'), reason: item.id);
+
+      for (final designItemId in item.testDesignItemIds) {
+        expect(testDesignItemIds, contains(designItemId), reason: item.id);
+      }
+      for (final checklistItemId in item.sourceChecklistItemIds) {
+        expect(
+          sourceChecklistItemIds,
+          contains(checklistItemId),
+          reason: item.id,
+        );
+      }
+    }
+  });
+
+  test('rust host c abi review matrix remains non-executable', () {
+    final encodedReview = [
+      for (final item in syncFfiRustHostContractReviewItems)
+        jsonEncode(syncFfiRustHostContractReviewItemShape(item)),
+    ].join('\n');
+
+    expect(syncFfiCommandBoundaryCurrentNativeSymbols, isEmpty);
+    expect(encodedReview, contains('no_native_symbol'));
+    expect(encodedReview, contains('c_abi_contract_review_ready'));
+    for (final symbol in syncFfiCommandBoundaryCandidateSymbols) {
+      expect(encodedReview, isNot(contains(symbol)), reason: symbol);
+    }
+    for (final rejected in syncBridgeCommandContractRejectedSamples) {
+      expect(
+        encodedReview,
+        isNot(contains(rejected.forbiddenFragment)),
+        reason: rejected.id,
+      );
+    }
+    for (final fragment in syncBridgeCommandContractForbiddenFragments) {
+      expect(encodedReview, isNot(contains(fragment)));
+    }
+    expect(encodedReview, isNot(contains('settings_action_payload')));
+    expect(encodedReview, isNot(contains('bridge_request_payload')));
+    expect(encodedReview, isNot(contains('remote_request_body')));
+    expect(encodedReview, isNot(contains('remote_response_body')));
+    expect(encodedReview, isNot(contains('connect_go_server_now')));
+    expect(encodedReview, isNot(contains('touch_platform_key_backend_now')));
   });
 
   test('rust and dart smoke plans cover ownership and redaction evidence', () {
