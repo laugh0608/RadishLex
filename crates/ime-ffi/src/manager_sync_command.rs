@@ -47,6 +47,16 @@ const SYNC_COMMAND_CONTEXT_OWNER_MISMATCH_ERROR: &str =
     "manager_sync_command_context_owner_mismatch";
 const HOST_CONTRACT_GATE_MIGRATION_REVIEW_READY: &str =
     "host_contract_gate_migration_review_ready_no_native_symbol";
+const SUMMARY_STORAGE_REVIEW_READY: &str = "summary_storage_review_ready_no_native_symbol";
+const SUMMARY_STORAGE_REVIEW_ERROR: &str = "manager_sync_summary_storage_not_reviewed";
+const COMMAND_WORKER_THREAD_POLICY_REVIEW_READY: &str =
+    "command_worker_thread_policy_review_ready_no_native_symbol";
+const COMMAND_WORKER_THREAD_POLICY_ERROR: &str =
+    "manager_sync_command_worker_thread_policy_not_reviewed";
+const DEBUG_REDACTION_TEST_SHAPE_REVIEW_READY: &str =
+    "debug_redaction_test_shape_review_ready_no_native_symbol";
+const DEBUG_REDACTION_TEST_SHAPE_ERROR: &str =
+    "manager_sync_debug_redaction_test_shape_not_reviewed";
 
 pub(crate) const MANAGER_SYNC_SECTION_RECOVERY_SETUP: u32 = 1;
 pub(crate) const MANAGER_SYNC_SECTION_RECOVERY_RESTORE: u32 = 2;
@@ -164,7 +174,11 @@ const MANAGER_SYNC_COMMAND_HOST_TEST_EVIDENCE_DRAFT: &[&str] = &[
 
 const MANAGER_SYNC_COMMAND_HOST_GATE_MIGRATION_CONDITIONS_DRAFT: &[&str] = &[
     "result_accessor_field_set_reviewed",
+    "summary_storage_policy_reviewed",
+    "object_summary_numeric_width_reviewed",
     "command_context_owner_scope_reviewed",
+    "command_worker_thread_policy_reviewed",
+    "debug_redaction_test_shape_reviewed",
     "forbidden_material_redaction_reviewed",
     "native_symbol_export_approved_by_adr",
     "dart_native_binding_approved",
@@ -251,7 +265,7 @@ pub(crate) const MANAGER_SYNC_COMMAND_RESULT_ACCESSOR_FIELDS_DRAFT:
     ManagerSyncCommandResultAccessorFieldDraft {
         field_name: "object_count_summary",
         accessor_symbol: "radishlex_manager_sync_command_result_summary",
-        value_kind: "usize_count",
+        value_kind: "u64_count",
         current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
         copy_required_before_release: true,
     },
@@ -269,6 +283,24 @@ pub(crate) const MANAGER_SYNC_COMMAND_RESULT_ACCESSOR_FIELDS_DRAFT:
         current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
         copy_required_before_release: true,
     },
+];
+
+const MANAGER_SYNC_COMMAND_DEBUG_REDACTION_TARGETS_DRAFT: &[&str] = &[
+    "request_error",
+    "command_result",
+    "result_accessor_field",
+    "owner_scope_review",
+    "worker_policy_review",
+    "gate_migration_review",
+];
+
+const MANAGER_SYNC_COMMAND_FORBIDDEN_CATEGORIES_DRAFT: &[&str] = &[
+    "token_material",
+    "recovery_secret_material",
+    "join_verifier_material",
+    "signature_or_wrapped_sync_material",
+    "opaque_transport_content",
+    "local_path_material",
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -450,6 +482,124 @@ impl ManagerSyncCommandContextOwnerScopeReviewDraft {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagerSyncCommandSummaryStorageReviewDraft {
+    pub review_state: &'static str,
+    pub current_phase_storage: &'static str,
+    pub future_dynamic_storage: &'static str,
+    pub borrowed_view_lifetime: &'static str,
+    pub stores_caller_pointer: bool,
+    pub stores_provider_message: bool,
+    pub stores_transport_payload: bool,
+}
+
+impl ManagerSyncCommandSummaryStorageReviewDraft {
+    pub(crate) fn current_phase() -> Self {
+        Self {
+            review_state: SUMMARY_STORAGE_REVIEW_READY,
+            current_phase_storage: "static_summary_code_table",
+            future_dynamic_storage: "rust_owned_result_handle_storage",
+            borrowed_view_lifetime: "valid_until_result_release",
+            stores_caller_pointer: false,
+            stores_provider_message: false,
+            stores_transport_payload: false,
+        }
+    }
+
+    pub(crate) fn assert_safe_storage_policy(&self) -> Result<(), FfiError> {
+        ensure_safe_summary_value(self.review_state, "summary_storage_review_state")?;
+        ensure_safe_summary_value(self.current_phase_storage, "current_phase_summary_storage")?;
+        ensure_safe_summary_value(
+            self.future_dynamic_storage,
+            "future_dynamic_summary_storage",
+        )?;
+        ensure_safe_summary_value(
+            self.borrowed_view_lifetime,
+            "summary_borrowed_view_lifetime",
+        )?;
+        if self.stores_caller_pointer
+            || self.stores_provider_message
+            || self.stores_transport_payload
+        {
+            return Err(FfiError::invalid_state(SUMMARY_STORAGE_REVIEW_ERROR));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagerSyncCommandWorkerThreadPolicyReviewDraft {
+    pub review_state: &'static str,
+    pub current_phase_policy: &'static str,
+    pub future_worker_policy: &'static str,
+    pub owner_migration_policy: &'static str,
+    pub allows_background_remote_retry: bool,
+    pub queues_secret_payload: bool,
+    pub blocks_flutter_ui_isolate: bool,
+}
+
+impl ManagerSyncCommandWorkerThreadPolicyReviewDraft {
+    pub(crate) fn current_phase() -> Self {
+        Self {
+            review_state: COMMAND_WORKER_THREAD_POLICY_REVIEW_READY,
+            current_phase_policy: "caller_thread_owner_checked_current_phase",
+            future_worker_policy: "single_serial_manager_sync_worker_before_real_sync",
+            owner_migration_policy: "must_be_reviewed_before_worker_enabled",
+            allows_background_remote_retry: false,
+            queues_secret_payload: false,
+            blocks_flutter_ui_isolate: false,
+        }
+    }
+
+    pub(crate) fn assert_safe_worker_policy(&self) -> Result<(), FfiError> {
+        ensure_safe_summary_value(
+            self.review_state,
+            "command_worker_thread_policy_review_state",
+        )?;
+        ensure_safe_summary_value(self.current_phase_policy, "current_phase_worker_policy")?;
+        ensure_safe_summary_value(self.future_worker_policy, "future_worker_policy")?;
+        ensure_safe_summary_value(self.owner_migration_policy, "owner_migration_policy")?;
+        if self.allows_background_remote_retry
+            || self.queues_secret_payload
+            || self.blocks_flutter_ui_isolate
+        {
+            return Err(FfiError::invalid_state(COMMAND_WORKER_THREAD_POLICY_ERROR));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagerSyncCommandDebugRedactionReviewDraft {
+    pub review_state: &'static str,
+    pub debug_targets: &'static [&'static str],
+    pub forbidden_categories: &'static [&'static str],
+}
+
+impl ManagerSyncCommandDebugRedactionReviewDraft {
+    pub(crate) fn current_phase() -> Self {
+        Self {
+            review_state: DEBUG_REDACTION_TEST_SHAPE_REVIEW_READY,
+            debug_targets: MANAGER_SYNC_COMMAND_DEBUG_REDACTION_TARGETS_DRAFT,
+            forbidden_categories: MANAGER_SYNC_COMMAND_FORBIDDEN_CATEGORIES_DRAFT,
+        }
+    }
+
+    pub(crate) fn assert_safe_debug_redaction_shape(&self) -> Result<(), FfiError> {
+        ensure_safe_summary_value(self.review_state, "debug_redaction_review_state")?;
+        if self.debug_targets.is_empty() || self.forbidden_categories.is_empty() {
+            return Err(FfiError::invalid_state(DEBUG_REDACTION_TEST_SHAPE_ERROR));
+        }
+        for target in self.debug_targets {
+            ensure_safe_summary_value(target, "debug_redaction_target")?;
+        }
+        for category in self.forbidden_categories {
+            ensure_safe_summary_value(category, "debug_redaction_forbidden_category")?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ManagerSyncCommandHostGateMigrationReviewDraft {
     pub review_state: &'static str,
     pub ready_for_host_contract_test: bool,
@@ -461,10 +611,16 @@ impl ManagerSyncCommandHostGateMigrationReviewDraft {
         gate: &ManagerSyncCommandHostContractTestGateDraft,
         result_fields: &ManagerSyncCommandResultAccessorFieldSetReviewDraft,
         owner_scope: &ManagerSyncCommandContextOwnerScopeReviewDraft,
+        summary_storage: &ManagerSyncCommandSummaryStorageReviewDraft,
+        worker_policy: &ManagerSyncCommandWorkerThreadPolicyReviewDraft,
+        debug_redaction: &ManagerSyncCommandDebugRedactionReviewDraft,
     ) -> Result<Self, FfiError> {
         gate.assert_safe_gate_summary()?;
         result_fields.assert_safe_field_set()?;
         owner_scope.assert_safe_owner_scope()?;
+        summary_storage.assert_safe_storage_policy()?;
+        worker_policy.assert_safe_worker_policy()?;
+        debug_redaction.assert_safe_debug_redaction_shape()?;
         Ok(Self {
             review_state: HOST_CONTRACT_GATE_MIGRATION_REVIEW_READY,
             ready_for_host_contract_test: false,
@@ -765,7 +921,7 @@ pub(crate) struct ManagerSyncCommandEnvelopeDraft {
     pub diagnostics_summary_code: &'static str,
     pub next_required_evidence: &'static str,
     pub object_type_summary: &'static str,
-    pub object_count_summary: usize,
+    pub object_count_summary: u64,
     pub object_version_summary: &'static str,
     pub recorded_at_summary: &'static str,
 }
@@ -855,7 +1011,7 @@ pub(crate) struct ManagerSyncCommandResultViewDraft<'a> {
     pub diagnostics_summary_code: &'a str,
     pub next_required_evidence: &'a str,
     pub object_type_summary: &'a str,
-    pub object_count_summary: usize,
+    pub object_count_summary: u64,
     pub object_version_summary: &'a str,
     pub recorded_at_summary: &'a str,
 }
@@ -918,7 +1074,7 @@ impl<'a> ManagerSyncCommandResultViewDraft<'a> {
             "object_type_summary" => Ok(ManagerSyncCommandResultAccessorValueDraft::SummaryCode(
                 self.object_type_summary,
             )),
-            "object_count_summary" => Ok(ManagerSyncCommandResultAccessorValueDraft::Usize(
+            "object_count_summary" => Ok(ManagerSyncCommandResultAccessorValueDraft::U64(
                 self.object_count_summary,
             )),
             "object_version_summary" => {
@@ -937,7 +1093,7 @@ impl<'a> ManagerSyncCommandResultViewDraft<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ManagerSyncCommandResultAccessorValueDraft<'a> {
     U32(u32),
-    Usize(usize),
+    U64(u64),
     SummaryCode(&'a str),
 }
 

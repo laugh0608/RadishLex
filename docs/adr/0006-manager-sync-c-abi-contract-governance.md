@@ -8,7 +8,7 @@ Accepted
 
 ## 背景
 
-Phase 4 manager 同步入口当前只做非上传治理。仓库已补齐真实 bridge 命令前 contract 草案、FFI command boundary、contract test plan、Rust host contract catalog、review catalog、source checklist、test design package、Dart fake binding replay、C ABI contract review matrix、implementation review package、Rust 内部非导出草案模块、C ABI wrapper 形状评审、result accessor field set 评审、command context owner scope 评审和 host contract test gate 迁出条件草案。
+Phase 4 manager 同步入口当前只做非上传治理。仓库已补齐真实 bridge 命令前 contract 草案、FFI command boundary、contract test plan、Rust host contract catalog、review catalog、source checklist、test design package、Dart fake binding replay、C ABI contract review matrix、implementation review package、Rust 内部非导出草案模块、C ABI wrapper 形状评审、result accessor field set 评审、summary storage / object count width 评审、command context owner scope 评审、worker thread policy 评审、Debug redaction test shape 评审和 host contract test gate 迁出条件草案。
 
 这些材料证明 future command contract 的安全边界、ownership、错误分层和 smoke 计划可复验，但不证明 native command 已实现。若后续直接创建 C ABI symbol 或 `ManagerBridge` 可执行方法，容易绕过以下边界：
 
@@ -47,7 +47,7 @@ radishlex_manager_sync_command_result_free
 
 - 后续 Rust 侧可能需要的 `manager_sync_command.rs::*Draft` 类型 / 函数草案。
 - 当前可复用的 `ime-ffi` 源码模式，例如 `ffi_status`、`ffi_ptr`、`ffi_release`、`read_utf8`、`read_ffi_bool`、error handle 和 sync preflight summary。
-- 进入真实 Rust host test 前仍需确认的实现问题，例如 action id 数值、真实 C ABI action section encoding、summary string storage、object summary numeric width、command worker thread policy 和 Debug redaction test shape。
+- 进入真实 Rust host test 前仍需确认的实现问题，例如 action id 数值、真实 C ABI action section encoding、future dynamic summary storage owner、future object count source、future worker queue API shape 和 diagnostics summary allowlist source。
 
 该包的状态为 `rust_host_implementation_review_ready_no_native_symbol`。它已经驱动 `crates/ime-ffi/src/manager_sync_command.rs` 落地为内部非导出草案模块，但不代表 C ABI symbol、Dart native binding、`ManagerBridge` 可执行方法或 `crates/ime-ffi/tests/manager_sync_command_boundary.rs` 已经落地。
 
@@ -67,7 +67,7 @@ radishlex_manager_sync_command_result_free
 
 当前所有候选 symbol 的状态都是 `planned_not_exported_current_phase`，`export_approved=false`。error lifecycle 继续复用现有 `radishlex_error_code`、`radishlex_error_message` 和 `radishlex_error_free`，不新增 manager 专用 error symbol。
 
-`ManagerSyncCommandHostContractTestGateDraft` 当前状态为 `host_contract_test_gate_closed_no_native_symbol`，`ready_for_host_contract_test=false`。阻塞项包括 native symbol export、Dart native binding、`ManagerBridge` command、host contract test 文件和真实同步执行均未批准。`ManagerSyncCommandHostGateMigrationReviewDraft` 进一步固定 gate 迁出条件：result accessor field set、command context owner scope、forbidden material redaction、ADR 批准、Dart binding、`ManagerBridge` command、host test 文件、dynamic library symbol smoke 和真实同步执行批准必须同时具备。它们只把进入 `crates/ime-ffi/tests/manager_sync_command_boundary.rs` 前需要复验的证据固化为内部草案，不创建该测试文件。
+`ManagerSyncCommandHostContractTestGateDraft` 当前状态为 `host_contract_test_gate_closed_no_native_symbol`，`ready_for_host_contract_test=false`。阻塞项包括 native symbol export、Dart native binding、`ManagerBridge` command、host contract test 文件和真实同步执行均未批准。`ManagerSyncCommandHostGateMigrationReviewDraft` 进一步固定 gate 迁出条件：result accessor field set、summary storage policy、object count `u64` width、command context owner scope、command worker thread policy、Debug redaction test shape、forbidden material redaction、ADR 批准、Dart binding、`ManagerBridge` command、host test 文件、dynamic library symbol smoke 和真实同步执行批准必须同时具备。它们只把进入 `crates/ime-ffi/tests/manager_sync_command_boundary.rs` 前需要复验的证据固化为内部草案，不创建该测试文件。
 
 ## Rust Internal Draft Module
 
@@ -79,12 +79,15 @@ radishlex_manager_sync_command_result_free
 - current-phase capability closed 结果摘要，返回稳定 `InvalidState`，只包含 allowlist summary code。
 - action-specific section draft，按 action id 绑定当前阶段允许的确认状态码、前置证据码和 transient material 状态码；不接受短码值、恢复码值或 payload-shaped 字段。
 - Rust-owned result handle draft、summary view draft、copy-before-release 断言、release 后 view 失效和 `release(None)` 无效果。
-- result accessor field set review draft，把 `schema_version`、`action_id`、`command_status`、`error_code`、`retry_policy`、`user_visible_summary_code`、`diagnostics_summary_code`、`next_required_evidence`、对象摘要和 recorded-at 摘要绑定到当前候选 accessor / summary 组；全部保持 `planned_not_exported_current_phase`。
+- result accessor field set review draft，把 `schema_version`、`action_id`、`command_status`、`error_code`、`retry_policy`、`user_visible_summary_code`、`diagnostics_summary_code`、`next_required_evidence`、对象摘要和 recorded-at 摘要绑定到当前候选 accessor / summary 组；对象计数固定为 `u64` 草案，全部保持 `planned_not_exported_current_phase`。
+- summary storage review draft，当前阶段使用静态 summary code table，future 动态摘要必须由 Rust-owned result handle 持有；borrowed view 只在 release 前有效，不保存 caller pointer、provider message 或 transport payload。
 - error handle draft，覆盖 read -> copy -> release 生命周期、release 后失效、`release(None)` 无效果和 forbidden provider message 拒绝。
 - 内部 panic boundary helper，将 unwind 映射为稳定 `InternalError`，不回显 panic payload。
 - manager sync command context draft，同一 sync domain 重入返回结构化 `InvalidState`，guard drop 后释放 domain；context owner scope 绑定创建线程，跨线程使用返回结构化 `InvalidState`，且不持有 Flutter widget state、settings payload、Dart pointer 或平台 UI object。
+- command worker thread policy review draft，当前阶段只允许 caller thread owner check；真实同步前必须另行评审单一串行 worker、owner 迁移、消息边界和取消语义，不允许后台远端重试或 secret payload 队列。
 - C ABI wrapper shape review draft，固定候选 executor / result accessor / release symbol 名称、现有 error lifecycle symbol 复用和 export approval 关闭态。
 - host contract test gate draft 和 gate migration review draft，记录当前进入真实 host contract test 文件前仍关闭的阻塞项、required evidence 和迁出条件。
+- Debug redaction test shape review draft，覆盖 request error、command result、result accessor field、owner scope、worker policy 和 gate migration review 的 Debug 脱敏断言形状。
 - Debug / error message / result summary 不回显 operation id、readiness snapshot、source tag、backend gate 或 secret-shaped 片段。
 
 当前内部草案不覆盖：
@@ -110,7 +113,8 @@ result 必须由 Rust-owned handle 承载，并只暴露 safe summary view：
 
 - Dart / 平台 binding 必须复制 summary 后调用 release function。
 - result view 在 release 后失效，不得跨调用或跨 isolate 持有。
-- result accessor field set 只能包含 `schema_version`、`action_id`、allowlist command status、error code、retry policy、user-visible summary code、diagnostics summary code、next required evidence、object type / count / version summary 和 recorded-at summary。
+- result accessor field set 只能包含 `schema_version`、`action_id`、allowlist command status、error code、retry policy、user-visible summary code、diagnostics summary code、next required evidence、object type / `u64` count / version summary 和 recorded-at summary。
+- current-phase summary 可来自静态 code table；future dynamic summary 必须由 Rust-owned result handle 持有，不能借用 caller request、provider message 或 transport payload。
 - result 不包含 token、恢复码、短码、signature bytes、wrapped material、payload bytes、请求 / 响应体、provider exception 原文、真实路径或平台 key backend secret。
 - `*_free(NULL)` 必须安全返回。
 
@@ -137,6 +141,7 @@ result 必须由 Rust-owned handle 承载，并只暴露 safe summary view：
 - 当前阶段 capability gate 在所有真实操作前执行。
 - 同一 sync domain 的写入命令串行化，或返回结构化互斥状态。
 - command context owner scope 必须明确；当前内部草案绑定创建线程，跨线程使用返回 `InvalidState`，后续若引入专用 worker 必须重新评审 owner 迁移规则。
+- command worker thread policy 必须先评审；真实同步前只允许一个 manager sync 串行 worker 方向，不允许 Flutter UI isolate 阻塞、secret payload 排队或后台远端重试。
 - `operation_id` 只能是非敏感幂等摘要，不从 secret、payload 或用户输入派生。
 - command context 不持有 Flutter widget state、settings draft payload、Dart pointer 或平台 UI object。
 - 后台远端重试、隐式设备状态推进和真实上传必须等真实同步入口开放后单独设计。
@@ -159,7 +164,7 @@ result 必须由 Rust-owned handle 承载，并只暴露 safe summary view：
 
 - `syncFfiRustHostContractReviewItems` 覆盖全部 `syncFfiCommandBoundaryRustHostTestDesignItems`。
 - `syncFfiRustHostImplementationReviewItems` 覆盖全部 C ABI contract review items，并且内部 Rust draft module 的单元测试继续通过。
-- request struct、result struct、result accessor field set、release function、error handle、panic boundary、command context 和 owner scope 已有明确 Rust 类型草案或等价实现说明。
+- request struct、result struct、result accessor field set、summary storage、object count width、release function、error handle、panic boundary、command context、owner scope、worker thread policy 和 Debug redaction test shape 已有明确 Rust 类型草案或等价实现说明。
 - C ABI wrapper 形状评审必须继续证明候选 symbol 仅为字符串级审阅材料，host contract test gate 和 gate migration review 必须通过 ADR / 文档 / smoke 证据明确打开后才能创建真实测试文件。
 - forbidden material contract 已映射到 test assertions。
 - Dart fake binding replay 继续证明 unknown native status、copy / free 和错误分类保持安全阻塞。

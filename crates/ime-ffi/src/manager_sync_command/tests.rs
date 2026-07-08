@@ -310,6 +310,15 @@ fn result_accessor_field_set_matches_safe_view_fields() {
         .fields
         .iter()
         .any(|field| field.accessor_symbol == "radishlex_manager_sync_command_result_summary"));
+    assert_eq!(
+        review
+            .fields
+            .iter()
+            .find(|field| field.field_name == "object_count_summary")
+            .unwrap()
+            .value_kind,
+        "u64_count"
+    );
 
     for field in review.fields {
         let value = view.accessor_value(field.field_name).unwrap();
@@ -319,6 +328,28 @@ fn result_accessor_field_set_matches_safe_view_fields() {
             let debug = format!("{field:?} {value:?}");
             assert!(!debug.contains(forbidden), "{forbidden}");
         }
+    }
+}
+
+#[test]
+fn summary_storage_review_keeps_dynamic_text_handle_owned() {
+    let storage = ManagerSyncCommandSummaryStorageReviewDraft::current_phase();
+    storage.assert_safe_storage_policy().unwrap();
+
+    assert_eq!(storage.review_state, SUMMARY_STORAGE_REVIEW_READY);
+    assert_eq!(storage.current_phase_storage, "static_summary_code_table");
+    assert_eq!(
+        storage.future_dynamic_storage,
+        "rust_owned_result_handle_storage"
+    );
+    assert_eq!(storage.borrowed_view_lifetime, "valid_until_result_release");
+    assert!(!storage.stores_caller_pointer);
+    assert!(!storage.stores_provider_message);
+    assert!(!storage.stores_transport_payload);
+
+    let debug = format!("{storage:?}");
+    for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
+        assert!(!debug.contains(forbidden), "{forbidden}");
     }
 }
 
@@ -413,6 +444,66 @@ fn command_context_owner_scope_rejects_cross_thread_and_ui_ownership() {
     assert_eq!(error.message, SYNC_COMMAND_CONTEXT_OWNER_MISMATCH_ERROR);
 
     let debug = format!("{owner_scope:?}");
+    for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
+        assert!(!debug.contains(forbidden), "{forbidden}");
+    }
+}
+
+#[test]
+fn command_worker_policy_requires_serial_worker_before_real_sync() {
+    let worker = ManagerSyncCommandWorkerThreadPolicyReviewDraft::current_phase();
+    worker.assert_safe_worker_policy().unwrap();
+
+    assert_eq!(
+        worker.review_state,
+        COMMAND_WORKER_THREAD_POLICY_REVIEW_READY
+    );
+    assert_eq!(
+        worker.current_phase_policy,
+        "caller_thread_owner_checked_current_phase"
+    );
+    assert_eq!(
+        worker.future_worker_policy,
+        "single_serial_manager_sync_worker_before_real_sync"
+    );
+    assert_eq!(
+        worker.owner_migration_policy,
+        "must_be_reviewed_before_worker_enabled"
+    );
+    assert!(!worker.allows_background_remote_retry);
+    assert!(!worker.queues_secret_payload);
+    assert!(!worker.blocks_flutter_ui_isolate);
+
+    let debug = format!("{worker:?}");
+    for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
+        assert!(!debug.contains(forbidden), "{forbidden}");
+    }
+}
+
+#[test]
+fn debug_redaction_review_covers_internal_draft_targets() {
+    let redaction = ManagerSyncCommandDebugRedactionReviewDraft::current_phase();
+    redaction.assert_safe_debug_redaction_shape().unwrap();
+
+    assert_eq!(
+        redaction.review_state,
+        DEBUG_REDACTION_TEST_SHAPE_REVIEW_READY
+    );
+    assert!(redaction.debug_targets.contains(&"request_error"));
+    assert!(redaction.debug_targets.contains(&"command_result"));
+    assert!(redaction.debug_targets.contains(&"result_accessor_field"));
+    assert!(redaction.debug_targets.contains(&"owner_scope_review"));
+    assert!(redaction.debug_targets.contains(&"worker_policy_review"));
+    assert!(redaction.debug_targets.contains(&"gate_migration_review"));
+    assert!(redaction.forbidden_categories.contains(&"token_material"));
+    assert!(redaction
+        .forbidden_categories
+        .contains(&"recovery_secret_material"));
+    assert!(redaction
+        .forbidden_categories
+        .contains(&"signature_or_wrapped_sync_material"));
+
+    let debug = format!("{redaction:?}");
     for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
         assert!(!debug.contains(forbidden), "{forbidden}");
     }
@@ -540,10 +631,16 @@ fn host_contract_gate_migration_conditions_remain_review_only() {
     let gate = ManagerSyncCommandHostContractTestGateDraft::current_phase(&wrapper_review).unwrap();
     let result_fields = ManagerSyncCommandResultAccessorFieldSetReviewDraft::current_phase();
     let owner_scope = ManagerSyncCommandContextOwnerScopeReviewDraft::current_phase();
+    let summary_storage = ManagerSyncCommandSummaryStorageReviewDraft::current_phase();
+    let worker_policy = ManagerSyncCommandWorkerThreadPolicyReviewDraft::current_phase();
+    let debug_redaction = ManagerSyncCommandDebugRedactionReviewDraft::current_phase();
     let migration = ManagerSyncCommandHostGateMigrationReviewDraft::current_phase(
         &gate,
         &result_fields,
         &owner_scope,
+        &summary_storage,
+        &worker_policy,
+        &debug_redaction,
     )
     .unwrap();
     migration.assert_safe_migration_conditions().unwrap();
@@ -558,7 +655,19 @@ fn host_contract_gate_migration_conditions_remain_review_only() {
         .contains(&"result_accessor_field_set_reviewed"));
     assert!(migration
         .required_conditions
+        .contains(&"summary_storage_policy_reviewed"));
+    assert!(migration
+        .required_conditions
+        .contains(&"object_summary_numeric_width_reviewed"));
+    assert!(migration
+        .required_conditions
         .contains(&"command_context_owner_scope_reviewed"));
+    assert!(migration
+        .required_conditions
+        .contains(&"command_worker_thread_policy_reviewed"));
+    assert!(migration
+        .required_conditions
+        .contains(&"debug_redaction_test_shape_reviewed"));
     assert!(migration
         .required_conditions
         .contains(&"forbidden_material_redaction_reviewed"));

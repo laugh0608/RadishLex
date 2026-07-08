@@ -961,6 +961,190 @@ void main() {
     );
   });
 
+  test(
+    'rust internal draft result accessor evidence matches result fields',
+    () {
+      final accessorFieldNames = {
+        for (final item in syncFfiRustHostResultAccessorFieldSetItems)
+          item.fieldName,
+      };
+      final encodedFieldSet = [
+        for (final item in syncFfiRustHostResultAccessorFieldSetItems)
+          jsonEncode(syncFfiRustHostResultAccessorFieldSetItemShape(item)),
+      ].join('\n');
+
+      expect(
+        accessorFieldNames,
+        syncFfiCommandBoundaryResultSummaryFields.toSet(),
+      );
+      expect(
+        syncFfiRustHostResultAccessorFieldSetItems.length,
+        syncFfiCommandBoundaryResultSummaryFields.length,
+      );
+      expect(
+        syncFfiRustHostResultAccessorFieldSetItems
+            .where((item) => item.fieldName == 'object_count_summary')
+            .single
+            .numericWidth,
+        'u64',
+      );
+      expect(
+        syncFfiRustHostResultAccessorFieldSetItems
+            .where((item) => item.numericWidth == 'u64')
+            .single
+            .fieldName,
+        'object_count_summary',
+      );
+      expect(
+        syncFfiRustHostResultAccessorFieldSetItems
+            .where((item) => item.valueKind == 'summary_code')
+            .map((item) => item.storagePolicy)
+            .toSet(),
+        {'handle_owned_or_static_summary'},
+      );
+      expect(
+        encodedFieldSet,
+        contains(syncFfiRustHostResultAccessorFieldSetReviewStatus),
+      );
+      expect(encodedFieldSet, contains('planned_not_exported_current_phase'));
+      expect(encodedFieldSet, isNot(contains('payload_bytes')));
+      expect(encodedFieldSet, isNot(contains('request_body')));
+      expect(encodedFieldSet, isNot(contains('response_body')));
+      for (final rejected in syncBridgeCommandContractRejectedSamples) {
+        expect(
+          encodedFieldSet,
+          isNot(contains(rejected.forbiddenFragment)),
+          reason: rejected.id,
+        );
+      }
+    },
+  );
+
+  test('rust internal draft owner worker and gate evidence stays closed', () {
+    final ownerShape = syncFfiRustHostCommandContextOwnerScopeReviewShape(
+      syncFfiRustHostCommandContextOwnerScopeReview,
+    );
+    final workerShape = syncFfiRustHostCommandWorkerThreadPolicyReviewShape(
+      syncFfiRustHostCommandWorkerThreadPolicyReview,
+    );
+    final gateShape = syncFfiRustHostGateMigrationReviewShape();
+    final encoded = jsonEncode({
+      'owner': ownerShape,
+      'worker': workerShape,
+      'gate': gateShape,
+    });
+
+    expect(
+      ownerShape['review_status'],
+      syncFfiRustHostCommandContextOwnerScopeReviewStatus,
+    );
+    expect(ownerShape['cross_thread_status'], 'InvalidState');
+    expect(ownerShape['owns_flutter_widget_state'], isFalse);
+    expect(ownerShape['owns_settings_payload'], isFalse);
+    expect(ownerShape['owns_dart_pointer'], isFalse);
+    expect(ownerShape['owns_platform_ui_object'], isFalse);
+
+    expect(
+      workerShape['review_status'],
+      syncFfiRustHostCommandWorkerThreadPolicyReviewStatus,
+    );
+    expect(
+      workerShape['future_worker_policy'],
+      'single_serial_manager_sync_worker_before_real_sync',
+    );
+    expect(workerShape['allows_background_remote_retry'], isFalse);
+    expect(workerShape['queues_secret_payload'], isFalse);
+    expect(workerShape['blocks_flutter_ui_isolate'], isFalse);
+
+    expect(
+      gateShape['review_status'],
+      syncFfiRustHostGateMigrationReviewStatus,
+    );
+    expect(gateShape['ready_for_host_contract_test'], isFalse);
+    expect(
+      gateShape['required_conditions'],
+      containsAll([
+        'result_accessor_field_set_reviewed',
+        'summary_storage_policy_reviewed',
+        'object_summary_numeric_width_reviewed',
+        'command_context_owner_scope_reviewed',
+        'command_worker_thread_policy_reviewed',
+        'debug_redaction_test_shape_reviewed',
+        'forbidden_material_redaction_reviewed',
+        'native_symbol_export_approved_by_adr',
+        'dart_native_binding_approved',
+        'manager_bridge_command_approved',
+        'host_contract_test_file_approved',
+        'ffi_smoke_candidate_symbols_absent_until_approval',
+        'real_sync_execution_approved_after_gate',
+      ]),
+    );
+    expect(encoded, isNot(contains('settings_action_payload')));
+    expect(encoded, isNot(contains('bridge_request_payload')));
+    expect(encoded, isNot(contains('remote_request_body')));
+    expect(encoded, isNot(contains('remote_response_body')));
+    for (final fragment in syncBridgeCommandContractForbiddenFragments) {
+      expect(encoded, isNot(contains(fragment)));
+    }
+  });
+
+  test('rust internal draft storage and debug redaction evidence is safe', () {
+    final storageShape = syncFfiRustHostSummaryStorageReviewShape(
+      syncFfiRustHostSummaryStorageReview,
+    );
+    final debugShape = syncFfiRustHostDebugRedactionReviewShape(
+      syncFfiRustHostDebugRedactionReview,
+    );
+    final encoded = jsonEncode({'storage': storageShape, 'debug': debugShape});
+
+    expect(
+      storageShape['review_status'],
+      syncFfiRustHostSummaryStorageReviewStatus,
+    );
+    expect(storageShape['current_phase_storage'], 'static_summary_code_table');
+    expect(
+      storageShape['future_dynamic_storage'],
+      'rust_owned_result_handle_storage',
+    );
+    expect(storageShape['stores_caller_pointer'], isFalse);
+    expect(storageShape['stores_provider_message'], isFalse);
+    expect(storageShape['stores_transport_payload'], isFalse);
+
+    expect(
+      debugShape['review_status'],
+      syncFfiRustHostDebugRedactionReviewStatus,
+    );
+    expect(
+      debugShape['debug_targets'],
+      containsAll([
+        'request_error',
+        'command_result',
+        'result_accessor_field',
+        'owner_scope_review',
+        'worker_policy_review',
+        'gate_migration_review',
+      ]),
+    );
+    expect(
+      debugShape['forbidden_categories'],
+      containsAll([
+        'token_material',
+        'recovery_secret_material',
+        'join_verifier_material',
+        'signature_or_wrapped_sync_material',
+        'opaque_transport_content',
+        'local_path_material',
+      ]),
+    );
+    expect(encoded, isNot(contains('Bearer ')));
+    expect(encoded, isNot(contains('RADISHLEX-RECOVERY-CODE-SECRET')));
+    expect(encoded, isNot(contains('short_code=')));
+    expect(encoded, isNot(contains('signature_bytes')));
+    expect(encoded, isNot(contains('wrapped_material_bytes')));
+    expect(encoded, isNot(contains('payload_bytes=')));
+    expect(encoded, isNot(contains('/synthetic/private')));
+  });
+
   test('rust and dart smoke plans cover ownership and redaction evidence', () {
     expect(
       syncFfiCommandBoundaryAllSmokeCaseIds(),

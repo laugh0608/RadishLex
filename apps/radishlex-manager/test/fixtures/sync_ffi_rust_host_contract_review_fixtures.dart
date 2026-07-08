@@ -20,6 +20,180 @@ const syncFfiRustHostContractReviewDecisionRecordPath =
 const syncFfiRustHostContractReviewImplementationStatus =
     'implementation_review_ready_no_native_symbol';
 
+const syncFfiRustHostInternalDraftEvidenceFormat =
+    'future_manager_sync_ffi_internal_draft_evidence.v1_draft';
+
+const syncFfiRustHostResultAccessorFieldSetReviewStatus =
+    'result_accessor_field_set_review_ready_no_native_symbol';
+
+const syncFfiRustHostSummaryStorageReviewStatus =
+    'summary_storage_review_ready_no_native_symbol';
+
+const syncFfiRustHostCommandContextOwnerScopeReviewStatus =
+    'command_context_owner_scope_review_ready_no_native_symbol';
+
+const syncFfiRustHostCommandWorkerThreadPolicyReviewStatus =
+    'command_worker_thread_policy_review_ready_no_native_symbol';
+
+const syncFfiRustHostDebugRedactionReviewStatus =
+    'debug_redaction_test_shape_review_ready_no_native_symbol';
+
+const syncFfiRustHostGateMigrationReviewStatus =
+    'host_contract_gate_migration_review_ready_no_native_symbol';
+
+const syncFfiRustHostResultAccessorFieldSetItems = [
+  SyncFfiRustHostResultAccessorFieldSetItem(
+    fieldName: 'schema_version',
+    accessorGroup: 'result_summary_accessor_group',
+    valueKind: 'u32',
+    storagePolicy: 'numeric_copy',
+    numericWidth: 'u32',
+  ),
+  SyncFfiRustHostResultAccessorFieldSetItem(
+    fieldName: 'action_id',
+    accessorGroup: 'result_action_id_accessor_group',
+    valueKind: 'u32',
+    storagePolicy: 'numeric_copy',
+    numericWidth: 'u32',
+  ),
+  SyncFfiRustHostResultAccessorFieldSetItem(
+    fieldName: 'command_status',
+    accessorGroup: 'result_status_accessor_group',
+    valueKind: 'summary_code',
+    storagePolicy: 'handle_owned_or_static_summary',
+    numericWidth: 'not_numeric',
+  ),
+  SyncFfiRustHostResultAccessorFieldSetItem(
+    fieldName: 'error_code',
+    accessorGroup: 'result_error_code_accessor_group',
+    valueKind: 'summary_code',
+    storagePolicy: 'handle_owned_or_static_summary',
+    numericWidth: 'not_numeric',
+  ),
+  SyncFfiRustHostResultAccessorFieldSetItem(
+    fieldName: 'retry_policy',
+    accessorGroup: 'result_retry_policy_accessor_group',
+    valueKind: 'summary_code',
+    storagePolicy: 'handle_owned_or_static_summary',
+    numericWidth: 'not_numeric',
+  ),
+  SyncFfiRustHostResultAccessorFieldSetItem(
+    fieldName: 'user_visible_summary_code',
+    accessorGroup: 'result_summary_accessor_group',
+    valueKind: 'summary_code',
+    storagePolicy: 'handle_owned_or_static_summary',
+    numericWidth: 'not_numeric',
+  ),
+  SyncFfiRustHostResultAccessorFieldSetItem(
+    fieldName: 'diagnostics_summary_code',
+    accessorGroup: 'result_summary_accessor_group',
+    valueKind: 'summary_code',
+    storagePolicy: 'handle_owned_or_static_summary',
+    numericWidth: 'not_numeric',
+  ),
+  SyncFfiRustHostResultAccessorFieldSetItem(
+    fieldName: 'next_required_evidence',
+    accessorGroup: 'result_summary_accessor_group',
+    valueKind: 'summary_code',
+    storagePolicy: 'handle_owned_or_static_summary',
+    numericWidth: 'not_numeric',
+  ),
+  SyncFfiRustHostResultAccessorFieldSetItem(
+    fieldName: 'object_type_summary',
+    accessorGroup: 'result_summary_accessor_group',
+    valueKind: 'summary_code',
+    storagePolicy: 'handle_owned_or_static_summary',
+    numericWidth: 'not_numeric',
+  ),
+  SyncFfiRustHostResultAccessorFieldSetItem(
+    fieldName: 'object_count_summary',
+    accessorGroup: 'result_summary_accessor_group',
+    valueKind: 'u64_count',
+    storagePolicy: 'numeric_copy',
+    numericWidth: 'u64',
+  ),
+  SyncFfiRustHostResultAccessorFieldSetItem(
+    fieldName: 'object_version_summary',
+    accessorGroup: 'result_summary_accessor_group',
+    valueKind: 'summary_code',
+    storagePolicy: 'handle_owned_or_static_summary',
+    numericWidth: 'not_numeric',
+  ),
+  SyncFfiRustHostResultAccessorFieldSetItem(
+    fieldName: 'recorded_at_summary',
+    accessorGroup: 'result_summary_accessor_group',
+    valueKind: 'summary_code',
+    storagePolicy: 'handle_owned_or_static_summary',
+    numericWidth: 'not_numeric',
+  ),
+];
+
+const syncFfiRustHostSummaryStorageReview = SyncFfiRustHostSummaryStorageReview(
+  currentPhaseStorage: 'static_summary_code_table',
+  futureDynamicStorage: 'rust_owned_result_handle_storage',
+  borrowedViewLifetime: 'valid_until_result_release',
+  storesCallerPointer: false,
+  storesProviderMessage: false,
+  storesTransportPayload: false,
+);
+
+const syncFfiRustHostCommandContextOwnerScopeReview =
+    SyncFfiRustHostCommandContextOwnerScopeReview(
+      ownerScope: 'manager_sync_command_context_owner_thread',
+      domainGuardStorageScope: 'rust_owned_context_mutex_active_domain_set',
+      commandWorkerScope: 'not_started_current_phase',
+      crossThreadStatus: 'InvalidState',
+      ownsFlutterWidgetState: false,
+      ownsSettingsPayload: false,
+      ownsDartPointer: false,
+      ownsPlatformUiObject: false,
+    );
+
+const syncFfiRustHostCommandWorkerThreadPolicyReview =
+    SyncFfiRustHostCommandWorkerThreadPolicyReview(
+      currentPhasePolicy: 'caller_thread_owner_checked_current_phase',
+      futureWorkerPolicy: 'single_serial_manager_sync_worker_before_real_sync',
+      ownerMigrationPolicy: 'must_be_reviewed_before_worker_enabled',
+      allowsBackgroundRemoteRetry: false,
+      queuesSecretPayload: false,
+      blocksFlutterUiIsolate: false,
+    );
+
+const syncFfiRustHostDebugRedactionReview = SyncFfiRustHostDebugRedactionReview(
+  debugTargets: [
+    'request_error',
+    'command_result',
+    'result_accessor_field',
+    'owner_scope_review',
+    'worker_policy_review',
+    'gate_migration_review',
+  ],
+  forbiddenCategories: [
+    'token_material',
+    'recovery_secret_material',
+    'join_verifier_material',
+    'signature_or_wrapped_sync_material',
+    'opaque_transport_content',
+    'local_path_material',
+  ],
+);
+
+const syncFfiRustHostGateMigrationConditions = [
+  'result_accessor_field_set_reviewed',
+  'summary_storage_policy_reviewed',
+  'object_summary_numeric_width_reviewed',
+  'command_context_owner_scope_reviewed',
+  'command_worker_thread_policy_reviewed',
+  'debug_redaction_test_shape_reviewed',
+  'forbidden_material_redaction_reviewed',
+  'native_symbol_export_approved_by_adr',
+  'dart_native_binding_approved',
+  'manager_bridge_command_approved',
+  'host_contract_test_file_approved',
+  'ffi_smoke_candidate_symbols_absent_until_approval',
+  'real_sync_execution_approved_after_gate',
+];
+
 const syncFfiRustHostContractReviewItems = [
   SyncFfiRustHostContractReviewItem(
     id: 'request_struct_layout_review',
@@ -275,14 +449,15 @@ const syncFfiRustHostImplementationReviewItems = [
     requiredImplementationNotes: [
       'rust_owned_result_handle',
       'summary_view_accessors_only',
+      'result_accessor_field_set_reviewed',
+      'summary_storage_policy_reviewed',
       'command_status_error_retry_evidence_allowlist',
-      'object_summary_counts_only',
+      'object_summary_counts_u64',
       'manager_state_never_stores_native_pointer',
     ],
     unresolvedImplementationQuestions: [
-      'result_accessor_field_set',
-      'summary_string_interning_or_owned_storage',
-      'object_summary_numeric_widths',
+      'future_dynamic_summary_storage_owner_for_real_sync',
+      'future_object_summary_count_source',
     ],
     implementationGuards: syncFfiCommandBoundaryRustHostReviewStopLines,
     implementationStatus: syncFfiRustHostContractReviewImplementationStatus,
@@ -358,13 +533,14 @@ const syncFfiRustHostImplementationReviewItems = [
     requiredImplementationNotes: [
       'capability_gate_runs_before_operation',
       'same_domain_write_guard',
+      'command_context_owner_scope_reviewed',
+      'command_worker_thread_policy_reviewed',
       'operation_id_non_sensitive',
       'owner_context_invalid_state_pattern',
       'no_background_remote_retry',
     ],
     unresolvedImplementationQuestions: [
-      'domain_guard_storage_scope',
-      'command_worker_thread_policy',
+      'future_worker_queue_api_shape',
       'operation_id_uniqueness_scope',
     ],
     implementationGuards: syncFfiCommandBoundaryRustHostReviewStopLines,
@@ -389,9 +565,9 @@ const syncFfiRustHostImplementationReviewItems = [
       'join_verifier_material_absent',
       'signature_and_wrapped_material_absent',
       'transport_payload_and_real_path_absent',
+      'debug_redaction_test_shape_reviewed',
     ],
     unresolvedImplementationQuestions: [
-      'debug_format_redaction_test_shape',
       'diagnostics_summary_code_allowlist_source',
       'forbidden_material_assertion_reuse_in_rust_test',
     ],
@@ -399,6 +575,90 @@ const syncFfiRustHostImplementationReviewItems = [
     implementationStatus: syncFfiRustHostContractReviewImplementationStatus,
   ),
 ];
+
+class SyncFfiRustHostResultAccessorFieldSetItem {
+  const SyncFfiRustHostResultAccessorFieldSetItem({
+    required this.fieldName,
+    required this.accessorGroup,
+    required this.valueKind,
+    required this.storagePolicy,
+    required this.numericWidth,
+  });
+
+  final String fieldName;
+  final String accessorGroup;
+  final String valueKind;
+  final String storagePolicy;
+  final String numericWidth;
+}
+
+class SyncFfiRustHostSummaryStorageReview {
+  const SyncFfiRustHostSummaryStorageReview({
+    required this.currentPhaseStorage,
+    required this.futureDynamicStorage,
+    required this.borrowedViewLifetime,
+    required this.storesCallerPointer,
+    required this.storesProviderMessage,
+    required this.storesTransportPayload,
+  });
+
+  final String currentPhaseStorage;
+  final String futureDynamicStorage;
+  final String borrowedViewLifetime;
+  final bool storesCallerPointer;
+  final bool storesProviderMessage;
+  final bool storesTransportPayload;
+}
+
+class SyncFfiRustHostCommandContextOwnerScopeReview {
+  const SyncFfiRustHostCommandContextOwnerScopeReview({
+    required this.ownerScope,
+    required this.domainGuardStorageScope,
+    required this.commandWorkerScope,
+    required this.crossThreadStatus,
+    required this.ownsFlutterWidgetState,
+    required this.ownsSettingsPayload,
+    required this.ownsDartPointer,
+    required this.ownsPlatformUiObject,
+  });
+
+  final String ownerScope;
+  final String domainGuardStorageScope;
+  final String commandWorkerScope;
+  final String crossThreadStatus;
+  final bool ownsFlutterWidgetState;
+  final bool ownsSettingsPayload;
+  final bool ownsDartPointer;
+  final bool ownsPlatformUiObject;
+}
+
+class SyncFfiRustHostCommandWorkerThreadPolicyReview {
+  const SyncFfiRustHostCommandWorkerThreadPolicyReview({
+    required this.currentPhasePolicy,
+    required this.futureWorkerPolicy,
+    required this.ownerMigrationPolicy,
+    required this.allowsBackgroundRemoteRetry,
+    required this.queuesSecretPayload,
+    required this.blocksFlutterUiIsolate,
+  });
+
+  final String currentPhasePolicy;
+  final String futureWorkerPolicy;
+  final String ownerMigrationPolicy;
+  final bool allowsBackgroundRemoteRetry;
+  final bool queuesSecretPayload;
+  final bool blocksFlutterUiIsolate;
+}
+
+class SyncFfiRustHostDebugRedactionReview {
+  const SyncFfiRustHostDebugRedactionReview({
+    required this.debugTargets,
+    required this.forbiddenCategories,
+  });
+
+  final List<String> debugTargets;
+  final List<String> forbiddenCategories;
+}
 
 class SyncFfiRustHostContractReviewItem {
   const SyncFfiRustHostContractReviewItem({
@@ -541,5 +801,89 @@ Map<String, Object?> syncFfiRustHostImplementationReviewItemShape(
         fixture.unresolvedImplementationQuestions,
     'implementation_guards': fixture.implementationGuards,
     'implementation_status': fixture.implementationStatus,
+  };
+}
+
+Map<String, Object?> syncFfiRustHostResultAccessorFieldSetItemShape(
+  SyncFfiRustHostResultAccessorFieldSetItem fixture,
+) {
+  return {
+    'format': syncFfiRustHostInternalDraftEvidenceFormat,
+    'review_status': syncFfiRustHostResultAccessorFieldSetReviewStatus,
+    'field_name': fixture.fieldName,
+    'accessor_group': fixture.accessorGroup,
+    'value_kind': fixture.valueKind,
+    'storage_policy': fixture.storagePolicy,
+    'numeric_width': fixture.numericWidth,
+    'export_state': 'planned_not_exported_current_phase',
+    'copy_required_before_release': true,
+  };
+}
+
+Map<String, Object?> syncFfiRustHostSummaryStorageReviewShape(
+  SyncFfiRustHostSummaryStorageReview fixture,
+) {
+  return {
+    'format': syncFfiRustHostInternalDraftEvidenceFormat,
+    'review_status': syncFfiRustHostSummaryStorageReviewStatus,
+    'current_phase_storage': fixture.currentPhaseStorage,
+    'future_dynamic_storage': fixture.futureDynamicStorage,
+    'borrowed_view_lifetime': fixture.borrowedViewLifetime,
+    'stores_caller_pointer': fixture.storesCallerPointer,
+    'stores_provider_message': fixture.storesProviderMessage,
+    'stores_transport_payload': fixture.storesTransportPayload,
+  };
+}
+
+Map<String, Object?> syncFfiRustHostCommandContextOwnerScopeReviewShape(
+  SyncFfiRustHostCommandContextOwnerScopeReview fixture,
+) {
+  return {
+    'format': syncFfiRustHostInternalDraftEvidenceFormat,
+    'review_status': syncFfiRustHostCommandContextOwnerScopeReviewStatus,
+    'owner_scope': fixture.ownerScope,
+    'domain_guard_storage_scope': fixture.domainGuardStorageScope,
+    'command_worker_scope': fixture.commandWorkerScope,
+    'cross_thread_status': fixture.crossThreadStatus,
+    'owns_flutter_widget_state': fixture.ownsFlutterWidgetState,
+    'owns_settings_payload': fixture.ownsSettingsPayload,
+    'owns_dart_pointer': fixture.ownsDartPointer,
+    'owns_platform_ui_object': fixture.ownsPlatformUiObject,
+  };
+}
+
+Map<String, Object?> syncFfiRustHostCommandWorkerThreadPolicyReviewShape(
+  SyncFfiRustHostCommandWorkerThreadPolicyReview fixture,
+) {
+  return {
+    'format': syncFfiRustHostInternalDraftEvidenceFormat,
+    'review_status': syncFfiRustHostCommandWorkerThreadPolicyReviewStatus,
+    'current_phase_policy': fixture.currentPhasePolicy,
+    'future_worker_policy': fixture.futureWorkerPolicy,
+    'owner_migration_policy': fixture.ownerMigrationPolicy,
+    'allows_background_remote_retry': fixture.allowsBackgroundRemoteRetry,
+    'queues_secret_payload': fixture.queuesSecretPayload,
+    'blocks_flutter_ui_isolate': fixture.blocksFlutterUiIsolate,
+  };
+}
+
+Map<String, Object?> syncFfiRustHostDebugRedactionReviewShape(
+  SyncFfiRustHostDebugRedactionReview fixture,
+) {
+  return {
+    'format': syncFfiRustHostInternalDraftEvidenceFormat,
+    'review_status': syncFfiRustHostDebugRedactionReviewStatus,
+    'debug_targets': fixture.debugTargets,
+    'forbidden_categories': fixture.forbiddenCategories,
+  };
+}
+
+Map<String, Object?> syncFfiRustHostGateMigrationReviewShape() {
+  return {
+    'format': syncFfiRustHostInternalDraftEvidenceFormat,
+    'review_status': syncFfiRustHostGateMigrationReviewStatus,
+    'ready_for_host_contract_test': false,
+    'required_conditions': syncFfiRustHostGateMigrationConditions,
+    'target_test_file': syncFfiCommandBoundaryRustHostContractTargetTestFile,
   };
 }
