@@ -47,6 +47,10 @@ const SYNC_COMMAND_CONTEXT_OWNER_MISMATCH_ERROR: &str =
     "manager_sync_command_context_owner_mismatch";
 const HOST_CONTRACT_GATE_MIGRATION_REVIEW_READY: &str =
     "host_contract_gate_migration_review_ready_no_native_symbol";
+const HOST_GATE_READINESS_REVIEW_READY: &str = "host_gate_readiness_review_ready_no_native_symbol";
+const HOST_GATE_BLOCKED_NO_NATIVE_SYMBOL: &str = "host_gate_blocked_no_native_symbol";
+const HOST_GATE_READINESS_REPLAY_READY: &str =
+    "dart_fake_native_gate_migration_replay_ready_no_native_symbol";
 const SUMMARY_STORAGE_REVIEW_READY: &str = "summary_storage_review_ready_no_native_symbol";
 const SUMMARY_STORAGE_REVIEW_ERROR: &str = "manager_sync_summary_storage_not_reviewed";
 const COMMAND_WORKER_THREAD_POLICY_REVIEW_READY: &str =
@@ -169,6 +173,7 @@ const MANAGER_SYNC_COMMAND_HOST_TEST_EVIDENCE_DRAFT: &[&str] = &[
     "adr_0006_current",
     "manager_sync_ffi_command_boundary_current",
     "manager_sync_command_internal_draft_tests",
+    "dart_fake_native_gate_migration_replay",
     "ffi_bridge_smoke_candidate_symbols_absent",
 ];
 
@@ -185,6 +190,25 @@ const MANAGER_SYNC_COMMAND_HOST_GATE_MIGRATION_CONDITIONS_DRAFT: &[&str] = &[
     "manager_bridge_command_approved",
     "host_contract_test_file_approved",
     "ffi_smoke_candidate_symbols_absent_until_approval",
+    "real_sync_execution_approved_after_gate",
+];
+
+const MANAGER_SYNC_COMMAND_HOST_GATE_REVIEWED_CONDITIONS_DRAFT: &[&str] = &[
+    "result_accessor_field_set_reviewed",
+    "summary_storage_policy_reviewed",
+    "object_summary_numeric_width_reviewed",
+    "command_context_owner_scope_reviewed",
+    "command_worker_thread_policy_reviewed",
+    "debug_redaction_test_shape_reviewed",
+    "forbidden_material_redaction_reviewed",
+    "ffi_smoke_candidate_symbols_absent_until_approval",
+];
+
+const MANAGER_SYNC_COMMAND_HOST_GATE_BLOCKING_CONDITIONS_DRAFT: &[&str] = &[
+    "native_symbol_export_approved_by_adr",
+    "dart_native_binding_approved",
+    "manager_bridge_command_approved",
+    "host_contract_test_file_approved",
     "real_sync_execution_approved_after_gate",
 ];
 
@@ -292,6 +316,7 @@ const MANAGER_SYNC_COMMAND_DEBUG_REDACTION_TARGETS_DRAFT: &[&str] = &[
     "owner_scope_review",
     "worker_policy_review",
     "gate_migration_review",
+    "host_gate_readiness_review",
 ];
 
 const MANAGER_SYNC_COMMAND_FORBIDDEN_CATEGORIES_DRAFT: &[&str] = &[
@@ -634,6 +659,59 @@ impl ManagerSyncCommandHostGateMigrationReviewDraft {
             ensure_safe_summary_value(condition, "host_gate_migration_condition")?;
         }
         if self.ready_for_host_contract_test {
+            return Err(FfiError::invalid_state(HOST_CONTRACT_TEST_GATE_CLOSED));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagerSyncCommandHostGateReadinessReviewDraft {
+    pub review_state: &'static str,
+    pub readiness_state: &'static str,
+    pub ready_for_host_contract_test: bool,
+    pub reviewed_conditions: &'static [&'static str],
+    pub blocking_conditions: &'static [&'static str],
+    pub dart_fake_replay_status: &'static str,
+}
+
+impl ManagerSyncCommandHostGateReadinessReviewDraft {
+    pub(crate) fn current_phase(
+        migration: &ManagerSyncCommandHostGateMigrationReviewDraft,
+    ) -> Result<Self, FfiError> {
+        migration.assert_safe_migration_conditions()?;
+        for condition in MANAGER_SYNC_COMMAND_HOST_GATE_REVIEWED_CONDITIONS_DRAFT {
+            if !migration.required_conditions.contains(condition) {
+                return Err(FfiError::invalid_state(HOST_CONTRACT_TEST_GATE_CLOSED));
+            }
+        }
+        for condition in MANAGER_SYNC_COMMAND_HOST_GATE_BLOCKING_CONDITIONS_DRAFT {
+            if !migration.required_conditions.contains(condition) {
+                return Err(FfiError::invalid_state(HOST_CONTRACT_TEST_GATE_CLOSED));
+            }
+        }
+
+        Ok(Self {
+            review_state: HOST_GATE_READINESS_REVIEW_READY,
+            readiness_state: HOST_GATE_BLOCKED_NO_NATIVE_SYMBOL,
+            ready_for_host_contract_test: false,
+            reviewed_conditions: MANAGER_SYNC_COMMAND_HOST_GATE_REVIEWED_CONDITIONS_DRAFT,
+            blocking_conditions: MANAGER_SYNC_COMMAND_HOST_GATE_BLOCKING_CONDITIONS_DRAFT,
+            dart_fake_replay_status: HOST_GATE_READINESS_REPLAY_READY,
+        })
+    }
+
+    pub(crate) fn assert_safe_readiness(&self) -> Result<(), FfiError> {
+        ensure_safe_summary_value(self.review_state, "host_gate_readiness_review_state")?;
+        ensure_safe_summary_value(self.readiness_state, "host_gate_readiness_state")?;
+        ensure_safe_summary_value(self.dart_fake_replay_status, "host_gate_replay_status")?;
+        for condition in self.reviewed_conditions {
+            ensure_safe_summary_value(condition, "host_gate_reviewed_condition")?;
+        }
+        for condition in self.blocking_conditions {
+            ensure_safe_summary_value(condition, "host_gate_blocking_condition")?;
+        }
+        if self.ready_for_host_contract_test || self.blocking_conditions.is_empty() {
             return Err(FfiError::invalid_state(HOST_CONTRACT_TEST_GATE_CLOSED));
         }
         Ok(())

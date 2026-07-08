@@ -1079,12 +1079,143 @@ void main() {
         'real_sync_execution_approved_after_gate',
       ]),
     );
+    expect(
+      gateShape['required_conditions'],
+      containsAll(syncFfiRustHostGateReadinessReviewedConditions),
+    );
+    expect(
+      gateShape['required_conditions'],
+      containsAll(syncFfiRustHostGateReadinessBlockingConditions),
+    );
     expect(encoded, isNot(contains('settings_action_payload')));
     expect(encoded, isNot(contains('bridge_request_payload')));
     expect(encoded, isNot(contains('remote_request_body')));
     expect(encoded, isNot(contains('remote_response_body')));
     for (final fragment in syncBridgeCommandContractForbiddenFragments) {
       expect(encoded, isNot(contains(fragment)));
+    }
+  });
+
+  test('rust internal draft gate readiness review separates blockers', () {
+    final readinessShape = syncFfiRustHostGateReadinessReviewShape(
+      syncFfiRustHostGateReadinessReview,
+    );
+    final gateShape = syncFfiRustHostGateMigrationReviewShape();
+    final encoded = jsonEncode({
+      'readiness': readinessShape,
+      'gate': gateShape,
+    });
+
+    expect(
+      readinessShape['review_status'],
+      syncFfiRustHostGateReadinessReviewStatus,
+    );
+    expect(
+      readinessShape['readiness_state'],
+      syncFfiRustHostGateReadinessState,
+    );
+    expect(readinessShape['ready_for_host_contract_test'], isFalse);
+    expect(
+      readinessShape['dart_fake_replay_status'],
+      syncFfiRustHostGateMigrationReplayStatus,
+    );
+    expect(
+      readinessShape['reviewed_conditions'],
+      syncFfiRustHostGateReadinessReviewedConditions,
+    );
+    expect(
+      readinessShape['blocking_conditions'],
+      syncFfiRustHostGateReadinessBlockingConditions,
+    );
+    expect(
+      syncFfiRustHostGateReadinessReviewedConditions.toSet().intersection(
+        syncFfiRustHostGateReadinessBlockingConditions.toSet(),
+      ),
+      isEmpty,
+    );
+    expect(
+      gateShape['required_conditions'],
+      containsAll(syncFfiRustHostGateReadinessReviewedConditions),
+    );
+    expect(
+      gateShape['required_conditions'],
+      containsAll(syncFfiRustHostGateReadinessBlockingConditions),
+    );
+    expect(encoded, isNot(contains('settings_action_payload')));
+    expect(encoded, isNot(contains('bridge_request_payload')));
+    expect(encoded, isNot(contains('remote_request_body')));
+    expect(encoded, isNot(contains('remote_response_body')));
+    for (final fragment in syncBridgeCommandContractForbiddenFragments) {
+      expect(encoded, isNot(contains(fragment)));
+    }
+  });
+
+  test('rust host gate migration replay cases remain closed', () {
+    final gateConditions =
+        (syncFfiRustHostGateMigrationReviewShape()['required_conditions']
+                as List<String>)
+            .toSet();
+    final coveredMissingConditions = {
+      for (final replayCase in syncFfiRustHostGateMigrationReplayCases)
+        ...replayCase.simulatedMissingConditions,
+    };
+    final encodedReplayCases = [
+      for (final replayCase in syncFfiRustHostGateMigrationReplayCases)
+        jsonEncode(syncFfiRustHostGateMigrationReplayCaseShape(replayCase)),
+    ].join('\n');
+
+    expect(
+      coveredMissingConditions,
+      containsAll(syncFfiRustHostGateReadinessBlockingConditions),
+    );
+    expect(
+      coveredMissingConditions,
+      contains('ffi_smoke_candidate_symbols_absent_until_approval'),
+    );
+    for (final replayCase in syncFfiRustHostGateMigrationReplayCases) {
+      final shape = syncFfiRustHostGateMigrationReplayCaseShape(replayCase);
+
+      expect(
+        shape['review_status'],
+        syncFfiRustHostGateMigrationReplayStatus,
+        reason: replayCase.id,
+      );
+      expect(
+        replayCase.expectedReadinessState,
+        syncFfiRustHostGateReadinessState,
+        reason: replayCase.id,
+      );
+      expect(
+        syncBridgeCommandContractCommandStatuses,
+        contains(replayCase.expectedCommandStatus),
+        reason: replayCase.id,
+      );
+      expect(
+        syncFfiCommandBoundaryAllCommandErrorCodes(),
+        contains(replayCase.expectedErrorCode),
+        reason: replayCase.id,
+      );
+      expect(
+        syncBridgeCommandContractRetryPolicies,
+        contains(replayCase.expectedRetryPolicy),
+        reason: replayCase.id,
+      );
+      for (final condition in replayCase.simulatedMissingConditions) {
+        expect(gateConditions, contains(condition), reason: replayCase.id);
+      }
+      expect(shape['can_create_host_contract_test_file'], isFalse);
+      expect(shape['can_export_native_symbol'], isFalse);
+      expect(shape['can_modify_manager_bridge'], isFalse);
+      expect(shape['can_execute_real_sync'], isFalse);
+    }
+
+    expect(encodedReplayCases, contains('no_native_symbol'));
+    expect(encodedReplayCases, isNot(contains('settings_action_payload')));
+    expect(encodedReplayCases, isNot(contains('bridge_request_payload')));
+    expect(encodedReplayCases, isNot(contains('remote_request_body')));
+    expect(encodedReplayCases, isNot(contains('remote_response_body')));
+    for (final fragment in syncBridgeCommandContractForbiddenFragments) {
+      expect(encodedReplayCases, isNot(contains(fragment)));
     }
   });
 

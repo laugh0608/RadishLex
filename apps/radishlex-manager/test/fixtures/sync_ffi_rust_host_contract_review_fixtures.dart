@@ -41,6 +41,14 @@ const syncFfiRustHostDebugRedactionReviewStatus =
 const syncFfiRustHostGateMigrationReviewStatus =
     'host_contract_gate_migration_review_ready_no_native_symbol';
 
+const syncFfiRustHostGateReadinessReviewStatus =
+    'host_gate_readiness_review_ready_no_native_symbol';
+
+const syncFfiRustHostGateReadinessState = 'host_gate_blocked_no_native_symbol';
+
+const syncFfiRustHostGateMigrationReplayStatus =
+    'dart_fake_native_gate_migration_replay_ready_no_native_symbol';
+
 const syncFfiRustHostResultAccessorFieldSetItems = [
   SyncFfiRustHostResultAccessorFieldSetItem(
     fieldName: 'schema_version',
@@ -167,6 +175,7 @@ const syncFfiRustHostDebugRedactionReview = SyncFfiRustHostDebugRedactionReview(
     'owner_scope_review',
     'worker_policy_review',
     'gate_migration_review',
+    'host_gate_readiness_review',
   ],
   forbiddenCategories: [
     'token_material',
@@ -192,6 +201,115 @@ const syncFfiRustHostGateMigrationConditions = [
   'host_contract_test_file_approved',
   'ffi_smoke_candidate_symbols_absent_until_approval',
   'real_sync_execution_approved_after_gate',
+];
+
+const syncFfiRustHostGateReadinessReviewedConditions = [
+  'result_accessor_field_set_reviewed',
+  'summary_storage_policy_reviewed',
+  'object_summary_numeric_width_reviewed',
+  'command_context_owner_scope_reviewed',
+  'command_worker_thread_policy_reviewed',
+  'debug_redaction_test_shape_reviewed',
+  'forbidden_material_redaction_reviewed',
+  'ffi_smoke_candidate_symbols_absent_until_approval',
+];
+
+const syncFfiRustHostGateReadinessBlockingConditions = [
+  'native_symbol_export_approved_by_adr',
+  'dart_native_binding_approved',
+  'manager_bridge_command_approved',
+  'host_contract_test_file_approved',
+  'real_sync_execution_approved_after_gate',
+];
+
+const syncFfiRustHostGateReadinessReview = SyncFfiRustHostGateReadinessReview(
+  readinessState: syncFfiRustHostGateReadinessState,
+  readyForHostContractTest: false,
+  reviewedConditions: syncFfiRustHostGateReadinessReviewedConditions,
+  blockingConditions: syncFfiRustHostGateReadinessBlockingConditions,
+  dartFakeReplayStatus: syncFfiRustHostGateMigrationReplayStatus,
+);
+
+const syncFfiRustHostGateMigrationReplayCases = [
+  SyncFfiRustHostGateMigrationReplayCase(
+    id: 'current_phase_all_gate_blockers',
+    simulatedMissingConditions: [
+      'native_symbol_export_approved_by_adr',
+      'dart_native_binding_approved',
+      'manager_bridge_command_approved',
+      'host_contract_test_file_approved',
+      'real_sync_execution_approved_after_gate',
+    ],
+    expectedReadinessState: syncFfiRustHostGateReadinessState,
+    expectedBlockerCode: 'host_gate_blocked_current_phase',
+    expectedCommandStatus: 'blocked_by_readiness',
+    expectedErrorCode: 'unexpected_bridge_error',
+    expectedRetryPolicy: 'not_retryable',
+    expectedNextRequiredEvidence: 'host_gate_blocked_current_phase',
+  ),
+  SyncFfiRustHostGateMigrationReplayCase(
+    id: 'native_symbol_export_not_approved',
+    simulatedMissingConditions: ['native_symbol_export_approved_by_adr'],
+    expectedReadinessState: syncFfiRustHostGateReadinessState,
+    expectedBlockerCode: 'native_symbol_export_not_approved',
+    expectedCommandStatus: 'blocked_by_readiness',
+    expectedErrorCode: 'unexpected_bridge_error',
+    expectedRetryPolicy: 'not_retryable',
+    expectedNextRequiredEvidence: 'native_symbol_export_approved_by_adr',
+  ),
+  SyncFfiRustHostGateMigrationReplayCase(
+    id: 'dart_native_binding_not_approved',
+    simulatedMissingConditions: ['dart_native_binding_approved'],
+    expectedReadinessState: syncFfiRustHostGateReadinessState,
+    expectedBlockerCode: 'dart_native_binding_not_approved',
+    expectedCommandStatus: 'blocked_by_readiness',
+    expectedErrorCode: 'unexpected_bridge_error',
+    expectedRetryPolicy: 'not_retryable',
+    expectedNextRequiredEvidence: 'dart_native_binding_approved',
+  ),
+  SyncFfiRustHostGateMigrationReplayCase(
+    id: 'manager_bridge_command_not_approved',
+    simulatedMissingConditions: ['manager_bridge_command_approved'],
+    expectedReadinessState: syncFfiRustHostGateReadinessState,
+    expectedBlockerCode: 'manager_bridge_command_not_approved',
+    expectedCommandStatus: 'blocked_by_readiness',
+    expectedErrorCode: 'unexpected_bridge_error',
+    expectedRetryPolicy: 'not_retryable',
+    expectedNextRequiredEvidence: 'manager_bridge_command_approved',
+  ),
+  SyncFfiRustHostGateMigrationReplayCase(
+    id: 'host_contract_test_file_not_approved',
+    simulatedMissingConditions: ['host_contract_test_file_approved'],
+    expectedReadinessState: syncFfiRustHostGateReadinessState,
+    expectedBlockerCode: 'host_contract_test_file_not_approved',
+    expectedCommandStatus: 'blocked_by_readiness',
+    expectedErrorCode: 'unexpected_bridge_error',
+    expectedRetryPolicy: 'not_retryable',
+    expectedNextRequiredEvidence: 'host_contract_test_file_approved',
+  ),
+  SyncFfiRustHostGateMigrationReplayCase(
+    id: 'dynamic_library_smoke_missing',
+    simulatedMissingConditions: [
+      'ffi_smoke_candidate_symbols_absent_until_approval',
+    ],
+    expectedReadinessState: syncFfiRustHostGateReadinessState,
+    expectedBlockerCode: 'ffi_smoke_candidate_symbols_absent_missing',
+    expectedCommandStatus: 'blocked_by_readiness',
+    expectedErrorCode: 'unexpected_bridge_error',
+    expectedRetryPolicy: 'not_retryable',
+    expectedNextRequiredEvidence:
+        'ffi_smoke_candidate_symbols_absent_until_approval',
+  ),
+  SyncFfiRustHostGateMigrationReplayCase(
+    id: 'real_sync_execution_not_approved',
+    simulatedMissingConditions: ['real_sync_execution_approved_after_gate'],
+    expectedReadinessState: syncFfiRustHostGateReadinessState,
+    expectedBlockerCode: 'real_sync_execution_not_approved',
+    expectedCommandStatus: 'blocked_by_readiness',
+    expectedErrorCode: 'unexpected_bridge_error',
+    expectedRetryPolicy: 'not_retryable',
+    expectedNextRequiredEvidence: 'real_sync_execution_approved_after_gate',
+  ),
 ];
 
 const syncFfiRustHostContractReviewItems = [
@@ -660,6 +778,48 @@ class SyncFfiRustHostDebugRedactionReview {
   final List<String> forbiddenCategories;
 }
 
+class SyncFfiRustHostGateReadinessReview {
+  const SyncFfiRustHostGateReadinessReview({
+    required this.readinessState,
+    required this.readyForHostContractTest,
+    required this.reviewedConditions,
+    required this.blockingConditions,
+    required this.dartFakeReplayStatus,
+  });
+
+  final String readinessState;
+  final bool readyForHostContractTest;
+  final List<String> reviewedConditions;
+  final List<String> blockingConditions;
+  final String dartFakeReplayStatus;
+}
+
+class SyncFfiRustHostGateMigrationReplayCase {
+  const SyncFfiRustHostGateMigrationReplayCase({
+    required this.id,
+    required this.simulatedMissingConditions,
+    required this.expectedReadinessState,
+    required this.expectedBlockerCode,
+    required this.expectedCommandStatus,
+    required this.expectedErrorCode,
+    required this.expectedRetryPolicy,
+    required this.expectedNextRequiredEvidence,
+  });
+
+  final String id;
+  final List<String> simulatedMissingConditions;
+  final String expectedReadinessState;
+  final String expectedBlockerCode;
+  final String expectedCommandStatus;
+  final String expectedErrorCode;
+  final String expectedRetryPolicy;
+  final String expectedNextRequiredEvidence;
+
+  String get missingConditionSummary {
+    return managerSyncCodeSummary(simulatedMissingConditions);
+  }
+}
+
 class SyncFfiRustHostContractReviewItem {
   const SyncFfiRustHostContractReviewItem({
     required this.id,
@@ -885,5 +1045,41 @@ Map<String, Object?> syncFfiRustHostGateMigrationReviewShape() {
     'ready_for_host_contract_test': false,
     'required_conditions': syncFfiRustHostGateMigrationConditions,
     'target_test_file': syncFfiCommandBoundaryRustHostContractTargetTestFile,
+  };
+}
+
+Map<String, Object?> syncFfiRustHostGateReadinessReviewShape(
+  SyncFfiRustHostGateReadinessReview fixture,
+) {
+  return {
+    'format': syncFfiRustHostInternalDraftEvidenceFormat,
+    'review_status': syncFfiRustHostGateReadinessReviewStatus,
+    'readiness_state': fixture.readinessState,
+    'ready_for_host_contract_test': fixture.readyForHostContractTest,
+    'reviewed_conditions': fixture.reviewedConditions,
+    'blocking_conditions': fixture.blockingConditions,
+    'dart_fake_replay_status': fixture.dartFakeReplayStatus,
+    'target_test_file': syncFfiCommandBoundaryRustHostContractTargetTestFile,
+  };
+}
+
+Map<String, Object?> syncFfiRustHostGateMigrationReplayCaseShape(
+  SyncFfiRustHostGateMigrationReplayCase fixture,
+) {
+  return {
+    'format': syncFfiRustHostInternalDraftEvidenceFormat,
+    'review_status': syncFfiRustHostGateMigrationReplayStatus,
+    'id': fixture.id,
+    'simulated_missing_conditions': fixture.simulatedMissingConditions,
+    'expected_readiness_state': fixture.expectedReadinessState,
+    'expected_blocker_code': fixture.expectedBlockerCode,
+    'expected_command_status': fixture.expectedCommandStatus,
+    'expected_error_code': fixture.expectedErrorCode,
+    'expected_retry_policy': fixture.expectedRetryPolicy,
+    'expected_next_required_evidence': fixture.expectedNextRequiredEvidence,
+    'can_create_host_contract_test_file': false,
+    'can_export_native_symbol': false,
+    'can_modify_manager_bridge': false,
+    'can_execute_real_sync': false,
   };
 }

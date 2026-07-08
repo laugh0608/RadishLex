@@ -6,6 +6,7 @@ import 'package:radishlex_manager/src/bridge/manager_bridge.dart';
 
 import '../fixtures/sync_bridge_command_contract_fixtures.dart';
 import '../fixtures/sync_ffi_command_boundary_fixtures.dart';
+import '../fixtures/sync_ffi_rust_host_contract_review_fixtures.dart';
 
 void main() {
   test('fake sync command binding copies summary before release', () {
@@ -260,6 +261,64 @@ void main() {
       syncFfiCommandBoundaryRustHostContractCaseIds().toSet(),
     );
   });
+
+  test('fake native binding replays host gate migration readiness', () {
+    final exercisedReplayCaseIds = <String>{};
+
+    for (final replayCase in syncFfiRustHostGateMigrationReplayCases) {
+      final native = _FakeSyncCommandNativeBinding(
+        result: _fakeNativeResultForGateReplay(replayCase),
+      );
+      final summary = _executeAndCopySyncCommandSummary(
+        native,
+        const _FakeSyncCommandRequest(
+          actionId: 'recovery_setup',
+          operationId: 'op_test_non_secret_gate_replay',
+          readinessSnapshotId: 'readiness_snapshot_test_gate_replay',
+          sourceTag: 'local_smoke',
+          deviceBackendGate: 'blocked',
+          explicitUserStart: true,
+        ),
+      );
+
+      exercisedReplayCaseIds.add(replayCase.id);
+
+      expect(native.events, ['execute:recovery_setup', 'copy:1', 'free:1']);
+      expect(native.openHandleCount, 0);
+      expect(summary.commandStatus, replayCase.expectedCommandStatus);
+      expect(summary.errorCode, replayCase.expectedErrorCode);
+      expect(summary.retryPolicy, replayCase.expectedRetryPolicy);
+      expect(
+        summary.nextRequiredEvidence,
+        replayCase.expectedNextRequiredEvidence,
+      );
+      expect(summary.gateReplayCaseId, replayCase.id);
+      expect(summary.gateReadinessState, replayCase.expectedReadinessState);
+      expect(summary.gateBlockerCode, replayCase.expectedBlockerCode);
+
+      final diagnostics = summary.diagnosticsText;
+      expect(diagnostics, contains(replayCase.id));
+      expect(diagnostics, contains(replayCase.expectedBlockerCode));
+      expect(diagnostics, contains(replayCase.expectedReadinessState));
+      for (final condition in replayCase.simulatedMissingConditions) {
+        expect(diagnostics, contains(condition), reason: replayCase.id);
+      }
+      expect(diagnostics, isNot(contains('settings_action_payload')));
+      expect(diagnostics, isNot(contains('bridge_request_payload')));
+      expect(diagnostics, isNot(contains('remote_request_body')));
+      expect(diagnostics, isNot(contains('remote_response_body')));
+      for (final fragment in syncBridgeCommandContractForbiddenFragments) {
+        expect(diagnostics, isNot(contains(fragment)), reason: replayCase.id);
+      }
+    }
+
+    expect(
+      exercisedReplayCaseIds,
+      syncFfiRustHostGateMigrationReplayCases
+          .map((replayCase) => replayCase.id)
+          .toSet(),
+    );
+  });
 }
 
 _DartOwnedSyncCommandSummary _executeAndCopySyncCommandSummary(
@@ -330,6 +389,10 @@ final class _FakeNativeSyncCommandResult {
     this.abiInputCase = 'none',
     this.hostSampleId = 'none',
     this.hostContractCaseId = 'none',
+    this.gateReplayCaseId = 'none',
+    this.gateReadinessState = 'none',
+    this.gateBlockerCode = 'none',
+    this.gateMissingConditionSummary = 'none',
   });
 
   final String actionId;
@@ -348,6 +411,10 @@ final class _FakeNativeSyncCommandResult {
   final String abiInputCase;
   final String hostSampleId;
   final String hostContractCaseId;
+  final String gateReplayCaseId;
+  final String gateReadinessState;
+  final String gateBlockerCode;
+  final String gateMissingConditionSummary;
 }
 
 final class _FakeSyncCommandNativeBinding {
@@ -400,6 +467,10 @@ final class _DartOwnedSyncCommandSummary {
     required this.abiInputCase,
     required this.hostSampleId,
     required this.hostContractCaseId,
+    required this.gateReplayCaseId,
+    required this.gateReadinessState,
+    required this.gateBlockerCode,
+    required this.gateMissingConditionSummary,
   });
 
   factory _DartOwnedSyncCommandSummary.fromNative(
@@ -423,6 +494,12 @@ final class _DartOwnedSyncCommandSummary {
         abiInputCase: _safeAbiInputCase(result.abiInputCase),
         hostSampleId: _safeHostSampleId(result.hostSampleId),
         hostContractCaseId: _safeHostContractCaseId(result.hostContractCaseId),
+        gateReplayCaseId: _safeGateReplayCaseId(result.gateReplayCaseId),
+        gateReadinessState: _safeGateReadinessState(result.gateReadinessState),
+        gateBlockerCode: _safeSummaryCode(result.gateBlockerCode),
+        gateMissingConditionSummary: _safeSummaryCode(
+          result.gateMissingConditionSummary,
+        ),
       );
     }
 
@@ -446,6 +523,12 @@ final class _DartOwnedSyncCommandSummary {
       abiInputCase: _safeAbiInputCase(result.abiInputCase),
       hostSampleId: _safeHostSampleId(result.hostSampleId),
       hostContractCaseId: _safeHostContractCaseId(result.hostContractCaseId),
+      gateReplayCaseId: _safeGateReplayCaseId(result.gateReplayCaseId),
+      gateReadinessState: _safeGateReadinessState(result.gateReadinessState),
+      gateBlockerCode: _safeSummaryCode(result.gateBlockerCode),
+      gateMissingConditionSummary: _safeSummaryCode(
+        result.gateMissingConditionSummary,
+      ),
     );
   }
 
@@ -464,6 +547,10 @@ final class _DartOwnedSyncCommandSummary {
   final String abiInputCase;
   final String hostSampleId;
   final String hostContractCaseId;
+  final String gateReplayCaseId;
+  final String gateReadinessState;
+  final String gateBlockerCode;
+  final String gateMissingConditionSummary;
 
   String get commandErrorCategory {
     return syncFfiCommandBoundaryAllCommandErrorCodes().contains(errorCode)
@@ -488,6 +575,10 @@ final class _DartOwnedSyncCommandSummary {
       'abi_input_case': abiInputCase,
       'host_sample_id': hostSampleId,
       'host_contract_case_id': hostContractCaseId,
+      'gate_replay_case_id': gateReplayCaseId,
+      'gate_readiness_state': gateReadinessState,
+      'gate_blocker_code': gateBlockerCode,
+      'gate_missing_condition_summary': gateMissingConditionSummary,
     });
   }
 }
@@ -514,6 +605,31 @@ _FakeNativeSyncCommandResult _fakeNativeResultForHostCatalog(
     abiInputCase: sample.abiInputCase,
     hostSampleId: sample.id,
     hostContractCaseId: contractCase.id,
+  );
+}
+
+_FakeNativeSyncCommandResult _fakeNativeResultForGateReplay(
+  SyncFfiRustHostGateMigrationReplayCase replayCase,
+) {
+  return _FakeNativeSyncCommandResult(
+    actionId: 'recovery_setup',
+    commandStatus: replayCase.expectedCommandStatus,
+    errorCode: replayCase.expectedErrorCode,
+    retryPolicy: replayCase.expectedRetryPolicy,
+    userVisibleSummaryCode: replayCase.expectedErrorCode,
+    diagnosticsSummaryCode: replayCase.expectedErrorCode,
+    nextRequiredEvidence: replayCase.expectedNextRequiredEvidence,
+    objectTypeSummary: 'host_gate_readiness_review',
+    objectCountSummary: '0',
+    objectVersionSummary: replayCase.missingConditionSummary,
+    recordedAtSummary: 'not_recorded',
+    nativeDebugText: syncBridgeCommandContractForbiddenFragments.join(' '),
+    abiStatusCode: 'InvalidState',
+    abiInputCase: 'sync_command_not_enabled_current_phase',
+    gateReplayCaseId: replayCase.id,
+    gateReadinessState: replayCase.expectedReadinessState,
+    gateBlockerCode: replayCase.expectedBlockerCode,
+    gateMissingConditionSummary: replayCase.missingConditionSummary,
   );
 }
 
@@ -624,6 +740,23 @@ String _safeHostContractCaseId(String value) {
   }
   final knownCaseIds = syncFfiCommandBoundaryRustHostContractCaseIds().toSet();
   return knownCaseIds.contains(value) ? value : 'unknown_contract_case';
+}
+
+String _safeGateReplayCaseId(String value) {
+  if (value == 'none') {
+    return value;
+  }
+  final knownReplayIds = {
+    for (final replayCase in syncFfiRustHostGateMigrationReplayCases)
+      replayCase.id,
+  };
+  return knownReplayIds.contains(value) ? value : 'unknown_gate_replay_case';
+}
+
+String _safeGateReadinessState(String value) {
+  return value == syncFfiRustHostGateReadinessState
+      ? value
+      : 'host_gate_blocked_no_native_symbol';
 }
 
 final class _BridgeFailureCategoryCase {

@@ -21,13 +21,14 @@
 - `syncFfiCommandBoundaryRustHostTestDesignItems` Rust host test design fixture
 - `syncFfiRustHostContractReviewItems` Rust host C ABI contract review fixture
 - Dart fake native binding 对 host catalog 的非执行 replay 回归
+- Dart fake native binding 对 host gate migration readiness 的非执行 replay 回归
 - `apps/radishlex-manager/tool/ffi_bridge_smoke.dart` 中真实 dynamic library future sync command symbol 缺席检查
 - `docs/manager-sync-ffi-command-boundary.md`
-- `crates/ime-ffi/src/manager_sync_command.rs` 内部 C ABI wrapper shape review、result accessor field set、summary storage、owner scope、worker policy、Debug redaction 和 host contract test gate 草案
+- `crates/ime-ffi/src/manager_sync_command.rs` 内部 C ABI wrapper shape review、result accessor field set、summary storage、owner scope、worker policy、Debug redaction、host contract test gate 和 host gate readiness 草案
 
 这些证据只证明未来 contract 的安全边界、ownership、错误分层和 smoke 计划可复验，不证明 native command 已实现。
 
-2026-07-08 已新增并扩展 `crates/ime-ffi/src/manager_sync_command.rs` 内部非导出草案模块，把 implementation review package 中的 request parsing、action-specific section、当前阶段 capability gate、result handle / release、error handle lifecycle、panic boundary、sync domain guard、C ABI wrapper shape review、host contract test gate、result accessor field set、summary storage policy、object count `u64` width、command context owner scope、command worker thread policy、Debug redaction test shape、host gate migration 条件和 forbidden material 检查先落到 Rust 单元测试；Dart design fixture / model test 已同步这些内部草案证据。该模块不新增 C ABI symbol，不创建 `crates/ime-ffi/tests/manager_sync_command_boundary.rs`，不修改 Dart native binding 或 `ManagerBridge`。
+2026-07-08 已新增并扩展 `crates/ime-ffi/src/manager_sync_command.rs` 内部非导出草案模块，把 implementation review package 中的 request parsing、action-specific section、当前阶段 capability gate、result handle / release、error handle lifecycle、panic boundary、sync domain guard、C ABI wrapper shape review、host contract test gate、result accessor field set、summary storage policy、object count `u64` width、command context owner scope、command worker thread policy、Debug redaction test shape、host gate migration 条件、host gate readiness review 和 forbidden material 检查先落到 Rust 单元测试；Dart design fixture / model test 已同步这些内部草案证据，并用 fake native binding replay 复验 gate migration 阻塞项。该模块不新增 C ABI symbol，不创建 `crates/ime-ffi/tests/manager_sync_command_boundary.rs`，不修改 Dart native binding 或 `ManagerBridge`。
 
 ## 测试分层
 
@@ -36,7 +37,7 @@
 | L0 | 文档边界 | 已完成 | 固定 ABI strategy、ownership、secret 生命周期、错误分层、host smoke 和停止线。 |
 | L1 | Dart design fixture / model test | 已完成 | 用合成 fixture 验证当前没有 native symbol，future request / result 只含安全摘要，forbidden material 不进入输出。 |
 | L2 | Rust host contract test 计划 | 已补评审材料、source-level checklist、test design fixture、C ABI contract review matrix，并落地内部非导出 Rust draft module / wrapper shape review / gate / accessor field set / storage / owner scope / worker policy / redaction / migration 条件草案 | 在新增 symbol 前先明确测试文件、输入样本、错误码、释放责任、既有 FFI 源码模式映射、candidate symbol 关闭态、summary storage、owner scope、worker policy 和 forbidden material 断言。 |
-| L3 | Dart FFI binding contract test 计划 | 已接入 host catalog replay | 在 Dart native binding 扩展前先明确 capability missing、copy / free、unknown status、host catalog 状态重放和错误映射测试。 |
+| L3 | Dart FFI binding contract test 计划 | 已接入 host catalog replay 和 gate migration readiness replay | 在 Dart native binding 扩展前先明确 capability missing、copy / free、unknown status、host catalog 状态重放、gate 迁出阻塞项和错误映射测试。 |
 | L4 | Manager 可见层回归 | 部分已有 | 确认 settings / sync / diagnostics 不展示 secret、不写 settings draft、不打开按钮。 |
 | L5 | Gated platform / deployment smoke | 后续阶段 | 平台私钥 backend、真实 Keychain / Keystore、目标部署证据和真实端到端同步必须单独授权或人工准备。 |
 
@@ -63,8 +64,8 @@ L2 / L3 只在 L0 / L1 继续通过、且 contract 文档没有未解决分歧�
 - Rust host test design package：把每个 host contract case 绑定到 source checklist、样本、expected status、断言组、forbidden output category、实现守卫和当前 `test_design_ready_no_native_symbol` 状态
 - Rust host C ABI contract review matrix：把真实 Rust host test 文件前必须评审的 request struct、result struct、release / error lifecycle、panic / status boundary、command context serialization 和 forbidden material contract 固定为 `c_abi_contract_review_ready_no_native_symbol` 状态
 - Rust host implementation review package：把每个 C ABI review item 绑定到后续 Rust `manager_sync_command.rs::*Draft` 草案、当前可复用源码模式、实现说明和仍需确认的问题，状态为 `rust_host_implementation_review_ready_no_native_symbol`
-- Rust 内部非导出 draft module：`crates/ime-ffi/src/manager_sync_command.rs` 已覆盖 request parsing、action-specific section allowlist、bool / UTF-8 校验、当前阶段 `InvalidState` 摘要、result handle / release、error handle lifecycle、panic boundary、sync domain guard、C ABI wrapper shape review、host contract test gate、result accessor field set、summary storage policy、object count `u64` width、command context owner scope、command worker thread policy、Debug redaction test shape、host gate migration 条件和 forbidden material 拒绝；仍不导出 C ABI symbol。
-- Rust 内部草案证据 fixture：`sync_ffi_rust_host_contract_review_fixtures.dart` 已记录 result accessor field set、summary storage policy、owner scope、worker thread policy、Debug redaction target 和 host gate migration conditions，`manager_sync_ffi_command_boundary_test.dart` 会验证这些证据仍为 non-executable、无 native symbol、无 settings action、无 bridge request、无 payload / request / response body。
+- Rust 内部非导出 draft module：`crates/ime-ffi/src/manager_sync_command.rs` 已覆盖 request parsing、action-specific section allowlist、bool / UTF-8 校验、当前阶段 `InvalidState` 摘要、result handle / release、error handle lifecycle、panic boundary、sync domain guard、C ABI wrapper shape review、host contract test gate、result accessor field set、summary storage policy、object count `u64` width、command context owner scope、command worker thread policy、Debug redaction test shape、host gate migration 条件、host gate readiness review 和 forbidden material 拒绝；仍不导出 C ABI symbol。
+- Rust 内部草案证据 fixture：`sync_ffi_rust_host_contract_review_fixtures.dart` 已记录 result accessor field set、summary storage policy、owner scope、worker thread policy、Debug redaction target、host gate migration conditions、host gate readiness review 和 gate migration replay cases，`manager_sync_ffi_command_boundary_test.dart` 会验证这些证据仍为 non-executable、无 native symbol、无 settings action、无 bridge request、无 payload / request / response body。
 
 新增或修改 future command 字段时，应先更新这份 fixture，再更新文档和测试。不要让文档表格、Dart fixture 和未来 Rust contract test 各自维护不同字段列表。
 
@@ -104,7 +105,7 @@ Rust host contract test 的 fixture 输入只能使用合成值：
 
 `syncFfiRustHostContractReviewItems` 是 test design package 之后、真实 Rust host test 文件和 C ABI symbol 之前的结构评审矩阵。它把 request struct layout、result struct layout、release / error lifecycle、panic / status boundary、command context serialization 和 forbidden material contract 分别绑定到已有 test design item、source checklist、required decision、required evidence、forbidden output category 和 implementation guard；状态为 `c_abi_contract_review_ready_no_native_symbol`。该矩阵用于评审真实 C ABI request / result struct、释放函数、panic boundary 和 command context 策略是否齐备，并已绑定决策记录 `docs/adr/0006-manager-sync-c-abi-contract-governance.md`；不代表已经批准新增 symbol 或 `ManagerBridge` 可执行方法。
 
-`syncFfiRustHostImplementationReviewItems` 是 C ABI review matrix 之后、真实 Rust host test 文件之前的实现前审阅包。它把每个 review item 绑定到 `crates/ime-ffi/src/manager_sync_command.rs::*Draft` 草案、当前可复用的 `ime-ffi` 源码模式、required implementation notes 和 unresolved implementation questions；状态为 `rust_host_implementation_review_ready_no_native_symbol`。当前已按该包新增并扩展 `crates/ime-ffi/src/manager_sync_command.rs` 内部非导出草案模块，用单元测试覆盖 request parsing、action-specific section、current-phase gate、result handle / release、error handle lifecycle、panic boundary、sync domain guard、C ABI wrapper shape review、host contract test gate、result accessor field set、summary storage policy、object count `u64` width、owner scope、worker policy、Debug redaction test shape 和 forbidden material redaction；但仍不新增 native symbol，不创建真实 host contract test 文件，不修改 Dart native binding，不打开真实同步。
+`syncFfiRustHostImplementationReviewItems` 是 C ABI review matrix 之后、真实 Rust host test 文件之前的实现前审阅包。它把每个 review item 绑定到 `crates/ime-ffi/src/manager_sync_command.rs::*Draft` 草案、当前可复用的 `ime-ffi` 源码模式、required implementation notes 和 unresolved implementation questions；状态为 `rust_host_implementation_review_ready_no_native_symbol`。当前已按该包新增并扩展 `crates/ime-ffi/src/manager_sync_command.rs` 内部非导出草案模块，用单元测试覆盖 request parsing、action-specific section、current-phase gate、result handle / release、error handle lifecycle、panic boundary、sync domain guard、C ABI wrapper shape review、host contract test gate、result accessor field set、summary storage policy、object count `u64` width、owner scope、worker policy、Debug redaction test shape、host gate migration 条件、host gate readiness review 和 forbidden material redaction；但仍不新增 native symbol，不创建真实 host contract test 文件，不修改 Dart native binding，不打开真实同步。
 
 当前 `ManagerSyncCommandResultAccessorFieldSetReviewDraft` 已把 result accessor 字段集合固定为 `schema_version`、`action_id`、`command_status`、`error_code`、`retry_policy`、`user_visible_summary_code`、`diagnostics_summary_code`、`next_required_evidence`、对象摘要和 recorded-at 摘要；这些字段只映射到现有候选 accessor / summary 组，全部保持 `planned_not_exported_current_phase`，不新增候选 native symbol。对象计数已固定为 `u64` 草案。单元测试已用内部 result view 逐项读取该字段集合，确认 copy-before-release 和 forbidden material redaction 可复验。
 
@@ -114,9 +115,11 @@ Rust host contract test 的 fixture 输入只能使用合成值：
 
 当前 `ManagerSyncCommandWorkerThreadPolicyReviewDraft` 已固定当前阶段 worker policy：真实同步前不启动 command worker；后续只能按单一串行 manager sync worker 方向评审 owner 迁移、消息边界和取消语义，不允许后台远端重试、secret payload 队列或 Flutter UI isolate 阻塞。
 
-当前 `ManagerSyncCommandDebugRedactionReviewDraft` 已固定 Debug redaction test shape：request error、command result、result accessor field、owner scope、worker policy 和 gate migration review 都必须覆盖 token、recovery secret、join verifier、signature / wrapped material、opaque transport 和 local path 类别的脱敏断言。
+当前 `ManagerSyncCommandDebugRedactionReviewDraft` 已固定 Debug redaction test shape：request error、command result、result accessor field、owner scope、worker policy、gate migration review 和 host gate readiness review 都必须覆盖 token、recovery secret、join verifier、signature / wrapped material、opaque transport 和 local path 类别的脱敏断言。
 
 当前 `ManagerSyncCommandHostContractTestGateDraft` 的状态是 `host_contract_test_gate_closed_no_native_symbol`，`ManagerSyncCommandHostGateMigrationReviewDraft` 进一步要求 result accessor field set、summary storage policy、object count width、command context owner scope、worker thread policy、Debug redaction shape、forbidden material redaction、native symbol export、Dart native binding、`ManagerBridge` command、host test 文件、dynamic library smoke 和真实同步执行批准全部具备。否则 L2 仍停留在内部单元测试和 smoke 缺席检查。
+
+当前 `ManagerSyncCommandHostGateReadinessReviewDraft` 已把 gate migration 条件拆成两组：已评审条件包括 result accessor field set、summary storage policy、object count width、owner scope、worker policy、Debug redaction、forbidden material redaction 和 dynamic library smoke 缺席证据；仍阻塞条件包括 native symbol export、Dart native binding、`ManagerBridge` command、host test 文件和真实同步执行批准。`syncFfiRustHostGateMigrationReplayCases` 在 Dart fake native binding 侧重放这些阻塞项，覆盖当前全部阻塞、单项 approval 缺失、dynamic library smoke 缺席和真实同步执行未批准，且全部输出 `blocked_by_readiness` / `unexpected_bridge_error` / `not_retryable` 这类安全摘要。
 
 除内部 Rust draft module 及其单元测试外，这些仍是 design fixture，不新增真实 symbol。
 
@@ -149,7 +152,7 @@ apps/radishlex-manager/test/
 
 Dart FFI binding test 的实现顺序：
 
-1. 先用 fake native binding 验证 mapper、copy / free 调用记录和错误分类；当前已覆盖 capability missing 时 manager 继续保持当前阶段关闭、settings 不写 action payload、diagnostics 不出现 future command request / result 或 forbidden material，并用测试侧 binding harness 覆盖 summary copy -> free 顺序、unknown native status 安全降级、`ffi_library_load_failed` / `invalid_argument` / `sync_error` 分类、command error allowlist，以及从 `syncFfiCommandBoundaryRustHostContractCases` 和 host input sample 重放出的 ABI status / input case / required evidence 非敏感摘要。
+1. 先用 fake native binding 验证 mapper、copy / free 调用记录和错误分类；当前已覆盖 capability missing 时 manager 继续保持当前阶段关闭、settings 不写 action payload、diagnostics 不出现 future command request / result 或 forbidden material，并用测试侧 binding harness 覆盖 summary copy -> free 顺序、unknown native status 安全降级、`ffi_library_load_failed` / `invalid_argument` / `sync_error` 分类、command error allowlist，从 `syncFfiCommandBoundaryRustHostContractCases` 和 host input sample 重放出的 ABI status / input case / required evidence 非敏感摘要，以及从 `syncFfiRustHostGateMigrationReplayCases` 重放出的 gate migration readiness 阻塞项。
 2. 再用真实 dynamic library 做 capability missing smoke，确认当前没有 sync command symbol 时 UI 保持关闭；当前 `ffi_bridge_smoke.dart` 已检查 `radishlex_manager_sync_command_execute_v1` 和 result accessor / free 候选 symbol 均未导出。
 3. 只有真实 C ABI symbol 评审通过后，才把 dynamic library smoke 扩展到 result handle 读取和释放。
 

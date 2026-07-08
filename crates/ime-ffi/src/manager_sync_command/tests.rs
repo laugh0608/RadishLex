@@ -495,6 +495,9 @@ fn debug_redaction_review_covers_internal_draft_targets() {
     assert!(redaction.debug_targets.contains(&"owner_scope_review"));
     assert!(redaction.debug_targets.contains(&"worker_policy_review"));
     assert!(redaction.debug_targets.contains(&"gate_migration_review"));
+    assert!(redaction
+        .debug_targets
+        .contains(&"host_gate_readiness_review"));
     assert!(redaction.forbidden_categories.contains(&"token_material"));
     assert!(redaction
         .forbidden_categories
@@ -691,6 +694,91 @@ fn host_contract_gate_migration_conditions_remain_review_only() {
         .contains(&"real_sync_execution_approved_after_gate"));
 
     let debug = format!("{migration:?}");
+    for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
+        assert!(!debug.contains(forbidden), "{forbidden}");
+    }
+}
+
+#[test]
+fn host_gate_readiness_review_keeps_reviewed_evidence_separate_from_blockers() {
+    let wrapper_review = ManagerSyncCommandCAbiWrapperShapeReviewDraft::current_phase();
+    let gate = ManagerSyncCommandHostContractTestGateDraft::current_phase(&wrapper_review).unwrap();
+    let result_fields = ManagerSyncCommandResultAccessorFieldSetReviewDraft::current_phase();
+    let owner_scope = ManagerSyncCommandContextOwnerScopeReviewDraft::current_phase();
+    let summary_storage = ManagerSyncCommandSummaryStorageReviewDraft::current_phase();
+    let worker_policy = ManagerSyncCommandWorkerThreadPolicyReviewDraft::current_phase();
+    let debug_redaction = ManagerSyncCommandDebugRedactionReviewDraft::current_phase();
+    let migration = ManagerSyncCommandHostGateMigrationReviewDraft::current_phase(
+        &gate,
+        &result_fields,
+        &owner_scope,
+        &summary_storage,
+        &worker_policy,
+        &debug_redaction,
+    )
+    .unwrap();
+    let readiness =
+        ManagerSyncCommandHostGateReadinessReviewDraft::current_phase(&migration).unwrap();
+    readiness.assert_safe_readiness().unwrap();
+
+    assert_eq!(readiness.review_state, HOST_GATE_READINESS_REVIEW_READY);
+    assert_eq!(
+        readiness.readiness_state,
+        HOST_GATE_BLOCKED_NO_NATIVE_SYMBOL
+    );
+    assert!(!readiness.ready_for_host_contract_test);
+    assert_eq!(
+        readiness.dart_fake_replay_status,
+        HOST_GATE_READINESS_REPLAY_READY
+    );
+    assert!(readiness
+        .reviewed_conditions
+        .contains(&"result_accessor_field_set_reviewed"));
+    assert!(readiness
+        .reviewed_conditions
+        .contains(&"summary_storage_policy_reviewed"));
+    assert!(readiness
+        .reviewed_conditions
+        .contains(&"object_summary_numeric_width_reviewed"));
+    assert!(readiness
+        .reviewed_conditions
+        .contains(&"command_context_owner_scope_reviewed"));
+    assert!(readiness
+        .reviewed_conditions
+        .contains(&"command_worker_thread_policy_reviewed"));
+    assert!(readiness
+        .reviewed_conditions
+        .contains(&"debug_redaction_test_shape_reviewed"));
+    assert!(readiness
+        .reviewed_conditions
+        .contains(&"forbidden_material_redaction_reviewed"));
+    assert!(readiness
+        .reviewed_conditions
+        .contains(&"ffi_smoke_candidate_symbols_absent_until_approval"));
+    assert!(readiness
+        .blocking_conditions
+        .contains(&"native_symbol_export_approved_by_adr"));
+    assert!(readiness
+        .blocking_conditions
+        .contains(&"dart_native_binding_approved"));
+    assert!(readiness
+        .blocking_conditions
+        .contains(&"manager_bridge_command_approved"));
+    assert!(readiness
+        .blocking_conditions
+        .contains(&"host_contract_test_file_approved"));
+    assert!(readiness
+        .blocking_conditions
+        .contains(&"real_sync_execution_approved_after_gate"));
+    for condition in readiness.reviewed_conditions {
+        assert!(!readiness.blocking_conditions.contains(condition));
+        assert!(migration.required_conditions.contains(condition));
+    }
+    for condition in readiness.blocking_conditions {
+        assert!(migration.required_conditions.contains(condition));
+    }
+
+    let debug = format!("{readiness:?}");
     for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
         assert!(!debug.contains(forbidden), "{forbidden}");
     }
