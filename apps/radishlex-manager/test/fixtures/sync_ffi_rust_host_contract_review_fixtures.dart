@@ -49,6 +49,15 @@ const syncFfiRustHostGateReadinessState = 'host_gate_blocked_no_native_symbol';
 const syncFfiRustHostGateMigrationReplayStatus =
     'dart_fake_native_gate_migration_replay_ready_no_native_symbol';
 
+const syncFfiRustHostTestAdmissionReviewStatus =
+    'host_contract_test_admission_review_ready_no_native_symbol';
+
+const syncFfiRustHostTestAdmissionDecision =
+    'blocked_before_real_host_contract_test_file';
+
+const syncFfiRustHostTestAdmissionNextDecision =
+    'native_symbol_export_and_binding_approval_required';
+
 const syncFfiRustHostResultAccessorFieldSetItems = [
   SyncFfiRustHostResultAccessorFieldSetItem(
     fieldName: 'schema_version',
@@ -176,6 +185,7 @@ const syncFfiRustHostDebugRedactionReview = SyncFfiRustHostDebugRedactionReview(
     'worker_policy_review',
     'gate_migration_review',
     'host_gate_readiness_review',
+    'host_test_admission_review',
   ],
   forbiddenCategories: [
     'token_material',
@@ -229,6 +239,56 @@ const syncFfiRustHostGateReadinessReview = SyncFfiRustHostGateReadinessReview(
   blockingConditions: syncFfiRustHostGateReadinessBlockingConditions,
   dartFakeReplayStatus: syncFfiRustHostGateMigrationReplayStatus,
 );
+
+const syncFfiRustHostTestAdmissionEvidenceSources = [
+  'adr_0006_current',
+  'manager_sync_ffi_command_boundary_current',
+  'manager_sync_command_internal_draft_tests',
+  'dart_fake_native_gate_migration_replay',
+  'ffi_bridge_smoke_candidate_symbols_absent',
+];
+
+const syncFfiRustHostTestAdmissionReview = SyncFfiRustHostTestAdmissionReview(
+  admissionDecision: syncFfiRustHostTestAdmissionDecision,
+  readyForHostContractTest: false,
+  satisfiedConditions: syncFfiRustHostGateReadinessReviewedConditions,
+  blockingConditions: syncFfiRustHostGateReadinessBlockingConditions,
+  evidenceSources: syncFfiRustHostTestAdmissionEvidenceSources,
+  nextDecisionRequired: syncFfiRustHostTestAdmissionNextDecision,
+);
+
+const syncFfiRustHostTestAdmissionGapItems = [
+  SyncFfiRustHostTestAdmissionGapItem(
+    condition: 'native_symbol_export_approved_by_adr',
+    blockerCode: 'native_symbol_export_not_approved',
+    requiredDecision: 'native_symbol_export_adr_approval',
+    evidenceSource: 'adr_0006_current',
+  ),
+  SyncFfiRustHostTestAdmissionGapItem(
+    condition: 'dart_native_binding_approved',
+    blockerCode: 'dart_native_binding_not_approved',
+    requiredDecision: 'dart_native_binding_contract_approval',
+    evidenceSource: 'manager_sync_ffi_command_boundary_current',
+  ),
+  SyncFfiRustHostTestAdmissionGapItem(
+    condition: 'manager_bridge_command_approved',
+    blockerCode: 'manager_bridge_command_not_approved',
+    requiredDecision: 'manager_bridge_command_contract_approval',
+    evidenceSource: 'manager_sync_ffi_command_boundary_current',
+  ),
+  SyncFfiRustHostTestAdmissionGapItem(
+    condition: 'host_contract_test_file_approved',
+    blockerCode: 'host_contract_test_file_not_approved',
+    requiredDecision: 'host_contract_test_file_creation_approval',
+    evidenceSource: 'manager_sync_command_internal_draft_tests',
+  ),
+  SyncFfiRustHostTestAdmissionGapItem(
+    condition: 'real_sync_execution_approved_after_gate',
+    blockerCode: 'real_sync_execution_not_approved',
+    requiredDecision: 'real_sync_execution_gate_approval',
+    evidenceSource: 'dart_fake_native_gate_migration_replay',
+  ),
+];
 
 const syncFfiRustHostGateMigrationReplayCases = [
   SyncFfiRustHostGateMigrationReplayCase(
@@ -820,6 +880,38 @@ class SyncFfiRustHostGateMigrationReplayCase {
   }
 }
 
+class SyncFfiRustHostTestAdmissionReview {
+  const SyncFfiRustHostTestAdmissionReview({
+    required this.admissionDecision,
+    required this.readyForHostContractTest,
+    required this.satisfiedConditions,
+    required this.blockingConditions,
+    required this.evidenceSources,
+    required this.nextDecisionRequired,
+  });
+
+  final String admissionDecision;
+  final bool readyForHostContractTest;
+  final List<String> satisfiedConditions;
+  final List<String> blockingConditions;
+  final List<String> evidenceSources;
+  final String nextDecisionRequired;
+}
+
+class SyncFfiRustHostTestAdmissionGapItem {
+  const SyncFfiRustHostTestAdmissionGapItem({
+    required this.condition,
+    required this.blockerCode,
+    required this.requiredDecision,
+    required this.evidenceSource,
+  });
+
+  final String condition;
+  final String blockerCode;
+  final String requiredDecision;
+  final String evidenceSource;
+}
+
 class SyncFfiRustHostContractReviewItem {
   const SyncFfiRustHostContractReviewItem({
     required this.id,
@@ -1077,6 +1169,44 @@ Map<String, Object?> syncFfiRustHostGateMigrationReplayCaseShape(
     'expected_error_code': fixture.expectedErrorCode,
     'expected_retry_policy': fixture.expectedRetryPolicy,
     'expected_next_required_evidence': fixture.expectedNextRequiredEvidence,
+    'can_create_host_contract_test_file': false,
+    'can_export_native_symbol': false,
+    'can_modify_manager_bridge': false,
+    'can_execute_real_sync': false,
+  };
+}
+
+Map<String, Object?> syncFfiRustHostTestAdmissionReviewShape(
+  SyncFfiRustHostTestAdmissionReview fixture,
+) {
+  return {
+    'format': syncFfiRustHostInternalDraftEvidenceFormat,
+    'review_status': syncFfiRustHostTestAdmissionReviewStatus,
+    'admission_decision': fixture.admissionDecision,
+    'ready_for_host_contract_test': fixture.readyForHostContractTest,
+    'satisfied_conditions': fixture.satisfiedConditions,
+    'blocking_conditions': fixture.blockingConditions,
+    'evidence_sources': fixture.evidenceSources,
+    'next_decision_required': fixture.nextDecisionRequired,
+    'target_test_file': syncFfiCommandBoundaryRustHostContractTargetTestFile,
+    'can_create_host_contract_test_file': false,
+    'can_export_native_symbol': false,
+    'can_modify_manager_bridge': false,
+    'can_execute_real_sync': false,
+  };
+}
+
+Map<String, Object?> syncFfiRustHostTestAdmissionGapItemShape(
+  SyncFfiRustHostTestAdmissionGapItem fixture,
+) {
+  return {
+    'format': syncFfiRustHostInternalDraftEvidenceFormat,
+    'review_status': syncFfiRustHostTestAdmissionReviewStatus,
+    'condition': fixture.condition,
+    'blocker_code': fixture.blockerCode,
+    'required_decision': fixture.requiredDecision,
+    'evidence_source': fixture.evidenceSource,
+    'target_test_file': syncFfiCommandBoundaryRustHostContractTargetTestFile,
     'can_create_host_contract_test_file': false,
     'can_export_native_symbol': false,
     'can_modify_manager_bridge': false,

@@ -1219,6 +1219,133 @@ void main() {
     }
   });
 
+  test('rust host test admission review keeps real host test blocked', () {
+    final admissionShape = syncFfiRustHostTestAdmissionReviewShape(
+      syncFfiRustHostTestAdmissionReview,
+    );
+    final readinessShape = syncFfiRustHostGateReadinessReviewShape(
+      syncFfiRustHostGateReadinessReview,
+    );
+    final encoded = jsonEncode({
+      'admission': admissionShape,
+      'readiness': readinessShape,
+    });
+
+    expect(
+      admissionShape['review_status'],
+      syncFfiRustHostTestAdmissionReviewStatus,
+    );
+    expect(
+      admissionShape['admission_decision'],
+      syncFfiRustHostTestAdmissionDecision,
+    );
+    expect(
+      admissionShape['next_decision_required'],
+      syncFfiRustHostTestAdmissionNextDecision,
+    );
+    expect(admissionShape['ready_for_host_contract_test'], isFalse);
+    expect(admissionShape['can_create_host_contract_test_file'], isFalse);
+    expect(admissionShape['can_export_native_symbol'], isFalse);
+    expect(admissionShape['can_modify_manager_bridge'], isFalse);
+    expect(admissionShape['can_execute_real_sync'], isFalse);
+    expect(
+      admissionShape['satisfied_conditions'],
+      syncFfiRustHostGateReadinessReviewedConditions,
+    );
+    expect(
+      admissionShape['blocking_conditions'],
+      syncFfiRustHostGateReadinessBlockingConditions,
+    );
+    expect(
+      admissionShape['evidence_sources'],
+      containsAll([
+        'adr_0006_current',
+        'manager_sync_command_internal_draft_tests',
+        'dart_fake_native_gate_migration_replay',
+        'ffi_bridge_smoke_candidate_symbols_absent',
+      ]),
+    );
+    expect(
+      syncFfiRustHostGateReadinessReviewedConditions.toSet().intersection(
+        syncFfiRustHostGateReadinessBlockingConditions.toSet(),
+      ),
+      isEmpty,
+    );
+    expect(encoded, contains('no_native_symbol'));
+    expect(
+      encoded,
+      isNot(contains('radishlex_manager_sync_command_execute_v1')),
+    );
+    expect(encoded, isNot(contains('settings_action_payload')));
+    expect(encoded, isNot(contains('bridge_request_payload')));
+    expect(encoded, isNot(contains('remote_request_body')));
+    expect(encoded, isNot(contains('remote_response_body')));
+    for (final fragment in syncBridgeCommandContractForbiddenFragments) {
+      expect(encoded, isNot(contains(fragment)));
+    }
+  });
+
+  test('rust host test admission gaps cover each remaining blocker', () {
+    final gateConditions =
+        (syncFfiRustHostGateMigrationReviewShape()['required_conditions']
+                as List<String>)
+            .toSet();
+    final gapConditions = {
+      for (final gapItem in syncFfiRustHostTestAdmissionGapItems)
+        gapItem.condition,
+    };
+    final replayBlockerCodes = {
+      for (final replayCase in syncFfiRustHostGateMigrationReplayCases)
+        replayCase.expectedBlockerCode,
+    };
+    final encodedGapItems = [
+      for (final gapItem in syncFfiRustHostTestAdmissionGapItems)
+        jsonEncode(syncFfiRustHostTestAdmissionGapItemShape(gapItem)),
+    ].join('\n');
+
+    expect(
+      gapConditions,
+      syncFfiRustHostGateReadinessBlockingConditions.toSet(),
+    );
+    expect(
+      replayBlockerCodes,
+      containsAll(
+        syncFfiRustHostTestAdmissionGapItems.map((item) => item.blockerCode),
+      ),
+    );
+    for (final gapItem in syncFfiRustHostTestAdmissionGapItems) {
+      final shape = syncFfiRustHostTestAdmissionGapItemShape(gapItem);
+
+      expect(
+        shape['review_status'],
+        syncFfiRustHostTestAdmissionReviewStatus,
+        reason: gapItem.condition,
+      );
+      expect(gateConditions, contains(gapItem.condition));
+      expect(shape['condition'], gapItem.condition);
+      expect(shape['blocker_code'], gapItem.blockerCode);
+      expect(shape['required_decision'], gapItem.requiredDecision);
+      expect(shape['evidence_source'], gapItem.evidenceSource);
+      expect(shape['can_create_host_contract_test_file'], isFalse);
+      expect(shape['can_export_native_symbol'], isFalse);
+      expect(shape['can_modify_manager_bridge'], isFalse);
+      expect(shape['can_execute_real_sync'], isFalse);
+    }
+
+    expect(encodedGapItems, contains('no_native_symbol'));
+    expect(
+      encodedGapItems,
+      isNot(contains('radishlex_manager_sync_command_execute_v1')),
+    );
+    expect(encodedGapItems, isNot(contains('settings_action_payload')));
+    expect(encodedGapItems, isNot(contains('bridge_request_payload')));
+    expect(encodedGapItems, isNot(contains('remote_request_body')));
+    expect(encodedGapItems, isNot(contains('remote_response_body')));
+    for (final fragment in syncBridgeCommandContractForbiddenFragments) {
+      expect(encodedGapItems, isNot(contains(fragment)));
+    }
+  });
+
   test('rust internal draft storage and debug redaction evidence is safe', () {
     final storageShape = syncFfiRustHostSummaryStorageReviewShape(
       syncFfiRustHostSummaryStorageReview,
@@ -1254,6 +1381,8 @@ void main() {
         'owner_scope_review',
         'worker_policy_review',
         'gate_migration_review',
+        'host_gate_readiness_review',
+        'host_test_admission_review',
       ]),
     );
     expect(

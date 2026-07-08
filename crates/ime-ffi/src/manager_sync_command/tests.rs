@@ -1,3 +1,4 @@
+use super::admission::ManagerSyncCommandHostTestAdmissionReviewDraft;
 use super::*;
 use std::sync::Arc;
 
@@ -779,6 +780,69 @@ fn host_gate_readiness_review_keeps_reviewed_evidence_separate_from_blockers() {
     }
 
     let debug = format!("{readiness:?}");
+    for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
+        assert!(!debug.contains(forbidden), "{forbidden}");
+    }
+}
+
+#[test]
+fn host_test_admission_review_blocks_real_host_test_until_external_approvals() {
+    let wrapper_review = ManagerSyncCommandCAbiWrapperShapeReviewDraft::current_phase();
+    let gate = ManagerSyncCommandHostContractTestGateDraft::current_phase(&wrapper_review).unwrap();
+    let result_fields = ManagerSyncCommandResultAccessorFieldSetReviewDraft::current_phase();
+    let owner_scope = ManagerSyncCommandContextOwnerScopeReviewDraft::current_phase();
+    let summary_storage = ManagerSyncCommandSummaryStorageReviewDraft::current_phase();
+    let worker_policy = ManagerSyncCommandWorkerThreadPolicyReviewDraft::current_phase();
+    let debug_redaction = ManagerSyncCommandDebugRedactionReviewDraft::current_phase();
+    let migration = ManagerSyncCommandHostGateMigrationReviewDraft::current_phase(
+        &gate,
+        &result_fields,
+        &owner_scope,
+        &summary_storage,
+        &worker_policy,
+        &debug_redaction,
+    )
+    .unwrap();
+    let readiness =
+        ManagerSyncCommandHostGateReadinessReviewDraft::current_phase(&migration).unwrap();
+    let admission =
+        ManagerSyncCommandHostTestAdmissionReviewDraft::current_phase(&readiness).unwrap();
+    admission.assert_safe_admission().unwrap();
+
+    assert_eq!(admission.review_state, HOST_TEST_ADMISSION_REVIEW_READY);
+    assert_eq!(admission.admission_decision, HOST_TEST_ADMISSION_BLOCKED);
+    assert_eq!(
+        admission.next_decision_required,
+        HOST_TEST_ADMISSION_NEXT_DECISION
+    );
+    assert!(!admission.ready_for_host_contract_test);
+    assert!(!admission.can_create_host_contract_test_file);
+    assert!(!admission.can_export_native_symbol);
+    assert!(!admission.can_modify_manager_bridge);
+    assert!(!admission.can_execute_real_sync);
+    assert_eq!(
+        admission.satisfied_conditions,
+        readiness.reviewed_conditions
+    );
+    assert_eq!(admission.blocking_conditions, readiness.blocking_conditions);
+    assert!(admission
+        .evidence_sources
+        .contains(&"dart_fake_native_gate_migration_replay"));
+    assert!(admission
+        .evidence_sources
+        .contains(&"ffi_bridge_smoke_candidate_symbols_absent"));
+    for condition in admission.satisfied_conditions {
+        assert!(!admission.blocking_conditions.contains(condition));
+        assert!(migration.required_conditions.contains(condition));
+    }
+    for condition in admission.blocking_conditions {
+        assert!(migration.required_conditions.contains(condition));
+    }
+    let mut accidental_host_test = admission;
+    accidental_host_test.can_create_host_contract_test_file = true;
+    assert!(accidental_host_test.assert_safe_admission().is_err());
+
+    let debug = format!("{admission:?}");
     for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
         assert!(!debug.contains(forbidden), "{forbidden}");
     }

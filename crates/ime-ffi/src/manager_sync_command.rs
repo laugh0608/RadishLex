@@ -10,6 +10,8 @@ use std::thread::{self, ThreadId};
 use crate::error::{FfiError, RadishLexStatusCode};
 use crate::snapshot::RadishLexStringView;
 
+mod admission;
+
 pub(crate) const MANAGER_SYNC_COMMAND_SCHEMA_VERSION_V1: u32 = 1;
 pub(crate) const MANAGER_SYNC_ACTION_RECOVERY_SETUP: u32 = 1;
 pub(crate) const MANAGER_SYNC_ACTION_RECOVERY_RESTORE: u32 = 2;
@@ -51,6 +53,11 @@ const HOST_GATE_READINESS_REVIEW_READY: &str = "host_gate_readiness_review_ready
 const HOST_GATE_BLOCKED_NO_NATIVE_SYMBOL: &str = "host_gate_blocked_no_native_symbol";
 const HOST_GATE_READINESS_REPLAY_READY: &str =
     "dart_fake_native_gate_migration_replay_ready_no_native_symbol";
+const HOST_TEST_ADMISSION_REVIEW_READY: &str =
+    "host_contract_test_admission_review_ready_no_native_symbol";
+const HOST_TEST_ADMISSION_BLOCKED: &str = "blocked_before_real_host_contract_test_file";
+const HOST_TEST_ADMISSION_NEXT_DECISION: &str =
+    "native_symbol_export_and_binding_approval_required";
 const SUMMARY_STORAGE_REVIEW_READY: &str = "summary_storage_review_ready_no_native_symbol";
 const SUMMARY_STORAGE_REVIEW_ERROR: &str = "manager_sync_summary_storage_not_reviewed";
 const COMMAND_WORKER_THREAD_POLICY_REVIEW_READY: &str =
@@ -317,6 +324,7 @@ const MANAGER_SYNC_COMMAND_DEBUG_REDACTION_TARGETS_DRAFT: &[&str] = &[
     "worker_policy_review",
     "gate_migration_review",
     "host_gate_readiness_review",
+    "host_test_admission_review",
 ];
 
 const MANAGER_SYNC_COMMAND_FORBIDDEN_CATEGORIES_DRAFT: &[&str] = &[

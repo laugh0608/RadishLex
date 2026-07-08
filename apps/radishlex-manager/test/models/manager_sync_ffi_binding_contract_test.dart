@@ -319,6 +319,66 @@ void main() {
           .toSet(),
     );
   });
+
+  test('fake native binding replays host test admission gaps', () {
+    final exercisedGapConditions = <String>{};
+
+    for (final gapItem in syncFfiRustHostTestAdmissionGapItems) {
+      final native = _FakeSyncCommandNativeBinding(
+        result: _fakeNativeResultForAdmissionGap(gapItem),
+      );
+      final summary = _executeAndCopySyncCommandSummary(
+        native,
+        const _FakeSyncCommandRequest(
+          actionId: 'recovery_setup',
+          operationId: 'op_test_non_secret_admission_gap',
+          readinessSnapshotId: 'readiness_snapshot_test_admission_gap',
+          sourceTag: 'local_smoke',
+          deviceBackendGate: 'blocked',
+          explicitUserStart: true,
+        ),
+      );
+
+      exercisedGapConditions.add(gapItem.condition);
+
+      expect(native.events, ['execute:recovery_setup', 'copy:1', 'free:1']);
+      expect(native.openHandleCount, 0);
+      expect(summary.commandStatus, 'blocked_by_readiness');
+      expect(summary.errorCode, 'unexpected_bridge_error');
+      expect(summary.retryPolicy, 'not_retryable');
+      expect(summary.nextRequiredEvidence, gapItem.condition);
+      expect(summary.objectTypeSummary, 'host_test_admission_review');
+      expect(summary.gateReadinessState, syncFfiRustHostGateReadinessState);
+      expect(summary.gateBlockerCode, gapItem.blockerCode);
+      expect(summary.gateMissingConditionSummary, gapItem.condition);
+
+      final diagnostics = summary.diagnosticsText;
+      expect(diagnostics, contains(gapItem.condition));
+      expect(diagnostics, contains(gapItem.blockerCode));
+      expect(diagnostics, contains(gapItem.requiredDecision));
+      expect(diagnostics, contains(gapItem.evidenceSource));
+      expect(diagnostics, isNot(contains('settings_action_payload')));
+      expect(diagnostics, isNot(contains('bridge_request_payload')));
+      expect(diagnostics, isNot(contains('remote_request_body')));
+      expect(diagnostics, isNot(contains('remote_response_body')));
+      expect(
+        diagnostics,
+        isNot(contains('radishlex_manager_sync_command_execute_v1')),
+      );
+      for (final fragment in syncBridgeCommandContractForbiddenFragments) {
+        expect(
+          diagnostics,
+          isNot(contains(fragment)),
+          reason: gapItem.condition,
+        );
+      }
+    }
+
+    expect(
+      exercisedGapConditions,
+      syncFfiRustHostGateReadinessBlockingConditions.toSet(),
+    );
+  });
 }
 
 _DartOwnedSyncCommandSummary _executeAndCopySyncCommandSummary(
@@ -630,6 +690,31 @@ _FakeNativeSyncCommandResult _fakeNativeResultForGateReplay(
     gateReadinessState: replayCase.expectedReadinessState,
     gateBlockerCode: replayCase.expectedBlockerCode,
     gateMissingConditionSummary: replayCase.missingConditionSummary,
+  );
+}
+
+_FakeNativeSyncCommandResult _fakeNativeResultForAdmissionGap(
+  SyncFfiRustHostTestAdmissionGapItem gapItem,
+) {
+  return _FakeNativeSyncCommandResult(
+    actionId: 'recovery_setup',
+    commandStatus: 'blocked_by_readiness',
+    errorCode: 'unexpected_bridge_error',
+    retryPolicy: 'not_retryable',
+    userVisibleSummaryCode: 'unexpected_bridge_error',
+    diagnosticsSummaryCode: 'unexpected_bridge_error',
+    nextRequiredEvidence: gapItem.condition,
+    objectTypeSummary: 'host_test_admission_review',
+    objectCountSummary: '0',
+    objectVersionSummary:
+        '${gapItem.requiredDecision}|${gapItem.evidenceSource}',
+    recordedAtSummary: 'not_recorded',
+    nativeDebugText: syncBridgeCommandContractForbiddenFragments.join(' '),
+    abiStatusCode: 'InvalidState',
+    abiInputCase: 'sync_command_not_enabled_current_phase',
+    gateReadinessState: syncFfiRustHostGateReadinessState,
+    gateBlockerCode: gapItem.blockerCode,
+    gateMissingConditionSummary: gapItem.condition,
   );
 }
 
