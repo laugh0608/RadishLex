@@ -7,6 +7,7 @@ import 'package:radishlex_manager/src/bridge/manager_bridge.dart';
 import '../fixtures/sync_bridge_command_contract_fixtures.dart';
 import '../fixtures/sync_ffi_command_boundary_fixtures.dart';
 import '../fixtures/sync_ffi_rust_host_contract_review_fixtures.dart';
+import '../fixtures/sync_ffi_rust_host_migration_review_fixtures.dart';
 
 void main() {
   test('fake sync command binding copies summary before release', () {
@@ -379,6 +380,104 @@ void main() {
       syncFfiRustHostGateReadinessBlockingConditions.toSet(),
     );
   });
+
+  test(
+    'fake native binding replays export binding and bridge migration reviews',
+    () {
+      final replayCases = [
+        const _MigrationReviewReplayCase(
+          id: 'native_export_approval_review',
+          objectTypeSummary: 'native_export_approval_review',
+          blockerCode: 'native_symbol_export_not_approved',
+          nextRequiredEvidence: 'native_symbol_export_approved_by_adr',
+          expectedDiagnostics: [
+            syncFfiRustHostExportApprovalReviewStatus,
+            syncFfiRustHostExportApprovalDecision,
+            'result_accessor_field_set_review',
+            'result_handle_copy_then_free_review',
+            'ffi_bridge_smoke_candidate_symbols_absent',
+          ],
+        ),
+        const _MigrationReviewReplayCase(
+          id: 'dart_binding_migration_review',
+          objectTypeSummary: 'dart_binding_migration_review',
+          blockerCode: 'dart_native_binding_not_approved',
+          nextRequiredEvidence: 'dart_native_binding_approved',
+          expectedDiagnostics: [
+            syncFfiRustHostDartBindingMigrationReviewStatus,
+            syncFfiRustHostDartBindingMigrationDecision,
+            'dart_copy_free_contract_reviewed',
+            'unknown_native_status_mapping_reviewed',
+            'ffi_command_error_mapping_reviewed',
+            'native_symbol_export_approved_by_adr',
+          ],
+        ),
+        const _MigrationReviewReplayCase(
+          id: 'manager_bridge_migration_review',
+          objectTypeSummary: 'manager_bridge_migration_review',
+          blockerCode: 'manager_bridge_command_not_approved',
+          nextRequiredEvidence: 'manager_bridge_command_approved',
+          expectedDiagnostics: [
+            syncFfiRustHostManagerBridgeMigrationReviewStatus,
+            syncFfiRustHostManagerBridgeMigrationDecision,
+            'action_intent_mapping_reviewed',
+            'settings_draft_write_absent_reviewed',
+            'manager_bridge_command_approved',
+            'host_contract_test_file_approved',
+          ],
+        ),
+      ];
+
+      for (final replayCase in replayCases) {
+        final native = _FakeSyncCommandNativeBinding(
+          result: _fakeNativeResultForMigrationReview(replayCase),
+        );
+        final summary = _executeAndCopySyncCommandSummary(
+          native,
+          const _FakeSyncCommandRequest(
+            actionId: 'recovery_setup',
+            operationId: 'op_test_non_secret_migration_review',
+            readinessSnapshotId: 'readiness_snapshot_test_migration_review',
+            sourceTag: 'local_smoke',
+            deviceBackendGate: 'blocked',
+            explicitUserStart: true,
+          ),
+        );
+
+        expect(native.events, ['execute:recovery_setup', 'copy:1', 'free:1']);
+        expect(native.openHandleCount, 0);
+        expect(summary.commandStatus, 'blocked_by_readiness');
+        expect(summary.errorCode, 'unexpected_bridge_error');
+        expect(summary.retryPolicy, 'not_retryable');
+        expect(summary.nextRequiredEvidence, replayCase.nextRequiredEvidence);
+        expect(summary.objectTypeSummary, replayCase.objectTypeSummary);
+        expect(summary.gateReadinessState, syncFfiRustHostGateReadinessState);
+        expect(summary.gateBlockerCode, replayCase.blockerCode);
+        expect(
+          summary.gateMissingConditionSummary,
+          replayCase.nextRequiredEvidence,
+        );
+
+        final diagnostics = summary.diagnosticsText;
+        expect(diagnostics, contains(replayCase.id));
+        expect(diagnostics, contains(replayCase.blockerCode));
+        for (final evidence in replayCase.expectedDiagnostics) {
+          expect(diagnostics, contains(evidence), reason: replayCase.id);
+        }
+        expect(diagnostics, isNot(contains('settings_action_payload')));
+        expect(diagnostics, isNot(contains('bridge_request_payload')));
+        expect(diagnostics, isNot(contains('remote_request_body')));
+        expect(diagnostics, isNot(contains('remote_response_body')));
+        expect(
+          diagnostics,
+          isNot(contains('radishlex_manager_sync_command_execute_v1')),
+        );
+        for (final fragment in syncBridgeCommandContractForbiddenFragments) {
+          expect(diagnostics, isNot(contains(fragment)), reason: replayCase.id);
+        }
+      }
+    },
+  );
 }
 
 _DartOwnedSyncCommandSummary _executeAndCopySyncCommandSummary(
@@ -716,6 +815,46 @@ _FakeNativeSyncCommandResult _fakeNativeResultForAdmissionGap(
     gateBlockerCode: gapItem.blockerCode,
     gateMissingConditionSummary: gapItem.condition,
   );
+}
+
+_FakeNativeSyncCommandResult _fakeNativeResultForMigrationReview(
+  _MigrationReviewReplayCase replayCase,
+) {
+  return _FakeNativeSyncCommandResult(
+    actionId: 'recovery_setup',
+    commandStatus: 'blocked_by_readiness',
+    errorCode: 'unexpected_bridge_error',
+    retryPolicy: 'not_retryable',
+    userVisibleSummaryCode: 'unexpected_bridge_error',
+    diagnosticsSummaryCode: 'unexpected_bridge_error',
+    nextRequiredEvidence: replayCase.nextRequiredEvidence,
+    objectTypeSummary: replayCase.objectTypeSummary,
+    objectCountSummary: '0',
+    objectVersionSummary: replayCase.expectedDiagnostics.join('|'),
+    recordedAtSummary: 'not_recorded',
+    nativeDebugText: syncBridgeCommandContractForbiddenFragments.join(' '),
+    abiStatusCode: 'InvalidState',
+    abiInputCase: replayCase.id,
+    gateReadinessState: syncFfiRustHostGateReadinessState,
+    gateBlockerCode: replayCase.blockerCode,
+    gateMissingConditionSummary: replayCase.nextRequiredEvidence,
+  );
+}
+
+final class _MigrationReviewReplayCase {
+  const _MigrationReviewReplayCase({
+    required this.id,
+    required this.objectTypeSummary,
+    required this.blockerCode,
+    required this.nextRequiredEvidence,
+    required this.expectedDiagnostics,
+  });
+
+  final String id;
+  final String objectTypeSummary;
+  final String blockerCode;
+  final String nextRequiredEvidence;
+  final List<String> expectedDiagnostics;
 }
 
 String _commandStatusForAbiStatus(String statusCode) {

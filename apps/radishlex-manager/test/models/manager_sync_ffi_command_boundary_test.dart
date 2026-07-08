@@ -1383,6 +1383,9 @@ void main() {
         'gate_migration_review',
         'host_gate_readiness_review',
         'host_test_admission_review',
+        'native_export_approval_review',
+        'dart_binding_migration_review',
+        'manager_bridge_migration_review',
       ]),
     );
     expect(
