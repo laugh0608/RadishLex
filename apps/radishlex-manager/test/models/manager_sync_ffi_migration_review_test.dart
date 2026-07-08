@@ -287,4 +287,85 @@ void main() {
       expect(encoded, isNot(contains(fragment)));
     }
   });
+
+  test('rust host real sync evidence bundle keeps release gate closed', () {
+    final shape = syncFfiRustHostRealSyncEvidenceBundleReviewShape(
+      syncFfiRustHostRealSyncEvidenceBundleReview,
+    );
+    final items = shape['evidence_items'] as List<Object?>;
+    final encoded = jsonEncode(shape);
+
+    expect(
+      shape['review_status'],
+      syncFfiRustHostRealSyncEvidenceBundleReviewStatus,
+    );
+    expect(
+      shape['bundle_decision'],
+      syncFfiRustHostRealSyncEvidenceBundleDecision,
+    );
+    expect(items, hasLength(3));
+    expect(
+      items.map((item) => (item as Map<String, Object?>)['evidence_id']),
+      containsAll([
+        'platform_private_key_backend',
+        'recovery_authorization_interaction',
+        'deployment_evidence_summary',
+      ]),
+    );
+    expect(
+      items.map((item) => (item as Map<String, Object?>)['current_state']),
+      containsAll([
+        'production_backend_not_ready_current_phase',
+        'interaction_tests_not_passed_current_phase',
+        'release_deployment_evidence_missing_current_phase',
+      ]),
+    );
+    for (final item in items.cast<Map<String, Object?>>()) {
+      expect(item['can_unlock_real_sync'], isFalse);
+      expect(item['safe_summary'], isNot(contains('payload')));
+      expect(item['safe_summary'], isNot(contains('signature')));
+    }
+    expect(
+      shape['reviewed_conditions'],
+      containsAll([
+        'platform_private_key_backend_summary_mapped',
+        'recovery_authorization_interaction_summary_mapped',
+        'deployment_evidence_summary_source_mapped',
+        'local_smoke_kept_development_only',
+      ]),
+    );
+    expect(
+      shape['blocking_conditions'],
+      containsAll([
+        'platform_private_key_backend_production_ready',
+        'recovery_authorization_interaction_tests_passed',
+        'deployment_evidence_summary_approved',
+        'release_evidence_bundle_approved_after_gate',
+      ]),
+    );
+    expect(
+      shape['required_evidence'],
+      containsAll([
+        'deployment_evidence_summary_v1_release_target',
+        'manager_sync_entry_gate_visible_layer_tests',
+        'real_sync_execution_evidence_bundle_replay',
+      ]),
+    );
+    expect(shape['can_mark_platform_backend_ready'], isFalse);
+    expect(shape['can_mark_recovery_authorization_ready'], isFalse);
+    expect(shape['can_mark_deployment_summary_ready'], isFalse);
+    expect(shape['can_unlock_real_sync'], isFalse);
+    expect(shape['can_execute_remote_call'], isFalse);
+    expect(shape['can_persist_secret_material'], isFalse);
+
+    expect(encoded, contains('local_smoke_kept_development_only'));
+    expect(encoded, contains('deployment_evidence_summary_v1_required'));
+    expect(encoded, isNot(contains('settings_action_payload')));
+    expect(encoded, isNot(contains('bridge_request_payload')));
+    expect(encoded, isNot(contains('remote_request_body')));
+    expect(encoded, isNot(contains('remote_response_body')));
+    for (final fragment in syncBridgeCommandContractForbiddenFragments) {
+      expect(encoded, isNot(contains(fragment)));
+    }
+  });
 }

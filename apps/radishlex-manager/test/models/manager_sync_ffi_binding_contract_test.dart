@@ -454,6 +454,21 @@ void main() {
             'deployment_evidence_summary_approved',
           ],
         ),
+        const _MigrationReviewReplayCase(
+          id: 'real_sync_execution_evidence_bundle_review',
+          objectTypeSummary: 'real_sync_execution_evidence_bundle_review',
+          blockerCode: 'real_sync_execution_evidence_bundle_not_approved',
+          nextRequiredEvidence: 'release_evidence_bundle_approved_after_gate',
+          expectedDiagnostics: [
+            syncFfiRustHostRealSyncEvidenceBundleReviewStatus,
+            syncFfiRustHostRealSyncEvidenceBundleDecision,
+            'platform_private_key_backend_summary_mapped',
+            'recovery_authorization_interaction_summary_mapped',
+            'deployment_evidence_summary_source_mapped',
+            'local_smoke_kept_development_only',
+            'deployment_evidence_summary_v1_release_target',
+          ],
+        ),
       ];
 
       for (final replayCase in replayCases) {

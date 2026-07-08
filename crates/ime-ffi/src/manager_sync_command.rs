@@ -332,6 +332,7 @@ const MANAGER_SYNC_COMMAND_DEBUG_REDACTION_TARGETS_DRAFT: &[&str] = &[
     "manager_bridge_migration_review",
     "host_test_file_approval_review",
     "real_sync_execution_gate_review",
+    "real_sync_execution_evidence_bundle_review",
 ];
 
 const MANAGER_SYNC_COMMAND_FORBIDDEN_CATEGORIES_DRAFT: &[&str] = &[

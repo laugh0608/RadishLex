@@ -31,6 +31,12 @@ const syncFfiRustHostRealSyncExecutionGateReviewStatus =
 const syncFfiRustHostRealSyncExecutionDecision =
     'real_sync_execution_blocked_until_platform_and_deployment_evidence';
 
+const syncFfiRustHostRealSyncEvidenceBundleReviewStatus =
+    'real_sync_execution_evidence_bundle_review_ready_no_remote_sync';
+
+const syncFfiRustHostRealSyncEvidenceBundleDecision =
+    'real_sync_execution_evidence_bundle_blocked_until_release_evidence';
+
 const syncFfiRustHostExportApprovalRequiredEvidence = [
   'adr_0006_current',
   'c_abi_wrapper_shape_review',
@@ -268,6 +274,70 @@ const syncFfiRustHostRealSyncExecutionGateReview =
       requiredEvidence: syncFfiRustHostRealSyncExecutionRequiredEvidence,
     );
 
+const syncFfiRustHostRealSyncEvidenceBundleItems = [
+  SyncFfiRustHostRealSyncEvidenceItem(
+    evidenceId: 'platform_private_key_backend',
+    evidenceDomain: 'platform_signing_backend',
+    currentState: 'production_backend_not_ready_current_phase',
+    blockingCondition: 'platform_private_key_backend_production_ready',
+    requiredSource: 'platform_private_key_backend_strategy',
+    safeSummary: 'backend_status_codes_only_no_key_material',
+  ),
+  SyncFfiRustHostRealSyncEvidenceItem(
+    evidenceId: 'recovery_authorization_interaction',
+    evidenceDomain: 'recovery_and_device_authorization',
+    currentState: 'interaction_tests_not_passed_current_phase',
+    blockingCondition: 'recovery_authorization_interaction_tests_passed',
+    requiredSource: 'manager_recovery_device_auth_flow',
+    safeSummary: 'confirmation_and_transient_lifecycle_codes_only',
+  ),
+  SyncFfiRustHostRealSyncEvidenceItem(
+    evidenceId: 'deployment_evidence_summary',
+    evidenceDomain: 'release_deployment_evidence',
+    currentState: 'release_deployment_evidence_missing_current_phase',
+    blockingCondition: 'deployment_evidence_summary_approved',
+    requiredSource: 'sync_server_production_deployment_runbook',
+    safeSummary: 'deployment_evidence_summary_v1_required_local_smoke_only',
+  ),
+];
+
+const syncFfiRustHostRealSyncEvidenceBundleReviewedConditions = [
+  'platform_private_key_backend_summary_mapped',
+  'recovery_authorization_interaction_summary_mapped',
+  'deployment_evidence_summary_source_mapped',
+  'local_smoke_kept_development_only',
+  'forbidden_material_redaction_reviewed',
+  'current_phase_real_sync_unlock_blocked',
+];
+
+const syncFfiRustHostRealSyncEvidenceBundleBlockingConditions = [
+  'platform_private_key_backend_production_ready',
+  'recovery_authorization_interaction_tests_passed',
+  'deployment_evidence_summary_approved',
+  'release_evidence_bundle_approved_after_gate',
+  'real_sync_execution_approved_after_gate',
+];
+
+const syncFfiRustHostRealSyncEvidenceBundleRequiredEvidence = [
+  'platform_private_key_backend_strategy_current',
+  'manager_recovery_device_auth_flow_current',
+  'sync_server_production_deployment_runbook_current',
+  'deployment_evidence_summary_v1_release_target',
+  'manager_sync_entry_gate_visible_layer_tests',
+  'real_sync_execution_evidence_bundle_replay',
+];
+
+const syncFfiRustHostRealSyncEvidenceBundleReview =
+    SyncFfiRustHostRealSyncEvidenceBundleReview(
+      bundleDecision: syncFfiRustHostRealSyncEvidenceBundleDecision,
+      evidenceItems: syncFfiRustHostRealSyncEvidenceBundleItems,
+      reviewedConditions:
+          syncFfiRustHostRealSyncEvidenceBundleReviewedConditions,
+      blockingConditions:
+          syncFfiRustHostRealSyncEvidenceBundleBlockingConditions,
+      requiredEvidence: syncFfiRustHostRealSyncEvidenceBundleRequiredEvidence,
+    );
+
 class SyncFfiRustHostExportSymbolReviewItem {
   const SyncFfiRustHostExportSymbolReviewItem({
     required this.symbolName,
@@ -355,6 +425,40 @@ class SyncFfiRustHostRealSyncExecutionGateReview {
   });
 
   final String executionDecision;
+  final List<String> reviewedConditions;
+  final List<String> blockingConditions;
+  final List<String> requiredEvidence;
+}
+
+class SyncFfiRustHostRealSyncEvidenceItem {
+  const SyncFfiRustHostRealSyncEvidenceItem({
+    required this.evidenceId,
+    required this.evidenceDomain,
+    required this.currentState,
+    required this.blockingCondition,
+    required this.requiredSource,
+    required this.safeSummary,
+  });
+
+  final String evidenceId;
+  final String evidenceDomain;
+  final String currentState;
+  final String blockingCondition;
+  final String requiredSource;
+  final String safeSummary;
+}
+
+class SyncFfiRustHostRealSyncEvidenceBundleReview {
+  const SyncFfiRustHostRealSyncEvidenceBundleReview({
+    required this.bundleDecision,
+    required this.evidenceItems,
+    required this.reviewedConditions,
+    required this.blockingConditions,
+    required this.requiredEvidence,
+  });
+
+  final String bundleDecision;
+  final List<SyncFfiRustHostRealSyncEvidenceItem> evidenceItems;
   final List<String> reviewedConditions;
   final List<String> blockingConditions;
   final List<String> requiredEvidence;
@@ -468,5 +572,43 @@ Map<String, Object?> syncFfiRustHostRealSyncExecutionGateReviewShape(
     'can_generate_recovery_code': false,
     'can_create_join_request': false,
     'can_revoke_device': false,
+  };
+}
+
+Map<String, Object?> syncFfiRustHostRealSyncEvidenceBundleReviewShape(
+  SyncFfiRustHostRealSyncEvidenceBundleReview fixture,
+) {
+  return {
+    'format': syncFfiRustHostInternalDraftEvidenceFormat,
+    'review_status': syncFfiRustHostRealSyncEvidenceBundleReviewStatus,
+    'bundle_decision': fixture.bundleDecision,
+    'evidence_items': [
+      for (final item in fixture.evidenceItems)
+        syncFfiRustHostRealSyncEvidenceItemShape(item),
+    ],
+    'reviewed_conditions': fixture.reviewedConditions,
+    'blocking_conditions': fixture.blockingConditions,
+    'required_evidence': fixture.requiredEvidence,
+    'can_mark_platform_backend_ready': false,
+    'can_mark_recovery_authorization_ready': false,
+    'can_mark_deployment_summary_ready': false,
+    'can_unlock_real_sync': false,
+    'can_execute_remote_call': false,
+    'can_persist_secret_material': false,
+  };
+}
+
+Map<String, Object?> syncFfiRustHostRealSyncEvidenceItemShape(
+  SyncFfiRustHostRealSyncEvidenceItem fixture,
+) {
+  return {
+    'format': syncFfiRustHostInternalDraftEvidenceFormat,
+    'evidence_id': fixture.evidenceId,
+    'evidence_domain': fixture.evidenceDomain,
+    'current_state': fixture.currentState,
+    'blocking_condition': fixture.blockingCondition,
+    'required_source': fixture.requiredSource,
+    'safe_summary': fixture.safeSummary,
+    'can_unlock_real_sync': false,
   };
 }

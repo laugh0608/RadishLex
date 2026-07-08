@@ -1,8 +1,10 @@
 use super::admission::ManagerSyncCommandHostTestAdmissionReviewDraft;
 use super::host_test_gate_review::{
-    ManagerSyncCommandHostTestFileApprovalReviewDraft,
+    ManagerSyncCommandHostTestFileApprovalReviewDraft, ManagerSyncCommandRealSyncEvidenceItemDraft,
+    ManagerSyncCommandRealSyncExecutionEvidenceBundleReviewDraft,
     ManagerSyncCommandRealSyncExecutionGateReviewDraft, HOST_TEST_FILE_APPROVAL_BLOCKED,
-    HOST_TEST_FILE_APPROVAL_REVIEW_READY, REAL_SYNC_EXECUTION_BLOCKED,
+    HOST_TEST_FILE_APPROVAL_REVIEW_READY, REAL_SYNC_EVIDENCE_BUNDLE_BLOCKED,
+    REAL_SYNC_EVIDENCE_BUNDLE_REVIEW_READY, REAL_SYNC_EXECUTION_BLOCKED,
     REAL_SYNC_EXECUTION_GATE_REVIEW_READY,
 };
 use super::migration_review::{
@@ -546,6 +548,9 @@ fn debug_redaction_review_covers_internal_draft_targets() {
     assert!(redaction
         .debug_targets
         .contains(&"host_gate_readiness_review"));
+    assert!(redaction
+        .debug_targets
+        .contains(&"real_sync_execution_evidence_bundle_review"));
     assert!(redaction.forbidden_categories.contains(&"token_material"));
     assert!(redaction
         .forbidden_categories
@@ -1204,6 +1209,88 @@ fn real_sync_execution_gate_review_blocks_remote_side_effects() {
     assert!(accidental_execution.assert_safe_execution_gate().is_err());
 
     let debug = format!("{execution_gate:?}");
+    for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
+        assert!(!debug.contains(forbidden), "{forbidden}");
+    }
+}
+
+#[test]
+fn real_sync_execution_evidence_bundle_review_keeps_release_evidence_blocking() {
+    let bridge_review = current_manager_bridge_migration_review();
+    let host_file_review =
+        ManagerSyncCommandHostTestFileApprovalReviewDraft::current_phase(&bridge_review).unwrap();
+    let execution_gate =
+        ManagerSyncCommandRealSyncExecutionGateReviewDraft::current_phase(&host_file_review)
+            .unwrap();
+    let evidence_bundle =
+        ManagerSyncCommandRealSyncExecutionEvidenceBundleReviewDraft::current_phase(
+            &execution_gate,
+        )
+        .unwrap();
+    evidence_bundle.assert_safe_evidence_bundle().unwrap();
+
+    assert_eq!(
+        evidence_bundle.review_state,
+        REAL_SYNC_EVIDENCE_BUNDLE_REVIEW_READY
+    );
+    assert_eq!(
+        evidence_bundle.bundle_decision,
+        REAL_SYNC_EVIDENCE_BUNDLE_BLOCKED
+    );
+    assert_eq!(evidence_bundle.evidence_items.len(), 3);
+    assert!(evidence_bundle.evidence_items.iter().any(|item| {
+        item.evidence_id == "platform_private_key_backend"
+            && item.current_state == "production_backend_not_ready_current_phase"
+            && item.blocking_condition == "platform_private_key_backend_production_ready"
+    }));
+    assert!(evidence_bundle.evidence_items.iter().any(|item| {
+        item.evidence_id == "recovery_authorization_interaction"
+            && item.current_state == "interaction_tests_not_passed_current_phase"
+            && item.blocking_condition == "recovery_authorization_interaction_tests_passed"
+    }));
+    assert!(evidence_bundle.evidence_items.iter().any(|item| {
+        item.evidence_id == "deployment_evidence_summary"
+            && item.current_state == "release_deployment_evidence_missing_current_phase"
+            && item.safe_summary == "deployment_evidence_summary_v1_required_local_smoke_only"
+    }));
+    assert!(evidence_bundle
+        .reviewed_conditions
+        .contains(&"local_smoke_kept_development_only"));
+    assert!(evidence_bundle
+        .blocking_conditions
+        .contains(&"release_evidence_bundle_approved_after_gate"));
+    assert!(evidence_bundle
+        .required_evidence
+        .contains(&"deployment_evidence_summary_v1_release_target"));
+    assert!(evidence_bundle
+        .required_evidence
+        .contains(&"real_sync_execution_evidence_bundle_replay"));
+    assert!(!evidence_bundle.can_mark_platform_backend_ready);
+    assert!(!evidence_bundle.can_mark_recovery_authorization_ready);
+    assert!(!evidence_bundle.can_mark_deployment_summary_ready);
+    assert!(!evidence_bundle.can_unlock_real_sync);
+    assert!(!evidence_bundle.can_execute_remote_call);
+    assert!(!evidence_bundle.can_persist_secret_material);
+
+    let mut accidental_bundle = evidence_bundle;
+    accidental_bundle.can_unlock_real_sync = true;
+    assert!(accidental_bundle.assert_safe_evidence_bundle().is_err());
+
+    let mut items = evidence_bundle.evidence_items.to_vec();
+    items[0] = ManagerSyncCommandRealSyncEvidenceItemDraft {
+        can_unlock_real_sync: true,
+        ..items[0]
+    };
+    let leaked_items = Box::leak(items.into_boxed_slice());
+    let accidental_item_bundle = ManagerSyncCommandRealSyncExecutionEvidenceBundleReviewDraft {
+        evidence_items: leaked_items,
+        ..evidence_bundle
+    };
+    assert!(accidental_item_bundle
+        .assert_safe_evidence_bundle()
+        .is_err());
+
+    let debug = format!("{evidence_bundle:?}");
     for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
         assert!(!debug.contains(forbidden), "{forbidden}");
     }
