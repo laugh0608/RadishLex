@@ -604,6 +604,127 @@ void main() {
     expect(encodedChecklist, isNot(contains('touch_platform_key_backend_now')));
   });
 
+  test('rust host test design binds source checklist to assertions', () {
+    final contractById = {
+      for (final item in syncFfiCommandBoundaryRustHostContractCases)
+        item.id: item,
+    };
+    final sourceChecklistById = {
+      for (final item in syncFfiCommandBoundaryRustHostSourceChecklistItems)
+        item.id: item,
+    };
+    final reviewById = {
+      for (final item in syncFfiCommandBoundaryRustHostReviewItems)
+        item.id: item,
+    };
+    final sampleById = {
+      for (final sample in syncFfiCommandBoundaryRustHostInputSamples)
+        sample.id: sample,
+    };
+    final designByContractCaseId = {
+      for (final item in syncFfiCommandBoundaryRustHostTestDesignItems)
+        item.contractCaseId: item,
+    };
+
+    expect(
+      syncFfiCommandBoundaryRustHostTestDesignItemIds(),
+      containsAll([
+        'contract_reports_command_capability_closed_test_design',
+        'invalid_request_inputs_return_stable_status_test_design',
+        'result_handle_copy_then_free_test_design',
+        'envelope_allowlist_only_test_design',
+        'forbidden_material_absent_from_native_outputs_test_design',
+        'panic_boundary_returns_internal_error_test_design',
+        'sync_domain_command_serialization_test_design',
+      ]),
+    );
+    expect(designByContractCaseId.keys.toSet(), contractById.keys.toSet());
+
+    for (final item in syncFfiCommandBoundaryRustHostTestDesignItems) {
+      final contract = contractById[item.contractCaseId];
+      final checklist = sourceChecklistById[item.sourceChecklistItemId];
+      final shape = syncFfiCommandBoundaryRustHostTestDesignItemShape(item);
+
+      expect(contract, isNotNull, reason: item.id);
+      expect(checklist, isNotNull, reason: item.id);
+      expect(
+        reviewById[checklist!.reviewItemId]?.contractCaseId,
+        item.contractCaseId,
+        reason: item.id,
+      );
+      expect(shape['format'], syncFfiCommandBoundaryRustHostTestDesignFormat);
+      expect(
+        shape['review_status'],
+        syncFfiCommandBoundaryRustHostTestDesignStatus,
+      );
+      expect(
+        shape['target_test_file'],
+        syncFfiCommandBoundaryRustHostContractTargetTestFile,
+      );
+      expect(item.sampleIds, contract!.sampleIds, reason: item.id);
+      expect(
+        item.expectedStatusCodes,
+        contract.expectedStatusCodes,
+        reason: item.id,
+      );
+      expect(
+        item.implementationGuards,
+        syncFfiCommandBoundaryRustHostReviewStopLines,
+        reason: item.id,
+      );
+      expect(
+        item.implementationStatus,
+        'test_design_ready_no_native_symbol',
+        reason: item.id,
+      );
+      expect(item.sampleIdSummary, isNot('none'), reason: item.id);
+      expect(item.expectedStatusSummary, isNot('none'), reason: item.id);
+      expect(item.assertionSummary, isNot('none'), reason: item.id);
+      expect(item.forbiddenOutputSummary, isNot('none'), reason: item.id);
+      expect(item.guardSummary, isNot('none'), reason: item.id);
+      expect(checklist.patternSourceRefs, isNotEmpty, reason: item.id);
+      expect(checklist.sourceRefSummary, isNot('none'), reason: item.id);
+
+      for (final sampleId in item.sampleIds) {
+        final sample = sampleById[sampleId];
+        expect(sample, isNotNull, reason: '${item.id}: $sampleId');
+        expect(
+          item.expectedStatusCodes,
+          contains(sample!.expectedStatusCode),
+          reason: '${item.id}: $sampleId',
+        );
+      }
+    }
+  });
+
+  test('rust host test design remains review-only and non-sensitive', () {
+    final encodedDesign = [
+      for (final item in syncFfiCommandBoundaryRustHostTestDesignItems)
+        jsonEncode(syncFfiCommandBoundaryRustHostTestDesignItemShape(item)),
+    ].join('\n');
+
+    expect(syncFfiCommandBoundaryCurrentNativeSymbols, isEmpty);
+    expect(encodedDesign, contains('test_design_ready_no_native_symbol'));
+    expect(encodedDesign, contains('no_native_symbol'));
+    for (final symbol in syncFfiCommandBoundaryCandidateSymbols) {
+      expect(encodedDesign, isNot(contains(symbol)), reason: symbol);
+    }
+    for (final rejected in syncBridgeCommandContractRejectedSamples) {
+      expect(
+        encodedDesign,
+        isNot(contains(rejected.forbiddenFragment)),
+        reason: rejected.id,
+      );
+    }
+    for (final fragment in syncBridgeCommandContractForbiddenFragments) {
+      expect(encodedDesign, isNot(contains(fragment)));
+    }
+    expect(encodedDesign, isNot(contains('settings_action_payload')));
+    expect(encodedDesign, isNot(contains('bridge_request_payload')));
+    expect(encodedDesign, isNot(contains('connect_go_server_now')));
+    expect(encodedDesign, isNot(contains('touch_platform_key_backend_now')));
+  });
+
   test('rust and dart smoke plans cover ownership and redaction evidence', () {
     expect(
       syncFfiCommandBoundaryAllSmokeCaseIds(),

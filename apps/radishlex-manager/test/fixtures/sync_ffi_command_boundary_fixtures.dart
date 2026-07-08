@@ -17,6 +17,9 @@ const syncFfiCommandBoundaryRustHostReviewFormat =
 const syncFfiCommandBoundaryRustHostSourceChecklistFormat =
     'future_manager_sync_ffi_rust_host_source_checklist.v1_draft';
 
+const syncFfiCommandBoundaryRustHostTestDesignFormat =
+    'future_manager_sync_ffi_rust_host_test_design.v1_draft';
+
 const syncFfiCommandBoundaryRustHostContractReviewStatus =
     'future_rust_host_contract_review_only_no_native_symbol';
 
@@ -25,6 +28,9 @@ const syncFfiCommandBoundaryRustHostReviewStatus =
 
 const syncFfiCommandBoundaryRustHostSourceChecklistStatus =
     'rust_host_source_checklist_ready_no_native_symbol';
+
+const syncFfiCommandBoundaryRustHostTestDesignStatus =
+    'rust_host_test_design_ready_no_native_symbol';
 
 const syncFfiCommandBoundaryRustHostContractTargetTestFile =
     'crates/ime-ffi/tests/manager_sync_command_boundary.rs';
@@ -978,6 +984,170 @@ const syncFfiCommandBoundaryRustHostSourceChecklistItems = [
   ),
 ];
 
+const syncFfiCommandBoundaryRustHostTestDesignItems = [
+  SyncFfiCommandBoundaryRustHostTestDesignItem(
+    id: 'contract_reports_command_capability_closed_test_design',
+    contractCaseId: 'contract_reports_command_capability_closed',
+    sourceChecklistItemId:
+        'contract_reports_command_capability_closed_source_checklist',
+    sampleIds: ['current_phase_capability_closed_recovery_setup'],
+    expectedStatusCodes: ['InvalidState'],
+    assertionGroups: [
+      'contract_version_current',
+      'sync_command_capability_closed',
+      'native_symbol_absent',
+      'invalid_state_status',
+    ],
+    forbiddenOutputCategories: [
+      'native_symbol_export',
+      'manager_bridge_method',
+      'remote_sync_execution',
+    ],
+    implementationGuards: syncFfiCommandBoundaryRustHostReviewStopLines,
+    implementationStatus: 'test_design_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostTestDesignItem(
+    id: 'invalid_request_inputs_return_stable_status_test_design',
+    contractCaseId: 'invalid_request_inputs_return_stable_status',
+    sourceChecklistItemId:
+        'invalid_request_inputs_return_stable_status_source_checklist',
+    sampleIds: [
+      'invalid_schema_version_rejected',
+      'invalid_action_rejected',
+      'invalid_bool_rejected',
+      'null_pointer_rejected',
+      'invalid_utf8_rejected',
+    ],
+    expectedStatusCodes: ['InvalidArgument'],
+    assertionGroups: [
+      'unknown_schema_invalid_argument',
+      'unknown_action_invalid_argument',
+      'invalid_bool_invalid_argument',
+      'null_pointer_invalid_argument',
+      'invalid_utf8_invalid_argument',
+      'error_handle_read_then_free',
+    ],
+    forbiddenOutputCategories: [
+      'unchecked_request_input',
+      'secret_material_echo',
+      'request_payload_echo',
+    ],
+    implementationGuards: syncFfiCommandBoundaryRustHostReviewStopLines,
+    implementationStatus: 'test_design_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostTestDesignItem(
+    id: 'result_handle_copy_then_free_test_design',
+    contractCaseId: 'result_handle_copy_then_free',
+    sourceChecklistItemId: 'result_handle_copy_then_free_source_checklist',
+    sampleIds: ['current_phase_capability_closed_recovery_setup'],
+    expectedStatusCodes: ['InvalidState'],
+    assertionGroups: [
+      'rust_owned_result_handle',
+      'copy_summary_before_free',
+      'free_null_noop',
+      'views_invalid_after_free',
+    ],
+    forbiddenOutputCategories: [
+      'stored_native_pointer',
+      'dart_owned_rust_view',
+      'result_handle_leak',
+    ],
+    implementationGuards: syncFfiCommandBoundaryRustHostReviewStopLines,
+    implementationStatus: 'test_design_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostTestDesignItem(
+    id: 'envelope_allowlist_only_test_design',
+    contractCaseId: 'envelope_allowlist_only',
+    sourceChecklistItemId: 'envelope_allowlist_only_source_checklist',
+    sampleIds: ['sync_unenveloped_failure_maps_to_sync_error'],
+    expectedStatusCodes: ['SyncError'],
+    assertionGroups: [
+      'command_status_allowlist',
+      'command_error_allowlist',
+      'retry_policy_allowlist',
+      'next_evidence_allowlist',
+    ],
+    forbiddenOutputCategories: [
+      'provider_exception_text',
+      'transport_response_echo',
+      'raw_error_payload',
+    ],
+    implementationGuards: syncFfiCommandBoundaryRustHostReviewStopLines,
+    implementationStatus: 'test_design_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostTestDesignItem(
+    id: 'forbidden_material_absent_from_native_outputs_test_design',
+    contractCaseId: 'forbidden_material_absent_from_native_outputs',
+    sourceChecklistItemId:
+        'forbidden_material_absent_from_native_outputs_source_checklist',
+    sampleIds: [
+      'invalid_schema_version_rejected',
+      'invalid_action_rejected',
+      'invalid_bool_rejected',
+      'sync_unenveloped_failure_maps_to_sync_error',
+      'panic_boundary_maps_to_internal_error',
+    ],
+    expectedStatusCodes: ['InvalidArgument', 'SyncError', 'InternalError'],
+    assertionGroups: [
+      'no_token_or_recovery_secret',
+      'no_short_code_or_signature',
+      'no_wrapped_material_or_transport_payload',
+      'no_real_path_or_provider_exception',
+    ],
+    forbiddenOutputCategories: [
+      'token_material',
+      'recovery_secret_material',
+      'join_verifier_material',
+      'signature_or_wrapped_sync_material',
+      'opaque_transport_content',
+      'local_path_material',
+    ],
+    implementationGuards: syncFfiCommandBoundaryRustHostReviewStopLines,
+    implementationStatus: 'test_design_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostTestDesignItem(
+    id: 'panic_boundary_returns_internal_error_test_design',
+    contractCaseId: 'panic_boundary_returns_internal_error',
+    sourceChecklistItemId:
+        'panic_boundary_returns_internal_error_source_checklist',
+    sampleIds: ['panic_boundary_maps_to_internal_error'],
+    expectedStatusCodes: ['InternalError'],
+    assertionGroups: [
+      'catch_unwind_boundary',
+      'internal_error_status',
+      'no_panic_crosses_abi',
+      'release_path_safe_after_error',
+    ],
+    forbiddenOutputCategories: [
+      'panic_message_echo',
+      'absolute_path_echo',
+      'unreleased_error_handle',
+    ],
+    implementationGuards: syncFfiCommandBoundaryRustHostReviewStopLines,
+    implementationStatus: 'test_design_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostTestDesignItem(
+    id: 'sync_domain_command_serialization_test_design',
+    contractCaseId: 'sync_domain_command_serialization',
+    sourceChecklistItemId: 'sync_domain_command_serialization_source_checklist',
+    sampleIds: ['same_domain_concurrent_command_blocked_or_serialized'],
+    expectedStatusCodes: ['InvalidState'],
+    assertionGroups: [
+      'same_domain_serialization_or_conflict',
+      'operation_id_non_sensitive',
+      'owner_context_invalid_state_pattern',
+      'no_ui_payload_retry_state',
+    ],
+    forbiddenOutputCategories: [
+      'background_remote_retry',
+      'ui_payload_queue',
+      'implicit_device_state_mutation',
+    ],
+    implementationGuards: syncFfiCommandBoundaryRustHostReviewStopLines,
+    implementationStatus: 'test_design_ready_no_native_symbol',
+  ),
+];
+
 class SyncFfiCommandBoundaryRustHostReviewItem {
   const SyncFfiCommandBoundaryRustHostReviewItem({
     required this.id,
@@ -1035,6 +1205,50 @@ class SyncFfiCommandBoundaryRustHostSourceChecklistItem {
 
   String get preCheckSummary {
     return managerSyncCodeSummary(requiredPreChecks);
+  }
+}
+
+class SyncFfiCommandBoundaryRustHostTestDesignItem {
+  const SyncFfiCommandBoundaryRustHostTestDesignItem({
+    required this.id,
+    required this.contractCaseId,
+    required this.sourceChecklistItemId,
+    required this.sampleIds,
+    required this.expectedStatusCodes,
+    required this.assertionGroups,
+    required this.forbiddenOutputCategories,
+    required this.implementationGuards,
+    required this.implementationStatus,
+  });
+
+  final String id;
+  final String contractCaseId;
+  final String sourceChecklistItemId;
+  final List<String> sampleIds;
+  final List<String> expectedStatusCodes;
+  final List<String> assertionGroups;
+  final List<String> forbiddenOutputCategories;
+  final List<String> implementationGuards;
+  final String implementationStatus;
+
+  String get sampleIdSummary {
+    return managerSyncCodeSummary(sampleIds);
+  }
+
+  String get expectedStatusSummary {
+    return managerSyncCodeSummary(expectedStatusCodes);
+  }
+
+  String get assertionSummary {
+    return managerSyncCodeSummary(assertionGroups);
+  }
+
+  String get forbiddenOutputSummary {
+    return managerSyncCodeSummary(forbiddenOutputCategories);
+  }
+
+  String get guardSummary {
+    return managerSyncCodeSummary(implementationGuards);
   }
 }
 
@@ -1113,6 +1327,14 @@ List<String> syncFfiCommandBoundaryRustHostReviewItemIds() {
   );
 }
 
+List<String> syncFfiCommandBoundaryRustHostTestDesignItemIds() {
+  return List.unmodifiable(
+    syncFfiCommandBoundaryRustHostTestDesignItems
+        .map((fixture) => fixture.id)
+        .toList(),
+  );
+}
+
 Map<String, Object?> syncFfiCommandBoundaryRustHostInputSampleShape(
   SyncFfiCommandBoundaryRustHostInputSample sample,
 ) {
@@ -1180,6 +1402,25 @@ Map<String, Object?> syncFfiCommandBoundaryRustHostSourceChecklistItemShape(
     'pattern_source_refs': fixture.patternSourceRefs,
     'required_pre_checks': fixture.requiredPreChecks,
     'stop_lines': syncFfiCommandBoundaryRustHostReviewStopLines,
+    'implementation_status': fixture.implementationStatus,
+  };
+}
+
+Map<String, Object?> syncFfiCommandBoundaryRustHostTestDesignItemShape(
+  SyncFfiCommandBoundaryRustHostTestDesignItem fixture,
+) {
+  return {
+    'format': syncFfiCommandBoundaryRustHostTestDesignFormat,
+    'review_status': syncFfiCommandBoundaryRustHostTestDesignStatus,
+    'target_test_file': syncFfiCommandBoundaryRustHostContractTargetTestFile,
+    'id': fixture.id,
+    'contract_case_id': fixture.contractCaseId,
+    'source_checklist_item_id': fixture.sourceChecklistItemId,
+    'sample_ids': fixture.sampleIds,
+    'expected_status_codes': fixture.expectedStatusCodes,
+    'assertion_groups': fixture.assertionGroups,
+    'forbidden_output_categories': fixture.forbiddenOutputCategories,
+    'implementation_guards': fixture.implementationGuards,
     'implementation_status': fixture.implementationStatus,
   };
 }

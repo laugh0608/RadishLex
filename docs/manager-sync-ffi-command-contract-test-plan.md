@@ -18,6 +18,7 @@
 - `syncFfiCommandBoundaryRustHostContractCases` host contract catalog fixture
 - `syncFfiCommandBoundaryRustHostReviewItems` Rust host review fixture
 - `syncFfiCommandBoundaryRustHostSourceChecklistItems` Rust host source-level checklist fixture
+- `syncFfiCommandBoundaryRustHostTestDesignItems` Rust host test design fixture
 - Dart fake native binding 对 host catalog 的非执行 replay 回归
 - `apps/radishlex-manager/tool/ffi_bridge_smoke.dart` 中真实 dynamic library future sync command symbol 缺席检查
 - `docs/manager-sync-ffi-command-boundary.md`
@@ -30,7 +31,7 @@
 | --- | --- | --- | --- |
 | L0 | 文档边界 | 已完成 | 固定 ABI strategy、ownership、secret 生命周期、错误分层、host smoke 和停止线。 |
 | L1 | Dart design fixture / model test | 已完成 | 用合成 fixture 验证当前没有 native symbol，future request / result 只含安全摘要，forbidden material 不进入输出。 |
-| L2 | Rust host contract test 计划 | 已补评审材料 fixture 与 source-level checklist | 在新增 symbol 前先明确测试文件、输入样本、错误码、释放责任、既有 FFI 源码模式映射和 forbidden material 断言。 |
+| L2 | Rust host contract test 计划 | 已补评审材料、source-level checklist 与 test design fixture | 在新增 symbol 前先明确测试文件、输入样本、错误码、释放责任、既有 FFI 源码模式映射和 forbidden material 断言。 |
 | L3 | Dart FFI binding contract test 计划 | 已接入 host catalog replay | 在 Dart native binding 扩展前先明确 capability missing、copy / free、unknown status、host catalog 状态重放和错误映射测试。 |
 | L4 | Manager 可见层回归 | 部分已有 | 确认 settings / sync / diagnostics 不展示 secret、不写 settings draft、不打开按钮。 |
 | L5 | Gated platform / deployment smoke | 后续阶段 | 平台私钥 backend、真实 Keychain / Keystore、目标部署证据和真实端到端同步必须单独授权或人工准备。 |
@@ -55,6 +56,7 @@ L2 / L3 只在 L0 / L1 继续通过、且 contract 文档没有未解决分歧�
 - Rust host contract catalog：目标测试文件、target test name、sample id、ABI input case、expected status、required evidence 和当前 `planned_no_native_symbol` 状态
 - Rust host review catalog：把每个 host contract case 绑定到既有 `ime-ffi` 模式、评审主题、非敏感证据码、停止线和当前 `review_ready_no_native_symbol` 状态
 - Rust host source-level checklist：把每个 review item 的既有模式绑定到具体源码引用、测试引用和当前 `source_checklist_ready_no_native_symbol` 状态
+- Rust host test design package：把每个 host contract case 绑定到 source checklist、样本、expected status、断言组、forbidden output category、实现守卫和当前 `test_design_ready_no_native_symbol` 状态
 
 新增或修改 future command 字段时，应先更新这份 fixture，再更新文档和测试。不要让文档表格、Dart fixture 和未来 Rust contract test 各自维护不同字段列表。
 
@@ -89,6 +91,8 @@ Rust host contract test 的 fixture 输入只能使用合成值：
 当前 `syncFfiCommandBoundaryRustHostInputSamples` 已固定第一批 Rust host 输入样本，覆盖 current-phase capability closed、unknown schema version、unknown action、invalid bool、null pointer、invalid UTF-8、unenveloped sync error、panic boundary 和 same-domain concurrent command，预期状态分别映射到 `InvalidState`、`InvalidArgument`、`SyncError` 和 `InternalError`。`syncFfiCommandBoundaryRustHostContractCases` 再把这些样本绑定到建议的 Rust host test name、host smoke case、required evidence 和 `planned_no_native_symbol` 实现状态。
 
 `syncFfiCommandBoundaryRustHostReviewItems` 是进入真实 Rust host test 之前的评审材料包，逐项绑定 host contract case 与现有 `ime-ffi` 模式，包括 `radishlex_ffi_contract` 版本检查、`ffi_status` / `ffi_ptr` / `ffi_release` panic boundary 与释放路径、UTF-8 和 bool 输入校验、error handle read / free、summary output pointer guard、平台 binding copy-before-release 测试、sync preflight summary 输出和 session owner-thread `InvalidState` 策略。`syncFfiCommandBoundaryRustHostSourceChecklistItems` 再把这些模式绑定到具体源码引用，例如 `crates/ime-ffi/src/abi.rs::ffi_status`、`crates/ime-ffi/src/abi.rs::read_utf8`、`crates/ime-ffi/src/abi.rs::read_ffi_bool`、`crates/ime-ffi/src/session.rs::RadishLexSession::ensure_owner_thread`、`crates/ime-ffi/tests/ffi_contract_and_dictionary.rs::platform_binding_style_copies_views_before_releasing_handles` 和 `apps/radishlex-manager/tool/ffi_bridge_smoke.dart::_expectFutureSyncCommandSymbolsAbsent`。这两组 fixture 还固定 `add_c_abi_symbol`、`add_manager_bridge_method`、`execute_remote_sync`、`write_settings_action`、`create_setup_or_authorization_material`、`connect_go_server` 和 `touch_platform_key_backend` 停止线；状态分别为 `review_ready_no_native_symbol` 和 `source_checklist_ready_no_native_symbol`，仍不创建真实 Rust test 文件或 symbol。
+
+`syncFfiCommandBoundaryRustHostTestDesignItems` 是 source checklist 之后、真实 Rust host test 文件之前的测试设计包。它把每个 host contract case 绑定到对应 source checklist、合成 sample、expected status、断言组、forbidden output category 和 implementation guard；状态为 `test_design_ready_no_native_symbol`。该 fixture 让后续 `crates/ime-ffi/tests/manager_sync_command_boundary.rs` 的测试项可以按目录转写，但当前仍不新增该测试文件、不新增 C ABI symbol、不修改 Dart native binding。
 
 这些仍是 design fixture，不新增真实 symbol。
 
