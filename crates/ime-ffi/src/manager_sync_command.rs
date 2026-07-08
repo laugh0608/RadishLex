@@ -1,7 +1,10 @@
 #![allow(dead_code)]
 
+use std::collections::HashSet;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::slice;
 use std::str;
+use std::sync::Mutex;
 
 use crate::error::{FfiError, RadishLexStatusCode};
 use crate::snapshot::RadishLexStringView;
@@ -15,6 +18,11 @@ pub(crate) const MANAGER_SYNC_ACTION_DEVICE_REVOCATION: u32 = 4;
 const CURRENT_PHASE_COMMAND_ERROR: &str = "sync_command_not_enabled_current_phase";
 const CURRENT_PHASE_USER_SUMMARY: &str = "user_sync_entry_closed_current_phase";
 const CURRENT_PHASE_DIAGNOSTICS_SUMMARY: &str = "not_executable_current_phase";
+const RESULT_HANDLE_RELEASED_ERROR: &str = "manager_sync_command_result_handle_released";
+const PANIC_BOUNDARY_ERROR: &str = "manager_sync_command_panic_boundary";
+const SYNC_COMMAND_CONTEXT_LOCK_ERROR: &str = "manager_sync_command_context_lock_poisoned";
+const SYNC_COMMAND_DOMAIN_DRAFT: &str = "manager_sync_write_domain";
+const SYNC_COMMAND_DOMAIN_BUSY_ERROR: &str = "sync_domain_command_in_progress";
 
 const FORBIDDEN_SUMMARY_FRAGMENTS: &[&str] = &[
     "secret-token",
@@ -213,6 +221,150 @@ impl ManagerSyncCommandResultDraft {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagerSyncCommandResultViewDraft<'a> {
+    pub abi_status: RadishLexStatusCode,
+    pub action_summary_code: &'a str,
+    pub command_status: &'a str,
+    pub error_code: &'a str,
+    pub retry_policy: &'a str,
+    pub user_visible_summary_code: &'a str,
+    pub diagnostics_summary_code: &'a str,
+    pub next_required_evidence: &'a str,
+    pub object_type_summary: &'a str,
+    pub object_count_summary: usize,
+    pub object_version_summary: &'a str,
+    pub recorded_at_summary: &'a str,
+}
+
+impl<'a> ManagerSyncCommandResultViewDraft<'a> {
+    fn from_result(result: &'a ManagerSyncCommandResultDraft) -> Self {
+        Self {
+            abi_status: result.abi_status,
+            action_summary_code: result.envelope.action_summary_code,
+            command_status: result.envelope.command_status,
+            error_code: result.envelope.error_code,
+            retry_policy: result.envelope.retry_policy,
+            user_visible_summary_code: result.envelope.user_visible_summary_code,
+            diagnostics_summary_code: result.envelope.diagnostics_summary_code,
+            next_required_evidence: result.envelope.next_required_evidence,
+            object_type_summary: result.envelope.object_type_summary,
+            object_count_summary: result.envelope.object_count_summary,
+            object_version_summary: result.envelope.object_version_summary,
+            recorded_at_summary: result.envelope.recorded_at_summary,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ManagerSyncCommandResultHandleDraft {
+    result: Option<ManagerSyncCommandResultDraft>,
+}
+
+impl ManagerSyncCommandResultHandleDraft {
+    pub(crate) fn new(result: ManagerSyncCommandResultDraft) -> Result<Self, FfiError> {
+        result.assert_safe_summary()?;
+        Ok(Self {
+            result: Some(result),
+        })
+    }
+
+    pub(crate) fn view(&self) -> Result<ManagerSyncCommandResultViewDraft<'_>, FfiError> {
+        let result = self
+            .result
+            .as_ref()
+            .ok_or_else(|| FfiError::invalid_state(RESULT_HANDLE_RELEASED_ERROR))?;
+        Ok(ManagerSyncCommandResultViewDraft::from_result(result))
+    }
+
+    pub(crate) fn release(&mut self) {
+        self.result = None;
+    }
+}
+
+pub(crate) fn release_manager_sync_command_result_handle_draft(
+    handle: Option<&mut ManagerSyncCommandResultHandleDraft>,
+) {
+    if let Some(handle) = handle {
+        handle.release();
+    }
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct ManagerSyncCommandContextDraft {
+    active_domains: Mutex<HashSet<&'static str>>,
+}
+
+impl ManagerSyncCommandContextDraft {
+    pub(crate) fn new() -> Self {
+        Self::default()
+    }
+
+    pub(crate) fn enter_write_domain(
+        &self,
+    ) -> Result<ManagerSyncCommandDomainGuardDraft<'_>, FfiError> {
+        let mut active_domains = self
+            .active_domains
+            .lock()
+            .map_err(|_| FfiError::internal(SYNC_COMMAND_CONTEXT_LOCK_ERROR))?;
+
+        if active_domains.contains(SYNC_COMMAND_DOMAIN_DRAFT) {
+            return Err(FfiError::invalid_state(SYNC_COMMAND_DOMAIN_BUSY_ERROR));
+        }
+
+        active_domains.insert(SYNC_COMMAND_DOMAIN_DRAFT);
+        Ok(ManagerSyncCommandDomainGuardDraft {
+            context: self,
+            domain: SYNC_COMMAND_DOMAIN_DRAFT,
+        })
+    }
+
+    fn evaluate_current_phase(
+        &self,
+        raw: ManagerSyncCommandRequestRawDraft,
+    ) -> Result<ManagerSyncCommandResultDraft, FfiError> {
+        let request = ManagerSyncCommandRequestDraft::from_raw(raw)?;
+        let _domain_guard = self.enter_write_domain()?;
+        let result = ManagerSyncCommandResultDraft::current_phase_closed(request.action());
+        result.assert_safe_summary()?;
+        Ok(result)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct ManagerSyncCommandDomainGuardDraft<'a> {
+    context: &'a ManagerSyncCommandContextDraft,
+    domain: &'static str,
+}
+
+impl Drop for ManagerSyncCommandDomainGuardDraft<'_> {
+    fn drop(&mut self) {
+        if let Ok(mut active_domains) = self.context.active_domains.lock() {
+            active_domains.remove(self.domain);
+        }
+    }
+}
+
+pub(crate) fn execute_manager_sync_command_current_phase_with_context_draft(
+    context: &ManagerSyncCommandContextDraft,
+    raw: ManagerSyncCommandRequestRawDraft,
+) -> Result<ManagerSyncCommandResultHandleDraft, FfiError> {
+    capture_manager_sync_command_panic_boundary_draft(|| context.evaluate_current_phase(raw))
+}
+
+pub(crate) fn capture_manager_sync_command_panic_boundary_draft<F>(
+    operation: F,
+) -> Result<ManagerSyncCommandResultHandleDraft, FfiError>
+where
+    F: FnOnce() -> Result<ManagerSyncCommandResultDraft, FfiError>,
+{
+    match catch_unwind(AssertUnwindSafe(operation)) {
+        Ok(Ok(result)) => ManagerSyncCommandResultHandleDraft::new(result),
+        Ok(Err(error)) => Err(error),
+        Err(_) => Err(FfiError::internal(PANIC_BOUNDARY_ERROR)),
+    }
+}
+
 pub(crate) fn evaluate_manager_sync_command_current_phase_draft(
     raw: ManagerSyncCommandRequestRawDraft,
 ) -> Result<ManagerSyncCommandResultDraft, FfiError> {
@@ -385,6 +537,59 @@ mod tests {
         assert_eq!(result.envelope.object_type_summary, "none");
         assert_eq!(result.envelope.object_count_summary, 0);
         result.assert_safe_summary().unwrap();
+    }
+
+    #[test]
+    fn result_handle_views_are_copyable_until_release() {
+        let context = ManagerSyncCommandContextDraft::new();
+        let mut handle = execute_manager_sync_command_current_phase_with_context_draft(
+            &context,
+            valid_raw(MANAGER_SYNC_ACTION_RECOVERY_RESTORE),
+        )
+        .unwrap();
+
+        let view = handle.view().unwrap();
+        assert_eq!(view.abi_status, RadishLexStatusCode::InvalidState);
+        assert_eq!(view.action_summary_code, "recovery_restore");
+        assert_eq!(view.command_status, "blocked_by_readiness");
+        assert_eq!(view.error_code, CURRENT_PHASE_COMMAND_ERROR);
+        assert_eq!(view.retry_policy, "not_retryable");
+        assert_eq!(view.object_count_summary, 0);
+        let copied_summary = view.user_visible_summary_code.to_owned();
+
+        release_manager_sync_command_result_handle_draft(Some(&mut handle));
+        let released_error = handle.view().unwrap_err();
+        assert_eq!(released_error.code, RadishLexStatusCode::InvalidState);
+        assert_eq!(released_error.message, RESULT_HANDLE_RELEASED_ERROR);
+        assert_eq!(copied_summary, CURRENT_PHASE_USER_SUMMARY);
+
+        release_manager_sync_command_result_handle_draft(None);
+    }
+
+    #[test]
+    fn panic_boundary_maps_unwind_to_internal_error() {
+        let error = capture_manager_sync_command_panic_boundary_draft(|| {
+            panic!("synthetic manager sync panic with secret-token")
+        })
+        .unwrap_err();
+
+        assert_eq!(error.code, RadishLexStatusCode::InternalError);
+        assert_eq!(error.message, PANIC_BOUNDARY_ERROR);
+        assert!(!error.message.contains("secret-token"));
+    }
+
+    #[test]
+    fn command_context_rejects_same_domain_overlap_and_releases_guard() {
+        let context = ManagerSyncCommandContextDraft::new();
+        let first_guard = context.enter_write_domain().unwrap();
+
+        let busy_error = context.enter_write_domain().unwrap_err();
+        assert_eq!(busy_error.code, RadishLexStatusCode::InvalidState);
+        assert_eq!(busy_error.message, SYNC_COMMAND_DOMAIN_BUSY_ERROR);
+
+        drop(first_guard);
+        let released_guard = context.enter_write_domain().unwrap();
+        drop(released_guard);
     }
 
     #[test]

@@ -59,12 +59,15 @@ radishlex_manager_sync_command_result_free
 
 - versioned raw request draft、action id allowlist、borrowed UTF-8 view 读取、`u8` bool 校验和 forbidden material 拒绝。
 - current-phase capability closed 结果摘要，返回稳定 `InvalidState`，只包含 allowlist summary code。
+- Rust-owned result handle draft、summary view draft、copy-before-release 断言、release 后 view 失效和 `release(None)` 无效果。
+- 内部 panic boundary helper，将 unwind 映射为稳定 `InternalError`，不回显 panic payload。
+- manager sync command context draft，同一 sync domain 重入返回结构化 `InvalidState`，guard drop 后释放 domain。
 - Debug / error message / result summary 不回显 operation id、readiness snapshot、source tag、backend gate 或 secret-shaped 片段。
 
 当前内部草案不覆盖：
 
-- Rust-owned result handle、result accessor、release function、error handle lifecycle 或 panic boundary C ABI 包装。
-- action-specific section layout、同一 sync domain 真实互斥状态、Rust sync / crypto 接线或远端 transport。
+- C ABI `extern "C"` wrapper、真实 result accessor symbol、真实 release function symbol 或 error handle read / free lifecycle。
+- action-specific section layout、跨线程 / 异步 command worker、Rust sync / crypto 接线或远端 transport。
 - `ManagerBridge` 方法、Flutter 可见操作按钮、settings action payload、恢复码生成 / 输入、join request 创建、授权成功或设备撤销。
 
 ## Request Struct 规则

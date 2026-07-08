@@ -26,7 +26,7 @@
 
 这些证据只证明未来 contract 的安全边界、ownership、错误分层和 smoke 计划可复验，不证明 native command 已实现。
 
-2026-07-08 已新增 `crates/ime-ffi/src/manager_sync_command.rs` 内部非导出草案模块，把 implementation review package 中的 request parsing、当前阶段 capability gate 和 forbidden material 检查先落到 Rust 单元测试。该模块不新增 C ABI symbol，不创建 `crates/ime-ffi/tests/manager_sync_command_boundary.rs`，不修改 Dart native binding 或 `ManagerBridge`。
+2026-07-08 已新增 `crates/ime-ffi/src/manager_sync_command.rs` 内部非导出草案模块，把 implementation review package 中的 request parsing、当前阶段 capability gate、result handle / release、panic boundary、sync domain guard 和 forbidden material 检查先落到 Rust 单元测试。该模块不新增 C ABI symbol，不创建 `crates/ime-ffi/tests/manager_sync_command_boundary.rs`，不修改 Dart native binding 或 `ManagerBridge`。
 
 ## 测试分层
 
@@ -62,7 +62,7 @@ L2 / L3 只在 L0 / L1 继续通过、且 contract 文档没有未解决分歧�
 - Rust host test design package：把每个 host contract case 绑定到 source checklist、样本、expected status、断言组、forbidden output category、实现守卫和当前 `test_design_ready_no_native_symbol` 状态
 - Rust host C ABI contract review matrix：把真实 Rust host test 文件前必须评审的 request struct、result struct、release / error lifecycle、panic / status boundary、command context serialization 和 forbidden material contract 固定为 `c_abi_contract_review_ready_no_native_symbol` 状态
 - Rust host implementation review package：把每个 C ABI review item 绑定到后续 Rust `manager_sync_command.rs::*Draft` 草案、当前可复用源码模式、实现说明和仍需确认的问题，状态为 `rust_host_implementation_review_ready_no_native_symbol`
-- Rust 内部非导出 draft module：`crates/ime-ffi/src/manager_sync_command.rs` 已覆盖 request parsing、action allowlist、bool / UTF-8 校验、当前阶段 `InvalidState` 摘要和 forbidden material 拒绝；仍不导出 C ABI symbol。
+- Rust 内部非导出 draft module：`crates/ime-ffi/src/manager_sync_command.rs` 已覆盖 request parsing、action allowlist、bool / UTF-8 校验、当前阶段 `InvalidState` 摘要、result handle / release、panic boundary、sync domain guard 和 forbidden material 拒绝；仍不导出 C ABI symbol。
 
 新增或修改 future command 字段时，应先更新这份 fixture，再更新文档和测试。不要让文档表格、Dart fixture 和未来 Rust contract test 各自维护不同字段列表。
 
@@ -102,7 +102,7 @@ Rust host contract test 的 fixture 输入只能使用合成值：
 
 `syncFfiRustHostContractReviewItems` 是 test design package 之后、真实 Rust host test 文件和 C ABI symbol 之前的结构评审矩阵。它把 request struct layout、result struct layout、release / error lifecycle、panic / status boundary、command context serialization 和 forbidden material contract 分别绑定到已有 test design item、source checklist、required decision、required evidence、forbidden output category 和 implementation guard；状态为 `c_abi_contract_review_ready_no_native_symbol`。该矩阵用于评审真实 C ABI request / result struct、释放函数、panic boundary 和 command context 策略是否齐备，并已绑定决策记录 `docs/adr/0006-manager-sync-c-abi-contract-governance.md`；不代表已经批准新增 symbol 或 `ManagerBridge` 可执行方法。
 
-`syncFfiRustHostImplementationReviewItems` 是 C ABI review matrix 之后、真实 Rust host test 文件之前的实现前审阅包。它把每个 review item 绑定到 `crates/ime-ffi/src/manager_sync_command.rs::*Draft` 草案、当前可复用的 `ime-ffi` 源码模式、required implementation notes 和 unresolved implementation questions；状态为 `rust_host_implementation_review_ready_no_native_symbol`。当前已按该包新增 `crates/ime-ffi/src/manager_sync_command.rs` 内部非导出草案模块，用单元测试覆盖 request parsing、current-phase gate 和 forbidden material redaction；但仍不新增 native symbol，不创建真实 host contract test 文件，不修改 Dart native binding，不打开真实同步。
+`syncFfiRustHostImplementationReviewItems` 是 C ABI review matrix 之后、真实 Rust host test 文件之前的实现前审阅包。它把每个 review item 绑定到 `crates/ime-ffi/src/manager_sync_command.rs::*Draft` 草案、当前可复用的 `ime-ffi` 源码模式、required implementation notes 和 unresolved implementation questions；状态为 `rust_host_implementation_review_ready_no_native_symbol`。当前已按该包新增并扩展 `crates/ime-ffi/src/manager_sync_command.rs` 内部非导出草案模块，用单元测试覆盖 request parsing、current-phase gate、result handle / release、panic boundary、sync domain guard 和 forbidden material redaction；但仍不新增 native symbol，不创建真实 host contract test 文件，不修改 Dart native binding，不打开真实同步。
 
 除内部 Rust draft module 及其单元测试外，这些仍是 design fixture，不新增真实 symbol。
 
