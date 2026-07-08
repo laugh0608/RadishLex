@@ -45,7 +45,8 @@
 | transient secret interaction | `sync_transient_secret_interaction_fixtures.dart`、`manager_sync_transient_secret_interaction_test.dart` | 恢复码一次性展示、恢复码输入、短码核对、授权确认和撤销确认的生命周期、禁止持久化目标和完成证据码可复验。 | 真实 secret 显示、输入、复制、保存或传递已开放。 |
 | visible-layer confirmation detail | `syncRecoveryVisibleLayerFixtures`、`syncRecoveryFutureConfirmationDetailFixtures`、`syncDeviceAuthorizationFutureConfirmationDetailFixtures` | recovery setup / restore 的展示占位、保存确认、输入占位、查询、失败限速和设备登记状态，以及 join request 授权 / 设备撤销的短码核对、显式确认、授权包、丢失设备风险和 key epoch 状态已绑定 UI / diagnostics 非敏感字段。 | 真实恢复码展示、短码输入、授权签名、设备撤销或 key epoch 推进已开放。 |
 | FFI command boundary | `sync_ffi_command_boundary_fixtures.dart`、`manager_sync_ffi_command_boundary_test.dart` | 推荐 ABI strategy、ownership、error status、host catalog、review catalog 和 forbidden material policy 可复验。 | C ABI symbol、Rust host test 文件或真实 command context 已存在。 |
-| Dart fake binding replay | `manager_sync_ffi_binding_contract_test.dart`、`ffi_manager_bridge_test.dart` | fake native binding 能消费 host catalog 摘要，验证 copy / free、unknown status 降级和 capability missing 时 UI 关闭。 | 真实 dynamic library 已导出 future sync command symbol。 |
+| Rust internal draft module | `crates/ime-ffi/src/manager_sync_command.rs`、`crates/ime-ffi/src/manager_sync_command/*.rs`、`cargo test -p radishlex-ime-ffi manager_sync_command` | request parsing、action-specific section、current-phase gate、result / error handle lifecycle、panic boundary、sync domain guard、result accessor field set、summary storage、owner scope、worker policy、host gate readiness、host test admission、native export / Dart binding / ManagerBridge migration、host test file approval、real sync execution gate 和 evidence bundle 的评审结构可在 Rust 内部复验。 | C ABI wrapper 已导出、Dart native binding 可调用、`ManagerBridge` 方法已存在，或真实同步可执行。 |
+| Dart fake binding replay | `manager_sync_ffi_binding_contract_test.dart`、`manager_sync_ffi_migration_review_test.dart`、`ffi_manager_bridge_test.dart` | fake native binding 能消费 host catalog、migration review 和 evidence bundle 摘要，验证 copy / free、unknown status 降级、native export / Dart binding / ManagerBridge / host test file / real sync execution blocker 和 capability missing 时 UI 关闭。 | 真实 dynamic library 已导出 future sync command symbol，或任何 blocker 已经批准迁出。 |
 
 真实 contract 设计时应按这个顺序提升证据强度：先补可见层和 fixture，确认状态码、生命周期和 forbidden material policy；再补 Dart contract / binding 测试；最后在 C ABI 评审通过后补 Rust host test 和真实 native symbol。任一层新增字段时，都必须同步更新 `docs/manager-settings-diagnostics.md`、本文件和对应 fixture，不应只修改 UI 文案或测试断言。
 
@@ -309,7 +310,7 @@ result `safe_summary`：
 
 真实实现前必须按 `docs/manager-sync-ffi-command-boundary.md` 另行解决：
 
-- 是否采用四个专用 C ABI symbol，还是一个 versioned command envelope 入口；当前建议优先评审单一 versioned executor，但不得把它做成任意 JSON tunnel。
+- 是否采用四个专用 C ABI symbol，还是一个 versioned command envelope 入口；当前 ADR 和内部草案建议优先评审单一 versioned executor，但不得把它做成任意 JSON tunnel。
 - 如果采用专用 symbol，每个 symbol 的 request / result 结构、版本号和释放函数如何命名。
 - 如果采用 envelope，如何避免把 JSON request / response body、payload bytes 或 secret 字段传到 Flutter 可见层。
 - Rust 分配 result / error buffer 的所有权、释放函数、空指针规则和 `*_free(NULL)` 行为。
@@ -320,6 +321,8 @@ result `safe_summary`：
 - FFI host smoke 和 Dart FFI smoke 如何覆盖 forbidden material 不穿越边界。
 
 在这些问题有专题文档或 ADR 前，不应新增 C ABI symbol。
+
+当前 `manager_sync_command` 内部草案已经给出实现前评审答案：result accessor 只允许安全摘要字段，summary storage 不能借用 caller / provider / transport 材料，owner scope 不持有 Flutter / settings / Dart pointer，真实 host test 文件、native export、Dart binding、`ManagerBridge` command 和真实同步执行仍分别受独立 gate 控制。这些答案仍需要在真实 symbol 前同步到 host contract test、Dart binding contract test 和 dynamic library smoke；不能因为 Rust 内部单元测试通过就跳过 C ABI / bridge 审批。
 
 ## 诊断与 Settings
 

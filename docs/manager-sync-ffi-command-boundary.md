@@ -23,6 +23,9 @@
 - `docs/manager-sync-bridge-command-contract-checklist.md`
 - `docs/manager-sync-bridge-command-contract.md`
 - `docs/manager-sync-ffi-command-contract-test-plan.md`
+- `docs/adr/0006-manager-sync-c-abi-contract-governance.md`
+- `crates/ime-ffi/src/manager_sync_command.rs`
+- `crates/ime-ffi/src/manager_sync_command/*.rs`
 - `apps/radishlex-manager/test/fixtures/sync_ffi_command_boundary_fixtures.dart`
 - `apps/radishlex-manager/test/models/manager_sync_ffi_command_boundary_test.dart`
 

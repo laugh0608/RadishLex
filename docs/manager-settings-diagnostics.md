@@ -11,6 +11,7 @@
 - 设置页可以导入 `manager_sync_readiness.v1` 非敏感摘要用于本地开发联调；该摘要只保存在当前 manager 内存态，驱动同步页、设置页 gate preview 和诊断报告的派生字段，不写入 settings draft，也不改变 `ManagerBridge` contract 或 C ABI。
 - 开发期 `manager_sync_evidence_bundle.v1` 只作为测试 fixture，把 readiness 摘要、connection health 摘要、部署证据来源和设备 production gate 组合成同一份预演输入；settings draft 仍只保存非敏感草案和净化后的 connection probe record，不保存 bundle 原文。
 - `manager_sync_action_command_preview.v1` 只从当前只读 action intent 派生非执行命令摘要，用于 settings gate preview、同步页和诊断报告展示 execution status、data policy、stop line、request boundary、result boundary、request / result allowed fields、forbidden material policy 和错误分类；它不写 settings draft，不创建 bridge 请求，也不携带命令 payload。
+- manager sync FFI command 的 host catalog、migration review、host test file approval、real sync execution gate 和 evidence bundle 当前只通过测试 fixture / fake native replay 参与审阅；它们不新增 settings draft 字段、不新增诊断报告字段、不写 bridge request，也不把候选 native symbol、request struct、result handle 或发布证据正文暴露给 UI。
 - recovery setup / restore 的可见层文案占位只展示状态码：一次性展示状态、保存确认、恢复输入、恢复记录查询、失败限速和设备登记状态会同步进入 settings gate preview、同步页和诊断报告；这些字段不携带恢复码、settings action payload、bridge request payload 或请求 / 响应体。
 - join request 授权和设备撤销的 future confirmation detail 只展示状态码：join request 状态、短码核对占位、授权包前置条件、授权包状态、撤销确认占位、丢失设备风险提示和 key epoch 状态会绑定到现有 `sync.device_join_*`、`sync.authorization_package_*`、`sync.device_revocation_*`、`sync.lost_device_risk` 和 `sync.key_epoch_status` 字段；这些字段不携带短码、签名、wrapped material、settings action payload、bridge request payload 或请求 / 响应体。
 - 真实远端同步、恢复码和设备授权 UI 继续关闭；`preflight_ready` 只表示本地草案和预检条件可解释，不代表用户可用同步入口已开放。
@@ -90,6 +91,8 @@ settings draft 不得保存：
 | visible-layer detail | `sync.recovery_setup_*`、`sync.recovery_restore_*`、`sync.device_join_*`、`sync.device_revocation_*` | 同步页可见层状态、transient secret 交互 fixture 和当前 readiness model | 只展示状态码、确认边界和前置条件；不显示、输入、保存或传递恢复码、短码、签名、wrapped material 或 payload bytes。 |
 
 recovery setup / restore 当前已补 visible-layer detail：一次性展示占位、保存确认、恢复输入占位、恢复记录查询、失败限速和设备登记状态必须在 UI / diagnostics 中保持同源。join request 授权和设备撤销当前已补 future confirmation detail：短码核对占位、授权显式确认、授权包状态、撤销显式确认、丢失设备风险提示和 key epoch 状态必须复用 `sync.device_join_*`、`sync.device_revocation_*`、`sync.authorization_package_*`、`sync.lost_device_risk` 和 `sync.key_epoch_status` 这些非敏感字段，而不是新增 settings action payload。
+
+FFI command gate / migration / evidence bundle replay 目前不属于诊断报告 schema。若后续需要把这些评审结果展示给 manager，只能先新增字段索引和测试，再输出 status、blocker、required evidence、source tag 或 safe summary code；不得输出候选 C ABI request / result 结构、native pointer、provider message、动态库路径、证据包正文、`deployment_evidence_summary.v1` 之外的自由文本摘要或任何 forbidden material。
 
 ## 连接健康摘要
 
