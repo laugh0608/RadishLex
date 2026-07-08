@@ -9,7 +9,7 @@
 当前仍保持：
 
 - 不修改 `apps/radishlex-manager/lib/src/bridge/manager_bridge.dart`。
-- 不新增 `ime-ffi` symbol、Rust FFI handler 或 Dart native binding。
+- 不新增 `ime-ffi` C ABI symbol、Rust FFI handler 或 Dart native binding；当前仅允许 `ime-ffi` 内部非导出 draft module。
 - 不新增同步页按钮、点击回调、settings draft action payload 或真实 bridge 调用。
 - 不生成恢复码、不输入恢复码、不创建 join request、不签名授权包、不撤销设备。
 - 不上传、下载或合并真实远端 P2 对象。
@@ -224,7 +224,7 @@ command result envelope 使用 allowlist 错误码：
 
 当前 Rust host C ABI contract review matrix 已把真实 Rust host test 文件前必须评审的结构决策固定下来：`syncFfiRustHostContractReviewItems` 覆盖 request struct layout、result struct layout、release / error lifecycle、panic / status boundary、command context serialization 和 forbidden material contract，逐项绑定 test design item、source checklist、required decision、required evidence、forbidden output category 和 implementation guard。该矩阵状态为 `c_abi_contract_review_ready_no_native_symbol`，并绑定 ADR `docs/adr/0006-manager-sync-c-abi-contract-governance.md`；它只作为是否进入真实 Rust host contract test 的评审输入，不新增 symbol，不修改 `ManagerBridge`。
 
-当前 Rust host implementation review package 已把每个 C ABI review item 绑定到后续 Rust `manager_sync_command.rs::*Draft` 类型 / 函数草案、可复用 `ime-ffi` 源码模式、实现说明和仍需确认的问题：`syncFfiRustHostImplementationReviewItems` 的状态为 `rust_host_implementation_review_ready_no_native_symbol`。该包只作为实现前结构索引，不新增 `manager_sync_command.rs`、C ABI symbol 或 `ManagerBridge` 方法。
+当前 Rust host implementation review package 已把每个 C ABI review item 绑定到后续 Rust `manager_sync_command.rs::*Draft` 类型 / 函数草案、可复用 `ime-ffi` 源码模式、实现说明和仍需确认的问题：`syncFfiRustHostImplementationReviewItems` 的状态为 `rust_host_implementation_review_ready_no_native_symbol`。当前已新增 `crates/ime-ffi/src/manager_sync_command.rs` 内部非导出草案模块，覆盖 request parsing、current-phase capability closed 摘要和 forbidden material redaction；它不是 C ABI handler，不导出 native symbol，不修改 `ManagerBridge` 方法。
 
 review catalog 的 source-level 映射如下，后续写真实 Rust host test 前应先逐项确认这些模式是否仍成立：
 

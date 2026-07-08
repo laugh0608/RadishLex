@@ -9,6 +9,7 @@ mod engine;
 mod error;
 mod key;
 mod learning_status;
+mod manager_sync_command;
 mod rank_explain;
 mod session;
 mod snapshot;

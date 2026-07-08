@@ -8,7 +8,7 @@ Accepted
 
 ## 背景
 
-Phase 4 manager 同步入口当前只做非上传治理。仓库已补齐真实 bridge 命令前 contract 草案、FFI command boundary、contract test plan、Rust host contract catalog、review catalog、source checklist、test design package、Dart fake binding replay 和 C ABI contract review matrix。
+Phase 4 manager 同步入口当前只做非上传治理。仓库已补齐真实 bridge 命令前 contract 草案、FFI command boundary、contract test plan、Rust host contract catalog、review catalog、source checklist、test design package、Dart fake binding replay、C ABI contract review matrix、implementation review package 和 Rust 内部非导出草案模块。
 
 这些材料证明 future command contract 的安全边界、ownership、错误分层和 smoke 计划可复验，但不证明 native command 已实现。若后续直接创建 C ABI symbol 或 `ManagerBridge` 可执行方法，容易绕过以下边界：
 
@@ -43,13 +43,29 @@ radishlex_manager_sync_command_result_free
 
 ## Implementation Review Package
 
-`syncFfiRustHostImplementationReviewItems` 是本 ADR 到真实 Rust host test 之间的实现前审阅包。它不新增代码实现，只把每个 C ABI contract review item 进一步映射到：
+`syncFfiRustHostImplementationReviewItems` 是本 ADR 到真实 Rust host test 之间的实现前审阅包。它把每个 C ABI contract review item 进一步映射到：
 
 - 后续 Rust 侧可能需要的 `manager_sync_command.rs::*Draft` 类型 / 函数草案。
 - 当前可复用的 `ime-ffi` 源码模式，例如 `ffi_status`、`ffi_ptr`、`ffi_release`、`read_utf8`、`read_ffi_bool`、error handle 和 sync preflight summary。
 - 进入真实 Rust host test 前仍需确认的实现问题，例如 action id 数值、action-specific section layout、result accessor field set、domain guard storage scope 和 Debug redaction test shape。
 
-该包的状态为 `rust_host_implementation_review_ready_no_native_symbol`。它只说明真实实现需要评审哪些 Rust 类型 / 函数边界，不代表 `crates/ime-ffi/src/manager_sync_command.rs`、C ABI symbol 或 `crates/ime-ffi/tests/manager_sync_command_boundary.rs` 已经落地。
+该包的状态为 `rust_host_implementation_review_ready_no_native_symbol`。它已经驱动 `crates/ime-ffi/src/manager_sync_command.rs` 落地为内部非导出草案模块，但不代表 C ABI symbol、Dart native binding、`ManagerBridge` 可执行方法或 `crates/ime-ffi/tests/manager_sync_command_boundary.rs` 已经落地。
+
+## Rust Internal Draft Module
+
+`crates/ime-ffi/src/manager_sync_command.rs` 是当前阶段允许存在的内部实现草案。它只在 Rust crate 内部编译和测试，不在 `abi.rs` 导出 `extern "C"`，不加入动态库 symbol 列表，也不修改 Dart native binding。
+
+当前内部草案只覆盖：
+
+- versioned raw request draft、action id allowlist、borrowed UTF-8 view 读取、`u8` bool 校验和 forbidden material 拒绝。
+- current-phase capability closed 结果摘要，返回稳定 `InvalidState`，只包含 allowlist summary code。
+- Debug / error message / result summary 不回显 operation id、readiness snapshot、source tag、backend gate 或 secret-shaped 片段。
+
+当前内部草案不覆盖：
+
+- Rust-owned result handle、result accessor、release function、error handle lifecycle 或 panic boundary C ABI 包装。
+- action-specific section layout、同一 sync domain 真实互斥状态、Rust sync / crypto 接线或远端 transport。
+- `ManagerBridge` 方法、Flutter 可见操作按钮、settings action payload、恢复码生成 / 输入、join request 创建、授权成功或设备撤销。
 
 ## Request Struct 规则
 
@@ -115,7 +131,7 @@ result 必须由 Rust-owned handle 承载，并只暴露 safe summary view：
 创建 `crates/ime-ffi/tests/manager_sync_command_boundary.rs` 前必须满足：
 
 - `syncFfiRustHostContractReviewItems` 覆盖全部 `syncFfiCommandBoundaryRustHostTestDesignItems`。
-- `syncFfiRustHostImplementationReviewItems` 覆盖全部 C ABI contract review items，并且 proposed Rust artifacts 仍保持 draft 状态。
+- `syncFfiRustHostImplementationReviewItems` 覆盖全部 C ABI contract review items，并且内部 Rust draft module 的单元测试继续通过。
 - request struct、result struct、release function、error handle、panic boundary 和 command context 已有明确 Rust 类型草案或等价实现说明。
 - forbidden material contract 已映射到 test assertions。
 - Dart fake binding replay 继续证明 unknown native status、copy / free 和错误分类保持安全阻塞。
@@ -127,6 +143,7 @@ result 必须由 Rust-owned handle 承载，并只暴露 safe summary view：
 普通推进至少运行：
 
 ```bash
+cargo test -p radishlex-ime-ffi manager_sync_command
 flutter test test/models/manager_sync_ffi_command_boundary_test.dart
 flutter test test/models/manager_sync_ffi_command_boundary_test.dart test/models/manager_sync_ffi_binding_contract_test.dart
 ./scripts/check-manager.sh
