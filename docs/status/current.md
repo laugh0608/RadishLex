@@ -6,7 +6,7 @@
 
 - 日期：2026-07-08
 - 常态分支：`dev`
-- 当前主题：Phase 3 自部署同步出口治理已有本地 Docker / HTTPS、Go server、Rust sync / crypto 和部署证据校验证据链；Phase 4 Flutter manager 本地验收复查已完成。当前同步入口推进集中在非上传治理：sync entry gate、readiness、evidence bundle、action preview、真实 bridge 命令前 contract、FFI 命令边界和 contract test 计划。2026-07-08 已补 join / revocation future confirmation detail、Rust host source checklist、test design package 和 C ABI contract review matrix 的 fixture / model test / 文档证据；真实域名、证书和外部反代复验保留为发布 / 真实用户开放前门禁；当前仍不改变 `ManagerBridge` contract、不新增 C ABI、不打开真实同步、恢复码生成 / 输入、join request 创建、授权成功或设备撤销路径。
+- 当前主题：Phase 3 自部署同步出口治理已有本地 Docker / HTTPS、Go server、Rust sync / crypto 和部署证据校验证据链；Phase 4 Flutter manager 本地验收复查已完成。当前同步入口推进集中在非上传治理：sync entry gate、readiness、evidence bundle、action preview、真实 bridge 命令前 contract、FFI 命令边界和 contract test 计划。2026-07-08 已补 join / revocation future confirmation detail、Rust host source checklist、test design package、C ABI contract review matrix 和 implementation review package 的 fixture / model test / 文档证据；真实域名、证书和外部反代复验保留为发布 / 真实用户开放前门禁；当前仍不改变 `ManagerBridge` contract、不新增 C ABI、不打开真实同步、恢复码生成 / 输入、join request 创建、授权成功或设备撤销路径。
 
 ## 当前阶段
 
@@ -59,7 +59,7 @@ Flutter manager：
 - UI 已拆分 manager shell、跨页 action 编排、词库子组件、学习子组件、同步子组件、设置诊断子组件、页面级 widget tests、action helper 回归测试、Dart model 分组和动态 FFI bridge 分层。
 - `docs/manager-local-acceptance.md` 已将 Phase 4 本地验收范围、退出标准映射、验证命令、隐私检查和真实同步停止线整理为可复验入口；2026-07-05 复查确认当前本地验收无影响退出标准的证据缺口。
 - `docs/manager-sync-entry-boundary.md` 已固定真实同步入口进入 UI / bridge 前的恢复码、设备授权、状态门禁、错误分类、诊断脱敏和测试计划。
-- 同步入口治理已覆盖 entry gate、connection health、恢复码 / 设备授权 readiness、evidence bundle、只读 action intent、action protocol、真实 bridge command contract 草案、FFI command boundary、transient secret 生命周期、recovery / device confirmation detail、Rust host contract catalog、review catalog、source checklist、test design package 和 C ABI contract review matrix。相关 model、settings、sync、diagnostics、Dart fake native / binding contract 回归和真实 FFI smoke 已证明 settings / sync / diagnostics 同源派生；真实 dynamic library 当前不导出 future sync command symbol。上述 host 侧材料仍是 design fixture：只绑定源码模式、测试样本、状态码、断言组、required decisions 与 evidence，不新增 native symbol。恢复码、短码、授权、撤销和 key epoch 仍只保留占位状态、状态码与完成证据码，不写 settings action payload，不泄漏 token、恢复码、短码、signature、wrapped material、payload bytes、请求 / 响应体或真实路径；真实同步按钮保持关闭。
+- 同步入口治理已覆盖 entry gate、connection health、恢复码 / 设备授权 readiness、evidence bundle、只读 action intent、action protocol、真实 bridge command contract 草案、FFI command boundary、transient secret 生命周期、recovery / device confirmation detail、Rust host contract catalog、review catalog、source checklist、test design package、C ABI contract review matrix 和 implementation review package。相关 model、settings、sync、diagnostics、Dart fake native / binding contract 回归和真实 FFI smoke 已证明 settings / sync / diagnostics 同源派生；真实 dynamic library 当前不导出 future sync command symbol。上述 host 侧材料仍是 design fixture：只绑定源码模式、测试样本、状态码、断言组、required decisions、evidence 和 Rust `*Draft` 草案，不新增 native symbol。恢复码、短码、授权、撤销和 key epoch 仍只保留占位状态、状态码与完成证据码，不写 settings action payload，不泄漏 token、恢复码、短码、signature、wrapped material、payload bytes、请求 / 响应体或真实路径；真实同步按钮保持关闭。
 
 平台私钥 backend：
 
@@ -112,5 +112,5 @@ Sync server 本地部署 / 联调：
 
 1. 维护本文短入口，避免新会话默认阅读长周志。
 2. 保持 Phase 4 manager 本地验收证据稳定；若后续改动触及验收范围，再按 `docs/manager-local-acceptance.md` 补精准 widget / helper / smoke 覆盖。
-3. 下一批产品开发继续围绕本地 Docker / 本地 HTTPS 联调和 manager 同步入口非上传治理，维护 readiness、evidence bundle、action preview、contract / FFI boundary、transient secret、device confirmation detail、Rust host catalog / checklist / test design / C ABI review matrix、Dart fake binding replay、诊断脱敏和错误分类测试。下一步可基于 ADR 0006 和 C ABI review matrix 评审是否进入真实 Rust host contract test 文件；仍不改变 `ManagerBridge` contract、不新增 C ABI、不打开真实同步、恢复码生成 / 输入、join request 创建、授权成功或设备撤销路径。
+3. 下一批产品开发继续围绕本地 Docker / 本地 HTTPS 联调和 manager 同步入口非上传治理，维护 readiness、evidence bundle、action preview、contract / FFI boundary、transient secret、device confirmation detail、Rust host catalog / checklist / test design / C ABI review matrix / implementation review package、Dart fake binding replay、诊断脱敏和错误分类测试。下一步可基于 ADR 0006 和 implementation review package 评审是否进入真实 Rust host contract test 文件；仍不改变 `ManagerBridge` contract、不新增 C ABI、不打开真实同步、恢复码生成 / 输入、join request 创建、授权成功或设备撤销路径。
 4. 同步联调用本地 Docker / 本地 HTTPS 和短生命周期数据目录；正式发布或真实用户开放前，再补真实目标环境的非敏感 `deployment_evidence.v1` 并导出 `deployment_evidence_summary.v1`。

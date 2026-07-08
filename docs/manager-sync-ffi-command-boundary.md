@@ -212,7 +212,7 @@ command result envelope 使用 allowlist 错误码：
 
 真实 C ABI symbol 前，先补 Rust host smoke 设计和 Dart FFI smoke 设计。两者都不连接真实远端同步，不读取真实输入法目录，不触碰真实 Keychain / Keystore，除非单独进入 gated 平台 smoke。
 
-当前这组 smoke 仍是 design fixture / model test 证据，不是已落地的 Rust C ABI smoke。测试真相源位于 `sync_ffi_command_boundary_fixtures.dart` 和 `sync_ffi_rust_host_contract_review_fixtures.dart`，用于固定推荐 ABI 策略、候选 symbol 名称、request / result field policy、ownership rule、ABI status 分层、Rust host smoke 项、Dart FFI smoke 项、Rust host contract catalog、review catalog、source checklist、test design package 和 C ABI contract review matrix；进入 Rust / Dart contract test 的分层计划见 `docs/manager-sync-ffi-command-contract-test-plan.md`。
+当前这组 smoke 仍是 design fixture / model test 证据，不是已落地的 Rust C ABI smoke。测试真相源位于 `sync_ffi_command_boundary_fixtures.dart` 和 `sync_ffi_rust_host_contract_review_fixtures.dart`，用于固定推荐 ABI 策略、候选 symbol 名称、request / result field policy、ownership rule、ABI status 分层、Rust host smoke 项、Dart FFI smoke 项、Rust host contract catalog、review catalog、source checklist、test design package、C ABI contract review matrix 和 implementation review package；进入 Rust / Dart contract test 的分层计划见 `docs/manager-sync-ffi-command-contract-test-plan.md`。
 
 当前 host contract catalog 已固定目标测试文件 `crates/ime-ffi/tests/manager_sync_command_boundary.rs`、建议 test name、样本 id、ABI input case、expected status、required evidence 和 `planned_no_native_symbol` 状态。覆盖样本包括 current-phase capability closed、unknown schema version、unknown action、invalid bool、null pointer、invalid UTF-8、unenveloped sync error、panic boundary 和 same-domain concurrent command。该 catalog 只用于评审后续 Rust host contract test 输入，不新增 symbol，不连接 Go server，不触碰平台 key backend。
 
@@ -223,6 +223,8 @@ command result envelope 使用 allowlist 错误码：
 当前 Rust host test design package 已把每个 host contract case 绑定到对应 source checklist、合成样本、expected status、断言组、forbidden output category 和 implementation guard：`syncFfiCommandBoundaryRustHostTestDesignItems` 的状态为 `test_design_ready_no_native_symbol`。该设计包只说明后续真实 Rust host test 应如何从 catalog / checklist 转写，不新增 `crates/ime-ffi/tests/manager_sync_command_boundary.rs`，不新增 C ABI，不修改 Dart native binding。
 
 当前 Rust host C ABI contract review matrix 已把真实 Rust host test 文件前必须评审的结构决策固定下来：`syncFfiRustHostContractReviewItems` 覆盖 request struct layout、result struct layout、release / error lifecycle、panic / status boundary、command context serialization 和 forbidden material contract，逐项绑定 test design item、source checklist、required decision、required evidence、forbidden output category 和 implementation guard。该矩阵状态为 `c_abi_contract_review_ready_no_native_symbol`，并绑定 ADR `docs/adr/0006-manager-sync-c-abi-contract-governance.md`；它只作为是否进入真实 Rust host contract test 的评审输入，不新增 symbol，不修改 `ManagerBridge`。
+
+当前 Rust host implementation review package 已把每个 C ABI review item 绑定到后续 Rust `manager_sync_command.rs::*Draft` 类型 / 函数草案、可复用 `ime-ffi` 源码模式、实现说明和仍需确认的问题：`syncFfiRustHostImplementationReviewItems` 的状态为 `rust_host_implementation_review_ready_no_native_symbol`。该包只作为实现前结构索引，不新增 `manager_sync_command.rs`、C ABI symbol 或 `ManagerBridge` 方法。
 
 review catalog 的 source-level 映射如下，后续写真实 Rust host test 前应先逐项确认这些模式是否仍成立：
 

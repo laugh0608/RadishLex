@@ -823,6 +823,144 @@ void main() {
     expect(encodedReview, isNot(contains('touch_platform_key_backend_now')));
   });
 
+  test('rust host implementation review package binds c abi matrix', () {
+    final contractReviewItemIds = syncFfiRustHostContractReviewItemIds()
+        .toSet();
+    final implementationReviewByContractId = {
+      for (final item in syncFfiRustHostImplementationReviewItems)
+        item.contractReviewItemId: item,
+    };
+    const allowedArtifactPrefixes = [
+      'crates/ime-ffi/src/manager_sync_command.rs::',
+    ];
+    const allowedSourcePrefixes = [
+      'crates/ime-ffi/src/',
+      'apps/radishlex-manager/tool/',
+      'apps/radishlex-manager/test/fixtures/',
+    ];
+
+    expect(
+      syncFfiRustHostImplementationReviewItemIds(),
+      containsAll([
+        'request_struct_layout_implementation_review',
+        'result_struct_layout_implementation_review',
+        'release_and_error_lifecycle_implementation_review',
+        'panic_and_status_boundary_implementation_review',
+        'command_context_serialization_implementation_review',
+        'forbidden_material_contract_implementation_review',
+      ]),
+    );
+    expect(
+      implementationReviewByContractId.keys.toSet(),
+      contractReviewItemIds,
+    );
+
+    for (final item in syncFfiRustHostImplementationReviewItems) {
+      final shape = syncFfiRustHostImplementationReviewItemShape(item);
+
+      expect(shape['format'], syncFfiRustHostImplementationReviewFormat);
+      expect(shape['review_status'], syncFfiRustHostImplementationReviewStatus);
+      expect(
+        shape['decision_record_path'],
+        syncFfiRustHostContractReviewDecisionRecordPath,
+      );
+      expect(
+        shape['target_test_file'],
+        syncFfiCommandBoundaryRustHostContractTargetTestFile,
+      );
+      expect(
+        contractReviewItemIds,
+        contains(item.contractReviewItemId),
+        reason: item.id,
+      );
+      expect(
+        item.implementationStatus,
+        syncFfiRustHostContractReviewImplementationStatus,
+        reason: item.id,
+      );
+      expect(
+        item.implementationGuards,
+        syncFfiCommandBoundaryRustHostReviewStopLines,
+        reason: item.id,
+      );
+      expect(item.proposedArtifactSummary, isNot('none'), reason: item.id);
+      expect(item.reusedSourceRefSummary, isNot('none'), reason: item.id);
+      expect(item.implementationNoteSummary, isNot('none'), reason: item.id);
+      expect(item.unresolvedQuestionSummary, isNot('none'), reason: item.id);
+      expect(item.guardSummary, isNot('none'), reason: item.id);
+
+      for (final artifact in item.proposedRustArtifacts) {
+        expect(artifact, contains('::'), reason: '${item.id}: $artifact');
+        expect(
+          allowedArtifactPrefixes.any(artifact.startsWith),
+          isTrue,
+          reason: '${item.id}: $artifact',
+        );
+        expect(artifact, contains('Draft'), reason: '${item.id}: $artifact');
+      }
+      for (final sourceRef in item.reusedSourceRefs) {
+        expect(sourceRef, contains('::'), reason: '${item.id}: $sourceRef');
+        expect(
+          allowedSourcePrefixes.any(sourceRef.startsWith),
+          isTrue,
+          reason: '${item.id}: $sourceRef',
+        );
+      }
+    }
+  });
+
+  test('rust host implementation review package remains non-executable', () {
+    final encodedImplementationReview = [
+      for (final item in syncFfiRustHostImplementationReviewItems)
+        jsonEncode(syncFfiRustHostImplementationReviewItemShape(item)),
+    ].join('\n');
+
+    expect(syncFfiCommandBoundaryCurrentNativeSymbols, isEmpty);
+    expect(encodedImplementationReview, contains('no_native_symbol'));
+    expect(
+      encodedImplementationReview,
+      contains('rust_host_implementation_review_ready_no_native_symbol'),
+    );
+    for (final symbol in syncFfiCommandBoundaryCandidateSymbols) {
+      expect(
+        encodedImplementationReview,
+        isNot(contains(symbol)),
+        reason: symbol,
+      );
+    }
+    for (final rejected in syncBridgeCommandContractRejectedSamples) {
+      expect(
+        encodedImplementationReview,
+        isNot(contains(rejected.forbiddenFragment)),
+        reason: rejected.id,
+      );
+    }
+    for (final fragment in syncBridgeCommandContractForbiddenFragments) {
+      expect(encodedImplementationReview, isNot(contains(fragment)));
+    }
+    expect(
+      encodedImplementationReview,
+      isNot(contains('settings_action_payload')),
+    );
+    expect(
+      encodedImplementationReview,
+      isNot(contains('bridge_request_payload')),
+    );
+    expect(encodedImplementationReview, isNot(contains('remote_request_body')));
+    expect(
+      encodedImplementationReview,
+      isNot(contains('remote_response_body')),
+    );
+    expect(
+      encodedImplementationReview,
+      isNot(contains('connect_go_server_now')),
+    );
+    expect(
+      encodedImplementationReview,
+      isNot(contains('touch_platform_key_backend_now')),
+    );
+  });
+
   test('rust and dart smoke plans cover ownership and redaction evidence', () {
     expect(
       syncFfiCommandBoundaryAllSmokeCaseIds(),

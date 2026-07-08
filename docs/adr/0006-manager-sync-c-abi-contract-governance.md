@@ -41,6 +41,16 @@ radishlex_manager_sync_command_result_free
 
 这些评审项的当前测试真相源是 `syncFfiRustHostContractReviewItems`，状态为 `c_abi_contract_review_ready_no_native_symbol`。
 
+## Implementation Review Package
+
+`syncFfiRustHostImplementationReviewItems` 是本 ADR 到真实 Rust host test 之间的实现前审阅包。它不新增代码实现，只把每个 C ABI contract review item 进一步映射到：
+
+- 后续 Rust 侧可能需要的 `manager_sync_command.rs::*Draft` 类型 / 函数草案。
+- 当前可复用的 `ime-ffi` 源码模式，例如 `ffi_status`、`ffi_ptr`、`ffi_release`、`read_utf8`、`read_ffi_bool`、error handle 和 sync preflight summary。
+- 进入真实 Rust host test 前仍需确认的实现问题，例如 action id 数值、action-specific section layout、result accessor field set、domain guard storage scope 和 Debug redaction test shape。
+
+该包的状态为 `rust_host_implementation_review_ready_no_native_symbol`。它只说明真实实现需要评审哪些 Rust 类型 / 函数边界，不代表 `crates/ime-ffi/src/manager_sync_command.rs`、C ABI symbol 或 `crates/ime-ffi/tests/manager_sync_command_boundary.rs` 已经落地。
+
 ## Request Struct 规则
 
 request struct 必须保持 summary / enum / borrowed view 形状：
@@ -105,6 +115,7 @@ result 必须由 Rust-owned handle 承载，并只暴露 safe summary view：
 创建 `crates/ime-ffi/tests/manager_sync_command_boundary.rs` 前必须满足：
 
 - `syncFfiRustHostContractReviewItems` 覆盖全部 `syncFfiCommandBoundaryRustHostTestDesignItems`。
+- `syncFfiRustHostImplementationReviewItems` 覆盖全部 C ABI contract review items，并且 proposed Rust artifacts 仍保持 draft 状态。
 - request struct、result struct、release function、error handle、panic boundary 和 command context 已有明确 Rust 类型草案或等价实现说明。
 - forbidden material contract 已映射到 test assertions。
 - Dart fake binding replay 继续证明 unknown native status、copy / free 和错误分类保持安全阻塞。
