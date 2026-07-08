@@ -12,6 +12,7 @@
 - 开发期 `manager_sync_evidence_bundle.v1` 只作为测试 fixture，把 readiness 摘要、connection health 摘要、部署证据来源和设备 production gate 组合成同一份预演输入；settings draft 仍只保存非敏感草案和净化后的 connection probe record，不保存 bundle 原文。
 - `manager_sync_action_command_preview.v1` 只从当前只读 action intent 派生非执行命令摘要，用于 settings gate preview、同步页和诊断报告展示 execution status、data policy、stop line、request boundary、result boundary、request / result allowed fields、forbidden material policy 和错误分类；它不写 settings draft，不创建 bridge 请求，也不携带命令 payload。
 - recovery setup / restore 的可见层文案占位只展示状态码：一次性展示状态、保存确认、恢复输入、恢复记录查询、失败限速和设备登记状态会同步进入 settings gate preview、同步页和诊断报告；这些字段不携带恢复码、settings action payload、bridge request payload 或请求 / 响应体。
+- join request 授权和设备撤销的 future confirmation detail 只展示状态码：join request 状态、短码核对占位、授权包前置条件、授权包状态、撤销确认占位、丢失设备风险提示和 key epoch 状态会绑定到现有 `sync.device_join_*`、`sync.authorization_package_*`、`sync.device_revocation_*`、`sync.lost_device_risk` 和 `sync.key_epoch_status` 字段；这些字段不携带短码、签名、wrapped material、settings action payload、bridge request payload 或请求 / 响应体。
 - 真实远端同步、恢复码和设备授权 UI 继续关闭；`preflight_ready` 只表示本地草案和预检条件可解释，不代表用户可用同步入口已开放。
 
 ## Settings Draft JSON
@@ -88,7 +89,7 @@ settings draft 不得保存：
 | command preview | `sync.action_command_*`、`sync.action_request_*`、`sync.action_result_*` | `manager_sync_action_command_preview.v1` 和 request / result preview | 只描述 future bridge command 的安全外壳、allowed fields、forbidden material 和错误分类；不构造 request payload 或接收 result material。 |
 | visible-layer detail | `sync.recovery_setup_*`、`sync.recovery_restore_*`、`sync.device_join_*`、`sync.device_revocation_*` | 同步页可见层状态、transient secret 交互 fixture 和当前 readiness model | 只展示状态码、确认边界和前置条件；不显示、输入、保存或传递恢复码、短码、签名、wrapped material 或 payload bytes。 |
 
-recovery setup / restore 当前已补 visible-layer detail：一次性展示占位、保存确认、恢复输入占位、恢复记录查询、失败限速和设备登记状态必须在 UI / diagnostics 中保持同源。join request 授权和设备撤销当前仍停留在 readiness、interaction intent 和 command preview 层；后续补确认细节时，应复用 `sync.device_join_*`、`sync.device_revocation_*`、`sync.authorization_package_*`、`sync.lost_device_risk` 和 `sync.key_epoch_status` 这些非敏感字段，而不是新增 settings action payload。
+recovery setup / restore 当前已补 visible-layer detail：一次性展示占位、保存确认、恢复输入占位、恢复记录查询、失败限速和设备登记状态必须在 UI / diagnostics 中保持同源。join request 授权和设备撤销当前已补 future confirmation detail：短码核对占位、授权显式确认、授权包状态、撤销显式确认、丢失设备风险提示和 key epoch 状态必须复用 `sync.device_join_*`、`sync.device_revocation_*`、`sync.authorization_package_*`、`sync.lost_device_risk` 和 `sync.key_epoch_status` 这些非敏感字段，而不是新增 settings action payload。
 
 ## 连接健康摘要
 

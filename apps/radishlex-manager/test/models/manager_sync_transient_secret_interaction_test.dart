@@ -346,6 +346,180 @@ void main() {
     expect(text, isNot(contains('settings_action_payload')));
     expect(text, isNot(contains('bridge_request_payload')));
   });
+
+  test(
+    'device authorization future confirmation details stay non executable',
+    () {
+      final interactionById = {
+        for (final fixture in syncTransientSecretInteractionFixtures)
+          fixture.id: fixture,
+      };
+      final encoded = [
+        for (final fixture
+            in syncDeviceAuthorizationFutureConfirmationDetailFixtures)
+          jsonEncode(
+            syncDeviceAuthorizationFutureConfirmationDetailShape(fixture),
+          ),
+      ].join('\n');
+
+      expect(syncDeviceAuthorizationFutureConfirmationDetailIds(), [
+        'join_request_authorization_confirmation_detail',
+        'device_revocation_confirmation_detail',
+      ]);
+      expect(
+        encoded,
+        contains(syncDeviceAuthorizationFutureConfirmationDetailFormat),
+      );
+      expect(
+        encoded,
+        contains(syncDeviceAuthorizationFutureConfirmationDetailReviewStatus),
+      );
+      expect(encoded, contains('confirmation_not_available_current_phase'));
+      expect(encoded, contains('settings_action_absent'));
+      expect(encoded, contains('clipboard_auto_copy_blocked'));
+      expect(encoded, isNot(contains('settings_action_payload')));
+      expect(encoded, isNot(contains('bridge_request_payload')));
+      expect(encoded, isNot(contains('request_body')));
+      expect(encoded, isNot(contains('response_body')));
+      expect(encoded, isNot(contains('short_code=')));
+      expect(encoded, isNot(contains('signature_bytes')));
+      expect(encoded, isNot(contains('wrapped_material=')));
+
+      for (final rejected in syncBridgeCommandContractRejectedSamples) {
+        expect(
+          encoded,
+          isNot(contains(rejected.forbiddenFragment)),
+          reason: rejected.id,
+        );
+      }
+
+      for (final fixture
+          in syncDeviceAuthorizationFutureConfirmationDetailFixtures) {
+        final interactions = [
+          for (final id in fixture.interactionFixtureIds) interactionById[id],
+        ];
+        expect(
+          interactions.every((interaction) => interaction != null),
+          isTrue,
+          reason: fixture.id,
+        );
+        expect(
+          interactions.map((interaction) => interaction!.actionId),
+          everyElement(fixture.actionId),
+          reason: fixture.id,
+        );
+
+        final interactionEvidence = {
+          for (final interaction in interactions)
+            ...interaction!.completionEvidenceCodes,
+        };
+        final prohibitedOperations = {
+          for (final interaction in interactions)
+            ...interaction!.prohibitedOperations,
+        };
+        expect(
+          interactionEvidence,
+          containsAll(fixture.allowedEvidenceCodes),
+          reason: fixture.id,
+        );
+        expect(
+          prohibitedOperations,
+          containsAll(fixture.prohibitedOperationCodes),
+          reason: fixture.id,
+        );
+        expect(fixture.interactionFixtureSummary, isNot('none'));
+        expect(fixture.preconditionSummary, isNot('none'), reason: fixture.id);
+        expect(
+          fixture.confirmationStateSummary,
+          isNot('none'),
+          reason: fixture.id,
+        );
+        expect(fixture.uiStatusSummary, isNot('none'), reason: fixture.id);
+        expect(
+          fixture.allowedEvidenceSummary,
+          isNot(contains('secret')),
+          reason: fixture.id,
+        );
+        expect(
+          fixture.prohibitedOperationSummary,
+          anyOf(contains('sign'), contains('revoke')),
+          reason: fixture.id,
+        );
+        expect(
+          fixture.persistencePolicySummary,
+          isNot(contains('payload')),
+          reason: fixture.id,
+        );
+      }
+    },
+  );
+
+  test(
+    'device authorization future details match UI and diagnostics today',
+    () {
+      final snapshot = createManagerFixture();
+      final gateAudit = managerSyncGateAuditForDraft(
+        draft: snapshot.settings.draft,
+        device: snapshot.sync.device,
+        readinessBridgeSnapshot: snapshot.sync.readinessBridgeSnapshot,
+      );
+      final deviceAuthorization = gateAudit.entryGate.deviceAuthorization;
+      final report = createManagerDiagnosticsReport(snapshot);
+      final diagnostics = _diagnosticsByKey(report);
+
+      final uiStatusByAction = {
+        'join_request_authorization': {
+          deviceAuthorization.joinRequestStatus.code,
+          deviceAuthorization.joinReadiness.shortCodeVerificationStatus,
+          deviceAuthorization.authorizationPackagePreconditions,
+          deviceAuthorization.authorizationPackageStatus,
+          deviceAuthorization.authorizationPackageBlocker,
+        },
+        'device_revocation': {
+          deviceAuthorization.revokeDeviceStatus,
+          deviceAuthorization.revocationReadiness.activeDeviceRequirement,
+          deviceAuthorization.lostDeviceRiskNotice,
+          deviceAuthorization.keyEpochStatus,
+          deviceAuthorization.revocationReadiness.status,
+        },
+      };
+
+      for (final fixture
+          in syncDeviceAuthorizationFutureConfirmationDetailFixtures) {
+        expect(
+          uiStatusByAction[fixture.actionId],
+          containsAll(fixture.uiExpectedStatusCodes),
+          reason: fixture.id,
+        );
+        for (final key in fixture.diagnosticsKeys) {
+          expect(diagnostics, contains(key), reason: '${fixture.id}: $key');
+        }
+        for (final status in fixture.diagnosticsExpectedStatusCodes) {
+          expect(diagnostics.values, contains(status), reason: fixture.id);
+        }
+        expect(fixture.entryStatusCode, 'read_only_current_phase');
+        expect(
+          fixture.userDecisionStatusCode,
+          'confirmation_not_available_current_phase',
+        );
+      }
+
+      final text = report.toRedactedText();
+      for (final fixture
+          in syncDeviceAuthorizationFutureConfirmationDetailFixtures) {
+        expect(text, contains(fixture.diagnosticsKeys.first));
+        expect(text, contains(fixture.diagnosticsExpectedStatusCodes.first));
+      }
+      for (final rejected in syncBridgeCommandContractRejectedSamples) {
+        expect(text, isNot(contains(rejected.forbiddenFragment)));
+      }
+      expect(text, isNot(contains('short_code=')));
+      expect(text, isNot(contains('signature_bytes')));
+      expect(text, isNot(contains('wrapped_material=')));
+      expect(text, isNot(contains('settings_action_payload')));
+      expect(text, isNot(contains('bridge_request_payload')));
+    },
+  );
 }
 
 Map<String, String> _diagnosticsByKey(ManagerDiagnosticsReport report) {

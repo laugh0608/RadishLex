@@ -47,6 +47,12 @@ const syncRecoveryFutureConfirmationDetailFormat =
 const syncRecoveryFutureConfirmationDetailReviewStatus =
     'future_confirmation_detail_review_only_no_secret_capture';
 
+const syncDeviceAuthorizationFutureConfirmationDetailFormat =
+    'future_manager_sync_device_authorization_confirmation_detail.v1_draft';
+
+const syncDeviceAuthorizationFutureConfirmationDetailReviewStatus =
+    'future_confirmation_detail_review_only_no_short_code_or_signature';
+
 const syncRecoveryVisibleLayerFixtures = [
   SyncRecoveryVisibleLayerFixture(
     id: 'recovery_setup_visible_copy_confirmation_placeholder',
@@ -381,6 +387,130 @@ const syncRecoveryFutureConfirmationDetailFixtures = [
   ),
 ];
 
+const syncDeviceAuthorizationFutureConfirmationDetailFixtures = [
+  SyncDeviceAuthorizationFutureConfirmationDetailFixture(
+    id: 'join_request_authorization_confirmation_detail',
+    actionId: 'join_request_authorization',
+    interactionFixtureIds: [
+      'join_short_code_verification_input',
+      'join_authorization_explicit_confirmation',
+    ],
+    detailBoundaryCode: 'join_authorization_confirmation_detail_status_only',
+    entryStatusCode: 'read_only_current_phase',
+    userDecisionStatusCode: 'confirmation_not_available_current_phase',
+    preconditionStatusCodes: [
+      'active_existing_device_required',
+      'join_request_pending_required',
+      'short_code_match_required',
+      'release_deployment_evidence_summary_required',
+      'explicit_user_start_required',
+    ],
+    confirmationStateCodes: [
+      'join_request_unavailable',
+      'short_code_verification_not_started',
+      'authorization_package_prerequisites_blocked',
+      'authorization_package_not_created',
+    ],
+    uiExpectedStatusCodes: [
+      'join_request_unavailable',
+      'short_code_verification_not_started',
+      'authorization_package_prerequisites_blocked',
+      'authorization_package_not_created',
+    ],
+    diagnosticsKeys: [
+      'sync.join_request_status',
+      'sync.device_join_short_code',
+      'sync.authorization_package_preconditions',
+      'sync.authorization_package_status',
+      'sync.authorization_package_blocker',
+    ],
+    diagnosticsExpectedStatusCodes: [
+      'join_request_unavailable',
+      'short_code_verification_not_started',
+      'active_existing_device_required, join_request_pending_required, short_code_match_required',
+      'authorization_package_not_created',
+      'authorization_package_prerequisites_blocked',
+    ],
+    allowedEvidenceCodes: [
+      'short_code_match_status_code',
+      'authorization_package_precondition_summary',
+      'explicit_authorization_ack_code_only',
+      'authorization_package_status_summary',
+    ],
+    prohibitedOperationCodes: [
+      'create_join_request',
+      'sign_authorization_package',
+      'write_wrapped_material',
+    ],
+    persistencePolicyCodes: [
+      'settings_action_absent',
+      'diagnostics_status_codes_only',
+      'widget_text_status_codes_only',
+      'route_argument_absent',
+      'clipboard_auto_copy_blocked',
+    ],
+  ),
+  SyncDeviceAuthorizationFutureConfirmationDetailFixture(
+    id: 'device_revocation_confirmation_detail',
+    actionId: 'device_revocation',
+    interactionFixtureIds: ['device_revocation_explicit_confirmation'],
+    detailBoundaryCode: 'device_revocation_confirmation_detail_status_only',
+    entryStatusCode: 'read_only_current_phase',
+    userDecisionStatusCode: 'confirmation_not_available_current_phase',
+    preconditionStatusCodes: [
+      'active_existing_device_required',
+      'lost_device_prior_material_not_recallable',
+      'key_epoch_rotation_not_started',
+      'release_deployment_evidence_summary_required',
+      'explicit_user_start_required',
+    ],
+    confirmationStateCodes: [
+      'closed_current_phase',
+      'lost_device_prior_material_not_recallable',
+      'key_epoch_rotation_not_started',
+      'device_revocation_flow_closed',
+    ],
+    uiExpectedStatusCodes: [
+      'closed_current_phase',
+      'active_existing_device_required',
+      'lost_device_prior_material_not_recallable',
+      'key_epoch_rotation_not_started',
+      'device_revocation_flow_closed',
+    ],
+    diagnosticsKeys: [
+      'sync.device_revocation_status',
+      'sync.device_revocation_active_requirement',
+      'sync.lost_device_risk',
+      'sync.key_epoch_status',
+      'sync.device_revocation_flow_status',
+    ],
+    diagnosticsExpectedStatusCodes: [
+      'closed_current_phase',
+      'active_existing_device_required',
+      'lost_device_prior_material_not_recallable',
+      'key_epoch_rotation_not_started',
+      'device_revocation_flow_closed',
+    ],
+    allowedEvidenceCodes: [
+      'explicit_revocation_ack_code_only',
+      'revocation_record_status_summary',
+      'key_epoch_status_summary',
+    ],
+    prohibitedOperationCodes: [
+      'revoke_device',
+      'sign_revocation_record',
+      'advance_key_epoch',
+    ],
+    persistencePolicyCodes: [
+      'settings_action_absent',
+      'diagnostics_status_codes_only',
+      'widget_text_status_codes_only',
+      'route_argument_absent',
+      'clipboard_auto_copy_blocked',
+    ],
+  ),
+];
+
 class SyncTransientSecretInteractionFixture {
   const SyncTransientSecretInteractionFixture({
     required this.id,
@@ -527,6 +657,76 @@ class SyncRecoveryFutureConfirmationDetailFixture {
   }
 }
 
+class SyncDeviceAuthorizationFutureConfirmationDetailFixture {
+  const SyncDeviceAuthorizationFutureConfirmationDetailFixture({
+    required this.id,
+    required this.actionId,
+    required this.interactionFixtureIds,
+    required this.detailBoundaryCode,
+    required this.entryStatusCode,
+    required this.userDecisionStatusCode,
+    required this.preconditionStatusCodes,
+    required this.confirmationStateCodes,
+    required this.uiExpectedStatusCodes,
+    required this.diagnosticsKeys,
+    required this.diagnosticsExpectedStatusCodes,
+    required this.allowedEvidenceCodes,
+    required this.prohibitedOperationCodes,
+    required this.persistencePolicyCodes,
+  });
+
+  final String id;
+  final String actionId;
+  final List<String> interactionFixtureIds;
+  final String detailBoundaryCode;
+  final String entryStatusCode;
+  final String userDecisionStatusCode;
+  final List<String> preconditionStatusCodes;
+  final List<String> confirmationStateCodes;
+  final List<String> uiExpectedStatusCodes;
+  final List<String> diagnosticsKeys;
+  final List<String> diagnosticsExpectedStatusCodes;
+  final List<String> allowedEvidenceCodes;
+  final List<String> prohibitedOperationCodes;
+  final List<String> persistencePolicyCodes;
+
+  String get interactionFixtureSummary {
+    return managerSyncCodeSummary(interactionFixtureIds);
+  }
+
+  String get preconditionSummary {
+    return managerSyncCodeSummary(preconditionStatusCodes);
+  }
+
+  String get confirmationStateSummary {
+    return managerSyncCodeSummary(confirmationStateCodes);
+  }
+
+  String get uiStatusSummary {
+    return managerSyncCodeSummary(uiExpectedStatusCodes);
+  }
+
+  String get diagnosticsKeySummary {
+    return managerSyncCodeSummary(diagnosticsKeys);
+  }
+
+  String get diagnosticsStatusSummary {
+    return managerSyncCodeSummary(diagnosticsExpectedStatusCodes);
+  }
+
+  String get allowedEvidenceSummary {
+    return managerSyncCodeSummary(allowedEvidenceCodes);
+  }
+
+  String get prohibitedOperationSummary {
+    return managerSyncCodeSummary(prohibitedOperationCodes);
+  }
+
+  String get persistencePolicySummary {
+    return managerSyncCodeSummary(persistencePolicyCodes);
+  }
+}
+
 Map<String, Object?> syncTransientSecretInteractionShape(
   SyncTransientSecretInteractionFixture fixture,
 ) {
@@ -600,6 +800,34 @@ Map<String, Object?> syncRecoveryFutureConfirmationDetailShape(
   };
 }
 
+Map<String, Object?> syncDeviceAuthorizationFutureConfirmationDetailShape(
+  SyncDeviceAuthorizationFutureConfirmationDetailFixture fixture,
+) {
+  return {
+    'format': syncDeviceAuthorizationFutureConfirmationDetailFormat,
+    'review_status':
+        syncDeviceAuthorizationFutureConfirmationDetailReviewStatus,
+    'current_phase': syncTransientSecretInteractionCurrentPhaseStatus,
+    'id': fixture.id,
+    'action_id': fixture.actionId,
+    'interaction_fixture_ids': fixture.interactionFixtureIds,
+    'detail_boundary_code': fixture.detailBoundaryCode,
+    'entry_status_code': fixture.entryStatusCode,
+    'user_decision_status_code': fixture.userDecisionStatusCode,
+    'precondition_status_codes': fixture.preconditionStatusCodes,
+    'confirmation_state_codes': fixture.confirmationStateCodes,
+    'ui_expected_status_codes': fixture.uiExpectedStatusCodes,
+    'diagnostics_keys': fixture.diagnosticsKeys,
+    'diagnostics_expected_status_codes': fixture.diagnosticsExpectedStatusCodes,
+    'allowed_evidence_codes': fixture.allowedEvidenceCodes,
+    'prohibited_operation_codes': fixture.prohibitedOperationCodes,
+    'persistence_policy_codes': fixture.persistencePolicyCodes,
+    'lifecycle_rules': syncTransientSecretLifecycleRules,
+    'forbidden_persistence_targets':
+        syncTransientSecretForbiddenPersistenceTargets,
+  };
+}
+
 List<String> syncRecoveryVisibleLayerDiagnosticsKeys() {
   return List.unmodifiable(
     {
@@ -612,6 +840,14 @@ List<String> syncRecoveryVisibleLayerDiagnosticsKeys() {
 List<String> syncRecoveryFutureConfirmationDetailIds() {
   return List.unmodifiable(
     syncRecoveryFutureConfirmationDetailFixtures
+        .map((fixture) => fixture.id)
+        .toList(),
+  );
+}
+
+List<String> syncDeviceAuthorizationFutureConfirmationDetailIds() {
+  return List.unmodifiable(
+    syncDeviceAuthorizationFutureConfirmationDetailFixtures
         .map((fixture) => fixture.id)
         .toList(),
   );

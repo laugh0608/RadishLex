@@ -80,10 +80,12 @@ future confirmation detail 当前固定为：
 | --- | --- | --- | --- |
 | `recovery_setup_save_confirmation_detail` | `recovery_setup` | `confirmation_not_available_current_phase` | `save_confirmation_ack_code_only`、`recovery_record_status_summary`、`first_upload_gate_summary` |
 | `recovery_restore_attempt_confirmation_detail` | `recovery_restore` | `confirmation_not_available_current_phase` | `restore_attempt_status_code`、`recovery_record_lookup_summary`、`attempt_limit_status_summary`、`device_registration_status_summary` |
+| `join_request_authorization_confirmation_detail` | `join_request_authorization` | `confirmation_not_available_current_phase` | `short_code_match_status_code`、`authorization_package_precondition_summary`、`explicit_authorization_ack_code_only`、`authorization_package_status_summary` |
+| `device_revocation_confirmation_detail` | `device_revocation` | `confirmation_not_available_current_phase` | `explicit_revocation_ack_code_only`、`revocation_record_status_summary`、`key_epoch_status_summary` |
 
-这两条 detail 必须继续绑定当前 diagnostics 字段：`sync.recovery_setup_display_status`、`sync.recovery_setup_save_confirmation`、`sync.recovery_first_upload_gate`、`sync.recovery_restore_code_input`、`sync.recovery_restore_lookup_status`、`sync.recovery_restore_attempt_limit` 和 `sync.recovery_restore_device_registration`。它们只能输出状态码，不输出恢复码、短码、token、signature、wrapped material、payload bytes、请求 / 响应体或真实路径。
+recovery detail 必须继续绑定当前 diagnostics 字段：`sync.recovery_setup_display_status`、`sync.recovery_setup_save_confirmation`、`sync.recovery_first_upload_gate`、`sync.recovery_restore_code_input`、`sync.recovery_restore_lookup_status`、`sync.recovery_restore_attempt_limit` 和 `sync.recovery_restore_device_registration`。device authorization detail 必须继续绑定 `sync.join_request_status`、`sync.device_join_short_code`、`sync.authorization_package_preconditions`、`sync.authorization_package_status`、`sync.authorization_package_blocker`、`sync.device_revocation_status`、`sync.device_revocation_active_requirement`、`sync.lost_device_risk`、`sync.key_epoch_status` 和 `sync.device_revocation_flow_status`。它们只能输出状态码，不输出恢复码、短码、token、signature、wrapped material、payload bytes、请求 / 响应体或真实路径。
 
-设备 join / revocation 当前仍只固定到 readiness、interaction intent 和 action command preview 层。后续补齐确认 detail 时，应沿用同一套状态码边界：
+设备 join / revocation confirmation detail 当前已固定到 fixture / model test 证据层，但仍是非执行状态码层，不是 UI 操作实现：
 
 - join request 授权只能表达 `join_request_status`、`short_code_verification_status`、`authorization_package_preconditions`、显式确认状态和授权包状态摘要；不得显示短码内容、创建 join request、签名授权包或写入 wrapped material。
 - 设备撤销只能表达 `target_device_status_summary`、`active_device_requirement`、`lost_device_risk_acknowledgement`、显式确认状态、撤销记录状态和 key epoch 状态摘要；不得执行撤销、签名 revocation record 或推进 key epoch。
