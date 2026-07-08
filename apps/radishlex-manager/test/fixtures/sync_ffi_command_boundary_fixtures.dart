@@ -14,11 +14,17 @@ const syncFfiCommandBoundaryRustHostContractFormat =
 const syncFfiCommandBoundaryRustHostReviewFormat =
     'future_manager_sync_ffi_rust_host_review.v1_draft';
 
+const syncFfiCommandBoundaryRustHostSourceChecklistFormat =
+    'future_manager_sync_ffi_rust_host_source_checklist.v1_draft';
+
 const syncFfiCommandBoundaryRustHostContractReviewStatus =
     'future_rust_host_contract_review_only_no_native_symbol';
 
 const syncFfiCommandBoundaryRustHostReviewStatus =
     'rust_host_contract_review_ready_no_native_symbol';
+
+const syncFfiCommandBoundaryRustHostSourceChecklistStatus =
+    'rust_host_source_checklist_ready_no_native_symbol';
 
 const syncFfiCommandBoundaryRustHostContractTargetTestFile =
     'crates/ime-ffi/tests/manager_sync_command_boundary.rs';
@@ -804,6 +810,174 @@ const syncFfiCommandBoundaryRustHostReviewItems = [
   ),
 ];
 
+const syncFfiCommandBoundaryRustHostSourceChecklistItems = [
+  SyncFfiCommandBoundaryRustHostSourceChecklistItem(
+    id: 'contract_reports_command_capability_closed_source_checklist',
+    reviewItemId: 'contract_reports_command_capability_closed_review',
+    patternSourceRefs: {
+      'radishlex_ffi_contract_current_version': [
+        'crates/ime-ffi/src/contract.rs::RadishLexFfiContract::current',
+        'crates/ime-ffi/src/abi.rs::radishlex_ffi_contract',
+        'crates/ime-ffi/tests/ffi_contract_and_dictionary.rs::ffi_contract_reports_lifecycle_and_thread_policy',
+      ],
+      'ffi_status_catch_unwind': ['crates/ime-ffi/src/abi.rs::ffi_status'],
+      'current_native_symbol_absent': [
+        'apps/radishlex-manager/tool/ffi_bridge_smoke.dart::_expectFutureSyncCommandSymbolsAbsent',
+        'apps/radishlex-manager/test/fixtures/sync_ffi_command_boundary_fixtures.dart::syncFfiCommandBoundaryCurrentNativeSymbols',
+      ],
+    },
+    requiredPreChecks: [
+      'confirm_contract_version_constant',
+      'confirm_capability_closed_status_code',
+      'confirm_candidate_symbols_absent',
+    ],
+    implementationStatus: 'source_checklist_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostSourceChecklistItem(
+    id: 'invalid_request_inputs_return_stable_status_source_checklist',
+    reviewItemId: 'invalid_request_inputs_return_stable_status_review',
+    patternSourceRefs: {
+      'read_utf8_rejects_null_and_invalid': [
+        'crates/ime-ffi/src/abi.rs::read_utf8',
+        'crates/ime-ffi/src/abi.rs::read_optional_utf8',
+      ],
+      'read_ffi_bool_rejects_unknown': [
+        'crates/ime-ffi/src/abi.rs::read_ffi_bool',
+      ],
+      'summary_output_pointer_invalid_argument': [
+        'crates/ime-ffi/src/abi.rs::radishlex_userdb_sync_preflight',
+        'crates/ime-ffi/src/abi.rs::radishlex_userdb_learning_status',
+      ],
+      'error_handle_read_then_free': [
+        'crates/ime-ffi/src/abi.rs::radishlex_error_code',
+        'crates/ime-ffi/src/abi.rs::radishlex_error_message',
+        'crates/ime-ffi/src/abi.rs::radishlex_error_free',
+      ],
+    },
+    requiredPreChecks: [
+      'confirm_request_version_rejected_before_execution',
+      'confirm_unknown_action_rejected_before_execution',
+      'confirm_invalid_bool_utf8_and_null_pointer_status',
+      'confirm_error_handle_read_then_free',
+    ],
+    implementationStatus: 'source_checklist_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostSourceChecklistItem(
+    id: 'result_handle_copy_then_free_source_checklist',
+    reviewItemId: 'result_handle_copy_then_free_review',
+    patternSourceRefs: {
+      'ffi_ptr_null_on_error': ['crates/ime-ffi/src/abi.rs::ffi_ptr'],
+      'ffi_release_free_null': [
+        'crates/ime-ffi/src/abi.rs::ffi_release',
+        'crates/ime-ffi/src/abi.rs::radishlex_buffer_free',
+      ],
+      'platform_binding_copies_views_before_release': [
+        'crates/ime-ffi/tests/ffi_contract_and_dictionary.rs::platform_binding_style_copies_views_before_releasing_handles',
+      ],
+    },
+    requiredPreChecks: [
+      'confirm_result_handle_is_rust_owned',
+      'confirm_string_views_copied_before_release',
+      'confirm_free_null_noop',
+    ],
+    implementationStatus: 'source_checklist_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostSourceChecklistItem(
+    id: 'envelope_allowlist_only_source_checklist',
+    reviewItemId: 'envelope_allowlist_only_review',
+    patternSourceRefs: {
+      'sync_preflight_summary_output': [
+        'crates/ime-ffi/src/sync_status.rs::RadishLexSyncPreflightSummary',
+        'crates/ime-ffi/src/abi.rs::radishlex_userdb_sync_preflight',
+      ],
+      'summary_output_pointer_invalid_argument': [
+        'crates/ime-ffi/src/abi.rs::radishlex_userdb_sync_preflight',
+        'crates/ime-ffi/src/abi.rs::radishlex_userdb_learning_status',
+      ],
+      'error_handle_read_then_free': [
+        'crates/ime-ffi/src/abi.rs::radishlex_error_code',
+        'crates/ime-ffi/src/abi.rs::radishlex_error_message',
+        'crates/ime-ffi/src/abi.rs::radishlex_error_free',
+      ],
+    },
+    requiredPreChecks: [
+      'confirm_command_status_allowlist',
+      'confirm_error_code_allowlist',
+      'confirm_retry_policy_allowlist',
+      'confirm_next_evidence_allowlist',
+    ],
+    implementationStatus: 'source_checklist_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostSourceChecklistItem(
+    id: 'forbidden_material_absent_from_native_outputs_source_checklist',
+    reviewItemId: 'forbidden_material_absent_from_native_outputs_review',
+    patternSourceRefs: {
+      'error_handle_read_then_free': [
+        'crates/ime-ffi/src/abi.rs::radishlex_error_code',
+        'crates/ime-ffi/src/abi.rs::radishlex_error_message',
+        'crates/ime-ffi/src/abi.rs::radishlex_error_free',
+      ],
+      'sync_preflight_summary_output': [
+        'crates/ime-ffi/src/sync_status.rs::RadishLexSyncPreflightSummary',
+        'crates/ime-ffi/src/abi.rs::radishlex_userdb_sync_preflight',
+      ],
+      'current_native_symbol_absent': [
+        'apps/radishlex-manager/tool/ffi_bridge_smoke.dart::_expectFutureSyncCommandSymbolsAbsent',
+        'apps/radishlex-manager/test/fixtures/sync_ffi_command_boundary_fixtures.dart::syncFfiCommandBoundaryCurrentNativeSymbols',
+      ],
+    },
+    requiredPreChecks: [
+      'confirm_result_uses_safe_categories',
+      'confirm_error_message_redaction',
+      'confirm_debug_output_redaction',
+    ],
+    implementationStatus: 'source_checklist_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostSourceChecklistItem(
+    id: 'panic_boundary_returns_internal_error_source_checklist',
+    reviewItemId: 'panic_boundary_returns_internal_error_review',
+    patternSourceRefs: {
+      'ffi_status_catch_unwind': ['crates/ime-ffi/src/abi.rs::ffi_status'],
+      'ffi_ptr_null_on_error': ['crates/ime-ffi/src/abi.rs::ffi_ptr'],
+      'radishlex_status_internal_error': [
+        'crates/ime-ffi/src/error.rs::RadishLexStatusCode::InternalError',
+        'crates/ime-ffi/src/error.rs::FfiError::internal',
+        'crates/ime-ffi/src/abi.rs::radishlex_error_code',
+      ],
+    },
+    requiredPreChecks: [
+      'confirm_catch_unwind_wraps_entry',
+      'confirm_internal_error_status',
+      'confirm_release_path_safe_after_error',
+    ],
+    implementationStatus: 'source_checklist_ready_no_native_symbol',
+  ),
+  SyncFfiCommandBoundaryRustHostSourceChecklistItem(
+    id: 'sync_domain_command_serialization_source_checklist',
+    reviewItemId: 'sync_domain_command_serialization_review',
+    patternSourceRefs: {
+      'session_owner_thread_invalid_state': [
+        'crates/ime-ffi/src/session.rs::RadishLexSession::ensure_owner_thread',
+        'crates/ime-ffi/tests/ffi_contract_and_dictionary.rs::session_handles_reject_non_owner_thread_use',
+      ],
+      'summary_output_pointer_invalid_argument': [
+        'crates/ime-ffi/src/abi.rs::radishlex_userdb_sync_preflight',
+        'crates/ime-ffi/src/abi.rs::radishlex_userdb_learning_status',
+      ],
+      'current_native_symbol_absent': [
+        'apps/radishlex-manager/tool/ffi_bridge_smoke.dart::_expectFutureSyncCommandSymbolsAbsent',
+        'apps/radishlex-manager/test/fixtures/sync_ffi_command_boundary_fixtures.dart::syncFfiCommandBoundaryCurrentNativeSymbols',
+      ],
+    },
+    requiredPreChecks: [
+      'confirm_sync_domain_write_guard_design',
+      'confirm_concurrent_command_status',
+      'confirm_operation_id_non_sensitive',
+    ],
+    implementationStatus: 'source_checklist_ready_no_native_symbol',
+  ),
+];
+
 class SyncFfiCommandBoundaryRustHostReviewItem {
   const SyncFfiCommandBoundaryRustHostReviewItem({
     required this.id,
@@ -831,6 +1005,36 @@ class SyncFfiCommandBoundaryRustHostReviewItem {
 
   String get evidenceSummary {
     return managerSyncCodeSummary(requiredReviewEvidence);
+  }
+}
+
+class SyncFfiCommandBoundaryRustHostSourceChecklistItem {
+  const SyncFfiCommandBoundaryRustHostSourceChecklistItem({
+    required this.id,
+    required this.reviewItemId,
+    required this.patternSourceRefs,
+    required this.requiredPreChecks,
+    required this.implementationStatus,
+  });
+
+  final String id;
+  final String reviewItemId;
+  final Map<String, List<String>> patternSourceRefs;
+  final List<String> requiredPreChecks;
+  final String implementationStatus;
+
+  String get patternSummary {
+    return managerSyncCodeSummary(patternSourceRefs.keys);
+  }
+
+  String get sourceRefSummary {
+    return managerSyncCodeSummary(
+      patternSourceRefs.values.expand((refs) => refs),
+    );
+  }
+
+  String get preCheckSummary {
+    return managerSyncCodeSummary(requiredPreChecks);
   }
 }
 
@@ -962,6 +1166,30 @@ Map<String, Object?> syncFfiCommandBoundaryRustHostReviewItemShape(
     'stop_lines': syncFfiCommandBoundaryRustHostReviewStopLines,
     'implementation_status': fixture.implementationStatus,
   };
+}
+
+Map<String, Object?> syncFfiCommandBoundaryRustHostSourceChecklistItemShape(
+  SyncFfiCommandBoundaryRustHostSourceChecklistItem fixture,
+) {
+  return {
+    'format': syncFfiCommandBoundaryRustHostSourceChecklistFormat,
+    'review_status': syncFfiCommandBoundaryRustHostSourceChecklistStatus,
+    'target_test_file': syncFfiCommandBoundaryRustHostContractTargetTestFile,
+    'id': fixture.id,
+    'review_item_id': fixture.reviewItemId,
+    'pattern_source_refs': fixture.patternSourceRefs,
+    'required_pre_checks': fixture.requiredPreChecks,
+    'stop_lines': syncFfiCommandBoundaryRustHostReviewStopLines,
+    'implementation_status': fixture.implementationStatus,
+  };
+}
+
+List<String> syncFfiCommandBoundaryRustHostSourceChecklistItemIds() {
+  return List.unmodifiable(
+    syncFfiCommandBoundaryRustHostSourceChecklistItems
+        .map((fixture) => fixture.id)
+        .toList(),
+  );
 }
 
 String _requestFieldPolicy(String field) {

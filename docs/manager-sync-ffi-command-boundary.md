@@ -218,6 +218,8 @@ command result envelope 使用 allowlist 错误码：
 
 当前 Rust host review catalog 已进一步把每个 host contract case 绑定到既有 `ime-ffi` 模式和非敏感评审证据：`radishlex_ffi_contract` 版本检查、`ffi_status` / `ffi_ptr` / `ffi_release` 的 panic boundary 与释放路径、UTF-8 和 bool 输入校验、error handle read / free、summary output pointer guard、平台 binding copy-before-release 测试、sync preflight summary 输出和 owner-thread `InvalidState` 策略。该 review catalog 的状态为 `review_ready_no_native_symbol`，只说明后续 Rust host test 应复用哪些既有模式和停止线，不代表真实 C ABI 或 command context 已落地。
 
+当前 Rust host source checklist 已进一步把 review catalog 的每个既有模式绑定到具体源码引用：`syncFfiCommandBoundaryRustHostSourceChecklistItems` 记录 `crates/ime-ffi/src/contract.rs::RadishLexFfiContract::current`、`crates/ime-ffi/src/abi.rs::ffi_status` / `ffi_ptr` / `ffi_release` / `read_utf8` / `read_ffi_bool` / summary output guard / error handle、`crates/ime-ffi/src/session.rs::RadishLexSession::ensure_owner_thread`、`crates/ime-ffi/tests/ffi_contract_and_dictionary.rs` 的 contract / owner-thread / copy-before-release 测试，以及 `apps/radishlex-manager/tool/ffi_bridge_smoke.dart::_expectFutureSyncCommandSymbolsAbsent`。该 checklist 的状态为 `source_checklist_ready_no_native_symbol`，只作为真实 Rust host test 前的源码审阅索引，不新增 `crates/ime-ffi/tests/manager_sync_command_boundary.rs`，不新增 native symbol。
+
 review catalog 的 source-level 映射如下，后续写真实 Rust host test 前应先逐项确认这些模式是否仍成立：
 
 | Host contract case | 现有 `ime-ffi` 模式 | 评审重点 |

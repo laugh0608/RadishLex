@@ -491,6 +491,119 @@ void main() {
     }
   });
 
+  test('rust host source checklist binds review items to source patterns', () {
+    final reviewById = {
+      for (final item in syncFfiCommandBoundaryRustHostReviewItems)
+        item.id: item,
+    };
+    final checklistByReviewId = {
+      for (final item in syncFfiCommandBoundaryRustHostSourceChecklistItems)
+        item.reviewItemId: item,
+    };
+    const allowedSourcePrefixes = [
+      'crates/ime-ffi/src/',
+      'crates/ime-ffi/tests/',
+      'apps/radishlex-manager/tool/',
+      'apps/radishlex-manager/test/fixtures/',
+    ];
+
+    expect(
+      syncFfiCommandBoundaryRustHostSourceChecklistItemIds(),
+      containsAll([
+        'contract_reports_command_capability_closed_source_checklist',
+        'invalid_request_inputs_return_stable_status_source_checklist',
+        'result_handle_copy_then_free_source_checklist',
+        'envelope_allowlist_only_source_checklist',
+        'forbidden_material_absent_from_native_outputs_source_checklist',
+        'panic_boundary_returns_internal_error_source_checklist',
+        'sync_domain_command_serialization_source_checklist',
+      ]),
+    );
+    expect(checklistByReviewId.keys.toSet(), reviewById.keys.toSet());
+
+    for (final item in syncFfiCommandBoundaryRustHostSourceChecklistItems) {
+      final review = reviewById[item.reviewItemId];
+      final shape = syncFfiCommandBoundaryRustHostSourceChecklistItemShape(
+        item,
+      );
+
+      expect(review, isNotNull, reason: item.id);
+      expect(
+        item.patternSourceRefs.keys,
+        containsAll(review!.requiredExistingPatterns),
+        reason: item.id,
+      );
+      expect(
+        item.implementationStatus,
+        'source_checklist_ready_no_native_symbol',
+        reason: item.id,
+      );
+      expect(
+        shape['format'],
+        syncFfiCommandBoundaryRustHostSourceChecklistFormat,
+      );
+      expect(
+        shape['review_status'],
+        syncFfiCommandBoundaryRustHostSourceChecklistStatus,
+      );
+      expect(
+        shape['target_test_file'],
+        syncFfiCommandBoundaryRustHostContractTargetTestFile,
+      );
+      expect(
+        shape['stop_lines'],
+        syncFfiCommandBoundaryRustHostReviewStopLines,
+      );
+      expect(item.patternSummary, isNot('none'), reason: item.id);
+      expect(item.sourceRefSummary, isNot('none'), reason: item.id);
+      expect(item.preCheckSummary, isNot('none'), reason: item.id);
+
+      for (final refs in item.patternSourceRefs.values) {
+        expect(refs, isNotEmpty, reason: item.id);
+        for (final ref in refs) {
+          expect(ref, contains('::'), reason: '${item.id}: $ref');
+          expect(
+            allowedSourcePrefixes.any(ref.startsWith),
+            isTrue,
+            reason: '${item.id}: $ref',
+          );
+        }
+      }
+    }
+  });
+
+  test('rust host source checklist remains review-only', () {
+    final encodedChecklist = [
+      for (final item in syncFfiCommandBoundaryRustHostSourceChecklistItems)
+        jsonEncode(
+          syncFfiCommandBoundaryRustHostSourceChecklistItemShape(item),
+        ),
+    ].join('\n');
+
+    expect(syncFfiCommandBoundaryCurrentNativeSymbols, isEmpty);
+    expect(encodedChecklist, contains('no_native_symbol'));
+    expect(
+      encodedChecklist,
+      contains('source_checklist_ready_no_native_symbol'),
+    );
+    for (final symbol in syncFfiCommandBoundaryCandidateSymbols) {
+      expect(encodedChecklist, isNot(contains(symbol)), reason: symbol);
+    }
+    for (final rejected in syncBridgeCommandContractRejectedSamples) {
+      expect(
+        encodedChecklist,
+        isNot(contains(rejected.forbiddenFragment)),
+        reason: rejected.id,
+      );
+    }
+    expect(encodedChecklist, isNot(contains('request_body')));
+    expect(encodedChecklist, isNot(contains('response_body')));
+    expect(encodedChecklist, isNot(contains('settings_action_payload')));
+    expect(encodedChecklist, isNot(contains('bridge_request_payload')));
+    expect(encodedChecklist, isNot(contains('connect_go_server_now')));
+    expect(encodedChecklist, isNot(contains('touch_platform_key_backend_now')));
+  });
+
   test('rust and dart smoke plans cover ownership and redaction evidence', () {
     expect(
       syncFfiCommandBoundaryAllSmokeCaseIds(),
