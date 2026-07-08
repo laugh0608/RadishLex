@@ -5,6 +5,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::slice;
 use std::str;
 use std::sync::Mutex;
+use std::thread::{self, ThreadId};
 
 use crate::error::{FfiError, RadishLexStatusCode};
 use crate::snapshot::RadishLexStringView;
@@ -35,6 +36,17 @@ const HOST_CONTRACT_TEST_GATE_CLOSED: &str = "host_contract_test_gate_closed_no_
 const C_ABI_SYMBOL_NOT_EXPORTED: &str = "planned_not_exported_current_phase";
 const C_ABI_SYMBOL_EXPORT_UNAPPROVED_ERROR: &str =
     "manager_sync_c_abi_symbol_export_not_approved_current_phase";
+const RESULT_ACCESSOR_FIELD_SET_REVIEW_READY: &str =
+    "result_accessor_field_set_review_ready_no_native_symbol";
+const RESULT_ACCESSOR_FIELD_SET_ERROR: &str = "manager_sync_result_accessor_field_set_not_reviewed";
+const COMMAND_CONTEXT_OWNER_SCOPE_REVIEW_READY: &str =
+    "command_context_owner_scope_review_ready_no_native_symbol";
+const COMMAND_CONTEXT_OWNER_SCOPE_ERROR: &str =
+    "manager_sync_command_context_owner_scope_not_reviewed";
+const SYNC_COMMAND_CONTEXT_OWNER_MISMATCH_ERROR: &str =
+    "manager_sync_command_context_owner_mismatch";
+const HOST_CONTRACT_GATE_MIGRATION_REVIEW_READY: &str =
+    "host_contract_gate_migration_review_ready_no_native_symbol";
 
 pub(crate) const MANAGER_SYNC_SECTION_RECOVERY_SETUP: u32 = 1;
 pub(crate) const MANAGER_SYNC_SECTION_RECOVERY_RESTORE: u32 = 2;
@@ -150,6 +162,115 @@ const MANAGER_SYNC_COMMAND_HOST_TEST_EVIDENCE_DRAFT: &[&str] = &[
     "ffi_bridge_smoke_candidate_symbols_absent",
 ];
 
+const MANAGER_SYNC_COMMAND_HOST_GATE_MIGRATION_CONDITIONS_DRAFT: &[&str] = &[
+    "result_accessor_field_set_reviewed",
+    "command_context_owner_scope_reviewed",
+    "forbidden_material_redaction_reviewed",
+    "native_symbol_export_approved_by_adr",
+    "dart_native_binding_approved",
+    "manager_bridge_command_approved",
+    "host_contract_test_file_approved",
+    "ffi_smoke_candidate_symbols_absent_until_approval",
+    "real_sync_execution_approved_after_gate",
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagerSyncCommandResultAccessorFieldDraft {
+    pub field_name: &'static str,
+    pub accessor_symbol: &'static str,
+    pub value_kind: &'static str,
+    pub current_export_state: &'static str,
+    pub copy_required_before_release: bool,
+}
+
+pub(crate) const MANAGER_SYNC_COMMAND_RESULT_ACCESSOR_FIELDS_DRAFT:
+    &[ManagerSyncCommandResultAccessorFieldDraft] = &[
+    ManagerSyncCommandResultAccessorFieldDraft {
+        field_name: "schema_version",
+        accessor_symbol: "radishlex_manager_sync_command_result_summary",
+        value_kind: "u32",
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        copy_required_before_release: true,
+    },
+    ManagerSyncCommandResultAccessorFieldDraft {
+        field_name: "action_id",
+        accessor_symbol: "radishlex_manager_sync_command_result_action_id",
+        value_kind: "u32",
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        copy_required_before_release: true,
+    },
+    ManagerSyncCommandResultAccessorFieldDraft {
+        field_name: "command_status",
+        accessor_symbol: "radishlex_manager_sync_command_result_status",
+        value_kind: "summary_code",
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        copy_required_before_release: true,
+    },
+    ManagerSyncCommandResultAccessorFieldDraft {
+        field_name: "error_code",
+        accessor_symbol: "radishlex_manager_sync_command_result_error_code",
+        value_kind: "summary_code",
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        copy_required_before_release: true,
+    },
+    ManagerSyncCommandResultAccessorFieldDraft {
+        field_name: "retry_policy",
+        accessor_symbol: "radishlex_manager_sync_command_result_retry_policy",
+        value_kind: "summary_code",
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        copy_required_before_release: true,
+    },
+    ManagerSyncCommandResultAccessorFieldDraft {
+        field_name: "user_visible_summary_code",
+        accessor_symbol: "radishlex_manager_sync_command_result_summary",
+        value_kind: "summary_code",
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        copy_required_before_release: true,
+    },
+    ManagerSyncCommandResultAccessorFieldDraft {
+        field_name: "diagnostics_summary_code",
+        accessor_symbol: "radishlex_manager_sync_command_result_summary",
+        value_kind: "summary_code",
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        copy_required_before_release: true,
+    },
+    ManagerSyncCommandResultAccessorFieldDraft {
+        field_name: "next_required_evidence",
+        accessor_symbol: "radishlex_manager_sync_command_result_summary",
+        value_kind: "summary_code",
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        copy_required_before_release: true,
+    },
+    ManagerSyncCommandResultAccessorFieldDraft {
+        field_name: "object_type_summary",
+        accessor_symbol: "radishlex_manager_sync_command_result_summary",
+        value_kind: "summary_code",
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        copy_required_before_release: true,
+    },
+    ManagerSyncCommandResultAccessorFieldDraft {
+        field_name: "object_count_summary",
+        accessor_symbol: "radishlex_manager_sync_command_result_summary",
+        value_kind: "usize_count",
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        copy_required_before_release: true,
+    },
+    ManagerSyncCommandResultAccessorFieldDraft {
+        field_name: "object_version_summary",
+        accessor_symbol: "radishlex_manager_sync_command_result_summary",
+        value_kind: "summary_code",
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        copy_required_before_release: true,
+    },
+    ManagerSyncCommandResultAccessorFieldDraft {
+        field_name: "recorded_at_summary",
+        accessor_symbol: "radishlex_manager_sync_command_result_summary",
+        value_kind: "summary_code",
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        copy_required_before_release: true,
+    },
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ManagerSyncCommandCAbiWrapperShapeReviewDraft {
     pub review_state: &'static str,
@@ -247,6 +368,122 @@ impl ManagerSyncCommandHostContractTestGateDraft {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagerSyncCommandResultAccessorFieldSetReviewDraft {
+    pub review_state: &'static str,
+    pub fields: &'static [ManagerSyncCommandResultAccessorFieldDraft],
+}
+
+impl ManagerSyncCommandResultAccessorFieldSetReviewDraft {
+    pub(crate) fn current_phase() -> Self {
+        Self {
+            review_state: RESULT_ACCESSOR_FIELD_SET_REVIEW_READY,
+            fields: MANAGER_SYNC_COMMAND_RESULT_ACCESSOR_FIELDS_DRAFT,
+        }
+    }
+
+    pub(crate) fn assert_safe_field_set(&self) -> Result<(), FfiError> {
+        ensure_safe_summary_value(self.review_state, "result_accessor_field_set_review_state")?;
+        let mut names = HashSet::new();
+        for field in self.fields {
+            ensure_safe_summary_value(field.field_name, "result_accessor_field_name")?;
+            ensure_safe_summary_value(field.accessor_symbol, "result_accessor_symbol")?;
+            ensure_safe_summary_value(field.value_kind, "result_accessor_value_kind")?;
+            ensure_safe_summary_value(field.current_export_state, "result_accessor_export_state")?;
+            if !field.copy_required_before_release
+                || field.current_export_state != C_ABI_SYMBOL_NOT_EXPORTED
+                || !names.insert(field.field_name)
+            {
+                return Err(FfiError::invalid_state(RESULT_ACCESSOR_FIELD_SET_ERROR));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagerSyncCommandContextOwnerScopeReviewDraft {
+    pub review_state: &'static str,
+    pub owner_scope: &'static str,
+    pub domain_guard_storage_scope: &'static str,
+    pub command_worker_scope: &'static str,
+    pub owns_flutter_widget_state: bool,
+    pub owns_settings_payload: bool,
+    pub owns_dart_pointer: bool,
+    pub owns_platform_ui_object: bool,
+}
+
+impl ManagerSyncCommandContextOwnerScopeReviewDraft {
+    pub(crate) fn current_phase() -> Self {
+        Self {
+            review_state: COMMAND_CONTEXT_OWNER_SCOPE_REVIEW_READY,
+            owner_scope: "manager_sync_command_context_owner_thread",
+            domain_guard_storage_scope: "rust_owned_context_mutex_active_domain_set",
+            command_worker_scope: "not_started_current_phase",
+            owns_flutter_widget_state: false,
+            owns_settings_payload: false,
+            owns_dart_pointer: false,
+            owns_platform_ui_object: false,
+        }
+    }
+
+    pub(crate) fn assert_safe_owner_scope(&self) -> Result<(), FfiError> {
+        ensure_safe_summary_value(
+            self.review_state,
+            "command_context_owner_scope_review_state",
+        )?;
+        ensure_safe_summary_value(self.owner_scope, "command_context_owner_scope")?;
+        ensure_safe_summary_value(
+            self.domain_guard_storage_scope,
+            "command_context_domain_guard_storage_scope",
+        )?;
+        ensure_safe_summary_value(self.command_worker_scope, "command_context_worker_scope")?;
+        if self.owns_flutter_widget_state
+            || self.owns_settings_payload
+            || self.owns_dart_pointer
+            || self.owns_platform_ui_object
+        {
+            return Err(FfiError::invalid_state(COMMAND_CONTEXT_OWNER_SCOPE_ERROR));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagerSyncCommandHostGateMigrationReviewDraft {
+    pub review_state: &'static str,
+    pub ready_for_host_contract_test: bool,
+    pub required_conditions: &'static [&'static str],
+}
+
+impl ManagerSyncCommandHostGateMigrationReviewDraft {
+    pub(crate) fn current_phase(
+        gate: &ManagerSyncCommandHostContractTestGateDraft,
+        result_fields: &ManagerSyncCommandResultAccessorFieldSetReviewDraft,
+        owner_scope: &ManagerSyncCommandContextOwnerScopeReviewDraft,
+    ) -> Result<Self, FfiError> {
+        gate.assert_safe_gate_summary()?;
+        result_fields.assert_safe_field_set()?;
+        owner_scope.assert_safe_owner_scope()?;
+        Ok(Self {
+            review_state: HOST_CONTRACT_GATE_MIGRATION_REVIEW_READY,
+            ready_for_host_contract_test: false,
+            required_conditions: MANAGER_SYNC_COMMAND_HOST_GATE_MIGRATION_CONDITIONS_DRAFT,
+        })
+    }
+
+    pub(crate) fn assert_safe_migration_conditions(&self) -> Result<(), FfiError> {
+        ensure_safe_summary_value(self.review_state, "host_gate_migration_review_state")?;
+        for condition in self.required_conditions {
+            ensure_safe_summary_value(condition, "host_gate_migration_condition")?;
+        }
+        if self.ready_for_host_contract_test {
+            return Err(FfiError::invalid_state(HOST_CONTRACT_TEST_GATE_CLOSED));
+        }
+        Ok(())
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub(crate) struct ManagerSyncCommandRequestRawDraft {
@@ -295,6 +532,15 @@ impl ManagerSyncCommandActionDraft {
             Self::RecoveryRestore => "recovery_restore",
             Self::JoinRequestAuthorization => "join_request_authorization",
             Self::DeviceRevocation => "device_revocation",
+        }
+    }
+
+    fn as_id(self) -> u32 {
+        match self {
+            Self::RecoverySetup => MANAGER_SYNC_ACTION_RECOVERY_SETUP,
+            Self::RecoveryRestore => MANAGER_SYNC_ACTION_RECOVERY_RESTORE,
+            Self::JoinRequestAuthorization => MANAGER_SYNC_ACTION_JOIN_REQUEST_AUTHORIZATION,
+            Self::DeviceRevocation => MANAGER_SYNC_ACTION_DEVICE_REVOCATION,
         }
     }
 
@@ -562,6 +808,8 @@ impl ManagerSyncCommandEnvelopeDraft {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ManagerSyncCommandResultDraft {
+    pub schema_version: u32,
+    pub action_id: u32,
     pub abi_status: RadishLexStatusCode,
     pub envelope: ManagerSyncCommandEnvelopeDraft,
 }
@@ -579,6 +827,8 @@ impl ManagerSyncCommandResultDraft {
         action_section: ManagerSyncActionSectionDraft,
     ) -> Self {
         Self {
+            schema_version: MANAGER_SYNC_COMMAND_SCHEMA_VERSION_V1,
+            action_id: action.as_id(),
             abi_status: RadishLexStatusCode::InvalidState,
             envelope: ManagerSyncCommandEnvelopeDraft::current_phase_closed(action, action_section),
         }
@@ -594,6 +844,8 @@ impl ManagerSyncCommandResultDraft {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct ManagerSyncCommandResultViewDraft<'a> {
+    pub schema_version: u32,
+    pub action_id: u32,
     pub abi_status: RadishLexStatusCode,
     pub action_summary_code: &'a str,
     pub command_status: &'a str,
@@ -611,6 +863,8 @@ pub(crate) struct ManagerSyncCommandResultViewDraft<'a> {
 impl<'a> ManagerSyncCommandResultViewDraft<'a> {
     fn from_result(result: &'a ManagerSyncCommandResultDraft) -> Self {
         Self {
+            schema_version: result.schema_version,
+            action_id: result.action_id,
             abi_status: result.abi_status,
             action_summary_code: result.envelope.action_summary_code,
             command_status: result.envelope.command_status,
@@ -624,6 +878,75 @@ impl<'a> ManagerSyncCommandResultViewDraft<'a> {
             object_version_summary: result.envelope.object_version_summary,
             recorded_at_summary: result.envelope.recorded_at_summary,
         }
+    }
+
+    pub(crate) fn accessor_value(
+        &self,
+        field_name: &str,
+    ) -> Result<ManagerSyncCommandResultAccessorValueDraft<'a>, FfiError> {
+        match field_name {
+            "schema_version" => Ok(ManagerSyncCommandResultAccessorValueDraft::U32(
+                self.schema_version,
+            )),
+            "action_id" => Ok(ManagerSyncCommandResultAccessorValueDraft::U32(
+                self.action_id,
+            )),
+            "command_status" => Ok(ManagerSyncCommandResultAccessorValueDraft::SummaryCode(
+                self.command_status,
+            )),
+            "error_code" => Ok(ManagerSyncCommandResultAccessorValueDraft::SummaryCode(
+                self.error_code,
+            )),
+            "retry_policy" => Ok(ManagerSyncCommandResultAccessorValueDraft::SummaryCode(
+                self.retry_policy,
+            )),
+            "user_visible_summary_code" => {
+                Ok(ManagerSyncCommandResultAccessorValueDraft::SummaryCode(
+                    self.user_visible_summary_code,
+                ))
+            }
+            "diagnostics_summary_code" => {
+                Ok(ManagerSyncCommandResultAccessorValueDraft::SummaryCode(
+                    self.diagnostics_summary_code,
+                ))
+            }
+            "next_required_evidence" => {
+                Ok(ManagerSyncCommandResultAccessorValueDraft::SummaryCode(
+                    self.next_required_evidence,
+                ))
+            }
+            "object_type_summary" => Ok(ManagerSyncCommandResultAccessorValueDraft::SummaryCode(
+                self.object_type_summary,
+            )),
+            "object_count_summary" => Ok(ManagerSyncCommandResultAccessorValueDraft::Usize(
+                self.object_count_summary,
+            )),
+            "object_version_summary" => {
+                Ok(ManagerSyncCommandResultAccessorValueDraft::SummaryCode(
+                    self.object_version_summary,
+                ))
+            }
+            "recorded_at_summary" => Ok(ManagerSyncCommandResultAccessorValueDraft::SummaryCode(
+                self.recorded_at_summary,
+            )),
+            _ => Err(FfiError::invalid_argument(RESULT_ACCESSOR_FIELD_SET_ERROR)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ManagerSyncCommandResultAccessorValueDraft<'a> {
+    U32(u32),
+    Usize(usize),
+    SummaryCode(&'a str),
+}
+
+impl ManagerSyncCommandResultAccessorValueDraft<'_> {
+    pub(crate) fn assert_safe_summary(self) -> Result<(), FfiError> {
+        if let Self::SummaryCode(value) = self {
+            ensure_safe_summary_value(value, "manager_sync_result_accessor_value")?;
+        }
+        Ok(())
     }
 }
 
@@ -704,19 +1027,34 @@ pub(crate) fn release_manager_sync_command_error_handle_draft(
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct ManagerSyncCommandContextDraft {
     active_domains: Mutex<HashSet<&'static str>>,
+    owner_thread: ThreadId,
 }
 
 impl ManagerSyncCommandContextDraft {
     pub(crate) fn new() -> Self {
-        Self::default()
+        Self {
+            active_domains: Mutex::new(HashSet::new()),
+            owner_thread: thread::current().id(),
+        }
+    }
+
+    fn ensure_owner_thread(&self) -> Result<(), FfiError> {
+        if thread::current().id() == self.owner_thread {
+            Ok(())
+        } else {
+            Err(FfiError::invalid_state(
+                SYNC_COMMAND_CONTEXT_OWNER_MISMATCH_ERROR,
+            ))
+        }
     }
 
     pub(crate) fn enter_write_domain(
         &self,
     ) -> Result<ManagerSyncCommandDomainGuardDraft<'_>, FfiError> {
+        self.ensure_owner_thread()?;
         let mut active_domains = self
             .active_domains
             .lock()

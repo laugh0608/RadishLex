@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::Arc;
 
 fn view(value: &str) -> RadishLexStringView {
     RadishLexStringView {
@@ -243,6 +244,8 @@ fn result_handle_views_are_copyable_until_release() {
     .unwrap();
 
     let view = handle.view().unwrap();
+    assert_eq!(view.schema_version, MANAGER_SYNC_COMMAND_SCHEMA_VERSION_V1);
+    assert_eq!(view.action_id, MANAGER_SYNC_ACTION_RECOVERY_RESTORE);
     assert_eq!(view.abi_status, RadishLexStatusCode::InvalidState);
     assert_eq!(view.action_summary_code, "recovery_restore");
     assert_eq!(view.command_status, "blocked_by_readiness");
@@ -258,6 +261,65 @@ fn result_handle_views_are_copyable_until_release() {
     assert_eq!(copied_summary, CURRENT_PHASE_USER_SUMMARY);
 
     release_manager_sync_command_result_handle_draft(None);
+}
+
+#[test]
+fn result_accessor_field_set_matches_safe_view_fields() {
+    let review = ManagerSyncCommandResultAccessorFieldSetReviewDraft::current_phase();
+    review.assert_safe_field_set().unwrap();
+
+    let context = ManagerSyncCommandContextDraft::new();
+    let handle = execute_manager_sync_command_current_phase_with_context_draft(
+        &context,
+        valid_raw(MANAGER_SYNC_ACTION_DEVICE_REVOCATION),
+    )
+    .unwrap();
+    let view = handle.view().unwrap();
+    let field_names = review
+        .fields
+        .iter()
+        .map(|field| field.field_name)
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        field_names,
+        vec![
+            "schema_version",
+            "action_id",
+            "command_status",
+            "error_code",
+            "retry_policy",
+            "user_visible_summary_code",
+            "diagnostics_summary_code",
+            "next_required_evidence",
+            "object_type_summary",
+            "object_count_summary",
+            "object_version_summary",
+            "recorded_at_summary",
+        ]
+    );
+    assert!(review.fields.iter().all(|field| {
+        field.current_export_state == C_ABI_SYMBOL_NOT_EXPORTED
+            && field.copy_required_before_release
+    }));
+    assert!(review
+        .fields
+        .iter()
+        .any(|field| field.accessor_symbol == "radishlex_manager_sync_command_result_action_id"));
+    assert!(review
+        .fields
+        .iter()
+        .any(|field| field.accessor_symbol == "radishlex_manager_sync_command_result_summary"));
+
+    for field in review.fields {
+        let value = view.accessor_value(field.field_name).unwrap();
+        value.assert_safe_summary().unwrap();
+        assert_eq!(field.current_export_state, C_ABI_SYMBOL_NOT_EXPORTED);
+        for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
+            let debug = format!("{field:?} {value:?}");
+            assert!(!debug.contains(forbidden), "{forbidden}");
+        }
+    }
 }
 
 #[test]
@@ -319,6 +381,41 @@ fn command_context_rejects_same_domain_overlap_and_releases_guard() {
     drop(first_guard);
     let released_guard = context.enter_write_domain().unwrap();
     drop(released_guard);
+}
+
+#[test]
+fn command_context_owner_scope_rejects_cross_thread_and_ui_ownership() {
+    let owner_scope = ManagerSyncCommandContextOwnerScopeReviewDraft::current_phase();
+    owner_scope.assert_safe_owner_scope().unwrap();
+
+    assert_eq!(
+        owner_scope.review_state,
+        COMMAND_CONTEXT_OWNER_SCOPE_REVIEW_READY
+    );
+    assert_eq!(
+        owner_scope.domain_guard_storage_scope,
+        "rust_owned_context_mutex_active_domain_set"
+    );
+    assert!(!owner_scope.owns_flutter_widget_state);
+    assert!(!owner_scope.owns_settings_payload);
+    assert!(!owner_scope.owns_dart_pointer);
+    assert!(!owner_scope.owns_platform_ui_object);
+
+    let context = Arc::new(ManagerSyncCommandContextDraft::new());
+    let same_thread_guard = context.enter_write_domain().unwrap();
+    drop(same_thread_guard);
+
+    let cross_thread_context = Arc::clone(&context);
+    let error = std::thread::spawn(move || cross_thread_context.enter_write_domain().unwrap_err())
+        .join()
+        .unwrap();
+    assert_eq!(error.code, RadishLexStatusCode::InvalidState);
+    assert_eq!(error.message, SYNC_COMMAND_CONTEXT_OWNER_MISMATCH_ERROR);
+
+    let debug = format!("{owner_scope:?}");
+    for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
+        assert!(!debug.contains(forbidden), "{forbidden}");
+    }
 }
 
 #[test]
@@ -432,6 +529,59 @@ fn host_contract_test_gate_stays_closed_until_native_symbol_is_approved() {
         .contains(&"ffi_bridge_smoke_candidate_symbols_absent"));
 
     let debug = format!("{gate:?}");
+    for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
+        assert!(!debug.contains(forbidden), "{forbidden}");
+    }
+}
+
+#[test]
+fn host_contract_gate_migration_conditions_remain_review_only() {
+    let wrapper_review = ManagerSyncCommandCAbiWrapperShapeReviewDraft::current_phase();
+    let gate = ManagerSyncCommandHostContractTestGateDraft::current_phase(&wrapper_review).unwrap();
+    let result_fields = ManagerSyncCommandResultAccessorFieldSetReviewDraft::current_phase();
+    let owner_scope = ManagerSyncCommandContextOwnerScopeReviewDraft::current_phase();
+    let migration = ManagerSyncCommandHostGateMigrationReviewDraft::current_phase(
+        &gate,
+        &result_fields,
+        &owner_scope,
+    )
+    .unwrap();
+    migration.assert_safe_migration_conditions().unwrap();
+
+    assert_eq!(
+        migration.review_state,
+        HOST_CONTRACT_GATE_MIGRATION_REVIEW_READY
+    );
+    assert!(!migration.ready_for_host_contract_test);
+    assert!(migration
+        .required_conditions
+        .contains(&"result_accessor_field_set_reviewed"));
+    assert!(migration
+        .required_conditions
+        .contains(&"command_context_owner_scope_reviewed"));
+    assert!(migration
+        .required_conditions
+        .contains(&"forbidden_material_redaction_reviewed"));
+    assert!(migration
+        .required_conditions
+        .contains(&"native_symbol_export_approved_by_adr"));
+    assert!(migration
+        .required_conditions
+        .contains(&"dart_native_binding_approved"));
+    assert!(migration
+        .required_conditions
+        .contains(&"manager_bridge_command_approved"));
+    assert!(migration
+        .required_conditions
+        .contains(&"host_contract_test_file_approved"));
+    assert!(migration
+        .required_conditions
+        .contains(&"ffi_smoke_candidate_symbols_absent_until_approval"));
+    assert!(migration
+        .required_conditions
+        .contains(&"real_sync_execution_approved_after_gate"));
+
+    let debug = format!("{migration:?}");
     for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
         assert!(!debug.contains(forbidden), "{forbidden}");
     }
