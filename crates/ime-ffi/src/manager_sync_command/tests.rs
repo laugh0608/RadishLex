@@ -352,3 +352,106 @@ fn result_debug_does_not_include_request_fields_or_forbidden_material() {
         assert!(!debug.contains(forbidden), "{forbidden}");
     }
 }
+
+#[test]
+fn c_abi_wrapper_shape_review_lists_candidate_symbols_without_export_approval() {
+    let review = ManagerSyncCommandCAbiWrapperShapeReviewDraft::current_phase();
+    review.assert_current_phase_not_exportable().unwrap();
+
+    assert_eq!(review.review_state, C_ABI_WRAPPER_REVIEW_READY);
+    assert_eq!(
+        review.executor_strategy,
+        "single_versioned_manager_sync_command_executor"
+    );
+    assert!(!review.native_symbol_export_approved);
+    assert!(!review.dart_native_binding_approved);
+    assert!(!review.manager_bridge_command_approved);
+
+    let symbol_names = review
+        .candidate_symbols
+        .iter()
+        .map(|symbol| symbol.name)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        symbol_names,
+        vec![
+            "radishlex_manager_sync_command_execute_v1",
+            "radishlex_manager_sync_command_result_action_id",
+            "radishlex_manager_sync_command_result_status",
+            "radishlex_manager_sync_command_result_error_code",
+            "radishlex_manager_sync_command_result_retry_policy",
+            "radishlex_manager_sync_command_result_summary",
+            "radishlex_manager_sync_command_result_free",
+        ]
+    );
+    assert!(review.candidate_symbols.iter().all(|symbol| {
+        symbol.current_export_state == C_ABI_SYMBOL_NOT_EXPORTED && !symbol.export_approved
+    }));
+    assert!(review
+        .existing_error_lifecycle_symbols
+        .contains(&"radishlex_error_code"));
+    assert!(review
+        .existing_error_lifecycle_symbols
+        .contains(&"radishlex_error_message"));
+    assert!(review
+        .existing_error_lifecycle_symbols
+        .contains(&"radishlex_error_free"));
+    assert!(review.candidate_symbols.iter().all(|symbol| !symbol
+        .name
+        .starts_with("radishlex_manager_sync_command_error")));
+
+    let debug = format!("{review:?}");
+    assert!(debug.contains("radishlex_manager_sync_command_execute_v1"));
+    for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
+        assert!(!debug.contains(forbidden), "{forbidden}");
+    }
+}
+
+#[test]
+fn host_contract_test_gate_stays_closed_until_native_symbol_is_approved() {
+    let review = ManagerSyncCommandCAbiWrapperShapeReviewDraft::current_phase();
+    let gate = ManagerSyncCommandHostContractTestGateDraft::current_phase(&review).unwrap();
+    gate.assert_safe_gate_summary().unwrap();
+
+    assert_eq!(gate.gate_state, HOST_CONTRACT_TEST_GATE_CLOSED);
+    assert!(!gate.ready_for_host_contract_test);
+    assert!(gate.blockers.contains(&"native_symbol_export_not_approved"));
+    assert!(gate.blockers.contains(&"dart_native_binding_not_approved"));
+    assert!(gate
+        .blockers
+        .contains(&"manager_bridge_command_not_approved"));
+    assert!(gate
+        .blockers
+        .contains(&"host_contract_test_file_not_approved"));
+    assert!(gate.blockers.contains(&"real_sync_execution_not_approved"));
+    assert!(gate
+        .required_evidence
+        .contains(&"manager_sync_command_internal_draft_tests"));
+    assert!(gate
+        .required_evidence
+        .contains(&"ffi_bridge_smoke_candidate_symbols_absent"));
+
+    let debug = format!("{gate:?}");
+    for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
+        assert!(!debug.contains(forbidden), "{forbidden}");
+    }
+}
+
+#[test]
+fn c_abi_wrapper_shape_review_rejects_accidental_export_approval() {
+    let mut candidate_symbols = MANAGER_SYNC_COMMAND_C_ABI_SYMBOLS_DRAFT
+        .iter()
+        .copied()
+        .collect::<Vec<_>>();
+    candidate_symbols[0].export_approved = true;
+    let leaked_review = ManagerSyncCommandCAbiWrapperShapeReviewDraft {
+        candidate_symbols: candidate_symbols.leak(),
+        ..ManagerSyncCommandCAbiWrapperShapeReviewDraft::current_phase()
+    };
+
+    let error = leaked_review
+        .assert_current_phase_not_exportable()
+        .unwrap_err();
+    assert_eq!(error.code, RadishLexStatusCode::InvalidState);
+    assert_eq!(error.message, C_ABI_SYMBOL_EXPORT_UNAPPROVED_ERROR);
+}

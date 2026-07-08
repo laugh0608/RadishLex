@@ -8,7 +8,7 @@ Accepted
 
 ## 背景
 
-Phase 4 manager 同步入口当前只做非上传治理。仓库已补齐真实 bridge 命令前 contract 草案、FFI command boundary、contract test plan、Rust host contract catalog、review catalog、source checklist、test design package、Dart fake binding replay、C ABI contract review matrix、implementation review package 和 Rust 内部非导出草案模块。
+Phase 4 manager 同步入口当前只做非上传治理。仓库已补齐真实 bridge 命令前 contract 草案、FFI command boundary、contract test plan、Rust host contract catalog、review catalog、source checklist、test design package、Dart fake binding replay、C ABI contract review matrix、implementation review package、Rust 内部非导出草案模块、C ABI wrapper 形状评审和 host contract test gate 草案。
 
 这些材料证明 future command contract 的安全边界、ownership、错误分层和 smoke 计划可复验，但不证明 native command 已实现。若后续直接创建 C ABI symbol 或 `ManagerBridge` 可执行方法，容易绕过以下边界：
 
@@ -51,6 +51,24 @@ radishlex_manager_sync_command_result_free
 
 该包的状态为 `rust_host_implementation_review_ready_no_native_symbol`。它已经驱动 `crates/ime-ffi/src/manager_sync_command.rs` 落地为内部非导出草案模块，但不代表 C ABI symbol、Dart native binding、`ManagerBridge` 可执行方法或 `crates/ime-ffi/tests/manager_sync_command_boundary.rs` 已经落地。
 
+## C ABI Wrapper Shape Review
+
+`ManagerSyncCommandCAbiWrapperShapeReviewDraft` 是当前内部草案中的 C ABI wrapper 形状评审材料。它只记录候选 symbol 名称、executor 策略、result handle 策略和 error lifecycle 策略，不导出 symbol。
+
+当前候选 symbol 与 dynamic library smoke 保持一致：
+
+- `radishlex_manager_sync_command_execute_v1`
+- `radishlex_manager_sync_command_result_action_id`
+- `radishlex_manager_sync_command_result_status`
+- `radishlex_manager_sync_command_result_error_code`
+- `radishlex_manager_sync_command_result_retry_policy`
+- `radishlex_manager_sync_command_result_summary`
+- `radishlex_manager_sync_command_result_free`
+
+当前所有候选 symbol 的状态都是 `planned_not_exported_current_phase`，`export_approved=false`。error lifecycle 继续复用现有 `radishlex_error_code`、`radishlex_error_message` 和 `radishlex_error_free`，不新增 manager 专用 error symbol。
+
+`ManagerSyncCommandHostContractTestGateDraft` 当前状态为 `host_contract_test_gate_closed_no_native_symbol`，`ready_for_host_contract_test=false`。阻塞项包括 native symbol export、Dart native binding、`ManagerBridge` command、host contract test 文件和真实同步执行均未批准。它只把进入 `crates/ime-ffi/tests/manager_sync_command_boundary.rs` 前需要复验的证据固化为内部草案，不创建该测试文件。
+
 ## Rust Internal Draft Module
 
 `crates/ime-ffi/src/manager_sync_command.rs` 是当前阶段允许存在的内部实现草案。它只在 Rust crate 内部编译和测试，不在 `abi.rs` 导出 `extern "C"`，不加入动态库 symbol 列表，也不修改 Dart native binding。
@@ -64,11 +82,13 @@ radishlex_manager_sync_command_result_free
 - error handle draft，覆盖 read -> copy -> release 生命周期、release 后失效、`release(None)` 无效果和 forbidden provider message 拒绝。
 - 内部 panic boundary helper，将 unwind 映射为稳定 `InternalError`，不回显 panic payload。
 - manager sync command context draft，同一 sync domain 重入返回结构化 `InvalidState`，guard drop 后释放 domain。
+- C ABI wrapper shape review draft，固定候选 executor / result accessor / release symbol 名称、现有 error lifecycle symbol 复用和 export approval 关闭态。
+- host contract test gate draft，记录当前进入真实 host contract test 文件前仍关闭的阻塞项和 required evidence。
 - Debug / error message / result summary 不回显 operation id、readiness snapshot、source tag、backend gate 或 secret-shaped 片段。
 
 当前内部草案不覆盖：
 
-- C ABI `extern "C"` wrapper、真实 result accessor symbol、真实 release function symbol 或真实 error handle read / free symbol。
+- C ABI `extern "C"` wrapper、真实 result accessor symbol、真实 release function symbol 或新的 manager 专用 error handle symbol。
 - 跨线程 / 异步 command worker、Rust sync / crypto 接线或远端 transport。
 - `ManagerBridge` 方法、Flutter 可见操作按钮、settings action payload、恢复码生成 / 输入、join request 创建、授权成功或设备撤销。
 
@@ -138,6 +158,7 @@ result 必须由 Rust-owned handle 承载，并只暴露 safe summary view：
 - `syncFfiRustHostContractReviewItems` 覆盖全部 `syncFfiCommandBoundaryRustHostTestDesignItems`。
 - `syncFfiRustHostImplementationReviewItems` 覆盖全部 C ABI contract review items，并且内部 Rust draft module 的单元测试继续通过。
 - request struct、result struct、release function、error handle、panic boundary 和 command context 已有明确 Rust 类型草案或等价实现说明。
+- C ABI wrapper 形状评审必须继续证明候选 symbol 仅为字符串级审阅材料，host contract test gate 必须通过 ADR / 文档 / smoke 证据明确打开后才能创建真实测试文件。
 - forbidden material contract 已映射到 test assertions。
 - Dart fake binding replay 继续证明 unknown native status、copy / free 和错误分类保持安全阻塞。
 - 真实 dynamic library smoke 仍能证明未批准前 candidate sync command symbol 缺席。

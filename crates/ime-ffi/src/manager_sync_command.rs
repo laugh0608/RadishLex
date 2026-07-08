@@ -30,6 +30,11 @@ const ACTION_SECTION_MISMATCH_ERROR: &str = "manager_sync_action_section_mismatc
 const ACTION_SECTION_VALUE_ERROR: &str = "manager_sync_action_section_value_not_allowed";
 const ACTION_CONFIRMATION_UNAVAILABLE_ERROR: &str =
     "manager_sync_action_confirmation_not_available_current_phase";
+const C_ABI_WRAPPER_REVIEW_READY: &str = "c_abi_wrapper_shape_review_ready_no_native_symbol";
+const HOST_CONTRACT_TEST_GATE_CLOSED: &str = "host_contract_test_gate_closed_no_native_symbol";
+const C_ABI_SYMBOL_NOT_EXPORTED: &str = "planned_not_exported_current_phase";
+const C_ABI_SYMBOL_EXPORT_UNAPPROVED_ERROR: &str =
+    "manager_sync_c_abi_symbol_export_not_approved_current_phase";
 
 pub(crate) const MANAGER_SYNC_SECTION_RECOVERY_SETUP: u32 = 1;
 pub(crate) const MANAGER_SYNC_SECTION_RECOVERY_RESTORE: u32 = 2;
@@ -63,6 +68,184 @@ const FORBIDDEN_SUMMARY_FRAGMENTS: &[&str] = &[
     "response_body",
     "/synthetic/private",
 ];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ManagerSyncCommandCAbiSymbolRoleDraft {
+    CommandExecutor,
+    ResultAccessor,
+    ResultRelease,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagerSyncCommandCAbiSymbolDraft {
+    pub name: &'static str,
+    pub role: ManagerSyncCommandCAbiSymbolRoleDraft,
+    pub current_export_state: &'static str,
+    pub export_approved: bool,
+}
+
+pub(crate) const MANAGER_SYNC_COMMAND_C_ABI_SYMBOLS_DRAFT: &[ManagerSyncCommandCAbiSymbolDraft] = &[
+    ManagerSyncCommandCAbiSymbolDraft {
+        name: "radishlex_manager_sync_command_execute_v1",
+        role: ManagerSyncCommandCAbiSymbolRoleDraft::CommandExecutor,
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        export_approved: false,
+    },
+    ManagerSyncCommandCAbiSymbolDraft {
+        name: "radishlex_manager_sync_command_result_action_id",
+        role: ManagerSyncCommandCAbiSymbolRoleDraft::ResultAccessor,
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        export_approved: false,
+    },
+    ManagerSyncCommandCAbiSymbolDraft {
+        name: "radishlex_manager_sync_command_result_status",
+        role: ManagerSyncCommandCAbiSymbolRoleDraft::ResultAccessor,
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        export_approved: false,
+    },
+    ManagerSyncCommandCAbiSymbolDraft {
+        name: "radishlex_manager_sync_command_result_error_code",
+        role: ManagerSyncCommandCAbiSymbolRoleDraft::ResultAccessor,
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        export_approved: false,
+    },
+    ManagerSyncCommandCAbiSymbolDraft {
+        name: "radishlex_manager_sync_command_result_retry_policy",
+        role: ManagerSyncCommandCAbiSymbolRoleDraft::ResultAccessor,
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        export_approved: false,
+    },
+    ManagerSyncCommandCAbiSymbolDraft {
+        name: "radishlex_manager_sync_command_result_summary",
+        role: ManagerSyncCommandCAbiSymbolRoleDraft::ResultAccessor,
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        export_approved: false,
+    },
+    ManagerSyncCommandCAbiSymbolDraft {
+        name: "radishlex_manager_sync_command_result_free",
+        role: ManagerSyncCommandCAbiSymbolRoleDraft::ResultRelease,
+        current_export_state: C_ABI_SYMBOL_NOT_EXPORTED,
+        export_approved: false,
+    },
+];
+
+const MANAGER_SYNC_COMMAND_EXISTING_ERROR_SYMBOLS_DRAFT: &[&str] = &[
+    "radishlex_error_code",
+    "radishlex_error_message",
+    "radishlex_error_free",
+];
+
+const MANAGER_SYNC_COMMAND_HOST_TEST_BLOCKERS_DRAFT: &[&str] = &[
+    "native_symbol_export_not_approved",
+    "dart_native_binding_not_approved",
+    "manager_bridge_command_not_approved",
+    "host_contract_test_file_not_approved",
+    "real_sync_execution_not_approved",
+];
+
+const MANAGER_SYNC_COMMAND_HOST_TEST_EVIDENCE_DRAFT: &[&str] = &[
+    "adr_0006_current",
+    "manager_sync_ffi_command_boundary_current",
+    "manager_sync_command_internal_draft_tests",
+    "ffi_bridge_smoke_candidate_symbols_absent",
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagerSyncCommandCAbiWrapperShapeReviewDraft {
+    pub review_state: &'static str,
+    pub executor_strategy: &'static str,
+    pub result_handle_strategy: &'static str,
+    pub error_lifecycle_strategy: &'static str,
+    pub candidate_symbols: &'static [ManagerSyncCommandCAbiSymbolDraft],
+    pub existing_error_lifecycle_symbols: &'static [&'static str],
+    pub native_symbol_export_approved: bool,
+    pub dart_native_binding_approved: bool,
+    pub manager_bridge_command_approved: bool,
+}
+
+impl ManagerSyncCommandCAbiWrapperShapeReviewDraft {
+    pub(crate) fn current_phase() -> Self {
+        Self {
+            review_state: C_ABI_WRAPPER_REVIEW_READY,
+            executor_strategy: "single_versioned_manager_sync_command_executor",
+            result_handle_strategy: "rust_owned_result_handle_copy_then_free",
+            error_lifecycle_strategy: "reuse_existing_radishlex_error_handle",
+            candidate_symbols: MANAGER_SYNC_COMMAND_C_ABI_SYMBOLS_DRAFT,
+            existing_error_lifecycle_symbols: MANAGER_SYNC_COMMAND_EXISTING_ERROR_SYMBOLS_DRAFT,
+            native_symbol_export_approved: false,
+            dart_native_binding_approved: false,
+            manager_bridge_command_approved: false,
+        }
+    }
+
+    pub(crate) fn assert_current_phase_not_exportable(&self) -> Result<(), FfiError> {
+        ensure_safe_summary_value(self.review_state, "c_abi_wrapper_review_state")?;
+        ensure_safe_summary_value(self.executor_strategy, "c_abi_executor_strategy")?;
+        ensure_safe_summary_value(self.result_handle_strategy, "c_abi_result_handle_strategy")?;
+        ensure_safe_summary_value(
+            self.error_lifecycle_strategy,
+            "c_abi_error_lifecycle_strategy",
+        )?;
+
+        if self.native_symbol_export_approved
+            || self.dart_native_binding_approved
+            || self.manager_bridge_command_approved
+        {
+            return Err(FfiError::invalid_state(
+                C_ABI_SYMBOL_EXPORT_UNAPPROVED_ERROR,
+            ));
+        }
+
+        for symbol in self.candidate_symbols {
+            ensure_safe_summary_value(symbol.name, "c_abi_candidate_symbol")?;
+            ensure_safe_summary_value(symbol.current_export_state, "c_abi_symbol_export_state")?;
+            if symbol.export_approved {
+                return Err(FfiError::invalid_state(
+                    C_ABI_SYMBOL_EXPORT_UNAPPROVED_ERROR,
+                ));
+            }
+        }
+
+        for symbol in self.existing_error_lifecycle_symbols {
+            ensure_safe_summary_value(symbol, "existing_error_lifecycle_symbol")?;
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct ManagerSyncCommandHostContractTestGateDraft {
+    pub gate_state: &'static str,
+    pub ready_for_host_contract_test: bool,
+    pub blockers: &'static [&'static str],
+    pub required_evidence: &'static [&'static str],
+}
+
+impl ManagerSyncCommandHostContractTestGateDraft {
+    pub(crate) fn current_phase(
+        review: &ManagerSyncCommandCAbiWrapperShapeReviewDraft,
+    ) -> Result<Self, FfiError> {
+        review.assert_current_phase_not_exportable()?;
+        Ok(Self {
+            gate_state: HOST_CONTRACT_TEST_GATE_CLOSED,
+            ready_for_host_contract_test: false,
+            blockers: MANAGER_SYNC_COMMAND_HOST_TEST_BLOCKERS_DRAFT,
+            required_evidence: MANAGER_SYNC_COMMAND_HOST_TEST_EVIDENCE_DRAFT,
+        })
+    }
+
+    pub(crate) fn assert_safe_gate_summary(&self) -> Result<(), FfiError> {
+        ensure_safe_summary_value(self.gate_state, "host_contract_test_gate_state")?;
+        for blocker in self.blockers {
+            ensure_safe_summary_value(blocker, "host_contract_test_blocker")?;
+        }
+        for evidence in self.required_evidence {
+            ensure_safe_summary_value(evidence, "host_contract_test_required_evidence")?;
+        }
+        Ok(())
+    }
+}
 
 #[repr(C)]
 #[derive(Clone, Copy)]
