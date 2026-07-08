@@ -96,7 +96,7 @@ Rust host contract test 的 fixture 输入只能使用合成值：
 
 `syncFfiCommandBoundaryRustHostTestDesignItems` 是 source checklist 之后、真实 Rust host test 文件之前的测试设计包。它把每个 host contract case 绑定到对应 source checklist、合成 sample、expected status、断言组、forbidden output category 和 implementation guard；状态为 `test_design_ready_no_native_symbol`。该 fixture 让后续 `crates/ime-ffi/tests/manager_sync_command_boundary.rs` 的测试项可以按目录转写，但当前仍不新增该测试文件、不新增 C ABI symbol、不修改 Dart native binding。
 
-`syncFfiRustHostContractReviewItems` 是 test design package 之后、真实 Rust host test 文件和 C ABI symbol 之前的结构评审矩阵。它把 request struct layout、result struct layout、release / error lifecycle、panic / status boundary、command context serialization 和 forbidden material contract 分别绑定到已有 test design item、source checklist、required decision、required evidence、forbidden output category 和 implementation guard；状态为 `c_abi_contract_review_ready_no_native_symbol`。该矩阵用于评审真实 C ABI request / result struct、释放函数、panic boundary 和 command context 策略是否齐备，不代表已经批准新增 symbol 或 `ManagerBridge` 可执行方法。
+`syncFfiRustHostContractReviewItems` 是 test design package 之后、真实 Rust host test 文件和 C ABI symbol 之前的结构评审矩阵。它把 request struct layout、result struct layout、release / error lifecycle、panic / status boundary、command context serialization 和 forbidden material contract 分别绑定到已有 test design item、source checklist、required decision、required evidence、forbidden output category 和 implementation guard；状态为 `c_abi_contract_review_ready_no_native_symbol`。该矩阵用于评审真实 C ABI request / result struct、释放函数、panic boundary 和 command context 策略是否齐备，并已绑定决策记录 `docs/adr/0006-manager-sync-c-abi-contract-governance.md`；不代表已经批准新增 symbol 或 `ManagerBridge` 可执行方法。
 
 这些仍是 design fixture，不新增真实 symbol。
 

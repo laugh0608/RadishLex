@@ -28,6 +28,7 @@ RadishLex 已完成 Rust core、Rime adapter、userdb、ranker、crypto、sync c
 - future bridge 命令 contract 草案：`docs/manager-sync-bridge-command-contract.md`
 - future FFI / C ABI 命令边界：`docs/manager-sync-ffi-command-boundary.md`
 - FFI 测试计划：`docs/manager-sync-ffi-command-contract-test-plan.md`
+- manager 同步命令 C ABI ADR：`docs/adr/0006-manager-sync-c-abi-contract-governance.md`
 - settings draft 与诊断字段：`docs/manager-settings-diagnostics.md`
 - readiness 联调场景目录：`docs/manager-readiness-scenarios.md`
 - 目标部署证据与生产停止线：`docs/runbooks/sync-server-production-deployment.md`
@@ -111,5 +112,5 @@ Sync server 本地部署 / 联调：
 
 1. 维护本文短入口，避免新会话默认阅读长周志。
 2. 保持 Phase 4 manager 本地验收证据稳定；若后续改动触及验收范围，再按 `docs/manager-local-acceptance.md` 补精准 widget / helper / smoke 覆盖。
-3. 下一批产品开发继续围绕本地 Docker / 本地 HTTPS 联调和 manager 同步入口非上传治理，维护 readiness、evidence bundle、action preview、contract / FFI boundary、transient secret、device confirmation detail、Rust host catalog / checklist / test design / C ABI review matrix、Dart fake binding replay、诊断脱敏和错误分类测试。下一步可基于 C ABI review matrix 评审是否进入真实 Rust host contract test 文件或先拆出更正式的 C ABI ADR；仍不改变 `ManagerBridge` contract、不新增 C ABI、不打开真实同步、恢复码生成 / 输入、join request 创建、授权成功或设备撤销路径。
+3. 下一批产品开发继续围绕本地 Docker / 本地 HTTPS 联调和 manager 同步入口非上传治理，维护 readiness、evidence bundle、action preview、contract / FFI boundary、transient secret、device confirmation detail、Rust host catalog / checklist / test design / C ABI review matrix、Dart fake binding replay、诊断脱敏和错误分类测试。下一步可基于 ADR 0006 和 C ABI review matrix 评审是否进入真实 Rust host contract test 文件；仍不改变 `ManagerBridge` contract、不新增 C ABI、不打开真实同步、恢复码生成 / 输入、join request 创建、授权成功或设备撤销路径。
 4. 同步联调用本地 Docker / 本地 HTTPS 和短生命周期数据目录；正式发布或真实用户开放前，再补真实目标环境的非敏感 `deployment_evidence.v1` 并导出 `deployment_evidence_summary.v1`。

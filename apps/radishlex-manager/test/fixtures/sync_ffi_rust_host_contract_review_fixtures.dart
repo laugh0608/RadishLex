@@ -8,6 +8,9 @@ const syncFfiRustHostContractReviewFormat =
 const syncFfiRustHostContractReviewStatus =
     'c_abi_contract_review_ready_no_native_symbol';
 
+const syncFfiRustHostContractReviewDecisionRecordPath =
+    'docs/adr/0006-manager-sync-c-abi-contract-governance.md';
+
 const syncFfiRustHostContractReviewImplementationStatus =
     'implementation_review_ready_no_native_symbol';
 
@@ -281,6 +284,7 @@ Map<String, Object?> syncFfiRustHostContractReviewItemShape(
   return {
     'format': syncFfiRustHostContractReviewFormat,
     'review_status': syncFfiRustHostContractReviewStatus,
+    'decision_record_path': syncFfiRustHostContractReviewDecisionRecordPath,
     'target_test_file': syncFfiCommandBoundaryRustHostContractTargetTestFile,
     'id': fixture.id,
     'review_scope': fixture.reviewScope,

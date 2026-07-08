@@ -222,7 +222,7 @@ command result envelope 使用 allowlist 错误码：
 
 当前 Rust host test design package 已把每个 host contract case 绑定到对应 source checklist、合成样本、expected status、断言组、forbidden output category 和 implementation guard：`syncFfiCommandBoundaryRustHostTestDesignItems` 的状态为 `test_design_ready_no_native_symbol`。该设计包只说明后续真实 Rust host test 应如何从 catalog / checklist 转写，不新增 `crates/ime-ffi/tests/manager_sync_command_boundary.rs`，不新增 C ABI，不修改 Dart native binding。
 
-当前 Rust host C ABI contract review matrix 已把真实 Rust host test 文件前必须评审的结构决策固定下来：`syncFfiRustHostContractReviewItems` 覆盖 request struct layout、result struct layout、release / error lifecycle、panic / status boundary、command context serialization 和 forbidden material contract，逐项绑定 test design item、source checklist、required decision、required evidence、forbidden output category 和 implementation guard。该矩阵状态为 `c_abi_contract_review_ready_no_native_symbol`，只作为是否进入真实 Rust host contract test 的评审输入，不新增 symbol，不修改 `ManagerBridge`。
+当前 Rust host C ABI contract review matrix 已把真实 Rust host test 文件前必须评审的结构决策固定下来：`syncFfiRustHostContractReviewItems` 覆盖 request struct layout、result struct layout、release / error lifecycle、panic / status boundary、command context serialization 和 forbidden material contract，逐项绑定 test design item、source checklist、required decision、required evidence、forbidden output category 和 implementation guard。该矩阵状态为 `c_abi_contract_review_ready_no_native_symbol`，并绑定 ADR `docs/adr/0006-manager-sync-c-abi-contract-governance.md`；它只作为是否进入真实 Rust host contract test 的评审输入，不新增 symbol，不修改 `ManagerBridge`。
 
 review catalog 的 source-level 映射如下，后续写真实 Rust host test 前应先逐项确认这些模式是否仍成立：
 

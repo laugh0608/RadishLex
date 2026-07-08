@@ -755,6 +755,10 @@ void main() {
       expect(shape['format'], syncFfiRustHostContractReviewFormat);
       expect(shape['review_status'], syncFfiRustHostContractReviewStatus);
       expect(
+        shape['decision_record_path'],
+        syncFfiRustHostContractReviewDecisionRecordPath,
+      );
+      expect(
         shape['target_test_file'],
         syncFfiCommandBoundaryRustHostContractTargetTestFile,
       );
@@ -796,6 +800,7 @@ void main() {
 
     expect(syncFfiCommandBoundaryCurrentNativeSymbols, isEmpty);
     expect(encodedReview, contains('no_native_symbol'));
+    expect(encodedReview, contains('0006-manager-sync-c-abi'));
     expect(encodedReview, contains('c_abi_contract_review_ready'));
     for (final symbol in syncFfiCommandBoundaryCandidateSymbols) {
       expect(encodedReview, isNot(contains(symbol)), reason: symbol);
