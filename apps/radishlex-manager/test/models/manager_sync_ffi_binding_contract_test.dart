@@ -426,6 +426,34 @@ void main() {
             'host_contract_test_file_approved',
           ],
         ),
+        const _MigrationReviewReplayCase(
+          id: 'host_test_file_approval_review',
+          objectTypeSummary: 'host_test_file_approval_review',
+          blockerCode: 'host_contract_test_file_not_approved',
+          nextRequiredEvidence: 'host_contract_test_file_approved',
+          expectedDiagnostics: [
+            syncFfiRustHostTestFileApprovalReviewStatus,
+            syncFfiRustHostTestFileApprovalDecision,
+            'c_abi_symbol_lookup_strategy_reviewed',
+            'result_handle_lifecycle_reviewed',
+            'dynamic_library_smoke_absence_reviewed',
+            'host_test_design_package_current',
+          ],
+        ),
+        const _MigrationReviewReplayCase(
+          id: 'real_sync_execution_gate_review',
+          objectTypeSummary: 'real_sync_execution_gate_review',
+          blockerCode: 'real_sync_execution_not_approved',
+          nextRequiredEvidence: 'real_sync_execution_approved_after_gate',
+          expectedDiagnostics: [
+            syncFfiRustHostRealSyncExecutionGateReviewStatus,
+            syncFfiRustHostRealSyncExecutionDecision,
+            'command_context_owner_scope_reviewed',
+            'readiness_snapshot_binding_reviewed',
+            'platform_private_key_backend_production_ready',
+            'deployment_evidence_summary_approved',
+          ],
+        ),
       ];
 
       for (final replayCase in replayCases) {

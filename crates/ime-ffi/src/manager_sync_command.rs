@@ -11,6 +11,7 @@ use crate::error::{FfiError, RadishLexStatusCode};
 use crate::snapshot::RadishLexStringView;
 
 mod admission;
+mod host_test_gate_review;
 mod migration_review;
 
 pub(crate) const MANAGER_SYNC_COMMAND_SCHEMA_VERSION_V1: u32 = 1;
@@ -329,6 +330,8 @@ const MANAGER_SYNC_COMMAND_DEBUG_REDACTION_TARGETS_DRAFT: &[&str] = &[
     "native_export_approval_review",
     "dart_binding_migration_review",
     "manager_bridge_migration_review",
+    "host_test_file_approval_review",
+    "real_sync_execution_gate_review",
 ];
 
 const MANAGER_SYNC_COMMAND_FORBIDDEN_CATEGORIES_DRAFT: &[&str] = &[

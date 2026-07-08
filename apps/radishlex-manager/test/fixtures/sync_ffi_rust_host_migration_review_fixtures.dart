@@ -19,6 +19,18 @@ const syncFfiRustHostManagerBridgeMigrationReviewStatus =
 const syncFfiRustHostManagerBridgeMigrationDecision =
     'manager_bridge_migration_blocked_until_binding_contract';
 
+const syncFfiRustHostTestFileApprovalReviewStatus =
+    'host_contract_test_file_approval_review_ready_no_native_symbol';
+
+const syncFfiRustHostTestFileApprovalDecision =
+    'host_contract_test_file_blocked_until_symbol_and_binding_approval';
+
+const syncFfiRustHostRealSyncExecutionGateReviewStatus =
+    'real_sync_execution_gate_review_ready_no_remote_sync';
+
+const syncFfiRustHostRealSyncExecutionDecision =
+    'real_sync_execution_blocked_until_platform_and_deployment_evidence';
+
 const syncFfiRustHostExportApprovalRequiredEvidence = [
   'adr_0006_current',
   'c_abi_wrapper_shape_review',
@@ -173,6 +185,89 @@ const syncFfiRustHostManagerBridgeMigrationReview =
       requiredEvidence: syncFfiRustHostManagerBridgeMigrationRequiredEvidence,
     );
 
+const syncFfiRustHostTestFilePlannedCases = [
+  'contract_reports_command_capability_closed',
+  'invalid_request_inputs_return_stable_status',
+  'result_handle_copy_then_free',
+  'envelope_allowlist_only',
+  'forbidden_material_absent_from_native_outputs',
+  'panic_boundary_returns_internal_error',
+  'sync_domain_command_serialization',
+];
+
+const syncFfiRustHostTestFileApprovalReviewedConditions = [
+  'rust_host_contract_cases_mapped',
+  'c_abi_symbol_lookup_strategy_reviewed',
+  'capability_missing_behavior_reviewed',
+  'result_handle_lifecycle_reviewed',
+  'error_handle_lifecycle_reviewed',
+  'panic_boundary_reviewed',
+  'forbidden_material_assertions_reviewed',
+  'dynamic_library_smoke_absence_reviewed',
+];
+
+const syncFfiRustHostTestFileApprovalBlockingConditions = [
+  'native_symbol_export_approved_by_adr',
+  'dart_native_binding_approved',
+  'manager_bridge_command_approved',
+  'host_contract_test_file_approved',
+];
+
+const syncFfiRustHostTestFileApprovalRequiredEvidence = [
+  'host_contract_catalog_current',
+  'host_test_design_package_current',
+  'c_abi_contract_review_matrix_current',
+  'manager_sync_command_internal_draft_tests',
+  'ffi_bridge_smoke_candidate_symbols_absent',
+];
+
+const syncFfiRustHostTestFileApprovalReview =
+    SyncFfiRustHostTestFileApprovalReview(
+      approvalDecision: syncFfiRustHostTestFileApprovalDecision,
+      targetTestFile: syncFfiCommandBoundaryRustHostContractTargetTestFile,
+      plannedTestCases: syncFfiRustHostTestFilePlannedCases,
+      reviewedConditions: syncFfiRustHostTestFileApprovalReviewedConditions,
+      blockingConditions: syncFfiRustHostTestFileApprovalBlockingConditions,
+      requiredEvidence: syncFfiRustHostTestFileApprovalRequiredEvidence,
+    );
+
+const syncFfiRustHostRealSyncExecutionReviewedConditions = [
+  'command_context_owner_scope_reviewed',
+  'command_worker_thread_policy_reviewed',
+  'sync_domain_serialization_reviewed',
+  'operation_id_idempotency_reviewed',
+  'readiness_snapshot_binding_reviewed',
+  'deployment_evidence_summary_reviewed',
+  'forbidden_material_redaction_reviewed',
+];
+
+const syncFfiRustHostRealSyncExecutionBlockingConditions = [
+  'host_contract_test_file_approved',
+  'native_symbol_export_approved_by_adr',
+  'dart_native_binding_approved',
+  'manager_bridge_command_approved',
+  'platform_private_key_backend_production_ready',
+  'recovery_authorization_interaction_tests_passed',
+  'deployment_evidence_summary_approved',
+  'real_sync_execution_approved_after_gate',
+];
+
+const syncFfiRustHostRealSyncExecutionRequiredEvidence = [
+  'platform_private_key_backend_strategy_current',
+  'manager_recovery_device_auth_flow_current',
+  'sync_server_production_deployment_runbook_current',
+  'manager_sync_entry_boundary_current',
+  'local_docker_https_smoke_development_only',
+];
+
+const syncFfiRustHostRealSyncExecutionGateReview =
+    SyncFfiRustHostRealSyncExecutionGateReview(
+      executionDecision: syncFfiRustHostRealSyncExecutionDecision,
+      reviewedConditions: syncFfiRustHostRealSyncExecutionReviewedConditions,
+      blockingConditions: syncFfiRustHostRealSyncExecutionBlockingConditions,
+      requiredEvidence: syncFfiRustHostRealSyncExecutionRequiredEvidence,
+    );
+
 class SyncFfiRustHostExportSymbolReviewItem {
   const SyncFfiRustHostExportSymbolReviewItem({
     required this.symbolName,
@@ -228,6 +323,38 @@ class SyncFfiRustHostManagerBridgeMigrationReview {
   });
 
   final String migrationDecision;
+  final List<String> reviewedConditions;
+  final List<String> blockingConditions;
+  final List<String> requiredEvidence;
+}
+
+class SyncFfiRustHostTestFileApprovalReview {
+  const SyncFfiRustHostTestFileApprovalReview({
+    required this.approvalDecision,
+    required this.targetTestFile,
+    required this.plannedTestCases,
+    required this.reviewedConditions,
+    required this.blockingConditions,
+    required this.requiredEvidence,
+  });
+
+  final String approvalDecision;
+  final String targetTestFile;
+  final List<String> plannedTestCases;
+  final List<String> reviewedConditions;
+  final List<String> blockingConditions;
+  final List<String> requiredEvidence;
+}
+
+class SyncFfiRustHostRealSyncExecutionGateReview {
+  const SyncFfiRustHostRealSyncExecutionGateReview({
+    required this.executionDecision,
+    required this.reviewedConditions,
+    required this.blockingConditions,
+    required this.requiredEvidence,
+  });
+
+  final String executionDecision;
   final List<String> reviewedConditions;
   final List<String> blockingConditions;
   final List<String> requiredEvidence;
@@ -303,5 +430,43 @@ Map<String, Object?> syncFfiRustHostManagerBridgeMigrationReviewShape(
     'can_create_bridge_command_request': false,
     'can_write_settings_action': false,
     'can_execute_real_sync': false,
+  };
+}
+
+Map<String, Object?> syncFfiRustHostTestFileApprovalReviewShape(
+  SyncFfiRustHostTestFileApprovalReview fixture,
+) {
+  return {
+    'format': syncFfiRustHostInternalDraftEvidenceFormat,
+    'review_status': syncFfiRustHostTestFileApprovalReviewStatus,
+    'approval_decision': fixture.approvalDecision,
+    'target_test_file': fixture.targetTestFile,
+    'planned_test_cases': fixture.plannedTestCases,
+    'reviewed_conditions': fixture.reviewedConditions,
+    'blocking_conditions': fixture.blockingConditions,
+    'required_evidence': fixture.requiredEvidence,
+    'can_create_host_contract_test_file': false,
+    'can_export_native_symbol': false,
+    'can_call_dynamic_library_symbol': false,
+    'can_modify_dart_native_binding': false,
+  };
+}
+
+Map<String, Object?> syncFfiRustHostRealSyncExecutionGateReviewShape(
+  SyncFfiRustHostRealSyncExecutionGateReview fixture,
+) {
+  return {
+    'format': syncFfiRustHostInternalDraftEvidenceFormat,
+    'review_status': syncFfiRustHostRealSyncExecutionGateReviewStatus,
+    'execution_decision': fixture.executionDecision,
+    'reviewed_conditions': fixture.reviewedConditions,
+    'blocking_conditions': fixture.blockingConditions,
+    'required_evidence': fixture.requiredEvidence,
+    'can_execute_real_sync': false,
+    'can_connect_go_server': false,
+    'can_touch_platform_key_backend': false,
+    'can_generate_recovery_code': false,
+    'can_create_join_request': false,
+    'can_revoke_device': false,
   };
 }

@@ -1,4 +1,10 @@
 use super::admission::ManagerSyncCommandHostTestAdmissionReviewDraft;
+use super::host_test_gate_review::{
+    ManagerSyncCommandHostTestFileApprovalReviewDraft,
+    ManagerSyncCommandRealSyncExecutionGateReviewDraft, HOST_TEST_FILE_APPROVAL_BLOCKED,
+    HOST_TEST_FILE_APPROVAL_REVIEW_READY, REAL_SYNC_EXECUTION_BLOCKED,
+    REAL_SYNC_EXECUTION_GATE_REVIEW_READY,
+};
 use super::migration_review::{
     ManagerSyncCommandDartBindingMigrationReviewDraft,
     ManagerSyncCommandHostExportApprovalReviewDraft,
@@ -69,6 +75,39 @@ fn valid_raw(action_id: u32) -> ManagerSyncCommandRequestRawDraft {
         explicit_user_start: 1,
         action_section: valid_action_section(action_id),
     }
+}
+
+fn current_manager_bridge_migration_review() -> ManagerSyncCommandManagerBridgeMigrationReviewDraft
+{
+    let wrapper_review = ManagerSyncCommandCAbiWrapperShapeReviewDraft::current_phase();
+    let gate = ManagerSyncCommandHostContractTestGateDraft::current_phase(&wrapper_review).unwrap();
+    let result_fields = ManagerSyncCommandResultAccessorFieldSetReviewDraft::current_phase();
+    let owner_scope = ManagerSyncCommandContextOwnerScopeReviewDraft::current_phase();
+    let summary_storage = ManagerSyncCommandSummaryStorageReviewDraft::current_phase();
+    let worker_policy = ManagerSyncCommandWorkerThreadPolicyReviewDraft::current_phase();
+    let debug_redaction = ManagerSyncCommandDebugRedactionReviewDraft::current_phase();
+    let migration = ManagerSyncCommandHostGateMigrationReviewDraft::current_phase(
+        &gate,
+        &result_fields,
+        &owner_scope,
+        &summary_storage,
+        &worker_policy,
+        &debug_redaction,
+    )
+    .unwrap();
+    let readiness =
+        ManagerSyncCommandHostGateReadinessReviewDraft::current_phase(&migration).unwrap();
+    let admission =
+        ManagerSyncCommandHostTestAdmissionReviewDraft::current_phase(&readiness).unwrap();
+    let export_review = ManagerSyncCommandHostExportApprovalReviewDraft::current_phase(
+        &admission,
+        &wrapper_review,
+        &result_fields,
+    )
+    .unwrap();
+    let binding_review =
+        ManagerSyncCommandDartBindingMigrationReviewDraft::current_phase(&export_review).unwrap();
+    ManagerSyncCommandManagerBridgeMigrationReviewDraft::current_phase(&binding_review).unwrap()
 }
 
 #[test]
@@ -1048,6 +1087,123 @@ fn dart_binding_and_manager_bridge_migration_reviews_keep_blockers_closed() {
     assert!(accidental_bridge.assert_safe_bridge_migration().is_err());
 
     let debug = format!("{binding_review:?}{bridge_review:?}");
+    for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
+        assert!(!debug.contains(forbidden), "{forbidden}");
+    }
+}
+
+#[test]
+fn host_test_file_approval_review_keeps_real_test_file_uncreated() {
+    let bridge_review = current_manager_bridge_migration_review();
+    let host_file_review =
+        ManagerSyncCommandHostTestFileApprovalReviewDraft::current_phase(&bridge_review).unwrap();
+    host_file_review.assert_safe_file_approval().unwrap();
+
+    assert_eq!(
+        host_file_review.review_state,
+        HOST_TEST_FILE_APPROVAL_REVIEW_READY
+    );
+    assert_eq!(
+        host_file_review.approval_decision,
+        HOST_TEST_FILE_APPROVAL_BLOCKED
+    );
+    assert_eq!(
+        host_file_review.target_test_file,
+        "crates/ime-ffi/tests/manager_sync_command_boundary.rs"
+    );
+    assert!(host_file_review
+        .planned_test_cases
+        .contains(&"contract_reports_command_capability_closed"));
+    assert!(host_file_review
+        .planned_test_cases
+        .contains(&"result_handle_copy_then_free"));
+    assert!(host_file_review
+        .planned_test_cases
+        .contains(&"forbidden_material_absent_from_native_outputs"));
+    assert!(host_file_review
+        .reviewed_conditions
+        .contains(&"c_abi_symbol_lookup_strategy_reviewed"));
+    assert!(host_file_review
+        .reviewed_conditions
+        .contains(&"dynamic_library_smoke_absence_reviewed"));
+    assert!(host_file_review
+        .blocking_conditions
+        .contains(&"host_contract_test_file_approved"));
+    assert!(host_file_review
+        .required_evidence
+        .contains(&"host_test_design_package_current"));
+    assert!(host_file_review
+        .required_evidence
+        .contains(&"ffi_bridge_smoke_candidate_symbols_absent"));
+    assert!(!host_file_review.can_create_host_contract_test_file);
+    assert!(!host_file_review.can_export_native_symbol);
+    assert!(!host_file_review.can_call_dynamic_library_symbol);
+    assert!(!host_file_review.can_modify_dart_native_binding);
+
+    let mut accidental_file = host_file_review;
+    accidental_file.can_create_host_contract_test_file = true;
+    assert!(accidental_file.assert_safe_file_approval().is_err());
+
+    let debug = format!("{host_file_review:?}");
+    for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
+        assert!(!debug.contains(forbidden), "{forbidden}");
+    }
+}
+
+#[test]
+fn real_sync_execution_gate_review_blocks_remote_side_effects() {
+    let bridge_review = current_manager_bridge_migration_review();
+    let host_file_review =
+        ManagerSyncCommandHostTestFileApprovalReviewDraft::current_phase(&bridge_review).unwrap();
+    let execution_gate =
+        ManagerSyncCommandRealSyncExecutionGateReviewDraft::current_phase(&host_file_review)
+            .unwrap();
+    execution_gate.assert_safe_execution_gate().unwrap();
+
+    assert_eq!(
+        execution_gate.review_state,
+        REAL_SYNC_EXECUTION_GATE_REVIEW_READY
+    );
+    assert_eq!(
+        execution_gate.execution_decision,
+        REAL_SYNC_EXECUTION_BLOCKED
+    );
+    assert!(execution_gate
+        .reviewed_conditions
+        .contains(&"command_context_owner_scope_reviewed"));
+    assert!(execution_gate
+        .reviewed_conditions
+        .contains(&"readiness_snapshot_binding_reviewed"));
+    assert!(execution_gate
+        .blocking_conditions
+        .contains(&"platform_private_key_backend_production_ready"));
+    assert!(execution_gate
+        .blocking_conditions
+        .contains(&"recovery_authorization_interaction_tests_passed"));
+    assert!(execution_gate
+        .blocking_conditions
+        .contains(&"deployment_evidence_summary_approved"));
+    assert!(execution_gate
+        .blocking_conditions
+        .contains(&"real_sync_execution_approved_after_gate"));
+    assert!(execution_gate
+        .required_evidence
+        .contains(&"platform_private_key_backend_strategy_current"));
+    assert!(execution_gate
+        .required_evidence
+        .contains(&"sync_server_production_deployment_runbook_current"));
+    assert!(!execution_gate.can_execute_real_sync);
+    assert!(!execution_gate.can_connect_go_server);
+    assert!(!execution_gate.can_touch_platform_key_backend);
+    assert!(!execution_gate.can_generate_recovery_code);
+    assert!(!execution_gate.can_create_join_request);
+    assert!(!execution_gate.can_revoke_device);
+
+    let mut accidental_execution = execution_gate;
+    accidental_execution.can_execute_real_sync = true;
+    assert!(accidental_execution.assert_safe_execution_gate().is_err());
+
+    let debug = format!("{execution_gate:?}");
     for forbidden in FORBIDDEN_SUMMARY_FRAGMENTS {
         assert!(!debug.contains(forbidden), "{forbidden}");
     }
