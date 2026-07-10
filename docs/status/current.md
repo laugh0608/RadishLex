@@ -4,18 +4,19 @@
 
 ## 复核日期
 
-- 日期：2026-07-08
+- 日期：2026-07-10
 - 常态分支：`dev`
-- 当前主题：Phase 3 自部署同步出口治理已有本地 Docker / HTTPS、Go server、Rust sync / crypto 和部署证据校验证据链；Phase 4 Flutter manager 本地验收复查已完成。当前集中推进 manager 同步入口非上传治理：readiness / evidence / action preview / bridge contract / FFI command boundary / contract test gate。2026-07-08 已补 join / revocation future confirmation detail、Rust host checklist / test design / C ABI matrix / implementation review package，以及 `ime-ffi` 内部非导出 draft module 的 gate migration、admission、native export、Dart binding、ManagerBridge、host test file approval、real sync execution gate 和 evidence bundle review；Dart fake native binding 已能重放对应阻塞项。真实域名、证书和外部反代复验保留为发布门禁；仍不改 `ManagerBridge` contract、不新增 C ABI、不打开真实同步、恢复码、join、授权成功或设备撤销路径。
+- 当前主题：进入 2026 年 7 月项目稳定化整改。当前主批次是 R00 文档真相源与停止线收敛，随后优先打通 macOS InputMethodKit 真实本地输入纵向链，并同步建立 Clippy、Flutter 与 native bundle 质量门禁。整改期间停止扩展与真实输入链无关的 readiness、evidence、preview、approval 和 no-symbol 证明层；真实用户同步继续保持关闭。
 
 ## 当前阶段
 
-RadishLex 已完成 Rust core、Rime adapter、userdb、ranker、crypto、sync client 边界、Go sync server 和第一批 Flutter manager 本地 FFI bridge 的起步证据。当前推进重点是保持 Phase 4 manager 本地验收证据可复查，并在本地 Docker / 本地 HTTPS 证据支撑下维护恢复码 setup / restore、设备 join / revocation 的只读状态、readiness 聚合摘要、bridge readiness 错误分类映射、只读 action intent 进入计划、真实 bridge 命令前 contract 检查清单和诊断脱敏；真实用户同步开放仍等待平台私钥 backend、恢复 / 授权交互和发布级部署证据。
+RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto、sync client 边界、Go sync server 和 Flutter manager 原型，但还没有真实平台输入法纵向链，正常 manager 产品包也尚未形成真实 FFI 与持久化配置闭环。当前不再把本地 manager 只读预演或实现前治理证据视为阶段完成；近期阶段证据重新收敛为真实输入、数据正确性、安全同步和产品构建。完整整改顺序、停止线和退出标准以 `docs/remediation/2026-07-project-stabilization.md` 为临时执行入口。
 
 部署证据当前状态：仓库内已有本地 Docker / 本地 HTTPS、短生命周期 HTTP、备份恢复、外部 TLS 反代和升级回滚实现级 smoke；`tests/fixtures/sync-deployment-evidence-valid.txt` 只是合成 fixture。没有真实目标环境 `deployment_evidence.v1` 时，不记录发布级部署通过，但这不阻止继续开发 manager 同步入口的非上传状态、说明和本地联调路径。
 
 近期默认先读本文，再按任务选读：
 
+- 当前整改批次、停止线和退出条件：`docs/remediation/2026-07-project-stabilization.md`
 - 总体架构和阶段边界：`docs/technical-plan.md`
 - 阶段顺序和退出标准：`docs/roadmap.md`
 - 管理端职责和停止线：`docs/manager-ui-boundary.md`
@@ -110,7 +111,7 @@ Sync server 本地部署 / 联调：
 
 ## 近期推进顺位
 
-1. 维护本文短入口，避免新会话默认阅读长周志。
-2. 保持 Phase 4 manager 本地验收证据稳定；若后续改动触及验收范围，再按 `docs/manager-local-acceptance.md` 补精准 widget / helper / smoke 覆盖。
-3. 下一批产品开发继续围绕本地 Docker / 本地 HTTPS 联调和 manager 同步入口非上传治理，维护 readiness、evidence bundle、action preview、contract / FFI boundary、transient secret、device confirmation detail、Rust host review package、内部 Rust draft module、Dart fake binding replay、诊断脱敏和错误分类测试。下一步可继续补 native export ADR 审批证据，或围绕 platform private key backend / recovery authorization / deployment evidence 补真实执行 gate 的发布前证据实现；仍不改变 `ManagerBridge` contract、不新增 C ABI、不创建真实 host contract test 文件、不打开真实同步、恢复码生成 / 输入、join request 创建、授权成功或设备撤销路径。
-4. 同步联调用本地 Docker / 本地 HTTPS 和短生命周期数据目录；正式发布或真实用户开放前，再补真实目标环境的非敏感 `deployment_evidence.v1` 并导出 `deployment_evidence_summary.v1`。
+1. 完成 R00：修正 `AGENTS.md` / `CLAUDE.md` 快速认知，压缩当前状态，清理 roadmap 实现流水，并给现有 manager sync review 资产建立保留、归档、删除或转化清单。
+2. 启动 R06 的首批质量门禁：修正 `ime-ffi` Clippy 裸指针契约，把 Flutter、Go race、MSRV 和 macOS native bundle 检查接入 CI。
+3. 推进 R01：返回完整 KeyOutcome，建立 engine / ranker / userdb runtime，收口 librime 全局生命周期，并打通 macOS InputMethodKit 真实本地输入纵向链。
+4. R01 完成前不再新增 future sync gate / evidence / preview 资产；R03 同步收敛与密码协议完成前，真实远端同步、恢复码、设备授权成功和设备撤销路径继续保持关闭。
