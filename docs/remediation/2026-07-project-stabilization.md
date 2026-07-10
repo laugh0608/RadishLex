@@ -7,7 +7,7 @@
 - 状态：生效，临时执行真相源
 - 建立日期：2026-07-10（Asia/Shanghai）
 - 审计基线：`dev` 分支，提交 `db8ffa78e354`
-- 当前主批次：R00 文档真相源与停止线收敛
+- 当前主批次：R01 真实输入纵向链（尚未进入代码实现）
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭
 - 关闭方式：全部退出条件满足后，将稳定结论回写现有正式文档，再把本文移入 `docs/archive/` 并从当前状态入口移除
@@ -86,8 +86,8 @@ RadishLex 已具备 Rust core、Rime adapter、userdb、ranker、crypto、sync c
 
 | 批次 | 名称 | 状态 | 前置依赖 | 退出结果 |
 | --- | --- | --- | --- | --- |
-| R00 | 文档真相源与停止线收敛 | 进行中 | 无 | 当前入口、阶段口径和推进顺位一致 |
-| R01 | 真实输入纵向链 | 待开始 | R00 | macOS 可离线完成真实中文输入 |
+| R00 | 文档真相源与停止线收敛 | 已完成（2026-07-10） | 无 | 当前入口、阶段口径和推进顺位一致 |
+| R01 | 真实输入纵向链 | 下一批，尚未实现 | R00 | macOS 可离线完成真实中文输入 |
 | R02 | userdb 与 ranker 正确性 | 待开始 | R01 的 runtime 边界 | 学习、删除和排序有正确性与评测证据 |
 | R03 | 同步收敛与密码协议 | 待开始 | R02 数据语义 | 多设备结果确定且协议可安全开放实现 |
 | R04 | 生产同步客户端与服务端闭环 | 待开始 | R03 | 两个真实客户端可完成完整同步周期 |
@@ -118,6 +118,14 @@ RadishLex 已具备 Rust core、Rime adapter、userdb、ranker、crypto、sync c
 - roadmap 只描述阶段目标、交付物和退出标准，不继续追加实现日记。
 - 文档检查、文本检查与 `git diff --check` 通过。
 - 现有 future review 资产均有明确处置结论，没有继续自然增长的默认路径。
+
+### 完成记录
+
+- `AGENTS.md` / `CLAUDE.md` 已同步纠正当前认知，并保持在 14k 字符目标内。
+- `docs/status/current.md` 已收敛为约 3.3k 字符的唯一当前状态短入口。
+- README、technical plan、roadmap、repository layout 和 privacy-sync 已移除重复的实现流水，分别恢复稳定入口、架构、阶段、目录和隐私职责。
+- 本文第十四节已登记 manager sync review 文档、Rust draft、Flutter 模型、fixture 和测试的处置去向。
+- 文档预算、文本卫生、协作入口同步、diff 检查和仓库基线结果记录在 `docs/devlogs/2026-W28.md`。
 
 ## 八、R01：真实输入纵向链
 
@@ -277,7 +285,72 @@ RadishLex 已具备 Rust core、Rime adapter、userdb、ranker、crypto、sync c
 - Go race 与 Flutter 全量测试进入常态门禁。
 - 生产源码中不存在仅用于证明 future feature 尚未开放的大规模 dead-code review 模型。
 
-## 十四、推荐执行顺序
+## 十四、Manager Sync Review 资产处置清单
+
+本清单只决定现有资产的去留，不批准真实同步，也不创建新的迁移层。处置前允许为修复明确 bug 或完成删除而修改；不得继续增加新的 review、approval、gate、evidence、fake replay 或 no-symbol 分支。
+
+### 文档与 ADR
+
+| 资产 | 处置 | 目标批次 | 说明 |
+| --- | --- | --- | --- |
+| `docs/manager-sync-entry-boundary.md` | 保留并收敛 | R05 | 保留 UI 职责、secret 与停止线；移除实现流水和 future preview 索引 |
+| `docs/manager-sync-bridge-command-contract.md` | 冻结后转化 | R03/R04 | 只提取为真实版本化 Rust command contract，不再扩展设计-only DTO |
+| `docs/manager-sync-bridge-command-contract-checklist.md` | 归档 | R04/R06 | 真实 host contract tests 落地后移入历史归档 |
+| `docs/manager-readiness-scenarios.md` | 冻结后归档 | R05 | 只保留可转化为真实状态/安全负例的场景 |
+| `docs/manager-sync-action-protocol-preview.md` | 冻结后归档 | R05 | 被真实 command/result contract 和 UI 交互替代 |
+| `docs/manager-sync-action-acceptance-matrix.md` | 冻结后归档 | R05 | 有效安全断言迁入真实集成测试，其余 preview 矩阵删除 |
+| `docs/manager-sync-ffi-command-boundary.md` | 提取后归档 | R04/R06 | 所有权、线程、panic 和 redaction 规则回写 `docs/ffi-boundary.md` |
+| `docs/manager-sync-ffi-command-contract-test-plan.md` | 由真实测试替代 | R04/R06 | 测试落地后归档，不继续增加计划层 |
+| `docs/adr/0006-manager-sync-c-abi-contract-governance.md` | 标记被替代后归档 | R04/R06 | 稳定 ABI 决策进入真实 contract/FFI ADR，不保留审批状态机 |
+
+### Rust 生产源码
+
+| 资产 | 处置 | 目标批次 | 说明 |
+| --- | --- | --- | --- |
+| `crates/ime-ffi/src/manager_sync_command.rs` | 删除或以真实实现替换 | R06 后接 R04 | 当前 `#![allow(dead_code)]` review draft 不作为生产基线 |
+| `crates/ime-ffi/src/manager_sync_command/admission.rs` | 删除 | R06 | admission/approval 状态属于历史治理，不属于运行时 |
+| `crates/ime-ffi/src/manager_sync_command/host_test_gate_review.rs` | 删除 | R06 | host test gate 由 CI 和真实 contract tests 取代 |
+| `crates/ime-ffi/src/manager_sync_command/migration_review.rs` | 删除 | R06 | migration review 不在 `src/` 保留 |
+| `crates/ime-ffi/src/manager_sync_command/tests.rs` | 拆分处置 | R06 | redaction/panic/ownership 负例迁入真实 FFI 测试，其余 review-only 测试删除 |
+
+真实 manager sync command 尚未进入 R04 前，`ime-ffi` 可以完全不导出该能力；不需要保留一套运行时草案来证明它没有导出。
+
+### Flutter 生产模型与 bridge
+
+| 资产 | 处置 | 目标批次 | 说明 |
+| --- | --- | --- | --- |
+| `manager_sync_action_preview_models.dart` | 冻结后删除 | R05 | 由真实 command/result 与明确 disabled state 替代 |
+| `manager_sync_entry_models.dart` | 保留核心、删除 future preview | R05 | 只保留真实可见状态、阻塞原因和用户操作入口 |
+| `manager_sync_models.dart` | 拆分并保留真实领域模型 | R05/R06 | 移除 approval/evidence shape，控制单文件规模 |
+| `ffi_manager_sync_readiness_mapper.dart` | 评估后保留或删除 | R05 | 只有映射真实 Rust snapshot 时保留；不再读取设计 fixture |
+| `ffi_manager_sync_mapper.dart` | 保留并收敛 | R05 | 只映射真实 FFI 输出，不派生同步业务真相源 |
+
+### Dart fixture 与测试
+
+| 资产 | 处置 | 目标批次 | 说明 |
+| --- | --- | --- | --- |
+| `sync_ffi_rust_host_contract_review_fixtures.dart` | 删除 | R06 | review package 不进入长期测试资产 |
+| `sync_ffi_rust_host_migration_review_fixtures.dart` | 删除 | R06 | approval/migration replay 由真实 contract tests 取代 |
+| `sync_ffi_command_boundary_fixtures.dart` | 拆分后删除 | R06 | 只迁移真实 ABI 安全负例 |
+| `manager_sync_ffi_migration_review_test.dart` | 删除 | R06 | 不再测试审批状态机 |
+| `manager_sync_ffi_command_boundary_test.dart` | 由真实 FFI 测试替代 | R06/R04 | 保留 ownership、status、redaction 断言，删除 no-symbol/review 断言 |
+| `manager_sync_ffi_binding_contract_test.dart` | 保留核心、删除 replay | R06 | 保留 dynamic binding 与释放契约 |
+| `manager_sync_bridge_command_contract_test.dart` | 由真实 bridge 测试替代 | R04/R05 | 不再验证设计-only command shape |
+| `sync_evidence_bundle_fixtures.dart` | 冻结后删除 | R05 | 发布证据由真实安全摘要输入替代 |
+| `sync_readiness_bridge_fixtures.dart` | 冻结后删除 | R05 | 由 Rust 真实 readiness snapshot integration fixture 替代 |
+| `manager_sync_action_preview_test.dart` | 随 preview 模型删除 | R05 | 真实 disabled/enabled UI 行为进入 widget/integration test |
+| `manager_sync_entry_gate_test.dart` | 保留安全断言并重写 | R05 | 保留停止线、隐私模式和失败可见性，不保留 future 状态机 |
+| `manager_sync_transient_secret_interaction_test.dart` | 转化为真实 secret 生命周期测试 | R03/R05 | 保留不持久化、不日志化和确认边界 |
+
+### 处置验收
+
+- R06 结束时，Rust `src/` 不再包含 review-only manager sync command module。
+- R05 结束时，Flutter 产品模型不再包含 action preview、approval 或 evidence bundle 业务层。
+- R04/R05 结束时，真实 command/bridge/integration tests 覆盖迁移保留的 ownership、panic、redaction、secret 和 disabled-state 断言。
+- 被归档文档从 `README.md`、`docs/status/current.md` 和默认阅读链移除；稳定规则回写现有边界文档。
+- 处置过程不得删除仍未迁移的隐私、安全或 FFI 生命周期断言；每次删除前先指出替代测试位置。
+
+## 十五、推荐执行顺序
 
 ### 第一段：纠偏与真实输入
 
@@ -299,7 +372,7 @@ RadishLex 已具备 Rust core、Rime adapter、userdb、ranker、crypto、sync c
 2. R05 的本地管理产品化可以在 R02 后推进；真实同步 UI 必须等待 R04。
 3. R06 持续收敛全部门禁和代码结构。
 
-## 十五、批次更新规则
+## 十六、批次更新规则
 
 - 本文只更新批次状态、阻塞项、验收证据链接和退出判断，不追加逐日流水。
 - 每次只能有一个主批次处于“进行中”；R06 可作为并行质量工作流，但不得抢占主批次产品目标。
@@ -308,7 +381,7 @@ RadishLex 已具备 Rust core、Rime adapter、userdb、ranker、crypto、sync c
 - 稳定接口、协议、隐私和平台决策回写对应正式文档，不以本文作为长期引用源。
 - 如果批次阻塞，必须记录具体缺失能力、已验证替代方案和解除条件，不能用新增 review 模型代替实现。
 
-## 十六、总体验收与退出条件
+## 十七、总体验收与退出条件
 
 本专题只有同时满足以下条件后才能关闭：
 

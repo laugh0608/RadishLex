@@ -1,238 +1,219 @@
 # RadishLex 阶段路线图
 
-当前阶段、验证基线和近期停止线优先见 [当前状态短入口](status/current.md)。2026 年 7 月整改期间的执行顺序、批次状态和退出条件见 [项目稳定化整改总专题](remediation/2026-07-project-stabilization.md)。本文只保留阶段路线、交付物和退出标准。
+本文档定义 RadishLex 的长期阶段顺序、阶段交付物和退出标准，读者是维护者、实现者和发布审阅者。本文不记录当前批次状态、逐日实现流水、提交清单或验证命令输出；这些内容分别进入 `docs/status/current.md`、临时整改专题和 `docs/devlogs/`。
 
-## Phase 0: 方案冻结
+当前阶段与验证基线见 [当前状态短入口](status/current.md)。2026 年 7 月稳定化整改的跨阶段执行顺序见 [项目稳定化整改总专题](remediation/2026-07-project-stabilization.md)。整改批次可以修正早期阶段缺口，但不因此宣称对应产品阶段已经完成。
+
+## Phase 0：方案与边界冻结
 
 目标：
 
-- 冻结项目名、定位和边界。
-- 明确 v1 不重写完整中文输入引擎。
-- 明确 Rust core / Go server / Flutter manager 的职责。
-- 明确平台薄壳策略。
+- 固定项目定位、许可边界、隐私立场和 MVP 范围。
+- 明确 v1 不从零重写完整中文输入引擎。
+- 明确 Rust core、Go server、Flutter manager 和平台薄壳的职责。
+- 固定文档真相源、分支策略和验证分层。
 
 交付：
 
-- 根 README
-- 技术方案
-- 仓库结构草案
-- 隐私与同步设计
+- 根 README、LICENSE 和协作入口。
+- 技术方案、仓库结构、隐私同步和阶段路线文档。
 
-## Phase 1: Rust Core 原型
+退出标准：
 
-周期建议：第 1 个月
+- 架构、隐私、许可、MVP 与平台策略没有互相冲突的入口口径。
+- 后续阶段的职责和停止线可以从正式文档复验。
+
+## Phase 1：Rust Core 与 Engine 原型
 
 目标：
 
-- 建立 Rust workspace。
-- 定义输入会话、候选、提交、按键事件等核心类型。
-- 实现 CLI demo。
-- 接入底层引擎 adapter 接口。
-- 完成基础单元测试。
+- 建立 Rust workspace 和平台无关输入领域模型。
+- 定义 composition、candidate、commit、key event 和 engine adapter 边界。
+- 接入成熟底层引擎并提供 CLI 复验链路。
+- 固定 engine 生命周期、错误语义和 clean-room 边界。
 
 交付：
 
 - `ime-core`
+- `ime-engine-rime`
 - `ime-cli`
-- `ime-engine-rime` 原型
-- CLI 可输入拼音并返回候选
+- engine 与 session 契约测试
 
 退出标准：
 
-- CLI 能完成 compose -> candidates -> commit。
-- 核心类型不依赖任何具体平台。
+- CLI 能通过真实 engine 完成 `compose -> candidates -> commit`。
+- 核心模型不依赖 Rime 私有对象或任何平台生命周期。
+- 多 session、schema 切换、错误释放和 engine 全局生命周期有可复验证据。
 
-## Phase 2: 个人化学习
-
-周期建议：第 2 个月
+## Phase 2：个人化学习
 
 目标：
 
-- 建立本地 userdb。
-- 实现候选重排。
-- 实现选择事件记录。
-- 实现负反馈。
-- 实现词库导入导出。
+- 建立本地 userdb、选择事件、负反馈和删除语义。
+- 实现候选重排、explain 和可管理用户词库。
+- 建立隐私分级、导入导出和本地学习开关。
+- 确保用户意图的事务性和排序模型的可评测性。
 
 交付：
 
 - `ime-userdb`
 - `ime-ranker`
-- SQLite schema
-- 用户词管理 CLI
+- SQLite schema 与 migration
+- 词库和学习 CLI
+- 合成排序评测集
 
 退出标准：
 
-- 用户连续选择某个候选后，该候选排序可提升。
-- 用户删除或降权某个词后，该词不会被旧权重立即复活。
-- Rime candidates 能进入 ranker，并输出可解释排序与提交映射。
-- 用户词库导入导出、导入检查、删除 tombstone 和同步前置计数均可复验。
-- FFI 管理入口只暴露受控 userdb、dictionary、learning status 和 sync preflight 摘要，不导出 P1 明细或明文同步 payload。
-- 进入 Phase 3 代码前，必须完成 `ime-crypto` 本地 envelope / key / hash 测试、同步密钥与设备生命周期 Rust 模型、删除合并测试、生产级 envelope 组装边界、恢复码 KDF ADR、恢复码 KDF Rust 模型、签名 / 设备密钥存储 ADR、签名 / 设备密钥存储 Rust 模型、真实 P2 payload 解析、合并结果写回 userdb 的执行器、Go server API / storage 边界设计、生产恢复流程设计，以及平台私钥存储 backend ADR。
+- 真实候选能进入 ranker，排序结果能稳定映射回 engine commit。
+- 选择、负反馈、删除和显式恢复要么完整提交、要么完整回滚。
+- deleted tombstone 能阻止旧事件、旧导入、旧设备和旧备份复活词条。
+- recency 随时间衰减，frequency 有界，suppress 与 delete 优先级明确。
+- 用户词库导入导出、学习状态和 explain 均可复验，P1 明细不进入 FFI 或同步 payload。
 
-## Phase 3: 自部署同步
-
-周期建议：第 3 个月
+## Phase 3：自部署加密同步
 
 目标：
 
-- 实现 Go 单用户同步服务。
-- 实现端到端加密 blob 同步；`ime-crypto` 本地 envelope、key、nonce、AAD、ciphertext hash 和篡改失败测试必须先于 Go server 上传下载。
-- 实现设备注册。
-- 实现备份恢复。
-- 当前生产访问控制先使用单用户 bearer access token；OIDC / Radish 产品账号接入作为后续专题，不纳入当前 Phase 3 退出标准。
-- Docker 部署后端的 WebUI / 管理控制台作为远期可选专题记录在 `docs/sync-server-admin-console.md`，不纳入当前 Phase 3 / Phase 4 退出标准，也不改变近期 Flutter manager bridge 接线顺序。
-- 同步密钥、设备授权、撤销、key epoch、签名模型和客户端合并写回 userdb 的 Rust 测试已经完成。
-- Go server API / storage、生产恢复流程、生产部署边界、OIDC 未来接入规划、平台私钥存储 backend 边界、平台私钥 backend 策略和管理端边界已由专题文档固定；平台私钥存储 backend capability / unavailable backend 的 Rust 模型和测试已经落地，`apple-keychain-v1` 首个平台 runbook 已固定，macOS Keychain backend 已在 `apple-keychain` feature 下接线并通过非 smoke 测试，真实 Keychain smoke 已执行但阻塞于 `ed25519-v1` 创建；Apple 平台签名策略已固定保留 `ed25519-v1` 协议、不把 seed 存储 fallback 混入 `apple-keychain-v1`，并让该 backend status 阻断生产签名；`android-keystore-v1` 平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin bridge source、Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录模板已固定，当前已补 Rust raw JNI glue；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。Go server 已起步 metadata / storage / API / runtime 验证模型，并已补 storage conformance tests、SQLite-backed repository、local object storage staged transaction 接线、Ed25519 签名验签门禁、device wrapping encrypted key bytes 承载、recovery wrapped material 读取接口、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、单用户 bearer access token 门禁、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、`cmd/radishlex-sync-server`、runtime 配置装配、HTTP timeout、对象大小门禁、脱敏 audit logger、本机 smoke runbook、短生命周期双设备 HTTP smoke 测试、短生命周期备份恢复 smoke、短生命周期外部 TLS 反代 smoke、短生命周期升级回滚 smoke、Docker Compose 本地 / 部署态入口、容器实际启动 smoke 和部署态 Compose 预演入口；本地 compose 提供 `https://localhost:7319` 并通过 Caddy internal TLS 到达 sync-server，部署态 compose 提供 HTTP 上游 `http://127.0.0.1:7319`，两者使用同一个对外端口，并附外部 Nginx TLS 终止示例。Rust `ime-sync` 已起步 remote client DTO / transport trait 和 std-only `http://` HTTP transport，覆盖 signed encrypted object upload request、metadata 读取、binary payload 下载、stale conflict latest metadata、`unauthenticated` 错误映射、可选 bearer access token header、payload length mismatch、真实 HTTP request / response 传递和错误脱敏；Rust HTTP transport 直连 Go server 的短生命周期跨语言测试已覆盖 domain 初始化、signed encrypted object 上传、metadata / payload 读取和 stale conflict；Rust 侧两客户端 userdb harness 已覆盖 P2 payload 加密上传、另一客户端下载解密、合并写回和冲突后 v2 上传；Rust userdb 两客户端真实 Go HTTP 测试已覆盖设备授权、三类 P2 对象上传下载、客户端解密写回、stale conflict 和 v2 重新上传；备份恢复 smoke 已覆盖 SQLite metadata 与 encrypted blob dir 成对恢复、domain / device / recovery latest / object payload 读取、stale conflict latest metadata 和日志脱敏；外部 TLS 反代 smoke 已覆盖 HTTPS client、TLS 1.2+、Authorization header 透传、HTTP upstream、对象上传下载、Go 对象大小门禁和日志脱敏；升级回滚 smoke 已覆盖 idempotent migration 重启、升级后 v2 写入、恢复升级前备份后 v2 不可见、v1 payload / stale conflict 和日志脱敏。Phase 4 已补 Flutter manager 第一批真实 Dart FFI bridge，覆盖本地 userdb list / delete / import / export、import batches、learning status、rank explain、sync preflight 摘要、配置来源诊断、脱敏诊断报告导出和结构化错误分类展示；真实远端上传、恢复码和设备授权成功路径必须等待可用平台私钥 backend、恢复 / 授权实现测试与发布级目标部署运行证据，本地 Docker / 本地 HTTPS 可以支撑当前非上传状态开发。OIDC 实现需后续先补认证策略 ADR 和 Go 认证接口抽象。
+- 实现 Go 单用户自部署同步服务。
+- 实现 P2 加密对象上传、发现、下载、验签、解密、合并和冲突重试。
+- 实现设备加入、恢复、撤销和 key epoch 轮换。
+- 保持服务端默认不可信，输入热路径完全不依赖后端。
+- 当前生产访问控制先使用受控单用户认证；OIDC 作为独立后续专题。
 
 交付：
 
-- `server/sync-server`
-- Docker Compose
-- `ime-sync`
 - `ime-crypto`
+- `ime-sync`
+- `server/sync-server`
+- Docker Compose 与生产部署 runbook
+- 跨语言协议 test vector 和多设备集成测试
 
 退出标准：
 
-- 两台客户端能同步加密用户词库。
-- 服务端无法读取明文词库。
+- 两个真实客户端能从空状态完成授权、上传、发现、下载、验签、解密、合并和重试。
+- 任意记录顺序得到相同结果，合并满足幂等性并覆盖离线并发、删除和恢复。
+- 服务端无法读取明文 P2 数据，日志和错误响应不泄漏敏感材料。
+- 撤销设备不能获得新 epoch 数据，恢复记录可轮换和撤销。
+- HTTPS、认证、请求上限、限速、备份恢复和升级回滚达到生产停止线。
 
-## Phase 4: 管理 UI
-
-周期建议：第 4 个月
+## Phase 4：Manager 产品化
 
 目标：
 
-- Flutter 管理界面。
-- 词库查看、删除、导入、导出。
-- 同步状态查看。
-- 隐私模式开关。
-- 本地学习状态、import batches、rank explain 摘要和 sync preflight 摘要。
-- 同步 UI 按 `docs/manager-ui-boundary.md` 显示不可用原因，不绕过平台私钥 backend 和目标部署停止线。
-- 当前 `apps/radishlex-manager` 已起步 macOS Flutter 工程，默认用合成 fixture 验证本地管理台结构；显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时，可通过真实 Dart FFI bridge 读取 / 删除 / 导入 / 导出本地 userdb，并展示 import batches、learning status、rank explain、sync preflight 摘要、配置来源诊断、非 secret settings JSON 草案持久化、sync gate 状态来源、设置页 gate 草案预览、部署证据来源标签、settings draft 格式演进测试、settings / diagnostics 字段参考、脱敏诊断报告和结构化错误分类。诊断报告预览已支持字段分组、筛选和复制与导出一致的脱敏文本，UI 与 widget tests 已按 manager action 编排、词库子组件、学习子组件、同步子组件、设置诊断子组件和页面级测试拆分，并补充 action helper 级结果文案和 failure 分类回归测试。
-- Phase 4 当前已补 `docs/status/current.md` 作为短入口，`docs/manager-local-acceptance.md` 映射本地验收范围、退出标准、验证入口、隐私检查和停止线，`docs/manager-sync-entry-boundary.md` 固定真实同步入口进入 UI / bridge 前的恢复码、设备授权、状态门禁、错误分类、诊断脱敏和测试计划，`docs/manager-recovery-device-auth-flow.md` 固定恢复码 setup / restore 与设备 join / revocation 四条只读交互进入条件，`docs/runbooks/sync-server-production-deployment.md` 固定目标部署证据包模板、校验入口和非敏感摘要导出；2026-07-05 复查确认本地验收当前无影响退出标准的证据缺口，并将真实域名、正式证书和外部反代复验调整为正式发布 / 真实用户开放前门禁。当前已在本地 Docker / 本地 HTTPS 证据支撑下完成 sync entry gate、恢复码准备态、设备授权准备态、同步服务连接健康摘要、`sync_connection_health.v1` 本地摘要采集、settings draft 回填入口、恢复码 setup / restore readiness、设备 join / revocation readiness、readiness 聚合摘要、Dart 侧 `manager_sync_readiness.v1` bridge mapper 错误分类准备层、只读 `SyncInteractionEntryPlan` / `SyncInteractionActionIntent` 进入计划，以及恢复码保存确认、恢复记录、授权包前置条件、撤销 / 丢失设备和 key epoch 风险提示的非上传只读实现。不在可用平台私钥 backend、恢复 / 授权实现测试和发布级部署证据齐备前打开真实远端同步、恢复码或设备授权成功路径。
+- 提供词库、学习、隐私、同步、设备和恢复管理界面。
+- 通过稳定 bridge 使用 Rust core，不在 Flutter 中复制业务真相源。
+- 将真实 FFI、数据库、设置和文件访问打包进正常产品运行态。
+- 对不可用能力显示明确原因，不以 fixture 或默认成功伪装。
 
 交付：
 
 - `apps/radishlex-manager`
-- Flutter desktop/mobile 基础页面
-- Rust core bridge
-- 管理端边界文档
-- 管理端本地验收口径
-- 真实同步入口前置边界文档
-- 目标部署证据包口径、校验入口和摘要导出
+- Rust manager bridge 与 native bundle
+- 本地设置、词库、诊断和同步状态页面
+- 平台持久化、文件选择和发布构建验证
 
 退出标准：
 
-- 用户能通过 UI 管理已学习词。
-- 用户能配置自部署后端。
-- 用户能看到同步预检状态和生产不可用原因。
-- 用户可用同步开关在可用平台私钥 backend、恢复 / 授权实现测试与发布级目标部署运行证据齐备前保持关闭；本地 Docker / 本地 HTTPS 可以支撑开发期同步状态和阻塞说明验证。
+- 用户无需 shell 环境变量即可在产品模式管理真实本地数据。
+- 应用包携带并加载匹配版本的 Rust FFI，设置和数据库在重启后保持。
+- 导入导出使用系统文件访问机制，sandbox 权限与数据目录符合平台要求。
+- FFI、权限、数据库和版本失败均明确展示，不静默回退 fixture。
+- 真实同步 UI 只有在 Phase 3 退出标准满足后才允许开启。
 
-## Future Topic: Sync Server Admin Console
+## Phase 5：第一个真实平台输入法
 
-定位：
+第一平台固定为 macOS InputMethodKit。Linux Fcitx5 保留为后续桌面候选，但不与第一平台并行展开。
 
-- 自部署 sync server 的可选运维控制台。
-- 面向部署者展示服务健康、migration、存储、备份恢复、升级回滚、认证模式和脱敏 audit 摘要。
-- 不作为用户词库、学习记录、候选偏好或同步明文数据管理页面。
+目标：
+
+- 在真实应用输入框中使用 RadishLex。
+- 平台壳通过 FFI 获得按键消费结果、commit、composition 和 candidates。
+- 用户真实选择进入本地学习，并影响后续候选排序。
+- 保持断网可用和平台原生候选交互。
+
+交付：
+
+- `platforms/macos-imk`
+- 安装、启用、移除和 smoke runbook
+- 平台契约测试与非敏感人工验证记录
+
+退出标准：
+
+- 开发版输入法可按 runbook 安装并完成连续中文输入。
+- 按键透传、候选导航、提交、取消、重置和多 session 行为正确。
+- 重启后用户词库仍在，学习结果能影响真实候选。
+- 输入热路径不发起网络请求，平台壳不承载排序、同步或隐私真相源。
+
+## Phase 6：Android 输入法
+
+目标：
+
+- 使用 Kotlin `InputMethodService` 和 Rust NDK bridge 落地 Android IME。
+- 处理生命周期、前后台、键盘 UI、设备密钥和移动端隐私模式。
+
+交付：
+
+- `platforms/android-ime`
+- Android native bridge、instrumented tests 和设备矩阵
+
+退出标准：
+
+- 常见 Android 版本与目标设备可稳定输入。
+- Rust core 复用成立，Kotlin 不承载用户词库、ranker 或同步真相源。
+- 平台密钥能力有真实设备证据，不依赖未经验证的算法假设。
+
+## Phase 7：Windows 输入法
+
+目标：
+
+- 使用 TSF 薄壳接入 Rust core。
+- 复用 Windows 原生候选与文本服务生命周期。
+
+交付：
+
+- `platforms/windows-tsf`
+
+退出标准：
+
+- 主流 Windows 版本可稳定注册、输入、升级和移除。
+- TSF 壳保持平台适配职责，不复制核心业务状态。
+
+## Phase 8：iOS Keyboard Extension
+
+目标：
+
+- 使用 Swift / UIKit Keyboard Extension 和 Rust XCFramework。
+- 默认离线可用，在 full access 边界内提供可选同步。
+
+交付：
+
+- `platforms/ios-keyboard`
+
+退出标准：
+
+- 无 full access 时核心输入可用且不尝试联网。
+- 内存、生命周期、App Group 和审核边界有真实设备证据。
+
+## Phase 9：自研 Rust Engine
+
+目标：
+
+- 在产品与评测证明有必要时，逐步替换成熟底层引擎。
+- 保持既有 engine trait、用户数据和平台壳兼容。
 
 进入条件：
 
-- OIDC / admin scope 或等价部署者认证边界已固定。
-- Go server admin API 权限模型、错误语义和脱敏测试已稳定。
-- 确认 Docker Compose 不会默认对公网暴露 WebUI。
-
-停止线：
-
-- 不展示明文用户词库、明文输入历史、明文候选偏好、明文上下文或 P1 原始事件。
-- 不展示 token、恢复码、私钥、wrapped material、signature bytes 或 encrypted payload bytes。
-- 不影响当前 Phase 4 Flutter manager 的真实 Dart FFI bridge 推进顺序。
-
-## Phase 5: 第一个真实平台
-
-周期建议：第 5-6 个月
-
-建议首选：
-
-- Linux Fcitx5 插件，或者
-- macOS InputMethodKit 原型。
-
-目标：
-
-- 在真实输入框中使用 RadishLex。
-- 输入热路径调用 Rust core。
-- 管理 UI 可查看学习结果。
+- 至少一个真实平台、个人化学习和自部署同步已经稳定。
+- 已有公开行为规格、评测集和明确的替换收益。
+- 不依赖复制外部引擎源码、私有结构或受限词库。
 
 退出标准：
 
-- 至少一个平台可日常打字。
-- 学习记录能影响真实输入候选。
+- 自研 engine 在输入质量、延迟、资源占用和兼容性评测上达到既定基线。
+- 替换不破坏 userdb、ranker、FFI、同步和平台壳边界。
 
-## Phase 6: Android
+## Future Topic：Sync Server Admin Console
 
-周期建议：第 7-8 个月
+这是部署者可选运维界面，不属于 Phase 3 或 Phase 4 的退出条件。进入实现前必须先固定管理员认证、scope、脱敏 API 和公网暴露策略。
 
-目标：
-
-- Kotlin InputMethodService 薄壳。
-- Rust core via NDK。
-- Flutter 设置 App。
-- 本地学习和同步可用。
-
-退出标准：
-
-- Android 真机可作为系统输入法使用。
-- 基础拼音、候选、提交、退格、符号页可用。
-
-## Phase 7: Windows
-
-周期建议：第 9-10 个月
-
-目标：
-
-- TSF 薄壳。
-- Rust core 集成。
-- 基础候选窗。
-- 安装与启用流程。
-
-退出标准：
-
-- Windows 桌面应用中可稳定输入中文。
-- 候选窗定位和焦点行为通过常见应用验证。
-
-## Phase 8: iOS
-
-周期建议：第 11-12 个月
-
-目标：
-
-- Swift Keyboard Extension。
-- Rust core via XCFramework。
-- Flutter 设置 App。
-- 离线可用。
-- full access 同步模式。
-
-退出标准：
-
-- iOS 真机可用。
-- 未开启 full access 时不影响基础输入。
-- 开启 full access 后可同步密文数据。
-
-## Phase 9: 自研 Rust 引擎
-
-周期建议：第 2 年开始
-
-目标：
-
-- 自研全拼引擎。
-- 自研双拼支持。
-- 自研词库编译格式。
-- 自研语言模型和纠错。
-
-策略：
-
-- 不一次性替代 librime。
-- 先做最小可用全拼。
-- 用同一套 Engine trait 并行对比。
-- 逐步迁移高价值路径。
+它只能展示服务健康、migration、存储、备份恢复、升级回滚、认证模式和脱敏 audit 摘要；不得展示明文用户词库、输入历史、候选偏好、token、恢复码、私钥、wrapped material、signature bytes 或 encrypted payload bytes。详细边界见 [Sync Server Admin Console](sync-server-admin-console.md)。

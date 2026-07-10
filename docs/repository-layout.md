@@ -1,13 +1,19 @@
-# RadishLex 仓库结构草案
+# RadishLex 仓库结构
+
+本文档说明 RadishLex 当前已提交的目录、模块职责和规划但尚未落地的边界，读者是维护者和实现者。本文不记录逐文件实现进度、测试流水、未来审批过程或平台安装步骤；当前批次见 `docs/status/current.md`，实现事实见源码和 devlog，平台操作见 runbook。
+
+## 当前结构
 
 ```text
 RadishLex/
   README.md
   LICENSE
   AGENTS.md
+  CLAUDE.md
   Cargo.toml
-  go.work
-  melos.yaml
+  Cargo.lock
+  .github/
+    workflows/
   crates/
     ime-core/
     ime-engine-rime/
@@ -22,311 +28,238 @@ RadishLex/
       cmd/
       internal/
       migrations/
-      configs/
       Dockerfile
   deploy/
     sync-server/
-      caddy/
       docker-compose.local.yaml
       docker-compose.yaml
       nginx.prod.conf
   apps/
     radishlex-manager/
-      flutter/
-    desktop-tools/
-      egui-inspector/
   platforms/
-    windows-tsf/
-    macos-imk/
-    linux-fcitx5/
-    linux-ibus/
     android-ime/
-    ios-keyboard/
+      keystore-bridge/
   docs/
     status/
-      current.md
-    devlogs/
-      2026-W27.md
-      2026-W27/
-    technical-plan.md
-    roadmap.md
-    repository-layout.md
-    privacy-sync.md
-    cli.md
-    engine-boundary.md
-    engine-rime-adapter.md
-    personalization-learning.md
-    sync-payload.md
-    crypto-boundary.md
-    sync-key-management.md
-    sync-server-api-storage.md
-    sync-server-oidc-roadmap.md
-    sync-server-admin-console.md
-    production-recovery-flow.md
-    platform-private-key-backend-strategy.md
-    manager-ui-boundary.md
-    manager-local-acceptance.md
-    manager-sync-entry-boundary.md
-    manager-recovery-device-auth-flow.md
-    manager-readiness-scenarios.md
-    manager-sync-action-protocol-preview.md
-    manager-sync-action-acceptance-matrix.md
-    manager-settings-diagnostics.md
-    ffi-boundary.md
+    remediation/
     adr/
     runbooks/
-    platform-notes/
+    devlogs/
   scripts/
-    check-repo.sh
-    check-repo.ps1
-    check-text-files.sh
-    check-text-files.ps1
-  examples/
-    sample-schemas/
-    sample-userdb/
   tests/
     fixtures/
-    integration/
 ```
 
-## 目录说明
+这个树只列出已提交的主要入口。构建产物、IDE 配置、本地日志、临时目录、真实密钥和部署数据不属于仓库结构。
 
-- `crates/`：Rust 核心和跨端复用库。
-- `server/`：Go 自部署同步服务。
-- `deploy/`：容器部署、反向代理和环境切换配置。
-- `apps/`：Flutter 管理器和可选工程工具。
-- `platforms/`：各平台系统输入法薄壳。
-- `docs/`：项目文档真相源。
-- `scripts/`：仓库检查、格式和构建脚本。
-- `examples/`：示例输入方案、词库和同步样本。
-- `tests/`：跨语言、跨平台集成测试。
+## 顶层职责
 
-## 当前已落地
+| 路径 | 职责 | 边界 |
+| --- | --- | --- |
+| `crates/` | Rust 输入核心、学习、加密、同步和 FFI | 跨平台业务真相源 |
+| `server/` | Go 自部署同步服务 | 只处理密文对象和必要 metadata |
+| `deploy/` | Compose、反向代理和部署示例 | 不保存真实 secret 或运行数据 |
+| `apps/` | Flutter manager | 不进入输入热路径 |
+| `platforms/` | 系统输入法与平台能力薄壳 | 不承载排序、同步或隐私真相源 |
+| `docs/` | 正式文档、临时整改、ADR、runbook 和周志 | 按文档职责分离当前状态与稳定边界 |
+| `scripts/` | 仓库检查、构建和 smoke 入口 | 根目录只保留稳定高频入口 |
+| `tests/` | 跨模块共享 fixture | 不存真实用户或敏感数据 |
+| `.github/` | PR、Release 和仓库治理 workflow | 门禁应覆盖真实交付链 |
 
-- `Cargo.toml`：Rust workspace 入口。
-- `deploy/sync-server/docker-compose.local.yaml`：Go sync server 本地容器验证入口，使用 Caddy internal TLS 暴露 `https://localhost:7319`。
-- `deploy/sync-server/docker-compose.yaml`：Go sync server 部署态入口，只暴露 HTTP 上游 `http://127.0.0.1:7319`，外部反代负责 TLS。
-- `deploy/sync-server/.env.example`：唯一 env 示例，真实部署复制为 `.env` 后修改。
-- `deploy/sync-server/nginx.prod.conf`：生产外部 Nginx TLS 终止示例。
-- `apps/radishlex-manager/`：Flutter manager 起步工程，通过受控 `ManagerBridge` contract 接入管理数据源；默认使用合成 fixture，显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时可切到真实 Dart FFI bridge，展示本地词库、import batches、学习摘要、rank explain 摘要、sync preflight、配置来源诊断、settings JSON 草案持久化、sync gate 状态来源、连接健康、`sync_connection_health.v1` 摘要回填、恢复码 / 设备授权只读准备态、`manager_sync_readiness.v1` 内存态导入、readiness 聚合、开发期 evidence bundle 同源回归、只读交互进入计划、`manager_sync_action_command_preview.v1` 非执行命令预演、request / result preview、脱敏诊断报告、结构化错误分类、设备签名状态和设置草案；UI 代码已按 manager shell、跨页 action 编排、词库、学习、同步、设置、词库子组件、学习子组件、同步子组件、设置诊断子组件和共享组件拆分，widget tests 已按页面迁入 `test/screens/`，action helper 结果文案和 failure 分类已有回归测试，Dart model 已按 dictionary、learning、sync、sync entry、sync action preview、settings、diagnostics 和 snapshot 分组，动态 FFI bridge 已按符号加载、调用规则、ABI struct types、view copy、高层 manager model mapper、readiness mapper 和 native DTO 能力分组边界拆分；本地验收口径已由 `docs/manager-local-acceptance.md` 固定，真实同步入口前置边界已由 `docs/manager-sync-entry-boundary.md` 固定，恢复码与设备授权只读流程已由 `docs/manager-recovery-device-auth-flow.md` 固定，readiness 场景目录和 action 协议预演边界已由 `docs/manager-readiness-scenarios.md`、`docs/manager-sync-action-protocol-preview.md` 与 `docs/manager-sync-action-acceptance-matrix.md` 固定，真实远端同步、恢复码生成 / 输入、join request 创建、设备授权成功和设备撤销 UI 仍按管理端边界关闭。
-- `platforms/android-ime/keystore-bridge/`：Android Keystore bridge 仓库内 Kotlin / Gradle harness，固定 `android-keystore-v1` 的 `AndroidKeyStore` / `Ed25519` 创建、加载、公钥读取、签名、删除、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke / 设备矩阵记录模板，以及 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 失败记录；Rust raw JNI glue 位于 `crates/ime-crypto`，该目录当前不包含完整 Android IME。
-- `crates/ime-core/`：Rust 输入核心领域模型与 engine boundary 起步 crate。
-- `crates/ime-cli/`：基于 demo adapter、可选 Rime adapter、userdb 和 ranker 的命令行复验入口。
-- `crates/ime-engine-rime/`：Rime adapter crate，默认不启用 native 绑定。
-- `crates/ime-ffi/`：C ABI 起步 crate，覆盖 ABI contract、opaque handle、session owner-thread policy、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、learning status、rank explain、sync preflight 状态摘要、userdb 管理入口、dictionary 文件管理入口和 host smoke。
-- `crates/ime-sync/`：同步 payload 来源分类、对象类型、P2 envelope 组装、加密对象外壳草案、设备生命周期、对象版本冲突、客户端合并模型、signed device authorization、signed device revocation、remote client DTO / transport trait 和 std-only `http://` HTTP transport。
-- `crates/ime-crypto/`：客户端加密本地模型 crate，当前覆盖 key role、object envelope、AAD、nonce、ciphertext hash、device wrapping、recovery material、Argon2id recovery KDF、Ed25519 signing、test-memory signing key store、platform backend capability / unavailable 模型、feature-gated macOS Keychain backend、feature-gated Android Keystore bridge wrapper / contract / raw JNI glue、signed object manifest 和 signed recovery record。
-- `server/sync-server/`：Go sync server 起步 module，当前覆盖配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、device wrapping encrypted key bytes 承载、recovery wrapped material 读取接口、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、单用户 bearer access token 门禁、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、`cmd/radishlex-sync-server`、runtime 配置装配、HTTP timeout、对象大小门禁、脱敏 audit logger、本机 smoke runbook、短生命周期双设备 HTTP smoke、Dockerfile / `.dockerignore`、Docker Compose 本地 / 部署态入口、生产部署 runbook、Rust HTTP transport 直连 Go server 的短生命周期跨语言测试，以及 Rust userdb 两客户端真实 Go HTTP 同步测试；不包含完整真实用户生产封装。
-- `docs/cli.md`：`radishlex-ime-cli` 命令、输出、退出码和安全边界说明。
-- `docs/status/current.md`：新会话短入口，记录当前阶段、已落地能力、验证基线、停止线和近期推进顺位。
-- `docs/devlogs/2026-W27.md`：2026-W27 周志索引；历史流水已按天拆到 `docs/devlogs/2026-W27/`。
-- `docs/engine-boundary.md`：Rust core 与底层输入引擎的稳定边界。
-- `docs/engine-rime-adapter.md`：`ime-engine-rime` 的 adapter 边界、构建策略和验证分层。
-- `docs/personalization-learning.md`：Phase 2 个人化学习、userdb、ranker、负反馈和 CLI 管理边界。
-- `docs/sync-payload.md`：同步 payload 草案和 P1/P2 来源分类。
-- `docs/crypto-boundary.md`：`ime-crypto` 进入实现前的客户端加密、密钥、envelope 和验证边界。
-- `docs/sync-key-management.md`：真实同步前的同步密钥、设备授权、恢复码、设备撤销、key epoch 和冲突边界。
-- `docs/sync-server-api-storage.md`：Go sync server API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和停止线。
-- `docs/sync-server-oidc-roadmap.md`：后续接入 Radish 产品账号体系或兼容 OIDC IdP 的认证边界、身份映射、scope 草案和停止线。
-- `docs/sync-server-admin-console.md`：Docker 部署后端未来可选 WebUI / 管理控制台的运维定位、权限边界、可见数据、禁止字段和停止线；不影响当前管理端近期计划。
-- `docs/production-recovery-flow.md`：生产恢复记录创建、轮换、撤销、新设备恢复加入、失败限速和停止线。
-- `docs/platform-private-key-backend-strategy.md`：平台私钥 backend 当前证据、禁止 fallback、生产合格条件和无新设备时的推进路径。
-- `docs/manager-ui-boundary.md`：Phase 4 Flutter manager 的职责、数据可见性、同步 UI 状态、恢复码 / 设备授权停止线和第一批功能顺序。
-- `docs/manager-local-acceptance.md`：Phase 4 Flutter manager 本地管理能力的验收范围、退出标准映射、验证入口、隐私检查和真实同步停止线。
-- `docs/manager-sync-entry-boundary.md`：真实同步入口进入 UI / bridge 前的恢复码、设备授权、状态门禁、错误分类、诊断脱敏和测试计划。
-- `docs/manager-recovery-device-auth-flow.md`：恢复码 setup / restore、设备 join / revocation 四条只读交互状态机、readiness 聚合、只读 action intent 进入计划和 action command preview 停止线。
-- `docs/manager-readiness-scenarios.md`：`manager_sync_readiness.v1`、开发期 `manager_sync_evidence_bundle.v1`、settings / sync / diagnostics 同源回归和 action preview 场景目录。
-- `docs/manager-sync-action-protocol-preview.md`：`manager_sync_action_command_preview.v1` 的 request / result boundary、allowed fields、forbidden material、data policy、stop line 和错误分类。
-- `docs/manager-sync-action-acceptance-matrix.md`：四条 action 的 execution / request / result status 矩阵、fixture 真相源和验证入口。
-- `docs/manager-settings-diagnostics.md`：settings draft JSON、连接健康摘要、诊断报告字段索引和脱敏边界。
-- `docs/adr/0002-recovery-code-kdf.md`：恢复码 Argon2id KDF、格式、恢复记录字段和生产实现验证口径。
-- `docs/adr/0003-device-signing-key-storage.md`：设备签名、签名对象、私钥存储抽象、错误语义和验证口径。
-- `docs/adr/0004-platform-private-key-storage-backend.md`：平台私钥存储 backend、capability metadata、FFI 边界、错误语义和停止线。
-- `docs/ffi-boundary.md`：后续 C ABI、所有权、生命周期和错误语义边界。
-- `docs/runbooks/ffi-platform-call-contract.md`：平台绑定层调用 C ABI 的错误、字符串、handle 释放和 owner-thread 调度规则。
-- `docs/runbooks/rime-native-smoke.md`：真实 `librime` 本机 smoke 操作步骤。
-- `docs/runbooks/apple-keychain-signing-backend.md`：`apple-keychain-v1` 创建、加载、签名、删除、锁屏 / 权限、备份迁移和日志脱敏验证边界。
-- `docs/runbooks/android-keystore-signing-backend.md`：`android-keystore-v1` Ed25519 创建、加载、签名、删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界。
-- `docs/runbooks/sync-server-local-smoke.md`：Go sync server 本机启动边界、自动化 smoke 和日志脱敏检查。
-- `docs/runbooks/sync-server-compose.md`：Go sync server Docker Compose 本地 HTTPS、部署态 HTTP 上游、持久化目录、外部反代示例、清理和停止线 runbook。
-- `scripts/check-manager.sh`：Flutter manager 格式、静态分析和 widget 测试入口。
-- `scripts/check-manager-ffi-smoke.sh`：Flutter manager 真实 Dart FFI bridge 的短生命周期 smoke，构建 `radishlex-ime-ffi` 动态库并使用临时 SQLite userdb、settings JSON、合成 TSV 和导出文件复验本地管理、import batches、rank explain、导入导出、设置草案和脱敏诊断报告链路，同时确认 future sync command symbol 未导出。
-- `scripts/check-sync-server-deployment-rehearsal.sh` / `scripts/check-sync-server-deployment-rehearsal.py`：sync server 部署态 Compose 的短生命周期预演入口，使用临时 env、随机 bearer token、仓库外数据目录和冷备份恢复复验。
-- `scripts/check-sync-server-connection-health.sh` / `scripts/check-sync-server-connection-health.py`：sync server 本地只读连接健康探测入口，读取 endpoint、access token 存在性和 `/api/v1/domains/<probe>/state` 状态，只输出 `sync_connection_health.v1` 非敏感摘要。
-- `scripts/check-sync-deployment-evidence.sh` / `scripts/check-sync-deployment-evidence.py`：目标部署证据包校验和摘要入口，验证 `deployment_evidence.v1` 字段、状态枚举、固定 Compose 文件、时间戳、目标别名、commit、image tag 和敏感内容黑名单，并在校验通过后导出 `deployment_evidence_summary.v1` 非敏感摘要。
-- `tests/fixtures/sync-deployment-evidence-valid.txt`：目标部署证据包校验器使用的合成非敏感 fixture，不代表真实部署。
+## 当前成熟度边界
 
-## Rust crates 建议
+| 范围 | 已有工程形态 | 尚未形成的产品能力 |
+| --- | --- | --- |
+| Rust input | core、Rime adapter、CLI、FFI 原型 | 完整 KeyOutcome 平台 ABI 和真实 input runtime |
+| 本地学习 | userdb、ranker、管理接口和测试 | 事务化用户意图、有效 recency 和固定评测基线 |
+| 同步 | crypto/sync 模型、Go server、HTTP 集成测试 | 确定合并、完整设备生命周期、生产 HTTPS 编排 |
+| Flutter manager | macOS 工程、真实开发期 FFI bridge、widget tests | 默认产品 FFI bundle、持久化和平台文件访问 |
+| 平台 | Android Keystore 能力验证桥 | macOS InputMethodKit 或其他真实系统输入法 |
+
+具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
+
+## Rust crates
 
 ### ime-core
 
-输入法核心领域模型：
+平台无关输入领域模型：
 
-- `InputSession`
-- `KeyEvent`
-- `Composition`
-- `Candidate`
-- `Commit`
-- `Engine`
-- `Ranker`
-- `LearningEvent`
+- input session
+- key event 与 KeyOutcome
+- composition、candidate、commit
+- engine trait 与 schema/status
+- 核心错误类型
 
-当前已落地 `InputSession`、`KeyEvent`、`Composition`、`Candidate`、`Commit`、`Engine` 和基础生命周期测试。`Ranker` 与 `LearningEvent` 后续在个人化学习阶段补齐。
+不得依赖 SQLite、Rime 私有类型、网络或平台框架。
 
 ### ime-engine-rime
 
-librime adapter：
+`librime` adapter：
 
-- 封装 librime session。
-- 转换 librime candidate 到 RadishLex candidate。
-- 屏蔽 C++ 细节。
+- native binding 与构建探测
+- 进程级 Rime runtime
+- Rime session 生命周期
+- key/composition/candidate/commit/status 转换
+- adapter 错误和 native smoke
 
-当前已落地配置模型、错误类型、key 分类、候选转换、`native-rime` build 探测、FFI session 生命周期、输入处理、context / commit 读取路径；默认 workspace 检查不依赖本机安装 `librime`。macOS 本机 `librime` 1.17.0 与隔离 `luna_pinyin` 数据目录下的 native smoke 已覆盖首候选、非首候选、翻页后当前页候选和越界候选索引错误。
+Rime 私有概念不得越过该 crate。
 
 ### ime-ranker
 
-候选重排：
+纯候选重排与 explain：
 
-- 个人词权重。
-- 最近使用。
-- 应用上下文。
-- 短语上下文。
-- 负反馈。
+- engine 顺序因子
+- user term、frequency、recency、context
+- negative、suppressed、deleted
+- deterministic ordering 与评测 helper
 
-当前已创建 `crates/ime-ranker/`，落地 `RankRequest`、`RankedCandidate`、结构化 explain 输出和频次、近期、上下文、负反馈、suppressed、deleted tombstone 排序测试；`ime-cli rank explain` 已接入基础解释链路。
+不得直接访问 SQLite、网络或平台 API。
 
 ### ime-userdb
 
-本地用户词库：
+SQLite 用户数据层：
 
-- SQLite schema。
-- 词条 CRUD。
-- 选择事件。
-- 学习记录。
-- 导入导出。
+- user terms 与 tombstone
+- selection 和 negative feedback
+- ranker summary
+- import/export 与 batches
+- schema migration、事务和同步 payload adapter
 
-当前已创建 `crates/ime-userdb/`，落地 SQLite schema migration、用户词条 CRUD、选择事件记录、负反馈记录、删除 tombstone、ranker weight 摘要、用户词库导入导出、同步前置计数、`dictionary.user_terms` / `ranker.weights` / `dictionary.deleted_terms` P2 plaintext payload 只读迭代器、已解密 P2 JSON 到 `ime-sync` merge input 的解析入口、合并结果写回真实 userdb 的事务执行器，以及两客户端 userdb 同步边界 integration test；基础 CLI 管理入口已由 `ime-cli` 承接。
-
-### ime-sync
-
-同步客户端：
-
-- 增量同步。
-- 冲突合并。
-- 版本管理。
-- 设备状态。
-
-当前已创建 `crates/ime-sync/`，落地 payload 来源分类、同步对象类型、P1/P2/本地审计分层、P2 plaintext payload 到 `ime-crypto` envelope 的 Rust 内部组装边界、从 crypto envelope 派生加密对象外壳元数据、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型、客户端解密后合并模型、remote client DTO / transport trait 和 std-only `http://` HTTP transport；不启动长期运行后端，不开放用户可用同步。
+本地原始事件和 P2 同步摘要必须有明确转换边界。若 `ime-userdb` 依赖同步协议类型，应通过窄 adapter 或中立领域模型控制依赖方向。
 
 ### ime-crypto
 
-加密：
+客户端密码边界：
 
-- 主密钥。
-- 设备密钥。
-- blob 加密。
-- 签名和校验。
+- key material 与 role
+- AEAD envelope、AAD、nonce、hash
+- device wrapping 与 recovery KDF
+- signing、verification 和 platform key backend
+- secret redaction/zeroization
 
-当前已创建 `crates/ime-crypto/`，落地 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、Argon2id recovery KDF、key role、object envelope、AAD、nonce、device key descriptor、device wrapping key / record、recovery material、Ed25519 设备签名、test-memory signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断、feature-gated macOS Keychain backend、feature-gated Android Keystore 不可用门禁、Rust bridge wrapper 和 bridge contract、signed sync object manifest、signed recovery record、删除同步和篡改失败测试；生产恢复流程和平台私钥存储 backend 边界已由文档固定，`apple-keychain-v1` 真实 smoke 阻塞于 `ed25519-v1` 创建，status 在 blocker 解除前阻断生产签名，`android-keystore-v1` 已补 runbook、feature、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin bridge source、Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，已补 Rust raw JNI glue，Android target build 已通过 `./scripts/check-android-target.sh`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
+不得包含 HTTP、Go server DTO 或 Flutter 状态。
+
+### ime-sync
+
+客户端同步协议和 orchestration：
+
+- P2 object 与版本
+- device/recovery/revocation lifecycle
+- deterministic merge
+- signed/encrypted remote DTO
+- discovery、download、upload、retry 和 transport
+
+不得提供 plaintext 远端上传入口。
 
 ### ime-ffi
 
-跨语言边界：
+C ABI 与 host contract：
 
-- C ABI。
-- Flutter bridge。
-- Swift/Kotlin/C++ 调用边界。
+- version/capability
+- session、runtime 和 manager handles
+- string/buffer/view ownership
+- structured errors 与 panic boundary
+- thread policy 与 release functions
 
-当前已创建 `crates/ime-ffi/`，落地 C ABI 起步验证：ABI contract、opaque session handle、session owner-thread policy、session options、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、learning status 摘要、rank explain 摘要、sync preflight 状态摘要、userdb 管理入口、dictionary 文件管理入口、释放函数 panic 边界、schema 设置、按键输入、snapshot 和候选提交。当前 host smoke 使用 deterministic demo engine，不代表真实平台壳已接入。
+生产源码只保存真实 ABI 和必要兼容层。审批流程、未来 symbol 列表和“尚未导出”证明应放文档或历史材料，不应长期存在于 `src/`。
 
 ### ime-cli
 
-调试工具：
+开发和领域验证入口：
 
-- 输入 demo。
-- 词库导入导出。
-- 同步测试。
-- ranker explain。
+- real/demo engine 输入
+- dictionary 与 learning
+- rank explain
+- sync preflight 和受控 smoke
 
-当前已落地基于合成 demo adapter 的 `demo <input-code> [candidate-index]` 命令，以及需要 `native-rime` feature 和本机 `librime` 依赖的 `rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] [--rank-db <path>] [--context <kind>] <input-code> [candidate-index]` 命令。`demo` 用于默认复验 `ime-core` 生命周期；它不代表真实中文输入引擎。Phase 2 起步已补 `dict list/add/delete`、`learn select/suppress`、`rank explain` 和 Rime rank smoke，通过显式 `--db` / `--rank-db` 的临时 SQLite 数据库复验用户词条、学习事件、负反馈、真实 engine candidates 重排和 explain 输出。
+CLI 不作为平台壳或 manager 的运行时依赖。
 
-## Go server 建议
-
-Go server 当前实现继续以 `docs/sync-server-api-storage.md` 为 API、storage、错误语义和验证边界。服务端只保存密文对象、设备公钥、签名记录、版本和必要同步元数据，不解析 userdb payload，不接触 P1 原始事件，也不进入输入热路径。
+## Go sync server
 
 ```text
 server/sync-server/
-  cmd/radishlex-sync-server/
-  internal/api/
-  internal/auth/
-  internal/devices/
-  internal/sync/
-  internal/storage/
-  internal/packages/
-  internal/config/
-  migrations/
-  configs/
+  cmd/radishlex-sync-server/   executable assembly
+  internal/api/                HTTP routing and DTO mapping
+  internal/config/             environment configuration
+  internal/runtime/            server lifecycle and wiring
+  internal/storage/            metadata and blob repositories
+  migrations/                  embedded SQLite migrations
 ```
 
-优先支持：
+边界要求：
 
-- 单用户模式。
-- SQLite。
-- Docker Compose。
-- 本地文件对象存储。
+- `api` 不绕过 storage interface 直接访问 SQLite 或 blob path。
+- `storage` 负责 metadata/blob 一致性、签名验证前置和持久化错误语义。
+- `runtime` 负责 timeout、shutdown、audit 和依赖装配。
+- `cmd` 保持薄，只处理启动、配置和退出码。
+- 默认单用户 SQLite，自部署优先，不提前拆微服务或多租户。
 
-当前已起步 `server/sync-server/`，但只实现 metadata / storage / API / runtime 验证模型、SQLite-backed metadata repository、local object storage staged transaction、对象 Rust envelope hash / length 复验、Ed25519 签名验签门禁、device wrapping encrypted key bytes 承载、recovery wrapped material 读取、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、单用户 bearer access token 门禁、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、启动入口、runtime 配置装配、脱敏日志、本机 runbook、Docker Compose 本地 / 部署态入口、生产部署 runbook 和短生命周期双设备 HTTP smoke。Rust `ime-sync` 已起步 remote client DTO / transport trait、std-only `http://` HTTP transport 和可选 bearer token header，`ime-userdb` 已补两客户端 userdb harness 和真实 Go HTTP 两客户端测试，Rust HTTP transport 直连 Go server 的短生命周期跨语言测试已覆盖对象上传、下载和 stale conflict；OIDC / Radish 产品账号体系只作为后续专题规划，当前不实现账号系统；完整真实用户生产封装、Flutter manager 和平台壳继续后置。
-
-后续支持：
-
-- 多用户。
-- Postgres。
-- S3-compatible storage。
-- OIDC。
-
-## Flutter app 建议
-
-管理端实现遵循 `docs/manager-ui-boundary.md`，本地验收口径见 `docs/manager-local-acceptance.md`，真实同步入口前置边界见 `docs/manager-sync-entry-boundary.md`。当前 `apps/radishlex-manager/` 已创建 macOS Flutter 工程，第一批页面通过 `ManagerBridge` contract 展示本地 userdb 管理、import batches、学习状态摘要、rank explain 摘要、sync preflight 摘要、配置来源诊断、settings JSON 草案持久化、sync gate 状态来源、脱敏诊断报告和结构化错误分类；默认仍使用合成 fixture，显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时可切到真实 Dart FFI bridge。页面结构已拆出 manager action 编排、词库子组件、学习子组件、同步子组件、设置诊断子组件和页面级 widget tests，并已补 action helper 级结果文案和 failure 分类回归测试，避免继续扩大单个 screen 或根 `widget_test.dart`。真实远端同步、恢复码和设备授权 UI 必须等待可用平台私钥 backend、目标部署运行证据和对应实现测试。
+## Flutter manager
 
 ```text
 apps/radishlex-manager/
-  lib/
-    src/
-      bridge/
-      models/
-      screens/
-        dictionary/
-        manager/
-        settings/
-    main.dart
-  test/
-    screens/
+  lib/src/bridge/       Dart FFI and ManagerBridge
+  lib/src/models/       UI-facing immutable models
+  lib/src/screens/      manager, dictionary, learning, sync, settings
+  lib/src/data/         explicit fixture/demo data
+  test/                 unit, mapper and widget tests
+  macos/                Flutter macOS host
 ```
 
-优先页面：
+边界要求：
 
-- Dashboard
-- Dictionary
-- Learning
-- Privacy
-- Sync
-- Devices
-- Settings
+- `bridge` 复制 native borrowed data 后再释放 handle。
+- `models` 不重新实现 Rust 排序、合并或隐私规则。
+- `screens` 只编排用户交互和展示结构化状态。
+- fixture 必须通过显式开发模式启用，不可成为产品默认成功路径。
+- 产品构建需要打包匹配版本的 Rust native library。
 
-## 平台壳建议
+后续若支持更多 Flutter host，应复用 manager bridge 和模型，但不把 Flutter 引入系统输入候选窗。
 
-平台壳只允许承担：
+## 平台目录
 
-- 系统输入法生命周期。
-- 按键事件接收。
-- 候选窗展示。
-- 提交文本。
-- 调用 Rust core。
+当前 `platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
 
-平台壳不应承担：
+规划目录按进入顺序创建：
 
-- 用户词库逻辑。
-- 同步逻辑。
-- 候选排序逻辑。
-- 隐私策略。
-- 业务配置真相源。
+1. `platforms/macos-imk/`：第一真实平台。
+2. `platforms/linux-fcitx5/`：后续桌面候选。
+3. `platforms/android-ime/`：在现有 keystore bridge 之外补完整 IME。
+4. `platforms/windows-tsf/`。
+5. `platforms/ios-keyboard/`。
+
+只有对应平台设计边界和退出标准明确后才创建目录。空目录、占位文件或安装脚本不构成平台进度证据。
+
+## 文档目录
+
+- `docs/status/current.md`：唯一当前阶段短入口。
+- `docs/remediation/`：当前状态明确引用的临时执行专题，完成后归档。
+- `docs/adr/`：已决策且需要长期追溯的架构选择。
+- `docs/runbooks/`：可重复操作步骤、环境前提和停止线。
+- `docs/devlogs/`：周内事实、命令、提交和历史流水。
+- `docs/*.md`：稳定架构、边界、协议、guide 或 reference。
+
+新增或大改文档必须在开头说明用途、读者和不包含内容。状态事实不得复制到多个稳定专题；详细实现流水不得进入 roadmap 或协作入口。
+
+## 规划但尚未落地
+
+以下内容不是当前仓库事实，只有出现真实需要时才创建：
+
+- `go.work`：只有出现第二个 Go module 时再评估。
+- `melos.yaml`：只有出现多个需要统一编排的 Dart/Flutter package 时再评估。
+- `examples/`：只有形成可维护的公开 schema、词库或配置样例后创建。
+- 顶层 `tests/integration/`：只有跨语言测试无法合理归属现有 crate/server 时创建。
+- `apps/desktop-tools/`：不为一次性调试工具提前建目录。
+- 未进入当前顺位的平台壳目录。
+
+规划名称不构成承诺。新增目录前应先确认职责不能由现有模块清晰承担。
+
+## 结构治理规则
+
+- 单个源码文件接近 1000 行时优先拆分职责，原则上不超过 1500 行。
+- `src/` 使用浅层职责分组，避免全部平铺或过深目录树。
+- `scripts/` 根目录保留稳定入口，较长实现放浅层分类目录。
+- committed 相对路径默认不超过 180 个字符。
+- 生成物、SDK、native build cache、IDE 私有状态、真实部署数据和 secret 不提交。
+- 测试 fixture 只能使用合成或公开数据，不包含真实输入历史和联系人。
+- 目录变化影响职责或平台策略时，同步更新本文；逐文件进度变化不更新本文。
