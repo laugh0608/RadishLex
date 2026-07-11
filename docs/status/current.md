@@ -32,14 +32,14 @@ RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/syn
 - userdb、ranker、crypto、sync、Go storage/API 和 manager 已有较丰富合成测试。
 - 本地 Docker/HTTPS、备份恢复、外部 TLS 反代和升级回滚已有开发或实现级 smoke。
 - Apple/Android 平台签名 backend 在能力不足时保持 unavailable，没有静默回退为生产密钥。
+- `ime-ffi` ABI contract v2 已无损返回 `consumed`、可选即时 commit 和同事件 snapshot；输入侧 C header 已通过 C11 与 Objective-C 编译测试。
 
 这些证据证明工程原型可继续演进，不证明真实平台输入、生产同步或产品发布已经完成。
 
 ## 已确认阻塞
 
-- `ime-ffi` 丢弃 `KeyOutcome` 的 `consumed` 和即时 `commit`，平台无法正确分流按键和提交文本。
-- 仓库缺少供 Swift / Objective-C 消费并受测试约束的 C header 或等价模块边界。
 - librime setup/initialize/finalize 尚未收口为进程级 runtime。
+- macOS InputMethodKit 薄壳、bundle build 和真实应用输入 smoke 尚未落地。
 - 输入 session 未组合 engine、ranker、userdb 与 privacy policy，真实选择没有进入平台学习热路径。
 - userdb 用户意图缺少统一事务、WAL/busy 策略；ranker recency/frequency 语义需要修正。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
@@ -58,12 +58,12 @@ RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/syn
 
 ## 下一步顺位
 
-1. 以 `docs/ffi-boundary.md`、`docs/engine-rime-adapter.md` 和 `docs/macos-inputmethodkit-boundary.md` 为 R01A 实现契约，固定版本化 KeyOutcome ABI、input runtime、librime 进程级生命周期与 InputMethodKit 薄壳。
-2. 实施 R01A：返回 `consumed`、可选 `commit` 和 snapshot，补受测试约束的 C header 或等价模块，并打通 macOS 基础离线输入。
-3. 并行实施 R06A：修复严格 Clippy，增加 Flutter 与 Go race CI，清理 review-only Rust/Flutter 生产资产。
-4. R01A 退出后实施 R02L，修正 userdb 事务、SQLite 并发、recency、frequency 与删除语义。
-5. R02L 退出后实施 R01B，让真实选择在隐私策略约束下持久化并影响后续候选。
-6. 关闭整改专题，按路线图进入 M3 加密同步 Beta；最终打包、签名与升级属于 M4。
+1. 以 `docs/engine-rime-adapter.md` 为契约，收口 librime 进程级 setup/initialize/finalize、多 session 与异常退出测试。
+2. 按 `docs/macos-inputmethodkit-boundary.md` 创建 macOS 薄壳和 bundle build，先完成不安装系统输入法的 wrapper/contract smoke。
+3. 编写安装、启用和移除 runbook；获得授权后再执行真实应用输入 smoke，完成 R01A。
+4. 并行实施 R06A：修复严格 Clippy，增加 Flutter 与 Go race CI，清理 review-only Rust/Flutter 生产资产。
+5. R01A 退出后实施 R02L，修正 userdb 事务、SQLite 并发、recency、frequency 与删除语义。
+6. R02L 退出后实施 R01B，让真实选择在隐私策略约束下持久化并影响后续候选；之后关闭整改专题并进入 M3。
 
 ## 验证入口
 

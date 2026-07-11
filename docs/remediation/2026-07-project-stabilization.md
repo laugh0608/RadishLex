@@ -67,8 +67,8 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 
 以下问题已经确认，整改实现不再重复证明问题是否存在：
 
-- `ime-ffi` 丢弃 `KeyOutcome` 的 `consumed` 与即时 `commit`。
-- 仓库缺少供 Swift / Objective-C 消费并受测试约束的 C header 或等价模块边界。
+- `ime-ffi` 丢弃 `KeyOutcome` 的 `consumed` 与即时 `commit`。（已由 R01A 第一代码批关闭）
+- 仓库缺少供 Swift / Objective-C 消费并受测试约束的 C header 或等价模块边界。（已由 R01A 第一代码批关闭）
 - 输入 session 未组合 engine、ranker、userdb 和 privacy policy。
 - librime 全局 setup/initialize/finalize 仍由单个 engine session 隐式承担。
 - userdb 用户意图缺少统一事务，未配置 WAL、busy timeout 和明确并发策略。
@@ -83,7 +83,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | 批次 | 名称 | 状态 | 退出结果 |
 | --- | --- | --- | --- |
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
-| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；边界文档已对齐，待代码实现 | 真实应用可离线完成基础中文输入 |
+| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；KeyOutcome/header 已完成，待 runtime 与 macOS | 真实应用可离线完成基础中文输入 |
 | R02L | 本地 userdb/ranker 正确性 | 待开始 | 学习、删除、并发和排序语义正确 |
 | R01B | 真实学习纵向闭环 | 待开始，依赖 R01A 与 R02L | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 可与 R01A 并行 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
@@ -111,6 +111,15 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 补 owner-thread、多 session、reset、schema 切换、异常释放和进程退出测试。
 - 按 `docs/macos-inputmethodkit-boundary.md` 新增 macOS InputMethodKit 薄壳，只处理系统生命周期、按键、候选、commit 和 Rust FFI。
 - 编写开发版安装、启用和移除 runbook；真实安装仍需人工授权。
+
+### 当前完成证据（2026-07-11）
+
+- ABI contract v2 新增 Rust-owned `RadishLexKeyResult`，无损返回 `consumed`、可选即时 commit 和同事件 snapshot。
+- 失败时 `result_out` 保持为空；owner-thread、空指针、非法 key event、borrowed view 和释放路径已有 host contract 测试。
+- `crates/ime-ffi/include/radishlex_input.h` 已覆盖输入侧 ABI，并通过 C11、Objective-C 编译和 Rust function pointer / layout 测试。
+- 旧 `push_key` / `push_key_event` 只保留为兼容入口，真实平台主契约切换为 `radishlex_session_handle_key_event`。
+
+这些证据关闭输入结果与 header 子项，不代表进程级 librime runtime、InputMethodKit 薄壳或真实平台 smoke 已完成。
 
 ### 退出场景
 

@@ -70,7 +70,7 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、Rime adapter、CLI、FFI 原型 | 完整 KeyOutcome 平台 ABI 和真实 input runtime |
+| Rust input | core、Rime adapter、CLI、ABI v2 key result 与受测输入 header | 进程级 librime runtime 和真实平台输入链 |
 | 本地学习 | userdb、ranker、管理接口和测试 | 事务化用户意图、有效 recency 和固定评测基线 |
 | 同步 | crypto/sync 模型、Go server、HTTP 集成测试 | 确定合并、完整设备生命周期、生产 HTTPS 编排 |
 | Flutter manager | macOS 工程、真实开发期 FFI bridge、widget tests | 默认产品 FFI bundle、持久化和平台文件访问 |
@@ -157,6 +157,7 @@ C ABI 与 host contract：
 
 - version/capability
 - session、runtime 和 manager handles
+- Rust-owned key result、同事件 snapshot 与受编译测试约束的输入 header
 - string/buffer/view ownership
 - structured errors 与 panic boundary
 - thread policy 与 release functions

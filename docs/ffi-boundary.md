@@ -45,7 +45,7 @@ RadishLexError*
 
 - ABI contract：`radishlex_ffi_contract`
 - session 生命周期：`radishlex_session_new`、`radishlex_session_new_with_options`、`radishlex_session_new_rime`、`radishlex_session_free`、`radishlex_session_engine_kind`、`radishlex_session_reset`、`radishlex_session_set_schema`
-- 输入与快照：`radishlex_session_push_key`、`radishlex_session_push_key_event`、`radishlex_session_snapshot`、`radishlex_session_snapshot_new`、`radishlex_snapshot_*`、`radishlex_session_commit_candidate`
+- 输入与快照：`radishlex_session_handle_key_event`、`radishlex_key_result_*`、兼容 `radishlex_session_push_key_event`、`radishlex_session_snapshot_new`、`radishlex_snapshot_*`、`radishlex_session_commit_candidate`
 - userdb 状态与词条管理：`radishlex_userdb_learning_status`、`radishlex_userdb_sync_preflight`、`radishlex_userdb_rank_explain_*`、`radishlex_userdb_add_term`、`radishlex_userdb_delete_term`、`radishlex_userdb_terms_*`
 - dictionary 文件与导入审计：`radishlex_userdb_dictionary_*`、`radishlex_userdb_import_batches_*`
 - Rust 分配对象读取与释放：`radishlex_buffer_*`、`radishlex_error_*`、`radishlex_userdb_rank_explain_free`
@@ -56,7 +56,7 @@ RadishLexError*
 
 ### FFI contract
 
-`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
+`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v2 增加 owned key result；当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
 
 ### Status 与文本 view
 
@@ -194,7 +194,7 @@ release = 2
 
 ### Key result
 
-真实平台按键入口必须采用版本化、Rust-owned 的 `RadishLexKeyResult*`。目标调用形态为：
+真实平台按键入口采用版本化、Rust-owned 的 `RadishLexKeyResult*`：
 
 ```text
 radishlex_session_handle_key_event(
@@ -225,7 +225,7 @@ snapshot: *const RadishLexSnapshot
 - `version` 未知时平台必须明确拒绝，布尔字段只允许 `0` 或 `1`，保留字段必须初始化为零。
 - 失败时 `result_out` 保持空，错误通过 status 与 `RadishLexError*` 返回；不得同时返回部分可用结果。
 
-现有只返回 `RadishLexStatusCode` 的按键函数可作为兼容或测试入口，但不能作为 InputMethodKit 等真实平台壳的主契约。实现时必须同步提供受编译测试约束的 C header 或等价 module map，不能要求 Swift / Objective-C 手抄 Rust `repr(C)` 布局。
+现有只返回 `RadishLexStatusCode` 的按键函数只作为兼容或测试入口，不能作为 InputMethodKit 等真实平台壳的主契约。输入侧声明由 `crates/ime-ffi/include/radishlex_input.h` 提供，并通过 C11、Objective-C 编译和 Rust function pointer 测试约束；Swift / Objective-C 不手抄 Rust `repr(C)` 布局。
 
 ### Snapshot 与 candidate view
 
@@ -356,7 +356,7 @@ term list 当前只返回 active / suppressed 词条。删除 tombstone 不通�
 
 dictionary inspect、export、import 与 import batch 的字段级结构、常量和规则见 [FFI Dictionary Reference](ffi-dictionary-reference.md)。本文件只保留所有权、隐私和跨平台通用边界。
 
-`radishlex_session_push_key` 保留为字符输入便利函数；真实平台壳后续应优先使用 `radishlex_session_push_key_event`。当前 normalized key event 使用数值常量承载字符键、命名键、修饰键、按下 / 释放阶段和平台不可识别键，避免让无效 enum discriminant 在 FFI 边界形成未定义行为。
+`radishlex_session_push_key` 与 `radishlex_session_push_key_event` 保留为兼容和测试入口；真实平台壳必须使用 `radishlex_session_handle_key_event`。当前 normalized key event 使用数值常量承载字符键、命名键、修饰键、按下 / 释放阶段和平台不可识别键，避免让无效 enum discriminant 在 FFI 边界形成未定义行为。
 
 Engine adapter 选择规则：
 

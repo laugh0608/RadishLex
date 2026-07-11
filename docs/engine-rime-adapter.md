@@ -257,12 +257,12 @@ RADISHLEX_RIME_SHARED_DATA=<path> RADISHLEX_RIME_USER_DATA=<path> cargo test -p 
 
 已有实现与历史 smoke 已证明真实 Rime adapter 能完成 composition、候选、翻页、选择、commit、错误映射和 ranker 接入，`ime-ffi` 也可在显式 `native-rime` feature 下创建真实 Rime session。详细完成记录留在 devlog，不在本文持续追加。
 
+ABI contract v2 已闭合 `KeyOutcome` 的 `consumed`、即时 commit、同事件 snapshot 和 Rust-owned result 生命周期；`crates/ime-ffi/include/radishlex_input.h` 已通过 C11 与 Objective-C 编译测试。
+
 平台接入前仍必须闭合：
 
 - 进程级 setup/initialize/finalize 与多 session 生命周期；
-- 从 `KeyOutcome` 到版本化 FFI 结果的 `consumed`、即时 commit 和 snapshot 无损传递；
-- 受测试约束的 C header 或等价平台模块边界；
-- native library、`librime` 与 schema 的开发版和发布版分发策略；
+- native library、`librime` 与 schema 的开发版加载策略；
 - macOS InputMethodKit 真实应用 smoke。
 
 这些未闭合项属于 M1 macOS 离线输入 Alpha，不应再被同步后端工作延后。最终发布包中的 `librime` 与 schema 分发属于 M4。
