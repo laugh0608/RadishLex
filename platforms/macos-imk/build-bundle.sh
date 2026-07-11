@@ -77,20 +77,25 @@ contents="${bundle}/Contents"
 macos_dir="${contents}/MacOS"
 frameworks_dir="${contents}/Frameworks"
 resources_dir="${contents}/Resources"
+native_licenses_dir="${resources_dir}/NativeLicenses"
 codesign_identity="${RADISHLEX_CODESIGN_IDENTITY:--}"
 export CLANG_MODULE_CACHE_PATH="${repo_root}/target/macos-imk/clang-module-cache"
+export SWIFT_MODULECACHE_PATH="${repo_root}/target/macos-imk/swift-module-cache"
 
 rm -rf "${bundle}"
 mkdir -p "${macos_dir}" "${frameworks_dir}" "${resources_dir}" \
-  "${CLANG_MODULE_CACHE_PATH}"
+  "${CLANG_MODULE_CACHE_PATH}" "${SWIFT_MODULECACHE_PATH}"
 
 ffi_dylib="${repo_root}/target/${cargo_profile}/libradishlex_ime_ffi.dylib"
 cp "${ffi_dylib}" "${frameworks_dir}/"
 install_name_tool -id "@rpath/libradishlex_ime_ffi.dylib" \
   "${frameworks_dir}/libradishlex_ime_ffi.dylib"
 if [[ "${mode}" == "native" ]]; then
-  install_name_tool -add_rpath "${RIME_LIB_DIR}" \
-    "${frameworks_dir}/libradishlex_ime_ffi.dylib"
+  python3 "${repo_root}/scripts/macos-imk/bundle_dylibs.py" bundle \
+    --root-binary "${frameworks_dir}/libradishlex_ime_ffi.dylib" \
+    --frameworks-dir "${frameworks_dir}" \
+    --licenses-dir "${native_licenses_dir}" \
+    --search-dir "${RIME_LIB_DIR}"
 fi
 
 clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
@@ -109,11 +114,17 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
 
 sed "s/__RADISHLEX_RIME_SCHEMA__/${schema}/g" \
   "${script_dir}/Resources/Info.plist.in" >"${contents}/Info.plist"
+xcrun swift "${repo_root}/scripts/macos-imk/render_icon.swift" \
+  "${script_dir}/Resources/RadishLexInputIcon.svg" \
+  "${resources_dir}/RadishLexInputIcon.tiff"
+ditto "${script_dir}/Resources/zh-Hans.lproj" "${resources_dir}/zh-Hans.lproj"
+ditto "${script_dir}/Resources/en.lproj" "${resources_dir}/en.lproj"
 plutil -lint "${contents}/Info.plist" >/dev/null
 
 if [[ "${mode}" == "native" ]]; then
   ditto "${shared_data}" "${resources_dir}/RimeData"
   cp "${RADISHLEX_RIME_DATA_LICENSE}" "${resources_dir}/RimeData.LICENSE"
+  cp "${repo_root}/LICENSE" "${resources_dir}/RadishLex.LICENSE"
   if [[ "${deploy_on_start}" == "1" ]]; then
     plutil -replace RadishLexRimeDeployOnStart -bool true "${contents}/Info.plist"
   fi
@@ -126,13 +137,20 @@ if [[ "${mode}" == "native" ]]; then
     --output "${manifest}"
 fi
 
-# Sign nested code before sealing the outer bundle. The development default is
-# an ad-hoc identity; callers may provide a named identity explicitly without
-# changing the bundle assembly or verification path.
-codesign --force --sign "${codesign_identity}" --timestamp=none \
-  "${frameworks_dir}/libradishlex_ime_ffi.dylib"
+# Sign every bundled native library before sealing the main executable and
+# outer bundle. The development default is ad-hoc; callers may provide a named
+# identity without changing assembly or verification.
+while IFS= read -r -d '' dylib; do
+  codesign --force --sign "${codesign_identity}" --timestamp=none "${dylib}"
+done < <(find "${frameworks_dir}" -type f -name '*.dylib' -print0 | sort -z)
 codesign --force --sign "${codesign_identity}" --timestamp=none \
   "${macos_dir}/RadishLex"
+if [[ "${mode}" == "native" ]]; then
+  python3 "${repo_root}/scripts/macos-imk/bundle_dylibs.py" manifest \
+    --frameworks-dir "${frameworks_dir}" \
+    --licenses-dir "${native_licenses_dir}" \
+    --output "${resources_dir}/NativeLibraries.manifest.plist"
+fi
 codesign --force --sign "${codesign_identity}" --timestamp=none "${bundle}"
 codesign --verify --deep --strict --verbose=2 "${bundle}"
 

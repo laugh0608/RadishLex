@@ -36,7 +36,10 @@ contents="${bundle}/Contents"
 executable="${contents}/MacOS/RadishLex"
 ffi_dylib="${contents}/Frameworks/libradishlex_ime_ffi.dylib"
 resources="${contents}/Resources"
+icon="${resources}/RadishLexInputIcon.tiff"
 manifest="${resources}/RimeData.manifest.plist"
+native_licenses="${resources}/NativeLicenses"
+native_manifest="${resources}/NativeLibraries.manifest.plist"
 architecture="$(uname -m)"
 deploy_on_start="${RADISHLEX_RIME_DEPLOY_ON_START:-1}"
 
@@ -49,7 +52,7 @@ check_dependencies() {
         ;;
       @rpath/*)
         local name="${dependency#@rpath/}"
-        if [[ ! -f "${contents}/Frameworks/${name}" && ! -f "${RIME_LIB_DIR}/${name}" ]]; then
+        if [[ ! -f "${contents}/Frameworks/${name}" ]]; then
           echo "unresolved @rpath dependency for ${binary}: ${dependency}" >&2
           return 1
         fi
@@ -69,10 +72,8 @@ check_dependencies() {
         fi
         ;;
       /*)
-        if [[ ! -f "${dependency}" ]]; then
-          echo "missing absolute dependency for ${binary}: ${dependency}" >&2
-          return 1
-        fi
+        echo "external absolute dependency for ${binary}: ${dependency}" >&2
+        return 1
         ;;
       *)
         echo "unsupported dependency path for ${binary}: ${dependency}" >&2
@@ -84,16 +85,47 @@ check_dependencies() {
 
 test -x "${executable}"
 test -f "${ffi_dylib}"
+test -s "${icon}"
+test -s "${resources}/zh-Hans.lproj/InfoPlist.strings"
+test -s "${resources}/en.lproj/InfoPlist.strings"
 codesign --verify --deep --strict --verbose=2 "${bundle}"
 test -f "${resources}/RimeData/default.yaml"
 test -f "${resources}/RimeData/${RADISHLEX_RIME_SCHEMA}.schema.yaml"
 test -s "${resources}/RimeData.LICENSE"
-plutil -lint "${contents}/Info.plist" "${manifest}" >/dev/null
+test -s "${resources}/RadishLex.LICENSE"
+test -d "${native_licenses}"
+plutil -lint "${contents}/Info.plist" "${manifest}" "${native_manifest}" \
+  "${resources}/zh-Hans.lproj/InfoPlist.strings" \
+  "${resources}/en.lproj/InfoPlist.strings" >/dev/null
 test "$(plutil -extract RadishLexRimeSchema raw "${contents}/Info.plist")" = \
   "${RADISHLEX_RIME_SCHEMA}"
 test "$(plutil -extract schema_id raw "${manifest}")" = "${RADISHLEX_RIME_SCHEMA}"
-test "$(plutil -extract TISInputSourceID raw "${contents}/Info.plist")" = \
-  "org.radishlex.inputmethod"
+test "$(plutil -extract tsInputMethodCharacterRepertoireKey.0 raw \
+  "${contents}/Info.plist")" = "Hans"
+test "$(plutil -extract tsInputMethodIconFileKey raw \
+  "${contents}/Info.plist")" = "RadishLexInputIcon.tiff"
+test "$(plutil -extract TISInputSourceID raw \
+  "${contents}/Info.plist")" = "org.radishlex.inputmethod"
+test "$(plutil -extract TISIntendedLanguage raw \
+  "${contents}/Info.plist")" = "zh-Hans"
+mode_path=":ComponentInputModeDict:tsInputModeListKey:org.radishlex.inputmethod.pinyin_simp"
+test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:TISInputSourceID" \
+  "${contents}/Info.plist")" = "org.radishlex.inputmethod.pinyin_simp"
+test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:TISIntendedLanguage" \
+  "${contents}/Info.plist")" = "zh-Hans"
+test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:tsInputModeIsVisibleKey" \
+  "${contents}/Info.plist")" = "true"
+test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:tsInputModeScriptKey" \
+  "${contents}/Info.plist")" = "smSimpChinese"
+test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:tsInputModeCharacterRepertoireKey:0" \
+  "${contents}/Info.plist")" = "Hans"
+test "$(plutil -extract ComponentInputModeDict.tsVisibleInputModeOrderedArrayKey.0 raw \
+  "${contents}/Info.plist")" = "org.radishlex.inputmethod.pinyin_simp"
+test "$(plutil -extract InputMethodServerDelegateClass raw \
+  "${contents}/Info.plist")" = "RadishLexInputController"
+test "$(plutil -extract LSUIElement raw "${contents}/Info.plist")" = "true"
+test "$(/usr/libexec/PlistBuddy -c 'Print :org.radishlex.inputmethod.pinyin_simp' \
+  "${resources}/zh-Hans.lproj/InfoPlist.strings")" = "萝卜词核拼音"
 test "$(plutil -extract RadishLexRimeDeployOnStart raw "${contents}/Info.plist")" = \
   "$([[ "${deploy_on_start}" == "1" ]] && echo true || echo false)"
 test "$(plutil -extract deploy_on_start raw "${manifest}")" = \
@@ -102,19 +134,20 @@ test "$(plutil -extract deploy_on_start raw "${manifest}")" = \
 lipo -archs "${executable}" | tr ' ' '\n' | grep -qx "${architecture}"
 lipo -archs "${ffi_dylib}" | tr ' ' '\n' | grep -qx "${architecture}"
 otool -L "${executable}" | grep -q "@rpath/libradishlex_ime_ffi.dylib"
-otool -L "${ffi_dylib}" | grep -q "librime"
-otool -l "${ffi_dylib}" | grep -A2 LC_RPATH | grep -q "${RIME_LIB_DIR}"
+otool -L "${ffi_dylib}" | grep -q "@rpath/librime"
 
 rime_dependency="$(otool -L "${ffi_dylib}" | awk '/librime/{print $1; exit}')"
 case "${rime_dependency}" in
-  @rpath/*) rime_binary="${RIME_LIB_DIR}/${rime_dependency#@rpath/}" ;;
-  /*) rime_binary="${rime_dependency}" ;;
+  @rpath/*) rime_binary="${contents}/Frameworks/${rime_dependency#@rpath/}" ;;
   *) echo "unsupported librime dependency path: ${rime_dependency}" >&2; exit 1 ;;
 esac
 test -f "${rime_binary}"
 check_dependencies "${executable}"
-check_dependencies "${ffi_dylib}"
-check_dependencies "${rime_binary}"
+while IFS= read -r -d '' dylib; do
+  check_dependencies "${dylib}"
+  codesign --verify --strict --verbose=2 "${dylib}"
+  lipo -archs "${dylib}" | tr ' ' '\n' | grep -qx "${architecture}"
+done < <(find "${contents}/Frameworks" -type f -name '*.dylib' -print0 | sort -z)
 
 for symbol in session_new_rime session_handle_key_event rime_runtime_shutdown; do
   nm -gU "${ffi_dylib}" | grep -q "_radishlex_${symbol}$"
@@ -126,5 +159,10 @@ python3 "${repo_root}/scripts/macos-imk/native_manifest.py" verify \
   --schema "${RADISHLEX_RIME_SCHEMA}" \
   --deploy-on-start "${deploy_on_start}" \
   --manifest "${manifest}"
+
+python3 "${repo_root}/scripts/macos-imk/bundle_dylibs.py" verify \
+  --frameworks-dir "${contents}/Frameworks" \
+  --licenses-dir "${native_licenses}" \
+  --manifest "${native_manifest}"
 
 echo "Native macOS InputMethodKit bundle checks passed without installation."

@@ -13,6 +13,8 @@ fi
 
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/macos-imk/test_native_manifest.py"
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/macos-imk/test_bundle_dylibs.py"
 "${platform_dir}/build-bundle.sh" contract
 
 smoke_dir="${repo_root}/target/macos-imk/contract-smoke"
@@ -43,9 +45,38 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
 bundle="${repo_root}/target/macos-imk/contract/RadishLex.app"
 test -x "${bundle}/Contents/MacOS/RadishLex"
 test -f "${bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib"
+test -s "${bundle}/Contents/Resources/RadishLexInputIcon.tiff"
+test -s "${bundle}/Contents/Resources/zh-Hans.lproj/InfoPlist.strings"
+test -s "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings"
 plutil -lint "${bundle}/Contents/Info.plist" >/dev/null
-test "$(plutil -extract TISInputSourceID raw "${bundle}/Contents/Info.plist")" = \
-  "org.radishlex.inputmethod"
+plutil -lint "${bundle}/Contents/Resources/zh-Hans.lproj/InfoPlist.strings" \
+  "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings" >/dev/null
+test "$(plutil -extract tsInputMethodCharacterRepertoireKey.0 raw \
+  "${bundle}/Contents/Info.plist")" = "Hans"
+test "$(plutil -extract tsInputMethodIconFileKey raw \
+  "${bundle}/Contents/Info.plist")" = "RadishLexInputIcon.tiff"
+test "$(plutil -extract TISInputSourceID raw \
+  "${bundle}/Contents/Info.plist")" = "org.radishlex.inputmethod"
+test "$(plutil -extract TISIntendedLanguage raw \
+  "${bundle}/Contents/Info.plist")" = "zh-Hans"
+mode_path=":ComponentInputModeDict:tsInputModeListKey:org.radishlex.inputmethod.pinyin_simp"
+test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:TISInputSourceID" \
+  "${bundle}/Contents/Info.plist")" = "org.radishlex.inputmethod.pinyin_simp"
+test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:TISIntendedLanguage" \
+  "${bundle}/Contents/Info.plist")" = "zh-Hans"
+test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:tsInputModeIsVisibleKey" \
+  "${bundle}/Contents/Info.plist")" = "true"
+test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:tsInputModeScriptKey" \
+  "${bundle}/Contents/Info.plist")" = "smSimpChinese"
+test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:tsInputModeCharacterRepertoireKey:0" \
+  "${bundle}/Contents/Info.plist")" = "Hans"
+test "$(plutil -extract ComponentInputModeDict.tsVisibleInputModeOrderedArrayKey.0 raw \
+  "${bundle}/Contents/Info.plist")" = "org.radishlex.inputmethod.pinyin_simp"
+test "$(plutil -extract InputMethodServerDelegateClass raw \
+  "${bundle}/Contents/Info.plist")" = "RadishLexInputController"
+test "$(plutil -extract LSUIElement raw "${bundle}/Contents/Info.plist")" = "true"
+test "$(/usr/libexec/PlistBuddy -c 'Print :org.radishlex.inputmethod.pinyin_simp' \
+  "${bundle}/Contents/Resources/zh-Hans.lproj/InfoPlist.strings")" = "萝卜词核拼音"
 otool -L "${bundle}/Contents/MacOS/RadishLex" | grep -q \
   "@rpath/libradishlex_ime_ffi.dylib"
 nm -gU "${bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib" | grep -q \
