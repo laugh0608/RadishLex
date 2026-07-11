@@ -38,12 +38,13 @@ RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/syn
 - native bundle gated 检查已固定隔离目录与 symlink 拒绝、schema/default/license 前提、deploy policy、架构、rpath、`librime` 直接依赖、FFI symbol 和全部 copied data 哈希清单。
 - 官方 Apache-2.0 `rime-pinyin-simp` 已在临时隔离目录按固定上游 commit 准备并构建；未读取用户 Rime 目录。真实 librime FFI smoke 已覆盖全拼 composition、候选、commit、多 session peer release 和不存在 schema 的拒绝。
 - adapter 在创建和切换 session schema 前读取 librime 已部署 schema list，并在选择后核对当前 schema；不存在或回读不一致时返回 `select_schema` 错误，新建 session 会销毁并回滚 runtime。
+- macOS build 现生成符合系统后台应用形态的 `RadishLex.app`，包含字符 repertoire、`NSApplication` metadata，并对嵌套 dylib、主程序和完整 bundle 执行可复验签名；ad-hoc 只用于无安装构建门禁。
 
 这些证据证明工程原型可继续演进，不证明真实平台输入、生产同步或产品发布已经完成。
 
 ## 已确认阻塞
 
-- macOS native-rime bundle 与真实 FFI 调用链已使用来源合规的临时隔离全拼数据复验；安装、启用、两个真实应用输入框 smoke、进程重启和移除尚未获授权执行。
+- macOS native-rime bundle 与真实 FFI 调用链已使用来源合规的临时隔离全拼数据复验。2026-07-11 经授权安装时确认当前用户没有有效 Apple Development code-signing identity；ad-hoc bundle 可启动 IMKServer，但 macOS 26.5.1 不产生可启用的 TIS source。安装副本、进程和运行数据已完整回滚，两个真实应用输入 smoke 尚未执行。
 - 输入 session 未组合 engine、ranker、userdb 与 privacy policy，真实选择没有进入平台学习热路径。
 - userdb 用户意图缺少统一事务、WAL/busy 策略；ranker recency/frequency 语义需要修正。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
@@ -62,11 +63,12 @@ RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/syn
 
 ## 下一步顺位
 
-1. 按 macOS 开发 runbook 评审安装、启用、两个应用输入 smoke、进程重启与移除步骤；取得明确授权后再执行并完成 R01A。
-2. 真实 smoke 重点复验连续输入、非首候选、翻页、取消、Backspace、Enter、中英文混输、未消费快捷键、client 切换与进程重启。
-3. 并行实施 R06A：修复严格 Clippy，增加 Flutter 与 Go race CI，清理 review-only Rust/Flutter 生产资产。
-4. R01A 退出后实施 R02L，修正 userdb 事务、SQLite 并发、recency、frequency 与删除语义。
-5. R02L 退出后实施 R01B，让真实选择在隐私策略约束下持久化并影响后续候选；之后关闭整改专题并进入 M3。
+1. 在 Xcode 中为当前用户准备有效 Apple Development code-signing identity，并通过 `RADISHLEX_CODESIGN_IDENTITY` 重建、签名和复验开发 bundle；不导出或提交证书私钥。
+2. 再次取得安装当次授权后，按 macOS 开发 runbook 执行安装、启用、两个应用输入 smoke、进程重启与移除步骤并完成 R01A。
+3. 真实 smoke 重点复验连续输入、非首候选、翻页、取消、Backspace、Enter、中英文混输、未消费快捷键、client 切换与进程重启。
+4. 并行实施 R06A：修复严格 Clippy，增加 Flutter 与 Go race CI，清理 review-only Rust/Flutter 生产资产。
+5. R01A 退出后实施 R02L，修正 userdb 事务、SQLite 并发、recency、frequency 与删除语义。
+6. R02L 退出后实施 R01B，让真实选择在隐私策略约束下持久化并影响后续候选；之后关闭整改专题并进入 M3。
 
 ## 验证入口
 

@@ -16,7 +16,7 @@
 ./scripts/check-macos-imk.sh
 ```
 
-该入口会构建 `target/macos-imk/contract/RadishLex.inputmethod`，执行 Objective-C wrapper contract smoke，并检查 bundle、动态库加载路径和关键 FFI symbol。contract bundle 只用于编译与契约复验，不能安装或作为真实输入证据。
+该入口会构建 `target/macos-imk/contract/RadishLex.app`，执行 Objective-C wrapper contract smoke，并检查 bundle、动态库加载路径、完整 ad-hoc 开发签名和关键 FFI symbol。contract bundle 只用于编译与契约复验，不能安装或作为真实输入证据。
 
 ## native-rime 开发 bundle
 
@@ -31,6 +31,6 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 ./scripts/check-macos-imk-native.sh
 ```
 
-`RADISHLEX_RIME_DEPLOY_ON_START` 可显式设为 `0` 或 `1`，默认 `1`。构建产物位于 `target/macos-imk/native/RadishLex.inputmethod`；bundle 同时保存全部 copied shared data 和许可证的 SHA-256 清单，并拒绝 shared data symlink。检查入口验证架构、plist、rpath、Rust symbol、`librime` 及其直接传递依赖，但不启动 bundle。脚本只复制调用方提供的数据到生成目录，不会写系统输入法目录、启动服务或修改系统配置。当前开发 bundle 仍从显式 `RIME_LIB_DIR` 对应的开发环境加载依赖，完整依赖封装、签名与普通用户分发属于 M4。
+`RADISHLEX_RIME_DEPLOY_ON_START` 可显式设为 `0` 或 `1`，默认 `1`。构建产物位于 `target/macos-imk/native/RadishLex.app`；bundle 同时保存全部 copied shared data 和许可证的 SHA-256 清单，并拒绝 shared data symlink。检查入口验证架构、plist、rpath、Rust symbol、`librime` 及其直接传递依赖，并默认使用 `codesign --sign -` 对嵌套 dylib、主程序和整个开发 bundle 依次签名与严格复验。可通过 `RADISHLEX_CODESIGN_IDENTITY` 显式提供 Apple Development identity；脚本不启动 bundle。它只复制调用方提供的数据到生成目录，不会写系统输入法目录、启动服务或修改系统配置。当前开发 bundle 仍从显式 `RIME_LIB_DIR` 对应的开发环境加载依赖，完整依赖封装、发布签名与普通用户分发属于 M4。
 
 安装、启用、真实应用输入和移除会修改本机状态，必须另行取得授权后按独立 runbook 执行。

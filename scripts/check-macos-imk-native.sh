@@ -31,7 +31,7 @@ esac
 
 "${platform_dir}/build-bundle.sh" native
 
-bundle="${repo_root}/target/macos-imk/native/RadishLex.inputmethod"
+bundle="${repo_root}/target/macos-imk/native/RadishLex.app"
 contents="${bundle}/Contents"
 executable="${contents}/MacOS/RadishLex"
 ffi_dylib="${contents}/Frameworks/libradishlex_ime_ffi.dylib"
@@ -84,6 +84,7 @@ check_dependencies() {
 
 test -x "${executable}"
 test -f "${ffi_dylib}"
+codesign --verify --deep --strict --verbose=2 "${bundle}"
 test -f "${resources}/RimeData/default.yaml"
 test -f "${resources}/RimeData/${RADISHLEX_RIME_SCHEMA}.schema.yaml"
 test -s "${resources}/RimeData.LICENSE"
@@ -91,6 +92,8 @@ plutil -lint "${contents}/Info.plist" "${manifest}" >/dev/null
 test "$(plutil -extract RadishLexRimeSchema raw "${contents}/Info.plist")" = \
   "${RADISHLEX_RIME_SCHEMA}"
 test "$(plutil -extract schema_id raw "${manifest}")" = "${RADISHLEX_RIME_SCHEMA}"
+test "$(plutil -extract TISInputSourceID raw "${contents}/Info.plist")" = \
+  "org.radishlex.inputmethod"
 test "$(plutil -extract RadishLexRimeDeployOnStart raw "${contents}/Info.plist")" = \
   "$([[ "${deploy_on_start}" == "1" ]] && echo true || echo false)"
 test "$(plutil -extract deploy_on_start raw "${manifest}")" = \

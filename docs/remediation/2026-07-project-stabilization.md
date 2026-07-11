@@ -124,15 +124,16 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - adapter stub API 精确验证初始化、创建、销毁和 finalize 次数；`ime-ffi` 增加隔离数据目录下的 gated 双 session peer-release smoke。
 - 新增 `platforms/macos-imk/` Objective-C 薄壳：`NSEvent` 规范化、ABI v2 key result、即时 commit、snapshot/candidate 复制、原生 `IMKCandidates`、稳定候选 index、reset/cancel、schema 和 owner-thread 均由同一 wrapper 收口。
 - `RLXProcessRuntime` 为每个 input controller 创建独立 session，并在进程 teardown 时先逐个 invalidate session，再调用 `radishlex_rime_runtime_shutdown`；生产条件编译分支不允许回退 demo engine。
-- `./scripts/check-macos-imk.sh` 可在不安装系统输入法时构建 contract `.inputmethod` bundle，运行 Objective-C → C ABI → Rust session smoke，并检查 plist、rpath、dylib 与关键 symbol；production 分支另有 `-fsyntax-only` 编译门禁。
+- `./scripts/check-macos-imk.sh` 可在不安装系统输入法时构建 contract `.app` bundle，运行 Objective-C → C ABI → Rust session smoke，并检查 plist、rpath、dylib、完整开发签名与关键 symbol；production 分支另有 `-fsyntax-only` 编译门禁。
 - `./scripts/check-macos-imk-native.sh` 增加显式 gated native bundle 门禁：拒绝真实用户/runtime 数据目录和 symlink，要求 schema/default/license，固定 deploy policy，并检查架构、rpath、`librime` 直接依赖、三个关键 symbol 与全部 copied data 哈希清单。
 - wrapper contract 扩展到完整命名键表、全部 modifier、modifier release、补充平面 Unicode、中文/emoji UTF-8 byte cursor 到 UTF-16 unit 转换、scalar 中间 cursor 拒绝和无 index 候选拒绝。
 - native-rime release dylib 已使用现有显式 Homebrew include/lib 构建并复核 `session_new_rime`、`session_handle_key_event` 与 `rime_runtime_shutdown` 导出。
 - 采用官方 Apache-2.0 `rime-pinyin-simp` 固定上游 commit，在临时隔离目录保留许可证和来源记录，并移除对其他 schema/preset 的外部依赖；没有读取或修改真实用户 Rime 目录。
 - native bundle 已携带上述隔离全拼 shared data 通过架构、依赖、symbol、许可证和哈希清单门禁；真实 librime FFI smoke 已复验 composition、候选、commit、两个 session 共享 runtime 与 peer release 后继续输入。
 - native smoke 发现 librime 对不存在 schema 的 `select_schema`/`get_current_schema` 返回过于宽松；adapter 现先读取已部署 schema list，再选择并精确回读。不存在或回读不一致会返回结构化错误，创建期还会销毁 session 并回滚 runtime，对应 stub 与真实 FFI 回归均已覆盖。
+- 首次经授权安装复核补齐完整 bundle 签名、字符 repertoire、后台 `NSApplication` metadata 和 `.app` 产物形态；ad-hoc bundle 在 macOS 26.5.1 可启动 IMKServer，但当前用户缺少有效 Apple Development identity，TIS 不产生可启用 source。测试副本、进程和运行数据已回滚，未修改既有输入源列表。
 
-这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle 与真实 FFI 调用链子项，不代表系统安装或真实应用输入 smoke 已完成。
+这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle 与真实 FFI 调用链子项，不代表系统安装或真实应用输入 smoke 已完成。再次安装前必须先具备有效 Apple Development identity。
 
 ### 退出场景
 

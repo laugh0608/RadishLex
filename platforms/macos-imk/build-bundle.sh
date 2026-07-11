@@ -72,11 +72,12 @@ if [[ ! "${schema}" =~ ^[A-Za-z0-9._-]+$ ]]; then
   exit 2
 fi
 build_root="${repo_root}/target/macos-imk/${mode}"
-bundle="${build_root}/RadishLex.inputmethod"
+bundle="${build_root}/RadishLex.app"
 contents="${bundle}/Contents"
 macos_dir="${contents}/MacOS"
 frameworks_dir="${contents}/Frameworks"
 resources_dir="${contents}/Resources"
+codesign_identity="${RADISHLEX_CODESIGN_IDENTITY:--}"
 export CLANG_MODULE_CACHE_PATH="${repo_root}/target/macos-imk/clang-module-cache"
 
 rm -rf "${bundle}"
@@ -124,5 +125,15 @@ if [[ "${mode}" == "native" ]]; then
     --deploy-on-start "${deploy_on_start}" \
     --output "${manifest}"
 fi
+
+# Sign nested code before sealing the outer bundle. The development default is
+# an ad-hoc identity; callers may provide a named identity explicitly without
+# changing the bundle assembly or verification path.
+codesign --force --sign "${codesign_identity}" --timestamp=none \
+  "${frameworks_dir}/libradishlex_ime_ffi.dylib"
+codesign --force --sign "${codesign_identity}" --timestamp=none \
+  "${macos_dir}/RadishLex"
+codesign --force --sign "${codesign_identity}" --timestamp=none "${bundle}"
+codesign --verify --deep --strict --verbose=2 "${bundle}"
 
 echo "Built ${bundle}"

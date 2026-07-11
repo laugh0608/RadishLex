@@ -40,10 +40,12 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   -o "${smoke_dir}/contract-smoke"
 "${smoke_dir}/contract-smoke"
 
-bundle="${repo_root}/target/macos-imk/contract/RadishLex.inputmethod"
+bundle="${repo_root}/target/macos-imk/contract/RadishLex.app"
 test -x "${bundle}/Contents/MacOS/RadishLex"
 test -f "${bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib"
 plutil -lint "${bundle}/Contents/Info.plist" >/dev/null
+test "$(plutil -extract TISInputSourceID raw "${bundle}/Contents/Info.plist")" = \
+  "org.radishlex.inputmethod"
 otool -L "${bundle}/Contents/MacOS/RadishLex" | grep -q \
   "@rpath/libradishlex_ime_ffi.dylib"
 nm -gU "${bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib" | grep -q \

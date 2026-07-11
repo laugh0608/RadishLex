@@ -27,7 +27,7 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 ./scripts/check-macos-imk-native.sh
 ```
 
-`RADISHLEX_RIME_DEPLOY_ON_START` 默认 `1`，只接受 `0` 或 `1`。产物为 `target/macos-imk/native/RadishLex.inputmethod`。检查入口会验证 plist、当前架构、`@rpath/libradishlex_ime_ffi.dylib`、`librime` 及其直接传递依赖、三个关键 FFI symbol，以及全部 copied shared data 和许可证的 SHA-256 清单；shared data 中的 symlink 会被拒绝。检查不会启动或安装 bundle。
+`RADISHLEX_RIME_DEPLOY_ON_START` 默认 `1`，只接受 `0` 或 `1`。产物为 `target/macos-imk/native/RadishLex.app`。检查入口会验证 plist、当前架构、`@rpath/libradishlex_ime_ffi.dylib`、`librime` 及其直接传递依赖、三个关键 FFI symbol、完整 bundle 签名，以及全部 copied shared data 和许可证的 SHA-256 清单；shared data 中的 symlink 会被拒绝。默认使用 ad-hoc 开发签名；真实安装 smoke 需要调用方通过 `RADISHLEX_CODESIGN_IDENTITY` 提供当前用户可用的 Apple Development identity。检查不会启动或安装 bundle。
 
 ## 授权停止线
 

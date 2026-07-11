@@ -19,7 +19,7 @@
   <key>CFBundleShortVersionString</key>
   <string>0.1.0</string>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>2</string>
   <key>InputMethodConnectionName</key>
   <string>org.radishlex.inputmethod_Connection</string>
   <key>InputMethodServerControllerClass</key>
@@ -28,6 +28,12 @@
   <true/>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
+  <key>LSUIElement</key>
+  <true/>
+  <key>NSPrincipalClass</key>
+  <string>NSApplication</string>
+  <key>NSSupportsSuddenTermination</key>
+  <true/>
   <key>RadishLexRimeDeployOnStart</key>
   <false/>
   <key>RadishLexRimeSchema</key>
@@ -36,13 +42,11 @@
   <string>RimeData</string>
   <key>TISInputSourceID</key>
   <string>org.radishlex.inputmethod</string>
-  <key>TISInputSourceLanguages</key>
-  <array>
-    <string>zh-Hans</string>
-  </array>
-  <key>TISInputSourceType</key>
-  <string>TISTypeKeyboardInputMode</string>
   <key>TISIntendedLanguage</key>
   <string>zh-Hans</string>
+  <key>tsInputMethodCharacterRepertoireKey</key>
+  <array>
+    <string>Hans</string>
+  </array>
 </dict>
 </plist>
