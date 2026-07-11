@@ -134,6 +134,7 @@ RADISHLEX_RIME_SESSION_OPTIONS_VERSION = 1
 - Rime session 必须使用隔离的 Rime shared / user data 目录；不得静默退回 demo engine，不得读取真实用户输入法目录。
 - 平台端不能缓存这些路径指针；Rust 侧只在调用期间借用传入字符串，并在 `RimeEngineConfig` / native string 管理中复制必要配置。
 - 进程 runtime 初始化后，shared / user / log / deploy 配置保持不变；schema 仍属于各 session。配置冲突返回 `InvalidState`，不会重启已有 runtime。
+- Rime session 创建和 `radishlex_session_set_schema` 都要求目标存在于 librime 已部署 schema list，并在选择后精确回读当前 schema；不存在或回读不一致返回 engine error，不能把 librime 的宽松成功返回当作有效 session。
 - 首个成功初始化的 Rime session 固定进程 runtime owner thread；后续 Rime session 创建、调用、释放和 shutdown 必须使用同一线程，跨线程返回 `InvalidState` 或构成错误释放用法。
 - `radishlex_session_free` 只释放对应 session，不触发全局 finalize。进程 teardown 必须在 runtime owner thread 先释放所有 Rime session，再调用可重复的 `radishlex_rime_runtime_shutdown`；仍有 session 时 shutdown 返回 `InvalidState`。
 

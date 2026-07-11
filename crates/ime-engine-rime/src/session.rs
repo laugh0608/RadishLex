@@ -16,7 +16,9 @@ use crate::convert::{candidate_from_view, composition_from_parts, RimeCandidateV
 use crate::error::{RimeEngineError, RimeEngineResult};
 use crate::ffi::{self, RimeApi, RimeCommit, RimeContext, RimeSessionId, TRUE};
 use crate::keymap::{classify_key_event, rime_keycode};
-use crate::runtime::{ensure_true, require_api_function, RimeRuntime};
+use crate::runtime::{
+    current_schema, ensure_true, require_api_function, select_schema_exact, RimeRuntime,
+};
 
 #[derive(Debug)]
 pub struct RimeEngine {
@@ -231,57 +233,19 @@ impl Engine for RimeEngine {
             })
         })?;
 
-        let selected = self
-            .runtime
-            .with_api(|api| {
-                // SAFETY: runtime serializes the native call, session_id belongs
-                // to this engine, and schema_cstring lives through the call.
-                unsafe {
-                    let select_schema = require_api_function(api.select_schema, "select_schema")?;
-                    Ok(select_schema(self.session_id, schema_cstring.as_ptr()))
-                }
-            })
+        self.runtime
+            .with_api(|api| select_schema_exact(api, self.session_id, schema_cstring.as_c_str()))
             .map_err(rime_to_core)?;
-        if selected != TRUE {
-            return Err(rime_to_core(RimeEngineError::FfiFailure {
-                stage: "select_schema",
-                message: format!("failed to select schema {}", schema.as_str()),
-            }));
-        }
 
         self.config.replace_schema(schema);
         Ok(())
     }
 
     fn schema(&self) -> CoreResult<SchemaId> {
-        const SCHEMA_BUFFER_SIZE: usize = 256;
-        let mut buffer = [0_i8; SCHEMA_BUFFER_SIZE];
-
-        let got_schema = self
+        let schema = self
             .runtime
-            .with_api(|api| {
-                // SAFETY: buffer is valid for SCHEMA_BUFFER_SIZE writes, runtime
-                // serializes the call, and the function is checked before use.
-                unsafe {
-                    let get_current_schema =
-                        require_api_function(api.get_current_schema, "get_current_schema")?;
-                    Ok(get_current_schema(
-                        self.session_id,
-                        buffer.as_mut_ptr(),
-                        buffer.len(),
-                    ))
-                }
-            })
+            .with_api(|api| current_schema(api, self.session_id))
             .map_err(rime_to_core)?;
-        if got_schema != TRUE {
-            return Err(rime_to_core(RimeEngineError::FfiFailure {
-                stage: "get_current_schema",
-                message: "librime did not return current schema".to_owned(),
-            }));
-        }
-
-        // SAFETY: get_current_schema writes a null-terminated C string on success.
-        let schema = unsafe { c_string_field("schema", buffer.as_ptr()) }.map_err(rime_to_core)?;
         SchemaId::new(schema)
     }
 }

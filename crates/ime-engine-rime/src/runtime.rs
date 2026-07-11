@@ -1,11 +1,13 @@
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::fmt;
+use std::ptr;
+use std::slice;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use std::thread::{self, ThreadId};
 
 use crate::config::RimeEngineConfig;
 use crate::error::{RimeEngineError, RimeEngineResult};
-use crate::ffi::{self, Bool, RimeApi, RimeSessionId, TRUE};
+use crate::ffi::{self, Bool, RimeApi, RimeSchemaList, RimeSessionId, TRUE};
 use crate::runtime_config::{NativeRimeStrings, RimeRuntimeConfig};
 
 static PROCESS_RUNTIME: OnceLock<Arc<RimeRuntime>> = OnceLock::new();
@@ -86,11 +88,11 @@ impl RimeRuntime {
 
         // SAFETY: session_id was returned by the initialized process runtime;
         // schema is a valid, live C string for the duration of this call.
-        let selected = unsafe {
+        let selection = unsafe {
             let api = state.api.as_ref();
-            require_api_function(api.select_schema, "select_schema")?(session_id, schema.as_ptr())
+            select_schema_exact(api, session_id, schema.as_c_str())
         };
-        if selected != TRUE {
+        if let Err(error) = selection {
             // SAFETY: session_id was created above and the function was checked
             // before initialization. Cleanup failure cannot replace the primary
             // select_schema error.
@@ -103,10 +105,7 @@ impl RimeRuntime {
             if initialized_here {
                 finalize_runtime(&mut state);
             }
-            return Err(RimeEngineError::FfiFailure {
-                stage: "select_schema",
-                message: format!("failed to select schema {}", config.schema().as_str()),
-            });
+            return Err(error);
         }
 
         state.active_sessions += 1;
@@ -351,6 +350,8 @@ fn require_runtime_api_functions(api: &RimeApi) -> RimeEngineResult<()> {
     require_api_function(api.free_commit, "free_commit")?;
     require_api_function(api.get_context, "get_context")?;
     require_api_function(api.free_context, "free_context")?;
+    require_api_function(api.get_schema_list, "get_schema_list")?;
+    require_api_function(api.free_schema_list, "free_schema_list")?;
     require_api_function(api.get_current_schema, "get_current_schema")?;
     Ok(())
 }
@@ -366,13 +367,128 @@ pub(crate) fn ensure_true(stage: &'static str, value: Bool) -> RimeEngineResult<
     }
 }
 
+pub(crate) fn current_schema(api: &RimeApi, session_id: RimeSessionId) -> RimeEngineResult<String> {
+    const SCHEMA_BUFFER_SIZE: usize = 256;
+    let mut buffer = [0_i8; SCHEMA_BUFFER_SIZE];
+
+    // SAFETY: buffer is valid for SCHEMA_BUFFER_SIZE writes and session_id
+    // belongs to the runtime that supplied api.
+    let got_schema = unsafe {
+        let get_current_schema =
+            require_api_function(api.get_current_schema, "get_current_schema")?;
+        get_current_schema(session_id, buffer.as_mut_ptr(), buffer.len())
+    };
+    ensure_true("get_current_schema", got_schema)?;
+
+    let nul = buffer.iter().position(|byte| *byte == 0).ok_or_else(|| {
+        RimeEngineError::EncodingFailure {
+            field: "schema",
+            message: "librime returned a schema id without a null terminator".to_owned(),
+        }
+    })?;
+    let bytes = buffer[..nul]
+        .iter()
+        .map(|byte| *byte as u8)
+        .collect::<Vec<_>>();
+    String::from_utf8(bytes).map_err(|error| RimeEngineError::EncodingFailure {
+        field: "schema",
+        message: error.to_string(),
+    })
+}
+
+pub(crate) fn select_schema_exact(
+    api: &RimeApi,
+    session_id: RimeSessionId,
+    schema: &CStr,
+) -> RimeEngineResult<()> {
+    let requested = schema
+        .to_str()
+        .map_err(|error| RimeEngineError::EncodingFailure {
+            field: "schema",
+            message: error.to_string(),
+        })?;
+
+    ensure_schema_available(api, requested)?;
+
+    // SAFETY: session_id belongs to this runtime and schema remains alive for
+    // the duration of the native call.
+    let selected = unsafe {
+        let select_schema = require_api_function(api.select_schema, "select_schema")?;
+        select_schema(session_id, schema.as_ptr())
+    };
+    if selected != TRUE {
+        return Err(RimeEngineError::FfiFailure {
+            stage: "select_schema",
+            message: format!("failed to select schema {requested}"),
+        });
+    }
+
+    let actual = current_schema(api, session_id)?;
+    if actual != requested {
+        return Err(RimeEngineError::FfiFailure {
+            stage: "select_schema",
+            message: format!(
+                "librime kept schema {actual} after selecting requested schema {requested}"
+            ),
+        });
+    }
+    Ok(())
+}
+
+fn ensure_schema_available(api: &RimeApi, requested: &str) -> RimeEngineResult<()> {
+    let mut schemas = RimeSchemaList {
+        size: 0,
+        list: ptr::null_mut(),
+    };
+
+    // SAFETY: schemas is initialized for librime to populate. Both functions
+    // are validated at runtime startup, and free_schema_list is called exactly
+    // once after a successful get_schema_list call.
+    unsafe {
+        let get_schema_list = require_api_function(api.get_schema_list, "get_schema_list")?;
+        let free_schema_list = require_api_function(api.free_schema_list, "free_schema_list")?;
+        ensure_true("get_schema_list", get_schema_list(&mut schemas))?;
+
+        let result = if schemas.size > 0 && schemas.list.is_null() {
+            Err(RimeEngineError::FfiFailure {
+                stage: "get_schema_list",
+                message: "librime returned a non-empty schema list without items".to_owned(),
+            })
+        } else {
+            let items = if schemas.size == 0 {
+                &[][..]
+            } else {
+                slice::from_raw_parts(schemas.list, schemas.size)
+            };
+            let found = items.iter().any(|item| {
+                !item.schema_id.is_null()
+                    && CStr::from_ptr(item.schema_id).to_bytes() == requested.as_bytes()
+            });
+            if found {
+                Ok(())
+            } else {
+                Err(RimeEngineError::FfiFailure {
+                    stage: "select_schema",
+                    message: format!(
+                        "schema {requested} is not present in librime's deployed schema list"
+                    ),
+                })
+            }
+        };
+
+        free_schema_list(&mut schemas);
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::ffi::CStr;
     use std::os::raw::{c_char, c_int};
     use std::sync::{Mutex, OnceLock};
 
-    use radishlex_ime_core::SchemaId;
+    use radishlex_ime_core::{Engine, SchemaId};
 
     use super::*;
     use crate::ffi::{RimeCommit, RimeContext, RimeTraits};
@@ -395,7 +511,9 @@ mod tests {
         create_returns_empty: bool,
         deploy_succeeds: bool,
         select_succeeds: bool,
+        selected_schema_override: Option<String>,
         selected_schemas: Vec<String>,
+        current_schemas: HashMap<RimeSessionId, String>,
     }
 
     impl Default for TestState {
@@ -411,7 +529,9 @@ mod tests {
                 create_returns_empty: false,
                 deploy_succeeds: true,
                 select_succeeds: true,
+                selected_schema_override: None,
                 selected_schemas: Vec::new(),
+                current_schemas: HashMap::new(),
             }
         }
     }
@@ -454,13 +574,15 @@ mod tests {
 
     #[test]
     fn runtime_api_validation_reports_missing_required_functions() {
-        let cases: [ApiMutation; 7] = [
+        let cases: [ApiMutation; 9] = [
             ("clear_composition", |api| api.clear_composition = None),
             ("process_key", |api| api.process_key = None),
             ("get_commit", |api| api.get_commit = None),
             ("free_commit", |api| api.free_commit = None),
             ("get_context", |api| api.get_context = None),
             ("free_context", |api| api.free_context = None),
+            ("get_schema_list", |api| api.get_schema_list = None),
+            ("free_schema_list", |api| api.free_schema_list = None),
             ("get_current_schema", |api| api.get_current_schema = None),
         ];
 
@@ -663,6 +785,81 @@ mod tests {
     }
 
     #[test]
+    fn unavailable_schema_rolls_back_before_native_selection() {
+        let _serial = TEST_SERIAL.lock().expect("test lock");
+        reset_test_state();
+        let mut api = Box::new(stub_api());
+        let runtime = RimeRuntime::for_test(api.as_mut());
+
+        let error = RimeEngine::new_with_runtime(test_config("schema.absent"), runtime)
+            .expect_err("an undeployed schema must fail");
+        assert!(matches!(
+            error,
+            RimeEngineError::FfiFailure {
+                stage: "select_schema",
+                ..
+            }
+        ));
+        assert!(error.to_string().contains("schema.absent"));
+        with_test_state(|state| {
+            assert_eq!(state.select_count, 0);
+            assert_eq!(state.destroy_count, 1);
+            assert_eq!(state.finalize_count, 1);
+        });
+    }
+
+    #[test]
+    fn mismatched_schema_selection_rolls_back_initialized_runtime() {
+        let _serial = TEST_SERIAL.lock().expect("test lock");
+        reset_test_state();
+        with_test_state_mut(|state| {
+            state.selected_schema_override = Some("schema.fallback".to_owned());
+        });
+        let mut api = Box::new(stub_api());
+        let runtime = RimeRuntime::for_test(api.as_mut());
+
+        let error = RimeEngine::new_with_runtime(test_config("schema.missing"), runtime)
+            .expect_err("a different active schema must reject session creation");
+        assert!(matches!(
+            error,
+            RimeEngineError::FfiFailure {
+                stage: "select_schema",
+                ..
+            }
+        ));
+        assert!(error.to_string().contains("schema.fallback"));
+        assert!(error.to_string().contains("schema.missing"));
+        with_test_state(|state| {
+            assert_eq!(state.create_count, 1);
+            assert_eq!(state.destroy_count, 1);
+            assert_eq!(state.finalize_count, 1);
+        });
+    }
+
+    #[test]
+    fn mismatched_runtime_schema_change_preserves_engine_config() {
+        let _serial = TEST_SERIAL.lock().expect("test lock");
+        reset_test_state();
+        let mut api = Box::new(stub_api());
+        let runtime = RimeRuntime::for_test(api.as_mut());
+        let mut engine =
+            RimeEngine::new_with_runtime(test_config("schema.one"), Arc::clone(&runtime))
+                .expect("session");
+
+        with_test_state_mut(|state| {
+            state.selected_schema_override = Some("schema.one".to_owned());
+        });
+        let error = engine
+            .set_schema(SchemaId::new("schema.missing").expect("schema"))
+            .expect_err("schema mismatch must fail");
+        assert!(error.to_string().contains("schema.missing"));
+        assert_eq!(engine.config().schema().as_str(), "schema.one");
+
+        drop(engine);
+        runtime.shutdown().expect("idle runtime shuts down");
+    }
+
+    #[test]
     fn empty_session_creation_finalizes_initialized_runtime() {
         let _serial = TEST_SERIAL.lock().expect("test lock");
         reset_test_state();
@@ -789,8 +986,8 @@ mod tests {
             get_option: None,
             set_property: None,
             get_property: None,
-            get_schema_list: None,
-            free_schema_list: None,
+            get_schema_list: Some(stub_get_schema_list),
+            free_schema_list: Some(stub_free_schema_list),
             get_current_schema: Some(stub_get_current_schema),
             select_schema: Some(stub_select_schema),
         }
@@ -827,8 +1024,11 @@ mod tests {
         })
     }
 
-    unsafe extern "C" fn stub_destroy_session(_session_id: RimeSessionId) -> Bool {
-        with_test_state_mut(|state| state.destroy_count += 1);
+    unsafe extern "C" fn stub_destroy_session(session_id: RimeSessionId) -> Bool {
+        with_test_state_mut(|state| {
+            state.destroy_count += 1;
+            state.current_schemas.remove(&session_id);
+        });
         TRUE
     }
 
@@ -864,24 +1064,73 @@ mod tests {
         TRUE
     }
 
+    unsafe extern "C" fn stub_get_schema_list(schema_list: *mut RimeSchemaList) -> Bool {
+        if schema_list.is_null() {
+            return 0;
+        }
+        const SCHEMAS: [&[u8]; 7] = [
+            b"schema.one\0",
+            b"schema.two\0",
+            b"schema.three\0",
+            b"schema.ok\0",
+            b"schema.missing\0",
+            b"schema.fallback\0",
+            b"missing\0",
+        ];
+        let items = SCHEMAS
+            .iter()
+            .map(|schema| ffi::RimeSchemaListItem {
+                schema_id: schema.as_ptr().cast::<c_char>().cast_mut(),
+                name: ptr::null_mut(),
+                reserved: ptr::null_mut(),
+            })
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+        (*schema_list).size = items.len();
+        (*schema_list).list = Box::into_raw(items).cast::<ffi::RimeSchemaListItem>();
+        TRUE
+    }
+
+    unsafe extern "C" fn stub_free_schema_list(schema_list: *mut RimeSchemaList) {
+        if schema_list.is_null() || (*schema_list).list.is_null() {
+            return;
+        }
+        let items = ptr::slice_from_raw_parts_mut((*schema_list).list, (*schema_list).size);
+        drop(Box::from_raw(items));
+        (*schema_list).size = 0;
+        (*schema_list).list = ptr::null_mut();
+    }
+
     unsafe extern "C" fn stub_get_current_schema(
-        _session_id: RimeSessionId,
-        _buffer: *mut c_char,
-        _buffer_size: usize,
+        session_id: RimeSessionId,
+        buffer: *mut c_char,
+        buffer_size: usize,
     ) -> Bool {
-        0
+        with_test_state(|state| {
+            let Some(schema) = state.current_schemas.get(&session_id) else {
+                return 0;
+            };
+            let bytes = schema.as_bytes();
+            if buffer.is_null() || bytes.len() + 1 > buffer_size {
+                return 0;
+            }
+            std::ptr::copy_nonoverlapping(bytes.as_ptr().cast::<c_char>(), buffer, bytes.len());
+            *buffer.add(bytes.len()) = 0;
+            TRUE
+        })
     }
 
     unsafe extern "C" fn stub_select_schema(
-        _session_id: RimeSessionId,
+        session_id: RimeSessionId,
         schema: *const c_char,
     ) -> Bool {
         with_test_state_mut(|state| {
             state.select_count += 1;
             if !schema.is_null() {
-                state
-                    .selected_schemas
-                    .push(CStr::from_ptr(schema).to_string_lossy().into_owned());
+                let requested = CStr::from_ptr(schema).to_string_lossy().into_owned();
+                state.selected_schemas.push(requested.clone());
+                let selected = state.selected_schema_override.clone().unwrap_or(requested);
+                state.current_schemas.insert(session_id, selected);
             }
             if state.select_succeeds {
                 TRUE

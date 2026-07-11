@@ -93,7 +93,7 @@ M1 开发版必须明确并隔离：
 - 输入法专用 user data；
 - 可选诊断目录。
 
-开发 smoke 不得读取用户现有 Rime 配置或词库目录，也不得把本机绝对路径写入 committed 文档或 fixture。M1 可以使用 runbook 指定的开发目录；M4 必须形成可安装、可升级、可移除且许可证口径清晰的完整 bundle。
+开发 smoke 不得读取用户现有 Rime 配置或词库目录，也不得把本机绝对路径写入 committed 文档或 fixture。M1 已使用固定上游 commit、保留 Apache-2.0 许可证和来源记录的 `rime-pinyin-simp` 临时隔离数据复验 native bundle 与真实 FFI 输入链；该临时资产不替代 M4 可安装、可升级、可移除且许可证口径清晰的完整分发包。
 
 ## Header、线程与错误
 

@@ -126,7 +126,9 @@ Engine::commit_candidate(index)
   -> get_commit
 
 Engine::set_schema(schema)
+  -> get_schema_list and require deployed schema
   -> select_schema
+  -> get_current_schema and require exact match
 
 Drop
   -> destroy_session
@@ -143,6 +145,7 @@ process teardown
 - 同一时刻只有一个进程级 `RimeRuntime`，所有 native 调用通过其互斥边界串行执行。
 - 活动 session 必须使用完全相同的 `shared_data_dir`、`user_data_dir`、`log_dir` 和 `deploy_on_start`；schema 属于 session，可各自选择和切换。
 - deploy、首个 session 创建或 schema 选择失败时，runtime 必须清理已建立的全局 / session 状态、执行 finalize 并恢复为可重新初始化状态。
+- `select_schema` 返回成功不能单独证明 schema 可用；创建和切换前必须由 `get_schema_list` 确认目标已部署，选择后必须由 `get_current_schema` 精确回读。不存在或回读不一致都按 `select_schema` 失败处理。
 - 任一 session drop 只销毁自己的 Rime session，不触发 finalize；即使活动 session 暂时降为零，runtime 也保持初始化，避免应用切换造成重复 setup / initialize。
 - CLI 在 Rime 命令结束后显式 shutdown；平台壳必须在进程 teardown 且所有 session 已释放后调用 `radishlex_rime_runtime_shutdown`。shutdown 可重复调用，仍有活动 session 时返回 `InvalidState`。
 - `RimeEngine` 保持 owner-thread-only；首个成功初始化的 session 固定进程 runtime owner thread，后续 Rime session 与 shutdown 必须回到该线程。进程锁用于串行化生命周期，不把 librime 变成任意线程可调用 API。
@@ -199,7 +202,7 @@ RadishLexRimeSessionOptions
 - `ime-ffi` 启用 `native-rime` feature 时，该入口会将 options 转为 `RimeEngineConfig` 并创建真实 `RimeEngine` session。
 - `ime-ffi` 内部使用 demo / Rime 可扩展 session engine 封装，平台端仍只持有 opaque `RadishLexSession*`。
 - 已初始化 Rime runtime 的进程级目录与 deploy 配置不一致时返回 `InvalidState`，即使当前活动 session 为零也不重置已有 runtime；如需更换配置，必须先在零 session 状态显式 shutdown。
-- 当前已通过 ignored native smoke 覆盖 `radishlex_session_new_rime -> push_key -> snapshot -> commit_candidate`；该 smoke 需要显式传入隔离 Rime shared / user data 目录。
+- 当前已通过 ignored native smoke 覆盖 `radishlex_session_new_rime -> push_key -> snapshot -> commit_candidate`、双 session peer release 和不存在 schema 拒绝；该 smoke 需要显式传入隔离 Rime shared / user data 目录。
 
 ## 候选转换规则
 
@@ -285,11 +288,10 @@ RADISHLEX_RIME_SHARED_DATA=<path> RADISHLEX_RIME_USER_DATA=<path> cargo test -p 
 
 ABI contract v2 已闭合 `KeyOutcome` 的 `consumed`、即时 commit、同事件 snapshot 和 Rust-owned result 生命周期；`crates/ime-ffi/include/radishlex_input.h` 已通过 C11 与 Objective-C 编译测试。
 
-进程级 runtime 已闭合 setup / initialize / explicit shutdown / finalize、多 session 共享、零 session 间隙、配置冲突和 deploy / session / schema 失败回滚；stub API 测试可精确复验调用次数，`ime-ffi` 另有需要隔离 Rime 数据目录的 gated 双 session smoke。
+进程级 runtime 已闭合 setup / initialize / explicit shutdown / finalize、多 session 共享、零 session 间隙、配置冲突和 deploy / session / schema 失败回滚；schema 创建与切换同时验证已部署列表和选择后回读。stub API 测试可精确复验调用次数，`ime-ffi` 另有需要隔离 Rime 数据目录的 gated 单/双 session 与无效 schema smoke。
 
 真实应用输入 smoke 前仍必须闭合：
 
-- 为 native bundle 提供来源合规且与用户现有配置隔离的 schema/shared data，并复核开发版依赖加载；
 - macOS InputMethodKit 真实应用 smoke。
 
 这些未闭合项属于 M1 macOS 离线输入 Alpha，不应再被同步后端工作延后。最终发布包中的 `librime` 与 schema 分发属于 M4。

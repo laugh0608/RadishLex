@@ -112,7 +112,15 @@ pub struct RimeStatus {
 
 #[repr(C)]
 pub struct RimeSchemaList {
-    _private: [u8; 0],
+    pub size: usize,
+    pub list: *mut RimeSchemaListItem,
+}
+
+#[repr(C)]
+pub struct RimeSchemaListItem {
+    pub schema_id: *mut c_char,
+    pub name: *mut c_char,
+    pub reserved: *mut c_void,
 }
 
 pub type RimeNotificationHandler =

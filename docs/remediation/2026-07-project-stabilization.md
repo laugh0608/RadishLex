@@ -83,7 +83,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | 批次 | 名称 | 状态 | 退出结果 |
 | --- | --- | --- | --- |
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
-| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；薄壳/contract bundle 已完成，待授权真实输入 | 真实应用可离线完成基础中文输入 |
+| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；隔离 native bundle/FFI smoke 已完成，待授权真实应用输入 | 真实应用可离线完成基础中文输入 |
 | R02L | 本地 userdb/ranker 正确性 | 待开始 | 学习、删除、并发和排序语义正确 |
 | R01B | 真实学习纵向闭环 | 待开始，依赖 R01A 与 R02L | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 可与 R01A 并行 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
@@ -127,9 +127,12 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - `./scripts/check-macos-imk.sh` 可在不安装系统输入法时构建 contract `.inputmethod` bundle，运行 Objective-C → C ABI → Rust session smoke，并检查 plist、rpath、dylib 与关键 symbol；production 分支另有 `-fsyntax-only` 编译门禁。
 - `./scripts/check-macos-imk-native.sh` 增加显式 gated native bundle 门禁：拒绝真实用户/runtime 数据目录和 symlink，要求 schema/default/license，固定 deploy policy，并检查架构、rpath、`librime` 直接依赖、三个关键 symbol 与全部 copied data 哈希清单。
 - wrapper contract 扩展到完整命名键表、全部 modifier、modifier release、补充平面 Unicode、中文/emoji UTF-8 byte cursor 到 UTF-16 unit 转换、scalar 中间 cursor 拒绝和无 index 候选拒绝。
-- native-rime release dylib 已使用现有显式 Homebrew include/lib 构建并复核 `session_new_rime`、`session_handle_key_event` 与 `rime_runtime_shutdown` 导出；native bundle 门禁只用不含词典的临时合成打包数据自测，未提供或读取真实 schema/user data，也未执行真实 Rime 输入。
+- native-rime release dylib 已使用现有显式 Homebrew include/lib 构建并复核 `session_new_rime`、`session_handle_key_event` 与 `rime_runtime_shutdown` 导出。
+- 采用官方 Apache-2.0 `rime-pinyin-simp` 固定上游 commit，在临时隔离目录保留许可证和来源记录，并移除对其他 schema/preset 的外部依赖；没有读取或修改真实用户 Rime 目录。
+- native bundle 已携带上述隔离全拼 shared data 通过架构、依赖、symbol、许可证和哈希清单门禁；真实 librime FFI smoke 已复验 composition、候选、commit、两个 session 共享 runtime 与 peer release 后继续输入。
+- native smoke 发现 librime 对不存在 schema 的 `select_schema`/`get_current_schema` 返回过于宽松；adapter 现先读取已部署 schema list，再选择并精确回读。不存在或回读不一致会返回结构化错误，创建期还会销毁 session 并回滚 runtime，对应 stub 与真实 FFI 回归均已覆盖。
 
-这些证据关闭输入结果、header、进程级 librime runtime 和不安装平台 wrapper/contract 子项，不代表 native schema bundle、系统安装或真实应用输入 smoke 已完成。
+这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle 与真实 FFI 调用链子项，不代表系统安装或真实应用输入 smoke 已完成。
 
 ### 退出场景
 
