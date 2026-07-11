@@ -59,9 +59,11 @@ test "$(plutil -extract TISInputSourceID raw \
   "${bundle}/Contents/Info.plist")" = "org.radishlex.inputmethod"
 test "$(plutil -extract TISIntendedLanguage raw \
   "${bundle}/Contents/Info.plist")" = "zh-Hans"
-mode_path=":ComponentInputModeDict:tsInputModeListKey:org.radishlex.inputmethod.pinyin_simp"
-test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:TISInputSourceID" \
-  "${bundle}/Contents/Info.plist")" = "org.radishlex.inputmethod.pinyin_simp"
+mode_path=":ComponentInputModeDict:tsInputModeListKey:org.radishlex.inputmethod.Pinyin"
+mode_id="$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:TISInputSourceID" \
+  "${bundle}/Contents/Info.plist")"
+test "${mode_id}" = "org.radishlex.inputmethod.Pinyin"
+[[ "${mode_id}" =~ ^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$ ]]
 test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:TISIntendedLanguage" \
   "${bundle}/Contents/Info.plist")" = "zh-Hans"
 test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:tsInputModeIsVisibleKey" \
@@ -71,11 +73,11 @@ test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:tsInputModeScriptKey" \
 test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:tsInputModeCharacterRepertoireKey:0" \
   "${bundle}/Contents/Info.plist")" = "Hans"
 test "$(plutil -extract ComponentInputModeDict.tsVisibleInputModeOrderedArrayKey.0 raw \
-  "${bundle}/Contents/Info.plist")" = "org.radishlex.inputmethod.pinyin_simp"
+  "${bundle}/Contents/Info.plist")" = "org.radishlex.inputmethod.Pinyin"
 test "$(plutil -extract InputMethodServerDelegateClass raw \
   "${bundle}/Contents/Info.plist")" = "RadishLexInputController"
-test "$(plutil -extract LSUIElement raw "${bundle}/Contents/Info.plist")" = "true"
-test "$(/usr/libexec/PlistBuddy -c 'Print :org.radishlex.inputmethod.pinyin_simp' \
+test "$(plutil -extract LSBackgroundOnly raw "${bundle}/Contents/Info.plist")" = "true"
+test "$(/usr/libexec/PlistBuddy -c 'Print :org.radishlex.inputmethod.Pinyin' \
   "${bundle}/Contents/Resources/zh-Hans.lproj/InfoPlist.strings")" = "萝卜词核拼音"
 otool -L "${bundle}/Contents/MacOS/RadishLex" | grep -q \
   "@rpath/libradishlex_ime_ffi.dylib"

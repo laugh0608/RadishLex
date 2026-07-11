@@ -25,12 +25,12 @@
     <string>MacOSX</string>
   </array>
   <key>CFBundleVersion</key>
-  <string>11</string>
+  <string>13</string>
   <key>ComponentInputModeDict</key>
   <dict>
     <key>tsInputModeListKey</key>
     <dict>
-      <key>org.radishlex.inputmethod.pinyin_simp</key>
+      <key>org.radishlex.inputmethod.Pinyin</key>
       <dict>
         <key>TISIconLabels</key>
         <dict>
@@ -38,7 +38,7 @@
           <string>萝</string>
         </dict>
         <key>TISInputSourceID</key>
-        <string>org.radishlex.inputmethod.pinyin_simp</string>
+        <string>org.radishlex.inputmethod.Pinyin</string>
         <key>TISIntendedLanguage</key>
         <string>zh-Hans</string>
         <key>tsInputModeCharacterRepertoireKey</key>
@@ -61,7 +61,7 @@
     </dict>
     <key>tsVisibleInputModeOrderedArrayKey</key>
     <array>
-      <string>org.radishlex.inputmethod.pinyin_simp</string>
+      <string>org.radishlex.inputmethod.Pinyin</string>
     </array>
   </dict>
   <key>InputMethodConnectionName</key>
@@ -70,7 +70,7 @@
   <string>RadishLexInputController</string>
   <key>InputMethodServerDelegateClass</key>
   <string>RadishLexInputController</string>
-  <key>LSUIElement</key>
+  <key>LSBackgroundOnly</key>
   <true/>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
