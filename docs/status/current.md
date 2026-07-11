@@ -13,7 +13,7 @@
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；受控同步实现与测试可继续
 
-RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/sync 原型、Go sync server 和 Flutter manager 原型，但还不是用户可安装使用的输入法。当前没有真实平台输入法，正常 manager 产品包也没有形成真实 FFI、持久化配置和平台文件访问闭环。
+RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/sync 原型、Go sync server、Flutter manager 原型和 macOS InputMethodKit 开发薄壳，但还不是用户可安装使用的输入法。macOS 当前只有不安装系统输入法的 contract bundle 与 wrapper smoke；正常 manager 产品包也没有形成真实 FFI、持久化配置和平台文件访问闭环。
 
 长期产品交付顺序见 [产品交付路线图](../roadmap.md)，当前整改批次、停止线、资产处置和退出条件见 [项目稳定化整改专题](../remediation/2026-07-project-stabilization.md)。
 
@@ -34,12 +34,13 @@ RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/syn
 - Apple/Android 平台签名 backend 在能力不足时保持 unavailable，没有静默回退为生产密钥。
 - `ime-ffi` ABI contract v2 已无损返回 `consumed`、可选即时 commit 和同事件 snapshot；输入侧 C header 已通过 C11 与 Objective-C 编译测试。
 - librime setup / initialize / explicit shutdown / finalize 已收口到进程级 runtime；多 session、零 session 间隙、配置冲突、失败回滚、peer release 和最终 finalize 已有自动测试或 gated native smoke。
+- `platforms/macos-imk/` 已形成可构建的 Objective-C InputMethodKit 薄壳、contract bundle 和 wrapper smoke；合成链覆盖 key normalization、未消费键、即时 commit、snapshot/candidate 复制、候选 index、reset、schema、owner-thread 与 teardown 释放顺序。
 
 这些证据证明工程原型可继续演进，不证明真实平台输入、生产同步或产品发布已经完成。
 
 ## 已确认阻塞
 
-- macOS InputMethodKit 薄壳、bundle build 和真实应用输入 smoke 尚未落地。
+- macOS native-rime bundle 尚需一份显式隔离且来源合规的 shared data/schema；安装、启用、两个真实应用输入框 smoke 和移除尚未获授权执行。
 - 输入 session 未组合 engine、ranker、userdb 与 privacy policy，真实选择没有进入平台学习热路径。
 - userdb 用户意图缺少统一事务、WAL/busy 策略；ranker recency/frequency 语义需要修正。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
@@ -58,9 +59,9 @@ RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/syn
 
 ## 下一步顺位
 
-1. 按 `docs/macos-inputmethodkit-boundary.md` 创建 macOS 薄壳和 bundle build，先完成不安装系统输入法的 wrapper/contract smoke。
-2. 在平台 wrapper 中复验 owner-thread、reset、schema 切换、取消和异常释放，不引入 ranker/userdb 或同步依赖。
-3. 编写安装、启用和移除 runbook；获得授权后再执行真实应用输入 smoke，完成 R01A。
+1. 准备来源合规、与用户现有输入法隔离的 Rime shared data/schema，执行 `build-bundle.sh native` 并复核开发依赖加载；不得隐式读取真实用户 Rime 目录。
+2. 按 macOS 开发 runbook 评审安装、启用、两个应用输入 smoke 与移除步骤；取得明确授权后再执行并完成 R01A。
+3. 真实 smoke 重点复验连续输入、非首候选、翻页、取消、Backspace、Enter、中英文混输、未消费快捷键、client 切换与进程重启。
 4. 并行实施 R06A：修复严格 Clippy，增加 Flutter 与 Go race CI，清理 review-only Rust/Flutter 生产资产。
 5. R01A 退出后实施 R02L，修正 userdb 事务、SQLite 并发、recency、frequency 与删除语义。
 6. R02L 退出后实施 R01B，让真实选择在隐私策略约束下持久化并影响后续候选；之后关闭整改专题并进入 M3。
@@ -78,6 +79,12 @@ Flutter manager：
 ```bash
 ./scripts/check-manager.sh
 ./scripts/check-manager-ffi-smoke.sh
+```
+
+macOS InputMethodKit（不安装）：
+
+```bash
+./scripts/check-macos-imk.sh
 ```
 
 文档与文本：

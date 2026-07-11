@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>zh_CN</string>
+  <key>CFBundleDisplayName</key>
+  <string>萝卜词核</string>
+  <key>CFBundleExecutable</key>
+  <string>RadishLex</string>
+  <key>CFBundleIdentifier</key>
+  <string>org.radishlex.inputmethod</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>RadishLex</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>0.1.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+  <key>InputMethodConnectionName</key>
+  <string>org.radishlex.inputmethod_Connection</string>
+  <key>InputMethodServerControllerClass</key>
+  <string>RadishLexInputController</string>
+  <key>LSBackgroundOnly</key>
+  <true/>
+  <key>LSMinimumSystemVersion</key>
+  <string>13.0</string>
+  <key>RadishLexRimeDeployOnStart</key>
+  <false/>
+  <key>RadishLexRimeSchema</key>
+  <string>__RADISHLEX_RIME_SCHEMA__</string>
+  <key>RadishLexRimeSharedDataDirectory</key>
+  <string>RimeData</string>
+  <key>TISInputSourceID</key>
+  <string>org.radishlex.inputmethod</string>
+  <key>TISInputSourceLanguages</key>
+  <array>
+    <string>zh-Hans</string>
+  </array>
+  <key>TISInputSourceType</key>
+  <string>TISTypeKeyboardInputMode</string>
+  <key>TISIntendedLanguage</key>
+  <string>zh-Hans</string>
+</dict>
+</plist>

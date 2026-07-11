@@ -287,9 +287,9 @@ ABI contract v2 已闭合 `KeyOutcome` 的 `consumed`、即时 commit、同事�
 
 进程级 runtime 已闭合 setup / initialize / explicit shutdown / finalize、多 session 共享、零 session 间隙、配置冲突和 deploy / session / schema 失败回滚；stub API 测试可精确复验调用次数，`ime-ffi` 另有需要隔离 Rime 数据目录的 gated 双 session smoke。
 
-平台接入前仍必须闭合：
+真实应用输入 smoke 前仍必须闭合：
 
-- native library、`librime` 与 schema 的开发版加载策略；
+- 为 native bundle 提供来源合规且与用户现有配置隔离的 schema/shared data，并复核开发版依赖加载；
 - macOS InputMethodKit 真实应用 smoke。
 
 这些未闭合项属于 M1 macOS 离线输入 Alpha，不应再被同步后端工作延后。最终发布包中的 `librime` 与 schema 分发属于 M4。

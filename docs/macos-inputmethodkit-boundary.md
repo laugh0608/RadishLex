@@ -107,6 +107,8 @@ M1 开发版必须明确并隔离：
 
 新增、启用或移除系统输入法会修改本机状态，必须在独立 runbook 中说明影响、路径、回滚和 smoke 数据要求，并在执行前获得用户明确授权。自动测试默认只构建 bundle、检查结构和运行 host contract，不自动安装、启用或重启系统输入法服务。
 
+当前开发实现位于 `platforms/macos-imk/`。`./scripts/check-macos-imk.sh` 只构建 contract bundle、编译 production 条件分支并运行合成 wrapper smoke；`build-bundle.sh native` 必须由调用方显式提供 `RIME_INCLUDE_DIR`、`RIME_LIB_DIR`、隔离 shared data 和 schema id。两条入口都不查找用户已有 Rime 目录，不执行安装、注册或服务重启。开发版安装与移除步骤见 `docs/runbooks/macos-inputmethodkit-development.md`。
+
 ## M1 验收证据
 
 自动证据至少覆盖：

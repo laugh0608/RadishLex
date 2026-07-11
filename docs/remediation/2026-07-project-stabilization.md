@@ -83,7 +83,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | 批次 | 名称 | 状态 | 退出结果 |
 | --- | --- | --- | --- |
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
-| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；KeyOutcome/header/runtime 已完成，待 macOS | 真实应用可离线完成基础中文输入 |
+| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；薄壳/contract bundle 已完成，待授权真实输入 | 真实应用可离线完成基础中文输入 |
 | R02L | 本地 userdb/ranker 正确性 | 待开始 | 学习、删除、并发和排序语义正确 |
 | R01B | 真实学习纵向闭环 | 待开始，依赖 R01A 与 R02L | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 可与 R01A 并行 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
@@ -122,8 +122,12 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 两个 session 与零 session 间隙共享一次 setup / initialize；已初始化期间目录或 deploy 配置冲突返回结构化错误，deploy / session 创建 / schema 选择失败会回滚，只有显式 process shutdown 且零活动 session 时才 finalize。
 - 首个成功初始化的 Rime session 固定进程 runtime owner thread；跨线程创建或 shutdown 返回 `InvalidState`，平台壳不能把多个 client 分散到任意线程直接调用 librime。
 - adapter stub API 精确验证初始化、创建、销毁和 finalize 次数；`ime-ffi` 增加隔离数据目录下的 gated 双 session peer-release smoke。
+- 新增 `platforms/macos-imk/` Objective-C 薄壳：`NSEvent` 规范化、ABI v2 key result、即时 commit、snapshot/candidate 复制、原生 `IMKCandidates`、稳定候选 index、reset/cancel、schema 和 owner-thread 均由同一 wrapper 收口。
+- `RLXProcessRuntime` 为每个 input controller 创建独立 session，并在进程 teardown 时先逐个 invalidate session，再调用 `radishlex_rime_runtime_shutdown`；生产条件编译分支不允许回退 demo engine。
+- `./scripts/check-macos-imk.sh` 可在不安装系统输入法时构建 contract `.inputmethod` bundle，运行 Objective-C → C ABI → Rust session smoke，并检查 plist、rpath、dylib 与关键 symbol；production 分支另有 `-fsyntax-only` 编译门禁。
+- native-rime release dylib 已使用现有显式 Homebrew include/lib 构建并复核 `session_new_rime`、`session_handle_key_event` 与 `rime_runtime_shutdown` 导出；未提供或读取 schema/user data，因此没有执行 native bundle 或真实 Rime 输入。
 
-这些证据关闭输入结果、header 与进程级 librime runtime 子项，不代表 InputMethodKit 薄壳或真实平台 smoke 已完成。
+这些证据关闭输入结果、header、进程级 librime runtime 和不安装平台 wrapper/contract 子项，不代表 native schema bundle、系统安装或真实应用输入 smoke 已完成。
 
 ### 退出场景
 
