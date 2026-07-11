@@ -74,7 +74,7 @@ Flutter Manager
 `ime-engine-rime` 把 `librime` 的输入、候选、composition、commit 和状态转换为 RadishLex 稳定模型。
 
 - Rime API、session ID、C/C++ 生命周期和数据目录停留在 adapter 内部。
-- librime setup、initialize、notification 和 finalize 由进程级 runtime 管理。
+- librime setup、initialize、notification 和 finalize 由进程级 runtime 管理；session drop 不触发 finalize，进程 teardown 在零活动 session 后显式 shutdown。
 - 单个输入 session 只管理对应的 librime session。
 - engine 原始分数可以作为 ranker 因子，但不是核心真相源。
 - bindings 必须有 ABI 版本与布局验证，不能只靠手写结构长期假定兼容。

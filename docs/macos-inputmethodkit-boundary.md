@@ -43,9 +43,9 @@ InputMethodKit 薄壳负责：
 - 同一输入法进程只初始化一次；多个输入 session 复用同一 runtime。
 - 单个 Rust input session 只拥有对应 engine session、composition 与候选状态。
 - 每个活动输入 context 使用独立 session；不得让两个输入 client 共享可变 composition。
-- session 创建、按键、候选提交、reset 和释放遵守 `ime-ffi` owner-thread 契约。
+- 所有 Rime session 创建、按键、候选提交、reset、释放和 runtime shutdown 使用同一个串行 owner thread；不能让不同 client 各自在任意线程直接调用 librime。
 - client 切换、输入法停用、异常取消和进程退出必须有明确 reset/drop 路径。
-- finalize 只在进程级 runtime 确认没有活动 session 后执行，不由任意 session drop 触发。
+- 任意 session drop 只释放自己的 engine session，不触发 finalize；进程 teardown 时先释放全部 session，再调用 `radishlex_rime_runtime_shutdown`，由 runtime 复核零活动 session 后执行 finalize。
 
 runtime 初始化失败必须返回结构化错误。平台不得静默切换 demo engine，也不得把未初始化状态显示为可用输入法。
 

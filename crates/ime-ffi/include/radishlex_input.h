@@ -123,7 +123,16 @@ RadishLexSession *radishlex_session_new_with_options(
 RadishLexSession *radishlex_session_new_rime(
     const RadishLexRimeSessionOptions *options,
     RadishLexError **error_out);
+/* Owner-thread only. A non-owner-thread call is ignored. */
 void radishlex_session_free(RadishLexSession *session);
+
+/*
+ * Call on the Rime runtime owner thread during process teardown after every
+ * Rime session is released.
+ * The call is idempotent and returns INVALID_STATE while sessions are active.
+ */
+RadishLexStatusCode radishlex_rime_runtime_shutdown(
+    RadishLexError **error_out);
 
 uint32_t radishlex_session_engine_kind(const RadishLexSession *session);
 RadishLexStatusCode radishlex_session_reset(

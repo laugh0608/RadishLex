@@ -8,7 +8,7 @@ use radishlex_ime_core::{
     Candidate, CoreError, Engine, InputSession, Key, KeyEvent, NamedKey, SchemaId, SessionState,
 };
 #[cfg(feature = "native-rime")]
-use radishlex_ime_engine_rime::{RimeEngine, RimeEngineConfig};
+use radishlex_ime_engine_rime::{shutdown_process_runtime, RimeEngine, RimeEngineConfig};
 use radishlex_ime_ranker::{RankRequest, RankedCandidate, Ranker};
 use radishlex_ime_userdb::{
     decode_dictionary_terms_tsv_document, encode_dictionary_terms_tsv, DictionaryTermRecord,
@@ -139,13 +139,25 @@ fn run_rime(args: &[String]) -> Result<String, CliError> {
     let config = RimeEngineConfig::new(options.shared_data, options.user_data, schema)
         .map_err(rime_error_to_cli)?;
     let session = InputSession::new(RimeEngine::new(config).map_err(rime_error_to_cli)?);
-    run_input_session(
+    let output = run_input_session(
         session,
         &options.input_code,
         &options.extra_keys,
         options.selected_index,
         options.rank_smoke.as_ref(),
-    )
+    );
+    let shutdown = shutdown_process_runtime().map_err(rime_error_to_cli);
+
+    match output {
+        Ok(output) => {
+            shutdown?;
+            Ok(output)
+        }
+        Err(error) => {
+            let _ = shutdown;
+            Err(error)
+        }
+    }
 }
 
 fn run_dict(args: &[String]) -> Result<String, CliError> {

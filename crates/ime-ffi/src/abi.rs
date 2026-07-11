@@ -87,9 +87,19 @@ pub extern "C" fn radishlex_session_new_rime(
 }
 
 #[no_mangle]
+/// Releases a session on the thread that created it.
+///
+/// # Safety
+///
+/// `session` must be null or a live handle returned by a RadishLex session
+/// constructor. Passing an already released pointer is invalid. A call from a
+/// non-owner thread is ignored so the owner thread can still release the handle.
 pub unsafe extern "C" fn radishlex_session_free(session: *mut RadishLexSession) {
     ffi_release(|| {
         if session.is_null() {
+            return;
+        }
+        if (&*session).ensure_owner_thread().is_err() {
             return;
         }
         let _ = Box::from_raw(session);
@@ -1012,6 +1022,10 @@ mod tests {
             radishlex_snapshot_free(snapshot);
             radishlex_session_free(session);
         }
+        assert_eq!(
+            unsafe { crate::radishlex_rime_runtime_shutdown(&mut error) },
+            RadishLexStatusCode::Ok
+        );
     }
 
     #[test]

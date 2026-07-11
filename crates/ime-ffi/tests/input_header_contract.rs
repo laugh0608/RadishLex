@@ -3,10 +3,11 @@ use std::mem::size_of;
 use radishlex_ime_ffi::{
     radishlex_key_result_commit, radishlex_key_result_commit_present,
     radishlex_key_result_consumed, radishlex_key_result_free, radishlex_key_result_snapshot,
-    radishlex_key_result_version, radishlex_session_handle_key_event, RadishLexError,
-    RadishLexFfiContract, RadishLexKeyEvent, RadishLexKeyResult, RadishLexSession,
-    RadishLexSessionOptions, RadishLexSnapshot, RadishLexStatusCode, RadishLexStringView,
-    RADISHLEX_ABI_CONTRACT_VERSION, RADISHLEX_KEY_RESULT_VERSION,
+    radishlex_key_result_version, radishlex_rime_runtime_shutdown,
+    radishlex_session_handle_key_event, RadishLexError, RadishLexFfiContract, RadishLexKeyEvent,
+    RadishLexKeyResult, RadishLexSession, RadishLexSessionOptions, RadishLexSnapshot,
+    RadishLexStatusCode, RadishLexStringView, RADISHLEX_ABI_CONTRACT_VERSION,
+    RADISHLEX_KEY_RESULT_VERSION,
 };
 
 #[test]
@@ -32,6 +33,8 @@ fn rust_input_abi_layout_matches_the_checked_header_contract() {
     let _: unsafe extern "C" fn(*const RadishLexKeyResult) -> *const RadishLexSnapshot =
         radishlex_key_result_snapshot;
     let _: unsafe extern "C" fn(*mut RadishLexKeyResult) = radishlex_key_result_free;
+    let _: unsafe extern "C" fn(*mut *mut RadishLexError) -> RadishLexStatusCode =
+        radishlex_rime_runtime_shutdown;
 }
 
 #[cfg(unix)]
@@ -106,6 +109,8 @@ RadishLexStatusCode radishlex_compile_input_contract(
     RadishLexSession *session,
     RadishLexKeyEvent event,
     RadishLexError **error_out) {
+  RadishLexStatusCode (*runtime_shutdown)(RadishLexError **) =
+      radishlex_rime_runtime_shutdown;
   RadishLexKeyResult *result = NULL;
   RadishLexStatusCode status =
       radishlex_session_handle_key_event(session, event, &result, error_out);
@@ -125,6 +130,7 @@ RadishLexStatusCode radishlex_compile_input_contract(
     (void)candidate;
     radishlex_key_result_free(result);
   }
+  (void)runtime_shutdown;
   return status;
 }
 "#;

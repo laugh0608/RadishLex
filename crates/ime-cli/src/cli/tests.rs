@@ -75,6 +75,7 @@ fn demo_command_rejects_invalid_candidate_index() {
 }
 
 #[test]
+#[cfg(not(feature = "native-rime"))]
 fn rime_command_requires_native_feature_by_default() {
     let err = run(&args(&[
         "radishlex-ime-cli",

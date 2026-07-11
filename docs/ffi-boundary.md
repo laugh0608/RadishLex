@@ -44,7 +44,7 @@ RadishLexError*
 当前已落地函数按能力分组：
 
 - ABI contract：`radishlex_ffi_contract`
-- session 生命周期：`radishlex_session_new`、`radishlex_session_new_with_options`、`radishlex_session_new_rime`、`radishlex_session_free`、`radishlex_session_engine_kind`、`radishlex_session_reset`、`radishlex_session_set_schema`
+- session / Rime runtime 生命周期：`radishlex_session_new`、`radishlex_session_new_with_options`、`radishlex_session_new_rime`、`radishlex_session_free`、`radishlex_rime_runtime_shutdown`、`radishlex_session_engine_kind`、`radishlex_session_reset`、`radishlex_session_set_schema`
 - 输入与快照：`radishlex_session_handle_key_event`、`radishlex_key_result_*`、兼容 `radishlex_session_push_key_event`、`radishlex_session_snapshot_new`、`radishlex_snapshot_*`、`radishlex_session_commit_candidate`
 - userdb 状态与词条管理：`radishlex_userdb_learning_status`、`radishlex_userdb_sync_preflight`、`radishlex_userdb_rank_explain_*`、`radishlex_userdb_add_term`、`radishlex_userdb_delete_term`、`radishlex_userdb_terms_*`
 - dictionary 文件与导入审计：`radishlex_userdb_dictionary_*`、`radishlex_userdb_import_batches_*`
@@ -133,6 +133,9 @@ RADISHLEX_RIME_SESSION_OPTIONS_VERSION = 1
 - 启用 `native-rime` feature 且本机 `librime` 可用时，该入口会把 options 转成 `RimeEngineConfig` 并创建真实 `RimeEngine` session。
 - Rime session 必须使用隔离的 Rime shared / user data 目录；不得静默退回 demo engine，不得读取真实用户输入法目录。
 - 平台端不能缓存这些路径指针；Rust 侧只在调用期间借用传入字符串，并在 `RimeEngineConfig` / native string 管理中复制必要配置。
+- 进程 runtime 初始化后，shared / user / log / deploy 配置保持不变；schema 仍属于各 session。配置冲突返回 `InvalidState`，不会重启已有 runtime。
+- 首个成功初始化的 Rime session 固定进程 runtime owner thread；后续 Rime session 创建、调用、释放和 shutdown 必须使用同一线程，跨线程返回 `InvalidState` 或构成错误释放用法。
+- `radishlex_session_free` 只释放对应 session，不触发全局 finalize。进程 teardown 必须在 runtime owner thread 先释放所有 Rime session，再调用可重复的 `radishlex_rime_runtime_shutdown`；仍有 session 时 shutdown 返回 `InvalidState`。
 
 ### Key event
 
@@ -364,6 +367,7 @@ Engine adapter 选择规则：
 - `radishlex_session_new_with_options` 接收带 `version` 的 `RadishLexSessionOptions`，当前只允许 `RADISHLEX_ENGINE_KIND_DEMO`。
 - `RADISHLEX_ENGINE_KIND_RIME` 已保留为稳定 kind，但当前返回 `InvalidState`；真实 Rime adapter 不通过该通用 options 入口传路径。
 - `radishlex_session_new_rime` 是 Rime 专用构造入口，负责校验 `RadishLexRimeSessionOptions`；默认构建下返回 `InvalidState`，`native-rime` feature 下创建真实 Rime session。
+- `radishlex_rime_runtime_shutdown` 是进程 teardown 入口；默认构建下返回 `InvalidState`，native 构建下只在零活动 Rime session 时 finalize，重复 shutdown 返回成功。
 - 未知 options version 或未知 engine kind 返回 `InvalidArgument`。
 - 平台端不能直接创建或持有 Rime session、Rime candidate 指针或底层 native handle。
 
@@ -405,8 +409,10 @@ Userdb 词条管理入口规则：
 - Rust 分配的字符串、数组和 snapshot buffer 必须由 Rust 释放。
 - 平台端传入的字符串只在调用期间借用，Rust 不保存裸指针。
 - `RadishLexSession*` 绑定创建线程；平台端如需跨线程调度输入，必须在平台侧投递回创建线程，或后续在 Rust 侧显式建模线程安全队列。
+- `radishlex_session_free` 也必须回到 session owner thread；非 owner thread 的释放调用不消费 handle，调用方仍须在 owner thread 完成释放。
 - FFI 不跨线程共享 snapshot、buffer、term list、import batch list 或 error 裸指针。
 - session drop 必须释放 engine adapter、userdb handle 和临时 buffer。
+- 释放最后一个 Rime session 不等同于进程 teardown；平台仍须显式调用 runtime shutdown，且不得在任何 session 活动时调用。
 - panic 不能跨 FFI 边界，必须转换为错误码。
 
 ## 错误语义

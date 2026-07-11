@@ -33,12 +33,12 @@ RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/syn
 - 本地 Docker/HTTPS、备份恢复、外部 TLS 反代和升级回滚已有开发或实现级 smoke。
 - Apple/Android 平台签名 backend 在能力不足时保持 unavailable，没有静默回退为生产密钥。
 - `ime-ffi` ABI contract v2 已无损返回 `consumed`、可选即时 commit 和同事件 snapshot；输入侧 C header 已通过 C11 与 Objective-C 编译测试。
+- librime setup / initialize / explicit shutdown / finalize 已收口到进程级 runtime；多 session、零 session 间隙、配置冲突、失败回滚、peer release 和最终 finalize 已有自动测试或 gated native smoke。
 
 这些证据证明工程原型可继续演进，不证明真实平台输入、生产同步或产品发布已经完成。
 
 ## 已确认阻塞
 
-- librime setup/initialize/finalize 尚未收口为进程级 runtime。
 - macOS InputMethodKit 薄壳、bundle build 和真实应用输入 smoke 尚未落地。
 - 输入 session 未组合 engine、ranker、userdb 与 privacy policy，真实选择没有进入平台学习热路径。
 - userdb 用户意图缺少统一事务、WAL/busy 策略；ranker recency/frequency 语义需要修正。
@@ -58,8 +58,8 @@ RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/syn
 
 ## 下一步顺位
 
-1. 以 `docs/engine-rime-adapter.md` 为契约，收口 librime 进程级 setup/initialize/finalize、多 session 与异常退出测试。
-2. 按 `docs/macos-inputmethodkit-boundary.md` 创建 macOS 薄壳和 bundle build，先完成不安装系统输入法的 wrapper/contract smoke。
+1. 按 `docs/macos-inputmethodkit-boundary.md` 创建 macOS 薄壳和 bundle build，先完成不安装系统输入法的 wrapper/contract smoke。
+2. 在平台 wrapper 中复验 owner-thread、reset、schema 切换、取消和异常释放，不引入 ranker/userdb 或同步依赖。
 3. 编写安装、启用和移除 runbook；获得授权后再执行真实应用输入 smoke，完成 R01A。
 4. 并行实施 R06A：修复严格 Clippy，增加 Flutter 与 Go race CI，清理 review-only Rust/Flutter 生产资产。
 5. R01A 退出后实施 R02L，修正 userdb 事务、SQLite 并发、recency、frequency 与删除语义。

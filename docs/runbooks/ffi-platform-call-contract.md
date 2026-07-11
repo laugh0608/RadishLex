@@ -68,6 +68,9 @@ radishlex_session_new_rime(options, error_out)
 - 跨线程误用返回 `InvalidState`；无 `error_out` 的 session 读取入口返回空值，例如 `radishlex_session_engine_kind` 返回 `0`。
 - 不要把 `RadishLexSession*` 放进全局并允许多个平台线程直接调用。
 - 如果平台输入事件来自多个线程，先投递到 session owner thread，再调用 C ABI。
+- `radishlex_session_free` 也必须投递到 session owner thread；非 owner thread 调用是 no-op，不能把它误判为已经释放。
+- 首个 Rime session 同时固定进程 runtime owner thread；后续 Rime session 也必须在该固定线程创建和使用，不能只满足“各自回到自己的创建线程”。
+- `radishlex_rime_runtime_shutdown` 不是 session 操作，只能在同一 runtime owner thread、进程 teardown、全部 Rime session 已释放且不再接收输入事件时调用。
 
 ### 3. 每次调用都按 `error_out` 规范处理
 
@@ -165,6 +168,7 @@ radishlex_session_commit_candidate(session, index, error_out)
 radishlex_key_result_free(result)
 radishlex_buffer_free(commit)
 radishlex_session_free(session)
+radishlex_rime_runtime_shutdown(error_out)  // process teardown only
 ```
 
 规则：
@@ -176,6 +180,7 @@ radishlex_session_free(session)
 - 候选提交返回 `RadishLexBuffer*`，读取后必须释放。
 - 独立 `snapshot_new` 只保留为兼容和调试入口；snapshot 不会跟随 session 后续输入自动更新。
 - 候选索引来自 snapshot 的当前候选列表；提交前如 session 状态已变化，平台层应重新取 snapshot。
+- `session_free` 只销毁该 session；不要在应用切换或 client 切换时 shutdown 进程 runtime。最终 shutdown 可重复调用，但活动 session 存在时必须按 `InvalidState` 处理为生命周期错误。
 
 ### Userdb 和 dictionary 管理
 
@@ -241,6 +246,7 @@ radishlex_userdb_import_batches_new(db_path, error_out)
 - 非 UTF-8、空指针、非法 bool、候选越界能返回稳定错误码并释放 error。
 - key result / snapshot / term list / import batch list 的 string view 能按长度复制，并在释放所属 handle 后继续使用已复制值。
 - `*_free(NULL)` 不崩溃。
+- 两个 Rime session 共享进程 runtime；释放其中一个后另一个仍可输入，全部释放后显式 runtime shutdown 成功，活动 session 存在时 shutdown 返回 `InvalidState`。
 - userdb 管理入口使用显式临时 SQLite 路径，不读取真实用户输入法目录；learning status smoke 需要断言 P1 明细和上下文统计标记为 false。
 - 本仓库 Rust host smoke 已覆盖 key result / snapshot / user term / import batch / error 的复制后释放；平台 wrapper 仍需在本语言层复验同一规则。
 
