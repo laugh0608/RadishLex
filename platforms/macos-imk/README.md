@@ -8,7 +8,7 @@
 - `Sources/RadishLexInputController.*`：映射 `NSEvent`，更新 marked text，使用 `IMKCandidates` 展示原生候选并按稳定 index 提交。
 - `Sources/RadishLexRuntime.*`：创建独立 Rime session；进程退出时先释放全部 session，再调用 `radishlex_rime_runtime_shutdown`。
 - `build-bundle.sh`：构建 contract 或显式 native-rime 开发 bundle，不安装 bundle。
-- `Tests/contract_smoke.m`：使用合成 demo engine 复验 ABI v2 调用链，不读取 Rime 目录。
+- `Tests/contract_smoke.m`：使用合成 demo engine 复验 ABI v2、完整按键映射、Unicode cursor、候选索引和生命周期，不读取 Rime 目录。
 
 ## 不安装验证
 
@@ -20,16 +20,17 @@
 
 ## native-rime 开发 bundle
 
-native build 不查找用户已有输入法目录，也不下载 schema。调用方必须显式提供 `librime` include/lib 和一份隔离的 shared data：
+native build 不查找用户已有输入法目录，也不下载 schema。调用方必须显式提供 `librime` include/lib、一份隔离的 shared data 及其许可证文件；shared data 必须包含 `default.yaml` 和 `<schema-id>.schema.yaml`：
 
 ```bash
 RIME_INCLUDE_DIR=<include> \
 RIME_LIB_DIR=<lib> \
 RADISHLEX_RIME_SHARED_DATA=<isolated-shared-data> \
 RADISHLEX_RIME_SCHEMA=<schema-id> \
-./platforms/macos-imk/build-bundle.sh native
+RADISHLEX_RIME_DATA_LICENSE=<license-file> \
+./scripts/check-macos-imk-native.sh
 ```
 
-构建产物位于 `target/macos-imk/native/RadishLex.inputmethod`。脚本只复制调用方提供的 shared data 到生成目录；不会写系统输入法目录、启动服务或修改系统配置。当前开发 bundle 仍从显式 `RIME_LIB_DIR` 对应的开发环境加载 `librime` 及其依赖，完整依赖封装、签名与普通用户分发属于 M4。
+`RADISHLEX_RIME_DEPLOY_ON_START` 可显式设为 `0` 或 `1`，默认 `1`。构建产物位于 `target/macos-imk/native/RadishLex.inputmethod`；bundle 同时保存全部 copied shared data 和许可证的 SHA-256 清单，并拒绝 shared data symlink。检查入口验证架构、plist、rpath、Rust symbol、`librime` 及其直接传递依赖，但不启动 bundle。脚本只复制调用方提供的数据到生成目录，不会写系统输入法目录、启动服务或修改系统配置。当前开发 bundle 仍从显式 `RIME_LIB_DIR` 对应的开发环境加载依赖，完整依赖封装、签名与普通用户分发属于 M4。
 
 安装、启用、真实应用输入和移除会修改本机状态，必须另行取得授权后按独立 runbook 执行。

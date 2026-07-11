@@ -125,7 +125,9 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 新增 `platforms/macos-imk/` Objective-C 薄壳：`NSEvent` 规范化、ABI v2 key result、即时 commit、snapshot/candidate 复制、原生 `IMKCandidates`、稳定候选 index、reset/cancel、schema 和 owner-thread 均由同一 wrapper 收口。
 - `RLXProcessRuntime` 为每个 input controller 创建独立 session，并在进程 teardown 时先逐个 invalidate session，再调用 `radishlex_rime_runtime_shutdown`；生产条件编译分支不允许回退 demo engine。
 - `./scripts/check-macos-imk.sh` 可在不安装系统输入法时构建 contract `.inputmethod` bundle，运行 Objective-C → C ABI → Rust session smoke，并检查 plist、rpath、dylib 与关键 symbol；production 分支另有 `-fsyntax-only` 编译门禁。
-- native-rime release dylib 已使用现有显式 Homebrew include/lib 构建并复核 `session_new_rime`、`session_handle_key_event` 与 `rime_runtime_shutdown` 导出；未提供或读取 schema/user data，因此没有执行 native bundle 或真实 Rime 输入。
+- `./scripts/check-macos-imk-native.sh` 增加显式 gated native bundle 门禁：拒绝真实用户/runtime 数据目录和 symlink，要求 schema/default/license，固定 deploy policy，并检查架构、rpath、`librime` 直接依赖、三个关键 symbol 与全部 copied data 哈希清单。
+- wrapper contract 扩展到完整命名键表、全部 modifier、modifier release、补充平面 Unicode、中文/emoji UTF-8 byte cursor 到 UTF-16 unit 转换、scalar 中间 cursor 拒绝和无 index 候选拒绝。
+- native-rime release dylib 已使用现有显式 Homebrew include/lib 构建并复核 `session_new_rime`、`session_handle_key_event` 与 `rime_runtime_shutdown` 导出；native bundle 门禁只用不含词典的临时合成打包数据自测，未提供或读取真实 schema/user data，也未执行真实 Rime 输入。
 
 这些证据关闭输入结果、header、进程级 librime runtime 和不安装平台 wrapper/contract 子项，不代表 native schema bundle、系统安装或真实应用输入 smoke 已完成。
 

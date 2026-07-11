@@ -35,6 +35,7 @@ RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/syn
 - `ime-ffi` ABI contract v2 已无损返回 `consumed`、可选即时 commit 和同事件 snapshot；输入侧 C header 已通过 C11 与 Objective-C 编译测试。
 - librime setup / initialize / explicit shutdown / finalize 已收口到进程级 runtime；多 session、零 session 间隙、配置冲突、失败回滚、peer release 和最终 finalize 已有自动测试或 gated native smoke。
 - `platforms/macos-imk/` 已形成可构建的 Objective-C InputMethodKit 薄壳、contract bundle 和 wrapper smoke；合成链覆盖 key normalization、未消费键、即时 commit、snapshot/candidate 复制、候选 index、reset、schema、owner-thread 与 teardown 释放顺序。
+- native bundle gated 检查已固定隔离目录与 symlink 拒绝、schema/default/license 前提、deploy policy、架构、rpath、`librime` 直接依赖、FFI symbol 和全部 copied data 哈希清单；当前只用无词典合成打包数据验证脚本，不构成真实 Rime 输入证据。
 
 这些证据证明工程原型可继续演进，不证明真实平台输入、生产同步或产品发布已经完成。
 
@@ -85,6 +86,8 @@ macOS InputMethodKit（不安装）：
 
 ```bash
 ./scripts/check-macos-imk.sh
+# 需要显式隔离 schema/shared data 与许可证
+./scripts/check-macos-imk-native.sh
 ```
 
 文档与文本：

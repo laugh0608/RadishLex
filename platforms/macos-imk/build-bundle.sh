@@ -18,8 +18,42 @@ case "${mode}" in
     : "${RIME_LIB_DIR:?native bundle requires RIME_LIB_DIR}"
     : "${RADISHLEX_RIME_SHARED_DATA:?native bundle requires isolated RADISHLEX_RIME_SHARED_DATA}"
     : "${RADISHLEX_RIME_SCHEMA:?native bundle requires RADISHLEX_RIME_SCHEMA}"
+    : "${RADISHLEX_RIME_DATA_LICENSE:?native bundle requires RADISHLEX_RIME_DATA_LICENSE}"
     if [[ ! -d "${RADISHLEX_RIME_SHARED_DATA}" ]]; then
       echo "RADISHLEX_RIME_SHARED_DATA must be an existing isolated directory." >&2
+      exit 2
+    fi
+    if [[ ! "${RADISHLEX_RIME_SCHEMA}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+      echo "Rime schema id must contain only ASCII letters, digits, dot, underscore or hyphen." >&2
+      exit 2
+    fi
+    shared_data="$(CDPATH= cd -- "${RADISHLEX_RIME_SHARED_DATA}" && pwd -P)"
+    case "${shared_data}" in
+      "${HOME}/Library/Rime"|"${HOME}/Library/Rime/"*|\
+      "${HOME}/Library/Input Methods"|"${HOME}/Library/Input Methods/"*|\
+      "${HOME}/Library/Application Support/Squirrel"|\
+      "${HOME}/Library/Application Support/Squirrel/"*|\
+      "${HOME}/Library/Application Support/RadishLex/Rime"|\
+      "${HOME}/Library/Application Support/RadishLex/Rime/"*)
+        echo "native bundle refuses a real or runtime user data directory: ${shared_data}" >&2
+        exit 2
+        ;;
+    esac
+    if [[ ! -f "${shared_data}/default.yaml" ]]; then
+      echo "native bundle shared data must contain default.yaml." >&2
+      exit 2
+    fi
+    if [[ ! -f "${shared_data}/${RADISHLEX_RIME_SCHEMA}.schema.yaml" ]]; then
+      echo "native bundle shared data must contain ${RADISHLEX_RIME_SCHEMA}.schema.yaml." >&2
+      exit 2
+    fi
+    if [[ ! -s "${RADISHLEX_RIME_DATA_LICENSE}" ]]; then
+      echo "RADISHLEX_RIME_DATA_LICENSE must be a non-empty license file." >&2
+      exit 2
+    fi
+    deploy_on_start="${RADISHLEX_RIME_DEPLOY_ON_START:-1}"
+    if [[ "${deploy_on_start}" != "0" && "${deploy_on_start}" != "1" ]]; then
+      echo "RADISHLEX_RIME_DEPLOY_ON_START must be 0 or 1." >&2
       exit 2
     fi
     cargo_profile="release"
@@ -37,7 +71,6 @@ if [[ ! "${schema}" =~ ^[A-Za-z0-9._-]+$ ]]; then
   echo "Rime schema id must contain only ASCII letters, digits, dot, underscore or hyphen." >&2
   exit 2
 fi
-
 build_root="${repo_root}/target/macos-imk/${mode}"
 bundle="${build_root}/RadishLex.inputmethod"
 contents="${bundle}/Contents"
@@ -78,7 +111,18 @@ sed "s/__RADISHLEX_RIME_SCHEMA__/${schema}/g" \
 plutil -lint "${contents}/Info.plist" >/dev/null
 
 if [[ "${mode}" == "native" ]]; then
-  ditto "${RADISHLEX_RIME_SHARED_DATA}" "${resources_dir}/RimeData"
+  ditto "${shared_data}" "${resources_dir}/RimeData"
+  cp "${RADISHLEX_RIME_DATA_LICENSE}" "${resources_dir}/RimeData.LICENSE"
+  if [[ "${deploy_on_start}" == "1" ]]; then
+    plutil -replace RadishLexRimeDeployOnStart -bool true "${contents}/Info.plist"
+  fi
+  manifest="${resources_dir}/RimeData.manifest.plist"
+  python3 "${repo_root}/scripts/macos-imk/native_manifest.py" create \
+    --data-dir "${resources_dir}/RimeData" \
+    --license "${resources_dir}/RimeData.LICENSE" \
+    --schema "${schema}" \
+    --deploy-on-start "${deploy_on_start}" \
+    --output "${manifest}"
 fi
 
 echo "Built ${bundle}"

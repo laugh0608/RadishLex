@@ -14,18 +14,20 @@
 
 1. 使用已有、显式指定的 `librime` include/lib；构建脚本不安装依赖。
 2. 准备来源与许可证已确认的 shared data/schema，并复制到与任何真实用户输入法目录无关的隔离目录。
-3. schema id 只允许 ASCII 字母、数字、点、下划线和连字符。
-4. smoke 只使用合成词，不记录窗口正文、输入历史、联系人或其他敏感信息。
+3. shared data 必须包含 `default.yaml` 和 `<schema-id>.schema.yaml`，许可证文件必须非空并显式传入。
+4. schema id 只允许 ASCII 字母、数字、点、下划线和连字符。
+5. smoke 只使用合成词，不记录窗口正文、输入历史、联系人或其他敏感信息。
 
 ```bash
 RIME_INCLUDE_DIR=<include> \
 RIME_LIB_DIR=<lib> \
 RADISHLEX_RIME_SHARED_DATA=<isolated-shared-data> \
 RADISHLEX_RIME_SCHEMA=<schema-id> \
-./platforms/macos-imk/build-bundle.sh native
+RADISHLEX_RIME_DATA_LICENSE=<license-file> \
+./scripts/check-macos-imk-native.sh
 ```
 
-产物为 `target/macos-imk/native/RadishLex.inputmethod`。构建完成后先用 `plutil -lint`、`otool -L` 和 `nm -gU` 检查 plist、`@rpath/libradishlex_ime_ffi.dylib`、`librime` 开发依赖与三个关键 FFI symbol，再考虑安装。
+`RADISHLEX_RIME_DEPLOY_ON_START` 默认 `1`，只接受 `0` 或 `1`。产物为 `target/macos-imk/native/RadishLex.inputmethod`。检查入口会验证 plist、当前架构、`@rpath/libradishlex_ime_ffi.dylib`、`librime` 及其直接传递依赖、三个关键 FFI symbol，以及全部 copied shared data 和许可证的 SHA-256 清单；shared data 中的 symlink 会被拒绝。检查不会启动或安装 bundle。
 
 ## 授权停止线
 

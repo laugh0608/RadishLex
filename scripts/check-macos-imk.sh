@@ -11,6 +11,8 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 2
 fi
 
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/macos-imk/test_native_manifest.py"
 "${platform_dir}/build-bundle.sh" contract
 
 smoke_dir="${repo_root}/target/macos-imk/contract-smoke"

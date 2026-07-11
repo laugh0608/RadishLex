@@ -60,6 +60,9 @@ FOUNDATION_EXPORT NSAttributedStringKey const RLXCandidateIndexAttributeName;
 @end
 
 FOUNDATION_EXPORT BOOL RLXNormalizeKeyEvent(NSEvent *event, RadishLexKeyEvent *eventOut);
+FOUNDATION_EXPORT NSUInteger RLXUTF16CursorForUTF8Offset(NSString *value,
+                                                         size_t utf8Offset,
+                                                         NSError **error);
 FOUNDATION_EXPORT NSAttributedString *RLXAttributedCandidate(RLXCandidate *candidate);
 FOUNDATION_EXPORT NSNumber *_Nullable RLXCandidateIndexFromAttributedString(
     NSAttributedString *candidate);

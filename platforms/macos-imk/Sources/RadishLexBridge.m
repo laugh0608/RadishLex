@@ -91,8 +91,8 @@ static NSString *_Nullable RLXCopyStringView(RadishLexStringView view,
   return value;
 }
 
-static NSUInteger RLXUTF16Cursor(NSString *value, size_t utf8Offset,
-                                 NSError **error) {
+NSUInteger RLXUTF16CursorForUTF8Offset(NSString *value, size_t utf8Offset,
+                                      NSError **error) {
   NSData *utf8 = [value dataUsingEncoding:NSUTF8StringEncoding];
   if (utf8Offset > utf8.length) {
     RLXAssignError(error, RADISHLEX_STATUS_INTERNAL_ERROR,
@@ -123,7 +123,8 @@ static RLXSnapshot *_Nullable RLXCopySnapshot(const RadishLexSnapshot *snapshot,
   if (schema == nil || preedit == nil) {
     return nil;
   }
-  NSUInteger cursor = RLXUTF16Cursor(preedit, radishlex_snapshot_cursor(snapshot), error);
+  NSUInteger cursor =
+      RLXUTF16CursorForUTF8Offset(preedit, radishlex_snapshot_cursor(snapshot), error);
   if (cursor == NSNotFound) {
     return nil;
   }

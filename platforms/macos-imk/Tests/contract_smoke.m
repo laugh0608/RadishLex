@@ -16,6 +16,20 @@ static RadishLexKeyEvent Character(unichar character) {
                              RADISHLEX_KEY_PHASE_PRESS};
 }
 
+static NSEvent *KeyEvent(NSEventType type, unsigned short keyCode,
+                         NSEventModifierFlags modifiers, NSString *characters) {
+  return [NSEvent keyEventWithType:type
+                          location:NSZeroPoint
+                     modifierFlags:modifiers
+                         timestamp:0
+                      windowNumber:0
+                           context:nil
+                        characters:characters
+       charactersIgnoringModifiers:characters
+                         isARepeat:NO
+                           keyCode:keyCode];
+}
+
 int main(void) {
   @autoreleasepool {
     RadishLexKeyEvent normalized = {0};
@@ -75,6 +89,73 @@ int main(void) {
                                                  keyCode:kVK_F1];
     Require(!RLXNormalizeKeyEvent(unknownFunction, &normalized),
             @"unknown function key is returned to the host");
+
+    NSArray<NSNumber *> *namedKeyCodes = @[
+      @(kVK_Space), @(kVK_Return), @(kVK_ANSI_KeypadEnter), @(kVK_Delete),
+      @(kVK_Escape), @(kVK_Tab), @(kVK_UpArrow), @(kVK_DownArrow),
+      @(kVK_LeftArrow), @(kVK_RightArrow), @(kVK_PageUp), @(kVK_PageDown),
+      @(kVK_Shift), @(kVK_RightShift), @(kVK_Control), @(kVK_RightControl),
+      @(kVK_Option), @(kVK_RightOption), @(kVK_Command), @(kVK_RightCommand)
+    ];
+    NSArray<NSNumber *> *namedKeys = @[
+      @(RADISHLEX_NAMED_KEY_SPACE), @(RADISHLEX_NAMED_KEY_ENTER),
+      @(RADISHLEX_NAMED_KEY_ENTER), @(RADISHLEX_NAMED_KEY_BACKSPACE),
+      @(RADISHLEX_NAMED_KEY_ESCAPE), @(RADISHLEX_NAMED_KEY_TAB),
+      @(RADISHLEX_NAMED_KEY_ARROW_UP), @(RADISHLEX_NAMED_KEY_ARROW_DOWN),
+      @(RADISHLEX_NAMED_KEY_ARROW_LEFT), @(RADISHLEX_NAMED_KEY_ARROW_RIGHT),
+      @(RADISHLEX_NAMED_KEY_PAGE_UP), @(RADISHLEX_NAMED_KEY_PAGE_DOWN),
+      @(RADISHLEX_NAMED_KEY_SHIFT), @(RADISHLEX_NAMED_KEY_SHIFT),
+      @(RADISHLEX_NAMED_KEY_CONTROL), @(RADISHLEX_NAMED_KEY_CONTROL),
+      @(RADISHLEX_NAMED_KEY_ALT), @(RADISHLEX_NAMED_KEY_ALT),
+      @(RADISHLEX_NAMED_KEY_META), @(RADISHLEX_NAMED_KEY_META)
+    ];
+    for (NSUInteger index = 0; index < namedKeyCodes.count; ++index) {
+      NSEvent *namedEvent = KeyEvent(NSEventTypeKeyDown,
+                                      namedKeyCodes[index].unsignedShortValue, 0, @"");
+      Require(RLXNormalizeKeyEvent(namedEvent, &normalized) &&
+                  normalized.key_kind == RADISHLEX_KEY_KIND_NAMED &&
+                  normalized.named_key == namedKeys[index].unsignedIntValue,
+              @"complete named key mapping");
+    }
+
+    NSEventModifierFlags allCocoaModifiers = NSEventModifierFlagShift |
+        NSEventModifierFlagControl | NSEventModifierFlagOption |
+        NSEventModifierFlagCommand;
+    NSEvent *allModifiers = KeyEvent(NSEventTypeKeyDown, kVK_ANSI_A,
+                                      allCocoaModifiers, @"a");
+    Require(RLXNormalizeKeyEvent(allModifiers, &normalized) &&
+                normalized.modifiers == (RADISHLEX_KEY_MOD_SHIFT |
+                                         RADISHLEX_KEY_MOD_CONTROL |
+                                         RADISHLEX_KEY_MOD_ALT |
+                                         RADISHLEX_KEY_MOD_META),
+            @"complete modifier mapping");
+    NSEvent *shiftUp = KeyEvent(NSEventTypeFlagsChanged, kVK_Shift, 0, @"");
+    Require(RLXNormalizeKeyEvent(shiftUp, &normalized) &&
+                normalized.phase == RADISHLEX_KEY_PHASE_RELEASE,
+            @"modifier-only release normalization");
+    NSEvent *emoji = KeyEvent(NSEventTypeKeyDown, kVK_ANSI_A, 0, @"😀");
+    Require(RLXNormalizeKeyEvent(emoji, &normalized) && normalized.codepoint == 0x1F600,
+            @"supplementary Unicode scalar normalization");
+    Require(!RLXNormalizeKeyEvent(KeyEvent(NSEventTypeKeyDown, kVK_ANSI_A, 0, @"ab"),
+                                  &normalized),
+            @"multiple scalars are returned to the host");
+
+    NSString *mixed = @"a萝卜😀z";
+    NSError *cursorError = nil;
+    Require(RLXUTF16CursorForUTF8Offset(mixed, 0, &cursorError) == 0 &&
+                RLXUTF16CursorForUTF8Offset(mixed, 1, &cursorError) == 1 &&
+                RLXUTF16CursorForUTF8Offset(mixed, 4, &cursorError) == 2 &&
+                RLXUTF16CursorForUTF8Offset(mixed, 7, &cursorError) == 3 &&
+                RLXUTF16CursorForUTF8Offset(mixed, 11, &cursorError) == 5 &&
+                RLXUTF16CursorForUTF8Offset(mixed, 12, &cursorError) == 6,
+            @"UTF-8 byte cursor converts to Cocoa UTF-16 units");
+    cursorError = nil;
+    Require(RLXUTF16CursorForUTF8Offset(mixed, 2, &cursorError) == NSNotFound &&
+                cursorError.code == RADISHLEX_STATUS_INTERNAL_ERROR,
+            @"cursor inside a UTF-8 scalar is rejected");
+    Require(RLXCandidateIndexFromAttributedString(
+                [[NSAttributedString alloc] initWithString:@"unindexed"]) == nil,
+            @"candidate without a Rust index is rejected");
 
     NSError *error = nil;
     Require([RLXSessionBridge validateFFIContract:&error], @"ABI v2 contract");
