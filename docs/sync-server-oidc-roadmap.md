@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-当前 Phase 3 仍保留 `RADISHLEX_SYNC_ACCESS_TOKEN` 作为单用户自部署的临时访问门禁。它只用于阻止未授权请求进入 sync server，不是 Radish 产品账号登录体系。
+M3 自部署同步仍保留 `RADISHLEX_SYNC_ACCESS_TOKEN` 作为单用户部署的访问门禁。它只用于阻止未授权请求进入 sync server，不是 Radish 产品账号登录体系。
 
 OIDC 应作为后续专题推进，目标是让 RadishLex 能接入 Radish 产品体系或兼容 OIDC 的自部署身份提供方，同时继续保持以下边界：
 

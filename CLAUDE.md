@@ -29,10 +29,10 @@
 
 ## 快速认知
 
-- 当前阶段：2026 年 7 月项目稳定化整改；实时批次和停止线见 `docs/status/current.md`
+- 当前阶段：M1 macOS 离线输入 Alpha；整改主批次 R01A，实时状态见 `docs/status/current.md`
 - 当前代码状态：Rust、Go、Flutter 原型已落地；尚无真实平台输入法，manager 产品包和生产同步未闭环
 - 当前交付：工程原型，不是可安装 MVP；阶段证据以真实输入、数据正确性、安全同步和产品构建为准
-- MVP 边界：Rust core 抽象、CLI demo、底层 engine adapter、用户词库、候选重排、个人化学习、自部署加密同步、至少一个真实平台输入法端
+- 交付梯度：先完成 macOS 离线 Alpha 与本地个人化 MVP；加密同步和最终产品包属于后续 M3/M4
 - 第一真实平台：macOS InputMethodKit；Linux Fcitx5 与 Android 后续，Windows、iOS 后置
 - 底层引擎策略：v1 可接 `librime`，但必须通过 engine adapter 隔离；长期保留 Rust 自研引擎替换空间
 - 隐私立场：服务端默认不可信，客户端才是数据真相源
@@ -43,7 +43,7 @@
 
 当前稳定入口：
 
-1. `README.md`：项目定位、设计原则、MVP 边界和非目标
+1. `README.md`：项目定位、设计原则、交付梯度和非目标
 2. `docs/status/current.md`：当前阶段、验证基线、停止线、主批次和近期顺位
 3. `docs/technical-plan.md`：总体架构、平台策略、学习设计、同步方案、clean-room 原则和风险
 4. `docs/roadmap.md`：阶段路线、交付物和退出标准

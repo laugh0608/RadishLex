@@ -1,6 +1,6 @@
 # Manager Settings 与诊断报告字段参考
 
-本文档是 Phase 4 Flutter manager 的 settings draft 与脱敏诊断报告字段参考，读者是维护 manager UI、Dart FFI bridge、测试和后续文档的人。本文只描述本地非 secret 草案格式、诊断报告字段、脱敏边界和验证口径；不定义真实远端同步协议、恢复码、设备授权 UI、Go server API 或 C ABI。
+本文档是 Flutter manager 的 settings draft 与脱敏诊断报告字段参考，读者是维护 manager UI、Dart FFI bridge、测试和后续文档的人。本文只描述本地非 secret 草案格式、诊断报告字段、脱敏边界和验证口径；不定义当前产品阶段、真实远端同步协议、恢复码、设备授权 UI、Go server API 或 C ABI。
 
 ## 当前边界
 

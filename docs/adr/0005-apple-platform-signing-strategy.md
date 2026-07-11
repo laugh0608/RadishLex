@@ -20,7 +20,7 @@ UnsupportedSignatureAlgorithm { algorithm: "ed25519-v1" }
 
 ## 决策
 
-RadishLex 继续保留 `ed25519-v1` 作为 Phase 3 设备签名协议，不因为 Apple 单个平台 backend 的当前阻塞改动全链路签名算法。
+RadishLex 继续保留 `ed25519-v1` 作为 M3 设备签名协议，不因为 Apple 单个平台 backend 的当前阻塞改动全链路签名算法。
 
 `apple-keychain-v1` 继续表示“Apple 原生非导出 signing key backend”方向，但在真实创建、加载、签名、删除 smoke 通过前，必须在代码和文档中视为生产不可用：
 

@@ -1,12 +1,12 @@
 # Sync Server Admin Console 远期专题
 
-本文档定义自部署 sync server 未来是否提供 WebUI / 管理控制台时的规划边界。读者是后续实现 Docker 部署运维界面、认证策略、Go server admin API 和审阅隐私边界的开发者。本文不包含当前阶段必须实现的 UI、路由、前端技术选型、账号系统、OIDC 代码、真实部署操作步骤或任何会改变 Phase 4 管理端近期推进顺序的任务。
+本文档定义自部署 sync server 未来是否提供 WebUI / 管理控制台时的规划边界。读者是后续实现 Docker 部署运维界面、认证策略、Go server admin API 和审阅隐私边界的开发者。本文不包含当前产品里程碑必须实现的 UI、路由、前端技术选型、账号系统、OIDC 代码或真实部署操作步骤，也不改变 M1-M4 的产品交付顺序。
 
 ## 当前结论
 
 当前仓库没有实现 sync server WebUI，也不把它纳入最近开发主线。
 
-近期主线仍是 Flutter manager 通过真实 Dart FFI bridge 接入本地 userdb 管理、学习状态摘要、rank explain 摘要和 sync preflight 摘要；真实远端同步、恢复码和设备授权 UI 继续等待可用平台私钥 backend 与目标部署运行证据。
+该控制台不是 M1-M4 的退出条件。真实远端同步、恢复码和设备授权仍由客户端与 Flutter manager 承担，服务端 WebUI 不得成为同步协议、安全边界或本地数据管理的前置条件。
 
 Sync server admin console 作为远期可选专题保留，适合在以下条件成熟后再评估实现：
 
@@ -110,11 +110,11 @@ Sync server admin console 面向部署者和服务端运维：
 
 ## 路线位置
 
-该专题属于后端部署治理的远期可选能力，不影响当前 Phase 4 管理端近期计划，也不作为 Phase 3 / Phase 4 退出标准。
+该专题属于后端部署治理的远期可选能力，不影响 M1-M4 交付顺序，也不作为 M3/M4 退出标准。
 
 建议顺序：
 
-1. 当前继续推进 Flutter manager 真实 Dart FFI bridge。
-2. 平台私钥 backend 与目标部署运行证据成熟后，再开放用户可用同步。
+1. 先完成 M1/M2 本地输入和个人化产品链。
+2. M3 平台私钥 backend、同步协议与目标部署证据成熟后，再开放用户可用同步。
 3. OIDC / admin scope 或等价认证边界固定后，再评估 sync server admin API。
 4. admin API 的权限、错误语义和脱敏测试稳定后，再考虑 WebUI 实现。

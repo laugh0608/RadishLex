@@ -1,16 +1,16 @@
 # Flutter manager 本地验收口径
 
-本文档定义 Phase 4 Flutter manager 当前本地管理能力的验收口径。读者是维护 `apps/radishlex-manager`、审阅阶段进度和决定是否进入下一批管理端工作的协作者。本文不定义真实远端同步协议、恢复码 UI、设备授权成功路径、Go server 新 API、C ABI 扩展或平台输入法壳。
+本文档记录 Flutter manager 本地管理原型的验收口径和已有证据。读者是维护 `apps/radishlex-manager`、审阅 M2 本地管理能力和决定后续补强工作的协作者。本文不定义真实远端同步协议、恢复码 UI、设备授权成功路径、Go server 新 API、C ABI 扩展或平台输入法壳，也不单独作为 M2 产品退出证明。
 
 ## 当前结论
 
-Flutter manager 当前进入本地能力验收收口阶段。已落地能力覆盖本地词库管理、导入导出、import batches、学习摘要、rank explain 摘要、sync preflight、设备 backend gate、settings draft、sync gate 草案、连接健康、`manager_sync_readiness.v1` 内存态导入、readiness 聚合、开发期 evidence bundle 同源回归、只读交互进入计划、`manager_sync_action_command_preview.v1` 非执行命令预演、request / result preview、脱敏诊断报告和结构化错误分类。
+Flutter manager 已有较完整的本地原型验收证据，覆盖词库管理、导入导出、学习摘要、rank explain、真实 Dart FFI smoke、脱敏诊断和结构化错误分类；同步相关 readiness、preview 与 evidence 只属于历史开发期非执行模型。
 
-本阶段验收只证明管理端可以安全、可审计地管理本机数据和解释同步不可用原因；不证明用户可用远端同步已经开放。
+本次原型验收只证明管理端可以安全、可审计地管理本机数据和解释同步不可用原因；不证明 M2 产品运行态或用户可用远端同步已经完成。
 
 当前 action preview 相关验收只证明 settings / sync / diagnostics 可以使用同一份非敏感模型解释 future bridge 命令形状和停止线；不证明已经存在真实 `ManagerBridge` method、C ABI、request payload、result material、恢复码生成 / 输入、join request 创建、授权成功或设备撤销执行。
 
-2026-07-05 复查结论：按下方退出标准逐项核对后，Phase 4 Flutter manager 本地验收当前没有影响退出标准的证据缺口。后续缺口集中在真实同步入口所需的平台私钥 backend、目标部署运行证据、恢复码 / 设备授权产品实现和对应测试，不阻塞本地管理能力验收。
+2026-07-11 复核结论：下方证据足以证明本地管理原型与开发期真实 FFI bridge 可工作，但尚不能证明 M2 产品能力退出。M2 仍需正常运行态加载真实 FFI、使用持久化平台目录、与真实输入 runtime 共享受控 userdb，并移除默认 fixture 伪装成功的路径。
 
 ## 验收范围
 
@@ -42,7 +42,7 @@ Flutter manager 当前进入本地能力验收收口阶段。已落地能力覆�
 
 ## 退出标准映射
 
-| Phase 4 退出标准 | 当前验收口径 | 证据入口 |
+| M2 本地管理能力 | 当前原型证据 | 证据入口 |
 | --- | --- | --- |
 | 用户能通过 UI 管理已学习词 | 词库页支持本地词条查看、搜索、审计详情、删除确认、导入检查、导入、导出和导入历史审计；真实 Dart FFI bridge 可对临时 userdb 执行 list / delete / inspect / import / export。 | `test/screens/dictionary_test.dart`、`test/screens/manager_home_actions_test.dart`、`test/ffi_manager_bridge_test.dart`、`./scripts/check-manager-ffi-smoke.sh` |
 | 用户能配置自部署后端 | 设置页保存非 secret `settings draft`，校验 `server_endpoint`、`retain_sync_config`、`privacy_mode`、`diagnostics_export` 和部署证据来源标签；配置只派生本地 sync gate，不连接真实远端。 | `test/screens/settings_test.dart`、`test/ffi_manager_bridge_test.dart`、`docs/manager-settings-diagnostics.md` |
@@ -92,7 +92,14 @@ git diff --check
 
 ## 当前缺口
 
-当前缺口不是 Phase 4 本地验收阻塞项，但会阻止真实用户同步入口：
+本地原型进入 M2 产品运行态仍有以下缺口：
+
+- 正常 manager 构建包尚未携带 RadishLex native library，也未固定平台持久化目录和文件权限。
+- 未与 macOS 输入 runtime 共享真实 userdb，输入法与 manager 的锁、migration 和所有权尚未形成产品证据。
+- 未显式配置环境时仍使用 fixture；产品模式必须改为明确失败，fixture 只能由持续标识的 demo mode 启用。
+- 真实选择尚未进入学习热路径，因此 manager 当前展示的数据不能证明 M2 个人化纵向闭环。
+
+以下缺口属于 M3，会阻止真实用户同步入口，但不阻塞 M2 本地管理实现：
 
 - `apple-keychain-v1` 真实 Keychain smoke 仍阻塞于 `ed25519-v1` 创建。
 - `android-keystore-v1` 在 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 上仍为 `unsupported_signature_algorithm`。
@@ -101,8 +108,9 @@ git diff --check
 
 ## 后续推进
 
-验收文档稳定后，近期推进顺位应从继续拆分现有 manager UI，转为按退出标准复查缺口：
+后续推进顺位按产品里程碑分层：
 
-1. 若 manager 本地验收缺证据，补精准 widget / helper / smoke 覆盖。
-2. 若真实同步入口要进入实现，先按 `docs/manager-sync-entry-boundary.md` 推进 sync entry state helper / UI gate 的非上传状态派生和本地联调测试；发布级部署证据、平台私钥 backend 证据齐备前，不打开真实用户同步开关。
-3. 若继续优化 manager 代码结构，只在文件职责继续增长或测试边界变弱时拆分，不为目录整齐新增无实际职责的层。
+1. M1/R01A 先完成 macOS 基础输入，不让 manager 工作阻塞首个平台。
+2. M2/R01B 接入真实学习后，闭合 native library、持久化目录、共享 userdb、明确 demo mode 和本地产品 smoke。
+3. M3 再按 `docs/manager-sync-entry-boundary.md` 实现真实同步、设备与恢复；安全证据齐备前不打开真实用户同步开关。
+4. 只在文件职责继续增长或测试边界变弱时拆分 manager 代码，不为目录整齐新增无实际职责的层。

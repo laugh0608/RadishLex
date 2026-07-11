@@ -1,16 +1,16 @@
 # RadishLex 管理端边界
 
-本文档定义 Phase 4 Flutter manager 实现和后续演进必须稳定的职责边界、数据可见性、同步 UI 停止线和第一批功能顺序。读者是后续实现 `apps/radishlex-manager`、`ime-ffi` 管理接口、同步设置页面和审阅隐私边界的开发者。本文不包含 Flutter 页面视觉稿、widget 目录结构、平台输入法壳接入、完整账号系统、OIDC 实现或真实平台私钥 backend 实现。
+本文档定义 Flutter manager 必须稳定的职责边界、数据可见性、分层交付和同步 UI 停止线。读者是实现 `apps/radishlex-manager`、`ime-ffi` 管理接口、本地管理页面和同步设置页面的开发者。本文不包含当前批次状态、Flutter 页面视觉稿、widget 目录结构、平台输入法壳接入、完整账号系统、OIDC 实现或真实平台私钥 backend 实现。
 
-Phase 4 本地能力是否满足当前退出标准，由 `docs/manager-local-acceptance.md` 记录验收范围、证据入口和停止线；真实同步入口进入 UI / bridge 前的交互边界、错误分类和测试计划见 `docs/manager-sync-entry-boundary.md`；本文只定义长期职责边界。
+本地原型能力由 `docs/manager-local-acceptance.md` 记录验收范围和证据入口；真实同步进入 UI / bridge 前的交互边界、错误分类和测试计划见 `docs/manager-sync-entry-boundary.md`；本文只定义长期职责边界。
 
-## 当前定位
+## 稳定定位
 
 Flutter manager 是 RadishLex 的管理界面，不进入输入热路径，不承担候选生成、候选排序、用户词库真相源、同步合并真相源或隐私策略真相源。
 
 管理端的职责是把 Rust core 和本地 userdb 已经具备的能力以可审计、可删除、可解释的方式呈现给用户，并在同步能力具备生产条件前清楚显示不可用原因。
 
-当前仓库已新增 `apps/radishlex-manager/` Flutter macOS 起步工程，通过受控 `ManagerBridge` contract 接入合成 fixture，并在显式配置本地 SQLite userdb 与 `ime-ffi` 动态库时切到真实 Dart FFI bridge。真实远端同步、恢复码和设备授权仍未开放。Phase 4 后续代码继续遵守以下边界：
+manager 分层交付：M2 先完成本地词库、学习、隐私和诊断管理；M3 再完成同步、设备、恢复与撤销；M4 闭合 native library、平台目录、签名和升级。已有 fixture 与开发期 Dart FFI smoke 只是实现基础，不等于正常产品包已经完成。后续代码继续遵守以下边界：
 
 - 本地 userdb 管理优先于远端同步开关。
 - 学习记录摘要优先于 P1 原始事件明细。
@@ -20,7 +20,7 @@ Flutter manager 是 RadishLex 的管理界面，不进入输入热路径，不�
 
 ## 职责范围
 
-Phase 4 第一批管理端功能应覆盖：
+M2 本地管理能力应优先覆盖：
 
 - 查看本地用户词条。
 - 删除用户词条，并写入 tombstone。
@@ -30,6 +30,9 @@ Phase 4 第一批管理端功能应覆盖：
 - 查看 ranker explain 的非敏感摘要。
 - 查看 sync preflight 摘要。
 - 查看 import batches、词条 tombstone 和本地 sync 影响摘要。
+
+M3 同步管理能力在安全退出条件满足后覆盖：
+
 - 配置自部署服务端地址和本地连接参数草案。
 - 查看本地同步服务连接健康摘要，只展示 endpoint 状态、access token 存在性、transport 分类、server state 摘要和结构化错误码。
 - 导入 `manager_sync_readiness.v1` 非敏感摘要到当前 manager 内存态，用于本地开发联调和同步页 / 设置页 / 诊断报告同源派生。
@@ -63,7 +66,7 @@ Phase 4 第一批管理端功能应覆盖：
 - 把 Go server 当作候选排序服务、在线转换服务或明文词库服务。
 - 在平台私钥 backend 不可用时提供用户可用同步开关。
 - 在发布级目标部署证据不足时把同步状态显示为生产可用。
-- 把 OIDC / Radish 产品账号登录提前做成 Phase 4 的前置条件。
+- 把 OIDC / Radish 产品账号登录提前做成 M2 或 M3 的前置条件。
 
 ## 数据可见性
 
@@ -185,7 +188,7 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 
 测试 fixture 应使用合成词、虚构设备、虚构服务端地址和合成错误码。截图测试不得包含真实用户词、真实账号、真实 token、真实域名证书细节或真实设备序列号。
 
-## Phase 4 起步顺序
+## 已验证原型能力
 
 1. 已固定本文档，并同步路线图、技术计划、仓库结构和周志。
 2. 已创建 `apps/radishlex-manager/` Flutter macOS 工程骨架，当前通过 `ManagerBridge` contract 接入合成 fixture。

@@ -1,12 +1,12 @@
 # RadishLex 个人化学习设计
 
-本文档用于定义 Phase 2 个人化学习的职责边界、数据模型、隐私分级、排序接口、CLI 管理入口和验证标准，读者是后续实现 `ime-userdb`、`ime-ranker`、`ime-cli` 学习命令和管理 UI 的开发者。本文不包含 SQLite migration 完整 SQL、ranker 权重公式最终参数、同步加密协议、Flutter 页面设计或平台输入法壳实现。
+本文档用于定义本地个人化学习的职责边界、数据模型、隐私分级、排序接口、CLI/FFI 管理入口和验证标准，读者是实现 `ime-userdb`、`ime-ranker`、输入 runtime 和本地管理 UI 的开发者。本文不包含当前批次状态、SQLite migration 完整 SQL、ranker 权重公式最终参数、同步加密协议、Flutter 页面设计或平台输入法壳实现；实时进度见 `docs/status/current.md`。
 
-## 阶段定位
+## 稳定定位
 
-当前处于 Phase 2 起步。`ime-core`、`ime-cli demo` 与真实 Rime adapter 已能复验 `compose -> candidates -> commit`，`ime-userdb` 已开始在 RadishLex candidate 层保存本地用户词库、选择事件、负反馈和删除 tombstone，`ime-ranker` 已提供可解释候选重排模型，`ime-cli` 已具备基础 `dict`、`learn status/select/suppress`、`rank explain`、`rime --rank-db`、用户词库导入导出、导入格式检查、学习状态只读摘要和同步前置检查命令。`ime-sync` 已补 payload 来源分类、加密对象外壳草案、P2 envelope 组装边界、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突模型、客户端解密后合并模型、signed device authorization 和 signed device revocation，`ime-crypto` 已补本地 AEAD envelope、device wrapping、recovery material、恢复码 KDF、Ed25519 设备签名、test-memory signing key store、signed sync object manifest、signed recovery record 和撤销后 key epoch 解密边界，`ime-userdb` 已补 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 P2 plaintext payload 只读迭代器、已解密 P2 JSON 到 merge input 的解析入口，以及合并结果写回真实 userdb 的事务执行器，并已通过 `SyncEnvelopeAssembler` 接入本地加密 / 解密 / sync draft 派生链路；该迭代器、解析入口和写回入口不暴露给 FFI，不导出 P1 原始事件、负反馈明细、上下文统计或本地审计批次。`docs/sync-key-management.md` 已补真实同步前的设备授权、恢复码、设备撤销、key epoch 和冲突边界，设备签名 / 私钥存储 ADR 已固定并已有 Rust 模型证据。`ime-ffi` 已补结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、learning status 只读摘要、sync preflight 状态入口、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、平台绑定式 view copy / release host smoke、释放 panic 边界 host smoke 和 FFI 调用 runbook；`ime-engine-rime` 已补必需 Rime API 缺失映射测试。下一阶段目标是补 Go server API / storage 边界设计，并继续把 P1 原始事件和上下文统计挡在同步路径之外。
+本地个人化属于 M2，但其正确性基础在真实学习纵向链接入前完成。已有 CLI、FFI、userdb、ranker 和同步原型只能作为实现基础；只有真实平台选择在隐私策略约束下持久化，并可解释地影响后续候选，才构成产品证据。
 
-Phase 2 不改变底层 engine adapter 边界：
+个人化能力不改变底层 engine adapter 边界：
 
 - `ime-engine-rime` 继续只负责真实候选生成和候选转换。
 - `ime-core` 继续定义平台无关输入模型。
@@ -14,7 +14,7 @@ Phase 2 不改变底层 engine adapter 边界：
 - `ime-ranker` 根据 engine candidates 与 userdb summary 输出重排后的候选。
 - `ime-cli` 提供可复验的学习、查询、删除、导入导出和 explain 命令。
 
-Phase 2 仍不推进平台壳、同步后端、Flutter manager 或自研拼音 engine。真实平台输入法应等待真实 engine candidates 与学习层复验稳定后再进入。
+平台壳只传递输入上下文和用户反馈，不实现学习语义。M2 可以交付本地 manager；远端同步、设备授权和密钥轮换属于 M3，自研拼音 engine 属于更后阶段。
 
 ## 目标
 
@@ -32,7 +32,7 @@ Phase 2 仍不推进平台壳、同步后端、Flutter manager 或自研拼音 e
 
 - 不从零实现完整拼音候选生成。
 - 不把 Rime 内部对象 ID、内部评分或私有状态写入 userdb。
-- 不在 Phase 2 实现远端同步、设备授权或密钥轮换。
+- 不在本地个人化里程碑实现远端同步、设备授权或密钥轮换。
 - 不把原始选择事件默认纳入同步。
 - 不把 P2 plaintext payload 暴露给 FFI、CLI 文件导出或平台壳。
 - 不在 ranker 中读取平台私有生命周期、窗口句柄或 App 原始标题。
@@ -40,7 +40,7 @@ Phase 2 仍不推进平台壳、同步后端、Flutter manager 或自研拼音 e
 
 ## 数据分级
 
-Phase 2 的学习数据按 `docs/privacy-sync.md` 的分级处理：
+个人化学习数据按 `docs/privacy-sync.md` 的分级处理：
 
 | 数据 | 分级 | 默认策略 |
 | --- | --- | --- |
@@ -154,7 +154,7 @@ DeletedTerm
 
 ## SQLite 草案
 
-Phase 2 初始 schema 建议包含：
+本地个人化初始 schema 建议包含：
 
 ```text
 user_terms
@@ -268,7 +268,7 @@ RankedCandidate
 - negative feedback penalty
 - deleted/suppressed reason
 
-Phase 2 初始排序可以使用稳定、可测试的线性加权；权重参数必须集中配置，不散落在 CLI 或 adapter 中。后续优化排序质量时必须保留 explain 输出。
+初始排序可以使用稳定、可测试的线性加权；权重参数必须集中配置，不散落在 CLI 或 adapter 中。后续优化排序质量时必须保留 explain 输出。
 
 ## 学习流程
 
@@ -419,7 +419,7 @@ luobo	萝卜	luo bo	manual_add	2	active
 
 ## 验证标准
 
-Phase 2 起步必须覆盖：
+本地个人化必须覆盖：
 
 - 新建空 userdb，schema migration 成功。
 - 添加、查询、更新、删除用户词条。
@@ -447,46 +447,22 @@ cargo test --workspace
 ./scripts/check-repo.sh
 ```
 
-当前 `ime-userdb` 与 `ime-ranker` 均已创建。起步验证以 `cargo test -p radishlex-ime-userdb`、`cargo test -p radishlex-ime-ranker` 和仓库级检查为准。
-基础 CLI 学习命令已接入 `ime-userdb` 与 `ime-ranker`，应额外覆盖 `cargo test -p radishlex-ime-cli`，确认 `dict add/list/delete/import/export`、`learn select/suppress` 和 `rank explain` 的命令参数、输出与隐私边界。
+已有 CLI、FFI、userdb、ranker、导入导出、P2 摘要和合成同步验证的完成记录保留在 devlog。本文后续只在数据模型、稳定边界或验收口径改变时更新。
 
-## 实施顺序
+## 稳定停止线
 
-1. `crates/ime-userdb/` 已创建，已包含 SQLite schema、migration、词条 CRUD、选择事件、负反馈记录和删除 tombstone 起步测试。
-2. `crates/ime-ranker/` 已创建，已包含 `RankRequest`、`RankedCandidate`、explain 模型和频次、近期、负反馈、删除 tombstone 排序测试。
-3. `ime-cli` 已扩展 `dict`、`learn` 和 `rank explain` 命令，基础学习链路可通过临时 SQLite 数据库复验。
-4. `ime-cli rime --rank-db` 已把 Rime adapter candidates 接入 ranker smoke，单元测试覆盖候选重排、explain 输出和原始 engine index 提交映射；本机 native rank smoke 命令已写入 runbook。
-5. 用户词库导入导出已补入 `ime-userdb` 与 `ime-cli`，格式为带版本头和字段表头的 UTF-8 TSV，并通过测试覆盖 P1 不导出、deleted tombstone 不复活和 malformed 文件错误。
-6. 导入 dry-run、批次查询、insert/update/duplicate/deleted 统计和 `import_batches` v2 migration 已补入。
-7. 导入格式版本解析、`dict inspect` 和 `sync preflight` 已补入。
-8. `ime-sync` 已补同步 payload 来源分类、同步对象类型和加密对象外壳草案。
-9. `ime-ffi` 已补 C ABI 起步验证，覆盖 opaque session handle、错误对象、UTF-8 buffer 和释放函数。
-10. `ime-ffi` 已补结构化 snapshot / candidate ABI 和 normalized key event。
-11. `ime-ffi` 已补 session options、engine kind 门禁和 sync preflight 状态摘要入口，当前只允许 demo engine，Rime kind 明确返回未可用。
-12. `ime-ffi` 已补受控 userdb add / delete / list、dictionary inspect / export / import 和 import batches 只读查询入口，继续使用显式 SQLite / 文件路径，不暴露 SQLite handle，不记录或导出 P1 学习事件。
-13. `ime-ffi` 已补 Rime session options ABI 和默认 unavailable 门禁，先固定 shared data、user data、schema、log dir 与 deploy flag 的跨语言配置形态。
-14. `ime-ffi` 已在 `native-rime` feature 下接入真实 `RimeEngine` session，并通过 ignored native smoke 覆盖 Rime FFI session 创建、按键输入、snapshot 候选读取和候选提交。
-15. `ime-ffi` 已补 ABI contract、session owner-thread policy 和释放 panic 边界，平台端跨线程误用会返回 `InvalidState`。
-16. 已补 `docs/runbooks/ffi-platform-call-contract.md`，明确平台绑定层的 `error_out`、string view、handle 释放和 owner-thread 调度规则。
-17. 已补 userdb / CLI / FFI 学习状态只读摘要，面向后续管理 UI 查看本地学习状态；该入口只输出聚合计数、latest timestamp 和隐私边界布尔标记，不导出 P1 原始选择事件、负反馈明细、上下文统计或明文同步 payload。
-18. 已补 native Rime 必需 API 缺失映射测试和平台绑定式 FFI view copy / release host smoke。
-19. 已补 `ime-crypto` 本地 envelope、AAD、ciphertext hash、nonce 和篡改失败测试，并让 `ime-sync::EncryptedSyncObjectDraft` 从 crypto envelope 派生上传草案元数据。
-20. 已补 userdb `dictionary.user_terms` / `dictionary.deleted_terms` P2 plaintext payload 只读迭代器，并通过 integration test 接入本地加密 / 解密 / sync draft 派生链路。
-21. 已补 `ranker.weights` P2 plaintext payload schema，字段来自 `ranker_weights` 摘要表，测试覆盖字段顺序、JSON escaping、空库行为、P1 明细阻断和本地加密 / sync draft 派生链路。
-22. 已补 `docs/sync-key-management.md`，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突边界。
-23. 已补 `ime-crypto` / `ime-sync` 的设备、key epoch、device wrapping、recovery material、授权包、撤销记录和对象版本冲突 Rust 模型。
-24. 已补 `ime-sync` 客户端解密后合并模型，覆盖 deleted tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词、显式恢复清理 tombstone 和恢复前旧权重不复活。
-25. 已补 `ime-sync::SyncEnvelopeAssembler`，固定 Rust 内部 P2 payload 到 envelope 的组装边界。
-26. 已补 `docs/adr/0002-recovery-code-kdf.md`，固定恢复码 KDF 算法、参数、格式、恢复记录字段和验证口径。
-27. 已补 `ime-crypto` 恢复码 KDF Rust 模型，覆盖恢复码格式 / 校验段、Argon2id profile、恢复 wrapping key、恢复记录 AAD、错误恢复码失败和 Debug 脱敏。
-28. 已补 `docs/adr/0003-device-signing-key-storage.md`，固定设备签名、签名对象、canonical bytes、私钥存储抽象、错误语义和验证口径。
-29. 已补签名 / 设备密钥存储 Rust 模型，覆盖 Ed25519 test-memory signer、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断、signed sync object manifest、signed recovery record、signed device authorization 和 signed device revocation；生产恢复流程和平台私钥存储 backend 边界已由文档固定。
-30. 已补真实 userdb P2 payload 解析到 merge input 的接线。
-31. 已补合并结果写回真实 userdb 的事务执行器；Go server API / storage、生产恢复流程和平台私钥存储 backend 边界已固定，Go server 已起步 metadata / storage / API 验证模型、SQLite-backed metadata repository 和 local object storage staged transaction；真实远端上传下载仍等待签名、metadata API、版本冲突、错误语义和平台 backend 验证。
+- selection、negative feedback、delete 和 explicit restore 未具备事务性前，不接入真实平台学习热路径。
+- SQLite WAL、busy timeout、连接并发和数据库文件权限未明确前，不让输入法与 manager 共享生产 userdb。
+- recency、frequency、suppress、delete 与 restore 语义未通过固定评测前，不凭主观体验调整权重。
+- P0/P1/P2 分级未在测试中体现前，不进入 manager 产品数据视图或远端同步。
+- P1 原始事件不得进入 FFI 管理接口、日志、导出文件或同步 payload。
 
-阶段停止线：
+## 产品退出证据
 
-- userdb schema 与删除语义未验证前，不接同步。
-- ranker explain 未落地前，不做主观权重调参。
-- 本机 Rime rank smoke 与用户词库导入导出未形成可复验证据前，不推进平台壳。
-- P0/P1/P2 分级未在测试中体现前，不进入管理 UI 或远端同步设计。
+M2 本地个人化退出时必须证明：
+
+- 真实平台选择在隐私策略允许时原子写入 userdb；
+- 重启输入法后学习结果仍存在，并能解释地改变后续候选；
+- P0、隐私模式与禁止学习场景不产生学习记录；
+- 删除与显式恢复不会被旧事件或旧备份静默反转；
+- manager 能通过真实 FFI 管理本地词库、学习和隐私设置，且不依赖远端同步。

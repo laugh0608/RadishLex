@@ -44,6 +44,17 @@ Flutter Manager
 
 客户端本地数据库和 Rust core 是用户数据真相源。Flutter、平台壳和 Go server 都不能各自复制一套候选排序、删除语义、同步状态或隐私策略。
 
+## 产品交付顺序
+
+架构模块可以提前形成原型和受控测试，但产品里程碑按用户可见纵向链退出：
+
+1. M1 先打通 macOS 离线输入，闭合按键消费、候选、commit、FFI、进程级 engine runtime 和平台壳。
+2. M2 再闭合本地个人化，让真实选择、删除和反馈以正确事务语义影响后续候选，并提供本地 manager 管理界面。
+3. M3 在本地数据语义稳定后开放端到端加密同步、设备授权、恢复、撤销和 manager 同步界面。
+4. M4 最后闭合 native library、`librime`、schema、manager、签名、升级和供应链发布门禁。
+
+同步原型、loopback、短生命周期服务和跨语言测试可以在 M1/M2 期间继续演进，但不能进入真实用户产品入口，也不能替代 M3 的退出证据。2026 年 7 月整改专题只负责修复 M1/M2 前置问题和首批质量门禁，不承担 M3/M4 的长期项目管理。
+
 ## Rust 模块职责
 
 ### ime-core
@@ -190,13 +201,13 @@ Flutter manager 负责：
 - 同步状态、设备、恢复和后端连接；
 - 安全诊断、导入导出和备份恢复入口。
 
-manager 通过受控 bridge 使用 Rust 能力。产品模式必须加载真实 FFI 和持久化数据；fixture 只能由显式开发开关启用并持续显示演示标识。manager 不进入输入热路径，也不承担排序、合并或密钥策略真相源。
+manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学习、隐私和诊断；M3 再交付同步、设备与恢复；M4 才要求正常产品包闭合 native library、平台目录和升级。产品模式必须加载真实 FFI 和持久化数据；fixture 只能由显式开发开关启用并持续显示演示标识。manager 不进入输入热路径，也不承担排序、合并或密钥策略真相源。
 
 ## 平台策略
 
 ### macOS
 
-第一真实平台使用 InputMethodKit。Swift / Objective-C 外壳只负责系统输入法生命周期、按键、候选、commit 和 Rust FFI。manager 与输入法若共享 userdb，需要固定 App Group、文件权限、锁和 schema migration 所有权。
+第一真实平台使用 InputMethodKit。Swift / Objective-C 外壳只负责系统输入法生命周期、按键、候选、commit 和 Rust FFI。manager 与输入法若共享 userdb，需要固定 App Group、文件权限、锁和 schema migration 所有权。进程级 runtime、session、按键结果、目录与验收边界见 [macOS InputMethodKit 平台边界](macos-inputmethodkit-boundary.md)。
 
 ### Linux
 
@@ -260,17 +271,26 @@ manager 通过受控 bridge 使用 Rust 能力。产品模式必须加载真实 
 - 平台风险：系统输入法安装、候选 UI、沙盒和生命周期复杂，必须一次只推进一个真实平台。
 - 文档风险：状态流水进入稳定文档会制造错误真相源；当前事实只放状态入口和 devlog。
 
-## MVP 成功标准
+## 本地个人化 MVP 成功标准
 
-MVP 至少同时满足：
+M2 退出至少同时满足：
 
 - 真实 engine 输出候选，ranker 能解释并重排。
 - 至少一个平台能离线完成日常中文输入。
 - 用户选择、负反馈、删除和恢复正确影响后续候选。
 - 用户可管理、导入、导出和停止学习，删除不会被旧状态复活。
+- Rust core、FFI、userdb、ranker、manager 本地能力和首个平台都有可重复门禁。
+
+M2 不以远端同步、设备授权或最终发布包为退出条件。
+
+## v1 成功标准
+
+在 M2 基础上，v1 还必须满足：
+
 - 两个真实客户端能安全同步 P2 密文，服务端无法读取明文。
 - manager 产品包使用真实 FFI、持久化配置和平台文件访问。
-- 核心、FFI、Go、Flutter 和首个平台都有可重复门禁。
+- 输入法、manager、native library、`librime`、schema、签名和升级形成可重复产品包。
+- 核心、FFI、Go、Flutter、首个平台和发布供应链都有可重复门禁。
 
 ## 稳定停止线
 
@@ -285,12 +305,13 @@ MVP 至少同时满足：
 ## 专题文档索引
 
 - [当前状态](status/current.md)：当前批次、验证基线、停止线和近期顺位。
-- [阶段路线图](roadmap.md)：长期阶段、交付物和退出标准。
+- [产品交付路线图](roadmap.md)：产品里程碑、交付物和退出标准。
 - [仓库结构](repository-layout.md)：实际目录与模块职责。
 - [Engine Boundary](engine-boundary.md)：engine trait 和核心模型。
 - [Rime Adapter](engine-rime-adapter.md)：librime adapter、构建与 native smoke。
 - [个人化学习](personalization-learning.md)：userdb、ranker、学习和删除语义。
 - [FFI Boundary](ffi-boundary.md)：C ABI、所有权、线程和错误语义。
+- [macOS InputMethodKit](macos-inputmethodkit-boundary.md)：第一平台的 runtime、按键链、目录和验收边界。
 - [隐私与同步](privacy-sync.md)：数据分级、删除、授权和威胁模型。
 - [同步 Payload](sync-payload.md)：P2 对象和 payload 边界。
 - [加密边界](crypto-boundary.md)：key、envelope、签名与恢复。

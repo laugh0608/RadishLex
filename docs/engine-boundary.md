@@ -1,17 +1,15 @@
 # RadishLex Engine Boundary
 
-本文档用于说明 RadishLex Rust core 与底层输入引擎之间的稳定边界，读者是后续实现 `ime-core`、engine adapter、CLI demo 和平台薄壳的开发者。本文只定义 v1 原型所需的领域模型、生命周期和验证口径，不包含 `librime` 绑定细节、平台输入法协议、候选排序权重公式或同步协议；`librime` adapter 细节见 `docs/engine-rime-adapter.md`。
+本文档用于说明 RadishLex Rust core 与底层输入引擎之间的稳定边界，读者是实现 `ime-core`、engine adapter、CLI demo 和平台薄壳的开发者。本文只定义 v1 所需的领域模型、生命周期和验证口径，不包含当前批次状态、`librime` 绑定细节、平台输入法协议、候选排序权重公式或同步协议；`librime` adapter 细节见 `docs/engine-rime-adapter.md`，实时进度见 `docs/status/current.md`。
 
-## 阶段定位
-
-当前处于 Phase 2 起步：`ime-core` 已具备可测试的输入会话、候选模型、提交模型和 engine interface；`ime-cli` 已能分别通过合成 demo adapter 和真实 Rime adapter 复验输入生命周期。真实 Rime adapter 已覆盖首候选、非首候选、翻页候选、候选索引异常和必需 API 缺失映射。`ime-userdb` 已承载本地用户词库、选择事件、负反馈、删除 tombstone、导入导出、学习状态只读摘要、同步前置计数、P2 plaintext payload 只读迭代器、已解密 P2 JSON 到 merge input 的解析入口和合并结果写回真实 userdb 的事务执行器；`ime-ranker` 已具备可解释排序模型；`ime-sync` 已定义同步 payload 来源分类、P2 envelope 组装边界、加密对象外壳草案、设备生命周期、对象版本冲突草案模型、客户端合并模型、signed device authorization 和 signed device revocation；`ime-crypto` 已落地本地 AEAD envelope、device wrapping、recovery material、恢复码 KDF、Ed25519 设备签名、signed sync object manifest、signed recovery record 和撤销后 key epoch 解密边界测试；设备签名 / 私钥存储 ADR 已固定；`ime-ffi` 已完成结构化 snapshot / candidate ABI、normalized key event、engine kind 门禁、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、sync preflight 状态入口、learning status 只读摘要、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、ABI contract、session owner-thread policy、平台绑定式 view copy / release、释放 panic 边界 host smoke 和 FFI 调用 runbook。下一步继续推进 Go server API / storage 边界设计，不直接推进平台壳。
-
-当前边界：
+## 稳定定位
 
 - `ime-core` 定义核心类型和 trait。
 - `ime-core` 不依赖 `librime`、SQLite、Go server、Flutter 或平台原生 SDK。
 - 测试可使用 test-only stub engine 验证生命周期，但不能把 stub 称为真实中文输入引擎。
 - `ime-engine-rime` 只能通过 `ime-core` 暴露的 engine boundary 与 core 通信。
+- 平台接入必须消费完整 `KeyOutcome`，不能在 FFI 或平台壳丢弃 `consumed`、即时 commit 或错误。
+- 当前里程碑、实现证据和下一步只在 `docs/status/current.md` 与 devlog 维护。
 
 ## 边界原则
 
@@ -23,7 +21,7 @@
 
 ## 核心模型
 
-Phase 1 的 `ime-core` 至少包含这些稳定模型：
+v1 的 `ime-core` 至少包含这些稳定模型：
 
 - `KeyEvent`：平台或 CLI 传入的按键事件，包含字符键、命名键、修饰键和按键阶段。
 - `Composition`：当前预编辑文本和光标位置。
@@ -112,7 +110,7 @@ Engine boundary 可以参考公开输入法行为和公开文档，但不能复�
 4. 实现 adapter。
 5. 用黑盒测试验证行为。
 
-## Phase 1 验证口径
+## 验证口径
 
 进入下一步前，至少应满足：
 

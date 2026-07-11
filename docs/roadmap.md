@@ -1,219 +1,175 @@
-# RadishLex 阶段路线图
+# RadishLex 产品交付路线图
 
-本文档定义 RadishLex 的长期阶段顺序、阶段交付物和退出标准，读者是维护者、实现者和发布审阅者。本文不记录当前批次状态、逐日实现流水、提交清单或验证命令输出；这些内容分别进入 `docs/status/current.md`、临时整改专题和 `docs/devlogs/`。
+本文档定义 RadishLex 的长期产品里程碑、交付物和退出标准，读者是维护者、实现者和发布审阅者。本文不记录当前批次、逐日流水、提交清单或命令输出；当前状态见 `docs/status/current.md`，临时整改执行见当前状态引用的整改专题，验证流水进入 `docs/devlogs/`。
 
-当前阶段与验证基线见 [当前状态短入口](status/current.md)。2026 年 7 月稳定化整改的跨阶段执行顺序见 [项目稳定化整改总专题](remediation/2026-07-project-stabilization.md)。整改批次可以修正早期阶段缺口，但不因此宣称对应产品阶段已经完成。
+## 路线原则
 
-## Phase 0：方案与边界冻结
+- 里程碑以用户可见纵向链为单位，不以 crate、服务或页面目录存在作为完成证据。
+- 首个可用版本先证明真实离线输入，再补本地个人化、同步和产品发布闭环。
+- 自部署同步保留为 v1 重要能力，但不阻塞首个 macOS 离线 Alpha。
+- Manager 的本地管理能力与同步管理能力分开验收；本地词库、学习和隐私管理可以先于真实同步 UI 产品化。
+- 第一平台达到可重复日常输入前，不启动第二平台实现。
+- 合成 fixture、CLI 输出、设计草案和 local smoke 只能证明对应边界，不替代真实平台、真实 bundle、真实客户端或目标部署证据。
+
+## M0：方向与工程基础
 
 目标：
 
-- 固定项目定位、许可边界、隐私立场和 MVP 范围。
-- 明确 v1 不从零重写完整中文输入引擎。
-- 明确 Rust core、Go server、Flutter manager 和平台薄壳的职责。
-- 固定文档真相源、分支策略和验证分层。
+- 固定项目定位、许可边界、隐私立场和 v1 范围。
+- 建立 Rust core、engine adapter、userdb、ranker、crypto/sync、Go server、FFI 和 manager 的工程原型。
+- 明确各模块职责、clean-room 原则和验证分层。
 
 交付：
 
-- 根 README、LICENSE 和协作入口。
-- 技术方案、仓库结构、隐私同步和阶段路线文档。
+- README、LICENSE、协作入口和正式架构文档。
+- Rust workspace、Go sync server 和 Flutter manager 原型。
+- 默认仓库验证、开发期 native/FFI smoke 与合成集成测试。
 
 退出标准：
 
-- 架构、隐私、许可、MVP 与平台策略没有互相冲突的入口口径。
-- 后续阶段的职责和停止线可以从正式文档复验。
+- 架构、隐私、许可、平台策略和模块职责没有互相冲突的稳定口径。
+- 工程原型能够支持首个真实平台纵向链开发。
+- 文档和测试不把原型能力误称为可安装产品。
 
-## Phase 1：Rust Core 与 Engine 原型
+M0 只证明方向与工程基础可继续演进，不证明任何产品里程碑已经完成。
+
+## M1：macOS 离线输入 Alpha
+
+第一真实平台固定为 macOS InputMethodKit。本里程碑只要求开发版真实输入链，不要求真实用户同步或完整 manager 产品包。
 
 目标：
 
-- 建立 Rust workspace 和平台无关输入领域模型。
-- 定义 composition、candidate、commit、key event 和 engine adapter 边界。
-- 接入成熟底层引擎并提供 CLI 复验链路。
-- 固定 engine 生命周期、错误语义和 clean-room 边界。
+- 在真实 macOS 应用输入框中离线完成中文输入。
+- 建立平台可消费的 input runtime、版本化 FFI 结果和进程级 librime 生命周期。
+- 证明平台薄壳、Rust core 和成熟底层引擎的职责分离成立。
 
 交付：
 
-- `ime-core`
-- `ime-engine-rime`
-- `ime-cli`
-- engine 与 session 契约测试
+- 版本化 KeyOutcome ABI，至少返回 `consumed`、可选 `commit` 和最新 snapshot。
+- 可供 Swift / Objective-C 使用并受测试约束的 C header 或等价模块边界。
+- 进程级 librime setup / initialize / finalize 与多 session 管理。
+- `platforms/macos-imk/` 开发版薄壳。
+- 安装、启用、移除和非敏感人工 smoke runbook。
 
 退出标准：
 
-- CLI 能通过真实 engine 完成 `compose -> candidates -> commit`。
-- 核心模型不依赖 Rime 私有对象或任何平台生命周期。
-- 多 session、schema 切换、错误释放和 engine 全局生命周期有可复验证据。
+- 开发者可以按 runbook 安装并启用开发版输入法。
+- 全拼输入、候选导航、数字键或空格选择、提交、取消、重置和未消费按键透传正确。
+- 两个 session 不重复初始化或破坏 librime 全局状态。
+- 断网时完整输入链可用，输入热路径不进入 manager 或网络。
+- 自动契约测试覆盖 KeyOutcome 到平台提交；人工 smoke 在真实应用完成且不含敏感输入。
 
-## Phase 2：个人化学习
+不阻塞 M1 的事项：
+
+- 真实用户同步、恢复码、设备授权和撤销。
+- 完整 manager 产品化。
+- 面向普通用户的 librime/schema 最终分发方案、签名和发布安装包；这些必须在 M4 前完成。
+
+## M2：本地个人化 MVP
 
 目标：
 
-- 建立本地 userdb、选择事件、负反馈和删除语义。
-- 实现候选重排、explain 和可管理用户词库。
-- 建立隐私分级、导入导出和本地学习开关。
-- 确保用户意图的事务性和排序模型的可评测性。
+- 让真实输入选择安全进入本地学习，并稳定影响后续候选。
+- 让用户能够查看、删除、导出、暂停或限制本地学习结果。
+- 修正 userdb、ranker、删除和并发访问的正确性基础。
 
 交付：
 
-- `ime-userdb`
-- `ime-ranker`
-- SQLite schema 与 migration
-- 词库和学习 CLI
-- 合成排序评测集
+- engine、ranker、userdb、privacy policy 组合的本地 input runtime。
+- 事务化 selection、negative feedback、delete 和 explicit restore。
+- SQLite WAL、busy timeout、并发访问、文件权限、迁移和损坏恢复策略。
+- 有效 recency 衰减、有界 frequency、明确 suppress/delete/restore 优先级。
+- 固定合成排序评测集和输入热路径性能基线。
+- 只覆盖本地词库、学习、隐私和诊断的最小 manager 产品模式。
 
 退出标准：
 
-- 真实候选能进入 ranker，排序结果能稳定映射回 engine commit。
-- 选择、负反馈、删除和显式恢复要么完整提交、要么完整回滚。
-- deleted tombstone 能阻止旧事件、旧导入、旧设备和旧备份复活词条。
-- recency 随时间衰减，frequency 有界，suppress 与 delete 优先级明确。
-- 用户词库导入导出、学习状态和 explain 均可复验，P1 明细不进入 FFI 或同步 payload。
+- 真实候选经 ranker 重排后仍能稳定映射回 engine commit。
+- 用户意图要么完整提交、要么完整回滚；并发 manager/IME 访问不频繁产生 `SQLITE_BUSY`。
+- secure text entry、P0 App 和隐私模式不会写入学习记录。
+- 删除不会被旧事件、旧导入或旧本地状态复活，显式恢复具有新的稳定版本。
+- 用户无需 shell 环境变量即可在产品模式管理真实本地数据；fixture 只能通过显式 demo mode 启用。
+- 重启后词库、学习设置和排序效果保持，explain 与评测结果一致。
 
-## Phase 3：自部署加密同步
+M2 是首个本地个人化 MVP。它不要求远端同步已经开放。
+
+## M3：端到端加密同步 Beta
 
 目标：
 
-- 实现 Go 单用户自部署同步服务。
-- 实现 P2 加密对象上传、发现、下载、验签、解密、合并和冲突重试。
-- 实现设备加入、恢复、撤销和 key epoch 轮换。
-- 保持服务端默认不可信，输入热路径完全不依赖后端。
-- 当前生产访问控制先使用受控单用户认证；OIDC 作为独立后续专题。
+- 在不改变本地输入热路径的前提下，让两个真实客户端安全同步 P2 数据。
+- 完成确定合并、设备加入、恢复、撤销、key epoch 和生产 HTTPS 编排。
+- 保持服务端默认不可信，P1 原始事件继续只在本地。
 
 交付：
 
-- `ime-crypto`
-- `ime-sync`
-- `server/sync-server`
-- Docker Compose 与生产部署 runbook
-- 跨语言协议 test vector 和多设备集成测试
+- 确定性 merge 与统一冲突表。
+- 签名绑定、KDF/解析资源上限、secret 生命周期和跨语言协议 test vector。
+- 对象发现、下载、验签、解密、合并、上传、冲突重试和本地 cursor orchestration。
+- 设备加入、恢复、撤销和 key epoch 轮换 API。
+- Go server 的认证、请求上限、限速、审计、备份恢复和升级回滚闭环。
+- 通过真实 Rust bridge 执行的 manager 同步 UI。
 
 退出标准：
 
-- 两个真实客户端能从空状态完成授权、上传、发现、下载、验签、解密、合并和重试。
-- 任意记录顺序得到相同结果，合并满足幂等性并覆盖离线并发、删除和恢复。
-- 服务端无法读取明文 P2 数据，日志和错误响应不泄漏敏感材料。
-- 撤销设备不能获得新 epoch 数据，恢复记录可轮换和撤销。
-- HTTPS、认证、请求上限、限速、备份恢复和升级回滚达到生产停止线。
+- 任意记录顺序得到相同结果，合并满足交换律、结合律和幂等性。
+- 两个真实客户端从空状态完成授权、上传、发现、下载、验签、解密、合并和受控重试。
+- 旧设备不能复活删除数据，被撤销设备不能获得新 epoch 数据。
+- HTTPS、认证、请求/响应上限、慢连接、错误 TLS、限速绕过和日志脱敏通过负向测试。
+- manager 不持久化 recovery code、token、wrapped material、signature bytes 或 payload bytes。
 
-## Phase 4：Manager 产品化
+在 M3 退出标准全部满足前，真实用户同步保持关闭。允许使用合成数据、loopback、短生命周期服务和受控集成测试实现并验证成功路径，但这些不能解锁产品入口。
+
+## M4：产品发布候选
 
 目标：
 
-- 提供词库、学习、隐私、同步、设备和恢复管理界面。
-- 通过稳定 bridge 使用 Rust core，不在 Flutter 中复制业务真相源。
-- 将真实 FFI、数据库、设置和文件访问打包进正常产品运行态。
-- 对不可用能力显示明确原因，不以 fixture 或默认成功伪装。
+- 把 macOS 输入法、manager、Rust native library、librime 和合法 schema/data 形成可安装、可升级、可移除的产品包。
+- 统一版本、兼容性诊断、签名、权限和发布门禁。
 
 交付：
 
-- `apps/radishlex-manager`
-- Rust manager bridge 与 native bundle
-- 本地设置、词库、诊断和同步状态页面
-- 平台持久化、文件选择和发布构建验证
+- 输入法与 manager 的可重复构建和 bundle presence 检查。
+- librime 动态/静态链接、schema/data 来源、许可证、完整性和更新策略。
+- App Group、App Support、sandbox entitlement、文件选择和数据库所有权边界。
+- 安装、升级、回滚、移除、数据迁移和故障恢复 runbook。
+- Rust fmt/check/test/clippy/MSRV、Go test/race/vet、Flutter format/analyze/test、native-rime 和 macOS bundle CI。
+- 依赖安全、许可证和必要供应链检查。
 
 退出标准：
 
-- 用户无需 shell 环境变量即可在产品模式管理真实本地数据。
-- 应用包携带并加载匹配版本的 Rust FFI，设置和数据库在重启后保持。
-- 导入导出使用系统文件访问机制，sandbox 权限与数据目录符合平台要求。
-- FFI、权限、数据库和版本失败均明确展示，不静默回退 fixture。
-- 真实同步 UI 只有在 Phase 3 退出标准满足后才允许开启。
+- 新环境无需手工配置 Homebrew 路径或 shell 环境变量即可安装和使用。
+- 输入法与 manager 加载匹配版本的 Rust/native 依赖，升级后用户数据保持。
+- FFI、数据库、权限、schema、版本和 bundle 缺失均有明确错误，不静默回退 fixture。
+- 发布候选通过自动门禁、安装 smoke 和非敏感日常输入复验。
 
-## Phase 5：第一个真实平台输入法
+## 第二平台选择门禁
 
-第一平台固定为 macOS InputMethodKit。Linux Fcitx5 保留为后续桌面候选，但不与第一平台并行展开。
+只有 M2 达到可重复日常输入、稳定本地学习和真实数据管理退出标准后，才评估第二平台。候选优先考虑 Linux Fcitx5 或 Android，依据目标用户、维护成本、平台能力和首个平台证据选择；不得同时展开多条真实平台主线。
 
-目标：
+Windows TSF 与 iOS Keyboard Extension 后置。任何第二平台都必须复用 Rust core、userdb、ranker、sync 和 privacy 边界，平台壳不得复制业务真相源。
 
-- 在真实应用输入框中使用 RadishLex。
-- 平台壳通过 FFI 获得按键消费结果、commit、composition 和 candidates。
-- 用户真实选择进入本地学习，并影响后续候选排序。
-- 保持断网可用和平台原生候选交互。
+## Future Topic：自研 Rust Engine
 
-交付：
-
-- `platforms/macos-imk`
-- 安装、启用、移除和 smoke runbook
-- 平台契约测试与非敏感人工验证记录
-
-退出标准：
-
-- 开发版输入法可按 runbook 安装并完成连续中文输入。
-- 按键透传、候选导航、提交、取消、重置和多 session 行为正确。
-- 重启后用户词库仍在，学习结果能影响真实候选。
-- 输入热路径不发起网络请求，平台壳不承载排序、同步或隐私真相源。
-
-## Phase 6：Android 输入法
-
-目标：
-
-- 使用 Kotlin `InputMethodService` 和 Rust NDK bridge 落地 Android IME。
-- 处理生命周期、前后台、键盘 UI、设备密钥和移动端隐私模式。
-
-交付：
-
-- `platforms/android-ime`
-- Android native bridge、instrumented tests 和设备矩阵
-
-退出标准：
-
-- 常见 Android 版本与目标设备可稳定输入。
-- Rust core 复用成立，Kotlin 不承载用户词库、ranker 或同步真相源。
-- 平台密钥能力有真实设备证据，不依赖未经验证的算法假设。
-
-## Phase 7：Windows 输入法
-
-目标：
-
-- 使用 TSF 薄壳接入 Rust core。
-- 复用 Windows 原生候选与文本服务生命周期。
-
-交付：
-
-- `platforms/windows-tsf`
-
-退出标准：
-
-- 主流 Windows 版本可稳定注册、输入、升级和移除。
-- TSF 壳保持平台适配职责，不复制核心业务状态。
-
-## Phase 8：iOS Keyboard Extension
-
-目标：
-
-- 使用 Swift / UIKit Keyboard Extension 和 Rust XCFramework。
-- 默认离线可用，在 full access 边界内提供可选同步。
-
-交付：
-
-- `platforms/ios-keyboard`
-
-退出标准：
-
-- 无 full access 时核心输入可用且不尝试联网。
-- 内存、生命周期、App Group 和审核边界有真实设备证据。
-
-## Phase 9：自研 Rust Engine
-
-目标：
-
-- 在产品与评测证明有必要时，逐步替换成熟底层引擎。
-- 保持既有 engine trait、用户数据和平台壳兼容。
+只有至少一个真实平台、本地个人化、产品评测和同步边界稳定，并且已有明确替换收益时，才进入自研 engine。
 
 进入条件：
 
-- 至少一个真实平台、个人化学习和自部署同步已经稳定。
-- 已有公开行为规格、评测集和明确的替换收益。
-- 不依赖复制外部引擎源码、私有结构或受限词库。
-
-退出标准：
-
-- 自研 engine 在输入质量、延迟、资源占用和兼容性评测上达到既定基线。
-- 替换不破坏 userdb、ranker、FFI、同步和平台壳边界。
+- 已有公开行为规格、输入质量和延迟评测集。
+- 成熟底层引擎成为可量化瓶颈，而不是主观偏好。
+- 替换不破坏 engine trait、userdb、ranker、FFI、同步和平台壳。
+- 实现遵守 clean-room 原则，不复制外部源码、私有结构或受限词库。
 
 ## Future Topic：Sync Server Admin Console
 
-这是部署者可选运维界面，不属于 Phase 3 或 Phase 4 的退出条件。进入实现前必须先固定管理员认证、scope、脱敏 API 和公网暴露策略。
+这是部署者可选运维界面，不属于 M3 或 M4 的必要交付。进入实现前必须固定管理员认证、scope、脱敏 API 和公网暴露策略。
 
 它只能展示服务健康、migration、存储、备份恢复、升级回滚、认证模式和脱敏 audit 摘要；不得展示明文用户词库、输入历史、候选偏好、token、恢复码、私钥、wrapped material、signature bytes 或 encrypted payload bytes。详细边界见 [Sync Server Admin Console](sync-server-admin-console.md)。
+
+## 里程碑证据规则
+
+- 设计文档证明边界，不能证明产品能力已经实现。
+- 单元测试证明局部语义，不能替代跨模块和真实平台证据。
+- CLI、fixture 和 local smoke 不得替代系统输入法、真实 bundle 或两个真实客户端。
+- 每个里程碑只维护必要退出证据；详细命令和流水写入 devlog 或 runbook。
+- 当前里程碑、阻塞项和下一步只在 `docs/status/current.md` 维护。

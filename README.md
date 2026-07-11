@@ -1,8 +1,8 @@
 # RadishLex
 
-RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flutter 为管理界面的源代码可见中文输入系统，中文定位为“萝卜词核”。
+RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支持自部署加密同步的源代码可见中文输入系统。它首先要成为可日常使用的本地输入法，再逐步扩展个人化学习与跨设备同步。
 
-项目目标不是再做一个单平台输入法外壳，而是建立本地优先、隐私可信、可解释、可删除、可自部署同步，并能长期学习个人输入习惯的中文输入基础设施。
+项目以 Rust 为输入核心、Go 为自部署同步后端、Flutter 为管理界面，并通过平台原生薄壳接入系统输入法。核心目标是让输入法逐步理解用户的词库、语气、场景和候选偏好，同时把数据控制权留给用户。
 
 许可条款以仓库根 [LICENSE](LICENSE) 为准，当前采用 RadishLex Source-Available License。
 
@@ -28,13 +28,14 @@ RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flut
 
 - [当前状态](docs/status/current.md)：当前批次、验证基线、停止线和下一步。
 - [技术方案](docs/technical-plan.md)：稳定架构、职责、输入链和平台策略。
-- [阶段路线图](docs/roadmap.md)：长期阶段、交付物和退出标准。
+- [产品交付路线图](docs/roadmap.md)：产品里程碑、交付物和退出标准。
 - [仓库结构](docs/repository-layout.md)：实际目录、模块职责和未落地边界。
 - [隐私与同步](docs/privacy-sync.md)：数据分级、密钥、删除、恢复和威胁模型。
 - [Engine Boundary](docs/engine-boundary.md)：核心 engine 契约。
 - [Rime Adapter](docs/engine-rime-adapter.md)：librime adapter 与 native smoke。
 - [个人化学习](docs/personalization-learning.md)：userdb、ranker、反馈和词库管理。
 - [FFI Boundary](docs/ffi-boundary.md)：C ABI、所有权、线程和错误语义。
+- [macOS InputMethodKit](docs/macos-inputmethodkit-boundary.md)：第一平台的 runtime、按键链、目录和验收边界。
 - [同步密钥管理](docs/sync-key-management.md)：设备、授权、恢复、撤销和 key epoch。
 - [Sync Server API/Storage](docs/sync-server-api-storage.md)：Go API、metadata、blob 和错误语义。
 - [Manager Boundary](docs/manager-ui-boundary.md)：Flutter manager 职责与数据可见性。
@@ -101,18 +102,18 @@ docker compose -f deploy/sync-server/docker-compose.local.yaml config
 
 真实 Keychain、Android Keystore、平台输入法安装、Docker 长流程和发布部署可能修改外部环境，必须按对应 runbook 和人工授权执行。
 
-## MVP 边界
+## 交付梯度
 
-v1 不重写完整中文输入引擎。拼音切分、基础候选和长句转换可由成熟底层引擎提供，RadishLex 聚焦：
+RadishLex 按用户可见纵向链分阶段交付，不要求同步、完整 manager 和最终安装包同时完成：
 
-- 稳定 Rust 输入核心与 engine adapter；
-- 用户词库、候选重排和个人化学习；
-- 可解释、可删除、可暂停的本地数据；
-- 自部署端到端加密同步；
-- 真实 manager 产品运行态；
-- 至少一个可日常使用的真实平台输入法。
+1. **M1 macOS 离线输入 Alpha**：真实应用中完成 composition、候选、选择、commit 和未消费按键回传；输入热路径完全离线。
+2. **M2 本地个人化 MVP**：真实选择安全写入 userdb 并影响后续候选；用户可在 manager 中管理词库、学习和隐私设置。
+3. **M3 加密同步 Beta**：两个真实客户端完成端到端加密同步、冲突收敛、删除传播、设备授权、恢复与撤销。
+4. **M4 产品发布候选**：输入法、manager、Rust native library、`librime`、schema、签名、升级和发布门禁形成可重复产品包。
 
-第一真实平台固定为 macOS InputMethodKit。第二平台只有在第一平台达到退出标准后再启动。
+v1 不重写完整中文输入引擎。拼音切分、基础候选和长句转换可由成熟底层引擎提供，RadishLex 聚焦稳定 Rust 输入核心与 engine adapter、用户词库、候选重排、个人化学习、端到端加密同步和至少一个可日常使用的真实平台输入法。
+
+第一真实平台固定为 macOS InputMethodKit。同步不阻塞 M1/M2 的本地输入与个人化交付；第二平台只有在第一平台达到退出标准后再选择和启动。
 
 ## 非目标
 

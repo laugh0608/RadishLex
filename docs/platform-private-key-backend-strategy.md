@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-RadishLex Phase 3 继续保留 `ed25519-v1` 作为设备签名协议。当前证据不足以解除任何生产平台私钥 backend 的门禁：
+RadishLex M3 继续保留 `ed25519-v1` 作为设备签名协议。当前证据不足以解除任何生产平台私钥 backend 的门禁：
 
 - `test-memory-v1` 只用于测试和 fixture，不能进入生产同步。
 - `unavailable` 是默认失败 backend，不允许静默回退。
@@ -116,7 +116,7 @@ RadishLex Phase 3 继续保留 `ed25519-v1` 作为设备签名协议。当前证
 适用条件：
 
 - 当前没有新 Android 真机或 Apple 平台调查条件。
-- 仍希望推进 Phase 4 manager 同步入口和本地联调能力。
+- 仍希望推进 M3 manager 同步入口和本地联调能力。
 
 可推进内容：
 
