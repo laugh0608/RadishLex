@@ -83,7 +83,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | 批次 | 名称 | 状态 | 退出结果 |
 | --- | --- | --- | --- |
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
-| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；隔离 native bundle/FFI smoke 已完成，待授权真实应用输入 | 真实应用可离线完成基础中文输入 |
+| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；隔离 native/FFI 与 Apple Development bundle 已完成，待一次方便的新登录、TIS 枚举和真实应用输入 | 真实应用可离线完成基础中文输入 |
 | R02L | 本地 userdb/ranker 正确性 | 待开始 | 学习、删除、并发和排序语义正确 |
 | R01B | 真实学习纵向闭环 | 待开始，依赖 R01A 与 R02L | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 可与 R01A 并行 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
@@ -125,15 +125,15 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 新增 `platforms/macos-imk/` Objective-C 薄壳：`NSEvent` 规范化、ABI v2 key result、即时 commit、snapshot/candidate 复制、原生 `IMKCandidates`、稳定候选 index、reset/cancel、schema 和 owner-thread 均由同一 wrapper 收口。
 - `RLXProcessRuntime` 为每个 input controller 创建独立 session，并在进程 teardown 时先逐个 invalidate session，再调用 `radishlex_rime_runtime_shutdown`；生产条件编译分支不允许回退 demo engine。
 - `./scripts/check-macos-imk.sh` 可在不安装系统输入法时构建 contract `.app` bundle，运行 Objective-C → C ABI → Rust session smoke，并检查 plist、rpath、dylib、完整开发签名与关键 symbol；production 分支另有 `-fsyntax-only` 编译门禁。
-- `./scripts/check-macos-imk-native.sh` 增加显式 gated native bundle 门禁：拒绝真实用户/runtime 数据目录和 symlink，要求 schema/default/license，固定 deploy policy，并检查架构、rpath、`librime` 直接依赖、三个关键 symbol 与全部 copied data 哈希清单。
+- `./scripts/check-macos-imk-native.sh` 增加显式 gated native bundle 门禁：拒绝真实用户/runtime 数据目录和 symlink，要求 schema/default/license，固定 deploy policy，并检查架构、三个关键 symbol 与全部 copied data 哈希清单；全部非系统 dylib 会递归封装、改写到 bundle 内 `@rpath`，逐库许可证、签名后哈希和外部绝对依赖拒绝已有自动验证。
 - wrapper contract 扩展到完整命名键表、全部 modifier、modifier release、补充平面 Unicode、中文/emoji UTF-8 byte cursor 到 UTF-16 unit 转换、scalar 中间 cursor 拒绝和无 index 候选拒绝。
 - native-rime release dylib 已使用现有显式 Homebrew include/lib 构建并复核 `session_new_rime`、`session_handle_key_event` 与 `rime_runtime_shutdown` 导出。
 - 采用官方 Apache-2.0 `rime-pinyin-simp` 固定上游 commit，在临时隔离目录保留许可证和来源记录，并移除对其他 schema/preset 的外部依赖；没有读取或修改真实用户 Rime 目录。
 - native bundle 已携带上述隔离全拼 shared data 通过架构、依赖、symbol、许可证和哈希清单门禁；真实 librime FFI smoke 已复验 composition、候选、commit、两个 session 共享 runtime 与 peer release 后继续输入。
 - native smoke 发现 librime 对不存在 schema 的 `select_schema`/`get_current_schema` 返回过于宽松；adapter 现先读取已部署 schema list，再选择并精确回读。不存在或回读不一致会返回结构化错误，创建期还会销毁 session 并回滚 runtime，对应 stub 与真实 FFI 回归均已覆盖。
-- 首次经授权安装复核补齐完整 bundle 签名、字符 repertoire、后台 `NSApplication` metadata 和 `.app` 产物形态；ad-hoc bundle 在 macOS 26.5.1 可启动 IMKServer，但当前用户缺少有效 Apple Development identity，TIS 不产生可启用 source。测试副本、进程和运行数据已回滚，未修改既有输入源列表。
+- Apple Development identity 与证书链已准备完成；最终 v13 固定 `LSBackgroundOnly`、单一 reverse-DNS `org.radishlex.inputmethod.Pinyin` mode、简体中文 script/repertoire、图标和本地化标签。用户级安装、即时注册和一次用户级新登录仍未产生 TIS source；系统级 v13 已在授权下暂存，等待开发者方便时只做一次新登录复查。当前未启用输入源、无 RadishLex 进程或运行数据，真实应用 smoke 尚未执行。
 
-这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle 与真实 FFI 调用链子项，不代表系统安装或真实应用输入 smoke 已完成。再次安装前必须先具备有效 Apple Development identity。
+这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链和 Apple Development 自包含 bundle 子项，不代表 TIS 枚举或真实应用输入 smoke 已完成。R01A 下一判断点是一次最终系统级 build 的新登录；若仍无 source，应转入参考 IMK bundle 对照，不继续反复安装或注销。
 
 ### 退出场景
 

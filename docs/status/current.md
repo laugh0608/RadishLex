@@ -19,32 +19,25 @@ RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/syn
 
 ## 本轮路线调整
 
-- 旧的技术 Phase 顺序不再作为产品推进主线；交付改为 M1 离线输入、M2 本地个人化、M3 加密同步、M4 发布候选。
-- 原 R01 拆为 R01A 基础输入、R02L 本地正确性和 R01B 真实学习闭环，避免一次批次同时改 FFI、librime、平台壳、数据库和 ranker。
-- 同步收敛、生产同步、manager 同步 UI 与最终产品包回归 M3/M4 正常路线，不再作为 2026-07 临时整改的关闭条件。
-- Flutter manager 分层交付：M2 先完成本地词库、学习和隐私管理；M3 再完成同步与设备管理；M4 完成产品打包。
-- R01A、R02L、R01B 与 R06A 退出后关闭整改专题，后续按路线图推进，不继续维护永久整改状态。
+- 产品主线为 M1 离线输入、M2 本地个人化、M3 加密同步、M4 发布候选；旧技术 Phase 不再决定交付顺序。
+- 输入整改拆为 R01A 基础输入、R02L 本地正确性和 R01B 真实学习，避免 FFI、平台壳、数据库和 ranker 同批失控。
+- 同步/设备管理与最终打包回归 M3/M4；R01A、R02L、R01B、R06A 退出后关闭临时整改专题。
 
 ## 已有工程证据
 
-- 默认 Rust workspace、Go server 和跨语言加密对象 HTTP 测试可通过仓库基线。
-- Flutter manager 的 format、analyze、widget tests 和开发期真实 FFI smoke 已有独立入口。
-- userdb、ranker、crypto、sync、Go storage/API 和 manager 已有较丰富合成测试。
-- 本地 Docker/HTTPS、备份恢复、外部 TLS 反代和升级回滚已有开发或实现级 smoke。
-- Apple/Android 平台签名 backend 在能力不足时保持 unavailable，没有静默回退为生产密钥。
+- 仓库基线已覆盖 Rust workspace、Go server、跨语言 HTTP、Flutter manager 与开发期真实 FFI；userdb、ranker、crypto、sync 和部署原型已有合成测试，但不作为产品阶段证据。
 - `ime-ffi` ABI contract v2 已无损返回 `consumed`、可选即时 commit 和同事件 snapshot；输入侧 C header 已通过 C11 与 Objective-C 编译测试。
-- librime setup / initialize / explicit shutdown / finalize 已收口到进程级 runtime；多 session、零 session 间隙、配置冲突、失败回滚、peer release 和最终 finalize 已有自动测试或 gated native smoke。
+- librime 生命周期已收口到进程级 runtime；多 session、owner-thread、配置冲突、失败回滚、peer release 和最终 finalize 已有自动或 native smoke。
 - `platforms/macos-imk/` 已形成可构建的 Objective-C InputMethodKit 薄壳、contract bundle 和 wrapper smoke；合成链覆盖 key normalization、未消费键、即时 commit、snapshot/candidate 复制、候选 index、reset、schema、owner-thread 与 teardown 释放顺序。
-- native bundle gated 检查已固定隔离目录与 symlink 拒绝、schema/default/license 前提、deploy policy、架构、rpath、`librime` 直接依赖、FFI symbol 和全部 copied data 哈希清单。
-- 官方 Apache-2.0 `rime-pinyin-simp` 已在临时隔离目录按固定上游 commit 准备并构建；未读取用户 Rime 目录。真实 librime FFI smoke 已覆盖全拼 composition、候选、commit、多 session peer release 和不存在 schema 的拒绝。
-- adapter 在创建和切换 session schema 前读取 librime 已部署 schema list，并在选择后核对当前 schema；不存在或回读不一致时返回 `select_schema` 错误，新建 session 会销毁并回滚 runtime。
-- macOS build 现生成符合系统后台应用形态的 `RadishLex.app`，包含字符 repertoire、`NSApplication` metadata，并对嵌套 dylib、主程序和完整 bundle 执行可复验签名；ad-hoc 只用于无安装构建门禁。
+- 隔离 `rime-pinyin-simp` 的真实 FFI smoke 已覆盖 composition、候选、commit、多 session 和不存在 schema 拒绝；adapter 以 deployed schema list 与选择后回读固定可用性。
+- native 门禁覆盖 schema/license/data 清单、架构、FFI symbol、递归 dylib closure、逐库许可证/签名哈希和外部绝对依赖拒绝；不读取用户 Rime 目录。
+- macOS build 现生成符合 IMKServer 契约的 `RadishLex.app`，固定 `LSBackgroundOnly`、单一 `org.radishlex.inputmethod.Pinyin` mode、简体中文 script/repertoire、图标和双语标签，并对全部 dylib、主程序和完整 bundle 执行可复验签名；ad-hoc 只用于无安装构建门禁。
 
 这些证据证明工程原型可继续演进，不证明真实平台输入、生产同步或产品发布已经完成。
 
 ## 已确认阻塞
 
-- macOS native-rime bundle 与真实 FFI 调用链已使用来源合规的临时隔离全拼数据复验。2026-07-11 经授权安装时确认当前用户没有有效 Apple Development code-signing identity；ad-hoc bundle 可启动 IMKServer，但 macOS 26.5.1 不产生可启用的 TIS source。安装副本、进程和运行数据已完整回滚，两个真实应用输入 smoke 尚未执行。
+- Apple Development identity 与证书链已准备完成，v13 native bundle 的完整 dependency closure、mode metadata 和严格签名均已复验。macOS 26.5.1 上，用户级安装、即时 TIS 注册和一次用户级新登录仍未产生 source；系统级 v13 已在授权下完成签名核验并暂存，等待开发者方便时执行一次新登录后复查。当前未启用 RadishLex、无输入法进程和运行数据，两个真实应用输入 smoke 尚未执行。
 - 输入 session 未组合 engine、ranker、userdb 与 privacy policy，真实选择没有进入平台学习热路径。
 - userdb 用户意图缺少统一事务、WAL/busy 策略；ranker recency/frequency 语义需要修正。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
@@ -63,12 +56,11 @@ RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/syn
 
 ## 下一步顺位
 
-1. 在 Xcode 中为当前用户准备有效 Apple Development code-signing identity，并通过 `RADISHLEX_CODESIGN_IDENTITY` 重建、签名和复验开发 bundle；不导出或提交证书私钥。
-2. 再次取得安装当次授权后，按 macOS 开发 runbook 执行安装、启用、两个应用输入 smoke、进程重启与移除步骤并完成 R01A。
-3. 真实 smoke 重点复验连续输入、非首候选、翻页、取消、Backspace、Enter、中英文混输、未消费快捷键、client 切换与进程重启。
-4. 并行实施 R06A：修复严格 Clippy，增加 Flutter 与 Go race CI，清理 review-only Rust/Flutter 生产资产。
-5. R01A 退出后实施 R02L，修正 userdb 事务、SQLite 并发、recency、frequency 与删除语义。
-6. R02L 退出后实施 R01B，让真实选择在隐私策略约束下持久化并影响后续候选；之后关闭整改专题并进入 M3。
+1. 等开发者方便时，只执行一次带系统级 v13 的新登录会话；登录后先用 TIS 查询和系统设置确认 `org.radishlex.inputmethod.Pinyin` 是否出现，不再为中间 metadata 版本反复注销。
+2. 若 source 出现，另行确认最终添加动作并按 runbook 完成两个应用输入、连续输入、非首候选、翻页、取消、Backspace、Enter、中英文混输、未消费快捷键、client 切换、进程重启、断网与回滚，完成 R01A 退出判断。
+3. 若新登录后仍无 source，停止安装域和缓存重试；建立同签名、同安装路径的参考 IMK bundle 对照，分离系统信任/注册问题与 RadishLex metadata/二进制问题，再决定代码修正。
+4. 等待方便登录期间并行实施 R06A：修复严格 Clippy，增加 Flutter 与 Go race CI，清理 review-only Rust/Flutter 生产资产；不抢占 R01A，也不启动第二平台。
+5. R01A 退出后实施 R02L，修正 userdb 事务、SQLite 并发、recency、frequency 与删除语义；R02L 退出后再由 R01B 接入真实学习，之后关闭整改专题并进入 M3。
 
 ## 验证入口
 
