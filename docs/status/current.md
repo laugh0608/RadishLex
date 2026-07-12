@@ -77,4 +77,4 @@ native-rime 门禁需要显式隔离 schema/shared data/license；真实平台�
 - [macOS InputMethodKit](../macos-inputmethodkit-boundary.md)：第一平台的 runtime、按键链、目录和验收边界。
 - [仓库结构](../repository-layout.md)：实际目录与未落地边界。
 - [隐私与同步](../privacy-sync.md)：数据分级、密钥、删除、恢复与威胁模型。
-- [本周周志](../devlogs/2026-W28.md)：本周事实、验证和交接记录。
+- [下一工作日周志](../devlogs/2026-W29.md)：2026-07-13 起的目标、停止线和交接记录。

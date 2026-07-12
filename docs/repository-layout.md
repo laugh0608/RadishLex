@@ -41,6 +41,7 @@ RadishLex/
       Sources/
       Resources/
       Tests/
+      ReferenceProbe/
     android-ime/
       keystore-bridge/
   docs/
@@ -74,11 +75,11 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、CLI、ABI v3 selection/key result 与受测输入 header | 经真实应用验证的平台输入链 |
+| Rust input | core、进程级 Rime runtime、CLI、ABI v3 selection/key result、受测输入 header 与 macOS 基础实机输入证据 | 完整 R01A 双应用/生命周期验收与可重复产品输入链 |
 | 本地学习 | userdb、ranker、管理接口和测试 | 事务化用户意图、有效 recency 和固定评测基线 |
 | 同步 | crypto/sync 模型、Go server、HTTP 集成测试 | 确定合并、完整设备生命周期、生产 HTTPS 编排 |
 | Flutter manager | macOS 工程、真实开发期 FFI bridge、widget tests | 默认产品 FFI bundle、持久化和平台文件访问 |
-| 平台 | macOS InputMethodKit 薄壳、contract bundle/smoke；Android Keystore 能力验证桥 | macOS 经授权安装与真实应用输入；其他系统输入法 |
+| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、基础实机输入与隔离 reference probe；Android Keystore 能力验证桥 | macOS R01A 完整退出、产品安装包；其他系统输入法 |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
 
@@ -223,7 +224,7 @@ apps/radishlex-manager/
 
 ## 平台目录
 
-当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build 和不安装系统输入法的 wrapper contract smoke；它尚未经过安装、启用和真实应用输入验证。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
+当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build、不安装系统输入法的 wrapper contract smoke，以及不接 Rime/FFI 的合成 reference probe。正式薄壳已完成 Apple Development 短时安装和基础真实输入验证，但方向视觉高亮、输入菜单、client 切换、进程重启、断网与双应用交叉矩阵尚未闭合，不能据此宣称 R01A 或 M1 退出。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
 
 后续平台目录按进入顺序创建：
 

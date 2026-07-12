@@ -73,7 +73,7 @@ runtime 初始化失败必须返回结构化错误。平台不得静默切换 de
 - engine 即时 commit 与候选选择产生的 commit 使用同一文本提交边界，并清理相应 marked text。
 - M1 全拼有候选时，Space 选择当前高亮候选，由 Rime adapter 调用稳定的 engine candidate selection 语义并通过同事件 key result 返回；平台壳不得把 Space 特判成直接提交展示文本，也不得依赖临时 schema 是否携带 `key_binder`。
 - `IMKCandidates` 附着到进程级 `IMKServer`，同一输入法进程只创建一个候选面板；各 input controller 只更新当前 session 的候选数据，不拥有或释放 server 在 deactivate 阶段仍会访问的候选对象。
-- composition 非空且存在候选时，平台缓存本轮交给 `IMKCandidates` 的 attributed candidate 对象，通过 `candidateStringIdentifier:` 与 `selectCandidateWithIdentifier:` 维护瞬时选中高亮；不能把 `kIMKScrollingGridCandidatePanel` 的 `candidateIdentifierAtLineNumber:` 当成横排单元格索引，因为该 panel 的 line 表示 grid 行。横排候选的 Left / Up 指向上一项，Right / Down 指向下一项，边界按已消费但不越界处理。事件派发期间 `isVisible` 不是可靠的候选状态真相源，不能用它阻断方向键或 Space。`candidateSelectionChanged:` / `candidateSelected:` 通过 callback candidate 与缓存候选的公开 identifier 对照回到当前 5×1 可见索引，不能依赖 InputMethodKit 不保证保留的自定义 attributed-string 属性，也不能轮询语义不明确的内部 selected identifier。Space 把该索引交给稳定 candidate-selection FFI；Enter 继续沿 key result 边界提交原始 composition；分页、Escape、带 Command 等修饰键和普通未消费按键仍沿既有 key result 边界处理。
+- 当前正式薄壳缓存交给 `IMKCandidates` 的 attributed candidate，通过公开 identifier 对照 callback 与显示索引；不能依赖自定义 attributed-string 属性，也不能把 scrolling grid 的 line number 当成横排 cell index。现实现消费方向键并调用 `selectCandidateWithIdentifier:`，engine/FFI 索引与 Space 提交已一致，但 macOS 26 不重绘视觉高亮，因此这只是已知阻塞实现，不是验收通过的最终事件模型。隔离 reference probe 使用 `kIMKSingleRowSteppingCandidatePanel`、`candidates:`/`updateCandidates`，并让四方向键返回面板、Space/Enter 留在 controller；该路径只有通过实机视觉/callback/提交三方复核后才能替换正式实现。分页、Escape、带 Command 等修饰键和普通未消费按键继续沿既有 key result 边界处理。
 - 输入源只声明唯一可选择的全拼 mode 及其 `TISInputSourceID`；macOS 仍会为 InputMethodKit bundle 自动生成不可选择的 parent source，并在输入菜单中预留 input-method-specific command 区域。当前 controller 以 `nil` 表达没有命令菜单，但 macOS 26 仍会渲染图标空白行；返回每次新建的空菜单会触发多余的 menu/deactivate 生命周期，返回稳定的标题菜单又会同时渲染菜单标题与身份项。该 UI 问题尚未关闭，后续必须先完成 InputMethodKit 菜单呈现调研，不能继续叠加占位项或 plist fallback。
 - 取消、失焦、client 切换和 schema 切换不能把旧 composition 提交到新 client。
 
@@ -115,6 +115,8 @@ TIS input source/mode id 与 bundle 文件名属于平台稳定身份，不等�
 新增、启用或移除系统输入法会修改本机状态，必须在独立 runbook 中说明影响、路径、回滚和 smoke 数据要求，并在执行前获得用户明确授权。自动测试默认只构建 bundle、检查结构和运行 host contract，不自动安装、启用或重启系统输入法服务。
 
 当前开发实现位于 `platforms/macos-imk/`。`./scripts/check-macos-imk.sh` 只构建 contract `.app` bundle、编译 production 条件分支并运行合成 wrapper smoke；`./scripts/check-macos-imk-native.sh` 必须由调用方显式提供 `RIME_INCLUDE_DIR`、`RIME_LIB_DIR`、隔离 shared data、schema id 和许可证文件，并检查 mode metadata、架构、递归 dependency closure、symbol、逐库许可证、完整 bundle 签名与数据哈希清单。默认 ad-hoc 签名只服务无安装门禁；真实安装 smoke 还必须显式提供当前用户有效的 Apple Development identity。两条入口都不查找用户已有 Rime 目录，不执行安装、注册、bundle 启动或服务重启。开发版安装与移除步骤见 `docs/runbooks/macos-inputmethodkit-development.md`。
+
+`platforms/macos-imk/ReferenceProbe/` 是 R01A 的隔离诊断资产，不是第二套产品输入法。它只使用合成候选和独立身份，证明静态事件路由、metadata 与清理停止线；probe 的 TIS 枚举、安装或失败不能单独修改正式输入源身份、Rust/Rime 边界或 M1 退出结论。
 
 ## M1 验收证据
 

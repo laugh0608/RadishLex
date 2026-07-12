@@ -50,8 +50,11 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 4. 正式开发身份固定为 Bundle ID `org.radishlex.inputmethod.macos`、mode ID `org.radishlex.inputmethod.macos.Pinyin` 和 bundle 文件名 `RadishLexInputMethod.app`；同一身份只保留一个待扫描安装副本。
 5. macOS 26.5.1 已确认 TIS 会对失败的 Bundle ID/安装路径保留负缓存：旧 `org.radishlex.inputmethod` 与 `RadishLex.app` 在签名和 metadata 修正后仍不重新枚举，而相同产品二进制使用全新 ID 与路径可立即出现。开发与回滚不得继续复用旧身份或旧路径，也不得修改 TIS 私有数据库清缓存。
 6. 构建目录、废纸篓、用户级与系统级副本的 LaunchServices 重复记录会干扰诊断，应在安装前注销或移出扫描路径。即时注册成功不能替代 TIS source 枚举证据。
+7. 对全新 Bundle ID/安装路径，用户级副本可能已被 TIS 解析却不进入当前登录会话的系统设置可添加目录。若已取得注销授权，应保持签名、bundle 和路径不变，只执行一次开发者主动注销/重新登录；登录后先只读复核 TIS 与系统设置，不提前启用、选择、注册或重建。若仍不出现，停止本轮并按清理停止线回滚，不能连续更换 ID、路径或修改私有数据库。
 
 登录后先用 TIS 查询或系统设置确认目标 source 确实存在，再申请启用和真实应用 smoke 授权。不要直接修改 `com.apple.HIToolbox` defaults，不把自注册逻辑放进输入法进程。
+
+候选事件或 metadata 的 reference probe 使用独立说明与精确清理入口，见 `platforms/macos-imk/ReferenceProbe/README.md`；probe 证据不能替代正式 native bundle smoke。
 
 ## 人工 smoke
 
@@ -64,7 +67,7 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 5. 断网前后输入行为一致；
 6. 退出时没有活动 session 阻止 runtime shutdown。
 
-R01A 退出验收固定使用短时用户级安装：产物为 `target/macos-imk/native/RadishLexInputMethod.app`，以当前用户有效的 Apple Development identity 重建后复制到 `~/Library/Input Methods/RadishLexInputMethod.app`。该动作会让系统重新枚举输入源、在系统设置中新增 RadishLex 项、启动输入法进程，并在断网/恢复与进程重启子项中短时影响当前网络和输入状态；不写系统级 `/Library/Input Methods`，不读取用户 Rime 目录，不保留长期启用状态。
+R01A 退出验收固定使用短时用户级安装：产物为 `target/macos-imk/native/RadishLexInputMethod.app`，以当前用户有效的 Apple Development identity 重建后复制到 `~/Library/Input Methods/RadishLexInputMethod.app`。复制后必须由 TIS 与系统设置证明确已枚举和加入，不能把目录存在视为成功；启用后会启动输入法进程，并在断网/恢复与进程重启子项中短时影响当前网络和输入状态。不写系统级 `/Library/Input Methods`，不读取用户 Rime 目录，不保留长期启用状态。
 
 退出矩阵按 TextEdit 与 Codex 交叉执行，记录只保留通过/失败和错误类别：
 

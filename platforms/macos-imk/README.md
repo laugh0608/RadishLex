@@ -9,7 +9,7 @@
 - `Sources/RadishLexRuntime.*`：创建独立 Rime session；进程退出时先释放全部 session，再调用 `radishlex_rime_runtime_shutdown`。
 - `build-bundle.sh`：构建 contract 或显式 native-rime 开发 bundle，不安装 bundle。
 - `Tests/contract_smoke.m`：使用合成 demo engine 复验 ABI v3、完整按键映射、Unicode cursor、候选选择结果和生命周期，不读取 Rime 目录。
-- `ReferenceProbe/`：隔离验证原生候选事件路由与 root-only 输入源 metadata，不链接 Rime 或正式 FFI，也不替代产品薄壳。
+- `ReferenceProbe/`：隔离验证原生候选事件路由与单 mode 输入源 metadata，不链接 Rime 或正式 FFI，也不替代产品薄壳。
 
 ## 不安装验证
 
@@ -19,13 +19,13 @@
 
 该入口会构建 `target/macos-imk/contract/RadishLexInputMethod.app`，执行 Objective-C wrapper contract smoke，并检查 bundle、动态库加载路径、完整 ad-hoc 开发签名和关键 FFI symbol。contract bundle 只用于编译与契约复验，不能安装或作为真实输入证据。
 
-候选事件与 root-only metadata 的隔离 probe 使用独立入口：
+候选事件与单 mode metadata 的隔离 probe 使用独立入口：
 
 ```bash
 ./scripts/check-macos-imk-reference-probe.sh
 ```
 
-该入口只构建并静态验证 `target/macos-imk/reference-probe/RadishLexIMKReferenceProbe.app`，不会安装、注册、选择或启动输入法；完整停止线与清理顺序见 `ReferenceProbe/README.md`。
+该入口只构建并静态验证 `target/macos-imk/reference-probe-mode/RadishLexIMKModeReferenceProbe.app`，不会安装、注册、选择或启动输入法；完整停止线与清理顺序见 `ReferenceProbe/README.md`。
 
 ## native-rime 开发 bundle
 
