@@ -97,7 +97,7 @@ M1 开发版必须明确并隔离：
 
 开发 smoke 不得读取用户现有 Rime 配置或词库目录，也不得把本机绝对路径写入 committed 文档或 fixture。M1 已使用固定上游 commit、保留 Apache-2.0 许可证和来源记录的 `rime-pinyin-simp` 临时隔离数据复验 native bundle 与真实 FFI 输入链。native bundle 必须递归封装全部非系统 dylib、把加载路径改写到 bundle 内、保存逐库许可证与签名后哈希清单，并拒绝任何外部绝对依赖。该开发期封装不替代 M4 的 Developer ID、公证、升级/移除和发布级供应链门禁。
 
-TIS input source/mode id 与 bundle 文件名属于平台稳定身份，不等同于允许下划线的 Rime schema id。当前正式 Bundle ID 为 `org.radishlex.inputmethod.macos`，单一全拼 mode 为 `org.radishlex.inputmethod.macos.Pinyin`，bundle 文件名为 `RadishLexInputMethod.app`，Rime schema 仍为 `pinyin_simp`；mode metadata 必须同时固定 `LSUIElement`、简体中文 language、script、repertoire、图标、本地化标签和可见顺序。macOS 26.5.1 已观察到失败身份与安装路径的 TIS 负缓存，开发过程不得复用旧 `org.radishlex.inputmethod` 或 `RadishLex.app`，也不得通过修改 TIS 私有数据库清缓存。
+TIS input source/mode id 与 bundle 文件名属于平台稳定身份，不等同于允许下划线的 Rime schema id。当前正式 Bundle ID 为 `org.radishlex.inputmethod.macos`，单一全拼 mode 为 `org.radishlex.inputmethod.macos.Pinyin`，bundle 文件名为 `RadishLexInputMethod.app`，Rime schema 仍为 `pinyin_simp`；mode metadata 必须同时固定 `LSUIElement`、简体中文 language、script、repertoire、图标、本地化标签和可见顺序。输入法列表 TIFF 使用 16pt 逻辑尺寸，当前 Retina 资产固定为 `32×32 @144dpi` 并保留安全边距，避免系统设置按 64pt 放大后覆盖名称。macOS 26.5.1 已观察到失败身份与安装路径的 TIS 负缓存，开发过程不得复用旧 `org.radishlex.inputmethod` 或 `RadishLex.app`，也不得通过修改 TIS 私有数据库清缓存。
 
 ## Header、线程与错误
 

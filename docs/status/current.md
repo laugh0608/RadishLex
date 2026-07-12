@@ -13,7 +13,7 @@
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；受控同步实现与测试可继续
 
-RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/sync 原型、Go sync server、Flutter manager 原型和 macOS InputMethodKit 开发薄壳。Apple Development v19 已完成一次用户级安装、启用和真实应用输入；为避免半成品长期占用日常输入源，验证后已切回系统拼音、停用 RadishLex 并将 bundle 移出用户输入法目录。它仍不是普通用户产品包；正常 manager 产品包也尚未形成真实 FFI、持久化配置和平台文件访问闭环。
+RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/sync 原型、Go sync server、Flutter manager 原型和 macOS InputMethodKit 开发薄壳。Apple Development v19 已完成一次用户级安装、启用和真实应用输入；为避免半成品长期占用日常输入源，验证后已切回系统拼音、停用 RadishLex 并将 bundle 移出用户输入法目录。2026-07-12 复核发现系统设置“所有输入法”仍保留用户配置项，证明停用和移走 bundle 不等于完整移除；当前已选中该项，等待动作时确认后点击“移除”。它仍不是普通用户产品包；正常 manager 产品包也尚未形成真实 FFI、持久化配置和平台文件访问闭环。
 
 长期产品交付顺序见 [产品交付路线图](../roadmap.md)，当前整改批次、停止线、资产处置和退出条件见 [项目稳定化整改专题](../remediation/2026-07-project-stabilization.md)。
 
@@ -31,7 +31,7 @@ RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/syn
 - `platforms/macos-imk/` 已形成可构建的 Objective-C InputMethodKit 薄壳、contract bundle 和 wrapper smoke；合成链覆盖 key normalization、未消费键、即时 commit、snapshot/candidate 复制、候选 index、reset、schema、owner-thread 与 teardown 释放顺序。
 - 隔离 `rime-pinyin-simp` 的真实 FFI smoke 已覆盖 composition、完整与分段非首候选、Backspace、Escape、Enter、翻页、方向键高亮与 Space、multi-session 和不存在 schema 拒绝；adapter 以 deployed schema list、原生 current-page selection API 与选择后回读固定可用性。
 - native 门禁覆盖 schema/license/data 清单、架构、FFI symbol、递归 dylib closure、逐库许可证/签名哈希和外部绝对依赖拒绝；不读取用户 Rime 目录。
-- macOS build 现生成 `RadishLexInputMethod.app`，固定正式 Bundle ID `org.radishlex.inputmethod.macos`、单一 `org.radishlex.inputmethod.macos.Pinyin` mode、`LSUIElement`、简体中文 script/repertoire、图标和双语标签，并对全部 dylib、主程序和完整 bundle 执行可复验签名。
+- macOS build 现生成 `RadishLexInputMethod.app`，固定正式 Bundle ID `org.radishlex.inputmethod.macos`、单一 `org.radishlex.inputmethod.macos.Pinyin` mode、`LSUIElement`、简体中文 script/repertoire、双语标签与 `32×32 @144dpi` 的 16pt Retina 列表图标，并对全部 dylib、主程序和完整 bundle 执行可复验签名。
 - Apple Development v19 已在用户级安装、加入并启用；TextEdit 已验证 Space 提交合成中文与 composition 存在时 `Command-N` 交还宿主，Codex 输入框已由开发者截图确认 5×1 原生横排候选可见。带 Control/Option/Command 的字符在进入 Rime 前保持未消费。
 
 这些证据证明工程原型可继续演进，不证明真实平台输入、生产同步或产品发布已经完成。
