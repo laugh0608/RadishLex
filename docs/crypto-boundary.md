@@ -1,19 +1,15 @@
 # RadishLex ime-crypto 边界设计
 
-本文档定义 `ime-crypto` 实施期间必须遵守的客户端加密、密钥、对象 envelope、删除同步和验证边界，读者是后续实现 `ime-crypto`、扩展 `ime-sync`、设计同步 CLI 和审阅 Go server 接口的开发者。本文不包含具体第三方 crate 选型、完整设备配对协议、Go server migration、Flutter 页面设计或真实上传下载流程；Go server API 与 storage 边界见 `docs/sync-server-api-storage.md`，生产恢复流程见 `docs/production-recovery-flow.md`，平台私钥存储 backend 边界见 `docs/adr/0004-platform-private-key-storage-backend.md`。
+本文档定义 `ime-crypto` 必须遵守的客户端加密、密钥、对象 envelope、删除同步和验证边界，读者是实现 `ime-crypto`、扩展 `ime-sync`、设计同步客户端和审阅 Go server 接口的开发者。本文不包含当前批次状态、完整设备配对协议、Go server migration、Flutter 页面设计或真实上传下载编排；实时进度见 `docs/status/current.md`，Go server 边界见 `docs/sync-server-api-storage.md`，生产恢复流程见 `docs/production-recovery-flow.md`，平台私钥边界见 `docs/adr/0004-platform-private-key-storage-backend.md`。
 
-## 当前定位
+## 稳定定位
 
-Phase 2 的 userdb、ranker、Rime adapter、FFI 管理入口和学习状态摘要已具备进入 `ime-crypto` 设计的证据链；`ime-crypto` 本地加密 crate 已落地，userdb `dictionary.user_terms`、`ranker.weights` 和 `dictionary.deleted_terms` P2 payload 已通过本地 envelope 装配测试，设备包装密钥、设备 key 描述、恢复码 KDF 和恢复材料模型已补入，真实生产同步与用户可用同步 UI 仍未开始。
-
-当前结论：
-
-- 已进入 `ime-crypto` 本地 crate 的设计与测试准备，当前覆盖 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、Argon2id recovery KDF、Ed25519 设备签名、test-memory signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断签名 / 导出、envelope、key role、AAD、nonce、device wrapping key / record、recovery material、signed sync object manifest、signed recovery record 和篡改失败测试；`ime-sync` 已可从 crypto envelope 派生上传草案元数据，并通过 `SyncEnvelopeAssembler` 提供 Rust 内部 P2 payload envelope 组装边界，同时补齐 signed device authorization / revocation 模型、remote object client DTO / transport trait 和 HTTP transport；`ime-userdb` 已提供 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 integration test 完成本地加密、解密和 sync draft 派生、两客户端 harness 中的下载解密 / 合并写回 / 冲突后 v2 上传，以及短生命周期 Go sync server 的两客户端真实 HTTP 同步验证。
-- 不生成可上传明文 payload，不把加密入口暴露给 FFI 或平台壳；Rust remote client 只接收已加密 object 和 signed manifest，HTTP transport 只传递 encrypted payload 和服务端可见 metadata。
-- 不把平台壳、Flutter manager 或用户可用同步 UI 提前压入当前主线。
-- 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
-
-当前真实加密实现只处理本地合成 payload、device wrapping 模型、recovery material 模型、设备签名模型、平台私钥存储 backend capability / unavailable 模型、feature-gated macOS Keychain backend、feature-gated Android Keystore 不可用门禁、Android Rust bridge wrapper、bridge contract、raw JNI glue 和 userdb integration test payload，不暴露 FFI。`docs/sync-key-management.md` 已固定设备授权、恢复码、撤销、key epoch 和冲突合并边界，`docs/sync-server-api-storage.md` 已固定 Go server API / storage 边界，`docs/production-recovery-flow.md` 已固定生产恢复流程，`docs/runbooks/sync-server-production-deployment.md` 已固定生产部署边界，`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF 决策，`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名和私钥存储边界，`docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend 边界，`docs/adr/0005-apple-platform-signing-strategy.md` 已固定 Apple 平台签名策略，`docs/runbooks/apple-keychain-signing-backend.md` 已固定 Apple Keychain backend 平台验证边界，`docs/runbooks/android-keystore-signing-backend.md` 已固定 Android Keystore backend 验证边界，`ime-sync` 已补客户端解密后合并模型、P2 envelope 组装边界、signed device authorization、signed device revocation、remote object client DTO、HTTP transport 和 bearer token header，`ime-userdb` 已补真实 P2 payload 解析到 merge input、写回真实 userdb、Rust 侧两客户端同步 harness 和真实 Go HTTP 两客户端测试；Go server 已覆盖签名、metadata API、encrypted object version、recovery latest、版本冲突、单用户 bearer access token 门禁、备份恢复、外部 TLS 反代、升级回滚、错误语义和脱敏日志验证。真实 Apple Keychain smoke 已运行但阻塞于 `UnsupportedSignatureAlgorithm { algorithm: "ed25519-v1" }`，`apple-keychain-v1` status 已阻断生产签名；Android Keystore 已接不可用状态门禁、bridge contract、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin bridge source、Gradle harness、`@JvmStatic` facade、gated instrumented smoke 和 provider diagnostics，并已补 Rust raw JNI glue；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。后续推进优先按真实设备 / API / provider 矩阵调查原生非导出 Ed25519 支持，也可补目标部署运行证据，或单独调查 Apple 原生非导出 Ed25519 支持矩阵，继续保持 Go / Rust API 映射、payload hash / length、stale conflict、客户端解密合并写回和错误脱敏一致。
+- `ime-crypto` 只负责客户端密钥、加解密、签名、恢复材料、算法版本和错误脱敏，不负责 UI、HTTP orchestration 或服务端业务。
+- 只有 P2 规范化 payload 可以进入加密对象；P0/P1 原始数据、平台句柄和 provider 原始错误不得进入同步对象。
+- Rust remote client 只接收已加密 object 和 signed manifest；Go server 不接触明文或客户端密钥。
+- 合成、loopback、短生命周期服务和跨语言测试可在 M1/M2 期间继续验证实现，但真实用户同步入口必须等 M3 安全退出标准满足后开放。
+- 平台输入和本地 manager 不依赖同步，可按 M1/M2 独立推进；平台签名 backend、恢复和设备授权不得因此被伪装为生产可用。
+- 完成记录、平台设备矩阵和当前 blocker 写入 devlog、状态入口或对应 runbook，不在本文重复维护。
 
 当前依赖选型：
 

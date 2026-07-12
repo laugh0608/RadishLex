@@ -3,6 +3,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::ptr;
 use std::slice;
+#[cfg(feature = "native-rime")]
+use std::sync::Mutex;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -27,12 +29,16 @@ use radishlex_ime_ffi::{
 };
 #[cfg(feature = "native-rime")]
 use radishlex_ime_ffi::{
-    radishlex_session_new_rime, RadishLexRimeSessionOptions, RADISHLEX_RIME_SESSION_OPTIONS_VERSION,
+    radishlex_rime_runtime_shutdown, radishlex_session_new_rime, RadishLexRimeSessionOptions,
+    RADISHLEX_RIME_SESSION_OPTIONS_VERSION,
 };
 use radishlex_ime_userdb::{
     DictionaryTermRecord, NegativeFeedbackDraft, NegativeFeedbackReason, SelectionEventDraft,
     TermSource, TermStatus, UserDb,
 };
+
+#[cfg(feature = "native-rime")]
+static NATIVE_RIME_TEST_SERIAL: Mutex<()> = Mutex::new(());
 
 #[test]
 fn ffi_contract_reports_lifecycle_and_thread_policy() {
@@ -84,6 +90,7 @@ fn session_handles_reject_non_owner_thread_use() {
         let message = unsafe { error_message(error) };
         unsafe {
             radishlex_error_free(error);
+            radishlex_session_free(session);
         }
         (status, code, message, engine_kind)
     })
@@ -444,6 +451,9 @@ fn userdb_learning_status_reports_read_only_counts() {
 #[test]
 #[ignore = "requires RADISHLEX_RIME_SHARED_DATA and RADISHLEX_RIME_USER_DATA"]
 fn rime_session_native_invalid_schema_reports_engine_error() {
+    let _serial = NATIVE_RIME_TEST_SERIAL
+        .lock()
+        .expect("native Rime test lock");
     let shared_data = std::env::var("RADISHLEX_RIME_SHARED_DATA")
         .expect("RADISHLEX_RIME_SHARED_DATA must point to isolated Rime shared data");
     let user_data = std::env::var("RADISHLEX_RIME_USER_DATA")
@@ -482,6 +492,69 @@ fn rime_session_native_invalid_schema_reports_engine_error() {
     unsafe {
         radishlex_error_free(error);
     }
+}
+
+#[cfg(feature = "native-rime")]
+#[test]
+#[ignore = "requires RADISHLEX_RIME_SHARED_DATA and RADISHLEX_RIME_USER_DATA"]
+fn rime_native_sessions_share_runtime_and_survive_peer_release() {
+    let _serial = NATIVE_RIME_TEST_SERIAL
+        .lock()
+        .expect("native Rime test lock");
+    let shared_data = std::env::var("RADISHLEX_RIME_SHARED_DATA")
+        .expect("RADISHLEX_RIME_SHARED_DATA must point to isolated Rime shared data");
+    let user_data = std::env::var("RADISHLEX_RIME_USER_DATA")
+        .expect("RADISHLEX_RIME_USER_DATA must point to isolated Rime user data");
+    let schema =
+        std::env::var("RADISHLEX_RIME_SCHEMA").unwrap_or_else(|_| "luna_pinyin".to_owned());
+    let shared_data = CString::new(shared_data).expect("shared data path");
+    let user_data = CString::new(user_data).expect("user data path");
+    let schema = CString::new(schema).expect("schema");
+    let options = RadishLexRimeSessionOptions {
+        version: RADISHLEX_RIME_SESSION_OPTIONS_VERSION,
+        shared_data_dir: shared_data.as_ptr(),
+        user_data_dir: user_data.as_ptr(),
+        schema: schema.as_ptr(),
+        log_dir: ptr::null(),
+        deploy_on_start: 0,
+    };
+    let mut error = ptr::null_mut();
+
+    let first = radishlex_session_new_rime(&options, &mut error);
+    assert!(!first.is_null(), "first session: {}", unsafe {
+        error_message(error)
+    });
+    let second = radishlex_session_new_rime(&options, &mut error);
+    assert!(!second.is_null(), "second session: {}", unsafe {
+        error_message(error)
+    });
+
+    unsafe {
+        radishlex_session_free(first);
+    }
+
+    for ch in "luobo".chars() {
+        assert_eq!(
+            radishlex_session_push_key_event(second, RadishLexKeyEvent::press_char(ch), &mut error,),
+            RadishLexStatusCode::Ok
+        );
+    }
+    let snapshot = radishlex_session_snapshot_new(second, &mut error);
+    assert!(
+        !snapshot.is_null(),
+        "surviving session snapshot: {}",
+        unsafe { error_message(error) }
+    );
+    assert!(radishlex_snapshot_candidate_count(snapshot) > 0);
+
+    unsafe {
+        radishlex_snapshot_free(snapshot);
+        radishlex_session_free(second);
+    }
+    assert_eq!(
+        unsafe { radishlex_rime_runtime_shutdown(&mut error) },
+        RadishLexStatusCode::Ok
+    );
 }
 
 unsafe fn error_message(error: *const RadishLexError) -> String {

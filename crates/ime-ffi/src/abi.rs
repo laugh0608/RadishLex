@@ -1,6 +1,5 @@
 use std::ffi::CStr;
 use std::os::raw::c_char;
-use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 
 use radishlex_ime_core::SchemaId;
@@ -21,9 +20,11 @@ use crate::engine::{
     RadishLexSessionOptions,
 };
 use crate::error::{FfiError, RadishLexError, RadishLexStatusCode};
+use crate::ffi_support::{ffi_ptr, ffi_release, ffi_status};
 use crate::key::RadishLexKeyEvent;
 use crate::learning_status::{learning_status_for_path, RadishLexLearningStatusSummary};
-use crate::session::RadishLexSession;
+use crate::rank_explain::{rank_explain_for_path, RadishLexRankExplain, RadishLexRankExplainView};
+use crate::session::{session_mut, session_ref, RadishLexSession};
 use crate::snapshot::{RadishLexCandidateView, RadishLexSnapshot, RadishLexStringView};
 use crate::sync_status::{sync_preflight_for_path, RadishLexSyncPreflightSummary};
 
@@ -86,9 +87,19 @@ pub extern "C" fn radishlex_session_new_rime(
 }
 
 #[no_mangle]
+/// Releases a session on the thread that created it.
+///
+/// # Safety
+///
+/// `session` must be null or a live handle returned by a RadishLex session
+/// constructor. Passing an already released pointer is invalid. A call from a
+/// non-owner thread is ignored so the owner thread can still release the handle.
 pub unsafe extern "C" fn radishlex_session_free(session: *mut RadishLexSession) {
     ffi_release(|| {
         if session.is_null() {
+            return;
+        }
+        if (&*session).ensure_owner_thread().is_err() {
             return;
         }
         let _ = Box::from_raw(session);
@@ -275,6 +286,55 @@ pub extern "C" fn radishlex_userdb_learning_status(
         }
         Ok(())
     })
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_userdb_rank_explain_new(
+    db_path: *const c_char,
+    input_code: *const c_char,
+    candidate_text: *const c_char,
+    reading: *const c_char,
+    context_kind: *const c_char,
+    error_out: *mut *mut RadishLexError,
+) -> *mut RadishLexRankExplain {
+    ffi_ptr(error_out, || {
+        let explain = rank_explain_for_path(
+            read_utf8(db_path, "db_path")?,
+            read_utf8(input_code, "input_code")?,
+            read_utf8(candidate_text, "candidate_text")?,
+            read_optional_utf8(reading, "reading")?,
+            read_optional_utf8(context_kind, "context_kind")?,
+        )?;
+        Ok(Box::into_raw(Box::new(explain)))
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_userdb_rank_explain_view(
+    explain: *const RadishLexRankExplain,
+    view_out: *mut RadishLexRankExplainView,
+    error_out: *mut *mut RadishLexError,
+) -> RadishLexStatusCode {
+    ffi_status(error_out, || {
+        if view_out.is_null() {
+            return Err(FfiError::invalid_argument(
+                "rank explain view output pointer is null",
+            ));
+        }
+
+        let view = rank_explain_ref(explain)?.view();
+        unsafe {
+            *view_out = view;
+        }
+        Ok(())
+    })
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn radishlex_userdb_rank_explain_free(explain: *mut RadishLexRankExplain) {
+    ffi_release(|| {
+        RadishLexRankExplain::free(explain);
+    });
 }
 
 #[no_mangle]
@@ -540,24 +600,6 @@ pub unsafe extern "C" fn radishlex_error_free(error: *mut RadishLexError) {
     });
 }
 
-fn session_mut<'a>(session: *mut RadishLexSession) -> Result<&'a mut RadishLexSession, FfiError> {
-    if session.is_null() {
-        return Err(FfiError::invalid_argument("session handle is null"));
-    }
-    let session = unsafe { &mut *session };
-    session.ensure_owner_thread()?;
-    Ok(session)
-}
-
-fn session_ref<'a>(session: *const RadishLexSession) -> Result<&'a RadishLexSession, FfiError> {
-    if session.is_null() {
-        return Err(FfiError::invalid_argument("session handle is null"));
-    }
-    let session = unsafe { &*session };
-    session.ensure_owner_thread()?;
-    Ok(session)
-}
-
 fn snapshot_ref<'a>(snapshot: *const RadishLexSnapshot) -> Result<&'a RadishLexSnapshot, FfiError> {
     if snapshot.is_null() {
         return Err(FfiError::invalid_argument("snapshot handle is null"));
@@ -583,6 +625,15 @@ fn import_batch_list_ref<'a>(
         ));
     }
     Ok(unsafe { &*batches })
+}
+
+fn rank_explain_ref<'a>(
+    explain: *const RadishLexRankExplain,
+) -> Result<&'a RadishLexRankExplain, FfiError> {
+    if explain.is_null() {
+        return Err(FfiError::invalid_argument("rank explain handle is null"));
+    }
+    Ok(unsafe { &*explain })
 }
 
 fn read_utf8<'a>(value: *const c_char, field: &'static str) -> Result<&'a str, FfiError> {
@@ -711,75 +762,6 @@ fn new_rime_session(
     Err(FfiError::invalid_state(
         "rime engine is not available through ime-ffi; rebuild radishlex-ime-ffi with the native-rime feature",
     ))
-}
-
-fn ffi_status<F>(error_out: *mut *mut RadishLexError, f: F) -> RadishLexStatusCode
-where
-    F: FnOnce() -> Result<(), FfiError>,
-{
-    match catch_unwind(AssertUnwindSafe(f)) {
-        Ok(Ok(())) => {
-            clear_error(error_out);
-            RadishLexStatusCode::Ok
-        }
-        Ok(Err(error)) => {
-            let code = error.code;
-            write_error(error_out, error);
-            code
-        }
-        Err(_) => {
-            let error = FfiError::internal("panic caught at FFI boundary");
-            let code = error.code;
-            write_error(error_out, error);
-            code
-        }
-    }
-}
-
-fn ffi_ptr<T, F>(error_out: *mut *mut RadishLexError, f: F) -> *mut T
-where
-    F: FnOnce() -> Result<*mut T, FfiError>,
-{
-    match catch_unwind(AssertUnwindSafe(f)) {
-        Ok(Ok(value)) => {
-            clear_error(error_out);
-            value
-        }
-        Ok(Err(error)) => {
-            write_error(error_out, error);
-            ptr::null_mut()
-        }
-        Err(_) => {
-            write_error(
-                error_out,
-                FfiError::internal("panic caught at FFI boundary"),
-            );
-            ptr::null_mut()
-        }
-    }
-}
-
-fn ffi_release<F>(f: F)
-where
-    F: FnOnce(),
-{
-    let _ = catch_unwind(AssertUnwindSafe(f));
-}
-
-fn clear_error(error_out: *mut *mut RadishLexError) {
-    if !error_out.is_null() {
-        unsafe {
-            *error_out = ptr::null_mut();
-        }
-    }
-}
-
-fn write_error(error_out: *mut *mut RadishLexError, error: FfiError) {
-    if !error_out.is_null() {
-        unsafe {
-            *error_out = error.into_raw_error();
-        }
-    }
 }
 
 #[cfg(test)]
@@ -1040,6 +1022,10 @@ mod tests {
             radishlex_snapshot_free(snapshot);
             radishlex_session_free(session);
         }
+        assert_eq!(
+            unsafe { crate::radishlex_rime_runtime_shutdown(&mut error) },
+            RadishLexStatusCode::Ok
+        );
     }
 
     #[test]
@@ -1363,6 +1349,7 @@ mod tests {
             radishlex_snapshot_free(ptr::null_mut());
             radishlex_userdb_terms_free(ptr::null_mut());
             radishlex_userdb_import_batches_free(ptr::null_mut());
+            radishlex_userdb_rank_explain_free(ptr::null_mut());
         }
         assert!(radishlex_buffer_data(ptr::null()).is_null());
         assert_eq!(radishlex_buffer_len(ptr::null()), 0);

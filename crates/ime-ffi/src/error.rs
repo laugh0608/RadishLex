@@ -116,6 +116,9 @@ impl From<RimeEngineError> for FfiError {
             RimeEngineError::MissingConfigPath { .. } | RimeEngineError::EncodingFailure { .. } => {
                 Self::invalid_argument(error.to_string())
             }
+            RimeEngineError::IncompatibleRuntimeConfig { .. }
+            | RimeEngineError::RuntimeHasActiveSessions { .. }
+            | RimeEngineError::RuntimeThreadMismatch => Self::invalid_state(error.to_string()),
             RimeEngineError::Core(core_error) => Self::from(core_error),
             RimeEngineError::NativeFeatureDisabled
             | RimeEngineError::NullApi
@@ -175,6 +178,24 @@ mod tests {
                 assert_eq!(error.code, RadishLexStatusCode::EngineError);
                 assert!(!error.message.is_empty());
             }
+        }
+
+        #[test]
+        fn runtime_lifecycle_conflicts_are_invalid_state() {
+            let error = FfiError::from(RimeEngineError::IncompatibleRuntimeConfig {
+                field: "shared_data_dir",
+            });
+
+            assert_eq!(error.code, RadishLexStatusCode::InvalidState);
+            assert!(error.message.contains("shared_data_dir"));
+
+            let error = FfiError::from(RimeEngineError::RuntimeHasActiveSessions { count: 2 });
+            assert_eq!(error.code, RadishLexStatusCode::InvalidState);
+            assert!(error.message.contains("2 active"));
+
+            let error = FfiError::from(RimeEngineError::RuntimeThreadMismatch);
+            assert_eq!(error.code, RadishLexStatusCode::InvalidState);
+            assert!(error.message.contains("thread"));
         }
     }
 }

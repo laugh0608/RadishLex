@@ -1,4 +1,5 @@
-pub const RADISHLEX_ABI_CONTRACT_VERSION: u32 = 1;
+/// ABI contract v2 adds the owned, versioned key result used by platform shells.
+pub const RADISHLEX_ABI_CONTRACT_VERSION: u32 = 2;
 pub const RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD: u32 = 1;
 pub const RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND: u32 = 1;
 

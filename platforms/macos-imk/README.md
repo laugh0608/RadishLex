@@ -1,0 +1,38 @@
+# macOS InputMethodKit 薄壳
+
+本目录实现 M1 第一平台的 InputMethodKit 薄壳、开发 bundle build 与不安装系统输入法的 contract smoke。它不包含 ranker/userdb 学习、同步、manager、发布签名、公证或复杂候选 UI，也不提供任何自动安装、注册或输入法服务重启动作。
+
+## 结构
+
+- `Sources/RadishLexBridge.*`：复制 Rust-owned key result、snapshot 与 candidate view，固定 owner-thread 和错误边界。
+- `Sources/RadishLexInputController.*`：映射 `NSEvent`，更新 marked text，使用 `IMKCandidates` 展示原生候选并按稳定 index 提交。
+- `Sources/RadishLexRuntime.*`：创建独立 Rime session；进程退出时先释放全部 session，再调用 `radishlex_rime_runtime_shutdown`。
+- `build-bundle.sh`：构建 contract 或显式 native-rime 开发 bundle，不安装 bundle。
+- `Tests/contract_smoke.m`：使用合成 demo engine 复验 ABI v2、完整按键映射、Unicode cursor、候选索引和生命周期，不读取 Rime 目录。
+
+## 不安装验证
+
+```bash
+./scripts/check-macos-imk.sh
+```
+
+该入口会构建 `target/macos-imk/contract/RadishLex.app`，执行 Objective-C wrapper contract smoke，并检查 bundle、动态库加载路径、完整 ad-hoc 开发签名和关键 FFI symbol。contract bundle 只用于编译与契约复验，不能安装或作为真实输入证据。
+
+## native-rime 开发 bundle
+
+native build 不查找用户已有输入法目录，也不下载 schema。调用方必须显式提供 `librime` include/lib、一份隔离的 shared data 及其许可证文件；shared data 必须包含 `default.yaml` 和 `<schema-id>.schema.yaml`：
+
+```bash
+RIME_INCLUDE_DIR=<include> \
+RIME_LIB_DIR=<lib> \
+RADISHLEX_RIME_SHARED_DATA=<isolated-shared-data> \
+RADISHLEX_RIME_SCHEMA=<schema-id> \
+RADISHLEX_RIME_DATA_LICENSE=<license-file> \
+./scripts/check-macos-imk-native.sh
+```
+
+`RADISHLEX_RIME_DEPLOY_ON_START` 可显式设为 `0` 或 `1`，默认 `1`。构建产物位于 `target/macos-imk/native/RadishLex.app`；bundle 同时保存 copied shared data、数据许可证和哈希清单，并拒绝 shared data symlink。native build 从显式 `RIME_LIB_DIR` 解析依赖，但运行产物会递归复制全部非系统 dylib 到 `Contents/Frameworks`、重写为 bundle 内 `@rpath`，并保存逐库许可证和签名后哈希清单；门禁拒绝残留外部绝对依赖。脚本对每个 dylib、主程序和完整 bundle 依次签名与严格复验，可通过 `RADISHLEX_CODESIGN_IDENTITY` 显式提供 Apple Development identity。
+
+bundle metadata 固定一个与 Rime schema id 解耦的 `org.radishlex.inputmethod.Pinyin` 模式，包含简体中文 script/repertoire、图标、本地化标签和 `LSBackgroundOnly`。contract/native 门禁会验证 mode id 的 reverse-DNS 字符范围，避免把允许下划线的 `pinyin_simp` schema id 直接用作 TIS mode id。构建脚本不启动或安装 bundle；普通用户分发、Developer ID、公证和发布级供应链门禁仍属于 M4。
+
+安装、启用、真实应用输入和移除会修改本机状态，必须另行取得授权后按独立 runbook 执行。

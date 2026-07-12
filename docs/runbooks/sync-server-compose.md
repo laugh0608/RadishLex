@@ -46,6 +46,17 @@ https://localhost:7319
 
 本地 HTTPS 由 Caddy internal TLS 提供，因为 Go sync server 当前只实现 HTTP API。该 Caddy 入口只存在于本地 compose 文件中，不进入部署态 compose。Caddy internal TLS 证书默认不被宿主机信任；命令行 smoke 可使用 `curl -k`，浏览器或真实客户端验证如需无警告访问，应只在本机开发场景信任 Caddy 生成的本地 CA。
 
+本地服务启动后，可以用只读连接健康脚本输出非敏感摘要：
+
+```sh
+./scripts/check-sync-server-connection-health.sh \
+  --endpoint https://localhost:7319 \
+  --allow-local-insecure-tls \
+  --summary-text
+```
+
+该脚本只执行 `GET /api/v1/domains/<probe>/state` 读请求。未配置 token 的本地 compose 预期返回 `404 not_found` 并归类为 `domain_missing_expected`；启用 `RADISHLEX_SYNC_ACCESS_TOKEN` 后可通过 `--access-token-env RADISHLEX_SYNC_ACCESS_TOKEN` 读取本机环境变量。脚本输出 `sync_connection_health.v1` 摘要，不打印 token、完整响应体或请求体。
+
 ## 部署态 HTTP 上游
 
 部署态与兄弟 Radish 项目保持同类边界：容器入口只提供 HTTP，上游 TLS 由外部反向代理终止。
@@ -139,6 +150,38 @@ docker compose -f deploy/sync-server/docker-compose.yaml \
 go test ./...
 ./scripts/check-repo.sh
 ```
+
+### 部署预演脚本
+
+仓库提供短生命周期部署预演入口：
+
+```sh
+./scripts/check-sync-server-deployment-rehearsal.sh
+```
+
+脚本会：
+
+- 在仓库外创建临时 env 和临时持久化数据目录。
+- 生成随机 `RADISHLEX_SYNC_ACCESS_TOKEN`，并在输出中脱敏。
+- 使用部署态 `docker-compose.yaml` 启动 HTTP upstream，不使用本地 Caddy HTTPS 文件。
+- 验证无 token 请求返回 `401 unauthenticated`，带 token 请求返回结构化业务响应。
+- 检查 SQLite metadata、encrypted blob dir 和 runtime log 脱敏。
+- 执行一次冷备份到临时目录，再恢复到隔离数据目录并复验 auth gate。
+- 结束后执行 `docker compose down` 并删除临时 env / 数据目录。
+
+只验证配置解析，不启动容器：
+
+```sh
+./scripts/check-sync-server-deployment-rehearsal.sh --config-only
+```
+
+打印 Compose 配置时必须使用脚本脱敏输出：
+
+```sh
+./scripts/check-sync-server-deployment-rehearsal.sh --config-only --print-config
+```
+
+该脚本不进入默认 `./scripts/check-repo.sh`，因为完整预演需要 Docker daemon、空闲本机端口和本机容器权限。Docker daemon 不可用时，应记录 `docker compose version`、`docker context ls` 和 `docker version --format '{{.Server.Version}}'` 的结果，不能把 `--config-only` 通过写成容器启动通过。
 
 ### 容器实际启动 smoke
 

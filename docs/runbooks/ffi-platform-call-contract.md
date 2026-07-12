@@ -7,7 +7,7 @@
 当前 runbook 适用于已落地的 C ABI host smoke：
 
 - `radishlex_ffi_contract`
-- session 创建、按键、snapshot、commit 和释放
+- session 创建、版本化 key result、snapshot、commit 和释放
 - structured snapshot / candidate view
 - userdb learning status
 - userdb sync preflight
@@ -18,6 +18,8 @@
 - error object 读取和释放
 
 当前不表示真实平台壳已经接入。平台壳进入前，绑定层仍需要按本 runbook 写出本平台自己的 smoke 或 wrapper 测试。
+
+输入侧 C 声明以 `crates/ime-ffi/include/radishlex_input.h` 为准，并由 C11 / Objective-C 编译测试约束。当前仍没有恢复码、设备授权或设备撤销的 native command symbol；这些能力不属于本输入调用契约。
 
 ## 调用顺序
 
@@ -32,7 +34,7 @@ radishlex_ffi_contract(contract_out, error_out)
 当前必须识别：
 
 ```text
-version = 1
+version = 2
 session_thread_policy = owner_thread
 panic_boundary = catch_unwind
 ```
@@ -62,10 +64,13 @@ radishlex_session_new_rime(options, error_out)
 
 规则：
 
-- session 创建成功后，后续 `reset`、`set_schema`、`push_key_event`、`snapshot_new`、`commit_candidate` 和 `engine_kind` 都必须回到创建线程调用。
+- session 创建成功后，后续 `reset`、`set_schema`、`handle_key_event`、`snapshot_new`、`commit_candidate` 和 `engine_kind` 都必须回到创建线程调用。
 - 跨线程误用返回 `InvalidState`；无 `error_out` 的 session 读取入口返回空值，例如 `radishlex_session_engine_kind` 返回 `0`。
 - 不要把 `RadishLexSession*` 放进全局并允许多个平台线程直接调用。
 - 如果平台输入事件来自多个线程，先投递到 session owner thread，再调用 C ABI。
+- `radishlex_session_free` 也必须投递到 session owner thread；非 owner thread 调用是 no-op，不能把它误判为已经释放。
+- 首个 Rime session 同时固定进程 runtime owner thread；后续 Rime session 也必须在该固定线程创建和使用，不能只满足“各自回到自己的创建线程”。
+- `radishlex_rime_runtime_shutdown` 不是 session 操作，只能在同一 runtime owner thread、进程 teardown、全部 Rime session 已释放且不再接收输入事件时调用。
 
 ### 3. 每次调用都按 `error_out` 规范处理
 
@@ -115,6 +120,7 @@ len: usize
 
 ```text
 snapshot schema / preedit / candidate view -> RadishLexSnapshot*
+key result commit / borrowed snapshot -> RadishLexKeyResult*
 user term view -> RadishLexUserTermList*
 import batch view -> RadishLexImportBatchList*
 error message -> RadishLexError*
@@ -127,6 +133,7 @@ buffer data -> RadishLexBuffer*
 
 ```text
 RadishLexSession*          -> radishlex_session_free
+RadishLexKeyResult*        -> radishlex_key_result_free
 RadishLexSnapshot*         -> radishlex_snapshot_free
 RadishLexBuffer*           -> radishlex_buffer_free
 RadishLexUserTermList*     -> radishlex_userdb_terms_free
@@ -151,21 +158,29 @@ RadishLexError*            -> radishlex_error_free
 ```text
 radishlex_session_new_rime(options, error_out)
 radishlex_session_set_schema(session, schema, error_out)
-radishlex_session_push_key_event(session, event, error_out)
-radishlex_session_snapshot_new(session, error_out)
-radishlex_snapshot_candidate(snapshot, index, candidate_out, error_out)
+radishlex_session_handle_key_event(session, event, result_out, error_out)
+radishlex_key_result_consumed(result)
+radishlex_key_result_commit_present(result)
+radishlex_key_result_commit(result)
+radishlex_key_result_snapshot(result)
+radishlex_snapshot_candidate(borrowed_snapshot, index, candidate_out, error_out)
 radishlex_session_commit_candidate(session, index, error_out)
-radishlex_snapshot_free(snapshot)
+radishlex_key_result_free(result)
 radishlex_buffer_free(commit)
 radishlex_session_free(session)
+radishlex_rime_runtime_shutdown(error_out)  // process teardown only
 ```
 
 规则：
 
-- 真实平台壳应优先使用 `radishlex_session_push_key_event`，不要长期依赖字符便利函数。
+- 真实平台壳必须使用 `radishlex_session_handle_key_event`；`push_key` 与 `push_key_event` 会丢弃 KeyOutcome，只保留为兼容和测试入口。
+- `consumed = 0` 时平台把按键交还宿主；`commit_present = 1` 时立即复制并提交 commit。
+- key result 中的 snapshot 与 consumed / commit 来自同一次按键处理，不能用下一次独立 snapshot 调用拼接。
+- `radishlex_key_result_snapshot` 返回借用指针，不得调用 `radishlex_snapshot_free`；释放 key result 后该 snapshot 与全部 view 一并失效。
 - 候选提交返回 `RadishLexBuffer*`，读取后必须释放。
-- snapshot 是一次性状态快照，不会跟随 session 后续输入自动更新。
+- 独立 `snapshot_new` 只保留为兼容和调试入口；snapshot 不会跟随 session 后续输入自动更新。
 - 候选索引来自 snapshot 的当前候选列表；提交前如 session 状态已变化，平台层应重新取 snapshot。
+- `session_free` 只销毁该 session；不要在应用切换或 client 切换时 shutdown 进程 runtime。最终 shutdown 可重复调用，但活动 session 存在时必须按 `InvalidState` 处理为生命周期错误。
 
 ### Userdb 和 dictionary 管理
 
@@ -197,7 +212,7 @@ radishlex_userdb_import_batches_new(db_path, error_out)
 
 - 用 `Data(bytes:count:)` 或等价方式按 `RadishLexStringView.len` 复制 UTF-8，不要把 view 当作 NUL 结尾字符串。
 - 用一个 owner queue 串行访问 `RadishLexSession*`。
-- 用 `defer` 或 wrapper `deinit` 调用对应 free 函数。
+- 用 `defer` 或 wrapper `deinit` 释放 key result 和其他 owned handle；从 key result 借用的 snapshot 不单独释放。
 - 错误对象读取后立即释放；不要把 `RadishLexError*` 存进异步闭包。
 
 ### Kotlin / JNI
@@ -209,7 +224,7 @@ radishlex_userdb_import_batches_new(db_path, error_out)
 
 ### C / C++
 
-- 用 RAII wrapper 管理 `RadishLexSession*`、`RadishLexSnapshot*`、`RadishLexBuffer*` 和 `RadishLexError*`。
+- 用 RAII wrapper 管理 `RadishLexSession*`、`RadishLexKeyResult*`、独立 `RadishLexSnapshot*`、`RadishLexBuffer*` 和 `RadishLexError*`。
 - wrapper 类型应禁止复制，允许 move。
 - 所有 C ABI 调用都应封装在检查返回码的薄函数里，不要在业务代码里散落裸调用。
 - string view 转 `std::string` 时必须使用 `(ptr, len)` 构造。
@@ -225,14 +240,15 @@ radishlex_userdb_import_batches_new(db_path, error_out)
 
 每个平台绑定层进入真实平台壳前，至少补以下 smoke：
 
-- contract 查询成功，能识别 `version = 1` 和 owner-thread policy。
-- 创建 session 后在 owner thread 上 push key、读取 snapshot、提交候选并释放所有 handle。
+- contract 查询成功，能识别 `version = 2`、owned key result 和 owner-thread policy。
+- 创建 session 后在 owner thread 上 handle key，核对 consumed / commit / 同事件 snapshot，提交候选并释放所有 owned handle。
 - 从非 owner thread 调用 session mutation 返回 `InvalidState`。
 - 非 UTF-8、空指针、非法 bool、候选越界能返回稳定错误码并释放 error。
-- snapshot / term list / import batch list 的 string view 能按长度复制，并在释放所属 handle 后继续使用已复制值。
+- key result / snapshot / term list / import batch list 的 string view 能按长度复制，并在释放所属 handle 后继续使用已复制值。
 - `*_free(NULL)` 不崩溃。
+- 两个 Rime session 共享进程 runtime；释放其中一个后另一个仍可输入，全部释放后显式 runtime shutdown 成功，活动 session 存在时 shutdown 返回 `InvalidState`。
 - userdb 管理入口使用显式临时 SQLite 路径，不读取真实用户输入法目录；learning status smoke 需要断言 P1 明细和上下文统计标记为 false。
-- 本仓库 Rust host smoke 已覆盖 snapshot / user term / import batch / error 的复制后释放；平台 wrapper 仍需在本语言层复验同一规则。
+- 本仓库 Rust host smoke 已覆盖 key result / snapshot / user term / import batch / error 的复制后释放；平台 wrapper 仍需在本语言层复验同一规则。
 
 推荐本仓库先用以下命令复验 Rust 侧基线：
 

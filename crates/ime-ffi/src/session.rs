@@ -57,13 +57,12 @@ impl RadishLexSession {
         self.inner.engine().engine_kind()
     }
 
-    pub fn push_char(&mut self, ch: char) -> radishlex_ime_core::CoreResult<()> {
+    pub fn push_char(&mut self, ch: char) -> radishlex_ime_core::CoreResult<KeyOutcome> {
         self.push_key_event(KeyEvent::press_char(ch))
     }
 
-    pub fn push_key_event(&mut self, key: KeyEvent) -> radishlex_ime_core::CoreResult<()> {
-        self.inner.push_key(key)?;
-        Ok(())
+    pub fn push_key_event(&mut self, key: KeyEvent) -> radishlex_ime_core::CoreResult<KeyOutcome> {
+        self.inner.push_key(key)
     }
 
     pub fn state(&self) -> radishlex_ime_core::CoreResult<SessionState> {
@@ -153,6 +152,28 @@ impl Default for RadishLexSession {
     fn default() -> Self {
         Self::new()
     }
+}
+
+pub(crate) fn session_mut<'a>(
+    session: *mut RadishLexSession,
+) -> Result<&'a mut RadishLexSession, FfiError> {
+    if session.is_null() {
+        return Err(FfiError::invalid_argument("session handle is null"));
+    }
+    let session = unsafe { &mut *session };
+    session.ensure_owner_thread()?;
+    Ok(session)
+}
+
+pub(crate) fn session_ref<'a>(
+    session: *const RadishLexSession,
+) -> Result<&'a RadishLexSession, FfiError> {
+    if session.is_null() {
+        return Err(FfiError::invalid_argument("session handle is null"));
+    }
+    let session = unsafe { &*session };
+    session.ensure_owner_thread()?;
+    Ok(session)
 }
 
 fn render_snapshot(state: &SessionState) -> radishlex_ime_core::CoreResult<String> {

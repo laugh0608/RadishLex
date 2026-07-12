@@ -1,96 +1,89 @@
 # RadishLex 技术方案
 
-本文档是 RadishLex 当前技术方向的入口摘要，读者是需要快速判断架构边界、阶段顺序和后续开发重点的维护者与协作者。本文不包含完整 trait 字段、SQLite migration、同步协议细节、平台安装流程、长期推演或验证流水；这些内容应放在对应专题文档、runbook 或 devlog 中。
+本文档是 RadishLex 稳定技术方向的入口，读者是需要判断架构边界、模块职责、平台策略和验证分层的维护者与实现者。本文不记录当前批次状态、完整 trait/DTO 字段、SQLite migration、平台安装步骤、命令流水或历史推进过程；这些内容分别进入 `docs/status/current.md`、对应专题、runbook 和 devlog。
 
-## 当前阶段
-
-RadishLex 当前处于 Phase 3 自部署同步起步阶段：
-
-- `ime-core` 已建立平台无关输入会话、候选模型、提交模型和 engine trait。
-- `ime-engine-rime` 已接入真实 `librime` adapter，并通过本机隔离 Rime smoke 复验 `compose -> candidates -> commit`，同时在 `native-rime` feature 测试中覆盖必需 Rime API 缺失映射。
-- `ime-userdb` 已落地本地 SQLite 用户词库、选择事件、负反馈、删除 tombstone、用户词库导入导出、同步前置计数、`dictionary.user_terms` / `ranker.weights` / `dictionary.deleted_terms` P2 plaintext payload 只读迭代器、解密后 P2 JSON 到 merge input 的解析入口，以及合并结果写回真实 userdb 的事务执行器，并通过 `ime-sync::SyncEnvelopeAssembler` 接入本地加密 envelope 装配链路；两客户端 integration test 已覆盖 A 端加密上传、B 端下载解密、合并写回、stale conflict 和 v2 重新上传，真实 Go HTTP 两客户端测试已覆盖设备授权、三类 P2 对象上传下载、客户端解密写回和 v2 重新上传。
-- `ime-ranker` 已提供可解释候选重排。
-- `ime-sync` 已提供同步 payload 来源分类、P2 envelope 组装边界、加密对象外壳草案、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型、客户端解密后合并模型、设备授权签名、设备撤销签名模型、远端对象版本 client 边界和 std-only `http://` HTTP transport；当前 remote client 只接收已加密 object 与 signed manifest，验证 JSON / base64 DTO、密文对象上传下载路径、stale conflict latest metadata 映射、`unauthenticated` 错误映射、可选 bearer access token header、真实 HTTP request / response 传递和错误脱敏，并已被 userdb 两客户端 harness 与真实 Go HTTP 两客户端测试复用；短生命周期 integration test 已覆盖 Rust HTTP transport 直连 Go server，不启动长期运行 server。
-- `ime-crypto` 已落地本地加密 crate，覆盖 XChaCha20Poly1305、HKDF-SHA256、SHA-256 ciphertext hash、Argon2id recovery KDF、Ed25519 设备签名、test-memory signing key store、platform backend id / capability metadata、unavailable backend 明确失败、key 撤销后阻断签名 / 导出、key role、object envelope、AAD 绑定、nonce 重复检测、篡改失败、device key descriptor、device wrapping key / record、recovery material、signed sync object manifest、signed recovery record，以及 userdb P2 payload 本地加密 / 解密 / sync draft 派生测试；`apple-keychain-v1` 平台 backend runbook 已固定，macOS Keychain backend 已在 `apple-keychain` feature 下接线并编译验证，真实 Keychain smoke 已执行但阻塞于 `ed25519-v1` 创建；Apple 平台签名策略 ADR 已固定保留 `ed25519-v1` 协议、不把 seed 存储 fallback 混入 `apple-keychain-v1`，并让该 backend status 在 smoke 通过前阻断生产签名；`android-keystore-v1` 平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin bridge source、Android Gradle library harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录模板已固定，当前已补 Rust raw JNI glue；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
-- `server/sync-server` 已起步 Go module，覆盖配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、device wrapping encrypted key bytes 承载 / 读取测试、recovery wrapped material 读取测试、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、单用户 bearer access token 门禁、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、`cmd/radishlex-sync-server`、runtime 配置装配、HTTP timeout、对象大小门禁、脱敏 audit logger、本机 smoke runbook、短生命周期 HTTP smoke、短生命周期备份恢复 smoke、短生命周期外部 TLS 反代 smoke、短生命周期升级回滚 smoke、Dockerfile、Docker Compose 本地 / 部署态入口、Compose runbook 和生产部署边界 runbook；本地 compose 通过 Caddy internal TLS 提供 `https://localhost:7319`，部署态 compose 只暴露 HTTP 上游 `http://127.0.0.1:7319`，两者使用同一个对外端口，并提供 Nginx 外部 TLS 终止示例。当前验证服务端可见 metadata、设备状态、签名、版本冲突、Rust envelope hash / 长度、blob ref 路径安全、staged write / commit / cleanup、启动装配、运行复验路径、访问 token 失败响应和错误语义，并已覆盖第二设备授权后的跨设备 object 版本链、Rust HTTP transport 直连 Go server 的跨语言对象上传 / 下载 / stale conflict、Rust userdb 两客户端真实 Go HTTP 同步、Docker Compose 本地 HTTPS / 部署态 HTTP 容器实际启动 smoke、SQLite metadata + encrypted blob dir 成对备份恢复后的 domain / device / recovery latest / object payload / stale conflict 复验、HTTPS client -> TLS reverse proxy -> HTTP upstream 下的 bearer header 透传、TLS 版本、对象上传下载、Go 对象大小门禁和日志脱敏，以及短生命周期升级 / 回滚演练中的 idempotent migration 重启、升级后 v2 写入、恢复升级前备份后 v2 不可见、v1 payload / stale conflict 和日志脱敏。
-- `docs/sync-key-management.md` 已固定真实同步前的同步密钥、设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突边界；`docs/sync-server-api-storage.md` 已固定 Go sync server API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和验证口径；`docs/production-recovery-flow.md` 已固定生产恢复流程、恢复记录轮换 / 撤销、新设备恢复加入、失败限速和停止线；`docs/sync-server-oidc-roadmap.md` 已固定 OIDC / Radish 产品账号体系为后续专题，当前不改变单用户 bearer access token 门禁；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 Argon2id KDF、格式、恢复记录字段和验证口径；`docs/adr/0003-device-signing-key-storage.md` 已固定 Ed25519 设备签名、签名对象、私钥存储抽象和验证口径；`docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend、capability metadata、错误语义和停止线；`docs/adr/0005-apple-platform-signing-strategy.md` 已固定 Apple 平台签名策略；`docs/runbooks/apple-keychain-signing-backend.md` 已固定 Apple Keychain backend 首个平台验证边界；`docs/runbooks/android-keystore-signing-backend.md` 已固定 Android Keystore backend 验证边界。
-- `ime-ffi` 已提供 C ABI 起步验证，覆盖 ABI contract、opaque handle、session owner-thread policy、session options、Rime session options、默认 unavailable 门禁、`native-rime` feature 下真实 Rime session smoke、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot / candidate view、normalized key event、learning status 只读摘要、sync preflight 状态摘要、userdb add / delete / list、dictionary inspect / export / import、import batches 只读查询、平台绑定式 view copy / release host smoke、释放函数 panic 边界、demo engine host smoke 和 FFI 调用 runbook。
-- `radishlex-ime-cli` 已提供 `demo`、`rime`、`dict`、`learn status`、`learn select/suppress`、`rank explain`、`rime --rank-db` 和 `sync preflight` 复验入口。
-
-当前下一步仍在同步服务端前置治理内。encrypted object 上传下载、版本冲突 HTTP 语义、runtime 配置装配、对象大小门禁、脱敏 audit logger、本机 smoke runbook、双设备 HTTP smoke、Docker Compose 本地 / 部署态入口、Docker Compose 容器实际启动 smoke、Rust remote client DTO / transport trait、std-only `http://` HTTP transport、Rust HTTP transport 直连 Go server 的短生命周期跨语言测试、Rust 侧两客户端 userdb harness、Rust userdb 两客户端真实 Go HTTP 同步测试、生产部署边界 runbook、单用户 bearer access token 门禁、备份恢复演练运行证据、外部 TLS 反代实现级验证证据、升级回滚演练运行证据、OIDC 未来接入规划、`apple-keychain-v1` 平台 backend runbook、Apple 平台签名策略 ADR、`android-keystore-v1` 平台 backend runbook、`android-keystore` feature 门禁、Android Rust bridge wrapper、bridge contract、仓库内 Kotlin bridge source、Android Gradle library harness、gated instrumented smoke、provider diagnostics 和 feature-gated macOS backend 编译验证已经补齐；真实 Apple Keychain smoke 已执行但未通过，backend status 已阻断生产签名，Android Keystore 已接不可用状态门禁、bridge contract、合成 bridge 单测、ignored smoke 入口、Kotlin source、Gradle harness、gated smoke 和 provider diagnostics，并已补 Rust raw JNI glue；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。后续继续推进时，优先继续扩展真实设备 / API / provider 矩阵调查原生非导出 Ed25519 支持；目标部署的真实证书、域名、反向代理配置、目标数据目录备份恢复和升级回滚仍需部署者人工复验；Apple 原生非导出 Ed25519 支持矩阵应单独作为平台 spike；OIDC 不进入当前核心实现，接入前应先补认证策略 ADR 并把 Go handler 认证层收敛为可插拔接口。P1 原始事件、本地审计批次和 FFI 明文 payload 继续不得进入同步路径；现阶段不推进完整平台壳、Flutter manager 主线，也不启动长期运行 server 做客户端上传下载。
+当前阶段与验证基线见 [当前状态短入口](status/current.md)，长期阶段顺序见 [路线图](roadmap.md)。临时整改专题只有在当前状态明确引用时才承担执行跟踪，不替代本文。
 
 ## 设计原则
 
 - 本地优先：输入热路径、候选生成、候选重排和学习必须离线可用。
-- 隐私优先：服务端默认不可信，不保存明文输入历史、明文用户词库、明文候选偏好或明文上下文片段。
-- 引擎可替换：v1 可接 `librime`，但 Rust core 不依赖 Rime 私有对象或内部评分。
-- 平台薄壳：平台端只处理系统输入法生命周期、按键接收、候选窗展示和文本提交。
-- 可解释学习：用户能查看输入法学到了什么，并能删除、导出、暂停或限制学习。
-- 自部署同步：后端只做设备管理、密文 blob 存储、版本历史、备份恢复和包分发。
+- 隐私优先：服务端默认不可信，不保存明文输入历史、明文用户词库、明文候选偏好或明文上下文。
+- 引擎可替换：v1 使用成熟底层引擎，但 Rust core 不依赖其私有对象、内部 ID 或生命周期细节。
+- 平台薄壳：平台只处理系统输入法生命周期、按键、候选展示、文本提交和 FFI 调用。
+- 可解释学习：用户能查看、删除、导出、暂停或限制输入法学习结果。
+- 可删除同步：删除意图通过 tombstone 或等价语义传播，旧设备和旧备份不能静默复活数据。
+- 自部署优先：后端只做设备管理、密文对象存储、版本、备份恢复和包分发。
+- 失败可诊断：FFI、数据库、同步、加密和平台错误必须明确返回，不使用静默 fallback 掩盖问题。
 
 ## 总体架构
 
 ```text
 Platform IME Shell
-  Windows TSF / macOS InputMethodKit / Linux Fcitx5
-  Android InputMethodService / iOS Keyboard Extension
+  macOS InputMethodKit / Linux Fcitx5 / Android IME / Windows TSF / iOS Extension
         |
         v
-Rust Core
-  ime-core      input session, composition, candidates, commit
-  ime-ranker    rerank and explain
-  ime-userdb    local dictionary, learning events, tombstones
-  ime-sync      sync payload boundary and planned sync client
-  ime-crypto    client-side encryption boundary
-  ime-ffi       C ABI boundary and planned platform bridge
+ime-ffi
         |
         v
-Engine Adapter
-  ime-engine-rime in v1
-  native Rust engine in later phases
+Input Runtime
+  ime-core + engine adapter + ime-ranker + ime-userdb + privacy policy
         |
-        v
-Local Storage
-  SQLite userdb
-  encrypted profile data
-  local schema/model packages
+        +-----------------------------+
+        |                             |
+        v                             v
+ime-engine-rime                 ime-sync + ime-crypto
+                                      |
+                                      v
+                              Go Sync Server
+                              encrypted objects only
 
-Management UI
-  Flutter desktop/mobile manager
-        |
-        v
-Go Self-host Backend
-  device registry
-  encrypted blob storage
-  version history
-  backup / restore
-  package distribution
+Flutter Manager
+  -> controlled manager bridge / ime-ffi
+  -> local settings, dictionary, diagnostics, device and sync management
 ```
 
-## 组件职责
+客户端本地数据库和 Rust core 是用户数据真相源。Flutter、平台壳和 Go server 都不能各自复制一套候选排序、删除语义、同步状态或隐私策略。
 
-### Rust Core
+## 产品交付顺序
 
-Rust 是跨端复用和输入热路径的核心层，负责：
+架构模块可以提前形成原型和受控测试，但产品里程碑按用户可见纵向链退出：
 
-- 输入会话状态机、composition、candidate 和 commit 模型。
-- Engine trait 与底层 engine adapter 边界。
-- 用户词库、选择事件、负反馈、删除 tombstone。
-- 候选重排、排序 explain 和后续学习摘要。
-- 后续同步客户端、端到端加密和 FFI 边界。
-- CLI / smoke 工具。
+1. M1 先打通 macOS 离线输入，闭合按键消费、候选、commit、FFI、进程级 engine runtime 和平台壳。
+2. M2 再闭合本地个人化，让真实选择、删除和反馈以正确事务语义影响后续候选，并提供本地 manager 管理界面。
+3. M3 在本地数据语义稳定后开放端到端加密同步、设备授权、恢复、撤销和 manager 同步界面。
+4. M4 最后闭合 native library、`librime`、schema、manager、签名、升级和供应链发布门禁。
 
-Rust core 不负责注册系统输入法、强行统一系统候选窗 UI、托管云端实时转换，或在 v1 阶段从零实现完整中文输入引擎。
+同步原型、loopback、短生命周期服务和跨语言测试可以在 M1/M2 期间继续演进，但不能进入真实用户产品入口，也不能替代 M3 的退出证据。2026 年 7 月整改专题只负责修复 M1/M2 前置问题和首批质量门禁，不承担 M3/M4 的长期项目管理。
 
-### Engine Adapter
+## Rust 模块职责
 
-`ime-engine-rime` 负责把 `librime` 的输入、候选、composition 和 commit 转换为 RadishLex 稳定模型。Rime 相关概念必须停留在 adapter 内部，不向 `ime-core`、`ime-userdb`、`ime-ranker` 或平台壳泄漏。
+### ime-core
 
-v1 采用 `librime` 作为成熟底层引擎。长期可以加入 Rust 自研 engine，但不能抢占当前 Rust core、userdb、ranker、同步前置验证和真实平台落地的优先级。
+`ime-core` 定义平台无关的输入领域模型和稳定 engine 边界：
 
-### ime-userdb 与 ime-ranker
+- input session、composition、candidate、commit 和 schema；
+- normalized key event；
+- `KeyOutcome`，至少表达按键是否消费和可选即时 commit；
+- engine reset、push key、composition、candidates、commit、schema 和状态查询；
+- 平台无关错误语义。
 
-`ime-userdb` 保存本地学习数据和用户可管理词条。当前已覆盖：
+`ime-core` 不负责系统输入法注册、平台候选窗、SQLite、网络、云端转换或完整拼音引擎实现。
+
+### ime-engine-rime
+
+`ime-engine-rime` 把 `librime` 的输入、候选、composition、commit 和状态转换为 RadishLex 稳定模型。
+
+- Rime API、session ID、C/C++ 生命周期和数据目录停留在 adapter 内部。
+- librime setup、initialize、notification 和 finalize 由进程级 runtime 管理；session drop 不触发 finalize，进程 teardown 在零活动 session 后显式 shutdown。
+- 单个输入 session 只管理对应的 librime session。
+- engine 原始分数可以作为 ranker 因子，但不是核心真相源。
+- bindings 必须有 ABI 版本与布局验证，不能只靠手写结构长期假定兼容。
+
+长期可以增加 Rust 自研 engine，但不得抢占真实平台、个人化学习和安全同步的近期优先级。
+
+### ime-userdb
+
+`ime-userdb` 保存本地用户数据和学习摘要：
 
 - `user_terms`
 - `selection_events`
@@ -99,130 +92,230 @@ v1 采用 `librime` 作为成熟底层引擎。长期可以加入 Rust 自研 en
 - `ranker_weights`
 - `import_batches`
 
-`ime-ranker` 只消费 RadishLex candidate、userdb summary 和 deleted tombstone summary，不访问 SQLite、不访问 Rime、不读取平台私有生命周期。排序结果必须输出 explain，说明 engine 顺序、用户词提升、频次、近期、上下文、负反馈、suppressed 和 deleted 的贡献。
+选择、负反馈、删除和显式恢复是用户意图，跨表写入必须具备事务性。数据库需要明确 WAL、busy timeout、并发访问、文件权限、备份恢复和 schema migration 策略。
 
-### Go Backend
+P1 原始事件只在本地用于学习，不得通过 FFI 管理接口或同步 payload 暴露。P2 导出只允许从明确的压缩摘要与用户可管理数据生成。
 
-Go 后端属于后续阶段。它只负责：
+### ime-ranker
 
-- 用户和设备注册。
-- 设备公钥登记。
-- 加密 blob 存储。
-- 同步版本号、冲突检测和版本历史。
-- 备份恢复、审计日志和包分发。
-- 默认单用户 SQLite 自部署模式。
+`ime-ranker` 只消费 RadishLex candidate 和经过 userdb 整理的摘要，不访问 SQLite、Rime 或平台生命周期。
 
-Go 后端不参与每次按键，不做候选排序，不做云端实时转换，不保存明文输入历史或明文用户词库。
+排序因子可以包含：
 
-### Flutter Manager
+- engine 原始顺序或分数；
+- 用户词权重；
+- 有界 frequency；
+- 基于时间的 recency 衰减；
+- 上下文类别；
+- 负反馈；
+- suppressed 与 deleted 惩罚。
 
-Flutter manager 属于后续阶段。它负责设置、词库管理、学习记录可视化、隐私控制台、同步状态、设备管理、后端连接和备份恢复。
+每次排序必须能输出 explain。权重调整必须依赖固定合成评测集和指标，不依赖单次主观体验。
 
-Flutter 不进入输入热路径，不作为系统候选窗的跨平台统一实现，也不承担用户词库、同步、排序或隐私策略真相源。
+### ime-crypto
 
-### Platform Shells
+`ime-crypto` 负责客户端密钥与加密边界：
 
-平台壳只负责系统输入法接入：
+- sync master key、object key、device wrapping key 和 recovery key；
+- AEAD envelope、AAD、nonce、ciphertext hash 和算法版本；
+- 设备签名、授权签名、撤销签名和恢复记录签名；
+- 恢复码 KDF 与资源上下限；
+- 平台密钥 backend 抽象和能力元数据；
+- secret 生命周期、内存清理和错误脱敏。
 
-- Windows：TSF 薄壳，后置。
-- macOS：InputMethodKit，第一批桌面候选平台。
-- Linux：优先 Fcitx5，其次 IBus，适合作为第一批真实平台。
-- Android：Kotlin `InputMethodService`，移动端首选。
-- iOS：Swift / UIKit Keyboard Extension，默认离线，同步依赖 full access，后置。
+协议必须支持算法演进。平台原生 P-256、平台封装的 Ed25519 seed 或其他方案必须使用不同 backend/algorithm ID，并明确各自的不可导出与硬件保护语义。
 
-候选窗优先使用平台原生机制，不强行统一 Windows、macOS、Linux、Android 和 iOS 的候选窗 UI。
+### ime-sync
 
-## 隐私与数据分级
+`ime-sync` 负责客户端同步协议与编排：
 
-RadishLex 按 `docs/privacy-sync.md` 的数据分级推进：
+- P2 payload 类型和加密对象外壳；
+- 对象版本、base version、cursor 和冲突错误；
+- 设备加入、授权、恢复、撤销和 key epoch；
+- 下载后的签名验证、解密、合并和本地写回；
+- 上传、发现、重试、退避和 `sync_once` 或等价 orchestration；
+- transport trait 与生产 HTTPS 实现。
 
-- P0：密码框、支付、证件、secure text entry、隐私模式输入，永不学习、永不同步。
-- P1：原始选择事件、负反馈详细事件、应用上下文统计，默认只本地学习。
-- P2：用户词库、候选权重摘要、自定义短语、输入方案配置，后续只能端到端加密同步。
-- P3：官方词库包、输入方案模板、模型包、UI 主题，可公开下载。
+同步 merge 必须包含本地当前状态，并定义与输入顺序无关的稳定版本顺序。至少使用 key epoch、逻辑时钟或对象版本、device ID 和确定性 tie-break；测试必须覆盖交换律、结合律和幂等性。
 
-删除语义必须强于普通降权。被删除词条需要 tombstone 或等价语义，避免旧选择事件、旧导入、旧设备或旧备份复活。
+### ime-ffi
 
-## 同步方向
+`ime-ffi` 是 Rust core 与平台/Flutter 的稳定边界：
 
-用户可用远端同步不是当前开发主线，但架构需要提前保持边界：
+- C ABI 版本与 capability 查询；
+- opaque handle、所有权、生命周期和释放函数；
+- UTF-8 编码、结构化错误和 panic boundary；
+- owner-thread / worker-thread 规则；
+- key result、snapshot、candidate、commit 和 manager data view；
+- 调用方复制 borrowed view 的明确时机。
 
-- 输入热路径不得依赖后端。
-- 服务端只看到设备 ID、加密对象 ID、密文 blob 大小、对象版本、更新时间和必要同步元数据。
-- 新设备加入必须通过已有设备授权或恢复码。
-- 单台设备丢失后应允许撤销设备，并在后续对象上轮换同步密钥。
-- 冲突合并应按对象类型处理：用户词按词合并，删除使用 tombstone，设置项可 last-write-wins 或显式提示。
+公开裸指针接口必须有一致的 `unsafe` 契约和 `# Safety` 文档。FFI 不得丢失平台做正确决策所需的 `consumed`、commit 或错误信息。
 
-当前 `ime-userdb` 可导出 `dictionary.user_terms`、`ranker.weights` 和 `dictionary.deleted_terms` 的 Rust 内部 P2 plaintext payload bytes，并已在测试中通过 `ime-sync::SyncEnvelopeAssembler` 接入 `ime-crypto` envelope 加密、解密和 `ime-sync::EncryptedSyncObjectDraft` 派生。`ranker.weights` 只来自 P1 本地事件压缩后的 P2 权重摘要，不包含原始 selection event、负反馈明细、上下文统计或本地审计批次。`ime-sync` 定义 payload 来源分类、同步对象类型、加密对象外壳校验、P2 envelope 组装边界、设备生命周期、对象版本冲突草案模型、客户端解密后合并模型、远端对象版本 client 边界和 std-only `http://` HTTP transport；`ime-userdb` 已能把已解密 P2 JSON 解析为该合并模型需要的记录，并把被接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite。当前 remote client 只接收 `AssembledSyncObject` 与 `SignedSyncObjectManifest`，通过 transport trait 和 HTTP transport 验证服务端 JSON / base64 DTO、metadata 读取、binary payload 下载和错误映射；Rust userdb 两客户端真实 Go HTTP 测试已复验设备授权、三类 P2 对象上传下载、客户端解密写回、stale conflict 和 v2 重新上传。不提供 plaintext 上传入口，也不提供生产恢复 UI / API 或平台私钥存储 backend 实现。
+### ime-cli
 
-`docs/sync-key-management.md` 已补同步密钥与设备生命周期设计，当前 Rust 侧已落 key epoch、device wrapping、加入请求、授权包、撤销记录、恢复材料模型、恢复码 KDF 模型、P2 envelope 组装边界、客户端合并模型、userdb 写回执行器、平台私钥存储 backend capability / unavailable 模型、feature-gated macOS Keychain backend、feature-gated Android Keystore 不可用门禁、Rust bridge wrapper 和 bridge contract、remote client DTO / transport trait、HTTP transport、两客户端 userdb harness 和真实 Go HTTP 两客户端测试，并覆盖撤销后旧 epoch key 不能解密新对象、授权设备和接收设备都必须 active、版本冲突检测边界、恢复码校验 / KDF / AAD 失败、删除 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词、显式恢复语义、测试 backend 不能用于生产签名、unavailable backend 不回退、Apple Keychain 默认能力不声明硬件保护、Android Keystore 未验证前不声明可用、Android bridge request / error code / response 校验、Android 合成 bridge 创建 / 签名 / 删除语义、远端上传请求不包含 plaintext 字段、stale conflict latest metadata 映射、payload length mismatch 拒绝、HTTP transport 错误脱敏、bearer access token header 脱敏和客户端解密写回边界。签名 / 设备密钥存储边界、生产恢复流程、Go server API / storage 边界、生产部署边界、Apple Keychain backend 平台验证边界、Apple 平台签名策略和 Android Keystore backend 验证边界已由专题文档固定；`platforms/android-ime/keystore-bridge` 已补 Kotlin / Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录。Go 侧已起步 metadata / storage / API 验证模型，并已补 SQLite-backed metadata repository、local blob transaction、签名验签、device wrapping 密文承载、recovery 密文读取、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version handler、bearer access token 门禁、request id、panic recovery、非持久审计 hook、SQLite audit_events 写入、runtime 装配、脱敏日志、双设备 HTTP smoke、Rust HTTP transport 直连 Go server 的短生命周期跨语言测试、Rust userdb 两客户端真实 Go HTTP 测试、Docker Compose 本地 / 部署态入口、容器实际启动 smoke、备份恢复 smoke、外部 TLS 反代 smoke 和升级回滚 smoke；后续代码应继续保持不接触 plaintext payload，并在进入真实用户部署或用户可用同步前按真实 API / 设备矩阵继续调查 Android Keystore Ed25519 支持，或补目标部署运行证据。
+`ime-cli` 提供可重复的领域与集成验证入口，包括真实 engine 输入、词库、学习、rank explain、同步预检和开发期 smoke。CLI 可以暴露调试信息，但不能成为平台热路径或生产同步的隐藏依赖。
+
+## 输入纵向链
+
+真实平台输入链固定为：
+
+```text
+system key event
+  -> platform normalization
+  -> FFI key call
+  -> input runtime privacy check
+  -> engine push key
+  -> composition / engine candidates / optional commit
+  -> userdb summary + ranker
+  -> versioned key result and snapshot
+  -> native candidate UI or text commit
+  -> privacy-aware selection / feedback transaction
+```
+
+关键约束：
+
+- 平台必须能判断按键是否被消费，未消费按键交还宿主应用。
+- engine 产生的即时 commit 不能在 FFI 层丢失。
+- candidate display index、ranked index 和 engine commit index 必须有稳定映射。
+- secure text entry、P0 App 或隐私模式必须在记录学习事件前阻断。
+- manager、后端和网络不可进入每次按键链路。
+
+## Go Sync Server
+
+Go server 负责：
+
+- 单用户部署配置与认证；
+- domain、device、公钥、join request、authorization、revocation 和 recovery metadata；
+- encrypted object metadata、版本冲突和 blob 存储；
+- 备份恢复、审计、迁移和包分发；
+- 请求大小、速率、超时、路径和日志边界。
+
+Go server 不做候选排序、云端实时转换、明文合并或客户端密钥恢复。生产部署必须使用外部或内置 TLS、非空认证、受控代理信任、持久化备份和 graceful shutdown。
+
+## Flutter Manager
+
+Flutter manager 负责：
+
+- 本地词库和学习摘要管理；
+- 隐私模式、学习开关和 schema 设置；
+- 同步状态、设备、恢复和后端连接；
+- 安全诊断、导入导出和备份恢复入口。
+
+manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学习、隐私和诊断；M3 再交付同步、设备与恢复；M4 才要求正常产品包闭合 native library、平台目录和升级。产品模式必须加载真实 FFI 和持久化数据；fixture 只能由显式开发开关启用并持续显示演示标识。manager 不进入输入热路径，也不承担排序、合并或密钥策略真相源。
+
+## 平台策略
+
+### macOS
+
+第一真实平台使用 InputMethodKit。Swift / Objective-C 外壳只负责系统输入法生命周期、按键、候选、commit 和 Rust FFI。manager 与输入法若共享 userdb，需要固定 App Group、文件权限、锁和 schema migration 所有权。进程级 runtime、session、按键结果、目录与验收边界见 [macOS InputMethodKit 平台边界](macos-inputmethodkit-boundary.md)。
+
+### Linux
+
+第二桌面候选优先 Fcitx5，其次 IBus。Wayland 下优先使用输入法框架 panel，不自行发明浮窗协议。
+
+### Android
+
+使用 Kotlin `InputMethodService` 和 Rust NDK `.so`。键盘 UI v1 使用平台原生实现；Keystore 算法和硬件能力必须用真实设备验证。
+
+### Windows
+
+使用 TSF 薄壳，候选窗优先原生机制，后置于首个平台稳定化。
+
+### iOS
+
+使用 Swift / UIKit Keyboard Extension 和 Rust XCFramework。无 full access 时必须离线可用；App Group、内存限制和审核边界需要真实设备验证。
+
+## 隐私与同步方向
+
+数据分级以 [隐私与同步设计](privacy-sync.md) 为准：
+
+- P0 永不学习、永不同步；
+- P1 默认只保留本地原始事件；
+- P2 只能作为端到端加密对象同步；
+- P3 可以公开下载。
+
+服务端只可见设备、对象、版本、密文大小、时间和必要协议 metadata。任何 debug、fixture、日志、截图或诊断都不得包含真实明文输入、联系人、密码、证件或支付信息。
 
 ## Clean-room 原则
 
-外部输入法和底层引擎只作为行为规格、接口约束和测试用例来源，不复制实现。
-
 允许：
 
-- 阅读公开文档。
-- 观察公开软件行为。
-- 总结输入法交互规格。
-- 自己设计数据结构、Rust API 和模块边界。
-- 使用兼容许可证的库作为可选 adapter。
+- 阅读公开文档和观察公开行为；
+- 编写行为规格、接口约束、黑盒测试和自己的数据结构；
+- 使用许可证兼容的底层库作为可替换 adapter。
 
 禁止：
 
-- 复制源码、私有函数结构或有版权风险的词库。
-- 从 GPL / LGPL 项目搬实现进核心层。
-- 把外部项目实现细节逐行翻译成 Rust。
+- 复制外部源码、私有函数结构或受版权限制的词库；
+- 把 GPL/LGPL 实现搬入核心层；
+- 逐行翻译外部实现；
+- 用本地兄弟项目路径或私有材料作为正式文档依赖。
+
+## 验证分层
+
+- 核心类型与纯算法：单元测试、property test 和固定 test vector。
+- userdb、ranker、sync、crypto：事务/故障注入、跨设备、篡改、排序评测和性能基线。
+- FFI：ABI contract、host binding smoke、线程、释放、panic 和无效指针边界。
+- Go server：storage conformance、race、HTTP/API、备份恢复、升级回滚和部署 smoke。
+- Flutter manager：format、analyze、unit/widget test、真实 FFI smoke 和产品 bundle 检查。
+- 平台壳：对应平台 build、自动契约测试与非敏感人工输入 smoke。
+
+默认先运行精确验证；跨边界、阶段交付和发布前运行仓库级门禁。快速或合成验证不能替代真实平台、真实 bundle 或真实设备证据。
 
 ## 主要风险
 
-- 输入质量风险：短期内依赖成熟底层引擎，RadishLex 先把个人化、可解释、可删除和同步边界做好。
-- 平台集成风险：系统输入法接入复杂，每个平台只写薄壳，并优先 Linux / macOS / Android。
-- iOS 限制风险：iOS 后置，默认离线可用，同步需要用户显式开启 full access。
-- 隐私信任风险：默认不上传明文，提供本地可视化学习记录、禁学名单、删除和导出能力。
-- 文档漂移风险：阶段目标、协议、隐私边界和平台策略变化必须同步更新对应专题文档。
+- 输入链风险：FFI 或平台壳若丢失 consumed/commit，会直接破坏宿主按键和文本提交。
+- 输入质量风险：没有固定评测时，frequency、recency 和负反馈容易形成不可解释漂移。
+- 数据一致性风险：userdb 非事务写入和非确定 merge 会破坏删除、恢复和多设备收敛。
+- 密钥风险：平台算法能力、签名绑定、KDF 上限和 secret 生命周期必须在开放同步前验证。
+- 平台风险：系统输入法安装、候选 UI、沙盒和生命周期复杂，必须一次只推进一个真实平台。
+- 文档风险：状态流水进入稳定文档会制造错误真相源；当前事实只放状态入口和 devlog。
 
-## MVP 成功标准
+## 本地个人化 MVP 成功标准
 
-MVP 至少需要证明：
+M2 退出至少同时满足：
 
-- CLI 能通过成熟底层 engine 输出真实候选。
-- Rime candidates 能进入 ranker，并输出可解释排序。
-- 用户选择、删除、负反馈能影响后续排序。
-- 用户词库能导入、导出，且普通导入不会复活 deleted tombstone。
-- 同步设计能保证服务端不接触明文 P2 数据，且服务端可见 hash 只基于 ciphertext 或 ciphertext + AAD。
-- 至少一个桌面或移动平台能作为真实系统输入法使用。
+- 真实 engine 输出候选，ranker 能解释并重排。
+- 至少一个平台能离线完成日常中文输入。
+- 用户选择、负反馈、删除和恢复正确影响后续候选。
+- 用户可管理、导入、导出和停止学习，删除不会被旧状态复活。
+- Rust core、FFI、userdb、ranker、manager 本地能力和首个平台都有可重复门禁。
 
-## 当前停止线
+M2 不以远端同步、设备授权或最终发布包为退出条件。
 
-- userdb schema、删除语义、导入导出和 ranker explain 未稳定前，不接远端同步。
-- FFI 所有权、生命周期、错误语义、字符串编码、线程模型和释放责任未明确前，不推进平台壳。
-- Rime native smoke 和学习层复验未稳定前，不推进复杂平台候选窗或管理 UI。
-- Apple Keychain 真实 smoke 未通过、目标部署 TLS / 备份 / 升级回滚复验证据没有补齐前，不进入管理 UI 同步主线，也不开放给真实用户同步。Go server 当前只能先按专题文档验证 metadata、storage、签名、版本冲突、encrypted object HTTP handler、bearer access token 门禁、runtime 装配、脱敏日志、server smoke、备份恢复 smoke、外部 TLS 反代 smoke、升级回滚 smoke、Docker Compose 本地 / 部署态入口、容器实际启动 smoke、生产部署边界和错误语义边界；Rust remote client 已验证 DTO / transport trait、std-only `http://` HTTP transport、bearer token header、两客户端 userdb harness、直连 Go server 的短生命周期测试和两客户端真实 Go HTTP 同步；OIDC 接入前必须另补认证策略 ADR，不得把账号登录、refresh token 或 Radish 产品 session 放进 sync server；Apple Keychain backend 目前只完成 feature-gated 接线和非 smoke 测试，真实 smoke 阻塞于 `ed25519-v1` 创建，backend status 明确阻断生产签名。
+## v1 成功标准
+
+在 M2 基础上，v1 还必须满足：
+
+- 两个真实客户端能安全同步 P2 密文，服务端无法读取明文。
+- manager 产品包使用真实 FFI、持久化配置和平台文件访问。
+- 输入法、manager、native library、`librime`、schema、签名和升级形成可重复产品包。
+- 核心、FFI、Go、Flutter、首个平台和发布供应链都有可重复门禁。
+
+## 稳定停止线
+
+- `KeyOutcome`、FFI 生命周期和 librime 全局生命周期未闭合前，不把平台壳视为可用输入法。
+- userdb 事务、ranker 评测和删除语义未稳定前，不开放生产同步。
+- merge 收敛、签名绑定、KDF 上限、平台私钥和 HTTPS 编排未验证前，不开放真实用户同步。
+- 第一真实平台未达到可日常输入前，不并行启动第二平台。
+- manager 产品模式不得用静默 fixture fallback 代替真实失败。
+
+临时批次的更严格停止线见 `docs/status/current.md` 当前引用的整改专题。
 
 ## 专题文档索引
 
-- [Engine Boundary](engine-boundary.md)：engine trait、核心模型、adapter 职责、错误语义和 clean-room 边界。
-- [ime-engine-rime Adapter 设计](engine-rime-adapter.md)：Rime adapter 构建、FFI 生命周期、数据目录和 native smoke。
-- [个人化学习设计](personalization-learning.md)：userdb、ranker、学习事件、负反馈、删除 tombstone、导入导出和 CLI 管理入口。
-- [隐私与同步设计](privacy-sync.md)：P0/P1/P2/P3 分级、加密对象、设备授权、删除语义和威胁模型。
-- [同步 Payload 草案](sync-payload.md)：同步对象类型、P1/P2 来源分类、加密对象外壳和验证口径。
-- [ime-crypto 边界设计](crypto-boundary.md)：客户端加密、密钥、envelope、删除同步和验证边界。
-- [同步密钥与设备生命周期设计](sync-key-management.md)：同步密钥、设备授权、恢复码、设备撤销、key epoch 和冲突边界。
-- [同步服务端 API 与存储边界](sync-server-api-storage.md)：Go sync server API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和停止线。
-- [Sync Server OIDC 未来接入规划](sync-server-oidc-roadmap.md)：后续接入 Radish 产品账号体系或兼容 OIDC IdP 的身份边界、认证策略演进和停止线。
-- [Sync Server Local Smoke Runbook](runbooks/sync-server-local-smoke.md)：Go sync server 本机启动边界、自动化 smoke 和日志脱敏检查。
-- [Sync Server Production Deployment Runbook](runbooks/sync-server-production-deployment.md)：部署拓扑、外部 TLS、认证 / 访问控制、备份恢复、升级回滚和真实用户开放停止线。
-- [生产恢复流程设计](production-recovery-flow.md)：恢复记录创建 / 轮换 / 撤销、新设备恢复加入、全部设备丢失、失败限速、日志和停止线。
-- [ADR 0002: 恢复码 KDF 与同步域恢复边界](adr/0002-recovery-code-kdf.md)：恢复码格式、Argon2id KDF 参数、恢复记录字段和生产实现验证口径。
-- [ADR 0003: 设备签名与私钥存储边界](adr/0003-device-signing-key-storage.md)：设备签名、签名对象、私钥存储抽象、错误语义和测试口径。
-- [ADR 0004: 平台私钥存储 Backend 边界](adr/0004-platform-private-key-storage-backend.md)：平台 key backend、capability metadata、FFI 边界、错误语义、迁移和停止线。
-- [ADR 0005: Apple 平台签名策略](adr/0005-apple-platform-signing-strategy.md)：`apple-keychain-v1` smoke 阻塞后的 Ed25519 协议、Keychain seed fallback 和生产状态门禁决策。
-- [Apple Keychain Signing Backend Runbook](runbooks/apple-keychain-signing-backend.md)：`apple-keychain-v1` 创建、加载、签名、删除、锁屏 / 权限、备份迁移和日志脱敏验证边界。
-- [Android Keystore Signing Backend Runbook](runbooks/android-keystore-signing-backend.md)：`android-keystore-v1` Ed25519 创建、加载、签名、删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界。
-- [FFI 边界](ffi-boundary.md)：C ABI 职责、所有权、生命周期、错误语义和平台壳停止线。
-- [仓库结构草案](repository-layout.md)：crate、server、app、platform、scripts 和 tests 职责。
-- [阶段路线图](roadmap.md)：Phase 0 到 Phase 7 的交付物和退出标准。
-- [CLI 说明](cli.md)：当前可运行命令、输出字段、错误语义和安全边界。
-- [Rime Native Smoke Runbook](runbooks/rime-native-smoke.md)：本机隔离 `librime` smoke 和 rank smoke 操作步骤。
+- [当前状态](status/current.md)：当前批次、验证基线、停止线和近期顺位。
+- [产品交付路线图](roadmap.md)：产品里程碑、交付物和退出标准。
+- [仓库结构](repository-layout.md)：实际目录与模块职责。
+- [Engine Boundary](engine-boundary.md)：engine trait 和核心模型。
+- [Rime Adapter](engine-rime-adapter.md)：librime adapter、构建与 native smoke。
+- [个人化学习](personalization-learning.md)：userdb、ranker、学习和删除语义。
+- [FFI Boundary](ffi-boundary.md)：C ABI、所有权、线程和错误语义。
+- [macOS InputMethodKit](macos-inputmethodkit-boundary.md)：第一平台的 runtime、按键链、目录和验收边界。
+- [隐私与同步](privacy-sync.md)：数据分级、删除、授权和威胁模型。
+- [同步 Payload](sync-payload.md)：P2 对象和 payload 边界。
+- [加密边界](crypto-boundary.md)：key、envelope、签名与恢复。
+- [同步密钥管理](sync-key-management.md)：设备、恢复、撤销和 key epoch。
+- [Sync Server API/Storage](sync-server-api-storage.md)：Go API、metadata、blob 和错误语义。
+- [Manager Boundary](manager-ui-boundary.md)：manager 职责和数据可见性。
+- [平台私钥策略](platform-private-key-backend-strategy.md)：平台 backend 能力与停止线。

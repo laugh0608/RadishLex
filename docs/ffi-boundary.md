@@ -1,13 +1,12 @@
 # RadishLex FFI 边界
 
-本文档定义后续 `ime-ffi` 的 ABI 职责、数据所有权、错误语义和平台壳停止线，读者是后续实现 C ABI、Flutter bridge、Swift/Kotlin/C++ 调用层和平台输入法薄壳的开发者。本文不包含具体平台输入法注册流程、TSF / InputMethodKit / Fcitx5 API 调用细节、Flutter 页面设计或移动端键盘 UI。
+本文档定义 `ime-ffi` 的 ABI 职责、数据所有权、错误语义和平台壳停止线，读者是实现 C ABI、Flutter bridge、Swift/Kotlin/C++ 调用层和平台输入法薄壳的开发者。本文不包含当前批次状态、具体平台输入法注册流程、TSF / InputMethodKit / Fcitx5 API 调用细节、Flutter 页面设计或移动端键盘 UI；实时进度见 `docs/status/current.md`。
 
-## 当前定位
+## 稳定定位
 
-当前已落地 `crates/ime-ffi/` 起步验证：C ABI 已覆盖 opaque session handle、ABI contract、session owner-thread policy、session options、Rime session options ABI、engine kind 门禁、错误对象、UTF-8 buffer、结构化 snapshot handle、candidate view、normalized key event、释放函数、schema 设置、按键输入、snapshot、候选提交、userdb learning status 只读摘要、userdb sync preflight 状态摘要、受控 userdb 词条管理入口、dictionary inspect / export / import 和 import batches 只读查询的 host smoke。当前 session 内部已使用 demo / Rime 可扩展 engine 封装；默认构建仍只启用 deterministic demo engine，`native-rime` feature 下 `radishlex_session_new_rime` 可通过显式 Rime 配置创建真实 `RimeEngine` session，并已通过隔离 Rime 数据目录 smoke。该状态仍不代表平台壳或系统输入法已经接入。
+`ime-ffi` 是 Rust 输入 runtime、平台输入法壳和 Flutter manager 的唯一稳定跨语言边界。平台按键入口必须无损返回 `KeyOutcome` 的 `consumed`、可选即时 commit 与同一事件后的 snapshot；只返回状态码再单独查询状态不能作为真实平台契约。
 
-平台壳后续只能通过 FFI 调用 Rust core，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。
-平台绑定层的具体调用清单见 `docs/runbooks/ffi-platform-call-contract.md`。
+平台壳只能通过 FFI 调用 Rust runtime，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。manager 同步命令只在 M3 真实领域模型、secret 生命周期和安全测试齐备后进入 C ABI；approval、preview、migration review 和 no-symbol 证明不属于生产 ABI。平台绑定层调用规则见 `docs/runbooks/ffi-platform-call-contract.md`。
 
 ## 职责边界
 
@@ -36,6 +35,7 @@ RadishLexSession*
 RadishLexBuffer*
 RadishLexSnapshot*
 RadishLexUserTermList*
+RadishLexRankExplain*
 RadishLexError*
 ```
 
@@ -44,11 +44,11 @@ RadishLexError*
 当前已落地函数按能力分组：
 
 - ABI contract：`radishlex_ffi_contract`
-- session 生命周期：`radishlex_session_new`、`radishlex_session_new_with_options`、`radishlex_session_new_rime`、`radishlex_session_free`、`radishlex_session_engine_kind`、`radishlex_session_reset`、`radishlex_session_set_schema`
-- 输入与快照：`radishlex_session_push_key`、`radishlex_session_push_key_event`、`radishlex_session_snapshot`、`radishlex_session_snapshot_new`、`radishlex_snapshot_*`、`radishlex_session_commit_candidate`
-- userdb 状态与词条管理：`radishlex_userdb_learning_status`、`radishlex_userdb_sync_preflight`、`radishlex_userdb_add_term`、`radishlex_userdb_delete_term`、`radishlex_userdb_terms_*`
+- session / Rime runtime 生命周期：`radishlex_session_new`、`radishlex_session_new_with_options`、`radishlex_session_new_rime`、`radishlex_session_free`、`radishlex_rime_runtime_shutdown`、`radishlex_session_engine_kind`、`radishlex_session_reset`、`radishlex_session_set_schema`
+- 输入与快照：`radishlex_session_handle_key_event`、`radishlex_key_result_*`、兼容 `radishlex_session_push_key_event`、`radishlex_session_snapshot_new`、`radishlex_snapshot_*`、`radishlex_session_commit_candidate`
+- userdb 状态与词条管理：`radishlex_userdb_learning_status`、`radishlex_userdb_sync_preflight`、`radishlex_userdb_rank_explain_*`、`radishlex_userdb_add_term`、`radishlex_userdb_delete_term`、`radishlex_userdb_terms_*`
 - dictionary 文件与导入审计：`radishlex_userdb_dictionary_*`、`radishlex_userdb_import_batches_*`
-- Rust 分配对象读取与释放：`radishlex_buffer_*`、`radishlex_error_*`
+- Rust 分配对象读取与释放：`radishlex_buffer_*`、`radishlex_error_*`、`radishlex_userdb_rank_explain_free`
 
 ## 当前 ABI 数据结构
 
@@ -56,7 +56,7 @@ RadishLexError*
 
 ### FFI contract
 
-`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
+`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v2 增加 owned key result；当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
 
 ### Status 与文本 view
 
@@ -133,6 +133,10 @@ RADISHLEX_RIME_SESSION_OPTIONS_VERSION = 1
 - 启用 `native-rime` feature 且本机 `librime` 可用时，该入口会把 options 转成 `RimeEngineConfig` 并创建真实 `RimeEngine` session。
 - Rime session 必须使用隔离的 Rime shared / user data 目录；不得静默退回 demo engine，不得读取真实用户输入法目录。
 - 平台端不能缓存这些路径指针；Rust 侧只在调用期间借用传入字符串，并在 `RimeEngineConfig` / native string 管理中复制必要配置。
+- 进程 runtime 初始化后，shared / user / log / deploy 配置保持不变；schema 仍属于各 session。配置冲突返回 `InvalidState`，不会重启已有 runtime。
+- Rime session 创建和 `radishlex_session_set_schema` 都要求目标存在于 librime 已部署 schema list，并在选择后精确回读当前 schema；不存在或回读不一致返回 engine error，不能把 librime 的宽松成功返回当作有效 session。
+- 首个成功初始化的 Rime session 固定进程 runtime owner thread；后续 Rime session 创建、调用、释放和 shutdown 必须使用同一线程，跨线程返回 `InvalidState` 或构成错误释放用法。
+- `radishlex_session_free` 只释放对应 session，不触发全局 finalize。进程 teardown 必须在 runtime owner thread 先释放所有 Rime session，再调用可重复的 `radishlex_rime_runtime_shutdown`；仍有 session 时 shutdown 返回 `InvalidState`。
 
 ### Key event
 
@@ -191,6 +195,41 @@ release = 2
 ```
 
 字符键必须提供合法 Unicode scalar value。未知 key kind、未知 named key、未知 modifier bit 或未知 phase 均返回 `InvalidArgument`。
+
+### Key result
+
+真实平台按键入口采用版本化、Rust-owned 的 `RadishLexKeyResult*`：
+
+```text
+radishlex_session_handle_key_event(
+  session,
+  event,
+  result_out,
+  error_out,
+) -> RadishLexStatusCode
+```
+
+成功时 `result_out` 非空，结果至少表达：
+
+```text
+version: u32
+consumed: u8
+commit: RadishLexStringView
+commit_present: u8
+snapshot: *const RadishLexSnapshot
+```
+
+稳定语义：
+
+- `consumed = 0` 时平台必须把按键交还宿主应用；不能根据 composition 是否为空猜测。
+- `commit_present = 1` 时 commit 必须在本次事件结果中返回；平台不能依赖下一次 snapshot 推断提交文本。
+- snapshot 与 `consumed`、commit 必须来自同一次按键处理后的状态，不允许跨事件拼装。
+- key result 拥有 commit storage 与 snapshot；其 string/candidate view 只在 result 存活期间有效。
+- `radishlex_key_result_free` 负责释放整个结果；平台不得单独释放借用的 snapshot，也不得在释放后缓存任何 view。
+- `version` 未知时平台必须明确拒绝，布尔字段只允许 `0` 或 `1`，保留字段必须初始化为零。
+- 失败时 `result_out` 保持空，错误通过 status 与 `RadishLexError*` 返回；不得同时返回部分可用结果。
+
+现有只返回 `RadishLexStatusCode` 的按键函数只作为兼容或测试入口，不能作为 InputMethodKit 等真实平台壳的主契约。输入侧声明由 `crates/ime-ffi/include/radishlex_input.h` 提供，并通过 C11、Objective-C 编译和 Rust function pointer 测试约束；Swift / Objective-C 不手抄 Rust `repr(C)` 布局。
 
 ### Snapshot 与 candidate view
 
@@ -268,6 +307,17 @@ local_import_batches: usize
 
 Rust 内部的 `UserDb::p2_plaintext_payloads()`、`ime-sync::SyncEnvelopeAssembler`、`ime-crypto::EncryptedObjectEnvelope` 和 `ime-sync::EncryptedSyncObjectDraft` 当前只用于 crate 内测试与 Rust 内部组装边界。FFI 不导出这些对象，也不导出 payload bytes、密文、hash、签名、key id 或上传草案。
 
+### Rank explain view
+
+`RadishLexRankExplainView` 字段：`input_code`、`candidate_text`、`reading`、`reading_present`、`context_kind`、`original_index`、`final_score`、`engine_order_factor`、`user_term_boost`、`frequency_boost`、`recency_boost`、`context_boost`、`negative_feedback_penalty`、`suppressed_penalty`、`deleted_penalty`。
+规则：
+
+- `radishlex_userdb_rank_explain_new` 必须显式传入 UTF-8 SQLite 路径、输入码、候选文本、可选 reading 和可选 context kind。
+- 输入码和候选文本不能为空；reading 为空或空白时按无 reading 处理，context kind 为空或空白时按 `general`。
+- 该入口只对单个候选返回稳定贡献项摘要，用 userdb 中匹配的用户词条、ranker weight 和删除 tombstone 调用 `ime-ranker`；不返回选择事件明细、负反馈 reason 明细、上下文统计分布、SQLite connection、statement、row 指针或同步 payload。
+- 返回的 `RadishLexRankExplain*` 由 `radishlex_userdb_rank_explain_free` 释放；`radishlex_userdb_rank_explain_view` 返回的 string view 借用自该 handle，平台端必须在释放前复制。
+- `final_score` 是 `ime-ranker` 对该候选的当前解释分数；平台 UI 可以展示摘要，但不得把这些字段作为输入热路径之外的业务真相源。
+
 ### User term view
 
 `RadishLexUserTermView`：
@@ -308,72 +358,9 @@ term list 当前只返回 active / suppressed 词条。删除 tombstone 不通�
 
 ### Dictionary file summaries
 
-当前 dictionary file FFI 只处理用户明确管理的 P2 用户词条 TSV，不导出 P1 选择事件、负反馈明细、上下文统计或 ranker 权重摘要。
+dictionary inspect、export、import 与 import batch 的字段级结构、常量和规则见 [FFI Dictionary Reference](ffi-dictionary-reference.md)。本文件只保留所有权、隐私和跨平台通用边界。
 
-当前常量：
-
-```text
-RADISHLEX_DICTIONARY_FORMAT_USER_TERMS_V1 = 1
-RADISHLEX_SYNC_CLASS_P2_ENCRYPTED_SYNC = 2
-```
-
-`RadishLexDictionaryInspectSummary`：
-
-```text
-format_version: u32
-record_count: usize
-sync_class: u32
-```
-
-`RadishLexDictionaryExportSummary`：
-
-```text
-format_version: u32
-exported_terms: usize
-sync_class: u32
-```
-
-`RadishLexDictionaryImportSummary`：
-
-```text
-import_batch_id: i64
-import_batch_id_present: u8
-total_records: usize
-imported_terms: usize
-inserted_terms: usize
-updated_terms: usize
-skipped_deleted_terms: usize
-skipped_duplicate_terms: usize
-dry_run: u8
-```
-
-`RadishLexImportBatchView`：
-
-```text
-id: i64
-source_name: RadishLexStringView
-total_records: usize
-imported_terms: usize
-inserted_terms: usize
-updated_terms: usize
-skipped_deleted_terms: usize
-skipped_duplicate_terms: usize
-created_at_ms: i64
-notes: RadishLexStringView
-notes_present: u8
-```
-
-规则：
-
-- `radishlex_userdb_dictionary_inspect` 只读取导入文件并返回格式版本、记录数和同步分类，不打开 userdb。
-- `radishlex_userdb_dictionary_export` 必须显式传入 SQLite 路径和输出文件路径，只导出 active / suppressed 用户词条字段。
-- `radishlex_userdb_dictionary_import` 必须显式传入 SQLite 路径、输入文件路径、可选 source name 和 `dry_run` 的 `0 / 1` 值。
-- `dry_run = 1` 时复用实际导入分类逻辑，但不写入词条或 import batch。
-- `dry_run = 0` 时写入词条并记录 import batch；导入仍遵守 deleted tombstone，不复活用户已删除词条。
-- `radishlex_userdb_import_batches_new` 返回只读 `RadishLexImportBatchList*`，由 `radishlex_userdb_import_batches_free` 释放。
-- import batch view 中的 string view 借用自 batch list handle，平台端只能在 list 释放前读取，不得缓存裸指针。
-
-`radishlex_session_push_key` 保留为字符输入便利函数；真实平台壳后续应优先使用 `radishlex_session_push_key_event`。当前 normalized key event 使用数值常量承载字符键、命名键、修饰键、按下 / 释放阶段和平台不可识别键，避免让无效 enum discriminant 在 FFI 边界形成未定义行为。
+`radishlex_session_push_key` 与 `radishlex_session_push_key_event` 保留为兼容和测试入口；真实平台壳必须使用 `radishlex_session_handle_key_event`。当前 normalized key event 使用数值常量承载字符键、命名键、修饰键、按下 / 释放阶段和平台不可识别键，避免让无效 enum discriminant 在 FFI 边界形成未定义行为。
 
 Engine adapter 选择规则：
 
@@ -381,6 +368,7 @@ Engine adapter 选择规则：
 - `radishlex_session_new_with_options` 接收带 `version` 的 `RadishLexSessionOptions`，当前只允许 `RADISHLEX_ENGINE_KIND_DEMO`。
 - `RADISHLEX_ENGINE_KIND_RIME` 已保留为稳定 kind，但当前返回 `InvalidState`；真实 Rime adapter 不通过该通用 options 入口传路径。
 - `radishlex_session_new_rime` 是 Rime 专用构造入口，负责校验 `RadishLexRimeSessionOptions`；默认构建下返回 `InvalidState`，`native-rime` feature 下创建真实 Rime session。
+- `radishlex_rime_runtime_shutdown` 是进程 teardown 入口；默认构建下返回 `InvalidState`，native 构建下只在零活动 Rime session 时 finalize，重复 shutdown 返回成功。
 - 未知 options version 或未知 engine kind 返回 `InvalidArgument`。
 - 平台端不能直接创建或持有 Rime session、Rime candidate 指针或底层 native handle。
 
@@ -401,6 +389,8 @@ Userdb 状态入口规则：
 - 返回结构只包含 schema version、P2 可同步对象计数、P1 本地事件计数、本地审计计数和 `plaintext_payload = false`。
 - 函数不返回用户词明文、选择事件明细、负反馈明细、导入批次内容、同步 payload、SQLite connection、statement 或 row 指针。
 - 该入口不连接 Go server，不执行加密、hash、签名、上传下载或冲突合并，也不暴露 Rust 内部 P2 plaintext payload 迭代器或 envelope / draft 类型。
+- `radishlex_userdb_rank_explain_new` / `radishlex_userdb_rank_explain_view` 只返回单候选 ranker explain 摘要；view 字符串借用自 explain handle，平台绑定层必须复制后再释放 handle。
+- rank explain 摘要允许包含候选文本和 reading，因为它面向用户正在管理的本地词条；不得扩展为 P1 原始事件明细、上下文分布、同步 payload 或 ranker 内部可变对象导出。
 
 Userdb 词条管理入口规则：
 
@@ -420,8 +410,10 @@ Userdb 词条管理入口规则：
 - Rust 分配的字符串、数组和 snapshot buffer 必须由 Rust 释放。
 - 平台端传入的字符串只在调用期间借用，Rust 不保存裸指针。
 - `RadishLexSession*` 绑定创建线程；平台端如需跨线程调度输入，必须在平台侧投递回创建线程，或后续在 Rust 侧显式建模线程安全队列。
+- `radishlex_session_free` 也必须回到 session owner thread；非 owner thread 的释放调用不消费 handle，调用方仍须在 owner thread 完成释放。
 - FFI 不跨线程共享 snapshot、buffer、term list、import batch list 或 error 裸指针。
 - session drop 必须释放 engine adapter、userdb handle 和临时 buffer。
+- 释放最后一个 Rime session 不等同于进程 teardown；平台仍须显式调用 runtime shutdown，且不得在任何 session 活动时调用。
 - panic 不能跨 FFI 边界，必须转换为错误码。
 
 ## 错误语义
@@ -466,14 +458,17 @@ InternalError
 
 - `ime-core` 输入会话、candidate、commit 和 engine trait 已稳定。
 - Rime adapter 与 rank smoke 可复验。
-- userdb 删除 tombstone、导入导出和 ranker explain 已通过测试。
-- 同步 payload 草案已区分 P1 本地和 P2 加密同步。
+- 按键 ABI 无损返回版本化 `consumed`、可选即时 commit 和同事件 snapshot。
+- librime setup/initialize/finalize 已收口为进程级 runtime，多 session 生命周期可复验。
 - FFI 文档明确所有权、生命周期、错误语义、字符串编码和释放责任。
-- `ime-ffi` 至少有 C ABI 单元测试或 host smoke，证明字符串、数组、snapshot、candidate view、normalized key event、session options、Rime session options、learning status 只读摘要、sync preflight 状态摘要、userdb 管理入口、ABI contract、session owner-thread policy、平台绑定式 view copy / release 和错误释放路径可复验。当前已完成上述 host smoke；真实平台壳前仍需由具体平台 wrapper 复验线程调度、字符串复制和释放规则。
+- 仓库提供受编译测试约束的 C header 或等价平台模块边界，并由具体 wrapper 复验线程调度、字符串复制和释放规则。
+- `ime-ffi` 有 C ABI 单元测试或 host smoke，覆盖 key result、snapshot、candidate view、normalized key event、session options、ABI contract、owner-thread、copy/release 和错误路径。
+
+userdb/ranker 正确性与真实学习闭环属于 M2，可在 M1 基础输入之后完成；同步 payload、设备授权和平台私钥不阻塞 M1 平台壳。
 
 ## 验证口径
 
-后续落地 `ime-ffi` 时至少需要：
+修改 `ime-ffi` 时至少需要：
 
 ```text
 cargo test -p radishlex-ime-ffi

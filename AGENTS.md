@@ -29,15 +29,13 @@
 
 ## 快速认知
 
-- 当前阶段：方案冻结与仓库基础治理
-- 当前代码状态：尚未落地 Rust workspace、Go server、Flutter manager 或平台壳代码
-- MVP 边界：Rust core 抽象、CLI demo、底层 engine adapter、用户词库、候选重排、个人化学习、自部署加密同步、至少一个真实平台输入法端
-- 推荐第一批真实平台：Linux Fcitx5 或 macOS InputMethodKit；Android 可作为移动端首选；Windows 与 iOS 后置
+- 当前阶段：M1 macOS 离线输入 Alpha；整改主批次 R01A，实时状态见 `docs/status/current.md`
+- 当前代码状态：Rust、Go、Flutter 原型与 macOS 开发薄壳已落地；真实安装、manager 产品包和生产同步未闭环
+- 当前交付：工程原型，不是可安装 MVP；阶段证据以真实输入、数据正确性、安全同步和产品构建为准
+- 交付梯度：先完成 macOS 离线 Alpha 与本地个人化 MVP；加密同步和最终产品包属于后续 M3/M4
+- 第一真实平台：macOS InputMethodKit；Linux Fcitx5 与 Android 后续，Windows、iOS 后置
 - 底层引擎策略：v1 可接 `librime`，但必须通过 engine adapter 隔离；长期保留 Rust 自研引擎替换空间
 - 隐私立场：服务端默认不可信，客户端才是数据真相源
-- 当前远程仓库：`https://github.com/laugh0608/RadishLex`
-- 当前常态开发分支：`dev`；`master` 作为稳定主线
-- 协作入口文件：`AGENTS.md` 与 `CLAUDE.md` 必须保持基本复制和长期同步
 
 ## 文档真相源
 
@@ -45,11 +43,14 @@
 
 当前稳定入口：
 
-1. `README.md`：项目定位、设计原则、MVP 边界和非目标
-2. `docs/technical-plan.md`：总体架构、平台策略、学习设计、同步方案、clean-room 原则和风险
-3. `docs/roadmap.md`：阶段路线、交付物和退出标准
-4. `docs/repository-layout.md`：仓库结构、crate / server / app / platform 职责
-5. `docs/privacy-sync.md`：数据分级、加密对象、设备授权、删除语义和威胁模型
+1. `README.md`：项目定位、设计原则、交付梯度和非目标
+2. `docs/status/current.md`：当前阶段、验证基线、停止线、主批次和近期顺位
+3. `docs/technical-plan.md`：总体架构、平台策略、学习设计、同步方案、clean-room 原则和风险
+4. `docs/roadmap.md`：阶段路线、交付物和退出标准
+5. `docs/repository-layout.md`：实际仓库结构、crate / server / app / platform 职责和未落地目录
+6. `docs/privacy-sync.md`：数据分级、加密对象、设备授权、删除语义和威胁模型
+
+临时专题仅在 `docs/status/current.md` 引用时进入阅读链，不自动成为长期真相源。
 
 按任务选读：
 
@@ -57,7 +58,7 @@
 - 涉及阶段顺序、MVP 范围或下一步计划：先读 `docs/roadmap.md`
 - 涉及同步、加密、设备授权、删除语义、日志和敏感数据：先读 `docs/privacy-sync.md`
 - 涉及 engine adapter、底层输入引擎或 clean-room 边界：先读 `docs/technical-plan.md` 中底层引擎策略与 clean-room 实现原则
-- 后续补齐 `docs/status/current.md` 或 `docs/README.md` 后，当前阶段、当前验证基线和日常推进入口应迁入这些短入口文档，本文件只保留长期稳定规则
+- 当前阶段、当前验证基线和日常推进入口统一维护在 `docs/status/current.md`；本文件只保留长期稳定规则和一行级当前认知
 
 规则：
 
@@ -143,15 +144,9 @@
 
 当前正式落地：
 
-- `README.md`：项目定位和稳定入口
-- `LICENSE`：RadishLex Source-Available License
-- `AGENTS.md` / `CLAUDE.md`：AI 协作入口
-- `docs/technical-plan.md`：技术方案
-- `docs/roadmap.md`：阶段路线图
-- `docs/repository-layout.md`：仓库结构草案
-- `docs/privacy-sync.md`：隐私与同步设计
+- 根 README / LICENSE / 协作入口，以及 `docs/status/current.md`、技术方案、路线图、仓库结构和隐私同步等正式文档
 
-规划结构：
+已落地核心结构：
 
 - `crates/`：Rust 核心和跨端复用库
 - `crates/ime-core/`：输入会话、候选模型、提交模型、engine trait、学习事件等核心领域模型
@@ -164,10 +159,13 @@
 - `crates/ime-cli/`：输入 demo、词库管理、同步测试、ranker explain
 - `server/sync-server/`：Go 自部署同步服务
 - `apps/radishlex-manager/`：Flutter 桌面 / 移动管理器
-- `platforms/`：Windows TSF、macOS InputMethodKit、Linux Fcitx5 / IBus、Android IME、iOS Keyboard Extension 薄壳
+- `deploy/sync-server/`：本地与部署态 Compose、反向代理示例
+- `platforms/android-ime/keystore-bridge/`：Android Keystore 能力验证桥，不是完整 IME
+- `platforms/macos-imk/`：InputMethodKit 薄壳、bundle build 与 contract smoke
 - `scripts/`：仓库检查、格式和构建脚本
-- `examples/`：示例输入方案、词库和同步样本
-- `tests/`：跨语言、跨平台集成测试和 fixture
+- `tests/fixtures/`：跨模块合成 fixture
+
+尚未落地：Linux/Windows/iOS 平台壳、完整 Android IME 和 `examples/`；macOS 尚缺经授权的真实安装与应用输入 smoke，contract bundle 不代表 M1 完成。
 
 ## 架构边界
 

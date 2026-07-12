@@ -8,7 +8,94 @@
 - 部署态只提供同机 HTTP upstream `http://127.0.0.1:7319`；外部 TLS 必须在反向代理、VPN 或等价网络边界完成，Go server 通过单用户 bearer access token 执行首个内建访问门禁。
 - 本地验证入口仍是显式 `-f deploy/sync-server/docker-compose.local.yaml`，通过 Caddy internal TLS 提供 `https://localhost:7319`，不新增第二个对外端口。
 - Go server 已验证密文对象上传下载、设备授权、版本冲突、日志脱敏、Docker Compose 本地 / 部署态启动 smoke、Rust userdb 两客户端真实 Go HTTP 同步、短生命周期冷备份 / 恢复到隔离目录 smoke，以及短生命周期外部 TLS 反代 smoke；这些证据仍不等于可以开放真实用户同步。
-- 真实用户同步前仍缺少目标部署上的备份恢复演练、升级回滚演练、真实证书 / 域名 / 外部反代复验、平台私钥存储 backend 和用户可用同步 UI；生产访问认证已有单用户 bearer token 实现证据，但部署者仍必须设置真实 token 并复验失败响应。
+- 真实用户同步或正式发布前仍缺少目标部署上的备份恢复演练、升级回滚演练、真实证书 / 域名 / 外部反代复验、平台私钥存储 backend 和用户可用同步 UI；这些不作为当前产品开发阻塞项。开发期同步测试以本地 Docker、本地 HTTPS、短生命周期数据目录和现有 smoke 为准。
+
+## 阶段边界
+
+本文档的目标部署证据包面向正式发布、真实用户开放或长期自部署交接。当前产品开发不要求准备真实域名、正式证书或外部反代；需要测试同步链路时，优先使用 `deploy/sync-server/docker-compose.local.yaml` 提供的本地 HTTPS、短生命周期数据目录和自动化 smoke。
+
+本地 Docker / 本地 HTTPS 通过可以记录为 `local_smoke`，用于支撑 manager 同步入口的状态派生、阻塞说明、诊断脱敏和本地联调。它不能代表发布级外部 TLS、备份恢复、升级回滚和日志策略已在目标环境通过，也不能单独解除真实用户同步开放门禁。
+
+## 目标部署证据包
+
+目标部署证据包用于判断某个实际部署是否可以进入 manager 的真实同步入口准备状态。它不是 settings JSON，不是诊断报告，也不是服务器自动上传的运行日志；它是部署者在目标环境完成复验后保留的非敏感记录。
+
+证据包至少记录：
+
+- 复验日期、操作者或维护者标识、目标环境别名和 RadishLex Git commit / 镜像 tag。
+- 使用的 Compose 文件、镜像 tag、`RADISHLEX_SYNC_BIND` / `RADISHLEX_SYNC_PORT` / `RADISHLEX_SYNC_PUBLIC_URL` 的非敏感摘要。
+- `RADISHLEX_SYNC_ACCESS_TOKEN` 是否已配置并通过失败响应复验；不得记录 token 明文、长度原文或派生材料。
+- 外部 TLS / 反代、访问控制、冷备份 / 恢复、升级 / 回滚和日志脱敏的结论。
+- 每项复验的命令类别、结果、时间和非敏感错误码；不得记录请求体、响应体、证书私钥、token、payload bytes、signature bytes、wrapped material bytes 或恢复材料。
+
+证据包可以引用以下非敏感 `deployment_evidence_source` 标签：
+
+| 标签 | 允许含义 | 不能代表 |
+| --- | --- | --- |
+| `local_smoke` | 本机或短生命周期环境 smoke 通过，适合证明实现级路径仍可复验。 | 真实目标部署可开放给用户。 |
+| `external_tls` | 目标部署外部 HTTPS、反代到 HTTP upstream、`Authorization` header 透传、TLS 1.2+ 和反代日志脱敏通过。 | 备份恢复、升级回滚或平台私钥 backend 可用。 |
+| `backup_restore` | 目标数据目录完成冷备份，并恢复到隔离目录后可读取 domain / device / recovery / object payload metadata。 | 线上原目录可以随意回滚，或能追回已同步到旧设备的数据。 |
+| `upgrade_rollback` | 目标部署使用明确镜像 tag 完成升级前备份、升级验证和旧备份回滚演练。 | 支持 down migration，或可以无备份升级。 |
+
+目标部署进入真实用户同步前，`external_tls`、`backup_restore`、`upgrade_rollback` 和访问控制失败响应都必须在目标环境有记录；`local_smoke` 只能作为实现级辅证。manager v1 settings draft 只能保存一个 allowlist 来源标签用于解释本地 gate，不保存完整证据包，也不因此证明真实用户同步已经开放。需要交接给后续 UI / bridge 设计时，只能交接校验器导出的 `deployment_evidence_summary.v1` 非敏感摘要。
+
+证据包模板：
+
+```text
+deployment_evidence.v1
+reviewed_at: <Asia/Shanghai timestamp>
+target_alias: <non-secret deployment alias>
+git_commit: <commit>
+image_tag: <explicit image tag>
+compose_file: deploy/sync-server/docker-compose.yaml
+public_url_status: configured | not_configured
+access_token_status: configured_and_401_verified | missing | failed
+access_control: passed | failed | not_run
+external_tls: passed | failed | not_run
+backup_restore: passed | failed | not_run
+upgrade_rollback: passed | failed | not_run
+log_redaction: passed | failed | not_run
+notes: <non-sensitive summary only>
+```
+
+填写后的证据包必须先通过 `./scripts/check-sync-deployment-evidence.sh <evidence-file>`。该脚本校验 `deployment_evidence.v1` 必填字段、状态枚举、固定 Compose 文件、时间戳、目标别名、commit、image tag 和敏感内容黑名单；仓库内合成 fixture 可用 `./scripts/check-sync-deployment-evidence.sh tests/fixtures/sync-deployment-evidence-valid.txt` 复验。脚本不连接真实部署，也不替代目标环境人工演练；它只用于拒绝格式漂移和敏感内容进入交接材料。
+
+校验通过后，可以导出非敏感摘要：
+
+```sh
+./scripts/check-sync-deployment-evidence.sh --summary-json <evidence-file>
+./scripts/check-sync-deployment-evidence.sh --summary-text <evidence-file>
+```
+
+摘要 schema 为 `deployment_evidence_summary.v1`，只包含 `target_alias`、`reviewed_at`、`git_commit`、`image_tag`、固定 Compose 文件、目标证据是否完整、可映射到 manager 的 `deployment_evidence_sources` 标签，以及各项状态枚举。摘要不得包含证据文件路径、`notes`、真实 URL、token、证书、日志正文、请求 / 响应体、payload bytes、signature bytes、wrapped material bytes、恢复材料或平台私钥材料。
+
+禁止把真实域名证书正文、证书私钥、token、`.env` 内容、宿主机绝对路径、请求 / 响应体、payload bytes、signature bytes、wrapped material bytes、恢复码、同步主密钥、平台私钥、用户词、input code、reading 或 P1 原始事件写入证据包、settings draft、诊断报告或 committed 文档。
+
+### 无真实证据包时的阻塞记录
+
+如果当前会话没有用户提供或目标环境产生的真实 `deployment_evidence.v1`，不得使用仓库内合成 fixture 冒充发布级部署证据，也不得从未通过校验的草稿中提取摘要。交接记录只写阶段结论：发布级目标部署未验证；manager 可以继续推进本地 `local_smoke` 支撑的状态派生和阻塞说明，真实用户同步、恢复码和设备授权成功路径继续关闭。
+
+部署者需要提供的非敏感字段清单：
+
+- `reviewed_at`：Asia/Shanghai `+08:00` 或 `Z` 时区的复验时间。
+- `target_alias`：不含真实域名、宿主机路径或用户信息的目标环境别名。
+- `git_commit`：部署对应的 RadishLex Git commit。
+- `image_tag`：明确镜像 tag，不使用浮动 `latest` 作为生产证据。
+- `compose_file`：固定为 `deploy/sync-server/docker-compose.yaml`。
+- `public_url_status`：只填 `configured` 或 `not_configured`，不写真实 URL。
+- `access_token_status`：只填 `configured_and_401_verified`、`missing` 或 `failed`，不写 token、长度、派生材料或请求头。
+- `access_control`、`external_tls`、`backup_restore`、`upgrade_rollback`、`log_redaction`：只填 `passed`、`failed` 或 `not_run`。
+- `notes`：只写非敏感摘要和阻塞原因，不写日志正文、命令输出、请求 / 响应体、证书、真实路径或 payload bytes。
+
+字段齐备后，先在本地未提交位置保存证据包，再执行：
+
+```sh
+./scripts/check-sync-deployment-evidence.sh <evidence-file>
+./scripts/check-sync-deployment-evidence.sh --summary-json <evidence-file>
+./scripts/check-sync-deployment-evidence.sh --summary-text <evidence-file>
+```
+
+只有通过校验后，才可以把 `deployment_evidence_summary.v1` 的非敏感摘要结论写入交接记录；证据包正文和证据文件路径不进入 committed 文档。
 
 ## 部署拓扑
 
@@ -191,6 +278,10 @@ sync-server/objects/
 部署配置变更至少执行：
 
 ```sh
+./scripts/check-sync-server-deployment-rehearsal.sh --config-only
+./scripts/check-sync-deployment-evidence.sh tests/fixtures/sync-deployment-evidence-valid.txt
+./scripts/check-sync-deployment-evidence.sh --summary-json tests/fixtures/sync-deployment-evidence-valid.txt
+
 go test ./internal/runtime -run TestLocalServerBackupRestorePreservesEncryptedSyncState -count=1
 go test ./internal/runtime -run TestExternalTLSProxySmokePreservesAuthAndEncryptedObjectFlow -count=1
 go test ./internal/runtime -run TestLocalServerUpgradeRollbackPreservesPreUpgradeBackup -count=1
@@ -206,6 +297,10 @@ git diff --check
 ```
 
 三条 runtime smoke 分别验证冷备份 / 恢复、外部 TLS 反代、升级 / 回滚；它们使用短生命周期测试服务和临时数据目录，不替代目标部署人工演练。
+
+`./scripts/check-sync-server-deployment-rehearsal.sh` 使用部署态 Compose 文件、临时 env、随机 bearer token 和仓库外数据目录执行短生命周期预演。完整模式会启动容器、验证 token 门禁、检查日志脱敏，并做一次冷备份 / 恢复到隔离目录；`--config-only` 只验证临时 env 与 Compose 解析，不代表容器启动通过。
+
+`./scripts/check-sync-deployment-evidence.sh --self-test` 使用仓库内合成 fixture 和反例复验校验器本身。目标部署证据文件写完后，应再对实际证据文件执行 `./scripts/check-sync-deployment-evidence.sh <evidence-file>`，通过后也只代表证据包格式和脱敏规则合格。`--summary-json` / `--summary-text` 只在校验通过后输出非敏感交接摘要；校验失败时不得从失败证据中提取摘要。
 
 需要 Docker daemon 的 build / up / curl smoke 如果被沙盒、Docker socket 或权限限制挡住，应申请真实环境复验。不能把 `config` 通过写成容器实际启动通过。
 

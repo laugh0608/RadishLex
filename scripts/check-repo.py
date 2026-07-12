@@ -43,14 +43,32 @@ REQUIRED_FILES = [
     "docs/repository-layout.md",
     "docs/roadmap.md",
     "docs/technical-plan.md",
+    "platforms/macos-imk/Sources/main.m",
+    "platforms/macos-imk/build-bundle.sh",
     "scripts/check-android-target.py",
     "scripts/check-android-target.sh",
     "scripts/check-docs.py",
     "scripts/check-docs.sh",
+    "scripts/check-manager-ffi-smoke.sh",
+    "scripts/check-manager.sh",
+    "scripts/check-macos-imk.sh",
+    "scripts/check-macos-imk-native.sh",
+    "scripts/macos-imk/native_manifest.py",
+    "scripts/macos-imk/test_native_manifest.py",
     "scripts/check-repo.py",
     "scripts/check-repo.sh",
+    "scripts/check-sync-deployment-evidence.py",
+    "scripts/check-sync-deployment-evidence.sh",
+    "scripts/check-sync-server-connection-health.py",
+    "scripts/check-sync-server-connection-health.sh",
     "scripts/check-text-files.py",
     "scripts/check-text-files.sh",
+    "tests/fixtures/sync-deployment-evidence-valid.txt",
+    "apps/radishlex-manager/README.md",
+    "apps/radishlex-manager/pubspec.yaml",
+    "apps/radishlex-manager/lib/main.dart",
+    "apps/radishlex-manager/tool/ffi_bridge_smoke.dart",
+    "apps/radishlex-manager/test/widget_test.dart",
 ]
 REQUIRED_STATUS_CHECKS = {"Repo Hygiene", "Repository Baseline"}
 CONVENTIONAL_COMMIT_PATTERN = "^(feat|fix|docs|refactor|test|chore|ci|build|perf|revert)(\\([a-z0-9._/-]+\\))?!?: .+"
@@ -202,6 +220,14 @@ def check_go_server() -> None:
     run_command(["go", "test", "./..."], cwd=REPO_ROOT / "server" / "sync-server")
 
 
+def check_deployment_evidence() -> None:
+    run_script("check-sync-deployment-evidence.py", ["--self-test"])
+
+
+def check_sync_connection_health() -> None:
+    run_script("check-sync-server-connection-health.py", ["--self-test"])
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run RadishLex repository baseline checks.")
     parser.add_argument("--skip-text-files", action="store_true", help="Skip text hygiene checks.")
@@ -224,6 +250,8 @@ def main() -> int:
     check_license_wording()
     check_ruleset_and_workflows()
     check_path_budget()
+    check_deployment_evidence()
+    check_sync_connection_health()
     if not args.skip_go:
         check_go_server()
     if not args.skip_rust:

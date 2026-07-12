@@ -1,60 +1,78 @@
 # RadishLex 隐私与同步设计
 
+本文档定义 RadishLex 长期稳定的数据分级、服务端可见性、密钥、设备、删除、恢复、日志和威胁模型边界，读者是 core、sync、server、manager 与平台实现者。本文不记录当前实现清单、设备 smoke 流水、部署命令或临时整改状态；这些内容分别进入 `docs/status/current.md`、对应 runbook、ADR 和 devlog。
+
 ## 核心立场
 
-输入法数据高度敏感。RadishLex 的同步服务必须默认不可信，客户端才是数据真相源。
+输入法数据高度敏感。同步服务默认不可信，客户端才是用户数据和解密能力的真相源。
 
-服务端只应看到：
-
-- 设备 ID。
-- 加密对象 ID。
-- 加密 blob 大小。
-- 对象版本。
-- 更新时间。
-- 必要的同步元数据。
-
-服务端不应看到：
-
-- 明文用户词。
-- 明文输入历史。
-- 明文候选偏好。
-- 明文应用上下文。
-- 明文短语和联系人信息。
+输入热路径必须完全本地可用。后端不能参与每次按键、候选生成、候选排序、文本提交或隐私判断。
 
 ## 数据分级
 
-### P0: 永不同步
+### P0：永不学习、永不同步
 
-- 密码框输入。
-- 银行、支付、证件类敏感 App。
-- 用户手动开启隐私模式期间的输入。
-- 系统标记为 secure text entry 的内容。
+- 密码框和系统 secure text entry。
+- 银行、支付、证件等敏感应用或场景。
+- 用户开启隐私模式期间的输入。
+- 平台明确标记为不可学习的内容。
 
-### P1: 本地学习，默认不同步
+P0 数据不写 selection event、negative feedback、user term 或同步摘要。平台无法可靠判断时，应优先按更严格等级处理。
 
-- 应用上下文统计。
-- 原始选择事件日志。
+### P1：本地学习、默认不同步
+
+- 原始选择事件。
 - 负反馈详细事件。
+- 应用和短语上下文统计。
+- 本地审计批次与调试统计。
 
-### P2: 加密同步
+P1 可以在客户端压缩为不可还原原始输入的 P2 摘要，但压缩规则必须明确、可测试和可删除。
+
+### P2：端到端加密同步
 
 - 用户词库。
 - 候选权重摘要。
-- 输入方案配置。
+- 输入方案和用户配置。
 - 自定义短语。
 - 设备设置。
+- 删除 tombstone。
 
-### P3: 可公开下载
+P2 只能以客户端加密对象传输和存储。服务端不得提供 plaintext payload API。
+
+### P3：可公开下载
 
 - 官方词库包。
 - 输入方案模板。
 - 模型包。
 - UI 主题。
 
-## 加密对象模型
+P3 包仍需要来源、版本、完整性和许可证校验，但不使用用户同步密钥。
+
+## 服务端可见性
+
+服务端可以看到：
+
+- domain、device 和必要公钥 metadata；
+- 加密对象 ID、类型、版本、base version 和 key epoch；
+- 密文长度、ciphertext hash、创建和更新时间；
+- 加入、授权、撤销和恢复记录的公开协议字段；
+- 请求 ID、结果码、延迟和必要非敏感审计摘要。
+
+服务端不得看到：
+
+- 明文用户词、输入历史、自定义短语和联系人；
+- 明文候选偏好、原始 selection/negative event；
+- 明文应用上下文或 phrase context；
+- sync master key、object key、recovery code、私钥或解密后的 wrapped material；
+- 认证 token、完整请求/响应体或平台密钥内部材料。
+
+## 加密对象
+
+稳定外壳至少包含：
 
 ```text
 SyncObject
+  domain_id
   object_id
   object_type
   owner_device_id
@@ -66,11 +84,24 @@ SyncObject
   nonce
   encrypted_payload_len
   ciphertext_hash
-  created_at
-  updated_at
+  created_at_ms
+  updated_at_ms
+  signer metadata
+  signature
 ```
 
-对象类型：
+要求：
+
+- ciphertext hash 基于密文或 AAD + 密文，不得基于 plaintext。
+- AAD 绑定会影响解释或路由的对象 metadata。
+- nonce 在同一 key/epoch 下不得重复。
+- 签名覆盖安全相关 metadata 和实际密文 hash，不能只覆盖密文长度。
+- 算法、schema 和 signature version 必须显式可演进。
+- 下载后先验证大小、hash、签名、版本和资源上限，再进入高成本解密或 KDF。
+
+## P1 到 P2 的边界
+
+允许同步的对象类型至少包括：
 
 - `dictionary.user_terms`
 - `dictionary.deleted_terms`
@@ -79,186 +110,217 @@ SyncObject
 - `settings.schema`
 - `backup.snapshot`
 
-## 同步前置检查
+禁止直接同步：
 
-在 Go 后端真实同步和远端上传下载落地前，`radishlex-ime-cli sync preflight --db <path>` 只用于检查本地 userdb 的分类边界：
+- `selection_events`
+- `negative_feedback`
+- 原始上下文记录
+- `import_batches`
 
-- P2 后续可加密同步：`dictionary.user_terms`、`ranker.weights`、`dictionary.deleted_terms`。
-- P1 默认本地保留：`selection_events`、`negative_feedback`。
-- 本地审计记录：`import_batches`。
+客户端内部可以提供 P2 payload encoder，但它不是 CLI 明文导出、FFI 管理接口或平台壳入口。任何同步 orchestration 都只接受已经分类、序列化并加密的对象；禁止为了联调增加 plaintext HTTP 上传路径。
 
-该命令不得生成明文同步 payload，不连接后端，不输出用户词明文、原始事件明文或负反馈明细。它的作用是提前复验“哪些表可以进入后续加密对象，哪些表必须留在本地”。
+同步预检只能输出类型、计数、状态和阻塞原因，不输出用户词、事件或 payload bytes。
 
-`ime-userdb` 当前已有 Rust 内部 `UserDb::p2_plaintext_payloads()` 只读迭代器，供本地 integration test 通过 `ime-sync::SyncEnvelopeAssembler` 把 `dictionary.user_terms`、`ranker.weights` 和 `dictionary.deleted_terms` 装入 `ime-crypto` envelope，再派生 `ime-sync::EncryptedSyncObjectDraft`。该迭代器不是 CLI / FFI / 文件导出接口，不得作为明文同步文件或平台壳调用入口。
+## 密钥层级
 
-`crates/ime-sync/` 当前定义 payload 来源分类、同步对象类型、加密对象外壳草案、P2 envelope 组装边界、同步域、设备状态、加入请求、授权包、撤销记录、对象版本冲突草案模型、客户端解密后合并模型、remote client DTO / transport trait、std-only `http://` HTTP transport 和可选 bearer access token header。该合并模型已覆盖 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词和显式恢复语义；`ime-userdb` 已能把已解密 P2 JSON 解析为 merge input，并把被接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite。当前 remote client 只接受已加密 `AssembledSyncObject` 和 `SignedSyncObjectManifest`，不接受 plaintext payload；HTTP transport 只传递 encrypted payload、服务端可见 metadata 和可选 `Authorization` header，不记录请求体、响应体或 token。Rust 侧两客户端 userdb harness 已覆盖 P2 payload 加密上传、另一客户端下载密文、解密、合并写回、stale conflict 和 v2 重新上传；Go server runtime smoke 已覆盖第二设备授权、跨设备 object 版本链、备份恢复、外部 TLS 反代和升级回滚；Rust HTTP transport 直连 Go server 的短生命周期跨语言测试已覆盖 domain 初始化、signed encrypted object 上传、metadata / payload 读取和 stale conflict；Rust userdb 两客户端真实 Go HTTP 测试已覆盖设备授权、三类 P2 对象上传下载、客户端解密写回、stale conflict 和 v2 重新上传。Docker Compose 本地 / 部署态入口已补，本地通过 `https://localhost:7319` 验证，部署态通过同机 HTTP 上游对接外部 TLS 反代；生产部署 runbook 已固定外部 TLS、认证 / 访问控制、备份恢复、升级回滚和真实用户开放停止线；`apple-keychain-v1` 平台 runbook 和签名策略已固定，macOS backend 已在 `apple-keychain` feature 下接线并通过非 smoke 测试；真实 Keychain smoke 已运行但阻塞于 `ed25519-v1` 创建，backend status 已阻断生产签名，未进入签名成功或用户可用同步路径；`android-keystore-v1` 平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin / Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录已固定，当前已补 Rust raw JNI glue；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。Go server API / storage 边界见 `docs/sync-server-api-storage.md`，当前 Go module 已覆盖 metadata / storage / API / runtime 验证、SQLite-backed metadata repository、local object storage staged transaction、encrypted object version handler、recovery latest handler、device wrapped key bytes 承载、单用户 bearer access token 门禁、非敏感 audit events、短生命周期 HTTP smoke、备份恢复 smoke、外部 TLS 反代 smoke、升级回滚 smoke、真实 Go HTTP 两客户端测试和 Compose 运行边界，服务端只能保存密文对象、设备公钥、签名记录、版本和必要同步元数据。
+```text
+Recovery Code
+  -> Recovery Wrapping Key
+     -> wrapped Sync Master Key
 
-`docs/crypto-boundary.md` 已补 `ime-crypto` 客户端加密边界，并已落地本地 AEAD envelope、ciphertext hash、device wrapping、recovery material 和撤销后 key epoch 解密边界测试。对象版本服务端可见 hash 当前对齐 Rust envelope 的 AAD + encrypted payload hash；device wrapping 和 recovery wrapped material 使用裸密文 bytes 的 hash / length 校验。任何 hash 都不得是 plaintext payload hash。
+Device Key Agreement / Wrapping Key
+  -> wrapped Sync Master Key for one device
 
-`docs/sync-key-management.md` 已补真实同步前的同步密钥与设备生命周期边界，固定设备授权、恢复码、设备撤销、key epoch、服务端可见元数据和冲突方向；`docs/adr/0002-recovery-code-kdf.md` 已固定恢复码 KDF、格式和恢复记录边界，`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名和私钥存储边界，`docs/sync-server-api-storage.md` 已固定 Go sync server 的 API、SQLite metadata、对象存储、版本冲突、恢复 / 撤销记录、错误语义和验证口径，`docs/production-recovery-flow.md` 已固定生产恢复记录创建 / 轮换 / 撤销、新设备恢复加入和失败限速，`docs/runbooks/sync-server-production-deployment.md` 已固定生产部署边界，`docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend 边界，`docs/adr/0005-apple-platform-signing-strategy.md` 已固定 Apple 平台签名策略，`docs/runbooks/apple-keychain-signing-backend.md` 已固定 Apple Keychain backend 平台验证边界，`docs/runbooks/android-keystore-signing-backend.md` 已固定 Android Keystore backend 验证边界；`ime-crypto` 已落地恢复码 KDF Rust 模型、恢复记录解密测试、Ed25519 test-memory signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断、feature-gated macOS Keychain backend、feature-gated Android Keystore 不可用门禁、signed sync object manifest 和 signed recovery record；`ime-sync` 已落地 signed device authorization / revocation、remote object client DTO、HTTP transport 和 bearer token header；`ime-userdb` 已补 Rust 侧两客户端同步边界测试和真实 Go HTTP 两客户端测试；Go server 已起步 metadata / storage / API / runtime 验证模型、SQLite-backed metadata repository、local object storage staged transaction、签名验证、device wrapping encrypted key bytes 承载、recovery wrapped material 读取、metadata API、object version 上传下载、版本冲突、错误语义、单用户 bearer access token 门禁、非敏感 audit events、双设备 HTTP smoke、备份恢复 smoke、外部 TLS 反代 smoke、升级回滚 smoke、Rust HTTP transport 直连 Go server 的短生命周期跨语言测试、Rust userdb 两客户端真实 Go HTTP 测试和 Docker Compose 本地 / 部署态入口。进入用户可用同步前，应继续保持日志脱敏、payload hash / length、stale conflict 和客户端解密后合并写回证据，并按真实 API / 设备矩阵继续调查 Android Keystore Ed25519 支持，或补目标部署运行证据；Apple 平台若继续推进，应单独调查原生非导出 Ed25519 支持矩阵或新增独立 backend / 算法 ADR。
+Sync Master Key + object identity + key epoch
+  -> Object Encryption Key
+```
 
-## 设备授权
+要求：
+
+- sync master key 不上传明文。
+- object key 按 domain/object/epoch 派生，避免跨对象复用。
+- 设备撤销后推进 key epoch，撤销设备不能解密后续对象。
+- recovery wrapping 和 device wrapping 使用独立 role、algorithm ID 和 AAD。
+- secret 类型应减少 Clone，并在生命周期结束时清零或使用受控 secret container。
+
+## 平台私钥
+
+平台 backend 必须报告：
+
+- backend ID 与版本；
+- signing/key-agreement algorithm；
+- 是否不可导出；
+- 是否声明硬件保护；
+- 当前 capability 和 production status；
+- 创建、加载、签名、删除和失效错误。
+
+禁止从平台名称推断算法一定可用，也禁止 unavailable backend 静默回退到内存私钥或普通文件。
+
+协议必须允许算法演进。平台原生 P-256 与“由平台密钥封装的 Ed25519 seed”具有不同保护语义，必须使用不同 backend/algorithm ID 和测试矩阵。
+
+## 新设备授权
 
 推荐流程：
 
-1. 第一台设备初始化主密钥。
-2. 第一台设备生成恢复码。
-3. 新设备生成设备密钥对。
-4. 旧设备扫描新设备二维码或输入配对码。
-5. 旧设备为新设备加密同步密钥。
-6. 新设备开始拉取密文对象。
+1. 新设备生成签名和密钥协商/封装能力。
+2. 新设备创建带过期时间、challenge 和短码的 join request。
+3. 已授权设备验证用户确认、设备身份和协议版本。
+4. 已授权设备为新设备封装当前 sync master key。
+5. 授权签名绑定双方设备 ID、接收公钥材料、challenge、key epoch、算法、nonce 和 wrapped ciphertext hash。
+6. 服务端验证签名和设备状态后激活新设备。
+7. 新设备下载、验签并解封同步密钥，再开始对象同步。
 
-详细设备授权、恢复码、撤销和 key epoch 规则见 `docs/sync-key-management.md`。生产恢复流程见 `docs/production-recovery-flow.md`。Go server API、存储字段、对象上传下载边界和错误语义见 `docs/sync-server-api-storage.md`。
+短码只用于人机确认，不能代替密码学 challenge 或签名绑定。授权包、短码和 wrapped key 不进入日志或长期诊断。
+
+## 设备撤销
+
+- 只有 active 已授权设备可以签署撤销。
+- 撤销记录绑定被撤销设备、执行设备、原因、旧 epoch、新 epoch 和时间。
+- 撤销后服务端拒绝被撤销设备上传新对象或获取新 wrapped key。
+- 客户端为后续对象轮换 key epoch；旧对象是否重加密由恢复与历史策略决定。
+- 设备丢失场景不得要求丢失设备参与。
 
 ## 删除语义
 
-删除必须同步。
+删除强于普通降权。用户删除词条时必须：
 
-原因：
+1. 在本地原子更新 user term 状态。
+2. 写入带稳定身份与版本的 tombstone。
+3. 清理或屏蔽相关 ranker 权重。
+4. 将 tombstone 作为 P2 对象同步。
 
-- 用户删除某个词后，旧设备不能在下次同步时把它恢复。
-- 需要 tombstone 记录删除意图。
+合并要求：
 
-建议：
+- 旧 active term、旧 weight、旧选择事件和旧备份不能压过新 tombstone。
+- 显式恢复必须是新的用户意图，并使用比 tombstone 更新的稳定版本。
+- 同时间戳冲突使用确定性 device/object tie-break，不能依赖到达顺序。
+- 合并必须把本地当前状态作为一等输入，并满足交换律、结合律和幂等性。
 
-```text
-DeletedTerm
-  term_id
-  text_hash
-  reading_hash
-  deleted_at
-  deleted_by_device
-```
+## 恢复码与恢复记录
 
-明文删除记录只保存在客户端。服务端看到的仍是加密 blob。
+- 恢复码由客户端生成，不上传明文。
+- KDF 使用版本化 Argon2id profile，并同时限制最小和最大 memory、iterations、parallelism、salt 和 output。
+- recovery record 保存 salt、KDF profile、algorithm、nonce、wrapped key metadata、ciphertext hash 和签名。
+- 签名绑定实际 wrapped ciphertext hash，服务端不能替换密文后只更新 hash。
+- 恢复记录可创建、轮换和撤销；旧恢复码在撤销后不可继续加入设备。
+- 恢复失败需要服务端和客户端双层限速，但不能依赖可伪造 header 作为唯一身份。
 
-## 备份恢复
+## 备份与恢复
 
-备份应是一个加密快照：
+服务端备份必须成对包含：
 
-- 包含用户词库。
-- 包含候选权重摘要。
-- 包含设置。
-- 不包含 P0 数据。
-- 默认不包含原始事件日志。
+- SQLite metadata；
+- encrypted blob directory；
+- migration/version 信息；
+- 恢复所需的部署配置，但不包含未加密 secret 导出。
 
-恢复方式：
+客户端仍是明文真相源。服务端备份恢复后必须重新验证 metadata/blob 长度与 hash，不能把缺失或不匹配的 blob 当作成功对象。
 
-- 使用恢复码。
-- 或使用已有设备授权。
+用户应能：
 
-恢复码路径只在客户端解开同步域材料，服务端只保存 signed recovery record 和包装密文；生产恢复流程的轮换、撤销、失败限速和日志边界见 `docs/production-recovery-flow.md`。
+- 导出本地加密备份；
+- 验证恢复码；
+- 查看非敏感恢复记录状态；
+- 撤销恢复记录；
+- 从恢复设备重新建立受信任设备集合。
 
-## 审计能力
+## Manager 可见性
 
-客户端管理 UI 应提供：
+Manager 可以显示：
 
-- 最近同步对象数量。
-- 最近上传时间。
-- 最近下载时间。
-- 哪些类别参与同步。
-- 服务端地址。
-- 当前设备列表。
-- 一键停止同步。
-- 一键删除本机学习数据。
-- 一键从服务端删除当前账号密文数据。
+- 当前设备和授权状态；
+- 最近同步时间、待同步计数和结构化错误；
+- key epoch、恢复记录状态和撤销提示；
+- 后端 endpoint 的净化显示与连接健康分类；
+- 隐私模式、学习开关和删除/导出操作。
+
+Manager 不得显示或持久化：
+
+- token、recovery code、短码历史；
+- signature bytes、wrapped material、payload bytes；
+- 原始请求/响应体；
+- 明文 P1 事件或真实敏感路径。
+
+诊断只使用 allowlist 字段和结构化状态码。真实同步操作必须通过 Rust sync/crypto 边界，Flutter 不自行构造签名或解密 payload。
 
 ## 后端部署
 
-MVP 部署：
+生产部署必须：
 
-```text
-radishlex-server
-sqlite
-local object storage
-```
+- 使用 HTTPS/TLS，明确外部反代或内置终止边界；
+- 强制非空认证，无认证只允许显式 loopback 开发模式；
+- 在解码 JSON/base64 前限制请求体，限制响应体和字符串/ID 长度；
+- 配置连接、读、写、idle 和总超时；
+- 使用持久化或可控限速策略，避免伪造 header 绕过；
+- 支持 graceful shutdown、迁移、备份恢复和升级回滚；
+- 仅记录非敏感 audit metadata，并处理审计写入失败。
 
-SQLite 只保存 domain、device、join request、authorization、revocation、recovery record、object metadata、blob ref 和非敏感审计事件；local object storage 只保存 encrypted object payload、recovery wrapped material，以及 device authorization wrapped key bytes 这类密文材料。Go storage 和 API 已覆盖 wrapped key bytes、recovery wrapped material、encrypted object payload 的 hash / length 复验和读取边界；对象版本 hash 按 Rust envelope AAD + encrypted payload 复验，wrapped key / recovery wrapped material 按裸密文 bytes 复验。两客户端合并写回、Docker Compose 本地 / 部署态入口、单用户 bearer access token 门禁、备份恢复、外部 TLS 反代、升级回滚和日志脱敏已经有测试或 runbook 证据；真实用户可用同步前仍必须补目标部署运行证据和可用平台私钥 backend。业务删除通过 `dictionary.deleted_terms` 加密对象表达，服务端级删除只用于用户明确清空同步域密文数据或管理员清理整域数据。
+Docker/反代操作步骤见对应 runbook，当前部署证据见 `docs/status/current.md` 和 devlog，不复制到本文。
 
-## 日志与错误脱敏
-
-服务端 audit event、runtime log、错误响应和 Rust remote client Debug 输出都属于隐私边界的一部分。
+## 日志、错误与测试数据
 
 允许记录：
 
-- route name / event type。
-- domain id、device id、opaque object id、object type。
-- object version、result code、HTTP status。
-- encrypted byte length、server time、latency。
+- request ID、route、result code 和 latency；
+- device/domain/object 的受控 opaque ID；
+- version、key epoch、密文大小和重试分类；
+- backend capability 与非敏感平台错误码。
 
 禁止记录：
 
-- 请求体或响应体。
-- access token 或 `Authorization` header。
-- encrypted payload bytes、base64 payload、signature bytes、wrapped material bytes、recovery material bytes。
-- 明文用户词、input code、reading、P1 原始事件、ranker 明细、窗口标题、联系人或恢复码。
-- panic / stack trace 中的请求 JSON。
+- 明文输入、用户词、联系人和上下文；
+- token、恢复码、私钥、密钥 seed；
+- wrapped key、signature、nonce 或 payload 的实际 bytes；
+- 完整请求/响应体和真实用户文件路径。
 
-Rust remote client 的 `SyncRemoteRequest`、`RemoteObjectVersion` 和 `RemoteObjectPayload` Debug 输出必须继续按长度脱敏；`SyncRemoteError` 不得保存 request body、response body 或 payload bytes。
-
-Docker Compose 服务：
-
-```text
-local services:
-  sync-server:
-  sync-gateway:
-
-deployment services:
-  sync-server:
-
-local volumes:
-  sync-server-data:
-  sync-gateway-data:
-  sync-gateway-config:
-```
-
-后期可选：
-
-- Postgres。
-- S3-compatible object storage。
-- OIDC 登录。
-- 多用户隔离。
+测试只使用合成词、虚构设备、虚构 App ID 和公开样例。性能或长期统计不得上传真实输入流。
 
 ## 威胁模型
 
-### 服务端被入侵
+至少考虑：
 
-攻击者获得：
+- 服务端或管理员读取存储；
+- 数据库或 blob 备份泄漏；
+- 中间人、恶意反向代理和错误 TLS；
+- 被撤销或长期离线设备重放旧状态；
+- 服务端替换公钥、wrapped ciphertext、hash 或版本 metadata；
+- 恶意 KDF 参数、超大请求/响应和慢连接资源消耗；
+- 本地恶意应用读取 manager/IME 共享目录；
+- debug、panic、截图和诊断泄漏；
+- 冲突顺序导致删除复活或设备分叉。
 
-- 密文 blob。
-- 设备 ID。
-- 版本元数据。
-
-攻击者不应获得：
-
-- 明文词库。
-- 明文输入习惯。
-
-### 单台设备丢失
-
-应对：
-
-- 允许从其他设备撤销该设备。
-- 撤销后轮换同步密钥。
-- 后续对象不再对旧设备可解密。
-- 撤销前旧设备已经取得的历史密钥无法被技术上追回；如不重加密历史对象，管理 UI 必须明确展示该限制。
-- 新设备恢复必须生成新的设备身份和平台私钥，不复用旧设备私钥。
-
-### 用户误删
-
-应对：
-
-- 加密备份快照。
-- 本地回收站。
-- 明确展示删除范围。
+不承诺在设备已被完全控制时保护该设备上的当前明文；目标是缩小暴露面、阻止服务端解密、支持撤销和减少持久敏感材料。
 
 ## 默认设置
 
-建议默认：
+- 默认本地学习开启，但 P0 场景自动禁学。
+- P1 默认不同步。
+- P2 只有在用户配置同步、设备授权和安全门禁通过后才同步。
+- 诊断默认脱敏，详细敏感日志不存在“临时开启”后门。
+- 无网络或后端不可用时输入功能不受影响。
+- 真实同步失败必须明确展示，不降级为明文、匿名或未认证上传。
 
-- 开启本地学习。
-- 关闭明细事件同步。
-- 开启用户词加密同步。
-- 开启隐私模式快捷开关。
-- 对敏感 App 默认禁学。
-- iOS 未开启 full access 时不同步。
+## 用户可用同步停止线
+
+在以下条件全部满足前保持关闭：
+
+- 平台私钥 backend 在目标平台真实可用；
+- 授权、恢复、撤销和 key epoch 有完整实现测试；
+- merge 确定收敛，删除与显式恢复通过多设备测试；
+- 签名绑定公钥和密文 hash，KDF/解析资源上限已验证；
+- Rust 客户端使用生产 HTTPS transport 和完整 sync orchestration；
+- Go server 的认证、限速、请求上限、备份恢复和部署证据达到发布要求；
+- Manager 只通过真实 Rust bridge 执行操作并保持 secret 生命周期边界。
+
+## 相关文档
+
+- [当前状态](status/current.md)
+- [技术方案](technical-plan.md)
+- [同步 Payload](sync-payload.md)
+- [加密边界](crypto-boundary.md)
+- [同步密钥管理](sync-key-management.md)
+- [生产恢复流程](production-recovery-flow.md)
+- [Sync Server API/Storage](sync-server-api-storage.md)
+- [平台私钥策略](platform-private-key-backend-strategy.md)
+- [Manager Boundary](manager-ui-boundary.md)
+- [生产部署 Runbook](runbooks/sync-server-production-deployment.md)

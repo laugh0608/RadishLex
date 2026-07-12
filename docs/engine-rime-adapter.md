@@ -1,24 +1,22 @@
 # ime-engine-rime Adapter 设计
 
-本文档用于说明 RadishLex v1 接入 `librime` 的 adapter 边界、构建策略、验证方式和停止线，读者是实现 `crates/ime-engine-rime/`、CLI 真实 engine 模式和后续平台壳的开发者。本文不包含 `librime` 源码实现细节、Rime 词库内容、平台输入法协议或 ranker 学习策略。
+本文档用于说明 RadishLex v1 接入 `librime` 的 adapter 边界、构建策略、验证方式和停止线，读者是实现 `crates/ime-engine-rime/`、CLI 真实 engine 模式和平台壳的开发者。本文不包含当前批次状态、`librime` 源码实现细节、Rime 词库内容、平台输入法协议或 ranker 学习策略；实时进度见 `docs/status/current.md`。
 
-## 阶段定位
-
-当前处于 Phase 1 向 Phase 2 过渡：`ime-core` 已有平台无关 engine trait，`ime-cli` 已有合成 demo adapter 和真实 Rime adapter 复验入口。真实 Rime 路径已通过 CLI 覆盖首候选、非首候选、翻页候选和候选索引异常路径，可作为后续 `ime-userdb` 与 `ime-ranker` 的 engine 输入基线。
-
-阶段目标：
+## 稳定定位
 
 - 建立 `ime-engine-rime` crate 边界。
 - 明确本机如何发现、链接和初始化 `librime`。
 - 明确 Rime C API 到 RadishLex core model 的转换规则。
 - 明确没有 `librime` 环境时的默认验证降级方式。
+- 将 setup、initialize、notification 和 finalize 收口为进程级 runtime，单个 engine session 只管理对应的 Rime session。
+- 为 CLI、FFI 和平台壳提供同一套可诊断 adapter 能力，不让任何一层依赖 Rime 私有对象。
 
 非目标：
 
 - 不复制 Rime 源码、私有函数结构、词库或 schema 数据。
 - 不把 Rime candidate 内部对象 ID 暴露给 `ime-core`、ranker、userdb、Flutter 或平台壳。
 - 不让 CI 默认依赖本机安装 `librime`。
-- 不在本阶段实现用户词库、同步、加密或平台输入法 UI。
+- 不在 adapter 内实现用户词库、同步、加密、候选重排或平台输入法 UI。
 
 ## 外部事实基线
 
@@ -47,6 +45,8 @@ crates/ime-engine-rime/
     error.rs
     ffi.rs
     keymap.rs
+    runtime.rs
+    runtime_config.rs
     session.rs
     convert.rs
 ```
@@ -57,7 +57,9 @@ crates/ime-engine-rime/
 - `ffi.rs`：最小 C API 绑定，只收纳 ABI 类型、函数表和 `unsafe` 调用边界。
 - `keymap.rs`：把 `ime-core::KeyEvent` 映射为 Rime C API 需要的 keycode / mask。
 - `convert.rs`：把 Rime context、composition、menu、candidate 转换为 RadishLex `Composition` / `Candidate`。
-- `session.rs`：实现 `RimeEngine`，对外只暴露 `ime-core::Engine`。
+- `runtime.rs`：管理进程级 API、setup / initialize / finalize、共享配置、session 计数和 native 调用串行化。
+- `runtime_config.rs`：保存进程级目录 / deploy 配置和需要跨 initialize 生命周期保活的 native traits 字符串。
+- `session.rs`：实现单个 `RimeEngine` session，对外只暴露 `ime-core::Engine`。
 - `error.rs`：把 Rime 初始化、会话、schema、候选、编码和 FFI 生命周期错误转换为可诊断错误。
 
 `ime-engine-rime` 只能依赖 `ime-core` 的公开类型，不反向修改 `ime-core` 来适配 Rime 私有概念。若 `ime-core` trait 缺字段，先写清楚场景与失败用例，再判断是否扩展稳定模型。
@@ -92,11 +94,16 @@ native-rime = []
 
 ## 生命周期映射
 
-`ime-core::Engine` 到 `librime` 的初步映射：
+`ime-core::Engine` 到 `librime` 的生命周期映射：
 
 ```text
-RimeEngine::new(config)
-  -> setup / initialize
+首个 RimeEngine::new(config)
+  -> process RimeRuntime
+  -> validate API / setup / initialize
+  -> create_session
+
+后续 RimeEngine::new(compatible config)
+  -> reuse process RimeRuntime
   -> create_session
 
 Engine::reset
@@ -119,18 +126,35 @@ Engine::commit_candidate(index)
   -> get_commit
 
 Engine::set_schema(schema)
+  -> get_schema_list and require deployed schema
   -> select_schema
+  -> get_current_schema and require exact match
 
 Drop
   -> destroy_session
-  -> cleanup if owner policy allows
+  -> decrement runtime session count
+
+process teardown
+  -> radishlex_rime_runtime_shutdown
+  -> reject if any session is active
+  -> finalize
 ```
+
+进程 runtime 规则：
+
+- 同一时刻只有一个进程级 `RimeRuntime`，所有 native 调用通过其互斥边界串行执行。
+- 活动 session 必须使用完全相同的 `shared_data_dir`、`user_data_dir`、`log_dir` 和 `deploy_on_start`；schema 属于 session，可各自选择和切换。
+- deploy、首个 session 创建或 schema 选择失败时，runtime 必须清理已建立的全局 / session 状态、执行 finalize 并恢复为可重新初始化状态。
+- `select_schema` 返回成功不能单独证明 schema 可用；创建和切换前必须由 `get_schema_list` 确认目标已部署，选择后必须由 `get_current_schema` 精确回读。不存在或回读不一致都按 `select_schema` 失败处理。
+- 任一 session drop 只销毁自己的 Rime session，不触发 finalize；即使活动 session 暂时降为零，runtime 也保持初始化，避免应用切换造成重复 setup / initialize。
+- CLI 在 Rime 命令结束后显式 shutdown；平台壳必须在进程 teardown 且所有 session 已释放后调用 `radishlex_rime_runtime_shutdown`。shutdown 可重复调用，仍有活动 session 时返回 `InvalidState`。
+- `RimeEngine` 保持 owner-thread-only；首个成功初始化的 session 固定进程 runtime owner thread，后续 Rime session 与 shutdown 必须回到该线程。进程锁用于串行化生命周期，不把 librime 变成任意线程可调用 API。
 
 需要在实现前确认的开放点：
 
 - Rime 候选选择应使用数字键模拟、page + select 组合，还是可用更直接的 API。实现前必须通过小型 smoke 记录确认。
 - `get_context` 返回的 composition cursor 单位是否能直接映射到 UTF-8 byte cursor；不能确认时先保守转换并测试中文、ASCII、混合输入。
-- schema 初始化、部署和用户目录隔离是否需要在 `RimeEngine::new` 显式执行，还是由外部安装流程负责。
+- schema 包部署和产品目录准备仍由平台安装流程固定；`deploy_on_start` 只用于显式开发 / smoke 配置，不得由不同活动 session 分别决定。
 
 ## 数据目录策略
 
@@ -177,7 +201,8 @@ RadishLexRimeSessionOptions
 - 默认 workspace 构建下，该入口只做 ABI 参数校验并返回 `InvalidState`，不会静默退回 demo engine。
 - `ime-ffi` 启用 `native-rime` feature 时，该入口会将 options 转为 `RimeEngineConfig` 并创建真实 `RimeEngine` session。
 - `ime-ffi` 内部使用 demo / Rime 可扩展 session engine 封装，平台端仍只持有 opaque `RadishLexSession*`。
-- 当前已通过 ignored native smoke 覆盖 `radishlex_session_new_rime -> push_key -> snapshot -> commit_candidate`；该 smoke 需要显式传入隔离 Rime shared / user data 目录。
+- 已初始化 Rime runtime 的进程级目录与 deploy 配置不一致时返回 `InvalidState`，即使当前活动 session 为零也不重置已有 runtime；如需更换配置，必须先在零 session 状态显式 shutdown。
+- 当前已通过 ignored native smoke 覆盖 `radishlex_session_new_rime -> push_key -> snapshot -> commit_candidate`、双 session peer release 和不存在 schema 拒绝；该 smoke 需要显式传入隔离 Rime shared / user data 目录。
 
 ## 候选转换规则
 
@@ -205,6 +230,7 @@ Rime candidate 转 RadishLex candidate 时只保留稳定字段：
 - C string 转 Rust string 时必须处理 null、非 UTF-8 和空字符串。
 - Rime session id 只能存于 `RimeEngine` 内部，不进入 `ime-core` 模型。
 - `Drop` 必须尽力释放 session，但释放失败不能 panic。
+- runtime 初始化、session 创建 / 销毁、按键、context / commit 读取和最终 finalize 必须受同一进程锁约束，避免不同 session 与 finalize 并发。
 - adapter 错误必须包含阶段信息，例如 `initialize`、`create_session`、`process_key`、`get_context`、`select_schema`。
 
 ## CLI 集成策略
@@ -244,6 +270,7 @@ cargo test -p radishlex-ime-engine-rime --features native-rime
 cargo check -p radishlex-ime-cli --features native-rime
 cargo run -p radishlex-ime-cli --features native-rime -- rime --schema <schema> --shared-data <path> --user-data <path> <input-code>
 RADISHLEX_RIME_SHARED_DATA=<path> RADISHLEX_RIME_USER_DATA=<path> cargo test -p radishlex-ime-ffi --features native-rime rime_session_native_smoke_uses_ffi_entrypoint -- --ignored
+RADISHLEX_RIME_SHARED_DATA=<path> RADISHLEX_RIME_USER_DATA=<path> cargo test -p radishlex-ime-ffi --features native-rime rime_native_sessions_share_runtime_and_survive_peer_release -- --ignored
 ```
 
 本机准备步骤见 `docs/runbooks/rime-native-smoke.md`。
@@ -255,31 +282,16 @@ RADISHLEX_RIME_SHARED_DATA=<path> RADISHLEX_RIME_USER_DATA=<path> cargo test -p 
 - Rime adapter 错误可诊断，不静默退回 demo adapter。
 - `ime-core` 不出现 Rime 私有类型、路径或 session id。
 
-## 实施顺序
+## 已验证能力与未闭合边界
 
-1. 新增本设计文档和入口索引。
-2. 新增 `crates/ime-engine-rime/` skeleton，但不默认启用 native 绑定。
-3. 增加 build script 的本地探测和明确错误信息。
-4. 增加最小 FFI 绑定与 session 管理。
-5. 增加 conversion 单元测试，优先测试 Rust 侧转换和错误语义。
-6. 增加本机 native smoke 文档与可选 CI job。
-7. 将 `ime-cli rime` 接入真实 adapter。
-8. 在安装 `librime` 和合法 schema 数据的开发机上执行真实 native smoke。
+已有实现与历史 smoke 已证明真实 Rime adapter 能完成 composition、候选、翻页、选择、commit、错误映射和 ranker 接入，`ime-ffi` 也可在显式 `native-rime` feature 下创建真实 Rime session。详细完成记录留在 devlog，不在本文持续追加。
 
-当前进度：
+ABI contract v2 已闭合 `KeyOutcome` 的 `consumed`、即时 commit、同事件 snapshot 和 Rust-owned result 生命周期；`crates/ime-ffi/include/radishlex_input.h` 已通过 C11 与 Objective-C 编译测试。
 
-- 第 1-3 步已落地。
-- 已补配置模型、错误类型、key 分类和候选转换测试。
-- 第 4 步已覆盖 `setup`、`initialize`、`create_session`、`select_schema` 和 `destroy_session` 的 FFI session 管理。
-- 已补 `process_key`、`get_context`、`get_commit`、`free_context` 和 `free_commit` 的 Rust 侧调用路径。
-- 已补必需 Rime API 校验测试，覆盖 startup 与 runtime 函数缺失时的 `MissingApiFunction` 映射。
-- 已实现 `ime-cli rime` 子命令；默认 feature 下会给出明确 `native-rime` 构建提示，启用 feature 后可构造 `RimeEngine` 并进入 `InputSession`。
-- 已在 macOS 本机 `librime` 1.17.0、`luna_pinyin` 隔离数据目录下完成真实 native smoke，`luobo` 可输出 composition、候选和默认 commit。
-- 已给 `ime-cli rime` 补充可重复的 `--key <name>` smoke 调试参数，用于在输入码后追加 `page-down`、`page-up`、方向键等命名键事件。
-- 候选提交当前通过当前页 `select_keys` 模拟选择；2026-06-25 本机 native smoke 已验证首候选、非首候选、翻页后当前页候选均可提交，越界候选索引返回明确错误。
-- 已给 `ime-cli rime` 补充 `--rank-db <path>` 和 `--context <kind>`，用于把当前 Rime candidates 接入 `ime-ranker` smoke；输出包含重排后候选、原始 engine index、score、explain 和提交映射。
-- 已完成本机 Rime rank smoke 记录，并补齐用户词库导入导出、导入批次治理、导入格式检查和同步前置计数。
-- 已在 `ime-ffi` 补 `RadishLexRimeSessionOptions` 与 `radishlex_session_new_rime`，默认构建下保持 unavailable 门禁，`native-rime` feature 下已接入真实 `RimeEngine` session。
-- 已完成 `ime-ffi` ignored native smoke，覆盖从 Rime FFI session 创建、字符按键输入、snapshot 候选读取到候选提交。
+进程级 runtime 已闭合 setup / initialize / explicit shutdown / finalize、多 session 共享、零 session 间隙、配置冲突和 deploy / session / schema 失败回滚；schema 创建与切换同时验证已部署列表和选择后回读。stub API 测试可精确复验调用次数，`ime-ffi` 另有需要隔离 Rime 数据目录的 gated 单/双 session 与无效 schema smoke。
 
-阶段结论：`ime-cli rime` 已满足 Phase 1 的真实 adapter 可复验要求，并具备 Phase 2 的 ranker smoke 接入口；`ime-ffi` 也已具备显式 native feature 下的真实 Rime session 入口。后续仍暂缓平台壳，当前主线优先推进 Go server API / storage 边界设计和生产同步前置边界。
+真实应用输入 smoke 前仍必须闭合：
+
+- macOS InputMethodKit 真实应用 smoke。
+
+这些未闭合项属于 M1 macOS 离线输入 Alpha，不应再被同步后端工作延后。最终发布包中的 `librime` 与 schema 分发属于 M4。

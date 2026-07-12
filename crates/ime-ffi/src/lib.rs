@@ -7,8 +7,13 @@ mod demo_engine;
 mod dictionary;
 mod engine;
 mod error;
+mod ffi_support;
 mod key;
+mod key_result;
 mod learning_status;
+mod manager_sync_command;
+mod rank_explain;
+mod rime_runtime;
 mod session;
 mod snapshot;
 mod sync_status;
@@ -35,7 +40,10 @@ pub use engine::{
 };
 pub use error::{RadishLexError, RadishLexStatusCode};
 pub use key::*;
+pub use key_result::*;
 pub use learning_status::RadishLexLearningStatusSummary;
+pub use rank_explain::{RadishLexRankExplain, RadishLexRankExplainView};
+pub use rime_runtime::radishlex_rime_runtime_shutdown;
 pub use session::RadishLexSession;
 pub use snapshot::{
     RadishLexCandidateView, RadishLexSnapshot, RadishLexStringView,

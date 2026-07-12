@@ -1,6 +1,6 @@
 # ADR 0004: 平台私钥存储 Backend 边界
 
-本文档用于固定 RadishLex 真实远端同步前的平台私钥存储 backend 边界，读者是后续实现 `ime-crypto`、平台 bridge、Go sync server 验签接线、管理 UI 设备页面和审阅隐私边界的开发者。本文不包含平台 SDK 调用代码、FFI 导出接口、Flutter 页面、系统输入法壳接入或安装权限流程；`apple-keychain-v1` 平台验证边界见 `docs/runbooks/apple-keychain-signing-backend.md`，Android Keystore 验证边界见 `docs/runbooks/android-keystore-signing-backend.md`，Apple 签名策略见 `docs/adr/0005-apple-platform-signing-strategy.md`。
+本文档用于固定 RadishLex 真实远端同步前的平台私钥存储 backend 边界，读者是后续实现 `ime-crypto`、平台 bridge、Go sync server 验签接线、管理 UI 设备页面和审阅隐私边界的开发者。本文不包含平台 SDK 调用代码、FFI 导出接口、Flutter 页面、系统输入法壳接入或安装权限流程；`apple-keychain-v1` 平台验证边界见 `docs/runbooks/apple-keychain-signing-backend.md`，Android Keystore 验证边界见 `docs/runbooks/android-keystore-signing-backend.md`，Apple 签名策略见 `docs/adr/0005-apple-platform-signing-strategy.md`，当前证据后的推进策略见 `docs/platform-private-key-backend-strategy.md`。
 
 ## 状态
 
@@ -208,9 +208,10 @@ DevicePrivateKeyStore
 5. 已在 `apple-keychain` feature 下接 macOS Keychain backend 和 ignored gated smoke，默认 workspace 不访问系统 Keychain；真实 Keychain smoke 已执行但返回 `UnsupportedSignatureAlgorithm { algorithm: "ed25519-v1" }`。
 6. 已补 ADR 0005，固定 Apple 平台签名策略：保持 `ed25519-v1` 协议，`apple-keychain-v1` 不做 seed 存储 fallback，status 在 smoke 通过前阻断生产签名。
 7. 已补 `android-keystore-v1` 平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、raw JNI glue、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin / Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，固定 Android Keystore Ed25519 创建 / 加载 / 签名 / 删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
-8. 其他平台仍需先补 backend spike / runbook，再接具体平台 SDK。
-9. 平台 backend 通过后，再允许真实远端对象上传下载使用生产签名。
-10. 最后才把管理 UI 的设备与恢复页面接入生产 backend。
+8. 已补平台私钥 backend 策略，固定无新增设备时不把真机矩阵作为硬阻塞，并明确保留 `ed25519-v1`、禁止现有 backend 内 fallback、生产 backend 合格条件和可选后续 ADR 路径。
+9. 其他平台仍需先补 backend spike / runbook，再接具体平台 SDK。
+10. 平台 backend 通过后，再允许真实远端对象上传下载使用生产签名。
+11. 最后才把管理 UI 的设备与恢复页面接入生产 backend。
 
 ## 验证口径
 

@@ -15,6 +15,13 @@ pub enum RimeEngineError {
     MissingApiFunction {
         name: &'static str,
     },
+    IncompatibleRuntimeConfig {
+        field: &'static str,
+    },
+    RuntimeHasActiveSessions {
+        count: usize,
+    },
+    RuntimeThreadMismatch,
     NativeProbeFailed {
         message: String,
     },
@@ -44,6 +51,18 @@ impl fmt::Display for RimeEngineError {
             Self::MissingApiFunction { name } => {
                 write!(f, "native librime is missing required API function: {name}")
             }
+            Self::IncompatibleRuntimeConfig { field } => write!(
+                f,
+                "initialized librime process runtime requires the same config: {field}"
+            ),
+            Self::RuntimeHasActiveSessions { count } => write!(
+                f,
+                "cannot shut down librime process runtime with {count} active session(s)"
+            ),
+            Self::RuntimeThreadMismatch => write!(
+                f,
+                "librime process runtime must be used on the thread that initialized it"
+            ),
             Self::NativeProbeFailed { message } => {
                 write!(f, "failed to locate native librime: {message}")
             }
