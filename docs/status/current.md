@@ -5,7 +5,8 @@
 ## 当前判断
 
 - 复核日期：2026-07-12（Asia/Shanghai）
-- 常态分支：`dev`
+- 常态分支：`dev`；稳定主线：`master`
+- 分支闭环：阶段性 `dev -> master` PR 合并后，必须在下一批常规开发前将最新 `master` merge 回 `dev`，正式口径见 ADR 0001
 - 当前产品里程碑：M1 macOS 离线输入 Alpha
 - 当前整改主批次：R01A 输入契约、进程级 runtime 与 macOS 基础输入
 - 并行质量批次：R06A 本地代码与文档清理完成，待远端 required checks 应用复验

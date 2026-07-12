@@ -8,7 +8,8 @@
 2. 功能、文档、规范类变更默认先合并到 `dev`。
 3. 阶段性稳定后，再从 `dev` 发起到默认分支（当前为 `master`，如切换可适配 `main`）的 Pull Request。
 4. 默认分支 PR 必须通过仓库检查。
-5. 管理员如需绕过规则，也只能通过 Pull Request，不开放直接 push。
+5. PR 合并后，在下一批常规开发前把最新默认分支 merge 回 `dev` 并推送，确认默认分支是 `dev` 的祖先。
+6. 管理员如需绕过规则，也只能通过 Pull Request，不开放直接 push。
 
 ## 默认分支规则说明
 
@@ -30,6 +31,8 @@
 - 当前阶段不启用 branch protection。
 - `push -> dev` 会自动触发 PR 同级检查，作为日常集成反馈。
 - 当前支持 `pull_request -> dev`，但不把 `dev` 配成强制保护分支。
+- 每次 `dev -> master` PR 合并后，必须把最新 `master` merge 回 `dev`；该回同步是阶段性 PR 的收尾，不是可选的反向功能流。
+- `dev` 是共享分支，回同步不使用 rebase 或 force push；完成后应确认 `git merge-base --is-ancestor origin/master dev` 返回成功。
 - 如后续进入多人并行开发，再评估是否对 `dev` 追加保护。
 
 ## 检查入口

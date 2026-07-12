@@ -131,14 +131,11 @@
 
 ## 分支与 PR 约定
 
-- 当前常态开发分支为 `dev`
-- `master` 作为稳定主线
-- 非特殊情况不直接在 `master` 上开发
-- 阶段性稳定后，再从 `dev` 发起到 `master` 的 Pull Request
-- 远端分支保护、合并策略、稳定主线 PR 目标和阶段性例外，后续应以 `docs/adr/0001-branch-and-pr-governance.md` 或同类 ADR 为准
-- 在正式 ADR 补齐前，以当前 Git 实际状态和用户明确指令为准，不擅自改分支策略
-- 默认不执行破坏性 Git 操作
-- 推送远端分支、改远端设置、创建 Release 或修改仓库保护规则前，必须先告知用户并获得明确授权
+- `dev` 是常态开发分支，`master` 是稳定主线；常规改动不直接进入 `master`
+- 阶段稳定后发起 `dev -> master` PR；合并后、下一批开发前必须将最新 `master` merge 回 `dev` 并推送，保持 `master` 是 `dev` 的祖先
+- 共享 `dev` 只用 merge 回同步，不做 rebase 或 force push
+- 完整分支与 PR 规则见 `docs/adr/0001-branch-and-pr-governance.md`
+- 不执行破坏性 Git 操作；推送远端、创建 Release 或修改远端设置与保护规则前，必须先告知并获得授权
 
 ## 仓库结构速记
 
