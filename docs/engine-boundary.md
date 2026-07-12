@@ -24,6 +24,7 @@
 v1 的 `ime-core` 至少包含这些稳定模型：
 
 - `KeyEvent`：平台或 CLI 传入的按键事件，包含字符键、命名键、修饰键和按键阶段。
+- `KeyOutcome`：一次按键或候选选择的结果，明确表达是否消费以及可选 commit；没有 commit 不等于操作失败。
 - `Composition`：当前预编辑文本和光标位置。
 - `Candidate`：可展示候选，包含候选文本、读音、注释和来源。
 - `Commit`：提交给宿主应用的文本，以及本次提交来源。
@@ -54,7 +55,7 @@ pub trait Engine {
 - `push_key` 只处理一个按键事件，返回该按键是否被输入法消费，以及是否产生提交。
 - `composition` 返回当前预编辑文本。
 - `candidates` 返回当前候选列表，列表顺序是进入 ranker 前的 engine 输出顺序。
-- `select_candidate` 按当前页候选列表索引驱动底层引擎选择，并返回 consumed 与 optional commit；分段候选可能只更新 composition 而不立即提交。
+- `select_candidate` 按当前页候选列表索引驱动底层引擎选择，并与 `push_key` 一样返回完整 `KeyOutcome`；分段候选可能消费选择并更新 composition，但不立即产生 commit。
 - `set_schema` 切换输入方案，切换失败必须显式报错。
 - `schema` 返回当前输入方案标识。
 

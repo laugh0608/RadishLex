@@ -196,14 +196,21 @@ release = 2
 
 字符键必须提供合法 Unicode scalar value。未知 key kind、未知 named key、未知 modifier bit 或未知 phase 均返回 `InvalidArgument`。
 
-### Key result
+### Key result 与候选选择
 
-真实平台按键入口采用版本化、Rust-owned 的 `RadishLexKeyResult*`：
+真实平台按键与候选选择入口统一采用版本化、Rust-owned 的 `RadishLexKeyResult*`：
 
 ```text
 radishlex_session_handle_key_event(
   session,
   event,
+  result_out,
+  error_out,
+) -> RadishLexStatusCode
+
+radishlex_session_select_candidate(
+  session,
+  current_page_index,
   result_out,
   error_out,
 ) -> RadishLexStatusCode
@@ -223,6 +230,7 @@ snapshot: *const RadishLexSnapshot
 
 - `consumed = 0` 时平台必须把按键交还宿主应用；不能根据 composition 是否为空猜测。
 - `commit_present = 1` 时 commit 必须在本次事件结果中返回；平台不能依赖下一次 snapshot 推断提交文本。
+- 候选选择索引来自当前 snapshot 的候选页；分段候选可能返回 `consumed = 1`、`commit_present = 0` 和更新后的 composition/candidates，平台不得直接提交展示文本。
 - snapshot 与 `consumed`、commit 必须来自同一次按键处理后的状态，不允许跨事件拼装。
 - key result 拥有 commit storage 与 snapshot；其 string/candidate view 只在 result 存活期间有效。
 - `radishlex_key_result_free` 负责释放整个结果；平台不得单独释放借用的 snapshot，也不得在释放后缓存任何 view。
