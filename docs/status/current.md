@@ -13,7 +13,7 @@
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；受控同步实现与测试可继续
 
-RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/sync 原型、Go sync server、Flutter manager 原型和 macOS InputMethodKit 开发薄壳。Apple Development v19 已完成一次用户级安装、启用和真实应用输入；为避免半成品长期占用日常输入源，验证后已切回系统拼音、停用 RadishLex 并将 bundle 移出用户输入法目录。2026-07-12 复核发现系统设置“所有输入法”仍保留用户配置项，证明停用和移走 bundle 不等于完整移除；当前已选中该项，等待动作时确认后点击“移除”。它仍不是普通用户产品包；正常 manager 产品包也尚未形成真实 FFI、持久化配置和平台文件访问闭环。
+RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/sync 原型、Go sync server、Flutter manager 原型和 macOS InputMethodKit 开发薄壳。Apple Development v19 已完成一次用户级安装、启用和真实应用输入；为避免半成品长期占用日常输入源，验证后已切回系统拼音、停用 RadishLex 并将 bundle 移出用户输入法目录。2026-07-12 复核发现系统设置“所有输入法”仍保留用户配置项，证明停用和移走 bundle 不等于完整移除；经动作时确认后已在系统设置点击“移除”，当前列表仅剩系统拼音和美国输入法，TIS 枚举 `matches=0`。它仍不是普通用户产品包；正常 manager 产品包也尚未形成真实 FFI、持久化配置和平台文件访问闭环。
 
 长期产品交付顺序见 [产品交付路线图](../roadmap.md)，当前整改批次、停止线、资产处置和退出条件见 [项目稳定化整改专题](../remediation/2026-07-project-stabilization.md)。
 
