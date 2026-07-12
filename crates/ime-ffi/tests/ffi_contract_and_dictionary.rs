@@ -485,7 +485,7 @@ fn rime_session_native_invalid_schema_reports_engine_error() {
         user_data_dir: user_data.as_ptr(),
         schema: missing_schema.as_ptr(),
         log_dir: ptr::null(),
-        deploy_on_start: 0,
+        deploy_on_start: 1,
     };
 
     let session = radishlex_session_new_rime(&options, &mut error);
@@ -531,7 +531,7 @@ fn rime_native_sessions_share_runtime_and_survive_peer_release() {
         user_data_dir: user_data.as_ptr(),
         schema: schema.as_ptr(),
         log_dir: ptr::null(),
-        deploy_on_start: 0,
+        deploy_on_start: 1,
     };
     let mut error = ptr::null_mut();
 
