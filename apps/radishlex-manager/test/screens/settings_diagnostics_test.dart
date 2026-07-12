@@ -6,7 +6,6 @@ import 'package:radishlex_manager/src/app.dart';
 import 'package:radishlex_manager/src/bridge/fixture_manager_bridge.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
-import '../fixtures/sync_evidence_bundle_fixtures.dart';
 import '../fixtures/sync_readiness_bridge_fixtures.dart';
 
 void main() {
@@ -84,23 +83,6 @@ void main() {
         scenario.expectedInteractionBlockers,
         reason: scenario.id,
       );
-      _expectDiagnosticsActionCommandPreview(
-        report,
-        expectedIntentStatusSummary: scenario.expectedInteractionStatuses,
-        expectedBlockerSummary: scenario.expectedInteractionBlockers,
-        expectedRequestBoundarySummary:
-            scenario.expectedActionCommandRequestBoundaries,
-        expectedResultBoundarySummary:
-            scenario.expectedActionCommandResultBoundaries,
-        expectedErrorCodeSummary: scenario.expectedActionCommandErrorCodes,
-        expectedRequestAllowedFieldSummary:
-            scenario.expectedActionRequestAllowedFields,
-        expectedResultAllowedFieldSummary:
-            scenario.expectedActionResultAllowedFields,
-        expectedForbiddenMaterialSummary:
-            scenario.expectedActionForbiddenMaterials,
-        reason: scenario.id,
-      );
       expect(
         _diagnosticsValue(report, 'sync.user_sync_enabled'),
         scenario.expectedUserSyncEnabled.toString(),
@@ -133,116 +115,6 @@ void main() {
     }
   });
 
-  test('sync evidence bundle catalog drives diagnostics summaries', () {
-    for (final scenario in syncEvidenceBundleScenarioCatalog()) {
-      final report = createManagerDiagnosticsReport(
-        managerSnapshotForSyncEvidenceBundleScenario(scenario),
-      );
-      final text = report.toRedactedText();
-
-      expect(
-        _diagnosticsValue(report, 'sync.entry_state'),
-        scenario.expectedEntryState.code,
-        reason: scenario.id,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.entry_blocker'),
-        scenario.expectedEntryBlocker,
-        reason: scenario.id,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.readiness_bridge_source'),
-        scenario.expectedBridgeSource,
-        reason: scenario.id,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.readiness_blocked_flows'),
-        scenario.expectedBlockedFlows,
-        reason: scenario.id,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.interaction_statuses'),
-        scenario.expectedInteractionStatuses,
-        reason: scenario.id,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.interaction_blockers'),
-        scenario.expectedInteractionBlockers,
-        reason: scenario.id,
-      );
-      _expectDiagnosticsActionCommandPreview(
-        report,
-        expectedIntentStatusSummary: scenario.expectedInteractionStatuses,
-        expectedBlockerSummary: scenario.expectedInteractionBlockers,
-        reason: scenario.id,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.user_sync_enabled'),
-        scenario.expectedUserSyncEnabled.toString(),
-        reason: scenario.id,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.connection_status'),
-        scenario.expectedConnectionStatusCode,
-        reason: scenario.id,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.connection_blocker'),
-        scenario.expectedConnectionBlocker,
-        reason: scenario.id,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.connection_probe_source'),
-        scenario.expectedConnectionProbeSource,
-        reason: scenario.id,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.connection_probe_recorded_at'),
-        syncEvidenceBundleRecordedAt,
-        reason: scenario.id,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.endpoint_status'),
-        scenario.expectedEndpointStatus,
-        reason: scenario.id,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.access_token_status'),
-        scenario.expectedAccessTokenStatus,
-        reason: scenario.id,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.transport_mode'),
-        scenario.expectedTransportMode,
-        reason: scenario.id,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.server_state_status'),
-        scenario.expectedServerStateStatus,
-        reason: scenario.id,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.connection_auth_status'),
-        scenario.expectedAuthStatus,
-        reason: scenario.id,
-      );
-      expect(
-        '${_diagnosticsValue(report, 'sync.connection_http_status')} '
-        '${_diagnosticsValue(report, 'sync.connection_http_status_class')}',
-        scenario.expectedHttpStatusText,
-        reason: scenario.id,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.last_remote_error_code'),
-        scenario.expectedLastRemoteErrorCode,
-        reason: scenario.id,
-      );
-      for (final fragment in syncEvidenceBundleSensitiveLeakFragments) {
-        expect(text, isNot(contains(fragment)), reason: scenario.id);
-      }
-    }
-  });
-
   testWidgets('settings view previews and exports diagnostics report', (
     WidgetTester tester,
   ) async {
@@ -265,7 +137,7 @@ void main() {
 
     expect(find.text('诊断摘要预览'), findsOneWidget);
     expect(find.text('分组 6'), findsOneWidget);
-    expect(find.text('字段 129'), findsOneWidget);
+    expect(find.text('字段 110'), findsOneWidget);
     expect(
       find.byKey(const Key('diagnostics-section-sync_gate')),
       findsOneWidget,
@@ -358,90 +230,6 @@ void main() {
     expect(
       find.textContaining(
         'sync.interaction_source_tags: recovery_setup_readiness, recovery_restore_readiness, device_join_readiness, device_revocation_readiness',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining(
-        'sync.action_command_format: manager_sync_action_command_preview.v1',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining(
-        'sync.action_command_intent_statuses: recovery_setup=closed_current_phase, recovery_restore=closed_current_phase, join_request_authorization=closed_current_phase, device_revocation=closed_current_phase',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining(
-        'sync.action_command_execution_statuses: recovery_setup=not_executable_current_phase, recovery_restore=not_executable_current_phase, join_request_authorization=not_executable_current_phase, device_revocation=not_executable_current_phase',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining(
-        'sync.action_command_data_policy: $syncActionCommandDataPolicySummary',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining(
-        'sync.action_command_stop_lines: $syncActionCommandStopLineSummary',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining(
-        'sync.action_command_request_boundaries: $syncActionCommandRequestBoundarySummary',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining(
-        'sync.action_command_result_boundaries: $syncActionCommandResultBoundarySummary',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining(
-        'sync.action_command_error_codes: $syncActionCommandErrorCodeSummary',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining(
-        'sync.action_request_statuses: ${syncActionExpectedRequestStatusSummary(syncReadinessClosedInteractionStatuses)}',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining(
-        'sync.action_request_allowed_fields: $syncActionRequestAllowedFieldSummary',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining(
-        'sync.action_request_forbidden_material: $syncActionForbiddenMaterialSummary',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining(
-        'sync.action_result_statuses: ${syncActionExpectedResultStatusSummary(syncReadinessClosedInteractionStatuses)}',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining(
-        'sync.action_result_allowed_fields: $syncActionResultAllowedFieldSummary',
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining(
-        'sync.action_result_forbidden_material: $syncActionForbiddenMaterialSummary',
       ),
       findsOneWidget,
     );
@@ -754,103 +542,6 @@ String _diagnosticsValue(ManagerDiagnosticsReport report, String key) {
     }
   }
   throw StateError('diagnostics item missing: $key');
-}
-
-void _expectDiagnosticsActionCommandPreview(
-  ManagerDiagnosticsReport report, {
-  required String expectedIntentStatusSummary,
-  required String expectedBlockerSummary,
-  String expectedRequestBoundarySummary =
-      syncActionCommandRequestBoundarySummary,
-  String expectedResultBoundarySummary = syncActionCommandResultBoundarySummary,
-  String expectedErrorCodeSummary = syncActionCommandErrorCodeSummary,
-  String expectedRequestAllowedFieldSummary =
-      syncActionRequestAllowedFieldSummary,
-  String expectedResultAllowedFieldSummary =
-      syncActionResultAllowedFieldSummary,
-  String expectedForbiddenMaterialSummary = syncActionForbiddenMaterialSummary,
-  required String reason,
-}) {
-  expect(
-    _diagnosticsValue(report, 'sync.action_command_format'),
-    managerSyncActionCommandPreviewFormat,
-    reason: reason,
-  );
-  expect(
-    _diagnosticsValue(report, 'sync.action_command_actions'),
-    'recovery_setup, recovery_restore, join_request_authorization, device_revocation',
-    reason: reason,
-  );
-  expect(
-    _diagnosticsValue(report, 'sync.action_command_intent_statuses'),
-    expectedIntentStatusSummary,
-    reason: reason,
-  );
-  expect(
-    _diagnosticsValue(report, 'sync.action_command_execution_statuses'),
-    syncActionExpectedExecutionSummary(expectedIntentStatusSummary),
-    reason: reason,
-  );
-  expect(
-    _diagnosticsValue(report, 'sync.action_command_blockers'),
-    expectedBlockerSummary,
-    reason: reason,
-  );
-  expect(
-    _diagnosticsValue(report, 'sync.action_command_data_policy'),
-    syncActionCommandDataPolicySummary,
-    reason: reason,
-  );
-  expect(
-    _diagnosticsValue(report, 'sync.action_command_stop_lines'),
-    syncActionCommandStopLineSummary,
-    reason: reason,
-  );
-  expect(
-    _diagnosticsValue(report, 'sync.action_command_request_boundaries'),
-    expectedRequestBoundarySummary,
-    reason: reason,
-  );
-  expect(
-    _diagnosticsValue(report, 'sync.action_command_result_boundaries'),
-    expectedResultBoundarySummary,
-    reason: reason,
-  );
-  expect(
-    _diagnosticsValue(report, 'sync.action_command_error_codes'),
-    expectedErrorCodeSummary,
-    reason: reason,
-  );
-  expect(
-    _diagnosticsValue(report, 'sync.action_request_statuses'),
-    syncActionExpectedRequestStatusSummary(expectedIntentStatusSummary),
-    reason: reason,
-  );
-  expect(
-    _diagnosticsValue(report, 'sync.action_request_allowed_fields'),
-    expectedRequestAllowedFieldSummary,
-    reason: reason,
-  );
-  expect(
-    _diagnosticsValue(report, 'sync.action_request_forbidden_material'),
-    expectedForbiddenMaterialSummary,
-    reason: reason,
-  );
-  expect(
-    _diagnosticsValue(report, 'sync.action_result_statuses'),
-    syncActionExpectedResultStatusSummary(expectedIntentStatusSummary),
-    reason: reason,
-  );
-  expect(
-    _diagnosticsValue(report, 'sync.action_result_allowed_fields'),
-    expectedResultAllowedFieldSummary,
-    reason: reason,
-  );
-  expect(
-    _diagnosticsValue(report, 'sync.action_result_forbidden_material'),
-    expectedForbiddenMaterialSummary,
-    reason: reason,
-  );
 }
 
 class _DiagnosticsRecordingBridge extends FixtureManagerBridge {

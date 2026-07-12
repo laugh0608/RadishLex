@@ -17,9 +17,6 @@ class SyncDeviceAuthorizationSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final joinIntent = interactionPlan.intentFor('join_request_authorization');
     final revocationIntent = interactionPlan.intentFor('device_revocation');
-    final commandPlan = interactionPlan.actionCommandPreviewPlan;
-    final joinCommand = commandPlan.previewFor('join_request_authorization');
-    final revocationCommand = commandPlan.previewFor('device_revocation');
 
     return ManagerSection(
       key: const Key('sync-device-authorization-readiness-section'),
@@ -89,54 +86,6 @@ class SyncDeviceAuthorizationSection extends StatelessWidget {
             value: joinIntent.requiredEvidenceSummary,
           ),
           ManagerKeyValueRow(
-            label: 'join command',
-            value: joinCommand.executionStatus,
-          ),
-          ManagerKeyValueRow(
-            label: 'join command policy',
-            value: joinCommand.dataPolicy,
-          ),
-          ManagerKeyValueRow(
-            label: 'join command stop',
-            value: joinCommand.stopLine,
-          ),
-          ManagerKeyValueRow(
-            label: 'join request boundary',
-            value: joinCommand.requestBoundary,
-          ),
-          ManagerKeyValueRow(
-            label: 'join result boundary',
-            value: joinCommand.resultBoundary,
-          ),
-          ManagerKeyValueRow(
-            label: 'join command errors',
-            value: joinCommand.errorCodeSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'join request status',
-            value: joinCommand.requestPreview.requestStatus,
-          ),
-          ManagerKeyValueRow(
-            label: 'join request fields',
-            value: joinCommand.requestPreview.allowedFieldSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'join request forbidden',
-            value: joinCommand.requestPreview.forbiddenMaterialSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'join result status',
-            value: joinCommand.resultPreview.resultStatus,
-          ),
-          ManagerKeyValueRow(
-            label: 'join result fields',
-            value: joinCommand.resultPreview.allowedFieldSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'join result forbidden',
-            value: joinCommand.resultPreview.forbiddenMaterialSummary,
-          ),
-          ManagerKeyValueRow(
             label: 'revocation intent',
             value: revocationIntent.intentStatus,
           ),
@@ -147,54 +96,6 @@ class SyncDeviceAuthorizationSection extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'revocation intent evidence',
             value: revocationIntent.requiredEvidenceSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'revocation command',
-            value: revocationCommand.executionStatus,
-          ),
-          ManagerKeyValueRow(
-            label: 'revocation command policy',
-            value: revocationCommand.dataPolicy,
-          ),
-          ManagerKeyValueRow(
-            label: 'revocation command stop',
-            value: revocationCommand.stopLine,
-          ),
-          ManagerKeyValueRow(
-            label: 'revocation request boundary',
-            value: revocationCommand.requestBoundary,
-          ),
-          ManagerKeyValueRow(
-            label: 'revocation result boundary',
-            value: revocationCommand.resultBoundary,
-          ),
-          ManagerKeyValueRow(
-            label: 'revocation command errors',
-            value: revocationCommand.errorCodeSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'revocation request status',
-            value: revocationCommand.requestPreview.requestStatus,
-          ),
-          ManagerKeyValueRow(
-            label: 'revocation request fields',
-            value: revocationCommand.requestPreview.allowedFieldSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'revocation request forbidden',
-            value: revocationCommand.requestPreview.forbiddenMaterialSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'revocation result status',
-            value: revocationCommand.resultPreview.resultStatus,
-          ),
-          ManagerKeyValueRow(
-            label: 'revocation result fields',
-            value: revocationCommand.resultPreview.allowedFieldSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'revocation result forbidden',
-            value: revocationCommand.resultPreview.forbiddenMaterialSummary,
           ),
           ManagerKeyValueRow(
             label: 'join flow',

@@ -210,7 +210,7 @@ MSRV、最终 native bundle presence、依赖安全和许可证扫描属于 M4 �
 - approval、admission、migration review、evidence bundle、fake replay 和 no-symbol 断言直接删除或归档，不转化为新的运行时状态机。
 - 简单的“能力未开放”只通过 capability 缺席、显式 disabled state 和产品测试表达。
 
-当前进度：严格 workspace Clippy 已通过；Rust `manager_sync_command` 主模块与四个 review-only 子/测试模块已删除。FFI ownership、owner-thread、copy-before-release、null release 和 panic payload 脱敏断言已归入真实 ABI/`ffi_support` 测试。PR workflow 与 ruleset 模板已加入 Rust Clippy、Flutter format/analyze/test 和 Go vet/race 独立检查，本机等价命令通过。剩余工作是 Flutter/Dart 资产、文档归档，以及提交后对远端 required checks 的应用/复验。
+当前进度：严格 workspace Clippy 已通过；Rust `manager_sync_command` 主模块与四个 review-only 子/测试模块已删除。FFI ownership、owner-thread、copy-before-release、null release 和 panic payload 脱敏断言已归入真实 ABI/`ffi_support` 测试。Flutter action preview、future command protocol、host review、migration、fake replay 和 transient-secret review fixture 已删除，关闭态、隐私优先、错误可见性与 secret 不持久化/不进入 diagnostics 已迁入稳定测试。配套 command contract、checklist、preview、acceptance、FFI boundary/test plan 与 ADR 0006 已移出默认阅读链并归档。PR workflow 与 ruleset 模板已加入 Rust Clippy、Flutter format/analyze/test 和 Go vet/race 独立检查，本机等价命令通过；剩余工作只有取得授权后应用并复验远端 required checks。
 
 ### 必须处置的 Rust 资产
 

@@ -551,30 +551,6 @@ class _SyncReadinessSummaryImportSection extends StatelessWidget {
             value: audit.entryGate.interactionEntryPlan.blockerSummary,
           ),
           ManagerKeyValueRow(
-            label: 'command execution',
-            value: audit
-                .entryGate
-                .interactionEntryPlan
-                .actionCommandPreviewPlan
-                .executionStatusSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'command policy',
-            value: audit
-                .entryGate
-                .interactionEntryPlan
-                .actionCommandPreviewPlan
-                .dataPolicySummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'command stop lines',
-            value: audit
-                .entryGate
-                .interactionEntryPlan
-                .actionCommandPreviewPlan
-                .stopLineSummary,
-          ),
-          ManagerKeyValueRow(
             label: 'user sync enabled',
             value: audit.entryGate.userSyncEnabled.toString(),
           ),
@@ -638,8 +614,6 @@ class _SettingsSyncGatePreview extends StatelessWidget {
     );
     final connection = audit.entryGate.connectionHealth;
     final interactionPlan = audit.entryGate.interactionEntryPlan;
-    final actionCommandPlan =
-        audit.entryGate.interactionEntryPlan.actionCommandPreviewPlan;
     final tone = audit.entryGate.userSyncEnabled
         ? ManagerBadgeTone.success
         : ManagerBadgeTone.warning;
@@ -739,70 +713,6 @@ class _SettingsSyncGatePreview extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'interaction sources',
             value: interactionPlan.sourceTagSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'command format',
-            value: managerSyncActionCommandPreviewFormat,
-          ),
-          ManagerKeyValueRow(
-            label: 'command actions',
-            value: actionCommandPlan.actionIdSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'command execution',
-            value: actionCommandPlan.executionStatusSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'command blockers',
-            value: actionCommandPlan.blockerSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'command evidence',
-            value: actionCommandPlan.requiredEvidenceSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'command policy',
-            value: actionCommandPlan.dataPolicySummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'command stop lines',
-            value: actionCommandPlan.stopLineSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'command request boundary',
-            value: actionCommandPlan.requestBoundarySummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'command result boundary',
-            value: actionCommandPlan.resultBoundarySummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'command errors',
-            value: actionCommandPlan.errorCodeSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'request status',
-            value: actionCommandPlan.requestStatusSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'request fields',
-            value: actionCommandPlan.requestAllowedFieldSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'request forbidden material',
-            value: actionCommandPlan.requestForbiddenMaterialSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'result status',
-            value: actionCommandPlan.resultStatusSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'result fields',
-            value: actionCommandPlan.resultAllowedFieldSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'result forbidden material',
-            value: actionCommandPlan.resultForbiddenMaterialSummary,
           ),
           ManagerKeyValueRow(
             label: 'user sync enabled',

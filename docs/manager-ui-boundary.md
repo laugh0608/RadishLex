@@ -38,7 +38,7 @@ M3 同步管理能力在安全退出条件满足后覆盖：
 - 导入 `manager_sync_readiness.v1` 非敏感摘要到当前 manager 内存态，用于本地开发联调和同步页 / 设置页 / 诊断报告同源派生。
 - 显示同步能力是否可用，以及不可用原因。
 - 查看本机设备身份、backend capability 和 production gate 状态摘要。
-- 查看四条恢复 / 授权 action 的非执行 command preview、request / result boundary、allowed fields、forbidden material policy 和错误分类摘要。
+- 查看恢复与设备流程的只读 action intent、阻塞原因和错误分类摘要。
 - 保存非 secret settings draft，并从草案、隐私模式、平台私钥 backend gate 和部署证据来源标签派生 sync gate。
 - 预览、复制和导出脱敏诊断摘要。
 - 以结构化错误分类展示 bridge 操作失败，不把 native 错误明细透传给 widget 层。
@@ -123,8 +123,6 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 
 当前 Dart 侧 `manager_sync_readiness.v1` mapper 只定义 future bridge readiness 摘要到 Manager 只读 readiness model 的准备层映射，不改变 `ManagerBridge` contract，也不新增 C ABI。该 mapper 只能接受 allowlist 状态码、来源标签、前置条件和错误分类；未知值必须降级为安全分类，不能把 provider 原始异常、路径、token、恢复码、短码、signature bytes、wrapped material 或 payload bytes 传播到 UI、settings draft 或诊断报告。
 
-当前 Dart 侧 `manager_sync_action_command_preview.v1`、`SyncActionCommandPreviewPlan`、`SyncActionRequestPreview` 和 `SyncActionResultPreview` 也只属于真实 bridge 命令前的非执行模型层。它们从只读 `SyncInteractionEntryPlan` 派生 action id、execution status、data policy、stop line、request / result boundary、allowed fields、forbidden material policy 和错误分类，供设置页、同步页和诊断报告展示同一份摘要；它们不是 `ManagerBridge` method、不是 C ABI DTO，也不能构造或接收真实 request / result payload。
-
 后续同步 UI 需要新增 bridge 时，应遵循：
 
 - bridge 入参不接受明文同步 payload。
@@ -150,13 +148,13 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 
 同步服务连接健康只允许展示 `connection_status`、`connection_blocker`、`endpoint_status`、`access_token_status`、`transport_mode`、`server_state_status`、`connection_probe_source`、`connection_probe_recorded_at`、`auth_status`、`http_status`、`http_status_class`、`local_insecure_tls` 和 `last_remote_error_code` 这类摘要；access token 只能以存在性表示，URL credential、query token、请求 / 响应体、证书内容、真实路径和日志正文不得进入 widget、settings draft 或诊断报告。
 
-`manager_sync_readiness.v1` 导入态只保存在当前 manager snapshot 内存中，不写入 settings JSON。`manager_sync_evidence_bundle.v1` 只作为测试 fixture 的组合输入，不提供 UI 导入入口。`manager_sync_action_command_preview.v1` 的 request / result preview 只用于解释 future bridge command 的安全外壳：当前阶段 ready 场景仍显示 `not_executable_current_phase`、`request_not_built_current_phase` 和 `result_not_available_current_phase`，readiness 阻塞时只显示对应阻塞状态，不创建按钮、点击回调或 bridge 调用。
+`manager_sync_readiness.v1` 导入态只保存在当前 manager snapshot 内存中，不写入 settings JSON。当前 Manager 不提供真实同步命令、恢复码输入、设备授权或撤销方法；关闭态由 capability 缺席、禁用按钮和稳定阻塞状态表达。
 
 ## 恢复码与设备授权
 
-恢复码、设备授权、设备撤销和真实同步入口状态进入产品实现前，必须先遵守 `docs/manager-sync-entry-boundary.md` 中的进入条件、bridge 边界、诊断脱敏和测试计划；四条 action 的非执行 request / result 预演边界必须同时遵守 `docs/manager-sync-action-protocol-preview.md` 和 `docs/manager-sync-action-acceptance-matrix.md`。
+恢复码、设备授权、设备撤销和真实同步入口状态进入产品实现前，必须先遵守 `docs/manager-sync-entry-boundary.md` 中的 UI 职责、secret 生命周期、bridge 边界、诊断脱敏和产品停止线。
 
-当前 Flutter manager 已能展示服务连接健康、恢复码准备态、设备授权准备态和 join request 状态的只读摘要，默认仍不上传真实 P2 数据；恢复码 / 设备授权默认状态为 `recovery_code_flow_closed`、`device_authorization_flow_closed` 和 `join_request_unavailable`。恢复码 setup / restore 与设备 join / revocation 已拆成四条 readiness，并通过 `SyncReadinessFlowSummary` 与 `SyncInteractionEntryPlan` 输出同一组聚合阻塞、错误分类、下一项证据、来源标签和非执行操作进入计划；`SyncActionCommandPreviewPlan` 再输出四条 action 的 command preview、request / result status、allowed fields 和 forbidden material。所有这些状态只用于解释阻塞和诊断脱敏，不提供恢复码生成 / 输入、join request 创建、授权成功、设备撤销或真实同步上传入口。
+当前 Flutter manager 已能展示服务连接健康、恢复码准备态、设备授权准备态和 join request 状态的只读摘要，默认仍不上传真实 P2 数据；恢复码 / 设备授权默认状态为 `recovery_code_flow_closed`、`device_authorization_flow_closed` 和 `join_request_unavailable`。恢复码 setup / restore 与设备 join / revocation 通过 `SyncReadinessFlowSummary` 与 `SyncInteractionEntryPlan` 输出聚合阻塞、错误分类、下一项证据、来源标签和只读进入状态，不提供恢复码生成 / 输入、join request 创建、授权成功、设备撤销或真实同步上传入口。
 
 恢复码 UI 必须等到以下条件同时满足：
 
@@ -198,7 +196,7 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 6. `rank explain` 区域已通过专用 `ime-ffi` ABI 读取单候选贡献项，Flutter 只展示复制后的非敏感摘要，不持有 Rust view 指针。
 7. 已补设置页配置来源诊断、sync gate 草案预览、部署证据来源标签、设置草案保存、脱敏诊断报告分组预览 / 筛选 / 复制 / 导出和 bridge 失败结构化错误分类展示；UI 不透传 native 错误明细。
 8. 同步配置页继续保持真实上传按钮禁用，状态由设置草案、隐私模式、平台私钥 backend gate 和部署证据来源草案派生，可显示 `local_only`、`sync_disabled_by_policy`、`backend_unavailable`、`deployment_unverified` 或 `preflight_ready`。
-9. 已接入 sync entry state、服务连接健康、`sync_connection_health.v1` 摘要回填、恢复码 / 设备授权准备态、四条 readiness 聚合、future bridge readiness mapper、settings 内存态 readiness 导入、开发期 evidence bundle 同源回归、只读交互进入计划、action command preview 和 request / result preview 的非上传实现；待可用平台私钥 backend、恢复 / 授权实现测试和发布级部署证据齐备后，再接设备授权成功路径、恢复码和用户可用同步。
+9. 已接入 sync entry state、服务连接健康、`sync_connection_health.v1` 摘要回填、恢复码 / 设备授权准备态、四条 readiness 聚合、settings 内存态 readiness 导入和只读交互进入状态；待可用平台私钥 backend、恢复 / 授权实现测试和发布级部署证据齐备后，再设计真实设备授权、恢复码和用户同步命令。
 
 ## 停止线
 
@@ -206,5 +204,5 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 - 没有发布级目标部署运行证据前，不把远端同步展示为生产可用；本地 Docker / 本地 HTTPS 联调状态可以作为非生产证据展示。
 - 没有 FFI / bridge 明确错误语义前，不让 Flutter 直接解析 Rust 内部错误字符串。
 - 任何会展示、记录、上传或导出 P0、P1 原始事件、恢复码、token、私钥或明文同步 payload 的设计都必须停止并回退。
-- 任何 action preview 被接成真实 `ManagerBridge` request / result、settings draft action payload、按钮点击回调或 C ABI DTO 前，都必须另补真实 contract 文档和实现测试。
+- 任何真实同步、恢复或设备命令进入 `ManagerBridge`、settings UI、按钮点击回调或 C ABI 前，都必须先补当期 contract 文档和真实实现测试。
 - 如果 UI 需要新增 Go server API，必须先更新 `docs/sync-server-api-storage.md` 或对应 ADR，不能让管理端绕过现有 encrypted object / metadata 边界。

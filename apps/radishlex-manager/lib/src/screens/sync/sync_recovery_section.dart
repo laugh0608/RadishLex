@@ -17,9 +17,6 @@ class SyncRecoverySection extends StatelessWidget {
   Widget build(BuildContext context) {
     final setupIntent = interactionPlan.intentFor('recovery_setup');
     final restoreIntent = interactionPlan.intentFor('recovery_restore');
-    final commandPlan = interactionPlan.actionCommandPreviewPlan;
-    final setupCommand = commandPlan.previewFor('recovery_setup');
-    final restoreCommand = commandPlan.previewFor('recovery_restore');
 
     return ManagerSection(
       key: const Key('sync-recovery-readiness-section'),
@@ -78,54 +75,6 @@ class SyncRecoverySection extends StatelessWidget {
             value: setupIntent.requiredEvidenceSummary,
           ),
           ManagerKeyValueRow(
-            label: 'setup command',
-            value: setupCommand.executionStatus,
-          ),
-          ManagerKeyValueRow(
-            label: 'setup command policy',
-            value: setupCommand.dataPolicy,
-          ),
-          ManagerKeyValueRow(
-            label: 'setup command stop',
-            value: setupCommand.stopLine,
-          ),
-          ManagerKeyValueRow(
-            label: 'setup request boundary',
-            value: setupCommand.requestBoundary,
-          ),
-          ManagerKeyValueRow(
-            label: 'setup result boundary',
-            value: setupCommand.resultBoundary,
-          ),
-          ManagerKeyValueRow(
-            label: 'setup command errors',
-            value: setupCommand.errorCodeSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'setup request status',
-            value: setupCommand.requestPreview.requestStatus,
-          ),
-          ManagerKeyValueRow(
-            label: 'setup request fields',
-            value: setupCommand.requestPreview.allowedFieldSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'setup request forbidden',
-            value: setupCommand.requestPreview.forbiddenMaterialSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'setup result status',
-            value: setupCommand.resultPreview.resultStatus,
-          ),
-          ManagerKeyValueRow(
-            label: 'setup result fields',
-            value: setupCommand.resultPreview.allowedFieldSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'setup result forbidden',
-            value: setupCommand.resultPreview.forbiddenMaterialSummary,
-          ),
-          ManagerKeyValueRow(
             label: 'restore intent',
             value: restoreIntent.intentStatus,
           ),
@@ -136,54 +85,6 @@ class SyncRecoverySection extends StatelessWidget {
           ManagerKeyValueRow(
             label: 'restore intent evidence',
             value: restoreIntent.requiredEvidenceSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'restore command',
-            value: restoreCommand.executionStatus,
-          ),
-          ManagerKeyValueRow(
-            label: 'restore command policy',
-            value: restoreCommand.dataPolicy,
-          ),
-          ManagerKeyValueRow(
-            label: 'restore command stop',
-            value: restoreCommand.stopLine,
-          ),
-          ManagerKeyValueRow(
-            label: 'restore request boundary',
-            value: restoreCommand.requestBoundary,
-          ),
-          ManagerKeyValueRow(
-            label: 'restore result boundary',
-            value: restoreCommand.resultBoundary,
-          ),
-          ManagerKeyValueRow(
-            label: 'restore command errors',
-            value: restoreCommand.errorCodeSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'restore request status',
-            value: restoreCommand.requestPreview.requestStatus,
-          ),
-          ManagerKeyValueRow(
-            label: 'restore request fields',
-            value: restoreCommand.requestPreview.allowedFieldSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'restore request forbidden',
-            value: restoreCommand.requestPreview.forbiddenMaterialSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'restore result status',
-            value: restoreCommand.resultPreview.resultStatus,
-          ),
-          ManagerKeyValueRow(
-            label: 'restore result fields',
-            value: restoreCommand.resultPreview.allowedFieldSummary,
-          ),
-          ManagerKeyValueRow(
-            label: 'restore result forbidden',
-            value: restoreCommand.resultPreview.forbiddenMaterialSummary,
           ),
           ManagerKeyValueRow(
             label: 'setup flow',

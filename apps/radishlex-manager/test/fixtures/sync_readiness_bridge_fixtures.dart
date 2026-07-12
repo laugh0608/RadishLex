@@ -2,10 +2,6 @@ import 'package:radishlex_manager/src/bridge/ffi_manager_sync_readiness_mapper.d
 import 'package:radishlex_manager/src/data/manager_fixture.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
-import 'sync_action_protocol_fixtures.dart';
-
-export 'sync_action_protocol_fixtures.dart';
-
 const syncReadinessScenarioReadyDevice = DeviceSecuritySummary(
   deviceId: 'device-ready-01',
   backendId: 'test-production-ready',
@@ -104,16 +100,6 @@ class SyncReadinessScenario {
     this.forbiddenNextEvidenceFragments = const [],
     required this.expectedInteractionStatuses,
     required this.expectedInteractionBlockers,
-    this.expectedActionCommandRequestBoundaries =
-        syncActionCommandRequestBoundarySummary,
-    this.expectedActionCommandResultBoundaries =
-        syncActionCommandResultBoundarySummary,
-    this.expectedActionCommandErrorCodes = syncActionCommandErrorCodeSummary,
-    this.expectedActionRequestAllowedFields =
-        syncActionRequestAllowedFieldSummary,
-    this.expectedActionResultAllowedFields =
-        syncActionResultAllowedFieldSummary,
-    this.expectedActionForbiddenMaterials = syncActionForbiddenMaterialSummary,
     required this.expectedUserSyncEnabled,
   });
 
@@ -136,12 +122,6 @@ class SyncReadinessScenario {
   final List<String> forbiddenNextEvidenceFragments;
   final String expectedInteractionStatuses;
   final String expectedInteractionBlockers;
-  final String expectedActionCommandRequestBoundaries;
-  final String expectedActionCommandResultBoundaries;
-  final String expectedActionCommandErrorCodes;
-  final String expectedActionRequestAllowedFields;
-  final String expectedActionResultAllowedFields;
-  final String expectedActionForbiddenMaterials;
   final bool expectedUserSyncEnabled;
 }
 

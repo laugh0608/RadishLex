@@ -11,9 +11,6 @@ import 'package:radishlex_manager/src/bridge/manager_bridge_factory.dart';
 import 'package:radishlex_manager/src/bridge/manager_settings_store.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
-import 'fixtures/sync_bridge_command_contract_fixtures.dart';
-import 'fixtures/sync_ffi_command_boundary_fixtures.dart';
-
 void main() {
   test('factory keeps fixture bridge when no local userdb is configured', () {
     final bridge = createDefaultManagerBridge(environment: const {});
@@ -180,75 +177,59 @@ void main() {
     },
   );
 
-  test(
-    'ffi manager bridge keeps future sync command capability absent',
-    () async {
-      final tempDir = Directory.systemTemp.createTempSync(
-        'radishlex-manager-sync-command-contract-test-',
-      );
-      addTearDown(() {
-        if (tempDir.existsSync()) {
-          tempDir.deleteSync(recursive: true);
-        }
-      });
-      final settingsFile = '${tempDir.path}/manager-settings.json';
-      final bridge = FfiManagerBridge(
-        dbPath: '/tmp/radishlex-userdb.sqlite',
-        settingsFilePath: settingsFile,
-        native: _FakeNativeBinding(),
-      );
-
-      final snapshot = await bridge.saveSettingsDraft(
-        const ManagerSettingsDraft(
-          serverEndpoint: 'https://localhost:7319',
-          retainSyncConfig: true,
-          privacyMode: false,
-          diagnosticsExport: true,
-          deploymentEvidenceRecorded: true,
-          accessTokenConfigured: true,
-          deploymentEvidenceSource: managerDeploymentEvidenceLocalSmoke,
-        ),
-      );
-      final report = await bridge.loadDiagnosticsReport();
-      final text = report.toRedactedText();
-      final settingsJson = File(settingsFile).readAsStringSync();
-
-      expect(snapshot.sync.state.canEnableUserSync, isFalse);
-      expect(
-        _diagnosticsValue(report, 'sync.action_command_format'),
-        managerSyncActionCommandPreviewFormat,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.action_command_execution_statuses'),
-        contains('not_executable_current_phase'),
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.action_request_statuses'),
-        contains('request_not_built_current_phase'),
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.action_result_statuses'),
-        contains('result_not_available_current_phase'),
-      );
-
-      expect(
-        syncFfiCommandBoundaryCurrentNativeSymbols,
-        isEmpty,
-        reason: 'sync command native symbols stay design-only',
-      );
-      expect(text, isNot(contains('future_manager_sync_ffi_command_request')));
-      expect(text, isNot(contains('future_manager_sync_ffi_command_result')));
-      expect(text, isNot(contains('future_manager_bridge_command_request')));
-      expect(text, isNot(contains('future_manager_bridge_command_result')));
-      expect(settingsJson, isNot(contains('action_command')));
-      expect(settingsJson, isNot(contains('future_manager_sync_ffi')));
-      expect(settingsJson, isNot(contains('join_request_authorization')));
-      for (final fragment in syncBridgeCommandContractForbiddenFragments) {
-        expect(text, isNot(contains(fragment)), reason: fragment);
-        expect(settingsJson, isNot(contains(fragment)), reason: fragment);
+  test('ffi manager bridge keeps sync disabled and secrets redacted', () async {
+    final tempDir = Directory.systemTemp.createTempSync(
+      'radishlex-manager-sync-command-contract-test-',
+    );
+    addTearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
       }
-    },
-  );
+    });
+    final settingsFile = '${tempDir.path}/manager-settings.json';
+    final bridge = FfiManagerBridge(
+      dbPath: '/tmp/radishlex-userdb.sqlite',
+      settingsFilePath: settingsFile,
+      native: _FakeNativeBinding(),
+    );
+
+    final snapshot = await bridge.saveSettingsDraft(
+      const ManagerSettingsDraft(
+        serverEndpoint: 'https://localhost:7319',
+        retainSyncConfig: true,
+        privacyMode: false,
+        diagnosticsExport: true,
+        deploymentEvidenceRecorded: true,
+        accessTokenConfigured: true,
+        deploymentEvidenceSource: managerDeploymentEvidenceLocalSmoke,
+      ),
+    );
+    final report = await bridge.loadDiagnosticsReport();
+    final text = report.toRedactedText();
+    final settingsJson = File(settingsFile).readAsStringSync();
+
+    expect(snapshot.sync.state.canEnableUserSync, isFalse);
+    expect(
+      _diagnosticsValue(report, 'sync.interaction_statuses'),
+      contains('closed_current_phase'),
+    );
+    expect(settingsJson, isNot(contains('action_command')));
+    expect(settingsJson, isNot(contains('join_request_authorization')));
+    for (final fragment in [
+      'Bearer ',
+      'access_token_value',
+      'recovery_code=',
+      'short_code=',
+      'private_key=',
+      'signature_bytes=',
+      'wrapped_material=',
+      'request_body',
+      'response_body',
+    ]) {
+      expect(text, isNot(contains(fragment)), reason: fragment);
+      expect(settingsJson, isNot(contains(fragment)), reason: fragment);
+    }
+  });
 
   test('settings store persists versioned deployment evidence draft', () {
     final tempDir = Directory.systemTemp.createTempSync(
