@@ -1,8 +1,8 @@
 use std::thread::{self, ThreadId};
 
 use radishlex_ime_core::{
-    Candidate, Commit, Composition, CoreResult, Engine, InputSession, KeyEvent, KeyOutcome,
-    SchemaId, SessionState,
+    Candidate, Composition, CoreResult, Engine, InputSession, KeyEvent, KeyOutcome, SchemaId,
+    SessionState,
 };
 #[cfg(feature = "native-rime")]
 use radishlex_ime_engine_rime::{RimeEngine, RimeEngineConfig};
@@ -123,11 +123,11 @@ impl Engine for SessionEngine {
         }
     }
 
-    fn commit_candidate(&mut self, index: usize) -> CoreResult<Commit> {
+    fn select_candidate(&mut self, index: usize) -> CoreResult<KeyOutcome> {
         match self {
-            Self::Demo(engine) => engine.commit_candidate(index),
+            Self::Demo(engine) => engine.select_candidate(index),
             #[cfg(feature = "native-rime")]
-            Self::Rime(engine) => engine.commit_candidate(index),
+            Self::Rime(engine) => engine.select_candidate(index),
         }
     }
 

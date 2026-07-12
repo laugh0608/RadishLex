@@ -9,10 +9,10 @@ use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use radishlex_ime_ffi::{
-    radishlex_buffer_data, radishlex_buffer_free, radishlex_buffer_len, radishlex_error_code,
-    radishlex_error_free, radishlex_error_message, radishlex_ffi_contract,
-    radishlex_session_commit_candidate, radishlex_session_engine_kind, radishlex_session_free,
-    radishlex_session_new, radishlex_session_push_key_event, radishlex_session_reset,
+    radishlex_error_code, radishlex_error_free, radishlex_error_message, radishlex_ffi_contract,
+    radishlex_key_result_commit, radishlex_key_result_commit_present, radishlex_key_result_free,
+    radishlex_session_engine_kind, radishlex_session_free, radishlex_session_new,
+    radishlex_session_push_key_event, radishlex_session_reset, radishlex_session_select_candidate,
     radishlex_session_snapshot_new, radishlex_snapshot_candidate,
     radishlex_snapshot_candidate_count, radishlex_snapshot_free, radishlex_snapshot_preedit,
     radishlex_snapshot_schema, radishlex_userdb_add_term, radishlex_userdb_dictionary_export,
@@ -152,11 +152,16 @@ fn platform_binding_style_copies_views_before_releasing_handles() {
     assert_eq!(candidate_text, "萝卜");
     assert_eq!(candidate_reading, "luobo");
 
-    let commit = radishlex_session_commit_candidate(session, 0, &mut error);
-    assert!(!commit.is_null());
-    let commit_text = unsafe { buffer_to_owned(commit) };
+    let mut result = ptr::null_mut();
+    assert_eq!(
+        unsafe { radishlex_session_select_candidate(session, 0, &mut result, &mut error) },
+        RadishLexStatusCode::Ok
+    );
+    assert!(!result.is_null());
+    assert_eq!(unsafe { radishlex_key_result_commit_present(result) }, 1);
+    let commit_text = unsafe { view_to_owned(radishlex_key_result_commit(result)) };
     unsafe {
-        radishlex_buffer_free(commit);
+        radishlex_key_result_free(result);
         radishlex_session_free(session);
     }
     assert_eq!(commit_text, "萝卜");
@@ -578,17 +583,6 @@ unsafe fn view_to_owned(view: RadishLexStringView) -> String {
     assert!(!view.data.is_null());
     let bytes = slice::from_raw_parts(view.data, view.len);
     String::from_utf8(bytes.to_vec()).expect("view must be UTF-8")
-}
-
-unsafe fn buffer_to_owned(buffer: *const radishlex_ime_ffi::RadishLexBuffer) -> String {
-    let data = radishlex_buffer_data(buffer);
-    let len = radishlex_buffer_len(buffer);
-    if len == 0 {
-        return String::new();
-    }
-    assert!(!data.is_null());
-    let bytes = slice::from_raw_parts(data, len);
-    String::from_utf8(bytes.to_vec()).expect("buffer must be UTF-8")
 }
 
 fn temp_db_path(name: &str) -> PathBuf {

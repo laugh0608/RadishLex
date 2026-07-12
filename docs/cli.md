@@ -7,7 +7,7 @@
 `radishlex-ime-cli` 是当前 Rust 侧命令行复验入口，用于验证两类链路：
 
 ```text
-input code -> push_key -> composition -> candidates -> commit_candidate
+input code -> push_key -> composition -> candidates -> select_candidate
 userdb -> learning event -> ranker summary -> rank explain
 ```
 
@@ -170,7 +170,7 @@ commit_engine_index: <n>
 - `engine_index`：该候选在底层 engine 当前候选列表中的原始索引。
 - `score`：ranker 最终分数。
 - `explain`：本地 userdb 与 ranker summary 对该候选的排序贡献。
-- `commit_engine_index`：最终提交给 `commit_candidate` 的原始 engine index。
+- `commit_engine_index`：最终传给 `select_candidate` 的原始 engine index；分段候选选择不保证同一步产生 commit。
 
 该模式只读取显式传入的 `--rank-db`，不把 Rime 内部对象 ID 写入 userdb。
 

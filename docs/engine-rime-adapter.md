@@ -121,9 +121,10 @@ Engine::candidates
   -> get_context
   -> convert context.menu candidates
 
-Engine::commit_candidate(index)
-  -> select candidate by key or index strategy
-  -> get_commit
+Engine::select_candidate(index)
+  -> select_candidate_on_current_page
+  -> get_commit if available
+  -> preserve updated composition when the selection only confirms one segment
 
 Engine::set_schema(schema)
   -> get_schema_list and require deployed schema
@@ -202,7 +203,7 @@ RadishLexRimeSessionOptions
 - `ime-ffi` 启用 `native-rime` feature 时，该入口会将 options 转为 `RimeEngineConfig` 并创建真实 `RimeEngine` session。
 - `ime-ffi` 内部使用 demo / Rime 可扩展 session engine 封装，平台端仍只持有 opaque `RadishLexSession*`。
 - 已初始化 Rime runtime 的进程级目录与 deploy 配置不一致时返回 `InvalidState`，即使当前活动 session 为零也不重置已有 runtime；如需更换配置，必须先在零 session 状态显式 shutdown。
-- 当前已通过 ignored native smoke 覆盖 `radishlex_session_new_rime -> push_key -> snapshot -> commit_candidate`、双 session peer release 和不存在 schema 拒绝；该 smoke 需要显式传入隔离 Rime shared / user data 目录。
+- 当前已通过 ignored native smoke 覆盖 `radishlex_session_new_rime -> key result -> snapshot -> select_candidate`、完整与分段候选选择、主要编辑/导航按键、双 session peer release 和不存在 schema 拒绝；该 smoke 需要显式传入隔离 Rime shared / user data 目录。
 
 ## 候选转换规则
 
@@ -286,7 +287,7 @@ RADISHLEX_RIME_SHARED_DATA=<path> RADISHLEX_RIME_USER_DATA=<path> cargo test -p 
 
 已有实现与历史 smoke 已证明真实 Rime adapter 能完成 composition、候选、翻页、选择、commit、错误映射和 ranker 接入，`ime-ffi` 也可在显式 `native-rime` feature 下创建真实 Rime session。详细完成记录留在 devlog，不在本文持续追加。
 
-ABI contract v2 已闭合 `KeyOutcome` 的 `consumed`、即时 commit、同事件 snapshot 和 Rust-owned result 生命周期；`crates/ime-ffi/include/radishlex_input.h` 已通过 C11 与 Objective-C 编译测试。
+ABI contract v3 已闭合按键与候选选择的 `consumed`、可选 commit、同事件 snapshot 和 Rust-owned result 生命周期；`crates/ime-ffi/include/radishlex_input.h` 已通过 C11 与 Objective-C 编译测试。
 
 进程级 runtime 已闭合 setup / initialize / explicit shutdown / finalize、多 session 共享、零 session 间隙、配置冲突和 deploy / session / schema 失败回滚；schema 创建与切换同时验证已部署列表和选择后回读。stub API 测试可精确复验调用次数，`ime-ffi` 另有需要隔离 Rime 数据目录的 gated 单/双 session 与无效 schema smoke。
 

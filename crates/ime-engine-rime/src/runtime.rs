@@ -353,6 +353,10 @@ fn require_runtime_api_functions(api: &RimeApi) -> RimeEngineResult<()> {
     require_api_function(api.get_schema_list, "get_schema_list")?;
     require_api_function(api.free_schema_list, "free_schema_list")?;
     require_api_function(api.get_current_schema, "get_current_schema")?;
+    require_api_function(
+        api.select_candidate_on_current_page,
+        "select_candidate_on_current_page",
+    )?;
     Ok(())
 }
 
@@ -574,7 +578,7 @@ mod tests {
 
     #[test]
     fn runtime_api_validation_reports_missing_required_functions() {
-        let cases: [ApiMutation; 9] = [
+        let cases: [ApiMutation; 10] = [
             ("clear_composition", |api| api.clear_composition = None),
             ("process_key", |api| api.process_key = None),
             ("get_commit", |api| api.get_commit = None),
@@ -584,6 +588,9 @@ mod tests {
             ("get_schema_list", |api| api.get_schema_list = None),
             ("free_schema_list", |api| api.free_schema_list = None),
             ("get_current_schema", |api| api.get_current_schema = None),
+            ("select_candidate_on_current_page", |api| {
+                api.select_candidate_on_current_page = None
+            }),
         ];
 
         for (name, remove) in cases {
@@ -990,6 +997,46 @@ mod tests {
             free_schema_list: Some(stub_free_schema_list),
             get_current_schema: Some(stub_get_current_schema),
             select_schema: Some(stub_select_schema),
+            _schema_open: None,
+            _config_open: None,
+            _config_close: None,
+            _config_get_bool: None,
+            _config_get_int: None,
+            _config_get_double: None,
+            _config_get_string: None,
+            _config_get_cstring: None,
+            _config_update_signature: None,
+            _config_begin_map: None,
+            _config_next: None,
+            _config_end: None,
+            _simulate_key_sequence: None,
+            _register_module: None,
+            _find_module: None,
+            _run_task: None,
+            _get_shared_data_dir: None,
+            _get_user_data_dir: None,
+            _get_sync_dir: None,
+            _get_user_id: None,
+            _get_user_data_sync_dir: None,
+            _config_init: None,
+            _config_load_string: None,
+            _config_set_bool: None,
+            _config_set_int: None,
+            _config_set_double: None,
+            _config_set_string: None,
+            _config_get_item: None,
+            _config_set_item: None,
+            _config_clear: None,
+            _config_create_list: None,
+            _config_create_map: None,
+            _config_list_size: None,
+            _config_begin_list: None,
+            _get_input: None,
+            _get_caret_pos: None,
+            select_candidate: None,
+            _get_version: None,
+            _set_caret_pos: None,
+            select_candidate_on_current_page: Some(stub_select_candidate_on_current_page),
         }
     }
 
@@ -1036,6 +1083,13 @@ mod tests {
         _session_id: RimeSessionId,
         _keycode: c_int,
         _mask: c_int,
+    ) -> Bool {
+        TRUE
+    }
+
+    unsafe extern "C" fn stub_select_candidate_on_current_page(
+        _session_id: RimeSessionId,
+        _index: usize,
     ) -> Bool {
         TRUE
     }

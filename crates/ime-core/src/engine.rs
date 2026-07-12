@@ -12,7 +12,11 @@ pub trait Engine {
 
     fn candidates(&self) -> CoreResult<Vec<Candidate>>;
 
-    fn commit_candidate(&mut self, index: usize) -> CoreResult<Commit>;
+    /// Selects a candidate from the current page.
+    ///
+    /// Engines with segmented composition may consume the selection without
+    /// producing a commit yet. The returned outcome preserves that distinction.
+    fn select_candidate(&mut self, index: usize) -> CoreResult<KeyOutcome>;
 
     fn set_schema(&mut self, schema: SchemaId) -> CoreResult<()>;
 

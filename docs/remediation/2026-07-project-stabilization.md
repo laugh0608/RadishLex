@@ -114,7 +114,7 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 
 ### 当前完成证据（更新至 2026-07-12）
 
-- ABI contract v2 新增 Rust-owned `RadishLexKeyResult`，无损返回 `consumed`、可选即时 commit 和同事件 snapshot。
+- ABI contract v3 统一按键处理与候选选择的 Rust-owned `RadishLexKeyResult`，无损返回 `consumed`、可选即时 commit 和同事件 snapshot。
 - 失败时 `result_out` 保持为空；owner-thread、空指针、非法 key event、borrowed view 和释放路径已有 host contract 测试。
 - `crates/ime-ffi/include/radishlex_input.h` 已覆盖输入侧 ABI，并通过 C11、Objective-C 编译和 Rust function pointer / layout 测试。
 - 旧 `push_key` / `push_key_event` 只保留为兼容入口，真实平台主契约切换为 `radishlex_session_handle_key_event`。
@@ -122,7 +122,7 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 两个 session 与零 session 间隙共享一次 setup / initialize；已初始化期间目录或 deploy 配置冲突返回结构化错误，deploy / session 创建 / schema 选择失败会回滚，只有显式 process shutdown 且零活动 session 时才 finalize。
 - 首个成功初始化的 Rime session 固定进程 runtime owner thread；跨线程创建或 shutdown 返回 `InvalidState`，平台壳不能把多个 client 分散到任意线程直接调用 librime。
 - adapter stub API 精确验证初始化、创建、销毁和 finalize 次数；`ime-ffi` 增加隔离数据目录下的 gated 双 session peer-release smoke。
-- 新增 `platforms/macos-imk/` Objective-C 薄壳：`NSEvent` 规范化、ABI v2 key result、即时 commit、snapshot/candidate 复制、原生 `IMKCandidates`、稳定候选 index、reset/cancel、schema 和 owner-thread 均由同一 wrapper 收口。
+- 新增 `platforms/macos-imk/` Objective-C 薄壳：`NSEvent` 规范化、ABI v3 key/selection result、即时 commit、snapshot/candidate 复制、原生 `IMKCandidates`、稳定候选 index、reset/cancel、schema 和 owner-thread 均由同一 wrapper 收口。
 - `RLXProcessRuntime` 为每个 input controller 创建独立 session，并在进程 teardown 时先逐个 invalidate session，再调用 `radishlex_rime_runtime_shutdown`；生产条件编译分支不允许回退 demo engine。
 - `./scripts/check-macos-imk.sh` 可在不安装系统输入法时构建 contract `.app` bundle，运行 Objective-C → C ABI → Rust session smoke，并检查 plist、rpath、dylib、完整开发签名与关键 symbol；production 分支另有 `-fsyntax-only` 编译门禁。
 - `./scripts/check-macos-imk-native.sh` 增加显式 gated native bundle 门禁：拒绝真实用户/runtime 数据目录和 symlink，要求 schema/default/license，固定 deploy policy，并检查架构、三个关键 symbol 与全部 copied data 哈希清单；全部非系统 dylib 会递归封装、改写到 bundle 内 `@rpath`，逐库许可证、签名后哈希和外部绝对依赖拒绝已有自动验证。
@@ -132,7 +132,7 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - native bundle 已携带上述隔离全拼 shared data 通过架构、依赖、symbol、许可证和哈希清单门禁；真实 librime FFI smoke 已复验 composition、候选、commit、两个 session 共享 runtime 与 peer release 后继续输入。
 - native smoke 发现 librime 对不存在 schema 的 `select_schema`/`get_current_schema` 返回过于宽松；adapter 现先读取已部署 schema list，再选择并精确回读。不存在或回读不一致会返回结构化错误，创建期还会销毁 session 并回滚 runtime，对应 stub 与真实 FFI 回归均已覆盖。
 - 2026-07-12 新登录确认旧 v13 仍无 source；reference/product probe 将问题定位为失败 Bundle ID/安装路径的 TIS 负缓存。正式身份已固定为 `org.radishlex.inputmethod.macos`、`org.radishlex.inputmethod.macos.Pinyin`、`RadishLexInputMethod.app` 与 `LSUIElement`。用户级 Apple Development v19 已安装、加入并启用；TextEdit 已验证 Space 中文提交与 composition 期间 `Command-N` 未消费，Codex 输入框已人工确认 5×1 原生横排候选可见。
-- Rime adapter 现拒绝把 Control/Option/Command 修饰字符降级为普通字母；M1 全拼有候选时由 adapter 以稳定 candidate commit 语义处理 Space，不再依赖临时 schema 的 delimiter/key binder。native FFI smoke 直接发送 `NamedKey::Space` 并要求同事件 commit，不再绕过按键调用候选提交 API。
+- Rime adapter 现拒绝把 Control/Option/Command 修饰字符降级为普通字母；M1 全拼有候选时由 adapter 以稳定 candidate selection 语义处理 Space，不再依赖临时 schema 的 delimiter/key binder。selection result 保留 optional commit 与更新后的 snapshot，覆盖分段候选只推进 composition 的情况。
 
 这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键未消费、Space 提交和横排候选子项，不代表真实应用输入矩阵已完成。R01A 下一判断点是补齐非首候选、翻页、取消、编辑键、client 切换、进程重启和断网证据。
 
@@ -180,7 +180,7 @@ R01A 不要求学习已经接入；真实学习在 R02L 正确性完成后由 R0
 ### 必须完成
 
 - input runtime 组合 engine、ranker、userdb 和 privacy policy。
-- 保留 display index、ranked index 与 engine commit index 的稳定映射。
+- 保留 display index、ranked index 与 engine selection index 的稳定映射。
 - 真实选择写入事务化 selection，并影响后续候选。
 - secure text entry、P0 App 和隐私模式在记录前阻断学习。
 - manager 只读取或修改 Rust 真相源，不复制排序和隐私逻辑。

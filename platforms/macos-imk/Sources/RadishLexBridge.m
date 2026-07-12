@@ -33,13 +33,6 @@ NSAttributedStringKey const RLXCandidateIndexAttributeName =
 @implementation RLXKeyHandlingResult
 @end
 
-@interface RLXCandidateCommitResult ()
-@property(nonatomic, copy) NSString *commit;
-@property(nonatomic, strong, nullable) RLXSnapshot *snapshot;
-@end
-@implementation RLXCandidateCommitResult
-@end
-
 @interface RLXSessionBridge ()
 @property(nonatomic) RadishLexSession *session;
 @property(nonatomic, strong) NSThread *ownerThread;
@@ -306,29 +299,31 @@ static RLXSnapshot *_Nullable RLXCopySnapshot(const RadishLexSnapshot *snapshot,
   return copied;
 }
 
-- (nullable RLXCandidateCommitResult *)commitCandidateAtIndex:(NSUInteger)index
-                                                         error:(NSError **)error {
+- (nullable RLXKeyHandlingResult *)selectCandidateAtIndex:(NSUInteger)index
+                                                      error:(NSError **)error {
   if (![self ensureOwner:error]) {
     return nil;
   }
   RadishLexError *ffiError = NULL;
-  RadishLexBuffer *buffer = radishlex_session_commit_candidate(self.session, index, &ffiError);
-  if (buffer == NULL) {
-    RLXCopyFFIError(error, RADISHLEX_STATUS_ENGINE_ERROR, ffiError);
+  RadishLexKeyResult *result = NULL;
+  RadishLexStatusCode status =
+      radishlex_session_select_candidate(self.session, index, &result, &ffiError);
+  if (status != RADISHLEX_STATUS_OK || result == NULL) {
+    RLXCopyFFIError(error, status, ffiError);
     return nil;
   }
-  RadishLexStringView view = {.data = radishlex_buffer_data(buffer),
-                               .len = radishlex_buffer_len(buffer)};
-  NSString *commit = RLXCopyStringView(view, error);
-  radishlex_buffer_free(buffer);
-  if (commit == nil) {
-    return nil;
-  }
-  RLXSnapshot *snapshot = [self snapshotWithError:error];
-  RLXCandidateCommitResult *result = [[RLXCandidateCommitResult alloc] init];
-  result.commit = commit;
-  result.snapshot = snapshot;
-  return result;
+  BOOL consumed = radishlex_key_result_consumed(result) == 1;
+  BOOL commitPresent = radishlex_key_result_commit_present(result) == 1;
+  NSString *commit = commitPresent ? RLXCopyStringView(radishlex_key_result_commit(result), error)
+                                   : nil;
+  RLXSnapshot *snapshot = RLXCopySnapshot(radishlex_key_result_snapshot(result), error);
+  radishlex_key_result_free(result);
+  if ((commitPresent && commit == nil) || snapshot == nil) return nil;
+  RLXKeyHandlingResult *copied = [[RLXKeyHandlingResult alloc] init];
+  copied.consumed = consumed;
+  copied.commit = commit;
+  copied.snapshot = snapshot;
+  return copied;
 }
 
 - (BOOL)resetWithError:(NSError **)error {

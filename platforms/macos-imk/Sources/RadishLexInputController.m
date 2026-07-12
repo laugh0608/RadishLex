@@ -121,13 +121,15 @@
     return;
   }
   NSError *error = nil;
-  RLXCandidateCommitResult *result =
-      [self.session commitCandidateAtIndex:index.unsignedIntegerValue error:&error];
+  RLXKeyHandlingResult *result =
+      [self.session selectCandidateAtIndex:index.unsignedIntegerValue error:&error];
   if (result == nil) {
     [self recoverFromError:error client:self.client];
     return;
   }
-  [self.client insertText:result.commit replacementRange:NSMakeRange(NSNotFound, NSNotFound)];
+  if (result.commit != nil) {
+    [self.client insertText:result.commit replacementRange:NSMakeRange(NSNotFound, NSNotFound)];
+  }
   if (result.snapshot != nil) {
     [self applySnapshot:result.snapshot client:self.client];
   } else {

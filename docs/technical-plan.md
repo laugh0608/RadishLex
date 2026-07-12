@@ -176,7 +176,8 @@ system key event
 
 - 平台必须能判断按键是否被消费，未消费按键交还宿主应用。
 - engine 产生的即时 commit 不能在 FFI 层丢失。
-- candidate display index、ranked index 和 engine commit index 必须有稳定映射。
+- candidate display index、ranked index 和 engine selection index 必须有稳定映射。
+- 候选选择结果必须同时表达 consumed、optional commit 和选择后的 snapshot；分段拼音候选可能只确定当前音节并继续 composition，平台不得假定每次候选选择都会立即提交文本。
 - secure text entry、P0 App 或隐私模式必须在记录学习事件前阻断。
 - manager、后端和网络不可进入每次按键链路。
 

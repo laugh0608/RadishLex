@@ -158,7 +158,7 @@ int main(void) {
             @"candidate without a Rust index is rejected");
 
     NSError *error = nil;
-    Require([RLXSessionBridge validateFFIContract:&error], @"ABI v2 contract");
+    Require([RLXSessionBridge validateFFIContract:&error], @"ABI v3 contract");
     RLXSessionBridge *session =
         [[RLXProcessRuntime sharedRuntime] createSessionWithError:&error];
     Require(session != nil, @"create owner-thread session");
@@ -187,11 +187,12 @@ int main(void) {
     NSAttributedString *candidate = RLXAttributedCandidate(snapshot.candidates[1]);
     Require([RLXCandidateIndexFromAttributedString(candidate) isEqualToNumber:@1],
             @"candidate display keeps the Rust index");
-    RLXCandidateCommitResult *candidateCommit =
-        [session commitCandidateAtIndex:1 error:&error];
-    Require([candidateCommit.commit isEqualToString:@"萝卜词核"] &&
-                candidateCommit.snapshot.preedit.length == 0,
-            @"candidate commit and post-commit snapshot");
+    RLXKeyHandlingResult *candidateSelection =
+        [session selectCandidateAtIndex:1 error:&error];
+    Require(candidateSelection.isConsumed &&
+                [candidateSelection.commit isEqualToString:@"萝卜词核"] &&
+                candidateSelection.snapshot.preedit.length == 0,
+            @"candidate selection commit and post-selection snapshot");
 
     Require([session setSchema:@"contract.schema" error:&error], @"schema switch");
     for (NSNumber *codepoint in @[@'c', @'i', @'h', @'e']) {

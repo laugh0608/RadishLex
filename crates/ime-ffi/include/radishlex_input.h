@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-#define RADISHLEX_ABI_CONTRACT_VERSION 2u
+#define RADISHLEX_ABI_CONTRACT_VERSION 3u
 #define RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD 1u
 #define RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND 1u
 
@@ -176,6 +176,16 @@ const RadishLexSnapshot *radishlex_key_result_snapshot(
     const RadishLexKeyResult *result);
 void radishlex_key_result_free(RadishLexKeyResult *result);
 
+/*
+ * Candidate selection can update a segmented composition without committing.
+ * Inspect commit_present and the returned snapshot from the same result.
+ */
+RadishLexStatusCode radishlex_session_select_candidate(
+    RadishLexSession *session,
+    size_t index,
+    RadishLexKeyResult **result_out,
+    RadishLexError **error_out);
+
 /* Independent snapshot compatibility API. */
 RadishLexSnapshot *radishlex_session_snapshot_new(
     RadishLexSession *session,
@@ -194,10 +204,6 @@ RadishLexStatusCode radishlex_snapshot_candidate(
     RadishLexError **error_out);
 void radishlex_snapshot_free(RadishLexSnapshot *snapshot);
 
-RadishLexBuffer *radishlex_session_commit_candidate(
-    RadishLexSession *session,
-    size_t index,
-    RadishLexError **error_out);
 const uint8_t *radishlex_buffer_data(const RadishLexBuffer *buffer);
 size_t radishlex_buffer_len(const RadishLexBuffer *buffer);
 void radishlex_buffer_free(RadishLexBuffer *buffer);

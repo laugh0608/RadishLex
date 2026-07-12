@@ -42,7 +42,7 @@ pub trait Engine {
     fn push_key(&mut self, key: KeyEvent) -> CoreResult<KeyOutcome>;
     fn composition(&self) -> CoreResult<Composition>;
     fn candidates(&self) -> CoreResult<Vec<Candidate>>;
-    fn commit_candidate(&mut self, index: usize) -> CoreResult<Commit>;
+    fn select_candidate(&mut self, index: usize) -> CoreResult<KeyOutcome>;
     fn set_schema(&mut self, schema: SchemaId) -> CoreResult<()>;
     fn schema(&self) -> CoreResult<SchemaId>;
 }
@@ -54,7 +54,7 @@ pub trait Engine {
 - `push_key` 只处理一个按键事件，返回该按键是否被输入法消费，以及是否产生提交。
 - `composition` 返回当前预编辑文本。
 - `candidates` 返回当前候选列表，列表顺序是进入 ranker 前的 engine 输出顺序。
-- `commit_candidate` 按当前候选列表索引提交候选，提交后 adapter 应按底层引擎规则更新会话状态。
+- `select_candidate` 按当前页候选列表索引驱动底层引擎选择，并返回 consumed 与 optional commit；分段候选可能只更新 composition 而不立即提交。
 - `set_schema` 切换输入方案，切换失败必须显式报错。
 - `schema` 返回当前输入方案标识。
 
@@ -92,7 +92,7 @@ InputSession::new(engine)
   -> set_schema(schema)
   -> push_key(...)
   -> state()
-  -> commit_candidate(index)
+  -> select_candidate(index)
   -> reset()
 ```
 
@@ -117,7 +117,7 @@ Engine boundary 可以参考公开输入法行为和公开文档，但不能复�
 - `cargo test -p radishlex-ime-core` 通过。
 - `cargo run -p radishlex-ime-cli -- demo luobo` 能展示 composition、候选和 commit。
 - `radishlex-ime-cli rime` 在启用 `native-rime` 且配置真实 `librime` 与隔离 schema 数据后，能展示真实 composition、候选和 commit。
-- test-only stub engine 能完成 `push_key -> candidates -> commit_candidate`。
+- test-only stub engine 能完成 `push_key -> candidates -> select_candidate`。
 - 核心类型不依赖平台 SDK 或真实底层 engine。
 - 文档入口能指向本边界说明。
 

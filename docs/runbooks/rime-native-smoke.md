@@ -272,7 +272,7 @@ cargo test -p radishlex-ime-ffi --features native-rime \
 
 - `cargo test -p radishlex-ime-ffi --features native-rime` 在 Homebrew `librime` 1.17.0 环境下通过，默认跳过 ignored native smoke。
 - `RADISHLEX_RIME_SHARED_DATA=/tmp/radishlex-rime-smoke.HpbV0l/shared RADISHLEX_RIME_USER_DATA=/tmp/radishlex-rime-smoke.HpbV0l/user cargo test -p radishlex-ime-ffi --features native-rime rime_session_native_smoke_uses_ffi_entrypoint -- --ignored` 通过。
-- 该 smoke 覆盖 `radishlex_session_new_rime -> radishlex_session_push_key -> radishlex_session_snapshot_new -> radishlex_session_commit_candidate`。
+- 该 smoke 当前覆盖 `radishlex_session_new_rime -> key result -> snapshot -> select_candidate`，并区分完整候选提交与分段候选只更新 composition 的结果。
 - 本次 smoke 继续使用隔离 Rime shared / user data，不使用真实个人词库或真实 Rime 用户目录。
 
 若运行时报 `dyld` 找不到 `librime`，执行：

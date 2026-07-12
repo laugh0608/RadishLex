@@ -108,6 +108,47 @@ pub unsafe extern "C" fn radishlex_session_handle_key_event(
     })
 }
 
+/// Selects a candidate from the current page and returns the resulting state.
+///
+/// A segmented engine can consume the selection while leaving `commit_present`
+/// false and returning an updated composition in the snapshot.
+///
+/// # Safety
+///
+/// `session` must be null or a live `RadishLexSession` pointer owned by the
+/// calling thread. `result_out` must point to writable storage for one result
+/// pointer. `error_out` must be null or point to writable storage for one error
+/// pointer. Output pointers must not alias each other.
+#[no_mangle]
+pub unsafe extern "C" fn radishlex_session_select_candidate(
+    session: *mut RadishLexSession,
+    index: usize,
+    result_out: *mut *mut RadishLexKeyResult,
+    error_out: *mut *mut RadishLexError,
+) -> RadishLexStatusCode {
+    ffi_status(error_out, || {
+        if result_out.is_null() {
+            return Err(FfiError::invalid_argument(
+                "candidate selection result output pointer is null",
+            ));
+        }
+
+        unsafe {
+            *result_out = ptr::null_mut();
+        }
+
+        let session = session_mut(session)?;
+        let outcome = session.inner_mut().select_candidate(index)?;
+        let state = session.state()?;
+        let result = Box::into_raw(Box::new(RadishLexKeyResult::new(outcome, state)));
+
+        unsafe {
+            *result_out = result;
+        }
+        Ok(())
+    })
+}
+
 /// Returns the schema version of a live key result.
 ///
 /// # Safety

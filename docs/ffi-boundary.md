@@ -45,7 +45,7 @@ RadishLexError*
 
 - ABI contract：`radishlex_ffi_contract`
 - session / Rime runtime 生命周期：`radishlex_session_new`、`radishlex_session_new_with_options`、`radishlex_session_new_rime`、`radishlex_session_free`、`radishlex_rime_runtime_shutdown`、`radishlex_session_engine_kind`、`radishlex_session_reset`、`radishlex_session_set_schema`
-- 输入与快照：`radishlex_session_handle_key_event`、`radishlex_key_result_*`、兼容 `radishlex_session_push_key_event`、`radishlex_session_snapshot_new`、`radishlex_snapshot_*`、`radishlex_session_commit_candidate`
+- 输入、候选选择与快照：`radishlex_session_handle_key_event`、`radishlex_session_select_candidate`、`radishlex_key_result_*`、兼容 `radishlex_session_push_key_event`、`radishlex_session_snapshot_new`、`radishlex_snapshot_*`
 - userdb 状态与词条管理：`radishlex_userdb_learning_status`、`radishlex_userdb_sync_preflight`、`radishlex_userdb_rank_explain_*`、`radishlex_userdb_add_term`、`radishlex_userdb_delete_term`、`radishlex_userdb_terms_*`
 - dictionary 文件与导入审计：`radishlex_userdb_dictionary_*`、`radishlex_userdb_import_batches_*`
 - Rust 分配对象读取与释放：`radishlex_buffer_*`、`radishlex_error_*`、`radishlex_userdb_rank_explain_free`
@@ -56,7 +56,7 @@ RadishLexError*
 
 ### FFI contract
 
-`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v2 增加 owned key result；当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
+`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v3 让按键处理和候选选择统一返回 owned key result，取代假定候选必然提交的旧函数；当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
 
 ### Status 与文本 view
 

@@ -506,7 +506,10 @@ fn run_input_session<E: Engine>(
         let ranked = rank_state_candidates(input_code, &state, rank_smoke)?;
         let commit_engine_index = ranked_commit_engine_index(&ranked, selected_index)?;
         let commit_text = if let Some(index) = commit_engine_index {
-            Some(session.commit_candidate(index)?.text().to_owned())
+            session
+                .select_candidate(index)?
+                .commit()
+                .map(|commit| commit.text().to_owned())
         } else {
             None
         };
@@ -523,7 +526,10 @@ fn run_input_session<E: Engine>(
 
     let commit_engine_index = selected_index.or(default_index(&state));
     let commit_text = if let Some(index) = commit_engine_index {
-        Some(session.commit_candidate(index)?.text().to_owned())
+        session
+            .select_candidate(index)?
+            .commit()
+            .map(|commit| commit.text().to_owned())
     } else {
         None
     };

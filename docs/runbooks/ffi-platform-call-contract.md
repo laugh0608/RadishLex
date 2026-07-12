@@ -34,7 +34,7 @@ radishlex_ffi_contract(contract_out, error_out)
 当前必须识别：
 
 ```text
-version = 2
+version = 3
 session_thread_policy = owner_thread
 panic_boundary = catch_unwind
 ```
@@ -64,7 +64,7 @@ radishlex_session_new_rime(options, error_out)
 
 规则：
 
-- session 创建成功后，后续 `reset`、`set_schema`、`handle_key_event`、`snapshot_new`、`commit_candidate` 和 `engine_kind` 都必须回到创建线程调用。
+- session 创建成功后，后续 `reset`、`set_schema`、`handle_key_event`、`snapshot_new`、`select_candidate` 和 `engine_kind` 都必须回到创建线程调用。
 - 跨线程误用返回 `InvalidState`；无 `error_out` 的 session 读取入口返回空值，例如 `radishlex_session_engine_kind` 返回 `0`。
 - 不要把 `RadishLexSession*` 放进全局并允许多个平台线程直接调用。
 - 如果平台输入事件来自多个线程，先投递到 session owner thread，再调用 C ABI。
@@ -164,9 +164,11 @@ radishlex_key_result_commit_present(result)
 radishlex_key_result_commit(result)
 radishlex_key_result_snapshot(result)
 radishlex_snapshot_candidate(borrowed_snapshot, index, candidate_out, error_out)
-radishlex_session_commit_candidate(session, index, error_out)
+radishlex_session_select_candidate(session, index, result_out, error_out)
+radishlex_key_result_commit_present(result)
+radishlex_key_result_commit(result)
+radishlex_key_result_snapshot(result)
 radishlex_key_result_free(result)
-radishlex_buffer_free(commit)
 radishlex_session_free(session)
 radishlex_rime_runtime_shutdown(error_out)  // process teardown only
 ```
@@ -177,7 +179,7 @@ radishlex_rime_runtime_shutdown(error_out)  // process teardown only
 - `consumed = 0` 时平台把按键交还宿主；`commit_present = 1` 时立即复制并提交 commit。
 - key result 中的 snapshot 与 consumed / commit 来自同一次按键处理，不能用下一次独立 snapshot 调用拼接。
 - `radishlex_key_result_snapshot` 返回借用指针，不得调用 `radishlex_snapshot_free`；释放 key result 后该 snapshot 与全部 view 一并失效。
-- 候选提交返回 `RadishLexBuffer*`，读取后必须释放。
+- 候选选择返回 owned key result；分段候选可能 `commit_present = 0`，此时平台只应用同一结果中的 snapshot，不得把候选展示文本直接提交。
 - 独立 `snapshot_new` 只保留为兼容和调试入口；snapshot 不会跟随 session 后续输入自动更新。
 - 候选索引来自 snapshot 的当前候选列表；提交前如 session 状态已变化，平台层应重新取 snapshot。
 - `session_free` 只销毁该 session；不要在应用切换或 client 切换时 shutdown 进程 runtime。最终 shutdown 可重复调用，但活动 session 存在时必须按 `InvalidState` 处理为生命周期错误。
@@ -240,7 +242,7 @@ radishlex_userdb_import_batches_new(db_path, error_out)
 
 每个平台绑定层进入真实平台壳前，至少补以下 smoke：
 
-- contract 查询成功，能识别 `version = 2`、owned key result 和 owner-thread policy。
+- contract 查询成功，能识别 `version = 3`、按键/候选选择共用的 owned result 和 owner-thread policy。
 - 创建 session 后在 owner thread 上 handle key，核对 consumed / commit / 同事件 snapshot，提交候选并释放所有 owned handle。
 - 从非 owner thread 调用 session mutation 返回 `InvalidState`。
 - 非 UTF-8、空指针、非法 bool、候选越界能返回稳定错误码并释放 error。

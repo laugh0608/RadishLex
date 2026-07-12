@@ -28,11 +28,6 @@ FOUNDATION_EXPORT NSAttributedStringKey const RLXCandidateIndexAttributeName;
 @property(nonatomic, strong, readonly, nullable) RLXSnapshot *snapshot;
 @end
 
-@interface RLXCandidateCommitResult : NSObject
-@property(nonatomic, copy, readonly) NSString *commit;
-@property(nonatomic, strong, readonly, nullable) RLXSnapshot *snapshot;
-@end
-
 @interface RLXSessionBridge : NSObject
 
 @property(nonatomic, strong, readonly) NSThread *ownerThread;
@@ -51,8 +46,8 @@ FOUNDATION_EXPORT NSAttributedStringKey const RLXCandidateIndexAttributeName;
 - (nullable RLXKeyHandlingResult *)handleEvent:(RadishLexKeyEvent)event
                                           error:(NSError **)error;
 - (nullable RLXSnapshot *)snapshotWithError:(NSError **)error;
-- (nullable RLXCandidateCommitResult *)commitCandidateAtIndex:(NSUInteger)index
-                                                         error:(NSError **)error;
+- (nullable RLXKeyHandlingResult *)selectCandidateAtIndex:(NSUInteger)index
+                                                      error:(NSError **)error;
 - (BOOL)resetWithError:(NSError **)error;
 - (BOOL)setSchema:(NSString *)schema error:(NSError **)error;
 - (void)invalidate;

@@ -67,10 +67,11 @@ runtime 初始化失败必须返回结构化错误。平台不得静默切换 de
 
 - composition 为空时清除 marked text；非空时更新 marked text 与 cursor。
 - 候选展示使用 macOS 原生机制或 InputMethodKit 兼容机制，不自造跨平台统一浮窗协议；当前开发实现使用 `IMKCandidates` scrolling grid，并以五候选页形成 5×1 横排。
-- 平台展示索引必须稳定映射到 RadishLex ranked candidate 与 engine commit index。
-- 用户选择候选后通过 Rust commit API 提交，平台不得直接把展示文本当作 engine 选择结果。
-- engine 即时 commit 与显式候选 commit 使用同一文本提交边界，并清理相应 marked text。
-- M1 全拼有候选时，Space 首候选提交由 Rime adapter 调用稳定的 engine candidate commit 语义，并通过同事件 key result 返回；平台壳不得把 Space 特判成直接提交展示文本，也不得依赖临时 schema 是否携带 `key_binder`。
+- 平台展示索引必须稳定映射到 RadishLex ranked candidate 与 engine selection index。
+- 用户选择候选后通过 Rust selection API 驱动 engine，平台不得直接把展示文本当作 engine 选择结果。
+- selection result 必须携带 consumed、optional commit 与选择后的 snapshot。分段拼音候选可能只确定当前音节并继续 composition；只有 commit 存在时平台才向宿主插入文本，否则更新 marked text 与候选。
+- engine 即时 commit 与候选选择产生的 commit 使用同一文本提交边界，并清理相应 marked text。
+- M1 全拼有候选时，Space 选择当前高亮候选，由 Rime adapter 调用稳定的 engine candidate selection 语义并通过同事件 key result 返回；平台壳不得把 Space 特判成直接提交展示文本，也不得依赖临时 schema 是否携带 `key_binder`。
 - 取消、失焦、client 切换和 schema 切换不能把旧 composition 提交到新 client。
 
 候选窗口视觉、分页快捷键和无障碍细节可以迭代，但不能改变索引映射、所有权或提交语义。

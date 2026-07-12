@@ -1,5 +1,5 @@
-/// ABI contract v2 adds the owned, versioned key result used by platform shells.
-pub const RADISHLEX_ABI_CONTRACT_VERSION: u32 = 2;
+/// ABI contract v3 uses owned results for both key handling and candidate selection.
+pub const RADISHLEX_ABI_CONTRACT_VERSION: u32 = 3;
 pub const RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD: u32 = 1;
 pub const RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND: u32 = 1;
 

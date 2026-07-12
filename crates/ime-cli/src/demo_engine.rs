@@ -93,7 +93,7 @@ impl Engine for DemoEngine {
         Ok(self.demo_candidates())
     }
 
-    fn commit_candidate(&mut self, index: usize) -> CoreResult<Commit> {
+    fn select_candidate(&mut self, index: usize) -> CoreResult<KeyOutcome> {
         let candidates = self.demo_candidates();
         let Some(candidate) = candidates.get(index) else {
             return Err(CoreError::InvalidCandidateIndex {
@@ -103,10 +103,10 @@ impl Engine for DemoEngine {
         };
 
         self.buffer.clear();
-        Ok(Commit::new(
+        Ok(KeyOutcome::committed(Commit::new(
             candidate.text().to_owned(),
             CommitSource::Candidate { index },
-        ))
+        )))
     }
 
     fn set_schema(&mut self, schema: SchemaId) -> CoreResult<()> {

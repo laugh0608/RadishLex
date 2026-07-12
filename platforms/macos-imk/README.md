@@ -8,7 +8,7 @@
 - `Sources/RadishLexInputController.*`：映射 `NSEvent`，更新 marked text，使用 `IMKCandidates` 展示原生候选并按稳定 index 提交。
 - `Sources/RadishLexRuntime.*`：创建独立 Rime session；进程退出时先释放全部 session，再调用 `radishlex_rime_runtime_shutdown`。
 - `build-bundle.sh`：构建 contract 或显式 native-rime 开发 bundle，不安装 bundle。
-- `Tests/contract_smoke.m`：使用合成 demo engine 复验 ABI v2、完整按键映射、Unicode cursor、候选索引和生命周期，不读取 Rime 目录。
+- `Tests/contract_smoke.m`：使用合成 demo engine 复验 ABI v3、完整按键映射、Unicode cursor、候选选择结果和生命周期，不读取 Rime 目录。
 
 ## 不安装验证
 
