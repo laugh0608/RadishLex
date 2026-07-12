@@ -70,7 +70,13 @@ REQUIRED_FILES = [
     "apps/radishlex-manager/tool/ffi_bridge_smoke.dart",
     "apps/radishlex-manager/test/widget_test.dart",
 ]
-REQUIRED_STATUS_CHECKS = {"Repo Hygiene", "Repository Baseline"}
+REQUIRED_STATUS_CHECKS = {
+    "Repo Hygiene",
+    "Repository Baseline",
+    "Rust Clippy",
+    "Flutter Manager",
+    "Go Quality",
+}
 CONVENTIONAL_COMMIT_PATTERN = "^(feat|fix|docs|refactor|test|chore|ci|build|perf|revert)(\\([a-z0-9._/-]+\\))?!?: .+"
 
 

@@ -17,7 +17,7 @@
 - 禁止删除分支。
 - 仅允许通过 Pull Request 合并。
 - 要求 1 个审批和已解决会话。
-- 要求 `Repo Hygiene` 与 `Repository Baseline` 检查通过。
+- 要求 `Repo Hygiene`、`Repository Baseline`、`Rust Clippy`、`Flutter Manager` 与 `Go Quality` 检查通过。
 - `Repo Hygiene` 覆盖文本文件卫生、文档篇幅预算和 PR diff 空白检查。
 - `Repository Baseline` 覆盖仓库必备文件、协作文件同步、ruleset / workflow 口径一致性和路径预算。
 - GitHub 对 Actions required status checks 当前按 job 名匹配，因此 ruleset 中固定写 job 名。
@@ -44,7 +44,7 @@
 
 默认分支 PR 的 GitHub Actions 会在 PR base/head 范围内执行 `git diff --check`，避免干净 checkout 中裸命令没有检查对象。
 
-当前 ruleset 仍只要求仓库级检查名称；`Repository Baseline` 内部已经覆盖 Rust workspace 和 Go sync-server 测试。后续落地 Flutter manager、平台壳或独立发布矩阵后，应同步更新 `scripts/check-repo.*`、workflow 和 `master-protection.json` required checks。
+`Repository Baseline` 保留 portable workspace 与 Go 基础测试；严格 Rust lint、Flutter format/analyze/test 和 Go vet/race 使用独立 required check，失败会阻止合并。native macOS bundle 仍使用独立平台门禁，不并入 Ubuntu portable baseline。
 
 ## 应用方式
 
