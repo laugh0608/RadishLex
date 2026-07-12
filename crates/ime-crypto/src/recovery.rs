@@ -387,7 +387,15 @@ fn recovery_code_checksum(secret: &[u8; RECOVERY_CODE_SECRET_LEN]) -> u8 {
     let mut hasher = Sha256::new();
     hasher.update(b"radishlex-recovery-code-checksum-v1");
     hasher.update(secret);
-    (hasher.finalize()[0] & 0x1f) as u8
+    hasher.finalize()[0] & 0x1f
+}
+
+fn low_bits_mask(bits: u8) -> u16 {
+    if bits == 0 {
+        0
+    } else {
+        (1u16 << bits) - 1
+    }
 }
 
 #[cfg(test)]
@@ -571,13 +579,5 @@ mod tests {
 
     fn nonce(seed: u8) -> Nonce {
         Nonce::new(vec![seed; XCHACHA20POLY1305_NONCE_LEN]).expect("nonce")
-    }
-}
-
-fn low_bits_mask(bits: u8) -> u16 {
-    if bits == 0 {
-        0
-    } else {
-        (1u16 << bits) - 1
     }
 }

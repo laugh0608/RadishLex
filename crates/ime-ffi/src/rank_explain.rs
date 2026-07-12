@@ -76,6 +76,8 @@ impl RadishLexRankExplain {
         }
     }
 
+    /// # Safety
+    /// `explain` must be null or a live `RadishLexRankExplain` pointer released exactly once.
     pub unsafe fn free(explain: *mut Self) {
         if explain.is_null() {
             return;

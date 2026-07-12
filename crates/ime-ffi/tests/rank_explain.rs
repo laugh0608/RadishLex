@@ -53,7 +53,7 @@ fn userdb_rank_explain_reports_candidate_contributions() {
 
     let mut view = RadishLexRankExplainView::empty();
     assert_eq!(
-        radishlex_userdb_rank_explain_view(explain, &mut view, &mut error),
+        unsafe { radishlex_userdb_rank_explain_view(explain, &mut view, &mut error) },
         RadishLexStatusCode::Ok
     );
     assert_eq!(unsafe { view_to_string(view.input_code) }, "luobo");
@@ -105,7 +105,7 @@ fn userdb_rank_explain_reports_deleted_term_penalty() {
 
     let mut view = RadishLexRankExplainView::empty();
     assert_eq!(
-        radishlex_userdb_rank_explain_view(explain, &mut view, &mut error),
+        unsafe { radishlex_userdb_rank_explain_view(explain, &mut view, &mut error) },
         RadishLexStatusCode::Ok
     );
     assert_eq!(unsafe { view_to_string(view.context_kind) }, "general");
@@ -137,7 +137,7 @@ fn userdb_rank_explain_rejects_invalid_arguments() {
     );
     assert!(explain.is_null());
     assert_eq!(
-        radishlex_error_code(error),
+        unsafe { radishlex_error_code(error) },
         RadishLexStatusCode::InvalidArgument
     );
 
@@ -148,11 +148,11 @@ fn userdb_rank_explain_rejects_invalid_arguments() {
     error = ptr::null_mut();
     let mut view = RadishLexRankExplainView::empty();
     assert_eq!(
-        radishlex_userdb_rank_explain_view(ptr::null(), &mut view, &mut error),
+        unsafe { radishlex_userdb_rank_explain_view(ptr::null(), &mut view, &mut error) },
         RadishLexStatusCode::InvalidArgument
     );
     assert_eq!(
-        radishlex_error_code(error),
+        unsafe { radishlex_error_code(error) },
         RadishLexStatusCode::InvalidArgument
     );
     unsafe {

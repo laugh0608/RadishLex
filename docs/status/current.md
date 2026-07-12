@@ -43,7 +43,7 @@ RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/syn
 - userdb 用户意图缺少统一事务、WAL/busy 策略；ranker recency/frequency 语义需要修正。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
 - manager 默认 fixture fallback，native library 打包、持久化路径和文件权限尚未产品化。
-- 严格 Rust Clippy 当前失败；常态 CI 尚未覆盖 Flutter、Go race 和完整 native bundle 门禁。
+- `cargo clippy --workspace --all-targets -- -D warnings` 已通过，Rust review-only manager sync command 模块已移除；常态 CI 仍待接入 Clippy、Flutter 与 Go race，Flutter review-only 模型/fixture 仍待清理。
 
 ## 当前停止线
 
@@ -60,7 +60,7 @@ RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/syn
 1. 下一次实机验证使用短时用户级安装，只复核 client 切换、进程重启、断网、中英文混输和两个应用交叉行为；完成即停用并移出输入法目录。
 2. 将 app-scoped 自动化抓图不包含 InputMethodKit 独立候选浮层视为工具边界；候选可见性使用无敏感内容的全屏人工观察确认，按键结果仍以应用文本和脱敏日志交叉验证。
 3. 短时矩阵通过后完成 R01A 退出判断，再经授权清理旧版本备份；失败则只修正真实平台链路。
-4. R01A 等待人工动作期间实施 R06A：修复严格 Clippy，增加 Flutter 与 Go race CI，清理 review-only Rust/Flutter 生产资产；不启动第二平台。
+4. R01A 等待人工动作期间继续 R06A：把已通过的严格 Clippy 与 Flutter/Go race 接入 CI，并清理 Flutter review-only 生产模型与 fixture；不启动第二平台。
 5. R01A 退出后实施 R02L，修正 userdb 事务、SQLite 并发、recency、frequency 与删除语义；R02L 退出后再由 R01B 接入真实学习，之后关闭整改专题并进入 M3。
 
 ## 验证入口

@@ -28,8 +28,12 @@ impl TermSource {
             Self::PhraseLearning => "phrase_learning",
         }
     }
+}
 
-    pub fn from_str(value: &str) -> UserDbResult<Self> {
+impl std::str::FromStr for TermSource {
+    type Err = UserDbError;
+
+    fn from_str(value: &str) -> UserDbResult<Self> {
         match value {
             "engine_selection" => Ok(Self::EngineSelection),
             "manual_import" => Ok(Self::ManualImport),
@@ -64,8 +68,12 @@ impl TermStatus {
             Self::Deleted => "deleted",
         }
     }
+}
 
-    pub fn from_str(value: &str) -> UserDbResult<Self> {
+impl std::str::FromStr for TermStatus {
+    type Err = UserDbError;
+
+    fn from_str(value: &str) -> UserDbResult<Self> {
         match value {
             "active" => Ok(Self::Active),
             "suppressed" => Ok(Self::Suppressed),
@@ -101,8 +109,12 @@ impl NegativeFeedbackReason {
             Self::ManualDelete => "manual_delete",
         }
     }
+}
 
-    pub fn from_str(value: &str) -> UserDbResult<Self> {
+impl std::str::FromStr for NegativeFeedbackReason {
+    type Err = UserDbError;
+
+    fn from_str(value: &str) -> UserDbResult<Self> {
         match value {
             "immediate_backspace" => Ok(Self::ImmediateBackspace),
             "reselect_same_code" => Ok(Self::ReselectSameCode),

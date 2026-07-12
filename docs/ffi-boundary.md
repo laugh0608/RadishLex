@@ -407,6 +407,7 @@ Userdb 词条管理入口规则：
 规则：
 
 - 创建函数返回的 handle 必须由对应 `*_free` 释放。
+- Rust 调用侧凡可能解引用输入/输出裸指针的公开入口均标记为 `unsafe` 并提供 `# Safety` 契约；C header 的调用约定不变，调用方仍须保证非空指针可读/可写且 handle 存活。
 - Rust 分配的字符串、数组和 snapshot buffer 必须由 Rust 释放。
 - 平台端传入的字符串只在调用期间借用，Rust 不保存裸指针。
 - `RadishLexSession*` 绑定创建线程；平台端如需跨线程调度输入，必须在平台侧投递回创建线程，或后续在 Rust 侧显式建模线程安全队列。
@@ -414,7 +415,7 @@ Userdb 词条管理入口规则：
 - FFI 不跨线程共享 snapshot、buffer、term list、import batch list 或 error 裸指针。
 - session drop 必须释放 engine adapter、userdb handle 和临时 buffer。
 - 释放最后一个 Rime session 不等同于进程 teardown；平台仍须显式调用 runtime shutdown，且不得在任何 session 活动时调用。
-- panic 不能跨 FFI 边界，必须转换为错误码。
+- panic 不能跨 FFI 边界，必须转换为错误码；真实 `ffi_status`、`ffi_ptr` 与 `ffi_release` 测试同时固定 panic payload 不进入错误消息。
 
 ## 错误语义
 

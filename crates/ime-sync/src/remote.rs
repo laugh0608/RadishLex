@@ -924,7 +924,7 @@ pub(crate) mod test_support {
             "signature_schema_version": 1,
             "signature_algorithm": "ed25519-v1",
             "signature_key_id": "signing-key-a",
-            "signature": Base64::encode_string(&vec![1u8; ED25519_SIGNATURE_LEN]),
+            "signature": Base64::encode_string(&[1u8; ED25519_SIGNATURE_LEN]),
             "server_received_at_ms": 110,
             "client_created_at_ms": object.draft.created_at_ms,
             "client_updated_at_ms": object.draft.updated_at_ms

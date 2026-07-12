@@ -754,8 +754,12 @@ fn user_term_from_row(row: &Row<'_>) -> rusqlite::Result<UserTerm> {
     let source: String = row.get(4)?;
     let status: String = row.get(6)?;
 
-    let source = TermSource::from_str(&source).map_err(to_sqlite_conversion_failure)?;
-    let status = TermStatus::from_str(&status).map_err(to_sqlite_conversion_failure)?;
+    let source = source
+        .parse::<TermSource>()
+        .map_err(to_sqlite_conversion_failure)?;
+    let status = status
+        .parse::<TermStatus>()
+        .map_err(to_sqlite_conversion_failure)?;
 
     Ok(UserTerm {
         id: row.get(0)?,
@@ -869,14 +873,14 @@ pub fn decode_dictionary_terms_tsv_document(input: &str) -> UserDbResult<Diction
             ));
         }
 
-        let source = TermSource::from_str(&fields[3])?;
+        let source = fields[3].parse::<TermSource>()?;
         let weight = fields[4].parse::<f64>().map_err(|_| {
             UserDbError::invalid_input(
                 "weight",
                 format!("line {line_number} has invalid weight {}", fields[4]),
             )
         })?;
-        let status = TermStatus::from_str(&fields[5])?;
+        let status = fields[5].parse::<TermStatus>()?;
 
         let record = DictionaryTermRecord {
             input_code: fields[0].clone(),
@@ -1120,7 +1124,9 @@ fn fetch_term_status_on(
             params![input_code, text, reading],
             |row| {
                 let status: String = row.get(0)?;
-                TermStatus::from_str(&status).map_err(to_sqlite_conversion_failure)
+                status
+                    .parse::<TermStatus>()
+                    .map_err(to_sqlite_conversion_failure)
             },
         )
         .optional()

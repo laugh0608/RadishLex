@@ -97,7 +97,7 @@ fn failed_key_handling_returns_no_partial_result() {
     assert_eq!(status, RadishLexStatusCode::InvalidArgument);
     assert!(result.is_null());
     assert_eq!(
-        radishlex_error_code(error),
+        unsafe { radishlex_error_code(error) },
         RadishLexStatusCode::InvalidArgument
     );
     assert!(unsafe { error_message(error) }.contains("unknown key phase code"));
@@ -141,7 +141,7 @@ fn key_result_handler_rejects_non_owner_thread() {
                 &mut error,
             )
         };
-        let code = radishlex_error_code(error);
+        let code = unsafe { radishlex_error_code(error) };
         let message = unsafe { error_message(error) };
         unsafe {
             radishlex_error_free(error);

@@ -75,8 +75,8 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 - userdb 将毫秒时间戳写入 `recency_score`，ranker 又将其裁剪为 `0..1`；frequency 无界线性增长。
 - 同步 merge 缺少稳定设备级 tie-break，签名绑定、KDF 上限、HTTPS orchestration 和资源上限仍未达到开放条件。
 - manager 默认 fixture fallback，正常产品包没有携带真实 FFI 与持久化路径。
-- 常态 CI 未覆盖 Flutter、Clippy、Go race、MSRV 和 native bundle；严格 Clippy 当前失败。
-- review-only manager sync 文档、ADR 与源码仍携带旧阶段编号和审批状态机；按 R06A 迁移安全断言后归档或删除，不继续润色为长期真相源。
+- 常态 CI 未覆盖 Flutter、Clippy、Go race、MSRV 和 native bundle；严格 Clippy 已在本地通过，尚待进入 PR 门禁。
+- Rust review-only manager sync command 源码已删除；Flutter review-only 模型/fixture 与配套文档、ADR 仍携带旧阶段编号和审批状态机，按 R06A 迁移安全断言后归档或删除，不继续润色为长期真相源。
 
 ## 六、整改批次总览
 
@@ -209,6 +209,8 @@ MSRV、最终 native bundle presence、依赖安全和许可证扫描属于 M4 �
 - ownership、panic、redaction 和 transient secret 断言迁入真实 contract test 或稳定边界文档。
 - approval、admission、migration review、evidence bundle、fake replay 和 no-symbol 断言直接删除或归档，不转化为新的运行时状态机。
 - 简单的“能力未开放”只通过 capability 缺席、显式 disabled state 和产品测试表达。
+
+当前进度：严格 workspace Clippy 已通过；Rust `manager_sync_command` 主模块与四个 review-only 子/测试模块已删除。FFI ownership、owner-thread、copy-before-release、null release 和 panic payload 脱敏断言已归入真实 ABI/`ffi_support` 测试。剩余工作是 Flutter/Dart 资产、文档归档和 CI 门禁。
 
 ### 必须处置的 Rust 资产
 

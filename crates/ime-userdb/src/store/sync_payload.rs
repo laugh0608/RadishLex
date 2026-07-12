@@ -175,8 +175,12 @@ fn sync_user_term_payload_record_from_row(
     let source: String = row.get(3)?;
     let status: String = row.get(5)?;
 
-    let source = TermSource::from_str(&source).map_err(to_sqlite_conversion_failure)?;
-    let status = TermStatus::from_str(&status).map_err(to_sqlite_conversion_failure)?;
+    let source = source
+        .parse::<TermSource>()
+        .map_err(to_sqlite_conversion_failure)?;
+    let status = status
+        .parse::<TermStatus>()
+        .map_err(to_sqlite_conversion_failure)?;
 
     let weight: f64 = row.get(4)?;
     if !weight.is_finite() || weight < 0.0 {

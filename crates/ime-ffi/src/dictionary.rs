@@ -169,6 +169,10 @@ impl RadishLexUserTermList {
         self.terms.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.terms.is_empty()
+    }
+
     pub fn term_view(&self, index: usize) -> Result<RadishLexUserTermView, FfiError> {
         let Some(term) = self.terms.get(index) else {
             return Err(FfiError::invalid_argument(format!(
@@ -180,6 +184,8 @@ impl RadishLexUserTermList {
         Ok(term_view(term))
     }
 
+    /// # Safety
+    /// `list` must be null or a live `RadishLexUserTermList` pointer released exactly once.
     pub unsafe fn free(list: *mut Self) {
         if list.is_null() {
             return;
@@ -202,6 +208,10 @@ impl RadishLexImportBatchList {
         self.batches.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.batches.is_empty()
+    }
+
     pub fn batch_view(&self, index: usize) -> Result<RadishLexImportBatchView, FfiError> {
         let Some(batch) = self.batches.get(index) else {
             return Err(FfiError::invalid_argument(format!(
@@ -213,6 +223,8 @@ impl RadishLexImportBatchList {
         Ok(import_batch_view(batch))
     }
 
+    /// # Safety
+    /// `list` must be null or a live `RadishLexImportBatchList` pointer released exactly once.
     pub unsafe fn free(list: *mut Self) {
         if list.is_null() {
             return;

@@ -11,7 +11,6 @@ mod ffi_support;
 mod key;
 mod key_result;
 mod learning_status;
-mod manager_sync_command;
 mod rank_explain;
 mod rime_runtime;
 mod session;

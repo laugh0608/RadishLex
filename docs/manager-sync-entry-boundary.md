@@ -206,7 +206,7 @@ manager 本地原型已有可复验证据，但不等于 M2 产品运行态已�
 
 `manager_sync_evidence_bundle.v1` 是开发期预演层，不是新的 `ManagerBridge` contract、C ABI 或 settings draft 字段。它只在测试 fixture 中把 `manager_sync_readiness.v1`、`sync_connection_health.v1`、部署证据来源标签和设备 production gate 汇总成同一组可复验输入；导入时仍分别复用 readiness mapper 与 connection health summary 的既有清洗路径。该 bundle 用于确认 settings gate preview、同步页和诊断报告对同一份 evidence 的派生结果一致，尤其确认连接可达、连接不可达或探测摘要不可用都不能绕过恢复码、设备授权、发布级证据和当前阶段关闭门禁。
 
-`crates/ime-ffi/src/manager_sync_command.rs` 及同域子模块当前是 Rust 内部非导出草案，不是 `ManagerBridge` command、Dart native binding 或 C ABI。它只把 future command 的 request parsing、action section、result / error handle lifecycle、result accessor field set、owner scope、worker policy、host test admission、native export migration、Dart binding migration、`ManagerBridge` migration、host test file approval、real sync execution gate 和 evidence bundle review 固定为可复验结构。真实入口推进时必须保持这个顺序：先让这些评审结构继续只输出安全摘要，再补真实 host contract test 和 Dart binding contract test，最后才评估 native symbol 与 bridge command；任何阶段都不能把 `local_smoke`、fake native replay 或内部单元测试解释成恢复码、join request、设备撤销或远端同步已经开放。
+当前没有 manager sync command C ABI、Dart native binding 或 `ManagerBridge` 可执行命令；旧 Rust review-only command 草案已删除。能力关闭由 symbol 缺席、明确 disabled state 和产品测试表达，不再维护 approval、migration、admission 或 evidence 状态机。M3 若实现真实命令，必须直接补版本化 ABI、ownership/panic/redaction contract test 和动态库 smoke；`local_smoke`、fixture 或内部单元测试不能解释为恢复码、join request、设备撤销或远端同步已经开放。
 
 禁止返回：
 

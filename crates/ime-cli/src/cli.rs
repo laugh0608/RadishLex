@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use radishlex_ime_core::{
@@ -416,7 +416,7 @@ fn run_learn_suppress(args: &[String]) -> Result<String, CliError> {
     let context_kind = options.get("context").map_or("general", String::as_str);
     let reason = options
         .get("reason")
-        .map(|value| NegativeFeedbackReason::from_str(value))
+        .map(|value| value.parse::<NegativeFeedbackReason>())
         .transpose()?
         .unwrap_or(NegativeFeedbackReason::ManualSuppress);
 
@@ -936,15 +936,14 @@ fn ranked_commit_engine_index(
     ranked: &[RankedCandidate],
     selected_index: Option<usize>,
 ) -> Result<Option<usize>, CliError> {
-    let Some(index) = selected_index.or_else(|| if ranked.is_empty() { None } else { Some(0) })
-    else {
+    let Some(index) = selected_index.or(if ranked.is_empty() { None } else { Some(0) }) else {
         return Ok(None);
     };
 
     ranked
         .get(index)
         .map(|candidate| Some(candidate.original_index))
-        .ok_or_else(|| CoreError::InvalidCandidateIndex {
+        .ok_or(CoreError::InvalidCandidateIndex {
             index,
             len: ranked.len(),
         })
@@ -1100,7 +1099,7 @@ fn render_rank_explanation(
 fn render_import_summary(
     summary: &radishlex_ime_userdb::DictionaryImportSummary,
     source_name: &str,
-    file_path: &PathBuf,
+    file_path: &Path,
     dry_run: bool,
 ) -> String {
     let mut output = String::new();

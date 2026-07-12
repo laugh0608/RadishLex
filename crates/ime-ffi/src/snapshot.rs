@@ -106,6 +106,8 @@ impl RadishLexSnapshot {
         Ok(candidate.view(index))
     }
 
+    /// # Safety
+    /// `snapshot` must be null or a live independent snapshot pointer released exactly once.
     pub unsafe fn free(snapshot: *mut Self) {
         if snapshot.is_null() {
             return;

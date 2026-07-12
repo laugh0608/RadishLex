@@ -29,7 +29,9 @@ use crate::snapshot::{RadishLexCandidateView, RadishLexSnapshot, RadishLexString
 use crate::sync_status::{sync_preflight_for_path, RadishLexSyncPreflightSummary};
 
 #[no_mangle]
-pub extern "C" fn radishlex_ffi_contract(
+/// # Safety
+/// `contract_out` must be writable; `error_out`, when non-null, must be writable.
+pub unsafe extern "C" fn radishlex_ffi_contract(
     contract_out: *mut RadishLexFfiContract,
     error_out: *mut *mut RadishLexError,
 ) -> RadishLexStatusCode {
@@ -57,7 +59,9 @@ pub extern "C" fn radishlex_session_new(
 }
 
 #[no_mangle]
-pub extern "C" fn radishlex_session_new_with_options(
+/// # Safety
+/// `options` must be null or readable; `error_out`, when non-null, must be writable.
+pub unsafe extern "C" fn radishlex_session_new_with_options(
     options: *const RadishLexSessionOptions,
     error_out: *mut *mut RadishLexError,
 ) -> *mut RadishLexSession {
@@ -216,7 +220,9 @@ pub extern "C" fn radishlex_snapshot_candidate_count(snapshot: *const RadishLexS
 }
 
 #[no_mangle]
-pub extern "C" fn radishlex_snapshot_candidate(
+/// # Safety
+/// Handles must be live and `candidate_out`/`error_out`, when non-null, must be writable.
+pub unsafe extern "C" fn radishlex_snapshot_candidate(
     snapshot: *const RadishLexSnapshot,
     index: usize,
     candidate_out: *mut RadishLexCandidateView,
@@ -238,6 +244,8 @@ pub extern "C" fn radishlex_snapshot_candidate(
 }
 
 #[no_mangle]
+/// # Safety
+/// `snapshot` must be null or a live independent snapshot released exactly once.
 pub unsafe extern "C" fn radishlex_snapshot_free(snapshot: *mut RadishLexSnapshot) {
     ffi_release(|| {
         RadishLexSnapshot::free(snapshot);
@@ -245,7 +253,9 @@ pub unsafe extern "C" fn radishlex_snapshot_free(snapshot: *mut RadishLexSnapsho
 }
 
 #[no_mangle]
-pub extern "C" fn radishlex_userdb_sync_preflight(
+/// # Safety
+/// Input strings must be readable and output pointers, when non-null, must be writable.
+pub unsafe extern "C" fn radishlex_userdb_sync_preflight(
     db_path: *const c_char,
     summary_out: *mut RadishLexSyncPreflightSummary,
     error_out: *mut *mut RadishLexError,
@@ -267,7 +277,9 @@ pub extern "C" fn radishlex_userdb_sync_preflight(
 }
 
 #[no_mangle]
-pub extern "C" fn radishlex_userdb_learning_status(
+/// # Safety
+/// Input strings must be readable and output pointers, when non-null, must be writable.
+pub unsafe extern "C" fn radishlex_userdb_learning_status(
     db_path: *const c_char,
     summary_out: *mut RadishLexLearningStatusSummary,
     error_out: *mut *mut RadishLexError,
@@ -310,7 +322,9 @@ pub extern "C" fn radishlex_userdb_rank_explain_new(
 }
 
 #[no_mangle]
-pub extern "C" fn radishlex_userdb_rank_explain_view(
+/// # Safety
+/// `explain` must be live and `view_out`/`error_out`, when non-null, must be writable.
+pub unsafe extern "C" fn radishlex_userdb_rank_explain_view(
     explain: *const RadishLexRankExplain,
     view_out: *mut RadishLexRankExplainView,
     error_out: *mut *mut RadishLexError,
@@ -331,6 +345,8 @@ pub extern "C" fn radishlex_userdb_rank_explain_view(
 }
 
 #[no_mangle]
+/// # Safety
+/// `explain` must be null or a live handle released exactly once.
 pub unsafe extern "C" fn radishlex_userdb_rank_explain_free(explain: *mut RadishLexRankExplain) {
     ffi_release(|| {
         RadishLexRankExplain::free(explain);
@@ -390,7 +406,9 @@ pub extern "C" fn radishlex_userdb_terms_count(terms: *const RadishLexUserTermLi
 }
 
 #[no_mangle]
-pub extern "C" fn radishlex_userdb_terms_get(
+/// # Safety
+/// `terms` must be live and `term_out`/`error_out`, when non-null, must be writable.
+pub unsafe extern "C" fn radishlex_userdb_terms_get(
     terms: *const RadishLexUserTermList,
     index: usize,
     term_out: *mut RadishLexUserTermView,
@@ -412,6 +430,8 @@ pub extern "C" fn radishlex_userdb_terms_get(
 }
 
 #[no_mangle]
+/// # Safety
+/// `terms` must be null or a live handle released exactly once.
 pub unsafe extern "C" fn radishlex_userdb_terms_free(terms: *mut RadishLexUserTermList) {
     ffi_release(|| {
         RadishLexUserTermList::free(terms);
@@ -419,7 +439,9 @@ pub unsafe extern "C" fn radishlex_userdb_terms_free(terms: *mut RadishLexUserTe
 }
 
 #[no_mangle]
-pub extern "C" fn radishlex_userdb_dictionary_inspect(
+/// # Safety
+/// Input strings must be readable and output pointers, when non-null, must be writable.
+pub unsafe extern "C" fn radishlex_userdb_dictionary_inspect(
     file_path: *const c_char,
     summary_out: *mut RadishLexDictionaryInspectSummary,
     error_out: *mut *mut RadishLexError,
@@ -440,7 +462,9 @@ pub extern "C" fn radishlex_userdb_dictionary_inspect(
 }
 
 #[no_mangle]
-pub extern "C" fn radishlex_userdb_dictionary_export(
+/// # Safety
+/// Input strings must be readable and output pointers, when non-null, must be writable.
+pub unsafe extern "C" fn radishlex_userdb_dictionary_export(
     db_path: *const c_char,
     file_path: *const c_char,
     summary_out: *mut RadishLexDictionaryExportSummary,
@@ -465,7 +489,9 @@ pub extern "C" fn radishlex_userdb_dictionary_export(
 }
 
 #[no_mangle]
-pub extern "C" fn radishlex_userdb_dictionary_import(
+/// # Safety
+/// Input strings must be readable and output pointers, when non-null, must be writable.
+pub unsafe extern "C" fn radishlex_userdb_dictionary_import(
     db_path: *const c_char,
     file_path: *const c_char,
     source_name: *const c_char,
@@ -512,7 +538,9 @@ pub extern "C" fn radishlex_userdb_import_batches_count(
 }
 
 #[no_mangle]
-pub extern "C" fn radishlex_userdb_import_batches_get(
+/// # Safety
+/// `batches` must be live and `batch_out`/`error_out`, when non-null, must be writable.
+pub unsafe extern "C" fn radishlex_userdb_import_batches_get(
     batches: *const RadishLexImportBatchList,
     index: usize,
     batch_out: *mut RadishLexImportBatchView,
@@ -534,6 +562,8 @@ pub extern "C" fn radishlex_userdb_import_batches_get(
 }
 
 #[no_mangle]
+/// # Safety
+/// `batches` must be null or a live handle released exactly once.
 pub unsafe extern "C" fn radishlex_userdb_import_batches_free(
     batches: *mut RadishLexImportBatchList,
 ) {
@@ -543,7 +573,9 @@ pub unsafe extern "C" fn radishlex_userdb_import_batches_free(
 }
 
 #[no_mangle]
-pub extern "C" fn radishlex_buffer_data(buffer: *const RadishLexBuffer) -> *const u8 {
+/// # Safety
+/// `buffer` must be null or a live buffer handle.
+pub unsafe extern "C" fn radishlex_buffer_data(buffer: *const RadishLexBuffer) -> *const u8 {
     if buffer.is_null() {
         return ptr::null();
     }
@@ -551,7 +583,9 @@ pub extern "C" fn radishlex_buffer_data(buffer: *const RadishLexBuffer) -> *cons
 }
 
 #[no_mangle]
-pub extern "C" fn radishlex_buffer_len(buffer: *const RadishLexBuffer) -> usize {
+/// # Safety
+/// `buffer` must be null or a live buffer handle.
+pub unsafe extern "C" fn radishlex_buffer_len(buffer: *const RadishLexBuffer) -> usize {
     if buffer.is_null() {
         return 0;
     }
@@ -559,6 +593,8 @@ pub extern "C" fn radishlex_buffer_len(buffer: *const RadishLexBuffer) -> usize 
 }
 
 #[no_mangle]
+/// # Safety
+/// `buffer` must be null or a live buffer handle released exactly once.
 pub unsafe extern "C" fn radishlex_buffer_free(buffer: *mut RadishLexBuffer) {
     ffi_release(|| {
         RadishLexBuffer::free(buffer);
@@ -566,7 +602,9 @@ pub unsafe extern "C" fn radishlex_buffer_free(buffer: *mut RadishLexBuffer) {
 }
 
 #[no_mangle]
-pub extern "C" fn radishlex_error_code(error: *const RadishLexError) -> RadishLexStatusCode {
+/// # Safety
+/// `error` must be null or a live error handle.
+pub unsafe extern "C" fn radishlex_error_code(error: *const RadishLexError) -> RadishLexStatusCode {
     if error.is_null() {
         return RadishLexStatusCode::InternalError;
     }
@@ -574,7 +612,9 @@ pub extern "C" fn radishlex_error_code(error: *const RadishLexError) -> RadishLe
 }
 
 #[no_mangle]
-pub extern "C" fn radishlex_error_message(error: *const RadishLexError) -> *const c_char {
+/// # Safety
+/// `error` must be null or a live error handle.
+pub unsafe extern "C" fn radishlex_error_message(error: *const RadishLexError) -> *const c_char {
     if error.is_null() {
         return ptr::null();
     }
@@ -582,6 +622,8 @@ pub extern "C" fn radishlex_error_message(error: *const RadishLexError) -> *cons
 }
 
 #[no_mangle]
+/// # Safety
+/// `error` must be null or a live error handle released exactly once.
 pub unsafe extern "C" fn radishlex_error_free(error: *mut RadishLexError) {
     ffi_release(|| {
         RadishLexError::free(error);
@@ -834,7 +876,7 @@ mod tests {
     fn session_options_select_demo_and_reject_unavailable_rime() {
         let mut error = ptr::null_mut();
         let options = RadishLexSessionOptions::demo();
-        let session = radishlex_session_new_with_options(&options, &mut error);
+        let session = unsafe { radishlex_session_new_with_options(&options, &mut error) };
         assert!(!session.is_null());
         assert_eq!(
             radishlex_session_engine_kind(session),
@@ -848,10 +890,10 @@ mod tests {
             version: RADISHLEX_SESSION_OPTIONS_VERSION,
             engine_kind: RADISHLEX_ENGINE_KIND_RIME,
         };
-        let session = radishlex_session_new_with_options(&rime_options, &mut error);
+        let session = unsafe { radishlex_session_new_with_options(&rime_options, &mut error) };
         assert!(session.is_null());
         assert_eq!(
-            radishlex_error_code(error),
+            unsafe { radishlex_error_code(error) },
             RadishLexStatusCode::InvalidState
         );
         let message = unsafe { CStr::from_ptr(radishlex_error_message(error)) }
@@ -866,10 +908,10 @@ mod tests {
             version: RADISHLEX_SESSION_OPTIONS_VERSION + 1,
             engine_kind: RADISHLEX_ENGINE_KIND_DEMO,
         };
-        let session = radishlex_session_new_with_options(&bad_options, &mut error);
+        let session = unsafe { radishlex_session_new_with_options(&bad_options, &mut error) };
         assert!(session.is_null());
         assert_eq!(
-            radishlex_error_code(error),
+            unsafe { radishlex_error_code(error) },
             RadishLexStatusCode::InvalidArgument
         );
         unsafe {
@@ -900,7 +942,7 @@ mod tests {
         let session = radishlex_session_new_rime(&bad_version, &mut error);
         assert!(session.is_null());
         assert_eq!(
-            radishlex_error_code(error),
+            unsafe { radishlex_error_code(error) },
             RadishLexStatusCode::InvalidArgument
         );
         unsafe {
@@ -915,7 +957,7 @@ mod tests {
         let session = radishlex_session_new_rime(&bad_deploy_flag, &mut error);
         assert!(session.is_null());
         assert_eq!(
-            radishlex_error_code(error),
+            unsafe { radishlex_error_code(error) },
             RadishLexStatusCode::InvalidArgument
         );
         let message = unsafe { CStr::from_ptr(radishlex_error_message(error)) }
@@ -947,7 +989,7 @@ mod tests {
         let session = radishlex_session_new_rime(&options, &mut error);
         assert!(session.is_null());
         assert_eq!(
-            radishlex_error_code(error),
+            unsafe { radishlex_error_code(error) },
             RadishLexStatusCode::InvalidState
         );
         let message = unsafe { CStr::from_ptr(radishlex_error_message(error)) }
@@ -985,7 +1027,7 @@ mod tests {
 
         let mut term = RadishLexUserTermView::empty();
         assert_eq!(
-            radishlex_userdb_terms_get(terms, 0, &mut term, &mut error),
+            unsafe { radishlex_userdb_terms_get(terms, 0, &mut term, &mut error) },
             RadishLexStatusCode::Ok
         );
         assert_eq!(unsafe { view_to_string(term.input_code) }, "luobo");
@@ -997,11 +1039,11 @@ mod tests {
         assert_eq!(term.last_used_at_present, 0);
 
         assert_eq!(
-            radishlex_userdb_terms_get(terms, 1, &mut term, &mut error),
+            unsafe { radishlex_userdb_terms_get(terms, 1, &mut term, &mut error) },
             RadishLexStatusCode::InvalidArgument
         );
         assert_eq!(
-            radishlex_error_code(error),
+            unsafe { radishlex_error_code(error) },
             RadishLexStatusCode::InvalidArgument
         );
         unsafe {
@@ -1030,7 +1072,7 @@ mod tests {
 
         let mut summary = RadishLexSyncPreflightSummary::empty();
         assert_eq!(
-            radishlex_userdb_sync_preflight(db_path.as_ptr(), &mut summary, &mut error),
+            unsafe { radishlex_userdb_sync_preflight(db_path.as_ptr(), &mut summary, &mut error) },
             RadishLexStatusCode::Ok
         );
         assert_eq!(summary.syncable_user_terms, 0);
@@ -1066,7 +1108,7 @@ mod tests {
         let db_path = CString::new(path.to_string_lossy().as_bytes()).expect("path");
         let mut summary = RadishLexSyncPreflightSummary::empty();
         assert_eq!(
-            radishlex_userdb_sync_preflight(db_path.as_ptr(), &mut summary, &mut error),
+            unsafe { radishlex_userdb_sync_preflight(db_path.as_ptr(), &mut summary, &mut error) },
             RadishLexStatusCode::Ok
         );
         assert!(error.is_null());
@@ -1080,11 +1122,13 @@ mod tests {
         assert_eq!(summary.local_import_batches, 0);
 
         assert_eq!(
-            radishlex_userdb_sync_preflight(db_path.as_ptr(), ptr::null_mut(), &mut error),
+            unsafe {
+                radishlex_userdb_sync_preflight(db_path.as_ptr(), ptr::null_mut(), &mut error)
+            },
             RadishLexStatusCode::InvalidArgument
         );
         assert_eq!(
-            radishlex_error_code(error),
+            unsafe { radishlex_error_code(error) },
             RadishLexStatusCode::InvalidArgument
         );
         unsafe {
@@ -1149,7 +1193,7 @@ mod tests {
 
         let mut candidate = RadishLexCandidateView::empty();
         assert_eq!(
-            radishlex_snapshot_candidate(snapshot, 1, &mut candidate, &mut error),
+            unsafe { radishlex_snapshot_candidate(snapshot, 1, &mut candidate, &mut error) },
             RadishLexStatusCode::Ok
         );
         assert_eq!(candidate.index, 1);
@@ -1164,11 +1208,11 @@ mod tests {
         assert_eq!(candidate.source, RADISHLEX_CANDIDATE_SOURCE_ENGINE);
 
         assert_eq!(
-            radishlex_snapshot_candidate(snapshot, 2, &mut candidate, &mut error),
+            unsafe { radishlex_snapshot_candidate(snapshot, 2, &mut candidate, &mut error) },
             RadishLexStatusCode::InvalidArgument
         );
         assert_eq!(
-            radishlex_error_code(error),
+            unsafe { radishlex_error_code(error) },
             RadishLexStatusCode::InvalidArgument
         );
 
@@ -1214,7 +1258,7 @@ mod tests {
         assert_eq!(status, RadishLexStatusCode::InvalidArgument);
         assert!(!error.is_null());
         assert_eq!(
-            radishlex_error_code(error),
+            unsafe { radishlex_error_code(error) },
             RadishLexStatusCode::InvalidArgument
         );
 
@@ -1261,7 +1305,7 @@ mod tests {
         );
         assert!(result.is_null());
         assert_eq!(
-            radishlex_error_code(error),
+            unsafe { radishlex_error_code(error) },
             RadishLexStatusCode::InvalidArgument
         );
         let message = unsafe { CStr::from_ptr(radishlex_error_message(error)) }
@@ -1286,9 +1330,9 @@ mod tests {
             radishlex_userdb_import_batches_free(ptr::null_mut());
             radishlex_userdb_rank_explain_free(ptr::null_mut());
         }
-        assert!(radishlex_buffer_data(ptr::null()).is_null());
-        assert_eq!(radishlex_buffer_len(ptr::null()), 0);
-        assert!(radishlex_error_message(ptr::null()).is_null());
+        assert!(unsafe { radishlex_buffer_data(ptr::null()) }.is_null());
+        assert_eq!(unsafe { radishlex_buffer_len(ptr::null()) }, 0);
+        assert!(unsafe { radishlex_error_message(ptr::null()) }.is_null());
         assert_eq!(radishlex_snapshot_cursor(ptr::null()), 0);
         assert_eq!(radishlex_snapshot_candidate_count(ptr::null()), 0);
         assert!(radishlex_snapshot_schema(ptr::null()).data.is_null());

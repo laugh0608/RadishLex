@@ -326,8 +326,8 @@ fn parse_user_term_record(value: &Value, key_epoch: u64) -> UserDbResult<UserDbS
     let reading = required_string(object, "reading")?.to_owned();
     validate_required("input_code", &input_code)?;
     validate_required("text", &text)?;
-    let source = TermSource::from_str(required_string(object, "source")?)?;
-    let status = TermStatus::from_str(required_string(object, "status")?)?;
+    let source = required_string(object, "source")?.parse::<TermSource>()?;
+    let status = required_string(object, "status")?.parse::<TermStatus>()?;
     if status == TermStatus::Deleted {
         return Err(invalid_payload(
             "status",

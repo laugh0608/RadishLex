@@ -42,6 +42,8 @@ impl RadishLexError {
         self.message.cast_const()
     }
 
+    /// # Safety
+    /// `error` must be null or a live `RadishLexError` pointer released exactly once.
     pub unsafe fn free(error: *mut Self) {
         if error.is_null() {
             return;
