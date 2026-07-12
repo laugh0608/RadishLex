@@ -25,7 +25,7 @@
     <string>MacOSX</string>
   </array>
   <key>CFBundleVersion</key>
-  <string>19</string>
+  <string>27</string>
   <key>ComponentInputModeDict</key>
   <dict>
     <key>tsInputModeListKey</key>
@@ -82,15 +82,11 @@
   <string>__RADISHLEX_RIME_SCHEMA__</string>
   <key>RadishLexRimeSharedDataDirectory</key>
   <string>RimeData</string>
-  <key>TISInputSourceID</key>
-  <string>org.radishlex.inputmethod.macos</string>
   <key>TISIntendedLanguage</key>
   <string>zh-Hans</string>
   <key>tsInputMethodCharacterRepertoireKey</key>
   <array>
     <string>Hans</string>
   </array>
-  <key>tsInputMethodIconFileKey</key>
-  <string>RadishLexInputIcon.tiff</string>
 </dict>
 </plist>

@@ -57,10 +57,6 @@ plutil -lint "${bundle}/Contents/Resources/zh-Hans.lproj/InfoPlist.strings" \
   "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings" >/dev/null
 test "$(plutil -extract tsInputMethodCharacterRepertoireKey.0 raw \
   "${bundle}/Contents/Info.plist")" = "Hans"
-test "$(plutil -extract tsInputMethodIconFileKey raw \
-  "${bundle}/Contents/Info.plist")" = "RadishLexInputIcon.tiff"
-test "$(plutil -extract TISInputSourceID raw \
-  "${bundle}/Contents/Info.plist")" = "org.radishlex.inputmethod.macos"
 test "$(plutil -extract TISIntendedLanguage raw \
   "${bundle}/Contents/Info.plist")" = "zh-Hans"
 mode_path=":ComponentInputModeDict:tsInputModeListKey:org.radishlex.inputmethod.macos.Pinyin"
@@ -76,6 +72,12 @@ test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:tsInputModeScriptKey" \
   "${bundle}/Contents/Info.plist")" = "smSimpChinese"
 test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:tsInputModeCharacterRepertoireKey:0" \
   "${bundle}/Contents/Info.plist")" = "Hans"
+test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:tsInputModeMenuIconFileKey" \
+  "${bundle}/Contents/Info.plist")" = "RadishLexInputIcon.tiff"
+test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:tsInputModePaletteIconFileKey" \
+  "${bundle}/Contents/Info.plist")" = "RadishLexInputIcon.tiff"
+test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:TISIconLabels:Primary" \
+  "${bundle}/Contents/Info.plist")" = "萝"
 test "$(plutil -extract ComponentInputModeDict.tsVisibleInputModeOrderedArrayKey.0 raw \
   "${bundle}/Contents/Info.plist")" = "org.radishlex.inputmethod.macos.Pinyin"
 if plutil -extract InputMethodServerDelegateClass raw \

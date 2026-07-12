@@ -3,9 +3,6 @@
 #import <Carbon/Carbon.h>
 
 NSErrorDomain const RLXBridgeErrorDomain = @"org.radishlex.inputmethod.bridge";
-NSAttributedStringKey const RLXCandidateIndexAttributeName =
-    @"org.radishlex.inputmethod.candidate-index";
-
 @interface RLXCandidate ()
 @property(nonatomic) NSUInteger index;
 @property(nonatomic, copy) NSString *text;
@@ -455,12 +452,5 @@ BOOL RLXNormalizeKeyEvent(NSEvent *event, RadishLexKeyEvent *eventOut) {
 }
 
 NSAttributedString *RLXAttributedCandidate(RLXCandidate *candidate) {
-  return [[NSAttributedString alloc]
-      initWithString:candidate.text
-          attributes:@{RLXCandidateIndexAttributeName : @(candidate.index)}];
-}
-
-NSNumber *_Nullable RLXCandidateIndexFromAttributedString(NSAttributedString *candidate) {
-  if (candidate.length == 0) return nil;
-  return [candidate attribute:RLXCandidateIndexAttributeName atIndex:0 effectiveRange:NULL];
+  return [[NSAttributedString alloc] initWithString:candidate.text];
 }

@@ -5,7 +5,6 @@
 NS_ASSUME_NONNULL_BEGIN
 
 FOUNDATION_EXPORT NSErrorDomain const RLXBridgeErrorDomain;
-FOUNDATION_EXPORT NSAttributedStringKey const RLXCandidateIndexAttributeName;
 
 @interface RLXCandidate : NSObject
 @property(nonatomic, readonly) NSUInteger index;
@@ -59,7 +58,5 @@ FOUNDATION_EXPORT NSUInteger RLXUTF16CursorForUTF8Offset(NSString *value,
                                                          size_t utf8Offset,
                                                          NSError **error);
 FOUNDATION_EXPORT NSAttributedString *RLXAttributedCandidate(RLXCandidate *candidate);
-FOUNDATION_EXPORT NSNumber *_Nullable RLXCandidateIndexFromAttributedString(
-    NSAttributedString *candidate);
 
 NS_ASSUME_NONNULL_END

@@ -153,10 +153,6 @@ int main(void) {
     Require(RLXUTF16CursorForUTF8Offset(mixed, 2, &cursorError) == NSNotFound &&
                 cursorError.code == RADISHLEX_STATUS_INTERNAL_ERROR,
             @"cursor inside a UTF-8 scalar is rejected");
-    Require(RLXCandidateIndexFromAttributedString(
-                [[NSAttributedString alloc] initWithString:@"unindexed"]) == nil,
-            @"candidate without a Rust index is rejected");
-
     NSError *error = nil;
     Require([RLXSessionBridge validateFFIContract:&error], @"ABI v3 contract");
     RLXSessionBridge *session =
@@ -185,8 +181,8 @@ int main(void) {
             @"snapshot preedit and cursor");
     Require(snapshot.candidates.count == 2, @"snapshot candidates");
     NSAttributedString *candidate = RLXAttributedCandidate(snapshot.candidates[1]);
-    Require([RLXCandidateIndexFromAttributedString(candidate) isEqualToNumber:@1],
-            @"candidate display keeps the Rust index");
+    Require([candidate.string isEqualToString:snapshot.candidates[1].text],
+            @"candidate display keeps the candidate text");
     RLXKeyHandlingResult *candidateSelection =
         [session selectCandidateAtIndex:1 error:&error];
     Require(candidateSelection.isConsumed &&

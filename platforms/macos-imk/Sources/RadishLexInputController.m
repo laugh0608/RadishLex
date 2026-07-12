@@ -5,10 +5,30 @@
 #import "RadishLexBridge.h"
 #import "RadishLexRuntime.h"
 
+static IMKCandidates *RLXProcessCandidatePanel(IMKServer *server) {
+  static IMKCandidates *candidatePanel;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    candidatePanel = [[IMKCandidates alloc] initWithServer:server
+                                                 panelType:kIMKScrollingGridCandidatePanel];
+    NSMutableDictionary *candidateAttributes =
+        [NSMutableDictionary dictionaryWithDictionary:candidatePanel.attributes ?: @{}];
+    candidateAttributes[IMKCandidatesSendServerKeyEventFirst] = @YES;
+    [candidatePanel setAttributes:candidateAttributes];
+    [candidatePanel setDismissesAutomatically:NO];
+  });
+  return candidatePanel;
+}
+
 @interface RadishLexInputController ()
 @property(nonatomic, strong) RLXSessionBridge *session;
 @property(nonatomic, strong) RLXSnapshot *snapshot;
 @property(nonatomic, strong) IMKCandidates *candidatePanel;
+@property(nonatomic, copy) NSArray<NSAttributedString *> *candidatePanelCandidates;
+@property(nonatomic) NSInteger candidatePanelIndex;
+- (NSInteger)candidateIndexForAttributedString:(NSAttributedString *)candidateString;
+- (BOOL)moveCandidateSelectionByOffset:(NSInteger)offset;
+- (BOOL)selectCandidateAtIndex:(NSUInteger)index client:(id)sender;
 @end
 
 @implementation RadishLexInputController
@@ -33,13 +53,14 @@
     [_session invalidate];
     return nil;
   }
-  _candidatePanel = [[IMKCandidates alloc] initWithServer:server
-                                                panelType:kIMKScrollingGridCandidatePanel];
-  NSMutableDictionary *candidateAttributes =
-      [NSMutableDictionary dictionaryWithDictionary:_candidatePanel.attributes ?: @{}];
-  candidateAttributes[IMKCandidatesSendServerKeyEventFirst] = @YES;
-  [_candidatePanel setAttributes:candidateAttributes];
-  [_candidatePanel setDismissesAutomatically:NO];
+  _candidatePanel = RLXProcessCandidatePanel(server);
+  if (_candidatePanel == nil) {
+    NSLog(@"RadishLex candidate panel creation failed");
+    [_session invalidate];
+    return nil;
+  }
+  _candidatePanelCandidates = @[];
+  _candidatePanelIndex = NSNotFound;
   return self;
 }
 
@@ -52,6 +73,31 @@
   if (![NSThread isMainThread] || self.session == nil) return NO;
   RadishLexKeyEvent normalized = {0};
   if (!RLXNormalizeKeyEvent(event, &normalized)) return NO;
+
+  if (self.snapshot.preedit.length > 0 && self.snapshot.candidates.count > 0 &&
+      normalized.phase == RADISHLEX_KEY_PHASE_PRESS && normalized.modifiers == 0 &&
+      normalized.key_kind == RADISHLEX_KEY_KIND_NAMED) {
+    switch (normalized.named_key) {
+      case RADISHLEX_NAMED_KEY_ARROW_UP:
+      case RADISHLEX_NAMED_KEY_ARROW_LEFT:
+        return [self moveCandidateSelectionByOffset:-1];
+      case RADISHLEX_NAMED_KEY_ARROW_DOWN:
+      case RADISHLEX_NAMED_KEY_ARROW_RIGHT:
+        return [self moveCandidateSelectionByOffset:1];
+      default:
+        break;
+    }
+  }
+
+  if (self.snapshot.preedit.length > 0 && self.snapshot.candidates.count > 0 &&
+      normalized.phase == RADISHLEX_KEY_PHASE_PRESS && normalized.modifiers == 0 &&
+      normalized.key_kind == RADISHLEX_KEY_KIND_NAMED &&
+      normalized.named_key == RADISHLEX_NAMED_KEY_SPACE) {
+    if (self.candidatePanelIndex != NSNotFound && self.candidatePanelIndex >= 0 &&
+        (NSUInteger)self.candidatePanelIndex < self.snapshot.candidates.count) {
+      return [self selectCandidateAtIndex:(NSUInteger)self.candidatePanelIndex client:sender];
+    }
+  }
 
   if (normalized.phase == RADISHLEX_KEY_PHASE_PRESS &&
       normalized.key_kind == RADISHLEX_KEY_KIND_NAMED &&
@@ -87,6 +133,8 @@
   for (RLXCandidate *candidate in snapshot.candidates) {
     [candidateData addObject:RLXAttributedCandidate(candidate)];
   }
+  self.candidatePanelCandidates = [candidateData copy];
+  self.candidatePanelIndex = candidateData.count > 0 ? 0 : NSNotFound;
   [self.candidatePanel setCandidateData:candidateData];
   if (snapshot.preedit.length > 0 && candidateData.count > 0) {
     [self.candidatePanel show:kIMKLocateCandidatesBelowHint];
@@ -115,26 +163,85 @@
 
 - (void)candidateSelected:(NSAttributedString *)candidateString {
   if (![NSThread isMainThread] || self.session == nil) return;
-  NSNumber *index = RLXCandidateIndexFromAttributedString(candidateString);
-  if (index == nil) {
+  NSInteger index = [self candidateIndexForAttributedString:candidateString];
+  if (index == NSNotFound) {
     [self recoverFromError:nil client:self.client];
     return;
   }
-  NSError *error = nil;
-  RLXKeyHandlingResult *result =
-      [self.session selectCandidateAtIndex:index.unsignedIntegerValue error:&error];
-  if (result == nil) {
-    [self recoverFromError:error client:self.client];
+  [self selectCandidateAtIndex:(NSUInteger)index client:self.client];
+}
+
+- (void)candidateSelectionChanged:(NSAttributedString *)candidateString {
+  if (![NSThread isMainThread] || self.session == nil) return;
+  NSInteger index = [self candidateIndexForAttributedString:candidateString];
+  if (index == NSNotFound) {
+    self.candidatePanelIndex = NSNotFound;
+    NSLog(@"RadishLex candidate highlight index is unavailable");
     return;
   }
+  self.candidatePanelIndex = index;
+}
+
+- (NSInteger)candidateIndexForAttributedString:(NSAttributedString *)candidateString {
+  if (candidateString.length == 0 || self.snapshot.candidates.count == 0) {
+    return NSNotFound;
+  }
+  NSInteger identifier = [self.candidatePanel candidateStringIdentifier:candidateString];
+  if (identifier == NSNotFound) return NSNotFound;
+  for (NSUInteger index = 0; index < self.candidatePanelCandidates.count; index++) {
+    NSInteger visibleIdentifier = [self.candidatePanel
+        candidateStringIdentifier:self.candidatePanelCandidates[index]];
+    if (visibleIdentifier == identifier) return (NSInteger)index;
+  }
+  return NSNotFound;
+}
+
+- (BOOL)moveCandidateSelectionByOffset:(NSInteger)offset {
+  NSUInteger candidateCount = self.candidatePanelCandidates.count;
+  if (candidateCount == 0 || candidateCount != self.snapshot.candidates.count) return NO;
+  NSInteger current = self.candidatePanelIndex;
+  if (current == NSNotFound || current < 0 || (NSUInteger)current >= candidateCount) {
+    current = 0;
+  }
+  NSInteger target = current + offset;
+  if (target < 0 || (NSUInteger)target >= candidateCount) {
+    return YES;
+  }
+  NSInteger identifier = [self.candidatePanel
+      candidateStringIdentifier:self.candidatePanelCandidates[(NSUInteger)target]];
+  if (identifier == NSNotFound) {
+    NSLog(@"RadishLex candidate panel rejected a visible selection");
+    return YES;
+  }
+  if (![self.candidatePanel selectCandidateWithIdentifier:identifier]) {
+    NSLog(@"RadishLex candidate panel rejected a visible selection");
+    return YES;
+  }
+  self.candidatePanelIndex = target;
+  NSLog(@"RadishLex candidate highlight moved to index %ld", (long)target);
+  return YES;
+}
+
+- (BOOL)selectCandidateAtIndex:(NSUInteger)index client:(id)sender {
+  if (![NSThread isMainThread] || self.session == nil) return NO;
+  NSError *error = nil;
+  RLXKeyHandlingResult *result =
+      [self.session selectCandidateAtIndex:index error:&error];
+  if (result == nil) {
+    [self recoverFromError:error client:sender];
+    return NO;
+  }
   if (result.commit != nil) {
-    [self.client insertText:result.commit replacementRange:NSMakeRange(NSNotFound, NSNotFound)];
+    [(id<IMKTextInput>)sender insertText:result.commit
+                       replacementRange:NSMakeRange(NSNotFound, NSNotFound)];
   }
   if (result.snapshot != nil) {
-    [self applySnapshot:result.snapshot client:self.client];
+    [self applySnapshot:result.snapshot client:sender];
   } else {
-    [self recoverFromError:error client:self.client];
+    [self recoverFromError:error client:sender];
+    return NO;
   }
+  return result.isConsumed;
 }
 
 - (void)commitComposition:(id)sender {
@@ -177,6 +284,10 @@
   }
   [self.candidatePanel hide];
   [super deactivateServer:sender];
+}
+
+- (NSMenu *)menu {
+  return nil;
 }
 
 - (void)inputControllerWillClose {

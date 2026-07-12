@@ -129,7 +129,10 @@ fn rime_session_native_smoke_uses_ffi_entrypoint() {
     let enter = unsafe { handle_named(session, RADISHLEX_NAMED_KEY_ENTER, &mut error) };
     assert_eq!(unsafe { radishlex_key_result_consumed(enter) }, 1);
     assert_eq!(unsafe { radishlex_key_result_commit_present(enter) }, 1);
-    assert!(!unsafe { view_to_string(radishlex_key_result_commit(enter)) }.is_empty());
+    assert_eq!(
+        unsafe { view_to_string(radishlex_key_result_commit(enter)) },
+        "nihao"
+    );
     assert!(unsafe { result_preedit(enter) }.is_empty());
     unsafe {
         radishlex_key_result_free(enter);
