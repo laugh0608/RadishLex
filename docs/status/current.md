@@ -14,7 +14,7 @@
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；受控同步实现与测试可继续
 
-2026-07-12 的 Apple Development 短时实机批次已验证连续中文输入、5×1 候选、主要编辑键、Enter 原文提交和方向选择语义；进程级候选面板修复后未再发生 deactivate 崩溃。R01A 仍未退出：`IMKCandidates` 选择索引正确但视觉高亮不重绘，自动 parent command 区域也仍有菜单问题。build 28 已完整移除；设置列表、TIS、bundle、运行数据和进程均无残留。下一步先形成资料证据与可复验方案，不继续逐 build 试错。
+2026-07-12 的 Apple Development 短时实机批次已验证连续中文输入、5×1 候选、主要编辑键、Enter 原文提交和方向选择语义；进程级候选面板修复后未再发生 deactivate 崩溃。R01A 仍未退出：`IMKCandidates` 选择索引正确但视觉高亮不重绘，自动 parent command 区域也仍有菜单问题。隔离 root-only reference probe 被 TIS 枚举为单一、可选择的 `TISTypeKeyboardInputMethodWithoutModes`，但不进入系统设置的可添加输入法列表，未能启用；失败 probe 已严格清理。全新 ID/路径的单 mode probe 已以 Apple Development 签名安装到用户级目录，TIS 正确枚举不可选择 parent 与一个可选择 mode，但系统设置完全重启后仍无可添加项。该 probe 暂时保留，下一判断点固定为开发者注销/重新登录后的只读枚举，不再修改 build；正式 mode metadata 保持不变。
 
 长期产品交付顺序见 [产品交付路线图](../roadmap.md)，当前整改批次、停止线、资产处置和退出条件见 [项目稳定化整改专题](../remediation/2026-07-project-stabilization.md)。
 
@@ -33,7 +33,7 @@
 
 ## 已确认阻塞
 
-- R01A 不安装 native 行为矩阵已闭合候选选择与主要编辑按键；真实应用方向键已能改变选择索引并提交对应候选，但 `IMKCandidates` 视觉高亮不重绘。输入菜单的自动 parent command 区域在 `nil`、空菜单和稳定标题菜单下分别表现为空白行、生命周期回归或重复标题。正式 mode 当前保持移除；在完成公开 API、系统 bundle metadata 和可复验 harness 调研前不再安装新 build。client 切换、进程重启、断网、中英文混输及两个应用交叉复核仍未完成。
+- R01A 不安装 native 行为矩阵已闭合候选选择与主要编辑按键；真实应用方向键已能改变选择索引并提交对应候选，但 `IMKCandidates` 视觉高亮不重绘。输入菜单的自动 parent command 区域在 `nil`、空菜单和稳定标题菜单下分别表现为空白行、生命周期回归或重复标题。root-only 与单 mode probe 均能被 TIS 解析，却不进入当前登录会话的系统设置可添加列表；候选面板尚未获得启用机会。正式 mode 当前保持移除，client 切换、进程重启、断网、中英文混输及两个应用交叉复核仍未完成。
 - 输入 session 未组合 engine、ranker、userdb 与 privacy policy，真实选择没有进入平台学习热路径。
 - userdb 用户意图缺少统一事务、WAL/busy 策略；ranker recency/frequency 语义需要修正。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
@@ -51,9 +51,9 @@
 
 ## 下一步顺位
 
-1. 暂停新 build，系统查阅 Apple InputMethodKit/IMKCandidates/输入法菜单公开资料、当前 SDK headers 与系统自带单 mode bundle metadata；形成候选视觉选择和 parent command 区域的明确行为模型。
-2. 在不安装系统输入法的前提下设计可复验 harness 或最小 reference probe，先证明事件路由、selection identifier、视觉刷新触发和菜单对象结构，再决定产品代码改法；不继续叠加 `clearSelection`、空菜单、身份占位项或 plist fallback。
-3. 方案经人工确认后才申请下一次短时安装，并一次性复核视觉高亮、菜单、client 切换、进程重启、断网、中英文混输和两个应用交叉行为；完成即严格移除。
+1. 保留当前用户级单 mode reference probe，等待开发者注销/重新登录；新会话先只读复核 TIS 与系统设置可添加列表，不提前启用、选择或生成新 build。
+2. 新 probe 方案必须继续让方向键返回候选面板、Space/Enter 留在 controller，并以四方向视觉高亮、callback 索引和提交三者一致为一次性判定；不叠加 `clearSelection`、程序化选择、空菜单或 plist fallback。
+3. 方案经人工确认后才申请下一次短时安装；probe 通过后再更新正式候选事件模型和输入源身份边界，并一次性复核正式视觉高亮、菜单、client 切换、进程重启、断网、中英文混输和两个应用交叉行为。
 4. R01A 退出后实施 R02L，修正 userdb 事务、SQLite 并发、recency、frequency 与删除语义；R02L 退出后再由 R01B 接入真实学习，之后关闭整改专题并进入 M3。
 
 ## 验证入口

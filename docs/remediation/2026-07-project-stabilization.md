@@ -83,7 +83,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | 批次 | 名称 | 状态 | 退出结果 |
 | --- | --- | --- | --- |
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
-| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；基础按键与方向选择语义已形成实机证据，候选视觉高亮和 parent command 菜单仍阻塞，暂停新 build 转入资料调研 | 真实应用可离线完成基础中文输入 |
+| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；root-only probe 未进入系统设置可添加列表，正式 mode 保持不变，候选视觉高亮和 parent command 菜单仍阻塞 | 真实应用可离线完成基础中文输入 |
 | R02L | 本地 userdb/ranker 正确性 | 待开始 | 学习、删除、并发和排序语义正确 |
 | R01B | 真实学习纵向闭环 | 待开始，依赖 R01A 与 R02L | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 已完成 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
@@ -136,6 +136,9 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 后续 build 20-28 的短时实机批次验证连续输入、数字选择、翻页、Backspace、Escape、Enter 原文提交和方向键选择对应候选；候选面板收口为进程级对象后未再出现 deactivate 崩溃。grid candidate 现通过缓存 attributed candidate 的公开 identifier 映射显示索引，方向键索引日志与 Space 最终提交一致。
 - R01A 仍被两个 InputMethodKit UI 问题阻塞：程序化 `selectCandidateWithIdentifier:` 成功且选择语义正确，但视觉高亮不重绘；系统自动生成不可选择的 parent source/command 区域，`nil`、空菜单与稳定标题菜单分别产生空白行、生命周期回归或重复标题。删除根级 source/icon metadata 与 `clearSelection` 均已被实机证伪。
 - build 28 已按 runbook 严格移除；系统设置仅剩系统拼音与美国输入法，公开 TIS 枚举 `matches=0`，用户级 bundle、运行数据和精确进程均不存在。下一判断点改为先完成公开资料、当前 SDK header、系统单 mode bundle metadata 与 reference harness 调研，不再逐 build 试错。
+- 隔离 reference probe 固定独立 Bundle/source ID、合成候选、进程级 `kIMKSingleRowSteppingCandidatePanel`、`candidates:`/`updateCandidates` 与 callback 路径，不链接 Rime/FFI 或用户数据。Apple Development 用户级安装后，公开 TIS 只枚举一个 `TISTypeKeyboardInputMethodWithoutModes` source，且 `select_capable=1`、语言为 `zh-Hans`；但系统设置简体中文可添加列表不显示该 source，无法按合规路径启用，候选视觉与 callback 路径因此未执行。
+- 失败 probe 未调用公开 TIS enable 代替系统设置，也未生成下一版本。系统设置确认现有列表无 probe 后删除精确 bundle/独立数据并终止精确进程；首次清理后 TIS 短暂保留未启用枚举，重新打开设置列表后复核为 `matches=0`。正式 plist、候选实现和 `docs/macos-inputmethodkit-boundary.md` 均未据此修改。
+- 后续设计改用全新 Bundle/source ID、bundle 路径和单一显式 mode，root 与 mode 同时固定图标和本地化名称；继续复用合成候选、单行面板、方向键交还候选面板、Space/Enter controller 分流和 callback contract。无安装门禁与 Apple Development 签名通过，用户级安装后 TIS 正确枚举不可选择 parent 与一个 `select_capable=1` mode，但系统设置完全重启后仍不显示可添加项。probe 暂时保留等待一次开发者注销/重新登录；此前不修改 build、正式身份或边界。
 
 这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键未消费、Space/非首候选提交和主要编辑按键子项，不代表真实应用输入矩阵或 UI 已完成。R01A 下一判断点是先形成候选视觉选择与输入菜单的可复验方案，再补 client 切换、进程重启、断网和双应用交叉证据。
 
