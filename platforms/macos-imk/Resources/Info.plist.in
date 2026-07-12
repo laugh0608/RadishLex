@@ -9,7 +9,7 @@
   <key>CFBundleExecutable</key>
   <string>RadishLex</string>
   <key>CFBundleIdentifier</key>
-  <string>org.radishlex.inputmethod</string>
+  <string>org.radishlex.inputmethod.macos</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
@@ -25,12 +25,12 @@
     <string>MacOSX</string>
   </array>
   <key>CFBundleVersion</key>
-  <string>13</string>
+  <string>19</string>
   <key>ComponentInputModeDict</key>
   <dict>
     <key>tsInputModeListKey</key>
     <dict>
-      <key>org.radishlex.inputmethod.Pinyin</key>
+      <key>org.radishlex.inputmethod.macos.Pinyin</key>
       <dict>
         <key>TISIconLabels</key>
         <dict>
@@ -38,7 +38,7 @@
           <string>萝</string>
         </dict>
         <key>TISInputSourceID</key>
-        <string>org.radishlex.inputmethod.Pinyin</string>
+        <string>org.radishlex.inputmethod.macos.Pinyin</string>
         <key>TISIntendedLanguage</key>
         <string>zh-Hans</string>
         <key>tsInputModeCharacterRepertoireKey</key>
@@ -61,16 +61,14 @@
     </dict>
     <key>tsVisibleInputModeOrderedArrayKey</key>
     <array>
-      <string>org.radishlex.inputmethod.Pinyin</string>
+      <string>org.radishlex.inputmethod.macos.Pinyin</string>
     </array>
   </dict>
   <key>InputMethodConnectionName</key>
-  <string>org.radishlex.inputmethod_Connection</string>
+  <string>org.radishlex.inputmethod.macos_Connection</string>
   <key>InputMethodServerControllerClass</key>
   <string>RadishLexInputController</string>
-  <key>InputMethodServerDelegateClass</key>
-  <string>RadishLexInputController</string>
-  <key>LSBackgroundOnly</key>
+  <key>LSUIElement</key>
   <true/>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
@@ -85,7 +83,7 @@
   <key>RadishLexRimeSharedDataDirectory</key>
   <string>RimeData</string>
   <key>TISInputSourceID</key>
-  <string>org.radishlex.inputmethod</string>
+  <string>org.radishlex.inputmethod.macos</string>
   <key>TISIntendedLanguage</key>
   <string>zh-Hans</string>
   <key>tsInputMethodCharacterRepertoireKey</key>

@@ -167,6 +167,14 @@ int main(void) {
     Require(ignored != nil && !ignored.isConsumed && ignored.commit == nil,
             @"unconsumed key is returned to the host");
 
+    RadishLexKeyEvent commandC = {RADISHLEX_KEY_KIND_CHAR, 'c', 0,
+                                   RADISHLEX_KEY_MOD_META,
+                                   RADISHLEX_KEY_PHASE_PRESS};
+    ignored = [session handleEvent:commandC error:&error];
+    Require(ignored != nil && !ignored.isConsumed && ignored.commit == nil &&
+                ignored.snapshot.preedit.length == 0,
+            @"Command-modified character is returned to the host");
+
     for (NSNumber *codepoint in @[@'l', @'u', @'o', @'b', @'o']) {
       RLXKeyHandlingResult *result =
           [session handleEvent:Character(codepoint.unsignedShortValue) error:&error];

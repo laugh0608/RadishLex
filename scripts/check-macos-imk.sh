@@ -42,7 +42,7 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   -o "${smoke_dir}/contract-smoke"
 "${smoke_dir}/contract-smoke"
 
-bundle="${repo_root}/target/macos-imk/contract/RadishLex.app"
+bundle="${repo_root}/target/macos-imk/contract/RadishLexInputMethod.app"
 test -x "${bundle}/Contents/MacOS/RadishLex"
 test -f "${bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib"
 test -s "${bundle}/Contents/Resources/RadishLexInputIcon.tiff"
@@ -56,13 +56,13 @@ test "$(plutil -extract tsInputMethodCharacterRepertoireKey.0 raw \
 test "$(plutil -extract tsInputMethodIconFileKey raw \
   "${bundle}/Contents/Info.plist")" = "RadishLexInputIcon.tiff"
 test "$(plutil -extract TISInputSourceID raw \
-  "${bundle}/Contents/Info.plist")" = "org.radishlex.inputmethod"
+  "${bundle}/Contents/Info.plist")" = "org.radishlex.inputmethod.macos"
 test "$(plutil -extract TISIntendedLanguage raw \
   "${bundle}/Contents/Info.plist")" = "zh-Hans"
-mode_path=":ComponentInputModeDict:tsInputModeListKey:org.radishlex.inputmethod.Pinyin"
+mode_path=":ComponentInputModeDict:tsInputModeListKey:org.radishlex.inputmethod.macos.Pinyin"
 mode_id="$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:TISInputSourceID" \
   "${bundle}/Contents/Info.plist")"
-test "${mode_id}" = "org.radishlex.inputmethod.Pinyin"
+test "${mode_id}" = "org.radishlex.inputmethod.macos.Pinyin"
 [[ "${mode_id}" =~ ^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$ ]]
 test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:TISIntendedLanguage" \
   "${bundle}/Contents/Info.plist")" = "zh-Hans"
@@ -73,11 +73,18 @@ test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:tsInputModeScriptKey" \
 test "$(/usr/libexec/PlistBuddy -c "Print ${mode_path}:tsInputModeCharacterRepertoireKey:0" \
   "${bundle}/Contents/Info.plist")" = "Hans"
 test "$(plutil -extract ComponentInputModeDict.tsVisibleInputModeOrderedArrayKey.0 raw \
-  "${bundle}/Contents/Info.plist")" = "org.radishlex.inputmethod.Pinyin"
-test "$(plutil -extract InputMethodServerDelegateClass raw \
-  "${bundle}/Contents/Info.plist")" = "RadishLexInputController"
-test "$(plutil -extract LSBackgroundOnly raw "${bundle}/Contents/Info.plist")" = "true"
-test "$(/usr/libexec/PlistBuddy -c 'Print :org.radishlex.inputmethod.Pinyin' \
+  "${bundle}/Contents/Info.plist")" = "org.radishlex.inputmethod.macos.Pinyin"
+if plutil -extract InputMethodServerDelegateClass raw \
+  "${bundle}/Contents/Info.plist" >/dev/null 2>&1; then
+  echo "macOS IMK bundle must not treat the input controller as a server delegate." >&2
+  exit 1
+fi
+test "$(plutil -extract LSUIElement raw "${bundle}/Contents/Info.plist")" = "true"
+if plutil -extract LSBackgroundOnly raw "${bundle}/Contents/Info.plist" >/dev/null 2>&1; then
+  echo "macOS IMK bundle must use LSUIElement without LSBackgroundOnly." >&2
+  exit 1
+fi
+test "$(/usr/libexec/PlistBuddy -c 'Print :org.radishlex.inputmethod.macos.Pinyin' \
   "${bundle}/Contents/Resources/zh-Hans.lproj/InfoPlist.strings")" = "萝卜词核拼音"
 otool -L "${bundle}/Contents/MacOS/RadishLex" | grep -q \
   "@rpath/libradishlex_ime_ffi.dylib"

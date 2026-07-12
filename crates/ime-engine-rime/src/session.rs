@@ -15,7 +15,7 @@ use crate::config::RimeEngineConfig;
 use crate::convert::{candidate_from_view, composition_from_parts, RimeCandidateView};
 use crate::error::{RimeEngineError, RimeEngineResult};
 use crate::ffi::{self, RimeApi, RimeCommit, RimeContext, RimeSessionId, TRUE};
-use crate::keymap::{classify_key_event, rime_keycode};
+use crate::keymap::{classify_key_event, rime_keycode, RimeKeyInput, RimeNamedKey};
 use crate::runtime::{
     current_schema, ensure_true, require_api_function, select_schema_exact, RimeRuntime,
 };
@@ -117,6 +117,9 @@ impl Engine for RimeEngine {
 
     fn push_key(&mut self, key: KeyEvent) -> CoreResult<KeyOutcome> {
         let input = classify_key_event(key);
+        if input == RimeKeyInput::Named(RimeNamedKey::Space) && !self.candidates()?.is_empty() {
+            return self.commit_candidate(0).map(KeyOutcome::committed);
+        }
         let Some(keycode) = rime_keycode(input) else {
             return Ok(KeyOutcome::ignored());
         };

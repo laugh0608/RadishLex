@@ -34,7 +34,11 @@
     return nil;
   }
   _candidatePanel = [[IMKCandidates alloc] initWithServer:server
-                                                panelType:kIMKSingleColumnScrollingCandidatePanel];
+                                                panelType:kIMKScrollingGridCandidatePanel];
+  NSMutableDictionary *candidateAttributes =
+      [NSMutableDictionary dictionaryWithDictionary:_candidatePanel.attributes ?: @{}];
+  candidateAttributes[IMKCandidatesSendServerKeyEventFirst] = @YES;
+  [_candidatePanel setAttributes:candidateAttributes];
   [_candidatePanel setDismissesAutomatically:NO];
   return self;
 }

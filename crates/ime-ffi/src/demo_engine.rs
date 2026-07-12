@@ -54,6 +54,11 @@ impl Engine for FfiDemoEngine {
             return Ok(KeyOutcome::ignored());
         }
 
+        let modifiers = key.modifiers();
+        if modifiers.control() || modifiers.alt() || modifiers.meta() {
+            return Ok(KeyOutcome::ignored());
+        }
+
         match key.key() {
             Key::Char(ch) if ch.is_ascii_alphanumeric() || ch == '\'' => {
                 self.buffer.push(ch.to_ascii_lowercase());

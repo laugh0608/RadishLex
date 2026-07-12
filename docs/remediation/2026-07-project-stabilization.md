@@ -83,7 +83,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | 批次 | 名称 | 状态 | 退出结果 |
 | --- | --- | --- | --- |
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
-| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；隔离 native/FFI 与 Apple Development bundle 已完成，待一次方便的新登录、TIS 枚举和真实应用输入 | 真实应用可离线完成基础中文输入 |
+| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；用户级 v19 已启用并形成两个应用的部分真实输入证据，待补完整矩阵 | 真实应用可离线完成基础中文输入 |
 | R02L | 本地 userdb/ranker 正确性 | 待开始 | 学习、删除、并发和排序语义正确 |
 | R01B | 真实学习纵向闭环 | 待开始，依赖 R01A 与 R02L | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 可与 R01A 并行 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
@@ -112,7 +112,7 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 按 `docs/macos-inputmethodkit-boundary.md` 新增 macOS InputMethodKit 薄壳，只处理系统生命周期、按键、候选、commit 和 Rust FFI。
 - 编写开发版安装、启用和移除 runbook；真实安装仍需人工授权。
 
-### 当前完成证据（2026-07-11）
+### 当前完成证据（更新至 2026-07-12）
 
 - ABI contract v2 新增 Rust-owned `RadishLexKeyResult`，无损返回 `consumed`、可选即时 commit 和同事件 snapshot。
 - 失败时 `result_out` 保持为空；owner-thread、空指针、非法 key event、borrowed view 和释放路径已有 host contract 测试。
@@ -131,9 +131,10 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 采用官方 Apache-2.0 `rime-pinyin-simp` 固定上游 commit，在临时隔离目录保留许可证和来源记录，并移除对其他 schema/preset 的外部依赖；没有读取或修改真实用户 Rime 目录。
 - native bundle 已携带上述隔离全拼 shared data 通过架构、依赖、symbol、许可证和哈希清单门禁；真实 librime FFI smoke 已复验 composition、候选、commit、两个 session 共享 runtime 与 peer release 后继续输入。
 - native smoke 发现 librime 对不存在 schema 的 `select_schema`/`get_current_schema` 返回过于宽松；adapter 现先读取已部署 schema list，再选择并精确回读。不存在或回读不一致会返回结构化错误，创建期还会销毁 session 并回滚 runtime，对应 stub 与真实 FFI 回归均已覆盖。
-- Apple Development identity 与证书链已准备完成；最终 v13 固定 `LSBackgroundOnly`、单一 reverse-DNS `org.radishlex.inputmethod.Pinyin` mode、简体中文 script/repertoire、图标和本地化标签。用户级安装、即时注册和一次用户级新登录仍未产生 TIS source；系统级 v13 已在授权下暂存，等待开发者方便时只做一次新登录复查。当前未启用输入源、无 RadishLex 进程或运行数据，真实应用 smoke 尚未执行。
+- 2026-07-12 新登录确认旧 v13 仍无 source；reference/product probe 将问题定位为失败 Bundle ID/安装路径的 TIS 负缓存。正式身份已固定为 `org.radishlex.inputmethod.macos`、`org.radishlex.inputmethod.macos.Pinyin`、`RadishLexInputMethod.app` 与 `LSUIElement`。用户级 Apple Development v19 已安装、加入并启用；TextEdit 已验证 Space 中文提交与 composition 期间 `Command-N` 未消费，Codex 输入框已人工确认 5×1 原生横排候选可见。
+- Rime adapter 现拒绝把 Control/Option/Command 修饰字符降级为普通字母；M1 全拼有候选时由 adapter 以稳定 candidate commit 语义处理 Space，不再依赖临时 schema 的 delimiter/key binder。native FFI smoke 直接发送 `NamedKey::Space` 并要求同事件 commit，不再绕过按键调用候选提交 API。
 
-这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链和 Apple Development 自包含 bundle 子项，不代表 TIS 枚举或真实应用输入 smoke 已完成。R01A 下一判断点是一次最终系统级 build 的新登录；若仍无 source，应转入参考 IMK bundle 对照，不继续反复安装或注销。
+这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键未消费、Space 提交和横排候选子项，不代表真实应用输入矩阵已完成。R01A 下一判断点是补齐非首候选、翻页、取消、编辑键、client 切换、进程重启和断网证据。
 
 ### 退出场景
 

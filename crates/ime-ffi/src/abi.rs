@@ -983,7 +983,7 @@ mod tests {
             user_data_dir: user_data.as_ptr(),
             schema: schema.as_ptr(),
             log_dir: ptr::null(),
-            deploy_on_start: 0,
+            deploy_on_start: 1,
         };
         let session = radishlex_session_new_rime(&options, &mut error);
         assert!(
@@ -1011,14 +1011,32 @@ mod tests {
         );
         assert!(radishlex_snapshot_candidate_count(snapshot) > 0);
 
-        let commit = radishlex_session_commit_candidate(session, 0, &mut error);
-        assert!(!commit.is_null(), "candidate should commit: {}", unsafe {
-            error_message(error)
-        });
-        assert!(!unsafe { buffer_to_string(commit) }.is_empty());
+        let space = RadishLexKeyEvent::press_named(crate::key::RADISHLEX_NAMED_KEY_SPACE);
+        let mut key_result = ptr::null_mut();
+        assert_eq!(
+            unsafe {
+                crate::radishlex_session_handle_key_event(
+                    session,
+                    space,
+                    &mut key_result,
+                    &mut error,
+                )
+            },
+            RadishLexStatusCode::Ok
+        );
+        assert_eq!(
+            unsafe { crate::radishlex_key_result_consumed(key_result) },
+            1
+        );
+        assert_eq!(
+            unsafe { crate::radishlex_key_result_commit_present(key_result) },
+            1
+        );
+        let committed = unsafe { crate::radishlex_key_result_commit(key_result) };
+        assert!(!unsafe { view_to_string(committed) }.is_empty());
 
         unsafe {
-            radishlex_buffer_free(commit);
+            crate::radishlex_key_result_free(key_result);
             radishlex_snapshot_free(snapshot);
             radishlex_session_free(session);
         }

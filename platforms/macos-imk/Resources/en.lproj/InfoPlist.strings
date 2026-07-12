@@ -1,4 +1,4 @@
 "CFBundleDisplayName" = "RadishLex";
 "CFBundleName" = "RadishLex";
-"org.radishlex.inputmethod" = "RadishLex";
-"org.radishlex.inputmethod.Pinyin" = "RadishLex Pinyin";
+"org.radishlex.inputmethod.macos" = "RadishLex";
+"org.radishlex.inputmethod.macos.Pinyin" = "RadishLex Pinyin";

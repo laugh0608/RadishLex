@@ -53,7 +53,7 @@ runtime 初始化失败必须返回结构化错误。平台不得静默切换 de
 
 平台主入口使用 `docs/ffi-boundary.md` 定义的版本化 key result。处理顺序固定为：
 
-1. 只把当前支持的 key、modifier 和 phase 规范化为稳定 ABI；未知组合明确交还宿主或返回可诊断错误。
+1. 只把当前支持的 key、modifier 和 phase 规范化为稳定 ABI；未知组合明确交还宿主或返回可诊断错误。Control、Option 或 Command 修饰的字符不得退化成无修饰字母送入 Rime，必须保持未消费并交还宿主；Shift 仍可参与普通字母输入。
 2. 在 session owner thread 调用 Rust 按键入口。
 3. status 失败时不读取部分结果，并按错误类别执行安全 reset、保留原按键或提示诊断。
 4. `consumed = 0` 时返回未处理，让宿主应用继续接收按键。
@@ -66,10 +66,11 @@ runtime 初始化失败必须返回结构化错误。平台不得静默切换 de
 ## Composition、候选与提交
 
 - composition 为空时清除 marked text；非空时更新 marked text 与 cursor。
-- 候选展示使用 macOS 原生机制或 InputMethodKit 兼容机制，不自造跨平台统一浮窗协议。
+- 候选展示使用 macOS 原生机制或 InputMethodKit 兼容机制，不自造跨平台统一浮窗协议；当前开发实现使用 `IMKCandidates` scrolling grid，并以五候选页形成 5×1 横排。
 - 平台展示索引必须稳定映射到 RadishLex ranked candidate 与 engine commit index。
 - 用户选择候选后通过 Rust commit API 提交，平台不得直接把展示文本当作 engine 选择结果。
 - engine 即时 commit 与显式候选 commit 使用同一文本提交边界，并清理相应 marked text。
+- M1 全拼有候选时，Space 首候选提交由 Rime adapter 调用稳定的 engine candidate commit 语义，并通过同事件 key result 返回；平台壳不得把 Space 特判成直接提交展示文本，也不得依赖临时 schema 是否携带 `key_binder`。
 - 取消、失焦、client 切换和 schema 切换不能把旧 composition 提交到新 client。
 
 候选窗口视觉、分页快捷键和无障碍细节可以迭代，但不能改变索引映射、所有权或提交语义。
@@ -95,7 +96,7 @@ M1 开发版必须明确并隔离：
 
 开发 smoke 不得读取用户现有 Rime 配置或词库目录，也不得把本机绝对路径写入 committed 文档或 fixture。M1 已使用固定上游 commit、保留 Apache-2.0 许可证和来源记录的 `rime-pinyin-simp` 临时隔离数据复验 native bundle 与真实 FFI 输入链。native bundle 必须递归封装全部非系统 dylib、把加载路径改写到 bundle 内、保存逐库许可证与签名后哈希清单，并拒绝任何外部绝对依赖。该开发期封装不替代 M4 的 Developer ID、公证、升级/移除和发布级供应链门禁。
 
-TIS input source/mode id 属于平台稳定身份，不等同于允许下划线的 Rime schema id。当前单一全拼模式使用 reverse-DNS `org.radishlex.inputmethod.Pinyin`，Rime schema 仍为 `pinyin_simp`；mode metadata 必须同时固定简体中文 language、script、repertoire、图标、本地化标签和可见顺序。
+TIS input source/mode id 与 bundle 文件名属于平台稳定身份，不等同于允许下划线的 Rime schema id。当前正式 Bundle ID 为 `org.radishlex.inputmethod.macos`，单一全拼 mode 为 `org.radishlex.inputmethod.macos.Pinyin`，bundle 文件名为 `RadishLexInputMethod.app`，Rime schema 仍为 `pinyin_simp`；mode metadata 必须同时固定 `LSUIElement`、简体中文 language、script、repertoire、图标、本地化标签和可见顺序。macOS 26.5.1 已观察到失败身份与安装路径的 TIS 负缓存，开发过程不得复用旧 `org.radishlex.inputmethod` 或 `RadishLex.app`，也不得通过修改 TIS 私有数据库清缓存。
 
 ## Header、线程与错误
 

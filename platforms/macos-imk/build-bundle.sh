@@ -72,7 +72,7 @@ if [[ ! "${schema}" =~ ^[A-Za-z0-9._-]+$ ]]; then
   exit 2
 fi
 build_root="${repo_root}/target/macos-imk/${mode}"
-bundle="${build_root}/RadishLex.app"
+bundle="${build_root}/RadishLexInputMethod.app"
 contents="${bundle}/Contents"
 macos_dir="${contents}/MacOS"
 frameworks_dir="${contents}/Frameworks"
