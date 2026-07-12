@@ -91,7 +91,8 @@ R01A 每轮真实 smoke 无论通过还是失败都必须完整回滚，不保�
 1. 先在系统设置“键盘 -> 文字输入 -> 编辑”中选中 RadishLex 并点击“移除”；不能用公开 TIS API 停用代替该动作。
 2. 确认当前输入源已切回系统输入法，再只处理 RadishLex 残余 TIS source；不得修改 `com.apple.HIToolbox` 或 TIS 私有数据库。
 3. 移除本轮安装的 `~/Library/Input Methods/RadishLexInputMethod.app`；若输入法进程仍持有旧 bundle，在授权范围内终止该进程。
-4. 复核 TIS 中 RadishLex `matches=0`、用户级 bundle 不存在、RadishLex 进程已停止、系统设置列表无 RadishLex 输入源残留。
-5. 只清理本轮生成的隔离 user data 与短期 staging；不删除 shared data 来源、用户其他输入法目录或任何非本轮数据。
+4. 删除 bundle 后重新打开系统设置输入源列表；macOS 26 已多次观察到用户配置项短暂回流。若 RadishLex 再次出现，必须再次点击“移除”并回到仅含原系统输入源的摘要。
+5. 复核 TIS 中 RadishLex `matches=0`、用户级 bundle 不存在、RadishLex 进程已停止、系统设置列表无 RadishLex 输入源残留。
+6. 只清理本轮生成的隔离 user data 与短期 staging；不删除 shared data 来源、用户其他输入法目录或任何非本轮数据。
 
 仅调用 `TISDisableInputSource` 或移走 bundle 不会自动删除“所有输入法”中的用户配置项。最终证据必须同时满足设置列表、TIS、安装域和进程四项无残留。

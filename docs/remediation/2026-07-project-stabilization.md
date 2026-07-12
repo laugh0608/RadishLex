@@ -83,7 +83,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | 批次 | 名称 | 状态 | 退出结果 |
 | --- | --- | --- | --- |
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
-| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；用户级 v19 已启用并形成两个应用的部分真实输入证据，待补完整矩阵 | 真实应用可离线完成基础中文输入 |
+| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；基础按键与方向选择语义已形成实机证据，候选视觉高亮和 parent command 菜单仍阻塞，暂停新 build 转入资料调研 | 真实应用可离线完成基础中文输入 |
 | R02L | 本地 userdb/ranker 正确性 | 待开始 | 学习、删除、并发和排序语义正确 |
 | R01B | 真实学习纵向闭环 | 待开始，依赖 R01A 与 R02L | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 已完成 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
@@ -133,8 +133,11 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - native smoke 发现 librime 对不存在 schema 的 `select_schema`/`get_current_schema` 返回过于宽松；adapter 现先读取已部署 schema list，再选择并精确回读。不存在或回读不一致会返回结构化错误，创建期还会销毁 session 并回滚 runtime，对应 stub 与真实 FFI 回归均已覆盖。
 - 2026-07-12 新登录确认旧 v13 仍无 source；reference/product probe 将问题定位为失败 Bundle ID/安装路径的 TIS 负缓存。正式身份已固定为 `org.radishlex.inputmethod.macos`、`org.radishlex.inputmethod.macos.Pinyin`、`RadishLexInputMethod.app` 与 `LSUIElement`。用户级 Apple Development v19 已安装、加入并启用；TextEdit 已验证 Space 中文提交与 composition 期间 `Command-N` 未消费，Codex 输入框已人工确认 5×1 原生横排候选可见。
 - Rime adapter 现拒绝把 Control/Option/Command 修饰字符降级为普通字母；M1 全拼有候选时由 adapter 以稳定 candidate selection 语义处理 Space，不再依赖临时 schema 的 delimiter/key binder。selection result 保留 optional commit 与更新后的 snapshot，覆盖分段候选只推进 composition 的情况。
+- 后续 build 20-28 的短时实机批次验证连续输入、数字选择、翻页、Backspace、Escape、Enter 原文提交和方向键选择对应候选；候选面板收口为进程级对象后未再出现 deactivate 崩溃。grid candidate 现通过缓存 attributed candidate 的公开 identifier 映射显示索引，方向键索引日志与 Space 最终提交一致。
+- R01A 仍被两个 InputMethodKit UI 问题阻塞：程序化 `selectCandidateWithIdentifier:` 成功且选择语义正确，但视觉高亮不重绘；系统自动生成不可选择的 parent source/command 区域，`nil`、空菜单与稳定标题菜单分别产生空白行、生命周期回归或重复标题。删除根级 source/icon metadata 与 `clearSelection` 均已被实机证伪。
+- build 28 已按 runbook 严格移除；系统设置仅剩系统拼音与美国输入法，公开 TIS 枚举 `matches=0`，用户级 bundle、运行数据和精确进程均不存在。下一判断点改为先完成公开资料、当前 SDK header、系统单 mode bundle metadata 与 reference harness 调研，不再逐 build 试错。
 
-这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键未消费、Space 提交和横排候选子项，不代表真实应用输入矩阵已完成。R01A 下一判断点是补齐非首候选、翻页、取消、编辑键、client 切换、进程重启和断网证据。
+这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键未消费、Space/非首候选提交和主要编辑按键子项，不代表真实应用输入矩阵或 UI 已完成。R01A 下一判断点是先形成候选视觉选择与输入菜单的可复验方案，再补 client 切换、进程重启、断网和双应用交叉证据。
 
 ### 退出场景
 

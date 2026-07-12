@@ -14,33 +14,26 @@
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；受控同步实现与测试可继续
 
-RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/sync 原型、Go sync server、Flutter manager 原型和 macOS InputMethodKit 开发薄壳。Apple Development v19 已完成一次用户级安装、启用和真实应用输入；为避免半成品长期占用日常输入源，验证后已切回系统拼音、停用 RadishLex 并将 bundle 移出用户输入法目录。2026-07-12 复核发现系统设置“所有输入法”仍保留用户配置项，证明停用和移走 bundle 不等于完整移除；经动作时确认后已在系统设置点击“移除”，当前列表仅剩系统拼音和美国输入法，TIS 枚举 `matches=0`。它仍不是普通用户产品包；正常 manager 产品包也尚未形成真实 FFI、持久化配置和平台文件访问闭环。
+2026-07-12 的 Apple Development 短时实机批次已验证连续中文输入、5×1 候选、主要编辑键、Enter 原文提交和方向选择语义；进程级候选面板修复后未再发生 deactivate 崩溃。R01A 仍未退出：`IMKCandidates` 选择索引正确但视觉高亮不重绘，自动 parent command 区域也仍有菜单问题。build 28 已完整移除；设置列表、TIS、bundle、运行数据和进程均无残留。下一步先形成资料证据与可复验方案，不继续逐 build 试错。
 
 长期产品交付顺序见 [产品交付路线图](../roadmap.md)，当前整改批次、停止线、资产处置和退出条件见 [项目稳定化整改专题](../remediation/2026-07-project-stabilization.md)。
 
-## 本轮路线调整
-
-- 产品主线为 M1 离线输入、M2 本地个人化、M3 加密同步、M4 发布候选；旧技术 Phase 不再决定交付顺序。
-- 输入整改拆为 R01A 基础输入、R02L 本地正确性和 R01B 真实学习，避免 FFI、平台壳、数据库和 ranker 同批失控。
-- 同步/设备管理与最终打包回归 M3/M4；R01A、R02L、R01B、R06A 退出后关闭临时整改专题。
-
 ## 已有工程证据
 
-- 仓库基线已覆盖 Rust workspace、Go server、跨语言 HTTP、Flutter manager 与开发期真实 FFI；userdb、ranker、crypto、sync 和部署原型已有合成测试，但不作为产品阶段证据。
-- `ime-ffi` ABI contract v3 已无损返回 `consumed`、可选即时 commit 和同事件 snapshot；候选选择复用同一 owned result，能表达分段候选只推进 composition 而不提交。输入侧 C header 已通过 C11 与 Objective-C 编译测试。
-- librime 生命周期已收口到进程级 runtime；多 session、owner-thread、配置冲突、失败回滚、peer release 和最终 finalize 已有自动或 native smoke。
-- `platforms/macos-imk/` 已形成可构建的 Objective-C InputMethodKit 薄壳、contract bundle 和 wrapper smoke；合成链覆盖 key normalization、未消费键、即时 commit、snapshot/candidate 复制、候选 index、reset、schema、owner-thread 与 teardown 释放顺序。
+- ABI contract v3 无损返回 `consumed`、可选 commit 和同事件 snapshot；候选选择复用 owned result，输入 C header 已通过 C11/Objective-C contract。
+- librime 生命周期已收口到进程级 runtime；多 session、owner-thread、配置冲突、失败回滚和 finalize 已有自动或 native smoke。
+- macOS Objective-C 薄壳、contract bundle 与 wrapper smoke 已落地，覆盖按键规范化、commit/snapshot/candidate 复制、reset、schema、线程与 teardown。
 - 隔离 `rime-pinyin-simp` 的真实 FFI smoke 已覆盖 composition、完整与分段非首候选、Backspace、Escape、Enter、翻页、方向键高亮与 Space、multi-session 和不存在 schema 拒绝；adapter 以 deployed schema list、原生 current-page selection API 与选择后回读固定可用性。
-- native 门禁覆盖 schema/license/data 清单、架构、FFI symbol、递归 dylib closure、逐库许可证/签名哈希和外部绝对依赖拒绝；不读取用户 Rime 目录。
-- macOS build 现生成 `RadishLexInputMethod.app`，固定正式 Bundle ID `org.radishlex.inputmethod.macos`、单一 `org.radishlex.inputmethod.macos.Pinyin` mode、`LSUIElement`、简体中文 script/repertoire、双语标签与 `32×32 @144dpi` 的 16pt Retina 列表图标，并对全部 dylib、主程序和完整 bundle 执行可复验签名。
-- Apple Development v19 已在用户级安装、加入并启用；TextEdit 已验证 Space 提交合成中文与 composition 存在时 `Command-N` 交还宿主，Codex 输入框已由开发者截图确认 5×1 原生横排候选可见。带 Control/Option/Command 的字符在进入 Rime 前保持未消费。
+- native 门禁覆盖隔离 schema/data/license、架构、FFI symbol、递归 dylib closure、逐库签名哈希和外部依赖拒绝；不读取用户 Rime 目录。
+- macOS bundle 固定正式 Bundle/mode ID、`LSUIElement`、简体中文 metadata、双语标签与 Retina 列表图标，并对完整依赖闭包签名。
+- TextEdit/Codex 实机已覆盖连续输入、中文提交、5×1 候选、数字/翻页/编辑键、Enter 原文和方向键后 Space 提交非首候选；系统修饰键保持未消费。索引日志与提交一致，但视觉高亮仍停在首项。
 - GitHub 仓库级 `Protect master via PR` ruleset 已只读复验为 active；`Repo Hygiene`、`Repository Baseline`、`Rust Clippy`、`Flutter Manager`、`Go Quality` 五项均为 required checks，且 strict/up-to-date policy 已启用。R06A 已完成退出。
 
 这些证据证明工程原型可继续演进，不证明真实平台输入、生产同步或产品发布已经完成。
 
 ## 已确认阻塞
 
-- R01A 不安装 native 行为矩阵已闭合候选选择与主要编辑按键；真实应用仍缺稳定 client 切换、进程重启、断网、中英文混输及两个应用交叉复核，不能据此退出 R01A。正式 mode 当前保持停用，最后只做一次短时实机复核，不再长期占用系统输入源。
+- R01A 不安装 native 行为矩阵已闭合候选选择与主要编辑按键；真实应用方向键已能改变选择索引并提交对应候选，但 `IMKCandidates` 视觉高亮不重绘。输入菜单的自动 parent command 区域在 `nil`、空菜单和稳定标题菜单下分别表现为空白行、生命周期回归或重复标题。正式 mode 当前保持移除；在完成公开 API、系统 bundle metadata 和可复验 harness 调研前不再安装新 build。client 切换、进程重启、断网、中英文混输及两个应用交叉复核仍未完成。
 - 输入 session 未组合 engine、ranker、userdb 与 privacy policy，真实选择没有进入平台学习热路径。
 - userdb 用户意图缺少统一事务、WAL/busy 策略；ranker recency/frequency 语义需要修正。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
@@ -58,44 +51,23 @@ RadishLex 已落地 Rust workspace、Rime adapter、userdb、ranker、crypto/syn
 
 ## 下一步顺位
 
-1. 下一次实机验证使用短时用户级安装，只复核 client 切换、进程重启、断网、中英文混输和两个应用交叉行为；完成即停用并移出输入法目录。
-2. 将 app-scoped 自动化抓图不包含 InputMethodKit 独立候选浮层视为工具边界；候选可见性使用无敏感内容的全屏人工观察确认，按键结果仍以应用文本和脱敏日志交叉验证。
-3. 短时矩阵通过后完成 R01A 退出判断，再经授权清理旧版本备份；失败则只修正真实平台链路。
+1. 暂停新 build，系统查阅 Apple InputMethodKit/IMKCandidates/输入法菜单公开资料、当前 SDK headers 与系统自带单 mode bundle metadata；形成候选视觉选择和 parent command 区域的明确行为模型。
+2. 在不安装系统输入法的前提下设计可复验 harness 或最小 reference probe，先证明事件路由、selection identifier、视觉刷新触发和菜单对象结构，再决定产品代码改法；不继续叠加 `clearSelection`、空菜单、身份占位项或 plist fallback。
+3. 方案经人工确认后才申请下一次短时安装，并一次性复核视觉高亮、菜单、client 切换、进程重启、断网、中英文混输和两个应用交叉行为；完成即严格移除。
 4. R01A 退出后实施 R02L，修正 userdb 事务、SQLite 并发、recency、frequency 与删除语义；R02L 退出后再由 R01B 接入真实学习，之后关闭整改专题并进入 M3。
 
 ## 验证入口
 
-常态仓库基线：
-
 ```bash
 ./scripts/check-repo.sh
-```
-
-Flutter manager：
-
-```bash
-./scripts/check-manager.sh
-./scripts/check-manager-ffi-smoke.sh
-```
-
-macOS InputMethodKit（不安装）：
-
-```bash
 ./scripts/check-macos-imk.sh
-# 需要显式隔离 schema/shared data 与许可证
-./scripts/check-macos-imk-native.sh
-```
-
-文档与文本：
-
-```bash
 ./scripts/check-docs.sh
 ./scripts/check-text-files.sh
 git diff --check
 cmp -s AGENTS.md CLAUDE.md
 ```
 
-native-rime、真实平台安装、Keychain/Android connected smoke、Docker 长流程和发布部署需要对应环境或人工授权，不属于普通文档变更的默认门禁。
+native-rime 门禁需要显式隔离 schema/shared data/license；真实平台安装、Keychain/Android connected smoke、Docker 长流程和发布部署需要对应环境或人工授权。
 
 ## 最小阅读索引
 
