@@ -6,9 +6,9 @@
 
 - 状态：生效，范围已于 2026-07-11 收窄
 - 审计基线：`dev` 分支，提交 `089c174`
-- 已完成：R00 文档真相源与停止线收敛
+- 已完成：R00 文档真相源与停止线收敛、R06A 首批质量门禁与 review-only 资产清理
 - 当前主批次：R01A 输入契约、进程级 runtime 与 macOS 基础输入
-- 并行质量批次：R06A 首批 Clippy、CI 与 review-only 资产清理
+- 并行质量批次：无；R06A 已退出
 - 真实用户同步：保持关闭
 - 关闭方式：R01A、R02L、R01B 与 R06A 全部退出后，将稳定结论写回正式文档，再把本文移入 `docs/archive/` 并从当前状态入口移除
 
@@ -75,8 +75,8 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 - userdb 将毫秒时间戳写入 `recency_score`，ranker 又将其裁剪为 `0..1`；frequency 无界线性增长。
 - 同步 merge 缺少稳定设备级 tie-break，签名绑定、KDF 上限、HTTPS orchestration 和资源上限仍未达到开放条件。
 - manager 默认 fixture fallback，正常产品包没有携带真实 FFI 与持久化路径。
-- PR workflow 与 ruleset 模板已加入 Flutter、严格 Clippy 和 Go vet/race required checks，本机等价命令通过；远端 ruleset 尚未应用或复验。MSRV 和 native bundle 仍属后续独立门禁。
-- Rust review-only manager sync command 源码已删除；Flutter review-only 模型/fixture 与配套文档、ADR 仍携带旧阶段编号和审批状态机，按 R06A 迁移安全断言后归档或删除，不继续润色为长期真相源。
+- PR workflow、ruleset 模板与远端 active ruleset 均已纳入 Flutter、严格 Clippy 和 Go vet/race required checks；远端五项 required checks 与 strict/up-to-date policy 已只读复验。MSRV 和 native bundle 仍属后续独立门禁。
+- Rust review-only manager sync command 源码与 Flutter review-only 模型/fixture 已删除；配套文档和 ADR 已在迁移有效安全断言后归档并退出默认阅读链。
 
 ## 六、整改批次总览
 
@@ -86,7 +86,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；用户级 v19 已启用并形成两个应用的部分真实输入证据，待补完整矩阵 | 真实应用可离线完成基础中文输入 |
 | R02L | 本地 userdb/ranker 正确性 | 待开始 | 学习、删除、并发和排序语义正确 |
 | R01B | 真实学习纵向闭环 | 待开始，依赖 R01A 与 R02L | 真实选择影响后续候选且受隐私策略约束 |
-| R06A | 首批质量门禁与 review-only 资产清理 | 可与 R01A 并行 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
+| R06A | 首批质量门禁与 review-only 资产清理 | 已完成 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
 
 每次只能有一个产品主批次进行；R06A 是并行质量工作流，不得抢占真实输入目标。
 
@@ -210,7 +210,7 @@ MSRV、最终 native bundle presence、依赖安全和许可证扫描属于 M4 �
 - approval、admission、migration review、evidence bundle、fake replay 和 no-symbol 断言直接删除或归档，不转化为新的运行时状态机。
 - 简单的“能力未开放”只通过 capability 缺席、显式 disabled state 和产品测试表达。
 
-当前进度：严格 workspace Clippy 已通过；Rust `manager_sync_command` 主模块与四个 review-only 子/测试模块已删除。FFI ownership、owner-thread、copy-before-release、null release 和 panic payload 脱敏断言已归入真实 ABI/`ffi_support` 测试。Flutter action preview、future command protocol、host review、migration、fake replay 和 transient-secret review fixture 已删除，关闭态、隐私优先、错误可见性与 secret 不持久化/不进入 diagnostics 已迁入稳定测试。配套 command contract、checklist、preview、acceptance、FFI boundary/test plan 与 ADR 0006 已移出默认阅读链并归档。PR workflow 与 ruleset 模板已加入 Rust Clippy、Flutter format/analyze/test 和 Go vet/race 独立检查，本机等价命令通过；剩余工作只有取得授权后应用并复验远端 required checks。
+退出结论：严格 workspace Clippy 已通过；Rust `manager_sync_command` 主模块与四个 review-only 子/测试模块已删除。FFI ownership、owner-thread、copy-before-release、null release 和 panic payload 脱敏断言已归入真实 ABI/`ffi_support` 测试。Flutter action preview、future command protocol、host review、migration、fake replay 和 transient-secret review fixture 已删除，关闭态、隐私优先、错误可见性与 secret 不持久化/不进入 diagnostics 已迁入稳定测试。配套 command contract、checklist、preview、acceptance、FFI boundary/test plan 与 ADR 0006 已移出默认阅读链并归档。PR workflow 与 ruleset 模板已加入 Rust Clippy、Flutter format/analyze/test 和 Go vet/race 独立检查，本机等价命令通过；GitHub 远端 active ruleset 已只读确认五项 required checks 与 strict/up-to-date policy 生效。R06A 于 2026-07-12 完成退出。
 
 ### 必须处置的 Rust 资产
 

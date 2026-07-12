@@ -64,10 +64,34 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 5. 断网前后输入行为一致；
 6. 退出时没有活动 session 阻止 runtime shutdown。
 
+R01A 退出验收固定使用短时用户级安装：产物为 `target/macos-imk/native/RadishLexInputMethod.app`，以当前用户有效的 Apple Development identity 重建后复制到 `~/Library/Input Methods/RadishLexInputMethod.app`。该动作会让系统重新枚举输入源、在系统设置中新增 RadishLex 项、启动输入法进程，并在断网/恢复与进程重启子项中短时影响当前网络和输入状态；不写系统级 `/Library/Input Methods`，不读取用户 Rime 目录，不保留长期启用状态。
+
+退出矩阵按 TextEdit 与 Codex 交叉执行，记录只保留通过/失败和错误类别：
+
+| 场景 | 预期 |
+| --- | --- |
+| 全拼 composition、首候选、非首候选 | marked text、候选映射和最终提交正确 |
+| 数字选择、方向键、翻页 | 高亮、页切换和 engine selection index 一致 |
+| Backspace、Escape、Enter | 编辑、取消和提交语义明确，状态及时清空 |
+| Command 等系统快捷键 | 不被输入法错误消费，仍由宿主应用处理 |
+| 中英文混输、普通未消费按键 | 已消费中文输入与宿主普通字符边界正确 |
+| composition 中切换 input client | 旧 composition 不提交或串入另一个应用 |
+| 停用再启用、进程重启 | 新 session 状态干净，输入能力恢复 |
+| 断网前后 | 输入能力、候选与提交行为一致 |
+| 5×1 横排候选 | 由执行者人工全屏观察确认，不以 app-scoped 抓图缺失判失败 |
+
 只记录通过/失败、错误类别和脱敏环境信息，不记录输入正文或截图中的敏感内容。
 
 InputMethodKit 候选条属于输入法进程的独立浮层。只截取宿主应用窗口的自动化工具可能看不到候选条，即使 marked text 和候选实际可见；候选布局应使用只含合成词的人工全屏观察确认，不能仅凭 app-scoped 截图判定“未显示”。
 
 ## 回滚
 
-完成 smoke 后按当次目标决定保留开发输入法或回滚。回滚时先在系统设置“键盘 -> 文字输入 -> 编辑”中选中 RadishLex 并点击“移除”，再停用残余 TIS source、移除本次安装的用户级或系统级 bundle，并按安装前记录恢复旧副本；仅调用 `TISDisableInputSource` 或移走 bundle 不会自动删除“所有输入法”中的用户配置项。若输入法进程仍持有旧 bundle，按授权范围终止对应开发进程后复核；不要删除 shared data 来源目录、用户其他输入法目录或任何非本次生成的数据。最终确认设置列表与目标安装域均无残留、没有 RadishLex 进程或运行数据，仓库外只保留执行者明确要求保留的隔离开发数据。
+R01A 每轮真实 smoke 无论通过还是失败都必须完整回滚，不保留开发输入源。顺序固定为：
+
+1. 先在系统设置“键盘 -> 文字输入 -> 编辑”中选中 RadishLex 并点击“移除”；不能用公开 TIS API 停用代替该动作。
+2. 确认当前输入源已切回系统输入法，再只处理 RadishLex 残余 TIS source；不得修改 `com.apple.HIToolbox` 或 TIS 私有数据库。
+3. 移除本轮安装的 `~/Library/Input Methods/RadishLexInputMethod.app`；若输入法进程仍持有旧 bundle，在授权范围内终止该进程。
+4. 复核 TIS 中 RadishLex `matches=0`、用户级 bundle 不存在、RadishLex 进程已停止、系统设置列表无 RadishLex 输入源残留。
+5. 只清理本轮生成的隔离 user data 与短期 staging；不删除 shared data 来源、用户其他输入法目录或任何非本轮数据。
+
+仅调用 `TISDisableInputSource` 或移走 bundle 不会自动删除“所有输入法”中的用户配置项。最终证据必须同时满足设置列表、TIS、安装域和进程四项无残留。
