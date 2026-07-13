@@ -167,6 +167,17 @@ int main(void) {
                                NSMakeRect(0, 0, 1000, 800), 6);
     Require(NSEqualRects(aboveFrame, NSMakeRect(10, 36, 260, 40)),
             @"candidate panel moves above the caret when below does not fit");
+    NSRect negativeScreenFrame = RLXCandidatePanelFrame(
+        NSMakeSize(400, 40), NSMakeRect(-1200, 400, 2, 20),
+        NSMakeRect(-1440, 0, 1440, 900), 6);
+    Require(NSEqualRects(negativeScreenFrame,
+                         NSMakeRect(-1200, 354, 400, 40)),
+            @"candidate panel preserves negative-coordinate display space");
+    NSRect oversizedFrame = RLXCandidatePanelFrame(
+        NSMakeSize(2000, 1000), NSMakeRect(900, 500, 2, 20),
+        NSMakeRect(0, 0, 1000, 800), 6);
+    Require(NSEqualRects(oversizedFrame, NSMakeRect(0, 0, 1000, 800)),
+            @"candidate panel clamps oversized content to the visible frame");
 
     NSString *mixed = @"a萝卜😀z";
     NSError *cursorError = nil;

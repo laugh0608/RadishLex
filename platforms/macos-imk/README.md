@@ -10,6 +10,8 @@
 - `Sources/RadishLexRuntime.*`：创建独立 Rime session；进程退出时先释放全部 session，再调用 `radishlex_rime_runtime_shutdown`。
 - `build-bundle.sh`：构建 contract 或显式 native-rime 开发 bundle，不安装 bundle。
 - `Tests/contract_smoke.m`：使用合成 demo engine 复验 ABI v3、完整按键映射、Unicode cursor、候选选择结果和生命周期，不读取 Rime 目录。
+- `Tests/candidate_panel_contract.m`：创建真实 AppKit panel/control，复验视觉与 accessibility selection、appearance、anchor fallback、owner 接管和完整隐藏。
+- `Tests/input_controller_contract.m`：使用正式 controller、panel 和 Rust demo session，贯通方向 keyDown/keyUp、Space、鼠标、accessibility press、Enter、Escape、宿主快捷键和双 client 生命周期。
 - `ReferenceProbe/`：隔离验证原生候选事件路由与单 mode 输入源 metadata，不链接 Rime 或正式 FFI，也不替代产品薄壳。
 
 ## 不安装验证
@@ -18,7 +20,7 @@
 ./scripts/check-macos-imk.sh
 ```
 
-该入口会构建 `target/macos-imk/contract/RadishLexInputMethod.app`，执行 Objective-C wrapper contract smoke，并检查 bundle、动态库加载路径、完整 ad-hoc 开发签名和关键 FFI symbol。contract bundle 只用于编译与契约复验，不能安装或作为真实输入证据。
+该入口会构建 `target/macos-imk/contract/RadishLexInputMethod.app`，执行 Objective-C wrapper、真实 AppKit candidate panel 和 controller-to-commit contract，并检查 bundle、动态库加载路径、完整 ad-hoc 开发签名和关键 FFI symbol。contract-only initializer/inspection API 不进入 native 产品。contract bundle 只用于编译与契约复验，不能安装或作为真实输入证据。
 
 候选事件与单 mode metadata 的隔离 probe 使用独立入口：
 

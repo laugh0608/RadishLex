@@ -6,11 +6,45 @@
 #import "RadishLexCandidatePanel.h"
 #import "RadishLexRuntime.h"
 
+static BOOL RLXNullableStringsEqual(NSString *left, NSString *right) {
+  return left == right || [left isEqualToString:right];
+}
+
+static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
+                                                       RLXSnapshot *right) {
+  if (left == right)
+    return YES;
+  if (left == nil || right == nil || left.cursor != right.cursor ||
+      ![left.schema isEqualToString:right.schema] ||
+      ![left.preedit isEqualToString:right.preedit] ||
+      left.candidates.count != right.candidates.count) {
+    return NO;
+  }
+  for (NSUInteger index = 0; index < left.candidates.count; ++index) {
+    RLXCandidate *leftCandidate = left.candidates[index];
+    RLXCandidate *rightCandidate = right.candidates[index];
+    if (leftCandidate.index != rightCandidate.index ||
+        leftCandidate.source != rightCandidate.source ||
+        ![leftCandidate.text isEqualToString:rightCandidate.text] ||
+        !RLXNullableStringsEqual(leftCandidate.reading,
+                                 rightCandidate.reading) ||
+        !RLXNullableStringsEqual(leftCandidate.annotation,
+                                 rightCandidate.annotation)) {
+      return NO;
+    }
+  }
+  return YES;
+}
+
 @interface RadishLexInputController () <RLXCandidatePanelOwner>
 @property(nonatomic, strong) RLXSessionBridge *session;
 @property(nonatomic, strong) RLXSnapshot *snapshot;
 @property(nonatomic, strong) RLXCandidatePanel *candidatePanel;
 @property(nonatomic) NSInteger candidatePanelIndex;
+#if RADISHLEX_CONTRACT_SMOKE
+@property(nonatomic, strong) id contractClient;
+#endif
+- (BOOL)prepareSessionAndCandidatePanel;
 - (BOOL)moveCandidateSelectionByOffset:(NSInteger)offset;
 - (BOOL)selectCandidateAtIndex:(NSUInteger)index client:(id)sender;
 @end
@@ -27,29 +61,55 @@
   if (self == nil) {
     return nil;
   }
-  NSError *error = nil;
-  _session = [[RLXProcessRuntime sharedRuntime] createSessionWithError:&error];
-  if (_session == nil) {
-    NSLog(@"RadishLex session creation failed (%@:%ld)", error.domain,
-          (long)error.code);
+  if (![self prepareSessionAndCandidatePanel])
     return nil;
-  }
-  _snapshot = [_session snapshotWithError:&error];
-  if (_snapshot == nil) {
-    NSLog(@"RadishLex initial snapshot failed (%@:%ld)", error.domain,
-          (long)error.code);
-    [_session invalidate];
-    return nil;
-  }
-  _candidatePanel = [RLXCandidatePanel sharedPanel];
-  if (_candidatePanel == nil) {
-    NSLog(@"RadishLex candidate panel creation failed");
-    [_session invalidate];
-    return nil;
-  }
-  _candidatePanelIndex = NSNotFound;
   return self;
 }
+
+- (BOOL)prepareSessionAndCandidatePanel {
+  NSError *error = nil;
+  self.session = [[RLXProcessRuntime sharedRuntime] createSessionWithError:&error];
+  if (self.session == nil) {
+    NSLog(@"RadishLex session creation failed (%@:%ld)", error.domain,
+          (long)error.code);
+    return NO;
+  }
+  self.snapshot = [self.session snapshotWithError:&error];
+  if (self.snapshot == nil) {
+    NSLog(@"RadishLex initial snapshot failed (%@:%ld)", error.domain,
+          (long)error.code);
+    [self.session invalidate];
+    self.session = nil;
+    return NO;
+  }
+  self.candidatePanel = [RLXCandidatePanel sharedPanel];
+  if (self.candidatePanel == nil) {
+    NSLog(@"RadishLex candidate panel creation failed");
+    [self.session invalidate];
+    self.session = nil;
+    return NO;
+  }
+  self.candidatePanelIndex = NSNotFound;
+  return YES;
+}
+
+#if RADISHLEX_CONTRACT_SMOKE
+- (instancetype)initForContractWithClient:(id)inputClient {
+  self = [super init];
+  if (self == nil)
+    return nil;
+  self.contractClient = inputClient;
+  if (![self prepareSessionAndCandidatePanel])
+    return nil;
+  return self;
+}
+
+- (id<IMKTextInput, NSObject>)client {
+  if (self.contractClient != nil)
+    return (id<IMKTextInput, NSObject>)self.contractClient;
+  return [super client];
+}
+#endif
 
 - (NSUInteger)recognizedEvents:(id)sender {
   (void)sender;
@@ -119,6 +179,14 @@
 }
 
 - (void)applySnapshot:(RLXSnapshot *)snapshot client:(id)sender {
+  BOOL preserveCandidateSelection =
+      RLXSnapshotsHaveSameCandidatePresentation(self.snapshot, snapshot);
+  NSInteger nextCandidateIndex = 0;
+  if (preserveCandidateSelection && self.candidatePanelIndex != NSNotFound &&
+      self.candidatePanelIndex >= 0 &&
+      (NSUInteger)self.candidatePanelIndex < snapshot.candidates.count) {
+    nextCandidateIndex = self.candidatePanelIndex;
+  }
   self.snapshot = snapshot;
   [(id<IMKTextInput>)sender setMarkedText:snapshot.preedit
                            selectionRange:NSMakeRange(snapshot.cursor, 0)
@@ -127,7 +195,8 @@
   for (RLXCandidate *candidate in snapshot.candidates) {
     [candidateData addObject:RLXAttributedCandidate(candidate)];
   }
-  self.candidatePanelIndex = candidateData.count > 0 ? 0 : NSNotFound;
+  self.candidatePanelIndex =
+      candidateData.count > 0 ? nextCandidateIndex : NSNotFound;
   if (snapshot.preedit.length > 0 && candidateData.count > 0) {
     [self.candidatePanel showCandidates:candidateData
                           selectedIndex:self.candidatePanelIndex
@@ -236,6 +305,10 @@
     [self cancelCompositionForClient:sender];
   }
   [self.candidatePanel hideForOwner:self];
+#if RADISHLEX_CONTRACT_SMOKE
+  if (self.contractClient != nil)
+    return;
+#endif
   [super deactivateServer:sender];
 }
 
@@ -248,6 +321,12 @@
   [self.session invalidate];
   [[RLXProcessRuntime sharedRuntime] forgetSession:self.session];
   self.session = nil;
+#if RADISHLEX_CONTRACT_SMOKE
+  if (self.contractClient != nil) {
+    self.contractClient = nil;
+    return;
+  }
+#endif
   [super inputControllerWillClose];
 }
 

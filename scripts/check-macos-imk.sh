@@ -44,6 +44,34 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   -o "${smoke_dir}/contract-smoke"
 "${smoke_dir}/contract-smoke"
 
+clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+  -mmacosx-version-min=13.0 \
+  -DRADISHLEX_CONTRACT_SMOKE=1 \
+  -I"${platform_dir}/Sources" \
+  -I"${platform_dir}/Tests" \
+  "${platform_dir}/Sources/RadishLexCandidatePanel.m" \
+  "${platform_dir}/Tests/candidate_panel_contract.m" \
+  -framework AppKit -framework InputMethodKit \
+  -o "${smoke_dir}/candidate-panel-contract"
+"${smoke_dir}/candidate-panel-contract"
+
+clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+  -mmacosx-version-min=13.0 \
+  -DRADISHLEX_CONTRACT_SMOKE=1 \
+  -I"${platform_dir}/Sources" \
+  -I"${platform_dir}/Tests" \
+  -I"${repo_root}/crates/ime-ffi/include" \
+  "${platform_dir}/Sources/RadishLexBridge.m" \
+  "${platform_dir}/Sources/RadishLexCandidatePanel.m" \
+  "${platform_dir}/Sources/RadishLexRuntime.m" \
+  "${platform_dir}/Sources/RadishLexInputController.m" \
+  "${platform_dir}/Tests/input_controller_contract.m" \
+  -L"${repo_root}/target/debug" -lradishlex_ime_ffi \
+  -Wl,-rpath,"${repo_root}/target/debug" \
+  -framework AppKit -framework Carbon -framework InputMethodKit \
+  -o "${smoke_dir}/input-controller-contract"
+"${smoke_dir}/input-controller-contract"
+
 bundle="${repo_root}/target/macos-imk/contract/RadishLexInputMethod.app"
 test -x "${bundle}/Contents/MacOS/RadishLex"
 test -f "${bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib"
@@ -57,7 +85,7 @@ test -s "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings"
 test -s "${bundle}/Contents/Resources/zh-Hans.lproj/Localizable.strings"
 test -s "${bundle}/Contents/Resources/en.lproj/Localizable.strings"
 plutil -lint "${bundle}/Contents/Info.plist" >/dev/null
-test "$(plutil -extract CFBundleVersion raw "${bundle}/Contents/Info.plist")" = "29"
+test "$(plutil -extract CFBundleVersion raw "${bundle}/Contents/Info.plist")" = "30"
 plutil -lint "${bundle}/Contents/Resources/zh-Hans.lproj/InfoPlist.strings" \
   "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings" \
   "${bundle}/Contents/Resources/zh-Hans.lproj/Localizable.strings" \

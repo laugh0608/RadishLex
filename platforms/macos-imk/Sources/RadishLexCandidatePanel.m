@@ -52,11 +52,48 @@ NSRect RLXCandidatePanelFrame(NSSize panelSize, NSRect anchorRect,
 }
 @end
 
+@interface RLXCandidateButton : NSButton
+@property(nonatomic, getter=isCandidateSelected) BOOL candidateSelected;
+@end
+
+@implementation RLXCandidateButton
+
+- (void)setCandidateSelected:(BOOL)candidateSelected {
+  _candidateSelected = candidateSelected;
+  [self applyCandidateAppearance];
+}
+
+- (void)viewDidChangeEffectiveAppearance {
+  [super viewDidChangeEffectiveAppearance];
+  [self applyCandidateAppearance];
+}
+
+- (void)applyCandidateAppearance {
+  if (self.layer == nil)
+    return;
+  NSColor *background = self.isCandidateSelected
+                            ? NSColor.selectedContentBackgroundColor
+                            : NSColor.clearColor;
+  [self.effectiveAppearance performAsCurrentDrawingAppearance:^{
+    self.layer.backgroundColor = background.CGColor;
+  }];
+  self.contentTintColor = self.isCandidateSelected
+                              ? NSColor.selectedMenuItemTextColor
+                              : NSColor.labelColor;
+}
+
+- (BOOL)accessibilityPerformPress {
+  [self performClick:nil];
+  return YES;
+}
+
+@end
+
 @interface RLXCandidatePanel ()
 @property(nonatomic, strong) RLXNonactivatingCandidatePanel *window;
 @property(nonatomic, strong) NSVisualEffectView *backgroundView;
 @property(nonatomic, strong) NSStackView *candidateStack;
-@property(nonatomic, copy) NSArray<NSButton *> *candidateButtons;
+@property(nonatomic, copy) NSArray<RLXCandidateButton *> *candidateButtons;
 @property(nonatomic, weak) id<RLXCandidatePanelOwner> owner;
 @property(nonatomic) NSInteger selectedIndex;
 - (void)clearCandidateViews;
@@ -150,24 +187,27 @@ NSRect RLXCandidatePanelFrame(NSSize panelSize, NSRect anchorRect,
   self.owner = owner;
   [self clearCandidateViews];
 
-  NSMutableArray<NSButton *> *buttons =
+  NSMutableArray<RLXCandidateButton *> *buttons =
       [NSMutableArray arrayWithCapacity:candidates.count];
   [candidates enumerateObjectsUsingBlock:^(NSAttributedString *candidate,
                                            NSUInteger index, BOOL *stop) {
     (void)stop;
-    NSButton *button = [NSButton
-        buttonWithTitle:[NSString stringWithFormat:@"%lu %@",
-                                                   (unsigned long)(index + 1),
-                                                   candidate.string]
-                 target:self
-                 action:@selector(candidatePressed:)];
+    RLXCandidateButton *button = [[RLXCandidateButton alloc] initWithFrame:NSZeroRect];
+    button.title = [NSString stringWithFormat:@"%lu %@",
+                                              (unsigned long)(index + 1),
+                                              candidate.string];
+    button.target = self;
+    button.action = @selector(candidatePressed:);
     button.tag = (NSInteger)index;
     button.bordered = NO;
     button.refusesFirstResponder = YES;
     button.font = [NSFont systemFontOfSize:15.0 weight:NSFontWeightRegular];
     button.wantsLayer = YES;
     button.layer.cornerRadius = 5.0;
-    button.contentTintColor = NSColor.labelColor;
+    button.lineBreakMode = NSLineBreakByTruncatingTail;
+    button.toolTip = candidate.string;
+    [button setContentCompressionResistancePriority:NSLayoutPriorityDefaultLow
+                                     forOrientation:NSLayoutConstraintOrientationHorizontal];
     button.accessibilityElement = YES;
     button.accessibilityLabel = candidate.string;
     button.accessibilityIdentifier = [NSString
@@ -249,14 +289,11 @@ NSRect RLXCandidatePanelFrame(NSSize panelSize, NSRect anchorRect,
   NSInteger previousIndex = self.selectedIndex;
   self.selectedIndex = selectedIndex;
   [self.candidateButtons enumerateObjectsUsingBlock:^(
-                             NSButton *button, NSUInteger index, BOOL *stop) {
+                             RLXCandidateButton *button, NSUInteger index,
+                             BOOL *stop) {
     (void)stop;
     BOOL selected = index == (NSUInteger)selectedIndex;
-    button.layer.backgroundColor =
-        (selected ? NSColor.selectedContentBackgroundColor : NSColor.clearColor)
-            .CGColor;
-    button.contentTintColor =
-        selected ? NSColor.selectedMenuItemTextColor : NSColor.labelColor;
+    button.candidateSelected = selected;
     button.accessibilityValue =
         selected ? NSLocalizedString(@"candidate_selected", nil) : @"";
   }];
@@ -272,7 +309,7 @@ NSRect RLXCandidatePanelFrame(NSSize panelSize, NSRect anchorRect,
   return YES;
 }
 
-- (void)candidatePressed:(NSButton *)sender {
+- (void)candidatePressed:(RLXCandidateButton *)sender {
   id<RLXCandidatePanelOwner> owner = self.owner;
   if (owner == nil || ![self.candidateButtons containsObject:sender] ||
       sender.tag < 0 || (NSUInteger)sender.tag >= self.candidateButtons.count) {
@@ -311,3 +348,30 @@ NSRect RLXCandidatePanelFrame(NSSize panelSize, NSRect anchorRect,
 }
 
 @end
+
+
+#if RADISHLEX_CONTRACT_SMOKE
+@implementation RLXCandidatePanel (ContractInspection)
+
+- (NSPanel *)rlx_contractWindow {
+  return self.window;
+}
+
+- (NSArray<NSButton *> *)rlx_contractCandidateButtons {
+  return self.candidateButtons;
+}
+
+- (NSStackView *)rlx_contractCandidateStack {
+  return self.candidateStack;
+}
+
+- (NSInteger)rlx_contractSelectedIndex {
+  return self.selectedIndex;
+}
+
+- (id<RLXCandidatePanelOwner>)rlx_contractOwner {
+  return self.owner;
+}
+
+@end
+#endif

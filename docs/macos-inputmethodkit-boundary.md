@@ -74,8 +74,9 @@ runtime 初始化失败必须返回结构化错误。平台不得静默切换 de
 - M1 全拼有候选时，Space 选择当前高亮候选，由 Rime adapter 调用稳定的 engine candidate selection 语义并通过同事件 key result 返回；平台壳不得把 Space 特判成直接提交展示文本，也不得依赖临时 schema 是否携带 `key_binder`。
 - 同一输入法进程只创建一个 candidate panel。panel 以弱引用记录当前 owner controller；新 session 展示候选时接管 owner，旧 session 的 deactivate/close 只能隐藏自己仍拥有的 panel，不能破坏后来激活的 session。空 snapshot、取消、错误恢复、失焦和 owner close 必须隐藏 panel。
 - 方向事件由当前 `IMKInputController` 接收并更新唯一的 display selection index；panel 的视觉高亮只从该 index 渲染，Space 也只以同一 index 调用 Rust selection API。鼠标点击和辅助功能 press 通过 panel delegate 回传 display index，再进入同一 Rust selection API。平台不得维护一份“视觉 index”和另一份“提交 index”，也不得把候选正文作为选择身份。
+- key release、modifier-only 或其他未改变 schema、preedit、cursor 与完整候选内容的 snapshot 必须保留当前 display selection；只有候选 presentation 确实变化时才重置到首项。否则方向 keyDown 后紧随的 keyUp 会把视觉和 Space 选择错误地拉回 index 0。
 - candidate panel 使用 `NSPanel` + 标准 AppKit view/control，必须是 `NSWindowStyleMaskNonactivatingPanel`，不能成为 key/main window，不能抢走宿主输入焦点。panel level 使用当前 `IMKTextInput.windowLevel + 1`；锚点优先使用 `attributesForCharacterIndex:lineHeightRectangle:` 的全局行矩形，并按实际 `NSScreen.visibleFrame` 选择下方或上方、限制在目标屏幕内。Spaces、全屏辅助窗口、窗口循环和多屏行为必须使用公开 `NSWindowCollectionBehavior` 表达。
-- panel 的候选项必须进入 AppKit accessibility hierarchy，暴露稳定 label、index 与 selected value；选择变化发送公开 accessibility notification。辅助功能 action 与鼠标 action 不能绕过 owner/index 检查。VoiceOver、全键盘访问、宿主焦点、多屏、全屏 Space 和 client 切换仍属于经授权实机 smoke，不可由静态门禁替代。
+- panel 的候选项必须进入 AppKit accessibility hierarchy，暴露稳定 label、index 与 selected value；选择变化发送公开 accessibility notification。候选 control 显式实现公开 accessibility press，并复用与鼠标相同的 target-action、owner 和 index 检查，不能另建提交路径。VoiceOver、全键盘访问、宿主焦点、多屏、全屏 Space 和 client 切换仍属于经授权实机 smoke，不可由自动 contract 替代。
 - 输入源只声明唯一可选择的全拼 mode 及其 `TISInputSourceID`。SDK `TextInputSources.h` 把 bundle input method 与 `ComponentInputModeDict` 中的 input mode 定义为两个层级，因此系统枚举不可选择 parent source 与可选择 mode 是平台模型，不是 `menu` 返回值生成的第二个产品 mode。
 - `IMKInputController.menu` 只返回 input-method-specific commands。M1 当前没有这类命令，正式实现固定返回 `nil`；macOS 26 因此渲染的图标空白 command 行记录为系统呈现限制。不得用空 `NSMenu`、菜单标题、重复身份项、disabled placeholder 或 plist fallback 填充该区域。以后只有在真实设置/命令能力存在时才能加入可执行 `NSMenuItem`，且必须通过 `doCommandBySelector:commandDictionary:` 进入明确动作与生命周期。
 - 分页、Escape、带 Command 等修饰键和普通未消费按键继续沿既有 key result 边界处理。
@@ -93,7 +94,7 @@ Apple 的公开 [InputMethodKit 概览](https://developer.apple.com/documentatio
 | 单 mode probe：`SendServerKeyEventFirst=YES`，controller 返回未处理 | controller 后按 header 转交 `IMKCandidates` | 未观察到迁移 | 未观察到非首项 | 高亮停在 index 0 | 提交 index 0 | 已证伪，不再依赖隐式 fallback |
 | 单 mode probe：controller 显式调用 panel `keyDown:` | controller；直接调用继承的 responder 方法 | `selectedCandidate` 前后均为 index 0 | callback index 0 | 高亮停在 index 0 | 提交 index 0 | 已证伪；且公开契约不承诺直接调用等价于系统路由 |
 | `SendServerKeyEventFirst=NO` / 默认 candidate-first | `IMKCandidates` 优先 | 未经实机验证 | 未经实机验证 | 未经实机验证 | 未经实机验证 | 顺序虽有公开契约，但仍依赖同一不透明 panel；不生成第三个签名 probe，也不作为正式闭环 |
-| macOS AppKit candidate panel | controller 更新唯一 display index | owner-scoped 状态可直接断言 | 鼠标/辅助功能 delegate 回传 index；键盘不依赖 IMK callback | 同一 index 驱动样式 | 同一 index 进入 Rust selection | 正式方向；需不安装 contract 与后续授权实机 smoke |
+| macOS AppKit candidate panel | controller 更新唯一 display index | owner-scoped 状态由动态 contract 直接断言 | 鼠标/辅助功能 delegate 回传 index；键盘不依赖 IMK callback | 同一 index 驱动真实 `NSButton` 样式与 accessibility state | Right keyDown、keyUp/modifier 保持、Space 与点击已动态贯通 Rust selection | 正式方向；不安装 contract 已通过，仍需一次集中授权实机 smoke |
 
 [menu](https://developer.apple.com/documentation/inputmethodkit/imkinputcontroller/menu()) 的公开职责是“输入法专用命令”，并允许每次绘制前按当前状态更新。它与系统从 bundle/mode metadata 自动形成的 source 身份区域不是同一层：
 
@@ -106,6 +107,8 @@ Apple 的公开 [InputMethodKit 概览](https://developer.apple.com/documentatio
 | 稳定标题 `NSMenu` | 标题与系统身份项重复；不是可执行命令 | 禁止 |
 
 SDK `IMKInputSession.h` 明确给自建候选窗提供 `windowLevel`，并说明使用 client level 加一；同一协议还提供用于候选定位的全局行矩形和 `firstRectForCharacterRange:actualRange:`。AppKit 的 [`NSWindowStyleMaskNonactivatingPanel`](https://developer.apple.com/documentation/appkit/nswindow/stylemask-swift.struct/nonactivatingpanel?language=objc)、[`NSWindowCollectionBehavior`](https://developer.apple.com/documentation/appkit/nswindow/collectionbehavior-swift.struct?language=objc) 与 [Accessibility for AppKit](https://developer.apple.com/documentation/appkit/accessibility-for-appkit) 构成自建 panel 的公开平台依据。这里的“自建”只表示不使用 `IMKCandidates` 的不透明选择状态，仍必须使用原生 AppKit 窗口、控件、外观和辅助功能接口。
+
+不安装动态 contract 必须创建真实 `NSApplication`、`NSPanel`、`NSButton` 和正式 controller，不只验证 helper 或源码字符串。组件 contract 覆盖非激活窗口、level、Spaces behavior、五候选、视觉/accessibility selection、appearance 重解析、长候选压缩、anchor fallback、owner 接管、旧 control 拒绝和完整隐藏；controller contract 覆盖 composition、方向 keyDown 后 keyUp/modifier 保持、候选变化重置、Space、鼠标、accessibility press、Enter、Escape、宿主快捷键与双 client 生命周期。contract-only initializer 和 inspection API 只在 `RADISHLEX_CONTRACT_SMOKE=1` 编译，native 产品门禁必须证明这些 selector 不存在。
 
 ## 隐私与本地数据
 
@@ -142,7 +145,7 @@ TIS input source/mode id 与 bundle 文件名属于平台稳定身份，不等�
 
 新增、启用或移除系统输入法会修改本机状态，必须在独立 runbook 中说明影响、路径、回滚和 smoke 数据要求，并在执行前获得用户明确授权。自动测试默认只构建 bundle、检查结构和运行 host contract，不自动安装、启用或重启系统输入法服务。
 
-当前开发实现位于 `platforms/macos-imk/`。`./scripts/check-macos-imk.sh` 只构建 contract `.app` bundle、编译 production 条件分支并运行合成 wrapper smoke；`./scripts/check-macos-imk-native.sh` 必须由调用方显式提供 `RIME_INCLUDE_DIR`、`RIME_LIB_DIR`、隔离 shared data、schema id 和许可证文件，并检查 mode metadata、架构、递归 dependency closure、symbol、逐库许可证、完整 bundle 签名与数据哈希清单。默认 ad-hoc 签名只服务无安装门禁；真实安装 smoke 还必须显式提供当前用户有效的 Apple Development identity。两条入口都不查找用户已有 Rime 目录，不执行安装、注册、bundle 启动或服务重启。开发版安装与移除步骤见 `docs/runbooks/macos-inputmethodkit-development.md`。
+当前开发实现位于 `platforms/macos-imk/`。`./scripts/check-macos-imk.sh` 只构建 contract `.app` bundle、编译 production 条件分支并运行 wrapper、真实 AppKit panel 与 controller 集成 contract；`./scripts/check-macos-imk-native.sh` 必须由调用方显式提供 `RIME_INCLUDE_DIR`、`RIME_LIB_DIR`、隔离 shared data、schema id 和许可证文件，并检查 mode metadata、架构、递归 dependency closure、symbol、逐库许可证、完整 bundle 签名、数据哈希清单与 contract-only API 缺失。默认 ad-hoc 签名只服务无安装门禁；真实安装 smoke 还必须显式提供当前用户有效的 Apple Development identity。两条入口都不查找用户已有 Rime 目录，不执行安装、注册、bundle 启动或服务重启。开发版安装与移除步骤见 `docs/runbooks/macos-inputmethodkit-development.md`。
 
 `platforms/macos-imk/ReferenceProbe/` 是 R01A 的隔离诊断资产，不是第二套产品输入法。它只使用合成候选和独立身份，证明静态事件路由、metadata 与清理停止线；probe 的 TIS 枚举、安装或失败不能单独修改正式输入源身份、Rust/Rime 边界或 M1 退出结论。
 
@@ -154,6 +157,7 @@ TIS input source/mode id 与 bundle 文件名属于平台稳定身份，不等�
 - C header/module map 与 Swift/Objective-C 最小调用方编译；
 - 进程级 runtime 的单次初始化、多 session、异常释放和最终 finalize；
 - key normalization、候选索引映射、取消、reset、schema 切换和未消费按键；
+- 真实 AppKit panel 的视觉/accessibility selection、appearance、owner 和 focus contract，以及 controller 到 Rust selection/commit 的键盘、鼠标和辅助功能动态链；
 - bundle 结构、native library 加载和缺失依赖的明确失败。
 
 经授权的人工 smoke 至少覆盖：
