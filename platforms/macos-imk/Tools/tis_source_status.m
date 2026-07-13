@@ -21,11 +21,12 @@ static NSString *LanguagesProperty(TISInputSourceRef source) {
 
 int main(int argc, const char *argv[]) {
   if (argc != 2) {
-    fprintf(stderr, "usage: tis-source-status <source-id-prefix>\n");
+    fprintf(stderr, "usage: tis-source-status <bundle-id>\n");
     return 2;
   }
   @autoreleasepool {
-    NSString *prefix = [NSString stringWithUTF8String:argv[1]];
+    NSString *bundleRoot = [NSString stringWithUTF8String:argv[1]];
+    NSString *sourcePrefix = [bundleRoot stringByAppendingString:@"."];
     CFArrayRef sources = TISCreateInputSourceList(NULL, true);
     if (sources == NULL) return 3;
     NSUInteger matches = 0;
@@ -35,7 +36,9 @@ int main(int argc, const char *argv[]) {
       TISInputSourceRef source = (__bridge TISInputSourceRef)value;
       NSString *sourceID = StringProperty(source, kTISPropertyInputSourceID);
       NSString *bundleID = StringProperty(source, kTISPropertyBundleID);
-      if (![sourceID hasPrefix:prefix] && ![bundleID hasPrefix:prefix]) continue;
+      BOOL sourceMatches = [sourceID isEqualToString:bundleRoot] ||
+                           [sourceID hasPrefix:sourcePrefix];
+      if (![bundleID isEqualToString:bundleRoot] || !sourceMatches) continue;
       BOOL isEnabled = BooleanProperty(source, kTISPropertyInputSourceIsEnabled);
       BOOL isSelected = BooleanProperty(source, kTISPropertyInputSourceIsSelected);
       BOOL isSelectCapable =

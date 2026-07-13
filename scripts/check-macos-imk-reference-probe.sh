@@ -31,7 +31,7 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
 mkdir -p "${build_root}/tools"
 clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   -mmacosx-version-min=13.0 \
-  "${probe_dir}/Tools/tis_source_status.m" \
+  "${repo_root}/platforms/macos-imk/Tools/tis_source_status.m" \
   -framework Carbon -framework Foundation \
   -o "${build_root}/tools/tis-source-status"
 

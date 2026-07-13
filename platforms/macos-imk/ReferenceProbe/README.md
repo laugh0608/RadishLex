@@ -36,4 +36,4 @@
 ./scripts/cleanup-macos-imk-reference-probe.sh --authorized-after-settings-removal
 ```
 
-清理入口只处理精确 probe bundle、独立运行数据和精确进程名，并使用公开 TIS API 验证状态；它不会修改 `com.apple.HIToolbox`、TIS 私有数据库、正式 RadishLex bundle 或正式用户数据。可发现的 mode 在未加入现有输入法列表时仍可能报告 `enabled=1`，因此删除前门禁拒绝任何 `selected=1` source 或仍为 `enabled=1` 的不可选择 parent；删除后仍要求 TIS 达到 `matches=0 enabled=0 selected=0`。
+清理入口只处理精确 probe bundle、独立运行数据和精确进程名，并复用 `platforms/macos-imk/Tools/tis_source_status.m` 通过公开 TIS API 按精确 Bundle ID 验证状态；它不会修改 `com.apple.HIToolbox`、TIS 私有数据库、正式 RadishLex bundle 或正式用户数据。可发现的 mode 在未加入现有输入法列表时仍可能报告 `enabled=1`，因此删除前门禁拒绝任何 `selected=1` source 或仍为 `enabled=1` 的不可选择 parent；删除后仍要求 TIS 达到 `matches=0 enabled=0 selected=0`。

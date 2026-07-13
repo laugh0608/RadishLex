@@ -19,6 +19,30 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
 
 smoke_dir="${repo_root}/target/macos-imk/contract-smoke"
 mkdir -p "${smoke_dir}" "${CLANG_MODULE_CACHE_PATH}"
+bash -n "${platform_dir}/cleanup-user-install.sh" \
+  "${repo_root}/scripts/cleanup-macos-imk.sh"
+clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+  -mmacosx-version-min=13.0 \
+  "${platform_dir}/Tools/tis_source_status.m" \
+  -framework Carbon -framework Foundation \
+  -o "${smoke_dir}/tis-source-status"
+test "$("${smoke_dir}/tis-source-status" \
+  org.radishlex.inputmethod.macos.contract-status-check)" = \
+  "matches=0 enabled=0 selected=0"
+rg -q -- '--authorized-after-settings-removal' \
+  "${platform_dir}/cleanup-user-install.sh"
+rg -q 'org\.radishlex\.inputmethod\.macos' \
+  "${platform_dir}/cleanup-user-install.sh"
+rg -q 'Library/Input Methods/RadishLexInputMethod\.app' \
+  "${platform_dir}/cleanup-user-install.sh"
+rg -q 'Application Support/RadishLex/Rime' \
+  "${platform_dir}/cleanup-user-install.sh"
+if rg -n 'TISDisableInputSource|com\.apple\.HIToolbox|defaults (write|delete)' \
+  "${platform_dir}/cleanup-user-install.sh" \
+  "${platform_dir}/Tools/tis_source_status.m"; then
+  echo "macOS cleanup must not mutate TIS or HIToolbox private state." >&2
+  exit 1
+fi
 clang -fobjc-arc -fmodules -Wall -Wextra -Werror -fsyntax-only \
   -mmacosx-version-min=13.0 \
   -DRADISHLEX_CONTRACT_SMOKE=0 \

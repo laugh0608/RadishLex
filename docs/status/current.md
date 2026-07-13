@@ -16,7 +16,7 @@
 
 2026-07-12 实机已验证连续输入、5×1 候选、主要编辑键、Enter 和方向选择提交；`IMKCandidates` 程序化选择的 engine/FFI/Space 索引一致，但视觉不重绘。2026-07-13 的单 mode probe 又证伪 controller-first fallback 与显式 panel `keyDown:`；两次测试均已零残留清理，实验代码已回退，不再生成第三个签名 probe。
 
-基于 Apple 公开契约，正式实现改为进程级非激活 AppKit panel：controller 的唯一 display index 同时驱动视觉与 Space，鼠标/辅助功能回调同一 Rust selection API；client 全局行矩形、`windowLevel + 1` 和目标屏幕负责定位。真实 AppKit component 与 controller 动态 contract 已贯通 Right keyDown、keyUp/modifier 保持、视觉/accessibility state、Space、鼠标、accessibility press、Rust selection、commit 和双 client owner 生命周期，并修正未变化 snapshot 把 selection 拉回首项的问题。`build 30` 的隔离 native 闭包与 ad-hoc 不安装门禁已通过；未使用 Apple Development 签名或安装。为避免逐轮注销打断开发者其他工作，下一次真实动作只在主动安排的集中窗口进行；R01A 未退出。
+基于 Apple 公开契约，正式实现改为进程级非激活 AppKit panel：controller 的唯一 display index 同时驱动视觉与 Space，鼠标/辅助功能回调同一 Rust selection API；client 全局行矩形、`windowLevel + 1` 和目标屏幕负责定位。真实 AppKit component 与 controller 动态 contract 已贯通 Right keyDown、keyUp/modifier 保持、视觉/accessibility state、Space、鼠标、accessibility press、Rust selection、commit 和双 client owner 生命周期，并修正未变化 snapshot 把 selection 拉回首项的问题。`build 30` 的隔离 native 闭包与 ad-hoc 不安装门禁已通过；集中验收 runbook 已固定输入一致性、AppKit 平台行为、生命周期/离线三阶段和同一冻结 build 的失败停止线，正式清理入口可按精确 Bundle ID 只读查询并在授权后验证 TIS、路径与进程零残留。未使用 Apple Development 签名或安装；下一次真实动作只在主动安排的集中窗口进行，R01A 未退出。
 
 长期产品交付顺序见 [产品交付路线图](../roadmap.md)，当前整改批次、停止线、资产处置和退出条件见 [项目稳定化整改专题](../remediation/2026-07-project-stabilization.md)。
 
@@ -26,6 +26,7 @@
 - librime 生命周期已收口到进程级 runtime；多 session、owner-thread、配置冲突、失败回滚和 finalize 已有自动或 native smoke。
 - macOS Objective-C 薄壳、contract bundle 与 wrapper smoke 已落地，覆盖按键规范化、commit/snapshot/candidate 复制、reset、schema、线程与 teardown。
 - 正式 AppKit panel/component contract 动态覆盖非激活窗口、level、Spaces behavior、五候选、视觉/accessibility selection、appearance、anchor fallback、owner 接管和完整隐藏；controller contract 覆盖 keyDown/keyUp/modifier、候选变化重置、Space/鼠标/accessibility press 到 Rust commit、Enter/Escape、宿主快捷键和双 client 生命周期。
+- 正式 TIS 状态/清理入口按精确 Bundle ID 隔离产品与 reference probe；只读状态已复核 `matches=0 enabled=0 selected=0`、bundle/运行数据不存在且进程停止，授权清理分支受系统设置移除前置和删除后零残留门禁约束。
 - 隔离 `rime-pinyin-simp` 的真实 FFI smoke 已覆盖 composition、完整与分段非首候选、Backspace、Escape、Enter、翻页、方向键高亮与 Space、multi-session 和不存在 schema 拒绝；adapter 以 deployed schema list、原生 current-page selection API 与选择后回读固定可用性。
 - native 门禁覆盖隔离 schema/data/license、架构、FFI symbol、递归 dylib closure、逐库签名哈希和外部依赖拒绝；不读取用户 Rime 目录。
 - macOS bundle 固定正式 Bundle/mode ID、`LSUIElement`、简体中文 metadata、双语标签与 Retina 列表图标，并对完整依赖闭包签名。
@@ -54,7 +55,7 @@
 
 ## 下一步顺位
 
-1. 保持正式输入法安装与登录边界暂停；`build 30` 源码、动态 contract、native 闭包和验收矩阵作为下一集中实机候选，不为单轮修复要求开发者注销，也不反复更换 Bundle ID 或路径。
+1. 保持正式输入法安装与登录边界暂停；`build 30` 源码、动态 contract、native 闭包、三阶段验收矩阵和精确清理门禁作为下一集中实机候选，不为单轮修复要求开发者注销，也不反复更换 Bundle ID 或路径。
 2. 仅在开发者主动安排不会打断其他任务的单次窗口后，以 Apple Development identity 重建同一 `build 30`，集中完成注销/登录、添加、选择、可判伪 smoke 与清理。
 3. panel 通过后补 client 切换、进程重启、断网、中英文混输与两个应用交叉证据，满足退出场景后关闭 R01A。
 4. R01A 退出后实施 R02L；R02L 退出后再由 R01B 接入真实学习，之后关闭整改专题并进入 M3。
