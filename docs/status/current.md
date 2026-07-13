@@ -16,7 +16,7 @@
 
 2026-07-12 实机已验证连续输入、5×1 候选、主要编辑键、Enter 和方向选择提交；`IMKCandidates` 程序化选择的 engine/FFI/Space 索引一致，但视觉不重绘。2026-07-13 的单 mode probe 又证伪 controller-first fallback 与显式 panel `keyDown:`；两次测试均已零残留清理，实验代码已回退，不再生成第三个签名 probe。
 
-基于 Apple 公开契约，正式实现改为进程级非激活 AppKit panel：controller 的唯一 display index 同时驱动视觉与 Space，鼠标/辅助功能回调同一 Rust selection API；client 全局行矩形、`windowLevel + 1` 和目标屏幕负责定位。`menu = nil` 继续表达没有专用命令，自动 parent 与空白 command 行作为平台限制，不再用占位菜单修补。不安装门禁与 Apple Development `build 29` 的 native 闭包、签名和用户级安装副本已通过；公开 TIS 枚举不可选择 parent 与唯一可选择 Pinyin mode，但系统设置重启后尚未显示可添加项。当前等待一次开发者注销/重新登录刷新公开目录，输入法没有添加、选择或启动，R01A 未退出。
+基于 Apple 公开契约，正式实现改为进程级非激活 AppKit panel：controller 的唯一 display index 同时驱动视觉与 Space，鼠标/辅助功能回调同一 Rust selection API；client 全局行矩形、`windowLevel + 1` 和目标屏幕负责定位。`menu = nil` 继续表达没有专用命令，自动 parent 与空白 command 行作为平台限制，不再用占位菜单修补。不安装门禁与 Apple Development `build 29` 的 native 闭包、签名和短时用户级安装副本已通过；公开 TIS 可枚举唯一 Pinyin mode，但当前登录会话的系统设置未显示可添加项。为避免逐轮注销打断开发者其他工作，本轮已取消登录边界验收并完成零残留清理；R01A 未退出。
 
 长期产品交付顺序见 [产品交付路线图](../roadmap.md)，当前整改批次、停止线、资产处置和退出条件见 [项目稳定化整改专题](../remediation/2026-07-project-stabilization.md)。
 
@@ -35,7 +35,7 @@
 
 ## 已确认阻塞
 
-- R01A 的 AppKit candidate panel 已通过不安装编译、bundle、index/frame、owner、焦点与辅助功能静态门禁，但尚无真实应用证据。正式 `build 29` 已安装到用户级目录，公开 TIS 可发现 mode；系统设置尚未显示可添加项，需一次开发者注销/重新登录后只读复核。mode 仍未加入、选择或运行；后续必须先复核视觉/提交同 index、宿主焦点、鼠标、VoiceOver、多屏/全屏和生命周期，再补 client 切换、进程重启、断网、中英文混输及两个应用交叉复核。
+- R01A 的 AppKit candidate panel 已通过不安装编译、bundle、index/frame、owner、焦点与辅助功能静态门禁，但尚无真实应用证据。`build 29` 曾由公开 TIS 正确发现却未进入当前登录会话的系统设置目录，且逐轮注销不可作为日常调试机制；安装副本、运行数据、进程与 TIS 已零残留。以后只在实现与门禁冻结、开发者主动安排单次登录边界窗口后集中复核视觉/提交同 index、宿主焦点、鼠标、VoiceOver、多屏/全屏和生命周期，再补 client 切换、进程重启、断网、中英文混输及两个应用交叉复核。
 - 输入 session 未组合 engine、ranker、userdb 与 privacy policy，真实选择没有进入平台学习热路径。
 - userdb 用户意图缺少统一事务、WAL/busy 策略；ranker recency/frequency 语义需要修正。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
@@ -53,8 +53,8 @@
 
 ## 下一步顺位
 
-1. 开发者完成一次注销/重新登录后，先只读复核正式 `build 29` 的公开 TIS 枚举、系统设置可添加目录、用户级 bundle 与精确进程；不重建、不复制、不私下启用。
-2. mode 出现后在动作时确认下通过系统设置加入并选择，再按正式产品 runbook 只执行一次可判伪 smoke：方向视觉/Space index、鼠标、宿主焦点、VoiceOver、多屏/全屏与 owner 生命周期任一失败即停止并清理，不叠加 `IMKCandidates` fallback。
+1. 暂停正式输入法安装与登录边界动作；不为单轮修复要求开发者注销，不反复更换 Bundle ID、路径或 build 试错。
+2. 仅在正式实现、contract、native 闭包与验收矩阵冻结，且开发者主动安排不会打断其他任务的单次窗口后，重建同一正式身份并集中完成注销/登录、添加、选择、可判伪 smoke 与清理。
 3. panel 通过后补 client 切换、进程重启、断网、中英文混输与两个应用交叉证据，满足退出场景后关闭 R01A。
 4. R01A 退出后实施 R02L；R02L 退出后再由 R01B 接入真实学习，之后关闭整改专题并进入 M3。
 
