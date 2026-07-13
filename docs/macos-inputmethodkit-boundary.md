@@ -66,18 +66,46 @@ runtime 初始化失败必须返回结构化错误。平台不得静默切换 de
 ## Composition、候选与提交
 
 - composition 为空时清除 marked text；非空时更新 marked text 与 cursor。
-- 候选展示使用 macOS 原生机制或 InputMethodKit 兼容机制，不自造跨平台统一浮窗协议；当前开发实现使用 `IMKCandidates` scrolling grid，并以五候选页形成 5×1 横排。
+- 候选展示使用 macOS 原生 AppKit 机制或 InputMethodKit 兼容机制，不自造跨平台统一浮窗协议。正式实现使用进程级、非激活的 AppKit candidate panel，并以五候选页形成 5×1 横排；它只属于 macOS 平台壳，不进入 Rust core，也不形成其他平台必须复用的窗口协议。
 - 平台展示索引必须稳定映射到 RadishLex ranked candidate 与 engine selection index。
 - 用户选择候选后通过 Rust selection API 驱动 engine，平台不得直接把展示文本当作 engine 选择结果。
 - selection result 必须携带 consumed、optional commit 与选择后的 snapshot。分段拼音候选可能只确定当前音节并继续 composition；只有 commit 存在时平台才向宿主插入文本，否则更新 marked text 与候选。
 - engine 即时 commit 与候选选择产生的 commit 使用同一文本提交边界，并清理相应 marked text。
 - M1 全拼有候选时，Space 选择当前高亮候选，由 Rime adapter 调用稳定的 engine candidate selection 语义并通过同事件 key result 返回；平台壳不得把 Space 特判成直接提交展示文本，也不得依赖临时 schema 是否携带 `key_binder`。
-- `IMKCandidates` 附着到进程级 `IMKServer`，同一输入法进程只创建一个候选面板；各 input controller 只更新当前 session 的候选数据，不拥有或释放 server 在 deactivate 阶段仍会访问的候选对象。
-- 当前正式薄壳缓存交给 `IMKCandidates` 的 attributed candidate，通过公开 identifier 对照 callback 与显示索引；不能依赖自定义 attributed-string 属性，也不能把 scrolling grid 的 line number 当成横排 cell index。现实现消费方向键并调用 `selectCandidateWithIdentifier:`，engine/FFI 索引与 Space 提交已一致，但 macOS 26 不重绘视觉高亮，因此这只是已知阻塞实现，不是验收通过的最终事件模型。隔离 reference probe 使用 `kIMKSingleRowSteppingCandidatePanel`、`candidates:`/`updateCandidates`，并让四方向键返回面板、Space/Enter 留在 controller；该路径只有通过实机视觉/callback/提交三方复核后才能替换正式实现。分页、Escape、带 Command 等修饰键和普通未消费按键继续沿既有 key result 边界处理。
-- 输入源只声明唯一可选择的全拼 mode 及其 `TISInputSourceID`；macOS 仍会为 InputMethodKit bundle 自动生成不可选择的 parent source，并在输入菜单中预留 input-method-specific command 区域。当前 controller 以 `nil` 表达没有命令菜单，但 macOS 26 仍会渲染图标空白行；返回每次新建的空菜单会触发多余的 menu/deactivate 生命周期，返回稳定的标题菜单又会同时渲染菜单标题与身份项。该 UI 问题尚未关闭，后续必须先完成 InputMethodKit 菜单呈现调研，不能继续叠加占位项或 plist fallback。
+- 同一输入法进程只创建一个 candidate panel。panel 以弱引用记录当前 owner controller；新 session 展示候选时接管 owner，旧 session 的 deactivate/close 只能隐藏自己仍拥有的 panel，不能破坏后来激活的 session。空 snapshot、取消、错误恢复、失焦和 owner close 必须隐藏 panel。
+- 方向事件由当前 `IMKInputController` 接收并更新唯一的 display selection index；panel 的视觉高亮只从该 index 渲染，Space 也只以同一 index 调用 Rust selection API。鼠标点击和辅助功能 press 通过 panel delegate 回传 display index，再进入同一 Rust selection API。平台不得维护一份“视觉 index”和另一份“提交 index”，也不得把候选正文作为选择身份。
+- candidate panel 使用 `NSPanel` + 标准 AppKit view/control，必须是 `NSWindowStyleMaskNonactivatingPanel`，不能成为 key/main window，不能抢走宿主输入焦点。panel level 使用当前 `IMKTextInput.windowLevel + 1`；锚点优先使用 `attributesForCharacterIndex:lineHeightRectangle:` 的全局行矩形，并按实际 `NSScreen.visibleFrame` 选择下方或上方、限制在目标屏幕内。Spaces、全屏辅助窗口、窗口循环和多屏行为必须使用公开 `NSWindowCollectionBehavior` 表达。
+- panel 的候选项必须进入 AppKit accessibility hierarchy，暴露稳定 label、index 与 selected value；选择变化发送公开 accessibility notification。辅助功能 action 与鼠标 action 不能绕过 owner/index 检查。VoiceOver、全键盘访问、宿主焦点、多屏、全屏 Space 和 client 切换仍属于经授权实机 smoke，不可由静态门禁替代。
+- 输入源只声明唯一可选择的全拼 mode 及其 `TISInputSourceID`。SDK `TextInputSources.h` 把 bundle input method 与 `ComponentInputModeDict` 中的 input mode 定义为两个层级，因此系统枚举不可选择 parent source 与可选择 mode 是平台模型，不是 `menu` 返回值生成的第二个产品 mode。
+- `IMKInputController.menu` 只返回 input-method-specific commands。M1 当前没有这类命令，正式实现固定返回 `nil`；macOS 26 因此渲染的图标空白 command 行记录为系统呈现限制。不得用空 `NSMenu`、菜单标题、重复身份项、disabled placeholder 或 plist fallback 填充该区域。以后只有在真实设置/命令能力存在时才能加入可执行 `NSMenuItem`，且必须通过 `doCommandBySelector:commandDictionary:` 进入明确动作与生命周期。
+- 分页、Escape、带 Command 等修饰键和普通未消费按键继续沿既有 key result 边界处理。
 - 取消、失焦、client 切换和 schema 切换不能把旧 composition 提交到新 client。
 
 候选窗口视觉、分页快捷键和无障碍细节可以迭代，但不能改变索引映射、所有权或提交语义。
+
+## 候选事件与输入菜单证据矩阵
+
+Apple 的公开 [InputMethodKit 概览](https://developer.apple.com/documentation/inputmethodkit) 明确 `IMKCandidates` 是可选能力；[IMKCandidates](https://developer.apple.com/documentation/inputmethodkit/imkcandidates?language=objc) 负责呈现候选并在用户活动时通知 controller；[candidateSelectionChanged:](https://developer.apple.com/documentation/inputmethodkit/imkinputcontroller/candidateselectionchanged(_:)) 只描述用户在候选窗中的移动通知。macOS 26.5 SDK `IMKCandidates.h` 进一步定义事件优先顺序、identifier 与选择 API，但没有承诺直接调用继承的 `keyDown:` 会驱动内部状态，也没有承诺 `selectCandidateWithIdentifier:` 成功后同步完成视觉重绘。
+
+| 路径 | 事件接收方 | panel 状态 | callback | 视觉 | Space/提交 | 结论 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 正式 build 28：controller 调用 `selectCandidateWithIdentifier:` | controller | 平台 display index 已移动，API 返回成功 | 不作为提交真相源 | 高亮停在 index 0 | engine/FFI 与目标 index 一致 | 语义正确但视觉失败，退出正式模型 |
+| 单 mode probe：`SendServerKeyEventFirst=YES`，controller 返回未处理 | controller 后按 header 转交 `IMKCandidates` | 未观察到迁移 | 未观察到非首项 | 高亮停在 index 0 | 提交 index 0 | 已证伪，不再依赖隐式 fallback |
+| 单 mode probe：controller 显式调用 panel `keyDown:` | controller；直接调用继承的 responder 方法 | `selectedCandidate` 前后均为 index 0 | callback index 0 | 高亮停在 index 0 | 提交 index 0 | 已证伪；且公开契约不承诺直接调用等价于系统路由 |
+| `SendServerKeyEventFirst=NO` / 默认 candidate-first | `IMKCandidates` 优先 | 未经实机验证 | 未经实机验证 | 未经实机验证 | 未经实机验证 | 顺序虽有公开契约，但仍依赖同一不透明 panel；不生成第三个签名 probe，也不作为正式闭环 |
+| macOS AppKit candidate panel | controller 更新唯一 display index | owner-scoped 状态可直接断言 | 鼠标/辅助功能 delegate 回传 index；键盘不依赖 IMK callback | 同一 index 驱动样式 | 同一 index 进入 Rust selection | 正式方向；需不安装 contract 与后续授权实机 smoke |
+
+[menu](https://developer.apple.com/documentation/inputmethodkit/imkinputcontroller/menu()) 的公开职责是“输入法专用命令”，并允许每次绘制前按当前状态更新。它与系统从 bundle/mode metadata 自动形成的 source 身份区域不是同一层：
+
+| 对象或返回值 | 公开职责 / 实机事实 | 正式处理 |
+| --- | --- | --- |
+| bundle parent source | SDK 定义的 input method 层；实机为不可选择 parent | 保留稳定 bundle 身份，不伪装成第二个 mode 或命令 |
+| Pinyin mode | `ComponentInputModeDict` 定义的可选择 input mode | 唯一产品输入源，稳定 ID、名称和图标 |
+| `menu = nil` | 表达没有 input-method-specific command；macOS 26 仍显示空白 command 行 | 保留；将空白行记录为系统限制 |
+| 新建空 `NSMenu` | 没有用户能力；实机触发多余 menu/deactivate 生命周期 | 禁止 |
+| 稳定标题 `NSMenu` | 标题与系统身份项重复；不是可执行命令 | 禁止 |
+
+SDK `IMKInputSession.h` 明确给自建候选窗提供 `windowLevel`，并说明使用 client level 加一；同一协议还提供用于候选定位的全局行矩形和 `firstRectForCharacterRange:actualRange:`。AppKit 的 [`NSWindowStyleMaskNonactivatingPanel`](https://developer.apple.com/documentation/appkit/nswindow/stylemask-swift.struct/nonactivatingpanel?language=objc)、[`NSWindowCollectionBehavior`](https://developer.apple.com/documentation/appkit/nswindow/collectionbehavior-swift.struct?language=objc) 与 [Accessibility for AppKit](https://developer.apple.com/documentation/appkit/accessibility-for-appkit) 构成自建 panel 的公开平台依据。这里的“自建”只表示不使用 `IMKCandidates` 的不透明选择状态，仍必须使用原生 AppKit 窗口、控件、外观和辅助功能接口。
 
 ## 隐私与本地数据
 

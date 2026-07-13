@@ -2,6 +2,7 @@
 #import <Carbon/Carbon.h>
 
 #import "RadishLexBridge.h"
+#import "RadishLexCandidatePanel.h"
 #import "RadishLexRuntime.h"
 
 static void Require(BOOL condition, NSString *message) {
@@ -77,68 +78,95 @@ int main(void) {
                 normalized.named_key == RADISHLEX_NAMED_KEY_SHIFT &&
                 normalized.phase == RADISHLEX_KEY_PHASE_PRESS,
             @"modifier-only normalization");
-    NSEvent *unknownFunction = [NSEvent keyEventWithType:NSEventTypeKeyDown
-                                                location:NSZeroPoint
-                                           modifierFlags:0
-                                               timestamp:0
-                                            windowNumber:0
-                                                 context:nil
-                                              characters:[NSString stringWithFormat:@"%C", (unichar)NSF1FunctionKey]
-                             charactersIgnoringModifiers:[NSString stringWithFormat:@"%C", (unichar)NSF1FunctionKey]
-                                               isARepeat:NO
-                                                 keyCode:kVK_F1];
+    NSEvent *unknownFunction = [NSEvent
+                   keyEventWithType:NSEventTypeKeyDown
+                           location:NSZeroPoint
+                      modifierFlags:0
+                          timestamp:0
+                       windowNumber:0
+                            context:nil
+                         characters:[NSString
+                                        stringWithFormat:@"%C",
+                                                         (unichar)
+                                                             NSF1FunctionKey]
+        charactersIgnoringModifiers:[NSString
+                                        stringWithFormat:@"%C",
+                                                         (unichar)
+                                                             NSF1FunctionKey]
+                          isARepeat:NO
+                            keyCode:kVK_F1];
     Require(!RLXNormalizeKeyEvent(unknownFunction, &normalized),
             @"unknown function key is returned to the host");
 
     NSArray<NSNumber *> *namedKeyCodes = @[
-      @(kVK_Space), @(kVK_Return), @(kVK_ANSI_KeypadEnter), @(kVK_Delete),
-      @(kVK_Escape), @(kVK_Tab), @(kVK_UpArrow), @(kVK_DownArrow),
-      @(kVK_LeftArrow), @(kVK_RightArrow), @(kVK_PageUp), @(kVK_PageDown),
-      @(kVK_Shift), @(kVK_RightShift), @(kVK_Control), @(kVK_RightControl),
-      @(kVK_Option), @(kVK_RightOption), @(kVK_Command), @(kVK_RightCommand)
+      @(kVK_Space),        @(kVK_Return),      @(kVK_ANSI_KeypadEnter),
+      @(kVK_Delete),       @(kVK_Escape),      @(kVK_Tab),
+      @(kVK_UpArrow),      @(kVK_DownArrow),   @(kVK_LeftArrow),
+      @(kVK_RightArrow),   @(kVK_PageUp),      @(kVK_PageDown),
+      @(kVK_Shift),        @(kVK_RightShift),  @(kVK_Control),
+      @(kVK_RightControl), @(kVK_Option),      @(kVK_RightOption),
+      @(kVK_Command),      @(kVK_RightCommand)
     ];
     NSArray<NSNumber *> *namedKeys = @[
-      @(RADISHLEX_NAMED_KEY_SPACE), @(RADISHLEX_NAMED_KEY_ENTER),
-      @(RADISHLEX_NAMED_KEY_ENTER), @(RADISHLEX_NAMED_KEY_BACKSPACE),
-      @(RADISHLEX_NAMED_KEY_ESCAPE), @(RADISHLEX_NAMED_KEY_TAB),
-      @(RADISHLEX_NAMED_KEY_ARROW_UP), @(RADISHLEX_NAMED_KEY_ARROW_DOWN),
+      @(RADISHLEX_NAMED_KEY_SPACE),      @(RADISHLEX_NAMED_KEY_ENTER),
+      @(RADISHLEX_NAMED_KEY_ENTER),      @(RADISHLEX_NAMED_KEY_BACKSPACE),
+      @(RADISHLEX_NAMED_KEY_ESCAPE),     @(RADISHLEX_NAMED_KEY_TAB),
+      @(RADISHLEX_NAMED_KEY_ARROW_UP),   @(RADISHLEX_NAMED_KEY_ARROW_DOWN),
       @(RADISHLEX_NAMED_KEY_ARROW_LEFT), @(RADISHLEX_NAMED_KEY_ARROW_RIGHT),
-      @(RADISHLEX_NAMED_KEY_PAGE_UP), @(RADISHLEX_NAMED_KEY_PAGE_DOWN),
-      @(RADISHLEX_NAMED_KEY_SHIFT), @(RADISHLEX_NAMED_KEY_SHIFT),
-      @(RADISHLEX_NAMED_KEY_CONTROL), @(RADISHLEX_NAMED_KEY_CONTROL),
-      @(RADISHLEX_NAMED_KEY_ALT), @(RADISHLEX_NAMED_KEY_ALT),
-      @(RADISHLEX_NAMED_KEY_META), @(RADISHLEX_NAMED_KEY_META)
+      @(RADISHLEX_NAMED_KEY_PAGE_UP),    @(RADISHLEX_NAMED_KEY_PAGE_DOWN),
+      @(RADISHLEX_NAMED_KEY_SHIFT),      @(RADISHLEX_NAMED_KEY_SHIFT),
+      @(RADISHLEX_NAMED_KEY_CONTROL),    @(RADISHLEX_NAMED_KEY_CONTROL),
+      @(RADISHLEX_NAMED_KEY_ALT),        @(RADISHLEX_NAMED_KEY_ALT),
+      @(RADISHLEX_NAMED_KEY_META),       @(RADISHLEX_NAMED_KEY_META)
     ];
     for (NSUInteger index = 0; index < namedKeyCodes.count; ++index) {
-      NSEvent *namedEvent = KeyEvent(NSEventTypeKeyDown,
-                                      namedKeyCodes[index].unsignedShortValue, 0, @"");
+      NSEvent *namedEvent = KeyEvent(
+          NSEventTypeKeyDown, namedKeyCodes[index].unsignedShortValue, 0, @"");
       Require(RLXNormalizeKeyEvent(namedEvent, &normalized) &&
                   normalized.key_kind == RADISHLEX_KEY_KIND_NAMED &&
                   normalized.named_key == namedKeys[index].unsignedIntValue,
               @"complete named key mapping");
     }
 
-    NSEventModifierFlags allCocoaModifiers = NSEventModifierFlagShift |
-        NSEventModifierFlagControl | NSEventModifierFlagOption |
-        NSEventModifierFlagCommand;
-    NSEvent *allModifiers = KeyEvent(NSEventTypeKeyDown, kVK_ANSI_A,
-                                      allCocoaModifiers, @"a");
+    NSEventModifierFlags allCocoaModifiers =
+        NSEventModifierFlagShift | NSEventModifierFlagControl |
+        NSEventModifierFlagOption | NSEventModifierFlagCommand;
+    NSEvent *allModifiers =
+        KeyEvent(NSEventTypeKeyDown, kVK_ANSI_A, allCocoaModifiers, @"a");
     Require(RLXNormalizeKeyEvent(allModifiers, &normalized) &&
-                normalized.modifiers == (RADISHLEX_KEY_MOD_SHIFT |
-                                         RADISHLEX_KEY_MOD_CONTROL |
-                                         RADISHLEX_KEY_MOD_ALT |
-                                         RADISHLEX_KEY_MOD_META),
+                normalized.modifiers ==
+                    (RADISHLEX_KEY_MOD_SHIFT | RADISHLEX_KEY_MOD_CONTROL |
+                     RADISHLEX_KEY_MOD_ALT | RADISHLEX_KEY_MOD_META),
             @"complete modifier mapping");
     NSEvent *shiftUp = KeyEvent(NSEventTypeFlagsChanged, kVK_Shift, 0, @"");
     Require(RLXNormalizeKeyEvent(shiftUp, &normalized) &&
                 normalized.phase == RADISHLEX_KEY_PHASE_RELEASE,
             @"modifier-only release normalization");
     NSEvent *emoji = KeyEvent(NSEventTypeKeyDown, kVK_ANSI_A, 0, @"😀");
-    Require(RLXNormalizeKeyEvent(emoji, &normalized) && normalized.codepoint == 0x1F600,
+    Require(RLXNormalizeKeyEvent(emoji, &normalized) &&
+                normalized.codepoint == 0x1F600,
             @"supplementary Unicode scalar normalization");
-    Require(!RLXNormalizeKeyEvent(KeyEvent(NSEventTypeKeyDown, kVK_ANSI_A, 0, @"ab"),
-                                  &normalized),
-            @"multiple scalars are returned to the host");
+    Require(
+        !RLXNormalizeKeyEvent(
+            KeyEvent(NSEventTypeKeyDown, kVK_ANSI_A, 0, @"ab"), &normalized),
+        @"multiple scalars are returned to the host");
+
+    Require(RLXCandidateIndexByMoving(NSNotFound, 1, 5) == 1 &&
+                RLXCandidateIndexByMoving(1, 1, 5) == 2 &&
+                RLXCandidateIndexByMoving(0, -1, 5) == 0 &&
+                RLXCandidateIndexByMoving(4, 1, 5) == 4 &&
+                RLXCandidateIndexByMoving(0, 1, 0) == NSNotFound,
+            @"candidate keyboard movement has one bounded display index");
+    NSRect belowFrame =
+        RLXCandidatePanelFrame(NSMakeSize(260, 40), NSMakeRect(900, 500, 2, 20),
+                               NSMakeRect(0, 0, 1000, 800), 6);
+    Require(NSEqualRects(belowFrame, NSMakeRect(740, 454, 260, 40)),
+            @"candidate panel clamps below the caret on the target screen");
+    NSRect aboveFrame =
+        RLXCandidatePanelFrame(NSMakeSize(260, 40), NSMakeRect(10, 10, 2, 20),
+                               NSMakeRect(0, 0, 1000, 800), 6);
+    Require(NSEqualRects(aboveFrame, NSMakeRect(10, 36, 260, 40)),
+            @"candidate panel moves above the caret when below does not fit");
 
     NSString *mixed = @"a萝卜😀z";
     NSError *cursorError = nil;
@@ -159,28 +187,32 @@ int main(void) {
         [[RLXProcessRuntime sharedRuntime] createSessionWithError:&error];
     Require(session != nil, @"create owner-thread session");
 
-    RLXKeyHandlingResult *ignored = [session handleEvent:Character('!') error:&error];
+    RLXKeyHandlingResult *ignored = [session handleEvent:Character('!')
+                                                   error:&error];
     Require(ignored != nil && !ignored.isConsumed && ignored.commit == nil,
             @"unconsumed key is returned to the host");
 
     RadishLexKeyEvent commandC = {RADISHLEX_KEY_KIND_CHAR, 'c', 0,
-                                   RADISHLEX_KEY_MOD_META,
-                                   RADISHLEX_KEY_PHASE_PRESS};
+                                  RADISHLEX_KEY_MOD_META,
+                                  RADISHLEX_KEY_PHASE_PRESS};
     ignored = [session handleEvent:commandC error:&error];
     Require(ignored != nil && !ignored.isConsumed && ignored.commit == nil &&
                 ignored.snapshot.preedit.length == 0,
             @"Command-modified character is returned to the host");
 
-    for (NSNumber *codepoint in @[@'l', @'u', @'o', @'b', @'o']) {
+    for (NSNumber *codepoint in @[ @'l', @'u', @'o', @'b', @'o' ]) {
       RLXKeyHandlingResult *result =
-          [session handleEvent:Character(codepoint.unsignedShortValue) error:&error];
-      Require(result != nil && result.isConsumed, @"composition key is consumed");
+          [session handleEvent:Character(codepoint.unsignedShortValue)
+                         error:&error];
+      Require(result != nil && result.isConsumed,
+              @"composition key is consumed");
     }
     RLXSnapshot *snapshot = [session snapshotWithError:&error];
     Require([snapshot.preedit isEqualToString:@"luobo"] && snapshot.cursor == 5,
             @"snapshot preedit and cursor");
     Require(snapshot.candidates.count == 2, @"snapshot candidates");
-    NSAttributedString *candidate = RLXAttributedCandidate(snapshot.candidates[1]);
+    NSAttributedString *candidate =
+        RLXAttributedCandidate(snapshot.candidates[1]);
     Require([candidate.string isEqualToString:snapshot.candidates[1].text],
             @"candidate display keeps the candidate text");
     RLXKeyHandlingResult *candidateSelection =
@@ -190,16 +222,19 @@ int main(void) {
                 candidateSelection.snapshot.preedit.length == 0,
             @"candidate selection commit and post-selection snapshot");
 
-    Require([session setSchema:@"contract.schema" error:&error], @"schema switch");
-    for (NSNumber *codepoint in @[@'c', @'i', @'h', @'e']) {
-      Require([[session handleEvent:Character(codepoint.unsignedShortValue) error:&error]
-                  isConsumed],
+    Require([session setSchema:@"contract.schema" error:&error],
+            @"schema switch");
+    for (NSNumber *codepoint in @[ @'c', @'i', @'h', @'e' ]) {
+      Require([[session handleEvent:Character(codepoint.unsignedShortValue)
+                              error:&error] isConsumed],
               @"second composition");
     }
-    RadishLexKeyEvent enter = {RADISHLEX_KEY_KIND_NAMED, 0, RADISHLEX_NAMED_KEY_ENTER, 0,
-                                RADISHLEX_KEY_PHASE_PRESS};
+    RadishLexKeyEvent enter = {RADISHLEX_KEY_KIND_NAMED, 0,
+                               RADISHLEX_NAMED_KEY_ENTER, 0,
+                               RADISHLEX_KEY_PHASE_PRESS};
     RLXKeyHandlingResult *immediate = [session handleEvent:enter error:&error];
-    Require(immediate.isConsumed && [immediate.commit isEqualToString:@"cihe"] &&
+    Require(immediate.isConsumed &&
+                [immediate.commit isEqualToString:@"cihe"] &&
                 immediate.snapshot.preedit.length == 0,
             @"same-event immediate commit and snapshot");
 
@@ -213,7 +248,8 @@ int main(void) {
     __block RLXKeyHandlingResult *crossThreadResult = nil;
     __block NSError *crossThreadError = nil;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-      crossThreadResult = [session handleEvent:Character('x') error:&crossThreadError];
+      crossThreadResult = [session handleEvent:Character('x')
+                                         error:&crossThreadError];
       dispatch_semaphore_signal(done);
     });
     dispatch_semaphore_wait(done, DISPATCH_TIME_FOREVER);
@@ -223,7 +259,8 @@ int main(void) {
 
     Require([[RLXProcessRuntime sharedRuntime] shutdownWithError:&error],
             @"process teardown");
-    Require(!session.isValid, @"process teardown releases sessions before shutdown");
+    Require(!session.isValid,
+            @"process teardown releases sessions before shutdown");
     NSLog(@"macOS InputMethodKit wrapper contract smoke passed");
   }
   return 0;

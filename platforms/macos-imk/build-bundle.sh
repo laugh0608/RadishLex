@@ -104,6 +104,7 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   -I"${script_dir}/Sources" \
   -I"${repo_root}/crates/ime-ffi/include" \
   "${script_dir}/Sources/RadishLexBridge.m" \
+  "${script_dir}/Sources/RadishLexCandidatePanel.m" \
   "${script_dir}/Sources/RadishLexRuntime.m" \
   "${script_dir}/Sources/RadishLexInputController.m" \
   "${script_dir}/Sources/main.m" \

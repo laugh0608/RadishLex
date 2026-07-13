@@ -14,8 +14,8 @@
 - plist 声明一个可见 mode，并在 root 与 mode 两层固定 ID、图标和本地化名称；预期只有 mode 可选择，root 只用于验证 parent 呈现。
 - 候选固定为五个合成字符串，不读取用户目录或外部数据。
 - 进程只创建一个 `IMKCandidates`，panel type 固定为 `kIMKSingleRowSteppingCandidatePanel`。
-- `IMKCandidatesSendServerKeyEventFirst=YES`；Space 和 Enter 由 controller 处理。Apple SDK header 说明未处理事件应继续发送候选窗，但 macOS 26.5.2 实机未产生选择迁移，因此当前源码不再依赖该隐式 fallback，四方向改为显式调用候选面板 `keyDown:`。
-- 候选通过 `candidates:` 与 `updateCandidates` 提供；选择仍只由 `candidateSelectionChanged:` 和 `candidateSelected:` 更新。方向日志只记录 key code、调用前后 panel identifier 与 callback index，不记录 composition 或候选正文。
+- `IMKCandidatesSendServerKeyEventFirst=YES`；Space 和 Enter 由 controller 处理。Apple SDK header 说明未处理事件应继续发送候选窗，但 macOS 26.5.2 实机没有产生选择迁移；显式调用候选面板 `keyDown:` 的短时实验同样失败，实验代码已回退，当前源码只保留最初的隐式 fallback 基线用于静态参考。
+- 候选通过 `candidates:` 与 `updateCandidates` 提供；选择只由 `candidateSelectionChanged:` 和 `candidateSelected:` 更新。两条失败路径的 identifier、callback、视觉与提交证据只保留在 R01A 正式文档和周志中，不继续扩展 probe。
 - 不调用 `setCandidateData`、`clearSelection` 或 `selectCandidateWithIdentifier:`。
 
 ## 无安装验证
@@ -28,7 +28,7 @@
 
 ## 实机证据与清理停止线
 
-真实 probe 必须人工确认四方向视觉高亮、callback 索引和最终提交一致，Space 提交当前合成候选，Enter 提交原始 composition；TIS 只允许一个可选择 mode，输入菜单不得出现空白 parent、重复标题或图标错位。失败时停止，不生成下一个 probe 版本。
+该 probe 已完成诊断并停止生成新签名 build。四方向视觉高亮、callback 索引和最终提交一致，Space 提交当前合成候选，Enter 提交原始 composition，以及唯一可选择 mode/菜单呈现等条目只保留为历史判定口径；当前正式实现改由 `docs/macos-inputmethodkit-boundary.md` 定义的 AppKit candidate panel 推进。
 
 每次实机结束必须先在系统设置点击“移除”，然后才能在已授权范围执行：
 

@@ -14,9 +14,9 @@
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；受控同步实现与测试可继续
 
-2026-07-12 的 Apple Development 短时实机批次已验证连续中文输入、5×1 候选、主要编辑键、Enter 原文提交和方向选择语义；进程级候选面板修复后未再发生 deactivate 崩溃。R01A 仍未退出：`IMKCandidates` 选择索引正确但视觉高亮不重绘，自动 parent command 区域也仍有菜单问题。隔离 root-only reference probe 被 TIS 枚举为单一、可选择的 `TISTypeKeyboardInputMethodWithoutModes`，但不进入系统设置的可添加输入法列表，未能启用；失败 probe 已严格清理。全新 ID/路径的单 mode probe 在 2026-07-13 注销并重新登录后进入系统设置目录，并经授权加入、选择和运行。Codex 输入框中合成字母与固定候选正常出现，首项视觉高亮；按一次右方向键后高亮未移动，Space 仍提交 index 0“候选甲”。这证明当前“方向键返回候选面板、由 callback 同步选择”的 reference 假设失败，但尚不能区分方向事件未被面板消费、面板未改变选择或 callback 未触发。实机已停止；系统设置经过回流后的第二次移除，精确 bundle、独立数据和同名进程已清除，TIS 最终两次为 `matches=0 enabled=0 selected=0`。正式 mode metadata 保持不变。
+2026-07-12 实机已验证连续输入、5×1 候选、主要编辑键、Enter 和方向选择提交；`IMKCandidates` 程序化选择的 engine/FFI/Space 索引一致，但视觉不重绘。2026-07-13 的单 mode probe 又证伪 controller-first fallback 与显式 panel `keyDown:`；两次测试均已零残留清理，实验代码已回退，不再生成第三个签名 probe。
 
-显式 `keyDown:` 候选方案经确认后已通过不安装门禁，并于 2026-07-13 使用现有 Apple Development identity 重新签名。真实环境严格签名、Team ID、Bundle/mode ID、资源 seal 与生成/安装二进制哈希均已复核；取得动作时授权后，probe 已通过系统设置加入、使用公开 TIS API 精确选择并由 macOS 启动。实体键盘判定中，右方向事件到达显式转发路径，但候选面板 `selectedCandidate` 的前后 identifier 相同，callback index 保持 0，视觉高亮未移动，Space 最终提交 index 0“候选甲”。这证明直接调用候选面板 `keyDown:` 也不能推进该面板的选择状态。测试停止后已切回系统拼音并从系统设置移除 probe；精确 bundle、独立数据和同名进程已清除，完整重启设置后现有列表与可添加目录均无 probe，TIS 最终连续两次为 `matches=0 enabled=0 selected=0`。正式候选事件模型与输入源身份保持不变。
+基于 Apple 公开契约，正式实现改为进程级非激活 AppKit panel：controller 的唯一 display index 同时驱动视觉与 Space，鼠标/辅助功能回调同一 Rust selection API；client 全局行矩形、`windowLevel + 1` 和目标屏幕负责定位。`menu = nil` 继续表达没有专用命令，自动 parent 与空白 command 行作为平台限制，不再用占位菜单修补。不安装编译、bundle、index/frame、焦点/辅助功能门禁已通过；授权实机尚未完成，R01A 未退出。
 
 长期产品交付顺序见 [产品交付路线图](../roadmap.md)，当前整改批次、停止线、资产处置和退出条件见 [项目稳定化整改专题](../remediation/2026-07-project-stabilization.md)。
 
@@ -35,7 +35,7 @@
 
 ## 已确认阻塞
 
-- R01A 不安装 native 行为矩阵已闭合候选选择与主要编辑按键；真实应用方向键已能改变选择索引并提交对应候选，但 `IMKCandidates` 视觉高亮不重绘。输入菜单的自动 parent command 区域在 `nil`、空菜单和稳定标题菜单下分别表现为空白行、生命周期回归或重复标题。单 mode probe 的隐式 fallback 与显式 `keyDown:` 两条路径均已失败：后者确认方向事件抵达，但 panel identifier、callback index、视觉高亮和最终提交均停在首项。正式 mode 当前保持移除，client 切换、进程重启、断网、中英文混输及两个应用交叉复核仍未完成。
+- R01A 的 AppKit candidate panel 已通过不安装编译、bundle、index/frame、owner、焦点与辅助功能静态门禁，但尚无真实应用证据；正式 mode 当前保持移除。下一次经授权实机必须先复核视觉/提交同 index、宿主焦点、鼠标、VoiceOver、多屏/全屏和生命周期，再补 client 切换、进程重启、断网、中英文混输及两个应用交叉复核。
 - 输入 session 未组合 engine、ranker、userdb 与 privacy policy，真实选择没有进入平台学习热路径。
 - userdb 用户意图缺少统一事务、WAL/busy 策略；ranker recency/frequency 语义需要修正。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
@@ -53,10 +53,10 @@
 
 ## 下一步顺位
 
-1. 以 macOS 26.5 SDK header 与本次实机差异为输入，收敛方向事件接收方、`IMKCandidates` 选择状态与 callback 触发边界；当前证据不足以指定根因，不修改正式候选事件模型或输入源身份。
-2. 隔离 probe 本批曾实现 controller 对四方向显式调用候选面板公开 `NSResponder keyDown:` 并记录前后 `selectedCandidate` 与 callback index；不安装门禁、签名实机和日志证据均已完成。该路径被证伪后已从工作源码和静态门禁回退，只保留文档负证据。
-3. 显式 `keyDown:` 实机已证伪并完成零残留清理，不继续其他方向键或叠加 `clearSelection`、程序化候选选择、空菜单、plist fallback；下一候选必须先形成不同于两条已失败路径的公开契约依据和可判伪方案，再决定是否保留或回退本批 reference 源码。
-4. R01A 退出后实施 R02L，修正 userdb 事务、SQLite 并发、recency、frequency 与删除语义；R02L 退出后再由 R01B 接入真实学习，之后关闭整改专题并进入 M3。
+1. 先复核 AppKit candidate panel 的正式源码、contract 和文档一致性；未经新授权不使用 Apple Development 签名、不安装、不启用、不生成第三个 probe。
+2. 取得真实动作授权后，按正式产品 runbook 只执行一次可判伪 smoke：方向视觉/Space index、鼠标、宿主焦点、VoiceOver、多屏/全屏与 owner 生命周期任一失败即停止并清理，不叠加 `IMKCandidates` fallback。
+3. panel 通过后补 client 切换、进程重启、断网、中英文混输与两个应用交叉证据，满足退出场景后关闭 R01A。
+4. R01A 退出后实施 R02L；R02L 退出后再由 R01B 接入真实学习，之后关闭整改专题并进入 M3。
 
 ## 验证入口
 

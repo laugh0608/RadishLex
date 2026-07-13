@@ -25,6 +25,7 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror -fsyntax-only \
   -I"${platform_dir}/Sources" \
   -I"${repo_root}/crates/ime-ffi/include" \
   "${platform_dir}/Sources/RadishLexBridge.m" \
+  "${platform_dir}/Sources/RadishLexCandidatePanel.m" \
   "${platform_dir}/Sources/RadishLexRuntime.m" \
   "${platform_dir}/Sources/RadishLexInputController.m" \
   "${platform_dir}/Sources/main.m"
@@ -34,11 +35,12 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   -I"${platform_dir}/Sources" \
   -I"${repo_root}/crates/ime-ffi/include" \
   "${platform_dir}/Sources/RadishLexBridge.m" \
+  "${platform_dir}/Sources/RadishLexCandidatePanel.m" \
   "${platform_dir}/Sources/RadishLexRuntime.m" \
   "${platform_dir}/Tests/contract_smoke.m" \
   -L"${repo_root}/target/debug" -lradishlex_ime_ffi \
   -Wl,-rpath,"${repo_root}/target/debug" \
-  -framework AppKit -framework Carbon \
+  -framework AppKit -framework Carbon -framework InputMethodKit \
   -o "${smoke_dir}/contract-smoke"
 "${smoke_dir}/contract-smoke"
 
@@ -52,9 +54,13 @@ test "$(sips -g dpiWidth "${bundle}/Contents/Resources/RadishLexInputIcon.tiff" 
 test "$(sips -g dpiHeight "${bundle}/Contents/Resources/RadishLexInputIcon.tiff" 2>/dev/null | awk '/dpiHeight:/ { print $2 }')" = "144.000"
 test -s "${bundle}/Contents/Resources/zh-Hans.lproj/InfoPlist.strings"
 test -s "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings"
+test -s "${bundle}/Contents/Resources/zh-Hans.lproj/Localizable.strings"
+test -s "${bundle}/Contents/Resources/en.lproj/Localizable.strings"
 plutil -lint "${bundle}/Contents/Info.plist" >/dev/null
 plutil -lint "${bundle}/Contents/Resources/zh-Hans.lproj/InfoPlist.strings" \
-  "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings" >/dev/null
+  "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings" \
+  "${bundle}/Contents/Resources/zh-Hans.lproj/Localizable.strings" \
+  "${bundle}/Contents/Resources/en.lproj/Localizable.strings" >/dev/null
 test "$(plutil -extract tsInputMethodCharacterRepertoireKey.0 raw \
   "${bundle}/Contents/Info.plist")" = "Hans"
 test "$(plutil -extract TISIntendedLanguage raw \
@@ -92,9 +98,38 @@ if plutil -extract LSBackgroundOnly raw "${bundle}/Contents/Info.plist" >/dev/nu
 fi
 test "$(/usr/libexec/PlistBuddy -c 'Print :org.radishlex.inputmethod.macos.Pinyin' \
   "${bundle}/Contents/Resources/zh-Hans.lproj/InfoPlist.strings")" = "萝卜词核拼音"
+test "$(/usr/libexec/PlistBuddy -c 'Print :candidate_list' \
+  "${bundle}/Contents/Resources/zh-Hans.lproj/Localizable.strings")" = "候选列表"
+test "$(/usr/libexec/PlistBuddy -c 'Print :candidate_selected' \
+  "${bundle}/Contents/Resources/en.lproj/Localizable.strings")" = "Selected"
 otool -L "${bundle}/Contents/MacOS/RadishLex" | grep -q \
   "@rpath/libradishlex_ime_ffi.dylib"
 nm -gU "${bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib" | grep -q \
   "_radishlex_session_handle_key_event"
+
+product_sources=(
+  "${platform_dir}/Sources/RadishLexInputController.m"
+  "${platform_dir}/Sources/RadishLexCandidatePanel.m"
+)
+if rg -n 'IMKCandidates|selectCandidateWithIdentifier|candidateSelectionChanged:' \
+  "${product_sources[@]}"; then
+  echo "macOS production candidate flow must not depend on IMKCandidates selection state." >&2
+  exit 1
+fi
+rg -q 'NSWindowStyleMaskNonactivatingPanel' \
+  "${platform_dir}/Sources/RadishLexCandidatePanel.m"
+rg -q 'attributesForCharacterIndex:cursorIndex' \
+  "${platform_dir}/Sources/RadishLexCandidatePanel.m"
+rg -q '\[client windowLevel\].*\+ 1' \
+  "${platform_dir}/Sources/RadishLexCandidatePanel.m"
+rg -q 'NSAccessibilityPostNotification' \
+  "${platform_dir}/Sources/RadishLexCandidatePanel.m"
+rg -q '\[self\.candidatePanel setSelectedIndex:target owner:self\]' \
+  "${platform_dir}/Sources/RadishLexInputController.m"
+if rg -n 'NSMenu alloc|menuWithTitle|addItem' \
+  "${platform_dir}/Sources/RadishLexInputController.m"; then
+  echo "macOS M1 must not add placeholder input-method command menu items." >&2
+  exit 1
+fi
 
 echo "macOS InputMethodKit bundle and wrapper contract checks passed."

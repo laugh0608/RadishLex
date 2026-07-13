@@ -83,7 +83,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | 批次 | 名称 | 状态 | 退出结果 |
 | --- | --- | --- | --- |
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
-| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；隔离 probe 的隐式 fallback 与显式 `keyDown:` 均已被实机证伪并完成零残留清理；正式 mode 保持不变 | 真实应用可离线完成基础中文输入 |
+| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；两条 `IMKCandidates` probe 已证伪并零残留清理；AppKit candidate panel 已通过不安装门禁，待授权实机 | 真实应用可离线完成基础中文输入 |
 | R02L | 本地 userdb/ranker 正确性 | 待开始 | 学习、删除、并发和排序语义正确 |
 | R01B | 真实学习纵向闭环 | 待开始，依赖 R01A 与 R02L | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 已完成 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
@@ -148,8 +148,11 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 取得短时签名安装授权后，当前 probe 使用现有 Apple Development identity 重建；真实环境严格签名、证书链、Team ID、Bundle/mode ID、资源 seal 与生成/安装二进制哈希通过。精确用户级路径复制后，打开系统设置可添加列表触发公开扫描，TIS 枚举不可选择 parent 与一个 `enabled=1 selected=0 select_capable=1` mode。动作时授权后已通过系统设置加入列表，并使用公开 TIS API 精确选择 mode；复核为 `enabled=1 selected=1 select_capable=1`，精确进程已启动，尚未输入测试文本。
 - 实体键盘右方向事件进入显式转发路径；统一日志记录 `before_identifier` 与 `after_identifier` 相同，`callback_index=0`，视觉高亮未移动，Space 记录并提交 index 0“候选甲”。该证据关闭“直接调用候选面板 `keyDown:` 可推进内部选择”的假设；测试立即停止。
 - 开发者切回系统拼音并从系统设置移除 probe 后，清理入口删除精确 bundle、独立数据并终止同名进程；第一次删除后 TIS 仍保留两个 `enabled=0 selected=0` 缓存 source，可添加目录也短暂显示缓存项。完整重启系统设置并再次打开可添加目录后，现有列表与目录均无 probe，TIS 连续两次为 `matches=0 enabled=0 selected=0`，最终清理门禁通过。公开 `TISDisableInputSource` 不能代替系统设置移除：真实会话会重新启用不可选择 parent，清理门禁已正确拒绝在该状态删除。
+- Apple 公开文档与 macOS 26.5 SDK headers 只承诺 `IMKCandidates` 的事件优先顺序、用户活动 callback 和 identifier selection，不承诺直接调用继承的 `keyDown:` 驱动内部状态，也不承诺程序化 selection 同步完成视觉重绘。正式实现因此退出 `IMKCandidates` 选择状态，改用进程级非激活 AppKit panel：controller 的唯一 display index 同时驱动视觉与 Space，鼠标/辅助功能按 owner-scoped index 回调同一 Rust selection API。
+- `IMKInputSession.h` 为自建候选窗公开提供 client `windowLevel` 和全局行矩形；AppKit 公开提供 nonactivating panel、Spaces/full-screen collection behavior 与 accessibility hierarchy。正式不安装门禁已覆盖 Objective-C production 编译、bundle、bounded index、上下定位/屏幕限制、owner guard、焦点和辅助功能静态约束，没有安装、注册、启用或启动输入法。
+- `IMKInputController.menu` 的公开职责只是 input-method-specific commands。M1 没有这类命令，正式实现保留 `nil`；自动 parent source 与 macOS 26 空白 command 行记录为平台模型/呈现限制，不再尝试空菜单、重复标题、disabled placeholder 或 plist fallback。
 
-这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键未消费、Space/非首候选提交和主要编辑按键子项，不代表真实应用输入矩阵或 UI 已完成。R01A 下一判断点是先形成候选视觉选择与输入菜单的可复验方案，再补 client 切换、进程重启、断网和双应用交叉证据。
+这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键未消费、Space/非首候选提交和主要编辑按键子项，不代表新 AppKit panel 的真实应用 UI 已完成。R01A 下一判断点是经授权复验视觉/提交同 index、宿主焦点、鼠标、VoiceOver、多屏/全屏和 owner 生命周期，再补 client 切换、进程重启、断网和双应用交叉证据。
 
 ### 退出场景
 
