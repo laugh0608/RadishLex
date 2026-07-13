@@ -6,16 +6,16 @@
 
 2026-07-12 在 macOS 26.5.2 上完成一次 root-only Apple Development 用户级安装：TIS 只枚举一个 `TISTypeKeyboardInputMethodWithoutModes` source，并报告 `select_capable=1` 与 `zh-Hans`；但系统设置简体中文可添加列表不显示它，probe 无法按合规路径启用。该 root-only metadata 假设已失败，候选事件模型尚未获得实机验证；清理后设置列表、TIS、bundle、独立数据和精确进程均无残留。
 
-当前实现已切换到全新 ID 与路径的单 mode probe，root-only 失败事实只保留在正式状态、整改专题与周志中。2026-07-12 的 Apple Development 用户级安装使 TIS 正确枚举不可选择 parent 与一个可选择 mode，但系统设置完全重启后仍不显示可添加项；bundle 暂时保留，等待开发者注销/重新登录后的只读复核。此前不得重建、启用或选择 probe，也不据此提前修改正式身份。
+当前实现是使用全新 ID 与路径的单 mode probe。2026-07-13 跨登录后它进入系统设置简体中文可添加列表，并完成一次授权实机判定：marked composition、固定候选和首项视觉高亮正常；按右方向键后高亮未移动，Space 仍提交 index 0。该结果证伪当前“controller 返回 `NO` 后由候选窗移动选择并回调”的事件假设，但尚不能区分事件未被候选窗消费、候选窗未改变选择或 callback 未触发。实机已停止并完成系统设置、TIS、bundle、独立数据和进程零残留清理；当前源码只保留为失败复现基线，不得直接重装或据此修改正式实现。
 
-## 固定假设
+## 固定边界与已证伪假设
 
 - Bundle ID 为 `org.radishlex.inputmethod.macos.reference-probe-mode`，mode source ID 为 `org.radishlex.inputmethod.macos.reference-probe-mode.Pinyin`，bundle 文件名为 `RadishLexIMKModeReferenceProbe.app`。
 - plist 声明一个可见 mode，并在 root 与 mode 两层固定 ID、图标和本地化名称；预期只有 mode 可选择，root 只用于验证 parent 呈现。
 - 候选固定为五个合成字符串，不读取用户目录或外部数据。
 - 进程只创建一个 `IMKCandidates`，panel type 固定为 `kIMKSingleRowSteppingCandidatePanel`。
-- `IMKCandidatesSendServerKeyEventFirst=YES`；Space 和 Enter 由 controller 处理，四方向键返回 `NO` 交给候选面板。
-- 候选通过 `candidates:` 与 `updateCandidates` 提供；选择只通过 `candidateSelectionChanged:` 和 `candidateSelected:` 同步。
+- 本轮使用 `IMKCandidatesSendServerKeyEventFirst=YES`；Space 和 Enter 由 controller 处理，四方向键返回 `NO` 交给候选面板。Apple SDK header 说明未处理事件应继续发送候选窗，但 macOS 26.5.2 实机未产生选择迁移，因此该事件假设已经证伪。
+- 候选通过 `candidates:` 与 `updateCandidates` 提供；本轮尝试只通过 `candidateSelectionChanged:` 和 `candidateSelected:` 同步选择，未获得方向键 callback 成功证据。
 - 不调用 `setCandidateData`、`clearSelection` 或 `selectCandidateWithIdentifier:`。
 
 ## 无安装验证
@@ -36,4 +36,4 @@
 ./scripts/cleanup-macos-imk-reference-probe.sh --authorized-after-settings-removal
 ```
 
-清理入口只处理精确 probe bundle、独立运行数据和精确进程名，并使用公开 TIS API 验证状态；它不会修改 `com.apple.HIToolbox`、TIS 私有数据库、正式 RadishLex bundle 或正式用户数据。若 probe 仍 enabled/selected，脚本会拒绝删除并要求先完成系统设置移除。
+清理入口只处理精确 probe bundle、独立运行数据和精确进程名，并使用公开 TIS API 验证状态；它不会修改 `com.apple.HIToolbox`、TIS 私有数据库、正式 RadishLex bundle 或正式用户数据。可发现的 mode 在未加入现有输入法列表时仍可能报告 `enabled=1`，因此删除前门禁拒绝任何 `selected=1` source 或仍为 `enabled=1` 的不可选择 parent；删除后仍要求 TIS 达到 `matches=0 enabled=0 selected=0`。

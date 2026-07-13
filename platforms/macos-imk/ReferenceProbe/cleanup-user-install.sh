@@ -30,12 +30,14 @@ before_status="$(${status_tool} "${source_prefix}" 2>&1)"
 before_code=$?
 set -e
 printf '%s\n' "${before_status}"
-if [[ ${before_code} -eq 4 ]]; then
-  echo "Reference probe is still enabled or selected." >&2
+if grep -Eq '^source_id=.* selected=1 ' <<<"${before_status}" ||
+  grep -Eq '^source_id=.* enabled=1 selected=0 select_capable=0 ' \
+    <<<"${before_status}"; then
+  echo "Reference probe is still selected or its parent is enabled." >&2
   echo "Remove it in System Settings before deleting the bundle." >&2
   exit 3
 fi
-if [[ ${before_code} -ne 0 ]]; then
+if [[ ${before_code} -ne 0 && ${before_code} -ne 4 ]]; then
   echo "Unable to inspect reference probe TIS state safely." >&2
   exit "${before_code}"
 fi

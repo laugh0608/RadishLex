@@ -83,7 +83,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | 批次 | 名称 | 状态 | 退出结果 |
 | --- | --- | --- | --- |
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
-| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；root-only 与单 mode probe 均未进入当前会话的系统设置可添加列表，单 mode probe 保留等待注销登录复核；正式 mode 保持不变 | 真实应用可离线完成基础中文输入 |
+| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；单 mode probe 已运行但右方向后高亮和提交仍停在 index 0，当前 callback 假设失败且已零残留清理，进入方向事件根因复盘；正式 mode 保持不变 | 真实应用可离线完成基础中文输入 |
 | R02L | 本地 userdb/ranker 正确性 | 待开始 | 学习、删除、并发和排序语义正确 |
 | R01B | 真实学习纵向闭环 | 待开始，依赖 R01A 与 R02L | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 已完成 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
@@ -139,6 +139,11 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 隔离 reference probe 固定独立 Bundle/source ID、合成候选、进程级 `kIMKSingleRowSteppingCandidatePanel`、`candidates:`/`updateCandidates` 与 callback 路径，不链接 Rime/FFI 或用户数据。Apple Development 用户级安装后，公开 TIS 只枚举一个 `TISTypeKeyboardInputMethodWithoutModes` source，且 `select_capable=1`、语言为 `zh-Hans`；但系统设置简体中文可添加列表不显示该 source，无法按合规路径启用，候选视觉与 callback 路径因此未执行。
 - 失败 probe 未调用公开 TIS enable 代替系统设置，也未生成下一版本。系统设置确认现有列表无 probe 后删除精确 bundle/独立数据并终止精确进程；首次清理后 TIS 短暂保留未启用枚举，重新打开设置列表后复核为 `matches=0`。正式 plist、候选实现和 `docs/macos-inputmethodkit-boundary.md` 均未据此修改。
 - 后续设计改用全新 Bundle/source ID、bundle 路径和单一显式 mode，root 与 mode 同时固定图标和本地化名称；继续复用合成候选、单行面板、方向键交还候选面板、Space/Enter controller 分流和 callback contract。无安装门禁与 Apple Development 签名通过，用户级安装后 TIS 正确枚举不可选择 parent 与一个 `select_capable=1` mode，但系统设置完全重启后仍不显示可添加项。probe 暂时保留等待一次开发者注销/重新登录；此前不修改 build、正式身份或边界。
+- 2026-07-13 开发者主动注销并重新登录后，只读 TIS 仍枚举不可选择 parent 与一个 `enabled=1 selected=0`、`select_capable=1` 的 mode；系统设置简体中文可添加列表已出现唯一“萝卜词核模式探针拼音”项。该结果关闭用户级全新身份跨登录进入系统设置目录的疑问，但 probe 尚未添加、选择或运行，候选视觉、callback、提交与输入菜单仍待动作时授权后一次性判定。
+- 取得动作时授权后，唯一 probe mode 已通过系统设置加入现有输入法列表；列表行同时显示“萝卜词核模式探针拼音”与 parent 名称“萝卜词核 IMK 模式探针”。TIS 仍为 `selected=0`，自动化系统切换快捷键没有改变 source，因此不继续猜测快捷键或绕过 TIS；下一步由开发者通过实体键盘或菜单栏选择 probe。
+- 开发者通过菜单栏或实体键盘选择 probe 后，在 Codex 输入框使用合成字母形成 marked composition 与固定候选；首项视觉高亮正常。按一次右方向键后高亮没有移动，随后 Space 仍提交 index 0“候选甲”。该结果判定“方向键返回 `IMKCandidates`、由 selection callback 同步状态”的当前假设失败；尚不能据此断言事件未被消费、面板未改变选择或 callback 未触发。测试立即停止，未继续四方向、Enter、数字或菜单矩阵，也未修改 probe 或生成新 build。
+- 开发者切回系统拼音后，probe 配置项在系统设置第一次移除并完整重启后回流，第二次移除才稳定退出现有列表。清理门禁同时修正可发现 mode `enabled=1` 与用户仍启用的区别：删除前拒绝任何 selected source 或 enabled parent，删除后继续要求零枚举。精确 bundle、独立数据和同名进程已删除，刷新系统设置后 TIS 两次为 `matches=0 enabled=0 selected=0`。
+- macOS 26.5 SDK header 明确 `IMKCandidatesSendServerKeyEventFirst=YES` 时 controller 未处理事件应继续送入候选窗，本轮代码意图与公开契约一致但实机未迁移选择。下一步只评审 controller 对方向事件显式调用候选面板公开 `NSResponder keyDown:` 并记录前后选择/callback 的单一方案；未经确认不修改 probe、正式实现或输入源身份。
 
 这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键未消费、Space/非首候选提交和主要编辑按键子项，不代表真实应用输入矩阵或 UI 已完成。R01A 下一判断点是先形成候选视觉选择与输入菜单的可复验方案，再补 client 切换、进程重启、断网和双应用交叉证据。
 
