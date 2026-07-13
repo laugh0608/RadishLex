@@ -57,6 +57,7 @@ test -s "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings"
 test -s "${bundle}/Contents/Resources/zh-Hans.lproj/Localizable.strings"
 test -s "${bundle}/Contents/Resources/en.lproj/Localizable.strings"
 plutil -lint "${bundle}/Contents/Info.plist" >/dev/null
+test "$(plutil -extract CFBundleVersion raw "${bundle}/Contents/Info.plist")" = "29"
 plutil -lint "${bundle}/Contents/Resources/zh-Hans.lproj/InfoPlist.strings" \
   "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings" \
   "${bundle}/Contents/Resources/zh-Hans.lproj/Localizable.strings" \

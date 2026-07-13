@@ -151,6 +151,7 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - Apple 公开文档与 macOS 26.5 SDK headers 只承诺 `IMKCandidates` 的事件优先顺序、用户活动 callback 和 identifier selection，不承诺直接调用继承的 `keyDown:` 驱动内部状态，也不承诺程序化 selection 同步完成视觉重绘。正式实现因此退出 `IMKCandidates` 选择状态，改用进程级非激活 AppKit panel：controller 的唯一 display index 同时驱动视觉与 Space，鼠标/辅助功能按 owner-scoped index 回调同一 Rust selection API。
 - `IMKInputSession.h` 为自建候选窗公开提供 client `windowLevel` 和全局行矩形；AppKit 公开提供 nonactivating panel、Spaces/full-screen collection behavior 与 accessibility hierarchy。正式不安装门禁已覆盖 Objective-C production 编译、bundle、bounded index、上下定位/屏幕限制、owner guard、焦点和辅助功能静态约束，没有安装、注册、启用或启动输入法。
 - `IMKInputController.menu` 的公开职责只是 input-method-specific commands。M1 没有这类命令，正式实现保留 `nil`；自动 parent source 与 macOS 26 空白 command 行记录为平台模型/呈现限制，不再尝试空菜单、重复标题、disabled placeholder 或 plist fallback。
+- AppKit panel 改变了上一正式 `build 27` 的用户可见实现，正式构建号因此升至 `29` 并由 contract 固定断言。Apple Development native 闭包、签名与用户级安装副本已通过；公开 TIS 枚举 parent 与唯一 Pinyin mode，但系统设置重启后仍未显示可添加项。当前等待开发者注销/重新登录刷新公开目录，mode 尚未添加、选择或运行。
 
 这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键未消费、Space/非首候选提交和主要编辑按键子项，不代表新 AppKit panel 的真实应用 UI 已完成。R01A 下一判断点是经授权复验视觉/提交同 index、宿主焦点、鼠标、VoiceOver、多屏/全屏和 owner 生命周期，再补 client 切换、进程重启、断网和双应用交叉证据。
 
