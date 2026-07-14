@@ -162,6 +162,7 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 一次公开 `TISSelectInputSource` 诊断在同一真实会话确认 RadishLex mode `property_selected=1` 且为精确 current source，但菜单栏仍显示系统拼音，实体输入行为来自 RadishLex；开发者手动切换 U.S. 再切回系统拼音后恢复一致。该组只证明菜单栏/SystemUIServer 显示可能滞后，不计作候选功能通过。后续不再自动选择或注入按键：执行者负责部署、添加、只读 source 监视与清理，开发者负责聚焦、手动切换和实体交互，每次只执行一组明确步骤。
 - 最终只读监视以公开 selected-source 分布式通知和 CFRunLoop 接收 source 变化，并先用 U.S. -> 系统拼音自检；正式记录显示 RadishLex mode 覆盖整组输入，返回 Codex 后才切回系统拼音。开发者实体输入确认候选出现并跟随文字光标、右方向高亮迁移到第二项、Space 提交同一项且无异常，正式关闭 build 31 光标锚点与本组视觉/提交一致性。
 - 清理前 TextEdit 文稿手动切回系统拼音；首次移除后配置项在完整重启设置时回流，清理门禁因不可选择 parent `enabled=1` 拒绝删除。第二次真实移除后删除 bundle/隔离数据并终止进程，随后打开现有列表和可添加目录刷新两个 `enabled=0 selected=0` 缓存 source。最终 `matches=0 enabled=0 selected=0`，路径与进程零残留；未使用 `TISDisableInputSource`、私有配置或注销。
+- 临时通知监视已并入现有正式 TIS 工具：`--monitor` 输出初始与通知后的精确 current source，并明确标识是否为 `org.radishlex.inputmethod.macos.Pinyin`；原状态/清理调用保持兼容。macOS contract 同时门禁编译、默认输出、通知/CFRunLoop 结构与 `TISSelectInputSource`、`TISDisableInputSource`、私有配置禁用线，不新建第三个 probe。用户主动关闭的“自动切换到文稿的输入法”继续保持关闭，不由验收自动化修改。
 
 这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键、主要编辑按键、光标锚点与本组方向视觉/Space 提交一致性，不代表 `build 31` 已完成全部真实应用 UI。R01A 下一判断点是补宿主焦点、鼠标、VoiceOver、边缘定位、多屏/全屏与输入菜单，再补 client 切换、进程重启、断网、中英文混输和双应用 owner 生命周期；任一新实机窗口仍按人工交互、通知型只读 source 监视和零残留清理执行。
 

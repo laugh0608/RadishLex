@@ -48,8 +48,9 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 
 - 执行者负责冻结产物、签名、安装、打开系统设置并添加 source、启动只读 TIS 监视，以及测试完成后的系统设置移除、bundle/运行数据/进程清理和零残留复核。
 - 开发者负责聚焦目标文稿、通过菜单栏或实体快捷键手动切换当前输入源，并完成实体键盘、鼠标、VoiceOver、应用切换与视觉观察。输入法进程由 macOS 随用户选择启动，不直接运行 bundle executable 代替该步骤。
-- 执行者每次只交付一组短步骤，等待开发者报告后才继续。验收自动化不得调用 `TISSelectInputSource`、注入合成按键或自动操作候选项来替代人工行为；只读 TIS 监视必须订阅 `kTISNotifySelectedKeyboardInputSourceChanged`、运行 CFRunLoop，并先以系统 source 切换自检，不能用不处理通知的轮询进程冒充实时记录。
+- 执行者每次只交付一组短步骤，等待开发者报告后才继续。验收自动化不得调用 `TISSelectInputSource`、注入合成按键或自动操作候选项来替代人工行为；只读 TIS 监视固定使用 `./scripts/cleanup-macos-imk.sh --monitor`，它先输出 `event=initial`，再订阅 `kTISNotifySelectedKeyboardInputSourceChanged` 并通过 CFRunLoop 输出 `event=changed`。每行的 `source_id` 是精确 current source，只有正式 mode 精确匹配时 `is_radishlex_pinyin=1`；开始产品组前必须先以系统 source 手动切换自检，不能用不处理通知的轮询进程冒充实时记录。
 - 菜单栏名称和图标只作辅助观察。若它与精确 TIS 或实际输入行为冲突，当前组停止并标记为显示缓存竞态；开发者先手动切到 U.S. 等中立输入源，再切到目标 source 后从头重做该组。
+- “自动切换到文稿的输入法”是开发者为避免文稿级 source 占用而主动关闭的测试前提；本轮保持关闭，执行者不得自动开启、关闭或恢复该设置。
 - 注销、重新登录或重启不会由刷新失败自动触发。若 source 未进入当前会话目录，执行者必须停下，由开发者保存工作并另行安排登录边界。
 
 ## 集中验收冻结点
@@ -152,7 +153,13 @@ R01A 每轮真实 smoke 无论通过还是失败都必须完整回滚，不保�
 ./scripts/cleanup-macos-imk.sh --status
 ```
 
-它只使用公开 TIS API 查询正式 Bundle ID，并报告精确用户级 bundle、隔离运行数据和精确进程状态，不修改系统配置。回滚顺序固定为：
+实时来源监视入口为：
+
+```bash
+./scripts/cleanup-macos-imk.sh --monitor
+```
+
+两者都只使用公开 TIS API，不选择、启用或停用 source，不修改系统配置，也不记录输入正文；监视器在测试组和清理开始前用 `Ctrl-C` 终止。状态入口报告正式 Bundle ID、精确用户级 bundle、隔离运行数据和精确进程状态。回滚顺序固定为：
 
 1. 开发者先让所有参加测试且可能记住文稿级 source 的目标文稿手动切回系统输入法；执行者再在系统设置“键盘 -> 文字输入 -> 编辑”中选中 RadishLex 并点击“移除”。不能用公开 TIS API 停用代替该动作；若自动化无法精确识别设置行，应停下请求人工协助，不能猜测点击。
 2. 只读确认当前 source 已不是 RadishLex，再处理其残余 TIS source；不得修改 `com.apple.HIToolbox` 或 TIS 私有数据库。

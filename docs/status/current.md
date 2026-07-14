@@ -24,6 +24,8 @@
 
 验收后清理经历设置项回流和 TIS 缓存竞态：TextEdit 文稿先切回系统拼音，完整重启设置后对回流项再次真实移除；删除 bundle/隔离数据并终止进程后，再打开现有列表与可添加目录触发公开扫描。最终 `matches=0 enabled=0 selected=0`，bundle、运行数据与进程均无残留；未使用 `TISDisableInputSource`、私有配置或注销。R01A 仍需第二、三阶段平台与生命周期证据，尚未退出。
 
+临时通知监视已收口到现有 `tis_source_status.m`：`--monitor` 先输出精确 current source，再在公开 selected-source 通知到达时通过 CFRunLoop 输出变化，并以 `is_radishlex_pinyin` 明确标识正式 Pinyin mode；原 Bundle ID 状态输出和清理调用保持兼容。门禁固定编译、默认输出、通知/RunLoop 结构以及 `TISSelectInputSource`、`TISDisableInputSource` 和私有配置禁用线。用户为避免文稿级 source 占用而主动关闭的“自动切换到文稿的输入法”继续保持关闭，执行者不得自动修改。
+
 长期产品交付顺序见 [产品交付路线图](../roadmap.md)，当前整改批次、停止线、资产处置和退出条件见 [项目稳定化整改专题](../remediation/2026-07-project-stabilization.md)。
 
 ## 已有工程证据
@@ -32,7 +34,7 @@
 - librime 生命周期已收口到进程级 runtime；多 session、owner-thread、配置冲突、失败回滚和 finalize 已有自动或 native smoke。
 - macOS Objective-C 薄壳、contract bundle 与 wrapper smoke 已落地，覆盖按键规范化、commit/snapshot/candidate 复制、reset、schema、线程与 teardown。
 - 正式 AppKit panel/component contract 动态覆盖非激活窗口、level、Spaces behavior、五候选、视觉/accessibility selection、appearance、合法 inline character index、绝对 insertion fallback、anchor、owner 接管和完整隐藏；controller contract 覆盖 keyDown/keyUp/modifier、候选变化重置、Space/鼠标/accessibility press 到 Rust commit、Enter/Escape、宿主快捷键和双 client 生命周期。
-- 正式 TIS 状态/清理入口按精确 Bundle ID 隔离产品与 reference probe；来源监视必须接收公开 selected-source 通知并运行 CFRunLoop，不能用不处理通知的进程内轮询冒充实时记录。清理仍以系统设置真实移除为前置，不使用 `TISDisableInputSource` 或私有配置替代。
+- 正式 TIS 状态/清理入口按精确 Bundle ID 隔离产品与 reference probe；同一工具的 `--monitor` 已通过公开 selected-source 通知、CFRunLoop 和精确 mode 标识形成实时来源记录，不能用不处理通知的进程内轮询冒充。清理仍以系统设置真实移除为前置，不使用 `TISDisableInputSource` 或私有配置替代。
 - 隔离 `rime-pinyin-simp` 的真实 FFI smoke 已覆盖 composition、完整与分段非首候选、Backspace、Escape、Enter、翻页、方向键高亮与 Space、multi-session 和不存在 schema 拒绝；adapter 以 deployed schema list、原生 current-page selection API 与选择后回读固定可用性。
 - native 门禁覆盖隔离 schema/data/license、架构、FFI symbol、递归 dylib closure、逐库签名哈希和外部依赖拒绝；不读取用户 Rime 目录。
 - macOS bundle 固定正式 Bundle/mode ID、`LSUIElement`、简体中文 metadata、双语标签与 Retina 列表图标，并对完整依赖闭包签名。
@@ -61,7 +63,7 @@
 
 ## 下一步顺位
 
-1. build 31 已完成本轮签名实机和零残留清理；不为后续单项自动重装、注销或程序化选择 source。下一集中窗口继续沿用人工切换/交互与公开通知监视分工。
+1. build 31 已完成本轮签名实机和零残留清理；正式通知监视已进入仓库。不为后续单项自动重装、注销或程序化选择 source，下一集中窗口继续沿用人工切换/交互与公开通知监视分工。
 2. 补宿主焦点、鼠标、VoiceOver、边缘定位、多屏/全屏与输入菜单证据，再补 client 切换、进程重启、断网、中英文混输和双应用生命周期；满足退出场景后关闭 R01A。
 3. 任一新实机窗口仍须使用冻结产物、明确授权和系统设置真实移除；完成后复核设置列表、可添加目录、TIS、bundle、运行数据和进程全部零残留。
 4. R01A 退出后实施 R02L；R02L 退出后再由 R01B 接入真实学习，之后关闭整改专题并进入 M3。
