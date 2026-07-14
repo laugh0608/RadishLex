@@ -110,7 +110,9 @@ SDK `IMKInputSession.h` 明确给自建候选窗提供 `windowLevel`，并说明
 
 不安装动态 contract 必须创建真实 `NSApplication`、`NSPanel`、`NSButton` 和正式 controller，不只验证 helper 或源码字符串。组件 contract 覆盖非激活窗口、level、Spaces behavior、五候选、视觉/accessibility selection、appearance 重解析、长候选压缩、character index 与 insertion range 分离、anchor fallback、owner 接管、旧 control 拒绝和完整隐藏；fake client 必须记录收到的 character index，并在越界时返回有限高度的 `(0,0)` 矩形，使末尾 cursor、中间 cursor、无 inline session 与最终有效行锚点成为可判伪动态证据。controller contract 覆盖 composition、方向 keyDown 后 keyUp/modifier 保持、候选变化重置、Space、鼠标、accessibility press、Enter、Escape、宿主快捷键与双 client 生命周期。contract-only initializer 和 inspection API 只在 `RADISHLEX_CONTRACT_SMOKE=1` 编译，native 产品门禁必须证明这些 selector 不存在。
 
-正式 `build 30` 的一次实体键盘观察发生在系统开启“自动切换到文稿的输入法”的环境中；事后 TIS 显示 TextEdit 已切回系统拼音，所以候选高亮迁移与 Space 提交不能归属为 RadishLex 通过证据。该轮同时观察到候选窗固定在屏幕左下角，仓库审计确认末尾插入 cursor 被错误当成 inline character index。修正后的产品构建号为 `31`；在另行授权签名安装前，它只具备仓库内 contract/native 证据。
+正式 `build 30` 的一次实体键盘观察发生在系统开启“自动切换到文稿的输入法”的环境中；事后 TIS 显示 TextEdit 已切回系统拼音，所以候选高亮迁移与 Space 提交不能归属为 RadishLex 通过证据。该轮同时观察到候选窗固定在屏幕左下角，仓库审计确认末尾插入 cursor 被错误当成 inline character index。修正后的产品构建号为 `31`；2026-07-14 已使用 Apple Development identity 重建、通过严格签名和安装副本哈希复核，并在不注销的当前会话进入系统设置现有列表，真实 UI 尚待按人工分组流程判定。
+
+本轮曾用公开 `TISSelectInputSource` 精确选择正式 mode，同会话返回 `property_selected=1` 且 current source ID 精确匹配，但菜单栏仍显示系统拼音，实体输入表现为 RadishLex；开发者手动切到 U.S. 再切回系统拼音后显示与行为恢复一致。这证明菜单栏/SystemUIServer 呈现可能滞后于 TIS 与实际事件归属。该诊断不计作候选功能通过，后续验收禁止自动选择 source：执行者只做部署、系统设置添加、只读来源监视和清理，开发者手动聚焦、切换与实体交互。
 
 ## 隐私与本地数据
 
@@ -145,7 +147,7 @@ TIS input source/mode id 与 bundle 文件名属于平台稳定身份，不等�
 
 ## 开发安装边界
 
-新增、启用或移除系统输入法会修改本机状态，必须在独立 runbook 中说明影响、路径、回滚和 smoke 数据要求，并在执行前获得用户明确授权。自动测试默认只构建 bundle、检查结构和运行 host contract，不自动安装、启用或重启系统输入法服务。为防文稿级自动切换污染来源归属，下一次真实 smoke 必须先聚焦目标文稿、再选择 RadishLex，并在实体输入前后立即用精确 TIS source 查询确认 RadishLex mode 持续 selected；任一时点不匹配时，该段输入不得计入验收。
+新增、启用或移除系统输入法会修改本机状态，必须在独立 runbook 中说明影响、路径、回滚和 smoke 数据要求，并在执行前获得用户明确授权。自动测试默认只构建 bundle、检查结构和运行 host contract，不自动安装、启用或重启系统输入法服务。授权实机采用固定人机分工：执行者负责部署、系统设置添加、只读 TIS 监视和最终移除清理；开发者负责目标文稿聚焦、当前 source 手动切换及实体键盘、鼠标和辅助功能交互。自动化不得调用 `TISSelectInputSource` 或注入按键代替验收；菜单栏名称仅作辅助观察，来源归属以输入期间只读精确 source 记录为准。注销或重启登录会话必须由开发者另行安排，不能作为自动刷新步骤。
 
 当前开发实现位于 `platforms/macos-imk/`。`./scripts/check-macos-imk.sh` 只构建 contract `.app` bundle、编译 production 条件分支并运行 wrapper、真实 AppKit panel 与 controller 集成 contract；`./scripts/check-macos-imk-native.sh` 必须由调用方显式提供 `RIME_INCLUDE_DIR`、`RIME_LIB_DIR`、隔离 shared data、schema id 和许可证文件，并检查 mode metadata、架构、递归 dependency closure、symbol、逐库许可证、完整 bundle 签名、数据哈希清单与 contract-only API 缺失。默认 ad-hoc 签名只服务无安装门禁；真实安装 smoke 还必须显式提供当前用户有效的 Apple Development identity。两条入口都不查找用户已有 Rime 目录，不执行安装、注册、bundle 启动或服务重启。开发版安装与移除步骤见 `docs/runbooks/macos-inputmethodkit-development.md`。
 

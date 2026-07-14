@@ -18,7 +18,9 @@
 
 2026-07-14 的正式 `build 30` 已完成 Apple Development 签名、用户级安装、一次注销/登录、系统设置添加和实体键盘观察，随后完整清理。实体输入时看到候选条、右方向后高亮移动且 Space 提交移动后候选，但系统开启了“自动切换到文稿的输入法”，事后 TIS 显示 TextEdit 已切回系统拼音；因此这组事件和提交不能归属为 RadishLex 正式通过证据。候选窗同时被观察到固定在屏幕左下角。清理后精确 TIS 为 `matches=0 enabled=0 selected=0`，用户级 bundle、隔离运行数据、精确进程均不存在。
 
-当前 SDK 契约确认 `attributesForCharacterIndex:` 接收 inline session 内的字符索引，不是末尾插入位置。正式实现现以 marked range 派生合法索引：有 inline text 时将 cursor 限制到 `length - 1`，无 inline session 时使用 `0`；`firstRectForCharacterRange:actualRange:` 继续使用文档绝对插入位置 fallback，不以拒绝合法 `(0,0)` 坐标的启发式规则掩盖问题。真实 AppKit component contract 已覆盖越界索引返回有限高度 `(0,0)` 的 fake client、末尾/中间 cursor、无 inline session 和最终 panel 锚点；生产行为变化使 `CFBundleVersion` 升至 `31`。`build 31` 目前只有仓库内代码、动态 contract、静态门禁和隔离 native 证据，尚未签名安装或形成真实应用证据，R01A 未退出。
+当前 SDK 契约确认 `attributesForCharacterIndex:` 接收 inline session 内的字符索引，不是末尾插入位置。正式实现以 marked range 派生合法索引，保留 `firstRectForCharacterRange:actualRange:` 的文档绝对插入位置 fallback；动态 contract 覆盖越界索引返回有限高度 `(0,0)`、末尾/中间 cursor、无 inline session 和最终 panel 锚点，产品构建号升至 `31`。
+
+`build 31` 已在明确授权后使用 Apple Development identity 重建并完成严格签名、安装副本哈希复核、用户级安装和系统设置添加；当前会话无需注销已识别 source。一次公开 TIS 自动选择诊断精确确认 RadishLex 为 current source，但菜单栏仍显示系统拼音，实体输入表现为 RadishLex；开发者手动经 U.S. 切回系统拼音后恢复一致。该现象只证明菜单栏/SystemUIServer 显示可能滞后，不计作候选功能通过。自动选择工具已停止，当前 RadishLex 为 `matches=2 enabled=1 selected=0`，bundle 与隔离运行数据存在、进程停止，等待人工分组测试后完整清理；R01A 未退出。
 
 长期产品交付顺序见 [产品交付路线图](../roadmap.md)，当前整改批次、停止线、资产处置和退出条件见 [项目稳定化整改专题](../remediation/2026-07-project-stabilization.md)。
 
@@ -28,7 +30,7 @@
 - librime 生命周期已收口到进程级 runtime；多 session、owner-thread、配置冲突、失败回滚和 finalize 已有自动或 native smoke。
 - macOS Objective-C 薄壳、contract bundle 与 wrapper smoke 已落地，覆盖按键规范化、commit/snapshot/candidate 复制、reset、schema、线程与 teardown。
 - 正式 AppKit panel/component contract 动态覆盖非激活窗口、level、Spaces behavior、五候选、视觉/accessibility selection、appearance、合法 inline character index、绝对 insertion fallback、anchor、owner 接管和完整隐藏；controller contract 覆盖 keyDown/keyUp/modifier、候选变化重置、Space/鼠标/accessibility press 到 Rust commit、Enter/Escape、宿主快捷键和双 client 生命周期。
-- 正式 TIS 状态/清理入口按精确 Bundle ID 隔离产品与 reference probe；`build 30` 清理后已复核 `matches=0 enabled=0 selected=0`、bundle/运行数据不存在且进程停止。系统设置列表与 TIS 缓存更新存在竞态，授权清理仍以系统设置真实移除为前置，不使用 `TISDisableInputSource` 或私有配置替代。
+- 正式 TIS 状态/清理入口按精确 Bundle ID 隔离产品与 reference probe；系统设置、TIS 与菜单栏呈现都可能短时竞态。来源归属使用输入期间只读精确 source 记录，清理仍以系统设置真实移除为前置，不使用 `TISDisableInputSource` 或私有配置替代。
 - 隔离 `rime-pinyin-simp` 的真实 FFI smoke 已覆盖 composition、完整与分段非首候选、Backspace、Escape、Enter、翻页、方向键高亮与 Space、multi-session 和不存在 schema 拒绝；adapter 以 deployed schema list、原生 current-page selection API 与选择后回读固定可用性。
 - native 门禁覆盖隔离 schema/data/license、架构、FFI symbol、递归 dylib closure、逐库签名哈希和外部依赖拒绝；不读取用户 Rime 目录。
 - macOS bundle 固定正式 Bundle/mode ID、`LSUIElement`、简体中文 metadata、双语标签与 Retina 列表图标，并对完整依赖闭包签名。
@@ -39,7 +41,7 @@
 
 ## 已确认阻塞
 
-- R01A 的 AppKit candidate panel 已形成 `build 31` 仓库内动态 contract、静态门禁与隔离 native 证据，但尚无可归属的真实应用通过证据。`build 30` 的实体输入因文稿自动切换输入源而来源不明，并暴露候选窗左下角定位缺陷；其安装副本、运行数据、进程与 TIS 已零残留。下一次实机必须先聚焦目标文稿、再选择 RadishLex，并在实体输入前后立即复核精确 TIS selected source；之后才判定视觉/提交同 index、锚点、宿主焦点、鼠标、VoiceOver、多屏/全屏和生命周期。
+- R01A 的 AppKit candidate panel 已形成 `build 31` 仓库与冻结安装产物，但尚无人工分组的真实应用通过证据。`build 30` 的实体输入来源不明并暴露左下角定位缺陷；`build 31` 的菜单栏竞态诊断也不计为候选通过。后续由执行者做部署、只读 source 监视和清理，开发者手动聚焦、切换并实体交互，再判定视觉/提交同 index、锚点、宿主焦点、鼠标、VoiceOver、多屏/全屏和生命周期。
 - 输入 session 未组合 engine、ranker、userdb 与 privacy policy，真实选择没有进入平台学习热路径。
 - userdb 用户意图缺少统一事务、WAL/busy 策略；ranker recency/frequency 语义需要修正。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
@@ -57,8 +59,8 @@
 
 ## 下一步顺位
 
-1. 保持正式输入法签名、安装与登录边界暂停；`build 31` 源码、动态 contract、native 闭包、三阶段验收矩阵和精确清理门禁作为下一集中实机候选，不为单轮修复要求开发者注销，也不反复更换 Bundle ID 或路径。
-2. 仅在开发者另行授权并主动安排不会打断其他任务的单次窗口后，以 Apple Development identity 重建同一 `build 31`，集中完成注销/登录、添加、选择、可判伪 smoke 与清理。每个目标文稿都必须先聚焦、后选择 RadishLex，并在实体输入前后立即确认精确 mode 保持 `selected=1`；否则该轮输入结果不进入正式证据。
+1. 保持当前已签名安装的冻结 `build 31`，不重建、不注销、不自动选择 source 或注入按键；执行者启动只读 source 监视后，每次向开发者交付一组可判伪实体步骤。
+2. 开发者先聚焦目标文稿，再手动选择 RadishLex 并完成该组输入；菜单栏只作辅助观察，输入期间精确 source 不匹配或任一行为异常即停止。测试结束后由执行者完成系统设置移除和 TIS、bundle、运行数据、进程零残留清理。
 3. panel 通过后补 client 切换、进程重启、断网、中英文混输与两个应用交叉证据，满足退出场景后关闭 R01A。
 4. R01A 退出后实施 R02L；R02L 退出后再由 R01B 接入真实学习，之后关闭整改专题并进入 M3。
 

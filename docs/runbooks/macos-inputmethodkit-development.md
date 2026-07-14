@@ -40,9 +40,17 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 - 在真实应用输入框执行 smoke；
 - 删除已安装 bundle 或修改系统输入源配置。
 
-集中验收可以使用一次明确授权覆盖同一冻结 build 的 Apple Development 签名、用户级安装、一次注销/登录、系统设置添加与选择、真实应用 smoke、精确进程重启、短时断网和完整清理。授权必须逐项列出这些影响；未被列入的动作仍须停止。只要 build、路径和动作范围没有变化，已覆盖的步骤不在登录前后重复请求授权。若代码、构建号、Bundle ID、mode ID、安装域或清理目标变化，本次授权立即失效。
+集中验收可以使用一次明确授权覆盖同一冻结 build 的 Apple Development 签名、用户级安装、一次注销/登录、系统设置添加、用户手动选择、真实应用 smoke、精确进程重启、短时断网和完整清理。授权必须逐项列出这些影响；未被列入的动作仍须停止。只要 build、路径和动作范围没有变化，已覆盖的步骤不在登录前后重复请求授权。若代码、构建号、Bundle ID、mode ID、安装域或清理目标变化，本次授权立即失效。
 
 取得授权后，执行者应先记录准备安装的生成 bundle 路径、安装域和回滚目标。启用与移除优先通过系统设置人工完成，不把注册、服务重启或系统数据库修改写进自动门禁。
+
+### 实机人机分工
+
+- 执行者负责冻结产物、签名、安装、打开系统设置并添加 source、启动只读 TIS 监视，以及测试完成后的系统设置移除、bundle/运行数据/进程清理和零残留复核。
+- 开发者负责聚焦目标文稿、通过菜单栏或实体快捷键手动切换当前输入源，并完成实体键盘、鼠标、VoiceOver、应用切换与视觉观察。输入法进程由 macOS 随用户选择启动，不直接运行 bundle executable 代替该步骤。
+- 执行者每次只交付一组短步骤，等待开发者报告后才继续。验收自动化不得调用 `TISSelectInputSource`、注入合成按键或自动操作候选项来替代人工行为；只读 TIS 监视可以记录 source 变化，但不得启用、停用或选择 source。
+- 菜单栏名称和图标只作辅助观察。若它与精确 TIS 或实际输入行为冲突，当前组停止并标记为显示缓存竞态；开发者先手动切到 U.S. 等中立输入源，再切到目标 source 后从头重做该组。
+- 注销、重新登录或重启不会由刷新失败自动触发。若 source 未进入当前会话目录，执行者必须停下，由开发者保存工作并另行安排登录边界。
 
 ## 集中验收冻结点
 
@@ -54,7 +62,7 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 4. 记录生成 bundle 主程序、FFI dylib 和 native manifest 的 SHA-256；复制后逐字节复核生成产物与安装副本，确保系统测试的就是冻结产物。
 5. 安装目标仅为 `~/Library/Input Methods/RadishLexInputMethod.app`，运行数据仅为本轮隔离的 `~/Library/Application Support/RadishLex/Rime`；不得读取或复用用户现有 Rime 数据。
 
-冻结后发现源码或产物问题，应取消本次真实动作并回到仓库修复。不得在已登录、已添加或已选择输入法的现场边改边重建。`build 31` 的 Apple Development 签名、真实安装、注销/登录、系统设置添加与集中验收均尚未授权；仓库内 ad-hoc contract/native 通过不能扩张为这些动作的授权。
+冻结后发现源码或产物问题，应取消本次真实动作并回到仓库修复。不得在已登录、已添加或已选择输入法的现场边改边重建。2026-07-14 已取得 `build 31` 的 Apple Development 签名、用户级安装、系统设置添加、真实 smoke 与完整清理授权；本轮 source 无需注销已进入现有列表。当前冻结安装副本仍在验收现场，源码或产物不得重建。
 
 上一正式 `build 30` 虽完成 Apple Development 签名、用户级安装、注销/登录、系统设置添加和实体键盘观察，但系统当时开启了“自动切换到文稿的输入法”。实体输入后 TIS 显示 TextEdit 已切回系统拼音，所以候选高亮迁移与 Space 提交不具备 RadishLex 来源归属，不能写成正式通过；该轮观察到的候选窗固定屏幕左下角则形成定位缺陷输入。完整清理后 TIS 为 `matches=0 enabled=0 selected=0`，bundle、隔离运行数据和精确进程均不存在。
 
@@ -68,7 +76,7 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 6. 构建目录、废纸篓、用户级与系统级副本的 LaunchServices 重复记录会干扰诊断，应在安装前注销或移出扫描路径。即时注册成功不能替代 TIS source 枚举证据。
 7. 对全新 Bundle ID/安装路径，用户级副本可能已被 TIS 解析却不进入当前登录会话的系统设置可添加目录。注销/重新登录只能是实现与验收矩阵冻结后、开发者主动安排的集中验收边界，不能作为逐 build 日常调试机制。若已取得注销授权，应保持签名、bundle 和路径不变，只执行一次；登录后先只读复核 TIS 与系统设置，不提前启用、选择、注册或重建。若当次不适合打断登录会话或登录后仍不出现，停止并按清理停止线回滚，不能连续更换 ID、路径或修改私有数据库。
 
-登录后先用 TIS 查询或系统设置确认目标 source 确实存在。若集中授权已明确覆盖添加、选择和 smoke，可在只读复核通过后继续；否则停在动作前重新取得授权。不要直接修改 `com.apple.HIToolbox` defaults，不把自注册逻辑放进输入法进程。
+登录后先用 TIS 查询或系统设置确认目标 source 确实存在。若集中授权已明确覆盖添加、用户手动选择和 smoke，可在只读复核通过后继续；否则停在动作前重新取得授权。不要直接修改 `com.apple.HIToolbox` defaults，不把自注册逻辑放进输入法进程。
 
 候选事件或 metadata 的 reference probe 使用独立说明与精确清理入口，见 `platforms/macos-imk/ReferenceProbe/README.md`；probe 证据不能替代正式 native bundle smoke。
 
@@ -80,13 +88,13 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 
 至少在 TextEdit 中先判定：
 
-1. 先聚焦目标 TextEdit 文稿与明确插入点，再选择 RadishLex；不能先选择输入法后再切入可能触发文稿级自动切换的窗口。
-2. 选择后立即运行 `./scripts/cleanup-macos-imk.sh --status` 精确查询正式 Bundle ID，确认 Pinyin mode 为 `selected=1`；完成一组实体输入后立即再次查询。输入前后任一查询不是精确 RadishLex selected source，该组候选事件和提交一律标记为“来源不可归属”，不得继续写成通过证据。
-3. 来源归属成立后，判定全拼 composition、首候选、非首候选和连续提交正确。
-4. 左右及上下方向移动时，视觉高亮、controller display index 与 Space 最终提交始终指向同一候选；keyUp 与 modifier-only 不把选择拉回首项。
-5. 候选 panel 必须跟随当前文字光标，不得固定在屏幕原点、左下角或旧 client；靠近边缘时的上下放置与裁剪留到第二阶段扩大验证。
-6. 数字选择、翻页、Backspace、Escape、Enter、取消和重置语义明确。
-7. 中英文混输边界正确，Command 快捷键与未消费普通按键继续由宿主接收。
+1. 执行者先启动只读精确 TIS source 监视并明确本组唯一按键序列；开发者先聚焦目标 TextEdit 文稿与插入点，再手动选择 RadishLex，不能反序操作。
+2. 只读记录必须确认正式 Pinyin mode 在本组输入期间持续为 current/selected source；开发者完成本组前不切换应用。返回 Codex 报告导致的文稿级自动切换只标记本组结束，不反推输入期间来源。
+3. 若菜单栏显示系统拼音但精确 source 或实际行为为 RadishLex，当前组不继续；开发者经中立输入源手动重选后从头执行。菜单栏显示不能单独证明或否定来源。
+4. 来源归属成立后，判定全拼 composition、首候选、非首候选和连续提交正确。
+5. 左右及上下方向移动时，视觉高亮、controller display index 与 Space 最终提交始终指向同一候选；keyUp 与 modifier-only 不把选择拉回首项。
+6. 候选 panel 必须跟随当前文字光标，不得固定在屏幕原点、左下角或旧 client；靠近边缘时的上下放置与裁剪留到第二阶段扩大验证。
+7. 数字选择、翻页、Backspace、Escape、Enter、取消和重置语义明确；中英文混输与宿主快捷键边界正确。
 8. 鼠标点击候选与 VoiceOver accessibility press 均通过当前候选选择语义提交，不产生第二套平台提交路径。
 
 视觉索引、选择索引与最终提交任一不一致，或候选窗抢走宿主输入焦点，均直接判定失败。
@@ -146,8 +154,8 @@ R01A 每轮真实 smoke 无论通过还是失败都必须完整回滚，不保�
 
 它只使用公开 TIS API 查询正式 Bundle ID，并报告精确用户级 bundle、隔离运行数据和精确进程状态，不修改系统配置。回滚顺序固定为：
 
-1. 先在系统设置“键盘 -> 文字输入 -> 编辑”中选中 RadishLex 并点击“移除”；不能用公开 TIS API 停用代替该动作。
-2. 确认当前输入源已切回系统输入法，再只处理 RadishLex 残余 TIS source；不得修改 `com.apple.HIToolbox` 或 TIS 私有数据库。
+1. 开发者先手动切回系统输入法；执行者再在系统设置“键盘 -> 文字输入 -> 编辑”中选中 RadishLex 并点击“移除”。不能用公开 TIS API 停用代替该动作；若自动化无法精确识别设置行，应停下请求人工协助，不能猜测点击。
+2. 只读确认当前 source 已不是 RadishLex，再处理其残余 TIS source；不得修改 `com.apple.HIToolbox` 或 TIS 私有数据库。
 3. 在本次集中授权明确覆盖清理、并已完成系统设置移除后执行：
 
    ```bash
