@@ -48,7 +48,7 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 
 - 执行者负责冻结产物、签名、安装、打开系统设置并添加 source、启动只读 TIS 监视，以及测试完成后的系统设置移除、bundle/运行数据/进程清理和零残留复核。
 - 开发者负责聚焦目标文稿、通过菜单栏或实体快捷键手动切换当前输入源，并完成实体键盘、鼠标、应用切换与视觉观察；另行安排辅助功能专项时再负责 VoiceOver 操作。输入法进程由 macOS 随用户选择启动，不直接运行 bundle executable 代替该步骤。
-- 执行者每次只交付一组短步骤，等待开发者报告后才继续。验收自动化不得调用 `TISSelectInputSource`、注入合成按键或自动操作候选项来替代人工行为；只读 TIS 监视固定使用 `./scripts/cleanup-macos-imk.sh --monitor`，它先输出 `event=initial`，再订阅 `kTISNotifySelectedKeyboardInputSourceChanged` 并通过 CFRunLoop 输出 `event=changed`。每行的 `source_id` 是精确 current source，只有正式 mode 精确匹配时 `is_radishlex_pinyin=1`；开始产品组前必须先以系统 source 手动切换自检，不能用不处理通知的轮询进程冒充实时记录。
+- 执行者每次只交付一组短步骤，等待开发者报告后才继续。验收自动化不得调用 `TISSelectInputSource`、注入合成按键或自动操作候选项来替代人工行为；只读 TIS 监视固定使用 `./scripts/cleanup-macos-imk.sh --monitor`，它先输出 `event=initial`，再订阅 `kTISNotifySelectedKeyboardInputSourceChanged` 并通过 CFRunLoop 输出 `event=changed`。每行的 `source_id` 是精确 current source，只有正式 mode 精确匹配时 `is_radishlex_pinyin=1`；同一次切换可能收到多条相同 source 通知，来源判定使用事件顺序和精确 ID，不按通知条数计数。开始产品组前必须先以系统 source 手动切换自检，不能用不处理通知的轮询进程冒充实时记录。
 - 若沙盒上下文出现 HiServices XPC 连接错误或手动切换后没有通知，停止该监视进程；只能在获得必要授权后于真实用户上下文运行同一已提交工具并重新执行系统 source 自检，不能改代码、重建产物或改用变异 API 掩盖环境隔离。
 - 菜单栏名称和图标只作辅助观察。若它与精确 TIS 或实际输入行为冲突，当前组停止并标记为显示缓存竞态；开发者先手动切到 U.S. 等中立输入源，再切到目标 source 后从头重做该组。
 - “自动切换到文稿的输入法”是开发者为避免文稿级 source 占用而主动关闭的测试前提；本轮保持关闭，执行者不得自动开启、关闭或恢复该设置。

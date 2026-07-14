@@ -26,7 +26,7 @@
 
 验收后清理经历设置项回流和 TIS 缓存竞态：TextEdit 文稿先切回系统拼音，通过系统设置真实移除；删除 bundle/隔离数据并终止进程后，再以系统设置公开界面刷新现有列表与可添加目录。最终现有列表和“添加 -> 简体中文”目录均无 RadishLex，`matches=0 enabled=0 selected=0`，bundle、运行数据、进程与本轮临时构建目录均无残留；未使用 `TISDisableInputSource`、私有配置或注销，“自动切换到文稿的输入法”仍保持关闭。R01A 因主输入路径的平台与生命周期矩阵尚未完成而继续开放。
 
-临时通知监视已收口到现有 `tis_source_status.m`：`--monitor` 先输出精确 current source，再在公开 selected-source 通知到达时通过 CFRunLoop 输出变化，并以 `is_radishlex_pinyin` 明确标识正式 Pinyin mode；原 Bundle ID 状态输出和清理调用保持兼容。门禁固定编译、默认输出、通知/RunLoop 结构以及 `TISSelectInputSource`、`TISDisableInputSource` 和私有配置禁用线。用户为避免文稿级 source 占用而主动关闭的“自动切换到文稿的输入法”继续保持关闭，执行者不得自动修改。
+临时通知监视已收口到现有 `tis_source_status.m`：`--monitor` 先输出精确 current source，再在公开 selected-source 通知到达时通过 CFRunLoop 重读并输出 current source，以 `is_radishlex_pinyin` 明确标识正式 Pinyin mode；同一次切换允许出现重复通知，原 Bundle ID 状态输出和清理调用保持兼容。门禁固定编译、默认输出、通知/RunLoop 结构以及 `TISSelectInputSource`、`TISDisableInputSource` 和私有配置禁用线。用户为避免文稿级 source 占用而主动关闭的“自动切换到文稿的输入法”继续保持关闭，执行者不得自动修改。
 
 长期产品交付顺序见 [产品交付路线图](../roadmap.md)，当前整改批次、停止线、资产处置和退出条件见 [项目稳定化整改专题](../remediation/2026-07-project-stabilization.md)。
 

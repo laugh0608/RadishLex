@@ -224,7 +224,7 @@ apps/radishlex-manager/
 
 ## 平台目录
 
-当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build、不安装系统输入法的 wrapper contract smoke，以及不接 Rime/FFI 的合成 reference probe。正式薄壳已完成 Apple Development 短时安装和基础真实输入验证，但方向视觉高亮、输入菜单、client 切换、进程重启、断网与双应用交叉矩阵尚未闭合，不能据此宣称 R01A 或 M1 退出。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
+当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build、不安装系统输入法的 wrapper contract smoke，以及不接 Rime/FFI 的合成 reference probe。正式薄壳已完成 Apple Development 短时安装，并在精确 source 归属下通过候选跟随光标、方向视觉与 Space 提交一致、鼠标选择和宿主焦点；边缘定位、多屏/全屏、输入菜单、client 切换、进程重启、断网与双应用交叉矩阵尚未闭合，不能据此宣称 R01A 或 M1 退出。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
 
 后续平台目录按进入顺序创建：
 

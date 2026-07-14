@@ -59,4 +59,4 @@ bundle metadata 固定正式 Bundle ID `org.radishlex.inputmethod.macos` 与单�
 ./scripts/cleanup-macos-imk.sh --authorized-after-settings-removal
 ```
 
-`--monitor` 先输出一次当前 source，随后只通过公开 selected-source 通知输出变化；`is_radishlex_pinyin=1` 只表示精确匹配正式 Pinyin mode。第三条命令只能在系统设置已移除 RadishLex、当前输入源已切回系统输入法且本次授权明确覆盖清理时执行。这些入口不修改 `com.apple.HIToolbox` 或 TIS 私有数据库；完整集中验收与回滚顺序见 `docs/runbooks/macos-inputmethodkit-development.md`。
+`--monitor` 先输出一次当前 source，随后在公开 selected-source 通知到达时重读并输出 current source；一次切换可能出现多条相同 source 记录，`is_radishlex_pinyin=1` 只表示精确匹配正式 Pinyin mode。第三条命令只能在系统设置已移除 RadishLex、当前输入源已切回系统输入法且本次授权明确覆盖清理时执行。这些入口不修改 `com.apple.HIToolbox` 或 TIS 私有数据库；完整集中验收与回滚顺序见 `docs/runbooks/macos-inputmethodkit-development.md`。
