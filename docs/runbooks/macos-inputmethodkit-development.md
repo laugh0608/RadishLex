@@ -10,6 +10,19 @@
 
 该命令只在 `target/` 下构建 contract bundle、smoke executable 和只读 TIS 状态工具，不写用户级或系统级 `Input Methods` 目录，不注册输入源，不启动或重启输入法服务。contract bundle 使用合成 demo engine，只证明 wrapper、bundle 和 FFI 调用链，不证明真实 Rime 或 InputMethodKit 可用。
 
+## 只读 TIS 诊断
+
+正式开发输入源使用同一包装入口编译并运行仓库内 TIS 工具：
+
+```bash
+./scripts/cleanup-macos-imk.sh --status
+./scripts/cleanup-macos-imk.sh --monitor
+```
+
+`--status` 输出匹配 source 的属性与 `matches/enabled/selected` 汇总，并继续报告精确用户级 bundle、隔离运行数据和进程状态；它不因路径存在而推断输入源已添加。`--monitor` 输出 `event=initial|changed source_id=... bundle_id=... is_radishlex_pinyin=0|1`，每次通知后立即刷新 stdout，使用 `Ctrl-C` 结束。同一次切换可能出现重复记录，必须按事件顺序与精确 source ID 判定来源。
+
+两条命令只写仓库 `target/macos-imk/tools/` 下的编译产物，不选择或修改输入源，也不读取输入正文。若沙盒上下文出现 HiServices XPC 连接错误或切换后没有通知，按后文实机分工停止并切换到获准的真实用户上下文，不能换成变异 API。
+
 ## native bundle 前提
 
 1. 使用已有、显式指定的 `librime` include/lib；构建脚本不安装依赖。

@@ -137,7 +137,18 @@ M1 开发版必须明确并隔离：
 
 开发 smoke 不得读取用户现有 Rime 配置或词库目录，也不得把本机绝对路径写入 committed 文档或 fixture。M1 已使用固定上游 commit、保留 Apache-2.0 许可证和来源记录的 `rime-pinyin-simp` 临时隔离数据复验 native bundle 与真实 FFI 输入链。native bundle 必须递归封装全部非系统 dylib、把加载路径改写到 bundle 内、保存逐库许可证与签名后哈希清单，并拒绝任何外部绝对依赖。该开发期封装不替代 M4 的 Developer ID、公证、升级/移除和发布级供应链门禁。
 
-TIS input source/mode id 与 bundle 文件名属于平台稳定身份，不等同于允许下划线的 Rime schema id。当前正式 Bundle ID 为 `org.radishlex.inputmethod.macos`，单一全拼 mode 为 `org.radishlex.inputmethod.macos.Pinyin`，bundle 文件名为 `RadishLexInputMethod.app`，Rime schema 仍为 `pinyin_simp`；mode metadata 必须同时固定 `LSUIElement`、简体中文 language、script、repertoire、图标、本地化标签和可见顺序。输入法列表 TIFF 使用 16pt 逻辑尺寸，当前 Retina 资产固定为 `32×32 @144dpi` 并保留安全边距，避免系统设置按 64pt 放大后覆盖名称。macOS 26.5.1 已观察到失败身份与安装路径的 TIS 负缓存，开发过程不得复用旧 `org.radishlex.inputmethod` 或 `RadishLex.app`，也不得通过修改 TIS 私有数据库清缓存。系统设置列表、菜单发布与公开 TIS 枚举之间可能竞态；正式只读工具的 `--monitor` 必须先输出 `TISCopyCurrentKeyboardInputSource` 的精确 source，再接收 `kTISNotifySelectedKeyboardInputSourceChanged` 并运行 CFRunLoop，以 `is_radishlex_pinyin` 标识是否精确等于正式 Pinyin mode。一次系统切换可能产生多条相同 source 的通知，记录方按事件顺序和精确 ID 判断来源，不把通知条数当作切换次数。工具不得选择、启用、停用或注册 source，不得修改 `com.apple.HIToolbox`、TIS 私有数据或其他配置，也不读取输入正文。清理必须先在设置中真实移除，必要时对重启后回流项再次移除；删除后打开现有列表与可添加目录触发公开扫描，再复核精确零残留，不能用 `TISDisableInputSource` 或私有配置替代。
+TIS input source/mode id 与 bundle 文件名属于平台稳定身份，不等同于允许下划线的 Rime schema id。当前正式 Bundle ID 为 `org.radishlex.inputmethod.macos`，单一全拼 mode 为 `org.radishlex.inputmethod.macos.Pinyin`，bundle 文件名为 `RadishLexInputMethod.app`，Rime schema 仍为 `pinyin_simp`；mode metadata 必须同时固定 `LSUIElement`、简体中文 language、script、repertoire、图标、本地化标签和可见顺序。输入法列表 TIFF 使用 16pt 逻辑尺寸，当前 Retina 资产固定为 `32×32 @144dpi` 并保留安全边距，避免系统设置按 64pt 放大后覆盖名称。macOS 26.5.1 已观察到失败身份与安装路径的 TIS 负缓存，开发过程不得复用旧 `org.radishlex.inputmethod` 或 `RadishLex.app`，也不得通过修改 TIS 私有数据库清缓存。
+
+## TIS 只读状态与来源监视
+
+`Tools/tis_source_status.m` 只有两种只读调用：
+
+- `<bundle-id>` 通过 `TISCreateInputSourceList` 同时匹配精确 bundle ID 与 source family，逐项输出 enabled、selected、select-capable、category、type 和 languages，最后输出 `matches/enabled/selected` 汇总。原状态与清理入口依赖该格式，新增能力不得改变它。
+- `--monitor` 先通过 `TISCopyCurrentKeyboardInputSource` 输出 `event=initial`，再订阅 `kTISNotifySelectedKeyboardInputSourceChanged`、运行 CFRunLoop，并在每次通知到达后重读 current source。输出只包含 event、source ID、bundle ID 与 `is_radishlex_pinyin`；该标记只在 source ID 精确等于正式 Pinyin mode 时为 `1`。
+
+一次系统切换可能产生多条相同 source 的通知，记录方按事件顺序和精确 ID 判断来源，不把通知条数当作切换次数。工具不得选择、启用、停用、注册或反注册 source，不得写 `CFPreferences`、`NSUserDefaults`、`com.apple.HIToolbox` 或 TIS 私有数据，也不读取输入正文。来源监视只服务授权实机归属，不能成为输入热路径或产品运行依赖。
+
+清理必须先在系统设置中真实移除，必要时对重启后回流项再次移除；删除后打开现有列表与可添加目录触发公开扫描，再复核精确零残留，不能用 `TISDisableInputSource` 或私有配置替代。
 
 ## Header、线程与错误
 

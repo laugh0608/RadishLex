@@ -76,6 +76,14 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
 
 详细命令见 [CLI 说明](docs/cli.md)，本机 Rime 环境见 [Rime Native Smoke Runbook](docs/runbooks/rime-native-smoke.md)。
 
+macOS InputMethodKit 不安装验证：
+
+```bash
+./scripts/check-macos-imk.sh
+```
+
+该入口编译正式 Objective-C 条件分支，并运行 wrapper、AppKit candidate panel、controller 与只读 TIS 工具契约，但不会安装或启用输入法。native-rime bundle、授权后签名安装、实时来源监视和完整移除见 [macOS 平台说明](platforms/macos-imk/README.md) 与 [开发 runbook](docs/runbooks/macos-inputmethodkit-development.md)。
+
 Flutter manager：
 
 ```bash

@@ -16,6 +16,12 @@
 - `cleanup-user-install.sh`：在系统设置已人工移除且取得授权后，清理正式开发 bundle、隔离运行数据和精确进程，并要求 TIS 零残留。
 - `ReferenceProbe/`：隔离验证原生候选事件路由与单 mode 输入源 metadata，不链接 Rime 或正式 FFI，也不替代产品薄壳。
 
+## 候选窗定位与选择
+
+Rust snapshot 的 cursor 是允许落在 composition 末尾的插入位置，但 `attributesForCharacterIndex:lineHeightRectangle:` 接收 inline session 内的现存字符索引。正式 panel 因此先读取 client marked range：存在 marked text 时使用 `min(cursor, length - 1)`，没有 inline session 时使用 `0`。若该行矩形不可用，才以 marked range 的文档绝对末尾位置调用 `firstRectForCharacterRange:actualRange:`；两种 range 不能混用。
+
+最终 panel frame 使用目标 `NSScreen.visibleFrame` 在锚点下方或上方放置并限制在屏幕内；contract 环境没有有效 screen frame 时围绕有效行矩形构造计算区域，不回退到 `(0,0)`。controller 的唯一 display index 同时驱动视觉高亮与 Space selection，鼠标回调也携带同一 index 进入 Rust selection API。
+
 ## 不安装验证
 
 ```bash
@@ -51,7 +57,9 @@ bundle metadata 固定正式 Bundle ID `org.radishlex.inputmethod.macos` 与单�
 
 安装、启用、真实应用输入和移除会修改本机状态，必须另行取得授权后按独立 runbook 执行。
 
-正式开发输入源的只读状态与授权后清理入口为：
+## 只读状态、实时来源与清理
+
+正式开发输入源的入口为：
 
 ```bash
 ./scripts/cleanup-macos-imk.sh --status
@@ -59,4 +67,6 @@ bundle metadata 固定正式 Bundle ID `org.radishlex.inputmethod.macos` 与单�
 ./scripts/cleanup-macos-imk.sh --authorized-after-settings-removal
 ```
 
-`--monitor` 先输出一次当前 source，随后在公开 selected-source 通知到达时重读并输出 current source；一次切换可能出现多条相同 source 记录，`is_radishlex_pinyin=1` 只表示精确匹配正式 Pinyin mode。第三条命令只能在系统设置已移除 RadishLex、当前输入源已切回系统输入法且本次授权明确覆盖清理时执行。这些入口不修改 `com.apple.HIToolbox` 或 TIS 私有数据库；完整集中验收与回滚顺序见 `docs/runbooks/macos-inputmethodkit-development.md`。
+`--status` 输出正式 bundle family 的 TIS source 属性与 `matches/enabled/selected` 汇总，并报告安装路径、隔离运行数据和精确进程。`--monitor` 先输出 `event=initial`，随后在公开 selected-source 通知到达时输出 `event=changed` 与最新 current source；一次切换可能出现多条相同 source 记录，`is_radishlex_pinyin=1` 只表示精确匹配正式 Pinyin mode。两者不记录输入正文，监视以 `Ctrl-C` 结束。
+
+第三条命令只能在系统设置已移除 RadishLex、当前输入源已切回系统输入法且本次授权明确覆盖清理时执行。这些入口不选择、启用或停用 source，不修改 `com.apple.HIToolbox` 或 TIS 私有数据库；完整集中验收与回滚顺序见 `docs/runbooks/macos-inputmethodkit-development.md`。
