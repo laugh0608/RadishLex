@@ -76,7 +76,7 @@ runtime 初始化失败必须返回结构化错误。平台不得静默切换 de
 - 方向事件由当前 `IMKInputController` 接收并更新唯一的 display selection index；panel 的视觉高亮只从该 index 渲染，Space 也只以同一 index 调用 Rust selection API。鼠标点击和辅助功能 press 通过 panel delegate 回传 display index，再进入同一 Rust selection API。平台不得维护一份“视觉 index”和另一份“提交 index”，也不得把候选正文作为选择身份。
 - key release、modifier-only 或其他未改变 schema、preedit、cursor 与完整候选内容的 snapshot 必须保留当前 display selection；只有候选 presentation 确实变化时才重置到首项。否则方向 keyDown 后紧随的 keyUp 会把视觉和 Space 选择错误地拉回 index 0。
 - candidate panel 使用 `NSPanel` + 标准 AppKit view/control，必须是 `NSWindowStyleMaskNonactivatingPanel`，不能成为 key/main window，不能抢走宿主输入焦点。panel level 使用当前 `IMKTextInput.windowLevel + 1`；锚点优先使用 `attributesForCharacterIndex:lineHeightRectangle:` 的全局行矩形。该 API 的 index 相对 inline session 且必须指向现存字符：marked range 非空时使用 `min(cursor, length - 1)`，无 inline session 时固定使用 `0`，不能把允许等于 composition length 的插入 cursor 原样传入。屏幕原点 `(0,0)` 本身可能合法，不以坐标拒绝启发式判断返回值。`firstRectForCharacterRange:actualRange:` fallback 继续使用文档绝对插入位置，允许 range 落在 marked text 末尾；两套 range 语义不得混淆。最终 frame 按实际 `NSScreen.visibleFrame` 选择下方或上方、限制在目标屏幕内。Spaces、全屏辅助窗口、窗口循环和多屏行为必须使用公开 `NSWindowCollectionBehavior` 表达。
-- panel 的候选项必须进入 AppKit accessibility hierarchy，暴露稳定 label、index 与 selected value；选择变化发送公开 accessibility notification。候选 control 显式实现公开 accessibility press，并复用与鼠标相同的 target-action、owner 和 index 检查，不能另建提交路径。VoiceOver、全键盘访问、宿主焦点、多屏、全屏 Space 和 client 切换仍属于经授权实机 smoke，不可由自动 contract 替代。
+- panel 的候选项必须进入 AppKit accessibility hierarchy，暴露稳定 label、index 与 selected value；选择变化发送公开 accessibility notification。候选 control 显式实现公开 accessibility press，并复用与鼠标相同的 target-action、owner 和 index 检查，不能另建提交路径。宿主焦点、多屏、全屏 Space 和 client 切换仍属于 R01A 经授权实机 smoke，不可由自动 contract 替代；VoiceOver 与全键盘访问保留为后续辅助功能专项，不阻塞 M1 Alpha。
 - 输入源只声明唯一可选择的全拼 mode 及其 `TISInputSourceID`。SDK `TextInputSources.h` 把 bundle input method 与 `ComponentInputModeDict` 中的 input mode 定义为两个层级，因此系统枚举不可选择 parent source 与可选择 mode 是平台模型，不是 `menu` 返回值生成的第二个产品 mode。
 - `IMKInputController.menu` 只返回 input-method-specific commands。M1 当前没有这类命令，正式实现固定返回 `nil`；macOS 26 因此渲染的图标空白 command 行记录为系统呈现限制。不得用空 `NSMenu`、菜单标题、重复身份项、disabled placeholder 或 plist fallback 填充该区域。以后只有在真实设置/命令能力存在时才能加入可执行 `NSMenuItem`，且必须通过 `doCommandBySelector:commandDictionary:` 进入明确动作与生命周期。
 - 分页、Escape、带 Command 等修饰键和普通未消费按键继续沿既有 key result 边界处理。
@@ -114,7 +114,7 @@ SDK `IMKInputSession.h` 明确给自建候选窗提供 `windowLevel`，并说明
 
 本轮曾用公开 `TISSelectInputSource` 精确选择正式 mode，同会话返回 `property_selected=1` 且 current source ID 精确匹配，但菜单栏仍显示系统拼音；该诊断不计作候选功能通过。停止自动选择后，系统设置一度“已添加但菜单未发布 source”，经真实移除并重新添加后菜单项可由开发者手动选择。最终只读监视先以 U.S. 与系统拼音切换自证通知链有效，再记录正式 RadishLex mode 为测试期间 current source；实体键盘确认候选跟随文字光标、右方向视觉高亮迁移到第二项、Space 提交同一项且无异常。该结果正式关闭 build 31 光标锚点与本组视觉/提交一致性。
 
-同一冻结 `build 31` 随后在精确 RadishLex source 下通过鼠标选择第二候选与宿主焦点保持；但 VoiceOver 导航到第二候选后，旁白焦点、视觉高亮和 accessibility press 提交发生分叉：旁白位于第二项，视觉仍为第一项，press 也没有提交第二项。该实机结果否定“现有 accessibility 动态 contract 足以证明生产语义”的推断，但不改变单一 display index、公开 selected state 与统一提交路径的设计边界。R01A 在此停止扩大矩阵，生产修复必须另升 `build 32`；边缘定位、外观、长候选、多屏/全屏、输入菜单与生命周期/离线矩阵仍未执行。
+同一冻结 `build 31` 随后在精确 RadishLex source 下通过鼠标选择第二候选与宿主焦点保持；但 VoiceOver 导航到第二候选后，旁白焦点、视觉高亮和 accessibility press 提交发生分叉：旁白位于第二项，视觉仍为第一项，press 也没有提交第二项。该实机结果否定“现有 accessibility 动态 contract 足以证明生产语义”的推断，但不改变单一 display index、公开 selected state 与统一提交路径的设计边界。本轮按停止线结束并完整清理；阶段复核后将该问题降为 M1 Alpha 已知限制，build 31 继续作为主输入路径候选，R01A 不因该问题单独要求 `build 32`。边缘定位、外观、长候选、多屏/全屏、输入菜单与生命周期/离线矩阵仍未执行。
 
 ## 隐私与本地数据
 

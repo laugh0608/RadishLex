@@ -22,9 +22,9 @@
 
 `build 31` 已在明确授权后完成 Apple Development 重建、严格签名、安装副本哈希复核、用户级安装和系统设置添加，全程无需注销。初次出现“设置已添加但菜单不发布 source”；经系统设置真实移除并重新添加后，菜单项可由开发者手动选择。自检后的只读 TIS 通知监视精确记录 RadishLex mode 为本组 current source，开发者实体输入确认候选出现、跟随文字光标、右方向迁移到第二项且 Space 提交该项，无异常；返回 Codex 后监视才记录切回系统拼音。因此 build 31 的光标锚点与本组视觉/提交同 index 正式通过。
 
-同一冻结 `build 31` 的后续集中验收在精确 RadishLex source 归属下确认鼠标点击第二候选可提交，且无需重新点击 TextEdit 即可继续产生 composition，鼠标路径与宿主焦点通过。随后 VoiceOver 以 `Control-Option-Right Arrow` 导航到第二候选时，旁白焦点已位于第二项，但候选条视觉高亮仍停在第一项；`Control-Option-Space` 执行 accessibility press 后提交的也不是第二项。该结果是 R01A 硬失败，证明动态 contract 不能替代真实 VoiceOver 语义；本轮立即停止，没有继续边缘定位、外观、长候选、多屏/全屏、输入菜单或生命周期/离线矩阵，也没有在安装现场重建。
+同一冻结 `build 31` 的后续集中验收在精确 RadishLex source 归属下确认鼠标点击第二候选可提交，且无需重新点击 TextEdit 即可继续产生 composition，鼠标路径与宿主焦点通过。随后 VoiceOver 以 `Control-Option-Right Arrow` 导航到第二候选时，旁白焦点已位于第二项，但候选条视觉高亮仍停在第一项；`Control-Option-Space` 执行 accessibility press 后提交的也不是第二项。本轮按当时停止线立即停止，没有继续边缘定位、外观、长候选、多屏/全屏、输入菜单或生命周期/离线矩阵，也没有在安装现场重建。该缺陷证据保留，但当前产品推进决策将 VoiceOver 完整可用性降为 M1 Alpha 已知限制，不再阻塞 R01A 退出，也不单独触发 `build 32`。
 
-验收后清理经历设置项回流和 TIS 缓存竞态：TextEdit 文稿先切回系统拼音，通过系统设置真实移除；删除 bundle/隔离数据并终止进程后，再以系统设置公开界面刷新现有列表与可添加目录。最终现有列表和“添加 -> 简体中文”目录均无 RadishLex，`matches=0 enabled=0 selected=0`，bundle、运行数据、进程与本轮临时构建目录均无残留；未使用 `TISDisableInputSource`、私有配置或注销，“自动切换到文稿的输入法”仍保持关闭。R01A 因 VoiceOver 失败继续开放。
+验收后清理经历设置项回流和 TIS 缓存竞态：TextEdit 文稿先切回系统拼音，通过系统设置真实移除；删除 bundle/隔离数据并终止进程后，再以系统设置公开界面刷新现有列表与可添加目录。最终现有列表和“添加 -> 简体中文”目录均无 RadishLex，`matches=0 enabled=0 selected=0`，bundle、运行数据、进程与本轮临时构建目录均无残留；未使用 `TISDisableInputSource`、私有配置或注销，“自动切换到文稿的输入法”仍保持关闭。R01A 因主输入路径的平台与生命周期矩阵尚未完成而继续开放。
 
 临时通知监视已收口到现有 `tis_source_status.m`：`--monitor` 先输出精确 current source，再在公开 selected-source 通知到达时通过 CFRunLoop 输出变化，并以 `is_radishlex_pinyin` 明确标识正式 Pinyin mode；原 Bundle ID 状态输出和清理调用保持兼容。门禁固定编译、默认输出、通知/RunLoop 结构以及 `TISSelectInputSource`、`TISDisableInputSource` 和私有配置禁用线。用户为避免文稿级 source 占用而主动关闭的“自动切换到文稿的输入法”继续保持关闭，执行者不得自动修改。
 
@@ -47,7 +47,7 @@
 
 ## 已确认阻塞
 
-- R01A 的 AppKit candidate panel 已由 build 31 正式关闭光标锚点、右方向视觉迁移、Space 提交同 index、鼠标选择与宿主焦点子项；VoiceOver 导航第二候选时视觉仍停在首项，accessibility press 也未提交 VoiceOver 所在候选，是当前硬阻塞。边缘定位、多屏/全屏、输入菜单和 owner/client 生命周期因该失败尚未继续。
+- R01A 的 AppKit candidate panel 已由 build 31 正式关闭光标锚点、右方向视觉迁移、Space 提交同 index、鼠标选择与宿主焦点子项；尚缺边缘定位、多屏/全屏、输入菜单、owner/client 生命周期、进程重启与离线一致性的集中证据。VoiceOver 导航、视觉与 accessibility press 不一致已记录为 M1 Alpha 已知限制，不属于当前退出阻塞。
 - 输入 session 未组合 engine、ranker、userdb 与 privacy policy，真实选择没有进入平台学习热路径。
 - userdb 用户意图缺少统一事务、WAL/busy 策略；ranker recency/frequency 语义需要修正。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
@@ -62,11 +62,12 @@
 - manager 产品模式不得把真实 FFI 失败静默伪装为 fixture 成功；fixture 只能由显式 demo mode 启用并持续标识。
 - 合成 fixture、local smoke、CLI 输出和设计草案不能单独作为产品阶段完成证据。
 - 输入热路径继续保持本地和离线，不引入网络依赖。
+- M1 Alpha 不声明 VoiceOver 候选操作可用；在后续明确支持或宣传 VoiceOver 前，必须修复并重新完成真实辅助功能验收。
 
 ## 下一步顺位
 
-1. build 31 已完成本轮签名实机、VoiceOver 失败判定和零残留清理，不再作为 R01A 退出候选复用；下一生产修复另行升至 `build 32`，先定位并统一 VoiceOver 焦点、视觉 selected state、accessibility press index 与最终 commit。
-2. build 32 仓库修复与门禁完成后另行请求集中授权，先复验 VoiceOver；通过后才继续边缘定位、浅色/深色、长候选、多屏/全屏、输入菜单、client 切换、进程重启、断网、中英文混输和双应用生命周期。全部退出场景通过后关闭 R01A。
+1. build 31 已完成本轮签名实机、VoiceOver 已知限制记录和零残留清理，继续作为 R01A 主输入路径候选；不为该已知限制单独升 `build 32`。
+2. 下一集中窗口继续使用冻结 build 31，补边缘定位、浅色/深色、长候选、多屏/全屏、输入菜单、client 切换、进程重启、断网、中英文混输、宿主快捷键和双应用生命周期；主输入路径退出场景全部通过后关闭 R01A。
 3. 任一新实机窗口仍须使用冻结产物、人工切换/交互、公开通知监视、明确授权和系统设置真实移除；完成后复核设置列表、可添加目录、TIS、bundle、运行数据和进程全部零残留。
 4. R01A 退出后实施 R02L；R02L 退出后再由 R01B 接入真实学习，之后关闭整改专题并进入 M3。
 
