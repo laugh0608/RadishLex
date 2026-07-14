@@ -112,7 +112,9 @@ SDK `IMKInputSession.h` 明确给自建候选窗提供 `windowLevel`，并说明
 
 正式 `build 30` 的一次实体键盘观察发生在系统开启“自动切换到文稿的输入法”的环境中；事后 TIS 显示 TextEdit 已切回系统拼音，所以候选高亮迁移与 Space 提交不能归属为 RadishLex 通过证据。该轮同时观察到候选窗固定在屏幕左下角，仓库审计确认末尾插入 cursor 被错误当成 inline character index。修正后的产品构建号为 `31`；2026-07-14 已使用 Apple Development identity 重建、通过严格签名和安装副本哈希复核，并在不注销的当前会话完成正式人工复验。
 
-本轮曾用公开 `TISSelectInputSource` 精确选择正式 mode，同会话返回 `property_selected=1` 且 current source ID 精确匹配，但菜单栏仍显示系统拼音；该诊断不计作候选功能通过。停止自动选择后，系统设置一度“已添加但菜单未发布 source”，经真实移除并重新添加后菜单项可由开发者手动选择。最终只读监视先以 U.S. 与系统拼音切换自证通知链有效，再记录正式 RadishLex mode 为测试期间 current source；实体键盘确认候选跟随文字光标、右方向视觉高亮迁移到第二项、Space 提交同一项且无异常。该结果正式关闭 build 31 光标锚点与本组视觉/提交一致性，不替代尚未执行的鼠标、VoiceOver、多屏/全屏和生命周期矩阵。
+本轮曾用公开 `TISSelectInputSource` 精确选择正式 mode，同会话返回 `property_selected=1` 且 current source ID 精确匹配，但菜单栏仍显示系统拼音；该诊断不计作候选功能通过。停止自动选择后，系统设置一度“已添加但菜单未发布 source”，经真实移除并重新添加后菜单项可由开发者手动选择。最终只读监视先以 U.S. 与系统拼音切换自证通知链有效，再记录正式 RadishLex mode 为测试期间 current source；实体键盘确认候选跟随文字光标、右方向视觉高亮迁移到第二项、Space 提交同一项且无异常。该结果正式关闭 build 31 光标锚点与本组视觉/提交一致性。
+
+同一冻结 `build 31` 随后在精确 RadishLex source 下通过鼠标选择第二候选与宿主焦点保持；但 VoiceOver 导航到第二候选后，旁白焦点、视觉高亮和 accessibility press 提交发生分叉：旁白位于第二项，视觉仍为第一项，press 也没有提交第二项。该实机结果否定“现有 accessibility 动态 contract 足以证明生产语义”的推断，但不改变单一 display index、公开 selected state 与统一提交路径的设计边界。R01A 在此停止扩大矩阵，生产修复必须另升 `build 32`；边缘定位、外观、长候选、多屏/全屏、输入菜单与生命周期/离线矩阵仍未执行。
 
 ## 隐私与本地数据
 

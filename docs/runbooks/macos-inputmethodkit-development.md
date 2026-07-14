@@ -49,6 +49,7 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 - 执行者负责冻结产物、签名、安装、打开系统设置并添加 source、启动只读 TIS 监视，以及测试完成后的系统设置移除、bundle/运行数据/进程清理和零残留复核。
 - 开发者负责聚焦目标文稿、通过菜单栏或实体快捷键手动切换当前输入源，并完成实体键盘、鼠标、VoiceOver、应用切换与视觉观察。输入法进程由 macOS 随用户选择启动，不直接运行 bundle executable 代替该步骤。
 - 执行者每次只交付一组短步骤，等待开发者报告后才继续。验收自动化不得调用 `TISSelectInputSource`、注入合成按键或自动操作候选项来替代人工行为；只读 TIS 监视固定使用 `./scripts/cleanup-macos-imk.sh --monitor`，它先输出 `event=initial`，再订阅 `kTISNotifySelectedKeyboardInputSourceChanged` 并通过 CFRunLoop 输出 `event=changed`。每行的 `source_id` 是精确 current source，只有正式 mode 精确匹配时 `is_radishlex_pinyin=1`；开始产品组前必须先以系统 source 手动切换自检，不能用不处理通知的轮询进程冒充实时记录。
+- 若沙盒上下文出现 HiServices XPC 连接错误或手动切换后没有通知，停止该监视进程；只能在获得必要授权后于真实用户上下文运行同一已提交工具并重新执行系统 source 自检，不能改代码、重建产物或改用变异 API 掩盖环境隔离。
 - 菜单栏名称和图标只作辅助观察。若它与精确 TIS 或实际输入行为冲突，当前组停止并标记为显示缓存竞态；开发者先手动切到 U.S. 等中立输入源，再切到目标 source 后从头重做该组。
 - “自动切换到文稿的输入法”是开发者为避免文稿级 source 占用而主动关闭的测试前提；本轮保持关闭，执行者不得自动开启、关闭或恢复该设置。
 - 注销、重新登录或重启不会由刷新失败自动触发。若 source 未进入当前会话目录，执行者必须停下，由开发者保存工作并另行安排登录边界。
@@ -58,12 +59,12 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 进入真实动作前必须冻结源码与产物，至少记录：
 
 1. Git 工作区干净，当前提交、分支和相对 `origin/dev` 的领先状态明确；验收过程中不修改源码或重建另一个 build。
-2. `CFBundleVersion`、Bundle ID、mode ID、schema id 与安装文件名符合当前文档；R01A 当前候选固定为 `build 31`。
+2. `CFBundleVersion`、Bundle ID、mode ID、schema id 与安装文件名符合当前文档；`build 31` 已因 VoiceOver 语义失败退出候选，下一生产修复必须升至 `build 32`。
 3. Apple Development bundle 已通过 native 门禁、完整递归签名和 `codesign --verify --deep --strict`。
 4. 记录生成 bundle 主程序、FFI dylib 和 native manifest 的 SHA-256；复制后逐字节复核生成产物与安装副本，确保系统测试的就是冻结产物。
 5. 安装目标仅为 `~/Library/Input Methods/RadishLexInputMethod.app`，运行数据仅为本轮隔离的 `~/Library/Application Support/RadishLex/Rime`；不得读取或复用用户现有 Rime 数据。
 
-冻结后发现源码或产物问题，应取消本次真实动作并回到仓库修复。不得在已登录、已添加或已选择输入法的现场边改边重建。2026-07-14 的 `build 31` 已按同一冻结产物完成签名、用户级安装、系统设置添加、人工 smoke 与零残留清理；后续实机需重新取得对应授权，不能把本轮授权或产物现场视为仍然有效。
+冻结后发现源码或产物问题，应取消本次真实动作并回到仓库修复。不得在已登录、已添加或已选择输入法的现场边改边重建。2026-07-14 的 `build 31` 已按同一冻结产物完成签名、用户级安装、系统设置添加和零残留清理；鼠标选择与宿主焦点通过，但 VoiceOver 导航第二项后视觉仍停在第一项，accessibility press 也未提交第二项，本轮因此立即停止。后续必须以另行修复和门禁后的 `build 32` 重新取得授权，不能复用本轮授权或产物现场。
 
 上一正式 `build 30` 虽完成 Apple Development 签名、用户级安装、注销/登录、系统设置添加和实体键盘观察，但系统当时开启了“自动切换到文稿的输入法”。实体输入后 TIS 显示 TextEdit 已切回系统拼音，所以候选高亮迁移与 Space 提交不具备 RadishLex 来源归属，不能写成正式通过；该轮观察到的候选窗固定屏幕左下角则形成定位缺陷输入。完整清理后 TIS 为 `matches=0 enabled=0 selected=0`，bundle、隔离运行数据和精确进程均不存在。
 
@@ -96,7 +97,7 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 5. 左右及上下方向移动时，视觉高亮、controller display index 与 Space 最终提交始终指向同一候选；keyUp 与 modifier-only 不把选择拉回首项。
 6. 候选 panel 必须跟随当前文字光标，不得固定在屏幕原点、左下角或旧 client；靠近边缘时的上下放置与裁剪留到第二阶段扩大验证。
 7. 数字选择、翻页、Backspace、Escape、Enter、取消和重置语义明确；中英文混输与宿主快捷键边界正确。
-8. 鼠标点击候选与 VoiceOver accessibility press 均通过当前候选选择语义提交，不产生第二套平台提交路径。
+8. 鼠标点击候选与 VoiceOver accessibility press 均通过当前候选选择语义提交，不产生第二套平台提交路径。VoiceOver 焦点所在项、候选条视觉高亮、accessibility selected state、press 回传 index 与最终 commit 必须全部一致；旁白可导航但任一其他状态仍停在旧项，同样判定失败。
 
 视觉索引、选择索引与最终提交任一不一致，或候选窗抢走宿主输入焦点，均直接判定失败。
 

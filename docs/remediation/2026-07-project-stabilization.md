@@ -83,7 +83,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | 批次 | 名称 | 状态 | 退出结果 |
 | --- | --- | --- | --- |
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
-| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；两条 `IMKCandidates` probe 已证伪；build 30 暴露左下角定位缺陷，build 31 已以精确 source 归属确认锚点、方向高亮与 Space 提交一致并零残留清理，待平台行为与生命周期矩阵 | 真实应用可离线完成基础中文输入 |
+| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；build 31 已确认锚点、方向/Space、鼠标选择与宿主焦点，但 VoiceOver 导航、视觉与 press 提交不一致，零残留清理后等待 build 32 修复 | 真实应用可离线完成基础中文输入 |
 | R02L | 本地 userdb/ranker 正确性 | 待开始 | 学习、删除、并发和排序语义正确 |
 | R01B | 真实学习纵向闭环 | 待开始，依赖 R01A 与 R02L | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 已完成 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
@@ -161,10 +161,11 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 2026-07-14 取得集中验收授权后，`build 31` 使用当前 Apple Development identity 重建，严格签名、生成/安装主程序与 FFI 哈希一致性通过；用户级副本在不注销的当前会话进入系统设置列表。设置一度已添加但菜单未发布 source，经真实移除并重新添加后由开发者手动选择成功。
 - 一次公开 `TISSelectInputSource` 诊断在同一真实会话确认 RadishLex mode `property_selected=1` 且为精确 current source，但菜单栏仍显示系统拼音，实体输入行为来自 RadishLex；开发者手动切换 U.S. 再切回系统拼音后恢复一致。该组只证明菜单栏/SystemUIServer 显示可能滞后，不计作候选功能通过。后续不再自动选择或注入按键：执行者负责部署、添加、只读 source 监视与清理，开发者负责聚焦、手动切换和实体交互，每次只执行一组明确步骤。
 - 最终只读监视以公开 selected-source 分布式通知和 CFRunLoop 接收 source 变化，并先用 U.S. -> 系统拼音自检；正式记录显示 RadishLex mode 覆盖整组输入，返回 Codex 后才切回系统拼音。开发者实体输入确认候选出现并跟随文字光标、右方向高亮迁移到第二项、Space 提交同一项且无异常，正式关闭 build 31 光标锚点与本组视觉/提交一致性。
+- 同一冻结 `build 31` 的后续集中组在精确 RadishLex source 下确认鼠标提交第二候选且 TextEdit 无需重新聚焦即可继续 composition。VoiceOver 以 `Control-Option-Right Arrow` 到达第二候选时，旁白焦点已位于第二项而视觉高亮仍停在第一项；`Control-Option-Space` 执行 accessibility press 后也未提交第二项。该差异是 R01A 硬失败，立即停止后续平台与生命周期矩阵，不在安装现场重建；生产修复另升 `build 32`。
 - 清理前 TextEdit 文稿手动切回系统拼音；首次移除后配置项在完整重启设置时回流，清理门禁因不可选择 parent `enabled=1` 拒绝删除。第二次真实移除后删除 bundle/隔离数据并终止进程，随后打开现有列表和可添加目录刷新两个 `enabled=0 selected=0` 缓存 source。最终 `matches=0 enabled=0 selected=0`，路径与进程零残留；未使用 `TISDisableInputSource`、私有配置或注销。
 - 临时通知监视已并入现有正式 TIS 工具：`--monitor` 输出初始与通知后的精确 current source，并明确标识是否为 `org.radishlex.inputmethod.macos.Pinyin`；原状态/清理调用保持兼容。macOS contract 同时门禁编译、默认输出、通知/CFRunLoop 结构与 `TISSelectInputSource`、`TISDisableInputSource`、私有配置禁用线，不新建第三个 probe。用户主动关闭的“自动切换到文稿的输入法”继续保持关闭，不由验收自动化修改。
 
-这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键、主要编辑按键、光标锚点与本组方向视觉/Space 提交一致性，不代表 `build 31` 已完成全部真实应用 UI。R01A 下一判断点是补宿主焦点、鼠标、VoiceOver、边缘定位、多屏/全屏与输入菜单，再补 client 切换、进程重启、断网、中英文混输和双应用 owner 生命周期；任一新实机窗口仍按人工交互、通知型只读 source 监视和零残留清理执行。
+这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键、主要编辑按键、光标锚点、本组方向视觉/Space 提交一致性、鼠标选择与宿主焦点，但 `build 31` 已因 VoiceOver 失败退出候选。R01A 下一判断点是以 `build 32` 修复并优先复验 VoiceOver；通过后再补边缘定位、外观、长候选、多屏/全屏、输入菜单、client 切换、进程重启、断网、中英文混输和双应用 owner 生命周期。任一新实机窗口仍按人工交互、通知型只读 source 监视和零残留清理执行。
 
 ### 退出场景
 
