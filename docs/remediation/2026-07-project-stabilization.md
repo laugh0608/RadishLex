@@ -83,7 +83,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | 批次 | 名称 | 状态 | 退出结果 |
 | --- | --- | --- | --- |
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
-| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；两条 `IMKCandidates` probe 已证伪并零残留清理；AppKit candidate panel/controller 动态 contract 与 build 30 native 门禁已通过，集中验收矩阵和精确清理入口已就绪，待集中授权实机 | 真实应用可离线完成基础中文输入 |
+| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；两条 `IMKCandidates` probe 已证伪并零残留清理；build 30 实体输入来源归属不成立且暴露左下角定位缺陷，build 31 的 AppKit candidate panel/controller 动态 contract、静态断言与隔离 native 门禁已通过，待另行授权集中实机 | 真实应用可离线完成基础中文输入 |
 | R02L | 本地 userdb/ranker 正确性 | 待开始 | 学习、删除、并发和排序语义正确 |
 | R01B | 真实学习纵向闭环 | 待开始，依赖 R01A 与 R02L | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 已完成 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
@@ -112,7 +112,7 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 按 `docs/macos-inputmethodkit-boundary.md` 新增 macOS InputMethodKit 薄壳，只处理系统生命周期、按键、候选、commit 和 Rust FFI。
 - 编写开发版安装、启用和移除 runbook；真实安装仍需人工授权。
 
-### 当前完成证据（更新至 2026-07-12）
+### 当前完成证据（更新至 2026-07-14）
 
 - ABI contract v3 统一按键处理与候选选择的 Rust-owned `RadishLexKeyResult`，无损返回 `consumed`、可选即时 commit 和同事件 snapshot。
 - 失败时 `result_out` 保持为空；owner-thread、空指针、非法 key event、borrowed view 和释放路径已有 host contract 测试。
@@ -154,8 +154,12 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - AppKit panel 改变了上一正式 `build 27` 的用户可见实现，正式构建号因此升至 `29` 并由 contract 固定断言。Apple Development native 闭包、签名与短时用户级安装副本已通过；公开 TIS 枚举 parent 与唯一 Pinyin mode，但系统设置重启后仍未显示可添加项。为避免把注销变成逐轮调试成本，本轮取消登录边界验收并完成 bundle、运行数据、进程与 TIS 零残留清理；以后只在实现冻结且开发者主动安排单次窗口时集中验收。
 - 后续不安装批次以真实 `NSApplication`、`NSPanel`、`NSButton`、正式 controller 和 Rust demo session 建立动态 contract，贯通方向 keyDown、keyUp/modifier 保持、视觉/accessibility state、Space、鼠标、accessibility press、Rust selection/commit 与双 client owner 生命周期。该批发现并修正未变化 snapshot 在 keyUp 时把 display selection 重置为 0 的问题，并让 layer 颜色随 effective appearance 重解析；新候选身份升至 `build 30`。隔离 native-rime、递归依赖、许可证、架构、ad-hoc 签名和产品不含 contract-only API 门禁通过，没有安装或修改系统输入法。
 - 集中实机 runbook 现按输入/候选一致性、AppKit 平台行为、生命周期/离线能力三阶段执行，同一冻结 build 失败后直接清理，不在登录现场重建。正式清理入口复用公开 TIS 工具并按精确 Bundle ID 隔离产品与 reference probe，删除前拒绝 selected source 或 enabled parent，删除后要求 TIS、bundle、隔离运行数据和精确进程全部零残留；只读状态已确认当前正式输入源无残留。
+- 正式 `build 30` 后续使用 Apple Development identity 重建并完成用户级安装、一次注销/登录、系统设置添加和实体键盘观察。候选条可见、右方向后高亮移动且 Space 提交移动后候选，但系统启用了“自动切换到文稿的输入法”，事后 TIS 显示 TextEdit 已切回系统拼音；事件与提交来源因此不可归属给 RadishLex，不计为 R01A 通过。该轮同时观察到候选窗固定在屏幕左下角。
+- build 30 清理经历系统设置列表与 TIS 缓存短时不同步；最终公开 TIS 为 `matches=0 enabled=0 selected=0`，用户级 bundle、隔离运行数据和精确进程均不存在。清理仍以系统设置真实移除为前置，不得用 `TISDisableInputSource` 或私有配置代替。
+- 当前 SDK `IMKInputSession.h` 明确 `attributesForCharacterIndex:` 接收 inline session 内字符索引，无 inline session 时使用 `0`；原实现直接传入允许等于 composition length 的 snapshot cursor，末尾位置会越界并可能获得有限高度的 `(0,0)` 行矩形。正式实现现将末尾 cursor 限制到 `length - 1`，保留 `firstRectForCharacterRange:actualRange:` 的文档绝对插入位置 fallback；没有以拒绝 `(0,0)` 坐标的启发式规则修复。
+- `candidate_panel_contract` fake client 现记录 character index，并对越界索引返回有限高度的 `(0,0)` 矩形；动态覆盖末尾 cursor、中间 cursor、无 inline session、绝对 end insertion fallback 与最终有效行锚点。生产行为变化后 `CFBundleVersion` 升至 `31`，bundle/native 脚本同步固定构建号与索引派生静态断言；`build 31` 尚未使用 Apple Development 签名、安装、启用或修改系统输入法配置。
 
-这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键未消费、Space/非首候选提交和主要编辑按键子项，不代表新 AppKit panel 的真实应用 UI 已完成。R01A 下一判断点是经授权复验视觉/提交同 index、宿主焦点、鼠标、VoiceOver、多屏/全屏和 owner 生命周期，再补 client 切换、进程重启、断网和双应用交叉证据。
+这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键未消费和主要编辑按键子项，不代表 `build 31` 的真实应用 UI 已完成，也不能把 build 30 来源不明的 Space/非首候选提交计为 AppKit panel 通过。R01A 下一判断点是另行授权后先聚焦目标文稿、再选择 RadishLex，并在实体输入前后立即复核精确 TIS selected source；归属成立后再复验视觉/提交同 index、锚点、宿主焦点、鼠标、VoiceOver、多屏/全屏和 owner 生命周期，最后补 client 切换、进程重启、断网和双应用交叉证据。
 
 ### 退出场景
 

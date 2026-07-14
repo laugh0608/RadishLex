@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核日期：2026-07-13（Asia/Shanghai）
+- 复核日期：2026-07-14（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 分支闭环：阶段性 `dev -> master` PR 合并后，必须在下一批常规开发前将最新 `master` merge 回 `dev`，正式口径见 ADR 0001
 - 当前产品里程碑：M1 macOS 离线输入 Alpha
@@ -16,7 +16,9 @@
 
 2026-07-12 实机已验证连续输入、5×1 候选、主要编辑键、Enter 和方向选择提交；`IMKCandidates` 程序化选择的 engine/FFI/Space 索引一致，但视觉不重绘。2026-07-13 的单 mode probe 又证伪 controller-first fallback 与显式 panel `keyDown:`；两次测试均已零残留清理，实验代码已回退，不再生成第三个签名 probe。
 
-基于 Apple 公开契约，正式实现改为进程级非激活 AppKit panel：controller 的唯一 display index 同时驱动视觉与 Space，鼠标/辅助功能回调同一 Rust selection API；client 全局行矩形、`windowLevel + 1` 和目标屏幕负责定位。真实 AppKit component 与 controller 动态 contract 已贯通 Right keyDown、keyUp/modifier 保持、视觉/accessibility state、Space、鼠标、accessibility press、Rust selection、commit 和双 client owner 生命周期，并修正未变化 snapshot 把 selection 拉回首项的问题。`build 30` 的隔离 native 闭包与 ad-hoc 不安装门禁已通过；集中验收 runbook 已固定输入一致性、AppKit 平台行为、生命周期/离线三阶段和同一冻结 build 的失败停止线，正式清理入口可按精确 Bundle ID 只读查询并在授权后验证 TIS、路径与进程零残留。未使用 Apple Development 签名或安装；下一次真实动作只在主动安排的集中窗口进行，R01A 未退出。
+2026-07-14 的正式 `build 30` 已完成 Apple Development 签名、用户级安装、一次注销/登录、系统设置添加和实体键盘观察，随后完整清理。实体输入时看到候选条、右方向后高亮移动且 Space 提交移动后候选，但系统开启了“自动切换到文稿的输入法”，事后 TIS 显示 TextEdit 已切回系统拼音；因此这组事件和提交不能归属为 RadishLex 正式通过证据。候选窗同时被观察到固定在屏幕左下角。清理后精确 TIS 为 `matches=0 enabled=0 selected=0`，用户级 bundle、隔离运行数据、精确进程均不存在。
+
+当前 SDK 契约确认 `attributesForCharacterIndex:` 接收 inline session 内的字符索引，不是末尾插入位置。正式实现现以 marked range 派生合法索引：有 inline text 时将 cursor 限制到 `length - 1`，无 inline session 时使用 `0`；`firstRectForCharacterRange:actualRange:` 继续使用文档绝对插入位置 fallback，不以拒绝合法 `(0,0)` 坐标的启发式规则掩盖问题。真实 AppKit component contract 已覆盖越界索引返回有限高度 `(0,0)` 的 fake client、末尾/中间 cursor、无 inline session 和最终 panel 锚点；生产行为变化使 `CFBundleVersion` 升至 `31`。`build 31` 目前只有仓库内代码、动态 contract、静态门禁和隔离 native 证据，尚未签名安装或形成真实应用证据，R01A 未退出。
 
 长期产品交付顺序见 [产品交付路线图](../roadmap.md)，当前整改批次、停止线、资产处置和退出条件见 [项目稳定化整改专题](../remediation/2026-07-project-stabilization.md)。
 
@@ -25,8 +27,8 @@
 - ABI contract v3 无损返回 `consumed`、可选 commit 和同事件 snapshot；候选选择复用 owned result，输入 C header 已通过 C11/Objective-C contract。
 - librime 生命周期已收口到进程级 runtime；多 session、owner-thread、配置冲突、失败回滚和 finalize 已有自动或 native smoke。
 - macOS Objective-C 薄壳、contract bundle 与 wrapper smoke 已落地，覆盖按键规范化、commit/snapshot/candidate 复制、reset、schema、线程与 teardown。
-- 正式 AppKit panel/component contract 动态覆盖非激活窗口、level、Spaces behavior、五候选、视觉/accessibility selection、appearance、anchor fallback、owner 接管和完整隐藏；controller contract 覆盖 keyDown/keyUp/modifier、候选变化重置、Space/鼠标/accessibility press 到 Rust commit、Enter/Escape、宿主快捷键和双 client 生命周期。
-- 正式 TIS 状态/清理入口按精确 Bundle ID 隔离产品与 reference probe；只读状态已复核 `matches=0 enabled=0 selected=0`、bundle/运行数据不存在且进程停止，授权清理分支受系统设置移除前置和删除后零残留门禁约束。
+- 正式 AppKit panel/component contract 动态覆盖非激活窗口、level、Spaces behavior、五候选、视觉/accessibility selection、appearance、合法 inline character index、绝对 insertion fallback、anchor、owner 接管和完整隐藏；controller contract 覆盖 keyDown/keyUp/modifier、候选变化重置、Space/鼠标/accessibility press 到 Rust commit、Enter/Escape、宿主快捷键和双 client 生命周期。
+- 正式 TIS 状态/清理入口按精确 Bundle ID 隔离产品与 reference probe；`build 30` 清理后已复核 `matches=0 enabled=0 selected=0`、bundle/运行数据不存在且进程停止。系统设置列表与 TIS 缓存更新存在竞态，授权清理仍以系统设置真实移除为前置，不使用 `TISDisableInputSource` 或私有配置替代。
 - 隔离 `rime-pinyin-simp` 的真实 FFI smoke 已覆盖 composition、完整与分段非首候选、Backspace、Escape、Enter、翻页、方向键高亮与 Space、multi-session 和不存在 schema 拒绝；adapter 以 deployed schema list、原生 current-page selection API 与选择后回读固定可用性。
 - native 门禁覆盖隔离 schema/data/license、架构、FFI symbol、递归 dylib closure、逐库签名哈希和外部依赖拒绝；不读取用户 Rime 目录。
 - macOS bundle 固定正式 Bundle/mode ID、`LSUIElement`、简体中文 metadata、双语标签与 Retina 列表图标，并对完整依赖闭包签名。
@@ -37,7 +39,7 @@
 
 ## 已确认阻塞
 
-- R01A 的 AppKit candidate panel 已通过不安装动态 contract 与 `build 30` native 门禁，但尚无真实应用证据。上一 `build 29` 的安装副本、运行数据、进程与 TIS 已零残留；逐轮注销不可作为日常调试机制。以后只在开发者主动安排单次登录边界窗口后集中复核真实视觉/提交同 index、宿主焦点、鼠标、VoiceOver、多屏/全屏和生命周期，再补 client 切换、进程重启、断网、中英文混输及两个应用交叉复核。
+- R01A 的 AppKit candidate panel 已形成 `build 31` 仓库内动态 contract、静态门禁与隔离 native 证据，但尚无可归属的真实应用通过证据。`build 30` 的实体输入因文稿自动切换输入源而来源不明，并暴露候选窗左下角定位缺陷；其安装副本、运行数据、进程与 TIS 已零残留。下一次实机必须先聚焦目标文稿、再选择 RadishLex，并在实体输入前后立即复核精确 TIS selected source；之后才判定视觉/提交同 index、锚点、宿主焦点、鼠标、VoiceOver、多屏/全屏和生命周期。
 - 输入 session 未组合 engine、ranker、userdb 与 privacy policy，真实选择没有进入平台学习热路径。
 - userdb 用户意图缺少统一事务、WAL/busy 策略；ranker recency/frequency 语义需要修正。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
@@ -55,8 +57,8 @@
 
 ## 下一步顺位
 
-1. 保持正式输入法安装与登录边界暂停；`build 30` 源码、动态 contract、native 闭包、三阶段验收矩阵和精确清理门禁作为下一集中实机候选，不为单轮修复要求开发者注销，也不反复更换 Bundle ID 或路径。
-2. 仅在开发者主动安排不会打断其他任务的单次窗口后，以 Apple Development identity 重建同一 `build 30`，集中完成注销/登录、添加、选择、可判伪 smoke 与清理。
+1. 保持正式输入法签名、安装与登录边界暂停；`build 31` 源码、动态 contract、native 闭包、三阶段验收矩阵和精确清理门禁作为下一集中实机候选，不为单轮修复要求开发者注销，也不反复更换 Bundle ID 或路径。
+2. 仅在开发者另行授权并主动安排不会打断其他任务的单次窗口后，以 Apple Development identity 重建同一 `build 31`，集中完成注销/登录、添加、选择、可判伪 smoke 与清理。每个目标文稿都必须先聚焦、后选择 RadishLex，并在实体输入前后立即确认精确 mode 保持 `selected=1`；否则该轮输入结果不进入正式证据。
 3. panel 通过后补 client 切换、进程重启、断网、中英文混输与两个应用交叉证据，满足退出场景后关闭 R01A。
 4. R01A 退出后实施 R02L；R02L 退出后再由 R01B 接入真实学习，之后关闭整改专题并进入 M3。
 

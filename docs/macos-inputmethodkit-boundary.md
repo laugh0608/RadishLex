@@ -75,7 +75,7 @@ runtime 初始化失败必须返回结构化错误。平台不得静默切换 de
 - 同一输入法进程只创建一个 candidate panel。panel 以弱引用记录当前 owner controller；新 session 展示候选时接管 owner，旧 session 的 deactivate/close 只能隐藏自己仍拥有的 panel，不能破坏后来激活的 session。空 snapshot、取消、错误恢复、失焦和 owner close 必须隐藏 panel。
 - 方向事件由当前 `IMKInputController` 接收并更新唯一的 display selection index；panel 的视觉高亮只从该 index 渲染，Space 也只以同一 index 调用 Rust selection API。鼠标点击和辅助功能 press 通过 panel delegate 回传 display index，再进入同一 Rust selection API。平台不得维护一份“视觉 index”和另一份“提交 index”，也不得把候选正文作为选择身份。
 - key release、modifier-only 或其他未改变 schema、preedit、cursor 与完整候选内容的 snapshot 必须保留当前 display selection；只有候选 presentation 确实变化时才重置到首项。否则方向 keyDown 后紧随的 keyUp 会把视觉和 Space 选择错误地拉回 index 0。
-- candidate panel 使用 `NSPanel` + 标准 AppKit view/control，必须是 `NSWindowStyleMaskNonactivatingPanel`，不能成为 key/main window，不能抢走宿主输入焦点。panel level 使用当前 `IMKTextInput.windowLevel + 1`；锚点优先使用 `attributesForCharacterIndex:lineHeightRectangle:` 的全局行矩形，并按实际 `NSScreen.visibleFrame` 选择下方或上方、限制在目标屏幕内。Spaces、全屏辅助窗口、窗口循环和多屏行为必须使用公开 `NSWindowCollectionBehavior` 表达。
+- candidate panel 使用 `NSPanel` + 标准 AppKit view/control，必须是 `NSWindowStyleMaskNonactivatingPanel`，不能成为 key/main window，不能抢走宿主输入焦点。panel level 使用当前 `IMKTextInput.windowLevel + 1`；锚点优先使用 `attributesForCharacterIndex:lineHeightRectangle:` 的全局行矩形。该 API 的 index 相对 inline session 且必须指向现存字符：marked range 非空时使用 `min(cursor, length - 1)`，无 inline session 时固定使用 `0`，不能把允许等于 composition length 的插入 cursor 原样传入。屏幕原点 `(0,0)` 本身可能合法，不以坐标拒绝启发式判断返回值。`firstRectForCharacterRange:actualRange:` fallback 继续使用文档绝对插入位置，允许 range 落在 marked text 末尾；两套 range 语义不得混淆。最终 frame 按实际 `NSScreen.visibleFrame` 选择下方或上方、限制在目标屏幕内。Spaces、全屏辅助窗口、窗口循环和多屏行为必须使用公开 `NSWindowCollectionBehavior` 表达。
 - panel 的候选项必须进入 AppKit accessibility hierarchy，暴露稳定 label、index 与 selected value；选择变化发送公开 accessibility notification。候选 control 显式实现公开 accessibility press，并复用与鼠标相同的 target-action、owner 和 index 检查，不能另建提交路径。VoiceOver、全键盘访问、宿主焦点、多屏、全屏 Space 和 client 切换仍属于经授权实机 smoke，不可由自动 contract 替代。
 - 输入源只声明唯一可选择的全拼 mode 及其 `TISInputSourceID`。SDK `TextInputSources.h` 把 bundle input method 与 `ComponentInputModeDict` 中的 input mode 定义为两个层级，因此系统枚举不可选择 parent source 与可选择 mode 是平台模型，不是 `menu` 返回值生成的第二个产品 mode。
 - `IMKInputController.menu` 只返回 input-method-specific commands。M1 当前没有这类命令，正式实现固定返回 `nil`；macOS 26 因此渲染的图标空白 command 行记录为系统呈现限制。不得用空 `NSMenu`、菜单标题、重复身份项、disabled placeholder 或 plist fallback 填充该区域。以后只有在真实设置/命令能力存在时才能加入可执行 `NSMenuItem`，且必须通过 `doCommandBySelector:commandDictionary:` 进入明确动作与生命周期。
@@ -106,9 +106,11 @@ Apple 的公开 [InputMethodKit 概览](https://developer.apple.com/documentatio
 | 新建空 `NSMenu` | 没有用户能力；实机触发多余 menu/deactivate 生命周期 | 禁止 |
 | 稳定标题 `NSMenu` | 标题与系统身份项重复；不是可执行命令 | 禁止 |
 
-SDK `IMKInputSession.h` 明确给自建候选窗提供 `windowLevel`，并说明使用 client level 加一；同一协议还提供用于候选定位的全局行矩形和 `firstRectForCharacterRange:actualRange:`。AppKit 的 [`NSWindowStyleMaskNonactivatingPanel`](https://developer.apple.com/documentation/appkit/nswindow/stylemask-swift.struct/nonactivatingpanel?language=objc)、[`NSWindowCollectionBehavior`](https://developer.apple.com/documentation/appkit/nswindow/collectionbehavior-swift.struct?language=objc) 与 [Accessibility for AppKit](https://developer.apple.com/documentation/appkit/accessibility-for-appkit) 构成自建 panel 的公开平台依据。这里的“自建”只表示不使用 `IMKCandidates` 的不透明选择状态，仍必须使用原生 AppKit 窗口、控件、外观和辅助功能接口。
+SDK `IMKInputSession.h` 明确给自建候选窗提供 `windowLevel`，并说明使用 client level 加一；同一协议还区分用于 inline 字符属性/全局行矩形的 character index，以及接收文档绝对 range 的 `firstRectForCharacterRange:actualRange:`。AppKit 的 [`NSWindowStyleMaskNonactivatingPanel`](https://developer.apple.com/documentation/appkit/nswindow/stylemask-swift.struct/nonactivatingpanel?language=objc)、[`NSWindowCollectionBehavior`](https://developer.apple.com/documentation/appkit/nswindow/collectionbehavior-swift.struct?language=objc) 与 [Accessibility for AppKit](https://developer.apple.com/documentation/appkit/accessibility-for-appkit) 构成自建 panel 的公开平台依据。这里的“自建”只表示不使用 `IMKCandidates` 的不透明选择状态，仍必须使用原生 AppKit 窗口、控件、外观和辅助功能接口。
 
-不安装动态 contract 必须创建真实 `NSApplication`、`NSPanel`、`NSButton` 和正式 controller，不只验证 helper 或源码字符串。组件 contract 覆盖非激活窗口、level、Spaces behavior、五候选、视觉/accessibility selection、appearance 重解析、长候选压缩、anchor fallback、owner 接管、旧 control 拒绝和完整隐藏；controller contract 覆盖 composition、方向 keyDown 后 keyUp/modifier 保持、候选变化重置、Space、鼠标、accessibility press、Enter、Escape、宿主快捷键与双 client 生命周期。contract-only initializer 和 inspection API 只在 `RADISHLEX_CONTRACT_SMOKE=1` 编译，native 产品门禁必须证明这些 selector 不存在。
+不安装动态 contract 必须创建真实 `NSApplication`、`NSPanel`、`NSButton` 和正式 controller，不只验证 helper 或源码字符串。组件 contract 覆盖非激活窗口、level、Spaces behavior、五候选、视觉/accessibility selection、appearance 重解析、长候选压缩、character index 与 insertion range 分离、anchor fallback、owner 接管、旧 control 拒绝和完整隐藏；fake client 必须记录收到的 character index，并在越界时返回有限高度的 `(0,0)` 矩形，使末尾 cursor、中间 cursor、无 inline session 与最终有效行锚点成为可判伪动态证据。controller contract 覆盖 composition、方向 keyDown 后 keyUp/modifier 保持、候选变化重置、Space、鼠标、accessibility press、Enter、Escape、宿主快捷键与双 client 生命周期。contract-only initializer 和 inspection API 只在 `RADISHLEX_CONTRACT_SMOKE=1` 编译，native 产品门禁必须证明这些 selector 不存在。
+
+正式 `build 30` 的一次实体键盘观察发生在系统开启“自动切换到文稿的输入法”的环境中；事后 TIS 显示 TextEdit 已切回系统拼音，所以候选高亮迁移与 Space 提交不能归属为 RadishLex 通过证据。该轮同时观察到候选窗固定在屏幕左下角，仓库审计确认末尾插入 cursor 被错误当成 inline character index。修正后的产品构建号为 `31`；在另行授权签名安装前，它只具备仓库内 contract/native 证据。
 
 ## 隐私与本地数据
 
@@ -131,7 +133,7 @@ M1 开发版必须明确并隔离：
 
 开发 smoke 不得读取用户现有 Rime 配置或词库目录，也不得把本机绝对路径写入 committed 文档或 fixture。M1 已使用固定上游 commit、保留 Apache-2.0 许可证和来源记录的 `rime-pinyin-simp` 临时隔离数据复验 native bundle 与真实 FFI 输入链。native bundle 必须递归封装全部非系统 dylib、把加载路径改写到 bundle 内、保存逐库许可证与签名后哈希清单，并拒绝任何外部绝对依赖。该开发期封装不替代 M4 的 Developer ID、公证、升级/移除和发布级供应链门禁。
 
-TIS input source/mode id 与 bundle 文件名属于平台稳定身份，不等同于允许下划线的 Rime schema id。当前正式 Bundle ID 为 `org.radishlex.inputmethod.macos`，单一全拼 mode 为 `org.radishlex.inputmethod.macos.Pinyin`，bundle 文件名为 `RadishLexInputMethod.app`，Rime schema 仍为 `pinyin_simp`；mode metadata 必须同时固定 `LSUIElement`、简体中文 language、script、repertoire、图标、本地化标签和可见顺序。输入法列表 TIFF 使用 16pt 逻辑尺寸，当前 Retina 资产固定为 `32×32 @144dpi` 并保留安全边距，避免系统设置按 64pt 放大后覆盖名称。macOS 26.5.1 已观察到失败身份与安装路径的 TIS 负缓存，开发过程不得复用旧 `org.radishlex.inputmethod` 或 `RadishLex.app`，也不得通过修改 TIS 私有数据库清缓存。
+TIS input source/mode id 与 bundle 文件名属于平台稳定身份，不等同于允许下划线的 Rime schema id。当前正式 Bundle ID 为 `org.radishlex.inputmethod.macos`，单一全拼 mode 为 `org.radishlex.inputmethod.macos.Pinyin`，bundle 文件名为 `RadishLexInputMethod.app`，Rime schema 仍为 `pinyin_simp`；mode metadata 必须同时固定 `LSUIElement`、简体中文 language、script、repertoire、图标、本地化标签和可见顺序。输入法列表 TIFF 使用 16pt 逻辑尺寸，当前 Retina 资产固定为 `32×32 @144dpi` 并保留安全边距，避免系统设置按 64pt 放大后覆盖名称。macOS 26.5.1 已观察到失败身份与安装路径的 TIS 负缓存，开发过程不得复用旧 `org.radishlex.inputmethod` 或 `RadishLex.app`，也不得通过修改 TIS 私有数据库清缓存。系统设置列表更新与公开 TIS 枚举之间还可能短时竞态；清理必须先在系统设置真实移除，再等待或触发公开刷新并复核精确零残留，不能用 `TISDisableInputSource` 或私有配置代替系统设置动作。
 
 ## Header、线程与错误
 
@@ -143,7 +145,7 @@ TIS input source/mode id 与 bundle 文件名属于平台稳定身份，不等�
 
 ## 开发安装边界
 
-新增、启用或移除系统输入法会修改本机状态，必须在独立 runbook 中说明影响、路径、回滚和 smoke 数据要求，并在执行前获得用户明确授权。自动测试默认只构建 bundle、检查结构和运行 host contract，不自动安装、启用或重启系统输入法服务。
+新增、启用或移除系统输入法会修改本机状态，必须在独立 runbook 中说明影响、路径、回滚和 smoke 数据要求，并在执行前获得用户明确授权。自动测试默认只构建 bundle、检查结构和运行 host contract，不自动安装、启用或重启系统输入法服务。为防文稿级自动切换污染来源归属，下一次真实 smoke 必须先聚焦目标文稿、再选择 RadishLex，并在实体输入前后立即用精确 TIS source 查询确认 RadishLex mode 持续 selected；任一时点不匹配时，该段输入不得计入验收。
 
 当前开发实现位于 `platforms/macos-imk/`。`./scripts/check-macos-imk.sh` 只构建 contract `.app` bundle、编译 production 条件分支并运行 wrapper、真实 AppKit panel 与 controller 集成 contract；`./scripts/check-macos-imk-native.sh` 必须由调用方显式提供 `RIME_INCLUDE_DIR`、`RIME_LIB_DIR`、隔离 shared data、schema id 和许可证文件，并检查 mode metadata、架构、递归 dependency closure、symbol、逐库许可证、完整 bundle 签名、数据哈希清单与 contract-only API 缺失。默认 ad-hoc 签名只服务无安装门禁；真实安装 smoke 还必须显式提供当前用户有效的 Apple Development identity。两条入口都不查找用户已有 Rime 目录，不执行安装、注册、bundle 启动或服务重启。开发版安装与移除步骤见 `docs/runbooks/macos-inputmethodkit-development.md`。
 
