@@ -29,6 +29,23 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
 test "$("${smoke_dir}/tis-source-status" \
   org.radishlex.inputmethod.macos.contract-status-check)" = \
   "matches=0 enabled=0 selected=0"
+rg -q 'kTISNotifySelectedKeyboardInputSourceChanged' \
+  "${platform_dir}/Tools/tis_source_status.m"
+rg -q 'TISCopyCurrentKeyboardInputSource' \
+  "${platform_dir}/Tools/tis_source_status.m"
+rg -q 'CFNotificationCenterGetDistributedCenter' \
+  "${platform_dir}/Tools/tis_source_status.m"
+rg -q 'CFNotificationCenterAddObserver' \
+  "${platform_dir}/Tools/tis_source_status.m"
+rg -q 'CFRunLoopRun\(\)' \
+  "${platform_dir}/Tools/tis_source_status.m"
+rg -q 'PrintCurrentSource\("initial"\)' \
+  "${platform_dir}/Tools/tis_source_status.m"
+rg -q 'PrintCurrentSource\("changed"\)' \
+  "${platform_dir}/Tools/tis_source_status.m"
+rg -q 'is_radishlex_pinyin' \
+  "${platform_dir}/Tools/tis_source_status.m"
+rg -q -- '--monitor' "${platform_dir}/cleanup-user-install.sh"
 rg -q -- '--authorized-after-settings-removal' \
   "${platform_dir}/cleanup-user-install.sh"
 rg -q 'org\.radishlex\.inputmethod\.macos' \
@@ -37,7 +54,7 @@ rg -q 'Library/Input Methods/RadishLexInputMethod\.app' \
   "${platform_dir}/cleanup-user-install.sh"
 rg -q 'Application Support/RadishLex/Rime' \
   "${platform_dir}/cleanup-user-install.sh"
-if rg -n 'TISDisableInputSource|com\.apple\.HIToolbox|defaults (write|delete)' \
+if rg -n 'TIS(Select|Disable|Enable|Register|Deregister)InputSource|CFPreferencesSet|NSUserDefaults|com\.apple\.HIToolbox|defaults (write|delete)' \
   "${platform_dir}/cleanup-user-install.sh" \
   "${platform_dir}/Tools/tis_source_status.m"; then
   echo "macOS cleanup must not mutate TIS or HIToolbox private state." >&2

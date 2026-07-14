@@ -5,11 +5,14 @@ case "${1:-}" in
   --status)
     action="status"
     ;;
+  --monitor)
+    action="monitor"
+    ;;
   --authorized-after-settings-removal)
     action="cleanup"
     ;;
   *)
-    echo "usage: $0 --status|--authorized-after-settings-removal" >&2
+    echo "usage: $0 --status|--monitor|--authorized-after-settings-removal" >&2
     echo "Cleanup requires prior removal in System Settings and explicit authorization." >&2
     exit 2
     ;;
@@ -31,6 +34,10 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   "${script_dir}/Tools/tis_source_status.m" \
   -framework Carbon -framework Foundation \
   -o "${status_tool}"
+
+if [[ "${action}" == "monitor" ]]; then
+  exec "${status_tool}" --monitor
+fi
 
 inspect_tis() {
   local output

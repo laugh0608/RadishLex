@@ -12,7 +12,7 @@
 - `Tests/contract_smoke.m`：使用合成 demo engine 复验 ABI v3、完整按键映射、Unicode cursor、候选选择结果和生命周期，不读取 Rime 目录。
 - `Tests/candidate_panel_contract.m`：创建真实 AppKit panel/control，复验视觉与 accessibility selection、appearance、anchor fallback、owner 接管和完整隐藏。
 - `Tests/input_controller_contract.m`：使用正式 controller、panel 和 Rust demo session，贯通方向 keyDown/keyUp、Space、鼠标、accessibility press、Enter、Escape、宿主快捷键和双 client 生命周期。
-- `Tools/tis_source_status.m`：使用公开 TIS API 按精确 Bundle ID 查询 parent/mode 状态，不启用、停用或选择输入源。
+- `Tools/tis_source_status.m`：使用公开 TIS API 按精确 Bundle ID 查询 parent/mode 状态，或以通知和 CFRunLoop 实时输出精确 current source；不启用、停用或选择输入源。
 - `cleanup-user-install.sh`：在系统设置已人工移除且取得授权后，清理正式开发 bundle、隔离运行数据和精确进程，并要求 TIS 零残留。
 - `ReferenceProbe/`：隔离验证原生候选事件路由与单 mode 输入源 metadata，不链接 Rime 或正式 FFI，也不替代产品薄壳。
 
@@ -55,7 +55,8 @@ bundle metadata 固定正式 Bundle ID `org.radishlex.inputmethod.macos` 与单�
 
 ```bash
 ./scripts/cleanup-macos-imk.sh --status
+./scripts/cleanup-macos-imk.sh --monitor
 ./scripts/cleanup-macos-imk.sh --authorized-after-settings-removal
 ```
 
-第二条命令只能在系统设置已移除 RadishLex、当前输入源已切回系统输入法且本次授权明确覆盖清理时执行。它不修改 `com.apple.HIToolbox` 或 TIS 私有数据库；完整集中验收与回滚顺序见 `docs/runbooks/macos-inputmethodkit-development.md`。
+`--monitor` 先输出一次当前 source，随后只通过公开 selected-source 通知输出变化；`is_radishlex_pinyin=1` 只表示精确匹配正式 Pinyin mode。第三条命令只能在系统设置已移除 RadishLex、当前输入源已切回系统输入法且本次授权明确覆盖清理时执行。这些入口不修改 `com.apple.HIToolbox` 或 TIS 私有数据库；完整集中验收与回滚顺序见 `docs/runbooks/macos-inputmethodkit-development.md`。
