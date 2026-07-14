@@ -83,7 +83,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | 批次 | 名称 | 状态 | 退出结果 |
 | --- | --- | --- | --- |
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
-| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；两条 `IMKCandidates` probe 已证伪并零残留清理；build 30 来源归属不成立且暴露左下角定位缺陷，build 31 已完成 contract/native、Apple Development 签名和用户级安装，等待人工分组实机与完整清理 | 真实应用可离线完成基础中文输入 |
+| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；两条 `IMKCandidates` probe 已证伪；build 30 暴露左下角定位缺陷，build 31 已以精确 source 归属确认锚点、方向高亮与 Space 提交一致并零残留清理，待平台行为与生命周期矩阵 | 真实应用可离线完成基础中文输入 |
 | R02L | 本地 userdb/ranker 正确性 | 待开始 | 学习、删除、并发和排序语义正确 |
 | R01B | 真实学习纵向闭环 | 待开始，依赖 R01A 与 R02L | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 已完成 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
@@ -158,10 +158,12 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - build 30 清理经历系统设置列表与 TIS 缓存短时不同步；最终公开 TIS 为 `matches=0 enabled=0 selected=0`，用户级 bundle、隔离运行数据和精确进程均不存在。清理仍以系统设置真实移除为前置，不得用 `TISDisableInputSource` 或私有配置代替。
 - 当前 SDK `IMKInputSession.h` 明确 `attributesForCharacterIndex:` 接收 inline session 内字符索引，无 inline session 时使用 `0`；原实现直接传入允许等于 composition length 的 snapshot cursor，末尾位置会越界并可能获得有限高度的 `(0,0)` 行矩形。正式实现现将末尾 cursor 限制到 `length - 1`，保留 `firstRectForCharacterRange:actualRange:` 的文档绝对插入位置 fallback；没有以拒绝 `(0,0)` 坐标的启发式规则修复。
 - `candidate_panel_contract` fake client 现记录 character index，并对越界索引返回有限高度的 `(0,0)` 矩形；动态覆盖末尾 cursor、中间 cursor、无 inline session、绝对 end insertion fallback 与最终有效行锚点。生产行为变化后 `CFBundleVersion` 升至 `31`，bundle/native 脚本同步固定构建号与索引派生静态断言。
-- 2026-07-14 取得集中验收授权后，`build 31` 使用当前 Apple Development identity 重建，严格签名、生成/安装主程序与 FFI 哈希一致性通过；用户级副本在不注销的当前会话已进入系统设置现有列表。当前 source 已由开发者切回系统拼音，RadishLex mode 为 `enabled=1 selected=0`，bundle 与隔离运行数据保留到本轮人工分组测试完成后统一清理。
+- 2026-07-14 取得集中验收授权后，`build 31` 使用当前 Apple Development identity 重建，严格签名、生成/安装主程序与 FFI 哈希一致性通过；用户级副本在不注销的当前会话进入系统设置列表。设置一度已添加但菜单未发布 source，经真实移除并重新添加后由开发者手动选择成功。
 - 一次公开 `TISSelectInputSource` 诊断在同一真实会话确认 RadishLex mode `property_selected=1` 且为精确 current source，但菜单栏仍显示系统拼音，实体输入行为来自 RadishLex；开发者手动切换 U.S. 再切回系统拼音后恢复一致。该组只证明菜单栏/SystemUIServer 显示可能滞后，不计作候选功能通过。后续不再自动选择或注入按键：执行者负责部署、添加、只读 source 监视与清理，开发者负责聚焦、手动切换和实体交互，每次只执行一组明确步骤。
+- 最终只读监视以公开 selected-source 分布式通知和 CFRunLoop 接收 source 变化，并先用 U.S. -> 系统拼音自检；正式记录显示 RadishLex mode 覆盖整组输入，返回 Codex 后才切回系统拼音。开发者实体输入确认候选出现并跟随文字光标、右方向高亮迁移到第二项、Space 提交同一项且无异常，正式关闭 build 31 光标锚点与本组视觉/提交一致性。
+- 清理前 TextEdit 文稿手动切回系统拼音；首次移除后配置项在完整重启设置时回流，清理门禁因不可选择 parent `enabled=1` 拒绝删除。第二次真实移除后删除 bundle/隔离数据并终止进程，随后打开现有列表和可添加目录刷新两个 `enabled=0 selected=0` 缓存 source。最终 `matches=0 enabled=0 selected=0`，路径与进程零残留；未使用 `TISDisableInputSource`、私有配置或注销。
 
-这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键未消费和主要编辑按键子项，不代表 `build 31` 的真实应用 UI 已完成，也不能把 build 30 来源不明的 Space/非首候选提交或本轮菜单栏竞态诊断计为 AppKit panel 通过。R01A 当前判断点是保持冻结安装副本，由执行者启动只读 source 监视、开发者先聚焦目标文稿再手动选择 RadishLex，并完成逐组实体测试；归属成立后依次复验视觉/提交同 index、锚点、宿主焦点、鼠标、VoiceOver、多屏/全屏和 owner 生命周期，最后补 client 切换、进程重启、断网和双应用交叉证据。任一硬性条件失败即停止并完成设置列表、TIS、bundle、运行数据和进程零残留清理。
+这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键、主要编辑按键、光标锚点与本组方向视觉/Space 提交一致性，不代表 `build 31` 已完成全部真实应用 UI。R01A 下一判断点是补宿主焦点、鼠标、VoiceOver、边缘定位、多屏/全屏与输入菜单，再补 client 切换、进程重启、断网、中英文混输和双应用 owner 生命周期；任一新实机窗口仍按人工交互、通知型只读 source 监视和零残留清理执行。
 
 ### 退出场景
 

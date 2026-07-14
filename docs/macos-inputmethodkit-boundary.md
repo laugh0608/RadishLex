@@ -110,9 +110,9 @@ SDK `IMKInputSession.h` 明确给自建候选窗提供 `windowLevel`，并说明
 
 不安装动态 contract 必须创建真实 `NSApplication`、`NSPanel`、`NSButton` 和正式 controller，不只验证 helper 或源码字符串。组件 contract 覆盖非激活窗口、level、Spaces behavior、五候选、视觉/accessibility selection、appearance 重解析、长候选压缩、character index 与 insertion range 分离、anchor fallback、owner 接管、旧 control 拒绝和完整隐藏；fake client 必须记录收到的 character index，并在越界时返回有限高度的 `(0,0)` 矩形，使末尾 cursor、中间 cursor、无 inline session 与最终有效行锚点成为可判伪动态证据。controller contract 覆盖 composition、方向 keyDown 后 keyUp/modifier 保持、候选变化重置、Space、鼠标、accessibility press、Enter、Escape、宿主快捷键与双 client 生命周期。contract-only initializer 和 inspection API 只在 `RADISHLEX_CONTRACT_SMOKE=1` 编译，native 产品门禁必须证明这些 selector 不存在。
 
-正式 `build 30` 的一次实体键盘观察发生在系统开启“自动切换到文稿的输入法”的环境中；事后 TIS 显示 TextEdit 已切回系统拼音，所以候选高亮迁移与 Space 提交不能归属为 RadishLex 通过证据。该轮同时观察到候选窗固定在屏幕左下角，仓库审计确认末尾插入 cursor 被错误当成 inline character index。修正后的产品构建号为 `31`；2026-07-14 已使用 Apple Development identity 重建、通过严格签名和安装副本哈希复核，并在不注销的当前会话进入系统设置现有列表，真实 UI 尚待按人工分组流程判定。
+正式 `build 30` 的一次实体键盘观察发生在系统开启“自动切换到文稿的输入法”的环境中；事后 TIS 显示 TextEdit 已切回系统拼音，所以候选高亮迁移与 Space 提交不能归属为 RadishLex 通过证据。该轮同时观察到候选窗固定在屏幕左下角，仓库审计确认末尾插入 cursor 被错误当成 inline character index。修正后的产品构建号为 `31`；2026-07-14 已使用 Apple Development identity 重建、通过严格签名和安装副本哈希复核，并在不注销的当前会话完成正式人工复验。
 
-本轮曾用公开 `TISSelectInputSource` 精确选择正式 mode，同会话返回 `property_selected=1` 且 current source ID 精确匹配，但菜单栏仍显示系统拼音，实体输入表现为 RadishLex；开发者手动切到 U.S. 再切回系统拼音后显示与行为恢复一致。这证明菜单栏/SystemUIServer 呈现可能滞后于 TIS 与实际事件归属。该诊断不计作候选功能通过，后续验收禁止自动选择 source：执行者只做部署、系统设置添加、只读来源监视和清理，开发者手动聚焦、切换与实体交互。
+本轮曾用公开 `TISSelectInputSource` 精确选择正式 mode，同会话返回 `property_selected=1` 且 current source ID 精确匹配，但菜单栏仍显示系统拼音；该诊断不计作候选功能通过。停止自动选择后，系统设置一度“已添加但菜单未发布 source”，经真实移除并重新添加后菜单项可由开发者手动选择。最终只读监视先以 U.S. 与系统拼音切换自证通知链有效，再记录正式 RadishLex mode 为测试期间 current source；实体键盘确认候选跟随文字光标、右方向视觉高亮迁移到第二项、Space 提交同一项且无异常。该结果正式关闭 build 31 光标锚点与本组视觉/提交一致性，不替代尚未执行的鼠标、VoiceOver、多屏/全屏和生命周期矩阵。
 
 ## 隐私与本地数据
 
@@ -135,7 +135,7 @@ M1 开发版必须明确并隔离：
 
 开发 smoke 不得读取用户现有 Rime 配置或词库目录，也不得把本机绝对路径写入 committed 文档或 fixture。M1 已使用固定上游 commit、保留 Apache-2.0 许可证和来源记录的 `rime-pinyin-simp` 临时隔离数据复验 native bundle 与真实 FFI 输入链。native bundle 必须递归封装全部非系统 dylib、把加载路径改写到 bundle 内、保存逐库许可证与签名后哈希清单，并拒绝任何外部绝对依赖。该开发期封装不替代 M4 的 Developer ID、公证、升级/移除和发布级供应链门禁。
 
-TIS input source/mode id 与 bundle 文件名属于平台稳定身份，不等同于允许下划线的 Rime schema id。当前正式 Bundle ID 为 `org.radishlex.inputmethod.macos`，单一全拼 mode 为 `org.radishlex.inputmethod.macos.Pinyin`，bundle 文件名为 `RadishLexInputMethod.app`，Rime schema 仍为 `pinyin_simp`；mode metadata 必须同时固定 `LSUIElement`、简体中文 language、script、repertoire、图标、本地化标签和可见顺序。输入法列表 TIFF 使用 16pt 逻辑尺寸，当前 Retina 资产固定为 `32×32 @144dpi` 并保留安全边距，避免系统设置按 64pt 放大后覆盖名称。macOS 26.5.1 已观察到失败身份与安装路径的 TIS 负缓存，开发过程不得复用旧 `org.radishlex.inputmethod` 或 `RadishLex.app`，也不得通过修改 TIS 私有数据库清缓存。系统设置列表更新与公开 TIS 枚举之间还可能短时竞态；清理必须先在系统设置真实移除，再等待或触发公开刷新并复核精确零残留，不能用 `TISDisableInputSource` 或私有配置代替系统设置动作。
+TIS input source/mode id 与 bundle 文件名属于平台稳定身份，不等同于允许下划线的 Rime schema id。当前正式 Bundle ID 为 `org.radishlex.inputmethod.macos`，单一全拼 mode 为 `org.radishlex.inputmethod.macos.Pinyin`，bundle 文件名为 `RadishLexInputMethod.app`，Rime schema 仍为 `pinyin_simp`；mode metadata 必须同时固定 `LSUIElement`、简体中文 language、script、repertoire、图标、本地化标签和可见顺序。输入法列表 TIFF 使用 16pt 逻辑尺寸，当前 Retina 资产固定为 `32×32 @144dpi` 并保留安全边距，避免系统设置按 64pt 放大后覆盖名称。macOS 26.5.1 已观察到失败身份与安装路径的 TIS 负缓存，开发过程不得复用旧 `org.radishlex.inputmethod` 或 `RadishLex.app`，也不得通过修改 TIS 私有数据库清缓存。系统设置列表、菜单发布与公开 TIS 枚举之间可能竞态；只读实时归属必须接收 `kTISNotifySelectedKeyboardInputSourceChanged` 并运行 CFRunLoop，不能只轮询进程内缓存。清理必须先在设置中真实移除，必要时对重启后回流项再次移除；删除后打开现有列表与可添加目录触发公开扫描，再复核精确零残留，不能用 `TISDisableInputSource` 或私有配置替代。
 
 ## Header、线程与错误
 

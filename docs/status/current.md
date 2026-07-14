@@ -20,7 +20,9 @@
 
 当前 SDK 契约确认 `attributesForCharacterIndex:` 接收 inline session 内的字符索引，不是末尾插入位置。正式实现以 marked range 派生合法索引，保留 `firstRectForCharacterRange:actualRange:` 的文档绝对插入位置 fallback；动态 contract 覆盖越界索引返回有限高度 `(0,0)`、末尾/中间 cursor、无 inline session 和最终 panel 锚点，产品构建号升至 `31`。
 
-`build 31` 已在明确授权后使用 Apple Development identity 重建并完成严格签名、安装副本哈希复核、用户级安装和系统设置添加；当前会话无需注销已识别 source。一次公开 TIS 自动选择诊断精确确认 RadishLex 为 current source，但菜单栏仍显示系统拼音，实体输入表现为 RadishLex；开发者手动经 U.S. 切回系统拼音后恢复一致。该现象只证明菜单栏/SystemUIServer 显示可能滞后，不计作候选功能通过。自动选择工具已停止，当前 RadishLex 为 `matches=2 enabled=1 selected=0`，bundle 与隔离运行数据存在、进程停止，等待人工分组测试后完整清理；R01A 未退出。
+`build 31` 已在明确授权后完成 Apple Development 重建、严格签名、安装副本哈希复核、用户级安装和系统设置添加，全程无需注销。初次出现“设置已添加但菜单不发布 source”；经系统设置真实移除并重新添加后，菜单项可由开发者手动选择。自检后的只读 TIS 通知监视精确记录 RadishLex mode 为本组 current source，开发者实体输入确认候选出现、跟随文字光标、右方向迁移到第二项且 Space 提交该项，无异常；返回 Codex 后监视才记录切回系统拼音。因此 build 31 的光标锚点与本组视觉/提交同 index 正式通过。
+
+验收后清理经历设置项回流和 TIS 缓存竞态：TextEdit 文稿先切回系统拼音，完整重启设置后对回流项再次真实移除；删除 bundle/隔离数据并终止进程后，再打开现有列表与可添加目录触发公开扫描。最终 `matches=0 enabled=0 selected=0`，bundle、运行数据与进程均无残留；未使用 `TISDisableInputSource`、私有配置或注销。R01A 仍需第二、三阶段平台与生命周期证据，尚未退出。
 
 长期产品交付顺序见 [产品交付路线图](../roadmap.md)，当前整改批次、停止线、资产处置和退出条件见 [项目稳定化整改专题](../remediation/2026-07-project-stabilization.md)。
 
@@ -30,18 +32,18 @@
 - librime 生命周期已收口到进程级 runtime；多 session、owner-thread、配置冲突、失败回滚和 finalize 已有自动或 native smoke。
 - macOS Objective-C 薄壳、contract bundle 与 wrapper smoke 已落地，覆盖按键规范化、commit/snapshot/candidate 复制、reset、schema、线程与 teardown。
 - 正式 AppKit panel/component contract 动态覆盖非激活窗口、level、Spaces behavior、五候选、视觉/accessibility selection、appearance、合法 inline character index、绝对 insertion fallback、anchor、owner 接管和完整隐藏；controller contract 覆盖 keyDown/keyUp/modifier、候选变化重置、Space/鼠标/accessibility press 到 Rust commit、Enter/Escape、宿主快捷键和双 client 生命周期。
-- 正式 TIS 状态/清理入口按精确 Bundle ID 隔离产品与 reference probe；系统设置、TIS 与菜单栏呈现都可能短时竞态。来源归属使用输入期间只读精确 source 记录，清理仍以系统设置真实移除为前置，不使用 `TISDisableInputSource` 或私有配置替代。
+- 正式 TIS 状态/清理入口按精确 Bundle ID 隔离产品与 reference probe；来源监视必须接收公开 selected-source 通知并运行 CFRunLoop，不能用不处理通知的进程内轮询冒充实时记录。清理仍以系统设置真实移除为前置，不使用 `TISDisableInputSource` 或私有配置替代。
 - 隔离 `rime-pinyin-simp` 的真实 FFI smoke 已覆盖 composition、完整与分段非首候选、Backspace、Escape、Enter、翻页、方向键高亮与 Space、multi-session 和不存在 schema 拒绝；adapter 以 deployed schema list、原生 current-page selection API 与选择后回读固定可用性。
 - native 门禁覆盖隔离 schema/data/license、架构、FFI symbol、递归 dylib closure、逐库签名哈希和外部依赖拒绝；不读取用户 Rime 目录。
 - macOS bundle 固定正式 Bundle/mode ID、`LSUIElement`、简体中文 metadata、双语标签与 Retina 列表图标，并对完整依赖闭包签名。
-- TextEdit/Codex 实机已覆盖连续输入、中文提交、5×1 候选、数字/翻页/编辑键、Enter 原文和方向键后 Space 提交非首候选；系统修饰键保持未消费。索引日志与提交一致，但视觉高亮仍停在首项。
+- 旧 `IMKCandidates` 实机覆盖连续输入、主要编辑键与提交语义，但视觉高亮不重绘；build 31 的 AppKit panel 已在精确 source 归属下确认候选跟随光标、右方向视觉迁移且 Space 提交同一第二项。
 - GitHub 仓库级 `Protect master via PR` ruleset 已只读复验为 active；`Repo Hygiene`、`Repository Baseline`、`Rust Clippy`、`Flutter Manager`、`Go Quality` 五项均为 required checks，且 strict/up-to-date policy 已启用。R06A 已完成退出。
 
 这些证据证明工程原型可继续演进，不证明真实平台输入、生产同步或产品发布已经完成。
 
 ## 已确认阻塞
 
-- R01A 的 AppKit candidate panel 已形成 `build 31` 仓库与冻结安装产物，但尚无人工分组的真实应用通过证据。`build 30` 的实体输入来源不明并暴露左下角定位缺陷；`build 31` 的菜单栏竞态诊断也不计为候选通过。后续由执行者做部署、只读 source 监视和清理，开发者手动聚焦、切换并实体交互，再判定视觉/提交同 index、锚点、宿主焦点、鼠标、VoiceOver、多屏/全屏和生命周期。
+- R01A 的 AppKit candidate panel 已由 build 31 正式关闭光标锚点、右方向视觉迁移与 Space 提交同 index 子项；尚缺宿主焦点、鼠标、VoiceOver、边缘定位、多屏/全屏、输入菜单和 owner/client 生命周期的集中人工证据。
 - 输入 session 未组合 engine、ranker、userdb 与 privacy policy，真实选择没有进入平台学习热路径。
 - userdb 用户意图缺少统一事务、WAL/busy 策略；ranker recency/frequency 语义需要修正。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
@@ -59,9 +61,9 @@
 
 ## 下一步顺位
 
-1. 保持当前已签名安装的冻结 `build 31`，不重建、不注销、不自动选择 source 或注入按键；执行者启动只读 source 监视后，每次向开发者交付一组可判伪实体步骤。
-2. 开发者先聚焦目标文稿，再手动选择 RadishLex 并完成该组输入；菜单栏只作辅助观察，输入期间精确 source 不匹配或任一行为异常即停止。测试结束后由执行者完成系统设置移除和 TIS、bundle、运行数据、进程零残留清理。
-3. panel 通过后补 client 切换、进程重启、断网、中英文混输与两个应用交叉证据，满足退出场景后关闭 R01A。
+1. build 31 已完成本轮签名实机和零残留清理；不为后续单项自动重装、注销或程序化选择 source。下一集中窗口继续沿用人工切换/交互与公开通知监视分工。
+2. 补宿主焦点、鼠标、VoiceOver、边缘定位、多屏/全屏与输入菜单证据，再补 client 切换、进程重启、断网、中英文混输和双应用生命周期；满足退出场景后关闭 R01A。
+3. 任一新实机窗口仍须使用冻结产物、明确授权和系统设置真实移除；完成后复核设置列表、可添加目录、TIS、bundle、运行数据和进程全部零残留。
 4. R01A 退出后实施 R02L；R02L 退出后再由 R01B 接入真实学习，之后关闭整改专题并进入 M3。
 
 ## 验证入口
