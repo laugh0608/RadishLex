@@ -232,11 +232,19 @@ NSRect RLXCandidatePanelFrame(NSSize panelSize, NSRect anchorRect,
   contentSize.width = MAX(contentSize.width, 1.0);
   contentSize.height = MAX(contentSize.height, 1.0);
 
+  NSRange markedRange = [client markedRange];
+  // IMKTextInput expects a character index inside the inline session, not the
+  // insertion position immediately after its final character.
+  NSUInteger inlineCharacterIndex = 0;
+  if (markedRange.location != NSNotFound && markedRange.length > 0) {
+    inlineCharacterIndex = MIN(cursorIndex, markedRange.length - 1);
+  }
   NSRect lineRect = NSZeroRect;
-  [client attributesForCharacterIndex:cursorIndex
+  [client attributesForCharacterIndex:inlineCharacterIndex
                   lineHeightRectangle:&lineRect];
   if (!RLXCandidateAnchorIsUsable(lineRect)) {
-    NSRange markedRange = [client markedRange];
+    // This fallback uses an absolute document insertion range and may point at
+    // the end of the marked range.
     NSUInteger location =
         markedRange.location == NSNotFound
             ? 0
@@ -253,8 +261,13 @@ NSRect RLXCandidatePanelFrame(NSSize panelSize, NSRect anchorRect,
   NSScreen *screen = [self screenForAnchorRect:lineRect];
   NSRect visibleFrame =
       screen != nil ? screen.visibleFrame : NSScreen.mainScreen.visibleFrame;
-  if (NSIsEmptyRect(visibleFrame))
-    visibleFrame = NSMakeRect(0, 0, contentSize.width, contentSize.height);
+  if (NSIsEmptyRect(visibleFrame)) {
+    visibleFrame = NSMakeRect(
+        NSMinX(lineRect),
+        NSMinY(lineRect) - RLXCandidatePanelGap - contentSize.height,
+        MAX(contentSize.width, NSWidth(lineRect)),
+        contentSize.height + RLXCandidatePanelGap + NSHeight(lineRect));
+  }
   NSRect panelFrame = RLXCandidatePanelFrame(
       contentSize, lineRect, visibleFrame, RLXCandidatePanelGap);
   self.window.level = (NSWindowLevel)[client windowLevel] + 1;

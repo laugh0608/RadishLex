@@ -106,7 +106,7 @@ fi
 plutil -lint "${contents}/Info.plist" "${manifest}" "${native_manifest}" \
   "${resources}/zh-Hans.lproj/InfoPlist.strings" \
   "${resources}/en.lproj/InfoPlist.strings" >/dev/null
-test "$(plutil -extract CFBundleVersion raw "${contents}/Info.plist")" = "30"
+test "$(plutil -extract CFBundleVersion raw "${contents}/Info.plist")" = "31"
 test "$(plutil -extract RadishLexRimeSchema raw "${contents}/Info.plist")" = \
   "${RADISHLEX_RIME_SCHEMA}"
 test "$(plutil -extract schema_id raw "${manifest}")" = "${RADISHLEX_RIME_SCHEMA}"

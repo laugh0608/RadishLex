@@ -36,6 +36,8 @@ static void Require(BOOL condition, NSString *message) {
 @property(nonatomic) BOOL provideLineRect;
 @property(nonatomic) NSUInteger lineRectRequestCount;
 @property(nonatomic) NSUInteger fallbackRequestCount;
+@property(nonatomic) NSUInteger lastCharacterIndex;
+@property(nonatomic) NSRange lastFallbackRange;
 @end
 
 @implementation RLXContractTextClient
@@ -45,15 +47,27 @@ static void Require(BOOL condition, NSString *message) {
     _contractMarkedRange = NSMakeRange(10, 5);
     _contractWindowLevel = NSNormalWindowLevel;
     _provideLineRect = YES;
+    _lastCharacterIndex = NSNotFound;
+    _lastFallbackRange = NSMakeRange(NSNotFound, 0);
   }
   return self;
 }
 - (NSDictionary *)attributesForCharacterIndex:(NSUInteger)index
                           lineHeightRectangle:(NSRectPointer)lineRect {
-  (void)index;
   self.lineRectRequestCount += 1;
-  if (lineRect != NULL)
-    *lineRect = self.provideLineRect ? self.lineRect : NSZeroRect;
+  self.lastCharacterIndex = index;
+  BOOL hasInlineSession = self.contractMarkedRange.location != NSNotFound &&
+                          self.contractMarkedRange.length > 0;
+  BOOL indexIsValid = hasInlineSession
+                          ? index < self.contractMarkedRange.length
+                          : index == 0;
+  if (lineRect != NULL) {
+    if (!indexIsValid) {
+      *lineRect = NSMakeRect(0, 0, 2, 22);
+    } else {
+      *lineRect = self.provideLineRect ? self.lineRect : NSZeroRect;
+    }
+  }
   return @{};
 }
 - (NSRange)markedRange {
@@ -61,8 +75,8 @@ static void Require(BOOL condition, NSString *message) {
 }
 - (NSRect)firstRectForCharacterRange:(NSRange)range
                          actualRange:(NSRangePointer)actualRange {
-  (void)range;
   self.fallbackRequestCount += 1;
+  self.lastFallbackRange = range;
   if (actualRange != NULL)
     *actualRange = NSMakeRange(NSNotFound, 0);
   return self.fallbackRect;
@@ -80,6 +94,27 @@ static NSArray<NSAttributedString *> *Candidates(void) {
     [[NSAttributedString alloc] initWithString:@"候选丁"],
     [[NSAttributedString alloc] initWithString:@"候选戊"],
   ];
+}
+
+static void RequirePanelFollowsLineRect(RLXCandidatePanel *panel,
+                                        NSRect lineRect, NSString *message) {
+  NSRect panelFrame = panel.rlx_contractWindow.frame;
+  NSScreen *screen = NSScreen.mainScreen ?: NSScreen.screens.firstObject;
+  NSRect visibleFrame = screen != nil ? screen.visibleFrame : NSZeroRect;
+  if (NSIsEmptyRect(visibleFrame)) {
+    visibleFrame = NSMakeRect(
+        NSMinX(lineRect), NSMinY(lineRect) - 6.0 - NSHeight(panelFrame),
+        MAX(NSWidth(panelFrame), NSWidth(lineRect)),
+        NSHeight(panelFrame) + 6.0 + NSHeight(lineRect));
+  }
+  NSRect expectedFrame = RLXCandidatePanelFrame(
+      panelFrame.size, lineRect, visibleFrame, 6.0);
+  NSString *failure = [NSString
+      stringWithFormat:@"%@ (panel=%@ expected=%@ line=%@)", message,
+                       NSStringFromRect(panelFrame),
+                       NSStringFromRect(expectedFrame),
+                       NSStringFromRect(lineRect)];
+  Require(NSEqualRects(panelFrame, expectedFrame), failure);
 }
 
 int main(void) {
@@ -103,12 +138,18 @@ int main(void) {
 
     [panel showCandidates:Candidates()
              selectedIndex:0
-               cursorIndex:2
+               cursorIndex:5
                     client:(id)client
                      owner:ownerA];
     NSPanel *window = panel.rlx_contractWindow;
     Require(window.isVisible && panel.rlx_contractOwner == ownerA,
             @"show establishes the visible owner");
+    Require(client.lastCharacterIndex == 4,
+            @"an insertion cursor at marked length is clamped to the last "
+             "inline character");
+    RequirePanelFollowsLineRect(
+        panel, client.lineRect,
+        @"an end insertion cursor follows the valid client line rectangle");
     Require(!window.canBecomeKeyWindow && !window.canBecomeMainWindow &&
                 !window.isKeyWindow && !window.isMainWindow,
             @"candidate panel cannot take host focus");
@@ -151,6 +192,11 @@ int main(void) {
                cursorIndex:3
                     client:(id)client
                      owner:ownerB];
+    Require(client.lastCharacterIndex == 3,
+            @"a middle insertion cursor remains the inline character index");
+    RequirePanelFollowsLineRect(
+        panel, client.lineRect,
+        @"a middle insertion cursor follows the valid client line rectangle");
     [panel hideForOwner:ownerA];
     Require(window.isVisible && panel.rlx_contractOwner == ownerB,
             @"an old owner cannot hide the current session");
@@ -165,14 +211,30 @@ int main(void) {
                 panel.rlx_contractSelectedIndex == 0,
             @"a stale owner cannot mutate the current selection");
 
-    client.provideLineRect = NO;
+    client.contractMarkedRange = NSMakeRange(NSNotFound, 0);
     [panel showCandidates:Candidates()
              selectedIndex:0
                cursorIndex:4
                     client:(id)client
                      owner:ownerB];
-    Require(window.isVisible && client.fallbackRequestCount == 1,
-            @"firstRectForCharacterRange is the public anchor fallback");
+    Require(client.lastCharacterIndex == 0,
+            @"a client without an inline session receives character index zero");
+    RequirePanelFollowsLineRect(
+        panel, client.lineRect,
+        @"a client without an inline session follows its valid line rectangle");
+
+    client.contractMarkedRange = NSMakeRange(10, 5);
+    client.provideLineRect = NO;
+    [panel showCandidates:Candidates()
+             selectedIndex:0
+               cursorIndex:5
+                    client:(id)client
+                     owner:ownerB];
+    Require(window.isVisible && client.lastCharacterIndex == 4 &&
+                client.fallbackRequestCount == 1 &&
+                NSEqualRanges(client.lastFallbackRange, NSMakeRange(15, 0)),
+            @"firstRectForCharacterRange keeps the absolute end insertion "
+             "position as the public anchor fallback");
     client.fallbackRect = NSZeroRect;
     [panel showCandidates:Candidates()
              selectedIndex:0

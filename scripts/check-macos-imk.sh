@@ -109,7 +109,7 @@ test -s "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings"
 test -s "${bundle}/Contents/Resources/zh-Hans.lproj/Localizable.strings"
 test -s "${bundle}/Contents/Resources/en.lproj/Localizable.strings"
 plutil -lint "${bundle}/Contents/Info.plist" >/dev/null
-test "$(plutil -extract CFBundleVersion raw "${bundle}/Contents/Info.plist")" = "30"
+test "$(plutil -extract CFBundleVersion raw "${bundle}/Contents/Info.plist")" = "31"
 plutil -lint "${bundle}/Contents/Resources/zh-Hans.lproj/InfoPlist.strings" \
   "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings" \
   "${bundle}/Contents/Resources/zh-Hans.lproj/Localizable.strings" \
@@ -171,7 +171,13 @@ if rg -n 'IMKCandidates|selectCandidateWithIdentifier|candidateSelectionChanged:
 fi
 rg -q 'NSWindowStyleMaskNonactivatingPanel' \
   "${platform_dir}/Sources/RadishLexCandidatePanel.m"
-rg -q 'attributesForCharacterIndex:cursorIndex' \
+rg -Fq 'NSUInteger inlineCharacterIndex = 0;' \
+  "${platform_dir}/Sources/RadishLexCandidatePanel.m"
+rg -Fq 'inlineCharacterIndex = MIN(cursorIndex, markedRange.length - 1)' \
+  "${platform_dir}/Sources/RadishLexCandidatePanel.m"
+rg -Fq 'attributesForCharacterIndex:inlineCharacterIndex' \
+  "${platform_dir}/Sources/RadishLexCandidatePanel.m"
+rg -Fq 'markedRange.location + MIN(cursorIndex, markedRange.length)' \
   "${platform_dir}/Sources/RadishLexCandidatePanel.m"
 rg -q '\[client windowLevel\].*\+ 1' \
   "${platform_dir}/Sources/RadishLexCandidatePanel.m"
