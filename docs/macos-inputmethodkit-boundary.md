@@ -129,6 +129,10 @@ SDK `IMKInputSession.h` 明确给自建候选窗提供 `windowLevel`，并说明
 - M2 输入法与 manager 若共享 userdb，必须固定 App Group 或等价目录、文件权限、WAL/busy 策略、migration 所有权和并发测试。
 - 平台壳不得直接打开 SQLite；目录只作为受控配置传给 Rust runtime 或 manager bridge。
 
+R01B 将正式 InputMethodKit session 切换到 `ime-runtime` 产品构造入口。每个 controller/session 使用独立 engine session 和独立 userdb connection，数据库固定在 `~/Library/Application Support/RadishLex/userdb.sqlite3`；Objective-C 只创建权限为 `0700` 的父目录并传 UTF-8 路径，Rust 负责 migration、WAL、busy timeout、数据库与 sidecar 的 `0600` 权限以及损坏错误。平台不得静默删除或重建数据库。
+
+候选 snapshot 同时携带 display index 与 engine index；候选窗、数字键、Space、鼠标和 accessibility action 始终回传 display index，由 Rust runtime 映射后选择 engine candidate。平台每次事件前传入 secure input、敏感应用、隐私模式、上下文可信度和受控 context kind；禁止学习场景不会写入，secure/敏感/未知场景也不读取个人化信号。分段选择的待确认意图、selection 事务和失败语义全部留在 Rust。平台日志只允许记录阶段、个人化状态与学习结果枚举，不记录输入码、候选、App ID 或数据库路径。
+
 ## Native 依赖与目录
 
 M1 开发版必须明确并隔离：

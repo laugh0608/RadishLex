@@ -1,6 +1,6 @@
 # macOS InputMethodKit 薄壳
 
-本目录实现 M1 第一平台的 InputMethodKit 薄壳、开发 bundle build 与不安装系统输入法的 contract smoke。它不包含 ranker/userdb 学习、同步、manager、发布签名、公证或复杂候选 UI，也不提供任何自动安装、注册或输入法服务重启动作。
+本目录实现 M1 第一平台的 InputMethodKit 薄壳、R01B 本地个人化 runtime 接线、开发 bundle build 与不安装系统输入法的 contract smoke。它不包含同步、manager、发布签名、公证或复杂候选 UI，也不提供任何自动安装、注册或输入法服务重启动作。
 
 ## 结构
 
@@ -10,7 +10,7 @@
 - `Sources/RadishLexRuntime.*`：创建独立 Rime session；进程退出时先释放全部 session，再调用 `radishlex_rime_runtime_shutdown`。
 - `Resources/Rime/default.yaml.in`：产品自有 Rime 默认配置模板，固定 schema list 与 5 项候选页；不读取或继承用户 Rime 配置。
 - `build-bundle.sh`：构建 contract 或显式 native-rime 开发 bundle，不安装 bundle。
-- `Tests/contract_smoke.m`：使用合成 demo engine 复验 ABI v3、完整按键映射、Unicode cursor、候选选择结果和生命周期，不读取 Rime 目录。
+- `Tests/contract_smoke.m`：使用合成 demo engine 复验 ABI v4、完整按键映射、display/engine index、个人化/学习状态、Unicode cursor、候选选择结果和生命周期，不读取 Rime 目录。
 - `Tests/candidate_panel_contract.m`：创建真实 AppKit panel/control，复验视觉与 accessibility selection、appearance、anchor fallback、owner 接管和完整隐藏。
 - `Tests/input_controller_contract.m`：使用正式 controller、panel 和 Rust demo session，贯通方向 keyDown/keyUp、Space、鼠标、accessibility press、Enter、Escape、宿主快捷键和双 client 生命周期。
 - `Tools/tis_source_status.m`：使用公开 TIS API 按精确 Bundle ID 查询 parent/mode 状态，或以通知和 CFRunLoop 实时输出精确 current source；不启用、停用或选择输入源。
@@ -21,7 +21,9 @@
 
 Rust snapshot 的 cursor 是允许落在 composition 末尾的插入位置，但 `attributesForCharacterIndex:lineHeightRectangle:` 接收 inline session 内的现存字符索引。正式 panel 因此先读取 client marked range：存在 marked text 时使用 `min(cursor, length - 1)`，没有 inline session 时使用 `0`。若该行矩形不可用，才以 marked range 的文档绝对末尾位置调用 `firstRectForCharacterRange:actualRange:`；两种 range 不能混用。
 
-最终 panel frame 使用目标 `NSScreen.visibleFrame` 在锚点下方或上方放置并限制在屏幕内；contract 环境没有有效 screen frame 时围绕有效行矩形构造计算区域，不回退到 `(0,0)`。controller 的唯一 display index 同时驱动视觉高亮与 Space selection，鼠标回调也携带同一 index 进入 Rust selection API。
+最终 panel frame 使用目标 `NSScreen.visibleFrame` 在锚点下方或上方放置并限制在屏幕内；contract 环境没有有效 screen frame 时围绕有效行矩形构造计算区域，不回退到 `(0,0)`。controller 的唯一 display index 同时驱动视觉高亮、Space、数字键、鼠标和 accessibility selection；Rust runtime 固化并执行 display index 到 engine index 的映射。
+
+native 产品 session 通过 ABI v4 的 personalized Rime 构造入口持有独立 userdb connection，数据库固定为 `~/Library/Application Support/RadishLex/userdb.sqlite3`。Objective-C 只创建并收紧 `RadishLex` 父目录到 `0700`，SQLite migration、WAL、busy timeout、文件权限、排序、selection 事务和失败回退都由 Rust 负责。每个事件前平台只传 secure input、隐私模式、上下文可信度与粗粒度类别；当前 Alpha 只把 TextEdit 和 Codex 识别为允许学习的普通上下文，其他未知应用默认 engine-only，敏感应用与 secure input 同样不读取、不写入个人化数据。
 
 ## 不安装验证
 

@@ -17,6 +17,7 @@ RadishLex/
   crates/
     ime-core/
     ime-engine-rime/
+    ime-runtime/
     ime-ranker/
     ime-userdb/
     ime-sync/
@@ -78,11 +79,11 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、CLI、ABI v3 selection/key result、受测输入 header 与 macOS 基础实机输入证据 | 完整 R01A 双应用/生命周期验收与可重复产品输入链 |
-| 本地学习 | userdb、ranker、管理接口和测试 | 事务化用户意图、有效 recency 和固定评测基线 |
+| Rust input | core、进程级 Rime runtime、CLI、ABI v3 selection/key result、受测输入 header 与已完成的 R01A macOS 双应用/生命周期证据 | R01B 产品个人化 runtime、ABI v4 隐私/索引/学习状态和真实选择闭环 |
+| 本地学习 | schema v3 userdb、事务化用户意图、确定性 ranker、固定合成评测与管理接口 | R01B 将既有正确性接入真实平台选择；manager 产品管理界面后续按 M2 顺位推进 |
 | 同步 | crypto/sync 模型、Go server、HTTP 集成测试 | 确定合并、完整设备生命周期、生产 HTTPS 编排 |
 | Flutter manager | macOS 工程、真实开发期 FFI bridge、widget tests | 默认产品 FFI bundle、持久化和平台文件访问 |
-| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、基础实机输入与隔离 reference probe；Android Keystore 能力验证桥 | macOS R01A 完整退出、产品安装包；其他系统输入法 |
+| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、已完成的 R01A build 32 实机矩阵与隔离 reference probe；Android Keystore 能力验证桥 | R01B 本地个人化纵向链、产品安装包；其他系统输入法 |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
 
@@ -111,6 +112,18 @@ RadishLex/
 - adapter 错误和 native smoke
 
 Rime 私有概念不得越过该 crate。
+
+### ime-runtime
+
+产品输入 session 的本地组合层：
+
+- 组合 `ime-core` engine session、`ime-ranker`、`ime-userdb` 与隐私策略
+- 取得稳定 input code，并批量读取当前候选的个人化信号
+- 保存 display index 到 engine index 的当次快照映射
+- 决定 selection 的即时或分段学习时机，并返回显式学习结果
+- 在 userdb/ranker 故障时保留 engine 输入与 commit，同时暴露退化状态
+
+每个 runtime session 持有独立 SQLite connection；平台壳、manager 和 engine adapter 不复制学习、删除或排序语义。该 crate 不依赖具体平台框架、远端同步或具体 engine 实现。
 
 ### ime-ranker
 
@@ -227,7 +240,7 @@ apps/radishlex-manager/
 
 ## 平台目录
 
-当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build、不安装系统输入法的 wrapper contract smoke、公开 TIS 只读状态/监视工具、授权清理入口，以及不接 Rime/FFI 的合成 reference probe。正式薄壳已完成 Apple Development 短时安装，并在精确 source 归属下通过候选跟随光标、方向视觉与 Space 提交一致、鼠标选择和宿主焦点；边缘定位、多屏/全屏、输入菜单、client 切换、进程重启、断网与双应用交叉矩阵尚未闭合，不能据此宣称 R01A 或 M1 退出。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
+当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build、不安装系统输入法的 wrapper contract smoke、公开 TIS 只读状态/监视工具、授权清理入口，以及不接 Rime/FFI 的合成 reference probe。正式薄壳已在 Apple Development build 32 完成 R01A 的 TextEdit/Codex、候选窗、生命周期、断网与清理证据；当前顺位是 R01B，将同一产品薄壳接入 Rust 个人化 runtime。副屏和 VoiceOver 仍按平台边界文档的已知限制处理，不能把自动 contract 当成对应实机证据。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
 
 后续平台目录按进入顺序创建：
 

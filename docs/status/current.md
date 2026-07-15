@@ -34,13 +34,16 @@
 
 R02L 已在不接入真实平台热路径的前提下完成本地正确性收口：userdb schema v3 以统一事务承载 add、explicit restore、selection、negative feedback 和 delete，文件库固定 WAL、5 秒 busy timeout、foreign keys、`synchronous=NORMAL`、独立连接和 Unix 私有权限；v1/v2 原子迁移移除 64 位 FNV 唯一身份，未来 schema 与损坏库显式拒绝并原位保留。ranker 改为显式评估时间、确定性 recency、对数有界 frequency/negative contribution、有限分数和稳定原索引 tie-break；固定 5 例合成集达到 Top-1 `0.8`、Top-3 `1.0`、MRR `0.9`，50 候选延迟只记录可复验观测而不设置易波动 CI 墙钟阈值。删除优先于 suppress 和旧状态，只有版本更新的独立恢复入口可清除 tombstone；同步 payload v1 不再把 `manual_add` 推断为恢复。当前主批次据此切换为 R01B。
 
+R01B 已完成自动化代码批：新增 `ime-runtime` 统一组合 engine、ranker、userdb 与 privacy policy；每个输入 session 使用独立数据库连接，一次读取当前候选页的排序信号，并保留 display 到 engine index 映射。macOS 产品 session 固定使用 `~/Library/Application Support/RadishLex/userdb.sqlite3`，在每次按键和选择前只传递 secure、privacy、上下文是否已知及粗粒度类别；secure/P0/未知应用不读取或写入 userdb，隐私模式只读排序。真实 librime/FFI native smoke 已证明 selection 记录、分段延迟记录、隐私零增量和 secure 阻断；R01B 仍需授权后的真实 TextEdit 学习、输入法进程重启持久化及零残留证据，当前不得标记完成。
+
 临时通知监视已收口到现有 `tis_source_status.m`：`--monitor` 先输出精确 current source，再在公开 selected-source 通知到达时通过 CFRunLoop 重读并输出 current source，以 `is_radishlex_pinyin` 明确标识正式 Pinyin mode；同一次切换允许出现重复通知，原 Bundle ID 状态输出和清理调用保持兼容。门禁固定编译、默认输出、通知/RunLoop 结构以及 `TISSelectInputSource`、`TISDisableInputSource` 和私有配置禁用线。用户为避免文稿级 source 占用而主动关闭的“自动切换到文稿的输入法”继续保持关闭，执行者不得自动修改。
 
 长期产品交付顺序见 [产品交付路线图](../roadmap.md)，当前整改批次、停止线、资产处置和退出条件见 [项目稳定化整改专题](../remediation/2026-07-project-stabilization.md)。
 
 ## 已有工程证据
 
-- ABI contract v3 无损返回 `consumed`、可选 commit 和同事件 snapshot；候选选择复用 owned result，输入 C header 已通过 C11/Objective-C contract。
+- ABI contract v4 无损返回 `consumed`、可选 commit、同事件 snapshot、个人化状态和学习处置；candidate view 同时携带 display/engine index，输入 C header 已通过 C11/Objective-C contract。
+- `ime-runtime` 已以产品 session 组合 engine、ranker、userdb 与 privacy policy；合成集覆盖重启持久化、映射、分段选择、写失败回滚、读失败降级、删除/显式恢复和 secure/P0/隐私隔离，50 候选延迟只记录观测基线。
 - librime 生命周期已收口到进程级 runtime；多 session、owner-thread、配置冲突、失败回滚和 finalize 已有自动或 native smoke。
 - macOS Objective-C 薄壳、contract bundle 与 wrapper smoke 已落地，覆盖按键规范化、commit/snapshot/candidate 复制、reset、schema、线程与 teardown。
 - 正式 AppKit panel/component contract 动态覆盖非激活窗口、level、Spaces behavior、五候选、视觉/accessibility selection、appearance、合法 inline character index、绝对 insertion fallback、anchor、owner 接管和完整隐藏；controller contract 覆盖 keyDown/keyUp/modifier、候选变化重置、Space/鼠标/accessibility press 到 Rust commit、Enter/Escape、宿主快捷键和双 client 生命周期。
@@ -56,7 +59,7 @@ R02L 已在不接入真实平台热路径的前提下完成本地正确性收口
 
 ## 已确认阻塞
 
-- 输入 session 未组合 engine、ranker、userdb 与 privacy policy，真实选择没有进入平台学习热路径。
+- R01B 自动化链已接入产品热路径，但尚缺真实 TextEdit 连续选择改变排序、输入法进程重启后保持、P0/隐私零写入及最终零残留的实机证据。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
 - manager 默认 fixture fallback，native library 打包、持久化路径和文件权限尚未产品化。
 
@@ -74,8 +77,8 @@ R02L 已在不接入真实平台热路径的前提下完成本地正确性收口
 ## 下一步顺位
 
 1. R01A 已由 build 32 的五项页、全屏/菜单、双 client、进程重启、离线和零残留证据完成退出；保留 VoiceOver 与副屏环境缺口，不在当前批重复消耗实机窗口。
-2. R02L 已以事务回滚、SQLite 文件策略和迁移、规范化删除身份、确定性有界排序、状态优先级、固定合成评测及延迟观测完成退出；真实平台热路径仍未接入学习。
-3. 当前进入 R01B，把真实选择接入 privacy policy、userdb 和 ranker，保留 display/ranked/engine index 映射，并用真实应用验证学习持久化与 P0 阻断；不开放真实同步或推进第二平台。
+2. R02L 已以事务回滚、SQLite 文件策略和迁移、规范化删除身份、确定性有界排序、状态优先级、固定合成评测及延迟观测完成退出，并作为 R01B 产品运行时的本地语义基础。
+3. R01B 自动化代码批已接入 privacy policy、userdb 和 ranker，并保留 display/engine index 映射；下一步只在明确授权后冻结并安装同一产物，用 TextEdit 验证学习改变排序、进程重启持久化、隐私/P0 零写入，再完成系统设置真实移除和零残留复核。
 4. 任一后续实机回归仍使用冻结产物、人工切换/交互、公开通知监视、明确授权和系统设置真实移除；不因 R01A 退出而降低零残留或来源归属要求。
 
 ## 验证入口

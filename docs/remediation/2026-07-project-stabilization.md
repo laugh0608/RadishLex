@@ -69,7 +69,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 
 - `ime-ffi` 丢弃 `KeyOutcome` 的 `consumed` 与即时 `commit`。（已由 R01A 第一代码批关闭）
 - 仓库缺少供 Swift / Objective-C 消费并受测试约束的 C header 或等价模块边界。（已由 R01A 第一代码批关闭）
-- 输入 session 未组合 engine、ranker、userdb 和 privacy policy。
+- 输入 session 未组合 engine、ranker、userdb 和 privacy policy。（R01B 自动化代码批已关闭，待真实应用证据）
 - librime 全局 setup/initialize/finalize 仍由单个 engine session 隐式承担。（已由 R01A 第二代码批关闭）
 - userdb 用户意图缺少统一事务，未配置 WAL、busy timeout 和明确并发策略。（已由 R02L 关闭）
 - userdb 将毫秒时间戳写入 `recency_score`，ranker 又将其裁剪为 `0..1`；frequency 无界线性增长。（已由 R02L 关闭）
@@ -237,6 +237,18 @@ R01A 不要求学习已经接入；真实学习在 R02L 正确性完成后由 R0
 - 重启输入法后学习结果保持。
 - P0 与隐私模式输入不产生 selection、weight 或 user term。
 - 删除与显式恢复在真实输入链中遵守 R02L 语义。
+
+### 当前完成证据（2026-07-15）
+
+- 新增 `ime-runtime` 产品层，统一持有 engine session、每 session 独立 userdb 连接、ranker、粗粒度学习上下文和 display 到 engine index 映射；候选页排序信号在单一 SQLite 读事务中批量取得，不把连接或排序逻辑下沉到平台壳。
+- secure text entry、敏感应用和未知应用采取 engine-only 策略，不读取或写入 userdb；显式隐私模式只读取已有 P2/P1 摘要用于本地排序，不记录 selection。上下文只允许固定粗粒度类别，平台 bundle id 不跨 FFI、不进入事件或日志。
+- selection 在 engine 返回即时 commit 时记录一次；分段选择只有在后续 commit 文本匹配时记录，reset、schema 或上下文变化会清除待定意图。学习写失败不撤销已经发生的 engine commit，向平台返回失败处置；排序读失败按 engine 原序降级并返回状态类别。
+- ABI contract v4 增加产品个人化 Rime session、学习上下文、个人化状态、学习处置和 candidate engine index；macOS 产品固定 userdb 路径及私有目录，Space、数字、鼠标/accessibility 选择均走 display index 到 engine index 的同一入口。
+- 合成 runtime 集成测试覆盖选择后重排与重启持久化、secure/敏感/未知/隐私隔离、分段选择、上下文切换、trigger 写失败、排序读失败、删除/显式恢复和 50 候选延迟观测。真实 librime/FFI native smoke 覆盖 selection 写入、分段处置、隐私零增量与 secure 阻断。
+
+### 剩余退出项
+
+- 尚未安装本批输入法，也未修改系统设置。R01B 继续保持进行中，必须在取得明确授权后使用同一冻结产物完成真实 TextEdit 连续选择改变排序、输入法进程重启后保持、P0/隐私模式零写入和最终零残留复核，才能关闭批次。
 
 ## 十一、R06A：首批质量门禁与 review-only 资产清理
 

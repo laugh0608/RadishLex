@@ -26,7 +26,7 @@ ime-ffi
         |
         v
 Input Runtime
-  ime-core + engine adapter + ime-ranker + ime-userdb + privacy policy
+  ime-runtime + ime-core + engine adapter + ime-ranker + ime-userdb + privacy policy
         |
         +-----------------------------+
         |                             |
@@ -80,6 +80,18 @@ Flutter Manager
 - bindings 必须有 ABI 版本与布局验证，不能只靠手写结构长期假定兼容。
 
 长期可以增加 Rust 自研 engine，但不得抢占真实平台、个人化学习和安全同步的近期优先级。
+
+### ime-runtime
+
+`ime-runtime` 组合单个 engine session、`ime-ranker`、文件型 `ime-userdb` 和隐私策略，是产品输入热路径的 Rust 真相源。
+
+- 每个输入 session 持有独立 engine session 与独立 SQLite connection；多个输入 session、manager 与诊断入口通过同一个 WAL 数据库文件并发，不共享跨线程 `Connection`。
+- runtime 从 engine 取得稳定 `input_code`，一次读取当前候选所需的 user term、ranker weight 和 tombstone，再输出 display index 到 engine index 的显式映射。
+- 平台壳只提交 display index 和受控的隐私上下文；候选选择、分段提交、学习判定与 userdb 写入由 runtime 统一决策。
+- secure input、敏感应用或无法安全判断的上下文只使用 engine 顺序且不读取、不写入个人化数据；隐私模式允许使用既有本地摘要，但不产生新学习写入。
+- userdb/ranker 读取失败时保留 engine 候选顺序并暴露退化状态；选择已经产生的 engine commit 不因学习写入失败而丢失，失败必须作为可诊断学习结果返回。
+
+`ime-runtime` 不负责平台生命周期、SQLite 管理 UI、远端同步、Rime 进程初始化或候选窗绘制。
 
 ### ime-userdb
 
@@ -166,6 +178,7 @@ system key event
   -> input runtime privacy check
   -> engine push key
   -> composition / engine candidates / optional commit
+  -> ime-runtime privacy decision
   -> userdb summary + ranker
   -> versioned key result and snapshot
   -> native candidate UI or text commit
@@ -179,6 +192,8 @@ system key event
 - candidate display index、ranked index 和 engine selection index 必须有稳定映射。
 - 候选选择结果必须同时表达 consumed、optional commit 和选择后的 snapshot；分段拼音候选可能只确定当前音节并继续 composition，平台不得假定每次候选选择都会立即提交文本。
 - secure text entry、P0 App 或隐私模式必须在记录学习事件前阻断。
+- display index 必须由 runtime 映射回当次快照中的 engine index，平台端不得假定重排后索引等于 engine 原始索引。
+- 选择先捕获 input code、候选身份、原始 engine index 和候选数；立即 commit 时写入一次 selection，分段选择则只保留待确认意图，并在后续匹配 commit 时写入。reset、schema/client/privacy context 变化、取消或不匹配 commit 必须丢弃待确认意图。
 - manager、后端和网络不可进入每次按键链路。
 
 ## Go Sync Server

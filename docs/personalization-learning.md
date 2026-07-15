@@ -16,6 +16,31 @@
 
 平台壳只传递输入上下文和用户反馈，不实现学习语义。M2 可以交付本地 manager；远端同步、设备授权和密钥轮换属于 M3，自研拼音 engine 属于更后阶段。
 
+## 产品 input runtime
+
+`ime-runtime` 是真实输入 session 的个人化组合层，依赖 `ime-core`、`ime-ranker` 和 `ime-userdb`，但不依赖具体平台或具体 engine 实现。每个 runtime session 持有一个 engine session、一个指向固定 userdb 文件的独立 SQLite connection、ranker、隐私上下文和当次候选映射；多个输入 session 与 manager 通过 WAL 和短事务并发，不共享跨线程 `Connection`。
+
+一次候选快照按以下顺序形成：
+
+1. 从 engine 读取 composition、候选和稳定 `input_code`。
+2. 根据平台传入的 secure input、敏感应用、隐私模式和上下文可信度决定个人化策略。
+3. 对允许读取个人化数据的路径，在同一只读事务中一次取得当前候选身份匹配的 user term、ranker weight 与 tombstone，避免候选级 N+1 查询和跨查询状态漂移。
+4. ranker 输出带 `original_index` 的确定性顺序；runtime 固化 display index 到 engine index 的映射，平台只使用 display index，真正选择时由 Rust 映射回 engine index。
+
+隐私策略固定为：
+
+| 上下文 | 候选读取 | 学习写入 |
+| --- | --- | --- |
+| secure input、敏感应用或无法安全判断 | 只用 engine 顺序，不读取 userdb 信号 | 禁止 |
+| 用户隐私模式 | 可使用既有本地个人化摘要 | 禁止 |
+| 已知普通上下文 | 允许本地重排 | 允许 P1 selection 与 P2 摘要事务写入 |
+
+平台只传递枚举化 `context_kind` 和布尔策略信号，不传、不持久化原始 App ID、窗口标题或文档文本。上下文变化必须显式更新 runtime；切换到禁止学习的上下文时，清除尚未由 commit 确认的选择意图。
+
+选择前，runtime 从当前快照捕获 input code、候选规范身份、display/engine index、候选数和受控 context kind。engine 立即返回匹配 commit 时记录一次 selection；分段选择没有立即 commit 时只保存待确认意图，后续仅在匹配 commit 到达时记录。reset、schema/client/context 变化、取消或不匹配 commit 必须丢弃待确认意图；无法关联候选的原始 engine commit 不推断学习。R01B 不通过退格、改选或时间窗口自动推断负反馈。
+
+userdb/ranker 读取失败时，runtime 必须保留 engine 原始顺序并返回明确的个人化退化状态。engine 已产生的 commit 不得因学习写入失败而丢失；key/select 结果同时携带 commit 和 `recorded`、`deferred`、`skipped_by_policy`、`failed` 等学习结果。错误诊断不得包含输入码、候选文本、数据库路径或原始应用信息。
+
 ## 目标
 
 - 建立本地 SQLite userdb。
@@ -52,6 +77,7 @@
 实现要求：
 
 - P0 输入路径必须在事件进入 userdb 前被拦截。
+- 隐私模式可以读取已经存在的本地排序摘要，但当前输入不得产生 selection、negative feedback、user term 或 ranker summary 写入。
 - P1 事件日志可以压缩为 `ranker.weights` P2 权重摘要，但原始事件、负反馈明细和上下文统计默认不进入同步。
 - P2 数据被删除时必须产生 tombstone 或等价语义，避免旧设备和旧备份复活词条。
 - 日志、测试 fixture、golden 输出和截图不得包含真实明文输入历史或敏感上下文。
@@ -309,6 +335,7 @@ radishlex-ime-cli sync preflight --db <path>
 
 ```text
 radishlex_userdb_add_term(db_path, input_code, text, reading)
+radishlex_userdb_restore_term(db_path, input_code, text, reading)
 radishlex_userdb_delete_term(db_path, input_code, text, reading)
 radishlex_userdb_terms_new(db_path)
 radishlex_userdb_terms_count(terms)
@@ -331,6 +358,7 @@ radishlex_ffi_contract(contract_out)
 - FFI 入口必须显式传入 UTF-8 SQLite 路径，不隐式读取真实用户输入法目录。
 - `add_term` 使用 `manual_add` 来源，只表示用户明确新增或更新未删除词条，不承担恢复语义。
 - `delete_term` 沿用 userdb tombstone 语义，删除后普通导入和旧权重不得立即复活该词。
+- `restore_term` 是独立且可审计的 explicit restore；`add_term`、selection 和导入不能替代它清除 tombstone 或 suppress。
 - `terms_new` 返回只读 list handle，平台端只能通过 `terms_get` 读取 view，并必须调用 `terms_free` 释放。
 - list view 中的字符串只在 list handle 释放前有效，平台端不得缓存裸指针。
 - dictionary inspect 只读取导入文件格式、记录数和 P2 同步分类，不打开 userdb。
