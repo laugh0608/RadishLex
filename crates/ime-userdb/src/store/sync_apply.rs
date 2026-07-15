@@ -4,16 +4,16 @@ use radishlex_ime_sync::{
     ClientSyncMergeResult, DictionaryDeletedTermMergeRecord, DictionaryUserTermMergeRecord,
     RankerWeightMergeRecord, SyncMergeDecisionKind,
 };
-use rusqlite::{params, Transaction};
+use rusqlite::{params, OptionalExtension, Transaction};
 
 use crate::error::{UserDbError, UserDbResult};
-use crate::model::TermSource;
 use crate::sync_decode::{
     UserDbDecodedSyncPayloadBatch, UserDbSyncDeletedTermRecord, UserDbSyncRankerWeightRecord,
     UserDbSyncUserTermRecord,
 };
 
-use super::{stable_hash_hex, UserDb};
+use super::identity::latest_deleted_tombstone_time;
+use super::UserDb;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UserDbSyncApplySummary {
@@ -23,6 +23,8 @@ pub struct UserDbSyncApplySummary {
     pub blocked_by_tombstone: usize,
     pub tombstones_cleared_by_restore: usize,
     pub stale_weights_blocked: usize,
+    pub stale_tombstones_blocked: usize,
+    pub stale_terms_blocked: usize,
 }
 
 pub(super) fn apply_decoded_sync_payload_batch(
@@ -40,8 +42,13 @@ pub(super) fn apply_decoded_sync_payload_batch(
     let ranker_weights = accepted_ranker_weights(batch, &merge_result)?;
 
     let transaction = db.connection.transaction()?;
-    let (user_terms, ranker_weights) =
-        filter_local_tombstone_conflicts(&transaction, user_terms, ranker_weights, &mut summary)?;
+    let (user_terms, deleted_terms, ranker_weights) = filter_local_state_conflicts(
+        &transaction,
+        user_terms,
+        deleted_terms,
+        ranker_weights,
+        &mut summary,
+    )?;
     summary.user_terms_written = user_terms.len();
     summary.deleted_terms_written = deleted_terms.len();
     summary.ranker_weights_written = ranker_weights.len();
@@ -68,6 +75,8 @@ fn summary_from_merge_result(result: &ClientSyncMergeResult) -> UserDbSyncApplyS
         blocked_by_tombstone: 0,
         tombstones_cleared_by_restore: 0,
         stale_weights_blocked: 0,
+        stale_tombstones_blocked: 0,
+        stale_terms_blocked: 0,
     };
 
     for decision in &result.decisions {
@@ -151,38 +160,81 @@ fn accepted_ranker_weights(
         .collect()
 }
 
-fn filter_local_tombstone_conflicts(
+fn filter_local_state_conflicts(
     transaction: &Transaction<'_>,
     user_terms: Vec<UserDbSyncUserTermRecord>,
+    deleted_terms: Vec<UserDbSyncDeletedTermRecord>,
     ranker_weights: Vec<UserDbSyncRankerWeightRecord>,
     summary: &mut UserDbSyncApplySummary,
 ) -> UserDbResult<(
     Vec<UserDbSyncUserTermRecord>,
+    Vec<UserDbSyncDeletedTermRecord>,
     Vec<UserDbSyncRankerWeightRecord>,
 )> {
-    let mut restored_terms = BTreeMap::new();
     let mut accepted_user_terms = Vec::new();
 
     for term in user_terms {
-        let key = LocalTermKey::from_user_term(&term);
-        if let Some(deleted_at_ms) =
-            local_deleted_tombstone_time(transaction, &term.input_code, &term.text, &term.reading)?
+        let restored_at_ms =
+            local_explicit_restore_time(transaction, &term.input_code, &term.text, &term.reading)?;
+        if restored_at_ms.is_some_and(|restored| term.updated_at_ms <= restored) {
+            summary.stale_terms_blocked += 1;
+        } else if latest_deleted_tombstone_time(
+            transaction,
+            &term.input_code,
+            &term.text,
+            &term.reading,
+        )?
+        .is_some()
         {
-            if term_restores_local_tombstone(&term, deleted_at_ms) {
-                restored_terms.insert(key, term.updated_at_ms);
-                accepted_user_terms.push(term);
-            } else {
-                summary.blocked_by_tombstone += 1;
-            }
+            summary.blocked_by_tombstone += 1;
+        } else if local_user_term_updated_at(
+            transaction,
+            &term.input_code,
+            &term.text,
+            &term.reading,
+        )?
+        .is_some_and(|local| local > term.updated_at_ms)
+        {
+            summary.stale_terms_blocked += 1;
         } else {
             accepted_user_terms.push(term);
         }
     }
 
+    let mut accepted_deleted_terms = Vec::new();
+    for tombstone in deleted_terms {
+        let local_deleted_at_ms = latest_deleted_tombstone_time(
+            transaction,
+            &tombstone.input_code,
+            &tombstone.text,
+            &tombstone.reading,
+        )?;
+        let restored_at_ms = local_explicit_restore_time(
+            transaction,
+            &tombstone.input_code,
+            &tombstone.text,
+            &tombstone.reading,
+        )?;
+        if local_deleted_at_ms.is_some_and(|local| local >= tombstone.deleted_at_ms)
+            || restored_at_ms.is_some_and(|restored| restored > tombstone.deleted_at_ms)
+        {
+            summary.stale_tombstones_blocked += 1;
+        } else {
+            accepted_deleted_terms.push(tombstone);
+        }
+    }
+
     let mut accepted_ranker_weights = Vec::new();
     for weight in ranker_weights {
-        let key = LocalTermKey::from_ranker_weight(&weight);
-        if local_deleted_tombstone_time(
+        let restored_at_ms = local_explicit_restore_time(
+            transaction,
+            &weight.input_code,
+            &weight.text,
+            &weight.reading,
+        )?;
+        if restored_at_ms.is_some_and(|restored| weight.updated_at_ms <= restored) {
+            summary.stale_weights_blocked += 1;
+        } else if latest_deleted_tombstone_time(
             transaction,
             &weight.input_code,
             &weight.text,
@@ -190,43 +242,59 @@ fn filter_local_tombstone_conflicts(
         )?
         .is_some()
         {
-            if restored_terms
-                .get(&key)
-                .is_some_and(|restored_at_ms| weight.updated_at_ms >= *restored_at_ms)
-            {
-                accepted_ranker_weights.push(weight);
-            } else {
-                summary.blocked_by_tombstone += 1;
-            }
+            summary.blocked_by_tombstone += 1;
+        } else if local_ranker_weight_updated_at(
+            transaction,
+            &weight.input_code,
+            &weight.text,
+            &weight.reading,
+            &weight.context_kind,
+        )?
+        .is_some_and(|local| local > weight.updated_at_ms)
+        {
+            summary.stale_weights_blocked += 1;
         } else {
             accepted_ranker_weights.push(weight);
         }
     }
 
-    Ok((accepted_user_terms, accepted_ranker_weights))
-}
-
-fn term_restores_local_tombstone(term: &UserDbSyncUserTermRecord, deleted_at_ms: i64) -> bool {
-    term.source == TermSource::ManualAdd && term.updated_at_ms > deleted_at_ms
+    Ok((
+        accepted_user_terms,
+        accepted_deleted_terms,
+        accepted_ranker_weights,
+    ))
 }
 
 fn apply_user_term(
     transaction: &Transaction<'_>,
     term: &UserDbSyncUserTermRecord,
 ) -> UserDbResult<()> {
-    clear_deleted_tombstones(transaction, &term.input_code, &term.text, &term.reading)?;
     transaction.execute(
         "INSERT INTO user_terms (
-            text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms
+            text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms,
+            last_used_at_ms, restored_at_ms
          )
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, NULL)
          ON CONFLICT(input_code, text, reading) DO UPDATE SET
-            source = excluded.source,
-            weight = excluded.weight,
-            status = excluded.status,
-            created_at_ms = excluded.created_at_ms,
-            updated_at_ms = excluded.updated_at_ms,
-            last_used_at_ms = excluded.last_used_at_ms",
+            source = CASE
+                WHEN user_terms.status IN ('deleted', 'suppressed') THEN user_terms.source
+                ELSE excluded.source
+            END,
+            weight = CASE
+                WHEN user_terms.status IN ('deleted', 'suppressed') THEN user_terms.weight
+                ELSE excluded.weight
+            END,
+            status = CASE
+                WHEN user_terms.status = 'deleted' THEN 'deleted'
+                WHEN user_terms.status = 'suppressed' AND excluded.status = 'active' THEN 'suppressed'
+                ELSE excluded.status
+            END,
+            created_at_ms = MIN(user_terms.created_at_ms, excluded.created_at_ms),
+            updated_at_ms = MAX(user_terms.updated_at_ms, excluded.updated_at_ms),
+            last_used_at_ms = CASE
+                WHEN user_terms.status IN ('deleted', 'suppressed') THEN user_terms.last_used_at_ms
+                ELSE excluded.last_used_at_ms
+            END",
         params![
             term.text,
             term.reading,
@@ -248,14 +316,16 @@ fn apply_deleted_term(
 ) -> UserDbResult<()> {
     transaction.execute(
         "INSERT INTO user_terms (
-            text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms
+            text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms,
+            last_used_at_ms, restored_at_ms
          )
-         VALUES (?1, ?2, ?3, 'manual_add', 0.0, 'deleted', ?4, ?4, NULL)
+         VALUES (?1, ?2, ?3, 'manual_add', 0.0, 'deleted', ?4, ?4, NULL, NULL)
          ON CONFLICT(input_code, text, reading) DO UPDATE SET
             status = 'deleted',
             weight = 0.0,
             updated_at_ms = excluded.updated_at_ms,
-            last_used_at_ms = NULL",
+            last_used_at_ms = NULL,
+            restored_at_ms = NULL",
         params![
             tombstone.text,
             tombstone.reading,
@@ -272,27 +342,19 @@ fn apply_deleted_term(
         |row| row.get::<_, i64>(0),
     )?;
     transaction.execute(
-        "DELETE FROM deleted_terms
-         WHERE input_code_hash = ?1 AND text_hash = ?2 AND reading_hash = ?3
-           AND deleted_at_ms = ?4 AND reason = ?5",
-        params![
-            stable_hash_hex(&tombstone.input_code),
-            stable_hash_hex(&tombstone.text),
-            stable_hash_hex(&tombstone.reading),
-            tombstone.deleted_at_ms,
-            tombstone.reason
-        ],
-    )?;
-    transaction.execute(
         "INSERT INTO deleted_terms (
-            term_id, text_hash, reading_hash, input_code_hash, deleted_at_ms, reason
+            term_id, input_code, text, reading, deleted_at_ms, reason
          )
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(input_code, text, reading) DO UPDATE SET
+            term_id = excluded.term_id,
+            deleted_at_ms = excluded.deleted_at_ms,
+            reason = excluded.reason",
         params![
             term_id,
-            stable_hash_hex(&tombstone.text),
-            stable_hash_hex(&tombstone.reading),
-            stable_hash_hex(&tombstone.input_code),
+            tombstone.input_code,
+            tombstone.text,
+            tombstone.reading,
             tombstone.deleted_at_ms,
             tombstone.reason
         ],
@@ -311,12 +373,13 @@ fn apply_ranker_weight(
 ) -> UserDbResult<()> {
     transaction.execute(
         "INSERT INTO ranker_weights (
-            input_code, text, reading, frequency, recency_score, negative_score, context_kind, updated_at_ms
+            input_code, text, reading, frequency, last_used_at_ms, negative_score,
+            context_kind, updated_at_ms
          )
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
          ON CONFLICT(input_code, text, reading, context_kind) DO UPDATE SET
             frequency = excluded.frequency,
-            recency_score = excluded.recency_score,
+            last_used_at_ms = excluded.last_used_at_ms,
             negative_score = excluded.negative_score,
             updated_at_ms = excluded.updated_at_ms",
         params![
@@ -324,7 +387,7 @@ fn apply_ranker_weight(
             weight.text,
             weight.reading,
             weight.frequency,
-            weight.recency_score,
+            sync_last_used_at_ms(weight.recency_score)?,
             weight.negative_score,
             weight.context_kind,
             weight.updated_at_ms
@@ -333,25 +396,7 @@ fn apply_ranker_weight(
     Ok(())
 }
 
-fn clear_deleted_tombstones(
-    transaction: &Transaction<'_>,
-    input_code: &str,
-    text: &str,
-    reading: &str,
-) -> UserDbResult<()> {
-    transaction.execute(
-        "DELETE FROM deleted_terms
-         WHERE input_code_hash = ?1 AND text_hash = ?2 AND reading_hash = ?3",
-        params![
-            stable_hash_hex(input_code),
-            stable_hash_hex(text),
-            stable_hash_hex(reading)
-        ],
-    )?;
-    Ok(())
-}
-
-fn local_deleted_tombstone_time(
+fn local_explicit_restore_time(
     transaction: &Transaction<'_>,
     input_code: &str,
     text: &str,
@@ -359,17 +404,70 @@ fn local_deleted_tombstone_time(
 ) -> UserDbResult<Option<i64>> {
     transaction
         .query_row(
-            "SELECT MAX(deleted_at_ms)
-             FROM deleted_terms
-             WHERE input_code_hash = ?1 AND text_hash = ?2 AND reading_hash = ?3",
-            params![
-                stable_hash_hex(input_code),
-                stable_hash_hex(text),
-                stable_hash_hex(reading)
-            ],
+            "SELECT restored_at_ms
+             FROM user_terms
+             WHERE input_code = ?1 AND text = ?2 AND reading = ?3
+               AND status != 'deleted'",
+            params![input_code, text, reading],
             |row| row.get(0),
         )
+        .optional()
+        .map(|value| value.flatten())
         .map_err(Into::into)
+}
+
+fn local_user_term_updated_at(
+    transaction: &Transaction<'_>,
+    input_code: &str,
+    text: &str,
+    reading: &str,
+) -> UserDbResult<Option<i64>> {
+    transaction
+        .query_row(
+            "SELECT updated_at_ms
+             FROM user_terms
+             WHERE input_code = ?1 AND text = ?2 AND reading = ?3",
+            params![input_code, text, reading],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(Into::into)
+}
+
+fn local_ranker_weight_updated_at(
+    transaction: &Transaction<'_>,
+    input_code: &str,
+    text: &str,
+    reading: &str,
+    context_kind: &str,
+) -> UserDbResult<Option<i64>> {
+    transaction
+        .query_row(
+            "SELECT updated_at_ms
+             FROM ranker_weights
+             WHERE input_code = ?1 AND text = ?2 AND reading = ?3 AND context_kind = ?4",
+            params![input_code, text, reading, context_kind],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(Into::into)
+}
+
+fn sync_last_used_at_ms(recency_score: f64) -> UserDbResult<Option<i64>> {
+    if recency_score == 0.0 {
+        return Ok(None);
+    }
+    if !recency_score.is_finite()
+        || recency_score < 0.0
+        || recency_score.fract() != 0.0
+        || recency_score > i64::MAX as f64
+    {
+        return Err(UserDbError::invalid_input(
+            "recency_score",
+            "legacy sync value must be 0 or a non-negative integral millisecond timestamp",
+        ));
+    }
+    Ok(Some(recency_score as i64))
 }
 
 fn missing_detail(object_type: &'static str) -> UserDbError {
@@ -377,31 +475,6 @@ fn missing_detail(object_type: &'static str) -> UserDbError {
         "sync_apply",
         format!("accepted {object_type} merge record has no decoded payload detail"),
     )
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct LocalTermKey {
-    input_code: String,
-    text: String,
-    reading: String,
-}
-
-impl LocalTermKey {
-    fn from_user_term(record: &UserDbSyncUserTermRecord) -> Self {
-        Self {
-            input_code: record.input_code.clone(),
-            text: record.text.clone(),
-            reading: record.reading.clone(),
-        }
-    }
-
-    fn from_ranker_weight(record: &UserDbSyncRankerWeightRecord) -> Self {
-        Self {
-            input_code: record.input_code.clone(),
-            text: record.text.clone(),
-            reading: record.reading.clone(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -502,9 +575,9 @@ mod tests {
         db.connection
             .execute(
                 "INSERT INTO ranker_weights (
-                    input_code, text, reading, frequency, recency_score, negative_score, context_kind, updated_at_ms
+                    input_code, text, reading, frequency, last_used_at_ms, negative_score, context_kind, updated_at_ms
                  )
-                 VALUES (?1, ?2, '', 1, 10.0, 0.0, ?3, 10)",
+                 VALUES (?1, ?2, '', 1, 10, 0.0, ?3, 10)",
                 rusqlite::params!["luobo", "萝卜", "chat"],
             )
             .expect("local weight");
@@ -562,7 +635,7 @@ mod tests {
             .expect("weight fetch")
             .expect("synced weight");
         assert_eq!(weight.frequency, 4);
-        assert_eq!(weight.recency_score, 30.0);
+        assert_eq!(weight.last_used_at_ms, Some(30));
         assert_eq!(weight.negative_score, 1.5);
     }
 
@@ -650,7 +723,33 @@ mod tests {
     }
 
     #[test]
-    fn apply_decoded_sync_payload_batch_clears_tombstone_for_explicit_restore() {
+    fn newer_synced_tombstone_replaces_older_local_tombstone_atomically() {
+        let mut db = UserDb::open_in_memory().expect("userdb opens");
+        mark_local_deleted_at(&mut db, "luobo", "萝卜", 100);
+        let batch = decode_userdb_sync_objects([decrypted(
+            UserDbSyncPayloadObjectType::DictionaryDeletedTerms,
+            2,
+            r#"{"payload_schema_version":1,"object_type":"dictionary.deleted_terms","tombstones":[{"input_code":"luobo","text":"萝卜","reading":"","deleted_at_ms":200,"reason":"manual_delete"}]}"#,
+        )])
+        .expect("decoded batch");
+
+        let summary = db
+            .apply_decoded_sync_payload_batch(&batch)
+            .expect("newer tombstone applies");
+
+        assert_eq!(summary.deleted_terms_written, 1);
+        assert_eq!(db.deleted_term_count().expect("tombstone count"), 1);
+        assert_eq!(
+            db.fetch_term("luobo", "萝卜", "")
+                .expect("term lookup")
+                .expect("deleted term")
+                .updated_at_ms,
+            200
+        );
+    }
+
+    #[test]
+    fn manual_add_sync_state_cannot_clear_local_tombstone() {
         let mut db = UserDb::open_in_memory().expect("userdb opens");
         mark_local_deleted_at(&mut db, "luobo", "萝卜", 100);
         let batch = decode_userdb_sync_objects([
@@ -671,16 +770,95 @@ mod tests {
             .apply_decoded_sync_payload_batch(&batch)
             .expect("sync payload applied");
 
-        assert_eq!(summary.user_terms_written, 1);
+        assert_eq!(summary.user_terms_written, 0);
         assert_eq!(summary.deleted_terms_written, 0);
-        assert_eq!(summary.tombstones_cleared_by_restore, 1);
-        assert_eq!(db.deleted_term_count().expect("deleted count"), 0);
+        assert_eq!(summary.tombstones_cleared_by_restore, 0);
+        assert_eq!(summary.blocked_by_tombstone, 1);
+        assert_eq!(summary.stale_tombstones_blocked, 1);
+        assert_eq!(db.deleted_term_count().expect("deleted count"), 1);
         assert_eq!(
             db.fetch_term("luobo", "萝卜", "")
                 .expect("term fetch")
+                .expect("deleted term")
+                .status,
+            TermStatus::Deleted
+        );
+    }
+
+    #[test]
+    fn stale_synced_tombstone_cannot_override_newer_explicit_local_restore() {
+        let mut db = UserDb::open_in_memory().expect("userdb opens");
+        db.add_term("luobo", "萝卜", None, TermSource::ManualAdd)
+            .expect("term added");
+        db.delete_term("luobo", "萝卜", None).expect("term deleted");
+        let deleted_at_ms = db
+            .fetch_term("luobo", "萝卜", "")
+            .expect("term lookup")
+            .expect("deleted term")
+            .updated_at_ms;
+        db.restore_term_at("luobo", "萝卜", None, deleted_at_ms + 10)
+            .expect("term restored");
+        let payload = format!(
+            r#"{{"payload_schema_version":1,"object_type":"dictionary.deleted_terms","tombstones":[{{"input_code":"luobo","text":"萝卜","reading":"","deleted_at_ms":{},"reason":"manual_delete"}}]}}"#,
+            deleted_at_ms + 5
+        );
+        let batch = decode_userdb_sync_objects([decrypted(
+            UserDbSyncPayloadObjectType::DictionaryDeletedTerms,
+            2,
+            &payload,
+        )])
+        .expect("decoded batch");
+
+        let summary = db
+            .apply_decoded_sync_payload_batch(&batch)
+            .expect("stale tombstone handled");
+
+        assert_eq!(summary.deleted_terms_written, 0);
+        assert_eq!(summary.stale_tombstones_blocked, 1);
+        assert_eq!(db.deleted_term_count().expect("tombstone count"), 0);
+        assert_eq!(
+            db.fetch_term("luobo", "萝卜", "")
+                .expect("term lookup")
                 .expect("restored term")
                 .status,
             TermStatus::Active
+        );
+
+        let stale_state_at_ms = deleted_at_ms + 9;
+        let stale_state = decode_userdb_sync_objects([
+            decrypted(
+                UserDbSyncPayloadObjectType::DictionaryUserTerms,
+                2,
+                &format!(
+                    r#"{{"payload_schema_version":1,"object_type":"dictionary.user_terms","terms":[{{"input_code":"luobo","text":"萝卜","reading":"","source":"manual_add","weight":99,"status":"active","created_at_ms":{},"updated_at_ms":{},"last_used_at_ms":null}}]}}"#,
+                    deleted_at_ms,
+                    stale_state_at_ms
+                ),
+            ),
+            decrypted(
+                UserDbSyncPayloadObjectType::RankerWeights,
+                2,
+                &format!(
+                    r#"{{"payload_schema_version":1,"object_type":"ranker.weights","weights":[{{"input_code":"luobo","text":"萝卜","reading":"","frequency":999,"recency_score":{},"negative_score":0,"context_kind":"general","updated_at_ms":{}}}]}}"#,
+                    stale_state_at_ms,
+                    stale_state_at_ms
+                ),
+            ),
+        ])
+        .expect("stale state decodes");
+        let stale_summary = db
+            .apply_decoded_sync_payload_batch(&stale_state)
+            .expect("stale state handled");
+        assert_eq!(stale_summary.user_terms_written, 0);
+        assert_eq!(stale_summary.ranker_weights_written, 0);
+        assert_eq!(stale_summary.stale_terms_blocked, 1);
+        assert_eq!(stale_summary.stale_weights_blocked, 1);
+        assert_eq!(
+            db.fetch_term("luobo", "萝卜", "")
+                .expect("term lookup")
+                .expect("restored term")
+                .weight,
+            1.0
         );
     }
 

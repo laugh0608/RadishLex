@@ -1,4 +1,5 @@
 use std::fmt;
+use std::path::PathBuf;
 
 pub type UserDbResult<T> = Result<T, UserDbError>;
 
@@ -9,6 +10,15 @@ pub enum UserDbError {
         message: String,
     },
     Sqlite(rusqlite::Error),
+    DatabaseFile {
+        path: PathBuf,
+        stage: &'static str,
+        message: String,
+    },
+    Io {
+        path: PathBuf,
+        source: std::io::Error,
+    },
     Time(std::time::SystemTimeError),
 }
 
@@ -28,6 +38,18 @@ impl fmt::Display for UserDbError {
                 write!(f, "invalid {field}: {message}")
             }
             Self::Sqlite(error) => write!(f, "sqlite failure: {error}"),
+            Self::DatabaseFile {
+                path,
+                stage,
+                message,
+            } => write!(
+                f,
+                "database {} failed during {stage}; the original database was preserved: {message}",
+                path.display()
+            ),
+            Self::Io { path, source } => {
+                write!(f, "filesystem failure for {}: {source}", path.display())
+            }
             Self::Time(error) => write!(f, "system time failure: {error}"),
         }
     }

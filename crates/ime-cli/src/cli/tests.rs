@@ -314,6 +314,40 @@ fn dict_commands_add_list_and_delete_terms() {
         run(&args(&["radishlex-ime-cli", "dict", "list", "--db", &db])).expect("list succeeds");
     assert!(listed.contains("terms:\n  <none>"));
 
+    let add_error = run(&args(&[
+        "radishlex-ime-cli",
+        "dict",
+        "add",
+        "--db",
+        &db,
+        "--input",
+        "luobo",
+        "--text",
+        "萝卜",
+        "--reading",
+        "luo bo",
+    ]))
+    .expect_err("add cannot implicitly restore");
+    assert!(add_error.to_string().contains("explicit restore"));
+
+    let restored = run(&args(&[
+        "radishlex-ime-cli",
+        "dict",
+        "restore",
+        "--db",
+        &db,
+        "--input",
+        "luobo",
+        "--text",
+        "萝卜",
+        "--reading",
+        "luo bo",
+    ]))
+    .expect("explicit restore succeeds");
+    assert!(restored.contains("restored: 萝卜"));
+    assert!(restored.contains("status: active"));
+    assert!(restored.contains("version_ms:"));
+
     let _ = fs::remove_file(db);
 }
 
@@ -457,7 +491,7 @@ fn dict_export_import_round_trip_feeds_rank_explain() {
         "luo bo",
     ]))
     .expect("rank explain succeeds");
-    assert!(explain.contains("user_term_boost: 2.000"));
+    assert!(explain.contains("user_term_boost: 1.000"));
 
     let _ = fs::remove_file(source_db);
     let _ = fs::remove_file(target_db);
@@ -706,7 +740,7 @@ fn learn_commands_feed_rank_explain() {
     .expect("rank explain succeeds");
     assert!(explain.contains("candidate: 萝卜"));
     assert!(explain.contains("user_term_boost: 1.000"));
-    assert!(explain.contains("frequency_boost: 0.350"));
+    assert!(explain.contains("frequency_boost: 0.243"));
     assert!(explain.contains("context_boost: 0.300"));
 
     let feedback = run(&args(&[
@@ -737,7 +771,7 @@ fn learn_commands_feed_rank_explain() {
         "萝卜",
     ]))
     .expect("rank explain succeeds");
-    assert!(explain.contains("negative_feedback_penalty: 1.200"));
+    assert!(explain.contains("negative_feedback_penalty: 0.832"));
     assert!(explain.contains("suppressed_penalty: 2.000"));
 
     let _ = fs::remove_file(db);
@@ -898,7 +932,7 @@ fn sync_preflight_reports_syncable_and_local_only_counts() {
     assert!(output.contains("ranker.weights: 1"));
     assert!(output.contains("dictionary.deleted_terms: 1"));
     assert!(output.contains("selection_events: 1"));
-    assert!(output.contains("negative_feedback: 1"));
+    assert!(output.contains("negative_feedback: 2"));
     assert!(output.contains("import_batches: 0"));
 
     let _ = fs::remove_file(db);

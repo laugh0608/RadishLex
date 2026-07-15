@@ -1063,6 +1063,25 @@ mod tests {
             RadishLexStatusCode::Ok
         );
 
+        assert_eq!(
+            radishlex_userdb_add_term(
+                db_path.as_ptr(),
+                input_code.as_ptr(),
+                text.as_ptr(),
+                reading.as_ptr(),
+                &mut error,
+            ),
+            RadishLexStatusCode::InvalidArgument
+        );
+        let message = unsafe { CStr::from_ptr(radishlex_error_message(error)) }
+            .to_string_lossy()
+            .into_owned();
+        assert!(message.contains("explicit restore"));
+        unsafe {
+            radishlex_error_free(error);
+        }
+        error = ptr::null_mut();
+
         let terms = radishlex_userdb_terms_new(db_path.as_ptr(), &mut error);
         assert!(!terms.is_null());
         assert_eq!(radishlex_userdb_terms_count(terms), 0);
@@ -1078,7 +1097,7 @@ mod tests {
         assert_eq!(summary.syncable_user_terms, 0);
         assert_eq!(summary.syncable_deleted_terms, 1);
         assert_eq!(summary.local_selection_events, 0);
-        assert_eq!(summary.local_negative_feedback, 0);
+        assert_eq!(summary.local_negative_feedback, 1);
 
         let _ = fs::remove_file(path);
     }
@@ -1112,13 +1131,13 @@ mod tests {
             RadishLexStatusCode::Ok
         );
         assert!(error.is_null());
-        assert_eq!(summary.schema_version, 2);
+        assert_eq!(summary.schema_version, 3);
         assert_eq!(summary.plaintext_payload, 0);
         assert_eq!(summary.syncable_user_terms, 1);
         assert_eq!(summary.syncable_ranker_weights, 1);
         assert_eq!(summary.syncable_deleted_terms, 1);
         assert_eq!(summary.local_selection_events, 1);
-        assert_eq!(summary.local_negative_feedback, 1);
+        assert_eq!(summary.local_negative_feedback, 2);
         assert_eq!(summary.local_import_batches, 0);
 
         assert_eq!(

@@ -6,7 +6,7 @@ use crate::model::{
     USERDB_SYNC_PAYLOAD_SCHEMA_VERSION,
 };
 
-use super::{stable_hash_hex, to_sqlite_conversion_failure, UserDb};
+use super::{to_sqlite_conversion_failure, UserDb};
 
 const HEX_LOWER: &[u8; 16] = b"0123456789abcdef";
 
@@ -38,7 +38,7 @@ struct SyncRankerWeightPayloadRecord {
     text: String,
     reading: String,
     frequency: i64,
-    recency_score: f64,
+    last_used_at_ms: Option<i64>,
     negative_score: f64,
     context_kind: String,
     updated_at_ms: i64,
@@ -97,7 +97,7 @@ fn sync_ranker_weight_payload_records(
     db: &UserDb,
 ) -> UserDbResult<Vec<SyncRankerWeightPayloadRecord>> {
     let mut statement = db.connection.prepare(
-        "SELECT input_code, text, reading, frequency, recency_score, negative_score,
+        "SELECT input_code, text, reading, frequency, last_used_at_ms, negative_score,
                 context_kind, updated_at_ms
          FROM ranker_weights
          ORDER BY input_code, text, reading, context_kind",
@@ -155,14 +155,8 @@ fn latest_deleted_tombstone(
         .query_row(
             "SELECT deleted_at_ms, reason
              FROM deleted_terms
-             WHERE input_code_hash = ?1 AND text_hash = ?2 AND reading_hash = ?3
-             ORDER BY deleted_at_ms DESC, id DESC
-             LIMIT 1",
-            params![
-                stable_hash_hex(input_code),
-                stable_hash_hex(text),
-                stable_hash_hex(reading)
-            ],
+             WHERE input_code = ?1 AND text = ?2 AND reading = ?3",
+            params![input_code, text, reading],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .optional()
@@ -222,14 +216,14 @@ fn sync_ranker_weight_payload_record_from_row(
         ));
     }
 
-    let recency_score: f64 = row.get(4)?;
-    if !recency_score.is_finite() || recency_score < 0.0 {
+    let last_used_at_ms: Option<i64> = row.get(4)?;
+    if last_used_at_ms.is_some_and(|value| value < 0) {
         return Err(rusqlite::Error::FromSqlConversionFailure(
             4,
-            rusqlite::types::Type::Real,
+            rusqlite::types::Type::Integer,
             Box::new(UserDbError::invalid_input(
-                "recency_score",
-                "value must be finite and non-negative",
+                "last_used_at_ms",
+                "value must be non-negative",
             )),
         ));
     }
@@ -251,7 +245,7 @@ fn sync_ranker_weight_payload_record_from_row(
         text: row.get(1)?,
         reading: row.get(2)?,
         frequency,
-        recency_score,
+        last_used_at_ms,
         negative_score,
         context_kind: row.get(6)?,
         updated_at_ms: row.get(7)?,
@@ -316,7 +310,11 @@ fn encode_ranker_weights_sync_payload(records: &[SyncRankerWeightPayloadRecord])
         output.push(',');
         push_json_i64_field(&mut output, "frequency", record.frequency);
         output.push(',');
-        push_json_number_field(&mut output, "recency_score", record.recency_score);
+        push_json_i64_field(
+            &mut output,
+            "recency_score",
+            record.last_used_at_ms.unwrap_or(0),
+        );
         output.push(',');
         push_json_number_field(&mut output, "negative_score", record.negative_score);
         output.push(',');

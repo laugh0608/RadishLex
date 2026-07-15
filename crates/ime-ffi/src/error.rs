@@ -104,7 +104,10 @@ impl From<UserDbError> for FfiError {
     fn from(error: UserDbError) -> Self {
         match error {
             UserDbError::InvalidInput { .. } => Self::invalid_argument(error.to_string()),
-            UserDbError::Sqlite(_) | UserDbError::Time(_) => {
+            UserDbError::Sqlite(_)
+            | UserDbError::DatabaseFile { .. }
+            | UserDbError::Io { .. }
+            | UserDbError::Time(_) => {
                 Self::new(RadishLexStatusCode::UserDbError, error.to_string())
             }
         }

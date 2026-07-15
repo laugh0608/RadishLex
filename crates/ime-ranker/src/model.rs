@@ -5,10 +5,14 @@ use radishlex_ime_userdb::{RankerWeight, UserTerm};
 pub struct RankerConfig {
     pub engine_order_step: f64,
     pub user_term_weight: f64,
+    pub max_user_term_weight: f64,
     pub frequency_weight: f64,
+    pub max_frequency_boost: f64,
     pub recency_weight: f64,
+    pub recency_half_life_ms: f64,
     pub context_weight: f64,
     pub negative_feedback_weight: f64,
+    pub max_negative_feedback_penalty: f64,
     pub suppressed_penalty: f64,
     pub deleted_penalty: f64,
 }
@@ -18,10 +22,14 @@ impl Default for RankerConfig {
         Self {
             engine_order_step: 0.01,
             user_term_weight: 1.0,
+            max_user_term_weight: 4.0,
             frequency_weight: 0.35,
+            max_frequency_boost: 2.0,
             recency_weight: 0.25,
+            recency_half_life_ms: 7.0 * 24.0 * 60.0 * 60.0 * 1_000.0,
             context_weight: 0.3,
             negative_feedback_weight: 1.2,
+            max_negative_feedback_penalty: 4.0,
             suppressed_penalty: 2.0,
             deleted_penalty: 10.0,
         }
@@ -53,6 +61,7 @@ impl DeletedTermSummary {
 pub struct RankRequest {
     pub input_code: String,
     pub candidates: Vec<Candidate>,
+    pub evaluated_at_ms: i64,
     pub context_kind: String,
     pub user_terms: Vec<UserTerm>,
     pub ranker_weights: Vec<RankerWeight>,
@@ -60,10 +69,15 @@ pub struct RankRequest {
 }
 
 impl RankRequest {
-    pub fn new(input_code: impl Into<String>, candidates: Vec<Candidate>) -> Self {
+    pub fn new(
+        input_code: impl Into<String>,
+        candidates: Vec<Candidate>,
+        evaluated_at_ms: i64,
+    ) -> Self {
         Self {
             input_code: input_code.into(),
             candidates,
+            evaluated_at_ms,
             context_kind: "general".to_owned(),
             user_terms: Vec::new(),
             ranker_weights: Vec::new(),

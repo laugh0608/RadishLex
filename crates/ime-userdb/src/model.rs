@@ -146,6 +146,7 @@ pub struct UserTerm {
     pub created_at_ms: i64,
     pub updated_at_ms: i64,
     pub last_used_at_ms: Option<i64>,
+    pub restored_at_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -120,16 +120,11 @@ pub struct UserDbSyncUserTermRecord {
 
 impl UserDbSyncUserTermRecord {
     fn to_merge_record(&self) -> UserDbResult<DictionaryUserTermMergeRecord> {
-        let intent = if self.source == TermSource::ManualAdd {
-            UserTermMergeIntent::ExplicitRestore
-        } else {
-            UserTermMergeIntent::SyncedTerm
-        };
         DictionaryUserTermMergeRecord::new(
             term_identity(&self.input_code, &self.text, &self.reading)?,
             self.key_epoch,
             self.updated_at_ms,
-            intent,
+            UserTermMergeIntent::SyncedTerm,
         )
         .map_err(sync_merge_error)
     }
@@ -321,11 +316,9 @@ fn parse_user_term_record(value: &Value, key_epoch: u64) -> UserDbResult<UserDbS
         ],
     )?;
 
-    let input_code = required_string(object, "input_code")?.to_owned();
-    let text = required_string(object, "text")?.to_owned();
-    let reading = required_string(object, "reading")?.to_owned();
-    validate_required("input_code", &input_code)?;
-    validate_required("text", &text)?;
+    let input_code = normalized_required_string(object, "input_code")?;
+    let text = normalized_required_string(object, "text")?;
+    let reading = required_string(object, "reading")?.trim().to_owned();
     let source = required_string(object, "source")?.parse::<TermSource>()?;
     let status = required_string(object, "status")?.parse::<TermStatus>()?;
     if status == TermStatus::Deleted {
@@ -370,13 +363,10 @@ fn parse_deleted_term_record(
         &["input_code", "text", "reading", "deleted_at_ms", "reason"],
     )?;
 
-    let input_code = required_string(object, "input_code")?.to_owned();
-    let text = required_string(object, "text")?.to_owned();
-    let reading = required_string(object, "reading")?.to_owned();
-    let reason = required_string(object, "reason")?.to_owned();
-    validate_required("input_code", &input_code)?;
-    validate_required("text", &text)?;
-    validate_required("reason", &reason)?;
+    let input_code = normalized_required_string(object, "input_code")?;
+    let text = normalized_required_string(object, "text")?;
+    let reading = required_string(object, "reading")?.trim().to_owned();
+    let reason = normalized_required_string(object, "reason")?;
 
     Ok(UserDbSyncDeletedTermRecord {
         input_code,
@@ -407,13 +397,10 @@ fn parse_ranker_weight_record(
         ],
     )?;
 
-    let input_code = required_string(object, "input_code")?.to_owned();
-    let text = required_string(object, "text")?.to_owned();
-    let reading = required_string(object, "reading")?.to_owned();
-    let context_kind = required_string(object, "context_kind")?.to_owned();
-    validate_required("input_code", &input_code)?;
-    validate_required("text", &text)?;
-    validate_required("context_kind", &context_kind)?;
+    let input_code = normalized_required_string(object, "input_code")?;
+    let text = normalized_required_string(object, "text")?;
+    let reading = required_string(object, "reading")?.trim().to_owned();
+    let context_kind = normalized_required_string(object, "context_kind")?;
 
     let frequency = required_i64(object, "frequency")?;
     if frequency < 0 {
@@ -488,6 +475,15 @@ fn required_string<'a>(
         .get(field)
         .and_then(Value::as_str)
         .ok_or_else(|| invalid_payload(field, "value must be a string"))
+}
+
+fn normalized_required_string(
+    object: &Map<String, Value>,
+    field: &'static str,
+) -> UserDbResult<String> {
+    let value = required_string(object, field)?.trim();
+    validate_required(field, value)?;
+    Ok(value.to_owned())
 }
 
 fn required_i64(object: &Map<String, Value>, field: &'static str) -> UserDbResult<i64> {

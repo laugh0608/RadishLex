@@ -3,6 +3,7 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use radishlex_ime_core::{
     Candidate, CoreError, Engine, InputSession, Key, KeyEvent, NamedKey, SchemaId, SessionState,
@@ -24,6 +25,7 @@ Usage:
   radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] [--rank-db <path>] [--context <kind>] <input-code> [candidate-index]
   radishlex-ime-cli dict list --db <path>
   radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
+  radishlex-ime-cli dict restore --db <path> --input <code> --text <text> [--reading <reading>]
   radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
   radishlex-ime-cli dict export --db <path> --file <path>
   radishlex-ime-cli dict inspect --file <path>
@@ -42,6 +44,7 @@ Examples:
   radishlex-ime-cli rime --schema luna_pinyin --shared-data ./rime-data --user-data ./tmp/rime-user luobo --key page-down 0
   radishlex-ime-cli rime --schema luna_pinyin --shared-data ./rime-data --user-data ./tmp/rime-user --rank-db /tmp/radishlex-userdb.sqlite luobo
   radishlex-ime-cli dict add --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
+  radishlex-ime-cli dict restore --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
   radishlex-ime-cli dict export --db /tmp/radishlex-userdb.sqlite --file /tmp/radishlex-terms.tsv
   radishlex-ime-cli dict inspect --file /tmp/radishlex-terms.tsv
   radishlex-ime-cli dict import --db /tmp/radishlex-userdb.sqlite --file /tmp/radishlex-terms.tsv --dry-run
@@ -164,6 +167,7 @@ fn run_dict(args: &[String]) -> Result<String, CliError> {
     match args.get(2).map(String::as_str) {
         Some("list") => run_dict_list(args),
         Some("add") => run_dict_add(args),
+        Some("restore") => run_dict_restore(args),
         Some("delete") => run_dict_delete(args),
         Some("export") => run_dict_export(args),
         Some("inspect") => run_dict_inspect(args),
@@ -216,6 +220,24 @@ fn run_dict_add(args: &[String]) -> Result<String, CliError> {
     Ok(format!(
         "added: {}\ninput: {}\nstatus: {}\nweight: {:.3}\n",
         term.text, term.input_code, term.status, term.weight
+    ))
+}
+
+fn run_dict_restore(args: &[String]) -> Result<String, CliError> {
+    let options =
+        parse_named_options(args, 3, &["db", "input", "text", "reading"], "dict restore")?;
+    let db_path = required_named_option(&options, "db")?;
+    let input_code = required_named_option(&options, "input")?;
+    validate_input_code(input_code)?;
+    let text = required_named_option(&options, "text")?;
+    let reading = options.get("reading").map(String::as_str);
+
+    let mut db = UserDb::open(db_path)?;
+    let term = db.restore_term(input_code, text, reading)?;
+
+    Ok(format!(
+        "restored: {}\ninput: {}\nstatus: {}\nversion_ms: {}\n",
+        term.text, term.input_code, term.status, term.updated_at_ms
     ))
 }
 
@@ -475,11 +497,13 @@ fn run_rank_explain(args: &[String]) -> Result<String, CliError> {
         candidate = candidate.with_reading(reading);
     }
 
-    let request = RankRequest::new(input_code, vec![candidate])
+    let request = RankRequest::new(input_code, vec![candidate], evaluation_time_ms()?)
         .with_context_kind(context_kind)
         .with_user_terms(user_terms)
         .with_ranker_weights(ranker_weights);
-    let ranked = Ranker::default().rank(request);
+    let ranked = Ranker::default()
+        .rank(request)
+        .map_err(|error| CliError::Data(error.to_string()))?;
     let candidate = ranked
         .first()
         .ok_or_else(|| CliError::Data("ranker returned no candidates".to_owned()))?;
@@ -886,11 +910,25 @@ fn rank_state_candidates(
         }
     }
 
-    let request = RankRequest::new(input_code, state.candidates().to_vec())
-        .with_context_kind(&options.context_kind)
-        .with_user_terms(user_terms)
-        .with_ranker_weights(ranker_weights);
-    Ok(Ranker::default().rank(request))
+    let request = RankRequest::new(
+        input_code,
+        state.candidates().to_vec(),
+        evaluation_time_ms()?,
+    )
+    .with_context_kind(&options.context_kind)
+    .with_user_terms(user_terms)
+    .with_ranker_weights(ranker_weights);
+    Ranker::default()
+        .rank(request)
+        .map_err(|error| CliError::Data(error.to_string()))
+}
+
+fn evaluation_time_ms() -> Result<i64, CliError> {
+    let duration = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| CliError::Data(format!("system time failure: {error}")))?;
+    i64::try_from(duration.as_millis())
+        .map_err(|_| CliError::Data("system time exceeds ranker timestamp range".to_owned()))
 }
 
 fn fetch_candidate_user_term(
