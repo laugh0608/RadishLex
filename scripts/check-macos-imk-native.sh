@@ -94,6 +94,11 @@ test -s "${resources}/zh-Hans.lproj/InfoPlist.strings"
 test -s "${resources}/en.lproj/InfoPlist.strings"
 codesign --verify --deep --strict --verbose=2 "${bundle}"
 test -f "${resources}/RimeData/default.yaml"
+cmp -s \
+  <(sed "s/__RADISHLEX_RIME_SCHEMA__/${RADISHLEX_RIME_SCHEMA}/g" \
+    "${platform_dir}/Resources/Rime/default.yaml.in") \
+  "${resources}/RimeData/default.yaml"
+grep -Fqx '  page_size: 5' "${resources}/RimeData/default.yaml"
 test -f "${resources}/RimeData/${RADISHLEX_RIME_SCHEMA}.schema.yaml"
 test -s "${resources}/RimeData.LICENSE"
 test -s "${resources}/RadishLex.LICENSE"
@@ -106,7 +111,7 @@ fi
 plutil -lint "${contents}/Info.plist" "${manifest}" "${native_manifest}" \
   "${resources}/zh-Hans.lproj/InfoPlist.strings" \
   "${resources}/en.lproj/InfoPlist.strings" >/dev/null
-test "$(plutil -extract CFBundleVersion raw "${contents}/Info.plist")" = "31"
+test "$(plutil -extract CFBundleVersion raw "${contents}/Info.plist")" = "32"
 test "$(plutil -extract RadishLexRimeSchema raw "${contents}/Info.plist")" = \
   "${RADISHLEX_RIME_SCHEMA}"
 test "$(plutil -extract schema_id raw "${manifest}")" = "${RADISHLEX_RIME_SCHEMA}"
@@ -185,5 +190,20 @@ python3 "${repo_root}/scripts/macos-imk/bundle_dylibs.py" verify \
   --frameworks-dir "${contents}/Frameworks" \
   --licenses-dir "${native_licenses}" \
   --manifest "${native_manifest}"
+
+native_user_data="$(mktemp -d "${TMPDIR:-/tmp}/radishlex-macos-imk-native.XXXXXX")"
+trap 'rm -rf "${native_user_data}"' EXIT
+(
+  cd "${repo_root}"
+  env \
+    RIME_INCLUDE_DIR="${RIME_INCLUDE_DIR}" \
+    RIME_LIB_DIR="${RIME_LIB_DIR}" \
+    RADISHLEX_RIME_SHARED_DATA="${resources}/RimeData" \
+    RADISHLEX_RIME_USER_DATA="${native_user_data}" \
+    RADISHLEX_RIME_SCHEMA="${RADISHLEX_RIME_SCHEMA}" \
+    RADISHLEX_EXPECTED_CANDIDATE_PAGE_SIZE=5 \
+    cargo test -p radishlex-ime-ffi --features native-rime \
+      rime_session_native_smoke_uses_ffi_entrypoint -- --ignored
+)
 
 echo "Native macOS InputMethodKit bundle checks passed without installation."

@@ -47,6 +47,7 @@ fn rime_session_native_smoke_uses_ffi_entrypoint() {
         "snapshot should be created: {}",
         unsafe { error_message(error) }
     );
+    assert_expected_candidate_page_size(snapshot);
     assert!(radishlex_snapshot_candidate_count(snapshot) > 1);
     let partial_candidate = unsafe { candidate_text(snapshot, 1, &mut error) };
     let mut partial_selection = ptr::null_mut();
@@ -201,6 +202,21 @@ fn push_text(session: *mut RadishLexSession, text: &str, error: &mut *mut Radish
             RadishLexStatusCode::Ok
         );
     }
+}
+
+fn assert_expected_candidate_page_size(snapshot: *const RadishLexSnapshot) {
+    let Ok(expected) = env::var("RADISHLEX_EXPECTED_CANDIDATE_PAGE_SIZE") else {
+        return;
+    };
+    let expected = expected
+        .parse::<usize>()
+        .expect("RADISHLEX_EXPECTED_CANDIDATE_PAGE_SIZE must be a positive integer");
+    assert!(expected > 0);
+    assert_eq!(
+        radishlex_snapshot_candidate_count(snapshot),
+        expected,
+        "native Rime candidate page must match the product display contract"
+    );
 }
 
 unsafe fn handle_named(

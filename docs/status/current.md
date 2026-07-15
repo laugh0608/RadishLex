@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核日期：2026-07-14（Asia/Shanghai）
+- 复核日期：2026-07-15（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 分支闭环：阶段性 `dev -> master` PR 合并后，必须在下一批常规开发前将最新 `master` merge 回 `dev`，正式口径见 ADR 0001
 - 当前产品里程碑：M1 macOS 离线输入 Alpha
@@ -26,6 +26,10 @@
 
 验收后清理经历设置项回流和 TIS 缓存竞态：TextEdit 文稿先切回系统拼音，通过系统设置真实移除；删除 bundle/隔离数据并终止进程后，再以系统设置公开界面刷新现有列表与可添加目录。最终现有列表和“添加 -> 简体中文”目录均无 RadishLex，`matches=0 enabled=0 selected=0`，bundle、运行数据、进程与本轮临时构建目录均无残留；未使用 `TISDisableInputSource`、私有配置或注销，“自动切换到文稿的输入法”仍保持关闭。R01A 因主输入路径的平台与生命周期矩阵尚未完成而继续开放。
 
+2026-07-15 再次冻结并签名安装 `build 31` 后，通知型 TIS 监视确认正式 Pinyin mode 覆盖每个测试组。候选窗在屏幕上下左右边缘的放置与限制通过，浅色/深色选中态通过且系统外观恢复原始“自动”；长输入组随即发现真实 panel 展示 9 项候选，与正式 5×1 契约冲突。本轮按停止线停止多屏/全屏、输入菜单和生命周期/离线矩阵，未在安装现场重建；系统设置现有列表与“添加 -> 简体中文”目录、TIS、bundle、运行数据和进程均已零残留，添加 source 时系统自动改变的 🌐︎ 键行为也随移除自动恢复。
+
+根因不是 panel 排版，而是本轮隔离 product-authored `default.yaml` 错误配置 `menu.page_size: 9`，controller/panel 又按设计完整展示 engine snapshot；原动态 contract 只注入恰好五项，未覆盖真实配置分叉。修复保持 engine/display index 一致，不在 UI 层截断：仓库现提供产品 `default.yaml` 模板并固定五项候选页，native bundle 构建覆盖 shared-data 输入中的默认配置，门禁逐字节复核模板并以真实 librime/FFI snapshot 断言候选数为 5。用户可见配置变化使下一候选升为 `build 32`；目前 contract、native bundle、递归签名与真实 FFI smoke 已通过，但尚未签名安装或实机复验。
+
 临时通知监视已收口到现有 `tis_source_status.m`：`--monitor` 先输出精确 current source，再在公开 selected-source 通知到达时通过 CFRunLoop 重读并输出 current source，以 `is_radishlex_pinyin` 明确标识正式 Pinyin mode；同一次切换允许出现重复通知，原 Bundle ID 状态输出和清理调用保持兼容。门禁固定编译、默认输出、通知/RunLoop 结构以及 `TISSelectInputSource`、`TISDisableInputSource` 和私有配置禁用线。用户为避免文稿级 source 占用而主动关闭的“自动切换到文稿的输入法”继续保持关闭，执行者不得自动修改。
 
 长期产品交付顺序见 [产品交付路线图](../roadmap.md)，当前整改批次、停止线、资产处置和退出条件见 [项目稳定化整改专题](../remediation/2026-07-project-stabilization.md)。
@@ -38,7 +42,7 @@
 - 正式 AppKit panel/component contract 动态覆盖非激活窗口、level、Spaces behavior、五候选、视觉/accessibility selection、appearance、合法 inline character index、绝对 insertion fallback、anchor、owner 接管和完整隐藏；controller contract 覆盖 keyDown/keyUp/modifier、候选变化重置、Space/鼠标/accessibility press 到 Rust commit、Enter/Escape、宿主快捷键和双 client 生命周期。
 - 正式 TIS 状态/清理入口按精确 Bundle ID 隔离产品与 reference probe；同一工具的 `--monitor` 已通过公开 selected-source 通知、CFRunLoop 和精确 mode 标识形成实时来源记录，不能用不处理通知的进程内轮询冒充。清理仍以系统设置真实移除为前置，不使用 `TISDisableInputSource` 或私有配置替代。
 - 隔离 `rime-pinyin-simp` 的真实 FFI smoke 已覆盖 composition、完整与分段非首候选、Backspace、Escape、Enter、翻页、方向键高亮与 Space、multi-session 和不存在 schema 拒绝；adapter 以 deployed schema list、原生 current-page selection API 与选择后回读固定可用性。
-- native 门禁覆盖隔离 schema/data/license、架构、FFI symbol、递归 dylib closure、逐库签名哈希和外部依赖拒绝；不读取用户 Rime 目录。
+- native 门禁覆盖隔离 schema/data/license、产品生成的五项候选页配置、真实 FFI snapshot 页大小、架构、FFI symbol、递归 dylib closure、逐库签名哈希和外部依赖拒绝；不读取用户 Rime 目录。
 - macOS bundle 固定正式 Bundle/mode ID、`LSUIElement`、简体中文 metadata、双语标签与 Retina 列表图标，并对完整依赖闭包签名。
 - 旧 `IMKCandidates` 实机覆盖连续输入、主要编辑键与提交语义，但视觉高亮不重绘；build 31 的 AppKit panel 已在精确 source 归属下确认候选跟随光标、右方向视觉迁移且 Space 提交同一第二项。
 - GitHub 仓库级 `Protect master via PR` ruleset 已只读复验为 active；`Repo Hygiene`、`Repository Baseline`、`Rust Clippy`、`Flutter Manager`、`Go Quality` 五项均为 required checks，且 strict/up-to-date policy 已启用。R06A 已完成退出。
@@ -47,7 +51,7 @@
 
 ## 已确认阻塞
 
-- R01A 的 AppKit candidate panel 已由 build 31 正式关闭光标锚点、右方向视觉迁移、Space 提交同 index、鼠标选择与宿主焦点子项；尚缺边缘定位、多屏/全屏、输入菜单、owner/client 生命周期、进程重启与离线一致性的集中证据。VoiceOver 导航、视觉与 accessibility press 不一致已记录为 M1 Alpha 已知限制，不属于当前退出阻塞。
+- R01A 的 AppKit candidate panel 已由 build 31 正式关闭光标锚点、四向屏幕边缘、浅色/深色、右方向视觉迁移、Space 提交同 index、鼠标选择与宿主焦点子项；真实 9 项候选已判定违反 5×1 契约，build 32 完成配置层修复但尚待实机复验。多屏/全屏、输入菜单、owner/client 生命周期、进程重启与离线一致性的集中证据仍缺。VoiceOver 导航、视觉与 accessibility press 不一致已记录为 M1 Alpha 已知限制，不属于当前退出阻塞。
 - 输入 session 未组合 engine、ranker、userdb 与 privacy policy，真实选择没有进入平台学习热路径。
 - userdb 用户意图缺少统一事务、WAL/busy 策略；ranker recency/frequency 语义需要修正。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
@@ -66,8 +70,8 @@
 
 ## 下一步顺位
 
-1. build 31 已完成本轮签名实机、VoiceOver 已知限制记录和零残留清理，继续作为 R01A 主输入路径候选；不为该已知限制单独升 `build 32`。
-2. 下一集中窗口继续使用冻结 build 31，补边缘定位、浅色/深色、长候选、多屏/全屏、输入菜单、client 切换、进程重启、断网、中英文混输、宿主快捷键和双应用生命周期；主输入路径退出场景全部通过后关闭 R01A。
+1. build 31 已完成边缘/外观证据并暴露 9 项候选配置缺陷，随后零残留清理，不再作为主输入路径候选；VoiceOver 已知限制仍不单独阻塞 Alpha。
+2. build 32 已完成产品五项页模板、native bundle 配置复核和真实 FFI snapshot 五项断言。下一集中窗口须重新授权、冻结签名与安装，先复验真实 5×1 长候选，再补多屏/全屏、输入菜单、client 切换、进程重启、断网、中英文混输、宿主快捷键和双应用生命周期；主输入路径退出场景全部通过后关闭 R01A。
 3. 任一新实机窗口仍须使用冻结产物、人工切换/交互、公开通知监视、明确授权和系统设置真实移除；完成后复核设置列表、可添加目录、TIS、bundle、运行数据和进程全部零残留。
 4. R01A 退出后实施 R02L；R02L 退出后再由 R01B 接入真实学习，之后关闭整改专题并进入 M3。
 

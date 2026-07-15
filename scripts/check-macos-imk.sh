@@ -125,8 +125,10 @@ test -s "${bundle}/Contents/Resources/zh-Hans.lproj/InfoPlist.strings"
 test -s "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings"
 test -s "${bundle}/Contents/Resources/zh-Hans.lproj/Localizable.strings"
 test -s "${bundle}/Contents/Resources/en.lproj/Localizable.strings"
+grep -Fqx '  page_size: 5' \
+  "${platform_dir}/Resources/Rime/default.yaml.in"
 plutil -lint "${bundle}/Contents/Info.plist" >/dev/null
-test "$(plutil -extract CFBundleVersion raw "${bundle}/Contents/Info.plist")" = "31"
+test "$(plutil -extract CFBundleVersion raw "${bundle}/Contents/Info.plist")" = "32"
 plutil -lint "${bundle}/Contents/Resources/zh-Hans.lproj/InfoPlist.strings" \
   "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings" \
   "${bundle}/Contents/Resources/zh-Hans.lproj/Localizable.strings" \

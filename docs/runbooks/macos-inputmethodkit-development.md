@@ -27,7 +27,7 @@
 
 1. 使用已有、显式指定的 `librime` include/lib；构建脚本不安装依赖。
 2. 准备来源与许可证已确认的 shared data/schema，并复制到与任何真实用户输入法目录无关的隔离目录。
-3. shared data 必须包含 `default.yaml` 和 `<schema-id>.schema.yaml`，许可证文件必须非空并显式传入。
+3. shared data 必须包含 `<schema-id>.schema.yaml` 及其声明的依赖，许可证文件必须非空并显式传入；bundle 的 `default.yaml` 由仓库产品模板生成，固定 schema list 与 `menu.page_size: 5`，不采用输入目录或用户目录的默认配置。
 4. schema id 只允许 ASCII 字母、数字、点、下划线和连字符。
 5. smoke 只使用合成词，不记录窗口正文、输入历史、联系人或其他敏感信息。
 
@@ -40,7 +40,7 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 ./scripts/check-macos-imk-native.sh
 ```
 
-`RADISHLEX_RIME_DEPLOY_ON_START` 默认 `1`，只接受 `0` 或 `1`。产物为 `target/macos-imk/native/RadishLexInputMethod.app`。检查入口会验证 plist、单一全拼 mode metadata、当前架构、关键 FFI symbol、完整 bundle 签名，以及 copied shared data/许可证清单。构建会递归收集 `librime` 的全部非系统 dylib，重写为 bundle 内 `@rpath`，复制逐库许可证并生成签名后哈希清单；任何残留外部绝对依赖都会使门禁失败。shared data 中的 symlink 同样会被拒绝。默认使用 ad-hoc 开发签名；真实安装 smoke 需要调用方通过 `RADISHLEX_CODESIGN_IDENTITY` 提供当前用户可用的 Apple Development identity。检查不会启动或安装 bundle。
+`RADISHLEX_RIME_DEPLOY_ON_START` 默认 `1`，只接受 `0` 或 `1`。产物为 `target/macos-imk/native/RadishLexInputMethod.app`。检查入口会验证 plist、单一全拼 mode metadata、产品生成的 5 项候选页配置、当前架构、关键 FFI symbol、完整 bundle 签名，以及 copied shared data/许可证清单；随后以临时隔离 user data 运行真实 FFI smoke，要求 snapshot 恰好返回 5 项候选。构建会递归收集 `librime` 的全部非系统 dylib，重写为 bundle 内 `@rpath`，复制逐库许可证并生成签名后哈希清单；任何残留外部绝对依赖都会使门禁失败。shared data 中的 symlink 同样会被拒绝。默认使用 ad-hoc 开发签名；真实安装 smoke 需要调用方通过 `RADISHLEX_CODESIGN_IDENTITY` 提供当前用户可用的 Apple Development identity。检查不会启动或安装 bundle。
 
 ## 授权停止线
 
@@ -72,12 +72,12 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 进入真实动作前必须冻结源码与产物，至少记录：
 
 1. Git 工作区干净，当前提交、分支和相对 `origin/dev` 的领先状态明确；验收过程中不修改源码或重建另一个 build。
-2. `CFBundleVersion`、Bundle ID、mode ID、schema id 与安装文件名符合当前文档；R01A 主输入路径当前候选固定为 `build 31`，已记录的 VoiceOver 限制不单独触发 `build 32`。
+2. `CFBundleVersion`、Bundle ID、mode ID、schema id 与安装文件名符合当前文档；R01A 下一主输入路径候选固定为 `build 32`。`build 31` 的 VoiceOver 已知限制本身不触发升级，但 2026-07-15 实机确认 product-authored Rime 配置错误使用 9 项候选页，已构成独立生产行为变化并触发 `build 32`。
 3. Apple Development bundle 已通过 native 门禁、完整递归签名和 `codesign --verify --deep --strict`。
 4. 记录生成 bundle 主程序、FFI dylib 和 native manifest 的 SHA-256；复制后逐字节复核生成产物与安装副本，确保系统测试的就是冻结产物。
 5. 安装目标仅为 `~/Library/Input Methods/RadishLexInputMethod.app`，运行数据仅为本轮隔离的 `~/Library/Application Support/RadishLex/Rime`；不得读取或复用用户现有 Rime 数据。
 
-冻结后发现源码或产物问题，应取消本次真实动作并回到仓库修复。不得在已登录、已添加或已选择输入法的现场边改边重建。2026-07-14 的 `build 31` 已按同一冻结产物完成签名、用户级安装、系统设置添加和零残留清理；鼠标选择与宿主焦点通过，VoiceOver 导航、视觉与 press 提交不一致记录为 M1 Alpha 已知限制。后续可在重新取得集中授权、重新冻结并复核哈希后继续 build 31 的主输入路径矩阵，不能复用上轮授权或安装现场。
+冻结后发现源码或产物问题，应取消本次真实动作并回到仓库修复。不得在已登录、已添加或已选择输入法的现场边改边重建。2026-07-15 的 `build 31` 已在精确 source 归属下通过四向屏幕边缘与浅色/深色外观，但长输入实机显示 9 项候选，与 5×1 契约不一致；本轮立即停止后续矩阵并完成系统设置、TIS、bundle、运行数据和进程零残留清理。修复后的 `build 32` 已完成不安装 contract/native/真实 FFI smoke，后续实机必须重新取得集中授权、重新冻结并复核哈希，不能复用 build 31 的授权或安装现场。
 
 上一正式 `build 30` 虽完成 Apple Development 签名、用户级安装、注销/登录、系统设置添加和实体键盘观察，但系统当时开启了“自动切换到文稿的输入法”。实体输入后 TIS 显示 TextEdit 已切回系统拼音，所以候选高亮迁移与 Space 提交不具备 RadishLex 来源归属，不能写成正式通过；该轮观察到的候选窗固定屏幕左下角则形成定位缺陷输入。完整清理后 TIS 为 `matches=0 enabled=0 selected=0`，bundle、隔离运行数据和精确进程均不存在。
 

@@ -1,0 +1,19 @@
+# RadishLex M1 isolated development configuration.
+# This file is product-owned and does not come from a user Rime directory.
+
+config_version: "0.1"
+
+schema_list:
+  - schema: __RADISHLEX_RIME_SCHEMA__
+
+menu:
+  page_size: 5
+
+ascii_composer:
+  good_old_caps_lock: true
+  switch_key:
+    Caps_Lock: clear
+    Shift_L: commit_code
+    Shift_R: noop
+    Control_L: noop
+    Control_R: noop

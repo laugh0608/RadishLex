@@ -39,10 +39,6 @@ case "${mode}" in
         exit 2
         ;;
     esac
-    if [[ ! -f "${shared_data}/default.yaml" ]]; then
-      echo "native bundle shared data must contain default.yaml." >&2
-      exit 2
-    fi
     if [[ ! -f "${shared_data}/${RADISHLEX_RIME_SCHEMA}.schema.yaml" ]]; then
       echo "native bundle shared data must contain ${RADISHLEX_RIME_SCHEMA}.schema.yaml." >&2
       exit 2
@@ -124,6 +120,9 @@ plutil -lint "${contents}/Info.plist" >/dev/null
 
 if [[ "${mode}" == "native" ]]; then
   ditto "${shared_data}" "${resources_dir}/RimeData"
+  sed "s/__RADISHLEX_RIME_SCHEMA__/${schema}/g" \
+    "${script_dir}/Resources/Rime/default.yaml.in" \
+    >"${resources_dir}/RimeData/default.yaml"
   cp "${RADISHLEX_RIME_DATA_LICENSE}" "${resources_dir}/RimeData.LICENSE"
   cp "${repo_root}/LICENSE" "${resources_dir}/RadishLex.LICENSE"
   if [[ "${deploy_on_start}" == "1" ]]; then

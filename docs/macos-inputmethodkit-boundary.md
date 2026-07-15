@@ -66,7 +66,7 @@ runtime 初始化失败必须返回结构化错误。平台不得静默切换 de
 ## Composition、候选与提交
 
 - composition 为空时清除 marked text；非空时更新 marked text 与 cursor。
-- 候选展示使用 macOS 原生 AppKit 机制或 InputMethodKit 兼容机制，不自造跨平台统一浮窗协议。正式实现使用进程级、非激活的 AppKit candidate panel，并以五候选页形成 5×1 横排；它只属于 macOS 平台壳，不进入 Rust core，也不形成其他平台必须复用的窗口协议。
+- 候选展示使用 macOS 原生 AppKit 机制或 InputMethodKit 兼容机制，不自造跨平台统一浮窗协议。正式实现使用进程级、非激活的 AppKit candidate panel，并以五候选页形成 5×1 横排；它只属于 macOS 平台壳，不进入 Rust core，也不形成其他平台必须复用的窗口协议。五项页大小必须在 engine 配置层成立，不能在 panel 截断 snapshot，否则方向选择、Space commit 与翻页会出现不可见 index。macOS bundle 因此从仓库内产品模板生成 `default.yaml` 并固定 `menu.page_size: 5`，不继承 shared-data 输入或用户 Rime 的默认配置；native 门禁以真实 FFI snapshot 精确复验五项候选页。
 - 平台展示索引必须稳定映射到 RadishLex ranked candidate 与 engine selection index。
 - 用户选择候选后通过 Rust selection API 驱动 engine，平台不得直接把展示文本当作 engine 选择结果。
 - selection result 必须携带 consumed、optional commit 与选择后的 snapshot。分段拼音候选可能只确定当前音节并继续 composition；只有 commit 存在时平台才向宿主插入文本，否则更新 marked text 与候选。
@@ -114,7 +114,9 @@ SDK `IMKInputSession.h` 明确给自建候选窗提供 `windowLevel`，并说明
 
 本轮曾用公开 `TISSelectInputSource` 精确选择正式 mode，同会话返回 `property_selected=1` 且 current source ID 精确匹配，但菜单栏仍显示系统拼音；该诊断不计作候选功能通过。停止自动选择后，系统设置一度“已添加但菜单未发布 source”，经真实移除并重新添加后菜单项可由开发者手动选择。最终只读监视先以 U.S. 与系统拼音切换自证通知链有效，再记录正式 RadishLex mode 为测试期间 current source；实体键盘确认候选跟随文字光标、右方向视觉高亮迁移到第二项、Space 提交同一项且无异常。该结果正式关闭 build 31 光标锚点与本组视觉/提交一致性。
 
-同一冻结 `build 31` 随后在精确 RadishLex source 下通过鼠标选择第二候选与宿主焦点保持；但 VoiceOver 导航到第二候选后，旁白焦点、视觉高亮和 accessibility press 提交发生分叉：旁白位于第二项，视觉仍为第一项，press 也没有提交第二项。该实机结果否定“现有 accessibility 动态 contract 足以证明生产语义”的推断，但不改变单一 display index、公开 selected state 与统一提交路径的设计边界。本轮按停止线结束并完整清理；阶段复核后将该问题降为 M1 Alpha 已知限制，build 31 继续作为主输入路径候选，R01A 不因该问题单独要求 `build 32`。边缘定位、外观、长候选、多屏/全屏、输入菜单与生命周期/离线矩阵仍未执行。
+同一冻结 `build 31` 随后在精确 RadishLex source 下通过鼠标选择第二候选与宿主焦点保持；但 VoiceOver 导航到第二候选后，旁白焦点、视觉高亮和 accessibility press 提交发生分叉：旁白位于第二项，视觉仍为第一项，press 也没有提交第二项。该实机结果否定“现有 accessibility 动态 contract 足以证明生产语义”的推断，但不改变单一 display index、公开 selected state 与统一提交路径的设计边界。本轮按停止线结束并完整清理；当时的阶段复核将该问题降为 M1 Alpha 已知限制，未因该问题单独升级构建号。边缘定位、外观、长候选、多屏/全屏、输入菜单与生命周期/离线矩阵仍未执行；build 31 的后续候选状态由下一段实机结果更新。
+
+2026-07-15 再次冻结 `build 31` 后，公开 TIS 通知确认正式 source 覆盖各测试组；候选窗在屏幕上下左右边缘的上下放置与左右限制通过，浅色/深色选中态通过并恢复原始自动外观。长输入组随即发现真实 panel 展示 9 项候选，而正式 boundary 固定 5×1；根因是临时 product-authored `default.yaml` 配置 `menu.page_size: 9`，controller/panel 又忠实展示完整 snapshot，恰好五项的 component contract 未覆盖该配置分叉。本轮按停止线停止多屏/全屏、输入菜单和生命周期/离线矩阵，完成公开系统设置/TIS 双路径零残留清理。修复不在 UI 层截断，而是把产品 `default.yaml` 模板收进仓库并固定五项页，同时由 native bundle 门禁运行真实 FFI snapshot 断言；用户可见配置变化使下一候选升为 `build 32`，目前只具备不安装证据，仍待重新授权实机复验。
 
 ## 隐私与本地数据
 

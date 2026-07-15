@@ -83,7 +83,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | 批次 | 名称 | 状态 | 退出结果 |
 | --- | --- | --- | --- |
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
-| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；build 31 已确认锚点、方向/Space、鼠标选择与宿主焦点；VoiceOver 缺陷降为 M1 Alpha 已知限制，继续补平台与生命周期主路径矩阵 | 真实应用可离线完成基础中文输入 |
+| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；build 31 已确认锚点、边缘、外观、方向/Space、鼠标与焦点，但暴露 9 项候选配置缺陷；build 32 已完成五项页不安装修复，继续补实机平台与生命周期矩阵 | 真实应用可离线完成基础中文输入 |
 | R02L | 本地 userdb/ranker 正确性 | 待开始 | 学习、删除、并发和排序语义正确 |
 | R01B | 真实学习纵向闭环 | 待开始，依赖 R01A 与 R02L | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 已完成 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
@@ -112,7 +112,7 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 按 `docs/macos-inputmethodkit-boundary.md` 新增 macOS InputMethodKit 薄壳，只处理系统生命周期、按键、候选、commit 和 Rust FFI。
 - 编写开发版安装、启用和移除 runbook；真实安装仍需人工授权。
 
-### 当前完成证据（更新至 2026-07-14）
+### 当前完成证据（更新至 2026-07-15）
 
 - ABI contract v3 统一按键处理与候选选择的 Rust-owned `RadishLexKeyResult`，无损返回 `consumed`、可选即时 commit 和同事件 snapshot。
 - 失败时 `result_out` 保持为空；owner-thread、空指针、非法 key event、borrowed view 和释放路径已有 host contract 测试。
@@ -125,7 +125,7 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 新增 `platforms/macos-imk/` Objective-C 薄壳：`NSEvent` 规范化、ABI v3 key/selection result、即时 commit、snapshot/candidate 复制、原生 `IMKCandidates`、稳定候选 index、reset/cancel、schema 和 owner-thread 均由同一 wrapper 收口。
 - `RLXProcessRuntime` 为每个 input controller 创建独立 session，并在进程 teardown 时先逐个 invalidate session，再调用 `radishlex_rime_runtime_shutdown`；生产条件编译分支不允许回退 demo engine。
 - `./scripts/check-macos-imk.sh` 可在不安装系统输入法时构建 contract `.app` bundle，运行 Objective-C → C ABI → Rust session smoke，并检查 plist、rpath、dylib、完整开发签名与关键 symbol；production 分支另有 `-fsyntax-only` 编译门禁。
-- `./scripts/check-macos-imk-native.sh` 增加显式 gated native bundle 门禁：拒绝真实用户/runtime 数据目录和 symlink，要求 schema/default/license，固定 deploy policy，并检查架构、三个关键 symbol 与全部 copied data 哈希清单；全部非系统 dylib 会递归封装、改写到 bundle 内 `@rpath`，逐库许可证、签名后哈希和外部绝对依赖拒绝已有自动验证。
+- `./scripts/check-macos-imk-native.sh` 增加显式 gated native bundle 门禁：拒绝真实用户/runtime 数据目录和 symlink，要求 schema/license，固定产品生成的五项候选页配置与 deploy policy，并检查真实 FFI snapshot 页大小、架构、三个关键 symbol 与全部 copied data 哈希清单；全部非系统 dylib 会递归封装、改写到 bundle 内 `@rpath`，逐库许可证、签名后哈希和外部绝对依赖拒绝已有自动验证。
 - wrapper contract 扩展到完整命名键表、全部 modifier、modifier release、补充平面 Unicode、中文/emoji UTF-8 byte cursor 到 UTF-16 unit 转换、scalar 中间 cursor 拒绝和无 index 候选拒绝。
 - native-rime release dylib 已使用现有显式 Homebrew include/lib 构建并复核 `session_new_rime`、`session_handle_key_event` 与 `rime_runtime_shutdown` 导出。
 - 采用官方 Apache-2.0 `rime-pinyin-simp` 固定上游 commit，在临时隔离目录保留许可证和来源记录，并移除对其他 schema/preset 的外部依赖；没有读取或修改真实用户 Rime 目录。
@@ -164,8 +164,11 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 同一冻结 `build 31` 的后续集中组在精确 RadishLex source 下确认鼠标提交第二候选且 TextEdit 无需重新聚焦即可继续 composition。VoiceOver 以 `Control-Option-Right Arrow` 到达第二候选时，旁白焦点已位于第二项而视觉高亮仍停在第一项；`Control-Option-Space` 执行 accessibility press 后也未提交第二项。本轮按停止线立即结束后续矩阵且未在安装现场重建；阶段复核将该缺陷降为 M1 Alpha 已知限制，不再阻塞 R01A，也不单独触发 `build 32`。
 - 清理前 TextEdit 文稿手动切回系统拼音；首次移除后配置项在完整重启设置时回流，清理门禁因不可选择 parent `enabled=1` 拒绝删除。第二次真实移除后删除 bundle/隔离数据并终止进程，随后打开现有列表和可添加目录刷新两个 `enabled=0 selected=0` 缓存 source。最终 `matches=0 enabled=0 selected=0`，路径与进程零残留；未使用 `TISDisableInputSource`、私有配置或注销。
 - 临时通知监视已并入现有正式 TIS 工具：`--monitor` 输出初始与通知后的精确 current source，并明确标识是否为 `org.radishlex.inputmethod.macos.Pinyin`；原状态/清理调用保持兼容。macOS contract 同时门禁编译、默认输出、通知/CFRunLoop 结构与 `TISSelectInputSource`、`TISDisableInputSource`、私有配置禁用线，不新建第三个 probe。用户主动关闭的“自动切换到文稿的输入法”继续保持关闭，不由验收自动化修改。
+- 2026-07-15 再次冻结 `build 31` 后，正式 source 归属下通过屏幕上下左右边缘与浅色/深色外观；长输入组发现真实 panel 展示 9 项候选，违反 5×1 契约。根因是隔离 product-authored `default.yaml` 错误配置 `menu.page_size: 9`，而 panel 正确展示完整 engine snapshot；原 contract 只使用恰好五项合成候选，未覆盖配置分叉。
+- 本轮没有在 UI 层截断候选。产品 `default.yaml` 模板现进入仓库并固定 `menu.page_size: 5`，native 构建覆盖 shared-data 输入中的默认配置，门禁逐字节复核生成结果并以临时 user data 运行真实 librime/FFI smoke，snapshot 精确为五项。用户可见配置变化使构建号升至 `32`；当前只有不安装证据，尚待重新授权实机复验。
+- build 31 失败后先通过系统设置真实移除，再删除 bundle/隔离运行数据并终止进程；TIS 与“添加 -> 简体中文”目录短暂缓存后仅通过完整重开系统设置自然收敛。最终现有列表、可添加目录、TIS、bundle、运行数据和进程全部零残留，外观与 🌐︎ 键行为恢复测试前值，没有使用停用 API、私有配置或注销。
 
-这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键、主要编辑按键、光标锚点、本组方向视觉/Space 提交一致性、鼠标选择与宿主焦点。build 31 继续作为 R01A 主输入路径候选；下一判断点是补边缘定位、外观、长候选、多屏/全屏、输入菜单、client 切换、进程重启、断网、中英文混输和双应用 owner 生命周期。VoiceOver 在进入产品受支持范围前另行修复和验收；任一新实机窗口仍按人工交互、通知型只读 source 监视和零残留清理执行。
+这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键、主要编辑按键、光标锚点、四向边缘、浅色/深色、方向视觉/Space 提交一致性、鼠标选择与宿主焦点。build 31 因真实 9 项候选失败而退出候选；下一判断点是对 build 32 重新签名安装并先复验真实 5×1 长候选，再补多屏/全屏、输入菜单、client 切换、进程重启、断网、中英文混输和双应用 owner 生命周期。VoiceOver 在进入产品受支持范围前另行修复和验收；任一新实机窗口仍按人工交互、通知型只读 source 监视和零残留清理执行。
 
 ### 退出场景
 
