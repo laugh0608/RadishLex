@@ -287,12 +287,12 @@ RADISHLEX_RIME_SHARED_DATA=<path> RADISHLEX_RIME_USER_DATA=<path> cargo test -p 
 
 已有实现与历史 smoke 已证明真实 Rime adapter 能完成 composition、候选、翻页、选择、commit、错误映射和 ranker 接入，`ime-ffi` 也可在显式 `native-rime` feature 下创建真实 Rime session。详细完成记录留在 devlog，不在本文持续追加。
 
-ABI contract v3 已闭合按键与候选选择的 `consumed`、可选 commit、同事件 snapshot 和 Rust-owned result 生命周期；`crates/ime-ffi/include/radishlex_input.h` 已通过 C11 与 Objective-C 编译测试。
+ABI contract v4 在 v3 已闭合的 `consumed`、可选 commit、同事件 snapshot 和 Rust-owned result 生命周期上，增加产品个人化 Rime session、学习上下文、display/engine index、个人化状态和学习处置；`crates/ime-ffi/include/radishlex_input.h` 已通过 C11 与 Objective-C 编译测试。
 
 进程级 runtime 已闭合 setup / initialize / explicit shutdown / finalize、多 session 共享、零 session 间隙、配置冲突和 deploy / session / schema 失败回滚；schema 创建与切换同时验证已部署列表和选择后回读。stub API 测试可精确复验调用次数，`ime-ffi` 另有需要隔离 Rime 数据目录的 gated 单/双 session 与无效 schema smoke。
 
-真实应用输入 smoke 前仍必须闭合：
+R01A build 32 已在真实 TextEdit/Codex 中完成基础输入、双 client、进程重启和离线证据。当前 adapter 不再有 M1 真实输入 smoke 缺口；R01B 仍须从产品个人化 session 补齐：
 
-- macOS InputMethodKit 真实应用 smoke。
+- 真实选择影响后续候选、输入法进程重启后保持，以及 secure/P0/隐私场景不写入的实机证据。
 
-这些未闭合项属于 M1 macOS 离线输入 Alpha，不应再被同步后端工作延后。最终发布包中的 `librime` 与 schema 分发属于 M4。
+该证据属于 M2 本地个人化纵向链，不应被同步后端、manager 同步 UI 或第二平台工作延后。最终发布包中的 `librime` 与 schema 分发属于 M4。

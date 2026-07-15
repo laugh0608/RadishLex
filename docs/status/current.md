@@ -55,11 +55,11 @@ R01B 已完成自动化代码批：新增 `ime-runtime` 统一组合 engine、ra
 - GitHub 仓库级 `Protect master via PR` ruleset 已只读复验为 active；`Repo Hygiene`、`Repository Baseline`、`Rust Clippy`、`Flutter Manager`、`Go Quality` 五项均为 required checks，且 strict/up-to-date policy 已启用。R06A 已完成退出。
 - userdb schema v3 已覆盖多表故障回滚、两个独立文件连接竞争、WAL/权限、v1/v2 迁移、未来版本拒绝、损坏文件保留、规范化删除身份、显式恢复与 P0/P1/P2 隔离；ranker 固定评测覆盖确定性衰减、有界贡献、状态优先级、有限分数与 explain 重构一致性。R02L 已完成退出。
 
-这些证据证明工程原型可继续演进，不证明真实平台输入、生产同步或产品发布已经完成。
+这些证据已证明 macOS 基础中文输入和自动化个人化接线可继续演进，不证明 R01B 真实个人化退出、生产同步或产品发布已经完成。
 
 ## 已确认阻塞
 
-- R01B 自动化链已接入产品热路径，但尚缺真实 TextEdit 连续选择改变排序、输入法进程重启后保持、P0/隐私零写入及最终零残留的实机证据。
+- R01B 自动化链已接入产品热路径，但尚缺 userdb 只读清理观测、真实 TextEdit 连续选择改变排序、输入法进程重启后保持、delete/explicit restore、P0/隐私零写入及按测试数据所有权执行的最终零残留证据。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
 - manager 默认 fixture fallback，native library 打包、持久化路径和文件权限尚未产品化。
 
@@ -78,7 +78,7 @@ R01B 已完成自动化代码批：新增 `ime-runtime` 统一组合 engine、ra
 
 1. R01A 已由 build 32 的五项页、全屏/菜单、双 client、进程重启、离线和零残留证据完成退出；保留 VoiceOver 与副屏环境缺口，不在当前批重复消耗实机窗口。
 2. R02L 已以事务回滚、SQLite 文件策略和迁移、规范化删除身份、确定性有界排序、状态优先级、固定合成评测及延迟观测完成退出，并作为 R01B 产品运行时的本地语义基础。
-3. R01B 自动化代码批已接入 privacy policy、userdb 和 ranker，并保留 display/engine index 映射；下一步只在明确授权后冻结并安装同一产物，用 TextEdit 验证学习改变排序、进程重启持久化、隐私/P0 零写入，再完成系统设置真实移除和零残留复核。
+3. R01B 自动化代码批已接入 privacy policy、userdb 和 ranker，并保留 display/engine index 映射；下一工作日先让清理状态入口只读报告 `userdb.sqlite3` 并固定测试数据所有权停止线，再冻结新构建号。取得明确授权后，用同一产物验证 TextEdit 学习重排、进程重启持久化、delete/explicit restore、隐私/P0 零写入，最后完成系统设置真实移除以及与安装前基线一致的数据清理复核。
 4. 任一后续实机回归仍使用冻结产物、人工切换/交互、公开通知监视、明确授权和系统设置真实移除；不因 R01A 退出而降低零残留或来源归属要求。
 
 ## 验证入口

@@ -14,7 +14,7 @@
 - `Tests/candidate_panel_contract.m`：创建真实 AppKit panel/control，复验视觉与 accessibility selection、appearance、anchor fallback、owner 接管和完整隐藏。
 - `Tests/input_controller_contract.m`：使用正式 controller、panel 和 Rust demo session，贯通方向 keyDown/keyUp、Space、鼠标、accessibility press、Enter、Escape、宿主快捷键和双 client 生命周期。
 - `Tools/tis_source_status.m`：使用公开 TIS API 按精确 Bundle ID 查询 parent/mode 状态，或以通知和 CFRunLoop 实时输出精确 current source；不启用、停用或选择输入源。
-- `cleanup-user-install.sh`：在系统设置已人工移除且取得授权后，清理正式开发 bundle、隔离运行数据和精确进程，并要求 TIS 零残留。
+- `cleanup-user-install.sh`：在系统设置已人工移除且取得授权后，清理正式开发 bundle、`Rime` 运行目录和精确进程，并要求 TIS 零残留；默认保留 `userdb.sqlite3`。
 - `ReferenceProbe/`：隔离验证原生候选事件路由与单 mode 输入源 metadata，不链接 Rime 或正式 FFI，也不替代产品薄壳。
 
 ## 候选窗定位与选择
@@ -24,6 +24,8 @@ Rust snapshot 的 cursor 是允许落在 composition 末尾的插入位置，但
 最终 panel frame 使用目标 `NSScreen.visibleFrame` 在锚点下方或上方放置并限制在屏幕内；contract 环境没有有效 screen frame 时围绕有效行矩形构造计算区域，不回退到 `(0,0)`。controller 的唯一 display index 同时驱动视觉高亮、Space、数字键、鼠标和 accessibility selection；Rust runtime 固化并执行 display index 到 engine index 的映射。
 
 native 产品 session 通过 ABI v4 的 personalized Rime 构造入口持有独立 userdb connection，数据库固定为 `~/Library/Application Support/RadishLex/userdb.sqlite3`。Objective-C 只创建并收紧 `RadishLex` 父目录到 `0700`，SQLite migration、WAL、busy timeout、文件权限、排序、selection 事务和失败回退都由 Rust 负责。每个事件前平台只传 secure input、隐私模式、上下文可信度与粗粒度类别；当前 Alpha 只把 TextEdit 和 Codex 识别为允许学习的普通上下文，其他未知应用默认 engine-only，敏感应用与 secure input 同样不读取、不写入个人化数据。
+
+`userdb.sqlite3` 不是临时 Rime 数据，卸载或普通开发清理不得删除。当前 `--status` 只报告 bundle、Rime 目录和进程，尚不能单独证明 R01B 测试数据库零残留；实机前必须补齐父目录和 userdb 只读状态。只有安装前已证明 userdb/Rime 不存在、对应内容全由本轮合成测试生成且另有明确授权时，才能精确删除本轮创建的数据；预存空父目录必须恢复为空并保留。
 
 ## 不安装验证
 

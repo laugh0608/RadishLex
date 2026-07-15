@@ -114,7 +114,7 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 
 ### 当前完成证据（更新至 2026-07-15）
 
-- ABI contract v3 统一按键处理与候选选择的 Rust-owned `RadishLexKeyResult`，无损返回 `consumed`、可选即时 commit 和同事件 snapshot。
+- R01A 以 ABI contract v3 统一按键处理与候选选择的 Rust-owned `RadishLexKeyResult`，无损返回 `consumed`、可选即时 commit 和同事件 snapshot；当前已由 R01B 升级为 v4。
 - 失败时 `result_out` 保持为空；owner-thread、空指针、非法 key event、borrowed view 和释放路径已有 host contract 测试。
 - `crates/ime-ffi/include/radishlex_input.h` 已覆盖输入侧 ABI，并通过 C11、Objective-C 编译和 Rust function pointer / layout 测试。
 - 旧 `push_key` / `push_key_event` 只保留为兼容入口，真实平台主契约切换为 `radishlex_session_handle_key_event`。
@@ -122,7 +122,7 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 两个 session 与零 session 间隙共享一次 setup / initialize；已初始化期间目录或 deploy 配置冲突返回结构化错误，deploy / session 创建 / schema 选择失败会回滚，只有显式 process shutdown 且零活动 session 时才 finalize。
 - 首个成功初始化的 Rime session 固定进程 runtime owner thread；跨线程创建或 shutdown 返回 `InvalidState`，平台壳不能把多个 client 分散到任意线程直接调用 librime。
 - adapter stub API 精确验证初始化、创建、销毁和 finalize 次数；`ime-ffi` 增加隔离数据目录下的 gated 双 session peer-release smoke。
-- 新增 `platforms/macos-imk/` Objective-C 薄壳：`NSEvent` 规范化、ABI v3 key/selection result、即时 commit、snapshot/candidate 复制、原生 `IMKCandidates`、稳定候选 index、reset/cancel、schema 和 owner-thread 均由同一 wrapper 收口。
+- 新增 `platforms/macos-imk/` Objective-C 薄壳：`NSEvent` 规范化、当时的 ABI v3 key/selection result、即时 commit、snapshot/candidate 复制、原生 `IMKCandidates`、稳定候选 index、reset/cancel、schema 和 owner-thread 均由同一 wrapper 收口；当前 wrapper 已消费 ABI v4。
 - `RLXProcessRuntime` 为每个 input controller 创建独立 session，并在进程 teardown 时先逐个 invalidate session，再调用 `radishlex_rime_runtime_shutdown`；生产条件编译分支不允许回退 demo engine。
 - `./scripts/check-macos-imk.sh` 可在不安装系统输入法时构建 contract `.app` bundle，运行 Objective-C → C ABI → Rust session smoke，并检查 plist、rpath、dylib、完整开发签名与关键 symbol；production 分支另有 `-fsyntax-only` 编译门禁。
 - `./scripts/check-macos-imk-native.sh` 增加显式 gated native bundle 门禁：拒绝真实用户/runtime 数据目录和 symlink，要求 schema/license，固定产品生成的五项候选页配置与 deploy policy，并检查真实 FFI snapshot 页大小、架构、三个关键 symbol 与全部 copied data 哈希清单；全部非系统 dylib 会递归封装、改写到 bundle 内 `@rpath`，逐库许可证、签名后哈希和外部绝对依赖拒绝已有自动验证。
@@ -248,7 +248,7 @@ R01A 不要求学习已经接入；真实学习在 R02L 正确性完成后由 R0
 
 ### 剩余退出项
 
-- 尚未安装本批输入法，也未修改系统设置。R01B 继续保持进行中，必须在取得明确授权后使用同一冻结产物完成真实 TextEdit 连续选择改变排序、输入法进程重启后保持、P0/隐私模式零写入和最终零残留复核，才能关闭批次。
+- 尚未安装本批输入法，也未修改系统设置。R01B 继续保持进行中；实机前先补 `userdb.sqlite3` 的只读状态观测和测试数据所有权停止线，因为现有清理入口默认只删除 Rime 运行目录并保留 userdb。随后必须在取得明确授权后使用同一冻结产物完成真实 TextEdit 连续选择改变排序、输入法进程重启后保持、delete/explicit restore、P0/隐私模式零写入和按基线归属执行的最终零残留复核，才能关闭批次。
 
 ## 十一、R06A：首批质量门禁与 review-only 资产清理
 

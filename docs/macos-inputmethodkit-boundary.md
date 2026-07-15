@@ -131,6 +131,8 @@ SDK `IMKInputSession.h` 明确给自建候选窗提供 `windowLevel`，并说明
 
 R01B 将正式 InputMethodKit session 切换到 `ime-runtime` 产品构造入口。每个 controller/session 使用独立 engine session 和独立 userdb connection，数据库固定在 `~/Library/Application Support/RadishLex/userdb.sqlite3`；Objective-C 只创建权限为 `0700` 的父目录并传 UTF-8 路径，Rust 负责 migration、WAL、busy timeout、数据库与 sidecar 的 `0600` 权限以及损坏错误。平台不得静默删除或重建数据库。
 
+userdb 是用户数据，默认输入法移除和开发 bundle 清理必须保留；现有清理入口只删除 `RadishLex/Rime` 运行目录，不删除 `userdb.sqlite3`。R01B 合成验收若要求数据零残留，安装前必须分别只读记录父目录、Rime 目录和 userdb 的基线：userdb 或 Rime 已存在时停止测试并保留原位，不得备份后替换、静默复用或删除；父目录原本为空时可以继续，但必须保留该预存空目录。只有系统设置真实移除、输入法退出、数据库连接关闭且再次取得精确清理授权后，才能删除已证明由本轮创建的 Rime/userdb；只有父目录本身也由本轮创建时，才能一并删除父目录。
+
 候选 snapshot 同时携带 display index 与 engine index；候选窗、数字键、Space、鼠标和 accessibility action 始终回传 display index，由 Rust runtime 映射后选择 engine candidate。平台每次事件前传入 secure input、敏感应用、隐私模式、上下文可信度和受控 context kind；禁止学习场景不会写入，secure/敏感/未知场景也不读取个人化信号。分段选择的待确认意图、selection 事务和失败语义全部留在 Rust。平台日志只允许记录阶段、个人化状态与学习结果枚举，不记录输入码、候选、App ID 或数据库路径。
 
 ## Native 依赖与目录

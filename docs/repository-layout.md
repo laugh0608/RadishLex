@@ -79,11 +79,11 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、CLI、ABI v3 selection/key result、受测输入 header 与已完成的 R01A macOS 双应用/生命周期证据 | R01B 产品个人化 runtime、ABI v4 隐私/索引/学习状态和真实选择闭环 |
-| 本地学习 | schema v3 userdb、事务化用户意图、确定性 ranker、固定合成评测与管理接口 | R01B 将既有正确性接入真实平台选择；manager 产品管理界面后续按 M2 顺位推进 |
+| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v4 隐私/索引/学习状态、受测输入 header 与已完成的 R01A macOS 双应用/生命周期证据 | R01B 真实应用学习、重启持久化和隐私阻断证据 |
+| 本地学习 | schema v3 userdb、事务化用户意图、确定性 ranker、固定合成评测、产品热路径接入与管理接口 | R01B 实机退出；随后按 M2 推进 manager 本地产品管理能力 |
 | 同步 | crypto/sync 模型、Go server、HTTP 集成测试 | 确定合并、完整设备生命周期、生产 HTTPS 编排 |
 | Flutter manager | macOS 工程、真实开发期 FFI bridge、widget tests | 默认产品 FFI bundle、持久化和平台文件访问 |
-| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、已完成的 R01A build 32 实机矩阵与隔离 reference probe；Android Keystore 能力验证桥 | R01B 本地个人化纵向链、产品安装包；其他系统输入法 |
+| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、已完成的 R01A build 32 实机矩阵、R01B 自动化个人化接线与隔离 reference probe；Android Keystore 能力验证桥 | R01B 本地个人化实机退出、产品安装包；其他系统输入法 |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
 

@@ -8,7 +8,7 @@ Flutter manager 已有较完整的本地原型验收证据，覆盖词库管理�
 
 本次原型验收只证明管理端可以安全、可审计地管理本机数据和解释同步不可用原因；不证明 M2 产品运行态或用户可用远端同步已经完成。
 
-2026-07-11 复核结论：下方证据足以证明本地管理原型与开发期真实 FFI bridge 可工作，但尚不能证明 M2 产品能力退出。M2 仍需正常运行态加载真实 FFI、使用持久化平台目录、与真实输入 runtime 共享受控 userdb，并移除默认 fixture 伪装成功的路径。
+2026-07-15 复核结论：下方证据足以证明本地管理原型与开发期真实 FFI bridge 可工作，产品输入 runtime 也已通过 ABI v4 接入固定 userdb 和本地学习热路径，但尚不能证明 M2 产品能力退出。R01B 仍需补真实应用学习证据；manager 仍需在正常运行态加载真实 FFI、使用同一受控持久化 userdb、验证与输入法双连接并发，并移除默认 fixture 伪装成功的路径。
 
 ## 验收范围
 
@@ -93,7 +93,7 @@ git diff --check
 - 正常 manager 构建包尚未携带 RadishLex native library，也未固定平台持久化目录和文件权限。
 - 未与 macOS 输入 runtime 共享真实 userdb，输入法与 manager 的锁、migration 和所有权尚未形成产品证据。
 - 未显式配置环境时仍使用 fixture；产品模式必须改为明确失败，fixture 只能由持续标识的 demo mode 启用。
-- 真实选择尚未进入学习热路径，因此 manager 当前展示的数据不能证明 M2 个人化纵向闭环。
+- 产品输入 runtime 已自动化接入选择学习热路径，但尚缺 R01B 真实应用选择、进程重启、delete/explicit restore 和隐私/P0 零写入证据；manager 当前展示的数据仍不能单独证明 M2 个人化纵向链退出。
 
 以下缺口属于 M3，会阻止真实用户同步入口，但不阻塞 M2 本地管理实现：
 
@@ -106,7 +106,7 @@ git diff --check
 
 后续推进顺位按产品里程碑分层：
 
-1. M1/R01A 先完成 macOS 基础输入，不让 manager 工作阻塞首个平台。
-2. M2/R01B 接入真实学习后，闭合 native library、持久化目录、共享 userdb、明确 demo mode 和本地产品 smoke。
+1. M1/R01A 的 macOS 基础输入已经退出，不再重复展开完整平台矩阵。
+2. 先完成 M2/R01B 真实学习实机退出，再闭合 manager 正常构建包中的 native library、固定持久化路径、共享 userdb 双连接并发、明确 demo mode 和本地产品 smoke。
 3. M3 再按 `docs/manager-sync-entry-boundary.md` 实现真实同步、设备与恢复；安全证据齐备前不打开真实用户同步开关。
 4. 只在文件职责继续增长或测试边界变弱时拆分 manager 代码，不为目录整齐新增无实际职责的层。

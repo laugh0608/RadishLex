@@ -81,7 +81,7 @@ M0 只证明方向与工程基础可继续演进，不证明任何产品里程�
 - SQLite WAL、busy timeout、并发访问、文件权限、迁移和损坏恢复策略。
 - 有效 recency 衰减、有界 frequency、明确 suppress/delete/restore 优先级。
 - 固定合成排序评测集和输入热路径性能基线。
-- 只覆盖本地词库、学习、隐私和诊断的最小 manager 产品模式。
+- 覆盖本地词库、学习、隐私和诊断主要路径的 manager 产品模式。
 
 退出标准：
 
