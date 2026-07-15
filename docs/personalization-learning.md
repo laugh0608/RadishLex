@@ -1,6 +1,6 @@
 # RadishLex 个人化学习设计
 
-本文档用于定义本地个人化学习的职责边界、数据模型、隐私分级、排序接口、CLI/FFI 管理入口和验证标准，读者是实现 `ime-userdb`、`ime-ranker`、输入 runtime 和本地管理 UI 的开发者。本文不包含当前批次状态、SQLite migration 完整 SQL、ranker 权重公式最终参数、同步加密协议、Flutter 页面设计或平台输入法壳实现；实时进度见 `docs/status/current.md`。
+本文档用于定义本地个人化学习的职责边界、数据模型、隐私分级、排序接口、CLI/FFI 管理入口和验证标准，读者是实现 `ime-userdb`、`ime-ranker`、输入 runtime 和本地管理 UI 的开发者。本文不包含当前批次状态、SQLite migration 完整 SQL、ranker 调参历史、同步加密协议、Flutter 页面设计或平台输入法壳实现；实时进度见 `docs/status/current.md`。
 
 ## 稳定定位
 
@@ -76,6 +76,7 @@ UserTerm
   created_at
   updated_at
   last_used_at
+  restored_at
 ```
 
 字段语义：
@@ -86,6 +87,7 @@ UserTerm
 - `source`：`engine_selection`、`manual_import`、`manual_add`、`phrase_learning`。
 - `weight`：本地学习权重，不直接等同于 engine score。
 - `status`：`active`、`suppressed`、`deleted`。
+- `restored_at`：只由显式恢复写入；普通新增、selection、导入和旧同步状态不得伪造该版本。
 
 ### SelectionEvent
 
@@ -139,9 +141,9 @@ NegativeFeedback
 ```text
 DeletedTerm
   term_id
-  text_hash
-  reading_hash
-  input_code_hash
+  input_code
+  text
+  reading
   deleted_at
   reason
 ```
@@ -154,83 +156,36 @@ DeletedTerm
 
 ## SQLite 草案
 
-本地个人化初始 schema 建议包含：
+本地个人化 schema 保留以下职责和稳定字段；实现可调整字段名，但必须保留语义并通过 migration 测试证明升级路径。
 
-```text
-user_terms
-selection_events
-negative_feedback
-deleted_terms
-ranker_weights
-import_batches
-```
+| 表 | 稳定字段 |
+| --- | --- |
+| `user_terms` | `id`、`text`、`reading`、`input_code`、`source`、`weight`、`status`、`created_at`、`updated_at`、`last_used_at`、`restored_at` |
+| `selection_events` | `id`、`session_id`、`input_code`、`selected_text`、`selected_reading`、`candidate_index`、`candidate_count`、`context_kind`、`created_at` |
+| `negative_feedback` | `id`、`input_code`、`text`、`reading`、`reason`、`context_kind`、`created_at` |
+| `deleted_terms` | `id`、`term_id`、`input_code`、`text`、`reading`、`deleted_at`、`reason` |
+| `ranker_weights` | `id`、`input_code`、`text`、`reading`、`frequency`、`last_used_at_ms`、`negative_score`、`context_kind`、`updated_at` |
+| `import_batches` | `id`、`source_name`、`term_count`、`created_at`、`notes` |
 
-`user_terms`：
+### SQLite 稳定决策
 
-- `id`
-- `text`
-- `reading`
-- `input_code`
-- `source`
-- `weight`
-- `status`
-- `created_at`
-- `updated_at`
-- `last_used_at`
+- 一次用户意图是最小事务边界。`add`、`explicit restore`、selection、negative feedback、delete 及导入分别在单个 `BEGIN IMMEDIATE` 事务内完成相关事件、词条、摘要和 tombstone 写入；任一语句失败时整项回滚，不能留下半条意图。
+- 文件型 userdb 固定使用 WAL、`busy_timeout = 5000 ms`、`foreign_keys = ON` 和 `synchronous = NORMAL`。IME 与 manager 各持有独立 SQLite 连接，不跨线程共享同一个 `Connection`；IME 可持有长期热路径连接，manager 使用独立短事务连接，写事务不得跨 UI 或平台回调等待。
+- Unix 上数据库主文件及已生成的 `-wal`、`-shm` sidecar 权限固定收紧为 `0600`。userdb 不依赖 shell 环境变量或真实用户 Rime 目录。
+- schema migration 在一个事务内完成。打开数据库时先读取并检查 `PRAGMA user_version`；高于当前实现的未来版本必须在任何 schema 写入前拒绝。v1/v2 升级必须保留词条、学习摘要、导入审计和删除状态，并收敛到同一当前 schema。
+- 文件损坏、身份迁移歧义或 migration 失败时，原数据库文件必须原位保留并返回带路径/SQLite 原因的显式错误；不得静默删除、重命名后新建、降级为空库或用 fixture 代替。
+- tombstone 的唯一身份使用 trim 归一化后的 `(input_code, text, reading)` 复合键。旧 64 位 FNV 字段只允许在 v1/v2 migration 中帮助关联既有本地行，不再作为当前 schema 的查询、唯一性或同步判断依据；无法无歧义恢复身份时 migration 整体失败并保留旧库。
 
-`selection_events`：
+### 学习状态与版本优先级
 
-- `id`
-- `session_id`
-- `input_code`
-- `selected_text`
-- `selected_reading`
-- `candidate_index`
-- `candidate_count`
-- `context_kind`
-- `created_at`
+同一规范化复合身份按以下规则决策：
 
-`negative_feedback`：
+1. `deleted` tombstone 高于 selection、导入、ranker weight、普通 `manual_add` 和没有显式恢复标记的旧本地/备份/同步状态。
+2. 没有 tombstone 时，`suppressed` 高于普通 active、selection 和导入状态；selection 可以继续记录 P1 事件，但不能隐式解除 suppress。
+3. 只有单独的 `explicit restore` 入口可以清除 tombstone 或 suppress。恢复版本必须严格晚于当前删除版本，事务同时清除 tombstone、恢复 active 状态并写入新的 `restored_at`/`updated_at`；普通 `add` 不承担恢复语义。
+4. 当前同步 plaintext schema v1 没有显式恢复字段，因此解密后的 `manual_add` 一律按普通 synced term 处理，不能推断为恢复。M3 若要跨设备传播恢复，必须先版本化增加显式 restore intent；在此之前旧备份或旧同步对象只能被 tombstone 阻断，不能复活词条。
 
-- `id`
-- `input_code`
-- `text`
-- `reading`
-- `reason`
-- `context_kind`
-- `created_at`
-
-`deleted_terms`：
-
-- `id`
-- `term_id`
-- `text_hash`
-- `reading_hash`
-- `input_code_hash`
-- `deleted_at`
-- `reason`
-
-`ranker_weights`：
-
-- `id`
-- `input_code`
-- `text`
-- `reading`
-- `frequency`
-- `recency_score`
-- `negative_score`
-- `context_kind`
-- `updated_at`
-
-`import_batches`：
-
-- `id`
-- `source_name`
-- `term_count`
-- `created_at`
-- `notes`
-
-实现阶段可以调整字段名，但必须保留这些语义，并通过 migration 测试证明升级路径。
+删除写入同样必须晚于本地已知状态；旧 tombstone 不能覆盖版本更新的显式恢复。ranker 只消费上述状态决策后的摘要，不能自行反转 userdb 真相源。
 
 ## Ranker 输入输出
 
@@ -268,7 +223,15 @@ RankedCandidate
 - negative feedback penalty
 - deleted/suppressed reason
 
-初始排序可以使用稳定、可测试的线性加权；权重参数必须集中配置，不散落在 CLI 或 adapter 中。后续优化排序质量时必须保留 explain 输出。
+排序组合保持稳定、可测试；frequency、recency 等单项先按各自有界公式变换，再线性合成。权重参数必须集中配置，不散落在 CLI 或 adapter 中。后续优化排序质量时必须保留 explain 输出。
+
+### Ranker 稳定公式
+
+- 每个 `RankRequest` 必须显式携带 `evaluated_at_ms`。recency 只由 `last_used_at_ms` 与该评估时间计算：未来时间按 age 0 处理，缺少最后使用时间贡献 0；默认使用 7 天半衰期的确定性指数衰减。同一输入与同一评估时间必须得到逐因子一致的结果。
+- selection 只把 engine 学习词条的存在权重初始化为稳定基值，不随每次选择重复线性累加；重复选择只增长有上限的 frequency 计数并更新 `last_used_at_ms`。
+- frequency 贡献使用 `ln(1 + frequency)` 后再按配置封顶；negative feedback 贡献同样封顶。用户词条权重、非法负值和所有外部浮点输入都必须校验或限制到明确范围，最终分数及 explain 每个因子必须为有限数。
+- `deleted` 候选只生效 engine order 与 delete penalty，旧正负摘要和 suppress 不重复计分；`suppressed` 候选不生效 user term、frequency、recency 或 context 正向因子。active 候选才消费正向摘要。
+- context boost 只在同场景存在正向 selection 摘要时生效。最终排序按有限 `final_score` 降序；完全相同时保留 `original_index`，不引入不稳定哈希或数据库行顺序 tie-break。
 
 ## 学习流程
 
@@ -312,6 +275,7 @@ manual delete
 radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] --rank-db <path> [--context <kind>] <input-code> [candidate-index]
 radishlex-ime-cli dict list --db <path>
 radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
+radishlex-ime-cli dict restore --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict export --db <path> --file <path>
 radishlex-ime-cli dict inspect --file <path>
@@ -331,7 +295,8 @@ radishlex-ime-cli sync preflight --db <path>
 - 测试使用临时 SQLite 数据库和合成词。
 - `rank explain` 输出排序因子，不能只输出最终分数。
 - `dict export` 只导出 P2 用户词条数据，不导出 P1 原始选择事件、负反馈详细事件、上下文统计或 ranker 权重摘要。
-- `dict import` 普通导入不得复活本地 deleted tombstone 命中的词条；恢复删除词条必须通过 `dict add` 这类明确人工动作。
+- `dict add` 只新增或更新未删除词条，不清除 tombstone，也不隐式解除 suppress。
+- `dict import` 普通导入不得复活本地 deleted tombstone 命中的词条；恢复删除或 suppressed 词条必须通过独立的 `dict restore` 明确人工动作。
 - `dict import --dry-run` 必须复用实际导入的分类逻辑，报告 `inserted`、`updated`、`skipped_deleted` 和 `skipped_duplicate`，但不得写入词条或导入批次。
 - `dict import-batches` 用于查看导入批次来源、导入数量、插入数量、更新数量、删除跳过数量、重复跳过数量和创建时间。
 - `dict inspect` 用于在不打开 userdb 的情况下检查导入文件格式版本、记录数和 CLI 输入码兼容性。
@@ -364,7 +329,7 @@ radishlex_ffi_contract(contract_out)
 规则：
 
 - FFI 入口必须显式传入 UTF-8 SQLite 路径，不隐式读取真实用户输入法目录。
-- `add_term` 使用 `manual_add` 来源，表示用户明确添加或恢复词条。
+- `add_term` 使用 `manual_add` 来源，只表示用户明确新增或更新未删除词条，不承担恢复语义。
 - `delete_term` 沿用 userdb tombstone 语义，删除后普通导入和旧权重不得立即复活该词。
 - `terms_new` 返回只读 list handle，平台端只能通过 `terms_get` 读取 view，并必须调用 `terms_free` 释放。
 - list view 中的字符串只在 list handle 释放前有效，平台端不得缓存裸指针。
@@ -374,6 +339,7 @@ radishlex_ffi_contract(contract_out)
 - import batches 通过只读 list handle 暴露来源和统计，不暴露 SQLite handle、statement 或 row 指针。
 - learning status 通过单个 `repr(C)` summary 暴露聚合计数、latest timestamp 和 `plaintext_payload / p1_raw_details / context_stats = false` 标记，不返回 string view、用户词明文、P1 事件行、负反馈 reason 列表或上下文统计。
 - 当前 FFI 不记录 selection event、negative feedback 或上下文统计，不作为学习事件入口。
+- 当前 FFI 尚未暴露 explicit restore；在 manager 增加明确恢复动作前，`add_term` 不能绕过 tombstone。可复验的恢复入口先由 Rust `UserDb::restore_term` 与 CLI `dict restore` 提供。
 - 当前 FFI contract 明确 session 绑定创建线程，平台端不得跨线程直接操作同一 `RadishLexSession*`。
 
 ### 用户词库导入导出格式
@@ -436,6 +402,13 @@ luobo	萝卜	luo bo	manual_add	2	active
 - 同步前置检查只输出分类计数，不输出明文用户词、原始事件或负反馈明细。
 - 学习状态只读摘要只输出聚合计数、latest timestamp 和隐私边界标记，不输出明文用户词、原始选择事件、负反馈 reason 明细或上下文统计。
 - `rank explain` 能说明候选排序变化原因。
+- trigger 或等价故障注入分别证明 selection、negative feedback、delete 和 explicit restore 的多表写入完整回滚。
+- 两个文件型独立连接在受控写竞争下依靠 WAL 与 busy timeout 完成短事务，不把常态 manager/IME 并发暴露为频繁 `SQLITE_BUSY`。
+- v1、v2 到当前 schema 的迁移保留数据；未来 schema 在写入前拒绝；损坏文件和迁移失败文件原位保留。
+- 固定合成排序评测至少记录 Top-1、Top-3、MRR 和 case 数；样例只使用公开合成词，不使用真实输入历史。基线变差必须由权重/语义变更说明解释，不能只凭主观体验接受。
+- 候选重排延迟使用固定候选数、固定迭代次数和 warm-up 记录可复验统计；CI 只校验结果、样本规模与统计值有限，不使用易受共享机器波动影响的严苛墙钟上限。
+
+R02L 已按上述口径建立 schema v3 与固定测试基线：5 个公开合成 case 的 Top-1 为 `0.8`、Top-3 为 `1.0`、MRR 为 `0.9`；延迟样本固定为 50 个候选、100 次 warm-up 和 1000 次计时迭代。该基线只证明本地正确性与可复验性，不代表真实平台学习纵向闭环或 M2 产品退出；真实接入仍由 R01B 完成，具体机器观测与全仓门禁记录在本周 devlog。
 
 默认验证入口：
 

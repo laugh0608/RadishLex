@@ -119,7 +119,7 @@ weights[]
 - 记录排序固定为 `input_code, text, reading, context_kind`。
 - `context_kind` 是稳定场景分类，用于摘要级合并和 explain，不包含窗口标题、正文、App 原始内容或上下文统计分布。
 - 不包含 SQLite rowid、selection event id、session id、candidate index、candidate count、negative feedback reason、selection event 原始行、negative feedback 原始行或 import batch source。
-- `frequency`、`recency_score` 和 `negative_score` 必须为非负摘要值；`reading` 使用稳定字符串表达，未知时为空字符串。
+- `frequency` 和 `negative_score` 必须为非负摘要值；当前 plaintext schema v1 为兼容既有字段名仍使用 `recency_score`，但 R02L 起其值只允许 `0` 或非负整数毫秒时间戳，`0` 表示没有 `last_used_at_ms`。ranker 不再把该字段当作已计算分数。`reading` 使用 trim 归一化后的稳定字符串表达，未知时为空字符串。
 
 `dictionary.deleted_terms` payload：
 
@@ -243,12 +243,12 @@ object_payload(domain_id, object_id, version)
 
 ## 冲突与删除方向
 
-客户端合并策略必须按对象类型区分。当前 Rust 侧已在 `ime-sync` 中落地 `ClientSyncMergeInput` / `ClientSyncMergeResult` 纯模型，用于表达客户端解密 P2 payload 后的合并决策；`ime-userdb` 已补 `UserDbDecryptedSyncObject` 和 `decode_userdb_sync_objects()`，把已解密 P2 JSON 解析为带 `key_epoch` 的 user terms、deleted terms、ranker weights 记录，再转换为 `ClientSyncMergeInput`。`UserDb::apply_decoded_sync_payload_batch()` 会在本地 SQLite transaction 内执行合并结果写回：先用本机已有 tombstone 过滤普通同步词条和旧权重，再写入被接受的删除 tombstone、被接受的用户词条和被接受的 ranker weight；只有更新时间晚于本机 tombstone 的 `manual_add` 显式恢复可以清理本机删除意图。该入口不连接后端，不生成上传补丁，不暴露 CLI / FFI 明文同步入口。
+客户端合并策略必须按对象类型区分。当前 Rust 侧已在 `ime-sync` 中落地 `ClientSyncMergeInput` / `ClientSyncMergeResult` 纯模型，用于表达客户端解密 P2 payload 后的合并决策；`ime-userdb` 已补 `UserDbDecryptedSyncObject` 和 `decode_userdb_sync_objects()`，把已解密 P2 JSON 解析为带 `key_epoch` 的 user terms、deleted terms、ranker weights 记录，再转换为 `ClientSyncMergeInput`。`UserDb::apply_decoded_sync_payload_batch()` 会在本地 SQLite transaction 内执行合并结果写回：本机 tombstone 过滤普通同步词条和旧权重，版本更新的本机 explicit restore 过滤更旧的词条、权重和 tombstone，再写入剩余 accepted 记录。plaintext schema v1 没有 restore intent，`manual_add` 不再被推断为显式恢复，也不能清理本机删除意图。该入口不连接后端，不生成上传补丁，不暴露 CLI / FFI 明文同步入口。
 
 - `dictionary.user_terms`：按 `input_code + text + reading` 合并，更新时间、`key_epoch` 和删除 tombstone 参与冲突判断；普通同步词条不能清除 tombstone。
 - `dictionary.deleted_terms`：删除意图优先，旧设备和旧备份不得复活用户已删除词条；同一 term identity 下以较新的 `key_epoch` / 删除时间作为当前删除意图。
 - `ranker.weights`：按 `input_code + text + reading + context_kind` 合并，active tombstone 会阻断同一 term identity 下的旧权重摘要。
-- 显式恢复：用户明确重新添加词条时，必须以 `ExplicitRestore` 这类恢复意图表达，并且 `key_epoch` / 更新时间晚于 tombstone；恢复通过后才清除对应删除意图。恢复前的旧 `ranker.weights` 不随词条恢复一起复活。
+- 显式恢复：本地只由 `UserDb::restore_term` / CLI `dict restore` 写入新 `restored_at` 版本并清除 tombstone 或 suppress；普通 `add` 不承担恢复语义。跨设备传播必须在 M3 先版本化增加明确的 `ExplicitRestore` 字段，并且 `key_epoch` / 更新时间晚于 tombstone；plaintext schema v1 不能表达远端恢复。恢复前的旧 term、tombstone 和 `ranker.weights` 不随词条恢复一起复活。
 - `settings.*`：可以先使用 last-write-wins，后续管理 UI 再提供显式冲突提示。
 - `backup.snapshot`：作为完整快照，不参与细粒度合并。
 
@@ -265,8 +265,8 @@ object_payload(domain_id, object_id, version)
 - `SyncDomain`、`SyncDevice`、`DeviceJoinRequest`、`DeviceAuthorizationPackage`、`DeviceRevocationRecord` 和 `SyncObjectVersion`：固定当前 Rust 侧设备生命周期、授权状态、撤销 epoch 推进和对象版本冲突判断。
 - `ClientSyncMergeInput`、`ClientSyncMergeResult`、`DictionaryUserTermMergeRecord`、`DictionaryDeletedTermMergeRecord` 和 `RankerWeightMergeRecord`：固定客户端解密后合并模型，覆盖 tombstone 压过旧 user terms / ranker weights、旧 epoch 上传不能复活删除词、显式恢复清理 tombstone、恢复前旧权重不复活和重复记录按 `key_epoch` / 时间收敛。
 - `UserDb::p2_plaintext_payloads()`：导出 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` 的 Rust 内部 plaintext payload bytes，测试固定字段顺序、JSON string escaping、空库行为和 P1 / 本地审计阻断。
-- `UserDbDecryptedSyncObject`、`UserDbDecodedSyncPayloadBatch` 和 `decode_userdb_sync_objects()`：解析已解密的 userdb P2 JSON，严格校验 schema、object type、字段集合和值域，把 `manual_add` 映射为显式恢复意图，并接入 `ClientSyncMergeInput`；解析依赖 `serde_json = 1.0.150`，许可为 MIT OR Apache-2.0。
-- `UserDb::apply_decoded_sync_payload_batch()` 和 `UserDbSyncApplySummary`：把已解密 P2 payload batch 经过 `ClientSyncMergeInput` 合并后写回真实 userdb，覆盖 user terms、deleted tombstones、ranker weights、payload tombstone 阻断、本机 tombstone 阻断、显式恢复清理和旧权重阻断；summary 只暴露计数，不暴露明文 term identity。
+- `UserDbDecryptedSyncObject`、`UserDbDecodedSyncPayloadBatch` 和 `decode_userdb_sync_objects()`：解析已解密的 userdb P2 JSON，严格校验 schema、object type、字段集合、归一化身份和值域；schema v1 的 `manual_add` 只映射为普通 synced term，不推断显式恢复。解析依赖 `serde_json = 1.0.150`，许可为 MIT OR Apache-2.0。
+- `UserDb::apply_decoded_sync_payload_batch()` 和 `UserDbSyncApplySummary`：把已解密 P2 payload batch 经过 `ClientSyncMergeInput` 合并后写回真实 userdb，覆盖 user terms、deleted tombstones、ranker weights、payload / 本机 tombstone 阻断，以及本机 explicit restore 版本阻断旧 term、weight 和 tombstone；summary 只暴露分类计数，不暴露明文 term identity。
 - userdb P2 payload 本地加密装配测试：通过 `SyncEnvelopeAssembler` 用合成 sync master key / device id 把 `dictionary.user_terms`、`ranker.weights` 与 `dictionary.deleted_terms` payload 加密为 `ime-crypto::EncryptedObjectEnvelope`，验证可解密回原 bytes、nonce 不重复，并派生 `ime-sync::EncryptedSyncObjectDraft` 元数据。
 - `SyncRemoteClient`、`SyncRemoteTransport`、`RemoteObjectVersion`、`RemoteObjectPayload`、`SyncRemoteError` 和 `HttpSyncRemoteTransport`：固定 Rust remote client 与 Go object version API 的 DTO / transport 边界，覆盖 JSON base64 byte 字段、metadata 读取、binary payload 下载、stale conflict latest metadata、server error code 映射、HTTP/1.1 request / response 传递、可选 bearer access token header、chunked response 解码、base path 拼接和 Debug 脱敏。
 - `two_client_sync` integration test：使用合成 userdb、sync master key、test-memory signing key store 和内存 remote harness，复验 P2 payload 加密上传、另一客户端下载密文后解密、解码、合并写回 SQLite、本机 tombstone 阻断旧远端词条、ranker weight 写回、stale base version 409 latest metadata 映射，以及合并后按 `base_version = 1` 重新上传 v2。
@@ -303,8 +303,8 @@ cargo test -p radishlex-ime-cli
 - remote client 必须拒绝 manifest 与 encrypted object metadata 不一致的上传请求，必须把 stale base version 映射为 latest metadata，且错误 / Debug 输出不得泄漏请求体、signature、nonce 或 payload bytes。
 - `HttpSyncRemoteTransport` 必须只支持不含凭据、query 和 fragment 的 `http://` base URL，必须传递 JSON request 和 binary payload response，必须拒绝请求 path 中的 query / fragment；访问启用 Go access token 的 server 时只能通过受控 bearer header 配置，不得把 token 放进 URL、日志或 Debug，且 transport 错误不得包含请求体、payload、nonce、signature、token 或 plaintext payload。
 - 设备生命周期模型必须验证 pending / active / revoked 状态转移，授权设备和接收设备都必须 active，撤销记录必须推进 `key_epoch`，对象版本必须能识别 stale base version。
-- 客户端合并模型必须验证 `dictionary.deleted_terms` tombstone 能压过旧 `dictionary.user_terms` 和旧 `ranker.weights`，旧 epoch 上传不能靠更晚本机时间复活删除词，显式恢复必须晚于 tombstone，且恢复前的旧权重不随词条恢复一起复活。
+- 客户端合并模型必须验证 `dictionary.deleted_terms` tombstone 能压过旧 `dictionary.user_terms` 和旧 `ranker.weights`，旧 epoch 上传不能靠更晚本机时间复活删除词；本地显式恢复必须晚于 tombstone，且恢复前的旧词条、权重和 tombstone 不随词条恢复一起复活。schema v1 的 `manual_add` 不得通过测试伪装为远端恢复。
 - userdb P2 payload 解码必须拒绝 schema / object type 不匹配、未知字段、非法字段类型、`dictionary.user_terms` 中的 deleted 状态、0 key epoch 和负数 / 非有限权重摘要，并能把真实 payload bytes 转成 `ClientSyncMergeInput`。
-- userdb P2 payload 写回必须在同一 SQLite transaction 内执行，并覆盖写入 accepted user terms、写入 accepted tombstones、写入 accepted ranker weights、payload tombstone / 本机 tombstone 阻断旧词条与旧权重、显式恢复清理 tombstone，以及 summary 不暴露明文身份。
+- userdb P2 payload 写回必须在同一 SQLite transaction 内执行，并覆盖写入 accepted user terms、写入 accepted tombstones、写入 accepted ranker weights、payload / 本机 tombstone 阻断旧词条与旧权重、本机 explicit restore 版本阻断旧状态，以及 summary 不暴露明文身份。
 - Rust 侧两客户端同步边界必须覆盖设备 A 加密上传、设备 B 下载二进制密文、解密、解码、合并写回 userdb、stale conflict latest metadata 映射和基于最新 base version 重新上传；该测试不得启动长期运行 server，也不得引入 plaintext payload、P1 event 或平台壳入口。
 - Go server 两客户端真实 HTTP 同步测试必须使用短生命周期 server、临时 metadata / blob 目录和真实 HTTP transport，覆盖设备授权、三类 P2 对象上传下载、客户端解密合并写回、stale conflict、v2 重新上传和日志脱敏；测试结束必须清理 server 进程与临时目录，不保留长期运行服务。

@@ -8,9 +8,9 @@
 - 常态分支：`dev`；稳定主线：`master`
 - 分支闭环：阶段性 `dev -> master` PR 合并后，必须在下一批常规开发前将最新 `master` merge 回 `dev`，正式口径见 ADR 0001
 - 当前产品里程碑：M1 macOS 离线输入 Alpha
-- 当前整改主批次：R02L 本地 userdb/ranker 正确性
+- 当前整改主批次：R01B 真实学习纵向闭环
 - 并行质量批次：无；R06A 已退出
-- 已完成批次：R00 文档真相源与停止线收敛、R01A 输入契约与 macOS 基础输入、R06A 首批质量门禁与 review-only 资产清理
+- 已完成批次：R00 文档真相源与停止线收敛、R01A 输入契约与 macOS 基础输入、R02L 本地 userdb/ranker 正确性、R06A 首批质量门禁与 review-only 资产清理
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；受控同步实现与测试可继续
 
@@ -32,6 +32,8 @@
 
 同日冻结的 Apple Development `build 32` 通过生成/安装哈希一致性与正式 source 通知归属；真实 panel 复验 5×1、长候选压缩与 tooltip，全屏 Space、单一输入菜单项、TextEdit/Codex owner 切换、精确进程重启和离线输入均通过。当前机器只有一个显示器，副屏行为明确记为环境未覆盖，M1 Alpha 不据此声明多显示器保证；VoiceOver 仍是既有已知限制。两次系统设置回流移除后，只有通过应用菜单真正退出 `System Settings` 并等待 `KeyboardSettings.appex` 结束，重开的可添加目录才清除缓存项；最终现有列表与可添加目录无 RadishLex，TIS、bundle、运行数据、生成 app 和进程全部零残留，🌐︎ 键行为恢复原值。R01A 据此完成退出，主批次切换到 R02L。
 
+R02L 已在不接入真实平台热路径的前提下完成本地正确性收口：userdb schema v3 以统一事务承载 add、explicit restore、selection、negative feedback 和 delete，文件库固定 WAL、5 秒 busy timeout、foreign keys、`synchronous=NORMAL`、独立连接和 Unix 私有权限；v1/v2 原子迁移移除 64 位 FNV 唯一身份，未来 schema 与损坏库显式拒绝并原位保留。ranker 改为显式评估时间、确定性 recency、对数有界 frequency/negative contribution、有限分数和稳定原索引 tie-break；固定 5 例合成集达到 Top-1 `0.8`、Top-3 `1.0`、MRR `0.9`，50 候选延迟只记录可复验观测而不设置易波动 CI 墙钟阈值。删除优先于 suppress 和旧状态，只有版本更新的独立恢复入口可清除 tombstone；同步 payload v1 不再把 `manual_add` 推断为恢复。当前主批次据此切换为 R01B。
+
 临时通知监视已收口到现有 `tis_source_status.m`：`--monitor` 先输出精确 current source，再在公开 selected-source 通知到达时通过 CFRunLoop 重读并输出 current source，以 `is_radishlex_pinyin` 明确标识正式 Pinyin mode；同一次切换允许出现重复通知，原 Bundle ID 状态输出和清理调用保持兼容。门禁固定编译、默认输出、通知/RunLoop 结构以及 `TISSelectInputSource`、`TISDisableInputSource` 和私有配置禁用线。用户为避免文稿级 source 占用而主动关闭的“自动切换到文稿的输入法”继续保持关闭，执行者不得自动修改。
 
 长期产品交付顺序见 [产品交付路线图](../roadmap.md)，当前整改批次、停止线、资产处置和退出条件见 [项目稳定化整改专题](../remediation/2026-07-project-stabilization.md)。
@@ -48,19 +50,19 @@
 - macOS bundle 固定正式 Bundle/mode ID、`LSUIElement`、简体中文 metadata、双语标签与 Retina 列表图标，并对完整依赖闭包签名。
 - 旧 `IMKCandidates` 实机覆盖连续输入、主要编辑键与提交语义，但视觉高亮不重绘；build 32 的 AppKit panel 已在精确 source 归属下确认五项页、长候选、全屏 Space、方向视觉/提交同 index、双 client、进程重启与离线一致性。
 - GitHub 仓库级 `Protect master via PR` ruleset 已只读复验为 active；`Repo Hygiene`、`Repository Baseline`、`Rust Clippy`、`Flutter Manager`、`Go Quality` 五项均为 required checks，且 strict/up-to-date policy 已启用。R06A 已完成退出。
+- userdb schema v3 已覆盖多表故障回滚、两个独立文件连接竞争、WAL/权限、v1/v2 迁移、未来版本拒绝、损坏文件保留、规范化删除身份、显式恢复与 P0/P1/P2 隔离；ranker 固定评测覆盖确定性衰减、有界贡献、状态优先级、有限分数与 explain 重构一致性。R02L 已完成退出。
 
 这些证据证明工程原型可继续演进，不证明真实平台输入、生产同步或产品发布已经完成。
 
 ## 已确认阻塞
 
 - 输入 session 未组合 engine、ranker、userdb 与 privacy policy，真实选择没有进入平台学习热路径。
-- userdb 用户意图缺少统一事务、WAL/busy 策略；ranker recency/frequency 语义需要修正。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
 - manager 默认 fixture fallback，native library 打包、持久化路径和文件权限尚未产品化。
 
 ## 当前停止线
 
-- R02L 完成前，不把真实平台选择接入长期学习热路径，也不新增与本地正确性无关的 readiness、evidence、preview、approval、migration review、fake replay 或 no-symbol 资产。
+- R01B 只把已经通过 R02L 的本地语义接入真实选择、privacy policy 与 ranker，不借接入扩张同步协议、manager 同步 UI、第二平台或新的证明状态机。
 - M3 退出前，不开放真实用户同步、非受控远端数据、恢复码产品成功路径、设备授权产品成功路径或设备撤销产品执行入口。
 - 允许使用合成数据、loopback、短生命周期服务和受控集成测试实现同步成功路径，但这些证据不能解锁产品入口。
 - 第一平台达到可重复日常输入前，不启动第二平台实现。
@@ -72,8 +74,8 @@
 ## 下一步顺位
 
 1. R01A 已由 build 32 的五项页、全屏/菜单、双 client、进程重启、离线和零残留证据完成退出；保留 VoiceOver 与副屏环境缺口，不在当前批重复消耗实机窗口。
-2. 当前进入 R02L。先复核 `docs/personalization-learning.md` 与整改专题的事务、WAL/busy、文件权限、迁移/损坏恢复、确定性 recency、有界 frequency、删除/恢复优先级、固定评测和性能基线，再按边界实施代码。
-3. R02L 完成后由 R01B 把真实选择接入 privacy policy、userdb 和 ranker；在此之前不修改 macOS 输入热路径学习语义。
+2. R02L 已以事务回滚、SQLite 文件策略和迁移、规范化删除身份、确定性有界排序、状态优先级、固定合成评测及延迟观测完成退出；真实平台热路径仍未接入学习。
+3. 当前进入 R01B，把真实选择接入 privacy policy、userdb 和 ranker，保留 display/ranked/engine index 映射，并用真实应用验证学习持久化与 P0 阻断；不开放真实同步或推进第二平台。
 4. 任一后续实机回归仍使用冻结产物、人工切换/交互、公开通知监视、明确授权和系统设置真实移除；不因 R01A 退出而降低零残留或来源归属要求。
 
 ## 验证入口

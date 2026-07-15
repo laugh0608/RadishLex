@@ -403,6 +403,7 @@ Userdb 状态入口规则：
 Userdb 词条管理入口规则：
 
 - `radishlex_userdb_add_term` 和 `radishlex_userdb_delete_term` 必须显式传入 UTF-8 SQLite 路径、输入码、词条文本和可选 reading。
+- `radishlex_userdb_add_term` 只新增或更新未删除词条，不能清除 tombstone 或隐式解除 suppress；当前 FFI 尚未暴露 explicit restore，manager 后续必须使用独立恢复动作。
 - 这些入口只表达用户明确管理的 P2 词条操作，不记录 P1 selection event、negative feedback 或上下文统计。
 - `radishlex_userdb_delete_term` 必须沿用 userdb tombstone 语义，后续旧权重或普通导入不得立即复活该词条。
 - `radishlex_userdb_terms_new` 返回只读 `RadishLexUserTermList*`，由 `radishlex_userdb_terms_free` 释放。

@@ -6,8 +6,8 @@
 
 - 状态：生效，范围已于 2026-07-11 收窄
 - 审计基线：`dev` 分支，提交 `089c174`
-- 已完成：R00 文档真相源与停止线收敛、R01A 输入契约与 macOS 基础输入、R06A 首批质量门禁与 review-only 资产清理
-- 当前主批次：R02L 本地 userdb/ranker 正确性
+- 已完成：R00 文档真相源与停止线收敛、R01A 输入契约与 macOS 基础输入、R02L 本地 userdb/ranker 正确性、R06A 首批质量门禁与 review-only 资产清理
+- 当前主批次：R01B 真实学习纵向闭环
 - 并行质量批次：无；R06A 已退出
 - 真实用户同步：保持关闭
 - 关闭方式：R01A、R02L、R01B 与 R06A 全部退出后，将稳定结论写回正式文档，再把本文移入 `docs/archive/` 并从当前状态入口移除
@@ -71,8 +71,8 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 - 仓库缺少供 Swift / Objective-C 消费并受测试约束的 C header 或等价模块边界。（已由 R01A 第一代码批关闭）
 - 输入 session 未组合 engine、ranker、userdb 和 privacy policy。
 - librime 全局 setup/initialize/finalize 仍由单个 engine session 隐式承担。（已由 R01A 第二代码批关闭）
-- userdb 用户意图缺少统一事务，未配置 WAL、busy timeout 和明确并发策略。
-- userdb 将毫秒时间戳写入 `recency_score`，ranker 又将其裁剪为 `0..1`；frequency 无界线性增长。
+- userdb 用户意图缺少统一事务，未配置 WAL、busy timeout 和明确并发策略。（已由 R02L 关闭）
+- userdb 将毫秒时间戳写入 `recency_score`，ranker 又将其裁剪为 `0..1`；frequency 无界线性增长。（已由 R02L 关闭）
 - 同步 merge 缺少稳定设备级 tie-break，签名绑定、KDF 上限、HTTPS orchestration 和资源上限仍未达到开放条件。
 - manager 默认 fixture fallback，正常产品包没有携带真实 FFI 与持久化路径。
 - PR workflow、ruleset 模板与远端 active ruleset 均已纳入 Flutter、严格 Clippy 和 Go vet/race required checks；远端五项 required checks 与 strict/up-to-date policy 已只读复验。MSRV 和 native bundle 仍属后续独立门禁。
@@ -84,8 +84,8 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | --- | --- | --- | --- |
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
 | R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 已完成；build 32 关闭五项页、全屏/菜单、双 client、进程重启、离线与零残留矩阵；VoiceOver 和副屏为明确未声明范围 | 真实应用可离线完成基础中文输入 |
-| R02L | 本地 userdb/ranker 正确性 | 进行中；先复核设计边界与实现顺序，尚未接入真实平台学习热路径 | 学习、删除、并发和排序语义正确 |
-| R01B | 真实学习纵向闭环 | 待开始，依赖 R01A 与 R02L | 真实选择影响后续候选且受隐私策略约束 |
+| R02L | 本地 userdb/ranker 正确性 | 已完成；真实平台学习热路径保持未接入 | 学习、删除、并发、迁移和排序语义正确 |
+| R01B | 真实学习纵向闭环 | 进行中；依赖 R01A 与 R02L 已满足 | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 已完成 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
 
 每次只能有一个产品主批次进行；R06A 是并行质量工作流，不得抢占真实输入目标。
@@ -185,7 +185,7 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 
 R01A 不要求学习已经接入；真实学习在 R02L 正确性完成后由 R01B 收口。
 
-## 九、R02L：本地 userdb/ranker 正确性
+## 九、R02L：本地 userdb/ranker 正确性（已完成）
 
 ### 目标
 
@@ -208,6 +208,14 @@ R01A 不要求学习已经接入；真实学习在 R02L 正确性完成后由 R0
 - recency 单调衰减、frequency 有界，explain 对应每个实际生效因子。
 - 删除、旧状态、显式恢复和备份恢复形成闭环。
 - 排序记录 Top-K、MRR 或等价指标，并记录候选重排延迟。
+
+### 完成证据（2026-07-15）
+
+- userdb schema v3 将 add、explicit restore、selection、negative feedback 和 delete 的相关多表写入统一到 `BEGIN IMMEDIATE`；trigger 故障注入逐项证明完整回滚。普通 add、selection、导入和 payload v1 `manual_add` 均不能代替恢复。
+- 文件数据库固定 WAL、5 秒 busy timeout、foreign keys、`synchronous=NORMAL`、IME/manager 独立连接与 Unix `0600` 权限；短写竞争双连接测试不返回 `SQLITE_BUSY`。v1/v2 在原子 migration 中升级到规范化复合删除身份，未来 schema 在写前拒绝，损坏或迁移失败数据库原位保留并显式报错。
+- ranker 以 `evaluated_at_ms` 和 `last_used_at_ms` 计算 7 天半衰期的确定性衰减，frequency 与 negative feedback 使用对数有界贡献；selection 不再重复线性增加 UserTerm weight。所有输入与输出分数校验为有限值，相同分数保留 engine original index，explain 可逐因子重构最终分数。
+- 删除高于 suppress、active 和旧状态，只有版本严格更新的 explicit restore 可以清除 tombstone 或 suppress；回归覆盖旧权重、旧词条、旧 tombstone、导入和 P0/P1/P2 隔离。当前同步 schema v1 不传播恢复意图，跨设备恢复留待 M3 显式版本化，不扩大本批协议。
+- 固定 5 例合成评测集记录 Top-1 `0.8`、Top-3 `1.0`、MRR `0.9`；固定 50 候选、100 次 warm-up、1000 次迭代记录延迟统计，CI 只约束样本与统计值有限，不使用共享机器墙钟上限。完整命令与本机观测见本周 devlog。
 
 ## 十、R01B：真实学习纵向闭环
 
