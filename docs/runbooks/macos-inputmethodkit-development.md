@@ -72,12 +72,12 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 进入真实动作前必须冻结源码与产物，至少记录：
 
 1. Git 工作区干净，当前提交、分支和相对 `origin/dev` 的领先状态明确；验收过程中不修改源码或重建另一个 build。
-2. `CFBundleVersion`、Bundle ID、mode ID、schema id 与安装文件名符合当前文档；R01A 下一主输入路径候选固定为 `build 32`。`build 31` 的 VoiceOver 已知限制本身不触发升级，但 2026-07-15 实机确认 product-authored Rime 配置错误使用 9 项候选页，已构成独立生产行为变化并触发 `build 32`。
+2. `CFBundleVersion`、Bundle ID、mode ID、schema id 与安装文件名符合当前文档。R01A 的最终冻结候选为 `build 32`：`build 31` 的 VoiceOver 已知限制本身不触发升级，但 2026-07-15 实机确认 product-authored Rime 配置错误使用 9 项候选页，形成独立生产行为变化；后续新回归不得把 `32` 当作永久固定构建号。
 3. Apple Development bundle 已通过 native 门禁、完整递归签名和 `codesign --verify --deep --strict`。
 4. 记录生成 bundle 主程序、FFI dylib 和 native manifest 的 SHA-256；复制后逐字节复核生成产物与安装副本，确保系统测试的就是冻结产物。
 5. 安装目标仅为 `~/Library/Input Methods/RadishLexInputMethod.app`，运行数据仅为本轮隔离的 `~/Library/Application Support/RadishLex/Rime`；不得读取或复用用户现有 Rime 数据。
 
-冻结后发现源码或产物问题，应取消本次真实动作并回到仓库修复。不得在已登录、已添加或已选择输入法的现场边改边重建。2026-07-15 的 `build 31` 已在精确 source 归属下通过四向屏幕边缘与浅色/深色外观，但长输入实机显示 9 项候选，与 5×1 契约不一致；本轮立即停止后续矩阵并完成系统设置、TIS、bundle、运行数据和进程零残留清理。修复后的 `build 32` 已完成不安装 contract/native/真实 FFI smoke，后续实机必须重新取得集中授权、重新冻结并复核哈希，不能复用 build 31 的授权或安装现场。
+冻结后发现源码或产物问题，应取消本次真实动作并回到仓库修复。不得在已登录、已添加或已选择输入法的现场边改边重建。2026-07-15 的 `build 31` 已在精确 source 归属下通过四向屏幕边缘与浅色/深色外观，但长输入实机显示 9 项候选，与 5×1 契约不一致；本轮立即停止后续矩阵并完成系统设置、TIS、bundle、运行数据和进程零残留清理。修复后的 `build 32` 重新取得授权并冻结哈希后，已通过真实 5×1、长候选、全屏/菜单、双 client、进程重启和离线矩阵，R01A 完成；当前单屏环境未覆盖副屏，VoiceOver 仍是非 Alpha 声明范围的已知限制。
 
 上一正式 `build 30` 虽完成 Apple Development 签名、用户级安装、注销/登录、系统设置添加和实体键盘观察，但系统当时开启了“自动切换到文稿的输入法”。实体输入后 TIS 显示 TextEdit 已切回系统拼音，所以候选高亮迁移与 Space 提交不具备 RadishLex 来源归属，不能写成正式通过；该轮观察到的候选窗固定屏幕左下角则形成定位缺陷输入。完整清理后 TIS 为 `matches=0 enabled=0 selected=0`，bundle、隔离运行数据和精确进程均不存在。
 
@@ -186,7 +186,7 @@ R01A 每轮真实 smoke 无论通过还是失败都必须完整回滚，不保�
    ```
 
    该入口只删除精确的 `~/Library/Input Methods/RadishLexInputMethod.app`、本轮隔离的 `~/Library/Application Support/RadishLex/Rime`，并终止精确 `RadishLex` 进程。若仍有已选择 source 或 enabled 的不可选择 parent，入口会在删除前拒绝执行。
-4. 完整重启 System Settings；macOS 26 已多次观察到配置项短暂回流。若 RadishLex 再次出现，必须再次真实移除并重新启动设置，直到摘要和现有列表只含原系统 source；门禁在不可选择 parent 仍为 `enabled=1` 时必须拒绝删除。
+4. 完整重启 System Settings；macOS 26 已多次观察到配置项短暂回流。若 RadishLex 再次出现，必须再次真实移除并重新启动设置，直到摘要和现有列表只含原系统 source；门禁在不可选择 parent 仍为 `enabled=1` 时必须拒绝删除。关闭窗口或快捷键动作不等于设置扩展已经退出：需要通过应用菜单“退出系统设置”，并在重新打开前确认 `System Settings` 与 `KeyboardSettings.appex` 均已结束，否则“添加”目录可能继续持有旧缓存。
 5. 删除 bundle 后若 TIS 暂留 `matches>0 enabled=0 selected=0`，打开现有列表和“添加 -> 简体中文”目录触发公开扫描，确认两处均无 RadishLex 后关闭窗口并重新运行清理入口。
 6. 只有 TIS 达到 `matches=0 enabled=0 selected=0`、用户级 bundle 与隔离运行数据不存在、精确进程停止，且设置摘要、现有列表与可添加目录均无 RadishLex，才算完成回滚。
 7. 只清理本轮生成的隔离 user data 与短期 staging；不删除 shared data 来源、用户其他输入法目录或任何非本轮数据。

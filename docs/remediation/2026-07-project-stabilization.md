@@ -6,8 +6,8 @@
 
 - 状态：生效，范围已于 2026-07-11 收窄
 - 审计基线：`dev` 分支，提交 `089c174`
-- 已完成：R00 文档真相源与停止线收敛、R06A 首批质量门禁与 review-only 资产清理
-- 当前主批次：R01A 输入契约、进程级 runtime 与 macOS 基础输入
+- 已完成：R00 文档真相源与停止线收敛、R01A 输入契约与 macOS 基础输入、R06A 首批质量门禁与 review-only 资产清理
+- 当前主批次：R02L 本地 userdb/ranker 正确性
 - 并行质量批次：无；R06A 已退出
 - 真实用户同步：保持关闭
 - 关闭方式：R01A、R02L、R01B 与 R06A 全部退出后，将稳定结论写回正式文档，再把本文移入 `docs/archive/` 并从当前状态入口移除
@@ -83,8 +83,8 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | 批次 | 名称 | 状态 | 退出结果 |
 | --- | --- | --- | --- |
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
-| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 进行中；build 31 已确认锚点、边缘、外观、方向/Space、鼠标与焦点，但暴露 9 项候选配置缺陷；build 32 已完成五项页不安装修复，继续补实机平台与生命周期矩阵 | 真实应用可离线完成基础中文输入 |
-| R02L | 本地 userdb/ranker 正确性 | 待开始 | 学习、删除、并发和排序语义正确 |
+| R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 已完成；build 32 关闭五项页、全屏/菜单、双 client、进程重启、离线与零残留矩阵；VoiceOver 和副屏为明确未声明范围 | 真实应用可离线完成基础中文输入 |
+| R02L | 本地 userdb/ranker 正确性 | 进行中；先复核设计边界与实现顺序，尚未接入真实平台学习热路径 | 学习、删除、并发和排序语义正确 |
 | R01B | 真实学习纵向闭环 | 待开始，依赖 R01A 与 R02L | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 已完成 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
 
@@ -96,7 +96,7 @@ R00 已完成入口文档、协作认知和整改停止线的主要纠偏。2026
 
 R00 完成不代表代码问题已经修复，也不代表任何产品里程碑已经退出。
 
-## 八、R01A：输入契约、进程级 runtime 与 macOS 基础输入
+## 八、R01A：输入契约、进程级 runtime 与 macOS 基础输入（已完成）
 
 ### 目标
 
@@ -165,10 +165,14 @@ R00 完成不代表代码问题已经修复，也不代表任何产品里程碑�
 - 清理前 TextEdit 文稿手动切回系统拼音；首次移除后配置项在完整重启设置时回流，清理门禁因不可选择 parent `enabled=1` 拒绝删除。第二次真实移除后删除 bundle/隔离数据并终止进程，随后打开现有列表和可添加目录刷新两个 `enabled=0 selected=0` 缓存 source。最终 `matches=0 enabled=0 selected=0`，路径与进程零残留；未使用 `TISDisableInputSource`、私有配置或注销。
 - 临时通知监视已并入现有正式 TIS 工具：`--monitor` 输出初始与通知后的精确 current source，并明确标识是否为 `org.radishlex.inputmethod.macos.Pinyin`；原状态/清理调用保持兼容。macOS contract 同时门禁编译、默认输出、通知/CFRunLoop 结构与 `TISSelectInputSource`、`TISDisableInputSource`、私有配置禁用线，不新建第三个 probe。用户主动关闭的“自动切换到文稿的输入法”继续保持关闭，不由验收自动化修改。
 - 2026-07-15 再次冻结 `build 31` 后，正式 source 归属下通过屏幕上下左右边缘与浅色/深色外观；长输入组发现真实 panel 展示 9 项候选，违反 5×1 契约。根因是隔离 product-authored `default.yaml` 错误配置 `menu.page_size: 9`，而 panel 正确展示完整 engine snapshot；原 contract 只使用恰好五项合成候选，未覆盖配置分叉。
-- 本轮没有在 UI 层截断候选。产品 `default.yaml` 模板现进入仓库并固定 `menu.page_size: 5`，native 构建覆盖 shared-data 输入中的默认配置，门禁逐字节复核生成结果并以临时 user data 运行真实 librime/FFI smoke，snapshot 精确为五项。用户可见配置变化使构建号升至 `32`；当前只有不安装证据，尚待重新授权实机复验。
+- 本轮没有在 UI 层截断候选。产品 `default.yaml` 模板现进入仓库并固定 `menu.page_size: 5`，native 构建覆盖 shared-data 输入中的默认配置，门禁逐字节复核生成结果并以临时 user data 运行真实 librime/FFI smoke，snapshot 精确为五项。用户可见配置变化使构建号升至 `32`；修复提交时先取得不安装证据，随后才重新授权实机复验。
 - build 31 失败后先通过系统设置真实移除，再删除 bundle/隔离运行数据并终止进程；TIS 与“添加 -> 简体中文”目录短暂缓存后仅通过完整重开系统设置自然收敛。最终现有列表、可添加目录、TIS、bundle、运行数据和进程全部零残留，外观与 🌐︎ 键行为恢复测试前值，没有使用停用 API、私有配置或注销。
+- `e44d92f` 冻结的 Apple Development `build 32` 使用同一隔离 `pinyin_simp` 输入重建；生成与安装副本逐字节一致，主程序、FFI 与 native manifest SHA-256 分别为 `a1783e591271b062fdb8b9b14ace3ca2c0e9fd80ecb7c97a83d7788a7e1641b4`、`07c93cc46629e3604c6ab03107cced9e0bb65a00e28f5c8a89034691c459ec9d` 与 `10585bcfe5d1f9f5e0f21d458949c378b10a0aa6a2b6e32be7cbb8abac0da1d4`，Team ID 为 `WF9UUN335P`。
+- 通知型只读监视先以 U.S. 与系统拼音自检，再确认正式 mode 覆盖每个产品组。开发者实体复验真实 5×1、长候选压缩/tooltip、全屏 Space 内的文字光标定位与第二项视觉/Space 提交一致性；输入菜单只有一个产品可选项，无重复标题、placeholder 或产品命令。
+- TextEdit composition 未提交切换到 Codex 时，旧 panel 消失且文字不串入新应用；Codex 新 composition 与返回 TextEdit 的新 session 均干净。终止唯一 RadishLex 进程后由系统重新拉起，五项候选与第二项提交恢复；开发者独立完成短时离线观察，候选和提交与联网时一致。当前真实会话只有一个 `NSScreen`，因此副屏定位记为环境未覆盖，M1 Alpha 不声明多显示器保证；VoiceOver 仍按既有已知限制处理。
+- build 32 清理经历两次系统设置回流移除。删除用户级 bundle、隔离运行数据和进程后，TIS 已为 `matches=0 enabled=0 selected=0`，但可添加目录仍由未退出的 `KeyboardSettings.appex` 持有缓存；通过应用菜单真正退出 `System Settings` 并确认两个进程结束后，新进程中的现有列表和“添加 -> 简体中文”目录均无 RadishLex。生成 app 同时清除，🌐︎ 键自动恢复“显示表情与符号”，“自动切换到文稿的输入法”保持 off；未注销、未改写私有配置。
 
-这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键、主要编辑按键、光标锚点、四向边缘、浅色/深色、方向视觉/Space 提交一致性、鼠标选择与宿主焦点。build 31 因真实 9 项候选失败而退出候选；下一判断点是对 build 32 重新签名安装并先复验真实 5×1 长候选，再补多屏/全屏、输入菜单、client 切换、进程重启、断网、中英文混输和双应用 owner 生命周期。VoiceOver 在进入产品受支持范围前另行修复和验收；任一新实机窗口仍按人工交互、通知型只读 source 监视和零残留清理执行。
+这些证据关闭输入结果、header、进程级 librime runtime、不安装平台 wrapper/contract、隔离 native schema bundle、真实 FFI 调用链、Apple Development 自包含 bundle、TIS 枚举/启用、快捷键、主要编辑按键、光标锚点、四向边缘、浅色/深色、五项长候选、全屏 Space、输入菜单、方向视觉/Space 提交一致性、鼠标与宿主焦点、双 client owner、进程重启和离线一致性。R01A 据此完成，当前主批次转入 R02L；VoiceOver 与副屏在各自进入声明范围前另行补真实环境验收，任一新实机窗口仍按人工交互、通知型只读 source 监视和零残留清理执行。
 
 ### 退出场景
 

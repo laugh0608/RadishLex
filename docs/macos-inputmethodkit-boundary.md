@@ -116,7 +116,9 @@ SDK `IMKInputSession.h` 明确给自建候选窗提供 `windowLevel`，并说明
 
 同一冻结 `build 31` 随后在精确 RadishLex source 下通过鼠标选择第二候选与宿主焦点保持；但 VoiceOver 导航到第二候选后，旁白焦点、视觉高亮和 accessibility press 提交发生分叉：旁白位于第二项，视觉仍为第一项，press 也没有提交第二项。该实机结果否定“现有 accessibility 动态 contract 足以证明生产语义”的推断，但不改变单一 display index、公开 selected state 与统一提交路径的设计边界。本轮按停止线结束并完整清理；当时的阶段复核将该问题降为 M1 Alpha 已知限制，未因该问题单独升级构建号。边缘定位、外观、长候选、多屏/全屏、输入菜单与生命周期/离线矩阵仍未执行；build 31 的后续候选状态由下一段实机结果更新。
 
-2026-07-15 再次冻结 `build 31` 后，公开 TIS 通知确认正式 source 覆盖各测试组；候选窗在屏幕上下左右边缘的上下放置与左右限制通过，浅色/深色选中态通过并恢复原始自动外观。长输入组随即发现真实 panel 展示 9 项候选，而正式 boundary 固定 5×1；根因是临时 product-authored `default.yaml` 配置 `menu.page_size: 9`，controller/panel 又忠实展示完整 snapshot，恰好五项的 component contract 未覆盖该配置分叉。本轮按停止线停止多屏/全屏、输入菜单和生命周期/离线矩阵，完成公开系统设置/TIS 双路径零残留清理。修复不在 UI 层截断，而是把产品 `default.yaml` 模板收进仓库并固定五项页，同时由 native bundle 门禁运行真实 FFI snapshot 断言；用户可见配置变化使下一候选升为 `build 32`，目前只具备不安装证据，仍待重新授权实机复验。
+2026-07-15 再次冻结 `build 31` 后，公开 TIS 通知确认正式 source 覆盖各测试组；候选窗在屏幕上下左右边缘的上下放置与左右限制通过，浅色/深色选中态通过并恢复原始自动外观。长输入组随即发现真实 panel 展示 9 项候选，而正式 boundary 固定 5×1；根因是临时 product-authored `default.yaml` 配置 `menu.page_size: 9`，controller/panel 又忠实展示完整 snapshot，恰好五项的 component contract 未覆盖该配置分叉。本轮按停止线停止多屏/全屏、输入菜单和生命周期/离线矩阵，完成公开系统设置/TIS 双路径零残留清理。修复不在 UI 层截断，而是把产品 `default.yaml` 模板收进仓库并固定五项页，同时由 native bundle 门禁运行真实 FFI snapshot 断言；用户可见配置变化使下一候选升为 `build 32`。
+
+随后冻结提交 `e44d92f` 的 Apple Development `build 32` 在精确 source 归属下通过真实 5×1、长候选压缩/tooltip、全屏 Space、单一产品输入菜单项、TextEdit/Codex owner 接管、精确进程重启和离线一致性；build 31 已通过的四向边缘、浅色/深色、鼠标与主要按键证据继续有效。当前实机只有单显示器，副屏不进入 M1 Alpha 保证；VoiceOver 仍是进入受支持范围前必须修复的已知限制。清理最终同时满足系统设置现有列表/可添加目录、TIS、用户级 bundle、运行数据、生成 app 和进程零残留，R01A 据此完成。
 
 ## 隐私与本地数据
 
