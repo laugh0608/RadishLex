@@ -256,6 +256,17 @@ pub fn delete_user_term(
     Ok(())
 }
 
+pub fn restore_user_term(
+    db_path: &str,
+    input_code: &str,
+    text: &str,
+    reading: Option<&str>,
+) -> Result<(), FfiError> {
+    let mut db = UserDb::open(db_path)?;
+    db.restore_term(input_code, text, reading)?;
+    Ok(())
+}
+
 pub fn list_user_terms(db_path: &str) -> Result<RadishLexUserTermList, FfiError> {
     let db = UserDb::open(db_path)?;
     Ok(RadishLexUserTermList::new(db.list_active_terms()?))

@@ -96,7 +96,7 @@ pub struct RimeApi {
     pub _config_create_map: Option<OpaqueRimeApiFunction>,
     pub _config_list_size: Option<OpaqueRimeApiFunction>,
     pub _config_begin_list: Option<OpaqueRimeApiFunction>,
-    pub _get_input: Option<OpaqueRimeApiFunction>,
+    pub get_input: Option<unsafe extern "C" fn(RimeSessionId) -> *const c_char>,
     pub _get_caret_pos: Option<OpaqueRimeApiFunction>,
     pub select_candidate: Option<unsafe extern "C" fn(RimeSessionId, usize) -> Bool>,
     pub _get_version: Option<OpaqueRimeApiFunction>,

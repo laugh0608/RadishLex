@@ -220,6 +220,19 @@ impl Engine for RimeEngine {
             .map_err(rime_to_core)
     }
 
+    fn input_code(&self) -> CoreResult<String> {
+        self.runtime
+            .with_api(|api| {
+                // SAFETY: runtime serializes the native call, session_id belongs
+                // to this engine, and librime owns the returned string.
+                unsafe {
+                    let get_input = require_api_function(api.get_input, "get_input")?;
+                    c_string_field("input_code", get_input(self.session_id))
+                }
+            })
+            .map_err(rime_to_core)
+    }
+
     fn select_candidate(&mut self, index: usize) -> CoreResult<KeyOutcome> {
         self.runtime
             .with_api(|api| {

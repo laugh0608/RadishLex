@@ -12,6 +12,12 @@ pub trait Engine {
 
     fn candidates(&self) -> CoreResult<Vec<Candidate>>;
 
+    /// Returns the stable input code for the current composition.
+    ///
+    /// This must not expose an engine-private object identifier. An empty
+    /// string means there is no active input code.
+    fn input_code(&self) -> CoreResult<String>;
+
     /// Selects a candidate from the current page.
     ///
     /// Engines with segmented composition may consume the selection without

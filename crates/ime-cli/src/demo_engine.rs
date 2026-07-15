@@ -93,6 +93,10 @@ impl Engine for DemoEngine {
         Ok(self.demo_candidates())
     }
 
+    fn input_code(&self) -> CoreResult<String> {
+        Ok(self.buffer.clone())
+    }
+
     fn select_candidate(&mut self, index: usize) -> CoreResult<KeyOutcome> {
         let candidates = self.demo_candidates();
         let Some(candidate) = candidates.get(index) else {

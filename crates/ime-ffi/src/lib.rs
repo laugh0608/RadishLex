@@ -11,6 +11,7 @@ mod ffi_support;
 mod key;
 mod key_result;
 mod learning_status;
+mod personalization;
 mod rank_explain;
 mod rime_runtime;
 mod session;
@@ -33,14 +34,16 @@ pub use dictionary::{
     RADISHLEX_TERM_STATUS_DELETED, RADISHLEX_TERM_STATUS_SUPPRESSED,
 };
 pub use engine::{
-    RadishLexRimeSessionOptions, RadishLexSessionOptions, RADISHLEX_ENGINE_KIND_DEMO,
-    RADISHLEX_ENGINE_KIND_RIME, RADISHLEX_RIME_SESSION_OPTIONS_VERSION,
+    RadishLexPersonalizedRimeSessionOptions, RadishLexRimeSessionOptions, RadishLexSessionOptions,
+    RADISHLEX_ENGINE_KIND_DEMO, RADISHLEX_ENGINE_KIND_RIME,
+    RADISHLEX_PERSONALIZED_RIME_SESSION_OPTIONS_VERSION, RADISHLEX_RIME_SESSION_OPTIONS_VERSION,
     RADISHLEX_SESSION_OPTIONS_VERSION,
 };
 pub use error::{RadishLexError, RadishLexStatusCode};
 pub use key::*;
 pub use key_result::*;
 pub use learning_status::RadishLexLearningStatusSummary;
+pub use personalization::*;
 pub use rank_explain::{RadishLexRankExplain, RadishLexRankExplainView};
 pub use rime_runtime::radishlex_rime_runtime_shutdown;
 pub use session::RadishLexSession;

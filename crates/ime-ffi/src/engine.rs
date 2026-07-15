@@ -4,6 +4,7 @@ use crate::error::FfiError;
 
 pub const RADISHLEX_SESSION_OPTIONS_VERSION: u32 = 1;
 pub const RADISHLEX_RIME_SESSION_OPTIONS_VERSION: u32 = 1;
+pub const RADISHLEX_PERSONALIZED_RIME_SESSION_OPTIONS_VERSION: u32 = 1;
 
 pub const RADISHLEX_ENGINE_KIND_DEMO: u32 = 1;
 pub const RADISHLEX_ENGINE_KIND_RIME: u32 = 2;
@@ -24,6 +25,19 @@ pub struct RadishLexRimeSessionOptions {
     pub schema: *const c_char,
     pub log_dir: *const c_char,
     pub deploy_on_start: u8,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RadishLexPersonalizedRimeSessionOptions {
+    pub version: u32,
+    pub shared_data_dir: *const c_char,
+    pub user_data_dir: *const c_char,
+    pub schema: *const c_char,
+    pub log_dir: *const c_char,
+    pub deploy_on_start: u8,
+    pub userdb_path: *const c_char,
+    pub session_id: *const c_char,
 }
 
 impl RadishLexSessionOptions {
@@ -60,6 +74,19 @@ pub fn validate_rime_session_options_version(
     if options.version != RADISHLEX_RIME_SESSION_OPTIONS_VERSION {
         return Err(FfiError::invalid_argument(format!(
             "unsupported rime session options version {}",
+            options.version
+        )));
+    }
+
+    Ok(())
+}
+
+pub fn validate_personalized_rime_session_options_version(
+    options: RadishLexPersonalizedRimeSessionOptions,
+) -> Result<(), FfiError> {
+    if options.version != RADISHLEX_PERSONALIZED_RIME_SESSION_OPTIONS_VERSION {
+        return Err(FfiError::invalid_argument(format!(
+            "unsupported personalized rime session options version {}",
             options.version
         )));
     }

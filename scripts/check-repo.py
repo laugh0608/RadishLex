@@ -34,6 +34,8 @@ REQUIRED_FILES = [
     "README.md",
     "crates/ime-core/Cargo.toml",
     "crates/ime-core/src/lib.rs",
+    "crates/ime-runtime/Cargo.toml",
+    "crates/ime-runtime/src/lib.rs",
     "crates/ime-engine-rime/Cargo.toml",
     "crates/ime-engine-rime/build.rs",
     "crates/ime-engine-rime/src/lib.rs",

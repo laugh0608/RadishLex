@@ -2,10 +2,12 @@
 
 use std::env;
 use std::ffi::{CStr, CString};
+use std::path::PathBuf;
 use std::ptr;
 use std::slice;
 
 use radishlex_ime_ffi::*;
+use radishlex_ime_userdb::UserDb;
 
 #[test]
 #[ignore = "requires RADISHLEX_RIME_SHARED_DATA and RADISHLEX_RIME_USER_DATA"]
@@ -15,21 +17,27 @@ fn rime_session_native_smoke_uses_ffi_entrypoint() {
     let user_data = env::var("RADISHLEX_RIME_USER_DATA")
         .expect("RADISHLEX_RIME_USER_DATA must point to isolated Rime user data");
     let schema = env::var("RADISHLEX_RIME_SCHEMA").unwrap_or_else(|_| "luna_pinyin".to_owned());
+    let userdb_path = PathBuf::from(&user_data).join("userdb.sqlite3");
 
     let shared_data = CString::new(shared_data).expect("shared data path");
     let user_data = CString::new(user_data).expect("user data path");
     let schema = CString::new(schema).expect("schema");
+    let userdb_path_text = userdb_path.to_string_lossy().into_owned();
+    let userdb_path = CString::new(userdb_path_text.as_bytes()).expect("userdb path");
+    let session_id = CString::new("native-rime-personalized-smoke").expect("session id");
     let mut error = ptr::null_mut();
 
-    let options = RadishLexRimeSessionOptions {
-        version: RADISHLEX_RIME_SESSION_OPTIONS_VERSION,
+    let options = RadishLexPersonalizedRimeSessionOptions {
+        version: RADISHLEX_PERSONALIZED_RIME_SESSION_OPTIONS_VERSION,
         shared_data_dir: shared_data.as_ptr(),
         user_data_dir: user_data.as_ptr(),
         schema: schema.as_ptr(),
         log_dir: ptr::null(),
         deploy_on_start: 1,
+        userdb_path: userdb_path.as_ptr(),
+        session_id: session_id.as_ptr(),
     };
-    let session = radishlex_session_new_rime(&options, &mut error);
+    let session = radishlex_session_new_personalized_rime(&options, &mut error);
     assert!(
         !session.is_null(),
         "Rime session should be created: {}",
@@ -39,6 +47,7 @@ fn rime_session_native_smoke_uses_ffi_entrypoint() {
         radishlex_session_engine_kind(session),
         RADISHLEX_ENGINE_KIND_RIME
     );
+    set_learning_context(session, false, false, true, &mut error);
 
     push_text(session, "luobo", &mut error);
     let snapshot = radishlex_session_snapshot_new(session, &mut error);
@@ -48,6 +57,10 @@ fn rime_session_native_smoke_uses_ffi_entrypoint() {
         unsafe { error_message(error) }
     );
     assert_expected_candidate_page_size(snapshot);
+    assert_eq!(
+        radishlex_snapshot_personalization_status(snapshot),
+        RADISHLEX_PERSONALIZATION_STATUS_READY
+    );
     assert!(radishlex_snapshot_candidate_count(snapshot) > 1);
     let partial_candidate = unsafe { candidate_text(snapshot, 1, &mut error) };
     let mut partial_selection = ptr::null_mut();
@@ -66,6 +79,10 @@ fn rime_session_native_smoke_uses_ffi_entrypoint() {
     assert_eq!(
         unsafe { radishlex_key_result_commit_present(partial_selection) },
         0
+    );
+    assert_eq!(
+        unsafe { radishlex_key_result_learning_disposition(partial_selection) },
+        RADISHLEX_LEARNING_DEFERRED
     );
     let partial_preedit = unsafe { result_preedit(partial_selection) };
     assert!(partial_preedit.starts_with(&partial_candidate));
@@ -91,6 +108,10 @@ fn rime_session_native_smoke_uses_ffi_entrypoint() {
     );
     assert_eq!(unsafe { radishlex_key_result_commit_present(non_first) }, 1);
     assert_eq!(
+        unsafe { radishlex_key_result_learning_disposition(non_first) },
+        RADISHLEX_LEARNING_RECORDED
+    );
+    assert_eq!(
         unsafe { view_to_string(radishlex_key_result_commit(non_first)) },
         expected_non_first
     );
@@ -98,6 +119,56 @@ fn rime_session_native_smoke_uses_ffi_entrypoint() {
         radishlex_key_result_free(non_first);
         radishlex_snapshot_free(snapshot);
     }
+
+    let db = UserDb::open(&userdb_path_text).expect("personalized userdb opens");
+    let learned_selection_count = db.selection_event_count().expect("selection count");
+    assert_eq!(learned_selection_count, 1);
+    drop(db);
+
+    set_learning_context(session, false, true, true, &mut error);
+    push_text(session, "shi", &mut error);
+    let private_snapshot = radishlex_session_snapshot_new(session, &mut error);
+    assert_eq!(
+        radishlex_snapshot_personalization_status(private_snapshot),
+        RADISHLEX_PERSONALIZATION_STATUS_READY
+    );
+    let mut private_selection = ptr::null_mut();
+    assert_eq!(
+        unsafe {
+            radishlex_session_select_candidate(session, 0, &mut private_selection, &mut error)
+        },
+        RadishLexStatusCode::Ok
+    );
+    assert_eq!(
+        unsafe { radishlex_key_result_learning_disposition(private_selection) },
+        RADISHLEX_LEARNING_SKIPPED_BY_POLICY
+    );
+    unsafe {
+        radishlex_key_result_free(private_selection);
+        radishlex_snapshot_free(private_snapshot);
+    }
+    let db = UserDb::open(&userdb_path_text).expect("personalized userdb reopens");
+    assert_eq!(
+        db.selection_event_count().expect("selection count"),
+        learned_selection_count
+    );
+    drop(db);
+
+    set_learning_context(session, true, false, true, &mut error);
+    push_text(session, "shi", &mut error);
+    let blocked_snapshot = radishlex_session_snapshot_new(session, &mut error);
+    assert_eq!(
+        radishlex_snapshot_personalization_status(blocked_snapshot),
+        RADISHLEX_PERSONALIZATION_STATUS_POLICY_BLOCKED
+    );
+    unsafe {
+        radishlex_snapshot_free(blocked_snapshot);
+    }
+    assert_eq!(
+        radishlex_session_reset(session, &mut error),
+        RadishLexStatusCode::Ok
+    );
+    set_learning_context(session, false, false, true, &mut error);
 
     push_text(session, "nihao", &mut error);
     let snapshot = radishlex_session_snapshot_new(session, &mut error);
@@ -191,6 +262,31 @@ fn rime_session_native_smoke_uses_ffi_entrypoint() {
     }
     assert_eq!(
         unsafe { radishlex_rime_runtime_shutdown(&mut error) },
+        RadishLexStatusCode::Ok
+    );
+}
+
+fn set_learning_context(
+    session: *mut RadishLexSession,
+    secure_input: bool,
+    privacy_mode: bool,
+    context_known: bool,
+    error: &mut *mut RadishLexError,
+) {
+    let context_kind = b"general";
+    let context = RadishLexLearningContext {
+        version: RADISHLEX_LEARNING_CONTEXT_VERSION,
+        secure_input: u8::from(secure_input),
+        sensitive_application: 0,
+        privacy_mode: u8::from(privacy_mode),
+        context_known: u8::from(context_known),
+        context_kind: RadishLexStringView {
+            data: context_kind.as_ptr(),
+            len: context_kind.len(),
+        },
+    };
+    assert_eq!(
+        unsafe { radishlex_session_set_learning_context(session, context, error) },
         RadishLexStatusCode::Ok
     );
 }

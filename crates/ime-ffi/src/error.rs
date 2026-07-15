@@ -4,6 +4,7 @@ use std::os::raw::c_char;
 use radishlex_ime_core::CoreError;
 #[cfg(feature = "native-rime")]
 use radishlex_ime_engine_rime::RimeEngineError;
+use radishlex_ime_runtime::RuntimeError;
 use radishlex_ime_userdb::UserDbError;
 
 #[repr(C)]
@@ -110,6 +111,16 @@ impl From<UserDbError> for FfiError {
             | UserDbError::Time(_) => {
                 Self::new(RadishLexStatusCode::UserDbError, error.to_string())
             }
+        }
+    }
+}
+
+impl From<RuntimeError> for FfiError {
+    fn from(error: RuntimeError) -> Self {
+        match error {
+            RuntimeError::Core(core) => Self::from(core),
+            RuntimeError::InvalidInput { .. } => Self::invalid_argument(error.to_string()),
+            RuntimeError::ClockFailure => Self::internal(error.to_string()),
         }
     }
 }

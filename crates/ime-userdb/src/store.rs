@@ -11,11 +11,13 @@ use crate::model::{
 mod connection;
 mod identity;
 mod learning;
+mod ranking;
 mod sync_apply;
 mod sync_payload;
 
 use identity::has_deleted_tombstone_on;
 use learning::now_ms;
+pub use ranking::{DeletedTermIdentity, RankingCandidateIdentity, RankingSignals};
 pub use sync_apply::UserDbSyncApplySummary;
 
 const DICTIONARY_EXPORT_HEADER: &str = "input_code\ttext\treading\tsource\tweight\tstatus";

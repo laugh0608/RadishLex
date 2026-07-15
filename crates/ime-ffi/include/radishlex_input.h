@@ -8,16 +8,31 @@
 extern "C" {
 #endif
 
-#define RADISHLEX_ABI_CONTRACT_VERSION 3u
+#define RADISHLEX_ABI_CONTRACT_VERSION 4u
 #define RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD 1u
 #define RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND 1u
 
 #define RADISHLEX_SESSION_OPTIONS_VERSION 1u
 #define RADISHLEX_RIME_SESSION_OPTIONS_VERSION 1u
+#define RADISHLEX_PERSONALIZED_RIME_SESSION_OPTIONS_VERSION 1u
+#define RADISHLEX_LEARNING_CONTEXT_VERSION 1u
 #define RADISHLEX_ENGINE_KIND_DEMO 1u
 #define RADISHLEX_ENGINE_KIND_RIME 2u
 
-#define RADISHLEX_KEY_RESULT_VERSION 1u
+#define RADISHLEX_KEY_RESULT_VERSION 2u
+
+#define RADISHLEX_PERSONALIZATION_STATUS_NOT_ENABLED 0u
+#define RADISHLEX_PERSONALIZATION_STATUS_READY 1u
+#define RADISHLEX_PERSONALIZATION_STATUS_POLICY_BLOCKED 2u
+#define RADISHLEX_PERSONALIZATION_STATUS_STORAGE_UNAVAILABLE 3u
+#define RADISHLEX_PERSONALIZATION_STATUS_READ_FAILED 4u
+#define RADISHLEX_PERSONALIZATION_STATUS_RANK_FAILED 5u
+
+#define RADISHLEX_LEARNING_NOT_APPLICABLE 0u
+#define RADISHLEX_LEARNING_RECORDED 1u
+#define RADISHLEX_LEARNING_DEFERRED 2u
+#define RADISHLEX_LEARNING_SKIPPED_BY_POLICY 3u
+#define RADISHLEX_LEARNING_FAILED 4u
 
 #define RADISHLEX_KEY_KIND_CHAR 1u
 #define RADISHLEX_KEY_KIND_NAMED 2u
@@ -89,6 +104,17 @@ typedef struct RadishLexRimeSessionOptions {
   uint8_t deploy_on_start;
 } RadishLexRimeSessionOptions;
 
+typedef struct RadishLexPersonalizedRimeSessionOptions {
+  uint32_t version;
+  const char *shared_data_dir;
+  const char *user_data_dir;
+  const char *schema;
+  const char *log_dir;
+  uint8_t deploy_on_start;
+  const char *userdb_path;
+  const char *session_id;
+} RadishLexPersonalizedRimeSessionOptions;
+
 typedef struct RadishLexKeyEvent {
   uint32_t key_kind;
   uint32_t codepoint;
@@ -104,6 +130,7 @@ typedef struct RadishLexStringView {
 
 typedef struct RadishLexCandidateView {
   size_t index;
+  size_t engine_index;
   RadishLexStringView text;
   RadishLexStringView reading;
   uint8_t reading_present;
@@ -111,6 +138,15 @@ typedef struct RadishLexCandidateView {
   uint8_t annotation_present;
   uint32_t source;
 } RadishLexCandidateView;
+
+typedef struct RadishLexLearningContext {
+  uint32_t version;
+  uint8_t secure_input;
+  uint8_t sensitive_application;
+  uint8_t privacy_mode;
+  uint8_t context_known;
+  RadishLexStringView context_kind;
+} RadishLexLearningContext;
 
 RadishLexStatusCode radishlex_ffi_contract(
     RadishLexFfiContract *contract_out,
@@ -122,6 +158,9 @@ RadishLexSession *radishlex_session_new_with_options(
     RadishLexError **error_out);
 RadishLexSession *radishlex_session_new_rime(
     const RadishLexRimeSessionOptions *options,
+    RadishLexError **error_out);
+RadishLexSession *radishlex_session_new_personalized_rime(
+    const RadishLexPersonalizedRimeSessionOptions *options,
     RadishLexError **error_out);
 /* Owner-thread only. A non-owner-thread call is ignored. */
 void radishlex_session_free(RadishLexSession *session);
@@ -141,6 +180,10 @@ RadishLexStatusCode radishlex_session_reset(
 RadishLexStatusCode radishlex_session_set_schema(
     RadishLexSession *session,
     const char *schema,
+    RadishLexError **error_out);
+RadishLexStatusCode radishlex_session_set_learning_context(
+    RadishLexSession *session,
+    RadishLexLearningContext context,
     RadishLexError **error_out);
 
 /*
@@ -170,6 +213,8 @@ RadishLexStringView radishlex_key_result_commit(
     const RadishLexKeyResult *result);
 uint8_t radishlex_key_result_commit_present(
     const RadishLexKeyResult *result);
+uint32_t radishlex_key_result_learning_disposition(
+    const RadishLexKeyResult *result);
 
 /* Borrowed from result. Do not call radishlex_snapshot_free on this pointer. */
 const RadishLexSnapshot *radishlex_key_result_snapshot(
@@ -196,6 +241,8 @@ RadishLexStringView radishlex_snapshot_preedit(
     const RadishLexSnapshot *snapshot);
 size_t radishlex_snapshot_cursor(const RadishLexSnapshot *snapshot);
 size_t radishlex_snapshot_candidate_count(
+    const RadishLexSnapshot *snapshot);
+uint32_t radishlex_snapshot_personalization_status(
     const RadishLexSnapshot *snapshot);
 RadishLexStatusCode radishlex_snapshot_candidate(
     const RadishLexSnapshot *snapshot,

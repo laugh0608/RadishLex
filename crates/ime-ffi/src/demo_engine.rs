@@ -87,6 +87,10 @@ impl Engine for FfiDemoEngine {
         Ok(self.candidates_for_buffer())
     }
 
+    fn input_code(&self) -> CoreResult<String> {
+        Ok(self.buffer.clone())
+    }
+
     fn select_candidate(&mut self, index: usize) -> CoreResult<KeyOutcome> {
         let candidates = self.candidates_for_buffer();
         let Some(candidate) = candidates.get(index) else {

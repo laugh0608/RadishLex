@@ -6,12 +6,15 @@ use std::thread;
 use radishlex_ime_ffi::{
     radishlex_error_code, radishlex_error_free, radishlex_error_message,
     radishlex_key_result_commit, radishlex_key_result_commit_present,
-    radishlex_key_result_consumed, radishlex_key_result_free, radishlex_key_result_snapshot,
+    radishlex_key_result_consumed, radishlex_key_result_free,
+    radishlex_key_result_learning_disposition, radishlex_key_result_snapshot,
     radishlex_key_result_version, radishlex_session_free, radishlex_session_handle_key_event,
-    radishlex_session_new, radishlex_snapshot_candidate_count, radishlex_snapshot_preedit,
-    RadishLexError, RadishLexKeyEvent, RadishLexKeyResult, RadishLexSession, RadishLexStatusCode,
+    radishlex_session_new, radishlex_snapshot_candidate_count,
+    radishlex_snapshot_personalization_status, radishlex_snapshot_preedit, RadishLexError,
+    RadishLexKeyEvent, RadishLexKeyResult, RadishLexSession, RadishLexStatusCode,
     RadishLexStringView, RADISHLEX_KEY_PHASE_RELEASE, RADISHLEX_KEY_RESULT_VERSION,
-    RADISHLEX_NAMED_KEY_ENTER, RADISHLEX_NAMED_KEY_TAB,
+    RADISHLEX_LEARNING_NOT_APPLICABLE, RADISHLEX_NAMED_KEY_ENTER, RADISHLEX_NAMED_KEY_TAB,
+    RADISHLEX_PERSONALIZATION_STATUS_NOT_ENABLED,
 };
 
 #[test]
@@ -32,9 +35,17 @@ fn key_result_keeps_consumed_commit_and_snapshot_from_one_event() {
     );
     assert_eq!(unsafe { radishlex_key_result_consumed(ignored) }, 0);
     assert_eq!(unsafe { radishlex_key_result_commit_present(ignored) }, 0);
+    assert_eq!(
+        unsafe { radishlex_key_result_learning_disposition(ignored) },
+        RADISHLEX_LEARNING_NOT_APPLICABLE
+    );
     assert!(unsafe { view_to_owned(radishlex_key_result_commit(ignored)) }.is_empty());
     let ignored_snapshot = unsafe { radishlex_key_result_snapshot(ignored) };
     assert!(!ignored_snapshot.is_null());
+    assert_eq!(
+        radishlex_snapshot_personalization_status(ignored_snapshot),
+        RADISHLEX_PERSONALIZATION_STATUS_NOT_ENABLED
+    );
     assert!(unsafe { view_to_owned(radishlex_snapshot_preedit(ignored_snapshot)) }.is_empty());
     unsafe {
         radishlex_key_result_free(ignored);

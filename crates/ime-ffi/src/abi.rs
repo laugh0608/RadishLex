@@ -10,7 +10,7 @@ use crate::buffer::RadishLexBuffer;
 use crate::contract::RadishLexFfiContract;
 use crate::dictionary::{
     add_user_term, delete_user_term, export_dictionary_file, import_dictionary_file,
-    inspect_dictionary_file, list_import_batches, list_user_terms,
+    inspect_dictionary_file, list_import_batches, list_user_terms, restore_user_term,
     RadishLexDictionaryExportSummary, RadishLexDictionaryImportSummary,
     RadishLexDictionaryInspectSummary, RadishLexImportBatchList, RadishLexImportBatchView,
     RadishLexUserTermList, RadishLexUserTermView,
@@ -121,7 +121,7 @@ pub extern "C" fn radishlex_session_reset(
     error_out: *mut *mut RadishLexError,
 ) -> RadishLexStatusCode {
     ffi_status(error_out, || {
-        session_mut(session)?.inner_mut().reset()?;
+        session_mut(session)?.reset()?;
         Ok(())
     })
 }
@@ -135,7 +135,7 @@ pub extern "C" fn radishlex_session_set_schema(
     ffi_status(error_out, || {
         let schema = read_utf8(schema, "schema")?;
         let schema = SchemaId::new(schema)?;
-        session_mut(session)?.inner_mut().set_schema(schema)?;
+        session_mut(session)?.set_schema(schema)?;
         Ok(())
     })
 }
@@ -184,7 +184,7 @@ pub extern "C" fn radishlex_session_snapshot_new(
     error_out: *mut *mut RadishLexError,
 ) -> *mut RadishLexSnapshot {
     ffi_ptr(error_out, || {
-        let snapshot = RadishLexSnapshot::from_state(session_mut(session)?.state()?);
+        let snapshot = session_mut(session)?.snapshot()?;
         Ok(Box::into_raw(Box::new(snapshot)))
     })
 }
@@ -217,6 +217,13 @@ pub extern "C" fn radishlex_snapshot_cursor(snapshot: *const RadishLexSnapshot) 
 #[no_mangle]
 pub extern "C" fn radishlex_snapshot_candidate_count(snapshot: *const RadishLexSnapshot) -> usize {
     snapshot_ref(snapshot).map_or(0, RadishLexSnapshot::candidate_count)
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_snapshot_personalization_status(
+    snapshot: *const RadishLexSnapshot,
+) -> u32 {
+    snapshot_ref(snapshot).map_or(0, RadishLexSnapshot::personalization_status)
 }
 
 #[no_mangle]
@@ -381,6 +388,24 @@ pub extern "C" fn radishlex_userdb_delete_term(
 ) -> RadishLexStatusCode {
     ffi_status(error_out, || {
         delete_user_term(
+            read_utf8(db_path, "db_path")?,
+            read_utf8(input_code, "input_code")?,
+            read_utf8(text, "text")?,
+            read_optional_utf8(reading, "reading")?,
+        )
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn radishlex_userdb_restore_term(
+    db_path: *const c_char,
+    input_code: *const c_char,
+    text: *const c_char,
+    reading: *const c_char,
+    error_out: *mut *mut RadishLexError,
+) -> RadishLexStatusCode {
+    ffi_status(error_out, || {
+        restore_user_term(
             read_utf8(db_path, "db_path")?,
             read_utf8(input_code, "input_code")?,
             read_utf8(text, "text")?,
@@ -675,7 +700,10 @@ fn read_utf8<'a>(value: *const c_char, field: &'static str) -> Result<&'a str, F
         .map_err(|_| FfiError::invalid_argument(format!("{field} must be valid UTF-8")))
 }
 
-fn read_required_utf8<'a>(value: *const c_char, field: &'static str) -> Result<&'a str, FfiError> {
+pub(crate) fn read_required_utf8<'a>(
+    value: *const c_char,
+    field: &'static str,
+) -> Result<&'a str, FfiError> {
     let value = read_utf8(value, field)?;
     if value.is_empty() {
         return Err(FfiError::invalid_argument(format!(
@@ -720,15 +748,15 @@ fn read_ffi_bool(value: u8, field: &'static str) -> Result<bool, FfiError> {
     }
 }
 
-struct ParsedRimeSessionOptions<'a> {
-    shared_data_dir: &'a str,
-    user_data_dir: &'a str,
-    schema: SchemaId,
-    log_dir: Option<&'a str>,
-    deploy_on_start: bool,
+pub(crate) struct ParsedRimeSessionOptions<'a> {
+    pub(crate) shared_data_dir: &'a str,
+    pub(crate) user_data_dir: &'a str,
+    pub(crate) schema: SchemaId,
+    pub(crate) log_dir: Option<&'a str>,
+    pub(crate) deploy_on_start: bool,
 }
 
-fn parse_rime_session_options<'a>(
+pub(crate) fn parse_rime_session_options<'a>(
     options: *const RadishLexRimeSessionOptions,
 ) -> Result<ParsedRimeSessionOptions<'a>, FfiError> {
     if options.is_null() {
@@ -806,11 +834,17 @@ mod tests {
     use super::*;
     use crate::dictionary::{RADISHLEX_TERM_SOURCE_MANUAL_ADD, RADISHLEX_TERM_STATUS_ACTIVE};
     use crate::engine::{
-        RadishLexRimeSessionOptions, RADISHLEX_ENGINE_KIND_DEMO, RADISHLEX_ENGINE_KIND_RIME,
+        RadishLexPersonalizedRimeSessionOptions, RadishLexRimeSessionOptions,
+        RADISHLEX_ENGINE_KIND_DEMO, RADISHLEX_ENGINE_KIND_RIME,
+        RADISHLEX_PERSONALIZED_RIME_SESSION_OPTIONS_VERSION,
         RADISHLEX_RIME_SESSION_OPTIONS_VERSION, RADISHLEX_SESSION_OPTIONS_VERSION,
     };
     use crate::key::{
         RADISHLEX_KEY_MOD_SHIFT, RADISHLEX_KEY_PHASE_RELEASE, RADISHLEX_NAMED_KEY_BACKSPACE,
+    };
+    use crate::personalization::{
+        radishlex_session_new_personalized_rime, radishlex_session_set_learning_context,
+        RadishLexLearningContext,
     };
     use crate::snapshot::RADISHLEX_CANDIDATE_SOURCE_ENGINE;
     use crate::{
@@ -969,6 +1003,57 @@ mod tests {
         }
     }
 
+    #[test]
+    fn personalized_session_options_and_learning_context_are_versioned() {
+        let shared_data_dir = CString::new("/tmp/radishlex-rime/shared").expect("shared path");
+        let user_data_dir = CString::new("/tmp/radishlex-rime/user").expect("user path");
+        let schema = CString::new("luna_pinyin").expect("schema");
+        let userdb_path = CString::new("/tmp/radishlex-rime/userdb.sqlite3").expect("db path");
+        let session_id = CString::new("ffi-personalized-test").expect("session id");
+        let mut error = ptr::null_mut();
+        let options = RadishLexPersonalizedRimeSessionOptions {
+            version: RADISHLEX_PERSONALIZED_RIME_SESSION_OPTIONS_VERSION + 1,
+            shared_data_dir: shared_data_dir.as_ptr(),
+            user_data_dir: user_data_dir.as_ptr(),
+            schema: schema.as_ptr(),
+            log_dir: ptr::null(),
+            deploy_on_start: 0,
+            userdb_path: userdb_path.as_ptr(),
+            session_id: session_id.as_ptr(),
+        };
+        let session = radishlex_session_new_personalized_rime(&options, &mut error);
+        assert!(session.is_null());
+        assert_eq!(
+            unsafe { radishlex_error_code(error) },
+            RadishLexStatusCode::InvalidArgument
+        );
+        unsafe { radishlex_error_free(error) };
+
+        let legacy = radishlex_session_new(&mut error);
+        assert!(!legacy.is_null());
+        let context_kind = b"general";
+        let context = RadishLexLearningContext {
+            version: crate::personalization::RADISHLEX_LEARNING_CONTEXT_VERSION,
+            secure_input: 0,
+            sensitive_application: 0,
+            privacy_mode: 0,
+            context_known: 1,
+            context_kind: RadishLexStringView {
+                data: context_kind.as_ptr(),
+                len: context_kind.len(),
+            },
+        };
+        error = ptr::null_mut();
+        assert_eq!(
+            unsafe { radishlex_session_set_learning_context(legacy, context, &mut error) },
+            RadishLexStatusCode::InvalidState
+        );
+        unsafe {
+            radishlex_error_free(error);
+            radishlex_session_free(legacy);
+        }
+    }
+
     #[cfg(not(feature = "native-rime"))]
     #[test]
     fn rime_session_options_return_unavailable_without_native_feature() {
@@ -1099,6 +1184,29 @@ mod tests {
         assert_eq!(summary.local_selection_events, 0);
         assert_eq!(summary.local_negative_feedback, 1);
 
+        assert_eq!(
+            radishlex_userdb_restore_term(
+                db_path.as_ptr(),
+                input_code.as_ptr(),
+                text.as_ptr(),
+                reading.as_ptr(),
+                &mut error,
+            ),
+            RadishLexStatusCode::Ok
+        );
+        let terms = radishlex_userdb_terms_new(db_path.as_ptr(), &mut error);
+        assert!(!terms.is_null());
+        assert_eq!(radishlex_userdb_terms_count(terms), 1);
+        unsafe {
+            radishlex_userdb_terms_free(terms);
+        }
+        assert_eq!(
+            unsafe { radishlex_userdb_sync_preflight(db_path.as_ptr(), &mut summary, &mut error) },
+            RadishLexStatusCode::Ok
+        );
+        assert_eq!(summary.syncable_user_terms, 1);
+        assert_eq!(summary.syncable_deleted_terms, 0);
+
         let _ = fs::remove_file(path);
     }
 
@@ -1216,6 +1324,7 @@ mod tests {
             RadishLexStatusCode::Ok
         );
         assert_eq!(candidate.index, 1);
+        assert_eq!(candidate.engine_index, 1);
         assert_eq!(unsafe { view_to_string(candidate.text) }, "萝卜词核");
         assert_eq!(candidate.reading_present, 1);
         assert_eq!(unsafe { view_to_string(candidate.reading) }, "luobo");

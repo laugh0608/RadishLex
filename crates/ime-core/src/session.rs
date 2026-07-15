@@ -37,6 +37,10 @@ impl<E: Engine> InputSession<E> {
         ))
     }
 
+    pub fn input_code(&self) -> CoreResult<String> {
+        self.engine.input_code()
+    }
+
     pub fn engine(&self) -> &E {
         &self.engine
     }

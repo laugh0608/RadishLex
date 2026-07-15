@@ -2,7 +2,8 @@ use std::mem::size_of;
 
 use radishlex_ime_ffi::{
     radishlex_key_result_commit, radishlex_key_result_commit_present,
-    radishlex_key_result_consumed, radishlex_key_result_free, radishlex_key_result_snapshot,
+    radishlex_key_result_consumed, radishlex_key_result_free,
+    radishlex_key_result_learning_disposition, radishlex_key_result_snapshot,
     radishlex_key_result_version, radishlex_rime_runtime_shutdown,
     radishlex_session_handle_key_event, RadishLexError, RadishLexFfiContract, RadishLexKeyEvent,
     RadishLexKeyResult, RadishLexSession, RadishLexSessionOptions, RadishLexSnapshot,
@@ -12,8 +13,8 @@ use radishlex_ime_ffi::{
 
 #[test]
 fn rust_input_abi_layout_matches_the_checked_header_contract() {
-    assert_eq!(RADISHLEX_ABI_CONTRACT_VERSION, 3);
-    assert_eq!(RADISHLEX_KEY_RESULT_VERSION, 1);
+    assert_eq!(RADISHLEX_ABI_CONTRACT_VERSION, 4);
+    assert_eq!(RADISHLEX_KEY_RESULT_VERSION, 2);
     assert_eq!(size_of::<RadishLexFfiContract>(), 3 * size_of::<u32>());
     assert_eq!(size_of::<RadishLexSessionOptions>(), 2 * size_of::<u32>());
     assert_eq!(size_of::<RadishLexKeyEvent>(), 5 * size_of::<u32>());
@@ -30,6 +31,8 @@ fn rust_input_abi_layout_matches_the_checked_header_contract() {
         radishlex_key_result_commit;
     let _: unsafe extern "C" fn(*const RadishLexKeyResult) -> u8 =
         radishlex_key_result_commit_present;
+    let _: unsafe extern "C" fn(*const RadishLexKeyResult) -> u32 =
+        radishlex_key_result_learning_disposition;
     let _: unsafe extern "C" fn(*const RadishLexKeyResult) -> *const RadishLexSnapshot =
         radishlex_key_result_snapshot;
     let _: unsafe extern "C" fn(*mut RadishLexKeyResult) = radishlex_key_result_free;
@@ -99,8 +102,8 @@ fn compile_header(language: &str) {
 const HEADER_SMOKE_SOURCE: &str = r#"
 #include "radishlex_input.h"
 
-_Static_assert(RADISHLEX_ABI_CONTRACT_VERSION == 3u, "ABI version mismatch");
-_Static_assert(RADISHLEX_KEY_RESULT_VERSION == 1u, "key result version mismatch");
+_Static_assert(RADISHLEX_ABI_CONTRACT_VERSION == 4u, "ABI version mismatch");
+_Static_assert(RADISHLEX_KEY_RESULT_VERSION == 2u, "key result version mismatch");
 _Static_assert(sizeof(RadishLexFfiContract) == 3u * sizeof(uint32_t), "contract layout mismatch");
 _Static_assert(sizeof(RadishLexSessionOptions) == 2u * sizeof(uint32_t), "session options layout mismatch");
 _Static_assert(sizeof(RadishLexKeyEvent) == 5u * sizeof(uint32_t), "key event layout mismatch");
@@ -118,16 +121,22 @@ RadishLexStatusCode radishlex_compile_input_contract(
     uint32_t version = radishlex_key_result_version(result);
     uint8_t consumed = radishlex_key_result_consumed(result);
     uint8_t commit_present = radishlex_key_result_commit_present(result);
+    uint32_t learning_disposition =
+        radishlex_key_result_learning_disposition(result);
     RadishLexStringView commit = radishlex_key_result_commit(result);
     const RadishLexSnapshot *snapshot = radishlex_key_result_snapshot(result);
     RadishLexStringView preedit = radishlex_snapshot_preedit(snapshot);
     RadishLexCandidateView candidate = {0};
+    uint32_t personalization_status =
+        radishlex_snapshot_personalization_status(snapshot);
     (void)version;
     (void)consumed;
     (void)commit_present;
+    (void)learning_disposition;
     (void)commit;
     (void)preedit;
     (void)candidate;
+    (void)personalization_status;
     radishlex_key_result_free(result);
   }
   (void)runtime_shutdown;

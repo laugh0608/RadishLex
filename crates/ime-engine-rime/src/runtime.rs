@@ -1031,7 +1031,7 @@ mod tests {
             _config_create_map: None,
             _config_list_size: None,
             _config_begin_list: None,
-            _get_input: None,
+            get_input: None,
             _get_caret_pos: None,
             select_candidate: None,
             _get_version: None,
