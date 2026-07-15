@@ -135,6 +135,8 @@ userdb 是用户数据，默认输入法移除和开发 bundle 清理必须保�
 
 候选 snapshot 同时携带 display index 与 engine index；候选窗、数字键、Space、鼠标和 accessibility action 始终回传 display index，由 Rust runtime 映射后选择 engine candidate。平台每次事件前传入 secure input、敏感应用、隐私模式、上下文可信度和受控 context kind；禁止学习场景不会写入，secure/敏感/未知场景也不读取个人化信号。分段选择的待确认意图、selection 事务和失败语义全部留在 Rust。平台日志只允许记录阶段、个人化状态与学习结果枚举，不记录输入码、候选、App ID 或数据库路径。
 
+当前 macOS 分类只使用前台应用 Bundle ID 生成粗粒度信号：TextEdit 映射为已知 `editor`，Codex 映射为已知 `code`；Passwords、Keychain Access、1Password 8 和旧版 1Password 7 的固定 Bundle ID 标记为敏感应用；其他应用一律为未知 `other`，因此只使用 engine 顺序。secure input 通过公开 `IsSecureEventInputEnabled()` 读取。隐私模式读取当前输入法 domain 的 `RadishLexPrivacyMode` 布尔设置，缺省为关闭；开启后只读既有本地摘要且不写当前选择。任一信号变化都会先更新 Rust learning context；已有 composition 时必须刷新 snapshot，使旧 display/engine mapping 失效后再处理选择。
+
 ## Native 依赖与目录
 
 M1 开发版必须明确并隔离：

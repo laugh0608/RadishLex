@@ -35,11 +35,11 @@
 | 用户隐私模式 | 可使用既有本地个人化摘要 | 禁止 |
 | 已知普通上下文 | 允许本地重排 | 允许 P1 selection 与 P2 摘要事务写入 |
 
-平台只传递枚举化 `context_kind` 和布尔策略信号，不传、不持久化原始 App ID、窗口标题或文档文本。上下文变化必须显式更新 runtime；切换到禁止学习的上下文时，清除尚未由 commit 确认的选择意图。
+平台只传递枚举化 `context_kind` 和布尔策略信号，不传、不持久化原始 App ID、窗口标题或文档文本。当前稳定类别为 `general`、`browser`、`chat`、`code`、`editor`、`office`、`terminal`、`other`；未知类别必须拒绝，FFI view 另限制为不超过 32 个 UTF-8 bytes。上下文变化必须显式更新 runtime；切换到禁止学习的上下文时，清除尚未由 commit 确认的选择意图。
 
-选择前，runtime 从当前快照捕获 input code、候选规范身份、display/engine index、候选数和受控 context kind。engine 立即返回匹配 commit 时记录一次 selection；分段选择没有立即 commit 时只保存待确认意图，后续仅在匹配 commit 到达时记录。reset、schema/client/context 变化、取消或不匹配 commit 必须丢弃待确认意图；无法关联候选的原始 engine commit 不推断学习。R01B 不通过退格、改选或时间窗口自动推断负反馈。
+选择前，runtime 从当前快照捕获 input code、候选规范身份、display/engine index、候选数和受控 context kind。engine 立即返回匹配 commit 时记录一次 selection；分段选择没有立即 commit 时只保存待确认意图，后续仅在匹配 commit 到达时记录。reset、schema/client/context 变化、取消或不匹配 commit 必须丢弃待确认意图；无法关联候选的原始 engine commit 不推断学习。当前产品 runtime 不通过退格、改选或时间窗口自动推断负反馈。
 
-userdb/ranker 读取失败时，runtime 必须保留 engine 原始顺序并返回明确的个人化退化状态。engine 已产生的 commit 不得因学习写入失败而丢失；key/select 结果同时携带 commit 和 `recorded`、`deferred`、`skipped_by_policy`、`failed` 等学习结果。错误诊断不得包含输入码、候选文本、数据库路径或原始应用信息。
+userdb/ranker 读取失败时，runtime 必须保留 engine 原始顺序并返回明确的个人化退化状态：`ready` 表示个人化路径可用（当前页可以没有匹配信号），`policy_blocked` 表示策略强制 engine-only，`storage_unavailable` 表示数据库打开或迁移不可用，`read_failed` 与 `rank_failed` 分别表示本次摘要读取或排序失败。engine 已产生的 commit 不得因学习写入失败而丢失；key/select 结果同时携带 commit 和 `recorded`、`deferred`、`skipped_by_policy`、`failed` 等学习结果。错误诊断不得包含输入码、候选文本、数据库路径或原始应用信息。
 
 ## 目标
 
@@ -136,7 +136,7 @@ SelectionEvent
 
 - `candidate_index` 是 RadishLex candidate 列表中的索引。
 - 不保存 Rime 候选指针、Rime session id 或底层私有对象。
-- `context_kind` 只保存归类后的场景，例如 `general`、`chat`、`code`、`search`，不保存窗口标题或正文内容。
+- `context_kind` 只保存上述受控场景类别，不保存 App ID、窗口标题或正文内容。
 
 ### NegativeFeedback
 
@@ -259,6 +259,8 @@ RankedCandidate
 - `deleted` 候选只生效 engine order 与 delete penalty，旧正负摘要和 suppress 不重复计分；`suppressed` 候选不生效 user term、frequency、recency 或 context 正向因子。active 候选才消费正向摘要。
 - context boost 只在同场景存在正向 selection 摘要时生效。最终排序按有限 `final_score` 降序；完全相同时保留 `original_index`，不引入不稳定哈希或数据库行顺序 tie-break。
 
+当前默认参数与实现保持同源：engine order 每后一位减 `0.01`；user term 先封顶 `4.0` 再乘 `1.0`；frequency 为 `min(ln(1 + frequency) × 0.35, 2.0)`；recency 为 `2^(-age/7天) × 0.25`；同场景正向摘要贡献 `0.3`；negative feedback 为 `min(ln(1 + negative_score) × 1.2, 4.0)`；suppressed 与 deleted penalty 分别为 `2.0`、`10.0`。`final_score` 必须与 explain 的加减项逐项重构一致；修改这些参数必须同步固定合成评测预期。
+
 ## 学习流程
 
 一次普通选择提交：
@@ -366,8 +368,8 @@ radishlex_ffi_contract(contract_out)
 - dictionary import 支持 `dry_run`，dry-run 不写词条、不写 import batch；实际导入必须记录 import batch，并继续遵守 deleted tombstone。
 - import batches 通过只读 list handle 暴露来源和统计，不暴露 SQLite handle、statement 或 row 指针。
 - learning status 通过单个 `repr(C)` summary 暴露聚合计数、latest timestamp 和 `plaintext_payload / p1_raw_details / context_stats = false` 标记，不返回 string view、用户词明文、P1 事件行、负反馈 reason 列表或上下文统计。
-- 当前 FFI 不记录 selection event、negative feedback 或上下文统计，不作为学习事件入口。
-- 当前 FFI 尚未暴露 explicit restore；在 manager 增加明确恢复动作前，`add_term` 不能绕过 tombstone。可复验的恢复入口先由 Rust `UserDb::restore_term` 与 CLI `dict restore` 提供。
+- userdb 管理 FFI 不直接接收 selection event、negative feedback 或上下文统计；产品输入 FFI 则通过 personalized session 在 Rust runtime 内部记录允许的 selection，平台不能自行拼写学习事件。
+- `restore_term` 已作为独立 FFI 管理入口开放；调用方必须把它呈现为明确恢复动作，不能在普通新增、导入或输入选择中隐式调用。
 - 当前 FFI contract 明确 session 绑定创建线程，平台端不得跨线程直接操作同一 `RadishLexSession*`。
 
 ### 用户词库导入导出格式
@@ -436,7 +438,7 @@ luobo	萝卜	luo bo	manual_add	2	active
 - 固定合成排序评测至少记录 Top-1、Top-3、MRR 和 case 数；样例只使用公开合成词，不使用真实输入历史。基线变差必须由权重/语义变更说明解释，不能只凭主观体验接受。
 - 候选重排延迟使用固定候选数、固定迭代次数和 warm-up 记录可复验统计；CI 只校验结果、样本规模与统计值有限，不使用易受共享机器波动影响的严苛墙钟上限。
 
-R02L 已按上述口径建立 schema v3 与固定测试基线：5 个公开合成 case 的 Top-1 为 `0.8`、Top-3 为 `1.0`、MRR 为 `0.9`；延迟样本固定为 50 个候选、100 次 warm-up 和 1000 次计时迭代。该基线只证明本地正确性与可复验性，不代表真实平台学习纵向闭环或 M2 产品退出；真实接入仍由 R01B 完成，具体机器观测与全仓门禁记录在本周 devlog。
+R02L 已按上述口径建立 schema v3 与固定测试基线：5 个公开合成 case 的 Top-1 为 `0.8`、Top-3 为 `1.0`、MRR 为 `0.9`；延迟样本固定为 50 个候选、100 次 warm-up 和 1000 次计时迭代。该基线只证明本地正确性与可复验性；产品 runtime 的自动化接线不能替代真实平台学习纵向证据或 M2 产品退出，具体机器观测与全仓门禁记录在 devlog。
 
 默认验证入口：
 

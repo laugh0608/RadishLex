@@ -24,6 +24,7 @@ M2 本地管理能力应优先覆盖：
 
 - 查看本地用户词条。
 - 删除用户词条，并写入 tombstone。
+- 查看 deleted/suppressed 状态，并通过单独确认动作执行 explicit restore。
 - 导入用户词库，并显示导入检查结果。
 - 导出用户词库。
 - 查看本地学习状态摘要。
@@ -95,6 +96,7 @@ M3 同步管理能力在安全退出条件满足后覆盖：
 ## 用户可见行为约束
 
 - 词库导入必须先展示导入检查摘要，再由用户确认写入；普通导入不得复活 tombstone，dry run 不写入 userdb。
+- 普通新增、选择学习和导入都不得清除 tombstone 或 suppressed；恢复必须使用独立的用户确认动作并调用 `restore_term`，界面需要明确展示这是恢复已删除/已抑制词条，不得在其他操作成功后隐式触发。
 - 词库导出只导出用户显式请求的 P2 用户词条视图，不作为诊断报告的一部分混入。
 - 学习页、同步页和诊断报告只能展示聚合计数、状态码、来源标签和解释性摘要，不展示 P1 原始事件或明文同步 payload。
 - 设置页保存的是本地草案；`retain_sync_config`、`server_endpoint`、`access_token_configured`、`privacy_mode`、`diagnostics_export` 和部署证据来源只用于派生 UI 状态，不启用真实上传。
@@ -112,7 +114,7 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 第一批可依赖的接口方向：
 
 - session / dictionary handle 的创建与释放。
-- userdb 词条 list / add / delete。
+- userdb 词条 list / add / explicit restore / delete。
 - dictionary inspect / import / export。
 - import batches 只读查询。
 - learning status 只读摘要。

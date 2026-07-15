@@ -20,6 +20,7 @@ radishlex-ime-cli demo <input-code> [candidate-index]
 radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] [--rank-db <path>] [--context <kind>] <input-code> [candidate-index]
 radishlex-ime-cli dict list --db <path>
 radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
+radishlex-ime-cli dict restore --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict export --db <path> --file <path>
 radishlex-ime-cli dict inspect --file <path>
@@ -210,7 +211,20 @@ cargo run -p radishlex-ime-cli -- \
   --reading "luo bo"
 ```
 
-删除会写入 tombstone，并清除对应 ranker 权重摘要，避免旧选择事件或旧导入立即复活该词。后续如需恢复同一词条，必须通过 `dict add` 这类明确的人工添加动作。
+删除会写入 tombstone，并清除对应 ranker 权重摘要，避免旧选择事件、普通新增或旧导入立即复活该词。
+
+显式恢复已删除或 suppressed 词条：
+
+```bash
+cargo run -p radishlex-ime-cli -- \
+  dict restore \
+  --db /tmp/radishlex-userdb.sqlite \
+  --input luobo \
+  --text 萝卜 \
+  --reading "luo bo"
+```
+
+成功输出 `restored`、`input`、`status: active` 和新的 `version_ms`。恢复必须严格晚于删除/旧状态版本，并在同一事务中清除 tombstone、恢复 active 状态和重置旧 frequency/negative 摘要；目标既未删除也未 suppressed 时返回明确错误。`dict add` 只新增或更新未删除词条，不能代替恢复。
 
 导出用户词库：
 
@@ -279,6 +293,8 @@ luobo	萝卜	luo bo	manual_add	2	active
 
 边界：
 
+- `dict add` 命中 deleted tombstone 时返回错误，不清除 tombstone，也不隐式解除 suppressed。
+- `dict restore` 是唯一能从 CLI 清除 tombstone 或 suppressed 的人工动作，普通选择和导入不能替代。
 - `dict export` 只导出 P2 用户词条字段，不导出 P1 原始选择事件、负反馈详细事件、上下文统计或 ranker 权重摘要。
 - `dict import` 不接受 `deleted` 状态的词条。
 - `dict import` 遇到本地 deleted tombstone 命中的词条会跳过，并计入 `skipped_deleted`，不会把普通导入当成恢复删除词条。
@@ -290,7 +306,7 @@ luobo	萝卜	luo bo	manual_add	2	active
 
 ## learn 命令
 
-`learn` 命令用于查看本地学习状态或向 userdb 写入本地学习事件。当前只支持显式数据库路径、合成数据和人工指定参数，适合验证排序变化，不代表平台壳已经接入真实输入事件。
+`learn` 命令用于查看本地学习状态或向显式 userdb 写入合成学习事件，适合独立复验排序变化。产品输入 runtime 已通过自己的 FFI/session 路径记录真实选择，CLI 不模拟平台隐私上下文、display/engine mapping 或 InputMethodKit 生命周期，也不能替代真实平台验收。
 
 查看学习状态只读摘要：
 
@@ -471,5 +487,6 @@ Rust 内部已经有 `UserDb::p2_plaintext_payloads()` 和 `ime-sync::SyncEnvelo
 - `unknown key name: ...`：`--key` 只接受文档列出的命名键，例如 `page-down`、`page-up`、`arrow-down`、`arrow-up`。
 - `--context requires --rank-db for rime`：`rime --context` 只在 rank smoke 中有效，必须同时传入 `--rank-db`。
 - `missing --db`：`dict`、`learn` 或 `rank explain` 必须显式指定 SQLite 路径。
+- `term is deleted; use explicit restore instead of add`：该身份已有 tombstone；确认是用户明确恢复意图后改用 `dict restore`，不要通过新增或导入绕过删除。
 - `invalid import_file`：导入文件需要符合 `radishlex-user-terms-v1` TSV，且词条状态只能是 `active` 或 `suppressed`。
 - `unknown negative feedback reason ...`：`learn suppress --reason` 只接受 `immediate_backspace`、`reselect_same_code`、`manual_suppress` 或 `manual_delete`。

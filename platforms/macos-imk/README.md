@@ -25,6 +25,8 @@ Rust snapshot 的 cursor 是允许落在 composition 末尾的插入位置，但
 
 native 产品 session 通过 ABI v4 的 personalized Rime 构造入口持有独立 userdb connection，数据库固定为 `~/Library/Application Support/RadishLex/userdb.sqlite3`。Objective-C 只创建并收紧 `RadishLex` 父目录到 `0700`，SQLite migration、WAL、busy timeout、文件权限、排序、selection 事务和失败回退都由 Rust 负责。每个事件前平台只传 secure input、隐私模式、上下文可信度与粗粒度类别；当前 Alpha 只把 TextEdit 和 Codex 识别为允许学习的普通上下文，其他未知应用默认 engine-only，敏感应用与 secure input 同样不读取、不写入个人化数据。
 
+当前分类把 TextEdit 映射为 `editor`、Codex 映射为 `code`；Passwords、Keychain Access、1Password 8/7 的固定 Bundle ID 标记为敏感，其余应用映射为未知 `other`。隐私模式由输入法 `NSUserDefaults` 中的 `RadishLexPrivacyMode` 布尔值控制，缺省关闭；开启后仍可使用既有本地排序摘要，但不会记录当前 selection 或更新 user term/ranker weight。设置或前台/secure 状态变化时，controller 会先刷新 Rust learning context 和候选 snapshot，再接受 display index 选择。
+
 `userdb.sqlite3` 不是临时 Rime 数据，卸载或普通开发清理不得删除。当前 `--status` 只报告 bundle、Rime 目录和进程，尚不能单独证明 R01B 测试数据库零残留；实机前必须补齐父目录和 userdb 只读状态。只有安装前已证明 userdb/Rime 不存在、对应内容全由本轮合成测试生成且另有明确授权时，才能精确删除本轮创建的数据；预存空父目录必须恢复为空并保留。
 
 ## 不安装验证

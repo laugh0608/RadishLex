@@ -140,9 +140,9 @@ RADISHLEX_RIME_SESSION_OPTIONS_VERSION = 1
 
 ### 产品个人化 session 与学习上下文
 
-`RadishLexPersonalizedRimeSessionOptions` 在 Rime 路径和 schema 之外增加非空 UTF-8 `userdb_path` 与 `session_id`。`radishlex_session_new_personalized_rime` 只在 `native-rime` 构建中创建 `ime-runtime` 产品 session；数据库打开或 migration 失败不得删除、重命名或重建原文件，session 可以保留 engine 输入能力，但必须通过 snapshot 个人化状态暴露不可用原因类别。版本化 `RadishLexLearningContext` 携带 `secure_input`、`sensitive_application`、`privacy_mode`、`context_known` 与 `context_kind`。
+`RadishLexPersonalizedRimeSessionOptions` 在 Rime 路径和 schema 之外增加非空 UTF-8 `userdb_path` 与 `session_id`。`session_id` trim 后必须非空且不超过 128 bytes，只用于本地 P1 选择事件关联，不是设备 ID、同步身份或跨进程稳定身份。`radishlex_session_new_personalized_rime` 只在 `native-rime` 构建中创建 `ime-runtime` 产品 session；数据库打开或 migration 失败不得删除、重命名或重建原文件，session 可以保留 engine 输入能力，但必须通过 snapshot 个人化状态暴露不可用原因类别。版本化 `RadishLexLearningContext` 携带 `secure_input`、`sensitive_application`、`privacy_mode`、`context_known` 与 `context_kind`。
 
-布尔字段只允许 `0` 或 `1`。平台只传受控 `context_kind` 枚举值，不传 App ID、窗口标题或文档内容。secure input、敏感应用或 `context_known = 0` 时 runtime 只保留 engine 顺序且不读写 userdb；隐私模式允许使用既有本地个人化摘要，但禁止当前输入写入。上下文改变时清除未由 commit 确认的分段选择意图并失效旧候选映射；若已有 composition，平台必须刷新 snapshot 后再允许选择。
+布尔字段只允许 `0` 或 `1`。平台只传 `general`、`browser`、`chat`、`code`、`editor`、`office`、`terminal`、`other` 之一，`context_kind` view 必须非空且不超过 32 个 UTF-8 bytes；不得传 App ID、窗口标题或文档内容。secure input、敏感应用或 `context_known = 0` 时 runtime 只保留 engine 顺序且不读写 userdb；隐私模式允许使用既有本地个人化摘要，但禁止当前输入写入。上下文改变时清除未由 commit 确认的分段选择意图并失效旧候选映射；若已有 composition，平台必须刷新 snapshot 后再允许选择。
 
 ### Key event
 
@@ -204,7 +204,7 @@ release = 2
 
 ### Key result 与候选选择
 
-真实平台按键与候选选择入口统一采用版本化、Rust-owned 的 `RadishLexKeyResult*`：
+真实平台按键与候选选择入口统一采用版本化、Rust-owned 的 `RadishLexKeyResult*`。当前 `RADISHLEX_KEY_RESULT_VERSION = 2`；v2 在 owned key result 上增加 `learning_disposition`，未知版本必须拒绝：
 
 ```text
 radishlex_session_handle_key_event(
@@ -271,7 +271,7 @@ personalized = 3
 system = 4
 ```
 
-`index` 是本次 snapshot 的 display index，`engine_index` 是 runtime 固化的 engine 原始索引；平台选择时只回传 display index，不自行换算或假定两者相等。`reading_present` 和 `annotation_present` 用于区分“字段不存在”和“存在但为空字符串”。candidate view 中所有 string view 都借用自 `RadishLexSnapshot*`。snapshot 另带个人化状态，至少区分 ready、policy blocked、storage unavailable、read failed 和 rank failed；平台只显示受控状态，不记录候选或数据库路径。
+`index` 是本次 snapshot 的 display index，`engine_index` 是 runtime 固化的 engine 原始索引；平台选择时只回传 display index，不自行换算或假定两者相等。`reading_present` 和 `annotation_present` 用于区分“字段不存在”和“存在但为空字符串”。candidate view 中所有 string view 都借用自 `RadishLexSnapshot*`。snapshot 个人化状态固定区分 `not_enabled`、`ready`、`policy_blocked`、`storage_unavailable`、`read_failed` 和 `rank_failed`：legacy/demo/Rime session 使用 `not_enabled`，personalized session 使用其余状态；平台只显示受控状态，不记录候选或数据库路径。
 
 ### Learning status summary
 
@@ -456,7 +456,7 @@ InternalError
 
 允许跨 FFI：
 
-- 输入码和归一化按键事件。
+- 输入热路径在调用期间需要的归一化按键事件、学习上下文布尔值和受控 context kind。
 - composition preedit 和 cursor。
 - candidate 文本、reading、annotation、rank explain 摘要。
 - commit 文本。
@@ -468,7 +468,7 @@ InternalError
 - Rime 内部指针和私有 ID。
 - SQLite connection、statement 或 row 指针。
 - 原始 P1 事件明细的批量导出。
-- P0 输入内容。
+- 通过 userdb 管理、诊断、导出或同步 FFI 暴露 P0 输入内容；P0 场景在输入 ABI 中只允许完成当前 engine 处理和宿主 commit 所需的短生命周期数据流，不得进入学习、日志或持久化返回对象。
 - 平台窗口标题、正文内容、控件句柄和系统私有对象。
 
 ## 平台壳停止线

@@ -121,6 +121,10 @@ Engine::candidates
   -> get_context
   -> convert context.menu candidates
 
+Engine::input_code
+  -> get_input
+  -> copy current UTF-8 input into an owned Rust String
+
 Engine::select_candidate(index)
   -> select_candidate_on_current_page
   -> get_commit if available
@@ -151,11 +155,12 @@ process teardown
 - CLI 在 Rime 命令结束后显式 shutdown；平台壳必须在进程 teardown 且所有 session 已释放后调用 `radishlex_rime_runtime_shutdown`。shutdown 可重复调用，仍有活动 session 时返回 `InvalidState`。
 - `RimeEngine` 保持 owner-thread-only；首个成功初始化的 session 固定进程 runtime owner thread，后续 Rime session 与 shutdown 必须回到该线程。进程锁用于串行化生命周期，不把 librime 变成任意线程可调用 API。
 
-需要在实现前确认的开放点：
+已固定的 adapter 决策：
 
-- Rime 候选选择应使用数字键模拟、page + select 组合，还是可用更直接的 API。实现前必须通过小型 smoke 记录确认。
-- `get_context` 返回的 composition cursor 单位是否能直接映射到 UTF-8 byte cursor；不能确认时先保守转换并测试中文、ASCII、混合输入。
-- schema 包部署和产品目录准备仍由平台安装流程固定；`deploy_on_start` 只用于显式开发 / smoke 配置，不得由不同活动 session 分别决定。
+- 当前页候选选择使用 `select_candidate_on_current_page`，不模拟数字键，也不让平台根据 page 自行换算 engine index；分段选择继续读取同一步更新后的 composition/commit。
+- `get_context` 的 composition cursor 经过 adapter 转换到 `Composition` 要求的 UTF-8 byte boundary，并覆盖 ASCII、中文和越界值；平台层再按宿主 API 需要转换为 UTF-16 索引。
+- `get_input` 只复制当前输入码字符串，用于 `ime-runtime` 的候选身份查询；返回值不作为 Rime 私有对象 ID 保存。
+- schema 包部署和产品目录准备由平台安装流程固定；`deploy_on_start` 只用于显式开发 / smoke 配置，不得由不同活动 session 分别决定。
 
 ## 数据目录策略
 
@@ -285,7 +290,7 @@ RADISHLEX_RIME_SHARED_DATA=<path> RADISHLEX_RIME_USER_DATA=<path> cargo test -p 
 
 ## 已验证能力与未闭合边界
 
-已有实现与历史 smoke 已证明真实 Rime adapter 能完成 composition、候选、翻页、选择、commit、错误映射和 ranker 接入，`ime-ffi` 也可在显式 `native-rime` feature 下创建真实 Rime session。详细完成记录留在 devlog，不在本文持续追加。
+已有实现与历史 smoke 已证明真实 Rime adapter 能完成 composition、稳定 input code、候选、翻页、当前页选择、commit、错误映射和 ranker 接入，`ime-ffi` 也可在显式 `native-rime` feature 下创建真实 Rime session。详细完成记录留在 devlog，不在本文持续追加。
 
 ABI contract v4 在 v3 已闭合的 `consumed`、可选 commit、同事件 snapshot 和 Rust-owned result 生命周期上，增加产品个人化 Rime session、学习上下文、display/engine index、个人化状态和学习处置；`crates/ime-ffi/include/radishlex_input.h` 已通过 C11 与 Objective-C 编译测试。
 
