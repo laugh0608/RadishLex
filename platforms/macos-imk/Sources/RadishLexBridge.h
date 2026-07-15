@@ -8,6 +8,7 @@ FOUNDATION_EXPORT NSErrorDomain const RLXBridgeErrorDomain;
 
 @interface RLXCandidate : NSObject
 @property(nonatomic, readonly) NSUInteger index;
+@property(nonatomic, readonly) NSUInteger engineIndex;
 @property(nonatomic, copy, readonly) NSString *text;
 @property(nonatomic, copy, readonly, nullable) NSString *reading;
 @property(nonatomic, copy, readonly, nullable) NSString *annotation;
@@ -19,12 +20,14 @@ FOUNDATION_EXPORT NSErrorDomain const RLXBridgeErrorDomain;
 @property(nonatomic, copy, readonly) NSString *preedit;
 @property(nonatomic, readonly) NSUInteger cursor;
 @property(nonatomic, copy, readonly) NSArray<RLXCandidate *> *candidates;
+@property(nonatomic, readonly) uint32_t personalizationStatus;
 @end
 
 @interface RLXKeyHandlingResult : NSObject
 @property(nonatomic, readonly, getter=isConsumed) BOOL consumed;
 @property(nonatomic, copy, readonly, nullable) NSString *commit;
 @property(nonatomic, strong, readonly, nullable) RLXSnapshot *snapshot;
+@property(nonatomic, readonly) uint32_t learningDisposition;
 @end
 
 @interface RLXSessionBridge : NSObject
@@ -41,6 +44,17 @@ FOUNDATION_EXPORT NSErrorDomain const RLXBridgeErrorDomain;
                                             logDirectory:(nullable NSString *)logDirectory
                                            deployOnStart:(BOOL)deployOnStart
                                                    error:(NSError **)error;
+- (nullable instancetype)initPersonalizedRimeWithSharedDataDirectory:
+                                (NSString *)sharedDataDirectory
+                                                userDataDirectory:
+                                                    (NSString *)userDataDirectory
+                                                           schema:(NSString *)schema
+                                                     logDirectory:
+                                                         (nullable NSString *)logDirectory
+                                                    deployOnStart:(BOOL)deployOnStart
+                                                       userDbPath:(NSString *)userDbPath
+                                                        sessionId:(NSString *)sessionId
+                                                            error:(NSError **)error;
 
 - (nullable RLXKeyHandlingResult *)handleEvent:(RadishLexKeyEvent)event
                                           error:(NSError **)error;
@@ -49,6 +63,12 @@ FOUNDATION_EXPORT NSErrorDomain const RLXBridgeErrorDomain;
                                                       error:(NSError **)error;
 - (BOOL)resetWithError:(NSError **)error;
 - (BOOL)setSchema:(NSString *)schema error:(NSError **)error;
+- (BOOL)setLearningContextSecureInput:(BOOL)secureInput
+                 sensitiveApplication:(BOOL)sensitiveApplication
+                          privacyMode:(BOOL)privacyMode
+                         contextKnown:(BOOL)contextKnown
+                           contextKind:(NSString *)contextKind
+                                 error:(NSError **)error;
 - (void)invalidate;
 
 @end

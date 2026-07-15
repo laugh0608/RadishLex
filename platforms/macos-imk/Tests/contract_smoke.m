@@ -193,7 +193,7 @@ int main(void) {
                 cursorError.code == RADISHLEX_STATUS_INTERNAL_ERROR,
             @"cursor inside a UTF-8 scalar is rejected");
     NSError *error = nil;
-    Require([RLXSessionBridge validateFFIContract:&error], @"ABI v3 contract");
+    Require([RLXSessionBridge validateFFIContract:&error], @"ABI v4 contract");
     RLXSessionBridge *session =
         [[RLXProcessRuntime sharedRuntime] createSessionWithError:&error];
     Require(session != nil, @"create owner-thread session");
@@ -221,7 +221,12 @@ int main(void) {
     RLXSnapshot *snapshot = [session snapshotWithError:&error];
     Require([snapshot.preedit isEqualToString:@"luobo"] && snapshot.cursor == 5,
             @"snapshot preedit and cursor");
-    Require(snapshot.candidates.count == 2, @"snapshot candidates");
+    Require(snapshot.candidates.count == 2 &&
+                snapshot.personalizationStatus ==
+                    RADISHLEX_PERSONALIZATION_STATUS_NOT_ENABLED &&
+                snapshot.candidates[1].index == 1 &&
+                snapshot.candidates[1].engineIndex == 1,
+            @"snapshot candidates and legacy index mapping");
     NSAttributedString *candidate =
         RLXAttributedCandidate(snapshot.candidates[1]);
     Require([candidate.string isEqualToString:snapshot.candidates[1].text],
@@ -230,7 +235,9 @@ int main(void) {
         [session selectCandidateAtIndex:1 error:&error];
     Require(candidateSelection.isConsumed &&
                 [candidateSelection.commit isEqualToString:@"萝卜词核"] &&
-                candidateSelection.snapshot.preedit.length == 0,
+                candidateSelection.snapshot.preedit.length == 0 &&
+                candidateSelection.learningDisposition ==
+                    RADISHLEX_LEARNING_NOT_APPLICABLE,
             @"candidate selection commit and post-selection snapshot");
 
     Require([session setSchema:@"contract.schema" error:&error],

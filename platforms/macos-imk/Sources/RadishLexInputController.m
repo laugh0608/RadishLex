@@ -10,6 +10,36 @@ static BOOL RLXNullableStringsEqual(NSString *left, NSString *right) {
   return left == right || [left isEqualToString:right];
 }
 
+#if !RADISHLEX_CONTRACT_SMOKE
+static void RLXClassifyFrontmostApplication(BOOL *sensitiveApplication,
+                                             BOOL *contextKnown,
+                                             NSString **contextKind) {
+  NSString *bundleIdentifier =
+      NSWorkspace.sharedWorkspace.frontmostApplication.bundleIdentifier;
+  *sensitiveApplication = NO;
+  *contextKnown = NO;
+  *contextKind = @"other";
+  if ([bundleIdentifier isEqualToString:@"com.apple.TextEdit"]) {
+    *contextKnown = YES;
+    *contextKind = @"editor";
+    return;
+  }
+  if ([bundleIdentifier isEqualToString:@"com.openai.codex"]) {
+    *contextKnown = YES;
+    *contextKind = @"code";
+    return;
+  }
+  NSSet<NSString *> *sensitiveBundleIdentifiers = [NSSet setWithArray:@[
+    @"com.apple.Passwords", @"com.apple.keychainaccess",
+    @"com.1password.1password", @"com.agilebits.onepassword7"
+  ]];
+  if ([sensitiveBundleIdentifiers containsObject:bundleIdentifier]) {
+    *sensitiveApplication = YES;
+    *contextKnown = YES;
+  }
+}
+#endif
+
 static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
                                                        RLXSnapshot *right) {
   if (left == right)
@@ -24,6 +54,7 @@ static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
     RLXCandidate *leftCandidate = left.candidates[index];
     RLXCandidate *rightCandidate = right.candidates[index];
     if (leftCandidate.index != rightCandidate.index ||
+        leftCandidate.engineIndex != rightCandidate.engineIndex ||
         leftCandidate.source != rightCandidate.source ||
         ![leftCandidate.text isEqualToString:rightCandidate.text] ||
         !RLXNullableStringsEqual(leftCandidate.reading,
@@ -41,12 +72,19 @@ static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
 @property(nonatomic, strong) RLXSnapshot *snapshot;
 @property(nonatomic, strong) RLXCandidatePanel *candidatePanel;
 @property(nonatomic) NSInteger candidatePanelIndex;
+@property(nonatomic) BOOL hasLearningContext;
+@property(nonatomic) BOOL learningSecureInput;
+@property(nonatomic) BOOL learningSensitiveApplication;
+@property(nonatomic) BOOL learningPrivacyMode;
+@property(nonatomic) BOOL learningContextKnown;
+@property(nonatomic, copy) NSString *learningContextKind;
 #if RADISHLEX_CONTRACT_SMOKE
 @property(nonatomic, strong) id contractClient;
 #endif
 - (BOOL)prepareSessionAndCandidatePanel;
 - (BOOL)moveCandidateSelectionByOffset:(NSInteger)offset;
 - (BOOL)selectCandidateAtIndex:(NSUInteger)index client:(id)sender;
+- (BOOL)updateLearningContextForClient:(id)sender;
 @end
 
 @implementation RadishLexInputController
@@ -122,6 +160,8 @@ static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
   RadishLexKeyEvent normalized = {0};
   if (!RLXNormalizeKeyEvent(event, &normalized))
     return NO;
+  if (![self updateLearningContextForClient:sender])
+    return NO;
 
   if (self.snapshot.preedit.length > 0 && self.snapshot.candidates.count > 0 &&
       normalized.phase == RADISHLEX_KEY_PHASE_PRESS &&
@@ -152,6 +192,17 @@ static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
     }
   }
 
+  if (self.snapshot.preedit.length > 0 && self.snapshot.candidates.count > 0 &&
+      normalized.phase == RADISHLEX_KEY_PHASE_PRESS &&
+      normalized.modifiers == 0 &&
+      normalized.key_kind == RADISHLEX_KEY_KIND_CHAR &&
+      normalized.codepoint >= '1' && normalized.codepoint <= '9') {
+    NSUInteger displayIndex = (NSUInteger)(normalized.codepoint - '1');
+    if (displayIndex < self.snapshot.candidates.count) {
+      return [self selectCandidateAtIndex:displayIndex client:sender];
+    }
+  }
+
   if (normalized.phase == RADISHLEX_KEY_PHASE_PRESS &&
       normalized.key_kind == RADISHLEX_KEY_KIND_NAMED &&
       normalized.named_key == RADISHLEX_NAMED_KEY_ESCAPE &&
@@ -170,6 +221,9 @@ static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
     [(id<IMKTextInput>)sender insertText:result.commit
                         replacementRange:NSMakeRange(NSNotFound, NSNotFound)];
   }
+  if (result.learningDisposition == RADISHLEX_LEARNING_FAILED) {
+    NSLog(@"RadishLex local learning result=%u", result.learningDisposition);
+  }
   if (result.snapshot != nil) {
     [self applySnapshot:result.snapshot client:sender];
   } else {
@@ -181,6 +235,12 @@ static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
 - (void)applySnapshot:(RLXSnapshot *)snapshot client:(id)sender {
   BOOL preserveCandidateSelection =
       RLXSnapshotsHaveSameCandidatePresentation(self.snapshot, snapshot);
+  if (snapshot.personalizationStatus != self.snapshot.personalizationStatus &&
+      snapshot.personalizationStatus >=
+          RADISHLEX_PERSONALIZATION_STATUS_STORAGE_UNAVAILABLE) {
+    NSLog(@"RadishLex personalization status=%u",
+          snapshot.personalizationStatus);
+  }
   NSInteger nextCandidateIndex = 0;
   if (preserveCandidateSelection && self.candidatePanelIndex != NSNotFound &&
       self.candidatePanelIndex >= 0 &&
@@ -244,6 +304,8 @@ static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
 - (BOOL)selectCandidateAtIndex:(NSUInteger)index client:(id)sender {
   if (![NSThread isMainThread] || self.session == nil)
     return NO;
+  if (![self updateLearningContextForClient:sender])
+    return NO;
   NSError *error = nil;
   RLXKeyHandlingResult *result = [self.session selectCandidateAtIndex:index
                                                                 error:&error];
@@ -254,6 +316,9 @@ static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
   if (result.commit != nil) {
     [(id<IMKTextInput>)sender insertText:result.commit
                         replacementRange:NSMakeRange(NSNotFound, NSNotFound)];
+  }
+  if (result.learningDisposition == RADISHLEX_LEARNING_FAILED) {
+    NSLog(@"RadishLex local learning result=%u", result.learningDisposition);
   }
   if (result.snapshot != nil) {
     [self applySnapshot:result.snapshot client:sender];
@@ -266,6 +331,8 @@ static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
 
 - (void)commitComposition:(id)sender {
   if (self.snapshot.preedit.length == 0)
+    return;
+  if (![self updateLearningContextForClient:sender])
     return;
   RadishLexKeyEvent enter = {RADISHLEX_KEY_KIND_NAMED, 0,
                              RADISHLEX_NAMED_KEY_ENTER, 0,
@@ -283,6 +350,61 @@ static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
   } else {
     [self recoverFromError:error client:sender];
   }
+}
+
+- (BOOL)updateLearningContextForClient:(id)sender {
+  (void)sender;
+#if RADISHLEX_CONTRACT_SMOKE
+  return YES;
+#else
+  BOOL sensitiveApplication = NO;
+  BOOL contextKnown = NO;
+  NSString *contextKind = nil;
+  RLXClassifyFrontmostApplication(&sensitiveApplication, &contextKnown,
+                                  &contextKind);
+  BOOL privacyMode =
+      [[NSUserDefaults standardUserDefaults] boolForKey:@"RadishLexPrivacyMode"];
+  BOOL secureInput = IsSecureEventInputEnabled() != 0;
+  BOOL contextChanged =
+      !self.hasLearningContext || self.learningSecureInput != secureInput ||
+      self.learningSensitiveApplication != sensitiveApplication ||
+      self.learningPrivacyMode != privacyMode ||
+      self.learningContextKnown != contextKnown ||
+      ![self.learningContextKind isEqualToString:contextKind];
+  if (!contextChanged)
+    return YES;
+  NSError *error = nil;
+  BOOL updated = [self.session
+      setLearningContextSecureInput:secureInput
+             sensitiveApplication:sensitiveApplication
+                      privacyMode:privacyMode
+                     contextKnown:contextKnown
+                       contextKind:contextKind
+                             error:&error];
+  if (!updated) {
+    NSLog(@"RadishLex learning context update failed (%@:%ld)",
+          error.domain ?: RLXBridgeErrorDomain, (long)error.code);
+    return NO;
+  }
+  RLXSnapshot *refreshed = nil;
+  if (self.snapshot.preedit.length > 0 || self.snapshot.candidates.count > 0) {
+    refreshed = [self.session snapshotWithError:&error];
+    if (refreshed == nil) {
+      NSLog(@"RadishLex learning context snapshot failed (%@:%ld)",
+            error.domain ?: RLXBridgeErrorDomain, (long)error.code);
+      return NO;
+    }
+  }
+  self.hasLearningContext = YES;
+  self.learningSecureInput = secureInput;
+  self.learningSensitiveApplication = sensitiveApplication;
+  self.learningPrivacyMode = privacyMode;
+  self.learningContextKnown = contextKnown;
+  self.learningContextKind = contextKind;
+  if (refreshed != nil)
+    [self applySnapshot:refreshed client:sender];
+  return YES;
+#endif
 }
 
 - (BOOL)cancelCompositionForClient:(id)sender {

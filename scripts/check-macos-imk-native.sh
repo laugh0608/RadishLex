@@ -175,7 +175,8 @@ while IFS= read -r -d '' dylib; do
   lipo -archs "${dylib}" | tr ' ' '\n' | grep -qx "${architecture}"
 done < <(find "${contents}/Frameworks" -type f -name '*.dylib' -print0 | sort -z)
 
-for symbol in session_new_rime session_handle_key_event rime_runtime_shutdown; do
+for symbol in session_new_personalized_rime session_handle_key_event \
+  session_set_learning_context rime_runtime_shutdown; do
   nm -gU "${ffi_dylib}" | grep -q "_radishlex_${symbol}$"
 done
 

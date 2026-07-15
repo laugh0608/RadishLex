@@ -198,6 +198,14 @@ int main(void) {
                 !panel.rlx_contractWindow.isVisible,
             @"Space commits the candidate at the same display index");
 
+    Require(TypeASCII(controller, client, @"luobo") &&
+                [controller handleEvent:KeyEvent(kVK_ANSI_2, 0, @"2")
+                                  client:client] &&
+                [client.committedTexts.lastObject isEqualToString:@"萝卜词核"] &&
+                client.markedText.length == 0 &&
+                !panel.rlx_contractWindow.isVisible,
+            @"number key commits the candidate at the same display index");
+
     Require(TypeASCII(controller, client, @"luobo"),
             @"second composition for pointer selection");
     [panel.rlx_contractCandidateButtons[1] performClick:nil];
