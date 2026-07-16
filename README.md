@@ -74,7 +74,7 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
   rime --schema luna_pinyin --shared-data <path> --user-data <path> luobo
 ```
 
-详细命令见 [CLI 说明](docs/cli.md)，本机 Rime 环境见 [Rime Native Smoke Runbook](docs/runbooks/rime-native-smoke.md)。
+详细命令见 [CLI 说明](docs/cli.md)，精确学习状态与非选择候选快照见 [学习取证 CLI 参考](docs/cli-learning-evidence.md)，本机 Rime 环境见 [Rime Native Smoke Runbook](docs/runbooks/rime-native-smoke.md)。
 
 macOS InputMethodKit 不安装验证：
 

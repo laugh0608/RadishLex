@@ -179,7 +179,7 @@ commit_engine_index: <n>
 
 ### Rime 非选择快照
 
-`rime snapshot` 不调用候选选择/提交 API，也不记录学习事件；它只接受小写拼音输入字符并报告 `selection_api_called: false`，但不对任意自定义 schema 的内部按键绑定作额外承诺。命令要求显式 `--deploy-on-start 0|1`，并只接受祖先不可被其他账户替换、当前系统账户拥有、mode `0700`、fresh empty 且不在用户 Rime/Squirrel/Input Methods/RadishLex Rime 路径内的 `--user-data`。权威 home 来自系统账户记录而非 `HOME`，复核后的 canonical 路径会实际传给 Rime。传入 `--rank-db` 时使用产品 `PersonalizedInputSession` 报告 display/engine index 与 explain；打开数据库仍可能执行 migration、PRAGMA 和权限维护。固定命令与判定见 [macOS R01B 本地个人化验收](runbooks/macos-r01b-personalization-acceptance.md)。
+`rime snapshot` 使用 fresh empty Rime user data 读取非选择候选快照，不调用候选选择 API；传入 `--rank-db` 时通过产品 `PersonalizedInputSession` 输出 display/engine index、最终分数和 explain。命令参数、fresh 目录约束、输出字段和证据组合规则见 [学习取证 CLI 参考](cli-learning-evidence.md)。
 
 ## dict 命令
 
@@ -351,7 +351,7 @@ latest_activity:
 
 `learn status` 面向后续管理 UI 的学习状态概览，只输出聚合计数、最新活动时间和隐私边界标记。它不输出 P1 原始选择事件、负反馈 reason 明细、上下文分布、用户词明文或同步明文 payload。
 
-`learn case-status` 是面向合成学习用例的版本化精确审计视图，当前 `inspection_version` 为 `1`。它在同一个 SQLite 读事务中返回全库聚合、目标 term、指定 context 的 ranker weight 和 tombstone；输出固定包含 `p1_rows: omitted`，不返回 P1 原始行。删除/恢复判定见 R01B 专用 runbook。
+`learn case-status` 是面向合成学习用例的版本化精确审计视图。它在同一个 SQLite 读事务中返回全库聚合、目标 term、指定 context 的 ranker weight 和 tombstone，并明确省略 P1 原始行。字段和判定规则见 [学习取证 CLI 参考](cli-learning-evidence.md)。
 
 记录一次候选选择：
 
@@ -471,8 +471,10 @@ cargo run -p radishlex-ime-cli -- \
 - `demo` 不读取本机输入法数据。
 - `rime` 必须显式指定 `shared-data` 与 `user-data`，不应指向真实 Rime 用户目录。
 - `rime --rank-db` 必须显式指定隔离 userdb，建议使用 `/tmp` 下临时 SQLite 文件。
+- `rime snapshot` 每次可归属快照都必须使用新的 fresh empty user data；带 `--rank-db` 时数据库打开仍可能执行迁移和权限维护。
 - `dict`、`learn` 和 `rank explain` 必须显式指定隔离 `--db`；导入导出文件也应位于 `/tmp` 并只含合成数据。
 - `learn status` 只输出聚合状态；`sync preflight` 只输出分类计数，二者均不暴露用户词或事件明文、上下文明细、payload、envelope、hash 或签名。
+- `learn case-status` 只用于合成用例的精确取证读模型，不作为 manager 产品接口，也不返回 P1 事件行。
 - `learn` 当前没有平台 secure text entry 信号输入，CLI smoke 只应使用合成词、虚构上下文和临时数据库。
 - 本机 smoke 应使用 `/tmp` 下的隔离目录和合成输入码，不提交 schema 数据、用户目录、日志或输出中的敏感内容。
 

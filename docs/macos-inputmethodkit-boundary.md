@@ -133,9 +133,14 @@ R01B 将正式 InputMethodKit session 切换到 `ime-runtime` 产品构造入口
 
 userdb 是用户数据，默认输入法移除和开发 bundle 清理必须保留；普通清理只删除用户级 bundle 与 `RadishLex/Rime`，不删除父目录或 SQLite 文件。`--status` 只读报告固定路径、`cleanup_path_ancestors=safe|unsafe`、父目录 kind/mode、已知 sidecar 聚合和四态进程身份，不打开数据库。悬空 symlink 视为存在或不安全；精确 stop 只处理命令行匹配固定 bundle executable 的进程，并在删除前再次确认进程停止和路径祖先安全。
 
-R01B 使用两个相互独立的授权边界。授权 A 覆盖 Apple Development 重建/签名、复制前完整原子基线、用户级安装、系统设置与人工交互、隐私设置临时变更和恢复、进程重启、delete/explicit restore，以及保留 userdb/父目录的普通清理。固定 CurrentUser/AnyHost CFPreferences domain/key 的 receipt 必须保留隐私键 absent 与显式 false 的差别；设置漂移、receipt 不安全或恢复失败时失败关闭。普通清理、隐私键恢复、数据库连接关闭和本轮数据归属证明完成后，才可申请授权 B。授权 B 只允许 receipt 绑定的精确清理入口删除本轮 `userdb.sqlite3`、`-wal`、`-shm`、`-journal`，随后将安装前已记录的空父目录恢复为 `0755`；父目录不得删除。目录身份、所有者、权限、条目集合、打开文件或 receipt 任一不符时保留数据；中途失败后的恢复也只能在同一 receipt 与父目录身份下处理残余固定文件。
+R01B 使用两个相互独立的授权边界。授权 A 覆盖 Apple Development 重建/签名、复制前原子基线、用户级安装、系统设置与人工交互、隐私设置临时变更和恢复、进程重启、delete/explicit restore，以及保留 userdb/父目录的普通清理。授权 B 只在授权 A 已完成回滚且数据归属可证明后，允许专用入口删除本轮固定 SQLite family；不能把 A 的普通清理扩张成数据删除。
 
-复制前必须以一次完整调用证明 TIS zero、bundle absent、祖先 safe、预存父目录 empty/`0755`、Rime/userdb/sidecar absent 和进程 stopped，并排他创建父目录/隐私状态 receipt；检查后任一漂移都取消批次。专用流程见 [macOS R01B 个人化验收 runbook](runbooks/macos-r01b-personalization-acceptance.md)。
+两个 receipt 工具都是固定参数、固定路径的失败关闭状态机：
+
+- 隐私 receipt 绑定 `org.radishlex.inputmethod.macos` / `RadishLexPrivacyMode` 的 CurrentUser/AnyHost CFPreferences 层，精确保留 absent 与布尔 false。baseline 只接受这两种初态；receipt 以当前用户 `0600` regular file 排他创建并绑定设备号/inode，先 `fsync` receipt 与状态目录，再写 true。恢复时必须从 true 回到原状态并读回确认，随后复核 receipt 身份、持久删除；设置漂移、非布尔值、路径/身份不安全或恢复失败均保留 receipt 供重试。
+- userdb receipt 只绑定安装前已存在的空 `~/Library/Application Support/RadishLex` 父目录及其设备号/inode/owner/mode。baseline 必须在一次完整检查中证明 TIS zero、bundle absent、祖先 safe、父目录 empty/`0755`、Rime 和四个 SQLite 文件 absent、进程 stopped。授权 B 前还必须证明固定文件没有打开句柄；helper 只通过 no-follow 目录句柄删除 `userdb.sqlite3`、`-wal`、`-shm`、`-journal`，拒绝未知条目、symlink、sidecar-only、身份或权限漂移。成功后恢复空父目录为 `0755`、持久删除 receipt；中途失败只能凭同一 receipt 继续恢复，父目录永不删除。
+
+命令、可重试状态和人工停止条件见 [macOS 平台说明](../platforms/macos-imk/README.md) 与 [macOS R01B 个人化验收 runbook](runbooks/macos-r01b-personalization-acceptance.md)。
 
 候选 snapshot 同时携带 display index 与 engine index；候选窗、数字键、Space、鼠标和 accessibility action 始终回传 display index，由 Rust runtime 映射后选择 engine candidate。平台每次事件前传入 secure input、敏感应用、隐私模式、上下文可信度和受控 context kind；禁止学习场景不会写入，secure/敏感/未知场景也不读取个人化信号。分段选择的待确认意图、selection 事务和失败语义全部留在 Rust。平台日志只允许记录阶段、个人化状态与学习结果枚举，不记录输入码、候选、App ID 或数据库路径。
 

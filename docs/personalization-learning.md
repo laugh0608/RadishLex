@@ -301,6 +301,7 @@ manual delete
 
 ```text
 radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] --rank-db <path> [--context <kind>] <input-code> [candidate-index]
+radishlex-ime-cli rime snapshot --schema <schema> --shared-data <path> --user-data <fresh-empty-path> --deploy-on-start <0|1> [--rank-db <path>] [--context <kind>] <input-code>
 radishlex-ime-cli dict list --db <path>
 radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict restore --db <path> --input <code> --text <text> [--reading <reading>]
@@ -310,6 +311,7 @@ radishlex-ime-cli dict inspect --file <path>
 radishlex-ime-cli dict import --db <path> --file <path> [--source <name>] [--dry-run]
 radishlex-ime-cli dict import-batches --db <path>
 radishlex-ime-cli learn status --db <path>
+radishlex-ime-cli learn case-status --db <path> --input <code> --text <text> [--reading <reading>] [--context <kind>]
 radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
 radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
 radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
@@ -329,7 +331,11 @@ radishlex-ime-cli sync preflight --db <path>
 - `dict import-batches` 用于查看导入批次来源、导入数量、插入数量、更新数量、删除跳过数量、重复跳过数量和创建时间。
 - `dict inspect` 用于在不打开 userdb 的情况下检查导入文件格式版本、记录数和 CLI 输入码兼容性。
 - `learn status` 用于查看管理 UI 需要的只读学习状态摘要，只输出词条、ranker weight、deleted tombstone、P1 本地事件和本地审计批次的总量与最新活动时间，不输出 P1 选择事件明细、负反馈明细、上下文分布、用户词文本或同步明文 payload。
+- `learn case-status` 是版本化的合成用例取证读模型：在一个 SQLite 读事务中返回规范化身份、全库计数/时间、精确 term、指定 context 的 ranker weight 和 tombstone，并明确省略 P1 原始行；它不替代 manager 的受限聚合接口。
+- `rime snapshot` 只编排 fresh Rime user data 上的非选择候选证据。带 `--rank-db` 时必须走产品 `PersonalizedInputSession`，输出 display/engine index 和 explain；它不新增 engine trait，也不能用单次 UI 顺序代替操作前后数据库增量。
 - `sync preflight` 只输出 P2 可同步对象计数、P1 本地事件计数和本地审计计数，不生成明文同步 payload。
+
+精确字段、路径安全边界与组合取证顺序见 [学习取证 CLI 参考](cli-learning-evidence.md)。
 
 ### FFI 管理入口
 

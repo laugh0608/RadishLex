@@ -34,6 +34,34 @@ native 产品 session 通过 ABI v4 的 personalized Rime 构造入口持有独�
 
 `userdb.sqlite3` 不是临时 Rime 数据，卸载或普通开发清理不得删除。`--status` 分别报告 bundle、固定删除路径祖先安全性、RadishLex 父目录的存在性/类型/权限、Rime 目录、userdb、已知 SQLite sidecar 和进程；悬空 symlink 也视为存在或不安全，但这些 metadata 不自动证明数据归属。R01B 在复制前必须捕获 privacy 与空父目录 receipts；授权 A 完成普通清理和隐私恢复后，授权 B 才能通过专用 helper 精确删除本轮四个 SQLite 文件并恢复预存父目录 `0755`。当前父目录不得删除，完整 case、增减量和停止线见 `docs/runbooks/macos-r01b-personalization-acceptance.md`。
 
+## R01B 辅助工具状态机
+
+两个入口只接受固定动作，不接受调用方路径或额外参数，也不提供通用偏好设置或数据库清理能力：
+
+```bash
+./platforms/macos-imk/privacy-mode.sh --status
+./platforms/macos-imk/privacy-mode.sh --capture-baseline
+./platforms/macos-imk/privacy-mode.sh --authorized-enable
+./platforms/macos-imk/privacy-mode.sh --authorized-restore
+
+./platforms/macos-imk/cleanup-r01b-test-userdb.sh --capture-baseline
+./platforms/macos-imk/cleanup-r01b-test-userdb.sh --authorized-delete-r01b-test-userdb
+```
+
+隐私工具固定操作输入法 domain `org.radishlex.inputmethod.macos` 的 CurrentUser/AnyHost `RadishLexPrivacyMode` 布尔键：
+
+1. `--capture-baseline` 只接受键 absent 或显式 false，排他保存二者之一；true、非布尔值或既有不安全 receipt 均拒绝。
+2. `--authorized-enable` 要求当前状态仍与 baseline 一致，写入 true 后立即读回；receipt 在偏好修改前已通过文件与目录 `fsync` 持久化。
+3. `--authorized-restore` 只从 true 恢复原始 absent/false，读回确认后才持久删除 receipt；任何中途失败保留可复核状态和 receipt，下一次仍使用同一 restore 动作，不手工改 receipt。
+
+test userdb 工具固定绑定 `~/Library/Application Support/RadishLex` 和 `userdb.sqlite3`、`-wal`、`-shm`、`-journal`：
+
+1. `--capture-baseline` 要求完整清理状态、父目录已存在且 empty/`0755`，并记录父目录与 receipt 的设备号/inode/owner/mode；它不创建或删除数据库。
+2. `--authorized-delete-r01b-test-userdb` 只能在授权 A 已完成、完整状态复核通过且 `lsof` 证明现有固定文件均未打开后执行。helper 只删除这四个精确名字，未知条目、symlink、sidecar-only、所有者/权限/身份漂移都失败关闭。
+3. 删除中断时，receipt 允许在同一父目录身份下识别“主库及 sidecar”“已删空但仍为 `0700`”“已恢复空 `0755`”三类可重试状态；成功终态必须是空父目录 `0755` 且 receipt 已持久移除。不要以 `rm` 或手工改权限绕过状态机。
+
+receipt 固定写入仓库 `target/macos-imk/r01b`，属于本机授权流程状态，不提交版本库。隐私临时变更属于授权 A；test userdb 精确删除属于单独授权 B。完整人工顺序见 [macOS R01B 个人化验收](../../docs/runbooks/macos-r01b-personalization-acceptance.md)。
+
 ## 不安装验证
 
 ```bash

@@ -246,6 +246,7 @@ Rime candidate 转 RadishLex candidate 时只保留稳定字段：
 ```text
 radishlex-ime-cli demo <input-code> [candidate-index]
 radishlex-ime-cli rime --schema luna_pinyin --shared-data <path> --user-data <path> [--key <name> ...] <input-code> [candidate-index]
+radishlex-ime-cli rime snapshot --schema luna_pinyin --shared-data <path> --user-data <fresh-empty-path> --deploy-on-start <0|1> [--rank-db <path>] [--context <kind>] <input-code>
 ```
 
 规则：
@@ -253,10 +254,12 @@ radishlex-ime-cli rime --schema luna_pinyin --shared-data <path> --user-data <pa
 - `demo` 保持无 native 依赖，继续作为默认 smoke。
 - `rime` 只在启用 `native-rime` 且本机依赖可用时编译或运行。
 - `rime --key <name>` 仅作为 CLI smoke 调试入口，用于在输入码后追加 `page-down`、`page-up`、方向键等命名键事件。
+- `rime snapshot` 只接受受限输入码并拒绝选择参数和命名键；它通过既有输入 session 取得候选，若输入字符意外产生 commit 则失败。
+- snapshot 是 CLI 层的证据编排，不新增 `Engine` trait 能力；带 `--rank-db` 时复用产品个人化 runtime，而不是在 adapter 内实现排序或学习。
 - CLI 输出继续包含 schema、composition、candidates、commit。
 - 没有真实 Rime 环境时，测试只验证参数解析和错误提示，不伪造真实 Rime 输出。
 
-命令参数、输出字段和退出码说明见 `docs/cli.md`。
+命令参数、输出字段和退出码说明见 [CLI 说明](cli.md)；非选择快照与精确学习读模型见 [学习取证 CLI 参考](cli-learning-evidence.md)。
 
 ## 验证分层
 
