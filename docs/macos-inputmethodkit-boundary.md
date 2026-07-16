@@ -15,7 +15,7 @@ system key event
   -> text commit
 ```
 
-M1 不要求远端同步、设备授权、恢复码、完整 manager 产品包、最终签名安装包或第二平台。M2 再接真实学习与本地 manager，M4 再闭合普通用户分发。
+M1 不要求远端同步、设备授权、恢复码、完整 manager 产品包、最终签名安装包或第二平台。R01B 在 M1 内完成真实学习纵向证据，M2 再接本地 manager 产品能力，M4 再闭合普通用户分发。
 
 ## 职责分工
 
@@ -125,17 +125,25 @@ SDK `IMKInputSession.h` 明确给自建候选窗提供 `windowLevel`，并说明
 - 输入热路径完全离线；Go server、manager 和网络不参与按键处理。
 - secure text entry、P0 应用、用户隐私模式或无法安全判断的敏感场景不得产生学习事件。
 - 日志、崩溃报告、截图和人工 smoke 记录不得包含真实输入历史、联系人、密码、证件或支付信息。
-- M1 可以不写学习事件，但必须保留向 M2 runtime 传递 privacy context 的稳定位置。
+- R01B 只有在明确允许的普通上下文中写学习事件，并必须通过稳定 privacy context 在记录前决定读写策略。
 - M2 输入法与 manager 若共享 userdb，必须固定 App Group 或等价目录、文件权限、WAL/busy 策略、migration 所有权和并发测试。
 - 平台壳不得直接打开 SQLite；目录只作为受控配置传给 Rust runtime 或 manager bridge。
 
 R01B 将正式 InputMethodKit session 切换到 `ime-runtime` 产品构造入口。每个 controller/session 使用独立 engine session 和独立 userdb connection，数据库固定在 `~/Library/Application Support/RadishLex/userdb.sqlite3`；Objective-C 只创建权限为 `0700` 的父目录并传 UTF-8 路径，Rust 负责 migration、WAL、busy timeout、数据库与 sidecar 的 `0600` 权限以及损坏错误。平台不得静默删除或重建数据库。
 
-userdb 是用户数据，默认输入法移除和开发 bundle 清理必须保留；现有清理入口只删除 `RadishLex/Rime` 运行目录，不删除父目录、`userdb.sqlite3` 或 SQLite sidecar。`--status` 只读报告固定路径的存在性、`cleanup_path_ancestors=safe|unsafe`、父目录 kind/mode、已知 sidecar 聚合和 `stopped|running_verified|running_unverified|unavailable` 进程状态，不打开数据库；悬空 symlink 视为存在或不安全，同名进程只有命令行匹配固定 bundle executable 才可被终止。授权清理必须在进程处理前和固定删除前复核从 `HOME` 到 bundle/Rime 的祖先均为普通目录或尚不存在，不能沿中间 symlink 删除外部目标；安装前 ancestor 状态不是 `safe` 时同样停止。当前 R01B 在复制前必须以一次完整调用重新证明 TIS zero、bundle absent、祖先 safe、预存父目录 empty/`0755`、Rime/userdb/sidecar absent 和进程 stopped，并记录隐私键是否存在及原值，检查后任一漂移都取消批次。第一阶段授权覆盖 Apple Development、实机数据操作、按原存在性/原值恢复隐私键和保留 userdb/父目录的普通清理；这些动作、数据库关闭和归属证明完成后，第二阶段精确授权才可删除本轮 userdb family并恢复预存父目录为空和 `0755`。归属或设置恢复不清时保留数据，当前父目录永不删除，R01B 不得关闭。
+userdb 是用户数据，默认输入法移除和开发 bundle 清理必须保留；普通清理只删除用户级 bundle 与 `RadishLex/Rime`，不删除父目录或 SQLite 文件。`--status` 只读报告固定路径、`cleanup_path_ancestors=safe|unsafe`、父目录 kind/mode、已知 sidecar 聚合和四态进程身份，不打开数据库。悬空 symlink 视为存在或不安全；精确 stop 只处理命令行匹配固定 bundle executable 的进程，并在删除前再次确认进程停止和路径祖先安全。
+
+R01B 使用两个相互独立的授权边界。授权 A 覆盖 Apple Development 重建/签名、复制前完整原子基线、用户级安装、系统设置与人工交互、隐私设置临时变更和恢复、进程重启、delete/explicit restore，以及保留 userdb/父目录的普通清理。固定 CurrentUser/AnyHost CFPreferences domain/key 的 receipt 必须保留隐私键 absent 与显式 false 的差别；设置漂移、receipt 不安全或恢复失败时失败关闭。普通清理、隐私键恢复、数据库连接关闭和本轮数据归属证明完成后，才可申请授权 B。授权 B 只允许 receipt 绑定的精确清理入口删除本轮 `userdb.sqlite3`、`-wal`、`-shm`、`-journal`，随后将安装前已记录的空父目录恢复为 `0755`；父目录不得删除。目录身份、所有者、权限、条目集合、打开文件或 receipt 任一不符时保留数据；中途失败后的恢复也只能在同一 receipt 与父目录身份下处理残余固定文件。
+
+复制前必须以一次完整调用证明 TIS zero、bundle absent、祖先 safe、预存父目录 empty/`0755`、Rime/userdb/sidecar absent 和进程 stopped，并排他创建父目录/隐私状态 receipt；检查后任一漂移都取消批次。专用流程见 [macOS R01B 个人化验收 runbook](runbooks/macos-r01b-personalization-acceptance.md)。
 
 候选 snapshot 同时携带 display index 与 engine index；候选窗、数字键、Space、鼠标和 accessibility action 始终回传 display index，由 Rust runtime 映射后选择 engine candidate。平台每次事件前传入 secure input、敏感应用、隐私模式、上下文可信度和受控 context kind；禁止学习场景不会写入，secure/敏感/未知场景也不读取个人化信号。分段选择的待确认意图、selection 事务和失败语义全部留在 Rust。平台日志只允许记录阶段、个人化状态与学习结果枚举，不记录输入码、候选、App ID 或数据库路径。
 
-当前 macOS 分类只使用前台应用 Bundle ID 生成粗粒度信号：TextEdit 映射为已知 `editor`，Codex 映射为已知 `code`；Passwords、Keychain Access、1Password 8 和旧版 1Password 7 的固定 Bundle ID 标记为敏感应用；其他应用一律为未知 `other`，因此只使用 engine 顺序。secure input 通过公开 `IsSecureEventInputEnabled()` 读取。隐私模式读取当前输入法 domain 的 `RadishLexPrivacyMode` 布尔设置，缺省为关闭；开启后只读既有本地摘要且不写当前选择。任一信号变化都会先更新 Rust learning context；已有 composition 时必须刷新 snapshot，使旧 display/engine mapping 失效后再处理选择。
+生产分类已抽取为 `RadishLexLearningContext`，正式 controller 使用该实现，分类 contract 也直接编译同一生产源码。TextEdit 映射为已知 `editor`，Codex 映射为已知 `code`；Passwords、Keychain Access、1Password 8 和旧版 1Password 7 的固定 Bundle ID 标记为 P0 敏感应用；其他应用一律为未知 `other`，只使用 engine 顺序。unknown/P0 `ValidationHost` 本体只提供固定 Bundle ID、普通输入框和 `NSSecureTextField`，分类 contract 以这两个身份覆盖生产判断；host 不读取、记录或持久化内容，仓库门禁只构建、不启动 GUI。secure input 只通过公开 `IsSecureEventInputEnabled()` 观察，验证宿主不得调用 enable/disable API。若 macOS 在 secure field 中直接旁路第三方输入法，实机记录必须写“系统 secure 路由旁路，controller secure 分支未由本组实机执行”，不能误记为 `policy_blocked`。
+
+隐私模式读取固定输入法 domain 的 `RadishLexPrivacyMode` 布尔设置，缺省为关闭；开启后只读既有本地摘要且不写当前选择。任一信号变化都会先更新 Rust learning context；已有 composition 时必须刷新 snapshot，使旧 display/engine mapping 失效后再处理选择。
+
+R01B 固定合成 case 为 `r01b-shi-time-v1`：`pinyin_simp` / `shi` / `时` / reading absent / `editor`；隔离初始页为 `是、时、事、使、市`，目标 display/engine index 为 `1/1`。一次真实选择后，fresh isolated non-selection snapshot 可得到 `0/1`。删除与显式恢复必须同时使用精确 `case-status` DTO 的目标 term/ranker/tombstone、聚合增减量和 fresh isolated Rime user-data snapshot 取证；librime 自身 user data 也会影响顺序，不能只凭候选 UI 宣称 RadishLex ranker 生效。
 
 ## Native 依赖与目录
 
@@ -172,9 +180,9 @@ TIS input source/mode id 与 bundle 文件名属于平台稳定身份，不等�
 
 ## 开发安装边界
 
-新增、启用或移除系统输入法会修改本机状态，必须在独立 runbook 中说明影响、路径、回滚和 smoke 数据要求，并在执行前获得用户明确授权。自动测试默认只构建 bundle、检查结构和运行 host contract，不自动安装、启用或重启系统输入法服务。授权实机采用固定人机分工：执行者负责部署、系统设置添加、只读 TIS 监视和最终移除清理；开发者负责目标文稿聚焦、当前 source 手动切换及实体键盘、鼠标和辅助功能交互。自动化不得调用 `TISSelectInputSource` 或注入按键代替验收；菜单栏名称仅作辅助观察，来源归属以输入期间只读精确 source 记录为准。用户主动关闭的“自动切换到文稿的输入法”在 R01A 集中验收中保持关闭，执行者不得修改。注销或重启登录会话必须由开发者另行安排，不能作为自动刷新步骤。
+新增、启用或移除系统输入法会修改本机状态，必须在独立 runbook 中说明影响、路径、回滚和合成 smoke 数据要求，并在执行前获得对应授权。自动测试默认只构建 bundle、验证宿主和 contract，不自动安装、启动 GUI host、启用或重启系统输入法服务。授权实机采用固定人机分工：执行者负责部署、系统设置添加、只读 TIS 监视和最终移除清理；开发者负责目标文稿聚焦、当前 source 手动切换及实体键盘、鼠标和辅助功能交互。自动化不得调用 `TISSelectInputSource` 或注入按键代替验收；菜单栏名称仅作辅助观察，来源归属以输入期间只读精确 source 记录为准。用户主动关闭的“自动切换到文稿的输入法”保持关闭，执行者不得修改。注销或重启登录会话必须由开发者另行安排，不能作为自动刷新步骤。
 
-当前开发实现位于 `platforms/macos-imk/`。`./scripts/check-macos-imk.sh` 只构建 contract `.app` bundle、编译 production 条件分支并运行 wrapper、真实 AppKit panel 与 controller 集成 contract；它同时编译 TIS 工具，逐字断言原状态输出兼容性，并对通知、CFRunLoop、初始/变化输出和禁止变异 API 建立门禁。`./scripts/check-macos-imk-native.sh` 必须由调用方显式提供 `RIME_INCLUDE_DIR`、`RIME_LIB_DIR`、隔离 shared data、schema id 和许可证文件，并检查 mode metadata、架构、递归 dependency closure、symbol、逐库许可证、完整 bundle 签名、数据哈希清单与 contract-only API 缺失。默认 ad-hoc 签名只服务无安装门禁；真实安装 smoke 还必须显式提供当前用户有效的 Apple Development identity。两条入口都不查找用户已有 Rime 目录，不执行安装、注册、bundle 启动或服务重启。开发版安装与移除步骤见 `docs/runbooks/macos-inputmethodkit-development.md`。
+当前开发实现位于 `platforms/macos-imk/`。`./scripts/check-macos-imk.sh` 构建 contract bundle 和 unknown/P0 ValidationHost，运行 wrapper、生产分类、AppKit panel、controller、CFPreferences receipt、精确 stop 与 R01B userdb receipt 清理 contract，但不启动 GUI host。`./scripts/check-macos-imk-native.sh` 必须由调用方显式提供 `RIME_INCLUDE_DIR`、`RIME_LIB_DIR`、隔离 shared data、schema id 和许可证文件，并检查 mode metadata、架构、递归 dependency closure、symbol、逐库许可证、完整 bundle 签名、数据哈希清单与 contract-only API 缺失。默认 ad-hoc 签名只服务无安装门禁；真实安装 smoke 还必须显式提供当前用户有效的 Apple Development identity。两条入口都不查找用户已有 Rime 目录，不执行安装、注册、bundle 启动或服务重启。通用安装与移除见 `docs/runbooks/macos-inputmethodkit-development.md`，R01B 固定 case、授权 A/B 和证据规则见 `docs/runbooks/macos-r01b-personalization-acceptance.md`。`build 33` 因生产分类与这些验证工具变更而只保留历史意义；当前 `build 34` repository-only/ad-hoc 候选必须在提交后的 clean HEAD 重新门禁和冻结，不能沿用旧哈希。
 
 `platforms/macos-imk/ReferenceProbe/` 是 R01A 的隔离诊断资产，不是第二套产品输入法。它只使用合成候选和独立身份，证明静态事件路由、metadata 与清理停止线；probe 的 TIS 枚举、安装或失败不能单独修改正式输入源身份、Rust/Rime 边界或 M1 退出结论。
 

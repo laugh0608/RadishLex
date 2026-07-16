@@ -1,6 +1,6 @@
 # RadishLex CLI 说明
 
-本文档用于说明 `radishlex-ime-cli` 当前可用命令、参数、输出字段、错误语义和安全边界，读者是需要在本地复验 Rust core 与 engine adapter 行为的开发者和协作者。本文不包含阶段路线、开发进度、Rime 数据准备细节、平台输入法安装流程、ranker 设计或同步协议。
+本文档面向本地复验 Rust core 与 engine adapter 的开发者，说明 `radishlex-ime-cli` 的命令、输出、错误和安全边界；不包含阶段路线、Rime 数据准备、平台安装、ranker 设计或同步协议。
 
 ## 定位
 
@@ -11,13 +11,14 @@ input code -> push_key -> composition -> candidates -> select_candidate
 userdb -> learning event -> ranker summary -> rank explain
 ```
 
-它不是系统输入法，也不注册平台输入法服务。CLI 只在当前进程内运行，用于观察 `ime-core`、engine adapter、`ime-userdb` 与 `ime-ranker` 的行为。
+它不注册系统输入法，只在当前进程观察 `ime-core`、engine adapter、`ime-userdb` 与 `ime-ranker`。
 
 当前命令：
 
 ```text
 radishlex-ime-cli demo <input-code> [candidate-index]
 radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] [--rank-db <path>] [--context <kind>] <input-code> [candidate-index]
+radishlex-ime-cli rime snapshot --schema <schema> --shared-data <path> --user-data <fresh-empty-path> --deploy-on-start <0|1> [--rank-db <path>] [--context <kind>] <input-code>
 radishlex-ime-cli dict list --db <path>
 radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict restore --db <path> --input <code> --text <text> [--reading <reading>]
@@ -27,6 +28,7 @@ radishlex-ime-cli dict inspect --file <path>
 radishlex-ime-cli dict import --db <path> --file <path> [--source <name>] [--dry-run]
 radishlex-ime-cli dict import-batches --db <path>
 radishlex-ime-cli learn status --db <path>
+radishlex-ime-cli learn case-status --db <path> --input <code> --text <text> [--reading <reading>] [--context <kind>]
 radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
 radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
 radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
@@ -173,7 +175,11 @@ commit_engine_index: <n>
 - `explain`：本地 userdb 与 ranker summary 对该候选的排序贡献。
 - `commit_engine_index`：最终传给 `select_candidate` 的原始 engine index；分段候选选择不保证同一步产生 commit。
 
-该模式只读取显式传入的 `--rank-db`，不把 Rime 内部对象 ID 写入 userdb。
+该模式只使用显式传入的 `--rank-db` 作为排序信号源，不把 Rime 内部对象 ID 写入 userdb。打开数据库仍会经过当前 `UserDb::open` 的 schema 检查、迁移、PRAGMA 和权限收紧流程，因此只能使用本批复核归属的数据库，不能把它理解为文件系统级只读访问。
+
+### Rime 非选择快照
+
+`rime snapshot` 不调用候选选择/提交 API，也不记录学习事件；它只接受小写拼音输入字符并报告 `selection_api_called: false`，但不对任意自定义 schema 的内部按键绑定作额外承诺。命令要求显式 `--deploy-on-start 0|1`，并只接受祖先不可被其他账户替换、当前系统账户拥有、mode `0700`、fresh empty 且不在用户 Rime/Squirrel/Input Methods/RadishLex Rime 路径内的 `--user-data`。权威 home 来自系统账户记录而非 `HOME`，复核后的 canonical 路径会实际传给 Rime。传入 `--rank-db` 时使用产品 `PersonalizedInputSession` 报告 display/engine index 与 explain；打开数据库仍可能执行 migration、PRAGMA 和权限维护。固定命令与判定见 [macOS R01B 本地个人化验收](runbooks/macos-r01b-personalization-acceptance.md)。
 
 ## dict 命令
 
@@ -320,7 +326,7 @@ cargo run -p radishlex-ime-cli -- \
 
 ```text
 learning_status: ready
-schema_version: 2
+schema_version: 3
 plaintext_payload: false
 p1_raw_details: false
 context_stats: false
@@ -344,6 +350,8 @@ latest_activity:
 ```
 
 `learn status` 面向后续管理 UI 的学习状态概览，只输出聚合计数、最新活动时间和隐私边界标记。它不输出 P1 原始选择事件、负反馈 reason 明细、上下文分布、用户词明文或同步明文 payload。
+
+`learn case-status` 是面向合成学习用例的版本化精确审计视图，当前 `inspection_version` 为 `1`。它在同一个 SQLite 读事务中返回全库聚合、目标 term、指定 context 的 ranker weight 和 tombstone；输出固定包含 `p1_rows: omitted`，不返回 P1 原始行。删除/恢复判定见 R01B 专用 runbook。
 
 记录一次候选选择：
 
@@ -402,19 +410,19 @@ cargo run -p radishlex-ime-cli -- \
   --context chat
 ```
 
-输出：
+输出示意（`final_score` 与 `recency_boost` 会随复验时间变化）：
 
 ```text
 input: luobo
 candidate: 萝卜
 context: chat
 original_index: 0
-final_score: 2.650
+final_score: <time-dependent-score>
 explain:
-  engine_order_factor: 1.000
+  engine_order_factor: -0.000
   user_term_boost: 1.000
-  frequency_boost: 0.350
-  recency_boost: 0.000
+  frequency_boost: 0.243
+  recency_boost: <time-dependent-score>
   context_boost: 0.300
   negative_feedback_penalty: 0.000
   suppressed_penalty: 0.000
@@ -434,7 +442,7 @@ explain:
 
 ## sync preflight 命令
 
-`sync preflight` 是同步实现前的本地检查入口，只统计 userdb 当前可进入后续加密同步对象的数据类别，不生成明文 payload，不连接后端。
+`sync preflight` 只统计 userdb 可进入后续加密同步对象的数据类别，不生成明文 payload，也不连接后端。
 
 ```bash
 cargo run -p radishlex-ime-cli -- \
@@ -442,19 +450,11 @@ cargo run -p radishlex-ime-cli -- \
   --db /tmp/radishlex-userdb.sqlite
 ```
 
-输出包含 `dictionary.user_terms`、`ranker.weights`、`dictionary.deleted_terms` 这类 P2 可同步计数，以及 `selection_events`、`negative_feedback` 这类 P1 本地计数。`plaintext_payload: false` 表示该命令没有输出明文同步对象。
-
-Rust 内部已经有 `UserDb::p2_plaintext_payloads()` 和 `ime-sync::SyncEnvelopeAssembler` 复验本地加密装配；CLI 仍只提供 preflight 计数，不暴露该迭代器、payload bytes、envelope、hash、签名或上传草案。
+输出包括 P2 的 `dictionary.user_terms`、`ranker.weights`、`dictionary.deleted_terms` 及 P1 本地计数；`plaintext_payload: false` 表示未输出明文同步对象。加密装配由 Rust 测试复验，CLI 不暴露 payload、envelope、hash、签名或上传草案。
 
 ## 输入限制
 
-当前 CLI 的 `<input-code>` 与 `--input <code>` 只接受：
-
-- ASCII 字母
-- ASCII 数字
-- apostrophe，即 `'`
-
-其他字符会返回用法错误。该限制是 CLI 复验入口的输入约束，不代表后续平台壳只能接收这些按键。
+当前 CLI 的 `<input-code>` 与 `--input <code>` 只接受 ASCII 字母、数字和 apostrophe（`'`）；其他字符返回用法错误。该限制不代表平台壳的按键范围。
 
 `--key` 仅用于 `rime` 命令的 smoke 调试，不改变 `<input-code>` 的字符限制，也不代表后续平台壳的完整按键协议。
 
@@ -471,10 +471,8 @@ Rust 内部已经有 `UserDb::p2_plaintext_payloads()` 和 `ime-sync::SyncEnvelo
 - `demo` 不读取本机输入法数据。
 - `rime` 必须显式指定 `shared-data` 与 `user-data`，不应指向真实 Rime 用户目录。
 - `rime --rank-db` 必须显式指定隔离 userdb，建议使用 `/tmp` 下临时 SQLite 文件。
-- `dict`、`learn` 和 `rank explain` 必须显式指定 `--db`，不应指向真实用户生产库；本阶段建议使用 `/tmp` 下临时 SQLite 文件。
-- `dict import/export` 的文件也建议放在 `/tmp` 下，测试内容使用合成词，不应导入真实个人词库或真实输入历史。
-- `learn status` 只输出聚合学习状态，不输出用户词明文、P1 事件明细、负反馈 reason 明细或上下文统计。
-- `sync preflight` 只输出分类计数，不输出用户词明文、事件明文、plaintext payload、envelope、hash、签名或加密 payload。
+- `dict`、`learn` 和 `rank explain` 必须显式指定隔离 `--db`；导入导出文件也应位于 `/tmp` 并只含合成数据。
+- `learn status` 只输出聚合状态；`sync preflight` 只输出分类计数，二者均不暴露用户词或事件明文、上下文明细、payload、envelope、hash 或签名。
 - `learn` 当前没有平台 secure text entry 信号输入，CLI smoke 只应使用合成词、虚构上下文和临时数据库。
 - 本机 smoke 应使用 `/tmp` 下的隔离目录和合成输入码，不提交 schema 数据、用户目录、日志或输出中的敏感内容。
 
