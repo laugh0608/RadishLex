@@ -11,6 +11,9 @@ use radishlex_ime_core::{
 #[cfg(feature = "native-rime")]
 use radishlex_ime_engine_rime::{shutdown_process_runtime, RimeEngine, RimeEngineConfig};
 use radishlex_ime_ranker::{RankRequest, RankedCandidate, Ranker};
+use radishlex_ime_runtime::RuntimeError;
+#[cfg(feature = "native-rime")]
+use radishlex_ime_runtime::{LearningContext, PersonalizedInputSession};
 use radishlex_ime_userdb::{
     decode_dictionary_terms_tsv_document, encode_dictionary_terms_tsv, DictionaryTermRecord,
     LearningStatusSummary, NegativeFeedbackDraft, NegativeFeedbackReason, RankerWeight,
@@ -19,10 +22,15 @@ use radishlex_ime_userdb::{
 
 use crate::DemoEngine;
 
+mod learning_inspection;
+#[cfg(any(feature = "native-rime", test))]
+mod rime_snapshot;
+
 const USAGE: &str = "\
 Usage:
   radishlex-ime-cli demo <input-code> [candidate-index]
   radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] [--rank-db <path>] [--context <kind>] <input-code> [candidate-index]
+  radishlex-ime-cli rime snapshot --schema <schema> --shared-data <path> --user-data <fresh-empty-path> --deploy-on-start <0|1> [--rank-db <path>] [--context <kind>] <input-code>
   radishlex-ime-cli dict list --db <path>
   radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
   radishlex-ime-cli dict restore --db <path> --input <code> --text <text> [--reading <reading>]
@@ -32,6 +40,7 @@ Usage:
   radishlex-ime-cli dict import --db <path> --file <path> [--source <name>] [--dry-run]
   radishlex-ime-cli dict import-batches --db <path>
   radishlex-ime-cli learn status --db <path>
+  radishlex-ime-cli learn case-status --db <path> --input <code> --text <text> [--reading <reading>] [--context <kind>]
   radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
   radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
   radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
@@ -43,6 +52,7 @@ Examples:
   radishlex-ime-cli rime --schema luna_pinyin --shared-data ./rime-data --user-data ./tmp/rime-user luobo
   radishlex-ime-cli rime --schema luna_pinyin --shared-data ./rime-data --user-data ./tmp/rime-user luobo --key page-down 0
   radishlex-ime-cli rime --schema luna_pinyin --shared-data ./rime-data --user-data ./tmp/rime-user --rank-db /tmp/radishlex-userdb.sqlite luobo
+  radishlex-ime-cli rime snapshot --schema luna_pinyin --shared-data ./rime-data --user-data /tmp/fresh-rime-user --deploy-on-start 1 luobo
   radishlex-ime-cli dict add --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
   radishlex-ime-cli dict restore --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
   radishlex-ime-cli dict export --db /tmp/radishlex-userdb.sqlite --file /tmp/radishlex-terms.tsv
@@ -51,6 +61,7 @@ Examples:
   radishlex-ime-cli dict import --db /tmp/radishlex-userdb.sqlite --file /tmp/radishlex-terms.tsv --source smoke
   radishlex-ime-cli dict import-batches --db /tmp/radishlex-userdb.sqlite
   radishlex-ime-cli learn status --db /tmp/radishlex-userdb.sqlite
+  radishlex-ime-cli learn case-status --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜 --context editor
   radishlex-ime-cli learn select --db /tmp/radishlex-userdb.sqlite --input luobo --text 萝卜
   radishlex-ime-cli rank explain --db /tmp/radishlex-userdb.sqlite --input luobo --candidate 萝卜
   radishlex-ime-cli sync preflight --db /tmp/radishlex-userdb.sqlite
@@ -92,6 +103,12 @@ impl From<CoreError> for CliError {
 
 impl From<UserDbError> for CliError {
     fn from(error: UserDbError) -> Self {
+        Self::Data(error.to_string())
+    }
+}
+
+impl From<RuntimeError> for CliError {
+    fn from(error: RuntimeError) -> Self {
         Self::Data(error.to_string())
     }
 }
@@ -138,9 +155,19 @@ fn run_rime(args: &[String]) -> Result<String, CliError> {
 #[cfg(feature = "native-rime")]
 fn run_rime(args: &[String]) -> Result<String, CliError> {
     let options = parse_rime_args(args)?;
+
+    match options.action {
+        RimeCommandAction::Select => run_rime_select(options),
+        RimeCommandAction::Snapshot => run_rime_snapshot(options),
+    }
+}
+
+#[cfg(feature = "native-rime")]
+fn run_rime_select(options: RimeCommandOptions) -> Result<String, CliError> {
     let schema = SchemaId::new(options.schema)?;
     let config = RimeEngineConfig::new(options.shared_data, options.user_data, schema)
-        .map_err(rime_error_to_cli)?;
+        .map_err(rime_error_to_cli)?
+        .with_deploy_on_start(options.deploy_on_start);
     let session = InputSession::new(RimeEngine::new(config).map_err(rime_error_to_cli)?);
     let output = run_input_session(
         session,
@@ -161,6 +188,71 @@ fn run_rime(args: &[String]) -> Result<String, CliError> {
             Err(error)
         }
     }
+}
+
+#[cfg(feature = "native-rime")]
+fn run_rime_snapshot(options: RimeCommandOptions) -> Result<String, CliError> {
+    let options = prepare_rime_snapshot_options(options)?;
+    let config = build_rime_snapshot_config(&options)?;
+    let engine = RimeEngine::new(config).map_err(rime_error_to_cli)?;
+
+    let output = (|| {
+        if let Some(rank_smoke) = options.rank_smoke.as_ref() {
+            let db = UserDb::open(&rank_smoke.db_path)?;
+            let mut session =
+                PersonalizedInputSession::with_userdb(engine, db, "cli-rime-snapshot")?;
+            session.set_learning_context(LearningContext::new(&rank_smoke.context_kind)?);
+            rime_snapshot::run_personalized_snapshot(
+                session,
+                &options.input_code,
+                options.deploy_on_start,
+                &rank_smoke.context_kind,
+            )
+        } else {
+            rime_snapshot::run_engine_snapshot(
+                InputSession::new(engine),
+                &options.input_code,
+                options.deploy_on_start,
+            )
+        }
+    })();
+    let shutdown = shutdown_process_runtime().map_err(rime_error_to_cli);
+
+    match output {
+        Ok(output) => {
+            shutdown?;
+            Ok(output)
+        }
+        Err(error) => {
+            let _ = shutdown;
+            Err(error)
+        }
+    }
+}
+
+#[cfg(any(feature = "native-rime", test))]
+fn prepare_rime_snapshot_options(
+    mut options: RimeCommandOptions,
+) -> Result<RimeCommandOptions, CliError> {
+    if options.action != RimeCommandAction::Snapshot {
+        return Err(CliError::Usage(
+            "snapshot safety preparation requires the rime snapshot action".to_owned(),
+        ));
+    }
+    options.user_data = rime_snapshot::require_fresh_user_data(&options.user_data)?;
+    Ok(options)
+}
+
+#[cfg(feature = "native-rime")]
+fn build_rime_snapshot_config(options: &RimeCommandOptions) -> Result<RimeEngineConfig, CliError> {
+    let schema = SchemaId::new(options.schema.clone())?;
+    RimeEngineConfig::new(
+        options.shared_data.clone(),
+        options.user_data.clone(),
+        schema,
+    )
+    .map_err(rime_error_to_cli)
+    .map(|config| config.with_deploy_on_start(options.deploy_on_start))
 }
 
 fn run_dict(args: &[String]) -> Result<String, CliError> {
@@ -373,6 +465,7 @@ fn run_sync_preflight(args: &[String]) -> Result<String, CliError> {
 fn run_learn(args: &[String]) -> Result<String, CliError> {
     match args.get(2).map(String::as_str) {
         Some("status") => run_learn_status(args),
+        Some("case-status") => learning_inspection::run(args),
         Some("select") => run_learn_select(args),
         Some("suppress") => run_learn_suppress(args),
         Some(other) => Err(CliError::Usage(format!("unknown learn command: {other}"))),
@@ -566,11 +659,19 @@ fn rime_error_to_cli(error: radishlex_ime_engine_rime::RimeEngineError) -> CliEr
     CliError::Core(CoreError::engine(error.to_string()))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RimeCommandAction {
+    Select,
+    Snapshot,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RimeCommandOptions {
+    action: RimeCommandAction,
     schema: String,
     shared_data: PathBuf,
     user_data: PathBuf,
+    deploy_on_start: bool,
     input_code: String,
     extra_keys: Vec<NamedKey>,
     selected_index: Option<usize>,
@@ -584,14 +685,20 @@ struct RankSmokeOptions {
 }
 
 fn parse_rime_args(args: &[String]) -> Result<RimeCommandOptions, CliError> {
+    let (action, first_option_index) = if args.get(2).map(String::as_str) == Some("snapshot") {
+        (RimeCommandAction::Snapshot, 3)
+    } else {
+        (RimeCommandAction::Select, 2)
+    };
     let mut schema = None;
     let mut shared_data = None;
     let mut user_data = None;
+    let mut deploy_on_start = None;
     let mut rank_db = None;
     let mut context_kind = None;
     let mut extra_keys = Vec::new();
     let mut positional = Vec::new();
-    let mut index = 2;
+    let mut index = first_option_index;
 
     while index < args.len() {
         match args[index].as_str() {
@@ -614,6 +721,13 @@ fn parse_rime_args(args: &[String]) -> Result<RimeCommandOptions, CliError> {
                     index,
                     "--user-data",
                 )?));
+            }
+            "--deploy-on-start" => {
+                index += 1;
+                deploy_on_start = Some(parse_zero_or_one(
+                    required_option_value(args, index, "--deploy-on-start")?,
+                    "deploy-on-start",
+                )?);
             }
             "--key" => {
                 index += 1;
@@ -643,10 +757,26 @@ fn parse_rime_args(args: &[String]) -> Result<RimeCommandOptions, CliError> {
     let input_code = positional
         .first()
         .ok_or_else(|| CliError::Usage("missing input code for rime".to_owned()))?;
-    validate_input_code(input_code)?;
-    if positional.len() > 2 {
+    match action {
+        RimeCommandAction::Select => validate_input_code(input_code)?,
+        RimeCommandAction::Snapshot => validate_snapshot_input_code(input_code)?,
+    }
+    match action {
+        RimeCommandAction::Select if positional.len() > 2 => {
+            return Err(CliError::Usage(
+                "too many positional arguments for rime".to_owned(),
+            ));
+        }
+        RimeCommandAction::Snapshot if positional.len() > 1 => {
+            return Err(CliError::Usage(
+                "rime snapshot does not accept a candidate index".to_owned(),
+            ));
+        }
+        _ => {}
+    }
+    if action == RimeCommandAction::Snapshot && !extra_keys.is_empty() {
         return Err(CliError::Usage(
-            "too many positional arguments for rime".to_owned(),
+            "rime snapshot does not accept --key because snapshot must not commit".to_owned(),
         ));
     }
 
@@ -664,10 +794,25 @@ fn parse_rime_args(args: &[String]) -> Result<RimeCommandOptions, CliError> {
     };
 
     Ok(RimeCommandOptions {
+        action,
         schema: schema.ok_or_else(|| CliError::Usage("missing --schema".to_owned()))?,
         shared_data: shared_data
             .ok_or_else(|| CliError::Usage("missing --shared-data".to_owned()))?,
         user_data: user_data.ok_or_else(|| CliError::Usage("missing --user-data".to_owned()))?,
+        deploy_on_start: match (action, deploy_on_start) {
+            (RimeCommandAction::Snapshot, None) => {
+                return Err(CliError::Usage(
+                    "rime snapshot requires explicit --deploy-on-start 0|1".to_owned(),
+                ));
+            }
+            (RimeCommandAction::Snapshot, Some(value)) => value,
+            (RimeCommandAction::Select, Some(_)) => {
+                return Err(CliError::Usage(
+                    "--deploy-on-start is only valid for rime snapshot".to_owned(),
+                ));
+            }
+            (RimeCommandAction::Select, None) => false,
+        },
         input_code: input_code.to_owned(),
         extra_keys,
         selected_index: parse_optional_candidate_index(positional.get(1))?,
@@ -821,6 +966,24 @@ fn validate_input_code(input_code: &str) -> Result<(), CliError> {
     Ok(())
 }
 
+fn validate_snapshot_input_code(input_code: &str) -> Result<(), CliError> {
+    if input_code.is_empty() {
+        return Err(CliError::Usage(
+            "rime snapshot input code cannot be empty".to_owned(),
+        ));
+    }
+    if !input_code
+        .chars()
+        .all(|ch| ch.is_ascii_lowercase() || ch == '\'')
+    {
+        return Err(CliError::Usage(
+            "rime snapshot input code must contain only lowercase ASCII letters or apostrophes"
+                .to_owned(),
+        ));
+    }
+    Ok(())
+}
+
 fn validate_import_input_codes(records: &[DictionaryTermRecord]) -> Result<(), CliError> {
     for record in records {
         if record.input_code.is_empty()
@@ -861,6 +1024,14 @@ fn parse_optional_usize(
             })
         })
         .transpose()
+}
+
+fn parse_zero_or_one(value: &str, field: &'static str) -> Result<bool, CliError> {
+    match value {
+        "0" => Ok(false),
+        "1" => Ok(true),
+        _ => Err(CliError::Usage(format!("{field} must be 0 or 1: {value}"))),
+    }
 }
 
 fn parse_named_key(value: &str) -> Result<NamedKey, CliError> {

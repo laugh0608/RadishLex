@@ -8,6 +8,7 @@ use crate::{
     decode_dictionary_terms_tsv, decode_dictionary_terms_tsv_document, encode_dictionary_terms_tsv,
     DictionaryTermRecord, DictionaryTermsFormat, NegativeFeedbackDraft, NegativeFeedbackReason,
     PrivacyLevel, SelectionEventDraft, TermSource, TermStatus, UserDbSyncPayloadObjectType,
+    LEARNING_CASE_INSPECTION_VERSION,
 };
 
 fn temp_db_path(test_name: &str) -> String {
@@ -121,6 +122,86 @@ fn selection_event_updates_term_and_ranker_summary() {
         .expect("ranker weight exists");
     assert_eq!(weight.frequency, 2);
     assert_eq!(weight.negative_score, 0.0);
+}
+
+#[test]
+fn exact_learning_case_inspection_tracks_active_deleted_and_restored_state() {
+    let mut db = UserDb::open_in_memory().expect("userdb opens");
+    let event = SelectionEventDraft::new("private-session", "luobo", "合成萝卜", 1, 5)
+        .with_context_kind("editor");
+    db.record_selection(event.clone())
+        .expect("first selection records");
+    db.record_selection(event)
+        .expect("second selection records");
+    db.record_selection(
+        SelectionEventDraft::new(
+            "unrelated-private-session",
+            "other",
+            "不应出现的合成词",
+            0,
+            1,
+        )
+        .with_context_kind("code"),
+    )
+    .expect("unrelated selection records");
+
+    let active = db
+        .inspect_learning_case("luobo", "合成萝卜", None, "editor")
+        .expect("active case inspects");
+    assert_eq!(active.inspection_version, LEARNING_CASE_INSPECTION_VERSION);
+    assert_eq!(active.identity.input_code, "luobo");
+    assert_eq!(active.identity.text, "合成萝卜");
+    assert_eq!(active.identity.reading, None);
+    assert_eq!(active.identity.context_kind, "editor");
+    assert_eq!(active.aggregate.active_user_terms, 2);
+    assert_eq!(active.aggregate.selection_events, 3);
+    let term = active.term.expect("active term is present");
+    assert_eq!(term.source, TermSource::EngineSelection);
+    assert_eq!(term.status, TermStatus::Active);
+    assert_eq!(term.weight, 1.0);
+    assert!(term.version_ms > 0);
+    assert!(term.last_used_at_ms.is_some());
+    assert_eq!(term.restored_at_ms, None);
+    let ranker = active
+        .ranker_weight
+        .expect("active ranker weight is present");
+    assert_eq!(ranker.frequency, 2);
+    assert_eq!(ranker.negative_score, 0.0);
+    assert!(ranker.last_used_at_ms.is_some());
+    assert!(ranker.updated_at_ms > 0);
+    assert_eq!(active.deleted_tombstone, None);
+
+    db.delete_term("luobo", "合成萝卜", None)
+        .expect("case term deletes");
+    let deleted = db
+        .inspect_learning_case("luobo", "合成萝卜", None, "editor")
+        .expect("deleted case inspects");
+    let deleted_term = deleted.term.expect("deleted term remains inspectable");
+    assert_eq!(deleted_term.status, TermStatus::Deleted);
+    assert_eq!(deleted_term.weight, 0.0);
+    assert!(deleted_term.version_ms >= term.version_ms);
+    assert_eq!(deleted_term.last_used_at_ms, None);
+    assert_eq!(deleted.ranker_weight, None);
+    let tombstone = deleted
+        .deleted_tombstone
+        .expect("deleted tombstone is inspectable");
+    assert_eq!(deleted.aggregate.deleted_term_tombstones, 1);
+    assert_eq!(deleted.aggregate.negative_feedback, 1);
+
+    let restored = db
+        .restore_term("luobo", "合成萝卜", None)
+        .expect("case term restores");
+    assert!(restored.updated_at_ms > tombstone.deleted_at_ms);
+    let restored_case = db
+        .inspect_learning_case("luobo", "合成萝卜", None, "editor")
+        .expect("restored case inspects");
+    let restored_term = restored_case.term.expect("restored term is present");
+    assert_eq!(restored_term.status, TermStatus::Active);
+    assert_eq!(restored_term.weight, 1.0);
+    assert_eq!(restored_term.restored_at_ms, Some(restored.updated_at_ms));
+    assert_eq!(restored_case.ranker_weight, None);
+    assert_eq!(restored_case.deleted_tombstone, None);
+    assert_eq!(restored_case.aggregate.selection_events, 3);
 }
 
 #[test]

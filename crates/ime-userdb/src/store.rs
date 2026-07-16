@@ -1,11 +1,13 @@
-use rusqlite::{params, Connection, OptionalExtension, Row};
+use rusqlite::{params, Connection, OptionalExtension, Row, TransactionBehavior};
 use std::collections::BTreeSet;
 
 use crate::error::{UserDbError, UserDbResult};
 use crate::model::{
     DictionaryImportBatch, DictionaryImportSummary, DictionaryTermRecord, DictionaryTermsDocument,
-    DictionaryTermsFormat, LearningStatusSummary, SyncPreflightSummary, TermSource, TermStatus,
-    UserDbSyncPlaintextPayload, UserTerm,
+    DictionaryTermsFormat, LearningCaseDeletedTombstoneInspection, LearningCaseIdentity,
+    LearningCaseInspection, LearningCaseRankerWeightInspection, LearningCaseTermInspection,
+    LearningStatusSummary, SyncPreflightSummary, TermSource, TermStatus,
+    UserDbSyncPlaintextPayload, UserTerm, LEARNING_CASE_INSPECTION_VERSION,
 };
 
 mod connection;
@@ -213,38 +215,92 @@ impl UserDb {
     }
 
     pub fn learning_status_summary(&self) -> UserDbResult<LearningStatusSummary> {
-        let latest_user_term_updated_at_ms =
-            max_i64_column(&self.connection, "user_terms", "updated_at_ms")?;
-        let latest_selection_event_at_ms =
-            max_i64_column(&self.connection, "selection_events", "created_at_ms")?;
-        let latest_negative_feedback_at_ms =
-            max_i64_column(&self.connection, "negative_feedback", "created_at_ms")?;
-        let latest_deleted_term_at_ms =
-            max_i64_column(&self.connection, "deleted_terms", "deleted_at_ms")?;
-        let latest_import_batch_at_ms =
-            max_i64_column(&self.connection, "import_batches", "created_at_ms")?;
+        learning_status_summary_on(&self.connection)
+    }
 
-        Ok(LearningStatusSummary {
-            schema_version: self.schema_version()?,
-            active_user_terms: self.count_user_terms_with_status(TermStatus::Active)?,
-            suppressed_user_terms: self.count_user_terms_with_status(TermStatus::Suppressed)?,
-            ranker_weights: count_rows_usize(&self.connection, "ranker_weights")?,
-            deleted_term_tombstones: count_rows_usize(&self.connection, "deleted_terms")?,
-            selection_events: count_rows_usize(&self.connection, "selection_events")?,
-            negative_feedback: count_rows_usize(&self.connection, "negative_feedback")?,
-            import_batches: count_rows_usize(&self.connection, "import_batches")?,
-            latest_user_term_updated_at_ms,
-            latest_selection_event_at_ms,
-            latest_negative_feedback_at_ms,
-            latest_deleted_term_at_ms,
-            latest_import_batch_at_ms,
-            latest_activity_at_ms: latest_ms([
-                latest_user_term_updated_at_ms,
-                latest_selection_event_at_ms,
-                latest_negative_feedback_at_ms,
-                latest_deleted_term_at_ms,
-                latest_import_batch_at_ms,
-            ]),
+    pub fn inspect_learning_case(
+        &mut self,
+        input_code: &str,
+        text: &str,
+        reading: Option<&str>,
+        context_kind: &str,
+    ) -> UserDbResult<LearningCaseInspection> {
+        let input_code = normalized_required("input_code", input_code)?;
+        let text = normalized_required("text", text)?;
+        let reading = normalized_optional(reading);
+        let context_kind = normalized_required("context_kind", context_kind)?;
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)?;
+
+        let aggregate = learning_status_summary_on(&transaction)?;
+        let term = transaction
+            .query_row(
+                "SELECT source, status, weight, updated_at_ms, last_used_at_ms, restored_at_ms
+                 FROM user_terms
+                 WHERE input_code = ?1 AND text = ?2 AND reading = ?3",
+                params![input_code, text, reading],
+                |row| {
+                    let source: String = row.get(0)?;
+                    let status: String = row.get(1)?;
+                    Ok(LearningCaseTermInspection {
+                        source: source
+                            .parse::<TermSource>()
+                            .map_err(to_sqlite_conversion_failure)?,
+                        status: status
+                            .parse::<TermStatus>()
+                            .map_err(to_sqlite_conversion_failure)?,
+                        weight: row.get(2)?,
+                        version_ms: row.get(3)?,
+                        last_used_at_ms: row.get(4)?,
+                        restored_at_ms: row.get(5)?,
+                    })
+                },
+            )
+            .optional()?;
+        let ranker_weight = transaction
+            .query_row(
+                "SELECT frequency, last_used_at_ms, negative_score, updated_at_ms
+                 FROM ranker_weights
+                 WHERE input_code = ?1 AND text = ?2 AND reading = ?3 AND context_kind = ?4",
+                params![input_code, text, reading, context_kind],
+                |row| {
+                    Ok(LearningCaseRankerWeightInspection {
+                        frequency: row.get(0)?,
+                        last_used_at_ms: row.get(1)?,
+                        negative_score: row.get(2)?,
+                        updated_at_ms: row.get(3)?,
+                    })
+                },
+            )
+            .optional()?;
+        let deleted_tombstone = transaction
+            .query_row(
+                "SELECT deleted_at_ms
+                 FROM deleted_terms
+                 WHERE input_code = ?1 AND text = ?2 AND reading = ?3",
+                params![input_code, text, reading],
+                |row| {
+                    Ok(LearningCaseDeletedTombstoneInspection {
+                        deleted_at_ms: row.get(0)?,
+                    })
+                },
+            )
+            .optional()?;
+
+        transaction.commit()?;
+        Ok(LearningCaseInspection {
+            inspection_version: LEARNING_CASE_INSPECTION_VERSION,
+            identity: LearningCaseIdentity {
+                input_code,
+                text,
+                reading: optional_from_storage(&reading),
+                context_kind,
+            },
+            aggregate,
+            term,
+            ranker_weight,
+            deleted_tombstone,
         })
     }
 
@@ -286,19 +342,6 @@ impl UserDb {
                  FROM user_terms
                  WHERE status IN ('active', 'suppressed')",
                 [],
-                |row| row.get::<_, i64>(0),
-            )
-            .and_then(|count| non_negative_usize(count, "user_terms"))
-            .map_err(Into::into)
-    }
-
-    fn count_user_terms_with_status(&self, status: TermStatus) -> UserDbResult<usize> {
-        self.connection
-            .query_row(
-                "SELECT COUNT(*)
-                 FROM user_terms
-                 WHERE status = ?1",
-                params![status.as_str()],
                 |row| row.get::<_, i64>(0),
             )
             .and_then(|count| non_negative_usize(count, "user_terms"))
@@ -522,6 +565,55 @@ fn count_rows(connection: &Connection, table: &str) -> UserDbResult<i64> {
 fn count_rows_usize(connection: &Connection, table: &'static str) -> UserDbResult<usize> {
     let count = count_rows(connection, table)?;
     non_negative_usize(count, table).map_err(Into::into)
+}
+
+fn count_user_terms_with_status_on(
+    connection: &Connection,
+    status: TermStatus,
+) -> UserDbResult<usize> {
+    connection
+        .query_row(
+            "SELECT COUNT(*)
+             FROM user_terms
+             WHERE status = ?1",
+            params![status.as_str()],
+            |row| row.get::<_, i64>(0),
+        )
+        .and_then(|count| non_negative_usize(count, "user_terms"))
+        .map_err(Into::into)
+}
+
+fn learning_status_summary_on(connection: &Connection) -> UserDbResult<LearningStatusSummary> {
+    let latest_user_term_updated_at_ms = max_i64_column(connection, "user_terms", "updated_at_ms")?;
+    let latest_selection_event_at_ms =
+        max_i64_column(connection, "selection_events", "created_at_ms")?;
+    let latest_negative_feedback_at_ms =
+        max_i64_column(connection, "negative_feedback", "created_at_ms")?;
+    let latest_deleted_term_at_ms = max_i64_column(connection, "deleted_terms", "deleted_at_ms")?;
+    let latest_import_batch_at_ms = max_i64_column(connection, "import_batches", "created_at_ms")?;
+
+    Ok(LearningStatusSummary {
+        schema_version: connection.query_row("PRAGMA user_version", [], |row| row.get(0))?,
+        active_user_terms: count_user_terms_with_status_on(connection, TermStatus::Active)?,
+        suppressed_user_terms: count_user_terms_with_status_on(connection, TermStatus::Suppressed)?,
+        ranker_weights: count_rows_usize(connection, "ranker_weights")?,
+        deleted_term_tombstones: count_rows_usize(connection, "deleted_terms")?,
+        selection_events: count_rows_usize(connection, "selection_events")?,
+        negative_feedback: count_rows_usize(connection, "negative_feedback")?,
+        import_batches: count_rows_usize(connection, "import_batches")?,
+        latest_user_term_updated_at_ms,
+        latest_selection_event_at_ms,
+        latest_negative_feedback_at_ms,
+        latest_deleted_term_at_ms,
+        latest_import_batch_at_ms,
+        latest_activity_at_ms: latest_ms([
+            latest_user_term_updated_at_ms,
+            latest_selection_event_at_ms,
+            latest_negative_feedback_at_ms,
+            latest_deleted_term_at_ms,
+            latest_import_batch_at_ms,
+        ]),
+    })
 }
 
 fn max_i64_column(

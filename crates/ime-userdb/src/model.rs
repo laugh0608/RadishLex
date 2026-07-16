@@ -3,6 +3,7 @@ use std::fmt;
 use crate::error::{UserDbError, UserDbResult};
 
 pub const USERDB_SYNC_PAYLOAD_SCHEMA_VERSION: u16 = 1;
+pub const LEARNING_CASE_INSPECTION_VERSION: u16 = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PrivacyLevel {
@@ -389,6 +390,52 @@ pub struct LearningStatusSummary {
     pub latest_deleted_term_at_ms: Option<i64>,
     pub latest_import_batch_at_ms: Option<i64>,
     pub latest_activity_at_ms: Option<i64>,
+}
+
+/// Versioned, exact inspection of one synthetic learning-case identity.
+///
+/// The aggregate contains counts and timestamps only. No selection-event or
+/// negative-feedback row is returned by this inspection boundary.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LearningCaseInspection {
+    pub inspection_version: u16,
+    pub identity: LearningCaseIdentity,
+    pub aggregate: LearningStatusSummary,
+    pub term: Option<LearningCaseTermInspection>,
+    pub ranker_weight: Option<LearningCaseRankerWeightInspection>,
+    pub deleted_tombstone: Option<LearningCaseDeletedTombstoneInspection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LearningCaseIdentity {
+    pub input_code: String,
+    pub text: String,
+    pub reading: Option<String>,
+    pub context_kind: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LearningCaseTermInspection {
+    pub source: TermSource,
+    pub status: TermStatus,
+    pub weight: f64,
+    /// Last-writer-wins term version stored in `user_terms.updated_at_ms`.
+    pub version_ms: i64,
+    pub last_used_at_ms: Option<i64>,
+    pub restored_at_ms: Option<i64>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LearningCaseRankerWeightInspection {
+    pub frequency: i64,
+    pub last_used_at_ms: Option<i64>,
+    pub negative_score: f64,
+    pub updated_at_ms: i64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LearningCaseDeletedTombstoneInspection {
+    pub deleted_at_ms: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
