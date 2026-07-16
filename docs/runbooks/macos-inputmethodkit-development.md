@@ -77,8 +77,8 @@ R01B 固定使用两阶段授权，不能用一次笼统的“完整清理”合
 
 1. Git 工作区干净，当前提交、分支和相对 `origin/dev` 的领先状态明确；验收过程中不修改源码或重建另一个 build。
 2. `CFBundleVersion`、Bundle ID、mode ID、schema id 与安装文件名符合当前文档。R01A 的最终冻结候选为 `build 32`：`build 31` 的 VoiceOver 已知限制本身不触发升级，但 2026-07-15 实机确认 product-authored Rime 配置错误使用 9 项候选页，形成独立生产行为变化；后续新回归不得把 `32` 当作永久固定构建号。
-3. 申请第一阶段授权前，以默认 ad-hoc 签名完成 native 门禁、完整递归签名复验和 `codesign --verify --deep --strict`，冻结源码、构建输入与候选；此时不得提供 Apple Development identity。
-4. 取得第一阶段授权后，只用同一源码和构建输入完成 Apple Development 重建/签名与全部门禁，记录生成 bundle 主程序、FFI dylib 和 native manifest 的 SHA-256；此时仍不复制安装副本。
+3. 申请第一阶段授权前，以默认 ad-hoc 签名完成 native 门禁、完整递归签名复验和 `codesign --verify --deep --strict`，记录生成 bundle 的 `Info.plist`、主程序、FFI dylib、Rime data manifest 与 native libraries manifest 的 SHA-256，冻结源码、构建输入与候选；`Info.plist` 哈希用于把证据绑定到具体 `CFBundleVersion`，此时不得提供 Apple Development identity。
+4. 取得第一阶段授权后，只用同一源码和构建输入完成 Apple Development 重建/签名与全部门禁，重新记录上述五项 SHA-256；此时仍不复制安装副本。
 5. 复制前最后一个检查点必须重新执行一次完整 `--status`。当前 R01B 批次只接受：`matches=0 enabled=0 selected=0`、`installed_bundle=absent`、`cleanup_path_ancestors=safe`、父目录 present/empty/`0755`、Rime/userdb/sidecar absent、进程 stopped；同时记录 `RadishLexPrivacyMode` 键是否存在及原值。检查与复制之间不得插入系统状态变更，任一字段漂移即取消本轮，不覆盖、迁移、复用或删除现场。
 6. 安装目标仅为 `~/Library/Input Methods/RadishLexInputMethod.app`，Rime 运行数据仅为 `~/Library/Application Support/RadishLex/Rime`，R01B userdb 固定为 `RadishLex/userdb.sqlite3`；不得读取或复用用户现有 Rime 或 userdb 数据。当前预存空父目录不属于本轮，runtime 收紧权限的变化必须在第一阶段授权中列明，并在第二阶段恢复为 `0755`，除非另获精确授权保留 `0700`。
 
