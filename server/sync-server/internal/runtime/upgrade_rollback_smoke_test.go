@@ -78,18 +78,19 @@ func TestLocalServerUpgradeRollbackPreservesPreUpgradeBackup(t *testing.T) {
 		t.Fatalf("rollback stale response leaked payload: %s", string(staleResponse.Body))
 	}
 
+	forbiddenLogValues := []string{
+		string(preUpgradePayload),
+		string(postUpgradePayload),
+		string(staleRollbackPayload),
+		string(postUpgrade.Signature),
+		string(stale.Signature),
+		"recovery-code",
+		"sync-master-key",
+	}
+	forbiddenLogValues = append(forbiddenLogValues, smokeSensitiveByteForms(backupSmokeWrappedMaterial())...)
+	forbiddenLogValues = append(forbiddenLogValues, smokeSensitiveByteForms(backupSmokeWrappedKey())...)
 	for _, logText := range []string{initialLogs.String(), upgradedLogs.String(), rollbackLogs.String()} {
-		for _, forbidden := range []string{
-			string(preUpgradePayload),
-			string(postUpgradePayload),
-			string(staleRollbackPayload),
-			string(backupSmokeWrappedMaterial()),
-			string(backupSmokeWrappedKey()),
-			string(postUpgrade.Signature),
-			string(stale.Signature),
-			"recovery-code",
-			"sync-master-key",
-		} {
+		for _, forbidden := range forbiddenLogValues {
 			if forbidden != "" && strings.Contains(logText, forbidden) {
 				t.Fatalf("runtime log leaked sensitive fixture %q in %s", forbidden, logText)
 			}

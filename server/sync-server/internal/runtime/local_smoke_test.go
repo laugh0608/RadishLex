@@ -3,6 +3,7 @@ package runtime
 import (
 	"bytes"
 	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"log"
@@ -146,15 +147,16 @@ func TestLocalServerSmokeUploadsReadsAndConflicts(t *testing.T) {
 	}
 
 	logText := logs.String()
-	for _, forbidden := range []string{
+	forbiddenLogValues := []string{
 		string(firstPayload),
 		string(secondPayload),
 		string(stalePayload),
-		string(deviceBAuthorization.WrappedKey),
 		string(first.Signature),
 		string(second.Signature),
 		string(stale.Signature),
-	} {
+	}
+	forbiddenLogValues = append(forbiddenLogValues, smokeSensitiveByteForms(deviceBAuthorization.WrappedKey)...)
+	for _, forbidden := range forbiddenLogValues {
 		if forbidden != "" && strings.Contains(logText, forbidden) {
 			t.Fatalf("runtime audit log leaked sensitive fixture %q in %s", forbidden, logText)
 		}
@@ -190,7 +192,7 @@ func smokeJoinRequest(joinRequestID string, deviceID string, createdAtMs int64) 
 }
 
 func smokeJoinAuthorization(join api.CreateJoinRequestRequest, createdAtMs int64) api.AuthorizeJoinRequestRequest {
-	wrappedKey := []byte{0x61, 0x62, 0x63}
+	wrappedKey := smokeDeviceWrappedKey()
 	request := api.AuthorizeJoinRequestRequest{
 		Authorization: api.DeviceAuthorizationRequest{
 			AuthorizerDeviceID:          "device-smoke",
@@ -217,6 +219,32 @@ func smokeJoinAuthorization(join api.CreateJoinRequestRequest, createdAtMs int64
 	}
 	signSmokeJoinAuthorization(&request, join)
 	return request
+}
+
+func smokeDeviceWrappedKey() []byte {
+	return []byte("radishlex-sensitive-device-wrapped-key-fixture-v1")
+}
+
+func smokeSensitiveByteForms(fixture []byte) []string {
+	if len(fixture) < 16 {
+		panic("sensitive smoke fixture must be at least 16 bytes to avoid incidental log matches")
+	}
+	return []string{
+		string(fixture),
+		base64.StdEncoding.EncodeToString(fixture),
+	}
+}
+
+func TestSensitiveSmokeFixturesDoNotMatchOpaqueRequestIDs(t *testing.T) {
+	t.Parallel()
+	logLine := `request_id="req-dk02zuygabct-6" route="objects.versions.create" result_code="ok"`
+	for _, fixture := range [][]byte{smokeDeviceWrappedKey(), backupSmokeWrappedKey()} {
+		for _, forbidden := range smokeSensitiveByteForms(fixture) {
+			if strings.Contains(logLine, forbidden) {
+				t.Fatalf("sensitive fixture %q collided with opaque request metadata", forbidden)
+			}
+		}
+	}
 }
 
 type smokeHTTPResponse struct {

@@ -85,17 +85,18 @@ func TestLocalServerBackupRestorePreservesEncryptedSyncState(t *testing.T) {
 	verifyRestoredBackupSmokeState(t, restoredHTTPServer.URL, payloads, stalePayload)
 	verifyRestoredAuditEvents(t, restoredCfg.MetadataPath)
 
+	forbiddenLogValues := []string{
+		string(payloads[storage.ObjectDictionaryUserTerms]),
+		string(payloads[storage.ObjectRankerWeights]),
+		string(payloads[storage.ObjectDictionaryDeletedTerms]),
+		string(stalePayload),
+		"recovery-code",
+		"sync-master-key",
+	}
+	forbiddenLogValues = append(forbiddenLogValues, smokeSensitiveByteForms(backupSmokeWrappedMaterial())...)
+	forbiddenLogValues = append(forbiddenLogValues, smokeSensitiveByteForms(backupSmokeWrappedKey())...)
 	for _, logText := range []string{sourceLogs.String(), restoredLogs.String()} {
-		for _, forbidden := range []string{
-			string(payloads[storage.ObjectDictionaryUserTerms]),
-			string(payloads[storage.ObjectRankerWeights]),
-			string(payloads[storage.ObjectDictionaryDeletedTerms]),
-			string(stalePayload),
-			string(backupSmokeWrappedMaterial()),
-			string(backupSmokeWrappedKey()),
-			"recovery-code",
-			"sync-master-key",
-		} {
+		for _, forbidden := range forbiddenLogValues {
 			if forbidden != "" && strings.Contains(logText, forbidden) {
 				t.Fatalf("runtime log leaked sensitive fixture %q in %s", forbidden, logText)
 			}
@@ -370,7 +371,7 @@ func backupSmokeWrappedMaterial() []byte {
 }
 
 func backupSmokeWrappedKey() []byte {
-	return []byte{0x61, 0x62, 0x63}
+	return []byte("radishlex-sensitive-backup-wrapped-key-fixture-v1")
 }
 
 func copyDirectory(source string, destination string) error {

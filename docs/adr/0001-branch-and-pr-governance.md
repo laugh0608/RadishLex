@@ -54,6 +54,14 @@ git rev-list --left-right --count origin/master...dev
 - 不因完成 `dev -> master` PR 删除长期 `dev` 分支。
 - 若 master PR 使用 rebase merge，回同步仍然必须执行，因为 master 上的稳定提交 hash 与 dev 原提交不同。
 
+### 自动化触发策略
+
+- 直接 push 到 `dev` 不触发 GitHub Actions；日常直接推进继续依赖风险匹配的本地验证。
+- 以 `dev` 或 `master` 为目标的 Pull Request 触发同一套 `PR Checks`。`dev` 检查为协作反馈，`master` 检查由 ruleset 配置为 strict required checks。
+- `master` 禁止直接 push，只能通过通过五项检查、审批和会话解决门禁的 Pull Request 进入；合并后的 `master` push 不重复触发 `PR Checks`。
+- `Release Checks` 只监听 `v*-dev`、`v*-test` 与 `v*-release` tag。普通分支 push、非发布 tag 和 PR 不触发发布工作流。
+- 准备阶段性 `dev -> master` PR 时，仍须先在本地执行完整仓库门禁并在 PR 中记录真实结果，不能只依赖远端检查发现问题。
+
 ### 紧急修复与冲突
 
 - 紧急修复通过专用分支向 `master` 提交 PR 后，同样必须立即回同步到 `dev`。
@@ -68,9 +76,11 @@ git rev-list --left-right --count origin/master...dev
 - PR merge-base、提交范围和冲突时点保持可预测。
 - master 上的治理与紧急修复不会遗漏在 dev 之外。
 - 无需通过破坏性 rebase 维持共享开发分支。
+- 日常 `dev` 连续提交不会重复消耗远端 Actions；其他开发者的 `dev` PR 与稳定主线 PR 仍有可追踪的远端验证记录。
 
 代价：
 
 - 每次阶段性 PR 合并后会多一个明确的回同步动作，通常也会保留一个 merge commit。
 - 合并完成不能视为本轮 Git 收尾；必须继续完成 dev 推送和祖先关系复核。
 - 如果未来启用 dev 保护，回同步需要额外的同步 PR 与 required checks。
+- `dev` 直接 push 不获得远端检查反馈，因此直接提交者必须承担本地验证责任；如希望强制所有开发者通过检查，需要另行启用 `dev` 保护。

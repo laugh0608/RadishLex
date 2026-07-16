@@ -179,21 +179,39 @@ def check_ruleset_and_workflows() -> None:
 
     contexts = required_status_contexts(ruleset)
     if contexts != REQUIRED_STATUS_CHECKS:
-        raise SystemExit(f"ruleset required checks mismatch: expected {sorted(REQUIRED_STATUS_CHECKS)}, got {sorted(contexts)}")
+        raise SystemExit(
+            "ruleset required checks mismatch: "
+            f"expected {sorted(REQUIRED_STATUS_CHECKS)}, got {sorted(contexts)}"
+        )
 
     if commit_message_pattern(ruleset) != CONVENTIONAL_COMMIT_PATTERN:
         raise SystemExit("ruleset conventional commit pattern does not match repository convention")
 
     pr_workflow = read_text(".github/workflows/pr-check.yml")
+    if not pr_workflow.startswith("name: PR Checks\n"):
+        raise SystemExit("pr-check workflow must use the PR Checks name")
     for context in REQUIRED_STATUS_CHECKS:
         if f"name: {context}" not in pr_workflow:
             raise SystemExit(f"pr-check workflow is missing job name: {context}")
-    if "pull_request:" not in pr_workflow or "push:" not in pr_workflow:
-        raise SystemExit("pr-check workflow must cover pull_request and push")
+    if "push:" in pr_workflow or "workflow_dispatch:" in pr_workflow:
+        raise SystemExit("pr-check workflow must only run for pull requests")
+    if "pull_request:" not in pr_workflow:
+        raise SystemExit("pr-check workflow must run for pull requests")
+    for target_branch in ("dev", "master"):
+        if f"      - {target_branch}\n" not in pr_workflow:
+            raise SystemExit(f"pr-check workflow is missing target branch: {target_branch}")
+    if "      - main\n" in pr_workflow:
+        raise SystemExit("pr-check workflow must not run for main pull requests")
     if "git diff --check" not in pr_workflow:
         raise SystemExit("pr-check workflow must check PR diff whitespace")
 
     release_workflow = read_text(".github/workflows/release-check.yml")
+    forbidden_release_triggers = ("pull_request:", "branches:", "workflow_dispatch:")
+    if any(trigger in release_workflow for trigger in forbidden_release_triggers):
+        raise SystemExit("release-check workflow must only run for release tags")
+    for tag_pattern in ('"v*-dev"', '"v*-test"', '"v*-release"'):
+        if f"      - {tag_pattern}\n" not in release_workflow:
+            raise SystemExit(f"release-check workflow is missing tag pattern: {tag_pattern}")
     for context in ("Release Repo Hygiene", "Release Repository Baseline"):
         if f"name: {context}" not in release_workflow:
             raise SystemExit(f"release-check workflow is missing job name: {context}")
