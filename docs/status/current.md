@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核日期：2026-07-15（Asia/Shanghai）
+- 复核日期：2026-07-16（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 分支闭环：阶段性 `dev -> master` PR 合并后，必须在下一批常规开发前将最新 `master` merge 回 `dev`，正式口径见 ADR 0001
 - 当前产品里程碑：M1 macOS 离线输入 Alpha
@@ -14,27 +14,15 @@
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；受控同步实现与测试可继续
 
-2026-07-12 实机已验证连续输入、5×1 候选、主要编辑键、Enter 和方向选择提交；`IMKCandidates` 程序化选择的 engine/FFI/Space 索引一致，但视觉不重绘。2026-07-13 的单 mode probe 又证伪 controller-first fallback 与显式 panel `keyDown:`；两次测试均已零残留清理，实验代码已回退，不再生成第三个签名 probe。
+R01A 已由冻结的 Apple Development `build 32` 在精确 source 通知归属下完成退出：真实 TextEdit/Codex 覆盖连续输入、5×1 候选、主要选择/编辑/提交、光标跟随、长候选、全屏、输入菜单、双 client、进程重启和离线一致性，系统设置、TIS、bundle、运行数据与进程最终回到零残留。构建 30–32 的失败纠偏、TIS 缓存竞态和清理流水保留在整改专题与周志，不再进入默认阅读链。
 
-2026-07-14 的正式 `build 30` 已完成 Apple Development 签名、用户级安装、一次注销/登录、系统设置添加和实体键盘观察，随后完整清理。实体输入时看到候选条、右方向后高亮移动且 Space 提交移动后候选，但系统开启了“自动切换到文稿的输入法”，事后 TIS 显示 TextEdit 已切回系统拼音；因此这组事件和提交不能归属为 RadishLex 正式通过证据。候选窗同时被观察到固定在屏幕左下角。清理后精确 TIS 为 `matches=0 enabled=0 selected=0`，用户级 bundle、隔离运行数据、精确进程均不存在。
-
-当前 SDK 契约确认 `attributesForCharacterIndex:` 接收 inline session 内的字符索引，不是末尾插入位置。正式实现以 marked range 派生合法索引，保留 `firstRectForCharacterRange:actualRange:` 的文档绝对插入位置 fallback；动态 contract 覆盖越界索引返回有限高度 `(0,0)`、末尾/中间 cursor、无 inline session 和最终 panel 锚点，产品构建号升至 `31`。
-
-`build 31` 已在明确授权后完成 Apple Development 重建、严格签名、安装副本哈希复核、用户级安装和系统设置添加，全程无需注销。初次出现“设置已添加但菜单不发布 source”；经系统设置真实移除并重新添加后，菜单项可由开发者手动选择。自检后的只读 TIS 通知监视精确记录 RadishLex mode 为本组 current source，开发者实体输入确认候选出现、跟随文字光标、右方向迁移到第二项且 Space 提交该项，无异常；返回 Codex 后监视才记录切回系统拼音。因此 build 31 的光标锚点与本组视觉/提交同 index 正式通过。
-
-同一冻结 `build 31` 的后续集中验收在精确 RadishLex source 归属下确认鼠标点击第二候选可提交，且无需重新点击 TextEdit 即可继续产生 composition，鼠标路径与宿主焦点通过。随后 VoiceOver 以 `Control-Option-Right Arrow` 导航到第二候选时，旁白焦点已位于第二项，但候选条视觉高亮仍停在第一项；`Control-Option-Space` 执行 accessibility press 后提交的也不是第二项。本轮按当时停止线立即停止，没有继续边缘定位、外观、长候选、多屏/全屏、输入菜单或生命周期/离线矩阵，也没有在安装现场重建。该缺陷证据保留，但当前产品推进决策将 VoiceOver 完整可用性降为 M1 Alpha 已知限制，不再阻塞 R01A 退出，也不单独触发 `build 32`。
-
-验收后清理经历设置项回流和 TIS 缓存竞态：TextEdit 文稿先切回系统拼音，通过系统设置真实移除；删除 bundle/隔离数据并终止进程后，再以系统设置公开界面刷新现有列表与可添加目录。最终现有列表和“添加 -> 简体中文”目录均无 RadishLex，`matches=0 enabled=0 selected=0`，bundle、运行数据、进程与本轮临时构建目录均无残留；未使用 `TISDisableInputSource`、私有配置或注销，“自动切换到文稿的输入法”仍保持关闭。该时点 R01A 因主输入路径的平台与生命周期矩阵尚未完成而继续开放，后续退出结论见 build 32 记录。
-
-2026-07-15 再次冻结并签名安装 `build 31` 后，通知型 TIS 监视确认正式 Pinyin mode 覆盖每个测试组。候选窗在屏幕上下左右边缘的放置与限制通过，浅色/深色选中态通过且系统外观恢复原始“自动”；长输入组随即发现真实 panel 展示 9 项候选，与正式 5×1 契约冲突。本轮按停止线停止多屏/全屏、输入菜单和生命周期/离线矩阵，未在安装现场重建；系统设置现有列表与“添加 -> 简体中文”目录、TIS、bundle、运行数据和进程均已零残留，添加 source 时系统自动改变的 🌐︎ 键行为也随移除自动恢复。
-
-根因不是 panel 排版，而是本轮隔离 product-authored `default.yaml` 错误配置 `menu.page_size: 9`，controller/panel 又按设计完整展示 engine snapshot；原动态 contract 只注入恰好五项，未覆盖真实配置分叉。修复保持 engine/display index 一致，不在 UI 层截断：仓库现提供产品 `default.yaml` 模板并固定五项候选页，native bundle 构建覆盖 shared-data 输入中的默认配置，门禁逐字节复核模板并以真实 librime/FFI snapshot 断言候选数为 5。用户可见配置变化使下一候选升为 `build 32`；修复提交为 `e44d92f`。
-
-同日冻结的 Apple Development `build 32` 通过生成/安装哈希一致性与正式 source 通知归属；真实 panel 复验 5×1、长候选压缩与 tooltip，全屏 Space、单一输入菜单项、TextEdit/Codex owner 切换、精确进程重启和离线输入均通过。当前机器只有一个显示器，副屏行为明确记为环境未覆盖，M1 Alpha 不据此声明多显示器保证；VoiceOver 仍是既有已知限制。两次系统设置回流移除后，只有通过应用菜单真正退出 `System Settings` 并等待 `KeyboardSettings.appex` 结束，重开的可添加目录才清除缓存项；最终现有列表与可添加目录无 RadishLex，TIS、bundle、运行数据、生成 app 和进程全部零残留，🌐︎ 键行为恢复原值。R01A 据此完成退出，主批次切换到 R02L。
+M1 Alpha 明确保留两项未声明范围：当前单屏环境未覆盖副屏；VoiceOver 能导航 accessibility 焦点但视觉/提交未跟随，进入受支持范围前必须修复并重新实机验收。
 
 R02L 已在不接入真实平台热路径的前提下完成本地正确性收口：userdb schema v3 以统一事务承载 add、explicit restore、selection、negative feedback 和 delete，文件库固定 WAL、5 秒 busy timeout、foreign keys、`synchronous=NORMAL`、独立连接和 Unix 私有权限；v1/v2 原子迁移移除 64 位 FNV 唯一身份，未来 schema 与损坏库显式拒绝并原位保留。ranker 改为显式评估时间、确定性 recency、对数有界 frequency/negative contribution、有限分数和稳定原索引 tie-break；固定 5 例合成集达到 Top-1 `0.8`、Top-3 `1.0`、MRR `0.9`，50 候选延迟只记录可复验观测而不设置易波动 CI 墙钟阈值。删除优先于 suppress 和旧状态，只有版本更新的独立恢复入口可清除 tombstone；同步 payload v1 不再把 `manual_add` 推断为恢复。当前主批次据此切换为 R01B。
 
-R01B 已完成自动化代码批：新增 `ime-runtime` 统一组合 engine、ranker、userdb 与 privacy policy；每个输入 session 使用独立数据库连接，一次读取当前候选页的排序信号，并保留 display 到 engine index 映射。macOS 产品 session 固定使用 `~/Library/Application Support/RadishLex/userdb.sqlite3`，在每次按键和选择前只传递 secure、privacy、上下文是否已知及粗粒度类别；secure/P0/未知应用不读取或写入 userdb，隐私模式只读排序。真实 librime/FFI native smoke 已证明 selection 记录、分段延迟记录、隐私零增量和 secure 阻断；R01B 仍需授权后的真实 TextEdit 学习、输入法进程重启持久化及零残留证据，当前不得标记完成。
+R01B 已完成自动化代码批：新增 `ime-runtime` 统一组合 engine、ranker、userdb 与 privacy policy；每个输入 session 使用独立数据库连接，一次读取当前候选页的排序信号，并保留 display 到 engine index 映射。macOS 产品 session 固定使用 `~/Library/Application Support/RadishLex/userdb.sqlite3`，在每次按键和选择前只传递 secure、privacy、上下文是否已知及粗粒度类别；secure/P0/未知应用不读取或写入 userdb，隐私模式只读排序。真实 librime/FFI native smoke 已证明 selection 记录、分段延迟记录、隐私零增量和 secure 阻断；R01B 仍需授权后的真实 TextEdit 学习、输入法进程重启持久化，以及与安装前数据、路径和权限基线一致的最终回滚证据，当前不得标记完成。
+
+2026-07-16 已完成 R01B 实机前置门禁：macOS `--status` 现在分别报告用户级 bundle、固定删除路径祖先安全性、RadishLex 父目录的存在性/类型/权限、Rime 运行目录、`userdb.sqlite3`、已知 SQLite sidecar 与 `stopped|running_verified|running_unverified|unavailable` 进程状态，悬空 symlink 也按 present/unsafe 处理。隔离 `HOME`、封闭假命令 `PATH`、假 TIS 与假进程命令的动态 contract 已证明普通清理只对命令行匹配固定 bundle executable 的进程执行终止，确认停止并复核固定路径祖先后再删除 bundle/Rime；父目录、主库、WAL、SHM、rollback journal 和无关条目保持，删除路径祖先不安全、source 仍 selected、不可选择 parent 仍 enabled、同名进程身份不符、终止失败或进程状态不可观测时均在删除前拒绝。当前只读基线为 TIS `matches=0 enabled=0 selected=0`、`cleanup_path_ancestors=safe`、bundle/Rime/userdb/sidecar 不存在、进程停止，父目录是预存空目录且 mode 为 `0755`；路径状态不推断测试数据所有权。产品 runtime 会把该预存目录收紧到 `0700`，因此后续实机授权与最终基线复核必须显式处理这一权限变化。
 
 临时通知监视已收口到现有 `tis_source_status.m`：`--monitor` 先输出精确 current source，再在公开 selected-source 通知到达时通过 CFRunLoop 重读并输出 current source，以 `is_radishlex_pinyin` 明确标识正式 Pinyin mode；同一次切换允许出现重复通知，原 Bundle ID 状态输出和清理调用保持兼容。门禁固定编译、默认输出、通知/RunLoop 结构以及 `TISSelectInputSource`、`TISDisableInputSource` 和私有配置禁用线。用户为避免文稿级 source 占用而主动关闭的“自动切换到文稿的输入法”继续保持关闭，执行者不得自动修改。
 
@@ -47,7 +35,7 @@ R01B 已完成自动化代码批：新增 `ime-runtime` 统一组合 engine、ra
 - librime 生命周期已收口到进程级 runtime；多 session、owner-thread、配置冲突、失败回滚和 finalize 已有自动或 native smoke。
 - macOS Objective-C 薄壳、contract bundle 与 wrapper smoke 已落地，覆盖按键规范化、commit/snapshot/candidate 复制、reset、schema、线程与 teardown。
 - 正式 AppKit panel/component contract 动态覆盖非激活窗口、level、Spaces behavior、五候选、视觉/accessibility selection、appearance、合法 inline character index、绝对 insertion fallback、anchor、owner 接管和完整隐藏；controller contract 覆盖 keyDown/keyUp/modifier、候选变化重置、Space/鼠标/accessibility press 到 Rust commit、Enter/Escape、宿主快捷键和双 client 生命周期。
-- 正式 TIS 状态/清理入口按精确 Bundle ID 隔离产品与 reference probe；同一工具的 `--monitor` 已通过公开 selected-source 通知、CFRunLoop 和精确 mode 标识形成实时来源记录，不能用不处理通知的进程内轮询冒充。清理仍以系统设置真实移除为前置，不使用 `TISDisableInputSource` 或私有配置替代。
+- 正式 TIS 状态/清理入口按精确 Bundle ID 隔离产品与 reference probe；同一工具的 `--monitor` 已通过公开 selected-source 通知、CFRunLoop 和精确 mode 标识形成实时来源记录，不能用不处理通知的进程内轮询冒充。`--status` 已覆盖 bundle、父目录类型/权限、Rime、userdb、sidecar 和进程，只观察固定路径 metadata；动态 contract 固定普通清理保留 userdb family 与父目录。清理仍以系统设置真实移除为前置，不使用 `TISDisableInputSource` 或私有配置替代。
 - 隔离 `rime-pinyin-simp` 的真实 FFI smoke 已覆盖 composition、完整与分段非首候选、Backspace、Escape、Enter、翻页、方向键高亮与 Space、multi-session 和不存在 schema 拒绝；adapter 以 deployed schema list、原生 current-page selection API 与选择后回读固定可用性。
 - native 门禁覆盖隔离 schema/data/license、产品生成的五项候选页配置、真实 FFI snapshot 页大小、架构、FFI symbol、递归 dylib closure、逐库签名哈希和外部依赖拒绝；不读取用户 Rime 目录。
 - macOS bundle 固定正式 Bundle/mode ID、`LSUIElement`、简体中文 metadata、双语标签与 Retina 列表图标，并对完整依赖闭包签名。
@@ -59,13 +47,14 @@ R01B 已完成自动化代码批：新增 `ime-runtime` 统一组合 engine、ra
 
 ## 已确认阻塞
 
-- R01B 自动化链已接入产品热路径，但尚缺 userdb 只读清理观测、真实 TextEdit 连续选择改变排序、输入法进程重启后保持、delete/explicit restore、P0/隐私零写入及按测试数据所有权执行的最终零残留证据。
+- R01B 自动化链和实机前置观测已完成，但尚缺真实 TextEdit 连续选择改变排序、输入法进程重启后保持、delete/explicit restore、P0/隐私零写入及按测试数据所有权执行的最终基线复核；预存空父目录从 `0755` 收紧到 `0700` 的行为还需纳入实机授权与最终权限处置。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
 - manager 默认 fixture fallback，native library 打包、持久化路径和文件权限尚未产品化。
 
 ## 当前停止线
 
 - R01B 只把已经通过 R02L 的本地语义接入真实选择、privacy policy 与 ranker，不借接入扩张同步协议、manager 同步 UI、第二平台或新的证明状态机。
+- `--status` 只形成时间点 metadata 证据，不自动声明测试数据归属。父目录 absent 时可继续并记录为本轮随后创建；父目录为预存普通空目录时可继续但须保留并恢复原 mode；父目录 nonempty/unsafe/unreadable，或 Rime、主库、sidecar 已存在时，必须停止实机批次并保留现场。
 - M3 退出前，不开放真实用户同步、非受控远端数据、恢复码产品成功路径、设备授权产品成功路径或设备撤销产品执行入口。
 - 允许使用合成数据、loopback、短生命周期服务和受控集成测试实现同步成功路径，但这些证据不能解锁产品入口。
 - 第一平台达到可重复日常输入前，不启动第二平台实现。
@@ -78,7 +67,7 @@ R01B 已完成自动化代码批：新增 `ime-runtime` 统一组合 engine、ra
 
 1. R01A 已由 build 32 的五项页、全屏/菜单、双 client、进程重启、离线和零残留证据完成退出；保留 VoiceOver 与副屏环境缺口，不在当前批重复消耗实机窗口。
 2. R02L 已以事务回滚、SQLite 文件策略和迁移、规范化删除身份、确定性有界排序、状态优先级、固定合成评测及延迟观测完成退出，并作为 R01B 产品运行时的本地语义基础。
-3. R01B 自动化代码批已接入 privacy policy、userdb 和 ranker，并保留 display/engine index 映射；下一工作日先让清理状态入口只读报告 `userdb.sqlite3` 并固定测试数据所有权停止线，再冻结新构建号。取得明确授权后，用同一产物验证 TextEdit 学习重排、进程重启持久化、delete/explicit restore、隐私/P0 零写入，最后完成系统设置真实移除以及与安装前基线一致的数据清理复核。
+3. R01B 自动化代码批与实机前置状态/所有权门禁已经完成；下一步使用高于 `build 32` 的新 `CFBundleVersion` 冻结同一 Apple Development 产物，并在授权清单中明确签名、安装、系统设置、人工选择、进程重启、隐私设置临时变化、父目录 `0755 -> 0700` 及最终权限恢复。取得明确授权后验证 TextEdit 学习重排、进程重启持久化、delete/explicit restore、隐私/P0 零写入，最后完成系统设置真实移除以及与安装前基线一致的数据清理复核。
 4. 任一后续实机回归仍使用冻结产物、人工切换/交互、公开通知监视、明确授权和系统设置真实移除；不因 R01A 退出而降低零残留或来源归属要求。
 
 ## 验证入口

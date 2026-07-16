@@ -4,6 +4,9 @@ set -euo pipefail
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
 platform_dir="${repo_root}/platforms/macos-imk"
+cleanup_script="${platform_dir}/cleanup-user-install.sh"
+cleanup_wrapper="${repo_root}/scripts/cleanup-macos-imk.sh"
+cleanup_sources=("${cleanup_script}" "${cleanup_wrapper}")
 export CLANG_MODULE_CACHE_PATH="${repo_root}/target/macos-imk/clang-module-cache"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
@@ -19,8 +22,49 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
 
 smoke_dir="${repo_root}/target/macos-imk/contract-smoke"
 mkdir -p "${smoke_dir}" "${CLANG_MODULE_CACHE_PATH}"
-bash -n "${platform_dir}/cleanup-user-install.sh" \
-  "${repo_root}/scripts/cleanup-macos-imk.sh"
+bash -n "${cleanup_script}" \
+  "${cleanup_wrapper}" \
+  "${platform_dir}/Tests/cleanup_user_install_contract.sh"
+if rg -n '/((usr/)?bin|usr/sbin|sbin)/' "${cleanup_sources[@]}" | \
+  rg -v ':1:#!/usr/bin/env bash$'; then
+  echo "macOS cleanup must not bypass the isolated contract with absolute executables." >&2
+  exit 1
+fi
+if rg -n '(^|[;&|()[:space:]])(HOME|PATH|BASH_ENV|ENV|SHELLOPTS)[[:space:]]*=' \
+  "${cleanup_sources[@]}"; then
+  echo "macOS cleanup must not replace the isolated contract environment." >&2
+  exit 1
+fi
+if rg -n '(^|[;&|()[:space:]])(builtin|command|eval|source|kill|killall|unlink|osascript|launchctl|xargs|python3?|perl|ruby|node|swift|ln|mv|cp|install|rsync|ditto)([;&|()[:space:]]|$)|(^|[;&|()[:space:]])(ba|z)?sh[[:space:]]+-c|-(exec|delete)([[:space:]]|$)' \
+  "${cleanup_sources[@]}"; then
+  echo "macOS cleanup contains a command that bypasses fixed-path contract interception." >&2
+  exit 1
+fi
+if rg -n '^[[:space:]]*rm[[:space:]]' \
+  "${cleanup_sources[@]}" | \
+  rg -v 'rm -rf "\$\{(installed_bundle|runtime_data)\}"$'; then
+  echo "macOS cleanup may only remove the fixed bundle and Rime runtime paths." >&2
+  exit 1
+fi
+rg -Fq 'pids="$(pgrep -x "${process_name}" 2>/dev/null)"' "${cleanup_script}"
+rg -Fq '! command_line="$(ps -ww -p "${pid}" -o command= 2>/dev/null)"; then' \
+  "${cleanup_script}"
+rg -Fq 'pkill -f "${process_pattern}" 2>/dev/null || true' "${cleanup_script}"
+if [[ "$(rg -o '\b(pgrep|ps|pkill)\b' "${cleanup_sources[@]}" | wc -l | tr -d ' ')" != "3" ]]; then
+  echo "macOS cleanup process inspection/termination commands changed unexpectedly." >&2
+  exit 1
+fi
+rg -Fq 'PATH="${fake_bin}" \' \
+  "${platform_dir}/Tests/cleanup_user_install_contract.sh"
+rg -Fq 'rm stub received a path outside the fixed cleanup targets' \
+  "${platform_dir}/Tests/cleanup_user_install_contract.sh"
+if rg -n 'TIS(Select|Disable|Enable|Register|Deregister)InputSource|CFPreferencesSet|NSUserDefaults|com\.apple\.HIToolbox|defaults (write|delete)' \
+  "${cleanup_script}" \
+  "${platform_dir}/Tools/tis_source_status.m"; then
+  echo "macOS cleanup must not mutate TIS or HIToolbox private state." >&2
+  exit 1
+fi
+"${platform_dir}/Tests/cleanup_user_install_contract.sh"
 clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   -mmacosx-version-min=13.0 \
   "${platform_dir}/Tools/tis_source_status.m" \
@@ -47,17 +91,29 @@ rg -q 'is_radishlex_pinyin' \
   "${platform_dir}/Tools/tis_source_status.m"
 rg -q -- '--monitor' "${platform_dir}/cleanup-user-install.sh"
 rg -q -- '--authorized-after-settings-removal' \
-  "${platform_dir}/cleanup-user-install.sh"
+  "${cleanup_script}"
 rg -q 'org\.radishlex\.inputmethod\.macos' \
-  "${platform_dir}/cleanup-user-install.sh"
-rg -q 'Library/Input Methods/RadishLexInputMethod\.app' \
-  "${platform_dir}/cleanup-user-install.sh"
-rg -q 'Application Support/RadishLex/Rime' \
-  "${platform_dir}/cleanup-user-install.sh"
-if rg -n 'TIS(Select|Disable|Enable|Register|Deregister)InputSource|CFPreferencesSet|NSUserDefaults|com\.apple\.HIToolbox|defaults (write|delete)' \
-  "${platform_dir}/cleanup-user-install.sh" \
-  "${platform_dir}/Tools/tis_source_status.m"; then
-  echo "macOS cleanup must not mutate TIS or HIToolbox private state." >&2
+  "${cleanup_script}"
+rg -Fq 'input_methods_parent="${library_dir}/Input Methods"' "${cleanup_script}"
+rg -Fq 'installed_bundle="${input_methods_parent}/RadishLexInputMethod.app"' \
+  "${cleanup_script}"
+rg -Fq 'application_support_root="${library_dir}/Application Support"' \
+  "${cleanup_script}"
+rg -Fq 'application_support_parent="${application_support_root}/RadishLex"' \
+  "${cleanup_script}"
+rg -Fq 'runtime_data="${application_support_parent}/Rime"' \
+  "${cleanup_script}"
+rg -q 'application_support_parent=' \
+  "${cleanup_script}"
+rg -q 'application_support_parent_kind=' \
+  "${cleanup_script}"
+rg -q 'application_support_parent_mode=' \
+  "${cleanup_script}"
+rg -q 'cleanup_path_ancestors=' "${cleanup_script}"
+rg -q 'userdb=' "${cleanup_script}"
+rg -q 'userdb_sidecars=' "${cleanup_script}"
+if [[ "$(rg -c '^require_safe_cleanup_paths$' "${cleanup_script}")" != "2" ]]; then
+  echo "macOS cleanup must recheck fixed-path ancestors before deletion." >&2
   exit 1
 fi
 clang -fobjc-arc -fmodules -Wall -Wextra -Werror -fsyntax-only \

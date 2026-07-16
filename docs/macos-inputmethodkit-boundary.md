@@ -131,7 +131,7 @@ SDK `IMKInputSession.h` 明确给自建候选窗提供 `windowLevel`，并说明
 
 R01B 将正式 InputMethodKit session 切换到 `ime-runtime` 产品构造入口。每个 controller/session 使用独立 engine session 和独立 userdb connection，数据库固定在 `~/Library/Application Support/RadishLex/userdb.sqlite3`；Objective-C 只创建权限为 `0700` 的父目录并传 UTF-8 路径，Rust 负责 migration、WAL、busy timeout、数据库与 sidecar 的 `0600` 权限以及损坏错误。平台不得静默删除或重建数据库。
 
-userdb 是用户数据，默认输入法移除和开发 bundle 清理必须保留；现有清理入口只删除 `RadishLex/Rime` 运行目录，不删除 `userdb.sqlite3`。R01B 合成验收若要求数据零残留，安装前必须分别只读记录父目录、Rime 目录和 userdb 的基线：userdb 或 Rime 已存在时停止测试并保留原位，不得备份后替换、静默复用或删除；父目录原本为空时可以继续，但必须保留该预存空目录。只有系统设置真实移除、输入法退出、数据库连接关闭且再次取得精确清理授权后，才能删除已证明由本轮创建的 Rime/userdb；只有父目录本身也由本轮创建时，才能一并删除父目录。
+userdb 是用户数据，默认输入法移除和开发 bundle 清理必须保留；现有清理入口只删除 `RadishLex/Rime` 运行目录，不删除父目录、`userdb.sqlite3` 或 SQLite sidecar。`--status` 只读报告固定路径的存在性、`cleanup_path_ancestors=safe|unsafe`、父目录 kind/mode、已知 sidecar 聚合和 `stopped|running_verified|running_unverified|unavailable` 进程状态，不打开数据库；悬空 symlink 视为存在或不安全，同名进程只有命令行匹配固定 bundle executable 才可被终止。授权清理必须在进程处理前和固定删除前复核从 `HOME` 到 bundle/Rime 的祖先均为普通目录或尚不存在，不能沿中间 symlink 删除外部目标；安装前 ancestor 状态不是 `safe` 时同样停止。R01B 合成验收若要求数据零残留，安装前必须记录父目录、Rime、主库和 sidecar 基线：父目录 absent 时可继续并记录为本轮随后创建，预存普通空目录也可继续但不属于本轮；父目录 nonempty/unsafe/unreadable，或 userdb/Rime/sidecar 已存在时停止并保留原位，不得备份后替换、静默复用或删除。若 runtime 将预存空父目录权限收紧到 `0700`，最终默认恢复安装前 mode，除非另获授权保留更严格权限。只有系统设置真实移除、输入法退出、数据库连接关闭且再次取得精确清理授权后，才能删除已证明由本轮创建的 Rime/userdb family；只有父目录本身也由本轮创建时，才能一并删除父目录。
 
 候选 snapshot 同时携带 display index 与 engine index；候选窗、数字键、Space、鼠标和 accessibility action 始终回传 display index，由 Rust runtime 映射后选择 engine candidate。平台每次事件前传入 secure input、敏感应用、隐私模式、上下文可信度和受控 context kind；禁止学习场景不会写入，secure/敏感/未知场景也不读取个人化信号。分段选择的待确认意图、selection 事务和失败语义全部留在 Rust。平台日志只允许记录阶段、个人化状态与学习结果枚举，不记录输入码、候选、App ID 或数据库路径。
 

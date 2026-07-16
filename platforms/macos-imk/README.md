@@ -13,6 +13,7 @@
 - `Tests/contract_smoke.m`：使用合成 demo engine 复验 ABI v4、完整按键映射、display/engine index、个人化/学习状态、Unicode cursor、候选选择结果和生命周期，不读取 Rime 目录。
 - `Tests/candidate_panel_contract.m`：创建真实 AppKit panel/control，复验视觉与 accessibility selection、appearance、anchor fallback、owner 接管和完整隐藏。
 - `Tests/input_controller_contract.m`：使用正式 controller、panel 和 Rust demo session，贯通方向 keyDown/keyUp、Space、鼠标、accessibility press、Enter、Escape、宿主快捷键和双 client 生命周期。
+- `Tests/cleanup_user_install_contract.sh`：在隔离仓库、隔离 `HOME`、假 TIS 与假进程命令中动态复验路径状态和普通清理的数据保留边界，不查询真实 TIS、不终止真实进程。
 - `Tools/tis_source_status.m`：使用公开 TIS API 按精确 Bundle ID 查询 parent/mode 状态，或以通知和 CFRunLoop 实时输出精确 current source；不启用、停用或选择输入源。
 - `cleanup-user-install.sh`：在系统设置已人工移除且取得授权后，清理正式开发 bundle、`Rime` 运行目录和精确进程，并要求 TIS 零残留；默认保留 `userdb.sqlite3`。
 - `ReferenceProbe/`：隔离验证原生候选事件路由与单 mode 输入源 metadata，不链接 Rime 或正式 FFI，也不替代产品薄壳。
@@ -27,7 +28,7 @@ native 产品 session 通过 ABI v4 的 personalized Rime 构造入口持有独�
 
 当前分类把 TextEdit 映射为 `editor`、Codex 映射为 `code`；Passwords、Keychain Access、1Password 8/7 的固定 Bundle ID 标记为敏感，其余应用映射为未知 `other`。隐私模式由输入法 `NSUserDefaults` 中的 `RadishLexPrivacyMode` 布尔值控制，缺省关闭；开启后仍可使用既有本地排序摘要，但不会记录当前 selection 或更新 user term/ranker weight。设置或前台/secure 状态变化时，controller 会先刷新 Rust learning context 和候选 snapshot，再接受 display index 选择。
 
-`userdb.sqlite3` 不是临时 Rime 数据，卸载或普通开发清理不得删除。当前 `--status` 只报告 bundle、Rime 目录和进程，尚不能单独证明 R01B 测试数据库零残留；实机前必须补齐父目录和 userdb 只读状态。只有安装前已证明 userdb/Rime 不存在、对应内容全由本轮合成测试生成且另有明确授权时，才能精确删除本轮创建的数据；预存空父目录必须恢复为空并保留。
+`userdb.sqlite3` 不是临时 Rime 数据，卸载或普通开发清理不得删除。`--status` 分别报告 bundle、固定删除路径祖先安全性、RadishLex 父目录的存在性/类型/权限、Rime 目录、userdb、已知 SQLite sidecar 和进程；悬空 symlink 也视为存在或不安全，但这些 metadata 不自动证明数据归属。只有 `cleanup_path_ancestors=safe`，且父目录 absent 或为预存普通空目录、Rime/userdb/sidecar 均 absent 时才可继续：前者由本轮随后创建并取得所有权，后者必须保留且不属于本轮。只有安装前已证明数据族不存在、对应内容全由本轮合成测试生成且另有明确授权时，才能精确删除本轮创建的数据；预存空父目录须恢复为空，权限若被 runtime 收紧则默认恢复安装前 mode，除非另获授权保留更严格权限。
 
 ## 不安装验证
 
@@ -74,6 +75,6 @@ bundle metadata 固定正式 Bundle ID `org.radishlex.inputmethod.macos` 与单�
 ./scripts/cleanup-macos-imk.sh --authorized-after-settings-removal
 ```
 
-`--status` 输出正式 bundle family 的 TIS source 属性与 `matches/enabled/selected` 汇总，并报告安装路径、隔离运行数据和精确进程。`--monitor` 先输出 `event=initial`，随后在公开 selected-source 通知到达时输出 `event=changed` 与最新 current source；一次切换可能出现多条相同 source 记录，`is_radishlex_pinyin=1` 只表示精确匹配正式 Pinyin mode。两者不记录输入正文，监视以 `Ctrl-C` 结束。
+`--status` 输出正式 bundle family 的 TIS source 属性与 `matches/enabled/selected` 汇总，并报告 `installed_bundle`、`cleanup_path_ancestors=safe|unsafe`、`application_support_parent`、父目录 kind/mode、`runtime_data`、`userdb`、`userdb_sidecars` 和 `process=stopped|running_verified|running_unverified|unavailable`。sidecar 聚合覆盖 WAL、SHM 与 rollback journal；输出只观察固定路径 metadata，不打开数据库、不记录目录条目名，也不推断测试所有权。授权清理在 RadishLex 父目录或从 `HOME` 到两个删除目标之间的祖先为 symlink/非目录、父目录不可读、同名进程不匹配固定 bundle executable，或进程状态不可观测时直接拒绝；只有 `running_verified` 才会先终止并确认停止，再次复核祖先安全后删除 bundle/Rime。`--monitor` 先输出 `event=initial`，随后在公开 selected-source 通知到达时输出 `event=changed` 与最新 current source；一次切换可能出现多条相同 source 记录，`is_radishlex_pinyin=1` 只表示精确匹配正式 Pinyin mode。两者不记录输入正文，监视以 `Ctrl-C` 结束。
 
 第三条命令只能在系统设置已移除 RadishLex、当前输入源已切回系统输入法且本次授权明确覆盖清理时执行。这些入口不选择、启用或停用 source，不修改 `com.apple.HIToolbox` 或 TIS 私有数据库；完整集中验收与回滚顺序见 `docs/runbooks/macos-inputmethodkit-development.md`。

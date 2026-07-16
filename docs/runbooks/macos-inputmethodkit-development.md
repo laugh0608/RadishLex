@@ -19,7 +19,7 @@
 ./scripts/cleanup-macos-imk.sh --monitor
 ```
 
-`--status` 输出匹配 source 的属性与 `matches/enabled/selected` 汇总，并报告精确用户级 bundle、`RadishLex/Rime` 运行目录和进程状态；它不因路径存在而推断输入源已添加。当前入口尚未报告父目录和 `userdb.sqlite3`，因此不能单独作为 R01B 测试数据零残留证据，实机前应先补齐该只读观测。`--monitor` 输出 `event=initial|changed source_id=... bundle_id=... is_radishlex_pinyin=0|1`，每次通知后立即刷新 stdout，使用 `Ctrl-C` 结束。同一次切换可能出现重复记录，必须按事件顺序与精确 source ID 判定来源。
+`--status` 输出匹配 source 的属性与 `matches/enabled/selected` 汇总，并分别报告用户级 bundle、`cleanup_path_ancestors=safe|unsafe`、RadishLex 父目录的存在性/类型/权限、`RadishLex/Rime`、`userdb.sqlite3`、已知 SQLite sidecar 和 `process=stopped|running_verified|running_unverified|unavailable`；它不打开数据库，也不因路径存在而推断输入源已添加或数据属于本轮。`userdb_sidecars` 聚合 WAL、SHM 与 rollback journal，悬空 symlink 同样按存在或不安全处理；同名进程的命令行必须匹配固定 bundle executable 才是 `running_verified`，其余非 stopped 状态均禁止清理。`--monitor` 输出 `event=initial|changed source_id=... bundle_id=... is_radishlex_pinyin=0|1`，每次通知后立即刷新 stdout，使用 `Ctrl-C` 结束。同一次切换可能出现重复记录，必须按事件顺序与精确 source ID 判定来源。
 
 两条命令只写仓库 `target/macos-imk/tools/` 下的编译产物，不选择或修改输入源，也不读取输入正文。若沙盒上下文出现 HiServices XPC 连接错误或切换后没有通知，按后文实机分工停止并切换到获准的真实用户上下文，不能换成变异 API。
 
@@ -44,14 +44,17 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 
 ## 授权停止线
 
-以下步骤会修改本机输入法状态，未取得当次明确授权时必须停止：
+以下步骤会使用开发者签名身份或修改本机输入法、产品设置与数据状态，未取得当次明确授权时必须停止：
 
+- 使用 Apple Development identity 签名真实安装产物；
 - 写入用户级或系统级 `Input Methods` 目录；
 - 使用系统设置启用输入源；
 - 启动、终止或重启输入法相关进程；
 - 注销、重新登录或重启 macOS 以刷新输入源；
 - 在真实应用输入框执行 smoke；
-- 删除已安装 bundle 或修改系统输入源配置。
+- 临时修改并恢复 `RadishLexPrivacyMode` 等产品设置；
+- 让 runtime 收紧预存父目录 mode，或在验收后恢复安装前 mode；
+- 删除已安装 bundle、已证明属于本轮的 userdb family / Rime，或修改系统输入源配置。
 
 集中验收可以使用一次明确授权覆盖同一冻结 build 的 Apple Development 签名、用户级安装、一次注销/登录、系统设置添加、用户手动选择、真实应用 smoke、精确进程重启、短时断网和完整清理。授权必须逐项列出这些影响；未被列入的动作仍须停止。只要 build、路径和动作范围没有变化，已覆盖的步骤不在登录前后重复请求授权。若代码、构建号、Bundle ID、mode ID、安装域或清理目标变化，本次授权立即失效。
 
@@ -75,7 +78,7 @@ RADISHLEX_RIME_DATA_LICENSE=<license-file> \
 2. `CFBundleVersion`、Bundle ID、mode ID、schema id 与安装文件名符合当前文档。R01A 的最终冻结候选为 `build 32`：`build 31` 的 VoiceOver 已知限制本身不触发升级，但 2026-07-15 实机确认 product-authored Rime 配置错误使用 9 项候选页，形成独立生产行为变化；后续新回归不得把 `32` 当作永久固定构建号。
 3. Apple Development bundle 已通过 native 门禁、完整递归签名和 `codesign --verify --deep --strict`。
 4. 记录生成 bundle 主程序、FFI dylib 和 native manifest 的 SHA-256；复制后逐字节复核生成产物与安装副本，确保系统测试的就是冻结产物。
-5. 安装目标仅为 `~/Library/Input Methods/RadishLexInputMethod.app`，Rime 运行数据仅为 `~/Library/Application Support/RadishLex/Rime`；不得读取或复用用户现有 Rime 数据。R01B 另使用固定 `RadishLex/userdb.sqlite3`，安装前必须分别只读记录父目录、Rime 目录和数据库是否存在：Rime 或数据库任一已存在就停止，不得替换、复用、迁移或删除；父目录预存但为空时可以继续，但必须记录其不属于本轮并在清理后恢复为空。
+5. 安装目标仅为 `~/Library/Input Methods/RadishLexInputMethod.app`，Rime 运行数据仅为 `~/Library/Application Support/RadishLex/Rime`；不得读取或复用用户现有 Rime 数据。R01B 另使用固定 `RadishLex/userdb.sqlite3`，安装前必须用 `--status` 记录固定路径祖先安全性、父目录 kind/mode、Rime、主库和 sidecar：`cleanup_path_ancestors` 不是 `safe`，或 Rime、主库、sidecar 任一已存在就停止，不得替换、复用、迁移或删除。父目录 absent 时可继续并记录其随后由本轮创建；父目录为预存普通空目录时也可继续，但必须记录其不属于本轮。父目录 nonempty/unsafe/unreadable 时停止。若 runtime 会改变预存父目录权限，授权清单必须明确该变化；最终默认恢复原 mode，除非另获授权保留收紧后的权限。
 
 冻结后发现源码或产物问题，应取消本次真实动作并回到仓库修复。不得在已登录、已添加或已选择输入法的现场边改边重建。2026-07-15 的 `build 31` 已在精确 source 归属下通过四向屏幕边缘与浅色/深色外观，但长输入实机显示 9 项候选，与 5×1 契约不一致；本轮立即停止后续矩阵并完成系统设置、TIS、bundle、运行数据和进程零残留清理。修复后的 `build 32` 重新取得授权并冻结哈希后，已通过真实 5×1、长候选、全屏/菜单、双 client、进程重启和离线矩阵，R01A 完成；当前单屏环境未覆盖副屏，VoiceOver 仍是非 Alpha 声明范围的已知限制。
 
@@ -168,7 +171,7 @@ R01B 使用继 build 32 之后的新构建号和同一冻结产物，不重做�
 1. 在 TextEdit 对同一非首候选执行足以产生稳定差异的明确选择，使用 Rust 聚合状态和 rank explain 比较前后，不读取或输出 P1 原始事件；再次输入时，候选顺序和 display/engine mapping 必须与提交一致。
 2. 终止精确输入法进程并由系统重新拉起，确认同一 userdb 上的排序效果保持；不得通过复制数据库或重新导入构造持久化结果。
 3. 通过 `ime-cli dict delete` 在同一数据库删除合成词，确认旧 selection、旧 weight 和再次选择不能复活；随后只通过 `dict restore` 显式恢复，并确认状态版本更新和输入链重新使用有效信号。
-4. 隐私模式组先只读保存产品 `NSUserDefaults` 原状态，取得明确授权后只修改对应布尔键，执行合成选择并确认 selection、weight 和 user term 计数不增加，随后恢复原值。secure/P0 组只在不含真实账号和密码的安全输入控件使用合成文本；不打开或截图真实凭据内容。
+4. 隐私模式组先只读保存产品 `NSUserDefaults` 对应键是否存在及原值，取得明确授权后只修改该布尔键，执行合成选择并确认 selection、weight 和 user term 计数不增加；结束时原本 absent 的键恢复为 absent，原本存在则恢复原值，不能把 absent 恢复成显式 false。secure/P0 组只在不含真实账号和密码的安全输入控件使用合成文本；不打开或截图真实凭据内容。
 5. 任一写入计数、映射、重启持久化、删除优先级、设置恢复或来源归属不符合预期，立即停止后续组，保留数据库原位并进入回滚，不在安装现场改代码或重建。
 
 验收记录只保留合成 case、聚合计数、状态枚举、排序位置和通过/失败；不得记录原始事件表、真实文本、App ID、窗口标题、数据库内容转储或敏感截图。
@@ -187,7 +190,7 @@ R01A/R01B 每轮真实 smoke 无论通过还是失败都必须完整回滚，不
 ./scripts/cleanup-macos-imk.sh --monitor
 ```
 
-两者都只使用公开 TIS API，不选择、启用或停用 source，不修改系统配置，也不记录输入正文；监视器在测试组和清理开始前用 `Ctrl-C` 终止。状态入口报告正式 Bundle ID、精确用户级 bundle、隔离运行数据和精确进程状态。回滚顺序固定为：
+两者都只使用公开 TIS API，不选择、启用或停用 source，不修改系统配置，也不记录输入正文；监视器在测试组和清理开始前用 `Ctrl-C` 终止。状态入口报告正式 Bundle ID、固定路径祖先安全性、用户级 bundle、父目录 kind/mode、Rime、userdb/sidecar 和四态进程。回滚顺序固定为：
 
 1. 开发者先让所有参加测试且可能记住文稿级 source 的目标文稿手动切回系统输入法；执行者再在系统设置“键盘 -> 文字输入 -> 编辑”中选中 RadishLex 并点击“移除”。不能用公开 TIS API 停用代替该动作；若自动化无法精确识别设置行，应停下请求人工协助，不能猜测点击。
 2. 只读确认当前 source 已不是 RadishLex，再处理其残余 TIS source；不得修改 `com.apple.HIToolbox` 或 TIS 私有数据库。
@@ -197,11 +200,11 @@ R01A/R01B 每轮真实 smoke 无论通过还是失败都必须完整回滚，不
    ./scripts/cleanup-macos-imk.sh --authorized-after-settings-removal
    ```
 
-   该入口只删除精确的 `~/Library/Input Methods/RadishLexInputMethod.app`、本轮隔离的 `~/Library/Application Support/RadishLex/Rime`，并终止精确 `RadishLex` 进程；它有意保留 `userdb.sqlite3`。若仍有已选择 source 或 enabled 的不可选择 parent，入口会在删除前拒绝执行。
+   该入口只终止命令行匹配固定 bundle executable 的 `RadishLex` 进程并确认停止，再删除精确的 `~/Library/Input Methods/RadishLexInputMethod.app` 与本轮隔离的 `~/Library/Application Support/RadishLex/Rime`；它有意保留父目录、`userdb.sqlite3` 及其 sidecar。隔离 contract 会动态证明顺序和负向边界；RadishLex 父目录或任一删除目标祖先为 symlink/非目录、父目录不可读、进程状态不可观测，或终止后仍未停止时，入口会在路径删除前拒绝，并在真正删除前再次复核祖先。若仍有已选择 source 或 enabled 的不可选择 parent，入口也会在终止和删除前拒绝执行。
 4. 完整重启 System Settings；macOS 26 已多次观察到配置项短暂回流。若 RadishLex 再次出现，必须再次真实移除并重新启动设置，直到摘要和现有列表只含原系统 source；门禁在不可选择 parent 仍为 `enabled=1` 时必须拒绝删除。关闭窗口或快捷键动作不等于设置扩展已经退出：需要通过应用菜单“退出系统设置”，并在重新打开前确认 `System Settings` 与 `KeyboardSettings.appex` 均已结束，否则“添加”目录可能继续持有旧缓存。
 5. 删除 bundle 后若 TIS 暂留 `matches>0 enabled=0 selected=0`，打开现有列表和“添加 -> 简体中文”目录触发公开扫描，确认两处均无 RadishLex 后关闭窗口并重新运行清理入口。
-6. 只有 TIS 达到 `matches=0 enabled=0 selected=0`、用户级 bundle 与隔离运行数据不存在、精确进程停止，且设置摘要、现有列表与可添加目录均无 RadishLex，才算完成回滚。
-7. R01B 只有在安装前已证明 userdb/Rime 不存在、对应内容全为本轮合成测试生成、系统设置/TIS/bundle/process 清理完成且数据库连接关闭时，才能在新的精确授权下删除本轮创建的 userdb/Rime；父目录若在安装前已存在，必须恢复为空并保留，只有父目录本身也由本轮创建时才能删除。无法证明数据归属时始终保留 userdb 原位，并把“未执行数据零残留”记为退出缺口。
+6. 只有 TIS 达到 `matches=0 enabled=0 selected=0`、用户级 bundle 与隔离运行数据不存在、精确进程停止，且设置摘要、现有列表与可添加目录均无 RadishLex，才算完成平台输入源回滚。
+7. R01B 只有在安装前已证明 userdb/Rime/sidecar 不存在、对应内容全为本轮合成测试生成、系统设置/TIS/bundle/process 清理完成且数据库连接关闭时，才能在新的精确授权下删除本轮创建的 userdb family 与 Rime；父目录若在安装前已存在，必须恢复为空、保留并恢复原 mode，只有父目录本身也由本轮创建时才能删除。另获授权保留更严格权限时须单独记录。无法证明数据归属时始终保留 userdb 原位，并把“未执行测试数据零残留”记为退出缺口。只有 userdb family、Rime、父目录存在性与 mode 均回到安装前基线，才算完成 R01B 完整回滚。
 8. 只清理本轮生成的隔离 user data 与短期 staging；不删除 shared data 来源、用户其他输入法目录或任何非本轮数据。
 
-仅调用 `TISDisableInputSource` 或移走 bundle 不会自动删除“所有输入法”中的用户配置项，也不能用 `com.apple.HIToolbox`、TIS 私有数据库或其他私有配置代替系统设置移除。最终证据必须同时满足设置列表、TIS、安装域和进程四项无残留；短时缓存竞态只能通过公开刷新、等待与重复只读复核收敛。
+仅调用 `TISDisableInputSource` 或移走 bundle 不会自动删除“所有输入法”中的用户配置项，也不能用 `com.apple.HIToolbox`、TIS 私有数据库或其他私有配置代替系统设置移除。平台输入源回滚证据必须同时满足设置列表、TIS、安装域和进程四项无残留；R01B 完整回滚还必须证明测试数据路径与父目录 mode 回到安装前基线。短时缓存竞态只能通过公开刷新、等待与重复只读复核收敛。

@@ -84,7 +84,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | --- | --- | --- | --- |
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
 | R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 已完成；build 32 关闭五项页、全屏/菜单、双 client、进程重启、离线与零残留矩阵；VoiceOver 和副屏为明确未声明范围 | 真实应用可离线完成基础中文输入 |
-| R02L | 本地 userdb/ranker 正确性 | 已完成；真实平台学习热路径保持未接入 | 学习、删除、并发、迁移和排序语义正确 |
+| R02L | 本地 userdb/ranker 正确性 | 已完成；退出时未接入真实平台，其语义基础已由后续 R01B 自动化代码批接入产品输入链 | 学习、删除、并发、迁移和排序语义正确 |
 | R01B | 真实学习纵向闭环 | 进行中；依赖 R01A 与 R02L 已满足 | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 已完成 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
 
@@ -229,7 +229,8 @@ R01A 不要求学习已经接入；真实学习在 R02L 正确性完成后由 R0
 - 保留 display index、ranked index 与 engine selection index 的稳定映射。
 - 真实选择写入事务化 selection，并影响后续候选。
 - secure text entry、P0 App 和隐私模式在记录前阻断学习。
-- manager 只读取或修改 Rust 真相源，不复制排序和隐私逻辑。
+
+R01B 不以 manager 接入作为退出项；后续 M2 manager 进入本地个人化链路时，只能读取或修改 Rust 真相源，不复制排序和隐私逻辑。
 
 ### 退出证据
 
@@ -238,17 +239,18 @@ R01A 不要求学习已经接入；真实学习在 R02L 正确性完成后由 R0
 - P0 与隐私模式输入不产生 selection、weight 或 user term。
 - 删除与显式恢复在真实输入链中遵守 R02L 语义。
 
-### 当前完成证据（2026-07-15）
+### 当前完成证据（更新至 2026-07-16）
 
 - 新增 `ime-runtime` 产品层，统一持有 engine session、每 session 独立 userdb 连接、ranker、粗粒度学习上下文和 display 到 engine index 映射；候选页排序信号在单一 SQLite 读事务中批量取得，不把连接或排序逻辑下沉到平台壳。
 - secure text entry、敏感应用和未知应用采取 engine-only 策略，不读取或写入 userdb；显式隐私模式只读取已有 P2/P1 摘要用于本地排序，不记录 selection。上下文只允许固定粗粒度类别，平台 bundle id 不跨 FFI、不进入事件或日志。
 - selection 在 engine 返回即时 commit 时记录一次；分段选择只有在后续 commit 文本匹配时记录，reset、schema 或上下文变化会清除待定意图。学习写失败不撤销已经发生的 engine commit，向平台返回失败处置；排序读失败按 engine 原序降级并返回状态类别。
 - ABI contract v4 增加产品个人化 Rime session、学习上下文、个人化状态、学习处置和 candidate engine index；macOS 产品固定 userdb 路径及私有目录，Space、数字、鼠标/accessibility 选择均走 display index 到 engine index 的同一入口。
 - 合成 runtime 集成测试覆盖选择后重排与重启持久化、secure/敏感/未知/隐私隔离、分段选择、上下文切换、trigger 写失败、排序读失败、删除/显式恢复和 50 候选延迟观测。真实 librime/FFI native smoke 覆盖 selection 写入、分段处置、隐私零增量与 secure 阻断。
+- macOS 状态入口已只读报告 bundle、固定路径祖先安全性、父目录 kind/mode、Rime、userdb、已知 sidecar 和四态进程身份；悬空 symlink 不再误报 absent，进程查询错误不再伪装为 stopped，同名非产品进程不会被终止。隔离 `HOME`、封闭假命令 `PATH`、假 TIS 与假进程命令的动态 contract 覆盖空/非空/不安全父目录、删除目标 symlink 祖先及终止后的祖先替换、Rime/userdb/sidecar 独立状态、source 仍 selected、不可选择 parent 仍 enabled、已验证/未验证/不可观测/终止失败进程，并证明普通清理只对固定 bundle executable 的进程先停、复核祖先后再删 bundle/Rime，同时保留父目录、主库、WAL、SHM、rollback journal 与无关条目。
 
 ### 剩余退出项
 
-- 尚未安装本批输入法，也未修改系统设置。R01B 继续保持进行中；实机前先补 `userdb.sqlite3` 的只读状态观测和测试数据所有权停止线，因为现有清理入口默认只删除 Rime 运行目录并保留 userdb。随后必须在取得明确授权后使用同一冻结产物完成真实 TextEdit 连续选择改变排序、输入法进程重启后保持、delete/explicit restore、P0/隐私模式零写入和按基线归属执行的最终零残留复核，才能关闭批次。
+- 尚未安装本批输入法，也未修改系统设置。`userdb.sqlite3`、sidecar、父目录与 Rime 的只读观测及测试数据所有权停止线已经补齐；当前基线中的预存空父目录 mode 为 `0755`，产品 runtime 将收紧为 `0700`，该变化必须进入后续授权与最终权限处置。R01B 继续保持进行中；仍须在明确授权后使用同一冻结产物完成真实 TextEdit 连续选择改变排序、输入法进程重启后保持、delete/explicit restore、P0/隐私模式零写入和按基线归属执行的最终复核，才能关闭批次。
 
 ## 十一、R06A：首批质量门禁与 review-only 资产清理
 

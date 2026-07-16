@@ -240,7 +240,7 @@ apps/radishlex-manager/
 
 ## 平台目录
 
-当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build、不安装系统输入法的 wrapper contract smoke、公开 TIS 只读状态/监视工具、授权清理入口，以及不接 Rime/FFI 的合成 reference probe。正式薄壳已在 Apple Development build 32 完成 R01A 的 TextEdit/Codex、候选窗、生命周期、断网与清理证据；当前顺位是 R01B，将同一产品薄壳接入 Rust 个人化 runtime。副屏和 VoiceOver 仍按平台边界文档的已知限制处理，不能把自动 contract 当成对应实机证据。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
+当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build、不安装系统输入法的 wrapper contract smoke、公开 TIS 只读状态/监视工具、路径/数据保留 contract、授权清理入口，以及不接 Rime/FFI 的合成 reference probe。正式薄壳已在 Apple Development build 32 完成 R01A 的 TextEdit/Codex、候选窗、生命周期、断网与清理证据；R01B 自动化代码批也已接入 Rust 个人化 runtime、固定 userdb、privacy policy 和 display/engine index 映射，当前顺位是取得真实应用学习、重启持久化、删除/恢复、隐私阻断与最终清理证据。副屏和 VoiceOver 仍按平台边界文档的已知限制处理，不能把自动 contract 当成对应实机证据。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
 
 后续平台目录按进入顺序创建：
 
