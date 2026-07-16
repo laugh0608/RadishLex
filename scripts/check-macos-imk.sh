@@ -30,16 +30,53 @@ if rg -n '/((usr/)?bin|usr/sbin|sbin)/' "${cleanup_sources[@]}" | \
   echo "macOS cleanup must not bypass the isolated contract with absolute executables." >&2
   exit 1
 fi
-if rg -n '(^|[;&|()[:space:]])(HOME|PATH|BASH_ENV|ENV|SHELLOPTS)[[:space:]]*=' \
+if rg -n "(^|[;|()={[:space:]])[\"']?/[^/[:space:]\"']" \
+  "${cleanup_sources[@]}"; then
+  echo "macOS cleanup must not contain literal absolute paths outside its shebang." >&2
+  exit 1
+fi
+if rg -n "&[[:space:]]*([\"']/|/[^/[:space:]\"']+/)" \
+  "${cleanup_sources[@]}"; then
+  echo "macOS cleanup must not invoke a literal absolute path after a control operator." >&2
+  exit 1
+fi
+if rg -n '(^|[;&|(){}[:space:]])(ash|bash|csh|dash|fish|ksh|pwsh|sh|tcsh|xonsh|zsh)([;&|(){}[:space:]]|$)' \
+  "${cleanup_sources[@]}" | rg -v ':1:#!/usr/bin/env bash$'; then
+  echo "macOS cleanup must not invoke another shell inside the isolated contract." >&2
+  exit 1
+fi
+if rg -n '\$(\{)?(SHELL|BASH)(\}|([^A-Za-z0-9_])|$)' \
+  "${cleanup_sources[@]}"; then
+  echo "macOS cleanup must not invoke a shell through SHELL or BASH variables." >&2
+  exit 1
+fi
+if rg -n 'RADISHLEX_CLEANUP_CONTRACT_' "${cleanup_sources[@]}"; then
+  echo "macOS cleanup must not read or replace contract-owned expectations." >&2
+  exit 1
+fi
+if rg -n '(^|[;&|()[:space:]])(HOME|PATH|BASH_ENV|ENV|SHELLOPTS)[[:space:]]*(\+)?=' \
   "${cleanup_sources[@]}"; then
   echo "macOS cleanup must not replace the isolated contract environment." >&2
   exit 1
 fi
-if rg -n '(^|[;&|()[:space:]])(builtin|command|eval|source|kill|killall|unlink|osascript|launchctl|xargs|python3?|perl|ruby|node|swift|ln|mv|cp|install|rsync|ditto)([;&|()[:space:]]|$)|(^|[;&|()[:space:]])(ba|z)?sh[[:space:]]+-c|-(exec|delete)([[:space:]]|$)' \
+if rg -n '(^|[;&|()[:space:]])(unset|local|declare|typeset|export|readonly)([;&|()[:space:]][^;&|()]*)?[;&|()[:space:]](HOME|PATH|BASH_ENV|ENV|SHELLOPTS)([;&|()[:space:]]|$)' \
+  "${cleanup_sources[@]}"; then
+  echo "macOS cleanup must not unset, shadow or redeclare the isolated contract environment." >&2
+  exit 1
+fi
+if rg -n '(^|[;&|()[:space:]])(alias|builtin|command|enable|env|eval|function|hash|nice|nohup|source|unset|kill|killall|unlink|osascript|launchctl|xargs|python3?|perl|ruby|node|swift|ln|mv|cp|install|rsync|ditto)([;&|()[:space:]]|$)|(^|[;&|()[:space:]])\.[[:space:]]+|-(exec|delete)([[:space:]]|$)' \
   "${cleanup_sources[@]}"; then
   echo "macOS cleanup contains a command that bypasses fixed-path contract interception." >&2
   exit 1
 fi
+if rg -n '(^|[;&|(){}[:space:]])exec[[:space:]]+' "${cleanup_sources[@]}" | \
+  rg -v '^[^:]+:[0-9]+:[[:space:]]*exec "\$\{status_tool\}" --monitor$|^[^:]+:[0-9]+:exec "\$\{repo_root\}/platforms/macos-imk/cleanup-user-install\.sh" "\$@"$'; then
+  echo "macOS cleanup may only exec the isolated status tool or cleanup wrapper target." >&2
+  exit 1
+fi
+rg -Fxq '  exec "${status_tool}" --monitor' "${cleanup_script}"
+rg -Fxq 'exec "${repo_root}/platforms/macos-imk/cleanup-user-install.sh" "$@"' \
+  "${cleanup_wrapper}"
 if rg -n '^[[:space:]]*rm[[:space:]]' \
   "${cleanup_sources[@]}" | \
   rg -v 'rm -rf "\$\{(installed_bundle|runtime_data)\}"$'; then
@@ -56,7 +93,22 @@ if [[ "$(rg -o '\b(pgrep|ps|pkill)\b' "${cleanup_sources[@]}" | wc -l | tr -d ' 
 fi
 rg -Fq 'PATH="${fake_bin}" \' \
   "${platform_dir}/Tests/cleanup_user_install_contract.sh"
+rg -Fq 'cd "${contract_root}"' \
+  "${platform_dir}/Tests/cleanup_user_install_contract.sh"
+rg -Fq 'for command_name in clang dirname find grep mkdir pgrep ps pkill rm sed sleep stat; do' \
+  "${platform_dir}/Tests/cleanup_user_install_contract.sh"
 rg -Fq 'rm stub received a path outside the fixed cleanup targets' \
+  "${platform_dir}/Tests/cleanup_user_install_contract.sh"
+if rg -n 'ln -s /((usr/)?bin|usr/sbin|sbin)/(dirname|find|grep|mkdir|sed|stat)' \
+  "${platform_dir}/Tests/cleanup_user_install_contract.sh"; then
+  echo "macOS cleanup contract must intercept path-observing commands with argument checks." >&2
+  exit 1
+fi
+rg -Fq 'set_enabled_mode_then_zero_tis_state' \
+  "${platform_dir}/Tests/cleanup_user_install_contract.sh"
+rg -Fq 'set_zero_then_residual_tis_state' \
+  "${platform_dir}/Tests/cleanup_user_install_contract.sh"
+rg -Fq 'assert_two_tis_calls' \
   "${platform_dir}/Tests/cleanup_user_install_contract.sh"
 if rg -n 'TIS(Select|Disable|Enable|Register|Deregister)InputSource|CFPreferencesSet|NSUserDefaults|com\.apple\.HIToolbox|defaults (write|delete)' \
   "${cleanup_script}" \

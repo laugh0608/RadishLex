@@ -246,11 +246,11 @@ R01B 不以 manager 接入作为退出项；后续 M2 manager 进入本地个人
 - selection 在 engine 返回即时 commit 时记录一次；分段选择只有在后续 commit 文本匹配时记录，reset、schema 或上下文变化会清除待定意图。学习写失败不撤销已经发生的 engine commit，向平台返回失败处置；排序读失败按 engine 原序降级并返回状态类别。
 - ABI contract v4 增加产品个人化 Rime session、学习上下文、个人化状态、学习处置和 candidate engine index；macOS 产品固定 userdb 路径及私有目录，Space、数字、鼠标/accessibility 选择均走 display index 到 engine index 的同一入口。
 - 合成 runtime 集成测试覆盖选择后重排与重启持久化、secure/敏感/未知/隐私隔离、分段选择、上下文切换、trigger 写失败、排序读失败、删除/显式恢复和 50 候选延迟观测。真实 librime/FFI native smoke 覆盖 selection 写入、分段处置、隐私零增量与 secure 阻断。
-- macOS 状态入口已只读报告 bundle、固定路径祖先安全性、父目录 kind/mode、Rime、userdb、已知 sidecar 和四态进程身份；悬空 symlink 不再误报 absent，进程查询错误不再伪装为 stopped，同名非产品进程不会被终止。隔离 `HOME`、封闭假命令 `PATH`、假 TIS 与假进程命令的动态 contract 覆盖空/非空/不安全父目录、删除目标 symlink 祖先及终止后的祖先替换、Rime/userdb/sidecar 独立状态、source 仍 selected、不可选择 parent 仍 enabled、已验证/未验证/不可观测/终止失败进程，并证明普通清理只对固定 bundle executable 的进程先停、复核祖先后再删 bundle/Rime，同时保留父目录、主库、WAL、SHM、rollback journal 与无关条目。
+- macOS 状态入口已只读报告 bundle、固定路径祖先安全性、父目录 kind/mode、Rime、userdb、已知 sidecar 和四态进程身份；悬空 symlink 不再误报 absent，进程查询错误不再伪装为 stopped，同名非产品进程不会被终止。动态 contract 隔离 `HOME`/工作目录，并以参数级命令 stub、双槽 TIS/进程状态固定被测脚本行为，覆盖空/非空/不安全父目录、删除目标 symlink 祖先及终止后的祖先替换、Rime/userdb/sidecar 独立状态、source 拒绝、TIS 清理前后迁移、清理后残留失败和进程负例；普通清理只对固定 bundle executable 的进程先停、复核祖先后再删 bundle/Rime，且仅在第二次 TIS 归零后成功，同时保留父目录、主库、WAL、SHM、rollback journal 与无关条目。
 
 ### 剩余退出项
 
-- 尚未安装本批输入法，也未修改系统设置。`userdb.sqlite3`、sidecar、父目录与 Rime 的只读观测及测试数据所有权停止线已经补齐；当前基线中的预存空父目录 mode 为 `0755`，产品 runtime 将收紧为 `0700`，该变化必须进入后续授权与最终权限处置。R01B 继续保持进行中；仍须在明确授权后使用同一冻结产物完成真实 TextEdit 连续选择改变排序、输入法进程重启后保持、delete/explicit restore、P0/隐私模式零写入和按基线归属执行的最终复核，才能关闭批次。
+- 尚未安装本批输入法，也未修改系统设置。下一步先在仓库内以 `build >32` 完成 ad-hoc 门禁并冻结构建输入；第一阶段授权后才执行 Apple Development 重建/签名、复制前完整原子基线、真实 TextEdit 学习/重启/CLI delete-restore/P0 与隐私验收，以及保留 userdb/父目录的普通清理。普通清理、隐私键恢复、数据库关闭和数据归属证明完成后，再申请第二阶段授权删除本轮 userdb family并把预存空父目录从 `0700` 恢复为 `0755`；当前父目录永不删除，归属不清或设置未恢复时保留数据，R01B 继续进行中。
 
 ## 十一、R06A：首批质量门禁与 review-only 资产清理
 

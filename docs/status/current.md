@@ -22,7 +22,7 @@ R02L 已在不接入真实平台热路径的前提下完成本地正确性收口
 
 R01B 已完成自动化代码批：新增 `ime-runtime` 统一组合 engine、ranker、userdb 与 privacy policy；每个输入 session 使用独立数据库连接，一次读取当前候选页的排序信号，并保留 display 到 engine index 映射。macOS 产品 session 固定使用 `~/Library/Application Support/RadishLex/userdb.sqlite3`，在每次按键和选择前只传递 secure、privacy、上下文是否已知及粗粒度类别；secure/P0/未知应用不读取或写入 userdb，隐私模式只读排序。真实 librime/FFI native smoke 已证明 selection 记录、分段延迟记录、隐私零增量和 secure 阻断；R01B 仍需授权后的真实 TextEdit 学习、输入法进程重启持久化，以及与安装前数据、路径和权限基线一致的最终回滚证据，当前不得标记完成。
 
-2026-07-16 已完成 R01B 实机前置门禁：macOS `--status` 现在分别报告用户级 bundle、固定删除路径祖先安全性、RadishLex 父目录的存在性/类型/权限、Rime 运行目录、`userdb.sqlite3`、已知 SQLite sidecar 与 `stopped|running_verified|running_unverified|unavailable` 进程状态，悬空 symlink 也按 present/unsafe 处理。隔离 `HOME`、封闭假命令 `PATH`、假 TIS 与假进程命令的动态 contract 已证明普通清理只对命令行匹配固定 bundle executable 的进程执行终止，确认停止并复核固定路径祖先后再删除 bundle/Rime；父目录、主库、WAL、SHM、rollback journal 和无关条目保持，删除路径祖先不安全、source 仍 selected、不可选择 parent 仍 enabled、同名进程身份不符、终止失败或进程状态不可观测时均在删除前拒绝。当前只读基线为 TIS `matches=0 enabled=0 selected=0`、`cleanup_path_ancestors=safe`、bundle/Rime/userdb/sidecar 不存在、进程停止，父目录是预存空目录且 mode 为 `0755`；路径状态不推断测试数据所有权。产品 runtime 会把该预存目录收紧到 `0700`，因此后续实机授权与最终基线复核必须显式处理这一权限变化。
+2026-07-16 已完成 R01B 实机前置门禁：macOS `--status` 现在分别报告用户级 bundle、固定删除路径祖先安全性、RadishLex 父目录的存在性/类型/权限、Rime 运行目录、`userdb.sqlite3`、已知 SQLite sidecar 与 `stopped|running_verified|running_unverified|unavailable` 进程状态，悬空 symlink 也按 present/unsafe 处理。隔离 `HOME`、工作目录和仅含受控 Bash 解释器与参数校验 stub 的 `PATH`，配合假 TIS/进程状态队列的动态 contract，已证明普通清理只对命令行匹配固定 bundle executable 的进程执行终止，确认停止并复核固定路径祖先后再删除 bundle/Rime，且必须在第二次 TIS 观测归零后才成功；父目录、主库、WAL、SHM、rollback journal 和无关条目保持，删除路径祖先不安全、source 仍 selected、不可选择 parent 仍 enabled、同名进程身份不符、终止失败、进程不可观测或清理后 TIS 残留时均拒绝或失败。当前只读基线为 TIS `matches=0 enabled=0 selected=0`、`cleanup_path_ancestors=safe`、bundle/Rime/userdb/sidecar 不存在、进程停止，父目录是预存空目录且 mode 为 `0755`；路径状态不推断测试数据所有权。产品 runtime 会把该预存目录收紧到 `0700`，因此后续实机授权与最终基线复核必须显式处理这一权限变化。
 
 临时通知监视已收口到现有 `tis_source_status.m`：`--monitor` 先输出精确 current source，再在公开 selected-source 通知到达时通过 CFRunLoop 重读并输出 current source，以 `is_radishlex_pinyin` 明确标识正式 Pinyin mode；同一次切换允许出现重复通知，原 Bundle ID 状态输出和清理调用保持兼容。门禁固定编译、默认输出、通知/RunLoop 结构以及 `TISSelectInputSource`、`TISDisableInputSource` 和私有配置禁用线。用户为避免文稿级 source 占用而主动关闭的“自动切换到文稿的输入法”继续保持关闭，执行者不得自动修改。
 
@@ -54,7 +54,7 @@ R01B 已完成自动化代码批：新增 `ime-runtime` 统一组合 engine、ra
 ## 当前停止线
 
 - R01B 只把已经通过 R02L 的本地语义接入真实选择、privacy policy 与 ranker，不借接入扩张同步协议、manager 同步 UI、第二平台或新的证明状态机。
-- `--status` 只形成时间点 metadata 证据，不自动声明测试数据归属。父目录 absent 时可继续并记录为本轮随后创建；父目录为预存普通空目录时可继续但须保留并恢复原 mode；父目录 nonempty/unsafe/unreadable，或 Rime、主库、sidecar 已存在时，必须停止实机批次并保留现场。
+- `--status` 只形成时间点 metadata 证据，不自动声明测试数据归属。当前批次必须在复制前以一次完整调用重新得到 `matches=0 enabled=0 selected=0`、bundle absent、祖先 safe、父目录 present/empty/`0755`、Rime/userdb/sidecar absent、进程 stopped，并同时记录隐私设置键的存在性与原值；其后不得插入系统状态变更，任一字段漂移即取消实机批次，不覆盖、迁移或删除现场。
 - M3 退出前，不开放真实用户同步、非受控远端数据、恢复码产品成功路径、设备授权产品成功路径或设备撤销产品执行入口。
 - 允许使用合成数据、loopback、短生命周期服务和受控集成测试实现同步成功路径，但这些证据不能解锁产品入口。
 - 第一平台达到可重复日常输入前，不启动第二平台实现。
@@ -67,8 +67,9 @@ R01B 已完成自动化代码批：新增 `ime-runtime` 统一组合 engine、ra
 
 1. R01A 已由 build 32 的五项页、全屏/菜单、双 client、进程重启、离线和零残留证据完成退出；保留 VoiceOver 与副屏环境缺口，不在当前批重复消耗实机窗口。
 2. R02L 已以事务回滚、SQLite 文件策略和迁移、规范化删除身份、确定性有界排序、状态优先级、固定合成评测及延迟观测完成退出，并作为 R01B 产品运行时的本地语义基础。
-3. R01B 自动化代码批与实机前置状态/所有权门禁已经完成；下一步使用高于 `build 32` 的新 `CFBundleVersion` 冻结同一 Apple Development 产物，并在授权清单中明确签名、安装、系统设置、人工选择、进程重启、隐私设置临时变化、父目录 `0755 -> 0700` 及最终权限恢复。取得明确授权后验证 TextEdit 学习重排、进程重启持久化、delete/explicit restore、隐私/P0 零写入，最后完成系统设置真实移除以及与安装前基线一致的数据清理复核。
-4. 任一后续实机回归仍使用冻结产物、人工切换/交互、公开通知监视、明确授权和系统设置真实移除；不因 R01A 退出而降低零残留或来源归属要求。
+3. R01B 自动化代码批与实机前置门禁已经完成；下一步先在仓库内以高于 `build 32` 的新 `CFBundleVersion` 完成 ad-hoc native 门禁并冻结源码、构建输入与候选，不使用 Apple Development identity。
+4. 第一阶段授权逐项覆盖同一输入的 Apple Development 重建/签名、复制前原子基线、用户级安装、系统设置与人工交互、进程重启、隐私设置、父目录 `0755 -> 0700`、CLI delete/explicit restore，以及系统设置真实移除和保留 userdb/父目录的普通清理。普通清理、隐私键恢复、数据库连接关闭和数据归属证明完成后，再申请第二阶段精确授权，只删除本轮 userdb family 并把预存空父目录恢复为 `0755`；当前父目录不得删除，归属不清或设置未恢复时保留数据并维持 R01B 进行中。
+5. 任一后续实机回归仍使用冻结产物、人工切换/交互、公开通知监视、明确授权和系统设置真实移除；不因 R01A 退出而降低零残留或来源归属要求。
 
 ## 验证入口
 

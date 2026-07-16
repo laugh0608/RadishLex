@@ -13,7 +13,7 @@
 - `Tests/contract_smoke.m`：使用合成 demo engine 复验 ABI v4、完整按键映射、display/engine index、个人化/学习状态、Unicode cursor、候选选择结果和生命周期，不读取 Rime 目录。
 - `Tests/candidate_panel_contract.m`：创建真实 AppKit panel/control，复验视觉与 accessibility selection、appearance、anchor fallback、owner 接管和完整隐藏。
 - `Tests/input_controller_contract.m`：使用正式 controller、panel 和 Rust demo session，贯通方向 keyDown/keyUp、Space、鼠标、accessibility press、Enter、Escape、宿主快捷键和双 client 生命周期。
-- `Tests/cleanup_user_install_contract.sh`：在隔离仓库、隔离 `HOME`、假 TIS 与假进程命令中动态复验路径状态和普通清理的数据保留边界，不查询真实 TIS、不终止真实进程。
+- `Tests/cleanup_user_install_contract.sh`：在隔离仓库、`HOME` 和工作目录中，以参数级命令 stub、双槽假 TIS 与假进程状态动态复验路径状态、清理前后 TIS 迁移和数据保留边界，不查询真实 TIS、不终止真实进程。
 - `Tools/tis_source_status.m`：使用公开 TIS API 按精确 Bundle ID 查询 parent/mode 状态，或以通知和 CFRunLoop 实时输出精确 current source；不启用、停用或选择输入源。
 - `cleanup-user-install.sh`：在系统设置已人工移除且取得授权后，清理正式开发 bundle、`Rime` 运行目录和精确进程，并要求 TIS 零残留；默认保留 `userdb.sqlite3`。
 - `ReferenceProbe/`：隔离验证原生候选事件路由与单 mode 输入源 metadata，不链接 Rime 或正式 FFI，也不替代产品薄壳。
@@ -28,7 +28,7 @@ native 产品 session 通过 ABI v4 的 personalized Rime 构造入口持有独�
 
 当前分类把 TextEdit 映射为 `editor`、Codex 映射为 `code`；Passwords、Keychain Access、1Password 8/7 的固定 Bundle ID 标记为敏感，其余应用映射为未知 `other`。隐私模式由输入法 `NSUserDefaults` 中的 `RadishLexPrivacyMode` 布尔值控制，缺省关闭；开启后仍可使用既有本地排序摘要，但不会记录当前 selection 或更新 user term/ranker weight。设置或前台/secure 状态变化时，controller 会先刷新 Rust learning context 和候选 snapshot，再接受 display index 选择。
 
-`userdb.sqlite3` 不是临时 Rime 数据，卸载或普通开发清理不得删除。`--status` 分别报告 bundle、固定删除路径祖先安全性、RadishLex 父目录的存在性/类型/权限、Rime 目录、userdb、已知 SQLite sidecar 和进程；悬空 symlink 也视为存在或不安全，但这些 metadata 不自动证明数据归属。只有 `cleanup_path_ancestors=safe`，且父目录 absent 或为预存普通空目录、Rime/userdb/sidecar 均 absent 时才可继续：前者由本轮随后创建并取得所有权，后者必须保留且不属于本轮。只有安装前已证明数据族不存在、对应内容全由本轮合成测试生成且另有明确授权时，才能精确删除本轮创建的数据；预存空父目录须恢复为空，权限若被 runtime 收紧则默认恢复安装前 mode，除非另获授权保留更严格权限。
+`userdb.sqlite3` 不是临时 Rime 数据，卸载或普通开发清理不得删除。`--status` 分别报告 bundle、固定删除路径祖先安全性、RadishLex 父目录的存在性/类型/权限、Rime 目录、userdb、已知 SQLite sidecar 和进程；悬空 symlink 也视为存在或不安全，但这些 metadata 不自动证明数据归属。当前 R01B 在复制前必须用一次完整调用重新得到 TIS zero、bundle absent、祖先 safe、预存父目录 empty/`0755`、Rime/userdb/sidecar absent、进程 stopped，并记录隐私键是否存在及原值，任一漂移即取消。第一阶段授权覆盖实机、按原存在性/原值恢复隐私键与保留 userdb/父目录的普通清理；这些动作、数据库关闭和归属证明完成后，第二阶段授权才可删除本轮 userdb family并恢复预存父目录 `0755`，该父目录不得删除。
 
 ## 不安装验证
 

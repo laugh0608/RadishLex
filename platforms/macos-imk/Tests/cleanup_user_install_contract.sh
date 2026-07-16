@@ -7,8 +7,11 @@ fail() {
 }
 
 run_stub() {
+  local code=0
   local command_name="${0##*/}"
   local output=""
+  local tis_call=""
+  local tis_state_path=""
 
   : "${RADISHLEX_CLEANUP_CONTRACT_ROOT:?contract root is required}"
   : "${RADISHLEX_CLEANUP_CONTRACT_LOG:?contract log is required}"
@@ -16,32 +19,108 @@ run_stub() {
 
   case "${command_name}" in
     clang)
-      while [[ $# -gt 0 ]]; do
-        if [[ "${1}" == "-o" ]]; then
-          shift
-          [[ $# -gt 0 ]] || fail "clang stub received -o without a path"
-          output="${1}"
-        fi
-        shift
-      done
-      [[ -n "${output}" ]] || fail "clang stub did not receive -o"
-      case "${output}" in
-        "${RADISHLEX_CLEANUP_CONTRACT_ROOT}"/*) ;;
-        *) fail "clang output escaped the contract root" ;;
-      esac
-      /bin/mkdir -p "$(/usr/bin/dirname -- "${output}")"
+      [[ $# -eq 13 && "${1}" == "-fobjc-arc" && \
+        "${2}" == "-fmodules" && "${3}" == "-Wall" && \
+        "${4}" == "-Wextra" && "${5}" == "-Werror" && \
+        "${6}" == "-mmacosx-version-min=13.0" && \
+        "${7}" == "${RADISHLEX_CLEANUP_CONTRACT_CLEANUP_SCRIPT%/*}/Tools/tis_source_status.m" && \
+        "${8}" == "-framework" && "${9}" == "Carbon" && \
+        "${10}" == "-framework" && "${11}" == "Foundation" && \
+        "${12}" == "-o" && \
+        "${13}" == "${RADISHLEX_CLEANUP_CONTRACT_TOOL_DIR}/tis-source-status" ]] || \
+        fail "clang stub received unexpected arguments"
+      [[ -d "${RADISHLEX_CLEANUP_CONTRACT_TOOL_DIR}" && \
+        ! -L "${RADISHLEX_CLEANUP_CONTRACT_TOOL_DIR}" && \
+        -d "${RADISHLEX_CLEANUP_CONTRACT_CLANG_CACHE}" && \
+        ! -L "${RADISHLEX_CLEANUP_CONTRACT_CLANG_CACHE}" ]] || \
+        fail "clang ran before production created its fixed tool directories"
+      output="${13}"
       /bin/ln -sf "${RADISHLEX_CLEANUP_CONTRACT_SCRIPT}" "${output}"
       echo "clang" >>"${RADISHLEX_CLEANUP_CONTRACT_LOG}"
+      ;;
+    dirname)
+      [[ $# -eq 2 && "${1}" == "--" ]] || \
+        fail "dirname stub received unexpected arguments"
+      case "${2}" in
+        "${RADISHLEX_CLEANUP_CONTRACT_WRAPPER}")
+          printf '%s\n' "${RADISHLEX_CLEANUP_CONTRACT_WRAPPER%/*}"
+          ;;
+        "${RADISHLEX_CLEANUP_CONTRACT_CLEANUP_SCRIPT}")
+          printf '%s\n' "${RADISHLEX_CLEANUP_CONTRACT_CLEANUP_SCRIPT%/*}"
+          ;;
+        *)
+          fail "dirname stub received a path outside the two cleanup scripts"
+          ;;
+      esac
+      echo "dirname" >>"${RADISHLEX_CLEANUP_CONTRACT_LOG}"
+      ;;
+    find)
+      [[ $# -eq 7 && \
+        "${1}" == "${RADISHLEX_CLEANUP_CONTRACT_APPLICATION_SUPPORT_PARENT}" && \
+        "${2}" == "-mindepth" && "${3}" == "1" && \
+        "${4}" == "-maxdepth" && "${5}" == "1" && \
+        "${6}" == "-print" && "${7}" == "-quit" ]] || \
+        fail "find stub received unexpected arguments"
+      echo "find" >>"${RADISHLEX_CLEANUP_CONTRACT_LOG}"
+      /usr/bin/find "$@"
+      ;;
+    grep)
+      if [[ $# -eq 2 && "${1}" == "-Eq" && \
+        ("${2}" == '^source_id=.* selected=1 ' || \
+        "${2}" == '^source_id=.* enabled=1 selected=0 select_capable=0 ') ]]; then
+        :
+      elif [[ $# -eq 2 && "${1}" == "-q" && \
+        "${2}" == '^matches=0 enabled=0 selected=0$' ]]; then
+        :
+      else
+        fail "grep stub received unexpected arguments"
+      fi
+      if /usr/bin/grep "$@"; then
+        code=0
+      else
+        code=$?
+      fi
+      echo "grep" >>"${RADISHLEX_CLEANUP_CONTRACT_LOG}"
+      return "${code}"
+      ;;
+    mkdir)
+      [[ $# -eq 3 && "${1}" == "-p" && \
+        "${2}" == "${RADISHLEX_CLEANUP_CONTRACT_TOOL_DIR}" && \
+        "${3}" == "${RADISHLEX_CLEANUP_CONTRACT_CLANG_CACHE}" ]] || \
+        fail "mkdir stub received unexpected arguments"
+      echo "mkdir" >>"${RADISHLEX_CLEANUP_CONTRACT_LOG}"
+      /bin/mkdir -p -- "${2}" "${3}"
+      ;;
+    sed)
+      [[ $# -eq 1 && \
+        "${1}" == 's/[][\\.^$*+?(){}|]/\\&/g' ]] || \
+        fail "sed stub received unexpected arguments"
+      echo "sed" >>"${RADISHLEX_CLEANUP_CONTRACT_LOG}"
+      /usr/bin/sed "${1}"
+      ;;
+    stat)
+      [[ $# -eq 3 && "${1}" == "-f" && "${2}" == "%Lp" && \
+        "${3}" == "${RADISHLEX_CLEANUP_CONTRACT_APPLICATION_SUPPORT_PARENT}" ]] || \
+        fail "stat stub received unexpected arguments"
+      echo "stat" >>"${RADISHLEX_CLEANUP_CONTRACT_LOG}"
+      /usr/bin/stat "$@"
       ;;
     tis-source-status)
       [[ $# -eq 1 && "${1}" == "org.radishlex.inputmethod.macos" ]] || \
         fail "TIS stub received unexpected arguments"
+      tis_call="$(<"${RADISHLEX_CLEANUP_CONTRACT_TIS_CURSOR}")"
+      [[ "${tis_call}" =~ ^[12]$ ]] || \
+        fail "TIS stub exceeded the two allowed inspections"
+      tis_state_path="${RADISHLEX_CLEANUP_CONTRACT_TIS_STATE_PREFIX}.${tis_call}"
+      [[ -f "${tis_state_path}.output" && -f "${tis_state_path}.exit" ]] || \
+        fail "TIS stub state slot is incomplete"
+      printf '%s\n' "$((tis_call + 1))" \
+        >"${RADISHLEX_CLEANUP_CONTRACT_TIS_CURSOR}"
       echo "tis" >>"${RADISHLEX_CLEANUP_CONTRACT_LOG}"
-      /bin/cat "${RADISHLEX_CLEANUP_CONTRACT_TIS_STATE}"
-      if [[ "$(<"${RADISHLEX_CLEANUP_CONTRACT_TIS_STATE}")" != \
-        "matches=0 enabled=0 selected=0" ]]; then
-        return 4
-      fi
+      /bin/cat "${tis_state_path}.output"
+      code="$(<"${tis_state_path}.exit")"
+      [[ "${code}" =~ ^[0-9]+$ ]] || fail "TIS stub exit code is invalid"
+      return "${code}"
       ;;
     pgrep)
       [[ $# -eq 2 && "${1}" == "-x" && "${2}" == "RadishLex" ]] || \
@@ -79,12 +158,17 @@ run_stub() {
     pkill)
       [[ $# -eq 2 && "${1}" == "-f" ]] || \
         fail "pkill stub received unexpected arguments"
+      [[ "${2}" == "${RADISHLEX_CLEANUP_CONTRACT_PROCESS_PATTERN}" ]] || \
+        fail "pkill pattern does not exactly match the fixed executable pattern"
       [[ "${RADISHLEX_CLEANUP_CONTRACT_PROCESS_EXECUTABLE}" =~ ${2} ]] || \
         fail "pkill pattern does not match the exact executable"
       [[ "${RADISHLEX_CLEANUP_CONTRACT_PROCESS_EXECUTABLE} --argument" =~ ${2} ]] || \
         fail "pkill pattern does not match executable arguments"
       if [[ "${RADISHLEX_CLEANUP_CONTRACT_PROCESS_EXECUTABLE}-other" =~ ${2} ]]; then
         fail "pkill pattern accepts a similar executable prefix"
+      fi
+      if [[ "/tmp/Unrelated/RadishLex" =~ ${2} ]]; then
+        fail "pkill pattern accepts an unrelated same-name executable"
       fi
       [[ -e "${RADISHLEX_CLEANUP_CONTRACT_RUNTIME_DATA}" ]] || \
         fail "pkill ran after Rime runtime data was removed"
@@ -141,7 +225,7 @@ run_stub() {
 }
 
 case "${0##*/}" in
-  clang|tis-source-status|pgrep|ps|pkill|sleep|rm)
+  clang|dirname|find|grep|mkdir|sed|stat|tis-source-status|pgrep|ps|pkill|sleep|rm)
     run_stub "$@"
     exit 0
     ;;
@@ -157,7 +241,8 @@ fake_home="${contract_root}/home"
 fake_bin="${contract_root}/bin"
 contract_log="${contract_root}/commands.log"
 process_state="${contract_root}/process.state"
-tis_state="${contract_root}/tis.state"
+tis_state_prefix="${contract_root}/tis.state"
+tis_cursor="${contract_root}/tis.cursor"
 library_dir="${fake_home}/Library"
 input_methods_parent="${library_dir}/Input Methods"
 application_support_root="${library_dir}/Application Support"
@@ -166,8 +251,14 @@ runtime_data="${parent}/Rime"
 userdb="${parent}/userdb.sqlite3"
 installed_bundle="${fake_home}/Library/Input Methods/RadishLexInputMethod.app"
 process_executable="${installed_bundle}/Contents/MacOS/RadishLex"
+process_pattern="^$(printf '%s' "${process_executable}" | \
+  /usr/bin/sed 's/[][\\.^$*+?(){}|]/\\&/g')([[:space:]]|$)"
 external_input_methods="${contract_root}/external-input-methods"
 swapped_input_methods="${contract_root}/swapped-input-methods"
+cleanup_script_copy="${fake_repo}/platforms/macos-imk/cleanup-user-install.sh"
+cleanup_wrapper_copy="${fake_repo}/scripts/cleanup-macos-imk.sh"
+tool_dir="${fake_repo}/target/macos-imk/tools"
+clang_cache="${tool_dir}/clang-module-cache"
 
 cleanup_contract() {
   rm -rf "${contract_root}"
@@ -182,37 +273,41 @@ cp "${repo_root}/scripts/cleanup-macos-imk.sh" \
   "${fake_repo}/scripts/cleanup-macos-imk.sh"
 chmod +x "${fake_repo}/platforms/macos-imk/cleanup-user-install.sh" \
   "${fake_repo}/scripts/cleanup-macos-imk.sh"
-for command_name in clang pgrep ps pkill sleep rm; do
+for command_name in clang dirname find grep mkdir pgrep ps pkill rm sed sleep stat; do
   ln -s "${contract_script}" "${fake_bin}/${command_name}"
 done
 ln -s /bin/bash "${fake_bin}/bash"
-ln -s /usr/bin/dirname "${fake_bin}/dirname"
-ln -s /usr/bin/find "${fake_bin}/find"
-ln -s /usr/bin/grep "${fake_bin}/grep"
-ln -s /bin/mkdir "${fake_bin}/mkdir"
-ln -s /usr/bin/sed "${fake_bin}/sed"
-ln -s /usr/bin/stat "${fake_bin}/stat"
 : >"${contract_log}"
 echo "stopped" >"${process_state}"
-echo "matches=0 enabled=0 selected=0" >"${tis_state}"
 
 run_cleanup() {
-  env -i \
-    HOME="${fake_home}" \
-    PATH="${fake_bin}" \
-    TMPDIR="${contract_root}/tmp" \
-    RADISHLEX_CLEANUP_CONTRACT_ROOT="${contract_root}" \
-    RADISHLEX_CLEANUP_CONTRACT_LOG="${contract_log}" \
-    RADISHLEX_CLEANUP_CONTRACT_SCRIPT="${contract_script}" \
-    RADISHLEX_CLEANUP_CONTRACT_PROCESS_STATE="${process_state}" \
-    RADISHLEX_CLEANUP_CONTRACT_TIS_STATE="${tis_state}" \
-    RADISHLEX_CLEANUP_CONTRACT_PROCESS_EXECUTABLE="${process_executable}" \
-    RADISHLEX_CLEANUP_CONTRACT_INSTALLED_BUNDLE="${installed_bundle}" \
-    RADISHLEX_CLEANUP_CONTRACT_INPUT_METHODS_PARENT="${input_methods_parent}" \
-    RADISHLEX_CLEANUP_CONTRACT_EXTERNAL_INPUT_METHODS="${external_input_methods}" \
-    RADISHLEX_CLEANUP_CONTRACT_SWAPPED_INPUT_METHODS="${swapped_input_methods}" \
-    RADISHLEX_CLEANUP_CONTRACT_RUNTIME_DATA="${runtime_data}" \
-    "${fake_repo}/scripts/cleanup-macos-imk.sh" "$@"
+  echo "1" >"${tis_cursor}"
+  (
+    cd "${contract_root}"
+    env -i \
+      HOME="${fake_home}" \
+      PATH="${fake_bin}" \
+      TMPDIR="${contract_root}/tmp" \
+      RADISHLEX_CLEANUP_CONTRACT_ROOT="${contract_root}" \
+      RADISHLEX_CLEANUP_CONTRACT_LOG="${contract_log}" \
+      RADISHLEX_CLEANUP_CONTRACT_SCRIPT="${contract_script}" \
+      RADISHLEX_CLEANUP_CONTRACT_CLEANUP_SCRIPT="${cleanup_script_copy}" \
+      RADISHLEX_CLEANUP_CONTRACT_WRAPPER="${cleanup_wrapper_copy}" \
+      RADISHLEX_CLEANUP_CONTRACT_TOOL_DIR="${tool_dir}" \
+      RADISHLEX_CLEANUP_CONTRACT_CLANG_CACHE="${clang_cache}" \
+      RADISHLEX_CLEANUP_CONTRACT_APPLICATION_SUPPORT_PARENT="${parent}" \
+      RADISHLEX_CLEANUP_CONTRACT_PROCESS_STATE="${process_state}" \
+      RADISHLEX_CLEANUP_CONTRACT_PROCESS_PATTERN="${process_pattern}" \
+      RADISHLEX_CLEANUP_CONTRACT_TIS_STATE_PREFIX="${tis_state_prefix}" \
+      RADISHLEX_CLEANUP_CONTRACT_TIS_CURSOR="${tis_cursor}" \
+      RADISHLEX_CLEANUP_CONTRACT_PROCESS_EXECUTABLE="${process_executable}" \
+      RADISHLEX_CLEANUP_CONTRACT_INSTALLED_BUNDLE="${installed_bundle}" \
+      RADISHLEX_CLEANUP_CONTRACT_INPUT_METHODS_PARENT="${input_methods_parent}" \
+      RADISHLEX_CLEANUP_CONTRACT_EXTERNAL_INPUT_METHODS="${external_input_methods}" \
+      RADISHLEX_CLEANUP_CONTRACT_SWAPPED_INPUT_METHODS="${swapped_input_methods}" \
+      RADISHLEX_CLEANUP_CONTRACT_RUNTIME_DATA="${runtime_data}" \
+      "${fake_repo}/scripts/cleanup-macos-imk.sh" "$@"
+  )
 }
 
 assert_status() {
@@ -271,11 +366,77 @@ assert_no_rm() {
   fi
 }
 
-set_zero_tis_state() {
-  echo "matches=0 enabled=0 selected=0" >"${tis_state}"
+set_tis_slot() {
+  local index="${1}"
+  local exit_code="${2}"
+  shift 2
+
+  [[ "${index}" =~ ^[12]$ && "${exit_code}" =~ ^[0-9]+$ && $# -gt 0 ]] || \
+    fail "invalid TIS state slot"
+  printf '%s\n' "$@" >"${tis_state_prefix}.${index}.output"
+  printf '%s\n' "${exit_code}" >"${tis_state_prefix}.${index}.exit"
 }
 
+set_zero_tis_state() {
+  set_tis_slot 1 0 'matches=0 enabled=0 selected=0'
+  set_tis_slot 2 0 'matches=0 enabled=0 selected=0'
+}
+
+set_selected_tis_state() {
+  set_tis_slot 1 4 \
+    'source_id=org.radishlex.inputmethod.macos.Pinyin bundle_id=org.radishlex.inputmethod.macos enabled=1 selected=1 select_capable=1' \
+    'matches=1 enabled=1 selected=1'
+  set_tis_slot 2 4 \
+    'source_id=org.radishlex.inputmethod.macos.Pinyin bundle_id=org.radishlex.inputmethod.macos enabled=1 selected=1 select_capable=1' \
+    'matches=1 enabled=1 selected=1'
+}
+
+set_enabled_parent_tis_state() {
+  set_tis_slot 1 4 \
+    'source_id=org.radishlex.inputmethod.macos enabled=1 selected=0 select_capable=0 bundle_id=org.radishlex.inputmethod.macos' \
+    'matches=1 enabled=1 selected=0'
+  set_tis_slot 2 4 \
+    'source_id=org.radishlex.inputmethod.macos enabled=1 selected=0 select_capable=0 bundle_id=org.radishlex.inputmethod.macos' \
+    'matches=1 enabled=1 selected=0'
+}
+
+set_enabled_mode_then_zero_tis_state() {
+  set_tis_slot 1 4 \
+    'source_id=org.radishlex.inputmethod.macos.Pinyin bundle_id=org.radishlex.inputmethod.macos enabled=1 selected=0 select_capable=1' \
+    'matches=1 enabled=1 selected=0'
+  set_tis_slot 2 0 'matches=0 enabled=0 selected=0'
+}
+
+set_zero_then_residual_tis_state() {
+  set_tis_slot 1 0 'matches=0 enabled=0 selected=0'
+  set_tis_slot 2 0 \
+    'source_id=org.radishlex.inputmethod.macos.Pinyin bundle_id=org.radishlex.inputmethod.macos enabled=0 selected=0 select_capable=1' \
+    'matches=1 enabled=0 selected=0'
+}
+
+assert_two_tis_calls() {
+  [[ "$(grep -c '^tis$' "${contract_log}")" == "2" ]] || \
+    fail "cleanup did not inspect TIS exactly twice"
+  [[ "$(<"${tis_cursor}")" == "3" ]] || \
+    fail "TIS state queue did not consume exactly two slots"
+}
+
+assert_bootstrap_command_order() {
+  local actual
+  local expected
+
+  actual="$(<"${contract_log}")"
+  expected="$(printf '%s\n' dirname dirname sed mkdir clang tis pgrep)"
+  [[ "${actual}" == "${expected}" ]] || {
+    printf 'expected bootstrap commands:\n%s\nactual bootstrap commands:\n%s\n' \
+      "${expected}" "${actual}" >&2
+    fail "status bootstrap command order changed unexpectedly"
+  }
+}
+
+set_zero_tis_state
 assert_status absent absent not_applicable absent absent absent safe
+assert_bootstrap_command_order
 
 mkdir -p "${parent}"
 parent_mode="$(stat -f '%Lp' "${parent}")"
@@ -377,10 +538,7 @@ assert_no_rm
 rm "${input_methods_parent}"
 
 prepare_deletion_targets
-cat >"${tis_state}" <<'EOF'
-source_id=org.radishlex.inputmethod.macos.Pinyin selected=1 enabled=1 select_capable=1 bundle_id=org.radishlex.inputmethod.macos
-matches=1 enabled=1 selected=1
-EOF
+set_selected_tis_state
 echo "stopped" >"${process_state}"
 : >"${contract_log}"
 set +e
@@ -394,10 +552,7 @@ assert_deletion_targets_present
 assert_no_pkill
 assert_no_rm
 
-cat >"${tis_state}" <<'EOF'
-source_id=org.radishlex.inputmethod.macos enabled=1 selected=0 select_capable=0 bundle_id=org.radishlex.inputmethod.macos
-matches=1 enabled=1 selected=0
-EOF
+set_enabled_parent_tis_state
 : >"${contract_log}"
 set +e
 enabled_parent_output="$(run_cleanup --authorized-after-settings-removal 2>&1)"
@@ -498,6 +653,7 @@ assert_no_rm
 rm "${input_methods_parent}"
 mv "${swapped_input_methods}" "${input_methods_parent}"
 
+set_enabled_mode_then_zero_tis_state
 echo "stopped" >"${process_state}"
 : >"${contract_log}"
 stopped_cleanup_output="$(run_cleanup --authorized-after-settings-removal)"
@@ -506,12 +662,45 @@ stopped_cleanup_output="$(run_cleanup --authorized-after-settings-removal)"
 [[ ! -e "${runtime_data}" && ! -L "${runtime_data}" ]] || \
   fail "stopped cleanup retained Rime runtime data"
 assert_no_pkill
+assert_two_tis_calls
 [[ "$(grep -c '^rm:' "${contract_log}")" == "2" ]] || \
   fail "stopped cleanup did not remove exactly two fixed targets"
+grep -Fq 'matches=1 enabled=1 selected=0' <<<"${stopped_cleanup_output}" || \
+  fail "stopped cleanup did not expose its initial enabled selectable mode"
+grep -Fq 'matches=0 enabled=0 selected=0' <<<"${stopped_cleanup_output}" || \
+  fail "stopped cleanup did not expose its final zero TIS state"
 grep -Fq \
   'RadishLex cleanup verified: settings removal precondition, TIS, paths and process.' \
   <<<"${stopped_cleanup_output}" || fail "stopped cleanup success result is missing"
 
+prepare_deletion_targets
+set_zero_then_residual_tis_state
+: >"${contract_log}"
+set +e
+residual_tis_output="$(run_cleanup --authorized-after-settings-removal 2>&1)"
+residual_tis_code=$?
+set -e
+[[ ${residual_tis_code} -eq 7 ]] || \
+  fail "cleanup did not reject a residual TIS source after path removal"
+grep -Fq 'matches=1 enabled=0 selected=0' <<<"${residual_tis_output}" || \
+  fail "residual TIS state is missing from cleanup output"
+grep -Fq 'TIS still reports RadishLex.' <<<"${residual_tis_output}" || \
+  fail "residual TIS refusal reason is missing"
+if grep -Fq \
+  'RadishLex cleanup verified: settings removal precondition, TIS, paths and process.' \
+  <<<"${residual_tis_output}"; then
+  fail "residual TIS cleanup reported false success"
+fi
+[[ ! -e "${installed_bundle}" && ! -L "${installed_bundle}" ]] || \
+  fail "residual TIS cleanup retained the installed bundle"
+[[ ! -e "${runtime_data}" && ! -L "${runtime_data}" ]] || \
+  fail "residual TIS cleanup retained Rime runtime data"
+assert_no_pkill
+assert_two_tis_calls
+[[ "$(grep -c '^rm:' "${contract_log}")" == "2" ]] || \
+  fail "residual TIS cleanup did not remove exactly two fixed targets"
+
+set_zero_tis_state
 rm -rf "${parent}"
 mkdir -p "${installed_bundle}" "${runtime_data}"
 printf 'runtime sentinel\n' >"${runtime_data}/sentinel"
@@ -546,8 +735,7 @@ cmp -s "${contract_root}/shm.expected" "${userdb}-shm" || \
   fail "cleanup changed the SHM sidecar"
 cmp -s "${contract_root}/journal.expected" "${userdb}-journal" || \
   fail "cleanup changed the rollback journal"
-[[ "$(grep -c '^tis$' "${contract_log}")" == "2" ]] || \
-  fail "cleanup did not inspect TIS before and after path removal"
+assert_two_tis_calls
 [[ "$(grep -c '^pgrep$' "${contract_log}")" == "3" ]] || \
   fail "cleanup did not inspect the process before termination, deletion and exit"
 [[ "$(grep -c '^ps$' "${contract_log}")" == "1" ]] || \
