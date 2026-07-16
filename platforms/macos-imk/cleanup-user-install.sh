@@ -8,11 +8,14 @@ case "${1:-}" in
   --monitor)
     action="monitor"
     ;;
+  --authorized-stop-process)
+    action="stop_process"
+    ;;
   --authorized-after-settings-removal)
     action="cleanup"
     ;;
   *)
-    echo "usage: $0 --status|--monitor|--authorized-after-settings-removal" >&2
+    echo "usage: $0 --status|--monitor|--authorized-stop-process|--authorized-after-settings-removal" >&2
     echo "Cleanup requires prior removal in System Settings and explicit authorization." >&2
     exit 2
     ;;
@@ -39,17 +42,6 @@ APPLICATION_SUPPORT_PARENT_KIND="uninspected"
 APPLICATION_SUPPORT_PARENT_MODE="uninspected"
 CLEANUP_PATH_ANCESTORS="uninspected"
 PROCESS_STATE="uninspected"
-
-mkdir -p "${tool_dir}" "${CLANG_MODULE_CACHE_PATH}"
-clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
-  -mmacosx-version-min=13.0 \
-  "${script_dir}/Tools/tis_source_status.m" \
-  -framework Carbon -framework Foundation \
-  -o "${status_tool}"
-
-if [[ "${action}" == "monitor" ]]; then
-  exec "${status_tool}" --monitor
-fi
 
 inspect_tis() {
   local output
@@ -193,6 +185,69 @@ inspect_process() {
   esac
 }
 
+stop_verified_process() {
+  local stop_context="${1}"
+
+  case "${PROCESS_STATE}" in
+    running_verified)
+      pkill -f "${process_pattern}" 2>/dev/null || true
+      for _ in {1..20}; do
+        inspect_process
+        [[ "${PROCESS_STATE}" == "stopped" ]] && break
+        [[ "${PROCESS_STATE}" != "running_verified" ]] && break
+        sleep 0.1
+      done
+      ;;
+    stopped)
+      ;;
+    running_unverified)
+      echo "A same-name process does not match the installed RadishLex executable." >&2
+      if [[ "${stop_context}" == "cleanup" ]]; then
+        echo "Refusing cleanup without exact process identity." >&2
+      else
+        echo "Refusing process termination without exact process identity." >&2
+      fi
+      exit 9
+      ;;
+    *)
+      echo "Unable to inspect the RadishLex process safely." >&2
+      if [[ "${stop_context}" == "cleanup" ]]; then
+        echo "Refusing cleanup while process state is unavailable." >&2
+      else
+        echo "Refusing process termination while process state is unavailable." >&2
+      fi
+      exit 8
+      ;;
+  esac
+
+  if [[ "${PROCESS_STATE}" != "stopped" ]]; then
+    if [[ "${stop_context}" == "cleanup" ]]; then
+      echo "RadishLex process did not stop before path cleanup." >&2
+    else
+      echo "RadishLex process did not stop after authorized termination." >&2
+    fi
+    exit 6
+  fi
+}
+
+if [[ "${action}" == "stop_process" ]]; then
+  inspect_process
+  stop_verified_process "stop_process"
+  echo "RadishLex process stop verified."
+  exit 0
+fi
+
+mkdir -p "${tool_dir}" "${CLANG_MODULE_CACHE_PATH}"
+clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+  -mmacosx-version-min=13.0 \
+  "${script_dir}/Tools/tis_source_status.m" \
+  -framework Carbon -framework Foundation \
+  -o "${status_tool}"
+
+if [[ "${action}" == "monitor" ]]; then
+  exec "${status_tool}" --monitor
+fi
+
 inspect_tis
 print_path_status
 if [[ "${action}" == "status" ]]; then
@@ -218,34 +273,7 @@ if grep -Eq '^source_id=.* selected=1 ' <<<"${TIS_OUTPUT}" ||
   exit 3
 fi
 
-case "${PROCESS_STATE}" in
-  running_verified)
-    pkill -f "${process_pattern}" 2>/dev/null || true
-    for _ in {1..20}; do
-      inspect_process
-      [[ "${PROCESS_STATE}" == "stopped" ]] && break
-      [[ "${PROCESS_STATE}" != "running_verified" ]] && break
-      sleep 0.1
-    done
-    ;;
-  stopped)
-    ;;
-  running_unverified)
-    echo "A same-name process does not match the installed RadishLex executable." >&2
-    echo "Refusing cleanup without exact process identity." >&2
-    exit 9
-    ;;
-  *)
-    echo "Unable to inspect the RadishLex process safely." >&2
-    echo "Refusing cleanup while process state is unavailable." >&2
-    exit 8
-    ;;
-esac
-
-if [[ "${PROCESS_STATE}" != "stopped" ]]; then
-  echo "RadishLex process did not stop before path cleanup." >&2
-  exit 6
-fi
+stop_verified_process "cleanup"
 
 require_safe_cleanup_paths
 rm -rf "${installed_bundle}"

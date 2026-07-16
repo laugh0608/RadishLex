@@ -16,6 +16,7 @@ run_stub() {
   : "${RADISHLEX_CLEANUP_CONTRACT_ROOT:?contract root is required}"
   : "${RADISHLEX_CLEANUP_CONTRACT_LOG:?contract log is required}"
   : "${RADISHLEX_CLEANUP_CONTRACT_SCRIPT:?contract script is required}"
+  : "${RADISHLEX_CLEANUP_CONTRACT_STOP_WRAPPER:?stop wrapper is required}"
 
   case "${command_name}" in
     clang)
@@ -48,8 +49,11 @@ run_stub() {
         "${RADISHLEX_CLEANUP_CONTRACT_CLEANUP_SCRIPT}")
           printf '%s\n' "${RADISHLEX_CLEANUP_CONTRACT_CLEANUP_SCRIPT%/*}"
           ;;
+        "${RADISHLEX_CLEANUP_CONTRACT_STOP_WRAPPER}")
+          printf '%s\n' "${RADISHLEX_CLEANUP_CONTRACT_STOP_WRAPPER%/*}"
+          ;;
         *)
-          fail "dirname stub received a path outside the two cleanup scripts"
+          fail "dirname stub received a path outside the cleanup entrypoints"
           ;;
       esac
       echo "dirname" >>"${RADISHLEX_CLEANUP_CONTRACT_LOG}"
@@ -127,8 +131,11 @@ run_stub() {
         fail "pgrep stub received unexpected arguments"
       echo "pgrep" >>"${RADISHLEX_CLEANUP_CONTRACT_LOG}"
       case "$(<"${RADISHLEX_CLEANUP_CONTRACT_PROCESS_STATE}")" in
-        running_verified|running_unverified|running_stubborn|running_then_unavailable|running_swap_ancestor)
+        running_verified|running_unverified|running_stubborn|running_then_unavailable|running_then_unverified|running_swap_ancestor)
           echo "4242"
+          ;;
+        multiple_verified|mixed)
+          printf '%s\n' "4242" "4343"
           ;;
         stopped)
           return 1
@@ -143,12 +150,20 @@ run_stub() {
       ;;
     ps)
       [[ $# -eq 5 && "${1}" == "-ww" && "${2}" == "-p" && \
-        "${3}" == "4242" && "${4}" == "-o" && "${5}" == "command=" ]] || \
+        ("${3}" == "4242" || "${3}" == "4343") && \
+        "${4}" == "-o" && "${5}" == "command=" ]] || \
         fail "ps stub received unexpected arguments"
       echo "ps" >>"${RADISHLEX_CLEANUP_CONTRACT_LOG}"
       case "$(<"${RADISHLEX_CLEANUP_CONTRACT_PROCESS_STATE}")" in
-        running_verified|running_stubborn|running_then_unavailable|running_swap_ancestor)
+        running_verified|running_stubborn|running_then_unavailable|running_then_unverified|running_swap_ancestor|multiple_verified)
           echo "${RADISHLEX_CLEANUP_CONTRACT_PROCESS_EXECUTABLE}"
+          ;;
+        mixed)
+          if [[ "${3}" == "4242" ]]; then
+            echo "${RADISHLEX_CLEANUP_CONTRACT_PROCESS_EXECUTABLE}"
+          else
+            echo "/tmp/Unrelated/RadishLex"
+          fi
           ;;
         *)
           echo "/tmp/Unrelated/RadishLex"
@@ -174,11 +189,14 @@ run_stub() {
         fail "pkill ran after Rime runtime data was removed"
       echo "pkill" >>"${RADISHLEX_CLEANUP_CONTRACT_LOG}"
       case "$(<"${RADISHLEX_CLEANUP_CONTRACT_PROCESS_STATE}")" in
-        running_verified)
+        running_verified|multiple_verified)
           echo "stopped" >"${RADISHLEX_CLEANUP_CONTRACT_PROCESS_STATE}"
           ;;
         running_then_unavailable)
           echo "unavailable" >"${RADISHLEX_CLEANUP_CONTRACT_PROCESS_STATE}"
+          ;;
+        running_then_unverified)
+          echo "running_unverified" >"${RADISHLEX_CLEANUP_CONTRACT_PROCESS_STATE}"
           ;;
         running_stubborn)
           ;;
@@ -257,6 +275,7 @@ external_input_methods="${contract_root}/external-input-methods"
 swapped_input_methods="${contract_root}/swapped-input-methods"
 cleanup_script_copy="${fake_repo}/platforms/macos-imk/cleanup-user-install.sh"
 cleanup_wrapper_copy="${fake_repo}/scripts/cleanup-macos-imk.sh"
+stop_wrapper_copy="${fake_repo}/scripts/stop-macos-imk-process.sh"
 tool_dir="${fake_repo}/target/macos-imk/tools"
 clang_cache="${tool_dir}/clang-module-cache"
 
@@ -271,8 +290,11 @@ cp "${repo_root}/platforms/macos-imk/cleanup-user-install.sh" \
   "${fake_repo}/platforms/macos-imk/cleanup-user-install.sh"
 cp "${repo_root}/scripts/cleanup-macos-imk.sh" \
   "${fake_repo}/scripts/cleanup-macos-imk.sh"
+cp "${repo_root}/scripts/stop-macos-imk-process.sh" \
+  "${fake_repo}/scripts/stop-macos-imk-process.sh"
 chmod +x "${fake_repo}/platforms/macos-imk/cleanup-user-install.sh" \
-  "${fake_repo}/scripts/cleanup-macos-imk.sh"
+  "${fake_repo}/scripts/cleanup-macos-imk.sh" \
+  "${fake_repo}/scripts/stop-macos-imk-process.sh"
 for command_name in clang dirname find grep mkdir pgrep ps pkill rm sed sleep stat; do
   ln -s "${contract_script}" "${fake_bin}/${command_name}"
 done
@@ -280,7 +302,10 @@ ln -s /bin/bash "${fake_bin}/bash"
 : >"${contract_log}"
 echo "stopped" >"${process_state}"
 
-run_cleanup() {
+run_entrypoint() {
+  local entrypoint="${1}"
+  shift
+
   echo "1" >"${tis_cursor}"
   (
     cd "${contract_root}"
@@ -293,6 +318,7 @@ run_cleanup() {
       RADISHLEX_CLEANUP_CONTRACT_SCRIPT="${contract_script}" \
       RADISHLEX_CLEANUP_CONTRACT_CLEANUP_SCRIPT="${cleanup_script_copy}" \
       RADISHLEX_CLEANUP_CONTRACT_WRAPPER="${cleanup_wrapper_copy}" \
+      RADISHLEX_CLEANUP_CONTRACT_STOP_WRAPPER="${stop_wrapper_copy}" \
       RADISHLEX_CLEANUP_CONTRACT_TOOL_DIR="${tool_dir}" \
       RADISHLEX_CLEANUP_CONTRACT_CLANG_CACHE="${clang_cache}" \
       RADISHLEX_CLEANUP_CONTRACT_APPLICATION_SUPPORT_PARENT="${parent}" \
@@ -306,8 +332,16 @@ run_cleanup() {
       RADISHLEX_CLEANUP_CONTRACT_EXTERNAL_INPUT_METHODS="${external_input_methods}" \
       RADISHLEX_CLEANUP_CONTRACT_SWAPPED_INPUT_METHODS="${swapped_input_methods}" \
       RADISHLEX_CLEANUP_CONTRACT_RUNTIME_DATA="${runtime_data}" \
-      "${fake_repo}/scripts/cleanup-macos-imk.sh" "$@"
+      "${entrypoint}" "$@"
   )
+}
+
+run_cleanup() {
+  run_entrypoint "${cleanup_wrapper_copy}" "$@"
+}
+
+run_stop_process() {
+  run_entrypoint "${stop_wrapper_copy}" "$@"
 }
 
 assert_status() {
@@ -364,6 +398,16 @@ assert_no_rm() {
   if grep -q '^rm:' "${contract_log}"; then
     fail "refused cleanup attempted fixed-path removal"
   fi
+}
+
+assert_stop_only_safety() {
+  assert_deletion_targets_present
+  assert_no_rm
+  if grep -q '^tis$' "${contract_log}"; then
+    fail "process-only stop inspected or changed TIS state"
+  fi
+  [[ "$(<"${tis_cursor}")" == "1" ]] || \
+    fail "process-only stop consumed a TIS state slot"
 }
 
 set_tis_slot() {
@@ -539,6 +583,165 @@ rm "${input_methods_parent}"
 
 prepare_deletion_targets
 set_selected_tis_state
+
+: >"${contract_log}"
+echo "running_verified" >"${process_state}"
+set +e
+stop_without_authorization_output="$(run_stop_process 2>&1)"
+stop_without_authorization_code=$?
+set -e
+[[ ${stop_without_authorization_code} -eq 2 ]] || \
+  fail "process-only entrypoint accepted a missing authorization flag"
+grep -Fq 'usage:' <<<"${stop_without_authorization_output}" || \
+  fail "process-only entrypoint authorization usage is missing"
+[[ "$(<"${process_state}")" == "running_verified" ]] || \
+  fail "unauthorized process-only entrypoint changed process state"
+assert_stop_only_safety
+assert_no_pkill
+
+: >"${contract_log}"
+set +e
+stop_cleanup_flag_output="$(run_stop_process \
+  --authorized-after-settings-removal 2>&1)"
+stop_cleanup_flag_code=$?
+set -e
+[[ ${stop_cleanup_flag_code} -eq 2 ]] || \
+  fail "process-only entrypoint relayed cleanup authorization"
+grep -Fq 'usage:' <<<"${stop_cleanup_flag_output}" || \
+  fail "process-only entrypoint cleanup-flag refusal is missing"
+[[ "$(<"${process_state}")" == "running_verified" ]] || \
+  fail "rejected cleanup flag changed process state"
+assert_stop_only_safety
+assert_no_pkill
+
+: >"${contract_log}"
+echo "stopped" >"${process_state}"
+stopped_process_output="$(run_stop_process --authorized-stop-process)"
+grep -Fq 'RadishLex process stop verified.' \
+  <<<"${stopped_process_output}" || \
+  fail "already-stopped process-only result is missing"
+[[ "$(grep -c '^pgrep$' "${contract_log}")" == "1" ]] || \
+  fail "already-stopped process-only action did not inspect exactly once"
+assert_stop_only_safety
+assert_no_pkill
+
+: >"${contract_log}"
+echo "running_verified" >"${process_state}"
+verified_process_output="$(run_stop_process --authorized-stop-process)"
+grep -Fq 'RadishLex process stop verified.' \
+  <<<"${verified_process_output}" || \
+  fail "verified process-only result is missing"
+[[ "$(<"${process_state}")" == "stopped" ]] || \
+  fail "verified process-only action did not stop the process"
+[[ "$(grep -c '^pkill$' "${contract_log}")" == "1" ]] || \
+  fail "verified process-only action did not terminate exactly once"
+assert_stop_only_safety
+
+: >"${contract_log}"
+echo "multiple_verified" >"${process_state}"
+multiple_process_output="$(run_stop_process --authorized-stop-process)"
+grep -Fq 'RadishLex process stop verified.' \
+  <<<"${multiple_process_output}" || \
+  fail "multiple verified process-only result is missing"
+[[ "$(<"${process_state}")" == "stopped" ]] || \
+  fail "process-only action did not stop every verified process"
+[[ "$(grep -c '^ps$' "${contract_log}")" == "2" ]] || \
+  fail "process-only action did not verify both matching process identities"
+[[ "$(grep -c '^pkill$' "${contract_log}")" == "1" ]] || \
+  fail "multiple verified process-only action did not terminate exactly once"
+assert_stop_only_safety
+
+: >"${contract_log}"
+echo "mixed" >"${process_state}"
+set +e
+mixed_process_output="$(run_stop_process --authorized-stop-process 2>&1)"
+mixed_process_code=$?
+set -e
+[[ ${mixed_process_code} -eq 9 ]] || \
+  fail "process-only action did not reject mixed process identities"
+grep -Fq 'Refusing process termination without exact process identity.' \
+  <<<"${mixed_process_output}" || \
+  fail "mixed process-only refusal reason is missing"
+[[ "$(grep -c '^ps$' "${contract_log}")" == "2" ]] || \
+  fail "mixed process-only action did not inspect both process identities"
+assert_stop_only_safety
+assert_no_pkill
+
+: >"${contract_log}"
+echo "running_unverified" >"${process_state}"
+set +e
+stop_unverified_output="$(run_stop_process --authorized-stop-process 2>&1)"
+stop_unverified_code=$?
+set -e
+[[ ${stop_unverified_code} -eq 9 ]] || \
+  fail "process-only action did not reject an unverified process"
+grep -Fq 'Refusing process termination without exact process identity.' \
+  <<<"${stop_unverified_output}" || \
+  fail "unverified process-only refusal reason is missing"
+assert_stop_only_safety
+assert_no_pkill
+
+: >"${contract_log}"
+echo "unavailable" >"${process_state}"
+set +e
+stop_unavailable_output="$(run_stop_process --authorized-stop-process 2>&1)"
+stop_unavailable_code=$?
+set -e
+[[ ${stop_unavailable_code} -eq 8 ]] || \
+  fail "process-only action did not reject unavailable inspection"
+grep -Fq 'Refusing process termination while process state is unavailable.' \
+  <<<"${stop_unavailable_output}" || \
+  fail "unavailable process-only refusal reason is missing"
+assert_stop_only_safety
+assert_no_pkill
+
+: >"${contract_log}"
+echo "running_stubborn" >"${process_state}"
+set +e
+stop_stubborn_output="$(run_stop_process --authorized-stop-process 2>&1)"
+stop_stubborn_code=$?
+set -e
+[[ ${stop_stubborn_code} -eq 6 ]] || \
+  fail "process-only action accepted a stubborn process"
+grep -Fq 'process did not stop after authorized termination' \
+  <<<"${stop_stubborn_output}" || \
+  fail "stubborn process-only refusal reason is missing"
+[[ "$(grep -c '^sleep$' "${contract_log}")" == "20" ]] || \
+  fail "stubborn process-only action did not complete the bounded wait"
+[[ "$(grep -c '^pkill$' "${contract_log}")" == "1" ]] || \
+  fail "stubborn process-only action did not terminate exactly once"
+assert_stop_only_safety
+
+: >"${contract_log}"
+echo "running_then_unavailable" >"${process_state}"
+set +e
+stop_post_kill_output="$(run_stop_process --authorized-stop-process 2>&1)"
+stop_post_kill_code=$?
+set -e
+[[ ${stop_post_kill_code} -eq 6 ]] || \
+  fail "process-only action accepted unavailable post-kill observation"
+grep -Fq 'process did not stop after authorized termination' \
+  <<<"${stop_post_kill_output}" || \
+  fail "post-kill process-only refusal reason is missing"
+[[ "$(grep -c '^pkill$' "${contract_log}")" == "1" ]] || \
+  fail "post-kill process-only action did not terminate exactly once"
+assert_stop_only_safety
+
+: >"${contract_log}"
+echo "running_then_unverified" >"${process_state}"
+set +e
+stop_post_kill_unverified_output="$(run_stop_process --authorized-stop-process 2>&1)"
+stop_post_kill_unverified_code=$?
+set -e
+[[ ${stop_post_kill_unverified_code} -eq 6 ]] || \
+  fail "process-only action accepted unverified post-kill observation"
+grep -Fq 'process did not stop after authorized termination' \
+  <<<"${stop_post_kill_unverified_output}" || \
+  fail "unverified post-kill refusal reason is missing"
+[[ "$(grep -c '^pkill$' "${contract_log}")" == "1" ]] || \
+  fail "unverified post-kill action did not terminate exactly once"
+assert_stop_only_safety
+
 echo "stopped" >"${process_state}"
 : >"${contract_log}"
 set +e

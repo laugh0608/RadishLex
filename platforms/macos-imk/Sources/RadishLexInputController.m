@@ -4,41 +4,12 @@
 
 #import "RadishLexBridge.h"
 #import "RadishLexCandidatePanel.h"
+#import "RadishLexLearningContext.h"
 #import "RadishLexRuntime.h"
 
 static BOOL RLXNullableStringsEqual(NSString *left, NSString *right) {
   return left == right || [left isEqualToString:right];
 }
-
-#if !RADISHLEX_CONTRACT_SMOKE
-static void RLXClassifyFrontmostApplication(BOOL *sensitiveApplication,
-                                             BOOL *contextKnown,
-                                             NSString **contextKind) {
-  NSString *bundleIdentifier =
-      NSWorkspace.sharedWorkspace.frontmostApplication.bundleIdentifier;
-  *sensitiveApplication = NO;
-  *contextKnown = NO;
-  *contextKind = @"other";
-  if ([bundleIdentifier isEqualToString:@"com.apple.TextEdit"]) {
-    *contextKnown = YES;
-    *contextKind = @"editor";
-    return;
-  }
-  if ([bundleIdentifier isEqualToString:@"com.openai.codex"]) {
-    *contextKnown = YES;
-    *contextKind = @"code";
-    return;
-  }
-  NSSet<NSString *> *sensitiveBundleIdentifiers = [NSSet setWithArray:@[
-    @"com.apple.Passwords", @"com.apple.keychainaccess",
-    @"com.1password.1password", @"com.agilebits.onepassword7"
-  ]];
-  if ([sensitiveBundleIdentifiers containsObject:bundleIdentifier]) {
-    *sensitiveApplication = YES;
-    *contextKnown = YES;
-  }
-}
-#endif
 
 static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
                                                        RLXSnapshot *right) {
@@ -360,8 +331,9 @@ static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
   BOOL sensitiveApplication = NO;
   BOOL contextKnown = NO;
   NSString *contextKind = nil;
-  RLXClassifyFrontmostApplication(&sensitiveApplication, &contextKnown,
-                                  &contextKind);
+  RLXClassifyApplicationBundleIdentifier(
+      NSWorkspace.sharedWorkspace.frontmostApplication.bundleIdentifier,
+      &sensitiveApplication, &contextKnown, &contextKind);
   BOOL privacyMode =
       [[NSUserDefaults standardUserDefaults] boolForKey:@"RadishLexPrivacyMode"];
   BOOL secureInput = IsSecureEventInputEnabled() != 0;

@@ -6,7 +6,17 @@ repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
 platform_dir="${repo_root}/platforms/macos-imk"
 cleanup_script="${platform_dir}/cleanup-user-install.sh"
 cleanup_wrapper="${repo_root}/scripts/cleanup-macos-imk.sh"
-cleanup_sources=("${cleanup_script}" "${cleanup_wrapper}")
+stop_wrapper="${repo_root}/scripts/stop-macos-imk-process.sh"
+cleanup_sources=("${cleanup_script}" "${cleanup_wrapper}" "${stop_wrapper}")
+privacy_script="${platform_dir}/privacy-mode.sh"
+privacy_wrapper="${repo_root}/scripts/manage-macos-imk-privacy-mode.sh"
+privacy_tool_source="${platform_dir}/Tools/privacy_mode_control.m"
+privacy_contract="${platform_dir}/Tests/privacy_mode_contract.sh"
+r01b_userdb_cleanup="${platform_dir}/cleanup-r01b-test-userdb.sh"
+r01b_userdb_cleanup_wrapper="${repo_root}/scripts/cleanup-macos-imk-r01b-test-userdb.sh"
+r01b_userdb_cleanup_helper="${platform_dir}/Tools/r01b_test_userdb_cleanup.c"
+r01b_userdb_helper_contract="${platform_dir}/Tests/r01b_test_userdb_cleanup_helper_contract.sh"
+r01b_userdb_orchestration_contract="${platform_dir}/Tests/r01b_test_userdb_cleanup_orchestration_contract.sh"
 export CLANG_MODULE_CACHE_PATH="${repo_root}/target/macos-imk/clang-module-cache"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
@@ -24,7 +34,17 @@ smoke_dir="${repo_root}/target/macos-imk/contract-smoke"
 mkdir -p "${smoke_dir}" "${CLANG_MODULE_CACHE_PATH}"
 bash -n "${cleanup_script}" \
   "${cleanup_wrapper}" \
-  "${platform_dir}/Tests/cleanup_user_install_contract.sh"
+  "${stop_wrapper}" \
+  "${platform_dir}/Tests/cleanup_user_install_contract.sh" \
+  "${privacy_script}" \
+  "${privacy_wrapper}" \
+  "${privacy_contract}" \
+  "${r01b_userdb_cleanup}" \
+  "${r01b_userdb_cleanup_wrapper}" \
+  "${r01b_userdb_helper_contract}" \
+  "${r01b_userdb_orchestration_contract}" \
+  "${platform_dir}/ValidationHost/build-bundle.sh" \
+  "${platform_dir}/ValidationHost/check.sh"
 if rg -n '/((usr/)?bin|usr/sbin|sbin)/' "${cleanup_sources[@]}" | \
   rg -v ':1:#!/usr/bin/env bash$'; then
   echo "macOS cleanup must not bypass the isolated contract with absolute executables." >&2
@@ -70,13 +90,18 @@ if rg -n '(^|[;&|()[:space:]])(alias|builtin|command|enable|env|eval|function|ha
   exit 1
 fi
 if rg -n '(^|[;&|(){}[:space:]])exec[[:space:]]+' "${cleanup_sources[@]}" | \
-  rg -v '^[^:]+:[0-9]+:[[:space:]]*exec "\$\{status_tool\}" --monitor$|^[^:]+:[0-9]+:exec "\$\{repo_root\}/platforms/macos-imk/cleanup-user-install\.sh" "\$@"$'; then
+  rg -v '^[^:]+:[0-9]+:[[:space:]]*exec "\$\{status_tool\}" --monitor$|^[^:]+:[0-9]+:exec "\$\{repo_root\}/platforms/macos-imk/cleanup-user-install\.sh" "\$@"$|^[^:]+:[0-9]+:exec "\$\{repo_root\}/platforms/macos-imk/cleanup-user-install\.sh" \\$'; then
   echo "macOS cleanup may only exec the isolated status tool or cleanup wrapper target." >&2
   exit 1
 fi
 rg -Fxq '  exec "${status_tool}" --monitor' "${cleanup_script}"
 rg -Fxq 'exec "${repo_root}/platforms/macos-imk/cleanup-user-install.sh" "$@"' \
   "${cleanup_wrapper}"
+rg -Fq 'if [[ $# -ne 1 || "${1}" != "--authorized-stop-process" ]]; then' \
+  "${stop_wrapper}"
+rg -Fxq 'exec "${repo_root}/platforms/macos-imk/cleanup-user-install.sh" \' \
+  "${stop_wrapper}"
+rg -Fxq '  --authorized-stop-process' "${stop_wrapper}"
 if rg -n '^[[:space:]]*rm[[:space:]]' \
   "${cleanup_sources[@]}" | \
   rg -v 'rm -rf "\$\{(installed_bundle|runtime_data)\}"$'; then
@@ -117,6 +142,71 @@ if rg -n 'TIS(Select|Disable|Enable|Register|Deregister)InputSource|CFPreference
   exit 1
 fi
 "${platform_dir}/Tests/cleanup_user_install_contract.sh"
+rg -Fxq 'exec "${repo_root}/platforms/macos-imk/privacy-mode.sh" "$@"' \
+  "${privacy_wrapper}"
+rg -Fq 'org.radishlex.inputmethod.macos' "${privacy_tool_source}"
+rg -Fq 'RadishLexPrivacyMode' "${privacy_tool_source}"
+rg -Fq 'CFPreferencesCopyValue' "${privacy_tool_source}"
+rg -Fq 'CFPreferencesSetValue' "${privacy_tool_source}"
+rg -Fq 'CFPreferencesSynchronize' "${privacy_tool_source}"
+rg -Fq 'RLX_PRIVACY_STATE_DIR' "${privacy_tool_source}"
+rg -Fq 'openat(' "${privacy_tool_source}"
+rg -Fq 'fstatat(' "${privacy_tool_source}"
+rg -Fq 'unlinkat(' "${privacy_tool_source}"
+rg -Fq 'device=%llu' "${privacy_tool_source}"
+rg -Fq 'inode=%llu' "${privacy_tool_source}"
+rg -Fq 'privacy baseline already exists or is unsafe' "${privacy_tool_source}"
+rg -Fq 'state_dir_define="-DRLX_PRIVACY_STATE_DIR=\"${state_dir}\""' \
+  "${privacy_script}"
+if rg -n 'CFPreferences(Copy|Set)AppValue|(^|[[:space:]])defaults([[:space:]]|$)|com\.apple\.HIToolbox|TIS(Select|Disable|Enable|Register|Deregister)InputSource' \
+  "${privacy_script}" "${privacy_wrapper}" "${privacy_tool_source}"; then
+  echo "macOS privacy control must use the fixed exact preference layer only." >&2
+  exit 1
+fi
+clang -fobjc-arc -fmodules -Wall -Wextra -Werror -fsyntax-only \
+  -mmacosx-version-min=13.0 \
+  -DRADISHLEX_PRIVACY_CONTRACT=0 \
+  '-DRLX_PRIVACY_STATE_DIR="/private/tmp/radishlex-privacy-contract-state"' \
+  "${privacy_tool_source}"
+"${privacy_contract}"
+rg -Fq 'if [[ $# -ne 1 || \' "${r01b_userdb_cleanup_wrapper}"
+rg -Fq '"${1}" != "--capture-baseline"' "${r01b_userdb_cleanup_wrapper}"
+rg -Fq '"${1}" != "--authorized-delete-r01b-test-userdb"' \
+  "${r01b_userdb_cleanup_wrapper}"
+rg -Fxq 'exec "${repo_root}/platforms/macos-imk/cleanup-r01b-test-userdb.sh" "$1"' \
+  "${r01b_userdb_cleanup_wrapper}"
+rg -Fq 'userdb_files=(' "${r01b_userdb_cleanup}"
+rg -Fq 'lsof_output="$(lsof -n -P -- "${path}" 2>&1)"' \
+  "${r01b_userdb_cleanup}"
+rg -Fq 'require_status_value "matches" "0 enabled=0 selected=0"' \
+  "${r01b_userdb_cleanup}"
+rg -Fq 'require_status_value "application_support_parent_kind" "empty_directory"' \
+  "${r01b_userdb_cleanup}"
+rg -Fq 'require_status_value "application_support_parent_mode" "755"' \
+  "${r01b_userdb_cleanup}"
+if rg -n '^[[:space:]]*rm[[:space:]]|rm -rf|find .*-(delete|exec)|(^|[[:space:]])xargs([[:space:]]|$)' \
+  "${r01b_userdb_cleanup}" "${r01b_userdb_cleanup_wrapper}"; then
+  echo "R01B test userdb cleanup must not expose general path deletion." >&2
+  exit 1
+fi
+rg -Fq '"userdb.sqlite3"' "${r01b_userdb_cleanup_helper}"
+rg -Fq '"userdb.sqlite3-wal"' "${r01b_userdb_cleanup_helper}"
+rg -Fq '"userdb.sqlite3-shm"' "${r01b_userdb_cleanup_helper}"
+rg -Fq '"userdb.sqlite3-journal"' "${r01b_userdb_cleanup_helper}"
+rg -Fq 'unlinkat(parent_fd, kUserDbNames[index], 0)' \
+  "${r01b_userdb_cleanup_helper}"
+rg -Fq 'AT_SYMLINK_NOFOLLOW' "${r01b_userdb_cleanup_helper}"
+if rg -n '(^|[^A-Za-z])(remove|rename|system|popen)[[:space:]]*\(' \
+  "${r01b_userdb_cleanup_helper}"; then
+  echo "R01B test userdb helper contains a general path or process primitive." >&2
+  exit 1
+fi
+clang -std=c11 -Wall -Wextra -Werror -fsyntax-only \
+  -mmacosx-version-min=13.0 \
+  '-DRLX_R01B_STATE_DIR="/private/tmp/radishlex-r01b-contract-state"' \
+  "${r01b_userdb_cleanup_helper}"
+"${r01b_userdb_helper_contract}"
+"${r01b_userdb_orchestration_contract}"
 clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   -mmacosx-version-min=13.0 \
   "${platform_dir}/Tools/tis_source_status.m" \
@@ -175,6 +265,7 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror -fsyntax-only \
   -I"${repo_root}/crates/ime-ffi/include" \
   "${platform_dir}/Sources/RadishLexBridge.m" \
   "${platform_dir}/Sources/RadishLexCandidatePanel.m" \
+  "${platform_dir}/Sources/RadishLexLearningContext.m" \
   "${platform_dir}/Sources/RadishLexRuntime.m" \
   "${platform_dir}/Sources/RadishLexInputController.m" \
   "${platform_dir}/Sources/main.m"
@@ -185,6 +276,7 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   -I"${repo_root}/crates/ime-ffi/include" \
   "${platform_dir}/Sources/RadishLexBridge.m" \
   "${platform_dir}/Sources/RadishLexCandidatePanel.m" \
+  "${platform_dir}/Sources/RadishLexLearningContext.m" \
   "${platform_dir}/Sources/RadishLexRuntime.m" \
   "${platform_dir}/Tests/contract_smoke.m" \
   -L"${repo_root}/target/debug" -lradishlex_ime_ffi \
@@ -212,6 +304,7 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   -I"${repo_root}/crates/ime-ffi/include" \
   "${platform_dir}/Sources/RadishLexBridge.m" \
   "${platform_dir}/Sources/RadishLexCandidatePanel.m" \
+  "${platform_dir}/Sources/RadishLexLearningContext.m" \
   "${platform_dir}/Sources/RadishLexRuntime.m" \
   "${platform_dir}/Sources/RadishLexInputController.m" \
   "${platform_dir}/Tests/input_controller_contract.m" \
@@ -220,6 +313,7 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   -framework AppKit -framework Carbon -framework InputMethodKit \
   -o "${smoke_dir}/input-controller-contract"
 "${smoke_dir}/input-controller-contract"
+"${platform_dir}/ValidationHost/check.sh"
 
 bundle="${repo_root}/target/macos-imk/contract/RadishLexInputMethod.app"
 test -x "${bundle}/Contents/MacOS/RadishLex"
@@ -236,7 +330,7 @@ test -s "${bundle}/Contents/Resources/en.lproj/Localizable.strings"
 grep -Fqx '  page_size: 5' \
   "${platform_dir}/Resources/Rime/default.yaml.in"
 plutil -lint "${bundle}/Contents/Info.plist" >/dev/null
-test "$(plutil -extract CFBundleVersion raw "${bundle}/Contents/Info.plist")" = "33"
+test "$(plutil -extract CFBundleVersion raw "${bundle}/Contents/Info.plist")" = "34"
 plutil -lint "${bundle}/Contents/Resources/zh-Hans.lproj/InfoPlist.strings" \
   "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings" \
   "${bundle}/Contents/Resources/zh-Hans.lproj/Localizable.strings" \
@@ -290,6 +384,7 @@ nm -gU "${bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib" | grep -q \
 product_sources=(
   "${platform_dir}/Sources/RadishLexInputController.m"
   "${platform_dir}/Sources/RadishLexCandidatePanel.m"
+  "${platform_dir}/Sources/RadishLexLearningContext.m"
 )
 if rg -n 'IMKCandidates|selectCandidateWithIdentifier|candidateSelectionChanged:' \
   "${product_sources[@]}"; then
