@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核日期：2026-07-16（Asia/Shanghai）
+- 复核日期：2026-07-17（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前产品里程碑：M1 macOS 离线输入 Alpha
 - 当前整改主批次：R01B 真实学习纵向闭环
@@ -18,31 +18,25 @@ R02L 已完成 userdb schema v3 的事务、并发、迁移、删除/显式恢�
 
 ## R01B 当前仓库状态
 
-`build 33` 的 ad-hoc 冻结因后续生产分类和验收工具变更而失效，只保留历史记录。`build 34` 代码与工具已提交为 `2464ce4`、`b917827`；提交前 repository/ad-hoc native 门禁和五项候选哈希通过，但尚未在 clean HEAD 重建比对，因此不能进入实机。
+`build 33` 的 ad-hoc 冻结因后续生产分类和验收工具变更而失效，只保留历史记录。`build 34` 已在 clean HEAD `ee331a5` 使用固定 `librime 1.17.0` 与三项哈希一致的隔离数据完成 repository/ad-hoc native 重建，五项产物哈希与提交前候选一致；同一输入的 Apple Development 产物完成签名、安装副本一致性和真实验收。
 
-当前仓库准备已包含：
+仓库已具备生产 `LearningContext` 分类、固定合成 case、`case-status`/隔离快照、隐私 receipt、精确进程 stop 和独立授权 B userdb 清理。分类、取证与回滚细节由 R01B runbook 承载；librime user-data 也会改变 UI 顺序，排序归因只认新鲜隔离快照与全库聚合。
 
-- 从正式 controller 抽取生产 `LearningContext` 分类；分类 contract 直接编译该生产源码并覆盖 unknown/P0 host 的固定 Bundle ID，`ValidationHost` 本体只提供对应身份与普通/secure 输入框，仓库门禁不启动 GUI。
-- 固定合成用例 `r01b-shi-time-v1`：schema `pinyin_simp`、input `shi`、target `时`、reading absent、context `editor`；隔离初始页为 `是、时、事、使、市`，目标为 display index `1` / engine index `1`。一次真实选择后，fresh isolated non-selection snapshot 可将目标提升到 display index `0`，engine index 仍为 `1`。
-- `case-status` 精确检查目标 term/ranker/tombstone 与聚合增减量；删除和恢复再用 fresh isolated Rime user-data snapshot 取证。librime user data 也会改变顺序，UI 不能单独证明 RadishLex ranker。
-- `RadishLexPrivacyMode` 固定 CurrentUser/AnyHost 的 CFPreferences domain/key；固定 `0700` state dir 与排他 `0600` receipt 绑定路径和文件身份，先持久化 baseline 再写设置，漂移或不安全时失败关闭。
-- 精确进程 stop 只处理命令行匹配固定 bundle executable 的进程，并在删除前复核停止和路径安全。
-- 测试 userdb receipt 绑定安装前空父目录与本轮四个 SQLite 文件；只有单独授权且归属、设置恢复、数据库关闭均满足时才执行，父目录始终保留。
+本轮真实证据已确认：TextEdit 首次选择把固定目标从隔离 display/engine `1/1` 重排为 `0/1`，第二次与精确进程重启后选择将 frequency 依次推进到 `2`、`3`；delete 产生 tombstone 与一次负反馈、移除 ranker，并在新鲜快照把目标降到 `4/1`、deleted penalty `10`，再次选择不能复活；explicit restore 以 `manual_add` 新版本恢复 `0/1`，后续选择重新从 frequency `1` 建立 ranker；隐私模式下同一真实提交保持全部聚合零增量。
 
-提交前已确认精准 Rust/集成测试、`./scripts/check-macos-imk.sh`、`./scripts/check-macos-imk-native.sh` 与 `./scripts/check-repo.sh` 通过；五项候选哈希记录在本周 devlog。该结果不是 clean-HEAD 冻结，提交后仍须用相同输入重跑并逐项比对。
-
-本轮尚未安装或启动输入法、未使用 Apple Development identity、未修改系统设置或隐私键、未终止真实输入法进程，也未打开、迁移或删除真实 userdb。
+进入 unknown host 后，真实候选显示为 librime 自身已学习后的 `时、是、事、使、市`，该顺序符合 engine-only 可受 engine user-data 影响的边界，不能单独判定异常。但人工异常报告步骤没有先要求取消 composition、切回中立 source 再返回 Codex；随后全库聚合出现四次非固定 case 写入，而固定目标自身未变化。未读取 P1 原文，也不把污染归因给具体应用或正文；批次按停止线终止，P0/secure 未执行。授权 A/B 回滚现已完成：隐私键 absent，TIS/bundle/Rime/userdb/sidecar absent，进程 stopped，预存父目录 empty/`0755`，隔离快照已删除。
 
 ## 已确认阻塞
 
-- R01B 尚缺同一冻结 `build 34` 的真实选择学习、重启持久化、删除/恢复、隐私分类和最终基线证据。
+- R01B 尚缺同一冻结 `build 34` 的 unknown/P0/secure 受控补验；排序、重启、删除/恢复、隐私模式与最终零残留已经取得证据。
+- unknown/P0 补验必须以全新 userdb 建立一次固定 TextEdit 学习基线；测试宿主无论提交、取消还是候选异常，都要在宿主内结束 composition、切回中立 source 后才允许返回 Codex 报告。任一全库聚合非预期增量立即停止。
 - secure field 若由 macOS 直接旁路第三方输入法，应记录“系统 secure 路由旁路，controller secure 分支未由本组实机执行”，不能误记为 `policy_blocked`。
 - 同步 merge、签名绑定、KDF 上限、secret 生命周期、HTTPS orchestration 和资源上限尚未达到真实用户开放条件。
 - manager 默认 fixture fallback、native library 打包和持久化尚未产品化。
 
 ## 当前停止线
 
-- `build 33` 只作历史证据；`build 34` 在 clean HEAD 重新通过完整门禁、确认隔离输入与五项产物哈希前，不进入实机授权 A。
+- `build 33` 只作历史证据；后续补验只能使用五项 Apple Development 哈希、签名与产品源码均未漂移的同一 `build 34`。任一产品输入变化都必须重新冻结，不得混用本轮证据。
 - 实机复制前必须用一次完整状态调用重新确认 TIS zero、bundle/Rime/userdb/sidecar absent、删除路径祖先 safe、预存父目录 empty/`0755`、产品进程 stopped，并用 receipt 固定父目录身份及隐私键 absent/显式 false；任一漂移立即取消批次。
 - unknown/P0 ValidationHost 只用于合成应用分类与输入框场景，不读取、记录或持久化输入内容；自动门禁不得启动 GUI host。
 - R01B 不扩张同步协议、manager 同步 UI、第二平台或新的证明状态机；输入热路径继续完全本地和离线。
@@ -51,10 +45,10 @@ R02L 已完成 userdb schema v3 的事务、并发、迁移、删除/显式恢�
 
 ## 下一步顺位
 
-1. 在 clean HEAD 用固定 `librime 1.17.0` 和哈希一致的隔离 `pinyin_simp` 数据重跑 contract、native 与仓库门禁，逐项复核 `build 34` 五项产物哈希并冻结候选。
-2. 冻结成功后申请授权 A。授权 A 覆盖 Apple Development 重建/签名、复制前原子基线、用户级安装、系统设置添加、人工 source/实体交互、固定合成用例、进程重启、隐私设置临时变更与恢复、delete/explicit restore，以及保留 userdb/父目录的普通清理。
-3. 授权 A 完成普通清理、隐私键恢复、数据库连接关闭和本轮数据归属证明后，再单独申请授权 B。授权 B 只允许精确删除本轮 `userdb.sqlite3`、`-wal`、`-shm`、`-journal`，随后把预存空父目录恢复为 `0755`；不得删除父目录。
-4. 只有固定用例的排序、重启、删除/恢复、隐私/P0/secure/unknown 和清理证据全部满足，才关闭 R01B。随后按路线图进入 M2 manager 本地产品能力；真实同步、第二平台与发布打包继续保持停止。
+1. 先提交并验证 R01B 人工交接规则：每组操作必须明确目标宿主；提交或异常都要在该宿主结束 composition、切回中立 source 后才返回 Codex，不跨窗口保留 RadishLex 活跃状态。
+2. 对 clean HEAD `ee331a5` 的冻结产物复核产品源码无漂移、Apple Development 五项哈希与签名完全一致；重新取得原子基线和授权 A 后，用全新 userdb 做一次固定 TextEdit 学习种子，再只补 unknown、P0 与 secure 场景。engine-only 的真实 UI 顺序按当时 librime 顺序记录，不预设 display index；只以全库聚合零增量判定。
+3. 补验结束仍须完成授权 A 普通清理和独立授权 B 精确 userdb 删除，复验 TIS/bundle/Rime/userdb/sidecar/进程/隐私键及父目录权限全部回到基线。
+4. 只有补齐 unknown/P0/secure 且无污染，才关闭 R01B 并按路线图进入 M2 manager 本地产品能力；真实同步、第二平台与发布打包继续保持停止。
 
 R01B 详细步骤、授权边界和证据表见 [macOS R01B 个人化验收 runbook](../runbooks/macos-r01b-personalization-acceptance.md)。
 

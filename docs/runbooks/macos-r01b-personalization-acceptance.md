@@ -1,6 +1,6 @@
 # macOS R01B 本地个人化验收
 
-本文档供维护者和开发者在已冻结的 macOS 开发 bundle 上复验 R01B 真实学习、重启、删除、显式恢复与隐私阻断。它不包含 R01A 基础输入矩阵、发布签名、真实用户数据迁移、同步或日常卸载；构建与系统设置通用步骤见 [InputMethodKit 开发 runbook](macos-inputmethodkit-development.md)，稳定边界见 [macOS InputMethodKit](../macos-inputmethodkit-boundary.md)。
+本文档用于在冻结的 macOS 开发 bundle 上复验 R01B 学习、重启、删除/恢复和隐私阻断。R01A 基础输入、发布、迁移、同步与日常卸载不在本文；通用步骤见 [开发 runbook](macos-inputmethodkit-development.md)，稳定边界见 [InputMethodKit](../macos-inputmethodkit-boundary.md)。
 
 ## 退出结论
 
@@ -49,6 +49,13 @@ R01B 只有同时取得以下证据才可退出：
 
 开发者只负责聚焦、手动切换 source 和实体输入/候选操作；执行者负责构建、签名、复制、只读来源记录、CLI 检查和回滚。不得调用 `TISSelectInputSource`、注入按键或自动点击候选代替人工证据。
 
+每个人工组必须在目标宿主内闭合后再回 Codex：
+
+1. 读完步骤后重新点击指定宿主和输入框，再手动选择 RadishLex；不沿用 Codex 焦点或旧 source。
+2. 正常时在宿主提交固定 case 后切回系统拼音或 U.S.；异常时先按 `Esc`、切回中立 source，并关闭验证 host。
+3. 来源监视确认离开 RadishLex 后才能在 Codex 报告；禁止保留 composition/source 跨窗口报告。
+4. 每组前后比较全库聚合和固定目标。任何非固定 case 或无法解释的增量都触发停止线，不读取 P1 原始行追查正文。
+
 ## 安装前原子基线
 
 先完成不安装门禁和 build 34 ad-hoc native 冻结，再在没有中间系统状态变更的窗口内执行：
@@ -60,7 +67,7 @@ R01B 只有同时取得以下证据才可退出：
 ./scripts/cleanup-macos-imk-r01b-test-userdb.sh --capture-baseline
 ```
 
-最后一条命令会重新取得一次完整状态，只接受：TIS `matches=0 enabled=0 selected=0`、bundle absent、祖先 safe、父目录为当前用户拥有的普通空目录且 mode `0755`、Rime/userdb/sidecar absent、进程 stopped。它以不可覆盖、当前用户拥有、mode `0600` 的 receipt 记录父目录 device/inode/uid/mode。privacy 工具使用不可由调用方覆盖的固定 state dir 和 receipt 名；state dir 必须是当前用户 `0700` 目录，receipt 必须是排他创建的当前用户 `0600`、单链接普通文件并自记录 device/inode。工具在启用写、恢复写与删除 receipt 前复核同一身份，先同步 receipt、state dir 及首次创建时的父目录，再修改 CurrentUser/AnyHost 设置，并精确保留键原本 absent 或显式 false 的区别。已有 receipt、父目录或隐私键状态不符合预期时立即停止，不覆盖现场。
+最后一条命令重新取得完整状态，只接受 TIS zero、bundle/Rime/userdb/sidecar absent、祖先 safe、当前用户普通空父目录 `0755` 和进程 stopped；不可覆盖的 `0600` receipt 绑定父目录身份。privacy 工具固定当前用户 `0700` state dir 与排他 `0600` 单链接 receipt，先持久化身份和 baseline，再修改 CurrentUser/AnyHost 设置，并区分键 absent 与显式 false。receipt、路径、身份、权限或设置漂移时立即停止，不覆盖现场。
 
 原子基线通过后才申请授权 A。Apple Development 产物必须由同一源码和输入重建，复制前再核对五项哈希、完整签名和上述状态；安装目标只允许 `~/Library/Input Methods/RadishLexInputMethod.app`。
 
@@ -85,7 +92,7 @@ cargo run -p radishlex-ime-cli -- \
   --input shi --text 时 --context editor
 ```
 
-`rime snapshot` 只接受小写 ASCII 拼音字母与撇号，不接受数字、候选 index 或 `--key`，不调用选择/提交入口，也不新增学习；若 engine 在输入过程中自行 commit，命令失败。带 `--rank-db` 会按产品 `UserDb::open` 执行 migration、PRAGMA 和权限检查，因此只允许操作已由本批取得归属的数据库，不能把它描述成文件系统只读。`case-status` 在同一 Deferred 读事务中返回聚合计数、目标 term、指定 context 的 ranker weight 和 tombstone；`p1_rows: omitted` 必须存在，不能输出 P1 原始行或 session ID。
+`rime snapshot` 只接受小写 ASCII 拼音和撇号，拒绝数字、候选 index 与 `--key`；不调用选择入口，engine 自行 commit 时失败。带 `--rank-db` 会执行产品 migration、PRAGMA 和权限检查，只能操作本批已取得归属的数据库，不能称为文件系统只读。`case-status` 在同一 Deferred 读事务中返回聚合、目标 term、指定 context weight 和 tombstone；必须输出 `p1_rows: omitted`，不得输出 P1 原始行或 session ID。
 
 快照目录只含本轮隔离的 Rime 部署数据。记录其固定前缀和最终清理结果，不把临时绝对路径、整段候选输出或数据库 dump 写入正式文档。
 
@@ -104,7 +111,7 @@ cargo run -p radishlex-ime-cli -- \
 | `dict restore` | active `+1`、tombstone `-1`、ranker 仍 absent、negative aggregate 保留；source 为 `manual_add`，`restored_at_ms` 与新 version 均晚于 delete；新鲜快照回到 display `0` / engine `1` |
 | restore 后再次选择 | selection `+1`、ranker row `+1`、frequency 重新从 `1` 开始；tombstone absent |
 
-真实 TextEdit 组固定先用数字 `2` 选择初始 display `1`，再输入 `shi` 并以当前 display `0` 的 Space 选择；每次提交后只留下固定测试字符。来源监视必须证明输入期间 current source 精确为 `org.radishlex.inputmethod.macos.Pinyin`。
+真实 TextEdit 组固定先用数字 `2` 选择初始 display `1`，再输入 `shi` 并以当前 display `0` 的 Space 选择；每次提交后只留下固定测试字符。来源监视必须证明输入期间 current source 精确为 `org.radishlex.inputmethod.macos.Pinyin`，并在返回 Codex 前证明已切回中立 source。
 
 重启前由开发者先手动切回中立 source，执行者在授权 A 下运行：
 
@@ -149,9 +156,20 @@ unknown 与 P0 组分别启动构建门禁生成的两个 host：
 - `target/macos-imk/validation-host/unknown/RadishLexContextValidationHost.app`
 - `target/macos-imk/validation-host/p0/RadishLexContextValidationHost.app`
 
-两者的普通文本框只输入同一固定 case，并在动作前后比较 `case-status`；两组都允许 engine 输入和提交，但逻辑状态必须零增量。P0 固定 Bundle ID 已进入生产敏感分类；unknown 固定 Bundle ID 保持 `contextKnown=false`。host 不读取、记录或持久化正文，也不手动调用 secure event API。
+两者的普通框只输入固定 case；允许 engine 提交，但全库聚合必须零增量。P0 Bundle ID 属于生产敏感分类，unknown 保持 `contextKnown=false`。两者都是 engine-only，真实顺序受 librime user-data 影响，前序选择可能已把 `时` 提升到首位；不得预设数字 `2` 或把 UI 变化归因于 RadishLex ranker。只确认目标仍在五项中并按实际 display index 提交、记录该 index。host 不读取、记录或持久化正文，也不调用 secure event API。
 
-secure 组只使用 host 的 `NSSecureTextField` 和同一固定 case。若状态标签显示 Secure Event Input 已启用，但 macOS 没有向第三方输入法路由，证据只能记录“系统 secure 路由旁路，controller secure 分支未由本组实机执行”，并附 source 观察和 userdb 零增量；不得写成 `policy_blocked` 已由实机通过，也不得注入按键、强制 source 或调用 secure API 补证据。controller 分类合同和 native FFI policy 测试继续承担该分支的自动证据。
+secure 组只使用 host 的 `NSSecureTextField` 和固定 case。若状态显示 Secure Event Input 已启用，但系统未向第三方输入法路由，只记录“系统 secure 路由旁路，controller secure 分支未由本组实机执行”，并附 source 与 userdb 零增量；不得写成 `policy_blocked` 实机通过，也不得注入按键、强制 source 或调用 secure API。自动证据由分类合同和 native FFI policy 测试承担。
+
+## 停止后的同产物补验
+
+同一签名产物若已完成排序、重启、删除/恢复和隐私组，仅因 context host 人工交接污染而停止，可保留污染前逐步冻结的证据；污染后状态不得继续使用。只补 unknown/P0/secure 还必须满足：
+
+- 上一轮已完成隐私恢复、授权 A 普通清理、授权 B 精确 userdb 删除和全部基线复验；
+- 产品源码无变化，Apple Development 五项哈希、Team ID、签名和固定输入逐项一致；
+- 重新取得原子基线与 receipts；全新 userdb 先做一次 TextEdit 固定选择，确认 active/ranker/selection 和 frequency 均为 `1`；
+- 后续每个 host 都按本 runbook 的人工交接规则闭合，并在进入下一 host 前确认全库聚合零增量。
+
+产品输入、签名、五项哈希、前序证据或清理状态任一不满足时，不得使用补验路径，必须重新执行完整 R01B 序列。
 
 ## 停止线与记录边界
 

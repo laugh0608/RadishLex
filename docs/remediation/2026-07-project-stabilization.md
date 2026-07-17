@@ -239,7 +239,7 @@ R01B 不以 manager 接入作为退出项；后续 M2 manager 进入本地个人
 - P0 与隐私模式输入不产生 selection、weight 或 user term。
 - 删除与显式恢复在真实输入链中遵守 R02L 语义。
 
-### 当前完成证据（更新至 2026-07-16）
+### 当前完成证据（更新至 2026-07-17）
 
 - 新增 `ime-runtime` 产品层，统一持有 engine session、每 session 独立 userdb 连接、ranker、粗粒度学习上下文和 display 到 engine index 映射；候选页排序信号在单一 SQLite 读事务中批量取得，不把连接或排序逻辑下沉到平台壳。
 - secure text entry、敏感应用和未知应用采取 engine-only 策略，不读取或写入 userdb；显式隐私模式只读取已有 P2/P1 摘要用于本地排序，不记录 selection。上下文只允许固定粗粒度类别，平台 bundle id 不跨 FFI、不进入事件或日志。生产 `LearningContext` 已从 controller 抽取；分类 contract 直接编译该生产源码并覆盖 unknown/P0 host 的固定 Bundle ID，验证宿主本体只构建不启动，也不读取、记录或持久化输入内容。
@@ -249,13 +249,14 @@ R01B 不以 manager 接入作为退出项；后续 M2 manager 进入本地个人
 - macOS 状态入口已只读报告 bundle、固定路径祖先安全性、父目录 kind/mode、Rime、userdb、已知 sidecar 和四态进程身份；悬空 symlink 不再误报 absent，进程查询错误不再伪装为 stopped，同名非产品进程不会被终止。动态 contract 隔离 `HOME`/工作目录，并以参数级命令 stub、双槽 TIS/进程状态固定被测脚本行为，覆盖空/非空/不安全父目录、删除目标 symlink 祖先及终止后的祖先替换、Rime/userdb/sidecar 独立状态、source 拒绝、TIS 清理前后迁移、清理后残留失败和进程负例；普通清理只对固定 bundle executable 的进程先停、复核祖先后再删 bundle/Rime，且仅在第二次 TIS 归零后成功，同时保留父目录、主库、WAL、SHM、rollback journal 与无关条目。
 - 仓库已增加固定 CurrentUser/AnyHost CFPreferences domain/key 的隐私 receipt、精确进程 stop 和 R01B 测试 userdb receipt 清理入口。隐私 state dir 固定为当前用户 `0700`，排他 `0600` receipt 绑定路径与文件身份，先同步 baseline 文件、state dir 及首次创建时的父目录，再修改设置；它区分 key absent 与显式 false。测试数据 receipt 绑定安装前空父目录身份，只允许删除本轮 `userdb.sqlite3`、`-wal`、`-shm`、`-journal` 并把父目录恢复为 `0755`，不删除父目录。归属、权限、条目、打开文件、设置恢复或 receipt 不满足时失败关闭。
 - 固定合成 case `r01b-shi-time-v1` 使用 `pinyin_simp` / `shi` / `时` / reading absent / `editor`。隔离初始页为 `是、时、事、使、市`，目标 display/engine index 为 `1/1`；一次真实选择后，fresh isolated non-selection snapshot 可得到 `0/1`。CLI 精确 `case-status` DTO 与聚合增减量共同验证目标 term/ranker/tombstone，删除和显式恢复再用 fresh isolated Rime user-data snapshot 取证；librime 自身 user data 会影响顺序，候选 UI 不能单独作为 RadishLex ranker 证据。
+- `build 34` 已在 clean HEAD `ee331a5` 使用固定 `librime 1.17.0` 和哈希一致输入完成 repository/ad-hoc native 重建与五项哈希比对；同一输入的 Apple Development 产物完成完整签名、安装副本一致性和真实 TextEdit 验收。真实选择、第二次选择、精确进程重启、delete 防复活、explicit restore 后重新学习及隐私模式零写入均按固定状态增量通过，详细哈希和流水见本周 devlog。
+- 首次 unknown host 补验没有形成有效零写入证据：候选显示为 librime 自身已学习后的顺序，本身不构成失败；但异常报告步骤未先闭合宿主 composition 和中立 source，随后全库聚合出现四次非固定 case 写入。执行者未读取 P1 原始行，按停止线跳过 P0/secure 并完成授权 A/B 全量回滚。当前 TIS、bundle、Rime、userdb、sidecar 和进程均无残留，隐私键与预存父目录权限已恢复。
 
 ### 剩余退出项
 
-- 提交 `f54763e` 的 `build 33` 曾在 clean HEAD 完成 ad-hoc 冻结；生产 `LearningContext`、验证宿主和验收/回滚工具随后变更，因此该冻结已经失效，只保留历史证据，五项旧哈希不得用于下一次实机。当前构建号为 `build 34`，代码与工具已提交为 `2464ce4`、`b917827`；提交前完整 repository/ad-hoc native 门禁和五项候选哈希通过，但尚未在 clean HEAD 重建复核和最终冻结。
-- 当前已确认 userdb/CLI 精准与集成测试、native-rime CLI、Rust format、不安装的 macOS contract/native 入口和完整 `./scripts/check-repo.sh` 通过；实际命令与五项候选哈希记入本周 devlog。尚未安装或启动本批输入法、使用 Apple Development identity、修改系统设置/隐私键、终止真实进程或打开、迁移、删除真实 userdb。
-- clean-HEAD 冻结完成后才申请授权 A，覆盖 Apple Development 重建/签名、复制前完整原子基线、用户级安装、系统设置、人工交互、真实 TextEdit 学习/重启、CLI delete/explicit restore、P0/unknown/secure 与隐私验收，以及保留 userdb/父目录的普通清理。secure field 若被 macOS 直接旁路第三方输入法，应记录“系统 secure 路由旁路，controller secure 分支未由本组实机执行”，不能误记为 `policy_blocked`。
-- 授权 A 完成普通清理、隐私键恢复、数据库关闭和数据归属证明后，再申请授权 B；授权 B 只删除 receipt 证明属于本轮的四个 SQLite 文件并把预存空父目录恢复为 `0755`，不得删除父目录。归属不清或设置未恢复时保留数据，R01B 继续进行中。详细步骤见 `docs/runbooks/macos-r01b-personalization-acceptance.md`。
+- 仍缺同一 `build 34` 的 unknown、固定 P0 与 secure 实机证据。补验前先固化人工交接规则：每组必须在目标宿主内提交或取消 composition、切回中立 source，再返回 Codex；候选异常不能省略这一步。
+- 若产品源码、五项 Apple Development 哈希、Team ID 和签名均与本轮冻结产物一致，可在全量清理后的新授权窗口使用全新 userdb，先做一次固定 TextEdit 学习种子，再只补 unknown/P0/secure；任一身份漂移则重新执行完整序列。engine-only host 的 UI 顺序按当时 librime 顺序记录，不预设 target display index，只以全库聚合零增量判定。
+- secure field 若被 macOS 直接旁路第三方输入法，应记录“系统 secure 路由旁路，controller secure 分支未由本组实机执行”，不能误记为 `policy_blocked`。补验结束仍须完成授权 A 普通清理与独立授权 B userdb 删除；详细步骤见 `docs/runbooks/macos-r01b-personalization-acceptance.md`。
 
 ## 十一、R06A：首批质量门禁与 review-only 资产清理
 
