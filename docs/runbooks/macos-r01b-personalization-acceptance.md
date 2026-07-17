@@ -2,7 +2,17 @@
 
 本文档用于在冻结的 macOS 开发 bundle 上复验 R01B 学习、重启、删除/恢复和隐私阻断。R01A 基础输入、发布、迁移、同步与日常卸载不在本文；通用步骤见 [开发 runbook](macos-inputmethodkit-development.md)，稳定边界见 [InputMethodKit](../macos-inputmethodkit-boundary.md)。
 
-## 退出结论
+## 关闭记录（2026-07-17）
+
+R01B 已使用同一 Apple Development `build 34` 完成退出。本轮完整序列取得 TextEdit 真实选择重排、第二次选择、精确进程重启、delete 防复活、explicit restore 后重新学习和隐私模式零写入证据；同产物补验再以全新 userdb 建立一次固定 TextEdit 学习种子，active/ranker/selection/frequency 均为 `1`。
+
+unknown 与固定 P0 host 中 `时` 均为第 `1` 候选，两组前后全库聚合零增量。secure field 显示 Secure Event Input 已启用，macOS 期间不允许切换到 RadishLex 或系统拼音，解除 secure 聚焦后恢复系统拼音；来源监视未记录 secure 期间 RadishLex source，数据库全量零增量。该项按既定边界归档为“macOS secure 路由旁路，controller secure 分支未由本组实机执行”，不记为 `policy_blocked` 实机通过。
+
+授权 A 普通清理与独立授权 B 均已完成。最终只读复验为 TIS `matches=0 enabled=0 selected=0`、bundle/Rime/userdb/sidecar/两个 receipts absent、进程 stopped、隐私键 absent、父目录 empty/`0755`，且无 R01B `/private/tmp` 快照目录。全程未读取 P1 原始行或数据库正文。详细产物身份、增减量和人工交接历史见 [本周 devlog](../devlogs/2026-W29.md)。
+
+本 runbook 继续保留为回归验收与授权边界，不表示 R01B 仍在进行。
+
+## 可复验退出标准
 
 R01B 只有同时取得以下证据才可退出：
 

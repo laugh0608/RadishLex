@@ -1,16 +1,16 @@
-# RadishLex 项目稳定化整改专题（2026-07）
+# RadishLex 项目稳定化整改专题归档（2026-07）
 
-本文档是 2026 年 7 月全仓审计后的临时执行专题，读者是当前整改实现者和审阅者。它只记录整改范围、批次顺序、停止线、资产处置和退出条件；不替代路线图、稳定架构、协议、隐私边界、runbook 或 devlog。
+本文档归档 2026 年 7 月全仓审计后的临时整改范围、批次顺序、停止线、资产处置和退出证据，读者是需要追溯该批次决策与证据链的维护者和审阅者。它不再承担当前状态或下一步真相源，也不替代路线图、稳定架构、协议、隐私边界、runbook 或 devlog。
 
 ## 文档状态
 
-- 状态：生效，范围已于 2026-07-11 收窄
+- 状态：已于 2026-07-17 关闭并归档
 - 审计基线：`dev` 分支，提交 `089c174`
-- 已完成：R00 文档真相源与停止线收敛、R01A 输入契约与 macOS 基础输入、R02L 本地 userdb/ranker 正确性、R06A 首批质量门禁与 review-only 资产清理
-- 当前主批次：R01B 真实学习纵向闭环
+- 已完成：R00 文档真相源与停止线收敛、R01A 输入契约与 macOS 基础输入、R02L 本地 userdb/ranker 正确性、R01B 真实学习纵向闭环、R06A 首批质量门禁与 review-only 资产清理
+- 当前主批次：无；后续按路线图进入 M2 manager 本地产品模式
 - 并行质量批次：无；R06A 已退出
 - 真实用户同步：保持关闭
-- 关闭方式：R01A、R02L、R01B 与 R06A 全部退出后，将稳定结论写回正式文档，再把本文移入 `docs/archive/` 并从当前状态入口移除
+- 关闭结果：稳定结论已写回当前状态、macOS/FFI/engine/manager 边界与协作入口；本文已移入 `docs/archive/` 并退出默认阅读链
 
 ## 一、整改结论
 
@@ -69,7 +69,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 
 - `ime-ffi` 丢弃 `KeyOutcome` 的 `consumed` 与即时 `commit`。（已由 R01A 第一代码批关闭）
 - 仓库缺少供 Swift / Objective-C 消费并受测试约束的 C header 或等价模块边界。（已由 R01A 第一代码批关闭）
-- 输入 session 未组合 engine、ranker、userdb 和 privacy policy。（R01B 自动化代码批已关闭，待真实应用证据）
+- 输入 session 未组合 engine、ranker、userdb 和 privacy policy。（已由 R01B 自动化与实机退出证据关闭）
 - librime 全局 setup/initialize/finalize 仍由单个 engine session 隐式承担。（已由 R01A 第二代码批关闭）
 - userdb 用户意图缺少统一事务，未配置 WAL、busy timeout 和明确并发策略。（已由 R02L 关闭）
 - userdb 将毫秒时间戳写入 `recency_score`，ranker 又将其裁剪为 `0..1`；frequency 无界线性增长。（已由 R02L 关闭）
@@ -85,7 +85,7 @@ RadishLex 的本地优先、隐私可信、可解释学习、可删除同步、e
 | R00 | 文档真相源与停止线收敛 | 已完成；旧专题文案随 R01A 清理 | 当前入口、长期路线和停止线基本一致 |
 | R01A | 输入契约、进程级 runtime 与 macOS 基础输入 | 已完成；build 32 关闭五项页、全屏/菜单、双 client、进程重启、离线与零残留矩阵；VoiceOver 和副屏为明确未声明范围 | 真实应用可离线完成基础中文输入 |
 | R02L | 本地 userdb/ranker 正确性 | 已完成；退出时未接入真实平台，其语义基础已由后续 R01B 自动化代码批接入产品输入链 | 学习、删除、并发、迁移和排序语义正确 |
-| R01B | 真实学习纵向闭环 | 进行中；依赖 R01A 与 R02L 已满足 | 真实选择影响后续候选且受隐私策略约束 |
+| R01B | 真实学习纵向闭环 | 已完成；build 34 完成真实学习、隐私/unknown/P0/secure 与零残留证据 | 真实选择影响后续候选且受隐私策略约束 |
 | R06A | 首批质量门禁与 review-only 资产清理 | 已完成 | Clippy/Flutter/Go race 入门禁，审批模型退出生产源码 |
 
 每次只能有一个产品主批次进行；R06A 是并行质量工作流，不得抢占真实输入目标。
@@ -251,12 +251,15 @@ R01B 不以 manager 接入作为退出项；后续 M2 manager 进入本地个人
 - 固定合成 case `r01b-shi-time-v1` 使用 `pinyin_simp` / `shi` / `时` / reading absent / `editor`。隔离初始页为 `是、时、事、使、市`，目标 display/engine index 为 `1/1`；一次真实选择后，fresh isolated non-selection snapshot 可得到 `0/1`。CLI 精确 `case-status` DTO 与聚合增减量共同验证目标 term/ranker/tombstone，删除和显式恢复再用 fresh isolated Rime user-data snapshot 取证；librime 自身 user data 会影响顺序，候选 UI 不能单独作为 RadishLex ranker 证据。
 - `build 34` 已在 clean HEAD `ee331a5` 使用固定 `librime 1.17.0` 和哈希一致输入完成 repository/ad-hoc native 重建与五项哈希比对；同一输入的 Apple Development 产物完成完整签名、安装副本一致性和真实 TextEdit 验收。真实选择、第二次选择、精确进程重启、delete 防复活、explicit restore 后重新学习及隐私模式零写入均按固定状态增量通过，详细哈希和流水见本周 devlog。
 - 首次 unknown host 补验没有形成有效零写入证据：候选显示为 librime 自身已学习后的顺序，本身不构成失败；但异常报告步骤未先闭合宿主 composition 和中立 source，随后全库聚合出现四次非固定 case 写入。执行者未读取 P1 原始行，按停止线跳过 P0/secure 并完成授权 A/B 全量回滚。当前 TIS、bundle、Rime、userdb、sidecar 和进程均无残留，隐私键与预存父目录权限已恢复。
+- 同一签名产物随后按补验边界重新取得原子基线，以全新 userdb 在 TextEdit 建立一次固定学习种子，active/ranker/selection/frequency 均为 `1`。unknown 与固定 P0 host 中 `时` 均为第 `1` 候选，两组全库聚合零增量。
+- secure field 显示 Secure Event Input 已启用，macOS 期间不允许切换到 RadishLex 或系统拼音，解除 secure 聚焦后恢复系统拼音；来源监视未记录 secure 期间 RadishLex source，数据库全量零增量。结论固定为“macOS secure 路由旁路，controller secure 分支未由本组实机执行”，不记为 `policy_blocked` 实机通过；controller 分支由生产分类 contract 与 native FFI policy 测试约束。
+- 授权 A 普通清理与独立授权 B 均已完成。最终复验为 TIS `matches=0 enabled=0 selected=0`、bundle/Rime/userdb/sidecar/两个 receipts absent、进程 stopped、隐私键 absent、父目录 empty/`0755`，且无 R01B `/private/tmp` 快照目录；未读取 P1 原始行或数据库正文。
 
-### 剩余退出项
+### 退出判断
 
-- 仍缺同一 `build 34` 的 unknown、固定 P0 与 secure 实机证据。补验前先固化人工交接规则：每组必须在目标宿主内提交或取消 composition、切回中立 source，再返回 Codex；候选异常不能省略这一步。
-- 若产品源码、五项 Apple Development 哈希、Team ID 和签名均与本轮冻结产物一致，可在全量清理后的新授权窗口使用全新 userdb，先做一次固定 TextEdit 学习种子，再只补 unknown/P0/secure；任一身份漂移则重新执行完整序列。engine-only host 的 UI 顺序按当时 librime 顺序记录，不预设 target display index，只以全库聚合零增量判定。
-- secure field 若被 macOS 直接旁路第三方输入法，应记录“系统 secure 路由旁路，controller secure 分支未由本组实机执行”，不能误记为 `policy_blocked`。补验结束仍须完成授权 A 普通清理与独立授权 B userdb 删除；详细步骤见 `docs/runbooks/macos-r01b-personalization-acceptance.md`。
+- R01B 的自动化、真实选择、重启、删除/恢复、隐私、unknown、P0、secure 实际系统路由和清理条件全部满足，于 2026-07-17 完成退出。
+- secure 的实机结论只证明 macOS 系统路由旁路和 userdb 零增量，不扩张为 controller `policy_blocked` 实机通过；该边界已写回稳定 macOS 文档与 R01B runbook。
+- manager 产品模式不属于 R01B 退出项，后续作为 M2 当前主批次推进；真实用户同步、第二平台和 M4 发布打包继续保持停止。
 
 ## 十一、R06A：首批质量门禁与 review-only 资产清理
 
@@ -336,3 +339,5 @@ MSRV、最终 native bundle presence、依赖安全和许可证扫描属于 M4 �
 - 当前状态、路线图、技术方案、协作入口与实现一致。
 
 关闭本专题不代表 M3 加密同步 Beta 或 M4 产品发布候选已经完成。真实用户同步继续保持关闭，直到 M3 全部退出标准满足。
+
+2026-07-17 复核确认以上条件全部满足：R01A、R02L、R01B 与 R06A 均已退出，稳定结论已写回正式文档，当前主线进入 M2 manager 本地产品模式。本专题自此只作历史归档，不再承担当前状态或下一步真相源。

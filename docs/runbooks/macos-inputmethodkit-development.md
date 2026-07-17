@@ -166,9 +166,9 @@ R01A 退出验收固定使用短时用户级安装：产物为 `target/macos-imk
 
 InputMethodKit 候选条属于输入法进程的独立浮层。只截取宿主应用窗口的自动化工具可能看不到候选条，即使 marked text 和候选实际可见；候选布局应使用只含合成词的人工全屏观察确认，不能仅凭 app-scoped 截图判定“未显示”。
 
-## R01B 本地个人化验收
+## 已关闭的 R01B 本地个人化回归验收
 
-R01B 不重做已退出的完整 R01A 平台矩阵。固定 `r01b-shi-time-v1` case、build 34 身份、非选择 snapshot、TextEdit/重启/delete/restore 增减量、privacy/unknown/P0/secure 证据口径和授权 B 精确清理全部维护在 [R01B 验收 runbook](macos-r01b-personalization-acceptance.md)。该文档是本批动作真相源；本节不复制会漂移的 case 细节。
+R01B 已于 2026-07-17 关闭，不重做已退出的完整 R01A 平台矩阵。固定 `r01b-shi-time-v1` case、build 34 身份、非选择 snapshot、TextEdit/重启/delete/restore 增减量、privacy/unknown/P0/secure 证据口径和授权 B 精确清理全部维护在 [R01B 验收 runbook](macos-r01b-personalization-acceptance.md)。该文档继续作为关闭证据和后续回归动作真相源；本节不复制会漂移的 case 细节。
 
 ## 回滚
 
@@ -198,7 +198,7 @@ R01A/R01B 每轮真实 smoke 无论通过还是失败都必须完整回滚，不
 4. 完整重启 System Settings；macOS 26 已多次观察到配置项短暂回流。若 RadishLex 再次出现，必须再次真实移除并重新启动设置，直到摘要和现有列表只含原系统 source；门禁在不可选择 parent 仍为 `enabled=1` 时必须拒绝删除。关闭窗口或快捷键动作不等于设置扩展已经退出：需要通过应用菜单“退出系统设置”，并在重新打开前确认 `System Settings` 与 `KeyboardSettings.appex` 均已结束，否则“添加”目录可能继续持有旧缓存。
 5. 删除 bundle 后若 TIS 暂留 `matches>0 enabled=0 selected=0`，打开现有列表和“添加 -> 简体中文”目录触发公开扫描，确认两处均无 RadishLex 后关闭窗口并重新运行清理入口。
 6. 只有 TIS 达到 `matches=0 enabled=0 selected=0`、用户级 bundle 与隔离运行数据不存在、精确进程停止、隐私键已恢复，且设置摘要、现有列表与可添加目录均无 RadishLex，才算平台输入源回滚完成。
-7. 步骤 1–6、隐私恢复、数据库关闭与 receipt 复核完成后，才申请授权 B，并只运行专用 `cleanup-macos-imk-r01b-test-userdb.sh --authorized-delete-r01b-test-userdb`。入口和拒绝边界见 R01B 专用 runbook；无法证明归属时始终保留 userdb 原位并维持 R01B 进行中。
+7. 步骤 1–6、隐私恢复、数据库关闭与 receipt 复核完成后，才申请授权 B，并只运行专用 `cleanup-macos-imk-r01b-test-userdb.sh --authorized-delete-r01b-test-userdb`。入口和拒绝边界见 R01B 专用 runbook；无法证明归属时始终保留 userdb 原位，且不得把本次回归验收标记为完成。
 8. 只清理本轮生成的隔离 user data 与短期 staging；不删除 shared data 来源、用户其他输入法目录或任何非本轮数据。
 
 仅调用 `TISDisableInputSource` 或移走 bundle 不会自动删除“所有输入法”中的用户配置项，也不能用 `com.apple.HIToolbox`、TIS 私有数据库或其他私有配置代替系统设置移除。平台输入源回滚证据必须同时满足设置列表、TIS、安装域和进程四项无残留；R01B 完整回滚还必须证明隐私键、测试数据路径与父目录 mode 回到安装前基线。短时缓存竞态只能通过公开刷新、等待与重复只读复核收敛。

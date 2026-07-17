@@ -299,8 +299,6 @@ ABI contract v4 在 v3 已闭合的 `consumed`、可选 commit、同事件 snaps
 
 进程级 runtime 已闭合 setup / initialize / explicit shutdown / finalize、多 session 共享、零 session 间隙、配置冲突和 deploy / session / schema 失败回滚；schema 创建与切换同时验证已部署列表和选择后回读。stub API 测试可精确复验调用次数，`ime-ffi` 另有需要隔离 Rime 数据目录的 gated 单/双 session 与无效 schema smoke。
 
-R01A build 32 已在真实 TextEdit/Codex 中完成基础输入、双 client、进程重启和离线证据。当前 adapter 不再有 M1 真实输入 smoke 缺口；R01B 仍须从产品个人化 session 补齐：
+R01A build 32 已在真实 TextEdit/Codex 中完成基础输入、双 client、进程重启和离线证据。R01B build 34 又从产品个人化 session 完成真实选择重排、进程重启保持、删除/恢复、隐私/unknown/P0 零写入，以及 secure 场景的 macOS 系统路由旁路与数据库零增量证据。当前 adapter 不再有 M1/R01B 真实输入 smoke 缺口。
 
-- 真实选择影响后续候选、输入法进程重启后保持，以及 secure/P0/隐私场景不写入的实机证据。
-
-该证据属于 M2 本地个人化纵向链，不应被同步后端、manager 同步 UI 或第二平台工作延后。最终发布包中的 `librime` 与 schema 分发属于 M4。
+M2 当前工作转向 manager 本地产品模式，不改变 adapter 真相源；最终发布包中的 `librime` 与 schema 分发仍属于 M4。

@@ -82,11 +82,11 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v4 隐私/索引/学习状态、精确 case inspection 与隔离非选择 snapshot | R01B 真实应用学习、重启持久化和隐私阻断证据 |
-| 本地学习 | schema v3 userdb、事务化用户意图、确定性 ranker、固定合成评测、产品热路径接入与精确目标状态 DTO | R01B 实机退出；随后按 M2 推进 manager 本地产品管理能力 |
+| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v4 隐私/索引/学习状态、精确 case inspection、隔离非选择 snapshot 与 R01B 实机退出证据 | M2 manager 正常产品运行态 |
+| 本地学习 | schema v3 userdb、事务化用户意图、确定性 ranker、固定合成评测、产品热路径接入、精确目标状态 DTO 与真实应用学习闭环 | M2 manager 共享 userdb、双连接并发和本地产品 smoke |
 | 同步 | crypto/sync 模型、Go server、HTTP 集成测试 | 确定合并、完整设备生命周期、生产 HTTPS 编排 |
 | Flutter manager | macOS 工程、真实开发期 FFI bridge、widget tests | 默认产品 FFI bundle、持久化和平台文件访问 |
-| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、已完成的 R01A build 32 实机矩阵、生产 LearningContext、R01B privacy/清理 contract 与隔离 ValidationHost；Android Keystore 能力验证桥 | build 34 clean-HEAD 冻结与 R01B 本地个人化实机退出、产品安装包；其他系统输入法 |
+| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、R01A build 32 与 R01B build 34 实机退出、生产 LearningContext、privacy/清理 contract 与隔离 ValidationHost；Android Keystore 能力验证桥 | M4 产品安装包；其他系统输入法 |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
 
@@ -244,9 +244,9 @@ apps/radishlex-manager/
 
 ## 平台目录
 
-当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build、不安装系统输入法的 wrapper contract、公开 TIS 只读状态/监视工具、生产 `LearningContext`、privacy CFPreferences receipt、精确进程 stop、R01B 测试 userdb receipt 清理入口，以及合成 reference probe 和 unknown/P0 `ValidationHost`。分类 contract 直接编译 controller 使用的生产源码，并以两个 host 的固定 Bundle ID 覆盖 unknown/P0；host 本体只构建不启动，也不读取或保存输入框内容。正式薄壳已在 Apple Development build 32 完成 R01A；R01B 已接入 Rust 个人化 runtime、固定 userdb、privacy policy 和 display/engine index 映射。曾冻结的 build 33 因生产分类和验收工具变更而成为历史；build 34 的 repository-only 代码与工具已提交，尚未在 clean HEAD 最终冻结，也没有安装、修改系统设置或触碰真实 userdb。
+当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build、不安装系统输入法的 wrapper contract、公开 TIS 只读状态/监视工具、生产 `LearningContext`、privacy CFPreferences receipt、精确进程 stop、R01B 测试 userdb receipt 清理入口，以及合成 reference probe 和 unknown/P0 `ValidationHost`。分类 contract 直接编译 controller 使用的生产源码，并以两个 host 的固定 Bundle ID 覆盖 unknown/P0；host 本体只构建不启动，也不读取或保存输入框内容。正式薄壳已在 Apple Development build 32 完成 R01A；R01B 以同一 Apple Development build 34 完成真实重排、重启、删除/恢复、隐私/unknown/P0/secure 系统路由与零残留退出。曾冻结的 build 33 只保留历史意义。
 
-R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-acceptance.md) 的授权 A/B：授权 A 才允许签名、安装、系统设置、人工交互和保留 userdb 的普通清理；授权 B 只在 receipt 归属、设置恢复和数据库关闭条件满足后删除本轮四个固定 SQLite 文件并把预存空父目录恢复为 `0755`，不得删除父目录。副屏和 VoiceOver 仍按平台边界文档的已知限制处理，自动 contract 不能替代对应实机证据。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
+R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-acceptance.md) 的授权 A/B：授权 A 才允许签名、安装、系统设置、人工交互和保留 userdb 的普通清理；授权 B 只在 receipt 归属、设置恢复和数据库关闭条件满足后删除本轮四个固定 SQLite 文件并把预存空父目录恢复为 `0755`，不得删除父目录。该 runbook 现在作为关闭证据与回归边界保留。副屏和 VoiceOver 仍按平台边界文档的已知限制处理，自动 contract 不能替代对应实机证据。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
 
 后续平台目录按进入顺序创建：
 
@@ -260,7 +260,8 @@ R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-
 ## 文档目录
 
 - `docs/status/current.md`：唯一当前阶段短入口。
-- `docs/remediation/`：当前状态明确引用的临时执行专题，完成后归档。
+- `docs/remediation/`：仅在当前状态明确引用活动临时专题时使用；当前无活动专题。
+- `docs/archive/`：已关闭且退出默认阅读链的历史专题与 review-only 材料。
 - `docs/adr/`：已决策且需要长期追溯的架构选择。
 - `docs/runbooks/`：可重复操作步骤、环境前提和停止线。
 - `docs/devlogs/`：周内事实、命令、提交和历史流水。

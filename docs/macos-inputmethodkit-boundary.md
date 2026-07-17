@@ -150,6 +150,8 @@ R01B 使用两个相互独立的授权边界。授权 A 覆盖 Apple Development
 
 R01B 固定合成 case 为 `r01b-shi-time-v1`：`pinyin_simp` / `shi` / `时` / reading absent / `editor`；隔离初始页为 `是、时、事、使、市`，目标 display/engine index 为 `1/1`。一次真实选择后，fresh isolated non-selection snapshot 可得到 `0/1`。删除与显式恢复必须同时使用精确 `case-status` DTO 的目标 term/ranker/tombstone、聚合增减量和 fresh isolated Rime user-data snapshot 取证；librime 自身 user data 也会影响顺序，不能只凭候选 UI 宣称 RadishLex ranker 生效。
 
+2026-07-17，R01B 使用同一 Apple Development `build 34` 完成退出：完整序列覆盖真实选择重排、第二次选择、精确进程重启、delete 防复活、explicit restore 后重新学习和隐私模式零写入；同产物补验以全新 userdb 建立一次固定 TextEdit 学习种子后，unknown 与固定 P0 host 均保持全库聚合零增量。secure field 启用 Secure Event Input 时由 macOS 旁路第三方输入法，来源监视未记录 RadishLex，数据库零增量；该证据只记为“macOS secure 路由旁路，controller secure 分支未由本组实机执行”，controller 分支继续由生产分类 contract 与 native FFI policy 测试约束。授权 A/B 后最终基线为 TIS zero、bundle/Rime/userdb/sidecar/receipts absent、进程 stopped、隐私键 absent、父目录 empty/`0755`。
+
 ## Native 依赖与目录
 
 M1 开发版必须明确并隔离：
@@ -187,7 +189,7 @@ TIS input source/mode id 与 bundle 文件名属于平台稳定身份，不等�
 
 新增、启用或移除系统输入法会修改本机状态，必须在独立 runbook 中说明影响、路径、回滚和合成 smoke 数据要求，并在执行前获得对应授权。自动测试默认只构建 bundle、验证宿主和 contract，不自动安装、启动 GUI host、启用或重启系统输入法服务。授权实机采用固定人机分工：执行者负责部署、系统设置添加、只读 TIS 监视和最终移除清理；开发者负责目标文稿聚焦、当前 source 手动切换及实体键盘、鼠标和辅助功能交互。自动化不得调用 `TISSelectInputSource` 或注入按键代替验收；菜单栏名称仅作辅助观察，来源归属以输入期间只读精确 source 记录为准。用户主动关闭的“自动切换到文稿的输入法”保持关闭，执行者不得修改。注销或重启登录会话必须由开发者另行安排，不能作为自动刷新步骤。
 
-当前开发实现位于 `platforms/macos-imk/`。`./scripts/check-macos-imk.sh` 构建 contract bundle 和 unknown/P0 ValidationHost，运行 wrapper、生产分类、AppKit panel、controller、CFPreferences receipt、精确 stop 与 R01B userdb receipt 清理 contract，但不启动 GUI host。`./scripts/check-macos-imk-native.sh` 必须由调用方显式提供 `RIME_INCLUDE_DIR`、`RIME_LIB_DIR`、隔离 shared data、schema id 和许可证文件，并检查 mode metadata、架构、递归 dependency closure、symbol、逐库许可证、完整 bundle 签名、数据哈希清单与 contract-only API 缺失。默认 ad-hoc 签名只服务无安装门禁；真实安装 smoke 还必须显式提供当前用户有效的 Apple Development identity。两条入口都不查找用户已有 Rime 目录，不执行安装、注册、bundle 启动或服务重启。通用安装与移除见 `docs/runbooks/macos-inputmethodkit-development.md`，R01B 固定 case、授权 A/B 和证据规则见 `docs/runbooks/macos-r01b-personalization-acceptance.md`。`build 33` 因生产分类与这些验证工具变更而只保留历史意义；当前 `build 34` repository-only/ad-hoc 候选必须在提交后的 clean HEAD 重新门禁和冻结，不能沿用旧哈希。
+当前开发实现位于 `platforms/macos-imk/`。`./scripts/check-macos-imk.sh` 构建 contract bundle 和 unknown/P0 ValidationHost，运行 wrapper、生产分类、AppKit panel、controller、CFPreferences receipt、精确 stop 与 R01B userdb receipt 清理 contract，但不启动 GUI host。`./scripts/check-macos-imk-native.sh` 必须由调用方显式提供 `RIME_INCLUDE_DIR`、`RIME_LIB_DIR`、隔离 shared data、schema id 和许可证文件，并检查 mode metadata、架构、递归 dependency closure、symbol、逐库许可证、完整 bundle 签名、数据哈希清单与 contract-only API 缺失。默认 ad-hoc 签名只服务无安装门禁；真实安装 smoke 还必须显式提供当前用户有效的 Apple Development identity。两条入口都不查找用户已有 Rime 目录，不执行安装、注册、bundle 启动或服务重启。通用安装与移除见 `docs/runbooks/macos-inputmethodkit-development.md`，R01B 固定 case、授权 A/B、关闭证据和回归规则见 `docs/runbooks/macos-r01b-personalization-acceptance.md`。`build 33` 因生产分类与验证工具变更只保留历史意义；同一 `build 34` 已完成 clean-HEAD 冻结、Apple Development 实机退出与最终零残留。
 
 `platforms/macos-imk/ReferenceProbe/` 是 R01A 的隔离诊断资产，不是第二套产品输入法。它只使用合成候选和独立身份，证明静态事件路由、metadata 与清理停止线；probe 的 TIS 枚举、安装或失败不能单独修改正式输入源身份、Rust/Rime 边界或 M1 退出结论。
 
