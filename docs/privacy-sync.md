@@ -160,7 +160,7 @@ Sync Master Key + object identity + key epoch
 
 当前设备签名 allowlist 为 `ed25519-v1` 与 `ecdsa-p256-sha256-v1`。后者只接受 65-byte SEC1 uncompressed public key 和 64-byte P1363 signature；两者复用既有 canonical builder，算法 id 本身被签名。设备登记必须绑定 algorithm、key id 与 public key，服务端不能按长度猜测算法，验签失败也不能尝试另一 profile。历史行回填 Ed25519 只能发生在明确 schema migration，新请求不得默认。
 
-`apple-keychain-p256-v1` 只表示 Apple 原生 P-256 `SecKey` 候选，和 Ed25519 `apple-keychain-v1` 分离。没有真实 gated smoke 前，它必须保持 production status 关闭；不可从“Apple Keychain”名称推断 Secure Enclave、hardware-backed、user presence 或可迁移能力。
+`apple-keychain-p256-v1` 只表示 Apple 原生 P-256 `SecKey` 候选，和 Ed25519 `apple-keychain-v1` 分离。基础生命周期 gated smoke 已通过，但产品进程访问、locked/denied 和 capability status 未闭环前仍保持 production status 关闭；不可从“Apple Keychain”名称或基础 smoke 推断 Secure Enclave、hardware-backed、user presence 或可迁移能力。
 
 ## 新设备授权
 

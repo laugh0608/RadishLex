@@ -10,7 +10,7 @@
 - `apple-keychain-v1` 已完成 feature-gated 接线和 ignored smoke 测试骨架；真实 Keychain smoke 已执行但未通过，不能视为平台验证通过。
 - 2026-06-30 smoke 在沙盒和提权真实环境均阻塞于 Ed25519 Keychain key 创建阶段，错误为 `UnsupportedSignatureAlgorithm { algorithm: "ed25519-v1" }`；测试未进入签名成功或用户可用同步路径。
 - `apple-keychain-v1` 的 `backend_status` 在平台策略未解决前必须阻断生产签名；普通 feature 测试只验证编译和状态门禁，不创建 Keychain item。
-- `apple-keychain-p256-v1` 的 repository spike 已覆盖 SecKey 参数、public key encoding、DER -> P1363、Rust/Go 验签、结构化错误映射和 gated smoke；真实 smoke 尚未执行，status 同样保持关闭。
+- `apple-keychain-p256-v1` 的 repository spike 已覆盖 SecKey 参数、public key encoding、DER -> P1363、Rust/Go 验签和结构化错误映射；命令行基础生命周期 gated smoke 已通过，产品进程访问、失败矩阵和 capability status 未闭环前继续保持关闭。
 - 当前策略保留 `ed25519-v1` 设备签名协议，不把 Ed25519 seed 作为 generic password / data item 存入 Keychain 后取回 Rust 签名，也不把该软件保护方案伪装成 `apple-keychain-v1`。
 - `apple-keychain-v1` 用于真实远端对象前必须通过本 runbook 的创建、加载、签名、删除 / 撤销、锁屏 / 权限、备份迁移和日志脱敏验证。
 - 未验证 Secure Enclave 前，不承诺 `hardware_backed = true`。
@@ -74,7 +74,7 @@ backend_status() -> DevicePrivateKeyStoreStatus
 
 ## 能力声明
 
-两个 Apple backend 在真实证据前都使用保守能力；P-256 profile 的声明为：
+两个 Apple backend 当前都使用保守能力；P-256 基础生命周期证据不会自动改变以下声明：
 
 ```text
 storage_backend = apple-keychain-p256-v1
@@ -241,9 +241,17 @@ RADISHLEX_RUN_APPLE_KEYCHAIN_P256_SMOKE=1 \
 
 正常 smoke 不证明 locked / denied。若要锁定 Keychain、改变 app 权限、sandbox/entitlement 或 user-presence policy，必须单独列出系统状态变化和恢复步骤并再次获得授权。
 
+## 2026-07-18 P-256 实机证据
+
+- 环境：arm64 macOS 26.5.2（25F84），仓库分支 `dev`，本轮基线提交 `c8457e9`。
+- 经开发者单独授权执行上述唯一 P-256 gated smoke；结果为 `1 passed`，内嵌 Go verifier `TestExternalP256SignatureSmoke` 同步通过。
+- 证据覆盖真实 Keychain key 创建、独立 store 重载同一 public key、非导出签名、Rust/Go 验签、删除后当前 store 撤销，以及 fresh store 返回 missing。测试使用合成标识，成功路径删除 item，失败路径 cleanup guard 保持启用。
+- 本轮未锁定 Keychain、修改权限、sandbox/entitlement、user-presence policy 或系统输入法设置，也未访问真实同步、userdb 或用户输入数据。
+- 该证据不证明 locked/denied 真实映射、产品 bundle 进程可访问、Secure Enclave、hardware-backed、user presence、backup migration 或 production-ready；这些能力继续独立门禁。
+
 ## 停止线
 
-- `apple-keychain-p256-v1` 未通过真实创建、加载、签名、Rust/Go 验签、删除和 cleanup 前，不用于真实远端对象上传。
+- `apple-keychain-p256-v1` 已通过基础生命周期 smoke，但 capability status、产品进程访问和受控失败矩阵完成前，不用于真实远端对象上传。
 - 如果需要导出私钥 bytes 才能完成签名，应停止并回退设计。
 - 如果 backend unavailable 时回退到 `test-memory-v1`，必须停止并回退实现。
 - 如果 Keychain label / account / 日志包含真实用户名、设备名称、本机路径或输入内容，必须停止并修正。

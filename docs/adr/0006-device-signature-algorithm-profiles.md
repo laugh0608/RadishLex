@@ -29,7 +29,7 @@ signature_len: 64
 
 `ecdsa-p256-sha256-v1` 是“ECDSA P-256 + SHA-256 + 固定编码”的完整协议标识，不允许用同一 id 表达 DER 签名、压缩点、SHA-384、prehash 输入或其他曲线。现有 `ed25519-v1` 继续保持 ADR 0003 已固定的 32-byte RFC 8032 public key 与 64-byte PureEd25519 signature。
 
-P-256 目前只是生产候选 profile。Rust/Go verifier、仓库内 Apple backend 和自动测试通过后，仍需 gated macOS 真实创建、重载、签名、删除与失败矩阵证据，才能评审 backend 的 production status；基础 smoke 成功也不自动证明 Secure Enclave、hardware-backed、user presence 或 backup migration。
+P-256 目前只是生产候选 profile。2026-07-18 已取得 gated macOS 真实创建、重载、签名、Rust/Go 验签和删除的基础生命周期证据；产品进程访问与失败矩阵完成后才能评审 backend 的 production status。基础 smoke 成功不自动证明 Secure Enclave、hardware-backed、user presence 或 backup migration。
 
 ## Public Key 编码
 

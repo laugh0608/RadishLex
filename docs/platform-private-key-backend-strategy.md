@@ -4,16 +4,16 @@
 
 ## 当前结论
 
-M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ecdsa-p256-sha256-v1` 作为与 `ed25519-v1` 共存的生产候选 profile；Rust/Go 验签、历史 metadata migration、共享跨语言 vectors 与独立 Apple backend 已在仓库内落地。当前证据仍不足以解除任何生产平台私钥 backend 的门禁：
+M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ecdsa-p256-sha256-v1` 作为与 `ed25519-v1` 共存的生产候选 profile；Rust/Go 验签、历史 metadata migration、共享跨语言 vectors 与独立 Apple backend 已在仓库内落地。Apple P-256 基础生命周期 gated smoke 已取得真实证据，但当前证据仍不足以解除生产门禁：
 
 - `test-memory-v1` 只用于测试和 fixture，不能进入生产同步。
 - `unavailable` 是默认失败 backend，不允许静默回退。
 - `apple-keychain-v1` 已接线并运行真实 smoke，但阻塞于 `UnsupportedSignatureAlgorithm { algorithm: "ed25519-v1" }`。
-- `apple-keychain-p256-v1` 已接线为 repository capability spike，普通 feature 测试已覆盖 DER/P1363、结构化错误映射和关闭态；真实 gated smoke 尚未获授权执行，因此仍不可用于生产。
+- `apple-keychain-p256-v1` 已接线为 repository capability spike；真实 gated smoke 已通过创建、重载、签名、Rust/Go 验签、删除/撤销与 fresh store missing，普通 feature 测试继续只覆盖 DER/P1363、结构化错误映射和关闭态。产品进程访问、locked/denied 与 capability status 尚未闭环，因此仍不可用于生产。
 - `android-keystore-v1` 已有 Kotlin / Gradle harness、JNI glue、gated smoke 和 provider diagnostics；Pixel 9 Pro API 35 AVD 与 Pixel 10 Pro API 37 AVD 均返回 `unsupported_signature_algorithm`。
 - `windows-cng-v1`、`linux-secret-service-v1` 仍只是能力边界标识，未进入实现。
 
-没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。M3 第一批当前只等待 Apple P-256 实机证据；协议和 repository spike 的存在不能自动改变 production status。发布级目标部署运行证据保留为正式发布前门禁，不作为本次平台 smoke 的前置阻塞。
+没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。M3 第一批已经取得 Apple P-256 命令行实机证据，当前转入 capability status、产品进程访问和受控失败矩阵评审；基础 smoke 通过不能自动改变 production status。发布级目标部署运行证据保留为正式发布前门禁。
 
 ## 策略目标
 
@@ -30,7 +30,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 | `test-memory-v1` | 测试可用，生产禁止 | Rust 单元测试、integration test 和签名对象 fixture 已覆盖 | 继续只用于测试，不进入 UI / 生产配置 |
 | `unavailable` | 默认明确失败 | Rust capability / status / error 测试已覆盖 | 继续作为能力缺失时的失败路径 |
 | `apple-keychain-v1` | 生产不可用 | feature-gated backend 编译通过，真实 smoke 在 Ed25519 创建阶段失败 | 单独补 Apple 原生非导出 Ed25519 支持矩阵，或另起 backend / 算法 ADR |
-| `apple-keychain-p256-v1` | 仓库实现完成，生产关闭 | P-256 profile、非导出 SecKey 参数、public key 导出、DER -> P1363、Rust/Go verifier、错误映射和 ignored gated smoke 已落地；未访问真实 Keychain | 经单独授权执行创建、重载、签名、跨语言验签、删除与 cleanup smoke，再评审 capability status |
+| `apple-keychain-p256-v1` | 基础实机 smoke 通过，生产关闭 | arm64 macOS 26.5.2（25F84）真实创建、跨 store 重载、签名、Rust/Go 验签、删除/撤销、fresh store missing 与 cleanup 通过 | 评审 capability status 和产品进程访问；另行授权验证 locked/denied，不推断硬件保护 |
 | `android-keystore-v1` | 生产不可用 | Android target build、Gradle harness、API 35 / API 37 AVD diagnostics 和 smoke 记录 | 有新 Android 真机 / OEM / system image 时先跑 diagnostics，再按结果决定 smoke |
 | `windows-cng-v1` | 未实现 | 仅有 ADR 0004 backend id | 进入 Windows 主线前补 CNG 签名能力 spike / runbook |
 | `linux-secret-service-v1` | 未实现 | 仅有 ADR 0004 backend id | 进入 Linux 同步主线前补 Secret Service / 软件保护能力边界 |
@@ -64,6 +64,8 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 
 硬件保护、user presence 和备份迁移能力需要单独证明。基础签名 smoke 通过不等于 `hardware_backed = true`，也不等于可以把同步开放给真实用户。
 
+截至 2026-07-18，`apple-keychain-p256-v1` 已满足创建、重载、签名、跨语言验签、删除/撤销和 cleanup 的基础生命周期条件；`backend_status()` 仍保持关闭，产品进程访问与 locked/denied 未取得真实证据。因此本次结果关闭的是 capability spike 的基础可行性问题，不是完整生产 backend 合格评审。
+
 ## 可选后续路径
 
 ### 路径 A：继续调查原生非导出 Ed25519
@@ -81,7 +83,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 
 ### 路径 B：新增签名算法 Profile
 
-当前状态：ADR 0006 与仓库实现已完成，正在等待 `apple-keychain-p256-v1` 真实 gated smoke；以下条目继续作为后续新增 profile 的通用进入条件。
+当前状态：ADR 0006、仓库实现与 `apple-keychain-p256-v1` 基础生命周期 gated smoke 已完成；production status、产品进程访问和 locked/denied 仍在门禁内。以下条目继续作为后续新增 profile 的通用进入条件。
 
 适用条件：
 

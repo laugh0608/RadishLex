@@ -279,7 +279,7 @@ object_payload(domain_id, object_id, version)
 
 - `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
 - 生产恢复 UI / API、远端密钥轮换执行器、备份快照 payload 字段序列化和用户可用同步设置。
-- 真实平台私钥存储 backend 的生产可用状态；独立 `apple-keychain-p256-v1` repository spike 与 gated smoke 已落地但尚未获授权访问真实 Keychain，status 保持关闭；`apple-keychain-v1` 仍阻塞于 Ed25519 创建，已测 Android AVD 也仍为 `unsupported_signature_algorithm`。
+- 真实平台私钥存储 backend 的生产可用状态；独立 `apple-keychain-p256-v1` 已通过命令行基础生命周期 gated smoke，但 capability status、产品进程访问和 locked/denied 仍未闭环，status 保持关闭；`apple-keychain-v1` 仍阻塞于 Ed25519 创建，已测 Android AVD 也仍为 `unsupported_signature_algorithm`。
 
 ## 验证口径
 
