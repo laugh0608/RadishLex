@@ -49,6 +49,8 @@ rg -Fq '$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)' \
 rg -Fq 'RADISHLEX_RUN_MANAGER_APPLE_KEYCHAIN_P256_SMOKE=1' "${apple_product_smoke}"
 rg -Fq 'RADISHLEX_RUN_MANAGER_APPLE_SECURE_ENCLAVE_P256_SMOKE=1' \
   "${secure_enclave_product_smoke}"
+rg -Fq 'locked_probe_delay_seconds=20' "${secure_enclave_product_smoke}"
+rg -Fq 'sleep "${locked_probe_delay_seconds}"' "${secure_enclave_product_smoke}"
 for authorization_argument in \
   --authorized-product-keychain-smoke \
   --authorized-product-keychain-denied-probe \

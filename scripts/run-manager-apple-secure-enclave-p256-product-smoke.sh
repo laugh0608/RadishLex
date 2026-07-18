@@ -17,6 +17,9 @@ if [ "$#" -ne 1 ]; then
   exit 2
 fi
 
+wait_for_device_lock=0
+locked_probe_delay_seconds=20
+
 case "$1" in
   --authorized-secure-enclave-product-smoke)
     product_argument="--radishlex-apple-secure-enclave-p256-product-smoke"
@@ -30,6 +33,7 @@ case "$1" in
     ;;
   --authorized-secure-enclave-locked-probe)
     product_argument="--radishlex-apple-secure-enclave-p256-locked-probe"
+    wait_for_device_lock=1
     ;;
   --authorized-secure-enclave-locked-cleanup)
     product_argument="--radishlex-apple-secure-enclave-p256-locked-cleanup"
@@ -64,6 +68,12 @@ for required_path in "${product_binary}" "${native_library}" "${go_server_dir}/g
     exit 1
   fi
 done
+
+if [ "${wait_for_device_lock}" -eq 1 ]; then
+  echo "The device-locked probe starts in ${locked_probe_delay_seconds} seconds." >&2
+  echo "During this delay, manually lock the screen without sleeping or closing the lid." >&2
+  sleep "${locked_probe_delay_seconds}"
+fi
 
 exec env \
   RADISHLEX_RUN_MANAGER_APPLE_SECURE_ENCLAVE_P256_SMOKE=1 \

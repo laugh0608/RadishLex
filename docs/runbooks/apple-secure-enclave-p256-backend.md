@@ -92,9 +92,11 @@ private/public key bytes、canonical bytes、signature bytes、CFError 文本和
 ```
 
 - denied：无合格 entitlement/host identity 或受限环境下创建必须失败关闭，不得留下 item。
-- locked：同一合格 identity 先创建固定合成 key；外部步骤锁定后只探测 sign/load；解锁后精确清理。仓库脚本不得自行锁定、解锁或改写 search list。
+- locked：同一合格 identity 先创建固定合成 key；probe 入口提供 20 秒倒计时，由开发者手动锁屏但不休眠或合盖，倒计时后只探测 sign/load；解锁后精确清理。仓库脚本不得自行锁屏、锁定/解锁 Keychain 或改写 search list。
 - unsupported：无 Secure Enclave 的设备、虚拟机或 CI 必须返回 backend unavailable/unsupported 固定分类，不回退普通 DPK。
 - user presence：本 backend 未启用 user-presence flag。若系统仍要求交互，记录结构化 blocker，不把它改写为 `user_presence_required=true`；先复核平台行为与 backend/version 决策。
+
+经典 `security lock-keychain` 只锁定登录 Keychain，不等价于 Data Protection Keychain / Secure Enclave 的设备锁定态。2026-07-18 实测该状态下签名仍成功，返回 `expected_failure_not_observed`；该结果不算 locked 失败关闭证据，也不算 backend 故障。后续不得再以登录 Keychain 锁定替代手动锁屏。
 
 ## 资格字段评审
 
