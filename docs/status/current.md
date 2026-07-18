@@ -37,7 +37,7 @@ ADR 0006 已接受 `ecdsa-p256-sha256-v1` 作为与 `ed25519-v1` 共存的生产
 - 缺少发布级目标部署运行证据，以及真实产品的同步 cursor/orchestration、设备恢复、撤销和 key epoch 全流程。
 - `ManagerBridge` 仍无真实同步、恢复码、设备加入、授权、撤销或轮换命令；现有 readiness 只证明关闭态。
 
-M3 当前主批已完成算法协议、跨语言 verifier/vector、普通 DPK 产品评审，以及 Secure Enclave repository/产品构建接线。下一证据是逐次授权的 qualification build 与 Secure Enclave 产品进程 smoke；不得复用普通 DPK 风险声明，也不得提前推进真实同步 orchestration。
+M3 当前主批已完成算法协议、跨语言 verifier/vector、普通 DPK 产品评审、Secure Enclave repository 接线与 qualification bundle 冻结。下一证据是独立授权的 Secure Enclave 产品进程 smoke；不得复用普通 DPK 风险声明，也不得提前推进真实同步 orchestration。
 
 ## 当前停止线
 
@@ -50,11 +50,10 @@ M3 当前主批已完成算法协议、跨语言 verifier/vector、普通 DPK �
 
 ## 下一步顺位
 
-1. 按独立授权冻结 provisioning-backed manager bundle，记录 identity、Team/application id、access group、profile、strict codesign 与产物 hash；构建本身不访问 Secure Enclave item。
-2. 再按独立授权运行 Secure Enclave 产品 lifecycle，覆盖创建、重载、签名、Rust/Go 验签、private external representation 失败、删除、missing、cleanup 与日志脱敏；按环境补 denied/locked/unsupported，不由脚本修改系统锁定状态。
-3. 逐字段评审 `runtime/product_qualified/hardware_backed/user_presence_required/backup_migratable`；只开放产品证据支持的字段，用户同步总 gate 继续关闭。
-4. 生产 backend 通过后才建立真实产品 sync orchestration；用户同步总 gate 不随 backend 资格自动开放。orchestration 需覆盖对象发现、hash/签名复验、解密、确定合并、本地 transaction、cursor、上传和 conflict retry，再接 `ManagerBridge`。
-5. 最后完成两个真实客户端、恢复/设备授权/撤销/key epoch 与发布级目标部署证据，满足后才评估开放用户同步。
+1. 按独立授权运行 Secure Enclave 产品 lifecycle，覆盖创建、重载、签名、Rust/Go 验签、private external representation 失败、删除、missing、cleanup 与日志脱敏；按环境补 denied/locked/unsupported，不由脚本修改系统锁定状态。
+2. 逐字段评审 `runtime/product_qualified/hardware_backed/user_presence_required/backup_migratable`；只开放产品证据支持的字段，用户同步总 gate 继续关闭。
+3. 生产 backend 通过后才建立真实产品 sync orchestration；用户同步总 gate 不随 backend 资格自动开放。orchestration 需覆盖对象发现、hash/签名复验、解密、确定合并、本地 transaction、cursor、上传和 conflict retry，再接 `ManagerBridge`。
+4. 最后完成两个真实客户端、恢复/设备授权/撤销/key epoch 与发布级目标部署证据，满足后才评估开放用户同步。
 
 ## 验证入口
 
