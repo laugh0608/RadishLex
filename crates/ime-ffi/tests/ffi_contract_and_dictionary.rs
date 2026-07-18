@@ -197,6 +197,7 @@ fn platform_binding_style_copies_views_before_releasing_handles() {
     }
     assert_eq!(term_input, "cihe");
     assert_eq!(term_text, "词核");
+    assert_eq!(term.import_batch_id_present, 0);
 
     {
         let mut db = UserDb::open(&db_path).expect("userdb opens");
@@ -232,6 +233,19 @@ fn platform_binding_style_copies_views_before_releasing_handles() {
 
     assert_eq!(batch_source, "binding-smoke");
     assert!(error_message_copy.contains("out of range"));
+
+    let terms = radishlex_userdb_terms_new(db_path_c.as_ptr(), &mut error);
+    assert!(!terms.is_null());
+    let mut imported_term = RadishLexUserTermView::empty();
+    assert_eq!(
+        unsafe { radishlex_userdb_terms_get(terms, 1, &mut imported_term, &mut error) },
+        RadishLexStatusCode::Ok
+    );
+    unsafe {
+        radishlex_userdb_terms_free(terms);
+    }
+    assert_eq!(imported_term.import_batch_id_present, 1);
+    assert_eq!(imported_term.import_batch_id, batch.id);
 
     let _ = fs::remove_file(db_path);
 }
@@ -463,7 +477,7 @@ fn userdb_learning_status_reports_read_only_counts() {
     );
     assert!(error.is_null());
 
-    assert_eq!(summary.schema_version, 3);
+    assert_eq!(summary.schema_version, 4);
     assert_eq!(summary.plaintext_payload, 0);
     assert_eq!(summary.p1_raw_details, 0);
     assert_eq!(summary.context_stats, 0);

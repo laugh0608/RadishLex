@@ -70,6 +70,12 @@ Future<void> main(List<String> args) async {
     'import batch imported terms',
   );
   _expect(
+    importedSnapshot.dictionaryTerms.every(
+      (term) => term.importBatchId == importedSnapshot.importBatches.single.id,
+    ),
+    'imported terms reference the recorded batch id',
+  );
+  _expect(
     importedSnapshot.explanations.first.signals.contains('user=2.500'),
     'rank explain user term boost',
   );
@@ -159,6 +165,13 @@ Future<void> main(List<String> args) async {
         'active',
     'restore returns active status',
   );
+  _expect(
+    restoredSnapshot.dictionaryTerms
+            .singleWhere((term) => term.inputCode == 'luobo')
+            .importBatchId ==
+        importedSnapshot.importBatches.single.id,
+    'restore preserves local import provenance',
+  );
 
   final restartedAfterRestore = await FfiManagerBridge(
     dbPath: dbPath,
@@ -167,7 +180,11 @@ Future<void> main(List<String> args) async {
   ).loadSnapshot();
   _expect(
     restartedAfterRestore.dictionaryTerms.length == 2 &&
-        restartedAfterRestore.deletedTerms.isEmpty,
+        restartedAfterRestore.deletedTerms.isEmpty &&
+        restartedAfterRestore.dictionaryTerms.every(
+          (term) =>
+              term.importBatchId == importedSnapshot.importBatches.single.id,
+        ),
     'explicit restore survives manager restart',
   );
 

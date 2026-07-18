@@ -535,6 +535,8 @@ void main() {
         updatedAtMs: 0,
         lastUsedAtMs: 0,
         lastUsedAtPresent: false,
+        importBatchId: 9,
+        importBatchIdPresent: true,
       ),
     );
     final learning = managerLearningSummaryFromNative(
@@ -620,6 +622,7 @@ void main() {
     expect(term.source, 'import');
     expect(term.status, 'suppressed');
     expect(term.lastUsed, '未使用');
+    expect(term.importBatchId, 9);
     expect(learning.lastUpdated, '无记录');
     expect(sync.state, SyncUiState.backendUnavailable);
     expect(managerSyncStateLabel(sync.state), '平台签名 backend 不可用');
@@ -691,6 +694,8 @@ final class _FakeNativeBinding implements RadishLexManagerNativeBinding {
         updatedAtMs: 1783123260000,
         lastUsedAtMs: 1783123260000,
         lastUsedAtPresent: true,
+        importBatchId: 7,
+        importBatchIdPresent: true,
       ),
     ];
   }

@@ -196,8 +196,12 @@ class _DictionaryViewState extends State<DictionaryView> {
     if (term == null) {
       return null;
     }
+    final importBatchId = term.importBatchId;
+    if (importBatchId == null) {
+      return null;
+    }
     for (final batch in batches) {
-      if (batch.sourceName == term.source) {
+      if (batch.id == importBatchId) {
         return batch;
       }
     }
@@ -235,7 +239,7 @@ class _DictionaryViewState extends State<DictionaryView> {
               term.reading.toLowerCase().contains(query) ||
               term.source.toLowerCase().contains(query);
           final matchesBatch =
-              selectedBatch == null || term.source == selectedBatch.sourceName;
+              selectedBatch == null || term.importBatchId == selectedBatch.id;
           return matchesQuery && matchesBatch;
         })
         .toList(growable: false);

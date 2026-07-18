@@ -21,6 +21,8 @@ final class NativeUserTermRecord {
     required this.updatedAtMs,
     required this.lastUsedAtMs,
     required this.lastUsedAtPresent,
+    required this.importBatchId,
+    required this.importBatchIdPresent,
   });
 
   final int id;
@@ -34,6 +36,8 @@ final class NativeUserTermRecord {
   final int updatedAtMs;
   final int lastUsedAtMs;
   final bool lastUsedAtPresent;
+  final int importBatchId;
+  final bool importBatchIdPresent;
 }
 
 final class NativeDeletedTermRecord {

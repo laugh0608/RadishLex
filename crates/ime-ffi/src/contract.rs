@@ -1,6 +1,6 @@
-/// ABI contract v4 adds personalized sessions, privacy context, index mapping,
-/// personalization status, and explicit learning outcomes.
-pub const RADISHLEX_ABI_CONTRACT_VERSION: u32 = 4;
+/// ABI contract v5 extends v4 with local import-batch provenance on user-term
+/// views while preserving the existing session, privacy, and learning contract.
+pub const RADISHLEX_ABI_CONTRACT_VERSION: u32 = 5;
 pub const RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD: u32 = 1;
 pub const RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND: u32 = 1;
 

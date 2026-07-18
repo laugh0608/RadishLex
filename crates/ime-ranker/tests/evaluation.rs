@@ -176,6 +176,7 @@ fn term(input_code: &str, text: &str, weight: f64) -> UserTerm {
         updated_at_ms: EVALUATED_AT_MS,
         last_used_at_ms: Some(EVALUATED_AT_MS),
         restored_at_ms: None,
+        import_batch_id: None,
     }
 }
 

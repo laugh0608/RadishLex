@@ -82,8 +82,8 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v4 隐私/索引/学习状态、deleted tombstone 管理查询、精确 case inspection、隔离非选择 snapshot 与 R01B 实机退出证据 | M2 manager/InputMethodKit 共库实机验收 |
-| 本地学习 | schema v3 userdb、事务化用户意图、确定性 ranker、固定合成评测、产品热路径接入、精确目标状态 DTO、并发 migration/WAL 双连接测试与真实应用学习闭环 | manager/InputMethodKit 共库重启与隐私实机证据 |
+| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v5 隐私/索引/学习状态与本地导入批次关联、deleted tombstone 管理查询、精确 case inspection、隔离非选择 snapshot 与 R01B 实机退出证据 | M2 manager/InputMethodKit 共库实机验收 |
+| 本地学习 | schema v4 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、固定合成评测、产品热路径接入、精确目标状态 DTO、并发 migration/WAL 双连接测试与真实应用学习闭环 | manager/InputMethodKit 共库重启与隐私实机证据 |
 | 同步 | crypto/sync 模型、Go server、HTTP 集成测试 | 确定合并、完整设备生命周期、生产 HTTPS 编排 |
 | Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 bridge、deleted restore、widget/FFI/产品门禁 | 正常 Release GUI 与输入法共库实机验收 |
 | 平台 | macOS InputMethodKit 薄壳、contract/native bundle、R01A build 32 与 R01B build 34 实机退出、生产 LearningContext、privacy/清理 contract 与隔离 ValidationHost；Android Keystore 能力验证桥 | M4 产品安装包；其他系统输入法 |

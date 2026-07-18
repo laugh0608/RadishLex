@@ -59,6 +59,12 @@ final class _RadishLexUserTermView extends ffi.Struct {
 
   @ffi.Uint8()
   external int lastUsedAtPresent;
+
+  @ffi.Int64()
+  external int importBatchId;
+
+  @ffi.Uint8()
+  external int importBatchIdPresent;
 }
 
 final class _RadishLexDeletedTermView extends ffi.Struct {

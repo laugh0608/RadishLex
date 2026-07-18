@@ -7,6 +7,7 @@ class UserTerm {
     required this.source,
     required this.lastUsed,
     this.status = 'active',
+    this.importBatchId,
   });
 
   final String inputCode;
@@ -16,6 +17,7 @@ class UserTerm {
   final String source;
   final String lastUsed;
   final String status;
+  final int? importBatchId;
 
   UserTermKey get key =>
       UserTermKey(inputCode: inputCode, text: text, reading: reading);

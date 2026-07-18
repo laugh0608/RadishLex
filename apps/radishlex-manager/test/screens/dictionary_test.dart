@@ -134,8 +134,9 @@ void main() {
             text: '边界清晰',
             reading: 'bian jie qing xi',
             weight: 0.71,
-            source: 'manager-import',
+            source: 'import',
             lastUsed: '2026-07-02 21:03',
+            importBatchId: 2,
           ),
         ],
       );

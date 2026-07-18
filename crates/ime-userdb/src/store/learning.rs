@@ -385,7 +385,7 @@ fn fetch_term_on(
     connection
         .query_row(
             "SELECT id, text, reading, input_code, source, weight, status, created_at_ms,
-                    updated_at_ms, last_used_at_ms, restored_at_ms
+                    updated_at_ms, last_used_at_ms, restored_at_ms, import_batch_id
              FROM user_terms
              WHERE input_code = ?1 AND text = ?2 AND reading = ?3",
             params![input_code, text, reading],

@@ -13,7 +13,7 @@ use radishlex_ime_ffi::{
 
 #[test]
 fn rust_input_abi_layout_matches_the_checked_header_contract() {
-    assert_eq!(RADISHLEX_ABI_CONTRACT_VERSION, 4);
+    assert_eq!(RADISHLEX_ABI_CONTRACT_VERSION, 5);
     assert_eq!(RADISHLEX_KEY_RESULT_VERSION, 2);
     assert_eq!(size_of::<RadishLexFfiContract>(), 3 * size_of::<u32>());
     assert_eq!(size_of::<RadishLexSessionOptions>(), 2 * size_of::<u32>());
@@ -102,7 +102,7 @@ fn compile_header(language: &str) {
 const HEADER_SMOKE_SOURCE: &str = r#"
 #include "radishlex_input.h"
 
-_Static_assert(RADISHLEX_ABI_CONTRACT_VERSION == 4u, "ABI version mismatch");
+_Static_assert(RADISHLEX_ABI_CONTRACT_VERSION == 5u, "ABI version mismatch");
 _Static_assert(RADISHLEX_KEY_RESULT_VERSION == 2u, "key result version mismatch");
 _Static_assert(sizeof(RadishLexFfiContract) == 3u * sizeof(uint32_t), "contract layout mismatch");
 _Static_assert(sizeof(RadishLexSessionOptions) == 2u * sizeof(uint32_t), "session options layout mismatch");

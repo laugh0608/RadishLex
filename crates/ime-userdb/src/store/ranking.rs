@@ -71,7 +71,7 @@ impl UserDb {
 
         let user_terms = {
             let mut statement = transaction.prepare(
-                "SELECT id, text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms, restored_at_ms
+                "SELECT id, text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms, restored_at_ms, import_batch_id
                  FROM user_terms
                  WHERE input_code = ?1
                  ORDER BY id",

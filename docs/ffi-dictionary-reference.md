@@ -15,7 +15,7 @@ RADISHLEX_SYNC_CLASS_P2_ENCRYPTED_SYNC = 2
 
 ## 本地词条与 deleted tombstone view
 
-`radishlex_userdb_terms_new/count/get/free` 返回 active / suppressed 用户词条。`RadishLexUserTermView.status` 使用 FFI 边界定义的 active/suppressed 数值常量；deleted 不混入该 list。
+`radishlex_userdb_terms_new/count/get/free` 返回 active / suppressed 用户词条。`RadishLexUserTermView.status` 使用 FFI 边界定义的 active/suppressed 数值常量；deleted 不混入该 list。ABI v5 在 view 末尾增加 `import_batch_id: i64` 与 `import_batch_id_present: u8`，用于关联最近一次实际写入该词条的本地导入批次。
 
 `radishlex_userdb_deleted_terms_new/count/get/free` 返回独立的只读 tombstone handle。`RadishLexDeletedTermView`：
 
@@ -33,7 +33,8 @@ reason: RadishLexStringView
 - input code、text、reading 与 reason view 都借用自 `RadishLexDeletedTermList*`，绑定层必须复制后再调用 `radishlex_userdb_deleted_terms_free`。
 - deleted list 只暴露 explicit restore 所需 identity、删除时间和非敏感 reason 分类，不暴露 P1 原始事件、上下文、SQL row ID 或 tombstone 内部版本。
 - `radishlex_userdb_restore_term` 仍是唯一恢复入口；普通导入、新增、学习或刷新不得自动恢复 deleted/suppressed 词条。
-- 新增 deleted list symbols 没有改变既有 ABI v4 结构布局；manager 产品绑定同时校验 ABI contract 与必需 symbol 集。
+- `import_batch_id` 只用于本地审计，不进入 P2 导出或同步 payload；未经过本地词库导入的词条必须返回 `import_batch_id_present = 0`。
+- user-term view 的结构布局已随该字段升级到 ABI v5；manager 产品绑定同时校验 ABI contract 与必需 symbol 集。
 
 ## Inspect 与 export
 
@@ -78,7 +79,7 @@ dry_run: u8
 
 - `radishlex_userdb_dictionary_import` 必须显式传入 SQLite 路径、输入文件路径、可选 source name 和 `dry_run` 的 `0 / 1` 值。
 - `dry_run = 1` 时复用实际导入分类逻辑，但不写入词条或 import batch。
-- `dry_run = 0` 时写入词条并记录 import batch；导入仍遵守 deleted tombstone，不复活用户已删除词条。
+- `dry_run = 0` 时先在事务内记录 import batch，再把实际插入或更新的词条关联到该 batch id；任一步失败都整体回滚。导入仍遵守 deleted tombstone，不复活用户已删除词条。
 
 ## Import batch view
 

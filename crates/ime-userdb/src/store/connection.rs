@@ -11,7 +11,7 @@ use crate::error::{UserDbError, UserDbResult};
 use super::identity::legacy_stable_hash_hex;
 use super::UserDb;
 
-pub(super) const SCHEMA_VERSION: i64 = 3;
+pub(super) const SCHEMA_VERSION: i64 = 4;
 pub(super) const BUSY_TIMEOUT: Duration = Duration::from_millis(5_000);
 pub(super) const MAX_LEARNING_COUNT: i64 = 1_000_000;
 
@@ -70,11 +70,12 @@ impl UserDb {
             return Ok(());
         }
         if version == 0 && !has_any_user_table(&transaction)? {
-            create_schema_v3(&transaction)?;
+            create_schema_v4(&transaction)?;
         } else {
             create_legacy_schema_if_missing(&transaction)?;
             ensure_import_batch_v2_columns(&transaction)?;
             ensure_user_term_restore_version(&transaction)?;
+            ensure_user_term_import_batch(&transaction)?;
             migrate_deleted_term_identity(&transaction)?;
             migrate_ranker_last_used_time(&transaction)?;
         }
@@ -114,6 +115,7 @@ impl UserDb {
                 "updated_at_ms",
                 "last_used_at_ms",
                 "restored_at_ms",
+                "import_batch_id",
             ],
         )?;
         require_columns(
@@ -241,12 +243,12 @@ fn preserved_userdb_error(path: &Path, stage: &'static str, source: UserDbError)
     }
 }
 
-fn create_schema_v3(transaction: &Transaction<'_>) -> UserDbResult<()> {
-    transaction.execute_batch(&schema_v3_sql())?;
+fn create_schema_v4(transaction: &Transaction<'_>) -> UserDbResult<()> {
+    transaction.execute_batch(&schema_v4_sql())?;
     Ok(())
 }
 
-fn schema_v3_sql() -> String {
+fn schema_v4_sql() -> String {
     format!(
         "
         CREATE TABLE user_terms (
@@ -260,7 +262,8 @@ fn schema_v3_sql() -> String {
             created_at_ms INTEGER NOT NULL,
             updated_at_ms INTEGER NOT NULL,
             last_used_at_ms INTEGER,
-            restored_at_ms INTEGER
+            restored_at_ms INTEGER,
+            import_batch_id INTEGER REFERENCES import_batches(id) ON DELETE SET NULL
         );
         CREATE UNIQUE INDEX idx_user_terms_identity
             ON user_terms(input_code, text, reading);
@@ -441,6 +444,16 @@ fn ensure_user_term_restore_version(transaction: &Transaction<'_>) -> UserDbResu
     if !table_columns(transaction, "user_terms")?.contains("restored_at_ms") {
         transaction.execute(
             "ALTER TABLE user_terms ADD COLUMN restored_at_ms INTEGER",
+            [],
+        )?;
+    }
+    Ok(())
+}
+
+fn ensure_user_term_import_batch(transaction: &Transaction<'_>) -> UserDbResult<()> {
+    if !table_columns(transaction, "user_terms")?.contains("import_batch_id") {
+        transaction.execute(
+            "ALTER TABLE user_terms ADD COLUMN import_batch_id INTEGER REFERENCES import_batches(id) ON DELETE SET NULL",
             [],
         )?;
     }

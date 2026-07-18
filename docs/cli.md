@@ -326,7 +326,7 @@ cargo run -p radishlex-ime-cli -- \
 
 ```text
 learning_status: ready
-schema_version: 3
+schema_version: 4
 plaintext_payload: false
 p1_raw_details: false
 context_stats: false

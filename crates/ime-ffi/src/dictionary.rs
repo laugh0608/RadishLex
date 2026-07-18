@@ -36,6 +36,8 @@ pub struct RadishLexUserTermView {
     pub updated_at_ms: i64,
     pub last_used_at_ms: i64,
     pub last_used_at_present: u8,
+    pub import_batch_id: i64,
+    pub import_batch_id_present: u8,
 }
 
 impl RadishLexUserTermView {
@@ -53,6 +55,8 @@ impl RadishLexUserTermView {
             updated_at_ms: 0,
             last_used_at_ms: 0,
             last_used_at_present: 0,
+            import_batch_id: 0,
+            import_batch_id_present: 0,
         }
     }
 }
@@ -196,6 +200,10 @@ impl RadishLexDeletedTermList {
 
     pub fn len(&self) -> usize {
         self.tombstones.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.tombstones.is_empty()
     }
 
     pub fn tombstone_view(&self, index: usize) -> Result<RadishLexDeletedTermView, FfiError> {
@@ -412,6 +420,8 @@ fn term_view(term: &UserTerm) -> RadishLexUserTermView {
         updated_at_ms: term.updated_at_ms,
         last_used_at_ms,
         last_used_at_present: u8::from(term.last_used_at_ms.is_some()),
+        import_batch_id: term.import_batch_id.unwrap_or_default(),
+        import_batch_id_present: u8::from(term.import_batch_id.is_some()),
     }
 }
 

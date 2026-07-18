@@ -89,6 +89,7 @@ class FixtureManagerBridge implements ManagerBridge {
         weight: 1,
         source: 'manual',
         lastUsed: candidate.lastUsed,
+        importBatchId: candidate.importBatchId,
       );
     }).toList();
 

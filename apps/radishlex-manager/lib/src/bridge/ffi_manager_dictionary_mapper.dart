@@ -12,6 +12,7 @@ UserTerm managerUserTermFromNative(NativeUserTermRecord term) {
         ? managerFormatTimestampMs(term.lastUsedAtMs)
         : '未使用',
     status: managerTermStatusLabel(term.status),
+    importBatchId: term.importBatchIdPresent ? term.importBatchId : null,
   );
 }
 

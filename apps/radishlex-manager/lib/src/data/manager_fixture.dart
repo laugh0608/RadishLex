@@ -27,6 +27,7 @@ ManagerSnapshot createManagerFixture() {
         weight: 0.71,
         source: 'import',
         lastUsed: '2026-07-02 21:03',
+        importBatchId: 2,
       ),
     ],
     deletedTerms: const [

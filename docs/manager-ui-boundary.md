@@ -35,7 +35,7 @@ macOS 产品路径由原生 `FileManager` 与 app bundle 解析，不依赖 shel
 
 M2 设置页中的同步配置仍是非 secret 草案；隐私模式不是普通草案字段。macOS 隐私模式必须通过受控平台 bridge 读写 InputMethodKit 使用的 `org.radishlex.inputmethod.macos` / `RadishLexPrivacyMode` 偏好，写入后读回确认，失败时保持原状态并显示结构化错误。manager 不展示 P1 原始行，也不通过隐私开关直接读取 userdb 正文。
 
-词库产品视图必须来自 Rust 真相源并区分 active、suppressed 和 deleted tombstone。suppressed 与 deleted 只能经独立确认调用 explicit restore；普通新增、导入或学习不得隐式恢复。deleted tombstone 查询只返回 identity、删除时间和非敏感原因分类，不返回 P1 原始事件。
+词库产品视图必须来自 Rust 真相源并区分 active、suppressed 和 deleted tombstone。suppressed 与 deleted 只能经独立确认调用 explicit restore；普通新增、导入或学习不得隐式恢复。deleted tombstone 查询只返回 identity、删除时间和非敏感原因分类，不返回 P1 原始事件。词条审计通过 Rust 持久化的可选 `import_batch_id` 关联本地导入批次；`source` 是来源枚举，批次 `source_name` 是用户提供的审计标签，两者不得按字符串相等推断关联。
 
 M2 产品运行态的验收至少覆盖：无 shell 环境变量启动、bundle 内 native library 加载、固定路径与权限、空库初始化与既有 schema 打开、active / suppressed / deleted 查询、删除后重启、explicit restore 后重启、隐私偏好写入读回、输入法与 manager 双连接读写、失败可见性，以及 demo/product 隔离。测试数据只能使用合成词和临时目录；自动化不得读取开发者真实 userdb 正文。
 
@@ -95,7 +95,7 @@ M3 同步管理能力在安全退出条件满足后覆盖：
 管理端可以展示的数据：
 
 - 本地用户词条、权重摘要和删除 tombstone 的用户可读视图。
-- 导入批次结果、导入错误分类和被跳过条目计数。
+- 导入批次结果、导入错误分类、被跳过条目计数，以及基于本地 batch id 的最近导入关联。
 - 学习状态摘要、候选 explain 摘要和 sync preflight 摘要。
 - 服务端地址、连接状态、HTTP 错误分类和认证缺失状态。
 - 设备 ID、backend id、backend capability、production gate 状态和不可用原因。
@@ -128,7 +128,7 @@ M3 同步管理能力在安全退出条件满足后覆盖：
 
 管理端应通过 `ime-ffi` 或后续受控 bridge 调用 Rust 能力，不直接读写 Rust 内部结构。
 
-当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、explicit restore、词库导入检查、词库导入、词库导出、设置草案保存、诊断报告预览和诊断报告导出这组受控方法。现有 `FixtureManagerBridge` 只在显式 demo 与测试中使用合成数据验证调用边界和 UI 状态；真实 Dart FFI bridge 已覆盖本地 userdb active/deleted list、delete、restore、dictionary inspect/import/export、import batches、learning status、rank explain、sync preflight、非 secret settings JSON 和脱敏诊断报告。产品 bootstrap 还通过受控平台 bridge 解析固定路径、收紧文件权限并读写输入 runtime 的隐私偏好。Dart 绑定层必须复制 Rust view 后释放 handle，不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层；widget 层只展示结构化错误码、错误分类和非敏感配置来源诊断。
+当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、explicit restore、词库导入检查、词库导入、词库导出、设置草案保存、诊断报告预览和诊断报告导出这组受控方法。现有 `FixtureManagerBridge` 只在显式 demo 与测试中使用合成数据验证调用边界和 UI 状态；真实 Dart FFI bridge 已覆盖本地 userdb active/deleted list、delete、restore、dictionary inspect/import/export、import batches、learning status、rank explain、sync preflight、非 secret settings JSON 和脱敏诊断报告。产品 bootstrap 还通过受控平台 bridge 解析固定路径、收紧文件权限并读写输入 runtime 的隐私偏好。Dart 绑定层通过 ABI v5 复制 Rust user-term view 的可选 `import_batch_id` 后释放 handle，不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层；widget 层只展示结构化错误码、错误分类和非敏感配置来源诊断。
 
 settings JSON schema、部署证据来源 allowlist、诊断报告字段索引和脱敏规则见 `docs/manager-settings-diagnostics.md`。
 
@@ -214,7 +214,7 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 1. 已固定本文档，并同步路线图、技术计划、仓库结构和周志。
 2. `apps/radishlex-manager/` 默认以 `product` mode 启动，产品失败进入结构化不可用态；显式 `demo` 构建通过 `ManagerBridge` contract 接入合成 fixture，并持续显示演示标识。
 3. 已验证词库搜索 / 空态、词条审计详情、导入历史筛选 / 排序 / 批次联动审计、本地 sync preflight 影响摘要、学习状态聚合摘要、rank explain 筛选和候选贡献项详情、同步页 gate 状态来源 / 本地 P2 对象分类 / 连接健康 / 设备 backend 门禁审计、设置页 gate 草案预览、部署证据来源标签、诊断报告 gate source / stop line、词条删除确认、词库导入检查、词库导入后刷新、词库导入 / 导出结果摘要和操作失败分类提示经由 fixture bridge 完成受控调用。
-4. 真实 Dart FFI bridge 已接入 userdb active/deleted list、delete、explicit restore、用户词库 inspect/import/export、import batches、learning status、rank explain 和 sync preflight；绑定初始化会验证 ABI v4、owner-thread 和 panic boundary。
+4. 真实 Dart FFI bridge 已接入 userdb active/deleted list、delete、explicit restore、用户词库 inspect/import/export、import batches、learning status、rank explain 和 sync preflight；绑定初始化会验证 ABI v5、owner-thread 和 panic boundary，词条与导入批次按可选 batch id 关联。
 5. `scripts/check-manager-ffi-smoke.sh` 使用临时合成数据复验开发期真实 bridge；`scripts/check-manager-product.sh` 构建 Release app，校验非 sandbox M2 profile、嵌套签名、bundle native library、ABI/符号/架构/依赖，并直接对 bundle dylib 执行重启、删除、tombstone 和恢复 smoke，不启动 GUI。
 6. `rank explain` 区域已通过专用 `ime-ffi` ABI 读取单候选贡献项，Flutter 只展示复制后的非敏感摘要，不持有 Rust view 指针。
 7. 已补设置页配置来源诊断、sync gate 草案预览、部署证据来源标签、设置草案保存、脱敏诊断报告分组预览 / 筛选 / 复制 / 导出和 bridge 失败结构化错误分类展示；UI 不透传 native 错误明细。

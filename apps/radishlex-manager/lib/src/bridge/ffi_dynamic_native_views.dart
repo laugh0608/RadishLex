@@ -13,6 +13,8 @@ NativeUserTermRecord _copyTermView(_RadishLexUserTermView term) {
     updatedAtMs: term.updatedAtMs,
     lastUsedAtMs: term.lastUsedAtMs,
     lastUsedAtPresent: term.lastUsedAtPresent != 0,
+    importBatchId: term.importBatchId,
+    importBatchIdPresent: term.importBatchIdPresent != 0,
   );
 }
 

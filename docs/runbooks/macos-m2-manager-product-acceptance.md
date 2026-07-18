@@ -48,7 +48,7 @@
 1. 从冻结 Release app 直接启动，不注入 `RADISHLEX_MANAGER_*` 环境变量。
 2. 确认没有“合成演示数据”标识；运行诊断显示 bundle native library 与平台 Application Support userdb，且不泄露真实绝对路径。
 3. 确认 `~/Library/Application Support/RadishLex` 为 `0700`，settings、可能存在的原子写临时文件和已创建的 userdb 为 `0600`，并确认都不是 symlink；manager 进程必须从启动起使用 `0077` umask，不能依赖保存完成后的补改权限。
-4. 通过 manager 导入固定合成 TSV，检查 active 词条、学习聚合和 rank explain；诊断不展示 P1 原始行或导入正文。
+4. 通过 manager 导入固定合成 TSV，检查 active 词条、学习聚合和 rank explain；词条审计必须按持久化 batch id 指向本轮导入批次，不得按 term source 与 batch source name 的显示字符串猜测关联；诊断不展示 P1 原始行或导入正文。
 5. 删除固定词条，确认 active 消失且 deleted tombstone 出现；普通刷新、导入或重启不得复活。
 6. 通过独立确认动作 explicit restore，确认 tombstone 消失、词条恢复；对 suppressed 固定条目执行同样的明确恢复，不允许其他操作隐式恢复。
 7. 完全退出并重新启动 manager，复核词条状态、settings 和排序/筛选保持一致。

@@ -106,6 +106,8 @@ Flutter Manager
 
 选择、负反馈、删除和显式恢复是用户意图，跨表写入必须具备事务性。数据库需要明确 WAL、busy timeout、并发访问、文件权限、备份恢复和 schema migration 策略。
 
+`user_terms.import_batch_id` 只记录最近一次实际写入该词条的本地导入批次，和 `import_batches.id` 在同一事务内建立；它是 manager 审计关联，不进入 P2 词条 payload。词条 `source` 仍是稳定的来源枚举，不能用来源显示标签猜测导入批次。
+
 P1 原始事件只在本地用于学习，不得通过 FFI 管理接口或同步 payload 暴露。P2 导出只允许从明确的压缩摘要与用户可管理数据生成。
 
 ### ime-ranker

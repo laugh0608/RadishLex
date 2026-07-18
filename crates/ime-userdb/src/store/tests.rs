@@ -39,7 +39,7 @@ fn remove_temp_db(path: &str) {
 fn migration_initializes_empty_database() {
     let db = UserDb::open_in_memory().expect("userdb opens");
 
-    assert_eq!(db.schema_version().expect("schema version"), 3);
+    assert_eq!(db.schema_version().expect("schema version"), 4);
     assert!(db.list_active_terms().expect("terms").is_empty());
     assert!(db.list_import_batches().expect("batches").is_empty());
 }
@@ -64,7 +64,7 @@ fn concurrent_open_serializes_schema_initialization() {
 
     barrier.wait();
     for handle in handles {
-        assert_eq!(handle.join().expect("open thread joins"), 3);
+        assert_eq!(handle.join().expect("open thread joins"), 4);
     }
 
     let db = UserDb::open(&path).expect("initialized userdb reopens");
@@ -95,7 +95,7 @@ fn open_waits_for_short_database_initialization_lock() {
         .join()
         .expect("open worker joins")
         .expect("userdb open waits for the short initialization lock");
-    assert_eq!(db.schema_version().expect("schema version"), 3);
+    assert_eq!(db.schema_version().expect("schema version"), 4);
     drop(db);
     drop(lock_holder);
     remove_temp_db(&path);
@@ -177,7 +177,7 @@ fn migration_upgrades_v1_import_batches() {
     }
 
     let db = UserDb::open(&path).expect("userdb migrates");
-    assert_eq!(db.schema_version().expect("schema version"), 3);
+    assert_eq!(db.schema_version().expect("schema version"), 4);
 
     let batches = db.list_import_batches().expect("batches");
     assert_eq!(batches.len(), 1);
@@ -185,6 +185,49 @@ fn migration_upgrades_v1_import_batches() {
     assert_eq!(batches[0].total_records, 3);
     assert_eq!(batches[0].imported_terms, 3);
     assert_eq!(batches[0].inserted_terms, 3);
+
+    remove_temp_db(&path);
+}
+
+#[test]
+fn migration_upgrades_v3_terms_without_inventing_import_provenance() {
+    let path = temp_db_path("migration-v3-import-batch");
+    {
+        let connection = rusqlite::Connection::open(&path).expect("sqlite opens");
+        connection
+            .execute_batch(
+                "
+                CREATE TABLE user_terms (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    text TEXT NOT NULL,
+                    reading TEXT NOT NULL DEFAULT '',
+                    input_code TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    weight REAL NOT NULL DEFAULT 0.0,
+                    status TEXT NOT NULL,
+                    created_at_ms INTEGER NOT NULL,
+                    updated_at_ms INTEGER NOT NULL,
+                    last_used_at_ms INTEGER,
+                    restored_at_ms INTEGER
+                );
+                CREATE UNIQUE INDEX idx_user_terms_identity
+                    ON user_terms(input_code, text, reading);
+                INSERT INTO user_terms (
+                    text, reading, input_code, source, weight, status,
+                    created_at_ms, updated_at_ms, last_used_at_ms, restored_at_ms
+                ) VALUES ('合成旧词', '', 'legacy', 'manual_add', 1, 'active', 10, 20, NULL, NULL);
+                PRAGMA user_version = 3;
+                ",
+            )
+            .expect("v3 schema is created");
+    }
+
+    let db = UserDb::open(&path).expect("v3 userdb migrates");
+    assert_eq!(db.schema_version().expect("schema version"), 4);
+    let terms = db.list_active_terms().expect("terms");
+    assert_eq!(terms.len(), 1);
+    assert_eq!(terms[0].input_code, "legacy");
+    assert_eq!(terms[0].import_batch_id, None);
 
     remove_temp_db(&path);
 }
@@ -791,6 +834,7 @@ fn dictionary_import_preserves_term_fields_and_skips_deleted_tombstones() {
     assert_eq!(terms[0].text, "词核");
     assert_eq!(terms[0].weight, 3.5);
     assert_eq!(terms[0].status, TermStatus::Suppressed);
+    assert_eq!(terms[0].import_batch_id, summary.import_batch_id);
 }
 
 #[test]
@@ -873,10 +917,12 @@ fn dictionary_import_reports_updates_duplicates_and_distinct_readings() {
         .expect("term exists");
     assert_eq!(updated.status, TermStatus::Suppressed);
     assert_eq!(updated.weight, 4.0);
-    assert!(db
+    assert_eq!(updated.import_batch_id, summary.import_batch_id);
+    let distinct_reading = db
         .fetch_term("luobo", "萝卜", "luo bu")
         .expect("term lookup")
-        .is_some());
+        .expect("distinct reading exists");
+    assert_eq!(distinct_reading.import_batch_id, summary.import_batch_id);
 }
 
 #[test]
@@ -980,7 +1026,7 @@ fn sync_preflight_separates_syncable_and_local_only_counts() {
 
     let summary = db.sync_preflight_summary().expect("summary");
 
-    assert_eq!(summary.schema_version, 3);
+    assert_eq!(summary.schema_version, 4);
     assert_eq!(summary.syncable_user_terms, 1);
     assert_eq!(summary.syncable_ranker_weights, 1);
     assert_eq!(summary.syncable_deleted_terms, 1);
@@ -994,7 +1040,7 @@ fn learning_status_reports_only_aggregate_counts_and_timestamps() {
     let mut db = UserDb::open_in_memory().expect("userdb opens");
 
     let empty = db.learning_status_summary().expect("empty summary");
-    assert_eq!(empty.schema_version, 3);
+    assert_eq!(empty.schema_version, 4);
     assert_eq!(empty.active_user_terms, 0);
     assert_eq!(empty.suppressed_user_terms, 0);
     assert_eq!(empty.selection_events, 0);
@@ -1017,7 +1063,7 @@ fn learning_status_reports_only_aggregate_counts_and_timestamps() {
 
     let summary = db.learning_status_summary().expect("summary");
 
-    assert_eq!(summary.schema_version, 3);
+    assert_eq!(summary.schema_version, 4);
     assert_eq!(summary.active_user_terms, 0);
     assert_eq!(summary.suppressed_user_terms, 1);
     assert_eq!(summary.ranker_weights, 1);

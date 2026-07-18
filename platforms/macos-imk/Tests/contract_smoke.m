@@ -193,7 +193,7 @@ int main(void) {
                 cursorError.code == RADISHLEX_STATUS_INTERNAL_ERROR,
             @"cursor inside a UTF-8 scalar is rejected");
     NSError *error = nil;
-    Require([RLXSessionBridge validateFFIContract:&error], @"ABI v4 contract");
+    Require([RLXSessionBridge validateFFIContract:&error], @"ABI v5 contract");
     RLXSessionBridge *session =
         [[RLXProcessRuntime sharedRuntime] createSessionWithError:&error];
     Require(session != nil, @"create owner-thread session");

@@ -43,7 +43,7 @@ pub struct UserDb {
 impl UserDb {
     pub fn list_active_terms(&self) -> UserDbResult<Vec<UserTerm>> {
         let mut statement = self.connection.prepare(
-            "SELECT id, text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms, restored_at_ms
+            "SELECT id, text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms, restored_at_ms, import_batch_id
              FROM user_terms
              WHERE status != 'deleted'
              ORDER BY input_code, text, reading",
@@ -77,7 +77,7 @@ impl UserDb {
 
     pub fn export_dictionary_records(&self) -> UserDbResult<Vec<DictionaryTermRecord>> {
         let mut statement = self.connection.prepare(
-            "SELECT id, text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms, restored_at_ms
+            "SELECT id, text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms, restored_at_ms, import_batch_id
              FROM user_terms
              WHERE status IN ('active', 'suppressed')
              ORDER BY input_code, text, reading",
@@ -100,12 +100,32 @@ impl UserDb {
         let transaction = self.connection.transaction()?;
         let (mut summary, actions) = prepare_dictionary_import(&transaction, records)?;
 
+        transaction.execute(
+            "INSERT INTO import_batches (
+                source_name, term_count, total_count, inserted_count, updated_count,
+                skipped_deleted_count, skipped_duplicate_count, created_at_ms, notes
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, '')",
+            params![
+                &source_name,
+                summary.imported_terms as i64,
+                summary.total_records as i64,
+                summary.inserted_terms as i64,
+                summary.updated_terms as i64,
+                summary.skipped_deleted_terms as i64,
+                summary.skipped_duplicate_terms as i64,
+                now
+            ],
+        )?;
+        let import_batch_id = transaction.last_insert_rowid();
+        summary.import_batch_id = Some(import_batch_id);
+
         for action in actions {
             transaction.execute(
                 "INSERT INTO user_terms (
-                    text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms, restored_at_ms
+                    text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms, restored_at_ms, import_batch_id
                  )
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, NULL, NULL)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, NULL, NULL, ?8)
                  ON CONFLICT(input_code, text, reading) DO UPDATE SET
                     source = CASE
                         WHEN user_terms.status = 'suppressed' THEN user_terms.source
@@ -116,7 +136,8 @@ impl UserDb {
                         WHEN user_terms.status = 'suppressed' THEN 'suppressed'
                         ELSE excluded.status
                     END,
-                    updated_at_ms = excluded.updated_at_ms",
+                    updated_at_ms = excluded.updated_at_ms,
+                    import_batch_id = excluded.import_batch_id",
                 params![
                     action.text,
                     action.reading,
@@ -124,29 +145,11 @@ impl UserDb {
                     action.source.as_str(),
                     action.weight,
                     action.status.as_str(),
-                    now
+                    now,
+                    import_batch_id
                 ],
             )?;
         }
-
-        transaction.execute(
-            "INSERT INTO import_batches (
-                source_name, term_count, total_count, inserted_count, updated_count,
-                skipped_deleted_count, skipped_duplicate_count, created_at_ms, notes
-             )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, '')",
-            params![
-                source_name,
-                summary.imported_terms as i64,
-                summary.total_records as i64,
-                summary.inserted_terms as i64,
-                summary.updated_terms as i64,
-                summary.skipped_deleted_terms as i64,
-                summary.skipped_duplicate_terms as i64,
-                now
-            ],
-        )?;
-        summary.import_batch_id = Some(transaction.last_insert_rowid());
         transaction.commit()?;
 
         Ok(summary)
@@ -171,7 +174,7 @@ impl UserDb {
     ) -> UserDbResult<Option<UserTerm>> {
         self.connection
             .query_row(
-                "SELECT id, text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms, restored_at_ms
+                "SELECT id, text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms, restored_at_ms, import_batch_id
                  FROM user_terms
                  WHERE input_code = ?1 AND text = ?2 AND reading = ?3",
                 params![input_code, text, reading],
@@ -394,6 +397,7 @@ fn user_term_from_row(row: &Row<'_>) -> rusqlite::Result<UserTerm> {
         updated_at_ms: row.get(8)?,
         last_used_at_ms: row.get(9)?,
         restored_at_ms: row.get(10)?,
+        import_batch_id: row.get(11)?,
     })
 }
 

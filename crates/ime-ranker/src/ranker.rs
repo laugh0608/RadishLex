@@ -312,6 +312,7 @@ mod tests {
             updated_at_ms: 1,
             last_used_at_ms: Some(1),
             restored_at_ms: None,
+            import_batch_id: None,
         }
     }
 

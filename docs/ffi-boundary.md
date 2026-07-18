@@ -56,7 +56,7 @@ RadishLexError*
 
 ### FFI contract
 
-`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v4 在 v3 owned key result 基础上增加产品个人化 Rime session、版本化学习上下文、display/engine index 映射、个人化状态和学习结果；M2 manager 的 deleted tombstone 查询是新增 symbol 与独立新结构，没有改变既有 v4 结构布局或调用语义，因此保持 v4，产品绑定必须同时校验 contract 与所需 symbol 集。当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
+`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v5 保留 v4 的产品个人化 Rime session、版本化学习上下文、display/engine index 映射、个人化状态和学习结果，并在 `RadishLexUserTermView` 末尾增加可选的本地 `import_batch_id`，供 manager 精确关联导入审计；该字段不进入同步 payload。产品绑定必须同时校验 contract 与所需 symbol 集。当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
 
 ### Status 与文本 view
 
