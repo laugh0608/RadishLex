@@ -273,16 +273,16 @@ updated_at_ms
 11. 已补 `apple-keychain-v1` 平台 runbook 和 Apple 签名策略 ADR，固定 Apple Keychain 创建、加载、签名、删除、锁屏 / 权限、备份迁移、日志脱敏和策略停止线；macOS backend 已在 `apple-keychain` feature 下接线，默认测试不访问系统 Keychain，真实 smoke 已运行但阻塞于 `ed25519-v1` 创建，backend status 已阻断生产签名。
 12. 已补 `android-keystore-v1` 平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、raw JNI glue、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin bridge source、Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，固定 Android Keystore Ed25519 创建 / 加载 / 签名 / 删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
 13. 已补 ADR 0006、Rust/Go 算法分派、显式 `signing_algorithm` metadata/migration、共享跨语言 vectors 和独立 `apple-keychain-p256-v1`；普通测试不访问 Keychain，manager Release native 接线、严格 DPK 选择、固定错误/OSStatus、五场景 gated smoke、ad-hoc denied 与合格产品生命周期均有证据。评审结论为软件运行时可用、`exportable=true`、产品资格拒绝。
-14. 已补 ADR 0007、独立 `apple-secure-enclave-p256-v1`、token/private-key-usage access control、不可导出 probe、Rust/FFI/manager native、六场景 gated smoke 和默认无外部状态产品构建门禁；产品进程证据尚未取得，能力字段未提前开放。
+14. 已补 ADR 0007、独立 `apple-secure-enclave-p256-v1`、token/private-key-usage access control、不可导出 probe、Rust/FFI/manager native、六场景 gated smoke 和默认无外部状态产品构建门禁；qualification lifecycle、不可导出、hardware-backed、ad-hoc denied 与真实设备锁屏 locked 已有产品证据，当前等待真实 unsupported 环境和产品资格评审。
 15. 已补真实 userdb P2 payload 解析到 merge input 的接线。
 16. 已补客户端合并结果写回真实 userdb 的执行器。
-16. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
-17. 已补 Go server API / storage 边界设计。
-18. 已补生产恢复流程设计和平台私钥存储 backend ADR。
-19. 已起步 Go server metadata / storage / API / runtime 验证模型，当前覆盖配置默认值、API request / error DTO、SQLite migration、storage interface、storage conformance tests、内存 storage、SQLite-backed metadata repository、local object storage staged transaction、签名验证、wrapped key bytes、recovery wrapped material、object version 上传下载、版本冲突、撤销设备阻断、非敏感 audit events 和隐私字段检查。
-20. 已补 Rust remote object client DTO / transport trait 和 std-only `http://` HTTP transport，固定 encrypted object upload request、metadata 读取、binary payload 下载、stale conflict latest metadata、server error code 映射、真实 HTTP request / response 传递和 Debug 脱敏。
-21. 已补 Rust 侧两客户端 userdb harness，覆盖 P2 payload 加密上传、另一客户端下载密文、解密、解码、合并写回、本机 tombstone 阻断旧远端词条、stale conflict latest metadata 映射和 v2 重新上传。
-22. 已补 Rust userdb 两客户端真实 Go HTTP 测试，覆盖设备授权、三类 P2 对象上传下载、客户端解密写回、stale conflict、v2 重新上传和 runtime 日志脱敏。
+17. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
+18. 已补 Go server API / storage 边界设计。
+19. 已补生产恢复流程设计和平台私钥存储 backend ADR。
+20. 已起步 Go server metadata / storage / API / runtime 验证模型，当前覆盖配置默认值、API request / error DTO、SQLite migration、storage interface、storage conformance tests、内存 storage、SQLite-backed metadata repository、local object storage staged transaction、签名验证、wrapped key bytes、recovery wrapped material、object version 上传下载、版本冲突、撤销设备阻断、非敏感 audit events 和隐私字段检查。
+21. 已补 Rust remote object client DTO / transport trait 和 std-only `http://` HTTP transport，固定 encrypted object upload request、metadata 读取、binary payload 下载、stale conflict latest metadata、server error code 映射、真实 HTTP request / response 传递和 Debug 脱敏。
+22. 已补 Rust 侧两客户端 userdb harness，覆盖 P2 payload 加密上传、另一客户端下载密文、解密、解码、合并写回、本机 tombstone 阻断旧远端词条、stale conflict latest metadata 映射和 v2 重新上传。
+23. 已补 Rust userdb 两客户端真实 Go HTTP 测试，覆盖设备授权、三类 P2 对象上传下载、客户端解密写回、stale conflict、v2 重新上传和 runtime 日志脱敏。
 
 ## 验证口径
 
@@ -306,7 +306,7 @@ updated_at_ms
 ## 停止线
 
 - 恢复码 KDF 算法、参数、格式、Rust model 和生产恢复流程设计已落地；服务端恢复记录 API 与管理 UI 未实现前，不提供用户可用恢复入口。
-- 设备签名模型、两个签名 profile、跨语言 verifier/vectors、私钥存储抽象、平台 capability、Apple/Android runbook 与 feature-gated backend 已落地；普通 DPK 软件运行时已验证但可导出，Secure Enclave lifecycle 已验证但产品失败矩阵尚未完成，既有 Android/Apple Ed25519 阻塞仍未解除。任何局部 capability 都不得开放用户可用远端对象上传下载。
+- 设备签名模型、两个签名 profile、跨语言 verifier/vectors、私钥存储抽象、平台 capability、Apple/Android runbook 与 feature-gated backend 已落地；普通 DPK 软件运行时已验证但可导出，Secure Enclave lifecycle、denied 与真实设备锁屏 locked 已验证，unsupported 和最终产品资格仍待真实环境证据，既有 Android/Apple Ed25519 阻塞也未解除。任何局部 capability 都不得开放用户可用远端对象上传下载。
 - 服务端若回退到只保存 wrapping metadata 而不能保存 / 返回 wrapped key bytes，则不得开放真实设备授权 handler。
 - Go server 与 Rust HTTP transport 继续推进时，必须先满足 `docs/sync-server-api-storage.md` 的签名、metadata API、版本冲突、错误语义和脱敏验证。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。

@@ -50,9 +50,9 @@ M3 当前主批已完成算法协议、跨语言 verifier/vector、普通 DPK �
 
 ## 下一步顺位
 
-1. 在不支持 Secure Enclave 的目标环境按独立授权执行 unsupported probe，确认不回退普通 DPK/test memory。
-2. 逐字段评审 `product_qualified/user_presence_required/backup_migratable`；只开放产品证据支持的字段，用户同步总 gate 继续关闭。
-3. 生产 backend 通过后才建立真实产品 sync orchestration；用户同步总 gate 不随 backend 资格自动开放。orchestration 需覆盖对象发现、hash/签名复验、解密、确定合并、本地 transaction、cursor、上传和 conflict retry，再接 `ManagerBridge`。
+1. 在真实不支持 Secure Enclave 的目标环境按独立授权执行 unsupported probe，确认不回退普通 DPK/test memory；当前设备不能伪造该证据，若目标环境不可得则记录环境阻塞。
+2. unsupported 通过后逐字段评审 `product_qualified/user_presence_required/backup_migratable`；只开放产品证据支持的字段，用户同步总 gate 继续关闭。
+3. 生产 backend 通过后先固定真实产品 sync orchestration 的 Rust 职责、状态机、secret 生命周期、transaction/cursor 与冲突语义，再实现对象发现、hash/签名复验、解密、确定合并、本地 transaction、cursor、上传和 conflict retry，最后接 `ManagerBridge`。backend 资格不自动开放用户同步。
 4. 最后完成两个真实客户端、恢复/设备授权/撤销/key epoch 与发布级目标部署证据，满足后才评估开放用户同步。
 
 ## 验证入口

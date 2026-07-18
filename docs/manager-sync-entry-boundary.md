@@ -51,7 +51,7 @@ Manager 不可以：
 
 Apple P-256 产品进程 gated smoke 只由五个显式命令行场景之一与环境门触发：DPK 正常生命周期、预期 denied 创建、locked 前置、locked 签名探测、解锁后清理。正常生命周期和前置场景在 native 内使用 synthetic canonical/signature 并完成 Rust 验签；正常生命周期额外调用短生命周期 Go verifier。smoke schema v4 返回 Swift 的只有固定 scenario、result、error category/detail、数值 OSStatus 和布尔摘要，不含 CFError 文本。private key、public key、canonical bytes、signature bytes 不得进入 Dart、Flutter method channel、settings 或 diagnostics。普通 manager 启动不访问该 Keychain 路径；脚本不锁定、解锁或改写 Keychain 搜索列表；InputMethodKit 不参与同步密钥或签名。
 
-Secure Enclave P-256 使用独立环境门、native symbol 与六个显式场景，额外覆盖 unsupported create，并在正常生命周期内要求 private external representation 失败。它复用同一固定 26-word 脱敏摘要布局，但拥有独立 schema version；qualification lifecycle 已支持运行时和 hardware-backed 字段，产品资格与用户同步 gate 继续关闭。Dart、普通 manager 启动和 InputMethodKit 同样不接触该路径。
+Secure Enclave P-256 使用独立环境门、native symbol 与六个显式场景，额外覆盖 unsupported create，并在正常生命周期内要求 private external representation 失败。它复用同一固定 26-word 脱敏摘要布局，但拥有独立 schema version；qualification lifecycle、ad-hoc denied 与真实设备锁屏 locked 已通过，当前运行时和 hardware-backed 字段开放，unsupported、产品资格与用户同步 gate 继续关闭。Dart、普通 manager 启动和 InputMethodKit 同样不接触该路径。
 
 ## 产品停止线
 

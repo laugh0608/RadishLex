@@ -279,7 +279,7 @@ object_payload(domain_id, object_id, version)
 
 - `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
 - 生产恢复 UI / API、远端密钥轮换执行器、备份快照 payload 字段序列化和用户可用同步设置。
-- 真实平台私钥存储 backend 的产品资格；普通 DPK P-256 运行时已验证但因 `exportable=true` 被拒绝。独立 `apple-secure-enclave-p256-v1` 已完成 compiled-only repository/FFI/manager build 接线，实际 runtime、不可导出与 hardware-backed 证据待授权取得；`apple-keychain-v1` 和已测 Android AVD 的 Ed25519 阻塞也仍未解除。
+- 真实平台私钥存储 backend 的最终产品资格；普通 DPK P-256 运行时已验证但因 `exportable=true` 被拒绝。独立 `apple-secure-enclave-p256-v1` 已取得 qualification lifecycle、不可导出、hardware-backed、ad-hoc denied 与真实设备锁屏 locked 证据，当前只缺真实不支持 Secure Enclave 环境的 unsupported 与随后逐字段资格评审；`apple-keychain-v1` 和已测 Android AVD 的 Ed25519 阻塞也仍未解除。
 
 ## 验证口径
 

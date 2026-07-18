@@ -164,7 +164,7 @@ Sync Master Key + object identity + key epoch
 
 `apple-keychain-p256-v1` 只表示 Apple 普通 DPK 软件 P-256 `SecKey`，和 Ed25519 `apple-keychain-v1` 及后续 Secure Enclave backend 分离。实现统一选择 macOS data protection keychain，private key、canonical bytes 与 signature bytes 均不进入 Dart；合格 manager 产品生命周期支持编译和运行时字段为 true。Apple 官方能力评审表明普通 DPK 软件私钥可由平台 API 导出，因此 capability 为 `exportable=true`，产品资格与用户同步 gate 关闭；不可从“Apple Keychain”名称推断 Secure Enclave、hardware-backed、user presence 或可迁移能力。
 
-`apple-secure-enclave-p256-v1` 由 ADR 0007 独立定义，复用 P-256 protocol 但使用新的 key identity、token/access-control、tag 与产品证据。repository/manager build 已接线且不向 Dart 暴露材料；产品 smoke 前仅报告 compiled，runtime、不可导出、hardware-backed 与 product qualification 均不能从代码配置推导。
+`apple-secure-enclave-p256-v1` 由 ADR 0007 独立定义，复用 P-256 protocol 但使用新的 key identity、token/access-control、tag 与产品证据。repository/manager build 不向 Dart 暴露材料；qualification 产品进程已证明 lifecycle、不可导出、hardware-backed、ad-hoc denied 与真实设备锁屏 locked，因此当前只开放 `runtime_available/can_create/can_sign/hardware_backed`。unsupported 尚需在真实不支持 Secure Enclave 的环境验证，`product_qualified/user_sync_enabled/user_presence_required/backup_migratable` 继续关闭，任何字段都不能仅从代码配置或平台名称推导。
 
 ## 新设备授权
 
