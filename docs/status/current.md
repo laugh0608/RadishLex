@@ -33,7 +33,7 @@ ADR 0006 已接受 `ecdsa-p256-sha256-v1` 作为与 `ed25519-v1` 共存的生产
 这些测试仍不是用户可用同步。当前生产阻塞项是：
 
 - `apple-keychain-p256-v1` 的 DPK 软件运行时可用，但私钥可导出，未满足生产 backend 的不可导出条件；locked 矩阵不能改变该资格结论，故本 backend 不进入真实同步。既有 `apple-keychain-v1` 与已测 Android Keystore 环境也仍未证明不可导出 `ed25519-v1` signing key；`test-memory-v1` 只允许测试且无 fallback。
-- `apple-secure-enclave-p256-v1` 已由 qualification 产品进程完成 lifecycle，并由 ad-hoc 产品确认 missing-entitlement denied 失败关闭且零残留；当前报告 runtime/create/sign/hardware-backed。locked/unsupported 和产品资格仍待独立证据。
+- `apple-secure-enclave-p256-v1` 已完成 qualification lifecycle 与 ad-hoc denied；locked prepare 现已创建并保留固定合成 key，`cleanup_required=1`。locked probe、解锁 cleanup、unsupported 和产品资格仍待独立证据。
 - 缺少发布级目标部署运行证据，以及真实产品的同步 cursor/orchestration、设备恢复、撤销和 key epoch 全流程。
 - `ManagerBridge` 仍无真实同步、恢复码、设备加入、授权、撤销或轮换命令；现有 readiness 只证明关闭态。
 
@@ -50,7 +50,7 @@ M3 当前主批已完成算法协议、跨语言 verifier/vector、普通 DPK �
 
 ## 下一步顺位
 
-1. qualification bundle 已恢复；分阶段授权执行 Secure Enclave locked prepare、外部锁定、locked probe、解锁与 cleanup。脚本不修改系统锁定状态。
+1. locked prepare 已完成且固定合成 item 待清理；由开发者在独立步骤锁定登录 Keychain，再授权运行 locked probe。之后必须先解锁，再授权 cleanup 并确认 missing；脚本不修改系统锁定状态。
 2. 在不支持 Secure Enclave 的目标环境按独立授权执行 unsupported probe，确认不回退普通 DPK/test memory。
 3. 逐字段评审 `product_qualified/user_presence_required/backup_migratable`；只开放产品证据支持的字段，用户同步总 gate 继续关闭。
 4. 生产 backend 通过后才建立真实产品 sync orchestration；用户同步总 gate 不随 backend 资格自动开放。orchestration 需覆盖对象发现、hash/签名复验、解密、确定合并、本地 transaction、cursor、上传和 conflict retry，再接 `ManagerBridge`。

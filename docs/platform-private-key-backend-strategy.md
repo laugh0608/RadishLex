@@ -32,7 +32,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 | `unavailable` | 默认明确失败 | Rust capability / status / error 测试已覆盖 | 继续作为能力缺失时的失败路径 |
 | `apple-keychain-v1` | 生产不可用 | feature-gated backend 编译通过，真实 smoke 在 Ed25519 创建阶段失败 | 单独补 Apple 原生非导出 Ed25519 支持矩阵，或另起 backend / 算法 ADR |
 | `apple-keychain-p256-v1` | DPK 软件运行时可用，生产资格拒绝 | provisioning-backed manager 产品进程已完成创建、重载、签名、Rust/Go 验签、删除、missing 和 cleanup；capability 为 `exportable=true` | 保留为软件保护证据与失败关闭实现，不接真实同步；另建 Secure Enclave backend |
-| `apple-secure-enclave-p256-v1` | 产品 runtime、不可导出、hardware-backed 与 denied 已取证，产品资格关闭 | qualification lifecycle 全部通过；ad-hoc missing-entitlement create 返回固定 access-denied，零残留；qualification bundle 已恢复 | 分阶段授权 locked；另需无 Secure Enclave 环境执行 unsupported，完成后评审 product qualification |
+| `apple-secure-enclave-p256-v1` | 产品 runtime、不可导出、hardware-backed 与 denied 已取证，产品资格关闭 | qualification lifecycle 与 ad-hoc denied 通过；locked prepare 已留下固定合成 key，`cleanup_required=1` | 锁定登录 Keychain 后授权 probe，解锁后必须 cleanup；另需无 Secure Enclave 环境执行 unsupported |
 | `android-keystore-v1` | 生产不可用 | Android target build、Gradle harness、API 35 / API 37 AVD diagnostics 和 smoke 记录 | 有新 Android 真机 / OEM / system image 时先跑 diagnostics，再按结果决定 smoke |
 | `windows-cng-v1` | 未实现 | 仅有 ADR 0004 backend id | 进入 Windows 主线前补 CNG 签名能力 spike / runbook |
 | `linux-secret-service-v1` | 未实现 | 仅有 ADR 0004 backend id | 进入 Linux 同步主线前补 Secret Service / 软件保护能力边界 |
