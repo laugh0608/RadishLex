@@ -33,11 +33,11 @@ ADR 0006 已接受 `ecdsa-p256-sha256-v1` 作为与 `ed25519-v1` 共存的生产
 这些测试仍不是用户可用同步。当前生产阻塞项是：
 
 - `apple-keychain-p256-v1` 的 DPK 软件运行时可用，但私钥可导出，未满足生产 backend 的不可导出条件；locked 矩阵不能改变该资格结论，故本 backend 不进入真实同步。既有 `apple-keychain-v1` 与已测 Android Keystore 环境也仍未证明不可导出 `ed25519-v1` signing key；`test-memory-v1` 只允许测试且无 fallback。
-- `apple-secure-enclave-p256-v1` 已由 qualification 产品进程完成创建、重载、签名、Rust/Go 验签、不可导出、删除、missing 与 cleanup，当前报告 runtime/create/sign/hardware-backed；denied/locked/unsupported 和产品资格仍待独立证据。
+- `apple-secure-enclave-p256-v1` 已由 qualification 产品进程完成 lifecycle，并由 ad-hoc 产品确认 missing-entitlement denied 失败关闭且零残留；当前报告 runtime/create/sign/hardware-backed。locked/unsupported 和产品资格仍待独立证据。
 - 缺少发布级目标部署运行证据，以及真实产品的同步 cursor/orchestration、设备恢复、撤销和 key epoch 全流程。
 - `ManagerBridge` 仍无真实同步、恢复码、设备加入、授权、撤销或轮换命令；现有 readiness 只证明关闭态。
 
-M3 当前主批已完成算法协议、跨语言 verifier/vector、普通 DPK 产品评审，以及 Secure Enclave qualification lifecycle。下一证据是逐项授权的 denied/locked/unsupported 失败矩阵；不得提前推进真实同步 orchestration。
+M3 当前主批已完成算法协议、跨语言 verifier/vector、普通 DPK 产品评审，以及 Secure Enclave qualification lifecycle 与 denied。下一证据是逐项授权的 locked/unsupported 失败矩阵；不得提前推进真实同步 orchestration。
 
 ## 当前停止线
 
@@ -50,10 +50,11 @@ M3 当前主批已完成算法协议、跨语言 verifier/vector、普通 DPK �
 
 ## 下一步顺位
 
-1. 使用已重新冻结的 qualification bundle，逐项授权补 Secure Enclave denied、locked 三段与 unsupported 失败矩阵；脚本不修改系统锁定状态，unsupported 需要不支持该能力的目标环境。
-2. 逐字段评审 `product_qualified/user_presence_required/backup_migratable`；只开放产品证据支持的字段，用户同步总 gate 继续关闭。
-3. 生产 backend 通过后才建立真实产品 sync orchestration；用户同步总 gate 不随 backend 资格自动开放。orchestration 需覆盖对象发现、hash/签名复验、解密、确定合并、本地 transaction、cursor、上传和 conflict retry，再接 `ManagerBridge`。
-4. 最后完成两个真实客户端、恢复/设备授权/撤销/key epoch 与发布级目标部署证据，满足后才评估开放用户同步。
+1. ad-hoc denied 已替换 build 产物；先按独立授权恢复 qualification bundle，再分阶段执行 Secure Enclave locked prepare、外部锁定、locked probe、解锁与 cleanup。脚本不修改系统锁定状态。
+2. 在不支持 Secure Enclave 的目标环境按独立授权执行 unsupported probe，确认不回退普通 DPK/test memory。
+3. 逐字段评审 `product_qualified/user_presence_required/backup_migratable`；只开放产品证据支持的字段，用户同步总 gate 继续关闭。
+4. 生产 backend 通过后才建立真实产品 sync orchestration；用户同步总 gate 不随 backend 资格自动开放。orchestration 需覆盖对象发现、hash/签名复验、解密、确定合并、本地 transaction、cursor、上传和 conflict retry，再接 `ManagerBridge`。
+5. 最后完成两个真实客户端、恢复/设备授权/撤销/key epoch 与发布级目标部署证据，满足后才评估开放用户同步。
 
 ## 验证入口
 
