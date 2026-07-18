@@ -1,6 +1,6 @@
 # ADR 0006: 设备签名算法 Profile
 
-本文档固定 RadishLex M3 设备签名算法的可演进边界，读者是实现 `ime-crypto`、`ime-sync`、Go sync server、Apple 私钥 backend 与后续设备管理入口的开发者和审阅者。本文不开放真实用户同步，不定义恢复码或设备授权 UI，也不证明任何 Apple 密钥已由 Secure Enclave 或其他硬件保护；平台真实证据继续由 gated smoke、runbook 与 `docs/status/current.md` 记录。
+本文档固定 RadishLex M3 设备签名算法的可演进边界，读者是实现 `ime-crypto`、`ime-sync`、Go sync server、Apple 私钥 backend 与后续设备管理入口的开发者和审阅者。本文不开放真实用户同步，不定义恢复码或设备授权 UI；算法 profile 决策本身不构成 Secure Enclave 或硬件保护证据，平台事实必须由 gated smoke、runbook 和逐字段资格评审取得。
 
 ## 状态
 
@@ -146,7 +146,7 @@ backup_migratable = false
 
 未启用 feature 或非 macOS target 不能报告上述运行时 true。`product_qualified` 因 `exportable=true` 保持 false；locked/denied 证据不能覆盖这一生产条件。用户同步继续受独立 M3 全链 gate。产品 validation ABI 只返回固定状态、生命周期、错误分类和数值 OSStatus，private key、public key、canonical bytes 与 signature bytes 不进入 Dart。
 
-ADR 0007 新增 `apple-secure-enclave-p256-v1`，复用本 ADR 的 P-256 protocol profile，但使用新的 backend id、signing key id、application tag 和产品证据。它不得把普通 DPK key 原地升级或在 Secure Enclave unavailable 时 fallback。qualification lifecycle 已支持 runtime、hardware-backed 与不可导出结论；product qualification 仍由独立失败矩阵决定。
+ADR 0007 新增 `apple-secure-enclave-p256-v1`，复用本 ADR 的 P-256 protocol profile，但使用新的 backend id、signing key id、application tag 和产品证据。它不得把普通 DPK key 原地升级或在 Secure Enclave unavailable 时 fallback。qualification lifecycle 已支持 runtime、hardware-backed 与不可导出结论，ad-hoc denied 和真实设备锁屏 locked 也已验证；当前仅剩真实无 Secure Enclave 环境的 unsupported，随后才可逐字段评审 `product_qualified`。
 
 ## 日志与脱敏
 

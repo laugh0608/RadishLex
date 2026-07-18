@@ -91,6 +91,8 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名。AD
 
 当前 storage 已在写入前使用设备登记的 `signing_algorithm + signing_public_key` 验证 object manifest、device authorization、device revocation 和 recovery record；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list，不在失败时尝试另一 verifier。HTTP API 已覆盖 domain/device/join、authorization、recovery 与 object version 路径；签名错误对外保持顶层 `invalid_signature`，并以脱敏 `error_detail` 区分算法、编码、验签和 key lifetime。runtime 使用 idempotent schema migration，历史缺列行固定回填 `ed25519-v1`；审计与日志不包含 request body、public key、signature 或 canonical bytes。
 
+metadata schema 的算法迁移必须区分“历史兼容”与“新写入契约”：全新 schema 的 `devices.signing_algorithm` 和 `device_join_requests.signing_algorithm` 是无默认值的 `NOT NULL` 字段；旧数据库只允许迁移事务在增加缺失列时用 `ed25519-v1` 回填历史行，并记录 metadata schema version 2。迁移后 application/storage 仍必须为每个新 device/join 显式写入算法，不能依赖 SQLite 列默认值把缺失请求解释成 Ed25519；API DTO 缺失、空值或未知算法必须在进入持久化前失败关闭。
+
 ## HTTP API 边界
 
 首批 API 使用 `/api/v1` 前缀。metadata 使用 JSON；当前对象上传使用 JSON `payload` byte 字段承载 encrypted bytes，Go JSON 编码下表现为 base64 字符串；对象 payload 下载接口返回 `application/octet-stream` 二进制密文。后续可以调整传输细节，但不能改变“metadata 可验证、payload 仍为密文”的边界。

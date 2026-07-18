@@ -56,7 +56,9 @@ RadishLexError*
 
 ### FFI contract
 
-`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v5 保留 v4 的产品个人化 Rime session、版本化学习上下文、display/engine index 映射、个人化状态和学习结果，并在 `RadishLexUserTermView` 末尾增加可选的本地 `import_batch_id`，供 manager 精确关联导入审计；该字段不进入同步 payload。产品绑定必须同时校验 contract 与所需 symbol 集。当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。`radishlex_apple_p256_product_status` 使用独立 validation status schema v1，`radishlex_apple_p256_product_smoke` 使用 smoke schema v4，均不改变 ABI contract v5；前者只读报告 target 编译、运行时能力、产品资格、用户同步 gate 和保护属性，后者只有 manager 产品进程显式场景与环境门同时满足才执行 DPK 生命周期或失败矩阵。v4 只新增固定错误细分和数值 OSStatus，不返回 CFError 文本、private/public key、canonical bytes 或 signature bytes；Dart dynamic binding 和 Flutter method channel 不得声明这些 symbol。
+`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v5 保留 v4 的产品个人化 Rime session、版本化学习上下文、display/engine index 映射、个人化状态和学习结果，并在 `RadishLexUserTermView` 末尾增加可选的本地 `import_batch_id`，供 manager 精确关联导入审计；该字段不进入同步 payload。产品绑定必须同时校验 contract 与所需 symbol 集。当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
+
+Apple 产品验证使用独立于 ABI contract v5 的原生自检结构：普通 DPK 的 `radishlex_apple_p256_product_status/smoke` 分别使用 status schema v1 与 smoke schema v4；Secure Enclave 的 `radishlex_apple_secure_enclave_p256_product_status/smoke` 分别使用独立 status schema v1 与 smoke schema v1。两组 status 都只读报告 target 编译、运行时能力、产品资格、用户同步 gate 和保护属性；smoke 只有 manager 产品进程显式场景与环境门同时满足才执行，Secure Enclave 比普通 DPK 多一个 unsupported create 场景。两组 smoke 复用固定字段布局，返回固定错误分类、数值 OSStatus、生命周期与 cleanup 布尔摘要，不返回 CFError 文本、private/public key、canonical bytes 或 signature bytes。Dart dynamic binding、`ManagerBridge` 和 Flutter method channel 不得声明或调用这些 symbol。
 
 ### Status 与文本 view
 
@@ -335,45 +337,11 @@ Rust 内部的 `UserDb::p2_plaintext_payloads()`、`ime-sync::SyncEnvelopeAssemb
 - 返回的 `RadishLexRankExplain*` 由 `radishlex_userdb_rank_explain_free` 释放；`radishlex_userdb_rank_explain_view` 返回的 string view 借用自该 handle，平台端必须在释放前复制。
 - `final_score` 是 `ime-ranker` 对该候选的当前解释分数；平台 UI 可以展示摘要，但不得把这些字段作为输入热路径之外的业务真相源。
 
-### User term view
+### Userdb dictionary views
 
-`RadishLexUserTermView`：
+user term、deleted tombstone、dictionary inspect/export/import 与 import batch 的字段级结构、数值常量和本地审计语义统一见 [FFI Dictionary Reference](ffi-dictionary-reference.md)。本文件只保留所有权、隐私和跨平台通用边界。
 
-```text
-id: i64
-input_code: RadishLexStringView
-text: RadishLexStringView
-reading: RadishLexStringView
-reading_present: u8
-source: u32
-status: u32
-weight: f64
-created_at_ms: i64
-updated_at_ms: i64
-last_used_at_ms: i64
-last_used_at_present: u8
-```
-
-当前 term source：
-
-```text
-engine_selection = 1
-manual_import = 2
-manual_add = 3
-phrase_learning = 4
-```
-
-当前 term status：
-
-```text
-active = 1
-suppressed = 2
-deleted = 3
-```
-
-### Dictionary file summaries
-
-dictionary inspect、export、import 与 import batch 的字段级结构、常量和规则见 [FFI Dictionary Reference](ffi-dictionary-reference.md)。本文件只保留所有权、隐私和跨平台通用边界。
+ABI v5 的 `import_batch_id` 只关联最近一次真实写入词条的本地导入批次，不进入 P2 payload；所有 term/deleted/batch string view 都借用自对应 owned list handle，平台绑定必须复制字段后再释放 handle。
 
 `radishlex_session_push_key` 与 `radishlex_session_push_key_event` 保留为兼容和测试入口；真实平台壳必须使用 `radishlex_session_handle_key_event`。当前 normalized key event 使用数值常量承载字符键、命名键、修饰键、按下 / 释放阶段和平台不可识别键，避免让无效 enum discriminant 在 FFI 边界形成未定义行为。
 

@@ -11,7 +11,7 @@
 - 2026-06-30 smoke 在沙盒和提权真实环境均阻塞于 Ed25519 Keychain key 创建阶段，错误为 `UnsupportedSignatureAlgorithm { algorithm: "ed25519-v1" }`；测试未进入签名成功或用户可用同步路径。
 - `apple-keychain-v1` 的 `backend_status` 在平台策略未解决前必须阻断生产签名；普通 feature 测试只验证编译和状态门禁，不创建 Keychain item。
 - `apple-keychain-p256-v1` 已进入 manager Release native library 并通过 provisioning-backed manager 产品进程 DPK 生命周期。Apple 的能力边界与实测参数审计确认普通 DPK 软件 key 可由平台 API 导出，因此运行时字段开放，`exportable=true`、`product_qualified=false`。
-- 独立 `apple-secure-enclave-p256-v1` 已完成仓库与 manager 产品构建接线，但本 runbook 的普通 DPK 证据不得复用；实际 Secure Enclave 访问见独立 runbook，当前 runtime/hardware/product 字段保持关闭。
+- 独立 `apple-secure-enclave-p256-v1` 的 qualification lifecycle、不可导出、hardware-backed、ad-hoc denied 与真实设备锁屏 locked 已有证据，但本 runbook 的普通 DPK 证据不得与之互换；实际 Secure Enclave 操作见独立 runbook。其 runtime/hardware 字段只按自身证据开放，unsupported、`product_qualified` 与用户同步 gate 仍关闭。
 - 当前策略保留 `ed25519-v1` 设备签名协议，不把 Ed25519 seed 作为 generic password / data item 存入 Keychain 后取回 Rust 签名，也不把该软件保护方案伪装成 `apple-keychain-v1`。
 - `apple-keychain-v1` 用于真实远端对象前必须通过本 runbook 的创建、加载、签名、删除 / 撤销、锁屏 / 权限、备份迁移和日志脱敏验证。
 - 未验证 Secure Enclave 前，不承诺 `hardware_backed = true`。

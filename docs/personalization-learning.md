@@ -186,12 +186,12 @@ DeletedTerm
 
 | 表 | 稳定字段 |
 | --- | --- |
-| `user_terms` | `id`、`text`、`reading`、`input_code`、`source`、`weight`、`status`、`created_at`、`updated_at`、`last_used_at`、`restored_at` |
+| `user_terms` | `id`、`text`、`reading`、`input_code`、`source`、`weight`、`status`、`created_at`、`updated_at`、`last_used_at`、`restored_at`、`import_batch_id` |
 | `selection_events` | `id`、`session_id`、`input_code`、`selected_text`、`selected_reading`、`candidate_index`、`candidate_count`、`context_kind`、`created_at` |
 | `negative_feedback` | `id`、`input_code`、`text`、`reading`、`reason`、`context_kind`、`created_at` |
 | `deleted_terms` | `id`、`term_id`、`input_code`、`text`、`reading`、`deleted_at`、`reason` |
 | `ranker_weights` | `id`、`input_code`、`text`、`reading`、`frequency`、`last_used_at_ms`、`negative_score`、`context_kind`、`updated_at` |
-| `import_batches` | `id`、`source_name`、`term_count`、`created_at`、`notes` |
+| `import_batches` | `id`、`source_name`、`term_count`、`total_count`、`inserted_count`、`updated_count`、`skipped_deleted_count`、`skipped_duplicate_count`、`created_at`、`notes` |
 
 ### SQLite 稳定决策
 
@@ -199,7 +199,7 @@ DeletedTerm
 - 文件型 userdb 固定使用 WAL、`busy_timeout = 5000 ms`、`foreign_keys = ON` 和 `synchronous = NORMAL`。IME 与 manager 各持有独立 SQLite 连接，不跨线程共享同一个 `Connection`；IME 可持有长期热路径连接，manager 使用独立短事务连接，写事务不得跨 UI 或平台回调等待。
 - 文件连接必须在任何 schema/version/integrity SQL 之前安装 busy timeout；首次并发打开争用 WAL journal mode 时，只对 SQLite busy/locked 或尚未切换到 WAL 的结果在同一 5 秒预算内重试，其他错误立即返回。不能把初始化竞争暴露成偶发启动失败，也不能无界重试或吞掉非锁错误。
 - Unix 上数据库主文件及已生成的 `-wal`、`-shm` sidecar 权限固定收紧为 `0600`。userdb 不依赖 shell 环境变量或真实用户 Rime 目录。
-- schema migration 在一个事务内完成。打开数据库时先读取并检查 `PRAGMA user_version`；高于当前实现的未来版本必须在任何 schema 写入前拒绝。v1/v2 升级必须保留词条、学习摘要、导入审计和删除状态，并收敛到同一当前 schema。
+- 当前 schema 为 v4。migration 在一个 `BEGIN IMMEDIATE` 事务内完成；打开数据库时先读取并检查 `PRAGMA user_version`，取得写事务后必须重读版本，高于当前实现的未来版本必须在任何 schema 写入前拒绝。全新空库直接创建 v4；v1/v2 才执行 legacy tombstone identity、ranker recency、恢复版本和导入批次计数迁移，v3 -> v4 只增加 nullable `user_terms.import_batch_id` 外键，不得重放旧 identity/recency 迁移，也不得为历史词条伪造导入来源。
 - 文件损坏、身份迁移歧义或 migration 失败时，原数据库文件必须原位保留并返回带路径/SQLite 原因的显式错误；不得静默删除、重命名后新建、降级为空库或用 fixture 代替。
 - tombstone 的唯一身份使用 trim 归一化后的 `(input_code, text, reading)` 复合键。旧 64 位 FNV 字段只允许在 v1/v2 migration 中帮助关联既有本地行，不再作为当前 schema 的查询、唯一性或同步判断依据；无法无歧义恢复身份时 migration 整体失败并保留旧库。
 
@@ -407,7 +407,7 @@ luobo	萝卜	luo bo	manual_add	2	active
 
 导入解析先识别格式版本，再按对应 header 解析字段。当前只支持 `radishlex-user-terms-v1`；未来未知版本必须返回明确的不兼容错误，不能按 v1 静默导入。
 
-导入会记录 `import_batches`，其中 `source_name` 来自 `dict import --source <name>`，未传时为 `cli`。该批次记录只表达导入来源，不改变每条词条的 `source` 字段。
+实际导入会在同一事务内先记录 `import_batches`，再把本批次真实插入或更新的词条写入对应 `import_batch_id`；dry run、deleted skip 和 duplicate skip 不创建或改写本批次关联，既有词条的历史关联保持原样。`source_name` 来自 `dict import --source <name>`，CLI 未传时为 `cli`。该批次记录只表达本地导入审计来源，不改变每条词条的 `source` 字段，也不进入 P2 payload。
 `source_name` 只允许 ASCII 字母、数字、dot、underscore 和 dash，最长 64 bytes。导入文件内重复的 `input_code`、`text`、`reading` 身份会跳过后续重复项；同 `input_code`、`text` 但不同 `reading` 视为不同词条。
 
 ### 同步前置检查
@@ -445,7 +445,7 @@ luobo	萝卜	luo bo	manual_add	2	active
 - 固定合成排序评测至少记录 Top-1、Top-3、MRR 和 case 数；样例只使用公开合成词，不使用真实输入历史。基线变差必须由权重/语义变更说明解释，不能只凭主观体验接受。
 - 候选重排延迟使用固定候选数、固定迭代次数和 warm-up 记录可复验统计；CI 只校验结果、样本规模与统计值有限，不使用易受共享机器波动影响的严苛墙钟上限。
 
-R02L 已按上述口径建立 schema v3 与固定测试基线：5 个公开合成 case 的 Top-1 为 `0.8`、Top-3 为 `1.0`、MRR 为 `0.9`；延迟样本固定为 50 个候选、100 次 warm-up 和 1000 次计时迭代。M2 后续 schema v4 只增加不进入同步 payload 的本地导入批次关联，不改变这些学习、排序和删除语义。该基线只证明本地正确性与可复验性；产品 runtime 的自动化接线不能替代真实平台学习纵向证据或 M2 产品退出，具体机器观测与全仓门禁记录在 devlog。
+R02L 按上述口径建立了 schema v3 学习语义与固定测试基线：5 个公开合成 case 的 Top-1 为 `0.8`、Top-3 为 `1.0`、MRR 为 `0.9`；延迟样本固定为 50 个候选、100 次 warm-up 和 1000 次计时迭代。当前 schema v4 只增加不进入同步 payload 的本地导入批次关联，不改变这些学习、排序和删除语义。该基线只证明本地正确性与可复验性；产品 runtime 自动化不能替代真实平台纵向证据，具体机器观测与全仓门禁记录在对应验收材料。
 
 默认验证入口：
 
