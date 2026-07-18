@@ -129,7 +129,7 @@ M3 同步管理能力在安全退出条件满足后覆盖：
 
 管理端应通过 `ime-ffi` 或后续受控 bridge 调用 Rust 能力，不直接读写 Rust 内部结构。
 
-当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、explicit restore、词库导入检查、词库导入、词库导出、设置草案保存、诊断报告预览和诊断报告导出这组受控方法。现有 `FixtureManagerBridge` 只在显式 demo 与测试中使用合成数据验证调用边界和 UI 状态；真实 Dart FFI bridge 已覆盖本地 userdb active/deleted list、delete、restore、dictionary inspect/import/export、import batches、learning status、rank explain、sync preflight、非 secret settings JSON 和脱敏诊断报告。产品 bootstrap 还通过受控平台 bridge 解析固定路径、收紧文件权限并读写输入 runtime 的隐私偏好。Dart 绑定层通过 ABI v5 复制 Rust user-term view 的可选 `import_batch_id` 后释放 handle，不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层；widget 层只展示结构化错误码、错误分类和非敏感配置来源诊断。
+当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、explicit restore、词库导入检查、词库导入、词库导出、设置草案保存、诊断报告预览和诊断报告导出这组受控方法。现有 `FixtureManagerBridge` 只在显式 demo 与测试中使用合成数据验证调用边界和 UI 状态；真实 Dart FFI bridge 已覆盖本地 userdb active/deleted list、delete、restore、dictionary inspect/import/export、import batches、learning status、rank explain、sync preflight、非 secret settings JSON 和脱敏诊断报告。产品 bootstrap 还通过受控平台 bridge 解析固定路径、收紧文件权限并读写输入 runtime 的隐私偏好。Dart 绑定层通过 ABI v5 复制 Rust user-term view 的可选 `import_batch_id` 后释放 handle，不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层；widget 层只展示结构化错误码、错误分类和非敏感配置来源诊断。manager Release dylib 中的 Apple P-256 validation ABI 只由原生产品自检路径使用，Dart/`ManagerBridge` 不绑定。
 
 settings JSON schema、部署证据来源 allowlist、诊断报告字段索引和脱敏规则见 `docs/manager-settings-diagnostics.md`。
 

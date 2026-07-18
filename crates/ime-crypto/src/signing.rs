@@ -405,9 +405,14 @@ impl DeviceSigningBackendCapabilities {
 pub struct DevicePrivateKeyStoreStatus {
     pub storage_backend: DeviceSigningStorageBackend,
     pub signature_algorithm: Option<SignatureAlgorithmId>,
+    /// Whether this backend implementation is compiled for the current target.
+    pub compiled: bool,
+    /// Runtime API capability in the current process. This is not a product gate.
     pub available: bool,
     pub can_create_signing_keys: bool,
     pub can_sign: bool,
+    /// Whether product-process evidence and review have qualified this backend.
+    pub product_qualified: bool,
     pub capabilities: DeviceSigningBackendCapabilities,
 }
 
@@ -416,9 +421,11 @@ impl DevicePrivateKeyStoreStatus {
         Self {
             storage_backend: DeviceSigningStorageBackend::TestMemoryV1,
             signature_algorithm: Some(SignatureAlgorithmId::ed25519_v1()),
+            compiled: true,
             available: true,
             can_create_signing_keys: true,
             can_sign: true,
+            product_qualified: false,
             capabilities: DeviceSigningBackendCapabilities::test_memory(),
         }
     }
@@ -427,36 +434,58 @@ impl DevicePrivateKeyStoreStatus {
         Self {
             storage_backend: DeviceSigningStorageBackend::Unavailable,
             signature_algorithm: None,
+            compiled: false,
             available: false,
             can_create_signing_keys: false,
             can_sign: false,
+            product_qualified: false,
             capabilities: DeviceSigningBackendCapabilities::unavailable(),
         }
     }
 
     pub fn apple_keychain_v1() -> Self {
-        // The native Apple Keychain Ed25519 path is wired for gated smoke only.
-        // It must not advertise production readiness until the platform smoke passes.
+        // Repository-level metadata does not claim target compilation or runtime support.
         Self {
             storage_backend: DeviceSigningStorageBackend::AppleKeychainV1,
             signature_algorithm: Some(SignatureAlgorithmId::ed25519_v1()),
+            compiled: false,
             available: false,
             can_create_signing_keys: false,
             can_sign: false,
+            product_qualified: false,
             capabilities: DeviceSigningBackendCapabilities::apple_keychain_v1(),
         }
     }
 
     pub fn apple_keychain_p256_v1() -> Self {
-        // The native Apple P-256 path is a repository-only capability spike.
-        // Production remains blocked until the gated platform smoke is authorized and passes.
+        // Repository-level metadata does not claim target compilation or runtime support.
         Self {
             storage_backend: DeviceSigningStorageBackend::AppleKeychainP256V1,
             signature_algorithm: Some(SignatureAlgorithmId::ecdsa_p256_sha256_v1()),
+            compiled: false,
             available: false,
             can_create_signing_keys: false,
             can_sign: false,
+            product_qualified: false,
             capabilities: DeviceSigningBackendCapabilities::apple_keychain_p256_v1(),
+        }
+    }
+
+    pub fn apple_keychain_v1_compiled() -> Self {
+        Self {
+            compiled: true,
+            ..Self::apple_keychain_v1()
+        }
+    }
+
+    pub fn apple_keychain_p256_v1_runtime_capable() -> Self {
+        Self {
+            compiled: true,
+            available: true,
+            can_create_signing_keys: true,
+            can_sign: true,
+            product_qualified: false,
+            ..Self::apple_keychain_p256_v1()
         }
     }
 
@@ -466,9 +495,11 @@ impl DevicePrivateKeyStoreStatus {
         Self {
             storage_backend: DeviceSigningStorageBackend::AndroidKeystoreV1,
             signature_algorithm: Some(SignatureAlgorithmId::ed25519_v1()),
+            compiled: false,
             available: false,
             can_create_signing_keys: false,
             can_sign: false,
+            product_qualified: false,
             capabilities: DeviceSigningBackendCapabilities::android_keystore_v1(),
         }
     }
@@ -488,9 +519,11 @@ impl DevicePrivateKeyStoreStatus {
         Ok(Self {
             storage_backend,
             signature_algorithm: backend_signature_algorithm(storage_backend),
+            compiled: true,
             available: true,
             can_create_signing_keys: true,
             can_sign: true,
+            product_qualified: true,
             capabilities,
         })
     }
@@ -519,10 +552,23 @@ impl DevicePrivateKeyStoreStatus {
                 message: "unavailable backend cannot be marked available".to_owned(),
             });
         }
+        if !self.compiled && self.available {
+            return Err(CryptoError::BackendCapabilityMismatch {
+                backend: self.storage_backend.as_str().to_owned(),
+                message: "runtime availability requires a compiled backend".to_owned(),
+            });
+        }
         if !self.available && (self.can_create_signing_keys || self.can_sign) {
             return Err(CryptoError::BackendCapabilityMismatch {
                 backend: self.storage_backend.as_str().to_owned(),
                 message: "unavailable status cannot create keys or sign".to_owned(),
+            });
+        }
+        if self.product_qualified && (!self.compiled || !self.available || !self.can_sign) {
+            return Err(CryptoError::BackendCapabilityMismatch {
+                backend: self.storage_backend.as_str().to_owned(),
+                message: "product qualification requires compiled runtime signing capability"
+                    .to_owned(),
             });
         }
         Ok(())
@@ -539,6 +585,12 @@ impl DevicePrivateKeyStoreStatus {
             return Err(CryptoError::BackendCapabilityMismatch {
                 backend: self.storage_backend.as_str().to_owned(),
                 message: "backend is not eligible for production signing".to_owned(),
+            });
+        }
+        if !self.product_qualified {
+            return Err(CryptoError::BackendCapabilityMismatch {
+                backend: self.storage_backend.as_str().to_owned(),
+                message: "backend has runtime capability but is not product-qualified".to_owned(),
             });
         }
         Ok(())

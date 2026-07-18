@@ -6,6 +6,10 @@ use radishlex_ime_core::SchemaId;
 #[cfg(feature = "native-rime")]
 use radishlex_ime_engine_rime::RimeEngineConfig;
 
+use crate::apple_p256_product::{
+    run_product_smoke, write_product_status, RadishLexAppleP256ProductSmokeSummary,
+    RadishLexAppleP256ProductStatus,
+};
 use crate::buffer::RadishLexBuffer;
 use crate::contract::RadishLexFfiContract;
 use crate::dictionary::{
@@ -29,6 +33,36 @@ use crate::sync_status::{sync_preflight_for_path, RadishLexSyncPreflightSummary}
 #[path = "abi/user_terms.rs"]
 mod user_terms;
 pub use user_terms::*;
+
+#[no_mangle]
+/// Returns compile/runtime capability and independent product/user-sync gates.
+///
+/// This validation ABI never returns key, canonical, or signature bytes.
+///
+/// # Safety
+/// `status_out` must be writable.
+pub unsafe extern "C" fn radishlex_apple_p256_product_status(
+    status_out: *mut RadishLexAppleP256ProductStatus,
+) -> u32 {
+    unsafe { write_product_status(status_out) }
+}
+
+#[no_mangle]
+/// Runs the explicitly gated manager product-process Apple P-256 smoke.
+///
+/// The returned summary contains fixed flags only. Private key material,
+/// canonical bytes, public key bytes, and signature bytes stay inside the
+/// native validation path and are never returned to Dart.
+///
+/// # Safety
+/// `go_server_dir` must be null or point to a NUL-terminated UTF-8 string;
+/// `summary_out` must be writable.
+pub unsafe extern "C" fn radishlex_apple_p256_product_smoke(
+    go_server_dir: *const c_char,
+    summary_out: *mut RadishLexAppleP256ProductSmokeSummary,
+) -> u32 {
+    unsafe { run_product_smoke(go_server_dir, summary_out) }
+}
 
 #[no_mangle]
 /// # Safety

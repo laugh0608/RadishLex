@@ -156,11 +156,13 @@ Sync Master Key + object identity + key epoch
 
 禁止从平台名称推断算法一定可用，也禁止 unavailable backend 静默回退到内存私钥或普通文件。
 
+状态必须区分：当前 target 是否编译 backend、当前进程是否具备创建/签名运行时能力、产品 bundle 是否经过真实环境资格评审，以及 M3 用户同步总 gate。前两层为 true 不推出后两层为 true；`test-memory-v1` 即使运行时可用也永远不能获得产品资格。
+
 协议必须允许算法演进。平台原生 P-256 与“由平台密钥封装的 Ed25519 seed”具有不同保护语义，必须使用不同 backend/algorithm ID 和测试矩阵。
 
 当前设备签名 allowlist 为 `ed25519-v1` 与 `ecdsa-p256-sha256-v1`。后者只接受 65-byte SEC1 uncompressed public key 和 64-byte P1363 signature；两者复用既有 canonical builder，算法 id 本身被签名。设备登记必须绑定 algorithm、key id 与 public key，服务端不能按长度猜测算法，验签失败也不能尝试另一 profile。历史行回填 Ed25519 只能发生在明确 schema migration，新请求不得默认。
 
-`apple-keychain-p256-v1` 只表示 Apple 原生 P-256 `SecKey` 候选，和 Ed25519 `apple-keychain-v1` 分离。基础生命周期 gated smoke 已通过，但产品进程访问、locked/denied 和 capability status 未闭环前仍保持 production status 关闭；不可从“Apple Keychain”名称或基础 smoke 推断 Secure Enclave、hardware-backed、user presence 或可迁移能力。
+`apple-keychain-p256-v1` 只表示 Apple 原生 P-256 `SecKey` 候选，和 Ed25519 `apple-keychain-v1` 分离。命令行和 manager Release 产品进程正常生命周期 smoke 已通过，private/public key、canonical bytes 与 signature bytes 均未进入 Dart；当前 macOS feature build 可报告编译和运行时能力。locked/denied 与最终评审未闭环，因此 `product_qualified=false`、用户同步 gate 关闭；不可从“Apple Keychain”名称或正常生命周期推断 Secure Enclave、hardware-backed、user presence 或可迁移能力。
 
 ## 新设备授权
 

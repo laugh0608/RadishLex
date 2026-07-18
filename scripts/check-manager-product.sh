@@ -13,6 +13,10 @@ m2_cleanup_source="${repo_root}/platforms/macos-imk/Tools/test_data_cleanup.c"
 m2_cleanup_helper_contract="${repo_root}/platforms/macos-imk/Tests/m2_manager_test_data_cleanup_helper_contract.sh"
 m2_cleanup_orchestration_contract="${repo_root}/platforms/macos-imk/Tests/m2_manager_test_data_cleanup_orchestration_contract.sh"
 manager_window="${manager_dir}/macos/Runner/MainFlutterWindow.swift"
+apple_status_smoke="${manager_dir}/tool/apple_p256_product_status_smoke.c"
+apple_status_smoke_binary="${smoke_dir}/apple-p256-product-status-smoke"
+apple_product_smoke="${repo_root}/scripts/run-manager-apple-keychain-p256-product-smoke.sh"
+manager_app_delegate="${manager_dir}/macos/Runner/AppDelegate.swift"
 
 cleanup() {
   rm -rf "${smoke_dir}"
@@ -24,8 +28,12 @@ if [ "$(uname -s)" != "Darwin" ]; then
   exit 1
 fi
 
-bash -n "${m2_cleanup}" "${m2_cleanup_wrapper}" \
+bash -n "${m2_cleanup}" "${m2_cleanup_wrapper}" "${apple_product_smoke}" \
   "${m2_cleanup_helper_contract}" "${m2_cleanup_orchestration_contract}"
+rg -Fq '"${1:-}" != "--authorized-product-keychain-smoke"' "${apple_product_smoke}"
+rg -Fq 'RADISHLEX_RUN_MANAGER_APPLE_KEYCHAIN_P256_SMOKE=1' "${apple_product_smoke}"
+rg -Fq -- '--radishlex-apple-p256-product-smoke' "${apple_product_smoke}" "${manager_app_delegate}"
+rg -Fq 'RADISHLEX_RUN_MANAGER_APPLE_KEYCHAIN_P256_SMOKE' "${manager_app_delegate}"
 rg -Fq '"${1}" != "--authorized-delete-m2-manager-test-data"' \
   "${m2_cleanup_wrapper}"
 rg -Fxq 'exec "${repo_root}/platforms/macos-imk/cleanup-m2-manager-test-data.sh" "$1"' \
@@ -64,6 +72,25 @@ if codesign -d --entitlements :- "${app_bundle}" 2>&1 | grep -Fq "com.apple.secu
 fi
 
 codesign --verify --deep --strict "${app_bundle}"
+for symbol in \
+  _radishlex_apple_p256_product_status \
+  _radishlex_apple_p256_product_smoke; do
+  if ! nm -gU "${native_library}" | grep -Eq "(^|[[:space:]])${symbol}$"; then
+    echo "manager product native library is missing required symbol: ${symbol}" >&2
+    exit 1
+  fi
+done
+if rg -n 'radishlex_apple_p256_product_(smoke|status)' \
+  "${manager_dir}/lib" "${manager_dir}/tool/ffi_bridge_smoke.dart"; then
+  echo "Apple P-256 product validation ABI must not be bound by Dart." >&2
+  exit 1
+fi
+clang -std=c11 -Wall -Wextra -Werror -pedantic \
+  -I "${repo_root}/crates/ime-ffi/include" \
+  "${apple_status_smoke}" "${native_library}" \
+  -Wl,-rpath,"$(dirname "${native_library}")" \
+  -o "${apple_status_smoke_binary}"
+"${apple_status_smoke_binary}"
 (
   cd "${manager_dir}"
   dart run tool/ffi_bridge_smoke.dart \

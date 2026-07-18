@@ -1,6 +1,6 @@
 # Apple Keychain Signing Backend Runbook
 
-本文档定义 `apple-keychain-v1` 与 `apple-keychain-p256-v1` 设备签名 backend 的平台验证边界。读者是后续实现 macOS / iOS Keychain bridge、`ime-crypto` backend 接线、管理 UI 设备页面和审阅同步隐私边界的开发者。本文不包含 FFI 导出接口、App Sandbox entitlement 配置、输入法安装流程、Flutter 页面或真实用户同步开放步骤；平台私钥抽象见 ADR 0004，算法 profile 见 ADR 0006。
+本文档定义 `apple-keychain-v1` 与 `apple-keychain-p256-v1` 设备签名 backend 的平台验证边界，以及 macOS manager 产品进程 gated smoke。读者是后续实现 macOS / iOS Keychain bridge、`ime-crypto`/`ime-ffi` 接线、管理 UI 设备页面和审阅同步隐私边界的开发者。本文不包含真实同步命令、App Sandbox 迁移、输入法安装流程或 Flutter 同步页面；平台私钥抽象见 ADR 0004，算法 profile 见 ADR 0006。
 
 ## 当前结论
 
@@ -10,7 +10,7 @@
 - `apple-keychain-v1` 已完成 feature-gated 接线和 ignored smoke 测试骨架；真实 Keychain smoke 已执行但未通过，不能视为平台验证通过。
 - 2026-06-30 smoke 在沙盒和提权真实环境均阻塞于 Ed25519 Keychain key 创建阶段，错误为 `UnsupportedSignatureAlgorithm { algorithm: "ed25519-v1" }`；测试未进入签名成功或用户可用同步路径。
 - `apple-keychain-v1` 的 `backend_status` 在平台策略未解决前必须阻断生产签名；普通 feature 测试只验证编译和状态门禁，不创建 Keychain item。
-- `apple-keychain-p256-v1` 的 repository spike 已覆盖 SecKey 参数、public key encoding、DER -> P1363、Rust/Go 验签和结构化错误映射；命令行基础生命周期 gated smoke 已通过，产品进程访问、失败矩阵和 capability status 未闭环前继续保持关闭。
+- `apple-keychain-p256-v1` 已进入 manager Release native library。命令行和 manager Release 产品进程正常生命周期 gated smoke 均已通过；locked/denied 与最终资格评审尚未完成，故 `product_qualified=false`。
 - 当前策略保留 `ed25519-v1` 设备签名协议，不把 Ed25519 seed 作为 generic password / data item 存入 Keychain 后取回 Rust 签名，也不把该软件保护方案伪装成 `apple-keychain-v1`。
 - `apple-keychain-v1` 用于真实远端对象前必须通过本 runbook 的创建、加载、签名、删除 / 撤销、锁屏 / 权限、备份迁移和日志脱敏验证。
 - 未验证 Secure Enclave 前，不承诺 `hardware_backed = true`。
@@ -74,16 +74,24 @@ backend_status() -> DevicePrivateKeyStoreStatus
 
 ## 能力声明
 
-两个 Apple backend 当前都使用保守能力；P-256 基础生命周期证据不会自动改变以下声明：
+能力必须按证据分层。当前 macOS `apple-keychain-p256-v1` feature build 的声明为：
 
 ```text
 storage_backend = apple-keychain-p256-v1
 signature_algorithm = ecdsa-p256-sha256-v1
+compiled = true
+available = true
+can_create_signing_keys = true
+can_sign = true
+product_qualified = false
+user_sync_enabled = false
 exportable = false
 hardware_backed = false
 user_presence_required = false
 backup_migratable = false
 ```
+
+其中前四个 true 只表示当前 target 已编译且命令行实机证据支持 Apple Security API 创建/签名能力；它们不等于产品资格。未启用 feature、非 macOS target 与阻塞中的 Ed25519 path 必须继续报告对应 false。
 
 规则：
 
@@ -225,7 +233,7 @@ iOS / Keyboard Extension 后续还需验证：
 cargo test -p radishlex-ime-crypto --features apple-keychain
 ```
 
-该命令会显示 Keychain integration tests 为 ignored，不会创建系统 key。
+该命令会显示 Keychain integration tests 为 ignored，不会创建系统 key。`./scripts/check-manager-product.sh` 还会构建 Release app、确认 bundle dylib 含 Apple validation ABI，并用独立 C host 只读检查编译/运行时字段与关闭的产品/同步 gate；它不启动 app，不访问 Keychain。
 
 macOS 本机手动 / gated smoke：
 
@@ -241,6 +249,19 @@ RADISHLEX_RUN_APPLE_KEYCHAIN_P256_SMOKE=1 \
 
 正常 smoke 不证明 locked / denied。若要锁定 Keychain、改变 app 权限、sandbox/entitlement 或 user-presence policy，必须单独列出系统状态变化和恢复步骤并再次获得授权。
 
+macOS manager 产品进程 gated smoke：
+
+```text
+./scripts/run-manager-apple-keychain-p256-product-smoke.sh \
+  --authorized-product-keychain-smoke
+```
+
+执行前必须先通过 `./scripts/check-manager-product.sh` 冻结同一 Release bundle，并单独取得“启动 manager 产品进程 + 访问本机 Keychain”的授权。入口使用显式参数、产品进程环境门和 native FFI 内部环境门三重约束；普通 GUI 启动不会调用它。
+
+产品 smoke 在 manager bundle executable 进程中加载 bundle dylib，native 内完成创建、跨 store 重载、签名、Rust 验签、短生命周期 Go verifier、删除、内存撤销后失败、fresh store missing 与 cleanup guard。返回 Swift 的只有固定布尔摘要和结果码；private key、public key、canonical bytes 与 signature bytes 不进入 Dart、Flutter method channel、日志或诊断。Go 子进程的 stdout/stderr 被关闭，失败只映射为固定 `go_verify_failed` 类别。
+
+该入口即使成功，也不自动证明 locked/denied、Secure Enclave、hardware-backed、user presence、backup migration 或真实用户同步可用。
+
 ## 2026-07-18 P-256 实机证据
 
 - 环境：arm64 macOS 26.5.2（25F84），仓库分支 `dev`，本轮基线提交 `c8457e9`。
@@ -249,9 +270,16 @@ RADISHLEX_RUN_APPLE_KEYCHAIN_P256_SMOKE=1 \
 - 本轮未锁定 Keychain、修改权限、sandbox/entitlement、user-presence policy 或系统输入法设置，也未访问真实同步、userdb 或用户输入数据。
 - 该证据不证明 locked/denied 真实映射、产品 bundle 进程可访问、Secure Enclave、hardware-backed、user presence、backup migration 或 production-ready；这些能力继续独立门禁。
 
+## 2026-07-18 产品接线证据
+
+- manager Release dylib 已显式启用 `ime-ffi/apple-keychain`，导出只读 status 与 gated product smoke validation ABI；ABI v5 的既有 Dart 管理接口未改变。
+- `./scripts/check-manager-product.sh` 已通过 Release build、严格签名、native symbol、C status host 和既有 Dart FFI smoke。只读结果为 `compiled/runtime_available/can_create/can_sign=true`，`product_qualified/user_sync_enabled=false`，其余未证明能力保持 false。
+- 经开发者单独授权运行同一 Release bundle，产品进程固定摘要为 `result=0`，且 `created/reloaded/rust_verified/go_verified/deleted/missing/fail_closed/cleanup_attempted=1`。`product_qualified/user_sync_enabled` 均保持 0。
+- 该证据只覆盖正常登录会话，不覆盖 locked/denied，也未修改 Keychain 锁定、权限、sandbox/entitlement 或 user-presence policy；因此不得把本节写成完整产品资格通过。
+
 ## 停止线
 
-- `apple-keychain-p256-v1` 已通过基础生命周期 smoke，但 capability status、产品进程访问和受控失败矩阵完成前，不用于真实远端对象上传。
+- `apple-keychain-p256-v1` 已通过命令行与正常产品进程生命周期，但 `product_qualified=false`；受控失败矩阵和最终评审完成前，不用于真实远端对象上传。
 - 如果需要导出私钥 bytes 才能完成签名，应停止并回退设计。
 - 如果 backend unavailable 时回退到 `test-memory-v1`，必须停止并回退实现。
 - 如果 Keychain label / account / 日志包含真实用户名、设备名称、本机路径或输入内容，必须停止并修正。

@@ -15,6 +15,9 @@ repo_root="$(CDPATH= cd -- "${PROJECT_DIR}/../../.." && pwd)"
 target_dir="${RADISHLEX_CARGO_TARGET_DIR:-${repo_root}/target}"
 profile="debug"
 cargo_args=(build --locked -p radishlex-ime-ffi)
+if [ "$(uname -s)" = "Darwin" ]; then
+  cargo_args+=(--features apple-keychain)
+fi
 if [ "${CONFIGURATION:-Debug}" != "Debug" ]; then
   profile="release"
   cargo_args+=(--release)
@@ -39,6 +42,8 @@ install -m 755 "${source_library}" "${bundled_library}"
 install_name_tool -id "@rpath/libradishlex_ime_ffi.dylib" "${bundled_library}"
 
 required_symbols=(
+  _radishlex_apple_p256_product_smoke
+  _radishlex_apple_p256_product_status
   _radishlex_ffi_contract
   _radishlex_userdb_terms_new
   _radishlex_userdb_deleted_terms_new

@@ -8,6 +8,7 @@
 - 真实远端同步、恢复码生成与输入、设备加入授权、设备撤销和密钥轮换没有产品执行入口。
 - `ManagerBridge` 当前不提供上述同步命令；缺少能力本身就是产品关闭证据，不使用 future command preview 或审批状态机模拟接口。
 - 即使 endpoint、平台 backend、部署证据和 readiness 摘要均显示 ready，用户同步入口仍保持关闭，直到 M3 退出条件满足。
+- manager Release native library 可以包含 Apple P-256 backend 与只返回固定 flags 的产品 validation ABI；该 ABI 不属于 `ManagerBridge` 同步命令，不进入 Dart binding，也不能解锁按钮。
 
 ## UI 职责
 
@@ -47,6 +48,8 @@ Manager 不可以：
 - Rust / FFI / Dart 的所有权、复制、释放、线程和 panic 边界必须在真实命令实现时由真实 contract test 验证。
 
 当前 Manager 没有恢复码、短码、私钥、签名或 wrapped material 的输入字段与执行方法；设置文件只保存 `access_token_configured` 布尔值，不保存 token 文本。
+
+Apple P-256 产品进程 gated smoke 只由显式命令行参数与环境门触发，在 native 内完成 synthetic canonical/signature 生命周期和 Rust/Go 验签；返回 Swift 的只有固定结果码和布尔摘要。private key、public key、canonical bytes、signature bytes 不得进入 Dart、Flutter method channel、settings 或 diagnostics。普通 manager 启动不访问该 Keychain 路径，InputMethodKit 不参与同步密钥或签名。
 
 ## 产品停止线
 

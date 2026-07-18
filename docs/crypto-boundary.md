@@ -89,7 +89,7 @@ P1 原始事件后续只能先在本机压缩为 P2 权重摘要，再由 P2 对
 - `RecoveryCode` 解析 `RLX1` 恢复码、Crockford Base32 secret 和短校验段；Debug 输出不打印恢复码 secret。
 - `RecoveryKdfProfile` 固定 `argon2id-v1`、`0x13`、64 MiB memory、3 iterations、4 parallelism、16 byte salt 和 32 byte output 的当前 profile，并拒绝弱化参数。
 - `RecoveryMaterial` 记录 recovery id、domain id、key epoch、KDF 参数、salt、envelope algorithm、envelope nonce、恢复密文和时间戳；Debug 输出只显示 `salt_len` / `envelope_nonce_len`，不打印 `encrypted_recovery_key`。
-- 设备签名与私钥存储边界已由 ADR 0003/0006 固定并在 Rust 模型中落地：`ed25519-v1` 与 `ecdsa-p256-sha256-v1` 按显式 profile 共存，签名 key 只用于签名，签名对象覆盖 object manifest、device authorization、device revocation 和 recovery record。普通测试可使用合成 `test-memory-v1`，平台 status 均保留生产门禁；`apple-keychain-p256-v1` 已通过命令行基础生命周期 Keychain smoke，但产品进程访问、失败矩阵和 capability status 尚未闭环，既有 Apple/Android Ed25519 阻塞也未解除。
+- 设备签名与私钥存储边界已由 ADR 0003/0006 固定并在 Rust 模型中落地：`ed25519-v1` 与 `ecdsa-p256-sha256-v1` 按显式 profile 共存，签名 key 只用于签名，签名对象覆盖 object manifest、device authorization、device revocation 和 recovery record。普通测试可使用合成 `test-memory-v1`，平台 status 均保留生产门禁；`apple-keychain-p256-v1` 已通过命令行和 manager Release bundle 进程正常生命周期 smoke，但 locked/denied 与最终产品资格评审尚未闭环，`product_qualified=false`，既有 Apple/Android Ed25519 阻塞也未解除。
 - 当前模型用于固定字段、校验、AAD 绑定、恢复记录解密、签名验签和日志边界；生产设备私钥存储 backend、非对称包装算法和生产恢复 UI / API 仍需补齐后再进入远端同步。
 
 规则：

@@ -240,8 +240,12 @@ mod platform {
 
     pub(super) fn backend_status(profile: AppleKeychainProfile) -> DevicePrivateKeyStoreStatus {
         match profile {
-            AppleKeychainProfile::Ed25519V1 => DevicePrivateKeyStoreStatus::apple_keychain_v1(),
-            AppleKeychainProfile::P256V1 => DevicePrivateKeyStoreStatus::apple_keychain_p256_v1(),
+            AppleKeychainProfile::Ed25519V1 => {
+                DevicePrivateKeyStoreStatus::apple_keychain_v1_compiled()
+            }
+            AppleKeychainProfile::P256V1 => {
+                DevicePrivateKeyStoreStatus::apple_keychain_p256_v1_runtime_capable()
+            }
         }
     }
 

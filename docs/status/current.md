@@ -26,15 +26,15 @@ M3 已具备 P2 envelope、signed manifest、两客户端授权/上传/下载/�
 
 ADR 0006 已接受 `ecdsa-p256-sha256-v1` 作为与 `ed25519-v1` 共存的生产候选 profile，固定 65-byte SEC1 uncompressed public key、64-byte P1363 signature 和既有 canonical bytes。Rust/Go verifier 已按算法分派并读取同一跨语言 fixture，覆盖两个 profile 正向签名、未知/不一致算法、错误公钥、篡改 canonical bytes、非法编码、签名不匹配和 revoked key。Go 设备与 join request metadata 现显式保存 `signing_algorithm`；历史 schema migration 只把旧行标记为 `ed25519-v1`，新请求缺少算法时失败关闭。
 
-独立 `apple-keychain-p256-v1` repository capability spike 已接入 Apple Security framework：创建永久 P-256 `SecKey` 时声明不可导出和仅本机解锁可用，public key 只导出公开 SEC1 点，Apple DER signature 在 backend 内严格转为 P1363；locked、denied、missing、corrupted 与 unsupported 映射为结构化错误。2026-07-18 经单独授权在 arm64 macOS 26.5.2（25F84）执行 gated smoke，真实完成创建、跨 store 重载、签名、Rust/Go 验签、删除/内存撤销和 fresh store missing 复核，测试结果为 `1 passed`，失败路径 cleanup guard 保持启用。该证据来自本机命令行测试进程，不证明产品进程、sandbox/entitlement、locked/denied、Secure Enclave 或硬件保护能力。
+独立 `apple-keychain-p256-v1` 已接入 Apple Security framework 和 manager Release native library：创建永久 P-256 `SecKey` 时声明不可导出和仅本机解锁可用，DER 只在 native 内转为 P1363。2026-07-18 的命令行 gated smoke 已通过；本轮经再次授权，manager Release bundle 进程也真实完成创建、跨 store 重载、签名、Rust/Go 验签、删除、内存撤销失败关闭、fresh missing 与 cleanup，固定摘要全部通过。Release dylib 如实报告 `compiled/runtime_available/can_create/can_sign=true`，同时保持 `product_qualified/user_sync_enabled=false`。
 
 这些测试仍不是用户可用同步。当前生产阻塞项是：
 
-- `apple-keychain-p256-v1` 已取得基础生命周期实机证据，但仍报告 `available=false`、`can_create_signing_keys=false`、`can_sign=false`；在 capability 评审、产品进程访问路径和 locked/denied 受控矩阵闭环前，不宣称 production-ready、Secure Enclave、hardware-backed、user presence 或 backup migration。既有 `apple-keychain-v1` 与已测 Android Keystore 环境也仍未证明不可导出 `ed25519-v1` signing key；`test-memory-v1` 禁止进入生产。
+- `apple-keychain-p256-v1` 的编译、运行时和正常登录会话产品进程生命周期已有证据，但 locked/denied 受控矩阵与最终资格评审未完成，故 `product_qualified=false`；不宣称 production-ready、Secure Enclave、hardware-backed、user presence 或 backup migration。既有 `apple-keychain-v1` 与已测 Android Keystore 环境也仍未证明不可导出 `ed25519-v1` signing key；`test-memory-v1` 只允许测试且无 fallback。
 - 缺少发布级目标部署运行证据，以及真实产品的同步 cursor/orchestration、设备恢复、撤销和 key epoch 全流程。
 - `ManagerBridge` 仍无真实同步、恢复码、设备加入、授权、撤销或轮换命令；现有 readiness 只证明关闭态。
 
-M3 第一主批的协议、仓库实现和 Apple P-256 基础生命周期实机证据已经落地，当前停止线转为 capability status 评审、产品进程访问路径与受控失败矩阵。不得因命令行 gated smoke 通过就开放产品 gate，也不得在现有 backend 内保存或导出 Ed25519 seed。若后续产品环境或失败矩阵暴露平台阻塞，先记录固定错误分类和 cleanup，再评审独立的软件保护 backend；该路径必须使用新 backend id 和明确风险等级。
+M3 第一主批的协议、仓库实现、Apple P-256 命令行与 manager 产品进程正常生命周期已经落地。状态现明确分为编译可用、运行时能力、产品资格和真实同步 gate；不得因前三层局部证据就开放真实同步。下一停止线是在另行授权条件下补 locked/denied 并完成资格评审。若失败矩阵暴露阻塞，先记录固定错误分类和 cleanup，再评审独立的软件保护 backend；该路径必须使用新 backend id 和明确风险等级。
 
 ## 当前停止线
 
@@ -47,10 +47,10 @@ M3 第一主批的协议、仓库实现和 Apple P-256 基础生命周期实机�
 
 ## 下一步顺位
 
-1. 评审 `apple-keychain-p256-v1` capability status 与产品进程访问路径；命令行 smoke 证据不自动把 `available/can_create/can_sign` 改为 true。
-2. 经再次授权在受控矩阵中补 locked / denied 的真实错误分类；没有证据时继续保留结构化映射测试，不通过人为改写系统状态冒充验证。
-3. 只有 capability 评审和产品环境 smoke 通过后，才更新 production status；Secure Enclave、hardware-backed、user presence 与 backup migration 分别保持独立门禁。
-4. 随后建立真实产品 sync orchestration：对象发现、hash/签名复验、解密、确定合并、本地 transaction、cursor、上传和 conflict retry；再接 `ManagerBridge`，不让 Flutter 复制协议或密钥逻辑。
+1. 经再次授权在受控矩阵中补 locked / denied 的真实错误分类；没有证据时继续保留结构化映射测试，不通过人为改写系统状态冒充验证。
+2. 结合已通过的产品进程正常生命周期与失败矩阵完成资格评审后，才更新 `product_qualified`；Secure Enclave、hardware-backed、user presence 与 backup migration 分别保持独立门禁。
+3. 随后建立真实产品 sync orchestration；用户同步总 gate 不随 backend 资格自动开放。
+4. orchestration 需覆盖对象发现、hash/签名复验、解密、确定合并、本地 transaction、cursor、上传和 conflict retry；再接 `ManagerBridge`，不让 Flutter 复制协议或密钥逻辑。
 5. 最后完成两个真实客户端、恢复/设备授权/撤销/key epoch 与发布级目标部署证据，满足后才评估开放用户同步。
 
 ## 验证入口

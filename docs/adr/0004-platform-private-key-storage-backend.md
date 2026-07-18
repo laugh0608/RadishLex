@@ -8,7 +8,7 @@ Accepted
 
 ## 背景
 
-`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名对象、canonical bytes、Ed25519 签名模型、`DevicePrivateKeyStore` 抽象和错误语义。ADR 0006 后续接受 P-256 生产候选 profile 与独立 `apple-keychain-p256-v1`，不改写 ADR 0005 对既有 Ed25519 backend 的失败结论。当前 Rust 实现已提供合成 `test-memory-v1`、`unavailable`、两个 Apple backend 的 capability/status、算法绑定和生产门禁；P-256 repository spike 与命令行基础生命周期 Keychain smoke 已完成，产品进程访问和失败矩阵仍未闭环。Android Ed25519 证据仍为已测 AVD 返回 `unsupported_signature_algorithm`，不解除生产签名门禁。
+`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名对象、canonical bytes、Ed25519 签名模型、`DevicePrivateKeyStore` 抽象和错误语义。ADR 0006 后续接受 P-256 生产候选 profile 与独立 `apple-keychain-p256-v1`，不改写 ADR 0005 对既有 Ed25519 backend 的失败结论。当前 Rust 实现已提供合成 `test-memory-v1`、`unavailable`、两个 Apple backend 的 capability/status、算法绑定和生产门禁；P-256 命令行与 manager Release 产品进程正常生命周期 smoke 已完成，locked/denied 失败矩阵仍未执行。Android Ed25519 证据仍为已测 AVD 返回 `unsupported_signature_algorithm`，不解除生产签名门禁。
 
 进入真实同步前，还需要明确生产私钥如何落到系统安全存储。否则后续平台壳、Flutter manager 或 FFI 可能为了接线方便直接持有私钥 bytes，破坏设备身份和撤销边界。
 
@@ -20,6 +20,7 @@ RadishLex 采用平台 backend 插拔策略：
 - 生产设备签名私钥必须由平台 backend 创建和保存，不允许通过 FFI、CLI 或管理 UI 导出私钥 bytes。
 - 默认 workspace 继续只启用 `test-memory-v1` 和 `unavailable` backend，不链接平台 SDK，不访问系统 Keychain / Keystore。
 - 平台 backend 必须显式声明 `storage_backend`、`exportable`、`hardware_backed`、`user_presence_required`、`backup_migratable` 和 `created_at_ms` 等属性。
+- backend status 必须把 `compiled`、运行时 `available/can_create/can_sign` 与 `product_qualified` 分开；真实用户同步是上层独立 gate，不得从任一 backend 字段自动推导。
 - 如果某个平台无法提供非导出私钥存储，可以先以软件保护 backend 进入设计，但必须标记 `exportable = true` 或等价风险属性，并在管理 UI / runbook 中说明保护级别。
 - 真实远端同步默认要求生产 backend 可用；backend unavailable 时，本地输入和本地学习仍可用，但同步对象上传、设备授权、撤销和恢复记录轮换必须返回明确错误。
 
@@ -142,13 +143,13 @@ DevicePrivateKeyStore
 
 ## FFI 与平台 Bridge 边界
 
-当前不新增 FFI 私钥接口。
+当前不新增 FFI 私钥、canonical bytes、signature bytes 或同步命令接口。允许新增只返回固定 capability/lifecycle flags 的产品验证 ABI，用于证明 manager Release bundle 进程接入；该 ABI 不进入 Dart binding，也不是 Flutter 同步真相源。
 
 后续如果需要跨语言签名，必须满足：
 
 - FFI 不导出私钥 bytes。
 - FFI 不导出内部 key handle 指针给长期持有的外部对象。
-- FFI 只允许传入 canonical bytes 或受控 manifest fields。
+- 正式同步 FFI 后续只允许传入受控 manifest fields 或在 Rust 内构建 canonical bytes；当前产品 validation ABI 在 native 内构建 canonical bytes，不把它交给 Dart。
 - 释放、线程、错误对象和 panic 边界必须沿用 `docs/ffi-boundary.md` 与 `docs/runbooks/ffi-platform-call-contract.md`。
 - 平台 bridge 复制 string / bytes view 后必须立即释放 Rust handle。
 - 任何平台 UI 都不能显示私钥、seed 或可导出的 key backup。
@@ -212,7 +213,7 @@ DevicePrivateKeyStore
 6. 已补 ADR 0005，固定 Apple 平台签名策略：保持 `ed25519-v1` 协议，`apple-keychain-v1` 不做 seed 存储 fallback，status 在 smoke 通过前阻断生产签名。
 7. 已补 `android-keystore-v1` 平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、raw JNI glue、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin / Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，固定 Android Keystore Ed25519 创建 / 加载 / 签名 / 删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
 8. 已补平台私钥 backend 策略，固定无新增设备时不把真机矩阵作为硬阻塞，并明确保留 `ed25519-v1`、禁止现有 backend 内 fallback、生产 backend 合格条件和可选后续 ADR 路径。
-9. 已补 ADR 0006、算法无关 Rust/Go verifier、共享 vectors、历史 Go metadata migration 与独立 `apple-keychain-p256-v1` repository spike；命令行基础生命周期 gated smoke 已通过，status 在产品访问和失败矩阵完成前继续失败关闭。
+9. 已补 ADR 0006、算法无关 Rust/Go verifier、共享 vectors、历史 Go metadata migration 与独立 `apple-keychain-p256-v1`；命令行与 manager Release 产品进程正常生命周期 gated smoke 已通过。native library 已接入 feature 与 validation ABI，status 如实报告编译/运行时能力，但 `product_qualified` 在 locked/denied 和最终评审完成前继续失败关闭。
 10. 其他平台仍需先补 backend spike / runbook，再接具体平台 SDK。
 11. 平台 backend 通过后，再允许真实远端对象上传下载使用生产签名。
 12. 最后才把管理 UI 的设备与恢复页面接入生产 backend。

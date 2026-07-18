@@ -128,19 +128,21 @@ apple-keychain-p256-v1
 - key tag 与 label 只含固定 service 和 opaque synthetic/production key id，不包含用户名、设备名称、本机路径、canonical bytes 或用户输入。
 - 本地 delete/revoke 成功后必须不能继续加载或签名；服务端 revoked 状态仍是跨设备真相，不能只依赖进程内撤销集合。
 
-在真实 gated smoke 完成前：
+状态分四层表达：target 编译、当前运行时能力、产品资格与真实用户同步 gate。2026-07-18 的命令行 Keychain 证据和 manager Release native 接线支持当前 macOS feature build 报告：
 
 ```text
-available = false
-can_create_signing_keys = false
-can_sign = false
-production_ready = false
+compiled = true
+available = true
+can_create_signing_keys = true
+can_sign = true
+product_qualified = false
+user_sync_enabled = false
 hardware_backed = false
 user_presence_required = false
 backup_migratable = false
 ```
 
-仓库内代码可以直接调用 capability spike 方法，但产品 orchestration 必须经 production gate，不能因实现存在而开放真实同步。
+未启用 feature 或非 macOS target 不能报告上述运行时 true。`product_qualified` 只有真实 manager bundle 进程 gated smoke 和评审通过后才可改变；用户同步还必须满足独立 M3 全链 gate。产品 validation ABI 只返回固定状态/生命周期 flags，private key、public key、canonical bytes 与 signature bytes 不进入 Dart。
 
 ## 日志与脱敏
 

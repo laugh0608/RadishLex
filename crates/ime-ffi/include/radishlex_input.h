@@ -21,6 +21,22 @@ extern "C" {
 
 #define RADISHLEX_KEY_RESULT_VERSION 2u
 
+#define RADISHLEX_APPLE_P256_PRODUCT_STATUS_VERSION 1u
+#define RADISHLEX_APPLE_P256_PRODUCT_SMOKE_VERSION 1u
+
+#define RADISHLEX_APPLE_P256_SMOKE_PASSED 0u
+#define RADISHLEX_APPLE_P256_SMOKE_GATE_DISABLED 1u
+#define RADISHLEX_APPLE_P256_SMOKE_UNSUPPORTED_BUILD 2u
+#define RADISHLEX_APPLE_P256_SMOKE_INVALID_ARGUMENT 3u
+#define RADISHLEX_APPLE_P256_SMOKE_CAPABILITY_MISMATCH 4u
+#define RADISHLEX_APPLE_P256_SMOKE_CREATE_FAILED 5u
+#define RADISHLEX_APPLE_P256_SMOKE_RELOAD_FAILED 6u
+#define RADISHLEX_APPLE_P256_SMOKE_RUST_VERIFY_FAILED 7u
+#define RADISHLEX_APPLE_P256_SMOKE_GO_VERIFY_FAILED 8u
+#define RADISHLEX_APPLE_P256_SMOKE_DELETE_FAILED 9u
+#define RADISHLEX_APPLE_P256_SMOKE_MISSING_CHECK_FAILED 10u
+#define RADISHLEX_APPLE_P256_SMOKE_INTERNAL_ERROR 255u
+
 #define RADISHLEX_PERSONALIZATION_STATUS_NOT_ENABLED 0u
 #define RADISHLEX_PERSONALIZATION_STATUS_READY 1u
 #define RADISHLEX_PERSONALIZATION_STATUS_POLICY_BLOCKED 2u
@@ -72,6 +88,43 @@ typedef struct RadishLexKeyResult RadishLexKeyResult;
 typedef struct RadishLexSnapshot RadishLexSnapshot;
 typedef struct RadishLexBuffer RadishLexBuffer;
 typedef struct RadishLexError RadishLexError;
+
+typedef struct RadishLexAppleP256ProductStatus {
+  uint32_t version;
+  uint32_t compiled;
+  uint32_t runtime_available;
+  uint32_t can_create_signing_keys;
+  uint32_t can_sign;
+  uint32_t product_qualified;
+  uint32_t user_sync_enabled;
+  uint32_t exportable;
+  uint32_t hardware_backed;
+  uint32_t user_presence_required;
+  uint32_t backup_migratable;
+} RadishLexAppleP256ProductStatus;
+
+typedef struct RadishLexAppleP256ProductSmokeSummary {
+  uint32_t version;
+  uint32_t result;
+  uint32_t compiled;
+  uint32_t runtime_available;
+  uint32_t can_create_signing_keys;
+  uint32_t can_sign;
+  uint32_t product_qualified;
+  uint32_t user_sync_enabled;
+  uint32_t exportable;
+  uint32_t hardware_backed;
+  uint32_t user_presence_required;
+  uint32_t backup_migratable;
+  uint32_t created;
+  uint32_t reloaded;
+  uint32_t rust_verified;
+  uint32_t go_verified;
+  uint32_t deleted;
+  uint32_t missing_confirmed;
+  uint32_t fail_closed;
+  uint32_t cleanup_attempted;
+} RadishLexAppleP256ProductSmokeSummary;
 
 typedef enum RadishLexStatusCode {
   RADISHLEX_STATUS_OK = 0,
@@ -151,6 +204,16 @@ typedef struct RadishLexLearningContext {
 RadishLexStatusCode radishlex_ffi_contract(
     RadishLexFfiContract *contract_out,
     RadishLexError **error_out);
+
+/*
+ * Product-validation ABI only. It returns fixed capability/lifecycle flags and
+ * never returns private key, canonical, public-key, or signature bytes.
+ */
+uint32_t radishlex_apple_p256_product_status(
+    RadishLexAppleP256ProductStatus *status_out);
+uint32_t radishlex_apple_p256_product_smoke(
+    const char *go_server_dir,
+    RadishLexAppleP256ProductSmokeSummary *summary_out);
 
 RadishLexSession *radishlex_session_new(RadishLexError **error_out);
 RadishLexSession *radishlex_session_new_with_options(
