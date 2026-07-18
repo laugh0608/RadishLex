@@ -1,4 +1,5 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{sync::Arc, sync::Barrier, thread};
 
 use rusqlite::params;
 
@@ -41,6 +42,86 @@ fn migration_initializes_empty_database() {
     assert_eq!(db.schema_version().expect("schema version"), 3);
     assert!(db.list_active_terms().expect("terms").is_empty());
     assert!(db.list_import_batches().expect("batches").is_empty());
+}
+
+#[test]
+fn concurrent_open_serializes_schema_initialization() {
+    let path = temp_db_path("concurrent-schema-initialization");
+    let barrier = Arc::new(Barrier::new(3));
+    let handles = (0..2)
+        .map(|_| {
+            let path = path.clone();
+            let barrier = Arc::clone(&barrier);
+            thread::spawn(move || {
+                barrier.wait();
+                UserDb::open(&path)
+                    .and_then(|db| db.schema_version())
+                    .expect("concurrent userdb open succeeds")
+            })
+        })
+        .collect::<Vec<_>>();
+
+    barrier.wait();
+    for handle in handles {
+        assert_eq!(handle.join().expect("open thread joins"), 3);
+    }
+
+    let db = UserDb::open(&path).expect("initialized userdb reopens");
+    assert!(db.list_active_terms().expect("terms").is_empty());
+    drop(db);
+    remove_temp_db(&path);
+}
+
+#[test]
+fn live_input_and_manager_connections_share_wal_state() {
+    let path = temp_db_path("shared-runtime-connections");
+    let mut input_connection = UserDb::open(&path).expect("input connection opens");
+    let mut manager_connection = UserDb::open(&path).expect("manager connection opens");
+
+    input_connection
+        .record_selection(
+            SelectionEventDraft::new("synthetic-session", "gongxiang", "共享词", 0, 1)
+                .with_reading("gong xiang")
+                .with_context_kind("editor"),
+        )
+        .expect("input selection is recorded");
+    assert_eq!(
+        manager_connection
+            .list_active_terms()
+            .expect("manager reads input write")
+            .len(),
+        1
+    );
+
+    manager_connection
+        .delete_term("gongxiang", "共享词", Some("gong xiang"))
+        .expect("manager deletes term");
+    let input_signals = input_connection
+        .ranking_signals(
+            "gongxiang",
+            &[super::RankingCandidateIdentity::new(
+                "共享词",
+                Some("gong xiang"),
+            )],
+        )
+        .expect("input reads manager tombstone");
+    assert_eq!(input_signals.deleted_terms.len(), 1);
+
+    manager_connection
+        .restore_term("gongxiang", "共享词", Some("gong xiang"))
+        .expect("manager restores term");
+    assert_eq!(
+        input_connection
+            .fetch_term("gongxiang", "共享词", "gong xiang")
+            .expect("input reads restored term")
+            .expect("restored term exists")
+            .status,
+        TermStatus::Active
+    );
+
+    drop(manager_connection);
+    drop(input_connection);
+    remove_temp_db(&path);
 }
 
 #[test]
@@ -97,6 +178,14 @@ fn add_query_and_delete_term_records_tombstone() {
 
     assert!(db.list_active_terms().expect("terms").is_empty());
     assert_eq!(db.deleted_term_count().expect("deleted count"), 1);
+    let tombstones = db
+        .list_deleted_term_tombstones()
+        .expect("tombstones are listed");
+    assert_eq!(tombstones.len(), 1);
+    assert_eq!(tombstones[0].input_code, "luobo");
+    assert_eq!(tombstones[0].text, "萝卜");
+    assert_eq!(tombstones[0].reading.as_deref(), Some("luo bo"));
+    assert_eq!(tombstones[0].reason, "manual_delete");
 }
 
 #[test]

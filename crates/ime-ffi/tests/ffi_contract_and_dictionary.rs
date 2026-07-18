@@ -15,15 +15,17 @@ use radishlex_ime_ffi::{
     radishlex_session_push_key_event, radishlex_session_reset, radishlex_session_select_candidate,
     radishlex_session_snapshot_new, radishlex_snapshot_candidate,
     radishlex_snapshot_candidate_count, radishlex_snapshot_free, radishlex_snapshot_preedit,
-    radishlex_snapshot_schema, radishlex_userdb_add_term, radishlex_userdb_dictionary_export,
+    radishlex_snapshot_schema, radishlex_userdb_add_term, radishlex_userdb_deleted_terms_count,
+    radishlex_userdb_deleted_terms_free, radishlex_userdb_deleted_terms_get,
+    radishlex_userdb_deleted_terms_new, radishlex_userdb_dictionary_export,
     radishlex_userdb_dictionary_import, radishlex_userdb_dictionary_inspect,
     radishlex_userdb_import_batches_count, radishlex_userdb_import_batches_free,
     radishlex_userdb_import_batches_get, radishlex_userdb_import_batches_new,
     radishlex_userdb_learning_status, radishlex_userdb_terms_count, radishlex_userdb_terms_free,
-    radishlex_userdb_terms_get, radishlex_userdb_terms_new, RadishLexCandidateView, RadishLexError,
-    RadishLexFfiContract, RadishLexImportBatchView, RadishLexKeyEvent,
-    RadishLexLearningStatusSummary, RadishLexSession, RadishLexStatusCode, RadishLexStringView,
-    RadishLexUserTermView, RADISHLEX_ABI_CONTRACT_VERSION,
+    radishlex_userdb_terms_get, radishlex_userdb_terms_new, RadishLexCandidateView,
+    RadishLexDeletedTermView, RadishLexError, RadishLexFfiContract, RadishLexImportBatchView,
+    RadishLexKeyEvent, RadishLexLearningStatusSummary, RadishLexSession, RadishLexStatusCode,
+    RadishLexStringView, RadishLexUserTermView, RADISHLEX_ABI_CONTRACT_VERSION,
     RADISHLEX_DICTIONARY_FORMAT_USER_TERMS_V1, RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND,
     RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD, RADISHLEX_SYNC_CLASS_P2_ENCRYPTED_SYNC,
 };
@@ -230,6 +232,47 @@ fn platform_binding_style_copies_views_before_releasing_handles() {
 
     assert_eq!(batch_source, "binding-smoke");
     assert!(error_message_copy.contains("out of range"));
+
+    let _ = fs::remove_file(db_path);
+}
+
+#[test]
+fn deleted_term_views_copy_identity_and_reason_before_release() {
+    let db_path = temp_db_path("deleted-term-view");
+    {
+        let mut db = UserDb::open(&db_path).expect("userdb opens");
+        db.add_term("huifu", "合成恢复词", Some("hui fu"), TermSource::ManualAdd)
+            .expect("term is added");
+        db.delete_term("huifu", "合成恢复词", Some("hui fu"))
+            .expect("term is deleted");
+    }
+
+    let db_path_c = CString::new(db_path.to_string_lossy().as_bytes()).expect("path");
+    let mut error = ptr::null_mut();
+    let terms = radishlex_userdb_deleted_terms_new(db_path_c.as_ptr(), &mut error);
+    assert!(!terms.is_null());
+    assert!(error.is_null());
+    assert_eq!(radishlex_userdb_deleted_terms_count(terms), 1);
+
+    let mut term = RadishLexDeletedTermView::empty();
+    assert_eq!(
+        unsafe { radishlex_userdb_deleted_terms_get(terms, 0, &mut term, &mut error) },
+        RadishLexStatusCode::Ok
+    );
+    let input_code = unsafe { view_to_owned(term.input_code) };
+    let text = unsafe { view_to_owned(term.text) };
+    let reading = unsafe { view_to_owned(term.reading) };
+    let reason = unsafe { view_to_owned(term.reason) };
+    let deleted_at_ms = term.deleted_at_ms;
+    unsafe {
+        radishlex_userdb_deleted_terms_free(terms);
+    }
+
+    assert_eq!(input_code, "huifu");
+    assert_eq!(text, "合成恢复词");
+    assert_eq!(reading, "hui fu");
+    assert_eq!(reason, "manual_delete");
+    assert!(deleted_at_ms > 0);
 
     let _ = fs::remove_file(db_path);
 }

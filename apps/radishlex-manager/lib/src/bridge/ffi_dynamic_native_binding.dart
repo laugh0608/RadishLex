@@ -14,7 +14,9 @@ part 'ffi_dynamic_native_views.dart';
 final class DynamicRadishLexManagerNativeBinding
     implements RadishLexManagerNativeBinding {
   DynamicRadishLexManagerNativeBinding(ffi.DynamicLibrary library)
-    : _api = _RadishLexNativeApi(library);
+    : _api = _RadishLexNativeApi(library) {
+    _api.validateContract();
+  }
 
   factory DynamicRadishLexManagerNativeBinding.open({String? libraryPath}) {
     final path = libraryPath?.trim();
@@ -57,6 +59,36 @@ final class DynamicRadishLexManagerNativeBinding
   }
 
   @override
+  List<NativeDeletedTermRecord> listDeletedTerms(String dbPath) {
+    return _withNativeString(dbPath, (dbPathPointer) {
+      final termsHandle = _callPointer<_RadishLexDeletedTermList>(
+        _api.errors,
+        (errorOut) => _api.deletedTerms.newList(dbPathPointer, errorOut),
+      );
+      try {
+        final count = _api.deletedTerms.count(termsHandle);
+        final terms = <NativeDeletedTermRecord>[];
+        for (var index = 0; index < count; index += 1) {
+          final termOut = calloc<_RadishLexDeletedTermView>();
+          try {
+            _callStatus(
+              _api.errors,
+              (errorOut) =>
+                  _api.deletedTerms.get(termsHandle, index, termOut, errorOut),
+            );
+            terms.add(_copyDeletedTermView(termOut.ref));
+          } finally {
+            calloc.free(termOut);
+          }
+        }
+        return List.unmodifiable(terms);
+      } finally {
+        _api.deletedTerms.free(termsHandle);
+      }
+    });
+  }
+
+  @override
   void deleteUserTerm({
     required String dbPath,
     required String inputCode,
@@ -70,6 +102,33 @@ final class DynamicRadishLexManagerNativeBinding
             _callStatus(
               _api.errors,
               (errorOut) => _api.userTerms.deleteTerm(
+                dbPathPointer,
+                inputCodePointer,
+                textPointer,
+                readingPointer,
+                errorOut,
+              ),
+            );
+          });
+        });
+      });
+    });
+  }
+
+  @override
+  void restoreUserTerm({
+    required String dbPath,
+    required String inputCode,
+    required String text,
+    required String? reading,
+  }) {
+    _withNativeString(dbPath, (dbPathPointer) {
+      _withNativeString(inputCode, (inputCodePointer) {
+        _withNativeString(text, (textPointer) {
+          _withOptionalNativeString(reading, (readingPointer) {
+            _callStatus(
+              _api.errors,
+              (errorOut) => _api.userTerms.restoreTerm(
                 dbPathPointer,
                 inputCodePointer,
                 textPointer,

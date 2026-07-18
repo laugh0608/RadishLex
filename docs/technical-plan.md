@@ -225,7 +225,7 @@ manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学�
 
 第一真实平台使用 InputMethodKit。Swift / Objective-C 外壳只负责系统输入法生命周期、按键、候选、commit 和 Rust FFI。候选 UI 是输入法进程内唯一的 nonactivating AppKit panel；controller 维护单一 display index，键盘视觉与 Space 选择读取同一 index，鼠标点击也把目标 index 送入同一 controller/Rust selection 路径，不能让平台显示状态与 Rust engine selection 分叉。
 
-候选锚点必须区分 inline session 内的现存字符索引与文档绝对插入位置：前者用于获取当前全局行矩形，后者只用于公开 fallback。panel 最终限制在目标 `NSScreen.visibleFrame` 内，不以屏幕原点代替无效定位。TIS 状态和测试期间 current source 归属由平台目录中的只读工具记录；输入源选择仍由开发者手动完成，工具不得进入输入热路径或修改系统配置。manager 与输入法若共享 userdb，需要固定 App Group、文件权限、锁和 schema migration 所有权。进程级 runtime、session、按键结果、候选窗、TIS 与验收边界见 [macOS InputMethodKit 平台边界](macos-inputmethodkit-boundary.md)。
+候选锚点必须区分 inline session 内的现存字符索引与文档绝对插入位置：前者用于获取当前全局行矩形，后者只用于公开 fallback。panel 最终限制在目标 `NSScreen.visibleFrame` 内，不以屏幕原点代替无效定位。TIS 状态和测试期间 current source 归属由平台目录中的只读工具记录；输入源选择仍由开发者手动完成，工具不得进入输入热路径或修改系统配置。M2 manager 使用非 App Sandbox 本地分发 profile，与输入法共享已验证的用户 Application Support userdb，并固定文件权限、锁和 schema migration 所有权；M4 若转为 App Group 或其他容器，必须先设计迁移、回滚和双端复验，不能静默复制数据。进程级 runtime、session、按键结果、候选窗、TIS 与验收边界见 [macOS InputMethodKit 平台边界](macos-inputmethodkit-boundary.md)。
 
 ### Linux
 

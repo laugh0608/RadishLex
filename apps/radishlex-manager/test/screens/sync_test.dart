@@ -13,7 +13,9 @@ void main() {
   testWidgets('sync gate keeps user sync disabled', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const RadishLexManagerApp());
+    await tester.pumpWidget(
+      RadishLexManagerApp(bridge: FixtureManagerBridge()),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.sync_outlined));

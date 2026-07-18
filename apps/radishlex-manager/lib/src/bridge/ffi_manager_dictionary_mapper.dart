@@ -11,6 +11,17 @@ UserTerm managerUserTermFromNative(NativeUserTermRecord term) {
     lastUsed: term.lastUsedAtPresent
         ? managerFormatTimestampMs(term.lastUsedAtMs)
         : '未使用',
+    status: managerTermStatusLabel(term.status),
+  );
+}
+
+DeletedTerm managerDeletedTermFromNative(NativeDeletedTermRecord term) {
+  return DeletedTerm(
+    inputCode: term.inputCode,
+    text: term.text,
+    reading: term.reading ?? '',
+    deletedAt: managerFormatTimestampMs(term.deletedAtMs),
+    reason: term.reason,
   );
 }
 
@@ -85,6 +96,19 @@ String managerTermSourceLabel(int source) {
       return 'phrase_learning';
     default:
       return 'unknown($source)';
+  }
+}
+
+String managerTermStatusLabel(int status) {
+  switch (status) {
+    case nativeTermStatusActive:
+      return 'active';
+    case nativeTermStatusSuppressed:
+      return 'suppressed';
+    case nativeTermStatusDeleted:
+      return 'deleted';
+    default:
+      return 'unknown($status)';
   }
 }
 

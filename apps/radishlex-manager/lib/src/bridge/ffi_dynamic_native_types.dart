@@ -4,9 +4,22 @@ final class _RadishLexError extends ffi.Opaque {}
 
 final class _RadishLexUserTermList extends ffi.Opaque {}
 
+final class _RadishLexDeletedTermList extends ffi.Opaque {}
+
 final class _RadishLexImportBatchList extends ffi.Opaque {}
 
 final class _RadishLexRankExplain extends ffi.Opaque {}
+
+final class _RadishLexFfiContract extends ffi.Struct {
+  @ffi.Uint32()
+  external int version;
+
+  @ffi.Uint32()
+  external int sessionThreadPolicy;
+
+  @ffi.Uint32()
+  external int panicBoundary;
+}
 
 final class _RadishLexStringView extends ffi.Struct {
   external ffi.Pointer<ffi.Uint8> data;
@@ -46,6 +59,20 @@ final class _RadishLexUserTermView extends ffi.Struct {
 
   @ffi.Uint8()
   external int lastUsedAtPresent;
+}
+
+final class _RadishLexDeletedTermView extends ffi.Struct {
+  external _RadishLexStringView inputCode;
+  external _RadishLexStringView text;
+  external _RadishLexStringView reading;
+
+  @ffi.Uint8()
+  external int readingPresent;
+
+  @ffi.Int64()
+  external int deletedAtMs;
+
+  external _RadishLexStringView reason;
 }
 
 final class _RadishLexDictionaryInspectSummary extends ffi.Struct {

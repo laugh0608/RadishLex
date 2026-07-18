@@ -122,9 +122,61 @@ Future<void> main(List<String> args) async {
     deletedSnapshot.learningSummary.deletedTerms == 1,
     'deleted tombstone count',
   );
+  _expect(deletedSnapshot.deletedTerms.length == 1, 'deleted term view count');
+  _expect(
+    deletedSnapshot.deletedTerms.single.inputCode == 'luobo' &&
+        deletedSnapshot.deletedTerms.single.reason == 'manual_delete',
+    'deleted term identity and reason',
+  );
   _expect(
     deletedSnapshot.sync.syncableObjects == 2,
     'post-delete syncable user term plus tombstone',
+  );
+
+  final restartedAfterDelete = await FfiManagerBridge(
+    dbPath: dbPath,
+    libraryPath: options.libraryPath,
+    settingsFilePath: settingsPath,
+  ).loadSnapshot();
+  _expect(
+    restartedAfterDelete.deletedTerms.single.inputCode == 'luobo',
+    'deleted tombstone survives manager restart',
+  );
+
+  final restoredSnapshot = await bridge.restoreUserTerm(
+    const UserTermKey(
+      inputCode: 'luobo',
+      text: '萝卜词核',
+      reading: 'luo bo ci he',
+    ),
+  );
+  _expect(restoredSnapshot.dictionaryTerms.length == 2, 'restored term count');
+  _expect(restoredSnapshot.deletedTerms.isEmpty, 'restore clears tombstone');
+  _expect(
+    restoredSnapshot.dictionaryTerms
+            .singleWhere((term) => term.inputCode == 'luobo')
+            .status ==
+        'active',
+    'restore returns active status',
+  );
+
+  final restartedAfterRestore = await FfiManagerBridge(
+    dbPath: dbPath,
+    libraryPath: options.libraryPath,
+    settingsFilePath: settingsPath,
+  ).loadSnapshot();
+  _expect(
+    restartedAfterRestore.dictionaryTerms.length == 2 &&
+        restartedAfterRestore.deletedTerms.isEmpty,
+    'explicit restore survives manager restart',
+  );
+
+  await bridge.deleteUserTerm(
+    const UserTermKey(
+      inputCode: 'luobo',
+      text: '萝卜词核',
+      reading: 'luo bo ci he',
+    ),
   );
 
   final exportResult = await bridge.exportDictionaryFile(exportPath);

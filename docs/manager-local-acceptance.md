@@ -1,111 +1,82 @@
 # Flutter manager 本地验收口径
 
-本文档记录 Flutter manager 本地管理原型的验收口径和已有证据。读者是维护 `apps/radishlex-manager`、审阅 M2 本地管理能力和决定后续补强工作的协作者。本文不定义真实远端同步协议、恢复码 UI、设备授权成功路径、Go server 新 API、C ABI 扩展或平台输入法壳，也不单独作为 M2 产品退出证明。
+本文档定义 Flutter manager 在 M2 的本地产品验收口径，并汇总自动化证据与尚待实机执行的证据。读者是维护 `apps/radishlex-manager`、审阅本地个人化能力和决定 M2 是否退出的协作者。本文不定义真实远端同步、恢复码或设备授权成功路径，也不替代 macOS 产品实机验收 runbook。
 
 ## 当前结论
 
-Flutter manager 已有较完整的本地原型验收证据，覆盖词库管理、导入导出、学习摘要、rank explain、真实 Dart FFI smoke、脱敏诊断和结构化错误分类；同步相关能力当前只保留 readiness、关闭态和不可用原因解释。
+截至 2026-07-18，manager 本地产品运行态的实现和自动门禁已经完成：正常启动默认进入 `product` mode，Release app bundle 携带匹配 ABI 的 native library，平台侧解析固定 userdb/settings 路径并收紧权限，真实 tombstone 与 suppressed 状态可查询和显式恢复，隐私设置通过 macOS `CFPreferences` 写入并读回，启动失败不会静默回退 fixture。`demo` mode 只能由编译期显式开关启用，并持续显示“合成演示数据”。
 
-本次原型验收只证明管理端可以安全、可审计地管理本机数据和解释同步不可用原因；不证明 M2 产品运行态或用户可用远端同步已经完成。
+临时 SQLite 上的双连接测试已经覆盖 migration 所有权、WAL 可见性、输入侧选择、manager 删除、输入侧 tombstone 观察和 manager 显式恢复；Release 产品 bundle 也已在不启动 GUI 的条件下完成签名结构、依赖、ABI、符号和真实 Dart FFI smoke。
 
-2026-07-17 复核结论：下方证据足以证明本地管理原型与开发期真实 FFI bridge 可工作；产品输入 runtime 已通过 ABI v4 接入固定 userdb，并由 R01B `build 34` 完成真实应用学习、重启、删除/恢复、隐私/unknown/P0/secure 路由和零残留证据。M2 当前缺口已收敛到 manager 正常产品运行态：加载匹配版本的真实 FFI、使用同一受控持久化 userdb、验证与输入法双连接并发，并移除默认 fixture 伪装成功的路径。
+这些证据证明实现已具备进入真实产品验收的条件，但尚不单独构成 M2 退出：仍需按 [macOS manager 产品验收 runbook](runbooks/macos-m2-manager-product-acceptance.md)，在单独授权下从正常 Release app 启动，无 shell 环境变量地复验固定平台路径、重启持久化、隐私键真实读回，以及输入法与 manager 同库运行时的双端可见性。真实同步继续保持关闭。
 
 ## 验收范围
 
-纳入验收：
+纳入 M2 本地验收：
 
-- 本地 userdb 词条查看、搜索、审计详情和空态。
-- 用户词条删除确认，并通过 tombstone 防止旧设备或旧备份复活。
-- 词库导入检查、用户确认导入、导入历史、导入批次联动审计和结果文案。
-- 用户词库导出结果文案，诊断导出不得混入词库内容。
-- 学习状态聚合摘要，P1 原始事件不展示。
-- `rank explain` 非敏感摘要、筛选和候选贡献项详情。
-- `sync preflight` 本地 P2 对象分类、local-only 事件计数、设备 backend capability 和 production gate 说明。
-- settings draft v1 保存、读取、输入校验、部署证据来源 allowlist 和 sync gate 派生。
-- `manager_sync_readiness.v1` 非敏感摘要导入、清除、错误降级和当前 manager 内存态派生。
-- 脱敏诊断报告预览、section 筛选、关键字筛选、复制和导出一致性。
-- `ManagerBridge` 结构化失败分类和用户可见文案。
-- 真实 Dart FFI bridge 在临时 SQLite userdb、临时 settings JSON 和合成 TSV 上的本地管理 smoke。
+- 默认 `product` 与显式 `demo` 启动模式，以及产品失败可见性。
+- app bundle 内 native library 的 ABI contract、必需符号、架构、依赖、签名嵌套和加载路径。
+- 固定 userdb/settings 路径、目录 `0700`、文件 `0600`、symlink 拒绝和结构化错误。
+- active、suppressed、deleted 三种词条状态；delete 产生 tombstone，恢复只能由明确用户动作触发。
+- 本地词库查看、搜索、审计、导入检查、导入、导出和批次历史。
+- 学习聚合摘要与 `rank explain`；不展示 P1 原始事件。
+- manager 与输入 runtime 共享 Rust/userdb 真相源时的 WAL、busy、migration 和重启行为。
+- macOS 隐私模式的系统偏好写入、读回、失败回滚和输入侧零学习增量。
+- settings draft、脱敏诊断、同步 readiness、关闭态和不可用原因解释。
 
-不纳入验收：
+不纳入 M2 验收：
 
-- 真实远端同步上传 / 下载主操作。
-- 恢复码生成、确认保存、轮换、撤销或恢复加入 UI。
-- 设备加入请求审批、设备授权成功路径和设备撤销 UI。
-- 平台私钥 backend 生产可用性判定。
-- 长期运行 Go server、真实部署目标、真实 token、真实证书或真实用户数据。
-- 平台输入法壳、输入热路径和候选窗行为。
+- 真实远端同步上传或下载。
+- 恢复码生成、轮换、撤销、恢复加入或设备授权成功路径。
+- 平台私钥 backend 的 M3 生产可用性。
+- App Store sandbox、App Group 迁移、公证、安装升级和最终发布包；这些属于 M4。
+- 第二真实平台。
 
 ## 退出标准映射
 
-| M2 本地管理能力 | 当前原型证据 | 证据入口 |
+| M2 能力 | 当前证据 | 证据入口 |
 | --- | --- | --- |
-| 用户能通过 UI 管理已学习词 | 词库页支持本地词条查看、搜索、审计详情、删除确认、导入检查、导入、导出和导入历史审计；真实 Dart FFI bridge 可对临时 userdb 执行 list / delete / inspect / import / export。 | `test/screens/dictionary_test.dart`、`test/screens/manager_home_actions_test.dart`、`test/ffi_manager_bridge_test.dart`、`./scripts/check-manager-ffi-smoke.sh` |
-| 用户能配置自部署后端 | 设置页保存非 secret `settings draft`，校验 `server_endpoint`、`retain_sync_config`、`privacy_mode`、`diagnostics_export` 和部署证据来源标签；配置只派生本地 sync gate，不连接真实远端。 | `test/screens/settings_test.dart`、`test/ffi_manager_bridge_test.dart`、`docs/manager-settings-diagnostics.md` |
-| 用户能看到同步预检状态和生产不可用原因 | 同步页展示 sync gate、P2 对象分类、local-only 事件、设备 backend capability、production gate、连接健康、readiness 聚合、只读 interaction plan 和停止线；诊断报告也输出 gate source / stop line 的脱敏摘要。 | `test/screens/sync_test.dart`、`test/screens/settings_diagnostics_test.dart`、`./scripts/check-manager.sh` |
-| 用户可用同步开关在条件齐备前保持关闭 | `启用同步` 按钮保持禁用；`preflight_ready` 和 readiness 全 ready 只表示本地状态可解释，不代表远端同步开放。 | `test/screens/sync_test.dart`、`test/screens/settings_test.dart`、`docs/manager-ui-boundary.md` |
+| 产品启动不伪装成功 | 默认 product；native/path/userdb/ABI 失败进入 `UnavailableManagerBridge`；fixture 仅由显式 demo 构建启用并显示常驻标识。 | `manager_bridge_factory.dart`、`unavailable_manager_bridge.dart`、`widget_test.dart`、`./scripts/check-manager.sh` |
+| 产品 bundle 可加载真实 Rust 能力 | Xcode 构建阶段嵌入 native library，校验 ABI v4、owner-thread、panic boundary、架构、必需符号和依赖；Release bundle smoke 使用其中的 dylib。 | `embed-manager-native-library.sh`、`check-manager-product.sh`、`ffi_dynamic_native_binding.dart` |
+| 用户能管理真实本地词条 | UI 和 FFI 覆盖 active/suppressed/deleted、删除、tombstone 查询、明确恢复、导入导出与重启后的状态保持。 | `dictionary_test.dart`、`ffi_manager_bridge_test.dart`、`ffi_bridge_smoke.dart` |
+| 输入法与 manager 共享数据语义 | 两个独立 `UserDb` 连接覆盖并发 schema 初始化、WAL 可见性、选择、删除、防复活和恢复；所有动作仍由 Rust 真相源执行。 | `ime-userdb` store tests、`cargo test -p radishlex-ime-userdb` |
+| 隐私设置作用于输入 runtime | Flutter 通过 MethodChannel 调用 macOS `CFPreferences` 的 CurrentUser/AnyHost 层，保存后读回；settings/权限失败会回滚。 | `MainFlutterWindow.swift`、`method_channel_manager_platform_control.dart`、对应 Flutter tests |
+| P1 与诊断边界不扩张 | 学习页只展示聚合；诊断不包含用户词、真实路径、token、恢复码、密钥或 payload bytes。 | `settings_diagnostics_test.dart`、`ffi_manager_bridge_test.dart`、产品 smoke |
+| 真实用户同步保持关闭 | 设置和同步页只保存本地草案、展示 readiness 与阻塞原因；上传主操作保持禁用。 | `sync_test.dart`、`settings_test.dart`、`docs/manager-ui-boundary.md` |
 
-## 复查记录
-
-| 复查项 | 结论 | 说明 |
-| --- | --- | --- |
-| 本地词库管理 | 通过 | `dictionary_test.dart` 覆盖查看、搜索、空态、词条审计、删除确认、导入检查、确认导入、导入历史和导出；`manager_home_actions_test.dart` 固定结果文案与失败分类；FFI smoke 覆盖临时 userdb 的 inspect / import / delete / export。 |
-| 自部署后端配置草案 | 通过 | `settings_test.dart` 覆盖 server endpoint 草案、隐私模式、部署证据来源和 sync gate 派生；`ffi_manager_bridge_test.dart` 覆盖 settings JSON v1 持久化、旧字段降级、非法版本 / URL / evidence source 拒绝。 |
-| 同步预检与生产不可用原因 | 通过 | `sync_test.dart` 覆盖 `backend_unavailable`、`local_only`、P2 对象分类、local-only 计数、backend capability、production gate、连接健康和 readiness 代表场景；`settings_diagnostics_test.dart` 覆盖 gate source / stop line、readiness 和 interaction plan 的脱敏诊断展示。 |
-| 同步开关关闭 | 通过 | `sync_test.dart` 和 `settings_test.dart` 均断言 `sync-enable-button` 处于禁用态，包括 `preflight_ready` 草案状态。 |
-| 隐私与脱敏 | 通过 | `settings_diagnostics_test.dart` 和 `ffi_manager_bridge_test.dart` 断言诊断文本不包含用户词和本地路径；FFI smoke 断言诊断报告不包含临时 db、settings、导入路径或用户词。 |
-| 真实 Dart FFI bridge | 通过 | `check-manager-ffi-smoke.sh` 构建真实 `radishlex-ime-ffi` 动态库，并用临时 SQLite userdb、临时 settings JSON 和合成 TSV 复验本地管理链路。 |
-
-## 验证入口
-
-本地 manager 改动的标准验收命令：
+## 自动验证入口
 
 ```bash
 ./scripts/check-manager.sh
 ./scripts/check-manager-ffi-smoke.sh
+./scripts/check-manager-product.sh
+./scripts/build-manager-macos-product.sh
 git diff --check
 ./scripts/check-repo.sh
 ```
 
-各命令覆盖：
+- `check-manager.sh` 执行 Dart format、Flutter analyze 和 unit/widget tests。
+- `check-manager-ffi-smoke.sh` 用临时合成数据复验开发期真实 FFI bridge。
+- `check-manager-product.sh` 构建 Release app，检查非 sandbox M2 profile、签名、bundle native library、ABI/符号/架构/依赖，并直接对 bundle dylib 执行产品 smoke；不启动 GUI。
+- `build-manager-macos-product.sh` 形成正常 Release app 并复核签名和 native 依赖，供后续授权实机验收使用。
+- `check-repo.sh` 覆盖仓库文本、文档、Rust、Go 与产品运行态 contract。
 
-- `./scripts/check-manager.sh`：执行 `dart format --set-exit-if-changed .`、`flutter analyze` 和 `flutter test`，覆盖 manager 默认 fixture、页面级 widget tests、Dart model / mapper tests 和 settings store tests。
-- `./scripts/check-manager-ffi-smoke.sh`：构建 `radishlex-ime-ffi` 动态库，并用临时 SQLite userdb、临时 settings JSON、合成 TSV 和导出文件复验真实 Dart FFI bridge 的本地管理链路。
-- `git diff --check`：检查空白、尾随空格和补丁文本问题。
-- `./scripts/check-repo.sh`：执行仓库 text hygiene、文档预算、Go server 测试、Rust workspace 测试和 doc-tests，确认 manager 文档变更没有破坏仓库基线。
+自动测试只使用合成词、临时 SQLite、临时 settings JSON 和虚构状态，不得读取真实 P1 原始行或数据库正文。
 
-普通文档-only 修改可以只运行 `git diff --check` 和 `./scripts/check-repo.sh`；若文档修改改变验收口径、测试口径或 manager 可见行为，应同时运行 `./scripts/check-manager.sh` 和 `./scripts/check-manager-ffi-smoke.sh`。
+## 尚待真实产品验收
 
-## 隐私与数据检查
+M2 当前只剩产品实机证据，不再以继续添加 fixture 或复制业务逻辑替代：
 
-验收过程中必须确认：
+- 从正常 Release app 直接启动，确认没有 demo 标识、无需 shell 环境变量，并使用固定平台路径。
+- 在 GUI 完成合成词条导入、删除、deleted/suppressed 显式恢复和 app 重启持久化。
+- 通过 GUI 切换隐私模式，复核 `CFPreferences` 实际读回与输入侧零学习增量。
+- 输入法与 manager 同时连接同一测试 userdb，复核双端状态可见、无非预期 `SQLITE_BUSY`，并在进程重启后保持一致。
+- 按 runbook 恢复 TIS、bundle、Rime、进程、隐私键、测试 userdb、settings 和目录权限基线，全程不读取 P1 原始行或数据库正文。
 
-- 诊断报告不包含用户词、真实路径、token、恢复码、私钥、signature bytes、wrapped material bytes 或 payload bytes。
-- 学习页不展示 P1 原始 selection event、原始输入历史、窗口标题或应用上下文明细。
-- sync preflight 和 settings draft 只展示状态、聚合计数和 allowlist 来源标签，不保存运行日志、证书正文或请求 / 响应体。
-- 测试使用合成词、临时 SQLite、临时 settings JSON、合成 TSV 和虚构设备状态。
-- Flutter widget 层只展示结构化错误码和分类，不透传 native 原始错误明细。
+实机证据全部通过后才能关闭 M2 并进入 M3；若任一项失败，应回到对应 Rust、FFI、Flutter 或平台层修复，并重跑匹配门禁。
 
-## 当前缺口
+## M3 停止线
 
-本地原型进入 M2 产品运行态仍有以下缺口：
-
-- 正常 manager 构建包尚未携带 RadishLex native library，也未固定平台持久化目录和文件权限。
-- 未与 macOS 输入 runtime 共享真实 userdb，输入法与 manager 的锁、migration 和所有权尚未形成产品证据。
-- 未显式配置环境时仍使用 fixture；产品模式必须改为明确失败，fixture 只能由持续标识的 demo mode 启用。
-
-以下缺口属于 M3，会阻止真实用户同步入口，但不阻塞 M2 本地管理实现：
-
-- `apple-keychain-v1` 真实 Keychain smoke 仍阻塞于 `ed25519-v1` 创建。
-- `android-keystore-v1` 在 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 上仍为 `unsupported_signature_algorithm`。
-- `docs/manager-sync-entry-boundary.md` 已固定恢复码 / 设备授权交互边界、UI 状态门禁、bridge 错误分类、诊断脱敏和测试计划；发布级目标部署运行证据、平台私钥 backend 生产可用性和真实用户同步 UI / bridge 仍未形成可用产品链路，但本地 Docker / 本地 HTTPS 足以支撑下一步非上传状态开发。
-- manager 没有真实远端 sync client 操作入口，当前只做本地 preflight、readiness 状态映射和不可用原因解释。
-
-## 后续推进
-
-后续推进顺位按产品里程碑分层：
-
-1. M1/R01A 与 R01B 输入侧真实学习均已退出，不再重复展开完整平台矩阵或把 manager 工作重新包装为 R01B。
-2. 当前直接闭合 manager 正常构建包中的 native library、固定持久化路径、共享 userdb 双连接并发、明确 product/demo mode 和本地产品 smoke。
-3. M3 再按 `docs/manager-sync-entry-boundary.md` 实现真实同步、设备与恢复；安全证据齐备前不打开真实用户同步开关。
-4. 只在文件职责继续增长或测试边界变弱时拆分 manager 代码，不为目录整齐新增无实际职责的层。
+- `apple-keychain-v1`、Android Keystore、恢复码、设备授权、设备撤销和 key epoch 的生产证据仍按 M3 专题推进。
+- 发布级目标部署和真实 sync client 尚未进入用户产品链路。
+- 安全证据齐备前，不打开真实用户同步开关，也不把 `preflight_ready` 表述为可同步。

@@ -52,6 +52,35 @@ class ManagerHomeActions {
     }
   }
 
+  Future<void> restoreTerm(UserTermKey term, String state) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) =>
+          DictionaryRestoreConfirmDialog(term: term, state: state),
+    );
+    if (!context.mounted || confirmed != true) {
+      return;
+    }
+
+    try {
+      final snapshot = await bridge.restoreUserTerm(term);
+      if (!context.mounted) {
+        return;
+      }
+      onSnapshotChanged(snapshot);
+      showMessage('已显式恢复词条：${term.inputCode} / ${term.text}');
+    } on Object catch (error) {
+      if (context.mounted) {
+        showMessage(
+          managerBridgeFailureMessage(
+            error,
+            ManagerBridgeOperation.restoreUserTerm,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> importDictionary() async {
     final request = await showDialog<DictionaryImportRequest>(
       context: context,
@@ -187,7 +216,7 @@ class ManagerHomeActions {
         return;
       }
       onSnapshotChanged(snapshot);
-      showMessage('设置草案已保存：${snapshot.sync.state.code}');
+      showMessage('本地设置已保存：${snapshot.sync.state.code}');
     } on Object catch (error) {
       if (context.mounted) {
         showMessage(

@@ -9,11 +9,9 @@ use radishlex_ime_engine_rime::RimeEngineConfig;
 use crate::buffer::RadishLexBuffer;
 use crate::contract::RadishLexFfiContract;
 use crate::dictionary::{
-    add_user_term, delete_user_term, export_dictionary_file, import_dictionary_file,
-    inspect_dictionary_file, list_import_batches, list_user_terms, restore_user_term,
+    export_dictionary_file, import_dictionary_file, inspect_dictionary_file, list_import_batches,
     RadishLexDictionaryExportSummary, RadishLexDictionaryImportSummary,
     RadishLexDictionaryInspectSummary, RadishLexImportBatchList, RadishLexImportBatchView,
-    RadishLexUserTermList, RadishLexUserTermView,
 };
 use crate::engine::{
     validate_rime_session_options_version, validate_session_options, RadishLexRimeSessionOptions,
@@ -27,6 +25,10 @@ use crate::rank_explain::{rank_explain_for_path, RadishLexRankExplain, RadishLex
 use crate::session::{session_mut, session_ref, RadishLexSession};
 use crate::snapshot::{RadishLexCandidateView, RadishLexSnapshot, RadishLexStringView};
 use crate::sync_status::{sync_preflight_for_path, RadishLexSyncPreflightSummary};
+
+#[path = "abi/user_terms.rs"]
+mod user_terms;
+pub use user_terms::*;
 
 #[no_mangle]
 /// # Safety
@@ -361,109 +363,6 @@ pub unsafe extern "C" fn radishlex_userdb_rank_explain_free(explain: *mut Radish
 }
 
 #[no_mangle]
-pub extern "C" fn radishlex_userdb_add_term(
-    db_path: *const c_char,
-    input_code: *const c_char,
-    text: *const c_char,
-    reading: *const c_char,
-    error_out: *mut *mut RadishLexError,
-) -> RadishLexStatusCode {
-    ffi_status(error_out, || {
-        add_user_term(
-            read_utf8(db_path, "db_path")?,
-            read_utf8(input_code, "input_code")?,
-            read_utf8(text, "text")?,
-            read_optional_utf8(reading, "reading")?,
-        )
-    })
-}
-
-#[no_mangle]
-pub extern "C" fn radishlex_userdb_delete_term(
-    db_path: *const c_char,
-    input_code: *const c_char,
-    text: *const c_char,
-    reading: *const c_char,
-    error_out: *mut *mut RadishLexError,
-) -> RadishLexStatusCode {
-    ffi_status(error_out, || {
-        delete_user_term(
-            read_utf8(db_path, "db_path")?,
-            read_utf8(input_code, "input_code")?,
-            read_utf8(text, "text")?,
-            read_optional_utf8(reading, "reading")?,
-        )
-    })
-}
-
-#[no_mangle]
-pub extern "C" fn radishlex_userdb_restore_term(
-    db_path: *const c_char,
-    input_code: *const c_char,
-    text: *const c_char,
-    reading: *const c_char,
-    error_out: *mut *mut RadishLexError,
-) -> RadishLexStatusCode {
-    ffi_status(error_out, || {
-        restore_user_term(
-            read_utf8(db_path, "db_path")?,
-            read_utf8(input_code, "input_code")?,
-            read_utf8(text, "text")?,
-            read_optional_utf8(reading, "reading")?,
-        )
-    })
-}
-
-#[no_mangle]
-pub extern "C" fn radishlex_userdb_terms_new(
-    db_path: *const c_char,
-    error_out: *mut *mut RadishLexError,
-) -> *mut RadishLexUserTermList {
-    ffi_ptr(error_out, || {
-        let terms = list_user_terms(read_utf8(db_path, "db_path")?)?;
-        Ok(Box::into_raw(Box::new(terms)))
-    })
-}
-
-#[no_mangle]
-pub extern "C" fn radishlex_userdb_terms_count(terms: *const RadishLexUserTermList) -> usize {
-    term_list_ref(terms).map_or(0, RadishLexUserTermList::len)
-}
-
-#[no_mangle]
-/// # Safety
-/// `terms` must be live and `term_out`/`error_out`, when non-null, must be writable.
-pub unsafe extern "C" fn radishlex_userdb_terms_get(
-    terms: *const RadishLexUserTermList,
-    index: usize,
-    term_out: *mut RadishLexUserTermView,
-    error_out: *mut *mut RadishLexError,
-) -> RadishLexStatusCode {
-    ffi_status(error_out, || {
-        if term_out.is_null() {
-            return Err(FfiError::invalid_argument(
-                "user term output pointer is null",
-            ));
-        }
-
-        let view = term_list_ref(terms)?.term_view(index)?;
-        unsafe {
-            *term_out = view;
-        }
-        Ok(())
-    })
-}
-
-#[no_mangle]
-/// # Safety
-/// `terms` must be null or a live handle released exactly once.
-pub unsafe extern "C" fn radishlex_userdb_terms_free(terms: *mut RadishLexUserTermList) {
-    ffi_release(|| {
-        RadishLexUserTermList::free(terms);
-    });
-}
-
-#[no_mangle]
 /// # Safety
 /// Input strings must be readable and output pointers, when non-null, must be writable.
 pub unsafe extern "C" fn radishlex_userdb_dictionary_inspect(
@@ -662,15 +561,6 @@ fn snapshot_ref<'a>(snapshot: *const RadishLexSnapshot) -> Result<&'a RadishLexS
     Ok(unsafe { &*snapshot })
 }
 
-fn term_list_ref<'a>(
-    terms: *const RadishLexUserTermList,
-) -> Result<&'a RadishLexUserTermList, FfiError> {
-    if terms.is_null() {
-        return Err(FfiError::invalid_argument("user term list handle is null"));
-    }
-    Ok(unsafe { &*terms })
-}
-
 fn import_batch_list_ref<'a>(
     batches: *const RadishLexImportBatchList,
 ) -> Result<&'a RadishLexImportBatchList, FfiError> {
@@ -832,7 +722,9 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::*;
-    use crate::dictionary::{RADISHLEX_TERM_SOURCE_MANUAL_ADD, RADISHLEX_TERM_STATUS_ACTIVE};
+    use crate::dictionary::{
+        RadishLexUserTermView, RADISHLEX_TERM_SOURCE_MANUAL_ADD, RADISHLEX_TERM_STATUS_ACTIVE,
+    };
     use crate::engine::{
         RadishLexPersonalizedRimeSessionOptions, RadishLexRimeSessionOptions,
         RADISHLEX_ENGINE_KIND_DEMO, RADISHLEX_ENGINE_KIND_RIME,
@@ -1455,6 +1347,7 @@ mod tests {
             radishlex_error_free(ptr::null_mut());
             radishlex_snapshot_free(ptr::null_mut());
             radishlex_userdb_terms_free(ptr::null_mut());
+            radishlex_userdb_deleted_terms_free(ptr::null_mut());
             radishlex_userdb_import_batches_free(ptr::null_mut());
             radishlex_userdb_rank_explain_free(ptr::null_mut());
         }
@@ -1466,6 +1359,7 @@ mod tests {
         assert!(radishlex_snapshot_schema(ptr::null()).data.is_null());
         assert_eq!(radishlex_session_engine_kind(ptr::null()), 0);
         assert_eq!(radishlex_userdb_terms_count(ptr::null()), 0);
+        assert_eq!(radishlex_userdb_deleted_terms_count(ptr::null()), 0);
         assert_eq!(radishlex_userdb_import_batches_count(ptr::null()), 0);
     }
 

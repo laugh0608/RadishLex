@@ -9,12 +9,14 @@ class DictionaryView extends StatefulWidget {
     super.key,
     required this.snapshot,
     required this.onDeleteTerm,
+    required this.onRestoreTerm,
     required this.onImportDictionary,
     required this.onExportDictionary,
   });
 
   final ManagerSnapshot snapshot;
   final ValueChanged<UserTerm> onDeleteTerm;
+  final void Function(UserTermKey term, String state) onRestoreTerm;
   final VoidCallback onImportDictionary;
   final VoidCallback onExportDictionary;
 
@@ -123,9 +125,13 @@ class _DictionaryViewState extends State<DictionaryView> {
                     selectedTermKey = term.key;
                   }),
                   onDeleteTerm: widget.onDeleteTerm,
+                  onRestoreTerm: widget.onRestoreTerm,
                 ),
               const SizedBox(height: 14),
-              _DeletedTermsStrip(deletedTerms: widget.snapshot.deletedTerms),
+              _DeletedTermsStrip(
+                deletedTerms: widget.snapshot.deletedTerms,
+                onRestoreTerm: widget.onRestoreTerm,
+              ),
             ],
           ),
         ),
@@ -292,8 +298,10 @@ class _DictionaryTermAuditPanel extends StatelessWidget {
           children: [
             ManagerStatusBadge(
               icon: Icons.key_outlined,
-              label: 'active user term',
-              tone: ManagerBadgeTone.success,
+              label: '${selectedTerm.status} user term',
+              tone: selectedTerm.status == 'active'
+                  ? ManagerBadgeTone.success
+                  : ManagerBadgeTone.warning,
             ),
             ManagerStatusBadge(
               icon: Icons.sync_outlined,
@@ -307,6 +315,7 @@ class _DictionaryTermAuditPanel extends StatelessWidget {
         ManagerKeyValueRow(label: 'text', value: selectedTerm.text),
         ManagerKeyValueRow(label: 'reading', value: selectedTerm.reading),
         ManagerKeyValueRow(label: 'source', value: selectedTerm.source),
+        ManagerKeyValueRow(label: 'status', value: selectedTerm.status),
         ManagerKeyValueRow(
           label: 'weight',
           value: selectedTerm.weight.toStringAsFixed(2),
@@ -369,12 +378,14 @@ class _DictionaryTermsTable extends StatelessWidget {
     required this.selectedTermKey,
     required this.onSelectTerm,
     required this.onDeleteTerm,
+    required this.onRestoreTerm,
   });
 
   final List<UserTerm> terms;
   final UserTermKey? selectedTermKey;
   final ValueChanged<UserTerm> onSelectTerm;
   final ValueChanged<UserTerm> onDeleteTerm;
+  final void Function(UserTermKey term, String state) onRestoreTerm;
 
   @override
   Widget build(BuildContext context) {
@@ -389,7 +400,7 @@ class _DictionaryTermsTable extends StatelessWidget {
           DataColumn(label: Text('reading')),
           DataColumn(label: Text('weight')),
           DataColumn(label: Text('source')),
-          DataColumn(label: Text('last used')),
+          DataColumn(label: Text('status')),
           DataColumn(label: Text('')),
         ],
         rows: terms
@@ -403,12 +414,18 @@ class _DictionaryTermsTable extends StatelessWidget {
                   DataCell(Text(term.reading)),
                   DataCell(Text(term.weight.toStringAsFixed(2))),
                   DataCell(Text(term.source)),
-                  DataCell(Text(term.lastUsed)),
+                  DataCell(Text(term.status)),
                   DataCell(
                     IconButton(
-                      tooltip: '删除词条',
-                      onPressed: () => onDeleteTerm(term),
-                      icon: const Icon(Icons.delete_outline),
+                      tooltip: term.status == 'suppressed' ? '显式恢复词条' : '删除词条',
+                      onPressed: term.status == 'suppressed'
+                          ? () => onRestoreTerm(term.key, term.status)
+                          : () => onDeleteTerm(term),
+                      icon: Icon(
+                        term.status == 'suppressed'
+                            ? Icons.restore
+                            : Icons.delete_outline,
+                      ),
                     ),
                   ),
                 ],
@@ -451,9 +468,13 @@ class _DictionaryEmptyState extends StatelessWidget {
 }
 
 class _DeletedTermsStrip extends StatelessWidget {
-  const _DeletedTermsStrip({required this.deletedTerms});
+  const _DeletedTermsStrip({
+    required this.deletedTerms,
+    required this.onRestoreTerm,
+  });
 
   final List<DeletedTerm> deletedTerms;
+  final void Function(UserTermKey term, String state) onRestoreTerm;
 
   @override
   Widget build(BuildContext context) {
@@ -467,9 +488,13 @@ class _DeletedTermsStrip extends StatelessWidget {
           style: Theme.of(context).textTheme.labelLarge,
         ),
         ...deletedTerms.map(
-          (term) => Chip(
+          (term) => InputChip(
             avatar: const Icon(Icons.block, size: 18),
             label: Text('${term.inputCode} / ${term.text}'),
+            tooltip: '${term.deletedAt} / ${term.reason}',
+            onPressed: () => onRestoreTerm(term.key, 'deleted'),
+            deleteIcon: const Icon(Icons.restore, size: 18),
+            onDeleted: () => onRestoreTerm(term.key, 'deleted'),
           ),
         ),
         if (deletedTerms.isEmpty) const Text('暂无 deleted tombstone'),

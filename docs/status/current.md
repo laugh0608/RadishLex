@@ -4,10 +4,10 @@
 
 ## 当前判断
 
-- 复核日期：2026-07-17（Asia/Shanghai）
+- 复核日期：2026-07-18（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前产品里程碑：M2 本地个人化 MVP
-- 当前产品主批次：manager 本地产品模式
+- 当前产品主批次：manager macOS 产品实机验收
 - 已完成整改批次：R00、R01A、R02L、R01B、R06A；2026-07 稳定化整改专题已归档
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；受控同步实现与测试可继续
@@ -28,12 +28,11 @@ R02L 已完成 userdb schema v3 的事务、并发、迁移、删除/显式恢�
 
 ## M2 当前边界
 
-Flutter manager 已有本地词库、导入导出、学习摘要、rank explain、真实 Dart FFI smoke、脱敏诊断和同步关闭态原型证据，但正常产品运行态尚未退出：
+manager 本地产品运行态的实现与自动门禁已经完成：默认 `product` mode 从 app bundle 加载 ABI v4 native library，固定使用平台 Application Support userdb/settings，路径和权限由 macOS 原生层控制；native、ABI、路径或 userdb 失败会显示结构化启动错误，不会回退 fixture。显式 `demo` 构建持续显示“合成演示数据”。
 
-- 正常 manager 构建包尚未携带匹配版本的 RadishLex native library，也未固定受控平台持久化目录与权限。
-- manager 尚未与 macOS 输入 runtime 共享真实 userdb；双连接锁竞争、migration 所有权和失败诊断缺少产品证据。
-- 未显式配置环境时仍可使用 fixture；产品模式必须明确失败，fixture 只能由持续标识的 demo mode 启用。
-- 尚缺无需 shell 环境变量的本地产品 smoke，不能把开发期 FFI smoke 或 widget fixture 当作 M2 退出证据。
+词库页已区分 active、suppressed、deleted，deleted tombstone 经新 FFI 查询，suppressed/deleted 只能由独立确认动作 explicit restore。manager 隐私设置通过 macOS CurrentUser/AnyHost `CFPreferences` 写入输入 runtime 的真实偏好键并读回；失败会回滚。Rust 双连接测试已覆盖并发 schema 初始化、WAL 可见性、输入侧选择、manager 删除、输入侧 tombstone 观察和 manager 恢复。
+
+Release 产品门禁已验证 bundle native library、架构、依赖、签名、ABI/必需符号，并直接用 bundle dylib 和临时合成数据跑通删除、tombstone、重启、恢复、再次删除与导出，不启动 GUI、不触碰真实 userdb。M2 尚未退出，因为正常 Release app 的无环境变量 GUI、固定平台路径重启、隐私真实读回和输入法/manager 同库运行仍需在单独授权下完成实机验收。
 
 ## 当前停止线
 
@@ -45,16 +44,18 @@ Flutter manager 已有本地词库、导入导出、学习摘要、rank explain�
 
 ## 下一步顺位
 
-1. 以 [manager 边界](../manager-ui-boundary.md) 和 [本地验收口径](../manager-local-acceptance.md) 为 M2 设计入口，先固定 product/demo 启动模式、native library 装载与版本失败语义、平台持久化路径和权限。
-2. 让 manager 与输入法通过 Rust 真相源访问同一受控 userdb，明确 migration 所有权，并补双连接 WAL/busy、删除/恢复和损坏保留测试。
-3. 在正常 manager 构建包中闭合本地词库、学习摘要、隐私设置、rank explain 与结构化诊断主要路径；产品模式失败必须可见，demo mode 必须持续标识。
-4. 完成无需 shell 环境变量的本地产品 smoke 和匹配门禁后再判断 M2 退出；真实同步、第二平台与发布打包继续保持停止。
+1. 在 clean HEAD 重跑 manager、FFI、Release 产品 bundle 与仓库门禁，冻结同一 manager/InputMethodKit 输入和产物证据。
+2. 按 [macOS manager 产品验收 runbook](../runbooks/macos-m2-manager-product-acceptance.md) 分阶段取得动作时授权，完成正常 Release app 无环境变量启动、固定路径/权限、GUI 删除/恢复和重启持久化。
+3. 在输入法与 manager 同时连接同一测试 userdb 的现场，完成双端状态可见、隐私偏好读回与零学习增量，并把系统、进程、偏好和测试数据恢复到可证明基线。
+4. 实机证据全部通过后关闭 M2；下一开发批次进入 M3 同步成功路径与安全证据设计。真实用户同步、第二平台和 M4 发布打包继续保持停止。
 
 ## 验证入口
 
 ```bash
 ./scripts/check-manager.sh
 ./scripts/check-manager-ffi-smoke.sh
+./scripts/check-manager-product.sh
+./scripts/build-manager-macos-product.sh
 ./scripts/check-repo.sh
 ./scripts/check-docs.sh
 ./scripts/check-text-files.sh
@@ -68,7 +69,8 @@ native-rime 门禁需要显式隔离 schema/shared data/license；真实安装�
 
 - [产品路线图](../roadmap.md)：里程碑与交付物。
 - [manager 边界](../manager-ui-boundary.md)：M2 本地产品职责与 M3/M4 停止线。
-- [manager 本地验收](../manager-local-acceptance.md)：已有原型证据、产品缺口与验证入口。
+- [manager 本地验收](../manager-local-acceptance.md)：自动产品证据、实机缺口与验证入口。
+- [macOS manager 产品验收](../runbooks/macos-m2-manager-product-acceptance.md)：M2 实机授权、验收与清理流程。
 - [macOS 平台边界](../macos-inputmethodkit-boundary.md)：runtime、隐私、数据与 R01B 稳定结论。
 - [R01B 验收 runbook](../runbooks/macos-r01b-personalization-acceptance.md)：关闭证据、授权与可复验流程。
 - [技术方案](../technical-plan.md)：架构与职责。

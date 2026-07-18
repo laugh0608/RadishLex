@@ -16,7 +16,9 @@ void main() {
   testWidgets('settings view exposes configuration diagnostics', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const RadishLexManagerApp());
+    await tester.pumpWidget(
+      RadishLexManagerApp(bridge: FixtureManagerBridge()),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.tune_outlined));
@@ -24,8 +26,8 @@ void main() {
 
     expect(find.text('配置来源'), findsOneWidget);
     expect(find.text('fixture'), findsOneWidget);
-    expect(find.text('RADISHLEX_MANAGER_DB not configured'), findsOneWidget);
-    expect(find.text('not loaded'), findsOneWidget);
+    expect(find.text('synthetic demo userdb'), findsOneWidget);
+    expect(find.text('not loaded (demo mode)'), findsOneWidget);
     expect(find.text('同步门禁草案'), findsOneWidget);
     expect(find.text('平台签名 backend 不可用'), findsOneWidget);
     expect(find.text('设备 production gate 为 blocked'), findsOneWidget);
@@ -237,7 +239,7 @@ void main() {
     await tester.tap(find.byKey(const Key('settings-save-button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('设置草案已保存：sync_disabled_by_policy'), findsOneWidget);
+    expect(find.text('本地设置已保存：sync_disabled_by_policy'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.sync_outlined));
     await tester.pumpAndSettle();
@@ -354,7 +356,7 @@ void main() {
     await tester.tap(find.byKey(const Key('settings-save-button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('设置草案已保存：preflight_ready'), findsOneWidget);
+    expect(find.text('本地设置已保存：preflight_ready'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.sync_outlined));
     await tester.pumpAndSettle();
@@ -449,7 +451,7 @@ void main() {
     await tester.tap(find.byKey(const Key('settings-save-button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('设置草案已保存：preflight_ready'), findsOneWidget);
+    expect(find.text('本地设置已保存：preflight_ready'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.sync_outlined));
     await tester.pumpAndSettle();

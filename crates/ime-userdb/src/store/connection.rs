@@ -60,6 +60,12 @@ impl UserDb {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let version = read_schema_version(&transaction)?;
+        reject_future_schema(version)?;
+        if version == SCHEMA_VERSION {
+            transaction.commit()?;
+            return Ok(());
+        }
         if version == 0 && !has_any_user_table(&transaction)? {
             create_schema_v3(&transaction)?;
         } else {

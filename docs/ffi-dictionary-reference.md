@@ -13,6 +13,28 @@ RADISHLEX_DICTIONARY_FORMAT_USER_TERMS_V1 = 1
 RADISHLEX_SYNC_CLASS_P2_ENCRYPTED_SYNC = 2
 ```
 
+## 本地词条与 deleted tombstone view
+
+`radishlex_userdb_terms_new/count/get/free` 返回 active / suppressed 用户词条。`RadishLexUserTermView.status` 使用 FFI 边界定义的 active/suppressed 数值常量；deleted 不混入该 list。
+
+`radishlex_userdb_deleted_terms_new/count/get/free` 返回独立的只读 tombstone handle。`RadishLexDeletedTermView`：
+
+```text
+input_code: RadishLexStringView
+text: RadishLexStringView
+reading: RadishLexStringView
+reading_present: u8
+deleted_at_ms: i64
+reason: RadishLexStringView
+```
+
+规则：
+
+- input code、text、reading 与 reason view 都借用自 `RadishLexDeletedTermList*`，绑定层必须复制后再调用 `radishlex_userdb_deleted_terms_free`。
+- deleted list 只暴露 explicit restore 所需 identity、删除时间和非敏感 reason 分类，不暴露 P1 原始事件、上下文、SQL row ID 或 tombstone 内部版本。
+- `radishlex_userdb_restore_term` 仍是唯一恢复入口；普通导入、新增、学习或刷新不得自动恢复 deleted/suppressed 词条。
+- 新增 deleted list symbols 没有改变既有 ABI v4 结构布局；manager 产品绑定同时校验 ABI contract 与必需 symbol 集。
+
 ## Inspect 与 export
 
 `RadishLexDictionaryInspectSummary`：

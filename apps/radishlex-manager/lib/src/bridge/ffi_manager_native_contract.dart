@@ -7,7 +7,16 @@ import 'manager_bridge.dart';
 abstract interface class RadishLexManagerNativeBinding {
   List<NativeUserTermRecord> listUserTerms(String dbPath);
 
+  List<NativeDeletedTermRecord> listDeletedTerms(String dbPath);
+
   void deleteUserTerm({
+    required String dbPath,
+    required String inputCode,
+    required String text,
+    required String? reading,
+  });
+
+  void restoreUserTerm({
     required String dbPath,
     required String inputCode,
     required String text,

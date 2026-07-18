@@ -17,7 +17,7 @@ class ManagerSettingsStore {
   bool get isPersistent => filePath.isNotEmpty;
 
   String get sourceLabel =>
-      isPersistent ? 'RADISHLEX_MANAGER_SETTINGS_FILE configured' : 'in_memory';
+      isPersistent ? 'persistent settings file configured' : 'in_memory';
 
   ManagerSettingsDraft load() {
     if (!isPersistent) {

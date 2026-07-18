@@ -34,7 +34,7 @@
 RadishLexSession*
 RadishLexBuffer*
 RadishLexSnapshot*
-RadishLexUserTermList*
+RadishLexUserTermList* / RadishLexDeletedTermList*
 RadishLexRankExplain*
 RadishLexError*
 ```
@@ -46,7 +46,7 @@ RadishLexError*
 - ABI contract：`radishlex_ffi_contract`
 - session / Rime runtime 生命周期：`radishlex_session_new`、`radishlex_session_new_with_options`、`radishlex_session_new_rime`、`radishlex_session_new_personalized_rime`、`radishlex_session_free`、`radishlex_rime_runtime_shutdown`、`radishlex_session_engine_kind`、`radishlex_session_reset`、`radishlex_session_set_schema`、`radishlex_session_set_learning_context`
 - 输入、候选选择与快照：`radishlex_session_handle_key_event`、`radishlex_session_select_candidate`、`radishlex_key_result_*`、兼容 `radishlex_session_push_key_event`、`radishlex_session_snapshot_new`、`radishlex_snapshot_*`
-- userdb 状态与词条管理：`radishlex_userdb_learning_status`、`radishlex_userdb_sync_preflight`、`radishlex_userdb_rank_explain_*`、`radishlex_userdb_add_term`、`radishlex_userdb_delete_term`、`radishlex_userdb_restore_term`、`radishlex_userdb_terms_*`
+- userdb 状态与词条管理：`radishlex_userdb_learning_status`、`radishlex_userdb_sync_preflight`、`radishlex_userdb_rank_explain_*`、`radishlex_userdb_add_term`、`radishlex_userdb_delete_term`、`radishlex_userdb_restore_term`、`radishlex_userdb_terms_*`、`radishlex_userdb_deleted_terms_*`
 - dictionary 文件与导入审计：`radishlex_userdb_dictionary_*`、`radishlex_userdb_import_batches_*`
 - Rust 分配对象读取与释放：`radishlex_buffer_*`、`radishlex_error_*`、`radishlex_userdb_rank_explain_free`
 
@@ -56,7 +56,7 @@ RadishLexError*
 
 ### FFI contract
 
-`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v4 在 v3 owned key result 基础上增加产品个人化 Rime session、版本化学习上下文、display/engine index 映射、个人化状态和学习结果；当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
+`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v4 在 v3 owned key result 基础上增加产品个人化 Rime session、版本化学习上下文、display/engine index 映射、个人化状态和学习结果；M2 manager 的 deleted tombstone 查询是新增 symbol 与独立新结构，没有改变既有 v4 结构布局或调用语义，因此保持 v4，产品绑定必须同时校验 contract 与所需 symbol 集。当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
 
 ### Status 与文本 view
 
@@ -84,7 +84,7 @@ len: usize
 
 - `data + len` 表示 UTF-8 字节片段，不保证 NUL 结尾。
 - `len = 0` 时 `data` 可以为空指针。
-- view 只在其所属 handle 存活期间有效，例如 snapshot view 依赖 `RadishLexSnapshot*`，term view 依赖 `RadishLexUserTermList*`。
+- view 只在其所属 handle 存活期间有效，例如 snapshot view 依赖 `RadishLexSnapshot*`，term/deleted term view 分别依赖 `RadishLexUserTermList*` 与 `RadishLexDeletedTermList*`。
 
 ### Session options 与 engine kind
 
@@ -371,8 +371,6 @@ suppressed = 2
 deleted = 3
 ```
 
-term list 当前只返回 active / suppressed 词条。删除 tombstone 不通过 list 暴露；需要通过删除语义和 sync preflight 的 `syncable_deleted_terms` 观察。
-
 ### Dictionary file summaries
 
 dictionary inspect、export、import 与 import batch 的字段级结构、常量和规则见 [FFI Dictionary Reference](ffi-dictionary-reference.md)。本文件只保留所有权、隐私和跨平台通用边界。
@@ -417,7 +415,9 @@ Userdb 词条管理入口规则：
 - `radishlex_userdb_delete_term` 必须沿用 userdb tombstone 语义，后续旧权重或普通导入不得立即复活该词条。
 - `radishlex_userdb_terms_new` 返回只读 `RadishLexUserTermList*`，由 `radishlex_userdb_terms_free` 释放。
 - `radishlex_userdb_terms_get` 返回的 string view 借用自 term list handle，平台端只能在 list 释放前读取，不得缓存指针。
-- term list 只列出当前 active / suppressed 用户词条；deleted tombstone 不通过词条列表导出，只通过删除语义和 sync preflight 计数体现。
+- term list 只列出当前 active / suppressed 用户词条。
+- `radishlex_userdb_deleted_terms_new` 返回只读 `RadishLexDeletedTermList*`，由 `radishlex_userdb_deleted_terms_free` 释放；`count/get` 的 view 借用自该 handle，平台端必须复制 input code、text、reading、deleted timestamp 和 reason 后再释放。
+- deleted list 只提供 explicit restore 所需的 P2 identity 与删除摘要，不提供 P1 原始 selection/negative event、上下文、SQL row ID 或内部 tombstone version；普通导入、学习和新增不得据此隐式调用 restore。
 - dictionary file 入口同样只处理用户明确管理的 P2 词条，不记录 P1 selection event、negative feedback 或上下文统计。
 
 ## 所有权与生命周期

@@ -56,6 +56,7 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
           selectedIndex: selectedIndex,
           onSelectPage: _selectPage,
           onDeleteTerm: actions.deleteTerm,
+          onRestoreTerm: actions.restoreTerm,
           onImportDictionary: actions.importDictionary,
           onExportDictionary: actions.exportDictionary,
           onPreviewDiagnostics: actions.previewDiagnostics,
@@ -101,6 +102,7 @@ class _ManagerShell extends StatelessWidget {
     required this.selectedIndex,
     required this.onSelectPage,
     required this.onDeleteTerm,
+    required this.onRestoreTerm,
     required this.onImportDictionary,
     required this.onExportDictionary,
     required this.onPreviewDiagnostics,
@@ -113,6 +115,7 @@ class _ManagerShell extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelectPage;
   final ValueChanged<UserTerm> onDeleteTerm;
+  final void Function(UserTermKey term, String state) onRestoreTerm;
   final VoidCallback onImportDictionary;
   final VoidCallback onExportDictionary;
   final VoidCallback onPreviewDiagnostics;
@@ -127,6 +130,7 @@ class _ManagerShell extends StatelessWidget {
       DictionaryView(
         snapshot: snapshot,
         onDeleteTerm: onDeleteTerm,
+        onRestoreTerm: onRestoreTerm,
         onImportDictionary: onImportDictionary,
         onExportDictionary: onExportDictionary,
       ),

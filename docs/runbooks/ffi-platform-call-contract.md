@@ -127,6 +127,7 @@ len: usize
 snapshot schema / preedit / candidate view -> RadishLexSnapshot*
 key result commit / borrowed snapshot -> RadishLexKeyResult*
 user term view -> RadishLexUserTermList*
+deleted term view -> RadishLexDeletedTermList*
 import batch view -> RadishLexImportBatchList*
 error message -> RadishLexError*
 buffer data -> RadishLexBuffer*
@@ -142,6 +143,7 @@ RadishLexKeyResult*        -> radishlex_key_result_free
 RadishLexSnapshot*         -> radishlex_snapshot_free
 RadishLexBuffer*           -> radishlex_buffer_free
 RadishLexUserTermList*     -> radishlex_userdb_terms_free
+RadishLexDeletedTermList*  -> radishlex_userdb_deleted_terms_free
 RadishLexImportBatchList*  -> radishlex_userdb_import_batches_free
 RadishLexRankExplain*      -> radishlex_userdb_rank_explain_free
 RadishLexError*            -> radishlex_error_free
@@ -209,6 +211,7 @@ radishlex_userdb_add_term(db_path, input_code, text, reading, error_out)
 radishlex_userdb_restore_term(db_path, input_code, text, reading, error_out)
 radishlex_userdb_delete_term(db_path, input_code, text, reading, error_out)
 radishlex_userdb_terms_new(db_path, error_out)
+radishlex_userdb_deleted_terms_new(db_path, error_out)
 radishlex_userdb_dictionary_inspect(file_path, summary_out, error_out)
 radishlex_userdb_dictionary_export(db_path, file_path, summary_out, error_out)
 radishlex_userdb_dictionary_import(db_path, file_path, source_name, dry_run, summary_out, error_out)
@@ -220,6 +223,8 @@ radishlex_userdb_import_batches_new(db_path, error_out)
 - 这些入口不暴露 SQLite connection、statement 或 row 指针。
 - `add_term` 只处理未删除词条，不能清除 tombstone 或 suppressed；只有用户明确触发的 `restore_term` 可以执行版本更新的显式恢复。绑定层不得在普通新增、导入或输入选择后自动调用 restore。
 - `delete_term` 写入 tombstone 并阻断旧 selection、weight、导入和旧状态复活；调用成功不表示远端同步已经开放。
+- active/suppressed term list 与 deleted term list 是两个独立 owned handle；两类 `get` 返回的字符串都只借用到对应 handle 释放前。绑定层必须先复制 deleted identity、删除时间和非敏感 reason，再释放 handle；不得把 view 指针缓存进 widget/model。
+- deleted list 只用于展示 tombstone 和承接用户明确确认的 `restore_term`，不能读取 P1 原始事件，也不能在刷新、导入或普通选择后自动恢复。
 - learning status 只返回聚合计数、latest timestamp 和 `plaintext_payload / p1_raw_details / context_stats = false` 标记；不得把 P1 原始选择事件、负反馈 reason 明细、上下文统计或用户词明文导出给管理 UI。
 - dictionary import 的 `dry_run` 使用 `0 / 1`，其他值返回 `InvalidArgument`。
 - dictionary export 只导出用户明确管理的 P2 词条，不导出 P1 原始选择事件、负反馈明细、上下文统计或 ranker 权重摘要。

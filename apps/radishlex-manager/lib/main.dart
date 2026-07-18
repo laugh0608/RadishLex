@@ -3,6 +3,10 @@ import 'package:flutter/widgets.dart';
 import 'src/bridge/manager_bridge_factory.dart';
 import 'src/app.dart';
 
-void main() {
-  runApp(RadishLexManagerApp(bridge: createDefaultManagerBridge()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final bootstrap = await createDefaultManagerBootstrap();
+  runApp(
+    RadishLexManagerApp(bridge: bootstrap.bridge, runtimeMode: bootstrap.mode),
+  );
 }

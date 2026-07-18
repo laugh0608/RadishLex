@@ -2,6 +2,9 @@ const nativeTermSourceEngineSelection = 1;
 const nativeTermSourceManualImport = 2;
 const nativeTermSourceManualAdd = 3;
 const nativeTermSourcePhraseLearning = 4;
+const nativeTermStatusActive = 1;
+const nativeTermStatusSuppressed = 2;
+const nativeTermStatusDeleted = 3;
 const nativeDictionaryFormatUserTermsV1 = 1;
 const nativeSyncClassP2EncryptedSync = 2;
 
@@ -31,6 +34,22 @@ final class NativeUserTermRecord {
   final int updatedAtMs;
   final int lastUsedAtMs;
   final bool lastUsedAtPresent;
+}
+
+final class NativeDeletedTermRecord {
+  const NativeDeletedTermRecord({
+    required this.inputCode,
+    required this.text,
+    required this.reading,
+    required this.deletedAtMs,
+    required this.reason,
+  });
+
+  final String inputCode;
+  final String text;
+  final String? reading;
+  final int deletedAtMs;
+  final String reason;
 }
 
 final class NativeDictionaryInspectSummary {

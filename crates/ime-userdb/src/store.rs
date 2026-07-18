@@ -3,11 +3,11 @@ use std::collections::BTreeSet;
 
 use crate::error::{UserDbError, UserDbResult};
 use crate::model::{
-    DictionaryImportBatch, DictionaryImportSummary, DictionaryTermRecord, DictionaryTermsDocument,
-    DictionaryTermsFormat, LearningCaseDeletedTombstoneInspection, LearningCaseIdentity,
-    LearningCaseInspection, LearningCaseRankerWeightInspection, LearningCaseTermInspection,
-    LearningStatusSummary, SyncPreflightSummary, TermSource, TermStatus,
-    UserDbSyncPlaintextPayload, UserTerm, LEARNING_CASE_INSPECTION_VERSION,
+    DeletedTermTombstone, DictionaryImportBatch, DictionaryImportSummary, DictionaryTermRecord,
+    DictionaryTermsDocument, DictionaryTermsFormat, LearningCaseDeletedTombstoneInspection,
+    LearningCaseIdentity, LearningCaseInspection, LearningCaseRankerWeightInspection,
+    LearningCaseTermInspection, LearningStatusSummary, SyncPreflightSummary, TermSource,
+    TermStatus, UserDbSyncPlaintextPayload, UserTerm, LEARNING_CASE_INSPECTION_VERSION,
 };
 
 mod connection;
@@ -52,6 +52,27 @@ impl UserDb {
             .query_map([], user_term_from_row)?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(terms)
+    }
+
+    pub fn list_deleted_term_tombstones(&self) -> UserDbResult<Vec<DeletedTermTombstone>> {
+        let mut statement = self.connection.prepare(
+            "SELECT input_code, text, reading, deleted_at_ms, reason
+             FROM deleted_terms
+             ORDER BY deleted_at_ms DESC, input_code, text, reading",
+        )?;
+        let tombstones = statement
+            .query_map([], |row| {
+                let reading: String = row.get(2)?;
+                Ok(DeletedTermTombstone {
+                    input_code: row.get(0)?,
+                    text: row.get(1)?,
+                    reading: optional_from_storage(&reading),
+                    deleted_at_ms: row.get(3)?,
+                    reason: row.get(4)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(tombstones)
     }
 
     pub fn export_dictionary_records(&self) -> UserDbResult<Vec<DictionaryTermRecord>> {

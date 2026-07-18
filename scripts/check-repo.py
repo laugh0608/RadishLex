@@ -39,12 +39,14 @@ REQUIRED_FILES = [
     "crates/ime-engine-rime/Cargo.toml",
     "crates/ime-engine-rime/build.rs",
     "crates/ime-engine-rime/src/lib.rs",
+    "crates/ime-ffi/src/abi/user_terms.rs",
     "docs/engine-boundary.md",
     "docs/engine-rime-adapter.md",
     "docs/privacy-sync.md",
     "docs/repository-layout.md",
     "docs/roadmap.md",
     "docs/technical-plan.md",
+    "docs/runbooks/macos-m2-manager-product-acceptance.md",
     "platforms/macos-imk/Sources/main.m",
     "platforms/macos-imk/Tools/tis_source_status.m",
     "platforms/macos-imk/build-bundle.sh",
@@ -54,7 +56,10 @@ REQUIRED_FILES = [
     "scripts/check-docs.py",
     "scripts/check-docs.sh",
     "scripts/check-manager-ffi-smoke.sh",
+    "scripts/check-manager-product.sh",
     "scripts/check-manager.sh",
+    "scripts/build-manager-macos-product.sh",
+    "scripts/embed-manager-native-library.sh",
     "scripts/check-macos-imk.sh",
     "scripts/check-macos-imk-native.sh",
     "scripts/cleanup-macos-imk.sh",
@@ -72,6 +77,9 @@ REQUIRED_FILES = [
     "apps/radishlex-manager/README.md",
     "apps/radishlex-manager/pubspec.yaml",
     "apps/radishlex-manager/lib/main.dart",
+    "apps/radishlex-manager/lib/src/bridge/manager_platform_control.dart",
+    "apps/radishlex-manager/lib/src/bridge/method_channel_manager_platform_control.dart",
+    "apps/radishlex-manager/macos/Runner/MainFlutterWindow.swift",
     "apps/radishlex-manager/tool/ffi_bridge_smoke.dart",
     "apps/radishlex-manager/test/widget_test.dart",
 ]
@@ -148,6 +156,63 @@ def check_license_wording() -> None:
 
     if "源代码可见中文输入系统" not in readme:
         raise SystemExit("README.md should describe RadishLex as a source-available input system")
+
+
+def check_manager_product_runtime_contract() -> None:
+    factory = read_text(
+        "apps/radishlex-manager/lib/src/bridge/manager_bridge_factory.dart"
+    )
+    for phrase in (
+        "defaultValue: 'product'",
+        "ManagerRuntimeMode.demo",
+        "UnavailableManagerBridge",
+        "MethodChannelManagerPlatformControl",
+    ):
+        if phrase not in factory:
+            raise SystemExit(f"manager product bootstrap is missing contract phrase: {phrase}")
+    if "Platform.environment" in factory or "fixture_fallback" in factory:
+        raise SystemExit("manager product bootstrap must not use environment or fixture fallback")
+
+    swift_bridge = read_text(
+        "apps/radishlex-manager/macos/Runner/MainFlutterWindow.swift"
+    )
+    for phrase in (
+        "FileManager.default",
+        "libradishlex_ime_ffi.dylib",
+        "CFPreferencesCopyValue",
+        "CFPreferencesSetValue",
+        "CFPreferencesSynchronize",
+        "restorePrivacyModeState",
+        "kCFPreferencesCurrentUser",
+        "kCFPreferencesAnyHost",
+        "lstat",
+        ".posixPermissions: 0o700",
+        ".posixPermissions: 0o600",
+    ):
+        if phrase not in swift_bridge:
+            raise SystemExit(f"manager macOS runtime bridge is missing contract phrase: {phrase}")
+
+    for entitlements_path in (
+        "apps/radishlex-manager/macos/Runner/DebugProfile.entitlements",
+        "apps/radishlex-manager/macos/Runner/Release.entitlements",
+    ):
+        if "com.apple.security.app-sandbox" in read_text(entitlements_path):
+            raise SystemExit(f"M2 manager must not enable App Sandbox: {entitlements_path}")
+
+    xcode_project = read_text(
+        "apps/radishlex-manager/macos/Runner.xcodeproj/project.pbxproj"
+    )
+    if "Embed RadishLex Native Library" not in xcode_project:
+        raise SystemExit("manager Xcode target must embed the RadishLex native library")
+
+    embed_script = read_text("scripts/embed-manager-native-library.sh")
+    for symbol in (
+        "_radishlex_ffi_contract",
+        "_radishlex_userdb_deleted_terms_new",
+        "_radishlex_userdb_restore_term",
+    ):
+        if symbol not in embed_script:
+            raise SystemExit(f"manager native bundle gate is missing symbol: {symbol}")
 
 
 def required_status_contexts(ruleset: dict[str, Any]) -> set[str]:
@@ -277,6 +342,7 @@ def main() -> int:
     check_required_files()
     check_collaboration_docs()
     check_license_wording()
+    check_manager_product_runtime_contract()
     check_ruleset_and_workflows()
     check_path_budget()
     check_deployment_evidence()

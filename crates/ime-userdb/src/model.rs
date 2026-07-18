@@ -150,6 +150,15 @@ pub struct UserTerm {
     pub restored_at_ms: Option<i64>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeletedTermTombstone {
+    pub input_code: String,
+    pub text: String,
+    pub reading: Option<String>,
+    pub deleted_at_ms: i64,
+    pub reason: String,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct DictionaryTermRecord {
     pub input_code: String,

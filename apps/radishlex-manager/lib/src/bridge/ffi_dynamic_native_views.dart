@@ -16,6 +16,16 @@ NativeUserTermRecord _copyTermView(_RadishLexUserTermView term) {
   );
 }
 
+NativeDeletedTermRecord _copyDeletedTermView(_RadishLexDeletedTermView term) {
+  return NativeDeletedTermRecord(
+    inputCode: _readStringView(term.inputCode),
+    text: _readStringView(term.text),
+    reading: _readOptionalStringView(term.reading, term.readingPresent),
+    deletedAtMs: term.deletedAtMs,
+    reason: _readStringView(term.reason),
+  );
+}
+
 NativeDictionaryImportSummary _copyDictionaryImportSummary(
   _RadishLexDictionaryImportSummary summary,
 ) {

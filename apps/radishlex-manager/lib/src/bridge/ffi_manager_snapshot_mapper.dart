@@ -8,6 +8,7 @@ import 'ffi_manager_sync_mapper.dart';
 ManagerSnapshot managerSnapshotFromNative({
   required int generatedAtMs,
   required Iterable<NativeUserTermRecord> nativeTerms,
+  required Iterable<NativeDeletedTermRecord> nativeDeletedTerms,
   required Iterable<NativeImportBatchRecord> nativeImportBatches,
   required NativeLearningStatusSummary nativeLearning,
   required NativeSyncPreflightSummary nativeSync,
@@ -22,7 +23,9 @@ ManagerSnapshot managerSnapshotFromNative({
   return ManagerSnapshot(
     generatedAt: managerFormatTimestampMs(generatedAtMs),
     dictionaryTerms: terms,
-    deletedTerms: const [],
+    deletedTerms: nativeDeletedTerms
+        .map(managerDeletedTermFromNative)
+        .toList(growable: false),
     importBatches: nativeImportBatches
         .map(managerImportBatchFromNative)
         .toList(growable: false),

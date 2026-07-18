@@ -85,7 +85,7 @@ class _SettingsViewState extends State<SettingsView> {
     return Column(
       children: [
         ManagerSection(
-          title: '设置草案',
+          title: '本地设置与同步草案',
           child: Column(
             children: [
               TextField(
@@ -106,6 +106,7 @@ class _SettingsViewState extends State<SettingsView> {
                 }),
                 secondary: const Icon(Icons.privacy_tip_outlined),
                 title: const Text('隐私模式'),
+                subtitle: const Text('保存时写入 macOS 输入法隐私偏好，并以读回结果为准。'),
               ),
               SwitchListTile(
                 key: const Key('settings-diagnostics-export'),

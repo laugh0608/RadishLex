@@ -6,6 +6,7 @@ class UserTerm {
     required this.weight,
     required this.source,
     required this.lastUsed,
+    this.status = 'active',
   });
 
   final String inputCode;
@@ -14,6 +15,7 @@ class UserTerm {
   final double weight;
   final String source;
   final String lastUsed;
+  final String status;
 
   UserTermKey get key =>
       UserTermKey(inputCode: inputCode, text: text, reading: reading);
@@ -48,12 +50,17 @@ class DeletedTerm {
     required this.text,
     required this.reading,
     required this.deletedAt,
+    this.reason = 'manual_delete',
   });
 
   final String inputCode;
   final String text;
   final String reading;
   final String deletedAt;
+  final String reason;
+
+  UserTermKey get key =>
+      UserTermKey(inputCode: inputCode, text: text, reading: reading);
 }
 
 class DictionaryImportBatchSummary {

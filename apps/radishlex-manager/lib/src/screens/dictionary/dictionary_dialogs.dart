@@ -49,6 +49,53 @@ class DictionaryDeleteConfirmDialog extends StatelessWidget {
   }
 }
 
+class DictionaryRestoreConfirmDialog extends StatelessWidget {
+  const DictionaryRestoreConfirmDialog({
+    super.key,
+    required this.term,
+    required this.state,
+  });
+
+  final UserTermKey term;
+  final String state;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('显式恢复词条'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ManagerKeyValueRow(label: 'input code', value: term.inputCode),
+            ManagerKeyValueRow(label: 'text', value: term.text),
+            ManagerKeyValueRow(label: 'reading', value: term.reading),
+            ManagerKeyValueRow(label: 'current state', value: state),
+            const ManagerKeyValueRow(
+              label: 'restore effect',
+              value: '清除对应 tombstone 或 suppressed 状态，并以新的版本恢复为 active',
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const Key('dictionary-restore-cancel'),
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('取消'),
+        ),
+        FilledButton.icon(
+          key: const Key('dictionary-restore-confirm'),
+          onPressed: () => Navigator.of(context).pop(true),
+          icon: const Icon(Icons.restore),
+          label: const Text('确认恢复'),
+        ),
+      ],
+    );
+  }
+}
+
 class DictionaryImportRequest {
   const DictionaryImportRequest({
     required this.filePath,
