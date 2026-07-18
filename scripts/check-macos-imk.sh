@@ -14,7 +14,7 @@ privacy_tool_source="${platform_dir}/Tools/privacy_mode_control.m"
 privacy_contract="${platform_dir}/Tests/privacy_mode_contract.sh"
 r01b_userdb_cleanup="${platform_dir}/cleanup-r01b-test-userdb.sh"
 r01b_userdb_cleanup_wrapper="${repo_root}/scripts/cleanup-macos-imk-r01b-test-userdb.sh"
-r01b_userdb_cleanup_helper="${platform_dir}/Tools/r01b_test_userdb_cleanup.c"
+r01b_userdb_cleanup_helper="${platform_dir}/Tools/test_data_cleanup.c"
 r01b_userdb_helper_contract="${platform_dir}/Tests/r01b_test_userdb_cleanup_helper_contract.sh"
 r01b_userdb_orchestration_contract="${platform_dir}/Tests/r01b_test_userdb_cleanup_orchestration_contract.sh"
 export CLANG_MODULE_CACHE_PATH="${repo_root}/target/macos-imk/clang-module-cache"
@@ -193,7 +193,7 @@ rg -Fq '"userdb.sqlite3"' "${r01b_userdb_cleanup_helper}"
 rg -Fq '"userdb.sqlite3-wal"' "${r01b_userdb_cleanup_helper}"
 rg -Fq '"userdb.sqlite3-shm"' "${r01b_userdb_cleanup_helper}"
 rg -Fq '"userdb.sqlite3-journal"' "${r01b_userdb_cleanup_helper}"
-rg -Fq 'unlinkat(parent_fd, kUserDbNames[index], 0)' \
+rg -Fq 'unlinkat(parent_fd, kTestDataNames[index], 0)' \
   "${r01b_userdb_cleanup_helper}"
 rg -Fq 'AT_SYMLINK_NOFOLLOW' "${r01b_userdb_cleanup_helper}"
 if rg -n '(^|[^A-Za-z])(remove|rename|system|popen)[[:space:]]*\(' \
@@ -203,7 +203,7 @@ if rg -n '(^|[^A-Za-z])(remove|rename|system|popen)[[:space:]]*\(' \
 fi
 clang -std=c11 -Wall -Wextra -Werror -fsyntax-only \
   -mmacosx-version-min=13.0 \
-  '-DRLX_R01B_STATE_DIR="/private/tmp/radishlex-r01b-contract-state"' \
+  '-DRLX_TEST_DATA_STATE_DIR="/private/tmp/radishlex-r01b-contract-state"' \
   "${r01b_userdb_cleanup_helper}"
 "${r01b_userdb_helper_contract}"
 "${r01b_userdb_orchestration_contract}"

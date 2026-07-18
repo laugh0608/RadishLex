@@ -7,6 +7,7 @@ class MainFlutterWindow: NSWindow {
   private var runtimeBridge: RadishLexManagerRuntimeBridge?
 
   override func awakeFromNib() {
+    _ = umask(0o077)
     let flutterViewController = FlutterViewController()
     let windowFrame = self.frame
     self.contentViewController = flutterViewController

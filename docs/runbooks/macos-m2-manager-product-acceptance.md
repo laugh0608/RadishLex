@@ -38,7 +38,7 @@
 1. 确认 `dev` 工作区干净，记录 HEAD；在 clean HEAD 依次运行 manager、FFI、产品 bundle 和仓库门禁。
 2. 用 `./scripts/build-manager-macos-product.sh` 生成 Release app，记录 app、主程序和 bundle native library 哈希、架构、签名与依赖。
 3. 只读确认当前 TIS matches/enabled/selected、安装 bundle、Rime、RadishLex 进程、隐私键、固定 Application Support 目录、userdb/settings/sidecars 和既有 receipts。
-4. 只有现场为空，或既有对象能由有效 receipt 和明确基线证明归属时，才形成不可覆盖的本轮基线 receipt。
+4. 只有现场为空，或既有对象能由有效 receipt 和明确基线证明归属时，才执行 `./scripts/cleanup-macos-m2-manager-test-data.sh --capture-baseline`。该入口只接受固定动作，生成不可覆盖的 `target/macos-manager/m2/m2-manager-test-data-baseline.receipt`，并要求 receipt 为当前用户普通 `0600` 文件。
 5. 测试词、App 标识和输入文本必须是公开合成数据；不要导入真实个人词库。
 
 ## 授权 A：产品启动与本地管理
@@ -47,7 +47,7 @@
 
 1. 从冻结 Release app 直接启动，不注入 `RADISHLEX_MANAGER_*` 环境变量。
 2. 确认没有“合成演示数据”标识；运行诊断显示 bundle native library 与平台 Application Support userdb，且不泄露真实绝对路径。
-3. 确认 `~/Library/Application Support/RadishLex` 为 `0700`，settings 和已创建的 userdb 为 `0600`，并确认都不是 symlink。
+3. 确认 `~/Library/Application Support/RadishLex` 为 `0700`，settings、可能存在的原子写临时文件和已创建的 userdb 为 `0600`，并确认都不是 symlink；manager 进程必须从启动起使用 `0077` umask，不能依赖保存完成后的补改权限。
 4. 通过 manager 导入固定合成 TSV，检查 active 词条、学习聚合和 rank explain；诊断不展示 P1 原始行或导入正文。
 5. 删除固定词条，确认 active 消失且 deleted tombstone 出现；普通刷新、导入或重启不得复活。
 6. 通过独立确认动作 explicit restore，确认 tombstone 消失、词条恢复；对 suppressed 固定条目执行同样的明确恢复，不允许其他操作隐式恢复。
@@ -73,9 +73,9 @@
 
 1. 开发者切回中立输入源并从系统设置移除测试输入法；精确停止 manager 与 RadishLex 进程。
 2. 用对应 receipt 恢复隐私键；删除本轮固定 manager/InputMethodKit bundle、Rime 测试数据和临时构建快照。
-3. 精确删除本轮 settings、userdb 及 `-wal`/`-shm` sidecars 和 receipts；不得扫描或读取数据库正文决定归属。
+3. 在单独取得本阶段删除授权后，只执行 `./scripts/cleanup-macos-m2-manager-test-data.sh --authorized-delete-m2-manager-test-data`，精确删除 receipt 归属的 `manager-settings.json`、原子写临时文件、userdb 及 `-wal`/`-shm`/rollback journal，并持久移除该 receipt；不得传入路径、扫描或读取数据库正文决定归属。
 4. 若父目录在基线为空，恢复其基线 mode；否则保留基线前已有对象，不进行目录级清空。
-5. 最终只读复验：TIS `matches=0 enabled=0 selected=0`，测试 bundle/Rime absent，RadishLex 进程 stopped，隐私键恢复基线，测试 userdb/settings/sidecars/receipts absent，父目录内容与 mode 回到基线，无本轮 `/private/tmp` 快照目录。
+5. 最终只读复验：TIS `matches=0 enabled=0 selected=0`，测试 bundle/Rime absent，RadishLex 进程 stopped，隐私键恢复基线，测试 userdb/settings/sidecars 与 `target/macos-manager/m2/m2-manager-test-data-baseline.receipt` absent，父目录内容与 mode 回到基线，无本轮 `/private/tmp` 快照目录。
 
 ## M2 退出判定
 

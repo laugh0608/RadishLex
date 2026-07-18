@@ -197,6 +197,7 @@ DeletedTerm
 
 - 一次用户意图是最小事务边界。`add`、`explicit restore`、selection、negative feedback、delete 及导入分别在单个 `BEGIN IMMEDIATE` 事务内完成相关事件、词条、摘要和 tombstone 写入；任一语句失败时整项回滚，不能留下半条意图。
 - 文件型 userdb 固定使用 WAL、`busy_timeout = 5000 ms`、`foreign_keys = ON` 和 `synchronous = NORMAL`。IME 与 manager 各持有独立 SQLite 连接，不跨线程共享同一个 `Connection`；IME 可持有长期热路径连接，manager 使用独立短事务连接，写事务不得跨 UI 或平台回调等待。
+- 文件连接必须在任何 schema/version/integrity SQL 之前安装 busy timeout；首次并发打开争用 WAL journal mode 时，只对 SQLite busy/locked 或尚未切换到 WAL 的结果在同一 5 秒预算内重试，其他错误立即返回。不能把初始化竞争暴露成偶发启动失败，也不能无界重试或吞掉非锁错误。
 - Unix 上数据库主文件及已生成的 `-wal`、`-shm` sidecar 权限固定收紧为 `0600`。userdb 不依赖 shell 环境变量或真实用户 Rime 目录。
 - schema migration 在一个事务内完成。打开数据库时先读取并检查 `PRAGMA user_version`；高于当前实现的未来版本必须在任何 schema 写入前拒绝。v1/v2 升级必须保留词条、学习摘要、导入审计和删除状态，并收敛到同一当前 schema。
 - 文件损坏、身份迁移歧义或 migration 失败时，原数据库文件必须原位保留并返回带路径/SQLite 原因的显式错误；不得静默删除、重命名后新建、降级为空库或用 fixture 代替。

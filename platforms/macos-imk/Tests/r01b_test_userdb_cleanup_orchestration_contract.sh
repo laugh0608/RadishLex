@@ -13,7 +13,7 @@ parent="${fake_home}/Library/Application Support/RadishLex"
 platform_script="${fake_repo}/platforms/macos-imk/cleanup-r01b-test-userdb.sh"
 wrapper="${fake_repo}/scripts/cleanup-macos-imk-r01b-test-userdb.sh"
 status_script="${fake_repo}/platforms/macos-imk/cleanup-user-install.sh"
-helper_source="${fake_repo}/platforms/macos-imk/Tools/r01b_test_userdb_cleanup.c"
+helper_source="${fake_repo}/platforms/macos-imk/Tools/test_data_cleanup.c"
 helper_stub_source="${contract_root}/helper-stub"
 status_state="${contract_root}/status-state"
 lsof_state="${contract_root}/lsof-state"
@@ -27,7 +27,7 @@ cp "${repo_root}/platforms/macos-imk/cleanup-r01b-test-userdb.sh" \
   "${platform_script}"
 cp "${repo_root}/scripts/cleanup-macos-imk-r01b-test-userdb.sh" \
   "${wrapper}"
-cp "${repo_root}/platforms/macos-imk/Tools/r01b_test_userdb_cleanup.c" \
+cp "${repo_root}/platforms/macos-imk/Tools/test_data_cleanup.c" \
   "${helper_source}"
 chmod +x "${platform_script}" "${wrapper}"
 

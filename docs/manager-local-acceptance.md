@@ -39,7 +39,7 @@
 | 产品启动不伪装成功 | 默认 product；native/path/userdb/ABI 失败进入 `UnavailableManagerBridge`；fixture 仅由显式 demo 构建启用并显示常驻标识。 | `manager_bridge_factory.dart`、`unavailable_manager_bridge.dart`、`widget_test.dart`、`./scripts/check-manager.sh` |
 | 产品 bundle 可加载真实 Rust 能力 | Xcode 构建阶段嵌入 native library，校验 ABI v4、owner-thread、panic boundary、架构、必需符号和依赖；Release bundle smoke 使用其中的 dylib。 | `embed-manager-native-library.sh`、`check-manager-product.sh`、`ffi_dynamic_native_binding.dart` |
 | 用户能管理真实本地词条 | UI 和 FFI 覆盖 active/suppressed/deleted、删除、tombstone 查询、明确恢复、导入导出与重启后的状态保持。 | `dictionary_test.dart`、`ffi_manager_bridge_test.dart`、`ffi_bridge_smoke.dart` |
-| 输入法与 manager 共享数据语义 | 两个独立 `UserDb` 连接覆盖并发 schema 初始化、WAL 可见性、选择、删除、防复活和恢复；所有动作仍由 Rust 真相源执行。 | `ime-userdb` store tests、`cargo test -p radishlex-ime-userdb` |
+| 输入法与 manager 共享数据语义 | 独立 `UserDb` 连接覆盖八路并发 schema 初始化、短时初始化锁等待、WAL 可见性、选择、删除、防复活和恢复；busy timeout 在任何 schema/integrity SQL 前生效，首次 WAL 协商只在固定预算内重试锁竞争。 | `ime-userdb` store tests、`cargo test -p radishlex-ime-userdb` |
 | 隐私设置作用于输入 runtime | Flutter 通过 MethodChannel 调用 macOS `CFPreferences` 的 CurrentUser/AnyHost 层，保存后读回；settings/权限失败会回滚。 | `MainFlutterWindow.swift`、`method_channel_manager_platform_control.dart`、对应 Flutter tests |
 | P1 与诊断边界不扩张 | 学习页只展示聚合；诊断不包含用户词、真实路径、token、恢复码、密钥或 payload bytes。 | `settings_diagnostics_test.dart`、`ffi_manager_bridge_test.dart`、产品 smoke |
 | 真实用户同步保持关闭 | 设置和同步页只保存本地草案、展示 readiness 与阻塞原因；上传主操作保持禁用。 | `sync_test.dart`、`settings_test.dart`、`docs/manager-ui-boundary.md` |

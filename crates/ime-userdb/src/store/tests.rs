@@ -47,8 +47,9 @@ fn migration_initializes_empty_database() {
 #[test]
 fn concurrent_open_serializes_schema_initialization() {
     let path = temp_db_path("concurrent-schema-initialization");
-    let barrier = Arc::new(Barrier::new(3));
-    let handles = (0..2)
+    const CONCURRENT_OPENERS: usize = 8;
+    let barrier = Arc::new(Barrier::new(CONCURRENT_OPENERS + 1));
+    let handles = (0..CONCURRENT_OPENERS)
         .map(|_| {
             let path = path.clone();
             let barrier = Arc::clone(&barrier);
@@ -69,6 +70,34 @@ fn concurrent_open_serializes_schema_initialization() {
     let db = UserDb::open(&path).expect("initialized userdb reopens");
     assert!(db.list_active_terms().expect("terms").is_empty());
     drop(db);
+    remove_temp_db(&path);
+}
+
+#[test]
+fn open_waits_for_short_database_initialization_lock() {
+    let path = temp_db_path("open-waits-for-initialization-lock");
+    let mut lock_holder = rusqlite::Connection::open(&path).expect("lock holder opens");
+    let transaction = lock_holder
+        .transaction_with_behavior(rusqlite::TransactionBehavior::Exclusive)
+        .expect("exclusive initialization lock starts");
+    transaction
+        .execute_batch("CREATE TABLE lock_holder_sentinel (id INTEGER PRIMARY KEY);")
+        .expect("lock holder writes synthetic schema");
+
+    let worker_path = path.clone();
+    let worker = thread::spawn(move || UserDb::open(worker_path));
+    thread::sleep(Duration::from_millis(50));
+    transaction
+        .rollback()
+        .expect("initialization lock rolls back");
+
+    let db = worker
+        .join()
+        .expect("open worker joins")
+        .expect("userdb open waits for the short initialization lock");
+    assert_eq!(db.schema_version().expect("schema version"), 3);
+    drop(db);
+    drop(lock_holder);
     remove_temp_db(&path);
 }
 

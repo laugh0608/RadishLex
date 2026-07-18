@@ -29,7 +29,7 @@ macOS 产品路径由原生 `FileManager` 与 app bundle 解析，不依赖 shel
 - userdb：用户 Application Support 下的 `RadishLex/userdb.sqlite3`。
 - manager 非 secret settings：同目录下的 `manager-settings.json`。
 - native library：app bundle 的 `Contents/Frameworks/libradishlex_ime_ffi.dylib`。
-- Application Support 的 `RadishLex` 目录必须保持 `0700`；新建 settings 文件必须保持 `0600`。manager 不改变既有 userdb / WAL / SHM 的正文或权限策略，schema migration 仍只由 Rust `ime-userdb` 打开流程执行。
+- Application Support 的 `RadishLex` 目录必须保持 `0700`；manager 进程在创建本地产品文件前设置 `0077` umask，settings 正式文件与原子写临时文件从创建时即保持 `0600`。manager 不改变既有 userdb / WAL / SHM 的正文或权限策略，schema migration 仍只由 Rust `ime-userdb` 打开流程执行。
 
 产品构建必须把当前 workspace 编译出的 native library 复制到 bundle，并验证目标架构、依赖解析、ABI contract version 和 manager 所需 symbol 集。开发期 FFI smoke 可以继续通过显式路径直接加载库，但不能替代无环境变量的产品 bundle smoke。
 

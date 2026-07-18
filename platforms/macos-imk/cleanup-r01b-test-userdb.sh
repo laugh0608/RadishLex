@@ -20,7 +20,7 @@ script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 repo_root="$(CDPATH= cd -- "${script_dir}/../.." && pwd)"
 tool_dir="${repo_root}/target/macos-imk/tools"
 state_dir="${repo_root}/target/macos-imk/r01b"
-helper_source="${script_dir}/Tools/r01b_test_userdb_cleanup.c"
+helper_source="${script_dir}/Tools/test_data_cleanup.c"
 helper="${tool_dir}/r01b-test-userdb-cleanup"
 status_entrypoint="${script_dir}/cleanup-user-install.sh"
 application_support_parent="${HOME}/Library/Application Support/RadishLex"
@@ -35,7 +35,7 @@ userdb_files=(
 mkdir -p "${tool_dir}" "${state_dir}"
 clang -std=c11 -Wall -Wextra -Werror \
   -mmacosx-version-min=13.0 \
-  "-DRLX_R01B_STATE_DIR=\"${state_dir}\"" \
+  "-DRLX_TEST_DATA_STATE_DIR=\"${state_dir}\"" \
   "${helper_source}" \
   -o "${helper}"
 

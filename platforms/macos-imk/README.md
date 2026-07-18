@@ -1,6 +1,6 @@
 # macOS InputMethodKit 薄壳
 
-本目录实现 M1 第一平台的 InputMethodKit 薄壳、R01B 本地个人化 runtime 接线、开发 bundle build 与不安装系统输入法的 contract smoke。它不包含同步、manager、发布签名、公证或复杂候选 UI，也不提供任何自动安装、注册或输入法服务重启动作。
+本目录实现 M1 第一平台的 InputMethodKit 薄壳、R01B 本地个人化 runtime 接线、开发 bundle build、共享 macOS 本地数据回滚 helper 与不安装系统输入法的 contract smoke。它不包含 manager 产品 UI、同步、发布签名、公证或跨平台候选 UI，也不提供任何自动安装、注册或输入法服务重启动作。
 
 ## 结构
 
@@ -15,11 +15,11 @@
 - `Tests/candidate_panel_contract.m`：创建真实 AppKit panel/control，复验视觉与 accessibility selection、appearance、anchor fallback、owner 接管和完整隐藏。
 - `Tests/input_controller_contract.m`：使用正式 controller、panel 和 Rust demo session，贯通方向 keyDown/keyUp、Space、鼠标、accessibility press、Enter、Escape、宿主快捷键和双 client 生命周期。
 - `Tests/cleanup_user_install_contract.sh`：在隔离仓库、`HOME` 和工作目录中，以参数级命令 stub、双槽假 TIS 与假进程状态动态复验路径状态、清理前后 TIS 迁移和数据保留边界，不查询真实 TIS、不终止真实进程。
-- `Tests/privacy_mode_contract.sh` 与 `Tests/r01b_test_userdb_cleanup_*_contract.sh`：复验 privacy absent/false 精确恢复和本轮 userdb receipt、固定文件、关闭证明、失败恢复边界。
+- `Tests/privacy_mode_contract.sh`、`Tests/r01b_test_userdb_cleanup_*_contract.sh` 与 `Tests/m2_manager_test_data_cleanup_*_contract.sh`：复验 privacy absent/false 精确恢复，以及 R01B/M2 两个固定数据 profile 的 receipt、文件白名单、关闭证明和失败恢复边界。
 - `Tools/tis_source_status.m`：使用公开 TIS API 按精确 Bundle ID 查询 parent/mode 状态，或以通知和 CFRunLoop 实时输出精确 current source；不启用、停用或选择输入源。
 - `ValidationHost/`：构建固定 unknown/P0 两个普通/secure 文本宿主；默认门禁只构建和检查，不启动 GUI。
 - `cleanup-user-install.sh`：在系统设置已人工移除且取得授权后，清理正式开发 bundle、`Rime` 运行目录和精确进程，并要求 TIS 零残留；默认保留 `userdb.sqlite3`。
-- `privacy-mode.sh` 与 `cleanup-r01b-test-userdb.sh`：只服务 R01B 授权验收，前者精确保存/恢复产品布尔键，后者按 receipt 删除本轮固定 userdb family，不提供通用数据删除。
+- `privacy-mode.sh`、`cleanup-r01b-test-userdb.sh` 与 `cleanup-m2-manager-test-data.sh`：前者精确保存/恢复产品布尔键；后两者按独立 receipt 删除各验收批次的固定白名单数据，不提供通用数据删除。
 - `ReferenceProbe/`：隔离验证原生候选事件路由与单 mode 输入源 metadata，不链接 Rime 或正式 FFI，也不替代产品薄壳。
 
 ## 候选窗定位与选择
@@ -61,6 +61,17 @@ test userdb 工具固定绑定 `~/Library/Application Support/RadishLex` 和 `us
 3. 删除中断时，receipt 允许在同一父目录身份下识别“主库及 sidecar”“已删空但仍为 `0700`”“已恢复空 `0755`”三类可重试状态；成功终态必须是空父目录 `0755` 且 receipt 已持久移除。不要以 `rm` 或手工改权限绕过状态机。
 
 receipt 固定写入仓库 `target/macos-imk/r01b`，属于本机授权流程状态，不提交版本库。隐私临时变更属于授权 A；test userdb 精确删除属于单独授权 B。完整人工顺序见 [macOS R01B 个人化验收](../../docs/runbooks/macos-r01b-personalization-acceptance.md)。
+
+## M2 manager 测试数据状态机
+
+M2 入口同样不接受调用方路径或额外参数：
+
+```bash
+./scripts/cleanup-macos-m2-manager-test-data.sh --capture-baseline
+./scripts/cleanup-macos-m2-manager-test-data.sh --authorized-delete-m2-manager-test-data
+```
+
+该 profile 固定绑定同一 Application Support 父目录，只允许 `userdb.sqlite3`、三个已知 sidecar、`manager-settings.json` 与 `manager-settings.json.tmp`；manager 进程启动即设置 `0077` umask，确保 settings 与临时文件从创建时就是私有文件。capture 要求 TIS、测试 bundle/Rime、输入法进程、manager 进程和目录均处于零基线；receipt 固定为 `target/macos-manager/m2/m2-manager-test-data-baseline.receipt`。delete 要求系统侧先回到零基线、manager 已停止、现有固定文件均由 `lsof` 证明关闭；helper 再复核 receipt/父目录身份、当前用户、`0600` 普通文件和精确白名单，成功后恢复父目录 empty/`0755`。最终删除属于独立授权，完整顺序见 [macOS M2 manager 产品验收](../../docs/runbooks/macos-m2-manager-product-acceptance.md)。
 
 ## 不安装验证
 

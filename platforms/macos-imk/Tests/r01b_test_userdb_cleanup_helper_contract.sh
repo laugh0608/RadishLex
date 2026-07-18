@@ -12,19 +12,19 @@ state_dir="${contract_root}/state"
 receipt="${state_dir}/r01b-test-userdb-baseline.receipt"
 helper="${contract_root}/r01b-test-userdb-cleanup"
 production_home_guard_helper="${contract_root}/r01b-home-guard-cleanup"
-source="${platform_dir}/Tools/r01b_test_userdb_cleanup.c"
+source="${platform_dir}/Tools/test_data_cleanup.c"
 
 mkdir -p "${state_dir}"
 chmod 0700 "${state_dir}"
 clang -std=c11 -Wall -Wextra -Werror \
   -mmacosx-version-min=13.0 \
-  -DRLX_R01B_CONTRACT=1 \
-  "-DRLX_R01B_STATE_DIR=\"${state_dir}\"" \
+  -DRLX_TEST_DATA_CONTRACT=1 \
+  "-DRLX_TEST_DATA_STATE_DIR=\"${state_dir}\"" \
   "${source}" \
   -o "${helper}"
 clang -std=c11 -Wall -Wextra -Werror \
   -mmacosx-version-min=13.0 \
-  "-DRLX_R01B_STATE_DIR=\"${state_dir}\"" \
+  "-DRLX_TEST_DATA_STATE_DIR=\"${state_dir}\"" \
   "${source}" \
   -o "${production_home_guard_helper}"
 
@@ -35,7 +35,7 @@ run_helper() {
 run_helper_with_fault() {
   local phase="${1}"
   env HOME="${contract_home}" \
-    RADISHLEX_R01B_CONTRACT_FAIL_PHASE="${phase}" \
+    RADISHLEX_TEST_DATA_CONTRACT_FAIL_PHASE="${phase}" \
     "${helper}" --authorized-delete-r01b-test-userdb
 }
 
@@ -85,7 +85,7 @@ assert_recovery_completed() {
 }
 
 production_strings="$(strings "${production_home_guard_helper}")"
-for contract_marker in RADISHLEX_R01B_CONTRACT_FAIL_PHASE \
+for contract_marker in RADISHLEX_TEST_DATA_CONTRACT_FAIL_PHASE \
   RLXContractFailureIs unlink-sidecar unlink-main receipt-unlink \
   receipt-fsync 'contract injected'; do
   if [[ "${production_strings}" == *"${contract_marker}"* ]]; then
@@ -308,7 +308,7 @@ rg -Fq 'openat(parent' "${source}"
 rg -Fq 'RLXOpenDirectoryAt(parent_fd, ".")' "${source}"
 rg -Fq 'fstatat(parent_fd' "${source}"
 rg -Fq 'AT_SYMLINK_NOFOLLOW' "${source}"
-rg -Fq 'unlinkat(parent_fd, kUserDbNames[index], 0)' "${source}"
+rg -Fq 'unlinkat(parent_fd, kTestDataNames[index], 0)' "${source}"
 if rg -n '(^|[^A-Za-z])(remove|rename|system|popen)[[:space:]]*\(' "${source}"; then
   echo "R01B userdb helper contains a general path or process primitive" >&2
   exit 1

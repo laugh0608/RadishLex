@@ -14,30 +14,54 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#ifndef RLX_R01B_STATE_DIR
-#error "RLX_R01B_STATE_DIR must be a fixed build-time directory"
+#ifndef RLX_TEST_DATA_STATE_DIR
+#error "RLX_TEST_DATA_STATE_DIR must be a fixed build-time directory"
 #endif
 
 #ifndef O_CLOEXEC
 #define O_CLOEXEC 0
 #endif
 
-#ifndef RLX_R01B_CONTRACT
-#define RLX_R01B_CONTRACT 0
+#ifndef RLX_TEST_DATA_CONTRACT
+#define RLX_TEST_DATA_CONTRACT 0
 #endif
 
+#ifndef RLX_TEST_DATA_PROFILE_MANAGER
+#define RLX_TEST_DATA_PROFILE_MANAGER 0
+#endif
+
+#if RLX_TEST_DATA_PROFILE_MANAGER
+#define RLX_RECEIPT_HEADER "radishlex-m2-manager-test-data-baseline-v1"
+#define RLX_TEST_DATA_ENTRY_COUNT 6
+static const char *const kReceiptName =
+    "m2-manager-test-data-baseline.receipt";
+static const char *const kAuthorizedDeleteAction =
+    "--authorized-delete-m2-manager-test-data";
+#else
+#define RLX_RECEIPT_HEADER "radishlex-r01b-test-userdb-baseline-v1"
+#define RLX_TEST_DATA_ENTRY_COUNT 4
 static const char *const kReceiptName =
     "r01b-test-userdb-baseline.receipt";
-static const char *const kReceiptHeader =
-    "radishlex-r01b-test-userdb-baseline-v1";
-static const char *const kUserDbNames[] = {
+static const char *const kAuthorizedDeleteAction =
+    "--authorized-delete-r01b-test-userdb";
+#endif
+
+static const char *const kReceiptHeader = RLX_RECEIPT_HEADER;
+static const char *const kTestDataNames[] = {
     "userdb.sqlite3",
     "userdb.sqlite3-wal",
     "userdb.sqlite3-shm",
     "userdb.sqlite3-journal",
+#if RLX_TEST_DATA_PROFILE_MANAGER
+    "manager-settings.json",
+    "manager-settings.json.tmp",
+#endif
 };
-static const size_t kUserDbNameCount =
-    sizeof(kUserDbNames) / sizeof(kUserDbNames[0]);
+static const size_t kTestDataNameCount =
+    sizeof(kTestDataNames) / sizeof(kTestDataNames[0]);
+_Static_assert(RLX_TEST_DATA_ENTRY_COUNT ==
+                   sizeof(kTestDataNames) / sizeof(kTestDataNames[0]),
+               "test data entry count must match the fixed allowlist");
 
 typedef struct {
   dev_t device;
@@ -52,12 +76,12 @@ typedef struct {
   bool present;
   dev_t device;
   ino_t inode;
-} RLXUserDbEntry;
+} RLXTestDataEntry;
 
-#if RLX_R01B_CONTRACT
+#if RLX_TEST_DATA_CONTRACT
 static bool RLXContractFailureIs(const char *phase) {
   const char *requested =
-      getenv("RADISHLEX_R01B_CONTRACT_FAIL_PHASE");
+      getenv("RADISHLEX_TEST_DATA_CONTRACT_FAIL_PHASE");
   return requested != NULL && strcmp(requested, phase) == 0;
 }
 #endif
@@ -92,7 +116,7 @@ static int RLXOpenFixedParent(void) {
     errno = EINVAL;
     return -1;
   }
-#if !RLX_R01B_CONTRACT
+#if !RLX_TEST_DATA_CONTRACT
   struct passwd *account = getpwuid(getuid());
   if (account == NULL || account->pw_dir == NULL ||
       strcmp(home, account->pw_dir) != 0) {
@@ -118,7 +142,7 @@ static int RLXOpenFixedParent(void) {
 }
 
 static int RLXOpenStateDirectory(void) {
-  return open(RLX_R01B_STATE_DIR,
+  return open(RLX_TEST_DATA_STATE_DIR,
               O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
 }
 
@@ -243,7 +267,7 @@ static bool RLXParseReceipt(const char *contents, size_t length,
   unsigned int mode = 0;
   int consumed = 0;
   int matched = sscanf(contents,
-                       "radishlex-r01b-test-userdb-baseline-v1\n"
+                       RLX_RECEIPT_HEADER "\n"
                        "parent_dev=%" SCNuMAX "\n"
                        "parent_ino=%" SCNuMAX "\n"
                        "parent_uid=%" SCNuMAX "\n"
@@ -329,17 +353,17 @@ static bool RLXReceiptStillMatches(int state_fd,
          metadata.st_ino == baseline->receipt_inode;
 }
 
-static ssize_t RLXUserDbNameIndex(const char *name) {
-  for (size_t index = 0; index < kUserDbNameCount; index++) {
-    if (strcmp(name, kUserDbNames[index]) == 0)
+static ssize_t RLXTestDataNameIndex(const char *name) {
+  for (size_t index = 0; index < kTestDataNameCount; index++) {
+    if (strcmp(name, kTestDataNames[index]) == 0)
       return (ssize_t)index;
   }
   return -1;
 }
 
-static bool RLXInspectUserDbEntries(int parent_fd,
-                                    RLXUserDbEntry *entries) {
-  memset(entries, 0, sizeof(*entries) * kUserDbNameCount);
+static bool RLXInspectTestDataEntries(int parent_fd,
+                                      RLXTestDataEntry *entries) {
+  memset(entries, 0, sizeof(*entries) * kTestDataNameCount);
   int iteration_fd = RLXOpenDirectoryAt(parent_fd, ".");
   if (iteration_fd < 0)
     return false;
@@ -358,7 +382,7 @@ static bool RLXInspectUserDbEntries(int parent_fd,
       errno = 0;
       continue;
     }
-    ssize_t index = RLXUserDbNameIndex(entry->d_name);
+    ssize_t index = RLXTestDataNameIndex(entry->d_name);
     if (index < 0 || entries[index].present) {
       valid = false;
       break;
@@ -384,18 +408,18 @@ static bool RLXInspectUserDbEntries(int parent_fd,
   return valid;
 }
 
-static bool RLXAnyUserDbEntryIsPresent(const RLXUserDbEntry *entries) {
-  for (size_t index = 0; index < kUserDbNameCount; index++) {
+static bool RLXAnyTestDataEntryIsPresent(const RLXTestDataEntry *entries) {
+  for (size_t index = 0; index < kTestDataNameCount; index++) {
     if (entries[index].present)
       return true;
   }
   return false;
 }
 
-static bool RLXEntryStillMatches(int parent_fd, size_t index,
-                                 const RLXUserDbEntry *entry) {
+static bool RLXTestDataEntryStillMatches(int parent_fd, size_t index,
+                                         const RLXTestDataEntry *entry) {
   struct stat metadata;
-  return fstatat(parent_fd, kUserDbNames[index], &metadata,
+  return fstatat(parent_fd, kTestDataNames[index], &metadata,
                  AT_SYMLINK_NOFOLLOW) == 0 &&
          S_ISREG(metadata.st_mode) && metadata.st_uid == getuid() &&
          metadata.st_nlink == 1 && RLXIsExactMode(metadata.st_mode, 0600) &&
@@ -405,24 +429,28 @@ static bool RLXEntryStillMatches(int parent_fd, size_t index,
 static int RLXCaptureBaseline(void) {
   int parent_fd = RLXOpenFixedParent();
   if (parent_fd < 0)
-    return RLXFail("R01B parent cannot be opened through fixed ordinary directories");
+    return RLXFail(
+        "Test-data parent cannot be opened through fixed ordinary directories");
 
   struct stat parent_metadata;
   if (!RLXValidateOwnedDirectory(parent_fd, 0755, &parent_metadata) ||
       !RLXDirectoryIsEmpty(parent_fd)) {
     close(parent_fd);
-    return RLXFail("R01B baseline requires an owned empty parent with mode 0755");
+    return RLXFail(
+        "Test-data baseline requires an owned empty parent with mode 0755");
   }
 
   int state_fd = RLXOpenStateDirectory();
   if (state_fd < 0) {
     close(parent_fd);
-    return RLXFail("R01B baseline state directory is unavailable or unsafe");
+    return RLXFail(
+        "Test-data baseline state directory is unavailable or unsafe");
   }
   if (!RLXValidateStateDirectory(state_fd)) {
     close(state_fd);
     close(parent_fd);
-    return RLXFail("R01B baseline state directory permissions are unsafe");
+    return RLXFail(
+        "Test-data baseline state directory permissions are unsafe");
   }
 
   RLXParentBaseline baseline = {
@@ -437,46 +465,56 @@ static int RLXCaptureBaseline(void) {
   close(state_fd);
   close(parent_fd);
   if (!created)
-    return RLXFail("R01B baseline receipt already exists or cannot be created safely");
+    return RLXFail(
+        "Test-data baseline receipt already exists or cannot be created safely");
 
+#if RLX_TEST_DATA_PROFILE_MANAGER
+  printf("m2_manager_test_data_baseline=captured\n");
+#else
   printf("r01b_userdb_baseline=captured\n");
+#endif
   return 0;
 }
 
-static bool RLXDeleteEntry(int parent_fd, size_t index,
-                           const RLXUserDbEntry *entry) {
+static bool RLXDeleteTestDataEntry(int parent_fd, size_t index,
+                                   const RLXTestDataEntry *entry) {
   if (!entry->present)
     return true;
-  if (!RLXEntryStillMatches(parent_fd, index, entry))
+  if (!RLXTestDataEntryStillMatches(parent_fd, index, entry))
     return false;
-#if RLX_R01B_CONTRACT
+#if RLX_TEST_DATA_CONTRACT
   if ((index == 2 && RLXContractFailureIs("unlink-sidecar")) ||
-      (index == 0 && RLXContractFailureIs("unlink-main"))) {
+      (index == 0 && RLXContractFailureIs("unlink-main")) ||
+      (index == 4 && RLXContractFailureIs("unlink-settings"))) {
     errno = EIO;
     return false;
   }
 #endif
-  return unlinkat(parent_fd, kUserDbNames[index], 0) == 0;
+  return unlinkat(parent_fd, kTestDataNames[index], 0) == 0;
 }
 
-static int RLXDeleteTestUserDb(void) {
+static int RLXDeleteTestData(void) {
   int state_fd = RLXOpenStateDirectory();
   if (state_fd < 0)
-    return RLXFail("R01B baseline state directory is unavailable or unsafe");
+    return RLXFail(
+        "Test-data baseline state directory is unavailable or unsafe");
   if (!RLXValidateStateDirectory(state_fd)) {
     close(state_fd);
-    return RLXFail("R01B baseline state directory permissions drifted");
+    return RLXFail(
+        "Test-data baseline state directory permissions drifted");
   }
   RLXParentBaseline baseline;
   if (!RLXReadReceipt(state_fd, &baseline)) {
     close(state_fd);
-    return RLXFail("R01B baseline receipt is missing, unsafe or malformed");
+    return RLXFail(
+        "Test-data baseline receipt is missing, unsafe or malformed");
   }
 
   int parent_fd = RLXOpenFixedParent();
   if (parent_fd < 0) {
     close(state_fd);
-    return RLXFail("R01B parent cannot be opened through fixed ordinary directories");
+    return RLXFail(
+        "Test-data parent cannot be opened through fixed ordinary directories");
   }
   struct stat parent_metadata;
   if (fstat(parent_fd, &parent_metadata) != 0 ||
@@ -487,62 +525,76 @@ static int RLXDeleteTestUserDb(void) {
       parent_metadata.st_uid != baseline.owner || baseline.mode != 0755) {
     close(parent_fd);
     close(state_fd);
-    return RLXFail("R01B parent identity or permissions drifted from the baseline");
+    return RLXFail(
+        "Test-data parent identity or permissions drifted from the baseline");
   }
 
-  RLXUserDbEntry entries[4];
-  if (!RLXInspectUserDbEntries(parent_fd, entries)) {
+  RLXTestDataEntry entries[RLX_TEST_DATA_ENTRY_COUNT];
+  if (!RLXInspectTestDataEntries(parent_fd, entries)) {
     close(parent_fd);
     close(state_fd);
-    return RLXFail("R01B parent contains a missing, unsafe or unknown userdb entry");
+    return RLXFail(
+        "Test-data parent contains an unsafe or unknown fixed-path entry");
   }
 
   mode_t parent_mode = parent_metadata.st_mode & 07777;
-  bool any_entry_present = RLXAnyUserDbEntryIsPresent(entries);
-  if (parent_mode == 0700 && entries[0].present) {
-    for (size_t index = 1; index < kUserDbNameCount; index++) {
-      if (!RLXDeleteEntry(parent_fd, index, &entries[index])) {
-        close(parent_fd);
-        close(state_fd);
-        return RLXFail("R01B sidecar identity changed or unlink failed during exact deletion");
-      }
-    }
-    if (!RLXDeleteEntry(parent_fd, 0, &entries[0])) {
-      close(parent_fd);
-      close(state_fd);
-      return RLXFail("R01B main userdb identity changed or unlink failed during exact deletion");
-    }
-  } else if (parent_mode == 0700 && any_entry_present) {
+  bool any_entry_present = RLXAnyTestDataEntryIsPresent(entries);
+  bool database_sidecar_present =
+      entries[1].present || entries[2].present || entries[3].present;
+  if (parent_mode == 0700 && !entries[0].present &&
+      database_sidecar_present) {
     close(parent_fd);
     close(state_fd);
-    return RLXFail("R01B recovery refuses sidecars without the main userdb");
+    return RLXFail(
+        "Test-data recovery refuses database sidecars without the main userdb");
+  }
+  if (parent_mode == 0700) {
+    for (size_t index = 1; index < kTestDataNameCount; index++) {
+      if (!RLXDeleteTestDataEntry(parent_fd, index, &entries[index])) {
+        close(parent_fd);
+        close(state_fd);
+        return RLXFail(
+            "Test-data entry identity changed or unlink failed during exact deletion");
+      }
+    }
+    if (!RLXDeleteTestDataEntry(parent_fd, 0, &entries[0])) {
+      close(parent_fd);
+      close(state_fd);
+      return RLXFail(
+          "Test-data main userdb identity changed or unlink failed during exact deletion");
+    }
   } else if (parent_mode == 0755 && any_entry_present) {
     close(parent_fd);
     close(state_fd);
-    return RLXFail("R01B restored parent must be empty before receipt removal");
+    return RLXFail(
+        "Test-data restored parent must be empty before receipt removal");
   } else if (parent_mode != 0700 && parent_mode != 0755) {
     close(parent_fd);
     close(state_fd);
-    return RLXFail("R01B parent mode is outside normal and recovery states");
+    return RLXFail(
+        "Test-data parent mode is outside normal and recovery states");
   }
 
   if (!RLXDirectoryIsEmpty(parent_fd)) {
     close(parent_fd);
     close(state_fd);
-    return RLXFail("R01B parent is not empty after exact userdb deletion");
+    return RLXFail(
+        "Test-data parent is not empty after exact fixed-path deletion");
   }
   if (parent_mode == 0700) {
-#if RLX_R01B_CONTRACT
+#if RLX_TEST_DATA_CONTRACT
     if (RLXContractFailureIs("fchmod")) {
       close(parent_fd);
       close(state_fd);
-      return RLXFail("R01B contract injected a parent mode restoration failure");
+      return RLXFail(
+          "Test-data contract injected a parent mode restoration failure");
     }
 #endif
     if (fchmod(parent_fd, baseline.mode) != 0) {
       close(parent_fd);
       close(state_fd);
-      return RLXFail("R01B parent mode could not be restored to the baseline");
+      return RLXFail(
+          "Test-data parent mode could not be restored to the baseline");
     }
   }
   if (fsync(parent_fd) != 0 ||
@@ -550,28 +602,32 @@ static int RLXDeleteTestUserDb(void) {
       !RLXDirectoryIsEmpty(parent_fd)) {
     close(parent_fd);
     close(state_fd);
-    return RLXFail("R01B restored parent could not be verified and synchronized");
+    return RLXFail(
+        "Test-data restored parent could not be verified and synchronized");
   }
   close(parent_fd);
 
   if (!RLXValidateStateDirectory(state_fd) ||
       !RLXReceiptStillMatches(state_fd, &baseline)) {
     close(state_fd);
-    return RLXFail("R01B data was deleted but baseline state safety drifted");
+    return RLXFail(
+        "Test data was deleted but baseline state safety drifted");
   }
-#if RLX_R01B_CONTRACT
+#if RLX_TEST_DATA_CONTRACT
   if (RLXContractFailureIs("receipt-unlink")) {
     close(state_fd);
-    return RLXFail("R01B contract injected a baseline receipt unlink failure");
+    return RLXFail(
+        "Test-data contract injected a baseline receipt unlink failure");
   }
 #endif
   if (unlinkat(state_fd, kReceiptName, 0) != 0) {
     close(state_fd);
-    return RLXFail("R01B data was deleted but baseline receipt removal failed");
+    return RLXFail(
+        "Test data was deleted but baseline receipt removal failed");
   }
 
   bool state_synced = false;
-#if RLX_R01B_CONTRACT
+#if RLX_TEST_DATA_CONTRACT
   if (RLXContractFailureIs("receipt-fsync")) {
     errno = EIO;
   } else
@@ -583,32 +639,39 @@ static int RLXDeleteTestUserDb(void) {
     if (RLXCreateReceipt(state_fd, &baseline)) {
       (void)fsync(state_fd);
       close(state_fd);
-      return RLXFail("R01B receipt removal was not durable; a retry receipt was restored");
+      return RLXFail(
+          "Test-data receipt removal was not durable; a retry receipt was restored");
     }
 
     struct stat receipt_metadata;
     if (fstatat(state_fd, kReceiptName, &receipt_metadata,
                 AT_SYMLINK_NOFOLLOW) == 0 || errno != ENOENT) {
       close(state_fd);
-      return RLXFail("R01B receipt durability failed and recovery state is unsafe");
+      return RLXFail(
+          "Test-data receipt durability failed and recovery state is unsafe");
     }
     fprintf(stderr,
-            "R01B warning: receipt directory synchronization failed after "
+            "Test-data warning: receipt directory synchronization failed after "
             "terminal removal\n");
   }
   close(state_fd);
+#if RLX_TEST_DATA_PROFILE_MANAGER
+  printf("m2_manager_test_data=deleted\n"
+         "application_support_parent=empty\n"
+         "application_support_parent_mode=0755\n"
+         "m2_manager_test_data_baseline=removed\n");
+#else
   printf("r01b_test_userdb=deleted\n"
          "application_support_parent=empty\n"
          "application_support_parent_mode=0755\n"
          "r01b_userdb_baseline=removed\n");
+#endif
   return 0;
 }
 
 static void RLXPrintUsage(const char *program) {
-  fprintf(stderr,
-          "usage: %s --capture-baseline | "
-          "--authorized-delete-r01b-test-userdb\n",
-          program);
+  fprintf(stderr, "usage: %s --capture-baseline | %s\n", program,
+          kAuthorizedDeleteAction);
 }
 
 int main(int argc, const char *argv[]) {
@@ -618,8 +681,8 @@ int main(int argc, const char *argv[]) {
   }
   if (strcmp(argv[1], "--capture-baseline") == 0)
     return RLXCaptureBaseline();
-  if (strcmp(argv[1], "--authorized-delete-r01b-test-userdb") == 0)
-    return RLXDeleteTestUserDb();
+  if (strcmp(argv[1], kAuthorizedDeleteAction) == 0)
+    return RLXDeleteTestData();
   RLXPrintUsage(argv[0]);
   return 2;
 }

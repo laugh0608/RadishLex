@@ -30,9 +30,11 @@ R02L 已完成 userdb schema v3 的事务、并发、迁移、删除/显式恢�
 
 manager 本地产品运行态的实现与自动门禁已经完成：默认 `product` mode 从 app bundle 加载 ABI v4 native library，固定使用平台 Application Support userdb/settings，路径和权限由 macOS 原生层控制；native、ABI、路径或 userdb 失败会显示结构化启动错误，不会回退 fixture。显式 `demo` 构建持续显示“合成演示数据”。
 
-词库页已区分 active、suppressed、deleted，deleted tombstone 经新 FFI 查询，suppressed/deleted 只能由独立确认动作 explicit restore。manager 隐私设置通过 macOS CurrentUser/AnyHost `CFPreferences` 写入输入 runtime 的真实偏好键并读回；失败会回滚。Rust 双连接测试已覆盖并发 schema 初始化、WAL 可见性、输入侧选择、manager 删除、输入侧 tombstone 观察和 manager 恢复。
+词库页已区分 active、suppressed、deleted，deleted tombstone 经新 FFI 查询，suppressed/deleted 只能由独立确认动作 explicit restore。manager 隐私设置通过 macOS CurrentUser/AnyHost `CFPreferences` 写入输入 runtime 的真实偏好键并读回；失败会回滚。Rust 文件连接在任何 schema/integrity SQL 前安装 busy timeout，首次 WAL 协商只对锁竞争做有界重试；测试已覆盖八路并发初始化、短时初始化锁、WAL 可见性、输入侧选择、manager 删除、输入侧 tombstone 观察和 manager 恢复。
 
 Release 产品门禁已验证 bundle native library、架构、依赖、签名、ABI/必需符号，并直接用 bundle dylib 和临时合成数据跑通删除、tombstone、重启、恢复、再次删除与导出，不启动 GUI、不触碰真实 userdb。M2 尚未退出，因为正常 Release app 的无环境变量 GUI、固定平台路径重启、隐私真实读回和输入法/manager 同库运行仍需在单独授权下完成实机验收。
+
+M2 实机前的数据回滚边界已补齐：manager 从进程启动起使用 `0077` umask，settings 正式文件与原子写临时文件从创建时即为私有权限；固定 profile 的 helper 以不可覆盖 receipt 绑定安装前空父目录，只允许处理本轮 userdb family、`manager-settings.json` 及其临时文件。未知条目、symlink、sidecar-only、身份/权限漂移、打开句柄或 manager 未停止均失败关闭。实机启动前必须先捕获该 receipt，最终删除仍需独立授权。
 
 ## 当前停止线
 

@@ -1,9 +1,10 @@
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::thread;
+use std::time::{Duration, Instant};
 
-use rusqlite::{params, Connection, Transaction, TransactionBehavior};
+use rusqlite::{params, Connection, ErrorCode, Transaction, TransactionBehavior};
 
 use crate::error::{UserDbError, UserDbResult};
 
@@ -19,6 +20,8 @@ impl UserDb {
         let path = path.as_ref().to_path_buf();
         let connection = Connection::open(&path)
             .map_err(|error| preserved_database_error(&path, "open", error))?;
+        configure_common_connection(&connection)
+            .map_err(|error| preserved_database_error(&path, "configure", error))?;
         let version = read_schema_version(&connection)
             .map_err(|error| preserved_database_error(&path, "read schema version", error))?;
         reject_future_schema(version)?;
@@ -146,14 +149,40 @@ impl UserDb {
 }
 
 fn configure_file_connection(connection: &Connection) -> rusqlite::Result<()> {
-    configure_common_connection(connection)?;
-    let journal_mode: String =
-        connection.query_row("PRAGMA journal_mode = WAL", [], |row| row.get(0))?;
-    if !journal_mode.eq_ignore_ascii_case("wal") {
-        return Err(rusqlite::Error::InvalidQuery);
-    }
+    enable_wal_with_busy_retry(connection)?;
     connection.pragma_update(None, "synchronous", "NORMAL")?;
     Ok(())
+}
+
+fn enable_wal_with_busy_retry(connection: &Connection) -> rusqlite::Result<()> {
+    const RETRY_DELAY: Duration = Duration::from_millis(10);
+
+    let started_at = Instant::now();
+    loop {
+        let result = connection.query_row("PRAGMA journal_mode = WAL", [], |row| {
+            row.get::<_, String>(0)
+        });
+        match result {
+            Ok(journal_mode) if journal_mode.eq_ignore_ascii_case("wal") => return Ok(()),
+            Ok(_) if started_at.elapsed() < BUSY_TIMEOUT => thread::sleep(RETRY_DELAY),
+            Ok(_) => return Err(rusqlite::Error::InvalidQuery),
+            Err(error) if sqlite_error_is_busy(&error) && started_at.elapsed() < BUSY_TIMEOUT => {
+                thread::sleep(RETRY_DELAY);
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+fn sqlite_error_is_busy(error: &rusqlite::Error) -> bool {
+    matches!(
+        error,
+        rusqlite::Error::SqliteFailure(sqlite_error, _)
+            if matches!(
+                sqlite_error.code,
+                ErrorCode::DatabaseBusy | ErrorCode::DatabaseLocked
+            )
+    )
 }
 
 fn configure_common_connection(connection: &Connection) -> rusqlite::Result<()> {
