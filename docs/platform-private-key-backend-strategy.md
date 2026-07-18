@@ -149,9 +149,9 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 
 1. 已完成 ADR 0006、算法无关 Rust/Go verifier、显式 Go metadata migration 与共享跨语言负向 vectors；`ed25519-v1` 保持兼容。
 2. 已完成独立 `apple-keychain-p256-v1` repository spike 与双层门禁；普通测试不访问系统 Keychain。
-3. 下一步经单独授权运行 gated macOS smoke，覆盖创建、重载、签名、Rust/Go 验签、删除后 missing 和 cleanup；locked/denied 真实矩阵需要另有受控条件。
-4. 基础签名成功不能自动宣称 Secure Enclave、hardware-backed、user presence 或 backup-migratable；这些能力分别保留为 false，直到有独立证据。
-5. 只有 production backend 通过后，才进入真实产品 sync orchestration 与 `ManagerBridge` 命令；恢复码、设备授权、撤销和用户同步入口继续关闭到 M3 全部退出证据成立。
+3. 已经单独授权并通过 gated macOS smoke，覆盖创建、重载、签名、Rust/Go 验签、删除后 missing 和 cleanup；locked/denied 真实矩阵仍需要另有受控条件。
+4. 下一步评审 capability status 与产品进程访问路径；基础签名成功不能自动宣称 Secure Enclave、hardware-backed、user presence 或 backup-migratable，这些能力分别保留为 false，直到有独立证据。
+5. 只有 production backend 评审和产品环境 smoke 通过后，才进入真实产品 sync orchestration 与 `ManagerBridge` 命令；恢复码、设备授权、撤销和用户同步入口继续关闭到 M3 全部退出证据成立。
 
 ## 验证口径
 
