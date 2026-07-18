@@ -72,12 +72,14 @@ impl UserDb {
         if version == 0 && !has_any_user_table(&transaction)? {
             create_schema_v4(&transaction)?;
         } else {
-            create_legacy_schema_if_missing(&transaction)?;
-            ensure_import_batch_v2_columns(&transaction)?;
-            ensure_user_term_restore_version(&transaction)?;
+            if version < 3 {
+                create_legacy_schema_if_missing(&transaction)?;
+                ensure_import_batch_v2_columns(&transaction)?;
+                ensure_user_term_restore_version(&transaction)?;
+                migrate_deleted_term_identity(&transaction)?;
+                migrate_ranker_last_used_time(&transaction)?;
+            }
             ensure_user_term_import_batch(&transaction)?;
-            migrate_deleted_term_identity(&transaction)?;
-            migrate_ranker_last_used_time(&transaction)?;
         }
         transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         transaction.commit()?;

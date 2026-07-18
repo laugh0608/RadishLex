@@ -104,7 +104,7 @@ Flutter Manager
 - `ranker_weights`
 - `import_batches`
 
-选择、负反馈、删除和显式恢复是用户意图，跨表写入必须具备事务性。数据库需要明确 WAL、busy timeout、并发访问、文件权限、备份恢复和 schema migration 策略。
+选择、负反馈、删除和显式恢复是用户意图，跨表写入必须具备事务性。数据库需要明确 WAL、busy timeout、并发访问、文件权限、备份恢复和 schema migration 策略。schema migration 必须按实际起始版本顺序执行且每次取得写事务后重读版本；已完成的旧结构迁移不得在后续版本升级时重放。
 
 `user_terms.import_batch_id` 只记录最近一次实际写入该词条的本地导入批次，和 `import_batches.id` 在同一事务内建立；它是 manager 审计关联，不进入 P2 词条 payload。词条 `source` 仍是稳定的来源枚举，不能用来源显示标签猜测导入批次。
 

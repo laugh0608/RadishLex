@@ -193,33 +193,20 @@ fn migration_upgrades_v1_import_batches() {
 fn migration_upgrades_v3_terms_without_inventing_import_provenance() {
     let path = temp_db_path("migration-v3-import-batch");
     {
-        let connection = rusqlite::Connection::open(&path).expect("sqlite opens");
+        let mut db = UserDb::open(&path).expect("v4 userdb opens");
+        db.add_term("legacy", "合成旧词", None, TermSource::ManualAdd)
+            .expect("synthetic term is added");
+    }
+    {
+        let connection = rusqlite::Connection::open(&path).expect("sqlite reopens");
         connection
             .execute_batch(
                 "
-                CREATE TABLE user_terms (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    text TEXT NOT NULL,
-                    reading TEXT NOT NULL DEFAULT '',
-                    input_code TEXT NOT NULL,
-                    source TEXT NOT NULL,
-                    weight REAL NOT NULL DEFAULT 0.0,
-                    status TEXT NOT NULL,
-                    created_at_ms INTEGER NOT NULL,
-                    updated_at_ms INTEGER NOT NULL,
-                    last_used_at_ms INTEGER,
-                    restored_at_ms INTEGER
-                );
-                CREATE UNIQUE INDEX idx_user_terms_identity
-                    ON user_terms(input_code, text, reading);
-                INSERT INTO user_terms (
-                    text, reading, input_code, source, weight, status,
-                    created_at_ms, updated_at_ms, last_used_at_ms, restored_at_ms
-                ) VALUES ('合成旧词', '', 'legacy', 'manual_add', 1, 'active', 10, 20, NULL, NULL);
+                ALTER TABLE user_terms DROP COLUMN import_batch_id;
                 PRAGMA user_version = 3;
                 ",
             )
-            .expect("v3 schema is created");
+            .expect("complete v4 schema is reduced to v3");
     }
 
     let db = UserDb::open(&path).expect("v3 userdb migrates");
