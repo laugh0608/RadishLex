@@ -1,57 +1,59 @@
 # RadishLex 当前状态
 
-本文档是新会话和日常推进的唯一短入口，读者是需要快速判断当前里程碑、停止线和下一步的维护者与协作者。本文不记录历史流水、完整字段或操作步骤；详细事实进入稳定边界、runbook 和 devlog。
+本文档是新会话和日常推进的唯一短入口，读者是需要快速判断当前里程碑、停止线和下一步的维护者与协作者。本文不记录完整历史流水、字段参考或操作步骤；详细事实进入稳定边界、runbook 和 devlog。
 
 ## 当前判断
 
 - 复核日期：2026-07-18（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
-- 当前产品里程碑：M2 本地个人化 MVP
-- 当前产品主批次：manager macOS 产品实机验收
-- 已完成整改批次：R00、R01A、R02L、R01B、R06A；2026-07 稳定化整改专题已归档
+- 当前产品里程碑：M3 端到端加密同步 Beta
+- 当前产品主批次：设备签名算法 profile 与 macOS 生产私钥 backend
+- 已完成：M0 工程基础、M1 macOS 离线输入 Alpha、M2 本地个人化 MVP；R00、R01A、R02L、R01B、R06A 已退出
 - 第一真实平台：macOS InputMethodKit
-- 真实用户同步：保持关闭；受控同步实现与测试可继续
+- 真实用户同步：保持关闭；合成数据、短生命周期服务与受控集成测试可以继续
 
-R01A 已以 Apple Development `build 32` 完成真实 TextEdit/Codex、5×1 候选、主要选择与编辑、光标跟随、全屏、输入菜单、双 client、进程重启、离线和零残留证据。M1 Alpha 暂不声明副屏和 VoiceOver 候选操作可用；进入受支持范围前必须修复并重新实机验收。
+M1 已用 Apple Development `build 32` 完成真实 TextEdit/Codex 离线输入、候选交互、生命周期、离线和零残留证据；副屏与 VoiceOver 候选操作仍不是已支持能力。R02L 与 R01B 随后关闭事务化学习、确定性排序、删除/显式恢复、真实重排、进程重启、隐私、unknown、P0 与 secure 系统路由。M2 manager 产品验收和最终回滚已完成，本地个人化 MVP 于 2026-07-18 正式关闭。
 
-R02L 已完成 userdb 的事务、并发、迁移、删除/显式恢复和确定性 ranker 语义；M2 将当前 schema 升至 v4，只增加不进入同步 payload 的本地导入批次关联。R01B 已把输入侧能力接入 `ime-runtime` 与 macOS 产品 session，并用同一 Apple Development `build 34` 完成真实选择重排、进程重启、删除防复活、显式恢复、隐私模式、unknown、P0、secure 系统路由与最终零残留证据。M1 输入侧真实学习纵向闭环至此关闭，阶段进入 M2 manager 本地产品能力。
+## M2 关闭证据
 
-## R01B 关闭证据
+manager 正常产品运行态固定为无环境变量的 `product` mode，从 app bundle 加载 ABI v5 native library，并与 InputMethodKit 共享平台 Application Support userdb；native、ABI、路径、权限或 userdb 失败不会回退 fixture。词库页真实区分 active、suppressed、deleted，导入批次按持久化 `import_batch_id` 关联，恢复只能经独立 explicit restore。文件连接在 schema/integrity SQL 前安装 busy timeout，WAL 首次协商只对锁竞争做有界重试。
 
-`build 34` 在 clean HEAD `ee331a5` 使用固定 `librime 1.17.0` 与哈希一致的隔离数据完成 repository/ad-hoc native 重建，五项产物哈希与提交前候选一致；同一输入的 Apple Development 产物完成签名、安装副本一致性和真实验收。
+实机冻结于 clean HEAD `a7e385e`。Release `Info.plist`、主程序、bundle FFI SHA-256 分别为 `780d2ecbf8d4fd6c615eb7b5cd40e03227fde2280956d005d573bc0087451ce2`、`4ae289fe1df7c1653940ea6e869a626c057dc8ce6b8469a0825fc2279e913bf6`、`4785dd662a918188ad506c0ec1b543a67ef477bafbd479de81e407623a794f0f`；ad-hoc 严格验签通过。Authorization A 已证明真实 v3 -> v4 migration、固定合成词导入审计、delete 防普通导入复活、deleted/suppressed 独立恢复、重启持久化与 rank explain 一致。
 
-完整序列已证明：TextEdit 首次选择把固定目标从隔离 display/engine `1/1` 重排为 `0/1`；第二次与精确进程重启后的选择把 frequency 推进到 `2`、`3`。delete 产生 tombstone 与一次负反馈、移除 ranker，并在新鲜快照把目标降到 `4/1`；再次选择不能复活。explicit restore 以 `manual_add` 新版本恢复 `0/1`，后续选择从 frequency `1` 重新建立 ranker。隐私模式下同一真实提交保持全库聚合零增量。
+Authorization B 使用同一 userdb 完成输入法与 manager 双端验收：输入侧提交后，manager 页头刷新无需重启即可观察聚合变化；manager delete 产生 tombstone 并清除 ranker，输入侧再次选择只增加本地 selection 聚合，不能复活词条；explicit restore 后输入侧新 session 重新学习；manager 与 IMK 精确重启后状态继续一致，未出现非预期 `SQLITE_BUSY`、重复 migration 或损坏降级。隐私模式真实读回为 true 时，普通 TextEdit 提交保持全库聚合零增量；恢复正常模式后，一次提交只产生一次预期 selection/frequency 增量。
 
-同产物补验用全新 userdb 在 TextEdit 建立一次固定学习种子，active/ranker/selection/frequency 均为 `1`。unknown host 与固定 P0 host 中 `时` 均为第 `1` 候选，两组前后全库聚合零增量。secure field 显示 Secure Event Input 已启用，macOS 期间不允许切换到 RadishLex 或系统拼音；解除 secure 聚焦后恢复系统拼音。来源监视未记录 secure 期间 RadishLex source，数据库全量零增量。该项结论固定为“macOS secure 路由旁路，controller secure 分支未由本组实机执行”，不记为 `policy_blocked` 实机通过；controller 分支继续由生产分类 contract 与 native FFI policy 测试约束。
+secure field 显示 Secure Event Input 已启用。secure 聚焦期间顶部输入法菜单不能切换到 RadishLex 或系统拼音；快捷键可以退回系统拼音，但不能进入 RadishLex；解除聚焦后保持系统拼音。来源监视未记录 secure 期间 RadishLex source，学习聚合保持 `selection_events=7`、固定 `shi/时 frequency=4`。该项只证明“macOS secure 路由旁路，controller secure 分支未由本组实机执行”，不记为 `policy_blocked` 实机通过。
 
-授权 A 普通清理和独立授权 B 数据清理均已完成。最终复验为 TIS `matches=0 enabled=0 selected=0`、bundle/Rime/userdb/sidecar/两个 receipts absent、进程 stopped、隐私键 absent、父目录 empty/`0755`，且无 R01B `/private/tmp` 快照目录。取证与清理全程未读取 P1 原始行或数据库正文。
+Authorization B/C 最终恢复了系统与数据基线。首次 C 删除在任何数据变化前因 v1 receipt 的 `st_dev` 跨登录漂移安全停止；共享 helper 现只在 receipt 与父目录的旧记录同设备、当前现场也同设备，且两者 inode、owner、mode、link、固定路径和白名单均精确匹配时接受成对 device drift，任一单侧漂移继续拒绝。contract 通过后重跑同一固定入口成功。最终证据为 TIS `matches=0 enabled=0 selected=0`，bundle/Rime/userdb/sidecars/settings/receipts 和 M2 `/private/tmp` 目录 absent，IMK/manager 进程 stopped，隐私键 absent，Application Support 父目录 empty/`0755`。全程未读取 P1 原始行或数据库正文。
 
-## M2 当前边界
+## M3 当前边界
 
-manager 本地产品运行态的实现与自动门禁已经完成：默认 `product` mode 从 app bundle 加载 ABI v5 native library，固定使用平台 Application Support userdb/settings，路径和权限由 macOS 原生层控制；native、ABI、路径或 userdb 失败会显示结构化启动错误，不会回退 fixture。显式 `demo` 构建持续显示“合成演示数据”。ABI v5 通过 user-term view 的可选本地 `import_batch_id` 精确关联最近导入批次，不再把 term source 与 batch source name 两类不同语义的显示字符串当作关联键。
+仓库已经具备 M3 的实现基础：P2 user term、ranker weight 与 tombstone 可在 Rust 内部组装为加密 envelope；remote client 只接收已加密对象与已签名 manifest；两客户端内存 harness 和短生命周期 Go HTTP 测试已覆盖授权、上传、下载、解密、合并写回、stale conflict 与 v2 重新上传。Go server 已有设备、join request、authorization、recovery record、对象版本、bearer token、SQLite metadata、local blob、备份恢复、外部 TLS 和升级回滚受控证据。
 
-词库页已区分 active、suppressed、deleted，deleted tombstone 经新 FFI 查询，suppressed/deleted 只能由独立确认动作 explicit restore。manager 隐私设置通过 macOS CurrentUser/AnyHost `CFPreferences` 写入输入 runtime 的真实偏好键并读回；失败会回滚。Rust 文件连接在任何 schema/integrity SQL 前安装 busy timeout，首次 WAL 协商只对锁竞争做有界重试；测试已覆盖八路并发初始化、短时初始化锁、WAL 可见性、输入侧选择、manager 删除、输入侧 tombstone 观察和 manager 恢复。
+这些测试仍不是用户可用同步。当前生产阻塞项是：
 
-Release 产品门禁已验证 bundle native library、架构、依赖、签名、ABI/必需符号，并直接用 bundle dylib 和临时合成数据跑通删除、tombstone、重启、恢复、再次删除与导出。clean HEAD `b2acd0a` 的 repository、manager product 与 macOS InputMethodKit 门禁通过；本轮冻结的 Release 主程序、bundle FFI 与 `Info.plist` SHA-256 分别为 `8ef53ec82d48d7148983ac0e00e9234d1cb1b6cf5b5575d085df0d57038b8c35`、`4785dd662a918188ad506c0ec1b543a67ef477bafbd479de81e407623a794f0f`、`780d2ecbf8d4fd6c615eb7b5cd40e03227fde2280956d005d573bc0087451ce2`，严格验签通过，签名为 ad-hoc。
+- `apple-keychain-v1` 与已测 Android Keystore 环境都未证明不可导出 `ed25519-v1` signing key；`test-memory-v1` 禁止进入生产。
+- 缺少发布级目标部署运行证据，以及真实产品的同步 cursor/orchestration、设备恢复、撤销和 key epoch 全流程。
+- `ManagerBridge` 仍无真实同步、恢复码、设备加入、授权、撤销或轮换命令；现有 readiness 只证明关闭态。
 
-Authorization A 已在该冻结产物上完成。正常 app 无环境变量启动为 `product` / `local_only`，真实 v3 userdb 成功迁移到 v4；固定合成 TSV 的 active/suppressed、导入统计、批次审计和 rank explain 可见。deleted tombstone 经再次导入和重启均未复活，deleted 与 suppressed 只能分别 explicit restore；完整退出重启后保持 2 个 active、0 suppressed、0 deleted，两个候选的 user contribution 均为 `1.000` 且 suppression/deletion penalty 为零。全程未展示 P1 原始行或数据库正文。M2 尚未退出，因为输入法/manager 同库双端可见、隐私真实读回与零学习增量、最终系统和数据回滚仍需在独立 Authorization B/C 下完成。
-
-M2 实机前的数据回滚边界已补齐：manager 从进程启动起使用 `0077` umask，settings 正式文件与原子写临时文件从创建时即为私有权限；固定 profile 的 helper 以不可覆盖 receipt 绑定安装前空父目录，只允许处理本轮 userdb family、`manager-settings.json` 及其临时文件。未知条目、symlink、sidecar-only、身份/权限漂移、打开句柄或 manager 未停止均失败关闭。实机启动前必须先捕获该 receipt，最终删除仍需独立授权。
+M3 第一主批不再继续堆叠 readiness fixture，也不在现有 backend 内保存或导出 Ed25519 seed。优先设计新的平台可用签名算法 profile，并以 Apple P-256 非导出能力为首个 spike 方向：先用 ADR 固定算法标识、公钥与签名编码、Rust/Go verifier、Ed25519 共存和历史设备迁移；ADR 通过后再实现跨语言 test vector、macOS backend 与 gated smoke。若平台 spike 失败，才评审独立的软件保护 backend，且必须使用新 backend id 和明确风险等级。
 
 ## 当前停止线
 
-- R01B 已关闭；除非生产输入行为或隐私策略发生回归，不重复完整实机矩阵，也不把 manager 工作重新包装为 R01B。
-- manager 产品模式不得在真实 FFI 加载、版本、路径或 userdb 打开失败时静默回退 fixture；不得直接复制 Rust 的排序、删除、恢复或隐私真相源。
-- P1 原始选择事件继续只留本地，不进入 manager 展示、诊断、提交记录或同步对象。
-- M3 退出前不开放真实用户同步、非受控远端数据、恢复码/设备授权产品成功路径或设备撤销产品入口。
-- M2 退出前不启动第二真实平台主线；M4 前不宣称普通用户安装包、最终 librime/schema 分发或发布供应链已经完成。
+- M3 退出前不开放真实用户同步，不上传非受控真实 P2 数据，不提供恢复码、设备授权、撤销或轮换的产品成功入口。
+- 不把 `test-memory-v1`、普通文件、SQLite、settings、generic password item 或可导出 seed 静默伪装成生产非导出 backend。
+- P0 永不学习/同步；P1 原始事件只留本地，不进入 payload、manager、诊断、日志或提交记录。
+- 输入热路径继续完全本地；Go server 不解密、不排序、不保存明文用户词或候选偏好。
+- M2 已通过第二平台选择门禁，但当前仍集中完成 M3 macOS 同步 Beta，不同时展开第二真实平台主线。
+- M4 前不宣称普通用户安装包、最终 librime/schema 分发、App Group 迁移、公证或发布供应链已经完成。
 
 ## 下一步顺位
 
-1. 保持 Authorization A 的冻结产物、固定 userdb 与 rollback receipt 不变，不再重复 manager 单端矩阵。
-2. 单独取得 Authorization B 后，在输入法与 manager 同时连接同一测试 userdb 的现场完成双端状态可见、隐私偏好读回、零学习增量和连接重启一致性；实体键盘输入、输入源切换与候选框观察由开发者执行，其余 manager GUI 操作由 AI 自主完成。
-3. 单独取得 Authorization C 后关闭全部连接，只执行固定 helper 删除本轮 manager 测试数据，并把 TIS、bundle、Rime、进程、隐私偏好、Application Support 与 receipts 恢复到可证明基线。
-4. 实机证据与最终回滚全部通过后关闭 M2；下一开发批次进入 M3 同步成功路径与安全证据设计。真实用户同步、第二平台和 M4 发布打包继续保持停止。
+1. 新增并评审设备签名算法 profile ADR，优先验证 P-256；固定 canonical bytes 复用边界、signature encoding、public key encoding、algorithm negotiation、Ed25519 共存和迁移失败语义。
+2. 在 `ime-crypto`、`ime-sync` 与 Go verifier 落地算法无关边界和跨语言负向 test vector；旧 `ed25519-v1` 行为必须保持兼容。
+3. 实现独立的 Apple P-256 Keychain backend 与 gated macOS smoke，证明创建、重载、签名、跨语言验签、删除/撤销、locked/denied 和日志脱敏；失败时保持 production gate 关闭。
+4. backend 通过后，建立真实产品 sync orchestration：对象发现、hash/签名复验、解密、确定合并、本地 transaction、cursor、上传和 conflict retry；再接 `ManagerBridge`，不让 Flutter 复制协议或密钥逻辑。
+5. 最后完成两个真实客户端、恢复/设备授权/撤销/key epoch 与发布级目标部署证据，满足后才评估开放用户同步。
 
 ## 验证入口
 
@@ -59,7 +61,7 @@ M2 实机前的数据回滚边界已补齐：manager 从进程启动起使用 `0
 ./scripts/check-manager.sh
 ./scripts/check-manager-ffi-smoke.sh
 ./scripts/check-manager-product.sh
-./scripts/build-manager-macos-product.sh
+./scripts/check-macos-imk.sh
 ./scripts/check-repo.sh
 ./scripts/check-docs.sh
 ./scripts/check-text-files.sh
@@ -67,17 +69,17 @@ git diff --check
 cmp -s AGENTS.md CLAUDE.md
 ```
 
-native-rime 门禁需要显式隔离 schema/shared data/license；真实安装、系统设置、用户数据、Keychain/Android connected smoke、Docker 长流程和发布部署需要对应环境或明确授权。
+平台 Keychain/Keystore smoke、Docker 长流程、真实系统设置、用户数据和发布部署需要对应环境或明确授权。
 
 ## 阅读索引
 
-- [产品路线图](../roadmap.md)：里程碑与交付物。
-- [manager 边界](../manager-ui-boundary.md)：M2 本地产品职责与 M3/M4 停止线。
-- [manager 本地验收](../manager-local-acceptance.md)：自动产品证据、实机缺口与验证入口。
-- [macOS manager 产品验收](../runbooks/macos-m2-manager-product-acceptance.md)：M2 实机授权、验收与清理流程。
-- [macOS 平台边界](../macos-inputmethodkit-boundary.md)：runtime、隐私、数据与 R01B 稳定结论。
-- [R01B 验收 runbook](../runbooks/macos-r01b-personalization-acceptance.md)：关闭证据、授权与可复验流程。
-- [技术方案](../technical-plan.md)：架构与职责。
-- [仓库结构](../repository-layout.md)：目录边界。
-- [隐私与同步](../privacy-sync.md)：数据分级、删除与威胁模型。
-- [本周周志](../devlogs/2026-W29.md)：验证与历史流水。
+- [产品路线图](../roadmap.md)：里程碑与退出标准。
+- [隐私与同步](../privacy-sync.md)：数据分级、密文边界和用户可用停止线。
+- [同步 Payload](../sync-payload.md)：P2 对象、remote client 与两客户端证据。
+- [同步密钥管理](../sync-key-management.md)：设备、恢复、撤销和 key epoch。
+- [平台私钥 Backend 策略](../platform-private-key-backend-strategy.md)：当前证据与算法/backend 决策顺序。
+- [Manager 同步入口](../manager-sync-entry-boundary.md)：M3 UI/bridge 与 transient secret 边界。
+- [M2 manager 验收 runbook](../runbooks/macos-m2-manager-product-acceptance.md)：关闭证据与回滚流程。
+- [manager 本地验收](../manager-local-acceptance.md)：M2 产品证据映射。
+- [macOS 平台边界](../macos-inputmethodkit-boundary.md)：M1/M2 输入与隐私稳定结论。
+- [本周周志](../devlogs/2026-W29.md)：完整验证和交接流水。

@@ -483,7 +483,7 @@ InternalError
 - 仓库提供受编译测试约束的 C header 或等价平台模块边界，并由具体 wrapper 复验线程调度、字符串复制和释放规则。
 - `ime-ffi` 有 C ABI 单元测试或 host smoke，覆盖 key result、snapshot、candidate view、normalized key event、session options、ABI contract、owner-thread、copy/release 和错误路径。
 
-userdb/ranker 正确性已由 R02L 收口，R01B 通过产品个人化 session 把它们接入 macOS 输入链，并由 build 34 完成真实应用学习、重启持久化、删除/恢复、隐私/unknown/P0 零写入和 secure 系统路由证据。M2 当前转向 manager 正常产品运行态；同步 payload、设备授权和平台私钥仍不进入输入热路径。
+userdb/ranker 正确性已由 R02L 收口，R01B 通过产品个人化 session 把它们接入 macOS 输入链，并由 build 34 完成真实应用学习、重启持久化、删除/恢复、隐私/unknown/P0 零写入和 secure 系统路由证据。M2 manager 正常产品运行态与同库实机已关闭；当前 M3 的同步 payload、设备授权和平台私钥仍不进入输入热路径。
 
 ## 验证口径
 

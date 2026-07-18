@@ -301,4 +301,4 @@ ABI contract v5 保留 v4 已闭合的产品个人化 Rime session、学习上�
 
 R01A build 32 已在真实 TextEdit/Codex 中完成基础输入、双 client、进程重启和离线证据。R01B build 34 又从产品个人化 session 完成真实选择重排、进程重启保持、删除/恢复、隐私/unknown/P0 零写入，以及 secure 场景的 macOS 系统路由旁路与数据库零增量证据。当前 adapter 不再有 M1/R01B 真实输入 smoke 缺口。
 
-M2 当前工作转向 manager 本地产品模式，不改变 adapter 真相源；最终发布包中的 `librime` 与 schema 分发仍属于 M4。
+M2 manager 本地产品模式已关闭，不改变 adapter 真相源；当前 M3 同步工作不进入输入热路径，最终发布包中的 `librime` 与 schema 分发仍属于 M4。

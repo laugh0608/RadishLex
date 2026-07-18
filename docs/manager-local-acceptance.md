@@ -4,11 +4,11 @@
 
 ## 当前结论
 
-截至 2026-07-18，manager 本地产品运行态的实现和自动门禁已经完成：正常启动默认进入 `product` mode，Release app bundle 携带匹配 ABI 的 native library，平台侧解析固定 userdb/settings 路径并收紧权限，真实 tombstone 与 suppressed 状态可查询和显式恢复，隐私设置通过 macOS `CFPreferences` 写入并读回，启动失败不会静默回退 fixture。`demo` mode 只能由编译期显式开关启用，并持续显示“合成演示数据”。
+截至 2026-07-18，manager 本地产品运行态的实现、自动门禁和 macOS 产品实机验收均已完成，M2 本地个人化 MVP 正式关闭。正常启动默认进入 `product` mode，Release app bundle 携带匹配 ABI 的 native library，平台侧解析固定 userdb/settings 路径并收紧权限，真实 tombstone 与 suppressed 状态可查询和显式恢复，隐私设置通过 macOS `CFPreferences` 写入并读回，启动失败不会静默回退 fixture。`demo` mode 只能由编译期显式开关启用，并持续显示“合成演示数据”。
 
 临时 SQLite 上的双连接测试已经覆盖 migration 所有权、WAL 可见性、输入侧选择、manager 删除、输入侧 tombstone 观察和 manager 显式恢复；Release 产品 bundle 也已在不启动 GUI 的条件下完成签名结构、依赖、ABI、符号和真实 Dart FFI smoke。
 
-这些证据证明实现已具备进入真实产品验收的条件，但尚不单独构成 M2 退出：仍需按 [macOS manager 产品验收 runbook](runbooks/macos-m2-manager-product-acceptance.md)，在单独授权下从正常 Release app 启动，无 shell 环境变量地复验固定平台路径、重启持久化、隐私键真实读回，以及输入法与 manager 同库运行时的双端可见性。真实同步继续保持关闭。
+clean HEAD `a7e385e` 的正常 Release app 已按 [macOS manager 产品验收 runbook](runbooks/macos-m2-manager-product-acceptance.md) 完成无环境变量启动、固定平台路径、GUI 导入/删除/恢复、重启持久化、输入法与 manager 同库双端可见、页头外部刷新、隐私真实读回与零学习增量、secure 系统路由和最终系统/数据回滚。真实同步继续保持关闭，后续改动不得削弱本页已经关闭的 M2 产品契约。
 
 ## 验收范围
 
@@ -64,17 +64,15 @@ git diff --check
 
 自动测试只使用合成词、临时 SQLite、临时 settings JSON 和虚构状态，不得读取真实 P1 原始行或数据库正文。
 
-## 尚待真实产品验收
+## M2 实机证据与 M3 交接
 
-M2 当前只剩产品实机证据，不再以继续添加 fixture 或复制业务逻辑替代：
+- 正常 Release app 直接显示 `product` / `local_only`，没有 demo 标识；真实 v3 userdb 迁移到 v4，固定合成导入审计、deleted/suppressed 显式恢复和完整重启均保持一致。
+- 输入法外部提交后，manager 页头刷新无需重启即可观察聚合；manager delete 后输入侧普通选择不能复活 tombstone，explicit restore 后新 session 可重新学习，manager/IMK 重启未产生非预期 `SQLITE_BUSY` 或 migration 漂移。
+- 隐私模式真实读回 true 时普通 TextEdit 提交全库零增量；恢复正常模式后一次提交只增加一次 selection/frequency。secure 期间 macOS 不向 RadishLex 路由，来源监视无 RadishLex，数据库零增量；该项不冒充 controller `policy_blocked` 实机通过。
+- Authorization B/C 后，TIS、bundle、Rime、进程、隐私键、测试 userdb、settings、sidecars、receipts 和 M2 临时目录全部恢复基线，父目录 empty/`0755`。全程未读取 P1 原始行或数据库正文。
+- cleanup receipt 的跨登录成对 `st_dev` 漂移已由共享 helper 的精确兼容规则和 M2/R01B contract 关闭；单侧 device drift、inode/权限/白名单漂移仍失败关闭。
 
-- 从正常 Release app 直接启动，确认没有 demo 标识、无需 shell 环境变量，并使用固定平台路径。
-- 在 GUI 完成合成词条导入、删除、deleted/suppressed 显式恢复和 app 重启持久化。
-- 通过 GUI 切换隐私模式，复核 `CFPreferences` 实际读回与输入侧零学习增量。
-- 输入法与 manager 同时连接同一测试 userdb，通过页头刷新复核双端状态可见、无非预期 `SQLITE_BUSY`，并在进程重启后保持一致。
-- 按 runbook 恢复 TIS、bundle、Rime、进程、隐私键、测试 userdb、settings 和目录权限基线，全程不读取 P1 原始行或数据库正文。
-
-实机证据全部通过后才能关闭 M2 并进入 M3；若任一项失败，应回到对应 Rust、FFI、Flutter 或平台层修复，并重跑匹配门禁。
+M3 可以依赖上述本地产品能力，但不能在 Flutter 层复制同步、加密、设备授权或密钥真相源。下一批先关闭设备签名算法 profile 与 macOS 生产私钥 backend，再进入真实产品 sync orchestration 和 `ManagerBridge` 命令。
 
 ## M3 停止线
 

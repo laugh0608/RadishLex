@@ -22,7 +22,7 @@
 - 写入或恢复 `org.radishlex.inputmethod.macos` 的 `RadishLexPrivacyMode`。
 - 终止精确产品进程、删除测试 bundle/Rime/settings/userdb/sidecars、恢复目录权限。
 
-开发者负责 GUI 聚焦、输入源手动切换、实体键盘输入和 manager 可见操作。AI 不程序化选择输入源、不合成按键冒充验收、不自动点击系统设置。
+开发者负责目标宿主聚焦、输入源手动切换、实体键盘输入和候选框观察。取得对应授权后，AI 负责 manager GUI、系统设置可见操作、只读状态监视和最终回滚；不得程序化选择输入源或合成按键冒充输入验收。
 
 出现以下任一情况立即停止并保留现场：
 
@@ -78,6 +78,15 @@
 6. 在 manager 关闭隐私模式并读回 false/基线值；再做一次受控普通选择，确认学习恢复且只产生预期聚合增量。
 7. secure field 只复核 macOS 路由旁路，不把 controller secure 分支记为实机通过；若系统不允许切换 RadishLex，记录来源监视和聚合零增量即可。
 
+### 本轮 Authorization B 证据（2026-07-18）
+
+- 最终冻结于 clean HEAD `a7e385e`。Release `Info.plist`、主程序与 bundle FFI SHA-256 分别为 `780d2ecbf8d4fd6c615eb7b5cd40e03227fde2280956d005d573bc0087451ce2`、`4ae289fe1df7c1653940ea6e869a626c057dc8ce6b8469a0825fc2279e913bf6`、`4785dd662a918188ad506c0ec1b543a67ef477bafbd479de81e407623a794f0f`，ad-hoc 严格验签通过。页头刷新修复的精准 Flutter 测试、manager/FFI/product、InputMethodKit 和完整 repository 门禁均在 clean HEAD 通过。
+- 输入侧第一次外部提交使 selection/frequency 各增加 1，manager 通过页头刷新在不重启 app 的情况下读到新聚合。manager delete 后 active `3 -> 2`、ranker `1 -> 0`、tombstone `0 -> 1`；输入侧再次选择只增加 selection，term/version/tombstone/ranker 不变，普通选择没有复活。
+- manager explicit restore 后 active `2 -> 3`、tombstone `1 -> 0`，恢复版本保留；后续两次实际提交使 selection `3 -> 5`、frequency `0 -> 2`。manager 与 IMK 精确重启后同库状态保持，再次提交使 selection `5 -> 6`、frequency `2 -> 3`，没有非预期 busy、migration 或损坏错误。
+- manager 隐私模式保存并真实读回 true；普通 TextEdit 提交前后全库与固定 case 零增量。关闭隐私并读回 false 后，一次正常提交使 selection `6 -> 7`、frequency `3 -> 4`，证明学习恢复且增量与实际动作一致。
+- secure field 显示 Secure Event Input 已启用。secure 聚焦期间顶部输入法菜单不能切换到 RadishLex 或系统拼音；快捷键可以退回系统拼音，但不能进入 RadishLex；解除聚焦后保持系统拼音。来源监视未记录 secure 期间 RadishLex，聚合保持 selection `7`、frequency `4`。该项只记为 macOS secure 路由旁路，不记为 controller `policy_blocked` 实机通过。
+- 回滚时系统设置第一次移除发生一次已知输入源回流；完整重启设置后再次移除，parent 变为 disabled。删除 bundle/Rime 后 TIS 暂留 disabled 目录缓存；全新系统设置进程检查现有列表和“添加 -> 简体中文”目录后收敛为 `matches=0 enabled=0 selected=0`。没有修改 TIS 私有状态。隐私键恢复 absent，三个精确 M2 临时目录删除，manager/IMK 停止；userdb/settings/sidecars 与 M2 receipt 按 Authorization C 边界保留。
+
 ## 授权 C：清理与最终复验
 
 清理授权必须在所有数据库连接关闭后单独确认，并只删除有效 receipt 归属的本轮对象。若归属、路径或对象清单不一致，保留现场，不猜测删除。
@@ -87,6 +96,13 @@
 3. 在单独取得本阶段删除授权后，只执行 `./scripts/cleanup-macos-m2-manager-test-data.sh --authorized-delete-m2-manager-test-data`，精确删除 receipt 归属的 `manager-settings.json`、原子写临时文件、userdb 及 `-wal`/`-shm`/rollback journal，并持久移除该 receipt；不得传入路径、扫描或读取数据库正文决定归属。
 4. 若父目录在基线为空，恢复其基线 mode；否则保留基线前已有对象，不进行目录级清空。
 5. 最终只读复验：TIS `matches=0 enabled=0 selected=0`，测试 bundle/Rime absent，RadishLex 进程 stopped，隐私键恢复基线，测试 userdb/settings/sidecars 与 `target/macos-manager/m2/m2-manager-test-data-baseline.receipt` absent，父目录内容与 mode 回到基线，无本轮 `/private/tmp` 快照目录。
+
+### 本轮 Authorization C 与 M2 关闭证据（2026-07-18）
+
+- C 前固定现场为 TIS zero、bundle/Rime absent、IMK/manager stopped、privacy absent；Application Support 父目录 `0700`，userdb、WAL、SHM、manager settings 与 M2 receipt 均为当前用户普通 `0600` 文件，tmp/journal absent，所有固定文件已关闭。
+- 首次执行固定 C 入口在删除前报告 receipt 不匹配并安全停止。诊断只读取固定 metadata 与 receipt 身份字段，未读取数据库正文或 P1：receipt 和父目录 inode 均与 baseline 一致，但二者记录的 `st_dev=16777234` 在当前跨登录现场同时变为 `16777230`。
+- 共享 helper 改为先要求 receipt/parent 的 inode、owner、mode、link、固定路径与目录白名单精确匹配；设备号要么分别精确一致，要么必须在旧记录中同设备、当前现场也同设备。成对 device drift contract 在 M2/R01B profile 通过，只漂移 parent 或只漂移 receipt 均继续拒绝；wrapper orchestration contract 与文本检查通过。
+- 重跑同一已授权固定入口后，helper 报告 manager test data deleted、父目录 empty/`0755`、receipt removed。最终复验为 TIS `0/0/0`，bundle/Rime/userdb/sidecars/settings/receipts/M2 临时目录 absent，IMK/manager stopped，privacy absent，父目录 empty/`0755`。
 
 ## M2 退出判定
 
@@ -99,3 +115,5 @@
 - 系统、进程、偏好和数据最终回到可证明基线。
 
 若全部通过，下一开发批次进入 M3 的同步成功路径设计与安全证据，不启动第二真实平台，也不提前宣称 M4 发布包完成。
+
+上述退出证据已于 2026-07-18 全部成立，M2 本地个人化 MVP 正式关闭。M3 第一主批转向设备签名算法 profile 与 macOS 生产私钥 backend；真实用户同步继续保持关闭。

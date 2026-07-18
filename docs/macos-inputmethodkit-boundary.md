@@ -150,7 +150,7 @@ R01B 使用两个相互独立的授权边界。授权 A 覆盖 Apple Development
 
 R01B 固定合成 case 为 `r01b-shi-time-v1`：`pinyin_simp` / `shi` / `时` / reading absent / `editor`；隔离初始页为 `是、时、事、使、市`，目标 display/engine index 为 `1/1`。一次真实选择后，fresh isolated non-selection snapshot 可得到 `0/1`。删除与显式恢复必须同时使用精确 `case-status` DTO 的目标 term/ranker/tombstone、聚合增减量和 fresh isolated Rime user-data snapshot 取证；librime 自身 user data 也会影响顺序，不能只凭候选 UI 宣称 RadishLex ranker 生效。
 
-2026-07-17，R01B 使用同一 Apple Development `build 34` 完成退出：完整序列覆盖真实选择重排、第二次选择、精确进程重启、delete 防复活、explicit restore 后重新学习和隐私模式零写入；同产物补验以全新 userdb 建立一次固定 TextEdit 学习种子后，unknown 与固定 P0 host 均保持全库聚合零增量。secure field 启用 Secure Event Input 时由 macOS 旁路第三方输入法，来源监视未记录 RadishLex，数据库零增量；该证据只记为“macOS secure 路由旁路，controller secure 分支未由本组实机执行”，controller 分支继续由生产分类 contract 与 native FFI policy 测试约束。授权 A/B 后最终基线为 TIS zero、bundle/Rime/userdb/sidecar/receipts absent、进程 stopped、隐私键 absent、父目录 empty/`0755`。
+2026-07-17，R01B 使用同一 Apple Development `build 34` 完成退出：完整序列覆盖真实选择重排、第二次选择、精确进程重启、delete 防复活、explicit restore 后重新学习和隐私模式零写入；同产物补验以全新 userdb 建立一次固定 TextEdit 学习种子后，unknown 与固定 P0 host 均保持全库聚合零增量。secure field 启用 Secure Event Input 后，顶部输入法菜单不能切换到 RadishLex 或系统拼音，快捷键可以退回系统拼音但不能进入 RadishLex，解除聚焦后保持系统拼音；来源监视未记录 RadishLex，数据库零增量。该证据只记为“macOS secure 路由旁路，controller secure 分支未由本组实机执行”，controller 分支继续由生产分类 contract 与 native FFI policy 测试约束。授权 A/B 后最终基线为 TIS zero、bundle/Rime/userdb/sidecar/receipts absent、进程 stopped、隐私键 absent、父目录 empty/`0755`。
 
 ## Native 依赖与目录
 

@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-RadishLex M3 继续保留 `ed25519-v1` 作为设备签名协议。当前证据不足以解除任何生产平台私钥 backend 的门禁：
+M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。现有 `ed25519-v1` 继续作为兼容设备签名 profile，但当前证据不足以解除任何生产平台私钥 backend 的门禁：
 
 - `test-memory-v1` 只用于测试和 fixture，不能进入生产同步。
 - `unavailable` 是默认失败 backend，不允许静默回退。
@@ -12,7 +12,7 @@ RadishLex M3 继续保留 `ed25519-v1` 作为设备签名协议。当前证据�
 - `android-keystore-v1` 已有 Kotlin / Gradle harness、JNI glue、gated smoke 和 provider diagnostics；Pixel 9 Pro API 35 AVD 与 Pixel 10 Pro API 37 AVD 均返回 `unsupported_signature_algorithm`。
 - `windows-cng-v1`、`linux-secret-service-v1` 仍只是能力边界标识，未进入实现。
 
-没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。可推进的工作是固定策略证据、收敛停止线、推进 manager 同步入口的非上传产品开发，或准备新的平台 spike / ADR 输入。发布级目标部署运行证据保留为正式发布前门禁，不作为当前开发阻塞项。
+没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。manager 同步入口的非上传状态与诊断已在 M2 完成；M3 第一批转向新的平台可用签名算法 profile ADR，并以 Apple P-256 非导出能力为首个 spike 方向。发布级目标部署运行证据保留为正式发布前门禁，不作为算法/backend 设计批的前置阻塞。
 
 ## 策略目标
 
@@ -137,14 +137,15 @@ RadishLex M3 继续保留 `ed25519-v1` 作为设备签名协议。当前证据�
 - 不把服务端 bearer token、OIDC token、恢复码或账号密码当作设备签名替代品。
 - 不让 Go server 根据管理 token 直接创建、替换或伪造设备签名。
 
-## 今日可推进项
+## M3 第一批推进项
 
-在只有当前 Mac 设备、没有额外 Android 真机时，推荐推进：
+在只有当前 Mac 设备、没有额外 Android 真机时，按以下顺序推进：
 
-1. 固定本策略文档，并同步入口文档。
-2. 保持 `apple-keychain-v1` 和 `android-keystore-v1` production gate 关闭。
-3. 记录“无新设备时不继续等待真机矩阵”的阶段判断。
-4. 后续若继续开发，优先推进 manager sync entry state helper / UI gate 的非上传实现，或准备 Apple 原生非导出 Ed25519 spike；不打开真实用户同步主操作。
+1. 新增设备签名算法 profile ADR，优先评审 P-256；固定算法标识、public key encoding、signature encoding、canonical bytes 复用、Rust/Go verifier、Ed25519 共存与历史设备迁移。
+2. ADR 通过前只做独立平台 capability spike，不把实验算法写进现有 `ed25519-v1` 字段，也不改变生产 gate。
+3. 先落地跨语言 test vector 和算法无关 verifier，再实现新的 Apple backend id；现有 `apple-keychain-v1` / `android-keystore-v1` 继续明确不可用，不静默 fallback。
+4. gated macOS smoke 必须覆盖创建、重载、签名、Rust/Go 验签、删除/撤销、locked/denied 和 cleanup；基础签名成功不能自动宣称 Secure Enclave、hardware-backed 或 backup-migratable。
+5. 只有 production backend 通过后，才进入真实产品 sync orchestration 与 `ManagerBridge` 命令；恢复码、设备授权、撤销和用户同步入口继续关闭到 M3 全部退出证据成立。
 
 ## 验证口径
 

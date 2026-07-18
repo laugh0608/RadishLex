@@ -20,7 +20,7 @@ manager 分层交付：M2 先完成本地词库、学习、隐私和诊断管理
 
 ## M2 产品运行态契约
 
-M2 manager 正常启动默认进入 `product` mode。`product` mode 必须加载构建包内匹配版本的 RadishLex native library，使用平台解析的固定持久化目录，并把 native library、路径、权限或 userdb 初始化失败作为结构化启动错误展示；任何失败都不得静默切换为 fixture。`demo` mode 只能通过编译期显式开关构建，且整个运行期间必须持续显示“合成演示数据”标识，不能与产品运行态共用无标识入口。
+本节契约已由 2026-07-18 M2 自动与 macOS 产品实机证据关闭，后续 M3/M4 改动必须保持。M2 manager 正常启动默认进入 `product` mode。`product` mode 必须加载构建包内匹配版本的 RadishLex native library，使用平台解析的固定持久化目录，并把 native library、路径、权限或 userdb 初始化失败作为结构化启动错误展示；任何失败都不得静默切换为 fixture。`demo` mode 只能通过编译期显式开关构建，且整个运行期间必须持续显示“合成演示数据”标识，不能与产品运行态共用无标识入口。
 
 macOS M2 本地产品构建沿用已经过 R01B 验证的 `~/Library/Application Support/RadishLex/userdb.sqlite3` 作为输入法与 manager 的单一 userdb 真相源。该构建使用非 App Sandbox 的本地分发 profile，使 manager 与 InputMethodKit 薄壳访问同一用户级目录；不得为了满足 sandbox 而静默迁移或复制 userdb。M4 若因签名、公证、商店分发或 App Group 约束需要改变容器模型，必须先形成迁移设计、原子迁移与回滚证据，并重新执行受影响的输入法 / manager 双端验收。
 
@@ -221,7 +221,7 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 7. 已补设置页配置来源诊断、sync gate 草案预览、部署证据来源标签、设置草案保存、脱敏诊断报告分组预览 / 筛选 / 复制 / 导出和 bridge 失败结构化错误分类展示；UI 不透传 native 错误明细。
 8. 同步配置页继续保持真实上传按钮禁用，状态由设置草案、隐私模式、平台私钥 backend gate 和部署证据来源草案派生，可显示 `local_only`、`sync_disabled_by_policy`、`backend_unavailable`、`deployment_unverified` 或 `preflight_ready`。
 9. 已接入 sync entry state、服务连接健康、`sync_connection_health.v1` 摘要回填、恢复码 / 设备授权准备态、四条 readiness 聚合、settings 内存态 readiness 导入和只读交互进入状态；待可用平台私钥 backend、恢复 / 授权实现测试和发布级部署证据齐备后，再设计真实设备授权、恢复码和用户同步命令。
-10. macOS 原生平台 bridge 已固定 Application Support 与 bundle Frameworks 路径、`0700`/`0600` 权限、symlink 拒绝和 `CFPreferences` 隐私键读写回滚；Rust 双连接测试已覆盖并发 schema 初始化、WAL 可见性、输入侧选择、manager 删除和恢复。manager 页头刷新会重新加载真实 bridge snapshot，widget 回归覆盖输入 runtime 外部更新后的聚合可见性。M2 仍等待按 runbook 执行正常 Release GUI 与输入法共库实机验收。
+10. macOS 原生平台 bridge 已固定 Application Support 与 bundle Frameworks 路径、`0700`/`0600` 权限、symlink 拒绝和 `CFPreferences` 隐私键读写回滚；Rust 双连接测试已覆盖并发 schema 初始化、WAL 可见性、输入侧选择、manager 删除和恢复。manager 页头刷新会重新加载真实 bridge snapshot，widget 回归覆盖输入 runtime 外部更新后的聚合可见性；正常 Release GUI 与输入法共库实机已进一步证明外部刷新、delete 防复活、explicit restore、双进程重启、隐私零增量与最终回滚，M2 于 2026-07-18 关闭。
 
 ## 停止线
 
