@@ -2,8 +2,9 @@ use std::mem::size_of;
 
 use radishlex_ime_ffi::{
     radishlex_apple_p256_product_smoke, radishlex_apple_p256_product_status,
-    radishlex_key_result_commit, radishlex_key_result_commit_present,
-    radishlex_key_result_consumed, radishlex_key_result_free,
+    radishlex_apple_secure_enclave_p256_product_smoke,
+    radishlex_apple_secure_enclave_p256_product_status, radishlex_key_result_commit,
+    radishlex_key_result_commit_present, radishlex_key_result_consumed, radishlex_key_result_free,
     radishlex_key_result_learning_disposition, radishlex_key_result_snapshot,
     radishlex_key_result_version, radishlex_rime_runtime_shutdown,
     radishlex_session_handle_key_event, RadishLexAppleP256ProductSmokeSummary,
@@ -55,6 +56,13 @@ fn rust_input_abi_layout_matches_the_checked_header_contract() {
         *const std::os::raw::c_char,
         *mut RadishLexAppleP256ProductSmokeSummary,
     ) -> u32 = radishlex_apple_p256_product_smoke;
+    let _: unsafe extern "C" fn(*mut RadishLexAppleP256ProductStatus) -> u32 =
+        radishlex_apple_secure_enclave_p256_product_status;
+    let _: unsafe extern "C" fn(
+        u32,
+        *const std::os::raw::c_char,
+        *mut RadishLexAppleP256ProductSmokeSummary,
+    ) -> u32 = radishlex_apple_secure_enclave_p256_product_smoke;
 }
 
 #[cfg(unix)]
@@ -137,6 +145,10 @@ RadishLexStatusCode radishlex_compile_input_contract(
       radishlex_apple_p256_product_status;
   uint32_t (*apple_smoke)(uint32_t, const char *, RadishLexAppleP256ProductSmokeSummary *) =
       radishlex_apple_p256_product_smoke;
+  uint32_t (*secure_enclave_status)(RadishLexAppleP256ProductStatus *) =
+      radishlex_apple_secure_enclave_p256_product_status;
+  uint32_t (*secure_enclave_smoke)(uint32_t, const char *, RadishLexAppleP256ProductSmokeSummary *) =
+      radishlex_apple_secure_enclave_p256_product_smoke;
   RadishLexKeyResult *result = NULL;
   RadishLexStatusCode status =
       radishlex_session_handle_key_event(session, event, &result, error_out);
@@ -165,6 +177,8 @@ RadishLexStatusCode radishlex_compile_input_contract(
   (void)runtime_shutdown;
   (void)apple_status;
   (void)apple_smoke;
+  (void)secure_enclave_status;
+  (void)secure_enclave_smoke;
   return status;
 }
 "#;

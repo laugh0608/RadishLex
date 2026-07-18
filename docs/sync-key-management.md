@@ -19,6 +19,7 @@
 - `docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend、capability metadata、FFI 边界、错误语义、迁移和停止线。
 - `docs/runbooks/apple-keychain-signing-backend.md` 已固定 `apple-keychain-v1` 首个平台 backend 验证边界，`docs/adr/0005-apple-platform-signing-strategy.md` 已固定 Apple 平台签名策略；`docs/runbooks/android-keystore-signing-backend.md` 已固定 `android-keystore-v1` 验证边界。
 - `docs/adr/0006-device-signature-algorithm-profiles.md` 已接受 `ecdsa-p256-sha256-v1` 作为与 `ed25519-v1` 共存的生产候选，固定编码、canonical bytes、错误、迁移和 `apple-keychain-p256-v1` 边界。
+- `docs/adr/0007-apple-secure-enclave-p256-backend.md` 与独立 runbook 已固定 Secure Enclave token、access control、key identity、迁移、资格字段和产品取证停止线。
 - `ime-crypto` 已补算法无关设备验签、Ed25519/P-256 profile、`test-memory-v1` signing key store、platform capability metadata、unavailable 明确失败、revoked key 阻断、两个 feature-gated macOS Keychain backend、Android bridge、signed sync object manifest 和 signed recovery record；`ime-sync` 已补 signed device authorization 与 signed device revocation。
 - `ime-userdb` 已补已解密 P2 JSON 到 merge input 的解析入口，并能把合并模型接受的 user terms、deleted tombstones 和 ranker weights 写回真实 SQLite。
 - Go server storage / API / runtime 验证模型已保存设备与 join request 的显式 `signing_algorithm`、公钥、authorization、wrapping、revocation、recovery、object、非敏感 audit 和密文 blob；历史 schema migration 只把旧设备/join 行回填为 `ed25519-v1`，新请求不做算法默认。Rust/Go 共同读取同一签名 profile fixture。
@@ -33,7 +34,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进真实设备配对成功路径；M1/M2 平台输入与本地 manager 可独立推进，但不得调用真实同步或把平台签名 backend 标记为生产可用。
 
-进入用户可用同步前，应按生产部署 runbook 补发布级目标部署运行证据。`apple-keychain-p256-v1` 已完成 DPK repository/manager native 接线、ad-hoc denied 与 provisioning-backed 产品生命周期；当前 `compiled/available/can_create/can_sign=true`，但普通 DPK 软件 key 必须声明 `exportable=true`，因此 `product_qualified` 和用户同步 gate 保持 false，也不能宣称 Secure Enclave 或 hardware-backed。下一主批先实现独立 Secure Enclave backend，不提前开放 orchestration。既有 Apple/Android Ed25519 失败结论继续有效；无新增 Android 真机或不同 system image 时，不把真机矩阵作为硬阻塞。
+进入用户可用同步前，应按生产部署 runbook 补发布级目标部署运行证据。普通 DPK P-256 当前 `compiled/available/can_create/can_sign=true`，但 `exportable=true` 使产品资格保持关闭。独立 Secure Enclave backend 已完成 compiled-only repository/manager native 与 gated smoke 接线，实际 runtime、不可导出、hardware-backed 和产品资格待逐次授权取证；不提前开放 orchestration。既有 Apple/Android Ed25519 失败结论继续有效。
 
 ## 设计目标
 
@@ -272,8 +273,9 @@ updated_at_ms
 11. 已补 `apple-keychain-v1` 平台 runbook 和 Apple 签名策略 ADR，固定 Apple Keychain 创建、加载、签名、删除、锁屏 / 权限、备份迁移、日志脱敏和策略停止线；macOS backend 已在 `apple-keychain` feature 下接线，默认测试不访问系统 Keychain，真实 smoke 已运行但阻塞于 `ed25519-v1` 创建，backend status 已阻断生产签名。
 12. 已补 `android-keystore-v1` 平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、raw JNI glue、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin bridge source、Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，固定 Android Keystore Ed25519 创建 / 加载 / 签名 / 删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
 13. 已补 ADR 0006、Rust/Go 算法分派、显式 `signing_algorithm` metadata/migration、共享跨语言 vectors 和独立 `apple-keychain-p256-v1`；普通测试不访问 Keychain，manager Release native 接线、严格 DPK 选择、固定错误/OSStatus、五场景 gated smoke、ad-hoc denied 与合格产品生命周期均有证据。评审结论为软件运行时可用、`exportable=true`、产品资格拒绝。
-14. 已补真实 userdb P2 payload 解析到 merge input 的接线。
-15. 已补客户端合并结果写回真实 userdb 的执行器。
+14. 已补 ADR 0007、独立 `apple-secure-enclave-p256-v1`、token/private-key-usage access control、不可导出 probe、Rust/FFI/manager native、六场景 gated smoke 和默认无外部状态产品构建门禁；产品进程证据尚未取得，能力字段未提前开放。
+15. 已补真实 userdb P2 payload 解析到 merge input 的接线。
+16. 已补客户端合并结果写回真实 userdb 的执行器。
 16. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
 17. 已补 Go server API / storage 边界设计。
 18. 已补生产恢复流程设计和平台私钥存储 backend ADR。
@@ -304,7 +306,7 @@ updated_at_ms
 ## 停止线
 
 - 恢复码 KDF 算法、参数、格式、Rust model 和生产恢复流程设计已落地；服务端恢复记录 API 与管理 UI 未实现前，不提供用户可用恢复入口。
-- 设备签名模型、两个签名 profile、跨语言 verifier/vectors、私钥存储抽象、平台 capability、Apple/Android runbook 与 feature-gated backend 已落地；`apple-keychain-p256-v1` 的 DPK 软件运行时已验证，但可导出属性使其不能用于生产同步。Secure Enclave 独立 backend、既有 Android/Apple Ed25519 阻塞与后续全链仍未解除，运行时 capability 不得被用来开放用户可用远端对象上传下载。
+- 设备签名模型、两个签名 profile、跨语言 verifier/vectors、私钥存储抽象、平台 capability、Apple/Android runbook 与 feature-gated backend 已落地；普通 DPK 软件运行时已验证但可导出，Secure Enclave 仅完成 compiled-only 接线，产品取证与既有 Android/Apple Ed25519 阻塞仍未解除。任何局部 capability 都不得开放用户可用远端对象上传下载。
 - 服务端若回退到只保存 wrapping metadata 而不能保存 / 返回 wrapped key bytes，则不得开放真实设备授权 handler。
 - Go server 与 Rust HTTP transport 继续推进时，必须先满足 `docs/sync-server-api-storage.md` 的签名、metadata API、版本冲突、错误语义和脱敏验证。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。

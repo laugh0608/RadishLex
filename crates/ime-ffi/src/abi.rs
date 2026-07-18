@@ -10,6 +10,10 @@ use crate::apple_p256_product::{
     run_product_smoke, write_product_status, RadishLexAppleP256ProductSmokeSummary,
     RadishLexAppleP256ProductStatus,
 };
+use crate::apple_secure_enclave_product::{
+    run_product_smoke as run_secure_enclave_product_smoke,
+    write_product_status as write_secure_enclave_product_status,
+};
 use crate::buffer::RadishLexBuffer;
 use crate::contract::RadishLexFfiContract;
 use crate::dictionary::{
@@ -63,6 +67,36 @@ pub unsafe extern "C" fn radishlex_apple_p256_product_smoke(
     summary_out: *mut RadishLexAppleP256ProductSmokeSummary,
 ) -> u32 {
     unsafe { run_product_smoke(scenario, go_server_dir, summary_out) }
+}
+
+#[no_mangle]
+/// Returns compiled Secure Enclave capability and closed runtime/product gates.
+///
+/// This validation ABI never returns key, canonical, or signature bytes.
+///
+/// # Safety
+/// `status_out` must be writable.
+pub unsafe extern "C" fn radishlex_apple_secure_enclave_p256_product_status(
+    status_out: *mut RadishLexAppleP256ProductStatus,
+) -> u32 {
+    unsafe { write_secure_enclave_product_status(status_out) }
+}
+
+#[no_mangle]
+/// Runs the explicitly gated manager product-process Secure Enclave P-256 smoke.
+///
+/// Private key material, public key bytes, canonical bytes, and signature bytes
+/// stay inside the native validation path and are never returned to Dart.
+///
+/// # Safety
+/// `go_server_dir` must be null or point to a NUL-terminated UTF-8 string;
+/// `summary_out` must be writable.
+pub unsafe extern "C" fn radishlex_apple_secure_enclave_p256_product_smoke(
+    scenario: u32,
+    go_server_dir: *const c_char,
+    summary_out: *mut RadishLexAppleP256ProductSmokeSummary,
+) -> u32 {
+    unsafe { run_secure_enclave_product_smoke(scenario, go_server_dir, summary_out) }
 }
 
 #[no_mangle]

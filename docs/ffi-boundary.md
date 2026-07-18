@@ -6,7 +6,7 @@
 
 `ime-ffi` 是 Rust 输入 runtime、平台输入法壳和 Flutter manager 的唯一稳定跨语言边界。平台按键入口必须无损返回 `KeyOutcome` 的 `consumed`、可选即时 commit 与同一事件后的 snapshot；只返回状态码再单独查询状态不能作为真实平台契约。
 
-平台壳只能通过 FFI 调用 Rust runtime，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。manager 同步命令只在 M3 真实领域模型、secret 生命周期和安全测试齐备后进入 C ABI；approval、preview、migration review 和 no-symbol 证明不属于生产 ABI。Apple P-256 产品 validation ABI 是例外的受控自检面：只返回固定 capability/lifecycle flags，不执行真实同步，不进入 Dart binding，也不改变 ABI v5 的 manager 业务接口。平台绑定层调用规则见 `docs/runbooks/ffi-platform-call-contract.md`。
+平台壳只能通过 FFI 调用 Rust runtime，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。manager 同步命令只在 M3 真实领域模型、secret 生命周期和安全测试齐备后进入 C ABI；approval、preview、migration review 和 no-symbol 证明不属于生产 ABI。Apple P-256 产品 validation ABI 是例外的受控自检面：普通 DPK 与 Secure Enclave 使用独立 symbol/environment gate，只返回固定 capability/lifecycle flags，不执行真实同步，不进入 Dart binding，也不改变 ABI v5 的 manager 业务接口。平台绑定层调用规则见 `docs/runbooks/ffi-platform-call-contract.md`。
 
 ## 职责边界
 

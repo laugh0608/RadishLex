@@ -146,6 +146,8 @@ backup_migratable = false
 
 未启用 feature 或非 macOS target 不能报告上述运行时 true。`product_qualified` 因 `exportable=true` 保持 false；locked/denied 证据不能覆盖这一生产条件。用户同步继续受独立 M3 全链 gate。产品 validation ABI 只返回固定状态、生命周期、错误分类和数值 OSStatus，private key、public key、canonical bytes 与 signature bytes 不进入 Dart。
 
+ADR 0007 新增 `apple-secure-enclave-p256-v1`，复用本 ADR 的 P-256 protocol profile，但使用新的 backend id、signing key id、application tag 和产品证据。它不得把普通 DPK key 原地升级或在 Secure Enclave unavailable 时 fallback。仓库实现阶段只报告 compiled；runtime、product qualification、hardware-backed 与不可导出实测结论由独立 runbook 和产品进程证据决定。
+
 ## 日志与脱敏
 
 允许记录固定 operation、backend id、algorithm id、结果分类、opaque device/key id 的受控形式和非敏感时间。禁止记录：

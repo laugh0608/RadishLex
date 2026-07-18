@@ -33,6 +33,7 @@ test-memory-v1
 unavailable
 apple-keychain-v1
 apple-keychain-p256-v1
+apple-secure-enclave-p256-v1
 android-keystore-v1
 windows-cng-v1
 linux-secret-service-v1
@@ -42,7 +43,7 @@ linux-secret-service-v1
 
 - `test-memory-v1` 只能用于单元测试、integration test 和合成 fixture。
 - `unavailable` 用于默认构建或平台能力缺失时的明确失败，不允许静默回退到 test memory。
-- `apple-keychain-v1` 只绑定 `ed25519-v1`；`apple-keychain-p256-v1` 只绑定 `ecdsa-p256-sha256-v1`。两者共享 Apple runbook，但不能互相 fallback。
+- `apple-keychain-v1` 只绑定 `ed25519-v1`；`apple-keychain-p256-v1` 与 `apple-secure-enclave-p256-v1` 分别表达普通软件 DPK 和 Secure Enclave P-256 风险模型，均只绑定 `ecdsa-p256-sha256-v1`，三者不能互相 fallback。
 - `android-keystore-v1` 已补平台 runbook；`windows-cng-v1`、`linux-secret-service-v1` 仍只是能力边界标识，进入实现前必须分别补平台 runbook 或 spike 记录。
 - backend id 是协议和日志可见 metadata，不得包含系统用户名、设备真实名称、本机路径或用户输入内容。
 
@@ -98,7 +99,7 @@ DevicePrivateKeyStore
 
 ### Apple 平台
 
-`apple-keychain-v1` 与 `apple-keychain-p256-v1` 分别代表 Ed25519 与 P-256 的 macOS / iOS Keychain 方向。
+`apple-keychain-v1`、`apple-keychain-p256-v1` 与 `apple-secure-enclave-p256-v1` 分别代表 Ed25519、普通软件 DPK P-256 与 Secure Enclave P-256 路径。
 
 边界：
 
@@ -109,6 +110,7 @@ DevicePrivateKeyStore
 - Rust core 不直接调用 Objective-C / Swift API。
 - 平台 bridge 只把签名结果、公钥和 handle metadata 传回 Rust。
 - 是否使用 Secure Enclave、是否要求 user presence、是否允许 iCloud Keychain 迁移，需要后续平台 spike 固定；未验证前不得在文档或 UI 中承诺硬件保护。
+- Secure Enclave 路径由 ADR 0007 固定为独立 backend：使用 token id、private-key-usage access control 和独立 tag；仓库实现完成后仍只报告 compiled，运行时、产品资格和 hardware-backed 字段等待产品环境证据。
 
 本次 storage domain 修正发生在真实用户同步关闭且既有 smoke key 已删除的阶段，不存在生产设备 key 迁移。未来若已有用户设备 key，storage domain、application identifier 或 access group 变化必须使用新 backend/version 或专门迁移 ADR，不能静默把 missing 当作新建身份。
 
@@ -217,10 +219,11 @@ DevicePrivateKeyStore
 6. 已补 ADR 0005，固定 Apple 平台签名策略：保持 `ed25519-v1` 协议，`apple-keychain-v1` 不做 seed 存储 fallback，status 在 smoke 通过前阻断生产签名。
 7. 已补 `android-keystore-v1` 平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、raw JNI glue、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin / Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，固定 Android Keystore Ed25519 创建 / 加载 / 签名 / 删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
 8. 已补平台私钥 backend 策略，固定无新增设备时不把真机矩阵作为硬阻塞，并明确保留 `ed25519-v1`、禁止现有 backend 内 fallback、生产 backend 合格条件和可选后续 ADR 路径。
-9. 已补 ADR 0006、算法无关 Rust/Go verifier、共享 vectors、历史 Go metadata migration 与独立 `apple-keychain-p256-v1`；修正后的 DPK manager 产品生命周期通过，运行时字段开放。普通软件 DPK key 因 `exportable=true` 被生产门禁拒绝；下一主批需为 Secure Enclave 补独立 backend ADR/runbook 和产品证据。
-10. 其他平台仍需先补 backend spike / runbook，再接具体平台 SDK。
-11. 平台 backend 通过后，再允许真实远端对象上传下载使用生产签名。
-12. 最后才把管理 UI 的设备与恢复页面接入生产 backend。
+9. 已补 ADR 0006、算法无关 Rust/Go verifier、共享 vectors、历史 Go metadata migration 与独立 `apple-keychain-p256-v1`；修正后的 DPK manager 产品生命周期通过，运行时字段开放。普通软件 DPK key 因 `exportable=true` 被生产门禁拒绝。
+10. 已补 ADR 0007、独立 `apple-secure-enclave-p256-v1`、compiled-only status、Rust/FFI/manager native gated smoke 与自动产品构建门禁；实际 runtime、不可导出和 hardware-backed 资格证据等待单独授权取得。
+11. 其他平台仍需先补 backend spike / runbook，再接具体平台 SDK。
+12. 平台 backend 通过后，再允许真实远端对象上传下载使用生产签名。
+13. 最后才把管理 UI 的设备与恢复页面接入生产 backend。
 
 ## 验证口径
 

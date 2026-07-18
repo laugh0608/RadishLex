@@ -11,33 +11,44 @@ use crate::model::{
 use super::{
     DevicePrivateKeyStoreStatus, DeviceSignature, DeviceSigningKeyHandle, DeviceSigningPublicKey,
     DeviceSigningStorageBackend, SignatureAlgorithmId, DEVICE_KEY_STORE_APPLE_KEYCHAIN_P256_V1,
-    DEVICE_KEY_STORE_APPLE_KEYCHAIN_V1, ED25519_PUBLIC_KEY_LEN, ED25519_SIGNATURE_LEN,
-    P256_PUBLIC_KEY_LEN, SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1, SIGNATURE_ALGORITHM_ED25519_V1,
+    DEVICE_KEY_STORE_APPLE_KEYCHAIN_V1, DEVICE_KEY_STORE_APPLE_SECURE_ENCLAVE_P256_V1,
+    ED25519_PUBLIC_KEY_LEN, ED25519_SIGNATURE_LEN, P256_PUBLIC_KEY_LEN,
+    SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1, SIGNATURE_ALGORITHM_ED25519_V1,
 };
 
 const DEFAULT_KEYCHAIN_SERVICE: &str = "org.radishlex.sync.signing";
 const DEFAULT_KEYCHAIN_LABEL: &str = "RadishLex Device Signing Key";
 const DEFAULT_P256_KEYCHAIN_SERVICE: &str = "org.radishlex.sync.signing.p256";
 const DEFAULT_P256_KEYCHAIN_LABEL: &str = "RadishLex P-256 Device Signing Key";
+const DEFAULT_SECURE_ENCLAVE_P256_KEYCHAIN_SERVICE: &str =
+    "org.radishlex.sync.signing.secure-enclave.p256";
+const DEFAULT_SECURE_ENCLAVE_P256_KEYCHAIN_LABEL: &str =
+    "RadishLex Secure Enclave P-256 Device Signing Key";
+
+mod secure_enclave;
+pub use secure_enclave::AppleSecureEnclaveP256DeviceKeyStore;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AppleKeychainProfile {
     Ed25519V1,
     P256V1,
+    SecureEnclaveP256V1,
 }
 
 impl AppleKeychainProfile {
     fn signature_algorithm(self) -> SignatureAlgorithmId {
         match self {
             Self::Ed25519V1 => SignatureAlgorithmId::ed25519_v1(),
-            Self::P256V1 => SignatureAlgorithmId::ecdsa_p256_sha256_v1(),
+            Self::P256V1 | Self::SecureEnclaveP256V1 => {
+                SignatureAlgorithmId::ecdsa_p256_sha256_v1()
+            }
         }
     }
 
     fn signature_algorithm_id(self) -> &'static str {
         match self {
             Self::Ed25519V1 => SIGNATURE_ALGORITHM_ED25519_V1,
-            Self::P256V1 => SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1,
+            Self::P256V1 | Self::SecureEnclaveP256V1 => SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1,
         }
     }
 
@@ -45,6 +56,7 @@ impl AppleKeychainProfile {
         match self {
             Self::Ed25519V1 => DeviceSigningStorageBackend::AppleKeychainV1,
             Self::P256V1 => DeviceSigningStorageBackend::AppleKeychainP256V1,
+            Self::SecureEnclaveP256V1 => DeviceSigningStorageBackend::AppleSecureEnclaveP256V1,
         }
     }
 
@@ -83,10 +95,12 @@ mod platform {
     type CFNumberRef = *const c_void;
     type CFErrorRef = *const c_void;
     type SecKeyRef = *const c_void;
+    type SecAccessControlRef = *const c_void;
     type OSStatus = i32;
     type SecKeyAlgorithm = CFStringRef;
     type SecKeyOperationType = CFIndex;
     type CFHashCode = usize;
+    type SecAccessControlCreateFlags = usize;
 
     #[repr(C)]
     struct CFDictionaryKeyCallBacks {
@@ -111,6 +125,7 @@ mod platform {
     const CF_NUMBER_SINT32_TYPE: CFIndex = 3;
     const SEC_KEY_OPERATION_SIGN: SecKeyOperationType = 0;
     const SIGNING_KEY_SIZE_BITS: i32 = 256;
+    const SEC_ACCESS_CONTROL_PRIVATE_KEY_USAGE: SecAccessControlCreateFlags = 1usize << 30;
 
     const ERR_SEC_SUCCESS: OSStatus = 0;
     const ERR_SEC_UNIMPLEMENTED: OSStatus = -4;
@@ -166,6 +181,7 @@ mod platform {
         static kSecClass: CFStringRef;
         static kSecClassKey: CFStringRef;
         static kSecAttrApplicationTag: CFStringRef;
+        static kSecAttrAccessControl: CFStringRef;
         static kSecAttrAccessible: CFStringRef;
         static kSecAttrAccessibleWhenUnlockedThisDeviceOnly: CFStringRef;
         static kSecAttrComment: CFStringRef;
@@ -178,6 +194,8 @@ mod platform {
         static kSecAttrKeyTypeECSECPrimeRandom: CFStringRef;
         static kSecAttrKeyTypeEd25519: CFStringRef;
         static kSecAttrLabel: CFStringRef;
+        static kSecAttrTokenID: CFStringRef;
+        static kSecAttrTokenIDSecureEnclave: CFStringRef;
         static kSecMatchLimit: CFStringRef;
         static kSecMatchLimitOne: CFStringRef;
         static kSecPrivateKeyAttrs: CFStringRef;
@@ -188,6 +206,12 @@ mod platform {
 
         fn SecItemCopyMatching(query: CFDictionaryRef, result: *mut CFTypeRef) -> OSStatus;
         fn SecItemDelete(query: CFDictionaryRef) -> OSStatus;
+        fn SecAccessControlCreateWithFlags(
+            allocator: CFAllocatorRef,
+            protection: CFTypeRef,
+            flags: SecAccessControlCreateFlags,
+            error: *mut CFErrorRef,
+        ) -> SecAccessControlRef;
         fn SecKeyCopyExternalRepresentation(key: SecKeyRef, error: *mut CFErrorRef) -> CFDataRef;
         fn SecKeyCopyPublicKey(key: SecKeyRef) -> SecKeyRef;
         fn SecKeyCreateRandomKey(parameters: CFDictionaryRef, error: *mut CFErrorRef) -> SecKeyRef;
@@ -254,6 +278,9 @@ mod platform {
             AppleKeychainProfile::P256V1 => {
                 DevicePrivateKeyStoreStatus::apple_keychain_p256_v1_runtime_available()
             }
+            AppleKeychainProfile::SecureEnclaveP256V1 => {
+                DevicePrivateKeyStoreStatus::apple_secure_enclave_p256_v1_compiled()
+            }
         }
     }
 
@@ -293,6 +320,9 @@ mod platform {
             }
             AppleKeychainProfile::P256V1 => {
                 DeviceSigningKeyHandle::apple_keychain_p256(device_id, signing_key_id, 0)
+            }
+            AppleKeychainProfile::SecureEnclaveP256V1 => {
+                DeviceSigningKeyHandle::apple_secure_enclave_p256(device_id, signing_key_id, 0)
             }
         }
     }
@@ -366,6 +396,36 @@ mod platform {
         )
     }
 
+    pub(super) fn verify_private_key_non_exportable(
+        store: &impl AppleKeychainStore,
+        handle: &DeviceSigningKeyHandle,
+    ) -> Result<(), CryptoError> {
+        validate_apple_handle(store.profile(), handle)?;
+        if store.profile() != AppleKeychainProfile::SecureEnclaveP256V1 {
+            return Err(CryptoError::BackendCapabilityMismatch {
+                backend: store.profile().storage_backend_id().to_owned(),
+                message: "private export-block verification requires Secure Enclave".to_owned(),
+            });
+        }
+        store.ensure_not_revoked(&handle.device_id, &handle.signing_key_id)?;
+        let private_key = load_private_key(store, &handle.signing_key_id)?;
+        let mut error = ptr::null();
+        let private_data =
+            unsafe { SecKeyCopyExternalRepresentation(private_key.as_key(), &mut error) };
+        release_error(error);
+        if private_data.is_null() {
+            return Ok(());
+        }
+        unsafe {
+            CFRelease(private_data.cast());
+        }
+        Err(CryptoError::BackendCapabilityMismatch {
+            backend: store.profile().storage_backend_id().to_owned(),
+            message: "Secure Enclave private key unexpectedly allowed external representation"
+                .to_owned(),
+        })
+    }
+
     pub(super) fn delete_or_revoke(
         store: &impl AppleKeychainStore,
         handle: &DeviceSigningKeyHandle,
@@ -385,7 +445,9 @@ mod platform {
     fn key_type(profile: AppleKeychainProfile) -> CFStringRef {
         match profile {
             AppleKeychainProfile::Ed25519V1 => unsafe { kSecAttrKeyTypeEd25519 },
-            AppleKeychainProfile::P256V1 => unsafe { kSecAttrKeyTypeECSECPrimeRandom },
+            AppleKeychainProfile::P256V1 | AppleKeychainProfile::SecureEnclaveP256V1 => unsafe {
+                kSecAttrKeyTypeECSECPrimeRandom
+            },
         }
     }
 
@@ -394,7 +456,7 @@ mod platform {
             AppleKeychainProfile::Ed25519V1 => unsafe {
                 kSecKeyAlgorithmEdDSASignatureMessageCurve25519SHA512
             },
-            AppleKeychainProfile::P256V1 => unsafe {
+            AppleKeychainProfile::P256V1 | AppleKeychainProfile::SecureEnclaveP256V1 => unsafe {
                 kSecKeyAlgorithmECDSASignatureMessageX962SHA256
             },
         }
@@ -405,9 +467,11 @@ mod platform {
             AppleKeychainProfile::Ed25519V1 if signature.len() == ED25519_SIGNATURE_LEN => {
                 Ok(signature.to_vec())
             }
-            AppleKeychainProfile::P256V1 => P256Signature::from_der(signature)
-                .map(|signature| signature.to_bytes().to_vec())
-                .map_err(|_| ()),
+            AppleKeychainProfile::P256V1 | AppleKeychainProfile::SecureEnclaveP256V1 => {
+                P256Signature::from_der(signature)
+                    .map(|signature| signature.to_bytes().to_vec())
+                    .map_err(|_| ())
+            }
             _ => Err(()),
         }
     }
@@ -424,16 +488,24 @@ mod platform {
         let key_size = cf_number_i32(profile, SIGNING_KEY_SIZE_BITS)?;
         let mut private_entries = vec![
             (unsafe { kSecAttrIsPermanent }, unsafe { kCFBooleanTrue }),
-            (unsafe { kSecAttrAccessible }, unsafe {
-                kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-            }),
             (unsafe { kSecAttrApplicationTag }, tag.as_type()),
             (unsafe { kSecAttrLabel }, label.as_type()),
         ];
-        if profile == AppleKeychainProfile::Ed25519V1 {
-            private_entries.push((unsafe { kSecAttrIsExtractable }, unsafe { kCFBooleanFalse }));
-            private_entries.push((unsafe { kSecAttrComment }, created_at.as_type()));
-        }
+        let _access_control = if profile == AppleKeychainProfile::SecureEnclaveP256V1 {
+            let access_control = create_secure_enclave_access_control(profile)?;
+            private_entries.push((unsafe { kSecAttrAccessControl }, access_control.as_type()));
+            Some(access_control)
+        } else {
+            private_entries.push((unsafe { kSecAttrAccessible }, unsafe {
+                kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            }));
+            if profile == AppleKeychainProfile::Ed25519V1 {
+                private_entries
+                    .push((unsafe { kSecAttrIsExtractable }, unsafe { kCFBooleanFalse }));
+                private_entries.push((unsafe { kSecAttrComment }, created_at.as_type()));
+            }
+            None
+        };
         let private_attrs = cf_dictionary(profile, &private_entries)?;
         let mut parameter_entries = vec![
             (unsafe { kSecAttrKeyType }, key_type(store.profile())),
@@ -441,6 +513,11 @@ mod platform {
             (unsafe { kSecPrivateKeyAttrs }, private_attrs.as_type()),
         ];
         add_data_protection_domain(profile, &mut parameter_entries);
+        if profile == AppleKeychainProfile::SecureEnclaveP256V1 {
+            parameter_entries.push((unsafe { kSecAttrTokenID }, unsafe {
+                kSecAttrTokenIDSecureEnclave
+            }));
+        }
         let parameters = cf_dictionary(profile, &parameter_entries)?;
 
         let mut error = ptr::null();
@@ -495,7 +572,9 @@ mod platform {
         let public_bytes = cf_data_bytes(&public_data)?;
         let expected_len = match profile {
             AppleKeychainProfile::Ed25519V1 => ED25519_PUBLIC_KEY_LEN,
-            AppleKeychainProfile::P256V1 => P256_PUBLIC_KEY_LEN,
+            AppleKeychainProfile::P256V1 | AppleKeychainProfile::SecureEnclaveP256V1 => {
+                P256_PUBLIC_KEY_LEN
+            }
         };
         if public_bytes.len() != expected_len {
             return Err(CryptoError::PrivateKeyCorrupted {
@@ -529,6 +608,7 @@ mod platform {
             (unsafe { kSecMatchLimit }, unsafe { kSecMatchLimitOne }),
         ];
         add_data_protection_domain(profile, &mut entries);
+        add_secure_enclave_token(profile, &mut entries);
         cf_dictionary(profile, &entries)
     }
 
@@ -548,6 +628,7 @@ mod platform {
             (unsafe { kSecMatchLimit }, unsafe { kSecMatchLimitOne }),
         ];
         add_data_protection_domain(profile, &mut entries);
+        add_secure_enclave_token(profile, &mut entries);
         cf_dictionary(profile, &entries)
     }
 
@@ -555,11 +636,48 @@ mod platform {
         profile: AppleKeychainProfile,
         entries: &mut Vec<(CFTypeRef, CFTypeRef)>,
     ) {
-        if profile == AppleKeychainProfile::P256V1 {
+        if matches!(
+            profile,
+            AppleKeychainProfile::P256V1 | AppleKeychainProfile::SecureEnclaveP256V1
+        ) {
             entries.push((unsafe { kSecUseDataProtectionKeychain }, unsafe {
                 kCFBooleanTrue
             }));
         }
+    }
+
+    fn add_secure_enclave_token(
+        profile: AppleKeychainProfile,
+        entries: &mut Vec<(CFTypeRef, CFTypeRef)>,
+    ) {
+        if profile == AppleKeychainProfile::SecureEnclaveP256V1 {
+            entries.push((unsafe { kSecAttrTokenID }, unsafe {
+                kSecAttrTokenIDSecureEnclave
+            }));
+        }
+    }
+
+    fn create_secure_enclave_access_control(
+        profile: AppleKeychainProfile,
+    ) -> Result<CfOwned, CryptoError> {
+        let mut error = ptr::null();
+        let access_control = unsafe {
+            SecAccessControlCreateWithFlags(
+                ptr::null(),
+                kSecAttrAccessibleWhenUnlockedThisDeviceOnly.cast(),
+                SEC_ACCESS_CONTROL_PRIVATE_KEY_USAGE,
+                &mut error,
+            )
+        };
+        let error_status = cf_error_status(error);
+        release_error(error);
+        CfOwned::new(access_control.cast(), profile).map_err(|_| {
+            error_status
+                .map(|status| map_status(profile, "access-control", status))
+                .unwrap_or_else(|| CryptoError::StorageBackendUnavailable {
+                    backend: profile.storage_backend_id().to_owned(),
+                })
+        })
     }
 
     fn validate_apple_handle(
@@ -623,6 +741,13 @@ mod platform {
             ERR_SEC_DECODE => CryptoError::PrivateKeyCorrupted {
                 key_id: signing_key_id.to_owned(),
             },
+            ERR_SEC_UNIMPLEMENTED | ERR_SEC_PARAM
+                if profile == AppleKeychainProfile::SecureEnclaveP256V1 =>
+            {
+                CryptoError::StorageBackendUnavailable {
+                    backend: profile.storage_backend_id().to_owned(),
+                }
+            }
             ERR_SEC_UNIMPLEMENTED | ERR_SEC_PARAM => CryptoError::UnsupportedSignatureAlgorithm {
                 algorithm: profile.signature_algorithm_id().to_owned(),
             },
@@ -776,6 +901,9 @@ mod platform {
         match profile {
             AppleKeychainProfile::Ed25519V1 => DevicePrivateKeyStoreStatus::apple_keychain_v1(),
             AppleKeychainProfile::P256V1 => DevicePrivateKeyStoreStatus::apple_keychain_p256_v1(),
+            AppleKeychainProfile::SecureEnclaveP256V1 => {
+                DevicePrivateKeyStoreStatus::apple_secure_enclave_p256_v1()
+            }
         }
     }
 
@@ -814,6 +942,15 @@ mod platform {
         _handle: &DeviceSigningKeyHandle,
         _canonical_bytes: &[u8],
     ) -> Result<DeviceSignature, CryptoError> {
+        Err(CryptoError::UnsupportedStorageBackend {
+            backend: store.profile().storage_backend_id().to_owned(),
+        })
+    }
+
+    pub(super) fn verify_private_key_non_exportable(
+        store: &impl AppleKeychainStore,
+        _handle: &DeviceSigningKeyHandle,
+    ) -> Result<(), CryptoError> {
         Err(CryptoError::UnsupportedStorageBackend {
             backend: store.profile().storage_backend_id().to_owned(),
         })

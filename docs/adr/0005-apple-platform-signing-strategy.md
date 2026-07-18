@@ -30,7 +30,7 @@ RadishLex 继续保留 `ed25519-v1` 作为 M3 设备签名协议，不因为 App
 
 暂不把 Ed25519 seed 作为 generic password / data item 存入 Keychain 后再取回 Rust 签名，也不把这种方案塞进 `apple-keychain-v1`。该方案会让签名私钥 bytes 进入进程内可导出路径，突破当前“非导出平台 signing key”停止线。后续如确需软件保护 fallback，必须新增独立 backend id 和 capability / 风险口径，例如单独标记为 software-protected、not hardware-backed、not production-eligible，不能复用 `apple-keychain-v1`。
 
-暂不把 Apple 平台切到 P-256 或其他平台原生签名算法。若后续选择新增算法，必须新增独立 signature algorithm profile，并同时更新 Rust verifier、Go verifier、API 字段约束、跨语言测试、迁移策略和文档。
+本 ADR 当时决定不直接把 Apple 平台切到 P-256；该进入条件随后已由 ADR 0006 满足并接受独立 P-256 profile，ADR 0007 又固定 Secure Enclave backend。这里保留为历史决策，不再表示当前禁止 P-256；独立算法/backend、跨语言 verifier、迁移与无 fallback 要求继续有效。
 
 ## 推进顺序
 

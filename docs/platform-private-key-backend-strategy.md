@@ -10,10 +10,11 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 - `unavailable` 是默认失败 backend，不允许静默回退。
 - `apple-keychain-v1` 已接线并运行真实 smoke，但阻塞于 `UnsupportedSignatureAlgorithm { algorithm: "ed25519-v1" }`。
 - `apple-keychain-p256-v1` 已接入 manager Release native library 并完成 DPK 产品生命周期。普通 DPK 软件 P-256 key 可由平台 API 导出，当前如实声明 `exportable=true`；运行时可创建、重载和签名，但不符合生产 backend 的不可导出条件，`product_qualified=false`。
+- `apple-secure-enclave-p256-v1` 已完成独立 compiled-only repository、FFI、manager native 与产品构建接线；实际 runtime、不可导出、hardware-backed 和产品资格尚未取证，相关字段保持关闭。
 - `android-keystore-v1` 已有 Kotlin / Gradle harness、JNI glue、gated smoke 和 provider diagnostics；Pixel 9 Pro API 35 AVD 与 Pixel 10 Pro API 37 AVD 均返回 `unsupported_signature_algorithm`。
 - `windows-cng-v1`、`linux-secret-service-v1` 仍只是能力边界标识，未进入实现。
 
-没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。M3 第一批已经完成普通 DPK P-256 的产品能力评审，结论是“软件运行时可用、生产资格拒绝”，不是继续堆叠 locked 证据后即可转正。下一主批进入 Secure Enclave P-256 独立 backend 设计与验证；发布级目标部署运行证据保留为正式发布前门禁。
+没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。普通 DPK P-256 的评审结论是“软件运行时可用、生产资格拒绝”。独立 Secure Enclave P-256 backend、ADR/runbook、Rust/FFI/manager native 接线与自动产品构建门禁现已完成；当前等待逐次授权取得产品进程 runtime、不可导出与 hardware-backed 证据，发布级目标部署运行证据仍保留为正式发布前门禁。
 
 ## 策略目标
 
@@ -31,6 +32,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 | `unavailable` | 默认明确失败 | Rust capability / status / error 测试已覆盖 | 继续作为能力缺失时的失败路径 |
 | `apple-keychain-v1` | 生产不可用 | feature-gated backend 编译通过，真实 smoke 在 Ed25519 创建阶段失败 | 单独补 Apple 原生非导出 Ed25519 支持矩阵，或另起 backend / 算法 ADR |
 | `apple-keychain-p256-v1` | DPK 软件运行时可用，生产资格拒绝 | provisioning-backed manager 产品进程已完成创建、重载、签名、Rust/Go 验签、删除、missing 和 cleanup；capability 为 `exportable=true` | 保留为软件保护证据与失败关闭实现，不接真实同步；另建 Secure Enclave backend |
+| `apple-secure-enclave-p256-v1` | 仓库实现与产品构建通过，运行时待取证 | 独立 backend/handle/tag、token/access-control、private export-block probe、Rust/FFI/Swift/C ABI、ignored smoke、denied/locked/unsupported 场景与默认无外部状态门禁 | 单独授权 qualification build 与产品进程 smoke；逐字段评审 runtime、不可导出、hardware-backed、user presence 和 cleanup |
 | `android-keystore-v1` | 生产不可用 | Android target build、Gradle harness、API 35 / API 37 AVD diagnostics 和 smoke 记录 | 有新 Android 真机 / OEM / system image 时先跑 diagnostics，再按结果决定 smoke |
 | `windows-cng-v1` | 未实现 | 仅有 ADR 0004 backend id | 进入 Windows 主线前补 CNG 签名能力 spike / runbook |
 | `linux-secret-service-v1` | 未实现 | 仅有 ADR 0004 backend id | 进入 Linux 同步主线前补 Secret Service / 软件保护能力边界 |
@@ -40,7 +42,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 后续遇到平台私钥 backend 阻塞时，按以下顺序判断：
 
 1. 先读取设备登记的显式 `signing_algorithm` 与 backend capability，不按平台名或 key 长度猜测算法。
-2. 对 Ed25519 设备继续使用原 profile；对 Apple P-256 候选只使用独立 `apple-keychain-p256-v1`，不得在失败时尝试另一算法或 backend。
+2. 对 Ed25519 设备继续使用原 profile；普通 DPK 与 Secure Enclave P-256 分别使用独立 backend/key identity，任一路径失败都不得尝试另一算法或 backend。
 3. 平台失败时记录 API / OS 版本、固定错误分类、cleanup 和日志脱敏结果，不记录 key、signature 或 canonical bytes。
 4. 不降级到软件 seed、普通文件、SQLite、SharedPreferences、generic password item 或 `test-memory-v1`。
 5. 编译和运行时证据只改变对应能力字段；只有产品环境 smoke 与 capability 评审满足生产合格条件，才允许设置 `product_qualified=true`。真实用户同步还受独立 M3 gate 约束。
@@ -160,7 +162,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 2. 已完成独立 `apple-keychain-p256-v1` repository spike 与双层门禁；普通测试不访问系统 Keychain。
 3. 已在独立授权后完成 ad-hoc denied 与 provisioning-backed manager 产品 DPK 生命周期；native 内完成创建、重载、签名、Rust/Go 验签、删除、missing、失败关闭、cleanup 和固定摘要。Dart 不绑定该 ABI，InputMethodKit 不接入同步密钥职责。
 4. 已完成 capability 评审：普通 DPK P-256 key 标记 `exportable=true`，编译/运行时字段如实开放，`product_qualified` 与用户同步 gate 关闭；Secure Enclave、hardware-backed、user presence 和 backup migration 均没有从基础签名成功推导。
-5. 下一主批先补 Secure Enclave 独立 backend ADR/runbook，再沿 crypto、FFI、manager native、产品环境证据推进；unsupported 设备必须失败关闭，不能回退普通 DPK 或 test memory。
+5. 已补 Secure Enclave 独立 backend ADR/runbook，并沿 crypto、FFI、manager native 完成 compiled-only repository 接线；unsupported 设备失败关闭，不回退普通 DPK 或 test memory。下一证据是单独授权的 qualification build 与产品进程 lifecycle/denied/locked/unsupported smoke。
 6. 只有不可导出 production backend 评审和产品环境 smoke 通过后，才进入真实产品 sync orchestration 与 `ManagerBridge` 命令；恢复码、设备授权、撤销和用户同步入口继续关闭到 M3 全部退出证据成立。
 
 ## 验证口径
@@ -195,7 +197,9 @@ cargo test -p radishlex-ime-crypto --features apple-keychain
 - [ADR 0004: 平台私钥存储 Backend 边界](adr/0004-platform-private-key-storage-backend.md)
 - [ADR 0005: Apple 平台签名策略](adr/0005-apple-platform-signing-strategy.md)
 - [ADR 0006: 设备签名算法 Profile](adr/0006-device-signature-algorithm-profiles.md)
+- [ADR 0007: Apple Secure Enclave P-256 Backend](adr/0007-apple-secure-enclave-p256-backend.md)
 - [Apple Keychain Signing Backend Runbook](runbooks/apple-keychain-signing-backend.md)
+- [Apple Secure Enclave P-256 Backend Runbook](runbooks/apple-secure-enclave-p256-backend.md)
 - [Android Keystore Signing Backend Runbook](runbooks/android-keystore-signing-backend.md)
 - [同步密钥与设备生命周期设计](sync-key-management.md)
 - [Sync Server Production Deployment Runbook](runbooks/sync-server-production-deployment.md)

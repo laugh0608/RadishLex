@@ -107,6 +107,7 @@ M2 是首个本地个人化 MVP。它不要求远端同步已经开放。
 - 确定性 merge 与统一冲突表。
 - 签名绑定、KDF/解析资源上限、secret 生命周期和跨语言协议 test vector。
 - 兼容 `ed25519-v1` / `ecdsa-p256-sha256-v1` 的显式设备签名 profile，以及至少一个创建不可导出私钥并分别通过编译、运行时、产品进程 gated smoke 与资格评审的生产 backend；普通 DPK 软件 key 即使生命周期通过，也不能替代不可导出条件。这些状态不得与用户同步总 gate 混用。
+- Apple Secure Enclave P-256 必须使用独立 backend/key identity；repository compiled、runtime、不可导出、hardware-backed、产品资格和用户同步总 gate 分别取证，不得从 token 配置或普通 DPK 证据推导。
 - 对象发现、下载、验签、解密、合并、上传、冲突重试和本地 cursor orchestration。
 - 设备加入、恢复、撤销和 key epoch 轮换 API。
 - Go server 的认证、请求上限、限速、审计、备份恢复和升级回滚闭环。

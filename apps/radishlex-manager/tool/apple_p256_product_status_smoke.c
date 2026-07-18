@@ -12,6 +12,7 @@ static int require_flag(const char *name, uint32_t actual, uint32_t expected) {
 
 int main(void) {
   RadishLexAppleP256ProductStatus status = {0};
+  RadishLexAppleP256ProductStatus secure_enclave_status = {0};
   if (radishlex_apple_p256_product_status(&status) !=
       RADISHLEX_APPLE_P256_SMOKE_PASSED) {
     fputs("Apple P-256 product status query failed\n", stderr);
@@ -37,6 +38,38 @@ int main(void) {
     return 1;
   }
 
-  puts("Apple P-256 software DPK runtime is available and product-gated");
+  if (radishlex_apple_secure_enclave_p256_product_status(
+          &secure_enclave_status) != RADISHLEX_APPLE_P256_SMOKE_PASSED) {
+    fputs("Apple Secure Enclave P-256 product status query failed\n", stderr);
+    return 1;
+  }
+  failed |= require_flag(
+      "secure_enclave.version", secure_enclave_status.version,
+      RADISHLEX_APPLE_SECURE_ENCLAVE_P256_PRODUCT_STATUS_VERSION);
+  failed |= require_flag("secure_enclave.compiled",
+                         secure_enclave_status.compiled, 1u);
+  failed |= require_flag("secure_enclave.runtime_available",
+                         secure_enclave_status.runtime_available, 0u);
+  failed |= require_flag("secure_enclave.can_create_signing_keys",
+                         secure_enclave_status.can_create_signing_keys, 0u);
+  failed |= require_flag("secure_enclave.can_sign",
+                         secure_enclave_status.can_sign, 0u);
+  failed |= require_flag("secure_enclave.product_qualified",
+                         secure_enclave_status.product_qualified, 0u);
+  failed |= require_flag("secure_enclave.user_sync_enabled",
+                         secure_enclave_status.user_sync_enabled, 0u);
+  failed |= require_flag("secure_enclave.exportable",
+                         secure_enclave_status.exportable, 0u);
+  failed |= require_flag("secure_enclave.hardware_backed",
+                         secure_enclave_status.hardware_backed, 0u);
+  failed |= require_flag("secure_enclave.user_presence_required",
+                         secure_enclave_status.user_presence_required, 0u);
+  failed |= require_flag("secure_enclave.backup_migratable",
+                         secure_enclave_status.backup_migratable, 0u);
+  if (failed != 0) {
+    return 1;
+  }
+
+  puts("Apple P-256 software DPK runtime and compiled-only Secure Enclave gates passed");
   return 0;
 }

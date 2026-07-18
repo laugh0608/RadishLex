@@ -16,6 +16,7 @@ manager_window="${manager_dir}/macos/Runner/MainFlutterWindow.swift"
 apple_status_smoke="${manager_dir}/tool/apple_p256_product_status_smoke.c"
 apple_status_smoke_binary="${smoke_dir}/apple-p256-product-status-smoke"
 apple_product_smoke="${repo_root}/scripts/run-manager-apple-keychain-p256-product-smoke.sh"
+secure_enclave_product_smoke="${repo_root}/scripts/run-manager-apple-secure-enclave-p256-product-smoke.sh"
 apple_qualified_build="${repo_root}/scripts/build-manager-macos-dpk-qualified-product.sh"
 apple_qualified_entitlements="${manager_dir}/macos/Runner/DPKQualification.entitlements"
 manager_app_delegate="${manager_dir}/macos/Runner/AppDelegate.swift"
@@ -31,6 +32,7 @@ if [ "$(uname -s)" != "Darwin" ]; then
 fi
 
 bash -n "${m2_cleanup}" "${m2_cleanup_wrapper}" "${apple_product_smoke}" \
+  "${secure_enclave_product_smoke}" \
   "${apple_qualified_build}" \
   "${m2_cleanup_helper_contract}" "${m2_cleanup_orchestration_contract}"
 rg -Fq '"${1:-}" != "--authorized-apple-development-provisioning-build"' \
@@ -45,6 +47,8 @@ rg -Fq '<key>keychain-access-groups</key>' "${apple_qualified_entitlements}"
 rg -Fq '$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)' \
   "${apple_qualified_entitlements}"
 rg -Fq 'RADISHLEX_RUN_MANAGER_APPLE_KEYCHAIN_P256_SMOKE=1' "${apple_product_smoke}"
+rg -Fq 'RADISHLEX_RUN_MANAGER_APPLE_SECURE_ENCLAVE_P256_SMOKE=1' \
+  "${secure_enclave_product_smoke}"
 for authorization_argument in \
   --authorized-product-keychain-smoke \
   --authorized-product-keychain-denied-probe \
@@ -52,6 +56,15 @@ for authorization_argument in \
   --authorized-product-keychain-locked-probe \
   --authorized-product-keychain-locked-cleanup; do
   rg -Fq -- "${authorization_argument}" "${apple_product_smoke}"
+done
+for authorization_argument in \
+  --authorized-secure-enclave-product-smoke \
+  --authorized-secure-enclave-denied-probe \
+  --authorized-secure-enclave-locked-prepare \
+  --authorized-secure-enclave-locked-probe \
+  --authorized-secure-enclave-locked-cleanup \
+  --authorized-secure-enclave-unsupported-probe; do
+  rg -Fq -- "${authorization_argument}" "${secure_enclave_product_smoke}"
 done
 for product_argument in \
   --radishlex-apple-p256-product-smoke \
@@ -61,9 +74,22 @@ for product_argument in \
   --radishlex-apple-p256-locked-cleanup; do
   rg -Fq -- "${product_argument}" "${apple_product_smoke}" "${manager_app_delegate}"
 done
+for product_argument in \
+  --radishlex-apple-secure-enclave-p256-product-smoke \
+  --radishlex-apple-secure-enclave-p256-denied-probe \
+  --radishlex-apple-secure-enclave-p256-locked-prepare \
+  --radishlex-apple-secure-enclave-p256-locked-probe \
+  --radishlex-apple-secure-enclave-p256-locked-cleanup \
+  --radishlex-apple-secure-enclave-p256-unsupported-probe; do
+  rg -Fq -- "${product_argument}" "${secure_enclave_product_smoke}" \
+    "${manager_app_delegate}"
+done
 rg -Fq 'RADISHLEX_RUN_MANAGER_APPLE_KEYCHAIN_P256_SMOKE' "${manager_app_delegate}"
+rg -Fq 'RADISHLEX_RUN_MANAGER_APPLE_SECURE_ENCLAVE_P256_SMOKE' \
+  "${manager_app_delegate}"
 if rg -n 'security[[:space:]]+(lock|unlock)-keychain|security[[:space:]]+list-keychains' \
-  "${apple_product_smoke}" "${apple_qualified_build}"; then
+  "${apple_product_smoke}" "${secure_enclave_product_smoke}" \
+  "${apple_qualified_build}"; then
   echo "Apple P-256 product smoke must not change Keychain lock or search-list state." >&2
   exit 1
 fi
@@ -107,13 +133,15 @@ fi
 codesign --verify --deep --strict "${app_bundle}"
 for symbol in \
   _radishlex_apple_p256_product_status \
-  _radishlex_apple_p256_product_smoke; do
+  _radishlex_apple_p256_product_smoke \
+  _radishlex_apple_secure_enclave_p256_product_status \
+  _radishlex_apple_secure_enclave_p256_product_smoke; do
   if ! nm -gU "${native_library}" | grep -Eq "(^|[[:space:]])${symbol}$"; then
     echo "manager product native library is missing required symbol: ${symbol}" >&2
     exit 1
   fi
 done
-if rg -n 'radishlex_apple_p256_product_(smoke|status)' \
+if rg -n 'radishlex_apple_(p256|secure_enclave_p256)_product_(smoke|status)' \
   "${manager_dir}/lib" "${manager_dir}/tool/ffi_bridge_smoke.dart"; then
   echo "Apple P-256 product validation ABI must not be bound by Dart." >&2
   exit 1

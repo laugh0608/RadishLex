@@ -10,7 +10,7 @@ class AppDelegate: FlutterAppDelegate {
       return
     }
     guard
-      let scenario = RadishLexAppleP256ProductSmoke.scenario(
+      let request = RadishLexAppleP256ProductSmoke.request(
         arguments: CommandLine.arguments
       )
     else {
@@ -18,7 +18,7 @@ class AppDelegate: FlutterAppDelegate {
       fflush(stderr)
       exit(EXIT_FAILURE)
     }
-    let result = RadishLexAppleP256ProductSmoke.run(scenario: scenario)
+    let result = RadishLexAppleP256ProductSmoke.run(request: request)
     fputs(result.safeLogLine + "\n", stderr)
     fflush(stderr)
     exit(result.passed ? EXIT_SUCCESS : EXIT_FAILURE)
@@ -95,6 +95,7 @@ private struct RadishLexAppleP256SmokeSummary {
 }
 
 private struct RadishLexAppleP256ProductSmokeResult {
+  let label: String
   let summary: RadishLexAppleP256SmokeSummary
 
   var passed: Bool {
@@ -102,7 +103,7 @@ private struct RadishLexAppleP256ProductSmokeResult {
   }
 
   var safeLogLine: String {
-    "RadishLex Apple P-256 product smoke" +
+    label +
       " result=\(summary.result)" +
       " scenario=\(summary.scenario)" +
       " error_category=\(summary.errorCategory)" +
@@ -125,13 +126,32 @@ private struct RadishLexAppleP256ProductSmokeResult {
   }
 }
 
+private struct RadishLexAppleP256SmokeRequest {
+  let scenario: UInt32
+  let environmentGate: String
+  let symbol: String
+  let label: String
+}
+
 private enum RadishLexAppleP256ProductSmoke {
-  private static let scenarios: [String: UInt32] = [
-    "--radishlex-apple-p256-product-smoke": 0,
-    "--radishlex-apple-p256-denied-probe": 1,
-    "--radishlex-apple-p256-locked-prepare": 2,
-    "--radishlex-apple-p256-locked-probe": 3,
-    "--radishlex-apple-p256-locked-cleanup": 4,
+  private static let requests: [String: RadishLexAppleP256SmokeRequest] = [
+    "--radishlex-apple-p256-product-smoke": softwareDPKRequest(scenario: 0),
+    "--radishlex-apple-p256-denied-probe": softwareDPKRequest(scenario: 1),
+    "--radishlex-apple-p256-locked-prepare": softwareDPKRequest(scenario: 2),
+    "--radishlex-apple-p256-locked-probe": softwareDPKRequest(scenario: 3),
+    "--radishlex-apple-p256-locked-cleanup": softwareDPKRequest(scenario: 4),
+    "--radishlex-apple-secure-enclave-p256-product-smoke":
+      secureEnclaveRequest(scenario: 0),
+    "--radishlex-apple-secure-enclave-p256-denied-probe":
+      secureEnclaveRequest(scenario: 1),
+    "--radishlex-apple-secure-enclave-p256-locked-prepare":
+      secureEnclaveRequest(scenario: 2),
+    "--radishlex-apple-secure-enclave-p256-locked-probe":
+      secureEnclaveRequest(scenario: 3),
+    "--radishlex-apple-secure-enclave-p256-locked-cleanup":
+      secureEnclaveRequest(scenario: 4),
+    "--radishlex-apple-secure-enclave-p256-unsupported-probe":
+      secureEnclaveRequest(scenario: 5),
   ]
 
   private typealias SmokeFunction = @convention(c) (
@@ -141,24 +161,30 @@ private enum RadishLexAppleP256ProductSmoke {
   ) -> UInt32
 
   static func isRequested(arguments: [String]) -> Bool {
-    arguments.contains { $0.hasPrefix("--radishlex-apple-p256-") }
+    arguments.contains {
+      $0.hasPrefix("--radishlex-apple-p256-")
+        || $0.hasPrefix("--radishlex-apple-secure-enclave-p256-")
+    }
   }
 
-  static func scenario(arguments: [String]) -> UInt32? {
-    let requested = arguments.filter { $0.hasPrefix("--radishlex-apple-p256-") }
+  static func request(arguments: [String]) -> RadishLexAppleP256SmokeRequest? {
+    let requested = arguments.filter {
+      $0.hasPrefix("--radishlex-apple-p256-")
+        || $0.hasPrefix("--radishlex-apple-secure-enclave-p256-")
+    }
     guard requested.count == 1 else {
       return nil
     }
-    return scenarios[requested[0]]
+    return requests[requested[0]]
   }
 
-  static func run(scenario: UInt32) -> RadishLexAppleP256ProductSmokeResult {
+  static func run(request: RadishLexAppleP256SmokeRequest)
+    -> RadishLexAppleP256ProductSmokeResult
+  {
     var summary = RadishLexAppleP256SmokeSummary()
-    summary.scenario = scenario
+    summary.scenario = request.scenario
     guard
-      ProcessInfo.processInfo.environment[
-        "RADISHLEX_RUN_MANAGER_APPLE_KEYCHAIN_P256_SMOKE"
-      ] == "1",
+      ProcessInfo.processInfo.environment[request.environmentGate] == "1",
       let goServerDirectory = ProcessInfo.processInfo.environment[
         "RADISHLEX_MANAGER_APPLE_P256_GO_SERVER_DIR"
       ],
@@ -166,7 +192,7 @@ private enum RadishLexAppleP256ProductSmoke {
       let frameworks = Bundle.main.privateFrameworksURL
     else {
       summary.result = 1
-      return RadishLexAppleP256ProductSmokeResult(summary: summary)
+      return RadishLexAppleP256ProductSmokeResult(label: request.label, summary: summary)
     }
 
     let library = frameworks.appendingPathComponent(
@@ -174,25 +200,47 @@ private enum RadishLexAppleP256ProductSmoke {
     )
     guard let handle = dlopen(library.path, RTLD_NOW | RTLD_LOCAL) else {
       summary.result = 2
-      return RadishLexAppleP256ProductSmokeResult(summary: summary)
+      return RadishLexAppleP256ProductSmokeResult(label: request.label, summary: summary)
     }
     defer { dlclose(handle) }
 
-    guard let symbol = dlsym(handle, "radishlex_apple_p256_product_smoke") else {
+    guard let symbol = dlsym(handle, request.symbol) else {
       summary.result = 2
-      return RadishLexAppleP256ProductSmokeResult(summary: summary)
+      return RadishLexAppleP256ProductSmokeResult(label: request.label, summary: summary)
     }
     let smoke = unsafeBitCast(symbol, to: SmokeFunction.self)
     var words = [UInt32](repeating: 0, count: 26)
     let result = goServerDirectory.withCString { directory in
       words.withUnsafeMutableBufferPointer { buffer in
-        smoke(scenario, directory, UnsafeMutableRawPointer(buffer.baseAddress))
+        smoke(request.scenario, directory, UnsafeMutableRawPointer(buffer.baseAddress))
       }
     }
     summary = RadishLexAppleP256SmokeSummary(words: words)
     if result != summary.result {
       summary.result = 255
     }
-    return RadishLexAppleP256ProductSmokeResult(summary: summary)
+    return RadishLexAppleP256ProductSmokeResult(label: request.label, summary: summary)
+  }
+
+  private static func softwareDPKRequest(scenario: UInt32)
+    -> RadishLexAppleP256SmokeRequest
+  {
+    RadishLexAppleP256SmokeRequest(
+      scenario: scenario,
+      environmentGate: "RADISHLEX_RUN_MANAGER_APPLE_KEYCHAIN_P256_SMOKE",
+      symbol: "radishlex_apple_p256_product_smoke",
+      label: "RadishLex Apple P-256 product smoke"
+    )
+  }
+
+  private static func secureEnclaveRequest(scenario: UInt32)
+    -> RadishLexAppleP256SmokeRequest
+  {
+    RadishLexAppleP256SmokeRequest(
+      scenario: scenario,
+      environmentGate: "RADISHLEX_RUN_MANAGER_APPLE_SECURE_ENCLAVE_P256_SMOKE",
+      symbol: "radishlex_apple_secure_enclave_p256_product_smoke",
+      label: "RadishLex Apple Secure Enclave P-256 product smoke"
+    )
   }
 }

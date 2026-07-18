@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型、已解密 P2 payload 写回本地 SQLite 的执行器、`ime-sync` remote client、两客户端内存与短生命周期 Go HTTP 测试。Go server 已具备 API/storage/runtime、SQLite metadata、local blob、Ed25519/P-256 签名 profile 验证、对象版本与冲突、recovery、审计、bearer token、备份恢复、外部 TLS 和升级回滚受控证据。尚未形成完整真实用户生产封装、发布级目标部署运行证据或可用生产私钥 backend；`apple-keychain-v1` 阻塞于 Ed25519 创建，`apple-keychain-p256-v1` 的 DPK 软件运行时已验证但因 `exportable=true` 被生产门禁拒绝，下一主批为独立 Secure Enclave backend。SQLite driver 使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
+当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型、已解密 P2 payload 写回本地 SQLite 的执行器、`ime-sync` remote client、两客户端内存与短生命周期 Go HTTP 测试。Go server 已具备 API/storage/runtime、SQLite metadata、local blob、Ed25519/P-256 签名 profile 验证、对象版本与冲突、recovery、审计、bearer token、备份恢复、外部 TLS 和升级回滚受控证据。尚未形成完整真实用户生产封装、发布级目标部署运行证据或可用生产私钥 backend；普通 DPK P-256 因可导出被拒绝，独立 Secure Enclave P-256 已完成 compiled-only 产品接线但尚无运行时资格证据。SQLite driver 使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
 
 本阶段只固定服务端 API 和 storage 边界：
 
@@ -421,7 +421,7 @@ latest_ciphertext_hash
 ## 停止线
 
 - Rust 侧两客户端 harness 已覆盖 encrypted userdb payload 的上传、下载、解密、合并写回和 stale conflict 重新上传；Go runtime smoke 已覆盖第二设备授权、跨设备 object 版本链、备份恢复链路、外部 TLS 反代链路和升级回滚链路；Rust HTTP transport 直连 Go server 的短生命周期测试已覆盖跨语言 DTO、handler、storage、错误语义和日志脱敏边界；Rust userdb 两客户端真实 Go HTTP 测试已覆盖客户端解密合并写回和 v2 重新上传；生产部署 runbook 已固定外部 TLS、认证、备份和升级停止线，Go server 与 Rust HTTP transport 已补单用户 bearer access token 证据。进入用户可用同步前，仍必须补可用平台私钥 backend 和发布级目标部署运行证据；当前产品开发继续使用本地 Docker / 本地 HTTPS 复验证据。
-- 平台私钥存储 backend 能力模型已落地；`apple-keychain-v1` 仍阻塞，`apple-keychain-p256-v1` 已完成 DPK 选择、manager native 接线、五场景 smoke、ad-hoc denied 和合格产品生命周期。普通 DPK 软件 key 因 `exportable=true` 不具备产品资格；独立 Secure Enclave backend 完成前，不提供用户可用同步 UI。
+- 平台私钥存储 backend 能力模型已落地；普通 DPK 软件 key 因 `exportable=true` 不具备产品资格，独立 Secure Enclave backend 已完成 repository/manager build 和 gated smoke 接线但尚未取得产品进程证据。生产 backend 评审通过前不提供用户可用同步 UI。
 - device authorization handler 对外开放前必须继续复用 wrapped key bytes 的存储 / 读取语义，且不得返回明文同步域材料。
 - recovery latest handler 已复用 wrapped material bytes 读取语义，并补齐限速与内部 `blob_ref` 不外泄测试；object version handler 已复用 encrypted object blob 读写语义，并补齐冲突、设备状态和脱敏测试；API handler 已补 panic recovery、request id、非持久审计 hook、SQLite `audit_events` 写入和 bearer access token 门禁；runtime 已补配置装配、脱敏 audit logger、本机 smoke runbook、双设备 HTTP smoke、备份恢复 smoke、外部 TLS 反代 smoke、升级回滚 smoke、Docker Compose 本地 / 部署态入口、容器实际启动 smoke 证据和生产部署边界 runbook。Rust remote client 已补 DTO、transport trait、HTTP transport、错误映射、可选 bearer token header、两客户端 userdb harness、直连 Go server 的短生命周期测试和 userdb 两客户端真实 Go HTTP 测试；进入真实用户部署前仍需补可用平台私钥 backend 和发布级目标部署运行证据，进入 manager 同步入口非上传开发可先依赖本地联调证据。
 - 服务端能保存、打印或索引明文用户词、input code、reading、P1 原始事件或候选偏好时，必须停止并回退该设计。

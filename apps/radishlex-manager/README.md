@@ -53,7 +53,7 @@ macOS 正常 product 构建使用仓库稳定入口：
 ../../scripts/build-manager-macos-product.sh
 ```
 
-Xcode 构建阶段会编译 `radishlex-ime-ffi`；macOS 产品 dylib 显式启用 `apple-keychain` feature，再修正 install name，检查目标架构、依赖与 manager 所需 symbol 集，把库复制到 app bundle 的 `Contents/Frameworks` 后签名。Dart 启动时读取 `radishlex_ffi_contract`，要求 ABI version、owner-thread policy 和 panic boundary 与 manager 预期一致。Apple P-256 status/product smoke symbol 只服务原生 gated validation，Dart 不绑定，也不返回 key、canonical 或 signature bytes。
+Xcode 构建阶段会编译 `radishlex-ime-ffi`；macOS 产品 dylib 显式启用 `apple-keychain` feature，再修正 install name，检查目标架构、依赖与 manager 所需 symbol 集，把库复制到 app bundle 的 `Contents/Frameworks` 后签名。Dart 启动时读取 `radishlex_ffi_contract`，要求 ABI version、owner-thread policy 和 panic boundary 与 manager 预期一致。普通 DPK 与 Secure Enclave P-256 status/product smoke symbol 只服务原生 gated validation，Dart 不绑定，也不返回 key、canonical 或 signature bytes。
 
 product mode 不读取 `RADISHLEX_MANAGER_DB`、`RADISHLEX_MANAGER_FFI_LIBRARY`、`RADISHLEX_MANAGER_SETTINGS_FILE` 或其他 shell 路径环境变量。macOS 固定路径为：
 
@@ -85,10 +85,12 @@ demo mode 只使用合成 fixture，并持续显示“合成演示数据”横�
 
 M2 本地能力验收范围、退出标准映射和隐私检查见仓库根 `docs/manager-local-acceptance.md`。
 
-`check-manager-ffi-smoke.sh` 会构建开发态 `radishlex-ime-ffi`，在仓库外临时目录创建 SQLite userdb、settings JSON、导入 TSV、读取 import batches 与 rank explain、执行删除 / 重启 / explicit restore / 再重启、导出词库并导出脱敏诊断报告，用真实 Dart FFI bridge 复验本地管理链路；同时确认当前动态库未导出已退役的 review-only sync command symbol。`check-manager-product.sh` 额外构建正常 macOS app bundle，验证非 sandbox entitlements、嵌入 dylib、签名、Apple P-256 validation symbol、只读 native status host 和 bundle 内真实 Dart FFI smoke，全程不启动 GUI、不访问 Keychain。
+`check-manager-ffi-smoke.sh` 会构建开发态 `radishlex-ime-ffi`，在仓库外临时目录创建 SQLite userdb、settings JSON、导入 TSV、读取 import batches 与 rank explain、执行删除 / 重启 / explicit restore / 再重启、导出词库并导出脱敏诊断报告，用真实 Dart FFI bridge 复验本地管理链路；同时确认当前动态库未导出已退役的 review-only sync command symbol。`check-manager-product.sh` 额外构建正常 macOS app bundle，验证非 sandbox entitlements、嵌入 dylib、签名、两类 Apple P-256 validation symbol、只读 native status host 和 bundle 内真实 Dart FFI smoke，全程不启动 GUI、不访问 Keychain/Secure Enclave。
 
 实际产品进程 DPK 验证只能在单独授权后使用仓库根 `scripts/run-manager-apple-keychain-p256-product-smoke.sh`。脚本接受正常生命周期、预期 denied、locked 前置、locked 探测和解锁后清理五个授权参数；它不会自行锁定、解锁或改写 Keychain 搜索列表。locked 矩阵必须按 runbook 分阶段执行，并在解锁后完成清理。
 
 DPK 正常生命周期必须先使用 `scripts/build-manager-macos-dpk-qualified-product.sh` 生成 provisioning-backed Apple Development bundle。该入口要求显式授权、Team ID 和 signing identity，并核对 embedded profile、application identifier 和默认 access group；它可能联系 Apple Developer 服务，但不会启动 app 或创建 Keychain item。默认 `check-manager-product.sh` 仍只生成 ad-hoc bundle，用于仓库门禁和预期 denied。
 
 当前普通 DPK P-256 软件 key 已通过 qualification 产品生命周期，status 报告编译/运行时可用且 `exportable=true`；因此 `product_qualified` 与用户同步 gate 保持 false。下一生产候选为独立 Secure Enclave backend，不允许从普通 DPK 静默 fallback 或原地升级。
+
+Secure Enclave repository backend 当前只报告 compiled；`scripts/run-manager-apple-secure-enclave-p256-product-smoke.sh` 提供 lifecycle、denied、locked 三段和 unsupported 场景，但任何执行都会启动产品并访问 Secure Enclave/Keychain，必须单独授权。产品证据前 runtime、hardware-backed、product qualification 与用户同步 gate 均保持关闭。

@@ -299,6 +299,51 @@ fn apple_keychain_p256_capabilities_declare_profile_but_keep_production_closed()
 }
 
 #[test]
+fn apple_secure_enclave_p256_declares_independent_compiled_only_backend() {
+    let capabilities = DeviceSigningBackendCapabilities::apple_secure_enclave_p256_v1();
+    assert_eq!(
+        capabilities.storage_backend,
+        DeviceSigningStorageBackend::AppleSecureEnclaveP256V1
+    );
+    assert!(!capabilities.exportable);
+    assert!(!capabilities.hardware_backed);
+    assert!(!capabilities.user_presence_required);
+    assert!(!capabilities.backup_migratable);
+    assert!(capabilities.allows_production_signing());
+
+    let status = DevicePrivateKeyStoreStatus::apple_secure_enclave_p256_v1();
+    status.validate().expect("Secure Enclave P-256 status");
+    assert!(!status.compiled);
+    assert!(!status.available);
+    assert!(!status.can_create_signing_keys);
+    assert!(!status.can_sign);
+    assert!(!status.product_qualified);
+    assert_eq!(
+        status
+            .ensure_production_signing_allowed()
+            .expect_err("product evidence is required before production signing"),
+        CryptoError::StorageBackendUnavailable {
+            backend: DEVICE_KEY_STORE_APPLE_SECURE_ENCLAVE_P256_V1.to_owned(),
+        }
+    );
+
+    let handle = DeviceSigningKeyHandle::apple_secure_enclave_p256(
+        "device-a",
+        "secure-enclave-signing-key-a",
+        10,
+    )
+    .expect("Secure Enclave handle metadata");
+    assert_eq!(
+        handle.storage_backend,
+        DeviceSigningStorageBackend::AppleSecureEnclaveP256V1
+    );
+    assert_eq!(
+        handle.signature_algorithm.as_str(),
+        SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1
+    );
+}
+
+#[test]
 fn android_keystore_capabilities_keep_metadata_but_status_blocks_production() {
     let capabilities = DeviceSigningBackendCapabilities::android_keystore_v1();
     assert_eq!(
@@ -397,6 +442,38 @@ fn apple_keychain_p256_store_status_reports_software_dpk_runtime_without_product
     assert!(debug.contains(DEVICE_KEY_STORE_APPLE_KEYCHAIN_P256_V1));
     assert!(debug.contains(SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1));
     assert!(!debug.contains("org.radishlex.sync.signing.p256"));
+}
+
+#[cfg(feature = "apple-keychain")]
+#[test]
+fn apple_secure_enclave_store_status_does_not_claim_runtime_or_hardware_evidence() {
+    let store = AppleSecureEnclaveP256DeviceKeyStore::new();
+    let status = store.backend_status();
+    status.validate().expect("Secure Enclave store status");
+    assert_eq!(
+        status.storage_backend,
+        DeviceSigningStorageBackend::AppleSecureEnclaveP256V1
+    );
+    assert_eq!(status.compiled, cfg!(target_os = "macos"));
+    assert!(!status.available);
+    assert!(!status.can_create_signing_keys);
+    assert!(!status.can_sign);
+    assert!(!status.product_qualified);
+    assert!(!status.capabilities.exportable);
+    assert!(!status.capabilities.hardware_backed);
+    assert!(!status.capabilities.user_presence_required);
+    assert!(!status.capabilities.backup_migratable);
+    assert_eq!(
+        status
+            .ensure_production_signing_allowed()
+            .expect_err("compiled Secure Enclave code is not runtime evidence"),
+        CryptoError::StorageBackendUnavailable {
+            backend: DEVICE_KEY_STORE_APPLE_SECURE_ENCLAVE_P256_V1.to_owned(),
+        }
+    );
+    let debug = format!("{store:?}");
+    assert!(debug.contains(DEVICE_KEY_STORE_APPLE_SECURE_ENCLAVE_P256_V1));
+    assert!(!debug.contains("org.radishlex.sync.signing.secure-enclave.p256"));
 }
 
 #[cfg(feature = "android-keystore")]

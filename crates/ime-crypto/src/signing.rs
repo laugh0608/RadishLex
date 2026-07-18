@@ -35,7 +35,10 @@ pub use android_keystore::{
 };
 
 #[cfg(feature = "apple-keychain")]
-pub use apple_keychain::{AppleKeychainDeviceKeyStore, AppleKeychainP256DeviceKeyStore};
+pub use apple_keychain::{
+    AppleKeychainDeviceKeyStore, AppleKeychainP256DeviceKeyStore,
+    AppleSecureEnclaveP256DeviceKeyStore,
+};
 
 pub const SIGNATURE_SCHEMA_VERSION: u16 = 1;
 pub const SIGNATURE_ALGORITHM_ED25519_V1: &str = "ed25519-v1";
@@ -44,6 +47,7 @@ pub const DEVICE_KEY_STORE_TEST_MEMORY_V1: &str = "test-memory-v1";
 pub const DEVICE_KEY_STORE_UNAVAILABLE: &str = "unavailable";
 pub const DEVICE_KEY_STORE_APPLE_KEYCHAIN_V1: &str = "apple-keychain-v1";
 pub const DEVICE_KEY_STORE_APPLE_KEYCHAIN_P256_V1: &str = "apple-keychain-p256-v1";
+pub const DEVICE_KEY_STORE_APPLE_SECURE_ENCLAVE_P256_V1: &str = "apple-secure-enclave-p256-v1";
 pub const DEVICE_KEY_STORE_ANDROID_KEYSTORE_V1: &str = "android-keystore-v1";
 pub const DEVICE_KEY_STORE_WINDOWS_CNG_V1: &str = "windows-cng-v1";
 pub const DEVICE_KEY_STORE_LINUX_SECRET_SERVICE_V1: &str = "linux-secret-service-v1";
@@ -93,6 +97,7 @@ pub enum DeviceSigningStorageBackend {
     Unavailable,
     AppleKeychainV1,
     AppleKeychainP256V1,
+    AppleSecureEnclaveP256V1,
     AndroidKeystoreV1,
     WindowsCngV1,
     LinuxSecretServiceV1,
@@ -105,6 +110,7 @@ impl DeviceSigningStorageBackend {
             Self::Unavailable => DEVICE_KEY_STORE_UNAVAILABLE,
             Self::AppleKeychainV1 => DEVICE_KEY_STORE_APPLE_KEYCHAIN_V1,
             Self::AppleKeychainP256V1 => DEVICE_KEY_STORE_APPLE_KEYCHAIN_P256_V1,
+            Self::AppleSecureEnclaveP256V1 => DEVICE_KEY_STORE_APPLE_SECURE_ENCLAVE_P256_V1,
             Self::AndroidKeystoreV1 => DEVICE_KEY_STORE_ANDROID_KEYSTORE_V1,
             Self::WindowsCngV1 => DEVICE_KEY_STORE_WINDOWS_CNG_V1,
             Self::LinuxSecretServiceV1 => DEVICE_KEY_STORE_LINUX_SECRET_SERVICE_V1,
@@ -120,6 +126,7 @@ impl DeviceSigningStorageBackend {
             self,
             Self::AppleKeychainV1
                 | Self::AppleKeychainP256V1
+                | Self::AppleSecureEnclaveP256V1
                 | Self::AndroidKeystoreV1
                 | Self::WindowsCngV1
                 | Self::LinuxSecretServiceV1
@@ -138,7 +145,8 @@ fn backend_signature_algorithm(
 ) -> Option<SignatureAlgorithmId> {
     match storage_backend {
         DeviceSigningStorageBackend::Unavailable => None,
-        DeviceSigningStorageBackend::AppleKeychainP256V1 => {
+        DeviceSigningStorageBackend::AppleKeychainP256V1
+        | DeviceSigningStorageBackend::AppleSecureEnclaveP256V1 => {
             Some(SignatureAlgorithmId::ecdsa_p256_sha256_v1())
         }
         DeviceSigningStorageBackend::TestMemoryV1
@@ -259,6 +267,21 @@ impl DeviceSigningKeyHandle {
         )
     }
 
+    pub fn apple_secure_enclave_p256(
+        device_id: impl Into<String>,
+        signing_key_id: impl Into<String>,
+        created_at_ms: i64,
+    ) -> Result<Self, CryptoError> {
+        Self::new(
+            device_id,
+            signing_key_id,
+            SignatureAlgorithmId::ecdsa_p256_sha256_v1(),
+            DeviceSigningStorageBackend::AppleSecureEnclaveP256V1,
+            DeviceSigningBackendCapabilities::apple_secure_enclave_p256_v1(),
+            created_at_ms,
+        )
+    }
+
     pub fn android_keystore(
         device_id: impl Into<String>,
         signing_key_id: impl Into<String>,
@@ -360,6 +383,16 @@ impl DeviceSigningBackendCapabilities {
         Self {
             storage_backend: DeviceSigningStorageBackend::AppleKeychainP256V1,
             exportable: true,
+            hardware_backed: false,
+            user_presence_required: false,
+            backup_migratable: false,
+        }
+    }
+
+    pub fn apple_secure_enclave_p256_v1() -> Self {
+        Self {
+            storage_backend: DeviceSigningStorageBackend::AppleSecureEnclaveP256V1,
+            exportable: false,
             hardware_backed: false,
             user_presence_required: false,
             backup_migratable: false,
@@ -471,6 +504,20 @@ impl DevicePrivateKeyStoreStatus {
         }
     }
 
+    pub fn apple_secure_enclave_p256_v1() -> Self {
+        // Repository code and official token semantics do not replace product evidence.
+        Self {
+            storage_backend: DeviceSigningStorageBackend::AppleSecureEnclaveP256V1,
+            signature_algorithm: Some(SignatureAlgorithmId::ecdsa_p256_sha256_v1()),
+            compiled: false,
+            available: false,
+            can_create_signing_keys: false,
+            can_sign: false,
+            product_qualified: false,
+            capabilities: DeviceSigningBackendCapabilities::apple_secure_enclave_p256_v1(),
+        }
+    }
+
     pub fn apple_keychain_v1_compiled() -> Self {
         Self {
             compiled: true,
@@ -482,6 +529,13 @@ impl DevicePrivateKeyStoreStatus {
         Self {
             compiled: true,
             ..Self::apple_keychain_p256_v1()
+        }
+    }
+
+    pub fn apple_secure_enclave_p256_v1_compiled() -> Self {
+        Self {
+            compiled: true,
+            ..Self::apple_secure_enclave_p256_v1()
         }
     }
 

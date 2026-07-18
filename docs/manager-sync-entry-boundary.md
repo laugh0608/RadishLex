@@ -8,7 +8,7 @@
 - 真实远端同步、恢复码生成与输入、设备加入授权、设备撤销和密钥轮换没有产品执行入口。
 - `ManagerBridge` 当前不提供上述同步命令；缺少能力本身就是产品关闭证据，不使用 future command preview 或审批状态机模拟接口。
 - 即使 endpoint、平台 backend、部署证据和 readiness 摘要均显示 ready，用户同步入口仍保持关闭，直到 M3 退出条件满足。
-- manager Release native library 可以包含 Apple P-256 backend 与只返回固定 flags 的产品 validation ABI；该 ABI 不属于 `ManagerBridge` 同步命令，不进入 Dart binding，也不能解锁按钮。
+- manager Release native library 可以包含普通 DPK 与 Secure Enclave P-256 backend 及只返回固定 flags 的独立产品 validation ABI；这些 ABI 不属于 `ManagerBridge` 同步命令，不进入 Dart binding，也不能解锁按钮。
 
 ## UI 职责
 
@@ -50,6 +50,8 @@ Manager 不可以：
 当前 Manager 没有恢复码、短码、私钥、签名或 wrapped material 的输入字段与执行方法；设置文件只保存 `access_token_configured` 布尔值，不保存 token 文本。
 
 Apple P-256 产品进程 gated smoke 只由五个显式命令行场景之一与环境门触发：DPK 正常生命周期、预期 denied 创建、locked 前置、locked 签名探测、解锁后清理。正常生命周期和前置场景在 native 内使用 synthetic canonical/signature 并完成 Rust 验签；正常生命周期额外调用短生命周期 Go verifier。smoke schema v4 返回 Swift 的只有固定 scenario、result、error category/detail、数值 OSStatus 和布尔摘要，不含 CFError 文本。private key、public key、canonical bytes、signature bytes 不得进入 Dart、Flutter method channel、settings 或 diagnostics。普通 manager 启动不访问该 Keychain 路径；脚本不锁定、解锁或改写 Keychain 搜索列表；InputMethodKit 不参与同步密钥或签名。
+
+Secure Enclave P-256 使用独立环境门、native symbol 与六个显式场景，额外覆盖 unsupported create，并在正常生命周期内要求 private external representation 失败。它复用同一固定 26-word 脱敏摘要布局，但拥有独立 schema version；当前只报告 compiled，运行时和硬件字段等待产品证据。Dart、普通 manager 启动和 InputMethodKit 同样不接触该路径。
 
 ## 产品停止线
 
