@@ -64,6 +64,20 @@ capture_baseline() {
     "m2_manager_test_data_baseline=captured"
 }
 
+rewrite_receipt_devices() {
+  local parent_device="${1}"
+  local receipt_device="${2}"
+  printf '%s\n' \
+    'radishlex-m2-manager-test-data-baseline-v1' \
+    "parent_dev=${parent_device}" \
+    "parent_ino=$(stat -f '%i' "${parent}")" \
+    "parent_uid=$(id -u)" \
+    'parent_mode=0755' \
+    "receipt_dev=${receipt_device}" \
+    "receipt_ino=$(stat -f '%i' "${receipt}")" >"${receipt}"
+  chmod 0600 "${receipt}"
+}
+
 prepare_test_data() {
   chmod 0700 "${parent}"
   for name in userdb.sqlite3 userdb.sqlite3-wal userdb.sqlite3-shm \
@@ -121,6 +135,34 @@ printf 'synthetic settings\n' >"${parent}/manager-settings.json"
 chmod 0600 "${parent}/manager-settings.json"
 run_helper --authorized-delete-m2-manager-test-data >/dev/null
 assert_recovery_completed
+
+reset_fixture
+capture_baseline
+prepare_test_data
+drifted_device="$(($(stat -f '%d' "${parent}") + 1))"
+rewrite_receipt_devices "${drifted_device}" "${drifted_device}"
+run_helper --authorized-delete-m2-manager-test-data >/dev/null
+assert_recovery_completed
+
+reset_fixture
+capture_baseline
+prepare_test_data
+current_device="$(stat -f '%d' "${parent}")"
+drifted_device="$((current_device + 1))"
+rewrite_receipt_devices "${drifted_device}" "${current_device}"
+expect_failure run_helper --authorized-delete-m2-manager-test-data
+test -e "${parent}/userdb.sqlite3"
+test -e "${receipt}"
+
+reset_fixture
+capture_baseline
+prepare_test_data
+current_device="$(stat -f '%d' "${parent}")"
+drifted_device="$((current_device + 1))"
+rewrite_receipt_devices "${current_device}" "${drifted_device}"
+expect_failure run_helper --authorized-delete-m2-manager-test-data
+test -e "${parent}/userdb.sqlite3"
+test -e "${receipt}"
 
 reset_fixture
 capture_baseline

@@ -295,7 +295,8 @@ static bool RLXParseReceipt(const char *contents, size_t length,
          memcmp(canonical, contents, length) == 0;
 }
 
-static bool RLXReadReceipt(int state_fd, RLXParentBaseline *baseline) {
+static bool RLXReadReceipt(int state_fd, RLXParentBaseline *baseline,
+                           struct stat *observed_metadata) {
   struct stat entry_metadata;
   if (fstatat(state_fd, kReceiptName, &entry_metadata,
               AT_SYMLINK_NOFOLLOW) != 0 ||
@@ -337,20 +338,32 @@ static bool RLXReadReceipt(int state_fd, RLXParentBaseline *baseline) {
     valid = false;
   if (close(receipt_fd) != 0)
     valid = false;
-  if (!valid || !RLXParseReceipt(contents, total, baseline))
+  if (!valid || !RLXParseReceipt(contents, total, baseline) ||
+      baseline->receipt_inode != opened_metadata.st_ino)
     return false;
-  return baseline->receipt_device == opened_metadata.st_dev &&
-         baseline->receipt_inode == opened_metadata.st_ino;
+  *observed_metadata = opened_metadata;
+  return true;
+}
+
+static bool RLXLongLivedDevicesMatch(
+    const RLXParentBaseline *baseline,
+    const struct stat *observed_receipt,
+    const struct stat *observed_parent) {
+  bool exact = baseline->receipt_device == observed_receipt->st_dev &&
+               baseline->device == observed_parent->st_dev;
+  bool paired_drift = baseline->receipt_device == baseline->device &&
+                      observed_receipt->st_dev == observed_parent->st_dev;
+  return exact || paired_drift;
 }
 
 static bool RLXReceiptStillMatches(int state_fd,
-                                   const RLXParentBaseline *baseline) {
+                                   const struct stat *observed_metadata) {
   struct stat metadata;
   return fstatat(state_fd, kReceiptName, &metadata,
                  AT_SYMLINK_NOFOLLOW) == 0 &&
          RLXReceiptMetadataIsSafe(&metadata) &&
-         metadata.st_dev == baseline->receipt_device &&
-         metadata.st_ino == baseline->receipt_inode;
+         metadata.st_dev == observed_metadata->st_dev &&
+         metadata.st_ino == observed_metadata->st_ino;
 }
 
 static ssize_t RLXTestDataNameIndex(const char *name) {
@@ -504,7 +517,8 @@ static int RLXDeleteTestData(void) {
         "Test-data baseline state directory permissions drifted");
   }
   RLXParentBaseline baseline;
-  if (!RLXReadReceipt(state_fd, &baseline)) {
+  struct stat receipt_metadata;
+  if (!RLXReadReceipt(state_fd, &baseline, &receipt_metadata)) {
     close(state_fd);
     return RLXFail(
         "Test-data baseline receipt is missing, unsafe or malformed");
@@ -520,14 +534,25 @@ static int RLXDeleteTestData(void) {
   if (fstat(parent_fd, &parent_metadata) != 0 ||
       !S_ISDIR(parent_metadata.st_mode) ||
       parent_metadata.st_uid != getuid() ||
-      parent_metadata.st_dev != baseline.device ||
       parent_metadata.st_ino != baseline.inode ||
-      parent_metadata.st_uid != baseline.owner || baseline.mode != 0755) {
+      parent_metadata.st_uid != baseline.owner || baseline.mode != 0755 ||
+      !RLXLongLivedDevicesMatch(&baseline, &receipt_metadata,
+                                &parent_metadata)) {
     close(parent_fd);
     close(state_fd);
     return RLXFail(
         "Test-data parent identity or permissions drifted from the baseline");
   }
+
+  /*
+   * macOS may reassign st_dev across login or mount contexts while stable
+   * inodes and both fixed paths remain unchanged.  The paired check above
+   * accepts only a common device transition for the parent and receipt.
+   * Normalize the in-memory baseline so a durability-recovery receipt records
+   * the currently observed device identity.
+   */
+  baseline.device = parent_metadata.st_dev;
+  baseline.receipt_device = receipt_metadata.st_dev;
 
   RLXTestDataEntry entries[RLX_TEST_DATA_ENTRY_COUNT];
   if (!RLXInspectTestDataEntries(parent_fd, entries)) {
@@ -608,7 +633,7 @@ static int RLXDeleteTestData(void) {
   close(parent_fd);
 
   if (!RLXValidateStateDirectory(state_fd) ||
-      !RLXReceiptStillMatches(state_fd, &baseline)) {
+      !RLXReceiptStillMatches(state_fd, &receipt_metadata)) {
     close(state_fd);
     return RLXFail(
         "Test data was deleted but baseline state safety drifted");

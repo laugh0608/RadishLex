@@ -71,7 +71,7 @@ M2 入口同样不接受调用方路径或额外参数：
 ./scripts/cleanup-macos-m2-manager-test-data.sh --authorized-delete-m2-manager-test-data
 ```
 
-该 profile 固定绑定同一 Application Support 父目录，只允许 `userdb.sqlite3`、三个已知 sidecar、`manager-settings.json` 与 `manager-settings.json.tmp`；manager 进程启动即设置 `0077` umask，确保 settings 与临时文件从创建时就是私有文件。capture 要求 TIS、测试 bundle/Rime、输入法进程、manager 进程和目录均处于零基线；receipt 固定为 `target/macos-manager/m2/m2-manager-test-data-baseline.receipt`。delete 要求系统侧先回到零基线、manager 已停止、现有固定文件均由 `lsof` 证明关闭；helper 再复核 receipt/父目录身份、当前用户、`0600` 普通文件和精确白名单，成功后恢复父目录 empty/`0755`。最终删除属于独立授权，完整顺序见 [macOS M2 manager 产品验收](../../docs/runbooks/macos-m2-manager-product-acceptance.md)。
+该 profile 固定绑定同一 Application Support 父目录，只允许 `userdb.sqlite3`、三个已知 sidecar、`manager-settings.json` 与 `manager-settings.json.tmp`；manager 进程启动即设置 `0077` umask，确保 settings 与临时文件从创建时就是私有文件。capture 要求 TIS、测试 bundle/Rime、输入法进程、manager 进程和目录均处于零基线；receipt 固定为 `target/macos-manager/m2/m2-manager-test-data-baseline.receipt`。delete 要求系统侧先回到零基线、manager 已停止、现有固定文件均由 `lsof` 证明关闭；helper 再复核 receipt/父目录身份、当前用户、`0600` 普通文件和精确白名单，成功后恢复父目录 empty/`0755`。长期 receipt 允许 macOS 跨登录后 parent 与 receipt 的 `st_dev` 成对变化，但只在旧记录中二者同设备、当前现场也同设备，且各自 inode、owner、mode、link、固定路径和白名单全部精确匹配时成立；任何单侧 device drift 继续失败关闭。最终删除属于独立授权，完整顺序见 [macOS M2 manager 产品验收](../../docs/runbooks/macos-m2-manager-product-acceptance.md)。
 
 ## 不安装验证
 

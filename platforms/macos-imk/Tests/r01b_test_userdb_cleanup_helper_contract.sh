@@ -62,6 +62,20 @@ capture_baseline() {
     "r01b_userdb_baseline=captured"
 }
 
+rewrite_receipt_devices() {
+  local parent_device="${1}"
+  local receipt_device="${2}"
+  printf '%s\n' \
+    'radishlex-r01b-test-userdb-baseline-v1' \
+    "parent_dev=${parent_device}" \
+    "parent_ino=$(stat -f '%i' "${parent}")" \
+    "parent_uid=$(id -u)" \
+    'parent_mode=0755' \
+    "receipt_dev=${receipt_device}" \
+    "receipt_ino=$(stat -f '%i' "${receipt}")" >"${receipt}"
+  chmod 0600 "${receipt}"
+}
+
 prepare_userdb_family() {
   chmod 0700 "${parent}"
   for name in userdb.sqlite3 userdb.sqlite3-wal userdb.sqlite3-shm \
@@ -147,6 +161,32 @@ printf 'main only\n' >"${parent}/userdb.sqlite3"
 chmod 0600 "${parent}/userdb.sqlite3"
 run_helper --authorized-delete-r01b-test-userdb >/dev/null
 assert_recovery_completed
+
+reset_fixture
+capture_baseline
+prepare_userdb_family
+drifted_device="$(($(stat -f '%d' "${parent}") + 1))"
+rewrite_receipt_devices "${drifted_device}" "${drifted_device}"
+run_helper --authorized-delete-r01b-test-userdb >/dev/null
+assert_recovery_completed
+
+reset_fixture
+capture_baseline
+prepare_userdb_family
+current_device="$(stat -f '%d' "${parent}")"
+drifted_device="$((current_device + 1))"
+rewrite_receipt_devices "${drifted_device}" "${current_device}"
+expect_failure run_helper --authorized-delete-r01b-test-userdb
+assert_failure_preserved_state
+
+reset_fixture
+capture_baseline
+prepare_userdb_family
+current_device="$(stat -f '%d' "${parent}")"
+drifted_device="$((current_device + 1))"
+rewrite_receipt_devices "${current_device}" "${drifted_device}"
+expect_failure run_helper --authorized-delete-r01b-test-userdb
+assert_failure_preserved_state
 
 reset_fixture
 capture_baseline
