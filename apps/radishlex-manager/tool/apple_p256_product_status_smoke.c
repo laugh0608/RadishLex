@@ -28,7 +28,7 @@ int main(void) {
   failed |= require_flag("can_sign", status.can_sign, 1u);
   failed |= require_flag("product_qualified", status.product_qualified, 0u);
   failed |= require_flag("user_sync_enabled", status.user_sync_enabled, 0u);
-  failed |= require_flag("exportable", status.exportable, 0u);
+  failed |= require_flag("exportable", status.exportable, 1u);
   failed |= require_flag("hardware_backed", status.hardware_backed, 0u);
   failed |= require_flag("user_presence_required",
                          status.user_presence_required, 0u);
@@ -37,6 +37,6 @@ int main(void) {
     return 1;
   }
 
-  puts("Apple P-256 product status is runtime-capable and product-gated");
+  puts("Apple P-256 software DPK runtime is available and product-gated");
   return 0;
 }

@@ -4,7 +4,9 @@ use std::sync::Mutex;
 
 use p256::ecdsa::Signature as P256Signature;
 
-use crate::model::{validate_non_empty_bytes, validate_required, CryptoError};
+use crate::model::{
+    validate_non_empty_bytes, validate_required, CryptoError, PrivateKeyAccessDeniedReason,
+};
 
 use super::{
     DevicePrivateKeyStoreStatus, DeviceSignature, DeviceSigningKeyHandle, DeviceSigningPublicKey,
@@ -113,10 +115,15 @@ mod platform {
     const ERR_SEC_SUCCESS: OSStatus = 0;
     const ERR_SEC_UNIMPLEMENTED: OSStatus = -4;
     const ERR_SEC_PARAM: OSStatus = -50;
+    const ERR_SEC_WR_PERM: OSStatus = -61;
+    const ERR_SEC_MISSING_ENTITLEMENT: OSStatus = -34018;
+    const ERR_SEC_RESTRICTED_API: OSStatus = -34020;
     const ERR_SEC_NOT_AVAILABLE: OSStatus = -25291;
+    const ERR_SEC_READ_ONLY: OSStatus = -25292;
     const ERR_SEC_AUTH_FAILED: OSStatus = -25293;
     const ERR_SEC_ITEM_NOT_FOUND: OSStatus = -25300;
     const ERR_SEC_INTERACTION_NOT_ALLOWED: OSStatus = -25308;
+    const ERR_SEC_INTERACTION_REQUIRED: OSStatus = -25315;
     const ERR_SEC_DECODE: OSStatus = -26275;
 
     #[link(name = "CoreFoundation", kind = "framework")]
@@ -175,6 +182,7 @@ mod platform {
         static kSecMatchLimitOne: CFStringRef;
         static kSecPrivateKeyAttrs: CFStringRef;
         static kSecReturnRef: CFStringRef;
+        static kSecUseDataProtectionKeychain: CFStringRef;
         static kSecKeyAlgorithmEdDSASignatureMessageCurve25519SHA512: CFStringRef;
         static kSecKeyAlgorithmECDSASignatureMessageX962SHA256: CFStringRef;
 
@@ -244,7 +252,7 @@ mod platform {
                 DevicePrivateKeyStoreStatus::apple_keychain_v1_compiled()
             }
             AppleKeychainProfile::P256V1 => {
-                DevicePrivateKeyStoreStatus::apple_keychain_p256_v1_runtime_capable()
+                DevicePrivateKeyStoreStatus::apple_keychain_p256_v1_runtime_available()
             }
         }
     }
@@ -343,6 +351,7 @@ mod platform {
                     .map(|status| map_status(store.profile(), &handle.signing_key_id, status))
                     .unwrap_or_else(|| CryptoError::PrivateKeyAccessDenied {
                         key_id: handle.signing_key_id.clone(),
+                        reason: PrivateKeyAccessDeniedReason::Unspecified,
                     })
             })?;
         let signature = normalize_signature(store.profile(), &cf_data_bytes(&signature_data)?)
@@ -413,27 +422,26 @@ mod platform {
         let label = cf_string(profile, store.label())?;
         let created_at = cf_string(profile, &created_at_ms.to_string())?;
         let key_size = cf_number_i32(profile, SIGNING_KEY_SIZE_BITS)?;
-        let private_attrs = cf_dictionary(
-            profile,
-            &[
-                (unsafe { kSecAttrIsPermanent }, unsafe { kCFBooleanTrue }),
-                (unsafe { kSecAttrIsExtractable }, unsafe { kCFBooleanFalse }),
-                (unsafe { kSecAttrAccessible }, unsafe {
-                    kSecAttrAccessibleWhenUnlockedThisDeviceOnly
-                }),
-                (unsafe { kSecAttrApplicationTag }, tag.as_type()),
-                (unsafe { kSecAttrLabel }, label.as_type()),
-                (unsafe { kSecAttrComment }, created_at.as_type()),
-            ],
-        )?;
-        let parameters = cf_dictionary(
-            profile,
-            &[
-                (unsafe { kSecAttrKeyType }, key_type(store.profile())),
-                (unsafe { kSecAttrKeySizeInBits }, key_size.as_type()),
-                (unsafe { kSecPrivateKeyAttrs }, private_attrs.as_type()),
-            ],
-        )?;
+        let mut private_entries = vec![
+            (unsafe { kSecAttrIsPermanent }, unsafe { kCFBooleanTrue }),
+            (unsafe { kSecAttrAccessible }, unsafe {
+                kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            }),
+            (unsafe { kSecAttrApplicationTag }, tag.as_type()),
+            (unsafe { kSecAttrLabel }, label.as_type()),
+        ];
+        if profile == AppleKeychainProfile::Ed25519V1 {
+            private_entries.push((unsafe { kSecAttrIsExtractable }, unsafe { kCFBooleanFalse }));
+            private_entries.push((unsafe { kSecAttrComment }, created_at.as_type()));
+        }
+        let private_attrs = cf_dictionary(profile, &private_entries)?;
+        let mut parameter_entries = vec![
+            (unsafe { kSecAttrKeyType }, key_type(store.profile())),
+            (unsafe { kSecAttrKeySizeInBits }, key_size.as_type()),
+            (unsafe { kSecPrivateKeyAttrs }, private_attrs.as_type()),
+        ];
+        add_data_protection_domain(profile, &mut parameter_entries);
+        let parameters = cf_dictionary(profile, &parameter_entries)?;
 
         let mut error = ptr::null();
         let private_key = unsafe { SecKeyCreateRandomKey(parameters.as_dictionary(), &mut error) };
@@ -510,19 +518,18 @@ mod platform {
     ) -> Result<CfOwned, CryptoError> {
         let profile = store.profile();
         let tag = cf_data(profile, &store.key_tag(signing_key_id))?;
-        cf_dictionary(
-            profile,
-            &[
-                (unsafe { kSecClass }, unsafe { kSecClassKey }),
-                (unsafe { kSecAttrKeyType }, key_type(store.profile())),
-                (unsafe { kSecAttrKeyClass }, unsafe {
-                    kSecAttrKeyClassPrivate
-                }),
-                (unsafe { kSecAttrApplicationTag }, tag.as_type()),
-                (unsafe { kSecReturnRef }, unsafe { kCFBooleanTrue }),
-                (unsafe { kSecMatchLimit }, unsafe { kSecMatchLimitOne }),
-            ],
-        )
+        let mut entries = vec![
+            (unsafe { kSecClass }, unsafe { kSecClassKey }),
+            (unsafe { kSecAttrKeyType }, key_type(store.profile())),
+            (unsafe { kSecAttrKeyClass }, unsafe {
+                kSecAttrKeyClassPrivate
+            }),
+            (unsafe { kSecAttrApplicationTag }, tag.as_type()),
+            (unsafe { kSecReturnRef }, unsafe { kCFBooleanTrue }),
+            (unsafe { kSecMatchLimit }, unsafe { kSecMatchLimitOne }),
+        ];
+        add_data_protection_domain(profile, &mut entries);
+        cf_dictionary(profile, &entries)
     }
 
     fn key_delete_query(
@@ -531,17 +538,28 @@ mod platform {
     ) -> Result<CfOwned, CryptoError> {
         let profile = store.profile();
         let tag = cf_data(profile, &store.key_tag(signing_key_id))?;
-        cf_dictionary(
-            profile,
-            &[
-                (unsafe { kSecClass }, unsafe { kSecClassKey }),
-                (unsafe { kSecAttrKeyType }, key_type(store.profile())),
-                (unsafe { kSecAttrKeyClass }, unsafe {
-                    kSecAttrKeyClassPrivate
-                }),
-                (unsafe { kSecAttrApplicationTag }, tag.as_type()),
-            ],
-        )
+        let mut entries = vec![
+            (unsafe { kSecClass }, unsafe { kSecClassKey }),
+            (unsafe { kSecAttrKeyType }, key_type(store.profile())),
+            (unsafe { kSecAttrKeyClass }, unsafe {
+                kSecAttrKeyClassPrivate
+            }),
+            (unsafe { kSecAttrApplicationTag }, tag.as_type()),
+            (unsafe { kSecMatchLimit }, unsafe { kSecMatchLimitOne }),
+        ];
+        add_data_protection_domain(profile, &mut entries);
+        cf_dictionary(profile, &entries)
+    }
+
+    fn add_data_protection_domain(
+        profile: AppleKeychainProfile,
+        entries: &mut Vec<(CFTypeRef, CFTypeRef)>,
+    ) {
+        if profile == AppleKeychainProfile::P256V1 {
+            entries.push((unsafe { kSecUseDataProtectionKeychain }, unsafe {
+                kCFBooleanTrue
+            }));
+        }
     }
 
     fn validate_apple_handle(
@@ -579,8 +597,28 @@ mod platform {
             ERR_SEC_INTERACTION_NOT_ALLOWED => CryptoError::PrivateKeyLocked {
                 key_id: signing_key_id.to_owned(),
             },
+            ERR_SEC_INTERACTION_REQUIRED => CryptoError::PrivateKeyUserPresenceRequired {
+                key_id: signing_key_id.to_owned(),
+            },
             ERR_SEC_AUTH_FAILED => CryptoError::PrivateKeyAccessDenied {
                 key_id: signing_key_id.to_owned(),
+                reason: PrivateKeyAccessDeniedReason::AuthenticationFailed,
+            },
+            ERR_SEC_WR_PERM => CryptoError::PrivateKeyAccessDenied {
+                key_id: signing_key_id.to_owned(),
+                reason: PrivateKeyAccessDeniedReason::WritePermission,
+            },
+            ERR_SEC_READ_ONLY => CryptoError::PrivateKeyAccessDenied {
+                key_id: signing_key_id.to_owned(),
+                reason: PrivateKeyAccessDeniedReason::ReadOnly,
+            },
+            ERR_SEC_MISSING_ENTITLEMENT => CryptoError::PrivateKeyAccessDenied {
+                key_id: signing_key_id.to_owned(),
+                reason: PrivateKeyAccessDeniedReason::MissingEntitlement,
+            },
+            ERR_SEC_RESTRICTED_API => CryptoError::PrivateKeyAccessDenied {
+                key_id: signing_key_id.to_owned(),
+                reason: PrivateKeyAccessDeniedReason::RestrictedApi,
             },
             ERR_SEC_DECODE => CryptoError::PrivateKeyCorrupted {
                 key_id: signing_key_id.to_owned(),
@@ -590,6 +628,7 @@ mod platform {
             },
             _ => CryptoError::PrivateKeyAccessDenied {
                 key_id: signing_key_id.to_owned(),
+                reason: PrivateKeyAccessDeniedReason::UnclassifiedPlatformStatus(status),
             },
         }
     }
@@ -706,6 +745,18 @@ mod platform {
             assert!(matches!(
                 map_status(profile, "synthetic-key", ERR_SEC_AUTH_FAILED),
                 CryptoError::PrivateKeyAccessDenied { .. }
+            ));
+            assert!(matches!(
+                map_status(profile, "synthetic-key", ERR_SEC_MISSING_ENTITLEMENT),
+                CryptoError::PrivateKeyAccessDenied { .. }
+            ));
+            assert!(matches!(
+                map_status(profile, "synthetic-key", ERR_SEC_RESTRICTED_API),
+                CryptoError::PrivateKeyAccessDenied { .. }
+            ));
+            assert!(matches!(
+                map_status(profile, "synthetic-key", ERR_SEC_INTERACTION_REQUIRED),
+                CryptoError::PrivateKeyUserPresenceRequired { .. }
             ));
             assert_eq!(
                 map_status(profile, "synthetic-key", ERR_SEC_NOT_AVAILABLE),

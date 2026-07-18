@@ -256,10 +256,11 @@ fn apple_keychain_p256_capabilities_declare_profile_but_keep_production_closed()
         capabilities.storage_backend,
         DeviceSigningStorageBackend::AppleKeychainP256V1
     );
-    assert!(!capabilities.exportable);
+    assert!(capabilities.exportable);
     assert!(!capabilities.hardware_backed);
     assert!(!capabilities.user_presence_required);
     assert!(!capabilities.backup_migratable);
+    assert!(!capabilities.allows_production_signing());
 
     let status = DevicePrivateKeyStoreStatus::apple_keychain_p256_v1();
     status.validate().expect("apple P-256 status");
@@ -359,7 +360,7 @@ fn apple_keychain_store_status_blocks_production_until_platform_strategy_is_reso
 
 #[cfg(feature = "apple-keychain")]
 #[test]
-fn apple_keychain_p256_store_status_separates_runtime_capability_from_product_qualification() {
+fn apple_keychain_p256_store_status_reports_software_dpk_runtime_without_product_qualification() {
     let store = AppleKeychainP256DeviceKeyStore::new();
     let status = store.backend_status();
     status.validate().expect("apple P-256 store status");
@@ -372,22 +373,26 @@ fn apple_keychain_p256_store_status_separates_runtime_capability_from_product_qu
     assert_eq!(status.can_create_signing_keys, cfg!(target_os = "macos"));
     assert_eq!(status.can_sign, cfg!(target_os = "macos"));
     assert!(!status.product_qualified);
-    let expected_error = if cfg!(target_os = "macos") {
-        CryptoError::BackendCapabilityMismatch {
-            backend: DEVICE_KEY_STORE_APPLE_KEYCHAIN_P256_V1.to_owned(),
-            message: "backend has runtime capability but is not product-qualified".to_owned(),
-        }
+    assert!(status.capabilities.exportable);
+    let error = status
+        .ensure_production_signing_allowed()
+        .expect_err("exportable software DPK key is not eligible for production signing");
+    if cfg!(target_os = "macos") {
+        assert_eq!(
+            error,
+            CryptoError::BackendCapabilityMismatch {
+                backend: DEVICE_KEY_STORE_APPLE_KEYCHAIN_P256_V1.to_owned(),
+                message: "backend is not eligible for production signing".to_owned(),
+            }
+        );
     } else {
-        CryptoError::StorageBackendUnavailable {
-            backend: DEVICE_KEY_STORE_APPLE_KEYCHAIN_P256_V1.to_owned(),
-        }
-    };
-    assert_eq!(
-        status
-            .ensure_production_signing_allowed()
-            .expect_err("runtime capability is not product qualification"),
-        expected_error
-    );
+        assert_eq!(
+            error,
+            CryptoError::StorageBackendUnavailable {
+                backend: DEVICE_KEY_STORE_APPLE_KEYCHAIN_P256_V1.to_owned(),
+            }
+        );
+    }
     let debug = format!("{store:?}");
     assert!(debug.contains(DEVICE_KEY_STORE_APPLE_KEYCHAIN_P256_V1));
     assert!(debug.contains(SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1));

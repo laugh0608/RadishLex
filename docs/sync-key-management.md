@@ -33,7 +33,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进真实设备配对成功路径；M1/M2 平台输入与本地 manager 可独立推进，但不得调用真实同步或把平台签名 backend 标记为生产可用。
 
-进入用户可用同步前，应按生产部署 runbook 补发布级目标部署运行证据。`apple-keychain-p256-v1` 已通过命令行和 manager Release 产品进程正常生命周期 smoke；当前 target 的编译与运行时能力字段可如实报告 true，但 locked/denied 失败矩阵与最终评审未完成，故 `product_qualified=false`。该 backend 的产品资格和用户同步 gate 都没有解除，也不能宣称 Secure Enclave 或 hardware-backed。既有 Apple/Android Ed25519 失败结论继续有效；无新增 Android 真机或不同 system image 时，不把真机矩阵作为硬阻塞。access token 已有首个 server / transport 证据，但可用平台私钥 backend 停止线解除前，不开放用户可用同步主线。
+进入用户可用同步前，应按生产部署 runbook 补发布级目标部署运行证据。`apple-keychain-p256-v1` 已完成 DPK repository/manager native 接线、ad-hoc denied 与 provisioning-backed 产品生命周期；当前 `compiled/available/can_create/can_sign=true`，但普通 DPK 软件 key 必须声明 `exportable=true`，因此 `product_qualified` 和用户同步 gate 保持 false，也不能宣称 Secure Enclave 或 hardware-backed。下一主批先实现独立 Secure Enclave backend，不提前开放 orchestration。既有 Apple/Android Ed25519 失败结论继续有效；无新增 Android 真机或不同 system image 时，不把真机矩阵作为硬阻塞。
 
 ## 设计目标
 
@@ -271,7 +271,7 @@ updated_at_ms
 10. 已按 ADR 落地签名 / 设备密钥存储 Rust 模型，当前使用合成 `test-memory-v1` key store，并补 platform backend capability metadata、unavailable backend 明确失败和 revoked key 阻断测试。
 11. 已补 `apple-keychain-v1` 平台 runbook 和 Apple 签名策略 ADR，固定 Apple Keychain 创建、加载、签名、删除、锁屏 / 权限、备份迁移、日志脱敏和策略停止线；macOS backend 已在 `apple-keychain` feature 下接线，默认测试不访问系统 Keychain，真实 smoke 已运行但阻塞于 `ed25519-v1` 创建，backend status 已阻断生产签名。
 12. 已补 `android-keystore-v1` 平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、raw JNI glue、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin bridge source、Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，固定 Android Keystore Ed25519 创建 / 加载 / 签名 / 删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
-13. 已补 ADR 0006、Rust/Go 算法分派、显式 `signing_algorithm` metadata/migration、共享跨语言 vectors 和独立 `apple-keychain-p256-v1`；普通测试不访问 Keychain，命令行与 manager Release 产品进程正常生命周期 gated smoke 已通过，manager Release native 接线和只读 status smoke 已通过。`product_qualified` 在 locked/denied 和最终评审完成前保持 false。
+13. 已补 ADR 0006、Rust/Go 算法分派、显式 `signing_algorithm` metadata/migration、共享跨语言 vectors 和独立 `apple-keychain-p256-v1`；普通测试不访问 Keychain，manager Release native 接线、严格 DPK 选择、固定错误/OSStatus、五场景 gated smoke、ad-hoc denied 与合格产品生命周期均有证据。评审结论为软件运行时可用、`exportable=true`、产品资格拒绝。
 14. 已补真实 userdb P2 payload 解析到 merge input 的接线。
 15. 已补客户端合并结果写回真实 userdb 的执行器。
 16. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
@@ -304,7 +304,7 @@ updated_at_ms
 ## 停止线
 
 - 恢复码 KDF 算法、参数、格式、Rust model 和生产恢复流程设计已落地；服务端恢复记录 API 与管理 UI 未实现前，不提供用户可用恢复入口。
-- 设备签名模型、两个签名 profile、跨语言 verifier/vectors、私钥存储抽象、平台 capability、Apple/Android runbook 与 feature-gated backend 已落地；`apple-keychain-p256-v1` 已通过命令行和 manager Release 产品进程正常生命周期，但 `product_qualified=false`。locked/denied、最终评审与既有 Android/Apple Ed25519 阻塞尚未解除，运行时 capability 不得被用来开放用户可用远端对象上传下载。
+- 设备签名模型、两个签名 profile、跨语言 verifier/vectors、私钥存储抽象、平台 capability、Apple/Android runbook 与 feature-gated backend 已落地；`apple-keychain-p256-v1` 的 DPK 软件运行时已验证，但可导出属性使其不能用于生产同步。Secure Enclave 独立 backend、既有 Android/Apple Ed25519 阻塞与后续全链仍未解除，运行时 capability 不得被用来开放用户可用远端对象上传下载。
 - 服务端若回退到只保存 wrapping metadata 而不能保存 / 返回 wrapped key bytes，则不得开放真实设备授权 handler。
 - Go server 与 Rust HTTP transport 继续推进时，必须先满足 `docs/sync-server-api-storage.md` 的签名、metadata API、版本冲突、错误语义和脱敏验证。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。

@@ -1,11 +1,46 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "${1:-}" != "--authorized-product-keychain-smoke" ] || [ "$#" -ne 1 ]; then
-  echo "usage: $0 --authorized-product-keychain-smoke" >&2
-  echo "This launches the manager product process and touches the local macOS Keychain." >&2
+usage() {
+  echo "usage: $0 AUTHORIZED_SCENARIO" >&2
+  echo "AUTHORIZED_SCENARIO must be exactly one of:" >&2
+  echo "  --authorized-product-keychain-smoke" >&2
+  echo "  --authorized-product-keychain-denied-probe" >&2
+  echo "  --authorized-product-keychain-locked-prepare" >&2
+  echo "  --authorized-product-keychain-locked-probe" >&2
+  echo "  --authorized-product-keychain-locked-cleanup" >&2
+}
+
+if [ "$#" -ne 1 ]; then
+  usage
   exit 2
 fi
+
+case "$1" in
+  --authorized-product-keychain-smoke)
+    product_argument="--radishlex-apple-p256-product-smoke"
+    ;;
+  --authorized-product-keychain-denied-probe)
+    product_argument="--radishlex-apple-p256-denied-probe"
+    ;;
+  --authorized-product-keychain-locked-prepare)
+    product_argument="--radishlex-apple-p256-locked-prepare"
+    echo "The prepare scenario leaves one synthetic Data Protection Keychain item for the locked probe." >&2
+    ;;
+  --authorized-product-keychain-locked-probe)
+    product_argument="--radishlex-apple-p256-locked-probe"
+    ;;
+  --authorized-product-keychain-locked-cleanup)
+    product_argument="--radishlex-apple-p256-locked-cleanup"
+    ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac
+
+echo "This launches the manager product process and touches the local macOS Keychain." >&2
+echo "The script does not lock, unlock, or reconfigure any Keychain." >&2
 
 if [ "$(uname -s)" != "Darwin" ]; then
   echo "manager Apple P-256 product smoke requires macOS." >&2
@@ -41,4 +76,4 @@ done
 exec env \
   RADISHLEX_RUN_MANAGER_APPLE_KEYCHAIN_P256_SMOKE=1 \
   RADISHLEX_MANAGER_APPLE_P256_GO_SERVER_DIR="${go_server_dir}" \
-  "${product_binary}" --radishlex-apple-p256-product-smoke
+  "${product_binary}" "${product_argument}"

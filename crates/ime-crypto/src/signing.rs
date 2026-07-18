@@ -359,7 +359,7 @@ impl DeviceSigningBackendCapabilities {
     pub fn apple_keychain_p256_v1() -> Self {
         Self {
             storage_backend: DeviceSigningStorageBackend::AppleKeychainP256V1,
-            exportable: false,
+            exportable: true,
             hardware_backed: false,
             user_presence_required: false,
             backup_migratable: false,
@@ -478,13 +478,19 @@ impl DevicePrivateKeyStoreStatus {
         }
     }
 
-    pub fn apple_keychain_p256_v1_runtime_capable() -> Self {
+    pub fn apple_keychain_p256_v1_compiled() -> Self {
+        Self {
+            compiled: true,
+            ..Self::apple_keychain_p256_v1()
+        }
+    }
+
+    pub fn apple_keychain_p256_v1_runtime_available() -> Self {
         Self {
             compiled: true,
             available: true,
             can_create_signing_keys: true,
             can_sign: true,
-            product_qualified: false,
             ..Self::apple_keychain_p256_v1()
         }
     }

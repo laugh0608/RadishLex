@@ -58,10 +58,11 @@ pub unsafe extern "C" fn radishlex_apple_p256_product_status(
 /// `go_server_dir` must be null or point to a NUL-terminated UTF-8 string;
 /// `summary_out` must be writable.
 pub unsafe extern "C" fn radishlex_apple_p256_product_smoke(
+    scenario: u32,
     go_server_dir: *const c_char,
     summary_out: *mut RadishLexAppleP256ProductSmokeSummary,
 ) -> u32 {
-    unsafe { run_product_smoke(go_server_dir, summary_out) }
+    unsafe { run_product_smoke(scenario, go_server_dir, summary_out) }
 }
 
 #[no_mangle]

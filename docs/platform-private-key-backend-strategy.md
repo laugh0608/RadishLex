@@ -9,11 +9,11 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 - `test-memory-v1` 只用于测试和 fixture，不能进入生产同步。
 - `unavailable` 是默认失败 backend，不允许静默回退。
 - `apple-keychain-v1` 已接线并运行真实 smoke，但阻塞于 `UnsupportedSignatureAlgorithm { algorithm: "ed25519-v1" }`。
-- `apple-keychain-p256-v1` 已接入 manager Release native library；普通 feature 测试覆盖 DER/P1363、结构化错误映射与 gate 语义。命令行和 manager Release bundle 进程 gated smoke 均已通过创建、重载、签名、Rust/Go 验签、删除/撤销、fresh missing 与 cleanup。locked/denied 尚未取得真实证据，最终资格评审未完成，因此 `product_qualified=false`，仍不可用于生产同步。
+- `apple-keychain-p256-v1` 已接入 manager Release native library 并完成 DPK 产品生命周期。普通 DPK 软件 P-256 key 可由平台 API 导出，当前如实声明 `exportable=true`；运行时可创建、重载和签名，但不符合生产 backend 的不可导出条件，`product_qualified=false`。
 - `android-keystore-v1` 已有 Kotlin / Gradle harness、JNI glue、gated smoke 和 provider diagnostics；Pixel 9 Pro API 35 AVD 与 Pixel 10 Pro API 37 AVD 均返回 `unsupported_signature_algorithm`。
 - `windows-cng-v1`、`linux-secret-service-v1` 仍只是能力边界标识，未进入实现。
 
-没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。M3 第一批已经取得 Apple P-256 命令行与 manager Release bundle 进程证据，当前转入 locked/denied 受控失败矩阵和最终产品资格评审；正常生命周期 smoke 通过不能自动改变 production status。发布级目标部署运行证据保留为正式发布前门禁。
+没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。M3 第一批已经完成普通 DPK P-256 的产品能力评审，结论是“软件运行时可用、生产资格拒绝”，不是继续堆叠 locked 证据后即可转正。下一主批进入 Secure Enclave P-256 独立 backend 设计与验证；发布级目标部署运行证据保留为正式发布前门禁。
 
 ## 策略目标
 
@@ -30,7 +30,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 | `test-memory-v1` | 测试可用，生产禁止 | Rust 单元测试、integration test 和签名对象 fixture 已覆盖 | 继续只用于测试，不进入 UI / 生产配置 |
 | `unavailable` | 默认明确失败 | Rust capability / status / error 测试已覆盖 | 继续作为能力缺失时的失败路径 |
 | `apple-keychain-v1` | 生产不可用 | feature-gated backend 编译通过，真实 smoke 在 Ed25519 创建阶段失败 | 单独补 Apple 原生非导出 Ed25519 支持矩阵，或另起 backend / 算法 ADR |
-| `apple-keychain-p256-v1` | 正常产品进程生命周期通过，产品资格关闭 | arm64 macOS 26.5.2（25F84）命令行和 manager Release bundle 进程均完成真实生命周期；status 为 `compiled/runtime_available/can_create/can_sign=true` | 另行授权验证 locked/denied并完成资格评审；不推断硬件保护 |
+| `apple-keychain-p256-v1` | DPK 软件运行时可用，生产资格拒绝 | provisioning-backed manager 产品进程已完成创建、重载、签名、Rust/Go 验签、删除、missing 和 cleanup；capability 为 `exportable=true` | 保留为软件保护证据与失败关闭实现，不接真实同步；另建 Secure Enclave backend |
 | `android-keystore-v1` | 生产不可用 | Android target build、Gradle harness、API 35 / API 37 AVD diagnostics 和 smoke 记录 | 有新 Android 真机 / OEM / system image 时先跑 diagnostics，再按结果决定 smoke |
 | `windows-cng-v1` | 未实现 | 仅有 ADR 0004 backend id | 进入 Windows 主线前补 CNG 签名能力 spike / runbook |
 | `linux-secret-service-v1` | 未实现 | 仅有 ADR 0004 backend id | 进入 Linux 同步主线前补 Secret Service / 软件保护能力边界 |
@@ -50,7 +50,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 ## 四层状态与门禁
 
 - 编译可用：当前 target 是否把平台 backend 编入实际产物。它只证明符号和平台依赖存在，不访问 Keychain，也不证明 API 在产品进程中成功。
-- 运行时能力：`available`、`can_create_signing_keys`、`can_sign` 表达当前实现和已验证平台 API 能力，不等于生产资格。`apple-keychain-p256-v1` 在 macOS feature build 中现如实报告 true；其他 target、未启用 feature 或 Ed25519 阻塞路径继续失败关闭。
+- 运行时能力：`available`、`can_create_signing_keys`、`can_sign` 表达当前实现和已验证 storage domain/host identity 能力，不等于生产资格。`apple-keychain-p256-v1` 的 DPK 产品生命周期已支持这些字段为 true，但 `exportable=true` 使其不能进入生产签名。
 - 产品资格：`product_qualified` 只由真实产品 bundle 进程证据和评审改变。repository test、命令行 gated smoke、bundle symbol/status smoke 都不能单独把它改为 true。
 - 真实同步 gate：对象 orchestration、设备授权、恢复、撤销、key epoch、部署和 manager Rust bridge 全链满足前继续为 false。backend 产品资格即使通过，也不能自动开放用户同步。
 
@@ -73,7 +73,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 
 硬件保护、user presence 和备份迁移能力需要单独证明。基础签名 smoke 通过不等于 `hardware_backed = true`，也不等于可以把同步开放给真实用户。
 
-截至 2026-07-18，`apple-keychain-p256-v1` 已满足命令行和 manager Release bundle 进程的创建、重载、签名、跨语言验签、删除/撤销、missing、失败关闭和 cleanup。当前 status 开放证据支持的编译与运行时字段；locked/denied 与最终评审未完成，故 `product_qualified=false`。本次结果关闭了正常产品进程访问问题，不是完整生产 backend 合格评审。
+截至 2026-07-18，`apple-keychain-p256-v1` 已在 application identifier、默认 Keychain access group 与 provisioning profile 一致的 manager 产品进程中完成 DPK 生命周期。评审确认标准 DPK 软件私钥可导出，因此该 backend 只开放编译和运行时字段，产品资格与真实同步保持关闭；继续补 locked 不能改变不可导出条件不满足的结论。
 
 ## 可选后续路径
 
@@ -92,7 +92,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 
 ### 路径 B：新增签名算法 Profile
 
-当前状态：ADR 0006、仓库实现与 `apple-keychain-p256-v1` 基础生命周期 gated smoke 已完成；production status、产品进程访问和 locked/denied 仍在门禁内。以下条目继续作为后续新增 profile 的通用进入条件。
+当前状态：ADR 0006、跨语言协议、普通 DPK 软件 backend 与产品评审已完成。P-256 协议本身可复用；Secure Enclave 必须使用独立 backend id、handle/capability 与产品证据，不能把普通 DPK key 原地升级成硬件 key。以下条目继续作为后续新增 profile 或 backend 的通用进入条件。
 
 适用条件：
 
@@ -152,16 +152,16 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 - 不把服务端 bearer token、OIDC token、恢复码或账号密码当作设备签名替代品。
 - 不让 Go server 根据管理 token 直接创建、替换或伪造设备签名。
 
-## M3 第一批推进项
+## M3 推进项
 
 在只有当前 Mac 设备、没有额外 Android 真机时，按以下顺序推进：
 
 1. 已完成 ADR 0006、算法无关 Rust/Go verifier、显式 Go metadata migration 与共享跨语言负向 vectors；`ed25519-v1` 保持兼容。
 2. 已完成独立 `apple-keychain-p256-v1` repository spike 与双层门禁；普通测试不访问系统 Keychain。
-3. 已经单独授权并通过 gated macOS smoke，覆盖创建、重载、签名、Rust/Go 验签、删除后 missing 和 cleanup；locked/denied 真实矩阵仍需要另有受控条件。
-4. 已完成 capability 字段语义评审和 manager Release native 接线：编译/运行时字段如实开放，`product_qualified` 与用户同步 gate 继续关闭；基础签名成功不能自动宣称 Secure Enclave、hardware-backed、user presence 或 backup-migratable。
-5. 已在单独授权后通过产品进程 smoke：native 内完成创建、重载、签名、Rust/Go 验签、删除、missing、失败关闭、cleanup 和固定摘要。Dart 不绑定该 ABI，InputMethodKit 不接入同步密钥职责。
-6. 只有 production backend 评审和产品环境 smoke 通过后，才进入真实产品 sync orchestration 与 `ManagerBridge` 命令；恢复码、设备授权、撤销和用户同步入口继续关闭到 M3 全部退出证据成立。
+3. 已在独立授权后完成 ad-hoc denied 与 provisioning-backed manager 产品 DPK 生命周期；native 内完成创建、重载、签名、Rust/Go 验签、删除、missing、失败关闭、cleanup 和固定摘要。Dart 不绑定该 ABI，InputMethodKit 不接入同步密钥职责。
+4. 已完成 capability 评审：普通 DPK P-256 key 标记 `exportable=true`，编译/运行时字段如实开放，`product_qualified` 与用户同步 gate 关闭；Secure Enclave、hardware-backed、user presence 和 backup migration 均没有从基础签名成功推导。
+5. 下一主批先补 Secure Enclave 独立 backend ADR/runbook，再沿 crypto、FFI、manager native、产品环境证据推进；unsupported 设备必须失败关闭，不能回退普通 DPK 或 test memory。
+6. 只有不可导出 production backend 评审和产品环境 smoke 通过后，才进入真实产品 sync orchestration 与 `ManagerBridge` 命令；恢复码、设备授权、撤销和用户同步入口继续关闭到 M3 全部退出证据成立。
 
 ## 验证口径
 

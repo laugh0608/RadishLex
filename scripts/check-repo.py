@@ -61,6 +61,7 @@ REQUIRED_FILES = [
     "scripts/check-manager-product.sh",
     "scripts/check-manager.sh",
     "scripts/build-manager-macos-product.sh",
+    "scripts/build-manager-macos-dpk-qualified-product.sh",
     "scripts/embed-manager-native-library.sh",
     "scripts/check-macos-imk.sh",
     "scripts/check-macos-imk-native.sh",
@@ -83,6 +84,7 @@ REQUIRED_FILES = [
     "apps/radishlex-manager/lib/src/bridge/manager_platform_control.dart",
     "apps/radishlex-manager/lib/src/bridge/method_channel_manager_platform_control.dart",
     "apps/radishlex-manager/macos/Runner/MainFlutterWindow.swift",
+    "apps/radishlex-manager/macos/Runner/DPKQualification.entitlements",
     "apps/radishlex-manager/tool/ffi_bridge_smoke.dart",
     "apps/radishlex-manager/test/widget_test.dart",
 ]

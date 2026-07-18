@@ -56,7 +56,7 @@ RadishLexError*
 
 ### FFI contract
 
-`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v5 保留 v4 的产品个人化 Rime session、版本化学习上下文、display/engine index 映射、个人化状态和学习结果，并在 `RadishLexUserTermView` 末尾增加可选的本地 `import_batch_id`，供 manager 精确关联导入审计；该字段不进入同步 payload。产品绑定必须同时校验 contract 与所需 symbol 集。当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。`radishlex_apple_p256_product_status` 与 `radishlex_apple_p256_product_smoke` 使用独立 validation schema v1，不改变 ABI contract v5；前者只读报告 target 编译、运行时能力、产品资格、用户同步 gate 和保守保护属性，后者只有 manager 产品进程显式参数与环境门同时满足才执行合成 Keychain 生命周期。两者都不返回 private/public key、canonical bytes 或 signature bytes；Dart dynamic binding 和 Flutter method channel 不得声明这些 symbol。
+`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v5 保留 v4 的产品个人化 Rime session、版本化学习上下文、display/engine index 映射、个人化状态和学习结果，并在 `RadishLexUserTermView` 末尾增加可选的本地 `import_batch_id`，供 manager 精确关联导入审计；该字段不进入同步 payload。产品绑定必须同时校验 contract 与所需 symbol 集。当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。`radishlex_apple_p256_product_status` 使用独立 validation status schema v1，`radishlex_apple_p256_product_smoke` 使用 smoke schema v4，均不改变 ABI contract v5；前者只读报告 target 编译、运行时能力、产品资格、用户同步 gate 和保护属性，后者只有 manager 产品进程显式场景与环境门同时满足才执行 DPK 生命周期或失败矩阵。v4 只新增固定错误细分和数值 OSStatus，不返回 CFError 文本、private/public key、canonical bytes 或 signature bytes；Dart dynamic binding 和 Flutter method channel 不得声明这些 symbol。
 
 ### Status 与文本 view
 

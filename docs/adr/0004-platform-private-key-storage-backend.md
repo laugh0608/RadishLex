@@ -8,7 +8,7 @@ Accepted
 
 ## 背景
 
-`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名对象、canonical bytes、Ed25519 签名模型、`DevicePrivateKeyStore` 抽象和错误语义。ADR 0006 后续接受 P-256 生产候选 profile 与独立 `apple-keychain-p256-v1`，不改写 ADR 0005 对既有 Ed25519 backend 的失败结论。当前 Rust 实现已提供合成 `test-memory-v1`、`unavailable`、两个 Apple backend 的 capability/status、算法绑定和生产门禁；P-256 命令行与 manager Release 产品进程正常生命周期 smoke 已完成，locked/denied 失败矩阵仍未执行。Android Ed25519 证据仍为已测 AVD 返回 `unsupported_signature_algorithm`，不解除生产签名门禁。
+`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名对象、canonical bytes、Ed25519 签名模型、`DevicePrivateKeyStore` 抽象和错误语义。ADR 0006 后续接受 P-256 生产候选 profile 与独立 `apple-keychain-p256-v1`，不改写 ADR 0005 对既有 Ed25519 backend 的失败结论。当前 Rust 实现已提供合成 `test-memory-v1`、`unavailable`、两个 Apple backend 的 capability/status、算法绑定和生产门禁；普通 DPK P-256 已通过 manager 产品进程生命周期，但评审确认软件 key 可导出，故只开放运行时能力，生产资格拒绝。Android Ed25519 证据仍为已测 AVD 返回 `unsupported_signature_algorithm`，不解除生产签名门禁。
 
 进入真实同步前，还需要明确生产私钥如何落到系统安全存储。否则后续平台壳、Flutter manager 或 FFI 可能为了接线方便直接持有私钥 bytes，破坏设备身份和撤销边界。
 
@@ -103,10 +103,14 @@ DevicePrivateKeyStore
 边界：
 
 - 私钥创建、加载和签名由 Apple 平台 backend 负责。
+- macOS `apple-keychain-p256-v1` 必须在创建、查询和删除中一致指定 `kSecUseDataProtectionKeychain=true`；不得让 `SecItem` 默认落到 legacy file-based keychain，也不得在 data protection keychain 失败时跨域查询或迁回 legacy keychain。普通 DPK key 只使用该 item class 支持的属性，不得依赖 legacy shim 忽略 `kSecAttrComment` 或 `kSecAttrIsExtractable`。
+- `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` 只有在 data protection keychain 中才作为本 backend 的正式可访问性声明。host process 的 code signing identity、application identifier、provisioning profile 和 Keychain access group 属于产品资格证据；ad-hoc bundle 只能用于编译和拒绝路径验证。
 - P-256 public key 使用 65-byte SEC1 uncompressed point，Apple DER signature 只能在 backend 内转换为 64-byte P1363；完整规则由 ADR 0006 固定。
 - Rust core 不直接调用 Objective-C / Swift API。
 - 平台 bridge 只把签名结果、公钥和 handle metadata 传回 Rust。
 - 是否使用 Secure Enclave、是否要求 user presence、是否允许 iCloud Keychain 迁移，需要后续平台 spike 固定；未验证前不得在文档或 UI 中承诺硬件保护。
+
+本次 storage domain 修正发生在真实用户同步关闭且既有 smoke key 已删除的阶段，不存在生产设备 key 迁移。未来若已有用户设备 key，storage domain、application identifier 或 access group 变化必须使用新 backend/version 或专门迁移 ADR，不能静默把 missing 当作新建身份。
 
 ### Android
 
@@ -213,7 +217,7 @@ DevicePrivateKeyStore
 6. 已补 ADR 0005，固定 Apple 平台签名策略：保持 `ed25519-v1` 协议，`apple-keychain-v1` 不做 seed 存储 fallback，status 在 smoke 通过前阻断生产签名。
 7. 已补 `android-keystore-v1` 平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、raw JNI glue、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin / Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，固定 Android Keystore Ed25519 创建 / 加载 / 签名 / 删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
 8. 已补平台私钥 backend 策略，固定无新增设备时不把真机矩阵作为硬阻塞，并明确保留 `ed25519-v1`、禁止现有 backend 内 fallback、生产 backend 合格条件和可选后续 ADR 路径。
-9. 已补 ADR 0006、算法无关 Rust/Go verifier、共享 vectors、历史 Go metadata migration 与独立 `apple-keychain-p256-v1`；命令行与 manager Release 产品进程正常生命周期 gated smoke 已通过。native library 已接入 feature 与 validation ABI，status 如实报告编译/运行时能力，但 `product_qualified` 在 locked/denied 和最终评审完成前继续失败关闭。
+9. 已补 ADR 0006、算法无关 Rust/Go verifier、共享 vectors、历史 Go metadata migration 与独立 `apple-keychain-p256-v1`；修正后的 DPK manager 产品生命周期通过，运行时字段开放。普通软件 DPK key 因 `exportable=true` 被生产门禁拒绝；下一主批需为 Secure Enclave 补独立 backend ADR/runbook 和产品证据。
 10. 其他平台仍需先补 backend spike / runbook，再接具体平台 SDK。
 11. 平台 backend 通过后，再允许真实远端对象上传下载使用生产签名。
 12. 最后才把管理 UI 的设备与恢复页面接入生产 backend。

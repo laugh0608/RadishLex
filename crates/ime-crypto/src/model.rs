@@ -667,6 +667,17 @@ struct NonceUse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PrivateKeyAccessDeniedReason {
+    Unspecified,
+    AuthenticationFailed,
+    WritePermission,
+    ReadOnly,
+    MissingEntitlement,
+    RestrictedApi,
+    UnclassifiedPlatformStatus(i32),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CryptoError {
     InvalidField {
         field: &'static str,
@@ -713,6 +724,7 @@ pub enum CryptoError {
     },
     PrivateKeyAccessDenied {
         key_id: String,
+        reason: PrivateKeyAccessDeniedReason,
     },
     PrivateKeyUserPresenceRequired {
         key_id: String,
@@ -782,7 +794,7 @@ impl fmt::Display for CryptoError {
             Self::PrivateKeyLocked { key_id } => {
                 write!(f, "private key locked: {key_id}")
             }
-            Self::PrivateKeyAccessDenied { key_id } => {
+            Self::PrivateKeyAccessDenied { key_id, .. } => {
                 write!(f, "private key access denied: {key_id}")
             }
             Self::PrivateKeyUserPresenceRequired { key_id } => {

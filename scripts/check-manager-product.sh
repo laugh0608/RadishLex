@@ -16,6 +16,8 @@ manager_window="${manager_dir}/macos/Runner/MainFlutterWindow.swift"
 apple_status_smoke="${manager_dir}/tool/apple_p256_product_status_smoke.c"
 apple_status_smoke_binary="${smoke_dir}/apple-p256-product-status-smoke"
 apple_product_smoke="${repo_root}/scripts/run-manager-apple-keychain-p256-product-smoke.sh"
+apple_qualified_build="${repo_root}/scripts/build-manager-macos-dpk-qualified-product.sh"
+apple_qualified_entitlements="${manager_dir}/macos/Runner/DPKQualification.entitlements"
 manager_app_delegate="${manager_dir}/macos/Runner/AppDelegate.swift"
 
 cleanup() {
@@ -29,11 +31,42 @@ if [ "$(uname -s)" != "Darwin" ]; then
 fi
 
 bash -n "${m2_cleanup}" "${m2_cleanup_wrapper}" "${apple_product_smoke}" \
+  "${apple_qualified_build}" \
   "${m2_cleanup_helper_contract}" "${m2_cleanup_orchestration_contract}"
-rg -Fq '"${1:-}" != "--authorized-product-keychain-smoke"' "${apple_product_smoke}"
+rg -Fq '"${1:-}" != "--authorized-apple-development-provisioning-build"' \
+  "${apple_qualified_build}"
+rg -Fq -- '-allowProvisioningUpdates' "${apple_qualified_build}"
+rg -Fq 'embedded.provisionprofile' "${apple_qualified_build}"
+rg -Fq 'com.apple.application-identifier' "${apple_qualified_build}"
+rg -Fq 'CODE_SIGN_ENTITLEMENTS="Runner/DPKQualification.entitlements"' \
+  "${apple_qualified_build}"
+plutil -lint "${apple_qualified_entitlements}" >/dev/null
+rg -Fq '<key>keychain-access-groups</key>' "${apple_qualified_entitlements}"
+rg -Fq '$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)' \
+  "${apple_qualified_entitlements}"
 rg -Fq 'RADISHLEX_RUN_MANAGER_APPLE_KEYCHAIN_P256_SMOKE=1' "${apple_product_smoke}"
-rg -Fq -- '--radishlex-apple-p256-product-smoke' "${apple_product_smoke}" "${manager_app_delegate}"
+for authorization_argument in \
+  --authorized-product-keychain-smoke \
+  --authorized-product-keychain-denied-probe \
+  --authorized-product-keychain-locked-prepare \
+  --authorized-product-keychain-locked-probe \
+  --authorized-product-keychain-locked-cleanup; do
+  rg -Fq -- "${authorization_argument}" "${apple_product_smoke}"
+done
+for product_argument in \
+  --radishlex-apple-p256-product-smoke \
+  --radishlex-apple-p256-denied-probe \
+  --radishlex-apple-p256-locked-prepare \
+  --radishlex-apple-p256-locked-probe \
+  --radishlex-apple-p256-locked-cleanup; do
+  rg -Fq -- "${product_argument}" "${apple_product_smoke}" "${manager_app_delegate}"
+done
 rg -Fq 'RADISHLEX_RUN_MANAGER_APPLE_KEYCHAIN_P256_SMOKE' "${manager_app_delegate}"
+if rg -n 'security[[:space:]]+(lock|unlock)-keychain|security[[:space:]]+list-keychains' \
+  "${apple_product_smoke}" "${apple_qualified_build}"; then
+  echo "Apple P-256 product smoke must not change Keychain lock or search-list state." >&2
+  exit 1
+fi
 rg -Fq '"${1}" != "--authorized-delete-m2-manager-test-data"' \
   "${m2_cleanup_wrapper}"
 rg -Fxq 'exec "${repo_root}/platforms/macos-imk/cleanup-m2-manager-test-data.sh" "$1"' \

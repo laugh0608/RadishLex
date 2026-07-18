@@ -26,7 +26,7 @@ fn rust_input_abi_layout_matches_the_checked_header_contract() {
     );
     assert_eq!(
         size_of::<RadishLexAppleP256ProductSmokeSummary>(),
-        20 * size_of::<u32>()
+        26 * size_of::<u32>()
     );
 
     let _: unsafe extern "C" fn(
@@ -51,6 +51,7 @@ fn rust_input_abi_layout_matches_the_checked_header_contract() {
     let _: unsafe extern "C" fn(*mut RadishLexAppleP256ProductStatus) -> u32 =
         radishlex_apple_p256_product_status;
     let _: unsafe extern "C" fn(
+        u32,
         *const std::os::raw::c_char,
         *mut RadishLexAppleP256ProductSmokeSummary,
     ) -> u32 = radishlex_apple_p256_product_smoke;
@@ -124,7 +125,7 @@ _Static_assert(sizeof(RadishLexFfiContract) == 3u * sizeof(uint32_t), "contract 
 _Static_assert(sizeof(RadishLexSessionOptions) == 2u * sizeof(uint32_t), "session options layout mismatch");
 _Static_assert(sizeof(RadishLexKeyEvent) == 5u * sizeof(uint32_t), "key event layout mismatch");
 _Static_assert(sizeof(RadishLexAppleP256ProductStatus) == 11u * sizeof(uint32_t), "Apple P-256 status layout mismatch");
-_Static_assert(sizeof(RadishLexAppleP256ProductSmokeSummary) == 20u * sizeof(uint32_t), "Apple P-256 smoke layout mismatch");
+_Static_assert(sizeof(RadishLexAppleP256ProductSmokeSummary) == 26u * sizeof(uint32_t), "Apple P-256 smoke layout mismatch");
 
 RadishLexStatusCode radishlex_compile_input_contract(
     RadishLexSession *session,
@@ -134,7 +135,7 @@ RadishLexStatusCode radishlex_compile_input_contract(
       radishlex_rime_runtime_shutdown;
   uint32_t (*apple_status)(RadishLexAppleP256ProductStatus *) =
       radishlex_apple_p256_product_status;
-  uint32_t (*apple_smoke)(const char *, RadishLexAppleP256ProductSmokeSummary *) =
+  uint32_t (*apple_smoke)(uint32_t, const char *, RadishLexAppleP256ProductSmokeSummary *) =
       radishlex_apple_p256_product_smoke;
   RadishLexKeyResult *result = NULL;
   RadishLexStatusCode status =

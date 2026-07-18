@@ -29,7 +29,7 @@ signature_len: 64
 
 `ecdsa-p256-sha256-v1` 是“ECDSA P-256 + SHA-256 + 固定编码”的完整协议标识，不允许用同一 id 表达 DER 签名、压缩点、SHA-384、prehash 输入或其他曲线。现有 `ed25519-v1` 继续保持 ADR 0003 已固定的 32-byte RFC 8032 public key 与 64-byte PureEd25519 signature。
 
-P-256 目前只是生产候选 profile。2026-07-18 已取得 gated macOS 真实创建、重载、签名、Rust/Go 验签和删除的基础生命周期证据；产品进程访问与失败矩阵完成后才能评审 backend 的 production status。基础 smoke 成功不自动证明 Secure Enclave、hardware-backed、user presence 或 backup migration。
+P-256 目前只是生产候选 profile。2026-07-18 已取得普通 DPK 软件 key 的 manager 产品进程创建、重载、签名、Rust/Go 验签和删除证据；评审确认该 key 可由平台 API 导出，因此 `apple-keychain-p256-v1` 不具备生产资格。协议 profile 可以由后续 Secure Enclave backend 复用，但基础 smoke 不证明 Secure Enclave、hardware-backed、user presence 或 backup migration。
 
 ## Public Key 编码
 
@@ -118,17 +118,18 @@ Go 继续保留既有顶层 `invalid_signature` / `forbidden_device` API 兼容�
 apple-keychain-p256-v1
 ```
 
-它表示 Apple Security framework 中不可由 RadishLex 导出的 P-256 `SecKey` 路径，与阻塞中的 Ed25519 `apple-keychain-v1` 分离。规则：
+它表示 Apple Security framework 中普通 data protection keychain 软件 P-256 `SecKey` 路径，与阻塞中的 Ed25519 `apple-keychain-v1` 及后续 Secure Enclave backend 分离。RadishLex 不提供私钥导出接口，但平台本身允许导出该软件 key，必须标记 `exportable=true`。规则：
 
-- private key 由 `SecKeyCreateRandomKey` 创建为永久 P-256 key，RadishLex 不提供 private external representation、seed、generic password item 或软件文件 fallback。
+- private key 由 `SecKeyCreateRandomKey` 创建为永久 P-256 key，RadishLex 不调用 private external representation，不提供 seed、generic password item 或软件文件 fallback。
+- macOS 创建、查询和删除必须一致使用 data protection keychain；`kSecAttrAccessibleWhenUnlockedThisDeviceOnly` 不得在默认 file-based `SecItem` shim 上被当作已生效。data protection keychain 因 host identity、entitlement 或访问组失败时必须返回 denied/unavailable，不得跨域读取 legacy item。
 - public key 通过 `SecKeyCopyPublicKey` 导出为 65-byte SEC1 uncompressed point；签名使用 `kSecKeyAlgorithmECDSASignatureMessageX962SHA256`，DER 只在 backend 内转为 P1363。
-- backend status 必须声明算法、backend id、`exportable=false`，并分别报告 `hardware_backed`、`user_presence_required`、`backup_migratable`。这些后三项在真实证据前均为 `false`。
+- backend status 必须声明算法、backend id、`exportable=true`，并分别报告 `hardware_backed=false`、`user_presence_required=false`、`backup_migratable=false`。这些字段描述普通软件 DPK 事实，不能被产品层改写为更强保护。
 - repository-only 实现和默认 feature 测试不得访问 Keychain；只有显式 feature + ignored gated smoke + 环境门禁才可创建合成 key。
 - locked、denied、missing、corrupted、unsupported 必须映射为结构化错误；不得创建新 key 顶替丢失身份，也不得回退 `test-memory-v1`。
 - key tag 与 label 只含固定 service 和 opaque synthetic/production key id，不包含用户名、设备名称、本机路径、canonical bytes 或用户输入。
 - 本地 delete/revoke 成功后必须不能继续加载或签名；服务端 revoked 状态仍是跨设备真相，不能只依赖进程内撤销集合。
 
-状态分四层表达：target 编译、当前运行时能力、产品资格与真实用户同步 gate。2026-07-18 的命令行 Keychain 证据和 manager Release native 接线支持当前 macOS feature build 报告：
+状态分四层表达：target 编译、当前运行时能力、产品资格与真实用户同步 gate。2026-07-18 的 provisioning-backed manager 产品进程 DPK 生命周期支持当前 macOS feature build 报告：
 
 ```text
 compiled = true
@@ -137,12 +138,13 @@ can_create_signing_keys = true
 can_sign = true
 product_qualified = false
 user_sync_enabled = false
+exportable = true
 hardware_backed = false
 user_presence_required = false
 backup_migratable = false
 ```
 
-未启用 feature 或非 macOS target 不能报告上述运行时 true。`product_qualified` 只有真实 manager bundle 进程 gated smoke 和评审通过后才可改变；用户同步还必须满足独立 M3 全链 gate。产品 validation ABI 只返回固定状态/生命周期 flags，private key、public key、canonical bytes 与 signature bytes 不进入 Dart。
+未启用 feature 或非 macOS target 不能报告上述运行时 true。`product_qualified` 因 `exportable=true` 保持 false；locked/denied 证据不能覆盖这一生产条件。用户同步继续受独立 M3 全链 gate。产品 validation ABI 只返回固定状态、生命周期、错误分类和数值 OSStatus，private key、public key、canonical bytes 与 signature bytes 不进入 Dart。
 
 ## 日志与脱敏
 

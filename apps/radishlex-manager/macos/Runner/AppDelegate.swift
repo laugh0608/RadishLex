@@ -6,10 +6,19 @@ import FlutterMacOS
 class AppDelegate: FlutterAppDelegate {
   override func applicationWillFinishLaunching(_ notification: Notification) {
     super.applicationWillFinishLaunching(notification)
-    guard CommandLine.arguments.contains("--radishlex-apple-p256-product-smoke") else {
+    guard RadishLexAppleP256ProductSmoke.isRequested(arguments: CommandLine.arguments) else {
       return
     }
-    let result = RadishLexAppleP256ProductSmoke.run()
+    guard
+      let scenario = RadishLexAppleP256ProductSmoke.scenario(
+        arguments: CommandLine.arguments
+      )
+    else {
+      fputs("RadishLex Apple P-256 product smoke result=1 scenario=invalid\n", stderr)
+      fflush(stderr)
+      exit(EXIT_FAILURE)
+    }
+    let result = RadishLexAppleP256ProductSmoke.run(scenario: scenario)
     fputs(result.safeLogLine + "\n", stderr)
     fflush(stderr)
     exit(result.passed ? EXIT_SUCCESS : EXIT_FAILURE)
@@ -27,6 +36,10 @@ class AppDelegate: FlutterAppDelegate {
 private struct RadishLexAppleP256SmokeSummary {
   var version: UInt32 = 0
   var result: UInt32 = 255
+  var scenario: UInt32 = 0
+  var errorCategory: UInt32 = 0
+  var errorDetail: UInt32 = 0
+  var platformStatus: Int32 = 0
   var compiled: UInt32 = 0
   var runtimeAvailable: UInt32 = 0
   var canCreateSigningKeys: UInt32 = 0
@@ -44,32 +57,40 @@ private struct RadishLexAppleP256SmokeSummary {
   var deleted: UInt32 = 0
   var missingConfirmed: UInt32 = 0
   var failClosed: UInt32 = 0
+  var expectedFailureConfirmed: UInt32 = 0
+  var cleanupRequired: UInt32 = 0
   var cleanupAttempted: UInt32 = 0
 
   init() {}
 
   init(words: [UInt32]) {
-    precondition(words.count == 20)
+    precondition(words.count == 26)
     version = words[0]
     result = words[1]
-    compiled = words[2]
-    runtimeAvailable = words[3]
-    canCreateSigningKeys = words[4]
-    canSign = words[5]
-    productQualified = words[6]
-    userSyncEnabled = words[7]
-    exportable = words[8]
-    hardwareBacked = words[9]
-    userPresenceRequired = words[10]
-    backupMigratable = words[11]
-    created = words[12]
-    reloaded = words[13]
-    rustVerified = words[14]
-    goVerified = words[15]
-    deleted = words[16]
-    missingConfirmed = words[17]
-    failClosed = words[18]
-    cleanupAttempted = words[19]
+    scenario = words[2]
+    errorCategory = words[3]
+    errorDetail = words[4]
+    platformStatus = Int32(bitPattern: words[5])
+    compiled = words[6]
+    runtimeAvailable = words[7]
+    canCreateSigningKeys = words[8]
+    canSign = words[9]
+    productQualified = words[10]
+    userSyncEnabled = words[11]
+    exportable = words[12]
+    hardwareBacked = words[13]
+    userPresenceRequired = words[14]
+    backupMigratable = words[15]
+    created = words[16]
+    reloaded = words[17]
+    rustVerified = words[18]
+    goVerified = words[19]
+    deleted = words[20]
+    missingConfirmed = words[21]
+    failClosed = words[22]
+    expectedFailureConfirmed = words[23]
+    cleanupRequired = words[24]
+    cleanupAttempted = words[25]
   }
 }
 
@@ -83,6 +104,10 @@ private struct RadishLexAppleP256ProductSmokeResult {
   var safeLogLine: String {
     "RadishLex Apple P-256 product smoke" +
       " result=\(summary.result)" +
+      " scenario=\(summary.scenario)" +
+      " error_category=\(summary.errorCategory)" +
+      " error_detail=\(summary.errorDetail)" +
+      " platform_status=\(summary.platformStatus)" +
       " compiled=\(summary.compiled)" +
       " runtime=\(summary.runtimeAvailable)" +
       " product_qualified=\(summary.productQualified)" +
@@ -94,18 +119,42 @@ private struct RadishLexAppleP256ProductSmokeResult {
       " deleted=\(summary.deleted)" +
       " missing=\(summary.missingConfirmed)" +
       " fail_closed=\(summary.failClosed)" +
+      " expected_failure=\(summary.expectedFailureConfirmed)" +
+      " cleanup_required=\(summary.cleanupRequired)" +
       " cleanup_attempted=\(summary.cleanupAttempted)"
   }
 }
 
 private enum RadishLexAppleP256ProductSmoke {
+  private static let scenarios: [String: UInt32] = [
+    "--radishlex-apple-p256-product-smoke": 0,
+    "--radishlex-apple-p256-denied-probe": 1,
+    "--radishlex-apple-p256-locked-prepare": 2,
+    "--radishlex-apple-p256-locked-probe": 3,
+    "--radishlex-apple-p256-locked-cleanup": 4,
+  ]
+
   private typealias SmokeFunction = @convention(c) (
+    UInt32,
     UnsafePointer<CChar>?,
     UnsafeMutableRawPointer?
   ) -> UInt32
 
-  static func run() -> RadishLexAppleP256ProductSmokeResult {
+  static func isRequested(arguments: [String]) -> Bool {
+    arguments.contains { $0.hasPrefix("--radishlex-apple-p256-") }
+  }
+
+  static func scenario(arguments: [String]) -> UInt32? {
+    let requested = arguments.filter { $0.hasPrefix("--radishlex-apple-p256-") }
+    guard requested.count == 1 else {
+      return nil
+    }
+    return scenarios[requested[0]]
+  }
+
+  static func run(scenario: UInt32) -> RadishLexAppleP256ProductSmokeResult {
     var summary = RadishLexAppleP256SmokeSummary()
+    summary.scenario = scenario
     guard
       ProcessInfo.processInfo.environment[
         "RADISHLEX_RUN_MANAGER_APPLE_KEYCHAIN_P256_SMOKE"
@@ -134,10 +183,10 @@ private enum RadishLexAppleP256ProductSmoke {
       return RadishLexAppleP256ProductSmokeResult(summary: summary)
     }
     let smoke = unsafeBitCast(symbol, to: SmokeFunction.self)
-    var words = [UInt32](repeating: 0, count: 20)
+    var words = [UInt32](repeating: 0, count: 26)
     let result = goServerDirectory.withCString { directory in
       words.withUnsafeMutableBufferPointer { buffer in
-        smoke(directory, UnsafeMutableRawPointer(buffer.baseAddress))
+        smoke(scenario, directory, UnsafeMutableRawPointer(buffer.baseAddress))
       }
     }
     summary = RadishLexAppleP256SmokeSummary(words: words)
