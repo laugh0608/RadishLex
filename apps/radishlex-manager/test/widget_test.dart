@@ -5,6 +5,7 @@ import 'package:radishlex_manager/src/app.dart';
 import 'package:radishlex_manager/src/bridge/fixture_manager_bridge.dart';
 import 'package:radishlex_manager/src/bridge/manager_bridge.dart';
 import 'package:radishlex_manager/src/bridge/manager_bridge_factory.dart';
+import 'package:radishlex_manager/src/data/manager_fixture.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
 void main() {
@@ -32,6 +33,48 @@ void main() {
     expect(find.byType(Banner), findsOneWidget);
     expect(tester.widget<Banner>(find.byType(Banner)).message, '合成演示数据');
   });
+
+  testWidgets('refresh reloads a snapshot changed by the input runtime', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final bridge = _ExternallyUpdatedBridge();
+    await tester.pumpWidget(RadishLexManagerApp(bridge: bridge));
+    await tester.pumpAndSettle();
+
+    bridge.simulateInputRuntimeSelection();
+    await tester.tap(find.byKey(const Key('manager-refresh-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('学习'));
+    await tester.pumpAndSettle();
+
+    expect(bridge.loadCount, 2);
+    expect(find.text('selection events 129'), findsOneWidget);
+  });
+}
+
+class _ExternallyUpdatedBridge extends FixtureManagerBridge {
+  ManagerSnapshot _snapshot = createManagerFixture();
+  int loadCount = 0;
+
+  void simulateInputRuntimeSelection() {
+    _snapshot = _snapshot.copyWith(
+      generatedAt: '2026-07-18 13:26',
+      learningSummary: _snapshot.learningSummary.copyWith(
+        userTerms: 4,
+        selectionEvents: 129,
+        lastUpdated: '2026-07-18 13:26',
+      ),
+    );
+  }
+
+  @override
+  Future<ManagerSnapshot> loadSnapshot() async {
+    loadCount += 1;
+    return _snapshot;
+  }
 }
 
 class _FailingBridge extends FixtureManagerBridge {

@@ -120,6 +120,7 @@ M3 同步管理能力在安全退出条件满足后覆盖：
 - 普通新增、选择学习和导入都不得清除 tombstone 或 suppressed；恢复必须使用独立的用户确认动作并调用 `restore_term`，界面需要明确展示这是恢复已删除/已抑制词条，不得在其他操作成功后隐式触发。
 - 词库导出只导出用户显式请求的 P2 用户词条视图，不作为诊断报告的一部分混入。
 - 学习页、同步页和诊断报告只能展示聚合计数、状态码、来源标签和解释性摘要，不展示 P1 原始事件或明文同步 payload。
+- manager 与输入 runtime 共用 userdb 时，页头必须提供显式刷新动作并重新调用 bridge `loadSnapshot`；不得把启动时 snapshot 当作长期真相源，也不得在 Flutter 层复制输入侧学习状态来伪造实时可见性。
 - 设置页保存的是本地草案；`retain_sync_config`、`server_endpoint`、`access_token_configured`、`privacy_mode`、`diagnostics_export` 和部署证据来源只用于派生 UI 状态，不启用真实上传。
 - 诊断报告预览的 section 筛选和关键字筛选只影响当前对话框字段列表，不改变 `ManagerDiagnosticsReport` 数据模型、脱敏文本、剪贴板内容或导出内容。
 - 复制诊断摘要必须复制完整脱敏文本；导出诊断摘要必须保持同一份脱敏摘要语义，不因当前筛选状态输出字段子集。
@@ -220,7 +221,7 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 7. 已补设置页配置来源诊断、sync gate 草案预览、部署证据来源标签、设置草案保存、脱敏诊断报告分组预览 / 筛选 / 复制 / 导出和 bridge 失败结构化错误分类展示；UI 不透传 native 错误明细。
 8. 同步配置页继续保持真实上传按钮禁用，状态由设置草案、隐私模式、平台私钥 backend gate 和部署证据来源草案派生，可显示 `local_only`、`sync_disabled_by_policy`、`backend_unavailable`、`deployment_unverified` 或 `preflight_ready`。
 9. 已接入 sync entry state、服务连接健康、`sync_connection_health.v1` 摘要回填、恢复码 / 设备授权准备态、四条 readiness 聚合、settings 内存态 readiness 导入和只读交互进入状态；待可用平台私钥 backend、恢复 / 授权实现测试和发布级部署证据齐备后，再设计真实设备授权、恢复码和用户同步命令。
-10. macOS 原生平台 bridge 已固定 Application Support 与 bundle Frameworks 路径、`0700`/`0600` 权限、symlink 拒绝和 `CFPreferences` 隐私键读写回滚；Rust 双连接测试已覆盖并发 schema 初始化、WAL 可见性、输入侧选择、manager 删除和恢复。M2 仍等待按 runbook 执行正常 Release GUI 与输入法共库实机验收。
+10. macOS 原生平台 bridge 已固定 Application Support 与 bundle Frameworks 路径、`0700`/`0600` 权限、symlink 拒绝和 `CFPreferences` 隐私键读写回滚；Rust 双连接测试已覆盖并发 schema 初始化、WAL 可见性、输入侧选择、manager 删除和恢复。manager 页头刷新会重新加载真实 bridge snapshot，widget 回归覆盖输入 runtime 外部更新后的聚合可见性。M2 仍等待按 runbook 执行正常 Release GUI 与输入法共库实机验收。
 
 ## 停止线
 

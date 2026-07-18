@@ -21,6 +21,7 @@
 - 本地词库查看、搜索、审计、导入检查、导入、导出和批次历史。
 - 学习聚合摘要与 `rank explain`；不展示 P1 原始事件。
 - manager 与输入 runtime 共享 Rust/userdb 真相源时的 WAL、busy、migration 和重启行为。
+- manager 保持运行时，通过页头刷新重新加载 bridge snapshot，并观察输入 runtime 写入的最新聚合状态。
 - macOS 隐私模式的系统偏好写入、读回、失败回滚和输入侧零学习增量。
 - settings draft、脱敏诊断、同步 readiness、关闭态和不可用原因解释。
 
@@ -39,7 +40,7 @@
 | 产品启动不伪装成功 | 默认 product；native/path/userdb/ABI 失败进入 `UnavailableManagerBridge`；fixture 仅由显式 demo 构建启用并显示常驻标识。 | `manager_bridge_factory.dart`、`unavailable_manager_bridge.dart`、`widget_test.dart`、`./scripts/check-manager.sh` |
 | 产品 bundle 可加载真实 Rust 能力 | Xcode 构建阶段嵌入 native library，校验 ABI v5、owner-thread、panic boundary、架构、必需符号和依赖；Release bundle smoke 使用其中的 dylib。 | `embed-manager-native-library.sh`、`check-manager-product.sh`、`ffi_dynamic_native_binding.dart` |
 | 用户能管理真实本地词条 | UI 和 FFI 覆盖 active/suppressed/deleted、删除、tombstone 查询、明确恢复、导入导出、按本地 batch id 关联导入审计与重启后的状态保持。 | `dictionary_test.dart`、`ffi_manager_bridge_test.dart`、`ffi_bridge_smoke.dart` |
-| 输入法与 manager 共享数据语义 | 独立 `UserDb` 连接覆盖八路并发 schema 初始化、短时初始化锁等待、WAL 可见性、选择、删除、防复活和恢复；busy timeout 在任何 schema/integrity SQL 前生效，首次 WAL 协商只在固定预算内重试锁竞争。 | `ime-userdb` store tests、`cargo test -p radishlex-ime-userdb` |
+| 输入法与 manager 共享数据语义 | 独立 `UserDb` 连接覆盖八路并发 schema 初始化、短时初始化锁等待、WAL 可见性、选择、删除、防复活和恢复；busy timeout 在任何 schema/integrity SQL 前生效，首次 WAL 协商只在固定预算内重试锁竞争。页头刷新重新调用 bridge snapshot，widget 回归覆盖输入侧外部更新后的可见性。 | `ime-userdb` store tests、`widget_test.dart`、`cargo test -p radishlex-ime-userdb` |
 | 隐私设置作用于输入 runtime | Flutter 通过 MethodChannel 调用 macOS `CFPreferences` 的 CurrentUser/AnyHost 层，保存后读回；settings/权限失败会回滚。 | `MainFlutterWindow.swift`、`method_channel_manager_platform_control.dart`、对应 Flutter tests |
 | P1 与诊断边界不扩张 | 学习页只展示聚合；诊断不包含用户词、真实路径、token、恢复码、密钥或 payload bytes。 | `settings_diagnostics_test.dart`、`ffi_manager_bridge_test.dart`、产品 smoke |
 | 真实用户同步保持关闭 | 设置和同步页只保存本地草案、展示 readiness 与阻塞原因；上传主操作保持禁用。 | `sync_test.dart`、`settings_test.dart`、`docs/manager-ui-boundary.md` |
@@ -70,7 +71,7 @@ M2 当前只剩产品实机证据，不再以继续添加 fixture 或复制业�
 - 从正常 Release app 直接启动，确认没有 demo 标识、无需 shell 环境变量，并使用固定平台路径。
 - 在 GUI 完成合成词条导入、删除、deleted/suppressed 显式恢复和 app 重启持久化。
 - 通过 GUI 切换隐私模式，复核 `CFPreferences` 实际读回与输入侧零学习增量。
-- 输入法与 manager 同时连接同一测试 userdb，复核双端状态可见、无非预期 `SQLITE_BUSY`，并在进程重启后保持一致。
+- 输入法与 manager 同时连接同一测试 userdb，通过页头刷新复核双端状态可见、无非预期 `SQLITE_BUSY`，并在进程重启后保持一致。
 - 按 runbook 恢复 TIS、bundle、Rime、进程、隐私键、测试 userdb、settings 和目录权限基线，全程不读取 P1 原始行或数据库正文。
 
 实机证据全部通过后才能关闭 M2 并进入 M3；若任一项失败，应回到对应 Rust、FFI、Flutter 或平台层修复，并重跑匹配门禁。
