@@ -27,8 +27,9 @@ func TestMetadataHandlersCreateDomainReadDeviceAndSaveJoinRequest(t *testing.T) 
 		ActiveKeyID:     "epoch-key-a",
 		FirstDevice: DeviceMetadata{
 			DeviceID:                "device-a",
+			SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 			SigningPublicKeyID:      "signing-key-a",
-			SigningPublicKey:        []byte("signing-public-key-a"),
+			SigningPublicKey:        signingPublicKeyForHandlerTest("device-a"),
 			KeyAgreementPublicKeyID: "agreement-key-a",
 			KeyAgreementPublicKey:   []byte("agreement-public-key-a"),
 			Status:                  string(storage.DeviceActive),
@@ -70,8 +71,9 @@ func TestMetadataHandlersCreateDomainReadDeviceAndSaveJoinRequest(t *testing.T) 
 	joinRequest := CreateJoinRequestRequest{
 		JoinRequestID:           "join-a",
 		DeviceID:                "device-b",
+		SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 		SigningPublicKeyID:      "signing-key-b",
-		SigningPublicKey:        []byte("signing-public-key-b"),
+		SigningPublicKey:        signingPublicKeyForHandlerTest("device-b"),
 		KeyAgreementPublicKeyID: "agreement-key-b",
 		KeyAgreementPublicKey:   []byte("agreement-public-key-b"),
 		Challenge:               []byte("join-challenge"),
@@ -233,8 +235,9 @@ func TestHandlerAddsRequestIDAndRecordsAuditEvent(t *testing.T) {
 		ActiveKeyID:     "epoch-key-a",
 		FirstDevice: DeviceMetadata{
 			DeviceID:                "device-a",
+			SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 			SigningPublicKeyID:      "signing-key-a",
-			SigningPublicKey:        []byte("signing-public-key-a"),
+			SigningPublicKey:        signingPublicKeyForHandlerTest("device-a"),
 			KeyAgreementPublicKeyID: "agreement-key-a",
 			KeyAgreementPublicKey:   []byte("agreement-public-key-a"),
 			Status:                  string(storage.DeviceActive),
@@ -285,8 +288,9 @@ func TestAuditEventDoesNotIncludeRequestBody(t *testing.T) {
 		ActiveKeyID:     "epoch-key-a",
 		FirstDevice: DeviceMetadata{
 			DeviceID:                "device-a",
+			SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 			SigningPublicKeyID:      "signing-key-a",
-			SigningPublicKey:        []byte("sensitive-signing-public-key-fixture"),
+			SigningPublicKey:        []byte("sensitive-signing-public-key!!!!"),
 			KeyAgreementPublicKeyID: "agreement-key-a",
 			KeyAgreementPublicKey:   []byte("sensitive-agreement-public-key-fixture"),
 			Status:                  string(storage.DeviceActive),
@@ -302,7 +306,7 @@ func TestAuditEventDoesNotIncludeRequestBody(t *testing.T) {
 		t.Fatalf("expected one audit event, got %d", len(audit.events))
 	}
 	eventText := fmt.Sprintf("%#v", audit.events[0])
-	if strings.Contains(eventText, "sensitive-signing-public-key-fixture") ||
+	if strings.Contains(eventText, "sensitive-signing-public-key!!!!") ||
 		strings.Contains(eventText, "sensitive-agreement-public-key-fixture") {
 		t.Fatalf("audit event leaked request body fields: %s", eventText)
 	}
@@ -709,6 +713,7 @@ func TestObjectVersionUploadRejectsRevokedPendingAndUnknownDevices(t *testing.T)
 			DomainID:                "domain-a",
 			JoinRequestID:           "join-b",
 			DeviceID:                "device-b",
+			SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 			SigningPublicKeyID:      signingKeyIDForHandlerTest("device-b"),
 			SigningPublicKey:        signingPublicKeyForHandlerTest("device-b"),
 			KeyAgreementPublicKeyID: "agreement-key-b",
@@ -877,6 +882,7 @@ func createDomainForObjectHandlerTest(t *testing.T, store storage.Store, domainI
 	}, storage.Device{
 		DomainID:                domainID,
 		DeviceID:                deviceID,
+		SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 		SigningPublicKeyID:      signingKeyIDForHandlerTest(deviceID),
 		SigningPublicKey:        signingPublicKeyForHandlerTest(deviceID),
 		KeyAgreementPublicKeyID: "agreement-key-" + deviceID,

@@ -1,18 +1,19 @@
 # 平台私钥 Backend 策略
 
-本文档整理 RadishLex 设备签名私钥 backend 的当前证据、决策顺序、继续调查条件和停止线。读者是后续实现平台 backend、管理 UI 同步设备页、评估签名算法演进和审阅隐私边界的开发者。本文不定义新的签名协议、不新增平台 SDK 代码、不替代 ADR 0003 / ADR 0004 / ADR 0005，也不包含 Android、Apple、Windows 或 Linux 的逐步 smoke 操作。
+本文档整理 RadishLex 设备签名私钥 backend 的当前证据、决策顺序、继续调查条件和停止线。读者是后续实现平台 backend、管理 UI 同步设备页、评估签名算法演进和审阅隐私边界的开发者。本文不替代 ADR 0003 至 ADR 0006，也不包含 Android、Apple、Windows 或 Linux 的逐步 smoke 操作。
 
 ## 当前结论
 
-M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。现有 `ed25519-v1` 继续作为兼容设备签名 profile，但当前证据不足以解除任何生产平台私钥 backend 的门禁：
+M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ecdsa-p256-sha256-v1` 作为与 `ed25519-v1` 共存的生产候选 profile；Rust/Go 验签、历史 metadata migration、共享跨语言 vectors 与独立 Apple backend 已在仓库内落地。当前证据仍不足以解除任何生产平台私钥 backend 的门禁：
 
 - `test-memory-v1` 只用于测试和 fixture，不能进入生产同步。
 - `unavailable` 是默认失败 backend，不允许静默回退。
 - `apple-keychain-v1` 已接线并运行真实 smoke，但阻塞于 `UnsupportedSignatureAlgorithm { algorithm: "ed25519-v1" }`。
+- `apple-keychain-p256-v1` 已接线为 repository capability spike，普通 feature 测试已覆盖 DER/P1363、结构化错误映射和关闭态；真实 gated smoke 尚未获授权执行，因此仍不可用于生产。
 - `android-keystore-v1` 已有 Kotlin / Gradle harness、JNI glue、gated smoke 和 provider diagnostics；Pixel 9 Pro API 35 AVD 与 Pixel 10 Pro API 37 AVD 均返回 `unsupported_signature_algorithm`。
 - `windows-cng-v1`、`linux-secret-service-v1` 仍只是能力边界标识，未进入实现。
 
-没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。manager 同步入口的非上传状态与诊断已在 M2 完成；M3 第一批转向新的平台可用签名算法 profile ADR，并以 Apple P-256 非导出能力为首个 spike 方向。发布级目标部署运行证据保留为正式发布前门禁，不作为算法/backend 设计批的前置阻塞。
+没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。M3 第一批当前只等待 Apple P-256 实机证据；协议和 repository spike 的存在不能自动改变 production status。发布级目标部署运行证据保留为正式发布前门禁，不作为本次平台 smoke 的前置阻塞。
 
 ## 策略目标
 
@@ -29,6 +30,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。现有 `ed25519-v1` �
 | `test-memory-v1` | 测试可用，生产禁止 | Rust 单元测试、integration test 和签名对象 fixture 已覆盖 | 继续只用于测试，不进入 UI / 生产配置 |
 | `unavailable` | 默认明确失败 | Rust capability / status / error 测试已覆盖 | 继续作为能力缺失时的失败路径 |
 | `apple-keychain-v1` | 生产不可用 | feature-gated backend 编译通过，真实 smoke 在 Ed25519 创建阶段失败 | 单独补 Apple 原生非导出 Ed25519 支持矩阵，或另起 backend / 算法 ADR |
+| `apple-keychain-p256-v1` | 仓库实现完成，生产关闭 | P-256 profile、非导出 SecKey 参数、public key 导出、DER -> P1363、Rust/Go verifier、错误映射和 ignored gated smoke 已落地；未访问真实 Keychain | 经单独授权执行创建、重载、签名、跨语言验签、删除与 cleanup smoke，再评审 capability status |
 | `android-keystore-v1` | 生产不可用 | Android target build、Gradle harness、API 35 / API 37 AVD diagnostics 和 smoke 记录 | 有新 Android 真机 / OEM / system image 时先跑 diagnostics，再按结果决定 smoke |
 | `windows-cng-v1` | 未实现 | 仅有 ADR 0004 backend id | 进入 Windows 主线前补 CNG 签名能力 spike / runbook |
 | `linux-secret-service-v1` | 未实现 | 仅有 ADR 0004 backend id | 进入 Linux 同步主线前补 Secret Service / 软件保护能力边界 |
@@ -37,11 +39,11 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。现有 `ed25519-v1` �
 
 后续遇到平台私钥 backend 阻塞时，按以下顺序判断：
 
-1. 先判断现有 backend 是否真的支持非导出 `ed25519-v1` signing key。
-2. 如果不支持，记录平台、API / OS 版本、provider、错误码、cleanup 和日志脱敏结果。
-3. 不在该 backend 内降级到软件 seed、普通文件、SQLite、SharedPreferences、generic password item 或 `test-memory-v1`。
-4. 如果多个目标平台都不能提供非导出 Ed25519 signing key，再准备新的签名算法 ADR 或新的软件保护 backend ADR。
-5. 只有 ADR 固定迁移策略、能力声明、Go / Rust verifier 变更和测试矩阵后，才允许改协议或新增生产 backend。
+1. 先读取设备登记的显式 `signing_algorithm` 与 backend capability，不按平台名或 key 长度猜测算法。
+2. 对 Ed25519 设备继续使用原 profile；对 Apple P-256 候选只使用独立 `apple-keychain-p256-v1`，不得在失败时尝试另一算法或 backend。
+3. 平台失败时记录 API / OS 版本、固定错误分类、cleanup 和日志脱敏结果，不记录 key、signature 或 canonical bytes。
+4. 不降级到软件 seed、普通文件、SQLite、SharedPreferences、generic password item 或 `test-memory-v1`。
+5. 只有 gated smoke 和 capability 评审满足生产合格条件，才允许把对应 backend status 从关闭态改为可用。
 
 这意味着 `apple-keychain-v1` 和 `android-keystore-v1` 都不能因为当前 blocker 而偷偷变成“平台保存 seed，Rust 取出 seed 签名”的方案。那是另一类 backend，风险和 UI 说明都不同。
 
@@ -79,12 +81,14 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。现有 `ed25519-v1` �
 
 ### 路径 B：新增签名算法 Profile
 
+当前状态：ADR 0006 与仓库实现已完成，正在等待 `apple-keychain-p256-v1` 真实 gated smoke；以下条目继续作为后续新增 profile 的通用进入条件。
+
 适用条件：
 
 - 目标平台明确不支持非导出 Ed25519，但支持另一种非导出 signing key，例如 P-256 / ECDSA。
 - 项目愿意承担协议迁移、跨语言 verifier 和历史设备兼容成本。
 
-进入实现前必须先补新的 ADR，至少回答：
+进入任何其他算法实现前必须先补新的 ADR，至少回答：
 
 - 新算法标识、public key 长度、signature 编码和 canonical bytes 是否复用。
 - Rust `ime-crypto`、Go server verifier、HTTP API 字段约束和测试 fixture 如何迁移。
@@ -92,7 +96,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。现有 `ed25519-v1` �
 - 设备授权、撤销、恢复记录和 object manifest 如何绑定算法。
 - 管理 UI 如何展示不同算法 backend 的能力和风险。
 
-在 ADR 完成前，不允许把 P-256 或其他算法直接接进现有 `ed25519-v1` 字段。
+不得把 P-256 或其他算法直接接进现有 `ed25519-v1` 字段。当前 P-256 使用 ADR 0006 固定的 `ecdsa-p256-sha256-v1` 和独立 Apple backend id。
 
 ### 路径 C：新增软件保护 Backend
 
@@ -141,10 +145,10 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。现有 `ed25519-v1` �
 
 在只有当前 Mac 设备、没有额外 Android 真机时，按以下顺序推进：
 
-1. 新增设备签名算法 profile ADR，优先评审 P-256；固定算法标识、public key encoding、signature encoding、canonical bytes 复用、Rust/Go verifier、Ed25519 共存与历史设备迁移。
-2. ADR 通过前只做独立平台 capability spike，不把实验算法写进现有 `ed25519-v1` 字段，也不改变生产 gate。
-3. 先落地跨语言 test vector 和算法无关 verifier，再实现新的 Apple backend id；现有 `apple-keychain-v1` / `android-keystore-v1` 继续明确不可用，不静默 fallback。
-4. gated macOS smoke 必须覆盖创建、重载、签名、Rust/Go 验签、删除/撤销、locked/denied 和 cleanup；基础签名成功不能自动宣称 Secure Enclave、hardware-backed 或 backup-migratable。
+1. 已完成 ADR 0006、算法无关 Rust/Go verifier、显式 Go metadata migration 与共享跨语言负向 vectors；`ed25519-v1` 保持兼容。
+2. 已完成独立 `apple-keychain-p256-v1` repository spike 与双层门禁；普通测试不访问系统 Keychain。
+3. 下一步经单独授权运行 gated macOS smoke，覆盖创建、重载、签名、Rust/Go 验签、删除后 missing 和 cleanup；locked/denied 真实矩阵需要另有受控条件。
+4. 基础签名成功不能自动宣称 Secure Enclave、hardware-backed、user presence 或 backup-migratable；这些能力分别保留为 false，直到有独立证据。
 5. 只有 production backend 通过后，才进入真实产品 sync orchestration 与 `ManagerBridge` 命令；恢复码、设备授权、撤销和用户同步入口继续关闭到 M3 全部退出证据成立。
 
 ## 验证口径
@@ -163,6 +167,14 @@ git diff --check
 cargo test -p radishlex-ime-crypto --features android-keystore
 ```
 
+Apple repository 测试可运行：
+
+```text
+cargo test -p radishlex-ime-crypto --features apple-keychain
+```
+
+该命令中的 Keychain 集成测试默认 ignored。执行 P-256 gated smoke 必须先获实机授权，并显式设置环境门；不能用普通测试通过替代真实证据。
+
 如果继续跑 gated Android diagnostics / smoke，必须先获得明确授权，因为 diagnostics 会触碰测试设备 Android Keystore 的合成 key。
 
 ## 参考入口
@@ -170,6 +182,7 @@ cargo test -p radishlex-ime-crypto --features android-keystore
 - [ADR 0003: 设备签名与私钥存储边界](adr/0003-device-signing-key-storage.md)
 - [ADR 0004: 平台私钥存储 Backend 边界](adr/0004-platform-private-key-storage-backend.md)
 - [ADR 0005: Apple 平台签名策略](adr/0005-apple-platform-signing-strategy.md)
+- [ADR 0006: 设备签名算法 Profile](adr/0006-device-signature-algorithm-profiles.md)
 - [Apple Keychain Signing Backend Runbook](runbooks/apple-keychain-signing-backend.md)
 - [Android Keystore Signing Backend Runbook](runbooks/android-keystore-signing-backend.md)
 - [同步密钥与设备生命周期设计](sync-key-management.md)

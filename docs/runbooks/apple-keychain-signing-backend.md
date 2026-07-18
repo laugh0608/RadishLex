@@ -1,14 +1,16 @@
 # Apple Keychain Signing Backend Runbook
 
-本文档定义 `apple-keychain-v1` 设备签名 backend 的平台验证边界。读者是后续实现 macOS / iOS Keychain bridge、`ime-crypto` backend 接线、管理 UI 设备页面和审阅同步隐私边界的开发者。本文不包含 Swift / Objective-C 源码、FFI 导出接口、App Sandbox entitlement 配置、输入法安装流程、Flutter 页面或真实用户同步开放步骤；平台私钥抽象见 `docs/adr/0004-platform-private-key-storage-backend.md`，当前 Apple 签名策略见 `docs/adr/0005-apple-platform-signing-strategy.md`。
+本文档定义 `apple-keychain-v1` 与 `apple-keychain-p256-v1` 设备签名 backend 的平台验证边界。读者是后续实现 macOS / iOS Keychain bridge、`ime-crypto` backend 接线、管理 UI 设备页面和审阅同步隐私边界的开发者。本文不包含 FFI 导出接口、App Sandbox entitlement 配置、输入法安装流程、Flutter 页面或真实用户同步开放步骤；平台私钥抽象见 ADR 0004，算法 profile 见 ADR 0006。
 
 ## 当前结论
 
-- `apple-keychain-v1` 是第一批真实平台私钥 backend 的优先验证对象。
+- `apple-keychain-v1` 保留为历史 Ed25519 候选；真实创建已证明当前路径不支持 `ed25519-v1`，其 production gate 继续关闭。
+- ADR 0006 已新增 `ecdsa-p256-sha256-v1` 和独立 `apple-keychain-p256-v1`，作为当前优先验证的 Apple 非导出候选。
 - 默认 Rust workspace 继续只启用 `test-memory-v1` 和 `unavailable` backend，不访问 Keychain；macOS backend 只在显式 `apple-keychain` feature 下编译。
 - `apple-keychain-v1` 已完成 feature-gated 接线和 ignored smoke 测试骨架；真实 Keychain smoke 已执行但未通过，不能视为平台验证通过。
 - 2026-06-30 smoke 在沙盒和提权真实环境均阻塞于 Ed25519 Keychain key 创建阶段，错误为 `UnsupportedSignatureAlgorithm { algorithm: "ed25519-v1" }`；测试未进入签名成功或用户可用同步路径。
 - `apple-keychain-v1` 的 `backend_status` 在平台策略未解决前必须阻断生产签名；普通 feature 测试只验证编译和状态门禁，不创建 Keychain item。
+- `apple-keychain-p256-v1` 的 repository spike 已覆盖 SecKey 参数、public key encoding、DER -> P1363、Rust/Go 验签、结构化错误映射和 gated smoke；真实 smoke 尚未执行，status 同样保持关闭。
 - 当前策略保留 `ed25519-v1` 设备签名协议，不把 Ed25519 seed 作为 generic password / data item 存入 Keychain 后取回 Rust 签名，也不把该软件保护方案伪装成 `apple-keychain-v1`。
 - `apple-keychain-v1` 用于真实远端对象前必须通过本 runbook 的创建、加载、签名、删除 / 撤销、锁屏 / 权限、备份迁移和日志脱敏验证。
 - 未验证 Secure Enclave 前，不承诺 `hardware_backed = true`。
@@ -22,11 +24,13 @@
 
 ```text
 apple-keychain-v1
+apple-keychain-p256-v1
 ```
 
 职责：
 
-- 平台 bridge 创建 Ed25519 设备签名私钥，并保存到 Apple Keychain 或等价 Apple 安全存储。
+- `apple-keychain-v1` 只表达 Ed25519 原生 SecKey 路径；`apple-keychain-p256-v1` 只表达 P-256 原生 SecKey 路径。
+- 平台 backend 创建永久 signing key 并保存到 Apple Keychain；RadishLex 不请求 private external representation。
 - 平台 bridge 返回 `DeviceSigningPublicKey`、`DeviceSigningKeyHandle` metadata 和签名结果。
 - Rust core 只接收 canonical bytes、public key、handle metadata 和 signature bytes。
 - FFI / CLI / Flutter / 平台壳不得获得私钥 bytes、seed、Keychain item secret 或可导出 key backup。
@@ -34,7 +38,7 @@ apple-keychain-v1
 当前不做：
 
 - 不把 Apple Keychain 调用直接散落到同步、userdb、ranker 或平台壳。
-- 不在 `apple-keychain-v1` 内静默降级为 Keychain 保存 seed、Rust 取出 seed 签名的软件保护路径。
+- 不在任一 Apple backend 内静默降级为 Keychain 保存 seed、Rust 取出 seed 签名的软件保护路径，也不在 P-256 失败后尝试 Ed25519 或 `test-memory-v1`。
 - 不通过 `security` 命令行工具实现生产 backend。
 - 不在默认 `cargo test` 中访问用户真实 Keychain。
 - 不把 Keychain account、access group 或 label 设计成包含系统用户名、设备真实名称、词库内容、input code 或本机绝对路径。
@@ -70,10 +74,11 @@ backend_status() -> DevicePrivateKeyStoreStatus
 
 ## 能力声明
 
-首版 macOS software-protected Keychain backend 建议能力：
+两个 Apple backend 在真实证据前都使用保守能力；P-256 profile 的声明为：
 
 ```text
-storage_backend = apple-keychain-v1
+storage_backend = apple-keychain-p256-v1
+signature_algorithm = ecdsa-p256-sha256-v1
 exportable = false
 hardware_backed = false
 user_presence_required = false
@@ -98,6 +103,9 @@ signing_key_id: RadishLex opaque signing key id
 keychain_service: org.radishlex.sync.signing
 keychain_account_or_tag: signing_key_id
 keychain_label: RadishLex Device Signing Key
+
+P-256 keychain_service: org.radishlex.sync.signing.p256
+P-256 keychain_label: RadishLex P-256 Device Signing Key
 ```
 
 限制：
@@ -111,8 +119,9 @@ keychain_label: RadishLex Device Signing Key
 
 必须验证：
 
-- 创建 key 后返回 32-byte Ed25519 public key。
-- `DeviceSigningKeyHandle` metadata 使用 `apple-keychain-v1`。
+- Ed25519 路径创建成功时返回 32-byte public key；不支持时返回明确 `unsupported_signature_algorithm`。
+- P-256 路径创建成功时返回 65-byte `0x04 || X || Y` SEC1 uncompressed public key，不接受 compressed point、SPKI 或平台对象序列化。
+- `DeviceSigningKeyHandle` metadata 使用与算法一一对应的 backend id 和 `signature_algorithm`。
 - handle Debug 不包含私钥、seed、Keychain query dictionary、account secret 或 access token。
 - 重新启动进程后能通过 `device_id + signing_key_id` 加载同一 public key。
 - 尝试加载不存在的 key 返回 `private_key_not_found` / `private_key_unavailable` 等明确错误。
@@ -122,8 +131,9 @@ keychain_label: RadishLex Device Signing Key
 
 必须验证：
 
-- 同一 handle 对同一 canonical bytes 生成 Ed25519 signature。
+- Ed25519 handle 只生成 64-byte Ed25519 signature；P-256 handle 使用 SHA-256/X9.62 签名，并在 backend 内把严格 DER 转成 64-byte P1363 `r || s`。
 - `DeviceSignature::verify_at` 可用返回的 public key 验证签名。
+- P-256 signature 还必须由 Go verifier 对同一 canonical bytes 验证；server/API 不接受 DER signature。
 - 篡改 canonical bytes、signing key id 或 signer device id 后验签失败。
 - revoked key 后续签名失败。
 - access denied、user presence required、Keychain locked 和 item corrupted 的错误可区分。
@@ -148,7 +158,7 @@ keychain_label: RadishLex Device Signing Key
 验证要求：
 
 - `SecItemDelete` 成功后，加载 key 返回 not found。
-- 如果平台删除失败，RadishLex 本地状态仍必须把 key 标记 revoked 并阻止后续签名。
+- 如果平台删除失败，backend 返回 locked / denied / unavailable 等明确错误，不能宣称本机 item 已删除；跨设备设备状态仍由已经提交的 signed revocation 失败关闭，不能依赖进程内集合替代服务端撤销真相。
 - 删除 userdb 不等于删除设备私钥；管理 UI 后续必须把两者分开。
 
 ## 锁屏、权限与用户交互
@@ -206,20 +216,34 @@ iOS / Keyboard Extension 后续还需验证：
 默认 CI：
 
 - 继续只跑 `test-memory-v1` 和 `unavailable`，不访问系统 Keychain。
-- 测试 `apple-keychain-v1` capability metadata 构造和 Debug 脱敏。
-- 测试 `apple-keychain-v1` backend status 在当前策略下阻断生产签名。
+- 测试两个 Apple backend 的 capability metadata、算法绑定和 Debug 脱敏。
+- 测试 DER -> P1363、locked / denied / missing 固定错误映射，以及两个 backend status 在真实证据前阻断生产签名。
+
+安全的 repository feature 门禁：
+
+```text
+cargo test -p radishlex-ime-crypto --features apple-keychain
+```
+
+该命令会显示 Keychain integration tests 为 ignored，不会创建系统 key。
 
 macOS 本机手动 / gated smoke：
 
 ```text
-cargo test -p radishlex-ime-crypto --features apple-keychain --test apple_keychain_smoke -- --ignored --nocapture
+RADISHLEX_RUN_APPLE_KEYCHAIN_P256_SMOKE=1 \
+  cargo test -p radishlex-ime-crypto --features apple-keychain \
+  --test apple_keychain_smoke \
+  apple_keychain_p256_smoke_creates_reloads_cross_verifies_and_deletes_key \
+  -- --ignored --exact --nocapture
 ```
 
-该 smoke 使用合成 `device_id` / `signing_key_id`，创建临时 Keychain item，完成签名验证后删除 item。测试带失败路径 cleanup guard，会在异常返回时尝试删除同一合成 item。失败时必须输出阻塞原因和可复验命令，不得把 skip 写成通过。运行前必须明确告知会触碰本机 macOS Keychain，并获得开发者批准。
+该 smoke 有 ignored 与环境变量双门，使用合成 `device_id` / `signing_key_id`，创建临时 P-256 Keychain item，跨独立 store 重载 public key，完成 Rust/Go 验签后删除 item并复核 missing。测试带失败路径 cleanup guard，会在异常返回时尝试删除同一合成 item。失败时必须输出阻塞原因和可复验命令，不得把 skip 写成通过。运行前必须明确告知会触碰本机 macOS Keychain，并获得开发者批准。
+
+正常 smoke 不证明 locked / denied。若要锁定 Keychain、改变 app 权限、sandbox/entitlement 或 user-presence policy，必须单独列出系统状态变化和恢复步骤并再次获得授权。
 
 ## 停止线
 
-- Keychain backend 未通过创建、加载、签名、删除和错误语义验证前，不用于真实远端对象上传。
+- `apple-keychain-p256-v1` 未通过真实创建、加载、签名、Rust/Go 验签、删除和 cleanup 前，不用于真实远端对象上传。
 - 如果需要导出私钥 bytes 才能完成签名，应停止并回退设计。
 - 如果 backend unavailable 时回退到 `test-memory-v1`，必须停止并回退实现。
 - 如果 Keychain label / account / 日志包含真实用户名、设备名称、本机路径或输入内容，必须停止并修正。

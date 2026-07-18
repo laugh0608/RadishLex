@@ -17,8 +17,9 @@
 - `hkdf` + `sha2`：提供 HKDF-SHA256 对象密钥派生和 SHA-256 ciphertext hash。
 - `argon2`：提供恢复码 Argon2id KDF；当前锁定版本为 `0.5.3`，主要传递依赖包括 `password-hash`、`blake2` 和 `base64ct`。
 - `ed25519-dalek`：提供纯 Rust Ed25519 签名和验签；当前锁定版本为 `2.2.0`，许可为 `BSD-3-Clause`，当前只用于本地 test-memory signing key store 与签名对象测试。
+- `p256`：提供 P-256 SEC1/P1363 编码校验和 ECDSA/SHA-256 验签；当前锁定版本为 `0.13.2`，关闭默认 PEM feature，只启用 `ecdsa` / `std`，许可为 `Apache-2.0 OR MIT`。
 
-上述 AEAD、KDF、HKDF 和 hash 依赖来自 RustCrypto 生态，当前采用 MIT OR Apache-2.0 兼容许可口径；`ed25519-dalek` 采用 `BSD-3-Clause`。后续仍需要在移动端和低内存平台记录 Argon2id 恢复耗时。
+上述 AEAD、KDF、HKDF、hash 与 P-256 依赖来自 RustCrypto 生态，当前采用 MIT OR Apache-2.0 兼容许可口径；`ed25519-dalek` 采用 `BSD-3-Clause`。后续仍需要在移动端和低内存平台记录 Argon2id 恢复耗时。
 
 ## 职责分工
 
@@ -88,7 +89,7 @@ P1 原始事件后续只能先在本机压缩为 P2 权重摘要，再由 P2 对
 - `RecoveryCode` 解析 `RLX1` 恢复码、Crockford Base32 secret 和短校验段；Debug 输出不打印恢复码 secret。
 - `RecoveryKdfProfile` 固定 `argon2id-v1`、`0x13`、64 MiB memory、3 iterations、4 parallelism、16 byte salt 和 32 byte output 的当前 profile，并拒绝弱化参数。
 - `RecoveryMaterial` 记录 recovery id、domain id、key epoch、KDF 参数、salt、envelope algorithm、envelope nonce、恢复密文和时间戳；Debug 输出只显示 `salt_len` / `envelope_nonce_len`，不打印 `encrypted_recovery_key`。
-- 设备签名与私钥存储边界已由 ADR 固定并在 Rust 模型中落地：v1 使用 `ed25519-v1`，签名 key 只用于签名，签名对象覆盖 sync object manifest、device authorization、device revocation 和 recovery record；平台私钥存储 backend 边界见 `docs/adr/0004-platform-private-key-storage-backend.md`，Apple 签名策略见 `docs/adr/0005-apple-platform-signing-strategy.md`，Android 验证边界见 `docs/runbooks/android-keystore-signing-backend.md`。当前可通过普通测试的 signing key store 仍只有合成 `test-memory-v1` 和明确失败的 `unavailable`，平台 backend id / capability metadata 已用于生产签名门禁测试；`apple-keychain-v1` 已接线但真实 smoke 阻塞于 `ed25519-v1` 创建，status 已阻断生产签名，不能作为可用生产 backend；`android-keystore-v1` 已接不可用门禁、Rust bridge wrapper、bridge contract、raw JNI glue、ignored smoke 入口、仓库内 Kotlin bridge source、Gradle harness、`@JvmStatic` facade、gated instrumented smoke 和 provider diagnostics，并已通过 Android target build；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
+- 设备签名与私钥存储边界已由 ADR 0003/0006 固定并在 Rust 模型中落地：`ed25519-v1` 与 `ecdsa-p256-sha256-v1` 按显式 profile 共存，签名 key 只用于签名，签名对象覆盖 object manifest、device authorization、device revocation 和 recovery record。普通测试可使用合成 `test-memory-v1`，平台 status 均保留生产门禁；`apple-keychain-p256-v1` repository spike 已落地但真实 Keychain smoke 尚未执行，既有 Apple/Android Ed25519 阻塞也未解除。
 - 当前模型用于固定字段、校验、AAD 绑定、恢复记录解密、签名验签和日志边界；生产设备私钥存储 backend、非对称包装算法和生产恢复 UI / API 仍需补齐后再进入远端同步。
 
 规则：

@@ -18,8 +18,6 @@ pub use recovery::{
     RECOVERY_CODE_SECRET_LEN, RECOVERY_KDF_ID_ARGON2ID_V1, RECOVERY_KDF_VERSION_ARGON2ID_V1,
     RECOVERY_SALT_LEN, RECOVERY_WRAPPING_KEY_LEN,
 };
-#[cfg(feature = "apple-keychain")]
-pub use signing::AppleKeychainDeviceKeyStore;
 #[cfg(feature = "android-keystore")]
 pub use signing::{
     android_keystore_alias, validate_android_keystore_public_key,
@@ -36,13 +34,17 @@ pub use signing::{
     ANDROID_KEYSTORE_SIGNATURE_ALGORITHM, DEFAULT_ANDROID_KEYSTORE_ALIAS_PREFIX,
 };
 pub use signing::{
-    canonical_signature_bytes, DevicePrivateKeyStoreStatus, DeviceSignature,
-    DeviceSigningBackendCapabilities, DeviceSigningKeyHandle, DeviceSigningPublicKey,
-    DeviceSigningStorageBackend, SignatureAlgorithmId, SignatureField,
+    canonical_signature_bytes, verify_device_signature, DevicePrivateKeyStoreStatus,
+    DeviceSignature, DeviceSigningBackendCapabilities, DeviceSigningKeyHandle,
+    DeviceSigningPublicKey, DeviceSigningStorageBackend, SignatureAlgorithmId, SignatureField,
     SignedRecoveryRecordManifest, SignedSyncObjectManifest, TestMemoryDeviceKeyStore,
     UnavailableDeviceKeyStore, DEVICE_KEY_STORE_ANDROID_KEYSTORE_V1,
-    DEVICE_KEY_STORE_APPLE_KEYCHAIN_V1, DEVICE_KEY_STORE_LINUX_SECRET_SERVICE_V1,
-    DEVICE_KEY_STORE_TEST_MEMORY_V1, DEVICE_KEY_STORE_UNAVAILABLE, DEVICE_KEY_STORE_WINDOWS_CNG_V1,
-    ED25519_PUBLIC_KEY_LEN, ED25519_SIGNATURE_LEN, SIGNATURE_ALGORITHM_ED25519_V1,
+    DEVICE_KEY_STORE_APPLE_KEYCHAIN_P256_V1, DEVICE_KEY_STORE_APPLE_KEYCHAIN_V1,
+    DEVICE_KEY_STORE_LINUX_SECRET_SERVICE_V1, DEVICE_KEY_STORE_TEST_MEMORY_V1,
+    DEVICE_KEY_STORE_UNAVAILABLE, DEVICE_KEY_STORE_WINDOWS_CNG_V1, ED25519_PUBLIC_KEY_LEN,
+    ED25519_SIGNATURE_LEN, P256_PUBLIC_KEY_LEN, P256_SIGNATURE_LEN,
+    SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1, SIGNATURE_ALGORITHM_ED25519_V1,
     SIGNATURE_SCHEMA_VERSION,
 };
+#[cfg(feature = "apple-keychain")]
+pub use signing::{AppleKeychainDeviceKeyStore, AppleKeychainP256DeviceKeyStore};

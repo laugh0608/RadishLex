@@ -682,6 +682,16 @@ pub enum CryptoError {
     CiphertextHashMismatch,
     KeyDerivationFailed,
     SignatureVerificationFailed,
+    SignatureAlgorithmMismatch,
+    InvalidSigningPublicKey {
+        algorithm: String,
+    },
+    InvalidSignatureEncoding {
+        algorithm: String,
+    },
+    SignatureKeyNotActive {
+        key_id: String,
+    },
     StorageBackendUnavailable {
         backend: String,
     },
@@ -742,6 +752,18 @@ impl fmt::Display for CryptoError {
             Self::CiphertextHashMismatch => f.write_str("ciphertext hash mismatch"),
             Self::KeyDerivationFailed => f.write_str("key derivation failed"),
             Self::SignatureVerificationFailed => f.write_str("signature verification failed"),
+            Self::SignatureAlgorithmMismatch => {
+                f.write_str("signature algorithm does not match signing public key")
+            }
+            Self::InvalidSigningPublicKey { algorithm } => {
+                write!(f, "invalid signing public key for algorithm: {algorithm}")
+            }
+            Self::InvalidSignatureEncoding { algorithm } => {
+                write!(f, "invalid signature encoding for algorithm: {algorithm}")
+            }
+            Self::SignatureKeyNotActive { key_id } => {
+                write!(f, "signature key is not active: {key_id}")
+            }
             Self::StorageBackendUnavailable { backend } => {
                 write!(f, "storage backend unavailable: {backend}")
             }

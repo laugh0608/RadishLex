@@ -70,7 +70,7 @@ func OpenStore(cfg config.Config) (storage.Store, CloseFunc, error) {
 	}
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.Exec(migrations.InitialSchema()); err != nil {
+	if err := migrations.Apply(db); err != nil {
 		_ = db.Close()
 		return nil, nil, fmt.Errorf("apply sqlite metadata migration: %w", err)
 	}

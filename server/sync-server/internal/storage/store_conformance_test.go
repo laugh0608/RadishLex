@@ -12,6 +12,36 @@ type storeFactory func(t *testing.T) Store
 func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 	t.Helper()
 
+	t.Run("requires an explicit supported device signing algorithm", func(t *testing.T) {
+		for _, algorithm := range []string{"", "future-signature-v1"} {
+			store := newStore(t)
+			device := Device{
+				DomainID:                "domain-profile",
+				DeviceID:                "device-profile",
+				SigningAlgorithm:        algorithm,
+				SigningPublicKeyID:      "signing-key-profile",
+				SigningPublicKey:        signingPublicKeyForTest("device-a"),
+				KeyAgreementPublicKeyID: "agreement-key-profile",
+				KeyAgreementPublicKey:   []byte{0x02},
+				Status:                  DeviceActive,
+				AuthorizedAtMs:          10,
+			}
+			err := store.CreateDomain(context.Background(), Domain{
+				DomainID:        "domain-profile",
+				CurrentKeyEpoch: 1,
+				ActiveKeyID:     "sync-key-profile",
+				CreatedAtMs:     10,
+				UpdatedAtMs:     10,
+			}, device)
+			if algorithm == "" && !IsCode(err, ErrInvalidRequest) {
+				t.Fatalf("missing algorithm must fail closed, got %v", err)
+			}
+			if algorithm != "" && !IsCode(err, ErrInvalidSignature) {
+				t.Fatalf("unsupported algorithm must fail closed, got %v", err)
+			}
+		}
+	})
+
 	t.Run("accepts encrypted object and returns payload by metadata", func(t *testing.T) {
 		ctx := context.Background()
 		store := newReadyStore(t, newStore)
@@ -297,6 +327,7 @@ func newReadyStore(t *testing.T, newStore storeFactory) Store {
 	}, Device{
 		DomainID:                "domain-a",
 		DeviceID:                "device-a",
+		SigningAlgorithm:        SignatureAlgorithmEd25519V1,
 		SigningPublicKeyID:      "signing-key-a",
 		SigningPublicKey:        signingPublicKeyForTest("device-a"),
 		KeyAgreementPublicKeyID: "agreement-key-a",
@@ -327,6 +358,7 @@ func joinAuthorizationFixture(domainID string, joinID string, deviceID string, a
 		DomainID:                domainID,
 		JoinRequestID:           joinID,
 		DeviceID:                deviceID,
+		SigningAlgorithm:        SignatureAlgorithmEd25519V1,
 		SigningPublicKeyID:      signingKeyIDForTest(deviceID),
 		SigningPublicKey:        signingPublicKeyForTest(deviceID),
 		KeyAgreementPublicKeyID: "agreement-key-" + deviceID,

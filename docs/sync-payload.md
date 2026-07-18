@@ -12,6 +12,8 @@
 
 `ime-ffi` 当前暴露 `radishlex_userdb_sync_preflight` 这类状态摘要入口：调用方必须显式传入 SQLite 路径，返回值只包含 P2 / P1 / 本地审计计数和 `plaintext_payload = false`，不返回同步 payload、P1 明细事件或数据库句柄。`ime-ffi` 的 userdb add / delete / list 入口只用于用户明确管理 P2 词条，不作为同步 payload 生成器。
 
+设备签名现由 ADR 0006 固定为显式 profile：`ed25519-v1` 与 `ecdsa-p256-sha256-v1` 共存，`signature_algorithm` 继续属于 signed canonical metadata。Rust/Go 已共享同一正负向 fixture，Go 设备与 join metadata 显式保存算法；历史行只由 schema migration 回填 Ed25519，新请求不做算法猜测或 fallback。该变化不改变 payload 明文分类、对象加密算法或 canonical field ordering。
+
 FFI preflight summary 字段含义：
 
 ```text
@@ -271,12 +273,13 @@ object_payload(domain_id, object_id, version)
 - `SyncRemoteClient`、`SyncRemoteTransport`、`RemoteObjectVersion`、`RemoteObjectPayload`、`SyncRemoteError` 和 `HttpSyncRemoteTransport`：固定 Rust remote client 与 Go object version API 的 DTO / transport 边界，覆盖 JSON base64 byte 字段、metadata 读取、binary payload 下载、stale conflict latest metadata、server error code 映射、HTTP/1.1 request / response 传递、可选 bearer access token header、chunked response 解码、base path 拼接和 Debug 脱敏。
 - `two_client_sync` integration test：使用合成 userdb、sync master key、test-memory signing key store 和内存 remote harness，复验 P2 payload 加密上传、另一客户端下载密文后解密、解码、合并写回 SQLite、本机 tombstone 阻断旧远端词条、ranker weight 写回、stale base version 409 latest metadata 映射，以及合并后按 `base_version = 1` 重新上传 v2。
 - `two_client_go_http_sync` integration test：使用短生命周期 Go sync server、临时 SQLite metadata、临时 blob dir、真实 `HttpSyncRemoteTransport` 和 test-memory signing key store，复验 domain 创建、设备 B join / signed authorization、`dictionary.user_terms` / `ranker.weights` / `dictionary.deleted_terms` 三类 P2 对象真实 HTTP 上传、另一客户端下载密文后解密 / 解码 / 合并写回 SQLite、stale conflict latest metadata、B 端按 `base_version = 1` 上传 v2、A 端下载 v2 写回，以及 runtime 日志脱敏。
+- 设备签名 profile 边界：Rust/Go 按显式算法分派 Ed25519/P-256 verifier，并读取 `tests/fixtures/device-signature-profiles-v1.txt`；Go API 对外保持顶层 `invalid_signature`，使用稳定 `error_detail` 区分算法、编码、验签和 key lifetime 错误。
 
 未落地：
 
 - `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
 - 生产恢复 UI / API、远端密钥轮换执行器、备份快照 payload 字段序列化和用户可用同步设置。
-- 真实平台私钥存储 backend 的生产可用状态；当前 `apple-keychain-v1` 已 feature-gated 接线，但真实 smoke 阻塞于 `ed25519-v1` 创建，不能作为可用生产 backend；`android-keystore-v1` 已补 runbook、feature-gated Rust store、Rust bridge wrapper、bridge contract、合成 bridge 单测、ignored smoke 门禁、仓库内 Kotlin / Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，已补 Rust raw JNI glue，Android target build 已通过 `./scripts/check-android-target.sh`；Pixel 9 Pro API 35 AVD 真实 smoke / provider diagnostics 与 Pixel 10 Pro API 37 AVD provider diagnostics 结果均为 `unsupported_signature_algorithm`。
+- 真实平台私钥存储 backend 的生产可用状态；独立 `apple-keychain-p256-v1` repository spike 与 gated smoke 已落地但尚未获授权访问真实 Keychain，status 保持关闭；`apple-keychain-v1` 仍阻塞于 Ed25519 创建，已测 Android AVD 也仍为 `unsupported_signature_algorithm`。
 
 ## 验证口径
 
@@ -303,6 +306,7 @@ cargo test -p radishlex-ime-cli
 - remote client 必须拒绝 manifest 与 encrypted object metadata 不一致的上传请求，必须把 stale base version 映射为 latest metadata，且错误 / Debug 输出不得泄漏请求体、signature、nonce 或 payload bytes。
 - `HttpSyncRemoteTransport` 必须只支持不含凭据、query 和 fragment 的 `http://` base URL，必须传递 JSON request 和 binary payload response，必须拒绝请求 path 中的 query / fragment；访问启用 Go access token 的 server 时只能通过受控 bearer header 配置，不得把 token 放进 URL、日志或 Debug，且 transport 错误不得包含请求体、payload、nonce、signature、token 或 plaintext payload。
 - 设备生命周期模型必须验证 pending / active / revoked 状态转移，授权设备和接收设备都必须 active，撤销记录必须推进 `key_epoch`，对象版本必须能识别 stale base version。
+- 设备签名 metadata 必须显式携带 profile id；Rust/Go 共享 vectors 必须覆盖两个 profile 正向签名及算法不一致、错误公钥、canonical 篡改、非法编码、签名不匹配和 revoked key，不能在失败时尝试另一 verifier。
 - 客户端合并模型必须验证 `dictionary.deleted_terms` tombstone 能压过旧 `dictionary.user_terms` 和旧 `ranker.weights`，旧 epoch 上传不能靠更晚本机时间复活删除词；本地显式恢复必须晚于 tombstone，且恢复前的旧词条、权重和 tombstone 不随词条恢复一起复活。schema v1 的 `manual_add` 不得通过测试伪装为远端恢复。
 - userdb P2 payload 解码必须拒绝 schema / object type 不匹配、未知字段、非法字段类型、`dictionary.user_terms` 中的 deleted 状态、0 key epoch 和负数 / 非有限权重摘要，并能把真实 payload bytes 转成 `ClientSyncMergeInput`。
 - userdb P2 payload 写回必须在同一 SQLite transaction 内执行，并覆盖写入 accepted user terms、写入 accepted tombstones、写入 accepted ranker weights、payload / 本机 tombstone 阻断旧词条与旧权重、本机 explicit restore 版本阻断旧状态，以及 summary 不暴露明文身份。

@@ -1,6 +1,6 @@
 # ADR 0004: 平台私钥存储 Backend 边界
 
-本文档用于固定 RadishLex 真实远端同步前的平台私钥存储 backend 边界，读者是后续实现 `ime-crypto`、平台 bridge、Go sync server 验签接线、管理 UI 设备页面和审阅隐私边界的开发者。本文不包含平台 SDK 调用代码、FFI 导出接口、Flutter 页面、系统输入法壳接入或安装权限流程；`apple-keychain-v1` 平台验证边界见 `docs/runbooks/apple-keychain-signing-backend.md`，Android Keystore 验证边界见 `docs/runbooks/android-keystore-signing-backend.md`，Apple 签名策略见 `docs/adr/0005-apple-platform-signing-strategy.md`，当前证据后的推进策略见 `docs/platform-private-key-backend-strategy.md`。
+本文档用于固定 RadishLex 真实远端同步前的平台私钥存储 backend 边界，读者是后续实现 `ime-crypto`、平台 bridge、Go sync server 验签接线、管理 UI 设备页面和审阅隐私边界的开发者。本文不包含平台 SDK 调用代码、FFI 导出接口、Flutter 页面、系统输入法壳接入或安装权限流程；Apple 平台验证边界见对应 runbook，Apple 签名策略见 ADR 0005，Ed25519/P-256 profile 与新 backend 见 ADR 0006。
 
 ## 状态
 
@@ -8,7 +8,7 @@ Accepted
 
 ## 背景
 
-`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名对象、canonical bytes、Ed25519 签名模型、`DevicePrivateKeyStore` 抽象和错误语义。当前 Rust 实现已提供合成 `test-memory-v1` signing key store、`unavailable` 明确失败 store、backend capability metadata 和生产签名门禁测试，用于测试 signed sync object manifest、signed recovery record、signed device authorization 和 signed device revocation；`apple-keychain-v1` 平台 runbook 已固定，macOS backend 已在 `apple-keychain` feature 下接线，真实 Keychain smoke 已执行但阻塞于 `ed25519-v1` 创建。ADR 0005 已决定保留 `ed25519-v1` 协议，不把 Keychain seed 存储 fallback 混入 `apple-keychain-v1`，并让该 backend status 在 smoke 通过前阻断生产签名。`android-keystore-v1` 已补平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin / Gradle harness、`@JvmStatic` facade、Rust raw JNI glue、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录；当前 Android target build 已通过 `./scripts/check-android-target.sh`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
+`docs/adr/0003-device-signing-key-storage.md` 已固定设备签名对象、canonical bytes、Ed25519 签名模型、`DevicePrivateKeyStore` 抽象和错误语义。ADR 0006 后续接受 P-256 生产候选 profile 与独立 `apple-keychain-p256-v1`，不改写 ADR 0005 对既有 Ed25519 backend 的失败结论。当前 Rust 实现已提供合成 `test-memory-v1`、`unavailable`、两个 Apple backend 的 capability/status、算法绑定和生产门禁；P-256 repository spike 已落地但真实 Keychain smoke 尚未执行。Android Ed25519 证据仍为已测 AVD 返回 `unsupported_signature_algorithm`，不解除生产签名门禁。
 
 进入真实同步前，还需要明确生产私钥如何落到系统安全存储。否则后续平台壳、Flutter manager 或 FFI 可能为了接线方便直接持有私钥 bytes，破坏设备身份和撤销边界。
 
@@ -31,6 +31,7 @@ RadishLex 采用平台 backend 插拔策略：
 test-memory-v1
 unavailable
 apple-keychain-v1
+apple-keychain-p256-v1
 android-keystore-v1
 windows-cng-v1
 linux-secret-service-v1
@@ -40,7 +41,8 @@ linux-secret-service-v1
 
 - `test-memory-v1` 只能用于单元测试、integration test 和合成 fixture。
 - `unavailable` 用于默认构建或平台能力缺失时的明确失败，不允许静默回退到 test memory。
-- `apple-keychain-v1` 和 `android-keystore-v1` 已补平台 runbook；`windows-cng-v1`、`linux-secret-service-v1` 仍只是能力边界标识，进入实现前必须分别补平台 runbook 或 spike 记录。
+- `apple-keychain-v1` 只绑定 `ed25519-v1`；`apple-keychain-p256-v1` 只绑定 `ecdsa-p256-sha256-v1`。两者共享 Apple runbook，但不能互相 fallback。
+- `android-keystore-v1` 已补平台 runbook；`windows-cng-v1`、`linux-secret-service-v1` 仍只是能力边界标识，进入实现前必须分别补平台 runbook 或 spike 记录。
 - backend id 是协议和日志可见 metadata，不得包含系统用户名、设备真实名称、本机路径或用户输入内容。
 
 ## Key Handle Metadata
@@ -95,11 +97,12 @@ DevicePrivateKeyStore
 
 ### Apple 平台
 
-`apple-keychain-v1` 代表 macOS / iOS Keychain 方向。
+`apple-keychain-v1` 与 `apple-keychain-p256-v1` 分别代表 Ed25519 与 P-256 的 macOS / iOS Keychain 方向。
 
 边界：
 
 - 私钥创建、加载和签名由 Apple 平台 backend 负责。
+- P-256 public key 使用 65-byte SEC1 uncompressed point，Apple DER signature 只能在 backend 内转换为 64-byte P1363；完整规则由 ADR 0006 固定。
 - Rust core 不直接调用 Objective-C / Swift API。
 - 平台 bridge 只把签名结果、公钥和 handle metadata 传回 Rust。
 - 是否使用 Secure Enclave、是否要求 user presence、是否允许 iCloud Keychain 迁移，需要后续平台 spike 固定；未验证前不得在文档或 UI 中承诺硬件保护。
@@ -209,9 +212,10 @@ DevicePrivateKeyStore
 6. 已补 ADR 0005，固定 Apple 平台签名策略：保持 `ed25519-v1` 协议，`apple-keychain-v1` 不做 seed 存储 fallback，status 在 smoke 通过前阻断生产签名。
 7. 已补 `android-keystore-v1` 平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、raw JNI glue、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin / Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，固定 Android Keystore Ed25519 创建 / 加载 / 签名 / 删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
 8. 已补平台私钥 backend 策略，固定无新增设备时不把真机矩阵作为硬阻塞，并明确保留 `ed25519-v1`、禁止现有 backend 内 fallback、生产 backend 合格条件和可选后续 ADR 路径。
-9. 其他平台仍需先补 backend spike / runbook，再接具体平台 SDK。
-10. 平台 backend 通过后，再允许真实远端对象上传下载使用生产签名。
-11. 最后才把管理 UI 的设备与恢复页面接入生产 backend。
+9. 已补 ADR 0006、算法无关 Rust/Go verifier、共享 vectors、历史 Go metadata migration 与独立 `apple-keychain-p256-v1` repository spike；真实 gated smoke 尚未执行，status 继续失败关闭。
+10. 其他平台仍需先补 backend spike / runbook，再接具体平台 SDK。
+11. 平台 backend 通过后，再允许真实远端对象上传下载使用生产签名。
+12. 最后才把管理 UI 的设备与恢复页面接入生产 backend。
 
 ## 验证口径
 

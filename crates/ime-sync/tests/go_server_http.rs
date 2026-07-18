@@ -116,6 +116,7 @@ fn create_domain(transport: &HttpSyncRemoteTransport, public_key: &DeviceSigning
         "active_key_id": "sync-key-a",
         "first_device": {
             "device_id": DEVICE_ID,
+            "signing_algorithm": public_key.signature_algorithm.as_str(),
             "signing_public_key_id": SIGNING_KEY_ID,
             "signing_public_key": b64(&public_key.public_key),
             "key_agreement_public_key_id": "agreement-key-a",

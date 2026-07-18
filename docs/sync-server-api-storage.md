@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型、已解密 P2 payload 写回本地 SQLite 的执行器、`ime-sync` remote client DTO / transport trait、std-only `http://` `HttpSyncRemoteTransport`、使用内存 remote harness 的两客户端同步边界测试，以及短生命周期 Go sync server 的两客户端真实 HTTP 同步测试。Go server 已起步，当前 `server/sync-server` 已包含配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、API 层 request id、panic recovery、非持久审计 hook、SQLite `audit_events` 写入测试、单用户自部署 bearer access token 门禁、`cmd/radishlex-sync-server` 启动入口、runtime 配置装配、SQLite migration 嵌入、对象大小门禁、脱敏 audit logger、本机 smoke runbook、短生命周期 HTTP smoke 测试、短生命周期备份恢复 smoke、短生命周期外部 TLS 反代 smoke、短生命周期升级回滚 smoke、Docker Compose 本地 / 部署态入口、容器实际启动 smoke 证据和生产部署边界 runbook；本地 compose 通过 Caddy internal TLS 在同一外部端口提供 `https://localhost:7319`，部署态 compose 在同一外部端口只暴露 HTTP 上游并提供外部 Nginx TLS 终止示例。runtime smoke 已覆盖第二设备 join request / authorization、active 状态复验、跨设备同一 object 的 stale conflict 与 v2 payload 读取，冷备份恢复后 domain state、device state、recovery latest、三类 P2 object metadata / payload、stale conflict latest metadata 和日志脱敏，HTTPS client 经 TLS reverse proxy 到 HTTP upstream 的 bearer header 透传、TLS 版本、encrypted object 上传下载、Go 对象大小门禁和日志脱敏，以及升级重启后 idempotent migration、升级后 v2 写入、恢复升级前备份后 v2 不可见、v1 payload / stale conflict 与日志脱敏。Rust HTTP transport 直连 Go server 的短生命周期跨语言测试已覆盖 domain 初始化、signed encrypted object 上传、metadata / payload 读取和 stale conflict 映射；Rust userdb 两客户端真实 HTTP 测试已覆盖设备授权、三类 P2 对象上传下载、客户端解密合并写回、stale conflict 和 v2 重新上传。尚未形成完整真实用户生产封装、发布级目标部署运行证据或可用平台私钥 backend；当前产品开发以本地 Docker / 本地 HTTPS 和短生命周期 smoke 继续推进同步入口状态与本地联调。`apple-keychain-v1` 已 feature-gated 接线但真实 smoke 阻塞于 `ed25519-v1` 创建，当前 status 会阻断生产签名。SQLite driver 当前使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
+当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型、已解密 P2 payload 写回本地 SQLite 的执行器、`ime-sync` remote client、两客户端内存与短生命周期 Go HTTP 测试。Go server 已具备 API/storage/runtime、SQLite metadata、local blob、Ed25519/P-256 签名 profile 验证、对象版本与冲突、recovery、审计、bearer token、备份恢复、外部 TLS 和升级回滚受控证据。尚未形成完整真实用户生产封装、发布级目标部署运行证据或可用平台私钥 backend；`apple-keychain-v1` 阻塞于 Ed25519 创建，`apple-keychain-p256-v1` 只有 repository spike、尚未运行真实 gated smoke，两者 status 都阻断生产签名。SQLite driver 使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
 
 本阶段只固定服务端 API 和 storage 边界：
 
@@ -13,7 +13,7 @@
 - 服务端不能解密、不能解析 plaintext payload、不能合并用户词、不能读取 P1 原始事件。
 - 客户端仍是真相源：解密、冲突合并、删除 tombstone 语义、显式恢复和 userdb 写回都在客户端完成。
 
-Go 代码必须继续受本文件约束 migration、handler 和测试命名；平台私钥存储 backend capability / unavailable backend 的 Rust 模型已经落地。进入真实用户可用同步前，仍必须保持签名验证、HTTP API handler、Go runtime smoke、Rust HTTP transport 直连 Go server、Rust 侧两客户端 harness、Rust userdb 两客户端真实 HTTP 测试、Docker Compose runbook、生产部署 runbook、错误语义、审计日志和平台 backend 验证彼此一致。
+Go 代码必须继续受本文件约束 migration、handler 和测试命名。ADR 0006 后，server 已按显式 `signing_algorithm` 分派 `ed25519-v1` / `ecdsa-p256-sha256-v1` verifier，历史设备与 join request 只由 schema migration 回填 Ed25519，新 API 请求不做默认或算法猜测。进入真实用户可用同步前，仍必须保持签名验证、HTTP API handler、Go runtime smoke、Rust HTTP transport 直连 Go server、Rust 侧两客户端 harness、生产部署、错误语义、审计日志和平台 backend 验证彼此一致。
 
 ## 服务端职责
 
@@ -47,9 +47,9 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名；�
 
 `current_key_epoch` 只用于拒绝撤销后的旧 epoch 新写入；客户端合并仍是最终冲突真相源。
 
-`devices`：`domain_id`、`device_id`、`signing_public_key_id`、`signing_public_key`、`key_agreement_public_key_id`、`key_agreement_public_key`、`status`、`authorized_at_ms`、`revoked_at_ms`、`last_seen_at_ms`。设备显示名如果后续需要展示，应作为用户可编辑的非敏感标签处理，不得从系统用户名、联系人或输入内容自动采集。
+`devices`：`domain_id`、`device_id`、`signing_algorithm`、`signing_public_key_id`、`signing_public_key`、`key_agreement_public_key_id`、`key_agreement_public_key`、`status`、`authorized_at_ms`、`revoked_at_ms`、`last_seen_at_ms`。设备显示名如果后续需要展示，应作为用户可编辑的非敏感标签处理，不得从系统用户名、联系人或输入内容自动采集。
 
-`device_join_requests`：`domain_id`、`join_request_id`、`device_id`、`signing_public_key_id`、`signing_public_key`、`key_agreement_public_key_id`、`key_agreement_public_key`、`challenge`、`created_at_ms`、`expires_at_ms`、`status`。
+`device_join_requests`：`domain_id`、`join_request_id`、`device_id`、`signing_algorithm`、`signing_public_key_id`、`signing_public_key`、`key_agreement_public_key_id`、`key_agreement_public_key`、`challenge`、`created_at_ms`、`expires_at_ms`、`status`。
 
 服务端只转发待授权设备的公钥、challenge 和状态。短码应由客户端根据加入请求内容本地计算和展示；授权提交时需要携带 signed authorization 中的 `join_short_code`，用于验签绑定用户确认过的短码。
 
@@ -87,9 +87,9 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名；�
 
 这组方法当前用于验证 metadata、设备状态、版本冲突、blob 写入和错误语义，不等同于完整 HTTP API。尚未暴露对象分页、审计日志查询或持久限速器。
 
-当前 storage conformance 已覆盖：第一台设备必须为 `active`；join request 从 `pending` 授权到 `active`；wrapped device key bytes 随授权事务保存并可按 metadata 读取；revoked 设备和旧 `key_epoch` 写入被拒绝；object version 支持同 hash 幂等重试、同版本不同 hash 冲突和 stale `base_version` latest metadata；object payload 读取复验长度 / Rust envelope ciphertext hash；recovery record 写入校验 wrapped material 长度 / ciphertext hash 并分配 `blob_ref`；latest recovery metadata 与 wrapped material bytes 可一起读取并复验；signed object manifest、device authorization、device revocation 和 recovery record 字段篡改会被 Ed25519 验签拒绝。
+当前 storage conformance 已覆盖：第一台设备必须为 `active` 且显式携带受支持签名算法；join request 从 `pending` 授权到 `active`；wrapped device key bytes 随授权事务保存并可按 metadata 读取；revoked 设备和旧 `key_epoch` 写入被拒绝；object version 冲突与 blob hash/length 复验；signed object manifest、device authorization、device revocation 和 recovery record 字段篡改会被验签拒绝。Rust/Go 另共同读取同一 profile fixture，覆盖两个算法正向签名和固定负向错误。
 
-当前 storage 已在写入前使用 `devices.signing_public_key` 验证 object manifest、device authorization、device revocation 和 recovery record；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list。当前 API 层已补 `GET /api/v1/domains/{domain_id}/recovery-records/latest`，复用 `LatestRecoveryWrappedMaterial`，返回服务端可见 recovery metadata 与 encrypted wrapped material，并覆盖统一 JSON 错误响应、`recovery_rate_limited` 和不泄漏内部 `blob_ref`。API 层也已补 `POST /domains`、`GET /domains/{domain_id}/state`、`GET /domains/{domain_id}/devices/{device_id}`、`POST /domains/{domain_id}/join-requests`、`GET /domains/{domain_id}/join-requests` 和 `POST /domains/{domain_id}/join-requests/{join_request_id}/authorization`，覆盖创建 domain、读取 domain metadata、读取 active / pending device metadata、创建 / 列出 pending join request、authorization request 到 storage upload 的映射和非法 JSON 错误响应。对象版本 API 已补 `POST /api/v1/domains/{domain_id}/objects/{object_id}/versions`、`GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}` 和 `GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}/payload`，复用 `PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`，覆盖 encrypted payload 长度 / hash mismatch、stale base version latest metadata、同版本同 hash 幂等、同版本不同 hash 冲突、revoked / pending / unknown device 禁止上传、plaintext 字段拒绝和错误 / 审计不泄漏 payload。当前 handler 外层已补 `X-Request-ID` 透传 / 生成、panic recovery 结构化 `storage_unavailable` 响应和非持久 `AuditSink` hook；当底层 store 实现持久审计时会写入 SQLite `audit_events`。runtime 层已补 `cmd/radishlex-sync-server`、SQLite + local blob store 装配、idempotent migration、HTTP timeout、`RADISHLEX_SYNC_MAX_OBJECT_BYTES` 门禁和脱敏 audit logger。审计事件和 runtime 日志只包含 route name / event type、domain id、device id、object id、object type、version、result code、HTTP status、byte count、server time 和 latency，不包含请求体或响应体。
+当前 storage 已在写入前使用设备登记的 `signing_algorithm + signing_public_key` 验证 object manifest、device authorization、device revocation 和 recovery record；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list，不在失败时尝试另一 verifier。HTTP API 已覆盖 domain/device/join、authorization、recovery 与 object version 路径；签名错误对外保持顶层 `invalid_signature`，并以脱敏 `error_detail` 区分算法、编码、验签和 key lifetime。runtime 使用 idempotent schema migration，历史缺列行固定回填 `ed25519-v1`；审计与日志不包含 request body、public key、signature 或 canonical bytes。
 
 ## HTTP API 边界
 
@@ -240,6 +240,7 @@ JSON byte 字段：
 
 ```text
 error_code
+error_detail
 message
 retryable
 server_time_ms
@@ -247,7 +248,7 @@ latest_version
 latest_ciphertext_hash
 ```
 
-`message` 只能包含非敏感说明；不得回显请求体、payload bytes、恢复码、签名材料或明文业务字段。
+`error_detail` 是可选固定 allowlist，当前用于 `invalid_signature` 的算法、编码、验签与 key lifetime 分类；`message` 只能包含非敏感说明。两者都不得回显请求体、public key、signature、canonical bytes、payload、恢复码或明文业务字段。
 
 首批错误码：
 
@@ -413,13 +414,14 @@ latest_ciphertext_hash
 23. 已补 runtime 备份恢复 smoke，覆盖短生命周期 Go server 写入 domain、第二设备授权、三类 P2 encrypted object、recovery record 和审计事件，停止后复制 SQLite metadata 与 encrypted blob dir 到备份目录，再恢复到隔离目录并重启验证 domain / device / recovery latest / object payload / stale conflict 与日志脱敏。
 24. 已补 runtime 外部 TLS 反代 smoke，覆盖 HTTPS client、TLS 1.2+、TLS reverse proxy 到 HTTP upstream、`Authorization` header 透传、`X-Forwarded-Proto=https`、Go bearer token 门禁、encrypted object 上传下载、Go 对象大小门禁和日志脱敏。
 25. 已补 runtime 升级回滚 smoke，覆盖升级前数据写入、关闭后冷备份、同一数据目录重启触发 idempotent migration、升级后 v2 写入、恢复升级前备份到隔离目录、确认 v2 不可见、v1 payload / stale conflict 仍按 latest metadata 返回，以及日志不泄漏 payload、signature、wrapped material 或恢复敏感字段。
+26. 已补 ADR 0006 对应的算法分派、设备/join `signing_algorithm` API/SQLite metadata、历史 Ed25519 migration、稳定 `error_detail` 和 Rust/Go 共享正负向 vectors；新请求缺少算法或传入未知算法时失败关闭。
 
 任何阶段都不应把 Flutter manager、平台壳、真实系统输入法服务或输入热路径接入 Go server。
 
 ## 停止线
 
 - Rust 侧两客户端 harness 已覆盖 encrypted userdb payload 的上传、下载、解密、合并写回和 stale conflict 重新上传；Go runtime smoke 已覆盖第二设备授权、跨设备 object 版本链、备份恢复链路、外部 TLS 反代链路和升级回滚链路；Rust HTTP transport 直连 Go server 的短生命周期测试已覆盖跨语言 DTO、handler、storage、错误语义和日志脱敏边界；Rust userdb 两客户端真实 Go HTTP 测试已覆盖客户端解密合并写回和 v2 重新上传；生产部署 runbook 已固定外部 TLS、认证、备份和升级停止线，Go server 与 Rust HTTP transport 已补单用户 bearer access token 证据。进入用户可用同步前，仍必须补可用平台私钥 backend 和发布级目标部署运行证据；当前产品开发继续使用本地 Docker / 本地 HTTPS 复验证据。
-- 平台私钥存储 backend 能力模型已落地；`apple-keychain-v1` 已 feature-gated 接线但当前不可用于生产签名，可用平台 backend 验证未完成前，不提供用户可用同步 UI。
+- 平台私钥存储 backend 能力模型已落地；`apple-keychain-v1` 仍阻塞，`apple-keychain-p256-v1` 只有 repository spike、尚无真实 Keychain smoke。可用平台 backend 验证未完成前，不提供用户可用同步 UI。
 - device authorization handler 对外开放前必须继续复用 wrapped key bytes 的存储 / 读取语义，且不得返回明文同步域材料。
 - recovery latest handler 已复用 wrapped material bytes 读取语义，并补齐限速与内部 `blob_ref` 不外泄测试；object version handler 已复用 encrypted object blob 读写语义，并补齐冲突、设备状态和脱敏测试；API handler 已补 panic recovery、request id、非持久审计 hook、SQLite `audit_events` 写入和 bearer access token 门禁；runtime 已补配置装配、脱敏 audit logger、本机 smoke runbook、双设备 HTTP smoke、备份恢复 smoke、外部 TLS 反代 smoke、升级回滚 smoke、Docker Compose 本地 / 部署态入口、容器实际启动 smoke 证据和生产部署边界 runbook。Rust remote client 已补 DTO、transport trait、HTTP transport、错误映射、可选 bearer token header、两客户端 userdb harness、直连 Go server 的短生命周期测试和 userdb 两客户端真实 Go HTTP 测试；进入真实用户部署前仍需补可用平台私钥 backend 和发布级目标部署运行证据，进入 manager 同步入口非上传开发可先依赖本地联调证据。
 - 服务端能保存、打印或索引明文用户词、input code、reading、P1 原始事件或候选偏好时，必须停止并回退该设计。

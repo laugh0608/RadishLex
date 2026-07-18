@@ -129,13 +129,13 @@ func (s *SQLiteStore) SaveJoinRequest(ctx context.Context, request JoinRequest) 
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO device_join_requests (
 			domain_id, join_request_id, device_id,
-			signing_public_key_id, signing_public_key,
+			signing_algorithm, signing_public_key_id, signing_public_key,
 			key_agreement_public_key_id, key_agreement_public_key,
 			challenge, created_at_ms, expires_at_ms, status
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		request.DomainID, request.JoinRequestID, request.DeviceID,
-		request.SigningPublicKeyID, cloneBytes(request.SigningPublicKey),
+		request.SigningAlgorithm, request.SigningPublicKeyID, cloneBytes(request.SigningPublicKey),
 		request.KeyAgreementPublicKeyID, cloneBytes(request.KeyAgreementPublicKey),
 		cloneBytes(request.Challenge), request.CreatedAtMs, request.ExpiresAtMs, string(request.Status),
 	); err != nil {
@@ -144,6 +144,7 @@ func (s *SQLiteStore) SaveJoinRequest(ctx context.Context, request JoinRequest) 
 	device := Device{
 		DomainID:                request.DomainID,
 		DeviceID:                request.DeviceID,
+		SigningAlgorithm:        request.SigningAlgorithm,
 		SigningPublicKeyID:      request.SigningPublicKeyID,
 		SigningPublicKey:        cloneBytes(request.SigningPublicKey),
 		KeyAgreementPublicKeyID: request.KeyAgreementPublicKeyID,
@@ -168,7 +169,7 @@ func (s *SQLiteStore) PendingJoinRequests(ctx context.Context, domainID string) 
 	}
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT domain_id, join_request_id, device_id,
-			signing_public_key_id, signing_public_key,
+			signing_algorithm, signing_public_key_id, signing_public_key,
 			key_agreement_public_key_id, key_agreement_public_key,
 			challenge, created_at_ms, expires_at_ms, status
 		FROM device_join_requests
@@ -669,7 +670,7 @@ func domainFromRow(row sqlRow) (Domain, error) {
 
 func deviceQuerier(ctx context.Context, querier sqlQuerier, domainID string, deviceID string) (Device, error) {
 	return deviceFromRow(querier.QueryRowContext(ctx, `
-		SELECT domain_id, device_id, signing_public_key_id, signing_public_key,
+		SELECT domain_id, device_id, signing_algorithm, signing_public_key_id, signing_public_key,
 			key_agreement_public_key_id, key_agreement_public_key,
 			status, authorized_at_ms, revoked_at_ms, last_seen_at_ms
 		FROM devices
@@ -699,7 +700,7 @@ func deviceFromRow(row sqlRow) (Device, error) {
 	var device Device
 	var status string
 	if err := row.Scan(
-		&device.DomainID, &device.DeviceID, &device.SigningPublicKeyID, &device.SigningPublicKey,
+		&device.DomainID, &device.DeviceID, &device.SigningAlgorithm, &device.SigningPublicKeyID, &device.SigningPublicKey,
 		&device.KeyAgreementPublicKeyID, &device.KeyAgreementPublicKey,
 		&status, &device.AuthorizedAtMs, &device.RevokedAtMs, &device.LastSeenAtMs,
 	); err != nil {
@@ -715,12 +716,12 @@ func deviceFromRow(row sqlRow) (Device, error) {
 func insertDeviceTx(ctx context.Context, tx *sql.Tx, device Device) error {
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO devices (
-			domain_id, device_id, signing_public_key_id, signing_public_key,
+			domain_id, device_id, signing_algorithm, signing_public_key_id, signing_public_key,
 			key_agreement_public_key_id, key_agreement_public_key,
 			status, authorized_at_ms, revoked_at_ms, last_seen_at_ms
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
-		device.DomainID, device.DeviceID, device.SigningPublicKeyID, cloneBytes(device.SigningPublicKey),
+		device.DomainID, device.DeviceID, device.SigningAlgorithm, device.SigningPublicKeyID, cloneBytes(device.SigningPublicKey),
 		device.KeyAgreementPublicKeyID, cloneBytes(device.KeyAgreementPublicKey),
 		string(device.Status), device.AuthorizedAtMs, device.RevokedAtMs, device.LastSeenAtMs,
 	); err != nil {
@@ -732,7 +733,7 @@ func insertDeviceTx(ctx context.Context, tx *sql.Tx, device Device) error {
 func joinRequestTx(ctx context.Context, tx *sql.Tx, domainID string, joinRequestID string) (JoinRequest, error) {
 	row := tx.QueryRowContext(ctx, `
 		SELECT domain_id, join_request_id, device_id,
-			signing_public_key_id, signing_public_key,
+			signing_algorithm, signing_public_key_id, signing_public_key,
 			key_agreement_public_key_id, key_agreement_public_key,
 			challenge, created_at_ms, expires_at_ms, status
 		FROM device_join_requests
@@ -742,7 +743,7 @@ func joinRequestTx(ctx context.Context, tx *sql.Tx, domainID string, joinRequest
 	var status string
 	if err := row.Scan(
 		&request.DomainID, &request.JoinRequestID, &request.DeviceID,
-		&request.SigningPublicKeyID, &request.SigningPublicKey,
+		&request.SigningAlgorithm, &request.SigningPublicKeyID, &request.SigningPublicKey,
 		&request.KeyAgreementPublicKeyID, &request.KeyAgreementPublicKey,
 		&request.Challenge, &request.CreatedAtMs, &request.ExpiresAtMs, &status,
 	); err != nil {
@@ -760,7 +761,7 @@ func scanJoinRequestRows(rows *sql.Rows) (JoinRequest, error) {
 	var status string
 	if err := rows.Scan(
 		&request.DomainID, &request.JoinRequestID, &request.DeviceID,
-		&request.SigningPublicKeyID, &request.SigningPublicKey,
+		&request.SigningAlgorithm, &request.SigningPublicKeyID, &request.SigningPublicKey,
 		&request.KeyAgreementPublicKeyID, &request.KeyAgreementPublicKey,
 		&request.Challenge, &request.CreatedAtMs, &request.ExpiresAtMs, &status,
 	); err != nil {

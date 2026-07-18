@@ -25,6 +25,8 @@ const (
 	ObjectBackupSnapshot         = "backup.snapshot"
 
 	AlgorithmXChaCha20Poly1305HKDFSHA256 = "xchacha20poly1305-hkdf-sha256-v1"
+	SignatureAlgorithmEd25519V1          = "ed25519-v1"
+	SignatureAlgorithmECDSAP256SHA256V1  = "ecdsa-p256-sha256-v1"
 )
 
 type Domain struct {
@@ -38,6 +40,7 @@ type Domain struct {
 type Device struct {
 	DomainID                string
 	DeviceID                string
+	SigningAlgorithm        string
 	SigningPublicKeyID      string
 	SigningPublicKey        []byte
 	KeyAgreementPublicKeyID string
@@ -52,6 +55,7 @@ type JoinRequest struct {
 	DomainID                string
 	JoinRequestID           string
 	DeviceID                string
+	SigningAlgorithm        string
 	SigningPublicKeyID      string
 	SigningPublicKey        []byte
 	KeyAgreementPublicKeyID string

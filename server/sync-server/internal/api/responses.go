@@ -17,6 +17,7 @@ type DomainStateResponse struct {
 type DeviceResponse struct {
 	DomainID                string               `json:"domain_id"`
 	DeviceID                string               `json:"device_id"`
+	SigningAlgorithm        string               `json:"signing_algorithm"`
 	SigningPublicKeyID      string               `json:"signing_public_key_id"`
 	SigningPublicKey        []byte               `json:"signing_public_key"`
 	KeyAgreementPublicKeyID string               `json:"key_agreement_public_key_id"`
@@ -31,6 +32,7 @@ type JoinRequestResponse struct {
 	DomainID                string               `json:"domain_id"`
 	JoinRequestID           string               `json:"join_request_id"`
 	DeviceID                string               `json:"device_id"`
+	SigningAlgorithm        string               `json:"signing_algorithm"`
 	SigningPublicKeyID      string               `json:"signing_public_key_id"`
 	SigningPublicKey        []byte               `json:"signing_public_key"`
 	KeyAgreementPublicKeyID string               `json:"key_agreement_public_key_id"`
@@ -107,6 +109,7 @@ func DeviceResponseFrom(device storage.Device) DeviceResponse {
 	return DeviceResponse{
 		DomainID:                device.DomainID,
 		DeviceID:                device.DeviceID,
+		SigningAlgorithm:        device.SigningAlgorithm,
 		SigningPublicKeyID:      device.SigningPublicKeyID,
 		SigningPublicKey:        cloneBytes(device.SigningPublicKey),
 		KeyAgreementPublicKeyID: device.KeyAgreementPublicKeyID,
@@ -123,6 +126,7 @@ func JoinRequestResponseFrom(request storage.JoinRequest) JoinRequestResponse {
 		DomainID:                request.DomainID,
 		JoinRequestID:           request.JoinRequestID,
 		DeviceID:                request.DeviceID,
+		SigningAlgorithm:        request.SigningAlgorithm,
 		SigningPublicKeyID:      request.SigningPublicKeyID,
 		SigningPublicKey:        cloneBytes(request.SigningPublicKey),
 		KeyAgreementPublicKeyID: request.KeyAgreementPublicKeyID,

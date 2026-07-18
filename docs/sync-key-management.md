@@ -18,9 +18,10 @@
 - `docs/production-recovery-flow.md` 已固定生产恢复记录创建、轮换、撤销、新设备恢复加入、全部设备丢失、失败限速和停止线。
 - `docs/adr/0004-platform-private-key-storage-backend.md` 已固定平台私钥存储 backend、capability metadata、FFI 边界、错误语义、迁移和停止线。
 - `docs/runbooks/apple-keychain-signing-backend.md` 已固定 `apple-keychain-v1` 首个平台 backend 验证边界，`docs/adr/0005-apple-platform-signing-strategy.md` 已固定 Apple 平台签名策略；`docs/runbooks/android-keystore-signing-backend.md` 已固定 `android-keystore-v1` 验证边界。
-- `ime-crypto` 已补 Ed25519 设备签名、`test-memory-v1` signing key store、platform backend capability metadata、unavailable backend 明确失败、revoked key 阻断签名 / 导出、feature-gated macOS Keychain backend、feature-gated Android Keystore 不可用门禁、Android Rust bridge wrapper、bridge contract、signed sync object manifest 和 signed recovery record；`ime-sync` 已补 signed device authorization 与 signed device revocation。
+- `docs/adr/0006-device-signature-algorithm-profiles.md` 已接受 `ecdsa-p256-sha256-v1` 作为与 `ed25519-v1` 共存的生产候选，固定编码、canonical bytes、错误、迁移和 `apple-keychain-p256-v1` 边界。
+- `ime-crypto` 已补算法无关设备验签、Ed25519/P-256 profile、`test-memory-v1` signing key store、platform capability metadata、unavailable 明确失败、revoked key 阻断、两个 feature-gated macOS Keychain backend、Android bridge、signed sync object manifest 和 signed recovery record；`ime-sync` 已补 signed device authorization 与 signed device revocation。
 - `ime-userdb` 已补已解密 P2 JSON 到 merge input 的解析入口，并能把合并模型接受的 user terms、deleted tombstones 和 ranker weights 写回真实 SQLite。
-- Go server storage / API / runtime 验证模型已保存 join request 公钥、authorization metadata、wrapping metadata、revocation metadata、recovery metadata、object metadata、非敏感 audit events 和密文 blob；device wrapping encrypted key bytes、recovery wrapped material 和 encrypted object payload 都已通过 hash / length 复验与读取边界测试。
+- Go server storage / API / runtime 验证模型已保存设备与 join request 的显式 `signing_algorithm`、公钥、authorization、wrapping、revocation、recovery、object、非敏感 audit 和密文 blob；历史 schema migration 只把旧设备/join 行回填为 `ed25519-v1`，新请求不做算法默认。Rust/Go 共同读取同一签名 profile fixture。
 - `ime-sync` 已补 remote object client DTO / transport trait 和 std-only `http://` HTTP transport，上传入口只接收 `AssembledSyncObject` 和 `SignedSyncObjectManifest`，不接受 plaintext payload。
 - Rust 侧两客户端 userdb harness 已覆盖设备 A 生成 P2 payload 并加密上传、设备 B 下载二进制密文后解密 / 解码 / 合并写回 SQLite、stale conflict latest metadata 映射，以及基于最新 base version 重新上传 v2。
 - Rust userdb 两客户端真实 Go HTTP 测试已覆盖设备 B join / signed authorization、三类 P2 对象真实 HTTP 上传下载、客户端解密 / 解码 / SQLite 写回、stale conflict latest metadata、按最新 `base_version` 上传 v2 和 runtime 日志脱敏。
@@ -32,7 +33,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进真实设备配对成功路径；M1/M2 平台输入与本地 manager 可独立推进，但不得调用真实同步或把平台签名 backend 标记为生产可用。
 
-进入用户可用同步前，应按生产部署 runbook 补发布级目标部署运行证据；Apple 原生非导出 Ed25519 支持矩阵应单独调查，Android Keystore 已补仓库内 Kotlin / Gradle harness、`@JvmStatic` facade、Rust raw JNI glue、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，且 Android target build 已通过；当前 Pixel 9 Pro API 35 AVD 和 Pixel 10 Pro API 37 AVD 均未证明 AndroidKeyStore 可提供非导出 Ed25519 signing key。无新增 Android 真机或不同 system image 时，按 `docs/platform-private-key-backend-strategy.md` 继续推进 manager 同步入口非上传开发、策略证据或新的平台 spike / ADR 输入，不把真机矩阵作为硬阻塞。access token 已有首个 server / transport 证据，但可用平台私钥 backend 停止线解除前，不应开放用户可用同步主线。
+进入用户可用同步前，应按生产部署 runbook 补发布级目标部署运行证据。当前优先项是经单独授权执行 `apple-keychain-p256-v1` 真实 gated smoke；在此之前该 backend 仍报告关闭态，不能宣称 Secure Enclave 或 hardware-backed。既有 Apple/Android Ed25519 失败结论继续有效；无新增 Android 真机或不同 system image 时，不把真机矩阵作为硬阻塞。access token 已有首个 server / transport 证据，但可用平台私钥 backend 停止线解除前，不开放用户可用同步主线。
 
 ## 设计目标
 
@@ -101,7 +102,11 @@ SyncDomain
 ```text
 SyncDevice
   device_id
-  public_key_id
+  signing_algorithm
+  signing_public_key_id
+  signing_public_key
+  key_agreement_public_key_id
+  key_agreement_public_key
   status
   authorized_at_ms
   revoked_at_ms
@@ -266,15 +271,16 @@ updated_at_ms
 10. 已按 ADR 落地签名 / 设备密钥存储 Rust 模型，当前使用合成 `test-memory-v1` key store，并补 platform backend capability metadata、unavailable backend 明确失败和 revoked key 阻断测试。
 11. 已补 `apple-keychain-v1` 平台 runbook 和 Apple 签名策略 ADR，固定 Apple Keychain 创建、加载、签名、删除、锁屏 / 权限、备份迁移、日志脱敏和策略停止线；macOS backend 已在 `apple-keychain` feature 下接线，默认测试不访问系统 Keychain，真实 smoke 已运行但阻塞于 `ed25519-v1` 创建，backend status 已阻断生产签名。
 12. 已补 `android-keystore-v1` 平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、raw JNI glue、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin bridge source、Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，固定 Android Keystore Ed25519 创建 / 加载 / 签名 / 删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
-13. 已补真实 userdb P2 payload 解析到 merge input 的接线。
-14. 已补客户端合并结果写回真实 userdb 的执行器。
-15. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
-16. 已补 Go server API / storage 边界设计。
-17. 已补生产恢复流程设计和平台私钥存储 backend ADR。
-18. 已起步 Go server metadata / storage / API / runtime 验证模型，当前覆盖配置默认值、API request / error DTO、SQLite migration、storage interface、storage conformance tests、内存 storage、SQLite-backed metadata repository、local object storage staged transaction、签名验证、wrapped key bytes、recovery wrapped material、object version 上传下载、版本冲突、撤销设备阻断、非敏感 audit events 和隐私字段检查。
-19. 已补 Rust remote object client DTO / transport trait 和 std-only `http://` HTTP transport，固定 encrypted object upload request、metadata 读取、binary payload 下载、stale conflict latest metadata、server error code 映射、真实 HTTP request / response 传递和 Debug 脱敏。
-20. 已补 Rust 侧两客户端 userdb harness，覆盖 P2 payload 加密上传、另一客户端下载密文、解密、解码、合并写回、本机 tombstone 阻断旧远端词条、stale conflict latest metadata 映射和 v2 重新上传。
-21. 已补 Rust userdb 两客户端真实 Go HTTP 测试，覆盖设备授权、三类 P2 对象上传下载、客户端解密写回、stale conflict、v2 重新上传和 runtime 日志脱敏。
+13. 已补 ADR 0006、Rust/Go 算法分派、显式 `signing_algorithm` metadata/migration、共享跨语言 vectors 和独立 `apple-keychain-p256-v1` repository spike；普通测试不访问 Keychain，真实 gated smoke 尚未执行，production status 保持关闭。
+14. 已补真实 userdb P2 payload 解析到 merge input 的接线。
+15. 已补客户端合并结果写回真实 userdb 的执行器。
+16. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
+17. 已补 Go server API / storage 边界设计。
+18. 已补生产恢复流程设计和平台私钥存储 backend ADR。
+19. 已起步 Go server metadata / storage / API / runtime 验证模型，当前覆盖配置默认值、API request / error DTO、SQLite migration、storage interface、storage conformance tests、内存 storage、SQLite-backed metadata repository、local object storage staged transaction、签名验证、wrapped key bytes、recovery wrapped material、object version 上传下载、版本冲突、撤销设备阻断、非敏感 audit events 和隐私字段检查。
+20. 已补 Rust remote object client DTO / transport trait 和 std-only `http://` HTTP transport，固定 encrypted object upload request、metadata 读取、binary payload 下载、stale conflict latest metadata、server error code 映射、真实 HTTP request / response 传递和 Debug 脱敏。
+21. 已补 Rust 侧两客户端 userdb harness，覆盖 P2 payload 加密上传、另一客户端下载密文、解密、解码、合并写回、本机 tombstone 阻断旧远端词条、stale conflict latest metadata 映射和 v2 重新上传。
+22. 已补 Rust userdb 两客户端真实 Go HTTP 测试，覆盖设备授权、三类 P2 对象上传下载、客户端解密写回、stale conflict、v2 重新上传和 runtime 日志脱敏。
 
 ## 验证口径
 
@@ -291,13 +297,14 @@ updated_at_ms
 - `dictionary.deleted_terms` tombstone 能压过旧 user terms 和旧 ranker weights；旧 epoch 上传不能靠更晚本机时间复活删除词，显式恢复必须晚于 tombstone，且恢复前旧权重不随词条恢复一起复活。
 - 已解密 userdb P2 payload 写回必须只应用被合并模型接受的记录，并在事务内覆盖 user terms、deleted tombstones、ranker weights、显式恢复清理和旧权重阻断。
 - 损坏的 envelope、非法 base version、未知设备状态和空 key id 必须返回明确错误。
+- Rust/Go 必须读取同一设备签名 profile fixture，并保持未知/不一致算法、非法公钥/签名编码、篡改 canonical bytes、签名不匹配和 revoked key 的固定负向语义；新设备 metadata 缺少 `signing_algorithm` 时不得默认 Ed25519。
 - 平台私钥存储 backend unavailable 时，签名、授权、撤销和恢复记录轮换必须明确失败，不能回退到 `test-memory-v1`。
 - 真实新设备加入入口必须持续覆盖 wrapped key bytes 密文存储 / 读取、hash / length 复验、authorization 签名验证和日志脱敏。
 
 ## 停止线
 
 - 恢复码 KDF 算法、参数、格式、Rust model 和生产恢复流程设计已落地；服务端恢复记录 API 与管理 UI 未实现前，不提供用户可用恢复入口。
-- 设备签名模型、签名对象验证、私钥存储抽象、平台私钥存储 backend capability / unavailable backend Rust 模型、`apple-keychain-v1` 平台 runbook、Apple 签名策略 ADR、`android-keystore-v1` 平台 runbook、feature-gated macOS backend、feature-gated Android Keystore 不可用门禁、Rust bridge wrapper、bridge contract、raw JNI glue、仓库内 Kotlin / Gradle harness、`@JvmStatic` facade 和 gated instrumented smoke 已落地；真实 Keychain smoke 和真实 Android Keystore smoke 未通过前，不做用户可用远端对象上传下载。
+- 设备签名模型、两个签名 profile、跨语言 verifier/vectors、私钥存储抽象、平台 capability、Apple/Android runbook 与 feature-gated backend 已落地；`apple-keychain-p256-v1` 真实 gated smoke 和既有 Android/Apple 阻塞尚未解除，任何 backend status 仍不得开放用户可用远端对象上传下载。
 - 服务端若回退到只保存 wrapping metadata 而不能保存 / 返回 wrapped key bytes，则不得开放真实设备授权 handler。
 - Go server 与 Rust HTTP transport 继续推进时，必须先满足 `docs/sync-server-api-storage.md` 的签名、metadata API、版本冲突、错误语义和脱敏验证。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。

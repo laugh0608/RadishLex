@@ -2,6 +2,9 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use ed25519_dalek::{Signature, Signer, SigningKey, VerifyingKey};
+use p256::ecdsa::{
+    signature::Verifier as _, Signature as P256Signature, VerifyingKey as P256VerifyingKey,
+};
 
 use crate::device::RecoveryMaterial;
 use crate::model::{
@@ -32,18 +35,22 @@ pub use android_keystore::{
 };
 
 #[cfg(feature = "apple-keychain")]
-pub use apple_keychain::AppleKeychainDeviceKeyStore;
+pub use apple_keychain::{AppleKeychainDeviceKeyStore, AppleKeychainP256DeviceKeyStore};
 
 pub const SIGNATURE_SCHEMA_VERSION: u16 = 1;
 pub const SIGNATURE_ALGORITHM_ED25519_V1: &str = "ed25519-v1";
+pub const SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1: &str = "ecdsa-p256-sha256-v1";
 pub const DEVICE_KEY_STORE_TEST_MEMORY_V1: &str = "test-memory-v1";
 pub const DEVICE_KEY_STORE_UNAVAILABLE: &str = "unavailable";
 pub const DEVICE_KEY_STORE_APPLE_KEYCHAIN_V1: &str = "apple-keychain-v1";
+pub const DEVICE_KEY_STORE_APPLE_KEYCHAIN_P256_V1: &str = "apple-keychain-p256-v1";
 pub const DEVICE_KEY_STORE_ANDROID_KEYSTORE_V1: &str = "android-keystore-v1";
 pub const DEVICE_KEY_STORE_WINDOWS_CNG_V1: &str = "windows-cng-v1";
 pub const DEVICE_KEY_STORE_LINUX_SECRET_SERVICE_V1: &str = "linux-secret-service-v1";
 pub const ED25519_PUBLIC_KEY_LEN: usize = 32;
 pub const ED25519_SIGNATURE_LEN: usize = 64;
+pub const P256_PUBLIC_KEY_LEN: usize = 65;
+pub const P256_SIGNATURE_LEN: usize = 64;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SignatureAlgorithmId(String);
@@ -52,17 +59,21 @@ impl SignatureAlgorithmId {
     pub fn new(value: impl Into<String>) -> Result<Self, CryptoError> {
         let value = value.into();
         validate_required("signature_algorithm", &value)?;
-        if value != SIGNATURE_ALGORITHM_ED25519_V1 {
-            return Err(CryptoError::invalid_field(
-                "signature_algorithm",
-                format!("unsupported signature algorithm {value}"),
-            ));
+        if !matches!(
+            value.as_str(),
+            SIGNATURE_ALGORITHM_ED25519_V1 | SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1
+        ) {
+            return Err(CryptoError::UnsupportedSignatureAlgorithm { algorithm: value });
         }
         Ok(Self(value))
     }
 
     pub fn ed25519_v1() -> Self {
         Self(SIGNATURE_ALGORITHM_ED25519_V1.to_owned())
+    }
+
+    pub fn ecdsa_p256_sha256_v1() -> Self {
+        Self(SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1.to_owned())
     }
 
     pub fn as_str(&self) -> &str {
@@ -81,6 +92,7 @@ pub enum DeviceSigningStorageBackend {
     TestMemoryV1,
     Unavailable,
     AppleKeychainV1,
+    AppleKeychainP256V1,
     AndroidKeystoreV1,
     WindowsCngV1,
     LinuxSecretServiceV1,
@@ -92,6 +104,7 @@ impl DeviceSigningStorageBackend {
             Self::TestMemoryV1 => DEVICE_KEY_STORE_TEST_MEMORY_V1,
             Self::Unavailable => DEVICE_KEY_STORE_UNAVAILABLE,
             Self::AppleKeychainV1 => DEVICE_KEY_STORE_APPLE_KEYCHAIN_V1,
+            Self::AppleKeychainP256V1 => DEVICE_KEY_STORE_APPLE_KEYCHAIN_P256_V1,
             Self::AndroidKeystoreV1 => DEVICE_KEY_STORE_ANDROID_KEYSTORE_V1,
             Self::WindowsCngV1 => DEVICE_KEY_STORE_WINDOWS_CNG_V1,
             Self::LinuxSecretServiceV1 => DEVICE_KEY_STORE_LINUX_SECRET_SERVICE_V1,
@@ -106,6 +119,7 @@ impl DeviceSigningStorageBackend {
         matches!(
             self,
             Self::AppleKeychainV1
+                | Self::AppleKeychainP256V1
                 | Self::AndroidKeystoreV1
                 | Self::WindowsCngV1
                 | Self::LinuxSecretServiceV1
@@ -117,6 +131,40 @@ impl fmt::Display for DeviceSigningStorageBackend {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.as_str())
     }
+}
+
+fn backend_signature_algorithm(
+    storage_backend: DeviceSigningStorageBackend,
+) -> Option<SignatureAlgorithmId> {
+    match storage_backend {
+        DeviceSigningStorageBackend::Unavailable => None,
+        DeviceSigningStorageBackend::AppleKeychainP256V1 => {
+            Some(SignatureAlgorithmId::ecdsa_p256_sha256_v1())
+        }
+        DeviceSigningStorageBackend::TestMemoryV1
+        | DeviceSigningStorageBackend::AppleKeychainV1
+        | DeviceSigningStorageBackend::AndroidKeystoreV1
+        | DeviceSigningStorageBackend::WindowsCngV1
+        | DeviceSigningStorageBackend::LinuxSecretServiceV1 => {
+            Some(SignatureAlgorithmId::ed25519_v1())
+        }
+    }
+}
+
+fn validate_backend_algorithm(
+    storage_backend: DeviceSigningStorageBackend,
+    signature_algorithm: &SignatureAlgorithmId,
+) -> Result<(), CryptoError> {
+    let Some(expected) = backend_signature_algorithm(storage_backend) else {
+        return Ok(());
+    };
+    if expected != *signature_algorithm {
+        return Err(CryptoError::BackendCapabilityMismatch {
+            backend: storage_backend.as_str().to_owned(),
+            message: format!("backend requires signature algorithm {}", expected.as_str()),
+        });
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -196,6 +244,21 @@ impl DeviceSigningKeyHandle {
         )
     }
 
+    pub fn apple_keychain_p256(
+        device_id: impl Into<String>,
+        signing_key_id: impl Into<String>,
+        created_at_ms: i64,
+    ) -> Result<Self, CryptoError> {
+        Self::new(
+            device_id,
+            signing_key_id,
+            SignatureAlgorithmId::ecdsa_p256_sha256_v1(),
+            DeviceSigningStorageBackend::AppleKeychainP256V1,
+            DeviceSigningBackendCapabilities::apple_keychain_p256_v1(),
+            created_at_ms,
+        )
+    }
+
     pub fn android_keystore(
         device_id: impl Into<String>,
         signing_key_id: impl Into<String>,
@@ -226,12 +289,7 @@ impl DeviceSigningKeyHandle {
     pub fn validate(&self) -> Result<(), CryptoError> {
         validate_required("device_id", &self.device_id)?;
         validate_required("signing_key_id", &self.signing_key_id)?;
-        if self.signature_algorithm.as_str() != SIGNATURE_ALGORITHM_ED25519_V1 {
-            return Err(CryptoError::invalid_field(
-                "signature_algorithm",
-                "value must be ed25519-v1",
-            ));
-        }
+        validate_backend_algorithm(self.storage_backend, &self.signature_algorithm)?;
         if self.storage_backend == DeviceSigningStorageBackend::Unavailable {
             return Err(CryptoError::invalid_field(
                 "storage_backend",
@@ -298,6 +356,16 @@ impl DeviceSigningBackendCapabilities {
         }
     }
 
+    pub fn apple_keychain_p256_v1() -> Self {
+        Self {
+            storage_backend: DeviceSigningStorageBackend::AppleKeychainP256V1,
+            exportable: false,
+            hardware_backed: false,
+            user_presence_required: false,
+            backup_migratable: false,
+        }
+    }
+
     pub fn android_keystore_v1() -> Self {
         Self {
             storage_backend: DeviceSigningStorageBackend::AndroidKeystoreV1,
@@ -336,6 +404,7 @@ impl DeviceSigningBackendCapabilities {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DevicePrivateKeyStoreStatus {
     pub storage_backend: DeviceSigningStorageBackend,
+    pub signature_algorithm: Option<SignatureAlgorithmId>,
     pub available: bool,
     pub can_create_signing_keys: bool,
     pub can_sign: bool,
@@ -346,6 +415,7 @@ impl DevicePrivateKeyStoreStatus {
     pub fn test_memory() -> Self {
         Self {
             storage_backend: DeviceSigningStorageBackend::TestMemoryV1,
+            signature_algorithm: Some(SignatureAlgorithmId::ed25519_v1()),
             available: true,
             can_create_signing_keys: true,
             can_sign: true,
@@ -356,6 +426,7 @@ impl DevicePrivateKeyStoreStatus {
     pub fn unavailable() -> Self {
         Self {
             storage_backend: DeviceSigningStorageBackend::Unavailable,
+            signature_algorithm: None,
             available: false,
             can_create_signing_keys: false,
             can_sign: false,
@@ -368,10 +439,24 @@ impl DevicePrivateKeyStoreStatus {
         // It must not advertise production readiness until the platform smoke passes.
         Self {
             storage_backend: DeviceSigningStorageBackend::AppleKeychainV1,
+            signature_algorithm: Some(SignatureAlgorithmId::ed25519_v1()),
             available: false,
             can_create_signing_keys: false,
             can_sign: false,
             capabilities: DeviceSigningBackendCapabilities::apple_keychain_v1(),
+        }
+    }
+
+    pub fn apple_keychain_p256_v1() -> Self {
+        // The native Apple P-256 path is a repository-only capability spike.
+        // Production remains blocked until the gated platform smoke is authorized and passes.
+        Self {
+            storage_backend: DeviceSigningStorageBackend::AppleKeychainP256V1,
+            signature_algorithm: Some(SignatureAlgorithmId::ecdsa_p256_sha256_v1()),
+            available: false,
+            can_create_signing_keys: false,
+            can_sign: false,
+            capabilities: DeviceSigningBackendCapabilities::apple_keychain_p256_v1(),
         }
     }
 
@@ -380,6 +465,7 @@ impl DevicePrivateKeyStoreStatus {
         // It must not advertise production readiness before JNI and device smoke pass.
         Self {
             storage_backend: DeviceSigningStorageBackend::AndroidKeystoreV1,
+            signature_algorithm: Some(SignatureAlgorithmId::ed25519_v1()),
             available: false,
             can_create_signing_keys: false,
             can_sign: false,
@@ -401,6 +487,7 @@ impl DevicePrivateKeyStoreStatus {
         )?;
         Ok(Self {
             storage_backend,
+            signature_algorithm: backend_signature_algorithm(storage_backend),
             available: true,
             can_create_signing_keys: true,
             can_sign: true,
@@ -414,6 +501,17 @@ impl DevicePrivateKeyStoreStatus {
                 backend: self.storage_backend.as_str().to_owned(),
                 message: "status capabilities must describe the status backend".to_owned(),
             });
+        }
+        match (&self.signature_algorithm, self.storage_backend) {
+            (Some(algorithm), backend) => validate_backend_algorithm(backend, algorithm)?,
+            (None, DeviceSigningStorageBackend::Unavailable) => {}
+            (None, _) => {
+                return Err(CryptoError::BackendCapabilityMismatch {
+                    backend: self.storage_backend.as_str().to_owned(),
+                    message: "signing backend status must declare its signature algorithm"
+                        .to_owned(),
+                });
+            }
         }
         if self.storage_backend == DeviceSigningStorageBackend::Unavailable && self.available {
             return Err(CryptoError::BackendCapabilityMismatch {
@@ -481,18 +579,7 @@ impl DeviceSigningPublicKey {
     pub fn validate(&self) -> Result<(), CryptoError> {
         validate_required("device_id", &self.device_id)?;
         validate_required("signing_key_id", &self.signing_key_id)?;
-        if self.signature_algorithm.as_str() != SIGNATURE_ALGORITHM_ED25519_V1 {
-            return Err(CryptoError::invalid_field(
-                "signature_algorithm",
-                "value must be ed25519-v1",
-            ));
-        }
-        if self.public_key.len() != ED25519_PUBLIC_KEY_LEN {
-            return Err(CryptoError::invalid_field(
-                "public_key",
-                format!("value must be {ED25519_PUBLIC_KEY_LEN} bytes"),
-            ));
-        }
+        validate_signing_public_key(&self.signature_algorithm, &self.public_key)?;
         if let Some(revoked_at_ms) = self.revoked_at_ms {
             if revoked_at_ms < self.created_at_ms {
                 return Err(CryptoError::invalid_field(
@@ -528,9 +615,23 @@ impl DeviceSignature {
         signer_device_id: impl Into<String>,
         signature: impl Into<Vec<u8>>,
     ) -> Result<Self, CryptoError> {
+        Self::new_for_algorithm(
+            SignatureAlgorithmId::ed25519_v1(),
+            signature_key_id,
+            signer_device_id,
+            signature,
+        )
+    }
+
+    pub fn new_for_algorithm(
+        signature_algorithm: SignatureAlgorithmId,
+        signature_key_id: impl Into<String>,
+        signer_device_id: impl Into<String>,
+        signature: impl Into<Vec<u8>>,
+    ) -> Result<Self, CryptoError> {
         let signature = Self {
             signature_schema_version: SIGNATURE_SCHEMA_VERSION,
-            signature_algorithm: SignatureAlgorithmId::ed25519_v1(),
+            signature_algorithm,
             signature_key_id: signature_key_id.into(),
             signer_device_id: signer_device_id.into(),
             signature: signature.into(),
@@ -546,20 +647,9 @@ impl DeviceSignature {
                 format!("value must be {SIGNATURE_SCHEMA_VERSION}"),
             ));
         }
-        if self.signature_algorithm.as_str() != SIGNATURE_ALGORITHM_ED25519_V1 {
-            return Err(CryptoError::invalid_field(
-                "signature_algorithm",
-                "value must be ed25519-v1",
-            ));
-        }
         validate_required("signature_key_id", &self.signature_key_id)?;
         validate_required("signer_device_id", &self.signer_device_id)?;
-        if self.signature.len() != ED25519_SIGNATURE_LEN {
-            return Err(CryptoError::invalid_field(
-                "signature",
-                format!("value must be {ED25519_SIGNATURE_LEN} bytes"),
-            ));
-        }
+        validate_signature_encoding(&self.signature_algorithm, &self.signature)?;
         Ok(())
     }
 
@@ -571,6 +661,9 @@ impl DeviceSignature {
     ) -> Result<(), CryptoError> {
         self.validate()?;
         public_key.validate()?;
+        if self.signature_algorithm != public_key.signature_algorithm {
+            return Err(CryptoError::SignatureAlgorithmMismatch);
+        }
         if self.signature_key_id != public_key.signing_key_id {
             return Err(CryptoError::SignatureVerificationFailed);
         }
@@ -578,29 +671,138 @@ impl DeviceSignature {
             return Err(CryptoError::SignatureVerificationFailed);
         }
         if !public_key.is_active_at(signed_at_ms) {
-            return Err(CryptoError::SignatureVerificationFailed);
+            return Err(CryptoError::SignatureKeyNotActive {
+                key_id: public_key.signing_key_id.clone(),
+            });
         }
+        verify_device_signature(
+            self.signature_algorithm.as_str(),
+            &public_key.public_key,
+            &self.signature,
+            canonical_bytes,
+        )
+    }
+}
 
-        let public_key_bytes: [u8; ED25519_PUBLIC_KEY_LEN] =
-            public_key.public_key.as_slice().try_into().map_err(|_| {
-                CryptoError::invalid_field(
-                    "public_key",
-                    format!("value must be {ED25519_PUBLIC_KEY_LEN} bytes"),
-                )
+pub fn verify_device_signature(
+    signature_algorithm: &str,
+    public_key: &[u8],
+    signature: &[u8],
+    canonical_bytes: &[u8],
+) -> Result<(), CryptoError> {
+    validate_non_empty_bytes("canonical_bytes", canonical_bytes)?;
+    let signature_algorithm = SignatureAlgorithmId::new(signature_algorithm.to_owned())?;
+    validate_signing_public_key(&signature_algorithm, public_key)?;
+    validate_signature_encoding(&signature_algorithm, signature)?;
+
+    match signature_algorithm.as_str() {
+        SIGNATURE_ALGORITHM_ED25519_V1 => {
+            let public_key_bytes: &[u8; ED25519_PUBLIC_KEY_LEN] =
+                public_key
+                    .try_into()
+                    .map_err(|_| CryptoError::InvalidSigningPublicKey {
+                        algorithm: signature_algorithm.as_str().to_owned(),
+                    })?;
+            let verifying_key = VerifyingKey::from_bytes(public_key_bytes).map_err(|_| {
+                CryptoError::InvalidSigningPublicKey {
+                    algorithm: signature_algorithm.as_str().to_owned(),
+                }
             })?;
-        let signature_bytes: [u8; ED25519_SIGNATURE_LEN] =
-            self.signature.as_slice().try_into().map_err(|_| {
-                CryptoError::invalid_field(
-                    "signature",
-                    format!("value must be {ED25519_SIGNATURE_LEN} bytes"),
-                )
+            let signature = Signature::from_slice(signature).map_err(|_| {
+                CryptoError::InvalidSignatureEncoding {
+                    algorithm: signature_algorithm.as_str().to_owned(),
+                }
             })?;
-        let verifying_key = VerifyingKey::from_bytes(&public_key_bytes)
-            .map_err(|_| CryptoError::SignatureVerificationFailed)?;
-        let signature = Signature::from_bytes(&signature_bytes);
-        verifying_key
-            .verify_strict(canonical_bytes, &signature)
-            .map_err(|_| CryptoError::SignatureVerificationFailed)
+            verifying_key
+                .verify_strict(canonical_bytes, &signature)
+                .map_err(|_| CryptoError::SignatureVerificationFailed)
+        }
+        SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1 => {
+            let verifying_key = P256VerifyingKey::from_sec1_bytes(public_key).map_err(|_| {
+                CryptoError::InvalidSigningPublicKey {
+                    algorithm: signature_algorithm.as_str().to_owned(),
+                }
+            })?;
+            let signature = P256Signature::from_slice(signature).map_err(|_| {
+                CryptoError::InvalidSignatureEncoding {
+                    algorithm: signature_algorithm.as_str().to_owned(),
+                }
+            })?;
+            verifying_key
+                .verify(canonical_bytes, &signature)
+                .map_err(|_| CryptoError::SignatureVerificationFailed)
+        }
+        _ => Err(CryptoError::UnsupportedSignatureAlgorithm {
+            algorithm: signature_algorithm.as_str().to_owned(),
+        }),
+    }
+}
+
+fn validate_signing_public_key(
+    signature_algorithm: &SignatureAlgorithmId,
+    public_key: &[u8],
+) -> Result<(), CryptoError> {
+    match signature_algorithm.as_str() {
+        SIGNATURE_ALGORITHM_ED25519_V1 => {
+            let public_key_bytes: &[u8; ED25519_PUBLIC_KEY_LEN] =
+                public_key
+                    .try_into()
+                    .map_err(|_| CryptoError::InvalidSigningPublicKey {
+                        algorithm: signature_algorithm.as_str().to_owned(),
+                    })?;
+            VerifyingKey::from_bytes(public_key_bytes).map_err(|_| {
+                CryptoError::InvalidSigningPublicKey {
+                    algorithm: signature_algorithm.as_str().to_owned(),
+                }
+            })?;
+            Ok(())
+        }
+        SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1 => {
+            if public_key.len() != P256_PUBLIC_KEY_LEN || public_key.first() != Some(&0x04) {
+                return Err(CryptoError::InvalidSigningPublicKey {
+                    algorithm: signature_algorithm.as_str().to_owned(),
+                });
+            }
+            P256VerifyingKey::from_sec1_bytes(public_key).map_err(|_| {
+                CryptoError::InvalidSigningPublicKey {
+                    algorithm: signature_algorithm.as_str().to_owned(),
+                }
+            })?;
+            Ok(())
+        }
+        _ => Err(CryptoError::UnsupportedSignatureAlgorithm {
+            algorithm: signature_algorithm.as_str().to_owned(),
+        }),
+    }
+}
+
+fn validate_signature_encoding(
+    signature_algorithm: &SignatureAlgorithmId,
+    signature: &[u8],
+) -> Result<(), CryptoError> {
+    match signature_algorithm.as_str() {
+        SIGNATURE_ALGORITHM_ED25519_V1 => {
+            Signature::from_slice(signature).map(|_| ()).map_err(|_| {
+                CryptoError::InvalidSignatureEncoding {
+                    algorithm: signature_algorithm.as_str().to_owned(),
+                }
+            })
+        }
+        SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1 => {
+            if signature.len() != P256_SIGNATURE_LEN {
+                return Err(CryptoError::InvalidSignatureEncoding {
+                    algorithm: signature_algorithm.as_str().to_owned(),
+                });
+            }
+            P256Signature::from_slice(signature)
+                .map(|_| ())
+                .map_err(|_| CryptoError::InvalidSignatureEncoding {
+                    algorithm: signature_algorithm.as_str().to_owned(),
+                })
+        }
+        _ => Err(CryptoError::UnsupportedSignatureAlgorithm {
+            algorithm: signature_algorithm.as_str().to_owned(),
+        }),
     }
 }
 

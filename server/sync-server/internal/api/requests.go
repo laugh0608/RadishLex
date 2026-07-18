@@ -13,6 +13,7 @@ type CreateDomainRequest struct {
 
 type DeviceMetadata struct {
 	DeviceID                string `json:"device_id"`
+	SigningAlgorithm        string `json:"signing_algorithm"`
 	SigningPublicKeyID      string `json:"signing_public_key_id"`
 	SigningPublicKey        []byte `json:"signing_public_key"`
 	KeyAgreementPublicKeyID string `json:"key_agreement_public_key_id"`
@@ -23,6 +24,7 @@ type DeviceMetadata struct {
 type CreateJoinRequestRequest struct {
 	JoinRequestID           string `json:"join_request_id"`
 	DeviceID                string `json:"device_id"`
+	SigningAlgorithm        string `json:"signing_algorithm"`
 	SigningPublicKeyID      string `json:"signing_public_key_id"`
 	SigningPublicKey        []byte `json:"signing_public_key"`
 	KeyAgreementPublicKeyID string `json:"key_agreement_public_key_id"`
@@ -124,6 +126,7 @@ func (r CreateJoinRequestRequest) JoinRequest(domainID string) storage.JoinReque
 		DomainID:                domainID,
 		JoinRequestID:           r.JoinRequestID,
 		DeviceID:                r.DeviceID,
+		SigningAlgorithm:        r.SigningAlgorithm,
 		SigningPublicKeyID:      r.SigningPublicKeyID,
 		SigningPublicKey:        r.SigningPublicKey,
 		KeyAgreementPublicKeyID: r.KeyAgreementPublicKeyID,
@@ -149,6 +152,7 @@ func (r CreateDomainRequest) Device() storage.Device {
 	return storage.Device{
 		DomainID:                r.DomainID,
 		DeviceID:                r.FirstDevice.DeviceID,
+		SigningAlgorithm:        r.FirstDevice.SigningAlgorithm,
 		SigningPublicKeyID:      r.FirstDevice.SigningPublicKeyID,
 		SigningPublicKey:        r.FirstDevice.SigningPublicKey,
 		KeyAgreementPublicKeyID: r.FirstDevice.KeyAgreementPublicKeyID,

@@ -74,8 +74,9 @@ func TestNewHTTPServerConfiguresHandlerTimeoutsAndRedactedAuditLog(t *testing.T)
 		ActiveKeyID:     "sync-key-a",
 		FirstDevice: api.DeviceMetadata{
 			DeviceID:                "device-a",
+			SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 			SigningPublicKeyID:      "signing-key-a",
-			SigningPublicKey:        []byte("sensitive-signing-public-key"),
+			SigningPublicKey:        []byte("sensitive-signing-public-key!!!!"),
 			KeyAgreementPublicKeyID: "agreement-key-a",
 			KeyAgreementPublicKey:   []byte("sensitive-agreement-public-key"),
 			Status:                  string(storage.DeviceActive),
@@ -120,7 +121,7 @@ func TestNewHTTPServerConfiguresHandlerTimeoutsAndRedactedAuditLog(t *testing.T)
 
 	logText := logs.String()
 	for _, forbidden := range []string{
-		"sensitive-signing-public-key",
+		"sensitive-signing-public-key!!!!",
 		"sensitive-agreement-public-key",
 		string(oversizedPayload),
 		"ZW5jcnlwdGVkLXBheWxvYWQtb3Zlci1saW1pdA",
@@ -172,8 +173,9 @@ func TestNewHTTPServerEnforcesConfiguredAccessToken(t *testing.T) {
 		ActiveKeyID:     "sync-key-a",
 		FirstDevice: api.DeviceMetadata{
 			DeviceID:                "device-a",
+			SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 			SigningPublicKeyID:      "signing-key-a",
-			SigningPublicKey:        []byte("signing-public-key"),
+			SigningPublicKey:        smokeSigningPublicKey("device-a"),
 			KeyAgreementPublicKeyID: "agreement-key-a",
 			KeyAgreementPublicKey:   []byte("agreement-public-key"),
 			Status:                  string(storage.DeviceActive),

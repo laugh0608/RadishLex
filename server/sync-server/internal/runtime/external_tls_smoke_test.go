@@ -66,6 +66,7 @@ func TestExternalTLSProxySmokePreservesAuthAndEncryptedObjectFlow(t *testing.T) 
 		ActiveKeyID:     "sync-key-tls",
 		FirstDevice: api.DeviceMetadata{
 			DeviceID:                "device-smoke",
+			SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 			SigningPublicKeyID:      smokeSigningKeyID("device-smoke"),
 			SigningPublicKey:        smokeSigningPublicKey("device-smoke"),
 			KeyAgreementPublicKeyID: "agreement-key-smoke",

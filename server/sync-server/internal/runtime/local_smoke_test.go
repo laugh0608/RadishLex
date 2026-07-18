@@ -36,6 +36,7 @@ func TestLocalServerSmokeUploadsReadsAndConflicts(t *testing.T) {
 		ActiveKeyID:     "sync-key-smoke",
 		FirstDevice: api.DeviceMetadata{
 			DeviceID:                "device-smoke",
+			SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 			SigningPublicKeyID:      smokeSigningKeyID("device-smoke"),
 			SigningPublicKey:        smokeSigningPublicKey("device-smoke"),
 			KeyAgreementPublicKeyID: "agreement-key-smoke",
@@ -181,6 +182,7 @@ func smokeJoinRequest(joinRequestID string, deviceID string, createdAtMs int64) 
 	return api.CreateJoinRequestRequest{
 		JoinRequestID:           joinRequestID,
 		DeviceID:                deviceID,
+		SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 		SigningPublicKeyID:      smokeSigningKeyID(deviceID),
 		SigningPublicKey:        smokeSigningPublicKey(deviceID),
 		KeyAgreementPublicKeyID: "agreement-key-" + deviceID,

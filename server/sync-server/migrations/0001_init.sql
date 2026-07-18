@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS sync_domains (
 CREATE TABLE IF NOT EXISTS devices (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     device_id TEXT NOT NULL,
+    signing_algorithm TEXT NOT NULL,
     signing_public_key_id TEXT NOT NULL,
     signing_public_key BLOB NOT NULL,
     key_agreement_public_key_id TEXT NOT NULL,
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS device_join_requests (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     join_request_id TEXT NOT NULL,
     device_id TEXT NOT NULL,
+    signing_algorithm TEXT NOT NULL,
     signing_public_key_id TEXT NOT NULL,
     signing_public_key BLOB NOT NULL,
     key_agreement_public_key_id TEXT NOT NULL,

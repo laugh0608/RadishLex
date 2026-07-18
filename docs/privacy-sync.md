@@ -52,7 +52,7 @@ P3 包仍需要来源、版本、完整性和许可证校验，但不使用用�
 
 服务端可以看到：
 
-- domain、device 和必要公钥 metadata；
+- domain、device、显式签名算法和必要公钥 metadata；
 - 加密对象 ID、类型、版本、base version 和 key epoch；
 - 密文长度、ciphertext hash、创建和更新时间；
 - 加入、授权、撤销和恢复记录的公开协议字段；
@@ -157,6 +157,10 @@ Sync Master Key + object identity + key epoch
 禁止从平台名称推断算法一定可用，也禁止 unavailable backend 静默回退到内存私钥或普通文件。
 
 协议必须允许算法演进。平台原生 P-256 与“由平台密钥封装的 Ed25519 seed”具有不同保护语义，必须使用不同 backend/algorithm ID 和测试矩阵。
+
+当前设备签名 allowlist 为 `ed25519-v1` 与 `ecdsa-p256-sha256-v1`。后者只接受 65-byte SEC1 uncompressed public key 和 64-byte P1363 signature；两者复用既有 canonical builder，算法 id 本身被签名。设备登记必须绑定 algorithm、key id 与 public key，服务端不能按长度猜测算法，验签失败也不能尝试另一 profile。历史行回填 Ed25519 只能发生在明确 schema migration，新请求不得默认。
+
+`apple-keychain-p256-v1` 只表示 Apple 原生 P-256 `SecKey` 候选，和 Ed25519 `apple-keychain-v1` 分离。没有真实 gated smoke 前，它必须保持 production status 关闭；不可从“Apple Keychain”名称推断 Secure Enclave、hardware-backed、user presence 或可迁移能力。
 
 ## 新设备授权
 
@@ -323,5 +327,6 @@ Docker/反代操作步骤见对应 runbook，当前部署证据见 `docs/status/
 - [生产恢复流程](production-recovery-flow.md)
 - [Sync Server API/Storage](sync-server-api-storage.md)
 - [平台私钥策略](platform-private-key-backend-strategy.md)
+- [设备签名算法 Profile ADR](adr/0006-device-signature-algorithm-profiles.md)
 - [Manager Boundary](manager-ui-boundary.md)
 - [生产部署 Runbook](runbooks/sync-server-production-deployment.md)

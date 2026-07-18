@@ -20,6 +20,7 @@ const (
 
 type Error struct {
 	Code                 ErrorCode
+	DetailCode           string
 	Message              string
 	Retryable            bool
 	LatestVersion        uint64

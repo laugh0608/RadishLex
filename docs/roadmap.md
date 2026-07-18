@@ -106,6 +106,7 @@ M2 是首个本地个人化 MVP。它不要求远端同步已经开放。
 
 - 确定性 merge 与统一冲突表。
 - 签名绑定、KDF/解析资源上限、secret 生命周期和跨语言协议 test vector。
+- 兼容 `ed25519-v1` / `ecdsa-p256-sha256-v1` 的显式设备签名 profile，以及至少一个通过真实 gated smoke 的生产私钥 backend。
 - 对象发现、下载、验签、解密、合并、上传、冲突重试和本地 cursor orchestration。
 - 设备加入、恢复、撤销和 key epoch 轮换 API。
 - Go server 的认证、请求上限、限速、审计、备份恢复和升级回滚闭环。

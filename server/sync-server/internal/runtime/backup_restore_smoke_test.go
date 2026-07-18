@@ -112,6 +112,7 @@ func createBackupSmokeDomain(t *testing.T, baseURL string) {
 		ActiveKeyID:     "sync-key-backup",
 		FirstDevice: api.DeviceMetadata{
 			DeviceID:                "device-smoke",
+			SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 			SigningPublicKeyID:      smokeSigningKeyID("device-smoke"),
 			SigningPublicKey:        smokeSigningPublicKey("device-smoke"),
 			KeyAgreementPublicKeyID: "agreement-key-smoke",

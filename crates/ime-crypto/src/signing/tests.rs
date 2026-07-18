@@ -248,6 +248,52 @@ fn apple_keychain_capabilities_keep_metadata_but_status_blocks_production() {
 }
 
 #[test]
+fn apple_keychain_p256_capabilities_declare_profile_but_keep_production_closed() {
+    let capabilities = DeviceSigningBackendCapabilities::apple_keychain_p256_v1();
+    assert_eq!(
+        capabilities.storage_backend,
+        DeviceSigningStorageBackend::AppleKeychainP256V1
+    );
+    assert!(!capabilities.exportable);
+    assert!(!capabilities.hardware_backed);
+    assert!(!capabilities.user_presence_required);
+    assert!(!capabilities.backup_migratable);
+
+    let status = DevicePrivateKeyStoreStatus::apple_keychain_p256_v1();
+    status.validate().expect("apple P-256 status");
+    assert_eq!(
+        status
+            .signature_algorithm
+            .as_ref()
+            .expect("declared algorithm")
+            .as_str(),
+        SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1
+    );
+    assert!(!status.available);
+    assert!(!status.can_create_signing_keys);
+    assert!(!status.can_sign);
+    assert_eq!(
+        status
+            .ensure_production_signing_allowed()
+            .expect_err("gated P-256 spike cannot sign production objects"),
+        CryptoError::StorageBackendUnavailable {
+            backend: DEVICE_KEY_STORE_APPLE_KEYCHAIN_P256_V1.to_owned(),
+        }
+    );
+
+    let handle = DeviceSigningKeyHandle::apple_keychain_p256("device-a", "signing-key-a", 10)
+        .expect("Apple P-256 handle");
+    assert_eq!(
+        handle.signature_algorithm.as_str(),
+        SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1
+    );
+    assert_eq!(
+        handle.storage_backend,
+        DeviceSigningStorageBackend::AppleKeychainP256V1
+    );
+}
+
+#[test]
 fn android_keystore_capabilities_keep_metadata_but_status_blocks_production() {
     let capabilities = DeviceSigningBackendCapabilities::android_keystore_v1();
     assert_eq!(
@@ -303,6 +349,25 @@ fn apple_keychain_store_status_blocks_production_until_platform_strategy_is_reso
             backend: DEVICE_KEY_STORE_APPLE_KEYCHAIN_V1.to_owned(),
         }
     );
+}
+
+#[cfg(feature = "apple-keychain")]
+#[test]
+fn apple_keychain_p256_store_status_blocks_production_until_gated_smoke_passes() {
+    let store = AppleKeychainP256DeviceKeyStore::new();
+    let status = store.backend_status();
+    status.validate().expect("apple P-256 store status");
+    assert_eq!(
+        status.storage_backend,
+        DeviceSigningStorageBackend::AppleKeychainP256V1
+    );
+    assert!(!status.available);
+    assert!(!status.can_create_signing_keys);
+    assert!(!status.can_sign);
+    let debug = format!("{store:?}");
+    assert!(debug.contains(DEVICE_KEY_STORE_APPLE_KEYCHAIN_P256_V1));
+    assert!(debug.contains(SIGNATURE_ALGORITHM_ECDSA_P256_SHA256_V1));
+    assert!(!debug.contains("org.radishlex.sync.signing.p256"));
 }
 
 #[cfg(feature = "android-keystore")]
@@ -375,7 +440,9 @@ fn signature_verification_rejects_wrong_key_and_revoked_key() {
         signature
             .verify_at(&revoked_key, &canonical, 12)
             .expect_err("revoked key fails"),
-        CryptoError::SignatureVerificationFailed
+        CryptoError::SignatureKeyNotActive {
+            key_id: "signing-key-a".to_owned(),
+        }
     );
 }
 

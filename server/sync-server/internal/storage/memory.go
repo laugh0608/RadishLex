@@ -137,6 +137,7 @@ func (s *MemoryStore) SaveJoinRequest(ctx context.Context, request JoinRequest) 
 	s.devices[deviceKey(request.DomainID, request.DeviceID)] = Device{
 		DomainID:                request.DomainID,
 		DeviceID:                request.DeviceID,
+		SigningAlgorithm:        request.SigningAlgorithm,
 		SigningPublicKeyID:      request.SigningPublicKeyID,
 		SigningPublicKey:        cloneBytes(request.SigningPublicKey),
 		KeyAgreementPublicKeyID: request.KeyAgreementPublicKeyID,
@@ -225,6 +226,7 @@ func (s *MemoryStore) AuthorizeJoinRequest(ctx context.Context, upload DeviceAut
 	s.devices[deviceKey(join.DomainID, join.DeviceID)] = Device{
 		DomainID:                join.DomainID,
 		DeviceID:                join.DeviceID,
+		SigningAlgorithm:        join.SigningAlgorithm,
 		SigningPublicKeyID:      join.SigningPublicKeyID,
 		SigningPublicKey:        cloneBytes(join.SigningPublicKey),
 		KeyAgreementPublicKeyID: join.KeyAgreementPublicKeyID,
@@ -523,8 +525,11 @@ func validateDevice(device Device) error {
 	if !validOpaqueID(device.DomainID) || !validOpaqueID(device.DeviceID) {
 		return newError(ErrInvalidRequest, "device ids must be opaque ids")
 	}
-	if device.SigningPublicKeyID == "" || len(device.SigningPublicKey) == 0 {
+	if device.SigningAlgorithm == "" || device.SigningPublicKeyID == "" || len(device.SigningPublicKey) == 0 {
 		return newError(ErrInvalidRequest, "signing public key is required")
+	}
+	if err := validateSigningPublicKeyEncoding(device.SigningAlgorithm, device.SigningPublicKey); err != nil {
+		return err
 	}
 	if device.KeyAgreementPublicKeyID == "" || len(device.KeyAgreementPublicKey) == 0 {
 		return newError(ErrInvalidRequest, "key agreement public key is required")
@@ -542,8 +547,11 @@ func validateJoinRequest(request JoinRequest) error {
 	if request.Status != DevicePending {
 		return newError(ErrInvalidRequest, "join request must start pending")
 	}
-	if request.SigningPublicKeyID == "" || len(request.SigningPublicKey) == 0 {
+	if request.SigningAlgorithm == "" || request.SigningPublicKeyID == "" || len(request.SigningPublicKey) == 0 {
 		return newError(ErrInvalidRequest, "join request signing key is required")
+	}
+	if err := validateSigningPublicKeyEncoding(request.SigningAlgorithm, request.SigningPublicKey); err != nil {
+		return err
 	}
 	if request.KeyAgreementPublicKeyID == "" || len(request.KeyAgreementPublicKey) == 0 {
 		return newError(ErrInvalidRequest, "join request key agreement key is required")
@@ -708,18 +716,15 @@ func validateAuditEvent(event AuditEvent) error {
 
 func validateSignatureFields(schemaVersion uint16, algorithm string, keyID string, signature []byte) error {
 	if schemaVersion != signatureSchemaVersion {
-		return newError(ErrInvalidSignature, "signature schema version is unsupported")
+		return newSignatureError(signatureDetailAlgorithm, "signature schema version is unsupported")
 	}
-	if algorithm != signatureAlgorithm {
-		return newError(ErrInvalidSignature, "signature algorithm is unsupported")
+	if !supportedSignatureAlgorithm(algorithm) {
+		return newSignatureError(signatureDetailAlgorithm, "signature algorithm is unsupported")
 	}
 	if keyID == "" {
-		return newError(ErrInvalidSignature, "signature key id is required")
+		return newSignatureError(signatureDetailVerify, "signature key id is required")
 	}
-	if len(signature) != ed25519SignatureLen {
-		return newError(ErrInvalidSignature, "signature length is invalid")
-	}
-	return nil
+	return validateSignatureEncoding(algorithm, signature)
 }
 
 func validOpaqueID(value string) bool {

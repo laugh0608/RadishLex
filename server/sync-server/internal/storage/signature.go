@@ -1,16 +1,28 @@
 package storage
 
 import (
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
+	"crypto/sha256"
 	"encoding/binary"
+	"math/big"
 	"strconv"
 )
 
 const (
-	signatureSchemaVersion = 1
-	signatureAlgorithm     = "ed25519-v1"
-	ed25519PublicKeyLen    = ed25519.PublicKeySize
-	ed25519SignatureLen    = ed25519.SignatureSize
+	signatureSchemaVersion   = 1
+	signatureAlgorithm       = SignatureAlgorithmEd25519V1
+	ed25519PublicKeyLen      = ed25519.PublicKeySize
+	ed25519SignatureLen      = ed25519.SignatureSize
+	p256PublicKeyLen         = 65
+	p256SignatureLen         = 64
+	signatureDetailAlgorithm = "unsupported_signature_algorithm"
+	signatureDetailMismatch  = "signature_algorithm_mismatch"
+	signatureDetailPublicKey = "invalid_signing_public_key"
+	signatureDetailEncoding  = "invalid_signature_encoding"
+	signatureDetailVerify    = "signature_verification_failed"
+	signatureDetailInactive  = "signature_key_not_active"
 )
 
 type signatureFields struct {
@@ -149,38 +161,119 @@ func verifyRecoverySignature(record RecoveryRecord, signer Device) error {
 
 func verifySignatureMetadata(fields signatureFields, signer Device, signedAtMs int64) error {
 	if fields.SchemaVersion != signatureSchemaVersion {
-		return newError(ErrInvalidSignature, "signature schema version is unsupported")
+		return newSignatureError(signatureDetailAlgorithm, "signature schema version is unsupported")
 	}
-	if fields.Algorithm != signatureAlgorithm {
-		return newError(ErrInvalidSignature, "signature algorithm is unsupported")
+	if !supportedSignatureAlgorithm(fields.Algorithm) {
+		return newSignatureError(signatureDetailAlgorithm, "signature algorithm is unsupported")
+	}
+	if fields.Algorithm != signer.SigningAlgorithm {
+		return newSignatureError(signatureDetailMismatch, "signature algorithm does not match signer device")
 	}
 	if fields.KeyID == "" || fields.KeyID != signer.SigningPublicKeyID {
-		return newError(ErrInvalidSignature, "signature key id does not match signer device")
+		return newSignatureError(signatureDetailVerify, "signature key id does not match signer device")
 	}
 	if fields.SignerDeviceID == "" || fields.SignerDeviceID != signer.DeviceID {
-		return newError(ErrInvalidSignature, "signature signer does not match device")
+		return newSignatureError(signatureDetailVerify, "signature signer does not match device")
 	}
 	if signer.Status != DeviceActive {
 		return newError(ErrForbiddenDevice, "signature signer device is not active")
 	}
 	if signedAtMs < signer.AuthorizedAtMs || (signer.RevokedAtMs > 0 && signedAtMs >= signer.RevokedAtMs) {
-		return newError(ErrInvalidSignature, "signature timestamp is outside signer lifetime")
+		return newSignatureError(signatureDetailInactive, "signature timestamp is outside signer lifetime")
 	}
-	if len(signer.SigningPublicKey) != ed25519PublicKeyLen {
-		return newError(ErrInvalidSignature, "signing public key length is invalid")
+	if err := validateSigningPublicKeyEncoding(fields.Algorithm, signer.SigningPublicKey); err != nil {
+		return err
 	}
-	if len(fields.Signature) != ed25519SignatureLen {
-		return newError(ErrInvalidSignature, "signature length is invalid")
+	if err := validateSignatureEncoding(fields.Algorithm, fields.Signature); err != nil {
+		return err
 	}
 	return nil
 }
 
 func verifyCanonicalSignature(fields signatureFields, signer Device, recordType string, fieldsToSign []signatureField) error {
 	canonical := canonicalSignatureBytes(recordType, fieldsToSign)
-	if !ed25519.Verify(ed25519.PublicKey(signer.SigningPublicKey), canonical, fields.Signature) {
-		return newError(ErrInvalidSignature, "signature verification failed")
+	return verifySignatureProfile(fields.Algorithm, signer.SigningPublicKey, fields.Signature, canonical)
+}
+
+func verifySignatureProfile(algorithm string, publicKey []byte, signature []byte, canonical []byte) error {
+	if !supportedSignatureAlgorithm(algorithm) {
+		return newSignatureError(signatureDetailAlgorithm, "signature algorithm is unsupported")
+	}
+	if err := validateSigningPublicKeyEncoding(algorithm, publicKey); err != nil {
+		return err
+	}
+	if err := validateSignatureEncoding(algorithm, signature); err != nil {
+		return err
+	}
+
+	switch algorithm {
+	case SignatureAlgorithmEd25519V1:
+		if !ed25519.Verify(ed25519.PublicKey(publicKey), canonical, signature) {
+			return newSignatureError(signatureDetailVerify, "signature verification failed")
+		}
+	case SignatureAlgorithmECDSAP256SHA256V1:
+		x, y := elliptic.Unmarshal(elliptic.P256(), publicKey)
+		if x == nil || y == nil {
+			return newSignatureError(signatureDetailPublicKey, "signing public key encoding is invalid")
+		}
+		r := new(big.Int).SetBytes(signature[:32])
+		s := new(big.Int).SetBytes(signature[32:])
+		digest := sha256.Sum256(canonical)
+		if !ecdsa.Verify(&ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}, digest[:], r, s) {
+			return newSignatureError(signatureDetailVerify, "signature verification failed")
+		}
 	}
 	return nil
+}
+
+func validateSigningPublicKeyEncoding(algorithm string, publicKey []byte) error {
+	switch algorithm {
+	case SignatureAlgorithmEd25519V1:
+		if len(publicKey) != ed25519PublicKeyLen {
+			return newSignatureError(signatureDetailPublicKey, "signing public key encoding is invalid")
+		}
+	case SignatureAlgorithmECDSAP256SHA256V1:
+		if len(publicKey) != p256PublicKeyLen || publicKey[0] != 0x04 {
+			return newSignatureError(signatureDetailPublicKey, "signing public key encoding is invalid")
+		}
+		x, y := elliptic.Unmarshal(elliptic.P256(), publicKey)
+		if x == nil || y == nil || !elliptic.P256().IsOnCurve(x, y) {
+			return newSignatureError(signatureDetailPublicKey, "signing public key encoding is invalid")
+		}
+	default:
+		return newSignatureError(signatureDetailAlgorithm, "signature algorithm is unsupported")
+	}
+	return nil
+}
+
+func validateSignatureEncoding(algorithm string, signature []byte) error {
+	switch algorithm {
+	case SignatureAlgorithmEd25519V1:
+		if len(signature) != ed25519SignatureLen {
+			return newSignatureError(signatureDetailEncoding, "signature encoding is invalid")
+		}
+	case SignatureAlgorithmECDSAP256SHA256V1:
+		if len(signature) != p256SignatureLen {
+			return newSignatureError(signatureDetailEncoding, "signature encoding is invalid")
+		}
+		r := new(big.Int).SetBytes(signature[:32])
+		s := new(big.Int).SetBytes(signature[32:])
+		order := elliptic.P256().Params().N
+		if r.Sign() <= 0 || s.Sign() <= 0 || r.Cmp(order) >= 0 || s.Cmp(order) >= 0 {
+			return newSignatureError(signatureDetailEncoding, "signature encoding is invalid")
+		}
+	default:
+		return newSignatureError(signatureDetailAlgorithm, "signature algorithm is unsupported")
+	}
+	return nil
+}
+
+func supportedSignatureAlgorithm(algorithm string) bool {
+	return algorithm == SignatureAlgorithmEd25519V1 || algorithm == SignatureAlgorithmECDSAP256SHA256V1
+}
+
+func newSignatureError(detailCode string, message string) *Error {
+	return &Error{Code: ErrInvalidSignature, DetailCode: detailCode, Message: message}
 }
 
 func canonicalSignatureBytes(recordType string, fields []signatureField) []byte {

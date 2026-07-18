@@ -217,6 +217,7 @@ fn create_domain(transport: &HttpSyncRemoteTransport, public_key: &DeviceSigning
         "active_key_id": "sync-key-v1",
         "first_device": {
             "device_id": DEVICE_A,
+            "signing_algorithm": public_key.signature_algorithm.as_str(),
             "signing_public_key_id": SIGNING_KEY_A,
             "signing_public_key": b64(&public_key.public_key),
             "key_agreement_public_key_id": AGREEMENT_KEY_A,
@@ -245,6 +246,7 @@ fn authorize_device_b(
     let join_body = json!({
         "join_request_id": "join-device-b",
         "device_id": DEVICE_B,
+        "signing_algorithm": public_key_b.signature_algorithm.as_str(),
         "signing_public_key_id": SIGNING_KEY_B,
         "signing_public_key": b64(&public_key_b.public_key),
         "key_agreement_public_key_id": AGREEMENT_KEY_B,
