@@ -162,7 +162,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 2. 已完成独立 `apple-keychain-p256-v1` repository spike 与双层门禁；普通测试不访问系统 Keychain。
 3. 已在独立授权后完成 ad-hoc denied 与 provisioning-backed manager 产品 DPK 生命周期；native 内完成创建、重载、签名、Rust/Go 验签、删除、missing、失败关闭、cleanup 和固定摘要。Dart 不绑定该 ABI，InputMethodKit 不接入同步密钥职责。
 4. 已完成 capability 评审：普通 DPK P-256 key 标记 `exportable=true`，编译/运行时字段如实开放，`product_qualified` 与用户同步 gate 关闭；Secure Enclave、hardware-backed、user presence 和 backup migration 均没有从基础签名成功推导。
-5. 已补 Secure Enclave 独立 backend ADR/runbook，并沿 crypto、FFI、manager native 完成 repository 接线、qualification bundle 与 lifecycle；unsupported 设备失败关闭，不回退普通 DPK 或 test memory。capability 更新后的 HEAD 需重新冻结，再按独立授权补 denied/locked/unsupported smoke。
+5. 已补 Secure Enclave 独立 backend ADR/runbook，并沿 crypto、FFI、manager native 完成 repository 接线、qualification lifecycle 与 capability 更新后 bundle 重冻结；unsupported 设备失败关闭，不回退普通 DPK 或 test memory。下一证据是独立授权的 denied/locked/unsupported smoke。
 6. 只有不可导出 production backend 评审和产品环境 smoke 通过后，才进入真实产品 sync orchestration 与 `ManagerBridge` 命令；恢复码、设备授权、撤销和用户同步入口继续关闭到 M3 全部退出证据成立。
 
 ## 验证口径

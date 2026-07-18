@@ -50,7 +50,7 @@ M3 当前主批已完成算法协议、跨语言 verifier/vector、普通 DPK �
 
 ## 下一步顺位
 
-1. 先按独立授权为 capability 更新后的 clean HEAD 重新冻结 qualification bundle，再逐项补 Secure Enclave denied、locked 三段与 unsupported 失败矩阵；脚本不修改系统锁定状态，unsupported 需要不支持该能力的目标环境。
+1. 使用已重新冻结的 qualification bundle，逐项授权补 Secure Enclave denied、locked 三段与 unsupported 失败矩阵；脚本不修改系统锁定状态，unsupported 需要不支持该能力的目标环境。
 2. 逐字段评审 `product_qualified/user_presence_required/backup_migratable`；只开放产品证据支持的字段，用户同步总 gate 继续关闭。
 3. 生产 backend 通过后才建立真实产品 sync orchestration；用户同步总 gate 不随 backend 资格自动开放。orchestration 需覆盖对象发现、hash/签名复验、解密、确定合并、本地 transaction、cursor、上传和 conflict retry，再接 `ManagerBridge`。
 4. 最后完成两个真实客户端、恢复/设备授权/撤销/key epoch 与发布级目标部署证据，满足后才评估开放用户同步。
