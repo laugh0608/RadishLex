@@ -279,7 +279,7 @@ mod platform {
                 DevicePrivateKeyStoreStatus::apple_keychain_p256_v1_runtime_available()
             }
             AppleKeychainProfile::SecureEnclaveP256V1 => {
-                DevicePrivateKeyStoreStatus::apple_secure_enclave_p256_v1_compiled()
+                DevicePrivateKeyStoreStatus::apple_secure_enclave_p256_v1_runtime_available()
             }
         }
     }

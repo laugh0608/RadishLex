@@ -93,4 +93,4 @@ DPK 正常生命周期必须先使用 `scripts/build-manager-macos-dpk-qualified
 
 当前普通 DPK P-256 软件 key 已通过 qualification 产品生命周期，status 报告编译/运行时可用且 `exportable=true`；因此 `product_qualified` 与用户同步 gate 保持 false。下一生产候选为独立 Secure Enclave backend，不允许从普通 DPK 静默 fallback 或原地升级。
 
-Secure Enclave repository backend 当前只报告 compiled；`scripts/run-manager-apple-secure-enclave-p256-product-smoke.sh` 提供 lifecycle、denied、locked 三段和 unsupported 场景，但任何执行都会启动产品并访问 Secure Enclave/Keychain，必须单独授权。产品证据前 runtime、hardware-backed、product qualification 与用户同步 gate 均保持关闭。
+Secure Enclave qualification 产品 lifecycle 已支持 runtime、不可导出与 hardware-backed；`scripts/run-manager-apple-secure-enclave-p256-product-smoke.sh` 继续提供 denied、locked 三段和 unsupported 场景，但任何执行都会启动产品并访问 Secure Enclave/Keychain，必须单独授权。`product_qualified` 与用户同步 gate 仍保持关闭。

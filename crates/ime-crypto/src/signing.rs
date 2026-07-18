@@ -393,7 +393,7 @@ impl DeviceSigningBackendCapabilities {
         Self {
             storage_backend: DeviceSigningStorageBackend::AppleSecureEnclaveP256V1,
             exportable: false,
-            hardware_backed: false,
+            hardware_backed: true,
             user_presence_required: false,
             backup_migratable: false,
         }
@@ -532,9 +532,12 @@ impl DevicePrivateKeyStoreStatus {
         }
     }
 
-    pub fn apple_secure_enclave_p256_v1_compiled() -> Self {
+    pub fn apple_secure_enclave_p256_v1_runtime_available() -> Self {
         Self {
             compiled: true,
+            available: true,
+            can_create_signing_keys: true,
+            can_sign: true,
             ..Self::apple_secure_enclave_p256_v1()
         }
     }

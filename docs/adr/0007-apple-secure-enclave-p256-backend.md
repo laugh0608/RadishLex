@@ -61,6 +61,8 @@ backup_migratable = false
 
 `exportable=false` 是该 backend 的平台 API 设计约束；产品 qualification smoke 仍必须实际确认 private external representation 失败。`hardware_backed` 在真实产品进程创建、重载、签名和 token 评审完成前保持 false，不能仅根据代码包含 `kSecAttrTokenIDSecureEnclave` 改为 true。
 
+2026-07-18 同一 qualification bundle 的产品 lifecycle 已完成创建、重载、签名、Rust/Go 验签、private external representation 失败、删除、missing 和 cleanup。评审据此开放 `available/can_create_signing_keys/can_sign/hardware_backed=true`；`product_qualified/user_sync_enabled/user_presence_required/backup_migratable=false` 继续保持，直至独立失败矩阵和上层总门禁完成。
+
 产品资格只能在同一冻结产品 bundle 中同时取得以下证据后评审：
 
 - 签名 identity、application identifier、Keychain access group、entitlement 与 provisioning profile 一致。
@@ -88,7 +90,7 @@ backup_migratable = false
 ## 验证与停止线
 
 - 默认 `cargo test`、manager product check 和仓库门禁不得访问 Keychain 或 Secure Enclave。
-- feature 测试必须覆盖 backend/algorithm 绑定、compiled-only status、Debug 脱敏、DER/P1363、错误映射和无 fallback。
+- feature 测试必须覆盖 backend/algorithm 绑定、evidenced runtime 与关闭的产品 gate、Debug 脱敏、DER/P1363、错误映射和无 fallback。
 - 实际 Secure Enclave/Keychain 访问、产品进程启动、系统锁定或权限变更必须分别获得授权。
 - 在资格证据完成前，不得把 `available`、`can_create_signing_keys`、`can_sign`、`product_qualified` 或 `hardware_backed` 改为 true。
 - 不把“当前 Mac 支持 Secure Enclave”扩写成所有 macOS、虚拟机、CI、Intel Mac 或 iOS extension 均支持。

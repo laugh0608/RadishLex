@@ -96,6 +96,7 @@ fn apple_secure_enclave_p256_smoke_creates_reloads_cross_verifies_proves_non_exp
         DeviceSigningStorageBackend::AppleSecureEnclaveP256V1
     );
     assert!(!handle.exportable);
+    assert!(handle.hardware_backed);
     assert!(!handle.user_presence_required);
     assert!(!handle.backup_migratable);
 

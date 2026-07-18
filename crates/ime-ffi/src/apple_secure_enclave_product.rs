@@ -185,13 +185,13 @@ fn run_macos_product_smoke(
 ) -> RadishLexAppleP256ProductSmokeSummary {
     let mut result = summary(scenario, RADISHLEX_APPLE_P256_SMOKE_INTERNAL_ERROR);
     if result.compiled != 1
-        || result.runtime_available != 0
-        || result.can_create_signing_keys != 0
-        || result.can_sign != 0
+        || result.runtime_available != 1
+        || result.can_create_signing_keys != 1
+        || result.can_sign != 1
         || result.product_qualified != 0
         || result.user_sync_enabled != 0
         || result.exportable != 0
-        || result.hardware_backed != 0
+        || result.hardware_backed != 1
         || result.user_presence_required != 0
         || result.backup_migratable != 0
     {
@@ -736,19 +736,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn status_is_compiled_only_and_keeps_independent_gates_closed() {
+    fn status_reports_evidenced_runtime_but_keeps_product_gate_closed() {
         let status = current_status();
-        assert_eq!(
-            status.compiled,
-            u32::from(cfg!(all(feature = "apple-keychain", target_os = "macos")))
-        );
-        assert_eq!(status.runtime_available, 0);
-        assert_eq!(status.can_create_signing_keys, 0);
-        assert_eq!(status.can_sign, 0);
+        let apple_runtime = u32::from(cfg!(all(feature = "apple-keychain", target_os = "macos")));
+        assert_eq!(status.compiled, apple_runtime);
+        assert_eq!(status.runtime_available, apple_runtime);
+        assert_eq!(status.can_create_signing_keys, apple_runtime);
+        assert_eq!(status.can_sign, apple_runtime);
         assert_eq!(status.product_qualified, 0);
         assert_eq!(status.user_sync_enabled, 0);
         assert_eq!(status.exportable, 0);
-        assert_eq!(status.hardware_backed, 0);
+        assert_eq!(status.hardware_backed, apple_runtime);
         assert_eq!(status.user_presence_required, 0);
         assert_eq!(status.backup_migratable, 0);
     }

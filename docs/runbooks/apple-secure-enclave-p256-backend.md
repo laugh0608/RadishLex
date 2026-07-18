@@ -39,8 +39,8 @@ cargo test -p radishlex-ime-ffi --features apple-keychain
 
 要求：
 
-- Secure Enclave store status 在 macOS feature build 只报告 `compiled=true`。
-- `available/can_create/can_sign/product_qualified/hardware_backed/user_sync_enabled=false`。
+- Secure Enclave store status 在 macOS feature build 报告 `compiled/available/can_create/can_sign/hardware_backed=true`。
+- `product_qualified/user_sync_enabled=false`，不得由 lifecycle 成功自动开放。
 - `exportable=false`、`user_presence_required=false`、`backup_migratable=false`。
 - C header、Rust ABI、Swift struct 与 Objective-C/C layout contract 一致。
 - manager product dylib 包含独立 status/smoke symbol，Dart 目录中没有对应 binding。

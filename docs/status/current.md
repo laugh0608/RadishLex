@@ -33,11 +33,11 @@ ADR 0006 已接受 `ecdsa-p256-sha256-v1` 作为与 `ed25519-v1` 共存的生产
 这些测试仍不是用户可用同步。当前生产阻塞项是：
 
 - `apple-keychain-p256-v1` 的 DPK 软件运行时可用，但私钥可导出，未满足生产 backend 的不可导出条件；locked 矩阵不能改变该资格结论，故本 backend 不进入真实同步。既有 `apple-keychain-v1` 与已测 Android Keystore 环境也仍未证明不可导出 `ed25519-v1` signing key；`test-memory-v1` 只允许测试且无 fallback。
-- `apple-secure-enclave-p256-v1` 已完成 ADR 0007、独立 tag/token/access-control、Rust/FFI/manager native、不可导出 probe、denied/locked/unsupported gated smoke 与默认无外部状态产品构建；当前只报告 compiled，尚未取得产品进程 runtime、不可导出和 hardware-backed 证据。
+- `apple-secure-enclave-p256-v1` 已由 qualification 产品进程完成创建、重载、签名、Rust/Go 验签、不可导出、删除、missing 与 cleanup，当前报告 runtime/create/sign/hardware-backed；denied/locked/unsupported 和产品资格仍待独立证据。
 - 缺少发布级目标部署运行证据，以及真实产品的同步 cursor/orchestration、设备恢复、撤销和 key epoch 全流程。
 - `ManagerBridge` 仍无真实同步、恢复码、设备加入、授权、撤销或轮换命令；现有 readiness 只证明关闭态。
 
-M3 当前主批已完成算法协议、跨语言 verifier/vector、普通 DPK 产品评审、Secure Enclave repository 接线与 qualification bundle 冻结。下一证据是独立授权的 Secure Enclave 产品进程 smoke；不得复用普通 DPK 风险声明，也不得提前推进真实同步 orchestration。
+M3 当前主批已完成算法协议、跨语言 verifier/vector、普通 DPK 产品评审，以及 Secure Enclave qualification lifecycle。下一证据是逐项授权的 denied/locked/unsupported 失败矩阵；不得提前推进真实同步 orchestration。
 
 ## 当前停止线
 
@@ -50,8 +50,8 @@ M3 当前主批已完成算法协议、跨语言 verifier/vector、普通 DPK �
 
 ## 下一步顺位
 
-1. 按独立授权运行 Secure Enclave 产品 lifecycle，覆盖创建、重载、签名、Rust/Go 验签、private external representation 失败、删除、missing、cleanup 与日志脱敏；按环境补 denied/locked/unsupported，不由脚本修改系统锁定状态。
-2. 逐字段评审 `runtime/product_qualified/hardware_backed/user_presence_required/backup_migratable`；只开放产品证据支持的字段，用户同步总 gate 继续关闭。
+1. 先按独立授权为 capability 更新后的 clean HEAD 重新冻结 qualification bundle，再逐项补 Secure Enclave denied、locked 三段与 unsupported 失败矩阵；脚本不修改系统锁定状态，unsupported 需要不支持该能力的目标环境。
+2. 逐字段评审 `product_qualified/user_presence_required/backup_migratable`；只开放产品证据支持的字段，用户同步总 gate 继续关闭。
 3. 生产 backend 通过后才建立真实产品 sync orchestration；用户同步总 gate 不随 backend 资格自动开放。orchestration 需覆盖对象发现、hash/签名复验、解密、确定合并、本地 transaction、cursor、上传和 conflict retry，再接 `ManagerBridge`。
 4. 最后完成两个真实客户端、恢复/设备授权/撤销/key epoch 与发布级目标部署证据，满足后才评估开放用户同步。
 

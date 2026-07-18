@@ -110,7 +110,7 @@ DevicePrivateKeyStore
 - Rust core 不直接调用 Objective-C / Swift API。
 - 平台 bridge 只把签名结果、公钥和 handle metadata 传回 Rust。
 - 是否使用 Secure Enclave、是否要求 user presence、是否允许 iCloud Keychain 迁移，需要后续平台 spike 固定；未验证前不得在文档或 UI 中承诺硬件保护。
-- Secure Enclave 路径由 ADR 0007 固定为独立 backend：使用 token id、private-key-usage access control 和独立 tag；仓库实现完成后仍只报告 compiled，运行时、产品资格和 hardware-backed 字段等待产品环境证据。
+- Secure Enclave 路径由 ADR 0007 固定为独立 backend：使用 token id、private-key-usage access control 和独立 tag；qualification lifecycle 已支持运行时和 hardware-backed 字段，产品资格仍等待 denied/locked/unsupported 证据。
 
 本次 storage domain 修正发生在真实用户同步关闭且既有 smoke key 已删除的阶段，不存在生产设备 key 迁移。未来若已有用户设备 key，storage domain、application identifier 或 access group 变化必须使用新 backend/version 或专门迁移 ADR，不能静默把 missing 当作新建身份。
 

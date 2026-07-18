@@ -49,11 +49,11 @@ int main(void) {
   failed |= require_flag("secure_enclave.compiled",
                          secure_enclave_status.compiled, 1u);
   failed |= require_flag("secure_enclave.runtime_available",
-                         secure_enclave_status.runtime_available, 0u);
+                         secure_enclave_status.runtime_available, 1u);
   failed |= require_flag("secure_enclave.can_create_signing_keys",
-                         secure_enclave_status.can_create_signing_keys, 0u);
+                         secure_enclave_status.can_create_signing_keys, 1u);
   failed |= require_flag("secure_enclave.can_sign",
-                         secure_enclave_status.can_sign, 0u);
+                         secure_enclave_status.can_sign, 1u);
   failed |= require_flag("secure_enclave.product_qualified",
                          secure_enclave_status.product_qualified, 0u);
   failed |= require_flag("secure_enclave.user_sync_enabled",
@@ -61,7 +61,7 @@ int main(void) {
   failed |= require_flag("secure_enclave.exportable",
                          secure_enclave_status.exportable, 0u);
   failed |= require_flag("secure_enclave.hardware_backed",
-                         secure_enclave_status.hardware_backed, 0u);
+                         secure_enclave_status.hardware_backed, 1u);
   failed |= require_flag("secure_enclave.user_presence_required",
                          secure_enclave_status.user_presence_required, 0u);
   failed |= require_flag("secure_enclave.backup_migratable",
@@ -70,6 +70,6 @@ int main(void) {
     return 1;
   }
 
-  puts("Apple P-256 software DPK runtime and compiled-only Secure Enclave gates passed");
+  puts("Apple P-256 software DPK and Secure Enclave runtime gates passed");
   return 0;
 }
