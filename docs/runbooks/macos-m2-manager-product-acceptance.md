@@ -55,6 +55,17 @@
 
 任一启动、读取、删除、恢复或重启错误必须以结构化用户可见状态出现；不得临时切换 demo 或直接编辑 SQLite 绕过。
 
+### 本轮 Authorization A 证据（2026-07-18）
+
+- clean HEAD `b2acd0a` 的 repository、manager product 与 macOS InputMethodKit 门禁通过；冻结 Release 主程序、bundle FFI 与 `Info.plist` SHA-256 分别为 `8ef53ec82d48d7148983ac0e00e9234d1cb1b6cf5b5575d085df0d57038b8c35`、`4785dd662a918188ad506c0ec1b543a67ef477bafbd479de81e407623a794f0f`、`780d2ecbf8d4fd6c615eb7b5cd40e03227fde2280956d005d573bc0087451ce2`；严格验签通过，签名为 ad-hoc。
+- 冻结 app 未注入环境变量直接启动，显示 `product` / `local_only`，没有 demo 标识；真实 v3 测试 userdb 成功迁移到 v4。迁移故障诊断只读取 schema 元数据和本轮合成副本，不读取表数据、数据库正文或 P1 原始行。
+- 固定合成 TSV 建立三条导入审计记录。active 词条关联 `#2 / manager-import / 2/2`，suppressed 条目经第三次导入更新后关联 `#3 / manager-import / 1/2`；导入历史在重启后仍按最新批次优先排序。
+- 删除 active 后出现 tombstone；再次导入结果为更新 1、跳过 1，deleted 计数 1，普通导入没有复活 tombstone。随后分别通过独立确认动作恢复 deleted 与 suppressed，二者均变为 active，tombstone 消失。
+- 完整退出并确认进程停止后重新启动，词库保持 2 个 active、0 suppressed、0 deleted；学习摘要为 user terms 2、selection events 0，两个 rank explain 的 user contribution 均为 `1.000`，suppressed/deleted contribution 均为零。settings 仍为 absent，符合 Authorization A 未进入隐私设置的边界。
+- 退出后只读复验为 TIS `matches=0 enabled=0 selected=0`、bundle/Rime/runtime absent、InputMethodKit 与 manager 进程 stopped、隐私键 absent；Application Support 父目录为 `0700`，仅 userdb 为普通 `0600` 文件，sidecars/settings absent，M2 receipt 与固定合成 TSV 均为普通 `0600` 文件，未发现 symlink。
+
+本组证据只关闭 Authorization A。InputMethodKit 安装、系统输入源、实体键盘输入、候选框与隐私偏好仍属于 Authorization B；最终测试数据删除仍属于 Authorization C。
+
 ## 授权 B：输入法共库与隐私
 
 授权 B 应精确覆盖 InputMethodKit 构建/签名/安装、系统设置添加/移除、开发者手动 source 选择、精确进程控制和隐私键临时变更。若真实输入法尚未安装或现场不是零基线，先按现有 macOS runbook 建立可回滚基线。

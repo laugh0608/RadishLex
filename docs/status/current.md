@@ -32,7 +32,9 @@ manager 本地产品运行态的实现与自动门禁已经完成：默认 `prod
 
 词库页已区分 active、suppressed、deleted，deleted tombstone 经新 FFI 查询，suppressed/deleted 只能由独立确认动作 explicit restore。manager 隐私设置通过 macOS CurrentUser/AnyHost `CFPreferences` 写入输入 runtime 的真实偏好键并读回；失败会回滚。Rust 文件连接在任何 schema/integrity SQL 前安装 busy timeout，首次 WAL 协商只对锁竞争做有界重试；测试已覆盖八路并发初始化、短时初始化锁、WAL 可见性、输入侧选择、manager 删除、输入侧 tombstone 观察和 manager 恢复。
 
-Release 产品门禁已验证 bundle native library、架构、依赖、签名、ABI/必需符号，并直接用 bundle dylib 和临时合成数据跑通删除、tombstone、重启、恢复、再次删除与导出，不启动 GUI、不触碰真实 userdb。M2 尚未退出，因为正常 Release app 的无环境变量 GUI、固定平台路径重启、隐私真实读回和输入法/manager 同库运行仍需在单独授权下完成实机验收。
+Release 产品门禁已验证 bundle native library、架构、依赖、签名、ABI/必需符号，并直接用 bundle dylib 和临时合成数据跑通删除、tombstone、重启、恢复、再次删除与导出。clean HEAD `b2acd0a` 的 repository、manager product 与 macOS InputMethodKit 门禁通过；本轮冻结的 Release 主程序、bundle FFI 与 `Info.plist` SHA-256 分别为 `8ef53ec82d48d7148983ac0e00e9234d1cb1b6cf5b5575d085df0d57038b8c35`、`4785dd662a918188ad506c0ec1b543a67ef477bafbd479de81e407623a794f0f`、`780d2ecbf8d4fd6c615eb7b5cd40e03227fde2280956d005d573bc0087451ce2`，严格验签通过，签名为 ad-hoc。
+
+Authorization A 已在该冻结产物上完成。正常 app 无环境变量启动为 `product` / `local_only`，真实 v3 userdb 成功迁移到 v4；固定合成 TSV 的 active/suppressed、导入统计、批次审计和 rank explain 可见。deleted tombstone 经再次导入和重启均未复活，deleted 与 suppressed 只能分别 explicit restore；完整退出重启后保持 2 个 active、0 suppressed、0 deleted，两个候选的 user contribution 均为 `1.000` 且 suppression/deletion penalty 为零。全程未展示 P1 原始行或数据库正文。M2 尚未退出，因为输入法/manager 同库双端可见、隐私真实读回与零学习增量、最终系统和数据回滚仍需在独立 Authorization B/C 下完成。
 
 M2 实机前的数据回滚边界已补齐：manager 从进程启动起使用 `0077` umask，settings 正式文件与原子写临时文件从创建时即为私有权限；固定 profile 的 helper 以不可覆盖 receipt 绑定安装前空父目录，只允许处理本轮 userdb family、`manager-settings.json` 及其临时文件。未知条目、symlink、sidecar-only、身份/权限漂移、打开句柄或 manager 未停止均失败关闭。实机启动前必须先捕获该 receipt，最终删除仍需独立授权。
 
@@ -46,10 +48,10 @@ M2 实机前的数据回滚边界已补齐：manager 从进程启动起使用 `0
 
 ## 下一步顺位
 
-1. 在 clean HEAD 重跑 manager、FFI、Release 产品 bundle 与仓库门禁，冻结同一 manager/InputMethodKit 输入和产物证据。
-2. 按 [macOS manager 产品验收 runbook](../runbooks/macos-m2-manager-product-acceptance.md) 分阶段取得动作时授权，完成正常 Release app 无环境变量启动、固定路径/权限、GUI 删除/恢复和重启持久化。
-3. 在输入法与 manager 同时连接同一测试 userdb 的现场，完成双端状态可见、隐私偏好读回与零学习增量，并把系统、进程、偏好和测试数据恢复到可证明基线。
-4. 实机证据全部通过后关闭 M2；下一开发批次进入 M3 同步成功路径与安全证据设计。真实用户同步、第二平台和 M4 发布打包继续保持停止。
+1. 保持 Authorization A 的冻结产物、固定 userdb 与 rollback receipt 不变，不再重复 manager 单端矩阵。
+2. 单独取得 Authorization B 后，在输入法与 manager 同时连接同一测试 userdb 的现场完成双端状态可见、隐私偏好读回、零学习增量和连接重启一致性；实体键盘输入、输入源切换与候选框观察由开发者执行，其余 manager GUI 操作由 AI 自主完成。
+3. 单独取得 Authorization C 后关闭全部连接，只执行固定 helper 删除本轮 manager 测试数据，并把 TIS、bundle、Rime、进程、隐私偏好、Application Support 与 receipts 恢复到可证明基线。
+4. 实机证据与最终回滚全部通过后关闭 M2；下一开发批次进入 M3 同步成功路径与安全证据设计。真实用户同步、第二平台和 M4 发布打包继续保持停止。
 
 ## 验证入口
 
