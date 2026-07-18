@@ -34,7 +34,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进真实设备配对成功路径；M1/M2 平台输入与本地 manager 可独立推进，但不得调用真实同步或把平台签名 backend 标记为生产可用。
 
-进入用户可用同步前，应按生产部署 runbook 补发布级目标部署运行证据。普通 DPK P-256 当前 `compiled/available/can_create/can_sign=true`，但 `exportable=true` 使产品资格保持关闭。独立 Secure Enclave backend 已取得 qualification lifecycle 的 runtime、不可导出和 hardware-backed 证据，产品资格仍待 denied/locked/unsupported；不提前开放 orchestration。既有 Apple/Android Ed25519 失败结论继续有效。
+进入用户可用同步前，应按生产部署 runbook 补发布级目标部署运行证据。普通 DPK P-256 当前 `compiled/available/can_create/can_sign=true`，但 `exportable=true` 使产品资格保持关闭。独立 Secure Enclave backend 已取得 qualification lifecycle、denied 与设备锁屏 locked 证据，产品资格仍待 unsupported；不提前开放 orchestration。既有 Apple/Android Ed25519 失败结论继续有效。
 
 ## 设计目标
 

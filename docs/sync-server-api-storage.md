@@ -421,7 +421,7 @@ latest_ciphertext_hash
 ## 停止线
 
 - Rust 侧两客户端 harness 已覆盖 encrypted userdb payload 的上传、下载、解密、合并写回和 stale conflict 重新上传；Go runtime smoke 已覆盖第二设备授权、跨设备 object 版本链、备份恢复链路、外部 TLS 反代链路和升级回滚链路；Rust HTTP transport 直连 Go server 的短生命周期测试已覆盖跨语言 DTO、handler、storage、错误语义和日志脱敏边界；Rust userdb 两客户端真实 Go HTTP 测试已覆盖客户端解密合并写回和 v2 重新上传；生产部署 runbook 已固定外部 TLS、认证、备份和升级停止线，Go server 与 Rust HTTP transport 已补单用户 bearer access token 证据。进入用户可用同步前，仍必须补可用平台私钥 backend 和发布级目标部署运行证据；当前产品开发继续使用本地 Docker / 本地 HTTPS 复验证据。
-- 平台私钥存储 backend 能力模型已落地；普通 DPK 软件 key 因 `exportable=true` 不具备产品资格，独立 Secure Enclave backend 已取得 qualification lifecycle 证据但仍待 denied/locked/unsupported 和产品资格评审。生产 backend 评审通过前不提供用户可用同步 UI。
+- 平台私钥存储 backend 能力模型已落地；普通 DPK 软件 key 因 `exportable=true` 不具备产品资格，独立 Secure Enclave backend 已取得 qualification lifecycle、denied 与设备锁屏 locked 证据但仍待 unsupported 和产品资格评审。生产 backend 评审通过前不提供用户可用同步 UI。
 - device authorization handler 对外开放前必须继续复用 wrapped key bytes 的存储 / 读取语义，且不得返回明文同步域材料。
 - recovery latest handler 已复用 wrapped material bytes 读取语义，并补齐限速与内部 `blob_ref` 不外泄测试；object version handler 已复用 encrypted object blob 读写语义，并补齐冲突、设备状态和脱敏测试；API handler 已补 panic recovery、request id、非持久审计 hook、SQLite `audit_events` 写入和 bearer access token 门禁；runtime 已补配置装配、脱敏 audit logger、本机 smoke runbook、双设备 HTTP smoke、备份恢复 smoke、外部 TLS 反代 smoke、升级回滚 smoke、Docker Compose 本地 / 部署态入口、容器实际启动 smoke 证据和生产部署边界 runbook。Rust remote client 已补 DTO、transport trait、HTTP transport、错误映射、可选 bearer token header、两客户端 userdb harness、直连 Go server 的短生命周期测试和 userdb 两客户端真实 Go HTTP 测试；进入真实用户部署前仍需补可用平台私钥 backend 和发布级目标部署运行证据，进入 manager 同步入口非上传开发可先依赖本地联调证据。
 - 服务端能保存、打印或索引明文用户词、input code、reading、P1 原始事件或候选偏好时，必须停止并回退该设计。

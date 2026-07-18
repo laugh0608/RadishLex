@@ -98,6 +98,8 @@ private/public key bytes、canonical bytes、signature bytes、CFError 文本和
 
 经典 `security lock-keychain` 只锁定登录 Keychain，不等价于 Data Protection Keychain / Secure Enclave 的设备锁定态。2026-07-18 实测该状态下签名仍成功，返回 `expected_failure_not_observed`；该结果不算 locked 失败关闭证据，也不算 backend 故障。后续不得再以登录 Keychain 锁定替代手动锁屏。
 
+修正后的产品 probe 通过 20 秒倒计时配合开发者手动锁屏。实测签名返回 `PrivateKeyLocked`、OSStatus `-25308`，`fail_closed=1/expected_failure_confirmed=1`；解锁后的精确 cleanup 返回 `deleted=1/missing_confirmed=1/cleanup_required=0`。这组证据满足本机设备锁定态语义，但不替代 unsupported、user presence 或 backup migration 门禁。
+
 ## 资格字段评审
 
 证据必须逐字段评审：

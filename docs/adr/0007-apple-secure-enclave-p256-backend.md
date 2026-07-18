@@ -61,7 +61,7 @@ backup_migratable = false
 
 `exportable=false` 是该 backend 的平台 API 设计约束；产品 qualification smoke 仍必须实际确认 private external representation 失败。`hardware_backed` 在真实产品进程创建、重载、签名和 token 评审完成前保持 false，不能仅根据代码包含 `kSecAttrTokenIDSecureEnclave` 改为 true。
 
-2026-07-18 同一 qualification bundle 的产品 lifecycle 已完成创建、重载、签名、Rust/Go 验签、private external representation 失败、删除、missing 和 cleanup。评审据此开放 `available/can_create_signing_keys/can_sign/hardware_backed=true`；`product_qualified/user_sync_enabled/user_presence_required/backup_migratable=false` 继续保持，直至独立失败矩阵和上层总门禁完成。
+2026-07-18 同一 qualification bundle 的产品 lifecycle 已完成创建、重载、签名、Rust/Go 验签、private external representation 失败、删除、missing 和 cleanup；ad-hoc denied 与真实设备锁屏 locked/cleanup 也已通过。评审据此开放 `available/can_create_signing_keys/can_sign/hardware_backed=true`；`product_qualified/user_sync_enabled/user_presence_required/backup_migratable=false` 继续保持，直至 unsupported 和上层总门禁完成。
 
 产品资格只能在同一冻结产品 bundle 中同时取得以下证据后评审：
 
