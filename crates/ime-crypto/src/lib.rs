@@ -51,7 +51,8 @@ pub use signing::{
 pub use signing::{
     canonical_signature_bytes, verify_device_signature, DevicePrivateKeyStoreStatus,
     DeviceSignature, DeviceSigningBackendCapabilities, DeviceSigningKeyHandle,
-    DeviceSigningPublicKey, DeviceSigningStorageBackend, SignatureAlgorithmId, SignatureField,
+    DeviceSigningPublicKey, DeviceSigningStorageBackend, RecoveredDeviceActivationManifest,
+    SignatureAlgorithmId, SignatureField, SignedRecoveredDeviceActivation,
     SignedRecoveryRecordManifest, SignedSyncObjectManifest, TestMemoryDeviceKeyStore,
     UnavailableDeviceKeyStore, DEVICE_KEY_STORE_ANDROID_KEYSTORE_V1,
     DEVICE_KEY_STORE_APPLE_KEYCHAIN_P256_V1, DEVICE_KEY_STORE_APPLE_KEYCHAIN_V1,

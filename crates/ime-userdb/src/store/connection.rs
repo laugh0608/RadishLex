@@ -11,7 +11,7 @@ use crate::error::{UserDbError, UserDbResult};
 use super::identity::legacy_stable_hash_hex;
 use super::UserDb;
 
-pub(super) const SCHEMA_VERSION: i64 = 7;
+pub(super) const SCHEMA_VERSION: i64 = 8;
 pub(super) const BUSY_TIMEOUT: Duration = Duration::from_millis(5_000);
 pub(super) const MAX_LEARNING_COUNT: i64 = 1_000_000;
 
@@ -85,6 +85,7 @@ impl UserDb {
             ensure_trusted_lifecycle_tables(&transaction)?;
         }
         ensure_trusted_device_key_agreement_columns(&transaction)?;
+        ensure_recovery_lifecycle_event_types(&transaction)?;
         ensure_wrapped_epoch_material_table(&transaction)?;
         transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         validate_current_schema_on(&transaction)?;
@@ -587,7 +588,7 @@ const TRUSTED_LIFECYCLE_SCHEMA_SQL: &str = "
         CREATE TABLE IF NOT EXISTS sync_trusted_lifecycle_events (
             domain_id TEXT NOT NULL REFERENCES sync_trusted_domains(domain_id) ON DELETE CASCADE,
             lifecycle_sequence INTEGER NOT NULL CHECK(lifecycle_sequence > 0),
-            event_type TEXT NOT NULL CHECK(event_type IN ('initial_device', 'device_authorized', 'device_revoked')),
+            event_type TEXT NOT NULL CHECK(event_type IN ('initial_device', 'device_authorized', 'device_revoked', 'recovery_record_rotated', 'device_recovered')),
             record_id TEXT NOT NULL,
             key_epoch INTEGER NOT NULL CHECK(key_epoch > 0),
             reject_from_object_change_sequence INTEGER,
@@ -600,6 +601,40 @@ const TRUSTED_LIFECYCLE_SCHEMA_SQL: &str = "
 
 fn ensure_trusted_lifecycle_tables(transaction: &Transaction<'_>) -> UserDbResult<()> {
     transaction.execute_batch(TRUSTED_LIFECYCLE_SCHEMA_SQL)?;
+    Ok(())
+}
+
+fn ensure_recovery_lifecycle_event_types(transaction: &Transaction<'_>) -> UserDbResult<()> {
+    let schema: String = transaction.query_row(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'sync_trusted_lifecycle_events'",
+        [],
+        |row| row.get(0),
+    )?;
+    if schema.contains("recovery_record_rotated") {
+        return Ok(());
+    }
+    transaction.execute_batch(
+        "CREATE TABLE sync_trusted_lifecycle_events_v8 (
+            domain_id TEXT NOT NULL REFERENCES sync_trusted_domains(domain_id) ON DELETE CASCADE,
+            lifecycle_sequence INTEGER NOT NULL CHECK(lifecycle_sequence > 0),
+            event_type TEXT NOT NULL CHECK(event_type IN ('initial_device', 'device_authorized', 'device_revoked', 'recovery_record_rotated', 'device_recovered')),
+            record_id TEXT NOT NULL,
+            key_epoch INTEGER NOT NULL CHECK(key_epoch > 0),
+            reject_from_object_change_sequence INTEGER,
+            created_at_ms INTEGER NOT NULL,
+            record_json TEXT NOT NULL CHECK(length(record_json) > 0),
+            PRIMARY KEY(domain_id, lifecycle_sequence),
+            UNIQUE(domain_id, event_type, record_id)
+        );
+        INSERT INTO sync_trusted_lifecycle_events_v8 (
+            domain_id, lifecycle_sequence, event_type, record_id, key_epoch,
+            reject_from_object_change_sequence, created_at_ms, record_json
+        ) SELECT domain_id, lifecycle_sequence, event_type, record_id, key_epoch,
+            reject_from_object_change_sequence, created_at_ms, record_json
+          FROM sync_trusted_lifecycle_events;
+        DROP TABLE sync_trusted_lifecycle_events;
+        ALTER TABLE sync_trusted_lifecycle_events_v8 RENAME TO sync_trusted_lifecycle_events;",
+    )?;
     Ok(())
 }
 

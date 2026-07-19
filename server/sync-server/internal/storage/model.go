@@ -39,6 +39,7 @@ const (
 	MaxEpochDistributionBytes            = MaxDeviceWrappedKeyBytes * MaxEpochDistributionRecords
 	WrappingSignatureDeviceAuthorization = "device_authorization"
 	WrappingSignatureEpochDistribution   = "epoch_distribution"
+	RecoveredDeviceActivationRecordType  = "recovered_device_activation"
 )
 
 type Domain struct {
@@ -152,12 +153,43 @@ type DeviceRevocation struct {
 	Signature              []byte
 }
 
+type RecoveredDeviceActivation struct {
+	RecoveryRecordID        string
+	DomainID                string
+	DeviceID                string
+	SigningAlgorithm        string
+	SigningPublicKeyID      string
+	SigningPublicKey        []byte
+	KeyAgreementAlgorithm   string
+	KeyAgreementPublicKeyID string
+	KeyAgreementPublicKey   []byte
+	KeyEpoch                uint64
+	CreatedAtMs             int64
+	SignatureSchemaVersion  uint16
+	ActivationAlgorithm     string
+	ActivationPublicKeyID   string
+	ActivationSignature     []byte
+}
+
+type RecoveredDeviceActivationUpload struct {
+	Activation   RecoveredDeviceActivation
+	Distribution EpochDistributionUpload
+}
+
+type RecoveredDeviceActivationResult struct {
+	Device             Device
+	LifecycleSequence  uint64
+	DistributedRecords int
+}
+
 type LifecycleEventType string
 
 const (
-	LifecycleInitialDevice    LifecycleEventType = "initial_device"
-	LifecycleDeviceAuthorized LifecycleEventType = "device_authorized"
-	LifecycleDeviceRevoked    LifecycleEventType = "device_revoked"
+	LifecycleInitialDevice         LifecycleEventType = "initial_device"
+	LifecycleDeviceAuthorized      LifecycleEventType = "device_authorized"
+	LifecycleDeviceRevoked         LifecycleEventType = "device_revoked"
+	LifecycleRecoveryRecordRotated LifecycleEventType = "recovery_record_rotated"
+	LifecycleDeviceRecovered       LifecycleEventType = "device_recovered"
 )
 
 type LifecycleEvent struct {
@@ -173,6 +205,8 @@ type LifecycleEvent struct {
 	Authorization                  *DeviceAuthorization
 	Wrapping                       *DeviceWrappingRecord
 	Revocation                     *DeviceRevocation
+	RecoveryRecord                 *RecoveryRecord
+	RecoveredActivation            *RecoveredDeviceActivation
 }
 
 type LifecycleSnapshot struct {

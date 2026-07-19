@@ -22,6 +22,7 @@ type MemoryStore struct {
 	wrapping       map[wrappingKey]DeviceWrappingRecord
 	revocations    map[revocationKey]DeviceRevocation
 	recoveries     map[recoveryKey]RecoveryRecord
+	activations    map[recoveryKey]RecoveredDeviceActivation
 	latestRecovery map[string]string
 	objects        map[objectKey]SyncObject
 	versions       map[objectVersionKey]ObjectVersion
@@ -41,6 +42,7 @@ func NewMemoryStore() *MemoryStore {
 		wrapping:       make(map[wrappingKey]DeviceWrappingRecord),
 		revocations:    make(map[revocationKey]DeviceRevocation),
 		recoveries:     make(map[recoveryKey]RecoveryRecord),
+		activations:    make(map[recoveryKey]RecoveredDeviceActivation),
 		latestRecovery: make(map[string]string),
 		objects:        make(map[objectKey]SyncObject),
 		versions:       make(map[objectVersionKey]ObjectVersion),
@@ -517,13 +519,21 @@ func (s *MemoryStore) PutRecoveryRecord(ctx context.Context, upload RecoveryReco
 		previousKey := recoveryKey{domainID: record.DomainID, recoveryRecordID: currentID}
 		previous := s.recoveries[previousKey]
 		previous.Status = RecoveryRecordSuperseded
-		previous.UpdatedAtMs = record.CreatedAtMs
 		previous.RevokedAtMs = record.CreatedAtMs
 		s.recoveries[previousKey] = previous
 	}
 	s.recoveries[key] = record
 	s.latestRecovery[record.DomainID] = record.RecoveryRecordID
 	s.blobs[record.BlobRef] = cloneBytes(upload.WrappedMaterial)
+	s.appendLifecycleLocked(LifecycleEvent{
+		DomainID:       record.DomainID,
+		EventType:      LifecycleRecoveryRecordRotated,
+		RecordID:       record.RecoveryRecordID,
+		KeyEpoch:       record.KeyEpoch,
+		CreatedAtMs:    record.CreatedAtMs,
+		Device:         devicePointer(signer),
+		RecoveryRecord: recoveryRecordPointer(record),
+	})
 	return record, nil
 }
 
@@ -540,6 +550,9 @@ func (s *MemoryStore) LatestRecoveryRecord(ctx context.Context, domainID string)
 	record, ok := s.recoveries[recoveryKey{domainID: domainID, recoveryRecordID: recoveryID}]
 	if !ok {
 		return RecoveryRecord{}, newError(ErrStorageUnavailable, "latest recovery record metadata missing")
+	}
+	if record.Status != RecoveryRecordActive {
+		return RecoveryRecord{}, newError(ErrNotFound, "active recovery record not found")
 	}
 	return cloneRecoveryRecord(record), nil
 }
@@ -558,6 +571,9 @@ func (s *MemoryStore) LatestRecoveryWrappedMaterial(ctx context.Context, domainI
 	if !ok {
 		return RecoveryRecord{}, nil, newError(ErrStorageUnavailable, "latest recovery record metadata missing")
 	}
+	if record.Status != RecoveryRecordActive {
+		return RecoveryRecord{}, nil, newError(ErrNotFound, "active recovery record not found")
+	}
 	wrappedMaterial, ok := s.blobs[record.BlobRef]
 	if !ok {
 		return RecoveryRecord{}, nil, newError(ErrStorageUnavailable, "recovery wrapped material is missing")
@@ -566,6 +582,105 @@ func (s *MemoryStore) LatestRecoveryWrappedMaterial(ctx context.Context, domainI
 		return RecoveryRecord{}, nil, newError(ErrStorageUnavailable, "recovery wrapped material metadata mismatch")
 	}
 	return cloneRecoveryRecord(record), cloneBytes(wrappedMaterial), nil
+}
+
+func (s *MemoryStore) RecoverDevice(ctx context.Context, upload RecoveredDeviceActivationUpload) (RecoveredDeviceActivationResult, error) {
+	if err := checkContext(ctx); err != nil {
+		return RecoveredDeviceActivationResult{}, err
+	}
+	if err := validateRecoveredDeviceActivationUpload(upload); err != nil {
+		return RecoveredDeviceActivationResult{}, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	activation := upload.Activation
+	domain, ok := s.domains[activation.DomainID]
+	if !ok {
+		return RecoveredDeviceActivationResult{}, newError(ErrNotFound, "domain not found")
+	}
+	if domain.CurrentKeyEpoch != activation.KeyEpoch {
+		return RecoveredDeviceActivationResult{}, newError(ErrConflictRecoveryRecord, "recovery activation key epoch is not current")
+	}
+	if s.latestRecovery[activation.DomainID] != activation.RecoveryRecordID {
+		return RecoveredDeviceActivationResult{}, newError(ErrConflictRecoveryRecord, "recovery record is not the chain head")
+	}
+	recoveryKey := recoveryKey{domainID: activation.DomainID, recoveryRecordID: activation.RecoveryRecordID}
+	record, ok := s.recoveries[recoveryKey]
+	if !ok || record.Status != RecoveryRecordActive {
+		return RecoveredDeviceActivationResult{}, newError(ErrConflictRecoveryRecord, "recovery record is not active")
+	}
+	if record.RecordSchemaVersion != RecoveryRecordSchemaVersionV2 || record.KeyEpoch != activation.KeyEpoch {
+		return RecoveredDeviceActivationResult{}, newError(ErrConflictRecoveryRecord, "recovery record cannot activate current epoch")
+	}
+	if _, exists := s.devices[deviceKey(activation.DomainID, activation.DeviceID)]; exists {
+		return RecoveredDeviceActivationResult{}, newError(ErrForbiddenDevice, "recovered device id is already registered")
+	}
+	if err := verifyRecoveredDeviceActivationSignature(activation, record); err != nil {
+		return RecoveredDeviceActivationResult{}, err
+	}
+	device := recoveredDeviceFromActivation(activation)
+	if err := validateDevice(device); err != nil {
+		return RecoveredDeviceActivationResult{}, err
+	}
+
+	active := make(map[string]Device)
+	for key, current := range s.devices {
+		if key.domainID == activation.DomainID && current.Status == DeviceActive {
+			active[current.DeviceID] = current
+		}
+	}
+	active[device.DeviceID] = device
+	if len(active) != len(upload.Distribution.Records) {
+		return RecoveredDeviceActivationResult{}, newError(ErrInvalidRequest, "recovery epoch distribution must cover every active device")
+	}
+	for _, item := range upload.Distribution.Records {
+		wrapped := item.Record
+		recipient, exists := active[wrapped.RecipientDeviceID]
+		if !exists || recipient.KeyAgreementPublicKeyID != wrapped.RecipientKeyAgreementKeyID {
+			return RecoveredDeviceActivationResult{}, newError(ErrForbiddenDevice, "recovery epoch recipient is not active with the signed key")
+		}
+		if err := verifyEpochDistributionSignature(wrapped, device); err != nil {
+			return RecoveredDeviceActivationResult{}, err
+		}
+		key := wrappingRecordKey(wrapped)
+		if existing, exists := s.wrapping[key]; exists {
+			existingBytes, blobExists := s.blobs[existing.BlobRef]
+			if !blobExists || !sameWrappingRecord(existing, wrapped) || !bytes.Equal(existingBytes, item.WrappedKey) {
+				return RecoveredDeviceActivationResult{}, newError(ErrConflictEpochDistribution, "recovery epoch distribution locator conflicts")
+			}
+		}
+	}
+
+	s.devices[deviceKey(device.DomainID, device.DeviceID)] = cloneDevice(device)
+	s.activations[recoveryKey] = cloneRecoveredDeviceActivation(activation)
+	record.Status = RecoveryRecordSuperseded
+	record.RevokedAtMs = activation.CreatedAtMs
+	s.recoveries[recoveryKey] = record
+	for _, item := range upload.Distribution.Records {
+		wrapped := item.Record
+		key := wrappingRecordKey(wrapped)
+		if _, exists := s.wrapping[key]; exists {
+			continue
+		}
+		wrapped.BlobRef = wrappingBlobRef(wrapped)
+		s.wrapping[key] = cloneWrappingRecord(wrapped)
+		s.blobs[wrapped.BlobRef] = cloneBytes(item.WrappedKey)
+	}
+	s.appendLifecycleLocked(LifecycleEvent{
+		DomainID:            activation.DomainID,
+		EventType:           LifecycleDeviceRecovered,
+		RecordID:            activation.RecoveryRecordID,
+		KeyEpoch:            activation.KeyEpoch,
+		CreatedAtMs:         activation.CreatedAtMs,
+		Device:              devicePointer(device),
+		RecoveredActivation: recoveredActivationPointer(activation),
+	})
+	return RecoveredDeviceActivationResult{
+		Device:             cloneDevice(device),
+		LifecycleSequence:  s.nextLifecycle[activation.DomainID],
+		DistributedRecords: len(upload.Distribution.Records),
+	}, nil
 }
 
 func (s *MemoryStore) PutObjectVersion(ctx context.Context, upload ObjectVersionUpload) (ObjectVersion, error) {
@@ -963,6 +1078,53 @@ func validateRecoveryRecordUpload(upload RecoveryRecordUpload) error {
 	return nil
 }
 
+func validateRecoveredDeviceActivationUpload(upload RecoveredDeviceActivationUpload) error {
+	activation := upload.Activation
+	if !validOpaqueID(activation.DomainID) || !validOpaqueID(activation.RecoveryRecordID) || !validOpaqueID(activation.DeviceID) {
+		return newError(ErrInvalidRequest, "recovered device activation ids must be opaque ids")
+	}
+	if activation.SignatureSchemaVersion != signatureSchemaVersion ||
+		activation.ActivationAlgorithm != SignatureAlgorithmEd25519V1 ||
+		activation.ActivationPublicKeyID == "" || len(activation.ActivationSignature) != ed25519SignatureLen {
+		return newError(ErrInvalidSignature, "recovered device activation signature profile is invalid")
+	}
+	if !supportedSignatureAlgorithm(activation.SigningAlgorithm) || activation.SigningPublicKeyID == "" {
+		return newError(ErrInvalidRequest, "recovered device signing profile is invalid")
+	}
+	if err := validateSigningPublicKeyEncoding(activation.SigningAlgorithm, activation.SigningPublicKey); err != nil {
+		return err
+	}
+	if activation.KeyAgreementAlgorithm != "p256-ecdh-v1" ||
+		activation.KeyAgreementPublicKeyID == "" {
+		return newError(ErrInvalidRequest, "recovered device key agreement profile is invalid")
+	}
+	if err := validateP256KeyAgreementPublicKey(activation.KeyAgreementPublicKey); err != nil {
+		return err
+	}
+	if activation.KeyEpoch == 0 || activation.CreatedAtMs <= 0 {
+		return newError(ErrInvalidRequest, "recovered device activation counters are invalid")
+	}
+	distribution := upload.Distribution
+	if distribution.DomainID != activation.DomainID || distribution.DistributorDeviceID != activation.DeviceID || distribution.KeyEpoch != activation.KeyEpoch {
+		return newError(ErrInvalidRequest, "recovery epoch distribution does not match activation")
+	}
+	return validateEpochDistributionUpload(distribution)
+}
+
+func recoveredDeviceFromActivation(activation RecoveredDeviceActivation) Device {
+	return Device{
+		DomainID:                activation.DomainID,
+		DeviceID:                activation.DeviceID,
+		SigningAlgorithm:        activation.SigningAlgorithm,
+		SigningPublicKeyID:      activation.SigningPublicKeyID,
+		SigningPublicKey:        cloneBytes(activation.SigningPublicKey),
+		KeyAgreementPublicKeyID: activation.KeyAgreementPublicKeyID,
+		KeyAgreementPublicKey:   cloneBytes(activation.KeyAgreementPublicKey),
+		Status:                  DeviceActive,
+		AuthorizedAtMs:          activation.CreatedAtMs,
+	}
+}
+
 func validateObjectUpload(upload ObjectVersionUpload) error {
 	version := upload.Version
 	if !validOpaqueID(version.DomainID) || !validOpaqueID(version.ObjectID) || !validOpaqueID(version.OwnerDeviceID) {
@@ -1208,6 +1370,23 @@ func revocationPointer(value DeviceRevocation) *DeviceRevocation {
 	return &cloned
 }
 
+func recoveryRecordPointer(value RecoveryRecord) *RecoveryRecord {
+	cloned := cloneRecoveryRecord(value)
+	return &cloned
+}
+
+func cloneRecoveredDeviceActivation(value RecoveredDeviceActivation) RecoveredDeviceActivation {
+	value.SigningPublicKey = cloneBytes(value.SigningPublicKey)
+	value.KeyAgreementPublicKey = cloneBytes(value.KeyAgreementPublicKey)
+	value.ActivationSignature = cloneBytes(value.ActivationSignature)
+	return value
+}
+
+func recoveredActivationPointer(value RecoveredDeviceActivation) *RecoveredDeviceActivation {
+	cloned := cloneRecoveredDeviceActivation(value)
+	return &cloned
+}
+
 func cloneLifecycleEvent(value LifecycleEvent) LifecycleEvent {
 	if value.Device != nil {
 		value.Device = devicePointer(*value.Device)
@@ -1223,6 +1402,12 @@ func cloneLifecycleEvent(value LifecycleEvent) LifecycleEvent {
 	}
 	if value.Revocation != nil {
 		value.Revocation = revocationPointer(*value.Revocation)
+	}
+	if value.RecoveryRecord != nil {
+		value.RecoveryRecord = recoveryRecordPointer(*value.RecoveryRecord)
+	}
+	if value.RecoveredActivation != nil {
+		value.RecoveredActivation = recoveredActivationPointer(*value.RecoveredActivation)
 	}
 	return value
 }

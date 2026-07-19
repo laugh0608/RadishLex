@@ -153,14 +153,14 @@ impl<T: SyncRemoteTransport> SyncRemoteClient<T> {
 }
 
 #[derive(Debug, Serialize)]
-struct EpochDistributionUploadDto<'a> {
+pub(super) struct EpochDistributionUploadDto<'a> {
     distributor_device_id: &'a str,
     key_epoch: u64,
     records: Vec<EpochDistributionRecordUploadDto<'a>>,
 }
 
 impl<'a> EpochDistributionUploadDto<'a> {
-    fn from_records(records: &'a [SignedEpochDistribution]) -> Self {
+    pub(super) fn from_records(records: &'a [SignedEpochDistribution]) -> Self {
         Self {
             distributor_device_id: &records[0].distributor_device_id,
             key_epoch: records[0].material.key_epoch,

@@ -49,7 +49,7 @@ func (s *SQLiteStore) PutRecoveryRecord(ctx context.Context, upload RecoveryReco
 	if upload.Record.KeyEpoch != domain.CurrentKeyEpoch {
 		return RecoveryRecord{}, newError(ErrConflictRecoveryRecord, "recovery record key epoch is not current")
 	}
-	current, err := latestRecoveryRecordQuerier(ctx, tx, upload.Record.DomainID)
+	current, err := latestRecoveryChainRecordQuerier(ctx, tx, upload.Record.DomainID)
 	if errors.Is(err, sql.ErrNoRows) {
 		if upload.Record.PreviousRecoveryID != "" {
 			return RecoveryRecord{}, newError(ErrConflictRecoveryRecord, "first recovery record cannot name a predecessor")
@@ -76,12 +76,12 @@ func (s *SQLiteStore) PutRecoveryRecord(ctx context.Context, upload RecoveryReco
 	}
 	defer cleanupStagedBlob(ctx, staged)
 
-	if current.RecoveryRecordID != "" {
+	if current.RecoveryRecordID != "" && current.Status == RecoveryRecordActive {
 		result, updateErr := tx.ExecContext(ctx, `
 			UPDATE recovery_records
-			SET status = ?, updated_at_ms = ?, revoked_at_ms = ?
+			SET status = ?, revoked_at_ms = ?
 			WHERE domain_id = ? AND recovery_record_id = ? AND status = ?
-		`, string(RecoveryRecordSuperseded), record.CreatedAtMs, record.CreatedAtMs,
+		`, string(RecoveryRecordSuperseded), record.CreatedAtMs,
 			record.DomainID, current.RecoveryRecordID, string(RecoveryRecordActive))
 		if updateErr != nil {
 			return RecoveryRecord{}, newError(ErrStorageUnavailable, "previous recovery record cannot be superseded")
@@ -102,6 +102,17 @@ func (s *SQLiteStore) PutRecoveryRecord(ctx context.Context, upload RecoveryReco
 		int64(record.SignatureSchemaVersion), record.SignatureAlgorithm, record.SignatureKeyID, cloneBytes(record.Signature), record.BlobRef,
 	); err != nil {
 		return RecoveryRecord{}, newError(ErrStorageUnavailable, "recovery metadata cannot be stored")
+	}
+	lifecycleSequence, err := nextLifecycleSequenceTx(ctx, tx, record.DomainID)
+	if err != nil {
+		return RecoveryRecord{}, err
+	}
+	if err := insertLifecycleEventTx(ctx, tx, LifecycleEvent{
+		DomainID: record.DomainID, LifecycleSequence: lifecycleSequence,
+		EventType: LifecycleRecoveryRecordRotated, RecordID: record.RecoveryRecordID,
+		KeyEpoch: record.KeyEpoch, CreatedAtMs: record.CreatedAtMs,
+	}); err != nil {
+		return RecoveryRecord{}, err
 	}
 	if err := staged.Commit(ctx); err != nil {
 		return RecoveryRecord{}, err
@@ -146,6 +157,12 @@ func latestRecoveryRecordQuerier(ctx context.Context, querier sqlQuerier, domain
 	return scanRecoveryRecord(querier.QueryRowContext(ctx, `SELECT `+recoveryRecordColumns+`
 		FROM recovery_records WHERE domain_id = ? AND status = ?
 		ORDER BY created_at_ms DESC, recovery_record_id DESC LIMIT 1`, domainID, string(RecoveryRecordActive)))
+}
+
+func latestRecoveryChainRecordQuerier(ctx context.Context, querier sqlQuerier, domainID string) (RecoveryRecord, error) {
+	return scanRecoveryRecord(querier.QueryRowContext(ctx, `SELECT `+recoveryRecordColumns+`
+		FROM recovery_records WHERE domain_id = ?
+		ORDER BY created_at_ms DESC, recovery_record_id DESC LIMIT 1`, domainID))
 }
 
 func recoveryRecordQuerier(ctx context.Context, querier sqlQuerier, domainID string, recoveryID string) (RecoveryRecord, error) {

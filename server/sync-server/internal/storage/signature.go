@@ -194,6 +194,38 @@ func verifyRecoverySignature(record RecoveryRecord, signer Device) error {
 	})
 }
 
+func verifyRecoveredDeviceActivationSignature(activation RecoveredDeviceActivation, record RecoveryRecord) error {
+	if activation.SignatureSchemaVersion != signatureSchemaVersion ||
+		activation.ActivationAlgorithm != SignatureAlgorithmEd25519V1 ||
+		activation.ActivationAlgorithm != record.ActivationAlgorithm ||
+		activation.ActivationPublicKeyID != record.ActivationPublicKeyID {
+		return newSignatureError(signatureDetailMismatch, "recovery activation signature profile does not match recovery record")
+	}
+	if len(record.ActivationPublicKey) != ed25519.PublicKeySize || len(activation.ActivationSignature) != ed25519.SignatureSize {
+		return newSignatureError(signatureDetailEncoding, "recovery activation signature encoding is invalid")
+	}
+	canonical := canonicalSignatureBytes(RecoveredDeviceActivationRecordType, []signatureField{
+		textField("signature_schema_version", strconv.Itoa(int(activation.SignatureSchemaVersion))),
+		textField("activation_algorithm", activation.ActivationAlgorithm),
+		textField("activation_public_key_id", activation.ActivationPublicKeyID),
+		textField("recovery_record_id", activation.RecoveryRecordID),
+		textField("domain_id", activation.DomainID),
+		textField("device_id", activation.DeviceID),
+		textField("signing_algorithm", activation.SigningAlgorithm),
+		textField("signing_public_key_id", activation.SigningPublicKeyID),
+		bytesField("signing_public_key", activation.SigningPublicKey),
+		textField("key_agreement_algorithm", activation.KeyAgreementAlgorithm),
+		textField("key_agreement_public_key_id", activation.KeyAgreementPublicKeyID),
+		bytesField("key_agreement_public_key", activation.KeyAgreementPublicKey),
+		textField("key_epoch", strconv.FormatUint(activation.KeyEpoch, 10)),
+		textField("created_at_ms", strconv.FormatInt(activation.CreatedAtMs, 10)),
+	})
+	if !ed25519.Verify(ed25519.PublicKey(record.ActivationPublicKey), canonical, activation.ActivationSignature) {
+		return newSignatureError(signatureDetailVerify, "recovery activation signature verification failed")
+	}
+	return nil
+}
+
 func verifySignatureMetadata(fields signatureFields, signer Device, signedAtMs int64) error {
 	if fields.SchemaVersion != signatureSchemaVersion {
 		return newSignatureError(signatureDetailAlgorithm, "signature schema version is unsupported")
@@ -257,6 +289,17 @@ func verifySignatureProfile(algorithm string, publicKey []byte, signature []byte
 		if !ecdsa.Verify(&ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}, digest[:], r, s) {
 			return newSignatureError(signatureDetailVerify, "signature verification failed")
 		}
+	}
+	return nil
+}
+
+func validateP256KeyAgreementPublicKey(publicKey []byte) error {
+	if len(publicKey) != p256PublicKeyLen {
+		return newError(ErrInvalidRequest, "P-256 key agreement public key length is invalid")
+	}
+	x, y := elliptic.Unmarshal(elliptic.P256(), publicKey)
+	if x == nil || y == nil {
+		return newError(ErrInvalidRequest, "P-256 key agreement public key encoding is invalid")
 	}
 	return nil
 }

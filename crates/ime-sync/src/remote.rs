@@ -11,6 +11,8 @@ use crate::product_provider::{SyncCryptoLoadError, SyncWrappedEpochMaterialSourc
 
 mod epoch_distribution_api;
 mod lifecycle_api;
+mod lifecycle_dto;
+mod recovery_activation_api;
 mod recovery_api;
 mod wrapped_epoch_source;
 
@@ -18,7 +20,9 @@ pub use epoch_distribution_api::RemoteEpochDistributionResult;
 pub use lifecycle_api::{
     RemoteDeviceAuthorization, RemoteDeviceRevocation, RemoteLifecycleDevice, RemoteLifecycleEvent,
     RemoteLifecycleEventKind, RemoteLifecyclePage, RemoteLifecycleSnapshot,
+    RemoteRecoveredDeviceActivation, RemoteRecoveryRecordRotation,
 };
+pub use recovery_activation_api::RemoteRecoveredDeviceResult;
 pub use recovery_api::RemoteVerifiedRecoveryRecord;
 pub use wrapped_epoch_source::{RemoteWrappedEpochLocator, RemoteWrappedEpochMaterialSource};
 
@@ -905,32 +909,6 @@ impl TryFrom<ObjectDiscoveryResponseDto> for RemoteObjectDiscoveryPage {
 }
 
 #[derive(Debug, Deserialize)]
-struct DomainResponseDto {
-    domain_id: String,
-    current_key_epoch: u64,
-    active_key_id: String,
-    created_at_ms: i64,
-    updated_at_ms: i64,
-}
-
-impl TryFrom<DomainResponseDto> for SyncDomain {
-    type Error = SyncRemoteError;
-
-    fn try_from(value: DomainResponseDto) -> Result<Self, Self::Error> {
-        SyncDomain::new(
-            value.domain_id,
-            value.current_key_epoch,
-            value.active_key_id,
-            value.created_at_ms,
-            value.updated_at_ms,
-        )
-        .map_err(|error| SyncRemoteError::InvalidResponse {
-            message: error.to_string(),
-        })
-    }
-}
-
-#[derive(Debug, Deserialize)]
 struct LifecycleDeviceDto {
     domain_id: String,
     device_id: String,
@@ -1123,6 +1101,8 @@ struct LifecycleEventDto {
     device: LifecycleDeviceDto,
     authorization: Option<DeviceAuthorizationDto>,
     revocation: Option<DeviceRevocationDto>,
+    recovery_record: Option<lifecycle_dto::LifecycleRecoveryRecordDto>,
+    recovered_activation: Option<lifecycle_dto::RecoveredDeviceActivationDto>,
 }
 
 impl TryFrom<LifecycleEventDto> for RemoteLifecycleEvent {
@@ -1133,6 +1113,8 @@ impl TryFrom<LifecycleEventDto> for RemoteLifecycleEvent {
             "initial_device" => RemoteLifecycleEventKind::InitialDevice,
             "device_authorized" => RemoteLifecycleEventKind::DeviceAuthorized,
             "device_revoked" => RemoteLifecycleEventKind::DeviceRevoked,
+            "recovery_record_rotated" => RemoteLifecycleEventKind::RecoveryRecordRotated,
+            "device_recovered" => RemoteLifecycleEventKind::DeviceRecovered,
             _ => return invalid_response("lifecycle event type is invalid"),
         };
         if value.lifecycle_sequence == 0
@@ -1151,20 +1133,46 @@ impl TryFrom<LifecycleEventDto> for RemoteLifecycleEvent {
             .revocation
             .map(RemoteDeviceRevocation::try_from)
             .transpose()?;
+        let recovery_record = value
+            .recovery_record
+            .map(RemoteRecoveryRecordRotation::try_from)
+            .transpose()?;
+        let recovered_activation = value
+            .recovered_activation
+            .map(RemoteRecoveredDeviceActivation::try_from)
+            .transpose()?;
         match event_type {
             RemoteLifecycleEventKind::InitialDevice
                 if authorization.is_none()
                     && revocation.is_none()
+                    && recovery_record.is_none()
+                    && recovered_activation.is_none()
                     && value.reject_from_object_change_sequence.is_none() => {}
             RemoteLifecycleEventKind::DeviceAuthorized
                 if authorization.is_some()
                     && revocation.is_none()
+                    && recovery_record.is_none()
+                    && recovered_activation.is_none()
                     && value.reject_from_object_change_sequence.is_none() => {}
             RemoteLifecycleEventKind::DeviceRevoked
                 if authorization.is_none()
                     && revocation.is_some()
+                    && recovery_record.is_none()
+                    && recovered_activation.is_none()
                     && matches!(value.reject_from_object_change_sequence, Some(sequence) if sequence > 0) =>
                 {}
+            RemoteLifecycleEventKind::RecoveryRecordRotated
+                if authorization.is_none()
+                    && revocation.is_none()
+                    && recovery_record.is_some()
+                    && recovered_activation.is_none()
+                    && value.reject_from_object_change_sequence.is_none() => {}
+            RemoteLifecycleEventKind::DeviceRecovered
+                if authorization.is_none()
+                    && revocation.is_none()
+                    && recovery_record.is_none()
+                    && recovered_activation.is_some()
+                    && value.reject_from_object_change_sequence.is_none() => {}
             _ => return invalid_response("lifecycle event payload does not match event type"),
         }
         if device.domain_id != value.domain_id {
@@ -1181,13 +1189,15 @@ impl TryFrom<LifecycleEventDto> for RemoteLifecycleEvent {
             device,
             authorization,
             revocation,
+            recovery_record,
+            recovered_activation,
         })
     }
 }
 
 #[derive(Debug, Deserialize)]
 struct LifecycleSnapshotResponseDto {
-    domain: DomainResponseDto,
+    domain: lifecycle_dto::DomainResponseDto,
     entries: Vec<LifecycleEventDto>,
     next_cursor: String,
 }
@@ -1204,7 +1214,7 @@ impl TryFrom<LifecycleSnapshotResponseDto> for RemoteLifecycleSnapshot {
         Ok(Self {
             domain,
             entries,
-            next_cursor: response_cursor(value.next_cursor)?,
+            next_cursor: lifecycle_dto::response_cursor(value.next_cursor)?,
         })
     }
 }
@@ -1231,7 +1241,7 @@ impl TryFrom<LifecycleDiscoveryResponseDto> for RemoteLifecyclePage {
         }
         Ok(Self {
             entries,
-            next_cursor: response_cursor(value.next_cursor)?,
+            next_cursor: lifecycle_dto::response_cursor(value.next_cursor)?,
             has_more: value.has_more,
         })
     }
@@ -1259,12 +1269,6 @@ fn validate_lifecycle_order(entries: &[RemoteLifecycleEvent]) -> Result<(), Sync
         }
     }
     Ok(())
-}
-
-fn response_cursor(value: String) -> Result<OpaqueSyncCursor, SyncRemoteError> {
-    OpaqueSyncCursor::new(value).map_err(|_| SyncRemoteError::InvalidResponse {
-        message: "lifecycle next_cursor is invalid".to_owned(),
-    })
 }
 
 fn request_error_as_response(error: SyncRemoteError) -> SyncRemoteError {
@@ -1454,9 +1458,17 @@ fn invalid_request<T>(message: impl Into<String>) -> Result<T, SyncRemoteError> 
 }
 
 fn invalid_response<T>(message: impl Into<String>) -> Result<T, SyncRemoteError> {
-    Err(SyncRemoteError::InvalidResponse {
+    Err(invalid_response_value(message))
+}
+
+fn invalid_response_value(message: impl Into<String>) -> SyncRemoteError {
+    SyncRemoteError::InvalidResponse {
         message: message.into(),
-    })
+    }
+}
+
+fn invalid_crypto_response(error: radishlex_ime_crypto::CryptoError) -> SyncRemoteError {
+    invalid_response_value(error.to_string())
 }
 
 mod base64_bytes {

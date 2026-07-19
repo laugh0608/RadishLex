@@ -1178,10 +1178,59 @@ func hydrateLifecycleEventTx(ctx context.Context, tx *sql.Tx, event *LifecycleEv
 		}
 		event.Device = devicePointer(device)
 		event.Revocation = revocationPointer(revocation)
+	case LifecycleRecoveryRecordRotated:
+		record, err := recoveryRecordQuerier(ctx, tx, event.DomainID, event.RecordID)
+		if err != nil {
+			return newError(ErrStorageUnavailable, "recovery lifecycle metadata cannot be read")
+		}
+		signer, err := deviceTx(ctx, tx, event.DomainID, record.SignerDeviceID)
+		if err != nil {
+			return newError(ErrStorageUnavailable, "recovery lifecycle signer cannot be read")
+		}
+		signer.Status = DeviceActive
+		signer.RevokedAtMs = 0
+		event.Device = devicePointer(signer)
+		event.RecoveryRecord = recoveryRecordPointer(record)
+	case LifecycleDeviceRecovered:
+		activation, err := recoveredDeviceActivationTx(ctx, tx, event.DomainID, event.RecordID)
+		if err != nil {
+			return err
+		}
+		device, err := deviceTx(ctx, tx, event.DomainID, activation.DeviceID)
+		if err != nil {
+			return newError(ErrStorageUnavailable, "recovered lifecycle device cannot be read")
+		}
+		event.Device = devicePointer(device)
+		event.RecoveredActivation = recoveredActivationPointer(activation)
 	default:
 		return newError(ErrStorageUnavailable, "lifecycle event type is invalid")
 	}
 	return nil
+}
+
+func recoveredDeviceActivationTx(ctx context.Context, tx *sql.Tx, domainID string, recoveryRecordID string) (RecoveredDeviceActivation, error) {
+	row := tx.QueryRowContext(ctx, `SELECT domain_id, recovery_record_id, device_id,
+		signing_algorithm, signing_public_key_id, signing_public_key,
+		key_agreement_algorithm, key_agreement_public_key_id, key_agreement_public_key,
+		key_epoch, created_at_ms, signature_schema_version,
+		activation_algorithm, activation_public_key_id, activation_signature
+		FROM recovered_device_activations WHERE domain_id = ? AND recovery_record_id = ?`,
+		domainID, recoveryRecordID)
+	var activation RecoveredDeviceActivation
+	var keyEpoch, signatureSchemaVersion int64
+	if err := row.Scan(&activation.DomainID, &activation.RecoveryRecordID, &activation.DeviceID,
+		&activation.SigningAlgorithm, &activation.SigningPublicKeyID, &activation.SigningPublicKey,
+		&activation.KeyAgreementAlgorithm, &activation.KeyAgreementPublicKeyID, &activation.KeyAgreementPublicKey,
+		&keyEpoch, &activation.CreatedAtMs, &signatureSchemaVersion,
+		&activation.ActivationAlgorithm, &activation.ActivationPublicKeyID, &activation.ActivationSignature); err != nil {
+		return RecoveredDeviceActivation{}, newError(ErrStorageUnavailable, "recovered device activation cannot be read")
+	}
+	if keyEpoch <= 0 || signatureSchemaVersion <= 0 {
+		return RecoveredDeviceActivation{}, newError(ErrStorageUnavailable, "recovered device activation metadata is invalid")
+	}
+	activation.KeyEpoch = uint64(keyEpoch)
+	activation.SignatureSchemaVersion = uint16(signatureSchemaVersion)
+	return cloneRecoveredDeviceActivation(activation), nil
 }
 
 func wrappingForAuthorizationTx(ctx context.Context, tx *sql.Tx, authorization DeviceAuthorization) (DeviceWrappingRecord, error) {

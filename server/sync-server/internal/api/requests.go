@@ -132,6 +132,46 @@ type RecoveryRecordUploadRequest struct {
 	WrappedMaterial        []byte                       `json:"wrapped_material"`
 }
 
+type RecoverDeviceRequest struct {
+	Activation   RecoveredDeviceActivationRequest `json:"activation"`
+	Distribution EpochDistributionRequest         `json:"distribution"`
+}
+
+type RecoveredDeviceActivationRequest struct {
+	DeviceID                string `json:"device_id"`
+	SigningAlgorithm        string `json:"signing_algorithm"`
+	SigningPublicKeyID      string `json:"signing_public_key_id"`
+	SigningPublicKey        []byte `json:"signing_public_key"`
+	KeyAgreementAlgorithm   string `json:"key_agreement_algorithm"`
+	KeyAgreementPublicKeyID string `json:"key_agreement_public_key_id"`
+	KeyAgreementPublicKey   []byte `json:"key_agreement_public_key"`
+	KeyEpoch                uint64 `json:"key_epoch"`
+	CreatedAtMs             int64  `json:"created_at_ms"`
+	SignatureSchemaVersion  uint16 `json:"signature_schema_version"`
+	ActivationAlgorithm     string `json:"activation_algorithm"`
+	ActivationPublicKeyID   string `json:"activation_public_key_id"`
+	ActivationSignature     []byte `json:"activation_signature"`
+}
+
+func (r RecoverDeviceRequest) Upload(domainID string, recoveryRecordID string) storage.RecoveredDeviceActivationUpload {
+	return storage.RecoveredDeviceActivationUpload{
+		Activation: storage.RecoveredDeviceActivation{
+			RecoveryRecordID: recoveryRecordID, DomainID: domainID,
+			DeviceID: r.Activation.DeviceID, SigningAlgorithm: r.Activation.SigningAlgorithm,
+			SigningPublicKeyID: r.Activation.SigningPublicKeyID, SigningPublicKey: cloneBytes(r.Activation.SigningPublicKey),
+			KeyAgreementAlgorithm:   r.Activation.KeyAgreementAlgorithm,
+			KeyAgreementPublicKeyID: r.Activation.KeyAgreementPublicKeyID,
+			KeyAgreementPublicKey:   cloneBytes(r.Activation.KeyAgreementPublicKey),
+			KeyEpoch:                r.Activation.KeyEpoch, CreatedAtMs: r.Activation.CreatedAtMs,
+			SignatureSchemaVersion: r.Activation.SignatureSchemaVersion,
+			ActivationAlgorithm:    r.Activation.ActivationAlgorithm,
+			ActivationPublicKeyID:  r.Activation.ActivationPublicKeyID,
+			ActivationSignature:    cloneBytes(r.Activation.ActivationSignature),
+		},
+		Distribution: r.Distribution.Upload(domainID),
+	}
+}
+
 func (r RecoveryRecordUploadRequest) Upload(domainID string) storage.RecoveryRecordUpload {
 	return storage.RecoveryRecordUpload{
 		Record: storage.RecoveryRecord{

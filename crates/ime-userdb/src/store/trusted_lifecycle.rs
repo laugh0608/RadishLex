@@ -395,6 +395,51 @@ fn lifecycle_record_json(event: &RemoteLifecycleEvent) -> UserDbResult<String> {
             "signature_key_id": value.signature_key_id,
             "signature": value.signature,
         })),
+        "recovery_record": event.recovery_record.as_ref().map(|value| json!({
+            "record_schema_version": value.manifest.record_schema_version,
+            "recovery_id": value.manifest.recovery_id,
+            "previous_recovery_id": value.manifest.previous_recovery_id,
+            "domain_id": value.manifest.domain_id,
+            "key_epoch": value.manifest.key_epoch,
+            "kdf_id": value.manifest.kdf_id,
+            "kdf_version": value.manifest.kdf_version,
+            "salt": value.manifest.salt,
+            "memory_kib": value.manifest.memory_kib,
+            "iterations": value.manifest.iterations,
+            "parallelism": value.manifest.parallelism,
+            "output_len": value.manifest.output_len,
+            "envelope_algorithm": value.manifest.envelope_algorithm,
+            "envelope_nonce": value.manifest.envelope_nonce,
+            "encrypted_recovery_key_len": value.manifest.encrypted_recovery_key_len,
+            "ciphertext_hash": value.manifest.ciphertext_hash,
+            "activation_algorithm": value.manifest.activation_algorithm,
+            "activation_public_key_id": value.manifest.activation_public_key_id,
+            "activation_public_key": value.manifest.activation_public_key,
+            "created_at_ms": value.manifest.created_at_ms,
+            "updated_at_ms": value.manifest.updated_at_ms,
+            "signer_device_id": value.manifest.signature.signer_device_id,
+            "signature_schema_version": value.manifest.signature.signature_schema_version,
+            "signature_algorithm": value.manifest.signature.signature_algorithm.as_str(),
+            "signature_key_id": value.manifest.signature.signature_key_id,
+            "signature": value.manifest.signature.signature,
+        })),
+        "recovered_activation": event.recovered_activation.as_ref().map(|value| json!({
+            "recovery_record_id": value.signed.manifest.recovery_record_id,
+            "domain_id": value.signed.manifest.domain_id,
+            "device_id": value.signed.manifest.device_id,
+            "signing_algorithm": value.signed.manifest.signing_algorithm,
+            "signing_public_key_id": value.signed.manifest.signing_public_key_id,
+            "signing_public_key": value.signed.manifest.signing_public_key,
+            "key_agreement_algorithm": value.signed.manifest.key_agreement_algorithm,
+            "key_agreement_public_key_id": value.signed.manifest.key_agreement_public_key_id,
+            "key_agreement_public_key": value.signed.manifest.key_agreement_public_key,
+            "key_epoch": value.signed.manifest.key_epoch,
+            "created_at_ms": value.signed.manifest.created_at_ms,
+            "signature_schema_version": value.signed.manifest.signature_schema_version,
+            "activation_algorithm": value.signed.manifest.activation_algorithm,
+            "activation_public_key_id": value.signed.manifest.activation_public_key_id,
+            "activation_signature": value.signed.signature,
+        })),
     }))
     .map_err(|error| UserDbError::invalid_input("lifecycle_record", error.to_string()))
 }
@@ -404,6 +449,8 @@ fn event_type_name(event_type: RemoteLifecycleEventKind) -> &'static str {
         RemoteLifecycleEventKind::InitialDevice => "initial_device",
         RemoteLifecycleEventKind::DeviceAuthorized => "device_authorized",
         RemoteLifecycleEventKind::DeviceRevoked => "device_revoked",
+        RemoteLifecycleEventKind::RecoveryRecordRotated => "recovery_record_rotated",
+        RemoteLifecycleEventKind::DeviceRecovered => "device_recovered",
     }
 }
 
@@ -512,7 +559,17 @@ pub(super) mod tests {
         }
         {
             let db = UserDb::open(&path).expect("migrate v6 cache");
-            assert_eq!(db.schema_version().expect("schema version"), 7);
+            assert_eq!(db.schema_version().expect("schema version"), 8);
+            let lifecycle_schema: String = db
+                .connection
+                .query_row(
+                    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'sync_trusted_lifecycle_events'",
+                    [],
+                    |row| row.get(0),
+                )
+                .expect("recovery lifecycle table schema");
+            assert!(lifecycle_schema.contains("recovery_record_rotated"));
+            assert!(lifecycle_schema.contains("device_recovered"));
             let profile = db
                 .trusted_domain_state("domain-a")
                 .expect("load migrated cache")
@@ -572,6 +629,8 @@ pub(super) mod tests {
                 device,
                 authorization: None,
                 revocation: None,
+                recovery_record: None,
+                recovered_activation: None,
             }],
             next_cursor: OpaqueSyncCursor::new(cursor).expect("cursor"),
         };

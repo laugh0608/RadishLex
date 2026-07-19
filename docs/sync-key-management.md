@@ -219,7 +219,7 @@ Rust 与 Go 的包装记录边界：
 
 - 恢复码只能用于恢复同步域材料，不能作为服务端登录密码。
 - 恢复参数可以公开保存，但不得降低离线攻击成本到不可接受水平。
-- 恢复码 KDF 参数、格式、校验段和失败限速策略已由 `docs/adr/0002-recovery-code-kdf.md` 固定；生产恢复记录创建、轮换、撤销和新设备恢复加入见 `docs/production-recovery-flow.md`。Rust 与 Go 已覆盖 v2 activation public profile、签名 metadata、原子轮换、verified HTTP 读取和恢复解封；recovered-device activation/lifecycle 与管理 UI 仍未实现。
+- 恢复码 KDF 参数、格式、校验段和失败限速策略已由 `docs/adr/0002-recovery-code-kdf.md` 固定；生产恢复记录创建、轮换、撤销和新设备恢复加入见 `docs/production-recovery-flow.md`。Rust 与 Go 已覆盖 v2 activation public profile、签名 metadata、原子轮换、verified HTTP 读取、恢复解封、recovered-device possession proof、完整 active cohort epoch 分发和 lifecycle 重启；signed recovery record 撤销与管理 UI 仍未实现。
 
 ## 设备撤销与 key epoch
 
@@ -319,7 +319,7 @@ updated_at_ms
 6. 已在 `ime-sync` 补 `SyncEnvelopeAssembler`，固定 Rust 内部 P2 payload 到 envelope 的组装边界，覆盖 sync master 派生 object key、nonce 复用阻断、draft 派生和 Debug 明文阻断。
 7. 已补 `docs/adr/0002-recovery-code-kdf.md`，固定恢复码 Argon2id KDF、格式、恢复记录字段、失败限速和验证口径。
 8. 已按 ADR 落地恢复码 KDF 纯 Rust 模型与测试，覆盖 `RecoveryCode`、`RecoveryKdfProfile`、恢复 wrapping key 和 `RecoveryMaterial` 恢复记录加解密。
-9. 已落地 `recovery-record-v2`、Go schema v7 optimistic rotation、Rust trusted remote 验签读取和真实短生命周期 Go HTTP 解封/轮换证据；下一步归约 recovered-device lifecycle。
+9. 已落地 `recovery-record-v2`、Go schema v8 optimistic rotation/recovered-device activation、Rust trusted remote 验签读取和真实短生命周期 Go HTTP 解封、轮换、恢复激活与文件 userdb 重启证据；下一步补 signed recovery record 撤销。
 9. 已补 `docs/adr/0003-device-signing-key-storage.md`，固定设备签名、签名对象、canonical bytes、私钥存储抽象、错误语义和验证口径。
 10. 已按 ADR 落地签名 / 设备密钥存储 Rust 模型，当前使用合成 `test-memory-v1` key store，并补 platform backend capability metadata、unavailable backend 明确失败和 revoked key 阻断测试。
 11. 已补 `apple-keychain-v1` 平台 runbook 和 Apple 签名策略 ADR，固定 Apple Keychain 创建、加载、签名、删除、锁屏 / 权限、备份迁移、日志脱敏和策略停止线；macOS backend 已在 `apple-keychain` feature 下接线，默认测试不访问系统 Keychain，真实 smoke 已运行但阻塞于 `ed25519-v1` 创建，backend status 已阻断生产签名。
@@ -337,7 +337,7 @@ updated_at_ms
 23. 已补 Rust userdb 两客户端真实 Go HTTP 测试，覆盖设备授权、三类 P2 对象上传下载、客户端解密写回、stale conflict、v2 重新上传和 runtime 日志脱敏。
 24. 已按 `docs/sync-orchestration.md` 落地 change cursor、local repository port、transaction-scoped apply + cursor、持久化 journal/outbox、取消/重启、409 重新发现和默认关闭的通用 crypto processor/provider；合成双 userdb Go HTTP service 已覆盖历史 epoch、撤销 sequence、cycle snapshot 与新 outbox 轮换边界。
 25. 已落地 `ProductSyncCryptoProvider` 与可信 device lifecycle、epoch material、platform signing 三端口；装载顺序先验证本机 active、registered public key 与 production backend，再读取 material。合成授权/撤销/轮换测试覆盖旧设备不读取新 epoch、历史对象、撤销 sequence、新 epoch outbox 和重启 snapshot 重建。
-26. 下一批补完整设备目录/lifecycle sequence、signed authorization/revocation 的 Rust 验证与本地 public cache，再实现 wrapped epoch material 解封装和平台 adapter；明文 sync master key 不进入 SQLite/settings，不接 Manager 产品命令。
+26. 已补完整设备目录/lifecycle sequence、signed authorization/revocation/recovery 的 Rust 验证与本地 public cache，并实现 wrapped epoch material 解封装和平台 adapter；明文 sync master key 不进入 SQLite/settings，不接 Manager 产品命令。
 
 ## 验证口径
 
@@ -360,7 +360,7 @@ updated_at_ms
 
 ## 停止线
 
-- 恢复码 KDF、Rust model 与服务端 v2 轮换 API 已落地；recovered-device activation/lifecycle、合格平台 backend 和管理 UI 未闭环前，不提供用户可用恢复入口。
+- 恢复码 KDF、Rust model、服务端 v2 轮换 API 与 recovered-device activation/lifecycle 已落地；signed recovery record 撤销、合格平台 backend 和管理 UI 未闭环前，不提供用户可用恢复入口。
 - 设备签名模型、两个签名 profile、跨语言 verifier/vectors、私钥存储抽象、平台 capability、Apple/Android runbook 与 feature-gated backend 已落地；普通 DPK 软件运行时已验证但可导出，Secure Enclave lifecycle、denied 与真实设备锁屏 locked 已验证，unsupported 和最终产品资格仍待真实环境证据，既有 Android/Apple Ed25519 阻塞也未解除。关闭态 Rust orchestration 可以独立推进，但任何局部 capability 或合成编排证据都不得开放用户可用远端对象上传下载。
 - 服务端若回退到只保存 wrapping metadata 而不能保存 / 返回 wrapped key bytes，则不得开放真实设备授权 handler。
 - Go server 与 Rust HTTP transport 继续推进时，必须先满足 `docs/sync-server-api-storage.md` 的签名、metadata API、版本冲突、错误语义和脱敏验证。

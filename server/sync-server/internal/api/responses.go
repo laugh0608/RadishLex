@@ -113,6 +113,19 @@ type RecoveryRecordResponse struct {
 	WrappedMaterial        []byte                       `json:"wrapped_material"`
 }
 
+type RecoveredDeviceActivationResponse struct {
+	Device             DeviceResponse `json:"device"`
+	LifecycleSequence  uint64         `json:"lifecycle_sequence"`
+	DistributedRecords int            `json:"distributed_records"`
+}
+
+func RecoveredDeviceActivationResponseFrom(result storage.RecoveredDeviceActivationResult) RecoveredDeviceActivationResponse {
+	return RecoveredDeviceActivationResponse{
+		Device: DeviceResponseFrom(result.Device), LifecycleSequence: result.LifecycleSequence,
+		DistributedRecords: result.DistributedRecords,
+	}
+}
+
 type ObjectVersionResponse struct {
 	DomainID               string `json:"domain_id"`
 	ObjectID               string `json:"object_id"`
@@ -177,17 +190,37 @@ type DeviceRevocationResponse struct {
 	Signature              []byte `json:"signature"`
 }
 
+type RecoveredDeviceActivationLifecycleResponse struct {
+	RecoveryRecordID        string `json:"recovery_record_id"`
+	DomainID                string `json:"domain_id"`
+	DeviceID                string `json:"device_id"`
+	SigningAlgorithm        string `json:"signing_algorithm"`
+	SigningPublicKeyID      string `json:"signing_public_key_id"`
+	SigningPublicKey        []byte `json:"signing_public_key"`
+	KeyAgreementAlgorithm   string `json:"key_agreement_algorithm"`
+	KeyAgreementPublicKeyID string `json:"key_agreement_public_key_id"`
+	KeyAgreementPublicKey   []byte `json:"key_agreement_public_key"`
+	KeyEpoch                uint64 `json:"key_epoch"`
+	CreatedAtMs             int64  `json:"created_at_ms"`
+	SignatureSchemaVersion  uint16 `json:"signature_schema_version"`
+	ActivationAlgorithm     string `json:"activation_algorithm"`
+	ActivationPublicKeyID   string `json:"activation_public_key_id"`
+	ActivationSignature     []byte `json:"activation_signature"`
+}
+
 type LifecycleEventResponse struct {
-	DomainID                       string                       `json:"domain_id"`
-	LifecycleSequence              uint64                       `json:"lifecycle_sequence"`
-	EventType                      storage.LifecycleEventType   `json:"event_type"`
-	RecordID                       string                       `json:"record_id"`
-	KeyEpoch                       uint64                       `json:"key_epoch"`
-	RejectFromObjectChangeSequence uint64                       `json:"reject_from_object_change_sequence,omitempty"`
-	CreatedAtMs                    int64                        `json:"created_at_ms"`
-	Device                         *DeviceResponse              `json:"device,omitempty"`
-	Authorization                  *DeviceAuthorizationResponse `json:"authorization,omitempty"`
-	Revocation                     *DeviceRevocationResponse    `json:"revocation,omitempty"`
+	DomainID                       string                                      `json:"domain_id"`
+	LifecycleSequence              uint64                                      `json:"lifecycle_sequence"`
+	EventType                      storage.LifecycleEventType                  `json:"event_type"`
+	RecordID                       string                                      `json:"record_id"`
+	KeyEpoch                       uint64                                      `json:"key_epoch"`
+	RejectFromObjectChangeSequence uint64                                      `json:"reject_from_object_change_sequence,omitempty"`
+	CreatedAtMs                    int64                                       `json:"created_at_ms"`
+	Device                         *DeviceResponse                             `json:"device,omitempty"`
+	Authorization                  *DeviceAuthorizationResponse                `json:"authorization,omitempty"`
+	Revocation                     *DeviceRevocationResponse                   `json:"revocation,omitempty"`
+	RecoveryRecord                 *RecoveryRecordResponse                     `json:"recovery_record,omitempty"`
+	RecoveredActivation            *RecoveredDeviceActivationLifecycleResponse `json:"recovered_activation,omitempty"`
 }
 
 type LifecycleSnapshotResponse struct {
@@ -292,6 +325,26 @@ func LifecycleEventResponseFrom(event storage.LifecycleEvent) LifecycleEventResp
 			CreatedAtMs: revocation.CreatedAtMs, SignatureSchemaVersion: revocation.SignatureSchemaVersion,
 			SignatureAlgorithm: revocation.SignatureAlgorithm, SignatureKeyID: revocation.SignatureKeyID,
 			Signature: cloneBytes(revocation.Signature),
+		}
+	}
+	if event.RecoveryRecord != nil {
+		record := RecoveryRecordResponseFrom(*event.RecoveryRecord, nil)
+		response.RecoveryRecord = &record
+	}
+	if event.RecoveredActivation != nil {
+		activation := event.RecoveredActivation
+		response.RecoveredActivation = &RecoveredDeviceActivationLifecycleResponse{
+			RecoveryRecordID: activation.RecoveryRecordID, DomainID: activation.DomainID,
+			DeviceID: activation.DeviceID, SigningAlgorithm: activation.SigningAlgorithm,
+			SigningPublicKeyID: activation.SigningPublicKeyID, SigningPublicKey: cloneBytes(activation.SigningPublicKey),
+			KeyAgreementAlgorithm:   activation.KeyAgreementAlgorithm,
+			KeyAgreementPublicKeyID: activation.KeyAgreementPublicKeyID,
+			KeyAgreementPublicKey:   cloneBytes(activation.KeyAgreementPublicKey),
+			KeyEpoch:                activation.KeyEpoch, CreatedAtMs: activation.CreatedAtMs,
+			SignatureSchemaVersion: activation.SignatureSchemaVersion,
+			ActivationAlgorithm:    activation.ActivationAlgorithm,
+			ActivationPublicKeyID:  activation.ActivationPublicKeyID,
+			ActivationSignature:    cloneBytes(activation.ActivationSignature),
 		}
 	}
 	return response

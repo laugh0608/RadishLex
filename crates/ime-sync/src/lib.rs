@@ -56,6 +56,7 @@ pub use remote::{
     RemoteDeviceRevocation, RemoteEpochDistributionResult, RemoteLifecycleDevice,
     RemoteLifecycleEvent, RemoteLifecycleEventKind, RemoteLifecyclePage, RemoteLifecycleSnapshot,
     RemoteObjectDiscoveryPage, RemoteObjectPayload, RemoteObjectVersion,
+    RemoteRecoveredDeviceActivation, RemoteRecoveredDeviceResult, RemoteRecoveryRecordRotation,
     RemoteVerifiedRecoveryRecord, RemoteWrappedEpochLocator, RemoteWrappedEpochMaterialSource,
     SyncRemoteClient, SyncRemoteError, SyncRemoteMethod, SyncRemoteRequest, SyncRemoteResponse,
     SyncRemoteTransport, SyncServerErrorCode,

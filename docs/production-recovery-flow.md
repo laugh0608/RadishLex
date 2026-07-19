@@ -9,11 +9,11 @@
 - `docs/adr/0002-recovery-code-kdf.md` 固定恢复码格式、Argon2id KDF profile、恢复记录字段、AAD 绑定和失败限速口径。
 - `ime-crypto` 已落地 recovery-record-v2、恢复 wrapping key、activation public identity/signature 和恢复材料加解密模型。
 - `docs/adr/0003-device-signing-key-storage.md` 固定设备签名对象、canonical bytes、私钥存储抽象和错误语义。
-- `ime-crypto` / `ime-sync` 已覆盖 signed recovery-record-v2、trusted remote upload/download/decrypt、signed device authorization/revocation 和客户端合并写回 userdb。
+- `ime-crypto` / `ime-sync` 已覆盖 signed recovery-record-v2、trusted remote upload/download/decrypt、recovered-device possession proof、signed device lifecycle 和客户端合并写回 userdb。
 - `docs/sync-server-api-storage.md` 已固定 Go server 只保存恢复记录 metadata、包装密文、签名和必要同步元数据。
-- Go schema v7 storage/API 已完成 recovery v2 optimistic rotation、`superseded` 状态、幂等/冲突、legacy v1 迁移、latest encrypted material 读取、限速、备份重启和日志脱敏证据。
+- Go schema v8 storage/API 已完成 recovery v2 optimistic rotation、recovered-device activation transaction、`superseded` 状态、幂等/冲突、legacy v1 迁移、latest encrypted material 读取、限速、文件重启和日志脱敏证据。
 
-当前仍不实现真实 UI、平台 Keychain/Keystore 实机操作或 recovered-device activation/lifecycle 成功入口。
+当前仍不实现真实 UI、平台 Keychain/Keystore 实机操作或 Manager recovered-device 成功入口；signed recovery record 撤销尚未实现。
 
 ## 设计目标
 
@@ -139,9 +139,11 @@
 5. 新设备用恢复 wrapping key 解开同步域材料。
 6. 新设备验证恢复记录签名、domain、key epoch 和 AAD。
 7. 新设备从同一 recovery wrapping key 域分离派生 activation key，核对 public key 与 v2 record 完全一致，再签名 `recovered_device_activation`；签名覆盖新 device id、两组完整公钥/算法/key id、domain、recovery record id、当前 epoch 和时间。
-8. 服务端验证 record 是当前 active v2、绑定当前 epoch、activation signature 有效且 device id/profile 未登记，然后在一个 transaction 中保存新 active 设备、把已使用 record 标记为 `superseded`，并追加 `device_recovered` lifecycle event。
-9. 新设备拉取密文对象，在本地解密、合并并写回 userdb。
-10. 管理 UI 提示用户轮换恢复码。
+8. 新设备同时提交由其新 signing key 签名的当前 epoch distribution；distribution 必须覆盖事务提交后的完整 active cohort，包括新设备自身，不能在恢复激活后留下尚未取得当前 epoch 的 active 设备。
+9. 服务端验证 record 是当前 active v2、绑定当前 epoch、activation signature 有效且 device id/profile 未登记，并验证 distribution 的 signer/profile、epoch、recipient key id、完整 cohort 与每条密文 metadata。
+10. 服务端在一个 transaction 中保存新 active 设备、把已使用 record 标记为 `superseded`、保存 `recovered_device_activation`、追加 `device_recovered` lifecycle event，并原子提交完整 cohort 的 wrapped epoch metadata；任一校验或 blob staging 失败都不得留下 active 设备或半套 distribution。
+11. 新设备拉取密文对象，在本地解密、合并并写回 userdb。
+12. 管理 UI 提示用户轮换恢复码。
 
 是否需要旧设备确认：
 
@@ -150,6 +152,9 @@
 - 服务端只根据 signed recovery record、恢复记录状态、设备公钥和限速规则接受恢复加入；服务端不验证恢复码明文。
 - 服务端不得仅凭 recovery record id、bearer token、device header 或“能够解密”的客户端声明激活设备；activation signature 是不暴露恢复码的 possession proof。
 - lifecycle verifier 必须先验证 `recovery_record_rotated`，再验证引用它的 `device_recovered`；缺事件、乱序、重复使用 record、profile/public key 替换或 current epoch 不一致均失败关闭。
+- `recovery_record_rotated` lifecycle event 携带可复验的 v2 metadata/signature，不携带 wrapped material；verifier 以当时 active signer 验签并要求 predecessor 严格承接上一条 recovery chain head。
+- `device_recovered` lifecycle event 携带 activation signature 与完整新设备公开 profile；canonical record type 固定为 `recovered_device_activation`，字段顺序固定为 signature schema/algorithm/key id、recovery record id、domain id、device id、signing profile、key-agreement profile、key epoch、created time。
+- activation 成功会消费 active recovery record；后续轮换必须以前一 chain head 为 predecessor，即使该 head 已因恢复使用而进入 `superseded`，不能重新从空 predecessor 开链。
 
 恢复后 key epoch：
 
@@ -270,7 +275,7 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 - 恢复记录 blob 缺失、长度不一致或 hash 不一致时，应返回 `storage_unavailable`，不能把损坏密文当作可恢复状态。
 - 服务端错误响应不得区分“恢复码接近正确”或泄漏 KDF 输出、AAD、wrapped material bytes。
 
-当前已实现 v2 optimistic rotation 与 Rust verified upload/download/decrypt：新写入固定当前 epoch/profile，精确重放幂等，旧 active 原子转为 `superseded`；v1 仅迁移保留并由产品客户端拒绝。尚未把 rotation 归入 lifecycle，也未实现 `device_recovered` transaction；下一批只用合成 recovery code/backend 完成这两项，不开放 Manager 成功入口。
+当前已实现 v2 optimistic rotation、Rust verified upload/download/decrypt、`recovery_record_rotated` / `device_recovered` lifecycle 和恢复激活 transaction：新写入固定当前 epoch/profile，精确重放幂等，旧 active 或已消费 chain head 可作为严格 predecessor；activation possession proof、全新设备 profile 与事务后完整 active cohort distribution 必须同时通过，失败不留下 active 设备或部分 wrapped metadata。文件 userdb 重启可从公开记录重放信任链；不开放 Manager 成功入口。
 
 ## 与管理 UI 的边界
 
@@ -299,8 +304,8 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 4. 已在 Go server storage 验证模型中覆盖 recovery record metadata、`blob_ref` 分配、wrapped material staged blob 写入与 hash / length 校验，不接触恢复码明文。
 5. 已补 Go server recovery latest handler，覆盖 wrapped material 读取、状态、限速和日志脱敏验证。
 6. 已实现 `recovery-record-v2`、activation public key 派生、原子轮换、verified remote 读取与恢复解封；v1 只迁移保留，当前产品客户端失败关闭。
-7. 下一批实现 recovered-device activation、`recovery_record_rotated` / `device_recovered` lifecycle 归约和文件 userdb 重启证据。
-8. 后续真实平台 backend 通过验证后，管理 UI 再接入用户可见恢复流程。
+7. 已实现 recovered-device activation、`recovery_record_rotated` / `device_recovered` lifecycle 归约、完整 active cohort 当前 epoch 分发和文件 userdb 重启证据。
+8. 下一批实现 signed recovery record 撤销及其 lifecycle/并发语义；后续真实平台 backend 通过验证后，管理 UI 再接入用户可见恢复流程。
 
 ## 验证口径
 

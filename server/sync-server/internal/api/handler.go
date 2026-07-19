@@ -180,6 +180,8 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request, audit *Audit
 		h.handleLatestRecovery(w, r, route.domainID)
 	case recoveryRecordsRoute:
 		h.handleRecoveryRecords(w, r, route.domainID, audit)
+	case recoveryActivationRoute:
+		h.handleRecoveryActivation(w, r, route.domainID, route.recoveryRecordID, audit)
 	case objectDiscoveryRoute:
 		h.handleObjectDiscovery(w, r, route.domainID)
 	case objectVersionsRoute:
@@ -575,6 +577,27 @@ func (h *Handler) handleRecoveryRecords(w http.ResponseWriter, r *http.Request, 
 	writeJSON(w, http.StatusCreated, RecoveryRecordResponseFrom(record, nil))
 }
 
+func (h *Handler) handleRecoveryActivation(w http.ResponseWriter, r *http.Request, domainID string, recoveryRecordID string, audit *AuditEvent) {
+	if r.Method != http.MethodPost {
+		h.writeMethodError(w, http.MethodPost)
+		return
+	}
+	var request RecoverDeviceRequest
+	if err := decodeJSONRequestWithLimit(w, r, &request, maxEpochDistributionRequestBytes); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	upload := request.Upload(domainID, recoveryRecordID)
+	audit.DeviceID = upload.Activation.DeviceID
+	audit.KeyEpoch = upload.Activation.KeyEpoch
+	result, err := h.store.RecoverDevice(r.Context(), upload)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, RecoveredDeviceActivationResponseFrom(result))
+}
+
 func (h *Handler) handleObjectVersions(w http.ResponseWriter, r *http.Request, domainID string, objectID string, audit *AuditEvent) {
 	if r.Method != http.MethodPost {
 		h.writeMethodError(w, http.MethodPost)
@@ -707,6 +730,7 @@ const (
 	joinAuthorizationRoute
 	recoveryLatestRoute
 	recoveryRecordsRoute
+	recoveryActivationRoute
 	objectDiscoveryRoute
 	objectVersionsRoute
 	objectVersionRoute
@@ -714,13 +738,14 @@ const (
 )
 
 type route struct {
-	kind          routeKind
-	domainID      string
-	deviceID      string
-	joinRequestID string
-	objectID      string
-	version       uint64
-	keyEpoch      uint64
+	kind             routeKind
+	domainID         string
+	deviceID         string
+	joinRequestID    string
+	recoveryRecordID string
+	objectID         string
+	version          uint64
+	keyEpoch         uint64
 }
 
 func (r route) name() string {
@@ -747,6 +772,8 @@ func (r route) name() string {
 		return "recovery.latest"
 	case recoveryRecordsRoute:
 		return "recovery.rotate"
+	case recoveryActivationRoute:
+		return "recovery.activate_device"
 	case objectDiscoveryRoute:
 		return "objects.discover"
 	case objectVersionsRoute:
@@ -802,6 +829,9 @@ func domainRoute(path string) (route, bool) {
 	}
 	if len(parts) == 2 && parts[0] != "" && parts[1] == "recovery-records" {
 		return route{kind: recoveryRecordsRoute, domainID: parts[0]}, true
+	}
+	if len(parts) == 4 && parts[0] != "" && parts[1] == "recovery-records" && parts[2] != "" && parts[3] == "activation" {
+		return route{kind: recoveryActivationRoute, domainID: parts[0], recoveryRecordID: parts[2]}, true
 	}
 	if len(parts) == 2 && parts[0] != "" && parts[1] == "objects" {
 		return route{kind: objectDiscoveryRoute, domainID: parts[0]}, true

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"strconv"
 	"testing"
 )
@@ -372,7 +373,7 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 			CiphertextHash:        CiphertextHash(wrapped),
 			ActivationAlgorithm:   SignatureAlgorithmEd25519V1,
 			ActivationPublicKeyID: "recovery-activation-key-a",
-			ActivationPublicKey:   make([]byte, ed25519.PublicKeySize),
+			ActivationPublicKey:   recoveryActivationPrivateKeyForTest().Public().(ed25519.PublicKey),
 			Status:                RecoveryRecordActive,
 			CreatedAtMs:           40,
 			UpdatedAtMs:           40,
@@ -445,6 +446,78 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 		third := recoveryRecordForTest("recovery-d", "recovery-b", 70, secondWrapped)
 		if _, err := store.PutRecoveryRecord(ctx, RecoveryRecordUpload{Record: third, WrappedMaterial: tampered}); !IsCode(err, ErrInvalidCiphertextMetadata) {
 			t.Fatalf("tampered wrapped recovery should fail metadata, got %v", err)
+		}
+	})
+
+	t.Run("recovered device activation consumes record and distributes epoch atomically", func(t *testing.T) {
+		ctx := context.Background()
+		store := newReadyStore(t, newStore)
+		saveJoinAndAuthorize(t, store, "domain-a", "join-b", "device-b", 20)
+		saveJoinAndAuthorize(t, store, "domain-a", "join-c", "device-c", 25)
+		revocation := DeviceRevocation{
+			DomainID: "domain-a", RevokedDeviceID: "device-c", RevokerDeviceID: "device-a",
+			PreviousKeyEpoch: 1, NewKeyEpoch: 2, Reason: "lost", CreatedAtMs: 30,
+		}
+		signRevocationForTest(&revocation)
+		if err := store.RevokeDevice(ctx, revocation); err != nil {
+			t.Fatalf("revoke device before recovery: %v", err)
+		}
+		wrapped := bytes.Repeat([]byte{0x51}, RecoveryWrappedMaterialBytes)
+		record := recoveryRecordForTest("recovery-a", "", 40, wrapped)
+		record.KeyEpoch = 2
+		signRecoveryForTest(&record)
+		if _, err := store.PutRecoveryRecord(ctx, RecoveryRecordUpload{Record: record, WrappedMaterial: wrapped}); err != nil {
+			t.Fatalf("put recovery record: %v", err)
+		}
+		upload := recoveredDeviceActivationUploadForTest(record, "device-recovered", 50, "device-a", "device-b", "device-recovered")
+
+		tampered := upload
+		tampered.Activation.ActivationSignature = cloneBytes(upload.Activation.ActivationSignature)
+		tampered.Activation.ActivationSignature[0] ^= 0x80
+		if _, err := store.RecoverDevice(ctx, tampered); !IsCode(err, ErrInvalidSignature) {
+			t.Fatalf("tampered activation must fail, got %v", err)
+		}
+		if _, err := store.Device(ctx, "domain-a", "device-recovered"); !IsCode(err, ErrNotFound) {
+			t.Fatalf("failed activation must not create device, got %v", err)
+		}
+		if latest, err := store.LatestRecoveryRecord(ctx, "domain-a"); err != nil || latest.RecoveryRecordID != "recovery-a" {
+			t.Fatalf("failed activation must not consume recovery: record=%#v err=%v", latest, err)
+		}
+
+		incomplete := upload
+		incomplete.Distribution.Records = append([]DeviceWrappingUpload(nil), upload.Distribution.Records[:2]...)
+		if _, err := store.RecoverDevice(ctx, incomplete); !IsCode(err, ErrInvalidRequest) {
+			t.Fatalf("incomplete cohort must fail, got %v", err)
+		}
+		result, err := store.RecoverDevice(ctx, upload)
+		if err != nil {
+			t.Fatalf("recover device: %v", err)
+		}
+		if result.Device.DeviceID != "device-recovered" || result.Device.Status != DeviceActive || result.DistributedRecords != 3 {
+			t.Fatalf("unexpected recovery result: %#v", result)
+		}
+		if _, err := store.LatestRecoveryRecord(ctx, "domain-a"); !IsCode(err, ErrNotFound) {
+			t.Fatalf("used recovery record must stop being latest active, got %v", err)
+		}
+		if _, err := store.RecoverDevice(ctx, upload); !IsCode(err, ErrConflictRecoveryRecord) {
+			t.Fatalf("recovery record reuse must conflict, got %v", err)
+		}
+		for _, recipient := range []string{"device-a", "device-b", "device-recovered"} {
+			if _, _, err := store.DeviceWrappedKey(ctx, "domain-a", recipient, 2, "epoch-2-"+recipient); err != nil {
+				t.Fatalf("recipient %s must read recovered epoch material: %v", recipient, err)
+			}
+		}
+		if _, _, err := store.DeviceWrappedKey(ctx, "domain-a", "device-c", 2, "epoch-2-device-c"); !IsCode(err, ErrForbiddenDevice) {
+			t.Fatalf("revoked device must not obtain recovered epoch, got %v", err)
+		}
+		snapshot, err := store.LifecycleSnapshot(ctx, "domain-a")
+		if err != nil {
+			t.Fatalf("read recovery lifecycle: %v", err)
+		}
+		if len(snapshot.Events) != 6 || snapshot.Events[4].EventType != LifecycleRecoveryRecordRotated ||
+			snapshot.Events[4].RecoveryRecord == nil || snapshot.Events[5].EventType != LifecycleDeviceRecovered ||
+			snapshot.Events[5].RecoveredActivation == nil || snapshot.Events[5].Device == nil {
+			t.Fatalf("unexpected recovery lifecycle: %#v", snapshot.Events)
 		}
 	})
 
@@ -825,7 +898,7 @@ func recoveryRecordForTest(recoveryID string, previousID string, createdAtMs int
 		CiphertextHash:        CiphertextHash(wrapped),
 		ActivationAlgorithm:   SignatureAlgorithmEd25519V1,
 		ActivationPublicKeyID: "recovery-activation-key-a",
-		ActivationPublicKey:   make([]byte, ed25519.PublicKeySize),
+		ActivationPublicKey:   recoveryActivationPrivateKeyForTest().Public().(ed25519.PublicKey),
 		Status:                RecoveryRecordActive,
 		CreatedAtMs:           createdAtMs,
 		UpdatedAtMs:           createdAtMs,
@@ -833,6 +906,48 @@ func recoveryRecordForTest(recoveryID string, previousID string, createdAtMs int
 	}
 	signRecoveryForTest(&record)
 	return record
+}
+
+func recoveredDeviceActivationUploadForTest(record RecoveryRecord, deviceID string, createdAtMs int64, recipients ...string) RecoveredDeviceActivationUpload {
+	activation := RecoveredDeviceActivation{
+		RecoveryRecordID: record.RecoveryRecordID, DomainID: record.DomainID, DeviceID: deviceID,
+		SigningAlgorithm: SignatureAlgorithmEd25519V1, SigningPublicKeyID: signingKeyIDForTest(deviceID),
+		SigningPublicKey: signingPublicKeyForTest(deviceID), KeyAgreementAlgorithm: "p256-ecdh-v1",
+		KeyAgreementPublicKeyID: "agreement-key-" + deviceID,
+		KeyAgreementPublicKey: elliptic.Marshal(
+			elliptic.P256(), elliptic.P256().Params().Gx, elliptic.P256().Params().Gy,
+		),
+		KeyEpoch: record.KeyEpoch, CreatedAtMs: createdAtMs, SignatureSchemaVersion: 1,
+		ActivationAlgorithm: record.ActivationAlgorithm, ActivationPublicKeyID: record.ActivationPublicKeyID,
+	}
+	activation.ActivationSignature = ed25519.Sign(recoveryActivationPrivateKeyForTest(), canonicalSignatureBytes(RecoveredDeviceActivationRecordType, []signatureField{
+		textField("signature_schema_version", "1"),
+		textField("activation_algorithm", activation.ActivationAlgorithm),
+		textField("activation_public_key_id", activation.ActivationPublicKeyID),
+		textField("recovery_record_id", activation.RecoveryRecordID),
+		textField("domain_id", activation.DomainID),
+		textField("device_id", activation.DeviceID),
+		textField("signing_algorithm", activation.SigningAlgorithm),
+		textField("signing_public_key_id", activation.SigningPublicKeyID),
+		bytesField("signing_public_key", activation.SigningPublicKey),
+		textField("key_agreement_algorithm", activation.KeyAgreementAlgorithm),
+		textField("key_agreement_public_key_id", activation.KeyAgreementPublicKeyID),
+		bytesField("key_agreement_public_key", activation.KeyAgreementPublicKey),
+		textField("key_epoch", uint64String(activation.KeyEpoch)),
+		textField("created_at_ms", int64String(activation.CreatedAtMs)),
+	}))
+	distribution := epochDistributionUploadForTest(record.KeyEpoch, recipients...)
+	distribution.DistributorDeviceID = deviceID
+	for index := range distribution.Records {
+		distribution.Records[index].Record.AuthorizerDeviceID = deviceID
+		distribution.Records[index].Record.CreatedAtMs = createdAtMs
+		signEpochDistributionForTest(&distribution.Records[index].Record)
+	}
+	return RecoveredDeviceActivationUpload{Activation: activation, Distribution: distribution}
+}
+
+func recoveryActivationPrivateKeyForTest() ed25519.PrivateKey {
+	return ed25519.NewKeyFromSeed(bytes.Repeat([]byte{0x35}, ed25519.SeedSize))
 }
 
 func signingPublicKeyForTest(deviceID string) []byte {

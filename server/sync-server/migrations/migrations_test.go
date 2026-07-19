@@ -134,7 +134,7 @@ func TestApplyBackfillsHistoricalDeviceAlgorithmsAndIsIdempotent(t *testing.T) {
 	if err := db.QueryRow("PRAGMA user_version").Scan(&schemaVersion); err != nil {
 		t.Fatalf("read schema version: %v", err)
 	}
-	if schemaVersion != 7 {
+	if schemaVersion != 8 {
 		t.Fatalf("unexpected schema version: %d", schemaVersion)
 	}
 	var wrappingRecipientKeyID string
