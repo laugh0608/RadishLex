@@ -32,6 +32,15 @@ func TestApplyBackfillsHistoricalDeviceAlgorithmsAndIsIdempotent(t *testing.T) {
 			'domain-history', 'device-history', 'signing-key-history', x'01',
 			'agreement-key-history', x'02', 'active', 100, 0, 0
 		);
+		INSERT INTO device_wrapping_records (
+			domain_id, recipient_device_id, authorizer_device_id, key_epoch,
+			wrapping_key_id, algorithm, nonce, wrapped_key_len, ciphertext_hash,
+			created_at_ms, signature, blob_ref
+		) VALUES (
+			'domain-history', 'device-history', 'device-history', 1,
+			'wrapping-history', 'xchacha20poly1305-hkdf-sha256-v1', x'01', 1,
+			'sha256:history', 100, x'02', 'wrapping/history'
+		);
 		INSERT INTO device_join_requests (
 			domain_id, join_request_id, device_id, signing_public_key_id,
 			signing_public_key, key_agreement_public_key_id,
@@ -125,8 +134,18 @@ func TestApplyBackfillsHistoricalDeviceAlgorithmsAndIsIdempotent(t *testing.T) {
 	if err := db.QueryRow("PRAGMA user_version").Scan(&schemaVersion); err != nil {
 		t.Fatalf("read schema version: %v", err)
 	}
-	if schemaVersion != 4 {
+	if schemaVersion != 5 {
 		t.Fatalf("unexpected schema version: %d", schemaVersion)
+	}
+	var wrappingRecipientKeyID string
+	if err := db.QueryRow(`
+		SELECT recipient_key_agreement_key_id FROM device_wrapping_records
+		WHERE domain_id = 'domain-history' AND recipient_device_id = 'device-history'
+	`).Scan(&wrappingRecipientKeyID); err != nil {
+		t.Fatalf("read migrated wrapping recipient key id: %v", err)
+	}
+	if wrappingRecipientKeyID != "agreement-key-history" {
+		t.Fatalf("unexpected migrated wrapping recipient key id: %q", wrappingRecipientKeyID)
 	}
 	var lifecycleCount int
 	if err := db.QueryRow("SELECT COUNT(*) FROM domain_lifecycle_events WHERE domain_id = 'domain-history'").Scan(&lifecycleCount); err != nil {
@@ -171,6 +190,21 @@ CREATE TABLE device_join_requests (
     expires_at_ms INTEGER NOT NULL,
     status TEXT NOT NULL,
     PRIMARY KEY (domain_id, join_request_id)
+);
+CREATE TABLE device_wrapping_records (
+    domain_id TEXT NOT NULL,
+    recipient_device_id TEXT NOT NULL,
+    authorizer_device_id TEXT NOT NULL,
+    key_epoch INTEGER NOT NULL,
+    wrapping_key_id TEXT NOT NULL,
+    algorithm TEXT NOT NULL,
+    nonce BLOB NOT NULL,
+    wrapped_key_len INTEGER NOT NULL,
+    ciphertext_hash TEXT NOT NULL,
+    created_at_ms INTEGER NOT NULL,
+    signature BLOB NOT NULL,
+    blob_ref TEXT NOT NULL,
+    PRIMARY KEY (domain_id, recipient_device_id, key_epoch, wrapping_key_id)
 );
 CREATE TABLE sync_objects (
     domain_id TEXT NOT NULL,

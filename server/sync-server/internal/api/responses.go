@@ -28,6 +28,20 @@ type DeviceResponse struct {
 	LastSeenAtMs            int64                `json:"last_seen_at_ms,omitempty"`
 }
 
+type DeviceWrappedEpochResponse struct {
+	SchemaVersion              uint16 `json:"schema_version"`
+	Algorithm                  string `json:"algorithm"`
+	DomainID                   string `json:"domain_id"`
+	RecipientDeviceID          string `json:"recipient_device_id"`
+	RecipientKeyAgreementKeyID string `json:"recipient_key_agreement_key_id"`
+	WrappingKeyID              string `json:"wrapping_key_id"`
+	KeyEpoch                   uint64 `json:"key_epoch"`
+	Nonce                      []byte `json:"nonce"`
+	WrappedKey                 []byte `json:"wrapped_key"`
+	CiphertextHash             string `json:"ciphertext_hash"`
+	CreatedAtMs                int64  `json:"created_at_ms"`
+}
+
 type JoinRequestResponse struct {
 	DomainID                string               `json:"domain_id"`
 	JoinRequestID           string               `json:"join_request_id"`
@@ -185,6 +199,22 @@ func DeviceResponseFrom(device storage.Device) DeviceResponse {
 		AuthorizedAtMs:          device.AuthorizedAtMs,
 		RevokedAtMs:             device.RevokedAtMs,
 		LastSeenAtMs:            device.LastSeenAtMs,
+	}
+}
+
+func DeviceWrappedEpochResponseFrom(record storage.DeviceWrappingRecord, wrappedKey []byte) DeviceWrappedEpochResponse {
+	return DeviceWrappedEpochResponse{
+		SchemaVersion:              1,
+		Algorithm:                  record.Algorithm,
+		DomainID:                   record.DomainID,
+		RecipientDeviceID:          record.RecipientDeviceID,
+		RecipientKeyAgreementKeyID: record.RecipientKeyAgreementKeyID,
+		WrappingKeyID:              record.WrappingKeyID,
+		KeyEpoch:                   record.KeyEpoch,
+		Nonce:                      cloneBytes(record.Nonce),
+		WrappedKey:                 cloneBytes(wrappedKey),
+		CiphertextHash:             record.CiphertextHash,
+		CreatedAtMs:                record.CreatedAtMs,
 	}
 }
 

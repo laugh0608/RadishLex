@@ -238,6 +238,7 @@ func (s *MemoryStore) AuthorizeJoinRequest(ctx context.Context, upload DeviceAut
 	if wrapping.DomainID != authorization.DomainID ||
 		wrapping.AuthorizerDeviceID != authorization.AuthorizerDeviceID ||
 		wrapping.RecipientDeviceID != authorization.RecipientDeviceID ||
+		wrapping.RecipientKeyAgreementKeyID != authorization.RecipientKeyAgreementKeyID ||
 		wrapping.KeyEpoch != authorization.KeyEpoch {
 		return newError(ErrInvalidRequest, "wrapping record must match authorization")
 	}
@@ -306,6 +307,9 @@ func (s *MemoryStore) DeviceWrappedKey(ctx context.Context, domainID string, rec
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if _, err := s.activeDeviceLocked(domainID, recipientDeviceID); err != nil {
+		return DeviceWrappingRecord{}, nil, err
+	}
 	record, ok := s.wrapping[wrappingKey{
 		domainID:          domainID,
 		recipientDeviceID: recipientDeviceID,
@@ -319,7 +323,7 @@ func (s *MemoryStore) DeviceWrappedKey(ctx context.Context, domainID string, rec
 	if !ok {
 		return DeviceWrappingRecord{}, nil, newError(ErrStorageUnavailable, "device wrapped key is missing")
 	}
-	if int64(len(wrappedKey)) != record.WrappedKeyLen || CiphertextHash(wrappedKey) != record.CiphertextHash {
+	if int64(len(wrappedKey)) != record.WrappedKeyLen || DeviceWrappedKeyCiphertextHash(record, wrappedKey) != record.CiphertextHash {
 		return DeviceWrappingRecord{}, nil, newError(ErrStorageUnavailable, "device wrapped key metadata mismatch")
 	}
 	return cloneWrappingRecord(record), cloneBytes(wrappedKey), nil
@@ -703,10 +707,10 @@ func validateWrappingRecord(record DeviceWrappingRecord) error {
 	if !validOpaqueID(record.DomainID) || !validOpaqueID(record.RecipientDeviceID) || !validOpaqueID(record.AuthorizerDeviceID) {
 		return newError(ErrInvalidRequest, "wrapping record ids must be opaque ids")
 	}
-	if record.KeyEpoch == 0 || record.WrappingKeyID == "" || record.Algorithm == "" {
+	if record.KeyEpoch == 0 || record.RecipientKeyAgreementKeyID == "" || record.WrappingKeyID == "" || record.Algorithm == "" {
 		return newError(ErrInvalidRequest, "wrapping record key metadata is required")
 	}
-	if len(record.Nonce) == 0 || record.WrappedKeyLen <= 0 || record.CiphertextHash == "" {
+	if len(record.Nonce) == 0 || record.WrappedKeyLen <= 0 || record.WrappedKeyLen > MaxDeviceWrappedKeyBytes || record.CiphertextHash == "" {
 		return newError(ErrInvalidCiphertextMetadata, "wrapping record ciphertext metadata is required")
 	}
 	if record.CreatedAtMs <= 0 {
@@ -722,11 +726,11 @@ func validateAuthorizationUpload(upload DeviceAuthorizationUpload) error {
 	if err := validateWrappingRecord(upload.Wrapping); err != nil {
 		return err
 	}
-	if len(upload.WrappedKey) == 0 {
+	if len(upload.WrappedKey) == 0 || len(upload.WrappedKey) > MaxDeviceWrappedKeyBytes {
 		return newError(ErrInvalidCiphertextMetadata, "device wrapped key is required")
 	}
 	if int64(len(upload.WrappedKey)) != upload.Wrapping.WrappedKeyLen ||
-		CiphertextHash(upload.WrappedKey) != upload.Wrapping.CiphertextHash {
+		DeviceWrappedKeyCiphertextHash(upload.Wrapping, upload.WrappedKey) != upload.Wrapping.CiphertextHash {
 		return newError(ErrInvalidCiphertextMetadata, "device wrapped key metadata mismatch")
 	}
 	return nil

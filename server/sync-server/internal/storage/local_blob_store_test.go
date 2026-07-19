@@ -158,11 +158,12 @@ func TestGeneratedBlobRefsUseSafePathComponents(t *testing.T) {
 	}
 
 	wrappingRef := wrappingBlobRef(DeviceWrappingRecord{
-		DomainID:          "domain:a",
-		RecipientDeviceID: "device:a",
-		KeyEpoch:          2,
-		WrappingKeyID:     "wrapping:key",
-		CiphertextHash:    "sha256:deadbeef",
+		DomainID:                   "domain:a",
+		RecipientDeviceID:          "device:a",
+		RecipientKeyAgreementKeyID: "agreement:key",
+		KeyEpoch:                   2,
+		WrappingKeyID:              "wrapping:key",
+		CiphertextHash:             "sha256:deadbeef",
 	})
 	if strings.Contains(wrappingRef, ":") {
 		t.Fatalf("wrapping blob ref should not contain raw hash or id separators: %q", wrappingRef)

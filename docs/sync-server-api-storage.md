@@ -59,9 +59,9 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名。AD
 
 授权记录只证明某个 active 设备接受了待加入设备的公钥和指定 key epoch，不包含同步主密钥明文或恢复码。当前 Go storage 会在同一事务中把 join request 置为 active、写入授权记录、写入 wrapping metadata，并激活接收设备。
 
-`device_wrapping_records`：`domain_id`、`recipient_device_id`、`authorizer_device_id`、`key_epoch`、`wrapping_key_id`、`algorithm`、`nonce`、`wrapped_key_len`、`ciphertext_hash`、`created_at_ms`、`signature`、`blob_ref`。
+`device_wrapping_records`：`domain_id`、`recipient_device_id`、`recipient_key_agreement_key_id`、`authorizer_device_id`、`key_epoch`、`wrapping_key_id`、`algorithm`、`nonce`、`wrapped_key_len`、`ciphertext_hash`、`created_at_ms`、`signature`、`blob_ref`。
 
-包装记录只保存给指定设备的包装密文元数据、签名和密文 blob ref，不保存 `SyncMasterKey`、`DeviceWrappingKey` 或恢复码明文。当前 Go storage 已在授权事务中保存 / 读取 wrapped key bytes，并按 `wrapped_key_len` 与 `ciphertext_hash` 复验；该字段只能是密文 bytes。
+包装记录只保存给指定设备的包装密文元数据、签名和密文 blob ref，不保存 `SyncMasterKey`、`DeviceWrappingKey` 或恢复码明文。`recipient_key_agreement_key_id` 必须与已签名 authorization 和加入 profile 一致，使 HTTP 响应能够完整重建 wrapped epoch v1 AAD；不能在读取时从可变的当前设备 profile 猜测。当前 Go storage 已在授权事务中保存 / 读取 wrapped key bytes，并按 `wrapped_key_len` 与 `ciphertext_hash` 复验；该字段只能是密文 bytes。
 
 `device_revocations`：`domain_id`、`revoked_device_id`、`revoker_device_id`、`previous_key_epoch`、`new_key_epoch`、`reason`、`created_at_ms`、`signature`。
 
@@ -104,6 +104,17 @@ metadata schema 的算法迁移必须区分“历史兼容”与“新写入契�
 ## HTTP API 边界
 
 首批 API 使用 `/api/v1` 前缀。metadata 使用 JSON；当前对象上传使用 JSON `payload` byte 字段承载 encrypted bytes，Go JSON 编码下表现为 base64 字符串；对象 payload 下载接口返回 `application/octet-stream` 二进制密文。后续可以调整传输细节，但不能改变“metadata 可验证、payload 仍为密文”的边界。
+
+### Device wrapped epoch 读取
+
+设备材料读取固定为 `GET /api/v1/domains/{domain_id}/devices/{recipient_device_id}/wrapped-epochs/{key_epoch}?wrapping_key_id=...`。响应只包含 wrapped epoch v1 的公开 metadata 与 base64 密文，不包含 authorization short code、平台 handle、shared secret 或明文 key。
+
+- 请求必须携带全局 bearer token 和 `X-RadishLex-Device-ID`；header device 必须与 route recipient 完全一致。该 header 是当前单用户自部署访问边界中的设备声明，不替代未来按设备认证，但可以阻止客户端误读其他 recipient 的记录。
+- storage 必须在同一锁/事务观察点确认 recipient 当前为 `active`，再读取 wrapping metadata；revoked/lost/pending/missing device 返回 `forbidden_device`，且不得读取 wrapped blob。撤销前已经取得或缓存的历史材料无法追回。
+- query 只接受单个非空 `wrapping_key_id`；epoch 必须为正整数。未知 query、重复参数、跨 recipient、错误 epoch/key id 与不存在记录失败关闭，不做“最新记录”猜测。
+- wrapped bytes 固定上限为 64 KiB；授权写入、storage validation、HTTP 读取和 Rust response validation 使用同一上限。长度、裸密文 SHA-256、nonce、算法、recipient key id 或其他 AAD 字段不一致时不得缓存或解封。
+- 审计只记录 route、domain、recipient、epoch、结果码和密文字节数，不记录 query value、nonce、ciphertext hash、wrapped bytes、signature 或平台错误文本。
+- 本批只开放授权事务已经写入记录的精确读取。多台仍 active 设备在撤销/轮换后接收新 epoch 的独立 signed distribution upload 尚未设计，不能通过复用 join authorization 或直接写 storage 绕过。
 
 ### 单用户访问 token
 
@@ -448,7 +459,8 @@ latest_ciphertext_hash
 26. 已补 ADR 0006 对应的算法分派、设备/join `signing_algorithm` API/SQLite metadata、历史 Ed25519 migration、稳定 `error_detail` 和 Rust/Go 共享正负向 vectors；新请求缺少算法或传入未知算法时失败关闭。
 27. 已按 `docs/sync-orchestration.md` 增加 domain 内 change sequence、opaque cursor discovery storage/API、Rust remote DTO 和分页/幂等/非法 cursor 测试；对象增量同步不能用时间戳过滤替代。
 28. 已补独立 lifecycle sequence、snapshot / events API、设备 revocation API、Rust trust-anchor signed chain verifier、`profile-sha256-v1` 公钥绑定 challenge 和 userdb schema v6 public cache；两个文件 userdb 已在短生命周期 Go HTTP 中完成授权、同步、撤销、缓存和重启恢复。
-29. Rust userdb schema 已升至 v7，结构化缓存签名链绑定的 key-agreement key id/public key，并只保存版本化 wrapped epoch ciphertext；`ProductWrappedEpochMaterialStore` 与 Apple signing/key-agreement adapter 已落地。Go storage 已有 `DeviceWrappedKey` 读取语义，但尚未开放受控 HTTP 读取 handler/Rust remote DTO，因此真实双客户端 wrapped material 取得与轮换仍是下一批，不能用 storage 单测替代。
+29. Rust userdb schema 已升至 v7，结构化缓存签名链绑定的 key-agreement key id/public key，并只保存版本化 wrapped epoch ciphertext；`ProductWrappedEpochMaterialStore` 与 Apple signing/key-agreement adapter 已落地。
+30. Go metadata schema v5 已结构化保存 wrapping record 的 recipient key-agreement key id；精确 wrapped epoch GET handler、transport device identity、active-before-blob storage 门禁、64 KiB 上限、Rust remote source与 userdb 幂等/fork cache 已接入双文件 Go HTTP 授权/轮换/撤销/重启证据。当前只读取 join authorization 已写入的 record；多 active 设备轮换后的独立 signed distribution upload 仍未设计。
 
 任何阶段都不应把 Flutter manager、平台壳、真实系统输入法服务或输入热路径接入 Go server。
 

@@ -55,16 +55,17 @@ type DeviceAuthorizationRequest struct {
 }
 
 type DeviceWrappingRequest struct {
-	AuthorizerDeviceID string `json:"authorizer_device_id"`
-	RecipientDeviceID  string `json:"recipient_device_id"`
-	KeyEpoch           uint64 `json:"key_epoch"`
-	WrappingKeyID      string `json:"wrapping_key_id"`
-	Algorithm          string `json:"algorithm"`
-	Nonce              []byte `json:"nonce"`
-	WrappedKeyLen      int64  `json:"wrapped_key_len"`
-	CiphertextHash     string `json:"ciphertext_hash"`
-	CreatedAtMs        int64  `json:"created_at_ms"`
-	Signature          []byte `json:"signature"`
+	AuthorizerDeviceID         string `json:"authorizer_device_id"`
+	RecipientDeviceID          string `json:"recipient_device_id"`
+	RecipientKeyAgreementKeyID string `json:"recipient_key_agreement_key_id"`
+	KeyEpoch                   uint64 `json:"key_epoch"`
+	WrappingKeyID              string `json:"wrapping_key_id"`
+	Algorithm                  string `json:"algorithm"`
+	Nonce                      []byte `json:"nonce"`
+	WrappedKeyLen              int64  `json:"wrapped_key_len"`
+	CiphertextHash             string `json:"ciphertext_hash"`
+	CreatedAtMs                int64  `json:"created_at_ms"`
+	Signature                  []byte `json:"signature"`
 }
 
 type DeviceRevocationRequest struct {
@@ -117,17 +118,18 @@ func (r AuthorizeJoinRequestRequest) Upload(domainID string, joinRequestID strin
 			Signature:                   r.Authorization.Signature,
 		},
 		Wrapping: storage.DeviceWrappingRecord{
-			DomainID:           domainID,
-			RecipientDeviceID:  r.Wrapping.RecipientDeviceID,
-			AuthorizerDeviceID: r.Wrapping.AuthorizerDeviceID,
-			KeyEpoch:           r.Wrapping.KeyEpoch,
-			WrappingKeyID:      r.Wrapping.WrappingKeyID,
-			Algorithm:          r.Wrapping.Algorithm,
-			Nonce:              r.Wrapping.Nonce,
-			WrappedKeyLen:      r.Wrapping.WrappedKeyLen,
-			CiphertextHash:     r.Wrapping.CiphertextHash,
-			CreatedAtMs:        r.Wrapping.CreatedAtMs,
-			Signature:          r.Wrapping.Signature,
+			DomainID:                   domainID,
+			RecipientDeviceID:          r.Wrapping.RecipientDeviceID,
+			RecipientKeyAgreementKeyID: r.Wrapping.RecipientKeyAgreementKeyID,
+			AuthorizerDeviceID:         r.Wrapping.AuthorizerDeviceID,
+			KeyEpoch:                   r.Wrapping.KeyEpoch,
+			WrappingKeyID:              r.Wrapping.WrappingKeyID,
+			Algorithm:                  r.Wrapping.Algorithm,
+			Nonce:                      r.Wrapping.Nonce,
+			WrappedKeyLen:              r.Wrapping.WrappedKeyLen,
+			CiphertextHash:             r.Wrapping.CiphertextHash,
+			CreatedAtMs:                r.Wrapping.CreatedAtMs,
+			Signature:                  r.Wrapping.Signature,
 		},
 		WrappedKey: r.WrappedKey,
 	}

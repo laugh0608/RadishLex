@@ -38,11 +38,44 @@ func Apply(db *sql.DB) error {
 	if err := ensureLifecycleEvents(tx); err != nil {
 		return err
 	}
-	if _, err := tx.Exec("PRAGMA user_version = 4"); err != nil {
+	if err := ensureDeviceWrappingRecipientKey(tx); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("PRAGMA user_version = 5"); err != nil {
 		return fmt.Errorf("record metadata schema version: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit metadata migration: %w", err)
+	}
+	return nil
+}
+
+func ensureDeviceWrappingRecipientKey(tx *sql.Tx) error {
+	hasColumn, err := columnExists(tx, "device_wrapping_records", "recipient_key_agreement_key_id")
+	if err != nil {
+		return err
+	}
+	if !hasColumn {
+		if _, err := tx.Exec("ALTER TABLE device_wrapping_records ADD COLUMN recipient_key_agreement_key_id TEXT NOT NULL DEFAULT ''"); err != nil {
+			return fmt.Errorf("add wrapping recipient key id: %w", err)
+		}
+		if _, err := tx.Exec(`
+			UPDATE device_wrapping_records
+			SET recipient_key_agreement_key_id = COALESCE((
+				SELECT devices.key_agreement_public_key_id FROM devices
+				WHERE devices.domain_id = device_wrapping_records.domain_id
+					AND devices.device_id = device_wrapping_records.recipient_device_id
+			), '')
+		`); err != nil {
+			return fmt.Errorf("backfill wrapping recipient key id: %w", err)
+		}
+	}
+	var invalid int
+	if err := tx.QueryRow("SELECT COUNT(*) FROM device_wrapping_records WHERE recipient_key_agreement_key_id = ''").Scan(&invalid); err != nil {
+		return fmt.Errorf("validate wrapping recipient key ids: %w", err)
+	}
+	if invalid != 0 {
+		return fmt.Errorf("validate wrapping recipient key ids: %d rows are missing key ids", invalid)
 	}
 	return nil
 }

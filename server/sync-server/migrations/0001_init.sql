@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS device_authorizations (
 CREATE TABLE IF NOT EXISTS device_wrapping_records (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     recipient_device_id TEXT NOT NULL,
+    recipient_key_agreement_key_id TEXT NOT NULL,
     authorizer_device_id TEXT NOT NULL,
     key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
     wrapping_key_id TEXT NOT NULL,

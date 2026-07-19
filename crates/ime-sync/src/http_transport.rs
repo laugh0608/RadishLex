@@ -14,6 +14,7 @@ pub struct HttpSyncRemoteTransport {
     endpoint: HttpEndpoint,
     timeout: Duration,
     access_token: Option<BearerAccessToken>,
+    device_identity: Option<HttpDeviceIdentity>,
 }
 
 impl fmt::Debug for HttpSyncRemoteTransport {
@@ -22,6 +23,10 @@ impl fmt::Debug for HttpSyncRemoteTransport {
             .field("endpoint", &self.endpoint)
             .field("timeout", &self.timeout)
             .field("access_token_configured", &self.access_token.is_some())
+            .field(
+                "device_identity_configured",
+                &self.device_identity.is_some(),
+            )
             .finish()
     }
 }
@@ -42,6 +47,7 @@ impl HttpSyncRemoteTransport {
             endpoint: HttpEndpoint::parse(&base_url.into())?,
             timeout,
             access_token: None,
+            device_identity: None,
         })
     }
 
@@ -50,6 +56,14 @@ impl HttpSyncRemoteTransport {
         access_token: impl Into<String>,
     ) -> Result<Self, SyncRemoteError> {
         self.access_token = Some(BearerAccessToken::new(access_token.into())?);
+        Ok(self)
+    }
+
+    pub fn with_device_identity(
+        mut self,
+        device_id: impl Into<String>,
+    ) -> Result<Self, SyncRemoteError> {
+        self.device_identity = Some(HttpDeviceIdentity::new(device_id.into())?);
         Ok(self)
     }
 
@@ -63,6 +77,10 @@ impl HttpSyncRemoteTransport {
 
     pub fn has_bearer_access_token(&self) -> bool {
         self.access_token.is_some()
+    }
+
+    pub fn has_device_identity(&self) -> bool {
+        self.device_identity.is_some()
     }
 }
 
@@ -87,6 +105,7 @@ impl SyncRemoteTransport for HttpSyncRemoteTransport {
             &self.endpoint,
             &path,
             self.access_token.as_ref(),
+            self.device_identity.as_ref(),
             &request,
         )?;
         let mut response = Vec::new();
@@ -121,6 +140,36 @@ impl BearerAccessToken {
 impl fmt::Debug for BearerAccessToken {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("[redacted bearer access token]")
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct HttpDeviceIdentity(String);
+
+impl HttpDeviceIdentity {
+    fn new(device_id: String) -> Result<Self, SyncRemoteError> {
+        if device_id.is_empty() || device_id.len() > 128 {
+            return invalid_request("http transport device identity must be 1..=128 bytes");
+        }
+        if !device_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+        {
+            return invalid_request(
+                "http transport device identity contains unsupported characters",
+            );
+        }
+        Ok(Self(device_id))
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Debug for HttpDeviceIdentity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("[configured device identity]")
     }
 }
 
@@ -290,6 +339,7 @@ fn write_request(
     endpoint: &HttpEndpoint,
     path: &str,
     access_token: Option<&BearerAccessToken>,
+    device_identity: Option<&HttpDeviceIdentity>,
     request: &SyncRemoteRequest,
 ) -> Result<(), SyncRemoteError> {
     let method = match request.method() {
@@ -315,6 +365,14 @@ fn write_request(
     if let Some(token) = access_token {
         write!(stream, "Authorization: Bearer {}\r\n", token.as_str())
             .map_err(|error| transport_error(format!("write request failed: {error}")))?;
+    }
+    if let Some(device_identity) = device_identity {
+        write!(
+            stream,
+            "X-RadishLex-Device-ID: {}\r\n",
+            device_identity.as_str()
+        )
+        .map_err(|error| transport_error(format!("write request failed: {error}")))?;
     }
     stream
         .write_all(b"\r\n")
@@ -556,6 +614,33 @@ mod tests {
     }
 
     #[test]
+    fn http_transport_sends_validated_device_identity() {
+        let Some(server) = TestHttpServer::try_spawn(|request| {
+            assert_eq!(request.header("x-radishlex-device-id"), Some("device-b"));
+            TestHttpResponse::json(200, br#"{"ok":true}"#)
+        }) else {
+            return;
+        };
+        let transport =
+            HttpSyncRemoteTransport::with_timeout(server.base_url(), Duration::from_secs(2))
+                .expect("transport")
+                .with_device_identity("device-b")
+                .expect("device identity");
+        assert!(transport.has_device_identity());
+
+        let response = transport
+            .send(SyncRemoteRequest::new(
+                SyncRemoteMethod::Get,
+                "/api/v1/domains/domain-a/state",
+                None,
+                Vec::new(),
+            ))
+            .expect("response");
+        assert_eq!(response.status, 200);
+        server.join();
+    }
+
+    #[test]
     fn http_transport_preserves_base_path_and_decodes_chunked_payload() {
         let Some(server) = TestHttpServer::try_spawn(|request| {
             assert_eq!(request.method, "GET");
@@ -725,6 +810,19 @@ mod tests {
         ));
         assert!(matches!(
             transport.with_bearer_access_token("test-access-token-12345678901234567890\n"),
+            Err(SyncRemoteError::InvalidRequest { .. })
+        ));
+    }
+
+    #[test]
+    fn http_transport_rejects_invalid_device_identity() {
+        let transport = HttpSyncRemoteTransport::new("http://example.test").expect("transport");
+        assert!(matches!(
+            transport.clone().with_device_identity(""),
+            Err(SyncRemoteError::InvalidRequest { .. })
+        ));
+        assert!(matches!(
+            transport.with_device_identity("device-b\r\nX-Leak: wrapped"),
             Err(SyncRemoteError::InvalidRequest { .. })
         ));
     }

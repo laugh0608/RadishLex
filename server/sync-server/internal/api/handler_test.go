@@ -238,16 +238,17 @@ func TestJoinAuthorizationHandlerPassesSignedMetadataToStorage(t *testing.T) {
 			Signature:                   []byte("signature"),
 		},
 		Wrapping: DeviceWrappingRequest{
-			AuthorizerDeviceID: "device-a",
-			RecipientDeviceID:  "device-b",
-			KeyEpoch:           1,
-			WrappingKeyID:      "wrapping-key-b",
-			Algorithm:          storage.AlgorithmXChaCha20Poly1305HKDFSHA256,
-			Nonce:              []byte("nonce"),
-			WrappedKeyLen:      int64(len("wrapped-key")),
-			CiphertextHash:     "sha256:wrapped",
-			CreatedAtMs:        200,
-			Signature:          []byte("wrapping-signature"),
+			AuthorizerDeviceID:         "device-a",
+			RecipientDeviceID:          "device-b",
+			RecipientKeyAgreementKeyID: "agreement-key-b",
+			KeyEpoch:                   1,
+			WrappingKeyID:              "wrapping-key-b",
+			Algorithm:                  storage.AlgorithmXChaCha20Poly1305HKDFSHA256,
+			Nonce:                      []byte("nonce"),
+			WrappedKeyLen:              int64(len("wrapped-key")),
+			CiphertextHash:             "sha256:wrapped",
+			CreatedAtMs:                200,
+			Signature:                  []byte("wrapping-signature"),
 		},
 		WrappedKey: []byte("wrapped-key"),
 	}
@@ -267,6 +268,42 @@ func TestJoinAuthorizationHandlerPassesSignedMetadataToStorage(t *testing.T) {
 		upload.Wrapping.WrappingKeyID != "wrapping-key-b" ||
 		string(upload.WrappedKey) != "wrapped-key" {
 		t.Fatalf("unexpected authorization upload: %#v", upload)
+	}
+}
+
+func TestDeviceWrappedEpochHandlerRequiresMatchingRecipientAndReturnsOnlyCiphertext(t *testing.T) {
+	store := &wrappedEpochStoreStub{}
+	handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+	path := PrefixV1 + "/domains/domain-a/devices/device-b/wrapped-epochs/2?wrapping_key_id=wrapping-key-b-2"
+
+	missingIdentity := httptest.NewRequest(http.MethodGet, path, nil)
+	missingResponse := httptest.NewRecorder()
+	handler.ServeHTTP(missingResponse, missingIdentity)
+	if missingResponse.Code != http.StatusForbidden || store.calls != 0 {
+		t.Fatalf("missing recipient identity should fail before storage: status=%d calls=%d", missingResponse.Code, store.calls)
+	}
+
+	wrongIdentity := httptest.NewRequest(http.MethodGet, path, nil)
+	wrongIdentity.Header.Set(deviceIDHeader, "device-a")
+	wrongResponse := httptest.NewRecorder()
+	handler.ServeHTTP(wrongResponse, wrongIdentity)
+	if wrongResponse.Code != http.StatusForbidden || store.calls != 0 {
+		t.Fatalf("wrong recipient identity should fail before storage: status=%d calls=%d", wrongResponse.Code, store.calls)
+	}
+
+	valid := httptest.NewRequest(http.MethodGet, path, nil)
+	valid.Header.Set(deviceIDHeader, "device-b")
+	validResponse := httptest.NewRecorder()
+	handler.ServeHTTP(validResponse, valid)
+	if validResponse.Code != http.StatusOK || store.calls != 1 {
+		t.Fatalf("unexpected wrapped epoch response: status=%d calls=%d body=%s", validResponse.Code, store.calls, validResponse.Body.String())
+	}
+	var body DeviceWrappedEpochResponse
+	decodeResponse(t, validResponse, &body)
+	if body.SchemaVersion != 1 || body.DomainID != "domain-a" || body.RecipientDeviceID != "device-b" ||
+		body.RecipientKeyAgreementKeyID != "agreement-key-b" || body.KeyEpoch != 2 ||
+		body.WrappingKeyID != "wrapping-key-b-2" || string(body.WrappedKey) != "wrapped-key" {
+		t.Fatalf("unexpected wrapped epoch body: %#v", body)
 	}
 }
 
@@ -941,6 +978,30 @@ type authorizationStoreStub struct {
 	storage.Store
 	upload storage.DeviceAuthorizationUpload
 	calls  int
+}
+
+type wrappedEpochStoreStub struct {
+	storage.Store
+	calls int
+}
+
+func (s *wrappedEpochStoreStub) DeviceWrappedKey(ctx context.Context, domainID string, recipientDeviceID string, keyEpoch uint64, wrappingKeyID string) (storage.DeviceWrappingRecord, []byte, error) {
+	s.calls++
+	wrappedKey := []byte("wrapped-key")
+	return storage.DeviceWrappingRecord{
+		DomainID:                   domainID,
+		RecipientDeviceID:          recipientDeviceID,
+		RecipientKeyAgreementKeyID: "agreement-key-b",
+		AuthorizerDeviceID:         "device-a",
+		KeyEpoch:                   keyEpoch,
+		WrappingKeyID:              wrappingKeyID,
+		Algorithm:                  "p256-ecdh-hkdf-sha256-xchacha20poly1305-v1",
+		Nonce:                      []byte("synthetic-nonce-24-byte"),
+		WrappedKeyLen:              int64(len(wrappedKey)),
+		CiphertextHash:             storage.CiphertextHash(wrappedKey),
+		CreatedAtMs:                200,
+		Signature:                  []byte("signature"),
+	}, wrappedKey, nil
 }
 
 func (s *authorizationStoreStub) AuthorizeJoinRequest(ctx context.Context, upload storage.DeviceAuthorizationUpload) error {

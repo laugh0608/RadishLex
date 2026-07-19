@@ -16,6 +16,14 @@ func CiphertextHash(ciphertext []byte) string {
 	return ciphertextHashPrefix + hex.EncodeToString(sum[:])
 }
 
+func DeviceWrappedKeyCiphertextHash(record DeviceWrappingRecord, ciphertext []byte) string {
+	if record.Algorithm == AlgorithmWrappedEpochP256ECDHV1 {
+		sum := sha256.Sum256(ciphertext)
+		return hex.EncodeToString(sum[:])
+	}
+	return CiphertextHash(ciphertext)
+}
+
 func ObjectCiphertextHash(version ObjectVersion, ciphertext []byte) string {
 	associatedData := objectAssociatedData(version)
 	hasher := sha256.New()

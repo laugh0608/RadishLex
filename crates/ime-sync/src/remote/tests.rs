@@ -1,5 +1,9 @@
 use super::test_support::{response_for, signed_object};
 use super::*;
+use p256::{elliptic_curve::sec1::ToEncodedPoint, SecretKey};
+use radishlex_ime_crypto::{
+    DeviceKeyAgreementPublicKey, KeyDescriptor, KeyRole, Nonce, SyncMasterKeyMaterial,
+};
 use serde_json::Value;
 use std::cell::RefCell;
 
@@ -313,4 +317,99 @@ fn object_payload_rejects_length_mismatch() {
 
     assert!(matches!(error, SyncRemoteError::InvalidResponse { .. }));
     assert!(error.to_string().contains("payload length"));
+}
+
+#[test]
+fn wrapped_epoch_source_uses_exact_locator_and_redacts_ciphertext() {
+    let record = wrapped_epoch_record();
+    let transport = RecordingTransport::default();
+    transport.push_json(
+        200,
+        &serde_json::json!({
+            "schema_version": record.schema_version,
+            "algorithm": record.algorithm,
+            "domain_id": record.domain_id,
+            "recipient_device_id": record.recipient_device_id,
+            "recipient_key_agreement_key_id": record.recipient_key_agreement_key_id,
+            "wrapping_key_id": record.wrapping_key_id,
+            "key_epoch": record.key_epoch,
+            "nonce": Base64::encode_string(record.nonce.as_bytes()),
+            "wrapped_key": Base64::encode_string(&record.wrapped_key),
+            "ciphertext_hash": record.ciphertext_hash,
+            "created_at_ms": record.created_at_ms
+        }),
+    );
+    let client = SyncRemoteClient::new(transport);
+    let mut source = RemoteWrappedEpochMaterialSource::new(
+        &client,
+        vec![RemoteWrappedEpochLocator::new(1, "wrapping-key-b-1").expect("locator")],
+    )
+    .expect("source");
+
+    let loaded = source
+        .load_wrapped_epoch_materials("domain-a", "device-b")
+        .expect("load wrapped epoch");
+    assert_eq!(loaded, vec![record.clone()]);
+    let requests = client.transport().requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(
+        requests[0].path(),
+        "/api/v1/domains/domain-a/devices/device-b/wrapped-epochs/1"
+    );
+    assert_eq!(
+        requests[0].query(),
+        &[("wrapping_key_id".to_owned(), "wrapping-key-b-1".to_owned())]
+    );
+    let debug = format!("{record:?}");
+    assert!(!debug.contains(&Base64::encode_string(&record.wrapped_key)));
+}
+
+#[test]
+fn wrapped_epoch_source_maps_revoked_before_material_use() {
+    let transport = RecordingTransport::default();
+    transport.push_json(
+        403,
+        &serde_json::json!({
+            "error_code": "forbidden_device",
+            "message": "device is not active",
+            "retryable": false,
+            "server_time_ms": 123
+        }),
+    );
+    let client = SyncRemoteClient::new(transport);
+    let mut source = RemoteWrappedEpochMaterialSource::new(
+        &client,
+        vec![RemoteWrappedEpochLocator::new(2, "wrapping-key-b-2").expect("locator")],
+    )
+    .expect("source");
+
+    let error = source
+        .load_wrapped_epoch_materials("domain-a", "device-b")
+        .expect_err("revoked device must fail");
+    assert_eq!(error, SyncCryptoLoadError::Revoked);
+}
+
+fn wrapped_epoch_record() -> WrappedEpochMaterial {
+    let secret = SecretKey::from_slice(&[7u8; 32]).expect("agreement secret");
+    let public = secret.public_key().to_encoded_point(false);
+    let recipient = DeviceKeyAgreementPublicKey::p256(
+        "device-b",
+        "agreement-key-b",
+        public.as_bytes().to_vec(),
+        100,
+        None,
+    )
+    .expect("recipient");
+    let object_key = KeyDescriptor::new("object-key-v1", KeyRole::ObjectKey, 1).expect("key");
+    let master_key = SyncMasterKeyMaterial::new([9u8; 32]).expect("master key");
+    WrappedEpochMaterial::seal_for_recipient(
+        "domain-a",
+        &recipient,
+        "wrapping-key-b-1",
+        &object_key,
+        &master_key,
+        Nonce::new(vec![3u8; 24]).expect("nonce"),
+        200,
+    )
+    .expect("wrapped epoch")
 }

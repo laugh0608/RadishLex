@@ -51,7 +51,7 @@ Go sync server
 
 通用 processor 已实现 manifest 验签、epoch material 选择、AEAD 解密、新 outbox 加密签名和 production gate，并接入双 userdb HTTP service 门禁。`ProductSyncCryptoProvider` 进一步固定三个产品端口：`SyncTrustedDeviceSource` 只提供已验证的 domain/device public lifecycle，`SyncEpochMaterialStore` 按本机 device 授权返回当前与历史 secret material，`SyncDeviceSigningBackend` 只通过不可导出 handle 签名。装载顺序必须先确认本机 active 和 backend 产品资格，再读取 epoch material；任一不匹配都在网络前失败关闭。
 
-端口背后的真实 adapter 仍未落地：服务端 public metadata 需要 signed authorization/revocation 验证和单调 lifecycle sequence 后才能进入本地可信缓存；wrapped epoch material 必须在本机受保护边界解封，不能以明文落入 userdb/settings；具体 Secure Enclave backend 仍受产品资格阻塞。合成 adapter 只证明组合逻辑与失败顺序，不构成平台证据。
+产品 adapter 已具备 verified lifecycle public cache、wrapped epoch ciphertext cache、独立 key-agreement 解封和 Apple signing adapter。下一段远端取得链按“transaction 外用 verified lifecycle locator 精确下载 -> Rust 校验公开 metadata/长度/hash -> userdb transaction 幂等缓存密文 -> 后续 preflight 从本地 cache 解封”执行；网络 I/O 不得发生在 SQLite transaction 内。相同 locator 的不同响应必须作为 fork/tamper 失败，撤销设备必须在 server blob 读取和本地材料读取前分别阻断。具体 Secure Enclave key-agreement backend 仍只有编译与合成协议证据，不能继承 signing backend 的实机资格。
 
 ## 一次同步周期
 

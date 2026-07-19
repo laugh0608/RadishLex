@@ -25,8 +25,10 @@ const (
 	ObjectBackupSnapshot         = "backup.snapshot"
 
 	AlgorithmXChaCha20Poly1305HKDFSHA256 = "xchacha20poly1305-hkdf-sha256-v1"
+	AlgorithmWrappedEpochP256ECDHV1      = "p256-ecdh-hkdf-sha256-xchacha20poly1305-v1"
 	SignatureAlgorithmEd25519V1          = "ed25519-v1"
 	SignatureAlgorithmECDSAP256SHA256V1  = "ecdsa-p256-sha256-v1"
+	MaxDeviceWrappedKeyBytes             = 64 * 1024
 )
 
 type Domain struct {
@@ -67,18 +69,19 @@ type JoinRequest struct {
 }
 
 type DeviceWrappingRecord struct {
-	DomainID           string
-	RecipientDeviceID  string
-	AuthorizerDeviceID string
-	KeyEpoch           uint64
-	WrappingKeyID      string
-	Algorithm          string
-	Nonce              []byte
-	WrappedKeyLen      int64
-	CiphertextHash     string
-	CreatedAtMs        int64
-	Signature          []byte
-	BlobRef            string
+	DomainID                   string
+	RecipientDeviceID          string
+	RecipientKeyAgreementKeyID string
+	AuthorizerDeviceID         string
+	KeyEpoch                   uint64
+	WrappingKeyID              string
+	Algorithm                  string
+	Nonce                      []byte
+	WrappedKeyLen              int64
+	CiphertextHash             string
+	CreatedAtMs                int64
+	Signature                  []byte
+	BlobRef                    string
 }
 
 type DeviceAuthorizationUpload struct {

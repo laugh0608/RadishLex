@@ -1,29 +1,24 @@
-use std::fmt::Write as _;
-use std::fs;
-use std::io::{self, Read};
-use std::net::TcpListener;
-use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::thread;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use base64ct::{Base64, Encoding};
 use radishlex_ime_crypto::{
-    canonical_signature_bytes, AlgorithmId, CiphertextHash, DeviceSignature,
-    DeviceSigningPublicKey, EncryptedObjectEnvelope, KeyDescriptor, KeyRole, Nonce, SignatureField,
-    SignedSyncObjectManifest, SyncMasterKeyMaterial, TestMemoryDeviceKeyStore,
-    ALGORITHM_XCHACHA20POLY1305_HKDF_SHA256, ED25519_SIGNATURE_LEN, ENVELOPE_SCHEMA_VERSION,
+    canonical_signature_bytes, AlgorithmId, CiphertextHash, CryptoError,
+    DeviceKeyAgreementKeyHandle, DeviceKeyAgreementPublicKey, DeviceSignature,
+    DeviceSigningPublicKey, EcdhSharedSecret, EncryptedObjectEnvelope, KeyDescriptor, KeyRole,
+    Nonce, SignatureField, SignedSyncObjectManifest, SyncMasterKeyMaterial,
+    TestMemoryDeviceKeyStore, WrappedEpochMaterial, ED25519_SIGNATURE_LEN, ENVELOPE_SCHEMA_VERSION,
     SIGNATURE_ALGORITHM_ED25519_V1, SIGNATURE_SCHEMA_VERSION,
 };
 use radishlex_ime_sync::{
     device_join_profile_challenge, verify_lifecycle_snapshot, AssembledSyncObject,
     HttpSyncRemoteTransport, LatestObjectConflictMetadata, LocalSyncSnapshot, PlaintextSyncPayload,
-    RemoteLifecycleDevice, RemoteObjectPayload, RemoteObjectVersion, SyncCycleOutcome,
-    SyncCyclePhase, SyncDeviceStatus, SyncEnvelopeAssembler, SyncObjectAssemblySpec,
+    ProductWrappedEpochMaterialStore, RemoteLifecycleDevice, RemoteObjectPayload,
+    RemoteObjectVersion, RemoteWrappedEpochLocator, RemoteWrappedEpochMaterialSource,
+    SyncCryptoLoadError, SyncCycleOutcome, SyncCyclePhase, SyncDeviceKeyAgreementBackend,
+    SyncDeviceStatus, SyncEnvelopeAssembler, SyncEpochMaterialStore, SyncObjectAssemblySpec,
     SyncObjectProcessor, SyncObjectType, SyncOnceConfig, SyncOrchestrationErrorCode,
     SyncOrchestrationService, SyncRemoteClient, SyncRemoteError, SyncRemoteMethod,
-    SyncRemoteRequest, SyncRemoteTransport, SyncServerErrorCode,
+    SyncRemoteRequest, SyncRemoteTransport, SyncServerErrorCode, SyncWrappedEpochMaterialSource,
 };
 use radishlex_ime_userdb::{
     decode_userdb_sync_objects, NegativeFeedbackDraft, NegativeFeedbackReason, PrivacyLevel,
@@ -31,11 +26,13 @@ use radishlex_ime_userdb::{
     UserDbSyncPayloadObjectType,
 };
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 
+#[path = "support/go_sync_server.rs"]
+mod go_sync_server;
 #[path = "support/sync_crypto_processor.rs"]
 mod sync_crypto_processor;
 
+use go_sync_server::GoSyncServer;
 use sync_crypto_processor::{test_signing_material, TestCryptoProcessor};
 
 const DOMAIN_ID: &str = "domain-two-client-go-http";
@@ -47,7 +44,6 @@ const AGREEMENT_KEY_A: &str = "agreement-key-a";
 const AGREEMENT_KEY_B: &str = "agreement-key-b";
 const OBJECT_KEY_ID: &str = "object-key-v1";
 const BASE_TIMESTAMP_MS: i64 = 1_790_001_000_000;
-static TEMP_ROOT_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 #[test]
 fn two_clients_sync_userdb_payloads_through_go_http_server() {
@@ -70,7 +66,7 @@ fn two_clients_sync_userdb_payloads_through_go_http_server() {
         .expect("device b signing key");
 
     create_domain(client.transport(), &public_key_a);
-    authorize_device_b(client.transport(), &signing_store, &public_key_b);
+    let wrapped_epoch_b = authorize_device_b(client.transport(), &signing_store, &public_key_b);
     let verified_lifecycle = verify_lifecycle_snapshot(
         client
             .lifecycle_snapshot(DOMAIN_ID)
@@ -83,12 +79,25 @@ fn two_clients_sync_userdb_payloads_through_go_http_server() {
         .device_profile(DEVICE_B)
         .is_some());
 
-    let device_a_db_path = server.root.join("device-a-userdb.sqlite");
-    let device_b_db_path = server.root.join("device-b-userdb.sqlite");
+    let device_a_db_path = server.data_path("device-a-userdb.sqlite");
+    let device_b_db_path = server.data_path("device-b-userdb.sqlite");
     let mut device_a_db = UserDb::open(&device_a_db_path).expect("device a db");
     device_a_db
         .store_verified_lifecycle(&verified_lifecycle)
         .expect("cache lifecycle on device a");
+    let wrapped_epoch_a1 = wrapped_epoch_for_device(
+        DEVICE_A,
+        AGREEMENT_KEY_A,
+        1,
+        OBJECT_KEY_ID,
+        1,
+        [11u8; 32],
+        "wrapping-key-device-a-1",
+        BASE_TIMESTAMP_MS + 21,
+    );
+    device_a_db
+        .cache_wrapped_epoch_materials(std::slice::from_ref(&wrapped_epoch_a1))
+        .expect("cache device a epoch 1");
     seed_device_a_userdb(&mut device_a_db);
     let device_a_objects = assemble_userdb_objects(
         &device_a_db,
@@ -118,6 +127,57 @@ fn two_clients_sync_userdb_payloads_through_go_http_server() {
     device_b_db
         .store_verified_lifecycle(&verified_lifecycle)
         .expect("cache lifecycle on device b");
+    let material_transport =
+        HttpSyncRemoteTransport::with_timeout(server.base_url(), Duration::from_secs(5))
+            .expect("material transport")
+            .with_device_identity(DEVICE_B)
+            .expect("device b transport identity");
+    let material_client = SyncRemoteClient::new(material_transport);
+    let verified_authorization = verified_lifecycle
+        .events()
+        .iter()
+        .filter_map(|event| event.authorization.as_ref())
+        .find(|authorization| authorization.recipient_device_id == DEVICE_B)
+        .expect("verified device b authorization");
+    let locator = RemoteWrappedEpochLocator::new(
+        verified_authorization.key_epoch,
+        verified_authorization.wrapping_key_id.clone(),
+    )
+    .expect("wrapped epoch locator");
+    let mut remote_materials =
+        RemoteWrappedEpochMaterialSource::new(&material_client, vec![locator.clone()])
+            .expect("remote wrapped source");
+    let fetched = remote_materials
+        .load_wrapped_epoch_materials(DOMAIN_ID, DEVICE_B)
+        .expect("download wrapped epoch for device b");
+    assert_eq!(fetched, vec![wrapped_epoch_b.clone()]);
+    assert_eq!(
+        device_b_db
+            .cache_wrapped_epoch_materials(&fetched)
+            .expect("cache remote wrapped epoch"),
+        1
+    );
+    assert_eq!(
+        device_b_db
+            .cache_wrapped_epoch_materials(&fetched)
+            .expect("repeat remote wrapped epoch"),
+        0
+    );
+    let trusted_b = verified_lifecycle
+        .trusted_domain()
+        .device_profile(DEVICE_B)
+        .expect("trusted device b")
+        .clone();
+    let mut product_materials = ProductWrappedEpochMaterialStore::new(
+        UserDb::open(&device_b_db_path).expect("open second device b cache"),
+        TestP256AgreementBackend::new(DEVICE_B, AGREEMENT_KEY_B, 2),
+    );
+    let loaded_materials = product_materials
+        .load_epoch_materials(verified_lifecycle.trusted_domain().domain(), &trusted_b)
+        .expect("unwrap cached remote epoch");
+    assert_eq!(loaded_materials.len(), 1);
+    assert_eq!(loaded_materials[0].key_id(), OBJECT_KEY_ID);
+    assert_eq!(loaded_materials[0].key_epoch(), 1);
     seed_device_b_local_state(&mut device_b_db);
     let stale_device_b_object = assemble_userdb_objects(
         &device_b_db,
@@ -252,9 +312,33 @@ fn two_clients_sync_userdb_payloads_through_go_http_server() {
     device_a_db
         .store_verified_lifecycle(&revoked_lifecycle)
         .expect("cache revoked lifecycle on device a");
+    let wrapped_epoch_a2 = wrapped_epoch_for_device(
+        DEVICE_A,
+        AGREEMENT_KEY_A,
+        1,
+        "object-key-v2",
+        2,
+        [12u8; 32],
+        "wrapping-key-device-a-2",
+        BASE_TIMESTAMP_MS + 2_001,
+    );
+    device_a_db
+        .cache_wrapped_epoch_materials(std::slice::from_ref(&wrapped_epoch_a2))
+        .expect("cache device a rotated epoch 2");
     device_b_db
         .store_verified_lifecycle(&revoked_lifecycle)
         .expect("cache revoked lifecycle on device b");
+
+    let remote_error = material_client
+        .device_wrapped_epoch_material(DOMAIN_ID, DEVICE_B, 2, "wrapping-key-device-b-2")
+        .expect_err("revoked device cannot request new wrapped epoch");
+    assert!(matches!(
+        remote_error,
+        SyncRemoteError::Server {
+            code: SyncServerErrorCode::ForbiddenDevice,
+            ..
+        }
+    ));
 
     drop(device_a_db);
     drop(device_b_db);
@@ -273,6 +357,39 @@ fn two_clients_sync_userdb_payloads_through_go_http_server() {
             Some(7)
         );
     }
+    assert_eq!(
+        restarted_b
+            .wrapped_epoch_materials(DOMAIN_ID, DEVICE_B)
+            .expect("restore wrapped cache after restart"),
+        vec![wrapped_epoch_b]
+    );
+    let trusted_a = revoked_lifecycle
+        .trusted_domain()
+        .device_profile(DEVICE_A)
+        .expect("active device a profile")
+        .clone();
+    let mut restarted_a_product_materials = ProductWrappedEpochMaterialStore::new(
+        restarted_a,
+        TestP256AgreementBackend::new(DEVICE_A, AGREEMENT_KEY_A, 1),
+    );
+    let restarted_a_materials = restarted_a_product_materials
+        .load_epoch_materials(revoked_lifecycle.trusted_domain().domain(), &trusted_a)
+        .expect("restore device a historical and rotated epochs");
+    assert_eq!(
+        restarted_a_materials
+            .iter()
+            .map(|material| (material.key_epoch(), material.key_id()))
+            .collect::<Vec<_>>(),
+        vec![(1, OBJECT_KEY_ID), (2, "object-key-v2")]
+    );
+    let mut revoked_product_materials = ProductWrappedEpochMaterialStore::new(
+        restarted_b,
+        TestP256AgreementBackend::new(DEVICE_B, AGREEMENT_KEY_B, 2),
+    );
+    let error = revoked_product_materials
+        .load_epoch_materials(revoked_lifecycle.trusted_domain().domain(), revoked_profile)
+        .expect_err("revoked cached material must be blocked before read");
+    assert_eq!(error, SyncCryptoLoadError::Revoked);
 
     let log_text = server.stop();
     assert_runtime_logs_redacted(&log_text);
@@ -559,7 +676,7 @@ fn authorize_device_b(
     transport: &HttpSyncRemoteTransport,
     signing_store: &TestMemoryDeviceKeyStore,
     public_key_b: &DeviceSigningPublicKey,
-) {
+) -> WrappedEpochMaterial {
     let join_created_at_ms = BASE_TIMESTAMP_MS + 10;
     let join_expires_at_ms = BASE_TIMESTAMP_MS + 600;
     let lifecycle_device = RemoteLifecycleDevice {
@@ -608,10 +725,30 @@ fn authorize_device_b(
     );
     assert_no_plaintext_leak(&join_response.body);
 
-    let wrapped_key = b"encrypted-sync-key-for-device-b";
-    let wrapped_key_len = wrapped_key.len();
     let wrapping_key_id = "wrapping-key-device-b";
     let created_at_ms = BASE_TIMESTAMP_MS + 20;
+    let recipient = DeviceKeyAgreementPublicKey::p256(
+        DEVICE_B,
+        AGREEMENT_KEY_B,
+        agreement_public_key(2),
+        BASE_TIMESTAMP_MS,
+        None,
+    )
+    .expect("device b agreement profile");
+    let object_key =
+        KeyDescriptor::new(OBJECT_KEY_ID, KeyRole::ObjectKey, 1).expect("wrapped epoch object key");
+    let master_key = SyncMasterKeyMaterial::new([11u8; 32]).expect("wrapped epoch master key");
+    let wrapped_epoch = WrappedEpochMaterial::seal_for_recipient(
+        DOMAIN_ID,
+        &recipient,
+        wrapping_key_id,
+        &object_key,
+        &master_key,
+        Nonce::new(vec![0x51; 24]).expect("wrapped epoch nonce"),
+        created_at_ms,
+    )
+    .expect("wrap epoch for device b");
+    let wrapped_key_len = wrapped_epoch.wrapped_key.len();
     let authorization_signature = sign_authorization(
         signing_store,
         challenge.as_bytes(),
@@ -637,16 +774,17 @@ fn authorize_device_b(
         "wrapping": {
             "authorizer_device_id": DEVICE_A,
             "recipient_device_id": DEVICE_B,
+            "recipient_key_agreement_key_id": AGREEMENT_KEY_B,
             "key_epoch": 1,
             "wrapping_key_id": wrapping_key_id,
-            "algorithm": ALGORITHM_XCHACHA20POLY1305_HKDF_SHA256,
-            "nonce": b64(b"wrapping-nonce-device-b"),
+            "algorithm": &wrapped_epoch.algorithm,
+            "nonce": b64(wrapped_epoch.nonce.as_bytes()),
             "wrapped_key_len": wrapped_key_len,
-            "ciphertext_hash": ciphertext_hash(wrapped_key),
+            "ciphertext_hash": &wrapped_epoch.ciphertext_hash,
             "created_at_ms": created_at_ms,
             "signature": b64(b"synthetic-wrapping-signature")
         },
-        "wrapped_key": b64(wrapped_key)
+        "wrapped_key": b64(&wrapped_epoch.wrapped_key)
     });
     let authorization_response = send_json(
         transport,
@@ -660,6 +798,7 @@ fn authorize_device_b(
         "authorize join request failed: {}",
         String::from_utf8_lossy(&authorization_response.body)
     );
+    wrapped_epoch
 }
 
 fn sign_authorization(
@@ -1047,19 +1186,124 @@ fn agreement_public_key(scalar: u8) -> Vec<u8> {
         .to_vec()
 }
 
-fn ciphertext_hash(ciphertext: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(ciphertext);
-    let digest = hasher.finalize();
-    let mut out = String::from("sha256:");
-    for byte in digest {
-        write!(&mut out, "{byte:02x}").expect("write hex");
+struct TestP256AgreementBackend {
+    device_id: String,
+    key_id: String,
+    secret: p256::SecretKey,
+    public_key: Vec<u8>,
+}
+
+impl TestP256AgreementBackend {
+    fn new(device_id: &str, key_id: &str, scalar: u8) -> Self {
+        let mut secret = [0u8; 32];
+        secret[31] = scalar;
+        let secret = p256::SecretKey::from_slice(&secret).expect("test agreement secret");
+        let public_key = {
+            use p256::elliptic_curve::sec1::ToEncodedPoint;
+            secret
+                .public_key()
+                .to_encoded_point(false)
+                .as_bytes()
+                .to_vec()
+        };
+        Self {
+            device_id: device_id.to_owned(),
+            key_id: key_id.to_owned(),
+            secret,
+            public_key,
+        }
     }
-    out
+}
+
+impl SyncDeviceKeyAgreementBackend for TestP256AgreementBackend {
+    fn key_handle(
+        &self,
+        device_id: &str,
+        key_id: &str,
+    ) -> Result<DeviceKeyAgreementKeyHandle, CryptoError> {
+        if device_id != self.device_id || key_id != self.key_id {
+            return Err(CryptoError::PrivateKeyUnavailable {
+                key_id: key_id.to_owned(),
+            });
+        }
+        DeviceKeyAgreementKeyHandle::p256(device_id, key_id, "test-p256-agreement-v1")
+    }
+
+    fn public_key(
+        &self,
+        handle: &DeviceKeyAgreementKeyHandle,
+    ) -> Result<DeviceKeyAgreementPublicKey, CryptoError> {
+        if handle.device_id != self.device_id || handle.key_id != self.key_id {
+            return Err(CryptoError::PrivateKeyUnavailable {
+                key_id: handle.key_id.clone(),
+            });
+        }
+        DeviceKeyAgreementPublicKey::p256(
+            &self.device_id,
+            &self.key_id,
+            self.public_key.clone(),
+            BASE_TIMESTAMP_MS,
+            None,
+        )
+    }
+
+    fn derive_shared_secret(
+        &self,
+        handle: &DeviceKeyAgreementKeyHandle,
+        peer_public_key: &[u8],
+    ) -> Result<EcdhSharedSecret, CryptoError> {
+        if handle.device_id != self.device_id || handle.key_id != self.key_id {
+            return Err(CryptoError::PrivateKeyUnavailable {
+                key_id: handle.key_id.clone(),
+            });
+        }
+        let peer = p256::PublicKey::from_sec1_bytes(peer_public_key)
+            .map_err(|_| CryptoError::KeyDerivationFailed)?;
+        let shared = p256::ecdh::diffie_hellman(self.secret.to_nonzero_scalar(), peer.as_affine());
+        EcdhSharedSecret::new((*shared.raw_secret_bytes()).into())
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn wrapped_epoch_for_device(
+    device_id: &str,
+    key_id: &str,
+    agreement_scalar: u8,
+    object_key_id: &str,
+    key_epoch: u64,
+    master_key: [u8; 32],
+    wrapping_key_id: &str,
+    created_at_ms: i64,
+) -> WrappedEpochMaterial {
+    let recipient = DeviceKeyAgreementPublicKey::p256(
+        device_id,
+        key_id,
+        agreement_public_key(agreement_scalar),
+        BASE_TIMESTAMP_MS,
+        None,
+    )
+    .expect("agreement profile");
+    let object_key = KeyDescriptor::new(object_key_id, KeyRole::ObjectKey, key_epoch)
+        .expect("wrapped object key");
+    let master_key = SyncMasterKeyMaterial::new(master_key).expect("wrapped master key");
+    WrappedEpochMaterial::seal_for_recipient(
+        DOMAIN_ID,
+        &recipient,
+        wrapping_key_id,
+        &object_key,
+        &master_key,
+        Nonce::new(vec![key_epoch as u8; 24]).expect("wrapped nonce"),
+        created_at_ms,
+    )
+    .expect("wrapped epoch")
 }
 
 fn assert_runtime_logs_redacted(log_text: &str) {
     assert_runtime_logs_redacted_without_conflict(log_text);
+    assert!(
+        log_text.contains(r#"route="devices.wrapped_epoch.get""#),
+        "runtime log missing wrapped epoch route: {log_text}"
+    );
     assert!(
         log_text.contains(r#"result_code="conflict_stale_base_version""#),
         "runtime log missing stale conflict: {log_text}"
@@ -1075,6 +1319,7 @@ fn assert_runtime_logs_redacted_without_conflict(log_text: &str) {
         "input_code",
         "reading",
         "plaintext",
+        "wrapping-key-device-b",
     ] {
         assert!(
             !log_text.contains(forbidden),
@@ -1111,156 +1356,4 @@ fn assert_no_plaintext_leak(bytes: &[u8]) {
             "response leaked {forbidden}: {text}"
         );
     }
-}
-
-struct GoSyncServer {
-    child: Option<Child>,
-    root: PathBuf,
-    base_url: String,
-}
-
-impl GoSyncServer {
-    fn try_spawn() -> Option<Self> {
-        let port = match reserve_loopback_port() {
-            Ok(port) => port,
-            Err(error) if error.kind() == io::ErrorKind::PermissionDenied => {
-                eprintln!("skipping Go sync server integration: loopback bind denied by sandbox");
-                return None;
-            }
-            Err(error) => panic!("reserve loopback port: {error}"),
-        };
-        let root = temp_root();
-        fs::create_dir_all(root.join("objects")).expect("create temp blob dir");
-        let server_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../server/sync-server");
-        let binary_path = root.join("radishlex-sync-server");
-        let build_status = match Command::new("go")
-            .args(["build", "-o"])
-            .arg(&binary_path)
-            .arg("./cmd/radishlex-sync-server")
-            .current_dir(&server_dir)
-            .status()
-        {
-            Ok(status) => status,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                eprintln!("skipping Go sync server integration: go command not found");
-                let _ = fs::remove_dir_all(&root);
-                return None;
-            }
-            Err(error) => panic!("build Go sync server: {error}"),
-        };
-        if !build_status.success() {
-            let _ = fs::remove_dir_all(&root);
-            panic!("build Go sync server failed: {build_status}");
-        }
-
-        let mut child = match Command::new(&binary_path)
-            .env("RADISHLEX_SYNC_LISTEN", format!("127.0.0.1:{port}"))
-            .env(
-                "RADISHLEX_SYNC_METADATA_PATH",
-                root.join("sync-server.sqlite"),
-            )
-            .env("RADISHLEX_SYNC_BLOB_DIR", root.join("objects"))
-            .env("RADISHLEX_SYNC_MAX_OBJECT_BYTES", "16777216")
-            .env("RADISHLEX_SYNC_RECOVERY_READS_PER_HOUR", "12")
-            .stdout(Stdio::null())
-            .stderr(Stdio::piped())
-            .spawn()
-        {
-            Ok(child) => child,
-            Err(error) => panic!("spawn Go sync server: {error}"),
-        };
-        let base_url = format!("http://127.0.0.1:{port}");
-        wait_until_ready(&base_url, &mut child);
-        Some(Self {
-            child: Some(child),
-            root,
-            base_url,
-        })
-    }
-
-    fn base_url(&self) -> String {
-        self.base_url.clone()
-    }
-
-    fn stop(mut self) -> String {
-        let logs = self.stop_child();
-        let _ = fs::remove_dir_all(&self.root);
-        logs
-    }
-
-    fn stop_child(&mut self) -> String {
-        let Some(mut child) = self.child.take() else {
-            return String::new();
-        };
-        let _ = child.kill();
-        let _ = child.wait();
-        read_child_stderr(&mut child)
-    }
-}
-
-impl Drop for GoSyncServer {
-    fn drop(&mut self) {
-        let _ = self.stop_child();
-        let _ = fs::remove_dir_all(&self.root);
-    }
-}
-
-fn reserve_loopback_port() -> io::Result<u16> {
-    let listener = TcpListener::bind(("127.0.0.1", 0))?;
-    let port = listener.local_addr()?.port();
-    drop(listener);
-    Ok(port)
-}
-
-fn temp_root() -> PathBuf {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time")
-        .as_nanos();
-    let sequence = TEMP_ROOT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    std::env::temp_dir().join(format!(
-        "radishlex-userdb-go-http-{}-{nanos}-{sequence}",
-        std::process::id(),
-    ))
-}
-
-fn wait_until_ready(base_url: &str, child: &mut Child) {
-    let transport =
-        HttpSyncRemoteTransport::with_timeout(base_url.to_owned(), Duration::from_millis(250))
-            .expect("readiness transport");
-    let deadline = Instant::now() + Duration::from_secs(20);
-    loop {
-        if let Some(status) = child.try_wait().expect("poll Go sync server") {
-            let stderr = read_child_stderr(child);
-            panic!("Go sync server exited before readiness: {status}\n{stderr}");
-        }
-        let response = transport.send(SyncRemoteRequest::new(
-            SyncRemoteMethod::Get,
-            "/api/v1/domains/readiness-domain/state",
-            None,
-            Vec::new(),
-        ));
-        match response {
-            Ok(_) => return,
-            Err(SyncRemoteError::Transport { .. }) if Instant::now() < deadline => {
-                thread::sleep(Duration::from_millis(100));
-            }
-            Err(error) => panic!("Go sync server readiness check failed: {error}"),
-        }
-        if Instant::now() >= deadline {
-            let _ = child.kill();
-            let _ = child.wait();
-            let stderr = read_child_stderr(child);
-            panic!("Go sync server did not become ready before timeout\n{stderr}");
-        }
-    }
-}
-
-fn read_child_stderr(child: &mut Child) -> String {
-    let Some(mut stderr) = child.stderr.take() else {
-        return String::new();
-    };
-    let mut output = String::new();
-    let _ = stderr.read_to_string(&mut output);
-    output
 }

@@ -205,6 +205,9 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 		if err := store.RevokeDevice(ctx, revocation); err != nil {
 			t.Fatalf("revoke device: %v", err)
 		}
+		if _, _, err := store.DeviceWrappedKey(ctx, "domain-a", "device-b", 1, "wrapping-key-device-b"); !IsCode(err, ErrForbiddenDevice) {
+			t.Fatalf("revoked device should be blocked before wrapped key read, got %v", err)
+		}
 
 		revokedUpload := objectUpload("domain-a", "object-b", "device-b", 1, 0, 2, []byte{0x95})
 		if _, err := store.PutObjectVersion(ctx, revokedUpload); !IsCode(err, ErrForbiddenDevice) {
@@ -261,8 +264,27 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 		if wrapping.BlobRef == "" {
 			t.Fatal("wrapping record should receive blob ref")
 		}
+		if wrapping.RecipientKeyAgreementKeyID != "agreement-key-device-b" {
+			t.Fatalf("unexpected wrapping recipient key id: %q", wrapping.RecipientKeyAgreementKeyID)
+		}
 		if string(wrappedKey) != string(wrappedKeyForTest()) {
 			t.Fatalf("wrapped key mismatch: got %x want %x", wrappedKey, wrappedKeyForTest())
+		}
+	})
+
+	t.Run("join authorization rejects wrapped key above resource limit", func(t *testing.T) {
+		ctx := context.Background()
+		store := newReadyStore(t, newStore)
+		request, upload := joinAuthorizationFixture("domain-a", "join-large", "device-large", 20)
+		upload.WrappedKey = make([]byte, MaxDeviceWrappedKeyBytes+1)
+		upload.Wrapping.WrappedKeyLen = int64(len(upload.WrappedKey))
+		upload.Wrapping.CiphertextHash = DeviceWrappedKeyCiphertextHash(upload.Wrapping, upload.WrappedKey)
+		signAuthorizationForTest(&upload.Authorization, upload.Wrapping, request)
+		if err := store.SaveJoinRequest(ctx, request); err != nil {
+			t.Fatalf("save join request: %v", err)
+		}
+		if err := store.AuthorizeJoinRequest(ctx, upload); !IsCode(err, ErrInvalidCiphertextMetadata) {
+			t.Fatalf("oversized wrapped key should fail, got %v", err)
 		}
 	})
 
@@ -464,17 +486,18 @@ func joinAuthorizationFixture(domainID string, joinID string, deviceID string, a
 		CreatedAtMs:                 atMs,
 	}
 	wrapping := DeviceWrappingRecord{
-		DomainID:           domainID,
-		RecipientDeviceID:  deviceID,
-		AuthorizerDeviceID: "device-a",
-		KeyEpoch:           1,
-		WrappingKeyID:      "wrapping-key-" + deviceID,
-		Algorithm:          AlgorithmXChaCha20Poly1305HKDFSHA256,
-		Nonce:              []byte{0x23},
-		WrappedKeyLen:      int64(len(wrapped)),
-		CiphertextHash:     CiphertextHash(wrapped),
-		CreatedAtMs:        atMs,
-		Signature:          []byte{0x24},
+		DomainID:                   domainID,
+		RecipientDeviceID:          deviceID,
+		RecipientKeyAgreementKeyID: request.KeyAgreementPublicKeyID,
+		AuthorizerDeviceID:         "device-a",
+		KeyEpoch:                   1,
+		WrappingKeyID:              "wrapping-key-" + deviceID,
+		Algorithm:                  AlgorithmXChaCha20Poly1305HKDFSHA256,
+		Nonce:                      []byte{0x23},
+		WrappedKeyLen:              int64(len(wrapped)),
+		CiphertextHash:             CiphertextHash(wrapped),
+		CreatedAtMs:                atMs,
+		Signature:                  []byte{0x24},
 	}
 	signAuthorizationForTest(&authorization, wrapping, request)
 	return request, DeviceAuthorizationUpload{

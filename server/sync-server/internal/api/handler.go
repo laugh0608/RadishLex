@@ -52,6 +52,7 @@ type AuditEvent struct {
 	ObjectID     string `json:"object_id,omitempty"`
 	ObjectType   string `json:"object_type,omitempty"`
 	Version      uint64 `json:"version,omitempty"`
+	KeyEpoch     uint64 `json:"key_epoch,omitempty"`
 	ResultCode   string `json:"result_code"`
 	StatusCode   int    `json:"status_code"`
 	Bytes        int64  `json:"bytes,omitempty"`
@@ -160,6 +161,8 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request, audit *Audit
 		h.handleDomainState(w, r, route.domainID)
 	case deviceRoute:
 		h.handleDevice(w, r, route.domainID, route.deviceID)
+	case deviceWrappedEpochRoute:
+		h.handleDeviceWrappedEpoch(w, r, route.domainID, route.deviceID, route.keyEpoch, audit)
 	case lifecycleSnapshotRoute:
 		h.handleLifecycleSnapshot(w, r, route.domainID)
 	case lifecycleEventsRoute:
@@ -307,6 +310,36 @@ func (h *Handler) handleDevice(w http.ResponseWriter, r *http.Request, domainID 
 		return
 	}
 	writeJSON(w, http.StatusOK, DeviceResponseFrom(device))
+}
+
+func (h *Handler) handleDeviceWrappedEpoch(w http.ResponseWriter, r *http.Request, domainID string, deviceID string, keyEpoch uint64, audit *AuditEvent) {
+	audit.DeviceID = deviceID
+	audit.KeyEpoch = keyEpoch
+	if r.Method != http.MethodGet {
+		h.writeMethodError(w, http.MethodGet)
+		return
+	}
+	if r.Header.Get(deviceIDHeader) != deviceID {
+		h.writeError(w, publicStorageError(storage.ErrForbiddenDevice, "wrapped epoch recipient is not the requesting device", false))
+		return
+	}
+	query := r.URL.Query()
+	values, ok := query["wrapping_key_id"]
+	if len(query) != 1 || !ok || len(values) != 1 || values[0] == "" {
+		h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "wrapped epoch query is invalid", false))
+		return
+	}
+	record, wrappedKey, err := h.store.DeviceWrappedKey(r.Context(), domainID, deviceID, keyEpoch, values[0])
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	if len(wrappedKey) > storage.MaxDeviceWrappedKeyBytes {
+		h.writeError(w, publicStorageError(storage.ErrStorageUnavailable, "wrapped epoch exceeds resource limit", true))
+		return
+	}
+	audit.Bytes = int64(len(wrappedKey))
+	writeJSON(w, http.StatusOK, DeviceWrappedEpochResponseFrom(record, wrappedKey))
 }
 
 func (h *Handler) handleLifecycleSnapshot(w http.ResponseWriter, r *http.Request, domainID string) {
@@ -578,6 +611,7 @@ type routeKind int
 const (
 	domainStateRoute routeKind = iota + 1
 	deviceRoute
+	deviceWrappedEpochRoute
 	lifecycleSnapshotRoute
 	lifecycleEventsRoute
 	deviceRevocationsRoute
@@ -597,6 +631,7 @@ type route struct {
 	joinRequestID string
 	objectID      string
 	version       uint64
+	keyEpoch      uint64
 }
 
 func (r route) name() string {
@@ -605,6 +640,8 @@ func (r route) name() string {
 		return "domains.state"
 	case deviceRoute:
 		return "devices.get"
+	case deviceWrappedEpochRoute:
+		return "devices.wrapped_epoch.get"
 	case lifecycleSnapshotRoute:
 		return "lifecycle.snapshot"
 	case lifecycleEventsRoute:
@@ -641,6 +678,13 @@ func domainRoute(path string) (route, bool) {
 	}
 	if len(parts) == 3 && parts[0] != "" && parts[1] == "devices" && parts[2] != "" {
 		return route{kind: deviceRoute, domainID: parts[0], deviceID: parts[2]}, true
+	}
+	if len(parts) == 5 && parts[0] != "" && parts[1] == "devices" && parts[2] != "" && parts[3] == "wrapped-epochs" {
+		keyEpoch, ok := parseRouteVersion(parts[4])
+		if !ok {
+			return route{}, false
+		}
+		return route{kind: deviceWrappedEpochRoute, domainID: parts[0], deviceID: parts[2], keyEpoch: keyEpoch}, true
 	}
 	if len(parts) == 2 && parts[0] != "" && parts[1] == "lifecycle" {
 		return route{kind: lifecycleSnapshotRoute, domainID: parts[0]}, true

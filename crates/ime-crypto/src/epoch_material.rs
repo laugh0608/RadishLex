@@ -21,6 +21,7 @@ pub const KEY_AGREEMENT_ALGORITHM_P256_ECDH_V1: &str = "p256-ecdh-v1";
 pub const WRAPPED_EPOCH_ALGORITHM_P256_ECDH_HKDF_SHA256_XCHACHA20POLY1305_V1: &str =
     "p256-ecdh-hkdf-sha256-xchacha20poly1305-v1";
 pub const P256_KEY_AGREEMENT_PUBLIC_KEY_LEN: usize = 65;
+pub const MAX_WRAPPED_EPOCH_MATERIAL_BYTES: usize = 64 * 1024;
 
 const ENVELOPE_MAGIC: &[u8; 4] = b"RLXE";
 const ENVELOPE_HEADER_LEN: usize = 8;
@@ -224,6 +225,12 @@ impl WrappedEpochMaterial {
 
     pub fn validate(&self) -> Result<(), CryptoError> {
         self.validate_metadata()?;
+        if self.wrapped_key.len() > MAX_WRAPPED_EPOCH_MATERIAL_BYTES {
+            return Err(CryptoError::invalid_field(
+                "wrapped_key",
+                "value exceeds 64 KiB resource limit",
+            ));
+        }
         let (_, ciphertext) = decode_envelope(&self.wrapped_key)?;
         if ciphertext.len() <= AEAD_TAG_LEN {
             return Err(CryptoError::invalid_field(
@@ -279,6 +286,12 @@ impl WrappedEpochMaterial {
         if self.key_epoch == 0 {
             return Err(CryptoError::invalid_field(
                 "key_epoch",
+                "value must be greater than zero",
+            ));
+        }
+        if self.created_at_ms <= 0 {
+            return Err(CryptoError::invalid_field(
+                "created_at_ms",
                 "value must be greater than zero",
             ));
         }
@@ -604,6 +617,31 @@ mod tests {
             tampered.unwrap(&shared(&secret, &record)),
             Err(CryptoError::CiphertextHashMismatch)
         );
+    }
+
+    #[test]
+    fn wrapped_epoch_rejects_material_above_resource_limit() {
+        let (_secret, recipient) = recipient();
+        let descriptor = KeyDescriptor::new("object-key-1", KeyRole::ObjectKey, 1).expect("key");
+        let master = SyncMasterKeyMaterial::new([8u8; 32]).expect("master");
+        let mut record = WrappedEpochMaterial::seal_for_recipient(
+            "domain-a",
+            &recipient,
+            "wrapping-a-1",
+            &descriptor,
+            &master,
+            Nonce::new(vec![4u8; 24]).expect("nonce"),
+            30,
+        )
+        .expect("record");
+        record.wrapped_key = vec![0; MAX_WRAPPED_EPOCH_MATERIAL_BYTES + 1];
+        assert!(matches!(
+            record.validate(),
+            Err(CryptoError::InvalidField {
+                field: "wrapped_key",
+                ..
+            })
+        ));
     }
 
     #[test]
