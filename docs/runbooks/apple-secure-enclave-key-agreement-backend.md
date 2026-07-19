@@ -92,4 +92,4 @@ lifecycle 的通过条件是 `created/reloaded/public_key_matched/shared_secret_
 
 冻结 hash：`Info.plist=780d2ecb...451ce2`、主程序 `d80e3ff2...b4b5b`、FFI dylib `ddea6306...d5fe`、profile `e816e592...922b`。完整值记录于本周周志。
 
-锁屏链结束后对同一未改写产物再次执行 `codesign --verify --deep --strict` 返回 `CSSMERR_TP_NOT_TRUSTED`，Authority 显示 unavailable；当前 identity仍被 `security find-identity`列为 valid，证书有效期为 2026-07-11 至 2027-07-11，OU/Team 与 Apple WWDR/Root CA 均存在。该事后 trust anomaly 不改写已完成的 native lifecycle/locked/cleanup 结果，但在最终产品资格前必须独立复验；不能通过重签不同 hash 产物掩盖。本机仍缺真实 unsupported 环境，`runtime_qualified/product_qualified/user_sync_enabled` 保持 false。
+锁屏链结束后，受限执行环境内的只读命令一度返回 `CSSMERR_TP_NOT_TRUSTED`、Authority unavailable 和 `0 valid identities`。真实登录会话中复验同一未改写产物，`security find-identity` 返回 `1 matching/1 valid identity`，`codesign --verify --deep --strict` 验证 app、嵌套 framework 与 FFI dylib 全部通过，四项冻结 SHA-256 均未变化。该现象已确定为执行隔离造成的信任评估假象，不要求重签、重建证书或修改 Keychain；以后资格验签若在沙盒内失败，必须先在获准的真实登录会话只读复验。本机仍缺真实 unsupported 环境，`runtime_qualified/product_qualified/user_sync_enabled` 保持 false。

@@ -30,7 +30,7 @@ Apple signing/key-agreement adapters 已接线。独立 key-agreement ABI、六�
 
 Manager ABI v6 的 `radishlex_manager_sync_product_status` 只读固定数值 capability，不访问系统 key item。默认构建显示 signing 未编译，macOS 产品构建显示 Secure Enclave signing 产品资格待完成；畸形或自称开启同步的 native 状态降级为 `native_sync_product_status_invalid`。gate 始终 blocked，底层 Apple validation 不直接进入 Dart，也没有新增同步命令。
 
-当前 M3 阻塞项只剩生产 backend 外部资格。开发者没有真实 unsupported 环境；现有支持设备不得模拟该证据。资格 bundle 在构建时严格验签通过并完成全部可执行场景，但锁屏链结束后的同产物 trust recheck 返回 `CSSMERR_TP_NOT_TRUSTED`，证书/Team/有效期和系统 Apple CA 链仍可读，必须另行复验，不能静默忽略。正式域名、公开证书和目标生产演练按产品决策后移到首版发布后；`product_qualified/user_sync_enabled` 继续关闭。
+当前 M3 阻塞项只剩生产 backend 外部资格。开发者没有真实 unsupported 环境；现有支持设备不得模拟该证据。锁屏链结束后，受限执行环境一度把同产物误报为 `CSSMERR_TP_NOT_TRUSTED`/`0 valid identities`；真实登录会话的只读复核稳定返回 `1 matching/1 valid identity`，同一冻结 hash bundle 通过 `codesign --verify --deep --strict`，因此不是 Keychain、证书或产物故障。正式域名、公开证书和目标生产演练按产品决策后移到首版发布后；`product_qualified/user_sync_enabled` 继续关闭。
 
 ## 当前停止线
 
@@ -43,10 +43,9 @@ Manager ABI v6 的 `radishlex_manager_sync_product_status` 只读固定数值 ca
 
 ## 下一步顺位
 
-1. 下一顺位是复验锁屏后的 Apple Development trust evaluation，区分临时 Keychain/trust 状态与产物签名问题；不得重签后把不同 hash 产物冒充本轮 lifecycle 证据。
-2. 在真实不支持 Secure Enclave 的环境可得时，分别执行 signing/key-agreement unsupported；当前设备不得模拟或改 capability 代替。
-3. 两条资格都通过后才重新审阅 `product_qualified`；在此之前不增加恢复、授权、撤销、轮换或上传成功入口，`user_sync_enabled=false`。
-4. 首个正式版本发布后、准备启用真实生产同步前，再在实际目标环境生成并校验 `deployment_evidence.v1`，复验正式域名/证书、固定镜像、权限、冷备份/恢复、升级回滚和日志脱敏。
+1. 在真实不支持 Secure Enclave 的环境可得时，分别执行 signing/key-agreement unsupported；当前设备不得模拟或改 capability 代替。
+2. 两条资格都通过后才重新审阅 `product_qualified`；在此之前不增加恢复、授权、撤销、轮换或上传成功入口，`user_sync_enabled=false`。
+3. 首个正式版本发布后、准备启用真实生产同步前，再在实际目标环境生成并校验 `deployment_evidence.v1`，复验正式域名/证书、固定镜像、权限、冷备份/恢复、升级回滚和日志脱敏。
 
 ## 验证入口
 
