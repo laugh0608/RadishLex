@@ -57,6 +57,14 @@ https://localhost:7319
 
 该脚本只执行 `GET /api/v1/domains/<probe>/state` 读请求。未配置 token 的本地 compose 预期返回 `404 not_found` 并归类为 `domain_missing_expected`；启用 `RADISHLEX_SYNC_ACCESS_TOKEN` 后可通过 `--access-token-env RADISHLEX_SYNC_ACCESS_TOKEN` 读取本机环境变量。脚本输出 `sync_connection_health.v1` 摘要，不打印 token、完整响应体或请求体。
 
+当前部署子阶段的自动化退出入口为：
+
+```sh
+./scripts/check-sync-server-local-https.sh
+```
+
+该脚本创建唯一临时 Compose project 和随机 bearer token，真实构建并启动 `sync-server` / `sync-gateway`，经 Caddy internal TLS 验证无 token `401`、带 token `404 not_found`、loopback-only 端口、容器 hardening 与日志脱敏，最后执行 `down --volumes` 并确认临时 container/volume 已清理。脚本不使用真实用户数据，不信任或安装本地 CA，也不留下 env/token；只运行离线 contract 可用 `--self-test`，只解析 Compose 可用 `--config-only`。
+
 ## 部署态 HTTP 上游
 
 部署态与兄弟 Radish 项目保持同类边界：容器入口只提供 HTTP，上游 TLS 由外部反向代理终止。
@@ -150,6 +158,8 @@ docker compose -f deploy/sync-server/docker-compose.yaml \
 go test ./...
 ./scripts/check-repo.sh
 ```
+
+关闭当前部署子阶段时还必须真实运行 `./scripts/check-sync-server-local-https.sh`；`--self-test`、`--config-only` 或手工 `docker compose config` 不能替代 TLS 握手和容器启动证据。正式域名、公开证书与目标生产环境演练按生产部署 runbook 后移到首个正式版本发布后。
 
 ### 部署预演脚本
 

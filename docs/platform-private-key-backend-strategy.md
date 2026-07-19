@@ -14,7 +14,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 - `android-keystore-v1` 已有 Kotlin / Gradle harness、JNI glue、gated smoke 和 provider diagnostics；Pixel 9 Pro API 35 AVD 与 Pixel 10 Pro API 37 AVD 均返回 `unsupported_signature_algorithm`。
 - `windows-cng-v1`、`linux-secret-service-v1` 仍只是能力边界标识，未进入实现。
 
-没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。普通 DPK P-256 的评审结论是“软件运行时可用、生产资格拒绝”。独立 Secure Enclave P-256 已完成 lifecycle、denied 与真实设备锁屏 locked；开发者当前没有真实无 Secure Enclave 目标，unsupported 和产品资格评审作为外部环境阻塞继续保留，发布级目标部署运行证据仍是正式发布前门禁。该阻塞不降低任何资格字段，但也不再冻结关闭产品入口、只使用合成数据与测试 backend 的 Rust 产品编排开发。
+没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。普通 DPK P-256 的评审结论是“软件运行时可用、生产资格拒绝”。独立 Secure Enclave P-256 已完成 lifecycle、denied 与真实设备锁屏 locked；开发者当前没有真实无 Secure Enclave 目标，unsupported 和产品资格评审作为外部环境阻塞继续保留。当前部署子阶段以本地 HTTPS 通过为准；发布级目标部署运行证据后移到首个正式版本发布后、启用真实生产同步前。该阻塞不降低任何资格字段，但也不再冻结关闭产品入口、只使用合成数据与测试 backend 的 Rust 产品编排开发。
 
 ## 策略目标
 

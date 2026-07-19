@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、signed epoch distribution、recovery-record-v2 签名轮换/可信解封/recovered-device activation/signed revocation、客户端解密合并和 `ime-sync` remote client。Go server metadata schema v9 已具备 API/storage/runtime、SQLite metadata、local blob、签名 profile 验证、对象/lifecycle/epoch distribution/recovery activation/revocation、审计、备份恢复和升级回滚受控证据。发布级目标部署证据和合格生产私钥 backend 尚未闭环；真实用户同步保持关闭。
+当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、signed epoch distribution、recovery-record-v2 签名轮换/可信解封/recovered-device activation/signed revocation、客户端解密合并和 `ime-sync` remote client。Go server metadata schema v9 已具备 API/storage/runtime、SQLite metadata、local blob、签名 profile 验证、对象/lifecycle/epoch distribution/recovery activation/revocation、审计、备份恢复和升级回滚受控证据。当前部署子阶段以本地 Compose / HTTPS 通过为退出条件；目标生产证据后移到首个正式版本发布后。合格生产私钥 backend 尚未闭环，真实用户同步保持关闭。
 
 本阶段只固定服务端 API 和 storage 边界：
 
@@ -478,7 +478,7 @@ latest_ciphertext_hash
 16. 已补 Rust 侧两客户端 userdb 同步边界测试，覆盖设备 A 生成 P2 payload 并加密上传、设备 B 下载密文后解密 / 解码 / 合并写回 SQLite、本机 tombstone 阻断旧远端词条、stale base version 409 latest metadata 映射，以及 B 基于最新 base version 重新组装并上传 v2。
 17. 已补 Rust `HttpSyncRemoteTransport` 直连 Go sync server 的短生命周期跨语言测试，覆盖 domain 初始化、Rust signed encrypted object 通过 Go HTTP API 上传、metadata / binary payload 读取、Go 服务端按 Rust envelope hash 复验，以及 stale conflict latest metadata 映射。
 18. 已补 Docker Compose 本地 / 部署态入口、sync server Dockerfile、Docker build context ignore、本地 Caddy HTTPS 入口、部署态 HTTP 上游、Nginx 生产反代示例和 `docs/runbooks/sync-server-compose.md`；本地默认 `https://localhost:7319`，部署态默认同机 HTTP 上游 `http://127.0.0.1:7319`，两者使用同一个对外端口，并明确生产认证 / 备份 / 平台私钥 backend 未补齐前不得开放给真实用户。
-19. 已补 Docker Compose 容器实际启动 smoke 证据；本地模式通过 Caddy internal TLS 到达 sync-server，部署态 HTTP upstream 可直达 sync-server，两种模式完成后均已 `down`，未保留运行容器、真实数据、容器生成数据或本机绝对路径。
+19. 已补 Docker Compose 容器实际启动 smoke 证据；本地模式现由独立自动化门禁通过 Caddy internal TLS 到达 sync-server，验证 bearer `401` / authorized backend response、loopback-only、容器 hardening、日志脱敏和唯一 project 的 container/volume 清理。部署态 HTTP upstream 预演另覆盖私有权限、冷备份与隔离恢复；两种模式均不保留运行容器或真实数据。
 20. 已补 Rust userdb 两客户端真实 Go HTTP 同步测试，覆盖设备 B join / signed authorization、`dictionary.user_terms` / `ranker.weights` / `dictionary.deleted_terms` 三类 P2 对象真实 HTTP 上传下载、客户端解密 / 解码 / SQLite 写回、stale conflict latest metadata、按 `base_version = 1` 上传 v2 和 runtime 日志脱敏。
 21. 已补 `docs/runbooks/sync-server-production-deployment.md`，固定部署拓扑、外部 TLS、认证 / 访问控制、数据目录权限、冷备份、恢复、升级回滚、验证证据和真实用户开放停止线。
 22. 已补单用户自部署 bearer access token 门禁，覆盖 Go handler 认证失败不进入业务 storage、runtime 配置透传、日志脱敏、Rust HTTP transport 可选 `Authorization: Bearer` header 和 `unauthenticated` 错误映射；发布级目标部署运行证据和可用平台私钥 backend 仍是用户可用同步停止线，但不阻塞当前本地联调和非上传 UI gate 开发。
@@ -498,7 +498,7 @@ latest_ciphertext_hash
 
 ## 停止线
 
-- Rust 侧两客户端 harness 已覆盖 encrypted userdb payload 的上传、下载、解密、合并写回和 stale conflict 重新上传；Go runtime smoke 已覆盖第二设备授权、跨设备 object 版本链、备份恢复链路、外部 TLS 反代链路和升级回滚链路；Rust HTTP transport 直连 Go server 的短生命周期测试已覆盖跨语言 DTO、handler、storage、错误语义和日志脱敏边界；Rust userdb 两客户端真实 Go HTTP 测试已覆盖客户端解密合并写回和 v2 重新上传；生产部署 runbook 已固定外部 TLS、认证、备份和升级停止线，Go server 与 Rust HTTP transport 已补单用户 bearer access token 证据。进入用户可用同步前，仍必须补可用平台私钥 backend 和发布级目标部署运行证据；当前产品开发继续使用本地 Docker / 本地 HTTPS 复验证据。
+- Rust 侧两客户端 harness 已覆盖 encrypted userdb payload 的上传、下载、解密、合并写回和 stale conflict 重新上传；Go runtime smoke 已覆盖第二设备授权、跨设备 object 版本链、备份恢复链路、外部 TLS 反代链路和升级回滚链路；Rust HTTP transport 直连 Go server 的短生命周期测试已覆盖跨语言 DTO、handler、storage、错误语义和日志脱敏边界；Rust userdb 两客户端真实 Go HTTP 测试已覆盖客户端解密合并写回和 v2 重新上传。当前部署子阶段以真实本地 Compose / HTTPS 和部署预演通过退出；进入用户可用生产同步前仍必须补可用平台私钥 backend，目标部署证据按产品决策在首个正式版本发布后补齐。
 - 平台私钥存储 backend 能力模型已落地；普通 DPK 软件 key 因 `exportable=true` 不具备产品资格，独立 Secure Enclave backend 已取得 qualification lifecycle、denied 与设备锁屏 locked 证据但仍待 unsupported 和产品资格评审。生产 backend 评审通过前不提供用户可用同步 UI。
 - device authorization handler 对外开放前必须继续复用 wrapped key bytes 的存储 / 读取语义，且不得返回明文同步域材料。
 - recovery latest handler 已复用 wrapped material bytes 读取语义，并补齐限速与内部 `blob_ref` 不外泄测试；object version handler 已复用 encrypted object blob 读写语义，并补齐冲突、设备状态和脱敏测试；API handler 已补 panic recovery、request id、非持久审计 hook、SQLite `audit_events` 写入和 bearer access token 门禁；runtime 已补配置装配、脱敏 audit logger、本机 smoke runbook、双设备 HTTP smoke、备份恢复 smoke、外部 TLS 反代 smoke、升级回滚 smoke、Docker Compose 本地 / 部署态入口、容器实际启动 smoke 证据和生产部署边界 runbook。Rust remote client 已补 DTO、transport trait、HTTP transport、错误映射、可选 bearer token header、两客户端 userdb harness、直连 Go server 的短生命周期测试和 userdb 两客户端真实 Go HTTP 测试；进入真实用户部署前仍需补可用平台私钥 backend 和发布级目标部署运行证据，进入 manager 同步入口非上传开发可先依赖本地联调证据。

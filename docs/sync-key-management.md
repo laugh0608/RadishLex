@@ -35,7 +35,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进真实设备配对成功路径；M1/M2 平台输入与本地 manager 可独立推进，但不得调用真实同步或把平台签名 backend 标记为生产可用。
 
-进入用户可用同步前，应按生产部署 runbook 补发布级目标部署运行证据。普通 DPK P-256 当前 `compiled/available/can_create/can_sign=true`，但 `exportable=true` 使产品资格保持关闭。独立 Secure Enclave backend 已取得 qualification lifecycle、denied 与设备锁屏 locked 证据，产品资格仍待真实 unsupported 环境；当前缺少该环境，因此只允许按 `docs/sync-orchestration.md` 推进关闭产品入口、合成 P2、测试 backend 的 Rust 编排，不开放真实产品签名路径。既有 Apple/Android Ed25519 失败结论继续有效。
+当前部署子阶段以本地 Compose / HTTPS 与部署预演通过为退出证据；首个正式版本发布后、进入真实生产同步前，再按生产部署 runbook 补目标部署运行证据。普通 DPK P-256 当前 `compiled/available/can_create/can_sign=true`，但 `exportable=true` 使产品资格保持关闭。独立 Secure Enclave backend 已取得 qualification lifecycle、denied 与设备锁屏 locked 证据，产品资格仍待真实 unsupported 环境；当前缺少该环境，因此只允许按 `docs/sync-orchestration.md` 推进关闭产品入口、合成 P2、测试 backend 的 Rust 编排，不开放真实产品签名路径。既有 Apple/Android Ed25519 失败结论继续有效。
 
 ## 设计目标
 
@@ -319,7 +319,7 @@ updated_at_ms
 6. 已在 `ime-sync` 补 `SyncEnvelopeAssembler`，固定 Rust 内部 P2 payload 到 envelope 的组装边界，覆盖 sync master 派生 object key、nonce 复用阻断、draft 派生和 Debug 明文阻断。
 7. 已补 `docs/adr/0002-recovery-code-kdf.md`，固定恢复码 Argon2id KDF、格式、恢复记录字段、失败限速和验证口径。
 8. 已按 ADR 落地恢复码 KDF 纯 Rust 模型与测试，覆盖 `RecoveryCode`、`RecoveryKdfProfile`、恢复 wrapping key 和 `RecoveryMaterial` 恢复记录加解密。
-9. 已落地 `recovery-record-v2`、Go schema v9 optimistic rotation/recovered-device activation/signed revocation、Rust trusted remote 验签读取和真实短生命周期 Go HTTP 解封、轮换、恢复激活、撤销与文件 userdb 重启证据；下一步补发布级目标部署运行证据。
+9. 已落地 `recovery-record-v2`、Go schema v9 optimistic rotation/recovered-device activation/signed revocation、Rust trusted remote 验签读取和真实短生命周期 Go HTTP 解封、轮换、恢复激活、撤销与文件 userdb 重启证据；当前部署子阶段补本地 Compose / HTTPS 自动化证据，目标生产运行证据后移到首个正式版本发布后。
 9. 已补 `docs/adr/0003-device-signing-key-storage.md`，固定设备签名、签名对象、canonical bytes、私钥存储抽象、错误语义和验证口径。
 10. 已按 ADR 落地签名 / 设备密钥存储 Rust 模型，当前使用合成 `test-memory-v1` key store，并补 platform backend capability metadata、unavailable backend 明确失败和 revoked key 阻断测试。
 11. 已补 `apple-keychain-v1` 平台 runbook 和 Apple 签名策略 ADR，固定 Apple Keychain 创建、加载、签名、删除、锁屏 / 权限、备份迁移、日志脱敏和策略停止线；macOS backend 已在 `apple-keychain` feature 下接线，默认测试不访问系统 Keychain，真实 smoke 已运行但阻塞于 `ed25519-v1` 创建，backend status 已阻断生产签名。
