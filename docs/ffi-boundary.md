@@ -6,7 +6,7 @@
 
 `ime-ffi` 是 Rust 输入 runtime、平台输入法壳和 Flutter manager 的唯一稳定跨语言边界。平台按键入口必须无损返回 `KeyOutcome` 的 `consumed`、可选即时 commit 与同一事件后的 snapshot；只返回状态码再单独查询状态不能作为真实平台契约。
 
-平台壳只能通过 FFI 调用 Rust runtime，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。manager 同步命令只在 M3 真实领域模型、secret 生命周期和安全测试齐备后进入 C ABI；approval、preview、migration review 和 no-symbol 证明不属于生产 ABI。Apple P-256 产品 validation ABI 是例外的受控自检面：普通 DPK 与 Secure Enclave 使用独立 symbol/environment gate，只返回固定 capability/lifecycle flags，不执行真实同步，也不直接进入 Dart binding。ABI v6 另增一条不带入参、不访问系统条目的 `radishlex_manager_sync_product_status`，只把 allowlist 产品状态送入现有 Manager snapshot；它不是同步命令，不能打开产品 gate。平台绑定层调用规则见 `docs/runbooks/ffi-platform-call-contract.md`。
+平台壳只能通过 FFI 调用 Rust runtime，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。M3 真实领域模型、secret 生命周期和本地 HTTPS 已具备实现证据；下一批允许增加与普通用户同步入口明确隔离的 Manager 资格执行 ABI，但必须先固定 opaque run 所有权、单次运行、取消/超时、transient 参数和脱敏结果契约。approval、preview、migration review 和 no-symbol 证明不属于生产 ABI。Apple P-256 产品 validation ABI 是例外的受控自检面：普通 DPK 与 Secure Enclave 使用独立 symbol/environment gate，只返回固定 capability/lifecycle flags，不执行真实同步，也不直接进入 Dart binding。ABI v6 另增一条不带入参、不访问系统条目的 `radishlex_manager_sync_product_status`，只把 allowlist 产品状态送入现有 Manager snapshot；它不是同步命令，不能打开产品 gate。平台绑定层调用规则见 `docs/runbooks/ffi-platform-call-contract.md`。
 
 ## 职责边界
 

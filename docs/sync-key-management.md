@@ -362,7 +362,7 @@ updated_at_ms
 
 ## 停止线
 
-- 恢复码 KDF、Rust model、服务端 v2 轮换 API、recovered-device activation 和 signed recovery record revocation/lifecycle 已落地；合格平台 backend、发布级部署证据和管理 UI 未闭环前，不提供用户可用恢复入口。
+- 恢复码 KDF、Rust model、服务端 v2 轮换 API、recovered-device activation、signed recovery record revocation/lifecycle 和 macOS 平台 backend 主路径资格已落地；Manager transient secret 交互、真实设备产品流程与用户入口退出评审未闭环前，不提供用户可用恢复入口。发布级目标部署证据按首版后计划补齐。
 - 设备签名模型、两个签名 profile、跨语言 verifier/vectors、私钥存储抽象、平台 capability、Apple/Android runbook 与 feature-gated backend 已落地；普通 DPK 软件运行时已验证但可导出，Secure Enclave lifecycle、denied、真实设备锁屏 locked 与 cleanup 已验证并按受支持 macOS 主路径取得产品资格，unsupported 延期补测。既有 Android/Apple Ed25519 阻塞不改写 P-256 结论；`user_sync_enabled` 仍由独立产品入口门禁控制。
 - 服务端若回退到只保存 wrapping metadata 而不能保存 / 返回 wrapped key bytes，则不得开放真实设备授权 handler。
 - Go server 与 Rust HTTP transport 继续推进时，必须先满足 `docs/sync-server-api-storage.md` 的签名、metadata API、版本冲突、错误语义和脱敏验证。

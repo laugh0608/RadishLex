@@ -121,6 +121,7 @@ M2 是首个本地个人化 MVP。它不要求远端同步已经开放。
 - 旧设备不能复活删除数据，被撤销设备不能获得新 epoch 数据。
 - HTTPS、认证、请求/响应上限、慢连接、错误 TLS、限速绕过和日志脱敏通过负向测试。
 - manager 不持久化 recovery code、token、wrapped material、signature bytes 或 payload bytes。
+- Manager 通过真实 Rust bridge 完成本地 HTTPS 合成 P2 资格执行，覆盖单次运行所有权、并发拒绝、取消、超时、错误脱敏和进程重启；资格入口与普通用户同步入口必须有明确产品区隔。
 - 至少一个受支持 macOS 设备上的真实产品 bundle 已完成 signing 与 key-agreement 的独立生命周期、锁定失败关闭、清理和日志脱敏评审；无 Secure Enclave 环境的 `unsupported` 属于发布兼容性补测，不再作为个人开发阶段退出前置条件。
 
 M3 的部署子阶段以短生命周期本地 Compose、Caddy internal TLS、bearer 认证负向响应、权限、备份恢复和日志脱敏通过为退出证据。首个正式版本保持真实用户同步关闭；真实域名、公开 CA 证书、目标生产备份恢复与升级回滚在该版本发布后、准备启用生产同步前单独验收，不能用本地证据冒充。

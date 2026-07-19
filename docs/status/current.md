@@ -43,10 +43,10 @@ Manager ABI v6 的 `radishlex_manager_sync_product_status` 只读固定数值 ca
 
 ## 下一步顺位
 
-1. 下一顺位是在已验证的 Rust HTTPS transport 上设计、实现 Manager 的受控资格执行链；只允许 localhost、合成 P2 与单次内存参数，Rust orchestration 继续是真相源，命令不得持久化 token、recovery code、master key、wrapped material 或 payload bytes。
-2. 在资格链通过并完成单次调用所有权、取消/重启、错误脱敏与无真实数据门禁前，普通用户成功入口和 `user_sync_enabled` 保持关闭。
-3. 在真实不支持 Secure Enclave 的环境可得时补测 signing/key-agreement unsupported；当前设备不得模拟，补测不阻塞上述开发。
-4. 首个正式版本发布后、准备启用真实生产同步前，再在实际目标环境生成并校验 `deployment_evidence.v1`，复验正式域名/证书、固定镜像、权限、冷备份/恢复、升级回滚和日志脱敏。
+1. 下一主批是 Manager 本地 HTTPS 同步资格执行：先在 `docs/manager-sync-entry-boundary.md` 固定的边界上完成 Rust-owned run handle、单次运行、start/poll/cancel/free、timeout、transient token/CA 和固定脱敏结果 contract。
+2. 资格 runner 必须复用现有 Rust orchestration/crypto/remote/userdb，内部生成隔离合成双客户端和 P2 数据，经真实 Caddy HTTPS 完成发现、验签解密、合并、上传、冲突处理和第二轮收敛；不得接受调用方 payload/key/path，也不得触发系统 key item。
+3. 在 Rust/FFI 稳定后接入真实 Dart bridge 与明确标识的 Manager 本地资格交互，覆盖取消、并发拒绝、重启、临时资源清理、错误脱敏和 Release bundle；普通用户成功入口与 `user_sync_enabled` 继续关闭。
+4. 在真实不支持 Secure Enclave 的环境可得时补测 signing/key-agreement unsupported；当前设备不得模拟，补测不阻塞上述开发。首个正式版本发布后、准备启用真实生产同步前，再补正式域名/证书和目标 `deployment_evidence.v1`。
 
 ## 验证入口
 

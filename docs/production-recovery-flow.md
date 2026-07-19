@@ -13,7 +13,7 @@
 - `docs/sync-server-api-storage.md` 已固定 Go server 只保存恢复记录 metadata、包装密文、签名和必要同步元数据。
 - Go schema v9 storage/API 已完成 recovery v2 optimistic rotation、recovered-device activation transaction、signed recovery record revocation、`superseded` / `revoked` 状态、幂等/冲突、legacy v1 迁移、latest encrypted material 读取、限速、文件重启和日志脱敏证据。
 
-当前仍不实现真实 UI、平台 Keychain/Keystore 实机操作或 Manager recovered-device 成功入口；合格平台 backend 仍是外部停止线。当前部署子阶段只要求本地 HTTPS / 部署预演，目标生产运行证据在首个正式版本发布后、启用真实生产同步前补齐。
+当前仍不实现真实恢复 UI 或 Manager recovered-device 成功入口。macOS signing/key-agreement 已按一个受支持设备的独立主路径完成产品资格；平台 Keychain/Secure Enclave validation 继续只允许在独立环境门和明确授权下执行，不由普通 Manager 启动触发。当前部署子阶段的本地 HTTPS / 部署预演已经通过，目标生产运行证据在首个正式版本发布后、启用真实生产同步前补齐。
 
 ## 设计目标
 
@@ -309,7 +309,7 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 5. 已补 Go server recovery latest handler，覆盖 wrapped material 读取、状态、限速和日志脱敏验证。
 6. 已实现 `recovery-record-v2`、activation public key 派生、原子轮换、verified remote 读取与恢复解封；v1 只迁移保留，当前产品客户端失败关闭。
 7. 已实现 recovered-device activation、`recovery_record_rotated` / `device_recovered` lifecycle 归约、完整 active cohort 当前 epoch 分发和文件 userdb 重启证据。
-8. 已实现 signed recovery record 撤销及其 lifecycle/activation/rotation 并发、幂等、历史记录和重启语义；当前补本地 Compose / HTTPS 自动化退出证据。目标生产部署证据后移到首个正式版本发布后；真实平台 backend 通过验证后，管理 UI 才接入用户可见恢复流程。
+8. 已实现 signed recovery record 撤销及其 lifecycle/activation/rotation 并发、幂等、历史记录和重启语义；本地 Compose/Caddy HTTPS、Rust 严格 TLS transport 与 macOS 平台 backend 主路径资格也已通过。下一批先完成 Manager 受控合成资格执行链；用户可见恢复流程仍需另行完成 transient secret 交互、真实设备流程和产品入口退出评审。目标生产部署证据后移到首个正式版本发布后。
 
 ## 验证口径
 

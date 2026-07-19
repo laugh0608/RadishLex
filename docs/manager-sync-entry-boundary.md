@@ -79,7 +79,23 @@ Secure Enclave key-agreement 再使用一组独立 status/smoke symbol、环境�
 - 本地 Docker、localhost、fixture、readiness ready 和合成 smoke 只能用于开发验证，不能解锁产品入口。
 - 服务端继续被视为不可信，输入热路径不得依赖网络。
 
-Rust orchestration、严格 HTTPS transport 与生产 backend 主路径资格已稳定，可以在 Manager 普通入口继续禁用时设计窄资格命令接口。该接口必须直接复用现有 Rust sync / crypto API、只接受 transient 参数并证明取消/重启/脱敏；不恢复已归档的 review-only DTO 或审批目录。
+Rust orchestration、严格 HTTPS transport 与生产 backend 主路径资格已稳定，可以在 Manager 普通入口继续禁用时设计受控资格命令接口。该接口必须直接复用现有 Rust sync / crypto API、只接受 transient 参数并证明取消/重启/脱敏；不恢复已归档的 review-only DTO 或审批目录。
+
+## 下一开发批：Manager 本地 HTTPS 同步资格执行
+
+下一开发批不是连接真实用户数据的同步开关，而是由真实 Manager bridge 发起、Rust 完整执行的本地 HTTPS 合成资格流程。它必须同时覆盖编排复用、FFI 所有权、transient secret、取消/重启、Manager 交互和产品构建，不能用独立脚本结果或只读 preview 代替。
+
+执行边界固定如下：
+
+- 请求只接受版本化参数：`https://localhost` 或明确 loopback endpoint、一次调用 bearer token、可选本地 CA DER 和受限 timeout。禁止 HTTP、非 loopback host、URL credential/query/fragment，以及调用方提供 userdb 路径、device/domain/key id、payload、master key、wrapped material 或 signature。
+- Rust 为每次运行生成唯一合成 domain/device/object 身份和固定 P2 数据，使用隔离临时 userdb/服务状态执行现有 discovery、验签、解密、merge、outbox、上传、冲突处理和第二轮收敛。合成 crypto provider 必须以资格专用身份显式标记，不能冒充生产 backend，也不能改变产品资格或用户同步 gate。
+- 资格运行不得隐式创建、读取、签名、派生或删除 Keychain/Secure Enclave 项目。生产 backend 只读取已评审的 metadata status；任何真实系统 key 操作仍使用独立 gated validation 和当次明确授权。
+- bearer token 在 Dart、FFI 和 Rust 中只属于本次调用；native 必须复制到受控内存并在完成、取消、超时和失败后清除。CA 是公开信任材料，但同样不写 settings、diagnostics、日志或长期状态；文件选择路径不得跨入 Rust 结果或诊断。
+- 执行采用 Rust-owned opaque run handle，固定 created/running/cancelling/completed/failed/cancelled 状态。start、poll、cancel、free 的线程和释放规则必须明确；同一 Manager bridge 同时只允许一个运行，重复 cancel 必须幂等，free 不能留下 worker、临时文件或悬空回调。
+- Dart bridge 只复制固定 phase/result/error enum、受限计数和布尔清理结果，不接收 HTTP body、对象/device/domain/key id、token、CA bytes、路径、payload、用户词或平台错误正文。未知版本、状态跳变或非 canonical flag 必须失败关闭。
+- Manager UI 必须明确标识“本地合成同步资格测试”，与“启用同步”分区。token 输入只存在于当前 modal/controller，提交、取消、导航、超时或错误后清空；运行期间提供取消和稳定阶段状态，结果进入内存摘要但不成为 readiness/deployment evidence，也不解锁恢复、授权、撤销或同步按钮。
+
+验证必须覆盖：真实短生命周期 Caddy HTTPS 正向链、错误 token、非 loopback/HTTP、非可信 CA、主机名不匹配、超时、网络中断、并发 start、各阶段取消、结果 handle 重复读取/释放、Manager 进程重启、临时 userdb/worker 清理、settings/diagnostics/log 脱敏，以及 C11/Objective-C header、Dart mapper、Flutter widget、Release bundle 和仓库总门禁。
 
 ## 当前验证归属
 
