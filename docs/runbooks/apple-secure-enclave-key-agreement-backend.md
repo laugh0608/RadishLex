@@ -83,3 +83,9 @@ lifecycle 的通过条件是 `created/reloaded/public_key_matched/shared_secret_
 - `exportable/user_presence_required/backup_migratable` 当前固定为 false；任何变化都需要新 schema、设计评审和实机证据。
 - `product_qualified` 还要求 wrapped epoch 往返、错误矩阵、日志脱敏和清理审计全部通过。
 - `user_sync_enabled` 继续为 false；该 runbook 通过也不接 Manager 成功入口。
+
+## 当前实机证据
+
+2026-07-19 已在当前 ad-hoc Manager bundle 执行 denied create：固定摘要返回 missing-entitlement `-34018`，`fail_closed/expected_failure/cleanup_attempted=true`，没有创建合成 item。随后按授权尝试恢复 Apple Development 资格 bundle，但 Xcode 没有当前 identity 所属 Team 的 account/provisioning profile；本机旧 profile 属于另一 Team，不能与当前唯一有效 identity 混用。脚本在启动产品前失败，lifecycle、locked prepare/probe/cleanup 均未执行。
+
+恢复条件只能是以下之一：在 Xcode 中为当前有效 identity 所属 Team 配置有效 account 并取得匹配 `dev.radishlex.radishlexManager` 的 Mac App Development profile，或恢复与旧 profile 同 Team 的有效 Apple Development identity。恢复后必须重新运行资格构建并冻结 Team、application identifier、access group、profile UUID/expiry 与产物 hash，不能手工重签、移除 entitlement 或使用 ad-hoc bundle冒充 lifecycle 资格。
