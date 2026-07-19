@@ -39,7 +39,7 @@ fn remove_temp_db(path: &str) {
 fn migration_initializes_empty_database() {
     let db = UserDb::open_in_memory().expect("userdb opens");
 
-    assert_eq!(db.schema_version().expect("schema version"), 5);
+    assert_eq!(db.schema_version().expect("schema version"), 6);
     assert!(db.list_active_terms().expect("terms").is_empty());
     assert!(db.list_import_batches().expect("batches").is_empty());
 }
@@ -64,7 +64,7 @@ fn concurrent_open_serializes_schema_initialization() {
 
     barrier.wait();
     for handle in handles {
-        assert_eq!(handle.join().expect("open thread joins"), 5);
+        assert_eq!(handle.join().expect("open thread joins"), 6);
     }
 
     let db = UserDb::open(&path).expect("initialized userdb reopens");
@@ -95,7 +95,7 @@ fn open_waits_for_short_database_initialization_lock() {
         .join()
         .expect("open worker joins")
         .expect("userdb open waits for the short initialization lock");
-    assert_eq!(db.schema_version().expect("schema version"), 5);
+    assert_eq!(db.schema_version().expect("schema version"), 6);
     drop(db);
     drop(lock_holder);
     remove_temp_db(&path);
@@ -177,7 +177,7 @@ fn migration_upgrades_v1_import_batches() {
     }
 
     let db = UserDb::open(&path).expect("userdb migrates");
-    assert_eq!(db.schema_version().expect("schema version"), 5);
+    assert_eq!(db.schema_version().expect("schema version"), 6);
 
     let batches = db.list_import_batches().expect("batches");
     assert_eq!(batches.len(), 1);
@@ -210,7 +210,7 @@ fn migration_upgrades_v3_terms_without_inventing_import_provenance() {
     }
 
     let db = UserDb::open(&path).expect("v3 userdb migrates");
-    assert_eq!(db.schema_version().expect("schema version"), 5);
+    assert_eq!(db.schema_version().expect("schema version"), 6);
     let terms = db.list_active_terms().expect("terms");
     assert_eq!(terms.len(), 1);
     assert_eq!(terms[0].input_code, "legacy");
@@ -223,7 +223,7 @@ fn migration_upgrades_v3_terms_without_inventing_import_provenance() {
 fn malformed_v4_sync_schema_rolls_back_migration_without_advancing_version() {
     let path = temp_db_path("migration-v4-sync-rollback");
     {
-        let mut db = UserDb::open(&path).expect("v5 userdb opens");
+        let mut db = UserDb::open(&path).expect("v6 userdb opens");
         db.add_term("preserve", "合成保留词", None, TermSource::ManualAdd)
             .expect("synthetic term is added");
     }
@@ -274,6 +274,60 @@ fn malformed_v4_sync_schema_rolls_back_migration_without_advancing_version() {
     assert_eq!(term_count, 1);
     assert_eq!(remote_table_count, 0);
     assert_eq!(domain_columns, vec!["domain_id"]);
+    drop(connection);
+    remove_temp_db(&path);
+}
+
+#[test]
+fn malformed_v5_lifecycle_schema_rolls_back_without_advancing_version() {
+    let path = temp_db_path("migration-v5-lifecycle-rollback");
+    {
+        let mut db = UserDb::open(&path).expect("v6 userdb opens");
+        db.add_term(
+            "preserve",
+            "合成生命周期保留词",
+            None,
+            TermSource::ManualAdd,
+        )
+        .expect("synthetic term is added");
+    }
+    {
+        let connection = rusqlite::Connection::open(&path).expect("sqlite reopens");
+        connection
+            .execute_batch(
+                "DROP TABLE sync_trusted_lifecycle_events;
+                 DROP TABLE sync_trusted_devices;
+                 DROP TABLE sync_trusted_domains;
+                 CREATE TABLE sync_trusted_domains (domain_id TEXT PRIMARY KEY);
+                 PRAGMA user_version = 5;",
+            )
+            .expect("malformed v5 lifecycle schema is created");
+    }
+
+    let error = UserDb::open(&path).expect_err("malformed v5 migration fails");
+    assert!(error.to_string().contains("sync_trusted_domains"));
+    let connection = rusqlite::Connection::open(&path).expect("sqlite reopens after rollback");
+    let version: i64 = connection
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .expect("schema version");
+    let term_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM user_terms WHERE input_code = 'preserve'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("preserved term count");
+    let device_table_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master
+             WHERE type = 'table' AND name = 'sync_trusted_devices'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("rolled back trusted device table count");
+    assert_eq!(version, 5);
+    assert_eq!(term_count, 1);
+    assert_eq!(device_table_count, 0);
     drop(connection);
     remove_temp_db(&path);
 }
@@ -1072,7 +1126,7 @@ fn sync_preflight_separates_syncable_and_local_only_counts() {
 
     let summary = db.sync_preflight_summary().expect("summary");
 
-    assert_eq!(summary.schema_version, 5);
+    assert_eq!(summary.schema_version, 6);
     assert_eq!(summary.syncable_user_terms, 1);
     assert_eq!(summary.syncable_ranker_weights, 1);
     assert_eq!(summary.syncable_deleted_terms, 1);
@@ -1086,7 +1140,7 @@ fn learning_status_reports_only_aggregate_counts_and_timestamps() {
     let mut db = UserDb::open_in_memory().expect("userdb opens");
 
     let empty = db.learning_status_summary().expect("empty summary");
-    assert_eq!(empty.schema_version, 5);
+    assert_eq!(empty.schema_version, 6);
     assert_eq!(empty.active_user_terms, 0);
     assert_eq!(empty.suppressed_user_terms, 0);
     assert_eq!(empty.selection_events, 0);
@@ -1109,7 +1163,7 @@ fn learning_status_reports_only_aggregate_counts_and_timestamps() {
 
     let summary = db.learning_status_summary().expect("summary");
 
-    assert_eq!(summary.schema_version, 5);
+    assert_eq!(summary.schema_version, 6);
     assert_eq!(summary.active_user_terms, 0);
     assert_eq!(summary.suppressed_user_terms, 1);
     assert_eq!(summary.ranker_weights, 1);

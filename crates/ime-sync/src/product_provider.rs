@@ -110,6 +110,10 @@ impl SyncTrustedDeviceProfile {
         &self.signing_public_key
     }
 
+    pub fn reject_from_change_sequence(&self) -> Option<u64> {
+        self.reject_from_change_sequence
+    }
+
     fn into_remote_profile(self) -> Result<SyncRemoteSigningProfile, SyncOrchestrationError> {
         match self.reject_from_change_sequence {
             Some(sequence) => SyncRemoteSigningProfile::revoked_from_change_sequence(
@@ -176,6 +180,10 @@ impl SyncTrustedDomainState {
 
     pub fn device_profile(&self, device_id: &str) -> Option<&SyncTrustedDeviceProfile> {
         self.device_profiles.get(device_id)
+    }
+
+    pub fn device_profiles(&self) -> impl ExactSizeIterator<Item = &SyncTrustedDeviceProfile> + '_ {
+        self.device_profiles.values()
     }
 }
 

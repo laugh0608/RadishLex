@@ -26,6 +26,8 @@ type MemoryStore struct {
 	objects        map[objectKey]SyncObject
 	versions       map[objectVersionKey]ObjectVersion
 	nextSequence   map[string]uint64
+	lifecycle      map[string][]LifecycleEvent
+	nextLifecycle  map[string]uint64
 	blobs          map[string][]byte
 	auditEvents    []AuditEvent
 }
@@ -43,6 +45,8 @@ func NewMemoryStore() *MemoryStore {
 		objects:        make(map[objectKey]SyncObject),
 		versions:       make(map[objectVersionKey]ObjectVersion),
 		nextSequence:   make(map[string]uint64),
+		lifecycle:      make(map[string][]LifecycleEvent),
+		nextLifecycle:  make(map[string]uint64),
 		blobs:          make(map[string][]byte),
 	}
 }
@@ -85,6 +89,14 @@ func (s *MemoryStore) CreateDomain(ctx context.Context, domain Domain, firstDevi
 	}
 	s.domains[domain.DomainID] = domain
 	s.devices[deviceKey(firstDevice.DomainID, firstDevice.DeviceID)] = cloneDevice(firstDevice)
+	s.appendLifecycleLocked(LifecycleEvent{
+		DomainID:    domain.DomainID,
+		EventType:   LifecycleInitialDevice,
+		RecordID:    firstDevice.DeviceID,
+		KeyEpoch:    domain.CurrentKeyEpoch,
+		CreatedAtMs: domain.CreatedAtMs,
+		Device:      devicePointer(firstDevice),
+	})
 	return nil
 }
 
@@ -112,6 +124,43 @@ func (s *MemoryStore) Device(ctx context.Context, domainID string, deviceID stri
 		return Device{}, newError(ErrNotFound, "device not found")
 	}
 	return cloneDevice(device), nil
+}
+
+func (s *MemoryStore) LifecycleSnapshot(ctx context.Context, domainID string) (LifecycleSnapshot, error) {
+	if err := checkContext(ctx); err != nil {
+		return LifecycleSnapshot{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	domain, ok := s.domains[domainID]
+	if !ok {
+		return LifecycleSnapshot{}, newError(ErrNotFound, "domain not found")
+	}
+	return LifecycleSnapshot{Domain: domain, Events: cloneLifecycleEvents(s.lifecycle[domainID])}, nil
+}
+
+func (s *MemoryStore) LifecycleEventsAfter(ctx context.Context, domainID string, afterSequence uint64, limit int) ([]LifecycleEvent, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	if !validOpaqueID(domainID) || limit <= 0 || limit > 201 {
+		return nil, newError(ErrInvalidRequest, "lifecycle discovery parameters are invalid")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.domains[domainID]; !ok {
+		return nil, newError(ErrNotFound, "domain not found")
+	}
+	events := make([]LifecycleEvent, 0, limit)
+	for _, event := range s.lifecycle[domainID] {
+		if event.LifecycleSequence > afterSequence {
+			events = append(events, cloneLifecycleEvent(event))
+			if len(events) == limit {
+				break
+			}
+		}
+	}
+	return events, nil
 }
 
 func (s *MemoryStore) SaveJoinRequest(ctx context.Context, request JoinRequest) error {
@@ -225,7 +274,7 @@ func (s *MemoryStore) AuthorizeJoinRequest(ctx context.Context, upload DeviceAut
 	s.authorizations[joinKey(authorization.DomainID, authorization.JoinRequestID)] = cloneAuthorization(authorization)
 	s.wrapping[wrappingRecordKey(wrapping)] = cloneWrappingRecord(wrapping)
 	s.blobs[wrapping.BlobRef] = cloneBytes(upload.WrappedKey)
-	s.devices[deviceKey(join.DomainID, join.DeviceID)] = Device{
+	device := Device{
 		DomainID:                join.DomainID,
 		DeviceID:                join.DeviceID,
 		SigningAlgorithm:        join.SigningAlgorithm,
@@ -236,6 +285,18 @@ func (s *MemoryStore) AuthorizeJoinRequest(ctx context.Context, upload DeviceAut
 		Status:                  DeviceActive,
 		AuthorizedAtMs:          authorization.CreatedAtMs,
 	}
+	s.devices[deviceKey(join.DomainID, join.DeviceID)] = device
+	s.appendLifecycleLocked(LifecycleEvent{
+		DomainID:      authorization.DomainID,
+		EventType:     LifecycleDeviceAuthorized,
+		RecordID:      authorization.JoinRequestID,
+		KeyEpoch:      authorization.KeyEpoch,
+		CreatedAtMs:   authorization.CreatedAtMs,
+		Device:        devicePointer(device),
+		JoinRequest:   joinRequestPointer(join),
+		Authorization: authorizationPointer(authorization),
+		Wrapping:      wrappingPointer(wrapping),
+	})
 	return nil
 }
 
@@ -308,7 +369,23 @@ func (s *MemoryStore) RevokeDevice(ctx context.Context, revocation DeviceRevocat
 	domain.UpdatedAtMs = revocation.CreatedAtMs
 	s.domains[domain.DomainID] = domain
 	s.revocations[revocationKeyFor(revocation)] = cloneRevocation(revocation)
+	s.appendLifecycleLocked(LifecycleEvent{
+		DomainID:                       revocation.DomainID,
+		EventType:                      LifecycleDeviceRevoked,
+		RecordID:                       fmt.Sprintf("%s:%d", revocation.RevokedDeviceID, revocation.NewKeyEpoch),
+		KeyEpoch:                       revocation.NewKeyEpoch,
+		RejectFromObjectChangeSequence: s.nextSequence[revocation.DomainID] + 1,
+		CreatedAtMs:                    revocation.CreatedAtMs,
+		Device:                         devicePointer(target),
+		Revocation:                     revocationPointer(revocation),
+	})
 	return nil
+}
+
+func (s *MemoryStore) appendLifecycleLocked(event LifecycleEvent) {
+	s.nextLifecycle[event.DomainID]++
+	event.LifecycleSequence = s.nextLifecycle[event.DomainID]
+	s.lifecycle[event.DomainID] = append(s.lifecycle[event.DomainID], cloneLifecycleEvent(event))
 }
 
 func (s *MemoryStore) PutRecoveryRecord(ctx context.Context, upload RecoveryRecordUpload) (RecoveryRecord, error) {
@@ -922,6 +999,58 @@ func cloneWrappingRecord(value DeviceWrappingRecord) DeviceWrappingRecord {
 func cloneRevocation(value DeviceRevocation) DeviceRevocation {
 	value.Signature = cloneBytes(value.Signature)
 	return value
+}
+
+func devicePointer(value Device) *Device {
+	cloned := cloneDevice(value)
+	return &cloned
+}
+
+func authorizationPointer(value DeviceAuthorization) *DeviceAuthorization {
+	cloned := cloneAuthorization(value)
+	return &cloned
+}
+
+func joinRequestPointer(value JoinRequest) *JoinRequest {
+	cloned := cloneJoinRequest(value)
+	return &cloned
+}
+
+func wrappingPointer(value DeviceWrappingRecord) *DeviceWrappingRecord {
+	cloned := cloneWrappingRecord(value)
+	return &cloned
+}
+
+func revocationPointer(value DeviceRevocation) *DeviceRevocation {
+	cloned := cloneRevocation(value)
+	return &cloned
+}
+
+func cloneLifecycleEvent(value LifecycleEvent) LifecycleEvent {
+	if value.Device != nil {
+		value.Device = devicePointer(*value.Device)
+	}
+	if value.Authorization != nil {
+		value.Authorization = authorizationPointer(*value.Authorization)
+	}
+	if value.JoinRequest != nil {
+		value.JoinRequest = joinRequestPointer(*value.JoinRequest)
+	}
+	if value.Wrapping != nil {
+		value.Wrapping = wrappingPointer(*value.Wrapping)
+	}
+	if value.Revocation != nil {
+		value.Revocation = revocationPointer(*value.Revocation)
+	}
+	return value
+}
+
+func cloneLifecycleEvents(values []LifecycleEvent) []LifecycleEvent {
+	cloned := make([]LifecycleEvent, 0, len(values))
+	for _, value := range values {
+		cloned = append(cloned, cloneLifecycleEvent(value))
+	}
+	return cloned
 }
 
 func cloneRecoveryRecord(value RecoveryRecord) RecoveryRecord {

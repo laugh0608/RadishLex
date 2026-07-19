@@ -102,6 +102,66 @@ type ObjectDiscoveryResponse struct {
 	HasMore    bool                    `json:"has_more"`
 }
 
+type DeviceAuthorizationResponse struct {
+	DomainID                    string `json:"domain_id"`
+	JoinRequestID               string `json:"join_request_id"`
+	AuthorizerDeviceID          string `json:"authorizer_device_id"`
+	RecipientDeviceID           string `json:"recipient_device_id"`
+	RecipientSigningPublicKeyID string `json:"recipient_signing_public_key_id"`
+	RecipientKeyAgreementKeyID  string `json:"recipient_key_agreement_key_id"`
+	JoinShortCode               string `json:"join_short_code"`
+	JoinChallenge               []byte `json:"join_challenge"`
+	JoinCreatedAtMs             int64  `json:"join_created_at_ms"`
+	JoinExpiresAtMs             int64  `json:"join_expires_at_ms"`
+	KeyEpoch                    uint64 `json:"key_epoch"`
+	WrappingKeyID               string `json:"wrapping_key_id"`
+	EncryptedKeyLen             int64  `json:"encrypted_key_len"`
+	CreatedAtMs                 int64  `json:"created_at_ms"`
+	SignatureSchemaVersion      uint16 `json:"signature_schema_version"`
+	SignatureAlgorithm          string `json:"signature_algorithm"`
+	SignatureKeyID              string `json:"signature_key_id"`
+	Signature                   []byte `json:"signature"`
+}
+
+type DeviceRevocationResponse struct {
+	DomainID               string `json:"domain_id"`
+	RevokedDeviceID        string `json:"revoked_device_id"`
+	RevokerDeviceID        string `json:"revoker_device_id"`
+	PreviousKeyEpoch       uint64 `json:"previous_key_epoch"`
+	NewKeyEpoch            uint64 `json:"new_key_epoch"`
+	Reason                 string `json:"reason"`
+	CreatedAtMs            int64  `json:"created_at_ms"`
+	SignatureSchemaVersion uint16 `json:"signature_schema_version"`
+	SignatureAlgorithm     string `json:"signature_algorithm"`
+	SignatureKeyID         string `json:"signature_key_id"`
+	Signature              []byte `json:"signature"`
+}
+
+type LifecycleEventResponse struct {
+	DomainID                       string                       `json:"domain_id"`
+	LifecycleSequence              uint64                       `json:"lifecycle_sequence"`
+	EventType                      storage.LifecycleEventType   `json:"event_type"`
+	RecordID                       string                       `json:"record_id"`
+	KeyEpoch                       uint64                       `json:"key_epoch"`
+	RejectFromObjectChangeSequence uint64                       `json:"reject_from_object_change_sequence,omitempty"`
+	CreatedAtMs                    int64                        `json:"created_at_ms"`
+	Device                         *DeviceResponse              `json:"device,omitempty"`
+	Authorization                  *DeviceAuthorizationResponse `json:"authorization,omitempty"`
+	Revocation                     *DeviceRevocationResponse    `json:"revocation,omitempty"`
+}
+
+type LifecycleSnapshotResponse struct {
+	Domain     DomainResponse           `json:"domain"`
+	Entries    []LifecycleEventResponse `json:"entries"`
+	NextCursor string                   `json:"next_cursor"`
+}
+
+type LifecycleDiscoveryResponse struct {
+	Entries    []LifecycleEventResponse `json:"entries"`
+	NextCursor string                   `json:"next_cursor"`
+	HasMore    bool                     `json:"has_more"`
+}
+
 func DomainResponseFrom(domain storage.Domain) DomainResponse {
 	return DomainResponse{
 		DomainID:        domain.DomainID,
@@ -126,6 +186,61 @@ func DeviceResponseFrom(device storage.Device) DeviceResponse {
 		RevokedAtMs:             device.RevokedAtMs,
 		LastSeenAtMs:            device.LastSeenAtMs,
 	}
+}
+
+func LifecycleEventResponseFrom(event storage.LifecycleEvent) LifecycleEventResponse {
+	response := LifecycleEventResponse{
+		DomainID:                       event.DomainID,
+		LifecycleSequence:              event.LifecycleSequence,
+		EventType:                      event.EventType,
+		RecordID:                       event.RecordID,
+		KeyEpoch:                       event.KeyEpoch,
+		RejectFromObjectChangeSequence: event.RejectFromObjectChangeSequence,
+		CreatedAtMs:                    event.CreatedAtMs,
+	}
+	if event.Device != nil {
+		device := DeviceResponseFrom(*event.Device)
+		response.Device = &device
+	}
+	if event.Authorization != nil && event.JoinRequest != nil && event.Wrapping != nil {
+		authorization := event.Authorization
+		response.Authorization = &DeviceAuthorizationResponse{
+			DomainID: authorization.DomainID, JoinRequestID: authorization.JoinRequestID,
+			AuthorizerDeviceID: authorization.AuthorizerDeviceID, RecipientDeviceID: authorization.RecipientDeviceID,
+			RecipientSigningPublicKeyID: authorization.RecipientSigningPublicKeyID,
+			RecipientKeyAgreementKeyID:  authorization.RecipientKeyAgreementKeyID,
+			JoinShortCode:               authorization.JoinShortCode,
+			JoinChallenge:               cloneBytes(event.JoinRequest.Challenge),
+			JoinCreatedAtMs:             event.JoinRequest.CreatedAtMs,
+			JoinExpiresAtMs:             event.JoinRequest.ExpiresAtMs,
+			KeyEpoch:                    authorization.KeyEpoch,
+			WrappingKeyID:               event.Wrapping.WrappingKeyID,
+			EncryptedKeyLen:             event.Wrapping.WrappedKeyLen,
+			CreatedAtMs:                 authorization.CreatedAtMs, SignatureSchemaVersion: authorization.SignatureSchemaVersion,
+			SignatureAlgorithm: authorization.SignatureAlgorithm, SignatureKeyID: authorization.SignatureKeyID,
+			Signature: cloneBytes(authorization.Signature),
+		}
+	}
+	if event.Revocation != nil {
+		revocation := event.Revocation
+		response.Revocation = &DeviceRevocationResponse{
+			DomainID: revocation.DomainID, RevokedDeviceID: revocation.RevokedDeviceID,
+			RevokerDeviceID: revocation.RevokerDeviceID, PreviousKeyEpoch: revocation.PreviousKeyEpoch,
+			NewKeyEpoch: revocation.NewKeyEpoch, Reason: revocation.Reason,
+			CreatedAtMs: revocation.CreatedAtMs, SignatureSchemaVersion: revocation.SignatureSchemaVersion,
+			SignatureAlgorithm: revocation.SignatureAlgorithm, SignatureKeyID: revocation.SignatureKeyID,
+			Signature: cloneBytes(revocation.Signature),
+		}
+	}
+	return response
+}
+
+func LifecycleEventResponsesFrom(events []storage.LifecycleEvent) []LifecycleEventResponse {
+	responses := make([]LifecycleEventResponse, 0, len(events))
+	for _, event := range events {
+		responses = append(responses, LifecycleEventResponseFrom(event))
+	}
+	return responses
 }
 
 func JoinRequestResponseFrom(request storage.JoinRequest) JoinRequestResponse {

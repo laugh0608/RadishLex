@@ -67,6 +67,18 @@ type DeviceWrappingRequest struct {
 	Signature          []byte `json:"signature"`
 }
 
+type DeviceRevocationRequest struct {
+	RevokerDeviceID        string `json:"revoker_device_id"`
+	PreviousKeyEpoch       uint64 `json:"previous_key_epoch"`
+	NewKeyEpoch            uint64 `json:"new_key_epoch"`
+	Reason                 string `json:"reason"`
+	CreatedAtMs            int64  `json:"created_at_ms"`
+	SignatureSchemaVersion uint16 `json:"signature_schema_version"`
+	SignatureAlgorithm     string `json:"signature_algorithm"`
+	SignatureKeyID         string `json:"signature_key_id"`
+	Signature              []byte `json:"signature"`
+}
+
 type ObjectVersionUploadRequest struct {
 	ObjectType             string `json:"object_type"`
 	Version                uint64 `json:"version"`
@@ -135,6 +147,17 @@ func (r CreateJoinRequestRequest) JoinRequest(domainID string) storage.JoinReque
 		CreatedAtMs:             r.CreatedAtMs,
 		ExpiresAtMs:             r.ExpiresAtMs,
 		Status:                  storage.DevicePending,
+	}
+}
+
+func (r DeviceRevocationRequest) Revocation(domainID string, revokedDeviceID string) storage.DeviceRevocation {
+	return storage.DeviceRevocation{
+		DomainID: domainID, RevokedDeviceID: revokedDeviceID, RevokerDeviceID: r.RevokerDeviceID,
+		PreviousKeyEpoch: r.PreviousKeyEpoch, NewKeyEpoch: r.NewKeyEpoch,
+		Reason: r.Reason, CreatedAtMs: r.CreatedAtMs,
+		SignatureSchemaVersion: r.SignatureSchemaVersion,
+		SignatureAlgorithm:     r.SignatureAlgorithm, SignatureKeyID: r.SignatureKeyID,
+		Signature: r.Signature,
 	}
 }
 

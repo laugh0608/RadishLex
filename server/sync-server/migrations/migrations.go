@@ -35,11 +35,132 @@ func Apply(db *sql.DB) error {
 	if err := ensureChangeSequenceColumns(tx); err != nil {
 		return err
 	}
-	if _, err := tx.Exec("PRAGMA user_version = 3"); err != nil {
+	if err := ensureLifecycleEvents(tx); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("PRAGMA user_version = 4"); err != nil {
 		return fmt.Errorf("record metadata schema version: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit metadata migration: %w", err)
+	}
+	return nil
+}
+
+func ensureLifecycleEvents(tx *sql.Tx) error {
+	rows, err := tx.Query("SELECT domain_id, current_key_epoch, created_at_ms FROM sync_domains ORDER BY domain_id")
+	if err != nil {
+		return fmt.Errorf("read lifecycle domains: %w", err)
+	}
+	type domainRow struct {
+		id        string
+		keyEpoch  int64
+		createdAt int64
+	}
+	var domains []domainRow
+	for rows.Next() {
+		var domain domainRow
+		if err := rows.Scan(&domain.id, &domain.keyEpoch, &domain.createdAt); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("read lifecycle domain: %w", err)
+		}
+		domains = append(domains, domain)
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("close lifecycle domains: %w", err)
+	}
+
+	for _, domain := range domains {
+		var count int
+		if err := tx.QueryRow("SELECT COUNT(*) FROM domain_lifecycle_events WHERE domain_id = ?", domain.id).Scan(&count); err != nil {
+			return fmt.Errorf("inspect lifecycle events: %w", err)
+		}
+		if count != 0 {
+			continue
+		}
+		var firstDeviceID string
+		if err := tx.QueryRow(`
+			SELECT device_id FROM devices
+			WHERE domain_id = ? AND status != 'pending'
+			ORDER BY CASE WHEN device_id IN (
+				SELECT recipient_device_id FROM device_authorizations WHERE domain_id = ?
+			) THEN 1 ELSE 0 END, authorized_at_ms, device_id
+			LIMIT 1
+		`, domain.id, domain.id).Scan(&firstDeviceID); err != nil {
+			return fmt.Errorf("find initial lifecycle device for %s: %w", domain.id, err)
+		}
+		sequence := int64(1)
+		initialKeyEpoch := domain.keyEpoch
+		if err := tx.QueryRow(`
+			SELECT COALESCE(
+				(SELECT MIN(key_epoch) FROM device_authorizations WHERE domain_id = ?),
+				(SELECT MIN(previous_key_epoch) FROM device_revocations WHERE domain_id = ?),
+				?
+			)
+		`, domain.id, domain.id, domain.keyEpoch).Scan(&initialKeyEpoch); err != nil {
+			return fmt.Errorf("derive initial lifecycle key epoch: %w", err)
+		}
+		if _, err := tx.Exec(`
+			INSERT INTO domain_lifecycle_events (
+				domain_id, lifecycle_sequence, event_type, record_id, key_epoch,
+				reject_from_object_change_sequence, created_at_ms
+			) VALUES (?, ?, 'initial_device', ?, ?, 0, ?)
+		`, domain.id, sequence, firstDeviceID, initialKeyEpoch, domain.createdAt); err != nil {
+			return fmt.Errorf("backfill initial lifecycle device: %w", err)
+		}
+
+		type historicalEvent struct {
+			typeID    string
+			recordID  string
+			keyEpoch  int64
+			createdAt int64
+		}
+		eventRows, err := tx.Query(`
+			SELECT 'device_authorized', join_request_id, key_epoch, created_at_ms
+			FROM device_authorizations WHERE domain_id = ?
+			UNION ALL
+			SELECT 'device_revoked', revoked_device_id || ':' || new_key_epoch, new_key_epoch, created_at_ms
+			FROM device_revocations WHERE domain_id = ?
+			ORDER BY created_at_ms, 1, 2
+		`, domain.id, domain.id)
+		if err != nil {
+			return fmt.Errorf("read historical lifecycle events: %w", err)
+		}
+		var events []historicalEvent
+		for eventRows.Next() {
+			var event historicalEvent
+			if err := eventRows.Scan(&event.typeID, &event.recordID, &event.keyEpoch, &event.createdAt); err != nil {
+				_ = eventRows.Close()
+				return fmt.Errorf("read historical lifecycle event: %w", err)
+			}
+			events = append(events, event)
+		}
+		if err := eventRows.Close(); err != nil {
+			return fmt.Errorf("close historical lifecycle events: %w", err)
+		}
+		for _, event := range events {
+			sequence++
+			rejectFrom := int64(0)
+			if event.typeID == "device_revoked" {
+				if err := tx.QueryRow(`
+					SELECT COALESCE(
+						MIN(CASE WHEN server_received_at_ms >= ? THEN change_sequence END),
+						MAX(change_sequence) + 1,
+						1
+					) FROM sync_object_versions WHERE domain_id = ?
+				`, event.createdAt, domain.id).Scan(&rejectFrom); err != nil {
+					return fmt.Errorf("backfill revocation object cutoff: %w", err)
+				}
+			}
+			if _, err := tx.Exec(`
+				INSERT INTO domain_lifecycle_events (
+					domain_id, lifecycle_sequence, event_type, record_id, key_epoch,
+					reject_from_object_change_sequence, created_at_ms
+				) VALUES (?, ?, ?, ?, ?, ?, ?)
+			`, domain.id, sequence, event.typeID, event.recordID, event.keyEpoch, rejectFrom, event.createdAt); err != nil {
+				return fmt.Errorf("backfill lifecycle event: %w", err)
+			}
+		}
 	}
 	return nil
 }

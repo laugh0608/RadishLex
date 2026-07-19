@@ -17,12 +17,13 @@ use radishlex_ime_crypto::{
     SIGNATURE_ALGORITHM_ED25519_V1, SIGNATURE_SCHEMA_VERSION,
 };
 use radishlex_ime_sync::{
-    AssembledSyncObject, HttpSyncRemoteTransport, LatestObjectConflictMetadata, LocalSyncSnapshot,
-    PlaintextSyncPayload, RemoteObjectPayload, RemoteObjectVersion, SyncCycleOutcome,
-    SyncCyclePhase, SyncEnvelopeAssembler, SyncObjectAssemblySpec, SyncObjectProcessor,
-    SyncObjectType, SyncOnceConfig, SyncOrchestrationErrorCode, SyncOrchestrationService,
-    SyncRemoteClient, SyncRemoteError, SyncRemoteMethod, SyncRemoteRequest, SyncRemoteTransport,
-    SyncServerErrorCode,
+    device_join_profile_challenge, verify_lifecycle_snapshot, AssembledSyncObject,
+    HttpSyncRemoteTransport, LatestObjectConflictMetadata, LocalSyncSnapshot, PlaintextSyncPayload,
+    RemoteLifecycleDevice, RemoteObjectPayload, RemoteObjectVersion, SyncCycleOutcome,
+    SyncCyclePhase, SyncDeviceStatus, SyncEnvelopeAssembler, SyncObjectAssemblySpec,
+    SyncObjectProcessor, SyncObjectType, SyncOnceConfig, SyncOrchestrationErrorCode,
+    SyncOrchestrationService, SyncRemoteClient, SyncRemoteError, SyncRemoteMethod,
+    SyncRemoteRequest, SyncRemoteTransport, SyncServerErrorCode,
 };
 use radishlex_ime_userdb::{
     decode_userdb_sync_objects, NegativeFeedbackDraft, NegativeFeedbackReason, PrivacyLevel,
@@ -70,8 +71,24 @@ fn two_clients_sync_userdb_payloads_through_go_http_server() {
 
     create_domain(client.transport(), &public_key_a);
     authorize_device_b(client.transport(), &signing_store, &public_key_b);
+    let verified_lifecycle = verify_lifecycle_snapshot(
+        client
+            .lifecycle_snapshot(DOMAIN_ID)
+            .expect("load two-device lifecycle"),
+        &public_key_a,
+    )
+    .expect("verify two-device lifecycle");
+    assert!(verified_lifecycle
+        .trusted_domain()
+        .device_profile(DEVICE_B)
+        .is_some());
 
-    let mut device_a_db = UserDb::open_in_memory().expect("device a db");
+    let device_a_db_path = server.root.join("device-a-userdb.sqlite");
+    let device_b_db_path = server.root.join("device-b-userdb.sqlite");
+    let mut device_a_db = UserDb::open(&device_a_db_path).expect("device a db");
+    device_a_db
+        .store_verified_lifecycle(&verified_lifecycle)
+        .expect("cache lifecycle on device a");
     seed_device_a_userdb(&mut device_a_db);
     let device_a_objects = assemble_userdb_objects(
         &device_a_db,
@@ -97,7 +114,10 @@ fn two_clients_sync_userdb_payloads_through_go_http_server() {
         .as_str()
         .to_owned();
 
-    let mut device_b_db = UserDb::open_in_memory().expect("device b db");
+    let mut device_b_db = UserDb::open(&device_b_db_path).expect("device b db");
+    device_b_db
+        .store_verified_lifecycle(&verified_lifecycle)
+        .expect("cache lifecycle on device b");
     seed_device_b_local_state(&mut device_b_db);
     let stale_device_b_object = assemble_userdb_objects(
         &device_b_db,
@@ -214,6 +234,45 @@ fn two_clients_sync_userdb_payloads_through_go_http_server() {
     assert!(latest_text.contains("client-b-alpha"));
     assert!(latest_text.contains("radish-alpha"));
     assert!(!latest_text.contains("blocked-alpha"));
+
+    revoke_device_b(client.transport(), &signing_store);
+    let revoked_lifecycle = verify_lifecycle_snapshot(
+        client
+            .lifecycle_snapshot(DOMAIN_ID)
+            .expect("load revoked lifecycle"),
+        &public_key_a,
+    )
+    .expect("verify revoked lifecycle");
+    let revoked_profile = revoked_lifecycle
+        .trusted_domain()
+        .device_profile(DEVICE_B)
+        .expect("revoked device profile");
+    assert_eq!(revoked_profile.device().status, SyncDeviceStatus::Lost);
+    assert_eq!(revoked_profile.reject_from_change_sequence(), Some(7));
+    device_a_db
+        .store_verified_lifecycle(&revoked_lifecycle)
+        .expect("cache revoked lifecycle on device a");
+    device_b_db
+        .store_verified_lifecycle(&revoked_lifecycle)
+        .expect("cache revoked lifecycle on device b");
+
+    drop(device_a_db);
+    drop(device_b_db);
+    let restarted_a = UserDb::open(&device_a_db_path).expect("restart device a userdb");
+    let restarted_b = UserDb::open(&device_b_db_path).expect("restart device b userdb");
+    for restarted in [&restarted_a, &restarted_b] {
+        let trusted = restarted
+            .trusted_domain_state(DOMAIN_ID)
+            .expect("restore trusted lifecycle after restart");
+        assert_eq!(trusted.domain().current_key_epoch, 2);
+        assert_eq!(
+            trusted
+                .device_profile(DEVICE_B)
+                .expect("restored revoked device")
+                .reject_from_change_sequence(),
+            Some(7)
+        );
+    }
 
     let log_text = server.stop();
     assert_runtime_logs_redacted(&log_text);
@@ -501,7 +560,28 @@ fn authorize_device_b(
     signing_store: &TestMemoryDeviceKeyStore,
     public_key_b: &DeviceSigningPublicKey,
 ) {
-    let challenge = b"join-challenge-device-b";
+    let join_created_at_ms = BASE_TIMESTAMP_MS + 10;
+    let join_expires_at_ms = BASE_TIMESTAMP_MS + 600;
+    let lifecycle_device = RemoteLifecycleDevice {
+        domain_id: DOMAIN_ID.to_owned(),
+        device_id: DEVICE_B.to_owned(),
+        signing_algorithm: public_key_b.signature_algorithm.as_str().to_owned(),
+        signing_public_key_id: SIGNING_KEY_B.to_owned(),
+        signing_public_key: public_key_b.public_key.clone(),
+        key_agreement_public_key_id: AGREEMENT_KEY_B.to_owned(),
+        key_agreement_public_key: vec![0x42u8; 32],
+        status: SyncDeviceStatus::Active,
+        authorized_at_ms: Some(BASE_TIMESTAMP_MS + 20),
+        revoked_at_ms: None,
+        last_seen_at_ms: None,
+    };
+    let challenge = device_join_profile_challenge(
+        DOMAIN_ID,
+        "join-device-b",
+        &lifecycle_device,
+        join_created_at_ms,
+        join_expires_at_ms,
+    );
     let join_body = json!({
         "join_request_id": "join-device-b",
         "device_id": DEVICE_B,
@@ -510,9 +590,9 @@ fn authorize_device_b(
         "signing_public_key": b64(&public_key_b.public_key),
         "key_agreement_public_key_id": AGREEMENT_KEY_B,
         "key_agreement_public_key": b64(&[0x42u8; 32]),
-        "challenge": b64(challenge),
-        "created_at_ms": BASE_TIMESTAMP_MS + 10,
-        "expires_at_ms": BASE_TIMESTAMP_MS + 600
+        "challenge": b64(challenge.as_bytes()),
+        "created_at_ms": join_created_at_ms,
+        "expires_at_ms": join_expires_at_ms
     });
     let join_response = send_json(
         transport,
@@ -534,7 +614,7 @@ fn authorize_device_b(
     let created_at_ms = BASE_TIMESTAMP_MS + 20;
     let authorization_signature = sign_authorization(
         signing_store,
-        challenge,
+        challenge.as_bytes(),
         "123456",
         wrapping_key_id,
         wrapped_key_len,
@@ -611,6 +691,52 @@ fn sign_authorization(
     signing_store
         .sign(&handle, &canonical)
         .expect("authorization signature")
+}
+
+fn revoke_device_b(transport: &HttpSyncRemoteTransport, signing_store: &TestMemoryDeviceKeyStore) {
+    let revoked_at_ms = BASE_TIMESTAMP_MS + 2_000;
+    let fields = [
+        SignatureField::u16("signature_schema_version", SIGNATURE_SCHEMA_VERSION),
+        SignatureField::text("signature_algorithm", SIGNATURE_ALGORITHM_ED25519_V1),
+        SignatureField::text("signature_key_id", SIGNING_KEY_A),
+        SignatureField::text("revoked_by_device_id", DEVICE_A),
+        SignatureField::text("revoked_device_id", DEVICE_B),
+        SignatureField::u64("previous_key_epoch", 1),
+        SignatureField::u64("new_key_epoch", 2),
+        SignatureField::text("reason", "device_lost"),
+        SignatureField::i64("revoked_at_ms", revoked_at_ms),
+    ];
+    let handle = signing_store
+        .handle(DEVICE_A, SIGNING_KEY_A)
+        .expect("device a signing handle");
+    let signature = signing_store
+        .sign(
+            &handle,
+            &canonical_signature_bytes("device_revocation", &fields),
+        )
+        .expect("revocation signature");
+    let response = send_json(
+        transport,
+        SyncRemoteMethod::Post,
+        "/api/v1/domains/domain-two-client-go-http/devices/device-b/revocations",
+        json!({
+            "revoker_device_id": DEVICE_A,
+            "previous_key_epoch": 1,
+            "new_key_epoch": 2,
+            "reason": "device_lost",
+            "created_at_ms": revoked_at_ms,
+            "signature_schema_version": signature.signature_schema_version,
+            "signature_algorithm": signature.signature_algorithm.as_str(),
+            "signature_key_id": signature.signature_key_id,
+            "signature": b64(&signature.signature),
+        }),
+    );
+    assert_eq!(
+        response.status,
+        204,
+        "revoke device failed: {}",
+        String::from_utf8_lossy(&response.body)
+    );
 }
 
 fn seed_device_a_userdb(db: &mut UserDb) {

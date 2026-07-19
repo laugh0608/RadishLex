@@ -53,6 +53,8 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名。AD
 
 服务端只转发待授权设备的公钥、challenge 和状态。短码应由客户端根据加入请求内容本地计算和展示；授权提交时需要携带 signed authorization 中的 `join_short_code`，用于验签绑定用户确认过的短码。
 
+进入可信 lifecycle cache 的加入请求必须使用 `profile-sha256-v1:<lowercase hex>` challenge。摘要输入为 `device_join_profile` canonical fields：`domain_id`、`join_request_id`、设备 ID、签名算法、签名 key id 与完整公钥 bytes、密钥协商 key id 与完整公钥 bytes、创建时间和过期时间。signed authorization 继续签入该 challenge，从而把接收设备的两组公开密钥和加入请求时限绑定进授权签名。任意旧式自由文本 challenge 可以继续用于历史测试或迁移读取，但 Rust 产品 lifecycle verifier 必须失败关闭，不能据此信任服务端返回的 recipient public key。
+
 `device_authorizations`：`domain_id`、`join_request_id`、`authorizer_device_id`、`recipient_device_id`、`recipient_signing_public_key_id`、`recipient_key_agreement_key_id`、`join_short_code`、`key_epoch`、`created_at_ms`、`signature_schema_version`、`signature_algorithm`、`signature_key_id`、`signature`。
 
 授权记录只证明某个 active 设备接受了待加入设备的公钥和指定 key epoch，不包含同步主密钥明文或恢复码。当前 Go storage 会在同一事务中把 join request 置为 active、写入授权记录、写入 wrapping metadata，并激活接收设备。
@@ -64,6 +66,12 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名。AD
 `device_revocations`：`domain_id`、`revoked_device_id`、`revoker_device_id`、`previous_key_epoch`、`new_key_epoch`、`reason`、`created_at_ms`、`signature`。
 
 撤销记录被接受后，服务端必须拒绝被撤销设备后续上传，并拒绝低于 `current_key_epoch` 的新对象版本写入。历史对象是否重加密由客户端和管理 UI 后续单独设计。
+
+`domain_lifecycle_events`：`domain_id`、`lifecycle_sequence`、`event_type`、`record_id`、`reject_from_object_change_sequence`、`created_at_ms`。
+
+`lifecycle_sequence` 是设备信任链的 domain 内严格递增序列，与加密对象的 `change_sequence` 属于不同命名空间。创建 domain、授权设备和撤销设备只在对应 metadata transaction 成功提交时追加生命周期事件；失败和回滚不得留下可发现事件。生命周期事件只引用第一设备 profile、signed authorization 或 signed revocation 的公开记录，不承载 wrapped key bytes、恢复材料或对象 payload。
+
+撤销事务必须把当时 domain 内下一条对象序列记录为 `reject_from_object_change_sequence`。客户端把该值作为“从此对象序列开始拒绝被撤销设备签名”的不可回退顺序证据；signed revocation 仍负责证明撤销者、目标设备和 key epoch 变化。服务端不能仅凭 `devices.status` 建立客户端信任，客户端必须验证签名链，并把同一撤销记录对应的截点变化视为冲突。服务端恶意分叉或首次 bootstrap 欺骗不由单机 cursor 完全解决；当前边界通过本地已观察高水位禁止回退，后续跨设备透明度 / gossip 另行设计。
 
 `recovery_records`：`domain_id`、`recovery_record_id`、`key_epoch`、`kdf_profile`、`kdf_version`、`memory_kib`、`iterations`、`parallelism`、`output_len`、`salt`、`algorithm`、`nonce`、`wrapped_material_len`、`ciphertext_hash`、`status`、`created_at_ms`、`revoked_at_ms`、`signer_device_id`、`signature_schema_version`、`signature_algorithm`、`signature_key_id`、`signature`、`blob_ref`。
 
@@ -83,9 +91,9 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名。AD
 
 ## 当前 Go storage surface
 
-当前 `server/sync-server/internal/storage.Store` 是 HTTP handler 前的内部边界，已经落地 `CreateDomain`、`Domain`、`Device`、`SaveJoinRequest`、`PendingJoinRequests`、`AuthorizeJoinRequest`、`DeviceWrappedKey`、`RevokeDevice`、`PutRecoveryRecord`、`LatestRecoveryRecord`、`LatestRecoveryWrappedMaterial`、`PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`。
+当前 `server/sync-server/internal/storage.Store` 是 HTTP handler 前的内部边界，已经落地 `CreateDomain`、`Domain`、`Device`、`LifecycleSnapshot`、`LifecycleEventsAfter`、`SaveJoinRequest`、`PendingJoinRequests`、`AuthorizeJoinRequest`、`DeviceWrappedKey`、`RevokeDevice`、`PutRecoveryRecord`、`LatestRecoveryRecord`、`LatestRecoveryWrappedMaterial`、`PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`。
 
-这组方法当前用于验证 metadata、设备状态、版本冲突、blob 写入和错误语义，不等同于完整 HTTP API。稳定 change cursor、对象 discovery 分页、审计日志查询和持久限速器尚未落地；产品编排不得用 `updated_after_ms` 或逐个猜测 object/version 代替 discovery。
+这组方法当前用于验证 metadata、设备状态、版本冲突、blob 写入和错误语义，不等同于完整产品入口。对象 change cursor、对象 discovery 分页和设备 lifecycle cursor 已落地；审计日志查询和持久限速器仍未落地。产品编排不得用 `updated_after_ms`、客户端时间或逐个猜测 object/version 代替 discovery。
 
 当前 storage conformance 已覆盖：第一台设备必须为 `active` 且显式携带受支持签名算法；join request 从 `pending` 授权到 `active`；wrapped device key bytes 随授权事务保存并可按 metadata 读取；revoked 设备和旧 `key_epoch` 写入被拒绝；object version 冲突与 blob hash/length 复验；signed object manifest、device authorization、device revocation 和 recovery record 字段篡改会被验签拒绝。Rust/Go 另共同读取同一 profile fixture，覆盖两个算法正向签名和固定负向错误。
 
@@ -121,8 +129,22 @@ OIDC / Radish 产品账号体系接入已后置为未来专题，见 `docs/sync-
 
 `GET /api/v1/domains/{domain_id}/state`
 
-- 返回 domain metadata、设备列表、恢复记录状态和对象 latest version 摘要。
+- 当前返回 domain metadata；设备公开信任链通过独立 lifecycle API 获取，不能从该响应中的服务端状态推导客户端信任。
 - 不返回对象 payload；客户端需要按对象版本显式下载密文 bytes。
+
+`GET /api/v1/domains/{domain_id}/lifecycle`
+
+- 返回一致性 lifecycle snapshot：domain metadata、第一设备与当前设备公开 profile、完整 signed authorization / revocation 记录、对应事件序列和 snapshot cursor。
+- 第一设备 profile 只能与客户端本地创建或恢复所得信任锚比对；服务端返回第一设备不能自行成为信任锚。
+- 客户端必须按事件序列从信任锚归约状态，不能直接采用服务端 `devices.status`。
+- snapshot 不返回 wrapped key、恢复材料、同步密钥、对象 payload 或 access token。
+
+`GET /api/v1/domains/{domain_id}/lifecycle/events`
+
+- 使用 domain-bound opaque `after_cursor` 与受限 `limit` 返回追加式生命周期事件。
+- 响应按 `lifecycle_sequence` 严格升序，包含 `entries`、`next_cursor` 和 `has_more`。
+- cursor 与对象 discovery cursor 类型隔离，跨 domain、跨 endpoint 或非法 cursor 必须失败关闭。
+- 客户端在整页签名链验证和本地事务写入都成功后才能推进 cursor；任一记录失败时不得部分采用服务端状态。
 
 ### 设备登记与授权
 
@@ -424,7 +446,8 @@ latest_ciphertext_hash
 24. 已补 runtime 外部 TLS 反代 smoke，覆盖 HTTPS client、TLS 1.2+、TLS reverse proxy 到 HTTP upstream、`Authorization` header 透传、`X-Forwarded-Proto=https`、Go bearer token 门禁、encrypted object 上传下载、Go 对象大小门禁和日志脱敏。
 25. 已补 runtime 升级回滚 smoke，覆盖升级前数据写入、关闭后冷备份、同一数据目录重启触发 idempotent migration、升级后 v2 写入、恢复升级前备份到隔离目录、确认 v2 不可见、v1 payload / stale conflict 仍按 latest metadata 返回，以及日志不泄漏 payload、signature、wrapped material 或恢复敏感字段。
 26. 已补 ADR 0006 对应的算法分派、设备/join `signing_algorithm` API/SQLite metadata、历史 Ed25519 migration、稳定 `error_detail` 和 Rust/Go 共享正负向 vectors；新请求缺少算法或传入未知算法时失败关闭。
-27. 下一批按 `docs/sync-orchestration.md` 增加 domain 内 change sequence、opaque cursor discovery storage/API、Rust remote DTO 和分页/幂等/非法 cursor 测试；当前尚未落地，不能用时间戳过滤替代。
+27. 已按 `docs/sync-orchestration.md` 增加 domain 内 change sequence、opaque cursor discovery storage/API、Rust remote DTO 和分页/幂等/非法 cursor 测试；对象增量同步不能用时间戳过滤替代。
+28. 已补独立 lifecycle sequence、snapshot / events API、设备 revocation API、Rust trust-anchor signed chain verifier、`profile-sha256-v1` 公钥绑定 challenge 和 userdb schema v6 public cache；两个文件 userdb 已在短生命周期 Go HTTP 中完成授权、同步、撤销、缓存和重启恢复。
 
 任何阶段都不应把 Flutter manager、平台壳、真实系统输入法服务或输入热路径接入 Go server。
 

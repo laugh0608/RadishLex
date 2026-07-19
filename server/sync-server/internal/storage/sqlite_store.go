@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 )
 
 type SQLiteStore struct {
@@ -81,6 +82,16 @@ func (s *SQLiteStore) CreateDomain(ctx context.Context, domain Domain, firstDevi
 	if err := insertDeviceTx(ctx, tx, cloneDevice(firstDevice)); err != nil {
 		return err
 	}
+	if err := insertLifecycleEventTx(ctx, tx, LifecycleEvent{
+		DomainID:          domain.DomainID,
+		LifecycleSequence: 1,
+		EventType:         LifecycleInitialDevice,
+		RecordID:          firstDevice.DeviceID,
+		KeyEpoch:          domain.CurrentKeyEpoch,
+		CreatedAtMs:       domain.CreatedAtMs,
+	}); err != nil {
+		return err
+	}
 	if err := tx.Commit(); err != nil {
 		return newError(ErrStorageUnavailable, "sqlite transaction cannot commit")
 	}
@@ -99,6 +110,54 @@ func (s *SQLiteStore) Device(ctx context.Context, domainID string, deviceID stri
 		return Device{}, err
 	}
 	return deviceQuerier(ctx, s.db, domainID, deviceID)
+}
+
+func (s *SQLiteStore) LifecycleSnapshot(ctx context.Context, domainID string) (LifecycleSnapshot, error) {
+	if err := checkContext(ctx); err != nil {
+		return LifecycleSnapshot{}, err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return LifecycleSnapshot{}, newError(ErrStorageUnavailable, "sqlite transaction cannot start")
+	}
+	defer rollbackTx(tx)
+	domain, err := domainTx(ctx, tx, domainID)
+	if err != nil {
+		return LifecycleSnapshot{}, err
+	}
+	events, err := lifecycleEventsAfterTx(ctx, tx, domainID, 0, -1)
+	if err != nil {
+		return LifecycleSnapshot{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return LifecycleSnapshot{}, newError(ErrStorageUnavailable, "sqlite transaction cannot commit")
+	}
+	return LifecycleSnapshot{Domain: domain, Events: events}, nil
+}
+
+func (s *SQLiteStore) LifecycleEventsAfter(ctx context.Context, domainID string, afterSequence uint64, limit int) ([]LifecycleEvent, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	if !validOpaqueID(domainID) || limit <= 0 || limit > 201 {
+		return nil, newError(ErrInvalidRequest, "lifecycle discovery parameters are invalid")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, newError(ErrStorageUnavailable, "sqlite transaction cannot start")
+	}
+	defer rollbackTx(tx)
+	if _, err := domainTx(ctx, tx, domainID); err != nil {
+		return nil, err
+	}
+	events, err := lifecycleEventsAfterTx(ctx, tx, domainID, afterSequence, limit)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, newError(ErrStorageUnavailable, "sqlite transaction cannot commit")
+	}
+	return events, nil
 }
 
 func (s *SQLiteStore) SaveJoinRequest(ctx context.Context, request JoinRequest) error {
@@ -290,6 +349,20 @@ func (s *SQLiteStore) AuthorizeJoinRequest(ctx context.Context, upload DeviceAut
 	`, string(DeviceActive), authorization.CreatedAtMs, join.DomainID, join.DeviceID); err != nil {
 		return newError(ErrStorageUnavailable, "device metadata cannot be updated")
 	}
+	lifecycleSequence, err := nextLifecycleSequenceTx(ctx, tx, authorization.DomainID)
+	if err != nil {
+		return err
+	}
+	if err := insertLifecycleEventTx(ctx, tx, LifecycleEvent{
+		DomainID:          authorization.DomainID,
+		LifecycleSequence: lifecycleSequence,
+		EventType:         LifecycleDeviceAuthorized,
+		RecordID:          authorization.JoinRequestID,
+		KeyEpoch:          authorization.KeyEpoch,
+		CreatedAtMs:       authorization.CreatedAtMs,
+	}); err != nil {
+		return err
+	}
 	if err := staged.Commit(ctx); err != nil {
 		return err
 	}
@@ -359,6 +432,10 @@ func (s *SQLiteStore) RevokeDevice(ctx context.Context, revocation DeviceRevocat
 	if err := verifyRevocationSignature(revocation, revoker); err != nil {
 		return err
 	}
+	rejectFromObjectSequence, err := nextObjectChangeSequenceTx(ctx, tx, revocation.DomainID)
+	if err != nil {
+		return err
+	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE devices
 		SET status = ?, revoked_at_ms = ?
@@ -386,6 +463,21 @@ func (s *SQLiteStore) RevokeDevice(ctx context.Context, revocation DeviceRevocat
 		int64(revocation.SignatureSchemaVersion), revocation.SignatureAlgorithm, revocation.SignatureKeyID, cloneBytes(revocation.Signature),
 	); err != nil {
 		return newError(ErrStorageUnavailable, "revocation metadata cannot be stored")
+	}
+	lifecycleSequence, err := nextLifecycleSequenceTx(ctx, tx, revocation.DomainID)
+	if err != nil {
+		return err
+	}
+	if err := insertLifecycleEventTx(ctx, tx, LifecycleEvent{
+		DomainID:                       revocation.DomainID,
+		LifecycleSequence:              lifecycleSequence,
+		EventType:                      LifecycleDeviceRevoked,
+		RecordID:                       fmt.Sprintf("%s:%d", revocation.RevokedDeviceID, revocation.NewKeyEpoch),
+		KeyEpoch:                       revocation.NewKeyEpoch,
+		RejectFromObjectChangeSequence: rejectFromObjectSequence,
+		CreatedAtMs:                    revocation.CreatedAtMs,
+	}); err != nil {
+		return err
 	}
 	if err := tx.Commit(); err != nil {
 		return newError(ErrStorageUnavailable, "sqlite transaction cannot commit")
@@ -984,6 +1076,222 @@ func insertObjectVersionTx(ctx context.Context, tx *sql.Tx, version ObjectVersio
 		return newError(ErrStorageUnavailable, "object version metadata cannot be stored")
 	}
 	return nil
+}
+
+func lifecycleEventsAfterTx(ctx context.Context, tx *sql.Tx, domainID string, afterSequence uint64, limit int) ([]LifecycleEvent, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT domain_id, lifecycle_sequence, event_type, record_id, key_epoch,
+			reject_from_object_change_sequence, created_at_ms
+		FROM domain_lifecycle_events
+		WHERE domain_id = ? AND lifecycle_sequence > ?
+		ORDER BY lifecycle_sequence
+		LIMIT ?
+	`, domainID, int64(afterSequence), limit)
+	if err != nil {
+		return nil, newError(ErrStorageUnavailable, "lifecycle metadata cannot be read")
+	}
+	var events []LifecycleEvent
+	for rows.Next() {
+		var event LifecycleEvent
+		var sequence int64
+		var eventType string
+		var keyEpoch int64
+		var rejectFrom int64
+		if err := rows.Scan(
+			&event.DomainID, &sequence, &eventType, &event.RecordID, &keyEpoch,
+			&rejectFrom, &event.CreatedAtMs,
+		); err != nil {
+			_ = rows.Close()
+			return nil, newError(ErrStorageUnavailable, "lifecycle metadata cannot be read")
+		}
+		if sequence <= 0 || keyEpoch <= 0 || rejectFrom < 0 {
+			_ = rows.Close()
+			return nil, newError(ErrStorageUnavailable, "lifecycle metadata is invalid")
+		}
+		event.LifecycleSequence = uint64(sequence)
+		event.EventType = LifecycleEventType(eventType)
+		event.KeyEpoch = uint64(keyEpoch)
+		event.RejectFromObjectChangeSequence = uint64(rejectFrom)
+		events = append(events, event)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, newError(ErrStorageUnavailable, "lifecycle metadata cannot be read")
+	}
+	for index := range events {
+		if err := hydrateLifecycleEventTx(ctx, tx, &events[index]); err != nil {
+			return nil, err
+		}
+	}
+	return events, nil
+}
+
+func hydrateLifecycleEventTx(ctx context.Context, tx *sql.Tx, event *LifecycleEvent) error {
+	switch event.EventType {
+	case LifecycleInitialDevice:
+		device, err := deviceTx(ctx, tx, event.DomainID, event.RecordID)
+		if err != nil {
+			return newError(ErrStorageUnavailable, "initial lifecycle device cannot be read")
+		}
+		device.Status = DeviceActive
+		device.AuthorizedAtMs = event.CreatedAtMs
+		device.RevokedAtMs = 0
+		event.Device = devicePointer(device)
+	case LifecycleDeviceAuthorized:
+		authorization, err := authorizationTx(ctx, tx, event.DomainID, event.RecordID)
+		if err != nil {
+			return err
+		}
+		device, err := deviceTx(ctx, tx, event.DomainID, authorization.RecipientDeviceID)
+		if err != nil {
+			return newError(ErrStorageUnavailable, "authorized lifecycle device cannot be read")
+		}
+		device.Status = DeviceActive
+		device.AuthorizedAtMs = authorization.CreatedAtMs
+		device.RevokedAtMs = 0
+		join, err := joinRequestTx(ctx, tx, event.DomainID, authorization.JoinRequestID)
+		if err != nil {
+			return newError(ErrStorageUnavailable, "authorization join request cannot be read")
+		}
+		wrapping, err := wrappingForAuthorizationTx(ctx, tx, authorization)
+		if err != nil {
+			return err
+		}
+		event.Device = devicePointer(device)
+		event.JoinRequest = joinRequestPointer(join)
+		event.Authorization = authorizationPointer(authorization)
+		event.Wrapping = wrappingPointer(wrapping)
+	case LifecycleDeviceRevoked:
+		revocation, err := revocationByRecordIDTx(ctx, tx, event.DomainID, event.RecordID)
+		if err != nil {
+			return err
+		}
+		device, err := deviceTx(ctx, tx, event.DomainID, revocation.RevokedDeviceID)
+		if err != nil {
+			return newError(ErrStorageUnavailable, "revoked lifecycle device cannot be read")
+		}
+		event.Device = devicePointer(device)
+		event.Revocation = revocationPointer(revocation)
+	default:
+		return newError(ErrStorageUnavailable, "lifecycle event type is invalid")
+	}
+	return nil
+}
+
+func wrappingForAuthorizationTx(ctx context.Context, tx *sql.Tx, authorization DeviceAuthorization) (DeviceWrappingRecord, error) {
+	row := tx.QueryRowContext(ctx, `
+		SELECT domain_id, recipient_device_id, authorizer_device_id, key_epoch,
+			wrapping_key_id, algorithm, nonce, wrapped_key_len,
+			ciphertext_hash, created_at_ms, signature, blob_ref
+		FROM device_wrapping_records
+		WHERE domain_id = ? AND recipient_device_id = ? AND authorizer_device_id = ? AND key_epoch = ?
+		ORDER BY created_at_ms, wrapping_key_id LIMIT 1
+	`, authorization.DomainID, authorization.RecipientDeviceID, authorization.AuthorizerDeviceID, int64(authorization.KeyEpoch))
+	var record DeviceWrappingRecord
+	var keyEpoch int64
+	if err := row.Scan(
+		&record.DomainID, &record.RecipientDeviceID, &record.AuthorizerDeviceID, &keyEpoch,
+		&record.WrappingKeyID, &record.Algorithm, &record.Nonce, &record.WrappedKeyLen,
+		&record.CiphertextHash, &record.CreatedAtMs, &record.Signature, &record.BlobRef,
+	); err != nil {
+		return DeviceWrappingRecord{}, newError(ErrStorageUnavailable, "authorization wrapping metadata cannot be read")
+	}
+	if keyEpoch <= 0 {
+		return DeviceWrappingRecord{}, newError(ErrStorageUnavailable, "authorization wrapping metadata is invalid")
+	}
+	record.KeyEpoch = uint64(keyEpoch)
+	return cloneWrappingRecord(record), nil
+}
+
+func authorizationTx(ctx context.Context, tx *sql.Tx, domainID string, joinRequestID string) (DeviceAuthorization, error) {
+	row := tx.QueryRowContext(ctx, `
+		SELECT domain_id, join_request_id, authorizer_device_id, recipient_device_id,
+			recipient_signing_public_key_id, recipient_key_agreement_key_id,
+			join_short_code, key_epoch, created_at_ms,
+			signature_schema_version, signature_algorithm, signature_key_id, signature
+		FROM device_authorizations
+		WHERE domain_id = ? AND join_request_id = ?
+	`, domainID, joinRequestID)
+	var authorization DeviceAuthorization
+	var keyEpoch int64
+	var signatureSchemaVersion int64
+	if err := row.Scan(
+		&authorization.DomainID, &authorization.JoinRequestID,
+		&authorization.AuthorizerDeviceID, &authorization.RecipientDeviceID,
+		&authorization.RecipientSigningPublicKeyID, &authorization.RecipientKeyAgreementKeyID,
+		&authorization.JoinShortCode, &keyEpoch, &authorization.CreatedAtMs,
+		&signatureSchemaVersion, &authorization.SignatureAlgorithm,
+		&authorization.SignatureKeyID, &authorization.Signature,
+	); err != nil {
+		return DeviceAuthorization{}, newError(ErrStorageUnavailable, "authorization lifecycle metadata cannot be read")
+	}
+	if keyEpoch <= 0 || signatureSchemaVersion <= 0 {
+		return DeviceAuthorization{}, newError(ErrStorageUnavailable, "authorization lifecycle metadata is invalid")
+	}
+	authorization.KeyEpoch = uint64(keyEpoch)
+	authorization.SignatureSchemaVersion = uint16(signatureSchemaVersion)
+	return cloneAuthorization(authorization), nil
+}
+
+func revocationByRecordIDTx(ctx context.Context, tx *sql.Tx, domainID string, recordID string) (DeviceRevocation, error) {
+	row := tx.QueryRowContext(ctx, `
+		SELECT domain_id, revoked_device_id, revoker_device_id,
+			previous_key_epoch, new_key_epoch, reason, created_at_ms,
+			signature_schema_version, signature_algorithm, signature_key_id, signature
+		FROM device_revocations
+		WHERE domain_id = ? AND revoked_device_id || ':' || new_key_epoch = ?
+	`, domainID, recordID)
+	var revocation DeviceRevocation
+	var previousKeyEpoch int64
+	var newKeyEpoch int64
+	var signatureSchemaVersion int64
+	if err := row.Scan(
+		&revocation.DomainID, &revocation.RevokedDeviceID, &revocation.RevokerDeviceID,
+		&previousKeyEpoch, &newKeyEpoch, &revocation.Reason, &revocation.CreatedAtMs,
+		&signatureSchemaVersion, &revocation.SignatureAlgorithm,
+		&revocation.SignatureKeyID, &revocation.Signature,
+	); err != nil {
+		return DeviceRevocation{}, newError(ErrStorageUnavailable, "revocation lifecycle metadata cannot be read")
+	}
+	if previousKeyEpoch <= 0 || newKeyEpoch <= previousKeyEpoch || signatureSchemaVersion <= 0 {
+		return DeviceRevocation{}, newError(ErrStorageUnavailable, "revocation lifecycle metadata is invalid")
+	}
+	revocation.PreviousKeyEpoch = uint64(previousKeyEpoch)
+	revocation.NewKeyEpoch = uint64(newKeyEpoch)
+	revocation.SignatureSchemaVersion = uint16(signatureSchemaVersion)
+	return cloneRevocation(revocation), nil
+}
+
+func insertLifecycleEventTx(ctx context.Context, tx *sql.Tx, event LifecycleEvent) error {
+	if event.LifecycleSequence == 0 || event.EventType == "" || event.RecordID == "" || event.KeyEpoch == 0 || event.CreatedAtMs <= 0 {
+		return newError(ErrInvalidRequest, "lifecycle event metadata is invalid")
+	}
+	if event.EventType != LifecycleDeviceRevoked && event.RejectFromObjectChangeSequence != 0 {
+		return newError(ErrInvalidRequest, "only revocation lifecycle events can reject object sequences")
+	}
+	if event.EventType == LifecycleDeviceRevoked && event.RejectFromObjectChangeSequence == 0 {
+		return newError(ErrInvalidRequest, "revocation lifecycle event requires object sequence cutoff")
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO domain_lifecycle_events (
+			domain_id, lifecycle_sequence, event_type, record_id, key_epoch,
+			reject_from_object_change_sequence, created_at_ms
+		) VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, event.DomainID, int64(event.LifecycleSequence), string(event.EventType), event.RecordID, int64(event.KeyEpoch),
+		int64(event.RejectFromObjectChangeSequence), event.CreatedAtMs); err != nil {
+		return newError(ErrStorageUnavailable, "lifecycle metadata cannot be stored")
+	}
+	return nil
+}
+
+func nextLifecycleSequenceTx(ctx context.Context, tx *sql.Tx, domainID string) (uint64, error) {
+	var next int64
+	if err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(MAX(lifecycle_sequence), 0) + 1
+		FROM domain_lifecycle_events WHERE domain_id = ?
+	`, domainID).Scan(&next); err != nil || next <= 0 {
+		return 0, newError(ErrStorageUnavailable, "lifecycle sequence cannot be allocated")
+	}
+	return uint64(next), nil
 }
 
 func nextObjectChangeSequenceTx(ctx context.Context, tx *sql.Tx, domainID string) (uint64, error) {

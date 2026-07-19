@@ -16,3 +16,4 @@ base64ct = { version = "1.8.3", features = ["alloc"] }
 radishlex-ime-crypto = { path = "../ime-crypto" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
+sha2 = "0.10.9"

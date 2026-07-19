@@ -125,8 +125,15 @@ func TestApplyBackfillsHistoricalDeviceAlgorithmsAndIsIdempotent(t *testing.T) {
 	if err := db.QueryRow("PRAGMA user_version").Scan(&schemaVersion); err != nil {
 		t.Fatalf("read schema version: %v", err)
 	}
-	if schemaVersion != 3 {
+	if schemaVersion != 4 {
 		t.Fatalf("unexpected schema version: %d", schemaVersion)
+	}
+	var lifecycleCount int
+	if err := db.QueryRow("SELECT COUNT(*) FROM domain_lifecycle_events WHERE domain_id = 'domain-history'").Scan(&lifecycleCount); err != nil {
+		t.Fatalf("read lifecycle backfill count: %v", err)
+	}
+	if lifecycleCount != 1 {
+		t.Fatalf("unexpected lifecycle backfill count: %d", lifecycleCount)
 	}
 }
 

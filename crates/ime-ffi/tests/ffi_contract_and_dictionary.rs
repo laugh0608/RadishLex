@@ -477,7 +477,7 @@ fn userdb_learning_status_reports_read_only_counts() {
     );
     assert!(error.is_null());
 
-    assert_eq!(summary.schema_version, 5);
+    assert_eq!(summary.schema_version, 6);
     assert_eq!(summary.plaintext_payload, 0);
     assert_eq!(summary.p1_raw_details, 0);
     assert_eq!(summary.context_stats, 0);

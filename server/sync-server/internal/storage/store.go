@@ -6,6 +6,8 @@ type Store interface {
 	CreateDomain(ctx context.Context, domain Domain, firstDevice Device) error
 	Domain(ctx context.Context, domainID string) (Domain, error)
 	Device(ctx context.Context, domainID string, deviceID string) (Device, error)
+	LifecycleSnapshot(ctx context.Context, domainID string) (LifecycleSnapshot, error)
+	LifecycleEventsAfter(ctx context.Context, domainID string, afterSequence uint64, limit int) ([]LifecycleEvent, error)
 	SaveJoinRequest(ctx context.Context, request JoinRequest) error
 	PendingJoinRequests(ctx context.Context, domainID string) ([]JoinRequest, error)
 	AuthorizeJoinRequest(ctx context.Context, upload DeviceAuthorizationUpload) error

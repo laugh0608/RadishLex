@@ -136,7 +136,7 @@ SyncDevice
 Rust 与 Go 的包装记录边界：
 
 - `ime-crypto::DeviceWrappingRecord` 持有 `encrypted_key` bytes，并在 Debug 中脱敏。
-- `ime-sync::DeviceAuthorizationPackage` 与 `SignedDeviceAuthorization` 只签 recipient、authorizer、join challenge / short code、key epoch、wrapping key id 和 `encrypted_key_len`，不复制密文本体。
+- `ime-sync::DeviceAuthorizationPackage` 与 `SignedDeviceAuthorization` 签 recipient、authorizer、join challenge / short code、key epoch、wrapping key id 和 `encrypted_key_len`，不复制密文本体。产品生命周期链要求 join challenge 使用 `profile-sha256-v1`，其摘要覆盖两组完整设备公钥、算法、key id、domain / join request id 和有效期；因此授权签名不能只依赖服务端可替换的 opaque key id。
 - Go server 当前把 wrapped key bytes 作为密文 blob 保存，并在读取时复验长度和 ciphertext hash；authorization handler 只能提交 signed authorization、wrapping metadata 和 encrypted wrapped key bytes。
 - 服务端永远不能从 wrapping record 推导 `SyncMasterKey`，也不能把 wrapped key bytes 写进日志、错误响应或审计 payload。
 

@@ -117,6 +117,34 @@ type DeviceRevocation struct {
 	Signature              []byte
 }
 
+type LifecycleEventType string
+
+const (
+	LifecycleInitialDevice    LifecycleEventType = "initial_device"
+	LifecycleDeviceAuthorized LifecycleEventType = "device_authorized"
+	LifecycleDeviceRevoked    LifecycleEventType = "device_revoked"
+)
+
+type LifecycleEvent struct {
+	DomainID                       string
+	LifecycleSequence              uint64
+	EventType                      LifecycleEventType
+	RecordID                       string
+	KeyEpoch                       uint64
+	RejectFromObjectChangeSequence uint64
+	CreatedAtMs                    int64
+	Device                         *Device
+	JoinRequest                    *JoinRequest
+	Authorization                  *DeviceAuthorization
+	Wrapping                       *DeviceWrappingRecord
+	Revocation                     *DeviceRevocation
+}
+
+type LifecycleSnapshot struct {
+	Domain Domain
+	Events []LifecycleEvent
+}
+
 type RecoveryRecord struct {
 	DomainID               string
 	RecoveryRecordID       string

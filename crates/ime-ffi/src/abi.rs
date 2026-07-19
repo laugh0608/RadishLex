@@ -1200,7 +1200,7 @@ mod tests {
             RadishLexStatusCode::Ok
         );
         assert!(error.is_null());
-        assert_eq!(summary.schema_version, 5);
+        assert_eq!(summary.schema_version, 6);
         assert_eq!(summary.plaintext_payload, 0);
         assert_eq!(summary.syncable_user_terms, 1);
         assert_eq!(summary.syncable_ranker_weights, 1);

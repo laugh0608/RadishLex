@@ -12,9 +12,9 @@ use radishlex_ime_crypto::{
     SyncMasterKeyMaterial, TestMemoryDeviceKeyStore, ED25519_SIGNATURE_LEN,
 };
 use radishlex_ime_sync::{
-    AssembledSyncObject, HttpSyncRemoteTransport, PlaintextSyncPayload, SyncEnvelopeAssembler,
-    SyncObjectAssemblySpec, SyncObjectType, SyncRemoteClient, SyncRemoteError, SyncRemoteMethod,
-    SyncRemoteRequest, SyncRemoteTransport, SyncServerErrorCode,
+    verify_lifecycle_snapshot, AssembledSyncObject, HttpSyncRemoteTransport, PlaintextSyncPayload,
+    SyncEnvelopeAssembler, SyncObjectAssemblySpec, SyncObjectType, SyncRemoteClient,
+    SyncRemoteError, SyncRemoteMethod, SyncRemoteRequest, SyncRemoteTransport, SyncServerErrorCode,
 };
 
 const DOMAIN_ID: &str = "domain-rust-go-http";
@@ -38,6 +38,22 @@ fn http_transport_round_trips_encrypted_object_through_go_sync_server() {
     create_domain(&transport, &public_key);
 
     let client = SyncRemoteClient::new(transport);
+    let lifecycle = client
+        .lifecycle_snapshot(DOMAIN_ID)
+        .expect("load lifecycle snapshot");
+    assert_eq!(lifecycle.entries.len(), 1);
+    let lifecycle_cursor = lifecycle.next_cursor.clone();
+    let verified =
+        verify_lifecycle_snapshot(lifecycle, &public_key).expect("verify initial trust anchor");
+    assert!(verified
+        .trusted_domain()
+        .device_profile(DEVICE_ID)
+        .is_some());
+    let lifecycle_page = client
+        .lifecycle_events(DOMAIN_ID, Some(&lifecycle_cursor), 10)
+        .expect("discover lifecycle after snapshot");
+    assert!(lifecycle_page.entries.is_empty());
+    assert!(!lifecycle_page.has_more);
     let version_1 = assemble_object(
         1,
         None,

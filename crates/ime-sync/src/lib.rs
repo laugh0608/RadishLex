@@ -1,6 +1,7 @@
 mod assemble;
 mod device;
 mod http_transport;
+mod lifecycle;
 mod merge;
 mod model;
 mod orchestration;
@@ -18,6 +19,10 @@ pub use device::{
     SyncDevice, SyncDeviceStatus, SyncDomain, SyncObjectVersion,
 };
 pub use http_transport::HttpSyncRemoteTransport;
+pub use lifecycle::{
+    device_join_profile_challenge, verify_lifecycle_snapshot, SyncLifecycleError,
+    VerifiedSyncLifecycle,
+};
 pub use merge::{
     ClientSyncMergeInput, ClientSyncMergeResult, DictionaryDeletedTermMergeRecord,
     DictionaryUserTermMergeRecord, RankerWeightMergeRecord, SyncMergeDecision,
@@ -42,7 +47,9 @@ pub use product_provider::{
     SyncTrustedDomainState,
 };
 pub use remote::{
-    LatestObjectConflictMetadata, OpaqueSyncCursor, RemoteObjectDiscoveryPage, RemoteObjectPayload,
+    LatestObjectConflictMetadata, OpaqueSyncCursor, RemoteDeviceAuthorization,
+    RemoteDeviceRevocation, RemoteLifecycleDevice, RemoteLifecycleEvent, RemoteLifecycleEventKind,
+    RemoteLifecyclePage, RemoteLifecycleSnapshot, RemoteObjectDiscoveryPage, RemoteObjectPayload,
     RemoteObjectVersion, SyncRemoteClient, SyncRemoteError, SyncRemoteMethod, SyncRemoteRequest,
     SyncRemoteResponse, SyncRemoteTransport, SyncServerErrorCode,
 };

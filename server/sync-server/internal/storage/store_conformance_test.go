@@ -144,6 +144,49 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 		}
 	})
 
+	t.Run("discovers signed device lifecycle independently from object changes", func(t *testing.T) {
+		ctx := context.Background()
+		store := newReadyStore(t, newStore)
+		saveJoinAndAuthorize(t, store, "domain-a", "join-b", "device-b", 20)
+		if _, err := store.PutObjectVersion(ctx, objectUpload("domain-a", "object-a", "device-a", 1, 0, 1, []byte{0x91})); err != nil {
+			t.Fatalf("put object before revocation: %v", err)
+		}
+		revocation := DeviceRevocation{
+			DomainID: "domain-a", RevokedDeviceID: "device-b", RevokerDeviceID: "device-a",
+			PreviousKeyEpoch: 1, NewKeyEpoch: 2, Reason: "lost", CreatedAtMs: 30,
+		}
+		signRevocationForTest(&revocation)
+		if err := store.RevokeDevice(ctx, revocation); err != nil {
+			t.Fatalf("revoke lifecycle device: %v", err)
+		}
+
+		snapshot, err := store.LifecycleSnapshot(ctx, "domain-a")
+		if err != nil {
+			t.Fatalf("read lifecycle snapshot: %v", err)
+		}
+		if snapshot.Domain.CurrentKeyEpoch != 2 || len(snapshot.Events) != 3 {
+			t.Fatalf("unexpected lifecycle snapshot: %#v", snapshot)
+		}
+		if snapshot.Events[0].EventType != LifecycleInitialDevice || snapshot.Events[0].Device == nil || snapshot.Events[0].Device.DeviceID != "device-a" {
+			t.Fatalf("unexpected initial lifecycle event: %#v", snapshot.Events[0])
+		}
+		if snapshot.Events[1].EventType != LifecycleDeviceAuthorized || snapshot.Events[1].Authorization == nil || snapshot.Events[1].Device == nil {
+			t.Fatalf("unexpected authorization lifecycle event: %#v", snapshot.Events[1])
+		}
+		if snapshot.Events[2].EventType != LifecycleDeviceRevoked || snapshot.Events[2].Revocation == nil || snapshot.Events[2].RejectFromObjectChangeSequence != 2 {
+			t.Fatalf("unexpected revocation lifecycle event: %#v", snapshot.Events[2])
+		}
+
+		firstPage, err := store.LifecycleEventsAfter(ctx, "domain-a", 0, 2)
+		if err != nil || len(firstPage) != 2 {
+			t.Fatalf("read first lifecycle page: events=%#v err=%v", firstPage, err)
+		}
+		secondPage, err := store.LifecycleEventsAfter(ctx, "domain-a", firstPage[1].LifecycleSequence, 2)
+		if err != nil || len(secondPage) != 1 || secondPage[0].LifecycleSequence != 3 {
+			t.Fatalf("read second lifecycle page: events=%#v err=%v", secondPage, err)
+		}
+	})
+
 	t.Run("blocks revoked devices and old key epoch writes", func(t *testing.T) {
 		ctx := context.Background()
 		store := newReadyStore(t, newStore)

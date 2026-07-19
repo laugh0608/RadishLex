@@ -47,6 +47,25 @@ func TestMetadataHandlersCreateDomainReadDeviceAndSaveJoinRequest(t *testing.T) 
 	if domainBody.Domain.DomainID != "domain-a" || domainBody.Domain.CurrentKeyEpoch != 1 {
 		t.Fatalf("unexpected domain response: %#v", domainBody)
 	}
+	lifecycleResponse := httptest.NewRecorder()
+	handler.ServeHTTP(lifecycleResponse, httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/lifecycle", nil))
+	if lifecycleResponse.Code != http.StatusOK {
+		t.Fatalf("unexpected lifecycle status: %d body=%s", lifecycleResponse.Code, lifecycleResponse.Body.String())
+	}
+	var lifecycleBody LifecycleSnapshotResponse
+	decodeResponse(t, lifecycleResponse, &lifecycleBody)
+	if len(lifecycleBody.Entries) != 1 || lifecycleBody.Entries[0].EventType != storage.LifecycleInitialDevice || lifecycleBody.Entries[0].KeyEpoch != 1 {
+		t.Fatalf("unexpected initial lifecycle response: %#v", lifecycleBody)
+	}
+	emptyLifecycleResponse := httptest.NewRecorder()
+	handler.ServeHTTP(emptyLifecycleResponse, httptest.NewRequest(
+		http.MethodGet,
+		PrefixV1+"/domains/domain-a/lifecycle/events?after_cursor="+lifecycleBody.NextCursor+"&limit=10",
+		nil,
+	))
+	if emptyLifecycleResponse.Code != http.StatusOK {
+		t.Fatalf("unexpected lifecycle discovery status: %d body=%s", emptyLifecycleResponse.Code, emptyLifecycleResponse.Body.String())
+	}
 
 	stateResponse := httptest.NewRecorder()
 	handler.ServeHTTP(stateResponse, httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/state", nil))
@@ -109,6 +128,35 @@ func TestMetadataHandlersCreateDomainReadDeviceAndSaveJoinRequest(t *testing.T) 
 	decodeResponse(t, pendingDeviceResponse, &deviceBody)
 	if deviceBody.DeviceID != "device-b" || deviceBody.Status != storage.DevicePending {
 		t.Fatalf("join request should create a pending device, got %#v", deviceBody)
+	}
+}
+
+func TestDeviceRevocationHandlerAppendsLifecycleCutoff(t *testing.T) {
+	store := storage.NewMemoryStore()
+	createDomainForObjectHandlerTest(t, store, "domain-a", "device-a", 1)
+	revocation := storage.DeviceRevocation{
+		DomainID: "domain-a", RevokedDeviceID: "device-a", RevokerDeviceID: "device-a",
+		PreviousKeyEpoch: 1, NewKeyEpoch: 2, Reason: "device_lost", CreatedAtMs: 20,
+	}
+	signRevocationForHandlerTest(&revocation)
+	request := DeviceRevocationRequest{
+		RevokerDeviceID: revocation.RevokerDeviceID, PreviousKeyEpoch: revocation.PreviousKeyEpoch,
+		NewKeyEpoch: revocation.NewKeyEpoch, Reason: revocation.Reason, CreatedAtMs: revocation.CreatedAtMs,
+		SignatureSchemaVersion: revocation.SignatureSchemaVersion,
+		SignatureAlgorithm:     revocation.SignatureAlgorithm, SignatureKeyID: revocation.SignatureKeyID,
+		Signature: revocation.Signature,
+	}
+	handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+	response := performJSONRequest(t, handler, http.MethodPost, PrefixV1+"/domains/domain-a/devices/device-a/revocations", request)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("unexpected revocation status: %d body=%s", response.Code, response.Body.String())
+	}
+	snapshot, err := store.LifecycleSnapshot(context.Background(), "domain-a")
+	if err != nil {
+		t.Fatalf("read lifecycle after revocation: %v", err)
+	}
+	if len(snapshot.Events) != 2 || snapshot.Events[1].RejectFromObjectChangeSequence != 1 || snapshot.Domain.CurrentKeyEpoch != 2 {
+		t.Fatalf("unexpected revocation lifecycle snapshot: %#v", snapshot)
 	}
 }
 

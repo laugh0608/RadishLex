@@ -11,7 +11,7 @@ use crate::error::{UserDbError, UserDbResult};
 use super::identity::legacy_stable_hash_hex;
 use super::UserDb;
 
-pub(super) const SCHEMA_VERSION: i64 = 5;
+pub(super) const SCHEMA_VERSION: i64 = 6;
 pub(super) const BUSY_TIMEOUT: Duration = Duration::from_millis(5_000);
 pub(super) const MAX_LEARNING_COUNT: i64 = 1_000_000;
 
@@ -71,6 +71,7 @@ impl UserDb {
         }
         if version == 0 && !has_any_user_table(&transaction)? {
             create_schema_v5(&transaction)?;
+            ensure_trusted_lifecycle_tables(&transaction)?;
         } else {
             if version < 3 {
                 create_legacy_schema_if_missing(&transaction)?;
@@ -81,6 +82,7 @@ impl UserDb {
             }
             ensure_user_term_import_batch(&transaction)?;
             ensure_sync_orchestration_tables(&transaction)?;
+            ensure_trusted_lifecycle_tables(&transaction)?;
         }
         transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         validate_current_schema_on(&transaction)?;
@@ -226,6 +228,50 @@ fn validate_current_schema_on(connection: &Connection) -> UserDbResult<()> {
             "started_at_ms",
             "lease_expires_at_ms",
             "cancel_requested",
+        ],
+    )?;
+    require_columns(
+        connection,
+        "sync_trusted_domains",
+        &[
+            "domain_id",
+            "current_key_epoch",
+            "active_key_id",
+            "created_at_ms",
+            "updated_at_ms",
+            "lifecycle_cursor",
+            "lifecycle_sequence",
+        ],
+    )?;
+    require_columns(
+        connection,
+        "sync_trusted_devices",
+        &[
+            "domain_id",
+            "device_id",
+            "signing_algorithm",
+            "signing_public_key_id",
+            "signing_public_key",
+            "signing_key_created_at_ms",
+            "status",
+            "authorized_at_ms",
+            "revoked_at_ms",
+            "last_seen_at_ms",
+            "reject_from_change_sequence",
+        ],
+    )?;
+    require_columns(
+        connection,
+        "sync_trusted_lifecycle_events",
+        &[
+            "domain_id",
+            "lifecycle_sequence",
+            "event_type",
+            "record_id",
+            "key_epoch",
+            "reject_from_object_change_sequence",
+            "created_at_ms",
+            "record_json",
         ],
     )?;
     Ok(())
@@ -486,6 +532,51 @@ const SYNC_ORCHESTRATION_SCHEMA_SQL: &str = "
 
 fn ensure_sync_orchestration_tables(transaction: &Transaction<'_>) -> UserDbResult<()> {
     transaction.execute_batch(SYNC_ORCHESTRATION_SCHEMA_SQL)?;
+    Ok(())
+}
+
+const TRUSTED_LIFECYCLE_SCHEMA_SQL: &str = "
+        CREATE TABLE IF NOT EXISTS sync_trusted_domains (
+            domain_id TEXT PRIMARY KEY,
+            current_key_epoch INTEGER NOT NULL CHECK(current_key_epoch > 0),
+            active_key_id TEXT NOT NULL,
+            created_at_ms INTEGER NOT NULL,
+            updated_at_ms INTEGER NOT NULL CHECK(updated_at_ms >= created_at_ms),
+            lifecycle_cursor TEXT NOT NULL CHECK(length(lifecycle_cursor) > 0),
+            lifecycle_sequence INTEGER NOT NULL CHECK(lifecycle_sequence > 0)
+        );
+
+        CREATE TABLE IF NOT EXISTS sync_trusted_devices (
+            domain_id TEXT NOT NULL REFERENCES sync_trusted_domains(domain_id) ON DELETE CASCADE,
+            device_id TEXT NOT NULL,
+            signing_algorithm TEXT NOT NULL,
+            signing_public_key_id TEXT NOT NULL,
+            signing_public_key BLOB NOT NULL,
+            signing_key_created_at_ms INTEGER NOT NULL,
+            status TEXT NOT NULL CHECK(status IN ('active', 'revoked', 'lost')),
+            authorized_at_ms INTEGER NOT NULL,
+            revoked_at_ms INTEGER,
+            last_seen_at_ms INTEGER,
+            reject_from_change_sequence INTEGER,
+            PRIMARY KEY(domain_id, device_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS sync_trusted_lifecycle_events (
+            domain_id TEXT NOT NULL REFERENCES sync_trusted_domains(domain_id) ON DELETE CASCADE,
+            lifecycle_sequence INTEGER NOT NULL CHECK(lifecycle_sequence > 0),
+            event_type TEXT NOT NULL CHECK(event_type IN ('initial_device', 'device_authorized', 'device_revoked')),
+            record_id TEXT NOT NULL,
+            key_epoch INTEGER NOT NULL CHECK(key_epoch > 0),
+            reject_from_object_change_sequence INTEGER,
+            created_at_ms INTEGER NOT NULL,
+            record_json TEXT NOT NULL CHECK(length(record_json) > 0),
+            PRIMARY KEY(domain_id, lifecycle_sequence),
+            UNIQUE(domain_id, event_type, record_id)
+        );
+";
+
+fn ensure_trusted_lifecycle_tables(transaction: &Transaction<'_>) -> UserDbResult<()> {
+    transaction.execute_batch(TRUSTED_LIFECYCLE_SCHEMA_SQL)?;
     Ok(())
 }
 

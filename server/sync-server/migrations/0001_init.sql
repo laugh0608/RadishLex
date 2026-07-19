@@ -89,6 +89,18 @@ CREATE TABLE IF NOT EXISTS device_revocations (
     PRIMARY KEY (domain_id, revoked_device_id, new_key_epoch)
 );
 
+CREATE TABLE IF NOT EXISTS domain_lifecycle_events (
+    domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
+    lifecycle_sequence INTEGER NOT NULL CHECK (lifecycle_sequence > 0),
+    event_type TEXT NOT NULL CHECK (event_type IN ('initial_device', 'device_authorized', 'device_revoked')),
+    record_id TEXT NOT NULL,
+    key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
+    reject_from_object_change_sequence INTEGER NOT NULL DEFAULT 0 CHECK (reject_from_object_change_sequence >= 0),
+    created_at_ms INTEGER NOT NULL,
+    PRIMARY KEY (domain_id, lifecycle_sequence),
+    UNIQUE (domain_id, event_type, record_id)
+);
+
 CREATE TABLE IF NOT EXISTS recovery_records (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     recovery_record_id TEXT NOT NULL,
@@ -180,3 +192,6 @@ CREATE INDEX IF NOT EXISTS idx_sync_objects_domain_type
 
 CREATE INDEX IF NOT EXISTS idx_audit_events_domain_time
     ON audit_events(domain_id, server_time_ms);
+
+CREATE INDEX IF NOT EXISTS idx_lifecycle_events_domain_sequence
+    ON domain_lifecycle_events(domain_id, lifecycle_sequence);

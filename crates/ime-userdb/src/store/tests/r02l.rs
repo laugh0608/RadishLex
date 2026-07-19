@@ -410,7 +410,7 @@ fn v2_migration_replaces_hash_identity_and_converts_recency_timestamp() {
     }
 
     let db = UserDb::open(&path).expect("v2 migrates");
-    assert_eq!(db.schema_version().expect("schema version"), 5);
+    assert_eq!(db.schema_version().expect("schema version"), 6);
     assert_eq!(db.deleted_term_count().expect("tombstone count"), 1);
     let deleted_columns = db
         .connection

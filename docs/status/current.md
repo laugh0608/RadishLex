@@ -7,7 +7,7 @@
 - 复核日期：2026-07-19（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前产品里程碑：M3 端到端加密同步 Beta
-- 当前产品主批次：macOS backend 外部资格阻塞与生产 sync provider 可信装载
+- 当前产品主批次：macOS backend 外部资格阻塞与 wrapped epoch material 产品装载
 - 已完成：M0 工程基础、M1 macOS 离线输入 Alpha、M2 本地个人化 MVP；R00、R01A、R02L、R01B、R06A 已退出
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；合成数据、短生命周期服务与受控集成测试可以继续
@@ -16,13 +16,15 @@ M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不�
 
 ## M3 当前边界
 
-M3 已具备 P2 envelope、signed manifest、Go server 设备/对象/密文/备份部署边界，以及关闭态 `sync_once`。Go/Rust 使用 domain 内 `change_sequence` 与 opaque cursor；userdb schema v5 持久化 cursor、remote observation、local revision、cycle journal 和完整密文 outbox，并原子提交 payload、observation、revision 与 cursor。`409 stale_base_version` 必须重新发现、验签解密、合并和签名。
+M3 已具备 P2 envelope、signed manifest、Go server 设备/对象/密文/备份部署边界，以及关闭态 `sync_once`。对象同步使用 domain 内 `change_sequence`；设备信任链使用独立 `lifecycle_sequence`，两类 opaque cursor 不复用。userdb schema v6 持久化对象 cursor、remote observation、local revision、cycle journal、完整密文 outbox，以及只含公开资料和签名记录的可信 lifecycle cache；payload apply 与对象 cursor、已验证 lifecycle state 与 lifecycle cursor 分别原子提交。`409 stale_base_version` 必须重新发现、验签解密、合并和签名。
 
 风险矩阵已覆盖取消、retry exhaustion、revision race、lease recovery、签名/密文/AAD 篡改、epoch/revocation、decode/SQLite 失败、outbox prepare/ack 故障和残缺 migration 回滚。两个隔离 userdb 通过短生命周期 Go HTTP 服务完成上传、发现、合并回传、service 重建与第二轮零上传收敛；失败不推进 cursor、不清除 dirty，也不丢失可重放请求。
 
 第四、第五实现批已落地默认关闭的 `DefaultSyncObjectProcessor`、`SyncCryptoProvider` 与 `ProductSyncCryptoProvider`。产品装载层组合可信设备生命周期源、本机授权的 epoch material store 和平台签名 backend；先确认本机 active 与 backend 产品资格，再读取 secret。preflight 冻结 signing profile、当前/历史 epoch、撤销 sequence 和 key material；缺少本机 profile、backend key 匹配、当前 epoch 或产品资格均在网络前失败关闭。
 
-合成授权/撤销/轮换记录已证明：测试 backend 和被撤销本机都不会触发 material 读取；撤销前历史对象仍可验签解密，阈值后的 sequence 被拒绝；新 active 设备用 epoch 2 写 outbox，重建 processor 后可从 sources 重建同一可信 snapshot。双 userdb HTTP fixture 继续复用通用 processor。以上只验证 provider 核心与端口顺序，不代表真实 lifecycle cache、wrapped material 解封装或平台 adapter 已落地。
+Go metadata schema v4 已追加 `initial_device`、`device_authorized`、`device_revoked` lifecycle 事件；授权和撤销与序列分配在同一事务，撤销原子冻结首个拒绝对象 sequence。Rust remote client 可获取 snapshot / 增量页，从本地初始信任锚验证完整授权和撤销链；加入 challenge 使用 `profile-sha256-v1` 摘要绑定两组完整设备公钥、算法、key id、domain / join request id 和有效期，服务端状态或仅 key id 不能替换公钥。乱序、序列缺口、epoch 跳变、公钥替换、inactive signer 和 cursor 分叉均失败关闭。
+
+两个文件 userdb 已通过短生命周期真实 Go HTTP 完成 A 初始化、B 加入授权、P2 双向同步、B 撤销、epoch 2 更新、双方缓存与重启恢复；撤销前 6 条对象 sequence 保留，B 从 sequence 7 起被拒绝。`UserDb` 已直接实现 `SyncTrustedDeviceSource`，`ProductSyncCryptoProvider` 可在无网络 preflight 中读取重启恢复的公开可信状态。以上仍不代表 wrapped material 解封装或平台 adapter 已落地。
 
 签名层已支持显式 Ed25519/P-256 profile 与 Rust/Go verifier；缺少或混用算法时失败关闭。普通 DPK P-256 产品进程生命周期可用但私钥可导出，production gate 明确拒绝；Secure Enclave 已证明 lifecycle、不可导出、hardware-backed、denied 与真实锁屏失败关闭，但 unsupported 和最终产品资格仍缺外部环境证据。
 
@@ -30,7 +32,7 @@ M3 已具备 P2 envelope、signed manifest、Go server 设备/对象/密文/备�
 
 - 普通 DPK P-256 可导出，Apple/Android Ed25519 也未满足生产私钥条件；`test-memory-v1` 只允许测试且无 fallback。
 - Secure Enclave 已完成 lifecycle、denied 与真实设备锁屏证据并清理合成 key；unsupported 和产品资格仍待独立环境。
-- 缺少发布级目标部署运行证据，以及 provider sources 的真实设备生命周期缓存、wrapped epoch material 解封装、设备恢复/撤销/key epoch 全流程。
+- 缺少发布级目标部署运行证据、wrapped epoch material 解封装、恢复码设备恢复和生产平台 adapter；设备授权/撤销/key epoch 的公开信任链已落地，但 secret material 链仍保持关闭。
 - `ManagerBridge` 仍无真实同步、恢复码、设备加入、授权、撤销或轮换命令；现有 readiness 只证明关闭态。
 
 开发者当前没有真实不支持 Secure Enclave 的目标环境，unsupported 与产品资格因此保持外部阻塞；不能在当前设备伪造，也不能据此开放资格字段。关闭态 provider/lifecycle 实现可继续推进，但不降低生产 backend 或真实用户同步门禁。
@@ -47,9 +49,9 @@ M3 已具备 P2 envelope、signed manifest、Go server 设备/对象/密文/备�
 ## 下一步顺位
 
 1. 将 unsupported 保留为外部环境阻塞：目标环境可得时按独立授权执行 probe，确认明确 unsupported、无残留且不回退普通 DPK/test memory；通过后再逐字段评审 `product_qualified/user_presence_required/backup_migratable`。当前设备不能替代该证据。
-2. 设计可信设备目录/lifecycle 同步边界：Go server 提供完整 domain/device public metadata 与单调 lifecycle sequence，Rust 验证 signed authorization/revocation 后原子缓存；服务端状态不能绕过客户端签名验证，缓存不含 secret。
-3. 实现 `SyncEpochMaterialStore` 与 `SyncDeviceSigningBackend` 产品 adapter：wrapped material 只能在本机受保护边界内解封并短暂交给 Rust，SQLite/settings 不保存明文 master key；旧设备拿不到新 epoch，backend 未获资格时继续在 material 读取前阻断。
-4. 完成真实 lifecycle/material 重启恢复与两个真实客户端证据后，才接窄 `ManagerBridge` command/status；最终满足恢复、授权、撤销、轮换和发布部署门禁后再评估开放用户同步。
+2. 实现 `SyncEpochMaterialStore` 与 `SyncDeviceSigningBackend` 产品 adapter：wrapped material 只能在本机受保护边界内解封并短暂交给 Rust，SQLite/settings 不保存明文 master key；旧设备拿不到新 epoch，backend 未获资格时继续在 material 读取前阻断。
+3. 将真实 lifecycle cache 与 wrapped material 组合进产品 provider，补恢复码恢复、epoch material 轮换、撤销后旧设备无法取得新材料，以及两个真实客户端重启恢复证据。
+4. lifecycle/material 产品链稳定后才接窄 `ManagerBridge` command/status；最终满足恢复、授权、撤销、轮换和发布部署门禁后再评估开放用户同步。
 
 ## 验证入口
 

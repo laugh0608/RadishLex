@@ -192,12 +192,12 @@ Preflight 只能返回计数、状态和阻塞原因，不返回明文 P2、P1 �
 ## 实施状态与后续批次
 
 1. 已落地：`ime-sync` phase/result/error、opaque cursor、discovery page、local repository port 与 prepared outbox；Go/Rust change cursor discovery 已覆盖分页、幂等 sequence、非法/跨域/越界 cursor。
-2. 已落地：userdb schema v5 持久化 domain state、remote observation、local revision、cycle journal/outbox；transaction-scoped apply 使 payload、observation、revision 与 cursor 同提交或回滚。
+2. 已落地：userdb schema v6 持久化 domain state、remote observation、local revision、cycle journal/outbox 与可信 public lifecycle cache；transaction-scoped apply 使 payload、observation、revision 与对象 cursor 同提交或回滚，已验证 lifecycle state 与独立 lifecycle cursor 同事务替换且拒绝回退 / 分叉。
 3. 已落地：关闭态 `sync_once` 组合 remote/local/crypto processor port，测试使用真实 test-memory signing 与密文解密，覆盖 `409` 重新发现、重新合并和新版本签名；文件重开可恢复同一 outbox。
-4. 已落地关闭态风险矩阵：取消、retry exhaustion、local revision race、lease recovery、签名/密文/AAD-bound metadata、epoch/revocation 拒绝、decode/transaction cursor rollback、v4→v5 migration rollback、outbox prepare/ack crash point，以及两个隔离 userdb 通过短生命周期 Go HTTP 服务第二轮零上传收敛。
+4. 已落地关闭态风险矩阵：取消、retry exhaustion、local revision race、lease recovery、签名/密文/AAD-bound metadata、epoch/revocation 拒绝、decode/transaction cursor rollback、v4→v5 与 v5→v6 migration rollback、outbox prepare/ack crash point，以及两个隔离 userdb 通过短生命周期 Go HTTP 服务第二轮零上传收敛。
 5. 已落地：默认关闭的 `DefaultSyncObjectProcessor`、cycle-frozen `SyncCryptoCycleSnapshot` 与 `SyncCryptoProvider` port；产品/合成构造路径分离，默认无 provider 时网络前阻断。测试覆盖历史 epoch、撤销 sequence、snapshot 漂移和轮换 outbox，双 userdb HTTP fixture 已复用该通用实现。
 6. 已落地：`ProductSyncCryptoProvider`、可信 lifecycle/material/signing 三端口和严格装载顺序；合成授权、撤销、轮换与重启测试证明 revoked/test backend 不读取 material、历史 epoch 可读、撤销后 sequence 拒绝和新 epoch outbox。
-7. 下一批实现完整设备目录/lifecycle sequence、Rust signed record 验证与本地 public cache，再接 wrapped epoch material 和平台 signing adapter；production backend 资格通过前不接真实签名路径。Rust service、真实 provider sources 与 backend 三条门禁都通过后才设计窄 FFI command/status。
+7. 已落地：独立 lifecycle sequence、Rust trust-anchor signed record 验证和 userdb public cache；真实 Go HTTP 组合测试覆盖设备授权、同步、撤销、缓存和重启恢复。下一批接 wrapped epoch material store 与平台 signing backend adapter；production backend 资格通过前不接真实签名路径。Rust service、真实 provider sources 与 backend 三条门禁都通过后才设计窄 FFI command/status。
 
 ## 验证矩阵
 
