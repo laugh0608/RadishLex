@@ -14,7 +14,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 - `android-keystore-v1` 已有 Kotlin / Gradle harness、JNI glue、gated smoke 和 provider diagnostics；Pixel 9 Pro API 35 AVD 与 Pixel 10 Pro API 37 AVD 均返回 `unsupported_signature_algorithm`。
 - `windows-cng-v1`、`linux-secret-service-v1` 仍只是能力边界标识，未进入实现。
 
-没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。普通 DPK P-256 的评审结论是“软件运行时可用、生产资格拒绝”。独立 Secure Enclave P-256 已完成 lifecycle、denied 与真实设备锁屏 locked；当前等待无 Secure Enclave 环境的 unsupported 和产品资格评审，发布级目标部署运行证据仍保留为正式发布前门禁。
+没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。普通 DPK P-256 的评审结论是“软件运行时可用、生产资格拒绝”。独立 Secure Enclave P-256 已完成 lifecycle、denied 与真实设备锁屏 locked；开发者当前没有真实无 Secure Enclave 目标，unsupported 和产品资格评审作为外部环境阻塞继续保留，发布级目标部署运行证据仍是正式发布前门禁。该阻塞不降低任何资格字段，但也不再冻结关闭产品入口、只使用合成数据与测试 backend 的 Rust 产品编排开发。
 
 ## 策略目标
 
@@ -128,21 +128,23 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 
 在该 ADR 完成前，不允许把 seed 存储 fallback 混入现有平台 backend。
 
-### 路径 D：继续本地同步产品开发
+### 路径 D：继续关闭态本地同步产品开发
 
 适用条件：
 
 - 当前没有新 Android 真机或 Apple 平台调查条件。
-- 仍希望推进 M3 manager 同步入口和本地联调能力。
+- 仍希望推进与平台硬件证据独立的 Rust 编排和本地联调能力。
 
 可推进内容：
 
 - 使用本地 Docker / 本地 HTTPS 复验 sync server 到达性、bearer token 失败响应、密文对象路径和日志脱敏。
+- 先按 `docs/sync-orchestration.md` 固定 Rust 状态机、discovery cursor、transaction、持久化 outbox、取消/重启和 409 重新发现语义。
+- 在 `ime-sync` / `ime-userdb` / `ime-crypto` 内使用测试 backend、合成 P2 和短生命周期服务实现可恢复 `sync_once`；不接真实产品签名路径。
 - 在 manager 中实现 sync entry state helper / UI gate，只展示本地联调来源、阻塞原因和下一步，不上传真实用户 P2 数据。
 - 为 settings draft、backend gate、部署证据来源、恢复码状态和设备授权状态补 Dart helper / widget / 诊断脱敏测试。
 - 保持正式发布前再补真实证书 / 域名 / 外部反代、目标数据目录备份恢复、升级回滚和日志策略复验。
 
-该路径不解除平台私钥 backend 门禁，也不解除真实用户同步开放门禁；它用于避免当前产品开发被发布级部署环境长期阻塞。
+该路径不解除平台私钥 backend 门禁，也不解除真实用户同步开放门禁；它用于避免产品开发被外部硬件或发布级部署环境长期阻塞。Rust service 稳定前不新增 FFI/Dart 执行命令，backend 产品资格通过前不接真实产品签名路径。
 
 ## 当前不做
 
@@ -163,7 +165,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 3. 已在独立授权后完成 ad-hoc denied 与 provisioning-backed manager 产品 DPK 生命周期；native 内完成创建、重载、签名、Rust/Go 验签、删除、missing、失败关闭、cleanup 和固定摘要。Dart 不绑定该 ABI，InputMethodKit 不接入同步密钥职责。
 4. 已完成普通 DPK capability 评审：P-256 key 标记 `exportable=true`，编译/运行时字段如实开放，`product_qualified` 与用户同步 gate 关闭；该基础签名成功没有被用于推导 Secure Enclave、hardware-backed、user presence 或 backup migration。后续独立 Secure Enclave 产品生命周期仅按自身证据开放 `hardware_backed`。
 5. 已补 Secure Enclave 独立 backend ADR/runbook，并沿 crypto、FFI、manager native 完成 repository 接线、qualification lifecycle、capability 重冻结、ad-hoc denied 与真实设备锁屏 locked；不回退普通 DPK 或 test memory。下一证据是在无 Secure Enclave 环境执行 unsupported。
-6. 只有不可导出 production backend 评审和产品环境 smoke 通过后，才进入真实产品 sync orchestration 与 `ManagerBridge` 命令；恢复码、设备授权、撤销和用户同步入口继续关闭到 M3 全部退出证据成立。
+6. 当前无真实 unsupported 目标，故将该证据记录为外部环境阻塞；关闭态 Rust sync orchestration 可以按独立边界使用测试 backend 与合成 P2 推进。只有 Rust service 稳定且不可导出 production backend 评审通过后，才进入真实产品签名路径与 `ManagerBridge` 命令；恢复码、设备授权、撤销和用户同步入口继续关闭到 M3 全部退出证据成立。
 
 ## 验证口径
 
@@ -202,4 +204,5 @@ cargo test -p radishlex-ime-crypto --features apple-keychain
 - [Apple Secure Enclave P-256 Backend Runbook](runbooks/apple-secure-enclave-p256-backend.md)
 - [Android Keystore Signing Backend Runbook](runbooks/android-keystore-signing-backend.md)
 - [同步密钥与设备生命周期设计](sync-key-management.md)
+- [产品同步编排边界](sync-orchestration.md)
 - [Sync Server Production Deployment Runbook](runbooks/sync-server-production-deployment.md)

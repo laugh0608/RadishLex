@@ -79,6 +79,7 @@ type ObjectVersionResponse struct {
 	ObjectType             string `json:"object_type"`
 	Version                uint64 `json:"version"`
 	BaseVersion            uint64 `json:"base_version"`
+	ChangeSequence         uint64 `json:"change_sequence"`
 	OwnerDeviceID          string `json:"owner_device_id"`
 	KeyID                  string `json:"key_id"`
 	KeyEpoch               uint64 `json:"key_epoch"`
@@ -93,6 +94,12 @@ type ObjectVersionResponse struct {
 	ServerReceivedAtMs     int64  `json:"server_received_at_ms"`
 	ClientCreatedAtMs      int64  `json:"client_created_at_ms"`
 	ClientUpdatedAtMs      int64  `json:"client_updated_at_ms"`
+}
+
+type ObjectDiscoveryResponse struct {
+	Entries    []ObjectVersionResponse `json:"entries"`
+	NextCursor string                  `json:"next_cursor"`
+	HasMore    bool                    `json:"has_more"`
 }
 
 func DomainResponseFrom(domain storage.Domain) DomainResponse {
@@ -183,6 +190,7 @@ func ObjectVersionResponseFrom(version storage.ObjectVersion) ObjectVersionRespo
 		ObjectType:             version.ObjectType,
 		Version:                version.Version,
 		BaseVersion:            version.BaseVersion,
+		ChangeSequence:         version.ChangeSequence,
 		OwnerDeviceID:          version.OwnerDeviceID,
 		KeyID:                  version.KeyID,
 		KeyEpoch:               version.KeyEpoch,

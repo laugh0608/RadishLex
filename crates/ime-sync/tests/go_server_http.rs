@@ -57,6 +57,15 @@ fn http_transport_round_trips_encrypted_object_through_go_sync_server() {
     assert_eq!(uploaded.owner_device_id, DEVICE_ID);
     assert_eq!(uploaded.key_id, OBJECT_KEY_ID);
     assert_eq!(uploaded.ciphertext_hash, version_1.draft.ciphertext_hash);
+    assert_eq!(uploaded.change_sequence, 1);
+
+    let discovery = client
+        .discover_object_versions(DOMAIN_ID, None, 10)
+        .expect("discover uploaded object");
+    assert_eq!(discovery.entries.len(), 1);
+    assert_eq!(discovery.entries[0], uploaded);
+    assert_eq!(discovery.entries[0].change_sequence, 1);
+    assert!(!discovery.has_more);
 
     let remote_payload = client
         .object_payload(DOMAIN_ID, OBJECT_ID, 1)

@@ -25,6 +25,7 @@ type MemoryStore struct {
 	latestRecovery map[string]string
 	objects        map[objectKey]SyncObject
 	versions       map[objectVersionKey]ObjectVersion
+	nextSequence   map[string]uint64
 	blobs          map[string][]byte
 	auditEvents    []AuditEvent
 }
@@ -41,6 +42,7 @@ func NewMemoryStore() *MemoryStore {
 		latestRecovery: make(map[string]string),
 		objects:        make(map[objectKey]SyncObject),
 		versions:       make(map[objectVersionKey]ObjectVersion),
+		nextSequence:   make(map[string]uint64),
 		blobs:          make(map[string][]byte),
 	}
 }
@@ -440,15 +442,45 @@ func (s *MemoryStore) PutObjectVersion(ctx context.Context, upload ObjectVersion
 	}
 
 	version := cloneObjectVersion(upload.Version)
+	s.nextSequence[version.DomainID]++
+	version.ChangeSequence = s.nextSequence[version.DomainID]
 	version.BlobRef = objectBlobRef(version)
 	object.LatestVersion = version.Version
 	object.LatestCiphertextHash = version.CiphertextHash
 	object.LatestKeyEpoch = version.KeyEpoch
+	object.LatestChangeSequence = version.ChangeSequence
 	object.UpdatedAtMs = version.ClientUpdatedAtMs
 	s.objects[objKey] = object
 	s.versions[versionKey] = version
 	s.blobs[version.BlobRef] = cloneBytes(upload.Payload)
 	return cloneObjectVersion(version), nil
+}
+
+func (s *MemoryStore) ObjectVersionsAfter(ctx context.Context, domainID string, afterSequence uint64, limit int) ([]ObjectVersion, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	if !validOpaqueID(domainID) || limit <= 0 || limit > 201 {
+		return nil, newError(ErrInvalidRequest, "object discovery parameters are invalid")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.domains[domainID]; !ok {
+		return nil, newError(ErrNotFound, "domain not found")
+	}
+	versions := make([]ObjectVersion, 0, limit)
+	for _, version := range s.versions {
+		if version.DomainID == domainID && version.ChangeSequence > afterSequence {
+			versions = append(versions, cloneObjectVersion(version))
+		}
+	}
+	sort.Slice(versions, func(i int, j int) bool {
+		return versions[i].ChangeSequence < versions[j].ChangeSequence
+	})
+	if len(versions) > limit {
+		versions = versions[:limit]
+	}
+	return versions, nil
 }
 
 func (s *MemoryStore) ObjectVersion(ctx context.Context, domainID string, objectID string, version uint64) (ObjectVersion, error) {

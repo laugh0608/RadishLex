@@ -249,6 +249,8 @@ Manager 不得显示或持久化：
 - 原始请求/响应体；
 - 明文 P1 事件或真实敏感路径。
 
+为支持 crash-safe 幂等上传，Rust-owned userdb 可以按 `docs/sync-orchestration.md` 持久化 prepared outbox 中的 encrypted envelope、signed manifest 与 signature bytes。这不属于 Manager settings 或 UI state；outbox 禁止保存 plaintext payload、canonical bytes、token、sync master/object key、设备私钥、wrapped material 或恢复码，并必须在成功确认、冲突替换和用户清除同步状态时按明确事务语义收口。
+
 诊断只使用 allowlist 字段和结构化状态码。真实同步操作必须通过 Rust sync/crypto 边界，Flutter 不自行构造签名或解密 payload。
 
 ## 后端部署
@@ -330,6 +332,7 @@ Docker/反代操作步骤见对应 runbook，当前部署证据见 `docs/status/
 - [同步密钥管理](sync-key-management.md)
 - [生产恢复流程](production-recovery-flow.md)
 - [Sync Server API/Storage](sync-server-api-storage.md)
+- [产品同步编排](sync-orchestration.md)
 - [平台私钥策略](platform-private-key-backend-strategy.md)
 - [设备签名算法 Profile ADR](adr/0006-device-signature-algorithm-profiles.md)
 - [Manager Boundary](manager-ui-boundary.md)

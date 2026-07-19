@@ -123,6 +123,7 @@ CREATE TABLE IF NOT EXISTS sync_objects (
     latest_version INTEGER NOT NULL CHECK (latest_version > 0),
     latest_ciphertext_hash TEXT NOT NULL,
     latest_key_epoch INTEGER NOT NULL CHECK (latest_key_epoch > 0),
+    latest_change_sequence INTEGER NOT NULL CHECK (latest_change_sequence > 0),
     created_at_ms INTEGER NOT NULL,
     updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= created_at_ms),
     PRIMARY KEY (domain_id, object_id)
@@ -134,6 +135,7 @@ CREATE TABLE IF NOT EXISTS sync_object_versions (
     object_type TEXT NOT NULL,
     version INTEGER NOT NULL CHECK (version > 0),
     base_version INTEGER NOT NULL CHECK (base_version + 1 = version),
+    change_sequence INTEGER NOT NULL CHECK (change_sequence > 0),
     owner_device_id TEXT NOT NULL,
     key_id TEXT NOT NULL,
     key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),

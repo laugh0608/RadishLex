@@ -574,6 +574,10 @@ func (s *SQLiteStore) PutObjectVersion(ctx context.Context, upload ObjectVersion
 	}
 
 	version := cloneObjectVersion(upload.Version)
+	version.ChangeSequence, err = nextObjectChangeSequenceTx(ctx, tx, version.DomainID)
+	if err != nil {
+		return ObjectVersion{}, err
+	}
 	version.BlobRef = objectBlobRef(version)
 	staged, err := s.blobs.StageObjectBlob(ctx, version.BlobRef, upload.Payload)
 	if err != nil {
@@ -584,6 +588,7 @@ func (s *SQLiteStore) PutObjectVersion(ctx context.Context, upload ObjectVersion
 	object.LatestVersion = version.Version
 	object.LatestCiphertextHash = version.CiphertextHash
 	object.LatestKeyEpoch = version.KeyEpoch
+	object.LatestChangeSequence = version.ChangeSequence
 	object.UpdatedAtMs = version.ClientUpdatedAtMs
 	if exists {
 		if err := updateSyncObjectTx(ctx, tx, object); err != nil {
@@ -605,6 +610,45 @@ func (s *SQLiteStore) PutObjectVersion(ctx context.Context, upload ObjectVersion
 		return ObjectVersion{}, newError(ErrStorageUnavailable, "sqlite transaction cannot commit")
 	}
 	return cloneObjectVersion(version), nil
+}
+
+func (s *SQLiteStore) ObjectVersionsAfter(ctx context.Context, domainID string, afterSequence uint64, limit int) ([]ObjectVersion, error) {
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	if !validOpaqueID(domainID) || limit <= 0 || limit > 201 {
+		return nil, newError(ErrInvalidRequest, "object discovery parameters are invalid")
+	}
+	if _, err := s.Domain(ctx, domainID); err != nil {
+		return nil, err
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT domain_id, object_id, object_type, version, base_version, change_sequence,
+			owner_device_id, key_id, key_epoch, algorithm, nonce,
+			encrypted_payload_len, ciphertext_hash,
+			signature_schema_version, signature_algorithm, signature_key_id, signature,
+			server_received_at_ms, client_created_at_ms, client_updated_at_ms, blob_ref
+		FROM sync_object_versions
+		WHERE domain_id = ? AND change_sequence > ?
+		ORDER BY change_sequence
+		LIMIT ?
+	`, domainID, int64(afterSequence), limit)
+	if err != nil {
+		return nil, newError(ErrStorageUnavailable, "object discovery metadata cannot be read")
+	}
+	defer rows.Close()
+	versions := make([]ObjectVersion, 0, limit)
+	for rows.Next() {
+		version, err := objectVersionFromRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		versions = append(versions, version)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, newError(ErrStorageUnavailable, "object discovery metadata cannot be read")
+	}
+	return versions, nil
 }
 
 func (s *SQLiteStore) ObjectVersion(ctx context.Context, domainID string, objectID string, version uint64) (ObjectVersion, error) {
@@ -826,16 +870,17 @@ func scanRecoveryRecord(row sqlRow) (RecoveryRecord, error) {
 func syncObjectTx(ctx context.Context, tx *sql.Tx, domainID string, objectID string) (SyncObject, bool, error) {
 	row := tx.QueryRowContext(ctx, `
 		SELECT domain_id, object_id, object_type, latest_version,
-			latest_ciphertext_hash, latest_key_epoch, created_at_ms, updated_at_ms
+			latest_ciphertext_hash, latest_key_epoch, latest_change_sequence, created_at_ms, updated_at_ms
 		FROM sync_objects
 		WHERE domain_id = ? AND object_id = ?
 	`, domainID, objectID)
 	var object SyncObject
 	var latestVersion int64
 	var latestKeyEpoch int64
+	var latestChangeSequence int64
 	if err := row.Scan(
 		&object.DomainID, &object.ObjectID, &object.ObjectType, &latestVersion,
-		&object.LatestCiphertextHash, &latestKeyEpoch, &object.CreatedAtMs, &object.UpdatedAtMs,
+		&object.LatestCiphertextHash, &latestKeyEpoch, &latestChangeSequence, &object.CreatedAtMs, &object.UpdatedAtMs,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return SyncObject{}, false, nil
@@ -844,6 +889,7 @@ func syncObjectTx(ctx context.Context, tx *sql.Tx, domainID string, objectID str
 	}
 	object.LatestVersion = uint64(latestVersion)
 	object.LatestKeyEpoch = uint64(latestKeyEpoch)
+	object.LatestChangeSequence = uint64(latestChangeSequence)
 	return object, true, nil
 }
 
@@ -851,11 +897,11 @@ func insertSyncObjectTx(ctx context.Context, tx *sql.Tx, object SyncObject) erro
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO sync_objects (
 			domain_id, object_id, object_type, latest_version,
-			latest_ciphertext_hash, latest_key_epoch, created_at_ms, updated_at_ms
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			latest_ciphertext_hash, latest_key_epoch, latest_change_sequence, created_at_ms, updated_at_ms
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		object.DomainID, object.ObjectID, object.ObjectType, int64(object.LatestVersion),
-		object.LatestCiphertextHash, int64(object.LatestKeyEpoch), object.CreatedAtMs, object.UpdatedAtMs,
+		object.LatestCiphertextHash, int64(object.LatestKeyEpoch), int64(object.LatestChangeSequence), object.CreatedAtMs, object.UpdatedAtMs,
 	); err != nil {
 		return newError(ErrStorageUnavailable, "object metadata cannot be stored")
 	}
@@ -865,10 +911,10 @@ func insertSyncObjectTx(ctx context.Context, tx *sql.Tx, object SyncObject) erro
 func updateSyncObjectTx(ctx context.Context, tx *sql.Tx, object SyncObject) error {
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE sync_objects
-		SET latest_version = ?, latest_ciphertext_hash = ?, latest_key_epoch = ?, updated_at_ms = ?
+		SET latest_version = ?, latest_ciphertext_hash = ?, latest_key_epoch = ?, latest_change_sequence = ?, updated_at_ms = ?
 		WHERE domain_id = ? AND object_id = ?
 	`,
-		int64(object.LatestVersion), object.LatestCiphertextHash, int64(object.LatestKeyEpoch), object.UpdatedAtMs,
+		int64(object.LatestVersion), object.LatestCiphertextHash, int64(object.LatestKeyEpoch), int64(object.LatestChangeSequence), object.UpdatedAtMs,
 		object.DomainID, object.ObjectID,
 	); err != nil {
 		return newError(ErrStorageUnavailable, "object metadata cannot be updated")
@@ -878,7 +924,7 @@ func updateSyncObjectTx(ctx context.Context, tx *sql.Tx, object SyncObject) erro
 
 func objectVersionQuerier(ctx context.Context, querier sqlQuerier, domainID string, objectID string, version uint64) (ObjectVersion, error) {
 	return objectVersionFromRow(querier.QueryRowContext(ctx, `
-		SELECT domain_id, object_id, object_type, version, base_version,
+		SELECT domain_id, object_id, object_type, version, base_version, change_sequence,
 			owner_device_id, key_id, key_epoch, algorithm, nonce,
 			encrypted_payload_len, ciphertext_hash,
 			signature_schema_version, signature_algorithm, signature_key_id, signature,
@@ -896,10 +942,11 @@ func objectVersionFromRow(row sqlRow) (ObjectVersion, error) {
 	var version ObjectVersion
 	var versionNumber int64
 	var baseVersion int64
+	var changeSequence int64
 	var keyEpoch int64
 	var signatureSchemaVersion int64
 	if err := row.Scan(
-		&version.DomainID, &version.ObjectID, &version.ObjectType, &versionNumber, &baseVersion,
+		&version.DomainID, &version.ObjectID, &version.ObjectType, &versionNumber, &baseVersion, &changeSequence,
 		&version.OwnerDeviceID, &version.KeyID, &keyEpoch, &version.Algorithm, &version.Nonce,
 		&version.EncryptedPayloadLen, &version.CiphertextHash,
 		&signatureSchemaVersion, &version.SignatureAlgorithm, &version.SignatureKeyID, &version.Signature,
@@ -912,6 +959,7 @@ func objectVersionFromRow(row sqlRow) (ObjectVersion, error) {
 	}
 	version.Version = uint64(versionNumber)
 	version.BaseVersion = uint64(baseVersion)
+	version.ChangeSequence = uint64(changeSequence)
 	version.KeyEpoch = uint64(keyEpoch)
 	version.SignatureSchemaVersion = uint16(signatureSchemaVersion)
 	return cloneObjectVersion(version), nil
@@ -920,14 +968,14 @@ func objectVersionFromRow(row sqlRow) (ObjectVersion, error) {
 func insertObjectVersionTx(ctx context.Context, tx *sql.Tx, version ObjectVersion) error {
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO sync_object_versions (
-			domain_id, object_id, object_type, version, base_version,
+			domain_id, object_id, object_type, version, base_version, change_sequence,
 			owner_device_id, key_id, key_epoch, algorithm, nonce,
 			encrypted_payload_len, ciphertext_hash,
 			signature_schema_version, signature_algorithm, signature_key_id, signature,
 			server_received_at_ms, client_created_at_ms, client_updated_at_ms, blob_ref
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
-		version.DomainID, version.ObjectID, version.ObjectType, int64(version.Version), int64(version.BaseVersion),
+		version.DomainID, version.ObjectID, version.ObjectType, int64(version.Version), int64(version.BaseVersion), int64(version.ChangeSequence),
 		version.OwnerDeviceID, version.KeyID, int64(version.KeyEpoch), version.Algorithm, cloneBytes(version.Nonce),
 		version.EncryptedPayloadLen, version.CiphertextHash,
 		int64(version.SignatureSchemaVersion), version.SignatureAlgorithm, version.SignatureKeyID, cloneBytes(version.Signature),
@@ -936,6 +984,18 @@ func insertObjectVersionTx(ctx context.Context, tx *sql.Tx, version ObjectVersio
 		return newError(ErrStorageUnavailable, "object version metadata cannot be stored")
 	}
 	return nil
+}
+
+func nextObjectChangeSequenceTx(ctx context.Context, tx *sql.Tx, domainID string) (uint64, error) {
+	var next int64
+	if err := tx.QueryRowContext(ctx, `
+		SELECT COALESCE(MAX(change_sequence), 0) + 1
+		FROM sync_object_versions
+		WHERE domain_id = ?
+	`, domainID).Scan(&next); err != nil || next <= 0 {
+		return 0, newError(ErrStorageUnavailable, "object change sequence cannot be allocated")
+	}
+	return uint64(next), nil
 }
 
 func rollbackTx(tx *sql.Tx) {

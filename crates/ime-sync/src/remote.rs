@@ -26,6 +26,7 @@ impl SyncRemoteMethod {
 pub struct SyncRemoteRequest {
     method: SyncRemoteMethod,
     path: String,
+    query: Vec<(String, String)>,
     content_type: Option<String>,
     body: Vec<u8>,
 }
@@ -40,9 +41,23 @@ impl SyncRemoteRequest {
         Self {
             method,
             path: path.into(),
+            query: Vec::new(),
             content_type,
             body: body.into(),
         }
+    }
+
+    pub fn with_query_param(
+        mut self,
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Result<Self, SyncRemoteError> {
+        let name = name.into();
+        let value = value.into();
+        validate_query_component("query name", &name, false)?;
+        validate_query_component("query value", &value, true)?;
+        self.query.push((name, value));
+        Ok(self)
     }
 
     pub fn method(&self) -> SyncRemoteMethod {
@@ -51,6 +66,10 @@ impl SyncRemoteRequest {
 
     pub fn path(&self) -> &str {
         &self.path
+    }
+
+    pub fn query(&self) -> &[(String, String)] {
+        &self.query
     }
 
     pub fn content_type(&self) -> Option<&str> {
@@ -67,6 +86,10 @@ impl fmt::Debug for SyncRemoteRequest {
         f.debug_struct("SyncRemoteRequest")
             .field("method", &self.method)
             .field("path", &self.path)
+            .field(
+                "query",
+                &format_args!("[redacted values; {} parameters]", self.query.len()),
+            )
             .field("content_type", &self.content_type)
             .field(
                 "body",
@@ -167,6 +190,30 @@ impl fmt::Display for SyncServerErrorCode {
 pub struct LatestObjectConflictMetadata {
     pub version: u64,
     pub ciphertext_hash: Option<String>,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct OpaqueSyncCursor(String);
+
+impl OpaqueSyncCursor {
+    pub fn new(value: impl Into<String>) -> Result<Self, SyncRemoteError> {
+        let value = value.into();
+        validate_query_component("sync cursor", &value, true)?;
+        if value.len() > 256 {
+            return invalid_request("sync cursor must be at most 256 bytes");
+        }
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Debug for OpaqueSyncCursor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("[opaque sync cursor]")
+    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -278,6 +325,7 @@ pub struct RemoteObjectVersion {
     pub object_type: SyncObjectType,
     pub version: u64,
     pub base_version: Option<u64>,
+    pub change_sequence: u64,
     pub owner_device_id: String,
     pub key_id: String,
     pub key_epoch: u64,
@@ -302,6 +350,7 @@ impl fmt::Debug for RemoteObjectVersion {
             .field("object_type", &self.object_type)
             .field("version", &self.version)
             .field("base_version", &self.base_version)
+            .field("change_sequence", &self.change_sequence)
             .field("owner_device_id", &self.owner_device_id)
             .field("key_id", &self.key_id)
             .field("key_epoch", &self.key_epoch)
@@ -339,6 +388,9 @@ impl RemoteObjectVersion {
         if self.version == 0 {
             return invalid_request("version must be greater than 0");
         }
+        if self.change_sequence == 0 {
+            return invalid_request("change_sequence must be greater than 0");
+        }
         if let Some(base_version) = self.base_version {
             if base_version >= self.version {
                 return invalid_request("base_version must be lower than version");
@@ -361,6 +413,13 @@ impl RemoteObjectVersion {
         }
         Ok(())
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteObjectDiscoveryPage {
+    pub entries: Vec<RemoteObjectVersion>,
+    pub next_cursor: OpaqueSyncCursor,
+    pub has_more: bool,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -423,6 +482,27 @@ impl<T: SyncRemoteTransport> SyncRemoteClient<T> {
         let request = ObjectVersionUploadDto::from_object(object, manifest);
         let path = self.object_versions_path(domain_id, &object.draft.object_id)?;
         self.send_json(SyncRemoteMethod::Post, path, &request)
+    }
+
+    pub fn discover_object_versions(
+        &self,
+        domain_id: &str,
+        after_cursor: Option<&OpaqueSyncCursor>,
+        limit: u16,
+    ) -> Result<RemoteObjectDiscoveryPage, SyncRemoteError> {
+        validate_path_segment("domain_id", domain_id)?;
+        if limit == 0 || limit > 200 {
+            return invalid_request("discovery limit must be between 1 and 200");
+        }
+        let path = format!("{}/domains/{domain_id}/objects", self.api_prefix);
+        let mut request = SyncRemoteRequest::new(SyncRemoteMethod::Get, path, None, Vec::new())
+            .with_query_param("limit", limit.to_string())?;
+        if let Some(cursor) = after_cursor {
+            request = request.with_query_param("after_cursor", cursor.as_str())?;
+        }
+        let response = self.transport.send(request)?;
+        let dto: ObjectDiscoveryResponseDto = decode_json_response(response)?;
+        dto.try_into()
     }
 
     pub fn object_version(
@@ -594,6 +674,7 @@ struct ObjectVersionResponseDto {
     object_type: String,
     version: u64,
     base_version: u64,
+    change_sequence: u64,
     owner_device_id: String,
     key_id: String,
     key_epoch: u64,
@@ -630,6 +711,7 @@ impl TryFrom<ObjectVersionResponseDto> for RemoteObjectVersion {
             } else {
                 Some(value.base_version)
             },
+            change_sequence: value.change_sequence,
             owner_device_id: value.owner_device_id,
             key_id: value.key_id,
             key_epoch: value.key_epoch,
@@ -647,6 +729,42 @@ impl TryFrom<ObjectVersionResponseDto> for RemoteObjectVersion {
         };
         object.validate()?;
         Ok(object)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ObjectDiscoveryResponseDto {
+    entries: Vec<ObjectVersionResponseDto>,
+    next_cursor: String,
+    has_more: bool,
+}
+
+impl TryFrom<ObjectDiscoveryResponseDto> for RemoteObjectDiscoveryPage {
+    type Error = SyncRemoteError;
+
+    fn try_from(value: ObjectDiscoveryResponseDto) -> Result<Self, Self::Error> {
+        let entries = value
+            .entries
+            .into_iter()
+            .map(RemoteObjectVersion::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
+        for pair in entries.windows(2) {
+            if pair[0].change_sequence >= pair[1].change_sequence {
+                return invalid_response("discovery entries must be ordered by change_sequence");
+            }
+        }
+        if value.has_more && entries.is_empty() {
+            return invalid_response("discovery page with has_more must contain entries");
+        }
+        Ok(Self {
+            entries,
+            next_cursor: OpaqueSyncCursor::new(value.next_cursor).map_err(|_| {
+                SyncRemoteError::InvalidResponse {
+                    message: "discovery next_cursor is invalid".to_owned(),
+                }
+            })?,
+            has_more: value.has_more,
+        })
     }
 }
 
@@ -798,6 +916,23 @@ fn validate_path_segment(field: &'static str, value: &str) -> Result<(), SyncRem
     Ok(())
 }
 
+fn validate_query_component(
+    field: &'static str,
+    value: &str,
+    allow_dot: bool,
+) -> Result<(), SyncRemoteError> {
+    if value.is_empty() {
+        return invalid_request(format!("{field} cannot be empty"));
+    }
+    let valid = value.bytes().all(|byte| {
+        byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_' || (allow_dot && byte == b'.')
+    });
+    if !valid {
+        return invalid_request(format!("{field} contains unsupported characters"));
+    }
+    Ok(())
+}
+
 fn validate_required(field: &'static str, value: &str) -> Result<(), SyncRemoteError> {
     if value.trim().is_empty() {
         return Err(SyncRemoteError::InvalidRequest {
@@ -914,6 +1049,7 @@ pub(crate) mod test_support {
             "object_type": object.draft.object_type.as_str(),
             "version": object.draft.version,
             "base_version": object.draft.base_version.unwrap_or(0),
+            "change_sequence": object.draft.version,
             "owner_device_id": object.draft.owner_device_id,
             "key_id": object.draft.key_id,
             "key_epoch": object.draft.key_epoch,
@@ -1026,6 +1162,71 @@ mod tests {
 
         assert!(matches!(error, SyncRemoteError::InvalidRequest { .. }));
         assert!(error.to_string().contains("object_id"));
+    }
+
+    #[test]
+    fn discovery_uses_structured_cursor_query_and_redacts_its_value() {
+        let (object, _) = signed_object();
+        let mut entry = response_for(&object);
+        entry["change_sequence"] = serde_json::json!(7);
+        let transport = RecordingTransport::default();
+        transport.push_json(
+            200,
+            &serde_json::json!({
+                "entries": [entry],
+                "next_cursor": "v1.cursor_7",
+                "has_more": false
+            }),
+        );
+        let client = SyncRemoteClient::new(transport);
+        let cursor = OpaqueSyncCursor::new("v1.cursor_6").expect("cursor");
+
+        let page = client
+            .discover_object_versions("domain-a", Some(&cursor), 50)
+            .expect("discovery page");
+
+        assert_eq!(page.entries.len(), 1);
+        assert_eq!(page.entries[0].change_sequence, 7);
+        assert_eq!(page.next_cursor.as_str(), "v1.cursor_7");
+        assert!(!page.has_more);
+        let requests = client.transport().requests();
+        assert_eq!(requests[0].path(), "/api/v1/domains/domain-a/objects");
+        assert_eq!(
+            requests[0].query(),
+            &[
+                ("limit".to_owned(), "50".to_owned()),
+                ("after_cursor".to_owned(), "v1.cursor_6".to_owned())
+            ]
+        );
+        let debug = format!("{:?}", requests[0]);
+        assert!(!debug.contains("v1.cursor_6"));
+    }
+
+    #[test]
+    fn discovery_rejects_non_monotonic_change_sequences() {
+        let (object, _) = signed_object();
+        let mut later = response_for(&object);
+        later["object_id"] = serde_json::json!("object-b");
+        later["change_sequence"] = serde_json::json!(9);
+        let mut earlier = response_for(&object);
+        earlier["change_sequence"] = serde_json::json!(8);
+        let transport = RecordingTransport::default();
+        transport.push_json(
+            200,
+            &serde_json::json!({
+                "entries": [later, earlier],
+                "next_cursor": "v1.cursor_9",
+                "has_more": false
+            }),
+        );
+        let client = SyncRemoteClient::new(transport);
+
+        let error = client
+            .discover_object_versions("domain-a", None, 100)
+            .expect_err("out-of-order discovery page must fail");
+
+        assert!(matches!(error, SyncRemoteError::InvalidResponse { .. }));
+        assert!(error.to_string().contains("change_sequence"));
     }
 
     #[test]

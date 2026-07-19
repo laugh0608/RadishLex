@@ -1,6 +1,6 @@
 # Manager 同步入口边界
 
-本文面向 RadishLex Manager、Rust bridge 与同步功能维护者，固定 Manager 在 M3 真实同步实现前后的职责、敏感材料边界和产品停止线。本文不定义 C ABI 命令草案、审批流程、部署证据包格式、同步协议或密码学细节；协议和密钥语义分别以 `docs/privacy-sync.md`、`docs/sync-key-management.md`、`docs/production-recovery-flow.md` 和 `docs/sync-server-api-storage.md` 为准。
+本文面向 RadishLex Manager、Rust bridge 与同步功能维护者，固定 Manager 在 M3 真实同步实现前后的职责、敏感材料边界和产品停止线。本文不定义 C ABI 命令草案、审批流程、部署证据包格式、同步状态机、同步协议或密码学细节；Rust 编排以 `docs/sync-orchestration.md` 为准，协议和密钥语义分别以 `docs/privacy-sync.md`、`docs/sync-key-management.md`、`docs/production-recovery-flow.md` 和 `docs/sync-server-api-storage.md` 为准。
 
 ## 当前结论
 
@@ -63,7 +63,7 @@ Secure Enclave P-256 使用独立环境门、native symbol 与六个显式场景
 - 本地 Docker、localhost、fixture、readiness ready 和合成 smoke 只能用于开发验证，不能解锁产品入口。
 - 服务端继续被视为不可信，输入热路径不得依赖网络。
 
-进入真实实现前应重新基于当时的 Rust sync / crypto API、服务端协议和平台密钥 backend 设计命令接口，不恢复本次归档的 review-only DTO 或审批目录。
+关闭态 Rust orchestration 可以在 Manager 入口继续禁用时独立实现。只有该 service 稳定且生产 backend 资格另行通过后，才重新基于当时的 Rust sync / crypto API、服务端协议和平台密钥 backend 设计窄命令接口；不恢复本次归档的 review-only DTO 或审批目录。
 
 ## 当前验证归属
 

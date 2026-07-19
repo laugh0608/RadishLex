@@ -68,7 +68,9 @@ impl HttpSyncRemoteTransport {
 
 impl SyncRemoteTransport for HttpSyncRemoteTransport {
     fn send(&self, request: SyncRemoteRequest) -> Result<SyncRemoteResponse, SyncRemoteError> {
-        let path = self.endpoint.request_path(request.path())?;
+        let path = self
+            .endpoint
+            .request_target(request.path(), request.query())?;
         validate_request_headers(&request)?;
         let mut stream =
             TcpStream::connect((self.endpoint.connect_host.as_str(), self.endpoint.port))
@@ -171,7 +173,11 @@ impl HttpEndpoint {
         format!("http://{}{}", self.host_header, path)
     }
 
-    fn request_path(&self, request_path: &str) -> Result<String, SyncRemoteError> {
+    fn request_target(
+        &self,
+        request_path: &str,
+        query: &[(String, String)],
+    ) -> Result<String, SyncRemoteError> {
         if !request_path.starts_with('/') {
             return invalid_request("http transport request path must start with '/'");
         }
@@ -184,13 +190,22 @@ impl HttpEndpoint {
         if request_path.chars().any(char::is_whitespace) {
             return invalid_request("http transport request path cannot contain whitespace");
         }
-        if self.base_path.is_empty() {
-            Ok(request_path.to_owned())
+        let path = if self.base_path.is_empty() {
+            request_path.to_owned()
         } else if request_path == "/" {
-            Ok(self.base_path.clone())
+            self.base_path.clone()
         } else {
-            Ok(format!("{}{}", self.base_path, request_path))
+            format!("{}{}", self.base_path, request_path)
+        };
+        if query.is_empty() {
+            return Ok(path);
         }
+        let query = query
+            .iter()
+            .map(|(name, value)| format!("{name}={value}"))
+            .collect::<Vec<_>>()
+            .join("&");
+        Ok(format!("{path}?{query}"))
     }
 }
 

@@ -11,7 +11,7 @@ use crate::error::{UserDbError, UserDbResult};
 use super::identity::legacy_stable_hash_hex;
 use super::UserDb;
 
-pub(super) const SCHEMA_VERSION: i64 = 4;
+pub(super) const SCHEMA_VERSION: i64 = 5;
 pub(super) const BUSY_TIMEOUT: Duration = Duration::from_millis(5_000);
 pub(super) const MAX_LEARNING_COUNT: i64 = 1_000_000;
 
@@ -70,7 +70,7 @@ impl UserDb {
             return Ok(());
         }
         if version == 0 && !has_any_user_table(&transaction)? {
-            create_schema_v4(&transaction)?;
+            create_schema_v5(&transaction)?;
         } else {
             if version < 3 {
                 create_legacy_schema_if_missing(&transaction)?;
@@ -80,6 +80,7 @@ impl UserDb {
                 migrate_ranker_last_used_time(&transaction)?;
             }
             ensure_user_term_import_batch(&transaction)?;
+            ensure_sync_orchestration_tables(&transaction)?;
         }
         transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         transaction.commit()?;
@@ -146,6 +147,78 @@ impl UserDb {
                 "negative_score",
                 "context_kind",
                 "updated_at_ms",
+            ],
+        )?;
+        require_columns(
+            &self.connection,
+            "sync_domain_state",
+            &["domain_id", "state_version", "cursor", "last_success_at_ms"],
+        )?;
+        require_columns(
+            &self.connection,
+            "sync_remote_objects",
+            &[
+                "domain_id",
+                "object_id",
+                "object_type",
+                "latest_version",
+                "ciphertext_hash",
+                "owner_device_id",
+                "key_epoch",
+                "change_sequence",
+            ],
+        )?;
+        require_columns(
+            &self.connection,
+            "sync_local_objects",
+            &[
+                "domain_id",
+                "object_id",
+                "object_type",
+                "payload_hash",
+                "local_revision",
+                "acknowledged_revision",
+                "dirty",
+            ],
+        )?;
+        require_columns(
+            &self.connection,
+            "sync_prepared_outbox",
+            &[
+                "domain_id",
+                "object_id",
+                "object_type",
+                "local_revision",
+                "version",
+                "base_version",
+                "owner_device_id",
+                "key_id",
+                "key_epoch",
+                "algorithm",
+                "nonce",
+                "encrypted_payload",
+                "ciphertext_hash",
+                "record_count",
+                "signature_schema_version",
+                "signature_algorithm",
+                "signature_key_id",
+                "signer_device_id",
+                "signature",
+                "created_at_ms",
+                "updated_at_ms",
+                "attempt_count",
+                "last_error_code",
+            ],
+        )?;
+        require_columns(
+            &self.connection,
+            "sync_cycle_journal",
+            &[
+                "domain_id",
+                "phase",
+                "started_at_ms",
+                "lease_expires_at_ms",
+                "cancel_requested",
             ],
         )?;
         Ok(())
@@ -245,12 +318,12 @@ fn preserved_userdb_error(path: &Path, stage: &'static str, source: UserDbError)
     }
 }
 
-fn create_schema_v4(transaction: &Transaction<'_>) -> UserDbResult<()> {
-    transaction.execute_batch(&schema_v4_sql())?;
+fn create_schema_v5(transaction: &Transaction<'_>) -> UserDbResult<()> {
+    transaction.execute_batch(&schema_v5_sql())?;
     Ok(())
 }
 
-fn schema_v4_sql() -> String {
+fn schema_v5_sql() -> String {
     format!(
         "
         CREATE TABLE user_terms (
@@ -329,8 +402,85 @@ fn schema_v4_sql() -> String {
             created_at_ms INTEGER NOT NULL,
             notes TEXT NOT NULL DEFAULT ''
         );
+
+        {SYNC_ORCHESTRATION_SCHEMA_SQL}
         "
     )
+}
+
+const SYNC_ORCHESTRATION_SCHEMA_SQL: &str = "
+        CREATE TABLE IF NOT EXISTS sync_domain_state (
+            domain_id TEXT PRIMARY KEY,
+            state_version INTEGER NOT NULL DEFAULT 1 CHECK(state_version = 1),
+            cursor TEXT,
+            last_success_at_ms INTEGER
+        );
+
+        CREATE TABLE IF NOT EXISTS sync_remote_objects (
+            domain_id TEXT NOT NULL,
+            object_id TEXT NOT NULL,
+            object_type TEXT NOT NULL,
+            latest_version INTEGER NOT NULL CHECK(latest_version > 0),
+            ciphertext_hash TEXT NOT NULL,
+            owner_device_id TEXT NOT NULL,
+            key_epoch INTEGER NOT NULL CHECK(key_epoch > 0),
+            change_sequence INTEGER NOT NULL CHECK(change_sequence > 0),
+            PRIMARY KEY(domain_id, object_id)
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_sync_remote_change_sequence
+            ON sync_remote_objects(domain_id, change_sequence);
+
+        CREATE TABLE IF NOT EXISTS sync_local_objects (
+            domain_id TEXT NOT NULL,
+            object_id TEXT NOT NULL,
+            object_type TEXT NOT NULL,
+            payload_hash TEXT NOT NULL,
+            local_revision INTEGER NOT NULL CHECK(local_revision > 0),
+            acknowledged_revision INTEGER NOT NULL DEFAULT 0 CHECK(acknowledged_revision >= 0),
+            dirty INTEGER NOT NULL CHECK(dirty IN (0, 1)),
+            PRIMARY KEY(domain_id, object_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS sync_prepared_outbox (
+            domain_id TEXT NOT NULL,
+            object_id TEXT NOT NULL,
+            object_type TEXT NOT NULL,
+            local_revision INTEGER NOT NULL CHECK(local_revision > 0),
+            version INTEGER NOT NULL CHECK(version > 0),
+            base_version INTEGER,
+            owner_device_id TEXT NOT NULL,
+            key_id TEXT NOT NULL,
+            key_epoch INTEGER NOT NULL CHECK(key_epoch > 0),
+            algorithm TEXT NOT NULL,
+            nonce BLOB NOT NULL,
+            encrypted_payload BLOB NOT NULL,
+            ciphertext_hash TEXT NOT NULL,
+            record_count INTEGER NOT NULL CHECK(record_count > 0),
+            signature_schema_version INTEGER NOT NULL,
+            signature_algorithm TEXT NOT NULL,
+            signature_key_id TEXT NOT NULL,
+            signer_device_id TEXT NOT NULL,
+            signature BLOB NOT NULL,
+            created_at_ms INTEGER NOT NULL,
+            updated_at_ms INTEGER NOT NULL,
+            attempt_count INTEGER NOT NULL DEFAULT 0 CHECK(attempt_count >= 0),
+            last_error_code TEXT,
+            PRIMARY KEY(domain_id, object_id, version),
+            UNIQUE(domain_id, object_id, local_revision)
+        );
+
+        CREATE TABLE IF NOT EXISTS sync_cycle_journal (
+            domain_id TEXT PRIMARY KEY,
+            phase TEXT NOT NULL,
+            started_at_ms INTEGER NOT NULL,
+            lease_expires_at_ms INTEGER NOT NULL,
+            cancel_requested INTEGER NOT NULL DEFAULT 0 CHECK(cancel_requested IN (0, 1))
+        );
+";
+
+fn ensure_sync_orchestration_tables(transaction: &Transaction<'_>) -> UserDbResult<()> {
+    transaction.execute_batch(SYNC_ORCHESTRATION_SCHEMA_SQL)?;
+    Ok(())
 }
 
 fn create_legacy_schema_if_missing(transaction: &Transaction<'_>) -> UserDbResult<()> {

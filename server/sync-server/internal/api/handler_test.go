@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -554,6 +555,71 @@ func TestObjectVersionHandlersUploadReadMetadataAndPayload(t *testing.T) {
 	}
 	if !bytes.Equal(payloadResponse.Body.Bytes(), payload) {
 		t.Fatalf("payload mismatch: got %x want %x", payloadResponse.Body.Bytes(), payload)
+	}
+}
+
+func TestObjectDiscoveryUsesOpaqueDomainBoundCursorAndStablePagination(t *testing.T) {
+	store := storage.NewMemoryStore()
+	createDomainForObjectHandlerTest(t, store, "domain-a", "device-a", 1)
+	createDomainForObjectHandlerTest(t, store, "domain-b", "device-b", 1)
+	handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+	uploads := []struct {
+		objectID string
+		version  uint64
+		base     uint64
+		payload  string
+	}{
+		{objectID: "object-a", version: 1, base: 0, payload: "encrypted-a1"},
+		{objectID: "object-b", version: 1, base: 0, payload: "encrypted-b1"},
+		{objectID: "object-a", version: 2, base: 1, payload: "encrypted-a2"},
+	}
+	for _, item := range uploads {
+		upload := objectUploadRequestForHandlerTest("domain-a", item.objectID, "device-a", item.version, item.base, 1, []byte(item.payload))
+		response := performJSONRequest(t, handler, http.MethodPost, PrefixV1+"/domains/domain-a/objects/"+item.objectID+"/versions", upload)
+		if response.Code != http.StatusCreated {
+			t.Fatalf("setup upload failed: status=%d body=%s", response.Code, response.Body.String())
+		}
+	}
+
+	first := httptest.NewRecorder()
+	handler.ServeHTTP(first, httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/objects?limit=2", nil))
+	if first.Code != http.StatusOK {
+		t.Fatalf("unexpected first discovery status: %d body=%s", first.Code, first.Body.String())
+	}
+	var firstPage ObjectDiscoveryResponse
+	decodeResponse(t, first, &firstPage)
+	if len(firstPage.Entries) != 2 || !firstPage.HasMore || firstPage.NextCursor == "" {
+		t.Fatalf("unexpected first discovery page: %#v", firstPage)
+	}
+	if firstPage.Entries[0].ChangeSequence != 1 || firstPage.Entries[1].ChangeSequence != 2 {
+		t.Fatalf("discovery order is unstable: %#v", firstPage.Entries)
+	}
+
+	second := httptest.NewRecorder()
+	handler.ServeHTTP(second, httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/objects?limit=2&after_cursor="+firstPage.NextCursor, nil))
+	if second.Code != http.StatusOK {
+		t.Fatalf("unexpected second discovery status: %d body=%s", second.Code, second.Body.String())
+	}
+	var secondPage ObjectDiscoveryResponse
+	decodeResponse(t, second, &secondPage)
+	if len(secondPage.Entries) != 1 || secondPage.HasMore || secondPage.Entries[0].ChangeSequence != 3 {
+		t.Fatalf("unexpected second discovery page: %#v", secondPage)
+	}
+
+	crossDomain := httptest.NewRecorder()
+	handler.ServeHTTP(crossDomain, httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-b/objects?after_cursor="+firstPage.NextCursor, nil))
+	if crossDomain.Code != http.StatusBadRequest {
+		t.Fatalf("cross-domain cursor must fail: status=%d body=%s", crossDomain.Code, crossDomain.Body.String())
+	}
+
+	overflow := httptest.NewRecorder()
+	handler.ServeHTTP(overflow, httptest.NewRequest(
+		http.MethodGet,
+		PrefixV1+"/domains/domain-a/objects?after_cursor="+encodeObjectCursor("domain-a", math.MaxUint64),
+		nil,
+	))
+	if overflow.Code != http.StatusBadRequest {
+		t.Fatalf("overflow cursor must fail: status=%d body=%s", overflow.Code, overflow.Body.String())
 	}
 }
 

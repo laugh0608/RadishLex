@@ -3,7 +3,9 @@ mod device;
 mod http_transport;
 mod merge;
 mod model;
+mod orchestration;
 mod remote;
+mod service;
 mod signing;
 
 pub use assemble::{
@@ -23,9 +25,15 @@ pub use model::{
     EncryptedSyncObjectDraft, LocalDataClass, PayloadSource, SyncObjectType, SyncPayloadError,
     SyncPayloadPlan, SyncPlanItem,
 };
-pub use remote::{
-    LatestObjectConflictMetadata, RemoteObjectPayload, RemoteObjectVersion, SyncRemoteClient,
-    SyncRemoteError, SyncRemoteMethod, SyncRemoteRequest, SyncRemoteResponse, SyncRemoteTransport,
-    SyncServerErrorCode,
+pub use orchestration::{
+    DecryptedSyncObject, LocalSyncSnapshot, PreparedSyncOutbox, SyncApplyPageSummary,
+    SyncCycleOutcome, SyncCyclePhase, SyncCycleSummary, SyncLocalRepository,
+    SyncOrchestrationError, SyncOrchestrationErrorCode,
 };
+pub use remote::{
+    LatestObjectConflictMetadata, OpaqueSyncCursor, RemoteObjectDiscoveryPage, RemoteObjectPayload,
+    RemoteObjectVersion, SyncRemoteClient, SyncRemoteError, SyncRemoteMethod, SyncRemoteRequest,
+    SyncRemoteResponse, SyncRemoteTransport, SyncServerErrorCode,
+};
+pub use service::{SyncObjectProcessor, SyncOnceConfig, SyncOrchestrationService};
 pub use signing::{SignedDeviceAuthorization, SignedDeviceRevocation};

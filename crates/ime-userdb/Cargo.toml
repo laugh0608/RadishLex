@@ -12,11 +12,11 @@ name = "radishlex_ime_userdb"
 path = "src/lib.rs"
 
 [dependencies]
+radishlex-ime-crypto = { path = "../ime-crypto" }
 radishlex-ime-sync = { path = "../ime-sync" }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 serde_json = "1.0.150"
+sha2 = "0.10.9"
 
 [dev-dependencies]
 base64ct = { version = "1.8.3", features = ["alloc"] }
-radishlex-ime-crypto = { path = "../ime-crypto" }
-sha2 = "0.10.9"

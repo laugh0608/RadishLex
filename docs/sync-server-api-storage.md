@@ -1,6 +1,6 @@
 # RadishLex 同步服务端 API 与存储边界
 
-本文档定义 Go sync server 实现期间必须稳定的 API、存储、错误语义和验证口径。读者是后续实现 `server/sync-server`、`ime-sync` 远端客户端、同步 runbook 和审阅隐私边界的开发者。本文不展开 Docker Compose 逐步操作、Flutter 同步页面、生产部署操作流程或生产平台私钥存储 backend；Docker Compose runbook 见 `docs/runbooks/sync-server-compose.md`，生产部署边界见 `docs/runbooks/sync-server-production-deployment.md`，生产恢复流程见 `docs/production-recovery-flow.md`，平台私钥存储 backend 边界见 `docs/adr/0004-platform-private-key-storage-backend.md`。
+本文档定义 Go sync server 实现期间必须稳定的 API、存储、错误语义和验证口径。读者是后续实现 `server/sync-server`、`ime-sync` 远端客户端、同步 runbook 和审阅隐私边界的开发者。本文不展开客户端产品状态机、Docker Compose 逐步操作、Flutter 同步页面、生产部署操作流程或生产平台私钥存储 backend；客户端 transaction/cursor/outbox 见 `docs/sync-orchestration.md`，Docker Compose runbook 见 `docs/runbooks/sync-server-compose.md`，生产部署边界见 `docs/runbooks/sync-server-production-deployment.md`，生产恢复流程见 `docs/production-recovery-flow.md`，平台私钥存储 backend 边界见 `docs/adr/0004-platform-private-key-storage-backend.md`。
 
 ## 当前定位
 
@@ -69,13 +69,13 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名。AD
 
 恢复记录只保存加密后的同步域材料和 KDF 参数。服务端可以对读取和替换恢复记录做限速，但不能依赖限速替代恢复码强度。
 
-`sync_objects`：`domain_id`、`object_id`、`object_type`、`latest_version`、`latest_ciphertext_hash`、`latest_key_epoch`、`created_at_ms`、`updated_at_ms`。
+`sync_objects`：`domain_id`、`object_id`、`object_type`、`latest_version`、`latest_ciphertext_hash`、`latest_key_epoch`、`latest_change_sequence`、`created_at_ms`、`updated_at_ms`。
 
 `object_id` 必须是不含业务明文的 opaque ID。需要稳定 term identity 时，只能放在 encrypted payload 内，或使用客户端持有密钥派生的不可公开反查 ID。
 
-`sync_object_versions`：`domain_id`、`object_id`、`version`、`base_version`、`owner_device_id`、`key_id`、`key_epoch`、`algorithm`、`nonce`、`encrypted_payload_len`、`ciphertext_hash`、`signature_schema_version`、`signature_algorithm`、`signature_key_id`、`signature`、`server_received_at_ms`、`client_created_at_ms`、`client_updated_at_ms`、`blob_ref`。
+`sync_object_versions`：`domain_id`、`object_id`、`version`、`base_version`、`change_sequence`、`owner_device_id`、`key_id`、`key_epoch`、`algorithm`、`nonce`、`encrypted_payload_len`、`ciphertext_hash`、`signature_schema_version`、`signature_algorithm`、`signature_key_id`、`signature`、`server_received_at_ms`、`client_created_at_ms`、`client_updated_at_ms`、`blob_ref`。
 
-服务端可以按 `object_type`、版本和时间分页列出 metadata；payload bytes 必须通过 blob 存储读取，不放入日志或错误响应。
+`change_sequence` 在 domain 内严格递增，只在新 object version 与 metadata transaction 成功提交时分配。同一 `object_id + version + ciphertext_hash` 幂等重放复用原 sequence；冲突、blob 写入失败和 transaction 回滚不产生可发现 entry。服务端按 sequence 分页列出 metadata；产品同步默认发现全部受支持 P2 类型。若提供 `object_type` 诊断过滤，opaque cursor 必须绑定相同过滤条件，不得与全量 cursor 混用。客户端时间和跨对象 version 不能替代权威 cursor。payload bytes 必须通过 blob 存储读取，不放入日志或错误响应。
 
 `audit_events`：`domain_id`、`event_type`、`device_id`、`object_id`、`version`、`result_code`、`bytes`、`server_time_ms`。
 
@@ -85,7 +85,7 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名。AD
 
 当前 `server/sync-server/internal/storage.Store` 是 HTTP handler 前的内部边界，已经落地 `CreateDomain`、`Domain`、`Device`、`SaveJoinRequest`、`PendingJoinRequests`、`AuthorizeJoinRequest`、`DeviceWrappedKey`、`RevokeDevice`、`PutRecoveryRecord`、`LatestRecoveryRecord`、`LatestRecoveryWrappedMaterial`、`PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`。
 
-这组方法当前用于验证 metadata、设备状态、版本冲突、blob 写入和错误语义，不等同于完整 HTTP API。尚未暴露对象分页、审计日志查询或持久限速器。
+这组方法当前用于验证 metadata、设备状态、版本冲突、blob 写入和错误语义，不等同于完整 HTTP API。稳定 change cursor、对象 discovery 分页、审计日志查询和持久限速器尚未落地；产品编排不得用 `updated_after_ms` 或逐个猜测 object/version 代替 discovery。
 
 当前 storage conformance 已覆盖：第一台设备必须为 `active` 且显式携带受支持签名算法；join request 从 `pending` 授权到 `active`；wrapped device key bytes 随授权事务保存并可按 metadata 读取；revoked 设备和旧 `key_epoch` 写入被拒绝；object version 冲突与 blob hash/length 复验；signed object manifest、device authorization、device revocation 和 recovery record 字段篡改会被验签拒绝。Rust/Go 另共同读取同一 profile fixture，覆盖两个算法正向签名和固定负向错误。
 
@@ -169,7 +169,11 @@ OIDC / Radish 产品账号体系接入已后置为未来专题，见 `docs/sync-
 
 `GET /api/v1/domains/{domain_id}/objects`
 
-- 按 `object_type`、`since_version`、`updated_after_ms` 和分页参数列出对象 metadata。
+- 使用 opaque `after_cursor` 和受限 `limit`，按 domain 内 `change_sequence` 升序列出已提交 object version metadata；产品同步默认不加类型过滤。
+- 当前稳定接口不接受 `object_type` 或其他过滤参数；未知 query key 失败关闭。后续若增加过滤，cursor 必须绑定过滤条件并版本化。
+- 响应包含 `entries`、`next_cursor` 和 `has_more`；不返回内部 SQL row id，也不要求客户端解析 cursor。
+- 首次请求省略 `after_cursor`；非法、跨 domain 或不受支持的 cursor 返回结构化错误，不按客户端时间回退。
+- `since_version` 只在单一 object 内有意义，`updated_after_ms` 受时钟和同时间戳分页影响，二者均不得作为产品增量同步 cursor。
 - 不返回 payload bytes。
 
 `GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}`
@@ -188,6 +192,7 @@ OIDC / Radish 产品账号体系接入已后置为未来专题，见 `docs/sync-
 Rust `ime-sync` remote client 与上述对象版本 API 的稳定映射如下：
 
 - `SyncRemoteClient::upload_object_version()` 调用 `POST /api/v1/domains/{domain_id}/objects/{object_id}/versions`。
+- `SyncRemoteClient::discover_object_versions()` 调用 `GET /api/v1/domains/{domain_id}/objects`，只接受 opaque cursor 和有界 page limit。
 - `SyncRemoteClient::object_version()` 调用 `GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}`。
 - `SyncRemoteClient::object_payload()` 先调用 metadata GET，再调用 `GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}/payload`。
 
@@ -211,6 +216,7 @@ JSON byte 字段：
 - Rust `base_version = None` 映射为 HTTP JSON 的 `base_version = 0`；响应中的 `base_version = 0` 映射回 `None`。
 - `409 conflict_stale_base_version` 必须映射为包含 latest version 和 latest ciphertext hash 的客户端错误；该错误不包含 payload bytes。
 - `409 conflict_object_version` 表示同一 object version 已存在但 ciphertext hash 不一致，客户端不得把它当作幂等成功。
+- SQLite metadata schema v3 为历史 object version 按 domain、`server_received_at_ms`、`object_id`、`version` 确定性回填 `change_sequence`；迁移先补列和校验正序列，再创建唯一索引，避免旧表在补列前因索引引用新字段而失败。
 
 客户端脱敏：
 
@@ -376,6 +382,7 @@ latest_ciphertext_hash
 - 对象上传拒绝缺失 `ciphertext_hash`、空 `object_id`、非法 `object_type`、非法 `nonce`、0 payload、错误长度和 Rust envelope hash mismatch。
 - 新对象必须使用 `version = 1` / `base_version = 0`；已有对象必须顺序递增。
 - stale `base_version` 返回 409，且响应不包含 payload bytes。
+- discovery change sequence 只在成功新版本提交时递增；幂等重放复用原 sequence，失败/冲突不产生可见 gap 语义；分页必须稳定、无重复遗漏，并拒绝非法或跨 domain cursor。
 - 同一 `object_id + version + ciphertext_hash` 重试幂等；同版本不同 hash 拒绝。
 - revoked / pending / unknown device 不能上传对象、授权设备或替换恢复记录。
 - 撤销后 `current_key_epoch` 推进，低于当前 epoch 的新对象写入被拒绝。
@@ -417,6 +424,7 @@ latest_ciphertext_hash
 24. 已补 runtime 外部 TLS 反代 smoke，覆盖 HTTPS client、TLS 1.2+、TLS reverse proxy 到 HTTP upstream、`Authorization` header 透传、`X-Forwarded-Proto=https`、Go bearer token 门禁、encrypted object 上传下载、Go 对象大小门禁和日志脱敏。
 25. 已补 runtime 升级回滚 smoke，覆盖升级前数据写入、关闭后冷备份、同一数据目录重启触发 idempotent migration、升级后 v2 写入、恢复升级前备份到隔离目录、确认 v2 不可见、v1 payload / stale conflict 仍按 latest metadata 返回，以及日志不泄漏 payload、signature、wrapped material 或恢复敏感字段。
 26. 已补 ADR 0006 对应的算法分派、设备/join `signing_algorithm` API/SQLite metadata、历史 Ed25519 migration、稳定 `error_detail` 和 Rust/Go 共享正负向 vectors；新请求缺少算法或传入未知算法时失败关闭。
+27. 下一批按 `docs/sync-orchestration.md` 增加 domain 内 change sequence、opaque cursor discovery storage/API、Rust remote DTO 和分页/幂等/非法 cursor 测试；当前尚未落地，不能用时间戳过滤替代。
 
 任何阶段都不应把 Flutter manager、平台壳、真实系统输入法服务或输入热路径接入 Go server。
 
@@ -428,4 +436,5 @@ latest_ciphertext_hash
 - recovery latest handler 已复用 wrapped material bytes 读取语义，并补齐限速与内部 `blob_ref` 不外泄测试；object version handler 已复用 encrypted object blob 读写语义，并补齐冲突、设备状态和脱敏测试；API handler 已补 panic recovery、request id、非持久审计 hook、SQLite `audit_events` 写入和 bearer access token 门禁；runtime 已补配置装配、脱敏 audit logger、本机 smoke runbook、双设备 HTTP smoke、备份恢复 smoke、外部 TLS 反代 smoke、升级回滚 smoke、Docker Compose 本地 / 部署态入口、容器实际启动 smoke 证据和生产部署边界 runbook。Rust remote client 已补 DTO、transport trait、HTTP transport、错误映射、可选 bearer token header、两客户端 userdb harness、直连 Go server 的短生命周期测试和 userdb 两客户端真实 Go HTTP 测试；进入真实用户部署前仍需补可用平台私钥 backend 和发布级目标部署运行证据，进入 manager 同步入口非上传开发可先依赖本地联调证据。
 - 服务端能保存、打印或索引明文用户词、input code、reading、P1 原始事件或候选偏好时，必须停止并回退该设计。
 - 服务端版本冲突检测未稳定前，不允许客户端把本地合并结果自动上传到真实远端。
+- change cursor discovery、客户端原子 apply + cursor 和 crash-safe outbox 未稳定前，不允许把现有逐对象测试 harness 包装成产品 `sync_once`。
 - 包分发、P3 资源下载和个人 P2 同步对象必须保持独立 API 与存储边界。

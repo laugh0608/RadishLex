@@ -1,4 +1,4 @@
-use rusqlite::{params, OptionalExtension, Row};
+use rusqlite::{params, Connection, OptionalExtension, Row};
 
 use crate::error::{UserDbError, UserDbResult};
 use crate::model::{
@@ -47,9 +47,15 @@ struct SyncRankerWeightPayloadRecord {
 pub(super) fn collect_p2_plaintext_payloads(
     db: &UserDb,
 ) -> UserDbResult<Vec<UserDbSyncPlaintextPayload>> {
+    collect_p2_plaintext_payloads_on(&db.connection)
+}
+
+pub(super) fn collect_p2_plaintext_payloads_on(
+    connection: &Connection,
+) -> UserDbResult<Vec<UserDbSyncPlaintextPayload>> {
     let mut payloads = Vec::new();
 
-    let user_terms = sync_user_term_payload_records(db)?;
+    let user_terms = sync_user_term_payload_records(connection)?;
     if !user_terms.is_empty() {
         payloads.push(UserDbSyncPlaintextPayload::new(
             UserDbSyncPayloadObjectType::DictionaryUserTerms,
@@ -58,7 +64,7 @@ pub(super) fn collect_p2_plaintext_payloads(
         )?);
     }
 
-    let ranker_weights = sync_ranker_weight_payload_records(db)?;
+    let ranker_weights = sync_ranker_weight_payload_records(connection)?;
     if !ranker_weights.is_empty() {
         payloads.push(UserDbSyncPlaintextPayload::new(
             UserDbSyncPayloadObjectType::RankerWeights,
@@ -67,7 +73,7 @@ pub(super) fn collect_p2_plaintext_payloads(
         )?);
     }
 
-    let deleted_terms = sync_deleted_term_payload_records(db)?;
+    let deleted_terms = sync_deleted_term_payload_records(connection)?;
     if !deleted_terms.is_empty() {
         payloads.push(UserDbSyncPlaintextPayload::new(
             UserDbSyncPayloadObjectType::DictionaryDeletedTerms,
@@ -79,8 +85,10 @@ pub(super) fn collect_p2_plaintext_payloads(
     Ok(payloads)
 }
 
-fn sync_user_term_payload_records(db: &UserDb) -> UserDbResult<Vec<SyncUserTermPayloadRecord>> {
-    let mut statement = db.connection.prepare(
+fn sync_user_term_payload_records(
+    connection: &Connection,
+) -> UserDbResult<Vec<SyncUserTermPayloadRecord>> {
+    let mut statement = connection.prepare(
         "SELECT input_code, text, reading, source, weight, status,
                 created_at_ms, updated_at_ms, last_used_at_ms
          FROM user_terms
@@ -94,9 +102,9 @@ fn sync_user_term_payload_records(db: &UserDb) -> UserDbResult<Vec<SyncUserTermP
 }
 
 fn sync_ranker_weight_payload_records(
-    db: &UserDb,
+    connection: &Connection,
 ) -> UserDbResult<Vec<SyncRankerWeightPayloadRecord>> {
-    let mut statement = db.connection.prepare(
+    let mut statement = connection.prepare(
         "SELECT input_code, text, reading, frequency, last_used_at_ms, negative_score,
                 context_kind, updated_at_ms
          FROM ranker_weights
@@ -109,9 +117,9 @@ fn sync_ranker_weight_payload_records(
 }
 
 fn sync_deleted_term_payload_records(
-    db: &UserDb,
+    connection: &Connection,
 ) -> UserDbResult<Vec<SyncDeletedTermPayloadRecord>> {
-    let mut statement = db.connection.prepare(
+    let mut statement = connection.prepare(
         "SELECT input_code, text, reading, updated_at_ms
          FROM user_terms
          WHERE status = 'deleted'
@@ -130,7 +138,7 @@ fn sync_deleted_term_payload_records(
 
     let mut records = Vec::with_capacity(deleted_terms.len());
     for (input_code, text, reading, updated_at_ms) in deleted_terms {
-        let tombstone = latest_deleted_tombstone(db, &input_code, &text, &reading)?;
+        let tombstone = latest_deleted_tombstone(connection, &input_code, &text, &reading)?;
         let (deleted_at_ms, reason) =
             tombstone.unwrap_or_else(|| (updated_at_ms, "manual_delete".to_owned()));
         records.push(SyncDeletedTermPayloadRecord {
@@ -146,12 +154,12 @@ fn sync_deleted_term_payload_records(
 }
 
 fn latest_deleted_tombstone(
-    db: &UserDb,
+    connection: &Connection,
     input_code: &str,
     text: &str,
     reading: &str,
 ) -> UserDbResult<Option<(i64, String)>> {
-    db.connection
+    connection
         .query_row(
             "SELECT deleted_at_ms, reason
              FROM deleted_terms

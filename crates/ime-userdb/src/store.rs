@@ -16,6 +16,7 @@ mod learning;
 mod ranking;
 mod sync_apply;
 mod sync_payload;
+mod sync_repository;
 
 use identity::has_deleted_tombstone_on;
 use learning::now_ms;

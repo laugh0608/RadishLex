@@ -104,6 +104,46 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 		}
 	})
 
+	t.Run("discovers committed object versions by stable change sequence", func(t *testing.T) {
+		ctx := context.Background()
+		store := newReadyStore(t, newStore)
+		first := objectUpload("domain-a", "object-a", "device-a", 1, 0, 1, []byte{0x91})
+		createdFirst, err := store.PutObjectVersion(ctx, first)
+		if err != nil {
+			t.Fatalf("put first version: %v", err)
+		}
+		if createdFirst.ChangeSequence != 1 {
+			t.Fatalf("unexpected first change sequence: %d", createdFirst.ChangeSequence)
+		}
+		retry, err := store.PutObjectVersion(ctx, first)
+		if err != nil || retry.ChangeSequence != createdFirst.ChangeSequence {
+			t.Fatalf("idempotent retry changed sequence: metadata=%#v err=%v", retry, err)
+		}
+		second := objectUpload("domain-a", "object-b", "device-a", 1, 0, 1, []byte{0x92})
+		if _, err := store.PutObjectVersion(ctx, second); err != nil {
+			t.Fatalf("put second object: %v", err)
+		}
+		third := objectUpload("domain-a", "object-a", "device-a", 2, 1, 1, []byte{0x93})
+		if _, err := store.PutObjectVersion(ctx, third); err != nil {
+			t.Fatalf("put third version: %v", err)
+		}
+
+		page, err := store.ObjectVersionsAfter(ctx, "domain-a", 0, 2)
+		if err != nil {
+			t.Fatalf("discover first page: %v", err)
+		}
+		if len(page) != 2 || page[0].ChangeSequence != 1 || page[1].ChangeSequence != 2 {
+			t.Fatalf("unexpected first discovery page: %#v", page)
+		}
+		next, err := store.ObjectVersionsAfter(ctx, "domain-a", page[1].ChangeSequence, 2)
+		if err != nil {
+			t.Fatalf("discover next page: %v", err)
+		}
+		if len(next) != 1 || next[0].ChangeSequence != 3 || next[0].ObjectID != "object-a" || next[0].Version != 2 {
+			t.Fatalf("unexpected next discovery page: %#v", next)
+		}
+	})
+
 	t.Run("blocks revoked devices and old key epoch writes", func(t *testing.T) {
 		ctx := context.Background()
 		store := newReadyStore(t, newStore)

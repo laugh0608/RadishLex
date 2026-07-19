@@ -31,6 +31,16 @@ pub(super) fn apply_decoded_sync_payload_batch(
     db: &mut UserDb,
     batch: &UserDbDecodedSyncPayloadBatch,
 ) -> UserDbResult<UserDbSyncApplySummary> {
+    let transaction = db.connection.transaction()?;
+    let summary = apply_decoded_sync_payload_batch_on(&transaction, batch)?;
+    transaction.commit()?;
+    Ok(summary)
+}
+
+pub(super) fn apply_decoded_sync_payload_batch_on(
+    transaction: &Transaction<'_>,
+    batch: &UserDbDecodedSyncPayloadBatch,
+) -> UserDbResult<UserDbSyncApplySummary> {
     let merge_result = batch
         .to_merge_input()?
         .merge()
@@ -41,9 +51,8 @@ pub(super) fn apply_decoded_sync_payload_batch(
     let deleted_terms = accepted_deleted_terms(batch, &merge_result)?;
     let ranker_weights = accepted_ranker_weights(batch, &merge_result)?;
 
-    let transaction = db.connection.transaction()?;
     let (user_terms, deleted_terms, ranker_weights) = filter_local_state_conflicts(
-        &transaction,
+        transaction,
         user_terms,
         deleted_terms,
         ranker_weights,
@@ -54,15 +63,14 @@ pub(super) fn apply_decoded_sync_payload_batch(
     summary.ranker_weights_written = ranker_weights.len();
 
     for tombstone in &deleted_terms {
-        apply_deleted_term(&transaction, tombstone)?;
+        apply_deleted_term(transaction, tombstone)?;
     }
     for term in &user_terms {
-        apply_user_term(&transaction, term)?;
+        apply_user_term(transaction, term)?;
     }
     for weight in &ranker_weights {
-        apply_ranker_weight(&transaction, weight)?;
+        apply_ranker_weight(transaction, weight)?;
     }
-    transaction.commit()?;
 
     Ok(summary)
 }

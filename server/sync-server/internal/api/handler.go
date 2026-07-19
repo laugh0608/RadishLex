@@ -166,6 +166,8 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request, audit *Audit
 		h.handleJoinAuthorization(w, r, route.domainID, route.joinRequestID, audit)
 	case recoveryLatestRoute:
 		h.handleLatestRecovery(w, r, route.domainID)
+	case objectDiscoveryRoute:
+		h.handleObjectDiscovery(w, r, route.domainID)
 	case objectVersionsRoute:
 		h.handleObjectVersions(w, r, route.domainID, route.objectID, audit)
 	case objectVersionRoute:
@@ -175,6 +177,66 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request, audit *Audit
 	default:
 		h.writeError(w, publicStorageError(storage.ErrNotFound, "api route not found", false))
 	}
+}
+
+func (h *Handler) handleObjectDiscovery(w http.ResponseWriter, r *http.Request, domainID string) {
+	if r.Method != http.MethodGet {
+		h.writeMethodError(w, http.MethodGet)
+		return
+	}
+	query := r.URL.Query()
+	for key := range query {
+		if key != "after_cursor" && key != "limit" {
+			h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "object discovery query is invalid", false))
+			return
+		}
+	}
+	limit := 100
+	if values, ok := query["limit"]; ok {
+		if len(values) != 1 {
+			h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "object discovery limit is invalid", false))
+			return
+		}
+		parsed, err := strconv.Atoi(values[0])
+		if err != nil || parsed <= 0 || parsed > 200 {
+			h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "object discovery limit is invalid", false))
+			return
+		}
+		limit = parsed
+	}
+	afterSequence := uint64(0)
+	if values, ok := query["after_cursor"]; ok {
+		if len(values) != 1 {
+			h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "object discovery cursor is invalid", false))
+			return
+		}
+		sequence, err := decodeObjectCursor(domainID, values[0])
+		if err != nil {
+			h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "object discovery cursor is invalid", false))
+			return
+		}
+		afterSequence = sequence
+	}
+	versions, err := h.store.ObjectVersionsAfter(r.Context(), domainID, afterSequence, limit+1)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	hasMore := len(versions) > limit
+	if hasMore {
+		versions = versions[:limit]
+	}
+	nextSequence := afterSequence
+	entries := make([]ObjectVersionResponse, 0, len(versions))
+	for _, version := range versions {
+		entries = append(entries, ObjectVersionResponseFrom(version))
+		nextSequence = version.ChangeSequence
+	}
+	writeJSON(w, http.StatusOK, ObjectDiscoveryResponse{
+		Entries:    entries,
+		NextCursor: encodeObjectCursor(domainID, nextSequence),
+		HasMore:    hasMore,
+	})
 }
 
 func (h *Handler) authorizeRequest(r *http.Request) bool {
@@ -411,6 +473,7 @@ const (
 	joinRequestsRoute
 	joinAuthorizationRoute
 	recoveryLatestRoute
+	objectDiscoveryRoute
 	objectVersionsRoute
 	objectVersionRoute
 	objectPayloadRoute
@@ -437,6 +500,8 @@ func (r route) name() string {
 		return "join_requests.authorize"
 	case recoveryLatestRoute:
 		return "recovery.latest"
+	case objectDiscoveryRoute:
+		return "objects.discover"
 	case objectVersionsRoute:
 		return "objects.versions.create"
 	case objectVersionRoute:
@@ -468,6 +533,9 @@ func domainRoute(path string) (route, bool) {
 	}
 	if len(parts) == 3 && parts[0] != "" && parts[1] == "recovery-records" && parts[2] == "latest" {
 		return route{kind: recoveryLatestRoute, domainID: parts[0]}, true
+	}
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "objects" {
+		return route{kind: objectDiscoveryRoute, domainID: parts[0]}, true
 	}
 	if len(parts) == 4 && parts[0] != "" && parts[1] == "objects" && parts[2] != "" && parts[3] == "versions" {
 		return route{kind: objectVersionsRoute, domainID: parts[0], objectID: parts[2]}, true

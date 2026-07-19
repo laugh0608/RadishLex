@@ -334,6 +334,7 @@ M2 不以远端同步、设备授权或最终发布包为退出条件。
 - [macOS InputMethodKit](macos-inputmethodkit-boundary.md)：第一平台的 runtime、按键链、目录和验收边界。
 - [隐私与同步](privacy-sync.md)：数据分级、删除、授权和威胁模型。
 - [同步 Payload](sync-payload.md)：P2 对象和 payload 边界。
+- [同步编排](sync-orchestration.md)：Rust 状态机、discovery cursor、transaction、outbox 与失败恢复。
 - [加密边界](crypto-boundary.md)：key、envelope、签名与恢复。
 - [同步密钥管理](sync-key-management.md)：设备、恢复、撤销和 key epoch。
 - [Sync Server API/Storage](sync-server-api-storage.md)：Go API、metadata、blob 和错误语义。

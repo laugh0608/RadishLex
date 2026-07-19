@@ -524,6 +524,7 @@ impl InMemoryObjectRemote {
         let mut metadata = request;
         metadata.insert("domain_id".to_owned(), Value::String(DOMAIN_ID.to_owned()));
         metadata.insert("object_id".to_owned(), Value::String(object_id));
+        metadata.insert("change_sequence".to_owned(), json!(version));
         metadata.insert("server_received_at_ms".to_owned(), json!(BASE_TIMESTAMP_MS));
         let metadata = Value::Object(metadata);
         versions.push(StoredObject {

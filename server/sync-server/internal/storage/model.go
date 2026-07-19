@@ -155,6 +155,7 @@ type SyncObject struct {
 	LatestVersion        uint64
 	LatestCiphertextHash string
 	LatestKeyEpoch       uint64
+	LatestChangeSequence uint64
 	CreatedAtMs          int64
 	UpdatedAtMs          int64
 }
@@ -165,6 +166,7 @@ type ObjectVersion struct {
 	ObjectType             string
 	Version                uint64
 	BaseVersion            uint64
+	ChangeSequence         uint64
 	OwnerDeviceID          string
 	KeyID                  string
 	KeyEpoch               uint64
