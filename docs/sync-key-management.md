@@ -26,6 +26,7 @@
 - `ime-sync` 已补 remote object client DTO / transport trait 和 std-only `http://` HTTP transport，上传入口只接收 `AssembledSyncObject` 和 `SignedSyncObjectManifest`，不接受 plaintext payload。
 - Rust 侧两客户端 userdb harness 已覆盖设备 A 生成 P2 payload 并加密上传、设备 B 下载二进制密文后解密 / 解码 / 合并写回 SQLite、stale conflict latest metadata 映射，以及基于最新 base version 重新上传 v2。
 - Rust userdb 两客户端真实 Go HTTP 测试已覆盖设备 B join / signed authorization、三类 P2 对象真实 HTTP 上传下载、客户端解密 / 解码 / SQLite 写回、stale conflict latest metadata、按最新 `base_version` 上传 v2 和 runtime 日志脱敏。
+- `ime-sync` 已落地默认关闭的通用 crypto processor/provider port：cycle snapshot 分离当前写 epoch 与历史可读 epoch，固定远端 signer/revocation sequence 决策，并在生产构造器执行 backend gate；双 userdb HTTP service 已复用该处理链，合成 backend 只允许显式测试路径。
 - `docs/runbooks/sync-server-production-deployment.md` 已固定生产部署边界，覆盖外部 TLS、认证 / 访问控制、冷备份、恢复、升级回滚和真实用户开放停止线。
 
 当前仍不做：
@@ -285,7 +286,8 @@ updated_at_ms
 21. 已补 Rust remote object client DTO / transport trait 和 std-only `http://` HTTP transport，固定 encrypted object upload request、metadata 读取、binary payload 下载、stale conflict latest metadata、server error code 映射、真实 HTTP request / response 传递和 Debug 脱敏。
 22. 已补 Rust 侧两客户端 userdb harness，覆盖 P2 payload 加密上传、另一客户端下载密文、解密、解码、合并写回、本机 tombstone 阻断旧远端词条、stale conflict latest metadata 映射和 v2 重新上传。
 23. 已补 Rust userdb 两客户端真实 Go HTTP 测试，覆盖设备授权、三类 P2 对象上传下载、客户端解密写回、stale conflict、v2 重新上传和 runtime 日志脱敏。
-24. 下一批按 `docs/sync-orchestration.md` 固定 change cursor、local repository port、transaction-scoped apply + cursor、持久化 journal/outbox、取消/重启和 409 重新发现语义；先使用合成 P2 与测试 backend，不接 Manager 产品命令。
+24. 已按 `docs/sync-orchestration.md` 落地 change cursor、local repository port、transaction-scoped apply + cursor、持久化 journal/outbox、取消/重启、409 重新发现和默认关闭的通用 crypto processor/provider；合成双 userdb Go HTTP service 已覆盖历史 epoch、撤销 sequence、cycle snapshot 与新 outbox 轮换边界。
+25. 下一批实现生产 provider 的可信设备生命周期和 epoch material 装载，缺少 active device、当前/历史 epoch、签名 profile 或 production-qualified backend 时继续在网络前失败关闭；不接 Manager 产品命令。
 
 ## 验证口径
 

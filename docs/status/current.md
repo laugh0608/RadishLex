@@ -7,43 +7,31 @@
 - 复核日期：2026-07-19（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前产品里程碑：M3 端到端加密同步 Beta
-- 当前产品主批次：macOS backend 外部资格阻塞与关闭态 Rust sync orchestration
+- 当前产品主批次：macOS backend 外部资格阻塞与生产 sync provider 可信装载
 - 已完成：M0 工程基础、M1 macOS 离线输入 Alpha、M2 本地个人化 MVP；R00、R01A、R02L、R01B、R06A 已退出
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；合成数据、短生命周期服务与受控集成测试可以继续
 
-M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 本地学习与 manager 验收、回滚于 2026-07-18 完成。
-
-## M2 关闭证据
-
-manager 产品态已证明 ABI v5、共享 userdb、migration、导入审计、删除恢复、rank explain、双端刷新、并发与重启一致，且失败不回退 fixture。隐私模式零学习；secure field 只证明系统路由旁路。
-
-最终回滚已恢复零基线，详见 manager 验收 runbook。
+M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
 ## M3 当前边界
 
-M3 已具备 P2 envelope、signed manifest、两客户端授权/上传/下载/解密/合并/conflict 测试，以及 Go server 设备、join authorization、对象版本、密文存储、备份恢复、外部 TLS 和升级回滚受控证据。
+M3 已具备 P2 envelope、signed manifest、Go server 设备/对象/密文/备份部署边界，以及关闭态 `sync_once`。Go/Rust 使用 domain 内 `change_sequence` 与 opaque cursor；userdb schema v5 持久化 cursor、remote observation、local revision、cycle journal 和完整密文 outbox，并原子提交 payload、observation、revision 与 cursor。`409 stale_base_version` 必须重新发现、验签解密、合并和签名。
 
-关闭态 orchestration 第一实现批已落地：Go/Rust 使用 domain 内 `change_sequence` 与 opaque cursor 分页发现；userdb schema v5 持久化 cursor、remote observation、local revision、cycle journal 和完整密文 outbox；payload apply、观察、revision 与 cursor 在同一 transaction 提交。Rust `sync_once` 已覆盖 prepared outbox 恢复、上传 ack，以及 `409 stale_base_version` 后重新发现、验签解密、合并和重新签名；测试只使用合成 P2 与 `test-memory-v1`。
+风险矩阵已覆盖取消、retry exhaustion、revision race、lease recovery、签名/密文/AAD 篡改、epoch/revocation、decode/SQLite 失败、outbox prepare/ack 故障和残缺 migration 回滚。两个隔离 userdb 通过短生命周期 Go HTTP 服务完成上传、发现、合并回传、service 重建与第二轮零上传收敛；失败不推进 cursor、不清除 dirty，也不丢失可重放请求。
 
-第二风险批已证明取消在网络与 outbox 前失败关闭、transport retry exhaustion 保留完全相同的 prepared outbox 供下轮重放、旧 revision ack 不清除并发产生的新 dirty revision、活跃 lease 拒绝重入且过期 lease 可恢复。两个隔离 userdb 已通过真实短生命周期 Go HTTP 服务执行完整 `sync_once`：首轮上传、发现下载、验签解密、合并回传、service 重建与第二轮零上传收敛均成立；签名、密文和认证 metadata 篡改在应用事务前被拒绝。该证据仍只使用合成 P2、共享测试 master key 与 `test-memory-v1`，不构成产品 backend 或真实用户同步资格。
+第四实现批已落地默认关闭的 `DefaultSyncObjectProcessor` 与 `SyncCryptoProvider`：preflight 冻结 cycle 级 signing handle/public key、当前写 epoch、历史可读 epoch、远端 signer profile、撤销 change sequence 和 key material；默认 provider 在网络前返回 `backend_unavailable`，产品构造器执行 production gate，合成 backend 只能走显式测试构造器。通用 processor 已替换双 userdb HTTP fixture 中的专用实现，并证明同周期 snapshot 不漂移、历史 epoch 在退役前可读、撤销阈值后的对象被拒绝、下一周期采用轮换 epoch 生成新 outbox。
 
-第三风险批已覆盖不在允许集合中的 key epoch、被策略拒绝的 revoked signer、decode 失败和 SQLite apply 失败，均不推进 cursor 或生成 outbox；outbox prepare/ack 故障保持 dirty 与完全相同的 prepared request。v4→v5 migration 现于提交前校验完整 schema，残缺同名 sync 表会连同新表和 `user_version` 一起回滚。当前写入 epoch 与允许解密的历史 epoch 集合已分离，避免误拒未重加密历史对象；产品 device/epoch/key material provider 仍未实现。
-
-ADR 0006 已接受 `ecdsa-p256-sha256-v1` 与 `ed25519-v1` 共存，固定 P-256 公钥、签名和 canonical encoding。Rust/Go verifier、共享正负向 fixture、显式 `signing_algorithm` metadata 和历史 Ed25519 migration 已落地；新请求缺少或混用算法时失败关闭。
-
-独立 `apple-keychain-p256-v1` 已接通 Apple Security、FFI 与 manager Release native library，并在 provisioning-backed 产品进程完成 DPK 创建、重载、签名、Rust/Go 验签、删除和 cleanup；禁止 legacy fallback，敏感 bytes 不进入 Dart，故 `compiled/runtime_available/can_create/can_sign=true`。
-
-评审同时确认普通软件 DPK P-256 私钥可由平台 API 导出，不能继续声明 `exportable=false`。当前 capability 已改为 `exportable=true`，`ensure_production_signing_allowed()` 明确拒绝；`product_qualified/user_sync_enabled=false`。这不是 Secure Enclave、hardware-backed、user presence 或 backup migration 证据。
+签名层已支持显式 Ed25519/P-256 profile 与 Rust/Go verifier；缺少或混用算法时失败关闭。普通 DPK P-256 产品进程生命周期可用但私钥可导出，production gate 明确拒绝；Secure Enclave 已证明 lifecycle、不可导出、hardware-backed、denied 与真实锁屏失败关闭，但 unsupported 和最终产品资格仍缺外部环境证据。
 
 这些测试仍不是用户可用同步。当前生产阻塞项是：
 
-- `apple-keychain-p256-v1` 的 DPK 软件运行时可用，但私钥可导出，未满足生产 backend 的不可导出条件；locked 矩阵不能改变该资格结论，故本 backend 不进入真实同步。既有 `apple-keychain-v1` 与已测 Android Keystore 环境也仍未证明不可导出 `ed25519-v1` signing key；`test-memory-v1` 只允许测试且无 fallback。
-- `apple-secure-enclave-p256-v1` 已完成 qualification lifecycle、ad-hoc denied 与真实设备锁屏 probe；锁屏签名返回 `locked/-25308` 并失败关闭，解锁 cleanup 已删除合成 key且确认 missing。unsupported 和产品资格仍待独立证据。
-- 缺少发布级目标部署运行证据，以及真实产品的同步 cursor/orchestration、设备恢复、撤销和 key epoch 全流程。
+- 普通 DPK P-256 可导出，Apple/Android Ed25519 也未满足生产私钥条件；`test-memory-v1` 只允许测试且无 fallback。
+- Secure Enclave 已完成 lifecycle、denied 与真实设备锁屏证据并清理合成 key；unsupported 和产品资格仍待独立环境。
+- 缺少发布级目标部署运行证据，以及真实产品 provider 的设备生命周期/epoch material 装载、设备恢复、撤销和 key epoch 全流程。
 - `ManagerBridge` 仍无真实同步、恢复码、设备加入、授权、撤销或轮换命令；现有 readiness 只证明关闭态。
 
-开发者当前没有真实不支持 Secure Enclave 的目标环境，unsupported 与产品资格因此保持外部阻塞；不能在当前设备伪造，也不能据此开放资格字段。关闭态 orchestration 可继续补风险矩阵，但不降低生产 backend 或真实用户同步门禁。
+开发者当前没有真实不支持 Secure Enclave 的目标环境，unsupported 与产品资格因此保持外部阻塞；不能在当前设备伪造，也不能据此开放资格字段。关闭态 provider/lifecycle 实现可继续推进，但不降低生产 backend 或真实用户同步门禁。
 
 ## 当前停止线
 
@@ -57,9 +45,9 @@ ADR 0006 已接受 `ecdsa-p256-sha256-v1` 与 `ed25519-v1` 共存，固定 P-256
 ## 下一步顺位
 
 1. 将 unsupported 保留为外部环境阻塞：目标环境可得时按独立授权执行 probe，确认明确 unsupported、无残留且不回退普通 DPK/test memory；通过后再逐字段评审 `product_qualified/user_presence_required/backup_migratable`。当前设备不能替代该证据。
-2. 实现默认关闭的 Rust crypto processor/provider：以 cycle 级可信快照提供 device signing profile/public key、本机 signing handle、当前写入 epoch、允许解密 epoch 集合、撤销时点/sequence 决策和 sync/object key material；产品构造器必须执行 production gate，测试 backend 不得成为 fallback。
-3. 用合成 provider 接回现有双 userdb HTTP service 门禁，补 provider snapshot 漂移、历史 epoch 可读、撤销后新对象拒绝与 epoch 轮换后新 outbox 的组合测试；生产 backend 资格通过前不得接 `ManagerBridge`。
-4. 只有 Rust service 与生产 backend 两条门禁均通过后，才接窄 `ManagerBridge` command/status；最后完成两个真实客户端、恢复/设备授权/撤销/key epoch 与发布级目标部署证据，满足后才评估开放用户同步。
+2. 设计并实现默认关闭的生产 `SyncCryptoProvider` 装载层：从 Rust 可信设备生命周期与本地 epoch material store 形成 cycle snapshot，只把平台 backend handle 交给签名端口；缺少 active device、签名 profile、接受 epoch、当前写 epoch 或 production-qualified backend 时必须在网络前阻断。
+3. 用合成设备授权、撤销和 epoch 轮换记录接入 provider 门禁，覆盖撤销前历史对象、撤销后新 sequence、旧设备无法取得新 epoch、重启后 snapshot 重建和无测试 backend fallback；真实 backend 资格通过前不得接 `ManagerBridge`。
+4. 只有 Rust service、生产 provider 与 backend 三条门禁均通过后，才接窄 `ManagerBridge` command/status；最后完成两个真实客户端、恢复/设备授权/撤销/key epoch 与发布级目标部署证据，满足后才评估开放用户同步。
 
 ## 验证入口
 

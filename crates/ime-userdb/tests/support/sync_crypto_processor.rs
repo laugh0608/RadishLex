@@ -1,35 +1,88 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use radishlex_ime_crypto::{
-    CryptoError, DeviceSignature, DeviceSigningPublicKey, KeyDescriptor, KeyRole,
-    SignatureAlgorithmId, SignedSyncObjectManifest, SyncMasterKeyMaterial,
-    TestMemoryDeviceKeyStore, SIGNATURE_SCHEMA_VERSION,
+    CryptoError, DeviceSignature, DeviceSigningKeyHandle, DeviceSigningPublicKey, KeyDescriptor,
+    KeyRole, SyncMasterKeyMaterial, TestMemoryDeviceKeyStore,
 };
 use radishlex_ime_sync::{
-    DecryptedSyncObject, LocalSyncSnapshot, PreparedSyncOutbox, RemoteObjectPayload,
-    RemoteObjectVersion, SyncCyclePhase, SyncEnvelopeAssembler, SyncObjectAssemblySpec,
-    SyncObjectProcessor, SyncOrchestrationError, SyncOrchestrationErrorCode,
+    DecryptedSyncObject, DefaultSyncObjectProcessor, LocalSyncSnapshot, PreparedSyncOutbox,
+    RemoteObjectPayload, RemoteObjectVersion, SyncCryptoCycleSnapshot, SyncCryptoProvider,
+    SyncEpochKeyMaterial, SyncObjectProcessor, SyncOrchestrationError, SyncRemoteSigningProfile,
 };
 
-use super::{
-    envelope_from_remote, sign_object, BASE_TIMESTAMP_MS, DEVICE_A, DEVICE_B, DOMAIN_ID,
-    OBJECT_KEY_ID, SIGNING_KEY_A, SIGNING_KEY_B,
-};
+use super::{BASE_TIMESTAMP_MS, DEVICE_A, DEVICE_B, OBJECT_KEY_ID, SIGNING_KEY_A, SIGNING_KEY_B};
 
 pub(super) struct TestCryptoProcessor {
-    device_id: &'static str,
-    signing_key_id: &'static str,
-    signing_store: TestMemoryDeviceKeyStore,
-    public_keys: BTreeMap<String, DeviceSigningPublicKey>,
-    accepted_key_epochs: BTreeSet<u64>,
-    revoked_devices: BTreeSet<String>,
-    sync_master_key: SyncMasterKeyMaterial,
-    object_key: KeyDescriptor,
-    assembler: SyncEnvelopeAssembler,
+    inner: DefaultSyncObjectProcessor<TestCryptoProvider>,
 }
 
 impl TestCryptoProcessor {
     pub(super) fn new(device_id: &'static str, signing_key_id: &'static str) -> Self {
+        Self {
+            inner: DefaultSyncObjectProcessor::synthetic_for_tests(TestCryptoProvider::new(
+                device_id,
+                signing_key_id,
+            )),
+        }
+    }
+
+    pub(super) fn signing_store(&self) -> &TestMemoryDeviceKeyStore {
+        &self.inner.provider().signing_store
+    }
+
+    pub(super) fn replace_accepted_key_epochs(&mut self, epochs: impl IntoIterator<Item = u64>) {
+        let accepted_key_epochs: BTreeSet<_> = epochs.into_iter().collect();
+        self.inner.provider_mut().current_write_epoch = accepted_key_epochs
+            .iter()
+            .next_back()
+            .copied()
+            .expect("test provider requires at least one accepted epoch");
+        self.inner.provider_mut().accepted_key_epochs = accepted_key_epochs;
+    }
+
+    pub(super) fn revoke_device(&mut self, device_id: impl Into<String>) {
+        self.inner
+            .provider_mut()
+            .revoked_devices
+            .insert(device_id.into(), 1);
+    }
+}
+
+impl SyncObjectProcessor for TestCryptoProcessor {
+    fn preflight(&mut self, domain_id: &str) -> Result<(), SyncOrchestrationError> {
+        self.inner.preflight(domain_id)
+    }
+
+    fn verify_and_decrypt(
+        &mut self,
+        expected: &RemoteObjectVersion,
+        downloaded: RemoteObjectPayload,
+    ) -> Result<DecryptedSyncObject, SyncOrchestrationError> {
+        self.inner.verify_and_decrypt(expected, downloaded)
+    }
+
+    fn prepare_outbox(
+        &mut self,
+        snapshot: LocalSyncSnapshot,
+        version: u64,
+        prepared_at_ms: i64,
+    ) -> Result<PreparedSyncOutbox, SyncOrchestrationError> {
+        self.inner.prepare_outbox(snapshot, version, prepared_at_ms)
+    }
+}
+
+struct TestCryptoProvider {
+    device_id: &'static str,
+    signing_key_id: &'static str,
+    signing_store: TestMemoryDeviceKeyStore,
+    public_keys: BTreeMap<String, DeviceSigningPublicKey>,
+    current_write_epoch: u64,
+    accepted_key_epochs: BTreeSet<u64>,
+    revoked_devices: BTreeMap<String, u64>,
+}
+
+impl TestCryptoProvider {
+    fn new(device_id: &'static str, signing_key_id: &'static str) -> Self {
         let (signing_store, public_key_a, public_key_b) = test_signing_material();
         Self {
             device_id,
@@ -39,179 +92,68 @@ impl TestCryptoProcessor {
                 (DEVICE_A.to_owned(), public_key_a),
                 (DEVICE_B.to_owned(), public_key_b),
             ]),
+            current_write_epoch: 1,
             accepted_key_epochs: BTreeSet::from([1]),
-            revoked_devices: BTreeSet::new(),
-            sync_master_key: SyncMasterKeyMaterial::new([11u8; 32]).expect("sync master key"),
-            object_key: KeyDescriptor::new(OBJECT_KEY_ID, KeyRole::ObjectKey, 1)
-                .expect("object key"),
-            assembler: SyncEnvelopeAssembler::new(),
+            revoked_devices: BTreeMap::new(),
         }
-    }
-
-    pub(super) fn signing_store(&self) -> &TestMemoryDeviceKeyStore {
-        &self.signing_store
-    }
-
-    pub(super) fn replace_accepted_key_epochs(&mut self, epochs: impl IntoIterator<Item = u64>) {
-        self.accepted_key_epochs = epochs.into_iter().collect();
-    }
-
-    pub(super) fn revoke_device(&mut self, device_id: impl Into<String>) {
-        self.revoked_devices.insert(device_id.into());
     }
 }
 
-impl SyncObjectProcessor for TestCryptoProcessor {
-    fn preflight(&mut self, domain_id: &str) -> Result<(), SyncOrchestrationError> {
-        if domain_id != DOMAIN_ID
-            || self
-                .signing_store
-                .handle(self.device_id, self.signing_key_id)
-                .is_err()
-        {
-            return Err(orchestration_error(
-                SyncOrchestrationErrorCode::BackendUnavailable,
-                SyncCyclePhase::Preflight,
-            ));
-        }
-        Ok(())
-    }
-
-    fn verify_and_decrypt(
+impl SyncCryptoProvider for TestCryptoProvider {
+    fn freeze_cycle(
         &mut self,
-        expected: &RemoteObjectVersion,
-        downloaded: RemoteObjectPayload,
-    ) -> Result<DecryptedSyncObject, SyncOrchestrationError> {
-        if expected.domain_id != DOMAIN_ID
-            || expected.signature_schema_version != SIGNATURE_SCHEMA_VERSION
-        {
-            return Err(orchestration_error(
-                SyncOrchestrationErrorCode::UnsupportedSchema,
-                SyncCyclePhase::Verify,
-            ));
-        }
-        let remote = downloaded.object.clone();
-        if self.revoked_devices.contains(&remote.owner_device_id) {
-            return Err(orchestration_error(
-                SyncOrchestrationErrorCode::RevokedDevice,
-                SyncCyclePhase::Verify,
-            ));
-        }
-        if !self.accepted_key_epochs.contains(&remote.key_epoch) {
-            return Err(orchestration_error(
-                SyncOrchestrationErrorCode::KeyEpochRejected,
-                SyncCyclePhase::Verify,
-            ));
-        }
-        let signature_algorithm = SignatureAlgorithmId::new(remote.signature_algorithm.clone())
-            .map_err(|_| {
-                orchestration_error(
-                    SyncOrchestrationErrorCode::UnsupportedAlgorithm,
-                    SyncCyclePhase::Verify,
-                )
-            })?;
-        let signature = DeviceSignature::new_for_algorithm(
-            signature_algorithm,
-            remote.signature_key_id.clone(),
-            remote.owner_device_id.clone(),
-            remote.signature.clone(),
-        )
-        .map_err(|_| {
-            orchestration_error(
-                SyncOrchestrationErrorCode::SignatureMismatch,
-                SyncCyclePhase::Verify,
-            )
-        })?;
-        let public_key = self
+        domain_id: &str,
+    ) -> Result<SyncCryptoCycleSnapshot, SyncOrchestrationError> {
+        let handle = self
+            .signing_store
+            .handle(self.device_id, self.signing_key_id)
+            .map_err(|_| backend_unavailable())?;
+        let local_public_key = self
             .public_keys
-            .get(&remote.owner_device_id)
-            .filter(|key| key.signing_key_id == remote.signature_key_id)
-            .ok_or_else(|| {
-                orchestration_error(
-                    SyncOrchestrationErrorCode::SignatureMismatch,
-                    SyncCyclePhase::Verify,
-                )
-            })?;
-        let envelope = envelope_from_remote(downloaded);
-        let manifest =
-            SignedSyncObjectManifest::new(DOMAIN_ID, &envelope, signature).map_err(|_| {
-                orchestration_error(
-                    SyncOrchestrationErrorCode::InvalidMetadata,
-                    SyncCyclePhase::Verify,
-                )
-            })?;
-        manifest.verify(public_key).map_err(|_| {
-            orchestration_error(
-                SyncOrchestrationErrorCode::SignatureMismatch,
-                SyncCyclePhase::Verify,
+            .get(self.device_id)
+            .filter(|public_key| public_key.signing_key_id == self.signing_key_id)
+            .cloned()
+            .ok_or_else(backend_unavailable)?;
+        let epoch_materials = self
+            .accepted_key_epochs
+            .iter()
+            .copied()
+            .map(test_epoch_material)
+            .collect::<Result<Vec<_>, _>>()?;
+        let remote_signers = self
+            .public_keys
+            .values()
+            .cloned()
+            .map(
+                |public_key| match self.revoked_devices.get(&public_key.device_id).copied() {
+                    Some(first_rejected_sequence) => {
+                        SyncRemoteSigningProfile::revoked_from_change_sequence(
+                            public_key,
+                            first_rejected_sequence,
+                        )
+                    }
+                    None => SyncRemoteSigningProfile::active(public_key),
+                },
             )
-        })?;
-        let object_key_material = self
-            .sync_master_key
-            .derive_object_key(&self.object_key, envelope.object_type, &envelope.object_id)
-            .map_err(|_| {
-                orchestration_error(
-                    SyncOrchestrationErrorCode::DecryptFailed,
-                    SyncCyclePhase::DecryptAndDecode,
-                )
-            })?;
-        let plaintext = envelope
-            .decrypt_payload(&object_key_material)
-            .map_err(map_decrypt_error)?;
-        Ok(DecryptedSyncObject {
-            remote,
-            plaintext_payload: plaintext.bytes,
-        })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        SyncCryptoCycleSnapshot::synthetic_for_tests(
+            domain_id,
+            handle,
+            local_public_key,
+            self.signing_store.backend_status(),
+            self.current_write_epoch,
+            epoch_materials,
+            remote_signers,
+        )
     }
 
-    fn prepare_outbox(
-        &mut self,
-        snapshot: LocalSyncSnapshot,
-        version: u64,
-        prepared_at_ms: i64,
-    ) -> Result<PreparedSyncOutbox, SyncOrchestrationError> {
-        if snapshot.domain_id != DOMAIN_ID || snapshot.object_type != snapshot.payload.object_type {
-            return Err(orchestration_error(
-                SyncOrchestrationErrorCode::InvalidMetadata,
-                SyncCyclePhase::PrepareSignedOutbox,
-            ));
-        }
-        let spec = SyncObjectAssemblySpec::new(
-            snapshot.object_id,
-            self.device_id,
-            self.object_key.clone(),
-            version,
-            snapshot.remote_base_version,
-            prepared_at_ms,
-        )
-        .map_err(|_| {
-            orchestration_error(
-                SyncOrchestrationErrorCode::InvalidMetadata,
-                SyncCyclePhase::PrepareSignedOutbox,
-            )
-        })?;
-        let object = self
-            .assembler
-            .assemble_payload(snapshot.payload, spec, &self.sync_master_key)
-            .map_err(|_| {
-                orchestration_error(
-                    SyncOrchestrationErrorCode::DecryptFailed,
-                    SyncCyclePhase::PrepareSignedOutbox,
-                )
-            })?;
-        let manifest = sign_object(
-            &object,
-            &self.signing_store,
-            self.device_id,
-            self.signing_key_id,
-        );
-        Ok(PreparedSyncOutbox {
-            domain_id: DOMAIN_ID.to_owned(),
-            local_revision: snapshot.local_revision,
-            object,
-            manifest,
-            attempt_count: 0,
-        })
+    fn sign(
+        &self,
+        handle: &DeviceSigningKeyHandle,
+        canonical_bytes: &[u8],
+    ) -> Result<DeviceSignature, CryptoError> {
+        self.signing_store.sign(handle, canonical_bytes)
     }
 }
 
@@ -230,18 +172,25 @@ pub(super) fn test_signing_material() -> (
     (signing_store, public_key_a, public_key_b)
 }
 
-fn map_decrypt_error(error: CryptoError) -> SyncOrchestrationError {
-    let code = match error {
-        CryptoError::CiphertextHashMismatch => SyncOrchestrationErrorCode::CiphertextHashMismatch,
-        CryptoError::AssociatedDataMismatch { .. } => SyncOrchestrationErrorCode::AadMismatch,
-        _ => SyncOrchestrationErrorCode::DecryptFailed,
-    };
-    orchestration_error(code, SyncCyclePhase::DecryptAndDecode)
+fn test_epoch_material(epoch: u64) -> Result<SyncEpochKeyMaterial, SyncOrchestrationError> {
+    let object_key = KeyDescriptor::new(OBJECT_KEY_ID, KeyRole::ObjectKey, epoch)
+        .map_err(|_| invalid_metadata())?;
+    let sync_master_key = SyncMasterKeyMaterial::new([11u8; 32]).map_err(|_| invalid_metadata())?;
+    SyncEpochKeyMaterial::new(object_key, sync_master_key)
 }
 
-fn orchestration_error(
-    code: SyncOrchestrationErrorCode,
-    phase: SyncCyclePhase,
-) -> SyncOrchestrationError {
-    SyncOrchestrationError::new(code, phase, false)
+fn backend_unavailable() -> SyncOrchestrationError {
+    SyncOrchestrationError::new(
+        radishlex_ime_sync::SyncOrchestrationErrorCode::BackendUnavailable,
+        radishlex_ime_sync::SyncCyclePhase::Preflight,
+        false,
+    )
+}
+
+fn invalid_metadata() -> SyncOrchestrationError {
+    SyncOrchestrationError::new(
+        radishlex_ime_sync::SyncOrchestrationErrorCode::InvalidMetadata,
+        radishlex_ime_sync::SyncCyclePhase::Preflight,
+        false,
+    )
 }

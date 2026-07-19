@@ -4,6 +4,7 @@ mod http_transport;
 mod merge;
 mod model;
 mod orchestration;
+mod processor;
 mod remote;
 mod service;
 mod signing;
@@ -29,6 +30,10 @@ pub use orchestration::{
     DecryptedSyncObject, LocalSyncSnapshot, PreparedSyncOutbox, SyncApplyPageSummary,
     SyncCycleOutcome, SyncCyclePhase, SyncCycleSummary, SyncLocalRepository,
     SyncOrchestrationError, SyncOrchestrationErrorCode,
+};
+pub use processor::{
+    DefaultSyncObjectProcessor, SyncCryptoCycleSnapshot, SyncCryptoProvider, SyncEpochKeyMaterial,
+    SyncRemoteSigningProfile, UnavailableSyncCryptoProvider,
 };
 pub use remote::{
     LatestObjectConflictMetadata, OpaqueSyncCursor, RemoteObjectDiscoveryPage, RemoteObjectPayload,

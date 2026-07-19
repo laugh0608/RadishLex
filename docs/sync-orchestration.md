@@ -8,7 +8,7 @@
 - `apple-secure-enclave-p256-v1` 的 unsupported 真实环境当前不可得，仍作为生产 backend 资格和 M3 退出阻塞项；不得在支持 Secure Enclave 的设备上模拟该证据。
 - 该外部证据不再阻塞关闭产品入口、只使用合成 P2 数据和测试 backend 的 Rust 编排设计与实现。
 - 在 unsupported、backend 资格、Rust 编排、两个真实客户端、设备生命周期和发布级部署证据全部闭环前，`product_qualified` 与 `user_sync_enabled` 不因本地编排进展自动改变，Manager 不增加真实同步成功入口。
-- 当前实现已有加密对象装配、signed manifest、remote object client、解密后确定性 merge、userdb transaction 写回和两客户端测试；缺口是稳定 discovery cursor、持久化同步 journal/outbox，以及把现有能力组成可取消、可重启、可诊断的一次同步周期。
+- 关闭态 `sync_once`、稳定 discovery cursor、持久化 journal/outbox、默认关闭的通用 crypto processor/provider port 与双 userdb HTTP 收敛证据已经落地；剩余缺口是生产 provider 的可信设备生命周期/epoch material 装载、平台 backend 资格和真实设备全流程。
 
 ## 职责与依赖方向
 
@@ -41,15 +41,15 @@ Go sync server
 
 ### Crypto processor 的可信输入边界
 
-`SyncObjectProcessor` 是 orchestration 与密码/设备策略之间的 port，不是测试密钥容器。后续产品实现必须在 cycle 开始时取得不可变的可信快照，至少包含：本机 device 状态与 signing handle、当前写入 epoch、允许解密的 epoch 集合、每个远端设备的 signing profile/public key，以及基于撤销时间或 change sequence 得出的对象接受决策。
+`SyncObjectProcessor` 是 orchestration 与密码/设备策略之间的 port，不是测试密钥容器。当前 `DefaultSyncObjectProcessor` 通过 `SyncCryptoProvider::freeze_cycle()` 在 cycle 开始时取得不可变可信快照，包含本机 signing handle/public key、当前写入 epoch、允许解密的 epoch material、远端 signing profile/public key，以及 provider 基于撤销时间或 change sequence 给出的对象接受阈值。
 
 - 当前写入 epoch 只决定新 outbox 使用哪个 key descriptor，不等于只允许读取该 epoch。未重加密的合法历史对象可以继续属于允许解密集合。
 - epoch 不在允许集合时返回稳定 `key_epoch_rejected`；不得尝试其他 key、降级到旧 master key 或改用测试 backend。
 - 被策略判定为撤销后产生或不再可信的 signer 返回 `revoked_device`。设备当前为 revoked 不应脱离撤销时点而自动否定所有撤销前历史对象；该时间/sequence 判断由可信设备生命周期 provider 完成，processor 不自行猜测。
 - signing algorithm、public key id、key epoch 和 device acceptance 必须显式匹配；任何 mismatch 都失败关闭，不做跨 profile fallback。
-- 测试 processor 可以注入合成公钥、允许 epoch 集合和撤销集合，但必须只存在于 test target。产品 processor 不得从 Manager settings、Flutter state 或普通文件读取私钥和 sync master key。
+- 合成 provider 只能通过显式测试构造器进入，`test-memory-v1` 不得被产品构造器接受或作为 fallback。产品 provider 不得从 Manager settings、Flutter state 或普通文件读取私钥和 sync master key。
 
-本批只固定上述 provider 契约并验证失败语义；生产 provider、Secure Enclave signing handle 和 epoch material 装载仍未接入。
+通用 processor 已实现 manifest 验签、epoch material 选择、AEAD 解密、新 outbox 加密签名和 production gate，并接入双 userdb HTTP service 门禁。生产 provider 的设备生命周期/epoch material 装载与 Secure Enclave signing handle 仍未接入；默认 provider 在 preflight 失败关闭。
 
 ## 一次同步周期
 
@@ -193,7 +193,8 @@ Preflight 只能返回计数、状态和阻塞原因，不返回明文 P2、P1 �
 2. 已落地：userdb schema v5 持久化 domain state、remote observation、local revision、cycle journal/outbox；transaction-scoped apply 使 payload、observation、revision 与 cursor 同提交或回滚。
 3. 已落地：关闭态 `sync_once` 组合 remote/local/crypto processor port，测试使用真实 test-memory signing 与密文解密，覆盖 `409` 重新发现、重新合并和新版本签名；文件重开可恢复同一 outbox。
 4. 已落地关闭态风险矩阵：取消、retry exhaustion、local revision race、lease recovery、签名/密文/AAD-bound metadata、epoch/revocation 拒绝、decode/transaction cursor rollback、v4→v5 migration rollback、outbox prepare/ack crash point，以及两个隔离 userdb 通过短生命周期 Go HTTP 服务第二轮零上传收敛。
-5. 下一批实现默认关闭的产品 crypto processor/provider，接入明确的 device profile、接受 epoch 集合与 key material port；production backend 资格通过前不接真实签名路径。Rust service 与 backend 两条门禁都通过后才设计窄 FFI command/status。
+5. 已落地：默认关闭的 `DefaultSyncObjectProcessor`、cycle-frozen `SyncCryptoCycleSnapshot` 与 `SyncCryptoProvider` port；产品/合成构造路径分离，默认无 provider 时网络前阻断。测试覆盖历史 epoch、撤销 sequence、snapshot 漂移和轮换 outbox，双 userdb HTTP fixture 已复用该通用实现。
+6. 下一批实现生产 provider 的可信设备生命周期与 epoch material 装载；production backend 资格通过前不接真实签名路径。Rust service、生产 provider 与 backend 三条门禁都通过后才设计窄 FFI command/status。
 
 ## 验证矩阵
 
@@ -213,6 +214,6 @@ Preflight 只能返回计数、状态和阻塞原因，不返回明文 P2、P1 �
 
 - 本文允许的是关闭产品入口的 Rust/Go 本地实现与合成集成验证，不是用户可用同步授权。
 - unsupported 环境缺失不允许改写 `product_qualified`；本地 orchestration 测试通过也不允许改写 `user_sync_enabled`。
-- Rust service 稳定前不增加 FFI/Dart 执行命令；backend 资格通过前不接真实产品签名路径。
+- 生产 provider 与 backend 资格稳定前不增加 FFI/Dart 执行命令，也不接真实产品签名路径。
 - 不实现 plaintext HTTP/CLI/FFI 上传，不持久化解密 payload，不把 token 或 key material 放入 manager settings。
 - 不在本批实现恢复码 UI、设备加入/授权/撤销 UI、真实 key epoch 轮换入口、M4 发布包或第二平台。

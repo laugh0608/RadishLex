@@ -333,6 +333,9 @@ fn crypto_processor_rejects_tampered_signature_ciphertext_and_authenticated_meta
 fn crypto_processor_rejects_unaccepted_epoch_and_revoked_signer() {
     let (mut epoch_processor, retired_epoch_payload) = prepared_remote_fixture();
     epoch_processor.replace_accepted_key_epochs([2]);
+    epoch_processor
+        .preflight(DOMAIN_ID)
+        .expect("refresh retired epoch snapshot");
     assert_processor_error(
         &mut epoch_processor,
         retired_epoch_payload,
@@ -342,6 +345,9 @@ fn crypto_processor_rejects_unaccepted_epoch_and_revoked_signer() {
 
     let (mut revoked_processor, revoked_payload) = prepared_remote_fixture();
     revoked_processor.revoke_device(DEVICE_A);
+    revoked_processor
+        .preflight(DOMAIN_ID)
+        .expect("refresh revoked signer snapshot");
     assert_processor_error(
         &mut revoked_processor,
         revoked_payload,
@@ -352,6 +358,9 @@ fn crypto_processor_rejects_unaccepted_epoch_and_revoked_signer() {
 
 fn prepared_remote_fixture() -> (TestCryptoProcessor, RemoteObjectPayload) {
     let mut processor = TestCryptoProcessor::new(DEVICE_A, SIGNING_KEY_A);
+    processor
+        .preflight(DOMAIN_ID)
+        .expect("fixture processor preflight");
     let snapshot = LocalSyncSnapshot {
         domain_id: DOMAIN_ID.to_owned(),
         object_id: "dictionary-user-terms-v1".to_owned(),
