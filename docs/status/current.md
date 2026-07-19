@@ -26,6 +26,8 @@ M3 已具备 P2 envelope、signed manifest、两客户端授权/上传/下载/�
 
 关闭态 orchestration 第一实现批已落地：Go/Rust 使用 domain 内 `change_sequence` 与 opaque cursor 分页发现；userdb schema v5 持久化 cursor、remote observation、local revision、cycle journal 和完整密文 outbox；payload apply、观察、revision 与 cursor 在同一 transaction 提交。Rust `sync_once` 已覆盖 prepared outbox 恢复、上传 ack，以及 `409 stale_base_version` 后重新发现、验签解密、合并和重新签名；测试只使用合成 P2 与 `test-memory-v1`。
 
+第二风险批已证明取消在网络与 outbox 前失败关闭、transport retry exhaustion 保留完全相同的 prepared outbox 供下轮重放、旧 revision ack 不清除并发产生的新 dirty revision、活跃 lease 拒绝重入且过期 lease 可恢复。两个隔离 userdb 已通过真实短生命周期 Go HTTP 服务执行完整 `sync_once`：首轮上传、发现下载、验签解密、合并回传、service 重建与第二轮零上传收敛均成立；签名、密文和认证 metadata 篡改在应用事务前被拒绝。该证据仍只使用合成 P2、共享测试 master key 与 `test-memory-v1`，不构成产品 backend 或真实用户同步资格。
+
 ADR 0006 已接受 `ecdsa-p256-sha256-v1` 与 `ed25519-v1` 共存，固定 P-256 公钥、签名和 canonical encoding。Rust/Go verifier、共享正负向 fixture、显式 `signing_algorithm` metadata 和历史 Ed25519 migration 已落地；新请求缺少或混用算法时失败关闭。
 
 独立 `apple-keychain-p256-v1` 已接通 Apple Security、FFI 与 manager Release native library，并在 provisioning-backed 产品进程完成 DPK 创建、重载、签名、Rust/Go 验签、删除和 cleanup；禁止 legacy fallback，敏感 bytes 不进入 Dart，故 `compiled/runtime_available/can_create/can_sign=true`。
@@ -53,9 +55,9 @@ ADR 0006 已接受 `ecdsa-p256-sha256-v1` 与 `ed25519-v1` 共存，固定 P-256
 ## 下一步顺位
 
 1. 将 unsupported 保留为外部环境阻塞：目标环境可得时按独立授权执行 probe，确认明确 unsupported、无残留且不回退普通 DPK/test memory；通过后再逐字段评审 `product_qualified/user_presence_required/backup_migratable`。当前设备不能替代该证据。
-2. 收紧关闭态 orchestration 风险矩阵：补取消、retry exhaustion、local revision race、metadata/signature/hash/AAD/epoch/revocation 负向路径，以及迁移和 crash point 测试；任何失败不得前移 cursor 或丢失 dirty/outbox。
-3. 用两个隔离 userdb、test backend、合成 P2 与短生命周期 Go HTTP 服务组合真实 `sync_once`，覆盖首轮上传、分页下载、并发冲突、重启幂等重放与第二轮收敛；不得把这些证据用于开放产品入口。
-4. 只有 Rust service 稳定且生产 backend 资格通过后，才接窄 `ManagerBridge` command/status；最后完成两个真实客户端、恢复/设备授权/撤销/key epoch 与发布级目标部署证据，满足后才评估开放用户同步。
+2. 收完关闭态 orchestration 剩余高风险矩阵：补旧 key epoch、revoked device、解码/事务失败 cursor 不前移、迁移与 apply/outbox crash point；将现有 manual stale conflict、service 状态机 conflict 与双 userdb HTTP 收敛证据组合为可重复门禁。任何失败不得丢失 dirty/outbox 或推进未应用 cursor。
+3. 将当前测试 processor 收敛为产品可复用但默认关闭的 Rust crypto processor 边界，明确设备公钥/profile、sync master/object key、epoch 与撤销状态的提供者；生产 backend 资格通过前不得接 `ManagerBridge`、不得把 test key material 做成运行时 fallback。
+4. 只有 Rust service 与生产 backend 两条门禁均通过后，才接窄 `ManagerBridge` command/status；最后完成两个真实客户端、恢复/设备授权/撤销/key epoch 与发布级目标部署证据，满足后才评估开放用户同步。
 
 ## 验证入口
 

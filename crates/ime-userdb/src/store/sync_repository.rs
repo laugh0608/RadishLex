@@ -800,8 +800,9 @@ mod tests {
         TestMemoryDeviceKeyStore, ED25519_SIGNATURE_LEN,
     };
     use radishlex_ime_sync::{
-        DecryptedSyncObject, OpaqueSyncCursor, PreparedSyncOutbox, RemoteObjectVersion,
-        SyncEnvelopeAssembler, SyncLocalRepository, SyncObjectAssemblySpec, SyncObjectType,
+        DecryptedSyncObject, LocalSyncSnapshot, OpaqueSyncCursor, PreparedSyncOutbox,
+        RemoteObjectVersion, SyncEnvelopeAssembler, SyncLocalRepository, SyncObjectAssemblySpec,
+        SyncObjectType,
     };
 
     use crate::{TermSource, UserDb};
@@ -873,48 +874,7 @@ mod tests {
             .expect("snapshots")
             .pop()
             .expect("user terms snapshot");
-        let object_key =
-            KeyDescriptor::new("object-key-v1", KeyRole::ObjectKey, 1).expect("object key");
-        let master_key = SyncMasterKeyMaterial::new([9u8; 32]).expect("master key");
-        let spec = SyncObjectAssemblySpec::new(
-            &snapshot.object_id,
-            "device-a",
-            object_key,
-            1,
-            snapshot.remote_base_version,
-            100,
-        )
-        .expect("assembly spec");
-        let object = SyncEnvelopeAssembler::new()
-            .assemble_payload(snapshot.payload, spec, &master_key)
-            .expect("assembled object");
-        let mut signing_store = TestMemoryDeviceKeyStore::new();
-        signing_store
-            .insert_signing_key("device-a", "signing-key-a", [7u8; 32], 90)
-            .expect("signing key");
-        let placeholder = DeviceSignature::new(
-            "signing-key-a",
-            "device-a",
-            vec![1u8; ED25519_SIGNATURE_LEN],
-        )
-        .expect("placeholder");
-        let unsigned = SignedSyncObjectManifest::new(DOMAIN_ID, &object.envelope, placeholder)
-            .expect("unsigned manifest");
-        let handle = signing_store
-            .handle("device-a", "signing-key-a")
-            .expect("handle");
-        let signature = signing_store
-            .sign(&handle, &unsigned.canonical_bytes())
-            .expect("signature");
-        let manifest = SignedSyncObjectManifest::new(DOMAIN_ID, &object.envelope, signature)
-            .expect("manifest");
-        let prepared = PreparedSyncOutbox {
-            domain_id: DOMAIN_ID.to_owned(),
-            local_revision: snapshot.local_revision,
-            object,
-            manifest,
-            attempt_count: 0,
-        };
+        let prepared = prepare_snapshot(snapshot, 1, 100);
 
         db.store_prepared_outbox(&prepared).expect("store outbox");
         drop(db);
@@ -941,6 +901,132 @@ mod tests {
             .is_empty());
         drop(db);
         remove_temporary_database(&database_path);
+    }
+
+    #[test]
+    fn acknowledgement_of_older_revision_keeps_newer_local_revision_dirty() {
+        let mut db = UserDb::open_in_memory().expect("userdb");
+        db.add_term("cihe", "词核", None, TermSource::ManualAdd)
+            .expect("first local term");
+        let first_snapshot = db
+            .outbound_snapshots(DOMAIN_ID)
+            .expect("first snapshots")
+            .pop()
+            .expect("first snapshot");
+        assert_eq!(first_snapshot.local_revision, 1);
+        let prepared = prepare_snapshot(first_snapshot, 1, 100);
+        db.store_prepared_outbox(&prepared).expect("store outbox");
+
+        db.add_term("luobo", "萝卜", None, TermSource::ManualAdd)
+            .expect("second local term");
+        let raced_snapshot = db
+            .outbound_snapshots(DOMAIN_ID)
+            .expect("raced snapshots")
+            .pop()
+            .expect("raced snapshot");
+        assert_eq!(raced_snapshot.local_revision, 2);
+
+        db.acknowledge_outbox(
+            DOMAIN_ID,
+            &prepared.object.draft.object_id,
+            prepared.object.draft.version,
+            &prepared.object.draft.ciphertext_hash,
+            1,
+            120,
+        )
+        .expect("acknowledge older revision");
+
+        let remaining = db.outbound_snapshots(DOMAIN_ID).expect("remaining dirty");
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].local_revision, 2);
+        let payload = String::from_utf8(remaining[0].payload.bytes.clone()).expect("payload utf8");
+        assert!(payload.contains("词核"));
+        assert!(payload.contains("萝卜"));
+    }
+
+    #[test]
+    fn active_cycle_lease_blocks_overlap_and_expired_lease_recovers_without_state_loss() {
+        let mut db = UserDb::open_in_memory().expect("userdb");
+        db.begin_cycle(DOMAIN_ID, 100, 200).expect("first lease");
+        assert!(db
+            .request_sync_cycle_cancel(DOMAIN_ID)
+            .expect("request cancellation"));
+
+        let overlap = db
+            .begin_cycle(DOMAIN_ID, 150, 250)
+            .expect_err("active lease must block overlap");
+        assert_eq!(
+            overlap.code,
+            radishlex_ime_sync::SyncOrchestrationErrorCode::LocalTransactionFailed
+        );
+        assert!(db.cycle_cancel_requested(DOMAIN_ID).expect("cancel state"));
+
+        db.begin_cycle(DOMAIN_ID, 200, 300)
+            .expect("expired lease recovers");
+        assert!(!db
+            .cycle_cancel_requested(DOMAIN_ID)
+            .expect("recovered cancel state"));
+        let journal: (String, i64, i64) = db
+            .connection
+            .query_row(
+                "SELECT phase, started_at_ms, lease_expires_at_ms
+                 FROM sync_cycle_journal WHERE domain_id = ?1",
+                [DOMAIN_ID],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .expect("journal");
+        assert_eq!(journal, ("preflight".to_owned(), 200, 300));
+        db.finish_cycle(DOMAIN_ID).expect("finish recovered lease");
+    }
+
+    fn prepare_snapshot(
+        snapshot: LocalSyncSnapshot,
+        version: u64,
+        timestamp_ms: i64,
+    ) -> PreparedSyncOutbox {
+        let local_revision = snapshot.local_revision;
+        let object_key =
+            KeyDescriptor::new("object-key-v1", KeyRole::ObjectKey, 1).expect("object key");
+        let master_key = SyncMasterKeyMaterial::new([9u8; 32]).expect("master key");
+        let spec = SyncObjectAssemblySpec::new(
+            &snapshot.object_id,
+            "device-a",
+            object_key,
+            version,
+            snapshot.remote_base_version,
+            timestamp_ms,
+        )
+        .expect("assembly spec");
+        let object = SyncEnvelopeAssembler::new()
+            .assemble_payload(snapshot.payload, spec, &master_key)
+            .expect("assembled object");
+        let mut signing_store = TestMemoryDeviceKeyStore::new();
+        signing_store
+            .insert_signing_key("device-a", "signing-key-a", [7u8; 32], 90)
+            .expect("signing key");
+        let placeholder = DeviceSignature::new(
+            "signing-key-a",
+            "device-a",
+            vec![1u8; ED25519_SIGNATURE_LEN],
+        )
+        .expect("placeholder");
+        let unsigned = SignedSyncObjectManifest::new(DOMAIN_ID, &object.envelope, placeholder)
+            .expect("unsigned manifest");
+        let handle = signing_store
+            .handle("device-a", "signing-key-a")
+            .expect("handle");
+        let signature = signing_store
+            .sign(&handle, &unsigned.canonical_bytes())
+            .expect("signature");
+        let manifest = SignedSyncObjectManifest::new(DOMAIN_ID, &object.envelope, signature)
+            .expect("manifest");
+        PreparedSyncOutbox {
+            domain_id: DOMAIN_ID.to_owned(),
+            local_revision,
+            object,
+            manifest,
+            attempt_count: 0,
+        }
     }
 
     fn decrypted_user_terms(version: u64, change_sequence: u64) -> DecryptedSyncObject {

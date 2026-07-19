@@ -4,6 +4,7 @@ use std::io::{self, Read};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -16,10 +17,12 @@ use radishlex_ime_crypto::{
     SIGNATURE_ALGORITHM_ED25519_V1, SIGNATURE_SCHEMA_VERSION,
 };
 use radishlex_ime_sync::{
-    AssembledSyncObject, HttpSyncRemoteTransport, LatestObjectConflictMetadata,
-    PlaintextSyncPayload, RemoteObjectPayload, SyncEnvelopeAssembler, SyncObjectAssemblySpec,
-    SyncObjectType, SyncRemoteClient, SyncRemoteError, SyncRemoteMethod, SyncRemoteRequest,
-    SyncRemoteTransport, SyncServerErrorCode,
+    AssembledSyncObject, HttpSyncRemoteTransport, LatestObjectConflictMetadata, LocalSyncSnapshot,
+    PlaintextSyncPayload, RemoteObjectPayload, RemoteObjectVersion, SyncCycleOutcome,
+    SyncCyclePhase, SyncEnvelopeAssembler, SyncObjectAssemblySpec, SyncObjectProcessor,
+    SyncObjectType, SyncOnceConfig, SyncOrchestrationErrorCode, SyncOrchestrationService,
+    SyncRemoteClient, SyncRemoteError, SyncRemoteMethod, SyncRemoteRequest, SyncRemoteTransport,
+    SyncServerErrorCode,
 };
 use radishlex_ime_userdb::{
     decode_userdb_sync_objects, NegativeFeedbackDraft, NegativeFeedbackReason, PrivacyLevel,
@@ -28,6 +31,11 @@ use radishlex_ime_userdb::{
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+
+#[path = "support/sync_crypto_processor.rs"]
+mod sync_crypto_processor;
+
+use sync_crypto_processor::{test_signing_material, TestCryptoProcessor};
 
 const DOMAIN_ID: &str = "domain-two-client-go-http";
 const DEVICE_A: &str = "device-a";
@@ -38,6 +46,7 @@ const AGREEMENT_KEY_A: &str = "agreement-key-a";
 const AGREEMENT_KEY_B: &str = "agreement-key-b";
 const OBJECT_KEY_ID: &str = "object-key-v1";
 const BASE_TIMESTAMP_MS: i64 = 1_790_001_000_000;
+static TEMP_ROOT_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
 #[test]
 fn two_clients_sync_userdb_payloads_through_go_http_server() {
@@ -208,6 +217,226 @@ fn two_clients_sync_userdb_payloads_through_go_http_server() {
 
     let log_text = server.stop();
     assert_runtime_logs_redacted(&log_text);
+}
+
+#[test]
+fn two_sync_once_services_converge_isolated_userdbs_through_go_http_server() {
+    let Some(server) = GoSyncServer::try_spawn() else {
+        return;
+    };
+    let setup_transport =
+        HttpSyncRemoteTransport::with_timeout(server.base_url(), Duration::from_secs(5))
+            .expect("setup transport");
+    let (setup_signing_store, public_key_a, public_key_b) = test_signing_material();
+    create_domain(&setup_transport, &public_key_a);
+    authorize_device_b(&setup_transport, &setup_signing_store, &public_key_b);
+
+    let mut device_a_db = UserDb::open_in_memory().expect("device a db");
+    seed_device_a_userdb(&mut device_a_db);
+    let mut device_a_service = sync_service(server.base_url(), DEVICE_A, SIGNING_KEY_A);
+    let first_a =
+        device_a_service.sync_once(&mut device_a_db, DOMAIN_ID, BASE_TIMESTAMP_MS + 1_000);
+    assert_eq!(first_a.outcome, SyncCycleOutcome::Completed, "{first_a:?}");
+    assert_eq!(first_a.discovered, 0);
+    assert_eq!(first_a.downloaded, 0);
+    assert_eq!(first_a.uploaded, 3);
+
+    let mut device_b_db = UserDb::open_in_memory().expect("device b db");
+    seed_device_b_local_state(&mut device_b_db);
+    let mut device_b_service = sync_service(server.base_url(), DEVICE_B, SIGNING_KEY_B);
+    let first_b =
+        device_b_service.sync_once(&mut device_b_db, DOMAIN_ID, BASE_TIMESTAMP_MS + 2_000);
+    assert_eq!(first_b.outcome, SyncCycleOutcome::Completed, "{first_b:?}");
+    assert_eq!(first_b.discovered, 3);
+    assert_eq!(first_b.downloaded, 3);
+    assert_eq!(first_b.uploaded, 3);
+    assert_converged_userdb_state(&device_b_db);
+
+    let second_a =
+        device_a_service.sync_once(&mut device_a_db, DOMAIN_ID, BASE_TIMESTAMP_MS + 3_000);
+    assert_eq!(
+        second_a.outcome,
+        SyncCycleOutcome::Completed,
+        "{second_a:?}"
+    );
+    assert_eq!(second_a.discovered, 6);
+    assert_eq!(second_a.downloaded, 6);
+    assert_eq!(second_a.uploaded, 3);
+    assert_converged_userdb_state(&device_a_db);
+
+    // Rebuild the orchestration service to prove that the persisted userdb cursor and
+    // remote observations, rather than process memory, drive the next cycle.
+    drop(device_b_service);
+    let mut restarted_device_b_service = sync_service(server.base_url(), DEVICE_B, SIGNING_KEY_B);
+    let second_b = restarted_device_b_service.sync_once(
+        &mut device_b_db,
+        DOMAIN_ID,
+        BASE_TIMESTAMP_MS + 4_000,
+    );
+    assert_eq!(
+        second_b.outcome,
+        SyncCycleOutcome::Completed,
+        "{second_b:?}"
+    );
+    assert_eq!(second_b.discovered, 6);
+    assert_eq!(second_b.downloaded, 6);
+    assert_eq!(second_b.uploaded, 0);
+    assert_converged_userdb_state(&device_b_db);
+
+    let log_text = server.stop();
+    assert_runtime_logs_redacted_without_conflict(&log_text);
+    assert!(
+        log_text.contains(r#"route="objects.discover""#),
+        "runtime log missing discovery route: {log_text}"
+    );
+}
+
+#[test]
+fn crypto_processor_rejects_tampered_signature_ciphertext_and_authenticated_metadata() {
+    let (mut processor, mut signature_tampered) = prepared_remote_fixture();
+    signature_tampered.object.signature[0] ^= 0x01;
+    assert_processor_error(
+        &mut processor,
+        signature_tampered,
+        SyncOrchestrationErrorCode::SignatureMismatch,
+        SyncCyclePhase::Verify,
+    );
+
+    let (mut processor, mut ciphertext_tampered) = prepared_remote_fixture();
+    ciphertext_tampered.payload[0] ^= 0x01;
+    assert_processor_error(
+        &mut processor,
+        ciphertext_tampered,
+        SyncOrchestrationErrorCode::CiphertextHashMismatch,
+        SyncCyclePhase::DecryptAndDecode,
+    );
+
+    let (mut processor, mut metadata_tampered) = prepared_remote_fixture();
+    metadata_tampered.object.client_updated_at_ms += 1;
+    let envelope = envelope_from_remote(metadata_tampered.clone());
+    let manifest = sign_envelope(
+        &envelope,
+        processor.signing_store(),
+        DEVICE_A,
+        SIGNING_KEY_A,
+    );
+    metadata_tampered.object.signature = manifest.signature.signature;
+    assert_processor_error(
+        &mut processor,
+        metadata_tampered,
+        SyncOrchestrationErrorCode::CiphertextHashMismatch,
+        SyncCyclePhase::DecryptAndDecode,
+    );
+}
+
+fn prepared_remote_fixture() -> (TestCryptoProcessor, RemoteObjectPayload) {
+    let mut processor = TestCryptoProcessor::new(DEVICE_A, SIGNING_KEY_A);
+    let snapshot = LocalSyncSnapshot {
+        domain_id: DOMAIN_ID.to_owned(),
+        object_id: "dictionary-user-terms-v1".to_owned(),
+        object_type: SyncObjectType::DictionaryUserTerms,
+        local_revision: 1,
+        remote_base_version: None,
+        payload: PlaintextSyncPayload::new(
+            SyncObjectType::DictionaryUserTerms,
+            1,
+            br#"{"synthetic":true}"#.to_vec(),
+        )
+        .expect("fixture payload"),
+    };
+    let outbox = processor
+        .prepare_outbox(snapshot, 1, BASE_TIMESTAMP_MS + 1_000)
+        .expect("prepared fixture outbox");
+    let draft = &outbox.object.draft;
+    let signature = &outbox.manifest.signature;
+    let remote = RemoteObjectVersion {
+        domain_id: DOMAIN_ID.to_owned(),
+        object_id: draft.object_id.clone(),
+        object_type: draft.object_type,
+        version: draft.version,
+        base_version: draft.base_version,
+        change_sequence: 1,
+        owner_device_id: draft.owner_device_id.clone(),
+        key_id: draft.key_id.clone(),
+        key_epoch: draft.key_epoch,
+        algorithm: draft.algorithm.clone(),
+        nonce: draft.nonce.clone(),
+        encrypted_payload_len: draft.encrypted_payload_len,
+        ciphertext_hash: draft.ciphertext_hash.clone(),
+        signature_schema_version: signature.signature_schema_version,
+        signature_algorithm: signature.signature_algorithm.as_str().to_owned(),
+        signature_key_id: signature.signature_key_id.clone(),
+        signature: signature.signature.clone(),
+        server_received_at_ms: BASE_TIMESTAMP_MS + 1_001,
+        client_created_at_ms: draft.created_at_ms,
+        client_updated_at_ms: draft.updated_at_ms,
+    };
+    (
+        processor,
+        RemoteObjectPayload {
+            object: remote,
+            payload: outbox.object.envelope.encrypted_payload,
+        },
+    )
+}
+
+fn assert_processor_error(
+    processor: &mut TestCryptoProcessor,
+    payload: RemoteObjectPayload,
+    expected_code: SyncOrchestrationErrorCode,
+    expected_phase: SyncCyclePhase,
+) {
+    let expected = payload.object.clone();
+    let error = processor
+        .verify_and_decrypt(&expected, payload)
+        .expect_err("tampered payload must be rejected");
+    assert_eq!(error.code, expected_code);
+    assert_eq!(error.phase, expected_phase);
+    assert!(!error.retryable);
+}
+
+fn assert_converged_userdb_state(db: &UserDb) {
+    assert_term_status(db, "radish", "radish-alpha", "ra dish", TermStatus::Active);
+    assert_term_status(
+        db,
+        "clientb",
+        "client-b-alpha",
+        "client b reading",
+        TermStatus::Active,
+    );
+    assert_term_status(
+        db,
+        "blocked",
+        "blocked-alpha",
+        "blocked reading",
+        TermStatus::Deleted,
+    );
+    assert_term_status(
+        db,
+        "deleted",
+        "deleted-alpha",
+        "deleted reading",
+        TermStatus::Deleted,
+    );
+    assert!(db
+        .ranker_weight("rank", "ranker-alpha", Some("ranker reading"), "chat")
+        .expect("ranker weight")
+        .is_some());
+}
+
+fn sync_service(
+    base_url: String,
+    device_id: &'static str,
+    signing_key_id: &'static str,
+) -> SyncOrchestrationService<HttpSyncRemoteTransport, TestCryptoProcessor> {
+    let transport = HttpSyncRemoteTransport::with_timeout(base_url, Duration::from_secs(5))
+        .expect("sync transport");
+    SyncOrchestrationService::new(
+        SyncRemoteClient::new(transport),
+        TestCryptoProcessor::new(device_id, signing_key_id),
+        SyncOnceConfig::default(),
+    )
+    .expect("sync service")
 }
 
 fn create_domain(transport: &HttpSyncRemoteTransport, public_key: &DeviceSigningPublicKey) {
@@ -477,6 +706,20 @@ fn sign_object(
     signer_device_id: &str,
     signing_key_id: &str,
 ) -> SignedSyncObjectManifest {
+    sign_envelope(
+        &object.envelope,
+        signing_store,
+        signer_device_id,
+        signing_key_id,
+    )
+}
+
+fn sign_envelope(
+    envelope: &EncryptedObjectEnvelope,
+    signing_store: &TestMemoryDeviceKeyStore,
+    signer_device_id: &str,
+    signing_key_id: &str,
+) -> SignedSyncObjectManifest {
     let handle = signing_store
         .handle(signer_device_id, signing_key_id)
         .expect("signing handle");
@@ -486,12 +729,12 @@ fn sign_object(
         vec![1u8; ED25519_SIGNATURE_LEN],
     )
     .expect("placeholder signature");
-    let unsigned = SignedSyncObjectManifest::new(DOMAIN_ID, &object.envelope, placeholder)
-        .expect("unsigned manifest");
+    let unsigned =
+        SignedSyncObjectManifest::new(DOMAIN_ID, envelope, placeholder).expect("unsigned manifest");
     let signature = signing_store
         .sign(&handle, &unsigned.canonical_bytes())
         .expect("signature");
-    SignedSyncObjectManifest::new(DOMAIN_ID, &object.envelope, signature).expect("manifest")
+    SignedSyncObjectManifest::new(DOMAIN_ID, envelope, signature).expect("manifest")
 }
 
 fn download_decrypt_userdb_payloads(
@@ -647,6 +890,14 @@ fn ciphertext_hash(ciphertext: &[u8]) -> String {
 }
 
 fn assert_runtime_logs_redacted(log_text: &str) {
+    assert_runtime_logs_redacted_without_conflict(log_text);
+    assert!(
+        log_text.contains(r#"result_code="conflict_stale_base_version""#),
+        "runtime log missing stale conflict: {log_text}"
+    );
+}
+
+fn assert_runtime_logs_redacted_without_conflict(log_text: &str) {
     for forbidden in [
         "radish-alpha",
         "blocked-alpha",
@@ -668,7 +919,6 @@ fn assert_runtime_logs_redacted(log_text: &str) {
         r#"route="objects.versions.create""#,
         r#"route="objects.versions.get""#,
         r#"route="objects.versions.payload""#,
-        r#"result_code="conflict_stale_base_version""#,
     ] {
         assert!(
             log_text.contains(required),
@@ -798,9 +1048,10 @@ fn temp_root() -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("system time")
         .as_nanos();
+    let sequence = TEMP_ROOT_SEQUENCE.fetch_add(1, Ordering::Relaxed);
     std::env::temp_dir().join(format!(
-        "radishlex-userdb-go-http-{}-{nanos}",
-        std::process::id()
+        "radishlex-userdb-go-http-{}-{nanos}-{sequence}",
+        std::process::id(),
     ))
 }
 

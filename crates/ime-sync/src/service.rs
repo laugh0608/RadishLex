@@ -524,6 +524,91 @@ mod tests {
         );
     }
 
+    #[test]
+    fn cancellation_before_discovery_finishes_lease_without_network_or_outbox() {
+        let transport = ScriptedTransport::new([]);
+        let processor = QueueProcessor::new([]);
+        let remote = SyncRemoteClient::new(transport);
+        let mut service =
+            SyncOrchestrationService::new(remote, processor, SyncOnceConfig::default())
+                .expect("service");
+        let mut repository = FakeRepository::new(local_snapshot(1, None, "local-v1"));
+        repository.cancel_requested = true;
+
+        let summary = service.sync_once(&mut repository, "domain-a", 100);
+
+        assert_eq!(summary.outcome, SyncCycleOutcome::Cancelled);
+        assert_eq!(summary.final_phase, SyncCyclePhase::Preflight);
+        assert_eq!(
+            summary.error.expect("cancel error").code,
+            SyncOrchestrationErrorCode::Cancelled
+        );
+        assert!(!repository.journal_active);
+        assert!(repository.outboxes.is_empty());
+        assert!(service.remote().transport().requests().is_empty());
+    }
+
+    #[test]
+    fn retry_exhaustion_preserves_identical_outbox_for_the_next_cycle() {
+        let prepared = prepared_object(1, None, 1, "local-v1", 100);
+        let first_transport = ScriptedTransport::new([
+            empty_discovery_response("v1.cursor_0"),
+            Err(SyncRemoteError::transport("timeout-1")),
+            Err(SyncRemoteError::transport("timeout-2")),
+            Err(SyncRemoteError::transport("timeout-3")),
+        ]);
+        let first_processor = QueueProcessor::new([prepared.clone()]);
+        let first_remote = SyncRemoteClient::new(first_transport);
+        let mut first_service =
+            SyncOrchestrationService::new(first_remote, first_processor, SyncOnceConfig::default())
+                .expect("service");
+        let mut repository = FakeRepository::new(local_snapshot(1, None, "local-v1"));
+
+        let failed = first_service.sync_once(&mut repository, "domain-a", 100);
+
+        assert_eq!(failed.outcome, SyncCycleOutcome::Failed);
+        assert_eq!(failed.retries, 2);
+        assert_eq!(
+            failed.error.expect("retry error").code,
+            SyncOrchestrationErrorCode::TransportTimeout
+        );
+        assert_eq!(repository.outboxes.len(), 1);
+        assert_eq!(repository.outboxes[0].attempt_count, 3);
+        assert_eq!(repository.outboxes[0].object, prepared.object);
+        assert_eq!(repository.outboxes[0].manifest, prepared.manifest);
+
+        let retry_transport = ScriptedTransport::new([
+            empty_discovery_response("v1.cursor_0"),
+            json_response(201, response_for_prepared(&prepared, 1)),
+        ]);
+        let retry_processor = QueueProcessor::new([]);
+        let retry_remote = SyncRemoteClient::new(retry_transport);
+        let mut retry_service =
+            SyncOrchestrationService::new(retry_remote, retry_processor, SyncOnceConfig::default())
+                .expect("retry service");
+
+        let completed = retry_service.sync_once(&mut repository, "domain-a", 200);
+
+        assert_eq!(completed.outcome, SyncCycleOutcome::Completed);
+        assert_eq!(completed.uploaded, 1);
+        assert!(repository.outboxes.is_empty());
+        let retry_requests = retry_service.remote().transport().requests();
+        let upload = retry_requests
+            .iter()
+            .find(|request| request.method() == SyncRemoteMethod::Post)
+            .expect("retry upload");
+        let retry_body: serde_json::Value =
+            serde_json::from_slice(upload.body()).expect("retry body");
+        assert_eq!(
+            retry_body["ciphertext_hash"],
+            prepared.object.draft.ciphertext_hash
+        );
+        assert_eq!(
+            retry_body["payload"],
+            Base64::encode_string(&prepared.object.envelope.encrypted_payload)
+        );
+    }
+
     struct ScriptedTransport {
         responses: RefCell<VecDeque<Result<SyncRemoteResponse, SyncRemoteError>>>,
         requests: RefCell<Vec<SyncRemoteRequest>>,
@@ -653,6 +738,7 @@ mod tests {
         acknowledged_revision: u64,
         outboxes: Vec<PreparedSyncOutbox>,
         journal_active: bool,
+        cancel_requested: bool,
     }
 
     impl FakeRepository {
@@ -663,6 +749,7 @@ mod tests {
                 acknowledged_revision: 0,
                 outboxes: Vec::new(),
                 journal_active: false,
+                cancel_requested: false,
             }
         }
     }
@@ -689,7 +776,7 @@ mod tests {
         }
 
         fn cycle_cancel_requested(&self, _domain_id: &str) -> Result<bool, SyncOrchestrationError> {
-            Ok(false)
+            Ok(self.cancel_requested)
         }
 
         fn finish_cycle(&mut self, _domain_id: &str) -> Result<(), SyncOrchestrationError> {
@@ -891,6 +978,17 @@ mod tests {
         value: serde_json::Value,
     ) -> Result<SyncRemoteResponse, SyncRemoteError> {
         SyncRemoteResponse::json(status, &value)
+    }
+
+    fn empty_discovery_response(next_cursor: &str) -> Result<SyncRemoteResponse, SyncRemoteError> {
+        json_response(
+            200,
+            serde_json::json!({
+                "entries": [],
+                "next_cursor": next_cursor,
+                "has_more": false
+            }),
+        )
     }
 
     fn response_for_prepared(
