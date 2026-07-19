@@ -609,6 +609,50 @@ mod tests {
         );
     }
 
+    #[test]
+    fn epoch_and_revocation_verification_failures_do_not_advance_cursor_or_prepare_outbox() {
+        for code in [
+            SyncOrchestrationErrorCode::KeyEpochRejected,
+            SyncOrchestrationErrorCode::RevokedDevice,
+        ] {
+            let remote_object = prepared_object(1, None, 9, "remote", 200);
+            let transport = ScriptedTransport::new([
+                json_response(
+                    200,
+                    serde_json::json!({
+                        "entries": [response_for_prepared(&remote_object, 1)],
+                        "next_cursor": "v1.cursor_1",
+                        "has_more": false
+                    }),
+                ),
+                json_response(200, response_for_prepared(&remote_object, 1)),
+                Ok(SyncRemoteResponse::new(
+                    200,
+                    Some("application/octet-stream".to_owned()),
+                    remote_object.object.envelope.encrypted_payload.clone(),
+                )),
+            ]);
+            let processor = QueueProcessor::new([]).reject_verification(code);
+            let remote = SyncRemoteClient::new(transport);
+            let mut service =
+                SyncOrchestrationService::new(remote, processor, SyncOnceConfig::default())
+                    .expect("service");
+            let mut repository = FakeRepository::new(local_snapshot(1, None, "local-v1"));
+
+            let summary = service.sync_once(&mut repository, "domain-a", 100);
+
+            assert_eq!(summary.outcome, SyncCycleOutcome::Failed);
+            assert_eq!(summary.final_phase, SyncCyclePhase::Verify);
+            assert_eq!(summary.discovered, 1);
+            assert_eq!(summary.downloaded, 1);
+            assert_eq!(summary.applied, 0);
+            assert_eq!(summary.error.expect("verification error").code, code);
+            assert!(repository.cursor.is_none());
+            assert!(repository.outboxes.is_empty());
+            assert!(!repository.journal_active);
+        }
+    }
+
     struct ScriptedTransport {
         responses: RefCell<VecDeque<Result<SyncRemoteResponse, SyncRemoteError>>>,
         requests: RefCell<Vec<SyncRemoteRequest>>,
@@ -641,6 +685,7 @@ mod tests {
 
     struct QueueProcessor {
         prepared: VecDeque<PreparedSyncOutbox>,
+        verification_error: Option<SyncOrchestrationError>,
         master_key: SyncMasterKeyMaterial,
         object_key: KeyDescriptor,
         public_key: DeviceSigningPublicKey,
@@ -654,11 +699,21 @@ mod tests {
                 .expect("public key");
             Self {
                 prepared: prepared.into_iter().collect(),
+                verification_error: None,
                 master_key: SyncMasterKeyMaterial::new([11u8; 32]).expect("master key"),
                 object_key: KeyDescriptor::new("object-key-v1", KeyRole::ObjectKey, 1)
                     .expect("object key"),
                 public_key,
             }
+        }
+
+        fn reject_verification(mut self, code: SyncOrchestrationErrorCode) -> Self {
+            self.verification_error = Some(SyncOrchestrationError::new(
+                code,
+                SyncCyclePhase::Verify,
+                false,
+            ));
+            self
         }
     }
 
@@ -672,6 +727,9 @@ mod tests {
             expected: &RemoteObjectVersion,
             downloaded: RemoteObjectPayload,
         ) -> Result<DecryptedSyncObject, SyncOrchestrationError> {
+            if let Some(error) = &self.verification_error {
+                return Err(error.clone());
+            }
             assert_eq!(&downloaded.object, expected);
             let envelope = EncryptedObjectEnvelope {
                 schema_version: ENVELOPE_SCHEMA_VERSION,

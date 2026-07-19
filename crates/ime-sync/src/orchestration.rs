@@ -65,6 +65,7 @@ pub enum SyncOrchestrationErrorCode {
     BackendUnavailable,
     Unauthenticated,
     RevokedDevice,
+    KeyEpochRejected,
     UnsupportedSchema,
     UnsupportedAlgorithm,
     InvalidMetadata,
@@ -88,6 +89,7 @@ impl SyncOrchestrationErrorCode {
             Self::BackendUnavailable => "backend_unavailable",
             Self::Unauthenticated => "unauthenticated",
             Self::RevokedDevice => "revoked_device",
+            Self::KeyEpochRejected => "key_epoch_rejected",
             Self::UnsupportedSchema => "unsupported_schema",
             Self::UnsupportedAlgorithm => "unsupported_algorithm",
             Self::InvalidMetadata => "invalid_metadata",
@@ -337,6 +339,10 @@ mod tests {
         assert_eq!(
             SyncCyclePhase::PrepareSignedOutbox.as_str(),
             "prepare_signed_outbox"
+        );
+        assert_eq!(
+            SyncOrchestrationErrorCode::KeyEpochRejected.as_str(),
+            "key_epoch_rejected"
         );
         assert_eq!(SyncCycleOutcome::Blocked.as_str(), "blocked");
     }

@@ -83,6 +83,7 @@ impl UserDb {
             ensure_sync_orchestration_tables(&transaction)?;
         }
         transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+        validate_current_schema_on(&transaction)?;
         transaction.commit()?;
 
         let actual = self.schema_version()?;
@@ -96,133 +97,138 @@ impl UserDb {
     }
 
     fn validate_current_schema(&self) -> UserDbResult<()> {
-        if self.schema_version()? != SCHEMA_VERSION {
-            return Err(UserDbError::invalid_input(
-                "schema_version",
-                format!("expected {SCHEMA_VERSION}"),
-            ));
-        }
-
-        require_columns(
-            &self.connection,
-            "user_terms",
-            &[
-                "id",
-                "text",
-                "reading",
-                "input_code",
-                "source",
-                "weight",
-                "status",
-                "created_at_ms",
-                "updated_at_ms",
-                "last_used_at_ms",
-                "restored_at_ms",
-                "import_batch_id",
-            ],
-        )?;
-        require_columns(
-            &self.connection,
-            "deleted_terms",
-            &[
-                "id",
-                "term_id",
-                "input_code",
-                "text",
-                "reading",
-                "deleted_at_ms",
-                "reason",
-            ],
-        )?;
-        require_columns(
-            &self.connection,
-            "ranker_weights",
-            &[
-                "id",
-                "input_code",
-                "text",
-                "reading",
-                "frequency",
-                "last_used_at_ms",
-                "negative_score",
-                "context_kind",
-                "updated_at_ms",
-            ],
-        )?;
-        require_columns(
-            &self.connection,
-            "sync_domain_state",
-            &["domain_id", "state_version", "cursor", "last_success_at_ms"],
-        )?;
-        require_columns(
-            &self.connection,
-            "sync_remote_objects",
-            &[
-                "domain_id",
-                "object_id",
-                "object_type",
-                "latest_version",
-                "ciphertext_hash",
-                "owner_device_id",
-                "key_epoch",
-                "change_sequence",
-            ],
-        )?;
-        require_columns(
-            &self.connection,
-            "sync_local_objects",
-            &[
-                "domain_id",
-                "object_id",
-                "object_type",
-                "payload_hash",
-                "local_revision",
-                "acknowledged_revision",
-                "dirty",
-            ],
-        )?;
-        require_columns(
-            &self.connection,
-            "sync_prepared_outbox",
-            &[
-                "domain_id",
-                "object_id",
-                "object_type",
-                "local_revision",
-                "version",
-                "base_version",
-                "owner_device_id",
-                "key_id",
-                "key_epoch",
-                "algorithm",
-                "nonce",
-                "encrypted_payload",
-                "ciphertext_hash",
-                "record_count",
-                "signature_schema_version",
-                "signature_algorithm",
-                "signature_key_id",
-                "signer_device_id",
-                "signature",
-                "created_at_ms",
-                "updated_at_ms",
-                "attempt_count",
-                "last_error_code",
-            ],
-        )?;
-        require_columns(
-            &self.connection,
-            "sync_cycle_journal",
-            &[
-                "domain_id",
-                "phase",
-                "started_at_ms",
-                "lease_expires_at_ms",
-                "cancel_requested",
-            ],
-        )?;
-        Ok(())
+        validate_current_schema_on(&self.connection)
     }
+}
+
+fn validate_current_schema_on(connection: &Connection) -> UserDbResult<()> {
+    let schema_version = read_schema_version(connection)?;
+    if schema_version != SCHEMA_VERSION {
+        return Err(UserDbError::invalid_input(
+            "schema_version",
+            format!("expected {SCHEMA_VERSION}"),
+        ));
+    }
+
+    require_columns(
+        connection,
+        "user_terms",
+        &[
+            "id",
+            "text",
+            "reading",
+            "input_code",
+            "source",
+            "weight",
+            "status",
+            "created_at_ms",
+            "updated_at_ms",
+            "last_used_at_ms",
+            "restored_at_ms",
+            "import_batch_id",
+        ],
+    )?;
+    require_columns(
+        connection,
+        "deleted_terms",
+        &[
+            "id",
+            "term_id",
+            "input_code",
+            "text",
+            "reading",
+            "deleted_at_ms",
+            "reason",
+        ],
+    )?;
+    require_columns(
+        connection,
+        "ranker_weights",
+        &[
+            "id",
+            "input_code",
+            "text",
+            "reading",
+            "frequency",
+            "last_used_at_ms",
+            "negative_score",
+            "context_kind",
+            "updated_at_ms",
+        ],
+    )?;
+    require_columns(
+        connection,
+        "sync_domain_state",
+        &["domain_id", "state_version", "cursor", "last_success_at_ms"],
+    )?;
+    require_columns(
+        connection,
+        "sync_remote_objects",
+        &[
+            "domain_id",
+            "object_id",
+            "object_type",
+            "latest_version",
+            "ciphertext_hash",
+            "owner_device_id",
+            "key_epoch",
+            "change_sequence",
+        ],
+    )?;
+    require_columns(
+        connection,
+        "sync_local_objects",
+        &[
+            "domain_id",
+            "object_id",
+            "object_type",
+            "payload_hash",
+            "local_revision",
+            "acknowledged_revision",
+            "dirty",
+        ],
+    )?;
+    require_columns(
+        connection,
+        "sync_prepared_outbox",
+        &[
+            "domain_id",
+            "object_id",
+            "object_type",
+            "local_revision",
+            "version",
+            "base_version",
+            "owner_device_id",
+            "key_id",
+            "key_epoch",
+            "algorithm",
+            "nonce",
+            "encrypted_payload",
+            "ciphertext_hash",
+            "record_count",
+            "signature_schema_version",
+            "signature_algorithm",
+            "signature_key_id",
+            "signer_device_id",
+            "signature",
+            "created_at_ms",
+            "updated_at_ms",
+            "attempt_count",
+            "last_error_code",
+        ],
+    )?;
+    require_columns(
+        connection,
+        "sync_cycle_journal",
+        &[
+            "domain_id",
+            "phase",
+            "started_at_ms",
+            "lease_expires_at_ms",
+            "cancel_requested",
+        ],
+    )?;
+    Ok(())
 }
 
 fn configure_file_connection(connection: &Connection) -> rusqlite::Result<()> {

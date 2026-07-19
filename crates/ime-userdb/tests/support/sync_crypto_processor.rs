@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use radishlex_ime_crypto::{
     CryptoError, DeviceSignature, DeviceSigningPublicKey, KeyDescriptor, KeyRole,
@@ -21,6 +21,8 @@ pub(super) struct TestCryptoProcessor {
     signing_key_id: &'static str,
     signing_store: TestMemoryDeviceKeyStore,
     public_keys: BTreeMap<String, DeviceSigningPublicKey>,
+    accepted_key_epochs: BTreeSet<u64>,
+    revoked_devices: BTreeSet<String>,
     sync_master_key: SyncMasterKeyMaterial,
     object_key: KeyDescriptor,
     assembler: SyncEnvelopeAssembler,
@@ -37,6 +39,8 @@ impl TestCryptoProcessor {
                 (DEVICE_A.to_owned(), public_key_a),
                 (DEVICE_B.to_owned(), public_key_b),
             ]),
+            accepted_key_epochs: BTreeSet::from([1]),
+            revoked_devices: BTreeSet::new(),
             sync_master_key: SyncMasterKeyMaterial::new([11u8; 32]).expect("sync master key"),
             object_key: KeyDescriptor::new(OBJECT_KEY_ID, KeyRole::ObjectKey, 1)
                 .expect("object key"),
@@ -46,6 +50,14 @@ impl TestCryptoProcessor {
 
     pub(super) fn signing_store(&self) -> &TestMemoryDeviceKeyStore {
         &self.signing_store
+    }
+
+    pub(super) fn replace_accepted_key_epochs(&mut self, epochs: impl IntoIterator<Item = u64>) {
+        self.accepted_key_epochs = epochs.into_iter().collect();
+    }
+
+    pub(super) fn revoke_device(&mut self, device_id: impl Into<String>) {
+        self.revoked_devices.insert(device_id.into());
     }
 }
 
@@ -79,6 +91,18 @@ impl SyncObjectProcessor for TestCryptoProcessor {
             ));
         }
         let remote = downloaded.object.clone();
+        if self.revoked_devices.contains(&remote.owner_device_id) {
+            return Err(orchestration_error(
+                SyncOrchestrationErrorCode::RevokedDevice,
+                SyncCyclePhase::Verify,
+            ));
+        }
+        if !self.accepted_key_epochs.contains(&remote.key_epoch) {
+            return Err(orchestration_error(
+                SyncOrchestrationErrorCode::KeyEpochRejected,
+                SyncCyclePhase::Verify,
+            ));
+        }
         let signature_algorithm = SignatureAlgorithmId::new(remote.signature_algorithm.clone())
             .map_err(|_| {
                 orchestration_error(

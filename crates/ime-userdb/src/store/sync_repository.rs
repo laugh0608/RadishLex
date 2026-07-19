@@ -864,6 +864,51 @@ mod tests {
     }
 
     #[test]
+    fn decode_failure_keeps_last_committed_cursor_and_remote_observation() {
+        let mut db = UserDb::open_in_memory().expect("userdb");
+        let cursor_1 = OpaqueSyncCursor::new("v1.cursor_1").expect("cursor 1");
+        db.apply_download_page(DOMAIN_ID, &cursor_1, &[decrypted_user_terms(1, 1)])
+            .expect("first page");
+
+        let cursor_2 = OpaqueSyncCursor::new("v1.cursor_2").expect("cursor 2");
+        let malformed = DecryptedSyncObject {
+            remote: remote_object(
+                "dictionary-user-terms-v1",
+                SyncObjectType::DictionaryUserTerms,
+                2,
+                2,
+            ),
+            plaintext_payload: b"{malformed-synthetic-json".to_vec(),
+        };
+        let error = db
+            .apply_download_page(DOMAIN_ID, &cursor_2, &[malformed])
+            .expect_err("decode failure");
+
+        assert_eq!(
+            error.code,
+            radishlex_ime_sync::SyncOrchestrationErrorCode::DecodeFailed
+        );
+        assert_eq!(
+            db.current_cursor(DOMAIN_ID)
+                .expect("cursor")
+                .expect("stored cursor")
+                .as_str(),
+            "v1.cursor_1"
+        );
+        let observed: (i64, i64) = db
+            .connection
+            .query_row(
+                "SELECT latest_version, change_sequence FROM sync_remote_objects
+                 WHERE domain_id = ?1 AND object_id = 'dictionary-user-terms-v1'",
+                [DOMAIN_ID],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("remote observation");
+        assert_eq!(observed, (1, 1));
+        assert!(db.fetch_term("cihe", "词核", "").expect("term").is_some());
+    }
+
+    #[test]
     fn prepared_outbox_round_trips_and_acknowledgement_clears_only_its_revision() {
         let database_path = temporary_database_path("outbox-restart");
         let mut db = UserDb::open(&database_path).expect("userdb");
@@ -942,6 +987,112 @@ mod tests {
         let payload = String::from_utf8(remaining[0].payload.bytes.clone()).expect("payload utf8");
         assert!(payload.contains("词核"));
         assert!(payload.contains("萝卜"));
+    }
+
+    #[test]
+    fn outbox_prepare_and_ack_failures_preserve_dirty_state_and_exact_request() {
+        let mut db = UserDb::open_in_memory().expect("userdb");
+        db.add_term("cihe", "词核", None, TermSource::ManualAdd)
+            .expect("local term");
+        let snapshot = db
+            .outbound_snapshots(DOMAIN_ID)
+            .expect("snapshots")
+            .pop()
+            .expect("user terms snapshot");
+        let prepared = prepare_snapshot(snapshot, 1, 100);
+
+        db.connection
+            .execute_batch(
+                "CREATE TRIGGER fail_outbox_prepare
+                 BEFORE INSERT ON sync_prepared_outbox
+                 BEGIN SELECT RAISE(ABORT, 'synthetic outbox prepare fault'); END;",
+            )
+            .expect("prepare fault trigger");
+        let prepare_error = db
+            .store_prepared_outbox(&prepared)
+            .expect_err("prepare transaction fails");
+        assert_eq!(
+            prepare_error.code,
+            radishlex_ime_sync::SyncOrchestrationErrorCode::LocalTransactionFailed
+        );
+        assert!(db
+            .prepared_outboxes(DOMAIN_ID)
+            .expect("outboxes after prepare failure")
+            .is_empty());
+        assert_eq!(
+            db.outbound_snapshots(DOMAIN_ID)
+                .expect("dirty after prepare failure")[0]
+                .local_revision,
+            prepared.local_revision
+        );
+
+        db.connection
+            .execute_batch("DROP TRIGGER fail_outbox_prepare;")
+            .expect("drop prepare fault");
+        db.store_prepared_outbox(&prepared)
+            .expect("store exact prepared outbox");
+        db.connection
+            .execute_batch(
+                "CREATE TRIGGER fail_outbox_ack
+                 BEFORE INSERT ON sync_domain_state
+                 BEGIN SELECT RAISE(ABORT, 'synthetic outbox ack fault'); END;",
+            )
+            .expect("ack fault trigger");
+        let ack_error = db
+            .acknowledge_outbox(
+                DOMAIN_ID,
+                &prepared.object.draft.object_id,
+                prepared.object.draft.version,
+                &prepared.object.draft.ciphertext_hash,
+                1,
+                120,
+            )
+            .expect_err("ack transaction fails");
+        assert_eq!(
+            ack_error.code,
+            radishlex_ime_sync::SyncOrchestrationErrorCode::LocalTransactionFailed
+        );
+        assert_eq!(
+            db.prepared_outboxes(DOMAIN_ID)
+                .expect("outbox after ack failure"),
+            vec![prepared.clone()]
+        );
+        let remote_count: i64 = db
+            .connection
+            .query_row(
+                "SELECT COUNT(*) FROM sync_remote_objects WHERE domain_id = ?1",
+                [DOMAIN_ID],
+                |row| row.get(0),
+            )
+            .expect("remote count");
+        assert_eq!(remote_count, 0);
+        assert_eq!(
+            db.outbound_snapshots(DOMAIN_ID)
+                .expect("dirty after ack failure")[0]
+                .local_revision,
+            prepared.local_revision
+        );
+
+        db.connection
+            .execute_batch("DROP TRIGGER fail_outbox_ack;")
+            .expect("drop ack fault");
+        db.acknowledge_outbox(
+            DOMAIN_ID,
+            &prepared.object.draft.object_id,
+            prepared.object.draft.version,
+            &prepared.object.draft.ciphertext_hash,
+            1,
+            120,
+        )
+        .expect("retry exact ack");
+        assert!(db
+            .prepared_outboxes(DOMAIN_ID)
+            .expect("outboxes after retry")
+            .is_empty());
+        assert!(db
+            .outbound_snapshots(DOMAIN_ID)
+            .expect("dirty after retry")
+            .is_empty());
     }
 
     #[test]

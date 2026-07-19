@@ -39,6 +39,18 @@ Go sync server
 - 网络请求不得在 SQLite transaction 持锁期间执行。
 - Manager 只消费稳定 phase、结果计数和脱敏错误；它不能读取或持久化 cursor、outbox、payload、signature 或 key material。
 
+### Crypto processor 的可信输入边界
+
+`SyncObjectProcessor` 是 orchestration 与密码/设备策略之间的 port，不是测试密钥容器。后续产品实现必须在 cycle 开始时取得不可变的可信快照，至少包含：本机 device 状态与 signing handle、当前写入 epoch、允许解密的 epoch 集合、每个远端设备的 signing profile/public key，以及基于撤销时间或 change sequence 得出的对象接受决策。
+
+- 当前写入 epoch 只决定新 outbox 使用哪个 key descriptor，不等于只允许读取该 epoch。未重加密的合法历史对象可以继续属于允许解密集合。
+- epoch 不在允许集合时返回稳定 `key_epoch_rejected`；不得尝试其他 key、降级到旧 master key 或改用测试 backend。
+- 被策略判定为撤销后产生或不再可信的 signer 返回 `revoked_device`。设备当前为 revoked 不应脱离撤销时点而自动否定所有撤销前历史对象；该时间/sequence 判断由可信设备生命周期 provider 完成，processor 不自行猜测。
+- signing algorithm、public key id、key epoch 和 device acceptance 必须显式匹配；任何 mismatch 都失败关闭，不做跨 profile fallback。
+- 测试 processor 可以注入合成公钥、允许 epoch 集合和撤销集合，但必须只存在于 test target。产品 processor 不得从 Manager settings、Flutter state 或普通文件读取私钥和 sync master key。
+
+本批只固定上述 provider 契约并验证失败语义；生产 provider、Secure Enclave signing handle 和 epoch material 装载仍未接入。
+
 ## 一次同步周期
 
 稳定阶段按以下顺序执行：
@@ -171,7 +183,7 @@ Preflight 只能返回计数、状态和阻塞原因，不返回明文 P2、P1 �
 - 最后成功时间；
 - 脱敏错误类别和 blocker code。
 
-错误类别至少区分：policy blocked、backend unavailable、unauthenticated、revoked device、unsupported schema/algorithm、invalid metadata、signature/hash/AAD failure、decrypt/decode failure、local transaction failure、cursor failure、conflict exhausted、transport timeout、server unavailable 和 cancellation。
+错误类别至少区分：policy blocked、backend unavailable、unauthenticated、revoked device、key epoch rejected、unsupported schema/algorithm、invalid metadata、signature/hash/AAD failure、decrypt/decode failure、local transaction failure、cursor failure、conflict exhausted、transport timeout、server unavailable 和 cancellation。
 
 不得向 FFI、Dart、日志或 diagnostics 返回：token、recovery code、key bytes、canonical bytes、signature bytes、nonce、payload、HTTP body、SQLite 路径、用户词、input code、reading、context 或平台错误正文。
 
@@ -179,9 +191,9 @@ Preflight 只能返回计数、状态和阻塞原因，不返回明文 P2、P1 �
 
 1. 已落地：`ime-sync` phase/result/error、opaque cursor、discovery page、local repository port 与 prepared outbox；Go/Rust change cursor discovery 已覆盖分页、幂等 sequence、非法/跨域/越界 cursor。
 2. 已落地：userdb schema v5 持久化 domain state、remote observation、local revision、cycle journal/outbox；transaction-scoped apply 使 payload、observation、revision 与 cursor 同提交或回滚。
-3. 已落地首轮：关闭态 `sync_once` 组合 remote/local/crypto processor port，测试使用真实 test-memory signing 与密文解密，覆盖 `409` 重新发现、重新合并和新版本签名；文件重开可恢复同一 outbox。
-4. 待补齐：取消、retry exhaustion、local revision race、更多 crash point 和安全负向路径；再用两个隔离 userdb 与短生命周期 Go HTTP 服务组合完整 service 收敛链。
-5. Rust service 风险矩阵和生产 backend 资格都通过后才设计窄 FFI command/status；Manager 真实入口继续关闭。
+3. 已落地：关闭态 `sync_once` 组合 remote/local/crypto processor port，测试使用真实 test-memory signing 与密文解密，覆盖 `409` 重新发现、重新合并和新版本签名；文件重开可恢复同一 outbox。
+4. 已落地关闭态风险矩阵：取消、retry exhaustion、local revision race、lease recovery、签名/密文/AAD-bound metadata、epoch/revocation 拒绝、decode/transaction cursor rollback、v4→v5 migration rollback、outbox prepare/ack crash point，以及两个隔离 userdb 通过短生命周期 Go HTTP 服务第二轮零上传收敛。
+5. 下一批实现默认关闭的产品 crypto processor/provider，接入明确的 device profile、接受 epoch 集合与 key material port；production backend 资格通过前不接真实签名路径。Rust service 与 backend 两条门禁都通过后才设计窄 FFI command/status。
 
 ## 验证矩阵
 

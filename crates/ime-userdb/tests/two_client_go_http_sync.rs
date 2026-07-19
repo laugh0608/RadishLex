@@ -329,6 +329,27 @@ fn crypto_processor_rejects_tampered_signature_ciphertext_and_authenticated_meta
     );
 }
 
+#[test]
+fn crypto_processor_rejects_unaccepted_epoch_and_revoked_signer() {
+    let (mut epoch_processor, retired_epoch_payload) = prepared_remote_fixture();
+    epoch_processor.replace_accepted_key_epochs([2]);
+    assert_processor_error(
+        &mut epoch_processor,
+        retired_epoch_payload,
+        SyncOrchestrationErrorCode::KeyEpochRejected,
+        SyncCyclePhase::Verify,
+    );
+
+    let (mut revoked_processor, revoked_payload) = prepared_remote_fixture();
+    revoked_processor.revoke_device(DEVICE_A);
+    assert_processor_error(
+        &mut revoked_processor,
+        revoked_payload,
+        SyncOrchestrationErrorCode::RevokedDevice,
+        SyncCyclePhase::Verify,
+    );
+}
+
 fn prepared_remote_fixture() -> (TestCryptoProcessor, RemoteObjectPayload) {
     let mut processor = TestCryptoProcessor::new(DEVICE_A, SIGNING_KEY_A);
     let snapshot = LocalSyncSnapshot {

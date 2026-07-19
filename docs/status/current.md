@@ -28,6 +28,8 @@ M3 已具备 P2 envelope、signed manifest、两客户端授权/上传/下载/�
 
 第二风险批已证明取消在网络与 outbox 前失败关闭、transport retry exhaustion 保留完全相同的 prepared outbox 供下轮重放、旧 revision ack 不清除并发产生的新 dirty revision、活跃 lease 拒绝重入且过期 lease 可恢复。两个隔离 userdb 已通过真实短生命周期 Go HTTP 服务执行完整 `sync_once`：首轮上传、发现下载、验签解密、合并回传、service 重建与第二轮零上传收敛均成立；签名、密文和认证 metadata 篡改在应用事务前被拒绝。该证据仍只使用合成 P2、共享测试 master key 与 `test-memory-v1`，不构成产品 backend 或真实用户同步资格。
 
+第三风险批已覆盖不在允许集合中的 key epoch、被策略拒绝的 revoked signer、decode 失败和 SQLite apply 失败，均不推进 cursor 或生成 outbox；outbox prepare/ack 故障保持 dirty 与完全相同的 prepared request。v4→v5 migration 现于提交前校验完整 schema，残缺同名 sync 表会连同新表和 `user_version` 一起回滚。当前写入 epoch 与允许解密的历史 epoch 集合已分离，避免误拒未重加密历史对象；产品 device/epoch/key material provider 仍未实现。
+
 ADR 0006 已接受 `ecdsa-p256-sha256-v1` 与 `ed25519-v1` 共存，固定 P-256 公钥、签名和 canonical encoding。Rust/Go verifier、共享正负向 fixture、显式 `signing_algorithm` metadata 和历史 Ed25519 migration 已落地；新请求缺少或混用算法时失败关闭。
 
 独立 `apple-keychain-p256-v1` 已接通 Apple Security、FFI 与 manager Release native library，并在 provisioning-backed 产品进程完成 DPK 创建、重载、签名、Rust/Go 验签、删除和 cleanup；禁止 legacy fallback，敏感 bytes 不进入 Dart，故 `compiled/runtime_available/can_create/can_sign=true`。
@@ -55,8 +57,8 @@ ADR 0006 已接受 `ecdsa-p256-sha256-v1` 与 `ed25519-v1` 共存，固定 P-256
 ## 下一步顺位
 
 1. 将 unsupported 保留为外部环境阻塞：目标环境可得时按独立授权执行 probe，确认明确 unsupported、无残留且不回退普通 DPK/test memory；通过后再逐字段评审 `product_qualified/user_presence_required/backup_migratable`。当前设备不能替代该证据。
-2. 收完关闭态 orchestration 剩余高风险矩阵：补旧 key epoch、revoked device、解码/事务失败 cursor 不前移、迁移与 apply/outbox crash point；将现有 manual stale conflict、service 状态机 conflict 与双 userdb HTTP 收敛证据组合为可重复门禁。任何失败不得丢失 dirty/outbox 或推进未应用 cursor。
-3. 将当前测试 processor 收敛为产品可复用但默认关闭的 Rust crypto processor 边界，明确设备公钥/profile、sync master/object key、epoch 与撤销状态的提供者；生产 backend 资格通过前不得接 `ManagerBridge`、不得把 test key material 做成运行时 fallback。
+2. 实现默认关闭的 Rust crypto processor/provider：以 cycle 级可信快照提供 device signing profile/public key、本机 signing handle、当前写入 epoch、允许解密 epoch 集合、撤销时点/sequence 决策和 sync/object key material；产品构造器必须执行 production gate，测试 backend 不得成为 fallback。
+3. 用合成 provider 接回现有双 userdb HTTP service 门禁，补 provider snapshot 漂移、历史 epoch 可读、撤销后新对象拒绝与 epoch 轮换后新 outbox 的组合测试；生产 backend 资格通过前不得接 `ManagerBridge`。
 4. 只有 Rust service 与生产 backend 两条门禁均通过后，才接窄 `ManagerBridge` command/status；最后完成两个真实客户端、恢复/设备授权/撤销/key epoch 与发布级目标部署证据，满足后才评估开放用户同步。
 
 ## 验证入口

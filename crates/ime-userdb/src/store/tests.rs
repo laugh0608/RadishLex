@@ -220,6 +220,65 @@ fn migration_upgrades_v3_terms_without_inventing_import_provenance() {
 }
 
 #[test]
+fn malformed_v4_sync_schema_rolls_back_migration_without_advancing_version() {
+    let path = temp_db_path("migration-v4-sync-rollback");
+    {
+        let mut db = UserDb::open(&path).expect("v5 userdb opens");
+        db.add_term("preserve", "合成保留词", None, TermSource::ManualAdd)
+            .expect("synthetic term is added");
+    }
+    {
+        let connection = rusqlite::Connection::open(&path).expect("sqlite reopens");
+        connection
+            .execute_batch(
+                "DROP TABLE sync_cycle_journal;
+                 DROP TABLE sync_prepared_outbox;
+                 DROP TABLE sync_local_objects;
+                 DROP TABLE sync_remote_objects;
+                 DROP TABLE sync_domain_state;
+                 CREATE TABLE sync_domain_state (domain_id TEXT PRIMARY KEY);
+                 PRAGMA user_version = 4;",
+            )
+            .expect("malformed v4 sync schema is created");
+    }
+
+    let error = UserDb::open(&path).expect_err("malformed v4 migration fails");
+    assert!(error.to_string().contains("sync_domain_state"));
+    let connection = rusqlite::Connection::open(&path).expect("sqlite reopens after rollback");
+    let version: i64 = connection
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .expect("schema version");
+    let term_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM user_terms WHERE input_code = 'preserve'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("preserved term count");
+    let remote_table_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master
+             WHERE type = 'table' AND name = 'sync_remote_objects'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("rolled back sync table count");
+    let domain_columns = connection
+        .prepare("PRAGMA table_info(sync_domain_state)")
+        .expect("domain columns prepare")
+        .query_map([], |row| row.get::<_, String>(1))
+        .expect("domain columns query")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("domain columns");
+    assert_eq!(version, 4);
+    assert_eq!(term_count, 1);
+    assert_eq!(remote_table_count, 0);
+    assert_eq!(domain_columns, vec!["domain_id"]);
+    drop(connection);
+    remove_temp_db(&path);
+}
+
+#[test]
 fn add_query_and_delete_term_records_tombstone() {
     let mut db = UserDb::open_in_memory().expect("userdb opens");
 
