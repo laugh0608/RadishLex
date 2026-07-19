@@ -18,6 +18,7 @@ type Store interface {
 	LatestRecoveryRecord(ctx context.Context, domainID string) (RecoveryRecord, error)
 	LatestRecoveryWrappedMaterial(ctx context.Context, domainID string) (RecoveryRecord, []byte, error)
 	RecoverDevice(ctx context.Context, upload RecoveredDeviceActivationUpload) (RecoveredDeviceActivationResult, error)
+	RevokeRecoveryRecord(ctx context.Context, revocation RecoveryRecordRevocation) (RecoveryRecordRevocationResult, error)
 	PutObjectVersion(ctx context.Context, upload ObjectVersionUpload) (ObjectVersion, error)
 	ObjectVersionsAfter(ctx context.Context, domainID string, afterSequence uint64, limit int) ([]ObjectVersion, error)
 	ObjectVersion(ctx context.Context, domainID string, objectID string, version uint64) (ObjectVersion, error)

@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、signed epoch distribution、recovery-record-v2 签名轮换/可信解封/recovered-device activation、客户端解密合并和 `ime-sync` remote client。Go server metadata schema v8 已具备 API/storage/runtime、SQLite metadata、local blob、签名 profile 验证、对象/lifecycle/epoch distribution/recovery activation、审计、备份恢复和升级回滚受控证据。signed recovery record 撤销、发布级目标部署证据和合格生产私钥 backend 尚未闭环；真实用户同步保持关闭。
+当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、signed epoch distribution、recovery-record-v2 签名轮换/可信解封/recovered-device activation/signed revocation、客户端解密合并和 `ime-sync` remote client。Go server metadata schema v9 已具备 API/storage/runtime、SQLite metadata、local blob、签名 profile 验证、对象/lifecycle/epoch distribution/recovery activation/revocation、审计、备份恢复和升级回滚受控证据。发布级目标部署证据和合格生产私钥 backend 尚未闭环；真实用户同步保持关闭。
 
 本阶段只固定服务端 API 和 storage 边界：
 
@@ -67,7 +67,7 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名。AD
 
 撤销记录被接受后，服务端必须拒绝被撤销设备后续上传，并拒绝低于 `current_key_epoch` 的新对象版本写入。历史对象是否重加密由客户端和管理 UI 后续单独设计。
 
-`domain_lifecycle_events`：`domain_id`、`lifecycle_sequence`、`event_type`、`record_id`、`reject_from_object_change_sequence`、`created_at_ms`。当前 event type 包含 `initial_device`、`device_authorized`、`device_revoked`、`recovery_record_rotated` 和 `device_recovered`。
+`domain_lifecycle_events`：`domain_id`、`lifecycle_sequence`、`event_type`、`record_id`、`reject_from_object_change_sequence`、`created_at_ms`。当前 event type 包含 `initial_device`、`device_authorized`、`device_revoked`、`recovery_record_rotated`、`device_recovered` 和 `recovery_record_revoked`。
 
 `lifecycle_sequence` 是设备信任链的 domain 内严格递增序列，与加密对象的 `change_sequence` 属于不同命名空间。创建 domain、授权设备和撤销设备只在对应 metadata transaction 成功提交时追加生命周期事件；失败和回滚不得留下可发现事件。生命周期事件只引用第一设备 profile、signed authorization 或 signed revocation 的公开记录，不承载 wrapped key bytes、恢复材料或对象 payload。
 
@@ -80,6 +80,10 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名。AD
 `recovered_device_activations`：`domain_id`、`recovery_record_id`、`device_id`、完整 signing/key-agreement public profile、`key_epoch`、`created_at_ms`、activation signature schema/algorithm/key id/signature。
 
 恢复激活只保存 possession proof 与新设备公开 profile，不保存恢复码、派生 activation private seed、同步主密钥或 ECDH shared secret。恢复记录消费、设备激活、activation 保存、完整 active cohort wrapped metadata 和 `device_recovered` lifecycle event 必须在一个 transaction 中提交。
+
+`recovery_record_revocations`：`domain_id`、`recovery_record_id`、`revoker_device_id`、`key_epoch`、`reason`、`created_at_ms`、signature schema/algorithm/key id/signature。
+
+恢复记录撤销只保存公开 signed decision。目标状态更新、revocation metadata 和 `recovery_record_revoked` lifecycle event 必须原子提交；不得删除 recovery wrapped blob，也不得让 unsigned bearer/header 请求改变恢复可用性。
 
 `sync_objects`：`domain_id`、`object_id`、`object_type`、`latest_version`、`latest_ciphertext_hash`、`latest_key_epoch`、`latest_change_sequence`、`created_at_ms`、`updated_at_ms`。
 
@@ -95,13 +99,13 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名。AD
 
 ## 当前 Go storage surface
 
-当前 `server/sync-server/internal/storage.Store` 是 HTTP handler 前的内部边界，已经落地 `CreateDomain`、`Domain`、`Device`、`LifecycleSnapshot`、`LifecycleEventsAfter`、`SaveJoinRequest`、`PendingJoinRequests`、`AuthorizeJoinRequest`、`PutEpochDistribution`、`DeviceWrappedKey`、`RevokeDevice`、`PutRecoveryRecord`、`LatestRecoveryRecord`、`LatestRecoveryWrappedMaterial`、`PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`。
+当前 `server/sync-server/internal/storage.Store` 是 HTTP handler 前的内部边界，已经落地 `CreateDomain`、`Domain`、`Device`、`LifecycleSnapshot`、`LifecycleEventsAfter`、`SaveJoinRequest`、`PendingJoinRequests`、`AuthorizeJoinRequest`、`PutEpochDistribution`、`DeviceWrappedKey`、`RevokeDevice`、`PutRecoveryRecord`、`LatestRecoveryRecord`、`LatestRecoveryWrappedMaterial`、`RecoverDevice`、`RevokeRecoveryRecord`、`PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`。
 
 这组方法当前用于验证 metadata、设备状态、版本冲突、blob 写入和错误语义，不等同于完整产品入口。对象 change cursor、对象 discovery 分页和设备 lifecycle cursor 已落地；审计日志查询和持久限速器仍未落地。产品编排不得用 `updated_after_ms`、客户端时间或逐个猜测 object/version 代替 discovery。
 
-当前 storage conformance 已覆盖设备状态、授权/撤销、完整 active cohort epoch distribution、对象版本冲突与 blob 完整性；recovery v2 另覆盖首次创建、原子轮换、精确重放、陈旧 predecessor、同 id 分叉和密文篡改。signed object、authorization、revocation、distribution 和 recovery 字段篡改均被验签拒绝。
+当前 storage conformance 已覆盖设备状态、授权/撤销、完整 active cohort epoch distribution、对象版本冲突与 blob 完整性；recovery v2 另覆盖首次创建、原子轮换、恢复激活、signed revocation、精确重放、陈旧 predecessor、同 id 分叉、activation/revocation 互斥、revoked head 后续轮换和密文篡改。signed object、authorization、device/recovery revocation、distribution、recovery 与 activation 字段篡改均被验签拒绝。
 
-当前 storage 已在写入前使用设备登记的 `signing_algorithm + signing_public_key` 验证 object manifest、device authorization、device revocation、epoch distribution 和 recovery record；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list，不在失败时尝试另一 verifier。HTTP API 已覆盖 domain/device/join、authorization、epoch distribution、recovery 与 object version 路径；签名错误对外保持顶层 `invalid_signature`，并以脱敏 `error_detail` 区分算法、编码、验签和 key lifetime。runtime 使用 idempotent schema migration；审计与日志不包含 request body、public key、signature 或 canonical bytes。
+当前 storage 已在写入前使用设备登记的 `signing_algorithm + signing_public_key` 验证 object manifest、device authorization、device revocation、epoch distribution、recovery record 和 recovery revocation；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list，不在失败时尝试另一 verifier。HTTP API 已覆盖 domain/device/join、authorization、epoch distribution、recovery create/latest/activation/revoke 与 object version 路径；签名错误对外保持顶层 `invalid_signature`，并以脱敏 `error_detail` 区分算法、编码、验签和 key lifetime。runtime 使用 idempotent schema migration；审计与日志不包含 request body、public key、signature 或 canonical bytes。
 
 metadata schema 的算法迁移必须区分“历史兼容”与“新写入契约”：全新 schema 的 `devices.signing_algorithm` 和 `device_join_requests.signing_algorithm` 是无默认值的 `NOT NULL` 字段；旧数据库只允许迁移事务在增加缺失列时用 `ed25519-v1` 回填历史行，并记录 metadata schema version 2。迁移后 application/storage 仍必须为每个新 device/join 显式写入算法，不能依赖 SQLite 列默认值把缺失请求解释成 Ed25519；API DTO 缺失、空值或未知算法必须在进入持久化前失败关闭。
 
@@ -290,10 +294,12 @@ JSON byte 字段：
 - 服务端先验证 recovery record 是当前 active v2、activation possession proof、未登记的新 device/profile、当前 epoch、完整 cohort 与每条 distribution，再原子激活设备、消费记录、保存公开 activation/wrapped metadata 并追加 lifecycle；任一失败不得留下部分状态。
 - 已消费、superseded、revoked 或未知 recovery record 不能再次激活设备；bearer token、device header 或 recovery record id 不能替代 activation signature。
 
-`POST /api/v1/domains/{domain_id}/recovery-records/{recovery_record_id}/revoke`（预留，尚未实现）
+`POST /api/v1/domains/{domain_id}/recovery-records/{recovery_record_id}/revoke`
 
-- 保存 signed recovery record revocation。
-- 不删除历史审计 metadata，但后续 `latest` 不再返回 revoked 记录作为 active。
+- 请求包含 revoker device id、当前 key epoch、稳定 reason、created time 和完整 signature metadata；`X-RadishLex-Device-ID` 必须与 signed revoker 一致，但不能替代签名。
+- canonical record type 固定为 `recovery_record_revocation`；服务端以 revoker 当前 active profile 验签，并要求 target 是当前 active chain head且绑定当前 epoch。
+- 同一 transaction 保存 revocation、把 target 标为 `revoked` 并追加 `recovery_record_revoked` lifecycle；精确重放幂等，同 target 分叉或已经被 activation/rotation 消费返回 `conflict_recovery_record`。
+- 不删除历史 metadata/blob，但后续 `latest` 不再返回 revoked 记录作为 active；rotation 可以严格承接 revoked chain head创建全新恢复记录，不能改变旧记录的 revoked 状态。
 
 ## 错误语义
 
@@ -485,6 +491,8 @@ latest_ciphertext_hash
 29. Rust userdb schema 已升至 v7，结构化缓存签名链绑定的 key-agreement key id/public key，并只保存版本化 wrapped epoch ciphertext；`ProductWrappedEpochMaterialStore` 与 Apple signing/key-agreement adapter 已落地。
 30. Go metadata schema v5 已结构化保存 wrapping record 的 recipient key-agreement key id；精确 wrapped epoch GET handler、transport device identity、active-before-blob storage 门禁、64 KiB 上限、Rust remote source与 userdb 幂等/fork cache 已接入双文件 Go HTTP 授权/轮换/撤销/重启证据。
 31. Go metadata schema v6 已追加 wrapping signature source/profile，独立 signed epoch distribution endpoint 与 storage transaction 已覆盖完整 active cohort、64 条/64 KiB/4 MiB 上限、坏签名无部分可读、精确重放幂等和 locator 分叉冲突；Rust remote client 在上传前验证 trusted lifecycle，在下载后复验 distributor signature。A/B/C Go HTTP 证据覆盖 B 撤销后 A/C 取得 epoch 2、历史 epoch 与 userdb/provider 重启恢复。
+32. Go metadata schema v8 与 userdb schema v8 已落地 recovered-device activation transaction、`recovery_record_rotated` / `device_recovered` 公开 lifecycle、完整 active cohort 当前 epoch 分发和重启恢复。
+33. Go metadata schema v9 与 userdb schema v9 已落地 signed recovery record revocation、`recovery_record_revoked` 公开 lifecycle、exact replay/分叉、activation/rotation 线性化、revoked 历史状态保持和 Rust/Go HTTP/userdb 重启证据。
 
 任何阶段都不应把 Flutter manager、平台壳、真实系统输入法服务或输入热路径接入 Go server。
 

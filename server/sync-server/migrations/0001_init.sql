@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS device_revocations (
 CREATE TABLE IF NOT EXISTS domain_lifecycle_events (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     lifecycle_sequence INTEGER NOT NULL CHECK (lifecycle_sequence > 0),
-    event_type TEXT NOT NULL CHECK (event_type IN ('initial_device', 'device_authorized', 'device_revoked', 'recovery_record_rotated', 'device_recovered')),
+    event_type TEXT NOT NULL CHECK (event_type IN ('initial_device', 'device_authorized', 'device_revoked', 'recovery_record_rotated', 'device_recovered', 'recovery_record_revoked')),
     record_id TEXT NOT NULL,
     key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
     reject_from_object_change_sequence INTEGER NOT NULL DEFAULT 0 CHECK (reject_from_object_change_sequence >= 0),
@@ -157,6 +157,21 @@ CREATE TABLE IF NOT EXISTS recovered_device_activations (
     activation_signature BLOB NOT NULL,
     PRIMARY KEY (domain_id, recovery_record_id),
     UNIQUE (domain_id, device_id),
+    FOREIGN KEY (domain_id, recovery_record_id) REFERENCES recovery_records(domain_id, recovery_record_id)
+);
+
+CREATE TABLE IF NOT EXISTS recovery_record_revocations (
+    domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
+    recovery_record_id TEXT NOT NULL,
+    revoker_device_id TEXT NOT NULL,
+    key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
+    reason TEXT NOT NULL,
+    created_at_ms INTEGER NOT NULL,
+    signature_schema_version INTEGER NOT NULL CHECK (signature_schema_version = 1),
+    signature_algorithm TEXT NOT NULL,
+    signature_key_id TEXT NOT NULL,
+    signature BLOB NOT NULL,
+    PRIMARY KEY (domain_id, recovery_record_id),
     FOREIGN KEY (domain_id, recovery_record_id) REFERENCES recovery_records(domain_id, recovery_record_id)
 );
 

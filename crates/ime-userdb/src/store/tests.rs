@@ -39,7 +39,7 @@ fn remove_temp_db(path: &str) {
 fn migration_initializes_empty_database() {
     let db = UserDb::open_in_memory().expect("userdb opens");
 
-    assert_eq!(db.schema_version().expect("schema version"), 8);
+    assert_eq!(db.schema_version().expect("schema version"), 9);
     assert!(db.list_active_terms().expect("terms").is_empty());
     assert!(db.list_import_batches().expect("batches").is_empty());
 }
@@ -64,7 +64,7 @@ fn concurrent_open_serializes_schema_initialization() {
 
     barrier.wait();
     for handle in handles {
-        assert_eq!(handle.join().expect("open thread joins"), 8);
+        assert_eq!(handle.join().expect("open thread joins"), 9);
     }
 
     let db = UserDb::open(&path).expect("initialized userdb reopens");
@@ -95,7 +95,7 @@ fn open_waits_for_short_database_initialization_lock() {
         .join()
         .expect("open worker joins")
         .expect("userdb open waits for the short initialization lock");
-    assert_eq!(db.schema_version().expect("schema version"), 8);
+    assert_eq!(db.schema_version().expect("schema version"), 9);
     drop(db);
     drop(lock_holder);
     remove_temp_db(&path);
@@ -177,7 +177,7 @@ fn migration_upgrades_v1_import_batches() {
     }
 
     let db = UserDb::open(&path).expect("userdb migrates");
-    assert_eq!(db.schema_version().expect("schema version"), 8);
+    assert_eq!(db.schema_version().expect("schema version"), 9);
 
     let batches = db.list_import_batches().expect("batches");
     assert_eq!(batches.len(), 1);
@@ -210,7 +210,7 @@ fn migration_upgrades_v3_terms_without_inventing_import_provenance() {
     }
 
     let db = UserDb::open(&path).expect("v3 userdb migrates");
-    assert_eq!(db.schema_version().expect("schema version"), 8);
+    assert_eq!(db.schema_version().expect("schema version"), 9);
     let terms = db.list_active_terms().expect("terms");
     assert_eq!(terms.len(), 1);
     assert_eq!(terms[0].input_code, "legacy");
@@ -1126,7 +1126,7 @@ fn sync_preflight_separates_syncable_and_local_only_counts() {
 
     let summary = db.sync_preflight_summary().expect("summary");
 
-    assert_eq!(summary.schema_version, 8);
+    assert_eq!(summary.schema_version, 9);
     assert_eq!(summary.syncable_user_terms, 1);
     assert_eq!(summary.syncable_ranker_weights, 1);
     assert_eq!(summary.syncable_deleted_terms, 1);
@@ -1140,7 +1140,7 @@ fn learning_status_reports_only_aggregate_counts_and_timestamps() {
     let mut db = UserDb::open_in_memory().expect("userdb opens");
 
     let empty = db.learning_status_summary().expect("empty summary");
-    assert_eq!(empty.schema_version, 8);
+    assert_eq!(empty.schema_version, 9);
     assert_eq!(empty.active_user_terms, 0);
     assert_eq!(empty.suppressed_user_terms, 0);
     assert_eq!(empty.selection_events, 0);
@@ -1163,7 +1163,7 @@ fn learning_status_reports_only_aggregate_counts_and_timestamps() {
 
     let summary = db.learning_status_summary().expect("summary");
 
-    assert_eq!(summary.schema_version, 8);
+    assert_eq!(summary.schema_version, 9);
     assert_eq!(summary.active_user_terms, 0);
     assert_eq!(summary.suppressed_user_terms, 1);
     assert_eq!(summary.ranker_weights, 1);

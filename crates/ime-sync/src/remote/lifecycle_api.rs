@@ -1,5 +1,7 @@
 use crate::device::{SyncDeviceStatus, SyncDomain};
-use radishlex_ime_crypto::{SignedRecoveredDeviceActivation, SignedRecoveryRecordManifest};
+use radishlex_ime_crypto::{
+    SignedRecoveredDeviceActivation, SignedRecoveryRecordManifest, SignedRecoveryRecordRevocation,
+};
 
 use super::{
     decode_json_response, invalid_request, validate_path_segment, OpaqueSyncCursor,
@@ -65,6 +67,7 @@ pub enum RemoteLifecycleEventKind {
     DeviceRevoked,
     RecoveryRecordRotated,
     DeviceRecovered,
+    RecoveryRecordRevoked,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -75,6 +78,11 @@ pub struct RemoteRecoveryRecordRotation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RemoteRecoveredDeviceActivation {
     pub signed: SignedRecoveredDeviceActivation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteRecoveryRecordRevocation {
+    pub signed: SignedRecoveryRecordRevocation,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -91,6 +99,7 @@ pub struct RemoteLifecycleEvent {
     pub revocation: Option<RemoteDeviceRevocation>,
     pub recovery_record: Option<RemoteRecoveryRecordRotation>,
     pub recovered_activation: Option<RemoteRecoveredDeviceActivation>,
+    pub recovery_revocation: Option<RemoteRecoveryRecordRevocation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

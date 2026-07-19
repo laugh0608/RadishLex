@@ -51,7 +51,7 @@ func Apply(db *sql.DB) error {
 	if err := ensureRecoveryLifecycleEvents(tx); err != nil {
 		return err
 	}
-	if _, err := tx.Exec("PRAGMA user_version = 8"); err != nil {
+	if _, err := tx.Exec("PRAGMA user_version = 9"); err != nil {
 		return fmt.Errorf("record metadata schema version: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -65,14 +65,14 @@ func ensureRecoveryLifecycleEvents(tx *sql.Tx) error {
 	if err := tx.QueryRow(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'domain_lifecycle_events'`).Scan(&schema); err != nil {
 		return fmt.Errorf("read lifecycle event schema: %w", err)
 	}
-	if strings.Contains(schema, "recovery_record_rotated") {
+	if strings.Contains(schema, "recovery_record_revoked") {
 		return nil
 	}
 	if _, err := tx.Exec(`
-		CREATE TABLE domain_lifecycle_events_v8 (
+		CREATE TABLE domain_lifecycle_events_v9 (
 			domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
 			lifecycle_sequence INTEGER NOT NULL CHECK (lifecycle_sequence > 0),
-			event_type TEXT NOT NULL CHECK (event_type IN ('initial_device', 'device_authorized', 'device_revoked', 'recovery_record_rotated', 'device_recovered')),
+			event_type TEXT NOT NULL CHECK (event_type IN ('initial_device', 'device_authorized', 'device_revoked', 'recovery_record_rotated', 'device_recovered', 'recovery_record_revoked')),
 			record_id TEXT NOT NULL,
 			key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
 			reject_from_object_change_sequence INTEGER NOT NULL DEFAULT 0 CHECK (reject_from_object_change_sequence >= 0),
@@ -84,7 +84,7 @@ func ensureRecoveryLifecycleEvents(tx *sql.Tx) error {
 		return fmt.Errorf("create recovery lifecycle event table: %w", err)
 	}
 	if _, err := tx.Exec(`
-		INSERT INTO domain_lifecycle_events_v8 (
+		INSERT INTO domain_lifecycle_events_v9 (
 			domain_id, lifecycle_sequence, event_type, record_id, key_epoch,
 			reject_from_object_change_sequence, created_at_ms
 		)
@@ -97,7 +97,7 @@ func ensureRecoveryLifecycleEvents(tx *sql.Tx) error {
 	if _, err := tx.Exec("DROP TABLE domain_lifecycle_events"); err != nil {
 		return fmt.Errorf("drop legacy lifecycle event table: %w", err)
 	}
-	if _, err := tx.Exec("ALTER TABLE domain_lifecycle_events_v8 RENAME TO domain_lifecycle_events"); err != nil {
+	if _, err := tx.Exec("ALTER TABLE domain_lifecycle_events_v9 RENAME TO domain_lifecycle_events"); err != nil {
 		return fmt.Errorf("activate recovery lifecycle event table: %w", err)
 	}
 	return nil

@@ -18,11 +18,15 @@ mod apple_keychain;
 mod android_keystore;
 mod recovered_device_activation;
 mod recovery_manifest;
+mod recovery_record_revocation;
 
 pub use recovered_device_activation::{
     RecoveredDeviceActivationManifest, SignedRecoveredDeviceActivation,
 };
 pub use recovery_manifest::SignedRecoveryRecordManifest;
+pub use recovery_record_revocation::{
+    SignedRecoveryRecordRevocation, RECOVERY_RECORD_REVOCATION_RECORD_TYPE,
+};
 
 #[cfg(feature = "android-keystore")]
 pub use android_keystore::{

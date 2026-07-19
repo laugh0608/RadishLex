@@ -153,6 +153,81 @@ func TestSQLiteStoreRecordsAuditEvent(t *testing.T) {
 	}
 }
 
+func TestSQLiteRecoveryRevocationSurvivesStoreRestart(t *testing.T) {
+	root := t.TempDir()
+	dbPath := filepath.Join(root, "metadata.sqlite")
+	blobPath := filepath.Join(root, "objects")
+	openStore := func(applyMigration bool) (*sql.DB, *SQLiteStore) {
+		db, err := sql.Open("sqlite", dbPath)
+		if err != nil {
+			t.Fatalf("open sqlite: %v", err)
+		}
+		db.SetMaxOpenConns(1)
+		if applyMigration {
+			applySQLiteMigrationForTest(t, db)
+		}
+		blobs, err := NewLocalObjectBlobStore(blobPath)
+		if err != nil {
+			t.Fatalf("open blob store: %v", err)
+		}
+		store, err := NewSQLiteStore(db, blobs)
+		if err != nil {
+			t.Fatalf("open sqlite store: %v", err)
+		}
+		return db, store
+	}
+
+	db, store := openStore(true)
+	_ = newReadyStore(t, func(t *testing.T) Store { return store })
+	wrapped := bytes.Repeat([]byte{0xf1}, RecoveryWrappedMaterialBytes)
+	record := recoveryRecordForTest("recovery-restart", "", 40, wrapped)
+	if _, err := store.PutRecoveryRecord(context.Background(), RecoveryRecordUpload{Record: record, WrappedMaterial: wrapped}); err != nil {
+		t.Fatalf("put recovery: %v", err)
+	}
+	revocation := recoveryRecordRevocationForTest("recovery-restart", 1, "disable_recovery", 50)
+	result, err := store.RevokeRecoveryRecord(context.Background(), revocation)
+	if err != nil {
+		t.Fatalf("revoke recovery: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close sqlite before restart: %v", err)
+	}
+
+	reopenedDB, reopened := openStore(false)
+	defer reopenedDB.Close()
+	if _, err := reopened.LatestRecoveryRecord(context.Background(), "domain-a"); !IsCode(err, ErrNotFound) {
+		t.Fatalf("revoked recovery must remain unavailable after restart, got %v", err)
+	}
+	replayed, err := reopened.RevokeRecoveryRecord(context.Background(), revocation)
+	if err != nil || replayed.LifecycleSequence != result.LifecycleSequence {
+		t.Fatalf("revocation replay must survive restart: result=%#v err=%v", replayed, err)
+	}
+	snapshot, err := reopened.LifecycleSnapshot(context.Background(), "domain-a")
+	if err != nil {
+		t.Fatalf("read lifecycle after restart: %v", err)
+	}
+	last := snapshot.Events[len(snapshot.Events)-1]
+	if last.EventType != LifecycleRecoveryRecordRevoked || last.RecoveryRevocation == nil || last.RecoveryRevocation.Reason != "disable_recovery" {
+		t.Fatalf("recovery revocation lifecycle did not survive restart: %#v", last)
+	}
+	nextWrapped := bytes.Repeat([]byte{0xf2}, RecoveryWrappedMaterialBytes)
+	next := recoveryRecordForTest("recovery-next-b", "recovery-restart", 60, nextWrapped)
+	if _, err := reopened.PutRecoveryRecord(context.Background(), RecoveryRecordUpload{Record: next, WrappedMaterial: nextWrapped}); err != nil {
+		t.Fatalf("rotate from restarted revoked predecessor: %v", err)
+	}
+	var predecessorStatus string
+	var predecessorRevokedAt int64
+	if err := reopenedDB.QueryRow(`SELECT status, revoked_at_ms FROM recovery_records
+		WHERE domain_id = ? AND recovery_record_id = ?`, "domain-a", "recovery-restart").Scan(
+		&predecessorStatus, &predecessorRevokedAt,
+	); err != nil {
+		t.Fatalf("read revoked predecessor after rotation: %v", err)
+	}
+	if predecessorStatus != string(RecoveryRecordRevoked) || predecessorRevokedAt != revocation.CreatedAtMs {
+		t.Fatalf("rotation changed revoked predecessor state: status=%q revoked_at_ms=%d", predecessorStatus, predecessorRevokedAt)
+	}
+}
+
 func newSQLiteStoreForTest(t *testing.T) *SQLiteStore {
 	t.Helper()
 	root := t.TempDir()

@@ -14,16 +14,18 @@ mod lifecycle_api;
 mod lifecycle_dto;
 mod recovery_activation_api;
 mod recovery_api;
+mod recovery_revocation_api;
 mod wrapped_epoch_source;
 
 pub use epoch_distribution_api::RemoteEpochDistributionResult;
 pub use lifecycle_api::{
     RemoteDeviceAuthorization, RemoteDeviceRevocation, RemoteLifecycleDevice, RemoteLifecycleEvent,
     RemoteLifecycleEventKind, RemoteLifecyclePage, RemoteLifecycleSnapshot,
-    RemoteRecoveredDeviceActivation, RemoteRecoveryRecordRotation,
+    RemoteRecoveredDeviceActivation, RemoteRecoveryRecordRevocation, RemoteRecoveryRecordRotation,
 };
 pub use recovery_activation_api::RemoteRecoveredDeviceResult;
 pub use recovery_api::RemoteVerifiedRecoveryRecord;
+pub use recovery_revocation_api::RemoteRecoveryRecordRevocationResult;
 pub use wrapped_epoch_source::{RemoteWrappedEpochLocator, RemoteWrappedEpochMaterialSource};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1047,49 +1049,6 @@ impl TryFrom<DeviceAuthorizationDto> for RemoteDeviceAuthorization {
 }
 
 #[derive(Debug, Deserialize)]
-struct DeviceRevocationDto {
-    domain_id: String,
-    revoked_device_id: String,
-    revoker_device_id: String,
-    previous_key_epoch: u64,
-    new_key_epoch: u64,
-    reason: String,
-    created_at_ms: i64,
-    signature_schema_version: u16,
-    signature_algorithm: String,
-    signature_key_id: String,
-    #[serde(with = "base64_bytes")]
-    signature: Vec<u8>,
-}
-
-impl TryFrom<DeviceRevocationDto> for RemoteDeviceRevocation {
-    type Error = SyncRemoteError;
-
-    fn try_from(value: DeviceRevocationDto) -> Result<Self, Self::Error> {
-        if value.previous_key_epoch == 0
-            || value.new_key_epoch <= value.previous_key_epoch
-            || value.created_at_ms <= 0
-            || value.signature.is_empty()
-        {
-            return invalid_response("revocation lifecycle fields are invalid");
-        }
-        Ok(Self {
-            domain_id: value.domain_id,
-            revoked_device_id: value.revoked_device_id,
-            revoker_device_id: value.revoker_device_id,
-            previous_key_epoch: value.previous_key_epoch,
-            new_key_epoch: value.new_key_epoch,
-            reason: value.reason,
-            created_at_ms: value.created_at_ms,
-            signature_schema_version: value.signature_schema_version,
-            signature_algorithm: value.signature_algorithm,
-            signature_key_id: value.signature_key_id,
-            signature: value.signature,
-        })
-    }
-}
-
-#[derive(Debug, Deserialize)]
 struct LifecycleEventDto {
     domain_id: String,
     lifecycle_sequence: u64,
@@ -1100,9 +1059,10 @@ struct LifecycleEventDto {
     created_at_ms: i64,
     device: LifecycleDeviceDto,
     authorization: Option<DeviceAuthorizationDto>,
-    revocation: Option<DeviceRevocationDto>,
+    revocation: Option<lifecycle_dto::DeviceRevocationDto>,
     recovery_record: Option<lifecycle_dto::LifecycleRecoveryRecordDto>,
     recovered_activation: Option<lifecycle_dto::RecoveredDeviceActivationDto>,
+    recovery_revocation: Option<lifecycle_dto::RecoveryRecordRevocationDto>,
 }
 
 impl TryFrom<LifecycleEventDto> for RemoteLifecycleEvent {
@@ -1115,6 +1075,7 @@ impl TryFrom<LifecycleEventDto> for RemoteLifecycleEvent {
             "device_revoked" => RemoteLifecycleEventKind::DeviceRevoked,
             "recovery_record_rotated" => RemoteLifecycleEventKind::RecoveryRecordRotated,
             "device_recovered" => RemoteLifecycleEventKind::DeviceRecovered,
+            "recovery_record_revoked" => RemoteLifecycleEventKind::RecoveryRecordRevoked,
             _ => return invalid_response("lifecycle event type is invalid"),
         };
         if value.lifecycle_sequence == 0
@@ -1141,24 +1102,31 @@ impl TryFrom<LifecycleEventDto> for RemoteLifecycleEvent {
             .recovered_activation
             .map(RemoteRecoveredDeviceActivation::try_from)
             .transpose()?;
+        let recovery_revocation = value
+            .recovery_revocation
+            .map(RemoteRecoveryRecordRevocation::try_from)
+            .transpose()?;
         match event_type {
             RemoteLifecycleEventKind::InitialDevice
                 if authorization.is_none()
                     && revocation.is_none()
                     && recovery_record.is_none()
                     && recovered_activation.is_none()
+                    && recovery_revocation.is_none()
                     && value.reject_from_object_change_sequence.is_none() => {}
             RemoteLifecycleEventKind::DeviceAuthorized
                 if authorization.is_some()
                     && revocation.is_none()
                     && recovery_record.is_none()
                     && recovered_activation.is_none()
+                    && recovery_revocation.is_none()
                     && value.reject_from_object_change_sequence.is_none() => {}
             RemoteLifecycleEventKind::DeviceRevoked
                 if authorization.is_none()
                     && revocation.is_some()
                     && recovery_record.is_none()
                     && recovered_activation.is_none()
+                    && recovery_revocation.is_none()
                     && matches!(value.reject_from_object_change_sequence, Some(sequence) if sequence > 0) =>
                 {}
             RemoteLifecycleEventKind::RecoveryRecordRotated
@@ -1166,12 +1134,21 @@ impl TryFrom<LifecycleEventDto> for RemoteLifecycleEvent {
                     && revocation.is_none()
                     && recovery_record.is_some()
                     && recovered_activation.is_none()
+                    && recovery_revocation.is_none()
                     && value.reject_from_object_change_sequence.is_none() => {}
             RemoteLifecycleEventKind::DeviceRecovered
                 if authorization.is_none()
                     && revocation.is_none()
                     && recovery_record.is_none()
                     && recovered_activation.is_some()
+                    && recovery_revocation.is_none()
+                    && value.reject_from_object_change_sequence.is_none() => {}
+            RemoteLifecycleEventKind::RecoveryRecordRevoked
+                if authorization.is_none()
+                    && revocation.is_none()
+                    && recovery_record.is_none()
+                    && recovered_activation.is_none()
+                    && recovery_revocation.is_some()
                     && value.reject_from_object_change_sequence.is_none() => {}
             _ => return invalid_response("lifecycle event payload does not match event type"),
         }
@@ -1191,6 +1168,7 @@ impl TryFrom<LifecycleEventDto> for RemoteLifecycleEvent {
             revocation,
             recovery_record,
             recovered_activation,
+            recovery_revocation,
         })
     }
 }

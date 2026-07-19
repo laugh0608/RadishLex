@@ -96,7 +96,14 @@ struct TrustedDeviceRecord {
 #[derive(Clone)]
 struct TrustedRecoveryRecord {
     manifest: radishlex_ime_crypto::SignedRecoveryRecordManifest,
-    consumed: bool,
+    state: TrustedRecoveryRecordState,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TrustedRecoveryRecordState {
+    Active,
+    Consumed,
+    Revoked,
 }
 
 pub fn verify_lifecycle_snapshot(
@@ -166,6 +173,12 @@ pub fn verify_lifecycle_snapshot(
                 }
                 apply_recovered_device(event, &mut devices, &mut recovery_chain)?;
             }
+            RemoteLifecycleEventKind::RecoveryRecordRevoked => {
+                if event.key_epoch != current_epoch {
+                    return Err(SyncLifecycleError::InvalidSequence);
+                }
+                apply_recovery_revocation(event, &devices, &mut recovery_chain)?;
+            }
         }
     }
     if current_epoch != snapshot.domain.current_key_epoch {
@@ -226,6 +239,21 @@ fn apply_recovery_rotation(
     if manifest.previous_recovery_id != expected_predecessor {
         return Err(SyncLifecycleError::InvalidRecovery);
     }
+    if recovery_chain
+        .as_ref()
+        .is_some_and(|record| manifest.created_at_ms <= record.manifest.created_at_ms)
+    {
+        return Err(SyncLifecycleError::InvalidRecovery);
+    }
+    if recovery_chain.as_ref().is_some_and(|record| {
+        manifest.salt == record.manifest.salt
+            || manifest.envelope_nonce == record.manifest.envelope_nonce
+            || manifest.ciphertext_hash == record.manifest.ciphertext_hash
+            || manifest.activation_public_key_id == record.manifest.activation_public_key_id
+            || manifest.activation_public_key == record.manifest.activation_public_key
+    }) {
+        return Err(SyncLifecycleError::InvalidRecovery);
+    }
     let signer = devices
         .get(&manifest.signature.signer_device_id)
         .filter(|record| record.device.status == SyncDeviceStatus::Active)
@@ -238,7 +266,7 @@ fn apply_recovery_rotation(
         .map_err(|_| SyncLifecycleError::InvalidRecovery)?;
     *recovery_chain = Some(TrustedRecoveryRecord {
         manifest: manifest.clone(),
-        consumed: false,
+        state: TrustedRecoveryRecordState::Active,
     });
     Ok(())
 }
@@ -256,13 +284,14 @@ fn apply_recovered_device(
     let manifest = &signed.manifest;
     let recovery = recovery_chain
         .as_mut()
-        .filter(|record| !record.consumed)
+        .filter(|record| record.state == TrustedRecoveryRecordState::Active)
         .ok_or(SyncLifecycleError::InvalidRecovery)?;
     if event.record_id != recovery.manifest.recovery_id
         || manifest.recovery_record_id != recovery.manifest.recovery_id
         || manifest.domain_id != event.domain_id
         || manifest.key_epoch != event.key_epoch
         || manifest.created_at_ms != event.created_at_ms
+        || manifest.created_at_ms <= recovery.manifest.created_at_ms
         || manifest.activation_algorithm != recovery.manifest.activation_algorithm
         || manifest.activation_public_key_id != recovery.manifest.activation_public_key_id
         || event.device.device_id != manifest.device_id
@@ -294,7 +323,46 @@ fn apply_recovered_device(
             reject_from_change_sequence: None,
         },
     );
-    recovery.consumed = true;
+    recovery.state = TrustedRecoveryRecordState::Consumed;
+    Ok(())
+}
+
+fn apply_recovery_revocation(
+    event: &RemoteLifecycleEvent,
+    devices: &BTreeMap<String, TrustedDeviceRecord>,
+    recovery_chain: &mut Option<TrustedRecoveryRecord>,
+) -> Result<(), SyncLifecycleError> {
+    let revocation = event
+        .recovery_revocation
+        .as_ref()
+        .ok_or(SyncLifecycleError::InvalidRecovery)?;
+    let signed = &revocation.signed;
+    let recovery = recovery_chain
+        .as_mut()
+        .filter(|record| record.state == TrustedRecoveryRecordState::Active)
+        .ok_or(SyncLifecycleError::InvalidRecovery)?;
+    if signed.recovery_record_id != recovery.manifest.recovery_id
+        || signed.recovery_record_id != event.record_id
+        || signed.domain_id != event.domain_id
+        || signed.key_epoch != event.key_epoch
+        || signed.created_at_ms != event.created_at_ms
+        || signed.created_at_ms <= recovery.manifest.created_at_ms
+        || event.device.device_id != signed.signature.signer_device_id
+        || event.device.status != SyncDeviceStatus::Active
+    {
+        return Err(SyncLifecycleError::InvalidRecovery);
+    }
+    let signer = devices
+        .get(&signed.signature.signer_device_id)
+        .filter(|record| record.device.status == SyncDeviceStatus::Active)
+        .ok_or(SyncLifecycleError::InvalidRecovery)?;
+    if !lifecycle_device_matches_trusted_record(&event.device, signer) {
+        return Err(SyncLifecycleError::InvalidRecovery);
+    }
+    signed
+        .verify(&signer.public_key)
+        .map_err(|_| SyncLifecycleError::InvalidRecovery)?;
+    recovery.state = TrustedRecoveryRecordState::Revoked;
     Ok(())
 }
 
@@ -604,11 +672,14 @@ pub fn device_join_profile_challenge(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{RemoteDeviceAuthorization, RemoteDeviceRevocation, SyncDomain};
+    use crate::{
+        RemoteDeviceAuthorization, RemoteDeviceRevocation, RemoteRecoveryRecordRevocation,
+        SyncDomain,
+    };
     use radishlex_ime_crypto::{
         AlgorithmId, DeviceSigningKeyHandle, Nonce, RecoveredDeviceActivationManifest,
         RecoveryMaterial, SignedRecoveredDeviceActivation, SignedRecoveryRecordManifest,
-        TestMemoryDeviceKeyStore, ED25519_SIGNATURE_LEN,
+        SignedRecoveryRecordRevocation, TestMemoryDeviceKeyStore, ED25519_SIGNATURE_LEN,
     };
 
     #[test]
@@ -676,6 +747,127 @@ mod tests {
             verify_lifecycle_snapshot(reused, &anchor),
             Err(SyncLifecycleError::InvalidRecovery)
         );
+    }
+
+    #[test]
+    fn recovery_revocation_lifecycle_blocks_activation_and_detects_tampering() {
+        let (mut snapshot, anchor) = recovery_lifecycle_fixture();
+        let activation = snapshot.entries.pop().expect("activation event");
+        let mut store = TestMemoryDeviceKeyStore::new();
+        store
+            .insert_signing_key("device-a", "signing-key-a", [7u8; 32], 10)
+            .expect("anchor key");
+        let handle = store
+            .handle("device-a", "signing-key-a")
+            .expect("anchor handle");
+        let unsigned = SignedRecoveryRecordRevocation::new(
+            "recovery-a",
+            "domain-a",
+            1,
+            "compromised",
+            30,
+            placeholder_signature(),
+        )
+        .expect("unsigned recovery revocation");
+        let signature = store
+            .sign(&handle, &unsigned.canonical_bytes())
+            .expect("recovery revocation signature");
+        let signed = SignedRecoveryRecordRevocation::new(
+            "recovery-a",
+            "domain-a",
+            1,
+            "compromised",
+            30,
+            signature,
+        )
+        .expect("signed recovery revocation");
+        snapshot.entries.push(RemoteLifecycleEvent {
+            domain_id: "domain-a".to_owned(),
+            lifecycle_sequence: 3,
+            event_type: RemoteLifecycleEventKind::RecoveryRecordRevoked,
+            record_id: "recovery-a".to_owned(),
+            key_epoch: 1,
+            reject_from_object_change_sequence: None,
+            created_at_ms: 30,
+            device: snapshot.entries[1].device.clone(),
+            authorization: None,
+            revocation: None,
+            recovery_record: None,
+            recovered_activation: None,
+            recovery_revocation: Some(RemoteRecoveryRecordRevocation { signed }),
+        });
+        snapshot.domain.updated_at_ms = 30;
+        verify_lifecycle_snapshot(snapshot.clone(), &anchor).expect("verified revocation");
+
+        let mut tampered = snapshot.clone();
+        tampered.entries[2]
+            .recovery_revocation
+            .as_mut()
+            .expect("revocation")
+            .signed
+            .reason = "lost".to_owned();
+        assert_eq!(
+            verify_lifecycle_snapshot(tampered, &anchor),
+            Err(SyncLifecycleError::InvalidRecovery)
+        );
+
+        let mut activation_after_revoke = snapshot.clone();
+        let mut activation = activation;
+        activation.lifecycle_sequence = 4;
+        activation.created_at_ms = 31;
+        activation_after_revoke.entries.push(activation);
+        assert_eq!(
+            verify_lifecycle_snapshot(activation_after_revoke, &anchor),
+            Err(SyncLifecycleError::InvalidRecovery)
+        );
+
+        let next_material = RecoveryMaterial::new(
+            2,
+            "recovery-b",
+            "recovery-a",
+            "domain-a",
+            1,
+            "argon2id-v1",
+            1,
+            vec![6; 16],
+            65_536,
+            3,
+            4,
+            32,
+            AlgorithmId::xchacha20poly1305_hkdf_sha256(),
+            Nonce::new(vec![7; 24]).expect("next nonce"),
+            vec![43; 48],
+            "ed25519-v1",
+            "recovery-activation-key-b",
+            vec![8; 32],
+            40,
+            40,
+        )
+        .expect("next recovery material");
+        let unsigned = SignedRecoveryRecordManifest::new(&next_material, placeholder_signature())
+            .expect("unsigned next recovery");
+        let signature = store
+            .sign(&handle, &unsigned.canonical_bytes())
+            .expect("next recovery signature");
+        let manifest = SignedRecoveryRecordManifest::new(&next_material, signature)
+            .expect("next recovery manifest");
+        snapshot.entries.push(RemoteLifecycleEvent {
+            domain_id: "domain-a".to_owned(),
+            lifecycle_sequence: 4,
+            event_type: RemoteLifecycleEventKind::RecoveryRecordRotated,
+            record_id: "recovery-b".to_owned(),
+            key_epoch: 1,
+            reject_from_object_change_sequence: None,
+            created_at_ms: 40,
+            device: snapshot.entries[1].device.clone(),
+            authorization: None,
+            revocation: None,
+            recovery_record: Some(crate::RemoteRecoveryRecordRotation { manifest }),
+            recovered_activation: None,
+            recovery_revocation: None,
+        });
+        snapshot.domain.updated_at_ms = 40;
+        verify_lifecycle_snapshot(snapshot, &anchor).expect("rotation from revoked chain head");
     }
 
     fn recovery_lifecycle_fixture() -> (RemoteLifecycleSnapshot, DeviceSigningPublicKey) {
@@ -786,6 +978,7 @@ mod tests {
                         revocation: None,
                         recovery_record: None,
                         recovered_activation: None,
+                        recovery_revocation: None,
                     },
                     RemoteLifecycleEvent {
                         domain_id: "domain-a".to_owned(),
@@ -802,6 +995,7 @@ mod tests {
                             manifest: recovery_manifest,
                         }),
                         recovered_activation: None,
+                        recovery_revocation: None,
                     },
                     RemoteLifecycleEvent {
                         domain_id: "domain-a".to_owned(),
@@ -821,6 +1015,7 @@ mod tests {
                                 signature: activation_signature,
                             },
                         }),
+                        recovery_revocation: None,
                     },
                 ],
                 next_cursor: OpaqueSyncCursor::new("lifecycle-cursor-recovery").expect("cursor"),
@@ -885,6 +1080,7 @@ mod tests {
                         revocation: None,
                         recovery_record: None,
                         recovered_activation: None,
+                        recovery_revocation: None,
                     },
                     RemoteLifecycleEvent {
                         domain_id: "domain-a".to_owned(),
@@ -899,6 +1095,7 @@ mod tests {
                         revocation: None,
                         recovery_record: None,
                         recovered_activation: None,
+                        recovery_revocation: None,
                     },
                     RemoteLifecycleEvent {
                         domain_id: "domain-a".to_owned(),
@@ -913,6 +1110,7 @@ mod tests {
                         revocation: Some(revocation),
                         recovery_record: None,
                         recovered_activation: None,
+                        recovery_revocation: None,
                     },
                 ],
                 next_cursor: OpaqueSyncCursor::new("lifecycle-cursor-3").expect("cursor"),

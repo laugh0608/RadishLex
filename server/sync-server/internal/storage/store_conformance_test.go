@@ -373,7 +373,7 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 			CiphertextHash:        CiphertextHash(wrapped),
 			ActivationAlgorithm:   SignatureAlgorithmEd25519V1,
 			ActivationPublicKeyID: "recovery-activation-key-a",
-			ActivationPublicKey:   recoveryActivationPrivateKeyForTest().Public().(ed25519.PublicKey),
+			ActivationPublicKey:   recoveryActivationPrivateKeyForTest("recovery-a").Public().(ed25519.PublicKey),
 			Status:                RecoveryRecordActive,
 			CreatedAtMs:           40,
 			UpdatedAtMs:           40,
@@ -446,6 +446,58 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 		third := recoveryRecordForTest("recovery-d", "recovery-b", 70, secondWrapped)
 		if _, err := store.PutRecoveryRecord(ctx, RecoveryRecordUpload{Record: third, WrappedMaterial: tampered}); !IsCode(err, ErrInvalidCiphertextMetadata) {
 			t.Fatalf("tampered wrapped recovery should fail metadata, got %v", err)
+		}
+	})
+
+	t.Run("recovery revocation is signed idempotent and blocks activation", func(t *testing.T) {
+		ctx := context.Background()
+		store := newReadyStore(t, newStore)
+		wrapped := bytes.Repeat([]byte{0xe1}, RecoveryWrappedMaterialBytes)
+		record := recoveryRecordForTest("recovery-a", "", 40, wrapped)
+		if _, err := store.PutRecoveryRecord(ctx, RecoveryRecordUpload{Record: record, WrappedMaterial: wrapped}); err != nil {
+			t.Fatalf("put recovery before revocation: %v", err)
+		}
+		revocation := recoveryRecordRevocationForTest("recovery-a", 1, "compromised", 50)
+		tampered := revocation
+		tampered.Reason = "lost"
+		if _, err := store.RevokeRecoveryRecord(ctx, tampered); !IsCode(err, ErrInvalidSignature) {
+			t.Fatalf("tampered recovery revocation must fail signature, got %v", err)
+		}
+		if latest, err := store.LatestRecoveryRecord(ctx, "domain-a"); err != nil || latest.RecoveryRecordID != "recovery-a" {
+			t.Fatalf("failed revocation must preserve active recovery: record=%#v err=%v", latest, err)
+		}
+		result, err := store.RevokeRecoveryRecord(ctx, revocation)
+		if err != nil {
+			t.Fatalf("revoke recovery record: %v", err)
+		}
+		replayed, err := store.RevokeRecoveryRecord(ctx, revocation)
+		if err != nil || replayed.LifecycleSequence != result.LifecycleSequence {
+			t.Fatalf("exact revocation replay must be idempotent: result=%#v err=%v", replayed, err)
+		}
+		divergent := recoveryRecordRevocationForTest("recovery-a", 1, "disable_recovery", 51)
+		if _, err := store.RevokeRecoveryRecord(ctx, divergent); !IsCode(err, ErrConflictRecoveryRecord) {
+			t.Fatalf("divergent revocation must conflict, got %v", err)
+		}
+		if _, err := store.LatestRecoveryRecord(ctx, "domain-a"); !IsCode(err, ErrNotFound) {
+			t.Fatalf("revoked recovery must disappear from latest, got %v", err)
+		}
+		activation := recoveredDeviceActivationUploadForTest(record, "device-recovered", 60, "device-a", "device-recovered")
+		if _, err := store.RecoverDevice(ctx, activation); !IsCode(err, ErrConflictRecoveryRecord) {
+			t.Fatalf("revoked recovery must not activate a device, got %v", err)
+		}
+		nextWrapped := bytes.Repeat([]byte{0xe2}, RecoveryWrappedMaterialBytes)
+		next := recoveryRecordForTest("recovery-b", "recovery-a", 70, nextWrapped)
+		if _, err := store.PutRecoveryRecord(ctx, RecoveryRecordUpload{Record: next, WrappedMaterial: nextWrapped}); err != nil {
+			t.Fatalf("rotation may explicitly succeed from revoked chain head: %v", err)
+		}
+		snapshot, err := store.LifecycleSnapshot(ctx, "domain-a")
+		if err != nil {
+			t.Fatalf("read revocation lifecycle: %v", err)
+		}
+		if len(snapshot.Events) != 4 || snapshot.Events[1].EventType != LifecycleRecoveryRecordRotated ||
+			snapshot.Events[2].EventType != LifecycleRecoveryRecordRevoked || snapshot.Events[2].RecoveryRevocation == nil ||
+			snapshot.Events[3].EventType != LifecycleRecoveryRecordRotated {
+			t.Fatalf("unexpected recovery revocation lifecycle: %#v", snapshot.Events)
 		}
 	})
 
@@ -878,7 +930,31 @@ func signRecoveryForTest(record *RecoveryRecord) {
 	}))
 }
 
+func recoveryRecordRevocationForTest(recoveryID string, keyEpoch uint64, reason string, createdAtMs int64) RecoveryRecordRevocation {
+	revocation := RecoveryRecordRevocation{
+		RecoveryRecordID: recoveryID, DomainID: "domain-a", RevokerDeviceID: "device-a",
+		KeyEpoch: keyEpoch, Reason: reason, CreatedAtMs: createdAtMs,
+	}
+	fields := signatureFieldsForTest(revocation.RevokerDeviceID)
+	revocation.SignatureSchemaVersion = fields.SchemaVersion
+	revocation.SignatureAlgorithm = fields.Algorithm
+	revocation.SignatureKeyID = fields.KeyID
+	revocation.Signature = ed25519.Sign(signingPrivateKeyForTest(revocation.RevokerDeviceID), canonicalSignatureBytes(RecoveryRecordRevocationRecordType, []signatureField{
+		textField("signature_schema_version", "1"),
+		textField("signature_algorithm", fields.Algorithm),
+		textField("signature_key_id", fields.KeyID),
+		textField("revoker_device_id", revocation.RevokerDeviceID),
+		textField("recovery_record_id", revocation.RecoveryRecordID),
+		textField("domain_id", revocation.DomainID),
+		textField("key_epoch", uint64String(revocation.KeyEpoch)),
+		textField("reason", revocation.Reason),
+		textField("created_at_ms", int64String(revocation.CreatedAtMs)),
+	}))
+	return revocation
+}
+
 func recoveryRecordForTest(recoveryID string, previousID string, createdAtMs int64, wrapped []byte) RecoveryRecord {
+	profileByte := recoveryID[len(recoveryID)-1]
 	record := RecoveryRecord{
 		RecordSchemaVersion:   RecoveryRecordSchemaVersionV2,
 		DomainID:              "domain-a",
@@ -891,14 +967,14 @@ func recoveryRecordForTest(recoveryID string, previousID string, createdAtMs int
 		Iterations:            3,
 		Parallelism:           4,
 		OutputLen:             32,
-		Salt:                  bytes.Repeat([]byte{0x01}, RecoverySaltBytes),
+		Salt:                  bytes.Repeat([]byte{profileByte}, RecoverySaltBytes),
 		Algorithm:             AlgorithmXChaCha20Poly1305HKDFSHA256,
-		Nonce:                 bytes.Repeat([]byte{0x03}, RecoveryNonceBytes),
+		Nonce:                 bytes.Repeat([]byte{profileByte ^ 0x5a}, RecoveryNonceBytes),
 		WrappedMaterialLen:    int64(len(wrapped)),
 		CiphertextHash:        CiphertextHash(wrapped),
 		ActivationAlgorithm:   SignatureAlgorithmEd25519V1,
-		ActivationPublicKeyID: "recovery-activation-key-a",
-		ActivationPublicKey:   recoveryActivationPrivateKeyForTest().Public().(ed25519.PublicKey),
+		ActivationPublicKeyID: "recovery-activation-key-" + recoveryID,
+		ActivationPublicKey:   recoveryActivationPrivateKeyForTest(recoveryID).Public().(ed25519.PublicKey),
 		Status:                RecoveryRecordActive,
 		CreatedAtMs:           createdAtMs,
 		UpdatedAtMs:           createdAtMs,
@@ -920,7 +996,7 @@ func recoveredDeviceActivationUploadForTest(record RecoveryRecord, deviceID stri
 		KeyEpoch: record.KeyEpoch, CreatedAtMs: createdAtMs, SignatureSchemaVersion: 1,
 		ActivationAlgorithm: record.ActivationAlgorithm, ActivationPublicKeyID: record.ActivationPublicKeyID,
 	}
-	activation.ActivationSignature = ed25519.Sign(recoveryActivationPrivateKeyForTest(), canonicalSignatureBytes(RecoveredDeviceActivationRecordType, []signatureField{
+	activation.ActivationSignature = ed25519.Sign(recoveryActivationPrivateKeyForTest(record.RecoveryRecordID), canonicalSignatureBytes(RecoveredDeviceActivationRecordType, []signatureField{
 		textField("signature_schema_version", "1"),
 		textField("activation_algorithm", activation.ActivationAlgorithm),
 		textField("activation_public_key_id", activation.ActivationPublicKeyID),
@@ -946,8 +1022,8 @@ func recoveredDeviceActivationUploadForTest(record RecoveryRecord, deviceID stri
 	return RecoveredDeviceActivationUpload{Activation: activation, Distribution: distribution}
 }
 
-func recoveryActivationPrivateKeyForTest() ed25519.PrivateKey {
-	return ed25519.NewKeyFromSeed(bytes.Repeat([]byte{0x35}, ed25519.SeedSize))
+func recoveryActivationPrivateKeyForTest(recoveryID string) ed25519.PrivateKey {
+	return ed25519.NewKeyFromSeed(bytes.Repeat([]byte{recoveryID[len(recoveryID)-1]}, ed25519.SeedSize))
 }
 
 func signingPublicKeyForTest(deviceID string) []byte {

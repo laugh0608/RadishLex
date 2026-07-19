@@ -226,6 +226,28 @@ func verifyRecoveredDeviceActivationSignature(activation RecoveredDeviceActivati
 	return nil
 }
 
+func verifyRecoveryRecordRevocationSignature(revocation RecoveryRecordRevocation, revoker Device) error {
+	fields := signatureFields{
+		SchemaVersion: revocation.SignatureSchemaVersion, Algorithm: revocation.SignatureAlgorithm,
+		KeyID: revocation.SignatureKeyID, SignerDeviceID: revocation.RevokerDeviceID,
+		Signature: revocation.Signature,
+	}
+	if err := verifySignatureMetadata(fields, revoker, revocation.CreatedAtMs); err != nil {
+		return err
+	}
+	return verifyCanonicalSignature(fields, revoker, RecoveryRecordRevocationRecordType, []signatureField{
+		textField("signature_schema_version", strconv.Itoa(int(fields.SchemaVersion))),
+		textField("signature_algorithm", fields.Algorithm),
+		textField("signature_key_id", fields.KeyID),
+		textField("revoker_device_id", revocation.RevokerDeviceID),
+		textField("recovery_record_id", revocation.RecoveryRecordID),
+		textField("domain_id", revocation.DomainID),
+		textField("key_epoch", strconv.FormatUint(revocation.KeyEpoch, 10)),
+		textField("reason", revocation.Reason),
+		textField("created_at_ms", strconv.FormatInt(revocation.CreatedAtMs, 10)),
+	})
+}
+
 func verifySignatureMetadata(fields signatureFields, signer Device, signedAtMs int64) error {
 	if fields.SchemaVersion != signatureSchemaVersion {
 		return newSignatureError(signatureDetailAlgorithm, "signature schema version is unsupported")

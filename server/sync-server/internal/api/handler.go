@@ -182,6 +182,8 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request, audit *Audit
 		h.handleRecoveryRecords(w, r, route.domainID, audit)
 	case recoveryActivationRoute:
 		h.handleRecoveryActivation(w, r, route.domainID, route.recoveryRecordID, audit)
+	case recoveryRevocationRoute:
+		h.handleRecoveryRevocation(w, r, route.domainID, route.recoveryRecordID, audit)
 	case objectDiscoveryRoute:
 		h.handleObjectDiscovery(w, r, route.domainID)
 	case objectVersionsRoute:
@@ -598,6 +600,31 @@ func (h *Handler) handleRecoveryActivation(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusCreated, RecoveredDeviceActivationResponseFrom(result))
 }
 
+func (h *Handler) handleRecoveryRevocation(w http.ResponseWriter, r *http.Request, domainID string, recoveryRecordID string, audit *AuditEvent) {
+	if r.Method != http.MethodPost {
+		h.writeMethodError(w, http.MethodPost)
+		return
+	}
+	var request RecoveryRecordRevocationRequest
+	if err := decodeJSONRequest(r, &request); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	revocation := request.Revocation(domainID, recoveryRecordID)
+	audit.DeviceID = revocation.RevokerDeviceID
+	audit.KeyEpoch = revocation.KeyEpoch
+	if r.Header.Get(deviceIDHeader) != revocation.RevokerDeviceID {
+		h.writeError(w, publicStorageError(storage.ErrForbiddenDevice, "recovery revoker is not the requesting device", false))
+		return
+	}
+	result, err := h.store.RevokeRecoveryRecord(r.Context(), revocation)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, RecoveryRecordRevocationResponseFrom(result))
+}
+
 func (h *Handler) handleObjectVersions(w http.ResponseWriter, r *http.Request, domainID string, objectID string, audit *AuditEvent) {
 	if r.Method != http.MethodPost {
 		h.writeMethodError(w, http.MethodPost)
@@ -731,6 +758,7 @@ const (
 	recoveryLatestRoute
 	recoveryRecordsRoute
 	recoveryActivationRoute
+	recoveryRevocationRoute
 	objectDiscoveryRoute
 	objectVersionsRoute
 	objectVersionRoute
@@ -774,6 +802,8 @@ func (r route) name() string {
 		return "recovery.rotate"
 	case recoveryActivationRoute:
 		return "recovery.activate_device"
+	case recoveryRevocationRoute:
+		return "recovery.revoke"
 	case objectDiscoveryRoute:
 		return "objects.discover"
 	case objectVersionsRoute:
@@ -832,6 +862,9 @@ func domainRoute(path string) (route, bool) {
 	}
 	if len(parts) == 4 && parts[0] != "" && parts[1] == "recovery-records" && parts[2] != "" && parts[3] == "activation" {
 		return route{kind: recoveryActivationRoute, domainID: parts[0], recoveryRecordID: parts[2]}, true
+	}
+	if len(parts) == 4 && parts[0] != "" && parts[1] == "recovery-records" && parts[2] != "" && parts[3] == "revoke" {
+		return route{kind: recoveryRevocationRoute, domainID: parts[0], recoveryRecordID: parts[2]}, true
 	}
 	if len(parts) == 2 && parts[0] != "" && parts[1] == "objects" {
 		return route{kind: objectDiscoveryRoute, domainID: parts[0]}, true

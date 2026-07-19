@@ -40,6 +40,7 @@ const (
 	WrappingSignatureDeviceAuthorization = "device_authorization"
 	WrappingSignatureEpochDistribution   = "epoch_distribution"
 	RecoveredDeviceActivationRecordType  = "recovered_device_activation"
+	RecoveryRecordRevocationRecordType   = "recovery_record_revocation"
 )
 
 type Domain struct {
@@ -182,6 +183,24 @@ type RecoveredDeviceActivationResult struct {
 	DistributedRecords int
 }
 
+type RecoveryRecordRevocation struct {
+	RecoveryRecordID       string
+	DomainID               string
+	RevokerDeviceID        string
+	KeyEpoch               uint64
+	Reason                 string
+	CreatedAtMs            int64
+	SignatureSchemaVersion uint16
+	SignatureAlgorithm     string
+	SignatureKeyID         string
+	Signature              []byte
+}
+
+type RecoveryRecordRevocationResult struct {
+	Revocation        RecoveryRecordRevocation
+	LifecycleSequence uint64
+}
+
 type LifecycleEventType string
 
 const (
@@ -190,6 +209,7 @@ const (
 	LifecycleDeviceRevoked         LifecycleEventType = "device_revoked"
 	LifecycleRecoveryRecordRotated LifecycleEventType = "recovery_record_rotated"
 	LifecycleDeviceRecovered       LifecycleEventType = "device_recovered"
+	LifecycleRecoveryRecordRevoked LifecycleEventType = "recovery_record_revoked"
 )
 
 type LifecycleEvent struct {
@@ -207,6 +227,7 @@ type LifecycleEvent struct {
 	Revocation                     *DeviceRevocation
 	RecoveryRecord                 *RecoveryRecord
 	RecoveredActivation            *RecoveredDeviceActivation
+	RecoveryRevocation             *RecoveryRecordRevocation
 }
 
 type LifecycleSnapshot struct {

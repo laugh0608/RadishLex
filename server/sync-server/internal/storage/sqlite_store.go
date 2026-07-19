@@ -1202,6 +1202,19 @@ func hydrateLifecycleEventTx(ctx context.Context, tx *sql.Tx, event *LifecycleEv
 		}
 		event.Device = devicePointer(device)
 		event.RecoveredActivation = recoveredActivationPointer(activation)
+	case LifecycleRecoveryRecordRevoked:
+		revocation, err := recoveryRecordRevocationQuerier(ctx, tx, event.DomainID, event.RecordID)
+		if err != nil {
+			return newError(ErrStorageUnavailable, "recovery revocation lifecycle metadata cannot be read")
+		}
+		revoker, err := deviceTx(ctx, tx, event.DomainID, revocation.RevokerDeviceID)
+		if err != nil {
+			return newError(ErrStorageUnavailable, "recovery revocation signer cannot be read")
+		}
+		revoker.Status = DeviceActive
+		revoker.RevokedAtMs = 0
+		event.Device = devicePointer(revoker)
+		event.RecoveryRevocation = recoveryRevocationPointer(revocation)
 	default:
 		return newError(ErrStorageUnavailable, "lifecycle event type is invalid")
 	}

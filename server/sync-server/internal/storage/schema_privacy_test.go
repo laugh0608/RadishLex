@@ -34,6 +34,8 @@ func TestMigrationAndModelsDoNotExposePlaintextBusinessFields(t *testing.T) {
 		"device_revocations",
 		"domain_lifecycle_events",
 		"recovery_records",
+		"recovered_device_activations",
+		"recovery_record_revocations",
 		"sync_objects",
 		"sync_object_versions",
 		"audit_events",
@@ -58,6 +60,8 @@ func TestMigrationAndModelsDoNotExposePlaintextBusinessFields(t *testing.T) {
 		DeviceRevocation{},
 		LifecycleEvent{},
 		RecoveryRecord{},
+		RecoveredDeviceActivation{},
+		RecoveryRecordRevocation{},
 		SyncObject{},
 		ObjectVersion{},
 	}

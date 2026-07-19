@@ -440,6 +440,18 @@ fn lifecycle_record_json(event: &RemoteLifecycleEvent) -> UserDbResult<String> {
             "activation_public_key_id": value.signed.manifest.activation_public_key_id,
             "activation_signature": value.signed.signature,
         })),
+        "recovery_revocation": event.recovery_revocation.as_ref().map(|value| json!({
+            "recovery_record_id": value.signed.recovery_record_id,
+            "domain_id": value.signed.domain_id,
+            "revoker_device_id": value.signed.signature.signer_device_id,
+            "key_epoch": value.signed.key_epoch,
+            "reason": value.signed.reason,
+            "created_at_ms": value.signed.created_at_ms,
+            "signature_schema_version": value.signed.signature.signature_schema_version,
+            "signature_algorithm": value.signed.signature.signature_algorithm.as_str(),
+            "signature_key_id": value.signed.signature.signature_key_id,
+            "signature": value.signed.signature.signature,
+        })),
     }))
     .map_err(|error| UserDbError::invalid_input("lifecycle_record", error.to_string()))
 }
@@ -451,6 +463,7 @@ fn event_type_name(event_type: RemoteLifecycleEventKind) -> &'static str {
         RemoteLifecycleEventKind::DeviceRevoked => "device_revoked",
         RemoteLifecycleEventKind::RecoveryRecordRotated => "recovery_record_rotated",
         RemoteLifecycleEventKind::DeviceRecovered => "device_recovered",
+        RemoteLifecycleEventKind::RecoveryRecordRevoked => "recovery_record_revoked",
     }
 }
 
@@ -559,7 +572,7 @@ pub(super) mod tests {
         }
         {
             let db = UserDb::open(&path).expect("migrate v6 cache");
-            assert_eq!(db.schema_version().expect("schema version"), 8);
+            assert_eq!(db.schema_version().expect("schema version"), 9);
             let lifecycle_schema: String = db
                 .connection
                 .query_row(
@@ -570,6 +583,7 @@ pub(super) mod tests {
                 .expect("recovery lifecycle table schema");
             assert!(lifecycle_schema.contains("recovery_record_rotated"));
             assert!(lifecycle_schema.contains("device_recovered"));
+            assert!(lifecycle_schema.contains("recovery_record_revoked"));
             let profile = db
                 .trusted_domain_state("domain-a")
                 .expect("load migrated cache")
@@ -631,6 +645,7 @@ pub(super) mod tests {
                 revocation: None,
                 recovery_record: None,
                 recovered_activation: None,
+                recovery_revocation: None,
             }],
             next_cursor: OpaqueSyncCursor::new(cursor).expect("cursor"),
         };

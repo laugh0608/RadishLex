@@ -60,6 +60,8 @@ func (s *SQLiteStore) PutRecoveryRecord(ctx context.Context, upload RecoveryReco
 		return RecoveryRecord{}, newError(ErrConflictRecoveryRecord, "recovery record predecessor is stale")
 	} else if upload.Record.CreatedAtMs <= current.CreatedAtMs {
 		return RecoveryRecord{}, newError(ErrConflictRecoveryRecord, "recovery record timestamp does not advance predecessor")
+	} else if !recoveryRecordRotatesPublicMaterial(current, upload.Record) {
+		return RecoveryRecord{}, newError(ErrConflictRecoveryRecord, "recovery rotation must replace public crypto material")
 	}
 	signer, err := activeDeviceTx(ctx, tx, upload.Record.DomainID, upload.Record.SignerDeviceID)
 	if err != nil {

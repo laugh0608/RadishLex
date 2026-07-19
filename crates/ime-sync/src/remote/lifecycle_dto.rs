@@ -1,6 +1,6 @@
 use radishlex_ime_crypto::{
     DeviceSignature, RecoveredDeviceActivationManifest, SignatureAlgorithmId,
-    SignedRecoveredDeviceActivation, SignedRecoveryRecordManifest,
+    SignedRecoveredDeviceActivation, SignedRecoveryRecordManifest, SignedRecoveryRecordRevocation,
 };
 use serde::Deserialize;
 
@@ -8,8 +8,8 @@ use crate::device::SyncDomain;
 
 use super::{
     base64_bytes, invalid_crypto_response, invalid_response, invalid_response_value,
-    OpaqueSyncCursor, RemoteRecoveredDeviceActivation, RemoteRecoveryRecordRotation,
-    SyncRemoteError,
+    OpaqueSyncCursor, RemoteDeviceRevocation, RemoteRecoveredDeviceActivation,
+    RemoteRecoveryRecordRevocation, RemoteRecoveryRecordRotation, SyncRemoteError,
 };
 
 #[derive(Debug, Deserialize)]
@@ -169,6 +169,92 @@ impl TryFrom<RecoveredDeviceActivationDto> for RemoteRecoveredDeviceActivation {
                 signature: value.activation_signature,
             },
         })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct DeviceRevocationDto {
+    domain_id: String,
+    revoked_device_id: String,
+    revoker_device_id: String,
+    previous_key_epoch: u64,
+    new_key_epoch: u64,
+    reason: String,
+    created_at_ms: i64,
+    signature_schema_version: u16,
+    signature_algorithm: String,
+    signature_key_id: String,
+    #[serde(with = "base64_bytes")]
+    signature: Vec<u8>,
+}
+
+impl TryFrom<DeviceRevocationDto> for RemoteDeviceRevocation {
+    type Error = SyncRemoteError;
+
+    fn try_from(value: DeviceRevocationDto) -> Result<Self, Self::Error> {
+        if value.previous_key_epoch == 0
+            || value.new_key_epoch <= value.previous_key_epoch
+            || value.created_at_ms <= 0
+            || value.signature.is_empty()
+        {
+            return invalid_response("revocation lifecycle fields are invalid");
+        }
+        Ok(Self {
+            domain_id: value.domain_id,
+            revoked_device_id: value.revoked_device_id,
+            revoker_device_id: value.revoker_device_id,
+            previous_key_epoch: value.previous_key_epoch,
+            new_key_epoch: value.new_key_epoch,
+            reason: value.reason,
+            created_at_ms: value.created_at_ms,
+            signature_schema_version: value.signature_schema_version,
+            signature_algorithm: value.signature_algorithm,
+            signature_key_id: value.signature_key_id,
+            signature: value.signature,
+        })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct RecoveryRecordRevocationDto {
+    recovery_record_id: String,
+    domain_id: String,
+    revoker_device_id: String,
+    key_epoch: u64,
+    reason: String,
+    created_at_ms: i64,
+    signature_schema_version: u16,
+    signature_algorithm: String,
+    signature_key_id: String,
+    #[serde(with = "base64_bytes")]
+    signature: Vec<u8>,
+}
+
+impl TryFrom<RecoveryRecordRevocationDto> for RemoteRecoveryRecordRevocation {
+    type Error = SyncRemoteError;
+
+    fn try_from(value: RecoveryRecordRevocationDto) -> Result<Self, Self::Error> {
+        if value.signature_schema_version != 1 {
+            return invalid_response("recovery revocation signature schema is unsupported");
+        }
+        let signature = DeviceSignature::new_for_algorithm(
+            SignatureAlgorithmId::new(value.signature_algorithm)
+                .map_err(invalid_crypto_response)?,
+            value.signature_key_id,
+            value.revoker_device_id,
+            value.signature,
+        )
+        .map_err(invalid_crypto_response)?;
+        let signed = SignedRecoveryRecordRevocation::new(
+            value.recovery_record_id,
+            value.domain_id,
+            value.key_epoch,
+            value.reason,
+            value.created_at_ms,
+            signature,
+        )
+        .map_err(invalid_crypto_response)?;
+        Ok(Self { signed })
     }
 }
 

@@ -11,9 +11,9 @@
 - `docs/adr/0003-device-signing-key-storage.md` 固定设备签名对象、canonical bytes、私钥存储抽象和错误语义。
 - `ime-crypto` / `ime-sync` 已覆盖 signed recovery-record-v2、trusted remote upload/download/decrypt、recovered-device possession proof、signed device lifecycle 和客户端合并写回 userdb。
 - `docs/sync-server-api-storage.md` 已固定 Go server 只保存恢复记录 metadata、包装密文、签名和必要同步元数据。
-- Go schema v8 storage/API 已完成 recovery v2 optimistic rotation、recovered-device activation transaction、`superseded` 状态、幂等/冲突、legacy v1 迁移、latest encrypted material 读取、限速、文件重启和日志脱敏证据。
+- Go schema v9 storage/API 已完成 recovery v2 optimistic rotation、recovered-device activation transaction、signed recovery record revocation、`superseded` / `revoked` 状态、幂等/冲突、legacy v1 迁移、latest encrypted material 读取、限速、文件重启和日志脱敏证据。
 
-当前仍不实现真实 UI、平台 Keychain/Keystore 实机操作或 Manager recovered-device 成功入口；signed recovery record 撤销尚未实现。
+当前仍不实现真实 UI、平台 Keychain/Keystore 实机操作或 Manager recovered-device 成功入口；发布级目标部署运行证据与合格平台 backend 仍是外部停止线。
 
 ## 设计目标
 
@@ -117,16 +117,20 @@
 
 撤销流程：
 
-1. active 设备创建 signed recovery record revocation。
-2. 服务端验证签名设备 active、记录存在、状态允许撤销。
-3. 服务端把记录状态改为 `revoked`。
-4. 后续 `recovery-records/latest` 不返回 revoked 记录。
+1. active 设备创建 signed recovery record revocation。canonical record type 固定为 `recovery_record_revocation`，依次签入 signature schema/algorithm/key id、revoker device id、recovery record id、domain id、当前 key epoch、reason 和 created time。
+2. 服务端验证 transport device、签名设备与 signed revoker 一致且仍为 active；目标必须是当前 chain head、状态为 `active`、绑定当前 epoch，并用 revoker 当前登记的 signing profile 验签。
+3. 服务端在一个 transaction 中保存公开 revocation、把目标状态改为 `revoked`、设置状态时间并追加 `recovery_record_revoked` lifecycle event。
+4. 后续 `recovery-records/latest` 不返回 revoked 记录；历史 metadata、签名和 wrapped ciphertext 继续保留用于审计与备份一致性，不再允许 activation。
 
 规则：
 
 - 撤销恢复记录不等于删除服务端所有密文对象。
 - 撤销恢复记录不能删除用户词 tombstone，也不能替代 `dictionary.deleted_terms`。
 - 如果所有恢复记录都撤销，用户必须依赖已有 active 设备授权新设备。
+- 精确重放同一 revocation 幂等并返回原 lifecycle sequence；同一 recovery id 的不同 reason、时间、signer、signature 或其他 signed metadata 返回 `conflict_recovery_record`。
+- revocation 与 activation 在同一 recovery record 上竞争时由 storage transaction 线性化：activation 先提交则 revocation 冲突，revocation 先提交则 activation 冲突，不能同时消费同一记录。
+- revocation 与 rotation 并发时，rotation 先提交会使旧 target 不再是 active chain head，revocation 冲突；revocation 先提交后，新的 rotation 仍可把 revoked head 作为严格 predecessor，但必须使用更新的时间、新 secret/salt/activation profile，并形成先 `recovery_record_revoked` 后 `recovery_record_rotated` 的可验证 lifecycle，不能复活被撤销记录。
+- lifecycle verifier 只在当前 active chain head 接受 revocation，按当时 active revoker profile 复验签名并把 head 标记为 revoked；后续 `device_recovered` 引用该 head 必须失败，后续 rotation 仍必须显式承接该 head。
 
 ## 新设备使用恢复码加入
 
@@ -275,7 +279,7 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 - 恢复记录 blob 缺失、长度不一致或 hash 不一致时，应返回 `storage_unavailable`，不能把损坏密文当作可恢复状态。
 - 服务端错误响应不得区分“恢复码接近正确”或泄漏 KDF 输出、AAD、wrapped material bytes。
 
-当前已实现 v2 optimistic rotation、Rust verified upload/download/decrypt、`recovery_record_rotated` / `device_recovered` lifecycle 和恢复激活 transaction：新写入固定当前 epoch/profile，精确重放幂等，旧 active 或已消费 chain head 可作为严格 predecessor；activation possession proof、全新设备 profile 与事务后完整 active cohort distribution 必须同时通过，失败不留下 active 设备或部分 wrapped metadata。文件 userdb 重启可从公开记录重放信任链；不开放 Manager 成功入口。
+当前已实现 v2 optimistic rotation、Rust verified upload/download/decrypt、`recovery_record_rotated` / `device_recovered` / `recovery_record_revoked` lifecycle、恢复激活 transaction 与 signed revocation transaction：新写入固定当前 epoch/profile，精确重放幂等，旧 active、已消费或已撤销 chain head 可作为严格 predecessor；activation possession proof、全新设备 profile 与事务后完整 active cohort distribution 必须同时通过，失败不留下 active 设备或部分 wrapped metadata。revocation 只作用于当前 active head，latest 随即消失；后续轮换不改变旧 head 的 `revoked` 状态。文件 userdb 重启可从公开记录重放信任链；不开放 Manager 成功入口。
 
 ## 与管理 UI 的边界
 
@@ -305,7 +309,7 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 5. 已补 Go server recovery latest handler，覆盖 wrapped material 读取、状态、限速和日志脱敏验证。
 6. 已实现 `recovery-record-v2`、activation public key 派生、原子轮换、verified remote 读取与恢复解封；v1 只迁移保留，当前产品客户端失败关闭。
 7. 已实现 recovered-device activation、`recovery_record_rotated` / `device_recovered` lifecycle 归约、完整 active cohort 当前 epoch 分发和文件 userdb 重启证据。
-8. 下一批实现 signed recovery record 撤销及其 lifecycle/并发语义；后续真实平台 backend 通过验证后，管理 UI 再接入用户可见恢复流程。
+8. 已实现 signed recovery record 撤销及其 lifecycle/activation/rotation 并发、幂等、历史记录和重启语义；下一批补发布级目标部署运行证据，后续真实平台 backend 通过验证后，管理 UI 再接入用户可见恢复流程。
 
 ## 验证口径
 

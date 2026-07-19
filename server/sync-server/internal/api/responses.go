@@ -208,6 +208,26 @@ type RecoveredDeviceActivationLifecycleResponse struct {
 	ActivationSignature     []byte `json:"activation_signature"`
 }
 
+type RecoveryRecordRevocationLifecycleResponse struct {
+	RecoveryRecordID       string `json:"recovery_record_id"`
+	DomainID               string `json:"domain_id"`
+	RevokerDeviceID        string `json:"revoker_device_id"`
+	KeyEpoch               uint64 `json:"key_epoch"`
+	Reason                 string `json:"reason"`
+	CreatedAtMs            int64  `json:"created_at_ms"`
+	SignatureSchemaVersion uint16 `json:"signature_schema_version"`
+	SignatureAlgorithm     string `json:"signature_algorithm"`
+	SignatureKeyID         string `json:"signature_key_id"`
+	Signature              []byte `json:"signature"`
+}
+
+type RecoveryRecordRevocationResponse struct {
+	DomainID          string                       `json:"domain_id"`
+	RecoveryRecordID  string                       `json:"recovery_record_id"`
+	Status            storage.RecoveryRecordStatus `json:"status"`
+	LifecycleSequence uint64                       `json:"lifecycle_sequence"`
+}
+
 type LifecycleEventResponse struct {
 	DomainID                       string                                      `json:"domain_id"`
 	LifecycleSequence              uint64                                      `json:"lifecycle_sequence"`
@@ -221,6 +241,7 @@ type LifecycleEventResponse struct {
 	Revocation                     *DeviceRevocationResponse                   `json:"revocation,omitempty"`
 	RecoveryRecord                 *RecoveryRecordResponse                     `json:"recovery_record,omitempty"`
 	RecoveredActivation            *RecoveredDeviceActivationLifecycleResponse `json:"recovered_activation,omitempty"`
+	RecoveryRevocation             *RecoveryRecordRevocationLifecycleResponse  `json:"recovery_revocation,omitempty"`
 }
 
 type LifecycleSnapshotResponse struct {
@@ -347,7 +368,25 @@ func LifecycleEventResponseFrom(event storage.LifecycleEvent) LifecycleEventResp
 			ActivationSignature:    cloneBytes(activation.ActivationSignature),
 		}
 	}
+	if event.RecoveryRevocation != nil {
+		revocation := event.RecoveryRevocation
+		response.RecoveryRevocation = &RecoveryRecordRevocationLifecycleResponse{
+			RecoveryRecordID: revocation.RecoveryRecordID, DomainID: revocation.DomainID,
+			RevokerDeviceID: revocation.RevokerDeviceID, KeyEpoch: revocation.KeyEpoch,
+			Reason: revocation.Reason, CreatedAtMs: revocation.CreatedAtMs,
+			SignatureSchemaVersion: revocation.SignatureSchemaVersion,
+			SignatureAlgorithm:     revocation.SignatureAlgorithm,
+			SignatureKeyID:         revocation.SignatureKeyID, Signature: cloneBytes(revocation.Signature),
+		}
+	}
 	return response
+}
+
+func RecoveryRecordRevocationResponseFrom(result storage.RecoveryRecordRevocationResult) RecoveryRecordRevocationResponse {
+	return RecoveryRecordRevocationResponse{
+		DomainID: result.Revocation.DomainID, RecoveryRecordID: result.Revocation.RecoveryRecordID,
+		Status: storage.RecoveryRecordRevoked, LifecycleSequence: result.LifecycleSequence,
+	}
 }
 
 func LifecycleEventResponsesFrom(events []storage.LifecycleEvent) []LifecycleEventResponse {

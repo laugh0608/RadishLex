@@ -153,6 +153,27 @@ type RecoveredDeviceActivationRequest struct {
 	ActivationSignature     []byte `json:"activation_signature"`
 }
 
+type RecoveryRecordRevocationRequest struct {
+	RevokerDeviceID        string `json:"revoker_device_id"`
+	KeyEpoch               uint64 `json:"key_epoch"`
+	Reason                 string `json:"reason"`
+	CreatedAtMs            int64  `json:"created_at_ms"`
+	SignatureSchemaVersion uint16 `json:"signature_schema_version"`
+	SignatureAlgorithm     string `json:"signature_algorithm"`
+	SignatureKeyID         string `json:"signature_key_id"`
+	Signature              []byte `json:"signature"`
+}
+
+func (r RecoveryRecordRevocationRequest) Revocation(domainID string, recoveryRecordID string) storage.RecoveryRecordRevocation {
+	return storage.RecoveryRecordRevocation{
+		RecoveryRecordID: recoveryRecordID, DomainID: domainID,
+		RevokerDeviceID: r.RevokerDeviceID, KeyEpoch: r.KeyEpoch, Reason: r.Reason,
+		CreatedAtMs: r.CreatedAtMs, SignatureSchemaVersion: r.SignatureSchemaVersion,
+		SignatureAlgorithm: r.SignatureAlgorithm, SignatureKeyID: r.SignatureKeyID,
+		Signature: cloneBytes(r.Signature),
+	}
+}
+
 func (r RecoverDeviceRequest) Upload(domainID string, recoveryRecordID string) storage.RecoveredDeviceActivationUpload {
 	return storage.RecoveredDeviceActivationUpload{
 		Activation: storage.RecoveredDeviceActivation{

@@ -4,8 +4,8 @@ use base64ct::{Base64, Encoding};
 use radishlex_ime_crypto::{
     DeviceKeyAgreementPublicKey, DeviceSignature, KeyDescriptor, KeyRole, Nonce,
     RecoveredDeviceActivationManifest, RecoveryCode, RecoveryKdfProfile, RecoveryMaterial,
-    SignedRecoveredDeviceActivation, SignedRecoveryRecordManifest, SyncMasterKeyMaterial,
-    TestMemoryDeviceKeyStore, WrappedEpochMaterial, ED25519_SIGNATURE_LEN,
+    SignedRecoveredDeviceActivation, SignedRecoveryRecordManifest, SignedRecoveryRecordRevocation,
+    SyncMasterKeyMaterial, TestMemoryDeviceKeyStore, WrappedEpochMaterial, ED25519_SIGNATURE_LEN,
     RECOVERY_CODE_SECRET_LEN,
 };
 use radishlex_ime_sync::{
@@ -271,7 +271,7 @@ fn recovery_rotates_and_decrypts_through_go_http_server() {
     let lifecycle = client
         .lifecycle_snapshot(DOMAIN_ID)
         .expect("recovery lifecycle");
-    let verified_lifecycle = verify_lifecycle_snapshot(lifecycle, &anchor_public_key)
+    let mut verified_lifecycle = verify_lifecycle_snapshot(lifecycle, &anchor_public_key)
         .expect("verify recovery lifecycle");
     assert_eq!(
         verified_lifecycle
@@ -282,6 +282,108 @@ fn recovery_rotates_and_decrypts_through_go_http_server() {
             .status,
         radishlex_ime_sync::SyncDeviceStatus::Active
     );
+    let third_code = recovery_code([5; RECOVERY_CODE_SECRET_LEN]);
+    let third = RecoveryMaterial::encrypt_sync_master_key(
+        "recovery-c",
+        "recovery-b",
+        DOMAIN_ID,
+        1,
+        &RecoveryKdfProfile::argon2id_v1(),
+        &third_code,
+        vec![12; 16],
+        &master_key,
+        BASE_TIMESTAMP_MS + 50,
+        Nonce::new(vec![13; 24]).expect("third nonce"),
+    )
+    .expect("third recovery");
+    let third_manifest = sign_recovery(&signing_store, &third);
+    client
+        .upload_recovery_record(verified_lifecycle.trusted_domain(), &third, &third_manifest)
+        .expect("rotate after recovery activation");
+    let downloaded_third = client
+        .latest_verified_recovery_record(verified_lifecycle.trusted_domain(), DOMAIN_ID)
+        .expect("download third recovery");
+    let revocation = sign_recovery_revocation(
+        &signing_store,
+        "recovery-c",
+        "compromised",
+        BASE_TIMESTAMP_MS + 60,
+    );
+    let mut wrong_domain = revocation.clone();
+    wrong_domain.domain_id = "domain-wrong".to_owned();
+    assert!(matches!(
+        client
+            .revoke_recovery_record(
+                verified_lifecycle.trusted_domain(),
+                &downloaded_third,
+                &wrong_domain,
+            )
+            .expect_err("wrong revocation domain fails before HTTP"),
+        SyncRemoteError::InvalidRequest { .. }
+    ));
+    let mut tampered_revocation = revocation.clone();
+    tampered_revocation.signature.signature[0] ^= 1;
+    assert!(matches!(
+        client
+            .revoke_recovery_record(
+                verified_lifecycle.trusted_domain(),
+                &downloaded_third,
+                &tampered_revocation,
+            )
+            .expect_err("tampered revocation fails before HTTP"),
+        SyncRemoteError::InvalidRequest { .. }
+    ));
+    let mut wrong_key_id = revocation.clone();
+    wrong_key_id.signature.signature_key_id = "signing-key-wrong".to_owned();
+    assert!(matches!(
+        client
+            .revoke_recovery_record(
+                verified_lifecycle.trusted_domain(),
+                &downloaded_third,
+                &wrong_key_id,
+            )
+            .expect_err("wrong revocation key id fails before HTTP"),
+        SyncRemoteError::InvalidRequest { .. }
+    ));
+    let wrong_device_client = SyncRemoteClient::new(
+        HttpSyncRemoteTransport::with_timeout(server.base_url(), Duration::from_secs(5))
+            .expect("wrong-device transport")
+            .with_device_identity(RECOVERED_DEVICE_ID)
+            .expect("wrong-device identity"),
+    );
+    assert!(matches!(
+        wrong_device_client
+            .revoke_recovery_record(
+                verified_lifecycle.trusted_domain(),
+                &downloaded_third,
+                &revocation,
+            )
+            .expect_err("transport device cannot impersonate revoker"),
+        SyncRemoteError::Server {
+            code: SyncServerErrorCode::ForbiddenDevice,
+            ..
+        }
+    ));
+    let revoked = client
+        .revoke_recovery_record(
+            verified_lifecycle.trusted_domain(),
+            &downloaded_third,
+            &revocation,
+        )
+        .expect("revoke recovery record");
+    let replayed = client
+        .revoke_recovery_record(
+            verified_lifecycle.trusted_domain(),
+            &downloaded_third,
+            &revocation,
+        )
+        .expect("replay recovery revocation");
+    assert_eq!(replayed, revoked);
+    let lifecycle = client
+        .lifecycle_snapshot(DOMAIN_ID)
+        .expect("recovery revocation lifecycle");
+    verified_lifecycle = verify_lifecycle_snapshot(lifecycle, &anchor_public_key)
+        .expect("verify recovery revocation lifecycle");
     let recovered_userdb_path = server.data_path("recovered-device-userdb.sqlite");
     {
         let mut userdb = UserDb::open(&recovered_userdb_path).expect("open recovered userdb");
@@ -290,7 +392,7 @@ fn recovery_rotates_and_decrypts_through_go_http_server() {
             .expect("cache recovered lifecycle");
     }
     let reopened_userdb = UserDb::open(&recovered_userdb_path).expect("reopen recovered userdb");
-    assert_eq!(reopened_userdb.schema_version().expect("schema version"), 8);
+    assert_eq!(reopened_userdb.schema_version().expect("schema version"), 9);
     assert!(reopened_userdb
         .trusted_domain_state(DOMAIN_ID)
         .expect("recovered lifecycle after restart")
@@ -325,8 +427,11 @@ fn recovery_rotates_and_decrypts_through_go_http_server() {
     for forbidden in [
         format_recovery_code([3; RECOVERY_CODE_SECRET_LEN]),
         format_recovery_code([4; RECOVERY_CODE_SECRET_LEN]),
+        format_recovery_code([5; RECOVERY_CODE_SECRET_LEN]),
         Base64::encode_string(master_key.as_bytes()),
         Base64::encode_string(&activation.signature),
+        Base64::encode_string(&revocation.signature.signature),
+        "compromised".to_owned(),
     ] {
         assert!(
             !logs.contains(&forbidden),
@@ -406,6 +511,41 @@ fn sign_recovery(
         .sign(&handle, &unsigned.canonical_bytes())
         .expect("signature");
     SignedRecoveryRecordManifest::new(material, signature).expect("signed manifest")
+}
+
+fn sign_recovery_revocation(
+    signing_store: &TestMemoryDeviceKeyStore,
+    recovery_record_id: &str,
+    reason: &str,
+    created_at_ms: i64,
+) -> SignedRecoveryRecordRevocation {
+    let unsigned = SignedRecoveryRecordRevocation::new(
+        recovery_record_id,
+        DOMAIN_ID,
+        1,
+        reason,
+        created_at_ms,
+        DeviceSignature::new(SIGNING_KEY_ID, DEVICE_ID, vec![0; ED25519_SIGNATURE_LEN])
+            .expect("placeholder signature"),
+    )
+    .expect("unsigned recovery revocation");
+    let signature = signing_store
+        .sign(
+            &signing_store
+                .handle(DEVICE_ID, SIGNING_KEY_ID)
+                .expect("signing handle"),
+            &unsigned.canonical_bytes(),
+        )
+        .expect("recovery revocation signature");
+    SignedRecoveryRecordRevocation::new(
+        recovery_record_id,
+        DOMAIN_ID,
+        1,
+        reason,
+        created_at_ms,
+        signature,
+    )
+    .expect("signed recovery revocation")
 }
 
 fn recovery_code(secret: [u8; RECOVERY_CODE_SECRET_LEN]) -> RecoveryCode {

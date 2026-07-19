@@ -15,41 +15,43 @@ var opaqueIDPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]+$`)
 type MemoryStore struct {
 	mu sync.Mutex
 
-	domains        map[string]Domain
-	devices        map[domainDeviceKey]Device
-	joinRequests   map[joinRequestKey]JoinRequest
-	authorizations map[joinRequestKey]DeviceAuthorization
-	wrapping       map[wrappingKey]DeviceWrappingRecord
-	revocations    map[revocationKey]DeviceRevocation
-	recoveries     map[recoveryKey]RecoveryRecord
-	activations    map[recoveryKey]RecoveredDeviceActivation
-	latestRecovery map[string]string
-	objects        map[objectKey]SyncObject
-	versions       map[objectVersionKey]ObjectVersion
-	nextSequence   map[string]uint64
-	lifecycle      map[string][]LifecycleEvent
-	nextLifecycle  map[string]uint64
-	blobs          map[string][]byte
-	auditEvents    []AuditEvent
+	domains             map[string]Domain
+	devices             map[domainDeviceKey]Device
+	joinRequests        map[joinRequestKey]JoinRequest
+	authorizations      map[joinRequestKey]DeviceAuthorization
+	wrapping            map[wrappingKey]DeviceWrappingRecord
+	revocations         map[revocationKey]DeviceRevocation
+	recoveries          map[recoveryKey]RecoveryRecord
+	activations         map[recoveryKey]RecoveredDeviceActivation
+	recoveryRevocations map[recoveryKey]RecoveryRecordRevocationResult
+	latestRecovery      map[string]string
+	objects             map[objectKey]SyncObject
+	versions            map[objectVersionKey]ObjectVersion
+	nextSequence        map[string]uint64
+	lifecycle           map[string][]LifecycleEvent
+	nextLifecycle       map[string]uint64
+	blobs               map[string][]byte
+	auditEvents         []AuditEvent
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		domains:        make(map[string]Domain),
-		devices:        make(map[domainDeviceKey]Device),
-		joinRequests:   make(map[joinRequestKey]JoinRequest),
-		authorizations: make(map[joinRequestKey]DeviceAuthorization),
-		wrapping:       make(map[wrappingKey]DeviceWrappingRecord),
-		revocations:    make(map[revocationKey]DeviceRevocation),
-		recoveries:     make(map[recoveryKey]RecoveryRecord),
-		activations:    make(map[recoveryKey]RecoveredDeviceActivation),
-		latestRecovery: make(map[string]string),
-		objects:        make(map[objectKey]SyncObject),
-		versions:       make(map[objectVersionKey]ObjectVersion),
-		nextSequence:   make(map[string]uint64),
-		lifecycle:      make(map[string][]LifecycleEvent),
-		nextLifecycle:  make(map[string]uint64),
-		blobs:          make(map[string][]byte),
+		domains:             make(map[string]Domain),
+		devices:             make(map[domainDeviceKey]Device),
+		joinRequests:        make(map[joinRequestKey]JoinRequest),
+		authorizations:      make(map[joinRequestKey]DeviceAuthorization),
+		wrapping:            make(map[wrappingKey]DeviceWrappingRecord),
+		revocations:         make(map[revocationKey]DeviceRevocation),
+		recoveries:          make(map[recoveryKey]RecoveryRecord),
+		activations:         make(map[recoveryKey]RecoveredDeviceActivation),
+		recoveryRevocations: make(map[recoveryKey]RecoveryRecordRevocationResult),
+		latestRecovery:      make(map[string]string),
+		objects:             make(map[objectKey]SyncObject),
+		versions:            make(map[objectVersionKey]ObjectVersion),
+		nextSequence:        make(map[string]uint64),
+		lifecycle:           make(map[string][]LifecycleEvent),
+		nextLifecycle:       make(map[string]uint64),
+		blobs:               make(map[string][]byte),
 	}
 }
 
@@ -505,6 +507,11 @@ func (s *MemoryStore) PutRecoveryRecord(ctx context.Context, upload RecoveryReco
 		return RecoveryRecord{}, newError(ErrConflictRecoveryRecord, "recovery record predecessor is stale")
 	} else if upload.Record.CreatedAtMs <= s.recoveries[recoveryKey{domainID: upload.Record.DomainID, recoveryRecordID: currentID}].CreatedAtMs {
 		return RecoveryRecord{}, newError(ErrConflictRecoveryRecord, "recovery record timestamp does not advance predecessor")
+	} else if !recoveryRecordRotatesPublicMaterial(
+		s.recoveries[recoveryKey{domainID: upload.Record.DomainID, recoveryRecordID: currentID}],
+		upload.Record,
+	) {
+		return RecoveryRecord{}, newError(ErrConflictRecoveryRecord, "recovery rotation must replace public crypto material")
 	}
 	signer, err := s.activeDeviceLocked(upload.Record.DomainID, upload.Record.SignerDeviceID)
 	if err != nil {
@@ -518,9 +525,11 @@ func (s *MemoryStore) PutRecoveryRecord(ctx context.Context, upload RecoveryReco
 	if currentID != "" {
 		previousKey := recoveryKey{domainID: record.DomainID, recoveryRecordID: currentID}
 		previous := s.recoveries[previousKey]
-		previous.Status = RecoveryRecordSuperseded
-		previous.RevokedAtMs = record.CreatedAtMs
-		s.recoveries[previousKey] = previous
+		if previous.Status == RecoveryRecordActive {
+			previous.Status = RecoveryRecordSuperseded
+			previous.RevokedAtMs = record.CreatedAtMs
+			s.recoveries[previousKey] = previous
+		}
 	}
 	s.recoveries[key] = record
 	s.latestRecovery[record.DomainID] = record.RecoveryRecordID
@@ -1408,6 +1417,9 @@ func cloneLifecycleEvent(value LifecycleEvent) LifecycleEvent {
 	}
 	if value.RecoveredActivation != nil {
 		value.RecoveredActivation = recoveredActivationPointer(*value.RecoveredActivation)
+	}
+	if value.RecoveryRevocation != nil {
+		value.RecoveryRevocation = recoveryRevocationPointer(*value.RecoveryRevocation)
 	}
 	return value
 }
