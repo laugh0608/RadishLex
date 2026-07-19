@@ -98,12 +98,12 @@ impl RadishLexManagerSyncProductStatus {
                 key_agreement_backend:
                     RADISHLEX_MANAGER_KEY_AGREEMENT_BACKEND_APPLE_SECURE_ENCLAVE_P256_V1,
                 key_agreement_compiled: key_agreement.compiled,
-                // Independent key-agreement runtime and product qualification
-                // require separately authorized real-device evidence. Never
-                // inherit the signing backend result here.
+                // Key-agreement qualification comes from its independently
+                // reviewed real-device status. Never inherit signing flags.
                 key_agreement_runtime_qualified: key_agreement.runtime_qualified,
                 key_agreement_product_qualified: key_agreement.product_qualified,
-                product_qualified: 0,
+                product_qualified: flag(signing.product_qualified)
+                    * key_agreement.product_qualified,
                 user_sync_enabled: 0,
                 blocker: RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_NONE,
             };
@@ -157,7 +157,10 @@ mod tests {
             status.version,
             RADISHLEX_MANAGER_SYNC_PRODUCT_STATUS_VERSION
         );
-        assert_eq!(status.product_qualified, 0);
+        assert_eq!(
+            status.product_qualified,
+            cfg!(all(feature = "apple-keychain", target_os = "macos")) as u32
+        );
         assert_eq!(status.user_sync_enabled, 0);
         assert_ne!(status.blocker, RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_NONE);
 

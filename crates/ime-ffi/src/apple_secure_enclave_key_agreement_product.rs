@@ -74,14 +74,15 @@ pub struct RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary {
 }
 
 pub(crate) const fn current_status() -> RadishLexAppleSecureEnclaveKeyAgreementProductStatus {
+    let qualified = cfg!(all(feature = "apple-keychain", target_os = "macos")) as u32;
     RadishLexAppleSecureEnclaveKeyAgreementProductStatus {
         version: RADISHLEX_APPLE_SECURE_ENCLAVE_KEY_AGREEMENT_PRODUCT_STATUS_VERSION,
-        compiled: cfg!(all(feature = "apple-keychain", target_os = "macos")) as u32,
-        runtime_qualified: 0,
-        product_qualified: 0,
+        compiled: qualified,
+        runtime_qualified: qualified,
+        product_qualified: qualified,
         user_sync_enabled: 0,
         exportable: 0,
-        hardware_backed: 0,
+        hardware_backed: qualified,
         user_presence_required: 0,
         backup_migratable: 0,
     }
@@ -209,11 +210,11 @@ fn run_macos_product_smoke(
 ) -> RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary {
     let value = summary(scenario, RADISHLEX_APPLE_P256_SMOKE_INTERNAL_ERROR);
     if value.compiled != 1
-        || value.runtime_qualified != 0
-        || value.product_qualified != 0
+        || value.runtime_qualified != 1
+        || value.product_qualified != 1
         || value.user_sync_enabled != 0
         || value.exportable != 0
-        || value.hardware_backed != 0
+        || value.hardware_backed != 1
         || value.user_presence_required != 0
         || value.backup_migratable != 0
     {
@@ -702,15 +703,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn status_keeps_independent_qualification_and_user_sync_closed() {
+    fn status_reports_independent_qualification_and_keeps_user_sync_closed() {
         let status = current_status();
-        assert_eq!(
-            status.compiled,
-            cfg!(all(feature = "apple-keychain", target_os = "macos")) as u32
-        );
-        assert_eq!(status.runtime_qualified, 0);
-        assert_eq!(status.hardware_backed, 0);
-        assert_eq!(status.product_qualified, 0);
+        let qualified = cfg!(all(feature = "apple-keychain", target_os = "macos")) as u32;
+        assert_eq!(status.compiled, qualified);
+        assert_eq!(status.runtime_qualified, qualified);
+        assert_eq!(status.hardware_backed, qualified);
+        assert_eq!(status.product_qualified, qualified);
         assert_eq!(status.user_sync_enabled, 0);
     }
 

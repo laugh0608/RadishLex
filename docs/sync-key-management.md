@@ -23,7 +23,7 @@
 - `ime-crypto` 已补算法无关设备验签、Ed25519/P-256 profile、`test-memory-v1` signing key store、platform capability metadata、unavailable 明确失败、revoked key 阻断、两个 feature-gated macOS Keychain backend、Android bridge、signed sync object manifest 和 signed recovery record；`ime-sync` 已补 signed device authorization 与 signed device revocation。
 - `ime-userdb` 已补已解密 P2 JSON 到 merge input 的解析入口，并能把合并模型接受的 user terms、deleted tombstones 和 ranker weights 写回真实 SQLite。
 - Go server storage / API / runtime 验证模型已保存设备与 join request 的显式 `signing_algorithm`、公钥、authorization、wrapping、revocation、recovery、object、非敏感 audit 和密文 blob；历史 schema migration 只把旧设备/join 行回填为 `ed25519-v1`，新请求不做算法默认。Rust/Go 共同读取同一签名 profile fixture。
-- `ime-sync` 已补 remote object client DTO / transport trait 和 std-only `http://` HTTP transport，上传入口只接收 `AssembledSyncObject` 和 `SignedSyncObjectManifest`，不接受 plaintext payload。
+- `ime-sync` 已补 remote object client DTO / transport trait 和 `http://` / `https://` transport。HTTPS 使用 rustls、Mozilla root 集与严格主机名校验；本地资格门禁只把短生命周期 Caddy CA 的 DER 作为进程内附加 trust anchor，不提供跳过验证开关。上传入口只接收 `AssembledSyncObject` 和 `SignedSyncObjectManifest`，不接受 plaintext payload。
 - Rust 侧两客户端 userdb harness 已覆盖设备 A 生成 P2 payload 并加密上传、设备 B 下载二进制密文后解密 / 解码 / 合并写回 SQLite、stale conflict latest metadata 映射，以及基于最新 base version 重新上传 v2。
 - Rust userdb 两客户端真实 Go HTTP 测试已覆盖设备 B join / signed authorization、三类 P2 对象真实 HTTP 上传下载、客户端解密 / 解码 / SQLite 写回、stale conflict latest metadata、按最新 `base_version` 上传 v2 和 runtime 日志脱敏。
 - `ime-sync` 已落地默认关闭的通用 crypto processor/provider port：cycle snapshot 分离当前写 epoch 与历史可读 epoch，固定远端 signer/revocation sequence 决策，并在生产构造器执行 backend gate；双 userdb HTTP service 已复用该处理链，合成 backend 只允许显式测试路径。
@@ -35,7 +35,7 @@
 - 不把 P1 原始选择事件、负反馈明细、上下文统计或本地审计批次纳入同步对象。
 - 不推进真实设备配对成功路径；M1/M2 平台输入与本地 manager 可独立推进，但不得调用真实同步或把平台签名 backend 标记为生产可用。
 
-当前部署子阶段以本地 Compose / HTTPS 与部署预演通过为退出证据；首个正式版本发布后、进入真实生产同步前，再按生产部署 runbook 补目标部署运行证据。普通 DPK P-256 当前 `compiled/available/can_create/can_sign=true`，但 `exportable=true` 使产品资格保持关闭。独立 Secure Enclave backend 已取得 qualification lifecycle、denied 与设备锁屏 locked 证据，产品资格仍待真实 unsupported 环境；当前缺少该环境，因此只允许按 `docs/sync-orchestration.md` 推进关闭产品入口、合成 P2、测试 backend 的 Rust 编排，不开放真实产品签名路径。既有 Apple/Android Ed25519 失败结论继续有效。
+当前部署子阶段以本地 Compose / HTTPS 与部署预演通过为退出证据；首个正式版本发布后、进入真实生产同步前，再按生产部署 runbook 补目标部署运行证据。普通 DPK P-256 当前 `compiled/available/can_create/can_sign=true`，但 `exportable=true` 使产品资格保持关闭。独立 Secure Enclave signing/key-agreement 已在一个受支持 macOS 设备取得独立 qualification lifecycle、denied、设备锁屏 locked、cleanup 与日志脱敏证据，按个人开发阶段的单平台主路径口径完成产品资格评审；真实 unsupported 环境改为有条件时补测，不开放真实用户同步。既有 Apple/Android Ed25519 失败结论继续有效。
 
 ## 设计目标
 
@@ -110,7 +110,7 @@ created_at_ms
 - 当前与历史 epoch 都按独立 record 解封；当前 epoch 必须存在且 `active_key_id` 匹配 domain。撤销设备的 trusted profile 在材料读取前阻断，因此不得请求或解封新 epoch；已持有的历史材料不承诺技术追回。
 - locked、user-presence、denied、unavailable、unsupported、missing、corrupted 和 authentication failure 保持可区分的内部错误；编排层只映射为稳定脱敏分类，不拼接 key bytes、wrapped bytes、shared secret、nonce 或平台错误文本。
 
-产品资格必须走 `docs/runbooks/apple-secure-enclave-key-agreement-backend.md` 的独立六场景 harness。其 lifecycle 以 fresh store 公钥一致、ECDH 成功、合成 wrapped epoch descriptor/master material 往返、精确删除和 fresh missing 为通过条件；denied、设备锁定态和 unsupported 分别取证。该证据不能继承设备签名 backend 的 lifecycle 或 hardware-backed 结论。自动门禁只运行 status/gate-disabled 与合成测试，任何真实 item 操作都需要当次明确授权。
+产品资格必须走 `docs/runbooks/apple-secure-enclave-key-agreement-backend.md` 的独立 harness。其 lifecycle 以 fresh store 公钥一致、ECDH 成功、合成 wrapped epoch descriptor/master material 往返、精确删除和 fresh missing 为通过条件；denied、设备锁定态与 cleanup 必须在受支持设备独立取证，不能继承设备签名 backend 的结论。unsupported 场景与失败关闭实现继续保留，但无真实环境时允许延期补测。自动门禁只运行 status/gate-disabled 与合成测试，任何真实 item 操作都需要当次明确授权。
 
 远端取得边界固定为精确 locator：`domain_id + recipient_device_id + key_epoch + wrapping_key_id`。Go metadata 必须持久化 record 创建时已签名绑定的 `recipient_key_agreement_key_id`，不能用读取时的设备目录值补写 AAD。客户端只能在已验证 lifecycle 给出 locator 后请求；HTTP transport 的设备声明必须等于 recipient，server storage 在读取 blob 前原子确认 recipient 仍为 active。单条 wrapped bytes 上限为 64 KiB；服务端响应通过长度/hash 检查后，Rust 仍要重新执行 schema、algorithm、AAD、hash 和 AEAD 验证。
 
@@ -327,14 +327,14 @@ updated_at_ms
 11. 已补 `apple-keychain-v1` 平台 runbook 和 Apple 签名策略 ADR，固定 Apple Keychain 创建、加载、签名、删除、锁屏 / 权限、备份迁移、日志脱敏和策略停止线；macOS backend 已在 `apple-keychain` feature 下接线，默认测试不访问系统 Keychain，真实 smoke 已运行但阻塞于 `ed25519-v1` 创建，backend status 已阻断生产签名。
 12. 已补 `android-keystore-v1` 平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、raw JNI glue、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin bridge source、Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，固定 Android Keystore Ed25519 创建 / 加载 / 签名 / 删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
 13. 已补 ADR 0006、Rust/Go 算法分派、显式 `signing_algorithm` metadata/migration、共享跨语言 vectors 和独立 `apple-keychain-p256-v1`；普通测试不访问 Keychain，manager Release native 接线、严格 DPK 选择、固定错误/OSStatus、五场景 gated smoke、ad-hoc denied 与合格产品生命周期均有证据。评审结论为软件运行时可用、`exportable=true`、产品资格拒绝。
-14. 已补 ADR 0007、独立 `apple-secure-enclave-p256-v1`、token/private-key-usage access control、不可导出 probe、Rust/FFI/manager native、六场景 gated smoke 和默认无外部状态产品构建门禁；qualification lifecycle、不可导出、hardware-backed、ad-hoc denied 与真实设备锁屏 locked 已有产品证据，当前等待真实 unsupported 环境和产品资格评审。
+14. 已补 ADR 0007、独立 `apple-secure-enclave-p256-v1`、token/private-key-usage access control、不可导出 probe、Rust/FFI/manager native、六场景 gated smoke 和默认无外部状态产品构建门禁；qualification lifecycle、不可导出、hardware-backed、ad-hoc denied、真实设备锁屏 locked 与 cleanup 已有产品证据，受支持 macOS 主路径资格已评审，unsupported 延期补测。
 15. 已补真实 userdb P2 payload 解析到 merge input 的接线。
 16. 已补客户端合并结果写回真实 userdb 的执行器。
 17. 继续保持 userdb P2 payload 只作为 Rust 内部测试输入，不新增 CLI / FFI 明文 payload。
 18. 已补 Go server API / storage 边界设计。
 19. 已补生产恢复流程设计和平台私钥存储 backend ADR。
 20. 已起步 Go server metadata / storage / API / runtime 验证模型，当前覆盖配置默认值、API request / error DTO、SQLite migration、storage interface、storage conformance tests、内存 storage、SQLite-backed metadata repository、local object storage staged transaction、签名验证、wrapped key bytes、recovery wrapped material、object version 上传下载、版本冲突、撤销设备阻断、非敏感 audit events 和隐私字段检查。
-21. 已补 Rust remote object client DTO / transport trait 和 std-only `http://` HTTP transport，固定 encrypted object upload request、metadata 读取、binary payload 下载、stale conflict latest metadata、server error code 映射、真实 HTTP request / response 传递和 Debug 脱敏。
+21. 已补 Rust remote object client DTO / transport trait 和 `http://` / rustls `https://` transport，固定 encrypted object upload request、metadata 读取、binary payload 下载、stale conflict latest metadata、server error code 映射、真实 HTTP/TLS request / response 传递和 Debug 脱敏；证书、主机名或 trust anchor 不匹配均失败关闭。
 22. 已补 Rust 侧两客户端 userdb harness，覆盖 P2 payload 加密上传、另一客户端下载密文、解密、解码、合并写回、本机 tombstone 阻断旧远端词条、stale conflict latest metadata 映射和 v2 重新上传。
 23. 已补 Rust userdb 两客户端真实 Go HTTP 测试，覆盖设备授权、三类 P2 对象上传下载、客户端解密写回、stale conflict、v2 重新上传和 runtime 日志脱敏。
 24. 已按 `docs/sync-orchestration.md` 落地 change cursor、local repository port、transaction-scoped apply + cursor、持久化 journal/outbox、取消/重启、409 重新发现和默认关闭的通用 crypto processor/provider；合成双 userdb Go HTTP service 已覆盖历史 epoch、撤销 sequence、cycle snapshot 与新 outbox 轮换边界。
@@ -363,7 +363,7 @@ updated_at_ms
 ## 停止线
 
 - 恢复码 KDF、Rust model、服务端 v2 轮换 API、recovered-device activation 和 signed recovery record revocation/lifecycle 已落地；合格平台 backend、发布级部署证据和管理 UI 未闭环前，不提供用户可用恢复入口。
-- 设备签名模型、两个签名 profile、跨语言 verifier/vectors、私钥存储抽象、平台 capability、Apple/Android runbook 与 feature-gated backend 已落地；普通 DPK 软件运行时已验证但可导出，Secure Enclave lifecycle、denied 与真实设备锁屏 locked 已验证，unsupported 和最终产品资格仍待真实环境证据，既有 Android/Apple Ed25519 阻塞也未解除。关闭态 Rust orchestration 可以独立推进，但任何局部 capability 或合成编排证据都不得开放用户可用远端对象上传下载。
+- 设备签名模型、两个签名 profile、跨语言 verifier/vectors、私钥存储抽象、平台 capability、Apple/Android runbook 与 feature-gated backend 已落地；普通 DPK 软件运行时已验证但可导出，Secure Enclave lifecycle、denied、真实设备锁屏 locked 与 cleanup 已验证并按受支持 macOS 主路径取得产品资格，unsupported 延期补测。既有 Android/Apple Ed25519 阻塞不改写 P-256 结论；`user_sync_enabled` 仍由独立产品入口门禁控制。
 - 服务端若回退到只保存 wrapping metadata 而不能保存 / 返回 wrapped key bytes，则不得开放真实设备授权 handler。
 - Go server 与 Rust HTTP transport 继续推进时，必须先满足 `docs/sync-server-api-storage.md` 的签名、metadata API、版本冲突、错误语义和脱敏验证。
 - CLI / FFI 继续不得暴露 plaintext sync payload 或生产同步密钥材料。

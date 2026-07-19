@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 import socket
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -160,6 +161,64 @@ def wait_for_https(endpoint: str, access_token: str, timeout_seconds: int) -> No
     raise LocalHttpsSmokeError("local HTTPS endpoint did not reach the expected bearer-gated state")
 
 
+def export_gateway_root_der(
+    project_name: str,
+    env_path: Path,
+    destination: Path,
+) -> None:
+    result = run_required(
+        compose_command(
+            project_name,
+            env_path,
+            "exec",
+            "-T",
+            "sync-gateway",
+            "cat",
+            "/data/caddy/pki/authorities/local/root.crt",
+        ),
+        capture=True,
+    )
+    try:
+        root_der = ssl.PEM_cert_to_DER_cert(result.stdout)
+    except ValueError as exc:
+        raise LocalHttpsSmokeError("local HTTPS gateway root certificate is invalid") from exc
+    destination.write_bytes(root_der)
+    destination.chmod(0o600)
+
+
+def run_rust_transport_probe(
+    endpoint: str,
+    access_token: str,
+    root_der_path: Path,
+) -> None:
+    env = os.environ.copy()
+    env.update(
+        {
+            "RADISHLEX_RUN_LOCAL_HTTPS_TRANSPORT_TEST": "1",
+            "RADISHLEX_LOCAL_HTTPS_ENDPOINT": endpoint,
+            "RADISHLEX_LOCAL_HTTPS_ACCESS_TOKEN": access_token,
+            "RADISHLEX_LOCAL_HTTPS_ROOT_DER_PATH": str(root_der_path),
+        }
+    )
+    result = run_command(
+        [
+            "cargo",
+            "test",
+            "-p",
+            "radishlex-ime-sync",
+            "--test",
+            "local_https_transport",
+            "rust_transport_reaches_local_caddy_with_verified_tls_and_bearer_gate",
+            "--",
+            "--exact",
+        ],
+        capture=True,
+        env=env,
+    )
+    if result.returncode != 0:
+        raise LocalHttpsSmokeError("Rust client failed the local verified HTTPS transport probe")
+
+
 def inspect_container(project_name: str, env_path: Path, service: str) -> dict[str, Any]:
     container_id = run_required(
         compose_command(project_name, env_path, "ps", "-q", service),
@@ -267,6 +326,7 @@ def run_smoke(args: argparse.Namespace) -> int:
 
     with tempfile.TemporaryDirectory(prefix="radishlex-local-https.") as temp_dir:
         env_path = Path(temp_dir) / "local-https.env"
+        root_der_path = Path(temp_dir) / "local-caddy-root.der"
         write_env(env_path, project_name, port, access_token)
         started = False
         primary_error: Exception | None = None
@@ -278,6 +338,8 @@ def run_smoke(args: argparse.Namespace) -> int:
             started = True
             run_required(compose_command(project_name, env_path, "up", "--build", "-d"))
             wait_for_https(endpoint, access_token, args.timeout_seconds)
+            export_gateway_root_der(project_name, env_path, root_der_path)
+            run_rust_transport_probe(endpoint, access_token, root_der_path)
             assert_container_hardening(project_name, env_path)
             assert_logs_redacted(project_name, env_path, access_token)
         except Exception as exc:  # noqa: BLE001
@@ -303,6 +365,7 @@ def run_smoke(args: argparse.Namespace) -> int:
     print("tls_handshake: passed")
     print("bearer_unauthenticated_401: passed")
     print("bearer_authorized_backend_response: passed")
+    print("rust_verified_tls_transport: passed")
     print("loopback_only: passed")
     print("container_hardening: passed")
     print("log_redaction: passed")

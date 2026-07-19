@@ -5,10 +5,10 @@
 ## 当前决策
 
 - 产品同步的状态与执行真相源固定在 Rust；Flutter、平台壳和 Go server 不复制编排、合并、cursor 或密钥策略。
-- `apple-secure-enclave-p256-v1` 的 unsupported 真实环境当前不可得，仍作为生产 backend 资格和 M3 退出阻塞项；不得在支持 Secure Enclave 的设备上模拟该证据。
-- 该外部证据不再阻塞关闭产品入口、只使用合成 P2 数据和测试 backend 的 Rust 编排设计与实现。
-- 在 unsupported、backend 资格、Rust 编排、两个真实客户端、设备生命周期和发布级部署证据全部闭环前，`product_qualified` 与 `user_sync_enabled` 不因本地编排进展自动改变，Manager 不增加真实同步成功入口。
-- 关闭态 `sync_once`、稳定 discovery cursor、持久化 journal/outbox、默认关闭的通用 crypto processor/provider、可信 lifecycle/wrapped material 产品装载与 signed epoch distribution remote 边界已经落地；剩余缺口是恢复链、平台 backend 资格、发布部署和真实设备全流程。
+- `apple-secure-enclave-p256-v1` 已按一个受支持 macOS 设备的真实 signing/key-agreement 主路径完成产品资格评审；无 Secure Enclave 环境的 unsupported 改为延期兼容性补测，不得在支持设备上模拟。
+- backend `product_qualified` 只表达已评审的平台私钥能力，不自动开放用户同步。
+- 在 Rust 编排、两个真实客户端、设备生命周期和产品入口边界全部闭环前，`user_sync_enabled` 保持关闭；发布级正式域名/证书/目标部署证据按产品决策后移到首版发布后。
+- 关闭态 `sync_once`、稳定 discovery cursor、持久化 journal/outbox、默认关闭的通用 crypto processor/provider、可信 lifecycle/wrapped material 产品装载、signed epoch distribution remote 边界和严格 HTTPS transport 已经落地；恢复链、macOS backend 主路径、本地部署与双客户端证据也已闭合。剩余产品缺口是受控 Manager 资格执行链与真实用户入口退出评审。
 
 ## 职责与依赖方向
 
@@ -219,7 +219,7 @@ Preflight 只能返回计数、状态和阻塞原因，不返回明文 P2、P1 �
 ## 停止线
 
 - 本文允许的是关闭产品入口的 Rust/Go 本地实现与合成集成验证，不是用户可用同步授权。
-- unsupported 环境缺失不允许改写 `product_qualified`；本地 orchestration 测试通过也不允许改写 `user_sync_enabled`。
-- 生产 provider 与 backend 资格稳定前不增加 FFI/Dart 执行命令，也不接真实产品签名路径。
-- 不实现 plaintext HTTP/CLI/FFI 上传，不持久化解密 payload，不把 token 或 key material 放入 manager settings。
+- unsupported 环境证据只允许在真实不支持目标上补测；缺失不会降级已由支持设备主路径评审的 `product_qualified`，也不允许在当前设备伪造。本地 orchestration 测试通过仍不允许改写 `user_sync_enabled`。
+- 只允许新增 localhost、合成 P2、单次调用内存参数的窄资格命令；普通用户成功入口、真实设备配对和后台自动同步继续缺席。
+- 不实现 plaintext HTTP/CLI/FFI 上传，不持久化解密 payload，不把 token、附加 CA 或 key material 放入 manager settings。
 - 不在本批实现恢复码 UI、设备加入/授权/撤销 UI、真实 key epoch 轮换入口、M4 发布包或第二平台。

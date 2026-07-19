@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前已落地 Rust 同步对象边界模型、remote client DTO / transport trait、std-only `http://` `HttpSyncRemoteTransport`、可选 bearer access token header、Rust 侧两客户端同步边界测试和 Go server 两客户端真实 HTTP 同步测试，不生成明文上传文件，也不启动或保留长期运行服务。`ime-sync` 的作用是把 `sync preflight` 已验证的本地分类边界转成可测试的 Rust API，并让上传草案元数据从 `ime-crypto` envelope 派生，避免同步层和加密层字段语义漂移；当前 remote client 上传入口只接收已加密 `AssembledSyncObject` 与 `SignedSyncObjectManifest`，不接受 plaintext payload。未来若从 shared token 演进到 OIDC bearer token，也只能改变传输层访问凭证，不改变 payload、envelope、object hash、设备签名或客户端解密合并边界；OIDC 规划见 `docs/sync-server-oidc-roadmap.md`。`ime-userdb` 当前提供 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 `SyncEnvelopeAssembler` 完成本地 envelope 加密、解密和 sync draft 派生验证；解密后的 userdb P2 JSON 已能解析为 `ClientSyncMergeInput` 所需记录，并可把被合并模型接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite；`crates/ime-userdb/tests/two_client_sync.rs` 已覆盖设备 A 加密上传到远端 harness、设备 B 下载二进制密文、解密、合并写回 SQLite、stale conflict latest metadata 和基于 base version 重新组装 v2 上传；`crates/ime-userdb/tests/two_client_go_http_sync.rs` 已通过短生命周期 Go sync server 验证设备 B 授权、三类 P2 对象真实 HTTP 上传 / 下载 / 解密 / 写回、stale conflict 和 v2 重新上传：
+当前已落地 Rust 同步对象边界模型、remote client DTO / transport trait、支持 `http://` 与严格 rustls `https://` 的 `HttpSyncRemoteTransport`、可选 bearer access token header、Rust 侧两客户端同步边界测试和 Go server 两客户端真实 HTTP/本地 HTTPS 同步测试，不生成明文上传文件，也不启动或保留长期运行服务。`ime-sync` 的作用是把 `sync preflight` 已验证的本地分类边界转成可测试的 Rust API，并让上传草案元数据从 `ime-crypto` envelope 派生，避免同步层和加密层字段语义漂移；当前 remote client 上传入口只接收已加密 `AssembledSyncObject` 与 `SignedSyncObjectManifest`，不接受 plaintext payload。未来若从 shared token 演进到 OIDC bearer token，也只能改变传输层访问凭证，不改变 payload、envelope、object hash、设备签名或客户端解密合并边界；OIDC 规划见 `docs/sync-server-oidc-roadmap.md`。`ime-userdb` 当前提供 Rust 内部 P2 plaintext payload 只读迭代器，并已通过 `SyncEnvelopeAssembler` 完成本地 envelope 加密、解密和 sync draft 派生验证；解密后的 userdb P2 JSON 已能解析为 `ClientSyncMergeInput` 所需记录，并可把被合并模型接受的 user terms、deleted tombstones 和 ranker weights 写回本地 SQLite；`crates/ime-userdb/tests/two_client_sync.rs` 已覆盖设备 A 加密上传到远端 harness、设备 B 下载二进制密文、解密、合并写回 SQLite、stale conflict latest metadata 和基于 base version 重新组装 v2 上传；`crates/ime-userdb/tests/two_client_go_http_sync.rs` 已通过短生命周期 Go sync server 验证设备 B 授权、三类 P2 对象真实 HTTP 上传 / 下载 / 解密 / 写回、stale conflict 和 v2 重新上传：
 
 - P2 数据可以进入后续端到端加密对象。
 - P1 明细事件默认只能留在本地。
@@ -184,7 +184,7 @@ updated_at_ms
 
 ## 远端对象客户端边界
 
-`ime-sync` 的 remote client 只负责把本地已经组装完成的加密对象映射到 Go sync server API。它不是明文 payload 生成器，不决定部署网络拓扑，也不直接启动或管理 Go server。当前 `HttpSyncRemoteTransport` 是 std-only `http://` transport 实现，用于短生命周期测试、受控自部署 upstream 和跨语言验证；生产外部 TLS、反向代理和访问 token 配置仍由部署层负责。
+`ime-sync` 的 remote client 只负责把本地已经组装完成的加密对象映射到 Go sync server API。它不是明文 payload 生成器，不决定部署网络拓扑，也不直接启动或管理 Go server。当前 `HttpSyncRemoteTransport` 支持 `http://` 与 rustls `https://`，用于短生命周期测试、受控自部署 upstream 和跨语言验证；HTTPS 默认使用 Mozilla root 并严格验证主机名，本地门禁可加入进程内 DER trust anchor，但没有 insecure bypass。生产外部 TLS、反向代理和访问 token 配置仍由部署层负责。
 
 核心类型：
 
@@ -280,7 +280,7 @@ object_payload(domain_id, object_id, version)
 - 稳定 change cursor discovery、local repository port、transaction-scoped apply + cursor、持久化 journal/outbox 与产品 `sync_once` orchestration。
 - `settings.profile`、`settings.schema` 和 `backup.snapshot` plaintext payload 字段序列化。
 - 生产恢复 UI / API、远端密钥轮换执行器、备份快照 payload 字段序列化和用户可用同步设置。
-- 真实平台私钥存储 backend 的最终产品资格；普通 DPK P-256 运行时已验证但因 `exportable=true` 被拒绝。独立 `apple-secure-enclave-p256-v1` 已取得 qualification lifecycle、不可导出、hardware-backed、ad-hoc denied 与真实设备锁屏 locked 证据，当前只缺真实不支持 Secure Enclave 环境的 unsupported 与随后逐字段资格评审；`apple-keychain-v1` 和已测 Android AVD 的 Ed25519 阻塞也仍未解除。
+- 真实平台私钥存储 backend 的资格已按一个受支持 macOS 设备主路径评审完成；普通 DPK P-256 仍因 `exportable=true` 被拒绝。独立 `apple-secure-enclave-p256-v1` 已取得 qualification lifecycle、不可导出、hardware-backed、ad-hoc denied、真实设备锁屏 locked 与 cleanup 证据；真实不支持 Secure Enclave 环境的 unsupported 延期补测。`apple-keychain-v1` 和已测 Android AVD 的 Ed25519 阻塞不影响当前 P-256 profile 结论。
 
 ## 验证口径
 
@@ -305,7 +305,7 @@ cargo test -p radishlex-ime-cli
 - userdb P2 payload 本地加密装配测试必须通过 `SyncEnvelopeAssembler` 验证 envelope 可解密回原 bytes，`EncryptedSyncObjectDraft` 只保留密文长度和 ciphertext hash 等元数据，不携带 plaintext bytes。
 - remote client 上传请求必须只由 `AssembledSyncObject` 和 `SignedSyncObjectManifest` 生成，不能接受 plaintext payload、P1 event 或 ranker 明细字段；JSON byte 字段必须保持 Go 兼容 base64。
 - remote client 必须拒绝 manifest 与 encrypted object metadata 不一致的上传请求，必须把 stale base version 映射为 latest metadata，且错误 / Debug 输出不得泄漏请求体、signature、nonce 或 payload bytes。
-- `HttpSyncRemoteTransport` 必须只支持不含凭据、query 和 fragment 的 `http://` base URL，必须传递 JSON request 和 binary payload response，必须拒绝请求 path 中的 query / fragment；访问启用 Go access token 的 server 时只能通过受控 bearer header 配置，不得把 token 放进 URL、日志或 Debug，且 transport 错误不得包含请求体、payload、nonce、signature、token 或 plaintext payload。
+- `HttpSyncRemoteTransport` 只支持不含凭据、query 和 fragment 的 `http://` / `https://` base URL，必须传递 JSON request 和 binary payload response，必须拒绝请求 path 中的 query / fragment。HTTPS 必须验证证书链与主机名，附加 DER root 只存在于 transport 内存且不得提供 insecure bypass；访问启用 Go access token 的 server 时只能通过受控 bearer header 配置，不得把 token 放进 URL、日志或 Debug，且 transport 错误不得包含请求体、payload、nonce、signature、token、证书 bytes 或 plaintext payload。
 - 设备生命周期模型必须验证 pending / active / revoked 状态转移，授权设备和接收设备都必须 active，撤销记录必须推进 `key_epoch`，对象版本必须能识别 stale base version。
 - 设备签名 metadata 必须显式携带 profile id；Rust/Go 共享 vectors 必须覆盖两个 profile 正向签名及算法不一致、错误公钥、canonical 篡改、非法编码、签名不匹配和 revoked key，不能在失败时尝试另一 verifier。
 - 客户端合并模型必须验证 `dictionary.deleted_terms` tombstone 能压过旧 `dictionary.user_terms` 和旧 `ranker.weights`，旧 epoch 上传不能靠更晚本机时间复活删除词；本地显式恢复必须晚于 tombstone，且恢复前的旧词条、权重和 tombstone 不随词条恢复一起复活。schema v1 的 `manual_add` 不得通过测试伪装为远端恢复。

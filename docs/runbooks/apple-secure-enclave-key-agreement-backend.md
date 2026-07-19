@@ -12,7 +12,7 @@
 - 在受限 host 下验证 denied，在设备锁定态验证 locked，或在不支持 Secure Enclave 的环境验证 unsupported；
 - 改变 Keychain、锁屏、entitlement、签名身份或其他系统状态。
 
-在独立实机证据完成前，`runtime_qualified/product_qualified/user_sync_enabled` 必须保持 `false`；不能继承签名 backend 的 lifecycle、hardware-backed 或错误矩阵结论。
+在独立实机证据完成前，`runtime_qualified/product_qualified` 必须保持 `false`；不能继承签名 backend 的 lifecycle、hardware-backed 或错误矩阵结论。当前受支持 macOS 主路径证据已经完成，因此两项资格为 `true`；`user_sync_enabled` 仍独立保持 `false`。
 
 ## 稳定配置
 
@@ -78,7 +78,7 @@ lifecycle 的通过条件是 `created/reloaded/public_key_matched/shared_secret_
 ## 资格结论
 
 - `compiled` 只说明目标包含 backend。
-- `runtime_qualified` 需要 lifecycle、denied、locked、cleanup 和 unsupported 的独立真实环境证据。
+- `runtime_qualified` 需要受支持设备上的 lifecycle、denied、locked 和 cleanup 独立真实证据；unsupported 无环境时允许延期补测。
 - `hardware_backed` 只有 Secure Enclave token 配置与独立 ECDH 实机证据共同成立后才可评审；不得从名称或签名证据推导。
 - `exportable/user_presence_required/backup_migratable` 当前固定为 false；任何变化都需要新 schema、设计评审和实机证据。
 - `product_qualified` 还要求 wrapped epoch 往返、错误矩阵、日志脱敏和清理审计全部通过。
@@ -92,4 +92,4 @@ lifecycle 的通过条件是 `created/reloaded/public_key_matched/shared_secret_
 
 冻结 hash：`Info.plist=780d2ecb...451ce2`、主程序 `d80e3ff2...b4b5b`、FFI dylib `ddea6306...d5fe`、profile `e816e592...922b`。完整值记录于本周周志。
 
-锁屏链结束后，受限执行环境内的只读命令一度返回 `CSSMERR_TP_NOT_TRUSTED`、Authority unavailable 和 `0 valid identities`。真实登录会话中复验同一未改写产物，`security find-identity` 返回 `1 matching/1 valid identity`，`codesign --verify --deep --strict` 验证 app、嵌套 framework 与 FFI dylib 全部通过，四项冻结 SHA-256 均未变化。该现象已确定为执行隔离造成的信任评估假象，不要求重签、重建证书或修改 Keychain；以后资格验签若在沙盒内失败，必须先在获准的真实登录会话只读复验。本机仍缺真实 unsupported 环境，`runtime_qualified/product_qualified/user_sync_enabled` 保持 false。
+锁屏链结束后，受限执行环境内的只读命令一度返回 `CSSMERR_TP_NOT_TRUSTED`、Authority unavailable 和 `0 valid identities`。真实登录会话中复验同一未改写产物，`security find-identity` 返回 `1 matching/1 valid identity`，`codesign --verify --deep --strict` 验证 app、嵌套 framework 与 FFI dylib 全部通过，四项冻结 SHA-256 均未变化。该现象已确定为执行隔离造成的信任评估假象，不要求重签、重建证书或修改 Keychain；以后资格验签若在沙盒内失败，必须先在获准的真实登录会话只读复验。按受支持 macOS 单设备主路径口径，`runtime_qualified/hardware_backed/product_qualified=true`；unsupported 延期补测，`user_sync_enabled=false`。

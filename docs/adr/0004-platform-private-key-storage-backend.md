@@ -110,7 +110,7 @@ DevicePrivateKeyStore
 - Rust core 不直接调用 Objective-C / Swift API。
 - 平台 bridge 只把签名结果、公钥和 handle metadata 传回 Rust。
 - Secure Enclave、user presence 和备份迁移是独立能力，不能从普通 Keychain/DPK 生命周期推导；未取得对应产品证据前不得在文档或 UI 中承诺。
-- Secure Enclave 路径由 ADR 0007 固定为独立 backend：使用 token id、private-key-usage access control 和独立 tag；qualification lifecycle、不可导出、hardware-backed、ad-hoc denied 与真实设备锁屏 locked 已有证据，产品资格仍等待真实 unsupported 环境和逐字段评审。
+- Secure Enclave 路径由 ADR 0007 固定为独立 backend：使用 token id、private-key-usage access control 和独立 tag；qualification lifecycle、不可导出、hardware-backed、ad-hoc denied、真实设备锁屏 locked 与 cleanup 已有证据，并按受支持 macOS 主路径完成逐字段产品资格评审；unsupported 延期补测。
 
 本次 storage domain 修正发生在真实用户同步关闭且既有 smoke key 已删除的阶段，不存在生产设备 key 迁移。未来若已有用户设备 key，storage domain、application identifier 或 access group 变化必须使用新 backend/version 或专门迁移 ADR，不能静默把 missing 当作新建身份。
 
@@ -220,7 +220,7 @@ DevicePrivateKeyStore
 7. 已补 `android-keystore-v1` 平台 runbook、`android-keystore` feature、不可用状态门禁、Rust bridge wrapper、bridge contract、raw JNI glue、合成 bridge 单测、ignored smoke 入口、仓库内 Kotlin / Gradle harness、`@JvmStatic` facade、gated instrumented smoke、provider diagnostics、smoke 记录模板和设备矩阵记录，固定 Android Keystore Ed25519 创建 / 加载 / 签名 / 删除、锁屏 / 权限、备份迁移、IME 生命周期和日志脱敏验证边界；Android target build 已通过 `./scripts/check-android-target.sh` 复验 `radishlex-ime-crypto --features android-keystore --target aarch64-linux-android`；Android Gradle harness 已在 Pixel 9 Pro API 35 AVD 上执行真实 smoke 和 provider diagnostics，并在 Pixel 10 Pro API 37 AVD 上执行 provider diagnostics，结果均为 `unsupported_signature_algorithm`，不解除生产签名门禁。
 8. 已补平台私钥 backend 策略，固定无新增设备时不把真机矩阵作为硬阻塞，并明确保留 `ed25519-v1`、禁止现有 backend 内 fallback、生产 backend 合格条件和可选后续 ADR 路径。
 9. 已补 ADR 0006、算法无关 Rust/Go verifier、共享 vectors、历史 Go metadata migration 与独立 `apple-keychain-p256-v1`；修正后的 DPK manager 产品生命周期通过，运行时字段开放。普通软件 DPK key 因 `exportable=true` 被生产门禁拒绝。
-10. 已补 ADR 0007、独立 `apple-secure-enclave-p256-v1`、Rust/FFI/manager native gated smoke 与自动产品构建门禁；qualification 产品进程已证明 lifecycle、不可导出、hardware-backed、ad-hoc denied 与真实设备锁屏 locked，当前等待真实 unsupported 环境和最终产品资格评审。
+10. 已补 ADR 0007、独立 `apple-secure-enclave-p256-v1`、Rust/FFI/manager native gated smoke 与自动产品构建门禁；qualification 产品进程已证明 lifecycle、不可导出、hardware-backed、ad-hoc denied、真实设备锁屏 locked 与 cleanup，受支持 macOS 主路径的最终产品资格已评审，unsupported 延期补测。
 11. 其他平台仍需先补 backend spike / runbook，再接具体平台 SDK。
 12. 平台 backend 通过后，再允许真实远端对象上传下载使用生产签名。
 13. 最后才把管理 UI 的设备与恢复页面接入生产 backend。

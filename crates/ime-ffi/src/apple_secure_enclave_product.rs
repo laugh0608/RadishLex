@@ -188,7 +188,7 @@ fn run_macos_product_smoke(
         || result.runtime_available != 1
         || result.can_create_signing_keys != 1
         || result.can_sign != 1
-        || result.product_qualified != 0
+        || result.product_qualified != 1
         || result.user_sync_enabled != 0
         || result.exportable != 0
         || result.hardware_backed != 1
@@ -736,14 +736,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn status_reports_evidenced_runtime_but_keeps_product_gate_closed() {
+    fn status_reports_reviewed_backend_but_keeps_user_sync_closed() {
         let status = current_status();
         let apple_runtime = u32::from(cfg!(all(feature = "apple-keychain", target_os = "macos")));
         assert_eq!(status.compiled, apple_runtime);
         assert_eq!(status.runtime_available, apple_runtime);
         assert_eq!(status.can_create_signing_keys, apple_runtime);
         assert_eq!(status.can_sign, apple_runtime);
-        assert_eq!(status.product_qualified, 0);
+        assert_eq!(status.product_qualified, apple_runtime);
         assert_eq!(status.user_sync_enabled, 0);
         assert_eq!(status.exportable, 0);
         assert_eq!(status.hardware_backed, apple_runtime);

@@ -7,7 +7,7 @@
 - 复核日期：2026-07-19（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前产品里程碑：M3 端到端加密同步 Beta
-- 当前产品主批次：独立 Secure Enclave key-agreement 资格 harness 已闭合；M3 剩余停止线是 macOS signing/key-agreement 外部资格
+- 当前产品主批次：macOS signing/key-agreement 产品资格已按单平台主路径闭合；下一批转入本地 HTTPS 下的 Manager 受控资格链
 - 已完成：M0 工程基础、M1 macOS 离线输入 Alpha、M2 本地个人化 MVP；R00、R01A、R02L、R01B、R06A 已退出
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；合成数据、短生命周期服务与受控集成测试可以继续
@@ -24,13 +24,13 @@ Go metadata schema v9 已落地 signed lifecycle、`profile-sha256-v1` 公钥绑
 
 A/B/C Go HTTP 已证明 B 撤销后仅 A/C 取得 epoch 2，历史/当前 epoch 可验签解封并在重启后恢复。恢复链覆盖 Argon2id possession proof、全新设备 profile、完整 active cohort 分发、单次使用、原子轮换/撤销、activation/revocation 线性化与日志脱敏。
 
-部署 hardening 与本地 HTTPS 子阶段已通过：Compose/Caddy internal TLS、bearer 负向响应、loopback-only、非 root/只读/cap drop、`0700/0600`、symlink 拒绝、冷备份/隔离恢复、日志脱敏和资源清理均有真实门禁。
+部署 hardening 与本地 HTTPS 子阶段已通过：Compose/Caddy internal TLS、bearer 负向响应、loopback-only、非 root/只读/cap drop、`0700/0600`、symlink 拒绝、冷备份/隔离恢复、日志脱敏和资源清理均有真实门禁。Rust `HttpSyncRemoteTransport` 现支持 rustls HTTPS、Mozilla root 与进程内附加本地 CA，严格校验证书链和主机名；真实门禁已用临时 Caddy CA 完成无 token `401`、有 token `404` 和退出资源清零，不提供 insecure bypass。
 
-Apple signing/key-agreement adapters 已接线。独立 key-agreement ABI、六场景调度与脱敏摘要已落地。ad-hoc denied 返回 missing-entitlement `-34018`；Team/profile 资格 bundle 下 lifecycle 完成 fresh public key、ECDH、wrapped epoch 往返、删除与 missing，设备锁定态返回 `PrivateKeyLocked/-25308`，解锁 cleanup 零残留。普通 DPK 可导出而被拒；两条 Secure Enclave backend 的 unsupported 和最终产品资格仍缺外部证据。
+Apple signing/key-agreement adapters 已接线。独立 key-agreement ABI、六场景调度与脱敏摘要已落地。ad-hoc denied 返回 missing-entitlement `-34018`；Team/profile 资格 bundle 下 lifecycle 完成 fresh public key、ECDH、wrapped epoch 往返、删除与 missing，设备锁定态返回 `PrivateKeyLocked/-25308`，解锁 cleanup 零残留。普通 DPK 可导出而被拒；两条 Secure Enclave backend 已按一个受支持 macOS 设备的真实主路径评审为 product qualified，unsupported 保留为延期兼容性补测。
 
-Manager ABI v6 的 `radishlex_manager_sync_product_status` 只读固定数值 capability，不访问系统 key item。默认构建显示 signing 未编译，macOS 产品构建显示 Secure Enclave signing 产品资格待完成；畸形或自称开启同步的 native 状态降级为 `native_sync_product_status_invalid`。gate 始终 blocked，底层 Apple validation 不直接进入 Dart，也没有新增同步命令。
+Manager ABI v6 的 `radishlex_manager_sync_product_status` 只读固定数值 capability，不访问系统 key item。默认构建显示 signing 未编译，macOS 产品构建显示 signing/key-agreement 与组合 backend 已获产品资格，但 blocker 固定为 `user_sync_closed_current_phase`；畸形或自称开启同步的 native 状态降级为 `native_sync_product_status_invalid`。gate 始终 blocked，底层 Apple validation 不直接进入 Dart，也没有新增同步命令。
 
-当前 M3 阻塞项只剩生产 backend 外部资格。开发者没有真实 unsupported 环境；现有支持设备不得模拟该证据。锁屏链结束后，受限执行环境一度把同产物误报为 `CSSMERR_TP_NOT_TRUSTED`/`0 valid identities`；真实登录会话的只读复核稳定返回 `1 matching/1 valid identity`，同一冻结 hash bundle 通过 `codesign --verify --deep --strict`，因此不是 Keychain、证书或产物故障。正式域名、公开证书和目标生产演练按产品决策后移到首版发布后；`product_qualified/user_sync_enabled` 继续关闭。
+平台 backend 外部资格已不再阻塞当前开发。开发者没有真实 unsupported 环境，现有支持设备不得模拟该证据；有合适目标时再按保留 harness 补测。锁屏链结束后的受限环境 trust 假象已由真实登录会话复核排除，同一冻结 hash bundle 严格验签通过。正式域名、公开证书和目标生产演练按产品决策后移到首版发布后；当前 `product_qualified=true`、`user_sync_enabled=false`。
 
 ## 当前停止线
 
@@ -43,9 +43,10 @@ Manager ABI v6 的 `radishlex_manager_sync_product_status` 只读固定数值 ca
 
 ## 下一步顺位
 
-1. 在真实不支持 Secure Enclave 的环境可得时，分别执行 signing/key-agreement unsupported；当前设备不得模拟或改 capability 代替。
-2. 两条资格都通过后才重新审阅 `product_qualified`；在此之前不增加恢复、授权、撤销、轮换或上传成功入口，`user_sync_enabled=false`。
-3. 首个正式版本发布后、准备启用真实生产同步前，再在实际目标环境生成并校验 `deployment_evidence.v1`，复验正式域名/证书、固定镜像、权限、冷备份/恢复、升级回滚和日志脱敏。
+1. 下一顺位是在已验证的 Rust HTTPS transport 上设计、实现 Manager 的受控资格执行链；只允许 localhost、合成 P2 与单次内存参数，Rust orchestration 继续是真相源，命令不得持久化 token、recovery code、master key、wrapped material 或 payload bytes。
+2. 在资格链通过并完成单次调用所有权、取消/重启、错误脱敏与无真实数据门禁前，普通用户成功入口和 `user_sync_enabled` 保持关闭。
+3. 在真实不支持 Secure Enclave 的环境可得时补测 signing/key-agreement unsupported；当前设备不得模拟，补测不阻塞上述开发。
+4. 首个正式版本发布后、准备启用真实生产同步前，再在实际目标环境生成并校验 `deployment_evidence.v1`，复验正式域名/证书、固定镜像、权限、冷备份/恢复、升级回滚和日志脱敏。
 
 ## 验证入口
 

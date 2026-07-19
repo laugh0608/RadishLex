@@ -10,11 +10,11 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 - `unavailable` 是默认失败 backend，不允许静默回退。
 - `apple-keychain-v1` 已接线并运行真实 smoke，但阻塞于 `UnsupportedSignatureAlgorithm { algorithm: "ed25519-v1" }`。
 - `apple-keychain-p256-v1` 已接入 manager Release native library 并完成 DPK 产品生命周期。普通 DPK 软件 P-256 key 可由平台 API 导出，当前如实声明 `exportable=true`；运行时可创建、重载和签名，但不符合生产 backend 的不可导出条件，`product_qualified=false`。
-- `apple-secure-enclave-p256-v1` 已完成独立 repository、FFI、manager native、qualification lifecycle、ad-hoc denied 与真实设备锁屏 locked；实测支持 runtime、不可导出和 hardware-backed，产品资格仍等待 unsupported。
+- `apple-secure-enclave-p256-v1` 已完成独立 repository、FFI、manager native、qualification lifecycle、ad-hoc denied 与真实设备锁屏 locked；实测支持 runtime、不可导出和 hardware-backed，并按一个受支持 macOS 设备的真实主路径完成产品资格评审。
 - `android-keystore-v1` 已有 Kotlin / Gradle harness、JNI glue、gated smoke 和 provider diagnostics；Pixel 9 Pro API 35 AVD 与 Pixel 10 Pro API 37 AVD 均返回 `unsupported_signature_algorithm`。
 - `windows-cng-v1`、`linux-secret-service-v1` 仍只是能力边界标识，未进入实现。
 
-没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。普通 DPK P-256 的评审结论是“软件运行时可用、生产资格拒绝”。独立 Secure Enclave P-256 已完成 lifecycle、denied 与真实设备锁屏 locked；开发者当前没有真实无 Secure Enclave 目标，unsupported 和产品资格评审作为外部环境阻塞继续保留。当前部署子阶段以本地 HTTPS 通过为准；发布级目标部署运行证据后移到首个正式版本发布后、启用真实生产同步前。该阻塞不降低任何资格字段，但也不再冻结关闭产品入口、只使用合成数据与测试 backend 的 Rust 产品编排开发。
+没有新的 Android 真机或不同系统镜像时，不应继续把“真机矩阵”作为当日硬阻塞。普通 DPK P-256 的评审结论是“软件运行时可用、生产资格拒绝”。独立 Secure Enclave P-256 已完成 lifecycle、denied、真实设备锁屏 locked 与 cleanup，按个人开发阶段“一类平台一条真实主路径”完成产品资格评审。开发者当前没有真实无 Secure Enclave 目标，unsupported 作为兼容性证据延期补测，不降低当前资格字段，也不得被伪造。当前部署子阶段以本地 HTTPS 通过为准；发布级目标部署运行证据后移到首个正式版本发布后、启用真实生产同步前。
 
 ## 策略目标
 
@@ -32,7 +32,7 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 | `unavailable` | 默认明确失败 | Rust capability / status / error 测试已覆盖 | 继续作为能力缺失时的失败路径 |
 | `apple-keychain-v1` | 生产不可用 | feature-gated backend 编译通过，真实 smoke 在 Ed25519 创建阶段失败 | 单独补 Apple 原生非导出 Ed25519 支持矩阵，或另起 backend / 算法 ADR |
 | `apple-keychain-p256-v1` | DPK 软件运行时可用，生产资格拒绝 | provisioning-backed manager 产品进程已完成创建、重载、签名、Rust/Go 验签、删除、missing 和 cleanup；capability 为 `exportable=true` | 保留为软件保护证据与失败关闭实现，不接真实同步；另建 Secure Enclave backend |
-| `apple-secure-enclave-p256-v1` | 产品 runtime、不可导出、hardware-backed、denied 与 locked 已取证，产品资格关闭 | qualification lifecycle、ad-hoc denied、设备锁屏 `locked/-25308` 与解锁 cleanup/missing 全部通过 | 在无 Secure Enclave 环境执行 unsupported，随后评审 product qualification；user presence/backup migration 继续独立关闭 |
+| `apple-secure-enclave-p256-v1` | 受支持 macOS 产品资格通过；user sync 关闭 | qualification lifecycle、不可导出、hardware-backed、ad-hoc denied、设备锁屏 `locked/-25308` 与解锁 cleanup/missing 全部通过 | 有合适环境时补 unsupported；user presence/backup migration 继续独立关闭 |
 | `android-keystore-v1` | 生产不可用 | Android target build、Gradle harness、API 35 / API 37 AVD diagnostics 和 smoke 记录 | 有新 Android 真机 / OEM / system image 时先跑 diagnostics，再按结果决定 smoke |
 | `windows-cng-v1` | 未实现 | 仅有 ADR 0004 backend id | 进入 Windows 主线前补 CNG 签名能力 spike / runbook |
 | `linux-secret-service-v1` | 未实现 | 仅有 ADR 0004 backend id | 进入 Linux 同步主线前补 Secret Service / 软件保护能力边界 |
@@ -164,8 +164,8 @@ M2 已于 2026-07-18 关闭，RadishLex 当前进入 M3。ADR 0006 已接受 `ec
 2. 已完成独立 `apple-keychain-p256-v1` repository spike 与双层门禁；普通测试不访问系统 Keychain。
 3. 已在独立授权后完成 ad-hoc denied 与 provisioning-backed manager 产品 DPK 生命周期；native 内完成创建、重载、签名、Rust/Go 验签、删除、missing、失败关闭、cleanup 和固定摘要。Dart 不绑定该 ABI，InputMethodKit 不接入同步密钥职责。
 4. 已完成普通 DPK capability 评审：P-256 key 标记 `exportable=true`，编译/运行时字段如实开放，`product_qualified` 与用户同步 gate 关闭；该基础签名成功没有被用于推导 Secure Enclave、hardware-backed、user presence 或 backup migration。后续独立 Secure Enclave 产品生命周期仅按自身证据开放 `hardware_backed`。
-5. 已补 Secure Enclave 独立 backend ADR/runbook，并沿 crypto、FFI、manager native 完成 repository 接线、qualification lifecycle、capability 重冻结、ad-hoc denied 与真实设备锁屏 locked；不回退普通 DPK 或 test memory。下一证据是在无 Secure Enclave 环境执行 unsupported。
-6. 当前无真实 unsupported 目标，故将该证据记录为外部环境阻塞；关闭态 Rust sync orchestration 可以按独立边界使用测试 backend 与合成 P2 推进。只有 Rust service 稳定且不可导出 production backend 评审通过后，才进入真实产品签名路径与 `ManagerBridge` 命令；恢复码、设备授权、撤销和用户同步入口继续关闭到 M3 全部退出证据成立。
+5. 已补 Secure Enclave 独立 backend ADR/runbook，并沿 crypto、FFI、manager native 完成 repository 接线、qualification lifecycle、capability 重冻结、ad-hoc denied、真实设备锁屏 locked 与 cleanup；不回退普通 DPK 或 test memory。受支持 macOS 主路径的产品资格已通过。
+6. 当前无真实 unsupported 目标，故将该证据改为延期兼容性补测，不再作为外部硬阻塞。Rust service 已稳定，下一顺位可进入本地 HTTPS、合成 P2 和显式资格门控制约束的 `ManagerBridge` 执行链；恢复码、设备授权、撤销和普通用户同步入口继续关闭到 M3 全部退出证据成立。
 
 ## 验证口径
 

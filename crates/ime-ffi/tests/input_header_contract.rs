@@ -103,7 +103,10 @@ fn manager_sync_product_status_is_read_only_and_fails_closed() {
         RadishLexStatusCode::Ok
     );
     assert!(error.is_null());
-    assert_eq!(status.product_qualified, 0);
+    assert_eq!(
+        status.product_qualified,
+        cfg!(all(feature = "apple-keychain", target_os = "macos")) as u32
+    );
     assert_eq!(status.user_sync_enabled, 0);
     assert_ne!(status.blocker, RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_NONE);
 

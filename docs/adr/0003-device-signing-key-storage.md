@@ -237,7 +237,7 @@ revoked_at_ms
 
 - 生产 backend 不允许导出私钥 bytes。
 - 测试 backend 可以使用合成可导出 key，但必须标记为 `test-memory-v1`，不得进入生产配置。
-- 默认 workspace 的可执行 store 仍只有测试专用 `test-memory-v1` 和明确失败的 `unavailable`。显式 feature 下另有阻塞中的 Ed25519 `apple-keychain-v1`、运行时可用但 `exportable=true` 的普通 DPK `apple-keychain-p256-v1`、已取得 lifecycle/不可导出/hardware-backed/denied/locked 证据但仍待 unsupported 与产品资格评审的 `apple-secure-enclave-p256-v1`，以及 Android Keystore bridge；backend 之间不得 fallback。
+- 默认 workspace 的可执行 store 仍只有测试专用 `test-memory-v1` 和明确失败的 `unavailable`。显式 feature 下另有阻塞中的 Ed25519 `apple-keychain-v1`、运行时可用但 `exportable=true` 的普通 DPK `apple-keychain-p256-v1`、已按受支持 macOS 主路径取得 lifecycle/不可导出/hardware-backed/denied/locked/cleanup 与产品资格证据的 `apple-secure-enclave-p256-v1`，以及 Android Keystore bridge；unsupported 延期补测，backend 之间不得 fallback。
 - FFI 不导出生产签名 handle 内部指针、canonical bytes helper 或通用签名 API。Apple 产品 validation ABI 是受控例外，只返回固定 status/smoke 摘要，不向 Dart 或 Flutter 暴露 key/canonical/signature bytes，也不是同步业务 ABI。
 - CLI 不新增生产签名命令；测试命令若后续加入，必须只使用合成 fixture。
 

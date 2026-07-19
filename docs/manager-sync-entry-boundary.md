@@ -19,7 +19,7 @@ M3 允许一条不带入参、只读且不访问系统密钥条目的 `radishlex
 规则固定如下：
 
 - signing 状态可以复用不触发系统调用的 backend metadata；key-agreement 在未完成独立实机资格前只能报告 compiled，不能继承 signing backend 的运行时或 hardware-backed 证据。
-- `product_qualified` 只有 signing 与 key-agreement 两条独立资格同时成立时才可为 `1`；当前必须为 `0`。`user_sync_enabled` 还受阶段停止线约束，当前固定为 `0`。
+- `product_qualified` 只有 signing 与 key-agreement 两条独立资格同时成立时才可为 `1`；当前 macOS 产品构建为 `1`，默认/非 macOS 构建仍为 `0`。`user_sync_enabled` 还受阶段停止线约束，所有构建当前固定为 `0`。
 - blocker 按 signing 未编译、signing runtime 不可用、signing 未获产品资格、key-agreement 未编译、key-agreement 实机资格缺失、key-agreement 产品资格缺失、当前阶段仍关闭的顺序选择首项；`none` 只允许全部条件成立时出现。
 - C ABI 使用标准 `RadishLexStatusCode` 与受控 `error_out`；空输出指针返回 `InvalidArgument`。Dart 对未知 schema、enum、非 `0/1` flag 或自相矛盾组合必须降级为 `native_sync_product_status_invalid`、`backendId = unavailable`、`productionGate = blocked`，保持 Manager 其余本地管理能力可用。
 - Dart 只把 allowlist 后的 backend 与 blocker 映射为 `DeviceSecuritySummary`，不持久化原始结构；settings、readiness JSON、diagnostics 和 widget 继续只看到稳定状态码。
@@ -65,21 +65,21 @@ Manager 不可以：
 
 Apple P-256 产品进程 gated smoke 只由五个显式命令行场景之一与环境门触发：DPK 正常生命周期、预期 denied 创建、locked 前置、locked 签名探测、解锁后清理。正常生命周期和前置场景在 native 内使用 synthetic canonical/signature 并完成 Rust 验签；正常生命周期额外调用短生命周期 Go verifier。smoke schema v4 返回 Swift 的只有固定 scenario、result、error category/detail、数值 OSStatus 和布尔摘要，不含 CFError 文本。private key、public key、canonical bytes、signature bytes 不得进入 Dart、Flutter method channel、settings 或 diagnostics。普通 manager 启动不访问该 Keychain 路径；脚本不锁定、解锁或改写 Keychain 搜索列表；InputMethodKit 不参与同步密钥或签名。
 
-Secure Enclave P-256 使用独立环境门、native symbol 与六个显式场景，额外覆盖 unsupported create，并在正常生命周期内要求 private external representation 失败。它复用同一固定 26-word 脱敏摘要布局，但拥有独立 schema version；qualification lifecycle、ad-hoc denied 与真实设备锁屏 locked 已通过，当前运行时和 hardware-backed 字段开放，unsupported、产品资格与用户同步 gate 继续关闭。Dart、普通 manager 启动和 InputMethodKit 同样不接触该路径。
+Secure Enclave P-256 使用独立环境门、native symbol 与六个显式场景，额外保留 unsupported create，并在正常生命周期内要求 private external representation 失败。它复用同一固定 26-word 脱敏摘要布局，但拥有独立 schema version；qualification lifecycle、ad-hoc denied、真实设备锁屏 locked 与 cleanup 已通过，按受支持 macOS 主路径评审开放运行时、hardware-backed 与产品资格字段。unsupported 延期补测，用户同步 gate 继续关闭。Dart、普通 manager 启动和 InputMethodKit 同样不接触该路径。
 
-Secure Enclave key-agreement 再使用一组独立 status/smoke symbol、环境门和固定摘要。其 lifecycle 必须完成 fresh store 公钥一致、ECDH、合成 wrapped epoch 解封、精确删除和 fresh missing；denied、locked、cleanup、unsupported 均为独立场景。普通 Manager 只读取 metadata-only status，不能触发 smoke；在真实资格完成前只报告 compiled，runtime/hardware-backed/product/user-sync 均保持关闭。
+Secure Enclave key-agreement 再使用一组独立 status/smoke symbol、环境门和固定摘要。其 lifecycle 已完成 fresh store 公钥一致、ECDH、合成 wrapped epoch 解封、精确删除和 fresh missing，denied、locked 与 cleanup 也有独立实机证据；unsupported 场景保留并延期补测。普通 Manager 只读取 metadata-only status，不能触发 smoke；当前报告 runtime/hardware-backed/product qualified，但组合用户同步 gate 仍保持关闭。
 
 ## 产品停止线
 
-在 M3 的协议、安全和真实部署证据全部满足前：
+在 M3 的协议、安全和本地产品资格证据全部满足前：
 
 - `启用同步` 保持禁用。
 - 不新增恢复码生成 / 输入、join request、授权成功、撤销或轮换的可执行按钮。
-- 不新增 manager 同步命令 C ABI 或远端写入调用；上述 status-only ABI 不属于同步命令。
+- 下一批只允许新增 localhost、合成 P2、单次调用内存参数的受控资格命令 C ABI；普通用户远端写入、后台同步与真实设备流程仍不得新增。上述 status-only ABI 不属于同步命令。
 - 本地 Docker、localhost、fixture、readiness ready 和合成 smoke 只能用于开发验证，不能解锁产品入口。
 - 服务端继续被视为不可信，输入热路径不得依赖网络。
 
-关闭态 Rust orchestration 可以在 Manager 入口继续禁用时独立实现。只有该 service 稳定且生产 backend 资格另行通过后，才重新基于当时的 Rust sync / crypto API、服务端协议和平台密钥 backend 设计窄命令接口；不恢复本次归档的 review-only DTO 或审批目录。
+Rust orchestration、严格 HTTPS transport 与生产 backend 主路径资格已稳定，可以在 Manager 普通入口继续禁用时设计窄资格命令接口。该接口必须直接复用现有 Rust sync / crypto API、只接受 transient 参数并证明取消/重启/脱敏；不恢复已归档的 review-only DTO 或审批目录。
 
 ## 当前验证归属
 

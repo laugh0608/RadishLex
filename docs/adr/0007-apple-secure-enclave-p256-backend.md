@@ -61,14 +61,14 @@ backup_migratable = false
 
 `exportable=false` 是该 backend 的平台 API 设计约束；产品 qualification smoke 仍必须实际确认 private external representation 失败。`hardware_backed` 在真实产品进程创建、重载、签名和 token 评审完成前保持 false，不能仅根据代码包含 `kSecAttrTokenIDSecureEnclave` 改为 true。
 
-2026-07-18 同一 qualification bundle 的产品 lifecycle 已完成创建、重载、签名、Rust/Go 验签、private external representation 失败、删除、missing 和 cleanup；ad-hoc denied 与真实设备锁屏 locked/cleanup 也已通过。评审据此开放 `available/can_create_signing_keys/can_sign/hardware_backed=true`；`product_qualified/user_sync_enabled/user_presence_required/backup_migratable=false` 继续保持，直至 unsupported 和上层总门禁完成。
+2026-07-18 至 2026-07-19，同一 qualification bundle 的产品 lifecycle 已完成创建、重载、签名、Rust/Go 验签、private external representation 失败、删除、missing 和 cleanup；ad-hoc denied 与真实设备锁屏 locked/cleanup 也已通过。个人开发阶段采用“每个平台一条受支持设备真实主路径”的资格口径，评审据此开放 `available/can_create_signing_keys/can_sign/hardware_backed/product_qualified=true`；`user_sync_enabled/user_presence_required/backup_migratable=false` 继续保持。
 
 产品资格只能在同一冻结产品 bundle 中同时取得以下证据后评审：
 
 - 签名 identity、application identifier、Keychain access group、entitlement 与 provisioning profile 一致。
 - 创建、跨 store/进程重载同一 public key、签名、Rust/Go 验签、删除和 fresh missing 全部通过。
 - private external representation 明确失败，且验证路径不返回、打印或持久化 private bytes。
-- unsupported、denied、locked 与 cleanup 语义能够区分，失败时不回退其他 backend。
+- denied、locked 与 cleanup 语义能够区分，失败时不回退其他 backend；unsupported 实现必须失败关闭并保留 gated harness，但真实无 Secure Enclave 环境允许延期补测。
 - `backend_status()` 与实测字段一致，日志只有固定分类、数值 OSStatus 和布尔摘要。
 
 即使上述条件支持 `runtime_available/product_qualified/hardware_backed=true`，`user_sync_enabled` 仍由 M3 上层 orchestration、设备生命周期和部署总门禁控制，不能自动开放。
@@ -92,7 +92,7 @@ backup_migratable = false
 - 默认 `cargo test`、manager product check 和仓库门禁不得访问 Keychain 或 Secure Enclave。
 - feature 测试必须覆盖 backend/algorithm 绑定、evidenced runtime 与关闭的产品 gate、Debug 脱敏、DER/P1363、错误映射和无 fallback。
 - 实际 Secure Enclave/Keychain 访问、产品进程启动、系统锁定或权限变更必须分别获得授权。
-- 在资格证据完成前，不得把 `available`、`can_create_signing_keys`、`can_sign`、`product_qualified` 或 `hardware_backed` 改为 true。
+- 在受支持设备的资格证据完成前，不得把 `available`、`can_create_signing_keys`、`can_sign`、`product_qualified` 或 `hardware_backed` 改为 true；延期的 unsupported 兼容性补测不得被写成已通过。
 - 不把“当前 Mac 支持 Secure Enclave”扩写成所有 macOS、虚拟机、CI、Intel Mac 或 iOS extension 均支持。
 - 不开放真实同步、恢复码、设备授权/撤销 UI 或 Flutter 同步真相源。
 

@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-本批首先完成 repository implementation、自动测试和不启动产品的 Release build。此时只允许声明 feature target 编译可用；运行时、产品资格、hardware-backed、user presence 与 backup migration 字段保持关闭。
+repository implementation、自动测试、Release build 与受支持 macOS 产品资格链均已完成。当前允许声明运行时、hardware-backed 与产品资格；user sync、user presence 与 backup migration 继续独立关闭，unsupported 在合适环境可得时补测。
 
 任何以下动作都必须单独授权：
 
@@ -40,7 +40,7 @@ cargo test -p radishlex-ime-ffi --features apple-keychain
 要求：
 
 - Secure Enclave store status 在 macOS feature build 报告 `compiled/available/can_create/can_sign/hardware_backed=true`。
-- `product_qualified/user_sync_enabled=false`，不得由 lifecycle 成功自动开放。
+- `product_qualified=true` 只表达已经完成的受支持 macOS 主路径评审；`user_sync_enabled=false`，不得由 backend 资格自动开放。
 - `exportable=false`、`user_presence_required=false`、`backup_migratable=false`。
 - C header、Rust ABI、Swift struct 与 Objective-C/C layout contract 一致。
 - manager product dylib 包含独立 status/smoke symbol，Dart 目录中没有对应 binding。
@@ -98,7 +98,7 @@ private/public key bytes、canonical bytes、signature bytes、CFError 文本和
 
 经典 `security lock-keychain` 只锁定登录 Keychain，不等价于 Data Protection Keychain / Secure Enclave 的设备锁定态。2026-07-18 实测该状态下签名仍成功，返回 `expected_failure_not_observed`；该结果不算 locked 失败关闭证据，也不算 backend 故障。后续不得再以登录 Keychain 锁定替代手动锁屏。
 
-修正后的产品 probe 通过 20 秒倒计时配合开发者手动锁屏。实测签名返回 `PrivateKeyLocked`、OSStatus `-25308`，`fail_closed=1/expected_failure_confirmed=1`；解锁后的精确 cleanup 返回 `deleted=1/missing_confirmed=1/cleanup_required=0`。这组证据满足本机设备锁定态语义，但不替代 unsupported、user presence 或 backup migration 门禁。
+修正后的产品 probe 通过 20 秒倒计时配合开发者手动锁屏。实测签名返回 `PrivateKeyLocked`、OSStatus `-25308`，`fail_closed=1/expected_failure_confirmed=1`；解锁后的精确 cleanup 返回 `deleted=1/missing_confirmed=1/cleanup_required=0`。这组证据满足本机设备锁定态语义；unsupported 真实环境延期补测，user presence 与 backup migration 仍保持独立关闭。
 
 ## 资格字段评审
 
@@ -109,7 +109,7 @@ private/public key bytes、canonical bytes、signature bytes、CFError 文本和
 - `hardware_backed=true`：只有 token 配置、产品创建/签名与不可导出证据共同支持才可开启。
 - `user_presence_required`：本版本目标为 false；必须确认正常签名不出现额外认证交互。
 - `backup_migratable=false`：Secure Enclave key 设备绑定；迁移/恢复仍需独立实测，不能宣称备份可迁移。
-- `product_qualified`：上述产品证据、错误矩阵、cleanup、日志脱敏与评审都满足后才可开启。
+- `product_qualified`：受支持 macOS 设备的生命周期、不可导出、denied、locked、cleanup、日志脱敏与评审满足后可开启；unsupported 仍需在合适环境补测，但不是个人开发阶段硬门槛。
 - `user_sync_enabled`：继续为 false，直到 M3 orchestration、设备授权/恢复/撤销、key epoch 和部署证据全部满足。
 
 ## 清理与中止

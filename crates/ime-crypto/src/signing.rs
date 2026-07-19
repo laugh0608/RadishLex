@@ -542,12 +542,13 @@ impl DevicePrivateKeyStoreStatus {
         }
     }
 
-    pub fn apple_secure_enclave_p256_v1_runtime_available() -> Self {
+    pub fn apple_secure_enclave_p256_v1_product_qualified() -> Self {
         Self {
             compiled: true,
             available: true,
             can_create_signing_keys: true,
             can_sign: true,
+            product_qualified: true,
             ..Self::apple_secure_enclave_p256_v1()
         }
     }

@@ -65,8 +65,7 @@ Future<void> main(List<String> args) async {
     (productBackend == 'unavailable' &&
             productCapability == 'signing_backend_not_compiled') ||
         (productBackend == 'apple-secure-enclave-p256-v1' &&
-            productCapability ==
-                'signing_backend_product_qualification_required'),
+            productCapability == 'user_sync_closed_current_phase'),
     'native product status allowlist',
   );
   _expect(

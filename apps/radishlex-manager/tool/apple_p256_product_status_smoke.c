@@ -56,7 +56,7 @@ int main(void) {
   failed |= require_flag("secure_enclave.can_sign",
                          secure_enclave_status.can_sign, 1u);
   failed |= require_flag("secure_enclave.product_qualified",
-                         secure_enclave_status.product_qualified, 0u);
+                         secure_enclave_status.product_qualified, 1u);
   failed |= require_flag("secure_enclave.user_sync_enabled",
                          secure_enclave_status.user_sync_enabled, 0u);
   failed |= require_flag("secure_enclave.exportable",
@@ -83,15 +83,15 @@ int main(void) {
   failed |= require_flag("key_agreement.compiled",
                          key_agreement_status.compiled, 1u);
   failed |= require_flag("key_agreement.runtime_qualified",
-                         key_agreement_status.runtime_qualified, 0u);
+                         key_agreement_status.runtime_qualified, 1u);
   failed |= require_flag("key_agreement.product_qualified",
-                         key_agreement_status.product_qualified, 0u);
+                         key_agreement_status.product_qualified, 1u);
   failed |= require_flag("key_agreement.user_sync_enabled",
                          key_agreement_status.user_sync_enabled, 0u);
   failed |= require_flag("key_agreement.exportable",
                          key_agreement_status.exportable, 0u);
   failed |= require_flag("key_agreement.hardware_backed",
-                         key_agreement_status.hardware_backed, 0u);
+                         key_agreement_status.hardware_backed, 1u);
   failed |= require_flag("key_agreement.user_presence_required",
                          key_agreement_status.user_presence_required, 0u);
   failed |= require_flag("key_agreement.backup_migratable",

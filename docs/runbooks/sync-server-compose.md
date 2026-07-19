@@ -44,7 +44,7 @@ docker compose -f deploy/sync-server/docker-compose.local.yaml up --build -d
 https://localhost:7319
 ```
 
-本地 HTTPS 由 Caddy internal TLS 提供，因为 Go sync server 当前只实现 HTTP API。该 Caddy 入口只存在于本地 compose 文件中，不进入部署态 compose。Caddy internal TLS 证书默认不被宿主机信任；命令行 smoke 可使用 `curl -k`，浏览器或真实客户端验证如需无警告访问，应只在本机开发场景信任 Caddy 生成的本地 CA。
+本地 HTTPS 由 Caddy internal TLS 提供，因为 Go sync server 当前只实现 HTTP API。该 Caddy 入口只存在于本地 compose 文件中，不进入部署态 compose。Caddy internal TLS 证书默认不被宿主机信任；脚本中的 `curl -k` 只用于 gateway 启动探测，不能作为 Rust 客户端资格证据。门禁会从本次短生命周期 gateway 导出本地 CA、转换为临时 `0600` DER，并仅通过子进程环境路径交给 Rust transport；Rust 仍严格验证证书链与 `localhost` 主机名。DER、token、Compose project 和 volumes 在退出时清理，不安装或信任系统级 CA，也不写 Manager settings。
 
 本地服务启动后，可以用只读连接健康脚本输出非敏感摘要：
 

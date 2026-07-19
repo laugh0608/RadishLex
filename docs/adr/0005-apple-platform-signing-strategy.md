@@ -73,5 +73,5 @@ RadishLex 继续保留 `ed25519-v1` 作为 M3 设备签名协议，不因为 App
 
 代价：
 
-- Apple 平台仍没有完成最终资格评审的生产 signing backend：普通 DPK P-256 因可导出被拒绝，Secure Enclave P-256 已有运行时、不可导出、hardware-backed、denied 与 locked 证据但仍待 unsupported 和产品资格评审。
+- Apple 平台已有按受支持 macOS 主路径完成最终资格评审的 Secure Enclave P-256 signing backend；普通 DPK P-256 仍因可导出被拒绝。unsupported 作为兼容性证据延期补测，不开放 backend fallback。
 - 后续需要单独投入平台 spike，或明确接受新的软件保护 backend / 新签名算法 profile 的实现成本。

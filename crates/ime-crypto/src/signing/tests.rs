@@ -446,7 +446,7 @@ fn apple_keychain_p256_store_status_reports_software_dpk_runtime_without_product
 
 #[cfg(feature = "apple-keychain")]
 #[test]
-fn apple_secure_enclave_store_status_reports_evidenced_runtime_without_product_qualification() {
+fn apple_secure_enclave_store_status_reports_reviewed_product_qualification() {
     let store = AppleSecureEnclaveP256DeviceKeyStore::new();
     let status = store.backend_status();
     status.validate().expect("Secure Enclave store status");
@@ -458,23 +458,19 @@ fn apple_secure_enclave_store_status_reports_evidenced_runtime_without_product_q
     assert_eq!(status.available, cfg!(target_os = "macos"));
     assert_eq!(status.can_create_signing_keys, cfg!(target_os = "macos"));
     assert_eq!(status.can_sign, cfg!(target_os = "macos"));
-    assert!(!status.product_qualified);
+    assert_eq!(status.product_qualified, cfg!(target_os = "macos"));
     assert!(!status.capabilities.exportable);
     assert!(status.capabilities.hardware_backed);
     assert!(!status.capabilities.user_presence_required);
     assert!(!status.capabilities.backup_migratable);
-    let error = status
-        .ensure_production_signing_allowed()
-        .expect_err("runtime evidence does not replace product qualification");
     if cfg!(target_os = "macos") {
-        assert_eq!(
-            error,
-            CryptoError::BackendCapabilityMismatch {
-                backend: DEVICE_KEY_STORE_APPLE_SECURE_ENCLAVE_P256_V1.to_owned(),
-                message: "backend has runtime capability but is not product-qualified".to_owned(),
-            }
-        );
+        status
+            .ensure_production_signing_allowed()
+            .expect("reviewed Secure Enclave backend supports production signing");
     } else {
+        let error = status
+            .ensure_production_signing_allowed()
+            .expect_err("non-macOS target remains unavailable");
         assert_eq!(
             error,
             CryptoError::StorageBackendUnavailable {

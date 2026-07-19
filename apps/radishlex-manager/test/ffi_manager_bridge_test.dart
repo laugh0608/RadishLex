@@ -72,7 +72,7 @@ void main() {
       expect(snapshot.sync.device.backendId, 'apple-secure-enclave-p256-v1');
       expect(
         snapshot.sync.device.capabilityStatus,
-        'signing_backend_product_qualification_required',
+        'user_sync_closed_current_phase',
       );
       expect(snapshot.sync.device.productionGate, 'blocked');
       expect(snapshot.explanations.single.signals, contains('user=2.000'));
@@ -95,9 +95,7 @@ void main() {
       expect(text, contains('device.backend: apple-secure-enclave-p256-v1'));
       expect(
         text,
-        contains(
-          'device.capability: signing_backend_product_qualification_required',
-        ),
+        contains('device.capability: user_sync_closed_current_phase'),
       );
       expect(text, contains('device.production_gate: blocked'));
       expect(text, contains('sync.local_evidence_source: not_recorded'));
@@ -138,10 +136,7 @@ void main() {
     );
 
     expect(device.backendId, 'apple-secure-enclave-p256-v1');
-    expect(
-      device.capabilityStatus,
-      'signing_backend_product_qualification_required',
-    );
+    expect(device.capabilityStatus, 'user_sync_closed_current_phase');
     expect(device.productionGate, 'blocked');
   });
 
@@ -150,7 +145,7 @@ void main() {
       _nativeSyncProductStatus(version: 2),
       _nativeSyncProductStatus(signingCompiled: 2),
       _nativeSyncProductStatus(blocker: 5),
-      _nativeSyncProductStatus(productQualified: 1),
+      _nativeSyncProductStatus(productQualified: 0),
       _nativeSyncProductStatus(
         signingProductQualified: 1,
         signingBackupMigratable: 1,
@@ -728,14 +723,14 @@ NativeSyncProductStatus _nativeSyncProductStatus({
   int signingHardwareBacked = 1,
   int signingUserPresenceRequired = 0,
   int signingBackupMigratable = 0,
-  int signingProductQualified = 0,
+  int signingProductQualified = 1,
   int keyAgreementBackend = 1,
   int keyAgreementCompiled = 1,
-  int keyAgreementRuntimeQualified = 0,
-  int keyAgreementProductQualified = 0,
-  int productQualified = 0,
+  int keyAgreementRuntimeQualified = 1,
+  int keyAgreementProductQualified = 1,
+  int productQualified = 1,
   int userSyncEnabled = 0,
-  int blocker = 3,
+  int blocker = 7,
 }) {
   return NativeSyncProductStatus(
     version: version,
