@@ -134,7 +134,7 @@ func TestApplyBackfillsHistoricalDeviceAlgorithmsAndIsIdempotent(t *testing.T) {
 	if err := db.QueryRow("PRAGMA user_version").Scan(&schemaVersion); err != nil {
 		t.Fatalf("read schema version: %v", err)
 	}
-	if schemaVersion != 5 {
+	if schemaVersion != 6 {
 		t.Fatalf("unexpected schema version: %d", schemaVersion)
 	}
 	var wrappingRecipientKeyID string
@@ -146,6 +146,21 @@ func TestApplyBackfillsHistoricalDeviceAlgorithmsAndIsIdempotent(t *testing.T) {
 	}
 	if wrappingRecipientKeyID != "agreement-key-history" {
 		t.Fatalf("unexpected migrated wrapping recipient key id: %q", wrappingRecipientKeyID)
+	}
+	var signatureRecordType string
+	var signatureSchemaVersion int
+	var signatureAlgorithm string
+	var signatureKeyID string
+	if err := db.QueryRow(`
+		SELECT signature_record_type, signature_schema_version, signature_algorithm, signature_key_id
+		FROM device_wrapping_records
+		WHERE domain_id = 'domain-history' AND recipient_device_id = 'device-history'
+	`).Scan(&signatureRecordType, &signatureSchemaVersion, &signatureAlgorithm, &signatureKeyID); err != nil {
+		t.Fatalf("read migrated wrapping signature metadata: %v", err)
+	}
+	if signatureRecordType != "device_authorization" || signatureSchemaVersion != 1 ||
+		signatureAlgorithm != "ed25519-v1" || signatureKeyID != "signing-key-history" {
+		t.Fatalf("unexpected migrated wrapping signature metadata: %q/%d/%q/%q", signatureRecordType, signatureSchemaVersion, signatureAlgorithm, signatureKeyID)
 	}
 	var lifecycleCount int
 	if err := db.QueryRow("SELECT COUNT(*) FROM domain_lifecycle_events WHERE domain_id = 'domain-history'").Scan(&lifecycleCount); err != nil {

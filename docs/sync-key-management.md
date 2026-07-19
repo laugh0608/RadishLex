@@ -114,6 +114,16 @@ created_at_ms
 
 远端响应先进入 userdb 的密文 cache transaction，再由产品材料 store 在后续 Rust cycle snapshot 中解封。重复取得相同 locator + 相同 bytes 幂等；相同 locator 出现不同 metadata/hash/bytes 视为 fork/tamper 并回滚，不能覆盖旧缓存。网络 I/O 不得发生在 SQLite transaction 内。
 
+### Signed epoch distribution
+
+撤销推进 `current_key_epoch` 后，新 epoch 不得复用 `device_authorization` 或直接写 wrapping storage。独立分发记录使用 `epoch_distribution` canonical record；每条记录由一个当前 active distributor 签名，并完整绑定：signature schema/algorithm/key id、distributor、domain、recipient、recipient key-agreement key id、key epoch、wrapping key id、envelope algorithm/nonce、wrapped length、ciphertext hash 和创建时间。recipient key id 必须来自已验证 lifecycle，server 和客户端都要与当前 active profile 复核。
+
+一次 distribution upload 必须覆盖提交事务观察到的当前 active 设备全集，recipient 不重复且按 device id 形成稳定集合，已撤销/pending/lost 设备不得出现。M3 上限为 64 台 active 设备、每条 64 KiB、整批 wrapped bytes 4 MiB。server 先验证 domain 当前 epoch、distributor active、active recipient 全集、每条 metadata/hash/signature，再原子写入整批 metadata；任一条失败不留下可读取的部分 distribution。blob store 在 metadata transaction 前后可能留下不可发现的孤立密文 staging/final file，必须允许后续精确重试复用并由维护流程清理，不能把孤立 blob 当成已接受记录。
+
+相同 `domain + recipient + epoch + wrapping_key_id`、相同签名字段语义和相同 ciphertext hash/bytes 的整批重放幂等；同 locator 的 metadata、nonce、hash 或 bytes 不同返回 distribution conflict，不覆盖旧记录。客户端必须保留并重试同一 sealed batch，不能在网络失败后以新 nonce/ephemeral key 悄悄替换 locator。只有整批被接受并由各 active 设备至少取得自己的 record 后，编排层才允许发布该新 epoch 的对象；本批不接 Manager 成功入口。
+
+通用 `RemoteWrappedEpochMaterialSource` 只接受 `device_authorization` signature source；`epoch_distribution` 必须走同时接收 verified lifecycle 的专用下载入口，并在返回 material 前复验当前 domain/epoch、active distributor/recipient、recipient key-agreement profile 和 distributor signature。调用方不能先丢弃 signature metadata 再把 distribution ciphertext 写入 cache。
+
 可信公开缓存从 schema v6 演进时必须把 `key_agreement_public_key_id` 与 `key_agreement_public_key` 作为结构化列原子保存，不能只依赖历史 `record_json`。这是重启后把平台 handle 绑定回已签名公钥的必要条件，不改变“公开缓存不保存 secret”的边界。
 
 `RecoverySecret`：

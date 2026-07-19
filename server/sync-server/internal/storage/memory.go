@@ -229,6 +229,12 @@ func (s *MemoryStore) AuthorizeJoinRequest(ctx context.Context, upload DeviceAut
 	}
 	authorization := upload.Authorization
 	wrapping := upload.Wrapping
+	wrapping.SignatureRecordType = WrappingSignatureDeviceAuthorization
+	wrapping.SignatureSchemaVersion = authorization.SignatureSchemaVersion
+	wrapping.SignatureAlgorithm = authorization.SignatureAlgorithm
+	wrapping.SignatureKeyID = authorization.SignatureKeyID
+	wrapping.Signature = cloneBytes(authorization.Signature)
+	upload.Wrapping = wrapping
 	if err := validateAuthorization(authorization); err != nil {
 		return err
 	}
@@ -299,6 +305,76 @@ func (s *MemoryStore) AuthorizeJoinRequest(ctx context.Context, upload DeviceAut
 		Wrapping:      wrappingPointer(wrapping),
 	})
 	return nil
+}
+
+func (s *MemoryStore) PutEpochDistribution(ctx context.Context, upload EpochDistributionUpload) (EpochDistributionResult, error) {
+	if err := checkContext(ctx); err != nil {
+		return EpochDistributionResult{}, err
+	}
+	if err := validateEpochDistributionUpload(upload); err != nil {
+		return EpochDistributionResult{}, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	domain, ok := s.domains[upload.DomainID]
+	if !ok {
+		return EpochDistributionResult{}, newError(ErrNotFound, "domain not found")
+	}
+	if domain.CurrentKeyEpoch != upload.KeyEpoch {
+		return EpochDistributionResult{}, newError(ErrInvalidRequest, "epoch distribution must target current domain epoch")
+	}
+	distributor, err := s.activeDeviceLocked(upload.DomainID, upload.DistributorDeviceID)
+	if err != nil {
+		return EpochDistributionResult{}, err
+	}
+	active := make(map[string]Device)
+	for key, device := range s.devices {
+		if key.domainID == upload.DomainID && device.Status == DeviceActive {
+			active[device.DeviceID] = device
+		}
+	}
+	if len(active) != len(upload.Records) {
+		return EpochDistributionResult{}, newError(ErrInvalidRequest, "epoch distribution must cover every active device")
+	}
+
+	inserted := 0
+	for _, item := range upload.Records {
+		record := item.Record
+		recipient, ok := active[record.RecipientDeviceID]
+		if !ok || recipient.KeyAgreementPublicKeyID != record.RecipientKeyAgreementKeyID {
+			return EpochDistributionResult{}, newError(ErrForbiddenDevice, "epoch distribution recipient is not active with the signed key")
+		}
+		if err := verifyEpochDistributionSignature(record, distributor); err != nil {
+			return EpochDistributionResult{}, err
+		}
+		key := wrappingRecordKey(record)
+		if existing, exists := s.wrapping[key]; exists {
+			existingBytes, blobExists := s.blobs[existing.BlobRef]
+			if !blobExists || !sameWrappingRecord(existing, record) || !bytes.Equal(existingBytes, item.WrappedKey) {
+				return EpochDistributionResult{}, newError(ErrConflictEpochDistribution, "epoch distribution locator already contains different material")
+			}
+			continue
+		}
+		inserted++
+	}
+
+	for _, item := range upload.Records {
+		record := item.Record
+		key := wrappingRecordKey(record)
+		if _, exists := s.wrapping[key]; exists {
+			continue
+		}
+		record.BlobRef = wrappingBlobRef(record)
+		s.wrapping[key] = cloneWrappingRecord(record)
+		s.blobs[record.BlobRef] = cloneBytes(item.WrappedKey)
+	}
+	return EpochDistributionResult{
+		KeyEpoch:        upload.KeyEpoch,
+		AcceptedRecords: len(upload.Records),
+		InsertedRecords: inserted,
+	}, nil
 }
 
 func (s *MemoryStore) DeviceWrappedKey(ctx context.Context, domainID string, recipientDeviceID string, keyEpoch uint64, wrappingKeyID string) (DeviceWrappingRecord, []byte, error) {
@@ -716,8 +792,11 @@ func validateWrappingRecord(record DeviceWrappingRecord) error {
 	if record.CreatedAtMs <= 0 {
 		return newError(ErrInvalidRequest, "wrapping record timestamp is required")
 	}
-	if len(record.Signature) == 0 {
-		return newError(ErrInvalidSignature, "wrapping record signature is required")
+	if record.SignatureRecordType != WrappingSignatureDeviceAuthorization && record.SignatureRecordType != WrappingSignatureEpochDistribution {
+		return newError(ErrInvalidSignature, "wrapping record signature type is unsupported")
+	}
+	if err := validateSignatureFields(record.SignatureSchemaVersion, record.SignatureAlgorithm, record.SignatureKeyID, record.Signature); err != nil {
+		return err
 	}
 	return nil
 }
@@ -734,6 +813,62 @@ func validateAuthorizationUpload(upload DeviceAuthorizationUpload) error {
 		return newError(ErrInvalidCiphertextMetadata, "device wrapped key metadata mismatch")
 	}
 	return nil
+}
+
+func validateEpochDistributionUpload(upload EpochDistributionUpload) error {
+	if !validOpaqueID(upload.DomainID) || !validOpaqueID(upload.DistributorDeviceID) || upload.KeyEpoch == 0 {
+		return newError(ErrInvalidRequest, "epoch distribution identity is invalid")
+	}
+	if len(upload.Records) == 0 || len(upload.Records) > MaxEpochDistributionRecords {
+		return newError(ErrInvalidRequest, "epoch distribution record count is invalid")
+	}
+	recipients := make(map[string]struct{}, len(upload.Records))
+	totalBytes := 0
+	for _, item := range upload.Records {
+		record := item.Record
+		if err := validateWrappingRecord(record); err != nil {
+			return err
+		}
+		if record.SignatureRecordType != WrappingSignatureEpochDistribution ||
+			record.DomainID != upload.DomainID ||
+			record.AuthorizerDeviceID != upload.DistributorDeviceID ||
+			record.KeyEpoch != upload.KeyEpoch {
+			return newError(ErrInvalidRequest, "epoch distribution record does not match batch")
+		}
+		if _, exists := recipients[record.RecipientDeviceID]; exists {
+			return newError(ErrInvalidRequest, "epoch distribution recipients must be unique")
+		}
+		recipients[record.RecipientDeviceID] = struct{}{}
+		if len(item.WrappedKey) == 0 || len(item.WrappedKey) > MaxDeviceWrappedKeyBytes {
+			return newError(ErrInvalidCiphertextMetadata, "epoch distribution wrapped key is invalid")
+		}
+		totalBytes += len(item.WrappedKey)
+		if totalBytes > MaxEpochDistributionBytes ||
+			int64(len(item.WrappedKey)) != record.WrappedKeyLen ||
+			DeviceWrappedKeyCiphertextHash(record, item.WrappedKey) != record.CiphertextHash {
+			return newError(ErrInvalidCiphertextMetadata, "epoch distribution ciphertext metadata mismatch")
+		}
+	}
+	return nil
+}
+
+func sameWrappingRecord(left DeviceWrappingRecord, right DeviceWrappingRecord) bool {
+	return left.DomainID == right.DomainID &&
+		left.RecipientDeviceID == right.RecipientDeviceID &&
+		left.RecipientKeyAgreementKeyID == right.RecipientKeyAgreementKeyID &&
+		left.AuthorizerDeviceID == right.AuthorizerDeviceID &&
+		left.KeyEpoch == right.KeyEpoch &&
+		left.WrappingKeyID == right.WrappingKeyID &&
+		left.Algorithm == right.Algorithm &&
+		bytes.Equal(left.Nonce, right.Nonce) &&
+		left.WrappedKeyLen == right.WrappedKeyLen &&
+		left.CiphertextHash == right.CiphertextHash &&
+		left.CreatedAtMs == right.CreatedAtMs &&
+		left.SignatureRecordType == right.SignatureRecordType &&
+		left.SignatureSchemaVersion == right.SignatureSchemaVersion &&
+		left.SignatureAlgorithm == right.SignatureAlgorithm &&
+		left.SignatureKeyID == right.SignatureKeyID &&
+		bytes.Equal(left.Signature, right.Signature)
 }
 
 func validateRevocation(revocation DeviceRevocation) error {

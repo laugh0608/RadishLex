@@ -70,6 +70,10 @@ CREATE TABLE IF NOT EXISTS device_wrapping_records (
     wrapped_key_len INTEGER NOT NULL CHECK (wrapped_key_len > 0),
     ciphertext_hash TEXT NOT NULL,
     created_at_ms INTEGER NOT NULL,
+    signature_record_type TEXT NOT NULL CHECK (signature_record_type IN ('device_authorization', 'epoch_distribution')),
+    signature_schema_version INTEGER NOT NULL CHECK (signature_schema_version = 1),
+    signature_algorithm TEXT NOT NULL,
+    signature_key_id TEXT NOT NULL,
     signature BLOB NOT NULL,
     blob_ref TEXT NOT NULL,
     PRIMARY KEY (domain_id, recipient_device_id, key_epoch, wrapping_key_id)

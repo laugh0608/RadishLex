@@ -68,6 +68,28 @@ type DeviceWrappingRequest struct {
 	Signature                  []byte `json:"signature"`
 }
 
+type EpochDistributionRequest struct {
+	DistributorDeviceID string                           `json:"distributor_device_id"`
+	KeyEpoch            uint64                           `json:"key_epoch"`
+	Records             []EpochDistributionRecordRequest `json:"records"`
+}
+
+type EpochDistributionRecordRequest struct {
+	RecipientDeviceID          string `json:"recipient_device_id"`
+	RecipientKeyAgreementKeyID string `json:"recipient_key_agreement_key_id"`
+	WrappingKeyID              string `json:"wrapping_key_id"`
+	Algorithm                  string `json:"algorithm"`
+	Nonce                      []byte `json:"nonce"`
+	WrappedKeyLen              int64  `json:"wrapped_key_len"`
+	CiphertextHash             string `json:"ciphertext_hash"`
+	CreatedAtMs                int64  `json:"created_at_ms"`
+	SignatureSchemaVersion     uint16 `json:"signature_schema_version"`
+	SignatureAlgorithm         string `json:"signature_algorithm"`
+	SignatureKeyID             string `json:"signature_key_id"`
+	Signature                  []byte `json:"signature"`
+	WrappedKey                 []byte `json:"wrapped_key"`
+}
+
 type DeviceRevocationRequest struct {
 	RevokerDeviceID        string `json:"revoker_device_id"`
 	PreviousKeyEpoch       uint64 `json:"previous_key_epoch"`
@@ -132,6 +154,39 @@ func (r AuthorizeJoinRequestRequest) Upload(domainID string, joinRequestID strin
 			Signature:                  r.Wrapping.Signature,
 		},
 		WrappedKey: r.WrappedKey,
+	}
+}
+
+func (r EpochDistributionRequest) Upload(domainID string) storage.EpochDistributionUpload {
+	records := make([]storage.DeviceWrappingUpload, 0, len(r.Records))
+	for _, item := range r.Records {
+		records = append(records, storage.DeviceWrappingUpload{
+			Record: storage.DeviceWrappingRecord{
+				DomainID:                   domainID,
+				RecipientDeviceID:          item.RecipientDeviceID,
+				RecipientKeyAgreementKeyID: item.RecipientKeyAgreementKeyID,
+				AuthorizerDeviceID:         r.DistributorDeviceID,
+				KeyEpoch:                   r.KeyEpoch,
+				WrappingKeyID:              item.WrappingKeyID,
+				Algorithm:                  item.Algorithm,
+				Nonce:                      item.Nonce,
+				WrappedKeyLen:              item.WrappedKeyLen,
+				CiphertextHash:             item.CiphertextHash,
+				CreatedAtMs:                item.CreatedAtMs,
+				SignatureRecordType:        storage.WrappingSignatureEpochDistribution,
+				SignatureSchemaVersion:     item.SignatureSchemaVersion,
+				SignatureAlgorithm:         item.SignatureAlgorithm,
+				SignatureKeyID:             item.SignatureKeyID,
+				Signature:                  item.Signature,
+			},
+			WrappedKey: item.WrappedKey,
+		})
+	}
+	return storage.EpochDistributionUpload{
+		DomainID:            domainID,
+		DistributorDeviceID: r.DistributorDeviceID,
+		KeyEpoch:            r.KeyEpoch,
+		Records:             records,
 	}
 }
 

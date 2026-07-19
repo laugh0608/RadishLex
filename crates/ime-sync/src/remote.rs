@@ -9,9 +9,11 @@ use crate::device::{SyncDeviceStatus, SyncDomain};
 use crate::model::{SyncObjectType, SyncPayloadError};
 use crate::product_provider::{SyncCryptoLoadError, SyncWrappedEpochMaterialSource};
 
+mod epoch_distribution_api;
 mod lifecycle_api;
 mod wrapped_epoch_source;
 
+pub use epoch_distribution_api::RemoteEpochDistributionResult;
 pub use lifecycle_api::{
     RemoteDeviceAuthorization, RemoteDeviceRevocation, RemoteLifecycleDevice, RemoteLifecycleEvent,
     RemoteLifecycleEventKind, RemoteLifecyclePage, RemoteLifecycleSnapshot,
@@ -149,6 +151,7 @@ pub enum SyncServerErrorCode {
     NotFound,
     ConflictStaleBaseVersion,
     ConflictObjectVersion,
+    ConflictEpochDistribution,
     PayloadTooLarge,
     RecoveryRateLimited,
     StorageUnavailable,
@@ -166,6 +169,7 @@ impl SyncServerErrorCode {
             Self::NotFound => "not_found",
             Self::ConflictStaleBaseVersion => "conflict_stale_base_version",
             Self::ConflictObjectVersion => "conflict_object_version",
+            Self::ConflictEpochDistribution => "conflict_epoch_distribution",
             Self::PayloadTooLarge => "payload_too_large",
             Self::RecoveryRateLimited => "recovery_rate_limited",
             Self::StorageUnavailable => "storage_unavailable",
@@ -183,6 +187,7 @@ impl SyncServerErrorCode {
             "not_found" => Self::NotFound,
             "conflict_stale_base_version" => Self::ConflictStaleBaseVersion,
             "conflict_object_version" => Self::ConflictObjectVersion,
+            "conflict_epoch_distribution" => Self::ConflictEpochDistribution,
             "payload_too_large" => Self::PayloadTooLarge,
             "recovery_rate_limited" => Self::RecoveryRateLimited,
             "storage_unavailable" => Self::StorageUnavailable,
@@ -574,9 +579,13 @@ impl<T: SyncRemoteTransport> SyncRemoteClient<T> {
         let request = SyncRemoteRequest::new(SyncRemoteMethod::Get, path, None, Vec::new())
             .with_query_param("wrapping_key_id", wrapping_key_id)?;
         let response = self.transport.send(request)?;
-        let record = WrappedEpochMaterial::try_from(decode_json_response::<
-            DeviceWrappedEpochResponseDto,
-        >(response)?)?;
+        let dto = decode_json_response::<DeviceWrappedEpochResponseDto>(response)?;
+        if dto.signature_record_type != "device_authorization" {
+            return invalid_response(
+                "wrapped epoch source requires a lifecycle authorization record",
+            );
+        }
+        let record = WrappedEpochMaterial::try_from(dto)?;
         if record.domain_id != domain_id
             || record.recipient_device_id != recipient_device_id
             || record.key_epoch != key_epoch
@@ -674,6 +683,18 @@ struct DeviceWrappedEpochResponseDto {
     wrapped_key: Vec<u8>,
     ciphertext_hash: String,
     created_at_ms: i64,
+    #[serde(default)]
+    distributor_device_id: String,
+    #[serde(default)]
+    signature_record_type: String,
+    #[serde(default)]
+    signature_schema_version: u16,
+    #[serde(default)]
+    signature_algorithm: String,
+    #[serde(default)]
+    signature_key_id: String,
+    #[serde(default, with = "base64_bytes")]
+    signature: Vec<u8>,
 }
 
 impl TryFrom<DeviceWrappedEpochResponseDto> for WrappedEpochMaterial {

@@ -29,6 +29,10 @@ const (
 	SignatureAlgorithmEd25519V1          = "ed25519-v1"
 	SignatureAlgorithmECDSAP256SHA256V1  = "ecdsa-p256-sha256-v1"
 	MaxDeviceWrappedKeyBytes             = 64 * 1024
+	MaxEpochDistributionRecords          = 64
+	MaxEpochDistributionBytes            = MaxDeviceWrappedKeyBytes * MaxEpochDistributionRecords
+	WrappingSignatureDeviceAuthorization = "device_authorization"
+	WrappingSignatureEpochDistribution   = "epoch_distribution"
 )
 
 type Domain struct {
@@ -80,8 +84,30 @@ type DeviceWrappingRecord struct {
 	WrappedKeyLen              int64
 	CiphertextHash             string
 	CreatedAtMs                int64
+	SignatureRecordType        string
+	SignatureSchemaVersion     uint16
+	SignatureAlgorithm         string
+	SignatureKeyID             string
 	Signature                  []byte
 	BlobRef                    string
+}
+
+type DeviceWrappingUpload struct {
+	Record     DeviceWrappingRecord
+	WrappedKey []byte
+}
+
+type EpochDistributionUpload struct {
+	DomainID            string
+	DistributorDeviceID string
+	KeyEpoch            uint64
+	Records             []DeviceWrappingUpload
+}
+
+type EpochDistributionResult struct {
+	KeyEpoch        uint64
+	AcceptedRecords int
+	InsertedRecords int
 }
 
 type DeviceAuthorizationUpload struct {

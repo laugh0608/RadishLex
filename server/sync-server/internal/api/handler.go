@@ -21,6 +21,7 @@ const deviceIDHeader = "X-RadishLex-Device-ID"
 const requestIDHeader = "X-Request-ID"
 const authorizationHeader = "Authorization"
 const bearerPrefix = "Bearer "
+const maxEpochDistributionRequestBytes = 6 * 1024 * 1024
 
 type HandlerConfig struct {
 	RecoveryReadLimit  int
@@ -163,6 +164,8 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request, audit *Audit
 		h.handleDevice(w, r, route.domainID, route.deviceID)
 	case deviceWrappedEpochRoute:
 		h.handleDeviceWrappedEpoch(w, r, route.domainID, route.deviceID, route.keyEpoch, audit)
+	case epochDistributionsRoute:
+		h.handleEpochDistribution(w, r, route.domainID, audit)
 	case lifecycleSnapshotRoute:
 		h.handleLifecycleSnapshot(w, r, route.domainID)
 	case lifecycleEventsRoute:
@@ -340,6 +343,44 @@ func (h *Handler) handleDeviceWrappedEpoch(w http.ResponseWriter, r *http.Reques
 	}
 	audit.Bytes = int64(len(wrappedKey))
 	writeJSON(w, http.StatusOK, DeviceWrappedEpochResponseFrom(record, wrappedKey))
+}
+
+func (h *Handler) handleEpochDistribution(w http.ResponseWriter, r *http.Request, domainID string, audit *AuditEvent) {
+	if r.Method != http.MethodPost {
+		h.writeMethodError(w, http.MethodPost)
+		return
+	}
+	var request EpochDistributionRequest
+	if err := decodeJSONRequestWithLimit(w, r, &request, maxEpochDistributionRequestBytes); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	audit.DomainID = domainID
+	audit.DeviceID = request.DistributorDeviceID
+	audit.KeyEpoch = request.KeyEpoch
+	if r.Header.Get(deviceIDHeader) != request.DistributorDeviceID {
+		h.writeError(w, publicStorageError(storage.ErrForbiddenDevice, "epoch distributor is not the requesting device", false))
+		return
+	}
+	totalBytes := int64(0)
+	for _, record := range request.Records {
+		totalBytes += int64(len(record.WrappedKey))
+	}
+	if totalBytes > storage.MaxEpochDistributionBytes {
+		h.writeError(w, publicStorageError(storage.ErrPayloadTooLarge, "epoch distribution wrapped material exceeds resource limit", false))
+		return
+	}
+	result, err := h.store.PutEpochDistribution(r.Context(), request.Upload(domainID))
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	audit.Bytes = totalBytes
+	status := http.StatusCreated
+	if result.InsertedRecords == 0 {
+		status = http.StatusOK
+	}
+	writeJSON(w, status, EpochDistributionResponseFrom(result))
 }
 
 func (h *Handler) handleLifecycleSnapshot(w http.ResponseWriter, r *http.Request, domainID string) {
@@ -593,6 +634,26 @@ func decodeJSONRequest(r *http.Request, value any) error {
 	return nil
 }
 
+func decodeJSONRequestWithLimit(w http.ResponseWriter, r *http.Request, value any, limit int64) error {
+	if r.ContentLength > limit {
+		return publicStorageError(storage.ErrPayloadTooLarge, "request body exceeds resource limit", false)
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(value); err != nil {
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
+			return publicStorageError(storage.ErrPayloadTooLarge, "request body exceeds resource limit", false)
+		}
+		return publicStorageError(storage.ErrInvalidRequest, "request body must be valid JSON metadata", false)
+	}
+	if decoder.Decode(&struct{}{}) != io.EOF {
+		return publicStorageError(storage.ErrInvalidRequest, "request body must contain one JSON object", false)
+	}
+	return nil
+}
+
 func (h *Handler) writeMethodError(w http.ResponseWriter, allowedMethods ...string) {
 	w.Header().Set("Allow", strings.Join(allowedMethods, ", "))
 	h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "method is not allowed", false))
@@ -612,6 +673,7 @@ const (
 	domainStateRoute routeKind = iota + 1
 	deviceRoute
 	deviceWrappedEpochRoute
+	epochDistributionsRoute
 	lifecycleSnapshotRoute
 	lifecycleEventsRoute
 	deviceRevocationsRoute
@@ -642,6 +704,8 @@ func (r route) name() string {
 		return "devices.get"
 	case deviceWrappedEpochRoute:
 		return "devices.wrapped_epoch.get"
+	case epochDistributionsRoute:
+		return "epoch_distributions.create"
 	case lifecycleSnapshotRoute:
 		return "lifecycle.snapshot"
 	case lifecycleEventsRoute:
@@ -685,6 +749,9 @@ func domainRoute(path string) (route, bool) {
 			return route{}, false
 		}
 		return route{kind: deviceWrappedEpochRoute, domainID: parts[0], deviceID: parts[2], keyEpoch: keyEpoch}, true
+	}
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "epoch-distributions" {
+		return route{kind: epochDistributionsRoute, domainID: parts[0]}, true
 	}
 	if len(parts) == 2 && parts[0] != "" && parts[1] == "lifecycle" {
 		return route{kind: lifecycleSnapshotRoute, domainID: parts[0]}, true
@@ -758,7 +825,7 @@ func statusCodeFromError(err error) int {
 		return http.StatusForbidden
 	case storage.ErrNotFound:
 		return http.StatusNotFound
-	case storage.ErrConflictStaleBaseVersion, storage.ErrConflictObjectVersion:
+	case storage.ErrConflictStaleBaseVersion, storage.ErrConflictObjectVersion, storage.ErrConflictEpochDistribution:
 		return http.StatusConflict
 	case storage.ErrPayloadTooLarge:
 		return http.StatusRequestEntityTooLarge

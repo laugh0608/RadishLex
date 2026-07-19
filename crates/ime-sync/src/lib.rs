@@ -1,5 +1,6 @@
 mod assemble;
 mod device;
+mod epoch_distribution;
 mod http_transport;
 mod lifecycle;
 mod merge;
@@ -17,6 +18,9 @@ pub use assemble::{
 pub use device::{
     DeviceAuthorizationPackage, DeviceJoinRequest, DeviceRevocationReason, DeviceRevocationRecord,
     SyncDevice, SyncDeviceStatus, SyncDomain, SyncObjectVersion,
+};
+pub use epoch_distribution::{
+    validate_epoch_distribution_batch, SignedEpochDistribution, MAX_EPOCH_DISTRIBUTION_RECORDS,
 };
 pub use http_transport::HttpSyncRemoteTransport;
 pub use lifecycle::{
@@ -49,11 +53,11 @@ pub use product_provider::{
 };
 pub use remote::{
     LatestObjectConflictMetadata, OpaqueSyncCursor, RemoteDeviceAuthorization,
-    RemoteDeviceRevocation, RemoteLifecycleDevice, RemoteLifecycleEvent, RemoteLifecycleEventKind,
-    RemoteLifecyclePage, RemoteLifecycleSnapshot, RemoteObjectDiscoveryPage, RemoteObjectPayload,
-    RemoteObjectVersion, RemoteWrappedEpochLocator, RemoteWrappedEpochMaterialSource,
-    SyncRemoteClient, SyncRemoteError, SyncRemoteMethod, SyncRemoteRequest, SyncRemoteResponse,
-    SyncRemoteTransport, SyncServerErrorCode,
+    RemoteDeviceRevocation, RemoteEpochDistributionResult, RemoteLifecycleDevice,
+    RemoteLifecycleEvent, RemoteLifecycleEventKind, RemoteLifecyclePage, RemoteLifecycleSnapshot,
+    RemoteObjectDiscoveryPage, RemoteObjectPayload, RemoteObjectVersion, RemoteWrappedEpochLocator,
+    RemoteWrappedEpochMaterialSource, SyncRemoteClient, SyncRemoteError, SyncRemoteMethod,
+    SyncRemoteRequest, SyncRemoteResponse, SyncRemoteTransport, SyncServerErrorCode,
 };
 pub use service::{SyncObjectProcessor, SyncOnceConfig, SyncOrchestrationService};
 pub use signing::{SignedDeviceAuthorization, SignedDeviceRevocation};

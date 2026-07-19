@@ -7,7 +7,7 @@
 - 复核日期：2026-07-19（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前产品里程碑：M3 端到端加密同步 Beta
-- 当前产品主批次：多 active 设备 epoch 分发协议、恢复链与 macOS backend 外部资格阻塞
+- 当前产品主批次：恢复码恢复、recovery record 轮换与 macOS backend 外部资格阻塞
 - 已完成：M0 工程基础、M1 macOS 离线输入 Alpha、M2 本地个人化 MVP；R00、R01A、R02L、R01B、R06A 已退出
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；合成数据、短生命周期服务与受控集成测试可以继续
@@ -16,32 +16,19 @@ M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不�
 
 ## M3 当前边界
 
-M3 已具备 P2 envelope、signed manifest、Go server 设备/对象/密文/备份部署边界，以及关闭态 `sync_once`。对象同步使用 domain 内 `change_sequence`；设备信任链使用独立 `lifecycle_sequence`，两类 opaque cursor 不复用。userdb schema v7 持久化对象 cursor、remote observation、local revision、cycle journal、完整密文 outbox、可信 lifecycle cache和 wrapped epoch ciphertext cache；payload apply 与对象 cursor、已验证 lifecycle state 与 lifecycle cursor 分别原子提交。SQLite/settings 不保存明文 master key。`409 stale_base_version` 必须重新发现、验签解密、合并和签名。
+M3 已具备 P2 envelope、signed manifest、Go 密文服务与关闭态 `sync_once`。对象 `change_sequence` 与设备 `lifecycle_sequence` 隔离；userdb schema v7 原子持久化 cursor、journal/outbox、可信公开 lifecycle 和 wrapped ciphertext cache，不保存明文 master key。失败不推进 cursor、不清除 dirty；`409 stale_base_version` 必须重新发现、验签解密、合并并签名。
 
-风险矩阵已覆盖取消、retry exhaustion、revision race、lease recovery、签名/密文/AAD 篡改、epoch/revocation、decode/SQLite 失败、outbox prepare/ack 故障和残缺 migration 回滚。两个隔离 userdb 通过短生命周期 Go HTTP 服务完成上传、发现、合并回传、service 重建与第二轮零上传收敛；失败不推进 cursor、不清除 dirty，也不丢失可重放请求。
+产品 crypto 装载组合可信 lifecycle、独立 epoch material store 与平台 signing backend。preflight 先确认本机 active、backend 产品资格和 public key 匹配，再读取 secret，并冻结当前/历史 epoch 与撤销阈值。`ProductWrappedEpochMaterialStore` 以独立 P-256 key-agreement backend 解封 `p256-ecdh-hkdf-sha256-xchacha20poly1305-v1`；错误 domain/device/key id、AAD/密文篡改、locked/unavailable backend、未来/重复 epoch 和 revoked 本机均失败关闭。secret 只短暂存在于 Rust material/cycle snapshot。
 
-第四、第五实现批已落地默认关闭的 `DefaultSyncObjectProcessor`、`SyncCryptoProvider` 与 `ProductSyncCryptoProvider`。产品装载层组合可信设备生命周期源、本机授权的 epoch material store 和平台签名 backend；先确认本机 active 与 backend 产品资格，再读取 secret。preflight 冻结 signing profile、当前/历史 epoch、撤销 sequence 和 key material；缺少本机 profile、backend key 匹配、当前 epoch 或产品资格均在网络前失败关闭。
+Go metadata schema v6 已落地 signed lifecycle、`profile-sha256-v1` 公钥绑定、结构化 recipient key-agreement key id 与 wrapping signature source。Rust 从本地初始信任锚验证授权/撤销链；乱序、缺口、epoch 跳变、公钥替换、inactive signer 和 cursor 分叉均拒绝。
 
-Go metadata schema v5 已追加 `initial_device`、`device_authorized`、`device_revoked` lifecycle 事件，并把 wrapping record 创建时的 `recipient_key_agreement_key_id` 结构化保存；旧记录只在 migration 中从设备目录回填并原子校验。授权和撤销与序列分配在同一事务，撤销原子冻结首个拒绝对象 sequence。Rust remote client 可获取 snapshot / 增量页，从本地初始信任锚验证完整授权和撤销链；加入 challenge 使用 `profile-sha256-v1` 摘要绑定两组完整设备公钥、算法、key id、domain / join request id 和有效期，服务端状态或仅 key id 不能替换公钥。乱序、序列缺口、epoch 跳变、公钥替换、inactive signer 和 cursor 分叉均失败关闭。
+独立 signed epoch distribution 已落地：active distributor 为当前 epoch 的完整 active cohort 分别生成签名 wrapped record，Go `POST .../epoch-distributions` 在同一事务验证 cohort、签名、recipient key 与 64 KiB/4 MiB 上限后原子提交 metadata；精确重放幂等，同 locator 分叉返回 `conflict_epoch_distribution`，任一坏签名或漏发均不产生可读取的部分 metadata。精确 GET 返回 signature source，Rust 按可信 distributor profile 复验后才能缓存与解封。
 
-两个文件 userdb 已通过短生命周期真实 Go HTTP 完成 A 初始化、B 加入授权、P2 双向同步、B 撤销、epoch 2 更新、双方缓存与重启恢复；撤销前 6 条对象 sequence 保留，B 从 sequence 7 起被拒绝。`UserDb` 已直接实现 `SyncTrustedDeviceSource`。schema v7 把签名链已绑定的 key-agreement key id/public key 结构化保存，并从 v6 `record_json` 原子回填；`UserDb` 同时实现只返回密文的 `SyncWrappedEpochMaterialSource`。
+短生命周期真实 Go HTTP 证据使用 A/B/C 三个合成设备：B 被撤销后 active A/C 获得 epoch 2，坏签名与不完整 cohort 先失败且无部分可读记录，完整批次重放幂等、分叉冲突；A/C 下载、验签、缓存并在 userdb/provider 重启后恢复当前与历史 epoch，B 在 blob/material 读取前被拒绝。日志不含 wrapping key id、nonce、签名、密文或合成明文。
 
-wrapped epoch material v1 已落地：`p256-ecdh-hkdf-sha256-xchacha20poly1305-v1` 使用版本化 binary envelope、65-byte ephemeral public key、完整 metadata AAD 和裸密文 SHA-256；明文只含 active object key id 与 32-byte master key。`ProductWrappedEpochMaterialStore` 先比对可信 device/key id/public key，再经独立 key-agreement backend 解封历史/当前 epoch；wrong domain/device/key id、密文/AAD 篡改、locked/unavailable/denied backend、重复/未来 epoch 和 revoked 本机均失败关闭。secret buffer 使用析构清零，只在 Rust material/cycle snapshot 中短暂存在。
+`apple-keychain` feature 已提供 Apple signing adapters 与独立 `AppleSecureEnclaveP256KeyAgreementStore`，但本批未调用系统 API、未创建/读取/删除真实条目。普通 DPK P-256 可导出而被 production gate 拒绝；Secure Enclave signing 已有 lifecycle、不可导出、hardware-backed、denied 与真实锁屏证据，unsupported、最终产品资格和独立 key-agreement 实机资格仍缺外部证据。
 
-device wrapped epoch 精确读取链已落地：Go `GET .../devices/{recipient}/wrapped-epochs/{epoch}?wrapping_key_id=...` 要求 transport device identity 等于 recipient，storage 在同一锁/事务先确认 active 再读取 blob，响应与 Rust 共同执行 64 KiB 上限、length/hash/schema/algorithm/AAD 校验。`RemoteWrappedEpochMaterialSource` 使用已验证 lifecycle locator 下载；userdb transaction 对同 locator 同 bytes 幂等、对分叉响应回滚。双文件 Go HTTP 证据已覆盖 B 授权后远端取得/产品解封、A 历史 epoch 1 + 轮换 epoch 2 密文重启恢复，以及 B 撤销后请求新 epoch 在 storage/blob 前返回 `forbidden_device`。
-
-`apple-keychain` feature 已提供三类现有 Apple signing store 的 `SyncDeviceSigningBackend` adapter，以及独立 `AppleSecureEnclaveP256KeyAgreementStore`：key identity/application tag 与签名 key 分离，使用 `SecKeyCopyKeyExchangeResult`，不导出长期私钥。普通测试与仓库门禁不访问 Keychain；本批只取得编译、纯 Rust协议、合成 provider和 ciphertext 重启证据，没有创建、读取或删除真实系统条目，也没有形成独立 key-agreement backend 的实机资格。
-
-签名层已支持显式 Ed25519/P-256 profile 与 Rust/Go verifier；缺少或混用算法时失败关闭。普通 DPK P-256 产品进程生命周期可用但私钥可导出，production gate 明确拒绝；Secure Enclave 已证明 lifecycle、不可导出、hardware-backed、denied 与真实锁屏失败关闭，但 unsupported 和最终产品资格仍缺外部环境证据。
-
-这些测试仍不是用户可用同步。当前生产阻塞项是：
-
-- 普通 DPK P-256 可导出，Apple/Android Ed25519 也未满足生产私钥条件；`test-memory-v1` 只允许测试且无 fallback。
-- Secure Enclave 已完成 lifecycle、denied 与真实设备锁屏证据并清理合成 key；unsupported 和产品资格仍待独立环境。
-- 缺少发布级目标部署运行证据、device wrapped record 的用户态下载 API/真实双客户端轮换链、恢复码设备恢复，以及独立 Secure Enclave key-agreement backend 的授权实机证据；本地产品 adapter 已落地，但 secret material 链仍保持关闭。
-- `ManagerBridge` 仍无真实同步、恢复码、设备加入、授权、撤销或轮换命令；现有 readiness 只证明关闭态。
-
-开发者当前没有真实不支持 Secure Enclave 的目标环境，unsupported 与产品资格因此保持外部阻塞；不能在当前设备伪造，也不能据此开放资格字段。关闭态 provider/lifecycle 实现可继续推进，但不降低生产 backend 或真实用户同步门禁。
+当前生产阻塞项：恢复码设备恢复与 recovery record 轮换、发布级目标部署运行证据、合格生产 signing/key-agreement backend，以及窄 `ManagerBridge` 产品链均未闭环。开发者当前没有真实 unsupported 环境，不得在当前设备伪造，也不得据此开启 `product_qualified` 或 `user_sync_enabled`。
 
 ## 当前停止线
 
@@ -55,9 +42,9 @@ device wrapped epoch 精确读取链已落地：Go `GET .../devices/{recipient}/
 ## 下一步顺位
 
 1. 将 unsupported 保留为外部环境阻塞：目标环境可得时按独立授权执行 probe，确认明确 unsupported、无残留且不回退普通 DPK/test memory；通过后再逐字段评审 `product_qualified/user_presence_required/backup_migratable`。当前设备不能替代该证据。
-2. 设计并实现独立 signed epoch distribution upload，使撤销/轮换后每台仍 active 设备都能取得自己的新 epoch record；不得复用 join authorization、直接写 storage 或仅靠 bearer/header 冒充设备签名。补多 active 设备的幂等、冲突、部分分发失败与重启证据。
-3. 补恢复码恢复、recovery record 轮换与新设备身份/key-agreement key 创建；需要真实创建、读取或删除 Keychain/Secure Enclave 条目时单独申请授权，不能把合成 backend 记为实机证据。
-4. lifecycle/material/recovery 产品链和发布部署稳定后才接窄 `ManagerBridge` command/status；最终满足恢复、授权、撤销、轮换和发布门禁后再评估开放用户同步。
+2. 补恢复码恢复、recovery record 轮换与新设备身份/signing/key-agreement profile 创建；恢复链必须重新进入 signed lifecycle，并为完整 active cohort 分发当前 epoch。先用合成 backend 完成协议、错误与重启证据。
+3. 需要真实创建、读取或删除 Keychain/Secure Enclave 条目时单独申请授权；合成 backend 不记为实机资格。随后补发布级目标部署运行证据。
+4. lifecycle/material/recovery 与发布部署稳定后才接窄 `ManagerBridge` command/status；满足恢复、授权、撤销、轮换和 backend 门禁后再评估开放用户同步。
 
 ## 验证入口
 

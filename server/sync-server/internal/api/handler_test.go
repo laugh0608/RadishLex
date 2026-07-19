@@ -307,6 +307,62 @@ func TestDeviceWrappedEpochHandlerRequiresMatchingRecipientAndReturnsOnlyCiphert
 	}
 }
 
+func TestEpochDistributionHandlerRequiresMatchingDistributorAndPassesBoundedBatch(t *testing.T) {
+	store := &epochDistributionStoreStub{}
+	handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+	request := EpochDistributionRequest{
+		DistributorDeviceID: "device-a",
+		KeyEpoch:            2,
+		Records: []EpochDistributionRecordRequest{{
+			RecipientDeviceID:          "device-a",
+			RecipientKeyAgreementKeyID: "agreement-key-a",
+			WrappingKeyID:              "epoch-2-device-a",
+			Algorithm:                  storage.AlgorithmWrappedEpochP256ECDHV1,
+			Nonce:                      []byte("synthetic-nonce-24-byte"),
+			WrappedKeyLen:              int64(len("wrapped-key")),
+			CiphertextHash:             "synthetic-hash",
+			CreatedAtMs:                200,
+			SignatureSchemaVersion:     1,
+			SignatureAlgorithm:         "ed25519-v1",
+			SignatureKeyID:             "signing-key-a",
+			Signature:                  []byte("signature"),
+			WrappedKey:                 []byte("wrapped-key"),
+		}},
+	}
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("encode distribution request: %v", err)
+	}
+	path := PrefixV1 + "/domains/domain-a/epoch-distributions"
+
+	wrong := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(body))
+	wrong.Header.Set("Content-Type", "application/json")
+	wrong.Header.Set(deviceIDHeader, "device-b")
+	wrongResponse := httptest.NewRecorder()
+	handler.ServeHTTP(wrongResponse, wrong)
+	if wrongResponse.Code != http.StatusForbidden || store.calls != 0 {
+		t.Fatalf("wrong distributor identity should fail before storage: status=%d calls=%d", wrongResponse.Code, store.calls)
+	}
+
+	valid := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(body))
+	valid.Header.Set("Content-Type", "application/json")
+	valid.Header.Set(deviceIDHeader, "device-a")
+	validResponse := httptest.NewRecorder()
+	handler.ServeHTTP(validResponse, valid)
+	if validResponse.Code != http.StatusCreated || store.calls != 1 {
+		t.Fatalf("unexpected distribution response: status=%d calls=%d body=%s", validResponse.Code, store.calls, validResponse.Body.String())
+	}
+	if store.upload.DomainID != "domain-a" || store.upload.DistributorDeviceID != "device-a" ||
+		len(store.upload.Records) != 1 || store.upload.Records[0].Record.SignatureRecordType != storage.WrappingSignatureEpochDistribution {
+		t.Fatalf("unexpected distribution upload: %#v", store.upload)
+	}
+	var response EpochDistributionResponse
+	decodeResponse(t, validResponse, &response)
+	if response.KeyEpoch != 2 || response.AcceptedRecords != 1 || response.InsertedRecords != 1 {
+		t.Fatalf("unexpected distribution response body: %#v", response)
+	}
+}
+
 func TestHandlerAddsRequestIDAndRecordsAuditEvent(t *testing.T) {
 	audit := &auditSinkStub{}
 	handler := NewHandler(storage.NewMemoryStore(), HandlerConfig{
@@ -983,6 +1039,20 @@ type authorizationStoreStub struct {
 type wrappedEpochStoreStub struct {
 	storage.Store
 	calls int
+}
+
+type epochDistributionStoreStub struct {
+	storage.Store
+	upload storage.EpochDistributionUpload
+	calls  int
+}
+
+func (s *epochDistributionStoreStub) PutEpochDistribution(ctx context.Context, upload storage.EpochDistributionUpload) (storage.EpochDistributionResult, error) {
+	s.calls++
+	s.upload = upload
+	return storage.EpochDistributionResult{
+		KeyEpoch: upload.KeyEpoch, AcceptedRecords: len(upload.Records), InsertedRecords: len(upload.Records),
+	}, nil
 }
 
 func (s *wrappedEpochStoreStub) DeviceWrappedKey(ctx context.Context, domainID string, recipientDeviceID string, keyEpoch uint64, wrappingKeyID string) (storage.DeviceWrappingRecord, []byte, error) {

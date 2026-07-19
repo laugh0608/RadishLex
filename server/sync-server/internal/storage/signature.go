@@ -101,6 +101,35 @@ func verifyAuthorizationSignature(authorization DeviceAuthorization, wrapping De
 	})
 }
 
+func verifyEpochDistributionSignature(record DeviceWrappingRecord, distributor Device) error {
+	fields := signatureFields{
+		SchemaVersion:  record.SignatureSchemaVersion,
+		Algorithm:      record.SignatureAlgorithm,
+		KeyID:          record.SignatureKeyID,
+		SignerDeviceID: record.AuthorizerDeviceID,
+		Signature:      record.Signature,
+	}
+	if err := verifySignatureMetadata(fields, distributor, record.CreatedAtMs); err != nil {
+		return err
+	}
+	return verifyCanonicalSignature(fields, distributor, "epoch_distribution", []signatureField{
+		textField("signature_schema_version", strconv.Itoa(int(fields.SchemaVersion))),
+		textField("signature_algorithm", fields.Algorithm),
+		textField("signature_key_id", fields.KeyID),
+		textField("distributor_device_id", record.AuthorizerDeviceID),
+		textField("domain_id", record.DomainID),
+		textField("recipient_device_id", record.RecipientDeviceID),
+		textField("recipient_key_agreement_key_id", record.RecipientKeyAgreementKeyID),
+		textField("key_epoch", strconv.FormatUint(record.KeyEpoch, 10)),
+		textField("wrapping_key_id", record.WrappingKeyID),
+		textField("envelope_algorithm", record.Algorithm),
+		bytesField("envelope_nonce", record.Nonce),
+		textField("wrapped_key_len", strconv.FormatInt(record.WrappedKeyLen, 10)),
+		textField("ciphertext_hash", record.CiphertextHash),
+		textField("created_at_ms", strconv.FormatInt(record.CreatedAtMs, 10)),
+	})
+}
+
 func verifyRevocationSignature(revocation DeviceRevocation, revoker Device) error {
 	fields := signatureFields{
 		SchemaVersion:  revocation.SignatureSchemaVersion,

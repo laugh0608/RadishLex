@@ -34,12 +34,32 @@ type DeviceWrappedEpochResponse struct {
 	DomainID                   string `json:"domain_id"`
 	RecipientDeviceID          string `json:"recipient_device_id"`
 	RecipientKeyAgreementKeyID string `json:"recipient_key_agreement_key_id"`
+	DistributorDeviceID        string `json:"distributor_device_id"`
 	WrappingKeyID              string `json:"wrapping_key_id"`
 	KeyEpoch                   uint64 `json:"key_epoch"`
 	Nonce                      []byte `json:"nonce"`
 	WrappedKey                 []byte `json:"wrapped_key"`
 	CiphertextHash             string `json:"ciphertext_hash"`
 	CreatedAtMs                int64  `json:"created_at_ms"`
+	SignatureRecordType        string `json:"signature_record_type"`
+	SignatureSchemaVersion     uint16 `json:"signature_schema_version"`
+	SignatureAlgorithm         string `json:"signature_algorithm"`
+	SignatureKeyID             string `json:"signature_key_id"`
+	Signature                  []byte `json:"signature"`
+}
+
+type EpochDistributionResponse struct {
+	KeyEpoch        uint64 `json:"key_epoch"`
+	AcceptedRecords int    `json:"accepted_records"`
+	InsertedRecords int    `json:"inserted_records"`
+}
+
+func EpochDistributionResponseFrom(result storage.EpochDistributionResult) EpochDistributionResponse {
+	return EpochDistributionResponse{
+		KeyEpoch:        result.KeyEpoch,
+		AcceptedRecords: result.AcceptedRecords,
+		InsertedRecords: result.InsertedRecords,
+	}
 }
 
 type JoinRequestResponse struct {
@@ -209,12 +229,18 @@ func DeviceWrappedEpochResponseFrom(record storage.DeviceWrappingRecord, wrapped
 		DomainID:                   record.DomainID,
 		RecipientDeviceID:          record.RecipientDeviceID,
 		RecipientKeyAgreementKeyID: record.RecipientKeyAgreementKeyID,
+		DistributorDeviceID:        record.AuthorizerDeviceID,
 		WrappingKeyID:              record.WrappingKeyID,
 		KeyEpoch:                   record.KeyEpoch,
 		Nonce:                      cloneBytes(record.Nonce),
 		WrappedKey:                 cloneBytes(wrappedKey),
 		CiphertextHash:             record.CiphertextHash,
 		CreatedAtMs:                record.CreatedAtMs,
+		SignatureRecordType:        record.SignatureRecordType,
+		SignatureSchemaVersion:     record.SignatureSchemaVersion,
+		SignatureAlgorithm:         record.SignatureAlgorithm,
+		SignatureKeyID:             record.SignatureKeyID,
+		Signature:                  cloneBytes(record.Signature),
 	}
 }
 

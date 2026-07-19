@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -260,6 +261,12 @@ func (s *SQLiteStore) AuthorizeJoinRequest(ctx context.Context, upload DeviceAut
 	}
 	authorization := upload.Authorization
 	wrapping := upload.Wrapping
+	wrapping.SignatureRecordType = WrappingSignatureDeviceAuthorization
+	wrapping.SignatureSchemaVersion = authorization.SignatureSchemaVersion
+	wrapping.SignatureAlgorithm = authorization.SignatureAlgorithm
+	wrapping.SignatureKeyID = authorization.SignatureKeyID
+	wrapping.Signature = cloneBytes(authorization.Signature)
+	upload.Wrapping = wrapping
 	if err := validateAuthorization(authorization); err != nil {
 		return err
 	}
@@ -334,12 +341,14 @@ func (s *SQLiteStore) AuthorizeJoinRequest(ctx context.Context, upload DeviceAut
 		INSERT INTO device_wrapping_records (
 			domain_id, recipient_device_id, recipient_key_agreement_key_id, authorizer_device_id, key_epoch,
 			wrapping_key_id, algorithm, nonce, wrapped_key_len,
-			ciphertext_hash, created_at_ms, signature, blob_ref
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ciphertext_hash, created_at_ms, signature_record_type, signature_schema_version,
+			signature_algorithm, signature_key_id, signature, blob_ref
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		wrapping.DomainID, wrapping.RecipientDeviceID, wrapping.RecipientKeyAgreementKeyID, wrapping.AuthorizerDeviceID, int64(wrapping.KeyEpoch),
 		wrapping.WrappingKeyID, wrapping.Algorithm, cloneBytes(wrapping.Nonce), wrapping.WrappedKeyLen,
-		wrapping.CiphertextHash, wrapping.CreatedAtMs, cloneBytes(wrapping.Signature), wrapping.BlobRef,
+		wrapping.CiphertextHash, wrapping.CreatedAtMs, wrapping.SignatureRecordType, int64(wrapping.SignatureSchemaVersion),
+		wrapping.SignatureAlgorithm, wrapping.SignatureKeyID, cloneBytes(wrapping.Signature), wrapping.BlobRef,
 	); err != nil {
 		return newError(ErrStorageUnavailable, "wrapping metadata cannot be stored")
 	}
@@ -372,6 +381,124 @@ func (s *SQLiteStore) AuthorizeJoinRequest(ctx context.Context, upload DeviceAut
 		return newError(ErrStorageUnavailable, "sqlite transaction cannot commit")
 	}
 	return nil
+}
+
+func (s *SQLiteStore) PutEpochDistribution(ctx context.Context, upload EpochDistributionUpload) (EpochDistributionResult, error) {
+	if err := checkContext(ctx); err != nil {
+		return EpochDistributionResult{}, err
+	}
+	if err := validateEpochDistributionUpload(upload); err != nil {
+		return EpochDistributionResult{}, err
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return EpochDistributionResult{}, newError(ErrStorageUnavailable, "sqlite transaction cannot start")
+	}
+	defer rollbackTx(tx)
+
+	domain, err := domainTx(ctx, tx, upload.DomainID)
+	if err != nil {
+		return EpochDistributionResult{}, err
+	}
+	if domain.CurrentKeyEpoch != upload.KeyEpoch {
+		return EpochDistributionResult{}, newError(ErrInvalidRequest, "epoch distribution must target current domain epoch")
+	}
+	distributor, err := activeDeviceTx(ctx, tx, upload.DomainID, upload.DistributorDeviceID)
+	if err != nil {
+		return EpochDistributionResult{}, err
+	}
+	rows, err := tx.QueryContext(ctx, `
+		SELECT device_id, key_agreement_public_key_id
+		FROM devices WHERE domain_id = ? AND status = ?
+	`, upload.DomainID, string(DeviceActive))
+	if err != nil {
+		return EpochDistributionResult{}, newError(ErrStorageUnavailable, "active device cohort cannot be read")
+	}
+	active := make(map[string]string)
+	for rows.Next() {
+		var deviceID string
+		var keyID string
+		if err := rows.Scan(&deviceID, &keyID); err != nil {
+			_ = rows.Close()
+			return EpochDistributionResult{}, newError(ErrStorageUnavailable, "active device cohort cannot be read")
+		}
+		active[deviceID] = keyID
+	}
+	if err := rows.Close(); err != nil {
+		return EpochDistributionResult{}, newError(ErrStorageUnavailable, "active device cohort cannot be read")
+	}
+	if len(active) != len(upload.Records) {
+		return EpochDistributionResult{}, newError(ErrInvalidRequest, "epoch distribution must cover every active device")
+	}
+
+	missing := make([]DeviceWrappingUpload, 0, len(upload.Records))
+	for _, item := range upload.Records {
+		record := item.Record
+		keyID, ok := active[record.RecipientDeviceID]
+		if !ok || keyID != record.RecipientKeyAgreementKeyID {
+			return EpochDistributionResult{}, newError(ErrForbiddenDevice, "epoch distribution recipient is not active with the signed key")
+		}
+		if err := verifyEpochDistributionSignature(record, distributor); err != nil {
+			return EpochDistributionResult{}, err
+		}
+		existing, err := wrappingRecordQuerier(ctx, tx, record.DomainID, record.RecipientDeviceID, record.KeyEpoch, record.WrappingKeyID)
+		if err == nil {
+			existingBytes, readErr := s.blobs.ReadObjectBlob(ctx, existing.BlobRef)
+			if readErr != nil || !sameWrappingRecord(existing, record) || !bytes.Equal(existingBytes, item.WrappedKey) {
+				return EpochDistributionResult{}, newError(ErrConflictEpochDistribution, "epoch distribution locator already contains different material")
+			}
+			continue
+		}
+		if !IsCode(err, ErrNotFound) {
+			return EpochDistributionResult{}, err
+		}
+		record.BlobRef = wrappingBlobRef(record)
+		missing = append(missing, DeviceWrappingUpload{Record: record, WrappedKey: cloneBytes(item.WrappedKey)})
+	}
+
+	staged := make([]StagedObjectBlob, 0, len(missing))
+	defer func() {
+		for _, blob := range staged {
+			_ = blob.Cleanup(context.Background())
+		}
+	}()
+	for _, item := range missing {
+		blob, err := s.blobs.StageObjectBlob(ctx, item.Record.BlobRef, item.WrappedKey)
+		if err != nil {
+			return EpochDistributionResult{}, err
+		}
+		staged = append(staged, blob)
+	}
+	for _, blob := range staged {
+		if err := blob.Commit(ctx); err != nil {
+			return EpochDistributionResult{}, err
+		}
+	}
+	for _, item := range missing {
+		record := item.Record
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO device_wrapping_records (
+				domain_id, recipient_device_id, recipient_key_agreement_key_id, authorizer_device_id, key_epoch,
+				wrapping_key_id, algorithm, nonce, wrapped_key_len, ciphertext_hash, created_at_ms,
+				signature_record_type, signature_schema_version, signature_algorithm, signature_key_id,
+				signature, blob_ref
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`, record.DomainID, record.RecipientDeviceID, record.RecipientKeyAgreementKeyID, record.AuthorizerDeviceID, int64(record.KeyEpoch),
+			record.WrappingKeyID, record.Algorithm, cloneBytes(record.Nonce), record.WrappedKeyLen,
+			record.CiphertextHash, record.CreatedAtMs, record.SignatureRecordType, int64(record.SignatureSchemaVersion),
+			record.SignatureAlgorithm, record.SignatureKeyID, cloneBytes(record.Signature), record.BlobRef); err != nil {
+			return EpochDistributionResult{}, newError(ErrStorageUnavailable, "epoch distribution metadata cannot be stored")
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return EpochDistributionResult{}, newError(ErrStorageUnavailable, "sqlite transaction cannot commit")
+	}
+	return EpochDistributionResult{
+		KeyEpoch:        upload.KeyEpoch,
+		AcceptedRecords: len(upload.Records),
+		InsertedRecords: len(missing),
+	}, nil
 }
 
 func (s *SQLiteStore) DeviceWrappedKey(ctx context.Context, domainID string, recipientDeviceID string, keyEpoch uint64, wrappingKeyID string) (DeviceWrappingRecord, []byte, error) {
@@ -923,16 +1050,19 @@ func wrappingRecordQuerier(ctx context.Context, querier sqlQuerier, domainID str
 	row := querier.QueryRowContext(ctx, `
 		SELECT domain_id, recipient_device_id, recipient_key_agreement_key_id, authorizer_device_id, key_epoch,
 			wrapping_key_id, algorithm, nonce, wrapped_key_len,
-			ciphertext_hash, created_at_ms, signature, blob_ref
+			ciphertext_hash, created_at_ms, signature_record_type, signature_schema_version,
+			signature_algorithm, signature_key_id, signature, blob_ref
 		FROM device_wrapping_records
 		WHERE domain_id = ? AND recipient_device_id = ? AND key_epoch = ? AND wrapping_key_id = ?
 	`, domainID, recipientDeviceID, int64(keyEpoch), wrappingKeyID)
 	var record DeviceWrappingRecord
 	var keyEpochValue int64
+	var signatureSchemaVersion int64
 	if err := row.Scan(
 		&record.DomainID, &record.RecipientDeviceID, &record.RecipientKeyAgreementKeyID, &record.AuthorizerDeviceID, &keyEpochValue,
 		&record.WrappingKeyID, &record.Algorithm, &record.Nonce, &record.WrappedKeyLen,
-		&record.CiphertextHash, &record.CreatedAtMs, &record.Signature, &record.BlobRef,
+		&record.CiphertextHash, &record.CreatedAtMs, &record.SignatureRecordType, &signatureSchemaVersion,
+		&record.SignatureAlgorithm, &record.SignatureKeyID, &record.Signature, &record.BlobRef,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return DeviceWrappingRecord{}, newError(ErrNotFound, "device wrapping record not found")
@@ -940,6 +1070,7 @@ func wrappingRecordQuerier(ctx context.Context, querier sqlQuerier, domainID str
 		return DeviceWrappingRecord{}, newError(ErrStorageUnavailable, "device wrapping metadata cannot be read")
 	}
 	record.KeyEpoch = uint64(keyEpochValue)
+	record.SignatureSchemaVersion = uint16(signatureSchemaVersion)
 	return cloneWrappingRecord(record), nil
 }
 
@@ -1193,17 +1324,20 @@ func wrappingForAuthorizationTx(ctx context.Context, tx *sql.Tx, authorization D
 	row := tx.QueryRowContext(ctx, `
 		SELECT domain_id, recipient_device_id, recipient_key_agreement_key_id, authorizer_device_id, key_epoch,
 			wrapping_key_id, algorithm, nonce, wrapped_key_len,
-			ciphertext_hash, created_at_ms, signature, blob_ref
+			ciphertext_hash, created_at_ms, signature_record_type, signature_schema_version,
+			signature_algorithm, signature_key_id, signature, blob_ref
 		FROM device_wrapping_records
 		WHERE domain_id = ? AND recipient_device_id = ? AND authorizer_device_id = ? AND key_epoch = ?
 		ORDER BY created_at_ms, wrapping_key_id LIMIT 1
 	`, authorization.DomainID, authorization.RecipientDeviceID, authorization.AuthorizerDeviceID, int64(authorization.KeyEpoch))
 	var record DeviceWrappingRecord
 	var keyEpoch int64
+	var signatureSchemaVersion int64
 	if err := row.Scan(
 		&record.DomainID, &record.RecipientDeviceID, &record.RecipientKeyAgreementKeyID, &record.AuthorizerDeviceID, &keyEpoch,
 		&record.WrappingKeyID, &record.Algorithm, &record.Nonce, &record.WrappedKeyLen,
-		&record.CiphertextHash, &record.CreatedAtMs, &record.Signature, &record.BlobRef,
+		&record.CiphertextHash, &record.CreatedAtMs, &record.SignatureRecordType, &signatureSchemaVersion,
+		&record.SignatureAlgorithm, &record.SignatureKeyID, &record.Signature, &record.BlobRef,
 	); err != nil {
 		return DeviceWrappingRecord{}, newError(ErrStorageUnavailable, "authorization wrapping metadata cannot be read")
 	}
@@ -1211,6 +1345,7 @@ func wrappingForAuthorizationTx(ctx context.Context, tx *sql.Tx, authorization D
 		return DeviceWrappingRecord{}, newError(ErrStorageUnavailable, "authorization wrapping metadata is invalid")
 	}
 	record.KeyEpoch = uint64(keyEpoch)
+	record.SignatureSchemaVersion = uint16(signatureSchemaVersion)
 	return cloneWrappingRecord(record), nil
 }
 

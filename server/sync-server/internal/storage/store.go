@@ -11,6 +11,7 @@ type Store interface {
 	SaveJoinRequest(ctx context.Context, request JoinRequest) error
 	PendingJoinRequests(ctx context.Context, domainID string) ([]JoinRequest, error)
 	AuthorizeJoinRequest(ctx context.Context, upload DeviceAuthorizationUpload) error
+	PutEpochDistribution(ctx context.Context, upload EpochDistributionUpload) (EpochDistributionResult, error)
 	DeviceWrappedKey(ctx context.Context, domainID string, recipientDeviceID string, keyEpoch uint64, wrappingKeyID string) (DeviceWrappingRecord, []byte, error)
 	RevokeDevice(ctx context.Context, revocation DeviceRevocation) error
 	PutRecoveryRecord(ctx context.Context, upload RecoveryRecordUpload) (RecoveryRecord, error)

@@ -1,8 +1,10 @@
 use super::test_support::{response_for, signed_object};
 use super::*;
+use crate::{SignedEpochDistribution, SyncDevice, SyncTrustedDomainState};
 use p256::{elliptic_curve::sec1::ToEncodedPoint, SecretKey};
 use radishlex_ime_crypto::{
-    DeviceKeyAgreementPublicKey, KeyDescriptor, KeyRole, Nonce, SyncMasterKeyMaterial,
+    DeviceKeyAgreementPublicKey, DeviceSignature, KeyDescriptor, KeyRole, Nonce,
+    SyncMasterKeyMaterial, TestMemoryDeviceKeyStore, ED25519_SIGNATURE_LEN,
 };
 use serde_json::Value;
 use std::cell::RefCell;
@@ -336,7 +338,8 @@ fn wrapped_epoch_source_uses_exact_locator_and_redacts_ciphertext() {
             "nonce": Base64::encode_string(record.nonce.as_bytes()),
             "wrapped_key": Base64::encode_string(&record.wrapped_key),
             "ciphertext_hash": record.ciphertext_hash,
-            "created_at_ms": record.created_at_ms
+            "created_at_ms": record.created_at_ms,
+            "signature_record_type": "device_authorization"
         }),
     );
     let client = SyncRemoteClient::new(transport);
@@ -389,27 +392,206 @@ fn wrapped_epoch_source_maps_revoked_before_material_use() {
     assert_eq!(error, SyncCryptoLoadError::Revoked);
 }
 
+#[test]
+fn wrapped_epoch_source_rejects_distribution_without_trusted_signature_verification() {
+    let record = wrapped_epoch_record();
+    let transport = RecordingTransport::default();
+    transport.push_json(
+        200,
+        &serde_json::json!({
+            "schema_version": record.schema_version,
+            "algorithm": record.algorithm,
+            "domain_id": record.domain_id,
+            "recipient_device_id": record.recipient_device_id,
+            "recipient_key_agreement_key_id": record.recipient_key_agreement_key_id,
+            "wrapping_key_id": record.wrapping_key_id,
+            "key_epoch": record.key_epoch,
+            "nonce": Base64::encode_string(record.nonce.as_bytes()),
+            "wrapped_key": Base64::encode_string(&record.wrapped_key),
+            "ciphertext_hash": record.ciphertext_hash,
+            "created_at_ms": record.created_at_ms,
+            "signature_record_type": "epoch_distribution"
+        }),
+    );
+    let client = SyncRemoteClient::new(transport);
+
+    let error = client
+        .device_wrapped_epoch_material("domain-a", "device-b", 1, "wrapping-key-b-1")
+        .expect_err("distribution requires the verified download path");
+
+    assert!(matches!(error, SyncRemoteError::InvalidResponse { .. }));
+}
+
+#[test]
+fn signed_epoch_distribution_upload_and_download_preserve_signed_metadata() {
+    let signed_a = signed_epoch_distribution(wrapped_epoch_record_for(
+        "device-a",
+        "agreement-key-a",
+        1,
+        "wrapping-key-a-1",
+    ));
+    let signed = signed_epoch_distribution(wrapped_epoch_record());
+    let records = vec![signed_a, signed.clone()];
+    let trusted_domain = trusted_distribution_domain();
+    let transport = RecordingTransport::default();
+    transport.push_json(
+        201,
+        &serde_json::json!({
+            "key_epoch": signed.material.key_epoch,
+            "accepted_records": 2,
+            "inserted_records": 2
+        }),
+    );
+    transport.push_json(
+        200,
+        &serde_json::json!({
+            "schema_version": signed.material.schema_version,
+            "algorithm": signed.material.algorithm,
+            "domain_id": signed.material.domain_id,
+            "recipient_device_id": signed.material.recipient_device_id,
+            "recipient_key_agreement_key_id": signed.material.recipient_key_agreement_key_id,
+            "distributor_device_id": signed.distributor_device_id,
+            "wrapping_key_id": signed.material.wrapping_key_id,
+            "key_epoch": signed.material.key_epoch,
+            "nonce": Base64::encode_string(signed.material.nonce.as_bytes()),
+            "wrapped_key": Base64::encode_string(&signed.material.wrapped_key),
+            "ciphertext_hash": signed.material.ciphertext_hash,
+            "created_at_ms": signed.material.created_at_ms,
+            "signature_record_type": "epoch_distribution",
+            "signature_schema_version": signed.signature.signature_schema_version,
+            "signature_algorithm": signed.signature.signature_algorithm.as_str(),
+            "signature_key_id": signed.signature.signature_key_id,
+            "signature": Base64::encode_string(&signed.signature.signature)
+        }),
+    );
+    let client = SyncRemoteClient::new(transport);
+
+    let uploaded = client
+        .upload_epoch_distribution(&trusted_domain, &records)
+        .expect("upload signed distribution");
+    assert_eq!(uploaded.accepted_records, 2);
+    assert_eq!(uploaded.inserted_records, 2);
+    let downloaded = client
+        .device_verified_epoch_distribution(
+            &trusted_domain,
+            "domain-a",
+            "device-b",
+            1,
+            "wrapping-key-b-1",
+        )
+        .expect("download signed distribution");
+    assert_eq!(downloaded, signed);
+
+    let requests = client.transport().requests();
+    assert_eq!(
+        requests[0].path(),
+        "/api/v1/domains/domain-a/epoch-distributions"
+    );
+    let body: Value = serde_json::from_slice(requests[0].body()).expect("distribution json");
+    assert_eq!(body["distributor_device_id"], "device-a");
+    assert_eq!(
+        body["records"][1]["recipient_key_agreement_key_id"],
+        "agreement-key-b"
+    );
+    assert_eq!(body["records"][1]["signature_key_id"], "signing-key-a");
+    let debug = format!("{downloaded:?}");
+    assert!(!debug.contains(&Base64::encode_string(&downloaded.material.wrapped_key)));
+}
+
 fn wrapped_epoch_record() -> WrappedEpochMaterial {
-    let secret = SecretKey::from_slice(&[7u8; 32]).expect("agreement secret");
+    wrapped_epoch_record_for("device-b", "agreement-key-b", 7, "wrapping-key-b-1")
+}
+
+fn wrapped_epoch_record_for(
+    device_id: &str,
+    key_id: &str,
+    scalar: u8,
+    wrapping_key_id: &str,
+) -> WrappedEpochMaterial {
+    let secret = SecretKey::from_slice(&[scalar; 32]).expect("agreement secret");
     let public = secret.public_key().to_encoded_point(false);
-    let recipient = DeviceKeyAgreementPublicKey::p256(
-        "device-b",
-        "agreement-key-b",
-        public.as_bytes().to_vec(),
-        100,
-        None,
-    )
-    .expect("recipient");
+    let recipient =
+        DeviceKeyAgreementPublicKey::p256(device_id, key_id, public.as_bytes().to_vec(), 100, None)
+            .expect("recipient");
     let object_key = KeyDescriptor::new("object-key-v1", KeyRole::ObjectKey, 1).expect("key");
     let master_key = SyncMasterKeyMaterial::new([9u8; 32]).expect("master key");
     WrappedEpochMaterial::seal_for_recipient(
         "domain-a",
         &recipient,
-        "wrapping-key-b-1",
+        wrapping_key_id,
         &object_key,
         &master_key,
         Nonce::new(vec![3u8; 24]).expect("nonce"),
         200,
     )
     .expect("wrapped epoch")
+}
+
+fn trusted_distribution_domain() -> SyncTrustedDomainState {
+    let mut store = TestMemoryDeviceKeyStore::new();
+    let public_a = store
+        .insert_signing_key("device-a", "signing-key-a", [8; 32], 100)
+        .expect("device a signing key");
+    let public_b = store
+        .insert_signing_key("device-b", "signing-key-b", [9; 32], 100)
+        .expect("device b signing key");
+    let profile_a = crate::SyncTrustedDeviceProfile::active_with_key_agreement(
+        SyncDevice::pending("device-a", "signing-key-a", 99)
+            .expect("pending a")
+            .activate(100)
+            .expect("active a"),
+        public_a,
+        agreement_profile("device-a", "agreement-key-a", 1),
+    )
+    .expect("trusted a");
+    let profile_b = crate::SyncTrustedDeviceProfile::active_with_key_agreement(
+        SyncDevice::pending("device-b", "signing-key-b", 99)
+            .expect("pending b")
+            .activate(100)
+            .expect("active b"),
+        public_b,
+        agreement_profile("device-b", "agreement-key-b", 7),
+    )
+    .expect("trusted b");
+    SyncTrustedDomainState::new(
+        SyncDomain::new("domain-a", 1, "object-key-v1", 100, 200).expect("domain"),
+        [profile_a, profile_b],
+    )
+    .expect("trusted domain")
+}
+
+fn agreement_profile(device_id: &str, key_id: &str, scalar: u8) -> DeviceKeyAgreementPublicKey {
+    let secret = SecretKey::from_slice(&[scalar; 32]).expect("agreement secret");
+    DeviceKeyAgreementPublicKey::p256(
+        device_id,
+        key_id,
+        secret
+            .public_key()
+            .to_encoded_point(false)
+            .as_bytes()
+            .to_vec(),
+        100,
+        None,
+    )
+    .expect("agreement profile")
+}
+
+fn signed_epoch_distribution(material: WrappedEpochMaterial) -> SignedEpochDistribution {
+    let mut store = TestMemoryDeviceKeyStore::new();
+    store
+        .insert_signing_key("device-a", "signing-key-a", [8; 32], 100)
+        .expect("insert signing key");
+    let handle = store
+        .handle("device-a", "signing-key-a")
+        .expect("signing handle");
+    let placeholder =
+        DeviceSignature::new("signing-key-a", "device-a", vec![1; ED25519_SIGNATURE_LEN])
+            .expect("placeholder signature");
+    let unsigned = SignedEpochDistribution::new("device-a", material, placeholder)
+        .expect("unsigned-shaped distribution");
+    let signature = store
+        .sign(&handle, &unsigned.canonical_bytes())
+        .expect("distribution signature");
+    SignedEpochDistribution::new("device-a", unsigned.material, signature)
+        .expect("signed distribution")
 }

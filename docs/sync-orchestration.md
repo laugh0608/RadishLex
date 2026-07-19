@@ -8,7 +8,7 @@
 - `apple-secure-enclave-p256-v1` 的 unsupported 真实环境当前不可得，仍作为生产 backend 资格和 M3 退出阻塞项；不得在支持 Secure Enclave 的设备上模拟该证据。
 - 该外部证据不再阻塞关闭产品入口、只使用合成 P2 数据和测试 backend 的 Rust 编排设计与实现。
 - 在 unsupported、backend 资格、Rust 编排、两个真实客户端、设备生命周期和发布级部署证据全部闭环前，`product_qualified` 与 `user_sync_enabled` 不因本地编排进展自动改变，Manager 不增加真实同步成功入口。
-- 关闭态 `sync_once`、稳定 discovery cursor、持久化 journal/outbox、默认关闭的通用 crypto processor/provider port 与双 userdb HTTP 收敛证据已经落地；剩余缺口是生产 provider 的可信设备生命周期/epoch material 装载、平台 backend 资格和真实设备全流程。
+- 关闭态 `sync_once`、稳定 discovery cursor、持久化 journal/outbox、默认关闭的通用 crypto processor/provider、可信 lifecycle/wrapped material 产品装载与 signed epoch distribution remote 边界已经落地；剩余缺口是恢复链、平台 backend 资格、发布部署和真实设备全流程。
 
 ## 职责与依赖方向
 
@@ -51,7 +51,9 @@ Go sync server
 
 通用 processor 已实现 manifest 验签、epoch material 选择、AEAD 解密、新 outbox 加密签名和 production gate，并接入双 userdb HTTP service 门禁。`ProductSyncCryptoProvider` 进一步固定三个产品端口：`SyncTrustedDeviceSource` 只提供已验证的 domain/device public lifecycle，`SyncEpochMaterialStore` 按本机 device 授权返回当前与历史 secret material，`SyncDeviceSigningBackend` 只通过不可导出 handle 签名。装载顺序必须先确认本机 active 和 backend 产品资格，再读取 epoch material；任一不匹配都在网络前失败关闭。
 
-产品 adapter 已具备 verified lifecycle public cache、wrapped epoch ciphertext cache、独立 key-agreement 解封和 Apple signing adapter。下一段远端取得链按“transaction 外用 verified lifecycle locator 精确下载 -> Rust 校验公开 metadata/长度/hash -> userdb transaction 幂等缓存密文 -> 后续 preflight 从本地 cache 解封”执行；网络 I/O 不得发生在 SQLite transaction 内。相同 locator 的不同响应必须作为 fork/tamper 失败，撤销设备必须在 server blob 读取和本地材料读取前分别阻断。具体 Secure Enclave key-agreement backend 仍只有编译与合成协议证据，不能继承 signing backend 的实机资格。
+产品 adapter 已具备 verified lifecycle public cache、wrapped epoch ciphertext cache、独立 key-agreement 解封和 Apple signing adapter。远端取得链固定为“transaction 外按 verified lifecycle locator 精确下载 -> Rust 校验 signature source、公开 metadata/长度/hash与 distributor 签名 -> userdb transaction 幂等缓存密文 -> 后续 preflight 从本地 cache 解封”；网络 I/O 不得发生在 SQLite transaction 内。相同 locator 的不同响应必须作为 fork/tamper 失败，撤销设备必须在 server blob 读取和本地材料读取前分别阻断。具体 Secure Enclave key-agreement backend 仍只有编译与合成协议证据，不能继承 signing backend 的实机资格。
+
+撤销或轮换产生新 epoch 后，distributor 必须先为同一 verified lifecycle 中的完整 active cohort 生成并签名 `epoch_distribution` batch。server 只有在 cohort、recipient key、签名、长度/hash 和全部 blob staging 均通过后才原子提交可读取 metadata；客户端取得 accepted response 后，后续 cycle 才能准备使用该 epoch 的新对象 outbox。坏签名、漏发、分叉或失败批次不得通过“先上传对象、稍后补材料”绕过；精确重放允许幂等恢复。
 
 ## 一次同步周期
 
@@ -197,7 +199,8 @@ Preflight 只能返回计数、状态和阻塞原因，不返回明文 P2、P1 �
 4. 已落地关闭态风险矩阵：取消、retry exhaustion、local revision race、lease recovery、签名/密文/AAD-bound metadata、epoch/revocation 拒绝、decode/transaction cursor rollback、v4→v5 与 v5→v6 migration rollback、outbox prepare/ack crash point，以及两个隔离 userdb 通过短生命周期 Go HTTP 服务第二轮零上传收敛。
 5. 已落地：默认关闭的 `DefaultSyncObjectProcessor`、cycle-frozen `SyncCryptoCycleSnapshot` 与 `SyncCryptoProvider` port；产品/合成构造路径分离，默认无 provider 时网络前阻断。测试覆盖历史 epoch、撤销 sequence、snapshot 漂移和轮换 outbox，双 userdb HTTP fixture 已复用该通用实现。
 6. 已落地：`ProductSyncCryptoProvider`、可信 lifecycle/material/signing 三端口和严格装载顺序；合成授权、撤销、轮换与重启测试证明 revoked/test backend 不读取 material、历史 epoch 可读、撤销后 sequence 拒绝和新 epoch outbox。
-7. 已落地：独立 lifecycle sequence、Rust trust-anchor signed record 验证和 userdb public cache；真实 Go HTTP 组合测试覆盖设备授权、同步、撤销、缓存和重启恢复。下一批接 wrapped epoch material store 与平台 signing backend adapter；production backend 资格通过前不接真实签名路径。Rust service、真实 provider sources 与 backend 三条门禁都通过后才设计窄 FFI command/status。
+7. 已落地：独立 lifecycle sequence、Rust trust-anchor signed record 验证、userdb public cache、wrapped epoch material store、Apple signing/key-agreement adapters 与精确远端读取；真实 Go HTTP 组合测试覆盖授权、同步、撤销、缓存和重启恢复。
+8. 已落地：独立 signed epoch distribution batch、完整 active cohort、原子 metadata、幂等/分叉冲突和 Rust distributor/recipient 验证边界；A/B/C Go HTTP 证据覆盖坏签名无部分可读、漏发拒绝、A/C 轮换重启和 revoked B 无新 epoch。下一批推进 recovery record 轮换与恢复加入；production backend 资格通过前不接真实签名路径，产品链稳定后才设计窄 FFI command/status。
 
 ## 验证矩阵
 

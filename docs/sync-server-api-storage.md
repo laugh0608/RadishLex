@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型、已解密 P2 payload 写回本地 SQLite 的执行器、`ime-sync` remote client、两客户端内存与短生命周期 Go HTTP 测试。Go server 已具备 API/storage/runtime、SQLite metadata、local blob、Ed25519/P-256 签名 profile 验证、对象版本与冲突、recovery、审计、bearer token、备份恢复、外部 TLS 和升级回滚受控证据。尚未形成完整真实用户生产封装、发布级目标部署运行证据或已评审通过的生产私钥 backend；普通 DPK P-256 因可导出被拒绝，独立 Secure Enclave P-256 已取得 runtime、不可导出与 hardware-backed lifecycle 证据但失败矩阵和产品资格仍关闭。SQLite driver 使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
+当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、signed epoch distribution、恢复记录签名、客户端解密合并与 userdb 写回、`ime-sync` remote client，以及短生命周期 Go HTTP 多设备证据。Go server metadata schema v6 已具备 API/storage/runtime、SQLite metadata、local blob、Ed25519/P-256 签名 profile 验证、对象版本与冲突、lifecycle、epoch distribution、recovery、审计、bearer token、备份恢复、外部 TLS 和升级回滚受控证据。尚未形成完整真实用户生产封装、发布级目标部署运行证据或已评审通过的生产私钥 backend；普通 DPK P-256 因可导出被拒绝，独立 Secure Enclave P-256 的产品资格仍关闭。SQLite driver 使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
 
 本阶段只固定服务端 API 和 storage 边界：
 
@@ -59,7 +59,7 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名。AD
 
 授权记录只证明某个 active 设备接受了待加入设备的公钥和指定 key epoch，不包含同步主密钥明文或恢复码。当前 Go storage 会在同一事务中把 join request 置为 active、写入授权记录、写入 wrapping metadata，并激活接收设备。
 
-`device_wrapping_records`：`domain_id`、`recipient_device_id`、`recipient_key_agreement_key_id`、`authorizer_device_id`、`key_epoch`、`wrapping_key_id`、`algorithm`、`nonce`、`wrapped_key_len`、`ciphertext_hash`、`created_at_ms`、`signature`、`blob_ref`。
+`device_wrapping_records`：`domain_id`、`recipient_device_id`、`recipient_key_agreement_key_id`、`authorizer_device_id`、`key_epoch`、`wrapping_key_id`、`algorithm`、`nonce`、`wrapped_key_len`、`ciphertext_hash`、`created_at_ms`、`signature_record_type`、`signature_schema_version`、`signature_algorithm`、`signature_key_id`、`signature`、`blob_ref`。
 
 包装记录只保存给指定设备的包装密文元数据、签名和密文 blob ref，不保存 `SyncMasterKey`、`DeviceWrappingKey` 或恢复码明文。`recipient_key_agreement_key_id` 必须与已签名 authorization 和加入 profile 一致，使 HTTP 响应能够完整重建 wrapped epoch v1 AAD；不能在读取时从可变的当前设备 profile 猜测。当前 Go storage 已在授权事务中保存 / 读取 wrapped key bytes，并按 `wrapped_key_len` 与 `ciphertext_hash` 复验；该字段只能是密文 bytes。
 
@@ -91,13 +91,13 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名。AD
 
 ## 当前 Go storage surface
 
-当前 `server/sync-server/internal/storage.Store` 是 HTTP handler 前的内部边界，已经落地 `CreateDomain`、`Domain`、`Device`、`LifecycleSnapshot`、`LifecycleEventsAfter`、`SaveJoinRequest`、`PendingJoinRequests`、`AuthorizeJoinRequest`、`DeviceWrappedKey`、`RevokeDevice`、`PutRecoveryRecord`、`LatestRecoveryRecord`、`LatestRecoveryWrappedMaterial`、`PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`。
+当前 `server/sync-server/internal/storage.Store` 是 HTTP handler 前的内部边界，已经落地 `CreateDomain`、`Domain`、`Device`、`LifecycleSnapshot`、`LifecycleEventsAfter`、`SaveJoinRequest`、`PendingJoinRequests`、`AuthorizeJoinRequest`、`PutEpochDistribution`、`DeviceWrappedKey`、`RevokeDevice`、`PutRecoveryRecord`、`LatestRecoveryRecord`、`LatestRecoveryWrappedMaterial`、`PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`。
 
 这组方法当前用于验证 metadata、设备状态、版本冲突、blob 写入和错误语义，不等同于完整产品入口。对象 change cursor、对象 discovery 分页和设备 lifecycle cursor 已落地；审计日志查询和持久限速器仍未落地。产品编排不得用 `updated_after_ms`、客户端时间或逐个猜测 object/version 代替 discovery。
 
-当前 storage conformance 已覆盖：第一台设备必须为 `active` 且显式携带受支持签名算法；join request 从 `pending` 授权到 `active`；wrapped device key bytes 随授权事务保存并可按 metadata 读取；revoked 设备和旧 `key_epoch` 写入被拒绝；object version 冲突与 blob hash/length 复验；signed object manifest、device authorization、device revocation 和 recovery record 字段篡改会被验签拒绝。Rust/Go 另共同读取同一 profile fixture，覆盖两个算法正向签名和固定负向错误。
+当前 storage conformance 已覆盖：第一台设备必须为 `active` 且显式携带受支持签名算法；join request 从 `pending` 授权到 `active`；wrapped bytes 随授权或完整 active cohort distribution 原子保存并可按 metadata 读取；revoked 设备和旧 `key_epoch` 写入被拒绝；object version 冲突与 blob hash/length 复验；signed object manifest、device authorization、device revocation、epoch distribution 和 recovery record 字段篡改会被验签拒绝。Rust/Go 另共同读取同一 profile fixture，覆盖两个算法正向签名和固定负向错误。
 
-当前 storage 已在写入前使用设备登记的 `signing_algorithm + signing_public_key` 验证 object manifest、device authorization、device revocation 和 recovery record；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list，不在失败时尝试另一 verifier。HTTP API 已覆盖 domain/device/join、authorization、recovery 与 object version 路径；签名错误对外保持顶层 `invalid_signature`，并以脱敏 `error_detail` 区分算法、编码、验签和 key lifetime。runtime 使用 idempotent schema migration，历史缺列行固定回填 `ed25519-v1`；审计与日志不包含 request body、public key、signature 或 canonical bytes。
+当前 storage 已在写入前使用设备登记的 `signing_algorithm + signing_public_key` 验证 object manifest、device authorization、device revocation、epoch distribution 和 recovery record；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list，不在失败时尝试另一 verifier。HTTP API 已覆盖 domain/device/join、authorization、epoch distribution、recovery 与 object version 路径；签名错误对外保持顶层 `invalid_signature`，并以脱敏 `error_detail` 区分算法、编码、验签和 key lifetime。runtime 使用 idempotent schema migration；审计与日志不包含 request body、public key、signature 或 canonical bytes。
 
 metadata schema 的算法迁移必须区分“历史兼容”与“新写入契约”：全新 schema 的 `devices.signing_algorithm` 和 `device_join_requests.signing_algorithm` 是无默认值的 `NOT NULL` 字段；旧数据库只允许迁移事务在增加缺失列时用 `ed25519-v1` 回填历史行，并记录 metadata schema version 2。迁移后 application/storage 仍必须为每个新 device/join 显式写入算法，不能依赖 SQLite 列默认值把缺失请求解释成 Ed25519；API DTO 缺失、空值或未知算法必须在进入持久化前失败关闭。
 
@@ -114,7 +114,17 @@ metadata schema 的算法迁移必须区分“历史兼容”与“新写入契�
 - query 只接受单个非空 `wrapping_key_id`；epoch 必须为正整数。未知 query、重复参数、跨 recipient、错误 epoch/key id 与不存在记录失败关闭，不做“最新记录”猜测。
 - wrapped bytes 固定上限为 64 KiB；授权写入、storage validation、HTTP 读取和 Rust response validation 使用同一上限。长度、裸密文 SHA-256、nonce、算法、recipient key id 或其他 AAD 字段不一致时不得缓存或解封。
 - 审计只记录 route、domain、recipient、epoch、结果码和密文字节数，不记录 query value、nonce、ciphertext hash、wrapped bytes、signature 或平台错误文本。
-- 本批只开放授权事务已经写入记录的精确读取。多台仍 active 设备在撤销/轮换后接收新 epoch 的独立 signed distribution upload 尚未设计，不能通过复用 join authorization 或直接写 storage 绕过。
+- 精确读取同时承载 join authorization 产生的初始 record 与独立 `epoch_distribution` record。前者的信任来自已验证 lifecycle authorization；后者必须返回 `signature_record_type` 与完整 signature metadata，由客户端按 trusted distributor profile 复验后才能缓存。
+
+### Signed epoch distribution 上传
+
+轮换分发固定为 `POST /api/v1/domains/{domain_id}/epoch-distributions`。请求携带 `distributor_device_id`、目标 `key_epoch` 和最多 64 条独立 signed record；每条包含 recipient/key-agreement key id、wrapped epoch v1 metadata、wrapped bytes 与 `epoch_distribution` signature metadata。请求必须携带与 distributor 相同的 `X-RadishLex-Device-ID`，但 header 只作为访问声明，不能替代记录签名。
+
+- `key_epoch` 必须等于事务中 domain `current_key_epoch`；distributor 和全部 recipients 必须在同一观察点为 active。recipient 集合必须无重复并精确等于当前 active 设备全集，因此 revoked/pending/lost 设备不能取得新 epoch，漏发某台 active 设备也不能形成已接受批次。
+- 每条 `epoch_distribution` canonical bytes 完整签入 distributor/domain/recipient/recipient key-agreement key id/epoch/wrapping key id/algorithm/nonce/wrapped length/ciphertext hash/created time。server 使用 distributor 当前登记的 signing profile 验签，并复核 recipient 当前 key-agreement key id。
+- 每条 wrapped bytes 上限 64 KiB，整批合计上限 4 MiB。所有 metadata、hash、签名、active cohort 与 blob staging 都通过后，metadata 在一个 transaction 中提交；任一记录失败不得产生可读取的部分批次。
+- 精确整批重放返回成功并报告 `inserted_records=0`；既有 locator 的 metadata/hash/bytes 不同返回 `conflict_epoch_distribution`。混合“已精确接受 + 尚缺记录”的重试只补齐缺记录，但仍需请求覆盖完整 active cohort。
+- runtime/audit 只记录 route、distributor、epoch、结果码、record count 和总密文字节数，不记录 recipient key id、wrapping key id、nonce、hash、signature 或 wrapped bytes。
 
 ### 单用户访问 token
 
@@ -177,7 +187,7 @@ OIDC / Radish 产品账号体系接入已后置为未来专题，见 `docs/sync-
 
 `POST /api/v1/domains/{domain_id}/devices/{device_id}/revocations`
 
-- `active` 设备提交 signed revocation、`previous_key_epoch`、`new_key_epoch` 和可选新 epoch 包装记录集合。
+- `active` 设备只提交 signed revocation、`previous_key_epoch` 与 `new_key_epoch`；新 epoch 包装记录必须通过独立 distribution endpoint 提交，不能混入撤销 canonical record。
 - 服务端验证 revoker 是 `active`，`new_key_epoch` 大于当前 epoch，签名有效。
 - 通过后标记目标设备 `revoked` / `lost`，推进 domain `current_key_epoch`。
 
@@ -299,7 +309,8 @@ latest_ciphertext_hash
 - `not_found`：domain、device、object、version 或 recovery record 不存在。
 - `conflict_stale_base_version`：上传基于旧版本，客户端必须拉取并合并。
 - `conflict_object_version`：同一对象版本存在但 ciphertext hash 不一致。
-- `invalid_signature`：对象 manifest、授权、撤销或恢复记录验签失败。
+- `conflict_epoch_distribution`：同一 recipient/epoch/wrapping key locator 已存在不同 metadata、hash 或 bytes。
+- `invalid_signature`：对象 manifest、授权、撤销、epoch distribution 或恢复记录验签失败。
 - `invalid_ciphertext_metadata`：payload 长度、ciphertext hash 或 algorithm metadata 与请求不一致。
 - `payload_too_large`：超过服务端配置的对象大小上限。
 - `recovery_rate_limited`：恢复记录读取或恢复尝试触发限速。
@@ -419,6 +430,7 @@ latest_ciphertext_hash
 - 同一 `object_id + version + ciphertext_hash` 重试幂等；同版本不同 hash 拒绝。
 - revoked / pending / unknown device 不能上传对象、授权设备或替换恢复记录。
 - 撤销后 `current_key_epoch` 推进，低于当前 epoch 的新对象写入被拒绝。
+- epoch distribution 必须覆盖完整 active cohort；坏签名、错误 recipient key 或漏发时无可读取部分 metadata，精确批次重放幂等，locator 分叉返回专用冲突。
 - signed object manifest、device authorization、device revocation 和 recovery record 验签失败时拒绝写入；Go storage conformance 已覆盖字段篡改失败路径。
 - recovery record 读取和替换遵守限速与签名校验，不接受恢复码明文。
 - SQLite transaction 失败时不留下可达 metadata；blob 写入失败时不提交 metadata。
@@ -460,7 +472,8 @@ latest_ciphertext_hash
 27. 已按 `docs/sync-orchestration.md` 增加 domain 内 change sequence、opaque cursor discovery storage/API、Rust remote DTO 和分页/幂等/非法 cursor 测试；对象增量同步不能用时间戳过滤替代。
 28. 已补独立 lifecycle sequence、snapshot / events API、设备 revocation API、Rust trust-anchor signed chain verifier、`profile-sha256-v1` 公钥绑定 challenge 和 userdb schema v6 public cache；两个文件 userdb 已在短生命周期 Go HTTP 中完成授权、同步、撤销、缓存和重启恢复。
 29. Rust userdb schema 已升至 v7，结构化缓存签名链绑定的 key-agreement key id/public key，并只保存版本化 wrapped epoch ciphertext；`ProductWrappedEpochMaterialStore` 与 Apple signing/key-agreement adapter 已落地。
-30. Go metadata schema v5 已结构化保存 wrapping record 的 recipient key-agreement key id；精确 wrapped epoch GET handler、transport device identity、active-before-blob storage 门禁、64 KiB 上限、Rust remote source与 userdb 幂等/fork cache 已接入双文件 Go HTTP 授权/轮换/撤销/重启证据。当前只读取 join authorization 已写入的 record；多 active 设备轮换后的独立 signed distribution upload 仍未设计。
+30. Go metadata schema v5 已结构化保存 wrapping record 的 recipient key-agreement key id；精确 wrapped epoch GET handler、transport device identity、active-before-blob storage 门禁、64 KiB 上限、Rust remote source与 userdb 幂等/fork cache 已接入双文件 Go HTTP 授权/轮换/撤销/重启证据。
+31. Go metadata schema v6 已追加 wrapping signature source/profile，独立 signed epoch distribution endpoint 与 storage transaction 已覆盖完整 active cohort、64 条/64 KiB/4 MiB 上限、坏签名无部分可读、精确重放幂等和 locator 分叉冲突；Rust remote client 在上传前验证 trusted lifecycle，在下载后复验 distributor signature。A/B/C Go HTTP 证据覆盖 B 撤销后 A/C 取得 epoch 2、历史 epoch 与 userdb/provider 重启恢复。
 
 任何阶段都不应把 Flutter manager、平台壳、真实系统输入法服务或输入热路径接入 Go server。
 

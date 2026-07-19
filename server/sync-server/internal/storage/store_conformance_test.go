@@ -225,6 +225,67 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 		}
 	})
 
+	t.Run("atomically distributes current epoch to the complete active cohort", func(t *testing.T) {
+		ctx := context.Background()
+		store := newReadyStore(t, newStore)
+		saveJoinAndAuthorize(t, store, "domain-a", "join-b", "device-b", 20)
+		saveJoinAndAuthorize(t, store, "domain-a", "join-c", "device-c", 25)
+		revocation := DeviceRevocation{
+			DomainID: "domain-a", RevokedDeviceID: "device-c", RevokerDeviceID: "device-a",
+			PreviousKeyEpoch: 1, NewKeyEpoch: 2, Reason: "lost", CreatedAtMs: 30,
+		}
+		signRevocationForTest(&revocation)
+		if err := store.RevokeDevice(ctx, revocation); err != nil {
+			t.Fatalf("revoke device before distribution: %v", err)
+		}
+
+		upload := epochDistributionUploadForTest(2, "device-a", "device-b")
+		partialFailure := upload
+		partialFailure.Records = append([]DeviceWrappingUpload(nil), upload.Records...)
+		partialFailure.Records[1].Record.Signature = cloneBytes(upload.Records[1].Record.Signature)
+		partialFailure.Records[1].Record.Signature[0] ^= 0x80
+		if _, err := store.PutEpochDistribution(ctx, partialFailure); !IsCode(err, ErrInvalidSignature) {
+			t.Fatalf("invalid record should reject the whole distribution, got %v", err)
+		}
+		if _, _, err := store.DeviceWrappedKey(ctx, "domain-a", "device-a", 2, "epoch-2-device-a"); !IsCode(err, ErrNotFound) {
+			t.Fatalf("partial failure must not expose an accepted record, got %v", err)
+		}
+
+		missingRecipient := upload
+		missingRecipient.Records = upload.Records[:1]
+		if _, err := store.PutEpochDistribution(ctx, missingRecipient); !IsCode(err, ErrInvalidRequest) {
+			t.Fatalf("incomplete active cohort must fail, got %v", err)
+		}
+
+		result, err := store.PutEpochDistribution(ctx, upload)
+		if err != nil {
+			t.Fatalf("put complete epoch distribution: %v", err)
+		}
+		if result.AcceptedRecords != 2 || result.InsertedRecords != 2 || result.KeyEpoch != 2 {
+			t.Fatalf("unexpected distribution result: %#v", result)
+		}
+		retry, err := store.PutEpochDistribution(ctx, upload)
+		if err != nil || retry.InsertedRecords != 0 || retry.AcceptedRecords != 2 {
+			t.Fatalf("exact distribution retry must be idempotent: result=%#v err=%v", retry, err)
+		}
+		if _, wrapped, err := store.DeviceWrappedKey(ctx, "domain-a", "device-b", 2, "epoch-2-device-b"); err != nil || string(wrapped) != string(upload.Records[1].WrappedKey) {
+			t.Fatalf("active recipient should read distributed material: wrapped=%x err=%v", wrapped, err)
+		}
+		if _, _, err := store.DeviceWrappedKey(ctx, "domain-a", "device-c", 2, "epoch-2-device-c"); !IsCode(err, ErrForbiddenDevice) {
+			t.Fatalf("revoked recipient must remain blocked, got %v", err)
+		}
+
+		conflict := upload
+		conflict.Records = append([]DeviceWrappingUpload(nil), upload.Records...)
+		conflict.Records[1].WrappedKey = []byte{0x99, 0x98, 0x97}
+		conflict.Records[1].Record.WrappedKeyLen = int64(len(conflict.Records[1].WrappedKey))
+		conflict.Records[1].Record.CiphertextHash = DeviceWrappedKeyCiphertextHash(conflict.Records[1].Record, conflict.Records[1].WrappedKey)
+		signEpochDistributionForTest(&conflict.Records[1].Record)
+		if _, err := store.PutEpochDistribution(ctx, conflict); !IsCode(err, ErrConflictEpochDistribution) {
+			t.Fatalf("same locator with different material must conflict, got %v", err)
+		}
+	})
+
 	t.Run("join authorization activates device and stores wrapped key bytes", func(t *testing.T) {
 		ctx := context.Background()
 		store := newReadyStore(t, newStore)
@@ -509,6 +570,62 @@ func joinAuthorizationFixture(domainID string, joinID string, deviceID string, a
 
 func wrappedKeyForTest() []byte {
 	return []byte{0x21, 0x22}
+}
+
+func epochDistributionUploadForTest(keyEpoch uint64, recipients ...string) EpochDistributionUpload {
+	records := make([]DeviceWrappingUpload, 0, len(recipients))
+	for index, recipient := range recipients {
+		wrapped := []byte{byte(0x70 + index), byte(keyEpoch), byte(index + 1)}
+		recipientKeyID := "agreement-key-" + recipient
+		if recipient == "device-a" {
+			recipientKeyID = "agreement-key-a"
+		}
+		record := DeviceWrappingRecord{
+			DomainID:                   "domain-a",
+			RecipientDeviceID:          recipient,
+			RecipientKeyAgreementKeyID: recipientKeyID,
+			AuthorizerDeviceID:         "device-a",
+			KeyEpoch:                   keyEpoch,
+			WrappingKeyID:              "epoch-" + strconv.FormatUint(keyEpoch, 10) + "-" + recipient,
+			Algorithm:                  AlgorithmWrappedEpochP256ECDHV1,
+			Nonce:                      []byte{byte(keyEpoch), byte(index + 1)},
+			WrappedKeyLen:              int64(len(wrapped)),
+			CreatedAtMs:                40,
+			SignatureRecordType:        WrappingSignatureEpochDistribution,
+		}
+		record.CiphertextHash = DeviceWrappedKeyCiphertextHash(record, wrapped)
+		signEpochDistributionForTest(&record)
+		records = append(records, DeviceWrappingUpload{Record: record, WrappedKey: wrapped})
+	}
+	return EpochDistributionUpload{
+		DomainID:            "domain-a",
+		DistributorDeviceID: "device-a",
+		KeyEpoch:            keyEpoch,
+		Records:             records,
+	}
+}
+
+func signEpochDistributionForTest(record *DeviceWrappingRecord) {
+	fields := signatureFieldsForTest(record.AuthorizerDeviceID)
+	record.SignatureSchemaVersion = fields.SchemaVersion
+	record.SignatureAlgorithm = fields.Algorithm
+	record.SignatureKeyID = fields.KeyID
+	record.Signature = ed25519.Sign(signingPrivateKeyForTest(record.AuthorizerDeviceID), canonicalSignatureBytes("epoch_distribution", []signatureField{
+		textField("signature_schema_version", "1"),
+		textField("signature_algorithm", signatureAlgorithm),
+		textField("signature_key_id", fields.KeyID),
+		textField("distributor_device_id", record.AuthorizerDeviceID),
+		textField("domain_id", record.DomainID),
+		textField("recipient_device_id", record.RecipientDeviceID),
+		textField("recipient_key_agreement_key_id", record.RecipientKeyAgreementKeyID),
+		textField("key_epoch", uint64String(record.KeyEpoch)),
+		textField("wrapping_key_id", record.WrappingKeyID),
+		textField("envelope_algorithm", record.Algorithm),
+		bytesField("envelope_nonce", record.Nonce),
+		textField("wrapped_key_len", int64String(record.WrappedKeyLen)),
+		textField("ciphertext_hash", record.CiphertextHash),
+		textField("created_at_ms", int64String(record.CreatedAtMs)),
+	}))
 }
 
 func objectUpload(domainID string, objectID string, deviceID string, version uint64, baseVersion uint64, keyEpoch uint64, payload []byte) ObjectVersionUpload {

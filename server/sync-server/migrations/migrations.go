@@ -41,11 +41,82 @@ func Apply(db *sql.DB) error {
 	if err := ensureDeviceWrappingRecipientKey(tx); err != nil {
 		return err
 	}
-	if _, err := tx.Exec("PRAGMA user_version = 5"); err != nil {
+	if err := ensureDeviceWrappingSignatureMetadata(tx); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("PRAGMA user_version = 6"); err != nil {
 		return fmt.Errorf("record metadata schema version: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit metadata migration: %w", err)
+	}
+	return nil
+}
+
+func ensureDeviceWrappingSignatureMetadata(tx *sql.Tx) error {
+	columns := []struct {
+		name       string
+		definition string
+	}{
+		{"signature_record_type", "TEXT NOT NULL DEFAULT ''"},
+		{"signature_schema_version", "INTEGER NOT NULL DEFAULT 0"},
+		{"signature_algorithm", "TEXT NOT NULL DEFAULT ''"},
+		{"signature_key_id", "TEXT NOT NULL DEFAULT ''"},
+	}
+	for _, column := range columns {
+		hasColumn, err := columnExists(tx, "device_wrapping_records", column.name)
+		if err != nil {
+			return err
+		}
+		if !hasColumn {
+			if _, err := tx.Exec("ALTER TABLE device_wrapping_records ADD COLUMN " + column.name + " " + column.definition); err != nil {
+				return fmt.Errorf("add wrapping %s: %w", column.name, err)
+			}
+		}
+	}
+	if _, err := tx.Exec(`
+		UPDATE device_wrapping_records
+		SET signature_record_type = 'device_authorization',
+			signature_schema_version = COALESCE((
+				SELECT signature_schema_version FROM device_authorizations
+				WHERE device_authorizations.domain_id = device_wrapping_records.domain_id
+					AND device_authorizations.recipient_device_id = device_wrapping_records.recipient_device_id
+					AND device_authorizations.key_epoch = device_wrapping_records.key_epoch
+				LIMIT 1
+			), 1),
+			signature_algorithm = COALESCE((
+				SELECT signature_algorithm FROM device_authorizations
+				WHERE device_authorizations.domain_id = device_wrapping_records.domain_id
+					AND device_authorizations.recipient_device_id = device_wrapping_records.recipient_device_id
+					AND device_authorizations.key_epoch = device_wrapping_records.key_epoch
+				LIMIT 1
+			), (SELECT signing_algorithm FROM devices
+				WHERE devices.domain_id = device_wrapping_records.domain_id
+					AND devices.device_id = device_wrapping_records.authorizer_device_id), ''),
+			signature_key_id = COALESCE((
+				SELECT signature_key_id FROM device_authorizations
+				WHERE device_authorizations.domain_id = device_wrapping_records.domain_id
+					AND device_authorizations.recipient_device_id = device_wrapping_records.recipient_device_id
+					AND device_authorizations.key_epoch = device_wrapping_records.key_epoch
+				LIMIT 1
+			), (SELECT signing_public_key_id FROM devices
+				WHERE devices.domain_id = device_wrapping_records.domain_id
+					AND devices.device_id = device_wrapping_records.authorizer_device_id), '')
+		WHERE signature_record_type = '' OR signature_schema_version = 0
+	`); err != nil {
+		return fmt.Errorf("backfill wrapping signature metadata: %w", err)
+	}
+	var invalid int
+	if err := tx.QueryRow(`
+		SELECT COUNT(*) FROM device_wrapping_records
+		WHERE signature_record_type NOT IN ('device_authorization', 'epoch_distribution')
+			OR signature_schema_version != 1
+			OR signature_algorithm = '' OR signature_key_id = ''
+	`).Scan(&invalid); err != nil {
+		return fmt.Errorf("validate wrapping signature metadata: %w", err)
+	}
+	if invalid != 0 {
+		return fmt.Errorf("validate wrapping signature metadata: %d rows are invalid", invalid)
 	}
 	return nil
 }
