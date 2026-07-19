@@ -28,7 +28,9 @@ signed epoch distribution 已原子覆盖当前 active cohort：Go 同事务验�
 
 signed recovery record 撤销也已闭合：active revoker 签名绑定目标/domain/epoch/reason/time；Go 原子保存公开 decision、标记当前 head 为 `revoked` 并追加 lifecycle。重放幂等，分叉、陈旧目标和身份/签名篡改失败；latest 消失，activation/revocation 线性化。后续可用全新材料严格承接 revoked head，但旧状态不变。Rust、Memory/SQLite、Go HTTP 与 userdb v9 重启均有脱敏证据。
 
-`apple-keychain` feature 已提供 Apple signing adapters 与独立 `AppleSecureEnclaveP256KeyAgreementStore`，但本批未调用系统 API、未创建/读取/删除真实条目。普通 DPK P-256 可导出而被 production gate 拒绝；Secure Enclave signing 已有 lifecycle、不可导出、hardware-backed、denied 与真实锁屏证据，unsupported、最终产品资格和独立 key-agreement 实机资格仍缺外部证据。
+部署 hardening 已闭合非 root UID/GID、drop capabilities、只读 root、私有 metadata/blob leaf 与 symlink 门禁；Docker 预演证明 token、`0700/0600`、日志、冷备份和隔离恢复。它只是 `local_smoke`，不能替代目标证书、发布镜像和备份/升级演练。
+
+Apple signing/key-agreement adapters 已接线但本批未调用系统 API。普通 DPK 可导出而被拒；Secure Enclave signing 已有不可导出、hardware-backed、denied 与锁屏证据，unsupported、最终产品资格和独立 key-agreement 实机资格仍缺外部证据。
 
 当前生产阻塞项：发布级目标部署运行证据、合格生产 signing/key-agreement backend，以及窄 `ManagerBridge` 产品链均未闭环。开发者当前没有真实 unsupported 环境，不得在当前设备伪造，也不得据此开启 `product_qualified` 或 `user_sync_enabled`。
 
@@ -43,7 +45,7 @@ signed recovery record 撤销也已闭合：active revoker 签名绑定目标/do
 
 ## 下一步顺位
 
-1. 补发布级目标部署运行证据，优先按生产部署 runbook 核对目标 TLS、认证、权限、冷备份/恢复、升级回滚与日志脱敏；不把本地 Compose smoke 冒充发布环境证据。
+1. 在实际目标环境按生产 runbook 生成并校验 `deployment_evidence.v1`：固定非浮动镜像 tag，核对 TLS、认证、runtime identity/权限、冷备份/恢复、升级回滚和日志脱敏；当前没有目标环境证据包。
 2. unsupported 继续保留为外部环境阻塞，目标环境可得时再按独立授权执行 probe，当前设备不得替代该证据。
 3. 需要真实创建、读取或删除 Keychain/Secure Enclave 条目时单独申请授权；合成 backend 不记为实机资格。
 4. lifecycle/material/recovery 与部署证据稳定后才接窄 `ManagerBridge` command/status；满足恢复、授权、撤销、轮换和 backend 门禁后再评估开放用户同步。

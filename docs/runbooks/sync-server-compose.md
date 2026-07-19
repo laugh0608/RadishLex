@@ -163,10 +163,11 @@ go test ./...
 
 - 在仓库外创建临时 env 和临时持久化数据目录。
 - 生成随机 `RADISHLEX_SYNC_ACCESS_TOKEN`，并在输出中脱敏。
+- 把容器 runtime identity 临时映射为当前宿主 UID/GID，使 bind mount 可在 `0700` 下工作；生产默认仍为 `10001:10001`，目标数据目录必须提前匹配 owner。
 - 使用部署态 `docker-compose.yaml` 启动 HTTP upstream，不使用本地 Caddy HTTPS 文件。
 - 验证无 token 请求返回 `401 unauthenticated`，带 token 请求返回结构化业务响应。
-- 检查 SQLite metadata、encrypted blob dir 和 runtime log 脱敏。
-- 执行一次冷备份到临时目录，再恢复到隔离数据目录并复验 auth gate。
+- 检查 env `0600`、数据目录 `0700`、SQLite `0600`、encrypted blob dir、container hardening 和 runtime log 脱敏。
+- 执行一次不包含 env/token 的冷备份到临时目录，再恢复到隔离数据目录并复验 auth gate与权限不放宽。
 - 结束后执行 `docker compose down` 并删除临时 env / 数据目录。
 
 只验证配置解析，不启动容器：

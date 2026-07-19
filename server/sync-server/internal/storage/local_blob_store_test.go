@@ -37,8 +37,44 @@ func TestLocalObjectBlobStoreStagesCommitsAndReadsEncryptedBytes(t *testing.T) {
 	if !bytes.Equal(readPayload, payload) {
 		t.Fatalf("payload mismatch: got %x want %x", readPayload, payload)
 	}
+	finalPath := filepath.Join(root, filepath.FromSlash(finalRef))
+	if info, err := os.Lstat(finalPath); err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("committed blob must be a private regular file: info=%v err=%v", info, err)
+	}
 	if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(staged.TempRef()))); !os.IsNotExist(err) {
 		t.Fatalf("temp blob should be removed after commit, got %v", err)
+	}
+}
+
+func TestLocalObjectBlobStoreRestrictsExistingBlobAndRejectsSymlink(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	store := newLocalObjectBlobStoreForTest(t, root)
+	finalRef := "objects/domain-a/object-a/1/sha256-private"
+	finalPath := filepath.Join(root, filepath.FromSlash(finalRef))
+	if err := os.MkdirAll(filepath.Dir(finalPath), 0o700); err != nil {
+		t.Fatalf("create blob parent: %v", err)
+	}
+	if err := os.WriteFile(finalPath, []byte{0x91}, 0o666); err != nil {
+		t.Fatalf("create broad blob: %v", err)
+	}
+	if err := os.Chmod(finalPath, 0o666); err != nil {
+		t.Fatalf("broaden blob: %v", err)
+	}
+	if _, err := store.ReadObjectBlob(ctx, finalRef); err != nil {
+		t.Fatalf("read broad blob: %v", err)
+	}
+	if info, err := os.Lstat(finalPath); err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("existing blob mode was not restricted: info=%v err=%v", info, err)
+	}
+
+	symlinkRef := "objects/domain-a/object-a/1/sha256-symlink"
+	symlinkPath := filepath.Join(root, filepath.FromSlash(symlinkRef))
+	if err := os.Symlink(finalPath, symlinkPath); err != nil {
+		t.Fatalf("create blob symlink: %v", err)
+	}
+	if _, err := store.ReadObjectBlob(ctx, symlinkRef); !IsCode(err, ErrStorageUnavailable) {
+		t.Fatalf("symlinked blob must fail closed, got %v", err)
 	}
 }
 

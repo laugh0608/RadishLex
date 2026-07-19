@@ -76,6 +76,8 @@ REQUIRED_FILES = [
     "scripts/check-repo.sh",
     "scripts/check-sync-deployment-evidence.py",
     "scripts/check-sync-deployment-evidence.sh",
+    "scripts/check-sync-server-deployment-rehearsal.py",
+    "scripts/check-sync-server-deployment-rehearsal.sh",
     "scripts/check-sync-server-connection-health.py",
     "scripts/check-sync-server-connection-health.sh",
     "scripts/check-text-files.py",
@@ -326,6 +328,33 @@ def check_deployment_evidence() -> None:
     run_script("check-sync-deployment-evidence.py", ["--self-test"])
 
 
+def check_sync_deployment_hardening() -> None:
+    production_compose = read_text("deploy/sync-server/docker-compose.yaml")
+    for phrase in (
+        'user: "${RADISHLEX_SYNC_RUNTIME_UID:-10001}:${RADISHLEX_SYNC_RUNTIME_GID:-10001}"',
+        "read_only: true",
+        "cap_drop:\n      - ALL",
+        "no-new-privileges:true",
+        '"${RADISHLEX_SYNC_BIND:-127.0.0.1}:${RADISHLEX_SYNC_PORT:-7319}:7319"',
+    ):
+        if phrase not in production_compose:
+            raise SystemExit(f"production sync compose is missing hardening contract: {phrase}")
+
+    dockerfile = read_text("server/sync-server/Dockerfile")
+    if "USER 10001:10001" not in dockerfile:
+        raise SystemExit("sync server runtime image must use the fixed non-root identity")
+
+    private_storage = read_text("server/sync-server/internal/runtime/private_storage.go")
+    for phrase in ("0o700", "0o600", "os.Lstat", "os.ModeSymlink", "os.Chmod"):
+        if phrase not in private_storage:
+            raise SystemExit(f"sync private storage gate is missing contract phrase: {phrase}")
+
+    rehearsal = read_text("scripts/check-sync-server-deployment-rehearsal.py")
+    for phrase in ("runtime_identity()", "0o700", "0o600", "assert_backup_safe", "refuses to run the sync container as root"):
+        if phrase not in rehearsal:
+            raise SystemExit(f"sync deployment rehearsal is missing hardening contract: {phrase}")
+
+
 def check_sync_connection_health() -> None:
     run_script("check-sync-server-connection-health.py", ["--self-test"])
 
@@ -354,6 +383,7 @@ def main() -> int:
     check_ruleset_and_workflows()
     check_path_budget()
     check_deployment_evidence()
+    check_sync_deployment_hardening()
     check_sync_connection_health()
     if not args.skip_go:
         check_go_server()

@@ -7,6 +7,7 @@ services:
       context: ../../server/sync-server
       dockerfile: Dockerfile
     init: true
+    user: "10001:10001"
     restart: unless-stopped
     environment:
       RADISHLEX_SYNC_LISTEN: "0.0.0.0:7319"
@@ -19,6 +20,8 @@ services:
     volumes:
       - sync-server-data:/var/lib/radishlex
     read_only: true
+    cap_drop:
+      - ALL
     tmpfs:
       - /tmp
     security_opt:
