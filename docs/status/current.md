@@ -26,11 +26,11 @@ A/B/C Go HTTP 已证明 B 撤销后仅 A/C 取得 epoch 2，历史/当前 epoch 
 
 部署 hardening 与本地 HTTPS 子阶段已通过：Compose/Caddy internal TLS、bearer 负向响应、loopback-only、非 root/只读/cap drop、`0700/0600`、symlink 拒绝、冷备份/隔离恢复、日志脱敏和资源清理均有真实门禁。
 
-Apple signing/key-agreement adapters 已接线。独立 key-agreement ABI、六场景产品调度、固定脱敏摘要与 runbook 已落地。ad-hoc denied 已真实返回 missing-entitlement `-34018` 并尝试 cleanup，没有创建 item。资格 bundle 因当前 identity 与旧 profile Team 不一致、Xcode 又缺当前 Team account/profile 而停止，lifecycle/locked 未执行。普通 DPK 可导出而被拒；Secure Enclave signing 已有不可导出、hardware-backed、denied 与锁屏证据，unsupported 和最终产品资格仍缺外部证据。
+Apple signing/key-agreement adapters 已接线。独立 key-agreement ABI、六场景调度与脱敏摘要已落地。ad-hoc denied 返回 missing-entitlement `-34018`；Team/profile 资格 bundle 下 lifecycle 完成 fresh public key、ECDH、wrapped epoch 往返、删除与 missing，设备锁定态返回 `PrivateKeyLocked/-25308`，解锁 cleanup 零残留。普通 DPK 可导出而被拒；两条 Secure Enclave backend 的 unsupported 和最终产品资格仍缺外部证据。
 
 Manager ABI v6 的 `radishlex_manager_sync_product_status` 只读固定数值 capability，不访问系统 key item。默认构建显示 signing 未编译，macOS 产品构建显示 Secure Enclave signing 产品资格待完成；畸形或自称开启同步的 native 状态降级为 `native_sync_product_status_invalid`。gate 始终 blocked，底层 Apple validation 不直接进入 Dart，也没有新增同步命令。
 
-当前 M3 阻塞项只剩合格生产 signing/key-agreement backend 的外部资格。正式域名、公开证书和目标生产备份/回滚演练按产品决策后移到首个正式版本发布后、准备启用真实生产同步前；本地证据不能冒充该后续证据。开发者当前没有真实 unsupported 环境；独立 key-agreement denied 已完成，但 lifecycle/locked 需要先恢复 Team/identity/profile 一致的资格 bundle，不得在 ad-hoc 产物或不匹配签名链上伪造，也不得据此开启 `product_qualified` 或 `user_sync_enabled`。
+当前 M3 阻塞项只剩生产 backend 外部资格。开发者没有真实 unsupported 环境；现有支持设备不得模拟该证据。资格 bundle 在构建时严格验签通过并完成全部可执行场景，但锁屏链结束后的同产物 trust recheck 返回 `CSSMERR_TP_NOT_TRUSTED`，证书/Team/有效期和系统 Apple CA 链仍可读，必须另行复验，不能静默忽略。正式域名、公开证书和目标生产演练按产品决策后移到首版发布后；`product_qualified/user_sync_enabled` 继续关闭。
 
 ## 当前停止线
 
@@ -43,8 +43,8 @@ Manager ABI v6 的 `radishlex_manager_sync_product_status` 只读固定数值 ca
 
 ## 下一步顺位
 
-1. 下一顺位是由开发者恢复资格签名链：为当前有效 Apple Development identity 所属 Team 配置 Xcode account并取得匹配 profile，或恢复与旧 profile 同 Team 的有效 identity；之后重新冻结资格 bundle。不得手工重签或移除 entitlement 绕过。
-2. 资格 bundle 恢复后，现有授权范围内继续执行 key-agreement lifecycle、locked prepare、开发者手动锁屏、probe和解锁 cleanup；当前设备不能替代真实 unsupported 环境。
+1. 下一顺位是复验锁屏后的 Apple Development trust evaluation，区分临时 Keychain/trust 状态与产物签名问题；不得重签后把不同 hash 产物冒充本轮 lifecycle 证据。
+2. 在真实不支持 Secure Enclave 的环境可得时，分别执行 signing/key-agreement unsupported；当前设备不得模拟或改 capability 代替。
 3. 两条资格都通过后才重新审阅 `product_qualified`；在此之前不增加恢复、授权、撤销、轮换或上传成功入口，`user_sync_enabled=false`。
 4. 首个正式版本发布后、准备启用真实生产同步前，再在实际目标环境生成并校验 `deployment_evidence.v1`，复验正式域名/证书、固定镜像、权限、冷备份/恢复、升级回滚和日志脱敏。
 

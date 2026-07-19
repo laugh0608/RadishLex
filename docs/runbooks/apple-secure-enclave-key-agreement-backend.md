@@ -86,6 +86,10 @@ lifecycle 的通过条件是 `created/reloaded/public_key_matched/shared_secret_
 
 ## 当前实机证据
 
-2026-07-19 已在当前 ad-hoc Manager bundle 执行 denied create：固定摘要返回 missing-entitlement `-34018`，`fail_closed/expected_failure/cleanup_attempted=true`，没有创建合成 item。随后按授权尝试恢复 Apple Development 资格 bundle，但 Xcode 没有当前 identity 所属 Team 的 account/provisioning profile；本机旧 profile 属于另一 Team，不能与当前唯一有效 identity 混用。脚本在启动产品前失败，lifecycle、locked prepare/probe/cleanup 均未执行。
+2026-07-19 已在 ad-hoc Manager bundle 执行 denied create：固定摘要返回 missing-entitlement `-34018`，`fail_closed/expected_failure/cleanup_attempted=true`，没有创建合成 item。随后使用 Team `WF9UUN335P`、application/access group `WF9UUN335P.dev.radishlex.radishlexManager`、profile `7ab763be-90d8-4f19-90ac-69a5681323af`（有效至 2026-07-25）恢复资格 bundle；构建入口的 strict codesign 通过。证书名称括号中的 `ZF6QRGH28J` 是持有人标识，证书 OU 才是 Team ID，不得混淆。
 
-恢复条件只能是以下之一：在 Xcode 中为当前有效 identity 所属 Team 配置有效 account 并取得匹配 `dev.radishlex.radishlexManager` 的 Mac App Development profile，或恢复与旧 profile 同 Team 的有效 Apple Development identity。恢复后必须重新运行资格构建并冻结 Team、application identifier、access group、profile UUID/expiry 与产物 hash，不能手工重签、移除 entitlement 或使用 ad-hoc bundle冒充 lifecycle 资格。
+同一冻结 bundle 的 lifecycle 固定摘要为 `result=0 created=1 reloaded=1 public_key_matched=1 shared_secret_derived=1 wrapped_epoch_verified=1 deleted=1 missing=1 cleanup_required=0 cleanup_attempted=1`。locked prepare 在解锁态完成 ECDH并保留固定 item；开发者手动锁屏后 probe 返回 `PrivateKeyLocked/-25308`、`fail_closed/expected_failure=true`；解锁 cleanup 返回 `deleted=1 missing=1 cleanup_required=0`。本轮合成 item 已零残留。
+
+冻结 hash：`Info.plist=780d2ecb...451ce2`、主程序 `d80e3ff2...b4b5b`、FFI dylib `ddea6306...d5fe`、profile `e816e592...922b`。完整值记录于本周周志。
+
+锁屏链结束后对同一未改写产物再次执行 `codesign --verify --deep --strict` 返回 `CSSMERR_TP_NOT_TRUSTED`，Authority 显示 unavailable；当前 identity仍被 `security find-identity`列为 valid，证书有效期为 2026-07-11 至 2027-07-11，OU/Team 与 Apple WWDR/Root CA 均存在。该事后 trust anomaly 不改写已完成的 native lifecycle/locked/cleanup 结果，但在最终产品资格前必须独立复验；不能通过重签不同 hash 产物掩盖。本机仍缺真实 unsupported 环境，`runtime_qualified/product_qualified/user_sync_enabled` 保持 false。
