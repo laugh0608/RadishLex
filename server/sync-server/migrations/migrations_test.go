@@ -134,7 +134,7 @@ func TestApplyBackfillsHistoricalDeviceAlgorithmsAndIsIdempotent(t *testing.T) {
 	if err := db.QueryRow("PRAGMA user_version").Scan(&schemaVersion); err != nil {
 		t.Fatalf("read schema version: %v", err)
 	}
-	if schemaVersion != 6 {
+	if schemaVersion != 7 {
 		t.Fatalf("unexpected schema version: %d", schemaVersion)
 	}
 	var wrappingRecipientKeyID string
@@ -168,6 +168,62 @@ func TestApplyBackfillsHistoricalDeviceAlgorithmsAndIsIdempotent(t *testing.T) {
 	}
 	if lifecycleCount != 1 {
 		t.Fatalf("unexpected lifecycle backfill count: %d", lifecycleCount)
+	}
+}
+
+func TestRecoveryV2MigrationPreservesLegacyRecordWithoutV2ActivationMetadata(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = db.Close() })
+	if _, err := db.Exec(`
+		CREATE TABLE sync_domains (domain_id TEXT PRIMARY KEY);
+		INSERT INTO sync_domains (domain_id) VALUES ('domain-a');
+		CREATE TABLE recovery_records (
+			domain_id TEXT NOT NULL, recovery_record_id TEXT NOT NULL, key_epoch INTEGER NOT NULL,
+			kdf_profile TEXT NOT NULL, kdf_version INTEGER NOT NULL, memory_kib INTEGER NOT NULL,
+			iterations INTEGER NOT NULL, parallelism INTEGER NOT NULL, output_len INTEGER NOT NULL,
+			salt BLOB NOT NULL, algorithm TEXT NOT NULL, nonce BLOB NOT NULL,
+			wrapped_material_len INTEGER NOT NULL, ciphertext_hash TEXT NOT NULL,
+			status TEXT NOT NULL CHECK (status IN ('active', 'revoked')), created_at_ms INTEGER NOT NULL,
+			revoked_at_ms INTEGER NOT NULL DEFAULT 0, signer_device_id TEXT NOT NULL,
+			signature_schema_version INTEGER NOT NULL, signature_algorithm TEXT NOT NULL,
+			signature_key_id TEXT NOT NULL, signature BLOB NOT NULL, blob_ref TEXT NOT NULL,
+			PRIMARY KEY (domain_id, recovery_record_id)
+		);
+		INSERT INTO recovery_records VALUES (
+			'domain-a', 'recovery-legacy', 1, 'argon2id-v1', 1, 65536, 3, 4, 32,
+			x'01', 'xchacha20poly1305-hkdf-sha256-v1', x'02', 3, 'sha256:legacy',
+			'active', 100, 0, 'device-a', 1, 'ed25519-v1', 'signing-key-a', x'03', 'blob-a'
+		);
+	`); err != nil {
+		t.Fatalf("create legacy recovery schema: %v", err)
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("begin migration: %v", err)
+	}
+	if err := ensureRecoveryRecordV2Metadata(tx); err != nil {
+		t.Fatalf("migrate recovery metadata: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit migration: %v", err)
+	}
+	var schemaVersion int
+	var previousID, activationAlgorithm string
+	var activationPublicKey []byte
+	var createdAt, updatedAt int64
+	if err := db.QueryRow(`
+		SELECT record_schema_version, previous_recovery_record_id, activation_algorithm,
+			activation_public_key, created_at_ms, updated_at_ms
+		FROM recovery_records WHERE domain_id = 'domain-a' AND recovery_record_id = 'recovery-legacy'
+	`).Scan(&schemaVersion, &previousID, &activationAlgorithm, &activationPublicKey, &createdAt, &updatedAt); err != nil {
+		t.Fatalf("read migrated recovery metadata: %v", err)
+	}
+	if schemaVersion != 1 || previousID != "" || activationAlgorithm != "" || len(activationPublicKey) != 0 || createdAt != updatedAt {
+		t.Fatalf("legacy recovery migration mismatch: schema=%d previous=%q activation=%q key=%x created=%d updated=%d", schemaVersion, previousID, activationAlgorithm, activationPublicKey, createdAt, updatedAt)
 	}
 }
 

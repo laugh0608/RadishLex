@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"os"
@@ -79,25 +80,30 @@ func TestSQLiteStoreLatestRecoveryWrappedMaterialDetectsMissingBlob(t *testing.T
 		t.Helper()
 		return store
 	})
-	wrapped := []byte{0xa1, 0xa2, 0xa3}
+	wrapped := bytes.Repeat([]byte{0xa1}, RecoveryWrappedMaterialBytes)
 	record := RecoveryRecord{
-		DomainID:           "domain-a",
-		RecoveryRecordID:   "recovery-a",
-		KeyEpoch:           1,
-		KDFProfile:         "argon2id-v1",
-		KDFVersion:         1,
-		MemoryKiB:          65536,
-		Iterations:         3,
-		Parallelism:        4,
-		OutputLen:          32,
-		Salt:               []byte{0x01, 0x02},
-		Algorithm:          AlgorithmXChaCha20Poly1305HKDFSHA256,
-		Nonce:              []byte{0x03, 0x04},
-		WrappedMaterialLen: int64(len(wrapped)),
-		CiphertextHash:     CiphertextHash(wrapped),
-		Status:             RecoveryRecordActive,
-		CreatedAtMs:        40,
-		SignerDeviceID:     "device-a",
+		RecordSchemaVersion:   RecoveryRecordSchemaVersionV2,
+		DomainID:              "domain-a",
+		RecoveryRecordID:      "recovery-a",
+		KeyEpoch:              1,
+		KDFProfile:            "argon2id-v1",
+		KDFVersion:            1,
+		MemoryKiB:             65536,
+		Iterations:            3,
+		Parallelism:           4,
+		OutputLen:             32,
+		Salt:                  bytes.Repeat([]byte{0x01}, RecoverySaltBytes),
+		Algorithm:             AlgorithmXChaCha20Poly1305HKDFSHA256,
+		Nonce:                 bytes.Repeat([]byte{0x03}, RecoveryNonceBytes),
+		WrappedMaterialLen:    int64(len(wrapped)),
+		CiphertextHash:        CiphertextHash(wrapped),
+		ActivationAlgorithm:   SignatureAlgorithmEd25519V1,
+		ActivationPublicKeyID: "recovery-activation-key-a",
+		ActivationPublicKey:   make([]byte, 32),
+		Status:                RecoveryRecordActive,
+		CreatedAtMs:           40,
+		UpdatedAtMs:           40,
+		SignerDeviceID:        "device-a",
 	}
 	signRecoveryForTest(&record)
 	metadata, err := store.PutRecoveryRecord(context.Background(), RecoveryRecordUpload{Record: record, WrappedMaterial: wrapped})

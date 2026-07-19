@@ -102,6 +102,56 @@ type DeviceRevocationRequest struct {
 	Signature              []byte `json:"signature"`
 }
 
+type RecoveryRecordUploadRequest struct {
+	RecordSchemaVersion    uint16                       `json:"record_schema_version"`
+	RecoveryRecordID       string                       `json:"recovery_record_id"`
+	PreviousRecoveryID     string                       `json:"previous_recovery_id"`
+	KeyEpoch               uint64                       `json:"key_epoch"`
+	KDFProfile             string                       `json:"kdf_profile"`
+	KDFVersion             uint16                       `json:"kdf_version"`
+	MemoryKiB              uint32                       `json:"memory_kib"`
+	Iterations             uint32                       `json:"iterations"`
+	Parallelism            uint32                       `json:"parallelism"`
+	OutputLen              int64                        `json:"output_len"`
+	Salt                   []byte                       `json:"salt"`
+	Algorithm              string                       `json:"algorithm"`
+	Nonce                  []byte                       `json:"nonce"`
+	WrappedMaterialLen     int64                        `json:"wrapped_material_len"`
+	CiphertextHash         string                       `json:"ciphertext_hash"`
+	ActivationAlgorithm    string                       `json:"activation_algorithm"`
+	ActivationPublicKeyID  string                       `json:"activation_public_key_id"`
+	ActivationPublicKey    []byte                       `json:"activation_public_key"`
+	Status                 storage.RecoveryRecordStatus `json:"status"`
+	CreatedAtMs            int64                        `json:"created_at_ms"`
+	UpdatedAtMs            int64                        `json:"updated_at_ms"`
+	SignerDeviceID         string                       `json:"signer_device_id"`
+	SignatureSchemaVersion uint16                       `json:"signature_schema_version"`
+	SignatureAlgorithm     string                       `json:"signature_algorithm"`
+	SignatureKeyID         string                       `json:"signature_key_id"`
+	Signature              []byte                       `json:"signature"`
+	WrappedMaterial        []byte                       `json:"wrapped_material"`
+}
+
+func (r RecoveryRecordUploadRequest) Upload(domainID string) storage.RecoveryRecordUpload {
+	return storage.RecoveryRecordUpload{
+		Record: storage.RecoveryRecord{
+			RecordSchemaVersion: r.RecordSchemaVersion, DomainID: domainID,
+			RecoveryRecordID: r.RecoveryRecordID, PreviousRecoveryID: r.PreviousRecoveryID,
+			KeyEpoch: r.KeyEpoch, KDFProfile: r.KDFProfile, KDFVersion: r.KDFVersion,
+			MemoryKiB: r.MemoryKiB, Iterations: r.Iterations, Parallelism: r.Parallelism,
+			OutputLen: r.OutputLen, Salt: cloneBytes(r.Salt), Algorithm: r.Algorithm,
+			Nonce: cloneBytes(r.Nonce), WrappedMaterialLen: r.WrappedMaterialLen,
+			CiphertextHash: r.CiphertextHash, ActivationAlgorithm: r.ActivationAlgorithm,
+			ActivationPublicKeyID: r.ActivationPublicKeyID, ActivationPublicKey: cloneBytes(r.ActivationPublicKey),
+			Status: r.Status, CreatedAtMs: r.CreatedAtMs, UpdatedAtMs: r.UpdatedAtMs,
+			SignerDeviceID: r.SignerDeviceID, SignatureSchemaVersion: r.SignatureSchemaVersion,
+			SignatureAlgorithm: r.SignatureAlgorithm, SignatureKeyID: r.SignatureKeyID,
+			Signature: cloneBytes(r.Signature),
+		},
+		WrappedMaterial: cloneBytes(r.WrappedMaterial),
+	}
+}
+
 type ObjectVersionUploadRequest struct {
 	ObjectType             string `json:"object_type"`
 	Version                uint64 `json:"version"`

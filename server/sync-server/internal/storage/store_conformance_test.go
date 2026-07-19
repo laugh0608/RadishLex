@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"crypto/ed25519"
 	"strconv"
@@ -352,25 +353,30 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 	t.Run("recovery record stores only wrapped material metadata", func(t *testing.T) {
 		ctx := context.Background()
 		store := newReadyStore(t, newStore)
-		wrapped := []byte{0xa1, 0xa2, 0xa3}
+		wrapped := bytes.Repeat([]byte{0xa1}, RecoveryWrappedMaterialBytes)
 		record := RecoveryRecord{
-			DomainID:           "domain-a",
-			RecoveryRecordID:   "recovery-a",
-			KeyEpoch:           1,
-			KDFProfile:         "argon2id-v1",
-			KDFVersion:         1,
-			MemoryKiB:          65536,
-			Iterations:         3,
-			Parallelism:        4,
-			OutputLen:          32,
-			Salt:               []byte{0x01, 0x02},
-			Algorithm:          AlgorithmXChaCha20Poly1305HKDFSHA256,
-			Nonce:              []byte{0x03, 0x04},
-			WrappedMaterialLen: int64(len(wrapped)),
-			CiphertextHash:     CiphertextHash(wrapped),
-			Status:             RecoveryRecordActive,
-			CreatedAtMs:        40,
-			SignerDeviceID:     "device-a",
+			RecordSchemaVersion:   RecoveryRecordSchemaVersionV2,
+			DomainID:              "domain-a",
+			RecoveryRecordID:      "recovery-a",
+			KeyEpoch:              1,
+			KDFProfile:            "argon2id-v1",
+			KDFVersion:            1,
+			MemoryKiB:             65536,
+			Iterations:            3,
+			Parallelism:           4,
+			OutputLen:             32,
+			Salt:                  bytes.Repeat([]byte{0x01}, RecoverySaltBytes),
+			Algorithm:             AlgorithmXChaCha20Poly1305HKDFSHA256,
+			Nonce:                 bytes.Repeat([]byte{0x03}, RecoveryNonceBytes),
+			WrappedMaterialLen:    int64(len(wrapped)),
+			CiphertextHash:        CiphertextHash(wrapped),
+			ActivationAlgorithm:   SignatureAlgorithmEd25519V1,
+			ActivationPublicKeyID: "recovery-activation-key-a",
+			ActivationPublicKey:   make([]byte, ed25519.PublicKeySize),
+			Status:                RecoveryRecordActive,
+			CreatedAtMs:           40,
+			UpdatedAtMs:           40,
+			SignerDeviceID:        "device-a",
 		}
 		signRecoveryForTest(&record)
 
@@ -397,6 +403,48 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 		}
 		if string(material) != string(wrapped) {
 			t.Fatalf("wrapped material mismatch: got %x want %x", material, wrapped)
+		}
+	})
+
+	t.Run("recovery rotation is atomic idempotent and predecessor guarded", func(t *testing.T) {
+		ctx := context.Background()
+		store := newReadyStore(t, newStore)
+		firstWrapped := bytes.Repeat([]byte{0xb1}, RecoveryWrappedMaterialBytes)
+		first := recoveryRecordForTest("recovery-a", "", 40, firstWrapped)
+		if _, err := store.PutRecoveryRecord(ctx, RecoveryRecordUpload{Record: first, WrappedMaterial: firstWrapped}); err != nil {
+			t.Fatalf("put first recovery: %v", err)
+		}
+		secondWrapped := bytes.Repeat([]byte{0xc1}, RecoveryWrappedMaterialBytes)
+		second := recoveryRecordForTest("recovery-b", "recovery-a", 50, secondWrapped)
+		if _, err := store.PutRecoveryRecord(ctx, RecoveryRecordUpload{Record: second, WrappedMaterial: secondWrapped}); err != nil {
+			t.Fatalf("rotate recovery: %v", err)
+		}
+		if _, err := store.PutRecoveryRecord(ctx, RecoveryRecordUpload{Record: second, WrappedMaterial: secondWrapped}); err != nil {
+			t.Fatalf("idempotent rotation retry: %v", err)
+		}
+		latest, wrapped, err := store.LatestRecoveryWrappedMaterial(ctx, "domain-a")
+		if err != nil {
+			t.Fatalf("read rotated recovery: %v", err)
+		}
+		if latest.RecoveryRecordID != "recovery-b" || string(wrapped) != string(secondWrapped) {
+			t.Fatalf("rotated recovery mismatch: %#v %x", latest, wrapped)
+		}
+		staleWrapped := bytes.Repeat([]byte{0xd1}, RecoveryWrappedMaterialBytes)
+		stale := recoveryRecordForTest("recovery-c", "recovery-a", 60, staleWrapped)
+		if _, err := store.PutRecoveryRecord(ctx, RecoveryRecordUpload{Record: stale, WrappedMaterial: staleWrapped}); !IsCode(err, ErrConflictRecoveryRecord) {
+			t.Fatalf("stale predecessor should conflict, got %v", err)
+		}
+		collision := second
+		collision.UpdatedAtMs++
+		signRecoveryForTest(&collision)
+		if _, err := store.PutRecoveryRecord(ctx, RecoveryRecordUpload{Record: collision, WrappedMaterial: secondWrapped}); !IsCode(err, ErrConflictRecoveryRecord) {
+			t.Fatalf("recovery id collision should conflict, got %v", err)
+		}
+		tampered := append([]byte(nil), secondWrapped...)
+		tampered[0] ^= 0xff
+		third := recoveryRecordForTest("recovery-d", "recovery-b", 70, secondWrapped)
+		if _, err := store.PutRecoveryRecord(ctx, RecoveryRecordUpload{Record: third, WrappedMaterial: tampered}); !IsCode(err, ErrInvalidCiphertextMetadata) {
+			t.Fatalf("tampered wrapped recovery should fail metadata, got %v", err)
 		}
 	})
 
@@ -449,28 +497,33 @@ func runStoreConformanceTests(t *testing.T, newStore storeFactory) {
 	t.Run("rejects signed recovery record tampering", func(t *testing.T) {
 		ctx := context.Background()
 		store := newReadyStore(t, newStore)
-		wrapped := []byte{0xa1, 0xa2, 0xa3}
+		wrapped := bytes.Repeat([]byte{0xa1}, RecoveryWrappedMaterialBytes)
 		record := RecoveryRecord{
-			DomainID:           "domain-a",
-			RecoveryRecordID:   "recovery-a",
-			KeyEpoch:           1,
-			KDFProfile:         "argon2id-v1",
-			KDFVersion:         1,
-			MemoryKiB:          65536,
-			Iterations:         3,
-			Parallelism:        4,
-			OutputLen:          32,
-			Salt:               []byte{0x01, 0x02},
-			Algorithm:          AlgorithmXChaCha20Poly1305HKDFSHA256,
-			Nonce:              []byte{0x03, 0x04},
-			WrappedMaterialLen: int64(len(wrapped)),
-			CiphertextHash:     CiphertextHash(wrapped),
-			Status:             RecoveryRecordActive,
-			CreatedAtMs:        40,
-			SignerDeviceID:     "device-a",
+			RecordSchemaVersion:   RecoveryRecordSchemaVersionV2,
+			DomainID:              "domain-a",
+			RecoveryRecordID:      "recovery-a",
+			KeyEpoch:              1,
+			KDFProfile:            "argon2id-v1",
+			KDFVersion:            1,
+			MemoryKiB:             65536,
+			Iterations:            3,
+			Parallelism:           4,
+			OutputLen:             32,
+			Salt:                  bytes.Repeat([]byte{0x01}, RecoverySaltBytes),
+			Algorithm:             AlgorithmXChaCha20Poly1305HKDFSHA256,
+			Nonce:                 bytes.Repeat([]byte{0x03}, RecoveryNonceBytes),
+			WrappedMaterialLen:    int64(len(wrapped)),
+			CiphertextHash:        CiphertextHash(wrapped),
+			ActivationAlgorithm:   SignatureAlgorithmEd25519V1,
+			ActivationPublicKeyID: "recovery-activation-key-a",
+			ActivationPublicKey:   make([]byte, ed25519.PublicKeySize),
+			Status:                RecoveryRecordActive,
+			CreatedAtMs:           40,
+			UpdatedAtMs:           40,
+			SignerDeviceID:        "device-a",
 		}
 		signRecoveryForTest(&record)
-		record.MemoryKiB = 32768
+		record.ActivationPublicKeyID = "recovery-activation-key-b"
 
 		if _, err := store.PutRecoveryRecord(ctx, RecoveryRecordUpload{Record: record, WrappedMaterial: wrapped}); !IsCode(err, ErrInvalidSignature) {
 			t.Fatalf("tampered recovery record should fail signature verification, got %v", err)
@@ -723,12 +776,14 @@ func signRecoveryForTest(record *RecoveryRecord) {
 	record.SignatureSchemaVersion = fields.SchemaVersion
 	record.SignatureAlgorithm = fields.Algorithm
 	record.SignatureKeyID = fields.KeyID
-	record.Signature = ed25519.Sign(signingPrivateKeyForTest(record.SignerDeviceID), canonicalSignatureBytes("recovery_record", []signatureField{
+	record.Signature = ed25519.Sign(signingPrivateKeyForTest(record.SignerDeviceID), canonicalSignatureBytes("recovery_record_v2", []signatureField{
 		textField("signature_schema_version", "1"),
 		textField("signature_algorithm", signatureAlgorithm),
 		textField("signature_key_id", fields.KeyID),
 		textField("signer_device_id", record.SignerDeviceID),
+		textField("record_schema_version", uint16String(record.RecordSchemaVersion)),
 		textField("recovery_id", record.RecoveryRecordID),
+		textField("previous_recovery_id", record.PreviousRecoveryID),
 		textField("domain_id", record.DomainID),
 		textField("key_epoch", uint64String(record.KeyEpoch)),
 		textField("kdf_id", record.KDFProfile),
@@ -741,9 +796,43 @@ func signRecoveryForTest(record *RecoveryRecord) {
 		textField("envelope_algorithm", record.Algorithm),
 		bytesField("envelope_nonce", record.Nonce),
 		textField("encrypted_recovery_key_len", int64String(record.WrappedMaterialLen)),
+		textField("ciphertext_hash", record.CiphertextHash),
+		textField("activation_algorithm", record.ActivationAlgorithm),
+		textField("activation_public_key_id", record.ActivationPublicKeyID),
+		bytesField("activation_public_key", record.ActivationPublicKey),
 		textField("created_at_ms", int64String(record.CreatedAtMs)),
-		textField("updated_at_ms", int64String(record.CreatedAtMs)),
+		textField("updated_at_ms", int64String(record.UpdatedAtMs)),
 	}))
+}
+
+func recoveryRecordForTest(recoveryID string, previousID string, createdAtMs int64, wrapped []byte) RecoveryRecord {
+	record := RecoveryRecord{
+		RecordSchemaVersion:   RecoveryRecordSchemaVersionV2,
+		DomainID:              "domain-a",
+		RecoveryRecordID:      recoveryID,
+		PreviousRecoveryID:    previousID,
+		KeyEpoch:              1,
+		KDFProfile:            "argon2id-v1",
+		KDFVersion:            1,
+		MemoryKiB:             65536,
+		Iterations:            3,
+		Parallelism:           4,
+		OutputLen:             32,
+		Salt:                  bytes.Repeat([]byte{0x01}, RecoverySaltBytes),
+		Algorithm:             AlgorithmXChaCha20Poly1305HKDFSHA256,
+		Nonce:                 bytes.Repeat([]byte{0x03}, RecoveryNonceBytes),
+		WrappedMaterialLen:    int64(len(wrapped)),
+		CiphertextHash:        CiphertextHash(wrapped),
+		ActivationAlgorithm:   SignatureAlgorithmEd25519V1,
+		ActivationPublicKeyID: "recovery-activation-key-a",
+		ActivationPublicKey:   make([]byte, ed25519.PublicKeySize),
+		Status:                RecoveryRecordActive,
+		CreatedAtMs:           createdAtMs,
+		UpdatedAtMs:           createdAtMs,
+		SignerDeviceID:        "device-a",
+	}
+	signRecoveryForTest(&record)
+	return record
 }
 
 func signingPublicKeyForTest(deviceID string) []byte {
@@ -794,6 +883,10 @@ func uint64String(value uint64) string {
 }
 
 func uint32String(value uint32) string {
+	return strconv.FormatUint(uint64(value), 10)
+}
+
+func uint16String(value uint16) string {
 	return strconv.FormatUint(uint64(value), 10)
 }
 

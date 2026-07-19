@@ -12,11 +12,17 @@ const (
 type RecoveryRecordStatus string
 
 const (
-	RecoveryRecordActive  RecoveryRecordStatus = "active"
-	RecoveryRecordRevoked RecoveryRecordStatus = "revoked"
+	RecoveryRecordActive     RecoveryRecordStatus = "active"
+	RecoveryRecordSuperseded RecoveryRecordStatus = "superseded"
+	RecoveryRecordRevoked    RecoveryRecordStatus = "revoked"
 )
 
 const (
+	RecoveryRecordSchemaVersionV2 = 2
+	RecoverySaltBytes             = 16
+	RecoveryNonceBytes            = 24
+	RecoveryWrappedMaterialBytes  = 48
+
 	ObjectDictionaryUserTerms    = "dictionary.user_terms"
 	ObjectDictionaryDeletedTerms = "dictionary.deleted_terms"
 	ObjectRankerWeights          = "ranker.weights"
@@ -175,8 +181,10 @@ type LifecycleSnapshot struct {
 }
 
 type RecoveryRecord struct {
+	RecordSchemaVersion    uint16
 	DomainID               string
 	RecoveryRecordID       string
+	PreviousRecoveryID     string
 	KeyEpoch               uint64
 	KDFProfile             string
 	KDFVersion             uint16
@@ -189,8 +197,12 @@ type RecoveryRecord struct {
 	Nonce                  []byte
 	WrappedMaterialLen     int64
 	CiphertextHash         string
+	ActivationAlgorithm    string
+	ActivationPublicKeyID  string
+	ActivationPublicKey    []byte
 	Status                 RecoveryRecordStatus
 	CreatedAtMs            int64
+	UpdatedAtMs            int64
 	RevokedAtMs            int64
 	SignerDeviceID         string
 	SignatureSchemaVersion uint16

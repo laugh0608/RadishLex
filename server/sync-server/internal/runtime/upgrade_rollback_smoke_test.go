@@ -164,8 +164,10 @@ func verifyUpgradeRollbackPreUpgradeState(t *testing.T, baseURL string, expected
 	}
 	var recovery api.RecoveryRecordResponse
 	decodeSmokeResponse(t, recoveryResponse.Body, &recovery)
-	if recovery.RecoveryRecordID != "recovery-backup" ||
+	if recovery.RecordSchemaVersion != storage.RecoveryRecordSchemaVersionV2 ||
+		recovery.RecoveryRecordID != "recovery-backup" ||
 		recovery.CiphertextHash != storage.CiphertextHash(backupSmokeWrappedMaterial()) ||
+		recovery.ActivationPublicKeyID != "recovery-activation-backup" ||
 		!bytes.Equal(recovery.WrappedMaterial, backupSmokeWrappedMaterial()) {
 		t.Fatalf("unexpected recovery state after restart: %#v", recovery)
 	}

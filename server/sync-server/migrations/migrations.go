@@ -44,11 +44,91 @@ func Apply(db *sql.DB) error {
 	if err := ensureDeviceWrappingSignatureMetadata(tx); err != nil {
 		return err
 	}
-	if _, err := tx.Exec("PRAGMA user_version = 6"); err != nil {
+	if err := ensureRecoveryRecordV2Metadata(tx); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("PRAGMA user_version = 7"); err != nil {
 		return fmt.Errorf("record metadata schema version: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit metadata migration: %w", err)
+	}
+	return nil
+}
+
+func ensureRecoveryRecordV2Metadata(tx *sql.Tx) error {
+	hasSchemaVersion, err := columnExists(tx, "recovery_records", "record_schema_version")
+	if err != nil {
+		return err
+	}
+	if hasSchemaVersion {
+		return nil
+	}
+	if _, err := tx.Exec(`
+		CREATE TABLE recovery_records_v7 (
+			record_schema_version INTEGER NOT NULL CHECK (record_schema_version IN (1, 2)),
+			domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
+			recovery_record_id TEXT NOT NULL,
+			previous_recovery_record_id TEXT NOT NULL DEFAULT '',
+			key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
+			kdf_profile TEXT NOT NULL,
+			kdf_version INTEGER NOT NULL CHECK (kdf_version > 0),
+			memory_kib INTEGER NOT NULL CHECK (memory_kib > 0),
+			iterations INTEGER NOT NULL CHECK (iterations > 0),
+			parallelism INTEGER NOT NULL CHECK (parallelism > 0),
+			output_len INTEGER NOT NULL CHECK (output_len > 0),
+			salt BLOB NOT NULL,
+			algorithm TEXT NOT NULL,
+			nonce BLOB NOT NULL,
+			wrapped_material_len INTEGER NOT NULL CHECK (wrapped_material_len > 0),
+			ciphertext_hash TEXT NOT NULL,
+			activation_algorithm TEXT NOT NULL DEFAULT '',
+			activation_public_key_id TEXT NOT NULL DEFAULT '',
+			activation_public_key BLOB NOT NULL DEFAULT X'',
+			status TEXT NOT NULL CHECK (status IN ('active', 'superseded', 'revoked')),
+			created_at_ms INTEGER NOT NULL,
+			updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= created_at_ms),
+			revoked_at_ms INTEGER NOT NULL DEFAULT 0,
+			signer_device_id TEXT NOT NULL,
+			signature_schema_version INTEGER NOT NULL CHECK (signature_schema_version = 1),
+			signature_algorithm TEXT NOT NULL,
+			signature_key_id TEXT NOT NULL,
+			signature BLOB NOT NULL,
+			blob_ref TEXT NOT NULL,
+			PRIMARY KEY (domain_id, recovery_record_id)
+		)
+	`); err != nil {
+		return fmt.Errorf("create recovery v2 metadata table: %w", err)
+	}
+	if _, err := tx.Exec(`
+		INSERT INTO recovery_records_v7 (
+			record_schema_version, domain_id, recovery_record_id, previous_recovery_record_id,
+			key_epoch, kdf_profile, kdf_version, memory_kib, iterations, parallelism, output_len,
+			salt, algorithm, nonce, wrapped_material_len, ciphertext_hash,
+			activation_algorithm, activation_public_key_id, activation_public_key,
+			status, created_at_ms, updated_at_ms, revoked_at_ms, signer_device_id,
+			signature_schema_version, signature_algorithm, signature_key_id, signature, blob_ref
+		)
+		SELECT 1, domain_id, recovery_record_id, '',
+			key_epoch, kdf_profile, kdf_version, memory_kib, iterations, parallelism, output_len,
+			salt, algorithm, nonce, wrapped_material_len, ciphertext_hash,
+			'', '', X'', status, created_at_ms, created_at_ms, revoked_at_ms, signer_device_id,
+			signature_schema_version, signature_algorithm, signature_key_id, signature, blob_ref
+		FROM recovery_records
+	`); err != nil {
+		return fmt.Errorf("copy legacy recovery metadata: %w", err)
+	}
+	if _, err := tx.Exec("DROP TABLE recovery_records"); err != nil {
+		return fmt.Errorf("replace legacy recovery metadata: %w", err)
+	}
+	if _, err := tx.Exec("ALTER TABLE recovery_records_v7 RENAME TO recovery_records"); err != nil {
+		return fmt.Errorf("activate recovery v2 metadata: %w", err)
+	}
+	if _, err := tx.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_recovery_records_domain_status
+		ON recovery_records(domain_id, status, created_at_ms)
+	`); err != nil {
+		return fmt.Errorf("index recovery v2 metadata: %w", err)
 	}
 	return nil
 }

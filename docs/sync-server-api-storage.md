@@ -4,7 +4,7 @@
 
 ## 当前定位
 
-当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、signed epoch distribution、恢复记录签名、客户端解密合并与 userdb 写回、`ime-sync` remote client，以及短生命周期 Go HTTP 多设备证据。Go server metadata schema v6 已具备 API/storage/runtime、SQLite metadata、local blob、Ed25519/P-256 签名 profile 验证、对象版本与冲突、lifecycle、epoch distribution、recovery、审计、bearer token、备份恢复、外部 TLS 和升级回滚受控证据。尚未形成完整真实用户生产封装、发布级目标部署运行证据或已评审通过的生产私钥 backend；普通 DPK P-256 因可导出被拒绝，独立 Secure Enclave P-256 的产品资格仍关闭。SQLite driver 使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
+当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、signed epoch distribution、recovery-record-v2 签名轮换与可信解封、客户端解密合并和 `ime-sync` remote client。Go server metadata schema v7 已具备 API/storage/runtime、SQLite metadata、local blob、签名 profile 验证、对象/lifecycle/epoch distribution/recovery、审计、备份恢复和升级回滚受控证据。恢复设备 activation/lifecycle、发布级目标部署证据和合格生产私钥 backend 尚未闭环；真实用户同步保持关闭。
 
 本阶段只固定服务端 API 和 storage 边界：
 
@@ -73,9 +73,9 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名。AD
 
 撤销事务必须把当时 domain 内下一条对象序列记录为 `reject_from_object_change_sequence`。客户端把该值作为“从此对象序列开始拒绝被撤销设备签名”的不可回退顺序证据；signed revocation 仍负责证明撤销者、目标设备和 key epoch 变化。服务端不能仅凭 `devices.status` 建立客户端信任，客户端必须验证签名链，并把同一撤销记录对应的截点变化视为冲突。服务端恶意分叉或首次 bootstrap 欺骗不由单机 cursor 完全解决；当前边界通过本地已观察高水位禁止回退，后续跨设备透明度 / gossip 另行设计。
 
-`recovery_records`：`domain_id`、`recovery_record_id`、`key_epoch`、`kdf_profile`、`kdf_version`、`memory_kib`、`iterations`、`parallelism`、`output_len`、`salt`、`algorithm`、`nonce`、`wrapped_material_len`、`ciphertext_hash`、`status`、`created_at_ms`、`revoked_at_ms`、`signer_device_id`、`signature_schema_version`、`signature_algorithm`、`signature_key_id`、`signature`、`blob_ref`。
+`recovery_records`：`record_schema_version`、`domain_id`、`recovery_record_id`、`previous_recovery_record_id`、`key_epoch`、KDF 参数、`salt`、envelope algorithm/nonce、wrapped length/hash、activation algorithm/key id/public key、`status`、`created_at_ms`、`updated_at_ms`、`revoked_at_ms`、signer/signature metadata 和 `blob_ref`。
 
-恢复记录只保存加密后的同步域材料和 KDF 参数。服务端可以对读取和替换恢复记录做限速，但不能依赖限速替代恢复码强度。
+恢复记录只保存加密后的同步域材料、KDF 参数和 activation 公钥。v2 新写入固定当前 epoch/profile，predecessor 必须指向当前 latest；旧 active 原子变为 `superseded`。v1 只保留迁移 metadata/blob，当前产品客户端拒绝直接解封或激活，必须由 active 设备轮换为 v2。服务端可以限速读取，但不能依赖限速替代恢复码强度。
 
 `sync_objects`：`domain_id`、`object_id`、`object_type`、`latest_version`、`latest_ciphertext_hash`、`latest_key_epoch`、`latest_change_sequence`、`created_at_ms`、`updated_at_ms`。
 
@@ -95,7 +95,7 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名。AD
 
 这组方法当前用于验证 metadata、设备状态、版本冲突、blob 写入和错误语义，不等同于完整产品入口。对象 change cursor、对象 discovery 分页和设备 lifecycle cursor 已落地；审计日志查询和持久限速器仍未落地。产品编排不得用 `updated_after_ms`、客户端时间或逐个猜测 object/version 代替 discovery。
 
-当前 storage conformance 已覆盖：第一台设备必须为 `active` 且显式携带受支持签名算法；join request 从 `pending` 授权到 `active`；wrapped bytes 随授权或完整 active cohort distribution 原子保存并可按 metadata 读取；revoked 设备和旧 `key_epoch` 写入被拒绝；object version 冲突与 blob hash/length 复验；signed object manifest、device authorization、device revocation、epoch distribution 和 recovery record 字段篡改会被验签拒绝。Rust/Go 另共同读取同一 profile fixture，覆盖两个算法正向签名和固定负向错误。
+当前 storage conformance 已覆盖设备状态、授权/撤销、完整 active cohort epoch distribution、对象版本冲突与 blob 完整性；recovery v2 另覆盖首次创建、原子轮换、精确重放、陈旧 predecessor、同 id 分叉和密文篡改。signed object、authorization、revocation、distribution 和 recovery 字段篡改均被验签拒绝。
 
 当前 storage 已在写入前使用设备登记的 `signing_algorithm + signing_public_key` 验证 object manifest、device authorization、device revocation、epoch distribution 和 recovery record；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list，不在失败时尝试另一 verifier。HTTP API 已覆盖 domain/device/join、authorization、epoch distribution、recovery 与 object version 路径；签名错误对外保持顶层 `invalid_signature`，并以脱敏 `error_detail` 区分算法、编码、验签和 key lifetime。runtime 使用 idempotent schema migration；审计与日志不包含 request body、public key、signature 或 canonical bytes。
 
@@ -269,18 +269,18 @@ JSON byte 字段：
 
 ### 恢复记录
 
-`PUT /api/v1/domains/{domain_id}/recovery-records/{recovery_record_id}`
+`POST /api/v1/domains/{domain_id}/recovery-records`
 
-- 上传或替换 signed recovery record。
-- 请求包含 KDF profile、salt、nonce、wrapped material 长度、ciphertext hash、状态和签名。
-- 服务端验证签名设备 active，metadata 合法，payload hash 匹配。
+- 创建或乐观轮换 signed recovery-record-v2；请求 body 的 signer 必须等于 transport device identity。
+- 请求包含 recovery id/predecessor、固定 KDF/envelope profile、salt/nonce、wrapped material 长度/hash、activation public profile、时间和签名。
+- 服务端验证当前 epoch、active signer、完整 v2 canonical signature 和密文；同记录精确重放幂等，旧 latest 与新记录在同一 transaction 切换。
 
 `GET /api/v1/domains/{domain_id}/recovery-records/latest`
 
 - 返回当前 active recovery record metadata 和 encrypted wrapped material。
 - 服务端应对该接口做基于 domain、IP、设备和时间窗的限速；限速失败返回结构化错误。
 
-`POST /api/v1/domains/{domain_id}/recovery-records/{recovery_record_id}/revoke`
+`POST /api/v1/domains/{domain_id}/recovery-records/{recovery_record_id}/revoke`（预留，尚未实现）
 
 - 保存 signed recovery record revocation。
 - 不删除历史审计 metadata，但后续 `latest` 不再返回 revoked 记录作为 active。
@@ -310,6 +310,7 @@ latest_ciphertext_hash
 - `conflict_stale_base_version`：上传基于旧版本，客户端必须拉取并合并。
 - `conflict_object_version`：同一对象版本存在但 ciphertext hash 不一致。
 - `conflict_epoch_distribution`：同一 recipient/epoch/wrapping key locator 已存在不同 metadata、hash 或 bytes。
+- `conflict_recovery_record`：recovery predecessor 已过期，或同 recovery id 已存在不同 metadata、签名或 bytes。
 - `invalid_signature`：对象 manifest、授权、撤销、epoch distribution 或恢复记录验签失败。
 - `invalid_ciphertext_metadata`：payload 长度、ciphertext hash 或 algorithm metadata 与请求不一致。
 - `payload_too_large`：超过服务端配置的对象大小上限。

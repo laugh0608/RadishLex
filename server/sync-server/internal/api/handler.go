@@ -178,6 +178,8 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request, audit *Audit
 		h.handleJoinAuthorization(w, r, route.domainID, route.joinRequestID, audit)
 	case recoveryLatestRoute:
 		h.handleLatestRecovery(w, r, route.domainID)
+	case recoveryRecordsRoute:
+		h.handleRecoveryRecords(w, r, route.domainID, audit)
 	case objectDiscoveryRoute:
 		h.handleObjectDiscovery(w, r, route.domainID)
 	case objectVersionsRoute:
@@ -549,6 +551,30 @@ func (h *Handler) handleLatestRecovery(w http.ResponseWriter, r *http.Request, d
 	writeJSON(w, http.StatusOK, RecoveryRecordResponseFrom(record, wrappedMaterial))
 }
 
+func (h *Handler) handleRecoveryRecords(w http.ResponseWriter, r *http.Request, domainID string, audit *AuditEvent) {
+	if r.Method != http.MethodPost {
+		h.writeMethodError(w, http.MethodPost)
+		return
+	}
+	var request RecoveryRecordUploadRequest
+	if err := decodeJSONRequestWithLimit(w, r, &request, storage.MaxDeviceWrappedKeyBytes*2); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	audit.DeviceID = request.SignerDeviceID
+	audit.Bytes = int64(len(request.WrappedMaterial))
+	if r.Header.Get(deviceIDHeader) != request.SignerDeviceID {
+		h.writeError(w, publicStorageError(storage.ErrForbiddenDevice, "recovery signer is not the requesting device", false))
+		return
+	}
+	record, err := h.store.PutRecoveryRecord(r.Context(), request.Upload(domainID))
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, RecoveryRecordResponseFrom(record, nil))
+}
+
 func (h *Handler) handleObjectVersions(w http.ResponseWriter, r *http.Request, domainID string, objectID string, audit *AuditEvent) {
 	if r.Method != http.MethodPost {
 		h.writeMethodError(w, http.MethodPost)
@@ -680,6 +706,7 @@ const (
 	joinRequestsRoute
 	joinAuthorizationRoute
 	recoveryLatestRoute
+	recoveryRecordsRoute
 	objectDiscoveryRoute
 	objectVersionsRoute
 	objectVersionRoute
@@ -718,6 +745,8 @@ func (r route) name() string {
 		return "join_requests.authorize"
 	case recoveryLatestRoute:
 		return "recovery.latest"
+	case recoveryRecordsRoute:
+		return "recovery.rotate"
 	case objectDiscoveryRoute:
 		return "objects.discover"
 	case objectVersionsRoute:
@@ -770,6 +799,9 @@ func domainRoute(path string) (route, bool) {
 	}
 	if len(parts) == 3 && parts[0] != "" && parts[1] == "recovery-records" && parts[2] == "latest" {
 		return route{kind: recoveryLatestRoute, domainID: parts[0]}, true
+	}
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "recovery-records" {
+		return route{kind: recoveryRecordsRoute, domainID: parts[0]}, true
 	}
 	if len(parts) == 2 && parts[0] != "" && parts[1] == "objects" {
 		return route{kind: objectDiscoveryRoute, domainID: parts[0]}, true
@@ -825,7 +857,7 @@ func statusCodeFromError(err error) int {
 		return http.StatusForbidden
 	case storage.ErrNotFound:
 		return http.StatusNotFound
-	case storage.ErrConflictStaleBaseVersion, storage.ErrConflictObjectVersion, storage.ErrConflictEpochDistribution:
+	case storage.ErrConflictStaleBaseVersion, storage.ErrConflictObjectVersion, storage.ErrConflictEpochDistribution, storage.ErrConflictRecoveryRecord:
 		return http.StatusConflict
 	case storage.ErrPayloadTooLarge:
 		return http.StatusRequestEntityTooLarge

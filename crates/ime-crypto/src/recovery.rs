@@ -1,6 +1,10 @@
 use std::fmt;
 
 use argon2::{Algorithm, Argon2, Params, Version};
+use ed25519_dalek::{Signer, SigningKey};
+use hkdf::Hkdf;
+use sha2::{Digest, Sha256};
+use zeroize::Zeroize;
 
 use crate::device::RecoveryMaterial;
 use crate::model::{
@@ -15,6 +19,8 @@ pub const RECOVERY_WRAPPING_KEY_LEN: usize = OBJECT_KEY_LEN;
 pub const RECOVERY_KDF_ID_ARGON2ID_V1: &str = "argon2id-v1";
 pub const RECOVERY_KDF_VERSION_ARGON2ID_V1: u16 = 1;
 pub const ARGON2_VERSION_V0X13: u32 = 0x13;
+pub const RECOVERY_RECORD_SCHEMA_VERSION_V2: u16 = 2;
+pub const RECOVERY_ACTIVATION_ALGORITHM_ED25519_V1: &str = "ed25519-v1";
 
 const RECOVERY_CODE_GROUPS: usize = 8;
 const RECOVERY_CODE_GROUP_LEN: usize = 4;
@@ -22,6 +28,8 @@ const RECOVERY_CODE_SECRET_CHARS: usize = RECOVERY_CODE_GROUPS * RECOVERY_CODE_G
 const ARGON2ID_V1_MEMORY_KIB: u32 = 65_536;
 const ARGON2ID_V1_ITERATIONS: u32 = 3;
 const ARGON2ID_V1_PARALLELISM: u32 = 4;
+const RECOVERY_ACTIVATION_HKDF_SALT: &[u8] = b"radishlex-recovery-activation-v1";
+const RECOVERY_ACTIVATION_HKDF_INFO: &[u8] = b"ed25519-signing-seed";
 #[derive(Clone, PartialEq, Eq)]
 pub struct RecoveryCode {
     secret: [u8; RECOVERY_CODE_SECRET_LEN],
@@ -84,6 +92,12 @@ impl RecoveryCode {
 impl fmt::Debug for RecoveryCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("RecoveryCode([redacted])")
+    }
+}
+
+impl Drop for RecoveryCode {
+    fn drop(&mut self) {
+        self.secret.zeroize();
     }
 }
 
@@ -229,10 +243,17 @@ impl fmt::Debug for RecoveryWrappingKeyMaterial {
     }
 }
 
+impl Drop for RecoveryWrappingKeyMaterial {
+    fn drop(&mut self) {
+        self.0.zeroize();
+    }
+}
+
 impl RecoveryMaterial {
     #[allow(clippy::too_many_arguments)]
     pub fn encrypt_sync_master_key(
         recovery_id: impl Into<String>,
+        previous_recovery_id: impl Into<String>,
         domain_id: impl Into<String>,
         key_epoch: u64,
         profile: &RecoveryKdfProfile,
@@ -244,8 +265,12 @@ impl RecoveryMaterial {
     ) -> Result<Self, CryptoError> {
         let salt = salt.into();
         let wrapping_key = profile.derive_wrapping_key(code, &salt)?;
+        let (activation_public_key_id, activation_public_key) =
+            recovery_activation_identity(&wrapping_key)?;
         let material = Self::new(
+            RECOVERY_RECORD_SCHEMA_VERSION_V2,
             recovery_id,
+            previous_recovery_id,
             domain_id,
             key_epoch,
             profile.kdf_id.clone(),
@@ -258,6 +283,9 @@ impl RecoveryMaterial {
             AlgorithmId::xchacha20poly1305_hkdf_sha256(),
             envelope_nonce,
             b"pending",
+            RECOVERY_ACTIVATION_ALGORITHM_ED25519_V1,
+            activation_public_key_id,
+            activation_public_key,
             timestamp_ms,
             timestamp_ms,
         )?;
@@ -270,7 +298,9 @@ impl RecoveryMaterial {
         )?;
 
         Self::new(
+            material.record_schema_version,
             material.recovery_id,
+            material.previous_recovery_id,
             material.domain_id,
             material.key_epoch,
             material.kdf_id,
@@ -283,6 +313,9 @@ impl RecoveryMaterial {
             material.envelope_algorithm,
             material.envelope_nonce,
             encrypted_recovery_key,
+            material.activation_algorithm,
+            material.activation_public_key_id,
+            material.activation_public_key,
             material.created_at_ms,
             material.updated_at_ms,
         )
@@ -295,6 +328,7 @@ impl RecoveryMaterial {
         self.validate()?;
         let profile = RecoveryKdfProfile::from_recovery_material(self)?;
         let wrapping_key = profile.derive_wrapping_key(code, &self.salt)?;
+        verify_recovery_activation_identity(self, &wrapping_key)?;
         let plaintext = decrypt_xchacha20poly1305_raw(
             wrapping_key.as_bytes(),
             &self.envelope_nonce,
@@ -306,6 +340,67 @@ impl RecoveryMaterial {
         })?;
         SyncMasterKeyMaterial::new(key)
     }
+
+    pub fn sign_recovered_device_activation(
+        &self,
+        code: &RecoveryCode,
+        canonical_bytes: &[u8],
+    ) -> Result<Vec<u8>, CryptoError> {
+        self.validate()?;
+        if canonical_bytes.is_empty() {
+            return Err(CryptoError::invalid_field(
+                "activation_canonical_bytes",
+                "value cannot be empty",
+            ));
+        }
+        let profile = RecoveryKdfProfile::from_recovery_material(self)?;
+        let wrapping_key = profile.derive_wrapping_key(code, &self.salt)?;
+        verify_recovery_activation_identity(self, &wrapping_key)?;
+        let mut seed = recovery_activation_seed(&wrapping_key)?;
+        let signing_key = SigningKey::from_bytes(&seed);
+        let signature = signing_key.sign(canonical_bytes).to_bytes().to_vec();
+        seed.zeroize();
+        Ok(signature)
+    }
+}
+
+fn recovery_activation_seed(
+    wrapping_key: &RecoveryWrappingKeyMaterial,
+) -> Result<[u8; 32], CryptoError> {
+    let hkdf = Hkdf::<Sha256>::new(Some(RECOVERY_ACTIVATION_HKDF_SALT), wrapping_key.as_bytes());
+    let mut seed = [0u8; 32];
+    hkdf.expand(RECOVERY_ACTIVATION_HKDF_INFO, &mut seed)
+        .map_err(|_| CryptoError::KeyDerivationFailed)?;
+    Ok(seed)
+}
+
+fn recovery_activation_identity(
+    wrapping_key: &RecoveryWrappingKeyMaterial,
+) -> Result<(String, Vec<u8>), CryptoError> {
+    let mut seed = recovery_activation_seed(wrapping_key)?;
+    let public_key = SigningKey::from_bytes(&seed).verifying_key().to_bytes();
+    seed.zeroize();
+    let digest = Sha256::digest(public_key);
+    let mut key_id = String::from("recovery-activation-sha256:");
+    for byte in digest {
+        use std::fmt::Write;
+        let _ = write!(key_id, "{byte:02x}");
+    }
+    Ok((key_id, public_key.to_vec()))
+}
+
+fn verify_recovery_activation_identity(
+    material: &RecoveryMaterial,
+    wrapping_key: &RecoveryWrappingKeyMaterial,
+) -> Result<(), CryptoError> {
+    let (key_id, public_key) = recovery_activation_identity(wrapping_key)?;
+    if material.activation_algorithm != RECOVERY_ACTIVATION_ALGORITHM_ED25519_V1
+        || material.activation_public_key_id != key_id
+        || material.activation_public_key != public_key
+    {
+        return Err(CryptoError::DecryptionFailed);
+    }
+    Ok(())
 }
 
 fn decode_secret(encoded: &str) -> Result<[u8; RECOVERY_CODE_SECRET_LEN], CryptoError> {
@@ -402,6 +497,7 @@ fn low_bits_mask(bits: u8) -> u16 {
 mod tests {
     use super::*;
     use crate::model::XCHACHA20POLY1305_NONCE_LEN;
+    use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 
     const CROCKFORD_ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
@@ -472,6 +568,7 @@ mod tests {
         let master_key = SyncMasterKeyMaterial::new([42u8; OBJECT_KEY_LEN]).expect("master");
         let material = RecoveryMaterial::encrypt_sync_master_key(
             "recovery-a",
+            "",
             "domain-a",
             3,
             &profile,
@@ -506,6 +603,7 @@ mod tests {
         let master_key = SyncMasterKeyMaterial::new([42u8; OBJECT_KEY_LEN]).expect("master");
         let material = RecoveryMaterial::encrypt_sync_master_key(
             "recovery-a",
+            "",
             "domain-a",
             3,
             &profile,
@@ -522,12 +620,94 @@ mod tests {
             .expect_err("wrong recovery code cannot decrypt");
         assert_eq!(error, CryptoError::DecryptionFailed);
 
-        let mut tampered = material;
+        let mut tampered = material.clone();
         tampered.domain_id = "domain-b".to_owned();
         let error = tampered
             .decrypt_sync_master_key(&code)
             .expect_err("AAD mutation fails");
         assert_eq!(error, CryptoError::DecryptionFailed);
+
+        tampered.domain_id = "domain-a".to_owned();
+        tampered.recovery_id = "recovery-b".to_owned();
+        assert_eq!(
+            tampered
+                .decrypt_sync_master_key(&code)
+                .expect_err("recovery id mutation fails"),
+            CryptoError::DecryptionFailed
+        );
+
+        let mut tampered = material.clone();
+        tampered.key_epoch += 1;
+        assert_eq!(
+            tampered
+                .decrypt_sync_master_key(&code)
+                .expect_err("epoch mutation fails"),
+            CryptoError::DecryptionFailed
+        );
+
+        let mut tampered = material.clone();
+        tampered.activation_public_key_id.push_str("-changed");
+        assert_eq!(
+            tampered
+                .decrypt_sync_master_key(&code)
+                .expect_err("activation key id mutation fails"),
+            CryptoError::DecryptionFailed
+        );
+
+        let mut tampered = material;
+        tampered.encrypted_recovery_key[0] ^= 0xff;
+        assert_eq!(
+            tampered
+                .decrypt_sync_master_key(&code)
+                .expect_err("ciphertext mutation fails"),
+            CryptoError::DecryptionFailed
+        );
+    }
+
+    #[test]
+    fn recovery_activation_signature_is_bound_to_code_derived_public_key() {
+        let profile = low_cost_test_profile();
+        let code = RecoveryCode::parse(&format_recovery_code([8u8; RECOVERY_CODE_SECRET_LEN]))
+            .expect("code");
+        let wrong_code =
+            RecoveryCode::parse(&format_recovery_code([9u8; RECOVERY_CODE_SECRET_LEN]))
+                .expect("wrong code");
+        let master_key = SyncMasterKeyMaterial::new([42u8; OBJECT_KEY_LEN]).expect("master");
+        let material = RecoveryMaterial::encrypt_sync_master_key(
+            "recovery-a",
+            "",
+            "domain-a",
+            3,
+            &profile,
+            &code,
+            b"0123456789abcdef".to_vec(),
+            &master_key,
+            100,
+            nonce(7),
+        )
+        .expect("material");
+        let activation = b"synthetic recovered-device profile";
+        let signature = material
+            .sign_recovered_device_activation(&code, activation)
+            .expect("activation signature");
+        let public_key: [u8; 32] = material
+            .activation_public_key
+            .clone()
+            .try_into()
+            .expect("activation public key");
+        VerifyingKey::from_bytes(&public_key)
+            .expect("verifying key")
+            .verify(
+                activation,
+                &Signature::from_slice(&signature).expect("signature bytes"),
+            )
+            .expect("activation verifies");
+        assert_eq!(
+            material
+                .sign_recovered_device_activation(&wrong_code, activation)
+                .expect_err("wrong code cannot activate"),
+            CryptoError::DecryptionFailed
+        );
     }
 
     fn low_cost_test_profile() -> RecoveryKdfProfile {

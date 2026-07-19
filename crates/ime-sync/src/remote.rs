@@ -11,6 +11,7 @@ use crate::product_provider::{SyncCryptoLoadError, SyncWrappedEpochMaterialSourc
 
 mod epoch_distribution_api;
 mod lifecycle_api;
+mod recovery_api;
 mod wrapped_epoch_source;
 
 pub use epoch_distribution_api::RemoteEpochDistributionResult;
@@ -18,6 +19,7 @@ pub use lifecycle_api::{
     RemoteDeviceAuthorization, RemoteDeviceRevocation, RemoteLifecycleDevice, RemoteLifecycleEvent,
     RemoteLifecycleEventKind, RemoteLifecyclePage, RemoteLifecycleSnapshot,
 };
+pub use recovery_api::RemoteVerifiedRecoveryRecord;
 pub use wrapped_epoch_source::{RemoteWrappedEpochLocator, RemoteWrappedEpochMaterialSource};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -152,6 +154,7 @@ pub enum SyncServerErrorCode {
     ConflictStaleBaseVersion,
     ConflictObjectVersion,
     ConflictEpochDistribution,
+    ConflictRecoveryRecord,
     PayloadTooLarge,
     RecoveryRateLimited,
     StorageUnavailable,
@@ -170,6 +173,7 @@ impl SyncServerErrorCode {
             Self::ConflictStaleBaseVersion => "conflict_stale_base_version",
             Self::ConflictObjectVersion => "conflict_object_version",
             Self::ConflictEpochDistribution => "conflict_epoch_distribution",
+            Self::ConflictRecoveryRecord => "conflict_recovery_record",
             Self::PayloadTooLarge => "payload_too_large",
             Self::RecoveryRateLimited => "recovery_rate_limited",
             Self::StorageUnavailable => "storage_unavailable",
@@ -188,6 +192,7 @@ impl SyncServerErrorCode {
             "conflict_stale_base_version" => Self::ConflictStaleBaseVersion,
             "conflict_object_version" => Self::ConflictObjectVersion,
             "conflict_epoch_distribution" => Self::ConflictEpochDistribution,
+            "conflict_recovery_record" => Self::ConflictRecoveryRecord,
             "payload_too_large" => Self::PayloadTooLarge,
             "recovery_rate_limited" => Self::RecoveryRateLimited,
             "storage_unavailable" => Self::StorageUnavailable,

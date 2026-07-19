@@ -7,13 +7,13 @@
 当前已经完成：
 
 - `docs/adr/0002-recovery-code-kdf.md` 固定恢复码格式、Argon2id KDF profile、恢复记录字段、AAD 绑定和失败限速口径。
-- `ime-crypto` 已落地 `RecoveryCode`、`RecoveryKdfProfile`、恢复 wrapping key 和 `RecoveryMaterial` 加解密模型。
+- `ime-crypto` 已落地 recovery-record-v2、恢复 wrapping key、activation public identity/signature 和恢复材料加解密模型。
 - `docs/adr/0003-device-signing-key-storage.md` 固定设备签名对象、canonical bytes、私钥存储抽象和错误语义。
-- `ime-crypto` / `ime-sync` 已覆盖 signed recovery record、signed device authorization、signed device revocation 和客户端合并写回 userdb。
+- `ime-crypto` / `ime-sync` 已覆盖 signed recovery-record-v2、trusted remote upload/download/decrypt、signed device authorization/revocation 和客户端合并写回 userdb。
 - `docs/sync-server-api-storage.md` 已固定 Go server 只保存恢复记录 metadata、包装密文、签名和必要同步元数据。
-- Go server storage / API 已能校验 recovery wrapped material 的长度 / ciphertext hash，把 wrapped material 写入 local object storage，metadata 中保存 `signer_device_id`、signature 和 `blob_ref`，并通过 recovery latest handler 返回 latest active metadata 与 encrypted wrapped material；读取路径已覆盖限速和日志脱敏测试。
+- Go schema v7 storage/API 已完成 recovery v2 optimistic rotation、`superseded` 状态、幂等/冲突、legacy v1 迁移、latest encrypted material 读取、限速、备份重启和日志脱敏证据。
 
-本阶段只固定生产恢复流程，不实现真实 UI、平台 Keychain / Keystore backend 或两客户端端到端同步。
+当前仍不实现真实 UI、平台 Keychain/Keystore 实机操作或 recovered-device activation/lifecycle 成功入口。
 
 ## 设计目标
 
@@ -37,6 +37,8 @@
 - 服务端可保存的恢复记录 metadata、KDF 参数、salt、envelope nonce、包装密文、状态和签名。
 - 不包含恢复码明文、派生 key、`SyncMasterKey` 明文或 plaintext payload。
 
+新写入固定为 `recovery-record-v2`。除既有 KDF/envelope 字段外，它必须由 active device 的签名同时绑定 predecessor recovery id、wrapped material 长度与裸密文 SHA-256、`updated_at_ms`，以及 recovery-activation algorithm/key id/public key。v1 只保留迁移 metadata/blob，当前产品客户端拒绝直接解封或激活；必须由已有 active device 轮换为 v2。
+
 `RecoveryRecordStatus` 建议：
 
 - `active`：当前可用于恢复。
@@ -49,6 +51,13 @@
 - 使用恢复码解开同步域材料的新设备。
 - 恢复完成后必须成为同步域中的 `active` 设备，拥有自己的设备签名 key 和 key agreement key。
 - 不继承旧设备 ID、旧设备私钥或旧设备本地 userdb。
+
+`RecoveryActivationKey`：
+
+- 从 Argon2id 产生的 `RecoveryWrappingKey` 通过独立 HKDF domain separator 派生 Ed25519 seed；不能直接复用 recovery wrapping key、设备 signing key 或 sync master key。
+- v2 record 只公开 algorithm、key id 与 public key，并由原 active device 签入 record；private seed 只在输入正确恢复码后的 Rust 恢复调用中短暂派生和清零。
+- recovered device activation 必须用该 key 签入完整新设备 signing/key-agreement profile、domain、recovery record id、当前 epoch 与时间。Go server 和其他客户端只验证公开签名，不取得恢复码或派生 secret。
+- 公开 activation key 允许攻击者对恢复码猜测做离线验证，但每次猜测仍必须完成同一 Argon2id KDF；不能降低既定恢复码熵或 KDF 成本。
 
 恢复流程创建的新设备仍必须生成与签名 key 分离的 key-agreement key。macOS 首个 profile 使用独立 Secure Enclave P-256 identity；恢复得到的 epoch material 只允许短暂进入 Rust cycle/material snapshot，随后为新设备创建当前 epoch wrapped record。恢复记录的 recovery wrapping 与设备 ECDH wrapping 使用不同 algorithm/domain separator/AAD，二者不能互相解封，也不能共用平台 key id。
 
@@ -85,8 +94,9 @@
 1. active 设备本地生成新 `RecoveryCode`。
 2. active 设备用当前同步域材料创建新 `RecoveryRecord`。
 3. active 设备签名新恢复记录 manifest。
-4. 客户端提交新记录，并把旧记录标记为 `superseded` 或 `revoked`。
-5. 服务端更新 latest recovery record 指向新记录。
+4. 客户端把当前 latest active record id 作为 `previous_recovery_record_id` 签入新记录并提交；首次创建固定为空。
+5. 服务端在一个 transaction 中验证 predecessor、当前 epoch、active signer、v2 manifest、密文 length/hash，将旧 active record 标记为 `superseded`，再写入新 active record和 lifecycle event。
+6. 服务端更新 latest recovery record 指向新记录。
 
 规则：
 
@@ -94,6 +104,8 @@
 - 新记录必须绑定当前 `domain_id`、`key_epoch`、KDF 参数、salt、nonce、包装密文长度和 ciphertext hash。
 - 服务端不能自行生成恢复码、KDF 输出或恢复包装密文。
 - 旧记录保留 metadata 可用于审计，但不应继续作为 `latest` 返回。
+- 精确重放同一 v2 record 与相同 wrapped bytes 幂等；同 recovery id 不同 metadata/signature/bytes 返回 recovery conflict，错误 predecessor 也返回冲突，不能让并发轮换静默覆盖。
+- `recovery_record_rotated` 使用独立 `lifecycle_sequence`，客户端必须在当时 active signer profile 下复验 record v2 签名；服务端的 latest 指针不能自行成为信任源。
 
 ## 恢复记录撤销
 
@@ -126,8 +138,8 @@
 4. 新设备按恢复记录 KDF profile 派生 `RecoveryWrappingKey`。
 5. 新设备用恢复 wrapping key 解开同步域材料。
 6. 新设备验证恢复记录签名、domain、key epoch 和 AAD。
-7. 新设备创建 device join request，或直接提交 signed recovered-device activation request。
-8. 服务端保存新设备公钥，并将设备状态置为 `active`，前提是恢复记录有效且未撤销。
+7. 新设备从同一 recovery wrapping key 域分离派生 activation key，核对 public key 与 v2 record 完全一致，再签名 `recovered_device_activation`；签名覆盖新 device id、两组完整公钥/算法/key id、domain、recovery record id、当前 epoch 和时间。
+8. 服务端验证 record 是当前 active v2、绑定当前 epoch、activation signature 有效且 device id/profile 未登记，然后在一个 transaction 中保存新 active 设备、把已使用 record 标记为 `superseded`，并追加 `device_recovered` lifecycle event。
 9. 新设备拉取密文对象，在本地解密、合并并写回 userdb。
 10. 管理 UI 提示用户轮换恢复码。
 
@@ -136,6 +148,8 @@
 - 恢复码路径用于没有旧设备可用的场景，因此不要求旧设备在线确认。
 - 恢复码路径仍必须创建新设备身份，不允许复用旧设备身份。
 - 服务端只根据 signed recovery record、恢复记录状态、设备公钥和限速规则接受恢复加入；服务端不验证恢复码明文。
+- 服务端不得仅凭 recovery record id、bearer token、device header 或“能够解密”的客户端声明激活设备；activation signature 是不暴露恢复码的 possession proof。
+- lifecycle verifier 必须先验证 `recovery_record_rotated`，再验证引用它的 `device_recovered`；缺事件、乱序、重复使用 record、profile/public key 替换或 current epoch 不一致均失败关闭。
 
 恢复后 key epoch：
 
@@ -256,6 +270,8 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 - 恢复记录 blob 缺失、长度不一致或 hash 不一致时，应返回 `storage_unavailable`，不能把损坏密文当作可恢复状态。
 - 服务端错误响应不得区分“恢复码接近正确”或泄漏 KDF 输出、AAD、wrapped material bytes。
 
+当前已实现 v2 optimistic rotation 与 Rust verified upload/download/decrypt：新写入固定当前 epoch/profile，精确重放幂等，旧 active 原子转为 `superseded`；v1 仅迁移保留并由产品客户端拒绝。尚未把 rotation 归入 lifecycle，也未实现 `device_recovered` transaction；下一批只用合成 recovery code/backend 完成这两项，不开放 Manager 成功入口。
+
 ## 与管理 UI 的边界
 
 后续管理 UI 可以提供：
@@ -282,8 +298,9 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 3. 已补平台私钥存储 backend ADR 与 Rust capability / unavailable backend 模型，明确生产设备签名 key 不应穿过 FFI、CLI 或 Go server。
 4. 已在 Go server storage 验证模型中覆盖 recovery record metadata、`blob_ref` 分配、wrapped material staged blob 写入与 hash / length 校验，不接触恢复码明文。
 5. 已补 Go server recovery latest handler，覆盖 wrapped material 读取、状态、限速和日志脱敏验证。
-6. 后续真实平台 backend 通过验证后，管理 UI 再接入用户可见恢复流程。
-7. 最后再接两客户端端到端同步和真实上传下载。
+6. 已实现 `recovery-record-v2`、activation public key 派生、原子轮换、verified remote 读取与恢复解封；v1 只迁移保留，当前产品客户端失败关闭。
+7. 下一批实现 recovered-device activation、`recovery_record_rotated` / `device_recovered` lifecycle 归约和文件 userdb 重启证据。
+8. 后续真实平台 backend 通过验证后，管理 UI 再接入用户可见恢复流程。
 
 ## 验证口径
 

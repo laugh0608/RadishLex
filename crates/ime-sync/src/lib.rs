@@ -55,9 +55,10 @@ pub use remote::{
     LatestObjectConflictMetadata, OpaqueSyncCursor, RemoteDeviceAuthorization,
     RemoteDeviceRevocation, RemoteEpochDistributionResult, RemoteLifecycleDevice,
     RemoteLifecycleEvent, RemoteLifecycleEventKind, RemoteLifecyclePage, RemoteLifecycleSnapshot,
-    RemoteObjectDiscoveryPage, RemoteObjectPayload, RemoteObjectVersion, RemoteWrappedEpochLocator,
-    RemoteWrappedEpochMaterialSource, SyncRemoteClient, SyncRemoteError, SyncRemoteMethod,
-    SyncRemoteRequest, SyncRemoteResponse, SyncRemoteTransport, SyncServerErrorCode,
+    RemoteObjectDiscoveryPage, RemoteObjectPayload, RemoteObjectVersion,
+    RemoteVerifiedRecoveryRecord, RemoteWrappedEpochLocator, RemoteWrappedEpochMaterialSource,
+    SyncRemoteClient, SyncRemoteError, SyncRemoteMethod, SyncRemoteRequest, SyncRemoteResponse,
+    SyncRemoteTransport, SyncServerErrorCode,
 };
 pub use service::{SyncObjectProcessor, SyncOnceConfig, SyncOrchestrationService};
 pub use signing::{SignedDeviceAuthorization, SignedDeviceRevocation};

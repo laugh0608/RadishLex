@@ -82,8 +82,10 @@ type JoinRequestsResponse struct {
 }
 
 type RecoveryRecordResponse struct {
+	RecordSchemaVersion    uint16                       `json:"record_schema_version"`
 	DomainID               string                       `json:"domain_id"`
 	RecoveryRecordID       string                       `json:"recovery_record_id"`
+	PreviousRecoveryID     string                       `json:"previous_recovery_id"`
 	KeyEpoch               uint64                       `json:"key_epoch"`
 	KDFProfile             string                       `json:"kdf_profile"`
 	KDFVersion             uint16                       `json:"kdf_version"`
@@ -96,8 +98,12 @@ type RecoveryRecordResponse struct {
 	Nonce                  []byte                       `json:"nonce"`
 	WrappedMaterialLen     int64                        `json:"wrapped_material_len"`
 	CiphertextHash         string                       `json:"ciphertext_hash"`
+	ActivationAlgorithm    string                       `json:"activation_algorithm"`
+	ActivationPublicKeyID  string                       `json:"activation_public_key_id"`
+	ActivationPublicKey    []byte                       `json:"activation_public_key"`
 	Status                 storage.RecoveryRecordStatus `json:"status"`
 	CreatedAtMs            int64                        `json:"created_at_ms"`
+	UpdatedAtMs            int64                        `json:"updated_at_ms"`
 	RevokedAtMs            int64                        `json:"revoked_at_ms,omitempty"`
 	SignerDeviceID         string                       `json:"signer_device_id"`
 	SignatureSchemaVersion uint16                       `json:"signature_schema_version"`
@@ -328,8 +334,10 @@ func JoinRequestsResponseFrom(requests []storage.JoinRequest) JoinRequestsRespon
 
 func RecoveryRecordResponseFrom(record storage.RecoveryRecord, wrappedMaterial []byte) RecoveryRecordResponse {
 	return RecoveryRecordResponse{
+		RecordSchemaVersion:    record.RecordSchemaVersion,
 		DomainID:               record.DomainID,
 		RecoveryRecordID:       record.RecoveryRecordID,
+		PreviousRecoveryID:     record.PreviousRecoveryID,
 		KeyEpoch:               record.KeyEpoch,
 		KDFProfile:             record.KDFProfile,
 		KDFVersion:             record.KDFVersion,
@@ -342,8 +350,12 @@ func RecoveryRecordResponseFrom(record storage.RecoveryRecord, wrappedMaterial [
 		Nonce:                  cloneBytes(record.Nonce),
 		WrappedMaterialLen:     record.WrappedMaterialLen,
 		CiphertextHash:         record.CiphertextHash,
+		ActivationAlgorithm:    record.ActivationAlgorithm,
+		ActivationPublicKeyID:  record.ActivationPublicKeyID,
+		ActivationPublicKey:    cloneBytes(record.ActivationPublicKey),
 		Status:                 record.Status,
 		CreatedAtMs:            record.CreatedAtMs,
+		UpdatedAtMs:            record.UpdatedAtMs,
 		RevokedAtMs:            record.RevokedAtMs,
 		SignerDeviceID:         record.SignerDeviceID,
 		SignatureSchemaVersion: record.SignatureSchemaVersion,

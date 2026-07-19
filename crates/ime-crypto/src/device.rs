@@ -133,7 +133,9 @@ impl fmt::Debug for DeviceWrappingRecord {
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct RecoveryMaterial {
+    pub record_schema_version: u16,
     pub recovery_id: String,
+    pub previous_recovery_id: String,
     pub domain_id: String,
     pub key_epoch: u64,
     pub kdf_id: String,
@@ -146,6 +148,9 @@ pub struct RecoveryMaterial {
     pub envelope_algorithm: AlgorithmId,
     pub envelope_nonce: Nonce,
     pub encrypted_recovery_key: Vec<u8>,
+    pub activation_algorithm: String,
+    pub activation_public_key_id: String,
+    pub activation_public_key: Vec<u8>,
     pub created_at_ms: i64,
     pub updated_at_ms: i64,
 }
@@ -153,7 +158,9 @@ pub struct RecoveryMaterial {
 impl RecoveryMaterial {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        record_schema_version: u16,
         recovery_id: impl Into<String>,
+        previous_recovery_id: impl Into<String>,
         domain_id: impl Into<String>,
         key_epoch: u64,
         kdf_id: impl Into<String>,
@@ -166,11 +173,16 @@ impl RecoveryMaterial {
         envelope_algorithm: AlgorithmId,
         envelope_nonce: Nonce,
         encrypted_recovery_key: impl Into<Vec<u8>>,
+        activation_algorithm: impl Into<String>,
+        activation_public_key_id: impl Into<String>,
+        activation_public_key: impl Into<Vec<u8>>,
         created_at_ms: i64,
         updated_at_ms: i64,
     ) -> Result<Self, CryptoError> {
         let material = Self {
+            record_schema_version,
             recovery_id: recovery_id.into(),
+            previous_recovery_id: previous_recovery_id.into(),
             domain_id: domain_id.into(),
             key_epoch,
             kdf_id: kdf_id.into(),
@@ -183,6 +195,9 @@ impl RecoveryMaterial {
             envelope_algorithm,
             envelope_nonce,
             encrypted_recovery_key: encrypted_recovery_key.into(),
+            activation_algorithm: activation_algorithm.into(),
+            activation_public_key_id: activation_public_key_id.into(),
+            activation_public_key: activation_public_key.into(),
             created_at_ms,
             updated_at_ms,
         };
@@ -191,7 +206,19 @@ impl RecoveryMaterial {
     }
 
     pub fn validate(&self) -> Result<(), CryptoError> {
+        if self.record_schema_version != 2 {
+            return Err(CryptoError::invalid_field(
+                "record_schema_version",
+                "recovery record schema must be version 2",
+            ));
+        }
         validate_required("recovery_id", &self.recovery_id)?;
+        if self.previous_recovery_id == self.recovery_id {
+            return Err(CryptoError::invalid_field(
+                "previous_recovery_id",
+                "predecessor must differ from recovery id",
+            ));
+        }
         validate_required("domain_id", &self.domain_id)?;
         if self.key_epoch == 0 {
             return Err(CryptoError::invalid_field(
@@ -244,6 +271,19 @@ impl RecoveryMaterial {
             ));
         }
         validate_non_empty_bytes("encrypted_recovery_key", &self.encrypted_recovery_key)?;
+        if self.activation_algorithm != "ed25519-v1" {
+            return Err(CryptoError::invalid_field(
+                "activation_algorithm",
+                "recovery activation algorithm must be ed25519-v1",
+            ));
+        }
+        validate_required("activation_public_key_id", &self.activation_public_key_id)?;
+        if self.activation_public_key.len() != 32 {
+            return Err(CryptoError::invalid_field(
+                "activation_public_key",
+                "Ed25519 public key must be 32 bytes",
+            ));
+        }
         if self.updated_at_ms < self.created_at_ms {
             return Err(CryptoError::invalid_field(
                 "updated_at_ms",
@@ -255,7 +295,9 @@ impl RecoveryMaterial {
 
     pub fn associated_data(&self) -> RecoveryAssociatedData {
         RecoveryAssociatedData {
+            record_schema_version: self.record_schema_version,
             recovery_id: self.recovery_id.clone(),
+            previous_recovery_id: self.previous_recovery_id.clone(),
             domain_id: self.domain_id.clone(),
             key_epoch: self.key_epoch,
             kdf_id: self.kdf_id.clone(),
@@ -267,6 +309,9 @@ impl RecoveryMaterial {
             output_len: self.output_len,
             envelope_algorithm: self.envelope_algorithm.clone(),
             envelope_nonce: self.envelope_nonce.clone(),
+            activation_algorithm: self.activation_algorithm.clone(),
+            activation_public_key_id: self.activation_public_key_id.clone(),
+            activation_public_key: self.activation_public_key.clone(),
             created_at_ms: self.created_at_ms,
             updated_at_ms: self.updated_at_ms,
         }
@@ -276,7 +321,9 @@ impl RecoveryMaterial {
 impl fmt::Debug for RecoveryMaterial {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RecoveryMaterial")
+            .field("record_schema_version", &self.record_schema_version)
             .field("recovery_id", &self.recovery_id)
+            .field("previous_recovery_id", &self.previous_recovery_id)
             .field("domain_id", &self.domain_id)
             .field("key_epoch", &self.key_epoch)
             .field("kdf_id", &self.kdf_id)
@@ -289,6 +336,12 @@ impl fmt::Debug for RecoveryMaterial {
             .field("envelope_algorithm", &self.envelope_algorithm)
             .field("envelope_nonce_len", &self.envelope_nonce.as_bytes().len())
             .field("encrypted_recovery_key", &"[redacted]")
+            .field("activation_algorithm", &self.activation_algorithm)
+            .field("activation_public_key_id", &self.activation_public_key_id)
+            .field(
+                "activation_public_key_len",
+                &self.activation_public_key.len(),
+            )
             .field("created_at_ms", &self.created_at_ms)
             .field("updated_at_ms", &self.updated_at_ms)
             .finish()
@@ -297,7 +350,9 @@ impl fmt::Debug for RecoveryMaterial {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecoveryAssociatedData {
+    pub record_schema_version: u16,
     pub recovery_id: String,
+    pub previous_recovery_id: String,
     pub domain_id: String,
     pub key_epoch: u64,
     pub kdf_id: String,
@@ -309,6 +364,9 @@ pub struct RecoveryAssociatedData {
     pub output_len: usize,
     pub envelope_algorithm: AlgorithmId,
     pub envelope_nonce: Nonce,
+    pub activation_algorithm: String,
+    pub activation_public_key_id: String,
+    pub activation_public_key: Vec<u8>,
     pub created_at_ms: i64,
     pub updated_at_ms: i64,
 }
@@ -316,7 +374,17 @@ pub struct RecoveryAssociatedData {
 impl RecoveryAssociatedData {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
+        push_aad_field(
+            &mut bytes,
+            "record_schema_version",
+            self.record_schema_version.to_string().as_bytes(),
+        );
         push_aad_field(&mut bytes, "recovery_id", self.recovery_id.as_bytes());
+        push_aad_field(
+            &mut bytes,
+            "previous_recovery_id",
+            self.previous_recovery_id.as_bytes(),
+        );
         push_aad_field(&mut bytes, "domain_id", self.domain_id.as_bytes());
         push_aad_field(
             &mut bytes,
@@ -356,6 +424,21 @@ impl RecoveryAssociatedData {
             self.envelope_algorithm.as_str().as_bytes(),
         );
         push_aad_field(&mut bytes, "envelope_nonce", self.envelope_nonce.as_bytes());
+        push_aad_field(
+            &mut bytes,
+            "activation_algorithm",
+            self.activation_algorithm.as_bytes(),
+        );
+        push_aad_field(
+            &mut bytes,
+            "activation_public_key_id",
+            self.activation_public_key_id.as_bytes(),
+        );
+        push_aad_field(
+            &mut bytes,
+            "activation_public_key",
+            &self.activation_public_key,
+        );
         push_aad_field(
             &mut bytes,
             "created_at_ms",

@@ -210,9 +210,10 @@ macOS wrapped epoch material 使用独立 Secure Enclave P-256 key-agreement ide
 
 - 恢复码由客户端生成，不上传明文。
 - KDF 使用版本化 Argon2id profile，并同时限制最小和最大 memory、iterations、parallelism、salt 和 output。
-- recovery record 保存 salt、KDF profile、algorithm、nonce、wrapped key metadata、ciphertext hash 和签名。
+- recovery-record-v2 保存 predecessor、salt、KDF/envelope profile、wrapped key metadata/hash、由恢复 wrapping key 独立派生的 activation 公钥和 active device 签名；activation private seed 不持久化。
 - 签名绑定实际 wrapped ciphertext hash，服务端不能替换密文后只更新 hash。
 - 恢复记录可创建、轮换和撤销；旧恢复码在撤销后不可继续加入设备。
+- 恢复设备必须用 activation key 签入完整新 signing/key-agreement profile并重新进入 verified lifecycle；bearer、header、record id 或服务端管理员权限不能代替恢复码 possession proof。
 - 恢复失败需要服务端和客户端双层限速，但不能依赖可伪造 header 作为唯一身份。
 
 ## 备份与恢复

@@ -165,12 +165,14 @@ func verifyRecoverySignature(record RecoveryRecord, signer Device) error {
 	if err := verifySignatureMetadata(fields, signer, record.CreatedAtMs); err != nil {
 		return err
 	}
-	return verifyCanonicalSignature(fields, signer, "recovery_record", []signatureField{
+	return verifyCanonicalSignature(fields, signer, "recovery_record_v2", []signatureField{
 		textField("signature_schema_version", strconv.Itoa(int(fields.SchemaVersion))),
 		textField("signature_algorithm", fields.Algorithm),
 		textField("signature_key_id", fields.KeyID),
 		textField("signer_device_id", fields.SignerDeviceID),
+		textField("record_schema_version", strconv.Itoa(int(record.RecordSchemaVersion))),
 		textField("recovery_id", record.RecoveryRecordID),
+		textField("previous_recovery_id", record.PreviousRecoveryID),
 		textField("domain_id", record.DomainID),
 		textField("key_epoch", strconv.FormatUint(record.KeyEpoch, 10)),
 		textField("kdf_id", record.KDFProfile),
@@ -183,8 +185,12 @@ func verifyRecoverySignature(record RecoveryRecord, signer Device) error {
 		textField("envelope_algorithm", record.Algorithm),
 		bytesField("envelope_nonce", record.Nonce),
 		textField("encrypted_recovery_key_len", strconv.FormatInt(record.WrappedMaterialLen, 10)),
+		textField("ciphertext_hash", record.CiphertextHash),
+		textField("activation_algorithm", record.ActivationAlgorithm),
+		textField("activation_public_key_id", record.ActivationPublicKeyID),
+		bytesField("activation_public_key", record.ActivationPublicKey),
 		textField("created_at_ms", strconv.FormatInt(record.CreatedAtMs, 10)),
-		textField("updated_at_ms", strconv.FormatInt(record.CreatedAtMs, 10)),
+		textField("updated_at_ms", strconv.FormatInt(record.UpdatedAtMs, 10)),
 	})
 }
 

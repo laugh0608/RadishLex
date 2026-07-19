@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    AlgorithmId, CiphertextHash, CryptoObjectType, KeyDescriptor, KeyRole, Nonce,
+    AlgorithmId, CiphertextHash, CryptoObjectType, KeyDescriptor, KeyRole, Nonce, RecoveryMaterial,
     XCHACHA20POLY1305_NONCE_LEN,
 };
 
@@ -605,7 +605,7 @@ fn recovery_record_signature_covers_kdf_and_ciphertext_metadata() {
         .sign(
             &handle,
             &canonical_signature_bytes(
-                "recovery_record",
+                "recovery_record_v2",
                 &SignedRecoveryRecordManifest::new(
                     &material,
                     empty_signature("signing-key-a", "device-a"),
@@ -669,7 +669,9 @@ fn sample_envelope() -> EncryptedObjectEnvelope {
 
 fn sample_recovery_material() -> RecoveryMaterial {
     RecoveryMaterial::new(
+        2,
         "recovery-a",
+        "",
         "domain-a",
         3,
         "argon2id-v1",
@@ -682,6 +684,9 @@ fn sample_recovery_material() -> RecoveryMaterial {
         AlgorithmId::xchacha20poly1305_hkdf_sha256(),
         Nonce::new(vec![2u8; XCHACHA20POLY1305_NONCE_LEN]).expect("nonce"),
         b"encrypted-recovery-key",
+        "ed25519-v1",
+        "recovery-activation-key-a",
+        [4u8; 32],
         20,
         20,
     )

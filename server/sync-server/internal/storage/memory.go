@@ -479,6 +479,31 @@ func (s *MemoryStore) PutRecoveryRecord(ctx context.Context, upload RecoveryReco
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	domain, ok := s.domains[upload.Record.DomainID]
+	if !ok {
+		return RecoveryRecord{}, newError(ErrNotFound, "domain not found")
+	}
+	if upload.Record.KeyEpoch != domain.CurrentKeyEpoch {
+		return RecoveryRecord{}, newError(ErrConflictRecoveryRecord, "recovery record key epoch is not current")
+	}
+	key := recoveryKey{domainID: upload.Record.DomainID, recoveryRecordID: upload.Record.RecoveryRecordID}
+	if existing, ok := s.recoveries[key]; ok {
+		wrapped := s.blobs[existing.BlobRef]
+		if sameRecoveryRecord(existing, upload.Record) && bytes.Equal(wrapped, upload.WrappedMaterial) {
+			return cloneRecoveryRecord(existing), nil
+		}
+		return RecoveryRecord{}, newError(ErrConflictRecoveryRecord, "recovery record id already exists with different content")
+	}
+	currentID := s.latestRecovery[upload.Record.DomainID]
+	if currentID == "" {
+		if upload.Record.PreviousRecoveryID != "" {
+			return RecoveryRecord{}, newError(ErrConflictRecoveryRecord, "first recovery record cannot name a predecessor")
+		}
+	} else if upload.Record.PreviousRecoveryID != currentID {
+		return RecoveryRecord{}, newError(ErrConflictRecoveryRecord, "recovery record predecessor is stale")
+	} else if upload.Record.CreatedAtMs <= s.recoveries[recoveryKey{domainID: upload.Record.DomainID, recoveryRecordID: currentID}].CreatedAtMs {
+		return RecoveryRecord{}, newError(ErrConflictRecoveryRecord, "recovery record timestamp does not advance predecessor")
+	}
 	signer, err := s.activeDeviceLocked(upload.Record.DomainID, upload.Record.SignerDeviceID)
 	if err != nil {
 		return RecoveryRecord{}, err
@@ -488,10 +513,16 @@ func (s *MemoryStore) PutRecoveryRecord(ctx context.Context, upload RecoveryReco
 	}
 	record := cloneRecoveryRecord(upload.Record)
 	record.BlobRef = recoveryBlobRef(record)
-	s.recoveries[recoveryKey{domainID: record.DomainID, recoveryRecordID: record.RecoveryRecordID}] = record
-	if record.Status == RecoveryRecordActive {
-		s.latestRecovery[record.DomainID] = record.RecoveryRecordID
+	if currentID != "" {
+		previousKey := recoveryKey{domainID: record.DomainID, recoveryRecordID: currentID}
+		previous := s.recoveries[previousKey]
+		previous.Status = RecoveryRecordSuperseded
+		previous.UpdatedAtMs = record.CreatedAtMs
+		previous.RevokedAtMs = record.CreatedAtMs
+		s.recoveries[previousKey] = previous
 	}
+	s.recoveries[key] = record
+	s.latestRecovery[record.DomainID] = record.RecoveryRecordID
 	s.blobs[record.BlobRef] = cloneBytes(upload.WrappedMaterial)
 	return record, nil
 }
@@ -892,26 +923,38 @@ func validateRecoveryRecordUpload(upload RecoveryRecordUpload) error {
 	if !validOpaqueID(record.DomainID) || !validOpaqueID(record.RecoveryRecordID) || !validOpaqueID(record.SignerDeviceID) {
 		return newError(ErrInvalidRequest, "recovery record ids must be opaque ids")
 	}
-	if record.KeyEpoch == 0 || record.KDFProfile == "" || record.Algorithm == "" {
+	if record.RecordSchemaVersion != RecoveryRecordSchemaVersionV2 {
+		return newError(ErrInvalidRequest, "recovery record schema version is unsupported")
+	}
+	if record.PreviousRecoveryID != "" && !validOpaqueID(record.PreviousRecoveryID) {
+		return newError(ErrInvalidRequest, "recovery record predecessor must be an opaque id")
+	}
+	if record.PreviousRecoveryID == record.RecoveryRecordID {
+		return newError(ErrInvalidRequest, "recovery record cannot name itself as predecessor")
+	}
+	if record.KeyEpoch == 0 || record.KDFProfile != "argon2id-v1" || record.Algorithm != AlgorithmXChaCha20Poly1305HKDFSHA256 {
 		return newError(ErrInvalidRequest, "recovery record key metadata is required")
 	}
-	if record.KDFVersion == 0 || record.MemoryKiB == 0 || record.Iterations == 0 ||
-		record.Parallelism == 0 || record.OutputLen <= 0 {
+	if record.KDFVersion != 1 || record.MemoryKiB != 65536 || record.Iterations != 3 ||
+		record.Parallelism != 4 || record.OutputLen != 32 {
 		return newError(ErrInvalidRequest, "recovery record KDF parameters are required")
 	}
-	if len(record.Salt) == 0 || len(record.Nonce) == 0 {
+	if len(record.Salt) != RecoverySaltBytes || len(record.Nonce) != RecoveryNonceBytes {
 		return newError(ErrInvalidCiphertextMetadata, "recovery record public crypto parameters are required")
 	}
-	if record.Status != RecoveryRecordActive && record.Status != RecoveryRecordRevoked {
-		return newError(ErrInvalidRequest, "recovery record status is invalid")
+	if record.ActivationAlgorithm != SignatureAlgorithmEd25519V1 || record.ActivationPublicKeyID == "" || len(record.ActivationPublicKey) != ed25519PublicKeyLen {
+		return newError(ErrInvalidRequest, "recovery activation public profile is invalid")
 	}
-	if len(upload.WrappedMaterial) == 0 {
+	if record.Status != RecoveryRecordActive || record.RevokedAtMs != 0 {
+		return newError(ErrInvalidRequest, "new recovery record must be active")
+	}
+	if len(upload.WrappedMaterial) != RecoveryWrappedMaterialBytes {
 		return newError(ErrInvalidCiphertextMetadata, "recovery wrapped material is required")
 	}
 	if int64(len(upload.WrappedMaterial)) != record.WrappedMaterialLen || CiphertextHash(upload.WrappedMaterial) != record.CiphertextHash {
 		return newError(ErrInvalidCiphertextMetadata, "recovery wrapped material metadata mismatch")
 	}
-	if record.CreatedAtMs <= 0 || record.RevokedAtMs < 0 {
+	if record.CreatedAtMs <= 0 || record.UpdatedAtMs < record.CreatedAtMs {
 		return newError(ErrInvalidRequest, "recovery record timestamps are invalid")
 	}
 	if err := validateSignatureFields(record.SignatureSchemaVersion, record.SignatureAlgorithm, record.SignatureKeyID, record.Signature); err != nil {
@@ -1195,8 +1238,40 @@ func cloneLifecycleEvents(values []LifecycleEvent) []LifecycleEvent {
 func cloneRecoveryRecord(value RecoveryRecord) RecoveryRecord {
 	value.Salt = cloneBytes(value.Salt)
 	value.Nonce = cloneBytes(value.Nonce)
+	value.ActivationPublicKey = cloneBytes(value.ActivationPublicKey)
 	value.Signature = cloneBytes(value.Signature)
 	return value
+}
+
+func sameRecoveryRecord(left RecoveryRecord, right RecoveryRecord) bool {
+	return left.RecordSchemaVersion == right.RecordSchemaVersion &&
+		left.DomainID == right.DomainID &&
+		left.RecoveryRecordID == right.RecoveryRecordID &&
+		left.PreviousRecoveryID == right.PreviousRecoveryID &&
+		left.KeyEpoch == right.KeyEpoch &&
+		left.KDFProfile == right.KDFProfile &&
+		left.KDFVersion == right.KDFVersion &&
+		left.MemoryKiB == right.MemoryKiB &&
+		left.Iterations == right.Iterations &&
+		left.Parallelism == right.Parallelism &&
+		left.OutputLen == right.OutputLen &&
+		bytes.Equal(left.Salt, right.Salt) &&
+		left.Algorithm == right.Algorithm &&
+		bytes.Equal(left.Nonce, right.Nonce) &&
+		left.WrappedMaterialLen == right.WrappedMaterialLen &&
+		left.CiphertextHash == right.CiphertextHash &&
+		left.ActivationAlgorithm == right.ActivationAlgorithm &&
+		left.ActivationPublicKeyID == right.ActivationPublicKeyID &&
+		bytes.Equal(left.ActivationPublicKey, right.ActivationPublicKey) &&
+		left.Status == right.Status &&
+		left.CreatedAtMs == right.CreatedAtMs &&
+		left.UpdatedAtMs == right.UpdatedAtMs &&
+		left.RevokedAtMs == right.RevokedAtMs &&
+		left.SignerDeviceID == right.SignerDeviceID &&
+		left.SignatureSchemaVersion == right.SignatureSchemaVersion &&
+		left.SignatureAlgorithm == right.SignatureAlgorithm &&
+		left.SignatureKeyID == right.SignatureKeyID &&
+		bytes.Equal(left.Signature, right.Signature)
 }
 
 func cloneObjectVersion(value ObjectVersion) ObjectVersion {
