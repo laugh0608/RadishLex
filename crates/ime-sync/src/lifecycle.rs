@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use radishlex_ime_crypto::{
-    canonical_signature_bytes, DeviceSignature, DeviceSigningPublicKey, SignatureAlgorithmId,
-    SignatureField,
+    canonical_signature_bytes, DeviceKeyAgreementPublicKey, DeviceSignature,
+    DeviceSigningPublicKey, SignatureAlgorithmId, SignatureField,
 };
 use sha2::{Digest, Sha256};
 
@@ -87,6 +87,7 @@ impl fmt::Debug for VerifiedSyncLifecycle {
 struct TrustedDeviceRecord {
     device: SyncDevice,
     public_key: DeviceSigningPublicKey,
+    key_agreement_public_key: DeviceKeyAgreementPublicKey,
     reject_from_change_sequence: Option<u64>,
 }
 
@@ -153,12 +154,19 @@ pub fn verify_lifecycle_snapshot(
     let profiles = devices
         .into_values()
         .map(|record| match record.reject_from_change_sequence {
-            Some(sequence) => SyncTrustedDeviceProfile::revoked_from_change_sequence(
+            Some(sequence) => {
+                SyncTrustedDeviceProfile::revoked_with_key_agreement_from_change_sequence(
+                    record.device,
+                    record.public_key,
+                    record.key_agreement_public_key,
+                    sequence,
+                )
+            }
+            None => SyncTrustedDeviceProfile::active_with_key_agreement(
                 record.device,
                 record.public_key,
-                sequence,
+                record.key_agreement_public_key,
             ),
-            None => SyncTrustedDeviceProfile::active(record.device, record.public_key),
         })
         .collect::<Result<Vec<_>, _>>()
         .map_err(|_| SyncLifecycleError::InvalidSnapshot)?;
@@ -191,11 +199,14 @@ fn apply_initial_device(
         return Err(SyncLifecycleError::InvalidTrustAnchor);
     }
     let device = sync_device_at_authorization(profile, event.created_at_ms)?;
+    let key_agreement_public_key =
+        key_agreement_public_key_from_profile(profile, event.created_at_ms, None)?;
     devices.insert(
         profile.device_id.clone(),
         TrustedDeviceRecord {
             device,
             public_key: trust_anchor.clone(),
+            key_agreement_public_key,
             reject_from_change_sequence: None,
         },
     );
@@ -258,11 +269,14 @@ fn apply_authorization(
         .verify_with_devices(&authorizer.public_key, &authorizer.device, &recipient)
         .map_err(|_| SyncLifecycleError::InvalidAuthorization)?;
     let public_key = public_key_from_profile(profile, authorization.join_created_at_ms, None)?;
+    let key_agreement_public_key =
+        key_agreement_public_key_from_profile(profile, authorization.join_created_at_ms, None)?;
     devices.insert(
         profile.device_id.clone(),
         TrustedDeviceRecord {
             device: recipient,
             public_key,
+            key_agreement_public_key,
             reject_from_change_sequence: None,
         },
     );
@@ -311,6 +325,8 @@ fn apply_revocation(
     if target.device.public_key_id != event.device.signing_public_key_id
         || target.public_key.public_key != event.device.signing_public_key
         || target.public_key.signature_algorithm.as_str() != event.device.signing_algorithm
+        || target.key_agreement_public_key.key_id != event.device.key_agreement_public_key_id
+        || target.key_agreement_public_key.public_key != event.device.key_agreement_public_key
     {
         return Err(SyncLifecycleError::InvalidRevocation);
     }
@@ -320,8 +336,24 @@ fn apply_revocation(
         .revoke(event.created_at_ms, lost)
         .map_err(|_| SyncLifecycleError::InvalidRevocation)?;
     target.public_key.revoked_at_ms = Some(event.created_at_ms);
+    target.key_agreement_public_key.revoked_at_ms = Some(event.created_at_ms);
     target.reject_from_change_sequence = Some(reject_from);
     Ok(())
+}
+
+fn key_agreement_public_key_from_profile(
+    profile: &RemoteLifecycleDevice,
+    created_at_ms: i64,
+    revoked_at_ms: Option<i64>,
+) -> Result<DeviceKeyAgreementPublicKey, SyncLifecycleError> {
+    DeviceKeyAgreementPublicKey::p256(
+        profile.device_id.clone(),
+        profile.key_agreement_public_key_id.clone(),
+        profile.key_agreement_public_key.clone(),
+        created_at_ms,
+        revoked_at_ms,
+    )
+    .map_err(|_| SyncLifecycleError::InvalidSnapshot)
 }
 
 fn sync_device_at_authorization(
@@ -579,11 +611,24 @@ mod tests {
             signing_public_key_id: key_id.to_owned(),
             signing_public_key: public_key,
             key_agreement_public_key_id: format!("agreement-{device_id}"),
-            key_agreement_public_key: vec![2, 3, 4],
+            key_agreement_public_key: agreement_public_key(1),
             status,
             authorized_at_ms: Some(authorized_at_ms),
             revoked_at_ms,
             last_seen_at_ms: None,
+        }
+    }
+
+    fn agreement_public_key(scalar: u8) -> Vec<u8> {
+        match scalar {
+            1 => vec![
+                0x04, 0x6b, 0x17, 0xd1, 0xf2, 0xe1, 0x2c, 0x42, 0x47, 0xf8, 0xbc, 0xe6, 0xe5, 0x63,
+                0xa4, 0x40, 0xf2, 0x77, 0x03, 0x7d, 0x81, 0x2d, 0xeb, 0x33, 0xa0, 0xf4, 0xa1, 0x39,
+                0x45, 0xd8, 0x98, 0xc2, 0x96, 0x4f, 0xe3, 0x42, 0xe2, 0xfe, 0x1a, 0x7f, 0x9b, 0x8e,
+                0xe7, 0xeb, 0x4a, 0x7c, 0x0f, 0x9e, 0x16, 0x2b, 0xce, 0x33, 0x57, 0x6b, 0x31, 0x5e,
+                0xce, 0xcb, 0xb6, 0x40, 0x68, 0x37, 0xbf, 0x51, 0xf5,
+            ],
+            _ => unreachable!("test scalar"),
         }
     }
 

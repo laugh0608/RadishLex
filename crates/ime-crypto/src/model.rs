@@ -7,6 +7,7 @@ use chacha20poly1305::{
 };
 use hkdf::Hkdf;
 use sha2::{Digest, Sha256};
+use zeroize::Zeroize;
 
 use crate::device::DeviceWrappingKeyMaterial;
 
@@ -176,6 +177,12 @@ impl SyncMasterKeyMaterial {
 impl fmt::Debug for SyncMasterKeyMaterial {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("SyncMasterKeyMaterial([redacted])")
+    }
+}
+
+impl Drop for SyncMasterKeyMaterial {
+    fn drop(&mut self) {
+        self.0.zeroize();
     }
 }
 

@@ -80,6 +80,38 @@
 - 每台授权设备应有独立包装记录，便于撤销。
 - 包装记录只允许包含密文和必要元数据，不包含 plaintext sync key。
 
+### macOS wrapped epoch material v1
+
+M3 的首个产品材料 profile 固定为 `p256-ecdh-hkdf-sha256-xchacha20poly1305-v1`。设备签名 key 与 key-agreement key 必须使用不同的 key id、application tag 和平台 handle；签名 backend 不能被复用为 ECDH 私钥入口。`profile-sha256-v1` 已签入接收设备完整 key-agreement 公钥和 key id，因此本 profile 暂不增加可由服务端替换的算法字段，而是把 P-256、65-byte SEC1 uncompressed 公钥作为 v1 的唯一解释；后续增加其他曲线时必须升级 join profile 和 wrapped record schema，不能按长度猜测或尝试多算法回退。
+
+wrapped record 的公开字段固定为：
+
+```text
+schema_version = 1
+algorithm = p256-ecdh-hkdf-sha256-xchacha20poly1305-v1
+domain_id
+recipient_device_id
+recipient_key_agreement_key_id
+wrapping_key_id
+key_epoch
+nonce (24 bytes)
+wrapped_key bytes
+created_at_ms
+```
+
+`wrapped_key bytes` 是版本化 binary envelope：magic、envelope version、65-byte ephemeral P-256 public key 和 XChaCha20-Poly1305 ciphertext。明文固定为当前 epoch 的 `active_key_id` 与 32-byte `SyncMasterKey`，解析时拒绝未知 version、重复/空 key id、尾随 bytes 和非法长度。ECDH 只产生临时 shared secret；HKDF-SHA256 以独立 domain separator 和完整 record AAD 派生 32-byte AEAD key。AAD 至少绑定 schema/algorithm、domain、recipient device、recipient key-agreement key id、wrapping key id、epoch、nonce 和创建时间；任一字段变化必须解封失败。
+
+平台边界固定如下：
+
+- authorizer 使用一次性 ephemeral P-256 private key 为 recipient 公钥包装材料；ephemeral private key 只存在于本次调用并在析构时清零。
+- recipient 的长期 key-agreement private key 由独立平台 backend 持有；macOS 产品候选使用独立 Secure Enclave P-256 key identity，并通过 `SecKeyCopyKeyExchangeResult` 返回 shared secret，Rust 随即派生/解封并清零临时 buffer。
+- `SyncEpochMaterialStore` 只能读取已验证 lifecycle 中与本机 device/key id/public key 完全一致的 wrapped record；错误 domain、device、key id、公钥、epoch、算法、AAD、ciphertext 或 backend 状态一律失败关闭。
+- SQLite 可以保存签名链验证后的公开 lifecycle 字段；若后续保存 wrapped record，也只能保存服务端同样可见的密文和公开 metadata。SQLite/settings/Manager state 永远不保存明文 master key、ECDH shared secret 或派生 wrapping key。
+- 当前与历史 epoch 都按独立 record 解封；当前 epoch 必须存在且 `active_key_id` 匹配 domain。撤销设备的 trusted profile 在材料读取前阻断，因此不得请求或解封新 epoch；已持有的历史材料不承诺技术追回。
+- locked、user-presence、denied、unavailable、unsupported、missing、corrupted 和 authentication failure 保持可区分的内部错误；编排层只映射为稳定脱敏分类，不拼接 key bytes、wrapped bytes、shared secret、nonce 或平台错误文本。
+
+可信公开缓存从 schema v6 演进时必须把 `key_agreement_public_key_id` 与 `key_agreement_public_key` 作为结构化列原子保存，不能只依赖历史 `record_json`。这是重启后把平台 handle 绑定回已签名公钥的必要条件，不改变“公开缓存不保存 secret”的边界。
+
 `RecoverySecret`：
 
 - 从恢复码和恢复参数派生出的恢复材料。

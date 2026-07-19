@@ -1,11 +1,24 @@
+#[cfg(feature = "apple-keychain")]
+mod apple_key_agreement;
 mod device;
+mod epoch_material;
 mod model;
 mod recovery;
 mod signing;
 
+#[cfg(feature = "apple-keychain")]
+pub use apple_key_agreement::{
+    AppleSecureEnclaveP256KeyAgreementStore, APPLE_SECURE_ENCLAVE_P256_KEY_AGREEMENT_BACKEND,
+};
 pub use device::{
     DeviceKeyDescriptor, DeviceWrappingKeyMaterial, DeviceWrappingRecord, RecoveryAssociatedData,
     RecoveryMaterial,
+};
+pub use epoch_material::{
+    DeviceKeyAgreementKeyHandle, DeviceKeyAgreementPublicKey, EcdhSharedSecret,
+    WrappedEpochMaterial, KEY_AGREEMENT_ALGORITHM_P256_ECDH_V1, P256_KEY_AGREEMENT_PUBLIC_KEY_LEN,
+    WRAPPED_EPOCH_ALGORITHM_P256_ECDH_HKDF_SHA256_XCHACHA20POLY1305_V1,
+    WRAPPED_EPOCH_SCHEMA_VERSION,
 };
 pub use model::{
     AlgorithmId, AssociatedData, CiphertextHash, CryptoError, CryptoObjectType,

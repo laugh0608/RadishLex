@@ -448,6 +448,7 @@ latest_ciphertext_hash
 26. 已补 ADR 0006 对应的算法分派、设备/join `signing_algorithm` API/SQLite metadata、历史 Ed25519 migration、稳定 `error_detail` 和 Rust/Go 共享正负向 vectors；新请求缺少算法或传入未知算法时失败关闭。
 27. 已按 `docs/sync-orchestration.md` 增加 domain 内 change sequence、opaque cursor discovery storage/API、Rust remote DTO 和分页/幂等/非法 cursor 测试；对象增量同步不能用时间戳过滤替代。
 28. 已补独立 lifecycle sequence、snapshot / events API、设备 revocation API、Rust trust-anchor signed chain verifier、`profile-sha256-v1` 公钥绑定 challenge 和 userdb schema v6 public cache；两个文件 userdb 已在短生命周期 Go HTTP 中完成授权、同步、撤销、缓存和重启恢复。
+29. Rust userdb schema 已升至 v7，结构化缓存签名链绑定的 key-agreement key id/public key，并只保存版本化 wrapped epoch ciphertext；`ProductWrappedEpochMaterialStore` 与 Apple signing/key-agreement adapter 已落地。Go storage 已有 `DeviceWrappedKey` 读取语义，但尚未开放受控 HTTP 读取 handler/Rust remote DTO，因此真实双客户端 wrapped material 取得与轮换仍是下一批，不能用 storage 单测替代。
 
 任何阶段都不应把 Flutter manager、平台壳、真实系统输入法服务或输入热路径接入 Go server。
 

@@ -145,7 +145,7 @@ fn create_domain(transport: &HttpSyncRemoteTransport, public_key: &DeviceSigning
             "signing_public_key_id": SIGNING_KEY_ID,
             "signing_public_key": b64(&public_key.public_key),
             "key_agreement_public_key_id": "agreement-key-a",
-            "key_agreement_public_key": b64(&[0x42u8; 32]),
+            "key_agreement_public_key": b64(&agreement_public_key(1)),
             "status": "active"
         },
         "created_at_ms": 100,
@@ -169,6 +169,19 @@ fn create_domain(transport: &HttpSyncRemoteTransport, public_key: &DeviceSigning
     assert!(!response_text.contains("radish-alpha"));
     assert!(!response_text.contains("input_code"));
     assert!(!response_text.contains("reading"));
+}
+
+fn agreement_public_key(scalar: u8) -> Vec<u8> {
+    use p256::elliptic_curve::sec1::ToEncodedPoint;
+
+    let mut secret = [0u8; 32];
+    secret[31] = scalar;
+    p256::SecretKey::from_slice(&secret)
+        .expect("test agreement secret")
+        .public_key()
+        .to_encoded_point(false)
+        .as_bytes()
+        .to_vec()
 }
 
 fn assemble_object(

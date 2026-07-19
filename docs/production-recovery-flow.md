@@ -50,6 +50,8 @@
 - 恢复完成后必须成为同步域中的 `active` 设备，拥有自己的设备签名 key 和 key agreement key。
 - 不继承旧设备 ID、旧设备私钥或旧设备本地 userdb。
 
+恢复流程创建的新设备仍必须生成与签名 key 分离的 key-agreement key。macOS 首个 profile 使用独立 Secure Enclave P-256 identity；恢复得到的 epoch material 只允许短暂进入 Rust cycle/material snapshot，随后为新设备创建当前 epoch wrapped record。恢复记录的 recovery wrapping 与设备 ECDH wrapping 使用不同 algorithm/domain separator/AAD，二者不能互相解封，也不能共用平台 key id。
+
 ## 第一台设备初始化
 
 初始化流程：

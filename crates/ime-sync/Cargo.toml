@@ -11,9 +11,16 @@ description = "Sync payload boundary models for RadishLex."
 name = "radishlex_ime_sync"
 path = "src/lib.rs"
 
+[features]
+default = []
+apple-keychain = ["radishlex-ime-crypto/apple-keychain"]
+
 [dependencies]
 base64ct = { version = "1.8.3", features = ["alloc"] }
 radishlex-ime-crypto = { path = "../ime-crypto" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 sha2 = "0.10.9"
+
+[dev-dependencies]
+p256 = { version = "0.13.2", default-features = false, features = ["arithmetic", "std"] }

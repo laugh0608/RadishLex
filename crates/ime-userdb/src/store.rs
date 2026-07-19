@@ -18,6 +18,7 @@ mod sync_apply;
 mod sync_payload;
 mod sync_repository;
 mod trusted_lifecycle;
+mod wrapped_epoch_material;
 
 use identity::has_deleted_tombstone_on;
 use learning::now_ms;

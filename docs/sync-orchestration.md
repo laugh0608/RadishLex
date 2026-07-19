@@ -192,7 +192,7 @@ Preflight 只能返回计数、状态和阻塞原因，不返回明文 P2、P1 �
 ## 实施状态与后续批次
 
 1. 已落地：`ime-sync` phase/result/error、opaque cursor、discovery page、local repository port 与 prepared outbox；Go/Rust change cursor discovery 已覆盖分页、幂等 sequence、非法/跨域/越界 cursor。
-2. 已落地：userdb schema v6 持久化 domain state、remote observation、local revision、cycle journal/outbox 与可信 public lifecycle cache；transaction-scoped apply 使 payload、observation、revision 与对象 cursor 同提交或回滚，已验证 lifecycle state 与独立 lifecycle cursor 同事务替换且拒绝回退 / 分叉。
+2. 已落地：userdb schema v7 持久化 domain state、remote observation、local revision、cycle journal/outbox、可信 public lifecycle cache 与 wrapped epoch ciphertext cache；transaction-scoped apply 使 payload、observation、revision 与对象 cursor 同提交或回滚，已验证 lifecycle state 与独立 lifecycle cursor 同事务替换且拒绝回退 / 分叉。明文 master key/shared secret 不进入 SQLite。
 3. 已落地：关闭态 `sync_once` 组合 remote/local/crypto processor port，测试使用真实 test-memory signing 与密文解密，覆盖 `409` 重新发现、重新合并和新版本签名；文件重开可恢复同一 outbox。
 4. 已落地关闭态风险矩阵：取消、retry exhaustion、local revision race、lease recovery、签名/密文/AAD-bound metadata、epoch/revocation 拒绝、decode/transaction cursor rollback、v4→v5 与 v5→v6 migration rollback、outbox prepare/ack crash point，以及两个隔离 userdb 通过短生命周期 Go HTTP 服务第二轮零上传收敛。
 5. 已落地：默认关闭的 `DefaultSyncObjectProcessor`、cycle-frozen `SyncCryptoCycleSnapshot` 与 `SyncCryptoProvider` port；产品/合成构造路径分离，默认无 provider 时网络前阻断。测试覆盖历史 epoch、撤销 sequence、snapshot 漂移和轮换 outbox，双 userdb HTTP fixture 已复用该通用实现。

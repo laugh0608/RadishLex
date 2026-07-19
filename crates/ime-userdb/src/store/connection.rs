@@ -11,7 +11,7 @@ use crate::error::{UserDbError, UserDbResult};
 use super::identity::legacy_stable_hash_hex;
 use super::UserDb;
 
-pub(super) const SCHEMA_VERSION: i64 = 6;
+pub(super) const SCHEMA_VERSION: i64 = 7;
 pub(super) const BUSY_TIMEOUT: Duration = Duration::from_millis(5_000);
 pub(super) const MAX_LEARNING_COUNT: i64 = 1_000_000;
 
@@ -84,6 +84,8 @@ impl UserDb {
             ensure_sync_orchestration_tables(&transaction)?;
             ensure_trusted_lifecycle_tables(&transaction)?;
         }
+        ensure_trusted_device_key_agreement_columns(&transaction)?;
+        ensure_wrapped_epoch_material_table(&transaction)?;
         transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
         validate_current_schema_on(&transaction)?;
         transaction.commit()?;
@@ -253,6 +255,8 @@ fn validate_current_schema_on(connection: &Connection) -> UserDbResult<()> {
             "signing_public_key_id",
             "signing_public_key",
             "signing_key_created_at_ms",
+            "key_agreement_public_key_id",
+            "key_agreement_public_key",
             "status",
             "authorized_at_ms",
             "revoked_at_ms",
@@ -272,6 +276,23 @@ fn validate_current_schema_on(connection: &Connection) -> UserDbResult<()> {
             "reject_from_object_change_sequence",
             "created_at_ms",
             "record_json",
+        ],
+    )?;
+    require_columns(
+        connection,
+        "sync_wrapped_epoch_materials",
+        &[
+            "domain_id",
+            "recipient_device_id",
+            "recipient_key_agreement_key_id",
+            "wrapping_key_id",
+            "key_epoch",
+            "schema_version",
+            "algorithm",
+            "nonce",
+            "wrapped_key",
+            "ciphertext_hash",
+            "created_at_ms",
         ],
     )?;
     Ok(())
@@ -553,6 +574,8 @@ const TRUSTED_LIFECYCLE_SCHEMA_SQL: &str = "
             signing_public_key_id TEXT NOT NULL,
             signing_public_key BLOB NOT NULL,
             signing_key_created_at_ms INTEGER NOT NULL,
+            key_agreement_public_key_id TEXT NOT NULL,
+            key_agreement_public_key BLOB NOT NULL,
             status TEXT NOT NULL CHECK(status IN ('active', 'revoked', 'lost')),
             authorized_at_ms INTEGER NOT NULL,
             revoked_at_ms INTEGER,
@@ -577,6 +600,109 @@ const TRUSTED_LIFECYCLE_SCHEMA_SQL: &str = "
 
 fn ensure_trusted_lifecycle_tables(transaction: &Transaction<'_>) -> UserDbResult<()> {
     transaction.execute_batch(TRUSTED_LIFECYCLE_SCHEMA_SQL)?;
+    Ok(())
+}
+
+fn ensure_trusted_device_key_agreement_columns(transaction: &Transaction<'_>) -> UserDbResult<()> {
+    if !table_columns(transaction, "sync_trusted_devices")?.contains("key_agreement_public_key_id")
+    {
+        transaction.execute_batch(
+            "ALTER TABLE sync_trusted_devices ADD COLUMN key_agreement_public_key_id TEXT;
+             ALTER TABLE sync_trusted_devices ADD COLUMN key_agreement_public_key BLOB;",
+        )?;
+    }
+
+    let missing_count: i64 = transaction.query_row(
+        "SELECT COUNT(*) FROM sync_trusted_devices
+         WHERE key_agreement_public_key_id IS NULL OR key_agreement_public_key IS NULL",
+        [],
+        |row| row.get(0),
+    )?;
+    if missing_count == 0 {
+        return Ok(());
+    }
+
+    let mut statement = transaction.prepare(
+        "SELECT domain_id, record_json FROM sync_trusted_lifecycle_events
+         ORDER BY domain_id, lifecycle_sequence",
+    )?;
+    let records = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    drop(statement);
+    for (domain_id, record_json) in records {
+        let value: serde_json::Value = serde_json::from_str(&record_json)
+            .map_err(|error| UserDbError::invalid_input("lifecycle_record", error.to_string()))?;
+        let device = value
+            .get("device")
+            .ok_or_else(|| UserDbError::invalid_input("lifecycle_record", "device is missing"))?;
+        let device_id = device
+            .get("device_id")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| {
+                UserDbError::invalid_input("lifecycle_record", "device id is invalid")
+            })?;
+        let key_id = device
+            .get("key_agreement_public_key_id")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| {
+                UserDbError::invalid_input("lifecycle_record", "key agreement id is invalid")
+            })?;
+        let public_key = serde_json::from_value::<Vec<u8>>(
+            device
+                .get("key_agreement_public_key")
+                .cloned()
+                .ok_or_else(|| {
+                    UserDbError::invalid_input(
+                        "lifecycle_record",
+                        "key agreement public key is missing",
+                    )
+                })?,
+        )
+        .map_err(|error| UserDbError::invalid_input("lifecycle_record", error.to_string()))?;
+        transaction.execute(
+            "UPDATE sync_trusted_devices
+             SET key_agreement_public_key_id = ?3, key_agreement_public_key = ?4
+             WHERE domain_id = ?1 AND device_id = ?2",
+            params![domain_id, device_id, key_id, public_key],
+        )?;
+    }
+    let remaining: i64 = transaction.query_row(
+        "SELECT COUNT(*) FROM sync_trusted_devices
+         WHERE key_agreement_public_key_id IS NULL OR key_agreement_public_key IS NULL",
+        [],
+        |row| row.get(0),
+    )?;
+    if remaining != 0 {
+        return Err(UserDbError::invalid_input(
+            "sync_trusted_devices",
+            "schema v6 cache cannot be migrated without signed key-agreement profile",
+        ));
+    }
+    Ok(())
+}
+
+const WRAPPED_EPOCH_MATERIAL_SCHEMA_SQL: &str = "
+        CREATE TABLE IF NOT EXISTS sync_wrapped_epoch_materials (
+            domain_id TEXT NOT NULL REFERENCES sync_trusted_domains(domain_id) ON DELETE CASCADE,
+            recipient_device_id TEXT NOT NULL,
+            recipient_key_agreement_key_id TEXT NOT NULL,
+            wrapping_key_id TEXT NOT NULL,
+            key_epoch INTEGER NOT NULL CHECK(key_epoch > 0),
+            schema_version INTEGER NOT NULL CHECK(schema_version > 0),
+            algorithm TEXT NOT NULL,
+            nonce BLOB NOT NULL,
+            wrapped_key BLOB NOT NULL,
+            ciphertext_hash TEXT NOT NULL,
+            created_at_ms INTEGER NOT NULL,
+            PRIMARY KEY(domain_id, recipient_device_id, key_epoch)
+        );
+";
+
+fn ensure_wrapped_epoch_material_table(transaction: &Transaction<'_>) -> UserDbResult<()> {
+    transaction.execute_batch(WRAPPED_EPOCH_MATERIAL_SCHEMA_SQL)?;
     Ok(())
 }
 

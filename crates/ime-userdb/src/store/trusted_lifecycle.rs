@@ -1,4 +1,6 @@
-use radishlex_ime_crypto::{DeviceSigningPublicKey, SignatureAlgorithmId};
+use radishlex_ime_crypto::{
+    DeviceKeyAgreementPublicKey, DeviceSigningPublicKey, SignatureAlgorithmId,
+};
 use radishlex_ime_sync::{
     RemoteLifecycleEvent, RemoteLifecycleEventKind, SyncCryptoLoadError, SyncDevice,
     SyncDeviceStatus, SyncTrustedDeviceProfile, SyncTrustedDeviceSource, SyncTrustedDomainState,
@@ -136,10 +138,11 @@ impl UserDb {
             transaction.execute(
                 "INSERT INTO sync_trusted_devices (
                     domain_id, device_id, signing_algorithm, signing_public_key_id,
-                    signing_public_key, signing_key_created_at_ms, status,
+                    signing_public_key, signing_key_created_at_ms,
+                    key_agreement_public_key_id, key_agreement_public_key, status,
                     authorized_at_ms, revoked_at_ms, last_seen_at_ms,
                     reject_from_change_sequence
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
                 params![
                     &domain.domain_id,
                     &device.device_id,
@@ -147,6 +150,17 @@ impl UserDb {
                     &public_key.signing_key_id,
                     &public_key.public_key,
                     public_key.created_at_ms,
+                    profile
+                        .key_agreement_public_key()
+                        .ok_or_else(|| UserDbError::invalid_input(
+                            "key_agreement_public_key",
+                            "verified lifecycle profile is missing key-agreement public key",
+                        ))?
+                        .key_id,
+                    profile
+                        .key_agreement_public_key()
+                        .expect("checked key-agreement profile")
+                        .public_key,
                     device.status.as_str(),
                     device.authorized_at_ms,
                     device.revoked_at_ms,
@@ -213,7 +227,8 @@ impl UserDb {
 
         let mut statement = self.connection.prepare(
             "SELECT device_id, signing_algorithm, signing_public_key_id, signing_public_key,
-                signing_key_created_at_ms, status, authorized_at_ms, revoked_at_ms,
+                signing_key_created_at_ms, key_agreement_public_key_id,
+                key_agreement_public_key, status, authorized_at_ms, revoked_at_ms,
                 last_seen_at_ms, reject_from_change_sequence
              FROM sync_trusted_devices WHERE domain_id = ?1 ORDER BY device_id",
         )?;
@@ -224,11 +239,13 @@ impl UserDb {
                 signing_public_key_id: row.get(2)?,
                 signing_public_key: row.get(3)?,
                 signing_key_created_at_ms: row.get(4)?,
-                status: row.get(5)?,
-                authorized_at_ms: row.get(6)?,
-                revoked_at_ms: row.get(7)?,
-                last_seen_at_ms: row.get(8)?,
-                reject_from_change_sequence: row.get(9)?,
+                key_agreement_public_key_id: row.get(5)?,
+                key_agreement_public_key: row.get(6)?,
+                status: row.get(7)?,
+                authorized_at_ms: row.get(8)?,
+                revoked_at_ms: row.get(9)?,
+                last_seen_at_ms: row.get(10)?,
+                reject_from_change_sequence: row.get(11)?,
             })
         })?;
         let mut profiles = Vec::new();
@@ -260,6 +277,8 @@ struct TrustedDeviceRow {
     signing_public_key_id: String,
     signing_public_key: Vec<u8>,
     signing_key_created_at_ms: i64,
+    key_agreement_public_key_id: String,
+    key_agreement_public_key: Vec<u8>,
     status: String,
     authorized_at_ms: i64,
     revoked_at_ms: Option<i64>,
@@ -292,7 +311,7 @@ impl TrustedDeviceRow {
         let algorithm = SignatureAlgorithmId::new(self.signing_algorithm)
             .map_err(|error| UserDbError::invalid_input("signing_algorithm", error.to_string()))?;
         let public_key = DeviceSigningPublicKey::new(
-            self.device_id,
+            self.device_id.clone(),
             self.signing_public_key_id,
             algorithm,
             self.signing_public_key,
@@ -300,13 +319,30 @@ impl TrustedDeviceRow {
             self.revoked_at_ms,
         )
         .map_err(|error| UserDbError::invalid_input("signing_public_key", error.to_string()))?;
+        let key_agreement_public_key = DeviceKeyAgreementPublicKey::p256(
+            self.device_id,
+            self.key_agreement_public_key_id,
+            self.key_agreement_public_key,
+            self.signing_key_created_at_ms,
+            self.revoked_at_ms,
+        )
+        .map_err(|error| {
+            UserDbError::invalid_input("key_agreement_public_key", error.to_string())
+        })?;
         match self.reject_from_change_sequence {
-            Some(sequence) => SyncTrustedDeviceProfile::revoked_from_change_sequence(
+            Some(sequence) => {
+                SyncTrustedDeviceProfile::revoked_with_key_agreement_from_change_sequence(
+                    device,
+                    public_key,
+                    key_agreement_public_key,
+                    from_i64(sequence, "reject_from_change_sequence")?,
+                )
+            }
+            None => SyncTrustedDeviceProfile::active_with_key_agreement(
                 device,
                 public_key,
-                from_i64(sequence, "reject_from_change_sequence")?,
+                key_agreement_public_key,
             ),
-            None => SyncTrustedDeviceProfile::active(device, public_key),
         }
         .map_err(|_| {
             UserDbError::invalid_input("trusted_device", "trusted device profile is invalid")
@@ -381,7 +417,7 @@ fn from_i64(value: i64, field: &'static str) -> UserDbResult<u64> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     use radishlex_ime_crypto::TestMemoryDeviceKeyStore;
     use radishlex_ime_sync::{
@@ -423,7 +459,8 @@ mod tests {
                 .expect_err("same sequence with another cursor must fail");
             assert!(error.to_string().contains("roll back or fork"));
 
-            let (history_fork, _) = initial_lifecycle_with_agreement("cursor-a", vec![9, 9, 9]);
+            let (history_fork, _) =
+                initial_lifecycle_with_agreement("cursor-a", agreement_public_key(2));
             let error = reopened
                 .store_verified_lifecycle(&history_fork)
                 .expect_err("replacing an observed signed record must fail");
@@ -434,8 +471,71 @@ mod tests {
         let _ = fs::remove_file(path.with_extension("db-shm"));
     }
 
-    fn initial_lifecycle(cursor: &str) -> (VerifiedSyncLifecycle, DeviceSigningPublicKey) {
-        initial_lifecycle_with_agreement(cursor, vec![2, 3, 4])
+    #[test]
+    fn schema_v6_cache_backfills_signed_key_agreement_profile_for_restart() {
+        let path = temporary_database_path();
+        let (verified, _) = initial_lifecycle("cursor-v6");
+        {
+            let mut db = UserDb::open(&path).expect("open current cache");
+            db.store_verified_lifecycle(&verified)
+                .expect("store signed lifecycle");
+        }
+        {
+            let connection = rusqlite::Connection::open(&path).expect("open raw v6 fixture");
+            connection
+                .execute_batch(
+                    "PRAGMA foreign_keys = OFF;
+                     CREATE TABLE sync_trusted_devices_v6 (
+                        domain_id TEXT NOT NULL REFERENCES sync_trusted_domains(domain_id) ON DELETE CASCADE,
+                        device_id TEXT NOT NULL,
+                        signing_algorithm TEXT NOT NULL,
+                        signing_public_key_id TEXT NOT NULL,
+                        signing_public_key BLOB NOT NULL,
+                        signing_key_created_at_ms INTEGER NOT NULL,
+                        status TEXT NOT NULL CHECK(status IN ('active', 'revoked', 'lost')),
+                        authorized_at_ms INTEGER NOT NULL,
+                        revoked_at_ms INTEGER,
+                        last_seen_at_ms INTEGER,
+                        reject_from_change_sequence INTEGER,
+                        PRIMARY KEY(domain_id, device_id)
+                     );
+                     INSERT INTO sync_trusted_devices_v6
+                     SELECT domain_id, device_id, signing_algorithm, signing_public_key_id,
+                        signing_public_key, signing_key_created_at_ms, status, authorized_at_ms,
+                        revoked_at_ms, last_seen_at_ms, reject_from_change_sequence
+                     FROM sync_trusted_devices;
+                     DROP TABLE sync_trusted_devices;
+                     ALTER TABLE sync_trusted_devices_v6 RENAME TO sync_trusted_devices;
+                     PRAGMA user_version = 6;",
+                )
+                .expect("downgrade public cache shape to v6");
+        }
+        {
+            let db = UserDb::open(&path).expect("migrate v6 cache");
+            assert_eq!(db.schema_version().expect("schema version"), 7);
+            let profile = db
+                .trusted_domain_state("domain-a")
+                .expect("load migrated cache")
+                .device_profile("device-a")
+                .expect("device")
+                .clone();
+            assert_eq!(
+                profile
+                    .key_agreement_public_key()
+                    .expect("backfilled agreement key")
+                    .key_id,
+                "agreement-device-a"
+            );
+        }
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_file(path.with_extension("db-wal"));
+        let _ = fs::remove_file(path.with_extension("db-shm"));
+    }
+
+    pub(crate) fn initial_lifecycle(
+        cursor: &str,
+    ) -> (VerifiedSyncLifecycle, DeviceSigningPublicKey) {
+        initial_lifecycle_with_agreement(cursor, agreement_public_key(1))
     }
 
     fn initial_lifecycle_with_agreement(
@@ -490,5 +590,25 @@ mod tests {
             "radishlex-trusted-lifecycle-{}-{suffix}.db",
             std::process::id()
         ))
+    }
+
+    fn agreement_public_key(scalar: u8) -> Vec<u8> {
+        match scalar {
+            1 => vec![
+                0x04, 0x6b, 0x17, 0xd1, 0xf2, 0xe1, 0x2c, 0x42, 0x47, 0xf8, 0xbc, 0xe6, 0xe5, 0x63,
+                0xa4, 0x40, 0xf2, 0x77, 0x03, 0x7d, 0x81, 0x2d, 0xeb, 0x33, 0xa0, 0xf4, 0xa1, 0x39,
+                0x45, 0xd8, 0x98, 0xc2, 0x96, 0x4f, 0xe3, 0x42, 0xe2, 0xfe, 0x1a, 0x7f, 0x9b, 0x8e,
+                0xe7, 0xeb, 0x4a, 0x7c, 0x0f, 0x9e, 0x16, 0x2b, 0xce, 0x33, 0x57, 0x6b, 0x31, 0x5e,
+                0xce, 0xcb, 0xb6, 0x40, 0x68, 0x37, 0xbf, 0x51, 0xf5,
+            ],
+            2 => vec![
+                0x04, 0x7c, 0xf2, 0x7b, 0x18, 0x8d, 0x03, 0x4f, 0x7e, 0x8a, 0x52, 0x38, 0x03, 0x04,
+                0xb5, 0x1a, 0xc3, 0xc0, 0x89, 0x69, 0xe2, 0x77, 0xf2, 0x1b, 0x35, 0xa6, 0x0b, 0x48,
+                0xfc, 0x47, 0x66, 0x99, 0x78, 0x07, 0x77, 0x55, 0x10, 0xdb, 0x8e, 0xd0, 0x40, 0x29,
+                0x3d, 0x9a, 0xc6, 0x9f, 0x74, 0x30, 0xdb, 0xba, 0x7d, 0xad, 0xe6, 0x3c, 0xe9, 0x82,
+                0x29, 0x9e, 0x04, 0xb7, 0x9d, 0x22, 0x78, 0x73, 0xd1,
+            ],
+            _ => unreachable!("test scalar"),
+        }
     }
 }

@@ -166,6 +166,8 @@ Sync Master Key + object identity + key epoch
 
 `apple-secure-enclave-p256-v1` 由 ADR 0007 独立定义，复用 P-256 protocol 但使用新的 key identity、token/access-control、tag 与产品证据。repository/manager build 不向 Dart 暴露材料；qualification 产品进程已证明 lifecycle、不可导出、hardware-backed、ad-hoc denied 与真实设备锁屏 locked，因此当前只开放 `runtime_available/can_create/can_sign/hardware_backed`。unsupported 尚需在真实不支持 Secure Enclave 的环境验证，`product_qualified/user_sync_enabled/user_presence_required/backup_migratable` 继续关闭，任何字段都不能仅从代码配置或平台名称推导。
 
+macOS wrapped epoch material 使用独立 Secure Enclave P-256 key-agreement identity，不复用设备签名 key。v1 只接受 `p256-ecdh-hkdf-sha256-xchacha20poly1305-v1`、65-byte SEC1 uncompressed recipient/ephemeral public key和版本化 envelope；完整 metadata 进入 AAD。平台 backend 只返回一次 ECDH shared secret 给 Rust 解封边界，private key 不离开 Secure Enclave，shared secret、派生 wrapping key和明文 master key必须在本次材料装载后尽快清零。SQLite/settings 只能持久化已签名公开 key-agreement profile 或 wrapped ciphertext，不能持久化上述明文 secret。
+
 ## 新设备授权
 
 推荐流程：

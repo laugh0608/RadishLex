@@ -1,9 +1,12 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
+use p256::{ecdh::diffie_hellman, elliptic_curve::sec1::ToEncodedPoint, PublicKey, SecretKey};
 use radishlex_ime_crypto::{
-    DeviceSigningBackendCapabilities, DeviceSigningStorageBackend, DeviceWrappingRecord,
-    KeyDescriptor, KeyRole, SignatureAlgorithmId, SyncMasterKeyMaterial, TestMemoryDeviceKeyStore,
+    DeviceKeyAgreementKeyHandle, DeviceKeyAgreementPublicKey, DeviceSigningBackendCapabilities,
+    DeviceSigningStorageBackend, DeviceWrappingRecord, EcdhSharedSecret, KeyDescriptor, KeyRole,
+    Nonce, SignatureAlgorithmId, SyncMasterKeyMaterial, TestMemoryDeviceKeyStore,
+    WrappedEpochMaterial,
 };
 
 use super::*;
@@ -59,6 +62,129 @@ struct StaticEpochMaterialStore {
     load_count: Rc<Cell<usize>>,
 }
 
+#[derive(Clone)]
+struct MemoryWrappedEpochSource {
+    records: Vec<WrappedEpochMaterial>,
+    loads: Rc<Cell<usize>>,
+}
+
+impl MemoryWrappedEpochSource {
+    fn new(records: Vec<WrappedEpochMaterial>) -> (Self, Rc<Cell<usize>>) {
+        let loads = Rc::new(Cell::new(0));
+        (
+            Self {
+                records,
+                loads: Rc::clone(&loads),
+            },
+            loads,
+        )
+    }
+}
+
+impl SyncWrappedEpochMaterialSource for MemoryWrappedEpochSource {
+    fn load_wrapped_epoch_materials(
+        &mut self,
+        _domain_id: &str,
+        _local_device_id: &str,
+    ) -> Result<Vec<WrappedEpochMaterial>, SyncCryptoLoadError> {
+        self.loads.set(self.loads.get() + 1);
+        Ok(self.records.clone())
+    }
+}
+
+#[derive(Clone, Copy)]
+enum AgreementFailure {
+    None,
+    Locked,
+    Unavailable,
+}
+
+struct MemoryP256AgreementBackend {
+    device_id: String,
+    key_id: String,
+    secret: SecretKey,
+    public_key: DeviceKeyAgreementPublicKey,
+    failure: AgreementFailure,
+}
+
+impl MemoryP256AgreementBackend {
+    fn new(device_id: &str, key_id: &str, scalar: u8) -> Self {
+        let mut secret_bytes = [0u8; 32];
+        secret_bytes[31] = scalar;
+        let secret = SecretKey::from_slice(&secret_bytes).expect("agreement secret");
+        let public_bytes = secret.public_key().to_encoded_point(false);
+        let public_key = DeviceKeyAgreementPublicKey::p256(
+            device_id,
+            key_id,
+            public_bytes.as_bytes(),
+            CREATED_AT_MS,
+            None,
+        )
+        .expect("agreement public key");
+        Self {
+            device_id: device_id.to_owned(),
+            key_id: key_id.to_owned(),
+            secret,
+            public_key,
+            failure: AgreementFailure::None,
+        }
+    }
+
+    fn with_failure(mut self, failure: AgreementFailure) -> Self {
+        self.failure = failure;
+        self
+    }
+}
+
+impl SyncDeviceKeyAgreementBackend for MemoryP256AgreementBackend {
+    fn key_handle(
+        &self,
+        device_id: &str,
+        key_id: &str,
+    ) -> Result<DeviceKeyAgreementKeyHandle, CryptoError> {
+        match self.failure {
+            AgreementFailure::Locked => {
+                return Err(CryptoError::PrivateKeyLocked {
+                    key_id: key_id.to_owned(),
+                })
+            }
+            AgreementFailure::Unavailable => {
+                return Err(CryptoError::StorageBackendUnavailable {
+                    backend: "synthetic-agreement".to_owned(),
+                })
+            }
+            AgreementFailure::None => {}
+        }
+        if device_id != self.device_id || key_id != self.key_id {
+            return Err(CryptoError::PrivateKeyUnavailable {
+                key_id: key_id.to_owned(),
+            });
+        }
+        DeviceKeyAgreementKeyHandle::p256(device_id, key_id, "synthetic-agreement")
+    }
+
+    fn public_key(
+        &self,
+        _handle: &DeviceKeyAgreementKeyHandle,
+    ) -> Result<DeviceKeyAgreementPublicKey, CryptoError> {
+        Ok(self.public_key.clone())
+    }
+
+    fn derive_shared_secret(
+        &self,
+        _handle: &DeviceKeyAgreementKeyHandle,
+        peer_public_key: &[u8],
+    ) -> Result<EcdhSharedSecret, CryptoError> {
+        let peer = PublicKey::from_sec1_bytes(peer_public_key).map_err(|_| {
+            CryptoError::PrivateKeyCorrupted {
+                key_id: self.key_id.clone(),
+            }
+        })?;
+        let shared = diffie_hellman(self.secret.to_nonzero_scalar(), peer.as_affine());
+        EcdhSharedSecret::new((*shared.raw_secret_bytes()).into())
+    }
+}
+
 impl StaticEpochMaterialStore {
     fn new(materials: Vec<SyncEpochKeyMaterial>) -> (Self, Rc<Cell<usize>>) {
         let load_count = Rc::new(Cell::new(0));
@@ -75,8 +201,8 @@ impl StaticEpochMaterialStore {
 impl SyncEpochMaterialStore for StaticEpochMaterialStore {
     fn load_epoch_materials(
         &mut self,
-        _domain_id: &str,
-        _local_device_id: &str,
+        _domain: &SyncDomain,
+        _local_device: &SyncTrustedDeviceProfile,
     ) -> Result<Vec<SyncEpochKeyMaterial>, SyncCryptoLoadError> {
         self.load_count.set(self.load_count.get() + 1);
         Ok(self.materials.clone())
@@ -123,6 +249,7 @@ impl SyncDeviceSigningBackend for SyntheticQualifiedSigningBackend {
         &self,
         device_id: &str,
         signing_key_id: &str,
+        _created_at_ms: i64,
     ) -> Result<DeviceSigningKeyHandle, CryptoError> {
         DeviceSigningKeyHandle::new(
             device_id,
@@ -183,6 +310,7 @@ impl SyncDeviceSigningBackend for TestMemorySigningBackend {
         &self,
         device_id: &str,
         signing_key_id: &str,
+        _created_at_ms: i64,
     ) -> Result<DeviceSigningKeyHandle, CryptoError> {
         self.signing_store.handle(device_id, signing_key_id)
     }
@@ -395,6 +523,152 @@ fn lifecycle_rotation_preserves_history_rejects_new_revoked_objects_and_rebuilds
     assert_eq!(snapshot.accepted_key_epochs().collect::<Vec<_>>(), [1, 2]);
 }
 
+#[test]
+fn wrapped_epoch_product_store_loads_history_rotation_and_restart_snapshot() {
+    let agreement = MemoryP256AgreementBackend::new(DEVICE_A, "agreement-a", 7);
+    let trusted_agreement = agreement.public_key.clone();
+    let records = vec![
+        wrapped_epoch(&trusted_agreement, 1, OBJECT_KEY_1, 11),
+        wrapped_epoch(&trusted_agreement, 2, OBJECT_KEY_2, 12),
+    ];
+    let (source, source_loads) = MemoryWrappedEpochSource::new(records.clone());
+    let material_store = ProductWrappedEpochMaterialStore::new(source, agreement);
+    let state = active_domain_state_with_agreement(2, trusted_agreement.clone());
+    let (trusted_devices, _) = StaticTrustedDeviceSource::new(state);
+    let backend = SyntheticQualifiedSigningBackend::new(DEVICE_A, SIGNING_KEY_A, [41u8; 32]);
+    let mut provider =
+        ProductSyncCryptoProvider::new(DEVICE_A, trusted_devices, material_store, backend)
+            .expect("provider");
+    let snapshot = provider.freeze_cycle(DOMAIN_ID).expect("wrapped snapshot");
+    assert_eq!(snapshot.current_write_epoch(), 2);
+    assert_eq!(snapshot.accepted_key_epochs().collect::<Vec<_>>(), [1, 2]);
+    assert_eq!(source_loads.get(), 1);
+
+    let (restart_source, _) = MemoryWrappedEpochSource::new(records);
+    let restart_material_store = ProductWrappedEpochMaterialStore::new(
+        restart_source,
+        MemoryP256AgreementBackend::new(DEVICE_A, "agreement-a", 7),
+    );
+    let (restart_devices, _) =
+        StaticTrustedDeviceSource::new(active_domain_state_with_agreement(2, trusted_agreement));
+    let restart_backend =
+        SyntheticQualifiedSigningBackend::new(DEVICE_A, SIGNING_KEY_A, [41u8; 32]);
+    let mut restart_provider = ProductSyncCryptoProvider::new(
+        DEVICE_A,
+        restart_devices,
+        restart_material_store,
+        restart_backend,
+    )
+    .expect("restart provider");
+    let restart_snapshot = restart_provider
+        .freeze_cycle(DOMAIN_ID)
+        .expect("restart unwraps protected records again");
+    assert_eq!(
+        restart_snapshot.accepted_key_epochs().collect::<Vec<_>>(),
+        [1, 2]
+    );
+}
+
+#[test]
+fn wrapped_epoch_store_rejects_identity_tamper_and_ciphertext_tamper() {
+    let agreement = MemoryP256AgreementBackend::new(DEVICE_A, "agreement-a", 7);
+    let trusted = agreement.public_key.clone();
+    let domain =
+        SyncDomain::new(DOMAIN_ID, 1, OBJECT_KEY_1, CREATED_AT_MS, CREATED_AT_MS).expect("domain");
+    let profile = active_profile_with_agreement(trusted.clone());
+    let original = wrapped_epoch(&trusted, 1, OBJECT_KEY_1, 13);
+
+    for mutate in [
+        |record: &mut WrappedEpochMaterial| record.domain_id.push('x'),
+        |record: &mut WrappedEpochMaterial| record.recipient_device_id.push('x'),
+        |record: &mut WrappedEpochMaterial| record.recipient_key_agreement_key_id.push('x'),
+    ] {
+        let mut record = original.clone();
+        mutate(&mut record);
+        let (source, _) = MemoryWrappedEpochSource::new(vec![record]);
+        let mut store = ProductWrappedEpochMaterialStore::new(
+            source,
+            MemoryP256AgreementBackend::new(DEVICE_A, "agreement-a", 7),
+        );
+        assert_eq!(
+            store.load_epoch_materials(&domain, &profile),
+            Err(SyncCryptoLoadError::InvalidState)
+        );
+    }
+
+    let mut tampered = original;
+    let last = tampered.wrapped_key.len() - 1;
+    tampered.wrapped_key[last] ^= 1;
+    let (source, _) = MemoryWrappedEpochSource::new(vec![tampered]);
+    let mut store = ProductWrappedEpochMaterialStore::new(
+        source,
+        MemoryP256AgreementBackend::new(DEVICE_A, "agreement-a", 7),
+    );
+    assert_eq!(
+        store.load_epoch_materials(&domain, &profile),
+        Err(SyncCryptoLoadError::AuthenticationFailed)
+    );
+}
+
+#[test]
+fn wrapped_epoch_store_distinguishes_locked_unavailable_and_revoked_before_record_read() {
+    let agreement = MemoryP256AgreementBackend::new(DEVICE_A, "agreement-a", 7);
+    let trusted = agreement.public_key.clone();
+    let domain =
+        SyncDomain::new(DOMAIN_ID, 2, OBJECT_KEY_2, CREATED_AT_MS, REVOKED_AT_MS).expect("domain");
+    let active = active_profile_with_agreement(trusted.clone());
+    let records = vec![wrapped_epoch(&trusted, 2, OBJECT_KEY_2, 14)];
+
+    for (failure, expected) in [
+        (AgreementFailure::Locked, SyncCryptoLoadError::Locked),
+        (
+            AgreementFailure::Unavailable,
+            SyncCryptoLoadError::Unavailable,
+        ),
+    ] {
+        let (source, source_loads) = MemoryWrappedEpochSource::new(records.clone());
+        let backend =
+            MemoryP256AgreementBackend::new(DEVICE_A, "agreement-a", 7).with_failure(failure);
+        let mut store = ProductWrappedEpochMaterialStore::new(source, backend);
+        assert_eq!(store.load_epoch_materials(&domain, &active), Err(expected));
+        assert_eq!(source_loads.get(), 0);
+    }
+
+    let mut signing_store = TestMemoryDeviceKeyStore::new();
+    let mut signing_public = signing_store
+        .insert_signing_key(DEVICE_A, SIGNING_KEY_A, [41u8; 32], CREATED_AT_MS)
+        .expect("signing key");
+    signing_public.revoked_at_ms = Some(REVOKED_AT_MS);
+    let device = SyncDevice::new(
+        DEVICE_A,
+        SIGNING_KEY_A,
+        SyncDeviceStatus::Revoked,
+        Some(CREATED_AT_MS),
+        Some(REVOKED_AT_MS),
+        None,
+    )
+    .expect("revoked device");
+    let mut revoked_agreement = trusted;
+    revoked_agreement.revoked_at_ms = Some(REVOKED_AT_MS);
+    let revoked = SyncTrustedDeviceProfile::revoked_with_key_agreement_from_change_sequence(
+        device,
+        signing_public,
+        revoked_agreement,
+        REJECT_FROM_SEQUENCE,
+    )
+    .expect("revoked profile");
+    let (source, source_loads) = MemoryWrappedEpochSource::new(records);
+    let mut store = ProductWrappedEpochMaterialStore::new(
+        source,
+        MemoryP256AgreementBackend::new(DEVICE_A, "agreement-a", 7),
+    );
+    assert_eq!(
+        store.load_epoch_materials(&domain, &revoked),
+        Err(SyncCryptoLoadError::Revoked)
+    );
+    assert_eq!(source_loads.get(), 0);
+}
+
 fn product_provider<B: SyncDeviceSigningBackend>(
     local_device_id: &str,
     state: SyncTrustedDomainState,
@@ -438,6 +712,81 @@ fn active_domain_state(current_epoch: u64) -> SyncTrustedDomainState {
         ],
     )
     .expect("active trusted state")
+}
+
+fn active_domain_state_with_agreement(
+    current_epoch: u64,
+    agreement_public_key: DeviceKeyAgreementPublicKey,
+) -> SyncTrustedDomainState {
+    let profile = active_profile_with_agreement(agreement_public_key);
+    SyncTrustedDomainState::new(
+        SyncDomain::new(
+            DOMAIN_ID,
+            current_epoch,
+            if current_epoch == 1 {
+                OBJECT_KEY_1
+            } else {
+                OBJECT_KEY_2
+            },
+            CREATED_AT_MS,
+            CREATED_AT_MS + i64::try_from(current_epoch).expect("epoch timestamp"),
+        )
+        .expect("domain"),
+        [profile],
+    )
+    .expect("trusted domain")
+}
+
+fn active_profile_with_agreement(
+    agreement_public_key: DeviceKeyAgreementPublicKey,
+) -> SyncTrustedDeviceProfile {
+    let mut signing_store = TestMemoryDeviceKeyStore::new();
+    signing_store
+        .insert_signing_key(DEVICE_A, SIGNING_KEY_A, [41u8; 32], CREATED_AT_MS)
+        .expect("signing key");
+    let handle = signing_store
+        .handle(DEVICE_A, SIGNING_KEY_A)
+        .expect("signing handle");
+    let signing_public_key = signing_store
+        .public_key(&handle)
+        .expect("signing public key");
+    let device = SyncDevice::new(
+        DEVICE_A,
+        SIGNING_KEY_A,
+        SyncDeviceStatus::Active,
+        Some(CREATED_AT_MS),
+        None,
+        None,
+    )
+    .expect("active device");
+    SyncTrustedDeviceProfile::active_with_key_agreement(
+        device,
+        signing_public_key,
+        agreement_public_key,
+    )
+    .expect("active profile")
+}
+
+fn wrapped_epoch(
+    recipient: &DeviceKeyAgreementPublicKey,
+    epoch: u64,
+    object_key_id: &str,
+    nonce_byte: u8,
+) -> WrappedEpochMaterial {
+    let descriptor =
+        KeyDescriptor::new(object_key_id, KeyRole::ObjectKey, epoch).expect("object key");
+    let master_byte = u8::try_from(epoch).expect("epoch byte");
+    let master = SyncMasterKeyMaterial::new([master_byte; 32]).expect("master key");
+    WrappedEpochMaterial::seal_for_recipient(
+        DOMAIN_ID,
+        recipient,
+        format!("wrapping-{epoch}"),
+        &descriptor,
+        &master,
+        Nonce::new(vec![nonce_byte; 24]).expect("nonce"),
+        CREATED_AT_MS + i64::try_from(epoch).expect("epoch time"),
+    )
+    .expect("wrapped epoch")
 }
 
 fn rotated_domain_state() -> SyncTrustedDomainState {

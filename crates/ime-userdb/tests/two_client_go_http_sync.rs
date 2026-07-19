@@ -539,7 +539,7 @@ fn create_domain(transport: &HttpSyncRemoteTransport, public_key: &DeviceSigning
             "signing_public_key_id": SIGNING_KEY_A,
             "signing_public_key": b64(&public_key.public_key),
             "key_agreement_public_key_id": AGREEMENT_KEY_A,
-            "key_agreement_public_key": b64(&[0x41u8; 32]),
+            "key_agreement_public_key": b64(&agreement_public_key(1)),
             "status": "active"
         },
         "created_at_ms": BASE_TIMESTAMP_MS,
@@ -569,7 +569,7 @@ fn authorize_device_b(
         signing_public_key_id: SIGNING_KEY_B.to_owned(),
         signing_public_key: public_key_b.public_key.clone(),
         key_agreement_public_key_id: AGREEMENT_KEY_B.to_owned(),
-        key_agreement_public_key: vec![0x42u8; 32],
+        key_agreement_public_key: agreement_public_key(2),
         status: SyncDeviceStatus::Active,
         authorized_at_ms: Some(BASE_TIMESTAMP_MS + 20),
         revoked_at_ms: None,
@@ -589,7 +589,7 @@ fn authorize_device_b(
         "signing_public_key_id": SIGNING_KEY_B,
         "signing_public_key": b64(&public_key_b.public_key),
         "key_agreement_public_key_id": AGREEMENT_KEY_B,
-        "key_agreement_public_key": b64(&[0x42u8; 32]),
+        "key_agreement_public_key": b64(&agreement_public_key(2)),
         "challenge": b64(challenge.as_bytes()),
         "created_at_ms": join_created_at_ms,
         "expires_at_ms": join_expires_at_ms
@@ -1032,6 +1032,19 @@ fn send_json(
 
 fn b64(bytes: &[u8]) -> String {
     Base64::encode_string(bytes)
+}
+
+fn agreement_public_key(scalar: u8) -> Vec<u8> {
+    use p256::elliptic_curve::sec1::ToEncodedPoint;
+
+    let mut secret = [0u8; 32];
+    secret[31] = scalar;
+    p256::SecretKey::from_slice(&secret)
+        .expect("test agreement secret")
+        .public_key()
+        .to_encoded_point(false)
+        .as_bytes()
+        .to_vec()
 }
 
 fn ciphertext_hash(ciphertext: &[u8]) -> String {

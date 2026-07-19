@@ -42,9 +42,10 @@ pub use processor::{
     SyncRemoteSigningProfile, UnavailableSyncCryptoProvider,
 };
 pub use product_provider::{
-    ProductSyncCryptoProvider, SyncCryptoLoadError, SyncDeviceSigningBackend,
-    SyncEpochMaterialStore, SyncTrustedDeviceProfile, SyncTrustedDeviceSource,
-    SyncTrustedDomainState,
+    ProductSyncCryptoProvider, ProductWrappedEpochMaterialStore, SyncCryptoLoadError,
+    SyncDeviceKeyAgreementBackend, SyncDeviceSigningBackend, SyncEpochMaterialStore,
+    SyncTrustedDeviceProfile, SyncTrustedDeviceSource, SyncTrustedDomainState,
+    SyncWrappedEpochMaterialSource,
 };
 pub use remote::{
     LatestObjectConflictMetadata, OpaqueSyncCursor, RemoteDeviceAuthorization,
