@@ -110,6 +110,8 @@ created_at_ms
 - 当前与历史 epoch 都按独立 record 解封；当前 epoch 必须存在且 `active_key_id` 匹配 domain。撤销设备的 trusted profile 在材料读取前阻断，因此不得请求或解封新 epoch；已持有的历史材料不承诺技术追回。
 - locked、user-presence、denied、unavailable、unsupported、missing、corrupted 和 authentication failure 保持可区分的内部错误；编排层只映射为稳定脱敏分类，不拼接 key bytes、wrapped bytes、shared secret、nonce 或平台错误文本。
 
+产品资格必须走 `docs/runbooks/apple-secure-enclave-key-agreement-backend.md` 的独立六场景 harness。其 lifecycle 以 fresh store 公钥一致、ECDH 成功、合成 wrapped epoch descriptor/master material 往返、精确删除和 fresh missing 为通过条件；denied、设备锁定态和 unsupported 分别取证。该证据不能继承设备签名 backend 的 lifecycle 或 hardware-backed 结论。自动门禁只运行 status/gate-disabled 与合成测试，任何真实 item 操作都需要当次明确授权。
+
 远端取得边界固定为精确 locator：`domain_id + recipient_device_id + key_epoch + wrapping_key_id`。Go metadata 必须持久化 record 创建时已签名绑定的 `recipient_key_agreement_key_id`，不能用读取时的设备目录值补写 AAD。客户端只能在已验证 lifecycle 给出 locator 后请求；HTTP transport 的设备声明必须等于 recipient，server storage 在读取 blob 前原子确认 recipient 仍为 active。单条 wrapped bytes 上限为 64 KiB；服务端响应通过长度/hash 检查后，Rust 仍要重新执行 schema、algorithm、AAD、hash 和 AEAD 验证。
 
 远端响应先进入 userdb 的密文 cache transaction，再由产品材料 store 在后续 Rust cycle snapshot 中解封。重复取得相同 locator + 相同 bytes 幂等；相同 locator 出现不同 metadata/hash/bytes 视为 fork/tamper 并回滚，不能覆盖旧缓存。网络 I/O 不得发生在 SQLite transaction 内。

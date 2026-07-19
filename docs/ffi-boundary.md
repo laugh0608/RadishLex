@@ -58,7 +58,7 @@ RadishLexError*
 
 `radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v6 保留 v5 的 `import_batch_id` 与全部既有布局，并增加 Manager status-only 产品摘要 symbol。产品绑定必须同时校验 contract 与所需 symbol 集。当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
 
-Apple 产品验证使用独立原生自检结构：普通 DPK 的 `radishlex_apple_p256_product_status/smoke` 分别使用 status schema v1 与 smoke schema v4；Secure Enclave 的 `radishlex_apple_secure_enclave_p256_product_status/smoke` 分别使用独立 status schema v1 与 smoke schema v1。两组 status 都只读报告 target 编译、运行时能力、产品资格、用户同步 gate 和保护属性；smoke 只有 manager 产品进程显式场景与环境门同时满足才执行，Secure Enclave 比普通 DPK 多一个 unsupported create 场景。两组 smoke 复用固定字段布局，返回固定错误分类、数值 OSStatus、生命周期与 cleanup 布尔摘要，不返回 CFError 文本、private/public key、canonical bytes 或 signature bytes。Dart dynamic binding、`ManagerBridge` 和 Flutter method channel 不得直接声明或调用这些 validation symbol；Dart 只绑定 ABI v6 的脱敏业务摘要。
+Apple 产品验证使用独立原生自检结构：普通 DPK 的 `radishlex_apple_p256_product_status/smoke` 分别使用 status schema v1 与 smoke schema v4；Secure Enclave signing 的 `radishlex_apple_secure_enclave_p256_product_status/smoke` 分别使用独立 status schema v1 与 smoke schema v1；Secure Enclave key-agreement 另用 `radishlex_apple_secure_enclave_key_agreement_product_status/smoke`，不得继承 signing 资格。三组 status 都是 metadata-only；smoke 只有 manager 产品进程显式场景与各自环境门同时满足才执行。key-agreement 使用独立固定摘要，只返回错误分类、数值 OSStatus、wrapped epoch 往返与 cleanup 布尔值，不返回 CFError 文本、private/public key、shared secret、wrapping key、master key、nonce 或 ciphertext。Dart dynamic binding、`ManagerBridge` 和 Flutter method channel 不得直接声明或调用这些 validation symbol；Dart 只绑定 ABI v6 的脱敏业务摘要。
 
 ### Status 与文本 view
 

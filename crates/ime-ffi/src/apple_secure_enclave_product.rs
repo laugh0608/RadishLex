@@ -619,7 +619,7 @@ fn record_product_error(
 }
 
 #[cfg(all(feature = "apple-keychain", target_os = "macos"))]
-fn product_error(error: &radishlex_ime_crypto::CryptoError) -> (u32, u32, i32) {
+pub(crate) fn product_error(error: &radishlex_ime_crypto::CryptoError) -> (u32, u32, i32) {
     use radishlex_ime_crypto::{CryptoError, PrivateKeyAccessDeniedReason};
 
     match error {

@@ -25,6 +25,8 @@ extern "C" {
 #define RADISHLEX_APPLE_P256_PRODUCT_SMOKE_VERSION 4u
 #define RADISHLEX_APPLE_SECURE_ENCLAVE_P256_PRODUCT_STATUS_VERSION 1u
 #define RADISHLEX_APPLE_SECURE_ENCLAVE_P256_PRODUCT_SMOKE_VERSION 1u
+#define RADISHLEX_APPLE_SECURE_ENCLAVE_KEY_AGREEMENT_PRODUCT_STATUS_VERSION 1u
+#define RADISHLEX_APPLE_SECURE_ENCLAVE_KEY_AGREEMENT_PRODUCT_SMOKE_VERSION 1u
 #define RADISHLEX_MANAGER_SYNC_PRODUCT_STATUS_VERSION 1u
 
 #define RADISHLEX_MANAGER_SIGNING_BACKEND_UNAVAILABLE 0u
@@ -55,6 +57,13 @@ extern "C" {
 #define RADISHLEX_APPLE_SECURE_ENCLAVE_P256_SCENARIO_EXPECT_LOCKED_SIGN 3u
 #define RADISHLEX_APPLE_SECURE_ENCLAVE_P256_SCENARIO_CLEANUP_LOCKED_SIGN 4u
 #define RADISHLEX_APPLE_SECURE_ENCLAVE_P256_SCENARIO_EXPECT_UNSUPPORTED_CREATE 5u
+
+#define RADISHLEX_APPLE_SECURE_ENCLAVE_KEY_AGREEMENT_SCENARIO_LIFECYCLE 0u
+#define RADISHLEX_APPLE_SECURE_ENCLAVE_KEY_AGREEMENT_SCENARIO_EXPECT_DENIED_CREATE 1u
+#define RADISHLEX_APPLE_SECURE_ENCLAVE_KEY_AGREEMENT_SCENARIO_PREPARE_LOCKED_DERIVE 2u
+#define RADISHLEX_APPLE_SECURE_ENCLAVE_KEY_AGREEMENT_SCENARIO_EXPECT_LOCKED_DERIVE 3u
+#define RADISHLEX_APPLE_SECURE_ENCLAVE_KEY_AGREEMENT_SCENARIO_CLEANUP_LOCKED_DERIVE 4u
+#define RADISHLEX_APPLE_SECURE_ENCLAVE_KEY_AGREEMENT_SCENARIO_EXPECT_UNSUPPORTED_CREATE 5u
 
 #define RADISHLEX_APPLE_P256_ERROR_NONE 0u
 #define RADISHLEX_APPLE_P256_ERROR_BACKEND_UNAVAILABLE 1u
@@ -186,6 +195,46 @@ typedef struct RadishLexAppleP256ProductSmokeSummary {
   uint32_t cleanup_attempted;
 } RadishLexAppleP256ProductSmokeSummary;
 
+typedef struct RadishLexAppleSecureEnclaveKeyAgreementProductStatus {
+  uint32_t version;
+  uint32_t compiled;
+  uint32_t runtime_qualified;
+  uint32_t product_qualified;
+  uint32_t user_sync_enabled;
+  uint32_t exportable;
+  uint32_t hardware_backed;
+  uint32_t user_presence_required;
+  uint32_t backup_migratable;
+} RadishLexAppleSecureEnclaveKeyAgreementProductStatus;
+
+typedef struct RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary {
+  uint32_t version;
+  uint32_t result;
+  uint32_t scenario;
+  uint32_t error_category;
+  uint32_t error_detail;
+  int32_t platform_status;
+  uint32_t compiled;
+  uint32_t runtime_qualified;
+  uint32_t product_qualified;
+  uint32_t user_sync_enabled;
+  uint32_t exportable;
+  uint32_t hardware_backed;
+  uint32_t user_presence_required;
+  uint32_t backup_migratable;
+  uint32_t created;
+  uint32_t reloaded;
+  uint32_t public_key_matched;
+  uint32_t shared_secret_derived;
+  uint32_t wrapped_epoch_verified;
+  uint32_t deleted;
+  uint32_t missing_confirmed;
+  uint32_t fail_closed;
+  uint32_t expected_failure_confirmed;
+  uint32_t cleanup_required;
+  uint32_t cleanup_attempted;
+} RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary;
+
 typedef struct RadishLexManagerSyncProductStatus {
   uint32_t version;
   uint32_t signing_backend;
@@ -311,6 +360,11 @@ uint32_t radishlex_apple_secure_enclave_p256_product_smoke(
     uint32_t scenario,
     const char *go_server_dir,
     RadishLexAppleP256ProductSmokeSummary *summary_out);
+uint32_t radishlex_apple_secure_enclave_key_agreement_product_status(
+    RadishLexAppleSecureEnclaveKeyAgreementProductStatus *status_out);
+uint32_t radishlex_apple_secure_enclave_key_agreement_product_smoke(
+    uint32_t scenario,
+    RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary *summary_out);
 
 RadishLexSession *radishlex_session_new(RadishLexError **error_out);
 RadishLexSession *radishlex_session_new_with_options(

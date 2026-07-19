@@ -17,6 +17,7 @@ apple_status_smoke="${manager_dir}/tool/apple_p256_product_status_smoke.c"
 apple_status_smoke_binary="${smoke_dir}/apple-p256-product-status-smoke"
 apple_product_smoke="${repo_root}/scripts/run-manager-apple-keychain-p256-product-smoke.sh"
 secure_enclave_product_smoke="${repo_root}/scripts/run-manager-apple-secure-enclave-p256-product-smoke.sh"
+key_agreement_product_smoke="${repo_root}/scripts/run-manager-apple-secure-enclave-key-agreement-product-smoke.sh"
 apple_qualified_build="${repo_root}/scripts/build-manager-macos-dpk-qualified-product.sh"
 apple_qualified_entitlements="${manager_dir}/macos/Runner/DPKQualification.entitlements"
 manager_app_delegate="${manager_dir}/macos/Runner/AppDelegate.swift"
@@ -32,7 +33,7 @@ if [ "$(uname -s)" != "Darwin" ]; then
 fi
 
 bash -n "${m2_cleanup}" "${m2_cleanup_wrapper}" "${apple_product_smoke}" \
-  "${secure_enclave_product_smoke}" \
+  "${secure_enclave_product_smoke}" "${key_agreement_product_smoke}" \
   "${apple_qualified_build}" \
   "${m2_cleanup_helper_contract}" "${m2_cleanup_orchestration_contract}"
 rg -Fq '"${1:-}" != "--authorized-apple-development-provisioning-build"' \
@@ -49,8 +50,12 @@ rg -Fq '$(AppIdentifierPrefix)$(PRODUCT_BUNDLE_IDENTIFIER)' \
 rg -Fq 'RADISHLEX_RUN_MANAGER_APPLE_KEYCHAIN_P256_SMOKE=1' "${apple_product_smoke}"
 rg -Fq 'RADISHLEX_RUN_MANAGER_APPLE_SECURE_ENCLAVE_P256_SMOKE=1' \
   "${secure_enclave_product_smoke}"
+rg -Fq 'RADISHLEX_RUN_MANAGER_APPLE_SECURE_ENCLAVE_KEY_AGREEMENT_SMOKE=1' \
+  "${key_agreement_product_smoke}"
 rg -Fq 'locked_probe_delay_seconds=20' "${secure_enclave_product_smoke}"
 rg -Fq 'sleep "${locked_probe_delay_seconds}"' "${secure_enclave_product_smoke}"
+rg -Fq 'locked_probe_delay_seconds=20' "${key_agreement_product_smoke}"
+rg -Fq 'sleep "${locked_probe_delay_seconds}"' "${key_agreement_product_smoke}"
 for authorization_argument in \
   --authorized-product-keychain-smoke \
   --authorized-product-keychain-denied-probe \
@@ -60,6 +65,15 @@ for authorization_argument in \
   rg -Fq -- "${authorization_argument}" "${apple_product_smoke}"
 done
 for authorization_argument in \
+  --authorized-key-agreement-product-smoke \
+  --authorized-key-agreement-denied-probe \
+  --authorized-key-agreement-locked-prepare \
+  --authorized-key-agreement-locked-probe \
+  --authorized-key-agreement-locked-cleanup \
+  --authorized-key-agreement-unsupported-probe; do
+  rg -Fq -- "${authorization_argument}" "${key_agreement_product_smoke}"
+done
+for authorization_argument in \
   --authorized-secure-enclave-product-smoke \
   --authorized-secure-enclave-denied-probe \
   --authorized-secure-enclave-locked-prepare \
@@ -67,6 +81,16 @@ for authorization_argument in \
   --authorized-secure-enclave-locked-cleanup \
   --authorized-secure-enclave-unsupported-probe; do
   rg -Fq -- "${authorization_argument}" "${secure_enclave_product_smoke}"
+done
+for product_argument in \
+  --radishlex-apple-secure-enclave-key-agreement-product-smoke \
+  --radishlex-apple-secure-enclave-key-agreement-denied-probe \
+  --radishlex-apple-secure-enclave-key-agreement-locked-prepare \
+  --radishlex-apple-secure-enclave-key-agreement-locked-probe \
+  --radishlex-apple-secure-enclave-key-agreement-locked-cleanup \
+  --radishlex-apple-secure-enclave-key-agreement-unsupported-probe; do
+  rg -Fq -- "${product_argument}" "${key_agreement_product_smoke}" \
+    "${manager_app_delegate}"
 done
 for product_argument in \
   --radishlex-apple-p256-product-smoke \
@@ -89,8 +113,11 @@ done
 rg -Fq 'RADISHLEX_RUN_MANAGER_APPLE_KEYCHAIN_P256_SMOKE' "${manager_app_delegate}"
 rg -Fq 'RADISHLEX_RUN_MANAGER_APPLE_SECURE_ENCLAVE_P256_SMOKE' \
   "${manager_app_delegate}"
+rg -Fq 'RADISHLEX_RUN_MANAGER_APPLE_SECURE_ENCLAVE_KEY_AGREEMENT_SMOKE' \
+  "${manager_app_delegate}"
 if rg -n 'security[[:space:]]+(lock|unlock)-keychain|security[[:space:]]+list-keychains' \
   "${apple_product_smoke}" "${secure_enclave_product_smoke}" \
+  "${key_agreement_product_smoke}" \
   "${apple_qualified_build}"; then
   echo "Apple P-256 product smoke must not change Keychain lock or search-list state." >&2
   exit 1
@@ -138,13 +165,15 @@ for symbol in \
   _radishlex_apple_p256_product_smoke \
   _radishlex_apple_secure_enclave_p256_product_status \
   _radishlex_apple_secure_enclave_p256_product_smoke \
+  _radishlex_apple_secure_enclave_key_agreement_product_status \
+  _radishlex_apple_secure_enclave_key_agreement_product_smoke \
   _radishlex_manager_sync_product_status; do
   if ! nm -gU "${native_library}" | grep -Eq "(^|[[:space:]])${symbol}$"; then
     echo "manager product native library is missing required symbol: ${symbol}" >&2
     exit 1
   fi
 done
-if rg -n 'radishlex_apple_(p256|secure_enclave_p256)_product_(smoke|status)' \
+if rg -n 'radishlex_apple_(p256|secure_enclave_p256|secure_enclave_key_agreement)_product_(smoke|status)' \
   "${manager_dir}/lib" "${manager_dir}/tool/ffi_bridge_smoke.dart"; then
   echo "Apple P-256 product validation ABI must not be bound by Dart." >&2
   exit 1

@@ -44,6 +44,8 @@ install_name_tool -id "@rpath/libradishlex_ime_ffi.dylib" "${bundled_library}"
 required_symbols=(
   _radishlex_apple_p256_product_smoke
   _radishlex_apple_p256_product_status
+  _radishlex_apple_secure_enclave_key_agreement_product_smoke
+  _radishlex_apple_secure_enclave_key_agreement_product_status
   _radishlex_ffi_contract
   _radishlex_manager_sync_product_status
   _radishlex_userdb_terms_new

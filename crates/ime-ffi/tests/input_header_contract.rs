@@ -2,6 +2,8 @@ use std::mem::size_of;
 
 use radishlex_ime_ffi::{
     radishlex_apple_p256_product_smoke, radishlex_apple_p256_product_status,
+    radishlex_apple_secure_enclave_key_agreement_product_smoke,
+    radishlex_apple_secure_enclave_key_agreement_product_status,
     radishlex_apple_secure_enclave_p256_product_smoke,
     radishlex_apple_secure_enclave_p256_product_status, radishlex_error_free,
     radishlex_key_result_commit, radishlex_key_result_commit_present,
@@ -9,10 +11,12 @@ use radishlex_ime_ffi::{
     radishlex_key_result_learning_disposition, radishlex_key_result_snapshot,
     radishlex_key_result_version, radishlex_manager_sync_product_status,
     radishlex_rime_runtime_shutdown, radishlex_session_handle_key_event,
-    RadishLexAppleP256ProductSmokeSummary, RadishLexAppleP256ProductStatus, RadishLexError,
-    RadishLexFfiContract, RadishLexKeyEvent, RadishLexKeyResult, RadishLexManagerSyncProductStatus,
-    RadishLexSession, RadishLexSessionOptions, RadishLexSnapshot, RadishLexStatusCode,
-    RadishLexStringView, RADISHLEX_ABI_CONTRACT_VERSION, RADISHLEX_KEY_RESULT_VERSION,
+    RadishLexAppleP256ProductSmokeSummary, RadishLexAppleP256ProductStatus,
+    RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary,
+    RadishLexAppleSecureEnclaveKeyAgreementProductStatus, RadishLexError, RadishLexFfiContract,
+    RadishLexKeyEvent, RadishLexKeyResult, RadishLexManagerSyncProductStatus, RadishLexSession,
+    RadishLexSessionOptions, RadishLexSnapshot, RadishLexStatusCode, RadishLexStringView,
+    RADISHLEX_ABI_CONTRACT_VERSION, RADISHLEX_KEY_RESULT_VERSION,
     RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_NONE,
 };
 
@@ -30,6 +34,14 @@ fn rust_input_abi_layout_matches_the_checked_header_contract() {
     assert_eq!(
         size_of::<RadishLexAppleP256ProductSmokeSummary>(),
         26 * size_of::<u32>()
+    );
+    assert_eq!(
+        size_of::<RadishLexAppleSecureEnclaveKeyAgreementProductStatus>(),
+        9 * size_of::<u32>()
+    );
+    assert_eq!(
+        size_of::<RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary>(),
+        25 * size_of::<u32>()
     );
     assert_eq!(
         size_of::<RadishLexManagerSyncProductStatus>(),
@@ -69,6 +81,12 @@ fn rust_input_abi_layout_matches_the_checked_header_contract() {
         *const std::os::raw::c_char,
         *mut RadishLexAppleP256ProductSmokeSummary,
     ) -> u32 = radishlex_apple_secure_enclave_p256_product_smoke;
+    let _: unsafe extern "C" fn(*mut RadishLexAppleSecureEnclaveKeyAgreementProductStatus) -> u32 =
+        radishlex_apple_secure_enclave_key_agreement_product_status;
+    let _: unsafe extern "C" fn(
+        u32,
+        *mut RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary,
+    ) -> u32 = radishlex_apple_secure_enclave_key_agreement_product_smoke;
     let _: unsafe extern "C" fn(
         *mut RadishLexManagerSyncProductStatus,
         *mut *mut RadishLexError,
@@ -168,6 +186,8 @@ _Static_assert(sizeof(RadishLexSessionOptions) == 2u * sizeof(uint32_t), "sessio
 _Static_assert(sizeof(RadishLexKeyEvent) == 5u * sizeof(uint32_t), "key event layout mismatch");
 _Static_assert(sizeof(RadishLexAppleP256ProductStatus) == 11u * sizeof(uint32_t), "Apple P-256 status layout mismatch");
 _Static_assert(sizeof(RadishLexAppleP256ProductSmokeSummary) == 26u * sizeof(uint32_t), "Apple P-256 smoke layout mismatch");
+_Static_assert(sizeof(RadishLexAppleSecureEnclaveKeyAgreementProductStatus) == 9u * sizeof(uint32_t), "Apple key-agreement status layout mismatch");
+_Static_assert(sizeof(RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary) == 25u * sizeof(uint32_t), "Apple key-agreement smoke layout mismatch");
 _Static_assert(sizeof(RadishLexManagerSyncProductStatus) == 19u * sizeof(uint32_t), "Manager sync product status layout mismatch");
 
 RadishLexStatusCode radishlex_compile_input_contract(
@@ -184,6 +204,10 @@ RadishLexStatusCode radishlex_compile_input_contract(
       radishlex_apple_secure_enclave_p256_product_status;
   uint32_t (*secure_enclave_smoke)(uint32_t, const char *, RadishLexAppleP256ProductSmokeSummary *) =
       radishlex_apple_secure_enclave_p256_product_smoke;
+  uint32_t (*key_agreement_status)(RadishLexAppleSecureEnclaveKeyAgreementProductStatus *) =
+      radishlex_apple_secure_enclave_key_agreement_product_status;
+  uint32_t (*key_agreement_smoke)(uint32_t, RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary *) =
+      radishlex_apple_secure_enclave_key_agreement_product_smoke;
   RadishLexStatusCode (*manager_sync_status)(RadishLexManagerSyncProductStatus *, RadishLexError **) =
       radishlex_manager_sync_product_status;
   RadishLexKeyResult *result = NULL;
@@ -216,6 +240,8 @@ RadishLexStatusCode radishlex_compile_input_contract(
   (void)apple_smoke;
   (void)secure_enclave_status;
   (void)secure_enclave_smoke;
+  (void)key_agreement_status;
+  (void)key_agreement_smoke;
   (void)manager_sync_status;
   return status;
 }

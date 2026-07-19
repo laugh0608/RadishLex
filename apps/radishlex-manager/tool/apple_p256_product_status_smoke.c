@@ -13,6 +13,7 @@ static int require_flag(const char *name, uint32_t actual, uint32_t expected) {
 int main(void) {
   RadishLexAppleP256ProductStatus status = {0};
   RadishLexAppleP256ProductStatus secure_enclave_status = {0};
+  RadishLexAppleSecureEnclaveKeyAgreementProductStatus key_agreement_status = {0};
   if (radishlex_apple_p256_product_status(&status) !=
       RADISHLEX_APPLE_P256_SMOKE_PASSED) {
     fputs("Apple P-256 product status query failed\n", stderr);
@@ -70,6 +71,35 @@ int main(void) {
     return 1;
   }
 
-  puts("Apple P-256 software DPK and Secure Enclave runtime gates passed");
+  if (radishlex_apple_secure_enclave_key_agreement_product_status(
+          &key_agreement_status) != RADISHLEX_APPLE_P256_SMOKE_PASSED) {
+    fputs("Apple Secure Enclave key-agreement product status query failed\n",
+          stderr);
+    return 1;
+  }
+  failed |= require_flag(
+      "key_agreement.version", key_agreement_status.version,
+      RADISHLEX_APPLE_SECURE_ENCLAVE_KEY_AGREEMENT_PRODUCT_STATUS_VERSION);
+  failed |= require_flag("key_agreement.compiled",
+                         key_agreement_status.compiled, 1u);
+  failed |= require_flag("key_agreement.runtime_qualified",
+                         key_agreement_status.runtime_qualified, 0u);
+  failed |= require_flag("key_agreement.product_qualified",
+                         key_agreement_status.product_qualified, 0u);
+  failed |= require_flag("key_agreement.user_sync_enabled",
+                         key_agreement_status.user_sync_enabled, 0u);
+  failed |= require_flag("key_agreement.exportable",
+                         key_agreement_status.exportable, 0u);
+  failed |= require_flag("key_agreement.hardware_backed",
+                         key_agreement_status.hardware_backed, 0u);
+  failed |= require_flag("key_agreement.user_presence_required",
+                         key_agreement_status.user_presence_required, 0u);
+  failed |= require_flag("key_agreement.backup_migratable",
+                         key_agreement_status.backup_migratable, 0u);
+  if (failed != 0) {
+    return 1;
+  }
+
+  puts("Apple P-256 signing and key-agreement product status gates passed");
   return 0;
 }

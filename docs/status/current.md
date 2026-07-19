@@ -7,7 +7,7 @@
 - 复核日期：2026-07-19（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前产品里程碑：M3 端到端加密同步 Beta
-- 当前产品主批次：窄 `ManagerBridge` status-only 产品链已闭合；M3 剩余停止线是 macOS signing/key-agreement 外部资格
+- 当前产品主批次：独立 Secure Enclave key-agreement 资格 harness 已闭合；M3 剩余停止线是 macOS signing/key-agreement 外部资格
 - 已完成：M0 工程基础、M1 macOS 离线输入 Alpha、M2 本地个人化 MVP；R00、R01A、R02L、R01B、R06A 已退出
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；合成数据、短生命周期服务与受控集成测试可以继续
@@ -26,7 +26,7 @@ A/B/C Go HTTP 已证明 B 撤销后仅 A/C 取得 epoch 2，历史/当前 epoch 
 
 部署 hardening 与本地 HTTPS 子阶段已通过：Compose/Caddy internal TLS、bearer 负向响应、loopback-only、非 root/只读/cap drop、`0700/0600`、symlink 拒绝、冷备份/隔离恢复、日志脱敏和资源清理均有真实门禁。
 
-Apple signing/key-agreement adapters 已接线但本批未调用系统 API。普通 DPK 可导出而被拒；Secure Enclave signing 已有不可导出、hardware-backed、denied 与锁屏证据，unsupported、最终产品资格和独立 key-agreement 实机资格仍缺外部证据。
+Apple signing/key-agreement adapters 已接线。独立 key-agreement status/smoke ABI、六场景产品调度、固定 25-word 脱敏摘要与 runbook 已落地；lifecycle 在 native 内要求 fresh public key、ECDH、合成 wrapped epoch 解封、精确删除和 fresh missing。自动门禁只验证 metadata、布局、symbol、Dart 无绑定和 gate-disabled 结构，本批未执行真实系统 item 操作。普通 DPK 可导出而被拒；Secure Enclave signing 已有不可导出、hardware-backed、denied 与锁屏证据，unsupported、最终产品资格和独立 key-agreement 实机资格仍缺外部证据。
 
 Manager ABI v6 的 `radishlex_manager_sync_product_status` 只读固定数值 capability，不访问系统 key item。默认构建显示 signing 未编译，macOS 产品构建显示 Secure Enclave signing 产品资格待完成；畸形或自称开启同步的 native 状态降级为 `native_sync_product_status_invalid`。gate 始终 blocked，底层 Apple validation 不直接进入 Dart，也没有新增同步命令。
 
@@ -43,8 +43,8 @@ Manager ABI v6 的 `radishlex_manager_sync_product_status` 只读固定数值 ca
 
 ## 下一步顺位
 
-1. 下一仓库内顺位是补独立 Secure Enclave key-agreement 的 gated qualification harness/runbook 与固定脱敏结果结构；默认 gate 必须关闭，普通 Manager 启动不得触发系统 API，也不能继承 signing 证据。
-2. 真正执行 key-agreement create/derive/delete 或 signing unsupported probe 前必须另行获得明确授权；unsupported 目标环境可得时再执行，当前设备不得替代该证据。
+1. 下一顺位是按独立 runbook 取得 key-agreement lifecycle、denied、设备锁定态、cleanup 与 unsupported 的真实产品证据；创建、读取、ECDH 或删除系统 item 前必须另行取得明确授权。
+2. 当前设备可以在授权后验证 lifecycle/denied/locked/cleanup，但不能替代真实 unsupported 环境；签名 unsupported 同样等待合适目标环境，不得伪造。
 3. 两条资格都通过后才重新审阅 `product_qualified`；在此之前不增加恢复、授权、撤销、轮换或上传成功入口，`user_sync_enabled=false`。
 4. 首个正式版本发布后、准备启用真实生产同步前，再在实际目标环境生成并校验 `deployment_evidence.v1`，复验正式域名/证书、固定镜像、权限、冷备份/恢复、升级回滚和日志脱敏。
 
@@ -71,6 +71,7 @@ cmp -s AGENTS.md CLAUDE.md
 - [同步 Payload](../sync-payload.md)：P2 对象、remote client 与两客户端证据。
 - [同步编排](../sync-orchestration.md)：Rust 状态机、discovery cursor、transaction、outbox 与冲突恢复边界。
 - [同步密钥管理](../sync-key-management.md)：设备、恢复、撤销和 key epoch。
+- [Secure Enclave Key Agreement Runbook](../runbooks/apple-secure-enclave-key-agreement-backend.md)：独立六场景资格、错误与清理边界。
 - [ADR 0006](../adr/0006-device-signature-algorithm-profiles.md)：Ed25519/P-256 profile、编码、迁移、错误与 Apple backend 边界。
 - [平台私钥 Backend 策略](../platform-private-key-backend-strategy.md)：当前证据与算法/backend 决策顺序。
 - [Manager 同步入口](../manager-sync-entry-boundary.md)：M3 UI/bridge 与 transient secret 边界。

@@ -2,6 +2,7 @@
 
 mod abi;
 mod apple_p256_product;
+mod apple_secure_enclave_key_agreement_product;
 mod apple_secure_enclave_product;
 mod buffer;
 mod contract;
@@ -49,6 +50,7 @@ pub use apple_p256_product::{
     RADISHLEX_APPLE_P256_SMOKE_UNEXPECTED_ERROR_CATEGORY,
     RADISHLEX_APPLE_P256_SMOKE_UNSUPPORTED_BUILD,
 };
+pub use apple_secure_enclave_key_agreement_product::*;
 pub use apple_secure_enclave_product::{
     RADISHLEX_APPLE_SECURE_ENCLAVE_P256_PRODUCT_SMOKE_VERSION,
     RADISHLEX_APPLE_SECURE_ENCLAVE_P256_PRODUCT_STATUS_VERSION,

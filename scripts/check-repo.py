@@ -48,6 +48,7 @@ REQUIRED_FILES = [
     "docs/technical-plan.md",
     "docs/adr/0007-apple-secure-enclave-p256-backend.md",
     "docs/runbooks/apple-secure-enclave-p256-backend.md",
+    "docs/runbooks/apple-secure-enclave-key-agreement-backend.md",
     "docs/runbooks/macos-m2-manager-product-acceptance.md",
     "platforms/macos-imk/Sources/main.m",
     "platforms/macos-imk/Tools/tis_source_status.m",
@@ -70,6 +71,7 @@ REQUIRED_FILES = [
     "scripts/cleanup-macos-m2-manager-test-data.sh",
     "scripts/cleanup-macos-imk.sh",
     "scripts/run-manager-apple-secure-enclave-p256-product-smoke.sh",
+    "scripts/run-manager-apple-secure-enclave-key-agreement-product-smoke.sh",
     "scripts/macos-imk/native_manifest.py",
     "scripts/macos-imk/test_native_manifest.py",
     "scripts/check-repo.py",
@@ -221,6 +223,8 @@ def check_manager_product_runtime_contract() -> None:
     for symbol in (
         "_radishlex_ffi_contract",
         "_radishlex_manager_sync_product_status",
+        "_radishlex_apple_secure_enclave_key_agreement_product_status",
+        "_radishlex_apple_secure_enclave_key_agreement_product_smoke",
         "_radishlex_userdb_deleted_terms_new",
         "_radishlex_userdb_restore_term",
     ):

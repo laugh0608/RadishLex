@@ -81,6 +81,7 @@ impl RadishLexManagerSyncProductStatus {
             // backend_status() is metadata-only. It does not create, read,
             // sign with, or delete a platform key.
             let signing = AppleSecureEnclaveP256DeviceKeyStore::new().backend_status();
+            let key_agreement = crate::apple_secure_enclave_key_agreement_product::current_status();
             let mut status = Self {
                 version: RADISHLEX_MANAGER_SYNC_PRODUCT_STATUS_VERSION,
                 signing_backend: RADISHLEX_MANAGER_SIGNING_BACKEND_APPLE_SECURE_ENCLAVE_P256_V1,
@@ -96,12 +97,12 @@ impl RadishLexManagerSyncProductStatus {
                 signing_product_qualified: flag(signing.product_qualified),
                 key_agreement_backend:
                     RADISHLEX_MANAGER_KEY_AGREEMENT_BACKEND_APPLE_SECURE_ENCLAVE_P256_V1,
-                key_agreement_compiled: flag(cfg!(target_os = "macos")),
+                key_agreement_compiled: key_agreement.compiled,
                 // Independent key-agreement runtime and product qualification
                 // require separately authorized real-device evidence. Never
                 // inherit the signing backend result here.
-                key_agreement_runtime_qualified: 0,
-                key_agreement_product_qualified: 0,
+                key_agreement_runtime_qualified: key_agreement.runtime_qualified,
+                key_agreement_product_qualified: key_agreement.product_qualified,
                 product_qualified: 0,
                 user_sync_enabled: 0,
                 blocker: RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_NONE,
