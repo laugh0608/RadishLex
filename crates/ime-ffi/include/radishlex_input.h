@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-#define RADISHLEX_ABI_CONTRACT_VERSION 5u
+#define RADISHLEX_ABI_CONTRACT_VERSION 6u
 #define RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD 1u
 #define RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND 1u
 
@@ -25,6 +25,23 @@ extern "C" {
 #define RADISHLEX_APPLE_P256_PRODUCT_SMOKE_VERSION 4u
 #define RADISHLEX_APPLE_SECURE_ENCLAVE_P256_PRODUCT_STATUS_VERSION 1u
 #define RADISHLEX_APPLE_SECURE_ENCLAVE_P256_PRODUCT_SMOKE_VERSION 1u
+#define RADISHLEX_MANAGER_SYNC_PRODUCT_STATUS_VERSION 1u
+
+#define RADISHLEX_MANAGER_SIGNING_BACKEND_UNAVAILABLE 0u
+#define RADISHLEX_MANAGER_SIGNING_BACKEND_APPLE_SECURE_ENCLAVE_P256_V1 1u
+#define RADISHLEX_MANAGER_SIGNING_ALGORITHM_UNAVAILABLE 0u
+#define RADISHLEX_MANAGER_SIGNING_ALGORITHM_ECDSA_P256_SHA256_V1 1u
+#define RADISHLEX_MANAGER_KEY_AGREEMENT_BACKEND_UNAVAILABLE 0u
+#define RADISHLEX_MANAGER_KEY_AGREEMENT_BACKEND_APPLE_SECURE_ENCLAVE_P256_V1 1u
+
+#define RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_NONE 0u
+#define RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_SIGNING_NOT_COMPILED 1u
+#define RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_SIGNING_UNAVAILABLE 2u
+#define RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_SIGNING_QUALIFICATION_REQUIRED 3u
+#define RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_KEY_AGREEMENT_NOT_COMPILED 4u
+#define RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_KEY_AGREEMENT_RUNTIME_QUALIFICATION_REQUIRED 5u
+#define RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_KEY_AGREEMENT_QUALIFICATION_REQUIRED 6u
+#define RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_USER_SYNC_CLOSED 7u
 
 #define RADISHLEX_APPLE_P256_SCENARIO_LIFECYCLE 0u
 #define RADISHLEX_APPLE_P256_SCENARIO_EXPECT_DENIED_CREATE 1u
@@ -169,6 +186,28 @@ typedef struct RadishLexAppleP256ProductSmokeSummary {
   uint32_t cleanup_attempted;
 } RadishLexAppleP256ProductSmokeSummary;
 
+typedef struct RadishLexManagerSyncProductStatus {
+  uint32_t version;
+  uint32_t signing_backend;
+  uint32_t signing_algorithm;
+  uint32_t signing_compiled;
+  uint32_t signing_runtime_available;
+  uint32_t signing_can_create;
+  uint32_t signing_can_sign;
+  uint32_t signing_exportable;
+  uint32_t signing_hardware_backed;
+  uint32_t signing_user_presence_required;
+  uint32_t signing_backup_migratable;
+  uint32_t signing_product_qualified;
+  uint32_t key_agreement_backend;
+  uint32_t key_agreement_compiled;
+  uint32_t key_agreement_runtime_qualified;
+  uint32_t key_agreement_product_qualified;
+  uint32_t product_qualified;
+  uint32_t user_sync_enabled;
+  uint32_t blocker;
+} RadishLexManagerSyncProductStatus;
+
 typedef enum RadishLexStatusCode {
   RADISHLEX_STATUS_OK = 0,
   RADISHLEX_STATUS_INVALID_ARGUMENT = 1,
@@ -246,6 +285,14 @@ typedef struct RadishLexLearningContext {
 
 RadishLexStatusCode radishlex_ffi_contract(
     RadishLexFfiContract *contract_out,
+    RadishLexError **error_out);
+
+/*
+ * Status-only Manager snapshot input. This call does not create, read, use, or
+ * delete platform key items and never returns identifiers or secret material.
+ */
+RadishLexStatusCode radishlex_manager_sync_product_status(
+    RadishLexManagerSyncProductStatus *status_out,
     RadishLexError **error_out);
 
 /*

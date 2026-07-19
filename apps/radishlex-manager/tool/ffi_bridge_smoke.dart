@@ -59,6 +59,20 @@ Future<void> main(List<String> args) async {
   _expect(importedSnapshot.sync.state == SyncUiState.localOnly, 'sync state');
   _expect(importedSnapshot.sync.syncableObjects == 2, 'syncable objects');
   _expect(importedSnapshot.sync.localOnlyEvents == 1, 'local import batch');
+  final productBackend = importedSnapshot.sync.device.backendId;
+  final productCapability = importedSnapshot.sync.device.capabilityStatus;
+  _expect(
+    (productBackend == 'unavailable' &&
+            productCapability == 'signing_backend_not_compiled') ||
+        (productBackend == 'apple-secure-enclave-p256-v1' &&
+            productCapability ==
+                'signing_backend_product_qualification_required'),
+    'native product status allowlist',
+  );
+  _expect(
+    importedSnapshot.sync.device.productionGate == 'blocked',
+    'native product gate remains closed',
+  );
   _expect(importedSnapshot.explanations.length == 2, 'explain summaries');
   _expect(importedSnapshot.importBatches.length == 1, 'import batch count');
   _expect(

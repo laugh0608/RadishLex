@@ -6,7 +6,7 @@
 
 `ime-ffi` 是 Rust 输入 runtime、平台输入法壳和 Flutter manager 的唯一稳定跨语言边界。平台按键入口必须无损返回 `KeyOutcome` 的 `consumed`、可选即时 commit 与同一事件后的 snapshot；只返回状态码再单独查询状态不能作为真实平台契约。
 
-平台壳只能通过 FFI 调用 Rust runtime，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。manager 同步命令只在 M3 真实领域模型、secret 生命周期和安全测试齐备后进入 C ABI；approval、preview、migration review 和 no-symbol 证明不属于生产 ABI。Apple P-256 产品 validation ABI 是例外的受控自检面：普通 DPK 与 Secure Enclave 使用独立 symbol/environment gate，只返回固定 capability/lifecycle flags，不执行真实同步，不进入 Dart binding，也不改变 ABI v5 的 manager 业务接口。平台绑定层调用规则见 `docs/runbooks/ffi-platform-call-contract.md`。
+平台壳只能通过 FFI 调用 Rust runtime，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。manager 同步命令只在 M3 真实领域模型、secret 生命周期和安全测试齐备后进入 C ABI；approval、preview、migration review 和 no-symbol 证明不属于生产 ABI。Apple P-256 产品 validation ABI 是例外的受控自检面：普通 DPK 与 Secure Enclave 使用独立 symbol/environment gate，只返回固定 capability/lifecycle flags，不执行真实同步，也不直接进入 Dart binding。ABI v6 另增一条不带入参、不访问系统条目的 `radishlex_manager_sync_product_status`，只把 allowlist 产品状态送入现有 Manager snapshot；它不是同步命令，不能打开产品 gate。平台绑定层调用规则见 `docs/runbooks/ffi-platform-call-contract.md`。
 
 ## 职责边界
 
@@ -43,7 +43,7 @@ RadishLexError*
 
 当前已落地函数按能力分组：
 
-- ABI contract：`radishlex_ffi_contract`
+- ABI contract 与 Manager 只读产品状态：`radishlex_ffi_contract`、`radishlex_manager_sync_product_status`
 - session / Rime runtime 生命周期：`radishlex_session_new`、`radishlex_session_new_with_options`、`radishlex_session_new_rime`、`radishlex_session_new_personalized_rime`、`radishlex_session_free`、`radishlex_rime_runtime_shutdown`、`radishlex_session_engine_kind`、`radishlex_session_reset`、`radishlex_session_set_schema`、`radishlex_session_set_learning_context`
 - 输入、候选选择与快照：`radishlex_session_handle_key_event`、`radishlex_session_select_candidate`、`radishlex_key_result_*`、兼容 `radishlex_session_push_key_event`、`radishlex_session_snapshot_new`、`radishlex_snapshot_*`
 - userdb 状态与词条管理：`radishlex_userdb_learning_status`、`radishlex_userdb_sync_preflight`、`radishlex_userdb_rank_explain_*`、`radishlex_userdb_add_term`、`radishlex_userdb_delete_term`、`radishlex_userdb_restore_term`、`radishlex_userdb_terms_*`、`radishlex_userdb_deleted_terms_*`
@@ -56,9 +56,9 @@ RadishLexError*
 
 ### FFI contract
 
-`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v5 保留 v4 的产品个人化 Rime session、版本化学习上下文、display/engine index 映射、个人化状态和学习结果，并在 `RadishLexUserTermView` 末尾增加可选的本地 `import_batch_id`，供 manager 精确关联导入审计；该字段不进入同步 payload。产品绑定必须同时校验 contract 与所需 symbol 集。当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
+`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v6 保留 v5 的 `import_batch_id` 与全部既有布局，并增加 Manager status-only 产品摘要 symbol。产品绑定必须同时校验 contract 与所需 symbol 集。当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
 
-Apple 产品验证使用独立于 ABI contract v5 的原生自检结构：普通 DPK 的 `radishlex_apple_p256_product_status/smoke` 分别使用 status schema v1 与 smoke schema v4；Secure Enclave 的 `radishlex_apple_secure_enclave_p256_product_status/smoke` 分别使用独立 status schema v1 与 smoke schema v1。两组 status 都只读报告 target 编译、运行时能力、产品资格、用户同步 gate 和保护属性；smoke 只有 manager 产品进程显式场景与环境门同时满足才执行，Secure Enclave 比普通 DPK 多一个 unsupported create 场景。两组 smoke 复用固定字段布局，返回固定错误分类、数值 OSStatus、生命周期与 cleanup 布尔摘要，不返回 CFError 文本、private/public key、canonical bytes 或 signature bytes。Dart dynamic binding、`ManagerBridge` 和 Flutter method channel 不得声明或调用这些 symbol。
+Apple 产品验证使用独立原生自检结构：普通 DPK 的 `radishlex_apple_p256_product_status/smoke` 分别使用 status schema v1 与 smoke schema v4；Secure Enclave 的 `radishlex_apple_secure_enclave_p256_product_status/smoke` 分别使用独立 status schema v1 与 smoke schema v1。两组 status 都只读报告 target 编译、运行时能力、产品资格、用户同步 gate 和保护属性；smoke 只有 manager 产品进程显式场景与环境门同时满足才执行，Secure Enclave 比普通 DPK 多一个 unsupported create 场景。两组 smoke 复用固定字段布局，返回固定错误分类、数值 OSStatus、生命周期与 cleanup 布尔摘要，不返回 CFError 文本、private/public key、canonical bytes 或 signature bytes。Dart dynamic binding、`ManagerBridge` 和 Flutter method channel 不得直接声明或调用这些 validation symbol；Dart 只绑定 ABI v6 的脱敏业务摘要。
 
 ### Status 与文本 view
 

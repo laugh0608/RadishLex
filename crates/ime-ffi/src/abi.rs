@@ -29,6 +29,7 @@ use crate::error::{FfiError, RadishLexError, RadishLexStatusCode};
 use crate::ffi_support::{ffi_ptr, ffi_release, ffi_status};
 use crate::key::RadishLexKeyEvent;
 use crate::learning_status::{learning_status_for_path, RadishLexLearningStatusSummary};
+use crate::manager_sync_product_status::RadishLexManagerSyncProductStatus;
 use crate::rank_explain::{rank_explain_for_path, RadishLexRankExplain, RadishLexRankExplainView};
 use crate::session::{session_mut, session_ref, RadishLexSession};
 use crate::snapshot::{RadishLexCandidateView, RadishLexSnapshot, RadishLexStringView};
@@ -97,6 +98,32 @@ pub unsafe extern "C" fn radishlex_apple_secure_enclave_p256_product_smoke(
     summary_out: *mut RadishLexAppleP256ProductSmokeSummary,
 ) -> u32 {
     unsafe { run_secure_enclave_product_smoke(scenario, go_server_dir, summary_out) }
+}
+
+#[no_mangle]
+/// Returns the fixed, redacted Manager sync product status.
+///
+/// This status path only reads compile-time and metadata-only capability flags.
+/// It never creates, reads, signs with, performs key agreement with, or deletes
+/// a platform key.
+///
+/// # Safety
+/// `status_out` must be writable; `error_out`, when non-null, must be writable.
+pub unsafe extern "C" fn radishlex_manager_sync_product_status(
+    status_out: *mut RadishLexManagerSyncProductStatus,
+    error_out: *mut *mut RadishLexError,
+) -> RadishLexStatusCode {
+    ffi_status(error_out, || {
+        if status_out.is_null() {
+            return Err(FfiError::invalid_argument(
+                "Manager sync product status output pointer is null",
+            ));
+        }
+        unsafe {
+            *status_out = RadishLexManagerSyncProductStatus::current();
+        }
+        Ok(())
+    })
 }
 
 #[no_mangle]

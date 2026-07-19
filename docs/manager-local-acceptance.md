@@ -38,7 +38,7 @@ clean HEAD `a7e385e` 的正常 Release app 已按 [macOS manager 产品验收 ru
 | M2 能力 | 当前证据 | 证据入口 |
 | --- | --- | --- |
 | 产品启动不伪装成功 | 默认 product；native/path/userdb/ABI 失败进入 `UnavailableManagerBridge`；fixture 仅由显式 demo 构建启用并显示常驻标识。 | `manager_bridge_factory.dart`、`unavailable_manager_bridge.dart`、`widget_test.dart`、`./scripts/check-manager.sh` |
-| 产品 bundle 可加载真实 Rust 能力 | Xcode 构建阶段嵌入 native library，校验 ABI v5、owner-thread、panic boundary、架构、必需符号和依赖；Release bundle smoke 使用其中的 dylib。 | `embed-manager-native-library.sh`、`check-manager-product.sh`、`ffi_dynamic_native_binding.dart` |
+| 产品 bundle 可加载真实 Rust 能力 | Xcode 构建阶段嵌入 native library，校验 ABI v6、owner-thread、panic boundary、架构、必需符号和依赖；Release bundle smoke 使用其中的 dylib。 | `embed-manager-native-library.sh`、`check-manager-product.sh`、`ffi_dynamic_native_binding.dart` |
 | 用户能管理真实本地词条 | UI 和 FFI 覆盖 active/suppressed/deleted、删除、tombstone 查询、明确恢复、导入导出、按本地 batch id 关联导入审计与重启后的状态保持。 | `dictionary_test.dart`、`ffi_manager_bridge_test.dart`、`ffi_bridge_smoke.dart` |
 | 输入法与 manager 共享数据语义 | 独立 `UserDb` 连接覆盖八路并发 schema 初始化、短时初始化锁等待、WAL 可见性、选择、删除、防复活和恢复；busy timeout 在任何 schema/integrity SQL 前生效，首次 WAL 协商只在固定预算内重试锁竞争。页头刷新重新调用 bridge snapshot，widget 回归覆盖输入侧外部更新后的可见性。 | `ime-userdb` store tests、`widget_test.dart`、`cargo test -p radishlex-ime-userdb` |
 | 隐私设置作用于输入 runtime | Flutter 通过 MethodChannel 调用 macOS `CFPreferences` 的 CurrentUser/AnyHost 层，保存后读回；settings/权限失败会回滚。 | `MainFlutterWindow.swift`、`method_channel_manager_platform_control.dart`、对应 Flutter tests |

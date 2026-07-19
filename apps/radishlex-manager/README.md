@@ -53,7 +53,7 @@ macOS 正常 product 构建使用仓库稳定入口：
 ../../scripts/build-manager-macos-product.sh
 ```
 
-Xcode 构建阶段会编译 `radishlex-ime-ffi`；macOS 产品 dylib 显式启用 `apple-keychain` feature，再修正 install name，检查目标架构、依赖与 manager 所需 symbol 集，把库复制到 app bundle 的 `Contents/Frameworks` 后签名。Dart 启动时读取 `radishlex_ffi_contract`，要求 ABI version、owner-thread policy 和 panic boundary 与 manager 预期一致。普通 DPK 与 Secure Enclave P-256 status/product smoke symbol 只服务原生 gated validation，Dart 不绑定，也不返回 key、canonical 或 signature bytes。
+Xcode 构建阶段会编译 `radishlex-ime-ffi`；macOS 产品 dylib 显式启用 `apple-keychain` feature，再修正 install name，检查目标架构、依赖与 manager 所需 symbol 集，把库复制到 app bundle 的 `Contents/Frameworks` 后签名。Dart 启动时读取 `radishlex_ffi_contract`，要求 ABI v6、owner-thread policy 和 panic boundary 与 manager 预期一致。普通 DPK 与 Secure Enclave P-256 status/product smoke symbol 只服务原生 gated validation，Dart 不直接绑定；现有 snapshot 只读取 `radishlex_manager_sync_product_status` 的固定脱敏状态，不触发系统 key 操作，也不返回 key、canonical、signature 或 wrapped material bytes。
 
 product mode 不读取 `RADISHLEX_MANAGER_DB`、`RADISHLEX_MANAGER_FFI_LIBRARY`、`RADISHLEX_MANAGER_SETTINGS_FILE` 或其他 shell 路径环境变量。macOS 固定路径为：
 

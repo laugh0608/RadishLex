@@ -45,6 +45,7 @@ required_symbols=(
   _radishlex_apple_p256_product_smoke
   _radishlex_apple_p256_product_status
   _radishlex_ffi_contract
+  _radishlex_manager_sync_product_status
   _radishlex_userdb_terms_new
   _radishlex_userdb_deleted_terms_new
   _radishlex_userdb_delete_term

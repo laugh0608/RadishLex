@@ -1,6 +1,6 @@
-/// ABI contract v5 extends v4 with local import-batch provenance on user-term
-/// views while preserving the existing session, privacy, and learning contract.
-pub const RADISHLEX_ABI_CONTRACT_VERSION: u32 = 5;
+/// ABI contract v6 preserves v5 local import-batch provenance and adds the
+/// status-only Manager sync product summary.
+pub const RADISHLEX_ABI_CONTRACT_VERSION: u32 = 6;
 pub const RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD: u32 = 1;
 pub const RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND: u32 = 1;
 

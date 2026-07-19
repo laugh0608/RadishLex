@@ -12,7 +12,7 @@ final class _RadishLexNativeApi {
       rank = _RadishLexRankSymbols(library),
       errors = _RadishLexErrorSymbols(library);
 
-  static const _expectedContractVersion = 5;
+  static const _expectedContractVersion = 6;
   static const _expectedThreadPolicy = 1;
   static const _expectedPanicBoundary = 1;
 

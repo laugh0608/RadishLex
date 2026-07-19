@@ -43,6 +43,8 @@ abstract interface class RadishLexManagerNativeBinding {
 
   NativeSyncPreflightSummary syncPreflight(String dbPath);
 
+  NativeSyncProductStatus syncProductStatus();
+
   NativeRankExplainSummary rankExplain({
     required String dbPath,
     required String inputCode,

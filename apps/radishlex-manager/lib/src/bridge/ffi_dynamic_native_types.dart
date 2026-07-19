@@ -262,6 +262,65 @@ final class _RadishLexSyncPreflightSummary extends ffi.Struct {
   external int localImportBatches;
 }
 
+final class _RadishLexManagerSyncProductStatus extends ffi.Struct {
+  @ffi.Uint32()
+  external int version;
+
+  @ffi.Uint32()
+  external int signingBackend;
+
+  @ffi.Uint32()
+  external int signingAlgorithm;
+
+  @ffi.Uint32()
+  external int signingCompiled;
+
+  @ffi.Uint32()
+  external int signingRuntimeAvailable;
+
+  @ffi.Uint32()
+  external int signingCanCreate;
+
+  @ffi.Uint32()
+  external int signingCanSign;
+
+  @ffi.Uint32()
+  external int signingExportable;
+
+  @ffi.Uint32()
+  external int signingHardwareBacked;
+
+  @ffi.Uint32()
+  external int signingUserPresenceRequired;
+
+  @ffi.Uint32()
+  external int signingBackupMigratable;
+
+  @ffi.Uint32()
+  external int signingProductQualified;
+
+  @ffi.Uint32()
+  external int keyAgreementBackend;
+
+  @ffi.Uint32()
+  external int keyAgreementCompiled;
+
+  @ffi.Uint32()
+  external int keyAgreementRuntimeQualified;
+
+  @ffi.Uint32()
+  external int keyAgreementProductQualified;
+
+  @ffi.Uint32()
+  external int productQualified;
+
+  @ffi.Uint32()
+  external int userSyncEnabled;
+
+  @ffi.Uint32()
+  external int blocker;
+}
+
 final class _RadishLexRankExplainView extends ffi.Struct {
   external _RadishLexStringView inputCode;
   external _RadishLexStringView candidateText;

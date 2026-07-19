@@ -9,6 +9,7 @@
 - 诊断报告只输出聚合计数、状态码、非敏感来源标签、聚合阻塞码和脱敏策略，不输出用户词、导入 / 导出文件内容、本机真实路径、请求 / 响应体或 native 原始错误明细。
 - 诊断报告预览按本文字段索引展示分组、字段筛选和脱敏文本复制入口；复制内容与导出文本一致，仍只包含脱敏摘要。
 - 设置页可以导入 `manager_sync_readiness.v1` 非敏感摘要用于本地开发联调；该摘要只保存在当前 manager 内存态，驱动同步页、设置页 gate preview 和诊断报告的派生字段，不写入 settings draft，也不改变 `ManagerBridge` contract 或 C ABI。
+- FFI Manager snapshot 会读取 native status-only 产品摘要，并只把 allowlist 后的 backend、capability blocker 与关闭态 production gate 派生进 `DeviceSecuritySummary`；原始数值结构不进入 settings。未知或不一致状态统一显示 `native_sync_product_status_invalid`，不得猜测为 ready。
 - recovery setup / restore 的可见层文案占位只展示状态码：一次性展示状态、保存确认、恢复输入、恢复记录查询、失败限速和设备登记状态会同步进入 settings gate preview、同步页和诊断报告；这些字段不携带恢复码、settings action payload、bridge request payload 或请求 / 响应体。
 - join request 授权和设备撤销只读状态只展示状态码：join request 状态、短码核对占位、授权包前置条件、授权包状态、丢失设备风险提示和 key epoch 状态会绑定到现有 `sync.device_join_*`、`sync.authorization_package_*`、`sync.device_revocation_*`、`sync.lost_device_risk` 和 `sync.key_epoch_status` 字段；这些字段不携带短码、签名、wrapped material、settings action payload、bridge request payload 或请求 / 响应体。
 - 真实远端同步、恢复码和设备授权 UI 继续关闭；`preflight_ready` 只表示本地草案和预检条件可解释，不代表用户可用同步入口已开放。

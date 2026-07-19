@@ -12,6 +12,7 @@ ManagerSnapshot managerSnapshotFromNative({
   required Iterable<NativeImportBatchRecord> nativeImportBatches,
   required NativeLearningStatusSummary nativeLearning,
   required NativeSyncPreflightSummary nativeSync,
+  required NativeSyncProductStatus nativeSyncProductStatus,
   required ManagerSettingsDraft settingsDraft,
   required ManagerRuntimeDiagnostics runtimeDiagnostics,
   required NativeRankExplainSummary Function(UserTerm term) explainTerm,
@@ -19,6 +20,10 @@ ManagerSnapshot managerSnapshotFromNative({
   final terms = nativeTerms
       .map(managerUserTermFromNative)
       .toList(growable: false);
+
+  final device = managerDeviceSecuritySummaryFromNative(
+    nativeSyncProductStatus,
+  );
 
   return ManagerSnapshot(
     generatedAt: managerFormatTimestampMs(generatedAtMs),
@@ -37,6 +42,7 @@ ManagerSnapshot managerSnapshotFromNative({
     sync: managerSyncSummaryFromNative(
       summary: nativeSync,
       settingsDraft: settingsDraft,
+      device: device,
     ),
     settings: managerSettingsFromFfiDraft(
       draft: settingsDraft,

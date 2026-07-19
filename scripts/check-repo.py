@@ -220,6 +220,7 @@ def check_manager_product_runtime_contract() -> None:
     embed_script = read_text("scripts/embed-manager-native-library.sh")
     for symbol in (
         "_radishlex_ffi_contract",
+        "_radishlex_manager_sync_product_status",
         "_radishlex_userdb_deleted_terms_new",
         "_radishlex_userdb_restore_term",
     ):

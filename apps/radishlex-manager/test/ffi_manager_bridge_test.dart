@@ -69,6 +69,11 @@ void main() {
       expect(snapshot.sync.state, SyncUiState.backendUnavailable);
       expect(snapshot.sync.syncableObjects, 4);
       expect(snapshot.sync.localOnlyEvents, 7);
+      expect(snapshot.sync.device.backendId, 'apple-secure-enclave-p256-v1');
+      expect(
+        snapshot.sync.device.capabilityStatus,
+        'signing_backend_product_qualification_required',
+      );
       expect(snapshot.sync.device.productionGate, 'blocked');
       expect(snapshot.explanations.single.signals, contains('user=2.000'));
       expect(snapshot.explanations.single.signals, contains('freq=0.350'));
@@ -87,6 +92,14 @@ void main() {
       expect(text, contains('sync.state_source: 设备 production gate 为 blocked'));
       expect(text, contains('sync.entry_state: backend_unavailable'));
       expect(text, contains('sync.entry_blocker: backend_unavailable'));
+      expect(text, contains('device.backend: apple-secure-enclave-p256-v1'));
+      expect(
+        text,
+        contains(
+          'device.capability: signing_backend_product_qualification_required',
+        ),
+      );
+      expect(text, contains('device.production_gate: blocked'));
       expect(text, contains('sync.local_evidence_source: not_recorded'));
       expect(text, contains('sync.recovery_status: recovery_code_flow_closed'));
       expect(
@@ -118,6 +131,46 @@ void main() {
       expect(text, isNot(contains('/tmp/radishlex-userdb.sqlite')));
     },
   );
+
+  test('native sync product status maps allowlisted closed capability', () {
+    final device = managerDeviceSecuritySummaryFromNative(
+      _nativeSyncProductStatus(),
+    );
+
+    expect(device.backendId, 'apple-secure-enclave-p256-v1');
+    expect(
+      device.capabilityStatus,
+      'signing_backend_product_qualification_required',
+    );
+    expect(device.productionGate, 'blocked');
+  });
+
+  test('native sync product status rejects malformed or enabling claims', () {
+    final malformedStatuses = [
+      _nativeSyncProductStatus(version: 2),
+      _nativeSyncProductStatus(signingCompiled: 2),
+      _nativeSyncProductStatus(blocker: 5),
+      _nativeSyncProductStatus(productQualified: 1),
+      _nativeSyncProductStatus(
+        signingProductQualified: 1,
+        signingBackupMigratable: 1,
+        keyAgreementRuntimeQualified: 1,
+        keyAgreementProductQualified: 1,
+        productQualified: 1,
+        blocker: 7,
+      ),
+      _nativeSyncProductStatus(userSyncEnabled: 1),
+      _nativeSyncProductStatus(signingBackend: 99),
+      _nativeSyncProductStatus(keyAgreementBackend: 99),
+    ];
+
+    for (final status in malformedStatuses) {
+      final device = managerDeviceSecuritySummaryFromNative(status);
+      expect(device.backendId, 'unavailable');
+      expect(device.capabilityStatus, 'native_sync_product_status_invalid');
+      expect(device.productionGate, 'blocked');
+    }
+  });
 
   test('ffi manager bridge delegates delete/import/export calls', () async {
     final native = _FakeNativeBinding();
@@ -663,6 +716,50 @@ String _diagnosticsValue(ManagerDiagnosticsReport report, String key) {
       .value;
 }
 
+NativeSyncProductStatus _nativeSyncProductStatus({
+  int version = 1,
+  int signingBackend = 1,
+  int signingAlgorithm = 1,
+  int signingCompiled = 1,
+  int signingRuntimeAvailable = 1,
+  int signingCanCreate = 1,
+  int signingCanSign = 1,
+  int signingExportable = 0,
+  int signingHardwareBacked = 1,
+  int signingUserPresenceRequired = 0,
+  int signingBackupMigratable = 0,
+  int signingProductQualified = 0,
+  int keyAgreementBackend = 1,
+  int keyAgreementCompiled = 1,
+  int keyAgreementRuntimeQualified = 0,
+  int keyAgreementProductQualified = 0,
+  int productQualified = 0,
+  int userSyncEnabled = 0,
+  int blocker = 3,
+}) {
+  return NativeSyncProductStatus(
+    version: version,
+    signingBackend: signingBackend,
+    signingAlgorithm: signingAlgorithm,
+    signingCompiled: signingCompiled,
+    signingRuntimeAvailable: signingRuntimeAvailable,
+    signingCanCreate: signingCanCreate,
+    signingCanSign: signingCanSign,
+    signingExportable: signingExportable,
+    signingHardwareBacked: signingHardwareBacked,
+    signingUserPresenceRequired: signingUserPresenceRequired,
+    signingBackupMigratable: signingBackupMigratable,
+    signingProductQualified: signingProductQualified,
+    keyAgreementBackend: keyAgreementBackend,
+    keyAgreementCompiled: keyAgreementCompiled,
+    keyAgreementRuntimeQualified: keyAgreementRuntimeQualified,
+    keyAgreementProductQualified: keyAgreementProductQualified,
+    productQualified: productQualified,
+    userSyncEnabled: userSyncEnabled,
+    blocker: blocker,
+  );
+}
+
 final class _FakeNativeBinding implements RadishLexManagerNativeBinding {
   String? listedDbPath;
   String? deletedInputCode;
@@ -840,6 +937,11 @@ final class _FakeNativeBinding implements RadishLexManagerNativeBinding {
       localNegativeFeedback: 1,
       localImportBatches: 2,
     );
+  }
+
+  @override
+  NativeSyncProductStatus syncProductStatus() {
+    return _nativeSyncProductStatus();
   }
 
   @override

@@ -306,6 +306,41 @@ final class DynamicRadishLexManagerNativeBinding
   }
 
   @override
+  NativeSyncProductStatus syncProductStatus() {
+    final statusOut = calloc<_RadishLexManagerSyncProductStatus>();
+    try {
+      _callStatus(
+        _api.errors,
+        (errorOut) => _api.sync.productStatus(statusOut, errorOut),
+      );
+      final status = statusOut.ref;
+      return NativeSyncProductStatus(
+        version: status.version,
+        signingBackend: status.signingBackend,
+        signingAlgorithm: status.signingAlgorithm,
+        signingCompiled: status.signingCompiled,
+        signingRuntimeAvailable: status.signingRuntimeAvailable,
+        signingCanCreate: status.signingCanCreate,
+        signingCanSign: status.signingCanSign,
+        signingExportable: status.signingExportable,
+        signingHardwareBacked: status.signingHardwareBacked,
+        signingUserPresenceRequired: status.signingUserPresenceRequired,
+        signingBackupMigratable: status.signingBackupMigratable,
+        signingProductQualified: status.signingProductQualified,
+        keyAgreementBackend: status.keyAgreementBackend,
+        keyAgreementCompiled: status.keyAgreementCompiled,
+        keyAgreementRuntimeQualified: status.keyAgreementRuntimeQualified,
+        keyAgreementProductQualified: status.keyAgreementProductQualified,
+        productQualified: status.productQualified,
+        userSyncEnabled: status.userSyncEnabled,
+        blocker: status.blocker,
+      );
+    } finally {
+      calloc.free(statusOut);
+    }
+  }
+
+  @override
   NativeRankExplainSummary rankExplain({
     required String dbPath,
     required String inputCode,

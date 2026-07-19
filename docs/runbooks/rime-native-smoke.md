@@ -202,7 +202,7 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
 
 ### 5. 运行 FFI native smoke
 
-FFI native smoke 用于确认 `radishlex_session_new_personalized_rime` 能通过 ABI v5 options 创建真实 Rime 产品 session，并能完成稳定 input code、按键输入、candidate snapshot、完整/分段候选选择和本地学习策略。测试会在隔离的 `$SMOKE/user/userdb.sqlite3` 写入合成 selection，断言完整选择为 `recorded`、分段选择为 `deferred`、隐私模式不增加事件、secure input 返回 engine-only `policy_blocked`。该测试默认标记为 ignored，必须显式传入隔离 Rime 数据目录后运行；只有调用方额外设置 `RADISHLEX_EXPECTED_CANDIDATE_PAGE_SIZE` 时才断言页大小，macOS 产品 native 门禁固定传入 `5`。
+FFI native smoke 用于确认 `radishlex_session_new_personalized_rime` 能通过当前 ABI v6（沿用 v5 options 布局）创建真实 Rime 产品 session，并能完成稳定 input code、按键输入、candidate snapshot、完整/分段候选选择和本地学习策略。测试会在隔离的 `$SMOKE/user/userdb.sqlite3` 写入合成 selection，断言完整选择为 `recorded`、分段选择为 `deferred`、隐私模式不增加事件、secure input 返回 engine-only `policy_blocked`。该测试默认标记为 ignored，必须显式传入隔离 Rime 数据目录后运行；只有调用方额外设置 `RADISHLEX_EXPECTED_CANDIDATE_PAGE_SIZE` 时才断言页大小，macOS 产品 native 门禁固定传入 `5`。
 
 ```bash
 RIME_INCLUDE_DIR="$RIME_INCLUDE_DIR" \

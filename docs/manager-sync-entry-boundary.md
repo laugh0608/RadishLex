@@ -8,7 +8,21 @@
 - 真实远端同步、恢复码生成与输入、设备加入授权、设备撤销和密钥轮换没有产品执行入口。
 - `ManagerBridge` 当前不提供上述同步命令；缺少能力本身就是产品关闭证据，不使用 future command preview 或审批状态机模拟接口。
 - 即使 endpoint、平台 backend、部署证据和 readiness 摘要均显示 ready，用户同步入口仍保持关闭，直到 M3 退出条件满足。
-- manager Release native library 可以包含普通 DPK 与 Secure Enclave P-256 backend 及只返回固定 flags 的独立产品 validation ABI；这些 ABI 不属于 `ManagerBridge` 同步命令，不进入 Dart binding，也不能解锁按钮。
+- manager Release native library 可以包含普通 DPK 与 Secure Enclave P-256 backend 及只返回固定 flags 的独立产品 validation ABI；这些底层 validation ABI 不直接进入 Dart binding。Manager 只通过下述独立 status-only 业务摘要读取脱敏结果，不能据此解锁按钮。
+
+## Status-only 产品摘要
+
+M3 允许一条不带入参、只读且不访问系统密钥条目的 `radishlex_manager_sync_product_status` C ABI。它随现有 `loadSnapshot` 进入 Manager，不增加 `ManagerBridge` 命令方法，也不创建、读取、签名、解封或删除 Keychain / Secure Enclave 项目。
+
+该摘要只包含固定版本与数值枚举：signing backend / algorithm、编译与静态运行时 capability、`can_create` / `can_sign`、`exportable` / `hardware_backed`、signing 产品资格、独立 key-agreement backend 编译与实机资格、组合 `product_qualified`、`user_sync_enabled` 和首个稳定 blocker。它不得包含 device id、key id、公钥、路径、OSStatus、平台错误正文、signature、wrapped material、master key、shared secret、nonce、HTTP 内容或任意自由文本。
+
+规则固定如下：
+
+- signing 状态可以复用不触发系统调用的 backend metadata；key-agreement 在未完成独立实机资格前只能报告 compiled，不能继承 signing backend 的运行时或 hardware-backed 证据。
+- `product_qualified` 只有 signing 与 key-agreement 两条独立资格同时成立时才可为 `1`；当前必须为 `0`。`user_sync_enabled` 还受阶段停止线约束，当前固定为 `0`。
+- blocker 按 signing 未编译、signing runtime 不可用、signing 未获产品资格、key-agreement 未编译、key-agreement 实机资格缺失、key-agreement 产品资格缺失、当前阶段仍关闭的顺序选择首项；`none` 只允许全部条件成立时出现。
+- C ABI 使用标准 `RadishLexStatusCode` 与受控 `error_out`；空输出指针返回 `InvalidArgument`。Dart 对未知 schema、enum、非 `0/1` flag 或自相矛盾组合必须降级为 `native_sync_product_status_invalid`、`backendId = unavailable`、`productionGate = blocked`，保持 Manager 其余本地管理能力可用。
+- Dart 只把 allowlist 后的 backend 与 blocker 映射为 `DeviceSecuritySummary`，不持久化原始结构；settings、readiness JSON、diagnostics 和 widget 继续只看到稳定状态码。
 
 ## UI 职责
 
@@ -59,7 +73,7 @@ Secure Enclave P-256 使用独立环境门、native symbol 与六个显式场景
 
 - `启用同步` 保持禁用。
 - 不新增恢复码生成 / 输入、join request、授权成功、撤销或轮换的可执行按钮。
-- 不新增 manager 同步命令 C ABI、Dart native binding 或远端写入调用。
+- 不新增 manager 同步命令 C ABI 或远端写入调用；上述 status-only ABI 不属于同步命令。
 - 本地 Docker、localhost、fixture、readiness ready 和合成 smoke 只能用于开发验证，不能解锁产品入口。
 - 服务端继续被视为不可信，输入热路径不得依赖网络。
 
@@ -71,5 +85,6 @@ Secure Enclave P-256 使用独立环境门、native symbol 与六个显式场景
 - settings 不保存敏感材料：`test/ffi_manager_bridge_test.dart`、`test/models/manager_sync_transient_secret_interaction_test.dart`
 - diagnostics 脱敏与错误可见性：`test/screens/settings_diagnostics_test.dart`、`test/models/manager_sync_transient_secret_interaction_test.dart`
 - UI 禁用入口：`test/screens/sync_test.dart`、`test/screens/settings_test.dart`
+- native 产品摘要 contract 与 fail-closed 映射：`crates/ime-ffi/tests/input_header_contract.rs`、`test/ffi_manager_bridge_test.dart`
 
 这些测试证明当前能力安全关闭，不代表 M3 同步产品已实现。

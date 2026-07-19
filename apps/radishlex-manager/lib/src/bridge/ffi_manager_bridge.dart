@@ -174,6 +174,7 @@ class FfiManagerBridge implements ManagerBridge {
       nativeImportBatches: _native.listImportBatches(dbPath),
       nativeLearning: _native.learningStatus(dbPath),
       nativeSync: _native.syncPreflight(dbPath),
+      nativeSyncProductStatus: _native.syncProductStatus(),
       settingsDraft: settingsDraft,
       runtimeDiagnostics: managerRuntimeDiagnosticsFromFfi(
         nativeInjected: _nativeInjected,

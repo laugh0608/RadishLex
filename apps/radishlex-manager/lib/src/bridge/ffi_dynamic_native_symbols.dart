@@ -348,7 +348,18 @@ final class _RadishLexSyncSymbols {
               ffi.Pointer<_RadishLexSyncPreflightSummary>,
               ffi.Pointer<ffi.Pointer<_RadishLexError>>,
             )
-          >('radishlex_userdb_sync_preflight');
+          >('radishlex_userdb_sync_preflight'),
+      productStatus = library
+          .lookupFunction<
+            ffi.Int32 Function(
+              ffi.Pointer<_RadishLexManagerSyncProductStatus>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            ),
+            int Function(
+              ffi.Pointer<_RadishLexManagerSyncProductStatus>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            )
+          >('radishlex_manager_sync_product_status');
 
   final int Function(
     ffi.Pointer<ffi.Char>,
@@ -356,6 +367,11 @@ final class _RadishLexSyncSymbols {
     ffi.Pointer<ffi.Pointer<_RadishLexError>>,
   )
   preflight;
+  final int Function(
+    ffi.Pointer<_RadishLexManagerSyncProductStatus>,
+    ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+  )
+  productStatus;
 }
 
 final class _RadishLexRankSymbols {

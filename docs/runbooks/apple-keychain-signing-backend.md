@@ -327,7 +327,7 @@ locked 矩阵仍可用于验证错误语义，但不能把 `exportable=true` 的
 
 ## 2026-07-18 DPK 产品接线与评审证据
 
-- manager Release dylib 已显式启用 `ime-ffi/apple-keychain`，导出只读 status 与 gated product smoke validation ABI；ABI v5 的既有 Dart 管理接口未改变。
+- manager Release dylib 已显式启用 `ime-ffi/apple-keychain`，导出只读 status 与 gated product smoke validation ABI；ABI v6 新增独立脱敏 Manager 产品摘要，既有 Dart 管理命令接口未改变。
 - `./scripts/check-manager-product.sh` 已通过 Release build、严格签名、native symbol、C status host 和既有 Dart FFI smoke；不启动产品、不访问 Keychain。最终 status 为 `compiled/runtime_available/can_create/can_sign=true`、`exportable=true`、`product_qualified/user_sync_enabled=false`。
 - validation smoke schema v4 固定五个场景、脱敏错误分类和数值 OSStatus；native 生命周期材料不进入 Dart，manager 普通启动和 InputMethodKit 不接触同步签名 key。
 - 经单独授权，当前 ad-hoc Release bundle 的 DPK denied 场景固定摘要通过：`result=0`、`scenario=1`、`error_category=3`、`created=0`、`fail_closed=1`、`expected_failure=1`、`cleanup_required=0`、`cleanup_attempted=1`。该证据只证明无合格身份时失败关闭，不开放运行时能力或产品资格。
