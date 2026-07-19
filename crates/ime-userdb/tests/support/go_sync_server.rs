@@ -31,9 +31,14 @@ impl GoSyncServer {
             Err(error) => panic!("reserve loopback port: {error}"),
         };
         let root = temp_root();
-        fs::create_dir_all(root.join("objects")).expect("create temp blob dir");
+        let server_store = root.join("server-store");
+        let client_store = root.join("clients");
+        let binary_dir = root.join("bin");
+        fs::create_dir_all(server_store.join("objects")).expect("create temp blob dir");
+        fs::create_dir_all(&client_store).expect("create temp client dir");
+        fs::create_dir_all(&binary_dir).expect("create temp binary dir");
         let server_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../server/sync-server");
-        let binary_path = root.join("radishlex-sync-server");
+        let binary_path = binary_dir.join("radishlex-sync-server");
         let build_status = match Command::new("go")
             .args(["build", "-o"])
             .arg(&binary_path)
@@ -58,9 +63,9 @@ impl GoSyncServer {
             .env("RADISHLEX_SYNC_LISTEN", format!("127.0.0.1:{port}"))
             .env(
                 "RADISHLEX_SYNC_METADATA_PATH",
-                root.join("sync-server.sqlite"),
+                server_store.join("sync-server.sqlite"),
             )
-            .env("RADISHLEX_SYNC_BLOB_DIR", root.join("objects"))
+            .env("RADISHLEX_SYNC_BLOB_DIR", server_store.join("objects"))
             .env("RADISHLEX_SYNC_MAX_OBJECT_BYTES", "16777216")
             .env("RADISHLEX_SYNC_RECOVERY_READS_PER_HOUR", "12")
             .stdout(Stdio::null())
@@ -84,7 +89,7 @@ impl GoSyncServer {
     }
 
     pub(crate) fn data_path(&self, file_name: &str) -> PathBuf {
-        self.root.join(file_name)
+        self.root.join("clients").join(file_name)
     }
 
     pub(crate) fn stop(mut self) -> String {
