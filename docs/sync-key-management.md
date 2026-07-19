@@ -287,7 +287,8 @@ updated_at_ms
 22. 已补 Rust 侧两客户端 userdb harness，覆盖 P2 payload 加密上传、另一客户端下载密文、解密、解码、合并写回、本机 tombstone 阻断旧远端词条、stale conflict latest metadata 映射和 v2 重新上传。
 23. 已补 Rust userdb 两客户端真实 Go HTTP 测试，覆盖设备授权、三类 P2 对象上传下载、客户端解密写回、stale conflict、v2 重新上传和 runtime 日志脱敏。
 24. 已按 `docs/sync-orchestration.md` 落地 change cursor、local repository port、transaction-scoped apply + cursor、持久化 journal/outbox、取消/重启、409 重新发现和默认关闭的通用 crypto processor/provider；合成双 userdb Go HTTP service 已覆盖历史 epoch、撤销 sequence、cycle snapshot 与新 outbox 轮换边界。
-25. 下一批实现生产 provider 的可信设备生命周期和 epoch material 装载，缺少 active device、当前/历史 epoch、签名 profile 或 production-qualified backend 时继续在网络前失败关闭；不接 Manager 产品命令。
+25. 已落地 `ProductSyncCryptoProvider` 与可信 device lifecycle、epoch material、platform signing 三端口；装载顺序先验证本机 active、registered public key 与 production backend，再读取 material。合成授权/撤销/轮换测试覆盖旧设备不读取新 epoch、历史对象、撤销 sequence、新 epoch outbox 和重启 snapshot 重建。
+26. 下一批补完整设备目录/lifecycle sequence、signed authorization/revocation 的 Rust 验证与本地 public cache，再实现 wrapped epoch material 解封装和平台 adapter；明文 sync master key 不进入 SQLite/settings，不接 Manager 产品命令。
 
 ## 验证口径
 

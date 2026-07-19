@@ -83,9 +83,9 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v5 隐私/索引/学习状态与本地导入批次关联、deleted tombstone 管理查询、精确 case inspection、隔离非选择 snapshot、R01B 与 manager/InputMethodKit 共库证据 | M3 生产同步 provider/FFI；M4 发布包复验 |
-| 本地学习 | schema v5 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox 与原子 apply | M3 真实设备生命周期和 epoch material 装载 |
-| 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP transport、关闭态 orchestration、cycle-frozen crypto provider port、双 userdb Go HTTP 收敛、Apple DPK/Secure Enclave backend | Secure Enclave 最终产品资格、生产 provider、真实设备生命周期与发布级部署 |
+| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v5 隐私/索引/学习状态与本地导入批次关联、deleted tombstone 管理查询、精确 case inspection、隔离非选择 snapshot、R01B 与 manager/InputMethodKit 共库证据 | M3 同步 lifecycle/material adapter 与 FFI；M4 发布包复验 |
+| 本地学习 | schema v5 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox 与原子 apply | M3 可信 public lifecycle cache；不得保存明文 master key |
+| 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP transport、关闭态 orchestration、通用 processor、生产 provider 三端口、双 userdb Go HTTP 收敛、Apple DPK/Secure Enclave backend | lifecycle/material/backend 真实 adapter、Secure Enclave 最终资格与发布级部署 |
 | Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、widget/FFI/产品与实机门禁 | M3 真实同步窄命令/status；M4 发布分发 |
 | 平台 | macOS InputMethodKit 薄壳、contract/native bundle、R01A build 32 与 R01B build 34 实机退出、生产 LearningContext、privacy/清理 contract 与隔离 ValidationHost；Android Keystore 能力验证桥 | M4 产品安装包；其他系统输入法 |
 

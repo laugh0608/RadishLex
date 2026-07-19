@@ -5,6 +5,7 @@ mod merge;
 mod model;
 mod orchestration;
 mod processor;
+mod product_provider;
 mod remote;
 mod service;
 mod signing;
@@ -34,6 +35,11 @@ pub use orchestration::{
 pub use processor::{
     DefaultSyncObjectProcessor, SyncCryptoCycleSnapshot, SyncCryptoProvider, SyncEpochKeyMaterial,
     SyncRemoteSigningProfile, UnavailableSyncCryptoProvider,
+};
+pub use product_provider::{
+    ProductSyncCryptoProvider, SyncCryptoLoadError, SyncDeviceSigningBackend,
+    SyncEpochMaterialStore, SyncTrustedDeviceProfile, SyncTrustedDeviceSource,
+    SyncTrustedDomainState,
 };
 pub use remote::{
     LatestObjectConflictMetadata, OpaqueSyncCursor, RemoteObjectDiscoveryPage, RemoteObjectPayload,

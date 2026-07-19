@@ -205,20 +205,11 @@ impl SyncCryptoCycleSnapshot {
         if domain_id.trim().is_empty() || current_write_epoch == 0 {
             return Err(invalid_preflight());
         }
-        signing_handle.validate().map_err(|_| invalid_preflight())?;
-        local_signing_public_key
-            .validate()
-            .map_err(|_| invalid_preflight())?;
-        backend_status.validate().map_err(|_| backend_preflight())?;
-        if signing_handle.device_id != local_signing_public_key.device_id
-            || signing_handle.signing_key_id != local_signing_public_key.signing_key_id
-            || signing_handle.signature_algorithm != local_signing_public_key.signature_algorithm
-            || backend_status.storage_backend != signing_handle.storage_backend
-            || backend_status.signature_algorithm.as_ref()
-                != Some(&signing_handle.signature_algorithm)
-        {
-            return Err(invalid_preflight());
-        }
+        validate_local_signing_boundary(
+            &signing_handle,
+            &local_signing_public_key,
+            &backend_status,
+        )?;
 
         let mut epoch_map = BTreeMap::new();
         for material in epoch_materials {
@@ -596,6 +587,35 @@ fn envelope_from_remote(
         created_at_ms: remote.client_created_at_ms,
         updated_at_ms: remote.client_updated_at_ms,
     })
+}
+
+pub(crate) fn validate_local_signing_boundary(
+    signing_handle: &DeviceSigningKeyHandle,
+    local_signing_public_key: &DeviceSigningPublicKey,
+    backend_status: &DevicePrivateKeyStoreStatus,
+) -> Result<(), SyncOrchestrationError> {
+    signing_handle.validate().map_err(|_| invalid_preflight())?;
+    local_signing_public_key
+        .validate()
+        .map_err(|_| invalid_preflight())?;
+    backend_status.validate().map_err(|_| backend_preflight())?;
+    if signing_handle.device_id != local_signing_public_key.device_id
+        || signing_handle.signing_key_id != local_signing_public_key.signing_key_id
+        || signing_handle.signature_algorithm != local_signing_public_key.signature_algorithm
+        || signing_handle.created_at_ms != local_signing_public_key.created_at_ms
+        || signing_handle.revoked_at_ms != local_signing_public_key.revoked_at_ms
+        || signing_handle.revoked_at_ms.is_some()
+        || backend_status.storage_backend != signing_handle.storage_backend
+        || backend_status.signature_algorithm.as_ref() != Some(&signing_handle.signature_algorithm)
+        || backend_status.capabilities.exportable != signing_handle.exportable
+        || backend_status.capabilities.hardware_backed != signing_handle.hardware_backed
+        || backend_status.capabilities.user_presence_required
+            != signing_handle.user_presence_required
+        || backend_status.capabilities.backup_migratable != signing_handle.backup_migratable
+    {
+        return Err(invalid_preflight());
+    }
+    Ok(())
 }
 
 fn placeholder_signature(

@@ -20,7 +20,9 @@ M3 已具备 P2 envelope、signed manifest、Go server 设备/对象/密文/备�
 
 风险矩阵已覆盖取消、retry exhaustion、revision race、lease recovery、签名/密文/AAD 篡改、epoch/revocation、decode/SQLite 失败、outbox prepare/ack 故障和残缺 migration 回滚。两个隔离 userdb 通过短生命周期 Go HTTP 服务完成上传、发现、合并回传、service 重建与第二轮零上传收敛；失败不推进 cursor、不清除 dirty，也不丢失可重放请求。
 
-第四实现批已落地默认关闭的 `DefaultSyncObjectProcessor` 与 `SyncCryptoProvider`：preflight 冻结 cycle 级 signing handle/public key、当前写 epoch、历史可读 epoch、远端 signer profile、撤销 change sequence 和 key material；默认 provider 在网络前返回 `backend_unavailable`，产品构造器执行 production gate，合成 backend 只能走显式测试构造器。通用 processor 已替换双 userdb HTTP fixture 中的专用实现，并证明同周期 snapshot 不漂移、历史 epoch 在退役前可读、撤销阈值后的对象被拒绝、下一周期采用轮换 epoch 生成新 outbox。
+第四、第五实现批已落地默认关闭的 `DefaultSyncObjectProcessor`、`SyncCryptoProvider` 与 `ProductSyncCryptoProvider`。产品装载层组合可信设备生命周期源、本机授权的 epoch material store 和平台签名 backend；先确认本机 active 与 backend 产品资格，再读取 secret。preflight 冻结 signing profile、当前/历史 epoch、撤销 sequence 和 key material；缺少本机 profile、backend key 匹配、当前 epoch 或产品资格均在网络前失败关闭。
+
+合成授权/撤销/轮换记录已证明：测试 backend 和被撤销本机都不会触发 material 读取；撤销前历史对象仍可验签解密，阈值后的 sequence 被拒绝；新 active 设备用 epoch 2 写 outbox，重建 processor 后可从 sources 重建同一可信 snapshot。双 userdb HTTP fixture 继续复用通用 processor。以上只验证 provider 核心与端口顺序，不代表真实 lifecycle cache、wrapped material 解封装或平台 adapter 已落地。
 
 签名层已支持显式 Ed25519/P-256 profile 与 Rust/Go verifier；缺少或混用算法时失败关闭。普通 DPK P-256 产品进程生命周期可用但私钥可导出，production gate 明确拒绝；Secure Enclave 已证明 lifecycle、不可导出、hardware-backed、denied 与真实锁屏失败关闭，但 unsupported 和最终产品资格仍缺外部环境证据。
 
@@ -28,7 +30,7 @@ M3 已具备 P2 envelope、signed manifest、Go server 设备/对象/密文/备�
 
 - 普通 DPK P-256 可导出，Apple/Android Ed25519 也未满足生产私钥条件；`test-memory-v1` 只允许测试且无 fallback。
 - Secure Enclave 已完成 lifecycle、denied 与真实设备锁屏证据并清理合成 key；unsupported 和产品资格仍待独立环境。
-- 缺少发布级目标部署运行证据，以及真实产品 provider 的设备生命周期/epoch material 装载、设备恢复、撤销和 key epoch 全流程。
+- 缺少发布级目标部署运行证据，以及 provider sources 的真实设备生命周期缓存、wrapped epoch material 解封装、设备恢复/撤销/key epoch 全流程。
 - `ManagerBridge` 仍无真实同步、恢复码、设备加入、授权、撤销或轮换命令；现有 readiness 只证明关闭态。
 
 开发者当前没有真实不支持 Secure Enclave 的目标环境，unsupported 与产品资格因此保持外部阻塞；不能在当前设备伪造，也不能据此开放资格字段。关闭态 provider/lifecycle 实现可继续推进，但不降低生产 backend 或真实用户同步门禁。
@@ -45,9 +47,9 @@ M3 已具备 P2 envelope、signed manifest、Go server 设备/对象/密文/备�
 ## 下一步顺位
 
 1. 将 unsupported 保留为外部环境阻塞：目标环境可得时按独立授权执行 probe，确认明确 unsupported、无残留且不回退普通 DPK/test memory；通过后再逐字段评审 `product_qualified/user_presence_required/backup_migratable`。当前设备不能替代该证据。
-2. 设计并实现默认关闭的生产 `SyncCryptoProvider` 装载层：从 Rust 可信设备生命周期与本地 epoch material store 形成 cycle snapshot，只把平台 backend handle 交给签名端口；缺少 active device、签名 profile、接受 epoch、当前写 epoch 或 production-qualified backend 时必须在网络前阻断。
-3. 用合成设备授权、撤销和 epoch 轮换记录接入 provider 门禁，覆盖撤销前历史对象、撤销后新 sequence、旧设备无法取得新 epoch、重启后 snapshot 重建和无测试 backend fallback；真实 backend 资格通过前不得接 `ManagerBridge`。
-4. 只有 Rust service、生产 provider 与 backend 三条门禁均通过后，才接窄 `ManagerBridge` command/status；最后完成两个真实客户端、恢复/设备授权/撤销/key epoch 与发布级目标部署证据，满足后才评估开放用户同步。
+2. 设计可信设备目录/lifecycle 同步边界：Go server 提供完整 domain/device public metadata 与单调 lifecycle sequence，Rust 验证 signed authorization/revocation 后原子缓存；服务端状态不能绕过客户端签名验证，缓存不含 secret。
+3. 实现 `SyncEpochMaterialStore` 与 `SyncDeviceSigningBackend` 产品 adapter：wrapped material 只能在本机受保护边界内解封并短暂交给 Rust，SQLite/settings 不保存明文 master key；旧设备拿不到新 epoch，backend 未获资格时继续在 material 读取前阻断。
+4. 完成真实 lifecycle/material 重启恢复与两个真实客户端证据后，才接窄 `ManagerBridge` command/status；最终满足恢复、授权、撤销、轮换和发布部署门禁后再评估开放用户同步。
 
 ## 验证入口
 
