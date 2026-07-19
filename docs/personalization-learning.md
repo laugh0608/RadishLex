@@ -180,7 +180,7 @@ DeletedTerm
 - 同步对象中后续应使用加密 payload；服务端只看到密文。
 - ranker 遇到 deleted tombstone 时不得用旧权重提升该词。
 
-## SQLite 草案
+## SQLite schema
 
 本地个人化 schema 保留以下职责和稳定字段；实现可调整字段名，但必须保留语义并通过 migration 测试证明升级路径。
 
@@ -192,6 +192,10 @@ DeletedTerm
 | `deleted_terms` | `id`、`term_id`、`input_code`、`text`、`reading`、`deleted_at`、`reason` |
 | `ranker_weights` | `id`、`input_code`、`text`、`reading`、`frequency`、`last_used_at_ms`、`negative_score`、`context_kind`、`updated_at` |
 | `import_batches` | `id`、`source_name`、`term_count`、`total_count`、`inserted_count`、`updated_count`、`skipped_deleted_count`、`skipped_duplicate_count`、`created_at`、`notes` |
+| `sync_domain_state`、`sync_remote_objects`、`sync_local_objects` | object cursor、远端 observation、本地 revision 与 dirty 状态 |
+| `sync_prepared_outbox`、`sync_cycle_journal` | crash-safe 密文 outbox、cycle phase、lease 与取消状态 |
+| `sync_trusted_domains`、`sync_trusted_devices`、`sync_trusted_lifecycle_events` | 已验签的公开 domain/device/recovery lifecycle cache |
+| `sync_wrapped_epoch_materials` | 版本化 wrapped epoch ciphertext 与公开 AAD metadata |
 
 ### SQLite 稳定决策
 
@@ -199,7 +203,8 @@ DeletedTerm
 - 文件型 userdb 固定使用 WAL、`busy_timeout = 5000 ms`、`foreign_keys = ON` 和 `synchronous = NORMAL`。IME 与 manager 各持有独立 SQLite 连接，不跨线程共享同一个 `Connection`；IME 可持有长期热路径连接，manager 使用独立短事务连接，写事务不得跨 UI 或平台回调等待。
 - 文件连接必须在任何 schema/version/integrity SQL 之前安装 busy timeout；首次并发打开争用 WAL journal mode 时，只对 SQLite busy/locked 或尚未切换到 WAL 的结果在同一 5 秒预算内重试，其他错误立即返回。不能把初始化竞争暴露成偶发启动失败，也不能无界重试或吞掉非锁错误。
 - Unix 上数据库主文件及已生成的 `-wal`、`-shm` sidecar 权限固定收紧为 `0600`。userdb 不依赖 shell 环境变量或真实用户 Rime 目录。
-- 当前 schema 为 v4。migration 在一个 `BEGIN IMMEDIATE` 事务内完成；打开数据库时先读取并检查 `PRAGMA user_version`，取得写事务后必须重读版本，高于当前实现的未来版本必须在任何 schema 写入前拒绝。全新空库直接创建 v4；v1/v2 才执行 legacy tombstone identity、ranker recency、恢复版本和导入批次计数迁移，v3 -> v4 只增加 nullable `user_terms.import_batch_id` 外键，不得重放旧 identity/recency 迁移，也不得为历史词条伪造导入来源。
+- 当前 schema 为 v9。migration 在一个 `BEGIN IMMEDIATE` 事务内完成；打开数据库时先读取并检查 `PRAGMA user_version`，取得写事务后必须重读版本，高于当前实现的未来版本必须在任何 schema 写入前拒绝。全新空库直接建立当前学习、导入和同步表；旧库只按缺失能力补齐 legacy tombstone identity / ranker recency、恢复版本、导入批次、同步 orchestration、可信公开 lifecycle、key-agreement 公钥、wrapped epoch ciphertext 和 recovery lifecycle。迁移不得重放已经完成的 identity/recency 变换，也不得为历史词条伪造导入来源；缺少已签名 key-agreement profile、存在 lifecycle 分叉或 recovery event 无法无歧义迁移时必须整体失败并保留旧库。
+- 同步扩展表不改变本地学习、排序和删除的真相源。`sync_prepared_outbox` 只能保存密文 envelope、签名 manifest 和幂等重放 metadata；可信 lifecycle cache 只能保存服务端同样可见的公开签名链；wrapped epoch 表只能保存密文。明文 master key、ECDH shared secret、派生 wrapping key、恢复码、bearer token 和 plaintext payload 不得写入 SQLite。
 - 文件损坏、身份迁移歧义或 migration 失败时，原数据库文件必须原位保留并返回带路径/SQLite 原因的显式错误；不得静默删除、重命名后新建、降级为空库或用 fixture 代替。
 - tombstone 的唯一身份使用 trim 归一化后的 `(input_code, text, reading)` 复合键。旧 64 位 FNV 字段只允许在 v1/v2 migration 中帮助关联既有本地行，不再作为当前 schema 的查询、唯一性或同步判断依据；无法无歧义恢复身份时 migration 整体失败并保留旧库。
 
@@ -441,11 +446,11 @@ luobo	萝卜	luo bo	manual_add	2	active
 - `rank explain` 能说明候选排序变化原因。
 - trigger 或等价故障注入分别证明 selection、negative feedback、delete 和 explicit restore 的多表写入完整回滚。
 - 两个文件型独立连接在受控写竞争下依靠 WAL 与 busy timeout 完成短事务，不把常态 manager/IME 并发暴露为频繁 `SQLITE_BUSY`。
-- v1、v2 到当前 schema 的迁移保留数据；未来 schema 在写入前拒绝；损坏文件和迁移失败文件原位保留。
+- 受支持旧 schema 到当前 schema 的迁移保留数据与已验证 lifecycle，并分别覆盖 legacy learning/import、sync orchestration、可信 lifecycle、wrapped epoch 和 recovery event 迁移；未来 schema 在写入前拒绝；损坏文件和迁移失败文件原位保留。
 - 固定合成排序评测至少记录 Top-1、Top-3、MRR 和 case 数；样例只使用公开合成词，不使用真实输入历史。基线变差必须由权重/语义变更说明解释，不能只凭主观体验接受。
 - 候选重排延迟使用固定候选数、固定迭代次数和 warm-up 记录可复验统计；CI 只校验结果、样本规模与统计值有限，不使用易受共享机器波动影响的严苛墙钟上限。
 
-R02L 按上述口径建立了 schema v3 学习语义与固定测试基线：5 个公开合成 case 的 Top-1 为 `0.8`、Top-3 为 `1.0`、MRR 为 `0.9`；延迟样本固定为 50 个候选、100 次 warm-up 和 1000 次计时迭代。当前 schema v4 只增加不进入同步 payload 的本地导入批次关联，不改变这些学习、排序和删除语义。该基线只证明本地正确性与可复验性；产品 runtime 自动化不能替代真实平台纵向证据，具体机器观测与全仓门禁记录在对应验收材料。
+R02L 按上述口径建立了 schema v3 学习语义与固定测试基线：5 个公开合成 case 的 Top-1 为 `0.8`、Top-3 为 `1.0`、MRR 为 `0.9`；延迟样本固定为 50 个候选、100 次 warm-up 和 1000 次计时迭代。schema v4 增加不进入同步 payload 的本地导入批次关联，v5 至 v9 增加同步 orchestration、可信公开 lifecycle、wrapped epoch ciphertext 与 recovery lifecycle 持久化；这些扩展不改变既有学习、排序和删除语义。该基线只证明本地正确性与可复验性；产品 runtime 自动化不能替代真实平台纵向证据，具体机器观测与全仓门禁记录在对应验收材料。
 
 默认验证入口：
 

@@ -35,12 +35,21 @@ RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支�
 - [Rime Adapter](docs/engine-rime-adapter.md)：librime adapter 与 native smoke。
 - [个人化学习](docs/personalization-learning.md)：userdb、ranker、反馈和词库管理。
 - [FFI Boundary](docs/ffi-boundary.md)：C ABI、所有权、线程和错误语义。
+- [Manager 同步产品状态](docs/manager-sync-product-status.md)：ABI v6 status-only 字段、blocker 和隐私 allowlist。
 - [macOS InputMethodKit](docs/macos-inputmethodkit-boundary.md)：第一平台的 runtime、按键链、目录和验收边界。
 - [同步密钥管理](docs/sync-key-management.md)：设备、授权、恢复、撤销和 key epoch。
 - [Sync Server API/Storage](docs/sync-server-api-storage.md)：Go API、metadata、blob 和错误语义。
 - [Manager Boundary](docs/manager-ui-boundary.md)：Flutter manager 职责与数据可见性。
 
 更细的 ADR、runbook 和协议专题从上述入口按任务进入。临时整改或发布专题只有被 `docs/status/current.md` 引用时才进入日常阅读链。
+
+核心组件的就地开发说明：
+
+- [Rust 同步客户端](crates/ime-sync/README.md)：cycle 编排、产品密码装载、transport 和验证入口。
+- [Go 同步服务](server/sync-server/README.md)：服务边界、配置、存储和开发验证。
+- [同步服务部署](deploy/sync-server/README.md)：本地 HTTPS 与自部署反向代理拓扑。
+- [Flutter Manager](apps/radishlex-manager/README.md)：页面能力、FFI bridge、产品路径和本地验证。
+- [macOS InputMethodKit](platforms/macos-imk/README.md)：平台薄壳、构建、安装与实机验收边界。
 
 ## 开发验证入口
 

@@ -21,17 +21,20 @@ RadishLex/
     ime-ranker/
     ime-userdb/
     ime-sync/
+      README.md
     ime-crypto/
     ime-ffi/
     ime-cli/
   server/
     sync-server/
+      README.md
       cmd/
       internal/
       migrations/
       Dockerfile
   deploy/
     sync-server/
+      README.md
       docker-compose.local.yaml
       docker-compose.yaml
       nginx.prod.conf
@@ -176,6 +179,8 @@ SQLite 用户数据层：
 
 不得提供 plaintext 远端上传入口。
 
+模块、产品密码端口、cycle 数据流和开发验证入口见 [ime-sync 组件说明](../crates/ime-sync/README.md)。
+
 ### ime-ffi
 
 C ABI 与 host contract：
@@ -206,6 +211,7 @@ CLI 不作为平台壳或 manager 的运行时依赖。
 
 ```text
 server/sync-server/
+  README.md                     component boundary and development entry
   cmd/radishlex-sync-server/   executable assembly
   internal/api/                HTTP routing and DTO mapping
   internal/config/             environment configuration
@@ -221,6 +227,8 @@ server/sync-server/
 - `runtime` 负责 timeout、shutdown、audit 和依赖装配。
 - `cmd` 保持薄，只处理启动、配置和退出码。
 - 默认单用户 SQLite，自部署优先，不提前拆微服务或多租户。
+
+服务配置、schema、日志脱敏和测试入口见 [Go 同步服务说明](../server/sync-server/README.md)；API 与 storage 的规范性字段参考仍以 [Sync Server API/Storage](sync-server-api-storage.md) 为准。部署目录的两种拓扑和 secret 边界见 [同步服务部署说明](../deploy/sync-server/README.md)。
 
 ## Flutter manager
 

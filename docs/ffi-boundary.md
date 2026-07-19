@@ -60,6 +60,10 @@ RadishLexError*
 
 Apple 产品验证使用独立原生自检结构：普通 DPK 的 `radishlex_apple_p256_product_status/smoke` 分别使用 status schema v1 与 smoke schema v4；Secure Enclave signing 的 `radishlex_apple_secure_enclave_p256_product_status/smoke` 分别使用独立 status schema v1 与 smoke schema v1；Secure Enclave key-agreement 另用 `radishlex_apple_secure_enclave_key_agreement_product_status/smoke`，不得继承 signing 资格。三组 status 都是 metadata-only；smoke 只有 manager 产品进程显式场景与各自环境门同时满足才执行。key-agreement 使用独立固定摘要，只返回错误分类、数值 OSStatus、wrapped epoch 往返与 cleanup 布尔值，不返回 CFError 文本、private/public key、shared secret、wrapping key、master key、nonce 或 ciphertext。Dart dynamic binding、`ManagerBridge` 和 Flutter method channel 不得直接声明或调用这些 validation symbol；Dart 只绑定 ABI v6 的脱敏业务摘要。
 
+### Manager sync product status
+
+`radishlex_manager_sync_product_status` 是 ABI v6 的 status-only 入口，只返回固定 enum/boolean 产品摘要，不创建、读取、使用或删除平台 key item。signing 与 key-agreement 资格必须独立表达，组合 `product_qualified` 不能自动打开 `user_sync_enabled`。完整结构、常量、blocker 优先级、隐私 allowlist 和 Dart binding 检查见 [Manager 同步产品状态参考](manager-sync-product-status.md)。
+
 ### Status 与文本 view
 
 `RadishLexStatusCode`：
