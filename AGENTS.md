@@ -29,10 +29,10 @@
 
 ## 快速认知
 
-- 当前阶段：M3 加密同步 Beta；主批次为设备签名 profile 与 macOS 私钥 backend，实时状态见 `docs/status/current.md`
-- 当前代码状态：macOS 离线 Alpha 与 M2 本地个人化 MVP 已完成；密文同步基础已落地，生产私钥 backend、产品 orchestration 与部署证据未闭环
+- 当前阶段：M4 产品发布候选；首批先固定 macOS 产品包、数据迁移、升级回滚与发布门禁边界，实时状态见 `docs/status/current.md`
+- 当前代码状态：macOS 离线 Alpha、M2 本地个人化 MVP 与 M3 加密同步 Beta 已完成；真实用户同步继续关闭，产品安装包与发布供应链尚未闭环
 - 当前交付：工程原型，不是可安装 MVP；阶段证据以真实输入、数据正确性、安全同步和产品构建为准
-- 交付梯度：macOS 离线 Alpha 与本地个人化 MVP 已完成；推进 M3 加密同步，产品包属于 M4
+- 交付梯度：macOS 离线 Alpha、本地个人化 MVP 与 M3 加密同步 Beta 已完成；当前推进 M4 产品包
 - 第一真实平台：macOS InputMethodKit；Linux Fcitx5 与 Android 后续，Windows、iOS 后置
 - 底层引擎策略：v1 可接 `librime`，但必须通过 engine adapter 隔离；长期保留 Rust 自研引擎替换空间
 - 隐私立场：服务端默认不可信，客户端才是数据真相源
@@ -162,7 +162,7 @@
 - `scripts/`：仓库检查、格式和构建脚本
 - `tests/fixtures/`：跨模块合成 fixture
 
-尚未落地：Linux/Windows/iOS 平台壳、完整 Android IME、`examples/`；M2 manager 已完成，生产同步与产品包尚未闭合。
+尚未落地：Linux/Windows/iOS 平台壳、完整 Android IME、`examples/`；M3 已完成，真实用户同步仍关闭，M4 产品包尚未闭合。
 
 ## 架构边界
 

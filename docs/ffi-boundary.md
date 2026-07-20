@@ -4,9 +4,9 @@
 
 ## 稳定定位
 
-`ime-ffi` 是 Rust 输入 runtime、平台输入法壳和 Flutter manager 的唯一稳定跨语言边界。平台按键入口必须无损返回 `KeyOutcome` 的 `consumed`、可选即时 commit 与同一事件后的 snapshot；只返回状态码再单独查询状态不能作为真实平台契约。
+`ime-ffi` 是 Rust 输入 runtime、平台输入法壳和 Flutter manager 的唯一稳定跨语言边界。平台按键入口必须无损返回 `KeyOutcome` 的 `consumed`、可选即时 commit 与同一事件后的 snapshot；只返回状态码再单独查询状态不能作为真实平台契约。Manager 同步资格执行由 `ime-sync-runtime` 组合网络、crypto 与 userdb，`ime-ffi` 只校验/复制版本化参数并包装 Rust-owned handle，不能自行实现同步状态机或直接连接 Go server。
 
-平台壳只能通过 FFI 调用 Rust runtime，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。M3 真实领域模型、secret 生命周期和本地 HTTPS 已具备实现证据；下一批允许增加与普通用户同步入口明确隔离的 Manager 资格执行 ABI，但必须先固定 opaque run 所有权、单次运行、取消/超时、transient 参数和脱敏结果契约。approval、preview、migration review 和 no-symbol 证明不属于生产 ABI。Apple P-256 产品 validation ABI 是例外的受控自检面：普通 DPK 与 Secure Enclave 使用独立 symbol/environment gate，只返回固定 capability/lifecycle flags，不执行真实同步，也不直接进入 Dart binding。ABI v6 另增一条不带入参、不访问系统条目的 `radishlex_manager_sync_product_status`，只把 allowlist 产品状态送入现有 Manager snapshot；它不是同步命令，不能打开产品 gate。平台绑定层调用规则见 `docs/runbooks/ffi-platform-call-contract.md`。
+平台壳只能通过 FFI 调用 Rust runtime，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。M3 的 ABI v7 已增加与普通用户同步入口隔离的 Manager 本地合成资格 run，固定 opaque handle、单次运行、取消/超时、transient 参数和脱敏结果；它不能打开产品 gate。approval、preview、migration review 和 no-symbol 证明不属于生产 ABI。Apple P-256 产品 validation ABI 是例外的受控自检面：普通 DPK 与 Secure Enclave 使用独立 symbol/environment gate，只返回固定 capability/lifecycle flags，不执行真实同步，也不直接进入 Dart binding。ABI v7 继续保留不带入参、不访问系统条目的 `radishlex_manager_sync_product_status`，只把 allowlist 产品状态送入现有 Manager snapshot。平台绑定层调用规则见 `docs/runbooks/ffi-platform-call-contract.md`。
 
 ## 职责边界
 
@@ -56,13 +56,15 @@ RadishLexError*
 
 ### FFI contract
 
-`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v6 保留 v5 的 `import_batch_id` 与全部既有布局，并增加 Manager status-only 产品摘要 symbol。产品绑定必须同时校验 contract 与所需 symbol 集。当前 `session_thread_policy = owner_thread`，表示 `RadishLexSession*` 只能在创建线程使用；跨线程调用返回 `InvalidState`，无 `error_out` 的 session 读取入口返回空值。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
+`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v7 保留 v6 的 Manager status-only 摘要与全部既有布局，并增加资格 request/snapshot、opaque run 与 start/poll/cancel/free。产品绑定必须同时校验 contract 与所需 symbol 集。当前 `session_thread_policy = owner_thread` 仍只约束 `RadishLexSession*`；资格 run 为 caller-serialized，可在异步轮询之间迁移线程，但 start/poll/cancel/free 不得由调用方并发，`free` 不得与其他调用重叠。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
 
-Apple 产品验证使用独立原生自检结构：普通 DPK 的 `radishlex_apple_p256_product_status/smoke` 分别使用 status schema v1 与 smoke schema v4；Secure Enclave signing 的 `radishlex_apple_secure_enclave_p256_product_status/smoke` 分别使用独立 status schema v1 与 smoke schema v1；Secure Enclave key-agreement 另用 `radishlex_apple_secure_enclave_key_agreement_product_status/smoke`，不得继承 signing 资格。三组 status 都是 metadata-only；smoke 只有 manager 产品进程显式场景与各自环境门同时满足才执行。key-agreement 使用独立固定摘要，只返回错误分类、数值 OSStatus、wrapped epoch 往返与 cleanup 布尔值，不返回 CFError 文本、private/public key、shared secret、wrapping key、master key、nonce 或 ciphertext。Dart dynamic binding、`ManagerBridge` 和 Flutter method channel 不得直接声明或调用这些 validation symbol；Dart 只绑定 ABI v6 的脱敏业务摘要。
+Apple 产品验证使用独立原生自检结构：普通 DPK 的 `radishlex_apple_p256_product_status/smoke` 分别使用 status schema v1 与 smoke schema v4；Secure Enclave signing 的 `radishlex_apple_secure_enclave_p256_product_status/smoke` 分别使用独立 status schema v1 与 smoke schema v1；Secure Enclave key-agreement 另用 `radishlex_apple_secure_enclave_key_agreement_product_status/smoke`，不得继承 signing 资格。三组 status 都是 metadata-only；smoke 只有 manager 产品进程显式场景与各自环境门同时满足才执行。key-agreement 使用独立固定摘要，只返回错误分类、数值 OSStatus、wrapped epoch 往返与 cleanup 布尔值，不返回 CFError 文本、private/public key、shared secret、wrapping key、master key、nonce 或 ciphertext。Dart dynamic binding、`ManagerBridge` 和 Flutter method channel 不得直接声明或调用这些 validation symbol；Dart 只绑定 ABI v7 的脱敏业务摘要和隔离资格 run。
 
 ### Manager sync product status
 
-`radishlex_manager_sync_product_status` 是 ABI v6 的 status-only 入口，只返回固定 enum/boolean 产品摘要，不创建、读取、使用或删除平台 key item。signing 与 key-agreement 资格必须独立表达，组合 `product_qualified` 不能自动打开 `user_sync_enabled`。完整结构、常量、blocker 优先级、隐私 allowlist 和 Dart binding 检查见 [Manager 同步产品状态参考](manager-sync-product-status.md)。
+`radishlex_manager_sync_product_status` 是 ABI v7 保留的 status-only 入口，只返回固定 enum/boolean 产品摘要，不创建、读取、使用或删除平台 key item。signing 与 key-agreement 资格必须独立表达，组合 `product_qualified` 不能自动打开 `user_sync_enabled`。完整结构、常量、blocker 优先级、隐私 allowlist 和 Dart binding 检查见 [Manager 同步产品状态参考](manager-sync-product-status.md)。
+
+`RadishLexManagerSyncQualificationRequest` 只接受 version、loopback HTTPS endpoint、一次性 bearer token byte view、可选本地 CA DER byte view 和受限 timeout；start 在返回前由 Rust 复制输入。`RadishLexManagerSyncQualificationSnapshot` 只包含固定 state/phase/error enum、对象计数和清理 flags，不返回路径、HTTP body、payload 或合成身份。`free` 会取消未终止运行、join worker 并释放 handle；Dart 必须先复制最终 snapshot，再串行释放。
 
 ### Status 与文本 view
 

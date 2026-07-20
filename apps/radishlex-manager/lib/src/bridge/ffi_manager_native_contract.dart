@@ -2,6 +2,7 @@ import 'ffi_manager_native_dictionary.dart';
 import 'ffi_manager_native_learning.dart';
 import 'ffi_manager_native_rank.dart';
 import 'ffi_manager_native_sync.dart';
+import 'dart:typed_data';
 import 'manager_bridge.dart';
 
 abstract interface class RadishLexManagerNativeBinding {
@@ -44,6 +45,13 @@ abstract interface class RadishLexManagerNativeBinding {
   NativeSyncPreflightSummary syncPreflight(String dbPath);
 
   NativeSyncProductStatus syncProductStatus();
+
+  NativeSyncQualificationRun startSyncQualification({
+    required String endpoint,
+    required Uint8List accessToken,
+    required Uint8List? localCaDer,
+    required int timeoutMs,
+  });
 
   NativeRankExplainSummary rankExplain({
     required String dbPath,

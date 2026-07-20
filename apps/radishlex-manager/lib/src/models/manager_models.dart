@@ -5,3 +5,4 @@ export 'manager_settings_models.dart';
 export 'manager_sync_entry_models.dart';
 export 'manager_snapshot.dart';
 export 'manager_sync_models.dart';
+export 'manager_sync_qualification_models.dart';

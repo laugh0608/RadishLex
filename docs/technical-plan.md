@@ -39,6 +39,7 @@ ime-engine-rime                 ime-sync + ime-crypto
 
 Flutter Manager
   -> controlled manager bridge / ime-ffi
+  -> ime-sync-runtime product composition
   -> local settings, dictionary, diagnostics, device and sync management
 ```
 
@@ -151,6 +152,17 @@ P1 原始事件只在本地用于学习，不得通过 FFI 管理接口或同步
 - transport trait 与生产 HTTPS 实现。
 
 同步 merge 必须包含本地当前状态，并定义与输入顺序无关的稳定版本顺序。至少使用 key epoch、逻辑时钟或对象版本、device ID 和确定性 tie-break；测试必须覆盖交换律、结合律和幂等性。
+
+### ime-sync-runtime
+
+`ime-sync-runtime` 是 Manager 同步执行的产品组合层，依赖 `ime-sync`、`ime-userdb` 与 `ime-crypto` 的稳定公开边界：
+
+- 组合 HTTPS transport、同步 orchestration、crypto provider 和文件型 userdb；
+- 管理 Rust-owned run、worker、取消、超时和临时资源生命周期；
+- 为受控资格执行生成隔离合成身份与 P2 数据，不能接受调用方提供 payload、userdb 路径、device/domain/key id 或 key material；
+- 只向 FFI 返回固定 phase/outcome/error、受限计数与清理结果，不返回 HTTP body、路径、身份、payload 或 secret。
+
+该 crate 不进入输入热路径，不承载 C ABI、Flutter 状态或 Go server DTO。`ime-sync` 不反向依赖 `ime-userdb`，`ime-ffi` 也不直接建立网络和数据库组合；真实用户同步开放前，资格 provider 必须与生产 backend 明确区分并保持 `user_sync_enabled=false`。
 
 ### ime-ffi
 

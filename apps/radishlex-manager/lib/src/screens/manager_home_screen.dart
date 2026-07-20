@@ -63,6 +63,7 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
           onPreviewDiagnostics: actions.previewDiagnostics,
           onExportDiagnostics: actions.exportDiagnostics,
           onSaveSettingsDraft: actions.saveSettingsDraft,
+          onStartSyncQualification: widget.bridge.startSyncQualification,
           onImportSyncReadinessSummary: (readinessBridgeSnapshot) =>
               _setSnapshot(
                 managerSnapshotWithSyncReadiness(data, readinessBridgeSnapshot),
@@ -110,6 +111,7 @@ class _ManagerShell extends StatelessWidget {
     required this.onPreviewDiagnostics,
     required this.onExportDiagnostics,
     required this.onSaveSettingsDraft,
+    required this.onStartSyncQualification,
     required this.onImportSyncReadinessSummary,
   });
 
@@ -124,6 +126,10 @@ class _ManagerShell extends StatelessWidget {
   final VoidCallback onPreviewDiagnostics;
   final VoidCallback onExportDiagnostics;
   final ValueChanged<ManagerSettingsDraft> onSaveSettingsDraft;
+  final ManagerSyncQualificationRun Function(
+    ManagerSyncQualificationRequest request,
+  )
+  onStartSyncQualification;
   final ValueChanged<ManagerSyncReadinessBridgeSnapshot>
   onImportSyncReadinessSummary;
 
@@ -138,7 +144,11 @@ class _ManagerShell extends StatelessWidget {
         onExportDictionary: onExportDictionary,
       ),
       LearningView(snapshot: snapshot),
-      SyncView(sync: snapshot.sync, settingsDraft: snapshot.settings.draft),
+      SyncView(
+        sync: snapshot.sync,
+        settingsDraft: snapshot.settings.draft,
+        onStartQualification: onStartSyncQualification,
+      ),
       SettingsView(
         settings: snapshot.settings,
         sync: snapshot.sync,

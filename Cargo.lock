@@ -663,6 +663,7 @@ dependencies = [
  "radishlex-ime-engine-rime",
  "radishlex-ime-ranker",
  "radishlex-ime-runtime",
+ "radishlex-ime-sync-runtime",
  "radishlex-ime-userdb",
 ]
 
@@ -697,6 +698,20 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "webpki-roots",
+ "zeroize",
+]
+
+[[package]]
+name = "radishlex-ime-sync-runtime"
+version = "0.1.0"
+dependencies = [
+ "base64ct",
+ "radishlex-ime-crypto",
+ "radishlex-ime-sync",
+ "radishlex-ime-userdb",
+ "serde",
+ "serde_json",
+ "zeroize",
 ]
 
 [[package]]

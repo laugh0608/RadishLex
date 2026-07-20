@@ -48,6 +48,10 @@ required_symbols=(
   _radishlex_apple_secure_enclave_key_agreement_product_status
   _radishlex_ffi_contract
   _radishlex_manager_sync_product_status
+  _radishlex_manager_sync_qualification_start
+  _radishlex_manager_sync_qualification_poll
+  _radishlex_manager_sync_qualification_cancel
+  _radishlex_manager_sync_qualification_free
   _radishlex_userdb_terms_new
   _radishlex_userdb_deleted_terms_new
   _radishlex_userdb_delete_term

@@ -6,7 +6,7 @@
 
 - 当前 Manager 只展示同步配置草案、本地 readiness、连接健康摘要、恢复与设备流程的不可用原因。
 - 真实远端同步、恢复码生成与输入、设备加入授权、设备撤销和密钥轮换没有产品执行入口。
-- `ManagerBridge` 当前不提供上述同步命令；缺少能力本身就是产品关闭证据，不使用 future command preview 或审批状态机模拟接口。
+- `ManagerBridge` 当前不提供真实用户同步、恢复、授权、撤销或轮换命令；唯一新增的执行能力是下述 loopback HTTPS 合成资格 run，不能解锁任何产品入口。
 - 即使 endpoint、平台 backend、部署证据和 readiness 摘要均显示 ready，用户同步入口仍保持关闭，直到 M3 退出条件满足。
 - manager Release native library 可以包含普通 DPK、Secure Enclave signing 与独立 Secure Enclave key-agreement backend，以及只返回固定 flags 的相互独立产品 validation ABI；这些底层 validation ABI 不直接进入 Dart binding。Manager 只通过下述独立 status-only 业务摘要读取脱敏结果，不能据此解锁按钮。
 
@@ -61,7 +61,7 @@ Manager 不可以：
 - diagnostics 只记录“已配置 / 未配置”、状态码和脱敏错误类别，不记录明文或可逆摘要。
 - Rust / FFI / Dart 的所有权、复制、释放、线程和 panic 边界必须在真实命令实现时由真实 contract test 验证。
 
-当前 Manager 没有恢复码、短码、私钥、签名或 wrapped material 的输入字段与执行方法；设置文件只保存 `access_token_configured` 布尔值，不保存 token 文本。
+当前 Manager 没有恢复码、短码、私钥、签名或 wrapped material 的输入字段与执行方法；设置文件只保存 `access_token_configured` 布尔值，不保存 token 文本。资格 modal 可接受一次性 bearer token 与可选 CA DER 路径，但 controller、Dart buffer、FFI copy 和 Rust transport copy 均限制在单次 run，并在提交、取消、失败或完成后清除；路径和 bytes 不进入结果或诊断。
 
 Apple P-256 产品进程 gated smoke 只由五个显式命令行场景之一与环境门触发：DPK 正常生命周期、预期 denied 创建、locked 前置、locked 签名探测、解锁后清理。正常生命周期和前置场景在 native 内使用 synthetic canonical/signature 并完成 Rust 验签；正常生命周期额外调用短生命周期 Go verifier。smoke schema v4 返回 Swift 的只有固定 scenario、result、error category/detail、数值 OSStatus 和布尔摘要，不含 CFError 文本。private key、public key、canonical bytes、signature bytes 不得进入 Dart、Flutter method channel、settings 或 diagnostics。普通 manager 启动不访问该 Keychain 路径；脚本不锁定、解锁或改写 Keychain 搜索列表；InputMethodKit 不参与同步密钥或签名。
 
@@ -81,9 +81,11 @@ Secure Enclave key-agreement 再使用一组独立 status/smoke symbol、环境�
 
 Rust orchestration、严格 HTTPS transport 与生产 backend 主路径资格已稳定，可以在 Manager 普通入口继续禁用时设计受控资格命令接口。该接口必须直接复用现有 Rust sync / crypto API、只接受 transient 参数并证明取消/重启/脱敏；不恢复已归档的 review-only DTO 或审批目录。
 
-## 下一开发批：Manager 本地 HTTPS 同步资格执行
+跨模块产品组合固定进入 `ime-sync-runtime`：`ime-sync` 保持协议、transport 与 orchestration 真相源，`ime-userdb` 保持 SQLite repository 真相源，`ime-ffi` 只包装 run handle。输入用 `ime-runtime` 继续不依赖远端同步；不得为减少一个 crate 把网络执行塞进输入热路径或 ABI 文件。
 
-下一开发批不是连接真实用户数据的同步开关，而是由真实 Manager bridge 发起、Rust 完整执行的本地 HTTPS 合成资格流程。它必须同时覆盖编排复用、FFI 所有权、transient secret、取消/重启、Manager 交互和产品构建，不能用独立脚本结果或只读 preview 代替。
+## 已完成批次：Manager 本地 HTTPS 同步资格执行
+
+该批次不是连接真实用户数据的同步开关，而是由真实 Manager bridge 发起、Rust 完整执行的本地 HTTPS 合成资格流程。runner、跨进程单运行与重启清理、ABI v7、Dart bridge、Manager 交互、Release bundle 和真实短生命周期 Caddy 正向链均已落地；资格摘要仍不能作为 readiness/deployment evidence 或用户同步开放依据。
 
 执行边界固定如下：
 

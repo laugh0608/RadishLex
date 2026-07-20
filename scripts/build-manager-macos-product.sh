@@ -25,4 +25,15 @@ fi
 codesign --verify --deep --strict "${app_bundle}"
 file "${native_library}"
 otool -L "${native_library}"
+for symbol in \
+  _radishlex_manager_sync_product_status \
+  _radishlex_manager_sync_qualification_start \
+  _radishlex_manager_sync_qualification_poll \
+  _radishlex_manager_sync_qualification_cancel \
+  _radishlex_manager_sync_qualification_free; do
+  if ! nm -gU "${native_library}" | grep -Eq "(^|[[:space:]])${symbol}$"; then
+    echo "manager product native library is missing required symbol: ${symbol}" >&2
+    exit 1
+  fi
+done
 echo "RadishLex manager product bundle: ${app_bundle}"

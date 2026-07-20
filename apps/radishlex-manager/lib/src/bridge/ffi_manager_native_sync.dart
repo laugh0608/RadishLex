@@ -63,3 +63,49 @@ final class NativeSyncProductStatus {
   final int userSyncEnabled;
   final int blocker;
 }
+
+abstract interface class NativeSyncQualificationRun {
+  NativeSyncQualificationSnapshot poll();
+
+  bool cancel();
+
+  void dispose();
+}
+
+final class NativeSyncQualificationSnapshot {
+  const NativeSyncQualificationSnapshot({
+    required this.version,
+    required this.state,
+    required this.phase,
+    required this.discovered,
+    required this.downloaded,
+    required this.applied,
+    required this.uploaded,
+    required this.conflicts,
+    required this.retries,
+    required this.convergenceRounds,
+    required this.temporaryFilesCleaned,
+    required this.workerStopped,
+    required this.transientInputsCleared,
+    required this.errorCode,
+    required this.errorPhase,
+    required this.errorRetryable,
+  });
+
+  final int version;
+  final int state;
+  final int phase;
+  final int discovered;
+  final int downloaded;
+  final int applied;
+  final int uploaded;
+  final int conflicts;
+  final int retries;
+  final int convergenceRounds;
+  final int temporaryFilesCleaned;
+  final int workerStopped;
+  final int transientInputsCleared;
+  final int errorCode;
+  final int errorPhase;
+  final int errorRetryable;
+}

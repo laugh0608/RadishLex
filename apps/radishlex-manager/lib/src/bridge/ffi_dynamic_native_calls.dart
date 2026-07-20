@@ -90,6 +90,30 @@ T _withOptionalNativeString<T>(
   return _withNativeString(value, run);
 }
 
+T _withNativeBytes<T>(
+  Uint8List value,
+  T Function(ffi.Pointer<ffi.Uint8>, int) run,
+) {
+  final pointer = calloc<ffi.Uint8>(value.length);
+  try {
+    pointer.asTypedList(value.length).setAll(0, value);
+    return run(pointer, value.length);
+  } finally {
+    pointer.asTypedList(value.length).fillRange(0, value.length, 0);
+    calloc.free(pointer);
+  }
+}
+
+T _withOptionalNativeBytes<T>(
+  Uint8List? value,
+  T Function(ffi.Pointer<ffi.Uint8>, int) run,
+) {
+  if (value == null) {
+    return run(ffi.nullptr.cast<ffi.Uint8>(), 0);
+  }
+  return _withNativeBytes(value, run);
+}
+
 String _readStringView(_RadishLexStringView view) {
   if (view.len == 0) {
     return '';

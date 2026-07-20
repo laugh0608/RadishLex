@@ -8,6 +8,7 @@ members = [
     "crates/ime-ranker",
     "crates/ime-runtime",
     "crates/ime-sync",
+    "crates/ime-sync-runtime",
     "crates/ime-userdb",
 ]
 resolver = "2"

@@ -22,6 +22,7 @@ RadishLex/
     ime-userdb/
     ime-sync/
       README.md
+    ime-sync-runtime/
     ime-crypto/
     ime-ffi/
     ime-cli/
@@ -86,10 +87,10 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v6 隐私/索引/学习状态、本地导入批次关联与 Manager 产品状态摘要、deleted tombstone 管理查询、精确 case inspection、隔离非选择 snapshot、R01B 与 manager/InputMethodKit 共库证据 | M3 同步命令仍关闭；M4 发布包复验 |
+| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v7 隐私/索引/学习状态、Manager 产品状态与隔离资格 run、deleted tombstone 管理查询、精确 case inspection、隔离非选择 snapshot、R01B 与 manager/InputMethodKit 共库证据 | M4 产品包、版本兼容与发布复验 |
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
 | 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS | Manager 受控资格执行链、用户入口退出评审、首版后的发布级目标部署 |
-| Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、widget/FFI/产品与实机门禁 | M3 受控资格执行链与用户入口退出评审；M4 发布分发 |
+| Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁 | M4 发布分发、容器迁移与升级回滚 |
 | 平台 | macOS InputMethodKit 薄壳、contract/native bundle、R01A build 32 与 R01B build 34 实机退出、生产 LearningContext、privacy/清理 contract 与隔离 ValidationHost；Android Keystore 能力验证桥 | M4 产品安装包；其他系统输入法 |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
@@ -180,6 +181,17 @@ SQLite 用户数据层：
 不得提供 plaintext 远端上传入口。
 
 模块、产品密码端口、cycle 数据流和开发验证入口见 [ime-sync 组件说明](../crates/ime-sync/README.md)。
+
+### ime-sync-runtime
+
+Manager 同步产品组合层：
+
+- 组合 `ime-sync` orchestration/HTTPS、`ime-userdb` repository 与 `ime-crypto` provider
+- 管理 Rust-owned qualification run、worker、取消、超时与临时目录
+- 生成隔离合成双客户端身份和固定 P2 数据
+- 输出固定脱敏 phase/result/error/count/cleanup 摘要
+
+不得承载 C ABI、Flutter 状态、真实用户入口 gate 或输入热路径。资格运行不得触碰真实 userdb、Keychain/Secure Enclave，也不得把 test backend 冒充生产 backend。
 
 ### ime-ffi
 

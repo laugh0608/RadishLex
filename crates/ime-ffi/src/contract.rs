@@ -1,6 +1,6 @@
-/// ABI contract v6 preserves v5 local import-batch provenance and adds the
-/// status-only Manager sync product summary.
-pub const RADISHLEX_ABI_CONTRACT_VERSION: u32 = 6;
+/// ABI contract v7 preserves v6 Manager product status and adds the isolated
+/// local HTTPS sync qualification run handle.
+pub const RADISHLEX_ABI_CONTRACT_VERSION: u32 = 7;
 pub const RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD: u32 = 1;
 pub const RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND: u32 = 1;
 

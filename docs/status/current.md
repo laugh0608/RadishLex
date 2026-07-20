@@ -4,17 +4,17 @@
 
 ## 当前判断
 
-- 复核日期：2026-07-19（Asia/Shanghai）
+- 复核日期：2026-07-20（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
-- 当前产品里程碑：M3 端到端加密同步 Beta
-- 当前产品主批次：macOS signing/key-agreement 产品资格已按单平台主路径闭合；下一批转入本地 HTTPS 下的 Manager 受控资格链
-- 已完成：M0 工程基础、M1 macOS 离线输入 Alpha、M2 本地个人化 MVP；R00、R01A、R02L、R01B、R06A 已退出
+- 当前产品里程碑：M4 产品发布候选
+- 当前产品主批次：M3 端到端加密同步 Beta 已退出；M4 先固定 macOS 产品包、数据迁移、升级回滚与发布门禁边界
+- 已完成：M0 工程基础、M1 macOS 离线输入 Alpha、M2 本地个人化 MVP、M3 端到端加密同步 Beta；R00、R01A、R02L、R01B、R06A 已退出
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；合成数据、短生命周期服务与受控集成测试可以继续
 
 M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
-## M3 当前边界
+## M3 退出结论
 
 M3 已具备 P2 envelope、signed manifest、Go 密文服务与关闭态 `sync_once`。对象 `change_sequence` 与设备 `lifecycle_sequence` 隔离；userdb schema v9 原子持久化 cursor、journal/outbox、可信公开 lifecycle 和 wrapped ciphertext cache，不保存明文 master key。失败不推进 cursor、不清除 dirty；`409 stale_base_version` 必须重新发现、验签解密、合并并签名。
 
@@ -28,25 +28,27 @@ A/B/C Go HTTP 已证明 B 撤销后仅 A/C 取得 epoch 2，历史/当前 epoch 
 
 Apple signing/key-agreement adapters 已接线。独立 key-agreement ABI、六场景调度与脱敏摘要已落地。ad-hoc denied 返回 missing-entitlement `-34018`；Team/profile 资格 bundle 下 lifecycle 完成 fresh public key、ECDH、wrapped epoch 往返、删除与 missing，设备锁定态返回 `PrivateKeyLocked/-25308`，解锁 cleanup 零残留。普通 DPK 可导出而被拒；两条 Secure Enclave backend 已按一个受支持 macOS 设备的真实主路径评审为 product qualified，unsupported 保留为延期兼容性补测。
 
-Manager ABI v6 的 `radishlex_manager_sync_product_status` 只读固定数值 capability，不访问系统 key item。默认构建显示 signing 未编译，macOS 产品构建显示 signing/key-agreement 与组合 backend 已获产品资格，但 blocker 固定为 `user_sync_closed_current_phase`；畸形或自称开启同步的 native 状态降级为 `native_sync_product_status_invalid`。gate 始终 blocked，底层 Apple validation 不直接进入 Dart，也没有新增同步命令。
+Manager ABI v7 保留只读 `radishlex_manager_sync_product_status`，并新增隔离的本地合成资格 start/poll/cancel/free。`ime-sync-runtime` 复用现有 transport/orchestration/userdb/crypto，以唯一合成 domain/device/P2 在临时双客户端中验证冲突恢复与两轮收敛；请求只接受 loopback HTTPS、一次性 token、可选 CA DER 和受限 timeout，不触碰真实 userdb 或平台 key item。Dart 对 enum/flag/成功条件失败关闭，UI 与“启用同步”分区；token/CA 在各层清除，结果不进入 settings/readiness/diagnostics。产品摘要 blocker 仍固定为 `user_sync_closed_current_phase`，用户同步 gate 始终 blocked。
+
+真实 Caddy 门禁已完成 TLS、bearer 负向/授权响应、建域、双设备授权、v1/v2 上传、`conflict_stale_base_version`、A 重发现与 v3 上传、B 合并 v4、第二轮双方零上传、日志脱敏与 Compose 资源清零。跨进程 socket guard 保证同时仅一条资格 run；新进程只清理同用户、精确命名且 marker 匹配的旧工作区，覆盖异常退出后的重启清理，不扫描其他 temp 内容。M3 路线图退出项已闭环，但这些仍是合成/本地资格证据，不开放真实用户同步。
 
 平台 backend 外部资格已不再阻塞当前开发。开发者没有真实 unsupported 环境，现有支持设备不得模拟该证据；有合适目标时再按保留 harness 补测。锁屏链结束后的受限环境 trust 假象已由真实登录会话复核排除，同一冻结 hash bundle 严格验签通过。正式域名、公开证书和目标生产演练按产品决策后移到首版发布后；当前 `product_qualified=true`、`user_sync_enabled=false`。
 
 ## 当前停止线
 
-- M3 退出前不开放真实用户同步，不上传非受控真实 P2 数据，不提供恢复码、设备授权、撤销或轮换的产品成功入口。
+- 首个正式版本继续关闭真实用户同步，不上传非受控真实 P2 数据，不提供恢复码、设备授权、撤销或轮换的产品成功入口。
 - 不把 `test-memory-v1`、普通文件、SQLite、settings、generic password item 或可导出 seed 静默伪装成生产非导出 backend。
 - P0 永不学习/同步；P1 原始事件只留本地，不进入 payload、manager、诊断、日志或提交记录。
 - 输入热路径继续完全本地；Go server 不解密、不排序、不保存明文用户词或候选偏好。
-- M2 已通过第二平台选择门禁，但当前仍集中完成 M3 macOS 同步 Beta，不同时展开第二真实平台主线。
+- M2 已通过第二平台选择门禁，但当前集中完成 M4 macOS 产品发布候选，不同时展开第二真实平台主线。
 - M4 前不宣称普通用户安装包、最终 librime/schema 分发、App Group 迁移、公证或发布供应链已经完成。
 
 ## 下一步顺位
 
-1. 下一主批是 Manager 本地 HTTPS 同步资格执行：先在 `docs/manager-sync-entry-boundary.md` 固定的边界上完成 Rust-owned run handle、单次运行、start/poll/cancel/free、timeout、transient token/CA 和固定脱敏结果 contract。
-2. 资格 runner 必须复用现有 Rust orchestration/crypto/remote/userdb，内部生成隔离合成双客户端和 P2 数据，经真实 Caddy HTTPS 完成发现、验签解密、合并、上传、冲突处理和第二轮收敛；不得接受调用方 payload/key/path，也不得触发系统 key item。
-3. 在 Rust/FFI 稳定后接入真实 Dart bridge 与明确标识的 Manager 本地资格交互，覆盖取消、并发拒绝、重启、临时资源清理、错误脱敏和 Release bundle；普通用户成功入口与 `user_sync_enabled` 继续关闭。
-4. 在真实不支持 Secure Enclave 的环境可得时补测 signing/key-agreement unsupported；当前设备不得模拟，补测不阻塞上述开发。首个正式版本发布后、准备启用真实生产同步前，再补正式域名/证书和目标 `deployment_evidence.v1`。
+1. 先新增 M4 macOS 产品包边界文档，固定 InputMethodKit、manager、Rust dylib、`librime`、schema/data、App Support/App Group、版本兼容、签名公证、安装升级回滚与移除的职责和停止线；未完成该设计前不直接改产品目录或安装流程。
+2. 在边界评审后，优先闭合可重复产品构建与 bundle manifest/presence/ABI 兼容门禁，再设计 userdb/settings 从当前 Application Support 布局迁移到目标容器的原子迁移、回滚和双端复验；不得静默复制或破坏现有 M1/M2 数据。
+3. 普通用户成功入口、`user_sync_enabled`、恢复/授权/撤销/轮换继续关闭；M4 产品包不得因 M3 合成资格通过而默认启用网络同步。
+4. 在真实不支持 Secure Enclave 的环境可得时补测 signing/key-agreement unsupported；当前设备不得模拟。首个正式版本发布后、准备启用真实生产同步前，再补正式域名/证书和目标 `deployment_evidence.v1`。
 
 ## 验证入口
 
@@ -77,4 +79,4 @@ cmp -s AGENTS.md CLAUDE.md
 - [Manager 同步入口](../manager-sync-entry-boundary.md)：M3 UI/bridge 与 transient secret 边界。
 - [M2 manager 验收 runbook](../runbooks/macos-m2-manager-product-acceptance.md)：关闭证据与回滚流程。
 - [macOS 平台边界](../macos-inputmethodkit-boundary.md)：M1/M2 输入与隐私稳定结论。
-- [本周周志](../devlogs/2026-W29.md)：完整验证和交接流水。
+- [本周周志](../devlogs/2026-W30.md)：当前资格执行批次的验证和交接流水。

@@ -44,4 +44,11 @@ class UnavailableManagerBridge implements ManagerBridge {
   @override
   Future<ManagerSnapshot> saveSettingsDraft(ManagerSettingsDraft draft) =>
       Future.error(failure);
+
+  @override
+  ManagerSyncQualificationRun startSyncQualification(
+    ManagerSyncQualificationRequest request,
+  ) {
+    throw failure;
+  }
 }

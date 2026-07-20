@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:radishlex_manager/src/bridge/ffi_manager_dictionary_mapper.dart';
@@ -940,6 +941,16 @@ final class _FakeNativeBinding implements RadishLexManagerNativeBinding {
   }
 
   @override
+  NativeSyncQualificationRun startSyncQualification({
+    required String endpoint,
+    required Uint8List accessToken,
+    required Uint8List? localCaDer,
+    required int timeoutMs,
+  }) {
+    return const _FakeNativeSyncQualificationRun();
+  }
+
+  @override
   NativeRankExplainSummary rankExplain({
     required String dbPath,
     required String inputCode,
@@ -967,6 +978,39 @@ final class _FakeNativeBinding implements RadishLexManagerNativeBinding {
       negativeFeedbackPenalty: 0.0,
       suppressedPenalty: 0.0,
       deletedPenalty: 0.0,
+    );
+  }
+}
+
+final class _FakeNativeSyncQualificationRun
+    implements NativeSyncQualificationRun {
+  const _FakeNativeSyncQualificationRun();
+
+  @override
+  bool cancel() => false;
+
+  @override
+  void dispose() {}
+
+  @override
+  NativeSyncQualificationSnapshot poll() {
+    return const NativeSyncQualificationSnapshot(
+      version: 1,
+      state: 4,
+      phase: 12,
+      discovered: 3,
+      downloaded: 3,
+      applied: 3,
+      uploaded: 3,
+      conflicts: 1,
+      retries: 1,
+      convergenceRounds: 2,
+      temporaryFilesCleaned: 1,
+      workerStopped: 1,
+      transientInputsCleared: 1,
+      errorCode: 0,
+      errorPhase: 0,
+      errorRetryable: 0,
     );
   }
 }

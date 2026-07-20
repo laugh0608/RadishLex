@@ -167,7 +167,11 @@ for symbol in \
   _radishlex_apple_secure_enclave_p256_product_smoke \
   _radishlex_apple_secure_enclave_key_agreement_product_status \
   _radishlex_apple_secure_enclave_key_agreement_product_smoke \
-  _radishlex_manager_sync_product_status; do
+  _radishlex_manager_sync_product_status \
+  _radishlex_manager_sync_qualification_start \
+  _radishlex_manager_sync_qualification_poll \
+  _radishlex_manager_sync_qualification_cancel \
+  _radishlex_manager_sync_qualification_free; do
   if ! nm -gU "${native_library}" | grep -Eq "(^|[[:space:]])${symbol}$"; then
     echo "manager product native library is missing required symbol: ${symbol}" >&2
     exit 1

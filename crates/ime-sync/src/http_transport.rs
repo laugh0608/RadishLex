@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use rustls::pki_types::{CertificateDer, ServerName};
 use rustls::{ClientConfig, ClientConnection, RootCertStore, StreamOwned};
+use zeroize::Zeroizing;
 
 use crate::remote::{
     SyncRemoteError, SyncRemoteMethod, SyncRemoteRequest, SyncRemoteResponse, SyncRemoteTransport,
@@ -21,7 +22,7 @@ pub struct HttpSyncRemoteTransport {
     timeout: Duration,
     access_token: Option<BearerAccessToken>,
     device_identity: Option<HttpDeviceIdentity>,
-    additional_root_certificates: Vec<Vec<u8>>,
+    additional_root_certificates: Vec<Zeroizing<Vec<u8>>>,
 }
 
 impl fmt::Debug for HttpSyncRemoteTransport {
@@ -106,7 +107,8 @@ impl HttpSyncRemoteTransport {
             .map_err(|_| {
                 invalid_request_value("https transport root certificate is not valid DER")
             })?;
-        self.additional_root_certificates.push(certificate_der);
+        self.additional_root_certificates
+            .push(Zeroizing::new(certificate_der));
         Ok(self)
     }
 
@@ -186,7 +188,7 @@ impl HttpSyncRemoteTransport {
         roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
         for certificate in &self.additional_root_certificates {
             roots
-                .add(CertificateDer::from(certificate.clone()))
+                .add(CertificateDer::from(certificate.as_slice()))
                 .map_err(|_| transport_error("tls root configuration failed"))?;
         }
         let config = ClientConfig::builder()
@@ -205,7 +207,7 @@ impl HttpSyncRemoteTransport {
 }
 
 #[derive(Clone, PartialEq, Eq)]
-struct BearerAccessToken(String);
+struct BearerAccessToken(Zeroizing<String>);
 
 impl BearerAccessToken {
     fn new(access_token: String) -> Result<Self, SyncRemoteError> {
@@ -217,11 +219,11 @@ impl BearerAccessToken {
                 "http transport bearer access token must not contain whitespace",
             );
         }
-        Ok(Self(access_token))
+        Ok(Self(Zeroizing::new(access_token)))
     }
 
     fn as_str(&self) -> &str {
-        &self.0
+        self.0.as_str()
     }
 }
 

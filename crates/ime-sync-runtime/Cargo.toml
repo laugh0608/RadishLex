@@ -1,0 +1,21 @@
+[package]
+name = "radishlex-ime-sync-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../LICENSE"
+description = "Product sync execution runtime for RadishLex Manager."
+
+[lib]
+name = "radishlex_ime_sync_runtime"
+path = "src/lib.rs"
+
+[dependencies]
+base64ct = { version = "1.8.3", features = ["alloc"] }
+radishlex-ime-crypto = { path = "../ime-crypto" }
+radishlex-ime-sync = { path = "../ime-sync" }
+radishlex-ime-userdb = { path = "../ime-userdb" }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+zeroize = "1.8.2"

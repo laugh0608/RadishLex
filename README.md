@@ -22,7 +22,7 @@ RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支�
 - **Flutter**：本地词库、学习、隐私、同步、设备和诊断管理界面。
 - **平台原生薄壳**：macOS InputMethodKit、Linux Fcitx5/IBus、Android IME、Windows TSF、iOS Keyboard Extension。
 
-当前工程成熟度、停止线和下一步只在 [当前状态](docs/status/current.md) 维护。仓库已有 Rust、Go、Flutter 工程原型、macOS 离线输入 Alpha 和本地个人化 MVP 真实产品证据；当前进入 M3 端到端加密同步 Beta，真实用户同步仍保持关闭，最终产品发布按 M4 路线推进。
+当前工程成熟度、停止线和下一步只在 [当前状态](docs/status/current.md) 维护。仓库已有 Rust、Go、Flutter 工程原型、macOS 离线输入 Alpha、本地个人化 MVP 与 M3 端到端加密同步 Beta 退出证据；当前进入 M4 产品发布候选，真实用户同步仍保持关闭。
 
 ## 稳定入口
 
@@ -35,7 +35,7 @@ RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支�
 - [Rime Adapter](docs/engine-rime-adapter.md)：librime adapter 与 native smoke。
 - [个人化学习](docs/personalization-learning.md)：userdb、ranker、反馈和词库管理。
 - [FFI Boundary](docs/ffi-boundary.md)：C ABI、所有权、线程和错误语义。
-- [Manager 同步产品状态](docs/manager-sync-product-status.md)：ABI v6 status-only 字段、blocker 和隐私 allowlist。
+- [Manager 同步产品状态](docs/manager-sync-product-status.md)：ABI v7 保留的 status-only 字段、blocker 和隐私 allowlist。
 - [macOS InputMethodKit](docs/macos-inputmethodkit-boundary.md)：第一平台的 runtime、按键链、目录和验收边界。
 - [同步密钥管理](docs/sync-key-management.md)：设备、授权、恢复、撤销和 key epoch。
 - [Sync Server API/Storage](docs/sync-server-api-storage.md)：Go API、metadata、blob 和错误语义。

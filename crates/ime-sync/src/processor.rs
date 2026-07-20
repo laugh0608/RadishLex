@@ -19,6 +19,7 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SyncCryptoSnapshotKind {
     Production,
+    Qualification,
     SyntheticTest,
 }
 
@@ -190,6 +191,37 @@ impl SyncCryptoCycleSnapshot {
         Ok(snapshot)
     }
 
+    /// Builds a snapshot for the isolated Manager local-sync qualification path.
+    ///
+    /// Qualification snapshots must use an explicitly test-only backend and
+    /// can never satisfy the production backend gate.
+    pub fn qualification(
+        domain_id: impl Into<String>,
+        signing_handle: DeviceSigningKeyHandle,
+        local_signing_public_key: DeviceSigningPublicKey,
+        backend_status: DevicePrivateKeyStoreStatus,
+        current_write_epoch: u64,
+        epoch_materials: impl IntoIterator<Item = SyncEpochKeyMaterial>,
+        remote_signers: impl IntoIterator<Item = SyncRemoteSigningProfile>,
+    ) -> Result<Self, SyncOrchestrationError> {
+        let snapshot = Self::new(
+            SyncCryptoSnapshotKind::Qualification,
+            domain_id,
+            signing_handle,
+            local_signing_public_key,
+            backend_status,
+            current_write_epoch,
+            epoch_materials,
+            remote_signers,
+        )?;
+        if !snapshot.backend_status.storage_backend.is_test_only()
+            || snapshot.backend_status.product_qualified
+        {
+            return Err(invalid_preflight());
+        }
+        Ok(snapshot)
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn new(
         kind: SyncCryptoSnapshotKind,
@@ -310,7 +342,7 @@ impl SyncCryptoProvider for UnavailableSyncCryptoProvider {
 #[derive(Debug)]
 pub struct DefaultSyncObjectProcessor<P> {
     provider: P,
-    allow_synthetic_snapshot: bool,
+    expected_snapshot_kind: SyncCryptoSnapshotKind,
     snapshot: Option<SyncCryptoCycleSnapshot>,
     assembler: SyncEnvelopeAssembler,
 }
@@ -325,7 +357,16 @@ impl<P> DefaultSyncObjectProcessor<P> {
     pub fn production(provider: P) -> Self {
         Self {
             provider,
-            allow_synthetic_snapshot: false,
+            expected_snapshot_kind: SyncCryptoSnapshotKind::Production,
+            snapshot: None,
+            assembler: SyncEnvelopeAssembler::new(),
+        }
+    }
+
+    pub fn qualification(provider: P) -> Self {
+        Self {
+            provider,
+            expected_snapshot_kind: SyncCryptoSnapshotKind::Qualification,
             snapshot: None,
             assembler: SyncEnvelopeAssembler::new(),
         }
@@ -335,7 +376,7 @@ impl<P> DefaultSyncObjectProcessor<P> {
     pub fn synthetic_for_tests(provider: P) -> Self {
         Self {
             provider,
-            allow_synthetic_snapshot: true,
+            expected_snapshot_kind: SyncCryptoSnapshotKind::SyntheticTest,
             snapshot: None,
             assembler: SyncEnvelopeAssembler::new(),
         }
@@ -375,12 +416,7 @@ impl<P: SyncCryptoProvider> SyncObjectProcessor for DefaultSyncObjectProcessor<P
     fn preflight(&mut self, domain_id: &str) -> Result<(), SyncOrchestrationError> {
         self.snapshot = None;
         let snapshot = self.provider.freeze_cycle(domain_id)?;
-        if snapshot.domain_id != domain_id
-            || (snapshot.kind == SyncCryptoSnapshotKind::SyntheticTest
-                && !self.allow_synthetic_snapshot)
-            || (snapshot.kind == SyncCryptoSnapshotKind::Production
-                && self.allow_synthetic_snapshot)
-        {
+        if snapshot.domain_id != domain_id || snapshot.kind != self.expected_snapshot_kind {
             return Err(invalid_preflight());
         }
         self.snapshot = Some(snapshot);

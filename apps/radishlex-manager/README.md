@@ -53,7 +53,7 @@ macOS 正常 product 构建使用仓库稳定入口：
 ../../scripts/build-manager-macos-product.sh
 ```
 
-Xcode 构建阶段会编译 `radishlex-ime-ffi`；macOS 产品 dylib 显式启用 `apple-keychain` feature，再修正 install name，检查目标架构、依赖与 manager 所需 symbol 集，把库复制到 app bundle 的 `Contents/Frameworks` 后签名。Dart 启动时读取 `radishlex_ffi_contract`，要求 ABI v6、owner-thread policy 和 panic boundary 与 manager 预期一致。普通 DPK 与 Secure Enclave P-256 status/product smoke symbol 只服务原生 gated validation，Dart 不直接绑定；现有 snapshot 只读取 `radishlex_manager_sync_product_status` 的固定脱敏状态，不触发系统 key 操作，也不返回 key、canonical、signature 或 wrapped material bytes。
+Xcode 构建阶段会编译 `radishlex-ime-ffi`；macOS 产品 dylib 显式启用 `apple-keychain` feature，再修正 install name，检查目标架构、依赖与 manager 所需 symbol 集，把库复制到 app bundle 的 `Contents/Frameworks` 后签名。Dart 启动时读取 `radishlex_ffi_contract`，要求 ABI v7、owner-thread policy 和 panic boundary 与 manager 预期一致。普通 DPK 与 Secure Enclave P-256 status/product smoke symbol 只服务原生 gated validation，Dart 不直接绑定；现有 snapshot 只读取 `radishlex_manager_sync_product_status` 的固定脱敏状态。同步页另提供只连接 loopback HTTPS、只使用合成数据的资格 run，不触发系统 key 操作，也不返回 key、canonical、signature、wrapped material、payload 或 HTTP body。
 
 `radishlex_manager_sync_product_status` 把 signing 与 key-agreement 作为两条独立资格链：`product_qualified` 只有在两者都通过时才为真，`user_sync_enabled` 是另一个产品策略开关，不能由资格结果推导或自动打开。`blocker` 按固定优先级返回首个失败原因；Manager 只负责把这些 enum/boolean 映射为状态说明，不执行创建、读取、签名、derive 或删除操作。完整字段与常量见 [Manager 同步产品状态参考](../../docs/manager-sync-product-status.md)。
 

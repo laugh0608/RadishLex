@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:ffi' as ffi;
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:radishlex_manager/src/bridge/ffi_manager_bridge.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
@@ -21,6 +22,37 @@ Future<void> main(List<String> args) async {
     dbPath: dbPath,
     libraryPath: options.libraryPath,
     settingsFilePath: settingsPath,
+  );
+
+  final qualificationRequest = ManagerSyncQualificationRequest(
+    endpoint: 'https://127.0.0.1:9',
+    accessToken: Uint8List.fromList(
+      ascii.encode('manager-product-bundle-qualification-token-0001'),
+    ),
+    localCaDer: null,
+    timeoutMs: 500,
+  );
+  final qualificationRun = bridge.startSyncQualification(qualificationRequest);
+  qualificationRequest.clearTransientInputs();
+  ManagerSyncQualificationSnapshot qualificationSnapshot;
+  final qualificationDeadline = DateTime.now().add(const Duration(seconds: 5));
+  do {
+    qualificationSnapshot = qualificationRun.poll();
+    if (!qualificationSnapshot.state.isTerminal) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+  } while (!qualificationSnapshot.state.isTerminal &&
+      DateTime.now().isBefore(qualificationDeadline));
+  qualificationRun.dispose();
+  _expect(
+    qualificationSnapshot.state == ManagerSyncQualificationState.failed,
+    'qualification unreachable state',
+  );
+  _expect(
+    qualificationSnapshot.temporaryFilesCleaned &&
+        qualificationSnapshot.workerStopped &&
+        qualificationSnapshot.transientInputsCleared,
+    'qualification unreachable cleanup',
   );
 
   final preview = await bridge.inspectDictionaryImport(importPath);

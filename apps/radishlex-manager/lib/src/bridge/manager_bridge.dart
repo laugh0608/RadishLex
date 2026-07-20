@@ -24,6 +24,10 @@ abstract interface class ManagerBridge {
   );
 
   Future<ManagerSnapshot> saveSettingsDraft(ManagerSettingsDraft draft);
+
+  ManagerSyncQualificationRun startSyncQualification(
+    ManagerSyncQualificationRequest request,
+  );
 }
 
 abstract interface class ManagerBridgeFailure implements Exception {
@@ -44,6 +48,7 @@ enum ManagerBridgeOperation {
   previewDiagnostics,
   exportDiagnostics,
   saveSettingsDraft,
+  startSyncQualification,
 }
 
 class ManagerBridgeFailurePresentation {
@@ -101,6 +106,8 @@ extension ManagerBridgeOperationLabel on ManagerBridgeOperation {
         return '导出诊断摘要';
       case ManagerBridgeOperation.saveSettingsDraft:
         return '保存设置草案';
+      case ManagerBridgeOperation.startSyncQualification:
+        return '运行本地合成同步资格测试';
     }
   }
 }
@@ -136,6 +143,9 @@ String _failureCategoryCode(
   }
   if (operation == ManagerBridgeOperation.saveSettingsDraft) {
     return 'settings_draft';
+  }
+  if (operation == ManagerBridgeOperation.startSyncQualification) {
+    return 'sync_qualification';
   }
 
   switch (failureCode) {
@@ -178,6 +188,8 @@ String _failureCategoryLabel(String categoryCode) {
       return 'rank explain 错误';
     case 'sync_preflight':
       return '同步预检错误';
+    case 'sync_qualification':
+      return '本地合成同步资格测试错误';
     case 'engine':
       return '输入引擎错误';
     case 'internal':
