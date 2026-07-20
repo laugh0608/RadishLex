@@ -5,10 +5,10 @@
 NS_ASSUME_NONNULL_BEGIN
 
 FOUNDATION_EXPORT NSErrorDomain const RLXBridgeErrorDomain;
-FOUNDATION_EXPORT NSAttributedStringKey const RLXCandidateIndexAttributeName;
 
 @interface RLXCandidate : NSObject
 @property(nonatomic, readonly) NSUInteger index;
+@property(nonatomic, readonly) NSUInteger engineIndex;
 @property(nonatomic, copy, readonly) NSString *text;
 @property(nonatomic, copy, readonly, nullable) NSString *reading;
 @property(nonatomic, copy, readonly, nullable) NSString *annotation;
@@ -20,17 +20,14 @@ FOUNDATION_EXPORT NSAttributedStringKey const RLXCandidateIndexAttributeName;
 @property(nonatomic, copy, readonly) NSString *preedit;
 @property(nonatomic, readonly) NSUInteger cursor;
 @property(nonatomic, copy, readonly) NSArray<RLXCandidate *> *candidates;
+@property(nonatomic, readonly) uint32_t personalizationStatus;
 @end
 
 @interface RLXKeyHandlingResult : NSObject
 @property(nonatomic, readonly, getter=isConsumed) BOOL consumed;
 @property(nonatomic, copy, readonly, nullable) NSString *commit;
 @property(nonatomic, strong, readonly, nullable) RLXSnapshot *snapshot;
-@end
-
-@interface RLXCandidateCommitResult : NSObject
-@property(nonatomic, copy, readonly) NSString *commit;
-@property(nonatomic, strong, readonly, nullable) RLXSnapshot *snapshot;
+@property(nonatomic, readonly) uint32_t learningDisposition;
 @end
 
 @interface RLXSessionBridge : NSObject
@@ -47,14 +44,31 @@ FOUNDATION_EXPORT NSAttributedStringKey const RLXCandidateIndexAttributeName;
                                             logDirectory:(nullable NSString *)logDirectory
                                            deployOnStart:(BOOL)deployOnStart
                                                    error:(NSError **)error;
+- (nullable instancetype)initPersonalizedRimeWithSharedDataDirectory:
+                                (NSString *)sharedDataDirectory
+                                                userDataDirectory:
+                                                    (NSString *)userDataDirectory
+                                                           schema:(NSString *)schema
+                                                     logDirectory:
+                                                         (nullable NSString *)logDirectory
+                                                    deployOnStart:(BOOL)deployOnStart
+                                                       userDbPath:(NSString *)userDbPath
+                                                        sessionId:(NSString *)sessionId
+                                                            error:(NSError **)error;
 
 - (nullable RLXKeyHandlingResult *)handleEvent:(RadishLexKeyEvent)event
                                           error:(NSError **)error;
 - (nullable RLXSnapshot *)snapshotWithError:(NSError **)error;
-- (nullable RLXCandidateCommitResult *)commitCandidateAtIndex:(NSUInteger)index
-                                                         error:(NSError **)error;
+- (nullable RLXKeyHandlingResult *)selectCandidateAtIndex:(NSUInteger)index
+                                                      error:(NSError **)error;
 - (BOOL)resetWithError:(NSError **)error;
 - (BOOL)setSchema:(NSString *)schema error:(NSError **)error;
+- (BOOL)setLearningContextSecureInput:(BOOL)secureInput
+                 sensitiveApplication:(BOOL)sensitiveApplication
+                          privacyMode:(BOOL)privacyMode
+                         contextKnown:(BOOL)contextKnown
+                           contextKind:(NSString *)contextKind
+                                 error:(NSError **)error;
 - (void)invalidate;
 
 @end
@@ -64,7 +78,5 @@ FOUNDATION_EXPORT NSUInteger RLXUTF16CursorForUTF8Offset(NSString *value,
                                                          size_t utf8Offset,
                                                          NSError **error);
 FOUNDATION_EXPORT NSAttributedString *RLXAttributedCandidate(RLXCandidate *candidate);
-FOUNDATION_EXPORT NSNumber *_Nullable RLXCandidateIndexFromAttributedString(
-    NSAttributedString *candidate);
 
 NS_ASSUME_NONNULL_END

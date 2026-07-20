@@ -1,5 +1,26 @@
 part of 'ffi_dynamic_native_binding.dart';
 
+final class _RadishLexContractSymbols {
+  _RadishLexContractSymbols(ffi.DynamicLibrary library)
+    : load = library
+          .lookupFunction<
+            ffi.Int32 Function(
+              ffi.Pointer<_RadishLexFfiContract>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            ),
+            int Function(
+              ffi.Pointer<_RadishLexFfiContract>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            )
+          >('radishlex_ffi_contract');
+
+  final int Function(
+    ffi.Pointer<_RadishLexFfiContract>,
+    ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+  )
+  load;
+}
+
 final class _RadishLexUserTermSymbols {
   _RadishLexUserTermSymbols(ffi.DynamicLibrary library)
     : newList = library
@@ -54,7 +75,24 @@ final class _RadishLexUserTermSymbols {
               ffi.Pointer<ffi.Char>,
               ffi.Pointer<ffi.Pointer<_RadishLexError>>,
             )
-          >('radishlex_userdb_delete_term');
+          >('radishlex_userdb_delete_term'),
+      restoreTerm = library
+          .lookupFunction<
+            ffi.Int32 Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            ),
+            int Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            )
+          >('radishlex_userdb_restore_term');
 
   final ffi.Pointer<_RadishLexUserTermList> Function(
     ffi.Pointer<ffi.Char>,
@@ -78,6 +116,69 @@ final class _RadishLexUserTermSymbols {
     ffi.Pointer<ffi.Pointer<_RadishLexError>>,
   )
   deleteTerm;
+  final int Function(
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+  )
+  restoreTerm;
+}
+
+final class _RadishLexDeletedTermSymbols {
+  _RadishLexDeletedTermSymbols(ffi.DynamicLibrary library)
+    : newList = library
+          .lookupFunction<
+            ffi.Pointer<_RadishLexDeletedTermList> Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            ),
+            ffi.Pointer<_RadishLexDeletedTermList> Function(
+              ffi.Pointer<ffi.Char>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            )
+          >('radishlex_userdb_deleted_terms_new'),
+      count = library
+          .lookupFunction<
+            ffi.Size Function(ffi.Pointer<_RadishLexDeletedTermList>),
+            int Function(ffi.Pointer<_RadishLexDeletedTermList>)
+          >('radishlex_userdb_deleted_terms_count'),
+      get = library
+          .lookupFunction<
+            ffi.Int32 Function(
+              ffi.Pointer<_RadishLexDeletedTermList>,
+              ffi.Size,
+              ffi.Pointer<_RadishLexDeletedTermView>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            ),
+            int Function(
+              ffi.Pointer<_RadishLexDeletedTermList>,
+              int,
+              ffi.Pointer<_RadishLexDeletedTermView>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            )
+          >('radishlex_userdb_deleted_terms_get'),
+      free = library
+          .lookupFunction<
+            ffi.Void Function(ffi.Pointer<_RadishLexDeletedTermList>),
+            void Function(ffi.Pointer<_RadishLexDeletedTermList>)
+          >('radishlex_userdb_deleted_terms_free');
+
+  final ffi.Pointer<_RadishLexDeletedTermList> Function(
+    ffi.Pointer<ffi.Char>,
+    ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+  )
+  newList;
+  final int Function(ffi.Pointer<_RadishLexDeletedTermList>) count;
+  final int Function(
+    ffi.Pointer<_RadishLexDeletedTermList>,
+    int,
+    ffi.Pointer<_RadishLexDeletedTermView>,
+    ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+  )
+  get;
+  final void Function(ffi.Pointer<_RadishLexDeletedTermList>) free;
 }
 
 final class _RadishLexDictionarySymbols {
@@ -247,7 +348,18 @@ final class _RadishLexSyncSymbols {
               ffi.Pointer<_RadishLexSyncPreflightSummary>,
               ffi.Pointer<ffi.Pointer<_RadishLexError>>,
             )
-          >('radishlex_userdb_sync_preflight');
+          >('radishlex_userdb_sync_preflight'),
+      productStatus = library
+          .lookupFunction<
+            ffi.Int32 Function(
+              ffi.Pointer<_RadishLexManagerSyncProductStatus>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            ),
+            int Function(
+              ffi.Pointer<_RadishLexManagerSyncProductStatus>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            )
+          >('radishlex_manager_sync_product_status');
 
   final int Function(
     ffi.Pointer<ffi.Char>,
@@ -255,6 +367,11 @@ final class _RadishLexSyncSymbols {
     ffi.Pointer<ffi.Pointer<_RadishLexError>>,
   )
   preflight;
+  final int Function(
+    ffi.Pointer<_RadishLexManagerSyncProductStatus>,
+    ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+  )
+  productStatus;
 }
 
 final class _RadishLexRankSymbols {

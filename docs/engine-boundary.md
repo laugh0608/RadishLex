@@ -24,6 +24,7 @@
 v1 的 `ime-core` 至少包含这些稳定模型：
 
 - `KeyEvent`：平台或 CLI 传入的按键事件，包含字符键、命名键、修饰键和按键阶段。
+- `KeyOutcome`：一次按键或候选选择的结果，明确表达是否消费以及可选 commit；没有 commit 不等于操作失败。
 - `Composition`：当前预编辑文本和光标位置。
 - `Candidate`：可展示候选，包含候选文本、读音、注释和来源。
 - `Commit`：提交给宿主应用的文本，以及本次提交来源。
@@ -34,7 +35,7 @@ v1 的 `ime-core` 至少包含这些稳定模型：
 
 ## Engine Trait
 
-v1 engine boundary 的最小接口为：
+v1 engine boundary 的当前稳定接口为：
 
 ```rust
 pub trait Engine {
@@ -42,7 +43,8 @@ pub trait Engine {
     fn push_key(&mut self, key: KeyEvent) -> CoreResult<KeyOutcome>;
     fn composition(&self) -> CoreResult<Composition>;
     fn candidates(&self) -> CoreResult<Vec<Candidate>>;
-    fn commit_candidate(&mut self, index: usize) -> CoreResult<Commit>;
+    fn input_code(&self) -> CoreResult<String>;
+    fn select_candidate(&mut self, index: usize) -> CoreResult<KeyOutcome>;
     fn set_schema(&mut self, schema: SchemaId) -> CoreResult<()>;
     fn schema(&self) -> CoreResult<SchemaId>;
 }
@@ -54,7 +56,8 @@ pub trait Engine {
 - `push_key` 只处理一个按键事件，返回该按键是否被输入法消费，以及是否产生提交。
 - `composition` 返回当前预编辑文本。
 - `candidates` 返回当前候选列表，列表顺序是进入 ranker 前的 engine 输出顺序。
-- `commit_candidate` 按当前候选列表索引提交候选，提交后 adapter 应按底层引擎规则更新会话状态。
+- `input_code` 返回当前 composition 对应的稳定输入码；没有活动输入时返回空字符串。该值用于个人化身份和选择学习，不得是 engine 私有对象 ID、session ID 或不可跨 adapter 复验的内部 token。
+- `select_candidate` 按当前页候选列表索引驱动底层引擎选择，并与 `push_key` 一样返回完整 `KeyOutcome`；分段候选可能消费选择并更新 composition，但不立即产生 commit。
 - `set_schema` 切换输入方案，切换失败必须显式报错。
 - `schema` 返回当前输入方案标识。
 
@@ -66,6 +69,7 @@ pub trait Engine {
 - 把底层 key 表示转换为 `KeyEvent` 可表达的结果，或在 adapter 内部完成不可泄露的映射。
 - 把底层 composition 转换为 `Composition`。
 - 把底层 candidate 转换为 `Candidate`。
+- 把底层当前输入复制为稳定 `input_code`，不向 core 暴露借用指针或 engine 私有身份。
 - 把底层错误转换为 `CoreError` 或后续更细分错误类型。
 - 屏蔽 C / C++ 指针、对象生命周期、线程限制和底层私有 ID。
 
@@ -92,7 +96,7 @@ InputSession::new(engine)
   -> set_schema(schema)
   -> push_key(...)
   -> state()
-  -> commit_candidate(index)
+  -> select_candidate(index)
   -> reset()
 ```
 
@@ -117,8 +121,8 @@ Engine boundary 可以参考公开输入法行为和公开文档，但不能复�
 - `cargo test -p radishlex-ime-core` 通过。
 - `cargo run -p radishlex-ime-cli -- demo luobo` 能展示 composition、候选和 commit。
 - `radishlex-ime-cli rime` 在启用 `native-rime` 且配置真实 `librime` 与隔离 schema 数据后，能展示真实 composition、候选和 commit。
-- test-only stub engine 能完成 `push_key -> candidates -> commit_candidate`。
+- test-only stub engine 能完成 `push_key -> candidates -> select_candidate`。
 - 核心类型不依赖平台 SDK 或真实底层 engine。
 - 文档入口能指向本边界说明。
 
-该验证证明 Rust core 边界和首条真实 Rime adapter 路径可复验；仍不证明完整中文输入质量、个人化学习、用户词库、ranker、同步或平台输入法可用。
+该组验证只证明 Rust core 边界和真实 Rime adapter 路径可复验；不能单独证明完整中文输入质量、真实平台个人化、manager、同步或产品发布可用。

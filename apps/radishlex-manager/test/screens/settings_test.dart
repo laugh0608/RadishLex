@@ -10,14 +10,15 @@ import 'package:radishlex_manager/src/bridge/fixture_manager_bridge.dart';
 import 'package:radishlex_manager/src/data/manager_fixture.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
-import '../fixtures/sync_evidence_bundle_fixtures.dart';
 import '../fixtures/sync_readiness_bridge_fixtures.dart';
 
 void main() {
   testWidgets('settings view exposes configuration diagnostics', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const RadishLexManagerApp());
+    await tester.pumpWidget(
+      RadishLexManagerApp(bridge: FixtureManagerBridge()),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.tune_outlined));
@@ -25,8 +26,8 @@ void main() {
 
     expect(find.text('配置来源'), findsOneWidget);
     expect(find.text('fixture'), findsOneWidget);
-    expect(find.text('RADISHLEX_MANAGER_DB not configured'), findsOneWidget);
-    expect(find.text('not loaded'), findsOneWidget);
+    expect(find.text('synthetic demo userdb'), findsOneWidget);
+    expect(find.text('not loaded (demo mode)'), findsOneWidget);
     expect(find.text('同步门禁草案'), findsOneWidget);
     expect(find.text('平台签名 backend 不可用'), findsOneWidget);
     expect(find.text('设备 production gate 为 blocked'), findsOneWidget);
@@ -210,33 +211,6 @@ void main() {
     );
   }
 
-  for (final scenarioId in representativeSyncEvidenceBundleScenarioIds) {
-    testWidgets(
-      'settings gate preview renders sync evidence bundle $scenarioId',
-      (WidgetTester tester) async {
-        await tester.binding.setSurfaceSize(const Size(1400, 1000));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
-        final scenario = syncEvidenceBundleScenarioById(scenarioId);
-
-        await tester.pumpWidget(
-          RadishLexManagerApp(
-            bridge: FixtureManagerBridge(
-              initialSnapshot: managerSnapshotForSyncEvidenceBundleScenario(
-                scenario,
-              ),
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
-
-        await tester.tap(find.byIcon(Icons.tune_outlined));
-        await tester.pumpAndSettle();
-
-        _expectSettingsGatePreviewEvidenceBundleScenario(scenario);
-      },
-    );
-  }
-
   testWidgets('settings draft save updates sync gate source', (
     WidgetTester tester,
   ) async {
@@ -265,7 +239,7 @@ void main() {
     await tester.tap(find.byKey(const Key('settings-save-button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('设置草案已保存：sync_disabled_by_policy'), findsOneWidget);
+    expect(find.text('本地设置已保存：sync_disabled_by_policy'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.sync_outlined));
     await tester.pumpAndSettle();
@@ -382,7 +356,7 @@ void main() {
     await tester.tap(find.byKey(const Key('settings-save-button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('设置草案已保存：preflight_ready'), findsOneWidget);
+    expect(find.text('本地设置已保存：preflight_ready'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.sync_outlined));
     await tester.pumpAndSettle();
@@ -477,7 +451,7 @@ void main() {
     await tester.tap(find.byKey(const Key('settings-save-button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('设置草案已保存：preflight_ready'), findsOneWidget);
+    expect(find.text('本地设置已保存：preflight_ready'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.sync_outlined));
     await tester.pumpAndSettle();
@@ -715,44 +689,6 @@ void _expectSettingsGatePreviewReadinessScenario(
   expect(find.text(scenario.expectedInteractionStatuses), findsWidgets);
   expect(find.text(scenario.expectedInteractionBlockers), findsWidgets);
   expect(
-    find.text(
-      syncActionExpectedExecutionSummary(scenario.expectedInteractionStatuses),
-    ),
-    findsWidgets,
-    reason: scenario.id,
-  );
-  expect(
-    find.text(
-      syncActionExpectedRequestStatusSummary(
-        scenario.expectedInteractionStatuses,
-      ),
-    ),
-    findsWidgets,
-    reason: scenario.id,
-  );
-  expect(
-    find.text(
-      syncActionExpectedResultStatusSummary(
-        scenario.expectedInteractionStatuses,
-      ),
-    ),
-    findsWidgets,
-    reason: scenario.id,
-  );
-  _expectActionCommandProtocolPreview(
-    reason: scenario.id,
-    expectedRequestBoundarySummary:
-        scenario.expectedActionCommandRequestBoundaries,
-    expectedResultBoundarySummary:
-        scenario.expectedActionCommandResultBoundaries,
-    expectedErrorCodeSummary: scenario.expectedActionCommandErrorCodes,
-    expectedRequestAllowedFieldSummary:
-        scenario.expectedActionRequestAllowedFields,
-    expectedResultAllowedFieldSummary:
-        scenario.expectedActionResultAllowedFields,
-    expectedForbiddenMaterialSummary: scenario.expectedActionForbiddenMaterials,
-  );
-  expect(
     find.text(scenario.expectedUserSyncEnabled.toString()),
     findsWidgets,
     reason: scenario.id,
@@ -782,91 +718,5 @@ void _expectSettingsGatePreviewReadinessScenario(
 
   for (final fragment in syncReadinessSensitiveLeakFragments) {
     expect(find.textContaining(fragment), findsNothing, reason: scenario.id);
-  }
-}
-
-void _expectSettingsGatePreviewEvidenceBundleScenario(
-  SyncEvidenceBundleScenario scenario,
-) {
-  expect(find.text(scenario.expectedEntryState.code), findsWidgets);
-  expect(find.text(scenario.expectedEntryBlocker), findsWidgets);
-  expect(find.text(scenario.expectedBlockedFlows), findsWidgets);
-  expect(find.text(scenario.expectedBridgeSource), findsWidgets);
-  expect(find.text(scenario.expectedInteractionStatuses), findsWidgets);
-  expect(find.text(scenario.expectedInteractionBlockers), findsWidgets);
-  expect(
-    find.text(
-      syncActionExpectedExecutionSummary(scenario.expectedInteractionStatuses),
-    ),
-    findsWidgets,
-    reason: scenario.id,
-  );
-  expect(
-    find.text(
-      syncActionExpectedRequestStatusSummary(
-        scenario.expectedInteractionStatuses,
-      ),
-    ),
-    findsWidgets,
-    reason: scenario.id,
-  );
-  expect(
-    find.text(
-      syncActionExpectedResultStatusSummary(
-        scenario.expectedInteractionStatuses,
-      ),
-    ),
-    findsWidgets,
-    reason: scenario.id,
-  );
-  _expectActionCommandProtocolPreview(
-    reason: scenario.id,
-    expectedRequestBoundarySummary:
-        scenario.expectedActionCommandRequestBoundaries,
-    expectedResultBoundarySummary:
-        scenario.expectedActionCommandResultBoundaries,
-    expectedErrorCodeSummary: scenario.expectedActionCommandErrorCodes,
-    expectedRequestAllowedFieldSummary:
-        scenario.expectedActionRequestAllowedFields,
-    expectedResultAllowedFieldSummary:
-        scenario.expectedActionResultAllowedFields,
-    expectedForbiddenMaterialSummary: scenario.expectedActionForbiddenMaterials,
-  );
-  expect(find.text(scenario.expectedConnectionStatusCode), findsWidgets);
-  expect(find.text(scenario.expectedConnectionProbeSource), findsWidgets);
-  expect(find.text(syncEvidenceBundleRecordedAt), findsWidgets);
-  expect(find.text(scenario.expectedConnectionBlocker), findsWidgets);
-  expect(find.text(scenario.expectedTransportMode), findsWidgets);
-  expect(find.text(scenario.expectedServerStateStatus), findsWidgets);
-  expect(find.text(scenario.expectedAuthStatus), findsWidgets);
-  expect(find.text(scenario.expectedHttpStatusText), findsWidgets);
-  expect(find.text(scenario.expectedLastRemoteErrorCode), findsWidgets);
-  expect(find.text(scenario.expectedUserSyncEnabled.toString()), findsWidgets);
-
-  for (final fragment in syncEvidenceBundleSensitiveLeakFragments) {
-    expect(find.textContaining(fragment), findsNothing, reason: scenario.id);
-  }
-}
-
-void _expectActionCommandProtocolPreview({
-  required String reason,
-  required String expectedRequestBoundarySummary,
-  required String expectedResultBoundarySummary,
-  required String expectedErrorCodeSummary,
-  required String expectedRequestAllowedFieldSummary,
-  required String expectedResultAllowedFieldSummary,
-  required String expectedForbiddenMaterialSummary,
-}) {
-  for (final value in [
-    syncActionCommandDataPolicySummary,
-    syncActionCommandStopLineSummary,
-    expectedRequestBoundarySummary,
-    expectedResultBoundarySummary,
-    expectedErrorCodeSummary,
-    expectedRequestAllowedFieldSummary,
-    expectedResultAllowedFieldSummary,
-    expectedForbiddenMaterialSummary,
-  ]) {
-    expect(find.text(value), findsWidgets, reason: reason);
   }
 }

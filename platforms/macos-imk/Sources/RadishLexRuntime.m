@@ -57,14 +57,31 @@
   NSArray<NSURL *> *applicationSupport =
       [[NSFileManager defaultManager] URLsForDirectory:NSApplicationSupportDirectory
                                              inDomains:NSUserDomainMask];
-  NSURL *userDataURL = [[applicationSupport firstObject]
-      URLByAppendingPathComponent:@"RadishLex/Rime" isDirectory:YES];
+  NSURL *runtimeDataURL = [[applicationSupport firstObject]
+      URLByAppendingPathComponent:@"RadishLex" isDirectory:YES];
+  NSURL *userDataURL =
+      [runtimeDataURL URLByAppendingPathComponent:@"Rime" isDirectory:YES];
+  NSURL *userDbURL =
+      [runtimeDataURL URLByAppendingPathComponent:@"userdb.sqlite3" isDirectory:NO];
   NSError *directoryError = nil;
-  if (userDataURL == nil ||
-      ![[NSFileManager defaultManager] createDirectoryAtURL:userDataURL
-                                withIntermediateDirectories:YES
-                                                 attributes:nil
-                                                      error:&directoryError]) {
+  NSDictionary<NSFileAttributeKey, id> *privateDirectoryAttributes =
+      @{NSFilePosixPermissions : @0700};
+  NSFileManager *fileManager = [NSFileManager defaultManager];
+  if (runtimeDataURL == nil || userDataURL == nil || userDbURL == nil ||
+      ![fileManager createDirectoryAtURL:runtimeDataURL
+             withIntermediateDirectories:YES
+                              attributes:privateDirectoryAttributes
+                                   error:&directoryError] ||
+      ![fileManager setAttributes:privateDirectoryAttributes
+                     ofItemAtPath:runtimeDataURL.path
+                            error:&directoryError] ||
+      ![fileManager createDirectoryAtURL:userDataURL
+              withIntermediateDirectories:YES
+                               attributes:privateDirectoryAttributes
+                                    error:&directoryError] ||
+      ![fileManager setAttributes:privateDirectoryAttributes
+                     ofItemAtPath:userDataURL.path
+                            error:&directoryError]) {
     if (error != NULL) {
       *error = [NSError errorWithDomain:RLXBridgeErrorDomain
                                    code:RADISHLEX_STATUS_INVALID_STATE
@@ -74,13 +91,17 @@
     return nil;
   }
   NSNumber *deploy = [bundle objectForInfoDictionaryKey:@"RadishLexRimeDeployOnStart"];
+  NSString *sessionId = [NSUUID UUID].UUIDString;
   RLXSessionBridge *session =
-      [[RLXSessionBridge alloc] initRimeWithSharedDataDirectory:sharedData
-                                             userDataDirectory:userDataURL.path
-                                                        schema:schema
-                                                  logDirectory:nil
-                                                 deployOnStart:deploy.boolValue
-                                                         error:error];
+      [[RLXSessionBridge alloc]
+          initPersonalizedRimeWithSharedDataDirectory:sharedData
+                                    userDataDirectory:userDataURL.path
+                                               schema:schema
+                                         logDirectory:nil
+                                        deployOnStart:deploy.boolValue
+                                           userDbPath:userDbURL.path
+                                            sessionId:sessionId
+                                                error:error];
 #endif
   if (session != nil) {
     [self.sessions addObject:session];

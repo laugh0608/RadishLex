@@ -55,7 +55,9 @@ class _ManagerHomeScreenState extends State<ManagerHomeScreen> {
           snapshot: data,
           selectedIndex: selectedIndex,
           onSelectPage: _selectPage,
+          onRefresh: _reloadSnapshot,
           onDeleteTerm: actions.deleteTerm,
+          onRestoreTerm: actions.restoreTerm,
           onImportDictionary: actions.importDictionary,
           onExportDictionary: actions.exportDictionary,
           onPreviewDiagnostics: actions.previewDiagnostics,
@@ -100,7 +102,9 @@ class _ManagerShell extends StatelessWidget {
     required this.snapshot,
     required this.selectedIndex,
     required this.onSelectPage,
+    required this.onRefresh,
     required this.onDeleteTerm,
+    required this.onRestoreTerm,
     required this.onImportDictionary,
     required this.onExportDictionary,
     required this.onPreviewDiagnostics,
@@ -112,7 +116,9 @@ class _ManagerShell extends StatelessWidget {
   final ManagerSnapshot snapshot;
   final int selectedIndex;
   final ValueChanged<int> onSelectPage;
+  final VoidCallback onRefresh;
   final ValueChanged<UserTerm> onDeleteTerm;
+  final void Function(UserTermKey term, String state) onRestoreTerm;
   final VoidCallback onImportDictionary;
   final VoidCallback onExportDictionary;
   final VoidCallback onPreviewDiagnostics;
@@ -127,6 +133,7 @@ class _ManagerShell extends StatelessWidget {
       DictionaryView(
         snapshot: snapshot,
         onDeleteTerm: onDeleteTerm,
+        onRestoreTerm: onRestoreTerm,
         onImportDictionary: onImportDictionary,
         onExportDictionary: onExportDictionary,
       ),
@@ -148,6 +155,7 @@ class _ManagerShell extends StatelessWidget {
         final content = _ManagerPageFrame(
           title: _destinations[selectedIndex].label,
           snapshot: snapshot,
+          onRefresh: onRefresh,
           child: pages[selectedIndex],
         );
 
@@ -293,11 +301,13 @@ class _ManagerPageFrame extends StatelessWidget {
   const _ManagerPageFrame({
     required this.title,
     required this.snapshot,
+    required this.onRefresh,
     required this.child,
   });
 
   final String title;
   final ManagerSnapshot snapshot;
+  final VoidCallback onRefresh;
   final Widget child;
 
   @override
@@ -307,7 +317,11 @@ class _ManagerPageFrame extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(24, 18, 24, 12),
-            child: _Header(title: title, snapshot: snapshot),
+            child: _Header(
+              title: title,
+              snapshot: snapshot,
+              onRefresh: onRefresh,
+            ),
           ),
           Expanded(
             child: SingleChildScrollView(
@@ -322,10 +336,15 @@ class _ManagerPageFrame extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.title, required this.snapshot});
+  const _Header({
+    required this.title,
+    required this.snapshot,
+    required this.onRefresh,
+  });
 
   final String title;
   final ManagerSnapshot snapshot;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -343,6 +362,13 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
+        IconButton(
+          key: const Key('manager-refresh-button'),
+          onPressed: onRefresh,
+          tooltip: '刷新管理数据',
+          icon: const Icon(Icons.refresh),
+        ),
+        const SizedBox(width: 8),
         ManagerStatusBadge(
           icon: Icons.shield_outlined,
           label: snapshot.sync.state.code,

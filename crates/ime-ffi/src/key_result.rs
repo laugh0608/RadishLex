@@ -1,14 +1,16 @@
 use std::ptr;
 
-use radishlex_ime_core::{KeyOutcome, SessionState};
+use radishlex_ime_core::KeyOutcome;
+use radishlex_ime_runtime::LearningDisposition;
 
 use crate::error::{FfiError, RadishLexError, RadishLexStatusCode};
 use crate::ffi_support::{ffi_release, ffi_status};
 use crate::key::RadishLexKeyEvent;
+use crate::personalization::learning_disposition_code;
 use crate::session::{session_mut, RadishLexSession};
 use crate::snapshot::{RadishLexSnapshot, RadishLexStringView};
 
-pub const RADISHLEX_KEY_RESULT_VERSION: u32 = 1;
+pub const RADISHLEX_KEY_RESULT_VERSION: u32 = 2;
 
 /// Rust-owned result of handling one platform key event.
 ///
@@ -18,16 +20,22 @@ pub struct RadishLexKeyResult {
     version: u32,
     consumed: u8,
     commit: Option<String>,
+    learning_disposition: u32,
     snapshot: RadishLexSnapshot,
 }
 
 impl RadishLexKeyResult {
-    pub fn new(outcome: KeyOutcome, state: SessionState) -> Self {
+    pub fn new(
+        outcome: KeyOutcome,
+        snapshot: RadishLexSnapshot,
+        learning_disposition: LearningDisposition,
+    ) -> Self {
         Self {
             version: RADISHLEX_KEY_RESULT_VERSION,
             consumed: u8::from(outcome.is_consumed()),
             commit: outcome.commit().map(|commit| commit.text().to_owned()),
-            snapshot: RadishLexSnapshot::from_state(state),
+            learning_disposition: learning_disposition_code(learning_disposition),
+            snapshot,
         }
     }
 
@@ -47,6 +55,10 @@ impl RadishLexKeyResult {
 
     pub fn commit_present(&self) -> u8 {
         u8::from(self.commit.is_some())
+    }
+
+    pub fn learning_disposition(&self) -> u32 {
+        self.learning_disposition
     }
 
     pub fn snapshot(&self) -> *const RadishLexSnapshot {
@@ -97,9 +109,56 @@ pub unsafe extern "C" fn radishlex_session_handle_key_event(
 
         let event = event.try_into()?;
         let session = session_mut(session)?;
-        let outcome = session.push_key_event(event)?;
-        let state = session.state()?;
-        let result = Box::into_raw(Box::new(RadishLexKeyResult::new(outcome, state)));
+        let event = session.handle_key_event(event)?;
+        let result = Box::into_raw(Box::new(RadishLexKeyResult::new(
+            event.outcome,
+            event.snapshot,
+            event.learning_disposition,
+        )));
+
+        unsafe {
+            *result_out = result;
+        }
+        Ok(())
+    })
+}
+
+/// Selects a candidate from the current page and returns the resulting state.
+///
+/// A segmented engine can consume the selection while leaving `commit_present`
+/// false and returning an updated composition in the snapshot.
+///
+/// # Safety
+///
+/// `session` must be null or a live `RadishLexSession` pointer owned by the
+/// calling thread. `result_out` must point to writable storage for one result
+/// pointer. `error_out` must be null or point to writable storage for one error
+/// pointer. Output pointers must not alias each other.
+#[no_mangle]
+pub unsafe extern "C" fn radishlex_session_select_candidate(
+    session: *mut RadishLexSession,
+    index: usize,
+    result_out: *mut *mut RadishLexKeyResult,
+    error_out: *mut *mut RadishLexError,
+) -> RadishLexStatusCode {
+    ffi_status(error_out, || {
+        if result_out.is_null() {
+            return Err(FfiError::invalid_argument(
+                "candidate selection result output pointer is null",
+            ));
+        }
+
+        unsafe {
+            *result_out = ptr::null_mut();
+        }
+
+        let session = session_mut(session)?;
+        let event = session.select_candidate(index)?;
+        let result = Box::into_raw(Box::new(RadishLexKeyResult::new(
+            event.outcome,
+            event.snapshot,
+            event.learning_disposition,
+        )));
 
         unsafe {
             *result_out = result;
@@ -151,6 +210,17 @@ pub unsafe extern "C" fn radishlex_key_result_commit_present(
     result: *const RadishLexKeyResult,
 ) -> u8 {
     key_result_ref(result).map_or(0, RadishLexKeyResult::commit_present)
+}
+
+/// Returns the learning disposition for this event.
+///
+/// # Safety
+/// `result` must be null or point to a live `RadishLexKeyResult`.
+#[no_mangle]
+pub unsafe extern "C" fn radishlex_key_result_learning_disposition(
+    result: *const RadishLexKeyResult,
+) -> u32 {
+    key_result_ref(result).map_or(0, RadishLexKeyResult::learning_disposition)
 }
 
 /// Returns the snapshot borrowed from a key result.

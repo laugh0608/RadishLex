@@ -1,11 +1,32 @@
 use std::fmt;
 
 use base64ct::{Base64, Encoding};
-use radishlex_ime_crypto::SignedSyncObjectManifest;
+use radishlex_ime_crypto::{Nonce, SignedSyncObjectManifest, WrappedEpochMaterial};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::assemble::AssembledSyncObject;
+use crate::device::{SyncDeviceStatus, SyncDomain};
 use crate::model::{SyncObjectType, SyncPayloadError};
+use crate::product_provider::{SyncCryptoLoadError, SyncWrappedEpochMaterialSource};
+
+mod epoch_distribution_api;
+mod lifecycle_api;
+mod lifecycle_dto;
+mod recovery_activation_api;
+mod recovery_api;
+mod recovery_revocation_api;
+mod wrapped_epoch_source;
+
+pub use epoch_distribution_api::RemoteEpochDistributionResult;
+pub use lifecycle_api::{
+    RemoteDeviceAuthorization, RemoteDeviceRevocation, RemoteLifecycleDevice, RemoteLifecycleEvent,
+    RemoteLifecycleEventKind, RemoteLifecyclePage, RemoteLifecycleSnapshot,
+    RemoteRecoveredDeviceActivation, RemoteRecoveryRecordRevocation, RemoteRecoveryRecordRotation,
+};
+pub use recovery_activation_api::RemoteRecoveredDeviceResult;
+pub use recovery_api::RemoteVerifiedRecoveryRecord;
+pub use recovery_revocation_api::RemoteRecoveryRecordRevocationResult;
+pub use wrapped_epoch_source::{RemoteWrappedEpochLocator, RemoteWrappedEpochMaterialSource};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SyncRemoteMethod {
@@ -26,6 +47,7 @@ impl SyncRemoteMethod {
 pub struct SyncRemoteRequest {
     method: SyncRemoteMethod,
     path: String,
+    query: Vec<(String, String)>,
     content_type: Option<String>,
     body: Vec<u8>,
 }
@@ -40,9 +62,23 @@ impl SyncRemoteRequest {
         Self {
             method,
             path: path.into(),
+            query: Vec::new(),
             content_type,
             body: body.into(),
         }
+    }
+
+    pub fn with_query_param(
+        mut self,
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Result<Self, SyncRemoteError> {
+        let name = name.into();
+        let value = value.into();
+        validate_query_component("query name", &name, false)?;
+        validate_query_component("query value", &value, true)?;
+        self.query.push((name, value));
+        Ok(self)
     }
 
     pub fn method(&self) -> SyncRemoteMethod {
@@ -51,6 +87,10 @@ impl SyncRemoteRequest {
 
     pub fn path(&self) -> &str {
         &self.path
+    }
+
+    pub fn query(&self) -> &[(String, String)] {
+        &self.query
     }
 
     pub fn content_type(&self) -> Option<&str> {
@@ -67,6 +107,10 @@ impl fmt::Debug for SyncRemoteRequest {
         f.debug_struct("SyncRemoteRequest")
             .field("method", &self.method)
             .field("path", &self.path)
+            .field(
+                "query",
+                &format_args!("[redacted values; {} parameters]", self.query.len()),
+            )
             .field("content_type", &self.content_type)
             .field(
                 "body",
@@ -115,6 +159,8 @@ pub enum SyncServerErrorCode {
     NotFound,
     ConflictStaleBaseVersion,
     ConflictObjectVersion,
+    ConflictEpochDistribution,
+    ConflictRecoveryRecord,
     PayloadTooLarge,
     RecoveryRateLimited,
     StorageUnavailable,
@@ -132,6 +178,8 @@ impl SyncServerErrorCode {
             Self::NotFound => "not_found",
             Self::ConflictStaleBaseVersion => "conflict_stale_base_version",
             Self::ConflictObjectVersion => "conflict_object_version",
+            Self::ConflictEpochDistribution => "conflict_epoch_distribution",
+            Self::ConflictRecoveryRecord => "conflict_recovery_record",
             Self::PayloadTooLarge => "payload_too_large",
             Self::RecoveryRateLimited => "recovery_rate_limited",
             Self::StorageUnavailable => "storage_unavailable",
@@ -149,6 +197,8 @@ impl SyncServerErrorCode {
             "not_found" => Self::NotFound,
             "conflict_stale_base_version" => Self::ConflictStaleBaseVersion,
             "conflict_object_version" => Self::ConflictObjectVersion,
+            "conflict_epoch_distribution" => Self::ConflictEpochDistribution,
+            "conflict_recovery_record" => Self::ConflictRecoveryRecord,
             "payload_too_large" => Self::PayloadTooLarge,
             "recovery_rate_limited" => Self::RecoveryRateLimited,
             "storage_unavailable" => Self::StorageUnavailable,
@@ -167,6 +217,30 @@ impl fmt::Display for SyncServerErrorCode {
 pub struct LatestObjectConflictMetadata {
     pub version: u64,
     pub ciphertext_hash: Option<String>,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct OpaqueSyncCursor(String);
+
+impl OpaqueSyncCursor {
+    pub fn new(value: impl Into<String>) -> Result<Self, SyncRemoteError> {
+        let value = value.into();
+        validate_query_component("sync cursor", &value, true)?;
+        if value.len() > 256 {
+            return invalid_request("sync cursor must be at most 256 bytes");
+        }
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Debug for OpaqueSyncCursor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("[opaque sync cursor]")
+    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -278,6 +352,7 @@ pub struct RemoteObjectVersion {
     pub object_type: SyncObjectType,
     pub version: u64,
     pub base_version: Option<u64>,
+    pub change_sequence: u64,
     pub owner_device_id: String,
     pub key_id: String,
     pub key_epoch: u64,
@@ -302,6 +377,7 @@ impl fmt::Debug for RemoteObjectVersion {
             .field("object_type", &self.object_type)
             .field("version", &self.version)
             .field("base_version", &self.base_version)
+            .field("change_sequence", &self.change_sequence)
             .field("owner_device_id", &self.owner_device_id)
             .field("key_id", &self.key_id)
             .field("key_epoch", &self.key_epoch)
@@ -339,6 +415,9 @@ impl RemoteObjectVersion {
         if self.version == 0 {
             return invalid_request("version must be greater than 0");
         }
+        if self.change_sequence == 0 {
+            return invalid_request("change_sequence must be greater than 0");
+        }
         if let Some(base_version) = self.base_version {
             if base_version >= self.version {
                 return invalid_request("base_version must be lower than version");
@@ -361,6 +440,13 @@ impl RemoteObjectVersion {
         }
         Ok(())
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteObjectDiscoveryPage {
+    pub entries: Vec<RemoteObjectVersion>,
+    pub next_cursor: OpaqueSyncCursor,
+    pub has_more: bool,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -425,6 +511,27 @@ impl<T: SyncRemoteTransport> SyncRemoteClient<T> {
         self.send_json(SyncRemoteMethod::Post, path, &request)
     }
 
+    pub fn discover_object_versions(
+        &self,
+        domain_id: &str,
+        after_cursor: Option<&OpaqueSyncCursor>,
+        limit: u16,
+    ) -> Result<RemoteObjectDiscoveryPage, SyncRemoteError> {
+        validate_path_segment("domain_id", domain_id)?;
+        if limit == 0 || limit > 200 {
+            return invalid_request("discovery limit must be between 1 and 200");
+        }
+        let path = format!("{}/domains/{domain_id}/objects", self.api_prefix);
+        let mut request = SyncRemoteRequest::new(SyncRemoteMethod::Get, path, None, Vec::new())
+            .with_query_param("limit", limit.to_string())?;
+        if let Some(cursor) = after_cursor {
+            request = request.with_query_param("after_cursor", cursor.as_str())?;
+        }
+        let response = self.transport.send(request)?;
+        let dto: ObjectDiscoveryResponseDto = decode_json_response(response)?;
+        dto.try_into()
+    }
+
     pub fn object_version(
         &self,
         domain_id: &str,
@@ -461,6 +568,43 @@ impl<T: SyncRemoteTransport> SyncRemoteClient<T> {
             });
         }
         Err(decode_error_response(response))
+    }
+
+    pub fn device_wrapped_epoch_material(
+        &self,
+        domain_id: &str,
+        recipient_device_id: &str,
+        key_epoch: u64,
+        wrapping_key_id: &str,
+    ) -> Result<WrappedEpochMaterial, SyncRemoteError> {
+        validate_path_segment("domain_id", domain_id)?;
+        validate_path_segment("recipient_device_id", recipient_device_id)?;
+        if key_epoch == 0 {
+            return invalid_request("key_epoch must be greater than zero");
+        }
+        validate_query_component("wrapping_key_id", wrapping_key_id, true)?;
+        let path = format!(
+            "{}/domains/{domain_id}/devices/{recipient_device_id}/wrapped-epochs/{key_epoch}",
+            self.api_prefix
+        );
+        let request = SyncRemoteRequest::new(SyncRemoteMethod::Get, path, None, Vec::new())
+            .with_query_param("wrapping_key_id", wrapping_key_id)?;
+        let response = self.transport.send(request)?;
+        let dto = decode_json_response::<DeviceWrappedEpochResponseDto>(response)?;
+        if dto.signature_record_type != "device_authorization" {
+            return invalid_response(
+                "wrapped epoch source requires a lifecycle authorization record",
+            );
+        }
+        let record = WrappedEpochMaterial::try_from(dto)?;
+        if record.domain_id != domain_id
+            || record.recipient_device_id != recipient_device_id
+            || record.key_epoch != key_epoch
+            || record.wrapping_key_id != wrapping_key_id
+        {
+            return invalid_response("wrapped epoch response does not match request locator");
+        }
+        Ok(record)
     }
 
     fn send_empty<R>(&self, method: SyncRemoteMethod, path: String) -> Result<R, SyncRemoteError>
@@ -535,6 +679,84 @@ impl<T: SyncRemoteTransport> SyncRemoteClient<T> {
     }
 }
 
+#[derive(Debug, Deserialize)]
+struct DeviceWrappedEpochResponseDto {
+    schema_version: u16,
+    algorithm: String,
+    domain_id: String,
+    recipient_device_id: String,
+    recipient_key_agreement_key_id: String,
+    wrapping_key_id: String,
+    key_epoch: u64,
+    #[serde(with = "base64_bytes")]
+    nonce: Vec<u8>,
+    #[serde(with = "base64_bytes")]
+    wrapped_key: Vec<u8>,
+    ciphertext_hash: String,
+    created_at_ms: i64,
+    #[serde(default)]
+    distributor_device_id: String,
+    #[serde(default)]
+    signature_record_type: String,
+    #[serde(default)]
+    signature_schema_version: u16,
+    #[serde(default)]
+    signature_algorithm: String,
+    #[serde(default)]
+    signature_key_id: String,
+    #[serde(default, with = "base64_bytes")]
+    signature: Vec<u8>,
+}
+
+impl TryFrom<DeviceWrappedEpochResponseDto> for WrappedEpochMaterial {
+    type Error = SyncRemoteError;
+
+    fn try_from(value: DeviceWrappedEpochResponseDto) -> Result<Self, Self::Error> {
+        let record = Self {
+            schema_version: value.schema_version,
+            algorithm: value.algorithm,
+            domain_id: value.domain_id,
+            recipient_device_id: value.recipient_device_id,
+            recipient_key_agreement_key_id: value.recipient_key_agreement_key_id,
+            wrapping_key_id: value.wrapping_key_id,
+            key_epoch: value.key_epoch,
+            nonce: Nonce::new(value.nonce).map_err(|error| SyncRemoteError::InvalidResponse {
+                message: error.to_string(),
+            })?,
+            wrapped_key: value.wrapped_key,
+            ciphertext_hash: value.ciphertext_hash,
+            created_at_ms: value.created_at_ms,
+        };
+        record
+            .validate()
+            .map_err(|error| SyncRemoteError::InvalidResponse {
+                message: error.to_string(),
+            })?;
+        Ok(record)
+    }
+}
+
+fn map_wrapped_epoch_remote_error(error: SyncRemoteError) -> SyncCryptoLoadError {
+    match error {
+        SyncRemoteError::Server {
+            code: SyncServerErrorCode::ForbiddenDevice,
+            ..
+        } => SyncCryptoLoadError::Revoked,
+        SyncRemoteError::Server {
+            code: SyncServerErrorCode::Unauthenticated,
+            ..
+        } => SyncCryptoLoadError::AccessDenied,
+        SyncRemoteError::Server {
+            code: SyncServerErrorCode::StorageUnavailable,
+            ..
+        }
+        | SyncRemoteError::Transport { .. } => SyncCryptoLoadError::Unavailable,
+        SyncRemoteError::InvalidRequest { .. }
+        | SyncRemoteError::InvalidResponse { .. }
+        | SyncRemoteError::Server { .. } => SyncCryptoLoadError::InvalidState,
+    }
+}
+
 #[derive(Debug, Serialize)]
 struct ObjectVersionUploadDto<'a> {
     object_type: &'a str,
@@ -594,6 +816,7 @@ struct ObjectVersionResponseDto {
     object_type: String,
     version: u64,
     base_version: u64,
+    change_sequence: u64,
     owner_device_id: String,
     key_id: String,
     key_epoch: u64,
@@ -630,6 +853,7 @@ impl TryFrom<ObjectVersionResponseDto> for RemoteObjectVersion {
             } else {
                 Some(value.base_version)
             },
+            change_sequence: value.change_sequence,
             owner_device_id: value.owner_device_id,
             key_id: value.key_id,
             key_epoch: value.key_epoch,
@@ -647,6 +871,387 @@ impl TryFrom<ObjectVersionResponseDto> for RemoteObjectVersion {
         };
         object.validate()?;
         Ok(object)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct ObjectDiscoveryResponseDto {
+    entries: Vec<ObjectVersionResponseDto>,
+    next_cursor: String,
+    has_more: bool,
+}
+
+impl TryFrom<ObjectDiscoveryResponseDto> for RemoteObjectDiscoveryPage {
+    type Error = SyncRemoteError;
+
+    fn try_from(value: ObjectDiscoveryResponseDto) -> Result<Self, Self::Error> {
+        let entries = value
+            .entries
+            .into_iter()
+            .map(RemoteObjectVersion::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
+        for pair in entries.windows(2) {
+            if pair[0].change_sequence >= pair[1].change_sequence {
+                return invalid_response("discovery entries must be ordered by change_sequence");
+            }
+        }
+        if value.has_more && entries.is_empty() {
+            return invalid_response("discovery page with has_more must contain entries");
+        }
+        Ok(Self {
+            entries,
+            next_cursor: OpaqueSyncCursor::new(value.next_cursor).map_err(|_| {
+                SyncRemoteError::InvalidResponse {
+                    message: "discovery next_cursor is invalid".to_owned(),
+                }
+            })?,
+            has_more: value.has_more,
+        })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct LifecycleDeviceDto {
+    domain_id: String,
+    device_id: String,
+    signing_algorithm: String,
+    signing_public_key_id: String,
+    #[serde(with = "base64_bytes")]
+    signing_public_key: Vec<u8>,
+    key_agreement_public_key_id: String,
+    #[serde(with = "base64_bytes")]
+    key_agreement_public_key: Vec<u8>,
+    status: String,
+    authorized_at_ms: Option<i64>,
+    revoked_at_ms: Option<i64>,
+    last_seen_at_ms: Option<i64>,
+}
+
+impl TryFrom<LifecycleDeviceDto> for RemoteLifecycleDevice {
+    type Error = SyncRemoteError;
+
+    fn try_from(value: LifecycleDeviceDto) -> Result<Self, Self::Error> {
+        let status = match value.status.as_str() {
+            "pending" => SyncDeviceStatus::Pending,
+            "active" => SyncDeviceStatus::Active,
+            "revoked" => SyncDeviceStatus::Revoked,
+            "lost" => SyncDeviceStatus::Lost,
+            _ => return invalid_response("lifecycle device status is invalid"),
+        };
+        validate_path_segment("domain_id", &value.domain_id).map_err(request_error_as_response)?;
+        validate_path_segment("device_id", &value.device_id).map_err(request_error_as_response)?;
+        validate_required("signing_algorithm", &value.signing_algorithm)
+            .map_err(request_error_as_response)?;
+        validate_required("signing_public_key_id", &value.signing_public_key_id)
+            .map_err(request_error_as_response)?;
+        validate_required(
+            "key_agreement_public_key_id",
+            &value.key_agreement_public_key_id,
+        )
+        .map_err(request_error_as_response)?;
+        if value.signing_public_key.is_empty() || value.key_agreement_public_key.is_empty() {
+            return invalid_response("lifecycle device public keys cannot be empty");
+        }
+        Ok(Self {
+            domain_id: value.domain_id,
+            device_id: value.device_id,
+            signing_algorithm: value.signing_algorithm,
+            signing_public_key_id: value.signing_public_key_id,
+            signing_public_key: value.signing_public_key,
+            key_agreement_public_key_id: value.key_agreement_public_key_id,
+            key_agreement_public_key: value.key_agreement_public_key,
+            status,
+            authorized_at_ms: value.authorized_at_ms.filter(|value| *value != 0),
+            revoked_at_ms: value.revoked_at_ms.filter(|value| *value != 0),
+            last_seen_at_ms: value.last_seen_at_ms.filter(|value| *value != 0),
+        })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct DeviceAuthorizationDto {
+    domain_id: String,
+    join_request_id: String,
+    authorizer_device_id: String,
+    recipient_device_id: String,
+    recipient_signing_public_key_id: String,
+    recipient_key_agreement_key_id: String,
+    join_short_code: String,
+    #[serde(with = "base64_bytes")]
+    join_challenge: Vec<u8>,
+    join_created_at_ms: i64,
+    join_expires_at_ms: i64,
+    key_epoch: u64,
+    wrapping_key_id: String,
+    encrypted_key_len: i64,
+    created_at_ms: i64,
+    signature_schema_version: u16,
+    signature_algorithm: String,
+    signature_key_id: String,
+    #[serde(with = "base64_bytes")]
+    signature: Vec<u8>,
+}
+
+impl TryFrom<DeviceAuthorizationDto> for RemoteDeviceAuthorization {
+    type Error = SyncRemoteError;
+
+    fn try_from(value: DeviceAuthorizationDto) -> Result<Self, Self::Error> {
+        if value.key_epoch == 0
+            || value.encrypted_key_len <= 0
+            || value.created_at_ms <= 0
+            || value.join_created_at_ms <= 0
+            || value.join_expires_at_ms <= value.join_created_at_ms
+            || value.created_at_ms > value.join_expires_at_ms
+        {
+            return invalid_response("authorization lifecycle counters are invalid");
+        }
+        let join_challenge = String::from_utf8(value.join_challenge).map_err(|_| {
+            SyncRemoteError::InvalidResponse {
+                message: "authorization join challenge must be UTF-8".to_owned(),
+            }
+        })?;
+        for (field, text) in [
+            ("domain_id", value.domain_id.as_str()),
+            ("join_request_id", value.join_request_id.as_str()),
+            ("authorizer_device_id", value.authorizer_device_id.as_str()),
+            ("recipient_device_id", value.recipient_device_id.as_str()),
+            ("join_short_code", value.join_short_code.as_str()),
+            ("wrapping_key_id", value.wrapping_key_id.as_str()),
+            ("signature_algorithm", value.signature_algorithm.as_str()),
+            ("signature_key_id", value.signature_key_id.as_str()),
+        ] {
+            validate_required(field, text).map_err(request_error_as_response)?;
+        }
+        if join_challenge.is_empty() || value.signature.is_empty() {
+            return invalid_response("authorization lifecycle signature fields are empty");
+        }
+        Ok(Self {
+            domain_id: value.domain_id,
+            join_request_id: value.join_request_id,
+            authorizer_device_id: value.authorizer_device_id,
+            recipient_device_id: value.recipient_device_id,
+            recipient_signing_public_key_id: value.recipient_signing_public_key_id,
+            recipient_key_agreement_key_id: value.recipient_key_agreement_key_id,
+            join_short_code: value.join_short_code,
+            join_challenge,
+            join_created_at_ms: value.join_created_at_ms,
+            join_expires_at_ms: value.join_expires_at_ms,
+            key_epoch: value.key_epoch,
+            wrapping_key_id: value.wrapping_key_id,
+            encrypted_key_len: value.encrypted_key_len as usize,
+            created_at_ms: value.created_at_ms,
+            signature_schema_version: value.signature_schema_version,
+            signature_algorithm: value.signature_algorithm,
+            signature_key_id: value.signature_key_id,
+            signature: value.signature,
+        })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct LifecycleEventDto {
+    domain_id: String,
+    lifecycle_sequence: u64,
+    event_type: String,
+    record_id: String,
+    key_epoch: u64,
+    reject_from_object_change_sequence: Option<u64>,
+    created_at_ms: i64,
+    device: LifecycleDeviceDto,
+    authorization: Option<DeviceAuthorizationDto>,
+    revocation: Option<lifecycle_dto::DeviceRevocationDto>,
+    recovery_record: Option<lifecycle_dto::LifecycleRecoveryRecordDto>,
+    recovered_activation: Option<lifecycle_dto::RecoveredDeviceActivationDto>,
+    recovery_revocation: Option<lifecycle_dto::RecoveryRecordRevocationDto>,
+}
+
+impl TryFrom<LifecycleEventDto> for RemoteLifecycleEvent {
+    type Error = SyncRemoteError;
+
+    fn try_from(value: LifecycleEventDto) -> Result<Self, Self::Error> {
+        let event_type = match value.event_type.as_str() {
+            "initial_device" => RemoteLifecycleEventKind::InitialDevice,
+            "device_authorized" => RemoteLifecycleEventKind::DeviceAuthorized,
+            "device_revoked" => RemoteLifecycleEventKind::DeviceRevoked,
+            "recovery_record_rotated" => RemoteLifecycleEventKind::RecoveryRecordRotated,
+            "device_recovered" => RemoteLifecycleEventKind::DeviceRecovered,
+            "recovery_record_revoked" => RemoteLifecycleEventKind::RecoveryRecordRevoked,
+            _ => return invalid_response("lifecycle event type is invalid"),
+        };
+        if value.lifecycle_sequence == 0
+            || value.key_epoch == 0
+            || value.created_at_ms <= 0
+            || value.record_id.is_empty()
+        {
+            return invalid_response("lifecycle event metadata is invalid");
+        }
+        let device = RemoteLifecycleDevice::try_from(value.device)?;
+        let authorization = value
+            .authorization
+            .map(RemoteDeviceAuthorization::try_from)
+            .transpose()?;
+        let revocation = value
+            .revocation
+            .map(RemoteDeviceRevocation::try_from)
+            .transpose()?;
+        let recovery_record = value
+            .recovery_record
+            .map(RemoteRecoveryRecordRotation::try_from)
+            .transpose()?;
+        let recovered_activation = value
+            .recovered_activation
+            .map(RemoteRecoveredDeviceActivation::try_from)
+            .transpose()?;
+        let recovery_revocation = value
+            .recovery_revocation
+            .map(RemoteRecoveryRecordRevocation::try_from)
+            .transpose()?;
+        match event_type {
+            RemoteLifecycleEventKind::InitialDevice
+                if authorization.is_none()
+                    && revocation.is_none()
+                    && recovery_record.is_none()
+                    && recovered_activation.is_none()
+                    && recovery_revocation.is_none()
+                    && value.reject_from_object_change_sequence.is_none() => {}
+            RemoteLifecycleEventKind::DeviceAuthorized
+                if authorization.is_some()
+                    && revocation.is_none()
+                    && recovery_record.is_none()
+                    && recovered_activation.is_none()
+                    && recovery_revocation.is_none()
+                    && value.reject_from_object_change_sequence.is_none() => {}
+            RemoteLifecycleEventKind::DeviceRevoked
+                if authorization.is_none()
+                    && revocation.is_some()
+                    && recovery_record.is_none()
+                    && recovered_activation.is_none()
+                    && recovery_revocation.is_none()
+                    && matches!(value.reject_from_object_change_sequence, Some(sequence) if sequence > 0) =>
+                {}
+            RemoteLifecycleEventKind::RecoveryRecordRotated
+                if authorization.is_none()
+                    && revocation.is_none()
+                    && recovery_record.is_some()
+                    && recovered_activation.is_none()
+                    && recovery_revocation.is_none()
+                    && value.reject_from_object_change_sequence.is_none() => {}
+            RemoteLifecycleEventKind::DeviceRecovered
+                if authorization.is_none()
+                    && revocation.is_none()
+                    && recovery_record.is_none()
+                    && recovered_activation.is_some()
+                    && recovery_revocation.is_none()
+                    && value.reject_from_object_change_sequence.is_none() => {}
+            RemoteLifecycleEventKind::RecoveryRecordRevoked
+                if authorization.is_none()
+                    && revocation.is_none()
+                    && recovery_record.is_none()
+                    && recovered_activation.is_none()
+                    && recovery_revocation.is_some()
+                    && value.reject_from_object_change_sequence.is_none() => {}
+            _ => return invalid_response("lifecycle event payload does not match event type"),
+        }
+        if device.domain_id != value.domain_id {
+            return invalid_response("lifecycle device domain does not match event domain");
+        }
+        Ok(Self {
+            domain_id: value.domain_id,
+            lifecycle_sequence: value.lifecycle_sequence,
+            event_type,
+            record_id: value.record_id,
+            key_epoch: value.key_epoch,
+            reject_from_object_change_sequence: value.reject_from_object_change_sequence,
+            created_at_ms: value.created_at_ms,
+            device,
+            authorization,
+            revocation,
+            recovery_record,
+            recovered_activation,
+            recovery_revocation,
+        })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct LifecycleSnapshotResponseDto {
+    domain: lifecycle_dto::DomainResponseDto,
+    entries: Vec<LifecycleEventDto>,
+    next_cursor: String,
+}
+
+impl TryFrom<LifecycleSnapshotResponseDto> for RemoteLifecycleSnapshot {
+    type Error = SyncRemoteError;
+
+    fn try_from(value: LifecycleSnapshotResponseDto) -> Result<Self, Self::Error> {
+        let domain = SyncDomain::try_from(value.domain)?;
+        let entries = decode_lifecycle_entries(value.entries, &domain.domain_id)?;
+        if entries.first().map(|event| event.lifecycle_sequence) != Some(1) {
+            return invalid_response("lifecycle snapshot must start at sequence 1");
+        }
+        Ok(Self {
+            domain,
+            entries,
+            next_cursor: lifecycle_dto::response_cursor(value.next_cursor)?,
+        })
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct LifecycleDiscoveryResponseDto {
+    entries: Vec<LifecycleEventDto>,
+    next_cursor: String,
+    has_more: bool,
+}
+
+impl TryFrom<LifecycleDiscoveryResponseDto> for RemoteLifecyclePage {
+    type Error = SyncRemoteError;
+
+    fn try_from(value: LifecycleDiscoveryResponseDto) -> Result<Self, Self::Error> {
+        let entries = value
+            .entries
+            .into_iter()
+            .map(RemoteLifecycleEvent::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
+        validate_lifecycle_order(&entries)?;
+        if value.has_more && entries.is_empty() {
+            return invalid_response("lifecycle page with has_more must contain entries");
+        }
+        Ok(Self {
+            entries,
+            next_cursor: lifecycle_dto::response_cursor(value.next_cursor)?,
+            has_more: value.has_more,
+        })
+    }
+}
+
+fn decode_lifecycle_entries(
+    entries: Vec<LifecycleEventDto>,
+    domain_id: &str,
+) -> Result<Vec<RemoteLifecycleEvent>, SyncRemoteError> {
+    let entries = entries
+        .into_iter()
+        .map(RemoteLifecycleEvent::try_from)
+        .collect::<Result<Vec<_>, _>>()?;
+    if entries.iter().any(|event| event.domain_id != domain_id) {
+        return invalid_response("lifecycle entry domain does not match snapshot domain");
+    }
+    validate_lifecycle_order(&entries)?;
+    Ok(entries)
+}
+
+fn validate_lifecycle_order(entries: &[RemoteLifecycleEvent]) -> Result<(), SyncRemoteError> {
+    for pair in entries.windows(2) {
+        if pair[0].lifecycle_sequence + 1 != pair[1].lifecycle_sequence {
+            return invalid_response("lifecycle entries must be contiguous and ordered");
+        }
+    }
+    Ok(())
+}
+
+fn request_error_as_response(error: SyncRemoteError) -> SyncRemoteError {
+    SyncRemoteError::InvalidResponse {
+        message: error.to_string(),
     }
 }
 
@@ -798,6 +1403,23 @@ fn validate_path_segment(field: &'static str, value: &str) -> Result<(), SyncRem
     Ok(())
 }
 
+fn validate_query_component(
+    field: &'static str,
+    value: &str,
+    allow_dot: bool,
+) -> Result<(), SyncRemoteError> {
+    if value.is_empty() {
+        return invalid_request(format!("{field} cannot be empty"));
+    }
+    let valid = value.bytes().all(|byte| {
+        byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_' || (allow_dot && byte == b'.')
+    });
+    if !valid {
+        return invalid_request(format!("{field} contains unsupported characters"));
+    }
+    Ok(())
+}
+
 fn validate_required(field: &'static str, value: &str) -> Result<(), SyncRemoteError> {
     if value.trim().is_empty() {
         return Err(SyncRemoteError::InvalidRequest {
@@ -814,9 +1436,17 @@ fn invalid_request<T>(message: impl Into<String>) -> Result<T, SyncRemoteError> 
 }
 
 fn invalid_response<T>(message: impl Into<String>) -> Result<T, SyncRemoteError> {
-    Err(SyncRemoteError::InvalidResponse {
+    Err(invalid_response_value(message))
+}
+
+fn invalid_response_value(message: impl Into<String>) -> SyncRemoteError {
+    SyncRemoteError::InvalidResponse {
         message: message.into(),
-    })
+    }
+}
+
+fn invalid_crypto_response(error: radishlex_ime_crypto::CryptoError) -> SyncRemoteError {
+    invalid_response_value(error.to_string())
 }
 
 mod base64_bytes {
@@ -840,349 +1470,7 @@ mod base64_bytes {
 }
 
 #[cfg(test)]
-pub(crate) mod test_support {
-    use super::*;
-    use radishlex_ime_crypto::{
-        DeviceSignature, KeyDescriptor, KeyRole, PlaintextPayload, SignedSyncObjectManifest,
-        SyncMasterKeyMaterial, TestMemoryDeviceKeyStore, ED25519_SIGNATURE_LEN,
-    };
-    use serde_json::Value;
-
-    pub(crate) fn signed_object() -> (AssembledSyncObject, SignedSyncObjectManifest) {
-        let object_key = KeyDescriptor::new("object-key-a", KeyRole::ObjectKey, 1).expect("key");
-        let sync_master_key = SyncMasterKeyMaterial::new([3u8; 32]).expect("master key");
-        let object_key_material = sync_master_key
-            .derive_object_key(
-                &object_key,
-                SyncObjectType::DictionaryUserTerms.to_crypto_object_type(),
-                "object-a",
-            )
-            .expect("object key");
-        let payload = PlaintextPayload::new(
-            SyncObjectType::DictionaryUserTerms.to_crypto_object_type(),
-            br#"{"payload_schema_version":1,"object_type":"dictionary.user_terms","terms":[{"term_id":"synthetic-term"}]}"#.to_vec(),
-        )
-        .expect("payload");
-        let envelope = radishlex_ime_crypto::EncryptedObjectEnvelope::encrypt_payload(
-            "object-a",
-            "device-a",
-            &object_key,
-            &object_key_material,
-            1,
-            None,
-            payload,
-            100,
-        )
-        .expect("envelope");
-        let draft =
-            crate::EncryptedSyncObjectDraft::from_crypto_envelope(&envelope).expect("draft");
-        let mut store = TestMemoryDeviceKeyStore::new();
-        store
-            .insert_signing_key("device-a", "signing-key-a", [8u8; 32], 1)
-            .expect("signing handle");
-        let handle = store
-            .handle("device-a", "signing-key-a")
-            .expect("signing handle");
-        let empty_signature = DeviceSignature::new(
-            "signing-key-a",
-            "device-a",
-            vec![1u8; ED25519_SIGNATURE_LEN],
-        )
-        .expect("empty signature");
-        let unsigned = SignedSyncObjectManifest::new("domain-a", &envelope, empty_signature)
-            .expect("manifest");
-        let signature = store
-            .sign(&handle, &unsigned.canonical_bytes())
-            .expect("signature");
-        let manifest =
-            SignedSyncObjectManifest::new("domain-a", &envelope, signature).expect("manifest");
-
-        (
-            AssembledSyncObject {
-                envelope,
-                draft,
-                record_count: 1,
-            },
-            manifest,
-        )
-    }
-
-    pub(crate) fn response_for(object: &AssembledSyncObject) -> Value {
-        serde_json::json!({
-            "domain_id": "domain-a",
-            "object_id": object.draft.object_id,
-            "object_type": object.draft.object_type.as_str(),
-            "version": object.draft.version,
-            "base_version": object.draft.base_version.unwrap_or(0),
-            "owner_device_id": object.draft.owner_device_id,
-            "key_id": object.draft.key_id,
-            "key_epoch": object.draft.key_epoch,
-            "algorithm": object.draft.algorithm,
-            "nonce": Base64::encode_string(&object.draft.nonce),
-            "encrypted_payload_len": object.draft.encrypted_payload_len,
-            "ciphertext_hash": object.draft.ciphertext_hash,
-            "signature_schema_version": 1,
-            "signature_algorithm": "ed25519-v1",
-            "signature_key_id": "signing-key-a",
-            "signature": Base64::encode_string(&vec![1u8; ED25519_SIGNATURE_LEN]),
-            "server_received_at_ms": 110,
-            "client_created_at_ms": object.draft.created_at_ms,
-            "client_updated_at_ms": object.draft.updated_at_ms
-        })
-    }
-}
+pub(crate) mod test_support;
 
 #[cfg(test)]
-mod tests {
-    use super::test_support::{response_for, signed_object};
-    use super::*;
-    use serde_json::Value;
-    use std::cell::RefCell;
-
-    #[derive(Default)]
-    struct RecordingTransport {
-        requests: RefCell<Vec<SyncRemoteRequest>>,
-        responses: RefCell<Vec<Result<SyncRemoteResponse, SyncRemoteError>>>,
-    }
-
-    impl RecordingTransport {
-        fn push_json<T: Serialize>(&self, status: u16, value: &T) {
-            self.responses
-                .borrow_mut()
-                .push(SyncRemoteResponse::json(status, value));
-        }
-
-        fn push_bytes(&self, status: u16, bytes: &[u8]) {
-            self.responses.borrow_mut().push(Ok(SyncRemoteResponse::new(
-                status,
-                Some("application/octet-stream".to_owned()),
-                bytes.to_vec(),
-            )));
-        }
-
-        fn requests(&self) -> Vec<SyncRemoteRequest> {
-            self.requests.borrow().clone()
-        }
-    }
-
-    impl SyncRemoteTransport for RecordingTransport {
-        fn send(&self, request: SyncRemoteRequest) -> Result<SyncRemoteResponse, SyncRemoteError> {
-            self.requests.borrow_mut().push(request);
-            self.responses.borrow_mut().remove(0)
-        }
-    }
-
-    #[test]
-    fn upload_object_version_sends_only_metadata_and_encrypted_payload() {
-        let (object, manifest) = signed_object();
-        let transport = RecordingTransport::default();
-        transport.push_json(201, &response_for(&object));
-        let client = SyncRemoteClient::new(transport);
-
-        let uploaded = client
-            .upload_object_version("domain-a", &object, &manifest)
-            .expect("upload");
-
-        assert_eq!(uploaded.object_id, object.draft.object_id);
-        assert_eq!(uploaded.version, object.draft.version);
-        let requests = client.transport().requests();
-        assert_eq!(requests.len(), 1);
-        let request = &requests[0];
-        assert_eq!(request.method(), SyncRemoteMethod::Post);
-        assert_eq!(
-            request.path(),
-            "/api/v1/domains/domain-a/objects/object-a/versions"
-        );
-        assert_eq!(request.content_type(), Some("application/json"));
-
-        let body: Value = serde_json::from_slice(request.body()).expect("json");
-        assert_eq!(body["object_type"], "dictionary.user_terms");
-        assert_eq!(body["base_version"], 0);
-        assert_eq!(
-            body["payload"],
-            Base64::encode_string(&object.envelope.encrypted_payload)
-        );
-        assert_eq!(body["nonce"], Base64::encode_string(&object.draft.nonce));
-        assert_eq!(
-            body["signature"],
-            Base64::encode_string(&manifest.signature.signature)
-        );
-        let body_text = String::from_utf8(request.body().to_vec()).expect("utf8");
-        assert!(!body_text.contains("plaintext"));
-        assert!(!body_text.contains("input_code"));
-        assert!(!body_text.contains("reading"));
-        assert!(!body_text.contains("ranker_detail"));
-    }
-
-    #[test]
-    fn upload_rejects_manifest_that_does_not_match_encrypted_object() {
-        let (object, mut manifest) = signed_object();
-        manifest.object_id = "object-b".to_owned();
-        let client = SyncRemoteClient::new(RecordingTransport::default());
-
-        let error = client
-            .upload_object_version("domain-a", &object, &manifest)
-            .expect_err("mismatch fails");
-
-        assert!(matches!(error, SyncRemoteError::InvalidRequest { .. }));
-        assert!(error.to_string().contains("object_id"));
-    }
-
-    #[test]
-    fn stale_base_version_maps_latest_conflict_metadata_without_payload() {
-        let (object, manifest) = signed_object();
-        let transport = RecordingTransport::default();
-        transport.push_json(
-            409,
-            &serde_json::json!({
-                "error_code": "conflict_stale_base_version",
-                "message": "base version is stale",
-                "retryable": false,
-                "server_time_ms": 123,
-                "latest_version": 3,
-                "latest_ciphertext_hash": "latest-hash"
-            }),
-        );
-        let client = SyncRemoteClient::new(transport);
-
-        let error = client
-            .upload_object_version("domain-a", &object, &manifest)
-            .expect_err("stale conflict");
-
-        match error {
-            SyncRemoteError::Server {
-                status,
-                code,
-                latest,
-                ..
-            } => {
-                assert_eq!(status, 409);
-                assert_eq!(code, SyncServerErrorCode::ConflictStaleBaseVersion);
-                assert_eq!(
-                    latest,
-                    Some(LatestObjectConflictMetadata {
-                        version: 3,
-                        ciphertext_hash: Some("latest-hash".to_owned()),
-                    })
-                );
-            }
-            other => panic!("unexpected error: {other:?}"),
-        }
-        let debug = format!("{:?}", client.transport().requests()[0]);
-        let payload_text = String::from_utf8_lossy(&object.envelope.encrypted_payload);
-        assert!(!debug.contains(payload_text.as_ref()));
-    }
-
-    #[test]
-    fn server_error_codes_map_to_public_remote_errors() {
-        let forbidden_transport = RecordingTransport::default();
-        forbidden_transport.push_json(
-            403,
-            &serde_json::json!({
-                "error_code": "forbidden_device",
-                "message": "device cannot write",
-                "retryable": false,
-                "server_time_ms": 456
-            }),
-        );
-        let client = SyncRemoteClient::new(forbidden_transport);
-
-        let error = client
-            .object_version("domain-a", "object-a", 1)
-            .expect_err("forbidden");
-
-        match error {
-            SyncRemoteError::Server {
-                status,
-                code,
-                retryable,
-                server_time_ms,
-                ..
-            } => {
-                assert_eq!(status, 403);
-                assert_eq!(code, SyncServerErrorCode::ForbiddenDevice);
-                assert!(!retryable);
-                assert_eq!(server_time_ms, Some(456));
-            }
-            other => panic!("unexpected error: {other:?}"),
-        }
-
-        let unauthenticated_transport = RecordingTransport::default();
-        unauthenticated_transport.push_json(
-            401,
-            &serde_json::json!({
-                "error_code": "unauthenticated",
-                "message": "access token is missing or invalid",
-                "retryable": false,
-                "server_time_ms": 789
-            }),
-        );
-        let client = SyncRemoteClient::new(unauthenticated_transport);
-
-        let error = client
-            .object_version("domain-a", "object-a", 1)
-            .expect_err("unauthenticated");
-
-        match error {
-            SyncRemoteError::Server {
-                status,
-                code,
-                retryable,
-                server_time_ms,
-                ..
-            } => {
-                assert_eq!(status, 401);
-                assert_eq!(code, SyncServerErrorCode::Unauthenticated);
-                assert!(!retryable);
-                assert_eq!(server_time_ms, Some(789));
-            }
-            other => panic!("unexpected error: {other:?}"),
-        }
-    }
-
-    #[test]
-    fn object_payload_reads_metadata_then_binary_payload() {
-        let (object, _) = signed_object();
-        let payload = object.envelope.encrypted_payload.clone();
-        let transport = RecordingTransport::default();
-        transport.push_json(200, &response_for(&object));
-        transport.push_bytes(200, &payload);
-        let client = SyncRemoteClient::new(transport);
-
-        let downloaded = client
-            .object_payload("domain-a", "object-a", 1)
-            .expect("payload");
-
-        assert_eq!(downloaded.object.object_id, "object-a");
-        assert_eq!(downloaded.payload, payload);
-        let debug = format!("{downloaded:?}");
-        assert!(debug.contains("[redacted;"));
-        assert!(!debug.contains(&Base64::encode_string(&payload)));
-        let requests = client.transport().requests();
-        assert_eq!(requests.len(), 2);
-        assert_eq!(
-            requests[0].path(),
-            "/api/v1/domains/domain-a/objects/object-a/versions/1"
-        );
-        assert_eq!(
-            requests[1].path(),
-            "/api/v1/domains/domain-a/objects/object-a/versions/1/payload"
-        );
-    }
-
-    #[test]
-    fn object_payload_rejects_length_mismatch() {
-        let (object, _) = signed_object();
-        let transport = RecordingTransport::default();
-        transport.push_json(200, &response_for(&object));
-        transport.push_bytes(200, b"short");
-        let client = SyncRemoteClient::new(transport);
-
-        let error = client
-            .object_payload("domain-a", "object-a", 1)
-            .expect_err("length mismatch");
-
-        assert!(matches!(error, SyncRemoteError::InvalidResponse { .. }));
-        assert!(error.to_string().contains("payload length"));
-    }
-}
+mod tests;

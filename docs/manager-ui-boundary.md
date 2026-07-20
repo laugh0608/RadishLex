@@ -2,7 +2,7 @@
 
 本文档定义 Flutter manager 必须稳定的职责边界、数据可见性、分层交付和同步 UI 停止线。读者是实现 `apps/radishlex-manager`、`ime-ffi` 管理接口、本地管理页面和同步设置页面的开发者。本文不包含当前批次状态、Flutter 页面视觉稿、widget 目录结构、平台输入法壳接入、完整账号系统、OIDC 实现或真实平台私钥 backend 实现。
 
-本地原型能力由 `docs/manager-local-acceptance.md` 记录验收范围和证据入口；真实同步进入 UI / bridge 前的交互边界、错误分类和测试计划见 `docs/manager-sync-entry-boundary.md`；本文只定义长期职责边界。
+本地产品能力由 `docs/manager-local-acceptance.md` 记录验收范围和证据入口；真实同步进入 UI / bridge 前的交互边界、错误分类和测试计划见 `docs/manager-sync-entry-boundary.md`；本文只定义长期职责边界。
 
 ## 稳定定位
 
@@ -10,13 +10,34 @@ Flutter manager 是 RadishLex 的管理界面，不进入输入热路径，不�
 
 管理端的职责是把 Rust core 和本地 userdb 已经具备的能力以可审计、可删除、可解释的方式呈现给用户，并在同步能力具备生产条件前清楚显示不可用原因。
 
-manager 分层交付：M2 先完成本地词库、学习、隐私和诊断管理；M3 再完成同步、设备、恢复与撤销；M4 闭合 native library、平台目录、签名和升级。已有 fixture 与开发期 Dart FFI smoke 只是实现基础，不等于正常产品包已经完成。后续代码继续遵守以下边界：
+manager 分层交付：M2 先完成本地词库、学习、隐私和诊断管理，并让正常本地产品运行态携带 native library、使用固定平台目录；M3 再完成同步、设备、恢复与撤销；M4 闭合发布签名、公证、安装升级和最终产品打包。fixture 与开发期 Dart FFI smoke 只承担显式演示和开发验证，Release 产品 bundle 与真实平台验收承担产品证据。后续代码继续遵守以下边界：
 
 - 本地 userdb 管理优先于远端同步开关。
 - 学习记录摘要优先于 P1 原始事件明细。
 - 同步预检、本地 Docker / 本地 HTTPS 联调状态和部署配置检查优先于真实远端启用。
-- 恢复码和设备授权 UI 必须等待可用平台私钥 backend。
-- 用户可用同步主操作必须等待发布级部署证据和可用平台私钥 backend；非上传的同步入口状态、阻塞说明和本地联调展示可以继续推进。
+- 恢复码和设备授权 UI 必须等待受控资格执行链、交互安全与对应产品流程退出评审；macOS 平台私钥 backend 主路径已经通过，但不单独解锁 UI。
+- 用户可用同步主操作必须等待产品入口退出评审；发布级目标部署证据按首版后计划补齐。非上传的同步入口状态、阻塞说明和本地联调展示可以继续推进。
+
+## M2 产品运行态契约
+
+本节契约已由 2026-07-18 M2 自动与 macOS 产品实机证据关闭，后续 M3/M4 改动必须保持。M2 manager 正常启动默认进入 `product` mode。`product` mode 必须加载构建包内匹配版本的 RadishLex native library，使用平台解析的固定持久化目录，并把 native library、路径、权限或 userdb 初始化失败作为结构化启动错误展示；任何失败都不得静默切换为 fixture。`demo` mode 只能通过编译期显式开关构建，且整个运行期间必须持续显示“合成演示数据”标识，不能与产品运行态共用无标识入口。
+
+macOS M2 本地产品构建沿用已经过 R01B 验证的 `~/Library/Application Support/RadishLex/userdb.sqlite3` 作为输入法与 manager 的单一 userdb 真相源。该构建使用非 App Sandbox 的本地分发 profile，使 manager 与 InputMethodKit 薄壳访问同一用户级目录；不得为了满足 sandbox 而静默迁移或复制 userdb。M4 若因签名、公证、商店分发或 App Group 约束需要改变容器模型，必须先形成迁移设计、原子迁移与回滚证据，并重新执行受影响的输入法 / manager 双端验收。
+
+macOS 产品路径由原生 `FileManager` 与 app bundle 解析，不依赖 shell 环境变量：
+
+- userdb：用户 Application Support 下的 `RadishLex/userdb.sqlite3`。
+- manager 非 secret settings：同目录下的 `manager-settings.json`。
+- native library：app bundle 的 `Contents/Frameworks/libradishlex_ime_ffi.dylib`。
+- Application Support 的 `RadishLex` 目录必须保持 `0700`；manager 进程在创建本地产品文件前设置 `0077` umask，settings 正式文件与原子写临时文件从创建时即保持 `0600`。manager 不改变既有 userdb / WAL / SHM 的正文或权限策略，schema migration 仍只由 Rust `ime-userdb` 打开流程执行。
+
+产品构建必须把当前 workspace 编译出的 native library 复制到 bundle，并验证目标架构、依赖解析、ABI contract version 和 manager 所需 symbol 集。开发期 FFI smoke 可以继续通过显式路径直接加载库，但不能替代无环境变量的产品 bundle smoke。
+
+M2 设置页中的同步配置仍是非 secret 草案；隐私模式不是普通草案字段。macOS 隐私模式必须通过受控平台 bridge 读写 InputMethodKit 使用的 `org.radishlex.inputmethod.macos` / `RadishLexPrivacyMode` 偏好，写入后读回确认，失败时保持原状态并显示结构化错误。manager 不展示 P1 原始行，也不通过隐私开关直接读取 userdb 正文。
+
+词库产品视图必须来自 Rust 真相源并区分 active、suppressed 和 deleted tombstone。suppressed 与 deleted 只能经独立确认调用 explicit restore；普通新增、导入或学习不得隐式恢复。deleted tombstone 查询只返回 identity、删除时间和非敏感原因分类，不返回 P1 原始事件。词条审计通过 Rust 持久化的可选 `import_batch_id` 关联本地导入批次；`source` 是来源枚举，批次 `source_name` 是用户提供的审计标签，两者不得按字符串相等推断关联。
+
+M2 产品运行态的验收至少覆盖：无 shell 环境变量启动、bundle 内 native library 加载、固定路径与权限、空库初始化与既有 schema 打开、active / suppressed / deleted 查询、删除后重启、explicit restore 后重启、隐私偏好写入读回、输入法与 manager 双连接读写、失败可见性，以及 demo/product 隔离。测试数据只能使用合成词和临时目录；自动化不得读取开发者真实 userdb 正文。
 
 ## 职责范围
 
@@ -24,6 +45,7 @@ M2 本地管理能力应优先覆盖：
 
 - 查看本地用户词条。
 - 删除用户词条，并写入 tombstone。
+- 查看 deleted/suppressed 状态，并通过单独确认动作执行 explicit restore。
 - 导入用户词库，并显示导入检查结果。
 - 导出用户词库。
 - 查看本地学习状态摘要。
@@ -31,14 +53,14 @@ M2 本地管理能力应优先覆盖：
 - 查看 sync preflight 摘要。
 - 查看 import batches、词条 tombstone 和本地 sync 影响摘要。
 
-M3 同步管理能力在安全退出条件满足后覆盖：
+M3 同步管理能力在安全退出条件满足后覆盖。当前 backend 产品资格和 Rust 严格 HTTPS transport 已闭合，但 `user_sync_enabled=false`；下一批只允许本地 HTTPS、合成 P2 和单次内存参数下的受控资格执行链，不开放普通用户成功入口：
 
 - 配置自部署服务端地址和本地连接参数草案。
 - 查看本地同步服务连接健康摘要，只展示 endpoint 状态、access token 存在性、transport 分类、server state 摘要和结构化错误码。
 - 导入 `manager_sync_readiness.v1` 非敏感摘要到当前 manager 内存态，用于本地开发联调和同步页 / 设置页 / 诊断报告同源派生。
 - 显示同步能力是否可用，以及不可用原因。
 - 查看本机设备身份、backend capability 和 production gate 状态摘要。
-- 查看四条恢复 / 授权 action 的非执行 command preview、request / result boundary、allowed fields、forbidden material policy 和错误分类摘要。
+- 查看恢复与设备流程的只读 action intent、阻塞原因和错误分类摘要。
 - 保存非 secret settings draft，并从草案、隐私模式、平台私钥 backend gate 和部署证据来源标签派生 sync gate。
 - 预览、复制和导出脱敏诊断摘要。
 - 以结构化错误分类展示 bridge 操作失败，不把 native 错误明细透传给 widget 层。
@@ -73,7 +95,7 @@ M3 同步管理能力在安全退出条件满足后覆盖：
 管理端可以展示的数据：
 
 - 本地用户词条、权重摘要和删除 tombstone 的用户可读视图。
-- 导入批次结果、导入错误分类和被跳过条目计数。
+- 导入批次结果、导入错误分类、被跳过条目计数，以及基于本地 batch id 的最近导入关联。
 - 学习状态摘要、候选 explain 摘要和 sync preflight 摘要。
 - 服务端地址、连接状态、HTTP 错误分类和认证缺失状态。
 - 设备 ID、backend id、backend capability、production gate 状态和不可用原因。
@@ -95,8 +117,10 @@ M3 同步管理能力在安全退出条件满足后覆盖：
 ## 用户可见行为约束
 
 - 词库导入必须先展示导入检查摘要，再由用户确认写入；普通导入不得复活 tombstone，dry run 不写入 userdb。
+- 普通新增、选择学习和导入都不得清除 tombstone 或 suppressed；恢复必须使用独立的用户确认动作并调用 `restore_term`，界面需要明确展示这是恢复已删除/已抑制词条，不得在其他操作成功后隐式触发。
 - 词库导出只导出用户显式请求的 P2 用户词条视图，不作为诊断报告的一部分混入。
 - 学习页、同步页和诊断报告只能展示聚合计数、状态码、来源标签和解释性摘要，不展示 P1 原始事件或明文同步 payload。
+- manager 与输入 runtime 共用 userdb 时，页头必须提供显式刷新动作并重新调用 bridge `loadSnapshot`；不得把启动时 snapshot 当作长期真相源，也不得在 Flutter 层复制输入侧学习状态来伪造实时可见性。
 - 设置页保存的是本地草案；`retain_sync_config`、`server_endpoint`、`access_token_configured`、`privacy_mode`、`diagnostics_export` 和部署证据来源只用于派生 UI 状态，不启用真实上传。
 - 诊断报告预览的 section 筛选和关键字筛选只影响当前对话框字段列表，不改变 `ManagerDiagnosticsReport` 数据模型、脱敏文本、剪贴板内容或导出内容。
 - 复制诊断摘要必须复制完整脱敏文本；导出诊断摘要必须保持同一份脱敏摘要语义，不因当前筛选状态输出字段子集。
@@ -105,14 +129,14 @@ M3 同步管理能力在安全退出条件满足后覆盖：
 
 管理端应通过 `ime-ffi` 或后续受控 bridge 调用 Rust 能力，不直接读写 Rust 内部结构。
 
-当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、词库导入检查、词库导入、词库导出、设置草案保存、诊断报告预览和诊断报告导出这组受控方法。现有 `FixtureManagerBridge` 只使用合成数据验证调用边界、UI 状态更新、词库搜索 / 空态、词条 key / source / import batch / tombstone / sync 分类审计详情、词库页导入历史筛选 / 排序 / 批次联动审计、本地 sync preflight 影响摘要、学习状态聚合摘要、rank explain 筛选和候选贡献项详情、同步页 gate 状态来源 / 本地 P2 对象分类 / 连接健康 / 设备 backend 门禁审计、设置页 gate 草案预览、部署证据来源标签、诊断报告字段分组 / 筛选 / 脱敏文本复制、诊断报告 gate source / stop line、删除确认、导入检查对话框、导入 / 导出结果反馈、操作失败分类提示、设置草案和脱敏诊断报告；真实 Dart FFI bridge 已覆盖本地 userdb list / delete、dictionary inspect / import / export、import batches、learning status、rank explain、sync preflight 摘要、非 secret settings JSON 草案持久化和脱敏诊断报告导出。Dart 绑定层必须复制 Rust view 后释放 handle，不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层；widget 层只展示结构化错误码、错误分类和非敏感配置来源诊断。
+当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、explicit restore、词库导入检查、词库导入、词库导出、设置草案保存、诊断报告预览和诊断报告导出这组受控方法。现有 `FixtureManagerBridge` 只在显式 demo 与测试中使用合成数据验证调用边界和 UI 状态；真实 Dart FFI bridge 已覆盖本地 userdb active/deleted list、delete、restore、dictionary inspect/import/export、import batches、learning status、rank explain、sync preflight、status-only 产品 backend 摘要、非 secret settings JSON 和脱敏诊断报告。产品 bootstrap 还通过受控平台 bridge 解析固定路径、收紧文件权限并读写输入 runtime 的隐私偏好。Dart 绑定层通过 ABI v6 复制 Rust user-term view 的可选 `import_batch_id` 后释放 handle，并把固定数值产品摘要映射为 `DeviceSecuritySummary`；不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层。manager Release dylib 中的 Apple P-256 validation ABI 仍只由原生产品自检路径使用，Dart 不直接绑定；Manager 读取的是不触发系统 API 的独立 `radishlex_manager_sync_product_status`。
 
 settings JSON schema、部署证据来源 allowlist、诊断报告字段索引和脱敏规则见 `docs/manager-settings-diagnostics.md`。
 
 第一批可依赖的接口方向：
 
 - session / dictionary handle 的创建与释放。
-- userdb 词条 list / add / delete。
+- userdb 词条 list / add / explicit restore / delete。
 - dictionary inspect / import / export。
 - import batches 只读查询。
 - learning status 只读摘要。
@@ -123,7 +147,7 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 
 当前 Dart 侧 `manager_sync_readiness.v1` mapper 只定义 future bridge readiness 摘要到 Manager 只读 readiness model 的准备层映射，不改变 `ManagerBridge` contract，也不新增 C ABI。该 mapper 只能接受 allowlist 状态码、来源标签、前置条件和错误分类；未知值必须降级为安全分类，不能把 provider 原始异常、路径、token、恢复码、短码、signature bytes、wrapped material 或 payload bytes 传播到 UI、settings draft 或诊断报告。
 
-当前 Dart 侧 `manager_sync_action_command_preview.v1`、`SyncActionCommandPreviewPlan`、`SyncActionRequestPreview` 和 `SyncActionResultPreview` 也只属于真实 bridge 命令前的非执行模型层。它们从只读 `SyncInteractionEntryPlan` 派生 action id、execution status、data policy、stop line、request / result boundary、allowed fields、forbidden material policy 和错误分类，供设置页、同步页和诊断报告展示同一份摘要；它们不是 `ManagerBridge` method、不是 C ABI DTO，也不能构造或接收真实 request / result payload。
+native 产品摘要同样不改变 `ManagerBridge` 方法集：`FfiManagerBridge.loadSnapshot` 在一次快照内读取 `sync preflight + product status`，后者只派生设备 backend、capability blocker 与关闭态 production gate。未知版本、枚举、flag 或不一致组合降级为 `native_sync_product_status_invalid`，不会回退 fixture、猜测平台 backend 或开放同步。
 
 后续同步 UI 需要新增 bridge 时，应遵循：
 
@@ -150,13 +174,13 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 
 同步服务连接健康只允许展示 `connection_status`、`connection_blocker`、`endpoint_status`、`access_token_status`、`transport_mode`、`server_state_status`、`connection_probe_source`、`connection_probe_recorded_at`、`auth_status`、`http_status`、`http_status_class`、`local_insecure_tls` 和 `last_remote_error_code` 这类摘要；access token 只能以存在性表示，URL credential、query token、请求 / 响应体、证书内容、真实路径和日志正文不得进入 widget、settings draft 或诊断报告。
 
-`manager_sync_readiness.v1` 导入态只保存在当前 manager snapshot 内存中，不写入 settings JSON。`manager_sync_evidence_bundle.v1` 只作为测试 fixture 的组合输入，不提供 UI 导入入口。`manager_sync_action_command_preview.v1` 的 request / result preview 只用于解释 future bridge command 的安全外壳：当前阶段 ready 场景仍显示 `not_executable_current_phase`、`request_not_built_current_phase` 和 `result_not_available_current_phase`，readiness 阻塞时只显示对应阻塞状态，不创建按钮、点击回调或 bridge 调用。
+`manager_sync_readiness.v1` 导入态只保存在当前 manager snapshot 内存中，不写入 settings JSON。当前 Manager 不提供真实同步命令、恢复码输入、设备授权或撤销方法；关闭态由 capability 缺席、禁用按钮和稳定阻塞状态表达。
 
 ## 恢复码与设备授权
 
-恢复码、设备授权、设备撤销和真实同步入口状态进入产品实现前，必须先遵守 `docs/manager-sync-entry-boundary.md` 中的进入条件、bridge 边界、诊断脱敏和测试计划；四条 action 的非执行 request / result 预演边界必须同时遵守 `docs/manager-sync-action-protocol-preview.md` 和 `docs/manager-sync-action-acceptance-matrix.md`。
+恢复码、设备授权、设备撤销和真实同步入口状态进入产品实现前，必须先遵守 `docs/manager-sync-entry-boundary.md` 中的 UI 职责、secret 生命周期、bridge 边界、诊断脱敏和产品停止线。
 
-当前 Flutter manager 已能展示服务连接健康、恢复码准备态、设备授权准备态和 join request 状态的只读摘要，默认仍不上传真实 P2 数据；恢复码 / 设备授权默认状态为 `recovery_code_flow_closed`、`device_authorization_flow_closed` 和 `join_request_unavailable`。恢复码 setup / restore 与设备 join / revocation 已拆成四条 readiness，并通过 `SyncReadinessFlowSummary` 与 `SyncInteractionEntryPlan` 输出同一组聚合阻塞、错误分类、下一项证据、来源标签和非执行操作进入计划；`SyncActionCommandPreviewPlan` 再输出四条 action 的 command preview、request / result status、allowed fields 和 forbidden material。所有这些状态只用于解释阻塞和诊断脱敏，不提供恢复码生成 / 输入、join request 创建、授权成功、设备撤销或真实同步上传入口。
+当前 Flutter manager 已能展示服务连接健康、恢复码准备态、设备授权准备态和 join request 状态的只读摘要，默认仍不上传真实 P2 数据；恢复码 / 设备授权默认状态为 `recovery_code_flow_closed`、`device_authorization_flow_closed` 和 `join_request_unavailable`。恢复码 setup / restore 与设备 join / revocation 通过 `SyncReadinessFlowSummary` 与 `SyncInteractionEntryPlan` 输出聚合阻塞、错误分类、下一项证据、来源标签和只读进入状态，不提供恢复码生成 / 输入、join request 创建、授权成功、设备撤销或真实同步上传入口。
 
 恢复码 UI 必须等到以下条件同时满足：
 
@@ -188,23 +212,24 @@ settings JSON schema、部署证据来源 allowlist、诊断报告字段索引�
 
 测试 fixture 应使用合成词、虚构设备、虚构服务端地址和合成错误码。截图测试不得包含真实用户词、真实账号、真实 token、真实域名证书细节或真实设备序列号。
 
-## 已验证原型能力
+## 已验证能力与当前证据
 
 1. 已固定本文档，并同步路线图、技术计划、仓库结构和周志。
-2. 已创建 `apps/radishlex-manager/` Flutter macOS 工程骨架，当前通过 `ManagerBridge` contract 接入合成 fixture。
+2. `apps/radishlex-manager/` 默认以 `product` mode 启动，产品失败进入结构化不可用态；显式 `demo` 构建通过 `ManagerBridge` contract 接入合成 fixture，并持续显示演示标识。
 3. 已验证词库搜索 / 空态、词条审计详情、导入历史筛选 / 排序 / 批次联动审计、本地 sync preflight 影响摘要、学习状态聚合摘要、rank explain 筛选和候选贡献项详情、同步页 gate 状态来源 / 本地 P2 对象分类 / 连接健康 / 设备 backend 门禁审计、设置页 gate 草案预览、部署证据来源标签、诊断报告 gate source / stop line、词条删除确认、词库导入检查、词库导入后刷新、词库导入 / 导出结果摘要和操作失败分类提示经由 fixture bridge 完成受控调用。
-4. 已补第一批真实 Dart FFI bridge：显式配置本地 SQLite userdb 与 `ime-ffi` 动态库后，可接入 userdb 词条 list / delete、用户词库 inspect / import / export、import batches、learning status 摘要、rank explain 摘要和 sync preflight 摘要。
-5. 已新增 `scripts/check-manager-ffi-smoke.sh`，构建 `radishlex-ime-ffi` 动态库并使用临时 SQLite userdb、合成 TSV 和导出文件复验真实 Dart FFI bridge 的本地 list / delete / import / export、import batches、learning status、rank explain 和 sync preflight 摘要。
+4. 真实 Dart FFI bridge 已接入 userdb active/deleted list、delete、explicit restore、用户词库 inspect/import/export、import batches、learning status、rank explain、sync preflight 和 status-only 产品摘要；绑定初始化会验证 ABI v6、owner-thread 和 panic boundary，词条与导入批次按可选 batch id 关联，产品摘要始终映射为关闭态 gate。
+5. `scripts/check-manager-ffi-smoke.sh` 使用临时合成数据复验开发期真实 bridge；`scripts/check-manager-product.sh` 构建 Release app，校验非 sandbox M2 profile、嵌套签名、bundle native library、ABI/符号/架构/依赖，并直接对 bundle dylib 执行重启、删除、tombstone 和恢复 smoke，不启动 GUI。
 6. `rank explain` 区域已通过专用 `ime-ffi` ABI 读取单候选贡献项，Flutter 只展示复制后的非敏感摘要，不持有 Rust view 指针。
 7. 已补设置页配置来源诊断、sync gate 草案预览、部署证据来源标签、设置草案保存、脱敏诊断报告分组预览 / 筛选 / 复制 / 导出和 bridge 失败结构化错误分类展示；UI 不透传 native 错误明细。
 8. 同步配置页继续保持真实上传按钮禁用，状态由设置草案、隐私模式、平台私钥 backend gate 和部署证据来源草案派生，可显示 `local_only`、`sync_disabled_by_policy`、`backend_unavailable`、`deployment_unverified` 或 `preflight_ready`。
-9. 已接入 sync entry state、服务连接健康、`sync_connection_health.v1` 摘要回填、恢复码 / 设备授权准备态、四条 readiness 聚合、future bridge readiness mapper、settings 内存态 readiness 导入、开发期 evidence bundle 同源回归、只读交互进入计划、action command preview 和 request / result preview 的非上传实现；待可用平台私钥 backend、恢复 / 授权实现测试和发布级部署证据齐备后，再接设备授权成功路径、恢复码和用户可用同步。
+9. 已接入 sync entry state、服务连接健康、`sync_connection_health.v1` 摘要回填、恢复码 / 设备授权准备态、四条 readiness 聚合、settings 内存态 readiness 导入和只读交互进入状态；macOS 平台私钥 backend 主路径已通过，下一步先完成 localhost 合成 P2 受控资格命令，再评审真实设备授权、恢复码和用户同步命令。
+10. macOS 原生平台 bridge 已固定 Application Support 与 bundle Frameworks 路径、`0700`/`0600` 权限、symlink 拒绝和 `CFPreferences` 隐私键读写回滚；Rust 双连接测试已覆盖并发 schema 初始化、WAL 可见性、输入侧选择、manager 删除和恢复。manager 页头刷新会重新加载真实 bridge snapshot，widget 回归覆盖输入 runtime 外部更新后的聚合可见性；正常 Release GUI 与输入法共库实机已进一步证明外部刷新、delete 防复活、explicit restore、双进程重启、隐私零增量与最终回滚，M2 于 2026-07-18 关闭。
 
 ## 停止线
 
-- 没有可用平台私钥 backend 前，不提供用户可用同步开关、恢复码创建 UI 或设备授权成功路径。
+- 受控资格执行链、交互安全与产品入口退出评审完成前，不提供用户可用同步开关、恢复码创建 UI 或设备授权成功路径。
 - 没有发布级目标部署运行证据前，不把远端同步展示为生产可用；本地 Docker / 本地 HTTPS 联调状态可以作为非生产证据展示。
 - 没有 FFI / bridge 明确错误语义前，不让 Flutter 直接解析 Rust 内部错误字符串。
 - 任何会展示、记录、上传或导出 P0、P1 原始事件、恢复码、token、私钥或明文同步 payload 的设计都必须停止并回退。
-- 任何 action preview 被接成真实 `ManagerBridge` request / result、settings draft action payload、按钮点击回调或 C ABI DTO 前，都必须另补真实 contract 文档和实现测试。
+- 任何真实同步、恢复或设备命令进入 `ManagerBridge`、settings UI、按钮点击回调或 C ABI 前，都必须先补当期 contract 文档和真实实现测试。
 - 如果 UI 需要新增 Go server API，必须先更新 `docs/sync-server-api-storage.md` 或对应 ADR，不能让管理端绕过现有 encrypted object / metadata 边界。

@@ -54,6 +54,11 @@ impl Engine for FfiDemoEngine {
             return Ok(KeyOutcome::ignored());
         }
 
+        let modifiers = key.modifiers();
+        if modifiers.control() || modifiers.alt() || modifiers.meta() {
+            return Ok(KeyOutcome::ignored());
+        }
+
         match key.key() {
             Key::Char(ch) if ch.is_ascii_alphanumeric() || ch == '\'' => {
                 self.buffer.push(ch.to_ascii_lowercase());
@@ -82,7 +87,11 @@ impl Engine for FfiDemoEngine {
         Ok(self.candidates_for_buffer())
     }
 
-    fn commit_candidate(&mut self, index: usize) -> CoreResult<Commit> {
+    fn input_code(&self) -> CoreResult<String> {
+        Ok(self.buffer.clone())
+    }
+
+    fn select_candidate(&mut self, index: usize) -> CoreResult<KeyOutcome> {
         let candidates = self.candidates_for_buffer();
         let Some(candidate) = candidates.get(index) else {
             return Err(CoreError::InvalidCandidateIndex {
@@ -92,10 +101,10 @@ impl Engine for FfiDemoEngine {
         };
 
         self.buffer.clear();
-        Ok(Commit::new(
+        Ok(KeyOutcome::committed(Commit::new(
             candidate.text().to_owned(),
             CommitSource::Candidate { index },
-        ))
+        )))
     }
 
     fn set_schema(&mut self, schema: SchemaId) -> CoreResult<()> {

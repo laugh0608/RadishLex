@@ -11,7 +11,9 @@ void main() {
   testWidgets('shows local dictionary management first', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const RadishLexManagerApp());
+    await tester.pumpWidget(
+      RadishLexManagerApp(bridge: FixtureManagerBridge()),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('萝卜词核'), findsWidgets);
@@ -35,7 +37,9 @@ void main() {
       await tester.binding.setSurfaceSize(const Size(1400, 900));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      await tester.pumpWidget(const RadishLexManagerApp());
+      await tester.pumpWidget(
+        RadishLexManagerApp(bridge: FixtureManagerBridge()),
+      );
       await tester.pumpAndSettle();
 
       await tester.enterText(
@@ -86,7 +90,9 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1400, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(const RadishLexManagerApp());
+    await tester.pumpWidget(
+      RadishLexManagerApp(bridge: FixtureManagerBridge()),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('luobo'));
@@ -128,8 +134,9 @@ void main() {
             text: '边界清晰',
             reading: 'bian jie qing xi',
             weight: 0.71,
-            source: 'manager-import',
+            source: 'import',
             lastUsed: '2026-07-02 21:03',
+            importBatchId: 2,
           ),
         ],
       );
@@ -229,6 +236,66 @@ void main() {
     expect(find.text('已删除词条：luobo / 萝卜词核'), findsOneWidget);
     expect(find.text('luobo'), findsNothing);
     expect(find.text('luobo / 萝卜词核'), findsOneWidget);
+  });
+
+  testWidgets('deleted tombstone restore requires explicit confirmation', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      RadishLexManagerApp(bridge: FixtureManagerBridge()),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('demo / 演示词'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('显式恢复词条'), findsOneWidget);
+    expect(find.text('deleted'), findsOneWidget);
+    expect(find.textContaining('清除对应 tombstone'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('dictionary-restore-confirm')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('已显式恢复词条：demo / 演示词'), findsOneWidget);
+    expect(find.text('demo / 演示词'), findsNothing);
+    expect(find.text('demo'), findsOneWidget);
+  });
+
+  testWidgets('suppressed term uses restore instead of delete action', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final snapshot = createManagerFixture().copyWith(
+      dictionaryTerms: const [
+        UserTerm(
+          inputCode: 'yizhi',
+          text: '抑制词',
+          reading: 'yi zhi',
+          weight: 0,
+          source: 'selection',
+          lastUsed: '未使用',
+          status: 'suppressed',
+        ),
+      ],
+      deletedTerms: const [],
+    );
+
+    await tester.pumpWidget(
+      RadishLexManagerApp(
+        bridge: FixtureManagerBridge(initialSnapshot: snapshot),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('suppressed'), findsOneWidget);
+    await tester.tap(find.byTooltip('显式恢复词条'));
+    await tester.pumpAndSettle();
+    expect(find.text('显式恢复词条'), findsOneWidget);
+    expect(find.text('suppressed'), findsWidgets);
   });
 
   testWidgets(

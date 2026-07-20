@@ -1,22 +1,52 @@
 use std::mem::size_of;
 
 use radishlex_ime_ffi::{
+    radishlex_apple_p256_product_smoke, radishlex_apple_p256_product_status,
+    radishlex_apple_secure_enclave_key_agreement_product_smoke,
+    radishlex_apple_secure_enclave_key_agreement_product_status,
+    radishlex_apple_secure_enclave_p256_product_smoke,
+    radishlex_apple_secure_enclave_p256_product_status, radishlex_error_free,
     radishlex_key_result_commit, radishlex_key_result_commit_present,
-    radishlex_key_result_consumed, radishlex_key_result_free, radishlex_key_result_snapshot,
-    radishlex_key_result_version, radishlex_rime_runtime_shutdown,
-    radishlex_session_handle_key_event, RadishLexError, RadishLexFfiContract, RadishLexKeyEvent,
-    RadishLexKeyResult, RadishLexSession, RadishLexSessionOptions, RadishLexSnapshot,
-    RadishLexStatusCode, RadishLexStringView, RADISHLEX_ABI_CONTRACT_VERSION,
-    RADISHLEX_KEY_RESULT_VERSION,
+    radishlex_key_result_consumed, radishlex_key_result_free,
+    radishlex_key_result_learning_disposition, radishlex_key_result_snapshot,
+    radishlex_key_result_version, radishlex_manager_sync_product_status,
+    radishlex_rime_runtime_shutdown, radishlex_session_handle_key_event,
+    RadishLexAppleP256ProductSmokeSummary, RadishLexAppleP256ProductStatus,
+    RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary,
+    RadishLexAppleSecureEnclaveKeyAgreementProductStatus, RadishLexError, RadishLexFfiContract,
+    RadishLexKeyEvent, RadishLexKeyResult, RadishLexManagerSyncProductStatus, RadishLexSession,
+    RadishLexSessionOptions, RadishLexSnapshot, RadishLexStatusCode, RadishLexStringView,
+    RADISHLEX_ABI_CONTRACT_VERSION, RADISHLEX_KEY_RESULT_VERSION,
+    RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_NONE,
 };
 
 #[test]
 fn rust_input_abi_layout_matches_the_checked_header_contract() {
-    assert_eq!(RADISHLEX_ABI_CONTRACT_VERSION, 2);
-    assert_eq!(RADISHLEX_KEY_RESULT_VERSION, 1);
+    assert_eq!(RADISHLEX_ABI_CONTRACT_VERSION, 6);
+    assert_eq!(RADISHLEX_KEY_RESULT_VERSION, 2);
     assert_eq!(size_of::<RadishLexFfiContract>(), 3 * size_of::<u32>());
     assert_eq!(size_of::<RadishLexSessionOptions>(), 2 * size_of::<u32>());
     assert_eq!(size_of::<RadishLexKeyEvent>(), 5 * size_of::<u32>());
+    assert_eq!(
+        size_of::<RadishLexAppleP256ProductStatus>(),
+        11 * size_of::<u32>()
+    );
+    assert_eq!(
+        size_of::<RadishLexAppleP256ProductSmokeSummary>(),
+        26 * size_of::<u32>()
+    );
+    assert_eq!(
+        size_of::<RadishLexAppleSecureEnclaveKeyAgreementProductStatus>(),
+        9 * size_of::<u32>()
+    );
+    assert_eq!(
+        size_of::<RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary>(),
+        25 * size_of::<u32>()
+    );
+    assert_eq!(
+        size_of::<RadishLexManagerSyncProductStatus>(),
+        19 * size_of::<u32>()
+    );
 
     let _: unsafe extern "C" fn(
         *mut RadishLexSession,
@@ -30,11 +60,64 @@ fn rust_input_abi_layout_matches_the_checked_header_contract() {
         radishlex_key_result_commit;
     let _: unsafe extern "C" fn(*const RadishLexKeyResult) -> u8 =
         radishlex_key_result_commit_present;
+    let _: unsafe extern "C" fn(*const RadishLexKeyResult) -> u32 =
+        radishlex_key_result_learning_disposition;
     let _: unsafe extern "C" fn(*const RadishLexKeyResult) -> *const RadishLexSnapshot =
         radishlex_key_result_snapshot;
     let _: unsafe extern "C" fn(*mut RadishLexKeyResult) = radishlex_key_result_free;
     let _: unsafe extern "C" fn(*mut *mut RadishLexError) -> RadishLexStatusCode =
         radishlex_rime_runtime_shutdown;
+    let _: unsafe extern "C" fn(*mut RadishLexAppleP256ProductStatus) -> u32 =
+        radishlex_apple_p256_product_status;
+    let _: unsafe extern "C" fn(
+        u32,
+        *const std::os::raw::c_char,
+        *mut RadishLexAppleP256ProductSmokeSummary,
+    ) -> u32 = radishlex_apple_p256_product_smoke;
+    let _: unsafe extern "C" fn(*mut RadishLexAppleP256ProductStatus) -> u32 =
+        radishlex_apple_secure_enclave_p256_product_status;
+    let _: unsafe extern "C" fn(
+        u32,
+        *const std::os::raw::c_char,
+        *mut RadishLexAppleP256ProductSmokeSummary,
+    ) -> u32 = radishlex_apple_secure_enclave_p256_product_smoke;
+    let _: unsafe extern "C" fn(*mut RadishLexAppleSecureEnclaveKeyAgreementProductStatus) -> u32 =
+        radishlex_apple_secure_enclave_key_agreement_product_status;
+    let _: unsafe extern "C" fn(
+        u32,
+        *mut RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary,
+    ) -> u32 = radishlex_apple_secure_enclave_key_agreement_product_smoke;
+    let _: unsafe extern "C" fn(
+        *mut RadishLexManagerSyncProductStatus,
+        *mut *mut RadishLexError,
+    ) -> RadishLexStatusCode = radishlex_manager_sync_product_status;
+}
+
+#[test]
+fn manager_sync_product_status_is_read_only_and_fails_closed() {
+    let mut status = RadishLexManagerSyncProductStatus::empty();
+    let mut error = std::ptr::null_mut();
+
+    assert_eq!(
+        unsafe { radishlex_manager_sync_product_status(&mut status, &mut error) },
+        RadishLexStatusCode::Ok
+    );
+    assert!(error.is_null());
+    assert_eq!(
+        status.product_qualified,
+        cfg!(all(feature = "apple-keychain", target_os = "macos")) as u32
+    );
+    assert_eq!(status.user_sync_enabled, 0);
+    assert_ne!(status.blocker, RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_NONE);
+
+    assert_eq!(
+        unsafe { radishlex_manager_sync_product_status(std::ptr::null_mut(), &mut error) },
+        RadishLexStatusCode::InvalidArgument
+    );
+    assert!(!error.is_null());
+    unsafe {
+        radishlex_error_free(error);
+    }
 }
 
 #[cfg(unix)]
@@ -99,11 +182,16 @@ fn compile_header(language: &str) {
 const HEADER_SMOKE_SOURCE: &str = r#"
 #include "radishlex_input.h"
 
-_Static_assert(RADISHLEX_ABI_CONTRACT_VERSION == 2u, "ABI version mismatch");
-_Static_assert(RADISHLEX_KEY_RESULT_VERSION == 1u, "key result version mismatch");
+_Static_assert(RADISHLEX_ABI_CONTRACT_VERSION == 6u, "ABI version mismatch");
+_Static_assert(RADISHLEX_KEY_RESULT_VERSION == 2u, "key result version mismatch");
 _Static_assert(sizeof(RadishLexFfiContract) == 3u * sizeof(uint32_t), "contract layout mismatch");
 _Static_assert(sizeof(RadishLexSessionOptions) == 2u * sizeof(uint32_t), "session options layout mismatch");
 _Static_assert(sizeof(RadishLexKeyEvent) == 5u * sizeof(uint32_t), "key event layout mismatch");
+_Static_assert(sizeof(RadishLexAppleP256ProductStatus) == 11u * sizeof(uint32_t), "Apple P-256 status layout mismatch");
+_Static_assert(sizeof(RadishLexAppleP256ProductSmokeSummary) == 26u * sizeof(uint32_t), "Apple P-256 smoke layout mismatch");
+_Static_assert(sizeof(RadishLexAppleSecureEnclaveKeyAgreementProductStatus) == 9u * sizeof(uint32_t), "Apple key-agreement status layout mismatch");
+_Static_assert(sizeof(RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary) == 25u * sizeof(uint32_t), "Apple key-agreement smoke layout mismatch");
+_Static_assert(sizeof(RadishLexManagerSyncProductStatus) == 19u * sizeof(uint32_t), "Manager sync product status layout mismatch");
 
 RadishLexStatusCode radishlex_compile_input_contract(
     RadishLexSession *session,
@@ -111,6 +199,20 @@ RadishLexStatusCode radishlex_compile_input_contract(
     RadishLexError **error_out) {
   RadishLexStatusCode (*runtime_shutdown)(RadishLexError **) =
       radishlex_rime_runtime_shutdown;
+  uint32_t (*apple_status)(RadishLexAppleP256ProductStatus *) =
+      radishlex_apple_p256_product_status;
+  uint32_t (*apple_smoke)(uint32_t, const char *, RadishLexAppleP256ProductSmokeSummary *) =
+      radishlex_apple_p256_product_smoke;
+  uint32_t (*secure_enclave_status)(RadishLexAppleP256ProductStatus *) =
+      radishlex_apple_secure_enclave_p256_product_status;
+  uint32_t (*secure_enclave_smoke)(uint32_t, const char *, RadishLexAppleP256ProductSmokeSummary *) =
+      radishlex_apple_secure_enclave_p256_product_smoke;
+  uint32_t (*key_agreement_status)(RadishLexAppleSecureEnclaveKeyAgreementProductStatus *) =
+      radishlex_apple_secure_enclave_key_agreement_product_status;
+  uint32_t (*key_agreement_smoke)(uint32_t, RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary *) =
+      radishlex_apple_secure_enclave_key_agreement_product_smoke;
+  RadishLexStatusCode (*manager_sync_status)(RadishLexManagerSyncProductStatus *, RadishLexError **) =
+      radishlex_manager_sync_product_status;
   RadishLexKeyResult *result = NULL;
   RadishLexStatusCode status =
       radishlex_session_handle_key_event(session, event, &result, error_out);
@@ -118,19 +220,32 @@ RadishLexStatusCode radishlex_compile_input_contract(
     uint32_t version = radishlex_key_result_version(result);
     uint8_t consumed = radishlex_key_result_consumed(result);
     uint8_t commit_present = radishlex_key_result_commit_present(result);
+    uint32_t learning_disposition =
+        radishlex_key_result_learning_disposition(result);
     RadishLexStringView commit = radishlex_key_result_commit(result);
     const RadishLexSnapshot *snapshot = radishlex_key_result_snapshot(result);
     RadishLexStringView preedit = radishlex_snapshot_preedit(snapshot);
     RadishLexCandidateView candidate = {0};
+    uint32_t personalization_status =
+        radishlex_snapshot_personalization_status(snapshot);
     (void)version;
     (void)consumed;
     (void)commit_present;
+    (void)learning_disposition;
     (void)commit;
     (void)preedit;
     (void)candidate;
+    (void)personalization_status;
     radishlex_key_result_free(result);
   }
   (void)runtime_shutdown;
+  (void)apple_status;
+  (void)apple_smoke;
+  (void)secure_enclave_status;
+  (void)secure_enclave_smoke;
+  (void)key_agreement_status;
+  (void)key_agreement_smoke;
+  (void)manager_sync_status;
   return status;
 }
 "#;

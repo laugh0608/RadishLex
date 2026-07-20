@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS sync_domains (
 CREATE TABLE IF NOT EXISTS devices (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     device_id TEXT NOT NULL,
+    signing_algorithm TEXT NOT NULL,
     signing_public_key_id TEXT NOT NULL,
     signing_public_key BLOB NOT NULL,
     key_agreement_public_key_id TEXT NOT NULL,
@@ -28,6 +29,7 @@ CREATE TABLE IF NOT EXISTS device_join_requests (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     join_request_id TEXT NOT NULL,
     device_id TEXT NOT NULL,
+    signing_algorithm TEXT NOT NULL,
     signing_public_key_id TEXT NOT NULL,
     signing_public_key BLOB NOT NULL,
     key_agreement_public_key_id TEXT NOT NULL,
@@ -59,6 +61,7 @@ CREATE TABLE IF NOT EXISTS device_authorizations (
 CREATE TABLE IF NOT EXISTS device_wrapping_records (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     recipient_device_id TEXT NOT NULL,
+    recipient_key_agreement_key_id TEXT NOT NULL,
     authorizer_device_id TEXT NOT NULL,
     key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
     wrapping_key_id TEXT NOT NULL,
@@ -67,6 +70,10 @@ CREATE TABLE IF NOT EXISTS device_wrapping_records (
     wrapped_key_len INTEGER NOT NULL CHECK (wrapped_key_len > 0),
     ciphertext_hash TEXT NOT NULL,
     created_at_ms INTEGER NOT NULL,
+    signature_record_type TEXT NOT NULL CHECK (signature_record_type IN ('device_authorization', 'epoch_distribution')),
+    signature_schema_version INTEGER NOT NULL CHECK (signature_schema_version = 1),
+    signature_algorithm TEXT NOT NULL,
+    signature_key_id TEXT NOT NULL,
     signature BLOB NOT NULL,
     blob_ref TEXT NOT NULL,
     PRIMARY KEY (domain_id, recipient_device_id, key_epoch, wrapping_key_id)
@@ -87,9 +94,23 @@ CREATE TABLE IF NOT EXISTS device_revocations (
     PRIMARY KEY (domain_id, revoked_device_id, new_key_epoch)
 );
 
+CREATE TABLE IF NOT EXISTS domain_lifecycle_events (
+    domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
+    lifecycle_sequence INTEGER NOT NULL CHECK (lifecycle_sequence > 0),
+    event_type TEXT NOT NULL CHECK (event_type IN ('initial_device', 'device_authorized', 'device_revoked', 'recovery_record_rotated', 'device_recovered', 'recovery_record_revoked')),
+    record_id TEXT NOT NULL,
+    key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
+    reject_from_object_change_sequence INTEGER NOT NULL DEFAULT 0 CHECK (reject_from_object_change_sequence >= 0),
+    created_at_ms INTEGER NOT NULL,
+    PRIMARY KEY (domain_id, lifecycle_sequence),
+    UNIQUE (domain_id, event_type, record_id)
+);
+
 CREATE TABLE IF NOT EXISTS recovery_records (
+    record_schema_version INTEGER NOT NULL CHECK (record_schema_version IN (1, 2)),
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     recovery_record_id TEXT NOT NULL,
+    previous_recovery_record_id TEXT NOT NULL DEFAULT '',
     key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
     kdf_profile TEXT NOT NULL,
     kdf_version INTEGER NOT NULL CHECK (kdf_version > 0),
@@ -102,8 +123,12 @@ CREATE TABLE IF NOT EXISTS recovery_records (
     nonce BLOB NOT NULL,
     wrapped_material_len INTEGER NOT NULL CHECK (wrapped_material_len > 0),
     ciphertext_hash TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('active', 'revoked')),
+    activation_algorithm TEXT NOT NULL DEFAULT '',
+    activation_public_key_id TEXT NOT NULL DEFAULT '',
+    activation_public_key BLOB NOT NULL DEFAULT X'',
+    status TEXT NOT NULL CHECK (status IN ('active', 'superseded', 'revoked')),
     created_at_ms INTEGER NOT NULL,
+    updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= created_at_ms),
     revoked_at_ms INTEGER NOT NULL DEFAULT 0,
     signer_device_id TEXT NOT NULL,
     signature_schema_version INTEGER NOT NULL CHECK (signature_schema_version = 1),
@@ -114,6 +139,42 @@ CREATE TABLE IF NOT EXISTS recovery_records (
     PRIMARY KEY (domain_id, recovery_record_id)
 );
 
+CREATE TABLE IF NOT EXISTS recovered_device_activations (
+    domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
+    recovery_record_id TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    signing_algorithm TEXT NOT NULL,
+    signing_public_key_id TEXT NOT NULL,
+    signing_public_key BLOB NOT NULL,
+    key_agreement_algorithm TEXT NOT NULL,
+    key_agreement_public_key_id TEXT NOT NULL,
+    key_agreement_public_key BLOB NOT NULL,
+    key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
+    created_at_ms INTEGER NOT NULL,
+    signature_schema_version INTEGER NOT NULL CHECK (signature_schema_version = 1),
+    activation_algorithm TEXT NOT NULL,
+    activation_public_key_id TEXT NOT NULL,
+    activation_signature BLOB NOT NULL,
+    PRIMARY KEY (domain_id, recovery_record_id),
+    UNIQUE (domain_id, device_id),
+    FOREIGN KEY (domain_id, recovery_record_id) REFERENCES recovery_records(domain_id, recovery_record_id)
+);
+
+CREATE TABLE IF NOT EXISTS recovery_record_revocations (
+    domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
+    recovery_record_id TEXT NOT NULL,
+    revoker_device_id TEXT NOT NULL,
+    key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
+    reason TEXT NOT NULL,
+    created_at_ms INTEGER NOT NULL,
+    signature_schema_version INTEGER NOT NULL CHECK (signature_schema_version = 1),
+    signature_algorithm TEXT NOT NULL,
+    signature_key_id TEXT NOT NULL,
+    signature BLOB NOT NULL,
+    PRIMARY KEY (domain_id, recovery_record_id),
+    FOREIGN KEY (domain_id, recovery_record_id) REFERENCES recovery_records(domain_id, recovery_record_id)
+);
+
 CREATE TABLE IF NOT EXISTS sync_objects (
     domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
     object_id TEXT NOT NULL,
@@ -121,6 +182,7 @@ CREATE TABLE IF NOT EXISTS sync_objects (
     latest_version INTEGER NOT NULL CHECK (latest_version > 0),
     latest_ciphertext_hash TEXT NOT NULL,
     latest_key_epoch INTEGER NOT NULL CHECK (latest_key_epoch > 0),
+    latest_change_sequence INTEGER NOT NULL CHECK (latest_change_sequence > 0),
     created_at_ms INTEGER NOT NULL,
     updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= created_at_ms),
     PRIMARY KEY (domain_id, object_id)
@@ -132,6 +194,7 @@ CREATE TABLE IF NOT EXISTS sync_object_versions (
     object_type TEXT NOT NULL,
     version INTEGER NOT NULL CHECK (version > 0),
     base_version INTEGER NOT NULL CHECK (base_version + 1 = version),
+    change_sequence INTEGER NOT NULL CHECK (change_sequence > 0),
     owner_device_id TEXT NOT NULL,
     key_id TEXT NOT NULL,
     key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
@@ -176,3 +239,6 @@ CREATE INDEX IF NOT EXISTS idx_sync_objects_domain_type
 
 CREATE INDEX IF NOT EXISTS idx_audit_events_domain_time
     ON audit_events(domain_id, server_time_ms);
+
+CREATE INDEX IF NOT EXISTS idx_lifecycle_events_domain_sequence
+    ON domain_lifecycle_events(domain_id, lifecycle_sequence);

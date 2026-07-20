@@ -1,8 +1,9 @@
 use std::fs;
 
 use radishlex_ime_userdb::{
-    decode_dictionary_terms_tsv_document, encode_dictionary_terms_tsv, DictionaryImportBatch,
-    DictionaryImportSummary, DictionaryTermsFormat, TermSource, TermStatus, UserDb, UserTerm,
+    decode_dictionary_terms_tsv_document, encode_dictionary_terms_tsv, DeletedTermTombstone,
+    DictionaryImportBatch, DictionaryImportSummary, DictionaryTermsFormat, TermSource, TermStatus,
+    UserDb, UserTerm,
 };
 
 use crate::error::FfiError;
@@ -35,6 +36,8 @@ pub struct RadishLexUserTermView {
     pub updated_at_ms: i64,
     pub last_used_at_ms: i64,
     pub last_used_at_present: u8,
+    pub import_batch_id: i64,
+    pub import_batch_id_present: u8,
 }
 
 impl RadishLexUserTermView {
@@ -52,6 +55,32 @@ impl RadishLexUserTermView {
             updated_at_ms: 0,
             last_used_at_ms: 0,
             last_used_at_present: 0,
+            import_batch_id: 0,
+            import_batch_id_present: 0,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RadishLexDeletedTermView {
+    pub input_code: RadishLexStringView,
+    pub text: RadishLexStringView,
+    pub reading: RadishLexStringView,
+    pub reading_present: u8,
+    pub deleted_at_ms: i64,
+    pub reason: RadishLexStringView,
+}
+
+impl RadishLexDeletedTermView {
+    pub const fn empty() -> Self {
+        Self {
+            input_code: RadishLexStringView::empty(),
+            text: RadishLexStringView::empty(),
+            reading: RadishLexStringView::empty(),
+            reading_present: 0,
+            deleted_at_ms: 0,
+            reason: RadishLexStringView::empty(),
         }
     }
 }
@@ -160,6 +189,45 @@ pub struct RadishLexUserTermList {
     terms: Vec<UserTerm>,
 }
 
+pub struct RadishLexDeletedTermList {
+    tombstones: Vec<DeletedTermTombstone>,
+}
+
+impl RadishLexDeletedTermList {
+    pub fn new(tombstones: Vec<DeletedTermTombstone>) -> Self {
+        Self { tombstones }
+    }
+
+    pub fn len(&self) -> usize {
+        self.tombstones.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.tombstones.is_empty()
+    }
+
+    pub fn tombstone_view(&self, index: usize) -> Result<RadishLexDeletedTermView, FfiError> {
+        let Some(tombstone) = self.tombstones.get(index) else {
+            return Err(FfiError::invalid_argument(format!(
+                "deleted term index {index} is out of range for {} tombstones",
+                self.tombstones.len()
+            )));
+        };
+
+        Ok(deleted_term_view(tombstone))
+    }
+
+    /// # Safety
+    /// `list` must be null or a live `RadishLexDeletedTermList` pointer released exactly once.
+    pub unsafe fn free(list: *mut Self) {
+        if list.is_null() {
+            return;
+        }
+
+        let _ = Box::from_raw(list);
+    }
+}
+
 impl RadishLexUserTermList {
     pub fn new(terms: Vec<UserTerm>) -> Self {
         Self { terms }
@@ -167,6 +235,10 @@ impl RadishLexUserTermList {
 
     pub fn len(&self) -> usize {
         self.terms.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.terms.is_empty()
     }
 
     pub fn term_view(&self, index: usize) -> Result<RadishLexUserTermView, FfiError> {
@@ -180,6 +252,8 @@ impl RadishLexUserTermList {
         Ok(term_view(term))
     }
 
+    /// # Safety
+    /// `list` must be null or a live `RadishLexUserTermList` pointer released exactly once.
     pub unsafe fn free(list: *mut Self) {
         if list.is_null() {
             return;
@@ -202,6 +276,10 @@ impl RadishLexImportBatchList {
         self.batches.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.batches.is_empty()
+    }
+
     pub fn batch_view(&self, index: usize) -> Result<RadishLexImportBatchView, FfiError> {
         let Some(batch) = self.batches.get(index) else {
             return Err(FfiError::invalid_argument(format!(
@@ -213,6 +291,8 @@ impl RadishLexImportBatchList {
         Ok(import_batch_view(batch))
     }
 
+    /// # Safety
+    /// `list` must be null or a live `RadishLexImportBatchList` pointer released exactly once.
     pub unsafe fn free(list: *mut Self) {
         if list.is_null() {
             return;
@@ -244,9 +324,27 @@ pub fn delete_user_term(
     Ok(())
 }
 
+pub fn restore_user_term(
+    db_path: &str,
+    input_code: &str,
+    text: &str,
+    reading: Option<&str>,
+) -> Result<(), FfiError> {
+    let mut db = UserDb::open(db_path)?;
+    db.restore_term(input_code, text, reading)?;
+    Ok(())
+}
+
 pub fn list_user_terms(db_path: &str) -> Result<RadishLexUserTermList, FfiError> {
     let db = UserDb::open(db_path)?;
     Ok(RadishLexUserTermList::new(db.list_active_terms()?))
+}
+
+pub fn list_deleted_terms(db_path: &str) -> Result<RadishLexDeletedTermList, FfiError> {
+    let db = UserDb::open(db_path)?;
+    Ok(RadishLexDeletedTermList::new(
+        db.list_deleted_term_tombstones()?,
+    ))
 }
 
 pub fn inspect_dictionary_file(
@@ -322,6 +420,19 @@ fn term_view(term: &UserTerm) -> RadishLexUserTermView {
         updated_at_ms: term.updated_at_ms,
         last_used_at_ms,
         last_used_at_present: u8::from(term.last_used_at_ms.is_some()),
+        import_batch_id: term.import_batch_id.unwrap_or_default(),
+        import_batch_id_present: u8::from(term.import_batch_id.is_some()),
+    }
+}
+
+fn deleted_term_view(tombstone: &DeletedTermTombstone) -> RadishLexDeletedTermView {
+    RadishLexDeletedTermView {
+        input_code: RadishLexStringView::from_str(&tombstone.input_code),
+        text: RadishLexStringView::from_str(&tombstone.text),
+        reading: optional_view(tombstone.reading.as_deref()),
+        reading_present: presence_flag(tombstone.reading.as_deref()),
+        deleted_at_ms: tombstone.deleted_at_ms,
+        reason: RadishLexStringView::from_str(&tombstone.reason),
     }
 }
 

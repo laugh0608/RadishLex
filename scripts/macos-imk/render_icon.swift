@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 
 guard CommandLine.arguments.count == 3 else {
-    fputs("usage: render_icon.swift <input-svg> <output-png>\n", stderr)
+    fputs("usage: render_icon.swift <input-svg> <output-tiff>\n", stderr)
     exit(2)
 }
 
@@ -12,10 +12,13 @@ guard let image = NSImage(contentsOfFile: input) else {
     fputs("unable to load input icon\n", stderr)
     exit(1)
 }
+let logicalSize = 16
+let pixelSize = 32
+let artworkInset = 1
 guard let bitmap = NSBitmapImageRep(
     bitmapDataPlanes: nil,
-    pixelsWide: 64,
-    pixelsHigh: 64,
+    pixelsWide: pixelSize,
+    pixelsHigh: pixelSize,
     bitsPerSample: 8,
     samplesPerPixel: 4,
     hasAlpha: true,
@@ -27,6 +30,7 @@ guard let bitmap = NSBitmapImageRep(
     fputs("unable to allocate icon bitmap\n", stderr)
     exit(1)
 }
+bitmap.size = NSSize(width: logicalSize, height: logicalSize)
 
 NSGraphicsContext.saveGraphicsState()
 guard let graphicsContext = NSGraphicsContext(bitmapImageRep: bitmap) else {
@@ -35,9 +39,14 @@ guard let graphicsContext = NSGraphicsContext(bitmapImageRep: bitmap) else {
 }
 NSGraphicsContext.current = graphicsContext
 NSColor.clear.setFill()
-NSRect(x: 0, y: 0, width: 64, height: 64).fill()
+NSRect(x: 0, y: 0, width: logicalSize, height: logicalSize).fill()
 image.draw(
-    in: NSRect(x: 0, y: 0, width: 64, height: 64),
+    in: NSRect(
+        x: artworkInset,
+        y: artworkInset,
+        width: logicalSize - artworkInset * 2,
+        height: logicalSize - artworkInset * 2
+    ),
     from: .zero,
     operation: .sourceOver,
     fraction: 1

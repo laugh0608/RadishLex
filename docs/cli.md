@@ -1,31 +1,34 @@
 # RadishLex CLI 说明
 
-本文档用于说明 `radishlex-ime-cli` 当前可用命令、参数、输出字段、错误语义和安全边界，读者是需要在本地复验 Rust core 与 engine adapter 行为的开发者和协作者。本文不包含阶段路线、开发进度、Rime 数据准备细节、平台输入法安装流程、ranker 设计或同步协议。
+本文档面向本地复验 Rust core 与 engine adapter 的开发者，说明 `radishlex-ime-cli` 的命令、输出、错误和安全边界；不包含阶段路线、Rime 数据准备、平台安装、ranker 设计或同步协议。
 
 ## 定位
 
 `radishlex-ime-cli` 是当前 Rust 侧命令行复验入口，用于验证两类链路：
 
 ```text
-input code -> push_key -> composition -> candidates -> commit_candidate
+input code -> push_key -> composition -> candidates -> select_candidate
 userdb -> learning event -> ranker summary -> rank explain
 ```
 
-它不是系统输入法，也不注册平台输入法服务。CLI 只在当前进程内运行，用于观察 `ime-core`、engine adapter、`ime-userdb` 与 `ime-ranker` 的行为。
+它不注册系统输入法，只在当前进程观察 `ime-core`、engine adapter、`ime-userdb` 与 `ime-ranker`。
 
 当前命令：
 
 ```text
 radishlex-ime-cli demo <input-code> [candidate-index]
 radishlex-ime-cli rime --schema <schema> --shared-data <path> --user-data <path> [--key <name> ...] [--rank-db <path>] [--context <kind>] <input-code> [candidate-index]
+radishlex-ime-cli rime snapshot --schema <schema> --shared-data <path> --user-data <fresh-empty-path> --deploy-on-start <0|1> [--rank-db <path>] [--context <kind>] <input-code>
 radishlex-ime-cli dict list --db <path>
 radishlex-ime-cli dict add --db <path> --input <code> --text <text> [--reading <reading>]
+radishlex-ime-cli dict restore --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict delete --db <path> --input <code> --text <text> [--reading <reading>]
 radishlex-ime-cli dict export --db <path> --file <path>
 radishlex-ime-cli dict inspect --file <path>
 radishlex-ime-cli dict import --db <path> --file <path> [--source <name>] [--dry-run]
 radishlex-ime-cli dict import-batches --db <path>
 radishlex-ime-cli learn status --db <path>
+radishlex-ime-cli learn case-status --db <path> --input <code> --text <text> [--reading <reading>] [--context <kind>]
 radishlex-ime-cli learn select --db <path> --input <code> --text <text> [--reading <reading>] [--index <n>] [--count <n>] [--session <id>] [--context <kind>]
 radishlex-ime-cli learn suppress --db <path> --input <code> --text <text> [--reading <reading>] [--reason <reason>] [--context <kind>]
 radishlex-ime-cli rank explain --db <path> --input <code> --candidate <text> [--reading <reading>] [--context <kind>]
@@ -170,9 +173,13 @@ commit_engine_index: <n>
 - `engine_index`：该候选在底层 engine 当前候选列表中的原始索引。
 - `score`：ranker 最终分数。
 - `explain`：本地 userdb 与 ranker summary 对该候选的排序贡献。
-- `commit_engine_index`：最终提交给 `commit_candidate` 的原始 engine index。
+- `commit_engine_index`：最终传给 `select_candidate` 的原始 engine index；分段候选选择不保证同一步产生 commit。
 
-该模式只读取显式传入的 `--rank-db`，不把 Rime 内部对象 ID 写入 userdb。
+该模式只使用显式传入的 `--rank-db` 作为排序信号源，不把 Rime 内部对象 ID 写入 userdb。打开数据库仍会经过当前 `UserDb::open` 的 schema 检查、迁移、PRAGMA 和权限收紧流程，因此只能使用本批复核归属的数据库，不能把它理解为文件系统级只读访问。
+
+### Rime 非选择快照
+
+`rime snapshot` 使用 fresh empty Rime user data 读取非选择候选快照，不调用候选选择 API；传入 `--rank-db` 时通过产品 `PersonalizedInputSession` 输出 display/engine index、最终分数和 explain。命令参数、fresh 目录约束、输出字段和证据组合规则见 [学习取证 CLI 参考](cli-learning-evidence.md)。
 
 ## dict 命令
 
@@ -210,7 +217,20 @@ cargo run -p radishlex-ime-cli -- \
   --reading "luo bo"
 ```
 
-删除会写入 tombstone，并清除对应 ranker 权重摘要，避免旧选择事件或旧导入立即复活该词。后续如需恢复同一词条，必须通过 `dict add` 这类明确的人工添加动作。
+删除会写入 tombstone，并清除对应 ranker 权重摘要，避免旧选择事件、普通新增或旧导入立即复活该词。
+
+显式恢复已删除或 suppressed 词条：
+
+```bash
+cargo run -p radishlex-ime-cli -- \
+  dict restore \
+  --db /tmp/radishlex-userdb.sqlite \
+  --input luobo \
+  --text 萝卜 \
+  --reading "luo bo"
+```
+
+成功输出 `restored`、`input`、`status: active` 和新的 `version_ms`。恢复必须严格晚于删除/旧状态版本，并在同一事务中清除 tombstone、恢复 active 状态和重置旧 frequency/negative 摘要；目标既未删除也未 suppressed 时返回明确错误。`dict add` 只新增或更新未删除词条，不能代替恢复。
 
 导出用户词库：
 
@@ -279,6 +299,8 @@ luobo	萝卜	luo bo	manual_add	2	active
 
 边界：
 
+- `dict add` 命中 deleted tombstone 时返回错误，不清除 tombstone，也不隐式解除 suppressed。
+- `dict restore` 是唯一能从 CLI 清除 tombstone 或 suppressed 的人工动作，普通选择和导入不能替代。
 - `dict export` 只导出 P2 用户词条字段，不导出 P1 原始选择事件、负反馈详细事件、上下文统计或 ranker 权重摘要。
 - `dict import` 不接受 `deleted` 状态的词条。
 - `dict import` 遇到本地 deleted tombstone 命中的词条会跳过，并计入 `skipped_deleted`，不会把普通导入当成恢复删除词条。
@@ -290,7 +312,7 @@ luobo	萝卜	luo bo	manual_add	2	active
 
 ## learn 命令
 
-`learn` 命令用于查看本地学习状态或向 userdb 写入本地学习事件。当前只支持显式数据库路径、合成数据和人工指定参数，适合验证排序变化，不代表平台壳已经接入真实输入事件。
+`learn` 命令用于查看本地学习状态或向显式 userdb 写入合成学习事件，适合独立复验排序变化。产品输入 runtime 已通过自己的 FFI/session 路径记录真实选择，CLI 不模拟平台隐私上下文、display/engine mapping 或 InputMethodKit 生命周期，也不能替代真实平台验收。
 
 查看学习状态只读摘要：
 
@@ -304,7 +326,7 @@ cargo run -p radishlex-ime-cli -- \
 
 ```text
 learning_status: ready
-schema_version: 2
+schema_version: 4
 plaintext_payload: false
 p1_raw_details: false
 context_stats: false
@@ -328,6 +350,8 @@ latest_activity:
 ```
 
 `learn status` 面向后续管理 UI 的学习状态概览，只输出聚合计数、最新活动时间和隐私边界标记。它不输出 P1 原始选择事件、负反馈 reason 明细、上下文分布、用户词明文或同步明文 payload。
+
+`learn case-status` 是面向合成学习用例的版本化精确审计视图。它在同一个 SQLite 读事务中返回全库聚合、目标 term、指定 context 的 ranker weight 和 tombstone，并明确省略 P1 原始行。字段和判定规则见 [学习取证 CLI 参考](cli-learning-evidence.md)。
 
 记录一次候选选择：
 
@@ -386,19 +410,19 @@ cargo run -p radishlex-ime-cli -- \
   --context chat
 ```
 
-输出：
+输出示意（`final_score` 与 `recency_boost` 会随复验时间变化）：
 
 ```text
 input: luobo
 candidate: 萝卜
 context: chat
 original_index: 0
-final_score: 2.650
+final_score: <time-dependent-score>
 explain:
-  engine_order_factor: 1.000
+  engine_order_factor: -0.000
   user_term_boost: 1.000
-  frequency_boost: 0.350
-  recency_boost: 0.000
+  frequency_boost: 0.243
+  recency_boost: <time-dependent-score>
   context_boost: 0.300
   negative_feedback_penalty: 0.000
   suppressed_penalty: 0.000
@@ -418,7 +442,7 @@ explain:
 
 ## sync preflight 命令
 
-`sync preflight` 是同步实现前的本地检查入口，只统计 userdb 当前可进入后续加密同步对象的数据类别，不生成明文 payload，不连接后端。
+`sync preflight` 只统计 userdb 可进入后续加密同步对象的数据类别，不生成明文 payload，也不连接后端。
 
 ```bash
 cargo run -p radishlex-ime-cli -- \
@@ -426,19 +450,11 @@ cargo run -p radishlex-ime-cli -- \
   --db /tmp/radishlex-userdb.sqlite
 ```
 
-输出包含 `dictionary.user_terms`、`ranker.weights`、`dictionary.deleted_terms` 这类 P2 可同步计数，以及 `selection_events`、`negative_feedback` 这类 P1 本地计数。`plaintext_payload: false` 表示该命令没有输出明文同步对象。
-
-Rust 内部已经有 `UserDb::p2_plaintext_payloads()` 和 `ime-sync::SyncEnvelopeAssembler` 复验本地加密装配；CLI 仍只提供 preflight 计数，不暴露该迭代器、payload bytes、envelope、hash、签名或上传草案。
+输出包括 P2 的 `dictionary.user_terms`、`ranker.weights`、`dictionary.deleted_terms` 及 P1 本地计数；`plaintext_payload: false` 表示未输出明文同步对象。加密装配由 Rust 测试复验，CLI 不暴露 payload、envelope、hash、签名或上传草案。
 
 ## 输入限制
 
-当前 CLI 的 `<input-code>` 与 `--input <code>` 只接受：
-
-- ASCII 字母
-- ASCII 数字
-- apostrophe，即 `'`
-
-其他字符会返回用法错误。该限制是 CLI 复验入口的输入约束，不代表后续平台壳只能接收这些按键。
+当前 CLI 的 `<input-code>` 与 `--input <code>` 只接受 ASCII 字母、数字和 apostrophe（`'`）；其他字符返回用法错误。该限制不代表平台壳的按键范围。
 
 `--key` 仅用于 `rime` 命令的 smoke 调试，不改变 `<input-code>` 的字符限制，也不代表后续平台壳的完整按键协议。
 
@@ -455,10 +471,10 @@ Rust 内部已经有 `UserDb::p2_plaintext_payloads()` 和 `ime-sync::SyncEnvelo
 - `demo` 不读取本机输入法数据。
 - `rime` 必须显式指定 `shared-data` 与 `user-data`，不应指向真实 Rime 用户目录。
 - `rime --rank-db` 必须显式指定隔离 userdb，建议使用 `/tmp` 下临时 SQLite 文件。
-- `dict`、`learn` 和 `rank explain` 必须显式指定 `--db`，不应指向真实用户生产库；本阶段建议使用 `/tmp` 下临时 SQLite 文件。
-- `dict import/export` 的文件也建议放在 `/tmp` 下，测试内容使用合成词，不应导入真实个人词库或真实输入历史。
-- `learn status` 只输出聚合学习状态，不输出用户词明文、P1 事件明细、负反馈 reason 明细或上下文统计。
-- `sync preflight` 只输出分类计数，不输出用户词明文、事件明文、plaintext payload、envelope、hash、签名或加密 payload。
+- `rime snapshot` 每次可归属快照都必须使用新的 fresh empty user data；带 `--rank-db` 时数据库打开仍可能执行迁移和权限维护。
+- `dict`、`learn` 和 `rank explain` 必须显式指定隔离 `--db`；导入导出文件也应位于 `/tmp` 并只含合成数据。
+- `learn status` 只输出聚合状态；`sync preflight` 只输出分类计数，二者均不暴露用户词或事件明文、上下文明细、payload、envelope、hash 或签名。
+- `learn case-status` 只用于合成用例的精确取证读模型，不作为 manager 产品接口，也不返回 P1 事件行。
 - `learn` 当前没有平台 secure text entry 信号输入，CLI smoke 只应使用合成词、虚构上下文和临时数据库。
 - 本机 smoke 应使用 `/tmp` 下的隔离目录和合成输入码，不提交 schema 数据、用户目录、日志或输出中的敏感内容。
 
@@ -471,5 +487,6 @@ Rust 内部已经有 `UserDb::p2_plaintext_payloads()` 和 `ime-sync::SyncEnvelo
 - `unknown key name: ...`：`--key` 只接受文档列出的命名键，例如 `page-down`、`page-up`、`arrow-down`、`arrow-up`。
 - `--context requires --rank-db for rime`：`rime --context` 只在 rank smoke 中有效，必须同时传入 `--rank-db`。
 - `missing --db`：`dict`、`learn` 或 `rank explain` 必须显式指定 SQLite 路径。
+- `term is deleted; use explicit restore instead of add`：该身份已有 tombstone；确认是用户明确恢复意图后改用 `dict restore`，不要通过新增或导入绕过删除。
 - `invalid import_file`：导入文件需要符合 `radishlex-user-terms-v1` TSV，且词条状态只能是 `active` 或 `suppressed`。
 - `unknown negative feedback reason ...`：`learn suppress --reason` 只接受 `immediate_backspace`、`reselect_same_code`、`manual_suppress` 或 `manual_delete`。

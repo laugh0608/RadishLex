@@ -1,8 +1,12 @@
 use std::ptr;
 
 use radishlex_ime_core::{Candidate, CandidateSource, SessionState};
+use radishlex_ime_runtime::RuntimeSnapshot;
 
 use crate::error::FfiError;
+use crate::personalization::{
+    personalization_status_code, RADISHLEX_PERSONALIZATION_STATUS_NOT_ENABLED,
+};
 
 pub const RADISHLEX_CANDIDATE_SOURCE_ENGINE: u32 = 1;
 pub const RADISHLEX_CANDIDATE_SOURCE_USER_DICTIONARY: u32 = 2;
@@ -36,6 +40,7 @@ impl RadishLexStringView {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RadishLexCandidateView {
     pub index: usize,
+    pub engine_index: usize,
     pub text: RadishLexStringView,
     pub reading: RadishLexStringView,
     pub reading_present: u8,
@@ -48,6 +53,7 @@ impl RadishLexCandidateView {
     pub const fn empty() -> Self {
         Self {
             index: 0,
+            engine_index: 0,
             text: RadishLexStringView::empty(),
             reading: RadishLexStringView::empty(),
             reading_present: 0,
@@ -63,6 +69,7 @@ pub struct RadishLexSnapshot {
     preedit: String,
     cursor: usize,
     candidates: Vec<RadishLexCandidateSnapshot>,
+    personalization_status: u32,
 }
 
 impl RadishLexSnapshot {
@@ -74,8 +81,32 @@ impl RadishLexSnapshot {
             candidates: state
                 .candidates()
                 .iter()
-                .map(RadishLexCandidateSnapshot::from_candidate)
+                .enumerate()
+                .map(|(index, candidate)| {
+                    RadishLexCandidateSnapshot::from_candidate(candidate, index, index)
+                })
                 .collect(),
+            personalization_status: RADISHLEX_PERSONALIZATION_STATUS_NOT_ENABLED,
+        }
+    }
+
+    pub fn from_runtime(snapshot: RuntimeSnapshot) -> Self {
+        Self {
+            schema: snapshot.schema().as_str().to_owned(),
+            preedit: snapshot.composition().preedit().to_owned(),
+            cursor: snapshot.composition().cursor(),
+            candidates: snapshot
+                .candidates()
+                .iter()
+                .map(|candidate| {
+                    RadishLexCandidateSnapshot::from_candidate(
+                        candidate.candidate(),
+                        candidate.display_index(),
+                        candidate.engine_index(),
+                    )
+                })
+                .collect(),
+            personalization_status: personalization_status_code(snapshot.personalization_status()),
         }
     }
 
@@ -95,6 +126,36 @@ impl RadishLexSnapshot {
         self.candidates.len()
     }
 
+    pub fn personalization_status(&self) -> u32 {
+        self.personalization_status
+    }
+
+    pub fn render_text(&self) -> String {
+        let mut output = String::new();
+        output.push_str(&format!("schema: {}\n", self.schema));
+        output.push_str(&format!("composition: {}\n", self.preedit));
+        output.push_str(&format!("cursor: {}\n", self.cursor));
+        output.push_str("candidates:\n");
+        if self.candidates.is_empty() {
+            output.push_str("  <none>\n");
+        } else {
+            for candidate in &self.candidates {
+                output.push_str(&format!(
+                    "  {}. {}",
+                    candidate.display_index, candidate.text
+                ));
+                if let Some(reading) = &candidate.reading {
+                    output.push_str(&format!(" [{reading}]"));
+                }
+                if let Some(annotation) = &candidate.annotation {
+                    output.push_str(&format!(" - {annotation}"));
+                }
+                output.push('\n');
+            }
+        }
+        output
+    }
+
     pub fn candidate_view(&self, index: usize) -> Result<RadishLexCandidateView, FfiError> {
         let Some(candidate) = self.candidates.get(index) else {
             return Err(FfiError::invalid_argument(format!(
@@ -103,9 +164,11 @@ impl RadishLexSnapshot {
             )));
         };
 
-        Ok(candidate.view(index))
+        Ok(candidate.view())
     }
 
+    /// # Safety
+    /// `snapshot` must be null or a live independent snapshot pointer released exactly once.
     pub unsafe fn free(snapshot: *mut Self) {
         if snapshot.is_null() {
             return;
@@ -116,6 +179,8 @@ impl RadishLexSnapshot {
 }
 
 struct RadishLexCandidateSnapshot {
+    display_index: usize,
+    engine_index: usize,
     text: String,
     reading: Option<String>,
     annotation: Option<String>,
@@ -123,8 +188,10 @@ struct RadishLexCandidateSnapshot {
 }
 
 impl RadishLexCandidateSnapshot {
-    fn from_candidate(candidate: &Candidate) -> Self {
+    fn from_candidate(candidate: &Candidate, display_index: usize, engine_index: usize) -> Self {
         Self {
+            display_index,
+            engine_index,
             text: candidate.text().to_owned(),
             reading: candidate.reading().map(ToOwned::to_owned),
             annotation: candidate.annotation().map(ToOwned::to_owned),
@@ -132,9 +199,10 @@ impl RadishLexCandidateSnapshot {
         }
     }
 
-    fn view(&self, index: usize) -> RadishLexCandidateView {
+    fn view(&self) -> RadishLexCandidateView {
         RadishLexCandidateView {
-            index,
+            index: self.display_index,
+            engine_index: self.engine_index,
             text: RadishLexStringView::from_str(&self.text),
             reading: optional_view(self.reading.as_deref()),
             reading_present: presence_flag(self.reading.as_deref()),

@@ -17,20 +17,24 @@ RadishLex/
   crates/
     ime-core/
     ime-engine-rime/
+    ime-runtime/
     ime-ranker/
     ime-userdb/
     ime-sync/
+      README.md
     ime-crypto/
     ime-ffi/
     ime-cli/
   server/
     sync-server/
+      README.md
       cmd/
       internal/
       migrations/
       Dockerfile
   deploy/
     sync-server/
+      README.md
       docker-compose.local.yaml
       docker-compose.yaml
       nginx.prod.conf
@@ -41,6 +45,14 @@ RadishLex/
       Sources/
       Resources/
       Tests/
+      Tools/
+      ReferenceProbe/
+      ValidationHost/
+      build-bundle.sh
+      cleanup-user-install.sh
+      cleanup-r01b-test-userdb.sh
+      cleanup-m2-manager-test-data.sh
+      privacy-mode.sh
     android-ime/
       keystore-bridge/
   docs/
@@ -74,11 +86,11 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、CLI、ABI v2 key result 与受测输入 header | 经真实应用验证的平台输入链 |
-| 本地学习 | userdb、ranker、管理接口和测试 | 事务化用户意图、有效 recency 和固定评测基线 |
-| 同步 | crypto/sync 模型、Go server、HTTP 集成测试 | 确定合并、完整设备生命周期、生产 HTTPS 编排 |
-| Flutter manager | macOS 工程、真实开发期 FFI bridge、widget tests | 默认产品 FFI bundle、持久化和平台文件访问 |
-| 平台 | macOS InputMethodKit 薄壳、contract bundle/smoke；Android Keystore 能力验证桥 | macOS 经授权安装与真实应用输入；其他系统输入法 |
+| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v6 隐私/索引/学习状态、本地导入批次关联与 Manager 产品状态摘要、deleted tombstone 管理查询、精确 case inspection、隔离非选择 snapshot、R01B 与 manager/InputMethodKit 共库证据 | M3 同步命令仍关闭；M4 发布包复验 |
+| 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
+| 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS | Manager 受控资格执行链、用户入口退出评审、首版后的发布级目标部署 |
+| Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、widget/FFI/产品与实机门禁 | M3 受控资格执行链与用户入口退出评审；M4 发布分发 |
+| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、R01A build 32 与 R01B build 34 实机退出、生产 LearningContext、privacy/清理 contract 与隔离 ValidationHost；Android Keystore 能力验证桥 | M4 产品安装包；其他系统输入法 |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
 
@@ -107,6 +119,18 @@ RadishLex/
 - adapter 错误和 native smoke
 
 Rime 私有概念不得越过该 crate。
+
+### ime-runtime
+
+产品输入 session 的本地组合层：
+
+- 组合 `ime-core` engine session、`ime-ranker`、`ime-userdb` 与隐私策略
+- 取得稳定 input code，并批量读取当前候选的个人化信号
+- 保存 display index 到 engine index 的当次快照映射
+- 决定 selection 的即时或分段学习时机，并返回显式学习结果
+- 在 userdb/ranker 故障时保留 engine 输入与 commit，同时暴露退化状态
+
+每个 runtime session 持有独立 SQLite connection；平台壳、manager 和 engine adapter 不复制学习、删除或排序语义。该 crate 不依赖具体平台框架、远端同步或具体 engine 实现。
 
 ### ime-ranker
 
@@ -155,6 +179,8 @@ SQLite 用户数据层：
 
 不得提供 plaintext 远端上传入口。
 
+模块、产品密码端口、cycle 数据流和开发验证入口见 [ime-sync 组件说明](../crates/ime-sync/README.md)。
+
 ### ime-ffi
 
 C ABI 与 host contract：
@@ -165,6 +191,7 @@ C ABI 与 host contract：
 - string/buffer/view ownership
 - structured errors 与 panic boundary
 - thread policy 与 release functions
+- Apple 普通 DPK / Secure Enclave 独立产品 validation status/smoke（仅原生 gated host，不进入 Dart）
 
 生产源码只保存真实 ABI 和必要兼容层。审批流程、未来 symbol 列表和“尚未导出”证明应放文档或历史材料，不应长期存在于 `src/`。
 
@@ -174,6 +201,7 @@ C ABI 与 host contract：
 
 - real/demo engine 输入
 - dictionary 与 learning
+- R01B `case-status` 精确状态检查与 fresh isolated Rime user-data 非选择 snapshot
 - rank explain
 - sync preflight 和受控 smoke
 
@@ -183,6 +211,7 @@ CLI 不作为平台壳或 manager 的运行时依赖。
 
 ```text
 server/sync-server/
+  README.md                     component boundary and development entry
   cmd/radishlex-sync-server/   executable assembly
   internal/api/                HTTP routing and DTO mapping
   internal/config/             environment configuration
@@ -199,6 +228,8 @@ server/sync-server/
 - `cmd` 保持薄，只处理启动、配置和退出码。
 - 默认单用户 SQLite，自部署优先，不提前拆微服务或多租户。
 
+服务配置、schema、日志脱敏和测试入口见 [Go 同步服务说明](../server/sync-server/README.md)；API 与 storage 的规范性字段参考仍以 [Sync Server API/Storage](sync-server-api-storage.md) 为准。部署目录的两种拓扑和 secret 边界见 [同步服务部署说明](../deploy/sync-server/README.md)。
+
 ## Flutter manager
 
 ```text
@@ -214,16 +245,20 @@ apps/radishlex-manager/
 边界要求：
 
 - `bridge` 复制 native borrowed data 后再释放 handle。
+- macOS method channel 只解析固定产品路径、收紧本地文件权限和读写 InputMethodKit 隐私偏好；不承载 userdb、排序、同步或密钥真相源。
 - `models` 不重新实现 Rust 排序、合并或隐私规则。
 - `screens` 只编排用户交互和展示结构化状态。
 - fixture 必须通过显式开发模式启用，不可成为产品默认成功路径。
 - 产品构建需要打包匹配版本的 Rust native library。
+- macOS M2 产品 host 使用非 App Sandbox profile 与 InputMethodKit 共享用户 Application Support userdb；App Group 迁移属于 M4 的独立设计与复验范围。
 
 后续若支持更多 Flutter host，应复用 manager bridge 和模型，但不把 Flutter 引入系统输入候选窗。
 
 ## 平台目录
 
-当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build 和不安装系统输入法的 wrapper contract smoke；它尚未经过安装、启用和真实应用输入验证。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
+当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build、不安装系统输入法的 wrapper contract、公开 TIS 只读状态/监视工具、生产 `LearningContext`、privacy CFPreferences receipt、精确进程 stop、R01B userdb 与 M2 manager 固定测试数据 receipt 清理入口，以及合成 reference probe 和 unknown/P0 `ValidationHost`。两个数据 profile 复用同一 hardened helper：R01B 只允许四个 SQLite 名称，M2 另允许 manager settings 与原子写临时文件；二者都不接受调用方路径。分类 contract 直接编译 controller 使用的生产源码，并以两个 host 的固定 Bundle ID 覆盖 unknown/P0；host 本体只构建不启动，也不读取或保存输入框内容。正式薄壳已在 Apple Development build 32 完成 R01A；R01B 以同一 Apple Development build 34 完成真实重排、重启、删除/恢复、隐私/unknown/P0/secure 系统路由与零残留退出。曾冻结的 build 33 只保留历史意义。
+
+R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-acceptance.md) 的授权 A/B：授权 A 才允许签名、安装、系统设置、人工交互和保留 userdb 的普通清理；授权 B 只在 receipt 归属、设置恢复和数据库关闭条件满足后删除本轮四个固定 SQLite 文件并把预存空父目录恢复为 `0755`，不得删除父目录。该 runbook 现在作为关闭证据与回归边界保留。副屏和 VoiceOver 仍按平台边界文档的已知限制处理，自动 contract 不能替代对应实机证据。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
 
 后续平台目录按进入顺序创建：
 
@@ -237,7 +272,8 @@ apps/radishlex-manager/
 ## 文档目录
 
 - `docs/status/current.md`：唯一当前阶段短入口。
-- `docs/remediation/`：当前状态明确引用的临时执行专题，完成后归档。
+- `docs/remediation/`：仅在当前状态明确引用活动临时专题时使用；当前无活动专题。
+- `docs/archive/`：已关闭且退出默认阅读链的历史专题与 review-only 材料。
 - `docs/adr/`：已决策且需要长期追溯的架构选择。
 - `docs/runbooks/`：可重复操作步骤、环境前提和停止线。
 - `docs/devlogs/`：周内事实、命令、提交和历史流水。

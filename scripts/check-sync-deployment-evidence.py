@@ -58,6 +58,7 @@ ABSOLUTE_PATH_PATTERN = re.compile(r"(^|\s)(/Users/|/home/|/private/|/var/|/etc/
 GIT_COMMIT_PATTERN = re.compile(r"^[0-9a-f]{7,40}$")
 SAFE_ALIAS_PATTERN = re.compile(r"^[A-Za-z0-9._-]{3,64}$")
 SAFE_IMAGE_TAG_PATTERN = re.compile(r"^[A-Za-z0-9._:/-]{3,128}$")
+FLOATING_IMAGE_TAGS = {"dev", "edge", "latest", "main", "master", "nightly"}
 REVIEWED_AT_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\+08:00|Z)$")
 FORBIDDEN_MARKERS = [
     "Authorization:",
@@ -159,8 +160,15 @@ def validate_fields(fields: dict[str, str]) -> list[str]:
         errors.append("git_commit: expected 7-40 lowercase hex characters")
 
     image_tag = fields.get("image_tag")
-    if image_tag is not None and not SAFE_IMAGE_TAG_PATTERN.match(image_tag):
-        errors.append("image_tag: contains unsupported characters")
+    if image_tag is not None:
+        if not SAFE_IMAGE_TAG_PATTERN.match(image_tag):
+            errors.append("image_tag: contains unsupported characters")
+        else:
+            image_name = image_tag.rsplit("/", 1)[-1]
+            if ":" not in image_name:
+                errors.append("image_tag: an explicit non-floating tag is required")
+            elif image_name.rsplit(":", 1)[-1].lower() in FLOATING_IMAGE_TAGS:
+                errors.append("image_tag: floating development tags are not release evidence")
 
     return errors
 
@@ -315,6 +323,16 @@ def run_self_test() -> None:
 
     assert_invalid(valid.replace("access_control: passed\n", ""), "missing field", "missing required fields")
     assert_invalid(valid.replace("external_tls: passed", "external_tls: maybe"), "invalid status", "external_tls")
+    assert_invalid(
+        valid.replace("radishlex-sync-server:synthetic", "radishlex-sync-server:latest"),
+        "floating image",
+        "floating development tags",
+    )
+    assert_invalid(
+        valid.replace("radishlex-sync-server:synthetic", "radishlex-sync-server"),
+        "missing image tag",
+        "explicit non-floating tag",
+    )
     assert_invalid(valid.replace("notes: synthetic deployment evidence only", "notes: Authorization: Bearer abc"), "bearer", "Authorization")
     assert_invalid(valid.replace("notes: synthetic deployment evidence only", "notes: /Users/example/sync"), "path", "absolute local paths")
     assert_invalid(valid.replace("notes: synthetic deployment evidence only", "notes: encrypted_payload bytes leaked"), "payload", "encrypted_payload")

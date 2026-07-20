@@ -6,6 +6,10 @@
 
 Accepted
 
+## 与后续 ADR 的关系
+
+本 ADR 固定的签名对象、canonical bytes、设备 key usage 分离、私钥抽象和失败关闭规则继续有效。算法 allowlist 已由 ADR 0006 扩展为 `ed25519-v1` 与 `ecdsa-p256-sha256-v1` 共存；Apple 普通 DPK 与 Secure Enclave P-256 backend 分别由 ADR 0006/0007 固定。下文只写 Ed25519 的原始决策用于解释兼容基线，不再表示当前协议只能登记 Ed25519。
+
 ## 背景
 
 当前 `ime-crypto` 已落地本地 AEAD envelope、HKDF-SHA256 object key 派生、device wrapping、recovery material 和恢复码 KDF；`ime-sync` 已落地设备生命周期、加入请求、授权包、撤销记录、对象版本冲突和客户端合并模型。进入真实远端同步前，还需要回答两个问题：
@@ -233,8 +237,8 @@ revoked_at_ms
 
 - 生产 backend 不允许导出私钥 bytes。
 - 测试 backend 可以使用合成可导出 key，但必须标记为 `test-memory-v1`，不得进入生产配置。
-- 当前可执行本地 store 只提供 `test-memory-v1` 和 `unavailable`；Apple Keychain、Android Keystore、Windows CNG、Linux Secret Service 等 platform backend id 已进入 Rust capability metadata，其中 `apple-keychain-v1` 已补齐平台 runbook 和策略 ADR，但真实 smoke 阻塞于 Ed25519 Keychain key 创建，backend status 在策略解决前必须阻断生产签名。
-- FFI 不导出私钥、签名 handle 内部指针、canonical bytes helper 或签名 API，直到平台线程、生命周期和错误语义稳定。
+- 默认 workspace 的可执行 store 仍只有测试专用 `test-memory-v1` 和明确失败的 `unavailable`。显式 feature 下另有阻塞中的 Ed25519 `apple-keychain-v1`、运行时可用但 `exportable=true` 的普通 DPK `apple-keychain-p256-v1`、已按受支持 macOS 主路径取得 lifecycle/不可导出/hardware-backed/denied/locked/cleanup 与产品资格证据的 `apple-secure-enclave-p256-v1`，以及 Android Keystore bridge；unsupported 延期补测，backend 之间不得 fallback。
+- FFI 不导出生产签名 handle 内部指针、canonical bytes helper 或通用签名 API。Apple 产品 validation ABI 是受控例外，只返回固定 status/smoke 摘要，不向 Dart 或 Flutter 暴露 key/canonical/signature bytes，也不是同步业务 ABI。
 - CLI 不新增生产签名命令；测试命令若后续加入，必须只使用合成 fixture。
 
 ## 错误语义
@@ -259,11 +263,11 @@ revoked_at_ms
 
 当前 Rust 实施口径：
 
-- `ime-crypto` 已新增签名基础类型、签名 key handle/public key、签名对象 canonical bytes、backend capability metadata、`unavailable` 明确失败 store 和纯 Rust `test-memory-v1` signer。
+- `ime-crypto` 已新增签名基础类型、签名 key handle/public key、签名对象 canonical bytes、算法分派、backend capability/status、`unavailable` 明确失败 store、纯 Rust `test-memory-v1` signer 和 feature-gated Apple/Android backend。
 - `ime-crypto` 已覆盖 `SignedSyncObjectManifest` 与 `SignedRecoveryRecordManifest`；`ime-sync` 已覆盖 `SignedDeviceAuthorization` 与 `SignedDeviceRevocation`，并接入设备状态校验。
-- 暂不接系统 Keychain / Keystore，不引入平台 SDK，不暴露 FFI。
-- 当前签名依赖为 `ed25519-dalek = 2.2.0`，许可 `BSD-3-Clause`；当前 test-memory signer 使用合成 seed，不依赖系统 RNG 创建生产 key。
-- Go server API 与平台存储 backend 边界已分别由 `docs/sync-server-api-storage.md` 和 ADR 0004 固定；生产 key 创建流程仍需后续平台 backend 实现和平台验证。
+- Rust/Go verifier 按显式算法分派 Ed25519 与 P-256，并共同读取跨语言 fixture；服务端设备与 join metadata 必须显式保存算法，新请求不得默认或猜测。
+- 当前 test-memory signer 使用合成 Ed25519 seed，不依赖系统 RNG 创建生产 key；P-256 只通过显式 profile/backend 进入，不替换历史 Ed25519 key。
+- Go server API 与平台存储 backend 边界已分别由 `docs/sync-server-api-storage.md` 和 ADR 0004 固定；局部平台 lifecycle 证据不等于产品资格或用户同步总 gate。
 
 ## 验证口径
 
@@ -271,7 +275,7 @@ revoked_at_ms
 
 - 同一 record type 的 canonical bytes 稳定。
 - 任一被签字段变化都会导致验签失败。
-- 错误设备公钥验签失败。
+- 两个允许的算法 profile 都能被 Rust/Go 对同一 canonical bytes 验证，错误设备公钥、算法不一致和非法编码均失败。
 - 非 active、revoked 或 lost 设备不能签发新对象、授权包、撤销记录或恢复记录。
 - `new_key_epoch <= previous_key_epoch` 的撤销签名无效。
 - `SignedSyncObjectManifest` 的 `ciphertext_hash`、`encrypted_payload_len`、`object_id`、`version` 和 `key_epoch` 与 envelope 不一致时失败。

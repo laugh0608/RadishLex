@@ -3,11 +3,9 @@
 #import <Carbon/Carbon.h>
 
 NSErrorDomain const RLXBridgeErrorDomain = @"org.radishlex.inputmethod.bridge";
-NSAttributedStringKey const RLXCandidateIndexAttributeName =
-    @"org.radishlex.inputmethod.candidate-index";
-
 @interface RLXCandidate ()
 @property(nonatomic) NSUInteger index;
+@property(nonatomic) NSUInteger engineIndex;
 @property(nonatomic, copy) NSString *text;
 @property(nonatomic, copy, nullable) NSString *reading;
 @property(nonatomic, copy, nullable) NSString *annotation;
@@ -21,6 +19,7 @@ NSAttributedStringKey const RLXCandidateIndexAttributeName =
 @property(nonatomic, copy) NSString *preedit;
 @property(nonatomic) NSUInteger cursor;
 @property(nonatomic, copy) NSArray<RLXCandidate *> *candidates;
+@property(nonatomic) uint32_t personalizationStatus;
 @end
 @implementation RLXSnapshot
 @end
@@ -29,15 +28,9 @@ NSAttributedStringKey const RLXCandidateIndexAttributeName =
 @property(nonatomic, getter=isConsumed) BOOL consumed;
 @property(nonatomic, copy, nullable) NSString *commit;
 @property(nonatomic, strong, nullable) RLXSnapshot *snapshot;
+@property(nonatomic) uint32_t learningDisposition;
 @end
 @implementation RLXKeyHandlingResult
-@end
-
-@interface RLXCandidateCommitResult ()
-@property(nonatomic, copy) NSString *commit;
-@property(nonatomic, strong, nullable) RLXSnapshot *snapshot;
-@end
-@implementation RLXCandidateCommitResult
 @end
 
 @interface RLXSessionBridge ()
@@ -155,6 +148,7 @@ static RLXSnapshot *_Nullable RLXCopySnapshot(const RadishLexSnapshot *snapshot,
     }
     RLXCandidate *candidate = [[RLXCandidate alloc] init];
     candidate.index = view.index;
+    candidate.engineIndex = view.engine_index;
     candidate.text = text;
     candidate.reading = reading;
     candidate.annotation = annotation;
@@ -167,6 +161,8 @@ static RLXSnapshot *_Nullable RLXCopySnapshot(const RadishLexSnapshot *snapshot,
   copied.preedit = preedit;
   copied.cursor = cursor;
   copied.candidates = candidates;
+  copied.personalizationStatus =
+      radishlex_snapshot_personalization_status(snapshot);
   return copied;
 }
 
@@ -241,6 +237,45 @@ static RLXSnapshot *_Nullable RLXCopySnapshot(const RadishLexSnapshot *snapshot,
   return self;
 }
 
+- (nullable instancetype)initPersonalizedRimeWithSharedDataDirectory:
+                                (NSString *)sharedDataDirectory
+                                                userDataDirectory:
+                                                    (NSString *)userDataDirectory
+                                                           schema:(NSString *)schema
+                                                     logDirectory:
+                                                         (nullable NSString *)logDirectory
+                                                    deployOnStart:(BOOL)deployOnStart
+                                                       userDbPath:(NSString *)userDbPath
+                                                        sessionId:(NSString *)sessionId
+                                                            error:(NSError **)error {
+  self = [super init];
+  if (self == nil) {
+    return nil;
+  }
+  if (![[self class] validateFFIContract:error]) {
+    return nil;
+  }
+  RadishLexPersonalizedRimeSessionOptions options = {
+      .version = RADISHLEX_PERSONALIZED_RIME_SESSION_OPTIONS_VERSION,
+      .shared_data_dir = sharedDataDirectory.fileSystemRepresentation,
+      .user_data_dir = userDataDirectory.fileSystemRepresentation,
+      .schema = schema.UTF8String,
+      .log_dir = logDirectory != nil ? logDirectory.fileSystemRepresentation : NULL,
+      .deploy_on_start = deployOnStart ? 1 : 0,
+      .userdb_path = userDbPath.fileSystemRepresentation,
+      .session_id = sessionId.UTF8String,
+  };
+  RadishLexError *ffiError = NULL;
+  _session = radishlex_session_new_personalized_rime(&options, &ffiError);
+  if (_session == NULL) {
+    RLXCopyFFIError(error, RADISHLEX_STATUS_INVALID_STATE, ffiError);
+    return nil;
+  }
+  _ownerThread = [NSThread currentThread];
+  _valid = YES;
+  return self;
+}
+
 - (BOOL)ensureOwner:(NSError **)error {
   if (!self.valid || self.session == NULL) {
     RLXAssignError(error, RADISHLEX_STATUS_INVALID_STATE,
@@ -270,8 +305,11 @@ static RLXSnapshot *_Nullable RLXCopySnapshot(const RadishLexSnapshot *snapshot,
   }
   uint8_t consumed = radishlex_key_result_consumed(result);
   uint8_t commitPresent = radishlex_key_result_commit_present(result);
+  uint32_t learningDisposition =
+      radishlex_key_result_learning_disposition(result);
   if (radishlex_key_result_version(result) != RADISHLEX_KEY_RESULT_VERSION ||
-      consumed > 1 || commitPresent > 1) {
+      consumed > 1 || commitPresent > 1 ||
+      learningDisposition > RADISHLEX_LEARNING_FAILED) {
     radishlex_key_result_free(result);
     RLXAssignError(error, RADISHLEX_STATUS_INVALID_STATE,
                    @"RadishLex key result contract is incompatible with the macOS shell");
@@ -288,6 +326,7 @@ static RLXSnapshot *_Nullable RLXCopySnapshot(const RadishLexSnapshot *snapshot,
   copied.consumed = consumed == 1;
   copied.commit = commit;
   copied.snapshot = snapshot;
+  copied.learningDisposition = learningDisposition;
   return copied;
 }
 
@@ -306,29 +345,44 @@ static RLXSnapshot *_Nullable RLXCopySnapshot(const RadishLexSnapshot *snapshot,
   return copied;
 }
 
-- (nullable RLXCandidateCommitResult *)commitCandidateAtIndex:(NSUInteger)index
-                                                         error:(NSError **)error {
+- (nullable RLXKeyHandlingResult *)selectCandidateAtIndex:(NSUInteger)index
+                                                      error:(NSError **)error {
   if (![self ensureOwner:error]) {
     return nil;
   }
   RadishLexError *ffiError = NULL;
-  RadishLexBuffer *buffer = radishlex_session_commit_candidate(self.session, index, &ffiError);
-  if (buffer == NULL) {
-    RLXCopyFFIError(error, RADISHLEX_STATUS_ENGINE_ERROR, ffiError);
+  RadishLexKeyResult *result = NULL;
+  RadishLexStatusCode status =
+      radishlex_session_select_candidate(self.session, index, &result, &ffiError);
+  if (status != RADISHLEX_STATUS_OK || result == NULL) {
+    RLXCopyFFIError(error, status, ffiError);
     return nil;
   }
-  RadishLexStringView view = {.data = radishlex_buffer_data(buffer),
-                               .len = radishlex_buffer_len(buffer)};
-  NSString *commit = RLXCopyStringView(view, error);
-  radishlex_buffer_free(buffer);
-  if (commit == nil) {
+  uint8_t consumedFlag = radishlex_key_result_consumed(result);
+  uint8_t commitPresentFlag = radishlex_key_result_commit_present(result);
+  uint32_t learningDisposition =
+      radishlex_key_result_learning_disposition(result);
+  if (radishlex_key_result_version(result) != RADISHLEX_KEY_RESULT_VERSION ||
+      consumedFlag > 1 || commitPresentFlag > 1 ||
+      learningDisposition > RADISHLEX_LEARNING_FAILED) {
+    radishlex_key_result_free(result);
+    RLXAssignError(error, RADISHLEX_STATUS_INVALID_STATE,
+                   @"RadishLex selection result contract is incompatible with the macOS shell");
     return nil;
   }
-  RLXSnapshot *snapshot = [self snapshotWithError:error];
-  RLXCandidateCommitResult *result = [[RLXCandidateCommitResult alloc] init];
-  result.commit = commit;
-  result.snapshot = snapshot;
-  return result;
+  BOOL consumed = consumedFlag == 1;
+  BOOL commitPresent = commitPresentFlag == 1;
+  NSString *commit = commitPresent ? RLXCopyStringView(radishlex_key_result_commit(result), error)
+                                   : nil;
+  RLXSnapshot *snapshot = RLXCopySnapshot(radishlex_key_result_snapshot(result), error);
+  radishlex_key_result_free(result);
+  if ((commitPresent && commit == nil) || snapshot == nil) return nil;
+  RLXKeyHandlingResult *copied = [[RLXKeyHandlingResult alloc] init];
+  copied.consumed = consumed;
+  copied.commit = commit;
+  copied.snapshot = snapshot;
+  copied.learningDisposition = learningDisposition;
+  return copied;
 }
 
 - (BOOL)resetWithError:(NSError **)error {
@@ -351,6 +405,39 @@ static RLXSnapshot *_Nullable RLXCopySnapshot(const RadishLexSnapshot *snapshot,
   RadishLexError *ffiError = NULL;
   RadishLexStatusCode status =
       radishlex_session_set_schema(self.session, schema.UTF8String, &ffiError);
+  if (status != RADISHLEX_STATUS_OK) {
+    RLXCopyFFIError(error, status, ffiError);
+    return NO;
+  }
+  return YES;
+}
+
+- (BOOL)setLearningContextSecureInput:(BOOL)secureInput
+                 sensitiveApplication:(BOOL)sensitiveApplication
+                          privacyMode:(BOOL)privacyMode
+                         contextKnown:(BOOL)contextKnown
+                           contextKind:(NSString *)contextKind
+                                 error:(NSError **)error {
+  if (![self ensureOwner:error]) {
+    return NO;
+  }
+  NSData *contextData = [contextKind dataUsingEncoding:NSUTF8StringEncoding];
+  if (contextData == nil || contextData.length == 0) {
+    RLXAssignError(error, RADISHLEX_STATUS_INVALID_ARGUMENT,
+                   @"Learning context kind must be non-empty UTF-8");
+    return NO;
+  }
+  RadishLexLearningContext context = {
+      .version = RADISHLEX_LEARNING_CONTEXT_VERSION,
+      .secure_input = secureInput ? 1 : 0,
+      .sensitive_application = sensitiveApplication ? 1 : 0,
+      .privacy_mode = privacyMode ? 1 : 0,
+      .context_known = contextKnown ? 1 : 0,
+      .context_kind = {.data = contextData.bytes, .len = contextData.length},
+  };
+  RadishLexError *ffiError = NULL;
+  RadishLexStatusCode status =
+      radishlex_session_set_learning_context(self.session, context, &ffiError);
   if (status != RADISHLEX_STATUS_OK) {
     RLXCopyFFIError(error, status, ffiError);
     return NO;
@@ -460,12 +547,5 @@ BOOL RLXNormalizeKeyEvent(NSEvent *event, RadishLexKeyEvent *eventOut) {
 }
 
 NSAttributedString *RLXAttributedCandidate(RLXCandidate *candidate) {
-  return [[NSAttributedString alloc]
-      initWithString:candidate.text
-          attributes:@{RLXCandidateIndexAttributeName : @(candidate.index)}];
-}
-
-NSNumber *_Nullable RLXCandidateIndexFromAttributedString(NSAttributedString *candidate) {
-  if (candidate.length == 0) return nil;
-  return [candidate attribute:RLXCandidateIndexAttributeName atIndex:0 effectiveRange:NULL];
+  return [[NSAttributedString alloc] initWithString:candidate.text];
 }

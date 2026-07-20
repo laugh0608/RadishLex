@@ -17,7 +17,7 @@
 - 用户开启隐私模式期间的输入。
 - 平台明确标记为不可学习的内容。
 
-P0 数据不写 selection event、negative feedback、user term 或同步摘要。平台无法可靠判断时，应优先按更严格等级处理。
+P0 数据不写 selection event、negative feedback、user term 或同步摘要。平台无法可靠判断时，应优先按更严格等级处理。当前隐私模式可以只读使用隐私模式开启前已经存在的本地 P2 排序摘要，但本次输入仍按 P0 处理且不产生任何学习写入；secure input、敏感应用或上下文无法可靠判断时连既有个人化摘要也不读取，只使用 engine 顺序。
 
 ### P1：本地学习、默认不同步
 
@@ -52,7 +52,7 @@ P3 包仍需要来源、版本、完整性和许可证校验，但不使用用�
 
 服务端可以看到：
 
-- domain、device 和必要公钥 metadata；
+- domain、device、显式签名算法和必要公钥 metadata；
 - 加密对象 ID、类型、版本、base version 和 key epoch；
 - 密文长度、ciphertext hash、创建和更新时间；
 - 加入、授权、撤销和恢复记录的公开协议字段；
@@ -156,7 +156,17 @@ Sync Master Key + object identity + key epoch
 
 禁止从平台名称推断算法一定可用，也禁止 unavailable backend 静默回退到内存私钥或普通文件。
 
+状态必须区分：当前 target 是否编译 backend、当前进程是否具备创建/签名运行时能力、产品 bundle 是否经过真实环境资格评审，以及 M3 用户同步总 gate。前两层为 true 不推出后两层为 true；`test-memory-v1` 即使运行时可用也永远不能获得产品资格。
+
 协议必须允许算法演进。平台原生 P-256 与“由平台密钥封装的 Ed25519 seed”具有不同保护语义，必须使用不同 backend/algorithm ID 和测试矩阵。
+
+当前设备签名 allowlist 为 `ed25519-v1` 与 `ecdsa-p256-sha256-v1`。后者只接受 65-byte SEC1 uncompressed public key 和 64-byte P1363 signature；两者复用既有 canonical builder，算法 id 本身被签名。设备登记必须绑定 algorithm、key id 与 public key，服务端不能按长度猜测算法，验签失败也不能尝试另一 profile。历史行回填 Ed25519 只能发生在明确 schema migration，新请求不得默认。
+
+`apple-keychain-p256-v1` 只表示 Apple 普通 DPK 软件 P-256 `SecKey`，和 Ed25519 `apple-keychain-v1` 及后续 Secure Enclave backend 分离。实现统一选择 macOS data protection keychain，private key、canonical bytes 与 signature bytes 均不进入 Dart；合格 manager 产品生命周期支持编译和运行时字段为 true。Apple 官方能力评审表明普通 DPK 软件私钥可由平台 API 导出，因此 capability 为 `exportable=true`，产品资格与用户同步 gate 关闭；不可从“Apple Keychain”名称推断 Secure Enclave、hardware-backed、user presence 或可迁移能力。
+
+`apple-secure-enclave-p256-v1` 由 ADR 0007 独立定义，复用 P-256 protocol 但使用新的 key identity、token/access-control、tag 与产品证据。repository/manager build 不向 Dart 暴露材料；qualification 产品进程已证明 lifecycle、不可导出、hardware-backed、ad-hoc denied、真实设备锁屏 locked 与 cleanup。个人开发阶段按每个平台一台真实支持设备的主路径证据评审 `runtime_available/can_create/can_sign/hardware_backed/product_qualified=true`；unsupported 保留为有匹配环境时补做的兼容性证据，不在支持设备上模拟，也不阻塞当前产品资格。`user_sync_enabled/user_presence_required/backup_migratable` 继续关闭，任何字段都不能仅从代码配置或平台名称推导。
+
+macOS wrapped epoch material 使用独立 Secure Enclave P-256 key-agreement identity，不复用设备签名 key。v1 只接受 `p256-ecdh-hkdf-sha256-xchacha20poly1305-v1`、65-byte SEC1 uncompressed recipient/ephemeral public key和版本化 envelope；完整 metadata 进入 AAD。平台 backend 只返回一次 ECDH shared secret 给 Rust 解封边界，private key 不离开 Secure Enclave，shared secret、派生 wrapping key和明文 master key必须在本次材料装载后尽快清零。SQLite/settings 只能持久化已签名公开 key-agreement profile 或 wrapped ciphertext，不能持久化上述明文 secret。
 
 ## 新设备授权
 
@@ -200,9 +210,10 @@ Sync Master Key + object identity + key epoch
 
 - 恢复码由客户端生成，不上传明文。
 - KDF 使用版本化 Argon2id profile，并同时限制最小和最大 memory、iterations、parallelism、salt 和 output。
-- recovery record 保存 salt、KDF profile、algorithm、nonce、wrapped key metadata、ciphertext hash 和签名。
+- recovery-record-v2 保存 predecessor、salt、KDF/envelope profile、wrapped key metadata/hash、由恢复 wrapping key 独立派生的 activation 公钥和 active device 签名；activation private seed 不持久化。
 - 签名绑定实际 wrapped ciphertext hash，服务端不能替换密文后只更新 hash。
 - 恢复记录可创建、轮换和撤销；旧恢复码在撤销后不可继续加入设备。
+- 恢复设备必须用 activation key 签入完整新 signing/key-agreement profile并重新进入 verified lifecycle；bearer、header、record id 或服务端管理员权限不能代替恢复码 possession proof。
 - 恢复失败需要服务端和客户端双层限速，但不能依赖可伪造 header 作为唯一身份。
 
 ## 备份与恢复
@@ -240,6 +251,8 @@ Manager 不得显示或持久化：
 - signature bytes、wrapped material、payload bytes；
 - 原始请求/响应体；
 - 明文 P1 事件或真实敏感路径。
+
+为支持 crash-safe 幂等上传，Rust-owned userdb 可以按 `docs/sync-orchestration.md` 持久化 prepared outbox 中的 encrypted envelope、signed manifest 与 signature bytes。这不属于 Manager settings 或 UI state；outbox 禁止保存 plaintext payload、canonical bytes、token、sync master/object key、设备私钥、wrapped material 或恢复码，并必须在成功确认、冲突替换和用户清除同步状态时按明确事务语义收口。
 
 诊断只使用 allowlist 字段和结构化状态码。真实同步操作必须通过 Rust sync/crypto 边界，Flutter 不自行构造签名或解密 payload。
 
@@ -294,6 +307,7 @@ Docker/反代操作步骤见对应 runbook，当前部署证据见 `docs/status/
 ## 默认设置
 
 - 默认本地学习开启，但 P0 场景自动禁学。
+- 隐私模式默认关闭；开启后当前输入停止学习，但不删除既有本地词库和排序摘要。
 - P1 默认不同步。
 - P2 只有在用户配置同步、设备授权和安全门禁通过后才同步。
 - 诊断默认脱敏，详细敏感日志不存在“临时开启”后门。
@@ -321,6 +335,8 @@ Docker/反代操作步骤见对应 runbook，当前部署证据见 `docs/status/
 - [同步密钥管理](sync-key-management.md)
 - [生产恢复流程](production-recovery-flow.md)
 - [Sync Server API/Storage](sync-server-api-storage.md)
+- [产品同步编排](sync-orchestration.md)
 - [平台私钥策略](platform-private-key-backend-strategy.md)
+- [设备签名算法 Profile ADR](adr/0006-device-signature-algorithm-profiles.md)
 - [Manager Boundary](manager-ui-boundary.md)
 - [生产部署 Runbook](runbooks/sync-server-production-deployment.md)

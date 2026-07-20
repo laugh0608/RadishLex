@@ -2,7 +2,7 @@ use radishlex_ime_core::Candidate;
 use radishlex_ime_ranker::{RankRequest, RankedCandidate, Ranker};
 use radishlex_ime_userdb::UserDb;
 
-use crate::error::FfiError;
+use crate::error::{FfiError, RadishLexStatusCode};
 use crate::snapshot::RadishLexStringView;
 
 #[repr(C)]
@@ -76,6 +76,8 @@ impl RadishLexRankExplain {
         }
     }
 
+    /// # Safety
+    /// `explain` must be null or a live `RadishLexRankExplain` pointer released exactly once.
     pub unsafe fn free(explain: *mut Self) {
         if explain.is_null() {
             return;
@@ -124,11 +126,12 @@ pub fn rank_explain_for_path(
 
     let ranked = Ranker::default()
         .rank(
-            RankRequest::new(input_code.clone(), vec![candidate])
+            RankRequest::new(input_code.clone(), vec![candidate], evaluation_time_ms()?)
                 .with_context_kind(context_kind.clone())
                 .with_user_terms(user_terms)
                 .with_ranker_weights(ranker_weights),
         )
+        .map_err(|error| FfiError::new(RadishLexStatusCode::RankerError, error.to_string()))?
         .into_iter()
         .next()
         .ok_or_else(|| FfiError::internal("ranker returned no candidates"))?;
@@ -139,6 +142,14 @@ pub fn rank_explain_for_path(
         context_kind,
         ranked,
     })
+}
+
+fn evaluation_time_ms() -> Result<i64, FfiError> {
+    let duration = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| FfiError::internal(format!("system time failure: {error}")))?;
+    i64::try_from(duration.as_millis())
+        .map_err(|_| FfiError::internal("system time exceeds ranker timestamp range"))
 }
 
 fn optional_view(value: Option<&str>) -> RadishLexStringView {
@@ -173,3 +184,4 @@ fn normalized_context_kind(value: Option<&str>) -> String {
         .unwrap_or("general")
         .to_owned()
 }
+use std::time::{SystemTime, UNIX_EPOCH};

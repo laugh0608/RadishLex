@@ -71,3 +71,45 @@ fn write_error(error_out: *mut *mut RadishLexError, error: FfiError) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::CStr;
+    use std::ptr;
+
+    use super::*;
+
+    #[test]
+    fn panic_is_mapped_without_exposing_payload() {
+        let mut error = ptr::null_mut();
+        let status = ffi_status(&mut error, || -> Result<(), FfiError> {
+            panic!("synthetic-private-panic-payload")
+        });
+
+        assert_eq!(status, RadishLexStatusCode::InternalError);
+        assert!(!error.is_null());
+        let message = unsafe { CStr::from_ptr((*error).message()) }
+            .to_string_lossy()
+            .into_owned();
+        assert!(message.contains("panic caught at FFI boundary"));
+        assert!(!message.contains("synthetic-private-panic-payload"));
+        unsafe {
+            RadishLexError::free(error);
+        }
+    }
+
+    #[test]
+    fn pointer_and_release_boundaries_contain_panics() {
+        let mut error = ptr::null_mut();
+        let value = ffi_ptr::<u8, _>(&mut error, || -> Result<*mut u8, FfiError> {
+            panic!("synthetic-pointer-panic")
+        });
+        assert!(value.is_null());
+        assert!(!error.is_null());
+        unsafe {
+            RadishLexError::free(error);
+        }
+
+        ffi_release(|| panic!("synthetic-release-panic"));
+    }
+}

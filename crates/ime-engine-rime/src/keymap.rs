@@ -29,6 +29,11 @@ pub fn classify_key_event(event: KeyEvent) -> RimeKeyInput {
         return RimeKeyInput::Ignored;
     }
 
+    let modifiers = event.modifiers();
+    if modifiers.control() || modifiers.alt() || modifiers.meta() {
+        return RimeKeyInput::Ignored;
+    }
+
     match event.key() {
         Key::Char(ch) if ch.is_ascii_alphanumeric() || ch == '\'' => {
             RimeKeyInput::Character(ch.to_ascii_lowercase())
@@ -102,6 +107,19 @@ mod tests {
             KeyPhase::Release,
         ));
         assert_eq!(input, RimeKeyInput::Ignored);
+    }
+
+    #[test]
+    fn returns_system_modified_characters_to_the_platform() {
+        for modifiers in [
+            KeyModifiers::new(false, true, false, false),
+            KeyModifiers::new(false, false, true, false),
+            KeyModifiers::new(false, false, false, true),
+        ] {
+            let input =
+                classify_key_event(KeyEvent::new(Key::Char('c'), modifiers, KeyPhase::Press));
+            assert_eq!(input, RimeKeyInput::Ignored);
+        }
     }
 
     #[test]

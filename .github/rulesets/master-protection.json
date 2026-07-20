@@ -49,6 +49,15 @@
           },
           {
             "context": "Repository Baseline"
+          },
+          {
+            "context": "Rust Clippy"
+          },
+          {
+            "context": "Flutter Manager"
+          },
+          {
+            "context": "Go Quality"
           }
         ],
         "strict_required_status_checks_policy": true

@@ -5,11 +5,6 @@ on:
     branches:
       - dev
       - master
-      - main
-  push:
-    branches:
-      - dev
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -42,8 +37,7 @@ jobs:
         shell: bash
         run: ./scripts/check-docs.sh
 
-      - name: Check committed diff whitespace
-        if: github.event_name == 'pull_request'
+      - name: Check PR diff whitespace
         shell: bash
         run: git diff --check "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}"
 
@@ -68,3 +62,68 @@ jobs:
       - name: Check repository baseline
         shell: bash
         run: ./scripts/check-repo.sh --skip-text-files
+
+  rust-clippy:
+    name: Rust Clippy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Clippy
+        run: rustup component add clippy
+
+      - name: Check workspace lints
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  flutter-manager:
+    name: Flutter Manager
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve Flutter dependencies
+        working-directory: apps/radishlex-manager
+        run: flutter pub get
+
+      - name: Check Dart formatting
+        working-directory: apps/radishlex-manager
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Analyze Flutter manager
+        working-directory: apps/radishlex-manager
+        run: flutter analyze
+
+      - name: Test Flutter manager
+        working-directory: apps/radishlex-manager
+        run: flutter test
+
+  go-quality:
+    name: Go Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/sync-server/go.mod
+
+      - name: Vet sync server
+        working-directory: server/sync-server
+        run: go vet ./...
+
+      - name: Test sync server with race detector
+        working-directory: server/sync-server
+        run: go test -race ./...

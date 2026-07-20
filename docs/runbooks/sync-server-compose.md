@@ -44,7 +44,7 @@ docker compose -f deploy/sync-server/docker-compose.local.yaml up --build -d
 https://localhost:7319
 ```
 
-本地 HTTPS 由 Caddy internal TLS 提供，因为 Go sync server 当前只实现 HTTP API。该 Caddy 入口只存在于本地 compose 文件中，不进入部署态 compose。Caddy internal TLS 证书默认不被宿主机信任；命令行 smoke 可使用 `curl -k`，浏览器或真实客户端验证如需无警告访问，应只在本机开发场景信任 Caddy 生成的本地 CA。
+本地 HTTPS 由 Caddy internal TLS 提供，因为 Go sync server 当前只实现 HTTP API。该 Caddy 入口只存在于本地 compose 文件中，不进入部署态 compose。Caddy internal TLS 证书默认不被宿主机信任；脚本中的 `curl -k` 只用于 gateway 启动探测，不能作为 Rust 客户端资格证据。门禁会从本次短生命周期 gateway 导出本地 CA、转换为临时 `0600` DER，并仅通过子进程环境路径交给 Rust transport；Rust 仍严格验证证书链与 `localhost` 主机名。DER、token、Compose project 和 volumes 在退出时清理，不安装或信任系统级 CA，也不写 Manager settings。
 
 本地服务启动后，可以用只读连接健康脚本输出非敏感摘要：
 
@@ -56,6 +56,14 @@ https://localhost:7319
 ```
 
 该脚本只执行 `GET /api/v1/domains/<probe>/state` 读请求。未配置 token 的本地 compose 预期返回 `404 not_found` 并归类为 `domain_missing_expected`；启用 `RADISHLEX_SYNC_ACCESS_TOKEN` 后可通过 `--access-token-env RADISHLEX_SYNC_ACCESS_TOKEN` 读取本机环境变量。脚本输出 `sync_connection_health.v1` 摘要，不打印 token、完整响应体或请求体。
+
+当前部署子阶段的自动化退出入口为：
+
+```sh
+./scripts/check-sync-server-local-https.sh
+```
+
+该脚本创建唯一临时 Compose project 和随机 bearer token，真实构建并启动 `sync-server` / `sync-gateway`，经 Caddy internal TLS 验证无 token `401`、带 token `404 not_found`、loopback-only 端口、容器 hardening 与日志脱敏，最后执行 `down --volumes` 并确认临时 container/volume 已清理。脚本不使用真实用户数据，不信任或安装本地 CA，也不留下 env/token；只运行离线 contract 可用 `--self-test`，只解析 Compose 可用 `--config-only`。
 
 ## 部署态 HTTP 上游
 
@@ -151,6 +159,8 @@ go test ./...
 ./scripts/check-repo.sh
 ```
 
+关闭当前部署子阶段时还必须真实运行 `./scripts/check-sync-server-local-https.sh`；`--self-test`、`--config-only` 或手工 `docker compose config` 不能替代 TLS 握手和容器启动证据。正式域名、公开证书与目标生产环境演练按生产部署 runbook 后移到首个正式版本发布后。
+
 ### 部署预演脚本
 
 仓库提供短生命周期部署预演入口：
@@ -163,10 +173,11 @@ go test ./...
 
 - 在仓库外创建临时 env 和临时持久化数据目录。
 - 生成随机 `RADISHLEX_SYNC_ACCESS_TOKEN`，并在输出中脱敏。
+- 把容器 runtime identity 临时映射为当前宿主 UID/GID，使 bind mount 可在 `0700` 下工作；生产默认仍为 `10001:10001`，目标数据目录必须提前匹配 owner。
 - 使用部署态 `docker-compose.yaml` 启动 HTTP upstream，不使用本地 Caddy HTTPS 文件。
 - 验证无 token 请求返回 `401 unauthenticated`，带 token 请求返回结构化业务响应。
-- 检查 SQLite metadata、encrypted blob dir 和 runtime log 脱敏。
-- 执行一次冷备份到临时目录，再恢复到隔离数据目录并复验 auth gate。
+- 检查 env `0600`、数据目录 `0700`、SQLite `0600`、encrypted blob dir、container hardening 和 runtime log 脱敏。
+- 执行一次不包含 env/token 的冷备份到临时目录，再恢复到隔离数据目录并复验 auth gate与权限不放宽。
 - 结束后执行 `docker compose down` 并删除临时 env / 数据目录。
 
 只验证配置解析，不启动容器：

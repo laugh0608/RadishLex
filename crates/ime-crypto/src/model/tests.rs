@@ -250,7 +250,9 @@ fn device_wrapping_record_redacts_wrapped_key_and_validates_role() {
 #[test]
 fn recovery_material_redacts_recovery_key_and_requires_public_parameters() {
     let material = RecoveryMaterial::new(
+        2,
         "recovery-a",
+        "",
         "domain-a",
         3,
         "argon2id-v1",
@@ -263,6 +265,9 @@ fn recovery_material_redacts_recovery_key_and_requires_public_parameters() {
         AlgorithmId::xchacha20poly1305_hkdf_sha256(),
         nonce(9),
         b"encrypted-recovery-key",
+        "ed25519-v1",
+        "recovery-activation-key-a",
+        [3u8; 32],
         30,
         30,
     )
@@ -274,7 +279,9 @@ fn recovery_material_redacts_recovery_key_and_requires_public_parameters() {
     assert!(!debug.contains("encrypted-recovery-key"));
 
     let error = RecoveryMaterial::new(
+        2,
         "recovery-a",
+        "",
         "domain-a",
         3,
         "",
@@ -287,6 +294,9 @@ fn recovery_material_redacts_recovery_key_and_requires_public_parameters() {
         AlgorithmId::xchacha20poly1305_hkdf_sha256(),
         nonce(9),
         b"encrypted-recovery-key",
+        "ed25519-v1",
+        "recovery-activation-key-a",
+        [3u8; 32],
         30,
         30,
     )

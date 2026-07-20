@@ -28,6 +28,14 @@ impl RadishLexBuffer {
         self.len
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Releases a buffer returned by the FFI allocation helpers.
+    ///
+    /// # Safety
+    /// `buffer` must be null or a live pointer allocated by `RadishLexBuffer` exactly once.
     pub unsafe fn free(buffer: *mut Self) {
         if buffer.is_null() {
             return;

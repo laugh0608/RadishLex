@@ -11,6 +11,7 @@ const PrefixV1 = "/api/v1"
 
 type ErrorResponse struct {
 	ErrorCode            string `json:"error_code"`
+	ErrorDetail          string `json:"error_detail,omitempty"`
 	Message              string `json:"message"`
 	Retryable            bool   `json:"retryable"`
 	ServerTimeMs         int64  `json:"server_time_ms"`
@@ -23,6 +24,7 @@ func ErrorResponseFrom(err error, now time.Time) ErrorResponse {
 	if errors.As(err, &storageErr) {
 		return ErrorResponse{
 			ErrorCode:            string(storageErr.Code),
+			ErrorDetail:          storageErr.DetailCode,
 			Message:              storageErr.Message,
 			Retryable:            storageErr.Retryable,
 			ServerTimeMs:         now.UnixMilli(),

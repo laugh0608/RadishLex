@@ -1,5 +1,3 @@
-part 'manager_sync_action_preview_models.dart';
-
 enum RecoveryEntryStatus {
   flowClosed,
   recoveryCodeRequired,
@@ -232,10 +230,6 @@ class SyncInteractionEntryPlan {
 
   String get sourceTagSummary {
     return managerSyncCodeSummary(intents.map((intent) => intent.sourceTag));
-  }
-
-  SyncActionCommandPreviewPlan get actionCommandPreviewPlan {
-    return managerSyncActionCommandPreviewPlanFromInteractionPlan(this);
   }
 }
 

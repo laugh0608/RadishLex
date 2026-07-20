@@ -2,9 +2,11 @@
 
 #![forbid(unsafe_code)]
 
+mod error;
 mod model;
 mod ranker;
 
+pub use error::RankerError;
 pub use model::{
     CandidateExplanation, DeletedTermSummary, RankRequest, RankedCandidate, RankerConfig,
 };

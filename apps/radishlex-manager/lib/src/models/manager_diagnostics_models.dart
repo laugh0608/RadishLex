@@ -85,8 +85,6 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
     readinessBridgeSnapshot: snapshot.sync.readinessBridgeSnapshot,
   );
   final interactionPlan = syncGateAudit.entryGate.interactionEntryPlan;
-  final actionCommandPlan =
-      syncGateAudit.entryGate.interactionEntryPlan.actionCommandPreviewPlan;
 
   return ManagerDiagnosticsReport(
     generatedAt: snapshot.generatedAt,
@@ -335,101 +333,6 @@ ManagerDiagnosticsReport createManagerDiagnosticsReport(
             'sync.interaction_source_tags',
             interactionPlan.sourceTagSummary,
             'gate',
-          ),
-          _diagnosticsItem(
-            'sync.action_command_format',
-            managerSyncActionCommandPreviewFormat,
-            'gate',
-          ),
-          _diagnosticsItem(
-            'sync.action_command_actions',
-            actionCommandPlan.actionIdSummary,
-            'gate',
-          ),
-          _diagnosticsItem(
-            'sync.action_command_visibility',
-            actionCommandPlan.visibilitySummary,
-            'gate',
-          ),
-          _diagnosticsItem(
-            'sync.action_command_intent_statuses',
-            actionCommandPlan.intentStatusSummary,
-            'gate',
-          ),
-          _diagnosticsItem(
-            'sync.action_command_execution_statuses',
-            actionCommandPlan.executionStatusSummary,
-            'gate',
-          ),
-          _diagnosticsItem(
-            'sync.action_command_blockers',
-            actionCommandPlan.blockerSummary,
-            'gate',
-          ),
-          _diagnosticsItem(
-            'sync.action_command_required_evidence',
-            actionCommandPlan.requiredEvidenceSummary,
-            'gate',
-          ),
-          _diagnosticsItem(
-            'sync.action_command_source_tags',
-            actionCommandPlan.sourceTagSummary,
-            'gate',
-          ),
-          _diagnosticsItem(
-            'sync.action_command_data_policy',
-            actionCommandPlan.dataPolicySummary,
-            'policy',
-          ),
-          _diagnosticsItem(
-            'sync.action_command_stop_lines',
-            actionCommandPlan.stopLineSummary,
-            'gate',
-          ),
-          _diagnosticsItem(
-            'sync.action_command_request_boundaries',
-            actionCommandPlan.requestBoundarySummary,
-            'gate',
-          ),
-          _diagnosticsItem(
-            'sync.action_command_result_boundaries',
-            actionCommandPlan.resultBoundarySummary,
-            'gate',
-          ),
-          _diagnosticsItem(
-            'sync.action_command_error_codes',
-            actionCommandPlan.errorCodeSummary,
-            'error_code',
-          ),
-          _diagnosticsItem(
-            'sync.action_request_statuses',
-            actionCommandPlan.requestStatusSummary,
-            'gate',
-          ),
-          _diagnosticsItem(
-            'sync.action_request_allowed_fields',
-            actionCommandPlan.requestAllowedFieldSummary,
-            'gate',
-          ),
-          _diagnosticsItem(
-            'sync.action_request_forbidden_material',
-            actionCommandPlan.requestForbiddenMaterialSummary,
-            'policy',
-          ),
-          _diagnosticsItem(
-            'sync.action_result_statuses',
-            actionCommandPlan.resultStatusSummary,
-            'gate',
-          ),
-          _diagnosticsItem(
-            'sync.action_result_allowed_fields',
-            actionCommandPlan.resultAllowedFieldSummary,
-            'gate',
-          ),
-          _diagnosticsItem(
-            'sync.action_result_forbidden_material',
-            actionCommandPlan.resultForbiddenMaterialSummary,
-            'policy',
           ),
           _diagnosticsItem(
             'sync.user_sync_enabled',

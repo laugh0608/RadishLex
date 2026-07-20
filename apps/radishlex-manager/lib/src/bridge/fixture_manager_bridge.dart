@@ -67,6 +67,68 @@ class FixtureManagerBridge implements ManagerBridge {
   }
 
   @override
+  Future<ManagerSnapshot> restoreUserTerm(UserTermKey term) async {
+    DeletedTerm? restoredTombstone;
+    final remainingTombstones = <DeletedTerm>[];
+    for (final tombstone in _snapshot.deletedTerms) {
+      if (tombstone.key == term && restoredTombstone == null) {
+        restoredTombstone = tombstone;
+      } else {
+        remainingTombstones.add(tombstone);
+      }
+    }
+
+    final restoredTerms = _snapshot.dictionaryTerms.map((candidate) {
+      if (candidate.key != term || candidate.status != 'suppressed') {
+        return candidate;
+      }
+      return UserTerm(
+        inputCode: candidate.inputCode,
+        text: candidate.text,
+        reading: candidate.reading,
+        weight: 1,
+        source: 'manual',
+        lastUsed: candidate.lastUsed,
+        importBatchId: candidate.importBatchId,
+      );
+    }).toList();
+
+    if (restoredTombstone != null) {
+      restoredTerms.add(
+        UserTerm(
+          inputCode: restoredTombstone.inputCode,
+          text: restoredTombstone.text,
+          reading: restoredTombstone.reading,
+          weight: 1,
+          source: 'manual',
+          lastUsed: '未使用',
+        ),
+      );
+    }
+
+    _snapshot = _snapshot.copyWith(
+      dictionaryTerms: restoredTerms,
+      deletedTerms: remainingTombstones,
+      learningSummary: _snapshot.learningSummary.copyWith(
+        userTerms: restoredTerms.length,
+        deletedTerms: remainingTombstones.length,
+        lastUpdated: _snapshot.generatedAt,
+      ),
+      sync: _snapshot.sync.copyWith(
+        syncableObjects:
+            _snapshot.sync.syncableObjects -
+            (restoredTombstone == null ? 0 : 1),
+        categories: _replaceCategoryCount(
+          _snapshot.sync.categories,
+          'dictionary.deleted_terms',
+          remainingTombstones.length,
+        ),
+      ),
+    );
+    return _snapshot;
+  }
+
+  @override
   Future<DictionaryImportPreview> inspectDictionaryImport(
     String filePath,
   ) async {

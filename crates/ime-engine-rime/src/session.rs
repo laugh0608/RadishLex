@@ -15,7 +15,7 @@ use crate::config::RimeEngineConfig;
 use crate::convert::{candidate_from_view, composition_from_parts, RimeCandidateView};
 use crate::error::{RimeEngineError, RimeEngineResult};
 use crate::ffi::{self, RimeApi, RimeCommit, RimeContext, RimeSessionId, TRUE};
-use crate::keymap::{classify_key_event, rime_keycode};
+use crate::keymap::{classify_key_event, rime_keycode, RimeKeyInput, RimeNamedKey};
 use crate::runtime::{
     current_schema, ensure_true, require_api_function, select_schema_exact, RimeRuntime,
 };
@@ -53,6 +53,27 @@ impl RimeEngine {
 
     pub fn session_id(&self) -> RimeSessionId {
         self.session_id
+    }
+
+    fn highlighted_candidate_index(&self) -> RimeEngineResult<Option<usize>> {
+        self.runtime.with_api(|api| {
+            Self::read_context(api, self.session_id, "get_context", |context| {
+                if context.menu.num_candidates <= 0 {
+                    return Ok(None);
+                }
+                let index = context.menu.highlighted_candidate_index;
+                if index < 0 || index >= context.menu.num_candidates {
+                    return Err(RimeEngineError::FfiFailure {
+                        stage: "get_context",
+                        message: format!(
+                            "highlighted candidate index {index} is outside current page length {}",
+                            context.menu.num_candidates
+                        ),
+                    });
+                }
+                Ok(Some(index as usize))
+            })
+        })
     }
 
     fn read_commit(api: &RimeApi, session_id: RimeSessionId) -> RimeEngineResult<Option<Commit>> {
@@ -117,6 +138,11 @@ impl Engine for RimeEngine {
 
     fn push_key(&mut self, key: KeyEvent) -> CoreResult<KeyOutcome> {
         let input = classify_key_event(key);
+        if input == RimeKeyInput::Named(RimeNamedKey::Space) {
+            if let Some(index) = self.highlighted_candidate_index().map_err(rime_to_core)? {
+                return self.select_candidate(index);
+            }
+        }
         let Some(keycode) = rime_keycode(input) else {
             return Ok(KeyOutcome::ignored());
         };
@@ -194,33 +220,42 @@ impl Engine for RimeEngine {
             .map_err(rime_to_core)
     }
 
-    fn commit_candidate(&mut self, index: usize) -> CoreResult<Commit> {
+    fn input_code(&self) -> CoreResult<String> {
         self.runtime
             .with_api(|api| {
-                let select_key =
-                    Self::read_context(api, self.session_id, "get_context", |context| {
-                        select_key_for_candidate(context, index)
-                    })?;
+                // SAFETY: runtime serializes the native call, session_id belongs
+                // to this engine, and librime owns the returned string.
+                unsafe {
+                    let get_input = require_api_function(api.get_input, "get_input")?;
+                    c_string_field("input_code", get_input(self.session_id))
+                }
+            })
+            .map_err(rime_to_core)
+    }
 
+    fn select_candidate(&mut self, index: usize) -> CoreResult<KeyOutcome> {
+        self.runtime
+            .with_api(|api| {
                 // SAFETY: runtime serializes the native call, session_id belongs
                 // to this engine, and the function is checked before use.
-                let consumed = unsafe {
-                    let process_key = require_api_function(api.process_key, "process_key")?;
-                    process_key(self.session_id, select_key as i32, 0)
+                let selected = unsafe {
+                    let select_candidate = require_api_function(
+                        api.select_candidate_on_current_page,
+                        "select_candidate_on_current_page",
+                    )?;
+                    select_candidate(self.session_id, index)
                 };
-                if consumed != TRUE {
+                if selected != TRUE {
                     return Err(RimeEngineError::FfiFailure {
-                        stage: "commit_candidate",
+                        stage: "select_candidate",
                         message: format!("candidate index {index} was not accepted by librime"),
                     });
                 }
 
-                Self::read_commit(api, self.session_id)?.ok_or_else(|| {
-                    RimeEngineError::FfiFailure {
-                        stage: "get_commit",
-                        message: format!("candidate index {index} did not produce commit text"),
-                    }
-                })
+                Ok(KeyOutcome::new(
+                    true,
+                    Self::read_commit(api, self.session_id)?,
+                ))
             })
             .map_err(rime_to_core)
     }
@@ -286,31 +321,6 @@ fn rime_context() -> RimeContext {
         commit_text_preview: ptr::null_mut(),
         select_labels: ptr::null_mut(),
     }
-}
-
-fn select_key_for_candidate(context: &RimeContext, index: usize) -> RimeEngineResult<char> {
-    if context.menu.num_candidates <= 0 || index >= context.menu.num_candidates as usize {
-        return Err(RimeEngineError::Core(CoreError::InvalidCandidateIndex {
-            index,
-            len: context.menu.num_candidates.max(0) as usize,
-        }));
-    }
-
-    if !context.menu.select_keys.is_null() {
-        // SAFETY: librime owns this null-terminated string until free_context.
-        let keys = unsafe { c_string_field("menu.select_keys", context.menu.select_keys)? };
-        if let Some(ch) = keys.chars().nth(index) {
-            return Ok(ch);
-        }
-    }
-
-    "1234567890"
-        .chars()
-        .nth(index)
-        .ok_or_else(|| RimeEngineError::FfiFailure {
-            stage: "commit_candidate",
-            message: format!("candidate index {index} has no select key"),
-        })
 }
 
 unsafe fn c_string_field(field: &'static str, value: *const i8) -> RimeEngineResult<String> {

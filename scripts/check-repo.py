@@ -34,31 +34,54 @@ REQUIRED_FILES = [
     "README.md",
     "crates/ime-core/Cargo.toml",
     "crates/ime-core/src/lib.rs",
+    "crates/ime-runtime/Cargo.toml",
+    "crates/ime-runtime/src/lib.rs",
     "crates/ime-engine-rime/Cargo.toml",
     "crates/ime-engine-rime/build.rs",
     "crates/ime-engine-rime/src/lib.rs",
+    "crates/ime-ffi/src/abi/user_terms.rs",
     "docs/engine-boundary.md",
     "docs/engine-rime-adapter.md",
     "docs/privacy-sync.md",
     "docs/repository-layout.md",
     "docs/roadmap.md",
     "docs/technical-plan.md",
+    "docs/adr/0007-apple-secure-enclave-p256-backend.md",
+    "docs/runbooks/apple-secure-enclave-p256-backend.md",
+    "docs/runbooks/apple-secure-enclave-key-agreement-backend.md",
+    "docs/runbooks/macos-m2-manager-product-acceptance.md",
     "platforms/macos-imk/Sources/main.m",
+    "platforms/macos-imk/Tools/tis_source_status.m",
+    "platforms/macos-imk/Tools/test_data_cleanup.c",
     "platforms/macos-imk/build-bundle.sh",
+    "platforms/macos-imk/cleanup-m2-manager-test-data.sh",
+    "platforms/macos-imk/cleanup-user-install.sh",
     "scripts/check-android-target.py",
     "scripts/check-android-target.sh",
     "scripts/check-docs.py",
     "scripts/check-docs.sh",
     "scripts/check-manager-ffi-smoke.sh",
+    "scripts/check-manager-product.sh",
     "scripts/check-manager.sh",
+    "scripts/build-manager-macos-product.sh",
+    "scripts/build-manager-macos-dpk-qualified-product.sh",
+    "scripts/embed-manager-native-library.sh",
     "scripts/check-macos-imk.sh",
     "scripts/check-macos-imk-native.sh",
+    "scripts/cleanup-macos-m2-manager-test-data.sh",
+    "scripts/cleanup-macos-imk.sh",
+    "scripts/run-manager-apple-secure-enclave-p256-product-smoke.sh",
+    "scripts/run-manager-apple-secure-enclave-key-agreement-product-smoke.sh",
     "scripts/macos-imk/native_manifest.py",
     "scripts/macos-imk/test_native_manifest.py",
     "scripts/check-repo.py",
     "scripts/check-repo.sh",
     "scripts/check-sync-deployment-evidence.py",
     "scripts/check-sync-deployment-evidence.sh",
+    "scripts/check-sync-server-deployment-rehearsal.py",
+    "scripts/check-sync-server-deployment-rehearsal.sh",
+    "scripts/check-sync-server-local-https.py",
+    "scripts/check-sync-server-local-https.sh",
     "scripts/check-sync-server-connection-health.py",
     "scripts/check-sync-server-connection-health.sh",
     "scripts/check-text-files.py",
@@ -67,10 +90,20 @@ REQUIRED_FILES = [
     "apps/radishlex-manager/README.md",
     "apps/radishlex-manager/pubspec.yaml",
     "apps/radishlex-manager/lib/main.dart",
+    "apps/radishlex-manager/lib/src/bridge/manager_platform_control.dart",
+    "apps/radishlex-manager/lib/src/bridge/method_channel_manager_platform_control.dart",
+    "apps/radishlex-manager/macos/Runner/MainFlutterWindow.swift",
+    "apps/radishlex-manager/macos/Runner/DPKQualification.entitlements",
     "apps/radishlex-manager/tool/ffi_bridge_smoke.dart",
     "apps/radishlex-manager/test/widget_test.dart",
 ]
-REQUIRED_STATUS_CHECKS = {"Repo Hygiene", "Repository Baseline"}
+REQUIRED_STATUS_CHECKS = {
+    "Repo Hygiene",
+    "Repository Baseline",
+    "Rust Clippy",
+    "Flutter Manager",
+    "Go Quality",
+}
 CONVENTIONAL_COMMIT_PATTERN = "^(feat|fix|docs|refactor|test|chore|ci|build|perf|revert)(\\([a-z0-9._/-]+\\))?!?: .+"
 
 
@@ -139,6 +172,66 @@ def check_license_wording() -> None:
         raise SystemExit("README.md should describe RadishLex as a source-available input system")
 
 
+def check_manager_product_runtime_contract() -> None:
+    factory = read_text(
+        "apps/radishlex-manager/lib/src/bridge/manager_bridge_factory.dart"
+    )
+    for phrase in (
+        "defaultValue: 'product'",
+        "ManagerRuntimeMode.demo",
+        "UnavailableManagerBridge",
+        "MethodChannelManagerPlatformControl",
+    ):
+        if phrase not in factory:
+            raise SystemExit(f"manager product bootstrap is missing contract phrase: {phrase}")
+    if "Platform.environment" in factory or "fixture_fallback" in factory:
+        raise SystemExit("manager product bootstrap must not use environment or fixture fallback")
+
+    swift_bridge = read_text(
+        "apps/radishlex-manager/macos/Runner/MainFlutterWindow.swift"
+    )
+    for phrase in (
+        "FileManager.default",
+        "libradishlex_ime_ffi.dylib",
+        "CFPreferencesCopyValue",
+        "CFPreferencesSetValue",
+        "CFPreferencesSynchronize",
+        "restorePrivacyModeState",
+        "kCFPreferencesCurrentUser",
+        "kCFPreferencesAnyHost",
+        "lstat",
+        ".posixPermissions: 0o700",
+        ".posixPermissions: 0o600",
+    ):
+        if phrase not in swift_bridge:
+            raise SystemExit(f"manager macOS runtime bridge is missing contract phrase: {phrase}")
+
+    for entitlements_path in (
+        "apps/radishlex-manager/macos/Runner/DebugProfile.entitlements",
+        "apps/radishlex-manager/macos/Runner/Release.entitlements",
+    ):
+        if "com.apple.security.app-sandbox" in read_text(entitlements_path):
+            raise SystemExit(f"M2 manager must not enable App Sandbox: {entitlements_path}")
+
+    xcode_project = read_text(
+        "apps/radishlex-manager/macos/Runner.xcodeproj/project.pbxproj"
+    )
+    if "Embed RadishLex Native Library" not in xcode_project:
+        raise SystemExit("manager Xcode target must embed the RadishLex native library")
+
+    embed_script = read_text("scripts/embed-manager-native-library.sh")
+    for symbol in (
+        "_radishlex_ffi_contract",
+        "_radishlex_manager_sync_product_status",
+        "_radishlex_apple_secure_enclave_key_agreement_product_status",
+        "_radishlex_apple_secure_enclave_key_agreement_product_smoke",
+        "_radishlex_userdb_deleted_terms_new",
+        "_radishlex_userdb_restore_term",
+    ):
+        if symbol not in embed_script:
+            raise SystemExit(f"manager native bundle gate is missing symbol: {symbol}")
+
+
 def required_status_contexts(ruleset: dict[str, Any]) -> set[str]:
     for rule in ruleset.get("rules", []):
         if rule.get("type") != "required_status_checks":
@@ -168,21 +261,39 @@ def check_ruleset_and_workflows() -> None:
 
     contexts = required_status_contexts(ruleset)
     if contexts != REQUIRED_STATUS_CHECKS:
-        raise SystemExit(f"ruleset required checks mismatch: expected {sorted(REQUIRED_STATUS_CHECKS)}, got {sorted(contexts)}")
+        raise SystemExit(
+            "ruleset required checks mismatch: "
+            f"expected {sorted(REQUIRED_STATUS_CHECKS)}, got {sorted(contexts)}"
+        )
 
     if commit_message_pattern(ruleset) != CONVENTIONAL_COMMIT_PATTERN:
         raise SystemExit("ruleset conventional commit pattern does not match repository convention")
 
     pr_workflow = read_text(".github/workflows/pr-check.yml")
+    if not pr_workflow.startswith("name: PR Checks\n"):
+        raise SystemExit("pr-check workflow must use the PR Checks name")
     for context in REQUIRED_STATUS_CHECKS:
         if f"name: {context}" not in pr_workflow:
             raise SystemExit(f"pr-check workflow is missing job name: {context}")
-    if "pull_request:" not in pr_workflow or "push:" not in pr_workflow:
-        raise SystemExit("pr-check workflow must cover pull_request and push")
+    if "push:" in pr_workflow or "workflow_dispatch:" in pr_workflow:
+        raise SystemExit("pr-check workflow must only run for pull requests")
+    if "pull_request:" not in pr_workflow:
+        raise SystemExit("pr-check workflow must run for pull requests")
+    for target_branch in ("dev", "master"):
+        if f"      - {target_branch}\n" not in pr_workflow:
+            raise SystemExit(f"pr-check workflow is missing target branch: {target_branch}")
+    if "      - main\n" in pr_workflow:
+        raise SystemExit("pr-check workflow must not run for main pull requests")
     if "git diff --check" not in pr_workflow:
         raise SystemExit("pr-check workflow must check PR diff whitespace")
 
     release_workflow = read_text(".github/workflows/release-check.yml")
+    forbidden_release_triggers = ("pull_request:", "branches:", "workflow_dispatch:")
+    if any(trigger in release_workflow for trigger in forbidden_release_triggers):
+        raise SystemExit("release-check workflow must only run for release tags")
+    for tag_pattern in ('"v*-dev"', '"v*-test"', '"v*-release"'):
+        if f"      - {tag_pattern}\n" not in release_workflow:
+            raise SystemExit(f"release-check workflow is missing tag pattern: {tag_pattern}")
     for context in ("Release Repo Hygiene", "Release Repository Baseline"):
         if f"name: {context}" not in release_workflow:
             raise SystemExit(f"release-check workflow is missing job name: {context}")
@@ -224,8 +335,39 @@ def check_deployment_evidence() -> None:
     run_script("check-sync-deployment-evidence.py", ["--self-test"])
 
 
+def check_sync_deployment_hardening() -> None:
+    production_compose = read_text("deploy/sync-server/docker-compose.yaml")
+    for phrase in (
+        'user: "${RADISHLEX_SYNC_RUNTIME_UID:-10001}:${RADISHLEX_SYNC_RUNTIME_GID:-10001}"',
+        "read_only: true",
+        "cap_drop:\n      - ALL",
+        "no-new-privileges:true",
+        '"${RADISHLEX_SYNC_BIND:-127.0.0.1}:${RADISHLEX_SYNC_PORT:-7319}:7319"',
+    ):
+        if phrase not in production_compose:
+            raise SystemExit(f"production sync compose is missing hardening contract: {phrase}")
+
+    dockerfile = read_text("server/sync-server/Dockerfile")
+    if "USER 10001:10001" not in dockerfile:
+        raise SystemExit("sync server runtime image must use the fixed non-root identity")
+
+    private_storage = read_text("server/sync-server/internal/runtime/private_storage.go")
+    for phrase in ("0o700", "0o600", "os.Lstat", "os.ModeSymlink", "os.Chmod"):
+        if phrase not in private_storage:
+            raise SystemExit(f"sync private storage gate is missing contract phrase: {phrase}")
+
+    rehearsal = read_text("scripts/check-sync-server-deployment-rehearsal.py")
+    for phrase in ("runtime_identity()", "0o700", "0o600", "assert_backup_safe", "refuses to run the sync container as root"):
+        if phrase not in rehearsal:
+            raise SystemExit(f"sync deployment rehearsal is missing hardening contract: {phrase}")
+
+
 def check_sync_connection_health() -> None:
     run_script("check-sync-server-connection-health.py", ["--self-test"])
+
+
+def check_sync_local_https() -> None:
+    run_script("check-sync-server-local-https.py", ["--self-test"])
 
 
 def parse_args() -> argparse.Namespace:
@@ -248,10 +390,13 @@ def main() -> int:
     check_required_files()
     check_collaboration_docs()
     check_license_wording()
+    check_manager_product_runtime_contract()
     check_ruleset_and_workflows()
     check_path_budget()
     check_deployment_evidence()
+    check_sync_deployment_hardening()
     check_sync_connection_health()
+    check_sync_local_https()
     if not args.skip_go:
         check_go_server()
     if not args.skip_rust:

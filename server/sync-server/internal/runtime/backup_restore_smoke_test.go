@@ -85,17 +85,18 @@ func TestLocalServerBackupRestorePreservesEncryptedSyncState(t *testing.T) {
 	verifyRestoredBackupSmokeState(t, restoredHTTPServer.URL, payloads, stalePayload)
 	verifyRestoredAuditEvents(t, restoredCfg.MetadataPath)
 
+	forbiddenLogValues := []string{
+		string(payloads[storage.ObjectDictionaryUserTerms]),
+		string(payloads[storage.ObjectRankerWeights]),
+		string(payloads[storage.ObjectDictionaryDeletedTerms]),
+		string(stalePayload),
+		"recovery-code",
+		"sync-master-key",
+	}
+	forbiddenLogValues = append(forbiddenLogValues, smokeSensitiveByteForms(backupSmokeWrappedMaterial())...)
+	forbiddenLogValues = append(forbiddenLogValues, smokeSensitiveByteForms(backupSmokeWrappedKey())...)
 	for _, logText := range []string{sourceLogs.String(), restoredLogs.String()} {
-		for _, forbidden := range []string{
-			string(payloads[storage.ObjectDictionaryUserTerms]),
-			string(payloads[storage.ObjectRankerWeights]),
-			string(payloads[storage.ObjectDictionaryDeletedTerms]),
-			string(stalePayload),
-			string(backupSmokeWrappedMaterial()),
-			string(backupSmokeWrappedKey()),
-			"recovery-code",
-			"sync-master-key",
-		} {
+		for _, forbidden := range forbiddenLogValues {
 			if forbidden != "" && strings.Contains(logText, forbidden) {
 				t.Fatalf("runtime log leaked sensitive fixture %q in %s", forbidden, logText)
 			}
@@ -111,6 +112,7 @@ func createBackupSmokeDomain(t *testing.T, baseURL string) {
 		ActiveKeyID:     "sync-key-backup",
 		FirstDevice: api.DeviceMetadata{
 			DeviceID:                "device-smoke",
+			SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 			SigningPublicKeyID:      smokeSigningKeyID("device-smoke"),
 			SigningPublicKey:        smokeSigningPublicKey("device-smoke"),
 			KeyAgreementPublicKeyID: "agreement-key-smoke",
@@ -154,23 +156,28 @@ func writeBackupSmokeRecoveryRecord(t *testing.T, cfg config.Config) {
 
 	wrapped := backupSmokeWrappedMaterial()
 	record := storage.RecoveryRecord{
-		DomainID:           "domain-backup",
-		RecoveryRecordID:   "recovery-backup",
-		KeyEpoch:           1,
-		KDFProfile:         "argon2id-v1",
-		KDFVersion:         1,
-		MemoryKiB:          65536,
-		Iterations:         3,
-		Parallelism:        1,
-		OutputLen:          32,
-		Salt:               []byte{0x31, 0x32},
-		Algorithm:          storage.AlgorithmXChaCha20Poly1305HKDFSHA256,
-		Nonce:              []byte{0x33, 0x34},
-		WrappedMaterialLen: int64(len(wrapped)),
-		CiphertextHash:     storage.CiphertextHash(wrapped),
-		Status:             storage.RecoveryRecordActive,
-		CreatedAtMs:        180,
-		SignerDeviceID:     "device-smoke",
+		RecordSchemaVersion:   storage.RecoveryRecordSchemaVersionV2,
+		DomainID:              "domain-backup",
+		RecoveryRecordID:      "recovery-backup",
+		KeyEpoch:              1,
+		KDFProfile:            "argon2id-v1",
+		KDFVersion:            1,
+		MemoryKiB:             65536,
+		Iterations:            3,
+		Parallelism:           4,
+		OutputLen:             32,
+		Salt:                  bytes.Repeat([]byte{0x31}, storage.RecoverySaltBytes),
+		Algorithm:             storage.AlgorithmXChaCha20Poly1305HKDFSHA256,
+		Nonce:                 bytes.Repeat([]byte{0x33}, storage.RecoveryNonceBytes),
+		WrappedMaterialLen:    int64(len(wrapped)),
+		CiphertextHash:        storage.CiphertextHash(wrapped),
+		ActivationAlgorithm:   storage.SignatureAlgorithmEd25519V1,
+		ActivationPublicKeyID: "recovery-activation-backup",
+		ActivationPublicKey:   bytes.Repeat([]byte{0x35}, ed25519.PublicKeySize),
+		Status:                storage.RecoveryRecordActive,
+		CreatedAtMs:           180,
+		UpdatedAtMs:           180,
+		SignerDeviceID:        "device-smoke",
 	}
 	signSmokeRecoveryRecord(&record)
 	if _, err := store.PutRecoveryRecord(context.Background(), storage.RecoveryRecordUpload{Record: record, WrappedMaterial: wrapped}); err != nil {
@@ -206,8 +213,10 @@ func verifyRestoredBackupSmokeState(t *testing.T, baseURL string, payloads map[s
 	}
 	var recovery api.RecoveryRecordResponse
 	decodeSmokeResponse(t, recoveryResponse.Body, &recovery)
-	if recovery.RecoveryRecordID != "recovery-backup" ||
+	if recovery.RecordSchemaVersion != storage.RecoveryRecordSchemaVersionV2 ||
+		recovery.RecoveryRecordID != "recovery-backup" ||
 		recovery.CiphertextHash != storage.CiphertextHash(backupSmokeWrappedMaterial()) ||
+		recovery.ActivationPublicKeyID != "recovery-activation-backup" ||
 		!bytes.Equal(recovery.WrappedMaterial, backupSmokeWrappedMaterial()) {
 		t.Fatalf("unexpected restored recovery response: %#v", recovery)
 	}
@@ -342,12 +351,14 @@ func signSmokeRecoveryRecord(record *storage.RecoveryRecord) {
 	record.SignatureSchemaVersion = 1
 	record.SignatureAlgorithm = "ed25519-v1"
 	record.SignatureKeyID = smokeSigningKeyID(record.SignerDeviceID)
-	record.Signature = ed25519.Sign(smokeSigningPrivateKey(record.SignerDeviceID), smokeCanonicalSignatureBytes("recovery_record", []smokeSignatureField{
+	record.Signature = ed25519.Sign(smokeSigningPrivateKey(record.SignerDeviceID), smokeCanonicalSignatureBytes("recovery_record_v2", []smokeSignatureField{
 		smokeTextField("signature_schema_version", "1"),
 		smokeTextField("signature_algorithm", "ed25519-v1"),
 		smokeTextField("signature_key_id", record.SignatureKeyID),
 		smokeTextField("signer_device_id", record.SignerDeviceID),
+		smokeTextField("record_schema_version", smokeUint64String(uint64(record.RecordSchemaVersion))),
 		smokeTextField("recovery_id", record.RecoveryRecordID),
+		smokeTextField("previous_recovery_id", record.PreviousRecoveryID),
 		smokeTextField("domain_id", record.DomainID),
 		smokeTextField("key_epoch", smokeUint64String(record.KeyEpoch)),
 		smokeTextField("kdf_id", record.KDFProfile),
@@ -360,17 +371,21 @@ func signSmokeRecoveryRecord(record *storage.RecoveryRecord) {
 		smokeTextField("envelope_algorithm", record.Algorithm),
 		smokeBytesField("envelope_nonce", record.Nonce),
 		smokeTextField("encrypted_recovery_key_len", smokeInt64String(record.WrappedMaterialLen)),
+		smokeTextField("ciphertext_hash", record.CiphertextHash),
+		smokeTextField("activation_algorithm", record.ActivationAlgorithm),
+		smokeTextField("activation_public_key_id", record.ActivationPublicKeyID),
+		smokeBytesField("activation_public_key", record.ActivationPublicKey),
 		smokeTextField("created_at_ms", smokeInt64String(record.CreatedAtMs)),
-		smokeTextField("updated_at_ms", smokeInt64String(record.CreatedAtMs)),
+		smokeTextField("updated_at_ms", smokeInt64String(record.UpdatedAtMs)),
 	}))
 }
 
 func backupSmokeWrappedMaterial() []byte {
-	return []byte("encrypted-recovery-wrapped-material")
+	return bytes.Repeat([]byte{0x36}, storage.RecoveryWrappedMaterialBytes)
 }
 
 func backupSmokeWrappedKey() []byte {
-	return []byte{0x61, 0x62, 0x63}
+	return []byte("radishlex-sensitive-backup-wrapped-key-fixture-v1")
 }
 
 func copyDirectory(source string, destination string) error {

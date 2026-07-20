@@ -27,6 +27,7 @@ ManagerSnapshot createManagerFixture() {
         weight: 0.71,
         source: 'import',
         lastUsed: '2026-07-02 21:03',
+        importBatchId: 2,
       ),
     ],
     deletedTerms: const [
@@ -117,8 +118,8 @@ ManagerSnapshot createManagerFixture() {
       ),
       runtimeDiagnostics: ManagerRuntimeDiagnostics(
         bridgeMode: 'fixture',
-        userDb: 'RADISHLEX_MANAGER_DB not configured',
-        nativeLibrary: 'not loaded',
+        userDb: 'synthetic demo userdb',
+        nativeLibrary: 'not loaded (demo mode)',
         settingsStore: 'fixture in_memory',
         syncEndpoint: 'sync endpoint draft configured',
         lastErrorCode: 'none',

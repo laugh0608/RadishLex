@@ -1,62 +1,98 @@
-import 'dart:io' show Platform;
-
 import 'ffi_manager_bridge.dart';
 import 'fixture_manager_bridge.dart';
 import 'manager_bridge.dart';
-import '../models/manager_models.dart';
+import 'manager_platform_control.dart';
+import 'method_channel_manager_platform_control.dart';
+import 'unavailable_manager_bridge.dart';
 
-ManagerBridge createDefaultManagerBridge({Map<String, String>? environment}) {
-  final env = environment ?? Platform.environment;
-  final dbPath = env['RADISHLEX_MANAGER_DB']?.trim();
-  if (dbPath == null || dbPath.isEmpty) {
-    return FixtureManagerBridge();
+enum ManagerRuntimeMode {
+  product,
+  demo;
+
+  static ManagerRuntimeMode? parse(String value) {
+    switch (value.trim().toLowerCase()) {
+      case 'product':
+        return ManagerRuntimeMode.product;
+      case 'demo':
+        return ManagerRuntimeMode.demo;
+      default:
+        return null;
+    }
+  }
+}
+
+class ManagerBootstrap {
+  const ManagerBootstrap({required this.mode, required this.bridge});
+
+  final ManagerRuntimeMode mode;
+  final ManagerBridge bridge;
+}
+
+Future<ManagerBootstrap> createDefaultManagerBootstrap({
+  String mode = const String.fromEnvironment(
+    'RADISHLEX_MANAGER_MODE',
+    defaultValue: 'product',
+  ),
+  ManagerPlatformControl? platformControl,
+}) async {
+  final runtimeMode = ManagerRuntimeMode.parse(mode);
+  if (runtimeMode == ManagerRuntimeMode.demo) {
+    return ManagerBootstrap(
+      mode: ManagerRuntimeMode.demo,
+      bridge: FixtureManagerBridge(),
+    );
+  }
+  if (runtimeMode == null) {
+    return const ManagerBootstrap(
+      mode: ManagerRuntimeMode.product,
+      bridge: UnavailableManagerBridge(
+        ManagerStartupException(
+          code: 'runtime_mode_invalid',
+          message: 'manager runtime mode must be product or demo',
+        ),
+      ),
+    );
   }
 
+  final platform = platformControl ?? MethodChannelManagerPlatformControl();
   try {
-    return FfiManagerBridge(
-      dbPath: dbPath,
-      libraryPath: env['RADISHLEX_MANAGER_FFI_LIBRARY'],
-      serverEndpoint: env['RADISHLEX_MANAGER_SYNC_SERVER'],
-      settingsFilePath: env['RADISHLEX_MANAGER_SETTINGS_FILE'],
+    final paths = await platform.resolveProductPaths();
+    return ManagerBootstrap(
+      mode: ManagerRuntimeMode.product,
+      bridge: FfiManagerBridge(
+        dbPath: paths.userDbPath,
+        libraryPath: paths.nativeLibraryPath,
+        settingsFilePath: paths.settingsFilePath,
+        platformControl: platform,
+      ),
     );
-  } on Object catch (error) {
-    return FixtureManagerBridge.withDiagnostics(
-      diagnostics: ManagerRuntimeDiagnostics(
-        bridgeMode: 'fixture_fallback',
-        userDb: 'RADISHLEX_MANAGER_DB configured',
-        nativeLibrary: _nativeLibraryStatus(env),
-        settingsStore: _settingsStoreStatus(env),
-        syncEndpoint: _syncEndpointStatus(env),
-        lastErrorCode: _factoryFailureCode(error),
+  } on ManagerBridgeFailure catch (failure) {
+    return ManagerBootstrap(
+      mode: ManagerRuntimeMode.product,
+      bridge: UnavailableManagerBridge(failure),
+    );
+  } on Object {
+    return const ManagerBootstrap(
+      mode: ManagerRuntimeMode.product,
+      bridge: UnavailableManagerBridge(
+        ManagerStartupException(
+          code: 'ffi_library_load_failed',
+          message: 'bundled RadishLex native library could not be loaded',
+        ),
       ),
     );
   }
 }
 
-String _nativeLibraryStatus(Map<String, String> environment) {
-  final libraryPath = environment['RADISHLEX_MANAGER_FFI_LIBRARY']?.trim();
-  return libraryPath == null || libraryPath.isEmpty
-      ? 'default dynamic library lookup failed'
-      : 'RADISHLEX_MANAGER_FFI_LIBRARY load failed';
-}
+class ManagerStartupException implements ManagerBridgeFailure {
+  const ManagerStartupException({required this.code, required this.message});
 
-String _settingsStoreStatus(Map<String, String> environment) {
-  final settingsFile = environment['RADISHLEX_MANAGER_SETTINGS_FILE']?.trim();
-  return settingsFile == null || settingsFile.isEmpty
-      ? 'settings file not configured'
-      : 'RADISHLEX_MANAGER_SETTINGS_FILE configured';
-}
+  @override
+  int get statusCode => 2;
 
-String _syncEndpointStatus(Map<String, String> environment) {
-  final endpoint = environment['RADISHLEX_MANAGER_SYNC_SERVER']?.trim();
-  return endpoint == null || endpoint.isEmpty
-      ? 'RADISHLEX_MANAGER_SYNC_SERVER not configured'
-      : 'RADISHLEX_MANAGER_SYNC_SERVER configured';
-}
+  @override
+  final String code;
 
-String _factoryFailureCode(Object error) {
-  if (error is ManagerBridgeFailure) {
-    return error.code;
-  }
-  return 'ffi_library_load_failed';
+  @override
+  final String message;
 }

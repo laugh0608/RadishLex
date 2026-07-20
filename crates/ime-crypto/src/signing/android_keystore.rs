@@ -190,6 +190,7 @@ impl AndroidKeystoreBridgeErrorCode {
             },
             Self::PrivateKeyAccessDenied => CryptoError::PrivateKeyAccessDenied {
                 key_id: signing_key_id.to_owned(),
+                reason: crate::PrivateKeyAccessDeniedReason::Unspecified,
             },
             Self::PrivateKeyUserPresenceRequired => CryptoError::PrivateKeyUserPresenceRequired {
                 key_id: signing_key_id.to_owned(),

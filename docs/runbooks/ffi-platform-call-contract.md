@@ -7,17 +7,19 @@
 当前 runbook 适用于已落地的 C ABI host smoke：
 
 - `radishlex_ffi_contract`
-- session 创建、版本化 key result、snapshot、commit 和释放
-- structured snapshot / candidate view
+- legacy/Rime/personalized Rime session 创建、版本化学习上下文和释放
+- 版本化 key result、snapshot、commit、学习处置和个人化状态
+- structured snapshot / candidate view 的 display/engine index 映射
 - userdb learning status
 - userdb sync preflight
-- userdb add / delete / list
+- userdb add / explicit restore / delete / list
+- rank explain
 - dictionary inspect / export / import
 - import batches 查询
 - platform binding style view copy / release smoke
 - error object 读取和释放
 
-当前不表示真实平台壳已经接入。平台壳进入前，绑定层仍需要按本 runbook 写出本平台自己的 smoke 或 wrapper 测试。
+Rust host smoke 只能证明 ABI 契约；每个平台绑定层仍须按本 runbook 提供本语言的 wrapper 测试，真实产品还要另行证明平台生命周期、隐私信号来源和用户可见行为。
 
 输入侧 C 声明以 `crates/ime-ffi/include/radishlex_input.h` 为准，并由 C11 / Objective-C 编译测试约束。当前仍没有恢复码、设备授权或设备撤销的 native command symbol；这些能力不属于本输入调用契约。
 
@@ -34,7 +36,7 @@ radishlex_ffi_contract(contract_out, error_out)
 当前必须识别：
 
 ```text
-version = 2
+version = 4
 session_thread_policy = owner_thread
 panic_boundary = catch_unwind
 ```
@@ -60,17 +62,20 @@ panic_boundary = catch_unwind
 radishlex_session_new(error_out)
 radishlex_session_new_with_options(options, error_out)
 radishlex_session_new_rime(options, error_out)
+radishlex_session_new_personalized_rime(options, error_out)
 ```
 
 规则：
 
-- session 创建成功后，后续 `reset`、`set_schema`、`handle_key_event`、`snapshot_new`、`commit_candidate` 和 `engine_kind` 都必须回到创建线程调用。
+- session 创建成功后，后续 `reset`、`set_schema`、`handle_key_event`、`snapshot_new`、`select_candidate` 和 `engine_kind` 都必须回到创建线程调用。
 - 跨线程误用返回 `InvalidState`；无 `error_out` 的 session 读取入口返回空值，例如 `radishlex_session_engine_kind` 返回 `0`。
 - 不要把 `RadishLexSession*` 放进全局并允许多个平台线程直接调用。
 - 如果平台输入事件来自多个线程，先投递到 session owner thread，再调用 C ABI。
 - `radishlex_session_free` 也必须投递到 session owner thread；非 owner thread 调用是 no-op，不能把它误判为已经释放。
 - 首个 Rime session 同时固定进程 runtime owner thread；后续 Rime session 也必须在该固定线程创建和使用，不能只满足“各自回到自己的创建线程”。
 - `radishlex_rime_runtime_shutdown` 不是 session 操作，只能在同一 runtime owner thread、进程 teardown、全部 Rime session 已释放且不再接收输入事件时调用。
+- personalized Rime options 的 `userdb_path` 与 `session_id` 必须在创建调用期间保持有效；Rust 会复制必要值，不保存平台裸指针。`session_id` 只是本地事件关联键，不能复用设备 ID、账号 ID 或同步身份。
+- personalized session 的数据库打开或 migration 失败会以 `storage_unavailable` 退化为 engine 输入，不会删除或重建数据库；平台必须读取 snapshot 状态，不能把 session 创建成功误判为个人化存储可用。
 
 ### 3. 每次调用都按 `error_out` 规范处理
 
@@ -122,6 +127,7 @@ len: usize
 snapshot schema / preedit / candidate view -> RadishLexSnapshot*
 key result commit / borrowed snapshot -> RadishLexKeyResult*
 user term view -> RadishLexUserTermList*
+deleted term view -> RadishLexDeletedTermList*
 import batch view -> RadishLexImportBatchList*
 error message -> RadishLexError*
 buffer data -> RadishLexBuffer*
@@ -137,7 +143,9 @@ RadishLexKeyResult*        -> radishlex_key_result_free
 RadishLexSnapshot*         -> radishlex_snapshot_free
 RadishLexBuffer*           -> radishlex_buffer_free
 RadishLexUserTermList*     -> radishlex_userdb_terms_free
+RadishLexDeletedTermList*  -> radishlex_userdb_deleted_terms_free
 RadishLexImportBatchList*  -> radishlex_userdb_import_batches_free
+RadishLexRankExplain*      -> radishlex_userdb_rank_explain_free
 RadishLexError*            -> radishlex_error_free
 ```
 
@@ -156,17 +164,23 @@ RadishLexError*            -> radishlex_error_free
 推荐调用形态：
 
 ```text
-radishlex_session_new_rime(options, error_out)
+radishlex_session_new_personalized_rime(options, error_out)  // product input
+radishlex_session_new_rime(options, error_out)               // non-personalized smoke
 radishlex_session_set_schema(session, schema, error_out)
+radishlex_session_set_learning_context(session, context, error_out)
 radishlex_session_handle_key_event(session, event, result_out, error_out)
 radishlex_key_result_consumed(result)
 radishlex_key_result_commit_present(result)
 radishlex_key_result_commit(result)
+radishlex_key_result_learning_disposition(result)
 radishlex_key_result_snapshot(result)
+radishlex_snapshot_personalization_status(borrowed_snapshot)
 radishlex_snapshot_candidate(borrowed_snapshot, index, candidate_out, error_out)
-radishlex_session_commit_candidate(session, index, error_out)
+radishlex_session_select_candidate(session, index, result_out, error_out)
+radishlex_key_result_commit_present(result)
+radishlex_key_result_commit(result)
+radishlex_key_result_snapshot(result)
 radishlex_key_result_free(result)
-radishlex_buffer_free(commit)
 radishlex_session_free(session)
 radishlex_rime_runtime_shutdown(error_out)  // process teardown only
 ```
@@ -174,12 +188,16 @@ radishlex_rime_runtime_shutdown(error_out)  // process teardown only
 规则：
 
 - 真实平台壳必须使用 `radishlex_session_handle_key_event`；`push_key` 与 `push_key_event` 会丢弃 KeyOutcome，只保留为兼容和测试入口。
+- 产品输入必须创建 personalized Rime session；普通 Rime session 的个人化状态为 `not_enabled`，对其调用 `set_learning_context` 返回 `InvalidState`。
+- 平台在按键、候选选择或 composition commit 前，根据 secure input、敏感应用、隐私模式和上下文可信度更新版本化 learning context。context kind 只能使用受控枚举，不能传 App ID、窗口标题或正文；上下文变化后若已有 composition，先使用刷新后的 snapshot 再允许选择。
+- secure input、敏感应用或未知上下文必须得到 `policy_blocked` 的 engine-only snapshot；隐私模式可以读既有本地摘要，但 learning disposition 不能为 `recorded`。
 - `consumed = 0` 时平台把按键交还宿主；`commit_present = 1` 时立即复制并提交 commit。
 - key result 中的 snapshot 与 consumed / commit 来自同一次按键处理，不能用下一次独立 snapshot 调用拼接。
 - `radishlex_key_result_snapshot` 返回借用指针，不得调用 `radishlex_snapshot_free`；释放 key result 后该 snapshot 与全部 view 一并失效。
-- 候选提交返回 `RadishLexBuffer*`，读取后必须释放。
+- 候选选择返回 owned key result；分段候选可能 `commit_present = 0`，此时平台只应用同一结果中的 snapshot，不得把候选展示文本直接提交。
 - 独立 `snapshot_new` 只保留为兼容和调试入口；snapshot 不会跟随 session 后续输入自动更新。
-- 候选索引来自 snapshot 的当前候选列表；提交前如 session 状态已变化，平台层应重新取 snapshot。
+- `RadishLexCandidateView.index` 是 display index，`engine_index` 只供诊断和映射复验；平台始终把 display index 原样传给 `radishlex_session_select_candidate`，不得自行换算或假定两者相等。提交前如 session 状态已变化，平台层应重新取 snapshot。
+- `learning_disposition = failed` 不撤销 engine commit；平台仍须提交文本，只记录不含输入内容、候选和路径的受控状态码。
 - `session_free` 只销毁该 session；不要在应用切换或 client 切换时 shutdown 进程 runtime。最终 shutdown 可重复调用，但活动 session 存在时必须按 `InvalidState` 处理为生命周期错误。
 
 ### Userdb 和 dictionary 管理
@@ -190,8 +208,10 @@ radishlex_rime_runtime_shutdown(error_out)  // process teardown only
 radishlex_userdb_learning_status(db_path, summary_out, error_out)
 radishlex_userdb_sync_preflight(db_path, summary_out, error_out)
 radishlex_userdb_add_term(db_path, input_code, text, reading, error_out)
+radishlex_userdb_restore_term(db_path, input_code, text, reading, error_out)
 radishlex_userdb_delete_term(db_path, input_code, text, reading, error_out)
 radishlex_userdb_terms_new(db_path, error_out)
+radishlex_userdb_deleted_terms_new(db_path, error_out)
 radishlex_userdb_dictionary_inspect(file_path, summary_out, error_out)
 radishlex_userdb_dictionary_export(db_path, file_path, summary_out, error_out)
 radishlex_userdb_dictionary_import(db_path, file_path, source_name, dry_run, summary_out, error_out)
@@ -201,6 +221,10 @@ radishlex_userdb_import_batches_new(db_path, error_out)
 规则：
 
 - 这些入口不暴露 SQLite connection、statement 或 row 指针。
+- `add_term` 只处理未删除词条，不能清除 tombstone 或 suppressed；只有用户明确触发的 `restore_term` 可以执行版本更新的显式恢复。绑定层不得在普通新增、导入或输入选择后自动调用 restore。
+- `delete_term` 写入 tombstone 并阻断旧 selection、weight、导入和旧状态复活；调用成功不表示远端同步已经开放。
+- active/suppressed term list 与 deleted term list 是两个独立 owned handle；两类 `get` 返回的字符串都只借用到对应 handle 释放前。绑定层必须先复制 deleted identity、删除时间和非敏感 reason，再释放 handle；不得把 view 指针缓存进 widget/model。
+- deleted list 只用于展示 tombstone 和承接用户明确确认的 `restore_term`，不能读取 P1 原始事件，也不能在刷新、导入或普通选择后自动恢复。
 - learning status 只返回聚合计数、latest timestamp 和 `plaintext_payload / p1_raw_details / context_stats = false` 标记；不得把 P1 原始选择事件、负反馈 reason 明细、上下文统计或用户词明文导出给管理 UI。
 - dictionary import 的 `dry_run` 使用 `0 / 1`，其他值返回 `InvalidArgument`。
 - dictionary export 只导出用户明确管理的 P2 词条，不导出 P1 原始选择事件、负反馈明细、上下文统计或 ranker 权重摘要。
@@ -240,14 +264,16 @@ radishlex_userdb_import_batches_new(db_path, error_out)
 
 每个平台绑定层进入真实平台壳前，至少补以下 smoke：
 
-- contract 查询成功，能识别 `version = 2`、owned key result 和 owner-thread policy。
+- contract 查询成功，能识别 `version = 4`、key result v2、按键/候选选择共用的 owned result 和 owner-thread policy。
 - 创建 session 后在 owner thread 上 handle key，核对 consumed / commit / 同事件 snapshot，提交候选并释放所有 owned handle。
+- personalized session smoke 覆盖受控 learning context、display/engine index 不同仍提交正确候选、selection 的 `recorded/deferred`、学习失败不丢 commit，以及 storage/read/rank 退化状态。
+- secure、敏感或 unknown context 断言不读取不写入个人化数据；隐私模式断言可读既有排序但不新增 selection、term 或 weight。
 - 从非 owner thread 调用 session mutation 返回 `InvalidState`。
 - 非 UTF-8、空指针、非法 bool、候选越界能返回稳定错误码并释放 error。
 - key result / snapshot / term list / import batch list 的 string view 能按长度复制，并在释放所属 handle 后继续使用已复制值。
 - `*_free(NULL)` 不崩溃。
 - 两个 Rime session 共享进程 runtime；释放其中一个后另一个仍可输入，全部释放后显式 runtime shutdown 成功，活动 session 存在时 shutdown 返回 `InvalidState`。
-- userdb 管理入口使用显式临时 SQLite 路径，不读取真实用户输入法目录；learning status smoke 需要断言 P1 明细和上下文统计标记为 false。
+- userdb 管理入口使用显式临时 SQLite 路径，不读取真实用户输入法目录；learning status smoke 需要断言 P1 明细和上下文统计标记为 false，并覆盖 add 不能复活 tombstone、restore 只能由独立入口执行。
 - 本仓库 Rust host smoke 已覆盖 key result / snapshot / user term / import batch / error 的复制后释放；平台 wrapper 仍需在本语言层复验同一规则。
 
 推荐本仓库先用以下命令复验 Rust 侧基线：

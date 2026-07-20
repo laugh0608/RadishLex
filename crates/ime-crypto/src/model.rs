@@ -7,6 +7,7 @@ use chacha20poly1305::{
 };
 use hkdf::Hkdf;
 use sha2::{Digest, Sha256};
+use zeroize::Zeroize;
 
 use crate::device::DeviceWrappingKeyMaterial;
 
@@ -176,6 +177,12 @@ impl SyncMasterKeyMaterial {
 impl fmt::Debug for SyncMasterKeyMaterial {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("SyncMasterKeyMaterial([redacted])")
+    }
+}
+
+impl Drop for SyncMasterKeyMaterial {
+    fn drop(&mut self) {
+        self.0.zeroize();
     }
 }
 
@@ -667,6 +674,17 @@ struct NonceUse {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PrivateKeyAccessDeniedReason {
+    Unspecified,
+    AuthenticationFailed,
+    WritePermission,
+    ReadOnly,
+    MissingEntitlement,
+    RestrictedApi,
+    UnclassifiedPlatformStatus(i32),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CryptoError {
     InvalidField {
         field: &'static str,
@@ -682,6 +700,16 @@ pub enum CryptoError {
     CiphertextHashMismatch,
     KeyDerivationFailed,
     SignatureVerificationFailed,
+    SignatureAlgorithmMismatch,
+    InvalidSigningPublicKey {
+        algorithm: String,
+    },
+    InvalidSignatureEncoding {
+        algorithm: String,
+    },
+    SignatureKeyNotActive {
+        key_id: String,
+    },
     StorageBackendUnavailable {
         backend: String,
     },
@@ -703,6 +731,7 @@ pub enum CryptoError {
     },
     PrivateKeyAccessDenied {
         key_id: String,
+        reason: PrivateKeyAccessDeniedReason,
     },
     PrivateKeyUserPresenceRequired {
         key_id: String,
@@ -742,6 +771,18 @@ impl fmt::Display for CryptoError {
             Self::CiphertextHashMismatch => f.write_str("ciphertext hash mismatch"),
             Self::KeyDerivationFailed => f.write_str("key derivation failed"),
             Self::SignatureVerificationFailed => f.write_str("signature verification failed"),
+            Self::SignatureAlgorithmMismatch => {
+                f.write_str("signature algorithm does not match signing public key")
+            }
+            Self::InvalidSigningPublicKey { algorithm } => {
+                write!(f, "invalid signing public key for algorithm: {algorithm}")
+            }
+            Self::InvalidSignatureEncoding { algorithm } => {
+                write!(f, "invalid signature encoding for algorithm: {algorithm}")
+            }
+            Self::SignatureKeyNotActive { key_id } => {
+                write!(f, "signature key is not active: {key_id}")
+            }
             Self::StorageBackendUnavailable { backend } => {
                 write!(f, "storage backend unavailable: {backend}")
             }
@@ -760,7 +801,7 @@ impl fmt::Display for CryptoError {
             Self::PrivateKeyLocked { key_id } => {
                 write!(f, "private key locked: {key_id}")
             }
-            Self::PrivateKeyAccessDenied { key_id } => {
+            Self::PrivateKeyAccessDenied { key_id, .. } => {
                 write!(f, "private key access denied: {key_id}")
             }
             Self::PrivateKeyUserPresenceRequired { key_id } => {

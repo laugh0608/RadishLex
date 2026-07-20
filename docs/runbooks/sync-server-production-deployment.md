@@ -6,19 +6,20 @@
 
 - 部署态入口仍是 `deploy/sync-server/docker-compose.yaml` 加唯一 env 示例 `deploy/sync-server/.env.example`，不新增第二个 env 文件。
 - 部署态只提供同机 HTTP upstream `http://127.0.0.1:7319`；外部 TLS 必须在反向代理、VPN 或等价网络边界完成，Go server 通过单用户 bearer access token 执行首个内建访问门禁。
+- 部署容器固定非 root runtime identity，默认 `10001:10001`，并显式 `cap_drop: ALL`、`no-new-privileges`、只读 root filesystem；目标宿主机数据目录必须预先归该 identity 所有，不能用 `0777` 绕过 ownership。
 - 本地验证入口仍是显式 `-f deploy/sync-server/docker-compose.local.yaml`，通过 Caddy internal TLS 提供 `https://localhost:7319`，不新增第二个对外端口。
 - Go server 已验证密文对象上传下载、设备授权、版本冲突、日志脱敏、Docker Compose 本地 / 部署态启动 smoke、Rust userdb 两客户端真实 Go HTTP 同步、短生命周期冷备份 / 恢复到隔离目录 smoke，以及短生命周期外部 TLS 反代 smoke；这些证据仍不等于可以开放真实用户同步。
-- 真实用户同步或正式发布前仍缺少目标部署上的备份恢复演练、升级回滚演练、真实证书 / 域名 / 外部反代复验、平台私钥存储 backend 和用户可用同步 UI；这些不作为当前产品开发阻塞项。开发期同步测试以本地 Docker、本地 HTTPS、短生命周期数据目录和现有 smoke 为准。
+- 首个正式版本发布后、准备启用真实生产同步前，仍需在目标部署补备份恢复、升级回滚、真实证书 / 域名 / 外部反代复验，并完成平台私钥 backend 与用户可用同步 UI 资格；这些不作为当前本地部署子阶段或首版关闭态产品开发的阻塞项。开发期同步测试以本地 Docker、本地 HTTPS、短生命周期数据目录和现有 smoke 为准。
 
 ## 阶段边界
 
-本文档的目标部署证据包面向正式发布、真实用户开放或长期自部署交接。当前产品开发不要求准备真实域名、正式证书或外部反代；需要测试同步链路时，优先使用 `deploy/sync-server/docker-compose.local.yaml` 提供的本地 HTTPS、短生命周期数据目录和自动化 smoke。
+本文档的目标部署证据包面向首个正式版本发布后的真实生产同步开放或长期自部署交接。当前部署子阶段不要求准备真实域名、正式证书或外部反代；需要测试同步链路时，使用 `deploy/sync-server/docker-compose.local.yaml` 提供的本地 HTTPS、短生命周期数据目录和自动化 smoke。
 
-本地 Docker / 本地 HTTPS 通过可以记录为 `local_smoke`，用于支撑 manager 同步入口的状态派生、阻塞说明、诊断脱敏和本地联调。它不能代表发布级外部 TLS、备份恢复、升级回滚和日志策略已在目标环境通过，也不能单独解除真实用户同步开放门禁。
+短生命周期本地 Docker / 本地 HTTPS 必须同时证明 Caddy internal TLS 握手、bearer `401`、带 token 的结构化业务响应、非公网绑定、日志脱敏和容器清理；结合部署态本地预演的权限、冷备份与隔离恢复证据后，当前部署子阶段即可记为通过。`local_smoke` 用于支撑 manager 状态派生、阻塞说明、诊断脱敏和本地联调，但不能代表发布级外部 TLS、备份恢复、升级回滚和日志策略已在目标环境通过，也不能单独解除真实用户同步开放门禁。
 
 ## 目标部署证据包
 
-目标部署证据包用于判断某个实际部署是否可以进入 manager 的真实同步入口准备状态。它不是 settings JSON，不是诊断报告，也不是服务器自动上传的运行日志；它是部署者在目标环境完成复验后保留的非敏感记录。
+目标部署证据包用于首个正式版本发布后判断某个实际部署是否可以进入 manager 的真实生产同步入口准备状态。它不是 settings JSON，不是诊断报告，也不是服务器自动上传的运行日志；它是部署者在目标环境完成复验后保留的非敏感记录。
 
 证据包至少记录：
 
@@ -58,7 +59,7 @@ log_redaction: passed | failed | not_run
 notes: <non-sensitive summary only>
 ```
 
-填写后的证据包必须先通过 `./scripts/check-sync-deployment-evidence.sh <evidence-file>`。该脚本校验 `deployment_evidence.v1` 必填字段、状态枚举、固定 Compose 文件、时间戳、目标别名、commit、image tag 和敏感内容黑名单；仓库内合成 fixture 可用 `./scripts/check-sync-deployment-evidence.sh tests/fixtures/sync-deployment-evidence-valid.txt` 复验。脚本不连接真实部署，也不替代目标环境人工演练；它只用于拒绝格式漂移和敏感内容进入交接材料。
+填写后的证据包必须先通过 `./scripts/check-sync-deployment-evidence.sh <evidence-file>`。该脚本校验 `deployment_evidence.v1` 必填字段、状态枚举、固定 Compose 文件、时间戳、目标别名、commit、显式非浮动 image tag 和敏感内容黑名单；`latest`、`dev` 等浮动/开发 tag 不能作为发布证据。仓库内合成 fixture 可用 `./scripts/check-sync-deployment-evidence.sh tests/fixtures/sync-deployment-evidence-valid.txt` 复验。脚本不连接真实部署，也不替代目标环境人工演练；它只用于拒绝格式漂移和敏感内容进入交接材料。
 
 校验通过后，可以导出非敏感摘要：
 
@@ -73,7 +74,7 @@ notes: <non-sensitive summary only>
 
 ### 无真实证据包时的阻塞记录
 
-如果当前会话没有用户提供或目标环境产生的真实 `deployment_evidence.v1`，不得使用仓库内合成 fixture 冒充发布级部署证据，也不得从未通过校验的草稿中提取摘要。交接记录只写阶段结论：发布级目标部署未验证；manager 可以继续推进本地 `local_smoke` 支撑的状态派生和阻塞说明，真实用户同步、恢复码和设备授权成功路径继续关闭。
+如果当前会话没有用户提供或目标环境产生的真实 `deployment_evidence.v1`，不得使用仓库内合成 fixture 冒充发布级部署证据，也不得从未通过校验的草稿中提取摘要。当前部署子阶段只记录本地 HTTPS / 部署预演结论；目标生产证据明确后移到首个正式版本发布后。manager 可以继续推进本地 `local_smoke` 支撑的状态派生和阻塞说明，真实用户同步、恢复码和设备授权成功路径继续关闭。
 
 部署者需要提供的非敏感字段清单：
 
@@ -198,7 +199,9 @@ sync-server/objects/
 要求：
 
 - 目录位于仓库外，不提交到 Git。
-- 只允许 sync-server 运行用户和备份任务读取。
+- 只允许 sync-server 运行用户和备份任务读取。部署 Compose 默认 runtime identity 为 `10001:10001`；如果目标平台必须覆盖 UID/GID，只能通过 Compose-only `RADISHLEX_SYNC_RUNTIME_UID` / `RADISHLEX_SYNC_RUNTIME_GID` 明确设置，并让宿主目录 owner 与之匹配，不允许以 root 或 world-writable 目录代替。
+- metadata file 与 blob directory 必须位于同一个专用 `sync-server/` leaf，目录中只允许 SQLite 文件/sidecar 与 `objects/`；不能把 `/tmp`、仓库根或含其他文件的共享目录当作数据根。`RADISHLEX_SYNC_DATA_PATH`、`sync-server/` 和 `objects/` 的有效 mode 必须为 `0700`；SQLite metadata 和 blob 普通文件必须为 `0600`。Go runtime 会收紧配置指向的 leaf directory/file，拒绝 symlink、非目录、非普通 metadata、拆分路径或非专用目录；无法收紧权限时启动失败，不继续提供 HTTP。
+- `.env` 固定为 `0600`，位于数据备份目录之外。冷备份只复制整个数据目录，不把 `.env`、TLS 私钥或 access token 一起复制。
 - 备份系统应把该目录视为敏感数据：blob 是密文，但 metadata 包含设备 ID、对象 ID、版本、时间和审计事件。
 - 日志和备份索引不得把宿主机真实用户名、联系人、输入词、input code 或 reading 写入文件名。
 - `docker compose down -v` 只适用于本地 named volume 测试；部署态清理必须针对 `RADISHLEX_SYNC_DATA_PATH` 做人工确认。
@@ -300,6 +303,8 @@ git diff --check
 
 `./scripts/check-sync-server-deployment-rehearsal.sh` 使用部署态 Compose 文件、临时 env、随机 bearer token 和仓库外数据目录执行短生命周期预演。完整模式会启动容器、验证 token 门禁、检查日志脱敏，并做一次冷备份 / 恢复到隔离目录；`--config-only` 只验证临时 env 与 Compose 解析，不代表容器启动通过。
 
+预演只为临时目录把 container runtime identity 映射到当前宿主 UID/GID，因此可以用 `0700` 数据目录完成 bind mount 写入；这不改变生产默认 `10001:10001`。预演必须检查 env `0600`、数据目录 `0700`、SQLite `0600`、备份不含 env/token，以及恢复后权限不放宽。任何 `0777` 目录、root container 或权限检查缺失都不能计入部署 hardening 证据。
+
 `./scripts/check-sync-deployment-evidence.sh --self-test` 使用仓库内合成 fixture 和反例复验校验器本身。目标部署证据文件写完后，应再对实际证据文件执行 `./scripts/check-sync-deployment-evidence.sh <evidence-file>`，通过后也只代表证据包格式和脱敏规则合格。`--summary-json` / `--summary-text` 只在校验通过后输出非敏感交接摘要；校验失败时不得从失败证据中提取摘要。
 
 需要 Docker daemon 的 build / up / curl smoke 如果被沙盒、Docker socket 或权限限制挡住，应申请真实环境复验。不能把 `config` 通过写成容器实际启动通过。
@@ -312,6 +317,7 @@ git diff --check
 - 目标部署数据目录的冷备份、恢复到隔离目录、回滚旧镜像。
 - 日志脱敏。
 - `RADISHLEX_SYNC_DATA_PATH` 权限和备份保留策略。
+- container runtime UID/GID、`cap_drop: ALL`、`no-new-privileges`、只读 root filesystem，以及数据目录/SQLite 的 `0700` / `0600` 实际权限。
 - 客户端设备授权、恢复记录和对象版本冲突路径。
 
 ## 停止线

@@ -13,6 +13,18 @@ NativeUserTermRecord _copyTermView(_RadishLexUserTermView term) {
     updatedAtMs: term.updatedAtMs,
     lastUsedAtMs: term.lastUsedAtMs,
     lastUsedAtPresent: term.lastUsedAtPresent != 0,
+    importBatchId: term.importBatchId,
+    importBatchIdPresent: term.importBatchIdPresent != 0,
+  );
+}
+
+NativeDeletedTermRecord _copyDeletedTermView(_RadishLexDeletedTermView term) {
+  return NativeDeletedTermRecord(
+    inputCode: _readStringView(term.inputCode),
+    text: _readStringView(term.text),
+    reading: _readOptionalStringView(term.reading, term.readingPresent),
+    deletedAtMs: term.deletedAtMs,
+    reason: _readStringView(term.reason),
   );
 }
 

@@ -1,10 +1,548 @@
 package migrations
 
-import _ "embed"
+import (
+	"database/sql"
+	_ "embed"
+	"fmt"
+	"strings"
+)
 
 //go:embed 0001_init.sql
 var initialSchema string
 
 func InitialSchema() string {
 	return initialSchema
+}
+
+func Apply(db *sql.DB) error {
+	if db == nil {
+		return fmt.Errorf("sqlite database is required")
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin metadata migration: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.Exec(initialSchema); err != nil {
+		return fmt.Errorf("apply initial metadata schema: %w", err)
+	}
+	if err := ensureSigningAlgorithmColumn(tx, "devices"); err != nil {
+		return err
+	}
+	if err := ensureSigningAlgorithmColumn(tx, "device_join_requests"); err != nil {
+		return err
+	}
+	if err := ensureChangeSequenceColumns(tx); err != nil {
+		return err
+	}
+	if err := ensureLifecycleEvents(tx); err != nil {
+		return err
+	}
+	if err := ensureDeviceWrappingRecipientKey(tx); err != nil {
+		return err
+	}
+	if err := ensureDeviceWrappingSignatureMetadata(tx); err != nil {
+		return err
+	}
+	if err := ensureRecoveryRecordV2Metadata(tx); err != nil {
+		return err
+	}
+	if err := ensureRecoveryLifecycleEvents(tx); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("PRAGMA user_version = 9"); err != nil {
+		return fmt.Errorf("record metadata schema version: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit metadata migration: %w", err)
+	}
+	return nil
+}
+
+func ensureRecoveryLifecycleEvents(tx *sql.Tx) error {
+	var schema string
+	if err := tx.QueryRow(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'domain_lifecycle_events'`).Scan(&schema); err != nil {
+		return fmt.Errorf("read lifecycle event schema: %w", err)
+	}
+	if strings.Contains(schema, "recovery_record_revoked") {
+		return nil
+	}
+	if _, err := tx.Exec(`
+		CREATE TABLE domain_lifecycle_events_v9 (
+			domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
+			lifecycle_sequence INTEGER NOT NULL CHECK (lifecycle_sequence > 0),
+			event_type TEXT NOT NULL CHECK (event_type IN ('initial_device', 'device_authorized', 'device_revoked', 'recovery_record_rotated', 'device_recovered', 'recovery_record_revoked')),
+			record_id TEXT NOT NULL,
+			key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
+			reject_from_object_change_sequence INTEGER NOT NULL DEFAULT 0 CHECK (reject_from_object_change_sequence >= 0),
+			created_at_ms INTEGER NOT NULL,
+			PRIMARY KEY (domain_id, lifecycle_sequence),
+			UNIQUE (domain_id, event_type, record_id)
+		)
+	`); err != nil {
+		return fmt.Errorf("create recovery lifecycle event table: %w", err)
+	}
+	if _, err := tx.Exec(`
+		INSERT INTO domain_lifecycle_events_v9 (
+			domain_id, lifecycle_sequence, event_type, record_id, key_epoch,
+			reject_from_object_change_sequence, created_at_ms
+		)
+		SELECT domain_id, lifecycle_sequence, event_type, record_id, key_epoch,
+			reject_from_object_change_sequence, created_at_ms
+		FROM domain_lifecycle_events
+	`); err != nil {
+		return fmt.Errorf("copy lifecycle events for recovery schema: %w", err)
+	}
+	if _, err := tx.Exec("DROP TABLE domain_lifecycle_events"); err != nil {
+		return fmt.Errorf("drop legacy lifecycle event table: %w", err)
+	}
+	if _, err := tx.Exec("ALTER TABLE domain_lifecycle_events_v9 RENAME TO domain_lifecycle_events"); err != nil {
+		return fmt.Errorf("activate recovery lifecycle event table: %w", err)
+	}
+	return nil
+}
+
+func ensureRecoveryRecordV2Metadata(tx *sql.Tx) error {
+	hasSchemaVersion, err := columnExists(tx, "recovery_records", "record_schema_version")
+	if err != nil {
+		return err
+	}
+	if hasSchemaVersion {
+		return nil
+	}
+	if _, err := tx.Exec(`
+		CREATE TABLE recovery_records_v7 (
+			record_schema_version INTEGER NOT NULL CHECK (record_schema_version IN (1, 2)),
+			domain_id TEXT NOT NULL REFERENCES sync_domains(domain_id),
+			recovery_record_id TEXT NOT NULL,
+			previous_recovery_record_id TEXT NOT NULL DEFAULT '',
+			key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
+			kdf_profile TEXT NOT NULL,
+			kdf_version INTEGER NOT NULL CHECK (kdf_version > 0),
+			memory_kib INTEGER NOT NULL CHECK (memory_kib > 0),
+			iterations INTEGER NOT NULL CHECK (iterations > 0),
+			parallelism INTEGER NOT NULL CHECK (parallelism > 0),
+			output_len INTEGER NOT NULL CHECK (output_len > 0),
+			salt BLOB NOT NULL,
+			algorithm TEXT NOT NULL,
+			nonce BLOB NOT NULL,
+			wrapped_material_len INTEGER NOT NULL CHECK (wrapped_material_len > 0),
+			ciphertext_hash TEXT NOT NULL,
+			activation_algorithm TEXT NOT NULL DEFAULT '',
+			activation_public_key_id TEXT NOT NULL DEFAULT '',
+			activation_public_key BLOB NOT NULL DEFAULT X'',
+			status TEXT NOT NULL CHECK (status IN ('active', 'superseded', 'revoked')),
+			created_at_ms INTEGER NOT NULL,
+			updated_at_ms INTEGER NOT NULL CHECK (updated_at_ms >= created_at_ms),
+			revoked_at_ms INTEGER NOT NULL DEFAULT 0,
+			signer_device_id TEXT NOT NULL,
+			signature_schema_version INTEGER NOT NULL CHECK (signature_schema_version = 1),
+			signature_algorithm TEXT NOT NULL,
+			signature_key_id TEXT NOT NULL,
+			signature BLOB NOT NULL,
+			blob_ref TEXT NOT NULL,
+			PRIMARY KEY (domain_id, recovery_record_id)
+		)
+	`); err != nil {
+		return fmt.Errorf("create recovery v2 metadata table: %w", err)
+	}
+	if _, err := tx.Exec(`
+		INSERT INTO recovery_records_v7 (
+			record_schema_version, domain_id, recovery_record_id, previous_recovery_record_id,
+			key_epoch, kdf_profile, kdf_version, memory_kib, iterations, parallelism, output_len,
+			salt, algorithm, nonce, wrapped_material_len, ciphertext_hash,
+			activation_algorithm, activation_public_key_id, activation_public_key,
+			status, created_at_ms, updated_at_ms, revoked_at_ms, signer_device_id,
+			signature_schema_version, signature_algorithm, signature_key_id, signature, blob_ref
+		)
+		SELECT 1, domain_id, recovery_record_id, '',
+			key_epoch, kdf_profile, kdf_version, memory_kib, iterations, parallelism, output_len,
+			salt, algorithm, nonce, wrapped_material_len, ciphertext_hash,
+			'', '', X'', status, created_at_ms, created_at_ms, revoked_at_ms, signer_device_id,
+			signature_schema_version, signature_algorithm, signature_key_id, signature, blob_ref
+		FROM recovery_records
+	`); err != nil {
+		return fmt.Errorf("copy legacy recovery metadata: %w", err)
+	}
+	if _, err := tx.Exec("DROP TABLE recovery_records"); err != nil {
+		return fmt.Errorf("replace legacy recovery metadata: %w", err)
+	}
+	if _, err := tx.Exec("ALTER TABLE recovery_records_v7 RENAME TO recovery_records"); err != nil {
+		return fmt.Errorf("activate recovery v2 metadata: %w", err)
+	}
+	if _, err := tx.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_recovery_records_domain_status
+		ON recovery_records(domain_id, status, created_at_ms)
+	`); err != nil {
+		return fmt.Errorf("index recovery v2 metadata: %w", err)
+	}
+	return nil
+}
+
+func ensureDeviceWrappingSignatureMetadata(tx *sql.Tx) error {
+	columns := []struct {
+		name       string
+		definition string
+	}{
+		{"signature_record_type", "TEXT NOT NULL DEFAULT ''"},
+		{"signature_schema_version", "INTEGER NOT NULL DEFAULT 0"},
+		{"signature_algorithm", "TEXT NOT NULL DEFAULT ''"},
+		{"signature_key_id", "TEXT NOT NULL DEFAULT ''"},
+	}
+	for _, column := range columns {
+		hasColumn, err := columnExists(tx, "device_wrapping_records", column.name)
+		if err != nil {
+			return err
+		}
+		if !hasColumn {
+			if _, err := tx.Exec("ALTER TABLE device_wrapping_records ADD COLUMN " + column.name + " " + column.definition); err != nil {
+				return fmt.Errorf("add wrapping %s: %w", column.name, err)
+			}
+		}
+	}
+	if _, err := tx.Exec(`
+		UPDATE device_wrapping_records
+		SET signature_record_type = 'device_authorization',
+			signature_schema_version = COALESCE((
+				SELECT signature_schema_version FROM device_authorizations
+				WHERE device_authorizations.domain_id = device_wrapping_records.domain_id
+					AND device_authorizations.recipient_device_id = device_wrapping_records.recipient_device_id
+					AND device_authorizations.key_epoch = device_wrapping_records.key_epoch
+				LIMIT 1
+			), 1),
+			signature_algorithm = COALESCE((
+				SELECT signature_algorithm FROM device_authorizations
+				WHERE device_authorizations.domain_id = device_wrapping_records.domain_id
+					AND device_authorizations.recipient_device_id = device_wrapping_records.recipient_device_id
+					AND device_authorizations.key_epoch = device_wrapping_records.key_epoch
+				LIMIT 1
+			), (SELECT signing_algorithm FROM devices
+				WHERE devices.domain_id = device_wrapping_records.domain_id
+					AND devices.device_id = device_wrapping_records.authorizer_device_id), ''),
+			signature_key_id = COALESCE((
+				SELECT signature_key_id FROM device_authorizations
+				WHERE device_authorizations.domain_id = device_wrapping_records.domain_id
+					AND device_authorizations.recipient_device_id = device_wrapping_records.recipient_device_id
+					AND device_authorizations.key_epoch = device_wrapping_records.key_epoch
+				LIMIT 1
+			), (SELECT signing_public_key_id FROM devices
+				WHERE devices.domain_id = device_wrapping_records.domain_id
+					AND devices.device_id = device_wrapping_records.authorizer_device_id), '')
+		WHERE signature_record_type = '' OR signature_schema_version = 0
+	`); err != nil {
+		return fmt.Errorf("backfill wrapping signature metadata: %w", err)
+	}
+	var invalid int
+	if err := tx.QueryRow(`
+		SELECT COUNT(*) FROM device_wrapping_records
+		WHERE signature_record_type NOT IN ('device_authorization', 'epoch_distribution')
+			OR signature_schema_version != 1
+			OR signature_algorithm = '' OR signature_key_id = ''
+	`).Scan(&invalid); err != nil {
+		return fmt.Errorf("validate wrapping signature metadata: %w", err)
+	}
+	if invalid != 0 {
+		return fmt.Errorf("validate wrapping signature metadata: %d rows are invalid", invalid)
+	}
+	return nil
+}
+
+func ensureDeviceWrappingRecipientKey(tx *sql.Tx) error {
+	hasColumn, err := columnExists(tx, "device_wrapping_records", "recipient_key_agreement_key_id")
+	if err != nil {
+		return err
+	}
+	if !hasColumn {
+		if _, err := tx.Exec("ALTER TABLE device_wrapping_records ADD COLUMN recipient_key_agreement_key_id TEXT NOT NULL DEFAULT ''"); err != nil {
+			return fmt.Errorf("add wrapping recipient key id: %w", err)
+		}
+		if _, err := tx.Exec(`
+			UPDATE device_wrapping_records
+			SET recipient_key_agreement_key_id = COALESCE((
+				SELECT devices.key_agreement_public_key_id FROM devices
+				WHERE devices.domain_id = device_wrapping_records.domain_id
+					AND devices.device_id = device_wrapping_records.recipient_device_id
+			), '')
+		`); err != nil {
+			return fmt.Errorf("backfill wrapping recipient key id: %w", err)
+		}
+	}
+	var invalid int
+	if err := tx.QueryRow("SELECT COUNT(*) FROM device_wrapping_records WHERE recipient_key_agreement_key_id = ''").Scan(&invalid); err != nil {
+		return fmt.Errorf("validate wrapping recipient key ids: %w", err)
+	}
+	if invalid != 0 {
+		return fmt.Errorf("validate wrapping recipient key ids: %d rows are missing key ids", invalid)
+	}
+	return nil
+}
+
+func ensureLifecycleEvents(tx *sql.Tx) error {
+	rows, err := tx.Query("SELECT domain_id, current_key_epoch, created_at_ms FROM sync_domains ORDER BY domain_id")
+	if err != nil {
+		return fmt.Errorf("read lifecycle domains: %w", err)
+	}
+	type domainRow struct {
+		id        string
+		keyEpoch  int64
+		createdAt int64
+	}
+	var domains []domainRow
+	for rows.Next() {
+		var domain domainRow
+		if err := rows.Scan(&domain.id, &domain.keyEpoch, &domain.createdAt); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("read lifecycle domain: %w", err)
+		}
+		domains = append(domains, domain)
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("close lifecycle domains: %w", err)
+	}
+
+	for _, domain := range domains {
+		var count int
+		if err := tx.QueryRow("SELECT COUNT(*) FROM domain_lifecycle_events WHERE domain_id = ?", domain.id).Scan(&count); err != nil {
+			return fmt.Errorf("inspect lifecycle events: %w", err)
+		}
+		if count != 0 {
+			continue
+		}
+		var firstDeviceID string
+		if err := tx.QueryRow(`
+			SELECT device_id FROM devices
+			WHERE domain_id = ? AND status != 'pending'
+			ORDER BY CASE WHEN device_id IN (
+				SELECT recipient_device_id FROM device_authorizations WHERE domain_id = ?
+			) THEN 1 ELSE 0 END, authorized_at_ms, device_id
+			LIMIT 1
+		`, domain.id, domain.id).Scan(&firstDeviceID); err != nil {
+			return fmt.Errorf("find initial lifecycle device for %s: %w", domain.id, err)
+		}
+		sequence := int64(1)
+		initialKeyEpoch := domain.keyEpoch
+		if err := tx.QueryRow(`
+			SELECT COALESCE(
+				(SELECT MIN(key_epoch) FROM device_authorizations WHERE domain_id = ?),
+				(SELECT MIN(previous_key_epoch) FROM device_revocations WHERE domain_id = ?),
+				?
+			)
+		`, domain.id, domain.id, domain.keyEpoch).Scan(&initialKeyEpoch); err != nil {
+			return fmt.Errorf("derive initial lifecycle key epoch: %w", err)
+		}
+		if _, err := tx.Exec(`
+			INSERT INTO domain_lifecycle_events (
+				domain_id, lifecycle_sequence, event_type, record_id, key_epoch,
+				reject_from_object_change_sequence, created_at_ms
+			) VALUES (?, ?, 'initial_device', ?, ?, 0, ?)
+		`, domain.id, sequence, firstDeviceID, initialKeyEpoch, domain.createdAt); err != nil {
+			return fmt.Errorf("backfill initial lifecycle device: %w", err)
+		}
+
+		type historicalEvent struct {
+			typeID    string
+			recordID  string
+			keyEpoch  int64
+			createdAt int64
+		}
+		eventRows, err := tx.Query(`
+			SELECT 'device_authorized', join_request_id, key_epoch, created_at_ms
+			FROM device_authorizations WHERE domain_id = ?
+			UNION ALL
+			SELECT 'device_revoked', revoked_device_id || ':' || new_key_epoch, new_key_epoch, created_at_ms
+			FROM device_revocations WHERE domain_id = ?
+			ORDER BY created_at_ms, 1, 2
+		`, domain.id, domain.id)
+		if err != nil {
+			return fmt.Errorf("read historical lifecycle events: %w", err)
+		}
+		var events []historicalEvent
+		for eventRows.Next() {
+			var event historicalEvent
+			if err := eventRows.Scan(&event.typeID, &event.recordID, &event.keyEpoch, &event.createdAt); err != nil {
+				_ = eventRows.Close()
+				return fmt.Errorf("read historical lifecycle event: %w", err)
+			}
+			events = append(events, event)
+		}
+		if err := eventRows.Close(); err != nil {
+			return fmt.Errorf("close historical lifecycle events: %w", err)
+		}
+		for _, event := range events {
+			sequence++
+			rejectFrom := int64(0)
+			if event.typeID == "device_revoked" {
+				if err := tx.QueryRow(`
+					SELECT COALESCE(
+						MIN(CASE WHEN server_received_at_ms >= ? THEN change_sequence END),
+						MAX(change_sequence) + 1,
+						1
+					) FROM sync_object_versions WHERE domain_id = ?
+				`, event.createdAt, domain.id).Scan(&rejectFrom); err != nil {
+					return fmt.Errorf("backfill revocation object cutoff: %w", err)
+				}
+			}
+			if _, err := tx.Exec(`
+				INSERT INTO domain_lifecycle_events (
+					domain_id, lifecycle_sequence, event_type, record_id, key_epoch,
+					reject_from_object_change_sequence, created_at_ms
+				) VALUES (?, ?, ?, ?, ?, ?, ?)
+			`, domain.id, sequence, event.typeID, event.recordID, event.keyEpoch, rejectFrom, event.createdAt); err != nil {
+				return fmt.Errorf("backfill lifecycle event: %w", err)
+			}
+		}
+	}
+	return nil
+}
+
+func ensureChangeSequenceColumns(tx *sql.Tx) error {
+	versionHasSequence, err := columnExists(tx, "sync_object_versions", "change_sequence")
+	if err != nil {
+		return err
+	}
+	if !versionHasSequence {
+		if _, err := tx.Exec("ALTER TABLE sync_object_versions ADD COLUMN change_sequence INTEGER NOT NULL DEFAULT 0"); err != nil {
+			return fmt.Errorf("add object version change sequence: %w", err)
+		}
+		rows, err := tx.Query(`
+			SELECT domain_id, object_id, version
+			FROM sync_object_versions
+			ORDER BY domain_id, server_received_at_ms, object_id, version
+		`)
+		if err != nil {
+			return fmt.Errorf("read historical object versions: %w", err)
+		}
+		type historicalVersion struct {
+			domainID string
+			objectID string
+			version  int64
+		}
+		var versions []historicalVersion
+		for rows.Next() {
+			var version historicalVersion
+			if err := rows.Scan(&version.domainID, &version.objectID, &version.version); err != nil {
+				_ = rows.Close()
+				return fmt.Errorf("read historical object version: %w", err)
+			}
+			versions = append(versions, version)
+		}
+		if err := rows.Close(); err != nil {
+			return fmt.Errorf("close historical object versions: %w", err)
+		}
+		sequences := make(map[string]int64)
+		for _, version := range versions {
+			sequences[version.domainID]++
+			if _, err := tx.Exec(`
+				UPDATE sync_object_versions SET change_sequence = ?
+				WHERE domain_id = ? AND object_id = ? AND version = ?
+			`, sequences[version.domainID], version.domainID, version.objectID, version.version); err != nil {
+				return fmt.Errorf("backfill object version change sequence: %w", err)
+			}
+		}
+	}
+
+	objectHasSequence, err := columnExists(tx, "sync_objects", "latest_change_sequence")
+	if err != nil {
+		return err
+	}
+	if !objectHasSequence {
+		if _, err := tx.Exec("ALTER TABLE sync_objects ADD COLUMN latest_change_sequence INTEGER NOT NULL DEFAULT 0"); err != nil {
+			return fmt.Errorf("add latest object change sequence: %w", err)
+		}
+		if _, err := tx.Exec(`
+			UPDATE sync_objects
+			SET latest_change_sequence = COALESCE((
+				SELECT change_sequence FROM sync_object_versions
+				WHERE sync_object_versions.domain_id = sync_objects.domain_id
+					AND sync_object_versions.object_id = sync_objects.object_id
+					AND sync_object_versions.version = sync_objects.latest_version
+			), 0)
+		`); err != nil {
+			return fmt.Errorf("backfill latest object change sequence: %w", err)
+		}
+	}
+	var invalidVersionSequences int
+	if err := tx.QueryRow("SELECT COUNT(*) FROM sync_object_versions WHERE change_sequence <= 0").Scan(&invalidVersionSequences); err != nil {
+		return fmt.Errorf("validate object version change sequences: %w", err)
+	}
+	if invalidVersionSequences != 0 {
+		return fmt.Errorf("validate object version change sequences: %d rows are not sequenced", invalidVersionSequences)
+	}
+	var invalidLatestSequences int
+	if err := tx.QueryRow("SELECT COUNT(*) FROM sync_objects WHERE latest_change_sequence <= 0").Scan(&invalidLatestSequences); err != nil {
+		return fmt.Errorf("validate latest object change sequences: %w", err)
+	}
+	if invalidLatestSequences != 0 {
+		return fmt.Errorf("validate latest object change sequences: %d rows are not sequenced", invalidLatestSequences)
+	}
+	if _, err := tx.Exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_sync_object_versions_domain_change
+		ON sync_object_versions(domain_id, change_sequence)
+	`); err != nil {
+		return fmt.Errorf("create object change sequence index: %w", err)
+	}
+	return nil
+}
+
+func columnExists(tx *sql.Tx, table string, wanted string) (bool, error) {
+	rows, err := tx.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return false, fmt.Errorf("inspect %s schema: %w", table, err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name string
+		var columnType string
+		var notNull int
+		var defaultValue any
+		var primaryKey int
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			return false, fmt.Errorf("inspect %s columns: %w", table, err)
+		}
+		if name == wanted {
+			return true, nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return false, fmt.Errorf("inspect %s columns: %w", table, err)
+	}
+	return false, nil
+}
+
+func ensureSigningAlgorithmColumn(tx *sql.Tx, table string) error {
+	rows, err := tx.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return fmt.Errorf("inspect %s schema: %w", table, err)
+	}
+	found := false
+	for rows.Next() {
+		var cid int
+		var name string
+		var columnType string
+		var notNull int
+		var defaultValue any
+		var primaryKey int
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("inspect %s columns: %w", table, err)
+		}
+		if name == "signing_algorithm" {
+			found = true
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("close %s schema inspection: %w", table, err)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("inspect %s columns: %w", table, err)
+	}
+	if found {
+		return nil
+	}
+	if _, err := tx.Exec("ALTER TABLE " + table + " ADD COLUMN signing_algorithm TEXT NOT NULL DEFAULT 'ed25519-v1'"); err != nil {
+		return fmt.Errorf("add %s signing algorithm: %w", table, err)
+	}
+	return nil
 }

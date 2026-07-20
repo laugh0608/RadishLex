@@ -22,7 +22,7 @@ RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支�
 - **Flutter**：本地词库、学习、隐私、同步、设备和诊断管理界面。
 - **平台原生薄壳**：macOS InputMethodKit、Linux Fcitx5/IBus、Android IME、Windows TSF、iOS Keyboard Extension。
 
-当前工程成熟度、停止线和下一步只在 [当前状态](docs/status/current.md) 维护。仓库已有 Rust、Go 和 Flutter 工程原型，但真实平台输入法与产品发布闭环仍按路线推进。
+当前工程成熟度、停止线和下一步只在 [当前状态](docs/status/current.md) 维护。仓库已有 Rust、Go、Flutter 工程原型、macOS 离线输入 Alpha 和本地个人化 MVP 真实产品证据；当前进入 M3 端到端加密同步 Beta，真实用户同步仍保持关闭，最终产品发布按 M4 路线推进。
 
 ## 稳定入口
 
@@ -35,12 +35,21 @@ RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支�
 - [Rime Adapter](docs/engine-rime-adapter.md)：librime adapter 与 native smoke。
 - [个人化学习](docs/personalization-learning.md)：userdb、ranker、反馈和词库管理。
 - [FFI Boundary](docs/ffi-boundary.md)：C ABI、所有权、线程和错误语义。
+- [Manager 同步产品状态](docs/manager-sync-product-status.md)：ABI v6 status-only 字段、blocker 和隐私 allowlist。
 - [macOS InputMethodKit](docs/macos-inputmethodkit-boundary.md)：第一平台的 runtime、按键链、目录和验收边界。
 - [同步密钥管理](docs/sync-key-management.md)：设备、授权、恢复、撤销和 key epoch。
 - [Sync Server API/Storage](docs/sync-server-api-storage.md)：Go API、metadata、blob 和错误语义。
 - [Manager Boundary](docs/manager-ui-boundary.md)：Flutter manager 职责与数据可见性。
 
 更细的 ADR、runbook 和协议专题从上述入口按任务进入。临时整改或发布专题只有被 `docs/status/current.md` 引用时才进入日常阅读链。
+
+核心组件的就地开发说明：
+
+- [Rust 同步客户端](crates/ime-sync/README.md)：cycle 编排、产品密码装载、transport 和验证入口。
+- [Go 同步服务](server/sync-server/README.md)：服务边界、配置、存储和开发验证。
+- [同步服务部署](deploy/sync-server/README.md)：本地 HTTPS 与自部署反向代理拓扑。
+- [Flutter Manager](apps/radishlex-manager/README.md)：页面能力、FFI bridge、产品路径和本地验证。
+- [macOS InputMethodKit](platforms/macos-imk/README.md)：平台薄壳、构建、安装与实机验收边界。
 
 ## 开发验证入口
 
@@ -74,7 +83,15 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
   rime --schema luna_pinyin --shared-data <path> --user-data <path> luobo
 ```
 
-详细命令见 [CLI 说明](docs/cli.md)，本机 Rime 环境见 [Rime Native Smoke Runbook](docs/runbooks/rime-native-smoke.md)。
+详细命令见 [CLI 说明](docs/cli.md)，精确学习状态与非选择候选快照见 [学习取证 CLI 参考](docs/cli-learning-evidence.md)，本机 Rime 环境见 [Rime Native Smoke Runbook](docs/runbooks/rime-native-smoke.md)。
+
+macOS InputMethodKit 不安装验证：
+
+```bash
+./scripts/check-macos-imk.sh
+```
+
+该入口编译正式 Objective-C 条件分支，并运行 wrapper、AppKit candidate panel、controller 与只读 TIS 工具契约，但不会安装或启用输入法。native-rime bundle、授权后签名安装、实时来源监视和完整移除见 [macOS 平台说明](platforms/macos-imk/README.md) 与 [开发 runbook](docs/runbooks/macos-inputmethodkit-development.md)。
 
 Flutter manager：
 

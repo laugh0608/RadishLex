@@ -11,6 +11,8 @@ const (
 	ErrNotFound                  ErrorCode = "not_found"
 	ErrConflictStaleBaseVersion  ErrorCode = "conflict_stale_base_version"
 	ErrConflictObjectVersion     ErrorCode = "conflict_object_version"
+	ErrConflictEpochDistribution ErrorCode = "conflict_epoch_distribution"
+	ErrConflictRecoveryRecord    ErrorCode = "conflict_recovery_record"
 	ErrInvalidSignature          ErrorCode = "invalid_signature"
 	ErrInvalidCiphertextMetadata ErrorCode = "invalid_ciphertext_metadata"
 	ErrPayloadTooLarge           ErrorCode = "payload_too_large"
@@ -20,6 +22,7 @@ const (
 
 type Error struct {
 	Code                 ErrorCode
+	DetailCode           string
 	Message              string
 	Retryable            bool
 	LatestVersion        uint64

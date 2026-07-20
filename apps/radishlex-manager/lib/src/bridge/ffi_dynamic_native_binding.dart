@@ -14,7 +14,9 @@ part 'ffi_dynamic_native_views.dart';
 final class DynamicRadishLexManagerNativeBinding
     implements RadishLexManagerNativeBinding {
   DynamicRadishLexManagerNativeBinding(ffi.DynamicLibrary library)
-    : _api = _RadishLexNativeApi(library);
+    : _api = _RadishLexNativeApi(library) {
+    _api.validateContract();
+  }
 
   factory DynamicRadishLexManagerNativeBinding.open({String? libraryPath}) {
     final path = libraryPath?.trim();
@@ -57,6 +59,36 @@ final class DynamicRadishLexManagerNativeBinding
   }
 
   @override
+  List<NativeDeletedTermRecord> listDeletedTerms(String dbPath) {
+    return _withNativeString(dbPath, (dbPathPointer) {
+      final termsHandle = _callPointer<_RadishLexDeletedTermList>(
+        _api.errors,
+        (errorOut) => _api.deletedTerms.newList(dbPathPointer, errorOut),
+      );
+      try {
+        final count = _api.deletedTerms.count(termsHandle);
+        final terms = <NativeDeletedTermRecord>[];
+        for (var index = 0; index < count; index += 1) {
+          final termOut = calloc<_RadishLexDeletedTermView>();
+          try {
+            _callStatus(
+              _api.errors,
+              (errorOut) =>
+                  _api.deletedTerms.get(termsHandle, index, termOut, errorOut),
+            );
+            terms.add(_copyDeletedTermView(termOut.ref));
+          } finally {
+            calloc.free(termOut);
+          }
+        }
+        return List.unmodifiable(terms);
+      } finally {
+        _api.deletedTerms.free(termsHandle);
+      }
+    });
+  }
+
+  @override
   void deleteUserTerm({
     required String dbPath,
     required String inputCode,
@@ -70,6 +102,33 @@ final class DynamicRadishLexManagerNativeBinding
             _callStatus(
               _api.errors,
               (errorOut) => _api.userTerms.deleteTerm(
+                dbPathPointer,
+                inputCodePointer,
+                textPointer,
+                readingPointer,
+                errorOut,
+              ),
+            );
+          });
+        });
+      });
+    });
+  }
+
+  @override
+  void restoreUserTerm({
+    required String dbPath,
+    required String inputCode,
+    required String text,
+    required String? reading,
+  }) {
+    _withNativeString(dbPath, (dbPathPointer) {
+      _withNativeString(inputCode, (inputCodePointer) {
+        _withNativeString(text, (textPointer) {
+          _withOptionalNativeString(reading, (readingPointer) {
+            _callStatus(
+              _api.errors,
+              (errorOut) => _api.userTerms.restoreTerm(
                 dbPathPointer,
                 inputCodePointer,
                 textPointer,
@@ -244,6 +303,41 @@ final class DynamicRadishLexManagerNativeBinding
         calloc.free(summaryOut);
       }
     });
+  }
+
+  @override
+  NativeSyncProductStatus syncProductStatus() {
+    final statusOut = calloc<_RadishLexManagerSyncProductStatus>();
+    try {
+      _callStatus(
+        _api.errors,
+        (errorOut) => _api.sync.productStatus(statusOut, errorOut),
+      );
+      final status = statusOut.ref;
+      return NativeSyncProductStatus(
+        version: status.version,
+        signingBackend: status.signingBackend,
+        signingAlgorithm: status.signingAlgorithm,
+        signingCompiled: status.signingCompiled,
+        signingRuntimeAvailable: status.signingRuntimeAvailable,
+        signingCanCreate: status.signingCanCreate,
+        signingCanSign: status.signingCanSign,
+        signingExportable: status.signingExportable,
+        signingHardwareBacked: status.signingHardwareBacked,
+        signingUserPresenceRequired: status.signingUserPresenceRequired,
+        signingBackupMigratable: status.signingBackupMigratable,
+        signingProductQualified: status.signingProductQualified,
+        keyAgreementBackend: status.keyAgreementBackend,
+        keyAgreementCompiled: status.keyAgreementCompiled,
+        keyAgreementRuntimeQualified: status.keyAgreementRuntimeQualified,
+        keyAgreementProductQualified: status.keyAgreementProductQualified,
+        productQualified: status.productQualified,
+        userSyncEnabled: status.userSyncEnabled,
+        blocker: status.blocker,
+      );
+    } finally {
+      calloc.free(statusOut);
+    }
   }
 
   @override

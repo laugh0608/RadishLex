@@ -1,21 +1,34 @@
 use std::thread::{self, ThreadId};
 
 use radishlex_ime_core::{
-    Candidate, Commit, Composition, CoreResult, Engine, InputSession, KeyEvent, KeyOutcome,
-    SchemaId, SessionState,
+    Candidate, Composition, CoreResult, Engine, InputSession, KeyEvent, KeyOutcome, SchemaId,
 };
 #[cfg(feature = "native-rime")]
 use radishlex_ime_engine_rime::{RimeEngine, RimeEngineConfig};
+use radishlex_ime_runtime::{LearningContext, LearningDisposition, PersonalizedInputSession};
 
 use crate::demo_engine::FfiDemoEngine;
 use crate::engine::RADISHLEX_ENGINE_KIND_DEMO;
 #[cfg(feature = "native-rime")]
 use crate::engine::RADISHLEX_ENGINE_KIND_RIME;
 use crate::error::FfiError;
+use crate::snapshot::RadishLexSnapshot;
 
 pub struct RadishLexSession {
-    inner: InputSession<SessionEngine>,
+    inner: SessionInner,
     owner_thread: ThreadId,
+}
+
+pub(crate) struct SessionEvent {
+    pub outcome: KeyOutcome,
+    pub snapshot: RadishLexSnapshot,
+    pub learning_disposition: LearningDisposition,
+}
+
+enum SessionInner {
+    Legacy(InputSession<SessionEngine>),
+    #[cfg_attr(not(feature = "native-rime"), allow(dead_code))]
+    Personalized(Box<PersonalizedInputSession<SessionEngine>>),
 }
 
 impl RadishLexSession {
@@ -26,7 +39,9 @@ impl RadishLexSession {
     pub fn new_with_engine_kind(engine_kind: u32) -> Self {
         debug_assert_eq!(engine_kind, RADISHLEX_ENGINE_KIND_DEMO);
         Self {
-            inner: InputSession::new(SessionEngine::Demo(FfiDemoEngine::new())),
+            inner: SessionInner::Legacy(InputSession::new(SessionEngine::Demo(
+                FfiDemoEngine::new(),
+            ))),
             owner_thread: thread::current().id(),
         }
     }
@@ -34,7 +49,26 @@ impl RadishLexSession {
     #[cfg(feature = "native-rime")]
     pub fn new_rime(config: RimeEngineConfig) -> Result<Self, FfiError> {
         Ok(Self {
-            inner: InputSession::new(SessionEngine::Rime(RimeEngine::new(config)?)),
+            inner: SessionInner::Legacy(InputSession::new(SessionEngine::Rime(RimeEngine::new(
+                config,
+            )?))),
+            owner_thread: thread::current().id(),
+        })
+    }
+
+    #[cfg(feature = "native-rime")]
+    pub fn new_personalized_rime(
+        config: RimeEngineConfig,
+        userdb_path: &str,
+        session_id: &str,
+    ) -> Result<Self, FfiError> {
+        let engine = SessionEngine::Rime(RimeEngine::new(config)?);
+        Ok(Self {
+            inner: SessionInner::Personalized(Box::new(PersonalizedInputSession::open(
+                engine,
+                userdb_path,
+                session_id,
+            )?)),
             owner_thread: thread::current().id(),
         })
     }
@@ -49,28 +83,110 @@ impl RadishLexSession {
         }
     }
 
-    pub(crate) fn inner_mut(&mut self) -> &mut InputSession<SessionEngine> {
-        &mut self.inner
-    }
-
     pub fn engine_kind(&self) -> u32 {
-        self.inner.engine().engine_kind()
+        match &self.inner {
+            SessionInner::Legacy(input) => input.engine().engine_kind(),
+            SessionInner::Personalized(runtime) => runtime.engine().engine_kind(),
+        }
     }
 
-    pub fn push_char(&mut self, ch: char) -> radishlex_ime_core::CoreResult<KeyOutcome> {
+    pub fn push_char(&mut self, ch: char) -> Result<KeyOutcome, FfiError> {
         self.push_key_event(KeyEvent::press_char(ch))
     }
 
-    pub fn push_key_event(&mut self, key: KeyEvent) -> radishlex_ime_core::CoreResult<KeyOutcome> {
-        self.inner.push_key(key)
+    pub fn push_key_event(&mut self, key: KeyEvent) -> Result<KeyOutcome, FfiError> {
+        Ok(self.handle_key_event(key)?.outcome)
     }
 
-    pub fn state(&self) -> radishlex_ime_core::CoreResult<SessionState> {
-        self.inner.state()
+    pub(crate) fn handle_key_event(&mut self, key: KeyEvent) -> Result<SessionEvent, FfiError> {
+        match &mut self.inner {
+            SessionInner::Legacy(input) => {
+                let outcome = input.push_key(key)?;
+                let snapshot = RadishLexSnapshot::from_state(input.state()?);
+                Ok(SessionEvent {
+                    outcome,
+                    snapshot,
+                    learning_disposition: LearningDisposition::NotApplicable,
+                })
+            }
+            SessionInner::Personalized(runtime) => {
+                let event = runtime.handle_key(key)?;
+                Ok(SessionEvent {
+                    outcome: event.outcome().clone(),
+                    snapshot: RadishLexSnapshot::from_runtime(event.snapshot().clone()),
+                    learning_disposition: event.learning_disposition(),
+                })
+            }
+        }
     }
 
-    pub fn snapshot_text(&self) -> radishlex_ime_core::CoreResult<String> {
-        render_snapshot(&self.inner.state()?)
+    pub(crate) fn select_candidate(
+        &mut self,
+        display_index: usize,
+    ) -> Result<SessionEvent, FfiError> {
+        match &mut self.inner {
+            SessionInner::Legacy(input) => {
+                let outcome = input.select_candidate(display_index)?;
+                let snapshot = RadishLexSnapshot::from_state(input.state()?);
+                Ok(SessionEvent {
+                    outcome,
+                    snapshot,
+                    learning_disposition: LearningDisposition::NotApplicable,
+                })
+            }
+            SessionInner::Personalized(runtime) => {
+                let event = runtime.select_candidate(display_index)?;
+                Ok(SessionEvent {
+                    outcome: event.outcome().clone(),
+                    snapshot: RadishLexSnapshot::from_runtime(event.snapshot().clone()),
+                    learning_disposition: event.learning_disposition(),
+                })
+            }
+        }
+    }
+
+    pub(crate) fn snapshot(&mut self) -> Result<RadishLexSnapshot, FfiError> {
+        match &mut self.inner {
+            SessionInner::Legacy(input) => Ok(RadishLexSnapshot::from_state(input.state()?)),
+            SessionInner::Personalized(runtime) => {
+                Ok(RadishLexSnapshot::from_runtime(runtime.snapshot()?))
+            }
+        }
+    }
+
+    pub(crate) fn reset(&mut self) -> Result<(), FfiError> {
+        match &mut self.inner {
+            SessionInner::Legacy(input) => input.reset()?,
+            SessionInner::Personalized(runtime) => runtime.reset()?,
+        }
+        Ok(())
+    }
+
+    pub(crate) fn set_schema(&mut self, schema: SchemaId) -> Result<(), FfiError> {
+        match &mut self.inner {
+            SessionInner::Legacy(input) => input.set_schema(schema)?,
+            SessionInner::Personalized(runtime) => runtime.set_schema(schema)?,
+        }
+        Ok(())
+    }
+
+    pub(crate) fn set_learning_context(
+        &mut self,
+        context: LearningContext,
+    ) -> Result<(), FfiError> {
+        match &mut self.inner {
+            SessionInner::Legacy(_) => Err(FfiError::invalid_state(
+                "learning context requires a personalized session",
+            )),
+            SessionInner::Personalized(runtime) => {
+                runtime.set_learning_context(context);
+                Ok(())
+            }
+        }
+    }
+
+    pub fn snapshot_text(&mut self) -> Result<String, FfiError> {
+        Ok(self.snapshot()?.render_text())
     }
 }
 
@@ -123,11 +239,19 @@ impl Engine for SessionEngine {
         }
     }
 
-    fn commit_candidate(&mut self, index: usize) -> CoreResult<Commit> {
+    fn input_code(&self) -> CoreResult<String> {
         match self {
-            Self::Demo(engine) => engine.commit_candidate(index),
+            Self::Demo(engine) => engine.input_code(),
             #[cfg(feature = "native-rime")]
-            Self::Rime(engine) => engine.commit_candidate(index),
+            Self::Rime(engine) => engine.input_code(),
+        }
+    }
+
+    fn select_candidate(&mut self, index: usize) -> CoreResult<KeyOutcome> {
+        match self {
+            Self::Demo(engine) => engine.select_candidate(index),
+            #[cfg(feature = "native-rime")]
+            Self::Rime(engine) => engine.select_candidate(index),
         }
     }
 
@@ -174,29 +298,4 @@ pub(crate) fn session_ref<'a>(
     let session = unsafe { &*session };
     session.ensure_owner_thread()?;
     Ok(session)
-}
-
-fn render_snapshot(state: &SessionState) -> radishlex_ime_core::CoreResult<String> {
-    let mut output = String::new();
-    output.push_str(&format!("schema: {}\n", state.schema().as_str()));
-    output.push_str(&format!("composition: {}\n", state.composition().preedit()));
-    output.push_str(&format!("cursor: {}\n", state.composition().cursor()));
-    output.push_str("candidates:\n");
-
-    if state.candidates().is_empty() {
-        output.push_str("  <none>\n");
-    } else {
-        for (index, candidate) in state.candidates().iter().enumerate() {
-            output.push_str(&format!("  {index}. {}", candidate.text()));
-            if let Some(reading) = candidate.reading() {
-                output.push_str(&format!(" [{reading}]"));
-            }
-            if let Some(annotation) = candidate.annotation() {
-                output.push_str(&format!(" - {annotation}"));
-            }
-            output.push('\n');
-        }
-    }
-
-    Ok(output)
 }

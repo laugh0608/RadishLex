@@ -12,7 +12,17 @@ pub trait Engine {
 
     fn candidates(&self) -> CoreResult<Vec<Candidate>>;
 
-    fn commit_candidate(&mut self, index: usize) -> CoreResult<Commit>;
+    /// Returns the stable input code for the current composition.
+    ///
+    /// This must not expose an engine-private object identifier. An empty
+    /// string means there is no active input code.
+    fn input_code(&self) -> CoreResult<String>;
+
+    /// Selects a candidate from the current page.
+    ///
+    /// Engines with segmented composition may consume the selection without
+    /// producing a commit yet. The returned outcome preserves that distinction.
+    fn select_candidate(&mut self, index: usize) -> CoreResult<KeyOutcome>;
 
     fn set_schema(&mut self, schema: SchemaId) -> CoreResult<()>;
 

@@ -1,4 +1,4 @@
-use rusqlite::{params, OptionalExtension, Row};
+use rusqlite::{params, Connection, OptionalExtension, Row};
 
 use crate::error::{UserDbError, UserDbResult};
 use crate::model::{
@@ -6,7 +6,7 @@ use crate::model::{
     USERDB_SYNC_PAYLOAD_SCHEMA_VERSION,
 };
 
-use super::{stable_hash_hex, to_sqlite_conversion_failure, UserDb};
+use super::{to_sqlite_conversion_failure, UserDb};
 
 const HEX_LOWER: &[u8; 16] = b"0123456789abcdef";
 
@@ -38,7 +38,7 @@ struct SyncRankerWeightPayloadRecord {
     text: String,
     reading: String,
     frequency: i64,
-    recency_score: f64,
+    last_used_at_ms: Option<i64>,
     negative_score: f64,
     context_kind: String,
     updated_at_ms: i64,
@@ -47,9 +47,15 @@ struct SyncRankerWeightPayloadRecord {
 pub(super) fn collect_p2_plaintext_payloads(
     db: &UserDb,
 ) -> UserDbResult<Vec<UserDbSyncPlaintextPayload>> {
+    collect_p2_plaintext_payloads_on(&db.connection)
+}
+
+pub(super) fn collect_p2_plaintext_payloads_on(
+    connection: &Connection,
+) -> UserDbResult<Vec<UserDbSyncPlaintextPayload>> {
     let mut payloads = Vec::new();
 
-    let user_terms = sync_user_term_payload_records(db)?;
+    let user_terms = sync_user_term_payload_records(connection)?;
     if !user_terms.is_empty() {
         payloads.push(UserDbSyncPlaintextPayload::new(
             UserDbSyncPayloadObjectType::DictionaryUserTerms,
@@ -58,7 +64,7 @@ pub(super) fn collect_p2_plaintext_payloads(
         )?);
     }
 
-    let ranker_weights = sync_ranker_weight_payload_records(db)?;
+    let ranker_weights = sync_ranker_weight_payload_records(connection)?;
     if !ranker_weights.is_empty() {
         payloads.push(UserDbSyncPlaintextPayload::new(
             UserDbSyncPayloadObjectType::RankerWeights,
@@ -67,7 +73,7 @@ pub(super) fn collect_p2_plaintext_payloads(
         )?);
     }
 
-    let deleted_terms = sync_deleted_term_payload_records(db)?;
+    let deleted_terms = sync_deleted_term_payload_records(connection)?;
     if !deleted_terms.is_empty() {
         payloads.push(UserDbSyncPlaintextPayload::new(
             UserDbSyncPayloadObjectType::DictionaryDeletedTerms,
@@ -79,8 +85,10 @@ pub(super) fn collect_p2_plaintext_payloads(
     Ok(payloads)
 }
 
-fn sync_user_term_payload_records(db: &UserDb) -> UserDbResult<Vec<SyncUserTermPayloadRecord>> {
-    let mut statement = db.connection.prepare(
+fn sync_user_term_payload_records(
+    connection: &Connection,
+) -> UserDbResult<Vec<SyncUserTermPayloadRecord>> {
+    let mut statement = connection.prepare(
         "SELECT input_code, text, reading, source, weight, status,
                 created_at_ms, updated_at_ms, last_used_at_ms
          FROM user_terms
@@ -94,10 +102,10 @@ fn sync_user_term_payload_records(db: &UserDb) -> UserDbResult<Vec<SyncUserTermP
 }
 
 fn sync_ranker_weight_payload_records(
-    db: &UserDb,
+    connection: &Connection,
 ) -> UserDbResult<Vec<SyncRankerWeightPayloadRecord>> {
-    let mut statement = db.connection.prepare(
-        "SELECT input_code, text, reading, frequency, recency_score, negative_score,
+    let mut statement = connection.prepare(
+        "SELECT input_code, text, reading, frequency, last_used_at_ms, negative_score,
                 context_kind, updated_at_ms
          FROM ranker_weights
          ORDER BY input_code, text, reading, context_kind",
@@ -109,9 +117,9 @@ fn sync_ranker_weight_payload_records(
 }
 
 fn sync_deleted_term_payload_records(
-    db: &UserDb,
+    connection: &Connection,
 ) -> UserDbResult<Vec<SyncDeletedTermPayloadRecord>> {
-    let mut statement = db.connection.prepare(
+    let mut statement = connection.prepare(
         "SELECT input_code, text, reading, updated_at_ms
          FROM user_terms
          WHERE status = 'deleted'
@@ -130,7 +138,7 @@ fn sync_deleted_term_payload_records(
 
     let mut records = Vec::with_capacity(deleted_terms.len());
     for (input_code, text, reading, updated_at_ms) in deleted_terms {
-        let tombstone = latest_deleted_tombstone(db, &input_code, &text, &reading)?;
+        let tombstone = latest_deleted_tombstone(connection, &input_code, &text, &reading)?;
         let (deleted_at_ms, reason) =
             tombstone.unwrap_or_else(|| (updated_at_ms, "manual_delete".to_owned()));
         records.push(SyncDeletedTermPayloadRecord {
@@ -146,23 +154,17 @@ fn sync_deleted_term_payload_records(
 }
 
 fn latest_deleted_tombstone(
-    db: &UserDb,
+    connection: &Connection,
     input_code: &str,
     text: &str,
     reading: &str,
 ) -> UserDbResult<Option<(i64, String)>> {
-    db.connection
+    connection
         .query_row(
             "SELECT deleted_at_ms, reason
              FROM deleted_terms
-             WHERE input_code_hash = ?1 AND text_hash = ?2 AND reading_hash = ?3
-             ORDER BY deleted_at_ms DESC, id DESC
-             LIMIT 1",
-            params![
-                stable_hash_hex(input_code),
-                stable_hash_hex(text),
-                stable_hash_hex(reading)
-            ],
+             WHERE input_code = ?1 AND text = ?2 AND reading = ?3",
+            params![input_code, text, reading],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .optional()
@@ -175,8 +177,12 @@ fn sync_user_term_payload_record_from_row(
     let source: String = row.get(3)?;
     let status: String = row.get(5)?;
 
-    let source = TermSource::from_str(&source).map_err(to_sqlite_conversion_failure)?;
-    let status = TermStatus::from_str(&status).map_err(to_sqlite_conversion_failure)?;
+    let source = source
+        .parse::<TermSource>()
+        .map_err(to_sqlite_conversion_failure)?;
+    let status = status
+        .parse::<TermStatus>()
+        .map_err(to_sqlite_conversion_failure)?;
 
     let weight: f64 = row.get(4)?;
     if !weight.is_finite() || weight < 0.0 {
@@ -218,14 +224,14 @@ fn sync_ranker_weight_payload_record_from_row(
         ));
     }
 
-    let recency_score: f64 = row.get(4)?;
-    if !recency_score.is_finite() || recency_score < 0.0 {
+    let last_used_at_ms: Option<i64> = row.get(4)?;
+    if last_used_at_ms.is_some_and(|value| value < 0) {
         return Err(rusqlite::Error::FromSqlConversionFailure(
             4,
-            rusqlite::types::Type::Real,
+            rusqlite::types::Type::Integer,
             Box::new(UserDbError::invalid_input(
-                "recency_score",
-                "value must be finite and non-negative",
+                "last_used_at_ms",
+                "value must be non-negative",
             )),
         ));
     }
@@ -247,7 +253,7 @@ fn sync_ranker_weight_payload_record_from_row(
         text: row.get(1)?,
         reading: row.get(2)?,
         frequency,
-        recency_score,
+        last_used_at_ms,
         negative_score,
         context_kind: row.get(6)?,
         updated_at_ms: row.get(7)?,
@@ -312,7 +318,11 @@ fn encode_ranker_weights_sync_payload(records: &[SyncRankerWeightPayloadRecord])
         output.push(',');
         push_json_i64_field(&mut output, "frequency", record.frequency);
         output.push(',');
-        push_json_number_field(&mut output, "recency_score", record.recency_score);
+        push_json_i64_field(
+            &mut output,
+            "recency_score",
+            record.last_used_at_ms.unwrap_or(0),
+        );
         output.push(',');
         push_json_number_field(&mut output, "negative_score", record.negative_score);
         output.push(',');

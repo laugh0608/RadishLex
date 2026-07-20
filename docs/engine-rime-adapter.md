@@ -121,9 +121,14 @@ Engine::candidates
   -> get_context
   -> convert context.menu candidates
 
-Engine::commit_candidate(index)
-  -> select candidate by key or index strategy
-  -> get_commit
+Engine::input_code
+  -> get_input
+  -> copy current UTF-8 input into an owned Rust String
+
+Engine::select_candidate(index)
+  -> select_candidate_on_current_page
+  -> get_commit if available
+  -> preserve updated composition when the selection only confirms one segment
 
 Engine::set_schema(schema)
   -> get_schema_list and require deployed schema
@@ -150,11 +155,12 @@ process teardown
 - CLI 在 Rime 命令结束后显式 shutdown；平台壳必须在进程 teardown 且所有 session 已释放后调用 `radishlex_rime_runtime_shutdown`。shutdown 可重复调用，仍有活动 session 时返回 `InvalidState`。
 - `RimeEngine` 保持 owner-thread-only；首个成功初始化的 session 固定进程 runtime owner thread，后续 Rime session 与 shutdown 必须回到该线程。进程锁用于串行化生命周期，不把 librime 变成任意线程可调用 API。
 
-需要在实现前确认的开放点：
+已固定的 adapter 决策：
 
-- Rime 候选选择应使用数字键模拟、page + select 组合，还是可用更直接的 API。实现前必须通过小型 smoke 记录确认。
-- `get_context` 返回的 composition cursor 单位是否能直接映射到 UTF-8 byte cursor；不能确认时先保守转换并测试中文、ASCII、混合输入。
-- schema 包部署和产品目录准备仍由平台安装流程固定；`deploy_on_start` 只用于显式开发 / smoke 配置，不得由不同活动 session 分别决定。
+- 当前页候选选择使用 `select_candidate_on_current_page`，不模拟数字键，也不让平台根据 page 自行换算 engine index；分段选择继续读取同一步更新后的 composition/commit。
+- `get_context` 的 composition cursor 经过 adapter 转换到 `Composition` 要求的 UTF-8 byte boundary，并覆盖 ASCII、中文和越界值；平台层再按宿主 API 需要转换为 UTF-16 索引。
+- `get_input` 只复制当前输入码字符串，用于 `ime-runtime` 的候选身份查询；返回值不作为 Rime 私有对象 ID 保存。
+- schema 包部署和产品目录准备由平台安装流程固定；`deploy_on_start` 只用于显式开发 / smoke 配置，不得由不同活动 session 分别决定。
 
 ## 数据目录策略
 
@@ -202,7 +208,7 @@ RadishLexRimeSessionOptions
 - `ime-ffi` 启用 `native-rime` feature 时，该入口会将 options 转为 `RimeEngineConfig` 并创建真实 `RimeEngine` session。
 - `ime-ffi` 内部使用 demo / Rime 可扩展 session engine 封装，平台端仍只持有 opaque `RadishLexSession*`。
 - 已初始化 Rime runtime 的进程级目录与 deploy 配置不一致时返回 `InvalidState`，即使当前活动 session 为零也不重置已有 runtime；如需更换配置，必须先在零 session 状态显式 shutdown。
-- 当前已通过 ignored native smoke 覆盖 `radishlex_session_new_rime -> push_key -> snapshot -> commit_candidate`、双 session peer release 和不存在 schema 拒绝；该 smoke 需要显式传入隔离 Rime shared / user data 目录。
+- 当前已通过 ignored native smoke 覆盖 `radishlex_session_new_rime -> key result -> snapshot -> select_candidate`、完整与分段候选选择、主要编辑/导航按键、双 session peer release 和不存在 schema 拒绝；该 smoke 需要显式传入隔离 Rime shared / user data 目录。
 
 ## 候选转换规则
 
@@ -240,6 +246,7 @@ Rime candidate 转 RadishLex candidate 时只保留稳定字段：
 ```text
 radishlex-ime-cli demo <input-code> [candidate-index]
 radishlex-ime-cli rime --schema luna_pinyin --shared-data <path> --user-data <path> [--key <name> ...] <input-code> [candidate-index]
+radishlex-ime-cli rime snapshot --schema luna_pinyin --shared-data <path> --user-data <fresh-empty-path> --deploy-on-start <0|1> [--rank-db <path>] [--context <kind>] <input-code>
 ```
 
 规则：
@@ -247,10 +254,12 @@ radishlex-ime-cli rime --schema luna_pinyin --shared-data <path> --user-data <pa
 - `demo` 保持无 native 依赖，继续作为默认 smoke。
 - `rime` 只在启用 `native-rime` 且本机依赖可用时编译或运行。
 - `rime --key <name>` 仅作为 CLI smoke 调试入口，用于在输入码后追加 `page-down`、`page-up`、方向键等命名键事件。
+- `rime snapshot` 只接受受限输入码并拒绝选择参数和命名键；它通过既有输入 session 取得候选，若输入字符意外产生 commit 则失败。
+- snapshot 是 CLI 层的证据编排，不新增 `Engine` trait 能力；带 `--rank-db` 时复用产品个人化 runtime，而不是在 adapter 内实现排序或学习。
 - CLI 输出继续包含 schema、composition、candidates、commit。
 - 没有真实 Rime 环境时，测试只验证参数解析和错误提示，不伪造真实 Rime 输出。
 
-命令参数、输出字段和退出码说明见 `docs/cli.md`。
+命令参数、输出字段和退出码说明见 [CLI 说明](cli.md)；非选择快照与精确学习读模型见 [学习取证 CLI 参考](cli-learning-evidence.md)。
 
 ## 验证分层
 
@@ -284,14 +293,12 @@ RADISHLEX_RIME_SHARED_DATA=<path> RADISHLEX_RIME_USER_DATA=<path> cargo test -p 
 
 ## 已验证能力与未闭合边界
 
-已有实现与历史 smoke 已证明真实 Rime adapter 能完成 composition、候选、翻页、选择、commit、错误映射和 ranker 接入，`ime-ffi` 也可在显式 `native-rime` feature 下创建真实 Rime session。详细完成记录留在 devlog，不在本文持续追加。
+已有实现与历史 smoke 已证明真实 Rime adapter 能完成 composition、稳定 input code、候选、翻页、当前页选择、commit、错误映射和 ranker 接入，`ime-ffi` 也可在显式 `native-rime` feature 下创建真实 Rime session。详细完成记录留在 devlog，不在本文持续追加。
 
-ABI contract v2 已闭合 `KeyOutcome` 的 `consumed`、即时 commit、同事件 snapshot 和 Rust-owned result 生命周期；`crates/ime-ffi/include/radishlex_input.h` 已通过 C11 与 Objective-C 编译测试。
+当前 ABI contract v6 保留 v5 已闭合的产品个人化 Rime session、学习上下文、display/engine index、个人化状态、本地导入批次关联与全部既有布局；新增 Manager 产品状态摘要不改变 Rime adapter 或输入热路径语义。`crates/ime-ffi/include/radishlex_input.h` 已通过 C11 与 Objective-C 编译测试。
 
 进程级 runtime 已闭合 setup / initialize / explicit shutdown / finalize、多 session 共享、零 session 间隙、配置冲突和 deploy / session / schema 失败回滚；schema 创建与切换同时验证已部署列表和选择后回读。stub API 测试可精确复验调用次数，`ime-ffi` 另有需要隔离 Rime 数据目录的 gated 单/双 session 与无效 schema smoke。
 
-真实应用输入 smoke 前仍必须闭合：
+R01A build 32 已在真实 TextEdit/Codex 中完成基础输入、双 client、进程重启和离线证据。R01B build 34 又从产品个人化 session 完成真实选择重排、进程重启保持、删除/恢复、隐私/unknown/P0 零写入，以及 secure 场景的 macOS 系统路由旁路与数据库零增量证据。当前 adapter 不再有 M1/R01B 真实输入 smoke 缺口。
 
-- macOS InputMethodKit 真实应用 smoke。
-
-这些未闭合项属于 M1 macOS 离线输入 Alpha，不应再被同步后端工作延后。最终发布包中的 `librime` 与 schema 分发属于 M4。
+M2 manager 本地产品模式已关闭，不改变 adapter 真相源；当前 M3 同步工作不进入输入热路径，最终发布包中的 `librime` 与 schema 分发仍属于 M4。

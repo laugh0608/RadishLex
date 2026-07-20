@@ -8,18 +8,40 @@ import 'package:radishlex_manager/src/bridge/ffi_manager_runtime_diagnostics.dar
 import 'package:radishlex_manager/src/bridge/ffi_manager_sync_mapper.dart';
 import 'package:radishlex_manager/src/bridge/fixture_manager_bridge.dart';
 import 'package:radishlex_manager/src/bridge/manager_bridge_factory.dart';
+import 'package:radishlex_manager/src/bridge/manager_bridge.dart';
+import 'package:radishlex_manager/src/bridge/manager_platform_control.dart';
 import 'package:radishlex_manager/src/bridge/manager_settings_store.dart';
 import 'package:radishlex_manager/src/models/manager_models.dart';
 
-import 'fixtures/sync_bridge_command_contract_fixtures.dart';
-import 'fixtures/sync_ffi_command_boundary_fixtures.dart';
-
 void main() {
-  test('factory keeps fixture bridge when no local userdb is configured', () {
-    final bridge = createDefaultManagerBridge(environment: const {});
+  test('factory enables fixture only through explicit demo mode', () async {
+    final bootstrap = await createDefaultManagerBootstrap(mode: 'demo');
 
-    expect(bridge, isA<FixtureManagerBridge>());
+    expect(bootstrap.mode, ManagerRuntimeMode.demo);
+    expect(bootstrap.bridge, isA<FixtureManagerBridge>());
   });
+
+  test(
+    'product bootstrap surfaces platform failure without fixture fallback',
+    () async {
+      final bootstrap = await createDefaultManagerBootstrap(
+        platformControl: const _FailingPlatformControl(),
+      );
+
+      expect(bootstrap.mode, ManagerRuntimeMode.product);
+      expect(bootstrap.bridge, isNot(isA<FixtureManagerBridge>()));
+      await expectLater(
+        bootstrap.bridge.loadSnapshot(),
+        throwsA(
+          isA<ManagerBridgeFailure>().having(
+            (failure) => failure.code,
+            'code',
+            'platform_paths_unavailable',
+          ),
+        ),
+      );
+    },
+  );
 
   test(
     'ffi manager bridge maps local userdb summaries into manager snapshot',
@@ -36,6 +58,8 @@ void main() {
       expect(native.listedDbPath, '/tmp/radishlex-userdb.sqlite');
       expect(snapshot.dictionaryTerms.single.text, '萝卜词核');
       expect(snapshot.dictionaryTerms.single.source, 'manual');
+      expect(snapshot.dictionaryTerms.single.status, 'active');
+      expect(snapshot.deletedTerms.single.text, '合成删除词');
       expect(snapshot.learningSummary.userTerms, 1);
       expect(snapshot.learningSummary.deletedTerms, 2);
       expect(snapshot.learningSummary.selectionEvents, 4);
@@ -45,6 +69,11 @@ void main() {
       expect(snapshot.sync.state, SyncUiState.backendUnavailable);
       expect(snapshot.sync.syncableObjects, 4);
       expect(snapshot.sync.localOnlyEvents, 7);
+      expect(snapshot.sync.device.backendId, 'apple-secure-enclave-p256-v1');
+      expect(
+        snapshot.sync.device.capabilityStatus,
+        'user_sync_closed_current_phase',
+      );
       expect(snapshot.sync.device.productionGate, 'blocked');
       expect(snapshot.explanations.single.signals, contains('user=2.000'));
       expect(snapshot.explanations.single.signals, contains('freq=0.350'));
@@ -63,6 +92,12 @@ void main() {
       expect(text, contains('sync.state_source: 设备 production gate 为 blocked'));
       expect(text, contains('sync.entry_state: backend_unavailable'));
       expect(text, contains('sync.entry_blocker: backend_unavailable'));
+      expect(text, contains('device.backend: apple-secure-enclave-p256-v1'));
+      expect(
+        text,
+        contains('device.capability: user_sync_closed_current_phase'),
+      );
+      expect(text, contains('device.production_gate: blocked'));
       expect(text, contains('sync.local_evidence_source: not_recorded'));
       expect(text, contains('sync.recovery_status: recovery_code_flow_closed'));
       expect(
@@ -95,6 +130,43 @@ void main() {
     },
   );
 
+  test('native sync product status maps allowlisted closed capability', () {
+    final device = managerDeviceSecuritySummaryFromNative(
+      _nativeSyncProductStatus(),
+    );
+
+    expect(device.backendId, 'apple-secure-enclave-p256-v1');
+    expect(device.capabilityStatus, 'user_sync_closed_current_phase');
+    expect(device.productionGate, 'blocked');
+  });
+
+  test('native sync product status rejects malformed or enabling claims', () {
+    final malformedStatuses = [
+      _nativeSyncProductStatus(version: 2),
+      _nativeSyncProductStatus(signingCompiled: 2),
+      _nativeSyncProductStatus(blocker: 5),
+      _nativeSyncProductStatus(productQualified: 0),
+      _nativeSyncProductStatus(
+        signingProductQualified: 1,
+        signingBackupMigratable: 1,
+        keyAgreementRuntimeQualified: 1,
+        keyAgreementProductQualified: 1,
+        productQualified: 1,
+        blocker: 7,
+      ),
+      _nativeSyncProductStatus(userSyncEnabled: 1),
+      _nativeSyncProductStatus(signingBackend: 99),
+      _nativeSyncProductStatus(keyAgreementBackend: 99),
+    ];
+
+    for (final status in malformedStatuses) {
+      final device = managerDeviceSecuritySummaryFromNative(status);
+      expect(device.backendId, 'unavailable');
+      expect(device.capabilityStatus, 'native_sync_product_status_invalid');
+      expect(device.productionGate, 'blocked');
+    }
+  });
+
   test('ffi manager bridge delegates delete/import/export calls', () async {
     final native = _FakeNativeBinding();
     final bridge = FfiManagerBridge(
@@ -104,6 +176,9 @@ void main() {
 
     await bridge.deleteUserTerm(
       const UserTermKey(inputCode: 'luobo', text: '萝卜词核', reading: ''),
+    );
+    await bridge.restoreUserTerm(
+      const UserTermKey(inputCode: 'huifu', text: '合成删除词', reading: ''),
     );
     final preview = await bridge.inspectDictionaryImport('/tmp/import.tsv');
     final importResult = await bridge.importDictionaryFile(
@@ -116,6 +191,9 @@ void main() {
     expect(native.deletedInputCode, 'luobo');
     expect(native.deletedText, '萝卜词核');
     expect(native.deletedReading, isNull);
+    expect(native.restoredInputCode, 'huifu');
+    expect(native.restoredText, '合成删除词');
+    expect(native.restoredReading, isNull);
     expect(preview.format, 'dictionary.user_terms.v1');
     expect(preview.syncClass, 'P2 encrypted sync');
     expect(importResult.importedTerms, 2);
@@ -181,10 +259,10 @@ void main() {
   );
 
   test(
-    'ffi manager bridge keeps future sync command capability absent',
+    'product platform privacy is authoritative and settings are secured',
     () async {
       final tempDir = Directory.systemTemp.createTempSync(
-        'radishlex-manager-sync-command-contract-test-',
+        'radishlex-manager-platform-settings-test-',
       );
       addTearDown(() {
         if (tempDir.existsSync()) {
@@ -192,63 +270,134 @@ void main() {
         }
       });
       final settingsFile = '${tempDir.path}/manager-settings.json';
+      final platform = _RecordingPlatformControl();
       final bridge = FfiManagerBridge(
         dbPath: '/tmp/radishlex-userdb.sqlite',
         settingsFilePath: settingsFile,
         native: _FakeNativeBinding(),
+        platformControl: platform,
       );
 
-      final snapshot = await bridge.saveSettingsDraft(
+      final saved = await bridge.saveSettingsDraft(
         const ManagerSettingsDraft(
-          serverEndpoint: 'https://localhost:7319',
-          retainSyncConfig: true,
-          privacyMode: false,
-          diagnosticsExport: true,
-          deploymentEvidenceRecorded: true,
-          accessTokenConfigured: true,
-          deploymentEvidenceSource: managerDeploymentEvidenceLocalSmoke,
+          serverEndpoint: '',
+          retainSyncConfig: false,
+          privacyMode: true,
+          diagnosticsExport: false,
+          deploymentEvidenceRecorded: false,
         ),
       );
-      final report = await bridge.loadDiagnosticsReport();
-      final text = report.toRedactedText();
-      final settingsJson = File(settingsFile).readAsStringSync();
 
-      expect(snapshot.sync.state.canEnableUserSync, isFalse);
-      expect(
-        _diagnosticsValue(report, 'sync.action_command_format'),
-        managerSyncActionCommandPreviewFormat,
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.action_command_execution_statuses'),
-        contains('not_executable_current_phase'),
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.action_request_statuses'),
-        contains('request_not_built_current_phase'),
-      );
-      expect(
-        _diagnosticsValue(report, 'sync.action_result_statuses'),
-        contains('result_not_available_current_phase'),
-      );
+      expect(platform.privacyMode, isTrue);
+      expect(platform.privacyWrites, [true]);
+      expect(platform.secureCalls, 1);
+      expect(saved.settings.draft.privacyMode, isTrue);
 
-      expect(
-        syncFfiCommandBoundaryCurrentNativeSymbols,
-        isEmpty,
-        reason: 'sync command native symbols stay design-only',
-      );
-      expect(text, isNot(contains('future_manager_sync_ffi_command_request')));
-      expect(text, isNot(contains('future_manager_sync_ffi_command_result')));
-      expect(text, isNot(contains('future_manager_bridge_command_request')));
-      expect(text, isNot(contains('future_manager_bridge_command_result')));
-      expect(settingsJson, isNot(contains('action_command')));
-      expect(settingsJson, isNot(contains('future_manager_sync_ffi')));
-      expect(settingsJson, isNot(contains('join_request_authorization')));
-      for (final fragment in syncBridgeCommandContractForbiddenFragments) {
-        expect(text, isNot(contains(fragment)), reason: fragment);
-        expect(settingsJson, isNot(contains(fragment)), reason: fragment);
-      }
+      platform.privacyMode = false;
+      final reloaded = await bridge.loadSnapshot();
+      expect(reloaded.settings.draft.privacyMode, isFalse);
     },
   );
+
+  test('product settings failure rolls privacy mode back', () async {
+    final tempDir = Directory.systemTemp.createTempSync(
+      'radishlex-manager-platform-rollback-test-',
+    );
+    addTearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+    final settingsFile = '${tempDir.path}/manager-settings.json';
+    final platform = _RecordingPlatformControl(failSecure: true);
+    final bridge = FfiManagerBridge(
+      dbPath: '/tmp/radishlex-userdb.sqlite',
+      settingsFilePath: settingsFile,
+      native: _FakeNativeBinding(),
+      platformControl: platform,
+    );
+
+    await expectLater(
+      bridge.saveSettingsDraft(
+        const ManagerSettingsDraft(
+          serverEndpoint: '',
+          retainSyncConfig: false,
+          privacyMode: true,
+          diagnosticsExport: false,
+          deploymentEvidenceRecorded: false,
+        ),
+      ),
+      throwsA(
+        isA<ManagerBridgeFailure>().having(
+          (failure) => failure.code,
+          'code',
+          'local_file_permissions_failed',
+        ),
+      ),
+    );
+
+    expect(platform.privacyMode, isFalse);
+    expect(platform.privacyPresent, isFalse);
+    expect(platform.privacyWrites, [true, false]);
+    expect(
+      File(settingsFile).readAsStringSync(),
+      contains('"privacy_mode": false'),
+    );
+  });
+
+  test('ffi manager bridge keeps sync disabled and secrets redacted', () async {
+    final tempDir = Directory.systemTemp.createTempSync(
+      'radishlex-manager-sync-command-contract-test-',
+    );
+    addTearDown(() {
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+    final settingsFile = '${tempDir.path}/manager-settings.json';
+    final bridge = FfiManagerBridge(
+      dbPath: '/tmp/radishlex-userdb.sqlite',
+      settingsFilePath: settingsFile,
+      native: _FakeNativeBinding(),
+    );
+
+    final snapshot = await bridge.saveSettingsDraft(
+      const ManagerSettingsDraft(
+        serverEndpoint: 'https://localhost:7319',
+        retainSyncConfig: true,
+        privacyMode: false,
+        diagnosticsExport: true,
+        deploymentEvidenceRecorded: true,
+        accessTokenConfigured: true,
+        deploymentEvidenceSource: managerDeploymentEvidenceLocalSmoke,
+      ),
+    );
+    final report = await bridge.loadDiagnosticsReport();
+    final text = report.toRedactedText();
+    final settingsJson = File(settingsFile).readAsStringSync();
+
+    expect(snapshot.sync.state.canEnableUserSync, isFalse);
+    expect(
+      _diagnosticsValue(report, 'sync.interaction_statuses'),
+      contains('closed_current_phase'),
+    );
+    expect(settingsJson, isNot(contains('action_command')));
+    expect(settingsJson, isNot(contains('join_request_authorization')));
+    for (final fragment in [
+      'Bearer ',
+      'access_token_value',
+      'recovery_code=',
+      'short_code=',
+      'private_key=',
+      'signature_bytes=',
+      'wrapped_material=',
+      'request_body',
+      'response_body',
+    ]) {
+      expect(text, isNot(contains(fragment)), reason: fragment);
+      expect(settingsJson, isNot(contains(fragment)), reason: fragment);
+    }
+  });
 
   test('settings store persists versioned deployment evidence draft', () {
     final tempDir = Directory.systemTemp.createTempSync(
@@ -428,12 +577,14 @@ void main() {
         text: '萝卜词核',
         reading: '',
         source: nativeTermSourceManualImport,
-        status: 1,
+        status: nativeTermStatusSuppressed,
         weight: 1.25,
         createdAtMs: 0,
         updatedAtMs: 0,
         lastUsedAtMs: 0,
         lastUsedAtPresent: false,
+        importBatchId: 9,
+        importBatchIdPresent: true,
       ),
     );
     final learning = managerLearningSummaryFromNative(
@@ -517,7 +668,9 @@ void main() {
     );
 
     expect(term.source, 'import');
+    expect(term.status, 'suppressed');
     expect(term.lastUsed, '未使用');
+    expect(term.importBatchId, 9);
     expect(learning.lastUpdated, '无记录');
     expect(sync.state, SyncUiState.backendUnavailable);
     expect(managerSyncStateLabel(sync.state), '平台签名 backend 不可用');
@@ -540,10 +693,7 @@ void main() {
     );
     expect(explanation.signals, contains('negative=-0.500'));
     expect(managerRankExplainReading(term), isNull);
-    expect(
-      diagnostics.nativeLibrary,
-      'RADISHLEX_MANAGER_FFI_LIBRARY configured',
-    );
+    expect(diagnostics.nativeLibrary, 'app bundle Frameworks native library');
     expect(diagnostics.syncEndpoint, 'sync endpoint draft configured');
     expect(
       fallbackFfiManagerSettingsDraft(
@@ -561,11 +711,58 @@ String _diagnosticsValue(ManagerDiagnosticsReport report, String key) {
       .value;
 }
 
+NativeSyncProductStatus _nativeSyncProductStatus({
+  int version = 1,
+  int signingBackend = 1,
+  int signingAlgorithm = 1,
+  int signingCompiled = 1,
+  int signingRuntimeAvailable = 1,
+  int signingCanCreate = 1,
+  int signingCanSign = 1,
+  int signingExportable = 0,
+  int signingHardwareBacked = 1,
+  int signingUserPresenceRequired = 0,
+  int signingBackupMigratable = 0,
+  int signingProductQualified = 1,
+  int keyAgreementBackend = 1,
+  int keyAgreementCompiled = 1,
+  int keyAgreementRuntimeQualified = 1,
+  int keyAgreementProductQualified = 1,
+  int productQualified = 1,
+  int userSyncEnabled = 0,
+  int blocker = 7,
+}) {
+  return NativeSyncProductStatus(
+    version: version,
+    signingBackend: signingBackend,
+    signingAlgorithm: signingAlgorithm,
+    signingCompiled: signingCompiled,
+    signingRuntimeAvailable: signingRuntimeAvailable,
+    signingCanCreate: signingCanCreate,
+    signingCanSign: signingCanSign,
+    signingExportable: signingExportable,
+    signingHardwareBacked: signingHardwareBacked,
+    signingUserPresenceRequired: signingUserPresenceRequired,
+    signingBackupMigratable: signingBackupMigratable,
+    signingProductQualified: signingProductQualified,
+    keyAgreementBackend: keyAgreementBackend,
+    keyAgreementCompiled: keyAgreementCompiled,
+    keyAgreementRuntimeQualified: keyAgreementRuntimeQualified,
+    keyAgreementProductQualified: keyAgreementProductQualified,
+    productQualified: productQualified,
+    userSyncEnabled: userSyncEnabled,
+    blocker: blocker,
+  );
+}
+
 final class _FakeNativeBinding implements RadishLexManagerNativeBinding {
   String? listedDbPath;
   String? deletedInputCode;
   String? deletedText;
   String? deletedReading;
+  String? restoredInputCode;
+  String? restoredText;
+  String? restoredReading;
   String? importedSourceName;
   String? explainInputCode;
   String? explainCandidateText;
@@ -589,6 +786,21 @@ final class _FakeNativeBinding implements RadishLexManagerNativeBinding {
         updatedAtMs: 1783123260000,
         lastUsedAtMs: 1783123260000,
         lastUsedAtPresent: true,
+        importBatchId: 7,
+        importBatchIdPresent: true,
+      ),
+    ];
+  }
+
+  @override
+  List<NativeDeletedTermRecord> listDeletedTerms(String dbPath) {
+    return const [
+      NativeDeletedTermRecord(
+        inputCode: 'huifu',
+        text: '合成删除词',
+        reading: null,
+        deletedAtMs: 1783123260000,
+        reason: 'manual_delete',
       ),
     ];
   }
@@ -603,6 +815,18 @@ final class _FakeNativeBinding implements RadishLexManagerNativeBinding {
     deletedInputCode = inputCode;
     deletedText = text;
     deletedReading = reading;
+  }
+
+  @override
+  void restoreUserTerm({
+    required String dbPath,
+    required String inputCode,
+    required String text,
+    required String? reading,
+  }) {
+    restoredInputCode = inputCode;
+    restoredText = text;
+    restoredReading = reading;
   }
 
   @override
@@ -711,6 +935,11 @@ final class _FakeNativeBinding implements RadishLexManagerNativeBinding {
   }
 
   @override
+  NativeSyncProductStatus syncProductStatus() {
+    return _nativeSyncProductStatus();
+  }
+
+  @override
   NativeRankExplainSummary rankExplain({
     required String dbPath,
     required String inputCode,
@@ -739,5 +968,78 @@ final class _FakeNativeBinding implements RadishLexManagerNativeBinding {
       suppressedPenalty: 0.0,
       deletedPenalty: 0.0,
     );
+  }
+}
+
+final class _FailingPlatformControl implements ManagerPlatformControl {
+  const _FailingPlatformControl();
+
+  @override
+  Future<ManagerProductPaths> resolveProductPaths() {
+    throw const ManagerPlatformException(
+      code: 'platform_paths_unavailable',
+      message: 'synthetic platform path failure',
+    );
+  }
+
+  @override
+  Future<ManagerPrivacyModeState> readPrivacyModeState() async =>
+      const ManagerPrivacyModeState(present: false, enabled: false);
+
+  @override
+  Future<void> restorePrivacyModeState(ManagerPrivacyModeState state) async {}
+
+  @override
+  Future<void> secureLocalFiles() async {}
+
+  @override
+  Future<void> writePrivacyMode(bool enabled) async {}
+}
+
+final class _RecordingPlatformControl implements ManagerPlatformControl {
+  _RecordingPlatformControl({this.failSecure = false});
+
+  bool privacyMode = false;
+  bool privacyPresent = false;
+  final bool failSecure;
+  final List<bool> privacyWrites = [];
+  int secureCalls = 0;
+
+  @override
+  Future<ManagerProductPaths> resolveProductPaths() async {
+    return const ManagerProductPaths(
+      userDbPath: '/tmp/userdb.sqlite3',
+      settingsFilePath: '/tmp/manager-settings.json',
+      nativeLibraryPath: '/tmp/libradishlex_ime_ffi.dylib',
+    );
+  }
+
+  @override
+  Future<ManagerPrivacyModeState> readPrivacyModeState() async =>
+      ManagerPrivacyModeState(present: privacyPresent, enabled: privacyMode);
+
+  @override
+  Future<void> restorePrivacyModeState(ManagerPrivacyModeState state) async {
+    privacyWrites.add(state.enabled);
+    privacyPresent = state.present;
+    privacyMode = state.enabled;
+  }
+
+  @override
+  Future<void> secureLocalFiles() async {
+    secureCalls += 1;
+    if (failSecure) {
+      throw const ManagerPlatformException(
+        code: 'local_file_permissions_failed',
+        message: 'synthetic permission failure',
+      );
+    }
+  }
+
+  @override
+  Future<void> writePrivacyMode(bool enabled) async {
+    privacyWrites.add(enabled);
+    privacyPresent = true;
+    privacyMode = enabled;
   }
 }

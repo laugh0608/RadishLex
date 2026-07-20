@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -27,8 +28,9 @@ func TestMetadataHandlersCreateDomainReadDeviceAndSaveJoinRequest(t *testing.T) 
 		ActiveKeyID:     "epoch-key-a",
 		FirstDevice: DeviceMetadata{
 			DeviceID:                "device-a",
+			SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 			SigningPublicKeyID:      "signing-key-a",
-			SigningPublicKey:        []byte("signing-public-key-a"),
+			SigningPublicKey:        signingPublicKeyForHandlerTest("device-a"),
 			KeyAgreementPublicKeyID: "agreement-key-a",
 			KeyAgreementPublicKey:   []byte("agreement-public-key-a"),
 			Status:                  string(storage.DeviceActive),
@@ -44,6 +46,25 @@ func TestMetadataHandlersCreateDomainReadDeviceAndSaveJoinRequest(t *testing.T) 
 	decodeResponse(t, createResponse, &domainBody)
 	if domainBody.Domain.DomainID != "domain-a" || domainBody.Domain.CurrentKeyEpoch != 1 {
 		t.Fatalf("unexpected domain response: %#v", domainBody)
+	}
+	lifecycleResponse := httptest.NewRecorder()
+	handler.ServeHTTP(lifecycleResponse, httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/lifecycle", nil))
+	if lifecycleResponse.Code != http.StatusOK {
+		t.Fatalf("unexpected lifecycle status: %d body=%s", lifecycleResponse.Code, lifecycleResponse.Body.String())
+	}
+	var lifecycleBody LifecycleSnapshotResponse
+	decodeResponse(t, lifecycleResponse, &lifecycleBody)
+	if len(lifecycleBody.Entries) != 1 || lifecycleBody.Entries[0].EventType != storage.LifecycleInitialDevice || lifecycleBody.Entries[0].KeyEpoch != 1 {
+		t.Fatalf("unexpected initial lifecycle response: %#v", lifecycleBody)
+	}
+	emptyLifecycleResponse := httptest.NewRecorder()
+	handler.ServeHTTP(emptyLifecycleResponse, httptest.NewRequest(
+		http.MethodGet,
+		PrefixV1+"/domains/domain-a/lifecycle/events?after_cursor="+lifecycleBody.NextCursor+"&limit=10",
+		nil,
+	))
+	if emptyLifecycleResponse.Code != http.StatusOK {
+		t.Fatalf("unexpected lifecycle discovery status: %d body=%s", emptyLifecycleResponse.Code, emptyLifecycleResponse.Body.String())
 	}
 
 	stateResponse := httptest.NewRecorder()
@@ -70,8 +91,9 @@ func TestMetadataHandlersCreateDomainReadDeviceAndSaveJoinRequest(t *testing.T) 
 	joinRequest := CreateJoinRequestRequest{
 		JoinRequestID:           "join-a",
 		DeviceID:                "device-b",
+		SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 		SigningPublicKeyID:      "signing-key-b",
-		SigningPublicKey:        []byte("signing-public-key-b"),
+		SigningPublicKey:        signingPublicKeyForHandlerTest("device-b"),
 		KeyAgreementPublicKeyID: "agreement-key-b",
 		KeyAgreementPublicKey:   []byte("agreement-public-key-b"),
 		Challenge:               []byte("join-challenge"),
@@ -106,6 +128,35 @@ func TestMetadataHandlersCreateDomainReadDeviceAndSaveJoinRequest(t *testing.T) 
 	decodeResponse(t, pendingDeviceResponse, &deviceBody)
 	if deviceBody.DeviceID != "device-b" || deviceBody.Status != storage.DevicePending {
 		t.Fatalf("join request should create a pending device, got %#v", deviceBody)
+	}
+}
+
+func TestDeviceRevocationHandlerAppendsLifecycleCutoff(t *testing.T) {
+	store := storage.NewMemoryStore()
+	createDomainForObjectHandlerTest(t, store, "domain-a", "device-a", 1)
+	revocation := storage.DeviceRevocation{
+		DomainID: "domain-a", RevokedDeviceID: "device-a", RevokerDeviceID: "device-a",
+		PreviousKeyEpoch: 1, NewKeyEpoch: 2, Reason: "device_lost", CreatedAtMs: 20,
+	}
+	signRevocationForHandlerTest(&revocation)
+	request := DeviceRevocationRequest{
+		RevokerDeviceID: revocation.RevokerDeviceID, PreviousKeyEpoch: revocation.PreviousKeyEpoch,
+		NewKeyEpoch: revocation.NewKeyEpoch, Reason: revocation.Reason, CreatedAtMs: revocation.CreatedAtMs,
+		SignatureSchemaVersion: revocation.SignatureSchemaVersion,
+		SignatureAlgorithm:     revocation.SignatureAlgorithm, SignatureKeyID: revocation.SignatureKeyID,
+		Signature: revocation.Signature,
+	}
+	handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+	response := performJSONRequest(t, handler, http.MethodPost, PrefixV1+"/domains/domain-a/devices/device-a/revocations", request)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("unexpected revocation status: %d body=%s", response.Code, response.Body.String())
+	}
+	snapshot, err := store.LifecycleSnapshot(context.Background(), "domain-a")
+	if err != nil {
+		t.Fatalf("read lifecycle after revocation: %v", err)
+	}
+	if len(snapshot.Events) != 2 || snapshot.Events[1].RejectFromObjectChangeSequence != 1 || snapshot.Domain.CurrentKeyEpoch != 2 {
+		t.Fatalf("unexpected revocation lifecycle snapshot: %#v", snapshot)
 	}
 }
 
@@ -187,16 +238,17 @@ func TestJoinAuthorizationHandlerPassesSignedMetadataToStorage(t *testing.T) {
 			Signature:                   []byte("signature"),
 		},
 		Wrapping: DeviceWrappingRequest{
-			AuthorizerDeviceID: "device-a",
-			RecipientDeviceID:  "device-b",
-			KeyEpoch:           1,
-			WrappingKeyID:      "wrapping-key-b",
-			Algorithm:          storage.AlgorithmXChaCha20Poly1305HKDFSHA256,
-			Nonce:              []byte("nonce"),
-			WrappedKeyLen:      int64(len("wrapped-key")),
-			CiphertextHash:     "sha256:wrapped",
-			CreatedAtMs:        200,
-			Signature:          []byte("wrapping-signature"),
+			AuthorizerDeviceID:         "device-a",
+			RecipientDeviceID:          "device-b",
+			RecipientKeyAgreementKeyID: "agreement-key-b",
+			KeyEpoch:                   1,
+			WrappingKeyID:              "wrapping-key-b",
+			Algorithm:                  storage.AlgorithmXChaCha20Poly1305HKDFSHA256,
+			Nonce:                      []byte("nonce"),
+			WrappedKeyLen:              int64(len("wrapped-key")),
+			CiphertextHash:             "sha256:wrapped",
+			CreatedAtMs:                200,
+			Signature:                  []byte("wrapping-signature"),
 		},
 		WrappedKey: []byte("wrapped-key"),
 	}
@@ -219,6 +271,98 @@ func TestJoinAuthorizationHandlerPassesSignedMetadataToStorage(t *testing.T) {
 	}
 }
 
+func TestDeviceWrappedEpochHandlerRequiresMatchingRecipientAndReturnsOnlyCiphertext(t *testing.T) {
+	store := &wrappedEpochStoreStub{}
+	handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+	path := PrefixV1 + "/domains/domain-a/devices/device-b/wrapped-epochs/2?wrapping_key_id=wrapping-key-b-2"
+
+	missingIdentity := httptest.NewRequest(http.MethodGet, path, nil)
+	missingResponse := httptest.NewRecorder()
+	handler.ServeHTTP(missingResponse, missingIdentity)
+	if missingResponse.Code != http.StatusForbidden || store.calls != 0 {
+		t.Fatalf("missing recipient identity should fail before storage: status=%d calls=%d", missingResponse.Code, store.calls)
+	}
+
+	wrongIdentity := httptest.NewRequest(http.MethodGet, path, nil)
+	wrongIdentity.Header.Set(deviceIDHeader, "device-a")
+	wrongResponse := httptest.NewRecorder()
+	handler.ServeHTTP(wrongResponse, wrongIdentity)
+	if wrongResponse.Code != http.StatusForbidden || store.calls != 0 {
+		t.Fatalf("wrong recipient identity should fail before storage: status=%d calls=%d", wrongResponse.Code, store.calls)
+	}
+
+	valid := httptest.NewRequest(http.MethodGet, path, nil)
+	valid.Header.Set(deviceIDHeader, "device-b")
+	validResponse := httptest.NewRecorder()
+	handler.ServeHTTP(validResponse, valid)
+	if validResponse.Code != http.StatusOK || store.calls != 1 {
+		t.Fatalf("unexpected wrapped epoch response: status=%d calls=%d body=%s", validResponse.Code, store.calls, validResponse.Body.String())
+	}
+	var body DeviceWrappedEpochResponse
+	decodeResponse(t, validResponse, &body)
+	if body.SchemaVersion != 1 || body.DomainID != "domain-a" || body.RecipientDeviceID != "device-b" ||
+		body.RecipientKeyAgreementKeyID != "agreement-key-b" || body.KeyEpoch != 2 ||
+		body.WrappingKeyID != "wrapping-key-b-2" || string(body.WrappedKey) != "wrapped-key" {
+		t.Fatalf("unexpected wrapped epoch body: %#v", body)
+	}
+}
+
+func TestEpochDistributionHandlerRequiresMatchingDistributorAndPassesBoundedBatch(t *testing.T) {
+	store := &epochDistributionStoreStub{}
+	handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+	request := EpochDistributionRequest{
+		DistributorDeviceID: "device-a",
+		KeyEpoch:            2,
+		Records: []EpochDistributionRecordRequest{{
+			RecipientDeviceID:          "device-a",
+			RecipientKeyAgreementKeyID: "agreement-key-a",
+			WrappingKeyID:              "epoch-2-device-a",
+			Algorithm:                  storage.AlgorithmWrappedEpochP256ECDHV1,
+			Nonce:                      []byte("synthetic-nonce-24-byte"),
+			WrappedKeyLen:              int64(len("wrapped-key")),
+			CiphertextHash:             "synthetic-hash",
+			CreatedAtMs:                200,
+			SignatureSchemaVersion:     1,
+			SignatureAlgorithm:         "ed25519-v1",
+			SignatureKeyID:             "signing-key-a",
+			Signature:                  []byte("signature"),
+			WrappedKey:                 []byte("wrapped-key"),
+		}},
+	}
+	body, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("encode distribution request: %v", err)
+	}
+	path := PrefixV1 + "/domains/domain-a/epoch-distributions"
+
+	wrong := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(body))
+	wrong.Header.Set("Content-Type", "application/json")
+	wrong.Header.Set(deviceIDHeader, "device-b")
+	wrongResponse := httptest.NewRecorder()
+	handler.ServeHTTP(wrongResponse, wrong)
+	if wrongResponse.Code != http.StatusForbidden || store.calls != 0 {
+		t.Fatalf("wrong distributor identity should fail before storage: status=%d calls=%d", wrongResponse.Code, store.calls)
+	}
+
+	valid := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(body))
+	valid.Header.Set("Content-Type", "application/json")
+	valid.Header.Set(deviceIDHeader, "device-a")
+	validResponse := httptest.NewRecorder()
+	handler.ServeHTTP(validResponse, valid)
+	if validResponse.Code != http.StatusCreated || store.calls != 1 {
+		t.Fatalf("unexpected distribution response: status=%d calls=%d body=%s", validResponse.Code, store.calls, validResponse.Body.String())
+	}
+	if store.upload.DomainID != "domain-a" || store.upload.DistributorDeviceID != "device-a" ||
+		len(store.upload.Records) != 1 || store.upload.Records[0].Record.SignatureRecordType != storage.WrappingSignatureEpochDistribution {
+		t.Fatalf("unexpected distribution upload: %#v", store.upload)
+	}
+	var response EpochDistributionResponse
+	decodeResponse(t, validResponse, &response)
+	if response.KeyEpoch != 2 || response.AcceptedRecords != 1 || response.InsertedRecords != 1 {
+		t.Fatalf("unexpected distribution response body: %#v", response)
+	}
+}
+
 func TestHandlerAddsRequestIDAndRecordsAuditEvent(t *testing.T) {
 	audit := &auditSinkStub{}
 	handler := NewHandler(storage.NewMemoryStore(), HandlerConfig{
@@ -233,8 +377,9 @@ func TestHandlerAddsRequestIDAndRecordsAuditEvent(t *testing.T) {
 		ActiveKeyID:     "epoch-key-a",
 		FirstDevice: DeviceMetadata{
 			DeviceID:                "device-a",
+			SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 			SigningPublicKeyID:      "signing-key-a",
-			SigningPublicKey:        []byte("signing-public-key-a"),
+			SigningPublicKey:        signingPublicKeyForHandlerTest("device-a"),
 			KeyAgreementPublicKeyID: "agreement-key-a",
 			KeyAgreementPublicKey:   []byte("agreement-public-key-a"),
 			Status:                  string(storage.DeviceActive),
@@ -285,8 +430,9 @@ func TestAuditEventDoesNotIncludeRequestBody(t *testing.T) {
 		ActiveKeyID:     "epoch-key-a",
 		FirstDevice: DeviceMetadata{
 			DeviceID:                "device-a",
+			SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 			SigningPublicKeyID:      "signing-key-a",
-			SigningPublicKey:        []byte("sensitive-signing-public-key-fixture"),
+			SigningPublicKey:        []byte("sensitive-signing-public-key!!!!"),
 			KeyAgreementPublicKeyID: "agreement-key-a",
 			KeyAgreementPublicKey:   []byte("sensitive-agreement-public-key-fixture"),
 			Status:                  string(storage.DeviceActive),
@@ -302,7 +448,7 @@ func TestAuditEventDoesNotIncludeRequestBody(t *testing.T) {
 		t.Fatalf("expected one audit event, got %d", len(audit.events))
 	}
 	eventText := fmt.Sprintf("%#v", audit.events[0])
-	if strings.Contains(eventText, "sensitive-signing-public-key-fixture") ||
+	if strings.Contains(eventText, "sensitive-signing-public-key!!!!") ||
 		strings.Contains(eventText, "sensitive-agreement-public-key-fixture") {
 		t.Fatalf("audit event leaked request body fields: %s", eventText)
 	}
@@ -553,6 +699,71 @@ func TestObjectVersionHandlersUploadReadMetadataAndPayload(t *testing.T) {
 	}
 }
 
+func TestObjectDiscoveryUsesOpaqueDomainBoundCursorAndStablePagination(t *testing.T) {
+	store := storage.NewMemoryStore()
+	createDomainForObjectHandlerTest(t, store, "domain-a", "device-a", 1)
+	createDomainForObjectHandlerTest(t, store, "domain-b", "device-b", 1)
+	handler := NewHandler(store, HandlerConfig{Now: fixedNow})
+	uploads := []struct {
+		objectID string
+		version  uint64
+		base     uint64
+		payload  string
+	}{
+		{objectID: "object-a", version: 1, base: 0, payload: "encrypted-a1"},
+		{objectID: "object-b", version: 1, base: 0, payload: "encrypted-b1"},
+		{objectID: "object-a", version: 2, base: 1, payload: "encrypted-a2"},
+	}
+	for _, item := range uploads {
+		upload := objectUploadRequestForHandlerTest("domain-a", item.objectID, "device-a", item.version, item.base, 1, []byte(item.payload))
+		response := performJSONRequest(t, handler, http.MethodPost, PrefixV1+"/domains/domain-a/objects/"+item.objectID+"/versions", upload)
+		if response.Code != http.StatusCreated {
+			t.Fatalf("setup upload failed: status=%d body=%s", response.Code, response.Body.String())
+		}
+	}
+
+	first := httptest.NewRecorder()
+	handler.ServeHTTP(first, httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/objects?limit=2", nil))
+	if first.Code != http.StatusOK {
+		t.Fatalf("unexpected first discovery status: %d body=%s", first.Code, first.Body.String())
+	}
+	var firstPage ObjectDiscoveryResponse
+	decodeResponse(t, first, &firstPage)
+	if len(firstPage.Entries) != 2 || !firstPage.HasMore || firstPage.NextCursor == "" {
+		t.Fatalf("unexpected first discovery page: %#v", firstPage)
+	}
+	if firstPage.Entries[0].ChangeSequence != 1 || firstPage.Entries[1].ChangeSequence != 2 {
+		t.Fatalf("discovery order is unstable: %#v", firstPage.Entries)
+	}
+
+	second := httptest.NewRecorder()
+	handler.ServeHTTP(second, httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-a/objects?limit=2&after_cursor="+firstPage.NextCursor, nil))
+	if second.Code != http.StatusOK {
+		t.Fatalf("unexpected second discovery status: %d body=%s", second.Code, second.Body.String())
+	}
+	var secondPage ObjectDiscoveryResponse
+	decodeResponse(t, second, &secondPage)
+	if len(secondPage.Entries) != 1 || secondPage.HasMore || secondPage.Entries[0].ChangeSequence != 3 {
+		t.Fatalf("unexpected second discovery page: %#v", secondPage)
+	}
+
+	crossDomain := httptest.NewRecorder()
+	handler.ServeHTTP(crossDomain, httptest.NewRequest(http.MethodGet, PrefixV1+"/domains/domain-b/objects?after_cursor="+firstPage.NextCursor, nil))
+	if crossDomain.Code != http.StatusBadRequest {
+		t.Fatalf("cross-domain cursor must fail: status=%d body=%s", crossDomain.Code, crossDomain.Body.String())
+	}
+
+	overflow := httptest.NewRecorder()
+	handler.ServeHTTP(overflow, httptest.NewRequest(
+		http.MethodGet,
+		PrefixV1+"/domains/domain-a/objects?after_cursor="+encodeObjectCursor("domain-a", math.MaxUint64),
+		nil,
+	))
+	if overflow.Code != http.StatusBadRequest {
+		t.Fatalf("overflow cursor must fail: status=%d body=%s", overflow.Code, overflow.Body.String())
+	}
+}
+
 func TestObjectVersionUploadRejectsCiphertextMetadataMismatchWithoutLeakingPayload(t *testing.T) {
 	audit := &auditSinkStub{}
 	store := storage.NewMemoryStore()
@@ -709,6 +920,7 @@ func TestObjectVersionUploadRejectsRevokedPendingAndUnknownDevices(t *testing.T)
 			DomainID:                "domain-a",
 			JoinRequestID:           "join-b",
 			DeviceID:                "device-b",
+			SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 			SigningPublicKeyID:      signingKeyIDForHandlerTest("device-b"),
 			SigningPublicKey:        signingPublicKeyForHandlerTest("device-b"),
 			KeyAgreementPublicKeyID: "agreement-key-b",
@@ -824,6 +1036,44 @@ type authorizationStoreStub struct {
 	calls  int
 }
 
+type wrappedEpochStoreStub struct {
+	storage.Store
+	calls int
+}
+
+type epochDistributionStoreStub struct {
+	storage.Store
+	upload storage.EpochDistributionUpload
+	calls  int
+}
+
+func (s *epochDistributionStoreStub) PutEpochDistribution(ctx context.Context, upload storage.EpochDistributionUpload) (storage.EpochDistributionResult, error) {
+	s.calls++
+	s.upload = upload
+	return storage.EpochDistributionResult{
+		KeyEpoch: upload.KeyEpoch, AcceptedRecords: len(upload.Records), InsertedRecords: len(upload.Records),
+	}, nil
+}
+
+func (s *wrappedEpochStoreStub) DeviceWrappedKey(ctx context.Context, domainID string, recipientDeviceID string, keyEpoch uint64, wrappingKeyID string) (storage.DeviceWrappingRecord, []byte, error) {
+	s.calls++
+	wrappedKey := []byte("wrapped-key")
+	return storage.DeviceWrappingRecord{
+		DomainID:                   domainID,
+		RecipientDeviceID:          recipientDeviceID,
+		RecipientKeyAgreementKeyID: "agreement-key-b",
+		AuthorizerDeviceID:         "device-a",
+		KeyEpoch:                   keyEpoch,
+		WrappingKeyID:              wrappingKeyID,
+		Algorithm:                  "p256-ecdh-hkdf-sha256-xchacha20poly1305-v1",
+		Nonce:                      []byte("synthetic-nonce-24-byte"),
+		WrappedKeyLen:              int64(len(wrappedKey)),
+		CiphertextHash:             storage.CiphertextHash(wrappedKey),
+		CreatedAtMs:                200,
+		Signature:                  []byte("signature"),
+	}, wrappedKey, nil
+}
+
 func (s *authorizationStoreStub) AuthorizeJoinRequest(ctx context.Context, upload storage.DeviceAuthorizationUpload) error {
 	s.calls++
 	s.upload = upload
@@ -877,6 +1127,7 @@ func createDomainForObjectHandlerTest(t *testing.T, store storage.Store, domainI
 	}, storage.Device{
 		DomainID:                domainID,
 		DeviceID:                deviceID,
+		SigningAlgorithm:        storage.SignatureAlgorithmEd25519V1,
 		SigningPublicKeyID:      signingKeyIDForHandlerTest(deviceID),
 		SigningPublicKey:        signingPublicKeyForHandlerTest(deviceID),
 		KeyAgreementPublicKeyID: "agreement-key-" + deviceID,

@@ -1,0 +1,20 @@
+[package]
+name = "radishlex-ime-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../LICENSE"
+description = "Local product input runtime for RadishLex."
+
+[lib]
+name = "radishlex_ime_runtime"
+path = "src/lib.rs"
+
+[dependencies]
+radishlex-ime-core = { path = "../ime-core" }
+radishlex-ime-ranker = { path = "../ime-ranker" }
+radishlex-ime-userdb = { path = "../ime-userdb" }
+
+[dev-dependencies]
+rusqlite = { version = "0.32.1", features = ["bundled"] }

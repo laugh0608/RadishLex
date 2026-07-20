@@ -5,6 +5,8 @@ abstract interface class ManagerBridge {
 
   Future<ManagerSnapshot> deleteUserTerm(UserTermKey term);
 
+  Future<ManagerSnapshot> restoreUserTerm(UserTermKey term);
+
   Future<DictionaryImportPreview> inspectDictionaryImport(String filePath);
 
   Future<DictionaryImportResult> importDictionaryFile({
@@ -35,6 +37,7 @@ abstract interface class ManagerBridgeFailure implements Exception {
 enum ManagerBridgeOperation {
   loadSnapshot,
   deleteUserTerm,
+  restoreUserTerm,
   inspectDictionaryImport,
   importDictionaryFile,
   exportDictionaryFile,
@@ -84,6 +87,8 @@ extension ManagerBridgeOperationLabel on ManagerBridgeOperation {
         return '加载管理数据';
       case ManagerBridgeOperation.deleteUserTerm:
         return '删除词条';
+      case ManagerBridgeOperation.restoreUserTerm:
+        return '恢复词条';
       case ManagerBridgeOperation.inspectDictionaryImport:
         return '检查导入词库';
       case ManagerBridgeOperation.importDictionaryFile:
@@ -105,8 +110,21 @@ String _failureCategoryCode(
   ManagerBridgeOperation operation,
 ) {
   if (failureCode == 'ffi_library_load_failed' ||
+      failureCode == 'ffi_contract_mismatch' ||
+      failureCode == 'platform_bridge_unavailable' ||
+      failureCode == 'platform_paths_unavailable' ||
+      failureCode == 'platform_paths_invalid' ||
       failureCode == 'unavailable') {
     return 'native_library';
+  }
+
+  if (failureCode == 'privacy_read_failed' ||
+      failureCode == 'privacy_write_failed' ||
+      failureCode == 'privacy_rollback_failed') {
+    return 'privacy_control';
+  }
+  if (failureCode == 'local_file_permissions_failed') {
+    return 'local_permissions';
   }
 
   if (operation == ManagerBridgeOperation.inspectDictionaryImport ||
@@ -148,6 +166,10 @@ String _failureCategoryLabel(String categoryCode) {
       return '设置草案错误';
     case 'native_library':
       return 'native library 不可用';
+    case 'privacy_control':
+      return '系统隐私模式控制失败';
+    case 'local_permissions':
+      return '本地文件权限错误';
     case 'invalid_input':
       return '输入参数无效';
     case 'local_userdb':

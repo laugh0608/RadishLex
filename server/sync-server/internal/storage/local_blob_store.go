@@ -82,10 +82,10 @@ func (s *LocalObjectBlobStore) ReadObjectBlob(ctx context.Context, finalRef stri
 	if err != nil {
 		return nil, err
 	}
-	payload, err := os.ReadFile(finalPath)
-	if os.IsNotExist(err) {
-		return nil, newError(ErrNotFound, "blob not found")
+	if err := requirePrivateBlobFile(finalPath); err != nil {
+		return nil, err
 	}
+	payload, err := os.ReadFile(finalPath)
 	if err != nil {
 		return nil, newError(ErrStorageUnavailable, "blob cannot be read")
 	}
@@ -169,6 +169,9 @@ func (s *localStagedObjectBlob) Commit(ctx context.Context) error {
 		}
 		return newError(ErrStorageUnavailable, "blob cannot be committed")
 	}
+	if err := os.Chmod(s.finalPath, 0o600); err != nil {
+		return newError(ErrStorageUnavailable, "blob permissions cannot be restricted")
+	}
 	if err := os.Remove(s.tempPath); err != nil && !os.IsNotExist(err) {
 		return newError(ErrStorageUnavailable, "blob temp file cannot be removed")
 	}
@@ -195,6 +198,12 @@ func (s *localStagedObjectBlob) Cleanup(ctx context.Context) error {
 }
 
 func (s *localStagedObjectBlob) commitExistingBlob() error {
+	if err := requirePrivateBlobFile(s.tempPath); err != nil {
+		return err
+	}
+	if err := requirePrivateBlobFile(s.finalPath); err != nil {
+		return err
+	}
 	stagedPayload, err := os.ReadFile(s.tempPath)
 	if err != nil {
 		return newError(ErrStorageUnavailable, "staged blob cannot be read")
@@ -212,6 +221,23 @@ func (s *localStagedObjectBlob) commitExistingBlob() error {
 		return newError(ErrStorageUnavailable, "blob temp file cannot be removed")
 	}
 	s.committed = true
+	return nil
+}
+
+func requirePrivateBlobFile(filePath string) error {
+	info, err := os.Lstat(filePath)
+	if os.IsNotExist(err) {
+		return newError(ErrNotFound, "blob not found")
+	}
+	if err != nil {
+		return newError(ErrStorageUnavailable, "blob cannot be inspected")
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return newError(ErrStorageUnavailable, "blob must be a non-symlink regular file")
+	}
+	if err := os.Chmod(filePath, 0o600); err != nil {
+		return newError(ErrStorageUnavailable, "blob permissions cannot be restricted")
+	}
 	return nil
 }
 

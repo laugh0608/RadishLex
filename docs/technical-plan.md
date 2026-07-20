@@ -26,7 +26,7 @@ ime-ffi
         |
         v
 Input Runtime
-  ime-core + engine adapter + ime-ranker + ime-userdb + privacy policy
+  ime-runtime + ime-core + engine adapter + ime-ranker + ime-userdb + privacy policy
         |
         +-----------------------------+
         |                             |
@@ -81,6 +81,18 @@ Flutter Manager
 
 长期可以增加 Rust 自研 engine，但不得抢占真实平台、个人化学习和安全同步的近期优先级。
 
+### ime-runtime
+
+`ime-runtime` 组合单个 engine session、`ime-ranker`、文件型 `ime-userdb` 和隐私策略，是产品输入热路径的 Rust 真相源。
+
+- 每个输入 session 持有独立 engine session 与独立 SQLite connection；多个输入 session、manager 与诊断入口通过同一个 WAL 数据库文件并发，不共享跨线程 `Connection`。
+- runtime 从 engine 取得稳定 `input_code`，一次读取当前候选所需的 user term、ranker weight 和 tombstone，再输出 display index 到 engine index 的显式映射。
+- 平台壳只提交 display index 和受控的隐私上下文；候选选择、分段提交、学习判定与 userdb 写入由 runtime 统一决策。
+- secure input、敏感应用或无法安全判断的上下文只使用 engine 顺序且不读取、不写入个人化数据；隐私模式允许使用既有本地摘要，但不产生新学习写入。
+- userdb/ranker 读取失败时保留 engine 候选顺序并暴露退化状态；选择已经产生的 engine commit 不因学习写入失败而丢失，失败必须作为可诊断学习结果返回。
+
+`ime-runtime` 不负责平台生命周期、SQLite 管理 UI、远端同步、Rime 进程初始化或候选窗绘制。
+
 ### ime-userdb
 
 `ime-userdb` 保存本地用户数据和学习摘要：
@@ -92,7 +104,9 @@ Flutter Manager
 - `ranker_weights`
 - `import_batches`
 
-选择、负反馈、删除和显式恢复是用户意图，跨表写入必须具备事务性。数据库需要明确 WAL、busy timeout、并发访问、文件权限、备份恢复和 schema migration 策略。
+选择、负反馈、删除和显式恢复是用户意图，跨表写入必须具备事务性。数据库需要明确 WAL、busy timeout、并发访问、文件权限、备份恢复和 schema migration 策略。schema migration 必须按实际起始版本顺序执行且每次取得写事务后重读版本；已完成的旧结构迁移不得在后续版本升级时重放。
+
+`user_terms.import_batch_id` 只记录最近一次实际写入该词条的本地导入批次，和 `import_batches.id` 在同一事务内建立；它是 manager 审计关联，不进入 P2 词条 payload。词条 `source` 仍是稳定的来源枚举，不能用来源显示标签猜测导入批次。
 
 P1 原始事件只在本地用于学习，不得通过 FFI 管理接口或同步 payload 暴露。P2 导出只允许从明确的压缩摘要与用户可管理数据生成。
 
@@ -166,6 +180,7 @@ system key event
   -> input runtime privacy check
   -> engine push key
   -> composition / engine candidates / optional commit
+  -> ime-runtime privacy decision
   -> userdb summary + ranker
   -> versioned key result and snapshot
   -> native candidate UI or text commit
@@ -176,8 +191,11 @@ system key event
 
 - 平台必须能判断按键是否被消费，未消费按键交还宿主应用。
 - engine 产生的即时 commit 不能在 FFI 层丢失。
-- candidate display index、ranked index 和 engine commit index 必须有稳定映射。
+- candidate display index、ranked index 和 engine selection index 必须有稳定映射。
+- 候选选择结果必须同时表达 consumed、optional commit 和选择后的 snapshot；分段拼音候选可能只确定当前音节并继续 composition，平台不得假定每次候选选择都会立即提交文本。
 - secure text entry、P0 App 或隐私模式必须在记录学习事件前阻断。
+- display index 必须由 runtime 映射回当次快照中的 engine index，平台端不得假定重排后索引等于 engine 原始索引。
+- 选择先捕获 input code、候选身份、原始 engine index 和候选数；立即 commit 时写入一次 selection，分段选择则只保留待确认意图，并在后续匹配 commit 时写入。reset、schema/client/privacy context 变化、取消或不匹配 commit 必须丢弃待确认意图。
 - manager、后端和网络不可进入每次按键链路。
 
 ## Go Sync Server
@@ -201,13 +219,15 @@ Flutter manager 负责：
 - 同步状态、设备、恢复和后端连接；
 - 安全诊断、导入导出和备份恢复入口。
 
-manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学习、隐私和诊断；M3 再交付同步、设备与恢复；M4 才要求正常产品包闭合 native library、平台目录和升级。产品模式必须加载真实 FFI 和持久化数据；fixture 只能由显式开发开关启用并持续显示演示标识。manager 不进入输入热路径，也不承担排序、合并或密钥策略真相源。
+manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学习、隐私和诊断，并让正常本地产品运行态携带 native library、使用固定平台目录和真实持久化数据；M3 再交付同步、设备与恢复；M4 闭合发布签名、公证、安装升级和最终产品打包。fixture 只能由显式开发开关启用并持续显示演示标识。manager 不进入输入热路径，也不承担排序、合并或密钥策略真相源。
 
 ## 平台策略
 
 ### macOS
 
-第一真实平台使用 InputMethodKit。Swift / Objective-C 外壳只负责系统输入法生命周期、按键、候选、commit 和 Rust FFI。manager 与输入法若共享 userdb，需要固定 App Group、文件权限、锁和 schema migration 所有权。进程级 runtime、session、按键结果、目录与验收边界见 [macOS InputMethodKit 平台边界](macos-inputmethodkit-boundary.md)。
+第一真实平台使用 InputMethodKit。Swift / Objective-C 外壳只负责系统输入法生命周期、按键、候选、commit 和 Rust FFI。候选 UI 是输入法进程内唯一的 nonactivating AppKit panel；controller 维护单一 display index，键盘视觉与 Space 选择读取同一 index，鼠标点击也把目标 index 送入同一 controller/Rust selection 路径，不能让平台显示状态与 Rust engine selection 分叉。
+
+候选锚点必须区分 inline session 内的现存字符索引与文档绝对插入位置：前者用于获取当前全局行矩形，后者只用于公开 fallback。panel 最终限制在目标 `NSScreen.visibleFrame` 内，不以屏幕原点代替无效定位。TIS 状态和测试期间 current source 归属由平台目录中的只读工具记录；输入源选择仍由开发者手动完成，工具不得进入输入热路径或修改系统配置。M2 manager 使用非 App Sandbox 本地分发 profile，与输入法共享已验证的用户 Application Support userdb，并固定文件权限、锁和 schema migration 所有权；M4 若转为 App Group 或其他容器，必须先设计迁移、回滚和双端复验，不能静默复制数据。进程级 runtime、session、按键结果、候选窗、TIS 与验收边界见 [macOS InputMethodKit 平台边界](macos-inputmethodkit-boundary.md)。
 
 ### Linux
 
@@ -296,7 +316,7 @@ M2 不以远端同步、设备授权或最终发布包为退出条件。
 
 - `KeyOutcome`、FFI 生命周期和 librime 全局生命周期未闭合前，不把平台壳视为可用输入法。
 - userdb 事务、ranker 评测和删除语义未稳定前，不开放生产同步。
-- merge 收敛、签名绑定、KDF 上限、平台私钥和 HTTPS 编排未验证前，不开放真实用户同步。
+- merge 收敛、签名绑定、KDF 上限、macOS 平台私钥主路径和本地 HTTPS 编排已有验证；Manager 受控资格执行链、真实设备产品流程与用户入口退出评审完成前，仍不开放真实用户同步。上述任一证据回归时同样失败关闭。
 - 第一真实平台未达到可日常输入前，不并行启动第二平台。
 - manager 产品模式不得用静默 fixture fallback 代替真实失败。
 
@@ -314,6 +334,7 @@ M2 不以远端同步、设备授权或最终发布包为退出条件。
 - [macOS InputMethodKit](macos-inputmethodkit-boundary.md)：第一平台的 runtime、按键链、目录和验收边界。
 - [隐私与同步](privacy-sync.md)：数据分级、删除、授权和威胁模型。
 - [同步 Payload](sync-payload.md)：P2 对象和 payload 边界。
+- [同步编排](sync-orchestration.md)：Rust 状态机、discovery cursor、transaction、outbox 与失败恢复。
 - [加密边界](crypto-boundary.md)：key、envelope、签名与恢复。
 - [同步密钥管理](sync-key-management.md)：设备、恢复、撤销和 key epoch。
 - [Sync Server API/Storage](sync-server-api-storage.md)：Go API、metadata、blob 和错误语义。

@@ -7,6 +7,7 @@ services:
       context: ../../server/sync-server
       dockerfile: Dockerfile
     init: true
+    user: "10001:10001"
     restart: unless-stopped
     environment:
       RADISHLEX_SYNC_LISTEN: "0.0.0.0:7319"
@@ -14,11 +15,14 @@ services:
       RADISHLEX_SYNC_BLOB_DIR: "/var/lib/radishlex/sync-server/objects"
       RADISHLEX_SYNC_MAX_OBJECT_BYTES: "16777216"
       RADISHLEX_SYNC_RECOVERY_READS_PER_HOUR: "12"
+      RADISHLEX_SYNC_ACCESS_TOKEN: "${RADISHLEX_SYNC_ACCESS_TOKEN:-}"
     expose:
       - "7319"
     volumes:
       - sync-server-data:/var/lib/radishlex
     read_only: true
+    cap_drop:
+      - ALL
     tmpfs:
       - /tmp
     security_opt:
@@ -34,7 +38,7 @@ services:
     depends_on:
       - sync-server
     ports:
-      - "127.0.0.1:7319:7319"
+      - "127.0.0.1:${RADISHLEX_SYNC_PORT:-7319}:7319"
     volumes:
       - ./caddy/local.Caddyfile:/etc/caddy/Caddyfile:ro
       - sync-gateway-data:/data

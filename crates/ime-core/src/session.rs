@@ -1,7 +1,7 @@
 use crate::engine::{Engine, KeyOutcome};
 use crate::error::CoreResult;
 use crate::key::KeyEvent;
-use crate::model::{Commit, SchemaId, SessionState};
+use crate::model::{SchemaId, SessionState};
 
 /// Platform-neutral input session over a concrete engine implementation.
 pub struct InputSession<E> {
@@ -21,8 +21,8 @@ impl<E: Engine> InputSession<E> {
         self.engine.push_key(key)
     }
 
-    pub fn commit_candidate(&mut self, index: usize) -> CoreResult<Commit> {
-        self.engine.commit_candidate(index)
+    pub fn select_candidate(&mut self, index: usize) -> CoreResult<KeyOutcome> {
+        self.engine.select_candidate(index)
     }
 
     pub fn set_schema(&mut self, schema: SchemaId) -> CoreResult<()> {
@@ -35,6 +35,10 @@ impl<E: Engine> InputSession<E> {
             self.engine.candidates()?,
             self.engine.schema()?,
         ))
+    }
+
+    pub fn input_code(&self) -> CoreResult<String> {
+        self.engine.input_code()
     }
 
     pub fn engine(&self) -> &E {

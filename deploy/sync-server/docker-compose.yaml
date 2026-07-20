@@ -7,6 +7,7 @@ services:
       context: ../../server/sync-server
       dockerfile: Dockerfile
     init: true
+    user: "${RADISHLEX_SYNC_RUNTIME_UID:-10001}:${RADISHLEX_SYNC_RUNTIME_GID:-10001}"
     restart: unless-stopped
     environment:
       RADISHLEX_SYNC_LISTEN: "${RADISHLEX_SYNC_LISTEN:-0.0.0.0:7319}"
@@ -20,6 +21,8 @@ services:
     volumes:
       - ${RADISHLEX_SYNC_DATA_PATH:-../../DeployData/SyncServer}:/var/lib/radishlex
     read_only: true
+    cap_drop:
+      - ALL
     tmpfs:
       - /tmp
     security_opt:

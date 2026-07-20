@@ -12,9 +12,9 @@ use radishlex_ime_crypto::{
     SyncMasterKeyMaterial, TestMemoryDeviceKeyStore, ED25519_SIGNATURE_LEN,
 };
 use radishlex_ime_sync::{
-    AssembledSyncObject, HttpSyncRemoteTransport, PlaintextSyncPayload, SyncEnvelopeAssembler,
-    SyncObjectAssemblySpec, SyncObjectType, SyncRemoteClient, SyncRemoteError, SyncRemoteMethod,
-    SyncRemoteRequest, SyncRemoteTransport, SyncServerErrorCode,
+    verify_lifecycle_snapshot, AssembledSyncObject, HttpSyncRemoteTransport, PlaintextSyncPayload,
+    SyncEnvelopeAssembler, SyncObjectAssemblySpec, SyncObjectType, SyncRemoteClient,
+    SyncRemoteError, SyncRemoteMethod, SyncRemoteRequest, SyncRemoteTransport, SyncServerErrorCode,
 };
 
 const DOMAIN_ID: &str = "domain-rust-go-http";
@@ -38,6 +38,22 @@ fn http_transport_round_trips_encrypted_object_through_go_sync_server() {
     create_domain(&transport, &public_key);
 
     let client = SyncRemoteClient::new(transport);
+    let lifecycle = client
+        .lifecycle_snapshot(DOMAIN_ID)
+        .expect("load lifecycle snapshot");
+    assert_eq!(lifecycle.entries.len(), 1);
+    let lifecycle_cursor = lifecycle.next_cursor.clone();
+    let verified =
+        verify_lifecycle_snapshot(lifecycle, &public_key).expect("verify initial trust anchor");
+    assert!(verified
+        .trusted_domain()
+        .device_profile(DEVICE_ID)
+        .is_some());
+    let lifecycle_page = client
+        .lifecycle_events(DOMAIN_ID, Some(&lifecycle_cursor), 10)
+        .expect("discover lifecycle after snapshot");
+    assert!(lifecycle_page.entries.is_empty());
+    assert!(!lifecycle_page.has_more);
     let version_1 = assemble_object(
         1,
         None,
@@ -57,6 +73,15 @@ fn http_transport_round_trips_encrypted_object_through_go_sync_server() {
     assert_eq!(uploaded.owner_device_id, DEVICE_ID);
     assert_eq!(uploaded.key_id, OBJECT_KEY_ID);
     assert_eq!(uploaded.ciphertext_hash, version_1.draft.ciphertext_hash);
+    assert_eq!(uploaded.change_sequence, 1);
+
+    let discovery = client
+        .discover_object_versions(DOMAIN_ID, None, 10)
+        .expect("discover uploaded object");
+    assert_eq!(discovery.entries.len(), 1);
+    assert_eq!(discovery.entries[0], uploaded);
+    assert_eq!(discovery.entries[0].change_sequence, 1);
+    assert!(!discovery.has_more);
 
     let remote_payload = client
         .object_payload(DOMAIN_ID, OBJECT_ID, 1)
@@ -116,10 +141,11 @@ fn create_domain(transport: &HttpSyncRemoteTransport, public_key: &DeviceSigning
         "active_key_id": "sync-key-a",
         "first_device": {
             "device_id": DEVICE_ID,
+            "signing_algorithm": public_key.signature_algorithm.as_str(),
             "signing_public_key_id": SIGNING_KEY_ID,
             "signing_public_key": b64(&public_key.public_key),
             "key_agreement_public_key_id": "agreement-key-a",
-            "key_agreement_public_key": b64(&[0x42u8; 32]),
+            "key_agreement_public_key": b64(&agreement_public_key(1)),
             "status": "active"
         },
         "created_at_ms": 100,
@@ -143,6 +169,19 @@ fn create_domain(transport: &HttpSyncRemoteTransport, public_key: &DeviceSigning
     assert!(!response_text.contains("radish-alpha"));
     assert!(!response_text.contains("input_code"));
     assert!(!response_text.contains("reading"));
+}
+
+fn agreement_public_key(scalar: u8) -> Vec<u8> {
+    use p256::elliptic_curve::sec1::ToEncodedPoint;
+
+    let mut secret = [0u8; 32];
+    secret[31] = scalar;
+    p256::SecretKey::from_slice(&secret)
+        .expect("test agreement secret")
+        .public_key()
+        .to_encoded_point(false)
+        .as_bytes()
+        .to_vec()
 }
 
 fn assemble_object(

@@ -1,12 +1,15 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{sync::Arc, sync::Barrier, thread};
 
 use rusqlite::params;
 
-use super::{stable_hash_hex, UserDb};
+use super::identity::legacy_stable_hash_hex;
+use super::UserDb;
 use crate::{
     decode_dictionary_terms_tsv, decode_dictionary_terms_tsv_document, encode_dictionary_terms_tsv,
     DictionaryTermRecord, DictionaryTermsFormat, NegativeFeedbackDraft, NegativeFeedbackReason,
     PrivacyLevel, SelectionEventDraft, TermSource, TermStatus, UserDbSyncPayloadObjectType,
+    LEARNING_CASE_INSPECTION_VERSION,
 };
 
 fn temp_db_path(test_name: &str) -> String {
@@ -22,13 +25,132 @@ fn temp_db_path(test_name: &str) -> String {
     path.to_string_lossy().into_owned()
 }
 
+fn remove_temp_db(path: &str) {
+    for candidate in [
+        path.to_owned(),
+        format!("{path}-wal"),
+        format!("{path}-shm"),
+    ] {
+        let _ = std::fs::remove_file(candidate);
+    }
+}
+
 #[test]
 fn migration_initializes_empty_database() {
     let db = UserDb::open_in_memory().expect("userdb opens");
 
-    assert_eq!(db.schema_version().expect("schema version"), 2);
+    assert_eq!(db.schema_version().expect("schema version"), 9);
     assert!(db.list_active_terms().expect("terms").is_empty());
     assert!(db.list_import_batches().expect("batches").is_empty());
+}
+
+#[test]
+fn concurrent_open_serializes_schema_initialization() {
+    let path = temp_db_path("concurrent-schema-initialization");
+    const CONCURRENT_OPENERS: usize = 8;
+    let barrier = Arc::new(Barrier::new(CONCURRENT_OPENERS + 1));
+    let handles = (0..CONCURRENT_OPENERS)
+        .map(|_| {
+            let path = path.clone();
+            let barrier = Arc::clone(&barrier);
+            thread::spawn(move || {
+                barrier.wait();
+                UserDb::open(&path)
+                    .and_then(|db| db.schema_version())
+                    .expect("concurrent userdb open succeeds")
+            })
+        })
+        .collect::<Vec<_>>();
+
+    barrier.wait();
+    for handle in handles {
+        assert_eq!(handle.join().expect("open thread joins"), 9);
+    }
+
+    let db = UserDb::open(&path).expect("initialized userdb reopens");
+    assert!(db.list_active_terms().expect("terms").is_empty());
+    drop(db);
+    remove_temp_db(&path);
+}
+
+#[test]
+fn open_waits_for_short_database_initialization_lock() {
+    let path = temp_db_path("open-waits-for-initialization-lock");
+    let mut lock_holder = rusqlite::Connection::open(&path).expect("lock holder opens");
+    let transaction = lock_holder
+        .transaction_with_behavior(rusqlite::TransactionBehavior::Exclusive)
+        .expect("exclusive initialization lock starts");
+    transaction
+        .execute_batch("CREATE TABLE lock_holder_sentinel (id INTEGER PRIMARY KEY);")
+        .expect("lock holder writes synthetic schema");
+
+    let worker_path = path.clone();
+    let worker = thread::spawn(move || UserDb::open(worker_path));
+    thread::sleep(Duration::from_millis(50));
+    transaction
+        .rollback()
+        .expect("initialization lock rolls back");
+
+    let db = worker
+        .join()
+        .expect("open worker joins")
+        .expect("userdb open waits for the short initialization lock");
+    assert_eq!(db.schema_version().expect("schema version"), 9);
+    drop(db);
+    drop(lock_holder);
+    remove_temp_db(&path);
+}
+
+#[test]
+fn live_input_and_manager_connections_share_wal_state() {
+    let path = temp_db_path("shared-runtime-connections");
+    let mut input_connection = UserDb::open(&path).expect("input connection opens");
+    let mut manager_connection = UserDb::open(&path).expect("manager connection opens");
+
+    input_connection
+        .record_selection(
+            SelectionEventDraft::new("synthetic-session", "gongxiang", "共享词", 0, 1)
+                .with_reading("gong xiang")
+                .with_context_kind("editor"),
+        )
+        .expect("input selection is recorded");
+    assert_eq!(
+        manager_connection
+            .list_active_terms()
+            .expect("manager reads input write")
+            .len(),
+        1
+    );
+
+    manager_connection
+        .delete_term("gongxiang", "共享词", Some("gong xiang"))
+        .expect("manager deletes term");
+    let input_signals = input_connection
+        .ranking_signals(
+            "gongxiang",
+            &[super::RankingCandidateIdentity::new(
+                "共享词",
+                Some("gong xiang"),
+            )],
+        )
+        .expect("input reads manager tombstone");
+    assert_eq!(input_signals.deleted_terms.len(), 1);
+
+    manager_connection
+        .restore_term("gongxiang", "共享词", Some("gong xiang"))
+        .expect("manager restores term");
+    assert_eq!(
+        input_connection
+            .fetch_term("gongxiang", "共享词", "gong xiang")
+            .expect("input reads restored term")
+            .expect("restored term exists")
+            .status,
+        TermStatus::Active
+    );
+
+    drop(manager_connection);
+    drop(input_connection);
+    remove_temp_db(&path);
 }
 
 #[test]
@@ -55,7 +177,7 @@ fn migration_upgrades_v1_import_batches() {
     }
 
     let db = UserDb::open(&path).expect("userdb migrates");
-    assert_eq!(db.schema_version().expect("schema version"), 2);
+    assert_eq!(db.schema_version().expect("schema version"), 9);
 
     let batches = db.list_import_batches().expect("batches");
     assert_eq!(batches.len(), 1);
@@ -64,7 +186,150 @@ fn migration_upgrades_v1_import_batches() {
     assert_eq!(batches[0].imported_terms, 3);
     assert_eq!(batches[0].inserted_terms, 3);
 
-    let _ = std::fs::remove_file(path);
+    remove_temp_db(&path);
+}
+
+#[test]
+fn migration_upgrades_v3_terms_without_inventing_import_provenance() {
+    let path = temp_db_path("migration-v3-import-batch");
+    {
+        let mut db = UserDb::open(&path).expect("v4 userdb opens");
+        db.add_term("legacy", "合成旧词", None, TermSource::ManualAdd)
+            .expect("synthetic term is added");
+    }
+    {
+        let connection = rusqlite::Connection::open(&path).expect("sqlite reopens");
+        connection
+            .execute_batch(
+                "
+                ALTER TABLE user_terms DROP COLUMN import_batch_id;
+                PRAGMA user_version = 3;
+                ",
+            )
+            .expect("complete v4 schema is reduced to v3");
+    }
+
+    let db = UserDb::open(&path).expect("v3 userdb migrates");
+    assert_eq!(db.schema_version().expect("schema version"), 9);
+    let terms = db.list_active_terms().expect("terms");
+    assert_eq!(terms.len(), 1);
+    assert_eq!(terms[0].input_code, "legacy");
+    assert_eq!(terms[0].import_batch_id, None);
+
+    remove_temp_db(&path);
+}
+
+#[test]
+fn malformed_v4_sync_schema_rolls_back_migration_without_advancing_version() {
+    let path = temp_db_path("migration-v4-sync-rollback");
+    {
+        let mut db = UserDb::open(&path).expect("v6 userdb opens");
+        db.add_term("preserve", "合成保留词", None, TermSource::ManualAdd)
+            .expect("synthetic term is added");
+    }
+    {
+        let connection = rusqlite::Connection::open(&path).expect("sqlite reopens");
+        connection
+            .execute_batch(
+                "DROP TABLE sync_cycle_journal;
+                 DROP TABLE sync_prepared_outbox;
+                 DROP TABLE sync_local_objects;
+                 DROP TABLE sync_remote_objects;
+                 DROP TABLE sync_domain_state;
+                 CREATE TABLE sync_domain_state (domain_id TEXT PRIMARY KEY);
+                 PRAGMA user_version = 4;",
+            )
+            .expect("malformed v4 sync schema is created");
+    }
+
+    let error = UserDb::open(&path).expect_err("malformed v4 migration fails");
+    assert!(error.to_string().contains("sync_domain_state"));
+    let connection = rusqlite::Connection::open(&path).expect("sqlite reopens after rollback");
+    let version: i64 = connection
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .expect("schema version");
+    let term_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM user_terms WHERE input_code = 'preserve'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("preserved term count");
+    let remote_table_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master
+             WHERE type = 'table' AND name = 'sync_remote_objects'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("rolled back sync table count");
+    let domain_columns = connection
+        .prepare("PRAGMA table_info(sync_domain_state)")
+        .expect("domain columns prepare")
+        .query_map([], |row| row.get::<_, String>(1))
+        .expect("domain columns query")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("domain columns");
+    assert_eq!(version, 4);
+    assert_eq!(term_count, 1);
+    assert_eq!(remote_table_count, 0);
+    assert_eq!(domain_columns, vec!["domain_id"]);
+    drop(connection);
+    remove_temp_db(&path);
+}
+
+#[test]
+fn malformed_v5_lifecycle_schema_rolls_back_without_advancing_version() {
+    let path = temp_db_path("migration-v5-lifecycle-rollback");
+    {
+        let mut db = UserDb::open(&path).expect("v6 userdb opens");
+        db.add_term(
+            "preserve",
+            "合成生命周期保留词",
+            None,
+            TermSource::ManualAdd,
+        )
+        .expect("synthetic term is added");
+    }
+    {
+        let connection = rusqlite::Connection::open(&path).expect("sqlite reopens");
+        connection
+            .execute_batch(
+                "DROP TABLE sync_trusted_lifecycle_events;
+                 DROP TABLE sync_trusted_devices;
+                 DROP TABLE sync_trusted_domains;
+                 CREATE TABLE sync_trusted_domains (domain_id TEXT PRIMARY KEY);
+                 PRAGMA user_version = 5;",
+            )
+            .expect("malformed v5 lifecycle schema is created");
+    }
+
+    let error = UserDb::open(&path).expect_err("malformed v5 migration fails");
+    assert!(error.to_string().contains("sync_trusted_domains"));
+    let connection = rusqlite::Connection::open(&path).expect("sqlite reopens after rollback");
+    let version: i64 = connection
+        .query_row("PRAGMA user_version", [], |row| row.get(0))
+        .expect("schema version");
+    let term_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM user_terms WHERE input_code = 'preserve'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("preserved term count");
+    let device_table_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master
+             WHERE type = 'table' AND name = 'sync_trusted_devices'",
+            [],
+            |row| row.get(0),
+        )
+        .expect("rolled back trusted device table count");
+    assert_eq!(version, 5);
+    assert_eq!(term_count, 1);
+    assert_eq!(device_table_count, 0);
+    drop(connection);
+    remove_temp_db(&path);
 }
 
 #[test]
@@ -85,6 +350,14 @@ fn add_query_and_delete_term_records_tombstone() {
 
     assert!(db.list_active_terms().expect("terms").is_empty());
     assert_eq!(db.deleted_term_count().expect("deleted count"), 1);
+    let tombstones = db
+        .list_deleted_term_tombstones()
+        .expect("tombstones are listed");
+    assert_eq!(tombstones.len(), 1);
+    assert_eq!(tombstones[0].input_code, "luobo");
+    assert_eq!(tombstones[0].text, "萝卜");
+    assert_eq!(tombstones[0].reading.as_deref(), Some("luo bo"));
+    assert_eq!(tombstones[0].reason, "manual_delete");
 }
 
 #[test]
@@ -102,7 +375,7 @@ fn selection_event_updates_term_and_ranker_summary() {
         .fetch_term("luobo", "萝卜", "luo bo")
         .expect("term lookup")
         .expect("term exists");
-    assert_eq!(term.weight, 2.0);
+    assert_eq!(term.weight, 1.0);
 
     let weight = db
         .ranker_weight("luobo", "萝卜", Some("luo bo"), "chat")
@@ -110,6 +383,86 @@ fn selection_event_updates_term_and_ranker_summary() {
         .expect("ranker weight exists");
     assert_eq!(weight.frequency, 2);
     assert_eq!(weight.negative_score, 0.0);
+}
+
+#[test]
+fn exact_learning_case_inspection_tracks_active_deleted_and_restored_state() {
+    let mut db = UserDb::open_in_memory().expect("userdb opens");
+    let event = SelectionEventDraft::new("private-session", "luobo", "合成萝卜", 1, 5)
+        .with_context_kind("editor");
+    db.record_selection(event.clone())
+        .expect("first selection records");
+    db.record_selection(event)
+        .expect("second selection records");
+    db.record_selection(
+        SelectionEventDraft::new(
+            "unrelated-private-session",
+            "other",
+            "不应出现的合成词",
+            0,
+            1,
+        )
+        .with_context_kind("code"),
+    )
+    .expect("unrelated selection records");
+
+    let active = db
+        .inspect_learning_case("luobo", "合成萝卜", None, "editor")
+        .expect("active case inspects");
+    assert_eq!(active.inspection_version, LEARNING_CASE_INSPECTION_VERSION);
+    assert_eq!(active.identity.input_code, "luobo");
+    assert_eq!(active.identity.text, "合成萝卜");
+    assert_eq!(active.identity.reading, None);
+    assert_eq!(active.identity.context_kind, "editor");
+    assert_eq!(active.aggregate.active_user_terms, 2);
+    assert_eq!(active.aggregate.selection_events, 3);
+    let term = active.term.expect("active term is present");
+    assert_eq!(term.source, TermSource::EngineSelection);
+    assert_eq!(term.status, TermStatus::Active);
+    assert_eq!(term.weight, 1.0);
+    assert!(term.version_ms > 0);
+    assert!(term.last_used_at_ms.is_some());
+    assert_eq!(term.restored_at_ms, None);
+    let ranker = active
+        .ranker_weight
+        .expect("active ranker weight is present");
+    assert_eq!(ranker.frequency, 2);
+    assert_eq!(ranker.negative_score, 0.0);
+    assert!(ranker.last_used_at_ms.is_some());
+    assert!(ranker.updated_at_ms > 0);
+    assert_eq!(active.deleted_tombstone, None);
+
+    db.delete_term("luobo", "合成萝卜", None)
+        .expect("case term deletes");
+    let deleted = db
+        .inspect_learning_case("luobo", "合成萝卜", None, "editor")
+        .expect("deleted case inspects");
+    let deleted_term = deleted.term.expect("deleted term remains inspectable");
+    assert_eq!(deleted_term.status, TermStatus::Deleted);
+    assert_eq!(deleted_term.weight, 0.0);
+    assert!(deleted_term.version_ms >= term.version_ms);
+    assert_eq!(deleted_term.last_used_at_ms, None);
+    assert_eq!(deleted.ranker_weight, None);
+    let tombstone = deleted
+        .deleted_tombstone
+        .expect("deleted tombstone is inspectable");
+    assert_eq!(deleted.aggregate.deleted_term_tombstones, 1);
+    assert_eq!(deleted.aggregate.negative_feedback, 1);
+
+    let restored = db
+        .restore_term("luobo", "合成萝卜", None)
+        .expect("case term restores");
+    assert!(restored.updated_at_ms > tombstone.deleted_at_ms);
+    let restored_case = db
+        .inspect_learning_case("luobo", "合成萝卜", None, "editor")
+        .expect("restored case inspects");
+    let restored_term = restored_case.term.expect("restored term is present");
+    assert_eq!(restored_term.status, TermStatus::Active);
+    assert_eq!(restored_term.weight, 1.0);
+    assert_eq!(restored_term.restored_at_ms, Some(restored.updated_at_ms));
+    assert_eq!(restored_case.ranker_weight, None);
+    assert_eq!(restored_case.deleted_tombstone, None);
+    assert_eq!(restored_case.aggregate.selection_events, 3);
 }
 
 #[test]
@@ -121,6 +474,58 @@ fn p0_selection_is_not_recorded() {
     assert_eq!(db.record_selection(event).expect("event"), None);
     assert_eq!(db.selection_event_count().expect("event count"), 0);
     assert!(db.list_active_terms().expect("terms").is_empty());
+}
+
+#[test]
+fn p0_p1_p2_learning_boundaries_remain_isolated() {
+    let mut db = UserDb::open_in_memory().expect("userdb opens");
+    let p0_selection = SelectionEventDraft::new("p0-session", "secret", "合成敏感词", 0, 1)
+        .with_privacy(PrivacyLevel::P0NeverLearn);
+    let p0_feedback = NegativeFeedbackDraft::new(
+        "secret",
+        "合成敏感词",
+        NegativeFeedbackReason::ManualSuppress,
+    )
+    .with_privacy(PrivacyLevel::P0NeverLearn);
+    assert_eq!(
+        db.record_selection(p0_selection).expect("p0 selection"),
+        None
+    );
+    assert_eq!(
+        db.record_negative_feedback(p0_feedback)
+            .expect("p0 feedback"),
+        None
+    );
+
+    db.record_selection(
+        SelectionEventDraft::new("p1-session", "privacy", "合成本地词", 0, 1)
+            .with_context_kind("chat"),
+    )
+    .expect("p1 selection");
+    db.record_negative_feedback(
+        NegativeFeedbackDraft::new(
+            "privacy",
+            "合成本地词",
+            NegativeFeedbackReason::ManualSuppress,
+        )
+        .with_context_kind("chat"),
+    )
+    .expect("p1 feedback");
+
+    assert_eq!(db.selection_event_count().expect("selection count"), 1);
+    assert_eq!(db.negative_feedback_count().expect("feedback count"), 1);
+    let payload_text = db
+        .p2_plaintext_payloads()
+        .expect("p2 payloads")
+        .map(|payload| payload.as_str().expect("utf-8 payload").to_owned())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(payload_text.contains("合成本地词"));
+    assert!(!payload_text.contains("合成敏感词"));
+    assert!(!payload_text.contains("p0-session"));
+    assert!(!payload_text.contains("p1-session"));
+    assert!(!payload_text.contains("manual_suppress"));
+    assert!(!payload_text.contains("candidate_index"));
 }
 
 #[test]
@@ -188,28 +593,40 @@ fn manual_import_does_not_revive_deleted_term() {
     db.delete_term("luobo", "萝卜", Some("luo bo"))
         .expect("term is deleted");
 
-    let term = db
+    let error = db
         .add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualImport)
-        .expect("import respects tombstone");
+        .expect_err("import is blocked by tombstone");
 
-    assert_eq!(term.status, TermStatus::Deleted);
+    assert!(error.to_string().contains("explicit restore"));
     assert!(db.list_active_terms().expect("terms").is_empty());
     assert_eq!(db.deleted_term_count().expect("deleted count"), 1);
 }
 
 #[test]
-fn manual_add_can_restore_deleted_term() {
+fn explicit_restore_is_distinct_from_manual_add() {
     let mut db = UserDb::open_in_memory().expect("userdb opens");
     db.add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualAdd)
         .expect("term is added");
     db.delete_term("luobo", "萝卜", Some("luo bo"))
         .expect("term is deleted");
 
-    let term = db
+    let error = db
         .add_term("luobo", "萝卜", Some("luo bo"), TermSource::ManualAdd)
-        .expect("manual add restores term");
+        .expect_err("manual add cannot restore term");
+    assert!(error.to_string().contains("explicit restore"));
+
+    let deleted_version = db
+        .fetch_term("luobo", "萝卜", "luo bo")
+        .expect("term lookup")
+        .expect("deleted term")
+        .updated_at_ms;
+    let term = db
+        .restore_term("luobo", "萝卜", Some("luo bo"))
+        .expect("explicit restore succeeds");
 
     assert_eq!(term.status, TermStatus::Active);
+    assert!(term.updated_at_ms > deleted_version);
+    assert_eq!(term.restored_at_ms, Some(term.updated_at_ms));
     assert_eq!(db.list_active_terms().expect("terms").len(), 1);
     assert_eq!(db.deleted_term_count().expect("deleted count"), 0);
 }
@@ -294,16 +711,10 @@ fn p2_plaintext_payloads_export_stable_user_and_deleted_term_schema() {
     db.connection
         .execute(
             "INSERT INTO deleted_terms (
-                term_id, text_hash, reading_hash, input_code_hash, deleted_at_ms, reason
+                term_id, input_code, text, reading, deleted_at_ms, reason
              )
              VALUES (NULL, ?1, ?2, ?3, ?4, ?5)",
-            params![
-                stable_hash_hex("删除"),
-                stable_hash_hex("shan chu"),
-                stable_hash_hex("shanchu"),
-                55,
-                "manual_delete"
-            ],
+            params!["shanchu", "删除", "shan chu", 55, "manual_delete"],
         )
         .expect("insert tombstone");
 
@@ -340,7 +751,7 @@ fn p2_plaintext_payloads_export_stable_ranker_weight_schema() {
     db.connection
         .execute(
             "INSERT INTO ranker_weights (
-                input_code, text, reading, frequency, recency_score, negative_score, context_kind, updated_at_ms
+                input_code, text, reading, frequency, last_used_at_ms, negative_score, context_kind, updated_at_ms
              )
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params!["luo\\bo", "萝\"卜\\词", "luo\tbo\nline", 1, 20.0, 0.0, "general", 10],
@@ -349,10 +760,10 @@ fn p2_plaintext_payloads_export_stable_ranker_weight_schema() {
     db.connection
         .execute(
             "INSERT INTO ranker_weights (
-                input_code, text, reading, frequency, recency_score, negative_score, context_kind, updated_at_ms
+                input_code, text, reading, frequency, last_used_at_ms, negative_score, context_kind, updated_at_ms
              )
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params!["cihe", "词核", "", 2, 1000.5, 1.25, "chat", 30],
+            params!["cihe", "词核", "", 2, 1000, 1.25, "chat", 30],
         )
         .expect("insert ranker weight");
 
@@ -369,7 +780,7 @@ fn p2_plaintext_payloads_export_stable_ranker_weight_schema() {
     assert_eq!(payloads[0].record_count, 2);
     assert_eq!(
         payloads[0].as_str().expect("utf-8 payload"),
-        r#"{"payload_schema_version":1,"object_type":"ranker.weights","weights":[{"input_code":"cihe","text":"词核","reading":"","frequency":2,"recency_score":1000.5,"negative_score":1.25,"context_kind":"chat","updated_at_ms":30},{"input_code":"luo\\bo","text":"萝\"卜\\词","reading":"luo\tbo\nline","frequency":1,"recency_score":20,"negative_score":0,"context_kind":"general","updated_at_ms":10}]}"#
+        r#"{"payload_schema_version":1,"object_type":"ranker.weights","weights":[{"input_code":"cihe","text":"词核","reading":"","frequency":2,"recency_score":1000,"negative_score":1.25,"context_kind":"chat","updated_at_ms":30},{"input_code":"luo\\bo","text":"萝\"卜\\词","reading":"luo\tbo\nline","frequency":1,"recency_score":20,"negative_score":0,"context_kind":"general","updated_at_ms":10}]}"#
     );
 }
 
@@ -523,6 +934,7 @@ fn dictionary_import_preserves_term_fields_and_skips_deleted_tombstones() {
     assert_eq!(terms[0].text, "词核");
     assert_eq!(terms[0].weight, 3.5);
     assert_eq!(terms[0].status, TermStatus::Suppressed);
+    assert_eq!(terms[0].import_batch_id, summary.import_batch_id);
 }
 
 #[test]
@@ -605,10 +1017,12 @@ fn dictionary_import_reports_updates_duplicates_and_distinct_readings() {
         .expect("term exists");
     assert_eq!(updated.status, TermStatus::Suppressed);
     assert_eq!(updated.weight, 4.0);
-    assert!(db
+    assert_eq!(updated.import_batch_id, summary.import_batch_id);
+    let distinct_reading = db
         .fetch_term("luobo", "萝卜", "luo bu")
         .expect("term lookup")
-        .is_some());
+        .expect("distinct reading exists");
+    assert_eq!(distinct_reading.import_batch_id, summary.import_batch_id);
 }
 
 #[test]
@@ -712,12 +1126,12 @@ fn sync_preflight_separates_syncable_and_local_only_counts() {
 
     let summary = db.sync_preflight_summary().expect("summary");
 
-    assert_eq!(summary.schema_version, 2);
+    assert_eq!(summary.schema_version, 9);
     assert_eq!(summary.syncable_user_terms, 1);
     assert_eq!(summary.syncable_ranker_weights, 1);
     assert_eq!(summary.syncable_deleted_terms, 1);
     assert_eq!(summary.local_selection_events, 1);
-    assert_eq!(summary.local_negative_feedback, 1);
+    assert_eq!(summary.local_negative_feedback, 2);
     assert_eq!(summary.local_import_batches, 0);
 }
 
@@ -726,7 +1140,7 @@ fn learning_status_reports_only_aggregate_counts_and_timestamps() {
     let mut db = UserDb::open_in_memory().expect("userdb opens");
 
     let empty = db.learning_status_summary().expect("empty summary");
-    assert_eq!(empty.schema_version, 2);
+    assert_eq!(empty.schema_version, 9);
     assert_eq!(empty.active_user_terms, 0);
     assert_eq!(empty.suppressed_user_terms, 0);
     assert_eq!(empty.selection_events, 0);
@@ -749,13 +1163,13 @@ fn learning_status_reports_only_aggregate_counts_and_timestamps() {
 
     let summary = db.learning_status_summary().expect("summary");
 
-    assert_eq!(summary.schema_version, 2);
+    assert_eq!(summary.schema_version, 9);
     assert_eq!(summary.active_user_terms, 0);
     assert_eq!(summary.suppressed_user_terms, 1);
     assert_eq!(summary.ranker_weights, 1);
     assert_eq!(summary.deleted_term_tombstones, 1);
     assert_eq!(summary.selection_events, 1);
-    assert_eq!(summary.negative_feedback, 1);
+    assert_eq!(summary.negative_feedback, 2);
     assert_eq!(summary.import_batches, 0);
     assert!(summary.latest_user_term_updated_at_ms.is_some());
     assert!(summary.latest_selection_event_at_ms.is_some());
@@ -783,3 +1197,5 @@ fn learning_status_reports_only_aggregate_counts_and_timestamps() {
     assert!(!debug.contains("萝卜"));
     assert!(!debug.contains("词核"));
 }
+
+mod r02l;

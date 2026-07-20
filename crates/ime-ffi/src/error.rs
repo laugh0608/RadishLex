@@ -4,6 +4,7 @@ use std::os::raw::c_char;
 use radishlex_ime_core::CoreError;
 #[cfg(feature = "native-rime")]
 use radishlex_ime_engine_rime::RimeEngineError;
+use radishlex_ime_runtime::RuntimeError;
 use radishlex_ime_userdb::UserDbError;
 
 #[repr(C)]
@@ -42,6 +43,8 @@ impl RadishLexError {
         self.message.cast_const()
     }
 
+    /// # Safety
+    /// `error` must be null or a live `RadishLexError` pointer released exactly once.
     pub unsafe fn free(error: *mut Self) {
         if error.is_null() {
             return;
@@ -102,9 +105,22 @@ impl From<UserDbError> for FfiError {
     fn from(error: UserDbError) -> Self {
         match error {
             UserDbError::InvalidInput { .. } => Self::invalid_argument(error.to_string()),
-            UserDbError::Sqlite(_) | UserDbError::Time(_) => {
+            UserDbError::Sqlite(_)
+            | UserDbError::DatabaseFile { .. }
+            | UserDbError::Io { .. }
+            | UserDbError::Time(_) => {
                 Self::new(RadishLexStatusCode::UserDbError, error.to_string())
             }
+        }
+    }
+}
+
+impl From<RuntimeError> for FfiError {
+    fn from(error: RuntimeError) -> Self {
+        match error {
+            RuntimeError::Core(core) => Self::from(core),
+            RuntimeError::InvalidInput { .. } => Self::invalid_argument(error.to_string()),
+            RuntimeError::ClockFailure => Self::internal(error.to_string()),
         }
     }
 }

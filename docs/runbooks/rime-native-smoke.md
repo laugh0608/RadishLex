@@ -202,7 +202,7 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
 
 ### 5. 运行 FFI native smoke
 
-FFI native smoke 用于确认 `radishlex_session_new_rime` 能通过 C ABI options 创建真实 Rime session，并能完成按键输入、snapshot 候选读取和候选提交。该测试默认标记为 ignored，必须显式传入隔离 Rime 数据目录后运行。
+FFI native smoke 用于确认 `radishlex_session_new_personalized_rime` 能通过当前 ABI v6（沿用 v5 options 布局）创建真实 Rime 产品 session，并能完成稳定 input code、按键输入、candidate snapshot、完整/分段候选选择和本地学习策略。测试会在隔离的 `$SMOKE/user/userdb.sqlite3` 写入合成 selection，断言完整选择为 `recorded`、分段选择为 `deferred`、隐私模式不增加事件、secure input 返回 engine-only `policy_blocked`。该测试默认标记为 ignored，必须显式传入隔离 Rime 数据目录后运行；只有调用方额外设置 `RADISHLEX_EXPECTED_CANDIDATE_PAGE_SIZE` 时才断言页大小，macOS 产品 native 门禁固定传入 `5`。
 
 ```bash
 RIME_INCLUDE_DIR="$RIME_INCLUDE_DIR" \
@@ -227,7 +227,8 @@ cargo test -p radishlex-ime-ffi --features native-rime \
 重点检查：
 
 - 测试结果为 `ok`。
-- 命令只使用 `$SMOKE/shared` 和 `$SMOKE/user`，不读取真实 Rime 用户目录。
+- 命令只使用 `$SMOKE/shared`、`$SMOKE/user` 和其中新建的合成 userdb，不读取真实 Rime/userdb 用户目录。
+- 正常 smoke 完成后可只读检查 `$SMOKE/user/userdb.sqlite3`，但不得把数据库内容或选择文本复制进日志；销毁整个 `$SMOKE` 临时目录即可清理。
 - 正常 smoke 不验证平台壳、系统输入法候选窗或 Flutter bridge。
 - 异常 smoke 预期错误码为 `EngineError`，错误消息包含 `select_schema` 和缺失 schema 名。
 
@@ -243,7 +244,7 @@ cargo test -p radishlex-ime-ffi --features native-rime \
 - 首候选、非首候选、翻页后候选是否都能按当前输出候选提交
 - 越界候选索引是否返回明确错误
 - rank smoke 是否输出 `rank_context`、`engine_index`、explain 和 `commit_engine_index`
-- FFI native smoke 是否通过 `rime_session_native_smoke_uses_ffi_entrypoint`
+- FFI native smoke 是否通过 `rime_session_native_smoke_uses_ffi_entrypoint`，并覆盖 personalized session、selection/deferred、隐私零增量和 secure 阻断
 - FFI native 异常 smoke 是否通过 `rime_session_native_invalid_schema_reports_engine_error`
 - 是否发现 candidate index 或 `select_keys` 行为异常
 
@@ -272,7 +273,7 @@ cargo test -p radishlex-ime-ffi --features native-rime \
 
 - `cargo test -p radishlex-ime-ffi --features native-rime` 在 Homebrew `librime` 1.17.0 环境下通过，默认跳过 ignored native smoke。
 - `RADISHLEX_RIME_SHARED_DATA=/tmp/radishlex-rime-smoke.HpbV0l/shared RADISHLEX_RIME_USER_DATA=/tmp/radishlex-rime-smoke.HpbV0l/user cargo test -p radishlex-ime-ffi --features native-rime rime_session_native_smoke_uses_ffi_entrypoint -- --ignored` 通过。
-- 该 smoke 覆盖 `radishlex_session_new_rime -> radishlex_session_push_key -> radishlex_session_snapshot_new -> radishlex_session_commit_candidate`。
+- 该时点 smoke 覆盖普通 `radishlex_session_new_rime -> key result -> snapshot -> select_candidate`；当前同名 smoke 已按上文升级为 personalized Rime session，并继续区分完整候选提交与分段候选只更新 composition 的结果。
 - 本次 smoke 继续使用隔离 Rime shared / user data，不使用真实个人词库或真实 Rime 用户目录。
 
 若运行时报 `dyld` 找不到 `librime`，执行：

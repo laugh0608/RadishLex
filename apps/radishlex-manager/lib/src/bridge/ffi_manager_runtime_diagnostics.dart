@@ -33,12 +33,14 @@ ManagerRuntimeDiagnostics managerRuntimeDiagnosticsFromFfi({
 }) {
   return ManagerRuntimeDiagnostics(
     bridgeMode: nativeInjected ? 'ffi_injected' : 'dart_ffi',
-    userDb: 'RADISHLEX_MANAGER_DB configured',
+    userDb: nativeInjected
+        ? 'injected synthetic userdb'
+        : 'platform Application Support userdb',
     nativeLibrary: nativeInjected
         ? 'injected native binding'
         : libraryPath.isEmpty
         ? 'default dynamic library lookup'
-        : 'RADISHLEX_MANAGER_FFI_LIBRARY configured',
+        : 'app bundle Frameworks native library',
     settingsStore: settingsStoreSourceLabel,
     syncEndpoint: draft.hasServerEndpoint
         ? 'sync endpoint draft configured'

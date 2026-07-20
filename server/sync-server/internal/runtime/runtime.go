@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -57,11 +55,8 @@ func OpenStore(cfg config.Config) (storage.Store, CloseFunc, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, nil, err
 	}
-	if err := os.MkdirAll(filepath.Dir(cfg.MetadataPath), 0o700); err != nil {
-		return nil, nil, fmt.Errorf("create metadata directory: %w", err)
-	}
-	if err := os.MkdirAll(cfg.BlobDir, 0o700); err != nil {
-		return nil, nil, fmt.Errorf("create blob directory: %w", err)
+	if err := preparePrivateStorePaths(cfg); err != nil {
+		return nil, nil, err
 	}
 
 	db, err := sql.Open("sqlite", cfg.MetadataPath)
@@ -70,9 +65,13 @@ func OpenStore(cfg config.Config) (storage.Store, CloseFunc, error) {
 	}
 	db.SetMaxOpenConns(1)
 
-	if _, err := db.Exec(migrations.InitialSchema()); err != nil {
+	if err := migrations.Apply(db); err != nil {
 		_ = db.Close()
 		return nil, nil, fmt.Errorf("apply sqlite metadata migration: %w", err)
+	}
+	if err := requirePrivateRegularFile(cfg.MetadataPath, "metadata database"); err != nil {
+		_ = db.Close()
+		return nil, nil, err
 	}
 	blobStore, err := storage.NewLocalObjectBlobStore(cfg.BlobDir)
 	if err != nil {

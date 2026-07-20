@@ -9,21 +9,23 @@ use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use radishlex_ime_ffi::{
-    radishlex_buffer_data, radishlex_buffer_free, radishlex_buffer_len, radishlex_error_code,
-    radishlex_error_free, radishlex_error_message, radishlex_ffi_contract,
-    radishlex_session_commit_candidate, radishlex_session_engine_kind, radishlex_session_free,
-    radishlex_session_new, radishlex_session_push_key_event, radishlex_session_reset,
+    radishlex_error_code, radishlex_error_free, radishlex_error_message, radishlex_ffi_contract,
+    radishlex_key_result_commit, radishlex_key_result_commit_present, radishlex_key_result_free,
+    radishlex_session_engine_kind, radishlex_session_free, radishlex_session_new,
+    radishlex_session_push_key_event, radishlex_session_reset, radishlex_session_select_candidate,
     radishlex_session_snapshot_new, radishlex_snapshot_candidate,
     radishlex_snapshot_candidate_count, radishlex_snapshot_free, radishlex_snapshot_preedit,
-    radishlex_snapshot_schema, radishlex_userdb_add_term, radishlex_userdb_dictionary_export,
+    radishlex_snapshot_schema, radishlex_userdb_add_term, radishlex_userdb_deleted_terms_count,
+    radishlex_userdb_deleted_terms_free, radishlex_userdb_deleted_terms_get,
+    radishlex_userdb_deleted_terms_new, radishlex_userdb_dictionary_export,
     radishlex_userdb_dictionary_import, radishlex_userdb_dictionary_inspect,
     radishlex_userdb_import_batches_count, radishlex_userdb_import_batches_free,
     radishlex_userdb_import_batches_get, radishlex_userdb_import_batches_new,
     radishlex_userdb_learning_status, radishlex_userdb_terms_count, radishlex_userdb_terms_free,
-    radishlex_userdb_terms_get, radishlex_userdb_terms_new, RadishLexCandidateView, RadishLexError,
-    RadishLexFfiContract, RadishLexImportBatchView, RadishLexKeyEvent,
-    RadishLexLearningStatusSummary, RadishLexSession, RadishLexStatusCode, RadishLexStringView,
-    RadishLexUserTermView, RADISHLEX_ABI_CONTRACT_VERSION,
+    radishlex_userdb_terms_get, radishlex_userdb_terms_new, RadishLexCandidateView,
+    RadishLexDeletedTermView, RadishLexError, RadishLexFfiContract, RadishLexImportBatchView,
+    RadishLexKeyEvent, RadishLexLearningStatusSummary, RadishLexSession, RadishLexStatusCode,
+    RadishLexStringView, RadishLexUserTermView, RADISHLEX_ABI_CONTRACT_VERSION,
     RADISHLEX_DICTIONARY_FORMAT_USER_TERMS_V1, RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND,
     RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD, RADISHLEX_SYNC_CLASS_P2_ENCRYPTED_SYNC,
 };
@@ -46,7 +48,7 @@ fn ffi_contract_reports_lifecycle_and_thread_policy() {
     let mut contract = RadishLexFfiContract::empty();
 
     assert_eq!(
-        radishlex_ffi_contract(&mut contract, &mut error),
+        unsafe { radishlex_ffi_contract(&mut contract, &mut error) },
         RadishLexStatusCode::Ok
     );
     assert!(error.is_null());
@@ -61,11 +63,11 @@ fn ffi_contract_reports_lifecycle_and_thread_policy() {
     );
 
     assert_eq!(
-        radishlex_ffi_contract(ptr::null_mut(), &mut error),
+        unsafe { radishlex_ffi_contract(ptr::null_mut(), &mut error) },
         RadishLexStatusCode::InvalidArgument
     );
     assert_eq!(
-        radishlex_error_code(error),
+        unsafe { radishlex_error_code(error) },
         RadishLexStatusCode::InvalidArgument
     );
     unsafe {
@@ -86,7 +88,7 @@ fn session_handles_reject_non_owner_thread_use() {
         let engine_kind = radishlex_session_engine_kind(session);
         let mut error: *mut RadishLexError = ptr::null_mut();
         let status = radishlex_session_reset(session, &mut error);
-        let code = radishlex_error_code(error);
+        let code = unsafe { radishlex_error_code(error) };
         let message = unsafe { error_message(error) };
         unsafe {
             radishlex_error_free(error);
@@ -138,7 +140,7 @@ fn platform_binding_style_copies_views_before_releasing_handles() {
     let preedit = unsafe { view_to_owned(radishlex_snapshot_preedit(snapshot)) };
     let mut candidate = RadishLexCandidateView::empty();
     assert_eq!(
-        radishlex_snapshot_candidate(snapshot, 0, &mut candidate, &mut error),
+        unsafe { radishlex_snapshot_candidate(snapshot, 0, &mut candidate, &mut error) },
         RadishLexStatusCode::Ok
     );
     let candidate_text = unsafe { view_to_owned(candidate.text) };
@@ -152,11 +154,16 @@ fn platform_binding_style_copies_views_before_releasing_handles() {
     assert_eq!(candidate_text, "萝卜");
     assert_eq!(candidate_reading, "luobo");
 
-    let commit = radishlex_session_commit_candidate(session, 0, &mut error);
-    assert!(!commit.is_null());
-    let commit_text = unsafe { buffer_to_owned(commit) };
+    let mut result = ptr::null_mut();
+    assert_eq!(
+        unsafe { radishlex_session_select_candidate(session, 0, &mut result, &mut error) },
+        RadishLexStatusCode::Ok
+    );
+    assert!(!result.is_null());
+    assert_eq!(unsafe { radishlex_key_result_commit_present(result) }, 1);
+    let commit_text = unsafe { view_to_owned(radishlex_key_result_commit(result)) };
     unsafe {
-        radishlex_buffer_free(commit);
+        radishlex_key_result_free(result);
         radishlex_session_free(session);
     }
     assert_eq!(commit_text, "萝卜");
@@ -180,7 +187,7 @@ fn platform_binding_style_copies_views_before_releasing_handles() {
     assert!(!terms.is_null());
     let mut term = RadishLexUserTermView::empty();
     assert_eq!(
-        radishlex_userdb_terms_get(terms, 0, &mut term, &mut error),
+        unsafe { radishlex_userdb_terms_get(terms, 0, &mut term, &mut error) },
         RadishLexStatusCode::Ok
     );
     let term_input = unsafe { view_to_owned(term.input_code) };
@@ -190,6 +197,7 @@ fn platform_binding_style_copies_views_before_releasing_handles() {
     }
     assert_eq!(term_input, "cihe");
     assert_eq!(term_text, "词核");
+    assert_eq!(term.import_batch_id_present, 0);
 
     {
         let mut db = UserDb::open(&db_path).expect("userdb opens");
@@ -209,12 +217,12 @@ fn platform_binding_style_copies_views_before_releasing_handles() {
     assert!(!batches.is_null());
     let mut batch = RadishLexImportBatchView::empty();
     assert_eq!(
-        radishlex_userdb_import_batches_get(batches, 0, &mut batch, &mut error),
+        unsafe { radishlex_userdb_import_batches_get(batches, 0, &mut batch, &mut error) },
         RadishLexStatusCode::Ok
     );
     let batch_source = unsafe { view_to_owned(batch.source_name) };
     assert_eq!(
-        radishlex_userdb_import_batches_get(batches, 1, &mut batch, &mut error),
+        unsafe { radishlex_userdb_import_batches_get(batches, 1, &mut batch, &mut error) },
         RadishLexStatusCode::InvalidArgument
     );
     let error_message_copy = unsafe { error_message(error) };
@@ -225,6 +233,60 @@ fn platform_binding_style_copies_views_before_releasing_handles() {
 
     assert_eq!(batch_source, "binding-smoke");
     assert!(error_message_copy.contains("out of range"));
+
+    let terms = radishlex_userdb_terms_new(db_path_c.as_ptr(), &mut error);
+    assert!(!terms.is_null());
+    let mut imported_term = RadishLexUserTermView::empty();
+    assert_eq!(
+        unsafe { radishlex_userdb_terms_get(terms, 1, &mut imported_term, &mut error) },
+        RadishLexStatusCode::Ok
+    );
+    unsafe {
+        radishlex_userdb_terms_free(terms);
+    }
+    assert_eq!(imported_term.import_batch_id_present, 1);
+    assert_eq!(imported_term.import_batch_id, batch.id);
+
+    let _ = fs::remove_file(db_path);
+}
+
+#[test]
+fn deleted_term_views_copy_identity_and_reason_before_release() {
+    let db_path = temp_db_path("deleted-term-view");
+    {
+        let mut db = UserDb::open(&db_path).expect("userdb opens");
+        db.add_term("huifu", "合成恢复词", Some("hui fu"), TermSource::ManualAdd)
+            .expect("term is added");
+        db.delete_term("huifu", "合成恢复词", Some("hui fu"))
+            .expect("term is deleted");
+    }
+
+    let db_path_c = CString::new(db_path.to_string_lossy().as_bytes()).expect("path");
+    let mut error = ptr::null_mut();
+    let terms = radishlex_userdb_deleted_terms_new(db_path_c.as_ptr(), &mut error);
+    assert!(!terms.is_null());
+    assert!(error.is_null());
+    assert_eq!(radishlex_userdb_deleted_terms_count(terms), 1);
+
+    let mut term = RadishLexDeletedTermView::empty();
+    assert_eq!(
+        unsafe { radishlex_userdb_deleted_terms_get(terms, 0, &mut term, &mut error) },
+        RadishLexStatusCode::Ok
+    );
+    let input_code = unsafe { view_to_owned(term.input_code) };
+    let text = unsafe { view_to_owned(term.text) };
+    let reading = unsafe { view_to_owned(term.reading) };
+    let reason = unsafe { view_to_owned(term.reason) };
+    let deleted_at_ms = term.deleted_at_ms;
+    unsafe {
+        radishlex_userdb_deleted_terms_free(terms);
+    }
+
+    assert_eq!(input_code, "huifu");
+    assert_eq!(text, "合成恢复词");
+    assert_eq!(reading, "hui fu");
+    assert_eq!(reason, "manual_delete");
+    assert!(deleted_at_ms > 0);
 
     let _ = fs::remove_file(db_path);
 }
@@ -257,12 +319,14 @@ fn userdb_dictionary_file_management_round_trips_p2_terms() {
 
     let mut export_summary = radishlex_ime_ffi::RadishLexDictionaryExportSummary::empty();
     assert_eq!(
-        radishlex_userdb_dictionary_export(
-            source_db_path.as_ptr(),
-            export_file_path.as_ptr(),
-            &mut export_summary,
-            &mut error,
-        ),
+        unsafe {
+            radishlex_userdb_dictionary_export(
+                source_db_path.as_ptr(),
+                export_file_path.as_ptr(),
+                &mut export_summary,
+                &mut error,
+            )
+        },
         RadishLexStatusCode::Ok
     );
     assert_eq!(
@@ -281,11 +345,13 @@ fn userdb_dictionary_file_management_round_trips_p2_terms() {
 
     let mut inspect_summary = radishlex_ime_ffi::RadishLexDictionaryInspectSummary::empty();
     assert_eq!(
-        radishlex_userdb_dictionary_inspect(
-            export_file_path.as_ptr(),
-            &mut inspect_summary,
-            &mut error,
-        ),
+        unsafe {
+            radishlex_userdb_dictionary_inspect(
+                export_file_path.as_ptr(),
+                &mut inspect_summary,
+                &mut error,
+            )
+        },
         RadishLexStatusCode::Ok
     );
     assert_eq!(inspect_summary.record_count, 1);
@@ -300,14 +366,16 @@ fn userdb_dictionary_file_management_round_trips_p2_terms() {
 
     let mut import_summary = radishlex_ime_ffi::RadishLexDictionaryImportSummary::empty();
     assert_eq!(
-        radishlex_userdb_dictionary_import(
-            target_db_path.as_ptr(),
-            export_file_path.as_ptr(),
-            source_name.as_ptr(),
-            1,
-            &mut import_summary,
-            &mut error,
-        ),
+        unsafe {
+            radishlex_userdb_dictionary_import(
+                target_db_path.as_ptr(),
+                export_file_path.as_ptr(),
+                source_name.as_ptr(),
+                1,
+                &mut import_summary,
+                &mut error,
+            )
+        },
         RadishLexStatusCode::Ok
     );
     assert_eq!(import_summary.dry_run, 1);
@@ -323,14 +391,16 @@ fn userdb_dictionary_file_management_round_trips_p2_terms() {
     }
 
     assert_eq!(
-        radishlex_userdb_dictionary_import(
-            target_db_path.as_ptr(),
-            export_file_path.as_ptr(),
-            source_name.as_ptr(),
-            0,
-            &mut import_summary,
-            &mut error,
-        ),
+        unsafe {
+            radishlex_userdb_dictionary_import(
+                target_db_path.as_ptr(),
+                export_file_path.as_ptr(),
+                source_name.as_ptr(),
+                0,
+                &mut import_summary,
+                &mut error,
+            )
+        },
         RadishLexStatusCode::Ok
     );
     assert_eq!(import_summary.dry_run, 0);
@@ -343,7 +413,7 @@ fn userdb_dictionary_file_management_round_trips_p2_terms() {
 
     let mut batch = RadishLexImportBatchView::empty();
     assert_eq!(
-        radishlex_userdb_import_batches_get(batches, 0, &mut batch, &mut error),
+        unsafe { radishlex_userdb_import_batches_get(batches, 0, &mut batch, &mut error) },
         RadishLexStatusCode::Ok
     );
     assert_eq!(unsafe { view_to_string(batch.source_name) }, "ffi-smoke");
@@ -354,11 +424,11 @@ fn userdb_dictionary_file_management_round_trips_p2_terms() {
     assert_eq!(batch.skipped_duplicate_terms, 0);
 
     assert_eq!(
-        radishlex_userdb_import_batches_get(batches, 1, &mut batch, &mut error),
+        unsafe { radishlex_userdb_import_batches_get(batches, 1, &mut batch, &mut error) },
         RadishLexStatusCode::InvalidArgument
     );
     assert_eq!(
-        radishlex_error_code(error),
+        unsafe { radishlex_error_code(error) },
         RadishLexStatusCode::InvalidArgument
     );
     unsafe {
@@ -402,12 +472,12 @@ fn userdb_learning_status_reports_read_only_counts() {
     let mut error = ptr::null_mut();
     let mut summary = RadishLexLearningStatusSummary::empty();
     assert_eq!(
-        radishlex_userdb_learning_status(db_path_c.as_ptr(), &mut summary, &mut error),
+        unsafe { radishlex_userdb_learning_status(db_path_c.as_ptr(), &mut summary, &mut error) },
         RadishLexStatusCode::Ok
     );
     assert!(error.is_null());
 
-    assert_eq!(summary.schema_version, 2);
+    assert_eq!(summary.schema_version, 9);
     assert_eq!(summary.plaintext_payload, 0);
     assert_eq!(summary.p1_raw_details, 0);
     assert_eq!(summary.context_stats, 0);
@@ -433,11 +503,13 @@ fn userdb_learning_status_reports_read_only_counts() {
     assert!(!debug.contains("词核"));
 
     assert_eq!(
-        radishlex_userdb_learning_status(db_path_c.as_ptr(), ptr::null_mut(), &mut error),
+        unsafe {
+            radishlex_userdb_learning_status(db_path_c.as_ptr(), ptr::null_mut(), &mut error)
+        },
         RadishLexStatusCode::InvalidArgument
     );
     assert_eq!(
-        radishlex_error_code(error),
+        unsafe { radishlex_error_code(error) },
         RadishLexStatusCode::InvalidArgument
     );
     unsafe {
@@ -470,7 +542,7 @@ fn rime_session_native_invalid_schema_reports_engine_error() {
         user_data_dir: user_data.as_ptr(),
         schema: missing_schema.as_ptr(),
         log_dir: ptr::null(),
-        deploy_on_start: 0,
+        deploy_on_start: 1,
     };
 
     let session = radishlex_session_new_rime(&options, &mut error);
@@ -482,7 +554,7 @@ fn rime_session_native_invalid_schema_reports_engine_error() {
     }
     assert!(session.is_null());
     assert_eq!(
-        radishlex_error_code(error),
+        unsafe { radishlex_error_code(error) },
         RadishLexStatusCode::EngineError
     );
 
@@ -516,7 +588,7 @@ fn rime_native_sessions_share_runtime_and_survive_peer_release() {
         user_data_dir: user_data.as_ptr(),
         schema: schema.as_ptr(),
         log_dir: ptr::null(),
-        deploy_on_start: 0,
+        deploy_on_start: 1,
     };
     let mut error = ptr::null_mut();
 
@@ -578,17 +650,6 @@ unsafe fn view_to_owned(view: RadishLexStringView) -> String {
     assert!(!view.data.is_null());
     let bytes = slice::from_raw_parts(view.data, view.len);
     String::from_utf8(bytes.to_vec()).expect("view must be UTF-8")
-}
-
-unsafe fn buffer_to_owned(buffer: *const radishlex_ime_ffi::RadishLexBuffer) -> String {
-    let data = radishlex_buffer_data(buffer);
-    let len = radishlex_buffer_len(buffer);
-    if len == 0 {
-        return String::new();
-    }
-    assert!(!data.is_null());
-    let bytes = slice::from_raw_parts(data, len);
-    String::from_utf8(bytes.to_vec()).expect("buffer must be UTF-8")
 }
 
 fn temp_db_path(name: &str) -> PathBuf {

@@ -28,6 +28,20 @@ func TestErrorResponseFromStorageErrorKeepsConflictMetadata(t *testing.T) {
 	}
 }
 
+func TestErrorResponseFromSignatureErrorKeepsStableDetailCode(t *testing.T) {
+	err := &storage.Error{
+		Code:       storage.ErrInvalidSignature,
+		DetailCode: "signature_algorithm_mismatch",
+		Message:    "signature algorithm does not match signer device",
+	}
+
+	response := ErrorResponseFrom(err, time.UnixMilli(1234))
+	if response.ErrorCode != string(storage.ErrInvalidSignature) ||
+		response.ErrorDetail != "signature_algorithm_mismatch" {
+		t.Fatalf("signature detail missing from error response: %#v", response)
+	}
+}
+
 func TestObjectUploadRequestDoesNotCarryCleartextPayload(t *testing.T) {
 	request := ObjectVersionUploadRequest{
 		ObjectType:          storage.ObjectDictionaryUserTerms,

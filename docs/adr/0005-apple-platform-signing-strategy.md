@@ -6,6 +6,10 @@
 
 Accepted
 
+## 与后续决策的关系
+
+本 ADR 对 `apple-keychain-v1` 的结论继续有效：Ed25519 原生 `SecKey` 路径保持生产不可用，也禁止用可导出 seed 冒充非导出 backend。ADR 0006 已按本 ADR 的进入条件接受独立 P-256 profile 和普通 DPK backend；ADR 0007 又固定独立 Secure Enclave backend。后续 P-256 进展不回写或放宽 `apple-keychain-v1`，三种 backend identity 与证据必须分开。
+
 ## 背景
 
 RadishLex v1 设备签名协议已固定为 `ed25519-v1`。Rust、Go server 和跨语言 smoke 当前都按 32-byte Ed25519 public key、64-byte signature 和 `radishlex-signature-v1` canonical bytes 验证对象版本、设备授权、设备撤销和恢复记录。
@@ -30,9 +34,11 @@ RadishLex 继续保留 `ed25519-v1` 作为 M3 设备签名协议，不因为 App
 
 暂不把 Ed25519 seed 作为 generic password / data item 存入 Keychain 后再取回 Rust 签名，也不把这种方案塞进 `apple-keychain-v1`。该方案会让签名私钥 bytes 进入进程内可导出路径，突破当前“非导出平台 signing key”停止线。后续如确需软件保护 fallback，必须新增独立 backend id 和 capability / 风险口径，例如单独标记为 software-protected、not hardware-backed、not production-eligible，不能复用 `apple-keychain-v1`。
 
-暂不把 Apple 平台切到 P-256 或其他平台原生签名算法。若后续选择新增算法，必须新增独立 signature algorithm profile，并同时更新 Rust verifier、Go verifier、API 字段约束、跨语言测试、迁移策略和文档。
+本 ADR 当时决定不直接把 Apple 平台切到 P-256；该进入条件随后已由 ADR 0006 满足并接受独立 P-256 profile，ADR 0007 又固定 Secure Enclave backend。这里保留为历史决策，不再表示当前禁止 P-256；独立算法/backend、跨语言 verifier、迁移与无 fallback 要求继续有效。
 
 ## 推进顺序
+
+以下顺序是 `apple-keychain-v1` 阻塞后的决策链。第 5 项已由 ADR 0006/0007 完成，其余规则继续约束 Ed25519 backend 和任何后续 fallback 讨论。
 
 1. 先让 `apple-keychain-v1` 的 status 明确阻断生产签名，保留 smoke 作为调查命令。
 2. 记录当前平台阻塞和不可用状态，避免后续管理 UI 或同步上传误认为 Apple backend 可用。
@@ -67,5 +73,5 @@ RadishLex 继续保留 `ed25519-v1` 作为 M3 设备签名协议，不因为 App
 
 代价：
 
-- Apple 平台在当前阶段仍没有可用生产 signing backend。
+- Apple 平台已有按受支持 macOS 主路径完成最终资格评审的 Secure Enclave P-256 signing backend；普通 DPK P-256 仍因可导出被拒绝。unsupported 作为兼容性证据延期补测，不开放 backend fallback。
 - 后续需要单独投入平台 spike，或明确接受新的软件保护 backend / 新签名算法 profile 的实现成本。

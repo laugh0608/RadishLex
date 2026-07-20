@@ -1,10 +1,10 @@
 # RadishLex 同步服务端 API 与存储边界
 
-本文档定义 Go sync server 实现期间必须稳定的 API、存储、错误语义和验证口径。读者是后续实现 `server/sync-server`、`ime-sync` 远端客户端、同步 runbook 和审阅隐私边界的开发者。本文不展开 Docker Compose 逐步操作、Flutter 同步页面、生产部署操作流程或生产平台私钥存储 backend；Docker Compose runbook 见 `docs/runbooks/sync-server-compose.md`，生产部署边界见 `docs/runbooks/sync-server-production-deployment.md`，生产恢复流程见 `docs/production-recovery-flow.md`，平台私钥存储 backend 边界见 `docs/adr/0004-platform-private-key-storage-backend.md`。
+本文档定义 Go sync server 实现期间必须稳定的 API、存储、错误语义和验证口径。读者是后续实现 `server/sync-server`、`ime-sync` 远端客户端、同步 runbook 和审阅隐私边界的开发者。本文不展开客户端产品状态机、Docker Compose 逐步操作、Flutter 同步页面、生产部署操作流程或生产平台私钥存储 backend；客户端 transaction/cursor/outbox 见 `docs/sync-orchestration.md`，Docker Compose runbook 见 `docs/runbooks/sync-server-compose.md`，生产部署边界见 `docs/runbooks/sync-server-production-deployment.md`，生产恢复流程见 `docs/production-recovery-flow.md`，平台私钥存储 backend 边界见 `docs/adr/0004-platform-private-key-storage-backend.md`。
 
 ## 当前定位
 
-当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、恢复记录签名、客户端解密后合并模型、已解密 P2 payload 写回本地 SQLite 的执行器、`ime-sync` remote client DTO / transport trait、std-only `http://` `HttpSyncRemoteTransport`、使用内存 remote harness 的两客户端同步边界测试，以及短生命周期 Go sync server 的两客户端真实 HTTP 同步测试。Go server 已起步，当前 `server/sync-server` 已包含配置默认值、API request / response / error DTO、storage interface、SQLite metadata migration 文本、storage conformance tests、内存 metadata store、SQLite-backed metadata repository、local object storage staged transaction、metadata transaction 与 blob transaction 接线、Ed25519 签名验证抽象、签名篡改拒绝测试、recovery latest handler、domain / device / join request metadata handler、authorization handler、encrypted object version 上传 / metadata 读取 / payload 下载 handler、API 层 request id、panic recovery、非持久审计 hook、SQLite `audit_events` 写入测试、单用户自部署 bearer access token 门禁、`cmd/radishlex-sync-server` 启动入口、runtime 配置装配、SQLite migration 嵌入、对象大小门禁、脱敏 audit logger、本机 smoke runbook、短生命周期 HTTP smoke 测试、短生命周期备份恢复 smoke、短生命周期外部 TLS 反代 smoke、短生命周期升级回滚 smoke、Docker Compose 本地 / 部署态入口、容器实际启动 smoke 证据和生产部署边界 runbook；本地 compose 通过 Caddy internal TLS 在同一外部端口提供 `https://localhost:7319`，部署态 compose 在同一外部端口只暴露 HTTP 上游并提供外部 Nginx TLS 终止示例。runtime smoke 已覆盖第二设备 join request / authorization、active 状态复验、跨设备同一 object 的 stale conflict 与 v2 payload 读取，冷备份恢复后 domain state、device state、recovery latest、三类 P2 object metadata / payload、stale conflict latest metadata 和日志脱敏，HTTPS client 经 TLS reverse proxy 到 HTTP upstream 的 bearer header 透传、TLS 版本、encrypted object 上传下载、Go 对象大小门禁和日志脱敏，以及升级重启后 idempotent migration、升级后 v2 写入、恢复升级前备份后 v2 不可见、v1 payload / stale conflict 与日志脱敏。Rust HTTP transport 直连 Go server 的短生命周期跨语言测试已覆盖 domain 初始化、signed encrypted object 上传、metadata / payload 读取和 stale conflict 映射；Rust userdb 两客户端真实 HTTP 测试已覆盖设备授权、三类 P2 对象上传下载、客户端解密合并写回、stale conflict 和 v2 重新上传。尚未形成完整真实用户生产封装、发布级目标部署运行证据或可用平台私钥 backend；当前产品开发以本地 Docker / 本地 HTTPS 和短生命周期 smoke 继续推进同步入口状态与本地联调。`apple-keychain-v1` 已 feature-gated 接线但真实 smoke 阻塞于 `ed25519-v1` 创建，当前 status 会阻断生产签名。SQLite driver 当前使用纯 Go `modernc.org/sqlite`，避免把 CGO 作为 server 单元测试前提。
+当前 Rust 侧已经完成 P2 payload 本地加密、设备授权 / 撤销签名、signed epoch distribution、recovery-record-v2 签名轮换/可信解封/recovered-device activation/signed revocation、客户端解密合并和 `ime-sync` remote client。Go server metadata schema v9 已具备 API/storage/runtime、SQLite metadata、local blob、签名 profile 验证、对象/lifecycle/epoch distribution/recovery activation/revocation、审计、备份恢复和升级回滚受控证据。本地 Compose / HTTPS 已通过，Rust 客户端也以严格 TLS 验证直连该本地入口；目标生产证据后移到首个正式版本发布后。macOS 生产私钥 backend 已按单设备主路径评审，真实用户同步保持关闭。
 
 本阶段只固定服务端 API 和 storage 边界：
 
@@ -13,7 +13,7 @@
 - 服务端不能解密、不能解析 plaintext payload、不能合并用户词、不能读取 P1 原始事件。
 - 客户端仍是真相源：解密、冲突合并、删除 tombstone 语义、显式恢复和 userdb 写回都在客户端完成。
 
-Go 代码必须继续受本文件约束 migration、handler 和测试命名；平台私钥存储 backend capability / unavailable backend 的 Rust 模型已经落地。进入真实用户可用同步前，仍必须保持签名验证、HTTP API handler、Go runtime smoke、Rust HTTP transport 直连 Go server、Rust 侧两客户端 harness、Rust userdb 两客户端真实 HTTP 测试、Docker Compose runbook、生产部署 runbook、错误语义、审计日志和平台 backend 验证彼此一致。
+Go 代码必须继续受本文件约束 migration、handler 和测试命名。ADR 0006 后，server 已按显式 `signing_algorithm` 分派 `ed25519-v1` / `ecdsa-p256-sha256-v1` verifier，历史设备与 join request 只由 schema migration 回填 Ed25519，新 API 请求不做默认或算法猜测。进入真实用户可用同步前，仍必须保持签名验证、HTTP API handler、Go runtime smoke、Rust HTTP transport 直连 Go server、Rust 侧两客户端 harness、生产部署、错误语义、审计日志和平台 backend 验证彼此一致。
 
 ## 服务端职责
 
@@ -47,35 +47,51 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名；�
 
 `current_key_epoch` 只用于拒绝撤销后的旧 epoch 新写入；客户端合并仍是最终冲突真相源。
 
-`devices`：`domain_id`、`device_id`、`signing_public_key_id`、`signing_public_key`、`key_agreement_public_key_id`、`key_agreement_public_key`、`status`、`authorized_at_ms`、`revoked_at_ms`、`last_seen_at_ms`。设备显示名如果后续需要展示，应作为用户可编辑的非敏感标签处理，不得从系统用户名、联系人或输入内容自动采集。
+`devices`：`domain_id`、`device_id`、`signing_algorithm`、`signing_public_key_id`、`signing_public_key`、`key_agreement_public_key_id`、`key_agreement_public_key`、`status`、`authorized_at_ms`、`revoked_at_ms`、`last_seen_at_ms`。设备显示名如果后续需要展示，应作为用户可编辑的非敏感标签处理，不得从系统用户名、联系人或输入内容自动采集。
 
-`device_join_requests`：`domain_id`、`join_request_id`、`device_id`、`signing_public_key_id`、`signing_public_key`、`key_agreement_public_key_id`、`key_agreement_public_key`、`challenge`、`created_at_ms`、`expires_at_ms`、`status`。
+`device_join_requests`：`domain_id`、`join_request_id`、`device_id`、`signing_algorithm`、`signing_public_key_id`、`signing_public_key`、`key_agreement_public_key_id`、`key_agreement_public_key`、`challenge`、`created_at_ms`、`expires_at_ms`、`status`。
 
 服务端只转发待授权设备的公钥、challenge 和状态。短码应由客户端根据加入请求内容本地计算和展示；授权提交时需要携带 signed authorization 中的 `join_short_code`，用于验签绑定用户确认过的短码。
+
+进入可信 lifecycle cache 的加入请求必须使用 `profile-sha256-v1:<lowercase hex>` challenge。摘要输入为 `device_join_profile` canonical fields：`domain_id`、`join_request_id`、设备 ID、签名算法、签名 key id 与完整公钥 bytes、密钥协商 key id 与完整公钥 bytes、创建时间和过期时间。signed authorization 继续签入该 challenge，从而把接收设备的两组公开密钥和加入请求时限绑定进授权签名。任意旧式自由文本 challenge 可以继续用于历史测试或迁移读取，但 Rust 产品 lifecycle verifier 必须失败关闭，不能据此信任服务端返回的 recipient public key。
 
 `device_authorizations`：`domain_id`、`join_request_id`、`authorizer_device_id`、`recipient_device_id`、`recipient_signing_public_key_id`、`recipient_key_agreement_key_id`、`join_short_code`、`key_epoch`、`created_at_ms`、`signature_schema_version`、`signature_algorithm`、`signature_key_id`、`signature`。
 
 授权记录只证明某个 active 设备接受了待加入设备的公钥和指定 key epoch，不包含同步主密钥明文或恢复码。当前 Go storage 会在同一事务中把 join request 置为 active、写入授权记录、写入 wrapping metadata，并激活接收设备。
 
-`device_wrapping_records`：`domain_id`、`recipient_device_id`、`authorizer_device_id`、`key_epoch`、`wrapping_key_id`、`algorithm`、`nonce`、`wrapped_key_len`、`ciphertext_hash`、`created_at_ms`、`signature`、`blob_ref`。
+`device_wrapping_records`：`domain_id`、`recipient_device_id`、`recipient_key_agreement_key_id`、`authorizer_device_id`、`key_epoch`、`wrapping_key_id`、`algorithm`、`nonce`、`wrapped_key_len`、`ciphertext_hash`、`created_at_ms`、`signature_record_type`、`signature_schema_version`、`signature_algorithm`、`signature_key_id`、`signature`、`blob_ref`。
 
-包装记录只保存给指定设备的包装密文元数据、签名和密文 blob ref，不保存 `SyncMasterKey`、`DeviceWrappingKey` 或恢复码明文。当前 Go storage 已在授权事务中保存 / 读取 wrapped key bytes，并按 `wrapped_key_len` 与 `ciphertext_hash` 复验；该字段只能是密文 bytes。
+包装记录只保存给指定设备的包装密文元数据、签名和密文 blob ref，不保存 `SyncMasterKey`、`DeviceWrappingKey` 或恢复码明文。`recipient_key_agreement_key_id` 必须与已签名 authorization 和加入 profile 一致，使 HTTP 响应能够完整重建 wrapped epoch v1 AAD；不能在读取时从可变的当前设备 profile 猜测。当前 Go storage 已在授权事务中保存 / 读取 wrapped key bytes，并按 `wrapped_key_len` 与 `ciphertext_hash` 复验；该字段只能是密文 bytes。
 
 `device_revocations`：`domain_id`、`revoked_device_id`、`revoker_device_id`、`previous_key_epoch`、`new_key_epoch`、`reason`、`created_at_ms`、`signature`。
 
 撤销记录被接受后，服务端必须拒绝被撤销设备后续上传，并拒绝低于 `current_key_epoch` 的新对象版本写入。历史对象是否重加密由客户端和管理 UI 后续单独设计。
 
-`recovery_records`：`domain_id`、`recovery_record_id`、`key_epoch`、`kdf_profile`、`kdf_version`、`memory_kib`、`iterations`、`parallelism`、`output_len`、`salt`、`algorithm`、`nonce`、`wrapped_material_len`、`ciphertext_hash`、`status`、`created_at_ms`、`revoked_at_ms`、`signer_device_id`、`signature_schema_version`、`signature_algorithm`、`signature_key_id`、`signature`、`blob_ref`。
+`domain_lifecycle_events`：`domain_id`、`lifecycle_sequence`、`event_type`、`record_id`、`reject_from_object_change_sequence`、`created_at_ms`。当前 event type 包含 `initial_device`、`device_authorized`、`device_revoked`、`recovery_record_rotated`、`device_recovered` 和 `recovery_record_revoked`。
 
-恢复记录只保存加密后的同步域材料和 KDF 参数。服务端可以对读取和替换恢复记录做限速，但不能依赖限速替代恢复码强度。
+`lifecycle_sequence` 是设备信任链的 domain 内严格递增序列，与加密对象的 `change_sequence` 属于不同命名空间。创建 domain、授权设备和撤销设备只在对应 metadata transaction 成功提交时追加生命周期事件；失败和回滚不得留下可发现事件。生命周期事件只引用第一设备 profile、signed authorization 或 signed revocation 的公开记录，不承载 wrapped key bytes、恢复材料或对象 payload。
 
-`sync_objects`：`domain_id`、`object_id`、`object_type`、`latest_version`、`latest_ciphertext_hash`、`latest_key_epoch`、`created_at_ms`、`updated_at_ms`。
+撤销事务必须把当时 domain 内下一条对象序列记录为 `reject_from_object_change_sequence`。客户端把该值作为“从此对象序列开始拒绝被撤销设备签名”的不可回退顺序证据；signed revocation 仍负责证明撤销者、目标设备和 key epoch 变化。服务端不能仅凭 `devices.status` 建立客户端信任，客户端必须验证签名链，并把同一撤销记录对应的截点变化视为冲突。服务端恶意分叉或首次 bootstrap 欺骗不由单机 cursor 完全解决；当前边界通过本地已观察高水位禁止回退，后续跨设备透明度 / gossip 另行设计。
+
+`recovery_records`：`record_schema_version`、`domain_id`、`recovery_record_id`、`previous_recovery_record_id`、`key_epoch`、KDF 参数、`salt`、envelope algorithm/nonce、wrapped length/hash、activation algorithm/key id/public key、`status`、`created_at_ms`、`updated_at_ms`、`revoked_at_ms`、signer/signature metadata 和 `blob_ref`。
+
+恢复记录只保存加密后的同步域材料、KDF 参数和 activation 公钥。v2 新写入固定当前 epoch/profile，predecessor 必须指向当前 latest；旧 active 原子变为 `superseded`。v1 只保留迁移 metadata/blob，当前产品客户端拒绝直接解封或激活，必须由 active 设备轮换为 v2。服务端可以限速读取，但不能依赖限速替代恢复码强度。
+
+`recovered_device_activations`：`domain_id`、`recovery_record_id`、`device_id`、完整 signing/key-agreement public profile、`key_epoch`、`created_at_ms`、activation signature schema/algorithm/key id/signature。
+
+恢复激活只保存 possession proof 与新设备公开 profile，不保存恢复码、派生 activation private seed、同步主密钥或 ECDH shared secret。恢复记录消费、设备激活、activation 保存、完整 active cohort wrapped metadata 和 `device_recovered` lifecycle event 必须在一个 transaction 中提交。
+
+`recovery_record_revocations`：`domain_id`、`recovery_record_id`、`revoker_device_id`、`key_epoch`、`reason`、`created_at_ms`、signature schema/algorithm/key id/signature。
+
+恢复记录撤销只保存公开 signed decision。目标状态更新、revocation metadata 和 `recovery_record_revoked` lifecycle event 必须原子提交；不得删除 recovery wrapped blob，也不得让 unsigned bearer/header 请求改变恢复可用性。
+
+`sync_objects`：`domain_id`、`object_id`、`object_type`、`latest_version`、`latest_ciphertext_hash`、`latest_key_epoch`、`latest_change_sequence`、`created_at_ms`、`updated_at_ms`。
 
 `object_id` 必须是不含业务明文的 opaque ID。需要稳定 term identity 时，只能放在 encrypted payload 内，或使用客户端持有密钥派生的不可公开反查 ID。
 
-`sync_object_versions`：`domain_id`、`object_id`、`version`、`base_version`、`owner_device_id`、`key_id`、`key_epoch`、`algorithm`、`nonce`、`encrypted_payload_len`、`ciphertext_hash`、`signature_schema_version`、`signature_algorithm`、`signature_key_id`、`signature`、`server_received_at_ms`、`client_created_at_ms`、`client_updated_at_ms`、`blob_ref`。
+`sync_object_versions`：`domain_id`、`object_id`、`version`、`base_version`、`change_sequence`、`owner_device_id`、`key_id`、`key_epoch`、`algorithm`、`nonce`、`encrypted_payload_len`、`ciphertext_hash`、`signature_schema_version`、`signature_algorithm`、`signature_key_id`、`signature`、`server_received_at_ms`、`client_created_at_ms`、`client_updated_at_ms`、`blob_ref`。
 
-服务端可以按 `object_type`、版本和时间分页列出 metadata；payload bytes 必须通过 blob 存储读取，不放入日志或错误响应。
+`change_sequence` 在 domain 内严格递增，只在新 object version 与 metadata transaction 成功提交时分配。同一 `object_id + version + ciphertext_hash` 幂等重放复用原 sequence；冲突、blob 写入失败和 transaction 回滚不产生可发现 entry。服务端按 sequence 分页列出 metadata；产品同步默认发现全部受支持 P2 类型。若提供 `object_type` 诊断过滤，opaque cursor 必须绑定相同过滤条件，不得与全量 cursor 混用。客户端时间和跨对象 version 不能替代权威 cursor。payload bytes 必须通过 blob 存储读取，不放入日志或错误响应。
 
 `audit_events`：`domain_id`、`event_type`、`device_id`、`object_id`、`version`、`result_code`、`bytes`、`server_time_ms`。
 
@@ -83,17 +99,40 @@ Go 代码必须继续受本文件约束 migration、handler 和测试命名；�
 
 ## 当前 Go storage surface
 
-当前 `server/sync-server/internal/storage.Store` 是 HTTP handler 前的内部边界，已经落地 `CreateDomain`、`Domain`、`Device`、`SaveJoinRequest`、`PendingJoinRequests`、`AuthorizeJoinRequest`、`DeviceWrappedKey`、`RevokeDevice`、`PutRecoveryRecord`、`LatestRecoveryRecord`、`LatestRecoveryWrappedMaterial`、`PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`。
+当前 `server/sync-server/internal/storage.Store` 是 HTTP handler 前的内部边界，已经落地 `CreateDomain`、`Domain`、`Device`、`LifecycleSnapshot`、`LifecycleEventsAfter`、`SaveJoinRequest`、`PendingJoinRequests`、`AuthorizeJoinRequest`、`PutEpochDistribution`、`DeviceWrappedKey`、`RevokeDevice`、`PutRecoveryRecord`、`LatestRecoveryRecord`、`LatestRecoveryWrappedMaterial`、`RecoverDevice`、`RevokeRecoveryRecord`、`PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`。
 
-这组方法当前用于验证 metadata、设备状态、版本冲突、blob 写入和错误语义，不等同于完整 HTTP API。尚未暴露对象分页、审计日志查询或持久限速器。
+这组方法当前用于验证 metadata、设备状态、版本冲突、blob 写入和错误语义，不等同于完整产品入口。对象 change cursor、对象 discovery 分页和设备 lifecycle cursor 已落地；审计日志查询和持久限速器仍未落地。产品编排不得用 `updated_after_ms`、客户端时间或逐个猜测 object/version 代替 discovery。
 
-当前 storage conformance 已覆盖：第一台设备必须为 `active`；join request 从 `pending` 授权到 `active`；wrapped device key bytes 随授权事务保存并可按 metadata 读取；revoked 设备和旧 `key_epoch` 写入被拒绝；object version 支持同 hash 幂等重试、同版本不同 hash 冲突和 stale `base_version` latest metadata；object payload 读取复验长度 / Rust envelope ciphertext hash；recovery record 写入校验 wrapped material 长度 / ciphertext hash 并分配 `blob_ref`；latest recovery metadata 与 wrapped material bytes 可一起读取并复验；signed object manifest、device authorization、device revocation 和 recovery record 字段篡改会被 Ed25519 验签拒绝。
+当前 storage conformance 已覆盖设备状态、授权/撤销、完整 active cohort epoch distribution、对象版本冲突与 blob 完整性；recovery v2 另覆盖首次创建、原子轮换、恢复激活、signed revocation、精确重放、陈旧 predecessor、同 id 分叉、activation/revocation 互斥、revoked head 后续轮换和密文篡改。signed object、authorization、device/recovery revocation、distribution、recovery 与 activation 字段篡改均被验签拒绝。
 
-当前 storage 已在写入前使用 `devices.signing_public_key` 验证 object manifest、device authorization、device revocation 和 recovery record；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list。当前 API 层已补 `GET /api/v1/domains/{domain_id}/recovery-records/latest`，复用 `LatestRecoveryWrappedMaterial`，返回服务端可见 recovery metadata 与 encrypted wrapped material，并覆盖统一 JSON 错误响应、`recovery_rate_limited` 和不泄漏内部 `blob_ref`。API 层也已补 `POST /domains`、`GET /domains/{domain_id}/state`、`GET /domains/{domain_id}/devices/{device_id}`、`POST /domains/{domain_id}/join-requests`、`GET /domains/{domain_id}/join-requests` 和 `POST /domains/{domain_id}/join-requests/{join_request_id}/authorization`，覆盖创建 domain、读取 domain metadata、读取 active / pending device metadata、创建 / 列出 pending join request、authorization request 到 storage upload 的映射和非法 JSON 错误响应。对象版本 API 已补 `POST /api/v1/domains/{domain_id}/objects/{object_id}/versions`、`GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}` 和 `GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}/payload`，复用 `PutObjectVersion`、`ObjectVersion` 和 `ObjectPayload`，覆盖 encrypted payload 长度 / hash mismatch、stale base version latest metadata、同版本同 hash 幂等、同版本不同 hash 冲突、revoked / pending / unknown device 禁止上传、plaintext 字段拒绝和错误 / 审计不泄漏 payload。当前 handler 外层已补 `X-Request-ID` 透传 / 生成、panic recovery 结构化 `storage_unavailable` 响应和非持久 `AuditSink` hook；当底层 store 实现持久审计时会写入 SQLite `audit_events`。runtime 层已补 `cmd/radishlex-sync-server`、SQLite + local blob store 装配、idempotent migration、HTTP timeout、`RADISHLEX_SYNC_MAX_OBJECT_BYTES` 门禁和脱敏 audit logger。审计事件和 runtime 日志只包含 route name / event type、domain id、device id、object id、object type、version、result code、HTTP status、byte count、server time 和 latency，不包含请求体或响应体。
+当前 storage 已在写入前使用设备登记的 `signing_algorithm + signing_public_key` 验证 object manifest、device authorization、device revocation、epoch distribution、recovery record 和 recovery revocation；签名 canonical bytes 对齐 Rust `radishlex-signature-v1` length-prefixed field list，不在失败时尝试另一 verifier。HTTP API 已覆盖 domain/device/join、authorization、epoch distribution、recovery create/latest/activation/revoke 与 object version 路径；签名错误对外保持顶层 `invalid_signature`，并以脱敏 `error_detail` 区分算法、编码、验签和 key lifetime。runtime 使用 idempotent schema migration，并要求 metadata/blob 共享专用非 symlink leaf、目录 `0700`、SQLite `0600`；审计与日志不包含 request body、public key、signature、真实存储路径或 canonical bytes。
+
+metadata schema 的算法迁移必须区分“历史兼容”与“新写入契约”：全新 schema 的 `devices.signing_algorithm` 和 `device_join_requests.signing_algorithm` 是无默认值的 `NOT NULL` 字段；旧数据库只允许迁移事务在增加缺失列时用 `ed25519-v1` 回填历史行，并记录 metadata schema version 2。迁移后 application/storage 仍必须为每个新 device/join 显式写入算法，不能依赖 SQLite 列默认值把缺失请求解释成 Ed25519；API DTO 缺失、空值或未知算法必须在进入持久化前失败关闭。
 
 ## HTTP API 边界
 
 首批 API 使用 `/api/v1` 前缀。metadata 使用 JSON；当前对象上传使用 JSON `payload` byte 字段承载 encrypted bytes，Go JSON 编码下表现为 base64 字符串；对象 payload 下载接口返回 `application/octet-stream` 二进制密文。后续可以调整传输细节，但不能改变“metadata 可验证、payload 仍为密文”的边界。
+
+### Device wrapped epoch 读取
+
+设备材料读取固定为 `GET /api/v1/domains/{domain_id}/devices/{recipient_device_id}/wrapped-epochs/{key_epoch}?wrapping_key_id=...`。响应只包含 wrapped epoch v1 的公开 metadata 与 base64 密文，不包含 authorization short code、平台 handle、shared secret 或明文 key。
+
+- 请求必须携带全局 bearer token 和 `X-RadishLex-Device-ID`；header device 必须与 route recipient 完全一致。该 header 是当前单用户自部署访问边界中的设备声明，不替代未来按设备认证，但可以阻止客户端误读其他 recipient 的记录。
+- storage 必须在同一锁/事务观察点确认 recipient 当前为 `active`，再读取 wrapping metadata；revoked/lost/pending/missing device 返回 `forbidden_device`，且不得读取 wrapped blob。撤销前已经取得或缓存的历史材料无法追回。
+- query 只接受单个非空 `wrapping_key_id`；epoch 必须为正整数。未知 query、重复参数、跨 recipient、错误 epoch/key id 与不存在记录失败关闭，不做“最新记录”猜测。
+- wrapped bytes 固定上限为 64 KiB；授权写入、storage validation、HTTP 读取和 Rust response validation 使用同一上限。长度、裸密文 SHA-256、nonce、算法、recipient key id 或其他 AAD 字段不一致时不得缓存或解封。
+- 审计只记录 route、domain、recipient、epoch、结果码和密文字节数，不记录 query value、nonce、ciphertext hash、wrapped bytes、signature 或平台错误文本。
+- 精确读取同时承载 join authorization 产生的初始 record 与独立 `epoch_distribution` record。前者的信任来自已验证 lifecycle authorization；后者必须返回 `signature_record_type` 与完整 signature metadata，由客户端按 trusted distributor profile 复验后才能缓存。
+
+### Signed epoch distribution 上传
+
+轮换分发固定为 `POST /api/v1/domains/{domain_id}/epoch-distributions`。请求携带 `distributor_device_id`、目标 `key_epoch` 和最多 64 条独立 signed record；每条包含 recipient/key-agreement key id、wrapped epoch v1 metadata、wrapped bytes 与 `epoch_distribution` signature metadata。请求必须携带与 distributor 相同的 `X-RadishLex-Device-ID`，但 header 只作为访问声明，不能替代记录签名。
+
+- `key_epoch` 必须等于事务中 domain `current_key_epoch`；distributor 和全部 recipients 必须在同一观察点为 active。recipient 集合必须无重复并精确等于当前 active 设备全集，因此 revoked/pending/lost 设备不能取得新 epoch，漏发某台 active 设备也不能形成已接受批次。
+- 每条 `epoch_distribution` canonical bytes 完整签入 distributor/domain/recipient/recipient key-agreement key id/epoch/wrapping key id/algorithm/nonce/wrapped length/ciphertext hash/created time。server 使用 distributor 当前登记的 signing profile 验签，并复核 recipient 当前 key-agreement key id。
+- 每条 wrapped bytes 上限 64 KiB，整批合计上限 4 MiB。所有 metadata、hash、签名、active cohort 与 blob staging 都通过后，metadata 在一个 transaction 中提交；任一记录失败不得产生可读取的部分批次。
+- 精确整批重放返回成功并报告 `inserted_records=0`；既有 locator 的 metadata/hash/bytes 不同返回 `conflict_epoch_distribution`。混合“已精确接受 + 尚缺记录”的重试只补齐缺记录，但仍需请求覆盖完整 active cohort。
+- runtime/audit 只记录 route、distributor、epoch、结果码、record count 和总密文字节数，不记录 recipient key id、wrapping key id、nonce、hash、signature 或 wrapped bytes。
 
 ### 单用户访问 token
 
@@ -119,8 +158,22 @@ OIDC / Radish 产品账号体系接入已后置为未来专题，见 `docs/sync-
 
 `GET /api/v1/domains/{domain_id}/state`
 
-- 返回 domain metadata、设备列表、恢复记录状态和对象 latest version 摘要。
+- 当前返回 domain metadata；设备公开信任链通过独立 lifecycle API 获取，不能从该响应中的服务端状态推导客户端信任。
 - 不返回对象 payload；客户端需要按对象版本显式下载密文 bytes。
+
+`GET /api/v1/domains/{domain_id}/lifecycle`
+
+- 返回一致性 lifecycle snapshot：domain metadata、第一设备与当前设备公开 profile、完整 signed authorization / revocation 记录、对应事件序列和 snapshot cursor。
+- 第一设备 profile 只能与客户端本地创建或恢复所得信任锚比对；服务端返回第一设备不能自行成为信任锚。
+- 客户端必须按事件序列从信任锚归约状态，不能直接采用服务端 `devices.status`。
+- snapshot 不返回 wrapped key、恢复材料、同步密钥、对象 payload 或 access token。
+
+`GET /api/v1/domains/{domain_id}/lifecycle/events`
+
+- 使用 domain-bound opaque `after_cursor` 与受限 `limit` 返回追加式生命周期事件。
+- 响应按 `lifecycle_sequence` 严格升序，包含 `entries`、`next_cursor` 和 `has_more`。
+- cursor 与对象 discovery cursor 类型隔离，跨 domain、跨 endpoint 或非法 cursor 必须失败关闭。
+- 客户端在整页签名链验证和本地事务写入都成功后才能推进 cursor；任一记录失败时不得部分采用服务端状态。
 
 ### 设备登记与授权
 
@@ -142,7 +195,7 @@ OIDC / Radish 产品账号体系接入已后置为未来专题，见 `docs/sync-
 
 `POST /api/v1/domains/{domain_id}/devices/{device_id}/revocations`
 
-- `active` 设备提交 signed revocation、`previous_key_epoch`、`new_key_epoch` 和可选新 epoch 包装记录集合。
+- `active` 设备只提交 signed revocation、`previous_key_epoch` 与 `new_key_epoch`；新 epoch 包装记录必须通过独立 distribution endpoint 提交，不能混入撤销 canonical record。
 - 服务端验证 revoker 是 `active`，`new_key_epoch` 大于当前 epoch，签名有效。
 - 通过后标记目标设备 `revoked` / `lost`，推进 domain `current_key_epoch`。
 
@@ -167,7 +220,11 @@ OIDC / Radish 产品账号体系接入已后置为未来专题，见 `docs/sync-
 
 `GET /api/v1/domains/{domain_id}/objects`
 
-- 按 `object_type`、`since_version`、`updated_after_ms` 和分页参数列出对象 metadata。
+- 使用 opaque `after_cursor` 和受限 `limit`，按 domain 内 `change_sequence` 升序列出已提交 object version metadata；产品同步默认不加类型过滤。
+- 当前稳定接口不接受 `object_type` 或其他过滤参数；未知 query key 失败关闭。后续若增加过滤，cursor 必须绑定过滤条件并版本化。
+- 响应包含 `entries`、`next_cursor` 和 `has_more`；不返回内部 SQL row id，也不要求客户端解析 cursor。
+- 首次请求省略 `after_cursor`；非法、跨 domain 或不受支持的 cursor 返回结构化错误，不按客户端时间回退。
+- `since_version` 只在单一 object 内有意义，`updated_after_ms` 受时钟和同时间戳分页影响，二者均不得作为产品增量同步 cursor。
 - 不返回 payload bytes。
 
 `GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}`
@@ -186,6 +243,7 @@ OIDC / Radish 产品账号体系接入已后置为未来专题，见 `docs/sync-
 Rust `ime-sync` remote client 与上述对象版本 API 的稳定映射如下：
 
 - `SyncRemoteClient::upload_object_version()` 调用 `POST /api/v1/domains/{domain_id}/objects/{object_id}/versions`。
+- `SyncRemoteClient::discover_object_versions()` 调用 `GET /api/v1/domains/{domain_id}/objects`，只接受 opaque cursor 和有界 page limit。
 - `SyncRemoteClient::object_version()` 调用 `GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}`。
 - `SyncRemoteClient::object_payload()` 先调用 metadata GET，再调用 `GET /api/v1/domains/{domain_id}/objects/{object_id}/versions/{version}/payload`。
 
@@ -209,6 +267,7 @@ JSON byte 字段：
 - Rust `base_version = None` 映射为 HTTP JSON 的 `base_version = 0`；响应中的 `base_version = 0` 映射回 `None`。
 - `409 conflict_stale_base_version` 必须映射为包含 latest version 和 latest ciphertext hash 的客户端错误；该错误不包含 payload bytes。
 - `409 conflict_object_version` 表示同一 object version 已存在但 ciphertext hash 不一致，客户端不得把它当作幂等成功。
+- SQLite metadata schema v3 为历史 object version 按 domain、`server_received_at_ms`、`object_id`、`version` 确定性回填 `change_sequence`；迁移先补列和校验正序列，再创建唯一索引，避免旧表在补列前因索引引用新字段而失败。
 
 客户端脱敏：
 
@@ -218,21 +277,29 @@ JSON byte 字段：
 
 ### 恢复记录
 
-`PUT /api/v1/domains/{domain_id}/recovery-records/{recovery_record_id}`
+`POST /api/v1/domains/{domain_id}/recovery-records`
 
-- 上传或替换 signed recovery record。
-- 请求包含 KDF profile、salt、nonce、wrapped material 长度、ciphertext hash、状态和签名。
-- 服务端验证签名设备 active，metadata 合法，payload hash 匹配。
+- 创建或乐观轮换 signed recovery-record-v2；请求 body 的 signer 必须等于 transport device identity。
+- 请求包含 recovery id/predecessor、固定 KDF/envelope profile、salt/nonce、wrapped material 长度/hash、activation public profile、时间和签名。
+- 服务端验证当前 epoch、active signer、完整 v2 canonical signature 和密文；同记录精确重放幂等，旧 latest 与新记录在同一 transaction 切换。
 
 `GET /api/v1/domains/{domain_id}/recovery-records/latest`
 
 - 返回当前 active recovery record metadata 和 encrypted wrapped material。
 - 服务端应对该接口做基于 domain、IP、设备和时间窗的限速；限速失败返回结构化错误。
 
+`POST /api/v1/domains/{domain_id}/recovery-records/{recovery_record_id}/activation`
+
+- 请求包含由恢复记录绑定的 activation key 签名的新设备完整 signing/key-agreement profile，以及由新设备 signing key 签名、精确覆盖事务后全部 active 设备的当前 epoch distribution。
+- 服务端先验证 recovery record 是当前 active v2、activation possession proof、未登记的新 device/profile、当前 epoch、完整 cohort 与每条 distribution，再原子激活设备、消费记录、保存公开 activation/wrapped metadata 并追加 lifecycle；任一失败不得留下部分状态。
+- 已消费、superseded、revoked 或未知 recovery record 不能再次激活设备；bearer token、device header 或 recovery record id 不能替代 activation signature。
+
 `POST /api/v1/domains/{domain_id}/recovery-records/{recovery_record_id}/revoke`
 
-- 保存 signed recovery record revocation。
-- 不删除历史审计 metadata，但后续 `latest` 不再返回 revoked 记录作为 active。
+- 请求包含 revoker device id、当前 key epoch、稳定 reason、created time 和完整 signature metadata；`X-RadishLex-Device-ID` 必须与 signed revoker 一致，但不能替代签名。
+- canonical record type 固定为 `recovery_record_revocation`；服务端以 revoker 当前 active profile 验签，并要求 target 是当前 active chain head且绑定当前 epoch。
+- 同一 transaction 保存 revocation、把 target 标为 `revoked` 并追加 `recovery_record_revoked` lifecycle；精确重放幂等，同 target 分叉或已经被 activation/rotation 消费返回 `conflict_recovery_record`。
+- 不删除历史 metadata/blob，但后续 `latest` 不再返回 revoked 记录作为 active；rotation 可以严格承接 revoked chain head创建全新恢复记录，不能改变旧记录的 revoked 状态。
 
 ## 错误语义
 
@@ -240,6 +307,7 @@ JSON byte 字段：
 
 ```text
 error_code
+error_detail
 message
 retryable
 server_time_ms
@@ -247,7 +315,7 @@ latest_version
 latest_ciphertext_hash
 ```
 
-`message` 只能包含非敏感说明；不得回显请求体、payload bytes、恢复码、签名材料或明文业务字段。
+`error_detail` 是可选固定 allowlist，当前用于 `invalid_signature` 的算法、编码、验签与 key lifetime 分类；`message` 只能包含非敏感说明。两者都不得回显请求体、public key、signature、canonical bytes、payload、恢复码或明文业务字段。
 
 首批错误码：
 
@@ -257,7 +325,9 @@ latest_ciphertext_hash
 - `not_found`：domain、device、object、version 或 recovery record 不存在。
 - `conflict_stale_base_version`：上传基于旧版本，客户端必须拉取并合并。
 - `conflict_object_version`：同一对象版本存在但 ciphertext hash 不一致。
-- `invalid_signature`：对象 manifest、授权、撤销或恢复记录验签失败。
+- `conflict_epoch_distribution`：同一 recipient/epoch/wrapping key locator 已存在不同 metadata、hash 或 bytes。
+- `conflict_recovery_record`：recovery predecessor 已过期，或同 recovery id 已存在不同 metadata、签名或 bytes。
+- `invalid_signature`：对象 manifest、授权、撤销、epoch distribution 或恢复记录验签失败。
 - `invalid_ciphertext_metadata`：payload 长度、ciphertext hash 或 algorithm metadata 与请求不一致。
 - `payload_too_large`：超过服务端配置的对象大小上限。
 - `recovery_rate_limited`：恢复记录读取或恢复尝试触发限速。
@@ -373,9 +443,11 @@ latest_ciphertext_hash
 - 对象上传拒绝缺失 `ciphertext_hash`、空 `object_id`、非法 `object_type`、非法 `nonce`、0 payload、错误长度和 Rust envelope hash mismatch。
 - 新对象必须使用 `version = 1` / `base_version = 0`；已有对象必须顺序递增。
 - stale `base_version` 返回 409，且响应不包含 payload bytes。
+- discovery change sequence 只在成功新版本提交时递增；幂等重放复用原 sequence，失败/冲突不产生可见 gap 语义；分页必须稳定、无重复遗漏，并拒绝非法或跨 domain cursor。
 - 同一 `object_id + version + ciphertext_hash` 重试幂等；同版本不同 hash 拒绝。
 - revoked / pending / unknown device 不能上传对象、授权设备或替换恢复记录。
 - 撤销后 `current_key_epoch` 推进，低于当前 epoch 的新对象写入被拒绝。
+- epoch distribution 必须覆盖完整 active cohort；坏签名、错误 recipient key 或漏发时无可读取部分 metadata，精确批次重放幂等，locator 分叉返回专用冲突。
 - signed object manifest、device authorization、device revocation 和 recovery record 验签失败时拒绝写入；Go storage conformance 已覆盖字段篡改失败路径。
 - recovery record 读取和替换遵守限速与签名校验，不接受恢复码明文。
 - SQLite transaction 失败时不留下可达 metadata；blob 写入失败时不提交 metadata。
@@ -399,29 +471,38 @@ latest_ciphertext_hash
 9. 已补 authorization handler，把 signed authorization、wrapping metadata 和 encrypted wrapped key bytes 映射到 storage upload；storage conformance 覆盖授权后 pending join request 不再列出、设备激活和 wrapped key bytes 读取。
 10. 已补 SQLite `audit_events` 写入，handler 会把非敏感审计事件映射到 storage audit model；测试覆盖 SQLite 行写入和 handler 自动调用持久审计 recorder。
 11. 已补 encrypted object 上传下载和版本冲突 HTTP 语义，覆盖 metadata / payload 读取、Rust envelope hash / length mismatch、stale latest metadata、幂等重试、同版本不同 hash 冲突、设备状态门禁、plaintext 字段拒绝和 audit / error 脱敏。
-12. 已补 runtime 装配和启动入口，覆盖 config env override、SQLite migration 嵌入与重复启动、local blob store 装配、HTTP timeout、对象大小门禁和脱敏 audit logger 测试；当前没有启动长期运行服务做真实联调。
+12. 已补 runtime 装配和启动入口，覆盖 config env override、SQLite migration 嵌入与重复启动、专用非 symlink metadata/blob leaf、`0700/0600` 私有权限、local blob store、HTTP timeout、对象大小门禁和脱敏 audit logger；部署预演使用短生命周期容器，不保留长期运行服务。
 13. 已补 `docs/runbooks/sync-server-local-smoke.md` 和短生命周期 HTTP smoke 测试，覆盖 domain 创建、第二设备 join / authorization、active 状态复验、跨设备 encrypted object 上传、metadata 读取、payload 下载、stale base version 冲突、v2 payload 读取和 runtime 日志脱敏。
 14. 已补 Rust `ime-sync` remote client DTO / transport trait，客户端上传入口以 `AssembledSyncObject` 和 `SignedSyncObjectManifest` 为输入，生成 JSON metadata + base64 encrypted payload 请求，不接受 plaintext payload；测试覆盖 metadata / binary payload 读取、stale conflict latest metadata、server error code 映射、payload length mismatch 和请求 / 错误 debug 脱敏。
-15. 已补 Rust `ime-sync` std-only `http://` `HttpSyncRemoteTransport`，复用 `SyncRemoteRequest` / `SyncRemoteResponse` 边界传递 JSON request 与 binary payload response；短生命周期 TCP 测试覆盖 upload request、metadata 读取、payload 下载、chunked response、stale conflict / unauthenticated 错误映射、base path 拼接、可选 bearer access token header 和 transport 错误脱敏。
+15. 已补 Rust `ime-sync` `http://` / rustls `https://` `HttpSyncRemoteTransport`，复用 `SyncRemoteRequest` / `SyncRemoteResponse` 边界传递 JSON request 与 binary payload response；短生命周期 TCP/TLS 测试覆盖 upload request、metadata 读取、payload 下载、chunked response、stale conflict / unauthenticated 错误映射、base path 拼接、可选 bearer access token header、可信本地 CA、非可信证书、错误主机名和 transport 错误脱敏。生产 HTTPS 使用 Mozilla root 集，附加本地 DER root 只保留在 transport 内存中，不提供 insecure bypass。
 16. 已补 Rust 侧两客户端 userdb 同步边界测试，覆盖设备 A 生成 P2 payload 并加密上传、设备 B 下载密文后解密 / 解码 / 合并写回 SQLite、本机 tombstone 阻断旧远端词条、stale base version 409 latest metadata 映射，以及 B 基于最新 base version 重新组装并上传 v2。
 17. 已补 Rust `HttpSyncRemoteTransport` 直连 Go sync server 的短生命周期跨语言测试，覆盖 domain 初始化、Rust signed encrypted object 通过 Go HTTP API 上传、metadata / binary payload 读取、Go 服务端按 Rust envelope hash 复验，以及 stale conflict latest metadata 映射。
 18. 已补 Docker Compose 本地 / 部署态入口、sync server Dockerfile、Docker build context ignore、本地 Caddy HTTPS 入口、部署态 HTTP 上游、Nginx 生产反代示例和 `docs/runbooks/sync-server-compose.md`；本地默认 `https://localhost:7319`，部署态默认同机 HTTP 上游 `http://127.0.0.1:7319`，两者使用同一个对外端口，并明确生产认证 / 备份 / 平台私钥 backend 未补齐前不得开放给真实用户。
-19. 已补 Docker Compose 容器实际启动 smoke 证据；本地模式通过 Caddy internal TLS 到达 sync-server，部署态 HTTP upstream 可直达 sync-server，两种模式完成后均已 `down`，未保留运行容器、真实数据、容器生成数据或本机绝对路径。
+19. 已补 Docker Compose 容器实际启动 smoke 证据；本地模式现由独立自动化门禁通过 Caddy internal TLS 到达 sync-server，验证 bearer `401` / authorized backend response、loopback-only、容器 hardening、日志脱敏和唯一 project 的 container/volume 清理。部署态 HTTP upstream 预演另覆盖私有权限、冷备份与隔离恢复；两种模式均不保留运行容器或真实数据。
 20. 已补 Rust userdb 两客户端真实 Go HTTP 同步测试，覆盖设备 B join / signed authorization、`dictionary.user_terms` / `ranker.weights` / `dictionary.deleted_terms` 三类 P2 对象真实 HTTP 上传下载、客户端解密 / 解码 / SQLite 写回、stale conflict latest metadata、按 `base_version = 1` 上传 v2 和 runtime 日志脱敏。
 21. 已补 `docs/runbooks/sync-server-production-deployment.md`，固定部署拓扑、外部 TLS、认证 / 访问控制、数据目录权限、冷备份、恢复、升级回滚、验证证据和真实用户开放停止线。
-22. 已补单用户自部署 bearer access token 门禁，覆盖 Go handler 认证失败不进入业务 storage、runtime 配置透传、日志脱敏、Rust HTTP transport 可选 `Authorization: Bearer` header 和 `unauthenticated` 错误映射；发布级目标部署运行证据和可用平台私钥 backend 仍是用户可用同步停止线，但不阻塞当前本地联调和非上传 UI gate 开发。
+22. 已补单用户自部署 bearer access token 门禁，覆盖 Go handler 认证失败不进入业务 storage、runtime 配置透传、日志脱敏、Rust transport 可选 `Authorization: Bearer` header 和 `unauthenticated` 错误映射；发布级目标部署运行证据按首版后计划保留，macOS 平台私钥 backend 主路径已通过，但产品入口 gate 仍是用户可用同步停止线。
 23. 已补 runtime 备份恢复 smoke，覆盖短生命周期 Go server 写入 domain、第二设备授权、三类 P2 encrypted object、recovery record 和审计事件，停止后复制 SQLite metadata 与 encrypted blob dir 到备份目录，再恢复到隔离目录并重启验证 domain / device / recovery latest / object payload / stale conflict 与日志脱敏。
 24. 已补 runtime 外部 TLS 反代 smoke，覆盖 HTTPS client、TLS 1.2+、TLS reverse proxy 到 HTTP upstream、`Authorization` header 透传、`X-Forwarded-Proto=https`、Go bearer token 门禁、encrypted object 上传下载、Go 对象大小门禁和日志脱敏。
 25. 已补 runtime 升级回滚 smoke，覆盖升级前数据写入、关闭后冷备份、同一数据目录重启触发 idempotent migration、升级后 v2 写入、恢复升级前备份到隔离目录、确认 v2 不可见、v1 payload / stale conflict 仍按 latest metadata 返回，以及日志不泄漏 payload、signature、wrapped material 或恢复敏感字段。
+26. 已补 ADR 0006 对应的算法分派、设备/join `signing_algorithm` API/SQLite metadata、历史 Ed25519 migration、稳定 `error_detail` 和 Rust/Go 共享正负向 vectors；新请求缺少算法或传入未知算法时失败关闭。
+27. 已按 `docs/sync-orchestration.md` 增加 domain 内 change sequence、opaque cursor discovery storage/API、Rust remote DTO 和分页/幂等/非法 cursor 测试；对象增量同步不能用时间戳过滤替代。
+28. 已补独立 lifecycle sequence、snapshot / events API、设备 revocation API、Rust trust-anchor signed chain verifier、`profile-sha256-v1` 公钥绑定 challenge 和 userdb schema v6 public cache；两个文件 userdb 已在短生命周期 Go HTTP 中完成授权、同步、撤销、缓存和重启恢复。
+29. Rust userdb schema 已升至 v7，结构化缓存签名链绑定的 key-agreement key id/public key，并只保存版本化 wrapped epoch ciphertext；`ProductWrappedEpochMaterialStore` 与 Apple signing/key-agreement adapter 已落地。
+30. Go metadata schema v5 已结构化保存 wrapping record 的 recipient key-agreement key id；精确 wrapped epoch GET handler、transport device identity、active-before-blob storage 门禁、64 KiB 上限、Rust remote source与 userdb 幂等/fork cache 已接入双文件 Go HTTP 授权/轮换/撤销/重启证据。
+31. Go metadata schema v6 已追加 wrapping signature source/profile，独立 signed epoch distribution endpoint 与 storage transaction 已覆盖完整 active cohort、64 条/64 KiB/4 MiB 上限、坏签名无部分可读、精确重放幂等和 locator 分叉冲突；Rust remote client 在上传前验证 trusted lifecycle，在下载后复验 distributor signature。A/B/C Go HTTP 证据覆盖 B 撤销后 A/C 取得 epoch 2、历史 epoch 与 userdb/provider 重启恢复。
+32. Go metadata schema v8 与 userdb schema v8 已落地 recovered-device activation transaction、`recovery_record_rotated` / `device_recovered` 公开 lifecycle、完整 active cohort 当前 epoch 分发和重启恢复。
+33. Go metadata schema v9 与 userdb schema v9 已落地 signed recovery record revocation、`recovery_record_revoked` 公开 lifecycle、exact replay/分叉、activation/rotation 线性化、revoked 历史状态保持和 Rust/Go HTTP/userdb 重启证据。
 
 任何阶段都不应把 Flutter manager、平台壳、真实系统输入法服务或输入热路径接入 Go server。
 
 ## 停止线
 
-- Rust 侧两客户端 harness 已覆盖 encrypted userdb payload 的上传、下载、解密、合并写回和 stale conflict 重新上传；Go runtime smoke 已覆盖第二设备授权、跨设备 object 版本链、备份恢复链路、外部 TLS 反代链路和升级回滚链路；Rust HTTP transport 直连 Go server 的短生命周期测试已覆盖跨语言 DTO、handler、storage、错误语义和日志脱敏边界；Rust userdb 两客户端真实 Go HTTP 测试已覆盖客户端解密合并写回和 v2 重新上传；生产部署 runbook 已固定外部 TLS、认证、备份和升级停止线，Go server 与 Rust HTTP transport 已补单用户 bearer access token 证据。进入用户可用同步前，仍必须补可用平台私钥 backend 和发布级目标部署运行证据；当前产品开发继续使用本地 Docker / 本地 HTTPS 复验证据。
-- 平台私钥存储 backend 能力模型已落地；`apple-keychain-v1` 已 feature-gated 接线但当前不可用于生产签名，可用平台 backend 验证未完成前，不提供用户可用同步 UI。
+- Rust 侧两客户端 harness 已覆盖 encrypted userdb payload 的上传、下载、解密、合并写回和 stale conflict 重新上传；Go runtime smoke 已覆盖第二设备授权、跨设备 object 版本链、备份恢复链路、外部 TLS 反代链路和升级回滚链路；Rust transport 直连短生命周期 Go HTTP 及本地 Caddy HTTPS，已覆盖跨语言 DTO、handler、storage、严格证书/主机名验证、错误语义和日志脱敏边界；Rust userdb 两客户端真实 Go HTTP 测试已覆盖客户端解密合并写回和 v2 重新上传。当前部署子阶段以真实本地 Compose / HTTPS 和部署预演通过退出；macOS 平台私钥 backend 已按单支持设备主路径完成产品资格，目标部署证据按产品决策在首个正式版本发布后补齐。
+- 平台私钥存储 backend 能力模型已落地；普通 DPK 软件 key 因 `exportable=true` 不具备产品资格，独立 Secure Enclave signing/key-agreement 已按受支持 macOS 主路径完成 qualification lifecycle、denied、设备锁屏 locked、cleanup 与产品资格评审。unsupported 延期补测；用户可用同步 UI 仍受独立 M3 产品入口门禁约束。
 - device authorization handler 对外开放前必须继续复用 wrapped key bytes 的存储 / 读取语义，且不得返回明文同步域材料。
-- recovery latest handler 已复用 wrapped material bytes 读取语义，并补齐限速与内部 `blob_ref` 不外泄测试；object version handler 已复用 encrypted object blob 读写语义，并补齐冲突、设备状态和脱敏测试；API handler 已补 panic recovery、request id、非持久审计 hook、SQLite `audit_events` 写入和 bearer access token 门禁；runtime 已补配置装配、脱敏 audit logger、本机 smoke runbook、双设备 HTTP smoke、备份恢复 smoke、外部 TLS 反代 smoke、升级回滚 smoke、Docker Compose 本地 / 部署态入口、容器实际启动 smoke 证据和生产部署边界 runbook。Rust remote client 已补 DTO、transport trait、HTTP transport、错误映射、可选 bearer token header、两客户端 userdb harness、直连 Go server 的短生命周期测试和 userdb 两客户端真实 Go HTTP 测试；进入真实用户部署前仍需补可用平台私钥 backend 和发布级目标部署运行证据，进入 manager 同步入口非上传开发可先依赖本地联调证据。
+- recovery latest handler 已复用 wrapped material bytes 读取语义，并补齐限速与内部 `blob_ref` 不外泄测试；object version handler 已复用 encrypted object blob 读写语义，并补齐冲突、设备状态和脱敏测试；API handler 已补 panic recovery、request id、非持久审计 hook、SQLite `audit_events` 写入和 bearer access token 门禁；runtime 已补配置装配、脱敏 audit logger、本机 smoke runbook、双设备 HTTP smoke、备份恢复 smoke、外部 TLS 反代 smoke、升级回滚 smoke、Docker Compose 本地 / 部署态入口、容器实际启动 smoke 证据和生产部署边界 runbook。Rust remote client 已补 DTO、HTTP/TLS transport、错误映射、bearer header、两客户端 userdb harness、直连 Go server 和本地 Caddy HTTPS 测试；macOS 平台私钥 backend 主路径已通过，进入真实用户部署前仍需产品入口退出评审，并按首版后计划补发布级目标部署运行证据。
 - 服务端能保存、打印或索引明文用户词、input code、reading、P1 原始事件或候选偏好时，必须停止并回退该设计。
 - 服务端版本冲突检测未稳定前，不允许客户端把本地合并结果自动上传到真实远端。
+- change cursor discovery、客户端原子 apply + cursor 和 crash-safe outbox 未稳定前，不允许把现有逐对象测试 harness 包装成产品 `sync_once`。
 - 包分发、P3 资源下载和个人 P2 同步对象必须保持独立 API 与存储边界。

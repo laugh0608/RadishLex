@@ -1,19 +1,27 @@
 use std::fmt;
 use std::io::{Read, Write};
 use std::net::TcpStream;
+use std::sync::Arc;
 use std::time::Duration;
+
+use rustls::pki_types::{CertificateDer, ServerName};
+use rustls::{ClientConfig, ClientConnection, RootCertStore, StreamOwned};
 
 use crate::remote::{
     SyncRemoteError, SyncRemoteMethod, SyncRemoteRequest, SyncRemoteResponse, SyncRemoteTransport,
 };
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
+const MAX_ADDITIONAL_ROOT_CERTIFICATES: usize = 8;
+const MAX_ROOT_CERTIFICATE_BYTES: usize = 64 * 1024;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct HttpSyncRemoteTransport {
     endpoint: HttpEndpoint,
     timeout: Duration,
     access_token: Option<BearerAccessToken>,
+    device_identity: Option<HttpDeviceIdentity>,
+    additional_root_certificates: Vec<Vec<u8>>,
 }
 
 impl fmt::Debug for HttpSyncRemoteTransport {
@@ -22,6 +30,14 @@ impl fmt::Debug for HttpSyncRemoteTransport {
             .field("endpoint", &self.endpoint)
             .field("timeout", &self.timeout)
             .field("access_token_configured", &self.access_token.is_some())
+            .field(
+                "device_identity_configured",
+                &self.device_identity.is_some(),
+            )
+            .field(
+                "additional_root_certificate_count",
+                &self.additional_root_certificates.len(),
+            )
             .finish()
     }
 }
@@ -42,6 +58,8 @@ impl HttpSyncRemoteTransport {
             endpoint: HttpEndpoint::parse(&base_url.into())?,
             timeout,
             access_token: None,
+            device_identity: None,
+            additional_root_certificates: Vec::new(),
         })
     }
 
@@ -50,6 +68,45 @@ impl HttpSyncRemoteTransport {
         access_token: impl Into<String>,
     ) -> Result<Self, SyncRemoteError> {
         self.access_token = Some(BearerAccessToken::new(access_token.into())?);
+        Ok(self)
+    }
+
+    pub fn with_device_identity(
+        mut self,
+        device_id: impl Into<String>,
+    ) -> Result<Self, SyncRemoteError> {
+        self.device_identity = Some(HttpDeviceIdentity::new(device_id.into())?);
+        Ok(self)
+    }
+
+    /// Adds one DER-encoded trust anchor for the lifetime of this transport.
+    ///
+    /// This is intended for local HTTPS qualification with an explicit local
+    /// CA. The certificate stays in memory and is never persisted by the
+    /// transport. Public HTTPS continues to use the compiled Mozilla roots.
+    pub fn with_additional_root_certificate_der(
+        mut self,
+        certificate_der: impl Into<Vec<u8>>,
+    ) -> Result<Self, SyncRemoteError> {
+        if self.endpoint.scheme != HttpScheme::Https {
+            return invalid_request(
+                "https transport root certificate requires an https:// base_url",
+            );
+        }
+        let certificate_der = certificate_der.into();
+        if certificate_der.is_empty() || certificate_der.len() > MAX_ROOT_CERTIFICATE_BYTES {
+            return invalid_request("https transport root certificate must be 1..=65536 bytes");
+        }
+        if self.additional_root_certificates.len() >= MAX_ADDITIONAL_ROOT_CERTIFICATES {
+            return invalid_request("https transport accepts at most 8 additional roots");
+        }
+        let mut roots = RootCertStore::empty();
+        roots
+            .add(CertificateDer::from(certificate_der.clone()))
+            .map_err(|_| {
+                invalid_request_value("https transport root certificate is not valid DER")
+            })?;
+        self.additional_root_certificates.push(certificate_der);
         Ok(self)
     }
 
@@ -64,15 +121,24 @@ impl HttpSyncRemoteTransport {
     pub fn has_bearer_access_token(&self) -> bool {
         self.access_token.is_some()
     }
+
+    pub fn has_device_identity(&self) -> bool {
+        self.device_identity.is_some()
+    }
+
+    pub fn is_https(&self) -> bool {
+        self.endpoint.scheme == HttpScheme::Https
+    }
 }
 
 impl SyncRemoteTransport for HttpSyncRemoteTransport {
     fn send(&self, request: SyncRemoteRequest) -> Result<SyncRemoteResponse, SyncRemoteError> {
-        let path = self.endpoint.request_path(request.path())?;
+        let path = self
+            .endpoint
+            .request_target(request.path(), request.query())?;
         validate_request_headers(&request)?;
-        let mut stream =
-            TcpStream::connect((self.endpoint.connect_host.as_str(), self.endpoint.port))
-                .map_err(|error| transport_error(format!("connect failed: {error}")))?;
+        let stream = TcpStream::connect((self.endpoint.connect_host.as_str(), self.endpoint.port))
+            .map_err(|error| transport_error(format!("connect failed: {error}")))?;
         stream
             .set_read_timeout(Some(self.timeout))
             .map_err(|error| transport_error(format!("set read timeout failed: {error}")))?;
@@ -80,18 +146,61 @@ impl SyncRemoteTransport for HttpSyncRemoteTransport {
             .set_write_timeout(Some(self.timeout))
             .map_err(|error| transport_error(format!("set write timeout failed: {error}")))?;
 
+        let response = match self.endpoint.scheme {
+            HttpScheme::Http => self.exchange(stream, &path, &request)?,
+            HttpScheme::Https => self.exchange_tls(stream, &path, &request)?,
+        };
+        parse_response(&response)
+    }
+}
+
+impl HttpSyncRemoteTransport {
+    fn exchange<S: Read + Write>(
+        &self,
+        mut stream: S,
+        path: &str,
+        request: &SyncRemoteRequest,
+    ) -> Result<Vec<u8>, SyncRemoteError> {
         write_request(
             &mut stream,
             &self.endpoint,
-            &path,
+            path,
             self.access_token.as_ref(),
-            &request,
+            self.device_identity.as_ref(),
+            request,
         )?;
         let mut response = Vec::new();
         stream
             .read_to_end(&mut response)
-            .map_err(|error| transport_error(format!("read response failed: {error}")))?;
-        parse_response(&response)
+            .map_err(|_| transport_error("read response failed"))?;
+        Ok(response)
+    }
+
+    fn exchange_tls(
+        &self,
+        stream: TcpStream,
+        path: &str,
+        request: &SyncRemoteRequest,
+    ) -> Result<Vec<u8>, SyncRemoteError> {
+        let mut roots = RootCertStore::empty();
+        roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+        for certificate in &self.additional_root_certificates {
+            roots
+                .add(CertificateDer::from(certificate.clone()))
+                .map_err(|_| transport_error("tls root configuration failed"))?;
+        }
+        let config = ClientConfig::builder()
+            .with_root_certificates(roots)
+            .with_no_client_auth();
+        let server_name = ServerName::try_from(self.endpoint.connect_host.clone())
+            .map_err(|_| invalid_request_value("https transport server name is invalid"))?;
+        let connection = ClientConnection::new(Arc::new(config), server_name)
+            .map_err(|_| transport_error("tls client initialization failed"))?;
+        self.exchange(StreamOwned::new(connection, stream), path, request)
+            .map_err(|error| match error {
+                SyncRemoteError::Transport { .. } => transport_error("tls exchange failed"),
+                other => other,
+            })
     }
 }
 
@@ -122,8 +231,61 @@ impl fmt::Debug for BearerAccessToken {
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
+struct HttpDeviceIdentity(String);
+
+impl HttpDeviceIdentity {
+    fn new(device_id: String) -> Result<Self, SyncRemoteError> {
+        if device_id.is_empty() || device_id.len() > 128 {
+            return invalid_request("http transport device identity must be 1..=128 bytes");
+        }
+        if !device_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+        {
+            return invalid_request(
+                "http transport device identity contains unsupported characters",
+            );
+        }
+        Ok(Self(device_id))
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Debug for HttpDeviceIdentity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("[configured device identity]")
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HttpScheme {
+    Http,
+    Https,
+}
+
+impl HttpScheme {
+    const fn default_port(self) -> u16 {
+        match self {
+            Self::Http => 80,
+            Self::Https => 443,
+        }
+    }
+
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Http => "http",
+            Self::Https => "https",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct HttpEndpoint {
+    scheme: HttpScheme,
     host_header: String,
     connect_host: String,
     port: u16,
@@ -139,8 +301,12 @@ impl HttpEndpoint {
         if raw.contains('?') || raw.contains('#') {
             return invalid_request("http transport base_url cannot contain query or fragment");
         }
-        let Some(rest) = raw.strip_prefix("http://") else {
-            return invalid_request("http transport only supports http:// base_url");
+        let (scheme, rest) = if let Some(rest) = raw.strip_prefix("http://") {
+            (HttpScheme::Http, rest)
+        } else if let Some(rest) = raw.strip_prefix("https://") {
+            (HttpScheme::Https, rest)
+        } else {
+            return invalid_request("http transport requires http:// or https:// base_url");
         };
         let (authority, path) = match rest.split_once('/') {
             Some((authority, path)) => (authority, path),
@@ -152,9 +318,10 @@ impl HttpEndpoint {
         if authority.contains('@') {
             return invalid_request("http transport base_url must not contain credentials");
         }
-        let (connect_host, host_header, port) = parse_authority(authority)?;
+        let (connect_host, host_header, port) = parse_authority(authority, scheme.default_port())?;
         let base_path = normalize_base_path(path)?;
         Ok(Self {
+            scheme,
             host_header,
             connect_host,
             port,
@@ -168,10 +335,14 @@ impl HttpEndpoint {
         } else {
             &self.base_path
         };
-        format!("http://{}{}", self.host_header, path)
+        format!("{}://{}{}", self.scheme.as_str(), self.host_header, path)
     }
 
-    fn request_path(&self, request_path: &str) -> Result<String, SyncRemoteError> {
+    fn request_target(
+        &self,
+        request_path: &str,
+        query: &[(String, String)],
+    ) -> Result<String, SyncRemoteError> {
         if !request_path.starts_with('/') {
             return invalid_request("http transport request path must start with '/'");
         }
@@ -184,17 +355,29 @@ impl HttpEndpoint {
         if request_path.chars().any(char::is_whitespace) {
             return invalid_request("http transport request path cannot contain whitespace");
         }
-        if self.base_path.is_empty() {
-            Ok(request_path.to_owned())
+        let path = if self.base_path.is_empty() {
+            request_path.to_owned()
         } else if request_path == "/" {
-            Ok(self.base_path.clone())
+            self.base_path.clone()
         } else {
-            Ok(format!("{}{}", self.base_path, request_path))
+            format!("{}{}", self.base_path, request_path)
+        };
+        if query.is_empty() {
+            return Ok(path);
         }
+        let query = query
+            .iter()
+            .map(|(name, value)| format!("{name}={value}"))
+            .collect::<Vec<_>>()
+            .join("&");
+        Ok(format!("{path}?{query}"))
     }
 }
 
-fn parse_authority(authority: &str) -> Result<(String, String, u16), SyncRemoteError> {
+fn parse_authority(
+    authority: &str,
+    default_port: u16,
+) -> Result<(String, String, u16), SyncRemoteError> {
     if let Some(rest) = authority.strip_prefix('[') {
         let Some((host, suffix)) = rest.split_once(']') else {
             return invalid_request("http transport IPv6 host must use bracket notation");
@@ -203,14 +386,14 @@ fn parse_authority(authority: &str) -> Result<(String, String, u16), SyncRemoteE
             return invalid_request("http transport IPv6 host cannot be empty");
         }
         let port = if suffix.is_empty() {
-            80
+            default_port
         } else {
             let Some(port_text) = suffix.strip_prefix(':') else {
                 return invalid_request("http transport IPv6 host suffix is invalid");
             };
             parse_port(port_text)?
         };
-        let host_header = if port == 80 {
+        let host_header = if port == default_port {
             format!("[{host}]")
         } else {
             format!("[{host}]:{port}")
@@ -226,7 +409,7 @@ fn parse_authority(authority: &str) -> Result<(String, String, u16), SyncRemoteE
     }
     let (host, port) = match authority.rsplit_once(':') {
         Some((host, port_text)) => (host, parse_port(port_text)?),
-        None => (authority, 80),
+        None => (authority, default_port),
     };
     if host.trim().is_empty() {
         return invalid_request("http transport host cannot be empty");
@@ -234,7 +417,7 @@ fn parse_authority(authority: &str) -> Result<(String, String, u16), SyncRemoteE
     if host.contains('/') || host.chars().any(char::is_whitespace) {
         return invalid_request("http transport host is invalid");
     }
-    let host_header = if port == 80 {
+    let host_header = if port == default_port {
         host.to_owned()
     } else {
         format!("{host}:{port}")
@@ -270,11 +453,12 @@ fn normalize_base_path(path: &str) -> Result<String, SyncRemoteError> {
     }
 }
 
-fn write_request(
-    stream: &mut TcpStream,
+fn write_request<W: Write>(
+    stream: &mut W,
     endpoint: &HttpEndpoint,
     path: &str,
     access_token: Option<&BearerAccessToken>,
+    device_identity: Option<&HttpDeviceIdentity>,
     request: &SyncRemoteRequest,
 ) -> Result<(), SyncRemoteError> {
     let method = match request.method() {
@@ -300,6 +484,14 @@ fn write_request(
     if let Some(token) = access_token {
         write!(stream, "Authorization: Bearer {}\r\n", token.as_str())
             .map_err(|error| transport_error(format!("write request failed: {error}")))?;
+    }
+    if let Some(device_identity) = device_identity {
+        write!(
+            stream,
+            "X-RadishLex-Device-ID: {}\r\n",
+            device_identity.as_str()
+        )
+        .map_err(|error| transport_error(format!("write request failed: {error}")))?;
     }
     stream
         .write_all(b"\r\n")
@@ -468,6 +660,10 @@ mod tests {
     use super::*;
     use crate::remote::test_support::{response_for, signed_object};
     use crate::{LatestObjectConflictMetadata, SyncRemoteClient, SyncServerErrorCode};
+    use base64ct::Encoding;
+    use rcgen::{BasicConstraints, CertificateParams, IsCa, KeyPair};
+    use rustls::pki_types::PrivatePkcs8KeyDer;
+    use rustls::{ServerConfig, ServerConnection};
     use std::io::{BufRead, BufReader};
     use std::net::TcpListener;
     use std::thread;
@@ -536,6 +732,33 @@ mod tests {
             ))
             .expect("response");
 
+        assert_eq!(response.status, 200);
+        server.join();
+    }
+
+    #[test]
+    fn http_transport_sends_validated_device_identity() {
+        let Some(server) = TestHttpServer::try_spawn(|request| {
+            assert_eq!(request.header("x-radishlex-device-id"), Some("device-b"));
+            TestHttpResponse::json(200, br#"{"ok":true}"#)
+        }) else {
+            return;
+        };
+        let transport =
+            HttpSyncRemoteTransport::with_timeout(server.base_url(), Duration::from_secs(2))
+                .expect("transport")
+                .with_device_identity("device-b")
+                .expect("device identity");
+        assert!(transport.has_device_identity());
+
+        let response = transport
+            .send(SyncRemoteRequest::new(
+                SyncRemoteMethod::Get,
+                "/api/v1/domains/domain-a/state",
+                None,
+                Vec::new(),
+            ))
+            .expect("response");
         assert_eq!(response.status, 200);
         server.join();
     }
@@ -686,9 +909,100 @@ mod tests {
     }
 
     #[test]
+    fn https_transport_verifies_explicit_local_root_and_redacts_certificate() {
+        let Some(server) = TestHttpsServer::try_spawn(|request| {
+            assert_eq!(request.method, "GET");
+            assert_eq!(request.path, "/api/v1/domains/domain-a/state");
+            TestHttpResponse::json(200, br#"{"ok":true}"#)
+        }) else {
+            return;
+        };
+        let root_der = server.root_certificate_der().to_vec();
+        let transport =
+            HttpSyncRemoteTransport::with_timeout(server.base_url(), Duration::from_secs(2))
+                .expect("https transport")
+                .with_additional_root_certificate_der(root_der.clone())
+                .expect("local root");
+
+        assert!(transport.is_https());
+        let debug = format!("{transport:?}");
+        assert!(debug.contains("additional_root_certificate_count"));
+        assert!(!debug.contains(&base64ct::Base64::encode_string(&root_der)));
+
+        let response = transport
+            .send(SyncRemoteRequest::new(
+                SyncRemoteMethod::Get,
+                "/api/v1/domains/domain-a/state",
+                None,
+                Vec::new(),
+            ))
+            .expect("https response");
+        assert_eq!(response.status, 200);
+        server.join();
+    }
+
+    #[test]
+    fn https_transport_rejects_untrusted_certificate_and_wrong_hostname() {
+        let Some(untrusted_server) =
+            TestHttpsServer::try_spawn(|_| TestHttpResponse::json(200, br#"{"unexpected":true}"#))
+        else {
+            return;
+        };
+        let untrusted = HttpSyncRemoteTransport::with_timeout(
+            untrusted_server.base_url(),
+            Duration::from_secs(2),
+        )
+        .expect("https transport")
+        .send(SyncRemoteRequest::new(
+            SyncRemoteMethod::Get,
+            "/api/v1/domains/domain-a/state",
+            None,
+            Vec::new(),
+        ))
+        .expect_err("untrusted local certificate must fail");
+        assert_eq!(
+            untrusted,
+            SyncRemoteError::Transport {
+                message: "tls exchange failed".to_owned(),
+            }
+        );
+        untrusted_server.join();
+
+        let Some(wrong_host_server) =
+            TestHttpsServer::try_spawn(|_| TestHttpResponse::json(200, br#"{"unexpected":true}"#))
+        else {
+            return;
+        };
+        let wrong_host = HttpSyncRemoteTransport::with_timeout(
+            wrong_host_server.ip_base_url(),
+            Duration::from_secs(2),
+        )
+        .expect("https transport")
+        .with_additional_root_certificate_der(wrong_host_server.root_certificate_der().to_vec())
+        .expect("local root")
+        .send(SyncRemoteRequest::new(
+            SyncRemoteMethod::Get,
+            "/api/v1/domains/domain-a/state",
+            None,
+            Vec::new(),
+        ))
+        .expect_err("certificate hostname mismatch must fail");
+        assert_eq!(
+            wrong_host,
+            SyncRemoteError::Transport {
+                message: "tls exchange failed".to_owned(),
+            }
+        );
+        wrong_host_server.join();
+    }
+
+    #[test]
     fn http_transport_rejects_unsupported_or_ambiguous_urls() {
+        let https = HttpSyncRemoteTransport::new("https://example.test").expect("https url");
+        assert!(https.is_https());
+        assert_eq!(https.base_url(), "https://example.test");
         assert!(matches!(
-            HttpSyncRemoteTransport::new("https://example.test"),
+            HttpSyncRemoteTransport::new("ftp://example.test"),
             Err(SyncRemoteError::InvalidRequest { .. })
         ));
         assert!(matches!(
@@ -702,6 +1016,56 @@ mod tests {
     }
 
     #[test]
+    fn https_transport_rejects_invalid_or_excessive_local_roots() {
+        let transport = HttpSyncRemoteTransport::new("https://localhost").expect("transport");
+        assert!(matches!(
+            transport
+                .clone()
+                .with_additional_root_certificate_der(Vec::new()),
+            Err(SyncRemoteError::InvalidRequest { .. })
+        ));
+        assert!(matches!(
+            transport
+                .clone()
+                .with_additional_root_certificate_der(vec![0x01, 0x02]),
+            Err(SyncRemoteError::InvalidRequest { .. })
+        ));
+        assert!(matches!(
+            transport
+                .clone()
+                .with_additional_root_certificate_der(vec![0u8; 65 * 1024]),
+            Err(SyncRemoteError::InvalidRequest { .. })
+        ));
+
+        let mut root_params =
+            CertificateParams::new(Vec::<String>::new()).expect("test root params");
+        root_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+        let root_key = KeyPair::generate().expect("generate test root key");
+        let root_der = root_params
+            .self_signed(&root_key)
+            .expect("sign test root")
+            .der()
+            .to_vec();
+        let mut transport = transport;
+        for _ in 0..MAX_ADDITIONAL_ROOT_CERTIFICATES {
+            transport = transport
+                .with_additional_root_certificate_der(root_der.clone())
+                .expect("root within count limit");
+        }
+        assert!(matches!(
+            transport.with_additional_root_certificate_der(root_der),
+            Err(SyncRemoteError::InvalidRequest { .. })
+        ));
+
+        assert!(matches!(
+            HttpSyncRemoteTransport::new("http://localhost")
+                .expect("http transport")
+                .with_additional_root_certificate_der(vec![0x01]),
+            Err(SyncRemoteError::InvalidRequest { .. })
+        ));
+    }
+
+    #[test]
     fn http_transport_rejects_invalid_bearer_access_token() {
         let transport = HttpSyncRemoteTransport::new("http://example.test").expect("transport");
         assert!(matches!(
@@ -710,6 +1074,19 @@ mod tests {
         ));
         assert!(matches!(
             transport.with_bearer_access_token("test-access-token-12345678901234567890\n"),
+            Err(SyncRemoteError::InvalidRequest { .. })
+        ));
+    }
+
+    #[test]
+    fn http_transport_rejects_invalid_device_identity() {
+        let transport = HttpSyncRemoteTransport::new("http://example.test").expect("transport");
+        assert!(matches!(
+            transport.clone().with_device_identity(""),
+            Err(SyncRemoteError::InvalidRequest { .. })
+        ));
+        assert!(matches!(
+            transport.with_device_identity("device-b\r\nX-Leak: wrapped"),
             Err(SyncRemoteError::InvalidRequest { .. })
         ));
     }
@@ -765,6 +1142,79 @@ mod tests {
         host: String,
         port: u16,
         handle: thread::JoinHandle<()>,
+    }
+
+    struct TestHttpsServer {
+        port: u16,
+        root_certificate_der: Vec<u8>,
+        handle: thread::JoinHandle<()>,
+    }
+
+    impl TestHttpsServer {
+        fn try_spawn(
+            handler: impl FnOnce(TestHttpRequest) -> TestHttpResponse + Send + 'static,
+        ) -> Option<Self> {
+            let listener = match TcpListener::bind("127.0.0.1:0") {
+                Ok(listener) => listener,
+                Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => return None,
+                Err(error) => panic!("bind test https server: {error}"),
+            };
+            let mut root_params =
+                CertificateParams::new(Vec::<String>::new()).expect("test root certificate params");
+            root_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+            let root_key = KeyPair::generate().expect("generate test root key");
+            let root_certificate = root_params
+                .self_signed(&root_key)
+                .expect("sign test root certificate");
+            let server_params = CertificateParams::new(vec!["localhost".to_owned()])
+                .expect("test server certificate params");
+            let server_key = KeyPair::generate().expect("generate test server key");
+            let server_certificate = server_params
+                .signed_by(&server_key, &root_certificate, &root_key)
+                .expect("sign test server certificate");
+            let root_certificate_der = root_certificate.der().to_vec();
+            let private_key = PrivatePkcs8KeyDer::from(server_key.serialize_der());
+            let config = ServerConfig::builder()
+                .with_no_client_auth()
+                .with_single_cert(vec![server_certificate.der().clone()], private_key.into())
+                .expect("test tls config");
+            let port = listener.local_addr().expect("local addr").port();
+            let handle = thread::spawn(move || {
+                let (stream, _) = listener.accept().expect("accept");
+                let connection =
+                    ServerConnection::new(Arc::new(config)).expect("test tls connection");
+                let mut stream = StreamOwned::new(connection, stream);
+                if stream.conn.complete_io(&mut stream.sock).is_err() {
+                    return;
+                }
+                let request = read_test_request(&mut stream);
+                let response = handler(request);
+                stream.write_all(&response.bytes).expect("write response");
+                stream.conn.send_close_notify();
+                stream.flush().expect("flush response");
+            });
+            Some(Self {
+                port,
+                root_certificate_der,
+                handle,
+            })
+        }
+
+        fn base_url(&self) -> String {
+            format!("https://localhost:{}", self.port)
+        }
+
+        fn ip_base_url(&self) -> String {
+            format!("https://127.0.0.1:{}", self.port)
+        }
+
+        fn root_certificate_der(&self) -> &[u8] {
+            &self.root_certificate_der
+        }
+
+        fn join(self) {
+            self.handle.join().expect("server thread");
+        }
     }
 
     type TestHttpHandler = Box<dyn FnOnce(TestHttpRequest) -> TestHttpResponse + Send>;
@@ -861,7 +1311,7 @@ mod tests {
         }
     }
 
-    fn read_test_request(stream: &mut TcpStream) -> TestHttpRequest {
+    fn read_test_request<R: Read>(stream: &mut R) -> TestHttpRequest {
         let mut reader = BufReader::new(stream);
         let mut first_line = String::new();
         reader.read_line(&mut first_line).expect("request line");

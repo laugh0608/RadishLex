@@ -10,7 +10,9 @@ void main() {
   testWidgets('learning view exposes aggregate explain data', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const RadishLexManagerApp());
+    await tester.pumpWidget(
+      RadishLexManagerApp(bridge: FixtureManagerBridge()),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.psychology_alt_outlined));
@@ -31,7 +33,9 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1400, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(const RadishLexManagerApp());
+    await tester.pumpWidget(
+      RadishLexManagerApp(bridge: FixtureManagerBridge()),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.psychology_alt_outlined));

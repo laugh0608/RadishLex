@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 
-import 'bridge/fixture_manager_bridge.dart';
 import 'bridge/manager_bridge.dart';
+import 'bridge/manager_bridge_factory.dart';
 import 'screens/manager_home_screen.dart';
 
 class RadishLexManagerApp extends StatelessWidget {
-  const RadishLexManagerApp({super.key, this.bridge});
+  const RadishLexManagerApp({
+    super.key,
+    required this.bridge,
+    this.runtimeMode = ManagerRuntimeMode.product,
+  });
 
-  final ManagerBridge? bridge;
+  final ManagerBridge bridge;
+  final ManagerRuntimeMode runtimeMode;
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +43,13 @@ class RadishLexManagerApp extends StatelessWidget {
           isDense: true,
         ),
       ),
-      home: ManagerHomeScreen(bridge: bridge ?? FixtureManagerBridge()),
+      home: runtimeMode == ManagerRuntimeMode.demo
+          ? Banner(
+              message: '合成演示数据',
+              location: BannerLocation.topEnd,
+              child: ManagerHomeScreen(bridge: bridge),
+            )
+          : ManagerHomeScreen(bridge: bridge),
     );
   }
 }

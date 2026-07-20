@@ -7,6 +7,7 @@ import 'ffi_manager_runtime_diagnostics.dart';
 import 'ffi_manager_snapshot_mapper.dart';
 import 'manager_bridge.dart';
 import 'manager_diagnostics_export.dart';
+import 'manager_platform_control.dart';
 import 'manager_settings_store.dart';
 
 export 'ffi_manager_native_models.dart';
@@ -19,6 +20,7 @@ class FfiManagerBridge implements ManagerBridge {
     String? settingsFilePath,
     RadishLexManagerNativeBinding? native,
     ManagerSettingsStore? settingsStore,
+    this.platformControl,
   }) : dbPath = dbPath.trim(),
        libraryPath = libraryPath?.trim() ?? '',
        _settingsStore =
@@ -41,6 +43,7 @@ class FfiManagerBridge implements ManagerBridge {
   final bool _nativeInjected;
   final RadishLexManagerNativeBinding _native;
   final ManagerSettingsStore _settingsStore;
+  final ManagerPlatformControl? platformControl;
 
   @override
   Future<ManagerSnapshot> loadSnapshot() async {
@@ -50,6 +53,17 @@ class FfiManagerBridge implements ManagerBridge {
   @override
   Future<ManagerSnapshot> deleteUserTerm(UserTermKey term) async {
     _native.deleteUserTerm(
+      dbPath: dbPath,
+      inputCode: term.inputCode,
+      text: term.text,
+      reading: term.reading.isEmpty ? null : term.reading,
+    );
+    return _loadSnapshot();
+  }
+
+  @override
+  Future<ManagerSnapshot> restoreUserTerm(UserTermKey term) async {
+    _native.restoreUserTerm(
       dbPath: dbPath,
       inputCode: term.inputCode,
       text: term.text,
@@ -97,7 +111,7 @@ class FfiManagerBridge implements ManagerBridge {
 
   @override
   Future<ManagerDiagnosticsReport> loadDiagnosticsReport() async {
-    return createManagerDiagnosticsReport(_loadSnapshot());
+    return createManagerDiagnosticsReport(await _loadSnapshot());
   }
 
   @override
@@ -112,18 +126,55 @@ class FfiManagerBridge implements ManagerBridge {
 
   @override
   Future<ManagerSnapshot> saveSettingsDraft(ManagerSettingsDraft draft) async {
-    _settingsStore.save(draft);
+    final platform = platformControl;
+    if (platform == null) {
+      _settingsStore.save(draft);
+      return _loadSnapshot();
+    }
+
+    final previousPrivacyState = await platform.readPrivacyModeState();
+    final privacyChanged = previousPrivacyState.enabled != draft.privacyMode;
+    try {
+      if (privacyChanged) {
+        await platform.writePrivacyMode(draft.privacyMode);
+      }
+      _settingsStore.save(draft);
+      await platform.secureLocalFiles();
+    } on Object {
+      if (privacyChanged) {
+        try {
+          await platform.restorePrivacyModeState(previousPrivacyState);
+          _settingsStore.save(
+            draft.copyWith(privacyMode: previousPrivacyState.enabled),
+          );
+        } on Object {
+          throw const ManagerPlatformException(
+            code: 'privacy_rollback_failed',
+            message: 'privacy mode could not be restored after save failure',
+          );
+        }
+      }
+      rethrow;
+    }
     return _loadSnapshot();
   }
 
-  ManagerSnapshot _loadSnapshot() {
-    final settingsDraft = _settingsStore.load();
+  Future<ManagerSnapshot> _loadSnapshot() async {
+    var settingsDraft = _settingsStore.load();
+    final platform = platformControl;
+    if (platform != null) {
+      settingsDraft = settingsDraft.copyWith(
+        privacyMode: (await platform.readPrivacyModeState()).enabled,
+      );
+    }
     return managerSnapshotFromNative(
       generatedAtMs: DateTime.now().millisecondsSinceEpoch,
       nativeTerms: _native.listUserTerms(dbPath),
+      nativeDeletedTerms: _native.listDeletedTerms(dbPath),
       nativeImportBatches: _native.listImportBatches(dbPath),
       nativeLearning: _native.learningStatus(dbPath),
       nativeSync: _native.syncPreflight(dbPath),
+      nativeSyncProductStatus: _native.syncProductStatus(),
       settingsDraft: settingsDraft,
       runtimeDiagnostics: managerRuntimeDiagnosticsFromFfi(
         nativeInjected: _nativeInjected,

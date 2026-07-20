@@ -1,23 +1,30 @@
+use rusqlite::{params, Connection, OptionalExtension, Row, TransactionBehavior};
 use std::collections::BTreeSet;
-use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-use rusqlite::{params, Connection, OptionalExtension, Row};
 
 use crate::error::{UserDbError, UserDbResult};
 use crate::model::{
-    DictionaryImportBatch, DictionaryImportSummary, DictionaryTermRecord, DictionaryTermsDocument,
-    DictionaryTermsFormat, LearningStatusSummary, NegativeFeedbackDraft, PrivacyLevel,
-    SelectionEventDraft, SyncPreflightSummary, TermSource, TermStatus, UserDbSyncPlaintextPayload,
-    UserTerm,
+    DeletedTermTombstone, DictionaryImportBatch, DictionaryImportSummary, DictionaryTermRecord,
+    DictionaryTermsDocument, DictionaryTermsFormat, LearningCaseDeletedTombstoneInspection,
+    LearningCaseIdentity, LearningCaseInspection, LearningCaseRankerWeightInspection,
+    LearningCaseTermInspection, LearningStatusSummary, SyncPreflightSummary, TermSource,
+    TermStatus, UserDbSyncPlaintextPayload, UserTerm, LEARNING_CASE_INSPECTION_VERSION,
 };
 
+mod connection;
+mod identity;
+mod learning;
+mod ranking;
 mod sync_apply;
 mod sync_payload;
+mod sync_repository;
+mod trusted_lifecycle;
+mod wrapped_epoch_material;
 
+use identity::has_deleted_tombstone_on;
+use learning::now_ms;
+pub use ranking::{DeletedTermIdentity, RankingCandidateIdentity, RankingSignals};
 pub use sync_apply::UserDbSyncApplySummary;
 
-const SCHEMA_VERSION: i64 = 2;
 const DICTIONARY_EXPORT_HEADER: &str = "input_code\ttext\treading\tsource\tweight\tstatus";
 
 #[derive(Debug, Clone, PartialEq)]
@@ -26,86 +33,20 @@ pub struct RankerWeight {
     pub text: String,
     pub reading: Option<String>,
     pub frequency: i64,
-    pub recency_score: f64,
+    pub last_used_at_ms: Option<i64>,
     pub negative_score: f64,
     pub context_kind: String,
 }
 
+#[derive(Debug)]
 pub struct UserDb {
-    connection: Connection,
+    pub(super) connection: Connection,
 }
 
 impl UserDb {
-    pub fn open(path: impl AsRef<Path>) -> UserDbResult<Self> {
-        let connection = Connection::open(path)?;
-        let db = Self { connection };
-        db.migrate()?;
-        Ok(db)
-    }
-
-    pub fn open_in_memory() -> UserDbResult<Self> {
-        let connection = Connection::open_in_memory()?;
-        let db = Self { connection };
-        db.migrate()?;
-        Ok(db)
-    }
-
-    pub fn schema_version(&self) -> UserDbResult<i64> {
-        self.connection
-            .query_row("PRAGMA user_version", [], |row| row.get(0))
-            .map_err(Into::into)
-    }
-
-    pub fn add_term(
-        &mut self,
-        input_code: impl AsRef<str>,
-        text: impl AsRef<str>,
-        reading: Option<&str>,
-        source: TermSource,
-    ) -> UserDbResult<UserTerm> {
-        let input_code = normalized_required("input_code", input_code.as_ref())?;
-        let text = normalized_required("text", text.as_ref())?;
-        let reading = normalized_optional(reading);
-        let now = now_ms()?;
-
-        if self.has_deleted_tombstone(&input_code, &text, &reading)? {
-            if source != TermSource::ManualAdd {
-                return self
-                    .fetch_term(&input_code, &text, &reading)?
-                    .ok_or_else(|| {
-                        UserDbError::invalid_input(
-                            "term",
-                            "term is blocked by a deletion tombstone",
-                        )
-                    });
-            }
-
-            self.clear_deleted_tombstones(&input_code, &text, &reading)?;
-        }
-
-        self.connection.execute(
-            "INSERT INTO user_terms (
-                text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms
-             )
-             VALUES (?1, ?2, ?3, ?4, 1.0, 'active', ?5, ?5, NULL)
-             ON CONFLICT(input_code, text, reading) DO UPDATE SET
-                source = excluded.source,
-                status = 'active',
-                weight = CASE
-                    WHEN user_terms.status = 'deleted' THEN excluded.weight
-                    ELSE user_terms.weight + 1.0
-                END,
-                updated_at_ms = excluded.updated_at_ms",
-            params![text, reading, input_code, source.as_str(), now],
-        )?;
-
-        self.fetch_term(&input_code, &text, &reading)?
-            .ok_or_else(|| UserDbError::invalid_input("term", "term was not stored"))
-    }
-
     pub fn list_active_terms(&self) -> UserDbResult<Vec<UserTerm>> {
         let mut statement = self.connection.prepare(
-            "SELECT id, text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms
+            "SELECT id, text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms, restored_at_ms, import_batch_id
              FROM user_terms
              WHERE status != 'deleted'
              ORDER BY input_code, text, reading",
@@ -116,9 +57,30 @@ impl UserDb {
         Ok(terms)
     }
 
+    pub fn list_deleted_term_tombstones(&self) -> UserDbResult<Vec<DeletedTermTombstone>> {
+        let mut statement = self.connection.prepare(
+            "SELECT input_code, text, reading, deleted_at_ms, reason
+             FROM deleted_terms
+             ORDER BY deleted_at_ms DESC, input_code, text, reading",
+        )?;
+        let tombstones = statement
+            .query_map([], |row| {
+                let reading: String = row.get(2)?;
+                Ok(DeletedTermTombstone {
+                    input_code: row.get(0)?,
+                    text: row.get(1)?,
+                    reading: optional_from_storage(&reading),
+                    deleted_at_ms: row.get(3)?,
+                    reason: row.get(4)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(tombstones)
+    }
+
     pub fn export_dictionary_records(&self) -> UserDbResult<Vec<DictionaryTermRecord>> {
         let mut statement = self.connection.prepare(
-            "SELECT id, text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms
+            "SELECT id, text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms, restored_at_ms, import_batch_id
              FROM user_terms
              WHERE status IN ('active', 'suppressed')
              ORDER BY input_code, text, reading",
@@ -141,29 +103,6 @@ impl UserDb {
         let transaction = self.connection.transaction()?;
         let (mut summary, actions) = prepare_dictionary_import(&transaction, records)?;
 
-        for action in actions {
-            transaction.execute(
-                "INSERT INTO user_terms (
-                    text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms
-                 )
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, NULL)
-                 ON CONFLICT(input_code, text, reading) DO UPDATE SET
-                    source = excluded.source,
-                    weight = excluded.weight,
-                    status = excluded.status,
-                    updated_at_ms = excluded.updated_at_ms",
-                params![
-                    action.text,
-                    action.reading,
-                    action.input_code,
-                    action.source.as_str(),
-                    action.weight,
-                    action.status.as_str(),
-                    now
-                ],
-            )?;
-        }
-
         transaction.execute(
             "INSERT INTO import_batches (
                 source_name, term_count, total_count, inserted_count, updated_count,
@@ -171,7 +110,7 @@ impl UserDb {
              )
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, '')",
             params![
-                source_name,
+                &source_name,
                 summary.imported_terms as i64,
                 summary.total_records as i64,
                 summary.inserted_terms as i64,
@@ -181,7 +120,39 @@ impl UserDb {
                 now
             ],
         )?;
-        summary.import_batch_id = Some(transaction.last_insert_rowid());
+        let import_batch_id = transaction.last_insert_rowid();
+        summary.import_batch_id = Some(import_batch_id);
+
+        for action in actions {
+            transaction.execute(
+                "INSERT INTO user_terms (
+                    text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms, restored_at_ms, import_batch_id
+                 )
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7, NULL, NULL, ?8)
+                 ON CONFLICT(input_code, text, reading) DO UPDATE SET
+                    source = CASE
+                        WHEN user_terms.status = 'suppressed' THEN user_terms.source
+                        ELSE excluded.source
+                    END,
+                    weight = excluded.weight,
+                    status = CASE
+                        WHEN user_terms.status = 'suppressed' THEN 'suppressed'
+                        ELSE excluded.status
+                    END,
+                    updated_at_ms = excluded.updated_at_ms,
+                    import_batch_id = excluded.import_batch_id",
+                params![
+                    action.text,
+                    action.reading,
+                    action.input_code,
+                    action.source.as_str(),
+                    action.weight,
+                    action.status.as_str(),
+                    now,
+                    import_batch_id
+                ],
+            )?;
+        }
         transaction.commit()?;
 
         Ok(summary)
@@ -206,7 +177,7 @@ impl UserDb {
     ) -> UserDbResult<Option<UserTerm>> {
         self.connection
             .query_row(
-                "SELECT id, text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms
+                "SELECT id, text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms, restored_at_ms, import_batch_id
                  FROM user_terms
                  WHERE input_code = ?1 AND text = ?2 AND reading = ?3",
                 params![input_code, text, reading],
@@ -214,146 +185,6 @@ impl UserDb {
             )
             .optional()
             .map_err(Into::into)
-    }
-
-    pub fn record_selection(&mut self, event: SelectionEventDraft) -> UserDbResult<Option<i64>> {
-        if event.privacy == PrivacyLevel::P0NeverLearn {
-            return Ok(None);
-        }
-
-        validate_selection_event(&event)?;
-        let reading = normalized_optional(event.selected_reading.as_deref());
-        let now = now_ms()?;
-
-        self.connection.execute(
-            "INSERT INTO selection_events (
-                session_id, input_code, selected_text, selected_reading, candidate_index,
-                candidate_count, context_kind, created_at_ms
-             )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            params![
-                event.session_id,
-                event.input_code,
-                event.selected_text,
-                reading,
-                event.candidate_index as i64,
-                event.candidate_count as i64,
-                event.context_kind,
-                now
-            ],
-        )?;
-        let event_id = self.connection.last_insert_rowid();
-
-        if !self.has_deleted_tombstone(&event.input_code, &event.selected_text, &reading)? {
-            self.upsert_term_from_selection(
-                &event.input_code,
-                &event.selected_text,
-                &reading,
-                &event.context_kind,
-                now,
-            )?;
-        }
-
-        Ok(Some(event_id))
-    }
-
-    pub fn record_negative_feedback(
-        &mut self,
-        feedback: NegativeFeedbackDraft,
-    ) -> UserDbResult<Option<i64>> {
-        if feedback.privacy == PrivacyLevel::P0NeverLearn {
-            return Ok(None);
-        }
-
-        validate_required("input_code", &feedback.input_code)?;
-        validate_required("text", &feedback.text)?;
-        validate_required("context_kind", &feedback.context_kind)?;
-
-        let reading = normalized_optional(feedback.reading.as_deref());
-        let now = now_ms()?;
-
-        self.connection.execute(
-            "INSERT INTO negative_feedback (
-                input_code, text, reading, reason, context_kind, created_at_ms
-             )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![
-                feedback.input_code,
-                feedback.text,
-                reading,
-                feedback.reason.as_str(),
-                feedback.context_kind,
-                now
-            ],
-        )?;
-        let feedback_id = self.connection.last_insert_rowid();
-
-        self.connection.execute(
-            "UPDATE user_terms
-             SET status = 'suppressed', weight = MAX(weight - 1.0, 0.0), updated_at_ms = ?4
-             WHERE input_code = ?1 AND text = ?2 AND reading = ?3 AND status != 'deleted'",
-            params![feedback.input_code, feedback.text, reading, now],
-        )?;
-
-        self.upsert_ranker_weight_penalty(
-            &feedback.input_code,
-            &feedback.text,
-            &reading,
-            &feedback.context_kind,
-            now,
-        )?;
-
-        Ok(Some(feedback_id))
-    }
-
-    pub fn delete_term(
-        &mut self,
-        input_code: impl AsRef<str>,
-        text: impl AsRef<str>,
-        reading: Option<&str>,
-    ) -> UserDbResult<()> {
-        let input_code = normalized_required("input_code", input_code.as_ref())?;
-        let text = normalized_required("text", text.as_ref())?;
-        let reading = normalized_optional(reading);
-        let now = now_ms()?;
-
-        let term_id = self
-            .fetch_term(&input_code, &text, &reading)?
-            .map(|term| term.id);
-
-        self.connection.execute(
-            "INSERT INTO user_terms (
-                text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms
-             )
-             VALUES (?1, ?2, ?3, 'manual_add', 0.0, 'deleted', ?4, ?4, NULL)
-             ON CONFLICT(input_code, text, reading) DO UPDATE SET
-                status = 'deleted',
-                weight = 0.0,
-                updated_at_ms = excluded.updated_at_ms",
-            params![text, reading, input_code, now],
-        )?;
-
-        self.connection.execute(
-            "INSERT INTO deleted_terms (
-                term_id, text_hash, reading_hash, input_code_hash, deleted_at_ms, reason
-             )
-             VALUES (?1, ?2, ?3, ?4, ?5, 'manual_delete')",
-            params![
-                term_id,
-                stable_hash_hex(&text),
-                stable_hash_hex(&reading),
-                stable_hash_hex(&input_code),
-                now
-            ],
-        )?;
-
-        self.connection.execute(
-            "DELETE FROM ranker_weights
-             WHERE input_code = ?1 AND text = ?2 AND reading = ?3",
-            params![input_code, text, reading],
-        )?;
-
-        Ok(())
     }
 
     pub fn selection_event_count(&self) -> UserDbResult<i64> {
@@ -411,38 +242,92 @@ impl UserDb {
     }
 
     pub fn learning_status_summary(&self) -> UserDbResult<LearningStatusSummary> {
-        let latest_user_term_updated_at_ms =
-            max_i64_column(&self.connection, "user_terms", "updated_at_ms")?;
-        let latest_selection_event_at_ms =
-            max_i64_column(&self.connection, "selection_events", "created_at_ms")?;
-        let latest_negative_feedback_at_ms =
-            max_i64_column(&self.connection, "negative_feedback", "created_at_ms")?;
-        let latest_deleted_term_at_ms =
-            max_i64_column(&self.connection, "deleted_terms", "deleted_at_ms")?;
-        let latest_import_batch_at_ms =
-            max_i64_column(&self.connection, "import_batches", "created_at_ms")?;
+        learning_status_summary_on(&self.connection)
+    }
 
-        Ok(LearningStatusSummary {
-            schema_version: self.schema_version()?,
-            active_user_terms: self.count_user_terms_with_status(TermStatus::Active)?,
-            suppressed_user_terms: self.count_user_terms_with_status(TermStatus::Suppressed)?,
-            ranker_weights: count_rows_usize(&self.connection, "ranker_weights")?,
-            deleted_term_tombstones: count_rows_usize(&self.connection, "deleted_terms")?,
-            selection_events: count_rows_usize(&self.connection, "selection_events")?,
-            negative_feedback: count_rows_usize(&self.connection, "negative_feedback")?,
-            import_batches: count_rows_usize(&self.connection, "import_batches")?,
-            latest_user_term_updated_at_ms,
-            latest_selection_event_at_ms,
-            latest_negative_feedback_at_ms,
-            latest_deleted_term_at_ms,
-            latest_import_batch_at_ms,
-            latest_activity_at_ms: latest_ms([
-                latest_user_term_updated_at_ms,
-                latest_selection_event_at_ms,
-                latest_negative_feedback_at_ms,
-                latest_deleted_term_at_ms,
-                latest_import_batch_at_ms,
-            ]),
+    pub fn inspect_learning_case(
+        &mut self,
+        input_code: &str,
+        text: &str,
+        reading: Option<&str>,
+        context_kind: &str,
+    ) -> UserDbResult<LearningCaseInspection> {
+        let input_code = normalized_required("input_code", input_code)?;
+        let text = normalized_required("text", text)?;
+        let reading = normalized_optional(reading);
+        let context_kind = normalized_required("context_kind", context_kind)?;
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)?;
+
+        let aggregate = learning_status_summary_on(&transaction)?;
+        let term = transaction
+            .query_row(
+                "SELECT source, status, weight, updated_at_ms, last_used_at_ms, restored_at_ms
+                 FROM user_terms
+                 WHERE input_code = ?1 AND text = ?2 AND reading = ?3",
+                params![input_code, text, reading],
+                |row| {
+                    let source: String = row.get(0)?;
+                    let status: String = row.get(1)?;
+                    Ok(LearningCaseTermInspection {
+                        source: source
+                            .parse::<TermSource>()
+                            .map_err(to_sqlite_conversion_failure)?,
+                        status: status
+                            .parse::<TermStatus>()
+                            .map_err(to_sqlite_conversion_failure)?,
+                        weight: row.get(2)?,
+                        version_ms: row.get(3)?,
+                        last_used_at_ms: row.get(4)?,
+                        restored_at_ms: row.get(5)?,
+                    })
+                },
+            )
+            .optional()?;
+        let ranker_weight = transaction
+            .query_row(
+                "SELECT frequency, last_used_at_ms, negative_score, updated_at_ms
+                 FROM ranker_weights
+                 WHERE input_code = ?1 AND text = ?2 AND reading = ?3 AND context_kind = ?4",
+                params![input_code, text, reading, context_kind],
+                |row| {
+                    Ok(LearningCaseRankerWeightInspection {
+                        frequency: row.get(0)?,
+                        last_used_at_ms: row.get(1)?,
+                        negative_score: row.get(2)?,
+                        updated_at_ms: row.get(3)?,
+                    })
+                },
+            )
+            .optional()?;
+        let deleted_tombstone = transaction
+            .query_row(
+                "SELECT deleted_at_ms
+                 FROM deleted_terms
+                 WHERE input_code = ?1 AND text = ?2 AND reading = ?3",
+                params![input_code, text, reading],
+                |row| {
+                    Ok(LearningCaseDeletedTombstoneInspection {
+                        deleted_at_ms: row.get(0)?,
+                    })
+                },
+            )
+            .optional()?;
+
+        transaction.commit()?;
+        Ok(LearningCaseInspection {
+            inspection_version: LEARNING_CASE_INSPECTION_VERSION,
+            identity: LearningCaseIdentity {
+                input_code,
+                text,
+                reading: optional_from_storage(&reading),
+                context_kind,
+            },
+            aggregate,
+            term,
+            ranker_weight,
+            deleted_tombstone,
         })
     }
 
@@ -456,7 +341,7 @@ impl UserDb {
         let reading = normalized_optional(reading);
         self.connection
             .query_row(
-                "SELECT input_code, text, reading, frequency, recency_score, negative_score, context_kind
+                "SELECT input_code, text, reading, frequency, last_used_at_ms, negative_score, context_kind
                  FROM ranker_weights
                  WHERE input_code = ?1 AND text = ?2 AND reading = ?3 AND context_kind = ?4",
                 params![input_code, text, reading, context_kind],
@@ -467,7 +352,7 @@ impl UserDb {
                         text: row.get(1)?,
                         reading: optional_from_storage(&reading),
                         frequency: row.get(3)?,
-                        recency_score: row.get(4)?,
+                        last_used_at_ms: row.get(4)?,
                         negative_score: row.get(5)?,
                         context_kind: row.get(6)?,
                     })
@@ -475,186 +360,6 @@ impl UserDb {
             )
             .optional()
             .map_err(Into::into)
-    }
-
-    fn migrate(&self) -> UserDbResult<()> {
-        self.connection.execute_batch(
-            "
-            PRAGMA foreign_keys = ON;
-
-            CREATE TABLE IF NOT EXISTS user_terms (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                text TEXT NOT NULL,
-                reading TEXT NOT NULL DEFAULT '',
-                input_code TEXT NOT NULL,
-                source TEXT NOT NULL,
-                weight REAL NOT NULL DEFAULT 0.0,
-                status TEXT NOT NULL,
-                created_at_ms INTEGER NOT NULL,
-                updated_at_ms INTEGER NOT NULL,
-                last_used_at_ms INTEGER
-            );
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_user_terms_identity
-                ON user_terms(input_code, text, reading);
-
-            CREATE TABLE IF NOT EXISTS selection_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT NOT NULL,
-                input_code TEXT NOT NULL,
-                selected_text TEXT NOT NULL,
-                selected_reading TEXT NOT NULL DEFAULT '',
-                candidate_index INTEGER NOT NULL,
-                candidate_count INTEGER NOT NULL,
-                context_kind TEXT NOT NULL,
-                created_at_ms INTEGER NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS negative_feedback (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                input_code TEXT NOT NULL,
-                text TEXT NOT NULL,
-                reading TEXT NOT NULL DEFAULT '',
-                reason TEXT NOT NULL,
-                context_kind TEXT NOT NULL,
-                created_at_ms INTEGER NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS deleted_terms (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                term_id INTEGER,
-                text_hash TEXT NOT NULL,
-                reading_hash TEXT NOT NULL,
-                input_code_hash TEXT NOT NULL,
-                deleted_at_ms INTEGER NOT NULL,
-                reason TEXT NOT NULL
-            );
-
-            CREATE TABLE IF NOT EXISTS ranker_weights (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                input_code TEXT NOT NULL,
-                text TEXT NOT NULL,
-                reading TEXT NOT NULL DEFAULT '',
-                frequency INTEGER NOT NULL DEFAULT 0,
-                recency_score REAL NOT NULL DEFAULT 0.0,
-                negative_score REAL NOT NULL DEFAULT 0.0,
-                context_kind TEXT NOT NULL DEFAULT 'general',
-                updated_at_ms INTEGER NOT NULL
-            );
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_ranker_weights_identity
-                ON ranker_weights(input_code, text, reading, context_kind);
-
-            CREATE TABLE IF NOT EXISTS import_batches (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                source_name TEXT NOT NULL,
-                term_count INTEGER NOT NULL,
-                total_count INTEGER NOT NULL DEFAULT 0,
-                inserted_count INTEGER NOT NULL DEFAULT 0,
-                updated_count INTEGER NOT NULL DEFAULT 0,
-                skipped_deleted_count INTEGER NOT NULL DEFAULT 0,
-                skipped_duplicate_count INTEGER NOT NULL DEFAULT 0,
-                created_at_ms INTEGER NOT NULL,
-                notes TEXT NOT NULL DEFAULT ''
-            );
-            ",
-        )?;
-
-        match self.schema_version()? {
-            0 => {
-                self.ensure_import_batch_v2_columns()?;
-                self.connection
-                    .pragma_update(None, "user_version", SCHEMA_VERSION)?;
-            }
-            1 => {
-                self.ensure_import_batch_v2_columns()?;
-                self.connection
-                    .pragma_update(None, "user_version", SCHEMA_VERSION)?;
-            }
-            SCHEMA_VERSION => {}
-            version => {
-                return Err(UserDbError::invalid_input(
-                    "schema_version",
-                    format!("expected {SCHEMA_VERSION}, got {version}"),
-                ));
-            }
-        }
-
-        let version = self.schema_version()?;
-        if version != SCHEMA_VERSION {
-            return Err(UserDbError::invalid_input(
-                "schema_version",
-                format!("expected {SCHEMA_VERSION}, got {version}"),
-            ));
-        }
-
-        Ok(())
-    }
-
-    fn ensure_import_batch_v2_columns(&self) -> UserDbResult<()> {
-        let columns = table_columns(&self.connection, "import_batches")?;
-        let migrations = [
-            (
-                "total_count",
-                "ALTER TABLE import_batches ADD COLUMN total_count INTEGER NOT NULL DEFAULT 0",
-            ),
-            (
-                "inserted_count",
-                "ALTER TABLE import_batches ADD COLUMN inserted_count INTEGER NOT NULL DEFAULT 0",
-            ),
-            (
-                "updated_count",
-                "ALTER TABLE import_batches ADD COLUMN updated_count INTEGER NOT NULL DEFAULT 0",
-            ),
-            (
-                "skipped_deleted_count",
-                "ALTER TABLE import_batches ADD COLUMN skipped_deleted_count INTEGER NOT NULL DEFAULT 0",
-            ),
-            (
-                "skipped_duplicate_count",
-                "ALTER TABLE import_batches ADD COLUMN skipped_duplicate_count INTEGER NOT NULL DEFAULT 0",
-            ),
-        ];
-
-        for (column, sql) in migrations {
-            if !columns.contains(column) {
-                self.connection.execute(sql, [])?;
-            }
-        }
-
-        self.connection.execute(
-            "UPDATE import_batches
-             SET total_count = CASE WHEN total_count = 0 THEN term_count ELSE total_count END,
-                 inserted_count = CASE WHEN inserted_count = 0 THEN term_count ELSE inserted_count END",
-            [],
-        )?;
-
-        Ok(())
-    }
-
-    fn has_deleted_tombstone(
-        &self,
-        input_code: &str,
-        text: &str,
-        reading: &str,
-    ) -> UserDbResult<bool> {
-        has_deleted_tombstone_on(&self.connection, input_code, text, reading)
-    }
-
-    fn clear_deleted_tombstones(
-        &self,
-        input_code: &str,
-        text: &str,
-        reading: &str,
-    ) -> UserDbResult<()> {
-        self.connection.execute(
-            "DELETE FROM deleted_terms
-             WHERE input_code_hash = ?1 AND text_hash = ?2 AND reading_hash = ?3",
-            params![
-                stable_hash_hex(input_code),
-                stable_hash_hex(text),
-                stable_hash_hex(reading)
-            ],
-        )?;
-        Ok(())
     }
 
     fn count_user_terms_for_sync(&self) -> UserDbResult<usize> {
@@ -669,84 +374,6 @@ impl UserDb {
             .and_then(|count| non_negative_usize(count, "user_terms"))
             .map_err(Into::into)
     }
-
-    fn count_user_terms_with_status(&self, status: TermStatus) -> UserDbResult<usize> {
-        self.connection
-            .query_row(
-                "SELECT COUNT(*)
-                 FROM user_terms
-                 WHERE status = ?1",
-                params![status.as_str()],
-                |row| row.get::<_, i64>(0),
-            )
-            .and_then(|count| non_negative_usize(count, "user_terms"))
-            .map_err(Into::into)
-    }
-
-    fn upsert_term_from_selection(
-        &self,
-        input_code: &str,
-        text: &str,
-        reading: &str,
-        context_kind: &str,
-        now: i64,
-    ) -> UserDbResult<()> {
-        self.connection.execute(
-            "INSERT INTO user_terms (
-                text, reading, input_code, source, weight, status, created_at_ms, updated_at_ms, last_used_at_ms
-             )
-             VALUES (?1, ?2, ?3, 'engine_selection', 1.0, 'active', ?4, ?4, ?4)
-             ON CONFLICT(input_code, text, reading) DO UPDATE SET
-                source = excluded.source,
-                weight = CASE
-                    WHEN user_terms.status = 'deleted' THEN user_terms.weight
-                    ELSE user_terms.weight + 1.0
-                END,
-                status = CASE
-                    WHEN user_terms.status = 'deleted' THEN user_terms.status
-                    ELSE 'active'
-                END,
-                updated_at_ms = excluded.updated_at_ms,
-                last_used_at_ms = excluded.last_used_at_ms",
-            params![text, reading, input_code, now],
-        )?;
-
-        self.connection.execute(
-            "INSERT INTO ranker_weights (
-                input_code, text, reading, frequency, recency_score, negative_score, context_kind, updated_at_ms
-             )
-             VALUES (?1, ?2, ?3, 1, ?5, 0.0, ?4, ?5)
-             ON CONFLICT(input_code, text, reading, context_kind) DO UPDATE SET
-                frequency = ranker_weights.frequency + 1,
-                recency_score = excluded.recency_score,
-                updated_at_ms = excluded.updated_at_ms",
-            params![input_code, text, reading, context_kind, now as f64],
-        )?;
-
-        Ok(())
-    }
-
-    fn upsert_ranker_weight_penalty(
-        &self,
-        input_code: &str,
-        text: &str,
-        reading: &str,
-        context_kind: &str,
-        now: i64,
-    ) -> UserDbResult<()> {
-        self.connection.execute(
-            "INSERT INTO ranker_weights (
-                input_code, text, reading, frequency, recency_score, negative_score, context_kind, updated_at_ms
-             )
-             VALUES (?1, ?2, ?3, 0, 0.0, 1.0, ?4, ?5)
-             ON CONFLICT(input_code, text, reading, context_kind) DO UPDATE SET
-                negative_score = ranker_weights.negative_score + 1.0,
-                updated_at_ms = excluded.updated_at_ms",
-            params![input_code, text, reading, context_kind, now],
-        )?;
-
-        Ok(())
-    }
 }
 
 fn user_term_from_row(row: &Row<'_>) -> rusqlite::Result<UserTerm> {
@@ -754,8 +381,12 @@ fn user_term_from_row(row: &Row<'_>) -> rusqlite::Result<UserTerm> {
     let source: String = row.get(4)?;
     let status: String = row.get(6)?;
 
-    let source = TermSource::from_str(&source).map_err(to_sqlite_conversion_failure)?;
-    let status = TermStatus::from_str(&status).map_err(to_sqlite_conversion_failure)?;
+    let source = source
+        .parse::<TermSource>()
+        .map_err(to_sqlite_conversion_failure)?;
+    let status = status
+        .parse::<TermStatus>()
+        .map_err(to_sqlite_conversion_failure)?;
 
     Ok(UserTerm {
         id: row.get(0)?,
@@ -768,6 +399,8 @@ fn user_term_from_row(row: &Row<'_>) -> rusqlite::Result<UserTerm> {
         created_at_ms: row.get(7)?,
         updated_at_ms: row.get(8)?,
         last_used_at_ms: row.get(9)?,
+        restored_at_ms: row.get(10)?,
+        import_batch_id: row.get(11)?,
     })
 }
 
@@ -869,14 +502,14 @@ pub fn decode_dictionary_terms_tsv_document(input: &str) -> UserDbResult<Diction
             ));
         }
 
-        let source = TermSource::from_str(&fields[3])?;
+        let source = fields[3].parse::<TermSource>()?;
         let weight = fields[4].parse::<f64>().map_err(|_| {
             UserDbError::invalid_input(
                 "weight",
                 format!("line {line_number} has invalid weight {}", fields[4]),
             )
         })?;
-        let status = TermStatus::from_str(&fields[5])?;
+        let status = fields[5].parse::<TermStatus>()?;
 
         let record = DictionaryTermRecord {
             input_code: fields[0].clone(),
@@ -962,6 +595,55 @@ fn count_rows_usize(connection: &Connection, table: &'static str) -> UserDbResul
     non_negative_usize(count, table).map_err(Into::into)
 }
 
+fn count_user_terms_with_status_on(
+    connection: &Connection,
+    status: TermStatus,
+) -> UserDbResult<usize> {
+    connection
+        .query_row(
+            "SELECT COUNT(*)
+             FROM user_terms
+             WHERE status = ?1",
+            params![status.as_str()],
+            |row| row.get::<_, i64>(0),
+        )
+        .and_then(|count| non_negative_usize(count, "user_terms"))
+        .map_err(Into::into)
+}
+
+fn learning_status_summary_on(connection: &Connection) -> UserDbResult<LearningStatusSummary> {
+    let latest_user_term_updated_at_ms = max_i64_column(connection, "user_terms", "updated_at_ms")?;
+    let latest_selection_event_at_ms =
+        max_i64_column(connection, "selection_events", "created_at_ms")?;
+    let latest_negative_feedback_at_ms =
+        max_i64_column(connection, "negative_feedback", "created_at_ms")?;
+    let latest_deleted_term_at_ms = max_i64_column(connection, "deleted_terms", "deleted_at_ms")?;
+    let latest_import_batch_at_ms = max_i64_column(connection, "import_batches", "created_at_ms")?;
+
+    Ok(LearningStatusSummary {
+        schema_version: connection.query_row("PRAGMA user_version", [], |row| row.get(0))?,
+        active_user_terms: count_user_terms_with_status_on(connection, TermStatus::Active)?,
+        suppressed_user_terms: count_user_terms_with_status_on(connection, TermStatus::Suppressed)?,
+        ranker_weights: count_rows_usize(connection, "ranker_weights")?,
+        deleted_term_tombstones: count_rows_usize(connection, "deleted_terms")?,
+        selection_events: count_rows_usize(connection, "selection_events")?,
+        negative_feedback: count_rows_usize(connection, "negative_feedback")?,
+        import_batches: count_rows_usize(connection, "import_batches")?,
+        latest_user_term_updated_at_ms,
+        latest_selection_event_at_ms,
+        latest_negative_feedback_at_ms,
+        latest_deleted_term_at_ms,
+        latest_import_batch_at_ms,
+        latest_activity_at_ms: latest_ms([
+            latest_user_term_updated_at_ms,
+            latest_selection_event_at_ms,
+            latest_negative_feedback_at_ms,
+            latest_deleted_term_at_ms,
+            latest_import_batch_at_ms,
+        ]),
+    })
+}
+
 fn max_i64_column(
     connection: &Connection,
     table: &'static str,
@@ -990,36 +672,11 @@ fn non_negative_usize(value: i64, field: &'static str) -> rusqlite::Result<usize
     })
 }
 
-fn table_columns(connection: &Connection, table: &str) -> UserDbResult<BTreeSet<String>> {
-    let mut statement = connection.prepare(&format!("PRAGMA table_info({table})"))?;
-    let columns = statement
-        .query_map([], |row| row.get::<_, String>(1))?
-        .collect::<Result<BTreeSet<_>, _>>()?;
-    Ok(columns)
-}
-
 fn validate_dictionary_v1_header(header: &str) -> UserDbResult<()> {
     if header != DICTIONARY_EXPORT_HEADER {
         return Err(UserDbError::invalid_input(
             "import_file",
             format!("expected v1 header {DICTIONARY_EXPORT_HEADER}"),
-        ));
-    }
-    Ok(())
-}
-
-fn validate_selection_event(event: &SelectionEventDraft) -> UserDbResult<()> {
-    validate_required("session_id", &event.session_id)?;
-    validate_required("input_code", &event.input_code)?;
-    validate_required("selected_text", &event.selected_text)?;
-    validate_required("context_kind", &event.context_kind)?;
-    if event.candidate_index >= event.candidate_count {
-        return Err(UserDbError::invalid_input(
-            "candidate_index",
-            format!(
-                "{} is out of range for {} candidates",
-                event.candidate_index, event.candidate_count
-            ),
         ));
     }
     Ok(())
@@ -1086,26 +743,6 @@ fn optional_from_storage(value: &str) -> Option<String> {
     }
 }
 
-fn has_deleted_tombstone_on(
-    connection: &Connection,
-    input_code: &str,
-    text: &str,
-    reading: &str,
-) -> UserDbResult<bool> {
-    let count: i64 = connection.query_row(
-        "SELECT COUNT(*)
-         FROM deleted_terms
-         WHERE input_code_hash = ?1 AND text_hash = ?2 AND reading_hash = ?3",
-        params![
-            stable_hash_hex(input_code),
-            stable_hash_hex(text),
-            stable_hash_hex(reading)
-        ],
-        |row| row.get(0),
-    )?;
-    Ok(count > 0)
-}
-
 fn fetch_term_status_on(
     connection: &Connection,
     input_code: &str,
@@ -1120,7 +757,9 @@ fn fetch_term_status_on(
             params![input_code, text, reading],
             |row| {
                 let status: String = row.get(0)?;
-                TermStatus::from_str(&status).map_err(to_sqlite_conversion_failure)
+                status
+                    .parse::<TermStatus>()
+                    .map_err(to_sqlite_conversion_failure)
             },
         )
         .optional()
@@ -1177,20 +816,6 @@ fn split_tsv_line(line: &str, line_number: usize) -> UserDbResult<Vec<String>> {
 
     fields.push(current);
     Ok(fields)
-}
-
-fn now_ms() -> UserDbResult<i64> {
-    let duration = SystemTime::now().duration_since(UNIX_EPOCH)?;
-    Ok(duration.as_millis() as i64)
-}
-
-fn stable_hash_hex(value: &str) -> String {
-    let mut hash = 0xcbf29ce484222325_u64;
-    for byte in value.as_bytes() {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x100000001b3);
-    }
-    format!("{hash:016x}")
 }
 
 #[cfg(test)]

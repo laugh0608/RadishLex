@@ -67,7 +67,11 @@ impl Engine for StubEngine {
         Ok(self.available_candidates())
     }
 
-    fn commit_candidate(&mut self, index: usize) -> CoreResult<Commit> {
+    fn input_code(&self) -> CoreResult<String> {
+        Ok(self.buffer.clone())
+    }
+
+    fn select_candidate(&mut self, index: usize) -> CoreResult<KeyOutcome> {
         let candidates = self.available_candidates();
         let Some(candidate) = candidates.get(index) else {
             return Err(CoreError::InvalidCandidateIndex {
@@ -77,10 +81,10 @@ impl Engine for StubEngine {
         };
 
         self.buffer.clear();
-        Ok(Commit::new(
+        Ok(KeyOutcome::committed(Commit::new(
             candidate.text().to_owned(),
             CommitSource::Candidate { index },
-        ))
+        )))
     }
 
     fn set_schema(&mut self, schema: SchemaId) -> CoreResult<()> {
@@ -115,9 +119,10 @@ fn session_composes_lists_candidates_and_commits() {
     assert_eq!(state.candidates()[0].text(), "radish");
     assert_eq!(state.candidates()[0].reading(), Some("rad"));
 
-    let commit = session
-        .commit_candidate(0)
-        .expect("candidate commit succeeds");
+    let outcome = session
+        .select_candidate(0)
+        .expect("candidate selection succeeds");
+    let commit = outcome.commit().expect("selection commits the candidate");
     assert_eq!(commit.text(), "radish");
     assert_eq!(commit.source(), &CommitSource::Candidate { index: 0 });
 
@@ -136,7 +141,7 @@ fn invalid_candidate_index_is_reported() {
     }
 
     let err = session
-        .commit_candidate(1)
+        .select_candidate(1)
         .expect_err("index must be rejected");
     assert_eq!(err, CoreError::InvalidCandidateIndex { index: 1, len: 1 });
 }

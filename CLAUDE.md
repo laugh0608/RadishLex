@@ -29,10 +29,10 @@
 
 ## 快速认知
 
-- 当前阶段：M1 macOS 离线输入 Alpha；整改主批次 R01A，实时状态见 `docs/status/current.md`
-- 当前代码状态：Rust、Go、Flutter 原型与 macOS 开发薄壳已落地；真实安装、manager 产品包和生产同步未闭环
+- 当前阶段：M3 加密同步 Beta；主批次为设备签名 profile 与 macOS 私钥 backend，实时状态见 `docs/status/current.md`
+- 当前代码状态：macOS 离线 Alpha 与 M2 本地个人化 MVP 已完成；密文同步基础已落地，生产私钥 backend、产品 orchestration 与部署证据未闭环
 - 当前交付：工程原型，不是可安装 MVP；阶段证据以真实输入、数据正确性、安全同步和产品构建为准
-- 交付梯度：先完成 macOS 离线 Alpha 与本地个人化 MVP；加密同步和最终产品包属于后续 M3/M4
+- 交付梯度：macOS 离线 Alpha 与本地个人化 MVP 已完成；推进 M3 加密同步，产品包属于 M4
 - 第一真实平台：macOS InputMethodKit；Linux Fcitx5 与 Android 后续，Windows、iOS 后置
 - 底层引擎策略：v1 可接 `librime`，但必须通过 engine adapter 隔离；长期保留 Rust 自研引擎替换空间
 - 隐私立场：服务端默认不可信，客户端才是数据真相源
@@ -131,14 +131,11 @@
 
 ## 分支与 PR 约定
 
-- 当前常态开发分支为 `dev`
-- `master` 作为稳定主线
-- 非特殊情况不直接在 `master` 上开发
-- 阶段性稳定后，再从 `dev` 发起到 `master` 的 Pull Request
-- 远端分支保护、合并策略、稳定主线 PR 目标和阶段性例外，后续应以 `docs/adr/0001-branch-and-pr-governance.md` 或同类 ADR 为准
-- 在正式 ADR 补齐前，以当前 Git 实际状态和用户明确指令为准，不擅自改分支策略
-- 默认不执行破坏性 Git 操作
-- 推送远端分支、改远端设置、创建 Release 或修改仓库保护规则前，必须先告知用户并获得明确授权
+- `dev` 是常态开发分支，`master` 是稳定主线；常规改动不直接进入 `master`
+- 阶段稳定后发起 `dev -> master` PR；合并后、下一批开发前必须将最新 `master` merge 回 `dev` 并推送，保持 `master` 是 `dev` 的祖先
+- 共享 `dev` 只用 merge 回同步，不做 rebase 或 force push
+- 完整分支与 PR 规则见 `docs/adr/0001-branch-and-pr-governance.md`
+- 不执行破坏性 Git 操作；推送远端、创建 Release 或修改远端设置与保护规则前，必须先告知并获得授权
 
 ## 仓库结构速记
 
@@ -165,7 +162,7 @@
 - `scripts/`：仓库检查、格式和构建脚本
 - `tests/fixtures/`：跨模块合成 fixture
 
-尚未落地：Linux/Windows/iOS 平台壳、完整 Android IME 和 `examples/`；macOS 尚缺经授权的真实安装与应用输入 smoke，contract bundle 不代表 M1 完成。
+尚未落地：Linux/Windows/iOS 平台壳、完整 Android IME、`examples/`；M2 manager 已完成，生产同步与产品包尚未闭合。
 
 ## 架构边界
 
@@ -214,7 +211,8 @@
 - iOS 使用 Swift / UIKit Keyboard Extension，Rust core 编译为 XCFramework；默认离线可用，同步需要用户开启 full access
 - 平台壳不承担用户词库逻辑、同步逻辑、候选排序逻辑、隐私策略或业务配置真相源
 - 平台差异应通过 FFI / bridge 和 platform shell 边界吸收，不向 Rust core 注入平台私有生命周期细节
-- 涉及系统输入法安装、启用、权限、full access、TSF 注册、Keychain 或系统目录写入的操作，必须先告知用户并获得明确授权
+- 修改系统输入法、权限、Keychain 或系统目录必须先获明确授权。授权实机中，AI 负责构建、签名、用户级安装、系统设置添加、只读监视及最终清理；用户负责聚焦、手动切换 source 和实体交互
+- AI 每次只给一组步骤并等待结果，不用程序化选择、合成按键或自动点击冒充验收；菜单栏仅供参考，来源用公开 API 只读记录。显示冲突时用户经中立 source 重选；注销或重启前必须保存工作并另行授权
 
 ## AI 执行边界
 
@@ -233,7 +231,6 @@
 
 - 安装依赖、下载 SDK / 模型 / 数据、修改全局工具链或需要网络引入依赖变更的命令，例如 `cargo add`、`cargo update`、`go get`、`flutter pub add`、`npm install`
 - 启动长期运行或需要人工交互的命令，例如 `cargo run`、Go server、Flutter desktop、移动端模拟器、输入法守护进程、平台服务或浏览器 dev server
-- 真实联调需要启动开发服务器、平台后端、桌面 UI、移动模拟器或系统输入法时，默认由用户在本机终端启动；AI 不默认启动或保留后台服务
 - 修改本机环境，例如安装输入法、修改系统输入法配置、注册 / 反注册 TSF、写系统目录、写注册表、安装证书、修改 Keychain、修改全局 Git 配置或编辑器全局配置
 - 打包、签名、发布、上传、创建 Release、推送远端分支、修改远程仓库设置或配置 GitHub ruleset
 - 更改许可证、商标、版权声明或第三方依赖授权口径
@@ -245,7 +242,6 @@
 - 把旧仓库代码整包迁入当前仓库
 - 复制外部项目源码、GPL / LGPL 实现细节或有版权风险的词库数据
 - 未经明确要求执行破坏性 Git 操作
-- 未经明确要求启动或保留用于真实联调的开发服务器、平台后端、桌面 UI、移动模拟器、输入法服务或浏览器 dev server 后台进程
 - 未经明确要求下载大型模型、词库、语料、数据集或二进制 SDK
 - 上传原始输入流、明文用户词库、明文候选偏好或敏感上下文
 - 在 v1 阶段把完整拼音引擎自研、全平台输入法端和复杂云服务同时压入主线

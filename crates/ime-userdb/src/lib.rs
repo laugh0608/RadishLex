@@ -9,15 +9,18 @@ mod sync_decode;
 
 pub use error::{UserDbError, UserDbResult};
 pub use model::{
-    DictionaryImportBatch, DictionaryImportSummary, DictionaryTermRecord, DictionaryTermsDocument,
-    DictionaryTermsFormat, LearningStatusSummary, NegativeFeedbackDraft, NegativeFeedbackReason,
-    PrivacyLevel, SelectionEventDraft, SyncPreflightSummary, TermSource, TermStatus,
-    UserDbSyncPayloadObjectType, UserDbSyncPlaintextPayload, UserTerm,
-    USERDB_SYNC_PAYLOAD_SCHEMA_VERSION,
+    DeletedTermTombstone, DictionaryImportBatch, DictionaryImportSummary, DictionaryTermRecord,
+    DictionaryTermsDocument, DictionaryTermsFormat, LearningCaseDeletedTombstoneInspection,
+    LearningCaseIdentity, LearningCaseInspection, LearningCaseRankerWeightInspection,
+    LearningCaseTermInspection, LearningStatusSummary, NegativeFeedbackDraft,
+    NegativeFeedbackReason, PrivacyLevel, SelectionEventDraft, SyncPreflightSummary, TermSource,
+    TermStatus, UserDbSyncPayloadObjectType, UserDbSyncPlaintextPayload, UserTerm,
+    LEARNING_CASE_INSPECTION_VERSION, USERDB_SYNC_PAYLOAD_SCHEMA_VERSION,
 };
 pub use store::{
     decode_dictionary_terms_tsv, decode_dictionary_terms_tsv_document, encode_dictionary_terms_tsv,
-    RankerWeight, UserDb, UserDbSyncApplySummary,
+    DeletedTermIdentity, RankerWeight, RankingCandidateIdentity, RankingSignals, UserDb,
+    UserDbSyncApplySummary,
 };
 pub use sync_decode::{
     decode_userdb_sync_objects, UserDbDecodedSyncPayloadBatch, UserDbDecryptedSyncObject,

@@ -21,6 +21,7 @@ const deviceIDHeader = "X-RadishLex-Device-ID"
 const requestIDHeader = "X-Request-ID"
 const authorizationHeader = "Authorization"
 const bearerPrefix = "Bearer "
+const maxEpochDistributionRequestBytes = 6 * 1024 * 1024
 
 type HandlerConfig struct {
 	RecoveryReadLimit  int
@@ -52,6 +53,7 @@ type AuditEvent struct {
 	ObjectID     string `json:"object_id,omitempty"`
 	ObjectType   string `json:"object_type,omitempty"`
 	Version      uint64 `json:"version,omitempty"`
+	KeyEpoch     uint64 `json:"key_epoch,omitempty"`
 	ResultCode   string `json:"result_code"`
 	StatusCode   int    `json:"status_code"`
 	Bytes        int64  `json:"bytes,omitempty"`
@@ -160,12 +162,30 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request, audit *Audit
 		h.handleDomainState(w, r, route.domainID)
 	case deviceRoute:
 		h.handleDevice(w, r, route.domainID, route.deviceID)
+	case deviceWrappedEpochRoute:
+		h.handleDeviceWrappedEpoch(w, r, route.domainID, route.deviceID, route.keyEpoch, audit)
+	case epochDistributionsRoute:
+		h.handleEpochDistribution(w, r, route.domainID, audit)
+	case lifecycleSnapshotRoute:
+		h.handleLifecycleSnapshot(w, r, route.domainID)
+	case lifecycleEventsRoute:
+		h.handleLifecycleEvents(w, r, route.domainID)
+	case deviceRevocationsRoute:
+		h.handleDeviceRevocation(w, r, route.domainID, route.deviceID, audit)
 	case joinRequestsRoute:
 		h.handleJoinRequests(w, r, route.domainID, audit)
 	case joinAuthorizationRoute:
 		h.handleJoinAuthorization(w, r, route.domainID, route.joinRequestID, audit)
 	case recoveryLatestRoute:
 		h.handleLatestRecovery(w, r, route.domainID)
+	case recoveryRecordsRoute:
+		h.handleRecoveryRecords(w, r, route.domainID, audit)
+	case recoveryActivationRoute:
+		h.handleRecoveryActivation(w, r, route.domainID, route.recoveryRecordID, audit)
+	case recoveryRevocationRoute:
+		h.handleRecoveryRevocation(w, r, route.domainID, route.recoveryRecordID, audit)
+	case objectDiscoveryRoute:
+		h.handleObjectDiscovery(w, r, route.domainID)
 	case objectVersionsRoute:
 		h.handleObjectVersions(w, r, route.domainID, route.objectID, audit)
 	case objectVersionRoute:
@@ -175,6 +195,66 @@ func (h *Handler) serveHTTP(w http.ResponseWriter, r *http.Request, audit *Audit
 	default:
 		h.writeError(w, publicStorageError(storage.ErrNotFound, "api route not found", false))
 	}
+}
+
+func (h *Handler) handleObjectDiscovery(w http.ResponseWriter, r *http.Request, domainID string) {
+	if r.Method != http.MethodGet {
+		h.writeMethodError(w, http.MethodGet)
+		return
+	}
+	query := r.URL.Query()
+	for key := range query {
+		if key != "after_cursor" && key != "limit" {
+			h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "object discovery query is invalid", false))
+			return
+		}
+	}
+	limit := 100
+	if values, ok := query["limit"]; ok {
+		if len(values) != 1 {
+			h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "object discovery limit is invalid", false))
+			return
+		}
+		parsed, err := strconv.Atoi(values[0])
+		if err != nil || parsed <= 0 || parsed > 200 {
+			h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "object discovery limit is invalid", false))
+			return
+		}
+		limit = parsed
+	}
+	afterSequence := uint64(0)
+	if values, ok := query["after_cursor"]; ok {
+		if len(values) != 1 {
+			h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "object discovery cursor is invalid", false))
+			return
+		}
+		sequence, err := decodeObjectCursor(domainID, values[0])
+		if err != nil {
+			h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "object discovery cursor is invalid", false))
+			return
+		}
+		afterSequence = sequence
+	}
+	versions, err := h.store.ObjectVersionsAfter(r.Context(), domainID, afterSequence, limit+1)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	hasMore := len(versions) > limit
+	if hasMore {
+		versions = versions[:limit]
+	}
+	nextSequence := afterSequence
+	entries := make([]ObjectVersionResponse, 0, len(versions))
+	for _, version := range versions {
+		entries = append(entries, ObjectVersionResponseFrom(version))
+		nextSequence = version.ChangeSequence
+	}
+	writeJSON(w, http.StatusOK, ObjectDiscoveryResponse{
+		Entries:    entries,
+		NextCursor: encodeObjectCursor(domainID, nextSequence),
+		HasMore:    hasMore,
+	})
 }
 
 func (h *Handler) authorizeRequest(r *http.Request) bool {
@@ -241,6 +321,176 @@ func (h *Handler) handleDevice(w http.ResponseWriter, r *http.Request, domainID 
 	writeJSON(w, http.StatusOK, DeviceResponseFrom(device))
 }
 
+func (h *Handler) handleDeviceWrappedEpoch(w http.ResponseWriter, r *http.Request, domainID string, deviceID string, keyEpoch uint64, audit *AuditEvent) {
+	audit.DeviceID = deviceID
+	audit.KeyEpoch = keyEpoch
+	if r.Method != http.MethodGet {
+		h.writeMethodError(w, http.MethodGet)
+		return
+	}
+	if r.Header.Get(deviceIDHeader) != deviceID {
+		h.writeError(w, publicStorageError(storage.ErrForbiddenDevice, "wrapped epoch recipient is not the requesting device", false))
+		return
+	}
+	query := r.URL.Query()
+	values, ok := query["wrapping_key_id"]
+	if len(query) != 1 || !ok || len(values) != 1 || values[0] == "" {
+		h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "wrapped epoch query is invalid", false))
+		return
+	}
+	record, wrappedKey, err := h.store.DeviceWrappedKey(r.Context(), domainID, deviceID, keyEpoch, values[0])
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	if len(wrappedKey) > storage.MaxDeviceWrappedKeyBytes {
+		h.writeError(w, publicStorageError(storage.ErrStorageUnavailable, "wrapped epoch exceeds resource limit", true))
+		return
+	}
+	audit.Bytes = int64(len(wrappedKey))
+	writeJSON(w, http.StatusOK, DeviceWrappedEpochResponseFrom(record, wrappedKey))
+}
+
+func (h *Handler) handleEpochDistribution(w http.ResponseWriter, r *http.Request, domainID string, audit *AuditEvent) {
+	if r.Method != http.MethodPost {
+		h.writeMethodError(w, http.MethodPost)
+		return
+	}
+	var request EpochDistributionRequest
+	if err := decodeJSONRequestWithLimit(w, r, &request, maxEpochDistributionRequestBytes); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	audit.DomainID = domainID
+	audit.DeviceID = request.DistributorDeviceID
+	audit.KeyEpoch = request.KeyEpoch
+	if r.Header.Get(deviceIDHeader) != request.DistributorDeviceID {
+		h.writeError(w, publicStorageError(storage.ErrForbiddenDevice, "epoch distributor is not the requesting device", false))
+		return
+	}
+	totalBytes := int64(0)
+	for _, record := range request.Records {
+		totalBytes += int64(len(record.WrappedKey))
+	}
+	if totalBytes > storage.MaxEpochDistributionBytes {
+		h.writeError(w, publicStorageError(storage.ErrPayloadTooLarge, "epoch distribution wrapped material exceeds resource limit", false))
+		return
+	}
+	result, err := h.store.PutEpochDistribution(r.Context(), request.Upload(domainID))
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	audit.Bytes = totalBytes
+	status := http.StatusCreated
+	if result.InsertedRecords == 0 {
+		status = http.StatusOK
+	}
+	writeJSON(w, status, EpochDistributionResponseFrom(result))
+}
+
+func (h *Handler) handleLifecycleSnapshot(w http.ResponseWriter, r *http.Request, domainID string) {
+	if r.Method != http.MethodGet {
+		h.writeMethodError(w, http.MethodGet)
+		return
+	}
+	if len(r.URL.Query()) != 0 {
+		h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "lifecycle snapshot query is invalid", false))
+		return
+	}
+	snapshot, err := h.store.LifecycleSnapshot(r.Context(), domainID)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	sequence := uint64(0)
+	if len(snapshot.Events) != 0 {
+		sequence = snapshot.Events[len(snapshot.Events)-1].LifecycleSequence
+	}
+	writeJSON(w, http.StatusOK, LifecycleSnapshotResponse{
+		Domain:     DomainResponseFrom(snapshot.Domain),
+		Entries:    LifecycleEventResponsesFrom(snapshot.Events),
+		NextCursor: encodeLifecycleCursor(domainID, sequence),
+	})
+}
+
+func (h *Handler) handleLifecycleEvents(w http.ResponseWriter, r *http.Request, domainID string) {
+	if r.Method != http.MethodGet {
+		h.writeMethodError(w, http.MethodGet)
+		return
+	}
+	query := r.URL.Query()
+	for key := range query {
+		if key != "after_cursor" && key != "limit" {
+			h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "lifecycle discovery query is invalid", false))
+			return
+		}
+	}
+	limit := 100
+	if values, ok := query["limit"]; ok {
+		if len(values) != 1 {
+			h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "lifecycle discovery limit is invalid", false))
+			return
+		}
+		parsed, err := strconv.Atoi(values[0])
+		if err != nil || parsed <= 0 || parsed > 200 {
+			h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "lifecycle discovery limit is invalid", false))
+			return
+		}
+		limit = parsed
+	}
+	afterSequence := uint64(0)
+	if values, ok := query["after_cursor"]; ok {
+		if len(values) != 1 {
+			h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "lifecycle discovery cursor is invalid", false))
+			return
+		}
+		sequence, err := decodeLifecycleCursor(domainID, values[0])
+		if err != nil {
+			h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "lifecycle discovery cursor is invalid", false))
+			return
+		}
+		afterSequence = sequence
+	}
+	events, err := h.store.LifecycleEventsAfter(r.Context(), domainID, afterSequence, limit+1)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	hasMore := len(events) > limit
+	if hasMore {
+		events = events[:limit]
+	}
+	nextSequence := afterSequence
+	if len(events) != 0 {
+		nextSequence = events[len(events)-1].LifecycleSequence
+	}
+	writeJSON(w, http.StatusOK, LifecycleDiscoveryResponse{
+		Entries:    LifecycleEventResponsesFrom(events),
+		NextCursor: encodeLifecycleCursor(domainID, nextSequence),
+		HasMore:    hasMore,
+	})
+}
+
+func (h *Handler) handleDeviceRevocation(w http.ResponseWriter, r *http.Request, domainID string, deviceID string, audit *AuditEvent) {
+	if r.Method != http.MethodPost {
+		h.writeMethodError(w, http.MethodPost)
+		return
+	}
+	var request DeviceRevocationRequest
+	if err := decodeJSONRequest(r, &request); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	revocation := request.Revocation(domainID, deviceID)
+	audit.DeviceID = deviceID
+	if err := h.store.RevokeDevice(r.Context(), revocation); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) handleJoinRequests(w http.ResponseWriter, r *http.Request, domainID string, audit *AuditEvent) {
 	switch r.Method {
 	case http.MethodGet:
@@ -303,6 +553,76 @@ func (h *Handler) handleLatestRecovery(w http.ResponseWriter, r *http.Request, d
 		return
 	}
 	writeJSON(w, http.StatusOK, RecoveryRecordResponseFrom(record, wrappedMaterial))
+}
+
+func (h *Handler) handleRecoveryRecords(w http.ResponseWriter, r *http.Request, domainID string, audit *AuditEvent) {
+	if r.Method != http.MethodPost {
+		h.writeMethodError(w, http.MethodPost)
+		return
+	}
+	var request RecoveryRecordUploadRequest
+	if err := decodeJSONRequestWithLimit(w, r, &request, storage.MaxDeviceWrappedKeyBytes*2); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	audit.DeviceID = request.SignerDeviceID
+	audit.Bytes = int64(len(request.WrappedMaterial))
+	if r.Header.Get(deviceIDHeader) != request.SignerDeviceID {
+		h.writeError(w, publicStorageError(storage.ErrForbiddenDevice, "recovery signer is not the requesting device", false))
+		return
+	}
+	record, err := h.store.PutRecoveryRecord(r.Context(), request.Upload(domainID))
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, RecoveryRecordResponseFrom(record, nil))
+}
+
+func (h *Handler) handleRecoveryActivation(w http.ResponseWriter, r *http.Request, domainID string, recoveryRecordID string, audit *AuditEvent) {
+	if r.Method != http.MethodPost {
+		h.writeMethodError(w, http.MethodPost)
+		return
+	}
+	var request RecoverDeviceRequest
+	if err := decodeJSONRequestWithLimit(w, r, &request, maxEpochDistributionRequestBytes); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	upload := request.Upload(domainID, recoveryRecordID)
+	audit.DeviceID = upload.Activation.DeviceID
+	audit.KeyEpoch = upload.Activation.KeyEpoch
+	result, err := h.store.RecoverDevice(r.Context(), upload)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, RecoveredDeviceActivationResponseFrom(result))
+}
+
+func (h *Handler) handleRecoveryRevocation(w http.ResponseWriter, r *http.Request, domainID string, recoveryRecordID string, audit *AuditEvent) {
+	if r.Method != http.MethodPost {
+		h.writeMethodError(w, http.MethodPost)
+		return
+	}
+	var request RecoveryRecordRevocationRequest
+	if err := decodeJSONRequest(r, &request); err != nil {
+		h.writeError(w, err)
+		return
+	}
+	revocation := request.Revocation(domainID, recoveryRecordID)
+	audit.DeviceID = revocation.RevokerDeviceID
+	audit.KeyEpoch = revocation.KeyEpoch
+	if r.Header.Get(deviceIDHeader) != revocation.RevokerDeviceID {
+		h.writeError(w, publicStorageError(storage.ErrForbiddenDevice, "recovery revoker is not the requesting device", false))
+		return
+	}
+	result, err := h.store.RevokeRecoveryRecord(r.Context(), revocation)
+	if err != nil {
+		h.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, RecoveryRecordRevocationResponseFrom(result))
 }
 
 func (h *Handler) handleObjectVersions(w http.ResponseWriter, r *http.Request, domainID string, objectID string, audit *AuditEvent) {
@@ -390,6 +710,26 @@ func decodeJSONRequest(r *http.Request, value any) error {
 	return nil
 }
 
+func decodeJSONRequestWithLimit(w http.ResponseWriter, r *http.Request, value any, limit int64) error {
+	if r.ContentLength > limit {
+		return publicStorageError(storage.ErrPayloadTooLarge, "request body exceeds resource limit", false)
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(value); err != nil {
+		var maxBytesError *http.MaxBytesError
+		if errors.As(err, &maxBytesError) {
+			return publicStorageError(storage.ErrPayloadTooLarge, "request body exceeds resource limit", false)
+		}
+		return publicStorageError(storage.ErrInvalidRequest, "request body must be valid JSON metadata", false)
+	}
+	if decoder.Decode(&struct{}{}) != io.EOF {
+		return publicStorageError(storage.ErrInvalidRequest, "request body must contain one JSON object", false)
+	}
+	return nil
+}
+
 func (h *Handler) writeMethodError(w http.ResponseWriter, allowedMethods ...string) {
 	w.Header().Set("Allow", strings.Join(allowedMethods, ", "))
 	h.writeError(w, publicStorageError(storage.ErrInvalidRequest, "method is not allowed", false))
@@ -408,21 +748,32 @@ type routeKind int
 const (
 	domainStateRoute routeKind = iota + 1
 	deviceRoute
+	deviceWrappedEpochRoute
+	epochDistributionsRoute
+	lifecycleSnapshotRoute
+	lifecycleEventsRoute
+	deviceRevocationsRoute
 	joinRequestsRoute
 	joinAuthorizationRoute
 	recoveryLatestRoute
+	recoveryRecordsRoute
+	recoveryActivationRoute
+	recoveryRevocationRoute
+	objectDiscoveryRoute
 	objectVersionsRoute
 	objectVersionRoute
 	objectPayloadRoute
 )
 
 type route struct {
-	kind          routeKind
-	domainID      string
-	deviceID      string
-	joinRequestID string
-	objectID      string
-	version       uint64
+	kind             routeKind
+	domainID         string
+	deviceID         string
+	joinRequestID    string
+	recoveryRecordID string
+	objectID         string
+	version          uint64
+	keyEpoch         uint64
 }
 
 func (r route) name() string {
@@ -431,12 +782,30 @@ func (r route) name() string {
 		return "domains.state"
 	case deviceRoute:
 		return "devices.get"
+	case deviceWrappedEpochRoute:
+		return "devices.wrapped_epoch.get"
+	case epochDistributionsRoute:
+		return "epoch_distributions.create"
+	case lifecycleSnapshotRoute:
+		return "lifecycle.snapshot"
+	case lifecycleEventsRoute:
+		return "lifecycle.events"
+	case deviceRevocationsRoute:
+		return "devices.revoke"
 	case joinRequestsRoute:
 		return "join_requests.collection"
 	case joinAuthorizationRoute:
 		return "join_requests.authorize"
 	case recoveryLatestRoute:
 		return "recovery.latest"
+	case recoveryRecordsRoute:
+		return "recovery.rotate"
+	case recoveryActivationRoute:
+		return "recovery.activate_device"
+	case recoveryRevocationRoute:
+		return "recovery.revoke"
+	case objectDiscoveryRoute:
+		return "objects.discover"
 	case objectVersionsRoute:
 		return "objects.versions.create"
 	case objectVersionRoute:
@@ -460,6 +829,25 @@ func domainRoute(path string) (route, bool) {
 	if len(parts) == 3 && parts[0] != "" && parts[1] == "devices" && parts[2] != "" {
 		return route{kind: deviceRoute, domainID: parts[0], deviceID: parts[2]}, true
 	}
+	if len(parts) == 5 && parts[0] != "" && parts[1] == "devices" && parts[2] != "" && parts[3] == "wrapped-epochs" {
+		keyEpoch, ok := parseRouteVersion(parts[4])
+		if !ok {
+			return route{}, false
+		}
+		return route{kind: deviceWrappedEpochRoute, domainID: parts[0], deviceID: parts[2], keyEpoch: keyEpoch}, true
+	}
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "epoch-distributions" {
+		return route{kind: epochDistributionsRoute, domainID: parts[0]}, true
+	}
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "lifecycle" {
+		return route{kind: lifecycleSnapshotRoute, domainID: parts[0]}, true
+	}
+	if len(parts) == 3 && parts[0] != "" && parts[1] == "lifecycle" && parts[2] == "events" {
+		return route{kind: lifecycleEventsRoute, domainID: parts[0]}, true
+	}
+	if len(parts) == 4 && parts[0] != "" && parts[1] == "devices" && parts[2] != "" && parts[3] == "revocations" {
+		return route{kind: deviceRevocationsRoute, domainID: parts[0], deviceID: parts[2]}, true
+	}
 	if len(parts) == 2 && parts[0] != "" && parts[1] == "join-requests" {
 		return route{kind: joinRequestsRoute, domainID: parts[0]}, true
 	}
@@ -468,6 +856,18 @@ func domainRoute(path string) (route, bool) {
 	}
 	if len(parts) == 3 && parts[0] != "" && parts[1] == "recovery-records" && parts[2] == "latest" {
 		return route{kind: recoveryLatestRoute, domainID: parts[0]}, true
+	}
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "recovery-records" {
+		return route{kind: recoveryRecordsRoute, domainID: parts[0]}, true
+	}
+	if len(parts) == 4 && parts[0] != "" && parts[1] == "recovery-records" && parts[2] != "" && parts[3] == "activation" {
+		return route{kind: recoveryActivationRoute, domainID: parts[0], recoveryRecordID: parts[2]}, true
+	}
+	if len(parts) == 4 && parts[0] != "" && parts[1] == "recovery-records" && parts[2] != "" && parts[3] == "revoke" {
+		return route{kind: recoveryRevocationRoute, domainID: parts[0], recoveryRecordID: parts[2]}, true
+	}
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "objects" {
+		return route{kind: objectDiscoveryRoute, domainID: parts[0]}, true
 	}
 	if len(parts) == 4 && parts[0] != "" && parts[1] == "objects" && parts[2] != "" && parts[3] == "versions" {
 		return route{kind: objectVersionsRoute, domainID: parts[0], objectID: parts[2]}, true
@@ -520,7 +920,7 @@ func statusCodeFromError(err error) int {
 		return http.StatusForbidden
 	case storage.ErrNotFound:
 		return http.StatusNotFound
-	case storage.ErrConflictStaleBaseVersion, storage.ErrConflictObjectVersion:
+	case storage.ErrConflictStaleBaseVersion, storage.ErrConflictObjectVersion, storage.ErrConflictEpochDistribution, storage.ErrConflictRecoveryRecord:
 		return http.StatusConflict
 	case storage.ErrPayloadTooLarge:
 		return http.StatusRequestEntityTooLarge
