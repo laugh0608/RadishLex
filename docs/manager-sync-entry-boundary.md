@@ -1,18 +1,18 @@
 # Manager 同步入口边界
 
-本文面向 RadishLex Manager、Rust bridge 与同步功能维护者，固定 Manager 在 M3 真实同步实现前后的职责、敏感材料边界和产品停止线。本文不定义 C ABI 命令草案、审批流程、部署证据包格式、同步状态机、同步协议或密码学细节；Rust 编排以 `docs/sync-orchestration.md` 为准，协议和密钥语义分别以 `docs/privacy-sync.md`、`docs/sync-key-management.md`、`docs/production-recovery-flow.md` 和 `docs/sync-server-api-storage.md` 为准。
+本文面向 RadishLex Manager、Rust bridge 与同步功能维护者，固定 Manager 同步能力的职责、敏感材料边界和产品停止线。本文不定义 C ABI 命令草案、审批流程、部署证据包格式、同步状态机、同步协议或密码学细节；Rust 编排以 `docs/sync-orchestration.md` 为准，协议和密钥语义分别以 `docs/privacy-sync.md`、`docs/sync-key-management.md`、`docs/production-recovery-flow.md` 和 `docs/sync-server-api-storage.md` 为准。
 
 ## 当前结论
 
 - 当前 Manager 只展示同步配置草案、本地 readiness、连接健康摘要、恢复与设备流程的不可用原因。
 - 真实远端同步、恢复码生成与输入、设备加入授权、设备撤销和密钥轮换没有产品执行入口。
 - `ManagerBridge` 当前不提供真实用户同步、恢复、授权、撤销或轮换命令；唯一新增的执行能力是下述 loopback HTTPS 合成资格 run，不能解锁任何产品入口。
-- 即使 endpoint、平台 backend、部署证据和 readiness 摘要均显示 ready，用户同步入口仍保持关闭，直到 M3 退出条件满足。
+- 即使 endpoint、平台 backend、部署证据和 readiness 摘要均显示 ready，首个正式版本的用户同步入口仍保持关闭；M3 退出不能自行解除产品 gate。
 - manager Release native library 可以包含普通 DPK、Secure Enclave signing 与独立 Secure Enclave key-agreement backend，以及只返回固定 flags 的相互独立产品 validation ABI；这些底层 validation ABI 不直接进入 Dart binding。Manager 只通过下述独立 status-only 业务摘要读取脱敏结果，不能据此解锁按钮。
 
 ## Status-only 产品摘要
 
-M3 允许一条不带入参、只读且不访问系统密钥条目的 `radishlex_manager_sync_product_status` C ABI。它随现有 `loadSnapshot` 进入 Manager，不增加 `ManagerBridge` 命令方法，也不创建、读取、签名、解封或删除 Keychain / Secure Enclave 项目。
+M3 已引入一条不带入参、只读且不访问系统密钥条目的 `radishlex_manager_sync_product_status` C ABI。它随现有 `loadSnapshot` 进入 Manager，不增加 `ManagerBridge` 命令方法，也不创建、读取、签名、解封或删除 Keychain / Secure Enclave 项目。
 
 该摘要只包含固定版本与数值枚举：signing backend / algorithm、编译与静态运行时 capability、`can_create` / `can_sign`、`exportable` / `hardware_backed`、signing 产品资格、独立 key-agreement backend 编译与实机资格、组合 `product_qualified`、`user_sync_enabled` 和首个稳定 blocker。它不得包含 device id、key id、公钥、路径、OSStatus、平台错误正文、signature、wrapped material、master key、shared secret、nonce、HTTP 内容或任意自由文本。
 
@@ -53,7 +53,7 @@ Manager 不可以：
 
 恢复码、短码、访问令牌、设备私钥、签名、wrapped material 和同等级材料都属于 transient secret 或更高敏感级别。
 
-后续 M3 若增加真实交互，必须同时满足：
+未来产品阶段若增加真实用户交互，必须同时满足：
 
 - 仅由用户显式操作触发，作用域限制在一次调用或当前可见 modal。
 - 提交、取消、导航离开、超时和错误后立即清除。
@@ -71,11 +71,11 @@ Secure Enclave key-agreement 再使用一组独立 status/smoke symbol、环境�
 
 ## 产品停止线
 
-在 M3 的协议、安全和本地产品资格证据全部满足前：
+首个正式版本执行以下停止线；后续也只有真实用户同步产品 gate 经独立评审解除后才能开放：
 
 - `启用同步` 保持禁用。
 - 不新增恢复码生成 / 输入、join request、授权成功、撤销或轮换的可执行按钮。
-- 下一批只允许新增 localhost、合成 P2、单次调用内存参数的受控资格命令 C ABI；普通用户远端写入、后台同步与真实设备流程仍不得新增。上述 status-only ABI 不属于同步命令。
+- localhost、合成 P2、单次调用内存参数的受控资格命令 C ABI 只用于开发资格；普通用户远端写入、后台同步与真实设备流程仍不得新增。上述 status-only ABI 不属于同步命令。
 - 本地 Docker、localhost、fixture、readiness ready 和合成 smoke 只能用于开发验证，不能解锁产品入口。
 - 服务端继续被视为不可信，输入热路径不得依赖网络。
 
@@ -107,4 +107,4 @@ Rust orchestration、严格 HTTPS transport 与生产 backend 主路径资格已
 - UI 禁用入口：`test/screens/sync_test.dart`、`test/screens/settings_test.dart`
 - native 产品摘要 contract 与 fail-closed 映射：`crates/ime-ffi/tests/input_header_contract.rs`、`test/ffi_manager_bridge_test.dart`
 
-这些测试证明当前能力安全关闭，不代表 M3 同步产品已实现。
+这些测试证明当前产品入口安全关闭，不代表真实用户同步或生产部署已经获准开放。
