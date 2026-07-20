@@ -19,13 +19,13 @@
   <key>CFBundleSignature</key>
   <string>????</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>__RADISHLEX_PRODUCT_VERSION__</string>
   <key>CFBundleSupportedPlatforms</key>
   <array>
     <string>MacOSX</string>
   </array>
   <key>CFBundleVersion</key>
-  <string>34</string>
+  <string>__RADISHLEX_PRODUCT_BUILD__</string>
   <key>ComponentInputModeDict</key>
   <dict>
     <key>tsInputModeListKey</key>

@@ -7,7 +7,7 @@
 - 复核日期：2026-07-20（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前产品里程碑：M4 产品发布候选
-- 当前产品主批次：M3 端到端加密同步 Beta 已退出；M4 先固定 macOS 产品包、数据迁移、升级回滚与发布门禁边界
+- 当前产品主批次：M4-P02 Application Support v1 数据升级协调器；M4-P01 双 bundle 产品装配已完成
 - 已完成：M0 工程基础、M1 macOS 离线输入 Alpha、M2 本地个人化 MVP、M3 端到端加密同步 Beta；R00、R01A、R02L、R01B、R06A 已退出
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；合成数据、短生命周期服务与受控集成测试可以继续
@@ -34,6 +34,12 @@ Manager ABI v7 保留只读 `radishlex_manager_sync_product_status`，并新增�
 
 平台 backend 外部资格已不再阻塞当前开发。开发者没有真实 unsupported 环境，现有支持设备不得模拟该证据；有合适目标时再按保留 harness 补测。锁屏链结束后的受限环境 trust 假象已由真实登录会话复核排除，同一冻结 hash bundle 严格验签通过。正式域名、公开证书和目标生产演练按产品决策后移到首版发布后；当前 `product_qualified=true`、`user_sync_enabled=false`。
 
+## M4-P01 退出结论
+
+macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v7、userdb v9 和 RimeData manifest v2。`packaging/rime/product-rime-data.json` 固定 `radishlex_pinyin`、Apache-2.0 `pinyin_simp` 词典 commit/hash、`SourceManifest.json` 和逐资产 LICENSE/AUTHORS；首个候选不携带 LGPL `prelude`、`stroke`、笔画反查或扩展符号表。
+
+稳定入口已从 committed RimeData 输入离线装配 Manager/InputMethod 双 bundle、`librime` 传递闭包和 `ProductManifest.json`。真实 `librime 1.17.0` CLI、native FFI smoke、递归 dylib、ad-hoc 签名、RimeData/native manifests 与无构建机绝对路径复验通过；装配目录仍不是普通用户安装包，也没有 Developer ID、公证或 Gatekeeper 发布证据。
+
 ## 当前停止线
 
 - 首个正式版本继续关闭真实用户同步，不上传非受控真实 P2 数据，不提供恢复码、设备授权、撤销或轮换的产品成功入口。
@@ -41,14 +47,13 @@ Manager ABI v7 保留只读 `radishlex_manager_sync_product_status`，并新增�
 - P0 永不学习/同步；P1 原始事件只留本地，不进入 payload、manager、诊断、日志或提交记录。
 - 输入热路径继续完全本地；Go server 不解密、不排序、不保存明文用户词或候选偏好。
 - M2 已通过第二平台选择门禁，但当前集中完成 M4 macOS 产品发布候选，不同时展开第二真实平台主线。
-- M4 前不宣称普通用户安装包、最终 librime/schema 分发、App Group 迁移、公证或发布供应链已经完成。
+- M4 退出前不宣称普通用户安装包、Developer ID、公证或发布供应链已经完成；首个候选保持已验证的 Application Support v1，不为形式统一迁入 App Group。
 
 ## 下一步顺位
 
-1. 先新增 M4 macOS 产品包边界文档，固定 InputMethodKit、manager、Rust dylib、`librime`、schema/data、App Support/App Group、版本兼容、签名公证、安装升级回滚与移除的职责和停止线；未完成该设计前不直接改产品目录或安装流程。
-2. 在边界评审后，优先闭合可重复产品构建与 bundle manifest/presence/ABI 兼容门禁，再设计 userdb/settings 从当前 Application Support 布局迁移到目标容器的原子迁移、回滚和双端复验；不得静默复制或破坏现有 M1/M2 数据。
-3. 普通用户成功入口、`user_sync_enabled`、恢复/授权/撤销/轮换继续关闭；M4 产品包不得因 M3 合成资格通过而默认启用网络同步。
-4. 在真实不支持 Secure Enclave 的环境可得时补测 signing/key-agreement unsupported；当前设备不得模拟。首个正式版本发布后、准备启用真实生产同步前，再补正式域名/证书和目标 `deployment_evidence.v1`。
+1. M4-P02 先补升级协调器边界文档，再实现 Application Support v1 内的进程静止、隔离副本 migration、双端打开验证、失败回滚和 receipt；当前没有 App Group 迁移需求，不得静默改变容器。
+2. M4-P03 选择并验证安装载体，闭合固定程序路径、Developer ID/Hardened Runtime、notarization、升级回滚和默认保留用户数据的移除语义；真实系统动作另行授权。
+3. 普通用户同步、恢复/授权/撤销/轮换继续关闭；在真实不支持 Secure Enclave 的环境可得时再补 unsupported，首版发布后且准备生产同步前再验收正式域名/证书。
 
 ## 验证入口
 
@@ -56,6 +61,7 @@ Manager ABI v7 保留只读 `radishlex_manager_sync_product_status`，并新增�
 ./scripts/check-manager.sh
 ./scripts/check-manager-ffi-smoke.sh
 ./scripts/check-manager-product.sh
+./scripts/check-macos-product-metadata.sh
 ./scripts/check-macos-imk.sh
 ./scripts/check-repo.sh
 ./scripts/check-docs.sh
@@ -79,4 +85,5 @@ cmp -s AGENTS.md CLAUDE.md
 - [Manager 同步入口](../manager-sync-entry-boundary.md)：M3 UI/bridge 与 transient secret 边界。
 - [M2 manager 验收 runbook](../runbooks/macos-m2-manager-product-acceptance.md)：关闭证据与回滚流程。
 - [macOS 平台边界](../macos-inputmethodkit-boundary.md)：M1/M2 输入与隐私稳定结论。
+- [macOS 产品包边界](../macos-product-package-boundary.md)：M4 组件、版本、数据、签名与装配停止线。
 - [本周周志](../devlogs/2026-W30.md)：当前资格执行批次的验证和交接流水。

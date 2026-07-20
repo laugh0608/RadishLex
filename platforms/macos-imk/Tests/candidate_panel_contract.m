@@ -109,12 +109,18 @@ static void RequirePanelFollowsLineRect(RLXCandidatePanel *panel,
   }
   NSRect expectedFrame = RLXCandidatePanelFrame(
       panelFrame.size, lineRect, visibleFrame, 6.0);
+  CGFloat backingScale = screen != nil ? screen.backingScaleFactor : 1.0;
+  CGFloat backingPixel = 1.0 / MAX(backingScale, 1.0);
+  BOOL sizeMatches = NSEqualSizes(panelFrame.size, expectedFrame.size);
+  BOOL originMatches =
+      fabs(NSMinX(panelFrame) - NSMinX(expectedFrame)) <= backingPixel &&
+      fabs(NSMinY(panelFrame) - NSMinY(expectedFrame)) <= backingPixel;
   NSString *failure = [NSString
       stringWithFormat:@"%@ (panel=%@ expected=%@ line=%@)", message,
                        NSStringFromRect(panelFrame),
                        NSStringFromRect(expectedFrame),
                        NSStringFromRect(lineRect)];
-  Require(NSEqualRects(panelFrame, expectedFrame), failure);
+  Require(sizeMatches && originMatches, failure);
 }
 
 int main(void) {

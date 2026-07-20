@@ -1,10 +1,11 @@
-# RadishLex M1 isolated development configuration.
-# This file is product-owned and does not come from a user Rime directory.
+# RadishLex product Rime configuration
+# encoding: utf-8
+# Distributed under Apache-2.0.
 
-config_version: "0.1"
+config_version: "1.0"
 
 schema_list:
-  - schema: __RADISHLEX_RIME_SCHEMA__
+  - schema: radishlex_pinyin
 
 menu:
   page_size: 5

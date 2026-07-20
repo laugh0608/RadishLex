@@ -21,6 +21,10 @@ key_agreement_product_smoke="${repo_root}/scripts/run-manager-apple-secure-encla
 apple_qualified_build="${repo_root}/scripts/build-manager-macos-dpk-qualified-product.sh"
 apple_qualified_entitlements="${manager_dir}/macos/Runner/DPKQualification.entitlements"
 manager_app_delegate="${manager_dir}/macos/Runner/AppDelegate.swift"
+product_tool="${repo_root}/scripts/macos-product/product_manifest.py"
+product_version="$(python3 "${product_tool}" field product_version)"
+product_build="$(python3 "${product_tool}" field build_number)"
+minimum_macos="$(python3 "${product_tool}" field minimum_macos)"
 
 cleanup() {
   rm -rf "${smoke_dir}"
@@ -144,10 +148,7 @@ clang -std=c11 -Wall -Wextra -Werror -fsyntax-only \
 "${m2_cleanup_helper_contract}"
 "${m2_cleanup_orchestration_contract}"
 
-(
-  cd "${manager_dir}"
-  flutter build macos --release --dart-define=RADISHLEX_MANAGER_MODE=product
-)
+"${repo_root}/scripts/build-manager-macos-product.sh"
 
 if [ ! -f "${native_library}" ]; then
   echo "manager product bundle is missing its native library." >&2
@@ -160,6 +161,12 @@ if codesign -d --entitlements :- "${app_bundle}" 2>&1 | grep -Fq "com.apple.secu
 fi
 
 codesign --verify --deep --strict "${app_bundle}"
+test "$(plutil -extract CFBundleShortVersionString raw \
+  "${app_bundle}/Contents/Info.plist")" = "${product_version}"
+test "$(plutil -extract CFBundleVersion raw \
+  "${app_bundle}/Contents/Info.plist")" = "${product_build}"
+test "$(plutil -extract LSMinimumSystemVersion raw \
+  "${app_bundle}/Contents/Info.plist")" = "${minimum_macos}"
 for symbol in \
   _radishlex_apple_p256_product_status \
   _radishlex_apple_p256_product_smoke \

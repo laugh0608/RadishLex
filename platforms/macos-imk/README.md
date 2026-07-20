@@ -9,7 +9,7 @@
 - `Sources/RadishLexLearningContext.*`：按固定 Bundle ID 生成 sensitive/context-known/context-kind，不接触正文或 userdb。
 - `Sources/RadishLexCandidatePanel.*`：进程级非激活 AppKit 候选面板，负责 owner 生命周期、焦点隔离、全局定位、多屏限制、鼠标/辅助功能 index 回调和原生视觉；不承载 engine 或候选排序。
 - `Sources/RadishLexRuntime.*`：创建独立 Rime session；进程退出时先释放全部 session，再调用 `radishlex_rime_runtime_shutdown`。
-- `Resources/Rime/default.yaml.in`：产品自有 Rime 默认配置模板，固定 schema list 与 5 项候选页；不读取或继承用户 Rime 配置。
+- `../../packaging/rime/`：产品自有 `default.yaml`、`radishlex_pinyin` schema、固定 Apache 词典、来源锁与逐资产许可证；不读取或继承用户 Rime 配置。
 - `build-bundle.sh`：构建 contract 或显式 native-rime 开发 bundle，不安装 bundle。
 - `Tests/contract_smoke.m`：使用合成 demo engine 复验 ABI v5、完整按键映射、display/engine index、个人化/学习状态、Unicode cursor、候选选择结果和生命周期，不读取 Rime 目录。
 - `Tests/candidate_panel_contract.m`：创建真实 AppKit panel/control，复验视觉与 accessibility selection、appearance、anchor fallback、owner 接管和完整隐藏。
@@ -91,18 +91,17 @@ M2 入口同样不接受调用方路径或额外参数：
 
 ## native-rime 开发 bundle
 
-native build 不查找用户已有输入法目录，也不下载 schema。调用方必须显式提供 `librime` include/lib、一份隔离的 shared data 及其许可证文件；shared data 必须包含 `<schema-id>.schema.yaml` 及其声明的依赖。产品不会采用输入目录中的 `default.yaml`，而是从仓库模板生成 schema list 与 `menu.page_size: 5`，避免 engine 页大小与 5×1 平台展示契约分叉：
+native build 不查找用户已有输入法目录，也不下载 schema。仓库的 `packaging/rime/product-rime-data.json` 固定 Apache-2.0 词典来源 commit、hash、产品 schema、`default.yaml` 与逐资产许可证；`./scripts/prepare-rime-product-data.sh assemble` 只从这些 committed 输入离线装配。native 入口只接受与该锁完全一致的隔离 RimeData，避免调用方替换 schema、遗漏许可证或让 engine 页大小与 5×1 平台展示契约分叉：
 
 ```bash
 RIME_INCLUDE_DIR=<include> \
 RIME_LIB_DIR=<lib> \
 RADISHLEX_RIME_SHARED_DATA=<isolated-shared-data> \
-RADISHLEX_RIME_SCHEMA=<schema-id> \
-RADISHLEX_RIME_DATA_LICENSE=<license-file> \
+RADISHLEX_RIME_SCHEMA=radishlex_pinyin \
 ./scripts/check-macos-imk-native.sh
 ```
 
-`RADISHLEX_RIME_DEPLOY_ON_START` 可显式设为 `0` 或 `1`，默认 `1`。构建产物位于 `target/macos-imk/native/RadishLexInputMethod.app`；bundle 同时保存 copied schema data、产品生成的 `default.yaml`、数据许可证和哈希清单，并拒绝 shared data symlink。native 门禁逐字节复核产品配置模板，并以临时隔离 user data 运行真实 FFI smoke，要求 snapshot 候选页恰好为 5 项。native build 从显式 `RIME_LIB_DIR` 解析依赖，但运行产物会递归复制全部非系统 dylib 到 `Contents/Frameworks`、重写为 bundle 内 `@rpath`，并保存逐库许可证和签名后哈希清单；门禁拒绝残留外部绝对依赖。脚本对每个 dylib、主程序和完整 bundle 依次签名与严格复验，可通过 `RADISHLEX_CODESIGN_IDENTITY` 显式提供 Apple Development identity。
+`RADISHLEX_RIME_DEPLOY_ON_START` 可显式设为 `0` 或 `1`，默认 `1`。构建产物位于 `target/macos-imk/native/RadishLexInputMethod.app`；bundle 保存 locked data、`SourceManifest.json`、`Licenses/` 与 RimeData manifest v2，并拒绝额外文件、hash 漂移和 symlink。native 门禁以临时隔离 user data 运行真实 FFI smoke，要求 snapshot 候选页恰好为 5 项。native build 从显式 `RIME_LIB_DIR` 解析依赖，但运行产物会递归复制全部非系统 dylib 到 `Contents/Frameworks`、重写为 bundle 内 `@rpath`，并保存逐库许可证和签名后哈希清单；门禁拒绝残留外部绝对依赖。脚本对每个 dylib、主程序和完整 bundle 依次签名与严格复验，可通过 `RADISHLEX_CODESIGN_IDENTITY` 显式提供 Apple Development identity。
 
 bundle metadata 固定正式 Bundle ID `org.radishlex.inputmethod.macos` 与单一 `org.radishlex.inputmethod.macos.Pinyin` 模式，包含简体中文 script/repertoire、图标、本地化标签和 `LSUIElement`。正式 bundle 文件名固定为 `RadishLexInputMethod.app`；开发期不再复用已被 macOS 26 TIS 负缓存的旧 ID 或 `RadishLex.app` 路径。contract/native 门禁会验证 mode id 的 reverse-DNS 字符范围，避免把允许下划线的 `pinyin_simp` schema id 直接用作 TIS mode id。构建脚本不启动或安装 bundle；普通用户分发、Developer ID、公证和发布级供应链门禁仍属于 M4。
 

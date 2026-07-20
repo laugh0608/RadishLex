@@ -56,6 +56,13 @@ RadishLex/
       privacy-mode.sh
     android-ime/
       keystore-bridge/
+  packaging/
+    macos/
+      product.json
+    rime/
+      data/
+      licenses/
+      product-rime-data.json
   docs/
     status/
     remediation/
@@ -63,6 +70,8 @@ RadishLex/
     runbooks/
     devlogs/
   scripts/
+    macos-product/
+    rime-product/
   tests/
     fixtures/
 ```
@@ -78,6 +87,7 @@ RadishLex/
 | `deploy/` | Compose、反向代理和部署示例 | 不保存真实 secret 或运行数据 |
 | `apps/` | Flutter manager | 不进入输入热路径 |
 | `platforms/` | 系统输入法与平台能力薄壳 | 不承载排序、同步或隐私真相源 |
+| `packaging/` | 产品版本、兼容性和装配元数据 | 不保存签名凭据或构建产物 |
 | `docs/` | 正式文档、临时整改、ADR、runbook 和周志 | 按文档职责分离当前状态与稳定边界 |
 | `scripts/` | 仓库检查、构建和 smoke 入口 | 根目录只保留稳定高频入口 |
 | `tests/` | 跨模块共享 fixture | 不存真实用户或敏感数据 |
@@ -87,11 +97,11 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v7 隐私/索引/学习状态、Manager 产品状态与隔离资格 run、deleted tombstone 管理查询、精确 case inspection、隔离非选择 snapshot、R01B 与 manager/InputMethodKit 共库证据 | M4 产品包、版本兼容与发布复验 |
+| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v7 隐私/索引/学习状态、Manager 产品状态与隔离资格 run、deleted tombstone 管理查询、精确 case inspection、隔离非选择 snapshot、R01B 与 manager/InputMethodKit 共库证据 | M4 数据升级与发布复验 |
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
 | 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS | Manager 受控资格执行链、用户入口退出评审、首版后的发布级目标部署 |
-| Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁 | M4 发布分发、容器迁移与升级回滚 |
-| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、R01A build 32 与 R01B build 34 实机退出、生产 LearningContext、privacy/清理 contract 与隔离 ValidationHost；Android Keystore 能力验证桥 | M4 产品安装包；其他系统输入法 |
+| Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁 | M4 数据升级、安装载体与发布分发 |
+| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、R01A build 32 与 R01B build 34 实机退出、生产 LearningContext、privacy/清理 contract 与隔离 ValidationHost；M4-P01 已装配 `0.1.0 (35)` 双 bundle 与 locked RimeData；Android Keystore 能力验证桥 | M4 数据升级、安装载体和普通用户安装包；其他系统输入法 |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
 
@@ -262,9 +272,15 @@ apps/radishlex-manager/
 - `screens` 只编排用户交互和展示结构化状态。
 - fixture 必须通过显式开发模式启用，不可成为产品默认成功路径。
 - 产品构建需要打包匹配版本的 Rust native library。
-- macOS M2 产品 host 使用非 App Sandbox profile 与 InputMethodKit 共享用户 Application Support userdb；App Group 迁移属于 M4 的独立设计与复验范围。
+- macOS 产品 host 使用非 App Sandbox profile 与 InputMethodKit 共享用户 Application Support userdb；M4 首个候选继续使用 `application-support-v1`，未来 App Group 变化必须由独立 ADR 与迁移复验驱动。
 
 后续若支持更多 Flutter host，应复用 manager bridge 和模型，但不把 Flutter 引入系统输入候选窗。
+
+## 产品打包目录
+
+`packaging/macos/product.json` 是 macOS 产品版本、build、最低系统、bundle ID、FFI ABI、userdb schema 和 manifest 格式的单一元数据真相源。`packaging/rime/product-rime-data.json` 绑定产品 schema、Apache 词典来源 commit/hash、运行时路径和逐资产许可证；`scripts/rime-product/product_data.py` 负责离线校验与装配。
+
+`scripts/macos-product/product_manifest.py` 校验源码声明、生成/复验无绝对路径的 `ProductManifest.json`，`scripts/build-macos-product.sh` 从 committed RimeData 输入装配双 bundle 产品目录。该目录不承担安装、签名凭据、公证上传或用户数据迁移。
 
 ## 平台目录
 

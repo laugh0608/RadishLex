@@ -1,0 +1,61 @@
+{
+  "format_version": 1,
+  "schema_id": "radishlex_pinyin",
+  "assets": [
+    {
+      "asset_id": "radishlex-rime-default",
+      "kind": "configuration",
+      "source_path": "data/default.yaml",
+      "runtime_path": "default.yaml",
+      "sha256": "55fc3e1ae6d48fa28806fcb9d93d89a3eb8c931f39a33a0baea681b6d89b44d6",
+      "license_id": "Apache-2.0",
+      "provenance": {
+        "type": "radishlex-authored",
+        "description": "Product configuration with a single schema, five-candidate page, and macOS ASCII switch behavior."
+      }
+    },
+    {
+      "asset_id": "radishlex-pinyin-schema",
+      "kind": "schema",
+      "source_path": "data/radishlex_pinyin.schema.yaml",
+      "runtime_path": "radishlex_pinyin.schema.yaml",
+      "sha256": "cf0d8e049d251537f8ec69bec38468625367073a7497e9a2bebcc767b3b31127",
+      "license_id": "Apache-2.0",
+      "provenance": {
+        "type": "radishlex-maintained",
+        "upstream_repository": "https://github.com/rime/rime-pinyin-simp.git",
+        "upstream_commit": "0c6861ef7420ee780270ca6d993d18d4101049d0",
+        "upstream_path": "pinyin_simp.schema.yaml",
+        "modifications": "Removed stroke reverse lookup and LGPL preset imports; added RadishLex punctuation and key bindings."
+      }
+    },
+    {
+      "asset_id": "rime-pinyin-simp-dictionary",
+      "kind": "dictionary",
+      "source_path": "data/pinyin_simp.dict.yaml",
+      "runtime_path": "pinyin_simp.dict.yaml",
+      "sha256": "e341598343a0f0f2035bb1aafc34a7f3bb7887deeecb3f60796262aaa2983e6b",
+      "license_id": "Apache-2.0",
+      "provenance": {
+        "type": "upstream-verbatim",
+        "repository": "https://github.com/rime/rime-pinyin-simp.git",
+        "commit": "0c6861ef7420ee780270ca6d993d18d4101049d0",
+        "path": "pinyin_simp.dict.yaml"
+      }
+    }
+  ],
+  "license_files": [
+    {
+      "component": "rime-pinyin-simp",
+      "source_path": "licenses/rime-pinyin-simp/LICENSE",
+      "runtime_path": "Licenses/rime-pinyin-simp/LICENSE",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "component": "rime-pinyin-simp",
+      "source_path": "licenses/rime-pinyin-simp/AUTHORS",
+      "runtime_path": "Licenses/rime-pinyin-simp/AUTHORS",
+      "sha256": "f4cff0fcbca4668ac449c24a53be547e162bc60cce63fdc5d5906801a452edc4"
+    }
+  ]
+}

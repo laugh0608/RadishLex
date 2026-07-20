@@ -46,6 +46,7 @@ REQUIRED_FILES = [
     "docs/repository-layout.md",
     "docs/roadmap.md",
     "docs/technical-plan.md",
+    "docs/macos-product-package-boundary.md",
     "docs/adr/0007-apple-secure-enclave-p256-backend.md",
     "docs/runbooks/apple-secure-enclave-p256-backend.md",
     "docs/runbooks/apple-secure-enclave-key-agreement-backend.md",
@@ -62,6 +63,8 @@ REQUIRED_FILES = [
     "scripts/check-docs.sh",
     "scripts/check-manager-ffi-smoke.sh",
     "scripts/check-manager-product.sh",
+    "scripts/build-macos-product.sh",
+    "scripts/check-macos-product-metadata.sh",
     "scripts/check-manager.sh",
     "scripts/build-manager-macos-product.sh",
     "scripts/build-manager-macos-dpk-qualified-product.sh",
@@ -74,6 +77,19 @@ REQUIRED_FILES = [
     "scripts/run-manager-apple-secure-enclave-key-agreement-product-smoke.sh",
     "scripts/macos-imk/native_manifest.py",
     "scripts/macos-imk/test_native_manifest.py",
+    "scripts/macos-product/product_manifest.py",
+    "scripts/macos-product/test_product_manifest.py",
+    "scripts/prepare-rime-product-data.sh",
+    "scripts/rime-product/product_data.py",
+    "scripts/rime-product/test_product_data.py",
+    "packaging/macos/product.json",
+    "packaging/rime/README.md",
+    "packaging/rime/product-rime-data.json",
+    "packaging/rime/data/default.yaml",
+    "packaging/rime/data/radishlex_pinyin.schema.yaml",
+    "packaging/rime/data/pinyin_simp.dict.yaml",
+    "packaging/rime/licenses/rime-pinyin-simp/LICENSE",
+    "packaging/rime/licenses/rime-pinyin-simp/AUTHORS",
     "scripts/check-repo.py",
     "scripts/check-repo.sh",
     "scripts/check-sync-deployment-evidence.py",
@@ -230,6 +246,21 @@ def check_manager_product_runtime_contract() -> None:
     ):
         if symbol not in embed_script:
             raise SystemExit(f"manager native bundle gate is missing symbol: {symbol}")
+
+
+def check_macos_product_metadata() -> None:
+    run_command(
+        [sys.executable, str(REPO_ROOT / "scripts/macos-product/product_manifest.py"), "validate-source"]
+    )
+    run_command(
+        [sys.executable, str(REPO_ROOT / "scripts/macos-product/test_product_manifest.py")]
+    )
+    run_command(
+        [sys.executable, str(REPO_ROOT / "scripts/rime-product/product_data.py"), "validate"]
+    )
+    run_command(
+        [sys.executable, str(REPO_ROOT / "scripts/rime-product/test_product_data.py")]
+    )
 
 
 def required_status_contexts(ruleset: dict[str, Any]) -> set[str]:
@@ -391,6 +422,7 @@ def main() -> int:
     check_collaboration_docs()
     check_license_wording()
     check_manager_product_runtime_contract()
+    check_macos_product_metadata()
     check_ruleset_and_workflows()
     check_path_budget()
     check_deployment_evidence()

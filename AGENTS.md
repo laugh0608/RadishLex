@@ -29,8 +29,8 @@
 
 ## 快速认知
 
-- 当前阶段：M4 产品发布候选；首批先固定 macOS 产品包、数据迁移、升级回滚与发布门禁边界，实时状态见 `docs/status/current.md`
-- 当前代码状态：macOS 离线 Alpha、M2 本地个人化 MVP 与 M3 加密同步 Beta 已完成；真实用户同步继续关闭，产品安装包与发布供应链尚未闭环
+- 当前阶段：M4 产品发布候选；M4-P01 双 bundle 装配已完成，推进 M4-P02 数据升级协调器，实时状态见 `docs/status/current.md`
+- 当前代码状态：M1-M3 已完成；M4 已统一版本/ABI/schema/最低系统，真实用户同步关闭，完整装配、数据升级与发布供应链未闭环
 - 当前交付：工程原型，不是可安装 MVP；阶段证据以真实输入、数据正确性、安全同步和产品构建为准
 - 交付梯度：macOS 离线 Alpha、本地个人化 MVP 与 M3 加密同步 Beta 已完成；当前推进 M4 产品包
 - 第一真实平台：macOS InputMethodKit；Linux Fcitx5 与 Android 后续，Windows、iOS 后置

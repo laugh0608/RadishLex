@@ -29,6 +29,8 @@ RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支�
 - [当前状态](docs/status/current.md)：当前批次、验证基线、停止线和下一步。
 - [技术方案](docs/technical-plan.md)：稳定架构、职责、输入链和平台策略。
 - [产品交付路线图](docs/roadmap.md)：产品里程碑、交付物和退出标准。
+- [macOS 产品包边界](docs/macos-product-package-boundary.md)：M4 组件、版本、数据与发布停止线。
+- [RimeData 产品输入](packaging/rime/README.md)：固定 schema、Apache 词典、来源锁与逐资产许可证。
 - [仓库结构](docs/repository-layout.md)：实际目录、模块职责和未落地边界。
 - [隐私与同步](docs/privacy-sync.md)：数据分级、密钥、删除、恢复和威胁模型。
 - [Engine Boundary](docs/engine-boundary.md)：核心 engine 契约。

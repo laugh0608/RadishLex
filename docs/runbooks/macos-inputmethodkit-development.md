@@ -26,21 +26,20 @@
 ## native bundle 前提
 
 1. 使用已有、显式指定的 `librime` include/lib；构建脚本不安装依赖。
-2. 准备来源与许可证已确认的 shared data/schema，并复制到与任何真实用户输入法目录无关的隔离目录。
-3. shared data 必须包含 `<schema-id>.schema.yaml` 及其声明的依赖，许可证文件必须非空并显式传入；bundle 的 `default.yaml` 由仓库产品模板生成，固定 schema list 与 `menu.page_size: 5`，不采用输入目录或用户目录的默认配置。
-4. schema id 只允许 ASCII 字母、数字、点、下划线和连字符。
+2. 使用 `./scripts/prepare-rime-product-data.sh assemble --output <isolated-shared-data>` 从仓库固定资产离线装配数据；输出不能位于任何真实用户输入法目录。
+3. `product-rime-data.json` 固定 `radishlex_pinyin`、Apache 词典 commit/hash、产品配置与逐资产 LICENSE/AUTHORS；门禁拒绝额外文件、hash 漂移、symlink 或 schema 替换。
+4. 首个候选不包含 upstream `stroke`、`prelude`、笔画反查或扩展符号表。
 5. smoke 只使用合成词，不记录窗口正文、输入历史、联系人或其他敏感信息。
 
 ```bash
 RIME_INCLUDE_DIR=<include> \
 RIME_LIB_DIR=<lib> \
 RADISHLEX_RIME_SHARED_DATA=<isolated-shared-data> \
-RADISHLEX_RIME_SCHEMA=<schema-id> \
-RADISHLEX_RIME_DATA_LICENSE=<license-file> \
+RADISHLEX_RIME_SCHEMA=radishlex_pinyin \
 ./scripts/check-macos-imk-native.sh
 ```
 
-`RADISHLEX_RIME_DEPLOY_ON_START` 默认 `1`，只接受 `0` 或 `1`。产物为 `target/macos-imk/native/RadishLexInputMethod.app`。检查入口会验证 plist、单一全拼 mode metadata、产品生成的 5 项候选页配置、当前架构、关键 FFI symbol、完整 bundle 签名，以及 copied shared data/许可证清单；随后以临时隔离 user data 运行真实 FFI smoke，要求 snapshot 恰好返回 5 项候选。构建会递归收集 `librime` 的全部非系统 dylib，重写为 bundle 内 `@rpath`，复制逐库许可证并生成签名后哈希清单；任何残留外部绝对依赖都会使门禁失败。shared data 中的 symlink 同样会被拒绝。默认使用 ad-hoc 开发签名；真实安装 smoke 需要调用方通过 `RADISHLEX_CODESIGN_IDENTITY` 提供当前用户可用的 Apple Development identity。检查不会启动或安装 bundle。
+`RADISHLEX_RIME_DEPLOY_ON_START` 默认 `1`，只接受 `0` 或 `1`。产物为 `target/macos-imk/native/RadishLexInputMethod.app`。检查入口会验证 plist、单一全拼 mode metadata、固定 5 项候选页、RimeData `SourceManifest.json`、逐资产许可证、manifest v2、当前架构、关键 FFI symbol 和完整 bundle 签名；随后以临时隔离 user data 运行真实 FFI smoke。构建会递归收集 `librime` 的全部非系统 dylib，重写为 bundle 内 `@rpath`，复制逐库许可证并生成签名后哈希清单；任何残留外部绝对依赖都会使门禁失败。默认使用 ad-hoc 开发签名；真实安装 smoke 需要调用方通过 `RADISHLEX_CODESIGN_IDENTITY` 提供当前用户可用的 Apple Development identity。检查不会启动或安装 bundle。
 
 ## 授权停止线
 
