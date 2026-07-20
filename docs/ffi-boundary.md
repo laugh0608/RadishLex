@@ -44,6 +44,7 @@ RadishLexError*
 当前已落地函数按能力分组：
 
 - ABI contract 与 Manager 只读产品状态：`radishlex_ffi_contract`、`radishlex_manager_sync_product_status`
+- Manager 本地 HTTPS 合成资格 run：`radishlex_manager_sync_qualification_start`、`radishlex_manager_sync_qualification_poll`、`radishlex_manager_sync_qualification_cancel`、`radishlex_manager_sync_qualification_free`
 - session / Rime runtime 生命周期：`radishlex_session_new`、`radishlex_session_new_with_options`、`radishlex_session_new_rime`、`radishlex_session_new_personalized_rime`、`radishlex_session_free`、`radishlex_rime_runtime_shutdown`、`radishlex_session_engine_kind`、`radishlex_session_reset`、`radishlex_session_set_schema`、`radishlex_session_set_learning_context`
 - 输入、候选选择与快照：`radishlex_session_handle_key_event`、`radishlex_session_select_candidate`、`radishlex_key_result_*`、兼容 `radishlex_session_push_key_event`、`radishlex_session_snapshot_new`、`radishlex_snapshot_*`
 - userdb 状态与词条管理：`radishlex_userdb_learning_status`、`radishlex_userdb_sync_preflight`、`radishlex_userdb_rank_explain_*`、`radishlex_userdb_add_term`、`radishlex_userdb_delete_term`、`radishlex_userdb_restore_term`、`radishlex_userdb_terms_*`、`radishlex_userdb_deleted_terms_*`
@@ -65,6 +66,8 @@ Apple 产品验证使用独立原生自检结构：普通 DPK 的 `radishlex_app
 `radishlex_manager_sync_product_status` 是 ABI v7 保留的 status-only 入口，只返回固定 enum/boolean 产品摘要，不创建、读取、使用或删除平台 key item。signing 与 key-agreement 资格必须独立表达，组合 `product_qualified` 不能自动打开 `user_sync_enabled`。完整结构、常量、blocker 优先级、隐私 allowlist 和 Dart binding 检查见 [Manager 同步产品状态参考](manager-sync-product-status.md)。
 
 `RadishLexManagerSyncQualificationRequest` 只接受 version、loopback HTTPS endpoint、一次性 bearer token byte view、可选本地 CA DER byte view 和受限 timeout；start 在返回前由 Rust 复制输入。`RadishLexManagerSyncQualificationSnapshot` 只包含固定 state/phase/error enum、对象计数和清理 flags，不返回路径、HTTP body、payload 或合成身份。`free` 会取消未终止运行、join worker 并释放 handle；Dart 必须先复制最终 snapshot，再串行释放。
+
+资格 run 的请求上限、完整 phase 顺序、成功条件、错误 allowlist、跨进程单运行和旧临时工作区清理规则见 [ime-sync-runtime 组件说明](../crates/ime-sync-runtime/README.md)。
 
 ### Status 与文本 view
 

@@ -1,6 +1,6 @@
 # macOS 产品包边界
 
-本文定义 RadishLex M4 macOS 产品发布候选的组件、版本、数据、签名和验证边界，读者是产品构建、InputMethodKit、Manager 与发布门禁的维护者。本文不记录具体构建流水、Apple 凭据、真实安装操作或历史验收结果；命令证据进入 runbook 与 devlog，当前顺位见 `docs/status/current.md`。
+本文定义 RadishLex M4 macOS 产品发布候选的组件、版本、数据、签名和验证边界，读者是产品构建、InputMethodKit、Manager 与发布门禁的维护者。本文不记录具体构建流水、Apple 凭据、真实安装操作或历史验收结果；可重复构建与复验步骤见 [macOS 产品装配 Runbook](runbooks/macos-product-assembly.md)。
 
 ## 目标与范围
 

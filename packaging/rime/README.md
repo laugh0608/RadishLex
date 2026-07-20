@@ -9,3 +9,13 @@
 - `product-rime-data.json`：来源 commit、文件 hash、运行时目标和许可证映射的唯一锁文件。
 
 仓库门禁只接受锁文件列出的普通文件和 hash。产品构建从这些 committed 输入离线装配 RimeData，不在构建时下载数据，也不读取 `~/Library/Rime`、Squirrel 或 RadishLex 运行目录。
+
+在仓库根可独立校验、装配和复验公开产品数据：
+
+```bash
+./scripts/prepare-rime-product-data.sh validate
+./scripts/prepare-rime-product-data.sh assemble --output <isolated-output>/RimeData
+./scripts/prepare-rime-product-data.sh verify --data-dir <isolated-output>/RimeData
+```
+
+输出目录必须是新建的隔离目录，不能指向用户或运行时 Rime 数据。完整双 bundle 构建、产物解释和失败处理见 [macOS 产品装配 Runbook](../../docs/runbooks/macos-product-assembly.md)。

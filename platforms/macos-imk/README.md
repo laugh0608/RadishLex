@@ -105,7 +105,7 @@ RADISHLEX_RIME_SCHEMA=radishlex_pinyin \
 
 bundle metadata 固定正式 Bundle ID `org.radishlex.inputmethod.macos` 与单一 `org.radishlex.inputmethod.macos.Pinyin` 模式，包含简体中文 script/repertoire、图标、本地化标签和 `LSUIElement`。正式 bundle 文件名固定为 `RadishLexInputMethod.app`；开发期不再复用已被 macOS 26 TIS 负缓存的旧 ID 或 `RadishLex.app` 路径。contract/native 门禁会验证 mode id 的 reverse-DNS 字符范围，避免把允许下划线的 `pinyin_simp` schema id 直接用作 TIS mode id。构建脚本不启动或安装 bundle；普通用户分发、Developer ID、公证和发布级供应链门禁仍属于 M4。
 
-安装、启用、真实应用输入和移除会修改本机状态，必须另行取得授权后按独立 runbook 执行。
+双 bundle 离线产品装配与 manifest 复验见 [macOS 产品装配 Runbook](../../docs/runbooks/macos-product-assembly.md)。安装、启用、真实应用输入和移除会修改本机状态，必须另行取得授权后按独立 runbook 执行。
 
 ## 只读状态、实时来源与清理
 

@@ -15,7 +15,7 @@ manager 分层交付：M2 先完成本地词库、学习、隐私和诊断管理
 - 本地 userdb 管理优先于远端同步开关。
 - 学习记录摘要优先于 P1 原始事件明细。
 - 同步预检、本地 Docker / 本地 HTTPS 联调状态和部署配置检查优先于真实远端启用。
-- 恢复码和设备授权 UI 必须等待受控资格执行链、交互安全与对应产品流程退出评审；macOS 平台私钥 backend 主路径已经通过，但不单独解锁 UI。
+- 恢复码和设备授权 UI 必须等待交互安全与对应产品流程退出评审；受控资格执行链和 macOS 平台私钥 backend 主路径已经通过，但都不单独解锁 UI。
 - 用户可用同步主操作必须等待产品入口退出评审；发布级目标部署证据按首版后计划补齐。非上传的同步入口状态、阻塞说明和本地联调展示可以继续推进。
 
 ## M2 产品运行态契约
@@ -53,7 +53,7 @@ M2 本地管理能力应优先覆盖：
 - 查看 sync preflight 摘要。
 - 查看 import batches、词条 tombstone 和本地 sync 影响摘要。
 
-M3 同步管理能力在安全退出条件满足后覆盖。当前 backend 产品资格和 Rust 严格 HTTPS transport 已闭合，但 `user_sync_enabled=false`；下一批只允许本地 HTTPS、合成 P2 和单次内存参数下的受控资格执行链，不开放普通用户成功入口：
+同步管理能力保持 `user_sync_enabled=false`。当前唯一可执行网络入口是本地 HTTPS、合成 P2 和单次内存参数下的受控资格 run；它与普通用户同步分区，不开放真实用户成功入口：
 
 - 配置自部署服务端地址和本地连接参数草案。
 - 查看本地同步服务连接健康摘要，只展示 endpoint 状态、access token 存在性、transport 分类、server state 摘要和结构化错误码。
@@ -222,12 +222,12 @@ native 产品摘要同样不改变 `ManagerBridge` 方法集：`FfiManagerBridge
 6. `rank explain` 区域已通过专用 `ime-ffi` ABI 读取单候选贡献项，Flutter 只展示复制后的非敏感摘要，不持有 Rust view 指针。
 7. 已补设置页配置来源诊断、sync gate 草案预览、部署证据来源标签、设置草案保存、脱敏诊断报告分组预览 / 筛选 / 复制 / 导出和 bridge 失败结构化错误分类展示；UI 不透传 native 错误明细。
 8. 同步配置页继续保持真实上传按钮禁用，状态由设置草案、隐私模式、平台私钥 backend gate 和部署证据来源草案派生，可显示 `local_only`、`sync_disabled_by_policy`、`backend_unavailable`、`deployment_unverified` 或 `preflight_ready`。
-9. 已接入 sync entry state、服务连接健康、`sync_connection_health.v1` 摘要回填、恢复码 / 设备授权准备态、四条 readiness 聚合、settings 内存态 readiness 导入和只读交互进入状态；macOS 平台私钥 backend 主路径已通过，下一步先完成 localhost 合成 P2 受控资格命令，再评审真实设备授权、恢复码和用户同步命令。
+9. 已接入 sync entry state、服务连接健康、`sync_connection_health.v1` 摘要回填、恢复码 / 设备授权准备态、四条 readiness 聚合、settings 内存态 readiness 导入、只读交互进入状态和 localhost 合成 P2 受控资格 run；macOS 平台私钥 backend 主路径已通过，真实设备授权、恢复码和用户同步命令仍须独立产品评审。
 10. macOS 原生平台 bridge 已固定 Application Support 与 bundle Frameworks 路径、`0700`/`0600` 权限、symlink 拒绝和 `CFPreferences` 隐私键读写回滚；Rust 双连接测试已覆盖并发 schema 初始化、WAL 可见性、输入侧选择、manager 删除和恢复。manager 页头刷新会重新加载真实 bridge snapshot，widget 回归覆盖输入 runtime 外部更新后的聚合可见性；正常 Release GUI 与输入法共库实机已进一步证明外部刷新、delete 防复活、explicit restore、双进程重启、隐私零增量与最终回滚，M2 于 2026-07-18 关闭。
 
 ## 停止线
 
-- 受控资格执行链、交互安全与产品入口退出评审完成前，不提供用户可用同步开关、恢复码创建 UI 或设备授权成功路径。
+- 交互安全、真实设备流程与产品入口退出评审完成前，不提供用户可用同步开关、恢复码创建 UI 或设备授权成功路径；受控资格执行成功不能替代这些条件。
 - 没有发布级目标部署运行证据前，不把远端同步展示为生产可用；本地 Docker / 本地 HTTPS 联调状态可以作为非生产证据展示。
 - 没有 FFI / bridge 明确错误语义前，不让 Flutter 直接解析 Rust 内部错误字符串。
 - 任何会展示、记录、上传或导出 P0、P1 原始事件、恢复码、token、私钥或明文同步 payload 的设计都必须停止并回退。

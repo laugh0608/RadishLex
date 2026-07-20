@@ -23,6 +23,7 @@ RadishLex/
     ime-sync/
       README.md
     ime-sync-runtime/
+      README.md
     ime-crypto/
     ime-ffi/
     ime-cli/
@@ -99,7 +100,7 @@ RadishLex/
 | --- | --- | --- |
 | Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v7 隐私/索引/学习状态、Manager 产品状态与隔离资格 run、deleted tombstone 管理查询、精确 case inspection、隔离非选择 snapshot、R01B 与 manager/InputMethodKit 共库证据 | M4 数据升级与发布复验 |
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
-| 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS | Manager 受控资格执行链、用户入口退出评审、首版后的发布级目标部署 |
+| 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
 | Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁 | M4 数据升级、安装载体与发布分发 |
 | 平台 | macOS InputMethodKit 薄壳、contract/native bundle、R01A build 32 与 R01B build 34 实机退出、生产 LearningContext、privacy/清理 contract 与隔离 ValidationHost；M4-P01 已装配 `0.1.0 (35)` 双 bundle 与 locked RimeData；Android Keystore 能力验证桥 | M4 数据升级、安装载体和普通用户安装包；其他系统输入法 |
 
@@ -203,6 +204,8 @@ Manager 同步产品组合层：
 
 不得承载 C ABI、Flutter 状态、真实用户入口 gate 或输入热路径。资格运行不得触碰真实 userdb、Keychain/Secure Enclave，也不得把 test backend 冒充生产 backend。
 
+请求约束、状态机、错误、取消和清理契约见 [ime-sync-runtime 组件说明](../crates/ime-sync-runtime/README.md)。
+
 ### ime-ffi
 
 C ABI 与 host contract：
@@ -280,7 +283,7 @@ apps/radishlex-manager/
 
 `packaging/macos/product.json` 是 macOS 产品版本、build、最低系统、bundle ID、FFI ABI、userdb schema 和 manifest 格式的单一元数据真相源。`packaging/rime/product-rime-data.json` 绑定产品 schema、Apache 词典来源 commit/hash、运行时路径和逐资产许可证；`scripts/rime-product/product_data.py` 负责离线校验与装配。
 
-`scripts/macos-product/product_manifest.py` 校验源码声明、生成/复验无绝对路径的 `ProductManifest.json`，`scripts/build-macos-product.sh` 从 committed RimeData 输入装配双 bundle 产品目录。该目录不承担安装、签名凭据、公证上传或用户数据迁移。
+`scripts/macos-product/product_manifest.py` 校验源码声明、生成/复验无绝对路径的 `ProductManifest.json`，`scripts/build-macos-product.sh` 从 committed RimeData 输入装配双 bundle 产品目录。该目录不承担安装、签名凭据、公证上传或用户数据迁移；具体构建和复验步骤见 [macOS 产品装配 Runbook](runbooks/macos-product-assembly.md)。
 
 ## 平台目录
 

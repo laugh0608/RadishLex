@@ -72,10 +72,10 @@ git diff --check
 - Authorization B/C 后，TIS、bundle、Rime、进程、隐私键、测试 userdb、settings、sidecars、receipts 和 M2 临时目录全部恢复基线，父目录 empty/`0755`。全程未读取 P1 原始行或数据库正文。
 - cleanup receipt 的跨登录成对 `st_dev` 漂移已由共享 helper 的精确兼容规则和 M2/R01B contract 关闭；单侧 device drift、inode/权限/白名单漂移仍失败关闭。
 
-M3 可以依赖上述本地产品能力，但不能在 Flutter 层复制同步、加密、设备授权或密钥真相源。下一批先关闭设备签名算法 profile 与 macOS 生产私钥 backend，再进入真实产品 sync orchestration 和 `ManagerBridge` 命令。
+后续同步与产品升级可以依赖上述本地产品能力，但不能在 Flutter 层复制同步、加密、设备授权、migration 或密钥真相源。设备签名 profile、macOS 生产私钥主路径、Rust sync orchestration 与受控合成资格 run 已有独立契约；真实用户命令仍须另行评审。
 
-## M3 停止线
+## 后续同步停止线
 
-- `apple-keychain-v1`、Android Keystore、恢复码、设备授权、设备撤销和 key epoch 的生产证据仍按 M3 专题推进。
-- 发布级目标部署和真实 sync client 尚未进入用户产品链路。
-- 安全证据齐备前，不打开真实用户同步开关，也不把 `preflight_ready` 表述为可同步。
+- 平台 backend、受控资格 run 和本地 HTTPS 证据都不能自行打开真实用户同步。
+- 恢复码、设备授权、设备撤销、key epoch 用户交互和发布级目标部署尚未进入普通用户产品链路。
+- 产品入口退出评审前，不打开真实用户同步开关，也不把 `preflight_ready` 或合成资格成功表述为可同步。

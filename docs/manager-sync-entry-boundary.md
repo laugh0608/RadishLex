@@ -79,9 +79,11 @@ Secure Enclave key-agreement 再使用一组独立 status/smoke symbol、环境�
 - 本地 Docker、localhost、fixture、readiness ready 和合成 smoke 只能用于开发验证，不能解锁产品入口。
 - 服务端继续被视为不可信，输入热路径不得依赖网络。
 
-Rust orchestration、严格 HTTPS transport 与生产 backend 主路径资格已稳定，可以在 Manager 普通入口继续禁用时设计受控资格命令接口。该接口必须直接复用现有 Rust sync / crypto API、只接受 transient 参数并证明取消/重启/脱敏；不恢复已归档的 review-only DTO 或审批目录。
+Rust orchestration、严格 HTTPS transport、生产 backend 主路径资格与受控资格命令已经稳定。资格命令直接复用现有 Rust sync / crypto API，只接受 transient 参数并证明取消、重启清理与脱敏；不得扩展为真实用户同步，也不恢复已归档的 review-only DTO 或审批目录。
 
 跨模块产品组合固定进入 `ime-sync-runtime`：`ime-sync` 保持协议、transport 与 orchestration 真相源，`ime-userdb` 保持 SQLite repository 真相源，`ime-ffi` 只包装 run handle。输入用 `ime-runtime` 继续不依赖远端同步；不得为减少一个 crate 把网络执行塞进输入热路径或 ABI 文件。
+
+资格 request、状态机、错误、并发、取消和清理的字段级契约见 [ime-sync-runtime 组件说明](../crates/ime-sync-runtime/README.md)。
 
 ## 已完成批次：Manager 本地 HTTPS 同步资格执行
 

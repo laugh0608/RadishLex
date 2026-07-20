@@ -164,6 +164,8 @@ P1 原始事件只在本地用于学习，不得通过 FFI 管理接口或同步
 
 该 crate 不进入输入热路径，不承载 C ABI、Flutter 状态或 Go server DTO。`ime-sync` 不反向依赖 `ime-userdb`，`ime-ffi` 也不直接建立网络和数据库组合；真实用户同步开放前，资格 provider 必须与生产 backend 明确区分并保持 `user_sync_enabled=false`。
 
+资格 request、phase/error、并发取消和清理 contract 见 [ime-sync-runtime 组件说明](../crates/ime-sync-runtime/README.md)。
+
 ### ime-ffi
 
 `ime-ffi` 是 Rust core 与平台/Flutter 的稳定边界：
@@ -330,7 +332,7 @@ M2 不以远端同步、设备授权或最终发布包为退出条件。
 
 - `KeyOutcome`、FFI 生命周期和 librime 全局生命周期未闭合前，不把平台壳视为可用输入法。
 - userdb 事务、ranker 评测和删除语义未稳定前，不开放生产同步。
-- merge 收敛、签名绑定、KDF 上限、macOS 平台私钥主路径和本地 HTTPS 编排已有验证；Manager 受控资格执行链、真实设备产品流程与用户入口退出评审完成前，仍不开放真实用户同步。上述任一证据回归时同样失败关闭。
+- merge 收敛、签名绑定、KDF 上限、macOS 平台私钥主路径、本地 HTTPS 编排和 Manager 受控资格执行链已有验证；真实用户入口仍须经过独立产品决策与发布级目标部署评审。该评审完成前保持关闭，上述任一既有证据回归时同样失败关闭。
 - 第一真实平台未达到可日常输入前，不并行启动第二平台。
 - manager 产品模式不得用静默 fixture fallback 代替真实失败。
 

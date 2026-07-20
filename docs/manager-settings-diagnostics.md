@@ -67,7 +67,7 @@ settings draft 不得保存：
 5. `deployment_evidence_source == local_smoke` 且前置项通过：`entry_state = local_smoke_ready`，`sync.state = preflight_ready`。
 6. 非本地 evidence source 且前置项通过：`entry_state = blocked_before_user_sync`，`sync.state = preflight_ready`。
 
-`sync.entry_blocker` 记录当前第一阻塞码，`sync.production_blockers` 记录聚合阻塞码。即使状态进入 `preflight_ready`，同步页的 `启用同步` 主按钮仍保持禁用。macOS 平台私钥 backend 主路径已经通过，但用户可用同步入口仍必须等待受控资格执行链、恢复码/设备授权链和产品入口退出评审；发布级目标部署证据按首版后计划补齐。
+`sync.entry_blocker` 记录当前第一阻塞码，`sync.production_blockers` 记录聚合阻塞码。即使状态进入 `preflight_ready` 或本地合成资格 run 成功，同步页的 `启用同步` 主按钮仍保持禁用。受控资格执行与 macOS 平台私钥 backend 主路径已经通过，但用户可用同步入口仍必须等待恢复码/设备授权链、产品入口退出评审和发布级目标部署证据。
 
 当前 `sync.production_blockers` 还会聚合恢复码保存确认、恢复记录、授权包前置条件、设备撤销、丢失设备风险提示和 key epoch 状态，例如 `recovery_record_not_created`、`recovery_code_save_confirmation_required`、`authorization_package_prerequisites_blocked`、`lost_device_risk_notice_required` 和 `key_epoch_rotation_not_started`。恢复码 setup / restore 与设备 join / revocation 的 readiness 摘要只输出状态码、前置条件和错误分类，并通过 `SyncReadinessFlowSummary` 聚合为 blocked flows、issue codes、next required evidence、source tags 和 user sync blocked；这些值只用于解释入口阻塞，不代表已创建恢复记录、join request、授权包或撤销记录。`SyncInteractionEntryPlan` / `SyncInteractionActionIntent` 只汇总 action id、visibility、intent status、blocker、required evidence 和 source tag，不构造 bridge 命令。Dart 侧 `manager_sync_readiness.v1` mapper 只接受 allowlist 状态码和来源标签，未知值降级为安全分类，不把原始 bridge 异常、路径、token、恢复码、短码或 payload 写入 UI、settings draft 或诊断报告。
 
