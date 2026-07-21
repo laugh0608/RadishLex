@@ -11,8 +11,9 @@ use serde::{Deserialize, Serialize};
 mod filesystem;
 #[cfg(unix)]
 pub use filesystem::{
-    UpgradeFilesystemError, UpgradeFilesystemErrorCode, UpgradeProcessGuard, UpgradeReceiptStore,
-    UpgradeSnapshotSpaceBudget, UpgradeSnapshotSummary, VerifiedDataRoot,
+    UpgradeCandidateSummary, UpgradeFilesystemError, UpgradeFilesystemErrorCode,
+    UpgradeProcessGuard, UpgradeReceiptStore, UpgradeSnapshotSpaceBudget, UpgradeSnapshotSummary,
+    VerifiedDataRoot,
 };
 
 pub const UPGRADE_RECEIPT_FORMAT: &str = "radishlex-product-upgrade-receipt-v1";

@@ -144,6 +144,12 @@ fn explicit_candidate_migration_reports_source_and_target_schema() {
     assert_eq!(summary.source_schema_version, 0);
     assert_eq!(summary.target_schema_version, 9);
     assert!(summary.migrated);
+    for suffix in ["-wal", "-shm", "-journal"] {
+        assert!(
+            !std::path::PathBuf::from(format!("{path}{suffix}")).exists(),
+            "standalone candidate must not retain {suffix}"
+        );
+    }
     assert_eq!(
         UserDb::inspect_file(&path)
             .expect("migrated candidate inspects")

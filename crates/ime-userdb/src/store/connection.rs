@@ -72,6 +72,7 @@ impl UserDb {
         let database = Self::open(path)?;
         let target_schema_version = database.schema_version()?;
         drop(database);
+        finalize_standalone_candidate(path)?;
         let target = Self::inspect_file(path)?;
         if target.compatibility != UserDbSchemaCompatibility::Current
             || target.schema_version != target_schema_version
@@ -177,6 +178,39 @@ impl UserDb {
     fn validate_current_schema(&self) -> UserDbResult<()> {
         validate_current_schema_on(&self.connection)
     }
+}
+
+fn finalize_standalone_candidate(path: &Path) -> UserDbResult<()> {
+    let connection = Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|error| preserved_database_error(path, "open migrated candidate", error))?;
+    connection
+        .busy_timeout(BUSY_TIMEOUT)
+        .map_err(|error| preserved_database_error(path, "configure migrated candidate", error))?;
+    let journal_mode: String = connection
+        .query_row("PRAGMA journal_mode = DELETE", [], |row| row.get(0))
+        .map_err(|error| preserved_database_error(path, "finalize candidate journal", error))?;
+    if !journal_mode.eq_ignore_ascii_case("delete") {
+        return Err(UserDbError::invalid_input(
+            "candidate",
+            "migrated candidate must finish as one standalone SQLite file",
+        ));
+    }
+    verify_integrity(&connection)
+        .map_err(|error| preserved_database_error(path, "validate migrated candidate", error))?;
+    drop(connection);
+    restrict_database_permissions(path)?;
+    for sidecar in standalone_sqlite_sidecar_paths(path) {
+        if sidecar.exists() {
+            return Err(UserDbError::invalid_input(
+                "candidate",
+                "migrated candidate retained a SQLite sidecar",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn validate_current_schema_on(connection: &Connection) -> UserDbResult<()> {
@@ -1195,5 +1229,14 @@ fn sqlite_sidecar_paths(path: &Path) -> [PathBuf; 2] {
     [
         PathBuf::from(format!("{path}-wal")),
         PathBuf::from(format!("{path}-shm")),
+    ]
+}
+
+fn standalone_sqlite_sidecar_paths(path: &Path) -> [PathBuf; 3] {
+    let path = path.as_os_str().to_string_lossy();
+    [
+        PathBuf::from(format!("{path}-wal")),
+        PathBuf::from(format!("{path}-shm")),
+        PathBuf::from(format!("{path}-journal")),
     ]
 }

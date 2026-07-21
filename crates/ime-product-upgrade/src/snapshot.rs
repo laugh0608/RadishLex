@@ -273,7 +273,7 @@ impl UpgradeReceiptStore {
         })
     }
 
-    fn snapshot_path(&self) -> PathBuf {
+    pub(super) fn snapshot_path(&self) -> PathBuf {
         self.state_directory.join(SNAPSHOT_FILE_NAME)
     }
 
@@ -327,7 +327,7 @@ fn validate_estimate(
     Ok(())
 }
 
-fn private_data_file_metadata(
+pub(super) fn private_data_file_metadata(
     path: &Path,
     expected_owner_id: u32,
     error_code: UpgradeFilesystemErrorCode,
@@ -343,7 +343,10 @@ fn private_data_file_metadata(
     Ok(metadata)
 }
 
-fn file_artifact_matches_metadata(identity: &UpgradeArtifactIdentity, metadata: &Metadata) -> bool {
+pub(super) fn file_artifact_matches_metadata(
+    identity: &UpgradeArtifactIdentity,
+    metadata: &Metadata,
+) -> bool {
     identity.device_id() == metadata.dev()
         && identity.inode() == metadata.ino()
         && identity.owner_id() == metadata.uid()

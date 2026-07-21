@@ -49,7 +49,7 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 `ime-userdb` 继续是 SQLite schema、事务 migration 与数据库结构校验的唯一真相源，并提供两个语义分离的产品能力：
 
 1. `inspect_file`：以只读方式读取 schema 并执行完整性检查，不创建数据库、不配置 WAL、不收紧权限、不执行 migration；
-2. `migrate_and_validate`：对调用方已经证明为隔离候选的文件执行现有事务 migration，随后验证目标 schema 与完整性。
+2. `migrate_and_validate`：对调用方已经证明为隔离候选的文件执行现有事务 migration，随后验证目标 schema 与完整性，并把候选收敛为不带 WAL/SHM/journal 的单文件 `DELETE` journal 状态。
 
 `ime-userdb` 不负责证明候选是否真的隔离，不停止进程，不生成产品 receipt，也不切换 Application Support 文件。
 
@@ -132,6 +132,8 @@ receipt 使用 UTF-8 JSON、固定字段顺序和末尾换行，当前格式为 
     receipt.json.tmp           # 仅可能由中断写入留下
     source-snapshot.sqlite3    # snapshot evidence 已固化后存在
     source-snapshot.sqlite3.tmp # backup 或 rename 中断时保留
+    migration-candidate.sqlite3 # candidate evidence 已固化后存在
+    migration-candidate.sqlite3.tmp # copy、migration 或 rename 中断时保留
 ```
 
 状态目录只接受上述固定文件名。读取前重新验证 data root 与状态目录的 canonical path、device、inode、owner 和 mode；receipt 还必须是 `link count = 1`、不超过 64 KiB 的普通文件，并在打开前、打开后和读取后保持同一身份。写入使用 `create_new` 创建临时文件，完成文件 `fsync` 后再次验证 root、guard 与旧 receipt 身份，再原子替换并 `fsync` 状态目录；写回结果必须与预期 canonical bytes 完全一致。
@@ -180,6 +182,14 @@ snapshot 写入顺序固定为：`create_new` 私有临时文件、SQLite backup
 - 在进入 migration 前再次确认原固定路径身份未漂移。
 
 如果空间预算不足以同时保留原库、快照、迁移候选和切换恢复余量，preflight 失败，不边复制边删除旧文件腾空间。当前 crate 已固定预算计算与拒绝语义；macOS host 的真实 available-space adapter、进程静止证明和 settings 保留副本仍需后续接入。
+
+### 隔离 migration candidate
+
+协调层只允许从 receipt 已记录身份的固定 `source-snapshot.sqlite3` 创建固定 `migration-candidate.sqlite3.tmp`，不接受调用方自定义源或目标。复制使用已打开并复验身份的 snapshot 文件句柄与 `create_new` 私有目标；复制完成、文件持久化和 snapshot 身份复验后，才把临时 candidate 交给 `UserDb::migrate_and_validate`。该 API 可以在迁移过程中使用 WAL，但返回前必须切回 `DELETE` journal、再次执行完整性与目标 schema 校验，并确认没有 `-wal`、`-shm` 或 `-journal` 残留。
+
+candidate 成功顺序固定为：复制 snapshot 到临时 candidate、隔离 migration/validation、文件 `fsync`、复验临时文件与 snapshot 身份、原子 rename、状态目录 `fsync`、先把 candidate identity 追加到仍为 `snapshot_ready` 的 receipt，再单独持久化 `candidate_migrated`。当前 schema 返回 `migrated = false`，schema 0 与受支持旧 schema 返回真实源/目标版本；未来 schema、损坏 snapshot、目标版本不符或身份漂移均不得生成可切换 candidate。
+
+故障注入覆盖临时文件创建后、snapshot copy 后、migration 后、rename 后和 receipt evidence 后。临时 candidate 或无 receipt identity 的最终 candidate 会使加载失败关闭；identity 已持久化而状态仍为 `snapshot_ready` 时只允许读取既有证据，不自动猜测并推进状态。原 `userdb.sqlite3` 和 `source-snapshot.sqlite3` 在整个 migration 过程中保持不变。
 
 ### 切换
 
@@ -253,10 +263,11 @@ Manager 与 InputMethod 在产品启动前必须检查是否存在非终态升�
 2. 在 `ime-userdb` 增加只读 inspection 与显式 migration/validation summary；
 3. 实现临时目录内的 receipt 原子持久化和跨进程 guard；
 4. 实现 SQLite 一致快照、空间预算、身份校验与故障注入文件系统端口；
-5. 实现 Manager/InputMethod 两个候选 validation host；
-6. 实现切换、启动门禁、重启恢复和回滚；
-7. 接入产品 manifest、自动门禁和隔离产品构建 smoke；
-8. M4-P03 选定安装载体后再编写真实安装升级 runbook。
+5. 从固定 snapshot 创建隔离 migration candidate，固化 standalone SQLite 与 receipt evidence；
+6. 实现 Manager/InputMethod 两个候选 validation host；
+7. 实现切换、启动门禁、重启恢复和回滚；
+8. 接入产品 manifest、自动门禁和隔离产品构建 smoke；
+9. M4-P03 选定安装载体后再编写真实安装升级 runbook。
 
 ## M4-P02 退出标准
 

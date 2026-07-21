@@ -15,6 +15,8 @@ const RECEIPT_FILE_NAME: &str = "receipt.json";
 const STAGED_RECEIPT_FILE_NAME: &str = "receipt.json.tmp";
 const SNAPSHOT_FILE_NAME: &str = "source-snapshot.sqlite3";
 const STAGED_SNAPSHOT_FILE_NAME: &str = "source-snapshot.sqlite3.tmp";
+const CANDIDATE_FILE_NAME: &str = "migration-candidate.sqlite3";
+const STAGED_CANDIDATE_FILE_NAME: &str = "migration-candidate.sqlite3.tmp";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UpgradeFilesystemErrorCode {
@@ -25,10 +27,13 @@ pub enum UpgradeFilesystemErrorCode {
     InvalidReceiptReplacement,
     InterruptedReceiptWrite,
     InterruptedSnapshot,
+    InterruptedCandidate,
     OperationAlreadyActive,
     InvalidSnapshotState,
+    InvalidCandidateState,
     InsufficientSpace,
     SnapshotFailed,
+    CandidateMigrationFailed,
     IdentityChanged,
     Io,
 }
@@ -64,14 +69,23 @@ impl fmt::Display for UpgradeFilesystemError {
                 "upgrade receipt write requires recovery"
             }
             UpgradeFilesystemErrorCode::InterruptedSnapshot => "upgrade snapshot requires recovery",
+            UpgradeFilesystemErrorCode::InterruptedCandidate => {
+                "upgrade migration candidate requires recovery"
+            }
             UpgradeFilesystemErrorCode::OperationAlreadyActive => {
                 "another upgrade operation is active"
             }
             UpgradeFilesystemErrorCode::InvalidSnapshotState => "upgrade snapshot state is invalid",
+            UpgradeFilesystemErrorCode::InvalidCandidateState => {
+                "upgrade migration candidate state is invalid"
+            }
             UpgradeFilesystemErrorCode::InsufficientSpace => {
                 "upgrade snapshot has insufficient free space"
             }
             UpgradeFilesystemErrorCode::SnapshotFailed => "upgrade snapshot failed",
+            UpgradeFilesystemErrorCode::CandidateMigrationFailed => {
+                "upgrade migration candidate failed"
+            }
             UpgradeFilesystemErrorCode::IdentityChanged => "upgrade filesystem identity changed",
             UpgradeFilesystemErrorCode::Io => "upgrade filesystem operation failed",
         };
@@ -274,6 +288,7 @@ impl UpgradeReceiptStore {
         }
         let receipt = self.load_current_internal()?.map(|(receipt, _, _)| receipt);
         snapshot::validate_snapshot_state(self, receipt.as_ref())?;
+        candidate::validate_candidate_state(self, receipt.as_ref())?;
         Ok(receipt)
     }
 
@@ -382,6 +397,8 @@ impl UpgradeReceiptStore {
                 && name != STAGED_RECEIPT_FILE_NAME
                 && name != SNAPSHOT_FILE_NAME
                 && name != STAGED_SNAPSHOT_FILE_NAME
+                && name != CANDIDATE_FILE_NAME
+                && name != STAGED_CANDIDATE_FILE_NAME
             {
                 return Err(error(UpgradeFilesystemErrorCode::UnexpectedStateObject));
             }
@@ -705,3 +722,7 @@ mod tests;
 #[path = "snapshot.rs"]
 mod snapshot;
 pub use snapshot::{UpgradeSnapshotSpaceBudget, UpgradeSnapshotSummary};
+
+#[path = "candidate.rs"]
+mod candidate;
+pub use candidate::UpgradeCandidateSummary;
