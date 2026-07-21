@@ -186,6 +186,7 @@ SQLite 用户数据层：
 - 固定 userdb 源/目标、保守空间预算、SQLite snapshot 编排与阶段故障注入
 - 固定 settings 保留副本与隔离 migration candidate 编排
 - 完全只读的 startup gate 与终态/非终态恢复判断
+- 双端 validation evidence v1 与 `candidate_verified` / `aborted_preserved` 持久化
 - 稳定失败分类和中断恢复判断
 
 该 crate 当前只对 receipt、settings 副本、隔离 snapshot 和 candidate 执行原子 rename，不执行最终 SQLite 文件切换、进程停止或产品 host 调度；macOS M4-P02 的完整职责和实现顺序见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。

@@ -28,7 +28,7 @@ Rust snapshot 的 cursor 是允许落在 composition 末尾的插入位置，但
 
 最终 panel frame 使用目标 `NSScreen.visibleFrame` 在锚点下方或上方放置并限制在屏幕内；contract 环境没有有效 screen frame 时围绕有效行矩形构造计算区域，不回退到 `(0,0)`。controller 的唯一 display index 同时驱动视觉高亮、Space、数字键、鼠标和 accessibility selection；Rust runtime 固化并执行 display index 到 engine index 的映射。
 
-native 产品 session 通过 ABI v5 的 personalized Rime 构造入口持有独立 userdb connection，数据库固定为 `~/Library/Application Support/RadishLex/userdb.sqlite3`。Objective-C 只创建并收紧 `RadishLex` 父目录到 `0700`，SQLite migration、WAL、busy timeout、文件权限、排序、selection 事务和失败回退都由 Rust 负责。每个事件前平台只传 secure input、隐私模式、上下文可信度与粗粒度类别；当前 Alpha 只把 TextEdit 和 Codex 识别为允许学习的普通上下文，其他未知应用默认 engine-only，敏感应用与 secure input 同样不读取、不写入个人化数据。
+native 产品 session 通过当前 ABI v8 中兼容保留的 personalized Rime 构造入口持有独立 userdb connection；该入口最初由 ABI v5 引入，数据库固定为 `~/Library/Application Support/RadishLex/userdb.sqlite3`。Objective-C 只创建并收紧 `RadishLex` 父目录到 `0700`，SQLite migration、WAL、busy timeout、文件权限、排序、selection 事务和失败回退都由 Rust 负责。每个事件前平台只传 secure input、隐私模式、上下文可信度与粗粒度类别；当前 Alpha 只把 TextEdit 和 Codex 识别为允许学习的普通上下文，其他未知应用默认 engine-only，敏感应用与 secure input 同样不读取、不写入个人化数据。
 
 当前分类把 TextEdit 映射为 `editor`、Codex 映射为 `code`；Passwords、Keychain Access、1Password 8/7 与固定 P0 验证宿主标记为敏感，其余应用（包括固定 unknown 验证宿主）映射为未知 `other`。隐私模式由输入法 `NSUserDefaults` 中的 `RadishLexPrivacyMode` 布尔值控制，缺省关闭；开启后仍可使用既有本地排序摘要，但不会记录当前 selection 或更新 user term/ranker weight。设置或前台/secure 状态变化时，controller 会先刷新 Rust learning context 和候选 snapshot，再接受 display index 选择。
 

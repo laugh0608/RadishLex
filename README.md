@@ -39,7 +39,7 @@ RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支�
 - [Rime Adapter](docs/engine-rime-adapter.md)：librime adapter 与 native smoke。
 - [个人化学习](docs/personalization-learning.md)：userdb、ranker、反馈和词库管理。
 - [FFI Boundary](docs/ffi-boundary.md)：C ABI、所有权、线程和错误语义。
-- [Manager 同步产品状态](docs/manager-sync-product-status.md)：ABI v7 保留的 status-only 字段、blocker 和隐私 allowlist。
+- [Manager 同步产品状态](docs/manager-sync-product-status.md)：当前 ABI v8 保留的 status-only 字段、blocker 和隐私 allowlist。
 - [macOS InputMethodKit](docs/macos-inputmethodkit-boundary.md)：第一平台的 runtime、按键链、目录和验收边界。
 - [同步密钥管理](docs/sync-key-management.md)：设备、授权、恢复、撤销和 key epoch。
 - [Sync Server API/Storage](docs/sync-server-api-storage.md)：Go API、metadata、blob 和错误语义。

@@ -89,4 +89,4 @@ cmp -s AGENTS.md CLAUDE.md
 - [macOS 平台边界](../macos-inputmethodkit-boundary.md)：M1/M2 输入与隐私稳定结论。
 - [macOS 产品包边界](../macos-product-package-boundary.md)：M4 组件、版本、数据、签名与装配停止线。
 - [macOS 数据升级协调器](../macos-data-upgrade-coordinator.md)：M4-P02 状态机、receipt、SQLite 快照、双端验证与回滚边界。
-- [本周周志](../devlogs/2026-W30.md)：当前资格执行批次的验证和交接流水。
+- [本周周志](../devlogs/2026-W30.md)：本周 M3 退出、M4-P01 装配与 M4-P02 升级协调器的验证和交接流水。

@@ -295,7 +295,7 @@ RADISHLEX_RIME_SHARED_DATA=<path> RADISHLEX_RIME_USER_DATA=<path> cargo test -p 
 
 已有实现与历史 smoke 已证明真实 Rime adapter 能完成 composition、稳定 input code、候选、翻页、当前页选择、commit、错误映射和 ranker 接入，`ime-ffi` 也可在显式 `native-rime` feature 下创建真实 Rime session。详细完成记录留在 devlog，不在本文持续追加。
 
-当前 ABI contract v6 保留 v5 已闭合的产品个人化 Rime session、学习上下文、display/engine index、个人化状态、本地导入批次关联与全部既有布局；新增 Manager 产品状态摘要不改变 Rime adapter 或输入热路径语义。`crates/ime-ffi/include/radishlex_input.h` 已通过 C11 与 Objective-C 编译测试。
+当前 ABI contract v8 保留 v5 已闭合的产品个人化 Rime session、学习上下文、display/engine index、个人化状态、本地导入批次关联与全部既有布局；v6 的 Manager 产品状态摘要、v7 的隔离资格 run 和 v8 的产品升级门禁均不改变 Rime adapter 或输入热路径语义。`crates/ime-ffi/include/radishlex_input.h` 已通过 C11 与 Objective-C 编译测试。
 
 进程级 runtime 已闭合 setup / initialize / explicit shutdown / finalize、多 session 共享、零 session 间隙、配置冲突和 deploy / session / schema 失败回滚；schema 创建与切换同时验证已部署列表和选择后回读。stub API 测试可精确复验调用次数，`ime-ffi` 另有需要隔离 Rime 数据目录的 gated 单/双 session 与无效 schema smoke。
 

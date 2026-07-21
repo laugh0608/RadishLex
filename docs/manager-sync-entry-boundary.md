@@ -87,7 +87,7 @@ Rust orchestration、严格 HTTPS transport、生产 backend 主路径资格与�
 
 ## 已完成批次：Manager 本地 HTTPS 同步资格执行
 
-该批次不是连接真实用户数据的同步开关，而是由真实 Manager bridge 发起、Rust 完整执行的本地 HTTPS 合成资格流程。runner、跨进程单运行与重启清理、ABI v7、Dart bridge、Manager 交互、Release bundle 和真实短生命周期 Caddy 正向链均已落地；资格摘要仍不能作为 readiness/deployment evidence 或用户同步开放依据。
+该批次不是连接真实用户数据的同步开关，而是由真实 Manager bridge 发起、Rust 完整执行的本地 HTTPS 合成资格流程。runner、跨进程单运行与重启清理、ABI v7 引入的资格 contract、Dart bridge、Manager 交互、Release bundle 和真实短生命周期 Caddy 正向链均已落地；当前产品 ABI v8 兼容保留该 contract，资格摘要仍不能作为 readiness/deployment evidence 或用户同步开放依据。
 
 执行边界固定如下：
 

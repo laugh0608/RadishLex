@@ -182,7 +182,7 @@ Apple 官方边界参考：
 
 签名身份、notary credential、公开上传和正式分发不进入普通仓库验证，需要发布授权。
 
-## M4-P01 实现顺序
+## M4-P01 已执行顺序
 
 1. 固定 `packaging/macos/product.json` 与 source contract 门禁；
 2. 对齐 Manager、InputMethod、FFI、userdb 和最低 macOS 版本；
@@ -190,9 +190,9 @@ Apple 官方边界参考：
 4. 生成并复验 `ProductManifest.json`；
 5. 把 source contract 单元测试接入仓库门禁；
 6. 在可用的隔离 RimeData/native dependency 环境运行完整装配验证；
-7. 下一批再实现数据升级协调器和安装/回滚载体。
+7. M4-P01 退出后进入数据升级协调器；M4-P02 当前已推进到 `candidate_verified`，后续仍需完成原子切换、最终路径复验与崩溃恢复，发布安装与程序版本回滚载体属于再下一批 M4-P03。
 
-## 当前退出标准
+## M4-P01 退出标准
 
 M4-P01 只有同时满足以下条件才可退出：
 
