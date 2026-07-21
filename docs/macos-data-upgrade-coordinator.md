@@ -42,7 +42,7 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 协调层不进入输入热路径，不负责停止任意进程，不接受调用方自定义数据路径，也不读取用户表正文决定升级行为。
 
-首个实现使用独立 `ime-product-upgrade` Rust crate 保存平台无关的状态机、receipt schema 和恢复判断。macOS host 负责固定路径、进程与文件系统适配；这避免把产品升级状态塞入 `ime-userdb`、Flutter UI 或 InputMethodKit 薄壳。
+首个实现使用独立 `ime-product-upgrade` Rust crate 保存平台无关的状态机、receipt schema 和恢复判断。`platforms/macos-product/UpgradePreflightHost` 负责固定数据根、可用容量、双 bundle 运行状态与受控文件打开句柄的只读适配；这避免把平台调用塞入 `forbid(unsafe_code)` 的核心，也避免把产品升级状态塞入 `ime-userdb`、Flutter UI 或 InputMethodKit 薄壳。
 
 ### `ime-userdb`
 
@@ -187,7 +187,7 @@ snapshot 写入顺序固定为：`create_new` 私有临时文件、SQLite backup
 - 保持目录 `0700`、普通数据文件 `0600`，拒绝 hardlink、symlink 和未知对象；
 - 在进入 migration 前再次确认原固定路径身份未漂移。
 
-如果空间预算不足以同时保留原库、settings 副本、快照、迁移候选和切换恢复余量，preflight 失败，不边复制边删除旧文件腾空间。当前 crate 已固定 SQLite 工作预算、settings 私有副本和拒绝语义；macOS host 的真实 available-space adapter 与进程静止证明仍需后续接入，后续 adapter 必须在 settings copy 前把其 byte length 纳入总预算。
+如果空间预算不足以同时保留原库、settings 副本、快照、迁移候选和切换恢复余量，preflight 失败，不边复制边删除旧文件腾空间。当前 crate 已固定 SQLite 工作预算、settings 私有副本和拒绝语义；macOS preflight host 针对固定 data root 同时查询 `volumeAvailableCapacityForImportantUsage` 与普通 available capacity，取两者可用正值中的保守值。后续协调入口必须在 settings copy 前把 settings byte length 纳入总预算，再把原始 available bytes 交给 Rust 预算判断。
 
 ### 隔离 migration candidate
 
@@ -218,6 +218,10 @@ Manager 与 InputMethod 在产品启动前必须检查是否存在非终态升�
 当前 guard 使用 root-owned、sticky `01777` 的短临时根，固定命名为 `rlx-upgrade-<uid>-<data-root-device>-<data-root-inode>.sock`，socket 必须属于目标用户且保持 `0600`。名称只绑定固定数据根身份，不包含 home、真实路径或用户数据 hash；使用短路径也避免 macOS `sockaddr_un` 长度受深层 Application Support 路径影响。
 
 新调用先验证既有对象确为同用户私有 socket：连接成功视为活动 operation；仅在精确 socket 返回 `ConnectionRefused` 时按异常退出残留删除并重新绑定。symlink、普通文件、owner/mode/type 漂移或其他连接错误一律失败关闭且不删除现场。guard 释放时也只删除与取得时 device/inode 身份完全一致的 socket，不扫描或清理其他临时内容。
+
+macOS preflight host 不接受调用方路径或进程名。它从产品 manifest 固定 Manager/InputMethod bundle ID，通过 `NSRunningApplication` 判断双端是否仍运行，并以系统固定 `/usr/sbin/lsof` 检查已存在的 `userdb.sqlite3` family、`manager-settings.json` 与其原子写临时文件是否仍有打开句柄；输出只包含 format、result、available bytes、quiescent 和稳定 blocker，不回显路径、进程详情或 `lsof` 内容。unsafe root/file、容量不可得或检测工具异常都失败关闭。
+
+这份结果只是同一时刻的只读证据：它不停止进程，也不能阻止旧版本在检测后、snapshot 前重新启动。协调器只有在 Manager/InputMethod 启动入口检查非终态 receipt，并把 preflight、`quiesced` 持久化与 snapshot 纳入同一 upgrade guard 后，才可把该证据用于持续静止结论。当前 startup gate 尚未接线，因此 M4-P02 仍不得宣称静止闭环。
 
 ## 稳定错误分类
 
@@ -270,7 +274,7 @@ Manager 与 InputMethod 在产品启动前必须检查是否存在非终态升�
 3. 实现临时目录内的 receipt 原子持久化和跨进程 guard；
 4. 实现 settings 原样保留副本、SQLite 一致快照、空间预算、身份校验与故障注入文件系统端口；
 5. 从固定 snapshot 创建隔离 migration candidate，固化 standalone SQLite 与 receipt evidence；
-6. 接入固定 macOS available-space、进程静止证明和 Manager/InputMethod 两个候选 validation host；
+6. 接入固定 macOS available-space 与点时静止探针，再实现双端 startup gate 和 Manager/InputMethod 两个候选 validation host；
 7. 实现切换、启动门禁、重启恢复和回滚；
 8. 接入产品 manifest、自动门禁和隔离产品构建 smoke；
 9. M4-P03 选定安装载体后再编写真实安装升级 runbook。

@@ -57,6 +57,12 @@ REQUIRED_FILES = [
     "platforms/macos-imk/build-bundle.sh",
     "platforms/macos-imk/cleanup-m2-manager-test-data.sh",
     "platforms/macos-imk/cleanup-user-install.sh",
+    "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.h",
+    "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.m",
+    "platforms/macos-product/UpgradePreflightHost/Sources/main.m",
+    "platforms/macos-product/UpgradePreflightHost/Tests/contract_smoke.m",
+    "platforms/macos-product/UpgradePreflightHost/build.sh",
+    "platforms/macos-product/UpgradePreflightHost/check.sh",
     "scripts/check-android-target.py",
     "scripts/check-android-target.sh",
     "scripts/check-docs.py",
@@ -65,6 +71,7 @@ REQUIRED_FILES = [
     "scripts/check-manager-product.sh",
     "scripts/build-macos-product.sh",
     "scripts/check-macos-product-metadata.sh",
+    "scripts/check-macos-upgrade-preflight.sh",
     "scripts/check-manager.sh",
     "scripts/build-manager-macos-product.sh",
     "scripts/build-manager-macos-dpk-qualified-product.sh",
@@ -263,6 +270,12 @@ def check_macos_product_metadata() -> None:
     )
 
 
+def check_macos_upgrade_preflight() -> None:
+    if sys.platform != "darwin":
+        return
+    run_command([str(REPO_ROOT / "scripts/check-macos-upgrade-preflight.sh")])
+
+
 def required_status_contexts(ruleset: dict[str, Any]) -> set[str]:
     for rule in ruleset.get("rules", []):
         if rule.get("type") != "required_status_checks":
@@ -423,6 +436,7 @@ def main() -> int:
     check_license_wording()
     check_manager_product_runtime_contract()
     check_macos_product_metadata()
+    check_macos_upgrade_preflight()
     check_ruleset_and_workflows()
     check_path_budget()
     check_deployment_evidence()

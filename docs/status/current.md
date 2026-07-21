@@ -12,7 +12,7 @@
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；合成数据、短生命周期服务与受控集成测试可以继续
 
-M4-P02 已完成升级协调器边界、`ime-userdb` 只读 inspection/隔离 migration contract、SQLite backup API 一致快照，以及 `ime-product-upgrade` 单向状态机、receipt v1、固定数据根身份、原子持久化、跨进程 socket guard、保守空间预算、settings 保留副本、snapshot 与 migration candidate 编排和故障注入。当前实现会先把 receipt 已记录身份的 `manager-settings.json` 原样固化为私有备份，再允许进入 `snapshot_ready`；未 checkpoint WAL 和 schema 0 空库可复制为单文件 snapshot，只在固定 candidate 上迁移并收敛为无 sidecar 的 `DELETE` journal 单文件。所有 artifact 都先固化 identity 再推进状态，原 settings、原库和 snapshot 不被 migration 改写；未知对象、symlink/hardlink、身份漂移、损坏 snapshot、非法状态替换和中断现场会失败关闭。真实 macOS available-space/静止证明、双端产品 validation host、原子切换与完整崩溃恢复尚未闭合，因此 M4-P02 未退出。
+M4-P02 已完成升级协调器边界、`ime-userdb` 只读 inspection/隔离 migration contract、SQLite backup API 一致快照，以及 `ime-product-upgrade` 单向状态机、receipt v1、固定数据根身份、原子持久化、跨进程 socket guard、保守空间预算、settings 保留副本、snapshot 与 migration candidate 编排和故障注入。当前实现会先把 receipt 已记录身份的 `manager-settings.json` 原样固化为私有备份，再允许进入 `snapshot_ready`；未 checkpoint WAL 和 schema 0 空库可复制为单文件 snapshot，只在固定 candidate 上迁移并收敛为无 sidecar 的 `DELETE` journal 单文件。新增 macOS 只读 preflight host 已从产品 manifest 固定双 bundle ID，并针对固定 data root 返回保守 available bytes、进程与受控文件打开句柄 blocker，不接受调用方路径或停止进程。所有 artifact 都先固化 identity 再推进状态，原 settings、原库和 snapshot 不被 migration 改写；未知对象、symlink/hardlink、身份漂移、损坏 snapshot、非法状态替换和中断现场会失败关闭。双端 startup gate、持续静止、产品 validation host、原子切换与完整崩溃恢复尚未闭合，因此 M4-P02 未退出。
 
 M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
@@ -53,7 +53,7 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v7、userd
 
 ## 下一步顺位
 
-1. M4-P02 下一切面接入固定 macOS available-space 与静止证明，并实现 Manager/InputMethod 两个独立候选 validation host；随后进入原子切换与崩溃恢复。现有 `ValidationHost` 只证明 unknown/P0 上下文分类，不能冒充数据升级产品宿主；原库继续只读，当前没有 App Group 迁移需求，不得静默改变容器。
+1. M4-P02 下一切面把非终态 receipt 检查接入 Manager/InputMethod startup gate，并实现两个独立候选 validation host；随后进入原子切换与崩溃恢复。preflight host 的点时检测不能替代持续静止，现有 `ValidationHost` 也只证明 unknown/P0 上下文分类，不能冒充数据升级产品宿主；原库继续只读，当前没有 App Group 迁移需求，不得静默改变容器。
 2. M4-P03 选择并验证安装载体，闭合固定程序路径、Developer ID/Hardened Runtime、notarization、升级回滚和默认保留用户数据的移除语义；真实系统动作另行授权。
 3. 普通用户同步、恢复/授权/撤销/轮换继续关闭；在真实不支持 Secure Enclave 的环境可得时再补 unsupported，首版发布后且准备生产同步前再验收正式域名/证书。
 

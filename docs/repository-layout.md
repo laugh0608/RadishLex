@@ -56,6 +56,12 @@ RadishLex/
       cleanup-r01b-test-userdb.sh
       cleanup-m2-manager-test-data.sh
       privacy-mode.sh
+    macos-product/
+      UpgradePreflightHost/
+        Sources/
+        Tests/
+        build.sh
+        check.sh
     android-ime/
       keystore-bridge/
   packaging/
@@ -99,11 +105,11 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v7 隐私/索引/学习状态、Manager 产品状态与隔离资格 run、deleted tombstone 管理查询、精确 case inspection、隔离非选择 snapshot、R01B 与 manager/InputMethodKit 共库证据；M4-P02 已固定只读 userdb inspection、隔离 migration summary、SQLite backup snapshot、升级状态、receipt 原子存储、空间预算、数据根身份与跨进程 guard | migration candidate 编排、原子切换、双端 upgrade host 与发布复验 |
+| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v7 隐私/索引/学习状态、Manager 产品状态与隔离资格 run、deleted tombstone 管理查询、精确 case inspection、隔离非选择 snapshot、R01B 与 manager/InputMethodKit 共库证据；M4-P02 已固定只读 userdb inspection、settings 保留副本、SQLite snapshot、隔离 migration candidate、升级状态、receipt 原子存储、空间预算、数据根身份与跨进程 guard | 原子切换、双端 upgrade validation host 与发布复验 |
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
 | 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
 | Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁 | M4 数据升级、安装载体与发布分发 |
-| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、R01A build 32 与 R01B build 34 实机退出、生产 LearningContext、privacy/清理 contract 与隔离 ValidationHost；M4-P01 已装配 `0.1.0 (35)` 双 bundle 与 locked RimeData；Android Keystore 能力验证桥 | M4 数据升级、安装载体和普通用户安装包；其他系统输入法 |
+| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、R01A build 32 与 R01B build 34 实机退出、生产 LearningContext、privacy/清理 contract 与隔离 ValidationHost；M4-P01 已装配 `0.1.0 (35)` 双 bundle 与 locked RimeData；M4-P02 已新增只读 upgrade preflight host；Android Keystore 能力验证桥 | M4 双端数据验证、切换回滚、安装载体和普通用户安装包；其他系统输入法 |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
 
@@ -180,9 +186,10 @@ SQLite 用户数据层：
 - 私有状态目录内的原子 receipt 存储、严格加载与逐状态替换
 - 绑定固定数据根身份的跨进程 Unix socket guard
 - 固定 userdb 源/目标、保守空间预算、SQLite snapshot 编排与阶段故障注入
+- 固定 settings 保留副本与隔离 migration candidate 编排
 - 稳定失败分类和中断恢复判断
 
-该 crate 当前只对 receipt 与隔离 snapshot 执行原子 rename，不执行最终 SQLite 文件切换、进程停止或产品 host 调度；macOS M4-P02 的完整职责和实现顺序见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。
+该 crate 当前只对 receipt、settings 副本、隔离 snapshot 和 candidate 执行原子 rename，不执行最终 SQLite 文件切换、进程停止或产品 host 调度；macOS M4-P02 的完整职责和实现顺序见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。
 
 ### ime-crypto
 
@@ -305,6 +312,8 @@ apps/radishlex-manager/
 ## 平台目录
 
 当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build、不安装系统输入法的 wrapper contract、公开 TIS 只读状态/监视工具、生产 `LearningContext`、privacy CFPreferences receipt、精确进程 stop、R01B userdb 与 M2 manager 固定测试数据 receipt 清理入口，以及合成 reference probe 和 unknown/P0 `ValidationHost`。两个数据 profile 复用同一 hardened helper：R01B 只允许四个 SQLite 名称，M2 另允许 manager settings 与原子写临时文件；二者都不接受调用方路径。分类 contract 直接编译 controller 使用的生产源码，并以两个 host 的固定 Bundle ID 覆盖 unknown/P0；host 本体只构建不启动，也不读取或保存输入框内容。正式薄壳已在 Apple Development build 32 完成 R01A；R01B 以同一 Apple Development build 34 完成真实重排、重启、删除/恢复、隐私/unknown/P0/secure 系统路由与零残留退出。曾冻结的 build 33 只保留历史意义。
+
+`platforms/macos-product/UpgradePreflightHost/` 是 M4-P02 双 bundle 之外的只读升级平台端口。生产 executable 不接受路径或其他参数，只解析用户域固定 `Application Support/RadishLex`；Manager/InputMethod bundle ID 从 `packaging/macos/product.json` 编译进入二进制。host 验证私有数据根和受控普通文件，查询卷级可用容量，并以 `NSRunningApplication` 与固定 `lsof` 检查双端进程和 SQLite/settings 打开句柄；只输出固定 JSON 状态，不创建目录、不停止进程、不修改文件。contract 使用合成目录验证容量、打开/关闭句柄、symlink 拒绝和无参数边界，生产 host 不在仓库门禁中对真实数据根执行。
 
 R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-acceptance.md) 的授权 A/B：授权 A 才允许签名、安装、系统设置、人工交互和保留 userdb 的普通清理；授权 B 只在 receipt 归属、设置恢复和数据库关闭条件满足后删除本轮四个固定 SQLite 文件并把预存空父目录恢复为 `0755`，不得删除父目录。该 runbook 现在作为关闭证据与回归边界保留。副屏和 VoiceOver 仍按平台边界文档的已知限制处理，自动 contract 不能替代对应实机证据。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
 
