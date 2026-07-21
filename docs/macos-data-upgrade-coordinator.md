@@ -134,11 +134,17 @@ receipt 使用 UTF-8 JSON、固定字段顺序和末尾换行，当前格式为 
     source-snapshot.sqlite3.tmp # backup 或 rename 中断时保留
     migration-candidate.sqlite3 # candidate evidence 已固化后存在
     migration-candidate.sqlite3.tmp # copy、migration 或 rename 中断时保留
+    source-settings.json        # settings backup evidence 已固化后存在
+    source-settings.json.tmp    # copy 或 rename 中断时保留
 ```
 
 状态目录只接受上述固定文件名。读取前重新验证 data root 与状态目录的 canonical path、device、inode、owner 和 mode；receipt 还必须是 `link count = 1`、不超过 64 KiB 的普通文件，并在打开前、打开后和读取后保持同一身份。写入使用 `create_new` 创建临时文件，完成文件 `fsync` 后再次验证 root、guard 与旧 receipt 身份，再原子替换并 `fsync` 状态目录；写回结果必须与预期 canonical bytes 完全一致。
 
 每次持久化最多推进一个合法状态，artifact 证据只能追加，operation、版本、layout 与既有证据不能被改写。相同 bytes 可以幂等重放；新 operation 不得覆盖仍存在的 operation。发现 `receipt.json.tmp` 时当前实现返回中断写入错误并保留现场，不自动猜测应提交还是丢弃；该残留的恢复决策与故障注入仍由后续崩溃恢复切面闭合。
+
+如果 preflight 记录了 `SourceSettings`，协调层必须在仍为 `quiesced` 时从固定 `manager-settings.json` 创建 `source-settings.json.tmp`。复制使用已打开并复验身份的源文件与 `create_new` 私有目标，不解析、不规范化也不改写 JSON；文件 `fsync`、源身份复验、原子 rename 和目录 `fsync` 后，先把 `BackupSettings` identity 追加到 receipt。settings 不存在时两个槽位都不存在；出现 source/backup 单边证据时不得进入 `snapshot_ready`。
+
+settings 故障注入覆盖 staged 创建、copy、rename 和 receipt evidence。staged 文件或无 identity 的最终备份会使加载失败关闭；identity 已持久化而状态仍为 `quiesced` 时可以读取证据，但不自动跨状态。原 settings 文件保持原字节与身份，路径替换、symlink/hardlink、owner/mode/link 或 byte length 漂移均拒绝。
 
 receipt 只允许保存：
 
@@ -181,7 +187,7 @@ snapshot 写入顺序固定为：`create_new` 私有临时文件、SQLite backup
 - 保持目录 `0700`、普通数据文件 `0600`，拒绝 hardlink、symlink 和未知对象；
 - 在进入 migration 前再次确认原固定路径身份未漂移。
 
-如果空间预算不足以同时保留原库、快照、迁移候选和切换恢复余量，preflight 失败，不边复制边删除旧文件腾空间。当前 crate 已固定预算计算与拒绝语义；macOS host 的真实 available-space adapter、进程静止证明和 settings 保留副本仍需后续接入。
+如果空间预算不足以同时保留原库、settings 副本、快照、迁移候选和切换恢复余量，preflight 失败，不边复制边删除旧文件腾空间。当前 crate 已固定 SQLite 工作预算、settings 私有副本和拒绝语义；macOS host 的真实 available-space adapter 与进程静止证明仍需后续接入，后续 adapter 必须在 settings copy 前把其 byte length 纳入总预算。
 
 ### 隔离 migration candidate
 
@@ -262,9 +268,9 @@ Manager 与 InputMethod 在产品启动前必须检查是否存在非终态升�
 1. 固定本文、状态机、receipt schema、错误枚举和负向解析测试；
 2. 在 `ime-userdb` 增加只读 inspection 与显式 migration/validation summary；
 3. 实现临时目录内的 receipt 原子持久化和跨进程 guard；
-4. 实现 SQLite 一致快照、空间预算、身份校验与故障注入文件系统端口；
+4. 实现 settings 原样保留副本、SQLite 一致快照、空间预算、身份校验与故障注入文件系统端口；
 5. 从固定 snapshot 创建隔离 migration candidate，固化 standalone SQLite 与 receipt evidence；
-6. 实现 Manager/InputMethod 两个候选 validation host；
+6. 接入固定 macOS available-space、进程静止证明和 Manager/InputMethod 两个候选 validation host；
 7. 实现切换、启动门禁、重启恢复和回滚；
 8. 接入产品 manifest、自动门禁和隔离产品构建 smoke；
 9. M4-P03 选定安装载体后再编写真实安装升级 runbook。

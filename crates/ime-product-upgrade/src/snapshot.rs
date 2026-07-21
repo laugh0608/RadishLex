@@ -145,6 +145,7 @@ impl UpgradeReceiptStore {
                 .artifacts()
                 .iter()
                 .any(|artifact| artifact.slot() == UpgradeArtifactSlot::SnapshotDatabase)
+            || !settings::settings_backup_is_ready(receipt)
         {
             return Err(error(UpgradeFilesystemErrorCode::InvalidSnapshotState));
         }
@@ -277,7 +278,7 @@ impl UpgradeReceiptStore {
         self.state_directory.join(SNAPSHOT_FILE_NAME)
     }
 
-    fn staged_snapshot_path(&self) -> PathBuf {
+    pub(super) fn staged_snapshot_path(&self) -> PathBuf {
         self.state_directory.join(STAGED_SNAPSHOT_FILE_NAME)
     }
 }

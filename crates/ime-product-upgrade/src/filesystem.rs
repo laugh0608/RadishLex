@@ -17,6 +17,8 @@ const SNAPSHOT_FILE_NAME: &str = "source-snapshot.sqlite3";
 const STAGED_SNAPSHOT_FILE_NAME: &str = "source-snapshot.sqlite3.tmp";
 const CANDIDATE_FILE_NAME: &str = "migration-candidate.sqlite3";
 const STAGED_CANDIDATE_FILE_NAME: &str = "migration-candidate.sqlite3.tmp";
+const SETTINGS_BACKUP_FILE_NAME: &str = "source-settings.json";
+const STAGED_SETTINGS_BACKUP_FILE_NAME: &str = "source-settings.json.tmp";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UpgradeFilesystemErrorCode {
@@ -28,12 +30,15 @@ pub enum UpgradeFilesystemErrorCode {
     InterruptedReceiptWrite,
     InterruptedSnapshot,
     InterruptedCandidate,
+    InterruptedSettingsBackup,
     OperationAlreadyActive,
     InvalidSnapshotState,
     InvalidCandidateState,
+    InvalidSettingsState,
     InsufficientSpace,
     SnapshotFailed,
     CandidateMigrationFailed,
+    SettingsBackupFailed,
     IdentityChanged,
     Io,
 }
@@ -72,12 +77,18 @@ impl fmt::Display for UpgradeFilesystemError {
             UpgradeFilesystemErrorCode::InterruptedCandidate => {
                 "upgrade migration candidate requires recovery"
             }
+            UpgradeFilesystemErrorCode::InterruptedSettingsBackup => {
+                "upgrade settings backup requires recovery"
+            }
             UpgradeFilesystemErrorCode::OperationAlreadyActive => {
                 "another upgrade operation is active"
             }
             UpgradeFilesystemErrorCode::InvalidSnapshotState => "upgrade snapshot state is invalid",
             UpgradeFilesystemErrorCode::InvalidCandidateState => {
                 "upgrade migration candidate state is invalid"
+            }
+            UpgradeFilesystemErrorCode::InvalidSettingsState => {
+                "upgrade settings backup state is invalid"
             }
             UpgradeFilesystemErrorCode::InsufficientSpace => {
                 "upgrade snapshot has insufficient free space"
@@ -86,6 +97,7 @@ impl fmt::Display for UpgradeFilesystemError {
             UpgradeFilesystemErrorCode::CandidateMigrationFailed => {
                 "upgrade migration candidate failed"
             }
+            UpgradeFilesystemErrorCode::SettingsBackupFailed => "upgrade settings backup failed",
             UpgradeFilesystemErrorCode::IdentityChanged => "upgrade filesystem identity changed",
             UpgradeFilesystemErrorCode::Io => "upgrade filesystem operation failed",
         };
@@ -289,6 +301,7 @@ impl UpgradeReceiptStore {
         let receipt = self.load_current_internal()?.map(|(receipt, _, _)| receipt);
         snapshot::validate_snapshot_state(self, receipt.as_ref())?;
         candidate::validate_candidate_state(self, receipt.as_ref())?;
+        settings::validate_settings_backup_state(self, receipt.as_ref())?;
         Ok(receipt)
     }
 
@@ -399,6 +412,8 @@ impl UpgradeReceiptStore {
                 && name != STAGED_SNAPSHOT_FILE_NAME
                 && name != CANDIDATE_FILE_NAME
                 && name != STAGED_CANDIDATE_FILE_NAME
+                && name != SETTINGS_BACKUP_FILE_NAME
+                && name != STAGED_SETTINGS_BACKUP_FILE_NAME
             {
                 return Err(error(UpgradeFilesystemErrorCode::UnexpectedStateObject));
             }
@@ -726,3 +741,7 @@ pub use snapshot::{UpgradeSnapshotSpaceBudget, UpgradeSnapshotSummary};
 #[path = "candidate.rs"]
 mod candidate;
 pub use candidate::UpgradeCandidateSummary;
+
+#[path = "settings.rs"]
+mod settings;
+pub use settings::UpgradeSettingsBackupSummary;
