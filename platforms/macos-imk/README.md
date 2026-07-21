@@ -9,9 +9,11 @@
 - `Sources/RadishLexLearningContext.*`：按固定 Bundle ID 生成 sensitive/context-known/context-kind，不接触正文或 userdb。
 - `Sources/RadishLexCandidatePanel.*`：进程级非激活 AppKit 候选面板，负责 owner 生命周期、焦点隔离、全局定位、多屏限制、鼠标/辅助功能 index 回调和原生视觉；不承载 engine 或候选排序。
 - `Sources/RadishLexRuntime.*`：创建独立 Rime session；进程退出时先释放全部 session，再调用 `radishlex_rime_runtime_shutdown`。
+- `Sources/main.m`：在创建 `IMKServer`、`NSApplication` 和 Rime runtime 前执行只读产品升级 startup gate；失败时不进入输入法事件循环。
 - `../../packaging/rime/`：产品自有 `default.yaml`、`radishlex_pinyin` schema、固定 Apache 词典、来源锁与逐资产许可证；不读取或继承用户 Rime 配置。
+- `../macos-product/UpgradeValidationHosts/`：构建进 bundle 的无参数候选验证 helper，复用本 bundle 的 native Rime/RimeData 和固定 migration candidate。
 - `build-bundle.sh`：构建 contract 或显式 native-rime 开发 bundle，不安装 bundle。
-- `Tests/contract_smoke.m`：使用合成 demo engine 复验 ABI v5、完整按键映射、display/engine index、个人化/学习状态、Unicode cursor、候选选择结果和生命周期，不读取 Rime 目录。
+- `Tests/contract_smoke.m`：使用合成 demo engine 复验当前 ABI v8、完整按键映射、display/engine index、个人化/学习状态、Unicode cursor、候选选择结果和生命周期，不读取 Rime 目录。
 - `Tests/candidate_panel_contract.m`：创建真实 AppKit panel/control，复验视觉与 accessibility selection、appearance、anchor fallback、owner 接管和完整隐藏。
 - `Tests/input_controller_contract.m`：使用正式 controller、panel 和 Rust demo session，贯通方向 keyDown/keyUp、Space、鼠标、accessibility press、Enter、Escape、宿主快捷键和双 client 生命周期。
 - `Tests/cleanup_user_install_contract.sh`：在隔离仓库、`HOME` 和工作目录中，以参数级命令 stub、双槽假 TIS 与假进程状态动态复验路径状态、清理前后 TIS 迁移和数据保留边界，不查询真实 TIS、不终止真实进程。
@@ -21,6 +23,16 @@
 - `cleanup-user-install.sh`：在系统设置已人工移除且取得授权后，清理正式开发 bundle、`Rime` 运行目录和精确进程，并要求 TIS 零残留；默认保留 `userdb.sqlite3`。
 - `privacy-mode.sh`、`cleanup-r01b-test-userdb.sh` 与 `cleanup-m2-manager-test-data.sh`：前者精确保存/恢复产品布尔键；后两者按独立 receipt 删除各验收批次的固定白名单数据，不提供通用数据删除。
 - `ReferenceProbe/`：隔离验证原生候选事件路由与单 mode 输入源 metadata，不链接 Rime 或正式 FFI，也不替代产品薄壳。
+
+## 产品启动与升级验证
+
+输入法 executable 在任何 `IMKServer`、`NSApplication`、Rime runtime、userdb 或业务对象创建之前调用 ABI v8 `radishlex_product_upgrade_startup_gate`。平台层只从用户域解析固定 `Application Support/RadishLex` 和 effective uid。
+
+data root 不存在、升级状态目录/receipt 不存在或 receipt 已终态时允许继续。active guard、非终态或损坏 receipt、中断 artifact、未知对象、unsafe root/state、identity drift、FFI 失败和未知 result 均返回非零，不能进入事件循环。门禁不创建目录、不 chmod、不删除 receipt/sidecar，也不打开 userdb；首次启动所需目录只能在门禁允许后由正常 runtime 创建。
+
+bundle 内 `Contents/Helpers/RadishLexUpgradeValidationHost` 只供升级协调器执行。它拒绝参数，固定读取 `.radishlex-upgrade-v1/migration-candidate.sqlite3`，从自身 `Resources/RimeData` 和 schema 创建短生命周期隔离 Rime user data，以 privacy mode personalized runtime 读取固定合成候选信号；不选择、不提交、不学习。helper 必须删除临时 Rime data，并证明 candidate 全字节不变且没有 WAL/SHM/journal，才能返回成功。
+
+startup gate 是产品普通启动边界，validation helper 是协调器的候选验证边界，两者不能互相替代。完整平台宿主说明见 [macOS 产品升级宿主](../macos-product/README.md)，跨语言调用规则见 [FFI 平台调用契约](../../docs/runbooks/ffi-platform-call-contract.md)。
 
 ## 候选窗定位与选择
 
@@ -79,7 +91,7 @@ M2 入口同样不接受调用方路径或额外参数：
 ./scripts/check-macos-imk.sh
 ```
 
-该入口会构建 `target/macos-imk/contract/RadishLexInputMethod.app` 和 unknown/P0 双验证 host，执行 Objective-C wrapper、真实 AppKit candidate panel、controller-to-commit、分类、privacy 与安全清理 contract，并检查 bundle、动态库加载路径、完整 ad-hoc 开发签名和关键 FFI symbol。它不启动 host；contract-only initializer/inspection API 不进入 native 产品。contract bundle 只用于编译与契约复验，不能安装或作为真实输入证据。
+该入口会构建 `target/macos-imk/contract/RadishLexInputMethod.app`、unknown/P0 双验证 host 和 bundle 内 upgrade validation helper，执行 Objective-C wrapper、真实 AppKit candidate panel、controller-to-commit、分类、privacy 与安全清理 contract，并检查 bundle、动态库加载路径、startup/validation symbol、完整 ad-hoc 开发签名和关键 FFI symbol。它不启动产品 executable 或 upgrade validation helper；contract-only initializer/inspection API 不进入 native 产品。contract bundle 只用于编译与契约复验，不能安装或作为真实输入证据。
 
 候选事件与单 mode metadata 的隔离 probe 使用独立入口：
 

@@ -42,14 +42,16 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 协调层不进入输入热路径，不负责停止任意进程，不接受调用方自定义数据路径，也不读取用户表正文决定升级行为。
 
-首个实现使用独立 `ime-product-upgrade` Rust crate 保存平台无关的状态机、receipt schema 和恢复判断。`platforms/macos-product/UpgradePreflightHost` 负责固定数据根、可用容量、双 bundle 运行状态与受控文件打开句柄的只读适配；这避免把平台调用塞入 `forbid(unsafe_code)` 的核心，也避免把产品升级状态塞入 `ime-userdb`、Flutter UI 或 InputMethodKit 薄壳。
+首个实现使用独立 `ime-product-upgrade` Rust crate 保存平台无关的状态机、receipt schema 和恢复判断。`platforms/macos-product/UpgradePreflightHost` 负责固定数据根、可用容量、双 bundle 运行状态与受控文件打开句柄的只读适配；这避免把平台调用塞入 `forbid(unsafe_code)` 的核心，也避免把产品升级状态塞入 `ime-userdb`、Flutter UI 或 InputMethodKit 薄壳。crate API 与副作用见 [ime-product-upgrade 组件说明](../crates/ime-product-upgrade/README.md)，macOS executable 的固定输入、输出和门禁见 [产品升级宿主说明](../platforms/macos-product/README.md)。
 
 ### `ime-userdb`
 
-`ime-userdb` 继续是 SQLite schema、事务 migration 与数据库结构校验的唯一真相源，并提供两个语义分离的产品能力：
+`ime-userdb` 继续是 SQLite schema、事务 migration 与数据库结构校验的唯一真相源，并提供四类语义分离的产品能力：
 
 1. `inspect_file`：以只读方式读取 schema 并执行完整性检查，不创建数据库、不配置 WAL、不收紧权限、不执行 migration；
-2. `migrate_and_validate`：对调用方已经证明为隔离候选的文件执行现有事务 migration，随后验证目标 schema 与完整性，并把候选收敛为不带 WAL/SHM/journal 的单文件 `DELETE` journal 状态。
+2. `estimate_snapshot` / `create_consistent_snapshot`：在只读事务中估算 logical bytes，并通过 SQLite backup API 把 WAL 可见内容复制到调用方已创建的独立空文件，不迁移源或目标；
+3. `migrate_and_validate`：对调用方已经证明为隔离候选的文件执行现有事务 migration，随后验证目标 schema 与完整性，并把候选收敛为不带 WAL/SHM/journal 的单文件 `DELETE` journal 状态；
+4. `open_read_only_current`：只接受当前 schema，以 read-only/query-only connection 支持 Manager 查询、personalized runtime 候选信号和协调核心最终复验，不创建文件、不配置 WAL、不 migration 或 chmod。
 
 `ime-userdb` 不负责证明候选是否真的隔离，不停止进程，不生成产品 receipt，也不切换 Application Support 文件。
 

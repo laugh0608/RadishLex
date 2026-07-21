@@ -68,6 +68,8 @@ Apple 产品验证使用独立原生自检结构：普通 DPK 的 `radishlex_app
 
 `radishlex_manager_upgrade_validate_candidate` 与 `radishlex_input_method_upgrade_validate_candidate` 使用 validation request/evidence/summary v1。两者只接受原生 host 解析的固定 migration candidate：Manager 复用真实管理查询和 settings v1 兼容检查，InputMethod 复用 native Rime、personalized runtime 与只读候选信号；两端都不得学习、同步、写 settings、修改 candidate 或留下 WAL/SHM/journal。validation evidence 由协调器在 guard、receipt、candidate identity 与 sidecar 仍一致时消费，成功才能推进 `candidate_verified`，明确失败进入 `aborted_preserved`。这些入口不属于普通 Dart UI 或输入热路径，也不接受调用方自定义路径。
 
+结构布局、具名常量、字符串生命周期和 host 到协调器的证据转换见 [产品升级 FFI 参考](ffi-product-upgrade-reference.md)。
+
 ### Manager sync product status
 
 `radishlex_manager_sync_product_status` 是当前 ABI v8 保留的 status-only 入口，只返回固定 enum/boolean 产品摘要，不创建、读取、使用或删除平台 key item。signing 与 key-agreement 资格必须独立表达，组合 `product_qualified` 不能自动打开 `user_sync_enabled`。完整结构、常量、blocker 优先级、隐私 allowlist 和 Dart binding 检查见 [Manager 同步产品状态参考](manager-sync-product-status.md)。

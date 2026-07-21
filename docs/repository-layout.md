@@ -21,6 +21,7 @@ RadishLex/
     ime-ranker/
     ime-userdb/
     ime-product-upgrade/
+      README.md
     ime-sync/
       README.md
     ime-sync-runtime/
@@ -57,6 +58,7 @@ RadishLex/
       cleanup-m2-manager-test-data.sh
       privacy-mode.sh
     macos-product/
+      README.md
       UpgradePreflightHost/
       UpgradeValidationHosts/
         Sources/
@@ -189,7 +191,7 @@ SQLite 用户数据层：
 - 双端 validation evidence v1 与 `candidate_verified` / `aborted_preserved` 持久化
 - 稳定失败分类和中断恢复判断
 
-该 crate 当前只对 receipt、settings 副本、隔离 snapshot 和 candidate 执行原子 rename，不执行最终 SQLite 文件切换、进程停止或产品 host 调度；macOS M4-P02 的完整职责和实现顺序见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。
+该 crate 当前只对 receipt、settings 副本、隔离 snapshot 和 candidate 执行原子 rename，不执行最终 SQLite 文件切换、进程停止或产品 host 调度；API、副作用与验证入口见 [ime-product-upgrade 组件说明](../crates/ime-product-upgrade/README.md)，macOS 完整状态机见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。
 
 ### ime-crypto
 

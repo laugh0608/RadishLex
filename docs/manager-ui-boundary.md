@@ -129,6 +129,10 @@ M2 本地管理能力应优先覆盖：
 
 管理端应通过 `ime-ffi` 或后续受控 bridge 调用 Rust 能力，不直接读写 Rust 内部结构。
 
+macOS 正常产品启动在 native `applicationWillFinishLaunching` 最前调用 ABI v8 startup gate，早于 Flutter delegate、settings、userdb 和所有 Manager 业务初始化。只有 data root/state absent 或终态 receipt 可以继续；active guard、非终态/损坏 receipt、中断 artifact、未知对象、身份漂移、FFI 失败和未知 result 都失败关闭，不能由 Flutter 错误页、demo mode 或创建空目录绕过。
+
+bundle 内无参数 `Contents/Helpers/RadishLexUpgradeValidationHost` 只供升级协调器读取固定 candidate/settings backup 并执行真实管理查询与 settings format v1 兼容检查。该 helper 不进入 `ManagerBridge` 或 Dart binding，不启动 Flutter，不接受任意路径，也不能直接写 receipt；协调核心必须在 guard 下复验证据后才能推进状态。
+
 当前 Flutter 工程已抽出 `ManagerBridge`，UI 依赖 snapshot 加载、词条删除、explicit restore、词库导入检查/导入/导出、设置草案保存、诊断报告预览/导出，以及隔离的本地合成同步资格 run。现有 `FixtureManagerBridge` 只在显式 demo 与测试中使用合成数据验证调用边界和 UI 状态，不能执行资格网络链；真实 Dart FFI bridge 已覆盖本地 userdb、学习、rank explain、sync preflight、status-only 产品 backend 摘要、非 secret settings、脱敏诊断和资格 start/poll/cancel/free。产品 bootstrap 还通过受控平台 bridge 解析固定路径、收紧文件权限并读写输入 runtime 的隐私偏好。Dart 绑定层通过当前 ABI v8 复制 native view/snapshot 后释放 handle，只把固定数值产品摘要映射为 `DeviceSecuritySummary`；资格 token/CA 在一次调用后覆写，不进入 snapshot/settings/diagnostics。manager Release dylib 中的 Apple validation ABI 仍只由原生产品自检路径使用，Dart 不直接绑定。
 
 settings JSON schema、部署证据来源 allowlist、诊断报告字段索引和脱敏规则见 `docs/manager-settings-diagnostics.md`。

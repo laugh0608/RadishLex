@@ -9,6 +9,7 @@ M4 macOS 产品包必须把以下已有能力组织成同一版本、可验证�
 - `RadishLexInputMethod.app`：InputMethodKit 输入法薄壳；
 - `radishlex_manager.app`：本地数据、隐私和诊断管理界面；
 - `libradishlex_ime_ffi.dylib`：两端调用的 Rust ABI；
+- 两端各自的 `Contents/Helpers/RadishLexUpgradeValidationHost`：使用本 bundle native library 验证固定 migration candidate；
 - `librime` 及其非系统传递依赖；
 - 合法来源的 Rime schema/data、RadishLex 许可证和第三方许可证；
 - 产品 manifest、安装升级 runbook 和发布验证证据。
@@ -24,10 +25,13 @@ InputMethod 与 Manager 是同一产品版本下的两个独立 bundle，不互�
 - InputMethod 由系统输入法生命周期启动，不能依赖 Manager 正在运行；
 - Manager 可以检查 InputMethod 安装和兼容性，但不是输入热路径守护进程；
 - 两端各自携带匹配的 Rust native library，不能从另一个可移动 bundle 加载 dylib；
+- 两端各自携带同名但职责不同的 upgrade validation helper，不能互换或由单一通用 helper 代替；
 - InputMethod 额外携带 `librime`、RimeData 与对应许可证；
 - Manager 只携带其真实调用所需的 native dependency，不为目录对称复制 `librime`。
 
 M4-P01 的稳定装配产物是版本化产品目录及其 manifest。面向用户的 `.pkg`、`.dmg` 或安装器应用属于后续安装批次；在安装位置、权限和回滚语义完成实证前，不能把装配目录称为普通用户安装包。
+
+只读 `RadishLexUpgradePreflightHost` 是后续升级载体调用的平台协调宿主，不属于任一业务 bundle，也不自动进入双 bundle 装配目录。发布载体必须明确安置和调用它，不能临时改成脚本、UI 进程检查或调用方自报容量。平台宿主的固定输入与只读边界见 [macOS 产品升级宿主说明](../platforms/macos-product/README.md)。
 
 ### 产品 manifest
 
@@ -93,12 +97,13 @@ build number 只描述产品构建，不替代 schema 或 ABI。任何 ABI、数
 Manager 与 InputMethod 都必须对下列情况失败关闭并返回稳定错误：
 
 - FFI ABI 不匹配或必需 symbol 缺失；
+- startup gate 返回阻止/失败结果，或 active guard、非终态/损坏 receipt、中断 artifact、未知对象与身份漂移无法排除；
 - userdb schema 高于当前支持版本；
 - 数据路径不是预期目录/普通文件，或权限无法收紧；
 - RimeData、native dependency 或 manifest 缺失/损坏；
 - 输入法 bundle 与 Manager 产品版本不兼容。
 
-不能通过加载旧 dylib、创建空数据库、改用 fixture 或忽略 manifest 来掩盖错误。
+不能通过加载旧 dylib、创建空数据库、删除升级状态、改用 fixture 或忽略 manifest 来掩盖错误。Manager 的门禁必须早于 Flutter/settings/userdb，InputMethod 的门禁必须早于 `IMKServer`/Rime runtime；只有 data root/state absent 或终态 receipt 可以继续正常启动。
 
 ## 数据布局与所有权
 

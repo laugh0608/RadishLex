@@ -1,0 +1,69 @@
+# macOS 产品升级宿主说明
+
+本文说明 `platforms/macos-product/` 内的平台宿主、固定输入、输出与验证边界，面向维护 M4 数据升级协调器、Manager/InputMethod 产品构建和仓库门禁的开发者。本文不包含真实用户目录演练、安装器操作、进程停止授权、Developer ID 或公证步骤；完整状态机见 [macOS 数据升级协调器边界](../../docs/macos-data-upgrade-coordinator.md)。
+
+## 目录职责
+
+```text
+platforms/macos-product/
+  UpgradePreflightHost/
+    Sources/                 fixed-path read-only preflight
+    Tests/                   synthetic contract host
+    build.sh
+    check.sh
+  UpgradeValidationHosts/
+    Sources/
+      RLXUpgradeValidationSupport.*
+      manager_main.m
+      input_method_main.m
+```
+
+平台宿主只吸收 macOS 路径解析、Foundation/AppKit 进程与容量 API、bundle 资源定位和 native executable 生命周期。receipt、文件身份、状态转换和候选证据属于 `ime-product-upgrade`；SQLite schema/migration 属于 `ime-userdb`；宿主不得成为新的业务真相源。
+
+## UpgradePreflightHost
+
+生产 executable 不接受参数，只从用户域 `Application Support/RadishLex` 解析固定 data root，并使用从 `packaging/macos/product.json` 编译注入的 Manager/InputMethod bundle ID。它执行：
+
+- 同时读取 important-usage 与普通 volume available capacity，取可用正值中的保守值；
+- 检查 data root 为当前用户所有的 canonical `0700` 目录；
+- 检查现存 userdb family/settings 为当前用户所有、`0600`、单 link 普通文件；
+- 通过 `NSRunningApplication` 检查固定双 bundle ID；
+- 通过固定 `/usr/sbin/lsof` 只读检查受控 SQLite/settings 文件是否仍被打开。
+
+输出为 `radishlex-upgrade-preflight-v1` JSON，只包含 result、available bytes、quiescent、固定 blocker/error 和必要数值错误码，不输出路径、PID、命令行或 `lsof` 正文。host 不创建目录、不 chmod、不清理文件、不停止进程，也不能阻止旧产品在点时检查后重新启动；持续静止必须由 startup gate 与 upgrade guard 共同保证。
+
+`./scripts/check-macos-upgrade-preflight.sh` 构建生产 host，但只执行拒绝参数路径；真实检查逻辑由合成 contract executable 在私有临时目录验证。普通门禁不得无参数运行生产 host，因为那会读取真实 Application Support 的只读状态。
+
+## UpgradeValidationHosts
+
+Manager 与 InputMethod bundle 各自把名为 `Contents/Helpers/RadishLexUpgradeValidationHost` 的无参数 executable 嵌入产品。两端名称相同但实现和 native dependency 不同，不能互换或由一个通用 host 代替。
+
+Manager host 固定读取：
+
+- `.radishlex-upgrade-v1/migration-candidate.sqlite3`；
+- `.radishlex-upgrade-v1/source-settings.json`（允许不存在）；
+- 本 bundle 的 `libradishlex_ime_ffi.dylib`。
+
+它通过 ABI v8 执行 current-schema 只读连接、active/deleted/import/learning 管理查询和 settings format v1 类型兼容检查。
+
+InputMethod host 固定读取同一 candidate，并从自身 bundle 解析 `Resources/RimeData`、schema 和 native library。它创建短生命周期 `0700` 临时 Rime user data，以 privacy mode 创建 personalized runtime、输入固定合成码并读取候选信号；不选择、不提交、不学习。临时 Rime data 必须在退出前删除。
+
+两端都在调用前后比较 candidate 全字节，并在调用前后拒绝 `-wal`、`-shm`、`-journal`。任何参数、candidate 缺失/损坏、summary version/check bit 不匹配、候选字节变化、sidecar 或临时目录清理失败都返回非零。
+
+validation host 不是普通用户工具，也不是协调器本身。它只产生当前进程的受控 validation summary；只有持有 upgrade guard 的协调核心可以把两端结果转换为 validation evidence 并持久化 `candidate_verified` 或 `aborted_preserved`。
+
+## 构建与验证
+
+Manager helper 由 Xcode native library 嵌入阶段构建并签名：
+
+```bash
+./scripts/check-manager-product.sh
+```
+
+InputMethod helper 由 bundle 构建入口装配并签名：
+
+```bash
+./scripts/check-macos-imk.sh
+```
+
+带真实 native Rime 的候选信号验证仍需使用隔离的 locked RimeData 和产品门禁；不得把 `RADISHLEX_RIME_SHARED_DATA` 指向用户 Rime 或 RadishLex Application Support。上述普通检查不安装、不启动真实 Manager/InputMethod，也不调度 validation host 访问真实 candidate。

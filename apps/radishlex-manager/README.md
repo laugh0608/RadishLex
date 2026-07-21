@@ -47,6 +47,16 @@ RadishLex Manager 是萝卜词核的 Flutter 本地管理端。macOS 正常构�
 - `lib/src/bridge/ffi_manager_native_models.dart` 作为 native DTO barrel 入口；contract、dictionary、learning、sync 和 rank DTO 已按能力拆分。
 - `test/screens/` 按页面拆分 dictionary、learning、settings、sync 和 settings diagnostics widget 覆盖；`manager_home_actions_test.dart` 固定跨页 action helper 的结构化结果文案和 failure 分类；`test/widget_test.dart` 只保留 app shell 级加载失败覆盖。
 
+## 产品启动与升级门禁
+
+macOS 正常 product mode 在 `applicationWillFinishLaunching` 最前执行 ABI v8 `radishlex_product_upgrade_startup_gate`。平台层只从用户域解析固定 `Application Support/RadishLex` 和当前 effective uid；检查发生在 Flutter delegate、settings、userdb 和所有 Manager 业务初始化之前。
+
+data root 不存在、升级状态目录/receipt 不存在或 receipt 已处于终态时允许继续。active guard、非终态或损坏 receipt、中断 artifact、未知对象、unsafe root/state、identity drift、FFI 失败或未知 result 都直接退出，不能通过创建目录、修改权限、删除 receipt/sidecar 或切换到 demo fixture 绕过。失败日志只包含稳定 decision/error/state 数值，不输出路径或数据内容。
+
+Apple P-256 与 Secure Enclave key-agreement 的显式 gated product smoke 是独立的早退出自检模式，不进入普通 Manager bootstrap；它们不能作为绕过 startup gate 启动产品 UI 的入口。
+
+Manager bundle 另携带无参数 `Contents/Helpers/RadishLexUpgradeValidationHost`。该 helper 只供升级协调器读取固定 `.radishlex-upgrade-v1/migration-candidate.sqlite3` 和可选 `source-settings.json`，复用 bundle 内 native library 执行 current-schema 管理查询和 settings format v1 兼容检查。它不接受调用方路径，不启动 Flutter，不写 candidate/settings，也不产生 WAL/SHM/journal；candidate 字节变化或 sidecar 残留均失败。
+
 ## FFI bridge
 
 macOS 正常 product 构建使用仓库稳定入口：
@@ -55,7 +65,7 @@ macOS 正常 product 构建使用仓库稳定入口：
 ../../scripts/build-manager-macos-product.sh
 ```
 
-Xcode 构建阶段会编译 `radishlex-ime-ffi`；macOS 产品 dylib 显式启用 `apple-keychain` feature，再修正 install name，检查目标架构、依赖与 manager 所需 symbol 集，把库复制到 app bundle 的 `Contents/Frameworks` 后签名。Dart 启动时读取 `radishlex_ffi_contract`，要求 ABI v7、owner-thread policy 和 panic boundary 与 manager 预期一致。普通 DPK 与 Secure Enclave P-256 status/product smoke symbol 只服务原生 gated validation，Dart 不直接绑定；现有 snapshot 只读取 `radishlex_manager_sync_product_status` 的固定脱敏状态。同步页另提供只连接 loopback HTTPS、只使用合成数据的资格 run，不触发系统 key 操作，也不返回 key、canonical、signature、wrapped material、payload 或 HTTP body。
+Xcode 构建阶段会编译 `radishlex-ime-ffi`；macOS 产品 dylib 显式启用 `apple-keychain` feature，再修正 install name，检查目标架构、依赖与 manager 所需 symbol 集，把库复制到 app bundle 的 `Contents/Frameworks` 后签名。Dart 启动时读取 `radishlex_ffi_contract`，要求 ABI v8、owner-thread policy 和 panic boundary 与 manager 预期一致。普通 DPK 与 Secure Enclave P-256 status/product smoke symbol 只服务原生 gated validation，Dart 不直接绑定；现有 snapshot 只读取 `radishlex_manager_sync_product_status` 的固定脱敏状态。同步页另提供只连接 loopback HTTPS、只使用合成数据的资格 run，不触发系统 key 操作，也不返回 key、canonical、signature、wrapped material、payload 或 HTTP body。
 
 `radishlex_manager_sync_product_status` 把 signing 与 key-agreement 作为两条独立资格链：`product_qualified` 只有在两者都通过时才为真，`user_sync_enabled` 是另一个产品策略开关，不能由资格结果推导或自动打开。`blocker` 按固定优先级返回首个失败原因；Manager 只负责把这些 enum/boolean 映射为状态说明，不执行创建、读取、签名、derive 或删除操作。完整字段与常量见 [Manager 同步产品状态参考](../../docs/manager-sync-product-status.md)。
 
@@ -77,7 +87,7 @@ demo mode 只使用合成 fixture，并持续显示“合成演示数据”横�
 
 本地同步服务启动后，可用仓库根 `scripts/check-sync-server-connection-health.sh` 生成 `sync_connection_health.v1` 摘要，再在设置页回填。Manager 只保存净化后的 `sync_connection_health_summary` 子对象，不保存原始 JSON、完整 endpoint、token、请求 / 响应体、证书或 payload bytes。
 
-当前 dynamic library smoke 还会确认 `radishlex-ime-ffi` 未导出已退役的 review-only sync command symbol。ABI v7 只新增隔离的资格 `start/poll/cancel/free` executor；真实用户数据同步、恢复码生成 / 输入、join request 创建、授权成功和设备撤销路径仍保持关闭。被拒绝的旧符号名只作为 smoke denylist 保留，不是待实现 API。资格 request、状态机、错误与清理契约见 [ime-sync-runtime 组件说明](../../crates/ime-sync-runtime/README.md)；历史预演材料统一归档在仓库根 `docs/archive/review-only-manager-sync/`，不作为当前设计或实现契约。
+当前 dynamic library smoke 还会确认 `radishlex-ime-ffi` 未导出已退役的 review-only sync command symbol。隔离资格 `start/poll/cancel/free` executor 最初由 ABI v7 引入，当前 ABI v8 兼容保留，并增加产品 startup/validation contract；真实用户数据同步、恢复码生成 / 输入、join request 创建、授权成功和设备撤销路径仍保持关闭。被拒绝的旧符号名只作为 smoke denylist 保留，不是待实现 API。资格 request、状态机、错误与清理契约见 [ime-sync-runtime 组件说明](../../crates/ime-sync-runtime/README.md)；产品升级 FFI 调用顺序见 [FFI 平台调用契约](../../docs/runbooks/ffi-platform-call-contract.md)。历史预演材料统一归档在仓库根 `docs/archive/review-only-manager-sync/`，不作为当前设计或实现契约。
 
 ## 验证
 
@@ -89,7 +99,7 @@ demo mode 只使用合成 fixture，并持续显示“合成演示数据”横�
 
 M2 本地能力验收范围、退出标准映射和隐私检查见仓库根 `docs/manager-local-acceptance.md`。
 
-`check-manager-ffi-smoke.sh` 会构建开发态 `radishlex-ime-ffi`，在仓库外临时目录创建 SQLite userdb、settings JSON、导入 TSV、读取 import batches 与 rank explain、执行删除 / 重启 / explicit restore / 再重启、导出词库并导出脱敏诊断报告，用真实 Dart FFI bridge 复验本地管理链路；同时确认当前动态库未导出已退役的 review-only sync command symbol。`check-manager-product.sh` 额外构建正常 macOS app bundle，验证非 sandbox entitlements、嵌入 dylib、签名、两类 Apple P-256 validation symbol、只读 native status host、资格 run 必需 symbol、不可达 loopback 失败/清理路径和 bundle 内真实 Dart FFI smoke，全程不启动 GUI、不访问 Keychain/Secure Enclave。
+`check-manager-ffi-smoke.sh` 会构建开发态 `radishlex-ime-ffi`，在仓库外临时目录创建 SQLite userdb、settings JSON、导入 TSV、读取 import batches 与 rank explain、执行删除 / 重启 / explicit restore / 再重启、导出词库并导出脱敏诊断报告，用真实 Dart FFI bridge 复验本地管理链路；同时确认当前动态库未导出已退役的 review-only sync command symbol。`check-manager-product.sh` 额外构建正常 macOS app bundle，验证非 sandbox entitlements、嵌入 dylib、签名、startup gate 与 Manager upgrade validation symbol/helper、两类 Apple P-256 validation symbol、只读 native status host、资格 run 必需 symbol、不可达 loopback 失败/清理路径和 bundle 内真实 Dart FFI smoke，全程不启动 GUI、不执行 upgrade helper、不访问真实 Application Support 或 Keychain/Secure Enclave。
 
 实际产品进程 DPK 验证只能在单独授权后使用仓库根 `scripts/run-manager-apple-keychain-p256-product-smoke.sh`。脚本接受正常生命周期、预期 denied、locked 前置、locked 探测和解锁后清理五个授权参数；它不会自行锁定、解锁或改写 Keychain 搜索列表。locked 矩阵必须按 runbook 分阶段执行，并在解锁后完成清理。
 
