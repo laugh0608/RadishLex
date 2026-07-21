@@ -79,13 +79,14 @@ contents="${bundle}/Contents"
 macos_dir="${contents}/MacOS"
 frameworks_dir="${contents}/Frameworks"
 resources_dir="${contents}/Resources"
+helpers_dir="${contents}/Helpers"
 native_licenses_dir="${resources_dir}/NativeLicenses"
 codesign_identity="${RADISHLEX_CODESIGN_IDENTITY:--}"
 export CLANG_MODULE_CACHE_PATH="${repo_root}/target/macos-imk/clang-module-cache"
 export SWIFT_MODULECACHE_PATH="${repo_root}/target/macos-imk/swift-module-cache"
 
 rm -rf "${bundle}"
-mkdir -p "${macos_dir}" "${frameworks_dir}" "${resources_dir}" \
+mkdir -p "${macos_dir}" "${frameworks_dir}" "${resources_dir}" "${helpers_dir}" \
   "${CLANG_MODULE_CACHE_PATH}" "${SWIFT_MODULECACHE_PATH}"
 
 ffi_dylib="${repo_root}/target/${cargo_profile}/libradishlex_ime_ffi.dylib"
@@ -115,6 +116,18 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   -Wl,-rpath,@executable_path/../Frameworks \
   -framework Cocoa -framework Carbon -framework InputMethodKit \
   -o "${macos_dir}/RadishLex"
+
+validation_sources="${repo_root}/platforms/macos-product/UpgradeValidationHosts/Sources"
+clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+  -mmacosx-version-min=13.0 \
+  -I"${validation_sources}" \
+  -I"${repo_root}/crates/ime-ffi/include" \
+  "${validation_sources}/RLXUpgradeValidationSupport.m" \
+  "${validation_sources}/input_method_main.m" \
+  -L"${frameworks_dir}" -lradishlex_ime_ffi \
+  -Wl,-rpath,@executable_path/../Frameworks \
+  -framework Foundation \
+  -o "${helpers_dir}/RadishLexUpgradeValidationHost"
 
 sed \
   -e "s/__RADISHLEX_RIME_SCHEMA__/${schema}/g" \
@@ -150,6 +163,8 @@ while IFS= read -r -d '' dylib; do
 done < <(find "${frameworks_dir}" -type f -name '*.dylib' -print0 | sort -z)
 codesign --force --sign "${codesign_identity}" --timestamp=none \
   "${macos_dir}/RadishLex"
+codesign --force --sign "${codesign_identity}" --timestamp=none \
+  "${helpers_dir}/RadishLexUpgradeValidationHost"
 if [[ "${mode}" == "native" ]]; then
   python3 "${repo_root}/scripts/macos-imk/bundle_dylibs.py" manifest \
     --frameworks-dir "${frameworks_dir}" \

@@ -5,7 +5,6 @@ import FlutterMacOS
 @main
 class AppDelegate: FlutterAppDelegate {
   override func applicationWillFinishLaunching(_ notification: Notification) {
-    super.applicationWillFinishLaunching(notification)
     if RadishLexAppleSecureEnclaveKeyAgreementProductSmoke.isRequested(
       arguments: CommandLine.arguments
     ) {
@@ -26,6 +25,13 @@ class AppDelegate: FlutterAppDelegate {
       exit(result.passed ? EXIT_SUCCESS : EXIT_FAILURE)
     }
     guard RadishLexAppleP256ProductSmoke.isRequested(arguments: CommandLine.arguments) else {
+      let startupGate = RadishLexProductUpgradeStartupGate.inspect()
+      guard startupGate.allowed else {
+        fputs(startupGate.safeLogLine + "\n", stderr)
+        fflush(stderr)
+        exit(EXIT_FAILURE)
+      }
+      super.applicationWillFinishLaunching(notification)
       return
     }
     guard
@@ -49,6 +55,71 @@ class AppDelegate: FlutterAppDelegate {
 
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
     return true
+  }
+}
+
+private struct RadishLexStartupGateRequest {
+  let version: UInt32
+  let dataRootPath: UnsafePointer<CChar>?
+  let expectedOwnerID: UInt32
+}
+
+private struct RadishLexStartupGateResult {
+  var version: UInt32 = 0
+  var decision: UInt32 = 0
+  var errorCode: UInt32 = 0
+  var receiptState: UInt32 = 0
+
+  var allowed: Bool { version == 1 && (1...3).contains(decision) }
+  var safeLogLine: String {
+    "RadishLex startup gate decision=\(decision) error=\(errorCode) state=\(receiptState)"
+  }
+}
+
+private enum RadishLexProductUpgradeStartupGate {
+  private typealias GateFunction = @convention(c) (
+    UnsafeRawPointer?,
+    UnsafeMutableRawPointer?,
+    UnsafeMutablePointer<UnsafeMutableRawPointer?>?
+  ) -> UInt32
+
+  static func inspect() -> RadishLexStartupGateResult {
+    var result = RadishLexStartupGateResult()
+    guard
+      let applicationSupport = FileManager.default.urls(
+        for: .applicationSupportDirectory,
+        in: .userDomainMask
+      ).first,
+      let frameworks = Bundle.main.privateFrameworksURL
+    else { return result }
+    let dataRoot = applicationSupport.appendingPathComponent("RadishLex", isDirectory: true)
+    let library = frameworks.appendingPathComponent("libradishlex_ime_ffi.dylib")
+    guard let handle = dlopen(library.path, RTLD_NOW | RTLD_LOCAL) else { return result }
+    defer { dlclose(handle) }
+    guard let symbol = dlsym(handle, "radishlex_product_upgrade_startup_gate") else {
+      return result
+    }
+    let gate = unsafeBitCast(symbol, to: GateFunction.self)
+    let status = dataRoot.path.withCString { path in
+      var request = RadishLexStartupGateRequest(
+        version: 1,
+        dataRootPath: path,
+        expectedOwnerID: geteuid()
+      )
+      return withUnsafePointer(to: &request) { requestPointer in
+        withUnsafeMutablePointer(to: &result) { resultPointer in
+          gate(
+            UnsafeRawPointer(requestPointer),
+            UnsafeMutableRawPointer(resultPointer),
+            nil
+          )
+        }
+      }
+    }
+    if status != 0 {
+      result = RadishLexStartupGateResult()
+    }
+    return result
   }
 }
 

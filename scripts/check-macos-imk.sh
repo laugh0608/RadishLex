@@ -321,7 +321,10 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
 
 bundle="${repo_root}/target/macos-imk/contract/RadishLexInputMethod.app"
 test -x "${bundle}/Contents/MacOS/RadishLex"
+test -x "${bundle}/Contents/Helpers/RadishLexUpgradeValidationHost"
 test -f "${bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib"
+nm -u "${bundle}/Contents/Helpers/RadishLexUpgradeValidationHost" | \
+  rg -q '_radishlex_input_method_upgrade_validate_candidate'
 test -s "${bundle}/Contents/Resources/RadishLexInputIcon.tiff"
 test "$(sips -g pixelWidth "${bundle}/Contents/Resources/RadishLexInputIcon.tiff" 2>/dev/null | awk '/pixelWidth:/ { print $2 }')" = "32"
 test "$(sips -g pixelHeight "${bundle}/Contents/Resources/RadishLexInputIcon.tiff" 2>/dev/null | awk '/pixelHeight:/ { print $2 }')" = "32"

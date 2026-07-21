@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-#define RADISHLEX_ABI_CONTRACT_VERSION 7u
+#define RADISHLEX_ABI_CONTRACT_VERSION 8u
 #define RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD 1u
 #define RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND 1u
 
@@ -30,6 +30,16 @@ extern "C" {
 #define RADISHLEX_MANAGER_SYNC_PRODUCT_STATUS_VERSION 1u
 #define RADISHLEX_MANAGER_SYNC_QUALIFICATION_REQUEST_VERSION 1u
 #define RADISHLEX_MANAGER_SYNC_QUALIFICATION_SNAPSHOT_VERSION 1u
+#define RADISHLEX_PRODUCT_UPGRADE_STARTUP_GATE_REQUEST_VERSION 1u
+#define RADISHLEX_PRODUCT_UPGRADE_STARTUP_GATE_RESULT_VERSION 1u
+#define RADISHLEX_MANAGER_UPGRADE_VALIDATION_REQUEST_VERSION 1u
+#define RADISHLEX_INPUT_METHOD_UPGRADE_VALIDATION_REQUEST_VERSION 1u
+
+#define RADISHLEX_STARTUP_GATE_ALLOWED_FIRST_LAUNCH 1u
+#define RADISHLEX_STARTUP_GATE_ALLOWED_NO_UPGRADE_STATE 2u
+#define RADISHLEX_STARTUP_GATE_ALLOWED_TERMINAL_RECEIPT 3u
+#define RADISHLEX_STARTUP_GATE_BLOCKED_UPGRADE_IN_PROGRESS 4u
+#define RADISHLEX_STARTUP_GATE_FAILED_CLOSED 5u
 
 #define RADISHLEX_MANAGER_SYNC_QUALIFICATION_STATE_CREATED 1u
 #define RADISHLEX_MANAGER_SYNC_QUALIFICATION_STATE_RUNNING 2u
@@ -161,6 +171,42 @@ typedef struct RadishLexSnapshot RadishLexSnapshot;
 typedef struct RadishLexBuffer RadishLexBuffer;
 typedef struct RadishLexError RadishLexError;
 typedef struct RadishLexManagerSyncQualificationRun RadishLexManagerSyncQualificationRun;
+
+typedef struct RadishLexProductUpgradeStartupGateRequest {
+  uint32_t version;
+  const char *data_root_path;
+  uint32_t expected_owner_id;
+} RadishLexProductUpgradeStartupGateRequest;
+
+typedef struct RadishLexProductUpgradeStartupGateResult {
+  uint32_t version;
+  uint32_t decision;
+  uint32_t error_code;
+  uint32_t receipt_state;
+} RadishLexProductUpgradeStartupGateResult;
+
+typedef struct RadishLexManagerUpgradeValidationRequest {
+  uint32_t version;
+  const char *candidate_path;
+  const char *settings_path;
+} RadishLexManagerUpgradeValidationRequest;
+
+typedef struct RadishLexInputMethodUpgradeValidationRequest {
+  uint32_t version;
+  const char *candidate_path;
+  const char *shared_data_path;
+  const char *validation_user_data_path;
+  const char *schema;
+} RadishLexInputMethodUpgradeValidationRequest;
+
+typedef struct RadishLexUpgradeValidationSummary {
+  uint32_t version;
+  int64_t schema_version;
+  uint32_t management_queries_checked;
+  uint32_t settings_checked;
+  uint32_t personalized_runtime_checked;
+  uint32_t candidate_signals_read;
+} RadishLexUpgradeValidationSummary;
 
 typedef struct RadishLexAppleP256ProductStatus {
   uint32_t version;
@@ -373,6 +419,19 @@ typedef struct RadishLexLearningContext {
 
 RadishLexStatusCode radishlex_ffi_contract(
     RadishLexFfiContract *contract_out,
+    RadishLexError **error_out);
+
+RadishLexStatusCode radishlex_product_upgrade_startup_gate(
+    const RadishLexProductUpgradeStartupGateRequest *request,
+    RadishLexProductUpgradeStartupGateResult *result_out,
+    RadishLexError **error_out);
+RadishLexStatusCode radishlex_manager_upgrade_validate_candidate(
+    const RadishLexManagerUpgradeValidationRequest *request,
+    RadishLexUpgradeValidationSummary *summary_out,
+    RadishLexError **error_out);
+RadishLexStatusCode radishlex_input_method_upgrade_validate_candidate(
+    const RadishLexInputMethodUpgradeValidationRequest *request,
+    RadishLexUpgradeValidationSummary *summary_out,
     RadishLexError **error_out);
 
 /*

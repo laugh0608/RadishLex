@@ -115,6 +115,39 @@ impl UserDb {
         Ok(db)
     }
 
+    /// Opens an already-migrated product validation candidate without WAL,
+    /// permission, schema, or content changes.
+    pub fn open_read_only_current(path: impl AsRef<Path>) -> UserDbResult<Self> {
+        let path = path.as_ref();
+        let connection = Connection::open_with_flags(
+            path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(|error| preserved_database_error(path, "open validation candidate", error))?;
+        connection.busy_timeout(BUSY_TIMEOUT).map_err(|error| {
+            preserved_database_error(path, "configure validation candidate", error)
+        })?;
+        connection
+            .pragma_update(None, "query_only", true)
+            .map_err(|error| {
+                preserved_database_error(path, "protect validation candidate", error)
+            })?;
+        let version = read_schema_version(&connection)
+            .map_err(|error| preserved_database_error(path, "read validation schema", error))?;
+        if version != SCHEMA_VERSION {
+            return Err(UserDbError::invalid_input(
+                "schema_version",
+                format!("validation candidate must use schema {SCHEMA_VERSION}"),
+            ));
+        }
+        verify_integrity(&connection).map_err(|error| {
+            preserved_database_error(path, "validate candidate integrity", error)
+        })?;
+        validate_current_schema_on(&connection)
+            .map_err(|error| preserved_userdb_error(path, "validate candidate schema", error))?;
+        Ok(Self { connection })
+    }
+
     pub fn open_in_memory() -> UserDbResult<Self> {
         let connection = Connection::open_in_memory()?;
         configure_common_connection(&connection)?;

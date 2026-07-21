@@ -745,3 +745,9 @@ pub use candidate::UpgradeCandidateSummary;
 #[path = "settings.rs"]
 mod settings;
 pub use settings::UpgradeSettingsBackupSummary;
+
+#[path = "startup_gate.rs"]
+mod startup_gate;
+pub use startup_gate::{
+    inspect_startup_gate, StartupGateDecision, StartupGateErrorCode, StartupGateResult,
+};

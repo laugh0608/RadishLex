@@ -57,14 +57,14 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 ### Manager 与 InputMethod
 
-Manager 和 InputMethod 不实现 migration。两端分别提供受控 validation host，使用与产品相同的 native library、固定路径规则和公开 ABI 打开候选数据库：
+Manager 和 InputMethod 不实现 migration。两端分别在真实 bundle 的 `Contents/Helpers/RadishLexUpgradeValidationHost` 提供无参数受控 host，使用 ABI v8、各自产品 native library 和固定路径规则打开候选数据库：
 
 - Manager 验证管理查询、settings 兼容和关闭连接；
 - InputMethod 验证 personalized runtime 创建、只读候选信号访问和关闭连接；
 - validation 不产生选择、负反馈、导入、同步或其他业务写入；
 - 任一端缺失、版本不匹配、打开失败或未关闭连接，候选不得切换。
 
-双端验证不是用同一个 `UserDb::open` 单元测试冒充两个产品宿主。
+双端验证不是用同一个 `UserDb::open` 单元测试冒充两个产品宿主。Manager host 通过只读 current-schema connection 执行 active/deleted/import/learning 管理查询，并检查固定 `source-settings.json` 与 settings format v1 的类型兼容；InputMethod host 从本 bundle 固定 `RimeData` 创建短生命周期隔离 Rime user data，使用 privacy-mode `LearningContext` 驱动 personalized runtime 的固定 `luobo` 候选读取，不选择、不提交也不学习。两端都在调用前后比较 candidate 全字节并拒绝 WAL/SHM/journal。
 
 ### 安装载体
 
@@ -221,7 +221,7 @@ Manager 与 InputMethod 在产品启动前必须检查是否存在非终态升�
 
 macOS preflight host 不接受调用方路径或进程名。它从产品 manifest 固定 Manager/InputMethod bundle ID，通过 `NSRunningApplication` 判断双端是否仍运行，并以系统固定 `/usr/sbin/lsof` 检查已存在的 `userdb.sqlite3` family、`manager-settings.json` 与其原子写临时文件是否仍有打开句柄；输出只包含 format、result、available bytes、quiescent 和稳定 blocker，不回显路径、进程详情或 `lsof` 内容。unsafe root/file、容量不可得或检测工具异常都失败关闭。
 
-这份结果只是同一时刻的只读证据：它不停止进程，也不能阻止旧版本在检测后、snapshot 前重新启动。协调器只有在 Manager/InputMethod 启动入口检查非终态 receipt，并把 preflight、`quiesced` 持久化与 snapshot 纳入同一 upgrade guard 后，才可把该证据用于持续静止结论。当前 startup gate 尚未接线，因此 M4-P02 仍不得宣称静止闭环。
+这份结果只是同一时刻的只读证据：它不停止进程，也不能阻止旧版本在检测后、snapshot 前重新启动。ABI v8 startup gate 已在 Manager `applicationWillFinishLaunching` 调用 `super` 之前、InputMethod 创建 `IMKServer` 之前接线；只读允许 data root/state absent 与终态 receipt，active guard、所有非终态、损坏 receipt、中断 artifact、未知对象和身份漂移均阻止业务初始化。它不创建目录、不改权限、不连接或清理 guard；协调器仍须把 preflight、`quiesced` 持久化与 snapshot 纳入同一 guard 才能形成持续静止结论。
 
 ## 稳定错误分类
 
@@ -274,8 +274,8 @@ macOS preflight host 不接受调用方路径或进程名。它从产品 manifes
 3. 实现临时目录内的 receipt 原子持久化和跨进程 guard；
 4. 实现 settings 原样保留副本、SQLite 一致快照、空间预算、身份校验与故障注入文件系统端口；
 5. 从固定 snapshot 创建隔离 migration candidate，固化 standalone SQLite 与 receipt evidence；
-6. 接入固定 macOS available-space 与点时静止探针，再实现双端 startup gate 和 Manager/InputMethod 两个候选 validation host；
-7. 实现切换、启动门禁、重启恢复和回滚；
+6. 已接入固定 macOS available-space、点时静止探针、双端 startup gate 和 Manager/InputMethod 候选 validation host；
+7. 把双端验证结果持久化后实现切换、重启恢复和回滚；
 8. 接入产品 manifest、自动门禁和隔离产品构建 smoke；
 9. M4-P03 选定安装载体后再编写真实安装升级 runbook。
 

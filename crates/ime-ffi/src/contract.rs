@@ -1,6 +1,5 @@
-/// ABI contract v7 preserves v6 Manager product status and adds the isolated
-/// local HTTPS sync qualification run handle.
-pub const RADISHLEX_ABI_CONTRACT_VERSION: u32 = 7;
+/// ABI contract v8 adds the versioned, read-only product startup gate.
+pub const RADISHLEX_ABI_CONTRACT_VERSION: u32 = 8;
 pub const RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD: u32 = 1;
 pub const RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND: u32 = 1;
 

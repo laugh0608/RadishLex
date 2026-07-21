@@ -661,10 +661,12 @@ dependencies = [
  "radishlex-ime-core",
  "radishlex-ime-crypto",
  "radishlex-ime-engine-rime",
+ "radishlex-ime-product-upgrade",
  "radishlex-ime-ranker",
  "radishlex-ime-runtime",
  "radishlex-ime-sync-runtime",
  "radishlex-ime-userdb",
+ "serde_json",
 ]
 
 [[package]]

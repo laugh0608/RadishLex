@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 mod filesystem;
 #[cfg(unix)]
 pub use filesystem::{
+    inspect_startup_gate, StartupGateDecision, StartupGateErrorCode, StartupGateResult,
     UpgradeCandidateSummary, UpgradeFilesystemError, UpgradeFilesystemErrorCode,
     UpgradeProcessGuard, UpgradeReceiptStore, UpgradeSettingsBackupSummary,
     UpgradeSnapshotSpaceBudget, UpgradeSnapshotSummary, VerifiedDataRoot,
@@ -74,7 +75,7 @@ impl UpgradeState {
         )
     }
 
-    const fn is_terminal(self) -> bool {
+    pub const fn is_terminal(self) -> bool {
         matches!(
             self,
             Self::Completed | Self::AbortedPreserved | Self::RolledBack

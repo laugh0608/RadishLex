@@ -31,6 +31,9 @@ fi
 source_library="${target_dir}/${profile}/libradishlex_ime_ffi.dylib"
 frameworks_dir="${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}"
 bundled_library="${frameworks_dir}/libradishlex_ime_ffi.dylib"
+app_contents="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}"
+helpers_dir="${app_contents}/Helpers"
+validation_sources="${repo_root}/platforms/macos-product/UpgradeValidationHosts/Sources"
 
 if [ ! -f "${source_library}" ]; then
   echo "RadishLex manager native library is missing: ${source_library}" >&2
@@ -40,6 +43,17 @@ fi
 install -d -m 755 "${frameworks_dir}"
 install -m 755 "${source_library}" "${bundled_library}"
 install_name_tool -id "@rpath/libradishlex_ime_ffi.dylib" "${bundled_library}"
+install -d -m 755 "${helpers_dir}"
+clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+  -mmacosx-version-min=13.0 \
+  -I"${validation_sources}" \
+  -I"${repo_root}/crates/ime-ffi/include" \
+  "${validation_sources}/RLXUpgradeValidationSupport.m" \
+  "${validation_sources}/manager_main.m" \
+  -L"${frameworks_dir}" -lradishlex_ime_ffi \
+  -Wl,-rpath,@executable_path/../Frameworks \
+  -framework Foundation \
+  -o "${helpers_dir}/RadishLexUpgradeValidationHost"
 
 required_symbols=(
   _radishlex_apple_p256_product_smoke
@@ -47,6 +61,8 @@ required_symbols=(
   _radishlex_apple_secure_enclave_key_agreement_product_smoke
   _radishlex_apple_secure_enclave_key_agreement_product_status
   _radishlex_ffi_contract
+  _radishlex_product_upgrade_startup_gate
+  _radishlex_manager_upgrade_validate_candidate
   _radishlex_manager_sync_product_status
   _radishlex_manager_sync_qualification_start
   _radishlex_manager_sync_qualification_poll
@@ -93,3 +109,5 @@ fi
 
 codesign_identity="${EXPANDED_CODE_SIGN_IDENTITY:--}"
 codesign --force --sign "${codesign_identity}" --timestamp=none "${bundled_library}"
+codesign --force --sign "${codesign_identity}" --timestamp=none \
+  "${helpers_dir}/RadishLexUpgradeValidationHost"

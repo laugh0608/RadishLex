@@ -63,7 +63,7 @@ manifest 是产品完整性与兼容性证据，不替代 Apple code signature�
 | product version | `0.1.0` | Manager 与 InputMethod 相同 |
 | build number | `35` | 正整数且两个 bundle 相同 |
 | minimum macOS | `13.0` | 取两端真实支持范围的交集 |
-| FFI ABI | `7` | 必须与 Rust contract 和 Dart binding 相同 |
+| FFI ABI | `8` | 增加只读 startup gate 与双端升级 validation contract |
 | userdb schema | `9` | 不允许旧产品打开未来 schema |
 | RimeData manifest | `2` | 绑定来源锁、多许可证与完整数据 hash |
 | data layout | `application-support-v1` | 首版继续使用已验证布局 |
