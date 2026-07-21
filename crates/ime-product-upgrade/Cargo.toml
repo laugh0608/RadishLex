@@ -1,0 +1,16 @@
+[package]
+name = "radishlex-ime-product-upgrade"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../LICENSE"
+description = "Product data upgrade state and receipt contracts for RadishLex."
+
+[lib]
+name = "radishlex_ime_product_upgrade"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"

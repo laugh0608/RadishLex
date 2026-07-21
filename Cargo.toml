@@ -5,6 +5,7 @@ members = [
     "crates/ime-crypto",
     "crates/ime-engine-rime",
     "crates/ime-ffi",
+    "crates/ime-product-upgrade",
     "crates/ime-ranker",
     "crates/ime-runtime",
     "crates/ime-sync",

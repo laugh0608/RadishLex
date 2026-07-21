@@ -8,8 +8,8 @@ use super::UserDb;
 use crate::{
     decode_dictionary_terms_tsv, decode_dictionary_terms_tsv_document, encode_dictionary_terms_tsv,
     DictionaryTermRecord, DictionaryTermsFormat, NegativeFeedbackDraft, NegativeFeedbackReason,
-    PrivacyLevel, SelectionEventDraft, TermSource, TermStatus, UserDbSyncPayloadObjectType,
-    LEARNING_CASE_INSPECTION_VERSION,
+    PrivacyLevel, SelectionEventDraft, TermSource, TermStatus, UserDbSchemaCompatibility,
+    UserDbSyncPayloadObjectType, LEARNING_CASE_INSPECTION_VERSION,
 };
 
 fn temp_db_path(test_name: &str) -> String {
@@ -42,6 +42,115 @@ fn migration_initializes_empty_database() {
     assert_eq!(db.schema_version().expect("schema version"), 9);
     assert!(db.list_active_terms().expect("terms").is_empty());
     assert!(db.list_import_batches().expect("batches").is_empty());
+}
+
+#[test]
+fn read_only_file_inspection_does_not_migrate_or_rewrite_database() {
+    let path = temp_db_path("read-only-inspection");
+    {
+        let connection = rusqlite::Connection::open(&path).expect("sqlite opens");
+        connection
+            .execute_batch(
+                "CREATE TABLE legacy_sentinel (value TEXT NOT NULL);
+                 INSERT INTO legacy_sentinel VALUES ('synthetic-preserve');
+                 PRAGMA user_version = 1;",
+            )
+            .expect("legacy fixture is created");
+    }
+    let before = std::fs::read(&path).expect("fixture bytes are read");
+
+    let inspection = UserDb::inspect_file(&path).expect("file inspection succeeds");
+
+    assert_eq!(inspection.schema_version, 1);
+    assert_eq!(inspection.supported_schema_version, 9);
+    assert_eq!(
+        inspection.compatibility,
+        UserDbSchemaCompatibility::MigrationRequired
+    );
+    assert_eq!(
+        std::fs::read(&path).expect("fixture bytes are read again"),
+        before
+    );
+    assert!(!std::path::Path::new(&format!("{path}-wal")).exists());
+    assert!(!std::path::Path::new(&format!("{path}-shm")).exists());
+    remove_temp_db(&path);
+}
+
+#[test]
+fn file_inspection_reports_future_schema_without_changing_it() {
+    let path = temp_db_path("future-inspection");
+    {
+        let connection = rusqlite::Connection::open(&path).expect("sqlite opens");
+        connection
+            .execute_batch(
+                "CREATE TABLE future_sentinel (value TEXT NOT NULL);
+                 INSERT INTO future_sentinel VALUES ('synthetic-preserve');
+                 PRAGMA user_version = 99;",
+            )
+            .expect("future fixture is created");
+    }
+
+    let inspection = UserDb::inspect_file(&path).expect("future schema is inspectable");
+
+    assert_eq!(inspection.schema_version, 99);
+    assert_eq!(inspection.compatibility, UserDbSchemaCompatibility::Future);
+    let connection = rusqlite::Connection::open(&path).expect("sqlite reopens");
+    let sentinel: String = connection
+        .query_row("SELECT value FROM future_sentinel", [], |row| row.get(0))
+        .expect("sentinel remains");
+    assert_eq!(sentinel, "synthetic-preserve");
+    drop(connection);
+    remove_temp_db(&path);
+}
+
+#[test]
+fn file_inspection_rejects_malformed_current_schema_without_rewriting_it() {
+    let path = temp_db_path("malformed-current-inspection");
+    {
+        let connection = rusqlite::Connection::open(&path).expect("sqlite opens");
+        connection
+            .execute_batch(
+                "CREATE TABLE incomplete_current_schema (value TEXT NOT NULL);
+                 INSERT INTO incomplete_current_schema VALUES ('synthetic-preserve');
+                 PRAGMA user_version = 9;",
+            )
+            .expect("malformed current fixture is created");
+    }
+    let before = std::fs::read(&path).expect("fixture bytes are read");
+
+    let error = UserDb::inspect_file(&path).expect_err("malformed current schema is rejected");
+
+    assert!(error.to_string().contains("user_terms"));
+    assert_eq!(
+        std::fs::read(&path).expect("fixture bytes are read again"),
+        before
+    );
+    remove_temp_db(&path);
+}
+
+#[test]
+fn explicit_candidate_migration_reports_source_and_target_schema() {
+    let path = temp_db_path("explicit-candidate-migration");
+    {
+        let connection = rusqlite::Connection::open(&path).expect("sqlite opens");
+        connection
+            .execute_batch("PRAGMA user_version = 0;")
+            .expect("empty candidate is created");
+    }
+
+    let summary =
+        UserDb::migrate_and_validate(&path).expect("isolated candidate migration succeeds");
+
+    assert_eq!(summary.source_schema_version, 0);
+    assert_eq!(summary.target_schema_version, 9);
+    assert!(summary.migrated);
+    assert_eq!(
+        UserDb::inspect_file(&path)
+            .expect("migrated candidate inspects")
+            .compatibility,
+        UserDbSchemaCompatibility::Current
+    );
+    remove_temp_db(&path);
 }
 
 #[test]

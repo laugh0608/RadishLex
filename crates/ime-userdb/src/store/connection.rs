@@ -4,9 +4,10 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use rusqlite::{params, Connection, ErrorCode, Transaction, TransactionBehavior};
+use rusqlite::{params, Connection, ErrorCode, OpenFlags, Transaction, TransactionBehavior};
 
 use crate::error::{UserDbError, UserDbResult};
+use crate::model::{UserDbFileInspection, UserDbMigrationSummary, UserDbSchemaCompatibility};
 
 use super::identity::legacy_stable_hash_hex;
 use super::UserDb;
@@ -16,6 +17,78 @@ pub(super) const BUSY_TIMEOUT: Duration = Duration::from_millis(5_000);
 pub(super) const MAX_LEARNING_COUNT: i64 = 1_000_000;
 
 impl UserDb {
+    /// Returns the schema version supported by this library build.
+    pub const fn supported_schema_version() -> i64 {
+        SCHEMA_VERSION
+    }
+
+    /// Inspects an existing database without configuring WAL, changing file
+    /// permissions, or running migrations.
+    ///
+    /// Product callers remain responsible for rejecting unsafe paths and for
+    /// proving that no product process is concurrently using the database.
+    pub fn inspect_file(path: impl AsRef<Path>) -> UserDbResult<UserDbFileInspection> {
+        let path = path.as_ref();
+        let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(|error| preserved_database_error(path, "open read-only", error))?;
+        connection
+            .busy_timeout(BUSY_TIMEOUT)
+            .map_err(|error| preserved_database_error(path, "configure read-only", error))?;
+        let version = read_schema_version(&connection)
+            .map_err(|error| preserved_database_error(path, "read schema version", error))?;
+        if version < 0 {
+            return Err(UserDbError::invalid_input(
+                "schema_version",
+                format!("database version must be non-negative, got {version}"),
+            ));
+        }
+        verify_integrity(&connection)
+            .map_err(|error| preserved_database_error(path, "integrity check", error))?;
+        if version == SCHEMA_VERSION {
+            validate_current_schema_on(&connection)
+                .map_err(|error| preserved_userdb_error(path, "validate schema", error))?;
+        }
+
+        let compatibility = match version.cmp(&SCHEMA_VERSION) {
+            std::cmp::Ordering::Less => UserDbSchemaCompatibility::MigrationRequired,
+            std::cmp::Ordering::Equal => UserDbSchemaCompatibility::Current,
+            std::cmp::Ordering::Greater => UserDbSchemaCompatibility::Future,
+        };
+        Ok(UserDbFileInspection {
+            schema_version: version,
+            supported_schema_version: SCHEMA_VERSION,
+            compatibility,
+        })
+    }
+
+    /// Migrates and validates a caller-owned candidate database.
+    ///
+    /// This operation mutates `path`. Product callers must only pass an
+    /// isolated candidate produced by the upgrade coordinator, never the live
+    /// Application Support database.
+    pub fn migrate_and_validate(path: impl AsRef<Path>) -> UserDbResult<UserDbMigrationSummary> {
+        let path = path.as_ref();
+        let source = Self::inspect_file(path)?;
+        let database = Self::open(path)?;
+        let target_schema_version = database.schema_version()?;
+        drop(database);
+        let target = Self::inspect_file(path)?;
+        if target.compatibility != UserDbSchemaCompatibility::Current
+            || target.schema_version != target_schema_version
+        {
+            return Err(UserDbError::invalid_input(
+                "schema_version",
+                "candidate database did not validate at the supported schema version",
+            ));
+        }
+
+        Ok(UserDbMigrationSummary {
+            source_schema_version: source.schema_version,
+            target_schema_version,
+            migrated: source.schema_version != target_schema_version,
+        })
+    }
+
     pub fn open(path: impl AsRef<Path>) -> UserDbResult<Self> {
         let path = path.as_ref().to_path_buf();
         let connection = Connection::open(&path)

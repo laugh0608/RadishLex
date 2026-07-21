@@ -668,6 +668,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "radishlex-ime-product-upgrade"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "radishlex-ime-ranker"
 version = "0.1.0"
 dependencies = [

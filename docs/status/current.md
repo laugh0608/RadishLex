@@ -4,13 +4,15 @@
 
 ## 当前判断
 
-- 复核日期：2026-07-20（Asia/Shanghai）
+- 复核日期：2026-07-21（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前产品里程碑：M4 产品发布候选
 - 当前产品主批次：M4-P02 Application Support v1 数据升级协调器；M4-P01 双 bundle 产品装配已完成
 - 已完成：M0 工程基础、M1 macOS 离线输入 Alpha、M2 本地个人化 MVP、M3 端到端加密同步 Beta；R00、R01A、R02L、R01B、R06A 已退出
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；合成数据、短生命周期服务与受控集成测试可以继续
+
+M4-P02 已完成升级协调器边界、`ime-userdb` 只读 inspection/隔离 migration contract，以及 `ime-product-upgrade` 单向状态机、receipt v1、固定数据根身份校验、原子持久化与跨进程 socket guard。当前实现会拒绝未知状态对象、symlink/hardlink、身份漂移、非法状态替换和中断临时文件，并且只在精确失活 socket 上恢复 guard；SQLite 一致快照、空间预算、双端产品 validation host、原子切换与完整崩溃恢复尚未实现，因此 M4-P02 未退出。
 
 M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
@@ -51,7 +53,7 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v7、userd
 
 ## 下一步顺位
 
-1. M4-P02 先补升级协调器边界文档，再实现 Application Support v1 内的进程静止、隔离副本 migration、双端打开验证、失败回滚和 receipt；当前没有 App Group 迁移需求，不得静默改变容器。
+1. M4-P02 下一切面实现 SQLite backup API 一致快照、空间预算与文件系统故障注入，保持原库只读且候选完全隔离；随后实现双端 validation host、原子切换与崩溃恢复。当前没有 App Group 迁移需求，不得静默改变容器。
 2. M4-P03 选择并验证安装载体，闭合固定程序路径、Developer ID/Hardened Runtime、notarization、升级回滚和默认保留用户数据的移除语义；真实系统动作另行授权。
 3. 普通用户同步、恢复/授权/撤销/轮换继续关闭；在真实不支持 Secure Enclave 的环境可得时再补 unsupported，首版发布后且准备生产同步前再验收正式域名/证书。
 
@@ -86,4 +88,5 @@ cmp -s AGENTS.md CLAUDE.md
 - [M2 manager 验收 runbook](../runbooks/macos-m2-manager-product-acceptance.md)：关闭证据与回滚流程。
 - [macOS 平台边界](../macos-inputmethodkit-boundary.md)：M1/M2 输入与隐私稳定结论。
 - [macOS 产品包边界](../macos-product-package-boundary.md)：M4 组件、版本、数据、签名与装配停止线。
+- [macOS 数据升级协调器](../macos-data-upgrade-coordinator.md)：M4-P02 状态机、receipt、SQLite 快照、双端验证与回滚边界。
 - [本周周志](../devlogs/2026-W30.md)：当前资格执行批次的验证和交接流水。

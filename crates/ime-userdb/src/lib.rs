@@ -14,7 +14,8 @@ pub use model::{
     LearningCaseIdentity, LearningCaseInspection, LearningCaseRankerWeightInspection,
     LearningCaseTermInspection, LearningStatusSummary, NegativeFeedbackDraft,
     NegativeFeedbackReason, PrivacyLevel, SelectionEventDraft, SyncPreflightSummary, TermSource,
-    TermStatus, UserDbSyncPayloadObjectType, UserDbSyncPlaintextPayload, UserTerm,
+    TermStatus, UserDbFileInspection, UserDbMigrationSummary, UserDbSchemaCompatibility,
+    UserDbSyncPayloadObjectType, UserDbSyncPlaintextPayload, UserTerm,
     LEARNING_CASE_INSPECTION_VERSION, USERDB_SYNC_PAYLOAD_SCHEMA_VERSION,
 };
 pub use store::{

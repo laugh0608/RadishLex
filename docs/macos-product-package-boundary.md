@@ -133,6 +133,8 @@ Manager 与 InputMethod 都必须对下列情况失败关闭并返回稳定错�
 - 安装器只安装程序组件，不创建、迁移或删除真实用户内容；
 - 升级协调器负责进程静止、备份 receipt、兼容性预检、切换与回滚，不解析明文词条。
 
+协调器状态、SQLite 一致快照、receipt、中断恢复和双端验证的详细 contract 见 [macOS 数据升级协调器边界](macos-data-upgrade-coordinator.md)。
+
 ### 升级与回滚原则
 
 M4 数据升级必须覆盖当前布局内的 schema 演进与程序版本切换：

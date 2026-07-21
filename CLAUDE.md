@@ -141,7 +141,7 @@
 
 当前正式落地：
 
-- 根 README / LICENSE / 协作入口，以及 `docs/status/current.md`、技术方案、路线图、仓库结构和隐私同步等正式文档
+- 根 README、LICENSE、协作入口和 `docs/` 稳定文档
 
 已落地核心结构：
 
@@ -149,7 +149,7 @@
 - `crates/ime-core/`：输入会话、候选模型、提交模型、engine trait、学习事件等核心领域模型
 - `crates/ime-engine-rime/`：`librime` adapter，屏蔽 C++ 细节和底层引擎状态
 - `crates/ime-ranker/`：候选重排、权重合成、解释能力
-- `crates/ime-userdb/`：SQLite 用户词库、事件日志、导入导出
+- `crates/ime-userdb/`、`ime-product-upgrade/`：用户数据与产品升级 contract
 - `crates/ime-sync/`：同步客户端、版本管理、冲突合并
 - `crates/ime-crypto/`：主密钥、设备密钥、blob 加密、签名和校验
 - `crates/ime-ffi/`：C ABI、Flutter bridge、Swift / Kotlin / C++ 调用边界
