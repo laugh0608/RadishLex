@@ -14,7 +14,7 @@ path = "src/lib.rs"
 [dependencies]
 radishlex-ime-crypto = { path = "../ime-crypto" }
 radishlex-ime-sync = { path = "../ime-sync" }
-rusqlite = { version = "0.32.1", features = ["bundled"] }
+rusqlite = { version = "0.32.1", features = ["backup", "bundled"] }
 serde_json = "1.0.150"
 sha2 = "0.10.9"
 

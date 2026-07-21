@@ -671,6 +671,7 @@ dependencies = [
 name = "radishlex-ime-product-upgrade"
 version = "0.1.0"
 dependencies = [
+ "radishlex-ime-userdb",
  "serde",
  "serde_json",
 ]

@@ -12,5 +12,6 @@ name = "radishlex_ime_product_upgrade"
 path = "src/lib.rs"
 
 [dependencies]
+radishlex-ime-userdb = { path = "../ime-userdb" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"

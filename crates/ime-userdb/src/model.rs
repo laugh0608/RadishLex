@@ -332,6 +332,26 @@ pub struct UserDbMigrationSummary {
     pub migrated: bool,
 }
 
+/// Logical size of one consistent SQLite snapshot before it is created.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UserDbSnapshotEstimate {
+    pub schema_version: i64,
+    pub page_size_bytes: u64,
+    pub page_count: u64,
+    pub logical_size_bytes: u64,
+}
+
+/// Result of copying one source database through SQLite's backup API.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UserDbSnapshotSummary {
+    pub source_schema_version: i64,
+    pub snapshot_schema_version: i64,
+    pub page_size_bytes: u64,
+    pub page_count: u64,
+    pub logical_size_bytes: u64,
+    pub snapshot_file_bytes: u64,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UserDbSyncPayloadObjectType {
     DictionaryUserTerms,

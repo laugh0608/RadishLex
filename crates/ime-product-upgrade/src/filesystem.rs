@@ -13,6 +13,8 @@ use crate::{
 const STATE_DIRECTORY_NAME: &str = ".radishlex-upgrade-v1";
 const RECEIPT_FILE_NAME: &str = "receipt.json";
 const STAGED_RECEIPT_FILE_NAME: &str = "receipt.json.tmp";
+const SNAPSHOT_FILE_NAME: &str = "source-snapshot.sqlite3";
+const STAGED_SNAPSHOT_FILE_NAME: &str = "source-snapshot.sqlite3.tmp";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UpgradeFilesystemErrorCode {
@@ -22,7 +24,11 @@ pub enum UpgradeFilesystemErrorCode {
     InvalidReceipt,
     InvalidReceiptReplacement,
     InterruptedReceiptWrite,
+    InterruptedSnapshot,
     OperationAlreadyActive,
+    InvalidSnapshotState,
+    InsufficientSpace,
+    SnapshotFailed,
     IdentityChanged,
     Io,
 }
@@ -57,9 +63,15 @@ impl fmt::Display for UpgradeFilesystemError {
             UpgradeFilesystemErrorCode::InterruptedReceiptWrite => {
                 "upgrade receipt write requires recovery"
             }
+            UpgradeFilesystemErrorCode::InterruptedSnapshot => "upgrade snapshot requires recovery",
             UpgradeFilesystemErrorCode::OperationAlreadyActive => {
                 "another upgrade operation is active"
             }
+            UpgradeFilesystemErrorCode::InvalidSnapshotState => "upgrade snapshot state is invalid",
+            UpgradeFilesystemErrorCode::InsufficientSpace => {
+                "upgrade snapshot has insufficient free space"
+            }
+            UpgradeFilesystemErrorCode::SnapshotFailed => "upgrade snapshot failed",
             UpgradeFilesystemErrorCode::IdentityChanged => "upgrade filesystem identity changed",
             UpgradeFilesystemErrorCode::Io => "upgrade filesystem operation failed",
         };
@@ -260,8 +272,9 @@ impl UpgradeReceiptStore {
             verify_private_socket(&metadata, self.root.expected_owner_id)?;
             return Err(error(UpgradeFilesystemErrorCode::OperationAlreadyActive));
         }
-        self.load_current_internal()
-            .map(|value| value.map(|item| item.0))
+        let receipt = self.load_current_internal()?.map(|(receipt, _, _)| receipt);
+        snapshot::validate_snapshot_state(self, receipt.as_ref())?;
+        Ok(receipt)
     }
 
     pub fn persist(
@@ -365,7 +378,11 @@ impl UpgradeReceiptStore {
         for entry in entries {
             let entry = entry.map_err(|_| error(UpgradeFilesystemErrorCode::Io))?;
             let name = entry.file_name();
-            if name != RECEIPT_FILE_NAME && name != STAGED_RECEIPT_FILE_NAME {
+            if name != RECEIPT_FILE_NAME
+                && name != STAGED_RECEIPT_FILE_NAME
+                && name != SNAPSHOT_FILE_NAME
+                && name != STAGED_SNAPSHOT_FILE_NAME
+            {
                 return Err(error(UpgradeFilesystemErrorCode::UnexpectedStateObject));
             }
         }
@@ -684,3 +701,7 @@ const fn error(code: UpgradeFilesystemErrorCode) -> UpgradeFilesystemError {
 #[cfg(test)]
 #[path = "filesystem_tests.rs"]
 mod tests;
+
+#[path = "snapshot.rs"]
+mod snapshot;
+pub use snapshot::{UpgradeSnapshotSpaceBudget, UpgradeSnapshotSummary};

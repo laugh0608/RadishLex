@@ -416,7 +416,7 @@ fn configure_common_connection(connection: &Connection) -> rusqlite::Result<()> 
     Ok(())
 }
 
-fn read_schema_version(connection: &Connection) -> rusqlite::Result<i64> {
+pub(super) fn read_schema_version(connection: &Connection) -> rusqlite::Result<i64> {
     connection.query_row("PRAGMA user_version", [], |row| row.get(0))
 }
 
@@ -436,7 +436,7 @@ fn reject_future_schema(version: i64) -> UserDbResult<()> {
     Ok(())
 }
 
-fn verify_integrity(connection: &Connection) -> rusqlite::Result<()> {
+pub(super) fn verify_integrity(connection: &Connection) -> rusqlite::Result<()> {
     let result: String = connection.query_row("PRAGMA quick_check(1)", [], |row| row.get(0))?;
     if result == "ok" {
         Ok(())
@@ -445,7 +445,7 @@ fn verify_integrity(connection: &Connection) -> rusqlite::Result<()> {
     }
 }
 
-fn preserved_database_error(
+pub(super) fn preserved_database_error(
     path: &Path,
     stage: &'static str,
     source: rusqlite::Error,

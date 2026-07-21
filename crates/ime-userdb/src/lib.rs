@@ -15,8 +15,9 @@ pub use model::{
     LearningCaseTermInspection, LearningStatusSummary, NegativeFeedbackDraft,
     NegativeFeedbackReason, PrivacyLevel, SelectionEventDraft, SyncPreflightSummary, TermSource,
     TermStatus, UserDbFileInspection, UserDbMigrationSummary, UserDbSchemaCompatibility,
-    UserDbSyncPayloadObjectType, UserDbSyncPlaintextPayload, UserTerm,
-    LEARNING_CASE_INSPECTION_VERSION, USERDB_SYNC_PAYLOAD_SCHEMA_VERSION,
+    UserDbSnapshotEstimate, UserDbSnapshotSummary, UserDbSyncPayloadObjectType,
+    UserDbSyncPlaintextPayload, UserTerm, LEARNING_CASE_INSPECTION_VERSION,
+    USERDB_SYNC_PAYLOAD_SCHEMA_VERSION,
 };
 pub use store::{
     decode_dictionary_terms_tsv, decode_dictionary_terms_tsv_document, encode_dictionary_terms_tsv,

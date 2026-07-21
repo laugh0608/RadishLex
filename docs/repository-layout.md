@@ -99,7 +99,7 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v7 隐私/索引/学习状态、Manager 产品状态与隔离资格 run、deleted tombstone 管理查询、精确 case inspection、隔离非选择 snapshot、R01B 与 manager/InputMethodKit 共库证据；M4-P02 已固定只读 userdb inspection、隔离 migration summary、升级状态、receipt 原子存储、数据根身份与跨进程 guard | SQLite 一致快照、原子切换、双端 upgrade host 与发布复验 |
+| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v7 隐私/索引/学习状态、Manager 产品状态与隔离资格 run、deleted tombstone 管理查询、精确 case inspection、隔离非选择 snapshot、R01B 与 manager/InputMethodKit 共库证据；M4-P02 已固定只读 userdb inspection、隔离 migration summary、SQLite backup snapshot、升级状态、receipt 原子存储、空间预算、数据根身份与跨进程 guard | migration candidate 编排、原子切换、双端 upgrade host 与发布复验 |
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
 | 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
 | Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁 | M4 数据升级、安装载体与发布分发 |
@@ -168,7 +168,7 @@ SQLite 用户数据层：
 
 本地原始事件和 P2 同步摘要必须有明确转换边界。若 `ime-userdb` 依赖同步协议类型，应通过窄 adapter 或中立领域模型控制依赖方向。
 
-产品升级使用独立的只读 inspection 和候选 migration/validation 接口。协调器只能把隔离副本交给修改型入口，不能用运行时打开原地升级真实 Application Support 数据。
+产品升级使用独立的只读 inspection、SQLite backup snapshot 和候选 migration/validation 接口。snapshot 在一个只读事务中纳入 WAL 可见内容，输出 standalone `DELETE` journal 文件；协调器只能把隔离副本交给修改型入口，不能用运行时打开原地升级真实 Application Support 数据。
 
 ### ime-product-upgrade
 
@@ -179,9 +179,10 @@ SQLite 用户数据层：
 - 固定逻辑槽位的文件身份与阶段证据
 - 私有状态目录内的原子 receipt 存储、严格加载与逐状态替换
 - 绑定固定数据根身份的跨进程 Unix socket guard
+- 固定 userdb 源/目标、保守空间预算、SQLite snapshot 编排与阶段故障注入
 - 稳定失败分类和中断恢复判断
 
-该 crate 当前只对 receipt 执行原子 rename，不执行 SQLite 文件快照/切换、进程停止或产品 host 调度；macOS M4-P02 的完整职责和实现顺序见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。
+该 crate 当前只对 receipt 与隔离 snapshot 执行原子 rename，不执行最终 SQLite 文件切换、进程停止或产品 host 调度；macOS M4-P02 的完整职责和实现顺序见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。
 
 ### ime-crypto
 

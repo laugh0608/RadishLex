@@ -130,9 +130,11 @@ receipt 使用 UTF-8 JSON、固定字段顺序和末尾换行，当前格式为 
   .radishlex-upgrade-v1/       # 0700
     receipt.json               # 0600
     receipt.json.tmp           # 仅可能由中断写入留下
+    source-snapshot.sqlite3    # snapshot evidence 已固化后存在
+    source-snapshot.sqlite3.tmp # backup 或 rename 中断时保留
 ```
 
-状态目录只接受上述两个固定文件名。读取前重新验证 data root 与状态目录的 canonical path、device、inode、owner 和 mode；receipt 还必须是 `link count = 1`、不超过 64 KiB 的普通文件，并在打开前、打开后和读取后保持同一身份。写入使用 `create_new` 创建临时文件，完成文件 `fsync` 后再次验证 root、guard 与旧 receipt 身份，再原子替换并 `fsync` 状态目录；写回结果必须与预期 canonical bytes 完全一致。
+状态目录只接受上述固定文件名。读取前重新验证 data root 与状态目录的 canonical path、device、inode、owner 和 mode；receipt 还必须是 `link count = 1`、不超过 64 KiB 的普通文件，并在打开前、打开后和读取后保持同一身份。写入使用 `create_new` 创建临时文件，完成文件 `fsync` 后再次验证 root、guard 与旧 receipt 身份，再原子替换并 `fsync` 状态目录；写回结果必须与预期 canonical bytes 完全一致。
 
 每次持久化最多推进一个合法状态，artifact 证据只能追加，operation、版本、layout 与既有证据不能被改写。相同 bytes 可以幂等重放；新 operation 不得覆盖仍存在的 operation。发现 `receipt.json.tmp` 时当前实现返回中断写入错误并保留现场，不自动猜测应提交还是丢弃；该残留的恢复决策与故障注入仍由后续崩溃恢复切面闭合。
 
@@ -163,6 +165,12 @@ operation ID 只接受协调层生成的固定长度小写十六进制随机标�
 
 进程静止是产品升级前置条件，但不能单独证明 SQLite 主文件包含 WAL 中的最新提交。协调器必须通过 SQLite backup API 或等价的 SQLite 一致快照能力生成候选基础，不能用普通文件复制拼装数据库 family。
 
+当前 `ime-userdb` 使用仓库既有 `rusqlite 0.32.1` 的 backup feature 提供两个分离入口：`estimate_snapshot` 在只读事务中读取 schema、`page_size`、`page_count` 并执行 `quick_check(1)`；`create_consistent_snapshot` 只接受调用方已创建的独立空普通文件，以同一只读事务通过 SQLite backup API 复制全部页。backup 完成后目标必须转为单文件 `DELETE` journal、再次通过 `quick_check(1)`，并与源事务的 schema/page 元数据一致；目标不得留下 WAL/SHM，也不执行 migration。schema 0 的零字节数据库按一个将被 materialize 的 SQLite header page 计入预算。
+
+协调层只允许固定 `userdb.sqlite3` 作为源、固定 `source-snapshot.sqlite3.tmp` / `source-snapshot.sqlite3` 作为目标；源主文件与 snapshot 在操作前后都校验 type、device、inode、owner、`0600`、`link count = 1` 和 byte length。当前保守空间预算为 `3 * logical_snapshot_bytes + 64 MiB`，覆盖 snapshot、后续 migration candidate、切换/rollback 工作余量和最低文件系统余量；真实 available bytes 必须由固定 data root 的平台文件系统端口提供，不能接受 UI 或任意路径调用方自报。预算不足或算术溢出在创建临时文件前失败。
+
+snapshot 写入顺序固定为：`create_new` 私有临时文件、SQLite backup/validation、文件 `fsync`、原子 rename、状态目录 `fsync`、先把 snapshot identity 追加到仍为 `quiesced` 的 receipt，再单独持久化 `snapshot_ready`。故障注入覆盖临时文件创建后、backup 后、rename 后和 receipt evidence 后：临时文件残留或已 rename 但尚未记录 identity 时启动加载失败关闭；identity 已持久化而状态仍为 `quiesced` 时允许读取证据，但当前不会自动猜测并推进状态，恢复动作留给后续 crash-recovery 切面。
+
 快照完成后必须：
 
 - 在独立连接上执行完整 `quick_check`；
@@ -171,7 +179,7 @@ operation ID 只接受协调层生成的固定长度小写十六进制随机标�
 - 保持目录 `0700`、普通数据文件 `0600`，拒绝 hardlink、symlink 和未知对象；
 - 在进入 migration 前再次确认原固定路径身份未漂移。
 
-如果空间预算不足以同时保留原库、快照、迁移候选和切换恢复余量，preflight 失败，不边复制边删除旧文件腾空间。
+如果空间预算不足以同时保留原库、快照、迁移候选和切换恢复余量，preflight 失败，不边复制边删除旧文件腾空间。当前 crate 已固定预算计算与拒绝语义；macOS host 的真实 available-space adapter、进程静止证明和 settings 保留副本仍需后续接入。
 
 ### 切换
 

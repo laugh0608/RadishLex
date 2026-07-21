@@ -111,7 +111,7 @@ Flutter Manager
 
 P1 原始事件只在本地用于学习，不得通过 FFI 管理接口或同步 payload 暴露。P2 导出只允许从明确的压缩摘要与用户可管理数据生成。
 
-M4 产品升级把运行时打开与产品迁移分开：`ime-userdb` 提供不配置 WAL、不改权限且不执行 migration 的只读文件 inspection，以及只供隔离候选使用的显式 migration/validation summary。产品协调层不得用运行时 `UserDb::open` 对原库做升级 preflight。
+M4 产品升级把运行时打开与产品迁移分开：`ime-userdb` 提供不配置 WAL、不改权限且不执行 migration 的只读文件 inspection、基于 SQLite backup API 的一致 snapshot，以及只供隔离候选使用的显式 migration/validation summary。snapshot 在只读事务中纳入 WAL 可见内容，输出通过 `quick_check(1)` 的 standalone `DELETE` journal 文件；产品协调层不得用运行时 `UserDb::open` 对原库做升级 preflight。
 
 ### ime-product-upgrade
 
@@ -122,6 +122,7 @@ M4 产品升级把运行时打开与产品迁移分开：`ime-userdb` 提供不�
 - receipt 严格解析且不保存真实路径、数据正文、内容 hash、输入历史或 secret；
 - data root 与状态目录在每次加载/持久化前重验对象身份，receipt 以私有临时文件、文件/目录 `fsync` 和原子 rename 落盘；
 - 跨进程 Unix socket guard 绑定用户与固定 data root 身份，只恢复精确失活 socket，非 socket 或身份漂移失败关闭；
+- snapshot 只读固定 `userdb.sqlite3`，空间预算覆盖三份逻辑工作副本和 64 MiB reserve，并按临时文件、backup、rename、receipt evidence、状态推进顺序提供故障注入；
 - 平台 host 负责固定路径、进程静止和文件系统适配，`ime-userdb` 继续独占 schema 与 migration 语义。
 
 该 crate 不进入输入热路径，不承载安装器 UI、SQLite migration SQL、macOS 进程控制或调用方自定义路径。完整边界见 [macOS 数据升级协调器](macos-data-upgrade-coordinator.md)。
