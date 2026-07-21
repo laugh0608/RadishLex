@@ -60,9 +60,6 @@ RadishLex/
       UpgradePreflightHost/
       UpgradeValidationHosts/
         Sources/
-        Tests/
-        build.sh
-        check.sh
     android-ime/
       keystore-bridge/
   packaging/
@@ -106,7 +103,7 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v8、Manager 产品状态与隔离资格 run、管理查询和共库证据；M4-P02 已固定只读 userdb inspection、snapshot/candidate、receipt/guard、startup gate 与双端 validation contract | 原子切换、最终路径双端复验与发布复验 |
+| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v8、Manager 产品状态与隔离资格 run、管理查询和共库证据；M4-P02 已固定只读 userdb inspection、snapshot/candidate、receipt/guard、startup gate、双端 validation contract 与 `candidate_verified` 持久化 | 原子切换、最终路径双端复验与发布复验 |
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
 | 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
 | Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁 | M4 数据升级、安装载体与发布分发 |

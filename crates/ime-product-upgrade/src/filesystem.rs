@@ -34,6 +34,7 @@ pub enum UpgradeFilesystemErrorCode {
     OperationAlreadyActive,
     InvalidSnapshotState,
     InvalidCandidateState,
+    InvalidCandidateValidation,
     InvalidSettingsState,
     InsufficientSpace,
     SnapshotFailed,
@@ -86,6 +87,9 @@ impl fmt::Display for UpgradeFilesystemError {
             UpgradeFilesystemErrorCode::InvalidSnapshotState => "upgrade snapshot state is invalid",
             UpgradeFilesystemErrorCode::InvalidCandidateState => {
                 "upgrade migration candidate state is invalid"
+            }
+            UpgradeFilesystemErrorCode::InvalidCandidateValidation => {
+                "upgrade candidate validation evidence is invalid"
             }
             UpgradeFilesystemErrorCode::InvalidSettingsState => {
                 "upgrade settings backup state is invalid"
@@ -741,6 +745,14 @@ pub use snapshot::{UpgradeSnapshotSpaceBudget, UpgradeSnapshotSummary};
 #[path = "candidate.rs"]
 mod candidate;
 pub use candidate::UpgradeCandidateSummary;
+
+#[path = "validation.rs"]
+mod validation;
+pub use validation::{
+    UpgradeCandidateValidationDisposition, UpgradeCandidateValidationReport,
+    UpgradeCandidateValidationSummary, UpgradeInputMethodValidationEvidence,
+    UpgradeManagerValidationEvidence, UPGRADE_VALIDATION_EVIDENCE_VERSION,
+};
 
 #[path = "settings.rs"]
 mod settings;

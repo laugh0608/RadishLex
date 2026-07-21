@@ -66,6 +66,10 @@ Manager 和 InputMethod 不实现 migration。两端分别在真实 bundle 的 `
 
 双端验证不是用同一个 `UserDb::open` 单元测试冒充两个产品宿主。Manager host 通过只读 current-schema connection 执行 active/deleted/import/learning 管理查询，并检查固定 `source-settings.json` 与 settings format v1 的类型兼容；InputMethod host 从本 bundle 固定 `RimeData` 创建短生命周期隔离 Rime user data，使用 privacy-mode `LearningContext` 驱动 personalized runtime 的固定 `luobo` 候选读取，不选择、不提交也不学习。两端都在调用前后比较 candidate 全字节并拒绝 WAL/SHM/journal。
 
+协调核心只接受 `UPGRADE_VALIDATION_EVIDENCE_VERSION = 1` 的固定摘要。Manager evidence 必须同时声明目标 schema、管理查询与 settings 检查完成；InputMethod evidence 必须同时声明同一目标 schema、personalized runtime 与候选信号检查完成。Manager 失败或 evidence 漂移优先记录 `manager_validation_failed`，Manager 通过后 InputMethod 失败或 evidence 漂移记录 `input_method_validation_failed`；这两类切换前失败都原子进入 `aborted_preserved`，原固定数据库不变。只有两端精确通过且协调核心再次以 read-only current-schema connection 复验 candidate，receipt 才从 `candidate_migrated` 单步推进 `candidate_verified`。
+
+receipt 的 `candidate_verified` 状态本身是双端成功的持久化证明，不另存 host stdout/stderr、调用路径、候选正文、内容 hash 或可重放的任意布尔数组。调用方必须是后续固定产品协调入口；UI、安装参数和普通业务代码不能直接构造或覆盖 receipt。
+
 ### 安装载体
 
 M4-P03 选择的 `.pkg`、`.dmg` 或安装器应用只能调用稳定协调入口并展示结果。它负责程序 bundle 的安装与恢复，不创建数据库 migration SQL，不解析 receipt 内部字段，不删除真实用户数据。
@@ -141,6 +145,8 @@ receipt 使用 UTF-8 JSON、固定字段顺序和末尾换行，当前格式为 
 状态目录只接受上述固定文件名。读取前重新验证 data root 与状态目录的 canonical path、device、inode、owner 和 mode；receipt 还必须是 `link count = 1`、不超过 64 KiB 的普通文件，并在打开前、打开后和读取后保持同一身份。写入使用 `create_new` 创建临时文件，完成文件 `fsync` 后再次验证 root、guard 与旧 receipt 身份，再原子替换并 `fsync` 状态目录；写回结果必须与预期 canonical bytes 完全一致。
 
 每次持久化最多推进一个合法状态，artifact 证据只能追加，operation、版本、layout 与既有证据不能被改写。相同 bytes 可以幂等重放；新 operation 不得覆盖仍存在的 operation。发现 `receipt.json.tmp` 时当前实现返回中断写入错误并保留现场，不自动猜测应提交还是丢弃；该残留的恢复决策与故障注入仍由后续崩溃恢复切面闭合。
+
+`candidate_verified` 不新增 artifact 或 validation 明细字段。协调核心在同一 guard 下复核当前 persisted receipt、candidate identity、sidecar 零残留、evidence version/schema/check bits，并用既有 receipt 原子替换链只写一个状态转换。写入前失败保持 `candidate_migrated`；端点明确失败则持久化 `aborted_preserved` 与对应稳定 failure code。
 
 如果 preflight 记录了 `SourceSettings`，协调层必须在仍为 `quiesced` 时从固定 `manager-settings.json` 创建 `source-settings.json.tmp`。复制使用已打开并复验身份的源文件与 `create_new` 私有目标，不解析、不规范化也不改写 JSON；文件 `fsync`、源身份复验、原子 rename 和目录 `fsync` 后，先把 `BackupSettings` identity 追加到 receipt。settings 不存在时两个槽位都不存在；出现 source/backup 单边证据时不得进入 `snapshot_ready`。
 
@@ -275,7 +281,7 @@ macOS preflight host 不接受调用方路径或进程名。它从产品 manifes
 4. 实现 settings 原样保留副本、SQLite 一致快照、空间预算、身份校验与故障注入文件系统端口；
 5. 从固定 snapshot 创建隔离 migration candidate，固化 standalone SQLite 与 receipt evidence；
 6. 已接入固定 macOS available-space、点时静止探针、双端 startup gate 和 Manager/InputMethod 候选 validation host；
-7. 把双端验证结果持久化后实现切换、重启恢复和回滚；
+7. 已把双端验证结果以 `candidate_verified` 或端点 failure 原子持久化；下一步实现切换、重启恢复和回滚；
 8. 接入产品 manifest、自动门禁和隔离产品构建 smoke；
 9. M4-P03 选定安装载体后再编写真实安装升级 runbook。
 

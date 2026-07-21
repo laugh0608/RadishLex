@@ -12,9 +12,12 @@ mod filesystem;
 #[cfg(unix)]
 pub use filesystem::{
     inspect_startup_gate, StartupGateDecision, StartupGateErrorCode, StartupGateResult,
-    UpgradeCandidateSummary, UpgradeFilesystemError, UpgradeFilesystemErrorCode,
-    UpgradeProcessGuard, UpgradeReceiptStore, UpgradeSettingsBackupSummary,
-    UpgradeSnapshotSpaceBudget, UpgradeSnapshotSummary, VerifiedDataRoot,
+    UpgradeCandidateSummary, UpgradeCandidateValidationDisposition,
+    UpgradeCandidateValidationReport, UpgradeCandidateValidationSummary, UpgradeFilesystemError,
+    UpgradeFilesystemErrorCode, UpgradeInputMethodValidationEvidence,
+    UpgradeManagerValidationEvidence, UpgradeProcessGuard, UpgradeReceiptStore,
+    UpgradeSettingsBackupSummary, UpgradeSnapshotSpaceBudget, UpgradeSnapshotSummary,
+    VerifiedDataRoot, UPGRADE_VALIDATION_EVIDENCE_VERSION,
 };
 
 pub const UPGRADE_RECEIPT_FORMAT: &str = "radishlex-product-upgrade-receipt-v1";

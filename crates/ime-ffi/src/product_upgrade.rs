@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use radishlex_ime_product_upgrade::{
     inspect_startup_gate, StartupGateDecision, StartupGateErrorCode, UpgradeState,
+    UPGRADE_VALIDATION_EVIDENCE_VERSION,
 };
 use radishlex_ime_userdb::UserDb;
 
@@ -160,7 +161,7 @@ pub unsafe extern "C" fn radishlex_manager_upgrade_validate_candidate(
         validate_manager_settings(&settings)?;
         unsafe {
             *summary_out = RadishLexUpgradeValidationSummary {
-                version: 1,
+                version: UPGRADE_VALIDATION_EVIDENCE_VERSION,
                 schema_version,
                 management_queries_checked: 1,
                 settings_checked: 1,
@@ -231,7 +232,7 @@ unsafe fn validate_input_method_candidate(
     drop(session);
     shutdown_process_runtime()?;
     *summary_out = RadishLexUpgradeValidationSummary {
-        version: 1,
+        version: UPGRADE_VALIDATION_EVIDENCE_VERSION,
         schema_version,
         personalized_runtime_checked: 1,
         candidate_signals_read: 1,
