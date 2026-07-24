@@ -785,6 +785,13 @@ pub use rollback::{
     UpgradeRollbackValidationSummary, UPGRADE_ROLLBACK_VALIDATION_EVIDENCE_VERSION,
 };
 
+#[path = "coordinator.rs"]
+mod coordinator;
+pub use coordinator::{
+    UpgradeCoordinatorCheckpoint, UpgradeCoordinatorDisposition, UpgradeCoordinatorError,
+    UpgradeCoordinatorPort, UpgradeCoordinatorSummary,
+};
+
 #[path = "startup_gate.rs"]
 mod startup_gate;
 pub use startup_gate::{

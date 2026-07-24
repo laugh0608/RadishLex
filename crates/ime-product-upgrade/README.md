@@ -84,6 +84,8 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 三条写路径都在调用前后复验源对象身份，并按临时文件、内容生成、文件持久化、原子 rename、目录持久化、receipt identity、状态推进的顺序提交。任何阶段失败都不得修改原固定 `userdb.sqlite3`。
 
+settings backup、snapshot 或 candidate 的 identity 已持久化而下一状态尚未落盘时，原 API 会复验固定对象、源对象与 SQLite 结构后幂等完成剩余状态转换。只有 rename 已发生但 receipt 尚无 identity、临时文件残留或对象漂移的现场继续失败关闭，不根据文件内容猜测归属。
+
 ### 双端验证证据
 
 `record_candidate_validation` 只接受 `UPGRADE_VALIDATION_EVIDENCE_VERSION = 1`：
@@ -106,6 +108,12 @@ receipt 不保存 host 输出、任意布尔数组、绝对路径、数据库正
 `record_post_switch_validation` 只在 `switched` 接受最终固定路径的双端 evidence。成功先持久化 `post_switch_verified`，随后由独立完成动作复验相同 inode 与 current schema 并推进 `completed`；验证失败或完成前重复复验失败都进入带 `post_switch_validation_failed` 的 `rollback_required`。
 
 回滚先把失败的新库移回固定 candidate 槽，再把旧库 backup 原 inode 恢复到 `userdb.sqlite3`，每次跨目录 rename 后按目标、源目录顺序 `fsync`。receipt 在文件恢复后仍保持 `rollback_required`；只有 source-release evidence v1 与核心只读 schema/integrity 复验同时通过，才能进入 `rolled_back`。失败的新库和全部恢复材料默认保留。
+
+### Guard-bound 协调驱动
+
+`resume_userdb_upgrade` 从已持久化的 `preflighted` 或任一后续状态续跑，不创建 operation 或接受路径。平台通过 `UpgradeCoordinatorPort` 在每个写入、产品 validation 前后和回滚验证前后重新证明静止，并只返回固定 validation report/evidence；核心在同一 `UpgradeProcessGuard` 下调度现有 settings、snapshot、candidate、switch、completion 与 rollback 原语。
+
+静止无法证明时返回精确 checkpoint，receipt 保持最后已证明状态；source-release evidence 不可得时旧库可已恢复，但 receipt 保持 `rollback_required`。candidate 失败正常收敛到 `aborted_preserved`，post-switch 失败正常收敛到 `rolled_back`，成功收敛到 `completed`。macOS 进程检查、helper executable 定位与 manifest 绑定仍由下一层平台适配负责。
 
 ## 错误与隐私边界
 

@@ -148,7 +148,9 @@ receipt 使用 UTF-8 JSON、固定字段顺序和末尾换行，当前格式为 
 
 状态目录只接受上述固定文件名。读取前重新验证 data root 与状态目录的 canonical path、device、inode、owner 和 mode；receipt 还必须是 `link count = 1`、不超过 64 KiB 的普通文件，并在打开前、打开后和读取后保持同一身份。写入使用 `create_new` 创建临时文件，完成文件 `fsync` 后再次验证 root、guard 与旧 receipt 身份，再原子替换并 `fsync` 状态目录；写回结果必须与预期 canonical bytes 完全一致。
 
-每次持久化最多推进一个合法状态，artifact 证据只能追加，operation、版本、layout 与既有证据不能被改写。相同 bytes 可以幂等重放；新 operation 不得覆盖仍存在的 operation。发现 `receipt.json.tmp` 时当前实现返回中断写入错误并保留现场，不自动猜测应提交还是丢弃；该残留的恢复决策与故障注入仍由后续崩溃恢复切面闭合。
+每次持久化最多推进一个合法状态，artifact 证据只能追加，operation、版本、layout 与既有证据不能被改写。相同 bytes 可以幂等重放；新 operation 不得覆盖仍存在的 operation。发现 `receipt.json.tmp` 时当前实现返回中断写入错误并保留现场，不自动猜测应提交还是丢弃。
+
+settings backup、snapshot 或 candidate 的最终 identity 已写入 receipt 而下一状态尚未持久化时，协调核心允许幂等收敛：再次复验源对象、固定目标 identity、sidecar 与 SQLite schema/integrity，再只补写缺失的下一状态。rename 已完成但 identity 尚未写入、临时文件仍存在或任一对象漂移时仍失败关闭，不从“文件能否打开”反推归属。
 
 `candidate_verified` 不新增 artifact 或 validation 明细字段。协调核心在同一 guard 下复核当前 persisted receipt、candidate identity、sidecar 零残留、evidence version/schema/check bits，并用既有 receipt 原子替换链只写一个状态转换。写入前失败保持 `candidate_migrated`；端点明确失败则持久化 `aborted_preserved` 与对应稳定 failure code。
 
@@ -273,7 +275,9 @@ Manager 与 InputMethod 在产品启动前必须检查是否存在非终态升�
 
 macOS preflight host 不接受调用方路径或进程名。它从产品 manifest 固定 Manager/InputMethod bundle ID，通过 `NSRunningApplication` 判断双端是否仍运行，并以系统固定 `/usr/sbin/lsof` 检查已存在的 `userdb.sqlite3` family、`manager-settings.json` 与其原子写临时文件是否仍有打开句柄；输出只包含 format、result、available bytes、quiescent 和稳定 blocker，不回显路径、进程详情或 `lsof` 内容。unsafe root/file、容量不可得或检测工具异常都失败关闭。
 
-这份结果只是同一时刻的只读证据：它不停止进程，也不能阻止旧版本在检测后、snapshot 前重新启动。ABI v8 startup gate 已在 Manager `applicationWillFinishLaunching` 调用 `super` 之前、InputMethod 创建 `IMKServer` 之前接线；只读允许 data root/state absent 与终态 receipt，active guard、所有非终态、损坏 receipt、中断 artifact、未知对象和身份漂移均阻止业务初始化。它不创建目录、不改权限、不连接或清理 guard；协调器仍须把 preflight、`quiesced` 持久化与 snapshot 纳入同一 guard 才能形成持续静止结论。
+这份结果只是同一时刻的只读证据：它不停止进程，也不能阻止旧版本在检测后、snapshot 前重新启动。ABI v8 startup gate 已在 Manager `applicationWillFinishLaunching` 调用 `super` 之前、InputMethod 创建 `IMKServer` 之前接线；只读允许 data root/state absent 与终态 receipt，active guard、所有非终态、损坏 receipt、中断 artifact、未知对象和身份漂移均阻止业务初始化。它不创建目录、不改权限、不连接或清理 guard。
+
+`resume_userdb_upgrade` 已把 `preflighted` 至终态的既有原语纳入同一 `UpgradeProcessGuard`。平台 port 必须在进入 `quiesced`、settings/snapshot/candidate、切换、完成和回滚前重新证明静止，并在 candidate/post-switch/source-release host 返回后再次证明静止；任一 checkpoint 失败都保持最后已持久化状态。该核心驱动不定位 executable、不启动进程、不接受路径；macOS adapter 仍须把每个 checkpoint 接到固定 preflight host，并把双端与 source-release helper 绑定到受 manifest 证明的固定 bundle。
 
 ## 稳定错误分类
 
@@ -328,9 +332,10 @@ macOS preflight host 不接受调用方路径或进程名。它从产品 manifes
 5. 从固定 snapshot 创建隔离 migration candidate，固化 standalone SQLite 与 receipt evidence；
 6. 已接入固定 macOS available-space、点时静止探针、双端 startup gate 和 Manager/InputMethod 候选 validation host；
 7. 已把双端验证结果以 `candidate_verified` 或端点 failure 原子持久化，并完成固定 backup、同文件系统双 rename、目录持久化与逐边界重启恢复；
-8. 下一步在最终固定路径执行双端验证，完成 `post_switch_verified` / `completed` 和精确 rollback；
-9. 接入产品 manifest、自动门禁和隔离产品构建 smoke；
-10. M4-P03 选定安装载体后再编写真实安装升级 runbook。
+8. 已在最终固定路径完成双端验证、`post_switch_verified` / `completed` 和精确 rollback；
+9. 已补齐 settings/snapshot/candidate evidence-only 恢复，并实现同一 guard 下逐 checkpoint 复验静止的核心协调驱动；
+10. 下一步实现 macOS 固定 host adapter、source/target manifest 绑定和隔离产品协调 smoke；
+11. M4-P03 选定安装载体后再编写真实安装升级 runbook。
 
 ## M4-P02 退出标准
 

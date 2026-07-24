@@ -140,14 +140,21 @@ impl UpgradeReceiptStore {
             .load_current_internal()?
             .map(|(stored, _, _)| stored)
             .ok_or_else(|| error(UpgradeFilesystemErrorCode::InvalidSnapshotState))?;
-        if current_receipt != *receipt
-            || receipt
-                .artifacts()
-                .iter()
-                .any(|artifact| artifact.slot() == UpgradeArtifactSlot::SnapshotDatabase)
-            || !settings::settings_backup_is_ready(receipt)
-        {
+        if current_receipt != *receipt || !settings::settings_backup_is_ready(receipt) {
             return Err(error(UpgradeFilesystemErrorCode::InvalidSnapshotState));
+        }
+        if let Some(snapshot_identity) = receipt
+            .artifacts()
+            .iter()
+            .find(|artifact| artifact.slot() == UpgradeArtifactSlot::SnapshotDatabase)
+            .cloned()
+        {
+            return self.resume_recorded_snapshot(
+                guard,
+                receipt,
+                reported_available_bytes,
+                snapshot_identity,
+            );
         }
         if path_exists(&self.staged_snapshot_path())? || path_exists(&self.snapshot_path())? {
             return Err(error(UpgradeFilesystemErrorCode::InterruptedSnapshot));
@@ -280,6 +287,60 @@ impl UpgradeReceiptStore {
 
     pub(super) fn staged_snapshot_path(&self) -> PathBuf {
         self.state_directory.join(STAGED_SNAPSHOT_FILE_NAME)
+    }
+
+    fn resume_recorded_snapshot(
+        &self,
+        guard: &UpgradeProcessGuard,
+        receipt: &mut UpgradeReceipt,
+        reported_available_bytes: u64,
+        snapshot_identity: UpgradeArtifactIdentity,
+    ) -> Result<UpgradeSnapshotSummary, UpgradeFilesystemError> {
+        validate_snapshot_state(self, Some(receipt))?;
+        let source_path = self.root.path.join(USERDB_FILE_NAME);
+        let source_metadata = private_data_file_metadata(
+            &source_path,
+            self.root.expected_owner_id,
+            UpgradeFilesystemErrorCode::IdentityChanged,
+        )?;
+        let source_identity = receipt
+            .artifacts()
+            .iter()
+            .find(|artifact| artifact.slot() == UpgradeArtifactSlot::SourceDatabase)
+            .ok_or_else(|| error(UpgradeFilesystemErrorCode::InvalidSnapshotState))?;
+        if !file_artifact_matches_metadata(source_identity, &source_metadata) {
+            return Err(error(UpgradeFilesystemErrorCode::IdentityChanged));
+        }
+        let source = UserDb::estimate_snapshot(&source_path)
+            .map_err(|_| error(UpgradeFilesystemErrorCode::SnapshotFailed))?;
+        validate_estimate(receipt, source)?;
+        let snapshot = UserDb::estimate_snapshot(self.snapshot_path())
+            .map_err(|_| error(UpgradeFilesystemErrorCode::SnapshotFailed))?;
+        if snapshot.schema_version != source.schema_version
+            || snapshot.logical_size_bytes != source.logical_size_bytes
+            || snapshot.page_size_bytes != source.page_size_bytes
+            || snapshot.page_count != source.page_count
+        {
+            return Err(error(UpgradeFilesystemErrorCode::InvalidSnapshotState));
+        }
+        let space_budget = UpgradeSnapshotSpaceBudget::evaluate(
+            snapshot.logical_size_bytes,
+            reported_available_bytes,
+        )?;
+        let mut next_receipt = receipt.clone();
+        next_receipt
+            .advance(UpgradeState::SnapshotReady)
+            .map_err(|_| error(UpgradeFilesystemErrorCode::InvalidSnapshotState))?;
+        self.persist(guard, &next_receipt)?;
+        *receipt = next_receipt;
+        Ok(UpgradeSnapshotSummary {
+            space_budget,
+            snapshot_identity,
+            source_schema_version: source.schema_version,
+            snapshot_schema_version: snapshot.schema_version,
+            page_size_bytes: snapshot.page_size_bytes,
+            page_count: snapshot.page_count,
+        })
     }
 }
 

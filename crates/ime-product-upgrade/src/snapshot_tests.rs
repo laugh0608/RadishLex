@@ -276,7 +276,7 @@ fn rename_before_receipt_evidence_fails_closed_without_guessing() {
 }
 
 #[test]
-fn persisted_snapshot_evidence_is_loadable_before_state_advance() {
+fn persisted_snapshot_evidence_advances_idempotently() {
     let mut fixture = SnapshotFixture::new();
     let guard = fixture.store.acquire_guard().expect("guard is acquired");
 
@@ -290,7 +290,7 @@ fn persisted_snapshot_evidence_is_loadable_before_state_advance() {
         )
         .expect_err("post-evidence fault is injected");
     drop(guard);
-    let stored = fixture
+    let mut stored = fixture
         .store
         .load()
         .expect("evidence-bearing receipt loads")
@@ -300,4 +300,18 @@ fn persisted_snapshot_evidence_is_loadable_before_state_advance() {
         .artifacts()
         .iter()
         .any(|artifact| artifact.slot() == UpgradeArtifactSlot::SnapshotDatabase));
+    let guard = fixture.store.acquire_guard().expect("recovery guard");
+    let summary = fixture
+        .store
+        .create_userdb_snapshot(&guard, &mut stored, u64::MAX)
+        .expect("recorded snapshot evidence advances");
+    assert_eq!(stored.state(), UpgradeState::SnapshotReady);
+    assert_eq!(
+        summary.snapshot_identity(),
+        stored
+            .artifacts()
+            .iter()
+            .find(|artifact| artifact.slot() == UpgradeArtifactSlot::SnapshotDatabase)
+            .expect("snapshot identity")
+    );
 }

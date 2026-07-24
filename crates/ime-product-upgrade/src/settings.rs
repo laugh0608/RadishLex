@@ -72,9 +72,7 @@ impl UpgradeReceiptStore {
             || receipt.artifacts().iter().any(|artifact| {
                 matches!(
                     artifact.slot(),
-                    UpgradeArtifactSlot::BackupSettings
-                        | UpgradeArtifactSlot::SnapshotDatabase
-                        | UpgradeArtifactSlot::CandidateDatabase
+                    UpgradeArtifactSlot::SnapshotDatabase | UpgradeArtifactSlot::CandidateDatabase
                 )
             })
         {
@@ -85,6 +83,17 @@ impl UpgradeReceiptStore {
             .iter()
             .find(|artifact| artifact.slot() == UpgradeArtifactSlot::SourceSettings)
             .ok_or_else(|| error(UpgradeFilesystemErrorCode::InvalidSettingsState))?;
+        validate_source_settings_identity(self, source_identity)?;
+        if let Some(backup_identity) = receipt
+            .artifacts()
+            .iter()
+            .find(|artifact| artifact.slot() == UpgradeArtifactSlot::BackupSettings)
+        {
+            validate_settings_backup_state(self, Some(receipt))?;
+            return Ok(UpgradeSettingsBackupSummary {
+                backup_identity: backup_identity.clone(),
+            });
+        }
         if path_exists(&self.staged_settings_backup_path())?
             || path_exists(&self.settings_backup_path())?
         {
@@ -97,9 +106,6 @@ impl UpgradeReceiptStore {
             self.root.expected_owner_id,
             UpgradeFilesystemErrorCode::IdentityChanged,
         )?;
-        if !snapshot::file_artifact_matches_metadata(source_identity, &source_metadata) {
-            return Err(error(UpgradeFilesystemErrorCode::IdentityChanged));
-        }
         let mut source_file = File::open(&source_path)
             .map_err(|_| error(UpgradeFilesystemErrorCode::SettingsBackupFailed))?;
         if FileIdentity::from_metadata(
@@ -217,6 +223,23 @@ pub(super) fn settings_backup_is_ready(receipt: &UpgradeReceipt) -> bool {
         .iter()
         .any(|artifact| artifact.slot() == UpgradeArtifactSlot::BackupSettings);
     source_present == backup_present
+}
+
+fn validate_source_settings_identity(
+    store: &UpgradeReceiptStore,
+    source_identity: &UpgradeArtifactIdentity,
+) -> Result<(), UpgradeFilesystemError> {
+    let source_path = store.root.path.join(SETTINGS_FILE_NAME);
+    let source_metadata = snapshot::private_data_file_metadata(
+        &source_path,
+        store.root.expected_owner_id,
+        UpgradeFilesystemErrorCode::IdentityChanged,
+    )?;
+    if snapshot::file_artifact_matches_metadata(source_identity, &source_metadata) {
+        Ok(())
+    } else {
+        Err(error(UpgradeFilesystemErrorCode::IdentityChanged))
+    }
 }
 
 pub(super) fn validate_settings_backup_state(

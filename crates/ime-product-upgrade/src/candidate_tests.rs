@@ -250,7 +250,7 @@ fn rename_before_candidate_evidence_fails_closed_without_guessing() {
 }
 
 #[test]
-fn persisted_candidate_evidence_is_loadable_before_state_advance() {
+fn persisted_candidate_evidence_advances_idempotently() {
     let mut fixture = CandidateFixture::new(SourceFixture::Current);
     let guard = fixture.store.acquire_guard().expect("guard is acquired");
 
@@ -263,7 +263,7 @@ fn persisted_candidate_evidence_is_loadable_before_state_advance() {
         )
         .expect_err("post-evidence fault is injected");
     drop(guard);
-    let stored = fixture
+    let mut stored = fixture
         .store
         .load()
         .expect("evidence-bearing receipt loads")
@@ -273,6 +273,20 @@ fn persisted_candidate_evidence_is_loadable_before_state_advance() {
         .artifacts()
         .iter()
         .any(|artifact| artifact.slot() == UpgradeArtifactSlot::CandidateDatabase));
+    let guard = fixture.store.acquire_guard().expect("recovery guard");
+    let summary = fixture
+        .store
+        .create_userdb_candidate(&guard, &mut stored)
+        .expect("recorded candidate evidence advances");
+    assert_eq!(stored.state(), UpgradeState::CandidateMigrated);
+    assert_eq!(
+        summary.candidate_identity(),
+        stored
+            .artifacts()
+            .iter()
+            .find(|artifact| artifact.slot() == UpgradeArtifactSlot::CandidateDatabase)
+            .expect("candidate identity")
+    );
 }
 
 #[test]

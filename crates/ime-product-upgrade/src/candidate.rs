@@ -80,13 +80,16 @@ impl UpgradeReceiptStore {
             .load_current_internal()?
             .map(|(stored, _, _)| stored)
             .ok_or_else(|| error(UpgradeFilesystemErrorCode::InvalidCandidateState))?;
-        if current_receipt != *receipt
-            || receipt
-                .artifacts()
-                .iter()
-                .any(|artifact| artifact.slot() == UpgradeArtifactSlot::CandidateDatabase)
-        {
+        if current_receipt != *receipt {
             return Err(error(UpgradeFilesystemErrorCode::InvalidCandidateState));
+        }
+        if let Some(candidate_identity) = receipt
+            .artifacts()
+            .iter()
+            .find(|artifact| artifact.slot() == UpgradeArtifactSlot::CandidateDatabase)
+            .cloned()
+        {
+            return self.resume_recorded_candidate(guard, receipt, candidate_identity);
         }
         if path_exists(&self.staged_candidate_path())? || path_exists(&self.candidate_path())? {
             return Err(error(UpgradeFilesystemErrorCode::InterruptedCandidate));
@@ -234,6 +237,41 @@ impl UpgradeReceiptStore {
 
     fn staged_candidate_path(&self) -> PathBuf {
         self.state_directory.join(STAGED_CANDIDATE_FILE_NAME)
+    }
+
+    fn resume_recorded_candidate(
+        &self,
+        guard: &UpgradeProcessGuard,
+        receipt: &mut UpgradeReceipt,
+        candidate_identity: UpgradeArtifactIdentity,
+    ) -> Result<UpgradeCandidateSummary, UpgradeFilesystemError> {
+        validate_candidate_state(self, Some(receipt))?;
+        snapshot::validate_snapshot_state(self, Some(receipt))?;
+        let snapshot = UserDb::inspect_file(self.snapshot_path())
+            .map_err(|_| error(UpgradeFilesystemErrorCode::CandidateMigrationFailed))?;
+        let candidate = UserDb::inspect_file(self.candidate_path())
+            .map_err(|_| error(UpgradeFilesystemErrorCode::CandidateMigrationFailed))?;
+        let source_schema_version = receipt
+            .source_schema_version()
+            .ok_or_else(|| error(UpgradeFilesystemErrorCode::InvalidCandidateState))?;
+        if snapshot.schema_version != source_schema_version
+            || candidate.schema_version != receipt.target_schema_version()
+            || candidate.compatibility != UserDbSchemaCompatibility::Current
+        {
+            return Err(error(UpgradeFilesystemErrorCode::InvalidCandidateState));
+        }
+        let mut next_receipt = receipt.clone();
+        next_receipt
+            .advance(UpgradeState::CandidateMigrated)
+            .map_err(|_| error(UpgradeFilesystemErrorCode::InvalidCandidateState))?;
+        self.persist(guard, &next_receipt)?;
+        *receipt = next_receipt;
+        Ok(UpgradeCandidateSummary {
+            candidate_identity,
+            source_schema_version,
+            target_schema_version: candidate.schema_version,
+            migrated: source_schema_version != candidate.schema_version,
+        })
     }
 }
 

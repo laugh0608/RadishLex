@@ -242,7 +242,7 @@ fn renamed_settings_without_receipt_evidence_fail_closed() {
 }
 
 #[test]
-fn persisted_settings_evidence_loads_without_advancing_state() {
+fn persisted_settings_evidence_replays_idempotently() {
     let mut fixture = SettingsFixture::new();
     let guard = fixture.store.acquire_guard().expect("guard is acquired");
 
@@ -255,7 +255,7 @@ fn persisted_settings_evidence_loads_without_advancing_state() {
         )
         .expect_err("post-evidence fault is injected");
     drop(guard);
-    let stored = fixture
+    let mut stored = fixture
         .store
         .load()
         .expect("evidence-bearing receipt loads")
@@ -265,6 +265,13 @@ fn persisted_settings_evidence_loads_without_advancing_state() {
         .artifacts()
         .iter()
         .any(|artifact| artifact.slot() == UpgradeArtifactSlot::BackupSettings));
+    let guard = fixture.store.acquire_guard().expect("recovery guard");
+    let summary = fixture
+        .store
+        .create_settings_backup(&guard, &mut stored)
+        .expect("recorded settings evidence replays");
+    assert_eq!(summary.byte_len(), SYNTHETIC_SETTINGS.len() as u64);
+    assert_eq!(stored.state(), UpgradeState::Quiesced);
 }
 
 #[test]

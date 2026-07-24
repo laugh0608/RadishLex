@@ -195,7 +195,7 @@ Apple 官方边界参考：
 4. 生成并复验 `ProductManifest.json`；
 5. 把 source contract 单元测试接入仓库门禁；
 6. 在可用的隔离 RimeData/native dependency 环境运行完整装配验证；
-7. M4-P01 退出后进入数据升级协调器；M4-P02 当前已完成原子切换、最终路径双端复验与精确数据回滚，后续仍需闭合 guard 内持续静止、完整平台协调入口和 source-release host 调度，发布安装与程序版本回滚载体属于再下一批 M4-P03。
+7. M4-P01 退出后进入数据升级协调器；M4-P02 当前已完成原子切换、最终路径双端复验、精确数据回滚和 guard-bound 核心驱动，后续仍需闭合 macOS 固定 host adapter、source/target manifest 绑定与隔离产品协调 smoke，发布安装与程序版本回滚载体属于再下一批 M4-P03。
 
 ## M4-P01 退出标准
 
