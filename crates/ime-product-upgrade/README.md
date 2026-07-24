@@ -37,6 +37,7 @@ macOS product host
   source-snapshot.sqlite3.tmp
   migration-candidate.sqlite3
   migration-candidate.sqlite3.tmp
+  source-backup.sqlite3
   source-settings.json
   source-settings.json.tmp
 ```
@@ -93,6 +94,12 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 - Manager 或 InputMethod 明确失败分别以稳定 failure code 进入 `aborted_preserved`。
 
 receipt 不保存 host 输出、任意布尔数组、绝对路径、数据库正文或内容 hash。`candidate_verified` 状态本身是本 operation 已接受双端证据的持久化结论。
+
+### 原子切换与重启恢复
+
+`switch_userdb_candidate` 只接受固定原库、candidate 与 backup 路径。它先把旧库 identity 以 `BackupDatabase` 追加到 receipt 并持久化 `switch_prepared`，随后执行旧库到 `source-backup.sqlite3`、candidate 到 `userdb.sqlite3` 的同文件系统 rename。每次跨目录 rename 后按目标目录、源目录顺序执行目录 `fsync`，最终复验两个 inode 与 sidecar 零残留后才持久化 `switched`。
+
+调用可从 `candidate_verified`、`switch_prepared` 或 `switched` 恢复。恢复只接受 receipt 所证明的原路径、单次 rename 后现场、两次 rename 后现场或完整 switched 现场；其他缺失、重复、替换、跨设备、sidecar 或未知对象组合失败关闭且不清理。`switched` 幂等重放不会再次移动文件，backup 默认保留。
 
 ## 错误与隐私边界
 

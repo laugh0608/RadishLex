@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核日期：2026-07-21（Asia/Shanghai）
+- 复核日期：2026-07-24（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前产品里程碑：M4 产品发布候选
 - 当前产品主批次：M4-P02 Application Support v1 数据升级协调器；M4-P01 双 bundle 产品装配已完成
@@ -12,7 +12,7 @@
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；合成数据、短生命周期服务与受控集成测试可以继续
 
-M4-P02 已完成升级协调器边界、只读 inspection、SQLite 一致快照、隔离 migration candidate、settings 副本、receipt/guard 与故障注入。macOS preflight 已固定检查容量、双端进程与受控句柄；ABI v8 startup gate 已在 Manager 原生 Runner 和 InputMethod `main` 的业务初始化之前接线。两个 bundle 各自携带无参数 upgrade validation host，并复验 candidate 字节及 WAL/SHM/journal 零残留。协调核心现只接受 validation evidence v1、目标 schema 与两端固定检查位：双端成功原子推进 `candidate_verified`，任一端失败以稳定 failure code 进入 `aborted_preserved`，不改原固定库；receipt 不保存 host 输出正文或路径。原子切换、最终路径复验与完整崩溃恢复尚未闭合，因此 M4-P02 未退出。
+M4-P02 已完成升级协调器边界、只读 inspection、SQLite 一致快照、隔离 migration candidate、settings 副本、receipt/guard 与故障注入。macOS preflight 已固定检查容量、双端进程与受控句柄；ABI v8 startup gate 已在 Manager 原生 Runner 和 InputMethod `main` 的业务初始化之前接线。两个 bundle 各自携带无参数 upgrade validation host，并复验 candidate 字节及 WAL/SHM/journal 零残留。协调核心只接受 validation evidence v1、目标 schema 与两端固定检查位：双端成功推进 `candidate_verified`，任一端失败进入 `aborted_preserved`。原子切换核心现固定 `source-backup.sqlite3`、同文件系统双 rename、目标/源目录 `fsync` 和 `switch_prepared -> switched`；13 个 receipt/rename/fsync 故障边界均可依据精确 inode 幂等恢复，sidecar、对象缺失或替换失败关闭且不清理。最终固定路径双端产品复验、`rollback_required -> rolled_back` 和完整协调入口尚未闭合，因此 M4-P02 未退出。
 
 M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
@@ -53,7 +53,7 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v8、userd
 
 ## 下一步顺位
 
-1. M4-P02 下一切面固定 `switch_prepared` 的备份身份、同文件系统 rename 顺序与逐崩溃点恢复，再实现最终路径双端复验和精确回滚。preflight 点时检测仍不能替代协调器在 guard 内的持续静止证明；原库继续只读，不迁入 App Group。
+1. M4-P02 下一切面复用现有双端 validation evidence，在最终固定 `userdb.sqlite3` 路径执行 Manager/InputMethod 复验；双端通过后推进 `post_switch_verified -> completed`，任一端失败进入 `rollback_required`，精确恢复旧 inode 并经旧版本兼容验证后进入 `rolled_back`。preflight 点时检测仍不能替代协调器在 guard 内的持续静止证明；原库继续只读，不迁入 App Group。
 2. M4-P03 选择并验证安装载体，闭合固定程序路径、Developer ID/Hardened Runtime、notarization、升级回滚和默认保留用户数据的移除语义；真实系统动作另行授权。
 3. 普通用户同步、恢复/授权/撤销/轮换继续关闭；在真实不支持 Secure Enclave 的环境可得时再补 unsupported，首版发布后且准备生产同步前再验收正式域名/证书。
 

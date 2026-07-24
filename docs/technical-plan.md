@@ -125,6 +125,7 @@ M4 产品升级把运行时打开与产品迁移分开：`ime-userdb` 提供不�
 - snapshot 只读固定 `userdb.sqlite3`，空间预算覆盖三份逻辑工作副本和 64 MiB reserve，并按临时文件、backup、rename、receipt evidence、状态推进顺序提供故障注入；
 - 完全只读的 startup gate 必须在 Manager/InputMethod 的 userdb、settings、Rime runtime 和业务初始化之前执行，首次启动与终态允许，其余不确定升级现场失败关闭；
 - 双端产品 validation host 只读取固定 migration candidate，协调器只在 guard、receipt、candidate identity 和 sidecar 仍一致时消费 validation evidence v1 并推进 `candidate_verified`；
+- 原子切换固定旧库 backup、candidate 与最终 userdb 路径，先持久化 `switch_prepared`，再按同文件系统双 rename 和目标/源目录 `fsync` 推进 `switched`；中断恢复只接受 receipt 与精确 inode 证明的四类现场；
 - 平台 host 负责固定路径、进程静止和文件系统适配，`ime-userdb` 继续独占 schema 与 migration 语义。
 
 该 crate 不进入输入热路径，不承载安装器 UI、SQLite migration SQL、macOS 进程控制或调用方自定义路径。完整边界见 [macOS 数据升级协调器](macos-data-upgrade-coordinator.md)。

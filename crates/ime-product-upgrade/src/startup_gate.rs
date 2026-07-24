@@ -155,6 +155,7 @@ const fn map_filesystem_error(code: UpgradeFilesystemErrorCode) -> StartupGateEr
         UpgradeFilesystemErrorCode::InterruptedReceiptWrite
         | UpgradeFilesystemErrorCode::InterruptedSnapshot
         | UpgradeFilesystemErrorCode::InterruptedCandidate
+        | UpgradeFilesystemErrorCode::InterruptedSwitch
         | UpgradeFilesystemErrorCode::InterruptedSettingsBackup => {
             StartupGateErrorCode::InterruptedArtifact
         }

@@ -140,6 +140,7 @@ receipt 使用 UTF-8 JSON、固定字段顺序和末尾换行，当前格式为 
     source-snapshot.sqlite3.tmp # backup 或 rename 中断时保留
     migration-candidate.sqlite3 # candidate evidence 已固化后存在
     migration-candidate.sqlite3.tmp # copy、migration 或 rename 中断时保留
+    source-backup.sqlite3       # switch_prepared 后保存原 userdb 对象
     source-settings.json        # settings backup evidence 已固化后存在
     source-settings.json.tmp    # copy 或 rename 中断时保留
 ```
@@ -209,7 +210,33 @@ candidate 成功顺序固定为：复制 snapshot 到临时 candidate、隔离 m
 
 候选只有在 migration 与双端验证都通过后才能进入 `switch_prepared`。切换操作必须有明确的原对象、备份对象和候选对象身份，并通过同文件系统 rename、文件与目录持久化形成可恢复序列。
 
-不能假设一次 rename 就覆盖完整数据库 family。最终固定路径切换前后必须确保没有遗留 WAL/SHM 使另一代主库被错误重放；具体 rename 序列和崩溃点需由隔离故障注入测试固定。
+首个实现固定三个路径，不接受调用方覆盖：
+
+```text
+<data-root>/userdb.sqlite3
+<data-root>/.radishlex-upgrade-v1/migration-candidate.sqlite3
+<data-root>/.radishlex-upgrade-v1/source-backup.sqlite3
+```
+
+`SourceDatabase` 与 `BackupDatabase` 表示同一个旧库 inode 在切换前后的两个固定路径；`CandidateDatabase` 表示同一个新库 inode 在 candidate 路径和最终固定路径之间移动。准备切换时先确认 data root、状态目录、原库和 candidate 的 device 相同，backup 路径不存在，三个数据库路径均没有 WAL/SHM/journal。协调器随后把旧库 identity 以 `BackupDatabase` 槽位追加到仍为 `candidate_verified` 的 receipt，再单独持久化 `switch_prepared`。任何 rename 都只能发生在这两个 receipt 写入完成之后。
+
+切换顺序固定为：
+
+1. `userdb.sqlite3 -> source-backup.sqlite3`；复验 backup 仍是 receipt 记录的旧库对象，依次 `fsync` 目标状态目录和源 data root；
+2. `migration-candidate.sqlite3 -> userdb.sqlite3`；复验最终固定路径仍是 receipt 记录的 candidate 对象，依次 `fsync` 目标 data root 和源状态目录；
+3. 再次复验 backup、最终固定路径、sidecar 零残留和同文件系统身份，最后持久化 `switched`。
+
+不能假设一次 rename 就覆盖完整数据库 family。最终固定路径切换前后必须确保没有遗留 WAL/SHM/journal 使另一代主库被错误重放。切换函数允许从 `candidate_verified`、`switch_prepared` 或已持久化的 `switched` 幂等调用，但只接受以下现场：
+
+| persisted state | 原固定路径 | candidate 路径 | backup 路径 | 唯一动作 |
+| --- | --- | --- | --- | --- |
+| `candidate_verified` | 旧库 | candidate | 不存在 | 记录 backup identity 并进入 `switch_prepared` |
+| `switch_prepared` | 旧库 | candidate | 不存在 | 执行两次 rename |
+| `switch_prepared` | 不存在 | candidate | 旧库 | 从第二次 rename 继续 |
+| `switch_prepared` | candidate | 不存在 | 旧库 | 复验后只持久化 `switched` |
+| `switched` | candidate | 不存在 | 旧库 | 幂等返回，不重复 rename |
+
+其他组合全部失败关闭并保留现场，包括同一对象出现在错误路径、对象缺失或替换、backup 提前存在、candidate 与旧库 identity 混淆、跨文件系统、未知 sidecar 或未知状态目录对象。恢复不能根据“哪个文件能打开”猜测世代，也不能自动删除任何对象。
 
 ## 启动门禁与中断恢复
 
@@ -283,9 +310,10 @@ macOS preflight host 不接受调用方路径或进程名。它从产品 manifes
 4. 实现 settings 原样保留副本、SQLite 一致快照、空间预算、身份校验与故障注入文件系统端口；
 5. 从固定 snapshot 创建隔离 migration candidate，固化 standalone SQLite 与 receipt evidence；
 6. 已接入固定 macOS available-space、点时静止探针、双端 startup gate 和 Manager/InputMethod 候选 validation host；
-7. 已把双端验证结果以 `candidate_verified` 或端点 failure 原子持久化；下一步实现切换、重启恢复和回滚；
-8. 接入产品 manifest、自动门禁和隔离产品构建 smoke；
-9. M4-P03 选定安装载体后再编写真实安装升级 runbook。
+7. 已把双端验证结果以 `candidate_verified` 或端点 failure 原子持久化，并完成固定 backup、同文件系统双 rename、目录持久化与逐边界重启恢复；
+8. 下一步在最终固定路径执行双端验证，完成 `post_switch_verified` / `completed` 和精确 rollback；
+9. 接入产品 manifest、自动门禁和隔离产品构建 smoke；
+10. M4-P03 选定安装载体后再编写真实安装升级 runbook。
 
 ## M4-P02 退出标准
 

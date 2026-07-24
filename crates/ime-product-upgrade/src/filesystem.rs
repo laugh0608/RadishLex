@@ -17,6 +17,7 @@ const SNAPSHOT_FILE_NAME: &str = "source-snapshot.sqlite3";
 const STAGED_SNAPSHOT_FILE_NAME: &str = "source-snapshot.sqlite3.tmp";
 const CANDIDATE_FILE_NAME: &str = "migration-candidate.sqlite3";
 const STAGED_CANDIDATE_FILE_NAME: &str = "migration-candidate.sqlite3.tmp";
+const SOURCE_BACKUP_FILE_NAME: &str = "source-backup.sqlite3";
 const SETTINGS_BACKUP_FILE_NAME: &str = "source-settings.json";
 const STAGED_SETTINGS_BACKUP_FILE_NAME: &str = "source-settings.json.tmp";
 
@@ -30,15 +31,18 @@ pub enum UpgradeFilesystemErrorCode {
     InterruptedReceiptWrite,
     InterruptedSnapshot,
     InterruptedCandidate,
+    InterruptedSwitch,
     InterruptedSettingsBackup,
     OperationAlreadyActive,
     InvalidSnapshotState,
     InvalidCandidateState,
     InvalidCandidateValidation,
+    InvalidSwitchState,
     InvalidSettingsState,
     InsufficientSpace,
     SnapshotFailed,
     CandidateMigrationFailed,
+    SwitchFailed,
     SettingsBackupFailed,
     IdentityChanged,
     Io,
@@ -78,6 +82,9 @@ impl fmt::Display for UpgradeFilesystemError {
             UpgradeFilesystemErrorCode::InterruptedCandidate => {
                 "upgrade migration candidate requires recovery"
             }
+            UpgradeFilesystemErrorCode::InterruptedSwitch => {
+                "upgrade database switch requires recovery"
+            }
             UpgradeFilesystemErrorCode::InterruptedSettingsBackup => {
                 "upgrade settings backup requires recovery"
             }
@@ -91,6 +98,9 @@ impl fmt::Display for UpgradeFilesystemError {
             UpgradeFilesystemErrorCode::InvalidCandidateValidation => {
                 "upgrade candidate validation evidence is invalid"
             }
+            UpgradeFilesystemErrorCode::InvalidSwitchState => {
+                "upgrade database switch state is invalid"
+            }
             UpgradeFilesystemErrorCode::InvalidSettingsState => {
                 "upgrade settings backup state is invalid"
             }
@@ -101,6 +111,7 @@ impl fmt::Display for UpgradeFilesystemError {
             UpgradeFilesystemErrorCode::CandidateMigrationFailed => {
                 "upgrade migration candidate failed"
             }
+            UpgradeFilesystemErrorCode::SwitchFailed => "upgrade database switch failed",
             UpgradeFilesystemErrorCode::SettingsBackupFailed => "upgrade settings backup failed",
             UpgradeFilesystemErrorCode::IdentityChanged => "upgrade filesystem identity changed",
             UpgradeFilesystemErrorCode::Io => "upgrade filesystem operation failed",
@@ -306,6 +317,7 @@ impl UpgradeReceiptStore {
         snapshot::validate_snapshot_state(self, receipt.as_ref())?;
         candidate::validate_candidate_state(self, receipt.as_ref())?;
         settings::validate_settings_backup_state(self, receipt.as_ref())?;
+        switch::validate_switch_state(self, receipt.as_ref())?;
         Ok(receipt)
     }
 
@@ -416,6 +428,7 @@ impl UpgradeReceiptStore {
                 && name != STAGED_SNAPSHOT_FILE_NAME
                 && name != CANDIDATE_FILE_NAME
                 && name != STAGED_CANDIDATE_FILE_NAME
+                && name != SOURCE_BACKUP_FILE_NAME
                 && name != SETTINGS_BACKUP_FILE_NAME
                 && name != STAGED_SETTINGS_BACKUP_FILE_NAME
             {
@@ -757,6 +770,10 @@ pub use validation::{
 #[path = "settings.rs"]
 mod settings;
 pub use settings::UpgradeSettingsBackupSummary;
+
+#[path = "switch.rs"]
+mod switch;
+pub use switch::{UpgradeSwitchDisposition, UpgradeSwitchSummary};
 
 #[path = "startup_gate.rs"]
 mod startup_gate;

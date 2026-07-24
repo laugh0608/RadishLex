@@ -8,7 +8,7 @@ use super::*;
 
 const SNAPSHOT_WORKING_COPY_MULTIPLIER: u64 = 3;
 const MINIMUM_FREE_SPACE_RESERVE_BYTES: u64 = 64 * 1024 * 1024;
-const USERDB_FILE_NAME: &str = "userdb.sqlite3";
+pub(super) const USERDB_FILE_NAME: &str = "userdb.sqlite3";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UpgradeSnapshotSpaceBudget {

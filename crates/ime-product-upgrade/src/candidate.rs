@@ -228,7 +228,7 @@ impl UpgradeReceiptStore {
         })
     }
 
-    fn candidate_path(&self) -> PathBuf {
+    pub(super) fn candidate_path(&self) -> PathBuf {
         self.state_directory.join(CANDIDATE_FILE_NAME)
     }
 
@@ -266,6 +266,21 @@ pub(super) fn validate_candidate_state(
             }
         }
         (true, None) => Err(error(UpgradeFilesystemErrorCode::InterruptedCandidate)),
+        (false, Some(_))
+            if receipt.is_some_and(|receipt| {
+                matches!(
+                    receipt.state(),
+                    UpgradeState::SwitchPrepared
+                        | UpgradeState::Switched
+                        | UpgradeState::PostSwitchVerified
+                        | UpgradeState::Completed
+                        | UpgradeState::RollbackRequired
+                        | UpgradeState::RolledBack
+                )
+            }) =>
+        {
+            Ok(())
+        }
         (false, Some(_)) => Err(error(UpgradeFilesystemErrorCode::IdentityChanged)),
     }
 }

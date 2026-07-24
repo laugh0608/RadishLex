@@ -17,7 +17,8 @@ pub use filesystem::{
     UpgradeFilesystemErrorCode, UpgradeInputMethodValidationEvidence,
     UpgradeManagerValidationEvidence, UpgradeProcessGuard, UpgradeReceiptStore,
     UpgradeSettingsBackupSummary, UpgradeSnapshotSpaceBudget, UpgradeSnapshotSummary,
-    VerifiedDataRoot, UPGRADE_VALIDATION_EVIDENCE_VERSION,
+    UpgradeSwitchDisposition, UpgradeSwitchSummary, VerifiedDataRoot,
+    UPGRADE_VALIDATION_EVIDENCE_VERSION,
 };
 
 pub const UPGRADE_RECEIPT_FORMAT: &str = "radishlex-product-upgrade-receipt-v1";
