@@ -34,6 +34,8 @@ bundled_library="${frameworks_dir}/libradishlex_ime_ffi.dylib"
 app_contents="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}"
 helpers_dir="${app_contents}/Helpers"
 validation_sources="${repo_root}/platforms/macos-product/UpgradeValidationHosts/Sources"
+preflight_sources="${repo_root}/platforms/macos-product/UpgradePreflightHost/Sources"
+product_tool="${repo_root}/scripts/macos-product/product_manifest.py"
 
 if [ ! -f "${source_library}" ]; then
   echo "RadishLex manager native library is missing: ${source_library}" >&2
@@ -54,6 +56,17 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   -Wl,-rpath,@executable_path/../Frameworks \
   -framework Foundation \
   -o "${helpers_dir}/RadishLexUpgradeValidationHost"
+manager_bundle_id="$(python3 "${product_tool}" field manager_bundle_id)"
+input_method_bundle_id="$(python3 "${product_tool}" field input_method_bundle_id)"
+clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+  -mmacosx-version-min=13.0 \
+  "-DRLX_MANAGER_BUNDLE_ID=${manager_bundle_id}" \
+  "-DRLX_INPUT_METHOD_BUNDLE_ID=${input_method_bundle_id}" \
+  -I"${preflight_sources}" \
+  "${preflight_sources}/RLXUpgradePreflight.m" \
+  "${preflight_sources}/main.m" \
+  -framework Cocoa \
+  -o "${helpers_dir}/RadishLexUpgradePreflightHost"
 
 required_symbols=(
   _radishlex_apple_p256_product_smoke
@@ -111,3 +124,5 @@ codesign_identity="${EXPANDED_CODE_SIGN_IDENTITY:--}"
 codesign --force --sign "${codesign_identity}" --timestamp=none "${bundled_library}"
 codesign --force --sign "${codesign_identity}" --timestamp=none \
   "${helpers_dir}/RadishLexUpgradeValidationHost"
+codesign --force --sign "${codesign_identity}" --timestamp=none \
+  "${helpers_dir}/RadishLexUpgradePreflightHost"

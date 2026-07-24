@@ -57,7 +57,7 @@ RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支�
 - [同步服务部署](deploy/sync-server/README.md)：本地 HTTPS 与自部署反向代理拓扑。
 - [Flutter Manager](apps/radishlex-manager/README.md)：页面能力、FFI bridge、产品路径和本地验证。
 - [macOS InputMethodKit](platforms/macos-imk/README.md)：平台薄壳、构建、安装与实机验收边界。
-- [macOS 产品升级宿主](platforms/macos-product/README.md)：只读 preflight、双端候选验证和产品构建接线。
+- [macOS 产品升级宿主](platforms/macos-product/README.md)：只读 preflight、双端 validation、manifest 绑定 adapter 和产品构建接线。
 
 ## 开发验证入口
 

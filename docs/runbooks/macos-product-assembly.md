@@ -11,6 +11,7 @@ target/macos-product/<product-version>-<build-number>/
   Components/
     radishlex_manager.app/
       Contents/Helpers/RadishLexUpgradeValidationHost
+      Contents/Helpers/RadishLexUpgradePreflightHost
     RadishLexInputMethod.app/
       Contents/Helpers/RadishLexUpgradeValidationHost
   LICENSE

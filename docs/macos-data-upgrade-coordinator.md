@@ -279,6 +279,33 @@ macOS preflight host 不接受调用方路径或进程名。它从产品 manifes
 
 `resume_userdb_upgrade` 已把 `preflighted` 至终态的既有原语纳入同一 `UpgradeProcessGuard`。平台 port 必须在进入 `quiesced`、settings/snapshot/candidate、切换、完成和回滚前重新证明静止，并在 candidate/post-switch/source-release host 返回后再次证明静止；任一 checkpoint 失败都保持最后已持久化状态。该核心驱动不定位 executable、不启动进程、不接受路径；macOS adapter 仍须把每个 checkpoint 接到固定 preflight host，并把双端与 source-release helper 绑定到受 manifest 证明的固定 bundle。
 
+### macOS 固定产品适配器
+
+macOS adapter 只接受两个已经形成产品装配的根目录，不接受独立 helper 路径、bundle ID、版本、build、schema 或 data root 覆盖：
+
+```text
+<source-product-root>/
+  ProductManifest.json
+  Components/
+    radishlex_manager.app/
+    RadishLexInputMethod.app/
+<target-product-root>/
+  ProductManifest.json
+  Components/
+    radishlex_manager.app/
+    RadishLexInputMethod.app/
+```
+
+两个根目录都必须是 canonical 的真实目录。adapter 严格解析 `ProductManifest.json`，固定要求 `radishlex-macos`、`application-support-v1`、唯一 Manager/InputMethod component、正整数 build 与 schema，并把 manifest release/schema 与 receipt 的 source/target 字段逐次比较。helper 只能从 component 固定相对路径解析：
+
+- target Manager `Contents/Helpers/RadishLexUpgradePreflightHost`：所有 quiescence checkpoint；
+- target Manager 与 InputMethod `Contents/Helpers/RadishLexUpgradeValidationHost`：candidate 和 `--post-switch`；
+- source Manager 与 InputMethod `Contents/Helpers/RadishLexUpgradeValidationHost`：恢复后的 `--post-switch` 兼容验证。
+
+每次执行前都必须重新确认 executable 是非 symlink、单 link 普通文件，长度和 SHA-256 与所属 manifest 的 file record 一致；manifest 缺少固定 record、重复 component/path、hash/size 漂移或 receipt release/schema 不一致均失败关闭。adapter 不把 stdout/stderr、绝对路径或 checkpoint 写入 receipt；preflight 只接受严格的 `radishlex-upgrade-preflight-v1` ready JSON，validation host 只以受控退出码形成固定 evidence。source-release evidence 只有旧 Manager 和旧 InputMethod 都在恢复后的最终固定路径成功打开并关闭后才能形成。
+
+`ProductManifest.json` 在 M4-P02 证明组件与 helper 的内容绑定，不单独证明发布者身份。Developer ID、Hardened Runtime、notarization、安装位置所有权和运行前 code signature requirement 属于 M4-P03，不能由 manifest hash 替代。
+
 ## 稳定错误分类
 
 首批 error code 至少覆盖：
@@ -334,8 +361,9 @@ macOS preflight host 不接受调用方路径或进程名。它从产品 manifes
 7. 已把双端验证结果以 `candidate_verified` 或端点 failure 原子持久化，并完成固定 backup、同文件系统双 rename、目录持久化与逐边界重启恢复；
 8. 已在最终固定路径完成双端验证、`post_switch_verified` / `completed` 和精确 rollback；
 9. 已补齐 settings/snapshot/candidate evidence-only 恢复，并实现同一 guard 下逐 checkpoint 复验静止的核心协调驱动；
-10. 下一步实现 macOS 固定 host adapter、source/target manifest 绑定和隔离产品协调 smoke；
-11. M4-P03 选定安装载体后再编写真实安装升级 runbook。
+10. 已实现 macOS 固定 host adapter、source/target manifest 绑定、target Manager preflight 装配和 adapter contract；
+11. 下一步在隔离合成 Application Support 中以真实产品 helper 完成成功、端点失败、静止丢失和回滚恢复协调 smoke；
+12. M4-P03 选定安装载体后再编写真实安装升级 runbook。
 
 ## M4-P02 退出标准
 

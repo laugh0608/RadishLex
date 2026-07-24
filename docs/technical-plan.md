@@ -130,6 +130,7 @@ M4 产品升级把运行时打开与产品迁移分开：`ime-userdb` 提供不�
 - rollback 先把失败新库移回 candidate，再把旧库原 inode 恢复到最终路径；只有 source-release evidence 与核心 schema/integrity 同时通过才进入 `rolled_back`，不自动删除恢复材料；
 - settings、snapshot 和 candidate 的 identity 已持久化但下一状态未落盘时，只复验既有证据并补写状态，不重建对象或猜测无 identity 现场；
 - guard-bound 驱动在每个写入、产品 validation 前后与 rollback validation 前后通过平台 port 重新证明静止；核心不定位或启动平台 executable；
+- macOS adapter 从 source/target `ProductManifest.json` 固定解析双端 helper，target preflight 负责全部 checkpoint，target/source 双端分别形成升级与回滚 evidence；执行前复验 manifest 长度/hash，发布者身份与固定安装来源后移到 M4-P03；
 - 平台 host 负责固定路径、进程静止和文件系统适配，`ime-userdb` 继续独占 schema 与 migration 语义。
 
 该 crate 不进入输入热路径，不承载安装器 UI、SQLite migration SQL、macOS 进程控制或调用方自定义路径。完整边界见 [macOS 数据升级协调器](macos-data-upgrade-coordinator.md)。

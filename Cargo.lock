@@ -739,6 +739,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "radishlex-macos-upgrade-coordinator"
+version = "0.1.0"
+dependencies = [
+ "radishlex-ime-product-upgrade",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "rand_core"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

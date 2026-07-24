@@ -323,6 +323,8 @@ apps/radishlex-manager/
 
 `platforms/macos-product/UpgradeValidationHosts/` 保存双端共用的数据库字节/sidecar 复验与两个受控 main。Manager helper 链接 Manager bundle 自带 native library；InputMethod helper 链接 native Rime 产品库并从自身 bundle 固定读取 `RimeData`。生产入口只接受无参数 candidate 模式或 `--post-switch` 最终路径模式，路径均由 Application Support v1 布局推导，不接受调用方路径或其他 validation input；共享参数与路径 contract 由独立 Objective-C 门禁覆盖。
 
+`platforms/macos-product/UpgradeCoordinatorAdapter/` 是实现 `UpgradeCoordinatorPort` 的 Rust 平台组合层。它只从 source/target 产品根的严格 `ProductManifest.json` 解析固定双 bundle 与 helper，逐次复验 helper 长度和 SHA-256；所有 checkpoint 使用 target Manager preflight，candidate/final 使用 target 双端 validation，回滚恢复使用 source 双端 validation。该 crate 不解释 SQLite 内容、不接收数据路径、不进入输入热路径，也不替代 M4-P03 的 code signature 与安装来源验证。
+
 R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-acceptance.md) 的授权 A/B：授权 A 才允许签名、安装、系统设置、人工交互和保留 userdb 的普通清理；授权 B 只在 receipt 归属、设置恢复和数据库关闭条件满足后删除本轮四个固定 SQLite 文件并把预存空父目录恢复为 `0755`，不得删除父目录。该 runbook 现在作为关闭证据与回归边界保留。副屏和 VoiceOver 仍按平台边界文档的已知限制处理，自动 contract 不能替代对应实机证据。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
 
 后续平台目录按进入顺序创建：

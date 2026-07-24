@@ -6,6 +6,8 @@ repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
 manager_dir="${repo_root}/apps/radishlex-manager"
 app_bundle="${manager_dir}/build/macos/Build/Products/Release/radishlex_manager.app"
 native_library="${app_bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib"
+validation_host="${app_bundle}/Contents/Helpers/RadishLexUpgradeValidationHost"
+preflight_host="${app_bundle}/Contents/Helpers/RadishLexUpgradePreflightHost"
 smoke_dir="$(mktemp -d "${TMPDIR:-/tmp}/radishlex-manager-product-smoke.XXXXXX")"
 m2_cleanup="${repo_root}/platforms/macos-imk/cleanup-m2-manager-test-data.sh"
 m2_cleanup_wrapper="${repo_root}/scripts/cleanup-macos-m2-manager-test-data.sh"
@@ -151,8 +153,8 @@ clang -std=c11 -Wall -Wextra -Werror -fsyntax-only \
 
 "${repo_root}/scripts/build-manager-macos-product.sh"
 
-if [ ! -f "${native_library}" ]; then
-  echo "manager product bundle is missing its native library." >&2
+if [ ! -f "${native_library}" ] || [ ! -x "${validation_host}" ] || [ ! -x "${preflight_host}" ]; then
+  echo "manager product bundle is missing its native library or upgrade hosts." >&2
   exit 1
 fi
 
@@ -162,6 +164,20 @@ if codesign -d --entitlements :- "${app_bundle}" 2>&1 | grep -Fq "com.apple.secu
 fi
 
 codesign --verify --deep --strict "${app_bundle}"
+codesign --verify --strict "${validation_host}"
+codesign --verify --strict "${preflight_host}"
+set +e
+"${preflight_host}" --caller-path-is-forbidden >/dev/null 2>&1
+preflight_argument_status=$?
+set -e
+if [[ ${preflight_argument_status} -ne 2 ]]; then
+  echo "bundled upgrade preflight host must reject every argument." >&2
+  exit 1
+fi
+manager_bundle_id="$(python3 "${product_tool}" field manager_bundle_id)"
+input_method_bundle_id="$(python3 "${product_tool}" field input_method_bundle_id)"
+strings "${preflight_host}" | grep -Fxq "${manager_bundle_id}"
+strings "${preflight_host}" | grep -Fxq "${input_method_bundle_id}"
 test "$(plutil -extract CFBundleShortVersionString raw \
   "${app_bundle}/Contents/Info.plist")" = "${product_version}"
 test "$(plutil -extract CFBundleVersion raw \

@@ -16,6 +16,9 @@ platforms/macos-product/
       RLXUpgradeValidationSupport.*
       manager_main.m
       input_method_main.m
+  UpgradeCoordinatorAdapter/
+    src/                     manifest-bound Rust platform port
+    Cargo.toml
 ```
 
 平台宿主只吸收 macOS 路径解析、Foundation/AppKit 进程与容量 API、bundle 资源定位和 native executable 生命周期。receipt、文件身份、状态转换和候选证据属于 `ime-product-upgrade`；SQLite schema/migration 属于 `ime-userdb`；宿主不得成为新的业务真相源。
@@ -51,6 +54,14 @@ InputMethod host 按同一模式选择 candidate 或最终固定数据库，并�
 两端都在调用前后比较目标数据库全字节，并在调用前后拒绝 `-wal`、`-shm`、`-journal`。非法参数、目标缺失/损坏、summary version/check bit 不匹配、数据库字节变化、sidecar 或临时目录清理失败都返回非零。
 
 validation host 不是普通用户工具，也不是协调器本身。它只产生当前进程的受控 validation summary；只有持有 upgrade guard 的协调核心可以把两端结果转换为 validation evidence，并按当前 receipt 阶段持久化 `candidate_verified`、`aborted_preserved`、`post_switch_verified` 或 `rollback_required`。
+
+## UpgradeCoordinatorAdapter
+
+adapter 实现 `ime-product-upgrade::UpgradeCoordinatorPort`，但不接收任意 executable 或数据路径。构造时只接收 source/target 产品装配根；内部严格解析两份 `ProductManifest.json`，固定定位两个 component 和 `Contents/Helpers`，并在每次调用前复验 helper 的普通文件身份、长度与 manifest SHA-256。
+
+checkpoint 一律调用 target Manager 内的 `RadishLexUpgradePreflightHost`。candidate 与最终路径验证调用 target 双端 validation host；回滚恢复验证调用 source 双端 validation host。release、build、userdb schema 或 data layout 与 receipt 不一致时，不启动任何 validation host。进程输出不进入 receipt 或日志，执行有固定时限，超时会终止对应 helper 并按未取得 evidence 处理。
+
+M4-P02 的 manifest 绑定只解决“执行哪一代、哪一端产品代码”的内容确定性。安装载体仍须在 M4-P03 证明产品根来源、Developer ID 签名、公证和固定安装位置，不能把调用方传入的任意目录直接当作可信产品。
 
 ## 构建与验证
 

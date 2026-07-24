@@ -7,6 +7,7 @@ manager_dir="${repo_root}/apps/radishlex-manager"
 app_bundle="${manager_dir}/build/macos/Build/Products/Release/radishlex_manager.app"
 native_library="${app_bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib"
 validation_host="${app_bundle}/Contents/Helpers/RadishLexUpgradeValidationHost"
+preflight_host="${app_bundle}/Contents/Helpers/RadishLexUpgradePreflightHost"
 product_tool="${repo_root}/scripts/macos-product/product_manifest.py"
 
 if [ "$(uname -s)" != "Darwin" ]; then
@@ -26,8 +27,8 @@ product_build="$(python3 "${product_tool}" field build_number)"
     --dart-define=RADISHLEX_MANAGER_MODE=product
 )
 
-if [ ! -f "${native_library}" ] || [ ! -x "${validation_host}" ]; then
-  echo "manager product bundle is missing its native library." >&2
+if [ ! -f "${native_library}" ] || [ ! -x "${validation_host}" ] || [ ! -x "${preflight_host}" ]; then
+  echo "manager product bundle is missing its native library or upgrade hosts." >&2
   exit 1
 fi
 
