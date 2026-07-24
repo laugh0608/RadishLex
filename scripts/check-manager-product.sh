@@ -147,6 +147,7 @@ clang -std=c11 -Wall -Wextra -Werror -fsyntax-only \
   "${m2_cleanup_source}"
 "${m2_cleanup_helper_contract}"
 "${m2_cleanup_orchestration_contract}"
+"${repo_root}/platforms/macos-product/UpgradeValidationHosts/check.sh"
 
 "${repo_root}/scripts/build-manager-macos-product.sh"
 

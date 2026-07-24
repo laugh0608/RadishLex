@@ -59,14 +59,15 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 ### Manager 与 InputMethod
 
-Manager 和 InputMethod 不实现 migration。两端分别在真实 bundle 的 `Contents/Helpers/RadishLexUpgradeValidationHost` 提供无参数受控 host，使用 ABI v8、各自产品 native library 和固定路径规则打开候选数据库：
+Manager 和 InputMethod 不实现 migration。两端分别在真实 bundle 的 `Contents/Helpers/RadishLexUpgradeValidationHost` 提供受控 host，使用 ABI v8、各自产品 native library 和固定路径规则打开数据库：
 
-- Manager 验证管理查询、settings 兼容和关闭连接；
+- 无参数模式固定验证 migration candidate；唯一可选参数 `--post-switch` 固定验证最终 `userdb.sqlite3`，不得接受路径或其他模式；
+- Manager 验证管理查询、对应固定 settings 兼容和关闭连接；
 - InputMethod 验证 personalized runtime 创建、只读候选信号访问和关闭连接；
 - validation 不产生选择、负反馈、导入、同步或其他业务写入；
 - 任一端缺失、版本不匹配、打开失败或未关闭连接，候选不得切换。
 
-双端验证不是用同一个 `UserDb::open` 单元测试冒充两个产品宿主。Manager host 通过只读 current-schema connection 执行 active/deleted/import/learning 管理查询，并检查固定 `source-settings.json` 与 settings format v1 的类型兼容；InputMethod host 从本 bundle 固定 `RimeData` 创建短生命周期隔离 Rime user data，使用 privacy-mode `LearningContext` 驱动 personalized runtime 的固定 `luobo` 候选读取，不选择、不提交也不学习。两端都在调用前后比较 candidate 全字节并拒绝 WAL/SHM/journal。
+双端验证不是用同一个 `UserDb::open` 单元测试冒充两个产品宿主。Manager host 通过只读 current-schema connection 执行 active/deleted/import/learning 管理查询；candidate 模式检查固定 `source-settings.json`，post-switch 模式检查固定 `manager-settings.json`，两者都只验证 settings format v1 类型兼容。InputMethod host 从本 bundle 固定 `RimeData` 创建短生命周期隔离 Rime user data，使用 privacy-mode `LearningContext` 驱动 personalized runtime 的固定 `luobo` 候选读取，不选择、不提交也不学习。两端都在调用前后比较目标数据库全字节并拒绝 WAL/SHM/journal。
 
 协调核心只接受 `UPGRADE_VALIDATION_EVIDENCE_VERSION = 1` 的固定摘要。Manager evidence 必须同时声明目标 schema、管理查询与 settings 检查完成；InputMethod evidence 必须同时声明同一目标 schema、personalized runtime 与候选信号检查完成。Manager 失败或 evidence 漂移优先记录 `manager_validation_failed`，Manager 通过后 InputMethod 失败或 evidence 漂移记录 `input_method_validation_failed`；这两类切换前失败都原子进入 `aborted_preserved`，原固定数据库不变。只有两端精确通过且协调核心再次以 read-only current-schema connection 复验 candidate，receipt 才从 `candidate_migrated` 单步推进 `candidate_verified`。
 
@@ -237,6 +238,22 @@ candidate 成功顺序固定为：复制 snapshot 到临时 candidate、隔离 m
 | `switched` | candidate | 不存在 | 旧库 | 幂等返回，不重复 rename |
 
 其他组合全部失败关闭并保留现场，包括同一对象出现在错误路径、对象缺失或替换、backup 提前存在、candidate 与旧库 identity 混淆、跨文件系统、未知 sidecar 或未知状态目录对象。恢复不能根据“哪个文件能打开”猜测世代，也不能自动删除任何对象。
+
+### 最终路径验证与回滚
+
+`switched` 后协调器在同一 guard 下分别以 Manager/InputMethod helper 的 `--post-switch` 模式打开最终固定 `userdb.sqlite3`。核心只接受 post-switch evidence v1、目标 schema 和两端固定检查位，并再次复验最终路径仍是 receipt 的 `CandidateDatabase` inode、backup 仍是 `BackupDatabase` inode且 sidecar 为零：
+
+- 双端通过后先持久化 `post_switch_verified`；再次复验固定现场与 current schema 后单独持久化 `completed`；
+- 任一端失败、evidence 漂移、核心复验失败或完成前重复复验失败都持久化 `rollback_required` 与 `post_switch_validation_failed`，不能直接覆盖为 `rolled_back`；
+- `post_switch_verified` 本身是双端成功的持久化证明，崩溃恢复不重放 host，只复验固定现场与 current schema；成功推进 `completed`，失败进入 rollback。
+
+回滚复用现有固定 candidate 槽，不新增任意文件名：
+
+1. `userdb.sqlite3 -> migration-candidate.sqlite3`，把验证失败的新库移回 receipt 已记录的 candidate identity；依次 `fsync` 目标状态目录和源 data root；
+2. `source-backup.sqlite3 -> userdb.sqlite3`，把旧库原 inode 恢复到固定路径；依次 `fsync` 目标 data root 和源状态目录；
+3. receipt 保持 `rollback_required`，直到 source-release validation evidence v1 与核心只读 `inspect_file` 同时证明恢复库 schema、integrity 和旧版本打开检查完成，才持久化 `rolled_back`。
+
+`rollback_required` 只接受三类可恢复现场：切换后原现场、只把新库移回 candidate 的中间现场、旧库已恢复但尚待 source-release evidence 的现场。每次恢复调用都先重复必要目录 `fsync`；其他对象组合失败关闭。失败的新库、snapshot、settings 副本和 receipt 均继续保留，不在本批清理。
 
 ## 启动门禁与中断恢复
 

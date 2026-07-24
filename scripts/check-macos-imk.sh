@@ -318,6 +318,7 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   -o "${smoke_dir}/input-controller-contract"
 "${smoke_dir}/input-controller-contract"
 "${platform_dir}/ValidationHost/check.sh"
+"${repo_root}/platforms/macos-product/UpgradeValidationHosts/check.sh"
 
 bundle="${repo_root}/target/macos-imk/contract/RadishLexInputMethod.app"
 test -x "${bundle}/Contents/MacOS/RadishLex"

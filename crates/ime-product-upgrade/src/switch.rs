@@ -224,11 +224,11 @@ impl UpgradeReceiptStore {
         faults.checkpoint(SwitchFaultPoint::SwitchPreparedPersisted)
     }
 
-    fn active_userdb_path(&self) -> PathBuf {
+    pub(super) fn active_userdb_path(&self) -> PathBuf {
         self.root.path.join(snapshot::USERDB_FILE_NAME)
     }
 
-    fn source_backup_path(&self) -> PathBuf {
+    pub(super) fn source_backup_path(&self) -> PathBuf {
         self.state_directory.join(SOURCE_BACKUP_FILE_NAME)
     }
 }
@@ -260,10 +260,7 @@ pub(super) fn validate_switch_state(
             classify_switch_scene(store, source_identity, candidate_identity, backup_identity)
                 .map(|_| ())
         }
-        UpgradeState::Switched
-        | UpgradeState::PostSwitchVerified
-        | UpgradeState::Completed
-        | UpgradeState::RollbackRequired => {
+        UpgradeState::Switched | UpgradeState::PostSwitchVerified | UpgradeState::Completed => {
             validate_switch_sidecars(store)?;
             let source_identity = artifact(receipt, UpgradeArtifactSlot::SourceDatabase)?;
             let candidate_identity = artifact(receipt, UpgradeArtifactSlot::CandidateDatabase)?;
@@ -277,7 +274,9 @@ pub(super) fn validate_switch_state(
                 SwitchScene::CandidateMoved,
             )
         }
-        UpgradeState::RolledBack => Err(error(UpgradeFilesystemErrorCode::InvalidSwitchState)),
+        UpgradeState::RollbackRequired | UpgradeState::RolledBack => {
+            rollback::validate_rollback_state(store, receipt)
+        }
         _ => {
             if backup_exists {
                 Err(error(UpgradeFilesystemErrorCode::InterruptedSwitch))
@@ -288,7 +287,27 @@ pub(super) fn validate_switch_state(
     }
 }
 
-fn validate_switch_sidecars(store: &UpgradeReceiptStore) -> Result<(), UpgradeFilesystemError> {
+pub(super) fn validate_exact_switched_scene(
+    store: &UpgradeReceiptStore,
+    receipt: &UpgradeReceipt,
+) -> Result<(), UpgradeFilesystemError> {
+    validate_switch_sidecars(store)?;
+    let source_identity = artifact(receipt, UpgradeArtifactSlot::SourceDatabase)?;
+    let candidate_identity = artifact(receipt, UpgradeArtifactSlot::CandidateDatabase)?;
+    let backup_identity = artifact(receipt, UpgradeArtifactSlot::BackupDatabase)?;
+    validate_same_filesystem(store, source_identity, candidate_identity, backup_identity)?;
+    require_scene(
+        store,
+        source_identity,
+        candidate_identity,
+        backup_identity,
+        SwitchScene::CandidateMoved,
+    )
+}
+
+pub(super) fn validate_switch_sidecars(
+    store: &UpgradeReceiptStore,
+) -> Result<(), UpgradeFilesystemError> {
     for path in [
         store.active_userdb_path(),
         store.candidate_path(),
@@ -402,7 +421,7 @@ fn sync_candidate_rename<F: SwitchFaultInjector>(
     faults.checkpoint(SwitchFaultPoint::CandidateSourceSynced)
 }
 
-fn artifact(
+pub(super) fn artifact(
     receipt: &UpgradeReceipt,
     slot: UpgradeArtifactSlot,
 ) -> Result<&UpgradeArtifactIdentity, UpgradeFilesystemError> {
@@ -463,7 +482,7 @@ fn validate_same_filesystem_without_backup(
     }
 }
 
-fn validate_same_filesystem(
+pub(super) fn validate_same_filesystem(
     store: &UpgradeReceiptStore,
     source: &UpgradeArtifactIdentity,
     candidate: &UpgradeArtifactIdentity,
@@ -487,7 +506,7 @@ fn same_database_object(left: &UpgradeArtifactIdentity, right: &UpgradeArtifactI
         && left.byte_len() == right.byte_len()
 }
 
-fn optional_private_metadata(
+pub(super) fn optional_private_metadata(
     path: &Path,
     expected_owner_id: u32,
 ) -> Result<Option<Metadata>, UpgradeFilesystemError> {
@@ -509,7 +528,7 @@ fn required_private_metadata(
     )
 }
 
-fn ensure_no_database_sidecars(path: &Path) -> Result<(), UpgradeFilesystemError> {
+pub(super) fn ensure_no_database_sidecars(path: &Path) -> Result<(), UpgradeFilesystemError> {
     let path = path.as_os_str().to_string_lossy();
     for sidecar in [
         PathBuf::from(format!("{path}-wal")),

@@ -6,13 +6,12 @@
 #import "RLXUpgradeValidationSupport.h"
 
 int main(int argc, const char *argv[]) {
-  (void)argv;
   @autoreleasepool {
-    if (argc != 1) return 2;
+    RLXUpgradeValidationTarget target;
+    if (!RLXParseUpgradeValidationTarget(argc, argv, &target)) return 2;
     NSURL *root = RLXFixedUpgradeDataRoot();
-    NSURL *state = [root URLByAppendingPathComponent:@".radishlex-upgrade-v1"
-                                         isDirectory:YES];
-    NSURL *candidate = [state URLByAppendingPathComponent:@"migration-candidate.sqlite3"];
+    if (root == nil) return 3;
+    NSURL *database = RLXUpgradeDatabaseURL(root, target);
     uint32_t executableLength = 0;
     _NSGetExecutablePath(NULL, &executableLength);
     NSMutableData *buffer = [NSMutableData dataWithLength:executableLength];
@@ -26,11 +25,11 @@ int main(int argc, const char *argv[]) {
         description];
     if (schema.length == 0) schema = @"radishlex_pinyin";
     NSError *error = nil;
-    NSData *before = [NSData dataWithContentsOfURL:candidate
+    NSData *before = [NSData dataWithContentsOfURL:database
                                            options:NSDataReadingMappedIfSafe
                                              error:&error];
-    if (root == nil || before == nil ||
-        !RLXRequireNoCandidateSidecars(candidate, &error)) return 3;
+    if (before == nil || !RLXRequireNoDatabaseSidecars(database, &error))
+      return 3;
     NSURL *validationUserData = [NSURL fileURLWithPath:[NSTemporaryDirectory()
         stringByAppendingPathComponent:[NSString stringWithFormat:
             @"radishlex-input-upgrade-validation-%d-%@", getpid(), NSUUID.UUID.UUIDString]]
@@ -41,7 +40,7 @@ int main(int argc, const char *argv[]) {
                                                         error:&error]) return 3;
     RadishLexInputMethodUpgradeValidationRequest request = {
         .version = RADISHLEX_INPUT_METHOD_UPGRADE_VALIDATION_REQUEST_VERSION,
-        .candidate_path = candidate.fileSystemRepresentation,
+        .candidate_path = database.fileSystemRepresentation,
         .shared_data_path = sharedData.fileSystemRepresentation,
         .validation_user_data_path = validationUserData.fileSystemRepresentation,
         .schema = schema.UTF8String,
@@ -54,8 +53,9 @@ int main(int argc, const char *argv[]) {
     BOOL cleanup = [[NSFileManager defaultManager] removeItemAtURL:validationUserData error:&error];
     if (status != RADISHLEX_STATUS_OK || summary.version != 1 ||
         summary.personalized_runtime_checked != 1 || summary.candidate_signals_read != 1 ||
-        !cleanup || !RLXValidateCandidateUnchanged(candidate, before, &error) ||
-        !RLXRequireNoCandidateSidecars(candidate, &error)) return 4;
+        !cleanup || !RLXValidateDatabaseUnchanged(database, before, &error) ||
+        !RLXRequireNoDatabaseSidecars(database, &error))
+      return 4;
   }
   return 0;
 }

@@ -763,8 +763,10 @@ pub use candidate::UpgradeCandidateSummary;
 mod validation;
 pub use validation::{
     UpgradeCandidateValidationDisposition, UpgradeCandidateValidationReport,
-    UpgradeCandidateValidationSummary, UpgradeInputMethodValidationEvidence,
-    UpgradeManagerValidationEvidence, UPGRADE_VALIDATION_EVIDENCE_VERSION,
+    UpgradeCandidateValidationSummary, UpgradeCompletionDisposition,
+    UpgradeInputMethodValidationEvidence, UpgradeManagerValidationEvidence,
+    UpgradePostSwitchValidationDisposition, UpgradePostSwitchValidationReport,
+    UpgradePostSwitchValidationSummary, UPGRADE_VALIDATION_EVIDENCE_VERSION,
 };
 
 #[path = "settings.rs"]
@@ -774,6 +776,14 @@ pub use settings::UpgradeSettingsBackupSummary;
 #[path = "switch.rs"]
 mod switch;
 pub use switch::{UpgradeSwitchDisposition, UpgradeSwitchSummary};
+
+#[path = "rollback.rs"]
+mod rollback;
+pub use rollback::{
+    UpgradeRollbackRestoreDisposition, UpgradeRollbackRestoreSummary,
+    UpgradeRollbackValidationDisposition, UpgradeRollbackValidationEvidence,
+    UpgradeRollbackValidationSummary, UPGRADE_ROLLBACK_VALIDATION_EVIDENCE_VERSION,
+};
 
 #[path = "startup_gate.rs"]
 mod startup_gate;

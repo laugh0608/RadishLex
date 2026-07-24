@@ -40,6 +40,7 @@ impl ValidationFixture {
         let store = UpgradeReceiptStore::open(root).expect("store");
         let source_path = data_root.join("userdb.sqlite3");
         drop(UserDb::open(&source_path).expect("source database"));
+        UserDb::migrate_and_validate(&source_path).expect("standalone source");
         let source_metadata = fs::metadata(&source_path).expect("source metadata");
         let source_identity = UpgradeArtifactIdentity::private_file(
             UpgradeArtifactSlot::SourceDatabase,
@@ -93,6 +94,22 @@ impl ValidationFixture {
             1,
             1,
         )
+    }
+
+    fn advance_to_switched(&mut self) {
+        let guard = self.store.acquire_guard().expect("guard");
+        let manager = self.manager();
+        let input_method = self.input_method();
+        self.store
+            .record_candidate_validation(
+                &guard,
+                &mut self.receipt,
+                UpgradeCandidateValidationReport::passed(manager, input_method),
+            )
+            .expect("candidate validation");
+        self.store
+            .switch_userdb_candidate(&guard, &mut self.receipt)
+            .expect("switch");
     }
 }
 
@@ -287,4 +304,126 @@ fn sidecar_or_stale_receipt_keeps_candidate_migrated_fail_closed() {
         UpgradeFilesystemErrorCode::InvalidCandidateValidation
     );
     assert_eq!(stale.receipt.state(), UpgradeState::CandidateMigrated);
+}
+
+#[test]
+fn post_switch_dual_evidence_persists_then_completes_in_a_separate_step() {
+    let mut fixture = ValidationFixture::new();
+    fixture.advance_to_switched();
+    let guard = fixture.store.acquire_guard().expect("guard");
+    let manager = fixture.manager();
+    let input_method = fixture.input_method();
+    let summary = fixture
+        .store
+        .record_post_switch_validation(
+            &guard,
+            &mut fixture.receipt,
+            UpgradePostSwitchValidationReport::passed(manager, input_method),
+        )
+        .expect("post-switch validation");
+    assert_eq!(
+        summary.disposition(),
+        UpgradePostSwitchValidationDisposition::PostSwitchVerified
+    );
+    assert_eq!(fixture.receipt.state(), UpgradeState::PostSwitchVerified);
+    drop(guard);
+
+    let mut loaded = fixture.store.load().expect("load").expect("receipt");
+    let guard = fixture.store.acquire_guard().expect("completion guard");
+    assert_eq!(
+        fixture
+            .store
+            .complete_post_switch_validation(&guard, &mut loaded)
+            .expect("completion"),
+        UpgradeCompletionDisposition::Completed
+    );
+    assert_eq!(loaded.state(), UpgradeState::Completed);
+    assert_eq!(
+        fixture
+            .store
+            .complete_post_switch_validation(&guard, &mut loaded)
+            .expect("idempotent completion"),
+        UpgradeCompletionDisposition::AlreadyCompleted
+    );
+}
+
+#[test]
+fn post_switch_endpoint_failure_or_corruption_requires_rollback() {
+    let mut endpoint_failure = ValidationFixture::new();
+    endpoint_failure.advance_to_switched();
+    let guard = endpoint_failure.store.acquire_guard().expect("guard");
+    let summary = endpoint_failure
+        .store
+        .record_post_switch_validation(
+            &guard,
+            &mut endpoint_failure.receipt,
+            UpgradePostSwitchValidationReport::manager_failed(),
+        )
+        .expect("failure persists");
+    assert_eq!(
+        summary.disposition(),
+        UpgradePostSwitchValidationDisposition::RollbackRequired
+    );
+    assert_eq!(
+        endpoint_failure.receipt.failure_code(),
+        Some(UpgradeFailureCode::PostSwitchValidationFailed)
+    );
+    assert!(endpoint_failure.receipt.manual_recovery_required());
+
+    let mut corrupt = ValidationFixture::new();
+    corrupt.advance_to_switched();
+    let active_path = corrupt.store.active_userdb_path();
+    let active_len = fs::metadata(&active_path).expect("active metadata").len();
+    fs::write(&active_path, vec![b'x'; active_len as usize]).expect("corrupt active");
+    fs::set_permissions(&active_path, fs::Permissions::from_mode(0o600)).expect("active mode");
+    let guard = corrupt.store.acquire_guard().expect("corrupt guard");
+    let manager = corrupt.manager();
+    let input_method = corrupt.input_method();
+    let summary = corrupt
+        .store
+        .record_post_switch_validation(
+            &guard,
+            &mut corrupt.receipt,
+            UpgradePostSwitchValidationReport::passed(manager, input_method),
+        )
+        .expect("core revalidation failure persists rollback");
+    assert_eq!(
+        summary.disposition(),
+        UpgradePostSwitchValidationDisposition::RollbackRequired
+    );
+}
+
+#[test]
+fn completion_recheck_failure_requires_rollback() {
+    let mut fixture = ValidationFixture::new();
+    fixture.advance_to_switched();
+    let guard = fixture.store.acquire_guard().expect("guard");
+    let manager = fixture.manager();
+    let input_method = fixture.input_method();
+    fixture
+        .store
+        .record_post_switch_validation(
+            &guard,
+            &mut fixture.receipt,
+            UpgradePostSwitchValidationReport::passed(manager, input_method),
+        )
+        .expect("post-switch validation");
+    let active_path = fixture.store.active_userdb_path();
+    let active_len = fs::metadata(&active_path).expect("active metadata").len();
+    fs::write(&active_path, vec![b'x'; active_len as usize])
+        .expect("corrupt final database on the same inode");
+    fs::set_permissions(&active_path, fs::Permissions::from_mode(0o600)).expect("active mode");
+
+    assert_eq!(
+        fixture
+            .store
+            .complete_post_switch_validation(&guard, &mut fixture.receipt)
+            .expect("completion failure persists rollback"),
+        UpgradeCompletionDisposition::RollbackRequired
+    );
+    assert_eq!(fixture.receipt.state(), UpgradeState::RollbackRequired);
+    assert_eq!(
+        fixture.receipt.failure_after_state(),
+        Some(UpgradeState::PostSwitchVerified)
+    );
 }

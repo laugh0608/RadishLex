@@ -3,23 +3,22 @@
 #import "RLXUpgradeValidationSupport.h"
 
 int main(int argc, const char *argv[]) {
-  (void)argv;
   @autoreleasepool {
-    if (argc != 1) return 2;
+    RLXUpgradeValidationTarget target;
+    if (!RLXParseUpgradeValidationTarget(argc, argv, &target)) return 2;
     NSURL *root = RLXFixedUpgradeDataRoot();
-    NSURL *state = [root URLByAppendingPathComponent:@".radishlex-upgrade-v1"
-                                         isDirectory:YES];
-    NSURL *candidate = [state URLByAppendingPathComponent:@"migration-candidate.sqlite3"];
-    NSURL *settings = [state URLByAppendingPathComponent:@"source-settings.json"];
+    if (root == nil) return 3;
+    NSURL *database = RLXUpgradeDatabaseURL(root, target);
+    NSURL *settings = RLXUpgradeSettingsURL(root, target);
     NSError *error = nil;
-    NSData *before = [NSData dataWithContentsOfURL:candidate
+    NSData *before = [NSData dataWithContentsOfURL:database
                                            options:NSDataReadingMappedIfSafe
                                              error:&error];
-    if (root == nil || before == nil ||
-        !RLXRequireNoCandidateSidecars(candidate, &error)) return 3;
+    if (before == nil || !RLXRequireNoDatabaseSidecars(database, &error))
+      return 3;
     RadishLexManagerUpgradeValidationRequest request = {
         .version = RADISHLEX_MANAGER_UPGRADE_VALIDATION_REQUEST_VERSION,
-        .candidate_path = candidate.fileSystemRepresentation,
+        .candidate_path = database.fileSystemRepresentation,
         .settings_path = settings.fileSystemRepresentation,
     };
     RadishLexUpgradeValidationSummary summary = {0};
@@ -29,8 +28,9 @@ int main(int argc, const char *argv[]) {
     if (ffiError != NULL) radishlex_error_free(ffiError);
     if (status != RADISHLEX_STATUS_OK || summary.version != 1 ||
         summary.management_queries_checked != 1 || summary.settings_checked != 1 ||
-        !RLXValidateCandidateUnchanged(candidate, before, &error) ||
-        !RLXRequireNoCandidateSidecars(candidate, &error)) return 4;
+        !RLXValidateDatabaseUnchanged(database, before, &error) ||
+        !RLXRequireNoDatabaseSidecars(database, &error))
+      return 4;
   }
   return 0;
 }

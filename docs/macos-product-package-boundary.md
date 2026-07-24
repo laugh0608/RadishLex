@@ -9,7 +9,7 @@ M4 macOS 产品包必须把以下已有能力组织成同一版本、可验证�
 - `RadishLexInputMethod.app`：InputMethodKit 输入法薄壳；
 - `radishlex_manager.app`：本地数据、隐私和诊断管理界面；
 - `libradishlex_ime_ffi.dylib`：两端调用的 Rust ABI；
-- 两端各自的 `Contents/Helpers/RadishLexUpgradeValidationHost`：使用本 bundle native library 验证固定 migration candidate；
+- 两端各自的 `Contents/Helpers/RadishLexUpgradeValidationHost`：使用本 bundle native library 验证固定 migration candidate 或最终 userdb；
 - `librime` 及其非系统传递依赖；
 - 合法来源的 Rime schema/data、RadishLex 许可证和第三方许可证；
 - 产品 manifest、安装升级 runbook 和发布验证证据。
@@ -195,7 +195,7 @@ Apple 官方边界参考：
 4. 生成并复验 `ProductManifest.json`；
 5. 把 source contract 单元测试接入仓库门禁；
 6. 在可用的隔离 RimeData/native dependency 环境运行完整装配验证；
-7. M4-P01 退出后进入数据升级协调器；M4-P02 当前已完成从 `candidate_verified` 到 `switched` 的原子切换与逐边界恢复，后续仍需完成最终路径双端复验、精确回滚和完整协调入口，发布安装与程序版本回滚载体属于再下一批 M4-P03。
+7. M4-P01 退出后进入数据升级协调器；M4-P02 当前已完成原子切换、最终路径双端复验与精确数据回滚，后续仍需闭合 guard 内持续静止、完整平台协调入口和 source-release host 调度，发布安装与程序版本回滚载体属于再下一批 M4-P03。
 
 ## M4-P01 退出标准
 

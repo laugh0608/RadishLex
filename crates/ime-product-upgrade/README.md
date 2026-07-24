@@ -101,6 +101,12 @@ receipt 不保存 host 输出、任意布尔数组、绝对路径、数据库正
 
 调用可从 `candidate_verified`、`switch_prepared` 或 `switched` 恢复。恢复只接受 receipt 所证明的原路径、单次 rename 后现场、两次 rename 后现场或完整 switched 现场；其他缺失、重复、替换、跨设备、sidecar 或未知对象组合失败关闭且不清理。`switched` 幂等重放不会再次移动文件，backup 默认保留。
 
+### 最终验证与回滚
+
+`record_post_switch_validation` 只在 `switched` 接受最终固定路径的双端 evidence。成功先持久化 `post_switch_verified`，随后由独立完成动作复验相同 inode 与 current schema 并推进 `completed`；验证失败或完成前重复复验失败都进入带 `post_switch_validation_failed` 的 `rollback_required`。
+
+回滚先把失败的新库移回固定 candidate 槽，再把旧库 backup 原 inode 恢复到 `userdb.sqlite3`，每次跨目录 rename 后按目标、源目录顺序 `fsync`。receipt 在文件恢复后仍保持 `rollback_required`；只有 source-release evidence v1 与核心只读 schema/integrity 复验同时通过，才能进入 `rolled_back`。失败的新库和全部恢复材料默认保留。
+
 ## 错误与隐私边界
 
 `UpgradeFilesystemErrorCode` 和 `UpgradeFailureCode` 是调用方分支使用的稳定分类。面向 UI 或普通日志只能输出阶段、稳定 code 和非敏感处置建议；不得记录真实路径、SQL、用户词、输入历史、settings 正文、secret 或 validation host stderr。

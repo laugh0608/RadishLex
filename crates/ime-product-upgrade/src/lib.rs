@@ -13,12 +13,16 @@ mod filesystem;
 pub use filesystem::{
     inspect_startup_gate, StartupGateDecision, StartupGateErrorCode, StartupGateResult,
     UpgradeCandidateSummary, UpgradeCandidateValidationDisposition,
-    UpgradeCandidateValidationReport, UpgradeCandidateValidationSummary, UpgradeFilesystemError,
-    UpgradeFilesystemErrorCode, UpgradeInputMethodValidationEvidence,
-    UpgradeManagerValidationEvidence, UpgradeProcessGuard, UpgradeReceiptStore,
-    UpgradeSettingsBackupSummary, UpgradeSnapshotSpaceBudget, UpgradeSnapshotSummary,
-    UpgradeSwitchDisposition, UpgradeSwitchSummary, VerifiedDataRoot,
-    UPGRADE_VALIDATION_EVIDENCE_VERSION,
+    UpgradeCandidateValidationReport, UpgradeCandidateValidationSummary,
+    UpgradeCompletionDisposition, UpgradeFilesystemError, UpgradeFilesystemErrorCode,
+    UpgradeInputMethodValidationEvidence, UpgradeManagerValidationEvidence,
+    UpgradePostSwitchValidationDisposition, UpgradePostSwitchValidationReport,
+    UpgradePostSwitchValidationSummary, UpgradeProcessGuard, UpgradeReceiptStore,
+    UpgradeRollbackRestoreDisposition, UpgradeRollbackRestoreSummary,
+    UpgradeRollbackValidationDisposition, UpgradeRollbackValidationEvidence,
+    UpgradeRollbackValidationSummary, UpgradeSettingsBackupSummary, UpgradeSnapshotSpaceBudget,
+    UpgradeSnapshotSummary, UpgradeSwitchDisposition, UpgradeSwitchSummary, VerifiedDataRoot,
+    UPGRADE_ROLLBACK_VALIDATION_EVIDENCE_VERSION, UPGRADE_VALIDATION_EVIDENCE_VERSION,
 };
 
 pub const UPGRADE_RECEIPT_FORMAT: &str = "radishlex-product-upgrade-receipt-v1";
@@ -488,10 +492,13 @@ impl UpgradeReceipt {
         &mut self,
         failure_code: UpgradeFailureCode,
     ) -> Result<(), UpgradeReceiptError> {
-        if self.state != UpgradeState::Switched {
+        if !matches!(
+            self.state,
+            UpgradeState::Switched | UpgradeState::PostSwitchVerified
+        ) {
             return Err(UpgradeReceiptError::invalid(
                 "state",
-                "rollback can only be required after the candidate was switched",
+                "rollback can only be required after the candidate was switched and before completion",
             ));
         }
         let previous_state = self.state;
@@ -500,7 +507,7 @@ impl UpgradeReceipt {
         let previous_manual_recovery_required = self.manual_recovery_required;
         self.state = UpgradeState::RollbackRequired;
         self.failure_code = Some(failure_code);
-        self.failure_after_state = Some(UpgradeState::Switched);
+        self.failure_after_state = Some(previous_state);
         self.manual_recovery_required = true;
         if let Err(error) = self.validate() {
             self.state = previous_state;
@@ -662,7 +669,10 @@ impl UpgradeReceipt {
             }
             UpgradeState::RollbackRequired => {
                 if self.failure_code.is_none()
-                    || self.failure_after_state != Some(UpgradeState::Switched)
+                    || !matches!(
+                        self.failure_after_state,
+                        Some(UpgradeState::Switched | UpgradeState::PostSwitchVerified)
+                    )
                     || !self.manual_recovery_required
                 {
                     return Err(UpgradeReceiptError::invalid(
@@ -673,7 +683,10 @@ impl UpgradeReceipt {
             }
             UpgradeState::RolledBack => {
                 if self.failure_code.is_none()
-                    || self.failure_after_state != Some(UpgradeState::Switched)
+                    || !matches!(
+                        self.failure_after_state,
+                        Some(UpgradeState::Switched | UpgradeState::PostSwitchVerified)
+                    )
                     || self.manual_recovery_required
                 {
                     return Err(UpgradeReceiptError::invalid(
@@ -730,8 +743,10 @@ impl UpgradeReceipt {
             || (previous.state.is_pre_switch()
                 && self.state == UpgradeState::AbortedPreserved
                 && self.failure_after_state == Some(previous.state))
-            || (previous.state == UpgradeState::Switched
-                && self.state == UpgradeState::RollbackRequired)
+            || (matches!(
+                previous.state,
+                UpgradeState::Switched | UpgradeState::PostSwitchVerified
+            ) && self.state == UpgradeState::RollbackRequired)
             || (previous.state == UpgradeState::RollbackRequired
                 && self.state == UpgradeState::RolledBack)
     }

@@ -1,6 +1,6 @@
 # 产品升级 FFI 参考
 
-本文定义 ABI v8 的产品升级 startup gate 与 Manager/InputMethod candidate validation 结构、调用方责任和证据边界，面向维护 C header、Swift/Objective-C host 与升级协调器的开发者。本文不包含完整 receipt 状态机、安装器操作或历史版本流水；通用所有权与错误规则见 [FFI 边界](ffi-boundary.md)，产品状态机见 [macOS 数据升级协调器](macos-data-upgrade-coordinator.md)。
+本文定义 ABI v8 的产品升级 startup gate 与 Manager/InputMethod validation 结构、调用方责任和证据边界，面向维护 C header、Swift/Objective-C host 与升级协调器的开发者。本文不包含完整 receipt 状态机、安装器操作或历史版本流水；通用所有权与错误规则见 [FFI 边界](ffi-boundary.md)，产品状态机见 [macOS 数据升级协调器](macos-data-upgrade-coordinator.md)。
 
 ## Startup gate
 
@@ -31,7 +31,7 @@ RADISHLEX_STARTUP_GATE_ALLOWED_TERMINAL_RECEIPT
 
 `RADISHLEX_STARTUP_GATE_BLOCKED_UPGRADE_IN_PROGRESS` 与 `RADISHLEX_STARTUP_GATE_FAILED_CLOSED` 都阻止启动。error code 区分 upgrade in progress、active guard、unsafe root/state、interrupted artifact、invalid receipt、unexpected object、identity changed 和 I/O；`receipt_state = 0` 表示没有可报告的已解析状态。调用方必须使用 C header 的具名常量，不依赖 Rust enum discriminant，也不能把未知值或仅 `error_code = 0` 推断为允许。
 
-## Candidate validation
+## 产品数据库 validation
 
 ```text
 RadishLexManagerUpgradeValidationRequest {
@@ -60,12 +60,14 @@ RadishLexUpgradeValidationSummary {
 
 两个 request version 和共享 summary version 均固定为 v1。字符串只在调用期间借用；summary 不拥有指针或 heap handle。
 
-路径字段只允许各 bundle 内无参数原生 host 填充：
+ABI v8 为兼容既有布局保留 `candidate_path` 字段名；它表示本次受控 validation 的固定数据库路径，不授权调用方接受任意路径。路径字段只允许各 bundle 内原生 host 填充：
 
-- Manager 固定 candidate 和 settings backup，成功必须返回目标 schema、`management_queries_checked = 1`、`settings_checked = 1`；
-- InputMethod 固定 candidate、本 bundle RimeData/schema 和短生命周期隔离 Rime user data，成功必须返回同一目标 schema、`personalized_runtime_checked = 1`、`candidate_signals_read = 1`。
+- 无参数模式固定 candidate 与 settings backup；
+- 唯一参数 `--post-switch` 固定最终 `userdb.sqlite3` 与产品 settings；
+- Manager 成功必须返回目标 schema、`management_queries_checked = 1`、`settings_checked = 1`；
+- InputMethod 固定本 bundle RimeData/schema 和短生命周期隔离 Rime user data，成功必须返回同一目标 schema、`personalized_runtime_checked = 1`、`candidate_signals_read = 1`。
 
-路径字段的存在不授权 Dart、InputMethod controller、安装参数或通用 CLI 接受任意路径。FFI 只完成端点内的真实产品读取；原生 host 还必须在调用前后复验 candidate 全字节不变、WAL/SHM/journal 零残留，并清理 InputMethod 临时 Rime data。
+路径字段的存在不授权 Dart、InputMethod controller、安装参数或通用 CLI 接受任意路径。FFI 只完成端点内的真实产品读取；原生 host 还必须在调用前后复验目标数据库全字节不变、WAL/SHM/journal 零残留，并清理 InputMethod 临时 Rime data。
 
 ## Evidence 转换
 
@@ -75,7 +77,7 @@ validation summary 不能直接持久化进 receipt，也不能由 UI 拼装。�
 - candidate identity、目标 schema 与 sidecar 状态未漂移；
 - Manager/InputMethod summary version 和各自固定 check bit 精确匹配。
 
-双端通过后，协调核心再次以 read-only current-schema connection 打开 candidate，才把两个 summary 转换为 validation evidence v1 并推进 `candidate_verified`。Manager 或 InputMethod 明确失败分别进入带稳定 failure code 的 `aborted_preserved`。receipt 只保存状态结论，不保存 summary、host stdout/stderr、路径、正文或内容 hash。
+candidate 阶段双端通过后，协调核心再次以 read-only current-schema connection 打开 candidate，才推进 `candidate_verified`；端点失败进入 `aborted_preserved`。post-switch 阶段核心改为复验最终路径的 candidate inode：双端通过先推进 `post_switch_verified`，端点失败或证据漂移进入 `rollback_required`；独立完成动作再次复验 current schema，失败同样进入 rollback。receipt 只保存状态结论，不保存 summary、host stdout/stderr、路径、正文或内容 hash。
 
 ## 调用顺序与验证
 

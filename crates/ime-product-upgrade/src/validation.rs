@@ -29,7 +29,7 @@ impl UpgradeManagerValidationEvidence {
         }
     }
 
-    const fn is_valid_for(self, target_schema_version: i64) -> bool {
+    pub(super) const fn is_valid_for(self, target_schema_version: i64) -> bool {
         self.version == UPGRADE_VALIDATION_EVIDENCE_VERSION
             && self.schema_version == target_schema_version
             && self.management_queries_checked == 1
@@ -60,7 +60,7 @@ impl UpgradeInputMethodValidationEvidence {
         }
     }
 
-    const fn is_valid_for(self, target_schema_version: i64) -> bool {
+    pub(super) const fn is_valid_for(self, target_schema_version: i64) -> bool {
         self.version == UPGRADE_VALIDATION_EVIDENCE_VERSION
             && self.schema_version == target_schema_version
             && self.personalized_runtime_checked == 1
@@ -110,6 +110,62 @@ pub enum UpgradeCandidateValidationDisposition {
 pub struct UpgradeCandidateValidationSummary {
     disposition: UpgradeCandidateValidationDisposition,
     failure_code: Option<UpgradeFailureCode>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpgradePostSwitchValidationReport {
+    Passed {
+        manager: UpgradeManagerValidationEvidence,
+        input_method: UpgradeInputMethodValidationEvidence,
+    },
+    ManagerFailed,
+    InputMethodFailed {
+        manager: UpgradeManagerValidationEvidence,
+    },
+}
+
+impl UpgradePostSwitchValidationReport {
+    pub const fn passed(
+        manager: UpgradeManagerValidationEvidence,
+        input_method: UpgradeInputMethodValidationEvidence,
+    ) -> Self {
+        Self::Passed {
+            manager,
+            input_method,
+        }
+    }
+
+    pub const fn manager_failed() -> Self {
+        Self::ManagerFailed
+    }
+
+    pub const fn input_method_failed(manager: UpgradeManagerValidationEvidence) -> Self {
+        Self::InputMethodFailed { manager }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpgradePostSwitchValidationDisposition {
+    PostSwitchVerified,
+    RollbackRequired,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpgradePostSwitchValidationSummary {
+    disposition: UpgradePostSwitchValidationDisposition,
+}
+
+impl UpgradePostSwitchValidationSummary {
+    pub const fn disposition(self) -> UpgradePostSwitchValidationDisposition {
+        self.disposition
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpgradeCompletionDisposition {
+    Completed,
+    AlreadyCompleted,
+    RollbackRequired,
 }
 
 impl UpgradeCandidateValidationSummary {
@@ -187,6 +243,100 @@ impl UpgradeReceiptStore {
             failure_code,
         })
     }
+
+    pub fn record_post_switch_validation(
+        &self,
+        guard: &UpgradeProcessGuard,
+        receipt: &mut UpgradeReceipt,
+        report: UpgradePostSwitchValidationReport,
+    ) -> Result<UpgradePostSwitchValidationSummary, UpgradeFilesystemError> {
+        self.revalidate()?;
+        if !guard.belongs_to(self) {
+            return Err(error(UpgradeFilesystemErrorCode::IdentityChanged));
+        }
+        guard.revalidate()?;
+        self.validate_known_entries()?;
+        if receipt.state() != UpgradeState::Switched {
+            return Err(error(
+                UpgradeFilesystemErrorCode::InvalidCandidateValidation,
+            ));
+        }
+        let stored = self
+            .load_current_internal()?
+            .map(|(stored, _, _)| stored)
+            .ok_or_else(|| error(UpgradeFilesystemErrorCode::InvalidCandidateValidation))?;
+        if stored != *receipt {
+            return Err(error(
+                UpgradeFilesystemErrorCode::InvalidCandidateValidation,
+            ));
+        }
+        switch::validate_exact_switched_scene(self, receipt)?;
+
+        let failed = post_switch_validation_failure(report, receipt.target_schema_version())
+            || !final_database_is_current(self, receipt);
+        let mut next_receipt = receipt.clone();
+        let disposition = if failed {
+            next_receipt
+                .require_rollback(UpgradeFailureCode::PostSwitchValidationFailed)
+                .map_err(|_| error(UpgradeFilesystemErrorCode::InvalidCandidateValidation))?;
+            UpgradePostSwitchValidationDisposition::RollbackRequired
+        } else {
+            next_receipt
+                .advance(UpgradeState::PostSwitchVerified)
+                .map_err(|_| error(UpgradeFilesystemErrorCode::InvalidCandidateValidation))?;
+            UpgradePostSwitchValidationDisposition::PostSwitchVerified
+        };
+        self.persist(guard, &next_receipt)?;
+        *receipt = next_receipt;
+        Ok(UpgradePostSwitchValidationSummary { disposition })
+    }
+
+    pub fn complete_post_switch_validation(
+        &self,
+        guard: &UpgradeProcessGuard,
+        receipt: &mut UpgradeReceipt,
+    ) -> Result<UpgradeCompletionDisposition, UpgradeFilesystemError> {
+        self.revalidate()?;
+        if !guard.belongs_to(self) {
+            return Err(error(UpgradeFilesystemErrorCode::IdentityChanged));
+        }
+        guard.revalidate()?;
+        self.validate_known_entries()?;
+        let stored = self
+            .load_current_internal()?
+            .map(|(stored, _, _)| stored)
+            .ok_or_else(|| error(UpgradeFilesystemErrorCode::InvalidCandidateValidation))?;
+        if stored != *receipt {
+            return Err(error(
+                UpgradeFilesystemErrorCode::InvalidCandidateValidation,
+            ));
+        }
+        switch::validate_exact_switched_scene(self, receipt)?;
+        if receipt.state() == UpgradeState::Completed {
+            return Ok(UpgradeCompletionDisposition::AlreadyCompleted);
+        }
+        if receipt.state() != UpgradeState::PostSwitchVerified {
+            return Err(error(
+                UpgradeFilesystemErrorCode::InvalidCandidateValidation,
+            ));
+        }
+        if !final_database_is_current(self, receipt) {
+            let mut next_receipt = receipt.clone();
+            next_receipt
+                .require_rollback(UpgradeFailureCode::PostSwitchValidationFailed)
+                .map_err(|_| error(UpgradeFilesystemErrorCode::InvalidCandidateValidation))?;
+            self.persist(guard, &next_receipt)?;
+            *receipt = next_receipt;
+            return Ok(UpgradeCompletionDisposition::RollbackRequired);
+        }
+        let mut next_receipt = receipt.clone();
+        next_receipt
+            .advance(UpgradeState::Completed)
+            .map_err(|_| error(UpgradeFilesystemErrorCode::InvalidCandidateValidation))?;
+        self.persist(guard, &next_receipt)?;
+        *receipt = next_receipt;
+        Ok(UpgradeCompletionDisposition::Completed)
+    }
 }
 
 const fn validation_failure(
@@ -217,6 +367,32 @@ const fn validation_failure(
             }
         }
     }
+}
+
+const fn post_switch_validation_failure(
+    report: UpgradePostSwitchValidationReport,
+    target_schema_version: i64,
+) -> bool {
+    match report {
+        UpgradePostSwitchValidationReport::ManagerFailed => true,
+        UpgradePostSwitchValidationReport::InputMethodFailed { manager: _ } => true,
+        UpgradePostSwitchValidationReport::Passed {
+            manager,
+            input_method,
+        } => {
+            !manager.is_valid_for(target_schema_version)
+                || !input_method.is_valid_for(target_schema_version)
+        }
+    }
+}
+
+fn final_database_is_current(store: &UpgradeReceiptStore, receipt: &UpgradeReceipt) -> bool {
+    let Ok(database) = UserDb::open_read_only_current(store.active_userdb_path()) else {
+        return false;
+    };
+    database
+        .schema_version()
+        .is_ok_and(|version| version == receipt.target_schema_version())
 }
 
 fn candidate_is_still_current(

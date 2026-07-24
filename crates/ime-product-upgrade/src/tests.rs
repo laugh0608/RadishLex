@@ -171,6 +171,52 @@ fn post_switch_failure_requires_explicit_rollback_completion() {
 }
 
 #[test]
+fn post_switch_verified_failure_can_require_rollback() {
+    let mut receipt = receipt();
+    receipt
+        .advance(UpgradeState::Quiesced)
+        .expect("state advances");
+    receipt
+        .record_artifact(private_file(UpgradeArtifactSlot::SnapshotDatabase, 22))
+        .expect("snapshot identity is recorded");
+    receipt
+        .advance(UpgradeState::SnapshotReady)
+        .expect("state advances");
+    receipt
+        .record_artifact(private_file(UpgradeArtifactSlot::CandidateDatabase, 23))
+        .expect("candidate identity is recorded");
+    receipt
+        .advance(UpgradeState::CandidateMigrated)
+        .expect("state advances");
+    receipt
+        .advance(UpgradeState::CandidateVerified)
+        .expect("state advances");
+    receipt
+        .record_artifact(private_file(UpgradeArtifactSlot::BackupDatabase, 24))
+        .expect("backup identity is recorded");
+    receipt
+        .advance(UpgradeState::SwitchPrepared)
+        .expect("state advances");
+    receipt
+        .advance(UpgradeState::Switched)
+        .expect("state advances");
+    receipt
+        .advance(UpgradeState::PostSwitchVerified)
+        .expect("state advances");
+    receipt
+        .require_rollback(UpgradeFailureCode::PostSwitchValidationFailed)
+        .expect("rollback is required");
+
+    assert_eq!(receipt.state(), UpgradeState::RollbackRequired);
+    assert_eq!(
+        receipt.failure_after_state(),
+        Some(UpgradeState::PostSwitchVerified)
+    );
+    receipt.mark_rolled_back().expect("rollback completes");
+    assert_eq!(receipt.state(), UpgradeState::RolledBack);
+}
+
+#[test]
 fn receipt_rejects_unsafe_identity_and_unstable_identifiers() {
     assert!(UpgradeArtifactIdentity::new(
         UpgradeArtifactSlot::SourceDatabase,

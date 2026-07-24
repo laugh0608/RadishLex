@@ -36,21 +36,21 @@ platforms/macos-product/
 
 ## UpgradeValidationHosts
 
-Manager 与 InputMethod bundle 各自把名为 `Contents/Helpers/RadishLexUpgradeValidationHost` 的无参数 executable 嵌入产品。两端名称相同但实现和 native dependency 不同，不能互换或由一个通用 host 代替。
+Manager 与 InputMethod bundle 各自把名为 `Contents/Helpers/RadishLexUpgradeValidationHost` 的 executable 嵌入产品。两端名称相同但实现和 native dependency 不同，不能互换或由一个通用 host 代替。无参数模式固定验证 migration candidate；唯一允许的参数 `--post-switch` 固定验证最终 `userdb.sqlite3`。任何路径参数或其他模式都拒绝。
 
-Manager host 固定读取：
+Manager host 的 candidate 模式固定读取：
 
 - `.radishlex-upgrade-v1/migration-candidate.sqlite3`；
 - `.radishlex-upgrade-v1/source-settings.json`（允许不存在）；
 - 本 bundle 的 `libradishlex_ime_ffi.dylib`。
 
-它通过 ABI v8 执行 current-schema 只读连接、active/deleted/import/learning 管理查询和 settings format v1 类型兼容检查。
+post-switch 模式改为读取固定 `userdb.sqlite3` 与 `manager-settings.json`。两种模式都通过 ABI v8 执行 current-schema 只读连接、active/deleted/import/learning 管理查询和 settings format v1 类型兼容检查。
 
-InputMethod host 固定读取同一 candidate，并从自身 bundle 解析 `Resources/RimeData`、schema 和 native library。它创建短生命周期 `0700` 临时 Rime user data，以 privacy mode 创建 personalized runtime、输入固定合成码并读取候选信号；不选择、不提交、不学习。临时 Rime data 必须在退出前删除。
+InputMethod host 按同一模式选择 candidate 或最终固定数据库，并从自身 bundle 解析 `Resources/RimeData`、schema 和 native library。它创建短生命周期 `0700` 临时 Rime user data，以 privacy mode 创建 personalized runtime、输入固定合成码并读取候选信号；不选择、不提交、不学习。临时 Rime data 必须在退出前删除。
 
-两端都在调用前后比较 candidate 全字节，并在调用前后拒绝 `-wal`、`-shm`、`-journal`。任何参数、candidate 缺失/损坏、summary version/check bit 不匹配、候选字节变化、sidecar 或临时目录清理失败都返回非零。
+两端都在调用前后比较目标数据库全字节，并在调用前后拒绝 `-wal`、`-shm`、`-journal`。非法参数、目标缺失/损坏、summary version/check bit 不匹配、数据库字节变化、sidecar 或临时目录清理失败都返回非零。
 
-validation host 不是普通用户工具，也不是协调器本身。它只产生当前进程的受控 validation summary；只有持有 upgrade guard 的协调核心可以把两端结果转换为 validation evidence 并持久化 `candidate_verified` 或 `aborted_preserved`。
+validation host 不是普通用户工具，也不是协调器本身。它只产生当前进程的受控 validation summary；只有持有 upgrade guard 的协调核心可以把两端结果转换为 validation evidence，并按当前 receipt 阶段持久化 `candidate_verified`、`aborted_preserved`、`post_switch_verified` 或 `rollback_required`。
 
 ## 构建与验证
 
@@ -66,4 +66,4 @@ InputMethod helper 由 bundle 构建入口装配并签名：
 ./scripts/check-macos-imk.sh
 ```
 
-带真实 native Rime 的候选信号验证仍需使用隔离的 locked RimeData 和产品门禁；不得把 `RADISHLEX_RIME_SHARED_DATA` 指向用户 Rime 或 RadishLex Application Support。上述普通检查不安装、不启动真实 Manager/InputMethod，也不调度 validation host 访问真实 candidate。
+两个产品门禁都会先执行 `UpgradeValidationHosts/check.sh`，验证仅允许的两种参数形式和固定路径映射，并拒绝任意路径及多余参数。带真实 native Rime 的候选信号验证仍需使用隔离的 locked RimeData 和产品门禁；不得把 `RADISHLEX_RIME_SHARED_DATA` 指向用户 Rime 或 RadishLex Application Support。上述普通检查不安装、不启动真实 Manager/InputMethod，也不调度 validation host 访问真实 candidate。

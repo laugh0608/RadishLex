@@ -55,7 +55,7 @@ data root 不存在、升级状态目录/receipt 不存在或 receipt 已处于�
 
 Apple P-256 与 Secure Enclave key-agreement 的显式 gated product smoke 是独立的早退出自检模式，不进入普通 Manager bootstrap；它们不能作为绕过 startup gate 启动产品 UI 的入口。
 
-Manager bundle 另携带无参数 `Contents/Helpers/RadishLexUpgradeValidationHost`。该 helper 只供升级协调器读取固定 `.radishlex-upgrade-v1/migration-candidate.sqlite3` 和可选 `source-settings.json`，复用 bundle 内 native library 执行 current-schema 管理查询和 settings format v1 兼容检查。它不接受调用方路径，不启动 Flutter，不写 candidate/settings，也不产生 WAL/SHM/journal；candidate 字节变化或 sidecar 残留均失败。
+Manager bundle 另携带 `Contents/Helpers/RadishLexUpgradeValidationHost`。无参数模式固定读取 `.radishlex-upgrade-v1/migration-candidate.sqlite3` 与可选 `source-settings.json`；唯一参数 `--post-switch` 固定读取最终 `userdb.sqlite3` 与 `manager-settings.json`。两种模式都复用 bundle 内 native library 执行 current-schema 管理查询和 settings format v1 兼容检查，不接受调用方路径、不启动 Flutter、不写数据库/settings，也不产生 WAL/SHM/journal；数据库字节变化或 sidecar 残留均失败。
 
 ## FFI bridge
 
