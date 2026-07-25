@@ -30,7 +30,7 @@
 ## 快速认知
 
 - 当前阶段：M4 产品发布候选；M4-P01/P02 已完成，推进 M4-P03 安装载体与发布供应链，实时状态见 `docs/status/current.md`
-- 当前代码状态：M1-M3、M4-P01/P02 完成；双 bundle、固定 RimeData、产品 manifest 与隔离协调资格已闭合；真实用户同步关闭，安装载体与发布供应链未闭环
+- 当前代码状态：M1-M3、M4-P01/P02 完成；双 bundle、RimeData、产品 manifest、数据协调资格与安装事务核心已闭合；真实用户同步关闭，程序切换、Installer 与发布供应链未闭环
 - 当前交付：工程原型，不是可安装 MVP；阶段证据以真实输入、数据正确性、安全同步和产品构建为准
 - 交付梯度：macOS 离线 Alpha、本地个人化 MVP 与 M3 加密同步 Beta 已完成；当前推进 M4 产品包
 - 第一真实平台：macOS InputMethodKit；Linux Fcitx5 与 Android 后续，Windows、iOS 后置

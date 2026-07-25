@@ -105,7 +105,7 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v8、Manager 产品状态与隔离资格 run、管理查询和共库证据；M4-P02 已固定只读 userdb inspection、snapshot/candidate、receipt/guard、startup gate、双模式 validation、原子切换、最终复验、精确回滚、guard-bound 驱动与 macOS host adapter | M4-P03 安装载体和发布复验 |
+| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v8、Manager 产品状态与隔离资格 run、管理查询和共库证据；M4-P02 数据协调与 M4-P03 外层安装 receipt/guard、产品身份、startup decision 已形成独立核心 | M4-P03 程序切换/恢复、macOS 安装 adapter 和发布复验 |
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
 | 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
 | Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁 | M4 数据升级、安装载体与发布分发 |
@@ -196,6 +196,18 @@ SQLite 用户数据层：
 - 稳定失败分类和中断恢复判断
 
 该 crate 当前已闭合固定布局内从 `preflighted` 到终态的核心调度与数据恢复，但仍不停止进程、不定位或启动产品 host，也不提供安装载体；API、副作用与验证入口见 [ime-product-upgrade 组件说明](../crates/ime-product-upgrade/README.md)，macOS 完整状态机见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。
+
+### ime-product-install
+
+产品程序安装事务 contract：
+
+- `first_install`、`upgrade`、`repair`、`remove_programs` 的显式 source/target 关系；
+- ProductManifest、bundle tree 与 canonical code identity evidence 组成的无路径产品身份；
+- staged/backup/installed evidence 只追加状态机，以及程序提交后的显式 rollback；
+- `.radishlex-install-v1` 私有 receipt、原子替换、root identity 与跨进程 Unix socket guard；
+- 终态 operation chain 与当前运行 Manager/InputMethod 身份 startup decision。
+
+该 crate 不依赖 `ime-product-upgrade`，不读取 bundle、验证签名、停止进程、复制/删除程序或接受安装路径。当前已形成外层事务状态与只读门禁核心；双目标 staging/rename/fsync、M4-P02 结果映射和 macOS 固定路径/签名 adapter 尚待下一切面。API 与验证入口见 [ime-product-install 组件说明](../crates/ime-product-install/README.md)，完整边界见 [macOS 程序安装事务](macos-installation-transaction.md)。
 
 ### ime-crypto
 

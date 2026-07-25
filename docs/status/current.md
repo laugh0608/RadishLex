@@ -18,6 +18,8 @@ M4-P02 已闭合只读 inspection、SQLite 一致快照、隔离 migration candi
 
 M4-P03 已接受 DMG + 独立用户域 Installer app：Manager、InputMethod 和 install state 固定在 current-user home 下，不请求管理员权限，也不让 `.pkg` script 承担明文数据协调。committed `install-layout.json` 与确定性 `InstallPayloadManifest.json` 已绑定产品 manifest、版本/build、Installer bundle ID、两个安装目标和默认保留数据语义；7 项 contract 覆盖确定性装配、额外文件、内容变更、layout 替换、bundle symlink 和覆盖拒绝。该 payload 仍不是 Installer/DMG，不证明签名、公证或真实安装。
 
+独立 `ime-product-install` 已固定首次安装、升级、修复和默认程序移除的 source/target 关系，以及 `prepared` 到三类终态的外层状态机。严格 receipt 绑定 data-root identity、ProductManifest/bundle tree/code identity hash、只追加 artifact evidence 和 previous-operation chain；原子存储与 Unix socket guard 拒绝中断写、未知对象、身份漂移和并发 operation。18 项合成测试覆盖状态顺序、提交前终止、提交后回滚、终态续接、root/程序身份漂移与只读 startup decision。核心不触碰真实 bundle 或 Application Support。
+
 M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
 ## M3 退出结论
@@ -57,8 +59,8 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v8、userd
 
 ## 下一步顺位
 
-1. M4-P03 下一切面先固定外层 installation transaction 专题：独立 `ime-product-install` 核心拥有严格 receipt/guard、program artifact identity、operation kind 和 startup decision；M4-P02 继续只负责数据，Installer/macOS adapter 只负责固定路径、签名与进程端口。
-2. 随后实现合成用户域内双 bundle staging/切换、部分切换重启恢复和 source 程序回滚，再把 M4-P02 数据协调结果纳入外层终态；没有外层非终态 startup gate 前不实现真实安装。
+1. M4-P03 下一切面实现跨平台程序切换原语：两个目标各自同文件系统的私有 staging/backup、逐端 rename/fsync、receipt evidence 与逐边界故障注入，先在合成用户域覆盖部分切换重启恢复和 source 程序回滚。
+2. 随后建立 macOS 固定路径/manifest/code-signature adapter，并把 M4-P02 数据协调结果映射到外层 `data_coordinating` / `data_settled` 与 rollback；双端产品启动接入外层 gate 前不实现真实安装。
 3. 普通用户同步、恢复/授权/撤销/轮换继续关闭；在真实不支持 Secure Enclave 的环境可得时再补 unsupported，首版发布后且准备生产同步前再验收正式域名/证书。
 
 ## 验证入口
@@ -69,6 +71,7 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v8、userd
 ./scripts/check-manager-product.sh
 ./scripts/check-macos-product-metadata.sh
 ./scripts/check-macos-install-layout.sh
+./scripts/check-product-install-core.sh
 ./scripts/check-macos-imk.sh
 ./scripts/check-macos-upgrade-coordinator.sh
 ./scripts/check-macos-upgrade-product-coordination.sh
@@ -96,5 +99,6 @@ cmp -s AGENTS.md CLAUDE.md
 - [macOS 平台边界](../macos-inputmethodkit-boundary.md)：M1/M2 输入与隐私稳定结论。
 - [macOS 产品包边界](../macos-product-package-boundary.md)：M4 组件、版本、数据、签名与装配停止线。
 - [macOS 安装载体 ADR](../adr/0008-macos-installation-carrier.md)：M4-P03 用户域 Installer、固定目标、程序事务与移除边界。
+- [macOS 程序安装事务](../macos-installation-transaction.md)：外层 operation、产品身份、receipt/guard、状态机与启动门禁。
 - [macOS 数据升级协调器](../macos-data-upgrade-coordinator.md)：M4-P02 状态机、receipt、SQLite 快照、双端验证与回滚边界。
 - [本周周志](../devlogs/2026-W30.md)：本周 M3 退出、M4-P01 装配与 M4-P02 升级协调器的验证和交接流水。

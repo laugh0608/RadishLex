@@ -137,6 +137,12 @@ M4 产品升级把运行时打开与产品迁移分开：`ime-userdb` 提供不�
 
 M4-P03 以签名、公证 DMG 内的独立用户域 Installer app 承担程序安装事务；Manager、InputMethod 和 Application Support 分别固定到 current-user home 下的 `Applications`、`Library/Input Methods` 与 `Library/Application Support/RadishLex`。`InstallPayloadManifest.json` 绑定 committed layout 与 ProductManifest，`.radishlex-install-v1` 外层 receipt/guard 负责两处程序切换和数据协调的一致性。非终态程序事务必须进入双端 startup gate，不能让旧程序在数据切换后重新启动。完整决策见 [ADR 0008](adr/0008-macos-installation-carrier.md)。
 
+### ime-product-install
+
+`ime-product-install` 是独立于数据协调器的程序事务核心。它显式区分首次安装、升级、修复和默认程序移除，以 source/target ProductManifest、bundle tree 与 canonical code identity evidence 的 SHA-256 表达逻辑产品身份；receipt 不保存绝对路径、签名输出或用户数据。staged、backup 和 installed evidence 只能按 operation 阶段追加，首个程序目标提交后失败必须进入程序回滚。
+
+外层 receipt 固定在 `.radishlex-install-v1`，绑定 data-root identity、operation chain、程序身份与稳定失败分类。Unix socket guard 拒绝同一 root 并发 operation；终态 receipt 只能由 `previous_operation_id` 与实际结果产品匹配的新 operation 替换。只读 startup decision 除阻止 active/non-terminal/损坏现场外，还要求当前运行 Manager/InputMethod 身份匹配 `completed` target 或 `aborted_preserved` / `rolled_back` source。完整字段、状态与停止线见 [macOS 程序安装事务](macos-installation-transaction.md)。
+
 ### ime-ranker
 
 `ime-ranker` 只消费 RadishLex candidate 和经过 userdb 整理的摘要，不访问 SQLite、Rime 或平台生命周期。

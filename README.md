@@ -31,6 +31,7 @@ RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支�
 - [产品交付路线图](docs/roadmap.md)：产品里程碑、交付物和退出标准。
 - [macOS 产品包边界](docs/macos-product-package-boundary.md)：M4 组件、版本、数据与发布停止线。
 - [macOS 安装载体 ADR](docs/adr/0008-macos-installation-carrier.md)：M4-P03 用户域 Installer、固定目标、程序事务与移除边界。
+- [macOS 程序安装事务](docs/macos-installation-transaction.md)：外层 operation、产品身份、receipt/guard 与启动门禁。
 - [macOS 数据升级协调器](docs/macos-data-upgrade-coordinator.md)：M4-P02 状态机、receipt、隔离 migration 与回滚边界。
 - [macOS 产品装配 Runbook](docs/runbooks/macos-product-assembly.md)：锁定输入、双 bundle 构建、manifest 复验和失败处理。
 - [RimeData 产品输入](packaging/rime/README.md)：固定 schema、Apache 词典、来源锁与逐资产许可证。

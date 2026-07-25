@@ -48,6 +48,7 @@ REQUIRED_FILES = [
     "docs/technical-plan.md",
     "docs/macos-product-package-boundary.md",
     "docs/macos-data-upgrade-coordinator.md",
+    "docs/macos-installation-transaction.md",
     "docs/adr/0008-macos-installation-carrier.md",
     "docs/adr/0007-apple-secure-enclave-p256-backend.md",
     "docs/runbooks/apple-secure-enclave-p256-backend.md",
@@ -80,6 +81,7 @@ REQUIRED_FILES = [
     "scripts/build-macos-install-payload.sh",
     "scripts/check-macos-product-metadata.sh",
     "scripts/check-macos-install-layout.sh",
+    "scripts/check-product-install-core.sh",
     "scripts/check-macos-upgrade-preflight.sh",
     "scripts/check-macos-upgrade-coordinator.sh",
     "scripts/check-macos-upgrade-product-coordination.sh",
@@ -112,6 +114,10 @@ REQUIRED_FILES = [
     "packaging/rime/data/pinyin_simp.dict.yaml",
     "packaging/rime/licenses/rime-pinyin-simp/LICENSE",
     "packaging/rime/licenses/rime-pinyin-simp/AUTHORS",
+    "crates/ime-product-install/Cargo.toml",
+    "crates/ime-product-install/README.md",
+    "crates/ime-product-install/src/lib.rs",
+    "crates/ime-product-install/src/filesystem.rs",
     "scripts/check-repo.py",
     "scripts/check-repo.sh",
     "scripts/check-sync-deployment-evidence.py",
@@ -272,6 +278,10 @@ def check_manager_product_runtime_contract() -> None:
 
 def check_macos_product_metadata() -> None:
     run_command([str(REPO_ROOT / "scripts/check-macos-product-metadata.sh")])
+
+
+def check_product_install_core() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-product-install-core.sh")])
 
 
 def check_macos_upgrade_preflight() -> None:
@@ -440,6 +450,7 @@ def main() -> int:
     check_license_wording()
     check_manager_product_runtime_contract()
     check_macos_product_metadata()
+    check_product_install_core()
     check_macos_upgrade_preflight()
     check_ruleset_and_workflows()
     check_path_budget()
