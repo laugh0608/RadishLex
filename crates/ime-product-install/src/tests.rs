@@ -41,6 +41,16 @@ fn root() -> InstallRootIdentity {
     InstallRootIdentity::new(10, 20, 501, 0o700).expect("root identity")
 }
 
+fn filesystem_identity(slot: InstallArtifactSlot) -> ProgramFilesystemIdentity {
+    let inode = match slot {
+        InstallArtifactSlot::SourceManager | InstallArtifactSlot::BackupManager => 100,
+        InstallArtifactSlot::SourceInputMethod | InstallArtifactSlot::BackupInputMethod => 101,
+        InstallArtifactSlot::StagedManager | InstallArtifactSlot::InstalledManager => 200,
+        InstallArtifactSlot::StagedInputMethod | InstallArtifactSlot::InstalledInputMethod => 201,
+    };
+    ProgramFilesystemIdentity::new(10, inode, 501, 0o755).expect("filesystem identity")
+}
+
 fn receipt(kind: InstallOperationKind) -> InstallReceipt {
     let source = match kind {
         InstallOperationKind::FirstInstall => None,
@@ -72,8 +82,21 @@ fn evidence(receipt: &InstallReceipt, slot: InstallArtifactSlot) -> InstallArtif
     } else {
         receipt.source_product().expect("source product")
     };
-    InstallArtifactEvidence::new(slot, product.program(slot.component()).clone())
-        .expect("artifact evidence")
+    InstallArtifactEvidence::new(
+        slot,
+        product.program(slot.component()).clone(),
+        filesystem_identity(slot),
+    )
+    .expect("artifact evidence")
+}
+
+fn record_source_programs(receipt: &mut InstallReceipt) {
+    receipt
+        .record_artifact(evidence(receipt, InstallArtifactSlot::SourceManager))
+        .expect("source Manager");
+    receipt
+        .record_artifact(evidence(receipt, InstallArtifactSlot::SourceInputMethod))
+        .expect("source InputMethod");
 }
 
 fn record_target_staging(receipt: &mut InstallReceipt) {
@@ -264,6 +287,7 @@ fn first_install_requires_staging_and_installed_evidence_in_order() {
 fn upgrade_data_failure_requires_source_program_rollback() {
     let mut receipt = receipt(InstallOperationKind::Upgrade);
     receipt.advance(InstallState::Quiesced).expect("quiesced");
+    record_source_programs(&mut receipt);
     record_target_staging(&mut receipt);
     receipt
         .advance(InstallState::TargetStaged)
@@ -302,6 +326,7 @@ fn upgrade_data_failure_requires_source_program_rollback() {
 fn remove_programs_has_no_target_and_blocks_a_removed_program_start() {
     let mut receipt = receipt(InstallOperationKind::RemovePrograms);
     receipt.advance(InstallState::Quiesced).expect("quiesced");
+    record_source_programs(&mut receipt);
     assert!(receipt
         .record_artifact(
             InstallArtifactEvidence::new(
@@ -311,6 +336,7 @@ fn remove_programs_has_no_target_and_blocks_a_removed_program_start() {
                     .expect("source")
                     .program(ProgramComponent::Manager)
                     .clone(),
+                filesystem_identity(InstallArtifactSlot::StagedManager),
             )
             .expect("syntactic evidence")
         )
@@ -394,6 +420,29 @@ fn decoded_receipt_rejects_artifacts_that_appear_before_their_stage() {
         .artifacts
         .push(evidence(&forged, InstallArtifactSlot::InstalledManager));
     assert!(forged.encode().is_err());
+}
+
+#[test]
+fn renamed_artifact_requires_exact_inode_continuity_without_mutating_on_rejection() {
+    assert!(ProgramFilesystemIdentity::new(10, 1, 501, 0o775).is_err());
+
+    let mut receipt = receipt(InstallOperationKind::FirstInstall);
+    receipt.advance(InstallState::Quiesced).expect("quiesced");
+    record_target_staging(&mut receipt);
+    receipt
+        .advance(InstallState::TargetStaged)
+        .expect("target staged");
+    let target = receipt.target_product().expect("target");
+    let mismatched = InstallArtifactEvidence::new(
+        InstallArtifactSlot::InstalledManager,
+        target.program(ProgramComponent::Manager).clone(),
+        ProgramFilesystemIdentity::new(10, 999, 501, 0o755).expect("filesystem identity"),
+    )
+    .expect("evidence");
+    assert!(receipt.record_artifact(mismatched).is_err());
+    assert!(receipt
+        .artifact(InstallArtifactSlot::InstalledManager)
+        .is_none());
 }
 
 #[test]

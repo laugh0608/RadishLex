@@ -331,6 +331,17 @@ impl InstallReceiptStore {
         Ok(())
     }
 
+    pub(crate) fn verify_guard(
+        &self,
+        guard: &InstallProcessGuard,
+    ) -> Result<(), InstallFilesystemError> {
+        self.revalidate()?;
+        if !guard.belongs_to(self) {
+            return Err(error(InstallFilesystemErrorCode::IdentityChanged));
+        }
+        guard.revalidate()
+    }
+
     fn revalidate(&self) -> Result<(), InstallFilesystemError> {
         self.root.revalidate()?;
         let metadata = fs::symlink_metadata(&self.state_directory)

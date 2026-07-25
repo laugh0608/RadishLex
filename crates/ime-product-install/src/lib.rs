@@ -8,12 +8,26 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+mod artifact;
+pub use artifact::{InstallArtifactEvidence, InstallArtifactSlot, ProgramFilesystemIdentity};
 #[cfg(unix)]
 mod filesystem;
+#[cfg(unix)]
+mod program_switch;
 #[cfg(unix)]
 pub use filesystem::{
     inspect_install_startup_gate, InstallFilesystemError, InstallFilesystemErrorCode,
     InstallProcessGuard, InstallReceiptStore, VerifiedInstallRoot,
+};
+#[cfg(unix)]
+pub use program_switch::{
+    commit_program_removal, commit_program_target, commit_program_target_with_faults,
+    finish_program_restore, finish_source_preservation, finish_target_staging,
+    preserve_program_source, preserve_program_source_with_faults, record_program_source,
+    record_staged_program, restore_program_source, restore_program_source_with_faults,
+    NoProgramSwitchFaults, ProgramSwitchAction, ProgramSwitchBoundary, ProgramSwitchError,
+    ProgramSwitchErrorCode, ProgramSwitchFaultInjector, ProgramSwitchFaultPoint,
+    ProgramSwitchStore, VerifiedProgramTarget, INPUT_METHOD_BUNDLE_NAME, MANAGER_BUNDLE_NAME,
 };
 
 pub const INSTALL_RECEIPT_FORMAT: &str = "radishlex-product-install-receipt-v1";
@@ -378,71 +392,6 @@ impl InstallRootIdentity {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum InstallArtifactSlot {
-    StagedManager,
-    StagedInputMethod,
-    BackupManager,
-    BackupInputMethod,
-    InstalledManager,
-    InstalledInputMethod,
-}
-
-impl InstallArtifactSlot {
-    const fn component(self) -> ProgramComponent {
-        match self {
-            Self::StagedManager | Self::BackupManager | Self::InstalledManager => {
-                ProgramComponent::Manager
-            }
-            Self::StagedInputMethod | Self::BackupInputMethod | Self::InstalledInputMethod => {
-                ProgramComponent::InputMethod
-            }
-        }
-    }
-
-    const fn is_target(self) -> bool {
-        matches!(
-            self,
-            Self::StagedManager
-                | Self::StagedInputMethod
-                | Self::InstalledManager
-                | Self::InstalledInputMethod
-        )
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct InstallArtifactEvidence {
-    slot: InstallArtifactSlot,
-    identity: ProgramBundleIdentity,
-}
-
-impl InstallArtifactEvidence {
-    pub fn new(
-        slot: InstallArtifactSlot,
-        identity: ProgramBundleIdentity,
-    ) -> Result<Self, InstallReceiptError> {
-        if slot.component() != identity.component {
-            return Err(InstallReceiptError::invalid(
-                "artifact_evidence",
-                "artifact slot and component differ",
-            ));
-        }
-        identity.validate()?;
-        Ok(Self { slot, identity })
-    }
-
-    pub const fn slot(&self) -> InstallArtifactSlot {
-        self.slot
-    }
-
-    pub fn identity(&self) -> &ProgramBundleIdentity {
-        &self.identity
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct InstallReceipt {
@@ -523,6 +472,10 @@ impl InstallReceipt {
         &self.artifacts
     }
 
+    pub fn artifact(&self, slot: InstallArtifactSlot) -> Option<&InstallArtifactEvidence> {
+        self.artifacts.iter().find(|item| item.slot == slot)
+    }
+
     pub fn record_artifact(
         &mut self,
         evidence: InstallArtifactEvidence,
@@ -540,9 +493,15 @@ impl InstallReceipt {
         }
         self.validate_artifact_for_operation(&evidence)?;
         self.validate_artifact_recording_state(evidence.slot)?;
-        self.artifacts.push(evidence);
-        self.artifacts.sort_by_key(|item| item.slot);
-        self.validate()
+        let mut next_artifacts = self.artifacts.clone();
+        next_artifacts.push(evidence);
+        next_artifacts.sort_by_key(|item| item.slot);
+        let previous_artifacts = std::mem::replace(&mut self.artifacts, next_artifacts);
+        if let Err(validation_error) = self.validate() {
+            self.artifacts = previous_artifacts;
+            return Err(validation_error);
+        }
+        Ok(())
     }
 
     pub fn advance(&mut self, next: InstallState) -> Result<(), InstallReceiptError> {
@@ -792,6 +751,7 @@ impl InstallReceipt {
                 "artifact identity differs from operation product",
             ));
         }
+        evidence.filesystem_identity.validate()?;
         Ok(())
     }
 
@@ -800,6 +760,9 @@ impl InstallReceipt {
         slot: InstallArtifactSlot,
     ) -> Result<(), InstallReceiptError> {
         let allowed = match slot {
+            InstallArtifactSlot::SourceManager | InstallArtifactSlot::SourceInputMethod => {
+                self.state == InstallState::Quiesced
+            }
             InstallArtifactSlot::StagedManager | InstallArtifactSlot::StagedInputMethod => {
                 self.state == InstallState::Quiesced
             }
@@ -830,6 +793,8 @@ impl InstallReceipt {
     fn validate_evidence_for_state(&self, state: InstallState) -> Result<(), InstallReceiptError> {
         let progress_state = self.effective_progress_state(state);
         let has = |slot| self.artifacts.iter().any(|item| item.slot == slot);
+        let source_recorded =
+            has(InstallArtifactSlot::SourceManager) && has(InstallArtifactSlot::SourceInputMethod);
         let target_staged =
             has(InstallArtifactSlot::StagedManager) && has(InstallArtifactSlot::StagedInputMethod);
         let source_preserved =
@@ -837,6 +802,41 @@ impl InstallReceipt {
         let manager_installed = has(InstallArtifactSlot::InstalledManager);
         let input_installed = has(InstallArtifactSlot::InstalledInputMethod);
 
+        if matches!(
+            progress_state,
+            InstallState::TargetStaged
+                | InstallState::SourcePreserved
+                | InstallState::ManagerCommitted
+                | InstallState::ProgramsCommitted
+                | InstallState::DataCoordinating
+                | InstallState::DataSettled
+                | InstallState::FinalVerified
+                | InstallState::Completed
+        ) && matches!(
+            self.operation_kind,
+            InstallOperationKind::Upgrade | InstallOperationKind::Repair
+        ) && !source_recorded
+        {
+            return Err(InstallReceiptError::invalid(
+                "artifacts",
+                "source program evidence is incomplete",
+            ));
+        }
+        if matches!(
+            progress_state,
+            InstallState::SourcePreserved
+                | InstallState::ManagerCommitted
+                | InstallState::ProgramsCommitted
+                | InstallState::FinalVerified
+                | InstallState::Completed
+        ) && self.operation_kind == InstallOperationKind::RemovePrograms
+            && !source_recorded
+        {
+            return Err(InstallReceiptError::invalid(
+                "artifacts",
+                "source program evidence is incomplete",
+            ));
+        }
         if matches!(
             progress_state,
             InstallState::TargetStaged
@@ -907,6 +907,39 @@ impl InstallReceipt {
                 "installed InputMethod evidence is missing",
             ));
         }
+        self.validate_filesystem_identity_continuity()
+    }
+
+    fn validate_filesystem_identity_continuity(&self) -> Result<(), InstallReceiptError> {
+        for (before_slot, after_slot) in [
+            (
+                InstallArtifactSlot::SourceManager,
+                InstallArtifactSlot::BackupManager,
+            ),
+            (
+                InstallArtifactSlot::SourceInputMethod,
+                InstallArtifactSlot::BackupInputMethod,
+            ),
+            (
+                InstallArtifactSlot::StagedManager,
+                InstallArtifactSlot::InstalledManager,
+            ),
+            (
+                InstallArtifactSlot::StagedInputMethod,
+                InstallArtifactSlot::InstalledInputMethod,
+            ),
+        ] {
+            let before = self.artifacts.iter().find(|item| item.slot == before_slot);
+            let after = self.artifacts.iter().find(|item| item.slot == after_slot);
+            if let (Some(before), Some(after)) = (before, after) {
+                if before.filesystem_identity != after.filesystem_identity {
+                    return Err(InstallReceiptError::invalid(
+                        "artifacts",
+                        "renamed artifact filesystem identity changed",
+                    ));
+                }
+            }
+        }
         Ok(())
     }
 
@@ -920,7 +953,10 @@ impl InstallReceipt {
         })?;
         for artifact in &self.artifacts {
             let minimum = match artifact.slot {
-                InstallArtifactSlot::StagedManager | InstallArtifactSlot::StagedInputMethod => 1,
+                InstallArtifactSlot::SourceManager
+                | InstallArtifactSlot::SourceInputMethod
+                | InstallArtifactSlot::StagedManager
+                | InstallArtifactSlot::StagedInputMethod => 1,
                 InstallArtifactSlot::BackupManager | InstallArtifactSlot::BackupInputMethod => {
                     if self.operation_kind == InstallOperationKind::RemovePrograms {
                         1

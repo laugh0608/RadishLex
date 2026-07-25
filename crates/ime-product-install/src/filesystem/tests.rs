@@ -7,7 +7,7 @@ use crate::{
     InstallArtifactEvidence, InstallArtifactSlot, InstallFailureCode, InstallOperationKind,
     InstallReceipt, InstallStartupGateDecision, InstallStartupGateErrorCode, InstallState,
     ProductArtifactIdentity, ProductRelease, ProgramBundleIdentity, ProgramComponent,
-    RunningProgramIdentity, INSTALL_PRODUCT_ID,
+    ProgramFilesystemIdentity, RunningProgramIdentity, INSTALL_PRODUCT_ID,
 };
 
 use super::*;
@@ -117,7 +117,19 @@ fn first_install_receipt(store: &InstallReceiptStore) -> InstallReceipt {
 
 fn evidence(receipt: &InstallReceipt, slot: InstallArtifactSlot) -> InstallArtifactEvidence {
     let target = receipt.target_product().expect("target");
-    InstallArtifactEvidence::new(slot, target.program(slot.component()).clone()).expect("evidence")
+    let inode = match slot {
+        InstallArtifactSlot::StagedManager | InstallArtifactSlot::InstalledManager => 200,
+        InstallArtifactSlot::StagedInputMethod | InstallArtifactSlot::InstalledInputMethod => 201,
+        InstallArtifactSlot::SourceManager | InstallArtifactSlot::BackupManager => 100,
+        InstallArtifactSlot::SourceInputMethod | InstallArtifactSlot::BackupInputMethod => 101,
+    };
+    InstallArtifactEvidence::new(
+        slot,
+        target.program(slot.component()).clone(),
+        ProgramFilesystemIdentity::new(10, inode, receipt.root_identity().owner_id(), 0o755)
+            .expect("filesystem identity"),
+    )
+    .expect("evidence")
 }
 
 fn complete_first_install(

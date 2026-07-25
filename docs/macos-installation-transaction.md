@@ -12,13 +12,13 @@ RadishLex Installer.app
                          ▼
 macOS installation adapter
   ├─ 固定 user-domain 路径、签名/manifest 与进程证据
-  ├─ 两个目标各自文件系统上的 staging/backup/rename/fsync
+  ├─ 向核心固定槽位填充已复验 staging bundle
   └─ 调用 M4-P02 数据协调器
                          │
                          ▼
 ime-product-install
   ├─ operation kind、产品逻辑身份与外层 receipt
-  ├─ 跨进程 guard、状态转换和失败分类
+  ├─ 跨进程 guard、同文件系统 rename/fsync、恢复与状态转换
   └─ 完全只读的终态身份 startup decision
                          │
                          ▼
@@ -26,7 +26,7 @@ ime-product-upgrade
   └─ Application Support 内的数据 snapshot/migration/rollback
 ```
 
-`ime-product-install` 不读取 bundle、不计算 code signature、不停止进程、不接受安装路径、不复制或删除程序、不解释数据 receipt。`ime-product-upgrade` 不知道程序 staging、backup 或双 bundle 切换状态。Installer 与平台 adapter 不能自己发明状态、跳过 receipt 或根据缺失文件猜测 operation。
+`ime-product-install` 不读取 bundle 内容、不计算 code signature、不停止进程、不接受自定义 bundle 名或最终路径，也不解释数据 receipt；它只接受平台已解析并验证的固定目标父目录，拥有私有事务槽位及 rename/fsync/recovery。`ime-product-upgrade` 不知道程序 staging、backup 或双 bundle 切换状态。Installer 与平台 adapter 不能自己发明状态、跳过 receipt 或根据缺失文件猜测 operation。
 
 ## 固定状态位置与权限
 
@@ -70,12 +70,51 @@ macOS adapter 负责从固定 bundle 和签名 API 形成 canonical evidence，�
 receipt 初始保存 source/target product identity。后续 artifact evidence 只能按 slot 追加：
 
 ```text
+source_manager / source_input_method
 staged_manager / staged_input_method
 backup_manager / backup_input_method
 installed_manager / installed_input_method
 ```
 
-staged/installed 必须逻辑匹配 target，backup 必须逻辑匹配 source；重复 slot、删除旧 evidence 或改写旧 identity 一律拒绝。
+每条 evidence 同时保存逻辑 bundle identity 和程序目录根的 device/inode/owner/mode。source/backup 必须逻辑匹配 source，staged/installed 必须逻辑匹配 target；同一次移动前后的 source/backup 或 staged/installed 必须保持相同 device/inode。重复 slot、删除旧 evidence 或改写旧 identity 一律拒绝。
+
+source evidence 必须在任何 rename 前持久化。这样中断恢复才能严格区分：
+
+- source 仍在固定目标、backup 不存在：尚未移动；
+- source 不在固定目标、相同 inode 已在 backup：rename 已完成但下一 receipt 尚未落盘；
+- 两边同时存在、同时缺失或任一 identity 漂移：失败关闭，不按文件名猜测。
+
+## 程序目标与同文件系统事务目录
+
+跨平台 Unix 核心只接受平台已经解析的两个目标父目录，不接受 bundle 名称或调用方自定义目标。component 固定映射：
+
+| component | 固定 bundle 名 |
+| --- | --- |
+| Manager | `RadishLex Manager.app` |
+| InputMethod | `RadishLexInputMethod.app` |
+
+父目录必须是 canonical、非 symlink、目标 uid 所有且不可由 group/other 写入的目录。每个 component 在自己的目标父目录建立当前 operation 独占的私有事务目录：
+
+```text
+<target-parent>/.radishlex-install-<operation-id>/
+  staged.app
+  source-backup.app
+```
+
+事务目录必须为 `0700`，只接受两个固定名称。staged、backup 与最终 bundle 必须是同一父文件系统上的非 symlink 目录；核心不跨设备复制或以 copy+delete 冒充原子切换。平台 adapter 负责使用保留 macOS bundle metadata 的方式把已验签 target 填入核心给出的 `staged.app`，核心随后复验目录身份并记录 staged evidence。
+
+程序切换顺序固定为：
+
+1. 双端静止后分别记录 source evidence；首次安装要求两个固定目标都不存在。
+2. install/upgrade/repair 的两个 staged bundle 均验签并持久化 evidence 后推进 `target_staged`。
+3. upgrade/repair/remove 将 source 原 inode rename 到各自 `source-backup.app`；每次 rename 后同步目标目录与原目录，再记录 backup evidence。
+4. Manager 先把 staged 原 inode rename 到固定目标并记录 installed evidence，推进 `manager_committed`。
+5. InputMethod 再执行同样动作，推进 `programs_committed`；remove 则以固定目标不存在作为对应 committed 证据。
+6. 任一步重启都只根据 receipt evidence 与精确 inode 在 staged/backup/final 三个固定槽位中的位置续跑。
+
+rollback 对每个已经提交的 target 先把失败 target 原 inode 移回 `staged.app`，再把 source backup 原 inode恢复到固定目标；首次安装没有 source，恢复结果是固定目标不存在；remove 没有 target staging，恢复结果是 source backup 回到固定目标。只有两个 component 都达到各自 source 结果，外层 receipt 才能推进 `programs_restored`。
+
+当前切面不递归清理 staged/backup 或历史 operation 目录。成功、回滚和诊断材料的身份绑定清理必须使用后续独立终态动作；不能为了开始下一次 operation 删除未知目录或未复验的 bundle。
 
 ## 状态机
 
@@ -116,7 +155,7 @@ M4-P02 数据 receipt 只能在 `upgrade` 的 `data_coordinating` 阶段运行�
 - 数据 receipt 非终态、损坏或身份漂移时，外层保持非终态并继续阻止两端启动；
 - 外层 `completed` 前必须复验两个已安装 target、数据终态和双端 startup identity。
 
-本切面先实现外层 receipt/guard、artifact contract 与 startup decision；程序 rename/fsync、数据协调映射和平台 adapter 在后续切面接入，但状态与替换规则从当前版本起固定。
+外层 receipt/guard、artifact contract、startup decision，以及合成目标上的程序 rename/fsync 和精确恢复均已实现。数据协调映射、macOS 固定路径/签名 adapter 与终态材料清理仍在后续切面接入。
 
 ## Startup decision
 
@@ -152,11 +191,14 @@ receipt format 固定为 `radishlex-product-install-receipt-v1`，最大 64 KiB�
 
 任何不确定状态保留现场，不删除 receipt 或临时对象来绕过 gate。
 
-## 当前实现退出条件
+## 当前实现边界与后续条件
 
 - 独立 crate 不依赖数据升级 crate，也不进入输入热路径；
 - 四种 operation 的 source/target 组合与状态顺序具有拒绝测试；
 - product/bundle/hash/artifact evidence 严格解析，receipt canonical 且只允许追加证据；
 - guard 能拒绝并发 operation，receipt 写入绑定正确 root 与 guard；
+- 两个 component 的固定目标、私有事务目录、同设备约束和 source/staged/backup/installed inode 连续性由核心执行；
+- preserve、逐端 commit 和 rollback 的每个 rename、目标目录 fsync、源目录 fsync 边界均可注入故障并从精确 inode 现场重试；
 - startup gate 对缺失、非终态、终态身份匹配/漂移、remove、损坏、未知对象和中断写均有稳定结果；
 - 全部测试只使用合成 `0700` 临时目录，不访问真实 Application Support、程序目标、系统设置、Keychain 或签名凭据。
+- macOS adapter、真实 bundle 内容/签名复验、M4-P02 状态映射、双端 startup 接线和身份绑定终态清理仍属于后续切面。
