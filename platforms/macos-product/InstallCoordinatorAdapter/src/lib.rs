@@ -5,11 +5,12 @@
 use std::fmt;
 
 use radishlex_ime_product_install::{
-    finish_program_restore, restore_program_source, InstallFailureCode, InstallFilesystemError,
-    InstallFilesystemErrorCode, InstallOperationKind, InstallProcessGuard,
-    InstallProgramValidationPort, InstallReceipt, InstallReceiptStore, InstallState,
-    ProductRelease, ProgramComponent, ProgramSwitchError, ProgramSwitchErrorCode,
-    ProgramSwitchStore,
+    finish_program_restore, restore_program_source, resume_install_finalization,
+    InstallFailureCode, InstallFilesystemError, InstallFilesystemErrorCode,
+    InstallFinalizationError, InstallFinalizationPort, InstallFinalizationValidationStage,
+    InstallOperationKind, InstallProcessGuard, InstallProgramValidationPort, InstallReceipt,
+    InstallReceiptStore, InstallState, ProductRelease, ProgramComponent, ProgramSwitchError,
+    ProgramSwitchErrorCode, ProgramSwitchStore,
 };
 use radishlex_ime_product_upgrade::{
     ProductRelease as UpgradeProductRelease, UpgradeCandidateValidationReport,
@@ -92,6 +93,75 @@ impl From<UpgradeCoordinatorError> for InstallDataCoordinationError {
     fn from(error: UpgradeCoordinatorError) -> Self {
         Self::Upgrade(error)
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InstallProductFinalizationError {
+    InstallFinalization(InstallFinalizationError),
+    Upgrade(UpgradeCoordinatorError),
+    InvalidBinding,
+    InvalidState,
+}
+
+impl fmt::Display for InstallProductFinalizationError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::InstallFinalization(_) => "product install finalization failed",
+            Self::Upgrade(_) => "product data finalization evidence is unavailable",
+            Self::InvalidBinding => "product finalization receipts are not bound",
+            Self::InvalidState => "product finalization states are inconsistent",
+        })
+    }
+}
+
+impl std::error::Error for InstallProductFinalizationError {}
+
+impl From<InstallFinalizationError> for InstallProductFinalizationError {
+    fn from(error: InstallFinalizationError) -> Self {
+        Self::InstallFinalization(error)
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn resume_upgrade_install_finalization<V>(
+    install_store: &InstallReceiptStore,
+    install_guard: &InstallProcessGuard,
+    install_receipt: &mut InstallReceipt,
+    manager: &ProgramSwitchStore,
+    input_method: &ProgramSwitchStore,
+    upgrade_store: &UpgradeReceiptStore,
+    upgrade_guard: &UpgradeProcessGuard,
+    upgrade_receipt: &UpgradeReceipt,
+    program_validation: &mut V,
+) -> Result<(), InstallProductFinalizationError>
+where
+    V: InstallProgramValidationPort,
+{
+    validate_finalization_binding(
+        install_store,
+        install_guard,
+        install_receipt,
+        manager,
+        input_method,
+        upgrade_store,
+        upgrade_guard,
+        upgrade_receipt,
+    )?;
+    let mut port = UpgradeInstallFinalizationPort {
+        upgrade_store,
+        upgrade_guard,
+        upgrade_receipt,
+        program_validation,
+    };
+    resume_install_finalization(
+        install_store,
+        install_guard,
+        install_receipt,
+        manager,
+        input_method,
+        &mut port,
+    )?;
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -222,6 +292,103 @@ fn validate_binding(
             InstallDataCoordinationError::Upgrade(UpgradeCoordinatorError::Filesystem(error.code()))
         })?;
     Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_finalization_binding(
+    install_store: &InstallReceiptStore,
+    install_guard: &InstallProcessGuard,
+    install_receipt: &InstallReceipt,
+    manager: &ProgramSwitchStore,
+    input_method: &ProgramSwitchStore,
+    upgrade_store: &UpgradeReceiptStore,
+    upgrade_guard: &UpgradeProcessGuard,
+    upgrade_receipt: &UpgradeReceipt,
+) -> Result<(), InstallProductFinalizationError> {
+    install_store
+        .verify_current(install_guard, install_receipt)
+        .map_err(|error| {
+            InstallProductFinalizationError::InstallFinalization(
+                InstallFinalizationError::InstallFilesystem(error.code()),
+            )
+        })?;
+    manager
+        .verify_binding(install_store, install_guard, install_receipt)
+        .map_err(|error| {
+            InstallProductFinalizationError::InstallFinalization(
+                InstallFinalizationError::ProgramSwitch(error.code()),
+            )
+        })?;
+    input_method
+        .verify_binding(install_store, install_guard, install_receipt)
+        .map_err(|error| {
+            InstallProductFinalizationError::InstallFinalization(
+                InstallFinalizationError::ProgramSwitch(error.code()),
+            )
+        })?;
+    if install_receipt.operation_kind() != InstallOperationKind::Upgrade
+        || !matches!(
+            install_receipt.state(),
+            InstallState::DataSettled | InstallState::FinalVerified | InstallState::Completed
+        )
+        || upgrade_receipt.state() != UpgradeState::Completed
+        || install_receipt.operation_id() != upgrade_receipt.operation_id()
+        || manager.operation_id() != install_receipt.operation_id()
+        || input_method.operation_id() != install_receipt.operation_id()
+        || manager.component() != ProgramComponent::Manager
+        || input_method.component() != ProgramComponent::InputMethod
+        || !data_root_matches(install_receipt, upgrade_store.data_root_identity())
+        || !data_root_matches(
+            install_receipt,
+            upgrade_receipt_data_root(upgrade_receipt)
+                .map_err(|_| InstallProductFinalizationError::InvalidBinding)?,
+        )
+        || !release_pair_matches(install_receipt, upgrade_receipt)
+    {
+        return Err(InstallProductFinalizationError::InvalidBinding);
+    }
+    upgrade_store
+        .verify_current(upgrade_guard, upgrade_receipt)
+        .map_err(|error| {
+            InstallProductFinalizationError::Upgrade(UpgradeCoordinatorError::Filesystem(
+                error.code(),
+            ))
+        })?;
+    Ok(())
+}
+
+struct UpgradeInstallFinalizationPort<'a, V> {
+    upgrade_store: &'a UpgradeReceiptStore,
+    upgrade_guard: &'a UpgradeProcessGuard,
+    upgrade_receipt: &'a UpgradeReceipt,
+    program_validation: &'a mut V,
+}
+
+impl<V> InstallFinalizationPort for UpgradeInstallFinalizationPort<'_, V>
+where
+    V: InstallProgramValidationPort,
+{
+    fn validate_final_state(
+        &mut self,
+        manager: &ProgramSwitchStore,
+        input_method: &ProgramSwitchStore,
+        receipt: &InstallReceipt,
+        _stage: InstallFinalizationValidationStage,
+    ) -> bool {
+        self.upgrade_receipt.state() == UpgradeState::Completed
+            && receipt.operation_id() == self.upgrade_receipt.operation_id()
+            && data_root_matches(receipt, self.upgrade_store.data_root_identity())
+            && upgrade_receipt_data_root(self.upgrade_receipt)
+                .is_ok_and(|root| data_root_matches(receipt, root))
+            && release_pair_matches(receipt, self.upgrade_receipt)
+            && self
+                .upgrade_store
+                .verify_current(self.upgrade_guard, self.upgrade_receipt)
+                .is_ok()
+            && self
+                .program_validation
+                .validate_installed_targets(manager, input_method, receipt)
+    }
 }
 
 fn validate_state_pair(

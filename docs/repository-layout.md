@@ -111,11 +111,11 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v8、Manager 产品状态与隔离资格 run、管理查询和共库证据；M4-P02 数据协调、M4-P03 外层 receipt/guard、双程序切换/恢复、manifest/code-signature adapter 与跨核心协调组合已形成独立边界 | M4-P03 终态/双端 startup 接线、Installer UI 和发布复验 |
+| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v9、Manager 产品状态与隔离资格 run、管理查询和共库证据；M4-P02 数据协调、M4-P03 外层 receipt/guard、双程序切换/恢复、两段终态、manifest/code-signature adapter 与跨核心协调组合已形成独立边界 | M4-P03 隔离端到端恢复门禁、Installer UI 和发布复验 |
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
 | 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
 | Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁 | M4 数据升级、安装载体与发布分发 |
-| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；M4-P01 双 bundle 与 locked RimeData；M4-P02 只读 preflight、双端 startup gate、独立 upgrade validation host、manifest-bound adapter 与隔离产品协调资格；Android Keystore 能力验证桥 | M4-P03 安装载体、发布供应链和普通用户安装包；其他系统输入法 |
+| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；M4-P01 双 bundle 与 locked RimeData；M4-P02 数据 gate/validation；M4-P03 外层 install gate、运行 bundle 身份与最前置双端接线；Android Keystore 能力验证桥 | M4-P03 隔离恢复门禁、Installer UI、发布供应链和普通用户安装包；其他系统输入法 |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
 

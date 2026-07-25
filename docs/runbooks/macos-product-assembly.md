@@ -133,7 +133,7 @@ target/macos-install-payload/<version>-<build>/
 
 - Manager/InputMethod 的版本、build、最低 macOS、bundle ID 与产品真相源一致；
 - FFI ABI、userdb schema、RimeData/native manifest 版本一致；
-- 两个 bundle 都携带已签名的独立 upgrade validation helper，并链接各自 bundle 内 ABI v8 native library；
+- 两个 bundle 都携带已签名的独立 upgrade validation helper，并链接各自 bundle 内 ABI v9 native library；
 - bundle 不依赖 Homebrew 或构建机绝对 library path；
 - committed schema、词典、来源 manifest 和逐资产许可证进入 InputMethod；
 - `ProductManifest.json` 能复算两个 bundle、内部安全 symlink 和许可证文件。
@@ -156,7 +156,7 @@ target/macos-install-payload/<version>-<build>/
 - `external absolute dependency`：某个 Mach-O 仍指向构建机路径；修正 dylib 收集或 install name，不能把本机路径加入 allowlist。
 - `product manifest does not match assembled artifacts`：产物在 manifest 生成后被修改、缺失或版本不一致；重新从受控输入装配，不手改 manifest。
 - `install payload ... does not match`：产品根、layout 或 payload manifest 不一致；重新从已验证产品装配生成，不复制或手改外层 manifest。
-- `missing ... RadishLexUpgradeValidationHost` 或 upgrade validation symbol 缺失：对应 bundle 未完成 ABI v8 helper 装配；修正组件构建，不能从另一 bundle 复制 helper 代替。
+- `missing ... RadishLexUpgradeValidationHost` 或 upgrade validation symbol 缺失：对应 bundle 未完成 ABI v9 helper 装配；修正组件构建，不能从另一 bundle 复制 helper 代替。
 - codesign 验证失败：检查嵌套 dylib、主 executable 和外层 bundle 的签名顺序；不要把 `--deep --force` 当作发布修复策略。
 
 任何需要安装输入法、修改系统设置、使用 Developer ID、提交公证或操作真实 Application Support 数据的后续步骤，都必须进入对应专用 runbook 并另行取得授权。

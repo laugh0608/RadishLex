@@ -135,7 +135,6 @@ fn running(
 ) -> RunningProgramIdentity {
     RunningProgramIdentity::new(
         product.release().clone(),
-        product.product_manifest_sha256(),
         product.program(component).clone(),
     )
     .expect("running program identity")

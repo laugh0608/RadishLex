@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-#define RADISHLEX_ABI_CONTRACT_VERSION 8u
+#define RADISHLEX_ABI_CONTRACT_VERSION 9u
 #define RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD 1u
 #define RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND 1u
 
@@ -32,6 +32,8 @@ extern "C" {
 #define RADISHLEX_MANAGER_SYNC_QUALIFICATION_SNAPSHOT_VERSION 1u
 #define RADISHLEX_PRODUCT_UPGRADE_STARTUP_GATE_REQUEST_VERSION 1u
 #define RADISHLEX_PRODUCT_UPGRADE_STARTUP_GATE_RESULT_VERSION 1u
+#define RADISHLEX_PRODUCT_INSTALL_STARTUP_GATE_REQUEST_VERSION 1u
+#define RADISHLEX_PRODUCT_INSTALL_STARTUP_GATE_RESULT_VERSION 1u
 #define RADISHLEX_MANAGER_UPGRADE_VALIDATION_REQUEST_VERSION 1u
 #define RADISHLEX_INPUT_METHOD_UPGRADE_VALIDATION_REQUEST_VERSION 1u
 
@@ -40,6 +42,22 @@ extern "C" {
 #define RADISHLEX_STARTUP_GATE_ALLOWED_TERMINAL_RECEIPT 3u
 #define RADISHLEX_STARTUP_GATE_BLOCKED_UPGRADE_IN_PROGRESS 4u
 #define RADISHLEX_STARTUP_GATE_FAILED_CLOSED 5u
+
+#define RADISHLEX_INSTALL_GATE_ALLOWED_FIRST_LAUNCH 1u
+#define RADISHLEX_INSTALL_GATE_ALLOWED_NO_INSTALL_STATE 2u
+#define RADISHLEX_INSTALL_GATE_ALLOWED_TERMINAL_RECEIPT 3u
+#define RADISHLEX_INSTALL_GATE_BLOCKED_IN_PROGRESS 4u
+#define RADISHLEX_INSTALL_GATE_FAILED_CLOSED 5u
+
+#define RADISHLEX_STARTUP_GATE_ERROR_NONE 0u
+
+#define RADISHLEX_INSTALL_RECEIPT_STATE_COMPLETED 10u
+#define RADISHLEX_INSTALL_RECEIPT_STATE_ABORTED_PRESERVED 11u
+#define RADISHLEX_INSTALL_RECEIPT_STATE_ROLLED_BACK 14u
+
+#define RADISHLEX_UPGRADE_RECEIPT_STATE_COMPLETED 9u
+#define RADISHLEX_UPGRADE_RECEIPT_STATE_ABORTED_PRESERVED 10u
+#define RADISHLEX_UPGRADE_RECEIPT_STATE_ROLLED_BACK 12u
 
 #define RADISHLEX_MANAGER_SYNC_QUALIFICATION_STATE_CREATED 1u
 #define RADISHLEX_MANAGER_SYNC_QUALIFICATION_STATE_RUNNING 2u
@@ -184,6 +202,19 @@ typedef struct RadishLexProductUpgradeStartupGateResult {
   uint32_t error_code;
   uint32_t receipt_state;
 } RadishLexProductUpgradeStartupGateResult;
+
+typedef struct RadishLexProductInstallStartupGateRequest {
+  uint32_t version;
+  const char *data_root_path;
+  uint32_t expected_owner_id;
+} RadishLexProductInstallStartupGateRequest;
+
+typedef struct RadishLexProductInstallStartupGateResult {
+  uint32_t version;
+  uint32_t decision;
+  uint32_t error_code;
+  uint32_t receipt_state;
+} RadishLexProductInstallStartupGateResult;
 
 typedef struct RadishLexManagerUpgradeValidationRequest {
   uint32_t version;
@@ -424,6 +455,10 @@ RadishLexStatusCode radishlex_ffi_contract(
 RadishLexStatusCode radishlex_product_upgrade_startup_gate(
     const RadishLexProductUpgradeStartupGateRequest *request,
     RadishLexProductUpgradeStartupGateResult *result_out,
+    RadishLexError **error_out);
+RadishLexStatusCode radishlex_product_install_startup_gate(
+    const RadishLexProductInstallStartupGateRequest *request,
+    RadishLexProductInstallStartupGateResult *result_out,
     RadishLexError **error_out);
 RadishLexStatusCode radishlex_manager_upgrade_validate_candidate(
     const RadishLexManagerUpgradeValidationRequest *request,

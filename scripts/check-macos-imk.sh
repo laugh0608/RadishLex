@@ -393,6 +393,11 @@ otool -L "${bundle}/Contents/MacOS/RadishLex" | grep -q \
   "@rpath/libradishlex_ime_ffi.dylib"
 nm -gU "${bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib" | grep -q \
   "_radishlex_session_handle_key_event"
+nm -gU "${bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib" | grep -q \
+  "_radishlex_product_install_startup_gate"
+nm -gU "${bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib" | grep -q \
+  "_radishlex_product_upgrade_startup_gate"
+python3 "${repo_root}/scripts/macos-product/test_startup_gate_order.py"
 
 product_sources=(
   "${platform_dir}/Sources/RadishLexInputController.m"

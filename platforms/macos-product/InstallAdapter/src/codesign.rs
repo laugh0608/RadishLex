@@ -106,6 +106,40 @@ impl CodesignCodeSignatureVerifier {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct CodesignRunningIdentityInspector;
+
+impl CodesignRunningIdentityInspector {
+    pub fn inspect(
+        &self,
+        bundle: &std::path::Path,
+        component: ProgramComponent,
+    ) -> Result<MacOsCodeIdentity, MacOsInstallAdapterError> {
+        if !bundle.is_absolute() {
+            return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
+        }
+        let verified = Command::new(CODESIGN_PATH)
+            .env_clear()
+            .args(["--verify", "--deep", "--strict"])
+            .arg(bundle)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map_err(|_| error(MacOsInstallAdapterErrorCode::SignatureRejected))?;
+        if !verified.success() {
+            return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
+        }
+        let parsed = inspect_code_identity(bundle)?;
+        if !valid_developer_id_requirement(&parsed.designated_requirement, &parsed.team_identifier)
+        {
+            return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
+        }
+        let evidence_sha256 = parsed.evidence_sha256(component);
+        MacOsCodeIdentity::new(parsed.identifier, evidence_sha256)
+    }
+}
+
 impl MacOsCodeSignatureVerifier for CodesignCodeSignatureVerifier {
     fn verify(
         &self,
@@ -132,22 +166,7 @@ impl MacOsCodeSignatureVerifier for CodesignCodeSignatureVerifier {
             return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
         }
 
-        let output = Command::new(CODESIGN_PATH)
-            .env_clear()
-            .args(["-d", "--verbose=4", "-r-"])
-            .arg(bundle)
-            .stdin(Stdio::null())
-            .output()
-            .map_err(|_| error(MacOsInstallAdapterErrorCode::SignatureRejected))?;
-        if !output.status.success()
-            || !output.stdout.is_empty()
-            || output.stderr.len() > MAX_CODESIGN_OUTPUT_BYTES
-        {
-            return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
-        }
-        let details = std::str::from_utf8(&output.stderr)
-            .map_err(|_| error(MacOsInstallAdapterErrorCode::SignatureRejected))?;
-        let parsed = ParsedCodeIdentity::parse(details)?;
+        let parsed = inspect_code_identity(bundle)?;
         if parsed.identifier != expected_bundle_id
             || parsed.team_identifier != self.requirements.team_identifier
             || parsed.designated_requirement != requirement
@@ -159,6 +178,27 @@ impl MacOsCodeSignatureVerifier for CodesignCodeSignatureVerifier {
         let evidence_sha256 = parsed.evidence_sha256(component);
         MacOsCodeIdentity::new(parsed.identifier, evidence_sha256)
     }
+}
+
+fn inspect_code_identity(
+    bundle: &std::path::Path,
+) -> Result<ParsedCodeIdentity, MacOsInstallAdapterError> {
+    let output = Command::new(CODESIGN_PATH)
+        .env_clear()
+        .args(["-d", "--verbose=4", "-r-"])
+        .arg(bundle)
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::SignatureRejected))?;
+    if !output.status.success()
+        || !output.stdout.is_empty()
+        || output.stderr.len() > MAX_CODESIGN_OUTPUT_BYTES
+    {
+        return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
+    }
+    let details = std::str::from_utf8(&output.stderr)
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::SignatureRejected))?;
+    ParsedCodeIdentity::parse(details)
 }
 
 struct ParsedCodeIdentity {

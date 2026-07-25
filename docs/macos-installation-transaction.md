@@ -202,11 +202,13 @@ M4-P02 数据 receipt 只能在 `upgrade` 的 `data_coordinating` 阶段运行�
 - data `aborted_preserved` / `rolled_back` 后先持久化外层 `rollback_required`，再恢复 source 双程序；只有精确 inode 与 tree/code identity 都复验通过，才允许外层 `programs_restored -> rolled_back`；
 - 静止、target/restored 身份或 source validation 暂不可得时保留两个 receipt 和全部恢复材料，外层继续阻止启动并允许按已持久化状态续跑。
 
-外层 receipt/guard、artifact contract、程序切换恢复、macOS manifest/code-signature adapter 与数据协调映射均已实现。`data_settled -> final_verified -> completed` 的产品终态接线、双端启动入口和终态材料清理仍在后续切面。
+外层终态使用四类 operation 共用的 `InstallFinalizationPort`，不复制各 operation 的临时完成逻辑。first install、repair、remove 从 `programs_committed` 进入终态，upgrade 从 `data_settled` 进入终态；每次分别在 `final_verified` 与 `completed` 前复验当前外层 receipt/guard、双 `ProgramSwitchStore` 和 operation 对应的最终程序结果。upgrade 组合层还在两次复验中绑定 data receipt/guard、data root、source/target release 与 data `completed`。第一段落盘后第二段中断时保留 `final_verified`，重启必须重新取得全部证据再完成。
+
+外层 receipt/guard、artifact contract、程序切换恢复、macOS manifest/code-signature adapter、数据协调映射、两段终态与双端启动入口均已实现。终态材料清理仍在后续独立切面。
 
 ## Startup decision
 
-Manager 与 InputMethod 必须在 M4-P02 数据 gate、userdb、settings、Rime runtime 和 Flutter/IMK 业务初始化之前调用外层只读 gate。调用方提供从当前运行 bundle 重新形成的 `RunningProgramIdentity`，不能从设置或 UI 参数构造。
+Manager 与 InputMethod 必须在 M4-P02 数据 gate、userdb、settings、Rime runtime 和 Flutter/IMK 业务初始化之前调用 ABI v9 外层只读 gate。FFI 不接受运行 identity 字段；macOS 实现只从当前 executable 反向绑定固定用户域 Manager/InputMethod bundle，再读取 Info.plist、计算完整 bundle tree 并形成严格 Developer ID code identity。UI、settings、`HOME` 环境变量或调用方自报 bundle/release/hash 均不能成为身份输入。
 
 只读结果：
 
@@ -248,4 +250,4 @@ receipt format 固定为 `radishlex-product-install-receipt-v1`，最大 64 KiB�
 - preserve、逐端 commit 和 rollback 的每个 rename、目标目录 fsync、源目录 fsync 边界均可注入故障并从精确 inode 现场重试；
 - startup gate 对缺失、非终态、终态身份匹配/漂移、remove、损坏、未知对象和中断写均有稳定结果；
 - 全部测试只使用合成 `0700` 临时目录，不访问真实 Application Support、程序目标、系统设置、Keychain 或签名凭据。
-- macOS adapter、真实 bundle 内容/签名复验、M4-P02 状态映射、双端 startup 接线和身份绑定终态清理仍属于后续切面。
+- macOS adapter、真实 bundle 内容/签名复验、M4-P02 状态映射、两段终态和双端 startup 接线已落地；身份绑定终态清理仍属于后续切面。

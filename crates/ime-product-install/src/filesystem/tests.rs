@@ -97,7 +97,6 @@ fn running(
 ) -> RunningProgramIdentity {
     RunningProgramIdentity::new(
         product.release().clone(),
-        product.product_manifest_sha256(),
         product.program(component).clone(),
     )
     .expect("running")
@@ -280,10 +279,24 @@ fn startup_gate_blocks_guard_and_nonterminal_then_matches_completed_target() {
             .error_code(),
         InstallStartupGateErrorCode::ActiveGuard
     );
+    assert_eq!(
+        inspect_install_startup_gate_with(&fixture.data_root, fixture.owner_id, || {
+            panic!("active guard must block before runtime identity")
+        })
+        .error_code(),
+        InstallStartupGateErrorCode::ActiveGuard
+    );
     drop(guard);
     assert_eq!(
         inspect_install_startup_gate(&fixture.data_root, fixture.owner_id, &running_input_method)
             .decision(),
+        InstallStartupGateDecision::BlockedInstallInProgress
+    );
+    assert_eq!(
+        inspect_install_startup_gate_with(&fixture.data_root, fixture.owner_id, || {
+            panic!("nonterminal receipt must block before runtime identity")
+        })
+        .decision(),
         InstallStartupGateDecision::BlockedInstallInProgress
     );
 

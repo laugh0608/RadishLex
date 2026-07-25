@@ -7,7 +7,7 @@
 当前 runbook 适用于已落地的 C ABI host smoke：
 
 - `radishlex_ffi_contract`
-- 产品升级 startup gate、Manager/InputMethod candidate validation
+- 产品 install/upgrade startup gate、Manager/InputMethod candidate validation
 - legacy/Rime/personalized Rime session 创建、版本化学习上下文和释放
 - 版本化 key result、snapshot、commit、学习处置和个人化状态
 - structured snapshot / candidate view 的 display/engine index 映射
@@ -27,17 +27,26 @@ Rust host smoke 只能证明 ABI 契约；每个平台绑定层仍须按本 runb
 
 ## 调用顺序
 
-### 0. 产品业务初始化前执行升级门禁
+### 0. 产品业务初始化前依次执行两层门禁
 
 macOS Manager 与 InputMethod 的正常产品启动必须先调用：
 
 ```text
+radishlex_product_install_startup_gate(request_v1, result_v1, error_out)
 radishlex_product_upgrade_startup_gate(request_v1, result_v1, error_out)
 ```
 
-平台层只负责从用户域解析固定 `Application Support/RadishLex` 和当前 effective uid，不接受命令行、环境变量、UI 或普通业务代码提供数据路径。调用位置必须早于 Flutter delegate、Manager settings/userdb、`IMKServer`、Rime runtime 和任何业务初始化。
+外层 install gate 必须先于数据 upgrade gate；前者检查程序事务和当前真实 bundle 身份，后者检查 Application Support 数据事务，两者不能合并或互相代替。平台层只负责从用户域解析固定 `Application Support/RadishLex` 和当前 effective uid，不接受命令行、环境变量、UI 或普通业务代码提供数据路径。外层 gate 不接受 bundle path、release、manifest 或 identity 字段；macOS FFI 从当前 executable 反向绑定固定用户域 bundle，并复验 Info.plist、完整 bundle tree 与 Developer ID code identity。两个调用位置都必须早于 Flutter delegate、Manager settings/userdb、`IMKServer`、Rime runtime 和任何业务初始化。
 
-只有下列 decision 可以启动：
+外层 gate 只有下列 decision 可以继续到数据 gate：
+
+```text
+RADISHLEX_INSTALL_GATE_ALLOWED_FIRST_LAUNCH
+RADISHLEX_INSTALL_GATE_ALLOWED_NO_INSTALL_STATE
+RADISHLEX_INSTALL_GATE_ALLOWED_TERMINAL_RECEIPT
+```
+
+数据 gate 只有下列 decision 可以启动：
 
 ```text
 RADISHLEX_STARTUP_GATE_ALLOWED_FIRST_LAUNCH
@@ -45,9 +54,9 @@ RADISHLEX_STARTUP_GATE_ALLOWED_NO_UPGRADE_STATE
 RADISHLEX_STARTUP_GATE_ALLOWED_TERMINAL_RECEIPT
 ```
 
-active guard、非终态 receipt、损坏 receipt、中断 artifact、未知对象、unsafe root/state 和 identity drift 都必须阻止启动。非 `Ok` status、result version 不是 v1、未知 decision/error/state 或 native symbol 缺失同样失败关闭。平台不能为了恢复启动而创建目录、chmod、删除 sidecar/receipt 或改用 fixture；现场处置只能交给升级协调器。
+任一层出现 active guard、非终态 receipt、损坏 receipt、中断 artifact、未知对象、unsafe root/state 或 identity drift 都必须阻止启动；外层 `completed remove` 同样阻断。非 `Ok` status、result version 不是 v1、未知 decision/error/state 或 native symbol 缺失同样失败关闭。平台不能为了恢复启动而创建目录、chmod、删除 sidecar/receipt 或改用 fixture；现场处置只能交给对应协调器。
 
-该 gate 完全只读。首次启动时 data root 不存在属于正常允许结果，平台只能在门禁通过后由既有产品 bootstrap 创建正常数据目录。
+两层 gate 都完全只读。首次启动时 data root 不存在属于正常允许结果，平台只能在两层门禁通过后由既有产品 bootstrap 创建正常数据目录。
 
 ### 1. 进程启动后读取 ABI contract
 
@@ -60,7 +69,7 @@ radishlex_ffi_contract(contract_out, error_out)
 当前必须识别：
 
 ```text
-version = 8
+version = 9
 session_thread_policy = owner_thread
 panic_boundary = catch_unwind
 ```
@@ -305,8 +314,8 @@ radishlex_input_method_upgrade_validate_candidate(request_v1, summary_v1, error_
 
 每个平台绑定层进入真实平台壳前，至少补以下 smoke：
 
-- contract 查询成功，能识别 `version = 8`、key result v2、按键/候选选择共用的 owned result 和 owner-thread policy。
-- startup gate 覆盖 data root absent、状态目录 absent、终态允许、非终态阻止、active guard、损坏 receipt、中断 artifact 和 identity drift；检查前后目录树与字节保持不变。
+- contract 查询成功，能识别 `version = 9`、key result v2、按键/候选选择共用的 owned result 和 owner-thread policy。
+- 外层 install gate 与数据 upgrade gate 分别覆盖 data root absent、状态目录 absent、终态允许、非终态阻止、active guard、损坏 receipt、中断 artifact 和 identity drift；外层另覆盖 `completed remove`，并检查两层门禁前后目录树与字节保持不变。
 - Manager/InputMethod validation host 拒绝参数，只读固定 candidate；覆盖候选损坏、双端打开失败、字节保持不变和 sidecar 零残留。
 - 创建 session 后在 owner thread 上 handle key，核对 consumed / commit / 同事件 snapshot，提交候选并释放所有 owned handle。
 - personalized session smoke 覆盖受控 learning context、display/engine index 不同仍提交正确候选、selection 的 `recorded/deferred`、学习失败不丢 commit，以及 storage/read/rank 退化状态。

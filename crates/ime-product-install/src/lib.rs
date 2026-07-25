@@ -13,11 +13,18 @@ pub use artifact::{InstallArtifactEvidence, InstallArtifactSlot, ProgramFilesyst
 #[cfg(unix)]
 mod filesystem;
 #[cfg(unix)]
+mod finalization;
+#[cfg(unix)]
 mod program_switch;
 #[cfg(unix)]
 pub use filesystem::{
-    inspect_install_startup_gate, InstallFilesystemError, InstallFilesystemErrorCode,
-    InstallProcessGuard, InstallReceiptStore, VerifiedInstallRoot,
+    inspect_install_startup_gate, inspect_install_startup_gate_with, InstallFilesystemError,
+    InstallFilesystemErrorCode, InstallProcessGuard, InstallReceiptStore, VerifiedInstallRoot,
+};
+#[cfg(unix)]
+pub use finalization::{
+    resume_install_finalization, InstallFinalizationError, InstallFinalizationPort,
+    InstallFinalizationValidationStage,
 };
 #[cfg(unix)]
 pub use program_switch::{
@@ -321,32 +328,23 @@ impl ProductArtifactIdentity {
     }
 
     fn matches_running(&self, running: &RunningProgramIdentity) -> bool {
-        self.release == running.release
-            && self.product_manifest_sha256 == running.product_manifest_sha256
-            && self.program(running.bundle.component) == &running.bundle
+        self.release == running.release && self.program(running.bundle.component) == &running.bundle
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunningProgramIdentity {
     release: ProductRelease,
-    product_manifest_sha256: String,
     bundle: ProgramBundleIdentity,
 }
 
 impl RunningProgramIdentity {
     pub fn new(
         release: ProductRelease,
-        product_manifest_sha256: impl Into<String>,
         bundle: ProgramBundleIdentity,
     ) -> Result<Self, InstallReceiptError> {
-        let identity = Self {
-            release,
-            product_manifest_sha256: product_manifest_sha256.into(),
-            bundle,
-        };
+        let identity = Self { release, bundle };
         identity.release.validate("running_program")?;
-        validate_sha256(&identity.product_manifest_sha256, "product_manifest_sha256")?;
         identity.bundle.validate()?;
         Ok(identity)
     }

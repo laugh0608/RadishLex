@@ -23,6 +23,10 @@ pub const RADISHLEX_STARTUP_GATE_ALLOWED_TERMINAL_RECEIPT: u32 = 3;
 pub const RADISHLEX_STARTUP_GATE_BLOCKED_UPGRADE_IN_PROGRESS: u32 = 4;
 pub const RADISHLEX_STARTUP_GATE_FAILED_CLOSED: u32 = 5;
 
+pub const RADISHLEX_UPGRADE_RECEIPT_STATE_COMPLETED: u32 = 9;
+pub const RADISHLEX_UPGRADE_RECEIPT_STATE_ABORTED_PRESERVED: u32 = 10;
+pub const RADISHLEX_UPGRADE_RECEIPT_STATE_ROLLED_BACK: u32 = 12;
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct RadishLexProductUpgradeStartupGateRequest {
@@ -335,7 +339,7 @@ const fn decision_code(value: StartupGateDecision) -> u32 {
 
 const fn error_code(value: StartupGateErrorCode) -> u32 {
     match value {
-        StartupGateErrorCode::None => 0,
+        StartupGateErrorCode::None => crate::RADISHLEX_STARTUP_GATE_ERROR_NONE,
         StartupGateErrorCode::UpgradeInProgress => 1,
         StartupGateErrorCode::ActiveGuard => 2,
         StartupGateErrorCode::UnsafeDataRoot => 3,
@@ -358,10 +362,10 @@ const fn state_code(value: UpgradeState) -> u32 {
         UpgradeState::SwitchPrepared => 6,
         UpgradeState::Switched => 7,
         UpgradeState::PostSwitchVerified => 8,
-        UpgradeState::Completed => 9,
-        UpgradeState::AbortedPreserved => 10,
+        UpgradeState::Completed => RADISHLEX_UPGRADE_RECEIPT_STATE_COMPLETED,
+        UpgradeState::AbortedPreserved => RADISHLEX_UPGRADE_RECEIPT_STATE_ABORTED_PRESERVED,
         UpgradeState::RollbackRequired => 11,
-        UpgradeState::RolledBack => 12,
+        UpgradeState::RolledBack => RADISHLEX_UPGRADE_RECEIPT_STATE_ROLLED_BACK,
     }
 }
 

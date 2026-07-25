@@ -36,6 +36,7 @@ codesign --verify --deep --strict "${app_bundle}"
 file "${native_library}"
 otool -L "${native_library}"
 for symbol in \
+  _radishlex_product_install_startup_gate \
   _radishlex_product_upgrade_startup_gate \
   _radishlex_manager_upgrade_validate_candidate \
   _radishlex_manager_sync_product_status \

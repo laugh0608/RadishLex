@@ -53,7 +53,7 @@ Manager host 的 candidate 模式固定读取：
 - `.radishlex-upgrade-v1/source-settings.json`（允许不存在）；
 - 本 bundle 的 `libradishlex_ime_ffi.dylib`。
 
-post-switch 模式改为读取固定 `userdb.sqlite3` 与 `manager-settings.json`。两种模式都通过 ABI v8 执行 current-schema 只读连接、active/deleted/import/learning 管理查询和 settings format v1 类型兼容检查。
+post-switch 模式改为读取固定 `userdb.sqlite3` 与 `manager-settings.json`。两种模式都通过 ABI v9 执行 current-schema 只读连接、active/deleted/import/learning 管理查询和 settings format v1 类型兼容检查。
 
 InputMethod host 按同一模式选择 candidate 或最终固定数据库，并从自身 bundle 解析 `Resources/RimeData`、schema 和 native library。它创建短生命周期 `0700` 临时 Rime user data，只把 bundle 内锁定 YAML 的部署产物写入该目录，不修改只读产品 `RimeData`、candidate 或 Application Support；随后以 privacy mode 创建 personalized runtime、输入固定合成码并读取候选信号，不选择、不提交、不学习。临时 Rime data 必须在退出前删除。
 
@@ -84,6 +84,8 @@ staging 使用 `/usr/bin/ditto` 保留 resource fork、extended attributes、ACL
 协调组合层依赖 `ime-product-install` 与 `ime-product-upgrade`，但两个核心不互相依赖。它只接受当前已持久化的两个 receipt、两个 guard、固定 Manager/InputMethod `ProgramSwitchStore`、M4-P02 port 和 `InstallAdapter` 实现的程序身份 port；operation ID、data-root identity、source/target release 或 component binding 任一不一致时，在数据写入前失败。
 
 进入 `data_coordinating` 后，M4-P02 的每个 quiescence checkpoint 都附带 installed target 双 bundle 复验。数据 `completed` 才推进外层 `data_settled`；数据 `aborted_preserved` / `rolled_back` 则先持久化外层 `rollback_required`，恢复 source 双程序并重复验证 tree/code identity，最后进入外层 `rolled_back`。中断或暂不可验证时保留两个 receipt 与全部 staging/backup，不清理现场。
+
+upgrade 产品终态在 `final_verified` 与 `completed` 前分别复验外层/data receipt、双 guard、Application Support identity、source/target release、data `completed` 和 installed 双 bundle。ABI v9 外层 startup gate 不接收运行 identity；它只从当前 executable 所在固定用户域 bundle 形成 Info.plist release、完整 tree 与 Developer ID code identity，并在 Manager/InputMethod 的既有数据 gate 和全部业务初始化之前执行。
 
 ## 构建与验证
 

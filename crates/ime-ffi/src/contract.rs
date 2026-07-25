@@ -1,7 +1,8 @@
-/// ABI contract v8 adds the versioned, read-only product startup gate.
-pub const RADISHLEX_ABI_CONTRACT_VERSION: u32 = 8;
+/// ABI contract v9 adds the outer product-install startup gate.
+pub const RADISHLEX_ABI_CONTRACT_VERSION: u32 = 9;
 pub const RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD: u32 = 1;
 pub const RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND: u32 = 1;
+pub const RADISHLEX_STARTUP_GATE_ERROR_NONE: u32 = 0;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

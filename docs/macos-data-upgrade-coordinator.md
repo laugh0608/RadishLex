@@ -59,7 +59,7 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 ### Manager 与 InputMethod
 
-Manager 和 InputMethod 不实现 migration。两端分别在真实 bundle 的 `Contents/Helpers/RadishLexUpgradeValidationHost` 提供受控 host，使用 ABI v8、各自产品 native library 和固定路径规则打开数据库：
+Manager 和 InputMethod 不实现 migration。两端分别在真实 bundle 的 `Contents/Helpers/RadishLexUpgradeValidationHost` 提供受控 host，使用当前 ABI v9 中兼容保留的 v8 validation contract、各自产品 native library 和固定路径规则打开数据库：
 
 - 无参数模式固定验证 migration candidate；唯一可选参数 `--post-switch` 固定验证最终 `userdb.sqlite3`，不得接受路径或其他模式；
 - Manager 验证管理查询、对应固定 settings 兼容和关闭连接；
@@ -275,7 +275,7 @@ Manager 与 InputMethod 在产品启动前必须检查是否存在非终态升�
 
 macOS preflight host 不接受调用方路径或进程名。它从产品 manifest 固定 Manager/InputMethod bundle ID，通过 `NSRunningApplication` 判断双端是否仍运行，并以系统固定 `/usr/sbin/lsof` 检查已存在的 `userdb.sqlite3` family、`manager-settings.json` 与其原子写临时文件是否仍有打开句柄；输出只包含 format、result、available bytes、quiescent 和稳定 blocker，不回显路径、进程详情或 `lsof` 内容。unsafe root/file、容量不可得或检测工具异常都失败关闭。
 
-这份结果只是同一时刻的只读证据：它不停止进程，也不能阻止旧版本在检测后、snapshot 前重新启动。ABI v8 startup gate 已在 Manager `applicationWillFinishLaunching` 调用 `super` 之前、InputMethod 创建 `IMKServer` 之前接线；只读允许 data root/state absent 与终态 receipt，active guard、所有非终态、损坏 receipt、中断 artifact、未知对象和身份漂移均阻止业务初始化。它不创建目录、不改权限、不连接或清理 guard。
+这份结果只是同一时刻的只读证据：它不停止进程，也不能阻止旧版本在检测后、snapshot 前重新启动。数据 startup gate 继续由 ABI v9 兼容保留，并位于外层 install gate 之后、Manager `super.applicationWillFinishLaunching` 与 InputMethod `IMKServer` 之前；只读允许 data root/state absent 与终态 receipt，active guard、所有非终态、损坏 receipt、中断 artifact、未知对象和身份漂移均阻止业务初始化。它不创建目录、不改权限、不连接或清理 guard。
 
 `resume_userdb_upgrade` 已把 `preflighted` 至终态的既有原语纳入同一 `UpgradeProcessGuard`。平台 port 必须在进入 `quiesced`、settings/snapshot/candidate、切换、完成和回滚前重新证明静止，并在 candidate/post-switch/source-release host 返回后再次证明静止；任一 checkpoint 失败都保持最后已持久化状态。该核心驱动不定位 executable、不启动进程、不接受路径；macOS adapter 仍须把每个 checkpoint 接到固定 preflight host，并把双端与 source-release helper 绑定到受 manifest 证明的固定 bundle。
 

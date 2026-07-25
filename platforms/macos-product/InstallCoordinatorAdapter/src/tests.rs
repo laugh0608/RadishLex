@@ -213,6 +213,31 @@ impl CoordinationFixture {
         )
     }
 
+    fn finalize(
+        &mut self,
+        program_validation: &mut TestProgramValidation,
+    ) -> Result<(), InstallProductFinalizationError> {
+        let install_guard = self
+            .install_store
+            .acquire_guard()
+            .expect("install finalization guard");
+        let upgrade_guard = self
+            .upgrade_store
+            .acquire_guard()
+            .expect("upgrade finalization guard");
+        resume_upgrade_install_finalization(
+            &self.install_store,
+            &install_guard,
+            &mut self.install_receipt,
+            &self.manager,
+            &self.input_method,
+            &self.upgrade_store,
+            &upgrade_guard,
+            &self.upgrade_receipt,
+            program_validation,
+        )
+    }
+
     fn assert_source_programs_restored(&self) {
         assert_eq!(
             fs::metadata(self.manager.target_path())
@@ -379,6 +404,102 @@ fn completed_data_advances_outer_receipt_to_data_settled() {
         fixture.active_database_inode(),
         fixture.source_database_inode
     );
+}
+
+#[test]
+fn completed_data_finalizes_outer_receipt_through_two_persisted_checkpoints() {
+    let mut fixture = CoordinationFixture::new();
+    fixture
+        .resume(
+            &mut TestUpgradePort::successful(),
+            &mut TestProgramValidation::successful(),
+        )
+        .expect("data coordination");
+    let mut program_validation = TestProgramValidation::successful();
+    fixture
+        .finalize(&mut program_validation)
+        .expect("product finalization");
+    assert_eq!(fixture.install_receipt.state(), InstallState::Completed);
+    assert_eq!(fixture.upgrade_receipt.state(), UpgradeState::Completed);
+    assert_eq!(program_validation.installed_calls, 2);
+
+    let mut replay_validation = TestProgramValidation::successful();
+    fixture
+        .finalize(&mut replay_validation)
+        .expect("completed replay revalidates final product");
+    assert_eq!(replay_validation.installed_calls, 1);
+    assert_eq!(fixture.install_receipt.state(), InstallState::Completed);
+}
+
+#[test]
+fn final_verified_restarts_only_after_reproving_bound_data_and_programs() {
+    let mut fixture = CoordinationFixture::new();
+    fixture
+        .resume(
+            &mut TestUpgradePort::successful(),
+            &mut TestProgramValidation::successful(),
+        )
+        .expect("data coordination");
+    let mut interrupted = TestProgramValidation::successful();
+    interrupted.installed_valid_through_call = Some(1);
+    assert_eq!(
+        fixture
+            .finalize(&mut interrupted)
+            .expect_err("second checkpoint unavailable"),
+        InstallProductFinalizationError::InstallFinalization(
+            InstallFinalizationError::FinalStateNotProven(
+                InstallFinalizationValidationStage::BeforeCompleted
+            )
+        )
+    );
+    assert_eq!(fixture.install_receipt.state(), InstallState::FinalVerified);
+    fixture.install_receipt = fixture
+        .install_store
+        .load()
+        .expect("load install receipt")
+        .expect("install receipt");
+
+    let mut resumed = TestProgramValidation::successful();
+    fixture
+        .finalize(&mut resumed)
+        .expect("restart finalization");
+    assert_eq!(resumed.installed_calls, 1);
+    assert_eq!(fixture.install_receipt.state(), InstallState::Completed);
+}
+
+#[test]
+fn finalization_rejects_noncompleted_or_drifted_data_receipt() {
+    let mut fixture = CoordinationFixture::new();
+    fixture
+        .resume(
+            &mut TestUpgradePort::successful(),
+            &mut TestProgramValidation::successful(),
+        )
+        .expect("data coordination");
+    let nonterminal_fixture = CoordinationFixture::new();
+    let install_guard = fixture
+        .install_store
+        .acquire_guard()
+        .expect("install guard");
+    let upgrade_guard = fixture
+        .upgrade_store
+        .acquire_guard()
+        .expect("upgrade guard");
+    assert_eq!(
+        resume_upgrade_install_finalization(
+            &fixture.install_store,
+            &install_guard,
+            &mut fixture.install_receipt,
+            &fixture.manager,
+            &fixture.input_method,
+            &fixture.upgrade_store,
+            &upgrade_guard,
+            &nonterminal_fixture.upgrade_receipt,
+            &mut TestProgramValidation::successful(),
+        ),
+        Err(InstallProductFinalizationError::InvalidBinding)
+    );
+    assert_eq!(fixture.install_receipt.state(), InstallState::DataSettled);
 }
 
 #[test]

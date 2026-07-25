@@ -9,11 +9,11 @@
 - `Sources/RadishLexLearningContext.*`：按固定 Bundle ID 生成 sensitive/context-known/context-kind，不接触正文或 userdb。
 - `Sources/RadishLexCandidatePanel.*`：进程级非激活 AppKit 候选面板，负责 owner 生命周期、焦点隔离、全局定位、多屏限制、鼠标/辅助功能 index 回调和原生视觉；不承载 engine 或候选排序。
 - `Sources/RadishLexRuntime.*`：创建独立 Rime session；进程退出时先释放全部 session，再调用 `radishlex_rime_runtime_shutdown`。
-- `Sources/main.m`：在创建 `IMKServer`、`NSApplication` 和 Rime runtime 前执行只读产品升级 startup gate；失败时不进入输入法事件循环。
+- `Sources/main.m`：在创建 `IMKServer`、`NSApplication` 和 Rime runtime 前依次执行外层 install 与数据 upgrade startup gate；任一失败时不进入输入法事件循环。
 - `../../packaging/rime/`：产品自有 `default.yaml`、`radishlex_pinyin` schema、固定 Apache 词典、来源锁与逐资产许可证；不读取或继承用户 Rime 配置。
 - `../macos-product/UpgradeValidationHosts/`：构建进 bundle 的无参数候选验证 helper，复用本 bundle 的 native Rime/RimeData 和固定 migration candidate。
 - `build-bundle.sh`：构建 contract 或显式 native-rime 开发 bundle，不安装 bundle。
-- `Tests/contract_smoke.m`：使用合成 demo engine 复验当前 ABI v8、完整按键映射、display/engine index、个人化/学习状态、Unicode cursor、候选选择结果和生命周期，不读取 Rime 目录。
+- `Tests/contract_smoke.m`：使用合成 demo engine 复验当前 ABI v9、完整按键映射、display/engine index、个人化/学习状态、Unicode cursor、候选选择结果和生命周期，不读取 Rime 目录。
 - `Tests/candidate_panel_contract.m`：创建真实 AppKit panel/control，复验视觉与 accessibility selection、appearance、anchor fallback、owner 接管和完整隐藏。
 - `Tests/input_controller_contract.m`：使用正式 controller、panel 和 Rust demo session，贯通方向 keyDown/keyUp、Space、鼠标、accessibility press、Enter、Escape、宿主快捷键和双 client 生命周期。
 - `Tests/cleanup_user_install_contract.sh`：在隔离仓库、`HOME` 和工作目录中，以参数级命令 stub、双槽假 TIS 与假进程状态动态复验路径状态、清理前后 TIS 迁移和数据保留边界，不查询真实 TIS、不终止真实进程。
@@ -26,9 +26,9 @@
 
 ## 产品启动与升级验证
 
-输入法 executable 在任何 `IMKServer`、`NSApplication`、Rime runtime、userdb 或业务对象创建之前调用 ABI v8 `radishlex_product_upgrade_startup_gate`。平台层只从用户域解析固定 `Application Support/RadishLex` 和 effective uid。
+输入法 executable 在任何 `IMKServer`、`NSApplication`、Rime runtime、userdb 或业务对象创建之前先调用 ABI v9 `radishlex_product_install_startup_gate`，再调用数据 `radishlex_product_upgrade_startup_gate`。平台层只从用户域解析固定 `Application Support/RadishLex` 和 effective uid；外层运行身份由 FFI 从当前 executable 的固定 bundle 形成。
 
-data root 不存在、升级状态目录/receipt 不存在或 receipt 已终态时允许继续。active guard、非终态或损坏 receipt、中断 artifact、未知对象、unsafe root/state、identity drift、FFI 失败和未知 result 均返回非零，不能进入事件循环。门禁不创建目录、不 chmod、不删除 receipt/sidecar，也不打开 userdb；首次启动所需目录只能在门禁允许后由正常 runtime 创建。
+data root 不存在、两层状态目录/receipt 不存在，或两层 receipt 均处于允许启动的终态时才可继续。active guard、非终态或损坏 receipt、中断 artifact、未知对象、unsafe root/state、identity drift、completed remove、FFI 失败和未知 result 均返回非零，不能进入事件循环。门禁不创建目录、不 chmod、不删除 receipt/sidecar，也不打开 userdb；首次启动所需目录只能在两层门禁允许后由正常 runtime 创建。
 
 bundle 内 `Contents/Helpers/RadishLexUpgradeValidationHost` 只供升级协调器执行。它拒绝参数，固定读取 `.radishlex-upgrade-v1/migration-candidate.sqlite3`，从自身只读 `Resources/RimeData` 和 schema 创建短生命周期隔离 Rime user data；锁定 YAML 的部署产物只写入该临时目录，不写回 bundle 或 Application Support。helper 随后以 privacy mode personalized runtime 读取固定合成候选信号，不选择、不提交、不学习；必须删除临时 Rime data，并证明 candidate 全字节不变且没有 WAL/SHM/journal，才能返回成功。
 
@@ -40,7 +40,7 @@ Rust snapshot 的 cursor 是允许落在 composition 末尾的插入位置，但
 
 最终 panel frame 使用目标 `NSScreen.visibleFrame` 在锚点下方或上方放置并限制在屏幕内；contract 环境没有有效 screen frame 时围绕有效行矩形构造计算区域，不回退到 `(0,0)`。controller 的唯一 display index 同时驱动视觉高亮、Space、数字键、鼠标和 accessibility selection；Rust runtime 固化并执行 display index 到 engine index 的映射。
 
-native 产品 session 通过当前 ABI v8 中兼容保留的 personalized Rime 构造入口持有独立 userdb connection；该入口最初由 ABI v5 引入，数据库固定为 `~/Library/Application Support/RadishLex/userdb.sqlite3`。Objective-C 只创建并收紧 `RadishLex` 父目录到 `0700`，SQLite migration、WAL、busy timeout、文件权限、排序、selection 事务和失败回退都由 Rust 负责。每个事件前平台只传 secure input、隐私模式、上下文可信度与粗粒度类别；当前 Alpha 只把 TextEdit 和 Codex 识别为允许学习的普通上下文，其他未知应用默认 engine-only，敏感应用与 secure input 同样不读取、不写入个人化数据。
+native 产品 session 通过当前 ABI v9 中兼容保留的 personalized Rime 构造入口持有独立 userdb connection；该入口最初由 ABI v5 引入，数据库固定为 `~/Library/Application Support/RadishLex/userdb.sqlite3`。Objective-C 只创建并收紧 `RadishLex` 父目录到 `0700`，SQLite migration、WAL、busy timeout、文件权限、排序、selection 事务和失败回退都由 Rust 负责。每个事件前平台只传 secure input、隐私模式、上下文可信度与粗粒度类别；当前 Alpha 只把 TextEdit 和 Codex 识别为允许学习的普通上下文，其他未知应用默认 engine-only，敏感应用与 secure input 同样不读取、不写入个人化数据。
 
 当前分类把 TextEdit 映射为 `editor`、Codex 映射为 `code`；Passwords、Keychain Access、1Password 8/7 与固定 P0 验证宿主标记为敏感，其余应用（包括固定 unknown 验证宿主）映射为未知 `other`。隐私模式由输入法 `NSUserDefaults` 中的 `RadishLexPrivacyMode` 布尔值控制，缺省关闭；开启后仍可使用既有本地排序摘要，但不会记录当前 selection 或更新 user term/ranker weight。设置或前台/secure 状态变化时，controller 会先刷新 Rust learning context 和候选 snapshot，再接受 display index 选择。
 

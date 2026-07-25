@@ -141,6 +141,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 - librime 动态/静态链接、schema/data 来源、许可证、完整性和更新策略。
 - App Group、App Support、sandbox entitlement、文件选择和数据库所有权边界。
 - 安装、升级、回滚、移除、数据迁移和故障恢复 runbook。
+- 外层程序 receipt 与数据 receipt 分层，产品终态分步持久化；Manager/InputMethod 在业务初始化前依次执行外层 install 与数据 upgrade gate。
 - Rust fmt/check/test/clippy/MSRV、Go test/race/vet、Flutter format/analyze/test、native-rime 和 macOS bundle CI。
 - 依赖安全、许可证和必要供应链检查。
 
@@ -149,6 +150,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 - 新环境无需手工配置 Homebrew 路径或 shell 环境变量即可安装和使用。
 - 输入法与 manager 加载匹配版本的 Rust/native 依赖，升级后用户数据保持。
 - FFI、数据库、权限、schema、版本和 bundle 缺失均有明确错误，不静默回退 fixture。
+- active/nonterminal/损坏事务、运行 bundle 身份漂移和 completed remove 均在 Flutter/IMK、settings、userdb、Rime 初始化前失败关闭。
 - 发布候选通过自动门禁、安装 smoke 和非敏感日常输入复验。
 
 ## 第二平台选择门禁

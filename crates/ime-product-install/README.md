@@ -11,6 +11,7 @@
 - 约束从 `prepared` 到终态的单步状态转换；
 - 在 `.radishlex-install-v1` 原子持久化 receipt，并以 Unix socket guard 拒绝并发 operation；
 - 在两个目标各自的文件系统内固定私有 staging/backup，按 Manager、InputMethod 顺序 rename/fsync，并按精确 inode 恢复中断现场；
+- 通过四类 operation 共用的终态 port 分别复验并持久化 `final_verified`、`completed`，第二段中断后重新取证续跑；
 - 只读 startup gate 同时检查事务终态与当前运行 bundle 身份。
 
 平台 adapter 负责解析固定 user-domain 父目录、code signature/ProductManifest 复验和保留 macOS metadata 的 staging 填充；独立 `InstallCoordinatorAdapter` 负责把本核心与 M4-P02 数据协调器组合。核心只接受已经验证的两个目标父目录，固定 bundle/事务槽位，不读取 bundle 内容、不计算签名、不停止进程、不依赖 `ime-product-upgrade`，也不递归清理程序或用户数据。
@@ -41,4 +42,4 @@ cargo clippy -p radishlex-ime-product-install --all-targets -- -D warnings
 ./scripts/check-product-install-core.sh
 ```
 
-测试只使用合成私有临时目录，覆盖部分双端提交、source 恢复和 preserve/commit/rollback 的逐 rename/fsync 边界；跨核心组合另由 `./scripts/check-macos-install-coordinator.sh` 验证。不会访问真实 Application Support、`~/Applications`、`~/Library/Input Methods`、系统设置、Keychain 或签名凭据。
+测试只使用合成私有临时目录，覆盖四类 operation 两段终态、`final_verified` 重启续跑、部分双端提交、source 恢复和 preserve/commit/rollback 的逐 rename/fsync 边界；跨核心组合另由 `./scripts/check-macos-install-coordinator.sh` 验证。不会访问真实 Application Support、`~/Applications`、`~/Library/Input Methods`、系统设置、Keychain 或签名凭据。

@@ -6,22 +6,25 @@ use std::fmt;
 use std::fs;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 
 use radishlex_ime_product_install::{
     record_program_source as record_core_program_source,
-    record_staged_program as record_core_staged_program, InstallOperationKind, InstallProcessGuard,
+    record_staged_program as record_core_staged_program, InstallFinalizationPort,
+    InstallFinalizationValidationStage, InstallOperationKind, InstallProcessGuard,
     InstallProgramValidationPort, InstallReceipt, InstallReceiptStore, InstallRootIdentity,
-    InstallState, ProductArtifactIdentity, ProgramBundleIdentity, ProgramComponent,
-    ProgramSwitchStore, VerifiedProgramTarget,
+    InstallState, ProductArtifactIdentity, ProductRelease, ProgramBundleIdentity, ProgramComponent,
+    ProgramSwitchStore, RunningProgramIdentity, VerifiedProgramTarget,
 };
+use serde::Deserialize;
 
 mod codesign;
 mod copy;
 mod manifest;
 
 pub use codesign::{
-    CodeSignatureRequirements, CodesignCodeSignatureVerifier, MacOsCodeIdentity,
-    MacOsCodeSignatureVerifier,
+    CodeSignatureRequirements, CodesignCodeSignatureVerifier, CodesignRunningIdentityInspector,
+    MacOsCodeIdentity, MacOsCodeSignatureVerifier,
 };
 use copy::{sync_bundle_tree, BundleCopier, DittoBundleCopier};
 use manifest::{inspect_bundle_tree, VerifiedInstallPayload};
@@ -29,6 +32,7 @@ use manifest::{inspect_bundle_tree, VerifiedInstallPayload};
 const MANAGER_PARENT: &str = "Applications";
 const INPUT_METHOD_PARENT: &str = "Library/Input Methods";
 const DATA_ROOT: &str = "Library/Application Support/RadishLex";
+const MAX_INFO_PLIST_BYTES: usize = 64 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MacOsInstallAdapterErrorCode {
@@ -103,6 +107,71 @@ impl fmt::Display for MacOsInstallAdapterError {
 }
 
 impl std::error::Error for MacOsInstallAdapterError {}
+
+pub fn inspect_running_program_identity(
+    bundle_path: &Path,
+    component: ProgramComponent,
+) -> Result<RunningProgramIdentity, MacOsInstallAdapterError> {
+    let tree = inspect_bundle_tree(bundle_path)?;
+    let code_identity = CodesignRunningIdentityInspector.inspect(bundle_path, component)?;
+    let confirmed_tree = inspect_bundle_tree(bundle_path)?;
+    if confirmed_tree.sha256() != tree.sha256() {
+        return Err(error(MacOsInstallAdapterErrorCode::ProductChanged));
+    }
+    let info = inspect_info_plist(bundle_path)?;
+    if info.bundle_id != code_identity.bundle_id() {
+        return Err(error(
+            MacOsInstallAdapterErrorCode::SignatureIdentityChanged,
+        ));
+    }
+    let release = ProductRelease::new(
+        info.product_version,
+        info.build_number
+            .parse::<u64>()
+            .map_err(|_| error(MacOsInstallAdapterErrorCode::InvalidProductManifest))?,
+    )
+    .map_err(|_| error(MacOsInstallAdapterErrorCode::InvalidProductManifest))?;
+    let bundle = ProgramBundleIdentity::new(
+        component,
+        info.bundle_id,
+        tree.sha256(),
+        code_identity.evidence_sha256(),
+    )
+    .map_err(|_| error(MacOsInstallAdapterErrorCode::InvalidProductManifest))?;
+    RunningProgramIdentity::new(release, bundle)
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::InvalidProductManifest))
+}
+
+#[derive(Deserialize)]
+struct RunningInfoPlist {
+    #[serde(rename = "CFBundleIdentifier")]
+    bundle_id: String,
+    #[serde(rename = "CFBundleShortVersionString")]
+    product_version: String,
+    #[serde(rename = "CFBundleVersion")]
+    build_number: String,
+}
+
+fn inspect_info_plist(bundle_path: &Path) -> Result<RunningInfoPlist, MacOsInstallAdapterError> {
+    let info_path = bundle_path.join("Contents/Info.plist");
+    let output = Command::new("/usr/bin/plutil")
+        .env_clear()
+        .args(["-convert", "json", "-o", "-"])
+        .arg(&info_path)
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::InvalidProductManifest))?;
+    if !output.status.success()
+        || !output.stderr.is_empty()
+        || output.stdout.is_empty()
+        || output.stdout.len() > MAX_INFO_PLIST_BYTES
+    {
+        return Err(error(MacOsInstallAdapterErrorCode::InvalidProductManifest));
+    }
+    serde_json::from_slice(&output.stdout)
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::InvalidProductManifest))
+}
 
 pub struct MacOsProductInstallAdapter {
     payload: VerifiedInstallPayload,
@@ -356,6 +425,29 @@ impl InstallProgramValidationPort for MacOsProductInstallAdapter {
     ) -> bool {
         self.verify_restored_source(manager, receipt).is_ok()
             && self.verify_restored_source(input_method, receipt).is_ok()
+    }
+}
+
+impl InstallFinalizationPort for MacOsProductInstallAdapter {
+    fn validate_final_state(
+        &mut self,
+        manager: &ProgramSwitchStore,
+        input_method: &ProgramSwitchStore,
+        receipt: &InstallReceipt,
+        _stage: InstallFinalizationValidationStage,
+    ) -> bool {
+        if self.verify_store_binding(manager, receipt).is_err()
+            || self.verify_store_binding(input_method, receipt).is_err()
+        {
+            return false;
+        }
+        if receipt.operation_kind() == InstallOperationKind::RemovePrograms {
+            return [manager, input_method].iter().all(|store| {
+                fs::symlink_metadata(store.target_path())
+                    .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound)
+            });
+        }
+        self.validate_installed_targets(manager, input_method, receipt)
     }
 }
 

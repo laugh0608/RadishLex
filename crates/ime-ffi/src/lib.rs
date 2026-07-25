@@ -17,6 +17,7 @@ mod learning_status;
 mod manager_sync_product_status;
 mod manager_sync_qualification;
 mod personalization;
+mod product_install;
 mod product_upgrade;
 mod rank_explain;
 mod rime_runtime;
@@ -67,6 +68,7 @@ pub use buffer::RadishLexBuffer;
 pub use contract::{
     RadishLexFfiContract, RADISHLEX_ABI_CONTRACT_VERSION,
     RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND, RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD,
+    RADISHLEX_STARTUP_GATE_ERROR_NONE,
 };
 pub use dictionary::{
     RadishLexDeletedTermList, RadishLexDeletedTermView, RadishLexDictionaryExportSummary,
@@ -90,6 +92,7 @@ pub use learning_status::RadishLexLearningStatusSummary;
 pub use manager_sync_product_status::*;
 pub use manager_sync_qualification::*;
 pub use personalization::*;
+pub use product_install::*;
 pub use product_upgrade::*;
 pub use rank_explain::{RadishLexRankExplain, RadishLexRankExplainView};
 pub use rime_runtime::radishlex_rime_runtime_shutdown;

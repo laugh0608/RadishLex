@@ -185,6 +185,9 @@ test "$(plutil -extract CFBundleVersion raw \
 test "$(plutil -extract LSMinimumSystemVersion raw \
   "${app_bundle}/Contents/Info.plist")" = "${minimum_macos}"
 for symbol in \
+  _radishlex_product_install_startup_gate \
+  _radishlex_product_upgrade_startup_gate \
+  _radishlex_manager_upgrade_validate_candidate \
   _radishlex_apple_p256_product_status \
   _radishlex_apple_p256_product_smoke \
   _radishlex_apple_secure_enclave_p256_product_status \
@@ -201,6 +204,7 @@ for symbol in \
     exit 1
   fi
 done
+python3 "${repo_root}/scripts/macos-product/test_startup_gate_order.py"
 if rg -n 'radishlex_apple_(p256|secure_enclave_p256|secure_enclave_key_agreement)_product_(smoke|status)' \
   "${manager_dir}/lib" "${manager_dir}/tool/ffi_bridge_smoke.dart"; then
   echo "Apple P-256 product validation ABI must not be bound by Dart." >&2

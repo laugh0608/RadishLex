@@ -8,8 +8,8 @@ use std::sync::Arc;
 use radishlex_ime_product_install::{
     commit_program_target, finish_program_restore, finish_source_preservation,
     finish_target_staging, preserve_program_source, restore_program_source, InstallFailureCode,
-    InstallOperationKind, InstallReceipt, InstallState, ProgramComponent, VerifiedInstallRoot,
-    INSTALL_PRODUCT_ID,
+    InstallFinalizationPort, InstallFinalizationValidationStage, InstallOperationKind,
+    InstallReceipt, InstallState, ProgramComponent, VerifiedInstallRoot, INSTALL_PRODUCT_ID,
 };
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -138,7 +138,7 @@ fn first_install_binds_payload_staging_and_installed_targets() {
     let fixture = Fixture::new("0.1.0", "35", "target");
     let signature = Arc::new(SignatureState::default());
     let copy = Arc::new(CopyState::default());
-    let adapter = fixture
+    let mut adapter = fixture
         .adapter(signature, copy.clone())
         .expect("install adapter");
     let receipt_store = InstallReceiptStore::open(
@@ -227,6 +227,12 @@ fn first_install_binds_payload_staging_and_installed_targets() {
     adapter
         .verify_installed_target(&input_method, &receipt)
         .expect("verify InputMethod");
+    assert!(adapter.validate_final_state(
+        &manager,
+        &input_method,
+        &receipt,
+        InstallFinalizationValidationStage::BeforeFinalVerified,
+    ));
 }
 
 #[test]
@@ -626,7 +632,7 @@ fn build_payload(root: &Path, version: &str, build: &str, marker: &str) {
         "product_version": version,
         "build_number": build,
         "minimum_macos": "13.0",
-        "ffi_abi_version": 8,
+        "ffi_abi_version": 9,
         "userdb_schema_version": 9,
         "rime_data_manifest_version": 2,
         "native_libraries_manifest_version": 1,

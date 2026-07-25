@@ -1,8 +1,29 @@
-# 产品升级 FFI 参考
+# 产品事务 FFI 参考
 
-本文定义 ABI v8 的产品升级 startup gate 与 Manager/InputMethod validation 结构、调用方责任和证据边界，面向维护 C header、Swift/Objective-C host 与升级协调器的开发者。本文不包含完整 receipt 状态机、安装器操作或历史版本流水；通用所有权与错误规则见 [FFI 边界](ffi-boundary.md)，产品状态机见 [macOS 数据升级协调器](macos-data-upgrade-coordinator.md)。
+本文定义 ABI v9 的外层 install startup gate、兼容保留的 ABI v8 数据 upgrade gate 与 Manager/InputMethod validation 结构、调用方责任和证据边界，面向维护 C header、Swift/Objective-C host 与产品协调器的开发者。本文不包含完整 receipt 状态机、安装器操作或历史版本流水；通用所有权与错误规则见 [FFI 边界](ffi-boundary.md)，产品状态机见 [macOS 程序安装事务](macos-installation-transaction.md)。
 
-## Startup gate
+## 外层 install startup gate
+
+```text
+RadishLexProductInstallStartupGateRequest {
+  version: u32
+  data_root_path: *const c_char
+  expected_owner_id: u32
+}
+
+RadishLexProductInstallStartupGateResult {
+  version: u32
+  decision: u32
+  error_code: u32
+  receipt_state: u32
+}
+```
+
+request/result version 均为 v1。接口不接受 component、bundle path、release、manifest/tree/code hash 或其他运行 identity；macOS 实现从当前 executable 反向绑定固定用户域 bundle，并以 Info.plist、完整 tree 和严格 Developer ID code identity 形成 `RunningProgramIdentity`。active guard、非终态 receipt 与 completed remove 在读取运行身份前直接阻断；终态 identity 漂移、损坏 receipt、中断写、未知对象和未知结果均失败关闭。
+
+允许常量仅为 `RADISHLEX_INSTALL_GATE_ALLOWED_FIRST_LAUNCH`、`RADISHLEX_INSTALL_GATE_ALLOWED_NO_INSTALL_STATE` 和 `RADISHLEX_INSTALL_GATE_ALLOWED_TERMINAL_RECEIPT`。前两者还必须同时满足 `error_code = RADISHLEX_STARTUP_GATE_ERROR_NONE`、`receipt_state = 0`；终态允许只接受具名的 `COMPLETED`、`ABORTED_PRESERVED` 或 `ROLLED_BACK` state。Manager/InputMethod 必须先消费该结果，再调用数据 gate；任何未知 status/version/decision/error/state 或不一致组合都不得继续初始化。
+
+## 数据 upgrade startup gate
 
 ```text
 RadishLexProductUpgradeStartupGateRequest {
@@ -30,6 +51,8 @@ RADISHLEX_STARTUP_GATE_ALLOWED_TERMINAL_RECEIPT
 ```
 
 `RADISHLEX_STARTUP_GATE_BLOCKED_UPGRADE_IN_PROGRESS` 与 `RADISHLEX_STARTUP_GATE_FAILED_CLOSED` 都阻止启动。error code 区分 upgrade in progress、active guard、unsafe root/state、interrupted artifact、invalid receipt、unexpected object、identity changed 和 I/O；`receipt_state = 0` 表示没有可报告的已解析状态。调用方必须使用 C header 的具名常量，不依赖 Rust enum discriminant，也不能把未知值或仅 `error_code = 0` 推断为允许。
+
+数据 gate 的允许组合与外层相同：first launch/no state 必须同时为无错误、零 state，terminal receipt 只接受具名 `COMPLETED`、`ABORTED_PRESERVED` 或 `ROLLED_BACK`。两层 state 数值空间不同，必须使用各自 `RADISHLEX_INSTALL_RECEIPT_STATE_*` / `RADISHLEX_UPGRADE_RECEIPT_STATE_*` 常量，不能交叉解释。
 
 ## 产品数据库 validation
 
@@ -60,7 +83,7 @@ RadishLexUpgradeValidationSummary {
 
 两个 request version 和共享 summary version 均固定为 v1。字符串只在调用期间借用；summary 不拥有指针或 heap handle。
 
-ABI v8 为兼容既有布局保留 `candidate_path` 字段名；它表示本次受控 validation 的固定数据库路径，不授权调用方接受任意路径。路径字段只允许各 bundle 内原生 host 填充：
+ABI v9 兼容保留 ABI v8 的 `candidate_path` 字段名；它表示本次受控 validation 的固定数据库路径，不授权调用方接受任意路径。路径字段只允许各 bundle 内原生 host 填充：
 
 - 无参数模式固定 candidate 与 settings backup；
 - 唯一参数 `--post-switch` 固定最终 `userdb.sqlite3` 与产品 settings；

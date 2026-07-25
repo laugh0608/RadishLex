@@ -67,7 +67,7 @@ manifest 是产品完整性与兼容性证据，不替代 Apple code signature�
 | product version | `0.1.0` | Manager 与 InputMethod 相同 |
 | build number | `35` | 正整数且两个 bundle 相同 |
 | minimum macOS | `13.0` | 取两端真实支持范围的交集 |
-| FFI ABI | `8` | 增加只读 startup gate 与双端升级 validation contract |
+| FFI ABI | `9` | 保留数据 startup/validation contract，增加独立外层 install startup gate |
 | userdb schema | `9` | 不允许旧产品打开未来 schema |
 | RimeData manifest | `2` | 绑定来源锁、多许可证与完整数据 hash |
 | data layout | `application-support-v1` | 首版继续使用已验证布局 |
@@ -94,7 +94,7 @@ build number 只描述产品构建，不替代 schema 或 ABI。任何 ABI、数
 
 ### 运行期
 
-Manager 与 InputMethod 都必须对下列情况失败关闭并返回稳定错误：
+Manager 与 InputMethod 都必须先执行 ABI v9 外层 install gate，再执行数据 upgrade gate，并对下列情况失败关闭并返回稳定错误：
 
 - FFI ABI 不匹配或必需 symbol 缺失；
 - startup gate 返回阻止/失败结果，或 active guard、非终态/损坏 receipt、中断 artifact、未知对象与身份漂移无法排除；
@@ -103,7 +103,7 @@ Manager 与 InputMethod 都必须对下列情况失败关闭并返回稳定错�
 - RimeData、native dependency 或 manifest 缺失/损坏；
 - 输入法 bundle 与 Manager 产品版本不兼容。
 
-不能通过加载旧 dylib、创建空数据库、删除升级状态、改用 fixture 或忽略 manifest 来掩盖错误。Manager 的门禁必须早于 Flutter/settings/userdb，InputMethod 的门禁必须早于 `IMKServer`/Rime runtime；只有 data root/state absent 或终态 receipt 可以继续正常启动。
+不能通过加载旧 dylib、创建空数据库、删除升级状态、改用 fixture 或忽略 manifest 来掩盖错误。Manager 的两层门禁必须早于 Flutter/settings/userdb，InputMethod 的两层门禁必须早于 `IMKServer`/Rime runtime；外层运行身份只能由当前 executable 所在固定用户域 bundle 的 Info.plist、完整 tree 与 code identity 形成。只有两层 gate 都返回已知允许结果才能继续。
 
 ## 数据布局与所有权
 
@@ -210,7 +210,8 @@ Apple 官方边界参考：
 7. M4-P01 退出后完成 M4-P02 数据升级协调器、manifest-bound macOS adapter 与隔离真实产品协调资格；
 8. M4-P03 已固定 DMG + 独立用户域 Installer、两个目标路径、InstallPayload manifest、外层 receipt/guard、双 bundle 程序切换恢复和 macOS manifest/code-signature adapter；
 9. M4-P03 已用独立组合层绑定双 receipt/guard、数据协调结果、installed target 持续复验和 source 程序一致回滚；
-10. 下一步完成外层产品终态动作并把双端产品启动接入外层 gate；随后建立隔离端到端恢复门禁，再进入 Installer UI、发布身份与授权实机验收。
+10. 已完成外层两段产品终态动作、upgrade data receipt/双 guard 最终绑定、ABI v9 外层只读 gate 与双端最前置接线；
+11. 下一步建立隔离端到端恢复门禁，再进入 Installer UI、发布身份与授权实机验收。
 
 ## M4-P01 退出标准
 

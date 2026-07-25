@@ -3,9 +3,10 @@ use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::{
-    InstallFailureCode, InstallOperationKind, InstallReceipt, ProductArtifactIdentity,
-    ProductRelease, ProgramBundleIdentity, ProgramComponent, VerifiedInstallRoot,
-    INSTALL_PRODUCT_ID,
+    resume_install_finalization, InstallFailureCode, InstallFinalizationError,
+    InstallFinalizationPort, InstallFinalizationValidationStage, InstallOperationKind,
+    InstallReceipt, ProductArtifactIdentity, ProductRelease, ProgramBundleIdentity,
+    ProgramComponent, VerifiedInstallRoot, INSTALL_PRODUCT_ID,
 };
 
 use super::*;
@@ -210,6 +211,171 @@ impl ProgramSwitchFaultInjector for FailOnce {
             false
         }
     }
+}
+
+#[derive(Default)]
+struct FinalizationPort {
+    calls: Vec<InstallFinalizationValidationStage>,
+    reject: Option<InstallFinalizationValidationStage>,
+}
+
+impl InstallFinalizationPort for FinalizationPort {
+    fn validate_final_state(
+        &mut self,
+        manager: &ProgramSwitchStore,
+        input_method: &ProgramSwitchStore,
+        receipt: &InstallReceipt,
+        stage: InstallFinalizationValidationStage,
+    ) -> bool {
+        self.calls.push(stage);
+        if self.reject == Some(stage) {
+            return false;
+        }
+        let manager_exists = fs::symlink_metadata(manager.target_path()).is_ok();
+        let input_method_exists = fs::symlink_metadata(input_method.target_path()).is_ok();
+        if receipt.operation_kind() == InstallOperationKind::RemovePrograms {
+            !manager_exists && !input_method_exists
+        } else {
+            manager_exists && input_method_exists
+        }
+    }
+}
+
+fn prepare_for_finalization(fixture: &mut Fixture) {
+    match fixture.receipt.operation_kind() {
+        InstallOperationKind::FirstInstall => fixture.commit_both(),
+        InstallOperationKind::Upgrade => {
+            fixture.preserve_both();
+            fixture.commit_both();
+            fixture
+                .receipt
+                .advance(InstallState::DataCoordinating)
+                .expect("data coordinating");
+            fixture
+                .receipt_store
+                .persist(fixture.guard.as_ref().expect("guard"), &fixture.receipt)
+                .expect("persist data coordinating");
+            fixture
+                .receipt
+                .advance(InstallState::DataSettled)
+                .expect("data settled");
+            fixture
+                .receipt_store
+                .persist(fixture.guard.as_ref().expect("guard"), &fixture.receipt)
+                .expect("persist data settled");
+        }
+        InstallOperationKind::Repair => {
+            fixture.preserve_both();
+            fixture.commit_both();
+        }
+        InstallOperationKind::RemovePrograms => {
+            fixture.preserve_both();
+            for store in [&fixture.manager, &fixture.input_method] {
+                commit_program_removal(
+                    &fixture.receipt_store,
+                    fixture.guard.as_ref().expect("guard"),
+                    store,
+                    &mut fixture.receipt,
+                )
+                .expect("commit removal");
+            }
+        }
+    }
+}
+
+#[test]
+fn finalization_uses_one_two_checkpoint_path_for_every_operation() {
+    for kind in [
+        InstallOperationKind::FirstInstall,
+        InstallOperationKind::Upgrade,
+        InstallOperationKind::Repair,
+        InstallOperationKind::RemovePrograms,
+    ] {
+        let mut fixture = Fixture::ready(kind);
+        prepare_for_finalization(&mut fixture);
+        let mut port = FinalizationPort::default();
+        resume_install_finalization(
+            &fixture.receipt_store,
+            fixture.guard.as_ref().expect("guard"),
+            &mut fixture.receipt,
+            &fixture.manager,
+            &fixture.input_method,
+            &mut port,
+        )
+        .expect("finalization");
+        assert_eq!(fixture.receipt.state(), InstallState::Completed);
+        assert_eq!(
+            port.calls,
+            [
+                InstallFinalizationValidationStage::BeforeFinalVerified,
+                InstallFinalizationValidationStage::BeforeCompleted,
+            ]
+        );
+        fixture
+            .receipt_store
+            .verify_current(fixture.guard.as_ref().expect("guard"), &fixture.receipt)
+            .expect("completed receipt persisted");
+    }
+}
+
+#[test]
+fn finalization_persists_final_verified_and_resumes_idempotently() {
+    let mut fixture = Fixture::upgrade_ready();
+    prepare_for_finalization(&mut fixture);
+    let mut interrupted = FinalizationPort {
+        reject: Some(InstallFinalizationValidationStage::BeforeCompleted),
+        ..FinalizationPort::default()
+    };
+    assert_eq!(
+        resume_install_finalization(
+            &fixture.receipt_store,
+            fixture.guard.as_ref().expect("guard"),
+            &mut fixture.receipt,
+            &fixture.manager,
+            &fixture.input_method,
+            &mut interrupted,
+        ),
+        Err(InstallFinalizationError::FinalStateNotProven(
+            InstallFinalizationValidationStage::BeforeCompleted
+        ))
+    );
+    assert_eq!(fixture.receipt.state(), InstallState::FinalVerified);
+    fixture
+        .receipt_store
+        .verify_current(fixture.guard.as_ref().expect("guard"), &fixture.receipt)
+        .expect("final_verified persisted");
+
+    let mut resumed = FinalizationPort::default();
+    resume_install_finalization(
+        &fixture.receipt_store,
+        fixture.guard.as_ref().expect("guard"),
+        &mut fixture.receipt,
+        &fixture.manager,
+        &fixture.input_method,
+        &mut resumed,
+    )
+    .expect("resume finalization");
+    assert_eq!(
+        resumed.calls,
+        [InstallFinalizationValidationStage::BeforeCompleted]
+    );
+    assert_eq!(fixture.receipt.state(), InstallState::Completed);
+    resume_install_finalization(
+        &fixture.receipt_store,
+        fixture.guard.as_ref().expect("guard"),
+        &mut fixture.receipt,
+        &fixture.manager,
+        &fixture.input_method,
+        &mut resumed,
+    )
+    .expect("completed finalization is idempotent");
+    assert_eq!(
+        resumed.calls,
+        [
+            InstallFinalizationValidationStage::BeforeCompleted,
+            InstallFinalizationValidationStage::BeforeCompleted,
+        ]
+    );
 }
 
 #[test]

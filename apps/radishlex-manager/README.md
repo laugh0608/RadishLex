@@ -49,9 +49,9 @@ RadishLex Manager 是萝卜词核的 Flutter 本地管理端。macOS 正常构�
 
 ## 产品启动与升级门禁
 
-macOS 正常 product mode 在 `applicationWillFinishLaunching` 最前执行 ABI v8 `radishlex_product_upgrade_startup_gate`。平台层只从用户域解析固定 `Application Support/RadishLex` 和当前 effective uid；检查发生在 Flutter delegate、settings、userdb 和所有 Manager 业务初始化之前。
+macOS 正常 product mode 在 `applicationWillFinishLaunching` 最前先执行 ABI v9 `radishlex_product_install_startup_gate`，再执行兼容保留的数据 `radishlex_product_upgrade_startup_gate`。平台层只从用户域解析固定 `Application Support/RadishLex` 和当前 effective uid；外层运行身份由 FFI 从当前 executable 的固定 bundle 形成。两层检查都发生在 Flutter delegate、settings、userdb 和所有 Manager 业务初始化之前。
 
-data root 不存在、升级状态目录/receipt 不存在或 receipt 已处于终态时允许继续。active guard、非终态或损坏 receipt、中断 artifact、未知对象、unsafe root/state、identity drift、FFI 失败或未知 result 都直接退出，不能通过创建目录、修改权限、删除 receipt/sidecar 或切换到 demo fixture 绕过。失败日志只包含稳定 decision/error/state 数值，不输出路径或数据内容。
+data root 不存在、两层状态目录/receipt 不存在，或两层 receipt 均处于允许启动的终态时才可继续。active guard、非终态或损坏 receipt、中断 artifact、未知对象、unsafe root/state、identity drift、completed remove、FFI 失败或未知 result 都直接退出，不能通过创建目录、修改权限、删除 receipt/sidecar 或切换到 demo fixture 绕过。失败日志只包含稳定 decision/error/state 数值，不输出路径或数据内容。
 
 Apple P-256 与 Secure Enclave key-agreement 的显式 gated product smoke 是独立的早退出自检模式，不进入普通 Manager bootstrap；它们不能作为绕过 startup gate 启动产品 UI 的入口。
 
@@ -65,7 +65,7 @@ macOS 正常 product 构建使用仓库稳定入口：
 ../../scripts/build-manager-macos-product.sh
 ```
 
-Xcode 构建阶段会编译 `radishlex-ime-ffi`；macOS 产品 dylib 显式启用 `apple-keychain` feature，再修正 install name，检查目标架构、依赖与 manager 所需 symbol 集，把库复制到 app bundle 的 `Contents/Frameworks` 后签名。Dart 启动时读取 `radishlex_ffi_contract`，要求 ABI v8、owner-thread policy 和 panic boundary 与 manager 预期一致。普通 DPK 与 Secure Enclave P-256 status/product smoke symbol 只服务原生 gated validation，Dart 不直接绑定；现有 snapshot 只读取 `radishlex_manager_sync_product_status` 的固定脱敏状态。同步页另提供只连接 loopback HTTPS、只使用合成数据的资格 run，不触发系统 key 操作，也不返回 key、canonical、signature、wrapped material、payload 或 HTTP body。
+Xcode 构建阶段会编译 `radishlex-ime-ffi`；macOS 产品 dylib 显式启用 `apple-keychain` feature，再修正 install name，检查目标架构、依赖与 manager 所需 symbol 集，把库复制到 app bundle 的 `Contents/Frameworks` 后签名。Dart 启动时读取 `radishlex_ffi_contract`，要求 ABI v9、owner-thread policy 和 panic boundary 与 manager 预期一致。普通 DPK 与 Secure Enclave P-256 status/product smoke symbol 只服务原生 gated validation，Dart 不直接绑定；现有 snapshot 只读取 `radishlex_manager_sync_product_status` 的固定脱敏状态。同步页另提供只连接 loopback HTTPS、只使用合成数据的资格 run，不触发系统 key 操作，也不返回 key、canonical、signature、wrapped material、payload 或 HTTP body。
 
 `radishlex_manager_sync_product_status` 把 signing 与 key-agreement 作为两条独立资格链：`product_qualified` 只有在两者都通过时才为真，`user_sync_enabled` 是另一个产品策略开关，不能由资格结果推导或自动打开。`blocker` 按固定优先级返回首个失败原因；Manager 只负责把这些 enum/boolean 映射为状态说明，不执行创建、读取、签名、derive 或删除操作。完整字段与常量见 [Manager 同步产品状态参考](../../docs/manager-sync-product-status.md)。
 
@@ -87,7 +87,7 @@ demo mode 只使用合成 fixture，并持续显示“合成演示数据”横�
 
 本地同步服务启动后，可用仓库根 `scripts/check-sync-server-connection-health.sh` 生成 `sync_connection_health.v1` 摘要，再在设置页回填。Manager 只保存净化后的 `sync_connection_health_summary` 子对象，不保存原始 JSON、完整 endpoint、token、请求 / 响应体、证书或 payload bytes。
 
-当前 dynamic library smoke 还会确认 `radishlex-ime-ffi` 未导出已退役的 review-only sync command symbol。隔离资格 `start/poll/cancel/free` executor 最初由 ABI v7 引入，当前 ABI v8 兼容保留，并增加产品 startup/validation contract；真实用户数据同步、恢复码生成 / 输入、join request 创建、授权成功和设备撤销路径仍保持关闭。被拒绝的旧符号名只作为 smoke denylist 保留，不是待实现 API。资格 request、状态机、错误与清理契约见 [ime-sync-runtime 组件说明](../../crates/ime-sync-runtime/README.md)；产品升级 FFI 调用顺序见 [FFI 平台调用契约](../../docs/runbooks/ffi-platform-call-contract.md)。历史预演材料统一归档在仓库根 `docs/archive/review-only-manager-sync/`，不作为当前设计或实现契约。
+当前 dynamic library smoke 还会确认 `radishlex-ime-ffi` 未导出已退役的 review-only sync command symbol。隔离资格 `start/poll/cancel/free` executor 最初由 ABI v7 引入，当前 ABI v9 兼容保留，并增加产品 startup/validation contract；真实用户数据同步、恢复码生成 / 输入、join request 创建、授权成功和设备撤销路径仍保持关闭。被拒绝的旧符号名只作为 smoke denylist 保留，不是待实现 API。资格 request、状态机、错误与清理契约见 [ime-sync-runtime 组件说明](../../crates/ime-sync-runtime/README.md)；产品升级 FFI 调用顺序见 [FFI 平台调用契约](../../docs/runbooks/ffi-platform-call-contract.md)。历史预演材料统一归档在仓库根 `docs/archive/review-only-manager-sync/`，不作为当前设计或实现契约。
 
 ## 验证
 

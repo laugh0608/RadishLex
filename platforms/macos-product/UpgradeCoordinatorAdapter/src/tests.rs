@@ -451,7 +451,7 @@ fn write_product(root: &Path, version: &str, build: &str, schema: u32, include_p
         "product_version": version,
         "build_number": build,
         "minimum_macos": "13.0",
-        "ffi_abi_version": 8,
+        "ffi_abi_version": 9,
         "userdb_schema_version": schema,
         "rime_data_manifest_version": 2,
         "native_libraries_manifest_version": 1,

@@ -74,6 +74,7 @@ required_symbols=(
   _radishlex_apple_secure_enclave_key_agreement_product_smoke
   _radishlex_apple_secure_enclave_key_agreement_product_status
   _radishlex_ffi_contract
+  _radishlex_product_install_startup_gate
   _radishlex_product_upgrade_startup_gate
   _radishlex_manager_upgrade_validate_candidate
   _radishlex_manager_sync_product_status

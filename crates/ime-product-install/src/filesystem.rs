@@ -475,6 +475,17 @@ pub fn inspect_install_startup_gate(
     expected_owner_id: u32,
     running: &RunningProgramIdentity,
 ) -> InstallStartupGateResult {
+    inspect_install_startup_gate_with(data_root, expected_owner_id, || Some(running.clone()))
+}
+
+pub fn inspect_install_startup_gate_with<F>(
+    data_root: impl AsRef<Path>,
+    expected_owner_id: u32,
+    running_identity: F,
+) -> InstallStartupGateResult
+where
+    F: FnOnce() -> Option<RunningProgramIdentity>,
+{
     let data_root = data_root.as_ref();
     if !data_root.is_absolute()
         || data_root
@@ -543,7 +554,25 @@ pub fn inspect_install_startup_gate(
     }
     match store.load_current_internal() {
         Ok(None) => allowed(InstallStartupGateDecision::AllowedNoInstallState, None),
-        Ok(Some((receipt, _, _))) => evaluate_install_startup_receipt(&receipt, running),
+        Ok(Some((receipt, _, _))) if !receipt.state().is_terminal() => InstallStartupGateResult {
+            decision: InstallStartupGateDecision::BlockedInstallInProgress,
+            error_code: InstallStartupGateErrorCode::InstallInProgress,
+            receipt_state: Some(receipt.state()),
+        },
+        Ok(Some((receipt, _, _)))
+            if receipt.operation_kind() == crate::InstallOperationKind::RemovePrograms
+                && receipt.state() == InstallState::Completed =>
+        {
+            InstallStartupGateResult {
+                decision: InstallStartupGateDecision::FailedClosed,
+                error_code: InstallStartupGateErrorCode::RemovedProgram,
+                receipt_state: Some(receipt.state()),
+            }
+        }
+        Ok(Some((receipt, _, _))) => match running_identity() {
+            Some(running) => evaluate_install_startup_receipt(&receipt, &running),
+            None => failed(InstallStartupGateErrorCode::ProgramIdentityChanged),
+        },
         Err(error) => failed(map_startup_error(error.code())),
     }
 }
