@@ -79,7 +79,7 @@ Contents/Resources/InstallPayload/
       ProductManifest.json
 ```
 
-`ProductManifest.json` 绑定两个产品 bundle、native dependency、RimeData 和许可证。`InstallPayloadManifest.json` format v2 再绑定 target product manifest、安装 layout、版本/build、Installer bundle ID、目标路径和显式历史 source 列表；每个 source 由自己的 ProductManifest 绑定完整旧产品，只用于旧版本 validation/rollback host。发布装配顺序必须是签名嵌套 Mach-O 与 target 两个产品 bundle、验证历史 source 的既有 exact Developer ID、冻结 product/payload manifest、签名 Installer bundle、创建并签名 DMG；任何后续修改都要求重新生成受影响的外层 manifest、重新签名并重新公证。
+`ProductManifest.json` format v2 绑定两个产品 bundle、native dependency、RimeData、许可证和公开发布者 Team ID `WF9UUN335P`。`InstallPayloadManifest.json` format v2 再绑定 target product manifest、安装 layout、版本/build、Installer bundle ID、目标路径和显式历史 source 列表；每个 source 由自己的 ProductManifest 绑定完整旧产品，只用于旧版本 validation/rollback host。发布装配顺序必须是签名嵌套 Mach-O 与 target 两个产品 bundle、验证历史 source 的既有 exact Developer ID、冻结 product/payload manifest、签名 Installer bundle、创建并签名 DMG；任何后续修改都要求重新生成受影响的外层 manifest、重新签名并重新公证。
 
 ### 外层安装事务
 
@@ -108,7 +108,7 @@ M4-P02 的数据 receipt 不能单独证明两个程序 bundle 已完成切换�
 
 ## 发布身份与验证
 
-发布候选要求两个产品 bundle、Installer app 和全部 executable 使用 Developer ID Application、Hardened Runtime 与 trusted timestamp。DMG 单独签名并提交 Apple notary service；使用 `notarytool` 或 Notary API，检查 notary log，staple ticket，并在隔离下载环境执行 Gatekeeper 评估。
+发布候选要求两个产品 bundle、Installer app 和全部 executable 使用 Team ID 精确为 `WF9UUN335P` 的 Developer ID Application、Hardened Runtime 与 trusted timestamp。另一有效 Developer ID Team 不能因载体内部身份一致而取得发布资格。DMG 单独签名并提交 Apple notary service；使用 `notarytool` 或 Notary API，检查 notary log，staple ticket，并在隔离下载环境执行 Gatekeeper 评估。
 
 DMG 固定为 APFS/UDZO UDIF，volume name 为 `RadishLex Installer`，根目录只允许 `RadishLex Installer.app`。notary 凭据只从已存入 Keychain 的 profile 读取；稳定 submission receipt 绑定提交时 DMG hash 与 Installer tree，staple 后 qualification 再绑定最终分发 hash。DMG open assessment 和挂载 Installer execute assessment 必须同时通过，且最终下载环境仍需按 qualification hash 独立复验。
 

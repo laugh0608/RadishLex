@@ -8,6 +8,7 @@ use crate::{error, MacOsInstallAdapterError, MacOsInstallAdapterErrorCode};
 const CODESIGN_PATH: &str = "/usr/bin/codesign";
 const MAX_CODESIGN_OUTPUT_BYTES: usize = 64 * 1024;
 const MAX_REQUIREMENT_BYTES: usize = 4096;
+pub const RADISHLEX_DEVELOPER_TEAM_ID: &str = "WF9UUN335P";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MacOsCodeIdentity {
@@ -90,6 +91,7 @@ pub fn inspect_developer_id_application(
     }
     let parsed = inspect_code_identity(bundle)?;
     if parsed.identifier != expected_bundle_id
+        || parsed.team_identifier != RADISHLEX_DEVELOPER_TEAM_ID
         || !valid_developer_id_requirement(&parsed.designated_requirement, &parsed.team_identifier)
     {
         return Err(error(
@@ -121,7 +123,8 @@ impl CodeSignatureRequirements {
             manager_designated_requirement: manager_designated_requirement.into(),
             input_method_designated_requirement: input_method_designated_requirement.into(),
         };
-        if requirements.team_identifier.len() != 10
+        if requirements.team_identifier != RADISHLEX_DEVELOPER_TEAM_ID
+            || requirements.team_identifier.len() != 10
             || !requirements
                 .team_identifier
                 .bytes()
@@ -190,7 +193,11 @@ impl CodesignRunningIdentityInspector {
             return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
         }
         let parsed = inspect_code_identity(bundle)?;
-        if !valid_developer_id_requirement(&parsed.designated_requirement, &parsed.team_identifier)
+        if parsed.team_identifier != RADISHLEX_DEVELOPER_TEAM_ID
+            || !valid_developer_id_requirement(
+                &parsed.designated_requirement,
+                &parsed.team_identifier,
+            )
         {
             return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
         }
@@ -565,23 +572,26 @@ mod tests {
             "identifier \"dev.radishlex.radishlexManager\" and anchor apple generic and ",
             "certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and ",
             "certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and ",
-            "certificate leaf[subject.OU] = ABCDEFGHIJ",
+            "certificate leaf[subject.OU] = WF9UUN335P",
         );
         let input_method = concat!(
             "identifier \"dev.radishlex.RadishLexInputMethod\" and anchor apple generic and ",
             "certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and ",
             "certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and ",
-            "certificate leaf[subject.OU] = \"ABCDEFGHIJ\"",
+            "certificate leaf[subject.OU] = \"WF9UUN335P\"",
         );
-        assert!(CodeSignatureRequirements::new("ABCDEFGHIJ", manager, input_method,).is_ok());
+        assert!(
+            CodeSignatureRequirements::new(RADISHLEX_DEVELOPER_TEAM_ID, manager, input_method,)
+                .is_ok()
+        );
         assert!(CodeSignatureRequirements::new(
-            "ABCDEFGHIJ",
+            RADISHLEX_DEVELOPER_TEAM_ID,
             "identifier \"dev.radishlex.radishlexManager\" and anchor apple generic",
             input_method,
         )
         .is_err());
         assert!(CodeSignatureRequirements::new(
-            "ABCDEFGHIJ",
+            RADISHLEX_DEVELOPER_TEAM_ID,
             format!("{manager} or true"),
             input_method,
         )

@@ -31,7 +31,7 @@ staple 会修改 DMG，所以 `ReleaseQualification.json` 同时保留提交前 
 ## 前置条件
 
 - macOS 13 或更高版本，Xcode command-line tools 中存在 `codesign`、`hdiutil`、`notarytool`、`stapler` 和 `spctl`；
-- `RADISHLEX_DEVELOPER_ID_APPLICATION` 精确命中本机有效的 `Developer ID Application:` identity；
+- `RADISHLEX_DEVELOPER_ID_APPLICATION` 精确命中本机有效、证书 OU 为产品固定 Team `WF9UUN335P` 的 `Developer ID Application:` identity；
 - Installer 发布根已由 `build-macos-release-installer.sh` 生成，所有嵌套 executable 具有 Hardened Runtime 与 trusted timestamp；
 - notary 凭据已由维护者使用 `notarytool store-credentials` 存入 Keychain；执行时只提供 profile 名称，不向脚本传 Apple ID、password、API private key 或 issuer；
 - 网络、Apple 服务和 timestamp/notary 资格已单独授权。

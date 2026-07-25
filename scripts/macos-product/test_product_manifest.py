@@ -5,6 +5,7 @@ import json
 import plistlib
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 import product_manifest
@@ -148,6 +149,25 @@ class ProductManifestTest(unittest.TestCase):
             product_manifest.ProductManifestError, "fields do not match"
         ):
             product_manifest.ProductMetadata.load(path)
+
+    def test_metadata_rejects_invalid_release_team(self) -> None:
+        value = json.loads(product_manifest.METADATA_PATH.read_text(encoding="utf-8"))
+        for team in ("", "wf9uun335p", "ABCDEFGHIJK"):
+            value["developer_team_id"] = team
+            path = self.root / f"product-{len(team)}.json"
+            path.write_text(json.dumps(value), encoding="utf-8")
+            with self.assertRaisesRegex(
+                product_manifest.ProductManifestError, "developer_team_id"
+            ):
+                product_manifest.ProductMetadata.load(path)
+
+    def test_source_contract_rejects_release_team_drift(self) -> None:
+        with self.assertRaisesRegex(
+            product_manifest.ProductManifestError, "Rust release Team ID"
+        ):
+            product_manifest.validate_source_contract(
+                replace(self.metadata, developer_team_id="ABCDEFGHIJ")
+            )
 
 
 if __name__ == "__main__":

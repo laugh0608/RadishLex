@@ -30,7 +30,7 @@ use codesign::CodesignQualificationCodeSignatureVerifier;
 pub use codesign::{
     inspect_developer_id_application, CodeSignatureRequirements, CodesignCodeSignatureVerifier,
     CodesignRunningIdentityInspector, DeveloperIdApplicationIdentity, MacOsCodeIdentity,
-    MacOsCodeSignatureVerifier,
+    MacOsCodeSignatureVerifier, RADISHLEX_DEVELOPER_TEAM_ID,
 };
 use copy::{sync_bundle_tree, BundleCopier, DittoBundleCopier};
 use manifest::{inspect_bundle_tree, VerifiedInstallPayload};

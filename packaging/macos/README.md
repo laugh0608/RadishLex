@@ -1,8 +1,8 @@
 # macOS 产品与安装元数据
 
-本目录保存 macOS 产品和安装目标的 committed 真相源，面向产品装配、Installer 和发布门禁维护者。它不保存签名身份、Apple 凭据、notary submission、绝对用户路径或真实安装状态。
+本目录保存 macOS 产品和安装目标的 committed 真相源，面向产品装配、Installer 和发布门禁维护者。它只保存稳定发布者 Team ID，不保存证书、私钥、Apple 凭据、notary submission、绝对用户路径或真实安装状态。
 
-- `product.json`：产品版本、build、bundle ID、FFI ABI、userdb schema、RimeData/native manifest 和数据布局。
+- `product.json`：format v2 产品版本、build、bundle ID、发布者 Team ID、FFI ABI、userdb schema、RimeData/native manifest 和数据布局。
 - `install-layout.json`：M4-P03 分发容器、Installer 类型、当前用户安装域、两个组件映射、Application Support 和默认移除语义。
 
 固定安装目标以当前用户 home 为基准：

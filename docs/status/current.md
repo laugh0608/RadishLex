@@ -16,11 +16,11 @@ M4-P02 已闭合只读 inspection、一致快照、隔离 candidate/settings、r
 
 隔离资格已用真实双 bundle/helper 和合成 Application Support 覆盖成功、端点失败、静止丢失、回滚与重启恢复；产品 RimeData、candidate 和数据根保持只读。首发 source qualification 具有独立版本/签名/manifest，但 native code/schema 与 target 同源，不冒充尚不存在的历史发布二进制；实际上一版发布形成后必须纳入跨发布门禁。
 
-M4-P03 已接受 DMG + 独立用户域 Installer app：Manager、InputMethod 和 install state 固定在 current-user home 下，不请求管理员权限，也不让 `.pkg` script 承担明文数据协调。committed `install-layout.json` 与确定性 `InstallPayloadManifest.json` format v2 已绑定 target 产品 manifest、版本/build、Installer bundle ID、两个安装目标、默认保留数据语义，以及显式 `UpgradeSources` 历史发布集合；每个 source 由精确 release、固定 payload 路径、ProductManifest、完整双 bundle tree 与 code identity 约束。该 payload 仍不是 Installer/DMG，不证明签名、公证或真实安装。
+M4-P03 已接受 DMG + 独立用户域 Installer app：Manager、InputMethod 和 install state 固定在 current-user home 下，不请求管理员权限，也不让 `.pkg` script 承担明文数据协调。`ProductManifest.json` format v2 固定发布者 Team ID `WF9UUN335P`；committed `install-layout.json` 与确定性 `InstallPayloadManifest.json` format v2 已绑定 target 产品 manifest、版本/build、Installer bundle ID、两个安装目标、默认保留数据语义，以及显式 `UpgradeSources` 历史发布集合。
 
 独立 `ime-product-install` 已固定首次安装、升级、修复和默认程序移除的 source/target 关系，以及 `prepared` 到三类终态的外层状态机。严格 receipt 绑定 data-root identity、ProductManifest/bundle tree/code identity hash、source/staged/backup/installed 文件系统身份和 previous-operation chain；原子存储与 Unix socket guard 拒绝中断写、未知对象、身份漂移和并发 operation。两个 component 各自在目标父目录使用 `0700` 私有事务目录，核心按精确 inode 执行 source preserve、Manager/InputMethod 逐端 rename/fsync 和程序 rollback。27 项合成测试覆盖四类终态、首次安装与移除恢复、升级部分提交恢复，以及 preserve/commit/rollback 每个 rename、目标目录 fsync、源目录 fsync 边界；不触碰真实 bundle、Application Support 或用户域安装目标。
 
-独立 `radishlex-macos-product-install` adapter 已内嵌 committed install layout，严格复验 InstallPayloadManifest、target/历史 source ProductManifest、许可证和完整双 bundle tree，并只从 authoritative current-user home 形成固定目标。production code identity 要求 exact Developer ID designated requirement 与 Team ID，经 strict `codesign` 后只把固定字段 hash 交给核心；没有 ad-hoc fallback。staging 使用 metadata-preserving `ditto`，复制前后复验并递归 fsync；完整但未记录的 staged bundle 可恢复 evidence，部分/漂移对象保持现场。12 项普通测试覆盖首次安装、完整升级回滚、历史 source lookup/revalidation、source/target/restored 复验、manifest/tree/signature/path 漂移和 staging 中断；没有读取真实用户目录或签名身份。
+独立 `radishlex-macos-product-install` adapter 已内嵌 committed install layout，严格复验 InstallPayloadManifest、target/历史 source ProductManifest、许可证和完整双 bundle tree，并只从 authoritative current-user home 形成固定目标。production code identity 要求 exact Developer ID designated requirement 与产品固定 Team ID，经 strict `codesign` 后只把固定字段 hash 交给核心；其他有效 Team 和 ad-hoc 均失败关闭。staging 使用 metadata-preserving `ditto`，复制前后复验并递归 fsync；完整但未记录的 staged bundle 可恢复 evidence，部分/漂移对象保持现场。12 项普通测试覆盖首次安装、完整升级回滚、历史 source lookup/revalidation、source/target/restored 复验、manifest/tree/signature/path 漂移和 staging 中断；没有读取真实用户目录或签名身份。
 
 独立 `radishlex-macos-product-install-coordinator` 已在不合并两个核心的前提下绑定同一 operation ID、Application Support inode、source/target release、双 receipt 与双 guard。M4-P02 每个 quiescence checkpoint 同时复验 installed target 双 bundle；数据 `completed` 映射外层 `data_settled`，数据 `aborted_preserved` / `rolled_back` 则在 source 双程序精确恢复和逻辑身份复验后映射外层 `rolled_back`。12 项合成测试覆盖成功、两段终态、candidate/post-switch 失败、静止丢失、target/source 身份暂不可得、重启续跑、未持久化双 receipt 状态及 operation/release/root 绑定拒绝。
 
@@ -32,11 +32,11 @@ Installer UI/driver contract 已落地。零写入 status projection 和 Rust dr
 
 隔离 restartable executor 与版本化 App bridge 已落地。begin/retry/remove 在 guard 内回读 current receipt、执行 manifest-bound target preflight，只生成 operation ID 并持久化 `prepared`；重新投影并确认中立输入源/Manager 关闭后，`ConfirmQuiescence` 再次 preflight，才沿同一 receipt 执行双 bundle staging/preserve/commit。first install、repair、remove 共用程序终态；upgrade 从外层 receipt、固定 data root、只读 userdb 与可选 settings/Rime 身份自动 bootstrap M4-P02 receipt，既有 progressed receipt 则按 operation/root/release/schema 精确重绑。`final_verified` 中断后可重开 data `completed` receipt，只重新证明终态与双程序。completed receipt 会与当前真实产品情况交叉判定，矛盾身份失败关闭。
 
-原生 bridge ABI v1 的三个 AppKit symbol 已绑定；未知版本、action、authorization flags、枚举或进度失败关闭。生产 bootstrap 从 `geteuid/getpwuid_r` 和当前 executable 固定形成 home/resources，严格复验完整 payload；sealed `ReleaseIdentity.json` 绑定 Installer、Manager、InputMethod 的 exact Developer ID requirement 与同一 Team ID，且 Installer 自身先过签名验证。
+原生 bridge ABI v1 的三个 AppKit symbol 已绑定；未知版本、action、authorization flags、枚举或进度失败关闭。生产 bootstrap 从 `geteuid/getpwuid_r` 和当前 executable 固定形成 home/resources，严格复验完整 payload；sealed `ReleaseIdentity.json` 绑定 Installer、Manager、InputMethod 的 exact Developer ID requirement 与产品固定 Team ID，且 Installer 自身先过签名验证。
 
 生产 bridge 已接通 manifest-bound adapter、target preflight、随机 operation ID、外层事务和 executor。first install 只在显式 action 后创建缺失的固定目录，既有对象不 chmod；repair、默认程序移除和三者恢复使用真实 mutation port。upgrade 只从当前外层 receipt 的 source/installed product release 选择 payload 中精确匹配的历史 assembly，在任何 receipt/program mutation 前复验 source manifest/tree/Developer ID，并构造 source/target coordinator；缺失 source 返回 `driver_unavailable`，错误、重复、身份漂移或非历史 source 返回产品身份阻断。默认首发 payload 的 `UpgradeSources` 为空，因此不会伪造上一版本。
 
-发布脚本已固定 Developer ID/Hardened Runtime/trusted timestamp、sealed identity、单 Installer 签名 DMG、Keychain-profile notary、可续跑 receipt、严格 log、staple 与双层 Gatekeeper。当前机器仍为 `0 valid identities found`，普通门禁只证明失败关闭；此前真实用户零基线未修改，也没有正向发布资格证据。
+发布脚本已固定 Developer ID/Hardened Runtime/trusted timestamp、sealed identity、单 Installer 签名 DMG、Keychain-profile notary、可续跑 receipt、严格 log、staple 与双层 Gatekeeper。签名前的本地 probe 会把所选证书 leaf OU 精确绑定到 `WF9UUN335P`，另一有效 Developer ID Team 在构建产品前即失败关闭。当前机器仍为 `0 valid identities found`，普通门禁只证明失败关闭；此前真实用户零基线未修改，也没有正向发布资格证据。
 
 M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
@@ -50,7 +50,7 @@ M3 已闭合 P2 envelope/signed manifest、Go 密文服务、signed lifecycle/ep
 
 ## M4-P01 退出结论
 
-macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v9、userdb v9 和 RimeData manifest v2。`packaging/rime/product-rime-data.json` 固定 `radishlex_pinyin`、Apache-2.0 `pinyin_simp` 词典 commit/hash、`SourceManifest.json` 和逐资产 LICENSE/AUTHORS；首个候选不携带 LGPL `prelude`、`stroke`、笔画反查或扩展符号表。
+macOS 产品元数据已统一为 `0.1.0 (35)`、ProductManifest v2、Developer Team `WF9UUN335P`、macOS 13.0、FFI ABI v9、userdb v9 和 RimeData manifest v2。`packaging/rime/product-rime-data.json` 固定 `radishlex_pinyin`、Apache-2.0 `pinyin_simp` 词典 commit/hash、`SourceManifest.json` 和逐资产 LICENSE/AUTHORS；首个候选不携带 LGPL `prelude`、`stroke`、笔画反查或扩展符号表。
 
 稳定入口已从 committed RimeData 输入离线装配 Manager/InputMethod 双 bundle、`librime` 传递闭包和 `ProductManifest.json`。真实 `librime 1.17.0` CLI、native FFI smoke、递归 dylib、ad-hoc 签名、RimeData/native manifests 与无构建机绝对路径复验通过；装配目录仍不是普通用户安装包，也没有 Developer ID、公证或 Gatekeeper 发布证据。
 

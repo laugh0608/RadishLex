@@ -5,7 +5,7 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
 use radishlex_macos_product_install::{
-    inspect_developer_id_application, CodeSignatureRequirements,
+    inspect_developer_id_application, CodeSignatureRequirements, RADISHLEX_DEVELOPER_TEAM_ID,
 };
 use serde::Deserialize;
 
@@ -160,7 +160,7 @@ impl InstallerBootstrapContext {
             fs::read(path).map_err(|_| InstallerBootstrapError::ReleaseIdentityUnavailable)?;
         let identity: ReleaseIdentity = serde_json::from_slice(&bytes)
             .map_err(|_| InstallerBootstrapError::ReleaseIdentityUnavailable)?;
-        if identity.format_version != 1 {
+        if identity.format_version != 1 || identity.team_identifier != RADISHLEX_DEVELOPER_TEAM_ID {
             return Err(InstallerBootstrapError::ReleaseIdentityUnavailable);
         }
         Ok(identity)

@@ -446,6 +446,35 @@ fn layout_payload_and_product_mutations_fail_closed() {
         MacOsInstallAdapterErrorCode::InvalidPayloadManifest
     );
 
+    let publisher_fixture = Fixture::new("0.1.0", "35", "target");
+    let product_manifest_path = publisher_fixture
+        .payload
+        .join("Product/ProductManifest.json");
+    let mut product_manifest: Value =
+        serde_json::from_slice(&fs::read(&product_manifest_path).expect("product manifest"))
+            .expect("product JSON");
+    product_manifest["developer_team_id"] = json!("ABCDEFGHIJ");
+    write_json(&product_manifest_path, &product_manifest);
+    let payload_manifest_path = publisher_fixture
+        .payload
+        .join("InstallPayloadManifest.json");
+    let mut payload_manifest: Value =
+        serde_json::from_slice(&fs::read(&payload_manifest_path).expect("payload manifest"))
+            .expect("payload JSON");
+    payload_manifest["product_manifest"] =
+        manifest_file_record(&product_manifest_path, "Product/ProductManifest.json");
+    write_json(&payload_manifest_path, &payload_manifest);
+    assert_eq!(
+        publisher_fixture
+            .adapter(
+                Arc::new(SignatureState::default()),
+                Arc::new(CopyState::default())
+            )
+            .expect_err("publisher Team drift")
+            .code(),
+        MacOsInstallAdapterErrorCode::InvalidProductManifest
+    );
+
     let product_fixture = Fixture::new("0.1.0", "35", "target");
     let adapter = product_fixture
         .adapter(
@@ -774,7 +803,7 @@ fn build_product_root(root: &Path, version: &str, build: &str, marker: &str) {
     create_bundle(&input_method, "input-method", marker);
     fs::write(root.join("LICENSE"), b"synthetic license\n").expect("license");
     let product_manifest = json!({
-        "format_version": 1,
+        "format_version": 2,
         "product_id": INSTALL_PRODUCT_ID,
         "product_version": version,
         "build_number": build,
@@ -784,6 +813,7 @@ fn build_product_root(root: &Path, version: &str, build: &str, marker: &str) {
         "rime_data_manifest_version": 2,
         "native_libraries_manifest_version": 1,
         "data_layout": "application-support-v1",
+        "developer_team_id": "WF9UUN335P",
         "rime_schema_id": "radishlex_pinyin",
         "components": [
             {

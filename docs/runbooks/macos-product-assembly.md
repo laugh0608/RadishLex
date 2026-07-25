@@ -70,12 +70,12 @@ RIME_LIB_DIR=<librime-library-dir> \
 
 入口按以下顺序工作：
 
-1. 校验产品元数据和 RimeData source lock；
+1. 校验 format v2 产品元数据、固定发布者 Team ID 和 RimeData source lock；
 2. 在 `target/macos-product/` 下创建隔离 RimeData；
 3. 构建 product mode Manager bundle及其固定候选验证 helper；
 4. 构建 native-rime InputMethod bundle及其固定候选验证 helper，并递归收集非系统 dylib 与许可证；
 5. 复制两个独立 bundle 和仓库许可证到 staging；
-6. 生成并复验 `ProductManifest.json`；
+6. 生成并复验包含 `developer_team_id=WF9UUN335P` 的 format v2 `ProductManifest.json`；
 7. 通过同文件系统原子 rename 发布版本化装配目录。
 
 脚本不会安装或启动任何 bundle。目标版本目录已存在时会拒绝覆盖；需要比较重复构建时，应使用干净 worktree 或先把既有产物归档到明确位置，不能让脚本静默删除旧结果。

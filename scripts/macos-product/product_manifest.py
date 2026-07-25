@@ -25,6 +25,7 @@ EXPECTED_KEYS = {
     "rime_data_manifest_version",
     "native_libraries_manifest_version",
     "data_layout",
+    "developer_team_id",
     "manager_bundle_id",
     "input_method_bundle_id",
 }
@@ -49,6 +50,7 @@ class ProductMetadata:
     rime_data_manifest_version: int
     native_libraries_manifest_version: int
     data_layout: str
+    developer_team_id: str
     manager_bundle_id: str
     input_method_bundle_id: str
 
@@ -59,7 +61,7 @@ class ProductMetadata:
         except Exception as exc:
             raise ProductManifestError(f"invalid product metadata: {exc}") from exc
         if not isinstance(value, dict) or set(value) != EXPECTED_KEYS:
-            raise ProductManifestError("product metadata fields do not match format v1")
+            raise ProductManifestError("product metadata fields do not match format v2")
 
         for key in (
             "format_version",
@@ -72,7 +74,7 @@ class ProductMetadata:
                 raise ProductManifestError(f"{key} must be an integer")
             if value[key] <= 0:
                 raise ProductManifestError(f"{key} must be positive")
-        if value["format_version"] != 1:
+        if value["format_version"] != 2:
             raise ProductManifestError("unsupported product metadata format")
 
         for key in (
@@ -81,6 +83,7 @@ class ProductMetadata:
             "build_number",
             "minimum_macos",
             "data_layout",
+            "developer_team_id",
             "manager_bundle_id",
             "input_method_bundle_id",
         ):
@@ -98,6 +101,8 @@ class ProductMetadata:
         for key in ("product_id", "data_layout"):
             if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", value[key]):
                 raise ProductManifestError(f"{key} contains unsupported characters")
+        if not re.fullmatch(r"[A-Z0-9]{10}", value["developer_team_id"]):
+            raise ProductManifestError("developer_team_id must be a 10-character Team ID")
         for key in ("manager_bundle_id", "input_method_bundle_id"):
             if not IDENTIFIER_PATTERN.fullmatch(value[key]) or "." not in value[key]:
                 raise ProductManifestError(f"{key} is not a stable bundle identifier")
@@ -115,6 +120,7 @@ class ProductMetadata:
             "rime_data_manifest_version": self.rime_data_manifest_version,
             "native_libraries_manifest_version": self.native_libraries_manifest_version,
             "data_layout": self.data_layout,
+            "developer_team_id": self.developer_team_id,
         }
 
 
@@ -254,6 +260,24 @@ def validate_source_contract(
     if native_manifest_version != metadata.native_libraries_manifest_version:
         raise ProductManifestError(
             "native libraries manifest version differs from product metadata"
+        )
+
+    expected_team_constant = (
+        'pub const RADISHLEX_DEVELOPER_TEAM_ID: &str = '
+        f'"{metadata.developer_team_id}";'
+    )
+    codesign_adapter = read_text(
+        repo_root / "platforms/macos-product/InstallAdapter/src/codesign.rs"
+    )
+    upgrade_adapter = read_text(
+        repo_root / "platforms/macos-product/UpgradeCoordinatorAdapter/src/manifest.rs"
+    )
+    if expected_team_constant not in codesign_adapter or (
+        f'self.developer_team_id != "{metadata.developer_team_id}"'
+        not in upgrade_adapter
+    ):
+        raise ProductManifestError(
+            "Rust release Team ID differs from product metadata"
         )
 
 

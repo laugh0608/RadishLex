@@ -30,6 +30,7 @@ const INSTALL_STATE_PATH: &str = "Library/Application Support/RadishLex/.radishl
 const INSTALLER_BUNDLE_ID: &str = "org.radishlex.installer.macos";
 const MANAGER_BUNDLE_ID: &str = "dev.radishlex.radishlexManager";
 const INPUT_METHOD_BUNDLE_ID: &str = "org.radishlex.inputmethod.macos";
+const DEVELOPER_TEAM_ID: &str = crate::RADISHLEX_DEVELOPER_TEAM_ID;
 const MAX_MANIFEST_BYTES: u64 = 2 * 1024 * 1024;
 const MAX_BUNDLE_RECORDS: usize = 20_000;
 const MAX_UPGRADE_SOURCES: usize = 64;
@@ -488,6 +489,7 @@ struct ProductManifest {
     rime_data_manifest_version: u32,
     native_libraries_manifest_version: u32,
     data_layout: String,
+    developer_team_id: String,
     rime_schema_id: String,
     components: Vec<ProductComponent>,
     licenses: Vec<ManifestFileRecord>,
@@ -495,7 +497,7 @@ struct ProductManifest {
 
 impl ProductManifest {
     fn validate(&self) -> Result<(), MacOsInstallAdapterError> {
-        if self.format_version != 1
+        if self.format_version != 2
             || self.product_id != INSTALL_PRODUCT_ID
             || !valid_version(&self.product_version, 3)
             || parse_positive_u64(&self.build_number).is_err()
@@ -505,6 +507,7 @@ impl ProductManifest {
             || self.rime_data_manifest_version == 0
             || self.native_libraries_manifest_version == 0
             || self.data_layout != "application-support-v1"
+            || self.developer_team_id != DEVELOPER_TEAM_ID
             || self.rime_schema_id.is_empty()
             || self.components.len() != 2
             || self.licenses.len() != 1

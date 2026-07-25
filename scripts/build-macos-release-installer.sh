@@ -47,6 +47,20 @@ if [[ "${codesign_identity}" != Developer\ ID\ Application:* ]]; then
   exit 2
 fi
 
+identity_probe_root="$(mktemp -d /private/tmp/radishlex-release-identity.XXXXXX)"
+identity_probe="${identity_probe_root}/probe"
+cleanup_identity_probe() {
+  rm -rf -- "${identity_probe_root}"
+}
+trap cleanup_identity_probe EXIT
+ditto /usr/bin/true "${identity_probe}"
+codesign --force --sign "${codesign_identity}" --timestamp=none --options runtime \
+  "${identity_probe}"
+PYTHONDONTWRITEBYTECODE=1 python3 "${identity_tool}" verify-team \
+  --signed-code "${identity_probe}"
+cleanup_identity_probe
+trap - EXIT
+
 product_version="$(python3 "${product_tool}" field product_version)"
 product_build="$(python3 "${product_tool}" field build_number)"
 source_product="${repo_root}/target/macos-product/${product_version}-${product_build}"

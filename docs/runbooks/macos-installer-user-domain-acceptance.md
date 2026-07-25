@@ -49,7 +49,7 @@ Installer 自身只从当前 executable 反推 `Contents/Resources/InstallPayloa
    - `InstallLayout.json`；
    - 完整 `InstallPayload/InstallPayloadManifest.json`；
    - 完整 `InstallPayload/Product/`。
-3. 记录 Installer、Manager、InputMethod 主 bundle 的 hash、版本和签名状态；发布验收要求所有对象绑定同一 Team ID 与冻结 designated requirement。
+3. 记录 Installer、Manager、InputMethod 主 bundle 的 hash、版本和签名状态；发布验收要求所有对象绑定产品 metadata 固定的 Team ID `WF9UUN335P` 与冻结 designated requirement。
 4. 运行 `./scripts/cleanup-macos-imk.sh --status`，只读记录 TIS matches/enabled/selected、已安装 bundle、runtime data、userdb family 和 InputMethod 进程。
 5. 按精确进程名只读确认 Manager 与 InputMethod 均停止。沙盒无法读取进程表时必须在获准的真实用户会话复验，不能把 `unavailable` 当作 `stopped`。
 6. 对四个固定对象及其父目录执行 `lstat`/`stat`。不要在基线阶段创建目录、chmod、删除对象或打开数据库。
@@ -69,7 +69,7 @@ Installer 自身只从当前 executable 反推 `Contents/Resources/InstallPayloa
 
 只有后续发布身份切面同时满足下列条件，才进入正向验收：
 
-- Installer、payload 内嵌套 executable、Manager 与 InputMethod 均通过 strict Developer ID/Hardened Runtime 验证；
+- Installer、payload 内嵌套 executable、Manager 与 InputMethod 均通过 strict Developer ID/Hardened Runtime 验证，且证书 OU 精确为 `WF9UUN335P`；
 - `ReleaseIdentity.json` 为 Installer 最终签名资源，format v1、Team ID 和 Installer/双 component designated requirement 与冻结产物逐字节一致；bridge 先验证 Installer 自身 strict Developer ID identity，再读取该资源；
 - bridge 复验嵌入 payload manifest、完整 bundle tree 和 exact code identity 后才产生 ready snapshot；
 - 真实 preflight 通过公开 API 证明 Manager/InputMethod 不运行、固定 data handle 未打开；

@@ -63,6 +63,8 @@ operation 必须显式声明，不通过目标存在性推断：
 
 macOS adapter 负责从固定 bundle 和签名 API 形成 canonical evidence，再交给核心。核心只接受 64 位小写十六进制 SHA-256、稳定 bundle ID、正确 component 配对和同一 release。hash 不能替代发布者要求；平台每次 staging、切换、恢复和启动仍须重新验证 code signature、ProductManifest 与固定来源。
 
+`ProductManifest.json` format v2 以公开元数据固定 RadishLex 发布者 Team ID `WF9UUN335P`。该值是证书 leaf OU 与 `TeamIdentifier` 的信任锚，不包含证书、私钥或公证凭据；另一有效 Developer ID Team 即使能形成内部一致的双 bundle、Installer 与 DMG，也不能通过产品门禁。
+
 receipt 初始保存 source/target product identity。后续 artifact evidence 只能按 slot 追加：
 
 ```text
@@ -118,7 +120,7 @@ macOS adapter 的输入只允许：
 
 - 从系统 user-domain API 得到的 authoritative current-user home 与 uid；
 - Installer 自身已验证资源中的 `InstallPayload/` 根；
-- 发布构建固定的 Manager/InputMethod Developer ID designated requirement 与 Team ID；
+- 发布构建固定的 Manager/InputMethod Developer ID designated requirement，以及 `ProductManifest.json` v2 绑定的 Team ID `WF9UUN335P`；
 - 已持有的外层 receipt store、guard 和对应 component 的 `ProgramSwitchStore`。
 
 adapter 内嵌 committed `packaging/macos/install-layout.json` 字节。payload 内 `InstallLayout.json` 必须逐字节一致，`InstallPayloadManifest.json` format v2 必须严格绑定 layout、target `ProductManifest.json`、版本/build、两个 component-to-target 映射、保留数据语义和 `UpgradeSources` 集合。每个历史 source 绑定精确 version/build、规范化固定目录、自己的 ProductManifest、许可证、完整双 bundle tree 和同发布要求 code identity；build 必须唯一、严格递增并早于 target。payload/product/source 根、manifest、bundle 与路径链中的真实目录不得由 symlink 或 hardlink 替换；未知顶层对象、字段、component、文件记录、source 或目标映射均失败关闭。
@@ -141,10 +143,10 @@ adapter 对 payload target、已安装 source、staged、installed 和 restored 
 
 code signature 验证固定为：
 
-1. 发布要求只接受五段 `and` 连接的 Developer ID Application designated requirement：精确 bundle identifier、`anchor apple generic`、Developer ID 中间证书 OID、Developer ID Application leaf OID 和匹配 Team ID 的 leaf OU；不接受 `or`、ad-hoc 或宽泛 requirement；
+1. 发布要求只接受五段 `and` 连接的 Developer ID Application designated requirement：精确 bundle identifier、`anchor apple generic`、Developer ID 中间证书 OID、Developer ID Application leaf OID 和固定 Team ID `WF9UUN335P` 的 leaf OU；不接受其他 Team、`or`、ad-hoc 或宽泛 requirement；
 2. `/usr/bin/codesign --verify --deep --strict -R=<expected designated requirement> <bundle>`；
 3. 独立读取 Identifier、TeamIdentifier、CDHash、Signature、CodeDirectory 与 designated requirement；
-4. 要求 bundle ID、Team ID 和 designated requirement 与该 component 的发布要求精确一致；
+4. 要求 bundle ID、Team ID 和 designated requirement 与该 component 的发布要求精确一致，且 Team ID 必须等于产品元数据固定值；
 5. 将上述固定字段编码为 `radishlex-macos-code-identity-v1` 后只把 SHA-256 写入逻辑程序身份。
 
 receipt 不保存 requirement、Team ID、Authority、CDHash 或 `codesign` 输出原文。验证进程的 stdout/stderr 不进入错误、日志或诊断。Developer ID 要求尚未冻结时只能使用测试注入的合成 verifier，不提供 production ad-hoc fallback，也不把当前 ad-hoc 产品装配冒充发布身份。

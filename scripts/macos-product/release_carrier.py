@@ -167,7 +167,12 @@ def release_identity_team(path: Path) -> str:
     if set(value) != EXPECTED_RELEASE_IDENTITY_KEYS or value["format_version"] != 1:
         raise ReleaseCarrierError("release identity fields changed")
     team = value["team_identifier"]
-    if not isinstance(team, str) or not release_identity.TEAM_PATTERN.fullmatch(team):
+    expected_team = load_metadata().developer_team_id
+    if (
+        not isinstance(team, str)
+        or not release_identity.TEAM_PATTERN.fullmatch(team)
+        or team != expected_team
+    ):
         raise ReleaseCarrierError("release identity TeamIdentifier is invalid")
     return team
 

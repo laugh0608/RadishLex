@@ -37,13 +37,13 @@ M4-P01 的稳定装配产物是版本化产品目录及其 manifest。M4-P03 已
 
 产品装配必须生成 `ProductManifest.json`，至少绑定：
 
-- manifest format、产品 ID、产品版本、build number 和最低 macOS；
+- manifest format、产品 ID、产品版本、build number、最低 macOS 和固定发布者 Team ID；
 - Manager 与 InputMethod 的 bundle ID、版本和 build；
 - FFI ABI、userdb schema、Rime schema ID、RimeData manifest 和 native libraries manifest 版本；
 - 两个 bundle 内所有普通文件的相对路径、大小和 SHA-256，以及安全内部 symlink 的相对目标；
 - 仓库许可证文件的相对路径、大小和 SHA-256。
 
-manifest 不包含构建机绝对路径、签名身份、Team ID、Apple 凭据、用户目录、时间戳或输入数据。相同输入 bundle 必须生成字节一致的 manifest；签名和公证证据另行记录。
+manifest 不包含证书、私钥、designated requirement、Apple 凭据、构建机绝对路径、用户目录、时间戳或输入数据。稳定 Team ID 是公开发布者锚点，不是凭据；相同输入 bundle 必须生成字节一致的 manifest，具体签名和公证证据另行记录。
 
 manifest 是产品完整性与兼容性证据，不替代 Apple code signature、notarization ticket 或 Gatekeeper 验证。
 
@@ -70,6 +70,7 @@ source build 必须唯一、严格早于 target，不能使用 target 副本、q
 | 字段 | 值 | 约束 |
 | --- | --- | --- |
 | product ID | `radishlex-macos` | manifest 稳定标识 |
+| ProductManifest format | `2` | v2 新增固定发布者 Team ID；旧结构失败关闭 |
 | product version | `0.1.0` | Manager 与 InputMethod 相同 |
 | build number | `35` | 正整数且两个 bundle 相同 |
 | minimum macOS | `13.0` | 取两端真实支持范围的交集 |
@@ -77,6 +78,7 @@ source build 必须唯一、严格早于 target，不能使用 target 副本、q
 | userdb schema | `9` | 不允许旧产品打开未来 schema |
 | RimeData manifest | `2` | 绑定来源锁、多许可证与完整数据 hash |
 | data layout | `application-support-v1` | 首版继续使用已验证布局 |
+| Developer Team ID | `WF9UUN335P` | 唯一允许生成和运行正式候选的 Apple Team |
 
 build number 只描述产品构建，不替代 schema 或 ABI。任何 ABI、数据库、RimeData 或 native manifest 格式变化都必须独立递增对应版本，并更新兼容测试。
 
@@ -199,13 +201,13 @@ InstallPayload 固定包含 committed layout、外层 payload manifest 和完整
 - 验证 notary log，staple ticket，并在隔离环境执行 Gatekeeper 评估；
 - 发布证据只记录固定状态、产品 hash、submission ID 和结果，不保存凭据。
 
-仓库发布构建入口 `./scripts/build-macos-release-installer.sh` 只接受环境中的 `RADISHLEX_DEVELOPER_ID_APPLICATION`，且该值必须精确命中本机有效的 `Developer ID Application:` identity。脚本在隔离 staging 中重签每个 target Mach-O 与嵌套 code container，启用 Hardened Runtime/trusted timestamp，再签双产品 bundle；可重复传入 `--upgrade-source-product-root` 的历史 assembly 保留原签名，并必须与 target 双 component exact designated requirement/Team ID 一致。随后脚本重新生成 ProductManifest/InstallPayloadManifest、首次签 Installer、从三份 target bundle 生成 `ReleaseIdentity.json`，最后封存资源并重签 Installer。release identity format v1 绑定同一 Team ID 与 Installer/Manager/InputMethod 三份 exact designated requirement；bridge 必须先验证 Installer 自身签名，再信任该资源。
+仓库发布构建入口 `./scripts/build-macos-release-installer.sh` 只接受环境中的 `RADISHLEX_DEVELOPER_ID_APPLICATION`，且该值必须精确命中本机有效的 `Developer ID Application:` identity。脚本先用本地无 timestamp probe 验证证书 OU 等于产品 metadata 固定的 `WF9UUN335P`，再进入产品 staging；其他有效 Developer ID Team 也会失败。随后按嵌套顺序启用 Hardened Runtime/trusted timestamp，重新生成 ProductManifest/InstallPayloadManifest、首次签 Installer、从三份 target bundle 生成 `ReleaseIdentity.json`，最后封存资源并重签 Installer。历史 assembly 保留原签名，且必须与 target exact requirement 和固定 Team 一致。
 
 `./scripts/build-macos-release-dmg.sh` 只接受上述固定 release root 和同一 Developer ID Application identity，不接受路径参数。它生成 APFS/UDZO UDIF，根目录精确只有 `RadishLex Installer.app`，对 DMG 使用 trusted timestamp 签名，并在发布前挂载复验唯一根对象、Installer strict signature、内嵌 payload 和 release identity。
 
 `./scripts/notarize-macos-release-dmg.sh` 只接受 `RADISHLEX_NOTARY_KEYCHAIN_PROFILE` 指向的 Keychain profile，不接受 Apple ID/password 或 API private key 参数。它只接受 `Accepted` submission，要求 notary log 的 UUID、archive name、提交 SHA-256、status code 与空 issues 精确匹配，之后才 staple、验证 ticket、执行 DMG open 与挂载 Installer execute 两层 Gatekeeper。`NotarizationSubmission.json` 使中断后按同 UUID 续跑而不重复上传；`ReleaseQualification.json` 同时绑定 staple 前提交 hash、staple 后分发 hash、Installer tree、submission ID 和稳定结果，不保存凭据或原始 log。详细步骤见 [macOS DMG、公证与 Gatekeeper Runbook](runbooks/macos-release-carrier.md)。
 
-缺失身份、`-`、Apple Development、ad-hoc、Team 漂移、requirement 漂移、任一 executable 缺少 runtime flag、未知/非终态 notary 结果、log 漂移、ticket 或 Gatekeeper 失败均不得留下成功资格。普通仓库门禁只执行 parser/失败关闭与 ad-hoc 产品检查，不要求凭据、不访问 timestamp/notary 服务，也不把未执行的发布脚本记作 Developer ID、公证或 Gatekeeper 成功证据。
+缺失身份、`-`、Apple Development、ad-hoc、非 `WF9UUN335P` Team、requirement 漂移、任一 executable 缺少 runtime flag、未知/非终态 notary 结果、log 漂移、ticket 或 Gatekeeper 失败均不得留下成功资格。普通仓库门禁只执行 parser/失败关闭与 ad-hoc 产品检查，不要求凭据、不访问 timestamp/notary 服务，也不把未执行的发布脚本记作 Developer ID、公证或 Gatekeeper 成功证据。
 
 Apple 官方边界参考：
 

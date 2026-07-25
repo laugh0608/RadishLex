@@ -92,7 +92,7 @@ M4-P02 的 manifest 绑定只解决“执行哪一代、哪一端产品代码”
 
 adapter 组合 `ime-product-install`，但不接受自定义最终路径、bundle 名或数据路径。构造时要求 authoritative current-user home、uid、InstallPayload 根，以及 Manager/InputMethod 各自的 Developer ID designated requirement 和同一 Team ID。它逐字节绑定 committed install layout，严格复验 payload format v2、target 与全部 `UpgradeSources` 的 product manifest、完整 bundle tree、许可证、release 顺序、code identity 和 component-to-target 映射。
 
-production code identity 使用 `/usr/bin/codesign --verify --deep --strict -R=<requirement>`，再从固定 Identifier、TeamIdentifier、CDHash、Signature、CodeDirectory 和 designated requirement 形成脱敏 SHA-256；原始输出不进入 receipt、日志或错误。没有冻结发布要求时只能运行注入合成 verifier 的单元测试，当前 ad-hoc 产品不自动获得发布资格。
+production code identity 使用 `/usr/bin/codesign --verify --deep --strict -R=<requirement>`，并要求 TeamIdentifier 等于产品 metadata 固定的 `WF9UUN335P`，再从 Identifier、TeamIdentifier、CDHash、Signature、CodeDirectory 和 designated requirement 形成脱敏 SHA-256；原始输出不进入 receipt、日志或错误。其他有效 Developer ID Team、Apple Development 与 ad-hoc 都不获得产品资格。
 
 staging 使用 `/usr/bin/ditto` 保留 resource fork、extended attributes、ACL、quarantine 和 HFS compression。复制前后都复验 payload target，复制后对 staged tree/code identity 重新形成与 receipt target 相同的逻辑身份，递归 `fsync` 后才调用核心记录 filesystem evidence。完整但未记录的 staged bundle 可以在重启后补记；部分或漂移对象保持现场，不覆盖、不自动清理。
 

@@ -10,6 +10,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+import product_manifest
+
 FORMAT_VERSION = 1
 EXPECTED_BUNDLE_IDS = {
     "installer": "org.radishlex.installer.macos",
@@ -56,7 +58,11 @@ def parse_codesign_output(details: bytes, expected_bundle_id: str) -> SignedBund
     requirement = _unique_prefixed_line(text, "# designated => ")
     if bundle_id != expected_bundle_id:
         raise ReleaseIdentityError("signed bundle identifier changed")
-    if not TEAM_PATTERN.fullmatch(team_identifier):
+    expected_team_id = product_manifest.ProductMetadata.load().developer_team_id
+    if (
+        not TEAM_PATTERN.fullmatch(team_identifier)
+        or team_identifier != expected_team_id
+    ):
         raise ReleaseIdentityError("Developer ID TeamIdentifier is unavailable")
     if (
         len(requirement.encode("utf-8")) > MAX_REQUIREMENT_BYTES
@@ -97,6 +103,44 @@ def inspect_signed_bundle(path: Path, expected_bundle_id: str) -> SignedBundleId
     if inspected.returncode != 0:
         raise ReleaseIdentityError("code identity inspection failed")
     return parse_codesign_output(details, expected_bundle_id)
+
+
+def verify_signed_code_team(path: Path) -> None:
+    if not path.is_absolute() or not path.is_file() or path.is_symlink():
+        raise ReleaseIdentityError("signed code path is unsafe")
+    verified = subprocess.run(
+        ["/usr/bin/codesign", "--verify", "--strict", str(path)],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if verified.returncode != 0:
+        raise ReleaseIdentityError("strict code signature verification failed")
+    inspected = subprocess.run(
+        ["/usr/bin/codesign", "-d", "--verbose=4", str(path)],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if inspected.returncode != 0:
+        raise ReleaseIdentityError("code identity inspection failed")
+    details = inspected.stderr + inspected.stdout
+    if (
+        not details
+        or len(details) > MAX_CODESIGN_OUTPUT_BYTES
+        or b"\0" in details
+        or b"\r" in details
+    ):
+        raise ReleaseIdentityError("codesign output is invalid")
+    try:
+        text = details.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ReleaseIdentityError("codesign output is not UTF-8") from error
+    team_identifier = _unique_prefixed_line(text, "TeamIdentifier=")
+    if team_identifier != product_manifest.ProductMetadata.load().developer_team_id:
+        raise ReleaseIdentityError("signing identity is not the RadishLex release Team")
 
 
 def build_identity(
@@ -201,6 +245,10 @@ def verify_upgrade_source(arguments: argparse.Namespace) -> None:
     )
 
 
+def verify_team(arguments: argparse.Namespace) -> None:
+    verify_signed_code_team(arguments.signed_code)
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser()
     subparsers = result.add_subparsers(dest="command", required=True)
@@ -218,6 +266,8 @@ def parser() -> argparse.ArgumentParser:
     source.add_argument("--target-input-method-bundle", type=Path, required=True)
     source.add_argument("--source-manager-bundle", type=Path, required=True)
     source.add_argument("--source-input-method-bundle", type=Path, required=True)
+    team = subparsers.add_parser("verify-team")
+    team.add_argument("--signed-code", type=Path, required=True)
     return result
 
 
@@ -228,8 +278,10 @@ def main() -> None:
             create(arguments)
         elif arguments.command == "verify":
             verify(arguments)
-        else:
+        elif arguments.command == "verify-upgrade-source":
             verify_upgrade_source(arguments)
+        else:
+            verify_team(arguments)
     except ReleaseIdentityError as error:
         raise SystemExit(str(error)) from error
 

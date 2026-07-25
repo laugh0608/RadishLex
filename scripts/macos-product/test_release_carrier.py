@@ -125,6 +125,27 @@ class ReleaseCarrierTests(unittest.TestCase):
             with self.assertRaises(release_carrier.ReleaseCarrierError):
                 release_carrier.parse_codesign_team(output)
 
+        identity = self.root / "ReleaseIdentity.json"
+        team = release_carrier.load_metadata().developer_team_id
+        identity.write_text(
+            json.dumps(
+                {
+                    "format_version": 1,
+                    "team_identifier": team,
+                    "installer_designated_requirement": "installer",
+                    "manager_designated_requirement": "manager",
+                    "input_method_designated_requirement": "input",
+                }
+            ),
+            encoding="utf-8",
+        )
+        self.assertEqual(release_carrier.release_identity_team(identity), team)
+        value = json.loads(identity.read_text(encoding="utf-8"))
+        value["team_identifier"] = "ABCDEFGHIJ"
+        identity.write_text(json.dumps(value), encoding="utf-8")
+        with self.assertRaises(release_carrier.ReleaseCarrierError):
+            release_carrier.release_identity_team(identity)
+
     def test_rejects_log_identity_hash_status_and_issues_drift(self) -> None:
         receipt = self.receipt()
         for changed in (

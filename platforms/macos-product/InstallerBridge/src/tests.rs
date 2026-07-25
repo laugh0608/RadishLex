@@ -379,19 +379,19 @@ fn bootstrap_accepts_only_strict_release_identity_resource() {
         "identifier \"dev.radishlex.radishlexManager\" and anchor apple generic and ",
         "certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and ",
         "certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and ",
-        "certificate leaf[subject.OU] = ABCDEFGHIJ"
+        "certificate leaf[subject.OU] = WF9UUN335P"
     );
     let input_method_requirement = concat!(
         "identifier \"org.radishlex.inputmethod.macos\" and anchor apple generic and ",
         "certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and ",
         "certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and ",
-        "certificate leaf[subject.OU] = \"ABCDEFGHIJ\""
+        "certificate leaf[subject.OU] = \"WF9UUN335P\""
     );
     let installer_requirement = concat!(
         "identifier \"org.radishlex.installer.macos\" and anchor apple generic and ",
         "certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and ",
         "certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and ",
-        "certificate leaf[subject.OU] = ABCDEFGHIJ"
+        "certificate leaf[subject.OU] = WF9UUN335P"
     );
     fs::write(
         resources.join("ReleaseIdentity.json"),
@@ -399,7 +399,7 @@ fn bootstrap_accepts_only_strict_release_identity_resource() {
             concat!(
                 "{{\n",
                 "  \"format_version\": 1,\n",
-                "  \"team_identifier\": \"ABCDEFGHIJ\",\n",
+                "  \"team_identifier\": \"WF9UUN335P\",\n",
                 "  \"installer_designated_requirement\": {installer:?},\n",
                 "  \"manager_designated_requirement\": {manager:?},\n",
                 "  \"input_method_designated_requirement\": {input_method:?}\n",
@@ -421,8 +421,19 @@ fn bootstrap_accepts_only_strict_release_identity_resource() {
         InstallerBootstrapError::ReleaseIdentityUnavailable
     );
 
+    let identity_path = resources.join("ReleaseIdentity.json");
+    let identity = fs::read_to_string(&identity_path).expect("read identity");
+    fs::write(&identity_path, identity.replace("WF9UUN335P", "ABCDEFGHIJ"))
+        .expect("replace release Team");
+    assert_eq!(
+        context
+            .unsealed_release_requirements_for_test()
+            .expect_err("foreign Developer ID Team must fail"),
+        InstallerBootstrapError::ReleaseIdentityUnavailable
+    );
+
     fs::write(
-        resources.join("ReleaseIdentity.json"),
+        identity_path,
         b"{\"format_version\":1,\"team_identifier\":\"not set\",\"manager_designated_requirement\":\"adhoc\",\"input_method_designated_requirement\":\"adhoc\"}\n",
     )
     .expect("replace release identity");

@@ -25,7 +25,7 @@ def details(bundle_id: str, team: str) -> bytes:
 
 class ReleaseIdentityTests(unittest.TestCase):
     def test_builds_deterministic_identity_for_one_team(self) -> None:
-        team = "ABCDEFGHIJ"
+        team = release_identity.product_manifest.ProductMetadata.load().developer_team_id
         identities = [
             release_identity.parse_codesign_output(
                 details(bundle_id, team), bundle_id
@@ -46,20 +46,32 @@ class ReleaseIdentityTests(unittest.TestCase):
             )
         with self.assertRaises(release_identity.ReleaseIdentityError):
             release_identity.parse_codesign_output(
-                details("org.example.other", "ABCDEFGHIJ"), installer_id
+                details(
+                    "org.example.other",
+                    release_identity.product_manifest.ProductMetadata.load().developer_team_id,
+                ),
+                installer_id,
             )
+        team = release_identity.product_manifest.ProductMetadata.load().developer_team_id
 
         identities = [
             release_identity.parse_codesign_output(
-                details(bundle_id, "ABCDEFGHIJ"), bundle_id
+                details(bundle_id, team), bundle_id
             )
             for bundle_id in release_identity.EXPECTED_BUNDLE_IDS.values()
         ]
-        changed_manager = release_identity.parse_codesign_output(
-            details(
-                release_identity.EXPECTED_BUNDLE_IDS["manager"], "KLMNOPQRST"
-            ),
-            release_identity.EXPECTED_BUNDLE_IDS["manager"],
+        with self.assertRaises(release_identity.ReleaseIdentityError):
+            release_identity.parse_codesign_output(
+                details(
+                    release_identity.EXPECTED_BUNDLE_IDS["manager"],
+                    "KLMNOPQRST",
+                ),
+                release_identity.EXPECTED_BUNDLE_IDS["manager"],
+            )
+        changed_manager = release_identity.SignedBundleIdentity(
+            identities[1].bundle_id,
+            "KLMNOPQRST",
+            identities[1].designated_requirement.replace(team, "KLMNOPQRST"),
         )
         with self.assertRaises(release_identity.ReleaseIdentityError):
             release_identity.build_identity(
@@ -69,11 +81,12 @@ class ReleaseIdentityTests(unittest.TestCase):
     def test_upgrade_source_requires_exact_component_identities(self) -> None:
         manager_id = release_identity.EXPECTED_BUNDLE_IDS["manager"]
         input_method_id = release_identity.EXPECTED_BUNDLE_IDS["input_method"]
+        team = release_identity.product_manifest.ProductMetadata.load().developer_team_id
         manager = release_identity.parse_codesign_output(
-            details(manager_id, "ABCDEFGHIJ"), manager_id
+            details(manager_id, team), manager_id
         )
         input_method = release_identity.parse_codesign_output(
-            details(input_method_id, "ABCDEFGHIJ"), input_method_id
+            details(input_method_id, team), input_method_id
         )
         release_identity.verify_upgrade_source_identity(
             manager,
@@ -81,8 +94,10 @@ class ReleaseIdentityTests(unittest.TestCase):
             manager,
             input_method,
         )
-        drifted_manager = release_identity.parse_codesign_output(
-            details(manager_id, "KLMNOPQRST"), manager_id
+        drifted_manager = release_identity.SignedBundleIdentity(
+            manager.bundle_id,
+            manager.team_identifier,
+            manager.designated_requirement + " and true",
         )
         with self.assertRaises(release_identity.ReleaseIdentityError):
             release_identity.verify_upgrade_source_identity(
