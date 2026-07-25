@@ -85,6 +85,18 @@ class InstallLayoutTest(unittest.TestCase):
         )
         return path
 
+    def write_metadata(self, **overrides: object) -> Path:
+        value = json.loads(
+            product_manifest.METADATA_PATH.read_text(encoding="utf-8")
+        )
+        value.update(overrides)
+        path = self.root / "product-metadata.json"
+        path.write_text(
+            json.dumps(value, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return path
+
     def test_repository_layout_matches_the_accepted_user_domain_decision(self) -> None:
         self.assertEqual(self.layout.distribution_container, "dmg")
         self.assertEqual(self.layout.installation_scope, "current-user")
@@ -139,6 +151,38 @@ class InstallLayoutTest(unittest.TestCase):
         ).write_bytes(b"mutated")
         with self.assertRaisesRegex(
             install_layout.InstallLayoutError, "product manifest verification failed"
+        ):
+            install_layout.verify_payload(payload)
+
+    def test_payload_can_bind_an_explicit_source_release_metadata(self) -> None:
+        metadata_path = self.write_metadata(
+            product_version="0.0.9",
+            build_number="34",
+        )
+        source_metadata = product_manifest.ProductMetadata.load(metadata_path)
+        for bundle in (self.manager, self.input_method):
+            info_path = bundle / "Contents/Info.plist"
+            with info_path.open("rb") as stream:
+                info = plistlib.load(stream)
+            info["CFBundleShortVersionString"] = source_metadata.product_version
+            info["CFBundleVersion"] = source_metadata.build_number
+            self.write_plist(info_path, info)
+        product_manifest.write_manifest(
+            self.manifest,
+            product_manifest.expected_manifest(
+                source_metadata,
+                self.manager,
+                self.input_method,
+                self.license,
+            ),
+        )
+
+        payload = self.root / "source-payload"
+        install_layout.assemble_payload(self.product, payload, source_metadata)
+        install_layout.verify_payload(payload, source_metadata)
+        with self.assertRaisesRegex(
+            install_layout.InstallLayoutError,
+            "product manifest verification failed",
         ):
             install_layout.verify_payload(payload)
 

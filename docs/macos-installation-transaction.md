@@ -204,7 +204,7 @@ M4-P02 数据 receipt 只能在 `upgrade` 的 `data_coordinating` 阶段运行�
 
 外层终态使用四类 operation 共用的 `InstallFinalizationPort`，不复制各 operation 的临时完成逻辑。first install、repair、remove 从 `programs_committed` 进入终态，upgrade 从 `data_settled` 进入终态；每次分别在 `final_verified` 与 `completed` 前复验当前外层 receipt/guard、双 `ProgramSwitchStore` 和 operation 对应的最终程序结果。upgrade 组合层还在两次复验中绑定 data receipt/guard、data root、source/target release 与 data `completed`。第一段落盘后第二段中断时保留 `final_verified`，重启必须重新取得全部证据再完成。
 
-外层 receipt/guard、artifact contract、程序切换恢复、macOS manifest/code-signature adapter、数据协调映射、两段终态与双端启动入口均已实现。终态材料清理仍在后续独立切面。
+外层 receipt/guard、artifact contract、程序切换恢复、macOS manifest/code-signature adapter、数据协调映射、两段终态与双端启动入口均已实现。隔离真实产品资格进一步证明 `final_verified` 中断续跑、candidate 失败恢复 source 双程序、Manager 单端已提交后的重启续跑，以及 active/non-terminal/terminal 双端启动决策；终态材料清理仍在后续独立切面。
 
 ## Startup decision
 
@@ -249,5 +249,5 @@ receipt format 固定为 `radishlex-product-install-receipt-v1`，最大 64 KiB�
 - 两个 component 的固定目标、私有事务目录、同设备约束和 source/staged/backup/installed inode 连续性由核心执行；
 - preserve、逐端 commit 和 rollback 的每个 rename、目标目录 fsync、源目录 fsync 边界均可注入故障并从精确 inode 现场重试；
 - startup gate 对缺失、非终态、终态身份匹配/漂移、remove、损坏、未知对象和中断写均有稳定结果；
-- 全部测试只使用合成 `0700` 临时目录，不访问真实 Application Support、程序目标、系统设置、Keychain 或签名凭据。
-- macOS adapter、真实 bundle 内容/签名复验、M4-P02 状态映射、两段终态和双端 startup 接线已落地；身份绑定终态清理仍属于后续切面。
+- 普通测试只使用合成 `0700` 临时目录；隔离产品资格只在带固定 marker 的系统临时根内使用真实构建 bundle、ad-hoc qualification identity 与合成 Application Support，不访问真实用户目录、程序目标、系统设置、Keychain 或发布签名凭据。
+- macOS adapter、真实 bundle 内容/签名复验、M4-P02 状态映射、两段终态、双端 startup 接线与隔离端到端恢复资格已落地；Installer UI 和身份绑定终态清理仍属于后续切面。

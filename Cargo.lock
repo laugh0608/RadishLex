@@ -765,6 +765,8 @@ dependencies = [
  "radishlex-ime-product-install",
  "radishlex-ime-product-upgrade",
  "radishlex-ime-userdb",
+ "radishlex-macos-product-install",
+ "radishlex-macos-upgrade-coordinator",
 ]
 
 [[package]]

@@ -5,6 +5,8 @@
 use std::fmt;
 use std::fs;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
+#[cfg(feature = "qualification-harness")]
+use std::path::Component;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -22,6 +24,8 @@ mod codesign;
 mod copy;
 mod manifest;
 
+#[cfg(feature = "qualification-harness")]
+use codesign::CodesignQualificationCodeSignatureVerifier;
 pub use codesign::{
     CodeSignatureRequirements, CodesignCodeSignatureVerifier, CodesignRunningIdentityInspector,
     MacOsCodeIdentity, MacOsCodeSignatureVerifier,
@@ -33,6 +37,10 @@ const MANAGER_PARENT: &str = "Applications";
 const INPUT_METHOD_PARENT: &str = "Library/Input Methods";
 const DATA_ROOT: &str = "Library/Application Support/RadishLex";
 const MAX_INFO_PLIST_BYTES: usize = 64 * 1024;
+#[cfg(feature = "qualification-harness")]
+const QUALIFICATION_MARKER_FILE: &str = "radishlex-upgrade-qualification.marker";
+#[cfg(feature = "qualification-harness")]
+const QUALIFICATION_MARKER_BYTES: &[u8] = b"radishlex-upgrade-qualification-v1\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MacOsInstallAdapterErrorCode {
@@ -48,6 +56,8 @@ pub enum MacOsInstallAdapterErrorCode {
     CopyFailed,
     InvalidOperation,
     CoreRejected,
+    #[cfg(feature = "qualification-harness")]
+    UnsafeQualification,
     Io,
 }
 
@@ -100,6 +110,10 @@ impl fmt::Display for MacOsInstallAdapterError {
             }
             MacOsInstallAdapterErrorCode::CoreRejected => {
                 "product installation core rejected the adapter result"
+            }
+            #[cfg(feature = "qualification-harness")]
+            MacOsInstallAdapterErrorCode::UnsafeQualification => {
+                "macOS install qualification root is unsafe"
             }
             MacOsInstallAdapterErrorCode::Io => "macOS install adapter I/O failed",
         })
@@ -203,6 +217,36 @@ impl MacOsProductInstallAdapter {
             authoritative_user_home,
             expected_owner_id,
             Box::new(CodesignCodeSignatureVerifier::new(requirements)),
+            Box::new(DittoBundleCopier),
+        )
+    }
+
+    #[cfg(feature = "qualification-harness")]
+    pub fn load_for_qualification(
+        payload_root: &Path,
+        synthetic_user_home: &Path,
+        expected_owner_id: u32,
+        qualification_root: &Path,
+    ) -> Result<Self, MacOsInstallAdapterError> {
+        let qualification_root_input = qualification_root.to_path_buf();
+        let qualification_root = verify_qualification_root(qualification_root)?;
+        let payload_root = verify_qualification_path(
+            &qualification_root_input,
+            &qualification_root,
+            payload_root,
+            0o700,
+        )?;
+        let synthetic_user_home = verify_qualification_path(
+            &qualification_root_input,
+            &qualification_root,
+            synthetic_user_home,
+            0o700,
+        )?;
+        Self::load_with_services(
+            &payload_root,
+            &synthetic_user_home,
+            expected_owner_id,
+            Box::new(CodesignQualificationCodeSignatureVerifier),
             Box::new(DittoBundleCopier),
         )
     }
@@ -605,6 +649,114 @@ fn sync_parent(path: &Path) -> Result<(), MacOsInstallAdapterError> {
     fs::File::open(parent)
         .and_then(|directory| directory.sync_all())
         .map_err(|_| error(MacOsInstallAdapterErrorCode::Io))
+}
+
+#[cfg(feature = "qualification-harness")]
+fn verify_qualification_root(root: &Path) -> Result<PathBuf, MacOsInstallAdapterError> {
+    let root_metadata = fs::symlink_metadata(root)
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::UnsafeQualification))?;
+    if root_metadata.file_type().is_symlink() || !root_metadata.is_dir() {
+        return Err(error(MacOsInstallAdapterErrorCode::UnsafeQualification));
+    }
+    let temp_root = fs::canonicalize(std::env::temp_dir())
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::UnsafeQualification))?;
+    let root = fs::canonicalize(root)
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::UnsafeQualification))?;
+    if root == temp_root || !root.starts_with(&temp_root) {
+        return Err(error(MacOsInstallAdapterErrorCode::UnsafeQualification));
+    }
+    let owner_id = verify_private_directory(&root)?;
+    let marker = root.join(QUALIFICATION_MARKER_FILE);
+    let metadata = fs::symlink_metadata(&marker)
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::UnsafeQualification))?;
+    if metadata.file_type().is_symlink()
+        || !metadata.is_file()
+        || metadata.uid() != owner_id
+        || metadata.nlink() != 1
+        || metadata.mode() & 0o7777 != 0o600
+        || fs::read(&marker)
+            .map_err(|_| error(MacOsInstallAdapterErrorCode::UnsafeQualification))?
+            != QUALIFICATION_MARKER_BYTES
+    {
+        return Err(error(MacOsInstallAdapterErrorCode::UnsafeQualification));
+    }
+    Ok(root)
+}
+
+#[cfg(feature = "qualification-harness")]
+fn verify_qualification_path(
+    qualification_root_input: &Path,
+    qualification_root: &Path,
+    path: &Path,
+    expected_mode: u32,
+) -> Result<PathBuf, MacOsInstallAdapterError> {
+    let relative = path
+        .strip_prefix(qualification_root_input)
+        .or_else(|_| path.strip_prefix(qualification_root))
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::UnsafeQualification))?;
+    if relative.as_os_str().is_empty() {
+        return Err(error(MacOsInstallAdapterErrorCode::UnsafeQualification));
+    }
+    let mut current = if path.starts_with(qualification_root_input) {
+        qualification_root_input.to_path_buf()
+    } else {
+        qualification_root.to_path_buf()
+    };
+    for component in relative.components() {
+        if !matches!(component, Component::Normal(_)) {
+            return Err(error(MacOsInstallAdapterErrorCode::UnsafeQualification));
+        }
+        current.push(component.as_os_str());
+        let metadata = fs::symlink_metadata(&current)
+            .map_err(|_| error(MacOsInstallAdapterErrorCode::UnsafeQualification))?;
+        if metadata.file_type().is_symlink() {
+            return Err(error(MacOsInstallAdapterErrorCode::UnsafeQualification));
+        }
+    }
+    let canonical = fs::canonicalize(path)
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::UnsafeQualification))?;
+    if canonical == qualification_root || !canonical.starts_with(qualification_root) {
+        return Err(error(MacOsInstallAdapterErrorCode::UnsafeQualification));
+    }
+    let owner_id = fs::symlink_metadata(qualification_root)
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::UnsafeQualification))?
+        .uid();
+    let mut current = qualification_root.to_path_buf();
+    let relative = canonical
+        .strip_prefix(qualification_root)
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::UnsafeQualification))?;
+    let components: Vec<_> = relative.components().collect();
+    for (index, component) in components.iter().enumerate() {
+        if !matches!(component, Component::Normal(_)) {
+            return Err(error(MacOsInstallAdapterErrorCode::UnsafeQualification));
+        }
+        current.push(component.as_os_str());
+        let metadata = fs::symlink_metadata(&current)
+            .map_err(|_| error(MacOsInstallAdapterErrorCode::UnsafeQualification))?;
+        if metadata.file_type().is_symlink()
+            || metadata.uid() != owner_id
+            || (index + 1 < components.len() && !metadata.is_dir())
+        {
+            return Err(error(MacOsInstallAdapterErrorCode::UnsafeQualification));
+        }
+    }
+    let metadata = fs::symlink_metadata(&canonical)
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::UnsafeQualification))?;
+    if !metadata.is_dir() || metadata.mode() & 0o7777 != expected_mode {
+        return Err(error(MacOsInstallAdapterErrorCode::UnsafeQualification));
+    }
+    Ok(canonical)
+}
+
+#[cfg(feature = "qualification-harness")]
+fn verify_private_directory(path: &Path) -> Result<u32, MacOsInstallAdapterError> {
+    let metadata = fs::symlink_metadata(path)
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::UnsafeQualification))?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() || metadata.mode() & 0o7777 != 0o700
+    {
+        return Err(error(MacOsInstallAdapterErrorCode::UnsafeQualification));
+    }
+    Ok(metadata.uid())
 }
 
 const fn error(code: MacOsInstallAdapterErrorCode) -> MacOsInstallAdapterError {

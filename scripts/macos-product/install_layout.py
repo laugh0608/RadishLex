@@ -74,7 +74,11 @@ class InstallLayout:
     data_removal: str
 
     @classmethod
-    def load(cls, path: Path = LAYOUT_PATH) -> "InstallLayout":
+    def load(
+        cls,
+        path: Path = LAYOUT_PATH,
+        product_metadata: product_manifest.ProductMetadata | None = None,
+    ) -> "InstallLayout":
         try:
             value = json.loads(path.read_text(encoding="utf-8"))
         except Exception as exc:
@@ -91,7 +95,7 @@ class InstallLayout:
             if value[key] != value[key].strip():
                 raise InstallLayoutError(f"{key} must not contain outer whitespace")
 
-        metadata = product_manifest.ProductMetadata.load()
+        metadata = product_metadata or product_manifest.ProductMetadata.load()
         if value["product_id"] != metadata.product_id:
             raise InstallLayoutError("install layout product_id differs from product metadata")
         for key, expected in FIXED_VALUES.items():
@@ -153,7 +157,9 @@ def regular_file_record(path: Path, payload_path: str) -> dict[str, Any]:
 
 
 def verify_product_root(
-    layout: InstallLayout, product_root: Path
+    layout: InstallLayout,
+    product_root: Path,
+    product_metadata: product_manifest.ProductMetadata | None = None,
 ) -> product_manifest.ProductMetadata:
     try:
         metadata = product_root.lstat()
@@ -183,7 +189,7 @@ def verify_product_root(
                 f"product component must be a non-symlink directory: {component_path}"
             )
 
-    product_metadata = product_manifest.ProductMetadata.load()
+    product_metadata = product_metadata or product_manifest.ProductMetadata.load()
     try:
         product_manifest.verify_manifest(
             product_metadata,
@@ -198,9 +204,12 @@ def verify_product_root(
 
 
 def expected_payload_manifest(
-    layout: InstallLayout, product_root: Path, layout_path: Path
+    layout: InstallLayout,
+    product_root: Path,
+    layout_path: Path,
+    product_metadata: product_manifest.ProductMetadata | None = None,
 ) -> dict[str, Any]:
-    metadata = verify_product_root(layout, product_root)
+    metadata = verify_product_root(layout, product_root, product_metadata)
     return {
         "format_version": 1,
         "product_id": metadata.product_id,
@@ -241,7 +250,10 @@ def write_json(path: Path, value: dict[str, Any]) -> None:
     )
 
 
-def verify_payload(payload_root: Path) -> None:
+def verify_payload(
+    payload_root: Path,
+    product_metadata: product_manifest.ProductMetadata | None = None,
+) -> None:
     if payload_root.is_symlink() or not payload_root.is_dir():
         raise InstallLayoutError("install payload root must be a non-symlink directory")
     expected_entries = {"InstallLayout.json", PAYLOAD_MANIFEST_NAME, "Product"}
@@ -250,8 +262,13 @@ def verify_payload(payload_root: Path) -> None:
     layout_path = payload_root / "InstallLayout.json"
     if layout_path.read_bytes() != LAYOUT_PATH.read_bytes():
         raise InstallLayoutError("payload InstallLayout.json differs from committed layout")
-    layout = InstallLayout.load(layout_path)
-    expected = expected_payload_manifest(layout, payload_root / "Product", layout_path)
+    layout = InstallLayout.load(layout_path, product_metadata)
+    expected = expected_payload_manifest(
+        layout,
+        payload_root / "Product",
+        layout_path,
+        product_metadata,
+    )
     try:
         actual = json.loads(
             (payload_root / PAYLOAD_MANIFEST_NAME).read_text(encoding="utf-8")
@@ -262,9 +279,13 @@ def verify_payload(payload_root: Path) -> None:
         raise InstallLayoutError("install payload manifest does not match payload contents")
 
 
-def assemble_payload(product_root: Path, output: Path) -> None:
-    layout = InstallLayout.load()
-    verify_product_root(layout, product_root)
+def assemble_payload(
+    product_root: Path,
+    output: Path,
+    product_metadata: product_manifest.ProductMetadata | None = None,
+) -> None:
+    layout = InstallLayout.load(product_metadata=product_metadata)
+    verify_product_root(layout, product_root, product_metadata)
     if output.exists() or output.is_symlink():
         raise InstallLayoutError("install payload output already exists")
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -276,16 +297,20 @@ def assemble_payload(product_root: Path, output: Path) -> None:
     try:
         shutil.copytree(product_root, staging / "Product", symlinks=True)
         shutil.copy2(LAYOUT_PATH, staging / "InstallLayout.json", follow_symlinks=False)
-        copied_layout = InstallLayout.load(staging / "InstallLayout.json")
+        copied_layout = InstallLayout.load(
+            staging / "InstallLayout.json",
+            product_metadata,
+        )
         write_json(
             staging / PAYLOAD_MANIFEST_NAME,
             expected_payload_manifest(
                 copied_layout,
                 staging / "Product",
                 staging / "InstallLayout.json",
+                product_metadata,
             ),
         )
-        verify_payload(staging)
+        verify_payload(staging, product_metadata)
         os.rename(staging, output)
     except Exception:
         shutil.rmtree(staging, ignore_errors=True)
@@ -303,8 +328,10 @@ def parse_args() -> argparse.Namespace:
     assemble_parser = subparsers.add_parser("assemble")
     assemble_parser.add_argument("--product-root", required=True, type=Path)
     assemble_parser.add_argument("--output", required=True, type=Path)
+    assemble_parser.add_argument("--metadata", type=Path)
     verify_parser = subparsers.add_parser("verify")
     verify_parser.add_argument("--payload-root", required=True, type=Path)
+    verify_parser.add_argument("--metadata", type=Path)
     return parser.parse_args()
 
 
@@ -319,10 +346,20 @@ def main() -> int:
             print(value)
             return 0
         if args.command == "assemble":
-            assemble_payload(args.product_root, args.output)
+            metadata = (
+                product_manifest.ProductMetadata.load(args.metadata)
+                if args.metadata
+                else None
+            )
+            assemble_payload(args.product_root, args.output, metadata)
             return 0
         if args.command == "verify":
-            verify_payload(args.payload_root)
+            metadata = (
+                product_manifest.ProductMetadata.load(args.metadata)
+                if args.metadata
+                else None
+            )
+            verify_payload(args.payload_root, metadata)
             return 0
     except InstallLayoutError as exc:
         raise SystemExit(str(exc)) from exc

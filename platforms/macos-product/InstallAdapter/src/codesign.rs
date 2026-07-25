@@ -100,6 +100,10 @@ pub struct CodesignCodeSignatureVerifier {
     requirements: CodeSignatureRequirements,
 }
 
+#[cfg(feature = "qualification-harness")]
+#[derive(Debug, Default)]
+pub(crate) struct CodesignQualificationCodeSignatureVerifier;
+
 impl CodesignCodeSignatureVerifier {
     pub const fn new(requirements: CodeSignatureRequirements) -> Self {
         Self { requirements }
@@ -180,6 +184,40 @@ impl MacOsCodeSignatureVerifier for CodesignCodeSignatureVerifier {
     }
 }
 
+#[cfg(feature = "qualification-harness")]
+impl MacOsCodeSignatureVerifier for CodesignQualificationCodeSignatureVerifier {
+    fn verify(
+        &self,
+        bundle: &std::path::Path,
+        component: ProgramComponent,
+        expected_bundle_id: &str,
+    ) -> Result<MacOsCodeIdentity, MacOsInstallAdapterError> {
+        if !bundle.is_absolute() || !valid_bundle_id(expected_bundle_id) {
+            return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
+        }
+        let verified = Command::new(CODESIGN_PATH)
+            .env_clear()
+            .args(["--verify", "--deep", "--strict"])
+            .arg(bundle)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map_err(|_| error(MacOsInstallAdapterErrorCode::SignatureRejected))?;
+        if !verified.success() {
+            return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
+        }
+        let parsed = inspect_qualification_code_identity(bundle)?;
+        if parsed.identifier != expected_bundle_id {
+            return Err(error(
+                MacOsInstallAdapterErrorCode::SignatureIdentityChanged,
+            ));
+        }
+        let evidence_sha256 = parsed.evidence_sha256(component);
+        MacOsCodeIdentity::new(parsed.identifier, evidence_sha256)
+    }
+}
+
 fn inspect_code_identity(
     bundle: &std::path::Path,
 ) -> Result<ParsedCodeIdentity, MacOsInstallAdapterError> {
@@ -191,14 +229,54 @@ fn inspect_code_identity(
         .output()
         .map_err(|_| error(MacOsInstallAdapterErrorCode::SignatureRejected))?;
     if !output.status.success()
-        || !output.stdout.is_empty()
+        || output.stdout.is_empty()
+        || output.stdout.len() > MAX_REQUIREMENT_BYTES
         || output.stderr.len() > MAX_CODESIGN_OUTPUT_BYTES
     {
         return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
     }
-    let details = std::str::from_utf8(&output.stderr)
+    let details = combined_codesign_details(&output.stderr, &output.stdout)?;
+    ParsedCodeIdentity::parse(&details)
+}
+
+fn combined_codesign_details(
+    identity_output: &[u8],
+    requirement_output: &[u8],
+) -> Result<String, MacOsInstallAdapterError> {
+    let identity = std::str::from_utf8(identity_output)
         .map_err(|_| error(MacOsInstallAdapterErrorCode::SignatureRejected))?;
-    ParsedCodeIdentity::parse(details)
+    let requirement = std::str::from_utf8(requirement_output)
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::SignatureRejected))?;
+    if identity.as_bytes().contains(&0)
+        || requirement.as_bytes().contains(&0)
+        || identity.contains('\r')
+        || requirement.contains('\r')
+    {
+        return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
+    }
+    Ok(format!("{identity}\n{requirement}"))
+}
+
+#[cfg(feature = "qualification-harness")]
+fn inspect_qualification_code_identity(
+    bundle: &std::path::Path,
+) -> Result<ParsedCodeIdentity, MacOsInstallAdapterError> {
+    let output = Command::new(CODESIGN_PATH)
+        .env_clear()
+        .args(["-d", "--verbose=4", "-r-"])
+        .arg(bundle)
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::SignatureRejected))?;
+    if !output.status.success()
+        || output.stdout.is_empty()
+        || output.stdout.len() > MAX_REQUIREMENT_BYTES
+        || output.stderr.len() > MAX_CODESIGN_OUTPUT_BYTES
+    {
+        return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
+    }
+    let details = combined_codesign_details(&output.stderr, &output.stdout)?;
+    ParsedCodeIdentity::parse_qualification(&details)
 }
 
 struct ParsedCodeIdentity {
@@ -212,28 +290,50 @@ struct ParsedCodeIdentity {
 
 impl ParsedCodeIdentity {
     fn parse(details: &str) -> Result<Self, MacOsInstallAdapterError> {
-        Ok(Self {
+        let parsed = Self {
             identifier: unique_value(details, "Identifier=")?,
             team_identifier: unique_value(details, "TeamIdentifier=")?,
             cdhash: unique_value(details, "CDHash=")?,
             signature: unique_line(details, "Signature")?,
             code_directory: unique_line(details, "CodeDirectory ")?,
-            designated_requirement: unique_value(details, "designated => ")?,
-        })
-        .and_then(|parsed| {
-            if valid_bundle_id(&parsed.identifier)
-                && parsed.team_identifier.len() == 10
-                && valid_cdhash(&parsed.cdhash)
-                && !parsed.signature.is_empty()
-                && parsed.signature.len() <= 256
-                && parsed.code_directory.len() <= 1024
-                && valid_requirement(&parsed.designated_requirement)
-            {
-                Ok(parsed)
-            } else {
-                Err(error(MacOsInstallAdapterErrorCode::SignatureRejected))
-            }
-        })
+            designated_requirement: unique_designated_requirement(details)?,
+        };
+        if parsed.has_valid_common_fields() && parsed.team_identifier.len() == 10 {
+            Ok(parsed)
+        } else {
+            Err(error(MacOsInstallAdapterErrorCode::SignatureRejected))
+        }
+    }
+
+    #[cfg(feature = "qualification-harness")]
+    fn parse_qualification(details: &str) -> Result<Self, MacOsInstallAdapterError> {
+        let parsed = Self {
+            identifier: unique_value(details, "Identifier=")?,
+            team_identifier: unique_value(details, "TeamIdentifier=")?,
+            cdhash: unique_value(details, "CDHash=")?,
+            signature: unique_line(details, "Signature")?,
+            code_directory: unique_line(details, "CodeDirectory ")?,
+            designated_requirement: unique_designated_requirement(details)?,
+        };
+        if parsed.has_valid_common_fields()
+            && parsed.team_identifier == "not set"
+            && parsed.signature == "Signature=adhoc"
+            && parsed.code_directory.contains(" flags=0x2(adhoc) ")
+            && valid_ad_hoc_requirement(&parsed.designated_requirement, &parsed.cdhash)
+        {
+            Ok(parsed)
+        } else {
+            Err(error(MacOsInstallAdapterErrorCode::SignatureRejected))
+        }
+    }
+
+    fn has_valid_common_fields(&self) -> bool {
+        valid_bundle_id(&self.identifier)
+            && valid_cdhash(&self.cdhash)
+            && !self.signature.is_empty()
+            && self.signature.len() <= 256
+            && self.code_directory.len() <= 1024
+            && valid_requirement(&self.designated_requirement)
     }
 
     fn evidence_sha256(&self, component: ProgramComponent) -> String {
@@ -260,9 +360,45 @@ impl ParsedCodeIdentity {
     }
 }
 
+#[cfg(feature = "qualification-harness")]
+fn valid_ad_hoc_requirement(value: &str, primary_cdhash: &str) -> bool {
+    let mut found_primary = false;
+    let clauses: Vec<_> = value.split(" or ").collect();
+    if clauses.is_empty() || clauses.len() > 16 {
+        return false;
+    }
+    for clause in clauses {
+        let Some(hash) = clause
+            .strip_prefix("cdhash H\"")
+            .and_then(|value| value.strip_suffix('"'))
+        else {
+            return false;
+        };
+        if !valid_cdhash(hash) {
+            return false;
+        }
+        found_primary |= hash.eq_ignore_ascii_case(primary_cdhash);
+    }
+    found_primary
+}
+
 fn unique_value(details: &str, prefix: &str) -> Result<String, MacOsInstallAdapterError> {
     let line = unique_line(details, prefix)?;
     Ok(line[prefix.len()..].to_owned())
+}
+
+fn unique_designated_requirement(details: &str) -> Result<String, MacOsInstallAdapterError> {
+    let mut matching = details.lines().filter_map(|line| {
+        line.strip_prefix("# designated => ")
+            .or_else(|| line.strip_prefix("designated => "))
+    });
+    let requirement = matching
+        .next()
+        .ok_or_else(|| error(MacOsInstallAdapterErrorCode::SignatureRejected))?;
+    if matching.next().is_some() || !valid_requirement(requirement) {
+        return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
+    }
+    Ok(requirement.to_owned())
 }
 
 fn unique_line(details: &str, prefix: &str) -> Result<String, MacOsInstallAdapterError> {
@@ -396,5 +532,45 @@ mod tests {
         )
         .is_err());
         assert!(CodeSignatureRequirements::new("ZZZZZZZZZZ", manager, input_method,).is_err());
+    }
+
+    #[cfg(feature = "qualification-harness")]
+    #[test]
+    fn qualification_parser_accepts_only_bounded_ad_hoc_identity() {
+        let details = concat!(
+            "Identifier=dev.radishlex.radishlexManager\n",
+            "CodeDirectory v=20400 size=663 flags=0x2(adhoc) hashes=10+7 location=embedded\n",
+            "CDHash=0123456789abcdef0123456789abcdef01234567\n",
+            "Signature=adhoc\n",
+            "TeamIdentifier=not set\n",
+            "# designated => cdhash H\"0123456789abcdef0123456789abcdef01234567\"\n",
+        );
+        assert!(ParsedCodeIdentity::parse_qualification(details).is_ok());
+        assert!(ParsedCodeIdentity::parse(details).is_err());
+        assert!(ParsedCodeIdentity::parse_qualification(
+            &details.replace("Signature=adhoc", "Signature size=9000")
+        )
+        .is_err());
+        assert!(ParsedCodeIdentity::parse_qualification(
+            &details.replace("flags=0x2(adhoc)", "flags=0x10000(runtime)")
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn combines_real_codesign_output_streams_without_ambiguity() {
+        let stderr = concat!(
+            "Identifier=dev.radishlex.radishlexManager\n",
+            "CodeDirectory v=20400 size=663 flags=0x2(adhoc) hashes=10+7 location=embedded\n",
+            "CDHash=0123456789abcdef0123456789abcdef01234567\n",
+            "Signature=adhoc\n",
+            "TeamIdentifier=not set\n",
+        );
+        let stdout = "# designated => cdhash H\"0123456789abcdef0123456789abcdef01234567\"\n";
+        let details = combined_codesign_details(stderr.as_bytes(), stdout.as_bytes())
+            .expect("combine codesign streams");
+        #[cfg(feature = "qualification-harness")]
+        assert!(ParsedCodeIdentity::parse_qualification(&details).is_ok());
+        assert!(unique_designated_requirement(&format!("{details}{stdout}")).is_err());
     }
 }

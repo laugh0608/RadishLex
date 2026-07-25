@@ -211,7 +211,8 @@ Apple 官方边界参考：
 8. M4-P03 已固定 DMG + 独立用户域 Installer、两个目标路径、InstallPayload manifest、外层 receipt/guard、双 bundle 程序切换恢复和 macOS manifest/code-signature adapter；
 9. M4-P03 已用独立组合层绑定双 receipt/guard、数据协调结果、installed target 持续复验和 source 程序一致回滚；
 10. 已完成外层两段产品终态动作、upgrade data receipt/双 guard 最终绑定、ABI v9 外层只读 gate 与双端最前置接线；
-11. 下一步建立隔离端到端恢复门禁，再进入 Installer UI、发布身份与授权实机验收。
+11. 已建立隔离双 bundle + 合成 Application Support 的端到端恢复门禁，覆盖程序部分提交、数据失败回滚、两段终态中断与双端启动决策；
+12. 下一步固定 Installer UI/驱动 contract，再进入发布身份与授权实机验收。
 
 ## M4-P01 退出标准
 

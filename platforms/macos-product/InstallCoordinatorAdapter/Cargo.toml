@@ -7,6 +7,15 @@ repository.workspace = true
 license-file = "../../../LICENSE"
 description = "Guard-bound macOS composition for product programs and data upgrades."
 
+[features]
+default = []
+qualification-harness = [
+    "dep:radishlex-macos-product-install",
+    "dep:radishlex-macos-upgrade-coordinator",
+    "radishlex-macos-product-install/qualification-harness",
+    "radishlex-macos-upgrade-coordinator/qualification-harness",
+]
+
 [lib]
 name = "radishlex_macos_product_install_coordinator"
 path = "src/lib.rs"
@@ -14,6 +23,8 @@ path = "src/lib.rs"
 [dependencies]
 radishlex-ime-product-install = { path = "../../../crates/ime-product-install" }
 radishlex-ime-product-upgrade = { path = "../../../crates/ime-product-upgrade" }
+radishlex-macos-product-install = { path = "../InstallAdapter", optional = true }
+radishlex-macos-upgrade-coordinator = { path = "../UpgradeCoordinatorAdapter", optional = true }
 
 [dev-dependencies]
 radishlex-ime-userdb = { path = "../../../crates/ime-userdb" }

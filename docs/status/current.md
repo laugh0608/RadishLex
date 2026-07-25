@@ -16,7 +16,7 @@ M4-P02 已闭合只读 inspection、SQLite 一致快照、隔离 migration candi
 
 隔离产品协调资格已用真实 Manager/InputMethod 装配和 helper 在合成 Application Support 上覆盖完整成功、Manager/InputMethod 端点失败、静止丢失后续跑、切换后回滚、source evidence 暂不可得后的重启恢复和临时根清理。InputMethod 只把锁定 YAML 部署到短生命周期验证 user data；产品 RimeData、candidate 和 Application Support 保持只读。首发 source qualification 具有独立版本、签名和 manifest，但使用当前 native code/schema；它证明 source/target 路由与恢复编排，不冒充尚不存在的历史发布二进制。未来形成实际上一版发布包后，真实跨发布 source bundle 复验必须成为后续升级门禁。
 
-M4-P03 已接受 DMG + 独立用户域 Installer app：Manager、InputMethod 和 install state 固定在 current-user home 下，不请求管理员权限，也不让 `.pkg` script 承担明文数据协调。committed `install-layout.json` 与确定性 `InstallPayloadManifest.json` 已绑定产品 manifest、版本/build、Installer bundle ID、两个安装目标和默认保留数据语义；7 项 contract 覆盖确定性装配、额外文件、内容变更、layout 替换、bundle symlink 和覆盖拒绝。该 payload 仍不是 Installer/DMG，不证明签名、公证或真实安装。
+M4-P03 已接受 DMG + 独立用户域 Installer app：Manager、InputMethod 和 install state 固定在 current-user home 下，不请求管理员权限，也不让 `.pkg` script 承担明文数据协调。committed `install-layout.json` 与确定性 `InstallPayloadManifest.json` 已绑定产品 manifest、版本/build、Installer bundle ID、两个安装目标和默认保留数据语义；8 项 contract 覆盖确定性装配、显式 source release metadata、额外文件、内容变更、layout 替换、bundle symlink 和覆盖拒绝。该 payload 仍不是 Installer/DMG，不证明签名、公证或真实安装。
 
 独立 `ime-product-install` 已固定首次安装、升级、修复和默认程序移除的 source/target 关系，以及 `prepared` 到三类终态的外层状态机。严格 receipt 绑定 data-root identity、ProductManifest/bundle tree/code identity hash、source/staged/backup/installed 文件系统身份和 previous-operation chain；原子存储与 Unix socket guard 拒绝中断写、未知对象、身份漂移和并发 operation。两个 component 各自在目标父目录使用 `0700` 私有事务目录，核心按精确 inode 执行 source preserve、Manager/InputMethod 逐端 rename/fsync 和程序 rollback。27 项合成测试覆盖四类终态、首次安装与移除恢复、升级部分提交恢复，以及 preserve/commit/rollback 每个 rename、目标目录 fsync、源目录 fsync 边界；不触碰真实 bundle、Application Support 或用户域安装目标。
 
@@ -25,6 +25,8 @@ M4-P03 已接受 DMG + 独立用户域 Installer app：Manager、InputMethod 和
 独立 `radishlex-macos-product-install-coordinator` 已在不合并两个核心的前提下绑定同一 operation ID、Application Support inode、source/target release、双 receipt 与双 guard。M4-P02 每个 quiescence checkpoint 同时复验 installed target 双 bundle；数据 `completed` 映射外层 `data_settled`，数据 `aborted_preserved` / `rolled_back` 则在 source 双程序精确恢复和逻辑身份复验后映射外层 `rolled_back`。12 项合成测试覆盖成功、两段终态、candidate/post-switch 失败、静止丢失、target/source 身份暂不可得、重启续跑、未持久化双 receipt 状态及 operation/release/root 绑定拒绝。
 
 外层终态现由四类 operation 共用的两段动作推进：每次先复验当前 receipt/guard、双 `ProgramSwitchStore` 与最终程序结果，再分别持久化 `final_verified`、`completed`；upgrade 组合层还在两段前精确复验 data receipt/guard、Application Support identity、source/target release、data `completed` 和 installed 双 bundle。第二段中断会保留 `final_verified` 并在重启后重新取证续跑。ABI v9 新增独立 `radishlex_product_install_startup_gate`；Manager/InputMethod 均先执行外层 gate，再执行既有数据 gate，之后才允许 Flutter/IMK、settings、userdb 或 Rime 初始化。运行身份由当前 executable 的固定用户域 bundle、Info.plist、完整 tree 与 Developer ID code identity 形成，不接受 UI/settings/`HOME` 或调用方 identity 字段。
+
+隔离端到端恢复资格现复用真实 Manager/InputMethod 构建、独立 source/target ProductManifest 与 InstallPayload，在带精确 marker 的私有临时根和合成 Application Support 上串联程序切换、数据协调、两段终态与两层 startup gate。真实场景覆盖 `final_verified` 中断落盘后重启完成、candidate 失败后恢复 source 双 bundle、Manager 已提交而 InputMethod 未提交时重启续跑，以及 active guard、非终态、completed target/source 身份决策。qualification ad-hoc code identity 只在 Cargo feature、固定 marker、temp 后代、owner/mode/symlink 复验全部成立时可用；production Developer ID requirement 路径未放宽。门禁不安装产品、不访问真实用户目录，也不清理 staging、backup 或历史 operation 材料。
 
 M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
@@ -65,8 +67,8 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v9、userd
 
 ## 下一步顺位
 
-1. M4-P03 下一切面建立隔离双 bundle + 合成 Application Support 的端到端故障恢复门禁，组合程序切换、数据协调、两段终态、双端启动阻断和重启续跑。
-2. 完成成功、数据失败、程序恢复、双端启动阻断与重启续跑证据后，才进入 Installer UI、真实用户目录安装与发布供应链；这些动作继续需要独立授权。
+1. M4-P03 下一切面先固定独立 Installer app 的 UI/驱动边界、可重启 operation 展示、稳定错误与用户授权交互，不让 UI 成为 receipt、运行身份或路径真相源。
+2. Installer contract 与隔离驱动门禁完成后，再单独授权真实用户目录安装、进程停止/输入源交互、Developer ID/Hardened Runtime、公证、Gatekeeper 和 DMG 发布证据。
 3. 普通用户同步、恢复/授权/撤销/轮换继续关闭；在真实不支持 Secure Enclave 的环境可得时再补 unsupported，首版发布后且准备生产同步前再验收正式域名/证书。
 
 ## 验证入口

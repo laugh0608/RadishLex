@@ -29,4 +29,13 @@
 ./scripts/check-macos-install-coordinator.sh
 ```
 
-测试使用同一个合成 Application Support 根、合成双 bundle 和合成 userdb，覆盖成功、两段终态、`final_verified` 重启续跑、candidate 失败、post-switch 失败、静止丢失、target 身份漂移、source 身份暂不可得，以及 operation/release/root 绑定拒绝。不会访问真实用户目录、系统设置、签名身份、Keychain 或网络。
+普通测试使用同一个合成 Application Support 根、合成双 bundle 和合成 userdb，覆盖成功、两段终态、`final_verified` 重启续跑、candidate 失败、post-switch 失败、静止丢失、target 身份漂移、source 身份暂不可得，以及 operation/release/root 绑定拒绝。
+
+`qualification-harness` 集成测试由产品协调门禁提供受 marker 保护的系统临时根、独立 source/target ProductManifest/InstallPayload 和真实构建双 bundle。它覆盖：
+
+- data `completed` 后在 `final_verified` 中断，释放双 guard、回读双 receipt，再重新取证完成；
+- 真实双端 candidate host 成功后注入失败，精确恢复 source Manager/InputMethod，并只允许 source 运行身份；
+- Manager target 已提交而 InputMethod 尚未提交时释放 guard，外层 gate 阻止双端，再从 receipt 续跑到完整 target 终态；
+- active install/data guard、外层非终态与终态 target/source 身份的两层只读 gate 决策。
+
+资格入口只接受固定 temp marker、私有合成 home/payload 和严格 ad-hoc identity；production Developer ID 路径不变。两类测试均不会访问真实用户目录、系统设置、发布签名身份、Keychain 或网络，也不清理 staging/backup/历史 operation 材料。

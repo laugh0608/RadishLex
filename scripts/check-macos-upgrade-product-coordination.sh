@@ -5,6 +5,7 @@ script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
 adapter_dir="${repo_root}/platforms/macos-product/UpgradeCoordinatorAdapter"
 product_tool="${repo_root}/scripts/macos-product/product_manifest.py"
+install_layout_tool="${repo_root}/scripts/macos-product/install_layout.py"
 rime_data_tool="${repo_root}/scripts/rime-product/product_data.py"
 manager_bundle="${repo_root}/apps/radishlex-manager/build/macos/Build/Products/Release/radishlex_manager.app"
 input_method_bundle="${repo_root}/target/macos-imk/native/RadishLexInputMethod.app"
@@ -13,6 +14,8 @@ marker_source="${adapter_dir}/fixtures/qualification.marker"
 qualification_root="$(mktemp -d "${TMPDIR:-/tmp}/radishlex-upgrade-product-qualification.XXXXXX")"
 source_product="${qualification_root}/source-product"
 target_product="${qualification_root}/target-product"
+source_payload="${qualification_root}/source-payload"
+target_payload="${qualification_root}/target-payload"
 rime_data="${qualification_root}/RimeData"
 
 cleanup() {
@@ -104,6 +107,19 @@ python3 "${product_tool}" verify \
   --manifest "${source_product}/ProductManifest.json"
 
 chmod 700 "${source_product}" "${target_product}"
+python3 "${install_layout_tool}" assemble \
+  --metadata "${source_metadata}" \
+  --product-root "${source_product}" \
+  --output "${source_payload}"
+python3 "${install_layout_tool}" verify \
+  --metadata "${source_metadata}" \
+  --payload-root "${source_payload}"
+python3 "${install_layout_tool}" assemble \
+  --product-root "${target_product}" \
+  --output "${target_payload}"
+python3 "${install_layout_tool}" verify \
+  --payload-root "${target_payload}"
+chmod 700 "${source_payload}" "${target_payload}"
 (
   cd "${repo_root}"
   env \
@@ -116,4 +132,18 @@ chmod 700 "${source_product}" "${target_product}"
       -- --nocapture
 )
 
-echo "macOS upgrade product coordination qualification passed."
+(
+  cd "${repo_root}"
+  env \
+    RADISHLEX_INSTALL_QUALIFICATION_ROOT="${qualification_root}" \
+    RADISHLEX_INSTALL_QUALIFICATION_SOURCE_PRODUCT="${source_product}" \
+    RADISHLEX_INSTALL_QUALIFICATION_TARGET_PRODUCT="${target_product}" \
+    RADISHLEX_INSTALL_QUALIFICATION_SOURCE_PAYLOAD="${source_payload}" \
+    RADISHLEX_INSTALL_QUALIFICATION_TARGET_PAYLOAD="${target_payload}" \
+    cargo test --locked -p radishlex-macos-product-install-coordinator \
+      --features qualification-harness \
+      --test product_recovery \
+      -- --nocapture
+)
+
+echo "macOS upgrade product and install recovery qualification passed."

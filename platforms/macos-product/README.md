@@ -69,7 +69,7 @@ checkpoint 一律调用 target Manager 内的 `RadishLexUpgradePreflightHost`。
 
 M4-P02 的 manifest 绑定只解决“执行哪一代、哪一端产品代码”的内容确定性。安装载体仍须在 M4-P03 证明产品根来源、Developer ID 签名、公证和固定安装位置，不能把调用方传入的任意目录直接当作可信产品。
 
-`qualification-harness` Cargo feature 仅供隔离产品协调门禁。它要求 canonical temp 根下的固定 marker 与 `0700` 合成 user home，并只对子进程设置 `CFFIXED_USER_HOME`；普通 `load` 始终清除该变量。资格场景使用真实 manifest-bound helper，故障只在 helper 返回后的 port 结果边界注入。source qualification 与 target 使用同一份当前 native code/schema，但具有独立 bundle 版本、重新签名和 manifest，因此只证明产品路由与恢复编排，不替代历史 source binary 或旧 schema migration 测试。
+`qualification-harness` Cargo feature 仅供隔离产品协调与安装恢复门禁。它要求 canonical temp 根下的固定 marker 与 `0700` 合成 user home；升级 host 只对子进程设置 `CFFIXED_USER_HOME`，普通 `load` 始终清除该变量。安装 adapter 还要求 payload/home 都是该根内无 symlink、同 owner、精确 mode 的后代，并只在此边界接受严格 ad-hoc code identity；production Developer ID requirement 不提供 fallback。资格场景使用真实 manifest-bound helper/bundle，故障只在 port 结果边界注入。source qualification 与 target 使用同一份当前 native code/schema，但具有独立 bundle 版本、重新签名、ProductManifest 和 InstallPayload，因此只证明产品路由与恢复编排，不替代历史 source binary 或旧 schema migration 测试。
 
 ## InstallAdapter
 
@@ -101,7 +101,7 @@ InputMethod helper 由 bundle 构建入口装配并签名：
 ./scripts/check-macos-imk.sh
 ```
 
-完整协调资格会重新装配真实 Manager/InputMethod 产品和独立 source/target manifest，在合成 Application Support 上运行成功、双端失败、静止丢失、回滚及重启恢复：
+完整协调资格会重新装配真实 Manager/InputMethod 产品、独立 source/target manifest 与 InstallPayload。它先运行数据协调既有场景，再在合成 Application Support 上串联程序切换、数据协调、两段终态、startup gate、source 回滚和部分程序提交重启：
 
 ```bash
 ./scripts/check-macos-upgrade-product-coordination.sh
