@@ -3,7 +3,13 @@
 #![forbid(unsafe_code)]
 
 use std::fmt;
+#[cfg(feature = "qualification-harness")]
+use std::fs;
+#[cfg(feature = "qualification-harness")]
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
+#[cfg(feature = "qualification-harness")]
+use std::path::{Component, PathBuf};
 
 use radishlex_ime_product_upgrade::{
     ProductRelease, UpgradeCandidateValidationReport, UpgradeCoordinatorCheckpoint,
@@ -20,6 +26,10 @@ use manifest::{ProductRole, VerifiedExecutable, VerifiedProductAssembly};
 use runner::{HostMode, HostOutput, ProcessProductHostRunner, ProductHostRunner};
 
 const PREFLIGHT_FORMAT: &str = "radishlex-upgrade-preflight-v1";
+#[cfg(feature = "qualification-harness")]
+const QUALIFICATION_MARKER_FILE: &str = "radishlex-upgrade-qualification.marker";
+#[cfg(feature = "qualification-harness")]
+const QUALIFICATION_MARKER_BYTES: &[u8] = b"radishlex-upgrade-qualification-v1\n";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MacOsUpgradeAdapterError {
@@ -27,6 +37,8 @@ pub enum MacOsUpgradeAdapterError {
     InvalidManifest,
     ProductChanged,
     PreflightRejected,
+    #[cfg(feature = "qualification-harness")]
+    UnsafeQualification,
 }
 
 impl fmt::Display for MacOsUpgradeAdapterError {
@@ -36,6 +48,8 @@ impl fmt::Display for MacOsUpgradeAdapterError {
             Self::InvalidManifest => "macOS upgrade product manifest is invalid",
             Self::ProductChanged => "macOS upgrade product content changed",
             Self::PreflightRejected => "macOS upgrade preflight was not proven",
+            #[cfg(feature = "qualification-harness")]
+            Self::UnsafeQualification => "macOS upgrade qualification root is unsafe",
         };
         formatter.write_str(message)
     }
@@ -80,7 +94,43 @@ impl MacOsUpgradeCoordinatorAdapter {
         Ok(Self {
             source,
             target,
-            runner: Box::new(ProcessProductHostRunner),
+            runner: Box::new(ProcessProductHostRunner::production()),
+        })
+    }
+
+    #[cfg(feature = "qualification-harness")]
+    pub fn load_for_qualification(
+        source_product_root: &Path,
+        target_product_root: &Path,
+        qualification_root: &Path,
+        synthetic_user_home: &Path,
+    ) -> Result<Self, MacOsUpgradeAdapterError> {
+        let qualification_root_input = qualification_root.to_path_buf();
+        let qualification_root = verify_qualification_root(qualification_root)?;
+        let synthetic_user_home = verify_qualification_path(
+            &qualification_root_input,
+            &qualification_root,
+            synthetic_user_home,
+            0o700,
+        )?;
+        let source_product_root = verify_qualification_path(
+            &qualification_root_input,
+            &qualification_root,
+            source_product_root,
+            0o700,
+        )?;
+        let target_product_root = verify_qualification_path(
+            &qualification_root_input,
+            &qualification_root,
+            target_product_root,
+            0o700,
+        )?;
+        let source = VerifiedProductAssembly::load(&source_product_root, ProductRole::Source)?;
+        let target = VerifiedProductAssembly::load(&target_product_root, ProductRole::Target)?;
+        Ok(Self {
+            source,
+            target,
+            runner: Box::new(ProcessProductHostRunner::qualification(synthetic_user_home)),
         })
     }
 
@@ -229,6 +279,112 @@ fn parse_preflight(output: HostOutput) -> Result<MacOsUpgradePreflight, MacOsUpg
     Ok(MacOsUpgradePreflight {
         available_bytes: parsed.available_bytes,
     })
+}
+
+#[cfg(feature = "qualification-harness")]
+fn verify_qualification_root(root: &Path) -> Result<PathBuf, MacOsUpgradeAdapterError> {
+    let root_metadata =
+        fs::symlink_metadata(root).map_err(|_| MacOsUpgradeAdapterError::UnsafeQualification)?;
+    if root_metadata.file_type().is_symlink() || !root_metadata.is_dir() {
+        return Err(MacOsUpgradeAdapterError::UnsafeQualification);
+    }
+    let temp_root = fs::canonicalize(std::env::temp_dir())
+        .map_err(|_| MacOsUpgradeAdapterError::UnsafeQualification)?;
+    let root = fs::canonicalize(root).map_err(|_| MacOsUpgradeAdapterError::UnsafeQualification)?;
+    if root == temp_root || !root.starts_with(&temp_root) {
+        return Err(MacOsUpgradeAdapterError::UnsafeQualification);
+    }
+    let owner_id = verify_private_directory(&root)?;
+    let marker = root.join(QUALIFICATION_MARKER_FILE);
+    let metadata =
+        fs::symlink_metadata(&marker).map_err(|_| MacOsUpgradeAdapterError::UnsafeQualification)?;
+    if metadata.file_type().is_symlink()
+        || !metadata.is_file()
+        || metadata.uid() != owner_id
+        || metadata.nlink() != 1
+        || metadata.mode() & 0o7777 != 0o600
+        || fs::read(&marker).map_err(|_| MacOsUpgradeAdapterError::UnsafeQualification)?
+            != QUALIFICATION_MARKER_BYTES
+    {
+        return Err(MacOsUpgradeAdapterError::UnsafeQualification);
+    }
+    Ok(root)
+}
+
+#[cfg(feature = "qualification-harness")]
+fn verify_qualification_path(
+    qualification_root_input: &Path,
+    qualification_root: &Path,
+    path: &Path,
+    expected_mode: u32,
+) -> Result<PathBuf, MacOsUpgradeAdapterError> {
+    let relative = path
+        .strip_prefix(qualification_root_input)
+        .or_else(|_| path.strip_prefix(qualification_root))
+        .map_err(|_| MacOsUpgradeAdapterError::UnsafeQualification)?;
+    if relative.as_os_str().is_empty() {
+        return Err(MacOsUpgradeAdapterError::UnsafeQualification);
+    }
+    let mut current = if path.starts_with(qualification_root_input) {
+        qualification_root_input.to_path_buf()
+    } else {
+        qualification_root.to_path_buf()
+    };
+    for component in relative.components() {
+        if !matches!(component, Component::Normal(_)) {
+            return Err(MacOsUpgradeAdapterError::UnsafeQualification);
+        }
+        current.push(component.as_os_str());
+        let metadata = fs::symlink_metadata(&current)
+            .map_err(|_| MacOsUpgradeAdapterError::UnsafeQualification)?;
+        if metadata.file_type().is_symlink() {
+            return Err(MacOsUpgradeAdapterError::UnsafeQualification);
+        }
+    }
+    let canonical =
+        fs::canonicalize(path).map_err(|_| MacOsUpgradeAdapterError::UnsafeQualification)?;
+    if canonical == qualification_root || !canonical.starts_with(qualification_root) {
+        return Err(MacOsUpgradeAdapterError::UnsafeQualification);
+    }
+    let owner_id = fs::symlink_metadata(qualification_root)
+        .map_err(|_| MacOsUpgradeAdapterError::UnsafeQualification)?
+        .uid();
+    let mut current = qualification_root.to_path_buf();
+    let relative = canonical
+        .strip_prefix(qualification_root)
+        .map_err(|_| MacOsUpgradeAdapterError::UnsafeQualification)?;
+    let components: Vec<_> = relative.components().collect();
+    for (index, component) in components.iter().enumerate() {
+        if !matches!(component, Component::Normal(_)) {
+            return Err(MacOsUpgradeAdapterError::UnsafeQualification);
+        }
+        current.push(component.as_os_str());
+        let metadata = fs::symlink_metadata(&current)
+            .map_err(|_| MacOsUpgradeAdapterError::UnsafeQualification)?;
+        if metadata.file_type().is_symlink()
+            || metadata.uid() != owner_id
+            || (index + 1 < components.len() && !metadata.is_dir())
+        {
+            return Err(MacOsUpgradeAdapterError::UnsafeQualification);
+        }
+    }
+    let metadata = fs::symlink_metadata(&canonical)
+        .map_err(|_| MacOsUpgradeAdapterError::UnsafeQualification)?;
+    if !metadata.is_dir() || metadata.mode() & 0o7777 != expected_mode {
+        return Err(MacOsUpgradeAdapterError::UnsafeQualification);
+    }
+    Ok(canonical)
+}
+
+#[cfg(feature = "qualification-harness")]
+fn verify_private_directory(path: &Path) -> Result<u32, MacOsUpgradeAdapterError> {
+    let metadata =
+        fs::symlink_metadata(path).map_err(|_| MacOsUpgradeAdapterError::UnsafeQualification)?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() || metadata.mode() & 0o7777 != 0o700
+    {
+        return Err(MacOsUpgradeAdapterError::UnsafeQualification);
+    }
+    Ok(metadata.uid())
 }
 
 #[cfg(test)]

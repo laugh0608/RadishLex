@@ -362,6 +362,59 @@ fn helper_parent_symlink_and_added_hardlink_are_rejected() {
     assert!(state.borrow().calls.is_empty());
 }
 
+#[cfg(feature = "qualification-harness")]
+#[test]
+fn qualification_requires_private_temp_root_and_exact_marker() {
+    let fixture = Fixture::new();
+    set_directory_mode(&fixture.root, 0o700);
+    set_directory_mode(&fixture.source, 0o700);
+    set_directory_mode(&fixture.target, 0o700);
+    let home = fixture.root.join("synthetic-home");
+    fs::create_dir(&home).expect("create synthetic home");
+    set_directory_mode(&home, 0o700);
+    let marker = fixture.root.join("radishlex-upgrade-qualification.marker");
+    fs::write(&marker, b"radishlex-upgrade-qualification-v1\n").expect("write marker");
+    let mut marker_permissions = fs::metadata(&marker)
+        .expect("marker metadata")
+        .permissions();
+    marker_permissions.set_mode(0o600);
+    fs::set_permissions(&marker, marker_permissions).expect("set marker mode");
+
+    MacOsUpgradeCoordinatorAdapter::load_for_qualification(
+        &fixture.source,
+        &fixture.target,
+        &fixture.root,
+        &home,
+    )
+    .expect("load qualification adapter");
+
+    fs::write(&marker, b"wrong-marker\n").expect("replace marker");
+    assert_eq!(
+        MacOsUpgradeCoordinatorAdapter::load_for_qualification(
+            &fixture.source,
+            &fixture.target,
+            &fixture.root,
+            &home,
+        )
+        .expect_err("wrong marker must fail"),
+        MacOsUpgradeAdapterError::UnsafeQualification
+    );
+
+    fs::write(&marker, b"radishlex-upgrade-qualification-v1\n").expect("restore marker");
+    let linked_home = fixture.root.join("linked-home");
+    symlink(&home, &linked_home).expect("link synthetic home");
+    assert_eq!(
+        MacOsUpgradeCoordinatorAdapter::load_for_qualification(
+            &fixture.source,
+            &fixture.target,
+            &fixture.root,
+            &linked_home,
+        )
+        .expect_err("symlinked home must fail"),
+        MacOsUpgradeAdapterError::UnsafeQualification
+    );
+}
+
 fn write_product(root: &Path, version: &str, build: &str, schema: u32, include_preflight: bool) {
     let manager = root.join("Components/radishlex_manager.app");
     let input_method = root.join("Components/RadishLexInputMethod.app");
@@ -454,6 +507,15 @@ fn set_executable(path: &Path) {
     let mut permissions = fs::metadata(path).expect("host metadata").permissions();
     permissions.set_mode(0o755);
     fs::set_permissions(path, permissions).expect("set executable");
+}
+
+#[cfg(feature = "qualification-harness")]
+fn set_directory_mode(path: &Path, mode: u32) {
+    let mut permissions = fs::metadata(path)
+        .expect("directory metadata")
+        .permissions();
+    permissions.set_mode(mode);
+    fs::set_permissions(path, permissions).expect("set directory mode");
 }
 
 fn ready_preflight(available_bytes: u64) -> HostOutput {

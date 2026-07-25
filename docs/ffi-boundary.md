@@ -66,7 +66,7 @@ Apple 产品验证使用独立原生自检结构：普通 DPK 的 `radishlex_app
 
 `radishlex_product_upgrade_startup_gate` 使用 startup request/result v1，只读检查固定 data root 和升级状态目录。数据根或状态目录不存在、以及 receipt 已处于终态时允许启动；active guard、非终态或损坏 receipt、中断 artifact、未知对象、unsafe root/state 和身份漂移必须失败关闭。调用不得创建目录、修改权限、清理现场或打开 userdb/settings/Rime runtime，产品必须在任何业务初始化之前消费结果。
 
-`radishlex_manager_upgrade_validate_candidate` 与 `radishlex_input_method_upgrade_validate_candidate` 使用 validation request/evidence/summary v1。两者只接受原生 host 解析的固定 migration candidate：Manager 复用真实管理查询和 settings v1 兼容检查，InputMethod 复用 native Rime、personalized runtime 与只读候选信号；两端都不得学习、同步、写 settings、修改 candidate 或留下 WAL/SHM/journal。validation evidence 由协调器在 guard、receipt、candidate identity 与 sidecar 仍一致时消费，成功才能推进 `candidate_verified`，明确失败进入 `aborted_preserved`。这些入口不属于普通 Dart UI 或输入热路径，也不接受调用方自定义路径。
+`radishlex_manager_upgrade_validate_candidate` 与 `radishlex_input_method_upgrade_validate_candidate` 使用 validation request/evidence/summary v1。两者只接受原生 host 解析的固定 migration candidate：Manager 复用真实管理查询和 settings v1 兼容检查；InputMethod 复用 native Rime、personalized runtime 与只读候选信号，bundle 内锁定 YAML 只部署到调用方创建且随后删除的隔离 Rime user data。两端都不得学习、同步、写 settings、修改 candidate、产品 RimeData 或 Application Support，也不得留下 WAL/SHM/journal。validation evidence 由协调器在 guard、receipt、candidate identity 与 sidecar 仍一致时消费，成功才能推进 `candidate_verified`，明确失败进入 `aborted_preserved`。这些入口不属于普通 Dart UI 或输入热路径，也不接受调用方自定义路径。
 
 结构布局、具名常量、字符串生命周期和 host 到协调器的证据转换见 [产品升级 FFI 参考](ffi-product-upgrade-reference.md)。
 

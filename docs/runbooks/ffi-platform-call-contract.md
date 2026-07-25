@@ -265,7 +265,7 @@ radishlex_input_method_upgrade_validate_candidate(request_v1, summary_v1, error_
 
 规则：
 
-- Manager host 固定 candidate/settings 路径，验证 current-schema 管理查询与 settings format v1 兼容；InputMethod host 固定 candidate、本 bundle RimeData/schema 与隔离临时 Rime user data。
+- Manager host 固定 candidate/settings 路径，验证 current-schema 管理查询与 settings format v1 兼容；InputMethod host 固定 candidate、本 bundle 只读 RimeData/schema 与隔离临时 Rime user data。锁定 YAML 只允许部署到该临时目录，不能写入 bundle、Application Support 或 candidate。
 - 两个 FFI request 的路径字段只用于原生 host 到 Rust 的窄调用边界，不授权上层接受任意路径；host 必须自行解析固定产品位置并拒绝参数。
 - validation summary version 固定为 v1。Manager 只能设置 management/settings check，InputMethod 只能设置 personalized runtime/candidate signal check；schema 必须与 receipt 目标一致。
 - candidate 必须保持全字节不变，调用前后都不得存在 WAL/SHM/journal；不得产生选择、负反馈、导入、同步或 settings 写入。

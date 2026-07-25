@@ -216,7 +216,7 @@ unsafe fn validate_input_method_candidate(
     let db = UserDb::open_read_only_current(&candidate)?;
     let schema_version = db.schema_version()?;
     let config = RimeEngineConfig::new(shared, user_data, SchemaId::new(schema)?)?
-        .with_deploy_on_start(false);
+        .with_deploy_on_start(true);
     let engine = RimeEngine::new(config)?;
     let mut session = PersonalizedInputSession::with_userdb(engine, db, "upgrade-validation-v1")?;
     session.set_learning_context(LearningContext::new("general")?.with_privacy_mode(true));

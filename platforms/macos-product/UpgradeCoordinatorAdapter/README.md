@@ -18,4 +18,7 @@ adapter 实现 `UpgradeCoordinatorPort`，把平台无关协调核心绑定到�
 
 ```bash
 ./scripts/check-macos-upgrade-coordinator.sh
+./scripts/check-macos-upgrade-product-coordination.sh
 ```
+
+前者验证 adapter contract 和 feature 编译边界；后者重新装配真实双端产品，只在私有合成 user home/Application Support 中执行 manifest-bound 协调资格，不读取真实用户目录，也不安装或启动 GUI 产品。

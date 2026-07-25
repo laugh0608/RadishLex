@@ -49,7 +49,7 @@ Manager host 的 candidate 模式固定读取：
 
 post-switch 模式改为读取固定 `userdb.sqlite3` 与 `manager-settings.json`。两种模式都通过 ABI v8 执行 current-schema 只读连接、active/deleted/import/learning 管理查询和 settings format v1 类型兼容检查。
 
-InputMethod host 按同一模式选择 candidate 或最终固定数据库，并从自身 bundle 解析 `Resources/RimeData`、schema 和 native library。它创建短生命周期 `0700` 临时 Rime user data，以 privacy mode 创建 personalized runtime、输入固定合成码并读取候选信号；不选择、不提交、不学习。临时 Rime data 必须在退出前删除。
+InputMethod host 按同一模式选择 candidate 或最终固定数据库，并从自身 bundle 解析 `Resources/RimeData`、schema 和 native library。它创建短生命周期 `0700` 临时 Rime user data，只把 bundle 内锁定 YAML 的部署产物写入该目录，不修改只读产品 `RimeData`、candidate 或 Application Support；随后以 privacy mode 创建 personalized runtime、输入固定合成码并读取候选信号，不选择、不提交、不学习。临时 Rime data 必须在退出前删除。
 
 两端都在调用前后比较目标数据库全字节，并在调用前后拒绝 `-wal`、`-shm`、`-journal`。非法参数、目标缺失/损坏、summary version/check bit 不匹配、数据库字节变化、sidecar 或临时目录清理失败都返回非零。
 
@@ -63,6 +63,8 @@ checkpoint 一律调用 target Manager 内的 `RadishLexUpgradePreflightHost`。
 
 M4-P02 的 manifest 绑定只解决“执行哪一代、哪一端产品代码”的内容确定性。安装载体仍须在 M4-P03 证明产品根来源、Developer ID 签名、公证和固定安装位置，不能把调用方传入的任意目录直接当作可信产品。
 
+`qualification-harness` Cargo feature 仅供隔离产品协调门禁。它要求 canonical temp 根下的固定 marker 与 `0700` 合成 user home，并只对子进程设置 `CFFIXED_USER_HOME`；普通 `load` 始终清除该变量。资格场景使用真实 manifest-bound helper，故障只在 helper 返回后的 port 结果边界注入。source qualification 与 target 使用同一份当前 native code/schema，但具有独立 bundle 版本、重新签名和 manifest，因此只证明产品路由与恢复编排，不替代历史 source binary 或旧 schema migration 测试。
+
 ## 构建与验证
 
 Manager helper 由 Xcode native library 嵌入阶段构建并签名：
@@ -75,6 +77,12 @@ InputMethod helper 由 bundle 构建入口装配并签名：
 
 ```bash
 ./scripts/check-macos-imk.sh
+```
+
+完整协调资格会重新装配真实 Manager/InputMethod 产品和独立 source/target manifest，在合成 Application Support 上运行成功、双端失败、静止丢失、回滚及重启恢复：
+
+```bash
+./scripts/check-macos-upgrade-product-coordination.sh
 ```
 
 两个产品门禁都会先执行 `UpgradeValidationHosts/check.sh`，验证仅允许的两种参数形式和固定路径映射，并拒绝任意路径及多余参数。带真实 native Rime 的候选信号验证仍需使用隔离的 locked RimeData 和产品门禁；不得把 `RADISHLEX_RIME_SHARED_DATA` 指向用户 Rime 或 RadishLex Application Support。上述普通检查不安装、不启动真实 Manager/InputMethod，也不调度 validation host 访问真实 candidate。

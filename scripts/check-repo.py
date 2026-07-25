@@ -47,6 +47,7 @@ REQUIRED_FILES = [
     "docs/roadmap.md",
     "docs/technical-plan.md",
     "docs/macos-product-package-boundary.md",
+    "docs/macos-data-upgrade-coordinator.md",
     "docs/adr/0007-apple-secure-enclave-p256-backend.md",
     "docs/runbooks/apple-secure-enclave-p256-backend.md",
     "docs/runbooks/apple-secure-enclave-key-agreement-backend.md",
@@ -63,6 +64,11 @@ REQUIRED_FILES = [
     "platforms/macos-product/UpgradePreflightHost/Tests/contract_smoke.m",
     "platforms/macos-product/UpgradePreflightHost/build.sh",
     "platforms/macos-product/UpgradePreflightHost/check.sh",
+    "platforms/macos-product/UpgradeCoordinatorAdapter/Cargo.toml",
+    "platforms/macos-product/UpgradeCoordinatorAdapter/src/lib.rs",
+    "platforms/macos-product/UpgradeCoordinatorAdapter/tests/product_coordination.rs",
+    "platforms/macos-product/UpgradeCoordinatorAdapter/fixtures/qualification.marker",
+    "platforms/macos-product/UpgradeCoordinatorAdapter/fixtures/source-product.json",
     "scripts/check-android-target.py",
     "scripts/check-android-target.sh",
     "scripts/check-docs.py",
@@ -72,6 +78,8 @@ REQUIRED_FILES = [
     "scripts/build-macos-product.sh",
     "scripts/check-macos-product-metadata.sh",
     "scripts/check-macos-upgrade-preflight.sh",
+    "scripts/check-macos-upgrade-coordinator.sh",
+    "scripts/check-macos-upgrade-product-coordination.sh",
     "scripts/check-manager.sh",
     "scripts/build-manager-macos-product.sh",
     "scripts/build-manager-macos-dpk-qualified-product.sh",
@@ -273,7 +281,7 @@ def check_macos_product_metadata() -> None:
 def check_macos_upgrade_preflight() -> None:
     if sys.platform != "darwin":
         return
-    run_command([str(REPO_ROOT / "scripts/check-macos-upgrade-preflight.sh")])
+    run_command([str(REPO_ROOT / "scripts/check-macos-upgrade-coordinator.sh")])
 
 
 def required_status_contexts(ruleset: dict[str, Any]) -> set[str]:

@@ -30,7 +30,7 @@
 
 data root 不存在、升级状态目录/receipt 不存在或 receipt 已终态时允许继续。active guard、非终态或损坏 receipt、中断 artifact、未知对象、unsafe root/state、identity drift、FFI 失败和未知 result 均返回非零，不能进入事件循环。门禁不创建目录、不 chmod、不删除 receipt/sidecar，也不打开 userdb；首次启动所需目录只能在门禁允许后由正常 runtime 创建。
 
-bundle 内 `Contents/Helpers/RadishLexUpgradeValidationHost` 只供升级协调器执行。它拒绝参数，固定读取 `.radishlex-upgrade-v1/migration-candidate.sqlite3`，从自身 `Resources/RimeData` 和 schema 创建短生命周期隔离 Rime user data，以 privacy mode personalized runtime 读取固定合成候选信号；不选择、不提交、不学习。helper 必须删除临时 Rime data，并证明 candidate 全字节不变且没有 WAL/SHM/journal，才能返回成功。
+bundle 内 `Contents/Helpers/RadishLexUpgradeValidationHost` 只供升级协调器执行。它拒绝参数，固定读取 `.radishlex-upgrade-v1/migration-candidate.sqlite3`，从自身只读 `Resources/RimeData` 和 schema 创建短生命周期隔离 Rime user data；锁定 YAML 的部署产物只写入该临时目录，不写回 bundle 或 Application Support。helper 随后以 privacy mode personalized runtime 读取固定合成候选信号，不选择、不提交、不学习；必须删除临时 Rime data，并证明 candidate 全字节不变且没有 WAL/SHM/journal，才能返回成功。
 
 startup gate 是产品普通启动边界，validation helper 是协调器的候选验证边界，两者不能互相替代。完整平台宿主说明见 [macOS 产品升级宿主](../macos-product/README.md)，跨语言调用规则见 [FFI 平台调用契约](../../docs/runbooks/ffi-platform-call-contract.md)。
 

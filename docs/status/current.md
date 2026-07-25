@@ -4,17 +4,17 @@
 
 ## 当前判断
 
-- 复核日期：2026-07-24（Asia/Shanghai）
+- 复核日期：2026-07-25（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前产品里程碑：M4 产品发布候选
-- 当前产品主批次：M4-P02 Application Support v1 数据升级协调器；M4-P01 双 bundle 产品装配已完成
-- 已完成：M0 工程基础、M1 macOS 离线输入 Alpha、M2 本地个人化 MVP、M3 端到端加密同步 Beta；R00、R01A、R02L、R01B、R06A 已退出
+- 当前产品主批次：M4-P03 安装载体与发布供应链；M4-P01 双 bundle 产品装配、M4-P02 Application Support v1 数据升级协调器已完成
+- 已完成：M0 工程基础、M1 macOS 离线输入 Alpha、M2 本地个人化 MVP、M3 端到端加密同步 Beta；R00、R01A、R02L、R01B、R06A、M4-P01、M4-P02 已退出
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；合成数据、短生命周期服务与受控集成测试可以继续
 
-M4-P02 已完成升级协调器边界、只读 inspection、SQLite 一致快照、隔离 migration candidate、settings 副本、receipt/guard 与故障注入。macOS preflight 固定检查容量、双端进程与受控句柄；ABI v8 startup gate 已在双端业务初始化前接线。两个 bundle 各自携带固定 candidate / `--post-switch` validation host。协调核心已闭合 `candidate_verified`、原子切换、`post_switch_verified -> completed` 和精确 inode 回滚；settings/snapshot/candidate 的 evidence-only 崩溃窗口可复验后幂等收敛。`resume_userdb_upgrade` 现于同一 guard 内在每个写入、产品验证前后和回滚验证前后要求平台重新证明静止，成功、切换前失败与切换后失败分别收敛到三个终态。61 项核心测试覆盖完整成功、原库保留、精确回滚、静止丢失与 source-release evidence 不可得后的重启续跑。
+M4-P02 已闭合只读 inspection、SQLite 一致快照、隔离 migration candidate、settings 副本、receipt/guard、原子切换、最终双端复验、精确 inode 回滚和逐 checkpoint 静止证明。manifest-bound macOS adapter 固定 target preflight、target 双端 candidate/final validation 与 source 双端 rollback validation，并在每次执行前复验 helper 身份、长度和 SHA-256。
 
-macOS 固定 adapter 已落地为独立平台 crate：严格解析 source/target `ProductManifest.json`，固定 target preflight、target 双端 candidate/final validation 和 source 双端 rollback validation，每次执行前复验 helper 的非 symlink/单 link 身份、长度与 SHA-256；release/schema 漂移、manifest 缺项、helper 篡改和端点失败都不形成 evidence。target Manager 现把只读 preflight host 一并嵌入并纳入产品 manifest。10 项 adapter contract、专项 gate、Manager 产品构建和临时双 bundle manifest create/verify 已通过。隔离合成 Application Support 下由真实产品 helper 驱动的完整协调 smoke 仍未闭合，因此 M4-P02 未退出。
+隔离产品协调资格已用真实 Manager/InputMethod 装配和 helper 在合成 Application Support 上覆盖完整成功、Manager/InputMethod 端点失败、静止丢失后续跑、切换后回滚、source evidence 暂不可得后的重启恢复和临时根清理。InputMethod 只把锁定 YAML 部署到短生命周期验证 user data；产品 RimeData、candidate 和 Application Support 保持只读。首发 source qualification 具有独立版本、签名和 manifest，但使用当前 native code/schema；它证明 source/target 路由与恢复编排，不冒充尚不存在的历史发布二进制。未来形成实际上一版发布包后，真实跨发布 source bundle 复验必须成为后续升级门禁。
 
 M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
@@ -55,8 +55,8 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v8、userd
 
 ## 下一步顺位
 
-1. M4-P02 下一切面实现隔离产品协调资格 harness：在固定合成 user home/Application Support 中创建受控起始 receipt，以受 manifest 证明的 source/target 双装配和真实 preflight/validation helper 驱动 `resume_userdb_upgrade`，覆盖完整成功、Manager/InputMethod 端点失败、checkpoint 静止丢失、切换后回滚与重启恢复。harness 只能通过测试进程环境重定向固定用户域，生产 adapter 继续清除该覆盖；原库继续只读，不接受 helper/数据库任意路径，不迁入 App Group。
-2. M4-P03 选择并验证安装载体，闭合固定程序路径、Developer ID/Hardened Runtime、notarization、升级回滚和默认保留用户数据的移除语义；真实系统动作另行授权。
+1. M4-P03 先在现有产品包边界内完成安装载体决策，明确 Manager/InputMethod 固定目标、preflight/协调器安置、权限与提权边界、程序 bundle 切换/回滚、默认保留 Application Support 的移除语义，以及 `.pkg`、`.dmg` 或安装器应用的取舍；在边界与退出标准固定前不写真实安装脚本。
+2. 按选定载体建立不修改系统安装位置的 payload/layout、签名顺序和离线升级 contract，证明产品根来源、source/target 程序恢复、数据协调结果与安装事务一致；真实安装、系统设置、Developer ID、notarization 和 Gatekeeper 复验另行授权。
 3. 普通用户同步、恢复/授权/撤销/轮换继续关闭；在真实不支持 Secure Enclave 的环境可得时再补 unsupported，首版发布后且准备生产同步前再验收正式域名/证书。
 
 ## 验证入口
@@ -68,6 +68,7 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v8、userd
 ./scripts/check-macos-product-metadata.sh
 ./scripts/check-macos-imk.sh
 ./scripts/check-macos-upgrade-coordinator.sh
+./scripts/check-macos-upgrade-product-coordination.sh
 ./scripts/check-repo.sh
 ./scripts/check-docs.sh
 ./scripts/check-text-files.sh

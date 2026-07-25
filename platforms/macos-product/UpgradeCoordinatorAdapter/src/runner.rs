@@ -1,4 +1,5 @@
 use std::io::Read;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -27,7 +28,24 @@ pub(crate) trait ProductHostRunner {
     fn run(&mut self, executable: &VerifiedExecutable, mode: HostMode) -> HostOutput;
 }
 
-pub(crate) struct ProcessProductHostRunner;
+pub(crate) struct ProcessProductHostRunner {
+    fixed_user_home: Option<PathBuf>,
+}
+
+impl ProcessProductHostRunner {
+    pub(crate) fn production() -> Self {
+        Self {
+            fixed_user_home: None,
+        }
+    }
+
+    #[cfg(feature = "qualification-harness")]
+    pub(crate) fn qualification(fixed_user_home: PathBuf) -> Self {
+        Self {
+            fixed_user_home: Some(fixed_user_home),
+        }
+    }
+}
 
 impl ProductHostRunner for ProcessProductHostRunner {
     fn run(&mut self, executable: &VerifiedExecutable, mode: HostMode) -> HostOutput {
@@ -42,6 +60,9 @@ impl ProductHostRunner for ProcessProductHostRunner {
             if key.to_string_lossy().starts_with("DYLD_") || key == "CFFIXED_USER_HOME" {
                 command.env_remove(key);
             }
+        }
+        if let Some(fixed_user_home) = &self.fixed_user_home {
+            command.env("CFFIXED_USER_HOME", fixed_user_home);
         }
         command.stdin(Stdio::null());
         command.stdout(Stdio::piped());

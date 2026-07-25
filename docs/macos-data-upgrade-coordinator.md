@@ -67,7 +67,7 @@ Manager 和 InputMethod 不实现 migration。两端分别在真实 bundle 的 `
 - validation 不产生选择、负反馈、导入、同步或其他业务写入；
 - 任一端缺失、版本不匹配、打开失败或未关闭连接，候选不得切换。
 
-双端验证不是用同一个 `UserDb::open` 单元测试冒充两个产品宿主。Manager host 通过只读 current-schema connection 执行 active/deleted/import/learning 管理查询；candidate 模式检查固定 `source-settings.json`，post-switch 模式检查固定 `manager-settings.json`，两者都只验证 settings format v1 类型兼容。InputMethod host 从本 bundle 固定 `RimeData` 创建短生命周期隔离 Rime user data，使用 privacy-mode `LearningContext` 驱动 personalized runtime 的固定 `luobo` 候选读取，不选择、不提交也不学习。两端都在调用前后比较目标数据库全字节并拒绝 WAL/SHM/journal。
+双端验证不是用同一个 `UserDb::open` 单元测试冒充两个产品宿主。Manager host 通过只读 current-schema connection 执行 active/deleted/import/learning 管理查询；candidate 模式检查固定 `source-settings.json`，post-switch 模式检查固定 `manager-settings.json`，两者都只验证 settings format v1 类型兼容。InputMethod host 从本 bundle 固定只读 `RimeData` 创建短生命周期隔离 Rime user data；锁定 YAML 只允许部署到该临时目录，不得写回 bundle、共享产品数据或 Application Support。随后使用 privacy-mode `LearningContext` 驱动 personalized runtime 的固定 `luobo` 候选读取，不选择、不提交也不学习。两端都在调用前后比较目标数据库全字节并拒绝 WAL/SHM/journal。
 
 协调核心只接受 `UPGRADE_VALIDATION_EVIDENCE_VERSION = 1` 的固定摘要。Manager evidence 必须同时声明目标 schema、管理查询与 settings 检查完成；InputMethod evidence 必须同时声明同一目标 schema、personalized runtime 与候选信号检查完成。Manager 失败或 evidence 漂移优先记录 `manager_validation_failed`，Manager 通过后 InputMethod 失败或 evidence 漂移记录 `input_method_validation_failed`；这两类切换前失败都原子进入 `aborted_preserved`，原固定数据库不变。只有两端精确通过且协调核心再次以 read-only current-schema connection 复验 candidate，receipt 才从 `candidate_migrated` 单步推进 `candidate_verified`。
 
@@ -306,6 +306,22 @@ macOS adapter 只接受两个已经形成产品装配的根目录，不接受独
 
 `ProductManifest.json` 在 M4-P02 证明组件与 helper 的内容绑定，不单独证明发布者身份。Developer ID、Hardened Runtime、notarization、安装位置所有权和运行前 code signature requirement 属于 M4-P03，不能由 manifest hash 替代。
 
+### 隔离产品协调资格
+
+产品协调资格 harness 只在 Cargo `qualification-harness` feature 下编译，不进入普通产品构建或安装载体。它仍执行与产品相同且受 manifest 绑定的 preflight/validation executable，唯一测试差异是为子进程设置固定 `CFFIXED_USER_HOME`，使 Foundation 用户域解析到合成 home。production runner 必须主动移除调用环境中的 `CFFIXED_USER_HOME`，不能继承或开放这项覆盖。
+
+合成 home 必须同时满足：
+
+- 位于当前系统 canonical temp root 之下，且 home 本身是非 symlink、当前进程可访问的 `0700` 目录；
+- 同级资格根存在内容精确为 `radishlex-upgrade-qualification-v1` 的固定 marker；
+- `Library/Application Support/RadishLex` 由 harness 以 `0700` 创建，所有数据库/settings 只使用合成内容；
+- 产品根、合成 home 和场景名只从仓库固定资格脚本传入测试进程，不形成产品 CLI、UI 参数或 receipt 字段；
+- 场景结束删除整个短生命周期资格根，不扫描或修改其他 temp 内容。
+
+资格脚本从同一次构建输出形成 target `0.1.0 (35)` 与 source qualification `0.0.9 (34)` 两份完整装配。source qualification 只改写两端 bundle 的版本/build 元数据并重新 ad-hoc 签名，再以固定测试 metadata 生成独立 manifest；其 helper/native code 与当前受测源码一致，userdb schema 仍为 9。它证明 source/target manifest 路由、真实双端打开、切换和原 inode 回滚，不冒充历史 schema 8 产品二进制。旧 schema migration 正确性继续由 `ime-userdb` 与协调核心的逐版本合成测试证明；未来真实跨发布升级还必须保留并验证实际 source release 装配。
+
+故障场景先让真实 helper 完成对应调用，再在 `UpgradeCoordinatorPort` 结果边界注入稳定 Manager/InputMethod failure、指定 checkpoint 静止丢失或一次 source evidence 不可得。这样既保留真实产品打开证据，也能确定性验证 `aborted_preserved`、最后已证明状态、`rollback_required` 和重启续跑；故障注入不能修改产品 helper、数据库正文或 receipt。
+
 ## 稳定错误分类
 
 首批 error code 至少覆盖：
@@ -362,7 +378,7 @@ macOS adapter 只接受两个已经形成产品装配的根目录，不接受独
 8. 已在最终固定路径完成双端验证、`post_switch_verified` / `completed` 和精确 rollback；
 9. 已补齐 settings/snapshot/candidate evidence-only 恢复，并实现同一 guard 下逐 checkpoint 复验静止的核心协调驱动；
 10. 已实现 macOS 固定 host adapter、source/target manifest 绑定、target Manager preflight 装配和 adapter contract；
-11. 下一步在隔离合成 Application Support 中以真实产品 helper 完成成功、端点失败、静止丢失和回滚恢复协调 smoke；
+11. 已在隔离合成 Application Support 中以真实产品 helper 完成成功、双端失败、静止丢失、回滚和重启恢复协调资格；
 12. M4-P03 选定安装载体后再编写真实安装升级 runbook。
 
 ## M4-P02 退出标准
@@ -377,3 +393,12 @@ M4-P02 只有同时满足以下条件才可退出：
 - receipt 严格、私有、无敏感内容，且不能被删除或篡改来绕过启动门禁；
 - 备份清理是有版本、receipt 与固定目标的后续动作，默认升级不删除恢复材料；
 - 全部证据来自隔离合成数据和产品 host，不触碰真实用户数据。
+
+截至 2026-07-25，上述条件已由核心 61 项测试、manifest-bound adapter contract 与真实双产品协调资格覆盖，M4-P02 对首个发布候选退出。资格 source 使用独立 `0.0.9 (34)` metadata、重新签名与 manifest，但因尚不存在上一版正式发布包，native code/schema 与 target 同源；这一限制不影响首发数据协调器退出，也不得被描述成历史二进制兼容证据。M4-P03 必须保留 source/target 程序版本回滚边界；从首个发布包形成后，后续版本必须用实际 source release 装配重跑跨发布资格。
+
+稳定验证入口：
+
+```bash
+./scripts/check-macos-upgrade-coordinator.sh
+./scripts/check-macos-upgrade-product-coordination.sh
+```
