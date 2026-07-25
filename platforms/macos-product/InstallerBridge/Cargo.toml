@@ -14,11 +14,10 @@ crate-type = ["rlib", "staticlib"]
 
 [dependencies]
 radishlex-ime-product-install = { path = "../../../crates/ime-product-install" }
+radishlex-ime-product-upgrade = { path = "../../../crates/ime-product-upgrade" }
 radishlex-macos-installer-driver = { path = "../InstallerDriver" }
 radishlex-macos-installer-executor = { path = "../InstallerExecutor" }
 radishlex-macos-product-install = { path = "../InstallAdapter" }
+radishlex-macos-upgrade-coordinator = { path = "../UpgradeCoordinatorAdapter" }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.138"
-
-[dev-dependencies]
-radishlex-ime-product-upgrade = { path = "../../../crates/ime-product-upgrade" }

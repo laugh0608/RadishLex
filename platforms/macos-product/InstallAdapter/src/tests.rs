@@ -593,6 +593,56 @@ fn home_alias_permissions_and_bundle_hardlinks_are_rejected() {
     );
 }
 
+#[test]
+fn first_install_layout_provisioning_creates_only_absent_fixed_directories() {
+    let container = fs::canonicalize(std::env::temp_dir())
+        .expect("temp directory")
+        .join(format!(
+            "radishlex-install-layout-{}-{}",
+            std::process::id(),
+            SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+    create_directory(&container, 0o700);
+    let owner_id = fs::metadata(&container).expect("owner").uid();
+    let home = container.join("home");
+    create_directory(&home, 0o700);
+    create_directory(&home.join("Library"), 0o700);
+    create_directory(&home.join("Library/Application Support"), 0o700);
+
+    assert!(
+        MacOsProductInstallAdapter::first_install_targets_are_absent(&home, owner_id)
+            .expect("read-only target inspection")
+    );
+    prepare_user_layout(&home, owner_id).expect("prepare fixed layout");
+    for path in [
+        home.join("Applications"),
+        home.join("Library/Input Methods"),
+        home.join(DATA_ROOT),
+    ] {
+        let metadata = fs::symlink_metadata(path).expect("prepared directory");
+        assert!(metadata.is_dir());
+        assert_eq!(metadata.permissions().mode() & 0o7777, 0o700);
+    }
+
+    fs::set_permissions(home.join(DATA_ROOT), fs::Permissions::from_mode(0o755))
+        .expect("make existing root unsafe");
+    assert_eq!(
+        prepare_user_layout(&home, owner_id)
+            .expect_err("existing data root must not be chmodded")
+            .code(),
+        MacOsInstallAdapterErrorCode::UnsafeTarget
+    );
+    assert_eq!(
+        fs::metadata(home.join(DATA_ROOT))
+            .expect("root metadata")
+            .permissions()
+            .mode()
+            & 0o7777,
+        0o755
+    );
+    let _ = fs::remove_dir_all(container);
+}
+
 fn first_install_receipt(
     adapter: &MacOsProductInstallAdapter,
     store: &InstallReceiptStore,

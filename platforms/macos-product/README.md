@@ -112,7 +112,9 @@ upgrade 产品终态在 `final_verified` 与 `completed` 前分别复验外层/d
 
 ABI v1 固定整数 enum、POD snapshot 与 contract/snapshot/perform 三个 symbol。AppKit 已静态链接并实际调用；Objective-C 不解释 receipt，只把已知 enum 映射为 driver snapshot。Rust dispatch 每次重新投影并授权 fresh action，再调用 executor。隔离测试证明 prepared/restart/stale/active guard。
 
-生产只读 bootstrap 通过 `geteuid/getpwuid_r` 取得 authoritative current-user home，从当前 executable 固定推导 Installer resources，并严格读取 sealed `ReleaseIdentity.json` 与内嵌 InstallPayload。ad-hoc 构建不携带 release identity，稳定返回 `product_identity_unavailable`；不存在 `HOME`、`CFFIXED_USER_HOME`、UI/caller path 或 ad-hoc production fallback。身份资源与 payload 通过后，在真实 mutation port 开放前继续以 `driver_unavailable` 阻断。
+生产只读 bootstrap 通过 `geteuid/getpwuid_r` 取得 authoritative current-user home，从当前 executable 固定推导 Installer resources，并严格读取 sealed `ReleaseIdentity.json` 与内嵌 InstallPayload。resource 同时绑定 Installer/Manager/InputMethod exact Developer ID requirement 与同一 Team ID，Installer 自身先过 strict signature 验证；ad-hoc 构建不携带 release identity，稳定返回 `product_identity_unavailable`。身份与 payload 通过后，first install、repair、默认程序移除进入真实 executor；缺少历史 source assembly 的 upgrade 在 receipt/program mutation 前返回 `driver_unavailable`。
+
+`./scripts/build-macos-release-installer.sh` 只接受本机有效的 `RADISHLEX_DEVELOPER_ID_APPLICATION`，按嵌套 Mach-O、code container、产品 bundle、manifest、Installer 初签、release identity、Installer 终签顺序启用 Hardened Runtime 与 trusted timestamp。默认门禁只验证失败关闭和脚本契约；没有本机身份时不生成假 Team ID 或成功证据。
 
 ## 构建与验证
 

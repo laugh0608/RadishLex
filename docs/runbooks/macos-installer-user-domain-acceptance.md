@@ -70,10 +70,19 @@ Installer 自身只从当前 executable 反推 `Contents/Resources/InstallPayloa
 只有后续发布身份切面同时满足下列条件，才进入正向验收：
 
 - Installer、payload 内嵌套 executable、Manager 与 InputMethod 均通过 strict Developer ID/Hardened Runtime 验证；
-- `ReleaseIdentity.json` 为 Installer 签名资源，format v1、Team ID 和双 component designated requirement 与冻结产物逐字节一致；
+- `ReleaseIdentity.json` 为 Installer 最终签名资源，format v1、Team ID 和 Installer/双 component designated requirement 与冻结产物逐字节一致；bridge 先验证 Installer 自身 strict Developer ID identity，再读取该资源；
 - bridge 复验嵌入 payload manifest、完整 bundle tree 和 exact code identity 后才产生 ready snapshot；
 - 真实 preflight 通过公开 API 证明 Manager/InputMethod 不运行、固定 data handle 未打开；
 - 当前输入源由开发者手动切换，Installer 只读确认，不调用 TIS mutation API。
+
+发布产物只允许通过：
+
+```bash
+RADISHLEX_DEVELOPER_ID_APPLICATION="Developer ID Application: …" \
+  ./scripts/build-macos-release-installer.sh
+```
+
+生成。命令需要另行确认本机身份和 timestamp 网络条件；不得把 `-`、Apple Development、临时 Team ID 或手工编写的 `ReleaseIdentity.json` 作为替代。
 
 ## D. 首次安装、人工添加与启动
 

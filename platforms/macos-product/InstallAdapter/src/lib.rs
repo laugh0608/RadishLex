@@ -4,7 +4,8 @@
 
 use std::fmt;
 use std::fs;
-use std::os::unix::fs::{MetadataExt, PermissionsExt};
+use std::io::ErrorKind;
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
 #[cfg(feature = "qualification-harness")]
 use std::path::Component;
 use std::path::{Path, PathBuf};
@@ -16,7 +17,7 @@ use radishlex_ime_product_install::{
     InstallFinalizationValidationStage, InstallOperationKind, InstallProcessGuard,
     InstallProgramValidationPort, InstallReceipt, InstallReceiptStore, InstallRootIdentity,
     InstallState, ProductArtifactIdentity, ProductRelease, ProgramBundleIdentity, ProgramComponent,
-    ProgramSwitchStore, RunningProgramIdentity, VerifiedProgramTarget,
+    ProgramSwitchStore, RunningProgramIdentity, VerifiedInstallRoot, VerifiedProgramTarget,
 };
 use serde::Deserialize;
 
@@ -27,8 +28,9 @@ mod manifest;
 #[cfg(feature = "qualification-harness")]
 use codesign::CodesignQualificationCodeSignatureVerifier;
 pub use codesign::{
-    CodeSignatureRequirements, CodesignCodeSignatureVerifier, CodesignRunningIdentityInspector,
-    MacOsCodeIdentity, MacOsCodeSignatureVerifier,
+    inspect_developer_id_application, CodeSignatureRequirements, CodesignCodeSignatureVerifier,
+    CodesignRunningIdentityInspector, DeveloperIdApplicationIdentity, MacOsCodeIdentity,
+    MacOsCodeSignatureVerifier,
 };
 use copy::{sync_bundle_tree, BundleCopier, DittoBundleCopier};
 use manifest::{inspect_bundle_tree, VerifiedInstallPayload};
@@ -206,6 +208,46 @@ impl fmt::Debug for MacOsProductInstallAdapter {
 }
 
 impl MacOsProductInstallAdapter {
+    pub fn first_install_targets_are_absent(
+        authoritative_user_home: &Path,
+        expected_owner_id: u32,
+    ) -> Result<bool, MacOsInstallAdapterError> {
+        verify_directory(
+            authoritative_user_home,
+            expected_owner_id,
+            None,
+            MacOsInstallAdapterErrorCode::UnsafeUserHome,
+        )?;
+        let library = authoritative_user_home.join("Library");
+        verify_directory(
+            &library,
+            expected_owner_id,
+            None,
+            MacOsInstallAdapterErrorCode::UnsafeTarget,
+        )?;
+        verify_directory(
+            &library.join("Application Support"),
+            expected_owner_id,
+            None,
+            MacOsInstallAdapterErrorCode::UnsafeTarget,
+        )?;
+        verify_optional_directory(
+            &authoritative_user_home.join(MANAGER_PARENT),
+            expected_owner_id,
+        )?;
+        verify_optional_directory(
+            &authoritative_user_home.join(INPUT_METHOD_PARENT),
+            expected_owner_id,
+        )?;
+        let manager = authoritative_user_home
+            .join(MANAGER_PARENT)
+            .join(radishlex_ime_product_install::MANAGER_BUNDLE_NAME);
+        let input_method = authoritative_user_home
+            .join(INPUT_METHOD_PARENT)
+            .join(radishlex_ime_product_install::INPUT_METHOD_BUNDLE_NAME);
+        Ok(path_is_absent(&manager)? && path_is_absent(&input_method)?)
+    }
+
     pub fn inspect_payload_product(
         payload_root: &Path,
         requirements: CodeSignatureRequirements,
@@ -229,6 +271,21 @@ impl MacOsProductInstallAdapter {
             expected_owner_id,
             Box::new(CodesignCodeSignatureVerifier::new(requirements)),
             Box::new(DittoBundleCopier),
+        )
+    }
+
+    pub fn prepare_first_install(
+        payload_root: &Path,
+        authoritative_user_home: &Path,
+        expected_owner_id: u32,
+        requirements: CodeSignatureRequirements,
+    ) -> Result<Self, MacOsInstallAdapterError> {
+        prepare_user_layout(authoritative_user_home, expected_owner_id)?;
+        Self::load(
+            payload_root,
+            authoritative_user_home,
+            expected_owner_id,
+            requirements,
         )
     }
 
@@ -264,6 +321,35 @@ impl MacOsProductInstallAdapter {
 
     pub fn target_product(&self) -> &ProductArtifactIdentity {
         &self.target_product
+    }
+
+    pub fn open_install_store(&self) -> Result<InstallReceiptStore, MacOsInstallAdapterError> {
+        self.layout.revalidate()?;
+        let root =
+            VerifiedInstallRoot::verify(self.layout.home.join(DATA_ROOT), self.layout.owner_id)
+                .map_err(|_| error(MacOsInstallAdapterErrorCode::UnsafeTarget))?;
+        InstallReceiptStore::open(root)
+            .map_err(|_| error(MacOsInstallAdapterErrorCode::CoreRejected))
+    }
+
+    pub fn verify_installed_product(
+        &self,
+        expected: Option<&ProductArtifactIdentity>,
+    ) -> Result<(), MacOsInstallAdapterError> {
+        self.layout.revalidate()?;
+        let manager = self.layout.target_path(ProgramComponent::Manager);
+        let input_method = self.layout.target_path(ProgramComponent::InputMethod);
+        let Some(expected) = expected else {
+            if path_is_absent(&manager)? && path_is_absent(&input_method)? {
+                return Ok(());
+            }
+            return Err(error(MacOsInstallAdapterErrorCode::ProductChanged));
+        };
+        self.verify_program(&manager, expected.program(ProgramComponent::Manager))?;
+        self.verify_program(
+            &input_method,
+            expected.program(ProgramComponent::InputMethod),
+        )
     }
 
     pub fn revalidate_target_product(
@@ -459,6 +545,86 @@ impl MacOsProductInstallAdapter {
         }
         Ok(())
     }
+}
+
+fn prepare_user_layout(home: &Path, owner_id: u32) -> Result<(), MacOsInstallAdapterError> {
+    verify_directory(
+        home,
+        owner_id,
+        None,
+        MacOsInstallAdapterErrorCode::UnsafeUserHome,
+    )?;
+    let library = home.join("Library");
+    verify_directory(
+        &library,
+        owner_id,
+        None,
+        MacOsInstallAdapterErrorCode::UnsafeTarget,
+    )?;
+    let application_support = library.join("Application Support");
+    verify_directory(
+        &application_support,
+        owner_id,
+        None,
+        MacOsInstallAdapterErrorCode::UnsafeTarget,
+    )?;
+    ensure_private_directory(&home.join(MANAGER_PARENT), home, owner_id, None)?;
+    ensure_private_directory(&home.join(INPUT_METHOD_PARENT), &library, owner_id, None)?;
+    ensure_private_directory(
+        &home.join(DATA_ROOT),
+        &application_support,
+        owner_id,
+        Some(0o700),
+    )?;
+    Ok(())
+}
+
+fn ensure_private_directory(
+    path: &Path,
+    parent: &Path,
+    owner_id: u32,
+    exact_mode: Option<u32>,
+) -> Result<(), MacOsInstallAdapterError> {
+    match fs::DirBuilder::new().mode(0o700).create(path) {
+        Ok(()) => sync_directory(parent)?,
+        Err(io_error) if io_error.kind() == ErrorKind::AlreadyExists => {}
+        Err(_) => return Err(error(MacOsInstallAdapterErrorCode::Io)),
+    }
+    verify_directory(
+        path,
+        owner_id,
+        exact_mode,
+        MacOsInstallAdapterErrorCode::UnsafeTarget,
+    )
+    .map(|_| ())
+}
+
+fn path_is_absent(path: &Path) -> Result<bool, MacOsInstallAdapterError> {
+    match fs::symlink_metadata(path) {
+        Err(io_error) if io_error.kind() == ErrorKind::NotFound => Ok(true),
+        Ok(_) => Ok(false),
+        Err(_) => Err(error(MacOsInstallAdapterErrorCode::Io)),
+    }
+}
+
+fn verify_optional_directory(path: &Path, owner_id: u32) -> Result<(), MacOsInstallAdapterError> {
+    match fs::symlink_metadata(path) {
+        Err(io_error) if io_error.kind() == ErrorKind::NotFound => Ok(()),
+        Err(_) => Err(error(MacOsInstallAdapterErrorCode::Io)),
+        Ok(_) => verify_directory(
+            path,
+            owner_id,
+            None,
+            MacOsInstallAdapterErrorCode::UnsafeTarget,
+        )
+        .map(|_| ()),
+    }
+}
+
+fn sync_directory(path: &Path) -> Result<(), MacOsInstallAdapterError> {
+    fs::File::open(path)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::Io))
 }
 
 impl InstallProgramValidationPort for MacOsProductInstallAdapter {

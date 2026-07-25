@@ -48,6 +48,61 @@ pub trait MacOsCodeSignatureVerifier: Send + Sync {
     ) -> Result<MacOsCodeIdentity, MacOsInstallAdapterError>;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeveloperIdApplicationIdentity {
+    bundle_id: String,
+    team_identifier: String,
+    designated_requirement: String,
+}
+
+impl DeveloperIdApplicationIdentity {
+    pub fn bundle_id(&self) -> &str {
+        &self.bundle_id
+    }
+
+    pub fn team_identifier(&self) -> &str {
+        &self.team_identifier
+    }
+
+    pub fn designated_requirement(&self) -> &str {
+        &self.designated_requirement
+    }
+}
+
+pub fn inspect_developer_id_application(
+    bundle: &std::path::Path,
+    expected_bundle_id: &str,
+) -> Result<DeveloperIdApplicationIdentity, MacOsInstallAdapterError> {
+    if !bundle.is_absolute() || !valid_bundle_id(expected_bundle_id) {
+        return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
+    }
+    let verified = Command::new(CODESIGN_PATH)
+        .env_clear()
+        .args(["--verify", "--deep", "--strict"])
+        .arg(bundle)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::SignatureRejected))?;
+    if !verified.success() {
+        return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
+    }
+    let parsed = inspect_code_identity(bundle)?;
+    if parsed.identifier != expected_bundle_id
+        || !valid_developer_id_requirement(&parsed.designated_requirement, &parsed.team_identifier)
+    {
+        return Err(error(
+            MacOsInstallAdapterErrorCode::SignatureIdentityChanged,
+        ));
+    }
+    Ok(DeveloperIdApplicationIdentity {
+        bundle_id: parsed.identifier,
+        team_identifier: parsed.team_identifier,
+        designated_requirement: parsed.designated_requirement,
+    })
+}
+
 #[derive(Debug, Clone)]
 pub struct CodeSignatureRequirements {
     team_identifier: String,

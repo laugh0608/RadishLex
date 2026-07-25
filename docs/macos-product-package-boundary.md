@@ -193,6 +193,10 @@ InstallPayload 固定包含 committed layout、外层 payload manifest 和完整
 - 验证 notary log，staple ticket，并在隔离环境执行 Gatekeeper 评估；
 - 发布证据只记录固定状态、产品 hash、submission ID 和结果，不保存凭据。
 
+仓库发布构建入口 `./scripts/build-macos-release-installer.sh` 只接受环境中的 `RADISHLEX_DEVELOPER_ID_APPLICATION`，且该值必须精确命中本机有效的 `Developer ID Application:` identity。脚本在隔离 staging 中重签每个 Mach-O 与嵌套 code container，启用 Hardened Runtime/trusted timestamp，再签双产品 bundle、重新生成 ProductManifest/InstallPayloadManifest、首次签 Installer、从三份已签 bundle 生成 `ReleaseIdentity.json`，最后封存资源并重签 Installer。release identity format v1 绑定同一 Team ID 与 Installer/Manager/InputMethod 三份 exact designated requirement；bridge 必须先验证 Installer 自身签名，再信任该资源。
+
+缺失身份、`-`、Apple Development、ad-hoc、Team 漂移、requirement 漂移或任一 executable 缺少 runtime flag 均不得留下 release 输出。普通仓库门禁只执行 parser/失败关闭与 ad-hoc 产品检查，不要求凭据、不访问 timestamp/notary 服务，也不把未执行的发布脚本记作 Developer ID 成功证据。
+
 Apple 官方边界参考：
 
 - [Creating distribution-signed code for macOS](https://developer.apple.com/documentation/xcode/creating-distribution-signed-code-for-the-mac/)
@@ -217,7 +221,8 @@ Apple 官方边界参考：
 12. 已固定 Installer UI/驱动 contract、可重启 operation 展示、稳定错误、显式用户授权与独立 AppKit contract shell；
 13. 已把 authorized intent 接入隔离 restartable executor 与版本化原生 bridge；
 14. 已接入 authoritative current-user 只读 bootstrap、完整内嵌 InstallPayload、严格 release identity resource 和可回退实机验收 runbook；ad-hoc 构建以 `product_identity_unavailable` 失败关闭；
-15. 下一步完成 Developer ID/Hardened Runtime、真实 mutation port、DMG/公证/staple/Gatekeeper 与正向实机验收。
+15. 已固定 Developer ID/Hardened Runtime 发布构建、三 bundle sealed release identity，并开放 first install/repair/default remove 的 production mutation port；缺少历史 source assembly 的 upgrade 在写入前失败关闭；
+16. 下一步绑定真实历史 source assembly，随后在身份可用时完成签名产物、DMG/公证/staple/Gatekeeper 与正向实机验收。
 
 ## M4-P01 退出标准
 

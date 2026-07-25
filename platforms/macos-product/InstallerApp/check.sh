@@ -27,7 +27,9 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   exit 2
 fi
 
-"${script_dir}/build.sh"
+env -u RADISHLEX_INSTALLER_PAYLOAD_ROOT \
+  -u RADISHLEX_INSTALLER_CODESIGN_IDENTITY \
+  "${script_dir}/build.sh"
 minimum_macos="$(python3 "${product_tool}" field minimum_macos)"
 mkdir -p "${output_root}" "${module_cache}"
 CLANG_MODULE_CACHE_PATH="${module_cache}" clang \
@@ -56,11 +58,12 @@ PYTHONDONTWRITEBYTECODE=1 python3 "${layout_tool}" verify \
   --payload-root "${bundle}/Contents/Resources/InstallPayload"
 test ! -e "${bundle}/Contents/Resources/ReleaseIdentity.json"
 codesign --verify --deep --strict "${bundle}"
+exported_symbols="$(nm -gU "${bundle}/Contents/MacOS/RadishLex Installer")"
 for symbol in \
   radishlex_installer_bridge_contract_version \
   radishlex_installer_bridge_snapshot_v1 \
   radishlex_installer_bridge_perform_v1; do
-  nm -gU "${bundle}/Contents/MacOS/RadishLex Installer" | rg -Fq "_${symbol}"
+  rg -Fq "_${symbol}" <<<"${exported_symbols}"
 done
 
 set +e

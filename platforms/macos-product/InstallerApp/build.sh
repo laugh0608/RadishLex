@@ -26,9 +26,11 @@ product_version="$(python3 "${product_tool}" field product_version)"
 build_number="$(python3 "${product_tool}" field build_number)"
 minimum_macos="$(python3 "${product_tool}" field minimum_macos)"
 bridge_library="${repo_root}/target/release/libradishlex_macos_installer_bridge.a"
-payload_root="${repo_root}/target/macos-install-payload/${product_version}-${build_number}"
+payload_root="${RADISHLEX_INSTALLER_PAYLOAD_ROOT:-${repo_root}/target/macos-install-payload/${product_version}-${build_number}}"
+codesign_identity="${RADISHLEX_INSTALLER_CODESIGN_IDENTITY:--}"
 
-cargo build --locked --release -p radishlex-macos-installer-bridge \
+env MACOSX_DEPLOYMENT_TARGET="${minimum_macos}" \
+  cargo build --locked --release -p radishlex-macos-installer-bridge \
   --manifest-path "${repo_root}/Cargo.toml"
 if [[ ! -d "${payload_root}" ]]; then
   "${repo_root}/scripts/build-macos-install-payload.sh"
@@ -61,7 +63,11 @@ CLANG_MODULE_CACHE_PATH="${module_cache}" clang \
   -framework Cocoa \
   -framework Security \
   -o "${executable}"
-codesign --force --sign - "${bundle}"
+if [[ "${codesign_identity}" == "-" ]]; then
+  codesign --force --sign - --timestamp=none "${bundle}"
+else
+  codesign --force --sign "${codesign_identity}" --timestamp --options runtime "${bundle}"
+fi
 codesign --verify --deep --strict "${bundle}"
 
 echo "RadishLex Installer app: ${bundle}"

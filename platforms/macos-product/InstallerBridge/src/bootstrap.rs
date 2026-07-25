@@ -4,11 +4,14 @@ use std::os::raw::{c_char, c_int};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
-use radishlex_macos_product_install::CodeSignatureRequirements;
+use radishlex_macos_product_install::{
+    inspect_developer_id_application, CodeSignatureRequirements,
+};
 use serde::Deserialize;
 
 const INSTALLER_EXECUTABLE_NAME: &str = "RadishLex Installer";
 const INSTALLER_BUNDLE_NAME: &str = "RadishLex Installer.app";
+const INSTALLER_BUNDLE_ID: &str = "org.radishlex.installer.macos";
 const RELEASE_IDENTITY_NAME: &str = "ReleaseIdentity.json";
 const PAYLOAD_DIRECTORY_NAME: &str = "InstallPayload";
 const MAX_RELEASE_IDENTITY_BYTES: u64 = 16 * 1024;
@@ -26,6 +29,7 @@ pub enum InstallerBootstrapError {
 pub struct InstallerBootstrapContext {
     owner_id: u32,
     user_home: PathBuf,
+    bundle: PathBuf,
     resources: PathBuf,
     resource_owner_id: u32,
 }
@@ -89,6 +93,7 @@ impl InstallerBootstrapContext {
         Ok(Self {
             owner_id,
             user_home: user_home.to_path_buf(),
+            bundle: bundle.to_path_buf(),
             resources,
             resource_owner_id,
         })
@@ -98,7 +103,6 @@ impl InstallerBootstrapContext {
         self.owner_id
     }
 
-    #[cfg(test)]
     pub fn user_home(&self) -> &Path {
         &self.user_home
     }
@@ -111,7 +115,6 @@ impl InstallerBootstrapContext {
         self.resources.join(PAYLOAD_DIRECTORY_NAME)
     }
 
-    #[cfg(test)]
     pub fn product_root(&self) -> PathBuf {
         self.payload_root().join("Product")
     }
@@ -119,6 +122,27 @@ impl InstallerBootstrapContext {
     pub fn release_requirements(
         &self,
     ) -> Result<CodeSignatureRequirements, InstallerBootstrapError> {
+        let identity = self.read_release_identity()?;
+        let installer_identity =
+            inspect_developer_id_application(&self.bundle, INSTALLER_BUNDLE_ID)
+                .map_err(|_| InstallerBootstrapError::ReleaseIdentityUnavailable)?;
+        if installer_identity.team_identifier() != identity.team_identifier
+            || installer_identity.designated_requirement()
+                != identity.installer_designated_requirement
+        {
+            return Err(InstallerBootstrapError::ReleaseIdentityUnavailable);
+        }
+        component_requirements(identity)
+    }
+
+    #[cfg(test)]
+    pub fn unsealed_release_requirements_for_test(
+        &self,
+    ) -> Result<CodeSignatureRequirements, InstallerBootstrapError> {
+        component_requirements(self.read_release_identity()?)
+    }
+
+    fn read_release_identity(&self) -> Result<ReleaseIdentity, InstallerBootstrapError> {
         let path = self.resources.join(RELEASE_IDENTITY_NAME);
         let metadata = fs::symlink_metadata(&path)
             .map_err(|_| InstallerBootstrapError::ReleaseIdentityUnavailable)?;
@@ -139,12 +163,7 @@ impl InstallerBootstrapContext {
         if identity.format_version != 1 {
             return Err(InstallerBootstrapError::ReleaseIdentityUnavailable);
         }
-        CodeSignatureRequirements::new(
-            identity.team_identifier,
-            identity.manager_designated_requirement,
-            identity.input_method_designated_requirement,
-        )
-        .map_err(|_| InstallerBootstrapError::ReleaseIdentityUnavailable)
+        Ok(identity)
     }
 }
 
@@ -153,8 +172,20 @@ impl InstallerBootstrapContext {
 struct ReleaseIdentity {
     format_version: u32,
     team_identifier: String,
+    installer_designated_requirement: String,
     manager_designated_requirement: String,
     input_method_designated_requirement: String,
+}
+
+fn component_requirements(
+    identity: ReleaseIdentity,
+) -> Result<CodeSignatureRequirements, InstallerBootstrapError> {
+    CodeSignatureRequirements::new(
+        identity.team_identifier,
+        identity.manager_designated_requirement,
+        identity.input_method_designated_requirement,
+    )
+    .map_err(|_| InstallerBootstrapError::ReleaseIdentityUnavailable)
 }
 
 fn verify_user_home(path: &Path, owner_id: u32) -> Result<(), InstallerBootstrapError> {

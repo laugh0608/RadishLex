@@ -272,6 +272,18 @@ fn ffi_contract_is_versioned_and_fails_closed_without_release_identity() {
     let unknown = radishlex_installer_bridge_perform_v1(99, 0);
     assert_eq!(unknown.phase, 6);
     assert_eq!(unknown.stable_error, 13);
+    let unknown_flags = radishlex_installer_bridge_perform_v1(1, 1 << 31);
+    assert_eq!(unknown_flags.phase, 6);
+    assert_eq!(unknown_flags.stable_error, 13);
+    assert_eq!(
+        decode_authorization(0b1111),
+        Some(InstallerUserAuthorization {
+            explicit_action_confirmed: true,
+            data_retention_acknowledged: true,
+            neutral_input_source_selected: true,
+            manager_closed: true,
+        })
+    );
 }
 
 #[test]
@@ -346,6 +358,12 @@ fn bootstrap_accepts_only_strict_release_identity_resource() {
         "certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and ",
         "certificate leaf[subject.OU] = \"ABCDEFGHIJ\""
     );
+    let installer_requirement = concat!(
+        "identifier \"org.radishlex.installer.macos\" and anchor apple generic and ",
+        "certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and ",
+        "certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and ",
+        "certificate leaf[subject.OU] = ABCDEFGHIJ"
+    );
     fs::write(
         resources.join("ReleaseIdentity.json"),
         format!(
@@ -353,18 +371,26 @@ fn bootstrap_accepts_only_strict_release_identity_resource() {
                 "{{\n",
                 "  \"format_version\": 1,\n",
                 "  \"team_identifier\": \"ABCDEFGHIJ\",\n",
+                "  \"installer_designated_requirement\": {installer:?},\n",
                 "  \"manager_designated_requirement\": {manager:?},\n",
                 "  \"input_method_designated_requirement\": {input_method:?}\n",
                 "}}\n"
             ),
+            installer = installer_requirement,
             manager = manager_requirement,
             input_method = input_method_requirement,
         ),
     )
     .expect("write release identity");
     context
-        .release_requirements()
+        .unsealed_release_requirements_for_test()
         .expect("strict release identity");
+    assert_eq!(
+        context
+            .release_requirements()
+            .expect_err("unsigned synthetic Installer cannot seal the identity"),
+        InstallerBootstrapError::ReleaseIdentityUnavailable
+    );
 
     fs::write(
         resources.join("ReleaseIdentity.json"),

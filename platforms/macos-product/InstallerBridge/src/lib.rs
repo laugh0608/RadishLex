@@ -4,7 +4,15 @@
 
 use std::path::Path;
 
-use radishlex_ime_product_install::{InstallOperationKind, InstallReceiptStore, InstallState};
+use radishlex_ime_product_install::{
+    inspect_install_status, InstallOperationKind, InstallReceiptStore, InstallState,
+    InstallStatusDecision, ProductArtifactIdentity,
+};
+use radishlex_ime_product_upgrade::{
+    ProductRelease as UpgradeProductRelease, UpgradeCandidateValidationReport,
+    UpgradeCoordinatorCheckpoint, UpgradePostSwitchValidationReport,
+    UpgradeRollbackValidationEvidence,
+};
 use radishlex_macos_installer_driver::{
     authorize_installer_action, inspect_installer_view, InstallerAction,
     InstallerAuthorizationError, InstallerManualPrompt, InstallerProductSituation,
@@ -14,9 +22,10 @@ use radishlex_macos_installer_driver::{
 use radishlex_macos_installer_executor::{
     execute_authorized_intent_with_upgrade_bootstrap, InstallerExecutionError,
     InstallerExecutionSummary, InstallerOperationIdSource, InstallerPreflightPort,
-    InstallerProgramPort, UpgradeCoordinatorPort,
+    InstallerProgramPort, SystemInstallerOperationIdSource, UpgradeCoordinatorPort,
 };
-use radishlex_macos_product_install::MacOsProductInstallAdapter;
+use radishlex_macos_product_install::{CodeSignatureRequirements, MacOsProductInstallAdapter};
+use radishlex_macos_upgrade_coordinator::MacOsProductPreflightAdapter;
 
 mod bootstrap;
 use bootstrap::InstallerBootstrapContext;
@@ -120,52 +129,301 @@ pub extern "C" fn radishlex_installer_bridge_snapshot_v1() -> RadishLexInstaller
 #[no_mangle]
 pub extern "C" fn radishlex_installer_bridge_perform_v1(
     action: u32,
-    _authorization_flags: u32,
+    authorization_flags: u32,
 ) -> RadishLexInstallerBridgeSnapshotV1 {
-    if action > 8 {
+    let Some(action) = decode_action(action) else {
         return unavailable_snapshot(InstallerStableError::UnknownDriverResult);
-    }
-    production_snapshot()
+    };
+    let Some(authorization) = decode_authorization(authorization_flags) else {
+        return unavailable_snapshot(InstallerStableError::UnknownDriverResult);
+    };
+    production_perform(action, authorization)
 }
 
 fn production_snapshot() -> RadishLexInstallerBridgeSnapshotV1 {
-    let context = match InstallerBootstrapContext::discover() {
-        Ok(context) => context,
-        Err(_) => {
-            return unavailable_snapshot(InstallerStableError::ProductIdentityUnavailable);
-        }
-    };
-    let requirements = match context.release_requirements() {
-        Ok(requirements) => requirements,
-        Err(_) => {
-            return unavailable_snapshot(InstallerStableError::ProductIdentityUnavailable);
-        }
-    };
-    if MacOsProductInstallAdapter::inspect_payload_product(&context.payload_root(), requirements)
-        .is_err()
-    {
-        return unavailable_snapshot(InstallerStableError::ProductIdentityUnavailable);
+    match ProductionInstallerEnvironment::discover() {
+        Ok(environment) => encode_installer_snapshot(environment.snapshot),
+        Err(error) => unavailable_snapshot(error),
     }
-    let state_snapshot = inspect_installer_view(
-        context.data_root(),
-        context.owner_id(),
-        InstallerProductSituation::IdentityUnavailable,
-    );
-    if matches!(
-        state_snapshot.stable_error(),
-        InstallerStableError::OperationActive
-            | InstallerStableError::UnsafeDataRoot
-            | InstallerStableError::UnsafeStateDirectory
-            | InstallerStableError::InterruptedReceipt
-            | InstallerStableError::InvalidReceipt
-            | InstallerStableError::UnexpectedStateObject
-            | InstallerStableError::RootIdentityChanged
-            | InstallerStableError::Io
-            | InstallerStableError::ManualRecoveryRequired
+}
+
+fn production_perform(
+    action: InstallerAction,
+    authorization: InstallerUserAuthorization,
+) -> RadishLexInstallerBridgeSnapshotV1 {
+    let environment = match ProductionInstallerEnvironment::discover() {
+        Ok(environment) => environment,
+        Err(error) => return unavailable_snapshot(error),
+    };
+    let intent = match authorize_installer_action(environment.snapshot, action, authorization) {
+        Ok(intent) => intent,
+        Err(_) => return unavailable_snapshot(InstallerStableError::UnknownDriverResult),
+    };
+    if action == InstallerAction::Refresh {
+        return encode_installer_snapshot(environment.snapshot);
+    }
+    if intent.operation_kind() == Some(InstallOperationKind::Upgrade) {
+        return unavailable_snapshot(InstallerStableError::DriverUnavailable);
+    }
+    let mut programs = match environment.load_program_adapter(action) {
+        Ok(programs) => programs,
+        Err(_) => {
+            return unavailable_snapshot(InstallerStableError::ProductIdentityUnavailable);
+        }
+    };
+    let store = match programs.open_install_store() {
+        Ok(store) => store,
+        Err(_) => return unavailable_snapshot(InstallerStableError::UnknownDriverResult),
+    };
+    let mut preflight =
+        match MacOsProductPreflightAdapter::load(&environment.context.product_root()) {
+            Ok(preflight) => preflight,
+            Err(_) => {
+                return unavailable_snapshot(InstallerStableError::ProductIdentityUnavailable)
+            }
+        };
+    let mut operation_ids = SystemInstallerOperationIdSource;
+    let mut upgrade = UnavailableProductionUpgrade;
+    match dispatch_installer_action(
+        environment.context.data_root(),
+        environment.context.owner_id(),
+        environment.product_situation,
+        action,
+        authorization,
+        &store,
+        &mut programs,
+        &mut preflight,
+        &mut operation_ids,
+        &mut upgrade,
     ) {
-        return encode_installer_snapshot(state_snapshot);
+        Ok(_) => production_snapshot(),
+        Err(_) => {
+            let refreshed = production_snapshot();
+            if refreshed.phase == phase_value(InstallerViewPhase::Blocked)
+                || refreshed.receipt_state != 0
+            {
+                refreshed
+            } else {
+                unavailable_snapshot(InstallerStableError::UnknownDriverResult)
+            }
+        }
     }
-    unavailable_snapshot(InstallerStableError::DriverUnavailable)
+}
+
+struct ProductionInstallerEnvironment {
+    context: InstallerBootstrapContext,
+    requirements: CodeSignatureRequirements,
+    target_product: ProductArtifactIdentity,
+    product_situation: InstallerProductSituation,
+    snapshot: InstallerViewSnapshot,
+}
+
+impl ProductionInstallerEnvironment {
+    fn discover() -> Result<Self, InstallerStableError> {
+        let context = InstallerBootstrapContext::discover()
+            .map_err(|_| InstallerStableError::ProductIdentityUnavailable)?;
+        let requirements = context
+            .release_requirements()
+            .map_err(|_| InstallerStableError::ProductIdentityUnavailable)?;
+        let target_product = MacOsProductInstallAdapter::inspect_payload_product(
+            &context.payload_root(),
+            requirements.clone(),
+        )
+        .map_err(|_| InstallerStableError::ProductIdentityUnavailable)?;
+        let status = inspect_install_status(context.data_root(), context.owner_id());
+        let blocked = inspect_installer_view(
+            context.data_root(),
+            context.owner_id(),
+            InstallerProductSituation::IdentityUnavailable,
+        );
+        if status.decision() == InstallStatusDecision::FailedClosed
+            || blocked.stable_error() == InstallerStableError::OperationActive
+        {
+            return Ok(Self {
+                context,
+                requirements,
+                target_product,
+                product_situation: InstallerProductSituation::IdentityUnavailable,
+                snapshot: blocked,
+            });
+        }
+        let product_situation = inspect_product_situation(
+            &context,
+            requirements.clone(),
+            &target_product,
+            status.decision(),
+        )?;
+        let snapshot =
+            inspect_installer_view(context.data_root(), context.owner_id(), product_situation);
+        Ok(Self {
+            context,
+            requirements,
+            target_product,
+            product_situation,
+            snapshot,
+        })
+    }
+
+    fn load_program_adapter(
+        &self,
+        action: InstallerAction,
+    ) -> Result<MacOsProductInstallAdapter, ()> {
+        let result = if action == InstallerAction::BeginFirstInstall
+            && std::fs::symlink_metadata(self.context.data_root())
+                .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound)
+        {
+            MacOsProductInstallAdapter::prepare_first_install(
+                &self.context.payload_root(),
+                self.context.user_home(),
+                self.context.owner_id(),
+                self.requirements.clone(),
+            )
+        } else {
+            MacOsProductInstallAdapter::load(
+                &self.context.payload_root(),
+                self.context.user_home(),
+                self.context.owner_id(),
+                self.requirements.clone(),
+            )
+        };
+        let adapter = result.map_err(|_| ())?;
+        if adapter.target_product() != &self.target_product {
+            return Err(());
+        }
+        Ok(adapter)
+    }
+}
+
+fn inspect_product_situation(
+    context: &InstallerBootstrapContext,
+    requirements: CodeSignatureRequirements,
+    target_product: &ProductArtifactIdentity,
+    status: InstallStatusDecision,
+) -> Result<InstallerProductSituation, InstallerStableError> {
+    if matches!(
+        status,
+        InstallStatusDecision::ReadyFirstLaunch | InstallStatusDecision::ReadyNoInstallState
+    ) {
+        let absent = MacOsProductInstallAdapter::first_install_targets_are_absent(
+            context.user_home(),
+            context.owner_id(),
+        )
+        .map_err(|_| InstallerStableError::ProductIdentityUnavailable)?;
+        if status == InstallStatusDecision::ReadyNoInstallState {
+            MacOsProductInstallAdapter::load(
+                &context.payload_root(),
+                context.user_home(),
+                context.owner_id(),
+                requirements,
+            )
+            .map_err(|_| InstallerStableError::ProductIdentityUnavailable)?;
+        }
+        return Ok(if absent {
+            InstallerProductSituation::NotInstalled
+        } else {
+            InstallerProductSituation::IdentityUnavailable
+        });
+    }
+    if status == InstallStatusDecision::OperationInProgress {
+        return Ok(InstallerProductSituation::IdentityUnavailable);
+    }
+    let adapter = MacOsProductInstallAdapter::load(
+        &context.payload_root(),
+        context.user_home(),
+        context.owner_id(),
+        requirements,
+    )
+    .map_err(|_| InstallerStableError::ProductIdentityUnavailable)?;
+    let store = adapter
+        .open_install_store()
+        .map_err(|_| InstallerStableError::ProductIdentityUnavailable)?;
+    let receipt = store
+        .load()
+        .map_err(|_| InstallerStableError::ProductIdentityUnavailable)?;
+    let expected = receipt
+        .as_ref()
+        .and_then(|receipt| receipt.installed_product());
+    adapter
+        .verify_installed_product(expected)
+        .map_err(|_| InstallerStableError::ProductIdentityUnavailable)?;
+    let Some(installed) = expected else {
+        return Ok(InstallerProductSituation::NotInstalled);
+    };
+    let installed_release = installed.release();
+    let target_release = target_product.release();
+    if installed_release == target_release {
+        Ok(InstallerProductSituation::MatchingReleaseInstalled)
+    } else if installed_release.build_number() < target_release.build_number() {
+        Ok(InstallerProductSituation::OlderReleaseInstalled)
+    } else if installed_release.build_number() > target_release.build_number() {
+        Ok(InstallerProductSituation::NewerReleaseInstalled)
+    } else {
+        Err(InstallerStableError::ProductIdentityUnavailable)
+    }
+}
+
+#[derive(Debug, Default)]
+struct UnavailableProductionUpgrade;
+
+impl UpgradeCoordinatorPort for UnavailableProductionUpgrade {
+    fn confirm_quiescence(&mut self, _checkpoint: UpgradeCoordinatorCheckpoint) -> bool {
+        false
+    }
+
+    fn validate_candidate(
+        &mut self,
+        _target_release: &UpgradeProductRelease,
+        _target_schema_version: i64,
+    ) -> UpgradeCandidateValidationReport {
+        UpgradeCandidateValidationReport::manager_failed()
+    }
+
+    fn validate_post_switch(
+        &mut self,
+        _target_release: &UpgradeProductRelease,
+        _target_schema_version: i64,
+    ) -> UpgradePostSwitchValidationReport {
+        UpgradePostSwitchValidationReport::manager_failed()
+    }
+
+    fn validate_restored_source(
+        &mut self,
+        _source_release: &UpgradeProductRelease,
+        _source_schema_version: i64,
+    ) -> Option<UpgradeRollbackValidationEvidence> {
+        None
+    }
+}
+
+fn decode_action(value: u32) -> Option<InstallerAction> {
+    match value {
+        1 => Some(InstallerAction::Refresh),
+        2 => Some(InstallerAction::BeginFirstInstall),
+        3 => Some(InstallerAction::BeginUpgrade),
+        4 => Some(InstallerAction::BeginRepair),
+        5 => Some(InstallerAction::ConfirmQuiescence),
+        6 => Some(InstallerAction::ResumeOperation),
+        7 => Some(InstallerAction::RetryOperation),
+        8 => Some(InstallerAction::RemovePrograms),
+        _ => None,
+    }
+}
+
+fn decode_authorization(flags: u32) -> Option<InstallerUserAuthorization> {
+    const EXPLICIT: u32 = 1 << 0;
+    const DATA_RETENTION: u32 = 1 << 1;
+    const NEUTRAL_INPUT_SOURCE: u32 = 1 << 2;
+    const MANAGER_CLOSED: u32 = 1 << 3;
+    const KNOWN: u32 = EXPLICIT | DATA_RETENTION | NEUTRAL_INPUT_SOURCE | MANAGER_CLOSED;
+    if flags & !KNOWN != 0 {
+        return None;
+    }
+    Some(InstallerUserAuthorization {
+        explicit_action_confirmed: flags & EXPLICIT != 0,
+        data_retention_acknowledged: flags & DATA_RETENTION != 0,
+        neutral_input_source_selected: flags & NEUTRAL_INPUT_SOURCE != 0,
+        manager_closed: flags & MANAGER_CLOSED != 0,
+    })
 }
 
 fn unavailable_snapshot(error: InstallerStableError) -> RadishLexInstallerBridgeSnapshotV1 {

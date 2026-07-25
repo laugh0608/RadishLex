@@ -98,9 +98,11 @@ refresh 是唯一不要求确认的 action。first install、upgrade、repair、
 
 AppKit 已静态链接 `radishlex-macos-installer-bridge` ABI v1，并通过三个已绑定 symbol 读取 snapshot、刷新和提交确认。ABI 只使用固定整数 enum 与 POD snapshot；Objective-C 只映射已知值，未知 contract/action/error/state/prompt/进度统一失败关闭。AppDelegate 不含复制、rename、删除、receipt 或 TIS 逻辑。
 
-Rust bridge 每次从 fresh status projection 重新授权 action，再进入 `InstallerExecutor`；隔离门禁已证明 `prepared` 持久化、重启投影、stale action 和 active guard。真实用户域只读 bootstrap 使用 `geteuid/getpwuid_r` 取得 authoritative home，只从当前 executable 固定反推 Installer resources，并复验签名资源 `ReleaseIdentity.json` 与内嵌 InstallPayload；不读取 `HOME`、UI 路径或调用方身份。ad-hoc 构建稳定返回 `blocked + product_identity_unavailable`，没有 production fallback；身份资源通过但 mutation port 尚未开放时返回 `driver_unavailable`。
+Rust bridge 每次从 fresh status projection 重新授权 action，再进入 `InstallerExecutor`；隔离门禁已证明 `prepared` 持久化、重启投影、stale action 和 active guard。真实用户域只读 bootstrap 使用 `geteuid/getpwuid_r` 取得 authoritative home，只从当前 executable 固定反推 Installer resources，并复验签名资源 `ReleaseIdentity.json` 与内嵌 InstallPayload；不读取 `HOME`、UI 路径或调用方身份。ad-hoc 构建稳定返回 `blocked + product_identity_unavailable`，没有 production fallback。身份资源通过后，first install、repair、默认程序移除及恢复进入真实 mutation port；upgrade 缺少历史 source assembly 时在任何 receipt 或程序写入前返回 `driver_unavailable`。
 
-`ReleaseIdentity.json` format v1 固定 Team ID、Manager designated requirement 和 InputMethod designated requirement；只有进入 Installer code signature 的 sealed resources 后才可作为 bootstrap 输入。缺失、额外字段、非普通单链接文件、owner 漂移、ad-hoc requirement 或 payload signature/tree 漂移全部失败关闭。
+`ReleaseIdentity.json` format v1 固定 Team ID，以及 Installer、Manager、InputMethod 各自的 exact designated requirement；只有 Installer 自身先通过 strict Developer ID 验证，且资源进入最终 Installer code signature 后才可作为 bootstrap 输入。缺失、额外字段、非普通单链接文件、owner 漂移、Team/requirement 不一致、ad-hoc requirement 或 payload signature/tree 漂移全部失败关闭。
+
+first install 的零写入 snapshot 允许固定 data root 尚不存在；只有用户显式确认后，platform adapter 才逐级验证既有 `Library` / `Application Support`，并以 `0700` 创建缺失的 `Applications`、`Library/Input Methods` 和 RadishLex data root。既有目录必须原样满足 owner、canonical path、symlink 和 mode 约束，bridge 不 chmod、不覆盖、不递归创建未知父链。
 
 ## 隔离执行器
 
@@ -116,6 +118,6 @@ cargo test --locked -p radishlex-ime-product-install --all-targets
 ./scripts/check-repo.sh
 ```
 
-门禁覆盖 absent root 零写入、active/stale guard、非终态重启投影、completed receipt 与后续 operation、产品情况分支、fresh reauthorization、四类执行、preflight 阻断、程序 staging、upgrade receipt bootstrap 与 `final_verified` 重启续跑、移除数据保留授权、ABI enum 映射、未知 snapshot/action、原生 bundle metadata、固定 layout、完整内嵌 payload、release identity 失败关闭、已绑定 Rust symbol 和 UI 源码禁止边界。普通门禁不启动 GUI、不访问真实用户目录或系统输入源。
+门禁覆盖 absent root 零写入、显式 first-install 固定目录 provisioning、active/stale guard、非终态重启投影、completed receipt 与后续 operation、产品情况分支、fresh reauthorization、四类执行、preflight 阻断、程序 staging、upgrade receipt bootstrap 与 `final_verified` 重启续跑、移除数据保留授权、ABI enum 映射、未知 snapshot/action/authorization bits、原生 bundle metadata、固定 layout、完整内嵌 payload、Installer/双 component release identity 失败关闭、已绑定 Rust symbol 和 UI 源码禁止边界。普通门禁不启动 GUI、不访问真实用户目录或系统输入源。
 
 真实用户域负向验收、人工输入源交互、静止检查和回退顺序见 [macOS Installer 真实用户域验收 Runbook](runbooks/macos-installer-user-domain-acceptance.md)。

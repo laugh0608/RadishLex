@@ -32,9 +32,11 @@ Installer UI/driver contract 已落地。零写入 status projection 和 Rust dr
 
 隔离 restartable executor 与版本化 App bridge 已落地。begin/retry/remove 在 guard 内回读 current receipt、执行 manifest-bound target preflight，只生成 operation ID 并持久化 `prepared`；重新投影并确认中立输入源/Manager 关闭后，`ConfirmQuiescence` 再次 preflight，才沿同一 receipt 执行双 bundle staging/preserve/commit。first install、repair、remove 共用程序终态；upgrade 从外层 receipt、固定 data root、只读 userdb 与可选 settings/Rime 身份自动 bootstrap M4-P02 receipt，既有 progressed receipt 则按 operation/root/release/schema 精确重绑。`final_verified` 中断后可重开 data `completed` receipt，只重新证明终态与双程序。completed receipt 会与当前真实产品情况交叉判定，矛盾身份失败关闭。
 
-`radishlex-macos-installer-bridge` ABI v1 使用固定整数 enum 和 POD snapshot；AppKit 已静态链接并实际调用三个版本化 symbol，未知版本、action、state、error、prompt 或进度失败关闭。隔离合成域证明 fresh snapshot、`prepared` 重启、stale/active 阻断和 upgrade data receipt 续跑。生产只读 bootstrap 现通过 `geteuid/getpwuid_r` 取得 authoritative home，从当前 executable 固定反推 resources，严格读取 sealed `ReleaseIdentity.json` 和内嵌完整 InstallPayload；不接受 `HOME`、`CFFIXED_USER_HOME`、UI/caller path 或 ad-hoc identity。
+原生 bridge ABI v1 的三个 AppKit symbol 已绑定；未知版本、action、authorization flags、枚举或进度失败关闭。生产 bootstrap 从 `geteuid/getpwuid_r` 和当前 executable 固定形成 home/resources，严格复验完整 payload；sealed `ReleaseIdentity.json` 绑定 Installer、Manager、InputMethod 的 exact Developer ID requirement 与同一 Team ID，且 Installer 自身先过签名验证。
 
-ad-hoc Installer 不携带 release identity，稳定返回 `blocked + product_identity_unavailable`；身份资源通过但真实 mutation port 未开放时继续返回 `driver_unavailable`。已授权实机负向验收确认当前无 codesigning identity、TIS/双 bundle/进程为零基线，Application Support/RadishLex 为空但 mode `0755`，因此未静默 chmod、安装或修改输入源。可回退 runbook 已固定人工中立输入源、精确静止、首次安装/升级/移除顺序和历史材料保留边界。
+生产 bridge 已接通 manifest-bound adapter、target preflight、随机 operation ID、外层事务和 executor。first install 只在显式 action 后创建缺失的固定目录，既有对象不 chmod；repair、默认程序移除和三者恢复使用真实 mutation port。缺少历史发布 source assembly 时，upgrade 在 receipt/program mutation 前返回 `driver_unavailable`。
+
+发布脚本已固定 Developer ID 输入、嵌套 Hardened Runtime/trusted timestamp、签名后 manifest 重冻结、release identity 生成、Installer 终签和逐 executable 复验；无效身份在构建前失败，ad-hoc Installer 仍返回 `product_identity_unavailable`。当前机器仍为 `0 valid identities found`，所以只有契约与负向证据；此前 TIS/双 bundle/进程零基线和空 `0755` data root 均未修改。
 
 M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
@@ -63,8 +65,8 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v9、userd
 
 ## 下一步顺位
 
-1. M4-P03 下一切面推进 Developer ID/Hardened Runtime 与 sealed `ReleaseIdentity.json` 生成，同时把已验证 bootstrap 接到真实 mutation port；没有可用签名身份时继续失败关闭，不生成临时 Team ID 或 ad-hoc fallback。
-2. 随后完成嵌套签名、DMG、公证、staple、Gatekeeper 与正向实机安装/升级/移除证据；smoke 必须保留/恢复用户数据和输入源状态，并继续禁止自动清理历史事务材料。
+1. M4-P03 下一切面把历史发布 source assembly 作为 payload 的显式、manifest-bound 输入，开放 production upgrade mutation port，并证明缺失/错误 source 在任何 receipt 或程序 mutation 前失败关闭。
+2. 可用 Developer ID Application 身份到位后执行已固定的嵌套签名/Hardened Runtime 构建，再完成 DMG、公证、staple、Gatekeeper 与正向实机首次安装、升级、修复和移除证据；smoke 必须保留/恢复用户数据和输入源状态，并继续禁止自动清理历史事务材料。
 3. 普通用户同步、恢复/授权/撤销/轮换继续关闭；在真实不支持 Secure Enclave 的环境可得时再补 unsupported，首版发布后且准备生产同步前再验收正式域名/证书。
 
 ## 验证入口
