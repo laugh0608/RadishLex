@@ -209,7 +209,8 @@ Apple 官方边界参考：
 6. 在可用的隔离 RimeData/native dependency 环境运行完整装配验证；
 7. M4-P01 退出后完成 M4-P02 数据升级协调器、manifest-bound macOS adapter 与隔离真实产品协调资格；
 8. M4-P03 已固定 DMG + 独立用户域 Installer、两个目标路径、InstallPayload manifest、外层 receipt/guard、双 bundle 程序切换恢复和 macOS manifest/code-signature adapter；
-9. 下一步把 M4-P02 数据协调结果映射到外层事务，并把双端产品启动接入外层 gate；随后再进入 Installer UI、发布身份与授权实机验收。
+9. M4-P03 已用独立组合层绑定双 receipt/guard、数据协调结果、installed target 持续复验和 source 程序一致回滚；
+10. 下一步完成外层产品终态动作并把双端产品启动接入外层 gate；随后建立隔离端到端恢复门禁，再进入 Installer UI、发布身份与授权实机验收。
 
 ## M4-P01 退出标准
 

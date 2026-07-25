@@ -1,0 +1,19 @@
+[package]
+name = "radishlex-macos-product-install-coordinator"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../../LICENSE"
+description = "Guard-bound macOS composition for product programs and data upgrades."
+
+[lib]
+name = "radishlex_macos_product_install_coordinator"
+path = "src/lib.rs"
+
+[dependencies]
+radishlex-ime-product-install = { path = "../../../crates/ime-product-install" }
+radishlex-ime-product-upgrade = { path = "../../../crates/ime-product-upgrade" }
+
+[dev-dependencies]
+radishlex-ime-userdb = { path = "../../../crates/ime-userdb" }

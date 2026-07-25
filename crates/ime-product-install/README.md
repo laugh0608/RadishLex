@@ -1,6 +1,6 @@
 # ime-product-install 组件说明
 
-本文说明 `radishlex-ime-product-install` 的职责、receipt、程序身份、同文件系统程序切换、跨进程 guard 与启动门禁，面向 Installer、平台适配层和双端启动维护者。本文不包含真实程序复制、签名 API、Installer UI 或数据 migration；完整 macOS 边界见 [程序安装事务](../../docs/macos-installation-transaction.md)。
+本文说明 `radishlex-ime-product-install` 的职责、receipt、程序身份、同文件系统程序切换、跨进程 guard 与启动门禁，面向 Installer、平台适配层和双端启动维护者。本文不包含真实程序复制、签名 API、Installer UI、数据 receipt 或 migration；完整 macOS 边界见 [程序安装事务](../../docs/macos-installation-transaction.md)。
 
 ## 组件定位
 
@@ -13,7 +13,9 @@
 - 在两个目标各自的文件系统内固定私有 staging/backup，按 Manager、InputMethod 顺序 rename/fsync，并按精确 inode 恢复中断现场；
 - 只读 startup gate 同时检查事务终态与当前运行 bundle 身份。
 
-平台 adapter 负责解析固定 user-domain 父目录、code signature/ProductManifest 复验、保留 macOS metadata 的 staging 填充、进程静止和 M4-P02 数据协调。核心只接受已经验证的两个目标父目录，固定 bundle/事务槽位，不读取 bundle 内容、不计算签名、不停止进程，也不递归清理程序或用户数据。
+平台 adapter 负责解析固定 user-domain 父目录、code signature/ProductManifest 复验和保留 macOS metadata 的 staging 填充；独立 `InstallCoordinatorAdapter` 负责把本核心与 M4-P02 数据协调器组合。核心只接受已经验证的两个目标父目录，固定 bundle/事务槽位，不读取 bundle 内容、不计算签名、不停止进程、不依赖 `ime-product-upgrade`，也不递归清理程序或用户数据。
+
+核心向组合层提供只读的 current receipt/guard、`ProgramSwitchStore` binding 校验，以及 `InstallProgramValidationPort`。这些接口只证明程序事务输入仍属于当前 operation；数据 receipt 的 operation/root/release 绑定和成功/失败映射仍由组合层负责。
 
 ## 稳定状态
 
@@ -39,4 +41,4 @@ cargo clippy -p radishlex-ime-product-install --all-targets -- -D warnings
 ./scripts/check-product-install-core.sh
 ```
 
-测试只使用合成私有临时目录，覆盖部分双端提交、source 恢复和 preserve/commit/rollback 的逐 rename/fsync 边界；不访问真实 Application Support、`~/Applications`、`~/Library/Input Methods`、系统设置、Keychain 或签名凭据。
+测试只使用合成私有临时目录，覆盖部分双端提交、source 恢复和 preserve/commit/rollback 的逐 rename/fsync 边界；跨核心组合另由 `./scripts/check-macos-install-coordinator.sh` 验证。不会访问真实 Application Support、`~/Applications`、`~/Library/Input Methods`、系统设置、Keychain 或签名凭据。

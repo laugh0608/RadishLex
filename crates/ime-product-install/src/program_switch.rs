@@ -180,7 +180,7 @@ impl ProgramSwitchStore {
         Ok(())
     }
 
-    fn verify_binding(
+    pub fn verify_binding(
         &self,
         receipt_store: &InstallReceiptStore,
         guard: &InstallProcessGuard,

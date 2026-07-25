@@ -62,6 +62,8 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 `UpgradeReceiptStore::persist` 要求调用方持有匹配的 `UpgradeProcessGuard`。写入顺序为同目录 `create_new` 临时文件、文件 `fsync`、身份复验、原子 rename、目录 `fsync` 和 canonical bytes 回读；不合法的跨状态替换、证据删除或字段漂移都会被拒绝。
 
+`UpgradeReceiptStore::verify_current` 只供持有匹配 guard 的外层组合层使用：它复验 data root、状态目录、guard、对象白名单和当前 canonical receipt 精确相等，不推进状态或写文件。这样外层事务不会以调用方仅在内存中提前推进的 data receipt 开始协调。
+
 ## 主要能力
 
 ### 启动门禁

@@ -22,6 +22,8 @@ M4-P03 已接受 DMG + 独立用户域 Installer app：Manager、InputMethod 和
 
 独立 `radishlex-macos-product-install` adapter 已内嵌 committed install layout，严格复验 InstallPayloadManifest、ProductManifest、许可证和完整双 bundle tree，并只从 authoritative current-user home 形成固定目标。production code identity 要求 exact Developer ID designated requirement 与 Team ID，经 strict `codesign` 后只把固定字段 hash 交给核心；没有 ad-hoc fallback。staging 使用 metadata-preserving `ditto`，复制前后复验并递归 fsync；完整但未记录的 staged bundle 可恢复 evidence，部分/漂移对象保持现场。9 项合成测试覆盖首次安装、完整升级回滚、source/target/restored 复验、manifest/tree/signature/path 漂移和 staging 中断；没有读取真实用户目录或签名身份。
 
+独立 `radishlex-macos-product-install-coordinator` 已在不合并两个核心的前提下绑定同一 operation ID、Application Support inode、source/target release、双 receipt 与双 guard。M4-P02 每个 quiescence checkpoint 同时复验 installed target 双 bundle；数据 `completed` 映射外层 `data_settled`，数据 `aborted_preserved` / `rolled_back` 则在 source 双程序精确恢复和逻辑身份复验后映射外层 `rolled_back`。9 项合成测试覆盖成功、candidate/post-switch 失败、静止丢失、target/source 身份暂不可得、重启续跑、未持久化双 receipt 状态及 operation/release/root 绑定拒绝。
+
 M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
 ## M3 退出结论
@@ -61,8 +63,8 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v8、userd
 
 ## 下一步顺位
 
-1. M4-P03 下一切面把 M4-P02 数据协调结果映射到外层 `data_coordinating` / `data_settled` 与 rollback：同一 guard 内持续证明静止，程序回滚与数据 `aborted_preserved` / `rolled_back` 必须形成一致终态。
-2. 随后将 Manager/InputMethod 产品启动接入外层只读 gate，并建立隔离双 bundle + 合成 Application Support 的端到端故障恢复门禁；完成这些证据前不实现真实安装或 Installer UI。
+1. M4-P03 下一切面完成 `data_settled -> final_verified -> completed` 的产品终态动作，并将 Manager/InputMethod 产品启动接入外层只读 gate；最终 target/data 身份必须与终态 receipt 同时匹配。
+2. 随后建立隔离双 bundle + 合成 Application Support 的端到端故障恢复门禁；完成成功、数据失败、程序恢复、双端启动阻断与重启续跑证据前不实现真实安装或 Installer UI。
 3. 普通用户同步、恢复/授权/撤销/轮换继续关闭；在真实不支持 Secure Enclave 的环境可得时再补 unsupported，首版发布后且准备生产同步前再验收正式域名/证书。
 
 ## 验证入口
@@ -75,6 +77,7 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v8、userd
 ./scripts/check-macos-install-layout.sh
 ./scripts/check-product-install-core.sh
 ./scripts/check-macos-install-adapter.sh
+./scripts/check-macos-install-coordinator.sh
 ./scripts/check-macos-imk.sh
 ./scripts/check-macos-upgrade-coordinator.sh
 ./scripts/check-macos-upgrade-product-coordination.sh

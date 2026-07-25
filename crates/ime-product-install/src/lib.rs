@@ -30,6 +30,23 @@ pub use program_switch::{
     ProgramSwitchStore, VerifiedProgramTarget, INPUT_METHOD_BUNDLE_NAME, MANAGER_BUNDLE_NAME,
 };
 
+#[cfg(unix)]
+pub trait InstallProgramValidationPort {
+    fn validate_installed_targets(
+        &mut self,
+        manager: &ProgramSwitchStore,
+        input_method: &ProgramSwitchStore,
+        receipt: &InstallReceipt,
+    ) -> bool;
+
+    fn validate_restored_sources(
+        &mut self,
+        manager: &ProgramSwitchStore,
+        input_method: &ProgramSwitchStore,
+        receipt: &InstallReceipt,
+    ) -> bool;
+}
+
 pub const INSTALL_RECEIPT_FORMAT: &str = "radishlex-product-install-receipt-v1";
 pub const INSTALL_PRODUCT_ID: &str = "radishlex-macos";
 pub const MAX_INSTALL_RECEIPT_BYTES: usize = 64 * 1024;

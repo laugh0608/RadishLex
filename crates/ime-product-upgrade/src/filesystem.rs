@@ -404,6 +404,34 @@ impl UpgradeReceiptStore {
         Ok(())
     }
 
+    pub fn verify_current(
+        &self,
+        guard: &UpgradeProcessGuard,
+        receipt: &UpgradeReceipt,
+    ) -> Result<(), UpgradeFilesystemError> {
+        self.revalidate()?;
+        if !guard.belongs_to(self) {
+            return Err(error(UpgradeFilesystemErrorCode::IdentityChanged));
+        }
+        guard.revalidate()?;
+        self.validate_known_entries()?;
+        if path_exists(&self.staged_receipt_path())? {
+            return Err(error(UpgradeFilesystemErrorCode::InterruptedReceiptWrite));
+        }
+        let stored = self
+            .load_current_internal()?
+            .map(|(stored, _, _)| stored)
+            .ok_or_else(|| error(UpgradeFilesystemErrorCode::InvalidReceipt))?;
+        if stored != *receipt {
+            return Err(error(UpgradeFilesystemErrorCode::InvalidReceiptReplacement));
+        }
+        snapshot::validate_snapshot_state(self, Some(&stored))?;
+        candidate::validate_candidate_state(self, Some(&stored))?;
+        settings::validate_settings_backup_state(self, Some(&stored))?;
+        switch::validate_switch_state(self, Some(&stored))?;
+        Ok(())
+    }
+
     fn revalidate(&self) -> Result<(), UpgradeFilesystemError> {
         self.root.revalidate()?;
         let metadata = fs::symlink_metadata(&self.state_directory)

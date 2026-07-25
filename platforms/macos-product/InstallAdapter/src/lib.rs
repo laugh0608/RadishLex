@@ -10,9 +10,9 @@ use std::path::{Path, PathBuf};
 use radishlex_ime_product_install::{
     record_program_source as record_core_program_source,
     record_staged_program as record_core_staged_program, InstallOperationKind, InstallProcessGuard,
-    InstallReceipt, InstallReceiptStore, InstallRootIdentity, InstallState,
-    ProductArtifactIdentity, ProgramBundleIdentity, ProgramComponent, ProgramSwitchStore,
-    VerifiedProgramTarget,
+    InstallProgramValidationPort, InstallReceipt, InstallReceiptStore, InstallRootIdentity,
+    InstallState, ProductArtifactIdentity, ProgramBundleIdentity, ProgramComponent,
+    ProgramSwitchStore, VerifiedProgramTarget,
 };
 
 mod codesign;
@@ -334,6 +334,28 @@ impl MacOsProductInstallAdapter {
             ));
         }
         Ok(())
+    }
+}
+
+impl InstallProgramValidationPort for MacOsProductInstallAdapter {
+    fn validate_installed_targets(
+        &mut self,
+        manager: &ProgramSwitchStore,
+        input_method: &ProgramSwitchStore,
+        receipt: &InstallReceipt,
+    ) -> bool {
+        self.verify_installed_target(manager, receipt).is_ok()
+            && self.verify_installed_target(input_method, receipt).is_ok()
+    }
+
+    fn validate_restored_sources(
+        &mut self,
+        manager: &ProgramSwitchStore,
+        input_method: &ProgramSwitchStore,
+        receipt: &InstallReceipt,
+    ) -> bool {
+        self.verify_restored_source(manager, receipt).is_ok()
+            && self.verify_restored_source(input_method, receipt).is_ok()
     }
 }
 

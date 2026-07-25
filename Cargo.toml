@@ -13,6 +13,7 @@ members = [
     "crates/ime-sync-runtime",
     "crates/ime-userdb",
     "platforms/macos-product/InstallAdapter",
+    "platforms/macos-product/InstallCoordinatorAdapter",
     "platforms/macos-product/UpgradeCoordinatorAdapter",
 ]
 resolver = "2"

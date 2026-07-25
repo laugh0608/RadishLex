@@ -10,20 +10,16 @@ RadishLex Installer.app
   └─ 要求用户手动切换输入源、关闭 Manager
                          │
                          ▼
-macOS installation adapter
-  ├─ 固定 user-domain 路径、签名/manifest 与进程证据
-  ├─ 向核心固定槽位填充已复验 staging bundle
-  └─ 调用 M4-P02 数据协调器
+macOS installation adapters
+  ├─ InstallAdapter 固定路径、签名/manifest 与 staging bundle
+  └─ InstallCoordinatorAdapter 绑定外层/data receipt、双 guard 与恢复顺序
                          │
-                         ▼
-ime-product-install
-  ├─ operation kind、产品逻辑身份与外层 receipt
-  ├─ 跨进程 guard、同文件系统 rename/fsync、恢复与状态转换
-  └─ 完全只读的终态身份 startup decision
-                         │
-                         ▼
-ime-product-upgrade
-  └─ Application Support 内的数据 snapshot/migration/rollback
+             ┌───────────┴───────────┐
+             ▼                       ▼
+ime-product-install         ime-product-upgrade
+  ├─ 外层 receipt/guard       ├─ data receipt/guard
+  ├─ 双程序切换/恢复           └─ snapshot/migration/rollback
+  └─ startup decision
 ```
 
 `ime-product-install` 不读取 bundle 内容、不计算 code signature、不停止进程、不接受自定义 bundle 名或最终路径，也不解释数据 receipt；它只接受平台已解析并验证的固定目标父目录，拥有私有事务槽位及 rename/fsync/recovery。`ime-product-upgrade` 不知道程序 staging、backup 或双 bundle 切换状态。Installer 与平台 adapter 不能自己发明状态、跳过 receipt 或根据缺失文件猜测 operation。
@@ -198,7 +194,15 @@ M4-P02 数据 receipt 只能在 `upgrade` 的 `data_coordinating` 阶段运行�
 - 数据 receipt 非终态、损坏或身份漂移时，外层保持非终态并继续阻止两端启动；
 - 外层 `completed` 前必须复验两个已安装 target、数据终态和双端 startup identity。
 
-外层 receipt/guard、artifact contract、startup decision，以及合成目标上的程序 rename/fsync 和精确恢复均已实现。数据协调映射、macOS 固定路径/签名 adapter 与终态材料清理仍在后续切面接入。
+`InstallCoordinatorAdapter` 已实现上述映射，但不合并两个核心：
+
+- 外层/data receipt 必须使用同一 operation ID、同一 data-root device/inode/uid/mode，并精确匹配 source/target version 与 build；
+- 外层与数据 guard 在整个组合调用期间同时存活；每个 M4-P02 quiescence checkpoint 都附带 installed target 双 bundle 逻辑身份复验；
+- data `completed` 后再次复验 target，外层才持久化 `data_settled`；
+- data `aborted_preserved` / `rolled_back` 后先持久化外层 `rollback_required`，再恢复 source 双程序；只有精确 inode 与 tree/code identity 都复验通过，才允许外层 `programs_restored -> rolled_back`；
+- 静止、target/restored 身份或 source validation 暂不可得时保留两个 receipt 和全部恢复材料，外层继续阻止启动并允许按已持久化状态续跑。
+
+外层 receipt/guard、artifact contract、程序切换恢复、macOS manifest/code-signature adapter 与数据协调映射均已实现。`data_settled -> final_verified -> completed` 的产品终态接线、双端启动入口和终态材料清理仍在后续切面。
 
 ## Startup decision
 

@@ -339,6 +339,26 @@ impl InstallReceiptStore {
         guard.revalidate()
     }
 
+    pub fn verify_current(
+        &self,
+        guard: &InstallProcessGuard,
+        receipt: &InstallReceipt,
+    ) -> Result<(), InstallFilesystemError> {
+        self.verify_guard(guard)?;
+        self.validate_known_entries()?;
+        if path_exists(&self.staged_receipt_path())? {
+            return Err(error(InstallFilesystemErrorCode::InterruptedReceiptWrite));
+        }
+        let stored = self
+            .load_current_internal()?
+            .map(|(stored, _, _)| stored)
+            .ok_or_else(|| error(InstallFilesystemErrorCode::InvalidReceipt))?;
+        if stored != *receipt {
+            return Err(error(InstallFilesystemErrorCode::InvalidReceiptReplacement));
+        }
+        Ok(())
+    }
+
     fn revalidate(&self) -> Result<(), InstallFilesystemError> {
         self.root.revalidate()?;
         let metadata = fs::symlink_metadata(&self.state_directory)

@@ -62,6 +62,7 @@ RadishLex/
     macos-product/
       README.md
       InstallAdapter/
+      InstallCoordinatorAdapter/
       UpgradePreflightHost/
       UpgradeValidationHosts/
         Sources/
@@ -110,7 +111,7 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v8、Manager 产品状态与隔离资格 run、管理查询和共库证据；M4-P02 数据协调、M4-P03 外层 receipt/guard、双程序切换/恢复与 macOS manifest/code-signature adapter 已形成独立边界 | M4-P03 数据协调映射、双端 startup 接线、Installer UI 和发布复验 |
+| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v8、Manager 产品状态与隔离资格 run、管理查询和共库证据；M4-P02 数据协调、M4-P03 外层 receipt/guard、双程序切换/恢复、manifest/code-signature adapter 与跨核心协调组合已形成独立边界 | M4-P03 终态/双端 startup 接线、Installer UI 和发布复验 |
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
 | 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
 | Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁 | M4 数据升级、安装载体与发布分发 |
@@ -212,7 +213,7 @@ SQLite 用户数据层：
 - `.radishlex-install-v1` 私有 receipt、原子替换、root identity 与跨进程 Unix socket guard；
 - 终态 operation chain 与当前运行 Manager/InputMethod 身份 startup decision。
 
-该 crate 不依赖 `ime-product-upgrade`，不读取 bundle、验证签名、停止进程、复制/删除程序或接受安装路径。当前已形成外层事务状态与只读门禁核心；双目标 staging/rename/fsync、M4-P02 结果映射和 macOS 固定路径/签名 adapter 尚待下一切面。API 与验证入口见 [ime-product-install 组件说明](../crates/ime-product-install/README.md)，完整边界见 [macOS 程序安装事务](macos-installation-transaction.md)。
+该 crate 不依赖 `ime-product-upgrade`，不读取 bundle、验证签名、停止进程、复制/删除程序或接受安装路径。当前已形成外层事务状态、双目标 staging/rename/fsync、精确恢复、只读 current/binding 校验和 startup decision；M4-P02 结果映射由平台组合 crate 承担。API 与验证入口见 [ime-product-install 组件说明](../crates/ime-product-install/README.md)，完整边界见 [macOS 程序安装事务](macos-installation-transaction.md)。
 
 ### ime-crypto
 
@@ -343,6 +344,8 @@ apps/radishlex-manager/
 `platforms/macos-product/UpgradeCoordinatorAdapter/` 是实现 `UpgradeCoordinatorPort` 的 Rust 平台组合层。它只从 source/target 产品根的严格 `ProductManifest.json` 解析固定双 bundle 与 helper，逐次复验 helper 长度和 SHA-256；所有 checkpoint 使用 target Manager preflight，candidate/final 使用 target 双端 validation，回滚恢复使用 source 双端 validation。仅测试 feature 可把这些真实 helper 重定向到 canonical temp 根下的私有合成 user home，并覆盖成功、端点失败、静止丢失、回滚和重启恢复；生产 runner 清除该覆盖。该 crate 不解释 SQLite 内容、不接收数据路径、不进入输入热路径，也不替代 M4-P03 的 code signature 与安装来源验证。
 
 `platforms/macos-product/InstallAdapter/` 是 M4-P03 的 manifest-bound 程序平台组合层。它内嵌 committed install layout，严格解析 InstallPayloadManifest/ProductManifest，按完整文件与内部 symlink 形成 bundle tree 身份，并把 exact Developer ID designated requirement、Team ID 与 `codesign` 固定字段转换为脱敏 code identity SHA-256。adapter 只从 authoritative current-user home 形成固定双目标，使用 metadata-preserving `ditto` 填充核心 staging，递归同步后记录 evidence，并在 source、installed 和 restored 阶段重新复验 tree/code identity。普通门禁只使用合成 verifier/copy port，不访问真实用户目录或签名凭据。
+
+`platforms/macos-product/InstallCoordinatorAdapter/` 是 M4-P03 的跨核心组合层。它不接管两个 receipt 的字段或文件操作，只在同时持有 install/upgrade guard 时验证同一 operation ID、data-root identity、source/target release 和双 `ProgramSwitchStore` binding。M4-P02 每个 quiescence checkpoint 同时消费 `InstallAdapter` 提供的 target 双 bundle 身份结果；数据失败只有在 data terminal、source 双程序精确恢复并重复复验后才把外层推进到 `rolled_back`。9 项合成测试覆盖成功、两类数据失败、静止/身份暂不可得、重启续跑、未持久化双 receipt 状态和绑定拒绝。
 
 R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-acceptance.md) 的授权 A/B：授权 A 才允许签名、安装、系统设置、人工交互和保留 userdb 的普通清理；授权 B 只在 receipt 归属、设置恢复和数据库关闭条件满足后删除本轮四个固定 SQLite 文件并把预存空父目录恢复为 `0755`，不得删除父目录。该 runbook 现在作为关闭证据与回归边界保留。副屏和 VoiceOver 仍按平台边界文档的已知限制处理，自动 contract 不能替代对应实机证据。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
 

@@ -22,6 +22,9 @@ platforms/macos-product/
   InstallAdapter/
     src/                     layout/manifest/signature/staging platform port
     Cargo.toml
+  InstallCoordinatorAdapter/
+    src/                     install/data receipt and rollback composition
+    Cargo.toml
 ```
 
 平台宿主只吸收 macOS 路径解析、Foundation/AppKit 进程与容量 API、bundle 资源定位和 native executable 生命周期。receipt、文件身份、状态转换和候选证据属于 `ime-product-upgrade`；SQLite schema/migration 属于 `ime-userdb`；宿主不得成为新的业务真相源。
@@ -76,6 +79,12 @@ production code identity 使用 `/usr/bin/codesign --verify --deep --strict -R=<
 
 staging 使用 `/usr/bin/ditto` 保留 resource fork、extended attributes、ACL、quarantine 和 HFS compression。复制前后都复验 payload target，复制后对 staged tree/code identity 重新形成与 receipt target 相同的逻辑身份，递归 `fsync` 后才调用核心记录 filesystem evidence。完整但未记录的 staged bundle 可以在重启后补记；部分或漂移对象保持现场，不覆盖、不自动清理。
 
+## InstallCoordinatorAdapter
+
+协调组合层依赖 `ime-product-install` 与 `ime-product-upgrade`，但两个核心不互相依赖。它只接受当前已持久化的两个 receipt、两个 guard、固定 Manager/InputMethod `ProgramSwitchStore`、M4-P02 port 和 `InstallAdapter` 实现的程序身份 port；operation ID、data-root identity、source/target release 或 component binding 任一不一致时，在数据写入前失败。
+
+进入 `data_coordinating` 后，M4-P02 的每个 quiescence checkpoint 都附带 installed target 双 bundle 复验。数据 `completed` 才推进外层 `data_settled`；数据 `aborted_preserved` / `rolled_back` 则先持久化外层 `rollback_required`，恢复 source 双程序并重复验证 tree/code identity，最后进入外层 `rolled_back`。中断或暂不可验证时保留两个 receipt 与全部 staging/backup，不清理现场。
+
 ## 构建与验证
 
 Manager helper 由 Xcode native library 嵌入阶段构建并签名：
@@ -100,6 +109,12 @@ InputMethod helper 由 bundle 构建入口装配并签名：
 
 ```bash
 ./scripts/check-macos-install-adapter.sh
+```
+
+外层/data receipt 组合门禁使用同一合成数据根、双 bundle 和 userdb，验证成功、失败与重启恢复：
+
+```bash
+./scripts/check-macos-install-coordinator.sh
 ```
 
 两个产品门禁都会先执行 `UpgradeValidationHosts/check.sh`，验证仅允许的两种参数形式和固定路径映射，并拒绝任意路径及多余参数。带真实 native Rime 的候选信号验证仍需使用隔离的 locked RimeData 和产品门禁；不得把 `RADISHLEX_RIME_SHARED_DATA` 指向用户 Rime 或 RadishLex Application Support。上述普通检查不安装、不启动真实 Manager/InputMethod，也不调度 validation host 访问真实 candidate。

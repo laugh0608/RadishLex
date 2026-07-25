@@ -757,6 +757,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "radishlex-macos-product-install-coordinator"
+version = "0.1.0"
+dependencies = [
+ "radishlex-ime-product-install",
+ "radishlex-ime-product-upgrade",
+ "radishlex-ime-userdb",
+]
+
+[[package]]
 name = "radishlex-macos-upgrade-coordinator"
 version = "0.1.0"
 dependencies = [

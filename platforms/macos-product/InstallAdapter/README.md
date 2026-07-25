@@ -12,6 +12,7 @@ adapter 在 `ime-product-install` 的路径无关事务核心与 macOS 产品之
 - 使用 `codesign --verify --deep --strict -R=<designated requirement>` 验证发布要求，并把固定 code identity 字段散列为 receipt 可保存的 SHA-256；
 - 使用 `ditto` 保留 macOS metadata 地填充核心固定 `staged.app`，同步完整 tree 后才记录 staged evidence；
 - 在 source、installed target 和 restored source 阶段重新验证 tree/code identity。
+- 实现 `InstallProgramValidationPort`，供独立协调组合层在每个数据 checkpoint 和程序恢复后复验双 bundle。
 
 production 构造必须提供两个 component 的精确 Developer ID designated requirement 与 10 字符 Team ID。没有 ad-hoc production fallback；单元测试通过注入的合成 verifier/copy port 覆盖平台编排，不产生发布证据。
 
