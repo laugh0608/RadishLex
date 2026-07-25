@@ -18,8 +18,9 @@ mod finalization;
 mod program_switch;
 #[cfg(unix)]
 pub use filesystem::{
-    inspect_install_startup_gate, inspect_install_startup_gate_with, InstallFilesystemError,
-    InstallFilesystemErrorCode, InstallProcessGuard, InstallReceiptStore, VerifiedInstallRoot,
+    inspect_install_startup_gate, inspect_install_startup_gate_with, inspect_install_status,
+    InstallFilesystemError, InstallFilesystemErrorCode, InstallProcessGuard, InstallReceiptStore,
+    VerifiedInstallRoot,
 };
 #[cfg(unix)]
 pub use finalization::{
@@ -1107,6 +1108,51 @@ pub enum InstallStartupGateErrorCode {
     ProgramIdentityChanged,
     RemovedProgram,
     Io,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InstallStatusDecision {
+    ReadyFirstLaunch,
+    ReadyNoInstallState,
+    OperationInProgress,
+    TerminalReceipt,
+    FailedClosed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InstallStatusResult {
+    decision: InstallStatusDecision,
+    error_code: InstallStartupGateErrorCode,
+    operation_kind: Option<InstallOperationKind>,
+    receipt_state: Option<InstallState>,
+    failure_code: Option<InstallFailureCode>,
+    manual_recovery_required: bool,
+}
+
+impl InstallStatusResult {
+    pub const fn decision(self) -> InstallStatusDecision {
+        self.decision
+    }
+
+    pub const fn error_code(self) -> InstallStartupGateErrorCode {
+        self.error_code
+    }
+
+    pub const fn operation_kind(self) -> Option<InstallOperationKind> {
+        self.operation_kind
+    }
+
+    pub const fn receipt_state(self) -> Option<InstallState> {
+        self.receipt_state
+    }
+
+    pub const fn failure_code(self) -> Option<InstallFailureCode> {
+        self.failure_code
+    }
+
+    pub const fn manual_recovery_required(self) -> bool {
+        self.manual_recovery_required
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

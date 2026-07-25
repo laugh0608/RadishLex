@@ -1,0 +1,19 @@
+# macOS Installer Driver
+
+本文说明独立 Installer App 的只读状态投影与显式动作授权契约，面向 Installer UI、外层安装事务和产品门禁维护者。本文不包含真实用户目录写入、程序停止、输入源修改、Developer ID、公证或 DMG 发布。
+
+`radishlex-macos-installer-driver` 只组合 `ime-product-install` 的只读状态检查，不直接执行程序切换。它把 receipt/guard 结果投影为版本化的：
+
+- `phase`、primary/secondary action、稳定 error 与 receipt state；
+- 0–10 的持久化进度步骤；
+- 手动切到中立输入源并关闭 Manager 的提示；
+- 默认移除仅删除程序、保留 Application Support 的数据策略。
+
+UI 不得解析 `receipt.json`、读取 `HOME`、接受自定义路径或根据 bundle 缺失猜测 operation。无 receipt 时，平台必须先以固定目标和产品身份形成 `InstallerProductSituation`；身份不可得或已安装版本更新时失败关闭。
+
+`authorize_installer_action` 会重新验证当前 snapshot 是否仍提供该动作。除 refresh 外，所有动作都要求显式确认；移除还要求用户确认保留数据，并确认已手动切换输入源、关闭 Manager。确认只形成 `AuthorizedInstallerIntent`，不能替代公开平台 API 和固定 preflight 的重新取证。
+
+```bash
+cargo test --locked -p radishlex-macos-installer-driver --all-targets
+cargo clippy --locked -p radishlex-macos-installer-driver --all-targets -- -D warnings
+```

@@ -6,8 +6,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use crate::{
     InstallArtifactEvidence, InstallArtifactSlot, InstallFailureCode, InstallOperationKind,
     InstallReceipt, InstallStartupGateDecision, InstallStartupGateErrorCode, InstallState,
-    ProductArtifactIdentity, ProductRelease, ProgramBundleIdentity, ProgramComponent,
-    ProgramFilesystemIdentity, RunningProgramIdentity, INSTALL_PRODUCT_ID,
+    InstallStatusDecision, ProductArtifactIdentity, ProductRelease, ProgramBundleIdentity,
+    ProgramComponent, ProgramFilesystemIdentity, RunningProgramIdentity, INSTALL_PRODUCT_ID,
 };
 
 use super::*;
@@ -263,6 +263,65 @@ fn startup_gate_is_read_only_for_absent_and_empty_state() {
         InstallStartupGateDecision::AllowedNoInstallState
     );
     assert!(!empty.data_root.join(STATE_DIRECTORY_NAME).exists());
+}
+
+#[test]
+fn status_inspection_projects_restart_state_without_creating_or_mutating() {
+    let absent = Fixture::new(false);
+    let first = inspect_install_status(&absent.data_root, absent.owner_id);
+    assert_eq!(first.decision(), InstallStatusDecision::ReadyFirstLaunch);
+    assert!(!absent.data_root.exists());
+
+    let fixture = Fixture::new(true);
+    let empty = inspect_install_status(&fixture.data_root, fixture.owner_id);
+    assert_eq!(empty.decision(), InstallStatusDecision::ReadyNoInstallState);
+    assert!(!fixture.data_root.join(STATE_DIRECTORY_NAME).exists());
+
+    let store = fixture.store();
+    let mut receipt = first_install_receipt(&store);
+    let guard = store.acquire_guard().expect("guard");
+    store.persist(&guard, &receipt).expect("persist prepared");
+    let active = inspect_install_status(&fixture.data_root, fixture.owner_id);
+    assert_eq!(
+        active.decision(),
+        InstallStatusDecision::OperationInProgress
+    );
+    assert_eq!(
+        active.error_code(),
+        InstallStartupGateErrorCode::ActiveGuard
+    );
+    assert_eq!(active.operation_kind(), None);
+    drop(guard);
+
+    let stale_guard = UnixListener::bind(store.guard_path()).expect("stale guard");
+    fs::set_permissions(store.guard_path(), fs::Permissions::from_mode(0o600))
+        .expect("stale guard permissions");
+    drop(stale_guard);
+    let resumable = inspect_install_status(&fixture.data_root, fixture.owner_id);
+    assert_eq!(
+        resumable.decision(),
+        InstallStatusDecision::OperationInProgress
+    );
+    assert_eq!(
+        resumable.operation_kind(),
+        Some(InstallOperationKind::FirstInstall)
+    );
+    assert_eq!(resumable.receipt_state(), Some(InstallState::Prepared));
+    assert_eq!(resumable.failure_code(), None);
+    assert!(!resumable.manual_recovery_required());
+    assert!(store.guard_path().exists());
+    fs::remove_file(store.guard_path()).expect("remove stale guard");
+
+    let guard = store.acquire_guard().expect("completion guard");
+    complete_first_install(&store, &guard, &mut receipt);
+    drop(guard);
+    let completed = inspect_install_status(&fixture.data_root, fixture.owner_id);
+    assert_eq!(completed.decision(), InstallStatusDecision::TerminalReceipt);
+    assert_eq!(completed.receipt_state(), Some(InstallState::Completed));
+    assert_eq!(
+        completed.operation_kind(),
+        Some(InstallOperationKind::FirstInstall)
+    );
 }
 
 #[test]

@@ -180,6 +180,8 @@ InstallPayload 固定包含 committed layout、外层 payload manifest 和完整
 
 程序切换还需要 `.radishlex-install-v1` 外层 receipt/guard。两端 startup gate 必须在业务初始化前拒绝非终态、损坏或身份漂移的程序事务；数据 receipt 终态不能绕过尚未完成的程序切换。真实安装、系统设置、进程停止、签名、公证和数据清理仍遵守仓库授权规则。
 
+独立 Installer 的 UI/驱动 contract 已固定。UI 只消费版本化 snapshot，展示 verified operation、receipt 进度、固定目标、稳定错误和默认保留数据语义；未知 snapshot 失败关闭。所有 mutation action 都重新验证当前 snapshot 并要求显式确认，remove 额外确认保留 Application Support，手动静止确认不能替代公开平台 API 的重新取证。详细边界见 [macOS Installer App UI 与驱动边界](macos-installer-app-boundary.md)。
+
 ## 签名、公证与供应链
 
 开发构建可以使用 ad-hoc 或 Apple Development，但必须明确标记，不能作为发布证据。当前 DMG 直接分发候选要求：
@@ -212,7 +214,8 @@ Apple 官方边界参考：
 9. M4-P03 已用独立组合层绑定双 receipt/guard、数据协调结果、installed target 持续复验和 source 程序一致回滚；
 10. 已完成外层两段产品终态动作、upgrade data receipt/双 guard 最终绑定、ABI v9 外层只读 gate 与双端最前置接线；
 11. 已建立隔离双 bundle + 合成 Application Support 的端到端恢复门禁，覆盖程序部分提交、数据失败回滚、两段终态中断与双端启动决策；
-12. 下一步固定 Installer UI/驱动 contract，再进入发布身份与授权实机验收。
+12. 已固定 Installer UI/驱动 contract、可重启 operation 展示、稳定错误、显式用户授权与独立 AppKit contract shell；
+13. 下一步把 authorized intent 接入隔离 restartable executor，再进入发布身份与授权实机验收。
 
 ## M4-P01 退出标准
 

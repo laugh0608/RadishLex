@@ -127,7 +127,7 @@ Apple 官方依据：
 3. 设计并实现外层 receipt/guard、程序 artifact identity 与 startup gate；
 4. 实现双 bundle staging、切换、逐边界故障注入和 source 程序恢复；
 5. 把 M4-P02 数据协调器纳入外层事务，覆盖成功、数据失败、程序失败和重启恢复；
-6. 实现独立 Installer app 的状态 UI、手动输入源提示、默认程序移除和脱敏诊断；
+6. 已实现独立 Installer app 的状态 UI/驱动 contract、手动输入源提示、默认程序移除授权和脱敏诊断；隔离写 executor 继续按同一边界接入；
 7. 完成 Developer ID/Hardened Runtime、DMG、公证、stapling、Gatekeeper 与授权真实安装/升级/移除验收。
 
 ## M4-P03 退出标准

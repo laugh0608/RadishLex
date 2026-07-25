@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>zh_CN</string>
+	<key>CFBundleDisplayName</key>
+	<string>萝卜词核安装器</string>
+	<key>CFBundleExecutable</key>
+	<string>RadishLex Installer</string>
+	<key>CFBundleIdentifier</key>
+	<string>__INSTALLER_BUNDLE_ID__</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>RadishLex Installer</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>__PRODUCT_VERSION__</string>
+	<key>CFBundleVersion</key>
+	<string>__BUILD_NUMBER__</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>__MINIMUM_MACOS__</string>
+	<key>LSUIElement</key>
+	<false/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+</dict>
+</plist>

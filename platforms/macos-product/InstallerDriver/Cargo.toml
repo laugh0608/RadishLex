@@ -1,0 +1,15 @@
+[package]
+name = "radishlex-macos-installer-driver"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../../LICENSE"
+description = "Read-only status projection and explicit-intent contract for the macOS Installer app."
+
+[lib]
+name = "radishlex_macos_installer_driver"
+path = "src/lib.rs"
+
+[dependencies]
+radishlex-ime-product-install = { path = "../../../crates/ime-product-install" }

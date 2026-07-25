@@ -111,11 +111,11 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v9、Manager 产品状态与隔离资格 run、管理查询和共库证据；M4-P02 数据协调、M4-P03 外层 receipt/guard、双程序切换/恢复、两段终态、manifest/code-signature adapter 与跨核心协调组合已形成独立边界 | M4-P03 隔离端到端恢复门禁、Installer UI 和发布复验 |
+| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v9、Manager 产品状态与隔离资格 run、管理查询和共库证据；M4-P02 数据协调、M4-P03 外层 receipt/guard、双程序切换/恢复、两段终态、manifest/code-signature adapter、跨核心协调与 Installer 只读驱动已形成独立边界 | M4-P03 Installer 隔离写 executor 和发布复验 |
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
 | 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
 | Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁 | M4 数据升级、安装载体与发布分发 |
-| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；M4-P01 双 bundle 与 locked RimeData；M4-P02 数据 gate/validation；M4-P03 外层 install gate、运行 bundle 身份与最前置双端接线；Android Keystore 能力验证桥 | M4-P03 隔离恢复门禁、Installer UI、发布供应链和普通用户安装包；其他系统输入法 |
+| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；M4-P01 双 bundle 与 locked RimeData；M4-P02 数据 gate/validation；M4-P03 外层 install gate、运行 bundle 身份、最前置双端接线、隔离恢复资格与 Installer AppKit contract shell；Android Keystore 能力验证桥 | M4-P03 Installer 隔离写 executor、发布供应链和普通用户安装包；其他系统输入法 |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
 
@@ -346,6 +346,8 @@ apps/radishlex-manager/
 `platforms/macos-product/InstallAdapter/` 是 M4-P03 的 manifest-bound 程序平台组合层。它内嵌 committed install layout，严格解析 InstallPayloadManifest/ProductManifest，按完整文件与内部 symlink 形成 bundle tree 身份，并把 exact Developer ID designated requirement、Team ID 与 `codesign` 固定字段转换为脱敏 code identity SHA-256。adapter 只从 authoritative current-user home 形成固定双目标，使用 metadata-preserving `ditto` 填充核心 staging，递归同步后记录 evidence，并在 source、installed 和 restored 阶段重新复验 tree/code identity。普通门禁只使用合成 verifier/copy port，不访问真实用户目录或签名凭据。
 
 `platforms/macos-product/InstallCoordinatorAdapter/` 是 M4-P03 的跨核心组合层。它不接管两个 receipt 的字段或文件操作，只在同时持有 install/upgrade guard 时验证同一 operation ID、data-root identity、source/target release 和双 `ProgramSwitchStore` binding。M4-P02 每个 quiescence checkpoint 同时消费 `InstallAdapter` 提供的 target 双 bundle 身份结果；数据失败只有在 data terminal、source 双程序精确恢复并重复复验后才把外层推进到 `rolled_back`。9 项合成测试覆盖成功、两类数据失败、静止/身份暂不可得、重启续跑、未持久化双 receipt 状态和绑定拒绝。
+
+`platforms/macos-product/InstallerDriver/` 把外层 receipt/guard 和平台已验证的 installed-product situation 投影为 snapshot v1，不创建状态目录、不解释路径或执行 mutation。它固定 operation、phase、action、稳定 error、receipt progress、manual prompt 与保留数据策略，并在形成 authorized intent 前拒绝 stale action 和缺失确认。`InstallerApp/` 是独立 AppKit contract shell，只展示该 snapshot、固定 layout 与脱敏摘要；默认 bridge 为 `driver_unavailable`，不在 UI 中实现复制、rename、删除、receipt 或 TIS 操作。
 
 R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-acceptance.md) 的授权 A/B：授权 A 才允许签名、安装、系统设置、人工交互和保留 userdb 的普通清理；授权 B 只在 receipt 归属、设置恢复和数据库关闭条件满足后删除本轮四个固定 SQLite 文件并把预存空父目录恢复为 `0755`，不得删除父目录。该 runbook 现在作为关闭证据与回归边界保留。副屏和 VoiceOver 仍按平台边界文档的已知限制处理，自动 contract 不能替代对应实机证据。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
 

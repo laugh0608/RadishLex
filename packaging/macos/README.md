@@ -18,6 +18,7 @@ Library/Application Support/RadishLex
 ```bash
 ./scripts/check-macos-product-metadata.sh
 ./scripts/check-macos-install-layout.sh
+./scripts/check-macos-installer.sh
 ```
 
 InstallPayload 装配只写 `target/`，不会安装程序或访问真实 Application Support：

@@ -8,7 +8,8 @@ use std::path::{Component, Path, PathBuf};
 use crate::{
     evaluate_install_startup_receipt, InstallReceipt, InstallRootIdentity,
     InstallStartupGateDecision, InstallStartupGateErrorCode, InstallStartupGateResult,
-    InstallState, RunningProgramIdentity, MAX_INSTALL_RECEIPT_BYTES,
+    InstallState, InstallStatusDecision, InstallStatusResult, RunningProgramIdentity,
+    MAX_INSTALL_RECEIPT_BYTES,
 };
 
 const STATE_DIRECTORY_NAME: &str = ".radishlex-install-v1";
@@ -574,6 +575,138 @@ where
             None => failed(InstallStartupGateErrorCode::ProgramIdentityChanged),
         },
         Err(error) => failed(map_startup_error(error.code())),
+    }
+}
+
+pub fn inspect_install_status(
+    data_root: impl AsRef<Path>,
+    expected_owner_id: u32,
+) -> InstallStatusResult {
+    let data_root = data_root.as_ref();
+    if !data_root.is_absolute()
+        || data_root
+            .components()
+            .any(|part| matches!(part, Component::CurDir | Component::ParentDir))
+    {
+        return failed_status(InstallStartupGateErrorCode::UnsafeDataRoot);
+    }
+    match fs::symlink_metadata(data_root) {
+        Err(io_error) if io_error.kind() == ErrorKind::NotFound => {
+            return ready_status(InstallStatusDecision::ReadyFirstLaunch);
+        }
+        Err(_) => return failed_status(InstallStartupGateErrorCode::Io),
+        Ok(_) => {}
+    }
+    let root = match VerifiedInstallRoot::verify(data_root, expected_owner_id) {
+        Ok(root) => root,
+        Err(_) => return failed_status(InstallStartupGateErrorCode::UnsafeDataRoot),
+    };
+    let guard_path = match build_guard_socket_path(root.identity(), expected_owner_id) {
+        Ok(path) => path,
+        Err(_) => return failed_status(InstallStartupGateErrorCode::UnsafeStateDirectory),
+    };
+    match fs::symlink_metadata(&guard_path) {
+        Ok(metadata) => {
+            if verify_private_socket(&metadata, expected_owner_id).is_err() {
+                return failed_status(InstallStartupGateErrorCode::RootIdentityChanged);
+            }
+            match UnixStream::connect(&guard_path) {
+                Ok(_) => {
+                    return InstallStatusResult {
+                        decision: InstallStatusDecision::OperationInProgress,
+                        error_code: InstallStartupGateErrorCode::ActiveGuard,
+                        operation_kind: None,
+                        receipt_state: None,
+                        failure_code: None,
+                        manual_recovery_required: false,
+                    };
+                }
+                Err(connect_error) if connect_error.kind() == ErrorKind::ConnectionRefused => {}
+                Err(_) => {
+                    return InstallStatusResult {
+                        decision: InstallStatusDecision::OperationInProgress,
+                        error_code: InstallStartupGateErrorCode::ActiveGuard,
+                        operation_kind: None,
+                        receipt_state: None,
+                        failure_code: None,
+                        manual_recovery_required: false,
+                    };
+                }
+            }
+        }
+        Err(io_error) if io_error.kind() == ErrorKind::NotFound => {}
+        Err(_) => return failed_status(InstallStartupGateErrorCode::Io),
+    }
+
+    let state_directory = data_root.join(STATE_DIRECTORY_NAME);
+    let state_metadata = match fs::symlink_metadata(&state_directory) {
+        Err(io_error) if io_error.kind() == ErrorKind::NotFound => {
+            return ready_status(InstallStatusDecision::ReadyNoInstallState);
+        }
+        Err(_) => return failed_status(InstallStartupGateErrorCode::Io),
+        Ok(metadata) => metadata,
+    };
+    if verify_private_directory(&state_metadata, expected_owner_id, 0o700).is_err() {
+        return failed_status(InstallStartupGateErrorCode::UnsafeStateDirectory);
+    }
+    let store = InstallReceiptStore {
+        guard_socket_path: guard_path,
+        root,
+        state_directory,
+        state_directory_identity: DirectoryIdentity::from_metadata(&state_metadata),
+    };
+    if let Err(error) = store
+        .revalidate()
+        .and_then(|_| store.validate_known_entries())
+    {
+        return failed_status(map_startup_error(error.code()));
+    }
+    match path_exists(&store.staged_receipt_path()) {
+        Ok(true) => return failed_status(InstallStartupGateErrorCode::InterruptedReceipt),
+        Ok(false) => {}
+        Err(_) => return failed_status(InstallStartupGateErrorCode::Io),
+    }
+    match store.load_current_internal() {
+        Ok(None) => ready_status(InstallStatusDecision::ReadyNoInstallState),
+        Ok(Some((receipt, _, _))) => InstallStatusResult {
+            decision: if receipt.state().is_terminal() {
+                InstallStatusDecision::TerminalReceipt
+            } else {
+                InstallStatusDecision::OperationInProgress
+            },
+            error_code: if receipt.state().is_terminal() {
+                InstallStartupGateErrorCode::None
+            } else {
+                InstallStartupGateErrorCode::InstallInProgress
+            },
+            operation_kind: Some(receipt.operation_kind()),
+            receipt_state: Some(receipt.state()),
+            failure_code: receipt.failure_code(),
+            manual_recovery_required: receipt.manual_recovery_required(),
+        },
+        Err(error) => failed_status(map_startup_error(error.code())),
+    }
+}
+
+const fn ready_status(decision: InstallStatusDecision) -> InstallStatusResult {
+    InstallStatusResult {
+        decision,
+        error_code: InstallStartupGateErrorCode::None,
+        operation_kind: None,
+        receipt_state: None,
+        failure_code: None,
+        manual_recovery_required: false,
+    }
+}
+
+const fn failed_status(error_code: InstallStartupGateErrorCode) -> InstallStatusResult {
+    InstallStatusResult {
+        decision: InstallStatusDecision::FailedClosed,
+        error_code,
+        operation_kind: None,
+        receipt_state: None,
+        failure_code: None,
+        manual_recovery_required: false,
     }
 }
 

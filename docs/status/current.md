@@ -12,9 +12,9 @@
 - 第一真实平台：macOS InputMethodKit
 - 真实用户同步：保持关闭；合成数据、短生命周期服务与受控集成测试可以继续
 
-M4-P02 已闭合只读 inspection、SQLite 一致快照、隔离 migration candidate、settings 副本、receipt/guard、原子切换、最终双端复验、精确 inode 回滚和逐 checkpoint 静止证明。manifest-bound macOS adapter 固定 target preflight、target 双端 candidate/final validation 与 source 双端 rollback validation，并在每次执行前复验 helper 身份、长度和 SHA-256。
+M4-P02 已闭合只读 inspection、一致快照、隔离 candidate/settings、receipt/guard、原子切换、双端复验、精确 inode 回滚和逐 checkpoint 静止证明。manifest-bound adapter 固定 target preflight/双端 validation 与 source rollback validation，并逐次复验 helper 内容身份。
 
-隔离产品协调资格已用真实 Manager/InputMethod 装配和 helper 在合成 Application Support 上覆盖完整成功、Manager/InputMethod 端点失败、静止丢失后续跑、切换后回滚、source evidence 暂不可得后的重启恢复和临时根清理。InputMethod 只把锁定 YAML 部署到短生命周期验证 user data；产品 RimeData、candidate 和 Application Support 保持只读。首发 source qualification 具有独立版本、签名和 manifest，但使用当前 native code/schema；它证明 source/target 路由与恢复编排，不冒充尚不存在的历史发布二进制。未来形成实际上一版发布包后，真实跨发布 source bundle 复验必须成为后续升级门禁。
+隔离资格已用真实双 bundle/helper 和合成 Application Support 覆盖成功、端点失败、静止丢失、回滚与重启恢复；产品 RimeData、candidate 和数据根保持只读。首发 source qualification 具有独立版本/签名/manifest，但 native code/schema 与 target 同源，不冒充尚不存在的历史发布二进制；实际上一版发布形成后必须纳入跨发布门禁。
 
 M4-P03 已接受 DMG + 独立用户域 Installer app：Manager、InputMethod 和 install state 固定在 current-user home 下，不请求管理员权限，也不让 `.pkg` script 承担明文数据协调。committed `install-layout.json` 与确定性 `InstallPayloadManifest.json` 已绑定产品 manifest、版本/build、Installer bundle ID、两个安装目标和默认保留数据语义；8 项 contract 覆盖确定性装配、显式 source release metadata、额外文件、内容变更、layout 替换、bundle symlink 和覆盖拒绝。该 payload 仍不是 Installer/DMG，不证明签名、公证或真实安装。
 
@@ -26,7 +26,9 @@ M4-P03 已接受 DMG + 独立用户域 Installer app：Manager、InputMethod 和
 
 外层终态现由四类 operation 共用的两段动作推进：每次先复验当前 receipt/guard、双 `ProgramSwitchStore` 与最终程序结果，再分别持久化 `final_verified`、`completed`；upgrade 组合层还在两段前精确复验 data receipt/guard、Application Support identity、source/target release、data `completed` 和 installed 双 bundle。第二段中断会保留 `final_verified` 并在重启后重新取证续跑。ABI v9 新增独立 `radishlex_product_install_startup_gate`；Manager/InputMethod 均先执行外层 gate，再执行既有数据 gate，之后才允许 Flutter/IMK、settings、userdb 或 Rime 初始化。运行身份由当前 executable 的固定用户域 bundle、Info.plist、完整 tree 与 Developer ID code identity 形成，不接受 UI/settings/`HOME` 或调用方 identity 字段。
 
-隔离端到端恢复资格现复用真实 Manager/InputMethod 构建、独立 source/target ProductManifest 与 InstallPayload，在带精确 marker 的私有临时根和合成 Application Support 上串联程序切换、数据协调、两段终态与两层 startup gate。真实场景覆盖 `final_verified` 中断落盘后重启完成、candidate 失败后恢复 source 双 bundle、Manager 已提交而 InputMethod 未提交时重启续跑，以及 active guard、非终态、completed target/source 身份决策。qualification ad-hoc code identity 只在 Cargo feature、固定 marker、temp 后代、owner/mode/symlink 复验全部成立时可用；production Developer ID requirement 路径未放宽。门禁不安装产品、不访问真实用户目录，也不清理 staging、backup 或历史 operation 材料。
+隔离端到端资格复用真实双 bundle、独立 source/target manifest/payload 和合成 Application Support，覆盖 `final_verified` 中断、candidate 失败恢复 source、部分程序提交重启，以及 active guard、非终态和 completed 身份决策。qualification ad-hoc identity 只在 feature、固定 marker、temp/owner/mode/symlink 约束全部成立时可用；production Developer ID 路径未放宽，也不清理 staging/backup/历史 operation。
+
+Installer UI/driver contract 已落地。零写入 status projection 和 Rust driver 把 verified product situation、receipt/guard、operation、持久化进度、稳定错误、手动提示和保留数据策略形成 snapshot v1；mutation 拒绝 stale UI 和缺失确认。AppKit bundle 展示目标、重启继续与稳定诊断，未知结果失败关闭；默认 bridge 为 `driver_unavailable`，门禁只构建 contract shell，不执行真实安装或 TIS 操作。
 
 M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
@@ -67,8 +69,8 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v9、userd
 
 ## 下一步顺位
 
-1. M4-P03 下一切面先固定独立 Installer app 的 UI/驱动边界、可重启 operation 展示、稳定错误与用户授权交互，不让 UI 成为 receipt、运行身份或路径真相源。
-2. Installer contract 与隔离驱动门禁完成后，再单独授权真实用户目录安装、进程停止/输入源交互、Developer ID/Hardened Runtime、公证、Gatekeeper 和 DMG 发布证据。
+1. M4-P03 下一切面在隔离合成用户域内把 authorized Installer intent 接入现有 manifest-bound adapter、外层事务和只读 preflight，打通 first install、upgrade、repair、remove 的 restartable executor；UI 仍不能成为 receipt、运行身份或路径真相源。
+2. 隔离 executor 门禁完成后，再单独授权真实用户目录安装、进程停止/输入源交互、Developer ID/Hardened Runtime、公证、Gatekeeper 和 DMG 发布证据。
 3. 普通用户同步、恢复/授权/撤销/轮换继续关闭；在真实不支持 Secure Enclave 的环境可得时再补 unsupported，首版发布后且准备生产同步前再验收正式域名/证书。
 
 ## 验证入口
@@ -82,6 +84,7 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v9、userd
 ./scripts/check-product-install-core.sh
 ./scripts/check-macos-install-adapter.sh
 ./scripts/check-macos-install-coordinator.sh
+./scripts/check-macos-installer.sh
 ./scripts/check-macos-imk.sh
 ./scripts/check-macos-upgrade-coordinator.sh
 ./scripts/check-macos-upgrade-product-coordination.sh
@@ -110,5 +113,6 @@ cmp -s AGENTS.md CLAUDE.md
 - [macOS 产品包边界](../macos-product-package-boundary.md)：M4 组件、版本、数据、签名与装配停止线。
 - [macOS 安装载体 ADR](../adr/0008-macos-installation-carrier.md)：M4-P03 用户域 Installer、固定目标、程序事务与移除边界。
 - [macOS 程序安装事务](../macos-installation-transaction.md)：外层 operation、产品身份、receipt/guard、状态机与启动门禁。
+- [macOS Installer App 边界](../macos-installer-app-boundary.md)：独立 UI、只读状态投影、稳定 snapshot 与显式授权。
 - [macOS 数据升级协调器](../macos-data-upgrade-coordinator.md)：M4-P02 状态机、receipt、SQLite 快照、双端验证与回滚边界。
 - [本周周志](../devlogs/2026-W30.md)：本周 M3 退出、M4-P01 装配与 M4-P02 升级协调器的验证和交接流水。

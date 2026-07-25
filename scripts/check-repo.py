@@ -49,6 +49,7 @@ REQUIRED_FILES = [
     "docs/macos-product-package-boundary.md",
     "docs/macos-data-upgrade-coordinator.md",
     "docs/macos-installation-transaction.md",
+    "docs/macos-installer-app-boundary.md",
     "docs/adr/0008-macos-installation-carrier.md",
     "docs/adr/0007-apple-secure-enclave-p256-backend.md",
     "docs/runbooks/apple-secure-enclave-p256-backend.md",
@@ -80,6 +81,18 @@ REQUIRED_FILES = [
     "platforms/macos-product/InstallCoordinatorAdapter/README.md",
     "platforms/macos-product/InstallCoordinatorAdapter/src/lib.rs",
     "platforms/macos-product/InstallCoordinatorAdapter/src/tests.rs",
+    "platforms/macos-product/InstallerDriver/Cargo.toml",
+    "platforms/macos-product/InstallerDriver/README.md",
+    "platforms/macos-product/InstallerDriver/src/lib.rs",
+    "platforms/macos-product/InstallerDriver/src/tests.rs",
+    "platforms/macos-product/InstallerApp/README.md",
+    "platforms/macos-product/InstallerApp/Resources/Info.plist.in",
+    "platforms/macos-product/InstallerApp/Sources/RLXInstallerPresentation.h",
+    "platforms/macos-product/InstallerApp/Sources/RLXInstallerPresentation.m",
+    "platforms/macos-product/InstallerApp/Sources/main.m",
+    "platforms/macos-product/InstallerApp/Tests/presentation_contract.m",
+    "platforms/macos-product/InstallerApp/build.sh",
+    "platforms/macos-product/InstallerApp/check.sh",
     "scripts/check-android-target.py",
     "scripts/check-android-target.sh",
     "scripts/check-docs.py",
@@ -92,6 +105,7 @@ REQUIRED_FILES = [
     "scripts/check-macos-install-layout.sh",
     "scripts/check-macos-install-adapter.sh",
     "scripts/check-macos-install-coordinator.sh",
+    "scripts/check-macos-installer.sh",
     "scripts/check-product-install-core.sh",
     "scripts/check-macos-upgrade-preflight.sh",
     "scripts/check-macos-upgrade-coordinator.sh",
@@ -307,6 +321,12 @@ def check_macos_install_coordinator() -> None:
     run_command([str(REPO_ROOT / "scripts/check-macos-install-coordinator.sh")])
 
 
+def check_macos_installer() -> None:
+    if sys.platform != "darwin":
+        return
+    run_command([str(REPO_ROOT / "scripts/check-macos-installer.sh")])
+
+
 def check_macos_upgrade_preflight() -> None:
     if sys.platform != "darwin":
         return
@@ -476,6 +496,7 @@ def main() -> int:
     check_product_install_core()
     check_macos_install_adapter()
     check_macos_install_coordinator()
+    check_macos_installer()
     check_macos_upgrade_preflight()
     check_ruleset_and_workflows()
     check_path_budget()

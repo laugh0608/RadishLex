@@ -749,6 +749,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "radishlex-macos-installer-driver"
+version = "0.1.0"
+dependencies = [
+ "radishlex-ime-product-install",
+]
+
+[[package]]
 name = "radishlex-macos-product-install"
 version = "0.1.0"
 dependencies = [

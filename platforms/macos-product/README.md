@@ -1,6 +1,6 @@
 # macOS 产品平台宿主与安装适配说明
 
-本文说明 `platforms/macos-product/` 内的平台宿主、固定输入、输出与验证边界，面向维护 M4 数据升级协调器、程序安装事务、Manager/InputMethod 产品构建和仓库门禁的开发者。本文不包含真实用户目录演练、Installer UI、进程停止授权、Developer ID 凭据或公证步骤；数据状态机见 [macOS 数据升级协调器边界](../../docs/macos-data-upgrade-coordinator.md)，程序事务见 [macOS 程序安装事务](../../docs/macos-installation-transaction.md)。
+本文说明 `platforms/macos-product/` 内的平台宿主、固定输入、输出与验证边界，面向维护 M4 数据升级协调器、程序安装事务、Installer、Manager/InputMethod 产品构建和仓库门禁的开发者。本文不包含真实用户目录演练、进程停止授权、Developer ID 凭据或公证步骤；数据状态机见 [macOS 数据升级协调器边界](../../docs/macos-data-upgrade-coordinator.md)，程序事务见 [macOS 程序安装事务](../../docs/macos-installation-transaction.md)，Installer UI/驱动见 [macOS Installer App 边界](../../docs/macos-installer-app-boundary.md)。
 
 ## 目录职责
 
@@ -25,6 +25,14 @@ platforms/macos-product/
   InstallCoordinatorAdapter/
     src/                     install/data receipt and rollback composition
     Cargo.toml
+  InstallerDriver/
+    src/                     read-only snapshot and action authorization
+    Cargo.toml
+  InstallerApp/
+    Sources/                 independent AppKit presentation shell
+    Tests/                   snapshot and fail-closed contract
+    build.sh
+    check.sh
 ```
 
 平台宿主只吸收 macOS 路径解析、Foundation/AppKit 进程与容量 API、bundle 资源定位和 native executable 生命周期。receipt、文件身份、状态转换和候选证据属于 `ime-product-upgrade`；SQLite schema/migration 属于 `ime-userdb`；宿主不得成为新的业务真相源。
@@ -88,6 +96,12 @@ staging 使用 `/usr/bin/ditto` 保留 resource fork、extended attributes、ACL
 upgrade 产品终态在 `final_verified` 与 `completed` 前分别复验外层/data receipt、双 guard、Application Support identity、source/target release、data `completed` 和 installed 双 bundle。ABI v9 外层 startup gate 不接收运行 identity；它只从当前 executable 所在固定用户域 bundle 形成 Info.plist release、完整 tree 与 Developer ID code identity，并在 Manager/InputMethod 的既有数据 gate 和全部业务初始化之前执行。
 
 ## 构建与验证
+
+Installer 的只读驱动和独立 AppKit 壳使用专用门禁。它验证 restart snapshot、stale action、remove 数据保留授权、未知结果失败关闭、固定 bundle metadata/layout 和禁止 UI 跨越 receipt/TIS/路径边界；不会启动 GUI 或执行真实安装：
+
+```bash
+./scripts/check-macos-installer.sh
+```
 
 Manager helper 由 Xcode native library 嵌入阶段构建并签名：
 

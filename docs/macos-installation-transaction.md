@@ -1,6 +1,6 @@
 # macOS 程序安装事务
 
-本文定义 RadishLex M4-P03 双 bundle 安装、升级、修复和默认程序移除的外层事务核心，读者是 `ime-product-install`、Installer、Manager/InputMethod startup gate 与 macOS 平台适配层维护者。本文不包含 Installer UI、真实用户目录操作、Apple 凭据、签名实现、数据 migration SQL 或历史验证流水；分发载体见 [ADR 0008](adr/0008-macos-installation-carrier.md)，数据升级仍见 [macOS 数据升级协调器](macos-data-upgrade-coordinator.md)。
+本文定义 RadishLex M4-P03 双 bundle 安装、升级、修复和默认程序移除的外层事务核心，读者是 `ime-product-install`、Installer、Manager/InputMethod startup gate 与 macOS 平台适配层维护者。本文不展开 Installer UI、真实用户目录操作、Apple 凭据、签名实现、数据 migration SQL 或历史验证流水；UI/驱动见 [macOS Installer App 边界](macos-installer-app-boundary.md)，分发载体见 [ADR 0008](adr/0008-macos-installation-carrier.md)，数据升级仍见 [macOS 数据升级协调器](macos-data-upgrade-coordinator.md)。
 
 ## 职责分层
 
@@ -250,4 +250,4 @@ receipt format 固定为 `radishlex-product-install-receipt-v1`，最大 64 KiB�
 - preserve、逐端 commit 和 rollback 的每个 rename、目标目录 fsync、源目录 fsync 边界均可注入故障并从精确 inode 现场重试；
 - startup gate 对缺失、非终态、终态身份匹配/漂移、remove、损坏、未知对象和中断写均有稳定结果；
 - 普通测试只使用合成 `0700` 临时目录；隔离产品资格只在带固定 marker 的系统临时根内使用真实构建 bundle、ad-hoc qualification identity 与合成 Application Support，不访问真实用户目录、程序目标、系统设置、Keychain 或发布签名凭据。
-- macOS adapter、真实 bundle 内容/签名复验、M4-P02 状态映射、两段终态、双端 startup 接线与隔离端到端恢复资格已落地；Installer UI 和身份绑定终态清理仍属于后续切面。
+- macOS adapter、真实 bundle 内容/签名复验、M4-P02 状态映射、两段终态、双端 startup 接线与隔离端到端恢复资格已落地；Installer 只读状态投影、显式授权 contract 与独立 AppKit 壳已落地，隔离写 executor 和身份绑定终态清理仍属于后续切面。
