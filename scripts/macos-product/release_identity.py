@@ -120,6 +120,22 @@ def build_identity(
     }
 
 
+def verify_upgrade_source_identity(
+    target_manager: SignedBundleIdentity,
+    target_input_method: SignedBundleIdentity,
+    source_manager: SignedBundleIdentity,
+    source_input_method: SignedBundleIdentity,
+) -> None:
+    if (
+        target_manager != source_manager
+        or target_input_method != source_input_method
+        or target_manager.team_identifier != target_input_method.team_identifier
+    ):
+        raise ReleaseIdentityError(
+            "historical source code identity differs from target release"
+        )
+
+
 def inspect_arguments(arguments: argparse.Namespace) -> dict[str, object]:
     return build_identity(
         inspect_signed_bundle(
@@ -166,6 +182,25 @@ def verify(arguments: argparse.Namespace) -> None:
         raise ReleaseIdentityError("release identity does not match signed bundles")
 
 
+def verify_upgrade_source(arguments: argparse.Namespace) -> None:
+    verify_upgrade_source_identity(
+        inspect_signed_bundle(
+            arguments.target_manager_bundle, EXPECTED_BUNDLE_IDS["manager"]
+        ),
+        inspect_signed_bundle(
+            arguments.target_input_method_bundle,
+            EXPECTED_BUNDLE_IDS["input_method"],
+        ),
+        inspect_signed_bundle(
+            arguments.source_manager_bundle, EXPECTED_BUNDLE_IDS["manager"]
+        ),
+        inspect_signed_bundle(
+            arguments.source_input_method_bundle,
+            EXPECTED_BUNDLE_IDS["input_method"],
+        ),
+    )
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser()
     subparsers = result.add_subparsers(dest="command", required=True)
@@ -178,6 +213,11 @@ def parser() -> argparse.ArgumentParser:
             subparser.add_argument("--output", type=Path, required=True)
         else:
             subparser.add_argument("--identity", type=Path, required=True)
+    source = subparsers.add_parser("verify-upgrade-source")
+    source.add_argument("--target-manager-bundle", type=Path, required=True)
+    source.add_argument("--target-input-method-bundle", type=Path, required=True)
+    source.add_argument("--source-manager-bundle", type=Path, required=True)
+    source.add_argument("--source-input-method-bundle", type=Path, required=True)
     return result
 
 
@@ -186,8 +226,10 @@ def main() -> None:
     try:
         if arguments.command == "create":
             create(arguments)
-        else:
+        elif arguments.command == "verify":
             verify(arguments)
+        else:
+            verify_upgrade_source(arguments)
     except ReleaseIdentityError as error:
         raise SystemExit(str(error)) from error
 

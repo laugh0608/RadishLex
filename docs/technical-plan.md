@@ -135,7 +135,7 @@ M4 产品升级把运行时打开与产品迁移分开：`ime-userdb` 提供不�
 
 该 crate 不进入输入热路径，不承载安装器 UI、SQLite migration SQL、macOS 进程控制或调用方自定义路径。完整边界见 [macOS 数据升级协调器](macos-data-upgrade-coordinator.md)。
 
-M4-P03 以签名、公证 DMG 内的独立用户域 Installer app 承担程序安装事务；Manager、InputMethod 和 Application Support 分别固定到 current-user home 下的 `Applications`、`Library/Input Methods` 与 `Library/Application Support/RadishLex`。`InstallPayloadManifest.json` 绑定 committed layout 与 ProductManifest，`.radishlex-install-v1` 外层 receipt/guard 负责两处程序切换和数据协调的一致性。非终态程序事务必须进入双端 startup gate，不能让旧程序在数据切换后重新启动。完整决策见 [ADR 0008](adr/0008-macos-installation-carrier.md)。
+M4-P03 以签名、公证 DMG 内的独立用户域 Installer app 承担程序安装事务；Manager、InputMethod 和 Application Support 分别固定到 current-user home 下的 `Applications`、`Library/Input Methods` 与 `Library/Application Support/RadishLex`。`InstallPayloadManifest.json` format v2 绑定 committed layout、target ProductManifest 与显式历史 source assembly 集合；production upgrade 只从外层 receipt 精确 release 选取旧版本 validation/rollback host。`.radishlex-install-v1` 外层 receipt/guard 负责两处程序切换和数据协调的一致性。非终态程序事务必须进入双端 startup gate，不能让旧程序在数据切换后重新启动。完整决策见 [ADR 0008](adr/0008-macos-installation-carrier.md)。
 
 ### ime-product-install
 

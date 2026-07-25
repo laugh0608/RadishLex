@@ -98,6 +98,15 @@ RADISHLEX_DEVELOPER_ID_APPLICATION="Developer ID Application: …" \
 升级必须使用真实上一发布产物作为 source，不得用同代码改版本冒充跨发布证据：
 
 1. 冻结 source/target product、InstallPayload、双 designated requirement 和基线数据身份。
+   发布构建必须显式传入真实历史 assembly：
+
+   ```bash
+   RADISHLEX_DEVELOPER_ID_APPLICATION="Developer ID Application: …" \
+     ./scripts/build-macos-release-installer.sh \
+     --upgrade-source-product-root "/absolute/path/to/frozen-source-product"
+   ```
+
+   构建必须证明 source/target 双 component exact designated requirement 一致，且 payload v2 中 source release/path/ProductManifest 精确绑定。
 2. 人工切回中立输入源并关闭双端；开始 upgrade，确认外层 receipt 先到 `prepared`。
 3. 分别在 Manager 已提交、双程序已提交、data switch 后、`final_verified` 后执行受控异常退出；重启 Installer 必须沿同 operation 续跑。
 4. candidate 或 post-switch 失败时，必须按 receipt 恢复 source 双 bundle和原数据 inode；旧程序只有在 source-release validation 通过后才允许启动。

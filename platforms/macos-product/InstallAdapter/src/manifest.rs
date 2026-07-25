@@ -18,6 +18,7 @@ use crate::{
 
 const COMMITTED_LAYOUT: &[u8] = include_bytes!("../../../../packaging/macos/install-layout.json");
 const PAYLOAD_MANIFEST_NAME: &str = "InstallPayloadManifest.json";
+const UPGRADE_SOURCES_DIRECTORY: &str = "UpgradeSources";
 const PRODUCT_MANIFEST_NAME: &str = "ProductManifest.json";
 const LICENSE_NAME: &str = "LICENSE";
 const MANAGER_PRODUCT_PATH: &str = "Components/radishlex_manager.app";
@@ -31,6 +32,7 @@ const MANAGER_BUNDLE_ID: &str = "dev.radishlex.radishlexManager";
 const INPUT_METHOD_BUNDLE_ID: &str = "org.radishlex.inputmethod.macos";
 const MAX_MANIFEST_BYTES: u64 = 2 * 1024 * 1024;
 const MAX_BUNDLE_RECORDS: usize = 20_000;
+const MAX_UPGRADE_SOURCES: usize = 64;
 
 #[derive(Debug)]
 pub(crate) struct VerifiedInstallPayload {
@@ -39,6 +41,14 @@ pub(crate) struct VerifiedInstallPayload {
     manager_bundle: PathBuf,
     input_method_bundle: PathBuf,
     target_product: ProductArtifactIdentity,
+    upgrade_sources: Vec<VerifiedUpgradeSource>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct VerifiedUpgradeSource {
+    release: ProductRelease,
+    product_root: PathBuf,
+    product: ProductArtifactIdentity,
 }
 
 impl VerifiedInstallPayload {
@@ -53,6 +63,7 @@ impl VerifiedInstallPayload {
             manager_bundle: snapshot.manager_bundle,
             input_method_bundle: snapshot.input_method_bundle,
             target_product: snapshot.target_product,
+            upgrade_sources: snapshot.upgrade_sources,
         })
     }
 
@@ -67,6 +78,13 @@ impl VerifiedInstallPayload {
         }
     }
 
+    pub(crate) fn upgrade_source_product_root(&self, release: &ProductRelease) -> Option<&Path> {
+        self.upgrade_sources
+            .iter()
+            .find(|source| &source.release == release)
+            .map(|source| source.product_root.as_path())
+    }
+
     pub(crate) fn revalidate(
         &self,
         verifier: &dyn MacOsCodeSignatureVerifier,
@@ -76,6 +94,7 @@ impl VerifiedInstallPayload {
             || snapshot.manager_bundle != self.manager_bundle
             || snapshot.input_method_bundle != self.input_method_bundle
             || snapshot.target_product != self.target_product
+            || snapshot.upgrade_sources != self.upgrade_sources
         {
             return Err(error(MacOsInstallAdapterErrorCode::ProductChanged));
         }
@@ -88,6 +107,7 @@ struct PayloadSnapshot {
     manager_bundle: PathBuf,
     input_method_bundle: PathBuf,
     target_product: ProductArtifactIdentity,
+    upgrade_sources: Vec<VerifiedUpgradeSource>,
 }
 
 impl PayloadSnapshot {
@@ -98,7 +118,12 @@ impl PayloadSnapshot {
         let root_identity = verify_payload_root(root)?;
         require_exact_entries(
             root,
-            &["InstallLayout.json", PAYLOAD_MANIFEST_NAME, "Product"],
+            &[
+                "InstallLayout.json",
+                PAYLOAD_MANIFEST_NAME,
+                "Product",
+                UPGRADE_SOURCES_DIRECTORY,
+            ],
             MacOsInstallAdapterErrorCode::UnsafePayload,
         )?;
 
@@ -119,10 +144,79 @@ impl PayloadSnapshot {
             .map_err(|_| error(MacOsInstallAdapterErrorCode::InvalidPayloadManifest))?;
         payload.validate(&layout_path, &layout_bytes)?;
 
-        let product_root = root.join("Product");
-        require_real_directory(&product_root, MacOsInstallAdapterErrorCode::UnsafePayload)?;
+        let target = ProductAssemblySnapshot::load(
+            &root.join("Product"),
+            &payload.product_manifest,
+            "Product/ProductManifest.json",
+            verifier,
+        )?;
+        payload.validate_product(&target.manifest)?;
+        let upgrade_sources_root = root.join(UPGRADE_SOURCES_DIRECTORY);
+        require_real_directory(
+            &upgrade_sources_root,
+            MacOsInstallAdapterErrorCode::UnsafePayload,
+        )?;
+        let expected_source_names: BTreeSet<_> = payload
+            .upgrade_sources
+            .iter()
+            .map(|source| source.directory_name())
+            .collect::<Result<_, _>>()?;
+        require_exact_entry_set(
+            &upgrade_sources_root,
+            &expected_source_names,
+            MacOsInstallAdapterErrorCode::InvalidPayloadManifest,
+        )?;
+        let mut upgrade_sources = Vec::with_capacity(payload.upgrade_sources.len());
+        let mut previous_build = 0;
+        for source in &payload.upgrade_sources {
+            source.validate(previous_build, target.product.release().build_number())?;
+            let product_root = root.join(&source.product_path);
+            let assembly = ProductAssemblySnapshot::load(
+                &product_root,
+                &source.product_manifest,
+                &format!("{}/ProductManifest.json", source.product_path),
+                verifier,
+            )?;
+            if assembly.product.release().product_version() != source.product_version
+                || assembly.product.release().build_number().to_string() != source.build_number
+            {
+                return Err(error(MacOsInstallAdapterErrorCode::InvalidPayloadManifest));
+            }
+            previous_build = assembly.product.release().build_number();
+            upgrade_sources.push(VerifiedUpgradeSource {
+                release: assembly.product.release().clone(),
+                product_root,
+                product: assembly.product,
+            });
+        }
+
+        Ok(Self {
+            root_identity,
+            manager_bundle: target.manager_bundle,
+            input_method_bundle: target.input_method_bundle,
+            target_product: target.product,
+            upgrade_sources,
+        })
+    }
+}
+
+struct ProductAssemblySnapshot {
+    manager_bundle: PathBuf,
+    input_method_bundle: PathBuf,
+    manifest: ProductManifest,
+    product: ProductArtifactIdentity,
+}
+
+impl ProductAssemblySnapshot {
+    fn load(
+        product_root: &Path,
+        manifest_record: &ManifestFileRecord,
+        expected_manifest_path: &str,
+        verifier: &dyn MacOsCodeSignatureVerifier,
+    ) -> Result<Self, MacOsInstallAdapterError> {
+        require_real_directory(product_root, MacOsInstallAdapterErrorCode::UnsafePayload)?;
         require_exact_entries(
-            &product_root,
+            product_root,
             &["Components", LICENSE_NAME, PRODUCT_MANIFEST_NAME],
             MacOsInstallAdapterErrorCode::InvalidProductManifest,
         )?;
@@ -146,39 +240,33 @@ impl PayloadSnapshot {
             &input_method_bundle,
             MacOsInstallAdapterErrorCode::InvalidProductManifest,
         )?;
-
         let product_manifest_path = product_root.join(PRODUCT_MANIFEST_NAME);
         let product_bytes = read_regular_file(
             &product_manifest_path,
             MacOsInstallAdapterErrorCode::InvalidProductManifest,
         )?;
-        payload
-            .product_manifest
+        manifest_record
             .verify(
                 &product_manifest_path,
                 &product_bytes,
-                "Product/ProductManifest.json",
+                expected_manifest_path,
             )
             .map_err(|_| error(MacOsInstallAdapterErrorCode::InvalidPayloadManifest))?;
-        let product_manifest: ProductManifest = serde_json::from_slice(&product_bytes)
+        let manifest: ProductManifest = serde_json::from_slice(&product_bytes)
             .map_err(|_| error(MacOsInstallAdapterErrorCode::InvalidProductManifest))?;
-        product_manifest.validate()?;
-        payload.validate_product(&product_manifest)?;
-
+        manifest.validate()?;
         let license_path = product_root.join(LICENSE_NAME);
         let license_bytes = read_regular_file(
             &license_path,
             MacOsInstallAdapterErrorCode::InvalidProductManifest,
         )?;
-        product_manifest.verify_license(&license_path, &license_bytes)?;
-
-        let manager = product_manifest.component("manager")?;
-        let input_method = product_manifest.component("input_method")?;
+        manifest.verify_license(&license_path, &license_bytes)?;
+        let manager = manifest.component("manager")?;
+        let input_method = manifest.component("input_method")?;
         let manager_tree = inspect_bundle_tree(&manager_bundle)?;
         manager.verify_tree(&manager_tree)?;
         let input_method_tree = inspect_bundle_tree(&input_method_bundle)?;
         input_method.verify_tree(&input_method_tree)?;
-
         let manager_code = verifier.verify(
             &manager_bundle,
             ProgramComponent::Manager,
@@ -203,10 +291,9 @@ impl PayloadSnapshot {
                 MacOsInstallAdapterErrorCode::SignatureIdentityChanged,
             ));
         }
-
         let release = ProductRelease::new(
-            product_manifest.product_version.clone(),
-            parse_positive_u64(&product_manifest.build_number)?,
+            manifest.product_version.clone(),
+            parse_positive_u64(&manifest.build_number)?,
         )
         .map_err(|_| error(MacOsInstallAdapterErrorCode::InvalidProductManifest))?;
         let manager_identity = ProgramBundleIdentity::new(
@@ -223,20 +310,19 @@ impl PayloadSnapshot {
             input_method_code.evidence_sha256(),
         )
         .map_err(|_| error(MacOsInstallAdapterErrorCode::InvalidProductManifest))?;
-        let target_product = ProductArtifactIdentity::new(
-            product_manifest.product_id.clone(),
+        let product = ProductArtifactIdentity::new(
+            manifest.product_id.clone(),
             release,
             sha256_bytes(&product_bytes),
             manager_identity,
             input_method_identity,
         )
         .map_err(|_| error(MacOsInstallAdapterErrorCode::InvalidProductManifest))?;
-
         Ok(Self {
-            root_identity,
             manager_bundle,
             input_method_bundle,
-            target_product,
+            manifest,
+            product,
         })
     }
 }
@@ -256,6 +342,7 @@ struct PayloadManifest {
     data: PayloadData,
     install_layout: ManifestFileRecord,
     product_manifest: ManifestFileRecord,
+    upgrade_sources: Vec<PayloadUpgradeSource>,
 }
 
 impl PayloadManifest {
@@ -264,7 +351,7 @@ impl PayloadManifest {
         layout_path: &Path,
         layout_bytes: &[u8],
     ) -> Result<(), MacOsInstallAdapterError> {
-        if self.format_version != 1
+        if self.format_version != 2
             || self.product_id != INSTALL_PRODUCT_ID
             || !valid_version(&self.product_version, 3)
             || parse_positive_u64(&self.build_number).is_err()
@@ -280,6 +367,7 @@ impl PayloadManifest {
             || self.data.install_state_path != INSTALL_STATE_PATH
             || self.data.default_removal != "programs-only"
             || self.data.data_removal != "separate-authorized-flow"
+            || self.upgrade_sources.len() > MAX_UPGRADE_SOURCES
         {
             return Err(error(MacOsInstallAdapterErrorCode::InvalidPayloadManifest));
         }
@@ -292,6 +380,43 @@ impl PayloadManifest {
             || self.product_version != product.product_version
             || self.build_number != product.build_number
         {
+            return Err(error(MacOsInstallAdapterErrorCode::InvalidPayloadManifest));
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PayloadUpgradeSource {
+    product_version: String,
+    build_number: String,
+    product_path: String,
+    product_manifest: ManifestFileRecord,
+}
+
+impl PayloadUpgradeSource {
+    fn directory_name(&self) -> Result<String, MacOsInstallAdapterError> {
+        if !valid_version(&self.product_version, 3)
+            || parse_positive_u64(&self.build_number).is_err()
+        {
+            return Err(error(MacOsInstallAdapterErrorCode::InvalidPayloadManifest));
+        }
+        let name = format!("{}-{}", self.product_version, self.build_number);
+        if self.product_path != format!("{UPGRADE_SOURCES_DIRECTORY}/{name}") {
+            return Err(error(MacOsInstallAdapterErrorCode::InvalidPayloadManifest));
+        }
+        Ok(name)
+    }
+
+    fn validate(
+        &self,
+        previous_build: u64,
+        target_build: u64,
+    ) -> Result<(), MacOsInstallAdapterError> {
+        self.directory_name()?;
+        let build = parse_positive_u64(&self.build_number)?;
+        if build <= previous_build || build >= target_build {
             return Err(error(MacOsInstallAdapterErrorCode::InvalidPayloadManifest));
         }
         Ok(())
@@ -688,6 +813,24 @@ fn require_exact_entries(
     }
     let expected: BTreeSet<_> = expected.iter().map(|value| (*value).to_owned()).collect();
     if actual != expected {
+        return Err(error(code));
+    }
+    Ok(())
+}
+
+fn require_exact_entry_set(
+    directory: &Path,
+    expected: &BTreeSet<String>,
+    code: MacOsInstallAdapterErrorCode,
+) -> Result<(), MacOsInstallAdapterError> {
+    let mut actual = BTreeSet::new();
+    for entry in fs::read_dir(directory).map_err(|_| error(MacOsInstallAdapterErrorCode::Io))? {
+        let name = entry
+            .map_err(|_| error(MacOsInstallAdapterErrorCode::Io))?
+            .file_name();
+        actual.insert(name.to_str().ok_or_else(|| error(code))?.to_owned());
+    }
+    if &actual != expected {
         return Err(error(code));
     }
     Ok(())

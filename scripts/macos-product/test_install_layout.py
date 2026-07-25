@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import plistlib
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -139,6 +140,103 @@ class InstallLayoutTest(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertNotIn(str(self.root), manifest_text)
+        manifest = json.loads(manifest_text)
+        self.assertEqual(manifest["format_version"], 2)
+        self.assertEqual(manifest["upgrade_sources"], [])
+        self.assertTrue((first / install_layout.UPGRADE_SOURCES_DIRECTORY).is_dir())
+
+    def test_payload_binds_historical_product_assemblies_by_exact_release(self) -> None:
+        source = self.make_historical_product("0.0.9", "34")
+        payload = self.root / "payload-with-source"
+        install_layout.assemble_payload(
+            self.product,
+            payload,
+            upgrade_source_product_roots=[source],
+        )
+        install_layout.verify_payload(payload)
+        manifest = json.loads(
+            (payload / install_layout.PAYLOAD_MANIFEST_NAME).read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            manifest["upgrade_sources"],
+            [
+                {
+                    "build_number": "34",
+                    "product_manifest": install_layout.regular_file_record(
+                        payload
+                        / install_layout.UPGRADE_SOURCES_DIRECTORY
+                        / "0.0.9-34"
+                        / "ProductManifest.json",
+                        "UpgradeSources/0.0.9-34/ProductManifest.json",
+                    ),
+                    "product_path": "UpgradeSources/0.0.9-34",
+                    "product_version": "0.0.9",
+                }
+            ],
+        )
+        source_program = (
+            payload
+            / install_layout.UPGRADE_SOURCES_DIRECTORY
+            / "0.0.9-34"
+            / self.layout.manager_component_path
+            / "Contents/MacOS/component"
+        )
+        source_program.write_bytes(b"mutated historical executable")
+        with self.assertRaisesRegex(
+            install_layout.InstallLayoutError,
+            "component does not match its manifest",
+        ):
+            install_layout.verify_payload(payload)
+
+    def test_payload_rejects_duplicate_or_nonhistorical_source_builds(self) -> None:
+        source = self.make_historical_product("0.0.9", "34")
+        with self.assertRaisesRegex(
+            install_layout.InstallLayoutError,
+            "must be distinct",
+        ):
+            install_layout.assemble_payload(
+                self.product,
+                self.root / "duplicate-source-payload",
+                upgrade_source_product_roots=[source, source],
+            )
+        target_release = self.make_historical_product("0.1.0", "35")
+        with self.assertRaisesRegex(
+            install_layout.InstallLayoutError,
+            "must be older",
+        ):
+            install_layout.assemble_payload(
+                self.product,
+                self.root / "nonhistorical-source-payload",
+                upgrade_source_product_roots=[target_release],
+            )
+
+    def test_multiple_historical_sources_are_sorted_and_keep_distinct_paths(self) -> None:
+        older = self.make_historical_product("0.0.8", "33")
+        newer = self.make_historical_product("0.0.9", "34")
+        payload = self.root / "multiple-source-payload"
+        install_layout.assemble_payload(
+            self.product,
+            payload,
+            upgrade_source_product_roots=[newer, older],
+        )
+        manifest = json.loads(
+            (payload / install_layout.PAYLOAD_MANIFEST_NAME).read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            [
+                (source["build_number"], source["product_path"])
+                for source in manifest["upgrade_sources"]
+            ],
+            [
+                ("33", "UpgradeSources/0.0.8-33"),
+                ("34", "UpgradeSources/0.0.9-34"),
+            ],
+        )
+        install_layout.verify_payload(payload)
 
     def test_payload_verification_rejects_product_mutation(self) -> None:
         payload = self.root / "payload"
@@ -219,6 +317,34 @@ class InstallLayoutTest(unittest.TestCase):
             install_layout.InstallLayoutError, "differs from committed layout"
         ):
             install_layout.verify_payload(payload)
+
+    def make_historical_product(self, version: str, build: str) -> Path:
+        source = self.root / f"historical-{version}-{build}"
+        shutil.copytree(self.product, source, symlinks=True)
+        metadata_path = self.write_metadata(
+            product_version=version,
+            build_number=build,
+        )
+        metadata = product_manifest.ProductMetadata.load(metadata_path)
+        manager = source / self.layout.manager_component_path
+        input_method = source / self.layout.input_method_component_path
+        for bundle in (manager, input_method):
+            info_path = bundle / "Contents/Info.plist"
+            with info_path.open("rb") as stream:
+                info = plistlib.load(stream)
+            info["CFBundleShortVersionString"] = version
+            info["CFBundleVersion"] = build
+            self.write_plist(info_path, info)
+        product_manifest.write_manifest(
+            source / "ProductManifest.json",
+            product_manifest.expected_manifest(
+                metadata,
+                manager,
+                input_method,
+                source / "LICENSE",
+            ),
+        )
+        return source
 
 
 if __name__ == "__main__":

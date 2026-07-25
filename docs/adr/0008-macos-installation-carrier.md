@@ -72,9 +72,14 @@ Contents/Resources/InstallPayload/
     Components/RadishLexInputMethod.app
     LICENSE
     ProductManifest.json
+  UpgradeSources/
+    <source-version>-<source-build>/
+      Components/...
+      LICENSE
+      ProductManifest.json
 ```
 
-`ProductManifest.json` 绑定两个产品 bundle、native dependency、RimeData 和许可证。`InstallPayloadManifest.json` 再绑定产品 manifest、安装 layout、版本/build、Installer bundle ID 和目标路径。发布装配顺序必须是签名嵌套 Mach-O 与两个产品 bundle、冻结 product/payload manifest、签名 Installer bundle、创建并签名 DMG；任何后续修改都要求重新生成受影响的外层 manifest、重新签名并重新公证。
+`ProductManifest.json` 绑定两个产品 bundle、native dependency、RimeData 和许可证。`InstallPayloadManifest.json` format v2 再绑定 target product manifest、安装 layout、版本/build、Installer bundle ID、目标路径和显式历史 source 列表；每个 source 由自己的 ProductManifest 绑定完整旧产品，只用于旧版本 validation/rollback host。发布装配顺序必须是签名嵌套 Mach-O 与 target 两个产品 bundle、验证历史 source 的既有 exact Developer ID、冻结 product/payload manifest、签名 Installer bundle、创建并签名 DMG；任何后续修改都要求重新生成受影响的外层 manifest、重新签名并重新公证。
 
 ### 外层安装事务
 

@@ -66,6 +66,32 @@ class ReleaseIdentityTests(unittest.TestCase):
                 identities[0], changed_manager, identities[2]
             )
 
+    def test_upgrade_source_requires_exact_component_identities(self) -> None:
+        manager_id = release_identity.EXPECTED_BUNDLE_IDS["manager"]
+        input_method_id = release_identity.EXPECTED_BUNDLE_IDS["input_method"]
+        manager = release_identity.parse_codesign_output(
+            details(manager_id, "ABCDEFGHIJ"), manager_id
+        )
+        input_method = release_identity.parse_codesign_output(
+            details(input_method_id, "ABCDEFGHIJ"), input_method_id
+        )
+        release_identity.verify_upgrade_source_identity(
+            manager,
+            input_method,
+            manager,
+            input_method,
+        )
+        drifted_manager = release_identity.parse_codesign_output(
+            details(manager_id, "KLMNOPQRST"), manager_id
+        )
+        with self.assertRaises(release_identity.ReleaseIdentityError):
+            release_identity.verify_upgrade_source_identity(
+                manager,
+                input_method,
+                drifted_manager,
+                input_method,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

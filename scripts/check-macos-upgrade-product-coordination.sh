@@ -116,7 +116,8 @@ python3 "${install_layout_tool}" verify \
   --payload-root "${source_payload}"
 python3 "${install_layout_tool}" assemble \
   --product-root "${target_product}" \
-  --output "${target_payload}"
+  --output "${target_payload}" \
+  --upgrade-source-product-root "${source_product}"
 python3 "${install_layout_tool}" verify \
   --payload-root "${target_payload}"
 chmod 700 "${source_payload}" "${target_payload}"

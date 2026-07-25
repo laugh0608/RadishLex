@@ -287,6 +287,35 @@ fn ffi_contract_is_versioned_and_fails_closed_without_release_identity() {
 }
 
 #[test]
+fn upgrade_source_selection_uses_outer_receipt_identity() {
+    let source = product_at("0.0.9", 34, 'a');
+    let target = product_at("0.1.0", 35, 'b');
+    let root = TestFixture::new();
+    let receipt = InstallReceipt::new(
+        "00112233445566778899aabbccddeeff",
+        None,
+        radishlex_ime_product_install::InstallOperationKind::Upgrade,
+        root.store.root_identity().clone(),
+        Some(source.clone()),
+        Some(target),
+    )
+    .expect("upgrade receipt");
+    assert_eq!(upgrade_source_release(&receipt), Some(source.release()));
+    let selected = Path::new("/manifest-bound/source");
+    assert_eq!(
+        select_upgrade_source_root(&receipt, |release| {
+            assert_eq!(release, source.release());
+            Some(selected)
+        }),
+        Ok(selected)
+    );
+    assert_eq!(
+        select_upgrade_source_root(&receipt, |_| None),
+        Err(InstallerStableError::DriverUnavailable)
+    );
+}
+
+#[test]
 fn bootstrap_derives_only_fixed_bundle_and_user_domain_paths() {
     let root = fs::canonicalize(std::env::temp_dir())
         .expect("temporary root")
@@ -408,10 +437,14 @@ fn bootstrap_accepts_only_strict_release_identity_resource() {
 }
 
 fn product() -> ProductArtifactIdentity {
+    product_at("1.0.0", 1, '0')
+}
+
+fn product_at(version: &str, build: u64, marker: char) -> ProductArtifactIdentity {
     ProductArtifactIdentity::new(
         INSTALL_PRODUCT_ID,
-        ProductRelease::new("1.0.0", 1).expect("release"),
-        hash('0'),
+        ProductRelease::new(version, build).expect("release"),
+        hash(marker),
         ProgramBundleIdentity::new(
             ProgramComponent::Manager,
             "org.radishlex.manager",

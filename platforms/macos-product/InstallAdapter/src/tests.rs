@@ -470,6 +470,61 @@ fn layout_payload_and_product_mutations_fail_closed() {
 }
 
 #[test]
+fn historical_upgrade_sources_are_release_bound_and_revalidated() {
+    let fixture = Fixture::new("0.1.0", "35", "target");
+    add_upgrade_source(&fixture.payload, "0.0.9", "34", "source");
+    let adapter = fixture
+        .adapter(
+            Arc::new(SignatureState::default()),
+            Arc::new(CopyState::default()),
+        )
+        .expect("adapter with historical source");
+    let source_release = ProductRelease::new("0.0.9", 34).expect("source release");
+    let source_root = adapter
+        .upgrade_source_product_root(&source_release)
+        .expect("manifest-bound source");
+    assert_eq!(source_root, fixture.payload.join("UpgradeSources/0.0.9-34"));
+    assert!(adapter
+        .upgrade_source_product_root(&ProductRelease::new("0.0.8", 33).expect("missing release"))
+        .is_none());
+
+    fs::write(
+        source_root.join("Components/radishlex_manager.app/Contents/MacOS/program"),
+        b"drifted source",
+    )
+    .expect("mutate source");
+    assert_eq!(
+        adapter
+            .revalidate_target_product()
+            .expect_err("historical source mutation")
+            .code(),
+        MacOsInstallAdapterErrorCode::ProductChanged
+    );
+
+    let duplicate = Fixture::new("0.1.0", "35", "target");
+    add_upgrade_source(&duplicate.payload, "0.0.9", "34", "source");
+    let manifest_path = duplicate.payload.join("InstallPayloadManifest.json");
+    let mut manifest: Value =
+        serde_json::from_slice(&fs::read(&manifest_path).expect("payload manifest"))
+            .expect("payload JSON");
+    let sources = manifest["upgrade_sources"]
+        .as_array_mut()
+        .expect("source array");
+    sources.push(sources[0].clone());
+    write_json(&manifest_path, &manifest);
+    assert_eq!(
+        duplicate
+            .adapter(
+                Arc::new(SignatureState::default()),
+                Arc::new(CopyState::default())
+            )
+            .expect_err("duplicate release")
+            .code(),
+        MacOsInstallAdapterErrorCode::InvalidPayloadManifest
+    );
+}
+
+#[test]
 fn signature_rejection_and_identity_drift_never_reach_receipt_evidence() {
     let fixture = Fixture::new("0.1.0", "35", "target");
     let rejected = Arc::new(SignatureState::default());
@@ -669,13 +724,55 @@ fn create_user_layout(home: &Path) {
 
 fn build_payload(root: &Path, version: &str, build: &str, marker: &str) {
     create_directory(root, 0o700);
-    create_directory(&root.join("Product"), 0o700);
-    create_directory(&root.join("Product/Components"), 0o700);
-    let manager = root.join("Product/Components/radishlex_manager.app");
-    let input_method = root.join("Product/Components/RadishLexInputMethod.app");
+    build_product_root(&root.join("Product"), version, build, marker);
+    create_directory(&root.join("UpgradeSources"), 0o700);
+    fs::write(root.join("InstallLayout.json"), COMMITTED_LAYOUT).expect("layout");
+    let payload_manifest = json!({
+        "format_version": 2,
+        "product_id": INSTALL_PRODUCT_ID,
+        "product_version": version,
+        "build_number": build,
+        "distribution_container": "dmg",
+        "installer_kind": "dedicated-user-domain-app",
+        "installation_scope": "current-user",
+        "installer_bundle_id": "org.radishlex.installer.macos",
+        "components": {
+            "manager": {
+                "product_path": "Components/radishlex_manager.app",
+                "target_path": "Applications/RadishLex Manager.app"
+            },
+            "input_method": {
+                "product_path": "Components/RadishLexInputMethod.app",
+                "target_path": "Library/Input Methods/RadishLexInputMethod.app"
+            }
+        },
+        "data": {
+            "root_path": "Library/Application Support/RadishLex",
+            "install_state_path": "Library/Application Support/RadishLex/.radishlex-install-v1",
+            "default_removal": "programs-only",
+            "data_removal": "separate-authorized-flow"
+        },
+        "install_layout": manifest_file_record(
+            &root.join("InstallLayout.json"),
+            "InstallLayout.json"
+        ),
+        "product_manifest": manifest_file_record(
+            &root.join("Product/ProductManifest.json"),
+            "Product/ProductManifest.json"
+        ),
+        "upgrade_sources": []
+    });
+    write_json(&root.join("InstallPayloadManifest.json"), &payload_manifest);
+}
+
+fn build_product_root(root: &Path, version: &str, build: &str, marker: &str) {
+    create_directory(root, 0o700);
+    create_directory(&root.join("Components"), 0o700);
+    let manager = root.join("Components/radishlex_manager.app");
+    let input_method = root.join("Components/RadishLexInputMethod.app");
     create_bundle(&manager, "manager", marker);
     create_bundle(&input_method, "input-method", marker);
-    fs::write(root.join("Product/LICENSE"), b"synthetic license\n").expect("license");
+    fs::write(root.join("LICENSE"), b"synthetic license\n").expect("license");
     let product_manifest = json!({
         "format_version": 1,
         "product_id": INSTALL_PRODUCT_ID,
@@ -708,50 +805,34 @@ fn build_payload(root: &Path, version: &str, build: &str, marker: &str) {
         ],
         "licenses": [{
             "path": "LICENSE",
-            "size": fs::metadata(root.join("Product/LICENSE")).expect("license metadata").len(),
-            "sha256": file_sha256(&root.join("Product/LICENSE")),
+            "size": fs::metadata(root.join("LICENSE")).expect("license metadata").len(),
+            "sha256": file_sha256(&root.join("LICENSE")),
         }]
     });
-    write_json(
-        &root.join("Product/ProductManifest.json"),
-        &product_manifest,
-    );
-    fs::write(root.join("InstallLayout.json"), COMMITTED_LAYOUT).expect("layout");
-    let payload_manifest = json!({
-        "format_version": 1,
-        "product_id": INSTALL_PRODUCT_ID,
-        "product_version": version,
-        "build_number": build,
-        "distribution_container": "dmg",
-        "installer_kind": "dedicated-user-domain-app",
-        "installation_scope": "current-user",
-        "installer_bundle_id": "org.radishlex.installer.macos",
-        "components": {
-            "manager": {
-                "product_path": "Components/radishlex_manager.app",
-                "target_path": "Applications/RadishLex Manager.app"
-            },
-            "input_method": {
-                "product_path": "Components/RadishLexInputMethod.app",
-                "target_path": "Library/Input Methods/RadishLexInputMethod.app"
-            }
-        },
-        "data": {
-            "root_path": "Library/Application Support/RadishLex",
-            "install_state_path": "Library/Application Support/RadishLex/.radishlex-install-v1",
-            "default_removal": "programs-only",
-            "data_removal": "separate-authorized-flow"
-        },
-        "install_layout": manifest_file_record(
-            &root.join("InstallLayout.json"),
-            "InstallLayout.json"
-        ),
-        "product_manifest": manifest_file_record(
-            &root.join("Product/ProductManifest.json"),
-            "Product/ProductManifest.json"
-        )
-    });
-    write_json(&root.join("InstallPayloadManifest.json"), &payload_manifest);
+    write_json(&root.join("ProductManifest.json"), &product_manifest);
+}
+
+fn add_upgrade_source(payload_root: &Path, version: &str, build: &str, marker: &str) {
+    let relative = format!("UpgradeSources/{version}-{build}");
+    let source_root = payload_root.join(&relative);
+    build_product_root(&source_root, version, build, marker);
+    let manifest_path = payload_root.join("InstallPayloadManifest.json");
+    let mut manifest: Value =
+        serde_json::from_slice(&fs::read(&manifest_path).expect("payload manifest"))
+            .expect("payload JSON");
+    manifest["upgrade_sources"]
+        .as_array_mut()
+        .expect("upgrade sources")
+        .push(json!({
+            "product_version": version,
+            "build_number": build,
+            "product_path": relative,
+            "product_manifest": manifest_file_record(
+                &source_root.join("ProductManifest.json"),
+                &format!("UpgradeSources/{version}-{build}/ProductManifest.json"),
+            ),
+        }));
+    write_json(&manifest_path, &manifest);
 }
 
 fn create_bundle(root: &Path, component: &str, marker: &str) {

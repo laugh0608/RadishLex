@@ -142,6 +142,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 - App Group、App Support、sandbox entitlement、文件选择和数据库所有权边界。
 - 安装、升级、回滚、移除、数据迁移和故障恢复 runbook。
 - 外层程序 receipt 与数据 receipt 分层，产品终态分步持久化；Manager/InputMethod 在业务初始化前依次执行外层 install 与数据 upgrade gate。
+- InstallPayload 显式绑定可支持的历史 source assembly；production upgrade 只按外层 receipt 的精确 release 选择旧版本 validation/rollback host，缺失或身份漂移在事务写入前失败关闭。
 - Rust fmt/check/test/clippy/MSRV、Go test/race/vet、Flutter format/analyze/test、native-rime 和 macOS bundle CI。
 - 依赖安全、许可证和必要供应链检查。
 

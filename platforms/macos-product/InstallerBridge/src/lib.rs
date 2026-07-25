@@ -5,8 +5,8 @@
 use std::path::Path;
 
 use radishlex_ime_product_install::{
-    inspect_install_status, InstallOperationKind, InstallReceiptStore, InstallState,
-    InstallStatusDecision, ProductArtifactIdentity,
+    inspect_install_status, InstallOperationKind, InstallReceipt, InstallReceiptStore,
+    InstallState, InstallStatusDecision, ProductArtifactIdentity, ProductRelease,
 };
 use radishlex_ime_product_upgrade::{
     ProductRelease as UpgradeProductRelease, UpgradeCandidateValidationReport,
@@ -25,7 +25,9 @@ use radishlex_macos_installer_executor::{
     InstallerProgramPort, SystemInstallerOperationIdSource, UpgradeCoordinatorPort,
 };
 use radishlex_macos_product_install::{CodeSignatureRequirements, MacOsProductInstallAdapter};
-use radishlex_macos_upgrade_coordinator::MacOsProductPreflightAdapter;
+use radishlex_macos_upgrade_coordinator::{
+    MacOsProductPreflightAdapter, MacOsUpgradeCoordinatorAdapter,
+};
 
 mod bootstrap;
 use bootstrap::InstallerBootstrapContext;
@@ -162,9 +164,6 @@ fn production_perform(
     if action == InstallerAction::Refresh {
         return encode_installer_snapshot(environment.snapshot);
     }
-    if intent.operation_kind() == Some(InstallOperationKind::Upgrade) {
-        return unavailable_snapshot(InstallerStableError::DriverUnavailable);
-    }
     let mut programs = match environment.load_program_adapter(action) {
         Ok(programs) => programs,
         Err(_) => {
@@ -183,7 +182,30 @@ fn production_perform(
             }
         };
     let mut operation_ids = SystemInstallerOperationIdSource;
-    let mut upgrade = UnavailableProductionUpgrade;
+    let mut upgrade = if intent.operation_kind() == Some(InstallOperationKind::Upgrade) {
+        let current = match store.load() {
+            Ok(Some(receipt)) => receipt,
+            _ => return unavailable_snapshot(InstallerStableError::UnknownDriverResult),
+        };
+        let source_root = match select_upgrade_source_root(&current, |release| {
+            programs.upgrade_source_product_root(release)
+        }) {
+            Ok(source_root) => source_root,
+            Err(error) => return unavailable_snapshot(error),
+        };
+        let adapter = match MacOsUpgradeCoordinatorAdapter::load(
+            source_root,
+            &environment.context.product_root(),
+        ) {
+            Ok(adapter) => adapter,
+            Err(_) => {
+                return unavailable_snapshot(InstallerStableError::ProductIdentityUnavailable)
+            }
+        };
+        ProductionUpgradePort::Available(Box::new(adapter))
+    } else {
+        ProductionUpgradePort::Unavailable
+    };
     match dispatch_installer_action(
         environment.context.data_root(),
         environment.context.owner_id(),
@@ -362,36 +384,78 @@ fn inspect_product_situation(
     }
 }
 
-#[derive(Debug, Default)]
-struct UnavailableProductionUpgrade;
+fn upgrade_source_release(receipt: &InstallReceipt) -> Option<&ProductRelease> {
+    if !receipt.state().is_terminal() && receipt.operation_kind() == InstallOperationKind::Upgrade {
+        receipt
+            .source_product()
+            .map(ProductArtifactIdentity::release)
+    } else {
+        receipt
+            .installed_product()
+            .map(ProductArtifactIdentity::release)
+    }
+}
 
-impl UpgradeCoordinatorPort for UnavailableProductionUpgrade {
-    fn confirm_quiescence(&mut self, _checkpoint: UpgradeCoordinatorCheckpoint) -> bool {
-        false
+fn select_upgrade_source_root<'a>(
+    receipt: &InstallReceipt,
+    lookup: impl FnOnce(&ProductRelease) -> Option<&'a Path>,
+) -> Result<&'a Path, InstallerStableError> {
+    let release =
+        upgrade_source_release(receipt).ok_or(InstallerStableError::ProductIdentityUnavailable)?;
+    lookup(release).ok_or(InstallerStableError::DriverUnavailable)
+}
+
+#[derive(Debug)]
+enum ProductionUpgradePort {
+    Available(Box<MacOsUpgradeCoordinatorAdapter>),
+    Unavailable,
+}
+
+impl UpgradeCoordinatorPort for ProductionUpgradePort {
+    fn confirm_quiescence(&mut self, checkpoint: UpgradeCoordinatorCheckpoint) -> bool {
+        match self {
+            Self::Available(adapter) => adapter.confirm_quiescence(checkpoint),
+            Self::Unavailable => false,
+        }
     }
 
     fn validate_candidate(
         &mut self,
-        _target_release: &UpgradeProductRelease,
-        _target_schema_version: i64,
+        target_release: &UpgradeProductRelease,
+        target_schema_version: i64,
     ) -> UpgradeCandidateValidationReport {
-        UpgradeCandidateValidationReport::manager_failed()
+        match self {
+            Self::Available(adapter) => {
+                adapter.validate_candidate(target_release, target_schema_version)
+            }
+            Self::Unavailable => UpgradeCandidateValidationReport::manager_failed(),
+        }
     }
 
     fn validate_post_switch(
         &mut self,
-        _target_release: &UpgradeProductRelease,
-        _target_schema_version: i64,
+        target_release: &UpgradeProductRelease,
+        target_schema_version: i64,
     ) -> UpgradePostSwitchValidationReport {
-        UpgradePostSwitchValidationReport::manager_failed()
+        match self {
+            Self::Available(adapter) => {
+                adapter.validate_post_switch(target_release, target_schema_version)
+            }
+            Self::Unavailable => UpgradePostSwitchValidationReport::manager_failed(),
+        }
     }
 
     fn validate_restored_source(
         &mut self,
-        _source_release: &UpgradeProductRelease,
-        _source_schema_version: i64,
+        source_release: &UpgradeProductRelease,
+        source_schema_version: i64,
     ) -> Option<UpgradeRollbackValidationEvidence> {
-        None
+        match self {
+            Self::Available(adapter) => {
+                adapter.validate_restored_source(source_release, source_schema_version)
+            }
+            Self::Unavailable => None,
+        }
     }
 }
 

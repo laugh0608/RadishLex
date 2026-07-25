@@ -8,10 +8,27 @@ layout_tool="${repo_root}/scripts/macos-product/install_layout.py"
 identity_tool="${repo_root}/scripts/macos-product/release_identity.py"
 codesign_identity="${RADISHLEX_DEVELOPER_ID_APPLICATION:-}"
 
-if [[ $# -ne 0 ]]; then
-  echo "macOS release Installer build does not accept arguments" >&2
-  exit 2
-fi
+upgrade_source_args=()
+upgrade_source_roots=()
+has_upgrade_sources=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --upgrade-source-product-root)
+      if [[ $# -lt 2 || -z "$2" ]]; then
+        echo "--upgrade-source-product-root requires a path" >&2
+        exit 2
+      fi
+      upgrade_source_args+=(--upgrade-source-product-root "$2")
+      upgrade_source_roots+=("$2")
+      has_upgrade_sources=true
+      shift 2
+      ;;
+    *)
+      echo "unknown macOS release Installer build argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "macOS is required for the release Installer build" >&2
   exit 2
@@ -52,6 +69,14 @@ python3 "${product_tool}" verify \
   --input-method-bundle "${input_method_source}" \
   --license "${source_product}/LICENSE" \
   --manifest "${source_product}/ProductManifest.json"
+if [[ "${has_upgrade_sources}" == true ]]; then
+  for historical_product in "${upgrade_source_roots[@]}"; do
+    if [[ ! -d "${historical_product}" || -L "${historical_product}" ]]; then
+      echo "historical macOS product assembly is invalid: ${historical_product}" >&2
+      exit 1
+    fi
+  done
+fi
 
 mkdir -p "${release_parent}"
 staging="$(mktemp -d "${release_parent}/.release-installer.XXXXXX")"
@@ -92,6 +117,17 @@ sign_nested_macho() {
 
 sign_nested_macho "${manager_bundle}"
 sign_nested_macho "${input_method_bundle}"
+if [[ "${has_upgrade_sources}" == true ]]; then
+  for historical_product in "${upgrade_source_roots[@]}"; do
+    PYTHONDONTWRITEBYTECODE=1 python3 "${identity_tool}" verify-upgrade-source \
+      --target-manager-bundle "${manager_bundle}" \
+      --target-input-method-bundle "${input_method_bundle}" \
+      --source-manager-bundle \
+        "${historical_product}/Components/radishlex_manager.app" \
+      --source-input-method-bundle \
+        "${historical_product}/Components/RadishLexInputMethod.app"
+  done
+fi
 rm -f -- "${product_root}/ProductManifest.json"
 python3 "${product_tool}" create \
   --manager-bundle "${manager_bundle}" \
@@ -104,11 +140,29 @@ python3 "${product_tool}" verify \
   --license "${product_root}/LICENSE" \
   --manifest "${product_root}/ProductManifest.json"
 
-PYTHONDONTWRITEBYTECODE=1 python3 "${layout_tool}" assemble \
-  --product-root "${product_root}" \
-  --output "${payload_root}"
+if [[ "${has_upgrade_sources}" == true ]]; then
+  PYTHONDONTWRITEBYTECODE=1 python3 "${layout_tool}" assemble \
+    --product-root "${product_root}" \
+    --output "${payload_root}" \
+    "${upgrade_source_args[@]}"
+else
+  PYTHONDONTWRITEBYTECODE=1 python3 "${layout_tool}" assemble \
+    --product-root "${product_root}" \
+    --output "${payload_root}"
+fi
 PYTHONDONTWRITEBYTECODE=1 python3 "${layout_tool}" verify \
   --payload-root "${payload_root}"
+if [[ "${has_upgrade_sources}" == true ]]; then
+  for embedded_source in "${payload_root}/UpgradeSources/"*; do
+    PYTHONDONTWRITEBYTECODE=1 python3 "${identity_tool}" verify-upgrade-source \
+      --target-manager-bundle "${manager_bundle}" \
+      --target-input-method-bundle "${input_method_bundle}" \
+      --source-manager-bundle \
+        "${embedded_source}/Components/radishlex_manager.app" \
+      --source-input-method-bundle \
+        "${embedded_source}/Components/RadishLexInputMethod.app"
+  done
+fi
 
 env \
   RADISHLEX_INSTALLER_PAYLOAD_ROOT="${payload_root}" \

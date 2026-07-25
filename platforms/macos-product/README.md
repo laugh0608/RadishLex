@@ -88,7 +88,7 @@ M4-P02 的 manifest 绑定只解决“执行哪一代、哪一端产品代码”
 
 ## InstallAdapter
 
-adapter 组合 `ime-product-install`，但不接受自定义最终路径、bundle 名或数据路径。构造时要求 authoritative current-user home、uid、InstallPayload 根，以及 Manager/InputMethod 各自的 Developer ID designated requirement 和同一 Team ID。它逐字节绑定 committed install layout，严格复验 payload/product manifest、完整 bundle tree、许可证和 component-to-target 映射。
+adapter 组合 `ime-product-install`，但不接受自定义最终路径、bundle 名或数据路径。构造时要求 authoritative current-user home、uid、InstallPayload 根，以及 Manager/InputMethod 各自的 Developer ID designated requirement 和同一 Team ID。它逐字节绑定 committed install layout，严格复验 payload format v2、target 与全部 `UpgradeSources` 的 product manifest、完整 bundle tree、许可证、release 顺序、code identity 和 component-to-target 映射。
 
 production code identity 使用 `/usr/bin/codesign --verify --deep --strict -R=<requirement>`，再从固定 Identifier、TeamIdentifier、CDHash、Signature、CodeDirectory 和 designated requirement 形成脱敏 SHA-256；原始输出不进入 receipt、日志或错误。没有冻结发布要求时只能运行注入合成 verifier 的单元测试，当前 ad-hoc 产品不自动获得发布资格。
 
@@ -112,9 +112,9 @@ upgrade 产品终态在 `final_verified` 与 `completed` 前分别复验外层/d
 
 ABI v1 固定整数 enum、POD snapshot 与 contract/snapshot/perform 三个 symbol。AppKit 已静态链接并实际调用；Objective-C 不解释 receipt，只把已知 enum 映射为 driver snapshot。Rust dispatch 每次重新投影并授权 fresh action，再调用 executor。隔离测试证明 prepared/restart/stale/active guard。
 
-生产只读 bootstrap 通过 `geteuid/getpwuid_r` 取得 authoritative current-user home，从当前 executable 固定推导 Installer resources，并严格读取 sealed `ReleaseIdentity.json` 与内嵌 InstallPayload。resource 同时绑定 Installer/Manager/InputMethod exact Developer ID requirement 与同一 Team ID，Installer 自身先过 strict signature 验证；ad-hoc 构建不携带 release identity，稳定返回 `product_identity_unavailable`。身份与 payload 通过后，first install、repair、默认程序移除进入真实 executor；缺少历史 source assembly 的 upgrade 在 receipt/program mutation 前返回 `driver_unavailable`。
+生产只读 bootstrap 通过 `geteuid/getpwuid_r` 取得 authoritative current-user home，从当前 executable 固定推导 Installer resources，并严格读取 sealed `ReleaseIdentity.json` 与内嵌 InstallPayload。resource 同时绑定 Installer/Manager/InputMethod exact Developer ID requirement 与同一 Team ID，Installer 自身先过 strict signature 验证；ad-hoc 构建不携带 release identity，稳定返回 `product_identity_unavailable`。身份与 payload 通过后四类 operation 都进入真实 executor；upgrade 从外层 receipt 选择 exact release 的 `UpgradeSources/<version>-<build>`，并在 dispatch 前构造 `MacOsUpgradeCoordinatorAdapter`。缺失 source 返回 `driver_unavailable`；source manifest/tree/signature、release 顺序或 helper 漂移返回产品身份阻断。
 
-`./scripts/build-macos-release-installer.sh` 只接受本机有效的 `RADISHLEX_DEVELOPER_ID_APPLICATION`，按嵌套 Mach-O、code container、产品 bundle、manifest、Installer 初签、release identity、Installer 终签顺序启用 Hardened Runtime 与 trusted timestamp。默认门禁只验证失败关闭和脚本契约；没有本机身份时不生成假 Team ID 或成功证据。
+`./scripts/build-macos-release-installer.sh` 只接受本机有效的 `RADISHLEX_DEVELOPER_ID_APPLICATION`，按嵌套 Mach-O、code container、产品 bundle、manifest、Installer 初签、release identity、Installer 终签顺序启用 Hardened Runtime 与 trusted timestamp。可重复传入 `--upgrade-source-product-root <historical-product-root>`；每个 source 必须是严格签名的真实历史 assembly，双 component designated requirement 与当前 target 精确一致，且 payload 工具要求 build 唯一并早于 target。未传入时稳定生成空 `UpgradeSources`，不能升级已有旧版。默认门禁只验证失败关闭和脚本契约；没有本机身份时不生成假 Team ID 或成功证据。
 
 ## 构建与验证
 

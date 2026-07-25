@@ -323,6 +323,10 @@ impl MacOsProductInstallAdapter {
         &self.target_product
     }
 
+    pub fn upgrade_source_product_root(&self, release: &ProductRelease) -> Option<&Path> {
+        self.payload.upgrade_source_product_root(release)
+    }
+
     pub fn open_install_store(&self) -> Result<InstallReceiptStore, MacOsInstallAdapterError> {
         self.layout.revalidate()?;
         let root =

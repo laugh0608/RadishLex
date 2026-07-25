@@ -123,9 +123,10 @@ target/macos-install-payload/<version>-<build>/
   InstallLayout.json
   InstallPayloadManifest.json
   Product/
+  UpgradeSources/
 ```
 
-`InstallPayloadManifest.json` 绑定 committed layout 与 ProductManifest 的大小/hash，并重复记录版本、build、Installer bundle ID、两个 component-to-target 映射和移除语义。装配拒绝输出覆盖、产品根额外条目、layout 替换、产品 manifest 漂移和 symlink 根。该目录是未来 Installer app 的资源输入，不是 Installer app、DMG 或安装包，不执行任何真实路径复制。
+`InstallPayloadManifest.json` format v2 绑定 committed layout 与 target ProductManifest 的大小/hash，并重复记录版本、build、Installer bundle ID、两个 component-to-target 映射和移除语义。`UpgradeSources/` 默认为空；有真实历史发布时可重复传入 `--upgrade-source-product-root <path>`，每个 source 绑定精确 release、规范化目录和自己的 ProductManifest/完整双 bundle tree。装配拒绝输出覆盖、产品根额外条目、layout 替换、manifest 漂移、重复或非历史 build 和 symlink 根。该目录是 Installer app 的资源输入，不是 Installer app、DMG 或安装包，不执行任何真实用户路径复制。
 
 ## 复验结果解释
 
@@ -137,7 +138,7 @@ target/macos-install-payload/<version>-<build>/
 - bundle 不依赖 Homebrew 或构建机绝对 library path；
 - committed schema、词典、来源 manifest 和逐资产许可证进入 InputMethod；
 - `ProductManifest.json` 能复算两个 bundle、内部安全 symlink 和许可证文件。
-- InstallPayload 能确定性绑定产品内容与固定用户域目标，不包含构建机或用户绝对路径。
+- InstallPayload 能确定性绑定 target、显式历史 source 集合与固定用户域目标，不包含构建机或用户绝对路径。
 
 它不证明：
 

@@ -121,7 +121,9 @@ macOS adapter 的输入只允许：
 - 发布构建固定的 Manager/InputMethod Developer ID designated requirement 与 Team ID；
 - 已持有的外层 receipt store、guard 和对应 component 的 `ProgramSwitchStore`。
 
-adapter 内嵌 committed `packaging/macos/install-layout.json` 字节。payload 内 `InstallLayout.json` 必须逐字节一致，`InstallPayloadManifest.json` 必须严格绑定 layout、`ProductManifest.json`、版本/build、两个 component-to-target 映射和保留数据语义。payload/product 根、manifest、bundle 与路径链中的真实目录不得由 symlink 或 hardlink 替换；未知顶层对象、字段、component、文件记录或目标映射均失败关闭。
+adapter 内嵌 committed `packaging/macos/install-layout.json` 字节。payload 内 `InstallLayout.json` 必须逐字节一致，`InstallPayloadManifest.json` format v2 必须严格绑定 layout、target `ProductManifest.json`、版本/build、两个 component-to-target 映射、保留数据语义和 `UpgradeSources` 集合。每个历史 source 绑定精确 version/build、规范化固定目录、自己的 ProductManifest、许可证、完整双 bundle tree 和同发布要求 code identity；build 必须唯一、严格递增并早于 target。payload/product/source 根、manifest、bundle 与路径链中的真实目录不得由 symlink 或 hardlink 替换；未知顶层对象、字段、component、文件记录、source 或目标映射均失败关闭。
+
+历史 source 只提供旧版本 validation host 与回滚验证代码，不是 target staging 输入。production bridge 不接受 UI、参数或环境变量自报 source；新 upgrade 从 terminal receipt 的 installed product 选源，续跑则从非终态 upgrade receipt 的 source product 选源。精确 release 不存在时返回 `driver_unavailable`，错误 manifest、重复 build、非历史 release、tree/signature 漂移在创建新 receipt 或执行程序 mutation 前阻断。
 
 authoritative home 必须是 canonical、非 symlink、目标 uid 所有且不可由 group/other 写入的真实目录。adapter 只从 committed 相对路径形成：
 
@@ -250,4 +252,4 @@ receipt format 固定为 `radishlex-product-install-receipt-v1`，最大 64 KiB�
 - preserve、逐端 commit 和 rollback 的每个 rename、目标目录 fsync、源目录 fsync 边界均可注入故障并从精确 inode 现场重试；
 - startup gate 对缺失、非终态、终态身份匹配/漂移、remove、损坏、未知对象和中断写均有稳定结果；
 - 普通测试只使用合成 `0700` 临时目录；隔离产品资格只在带固定 marker 的系统临时根内使用真实构建 bundle、ad-hoc qualification identity 与合成 Application Support，不访问真实用户目录、程序目标、系统设置、Keychain 或发布签名凭据。
-- macOS adapter、真实 bundle 内容/签名复验、M4-P02 状态映射、两段终态、双端 startup 接线与隔离端到端恢复资格已落地；Installer 只读状态投影、显式授权 contract、restartable executor、upgrade data receipt bootstrap、版本化原生 bridge 与独立 AppKit 壳已落地。executor 先持久化 `prepared` 等待重新确认，再从 guard 内 receipt 续跑四类 operation。生产 bridge 已验证 Installer/双 component Developer ID 身份并接入 first install、repair、默认程序移除与恢复的真实 user-domain mutation port；缺失历史 source assembly 的 upgrade 在任何 receipt/program mutation 前返回 `driver_unavailable`。Developer ID 成功产物、正向安装、进程/输入源交互、跨发布 source payload 与身份绑定终态清理仍属于后续切面。
+- macOS adapter、真实 bundle 内容/签名复验、M4-P02 状态映射、两段终态、双端 startup 接线与隔离端到端恢复资格已落地；Installer 只读状态投影、显式授权 contract、restartable executor、upgrade data receipt bootstrap、版本化原生 bridge 与独立 AppKit 壳已落地。executor 先持久化 `prepared` 等待重新确认，再从 guard 内 receipt 续跑四类 operation。生产 bridge 已验证 Installer/双 component Developer ID 身份并接入四类 operation 的真实 user-domain mutation port；upgrade 还要求 payload v2 中存在 receipt release 精确匹配的历史 source，并在写入前构造 manifest-bound source/target coordinator。默认首发 payload source 集为空，缺失时稳定返回 `driver_unavailable`。Developer ID 成功产物、真实跨发布 source、正向安装、进程/输入源交互与身份绑定终态清理仍属于后续证据。
