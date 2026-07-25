@@ -36,7 +36,7 @@ radishlex_product_install_startup_gate(request_v1, result_v1, error_out)
 radishlex_product_upgrade_startup_gate(request_v1, result_v1, error_out)
 ```
 
-外层 install gate 必须先于数据 upgrade gate；前者检查程序事务和当前真实 bundle 身份，后者检查 Application Support 数据事务，两者不能合并或互相代替。平台层只负责从用户域解析固定 `Application Support/RadishLex` 和当前 effective uid，不接受命令行、环境变量、UI 或普通业务代码提供数据路径。外层 gate 不接受 bundle path、release、manifest 或 identity 字段；macOS FFI 从当前 executable 反向绑定固定用户域 bundle，并复验 Info.plist、完整 bundle tree 与 Developer ID code identity。两个调用位置都必须早于 Flutter delegate、Manager settings/userdb、`IMKServer`、Rime runtime 和任何业务初始化。
+外层 install gate 必须先于数据 upgrade gate；前者检查程序事务和当前真实 bundle 身份，后者检查 Application Support 数据事务，两者不能合并或互相代替。平台层只负责从用户域解析固定 `Application Support/RadishLex` 和当前 effective uid，不接受命令行、环境变量、UI 或普通业务代码提供数据路径。外层 gate 不接受 bundle path、release、manifest 或 identity 字段；macOS FFI 从当前 executable 反向绑定固定用户域 bundle，并复验 Info.plist、完整 bundle tree、strict ad-hoc code identity 与 sealed requirement 集合。两个调用位置都必须早于 Flutter delegate、Manager settings/userdb、`IMKServer`、Rime runtime 和任何业务初始化。
 
 外层 gate 只有下列 decision 可以继续到数据 gate：
 

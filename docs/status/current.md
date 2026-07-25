@@ -13,11 +13,11 @@
 
 ## M4 稳定事实
 
-M4-P01 已形成离线双 bundle 产品装配。根 `version.json` 是产品版本与 Flutter build number 的唯一人工真相源；首发采用 Radish CalVer `26.7.1 (35)`。`packaging/macos/product.json` 固定 macOS 13.0、FFI ABI v9、userdb v9、RimeData manifest v2 和 `community-adhoc-v1`；`ProductManifest.json` format v3 绑定双 bundle 完整 tree、许可证、版本、schema 与 distribution identity。
+M4-P01 已形成离线双 bundle 产品装配。根 `version.json` 是版本/build 唯一人工真相源，首发为 Radish CalVer `26.7.1 (35)`。产品 metadata 固定 macOS 13.0、FFI ABI v9、userdb v9、RimeData v2 和 `community-adhoc-v1`；ProductManifest v3 绑定双 bundle tree、许可证、版本与 schema。
 
-RimeData 来源锁固定 `radishlex_pinyin`、Apache-2.0 `pinyin_simp` 词典 commit/hash 和逐资产许可证。首发不携带 LGPL `prelude`、`stroke` 或笔画反查。真实 `librime 1.17.0`、native FFI、递归 dylib 与 manifest 门禁已通过。
+RimeData 来源锁固定 `radishlex_pinyin`、Apache-2.0 `pinyin_simp` 词典和逐资产许可证；首发不携带 LGPL `prelude`、`stroke`。真实 `librime 1.17.0`、native FFI、递归 dylib 与 manifest 门禁已通过。
 
-M4-P02 已闭合只读 inspection、一致快照、隔离 candidate/settings、receipt/guard、原子切换、双端验证、精确 inode 回滚和逐 checkpoint 静止证明。manifest-bound adapter 固定 target preflight、双端 validation 与 source rollback validation。隔离资格使用真实双 bundle/helper 和合成 Application Support 覆盖成功、端点失败、静止丢失、回滚与重启恢复；不会把同源资格 fixture 冒充真实历史发布。
+M4-P02 已闭合只读 inspection、一致快照、隔离 candidate/settings、receipt/guard、原子切换、双端验证、精确 inode 回滚和逐 checkpoint 静止证明。隔离资格使用真实双 bundle/helper 与合成 Application Support 覆盖失败、回滚和重启恢复，不冒充真实历史发布。
 
 M4-P03 固定 DMG + 独立用户域 Installer app。Manager、InputMethod 和 install state 位于 authoritative current-user home，不请求管理员权限：
 
@@ -39,10 +39,9 @@ Library/Application Support/RadishLex/.radishlex-install-v1
 - Installer、Manager 与 InputMethod 使用 strict ad-hoc code signature；
 - production adapter 要求 `TeamIdentifier=not set`、`Signature=adhoc`、CodeDirectory ad-hoc flag、primary CDHash 与 designated requirement 全部精确匹配；
 - `ReleaseIdentity.json` format v2 绑定 target 与全部显式历史 source 的 Manager/InputMethod requirement 有界、排序、去重集合；两端集合不得重叠；
-- Installer 自身只做 strict ad-hoc 结构验证，不自绑定其 `cdhash`，避免资源内容与最终签名形成循环；
 - Developer ID、Apple Development、unknown requirement、manifest/tree/bundle ID 漂移均失败关闭。
 
-ad-hoc 只提供包内完整性与安装事务 identity，不提供 Apple 发布者认证。DMG 不签名、不公证、不 staple；`notarize-macos-release-dmg.sh` 在当前模式稳定拒绝执行。`build-macos-release-dmg.sh` 输出 `CommunityReleaseEvidence.json`，精确绑定版本、DMG 文件名、大小、SHA-256 与 release identity SHA-256。
+ad-hoc 只提供包内完整性与安装事务 identity，不提供 Apple 发布者认证。DMG 不签名、不公证、不 staple；`notarize-macos-release-dmg.sh` 在当前模式稳定拒绝执行。本机已生成并挂载复验 `26.7.1 (35)` DMG，SHA-256 为 `1137b14f284275723a5d019447c70cd926638937944b73e749cce81c8975b4ec`；`CommunityReleaseEvidence.json` 绑定版本、文件名、大小、该摘要与 release identity，产物保留在 ignored `target/`，尚未公开上传。
 
 用户安装必须先核对 SHA-256，再使用“系统设置 → 隐私与安全性 → 仍要打开”。终端 fallback 只作用于复制到 `$HOME/Applications` 的精确 `RadishLex Installer.app`，不使用 `sudo`，不得对宽泛目录递归移除 quarantine。完整步骤见 [macOS 社区 ad-hoc DMG Runbook](../runbooks/macos-release-carrier.md)。
 
@@ -65,10 +64,10 @@ upgrade 只从当前外层 receipt 精确选择 `UpgradeSources/<version>-<build
 
 ## 下一步顺位
 
-1. 构建并冻结 `26.7.1 (35)` 社区 Installer、DMG 与 evidence，完成隔离下载 SHA-256 复验和人工“仍要打开”验收。
-2. 对同一冻结发布完成真实用户域 first install、repair、默认 remove 与重启 startup gate 证据；保留/恢复用户数据和输入源状态。
-3. 首个正式发布形成后，将其 assembly 作为下一版本真实历史 source，证明跨发布 upgrade、重启续跑与 source 回滚。
-4. 真实用户同步继续关闭；正式域名、公开证书和生产同步演练后移。
+1. 从同一 `26.7.1 (35)` 冻结候选完成独立下载 SHA-256 复验、人工“仍要打开”与真实用户域验收；不得以重新构建或本机复制替代下载载体证据。
+2. 依次证明 first install、重启双端 startup gate、Manager/输入 smoke、repair、默认 remove 与数据/输入源基线恢复；失败先保留现场并修正根因。
+3. 验收通过后整理发布说明、DMG/evidence/checksum 和安装警示；上传、tag、Release 与远端操作另行授权。
+4. 首发形成后把该 assembly 作为下一版本真实历史 source，证明跨发布 upgrade、重启续跑与 source 回滚；真实用户同步继续关闭。
 
 ## 验证入口
 

@@ -116,7 +116,7 @@ ABI v1 固定整数 enum、POD snapshot 与 contract/snapshot/perform 三个 sym
 
 生产只读 bootstrap 通过 `geteuid/getpwuid_r` 取得 authoritative current-user home，从当前 executable 固定推导 Installer resources，并严格读取 sealed `ReleaseIdentity.json` 与内嵌 InstallPayload。Installer 自身先过 strict ad-hoc 结构验证；resource 绑定 Manager/InputMethod target 与全部历史 source 的 exact requirement 集合。身份与 payload 通过后四类 operation 都进入真实 executor；upgrade 从外层 receipt 选择 exact release 的 `UpgradeSources/<version>-<build>`。缺失 source 返回 `driver_unavailable`；source manifest/tree/signature、release 顺序或 helper 漂移返回产品身份阻断。
 
-`./scripts/build-macos-release-installer.sh` 只接受本机有效的 `RADISHLEX_DEVELOPER_ID_APPLICATION`，按嵌套 Mach-O、code container、产品 bundle、manifest、Installer 初签、release identity、Installer 终签顺序启用 Hardened Runtime 与 trusted timestamp。可重复传入 `--upgrade-source-product-root <historical-product-root>`；每个 source 必须是严格签名的真实历史 assembly，双 component designated requirement 与当前 target 精确一致，且 payload 工具要求 build 唯一并早于 target。未传入时稳定生成空 `UpgradeSources`，不能升级已有旧版。默认门禁只验证失败关闭和脚本契约；没有本机身份时不生成假 Team ID 或成功证据。
+`./scripts/build-macos-release-installer.sh` 不读取 Developer ID、Keychain 或 timestamp，按嵌套 Mach-O、code container、产品 bundle、manifest、sealed release identity、Installer 终签顺序生成 strict ad-hoc 候选。可重复传入 `--upgrade-source-product-root <historical-product-root>`；每个 source 必须是 strict ad-hoc 的真实历史 assembly，其双 component requirement 分别进入 sealed 有界集合，且 payload 工具要求 build 唯一并早于 target。未传入时稳定生成空 `UpgradeSources`，不能升级已有旧版。
 
 ## 构建与验证
 

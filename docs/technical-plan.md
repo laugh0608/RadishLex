@@ -130,18 +130,18 @@ M4 产品升级把运行时打开与产品迁移分开：`ime-userdb` 提供不�
 - rollback 先把失败新库移回 candidate，再把旧库原 inode 恢复到最终路径；只有 source-release evidence 与核心 schema/integrity 同时通过才进入 `rolled_back`，不自动删除恢复材料；
 - settings、snapshot 和 candidate 的 identity 已持久化但下一状态未落盘时，只复验既有证据并补写状态，不重建对象或猜测无 identity 现场；
 - guard-bound 驱动在每个写入、产品 validation 前后与 rollback validation 前后通过平台 port 重新证明静止；核心不定位或启动平台 executable；
-- macOS adapter 从 source/target `ProductManifest.json` 固定解析双端 helper，target preflight 负责全部 checkpoint，target/source 双端分别形成升级与回滚 evidence；执行前复验 manifest 长度/hash，发布者身份与固定安装来源后移到 M4-P03；
+- macOS adapter 从 source/target `ProductManifest.json` 固定解析双端 helper，target preflight 负责全部 checkpoint，target/source 双端分别形成升级与回滚 evidence；执行前复验 manifest 长度/hash，版本化 distribution identity 与固定安装来源由 M4-P03 绑定；
 - 平台 host 负责固定路径、进程静止和文件系统适配，`ime-userdb` 继续独占 schema 与 migration 语义。
 
 该 crate 不进入输入热路径，不承载安装器 UI、SQLite migration SQL、macOS 进程控制或调用方自定义路径。完整边界见 [macOS 数据升级协调器](macos-data-upgrade-coordinator.md)。
 
-M4-P03 以签名、公证 DMG 内的独立用户域 Installer app 承担程序安装事务；Manager、InputMethod 和 Application Support 分别固定到 current-user home 下的 `Applications`、`Library/Input Methods` 与 `Library/Application Support/RadishLex`。`InstallPayloadManifest.json` format v2 绑定 committed layout、target ProductManifest 与显式历史 source assembly 集合；production upgrade 只从外层 receipt 精确 release 选取旧版本 validation/rollback host。`.radishlex-install-v1` 外层 receipt/guard 负责两处程序切换和数据协调的一致性。非终态程序事务必须进入双端 startup gate，不能让旧程序在数据切换后重新启动。完整决策见 [ADR 0008](adr/0008-macos-installation-carrier.md)。
+M4-P03 以未公证社区 ad-hoc DMG 内的独立用户域 Installer app 承担程序安装事务；Manager、InputMethod 和 Application Support 分别固定到 current-user home 下的 `Applications`、`Library/Input Methods` 与 `Library/Application Support/RadishLex`。`InstallPayloadManifest.json` format v2 绑定 committed layout、target ProductManifest 与显式历史 source assembly 集合；production upgrade 只从外层 receipt 精确 release 选取旧版本 validation/rollback host。`.radishlex-install-v1` 外层 receipt/guard 负责两处程序切换和数据协调的一致性。非终态程序事务必须进入双端 startup gate，不能让旧程序在数据切换后重新启动。完整决策见 [ADR 0008](adr/0008-macos-installation-carrier.md)。
 
 ### ime-product-install
 
 `ime-product-install` 是独立于数据协调器的程序事务核心。它显式区分首次安装、升级、修复和默认程序移除，以 source/target ProductManifest、bundle tree 与 canonical code identity evidence 的 SHA-256 表达逻辑产品身份；receipt 不保存绝对路径、签名输出或用户数据。source、staged、backup 和 installed evidence 只能按 operation 阶段追加，首个程序目标提交后失败必须进入程序回滚。
 
-外层 receipt 固定在 `.radishlex-install-v1`，绑定 data-root identity、operation chain、程序逻辑/文件系统身份与稳定失败分类。两个程序目标各自在同文件系统私有目录执行 source preserve、逐端 rename/fsync 和精确 inode 回滚；Unix socket guard 拒绝同一 root 并发 operation。macOS install adapter 逐字节绑定 committed layout，严格复验 payload/product manifest、完整 bundle tree 与 exact Developer ID requirement，使用 metadata-preserving copy 填充 staging，并在 source/installed/restored 阶段重复验证。
+外层 receipt 固定在 `.radishlex-install-v1`，绑定 data-root identity、operation chain、程序逻辑/文件系统身份与稳定失败分类。两个程序目标各自在同文件系统私有目录执行 source preserve、逐端 rename/fsync 和精确 inode 回滚；Unix socket guard 拒绝同一 root 并发 operation。macOS install adapter 逐字节绑定 committed layout，严格复验 payload/product manifest、完整 bundle tree、strict ad-hoc code identity 与 sealed requirement 集合，使用 metadata-preserving copy 填充 staging，并在 source/installed/restored 阶段重复验证。
 
 独立 macOS install coordinator 同时持有外层与数据 guard，以同一 operation ID、data-root inode 和 source/target release 绑定 M4-P02 receipt。每个数据 quiescence checkpoint 同时复验 installed target；数据失败必须先达到 `aborted_preserved` / `rolled_back`，再恢复并复验 source 双程序，外层才能进入 `rolled_back`。两个核心不互相依赖或解释对方 receipt。只读 startup decision 除阻止 active/non-terminal/损坏现场外，还要求当前运行 Manager/InputMethod 身份匹配 `completed` target 或 `aborted_preserved` / `rolled_back` source。完整字段、状态与停止线见 [macOS 程序安装事务](macos-installation-transaction.md)。
 
@@ -267,7 +267,7 @@ Flutter manager 负责：
 - 同步状态、设备、恢复和后端连接；
 - 安全诊断、导入导出和备份恢复入口。
 
-manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学习、隐私和诊断，并让正常本地产品运行态携带 native library、使用固定平台目录和真实持久化数据；M3 再交付同步、设备与恢复；M4 闭合发布签名、公证、安装升级和最终产品打包。fixture 只能由显式开发开关启用并持续显示演示标识。manager 不进入输入热路径，也不承担排序、合并或密钥策略真相源。
+manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学习、隐私和诊断，并让正常本地产品运行态携带 native library、使用固定平台目录和真实持久化数据；M3 再交付同步、设备与恢复；M4 闭合版本化 distribution identity、安装升级、发布载体和最终产品打包。首发采用社区 ad-hoc 路径，未来 Developer ID/公证必须作为新的 identity 独立治理。fixture 只能由显式开发开关启用并持续显示演示标识。manager 不进入输入热路径，也不承担排序、合并或密钥策略真相源。
 
 ## 平台策略
 

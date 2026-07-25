@@ -75,7 +75,7 @@ receipt 的 `candidate_verified` 状态本身是双端成功的持久化证明�
 
 ### 安装载体
 
-M4-P03 已选择签名、公证 DMG 中的独立用户域 Installer app。Installer 只能调用稳定协调入口并展示结果；它负责程序 bundle 的安装与恢复，不创建数据库 migration SQL，不解析数据 receipt 内部字段，不删除真实用户数据。载体、固定目标与外层程序事务见 [ADR 0008](adr/0008-macos-installation-carrier.md)。
+M4-P03 已选择未公证社区 ad-hoc DMG 中的独立用户域 Installer app。Installer 只能调用稳定协调入口并展示结果；它负责程序 bundle 的安装与恢复，不创建数据库 migration SQL，不解析数据 receipt 内部字段，不删除真实用户数据。载体、固定目标与外层程序事务见 [ADR 0008](adr/0008-macos-installation-carrier.md)。
 
 ## 受控数据范围
 
@@ -304,7 +304,7 @@ macOS adapter 只接受两个已经形成产品装配的根目录，不接受独
 
 每次执行前都必须重新确认 executable 是非 symlink、单 link 普通文件，长度和 SHA-256 与所属 manifest 的 file record 一致；manifest 缺少固定 record、重复 component/path、hash/size 漂移或 receipt release/schema 不一致均失败关闭。adapter 不把 stdout/stderr、绝对路径或 checkpoint 写入 receipt；preflight 只接受严格的 `radishlex-upgrade-preflight-v1` ready JSON，validation host 只以受控退出码形成固定 evidence。source-release evidence 只有旧 Manager 和旧 InputMethod 都在恢复后的最终固定路径成功打开并关闭后才能形成。
 
-`ProductManifest.json` 在 M4-P02 证明组件与 helper 的内容绑定，不单独证明发布者身份。Developer ID、Hardened Runtime、notarization、安装位置所有权和运行前 code signature requirement 属于 M4-P03，不能由 manifest hash 替代。
+`ProductManifest.json` 在 M4-P02 证明组件与 helper 的内容绑定，不单独证明 Apple 发布者身份。M4-P03 另以版本化 distribution identity、strict ad-hoc code identity、sealed requirement 集合、安装位置所有权和 DMG SHA-256 evidence 绑定社区首发；这些约束不能由 manifest hash 替代。
 
 ### 隔离产品协调资格
 
@@ -318,7 +318,7 @@ macOS adapter 只接受两个已经形成产品装配的根目录，不接受独
 - 产品根、合成 home 和场景名只从仓库固定资格脚本传入测试进程，不形成产品 CLI、UI 参数或 receipt 字段；
 - 场景结束删除整个短生命周期资格根，不扫描或修改其他 temp 内容。
 
-资格脚本从同一次构建输出形成 target `0.1.0 (35)` 与 source qualification `0.0.9 (34)` 两份完整装配。source qualification 只改写两端 bundle 的版本/build 元数据并重新 ad-hoc 签名，再以固定测试 metadata 生成独立 manifest；其 helper/native code 与当前受测源码一致，userdb schema 仍为 9。它证明 source/target manifest 路由、真实双端打开、切换和原 inode 回滚，不冒充历史 schema 8 产品二进制。旧 schema migration 正确性继续由 `ime-userdb` 与协调核心的逐版本合成测试证明；未来真实跨发布升级还必须保留并验证实际 source release 装配。
+资格脚本从同一次构建输出形成 target `26.7.1 (35)` 与 source qualification `26.6.1 (34)` 两份完整装配。source qualification 只改写两端 bundle 的版本/build 元数据并重新 ad-hoc 签名，再以固定测试 metadata 生成独立 manifest；其 helper/native code 与当前受测源码一致，userdb schema 仍为 9。它证明 source/target manifest 路由、真实双端打开、切换和原 inode 回滚，不冒充历史 schema 8 产品二进制。旧 schema migration 正确性继续由 `ime-userdb` 与协调核心的逐版本合成测试证明；未来真实跨发布升级还必须保留并验证实际 source release 装配。
 
 故障场景先让真实 helper 完成对应调用，再在 `UpgradeCoordinatorPort` 结果边界注入稳定 Manager/InputMethod failure、指定 checkpoint 静止丢失或一次 source evidence 不可得。这样既保留真实产品打开证据，也能确定性验证 `aborted_preserved`、最后已证明状态、`rollback_required` 和重启续跑；故障注入不能修改产品 helper、数据库正文或 receipt。
 

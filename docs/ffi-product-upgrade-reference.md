@@ -19,7 +19,7 @@ RadishLexProductInstallStartupGateResult {
 }
 ```
 
-request/result version 均为 v1。接口不接受 component、bundle path、release、manifest/tree/code hash 或其他运行 identity；macOS 实现从当前 executable 反向绑定固定用户域 bundle，并以 Info.plist、完整 tree 和严格 Developer ID code identity 形成 `RunningProgramIdentity`。active guard、非终态 receipt 与 completed remove 在读取运行身份前直接阻断；终态 identity 漂移、损坏 receipt、中断写、未知对象和未知结果均失败关闭。
+request/result version 均为 v1。接口不接受 component、bundle path、release、manifest/tree/code hash 或其他运行 identity；macOS 实现从当前 executable 反向绑定固定用户域 bundle，并以 Info.plist、完整 tree、strict ad-hoc code identity 与 sealed requirement 集合形成 `RunningProgramIdentity`。active guard、非终态 receipt 与 completed remove 在读取运行身份前直接阻断；终态 identity 漂移、损坏 receipt、中断写、未知对象和未知结果均失败关闭。
 
 允许常量仅为 `RADISHLEX_INSTALL_GATE_ALLOWED_FIRST_LAUNCH`、`RADISHLEX_INSTALL_GATE_ALLOWED_NO_INSTALL_STATE` 和 `RADISHLEX_INSTALL_GATE_ALLOWED_TERMINAL_RECEIPT`。前两者还必须同时满足 `error_code = RADISHLEX_STARTUP_GATE_ERROR_NONE`、`receipt_state = 0`；终态允许只接受具名的 `COMPLETED`、`ABORTED_PRESERVED` 或 `ROLLED_BACK` state。Manager/InputMethod 必须先消费该结果，再调用数据 gate；任何未知 status/version/decision/error/state 或不一致组合都不得继续初始化。
 

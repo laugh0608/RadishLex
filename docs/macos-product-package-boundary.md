@@ -232,7 +232,7 @@ Apple 官方边界参考：
 14. 已接入 authoritative current-user bootstrap、完整内嵌 InstallPayload、strict ad-hoc release identity 和可回退实机验收 runbook；普通开发构建因缺失 sealed identity 失败关闭；
 15. 已固定 community ad-hoc 发布构建、双 component sealed release identity 与 DMG SHA-256 evidence，并开放 first install/repair/default remove 的 production mutation port；
 16. 已将历史 source assembly 纳入 payload v2，按外层 receipt 精确选源并开放 production upgrade port；
-17. 已固定未公证 APFS/UDZO DMG、社区发布证据和用户人工放行 runbook；下一步形成首发冻结产物与真实用户域首次安装/修复/移除证据。
+17. 已生成并挂载复验 `26.7.1 (35)` 未公证 APFS/UDZO DMG、社区发布证据和用户人工放行 runbook；下一步从同一冻结候选形成独立下载核验与真实用户域首次安装/修复/移除证据。
 
 ## M4-P01 退出标准
 

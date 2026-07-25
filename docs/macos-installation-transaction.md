@@ -146,7 +146,7 @@ code signature 验证固定为：
 1. 当前发布要求 strict ad-hoc：`TeamIdentifier=not set`、`Signature=adhoc`、CodeDirectory ad-hoc flag、primary CDHash 与 designated requirement 一致，并命中对应 component 的 sealed 有界排序集合；
 2. `/usr/bin/codesign --verify --deep --strict -R=<expected designated requirement> <bundle>`；
 3. 独立读取 Identifier、TeamIdentifier、CDHash、Signature、CodeDirectory 与 designated requirement；
-4. 要求 bundle ID、Team ID 和 designated requirement 与该 component 的发布要求精确一致，且 Team ID 必须等于产品元数据固定值；
+4. 要求 bundle ID 和 designated requirement 与该 component 的 sealed 发布要求精确一致，且 `TeamIdentifier=not set`；
 5. 将上述固定字段编码为 `radishlex-macos-code-identity-v1` 后只把 SHA-256 写入逻辑程序身份。
 
 receipt 不保存 requirement、Team ID、Authority、CDHash 或 `codesign` 输出原文，只保存稳定 evidence hash。验证进程 stdout/stderr 不进入错误、日志或诊断。ad-hoc 只证明当前 artifact identity，不得表述为 Apple 发布者认证。

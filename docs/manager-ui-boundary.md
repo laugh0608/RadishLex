@@ -10,7 +10,7 @@ Flutter manager 是 RadishLex 的管理界面，不进入输入热路径，不�
 
 管理端的职责是把 Rust core 和本地 userdb 已经具备的能力以可审计、可删除、可解释的方式呈现给用户，并在同步能力具备生产条件前清楚显示不可用原因。
 
-manager 分层交付：M2 先完成本地词库、学习、隐私和诊断管理，并让正常本地产品运行态携带 native library、使用固定平台目录；M3 再完成同步、设备、恢复与撤销；M4 闭合发布签名、公证、安装升级和最终产品打包。fixture 与开发期 Dart FFI smoke 只承担显式演示和开发验证，Release 产品 bundle 与真实平台验收承担产品证据。后续代码继续遵守以下边界：
+manager 分层交付：M2 先完成本地词库、学习、隐私和诊断管理，并让正常本地产品运行态携带 native library、使用固定平台目录；M3 再完成同步、设备、恢复与撤销；M4 闭合版本化 distribution identity、安装升级、发布载体和最终产品打包。首发使用社区 ad-hoc 路径，未来 Developer ID/公证必须作为新的 identity 独立治理。fixture 与开发期 Dart FFI smoke 只承担显式演示和开发验证，Release 产品 bundle 与真实平台验收承担产品证据。后续代码继续遵守以下边界：
 
 - 本地 userdb 管理优先于远端同步开关。
 - 学习记录摘要优先于 P1 原始事件明细。
