@@ -25,6 +25,10 @@ installer_bundle_id="$(python3 "${layout_tool}" field installer_bundle_id)"
 product_version="$(python3 "${product_tool}" field product_version)"
 build_number="$(python3 "${product_tool}" field build_number)"
 minimum_macos="$(python3 "${product_tool}" field minimum_macos)"
+bridge_library="${repo_root}/target/release/libradishlex_macos_installer_bridge.a"
+
+cargo build --locked --release -p radishlex-macos-installer-bridge \
+  --manifest-path "${repo_root}/Cargo.toml"
 
 rm -rf -- "${bundle}"
 mkdir -p "${contents}/MacOS" "${contents}/Resources" "${module_cache}"
@@ -42,9 +46,13 @@ CLANG_MODULE_CACHE_PATH="${module_cache}" clang \
   -fobjc-arc -fblocks -fmodules -Wall -Wextra -Werror \
   "-mmacosx-version-min=${minimum_macos}" \
   -I "${script_dir}/Sources" \
+  -I "${repo_root}/platforms/macos-product/InstallerBridge/include" \
+  "${script_dir}/Sources/RLXInstallerBridge.m" \
   "${script_dir}/Sources/RLXInstallerPresentation.m" \
   "${script_dir}/Sources/main.m" \
+  "${bridge_library}" \
   -framework Cocoa \
+  -framework Security \
   -o "${executable}"
 codesign --force --sign - "${bundle}"
 codesign --verify --deep --strict "${bundle}"

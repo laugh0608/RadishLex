@@ -19,7 +19,9 @@ fi
   cargo clippy --locked -p radishlex-macos-installer-driver --all-targets -- -D warnings
   cargo test --locked -p radishlex-macos-installer-executor --all-targets
   cargo clippy --locked -p radishlex-macos-installer-executor --all-targets -- -D warnings
+  cargo test --locked -p radishlex-macos-installer-bridge --all-targets
+  cargo clippy --locked -p radishlex-macos-installer-bridge --all-targets -- -D warnings
 )
 "${repo_root}/platforms/macos-product/InstallerApp/check.sh"
 
-echo "macOS Installer UI/driver/executor gate passed."
+echo "macOS Installer UI/bridge/driver/executor gate passed."

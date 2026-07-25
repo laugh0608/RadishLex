@@ -10,11 +10,10 @@ use radishlex_ime_product_install::{
     INSTALL_PRODUCT_ID,
 };
 use radishlex_ime_product_upgrade::{
-    ProductRelease as UpgradeProductRelease, UpgradeArtifactIdentity, UpgradeArtifactSlot,
-    UpgradeCandidateValidationReport, UpgradeCoordinatorCheckpoint,
-    UpgradeInputMethodValidationEvidence, UpgradeManagerValidationEvidence,
-    UpgradePostSwitchValidationReport, UpgradeRollbackValidationEvidence, UpgradeState,
-    VerifiedDataRoot, UPGRADE_ROLLBACK_VALIDATION_EVIDENCE_VERSION,
+    ProductRelease as UpgradeProductRelease, UpgradeArtifactSlot, UpgradeCandidateValidationReport,
+    UpgradeCoordinatorCheckpoint, UpgradeInputMethodValidationEvidence,
+    UpgradeManagerValidationEvidence, UpgradePostSwitchValidationReport,
+    UpgradeRollbackValidationEvidence, UpgradeState, UPGRADE_ROLLBACK_VALIDATION_EVIDENCE_VERSION,
     UPGRADE_VALIDATION_EVIDENCE_VERSION,
 };
 use radishlex_ime_userdb::UserDb;
@@ -105,6 +104,23 @@ impl Fixture {
         execute_authorized_intent(
             intent,
             &self.store,
+            &mut self.programs,
+            &mut self.preflight,
+            &mut self.operation_ids,
+            upgrade,
+        )
+    }
+
+    fn execute_with_upgrade_bootstrap<U: UpgradeCoordinatorPort>(
+        &mut self,
+        intent: AuthorizedInstallerIntent,
+        upgrade: &mut U,
+    ) -> Result<InstallerExecutionSummary, InstallerExecutionError> {
+        execute_authorized_intent_with_upgrade_bootstrap(
+            intent,
+            &self.store,
+            &self.data_root,
+            self.owner_id,
             &mut self.programs,
             &mut self.preflight,
             &mut self.operation_ids,
@@ -428,21 +444,48 @@ fn upgrade_runs_existing_data_transaction_and_both_final_checkpoints() {
         InstallerAction::BeginFirstInstall,
     );
     fixture.programs.target_product = product("2.0.0", 2, 1);
+    prepare_upgrade_data(&fixture.data_root);
+    let mut upgrade_port = TestUpgradePort;
 
     let begin = fixture.authorize(
         InstallerProductSituation::OlderReleaseInstalled,
         InstallerAction::BeginUpgrade,
     );
     let prepared = fixture
-        .execute(begin, &mut NoUpgradeExecution)
+        .execute_with_upgrade_bootstrap(begin, &mut upgrade_port)
         .expect("prepare upgrade");
     assert_eq!(prepared.state(), InstallState::Prepared);
     let outer = fixture.receipt();
-    let (upgrade_store, mut upgrade_receipt) =
-        prepare_upgrade_receipt(&fixture.data_root, fixture.owner_id, outer.operation_id());
-    let mut upgrade_port = TestUpgradePort;
-    let mut bound =
-        BoundUpgradeExecution::new(&upgrade_store, &mut upgrade_receipt, &mut upgrade_port);
+    let bootstrapped = bootstrap_upgrade_receipt(&outer, &fixture.data_root, fixture.owner_id)
+        .expect("reload bootstrapped upgrade receipt");
+    assert!(bootstrapped
+        .receipt()
+        .artifacts()
+        .iter()
+        .any(|artifact| artifact.slot() == UpgradeArtifactSlot::SourceSettings));
+    assert!(bootstrapped
+        .receipt()
+        .artifacts()
+        .iter()
+        .any(|artifact| artifact.slot() == UpgradeArtifactSlot::RimeRoot));
+    let drifted_outer = InstallReceipt::new(
+        outer.operation_id(),
+        None,
+        InstallOperationKind::Upgrade,
+        outer.root_identity().clone(),
+        outer.source_product().cloned(),
+        Some(product("3.0.0", 3, 2)),
+    )
+    .expect("drifted outer receipt");
+    let drift_error =
+        match bootstrap_upgrade_receipt(&drifted_outer, &fixture.data_root, fixture.owner_id) {
+            Ok(_) => panic!("target release drift must be rejected"),
+            Err(error) => error,
+        };
+    assert_eq!(
+        drift_error.code(),
+        UpgradeBootstrapErrorCode::ReceiptBindingChanged
+    );
     fixture.programs.reject_finalization_completion = true;
     let confirm = fixture.authorize(
         InstallerProductSituation::OlderReleaseInstalled,
@@ -450,24 +493,27 @@ fn upgrade_runs_existing_data_transaction_and_both_final_checkpoints() {
     );
     assert!(matches!(
         fixture
-            .execute(confirm, &mut bound)
+            .execute_with_upgrade_bootstrap(confirm, &mut upgrade_port)
             .expect_err("interrupt second finalization checkpoint"),
         InstallerExecutionError::UpgradeFinalization(_)
     ));
     assert_eq!(fixture.receipt().state(), InstallState::FinalVerified);
 
+    let restarted =
+        bootstrap_upgrade_receipt(&fixture.receipt(), &fixture.data_root, fixture.owner_id)
+            .expect("reload progressed upgrade receipt after restart");
+    assert_eq!(restarted.receipt().state(), UpgradeState::Completed);
     fixture.programs.reject_finalization_completion = false;
     let resume = fixture.authorize(
         InstallerProductSituation::OlderReleaseInstalled,
         InstallerAction::ResumeOperation,
     );
     let completed = fixture
-        .execute(resume, &mut bound)
+        .execute_with_upgrade_bootstrap(resume, &mut upgrade_port)
         .expect("resume final_verified upgrade");
 
     assert_eq!(completed.operation_kind(), InstallOperationKind::Upgrade);
     assert_eq!(completed.state(), InstallState::Completed);
-    assert_eq!(upgrade_receipt.state(), UpgradeState::Completed);
     assert!(fixture.programs.installed_validation_calls >= 12);
 }
 
@@ -571,43 +617,18 @@ fn system_operation_ids_are_fixed_lowercase_hex() {
         .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)));
 }
 
-fn prepare_upgrade_receipt(
-    data_root: &Path,
-    owner_id: u32,
-    operation_id: &str,
-) -> (UpgradeReceiptStore, UpgradeReceipt) {
-    let upgrade_store = UpgradeReceiptStore::open(
-        VerifiedDataRoot::verify(data_root, owner_id).expect("verified upgrade root"),
-    )
-    .expect("upgrade receipt store");
+fn prepare_upgrade_data(data_root: &Path) {
     let database = data_root.join("userdb.sqlite3");
     drop(UserDb::open(&database).expect("source userdb"));
     UserDb::migrate_and_validate(&database).expect("validated source userdb");
-    let metadata = fs::metadata(&database).expect("database metadata");
-    let source_database = UpgradeArtifactIdentity::private_file(
-        UpgradeArtifactSlot::SourceDatabase,
-        metadata.dev(),
-        metadata.ino(),
-        metadata.uid(),
-        metadata.len(),
+    let settings = data_root.join("manager-settings.json");
+    fs::write(
+        &settings,
+        b"{\"format_version\":1,\"privacy_mode\":false}\n",
     )
-    .expect("source database identity");
-    let receipt = UpgradeReceipt::new(
-        operation_id,
-        None,
-        UpgradeProductRelease::new("1.0.0", 1).expect("source release"),
-        UpgradeProductRelease::new("2.0.0", 2).expect("target release"),
-        Some(UserDb::supported_schema_version()),
-        UserDb::supported_schema_version(),
-        vec![upgrade_store.data_root_identity().clone(), source_database],
-    )
-    .expect("upgrade receipt");
-    let guard = upgrade_store.acquire_guard().expect("upgrade guard");
-    upgrade_store
-        .persist(&guard, &receipt)
-        .expect("persist upgrade receipt");
-    drop(guard);
-    (upgrade_store, receipt)
+    .expect("synthetic settings");
+    fs::set_permissions(&settings, fs::Permissions::from_mode(0o600)).expect("private settings");
+    create_directory(&data_root.join("Rime"), 0o700);
 }
 
 fn manager_evidence(schema_version: i64) -> UpgradeManagerValidationEvidence {

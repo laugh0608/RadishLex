@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 use std::fmt;
+use std::path::Path;
 
 use radishlex_ime_product_install::{
     commit_program_removal, commit_program_target, finish_source_preservation,
@@ -12,7 +13,8 @@ use radishlex_ime_product_install::{
     InstallReceiptStore, InstallState, ProductArtifactIdentity, ProgramComponent,
     ProgramSwitchErrorCode, ProgramSwitchStore,
 };
-use radishlex_ime_product_upgrade::{UpgradeCoordinatorPort, UpgradeReceipt, UpgradeReceiptStore};
+pub use radishlex_ime_product_upgrade::UpgradeCoordinatorPort;
+use radishlex_ime_product_upgrade::{UpgradeReceipt, UpgradeReceiptStore};
 use radishlex_macos_installer_driver::{AuthorizedInstallerIntent, InstallerAction};
 use radishlex_macos_product_install::{MacOsInstallAdapterErrorCode, MacOsProductInstallAdapter};
 use radishlex_macos_product_install_coordinator::{
@@ -21,6 +23,12 @@ use radishlex_macos_product_install_coordinator::{
     InstallProductFinalizationError,
 };
 use radishlex_macos_upgrade_coordinator::{MacOsProductPreflightAdapter, MacOsUpgradeAdapterError};
+
+mod bootstrap;
+pub use bootstrap::{
+    bootstrap_upgrade_receipt, BootstrappedUpgradeReceipt, UpgradeBootstrapError,
+    UpgradeBootstrapErrorCode,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InstallerPreflightEvidence {
@@ -324,6 +332,7 @@ pub enum InstallerExecutionError {
     InstallFinalization(InstallFinalizationError),
     UpgradeFinalization(InstallProductFinalizationError),
     UpgradeFilesystem(radishlex_ime_product_upgrade::UpgradeFilesystemErrorCode),
+    UpgradeBootstrap(UpgradeBootstrapErrorCode),
 }
 
 impl fmt::Display for InstallerExecutionError {
@@ -342,6 +351,7 @@ impl fmt::Display for InstallerExecutionError {
             Self::InstallFinalization(_) => "Installer finalization failure",
             Self::UpgradeFinalization(_) => "Installer upgrade finalization failure",
             Self::UpgradeFilesystem(_) => "Installer upgrade receipt filesystem failure",
+            Self::UpgradeBootstrap(_) => "Installer upgrade receipt bootstrap failure",
         })
     }
 }
@@ -364,8 +374,71 @@ impl InstallerExecutionError {
             Self::InstallFinalization(_) => "install_finalization_failure",
             Self::UpgradeFinalization(_) => "upgrade_finalization_failure",
             Self::UpgradeFilesystem(_) => "upgrade_filesystem_failure",
+            Self::UpgradeBootstrap(_) => "upgrade_bootstrap_failure",
         }
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn execute_authorized_intent_with_upgrade_bootstrap<P, F, I, U>(
+    intent: AuthorizedInstallerIntent,
+    install_store: &InstallReceiptStore,
+    data_root: impl AsRef<Path>,
+    expected_owner_id: u32,
+    programs: &mut P,
+    preflight: &mut F,
+    operation_ids: &mut I,
+    upgrade_port: &mut U,
+) -> Result<InstallerExecutionSummary, InstallerExecutionError>
+where
+    P: InstallerProgramPort,
+    F: InstallerPreflightPort,
+    I: InstallerOperationIdSource,
+    U: UpgradeCoordinatorPort,
+{
+    if intent.operation_kind() != Some(InstallOperationKind::Upgrade) {
+        return execute_authorized_intent(
+            intent,
+            install_store,
+            programs,
+            preflight,
+            operation_ids,
+            &mut NoUpgradeExecution,
+        );
+    }
+    if intent.action() == InstallerAction::BeginUpgrade {
+        let summary = execute_authorized_intent(
+            intent,
+            install_store,
+            programs,
+            preflight,
+            operation_ids,
+            &mut NoUpgradeExecution,
+        )?;
+        let outer = install_store
+            .load()
+            .map_err(|error| InstallerExecutionError::InstallFilesystem(error.code()))?
+            .ok_or(InstallerExecutionError::InvalidState)?;
+        bootstrap_upgrade_receipt(&outer, data_root, expected_owner_id)
+            .map_err(|error| InstallerExecutionError::UpgradeBootstrap(error.code()))?;
+        return Ok(summary);
+    }
+    let outer = install_store
+        .load()
+        .map_err(|error| InstallerExecutionError::InstallFilesystem(error.code()))?
+        .ok_or(InstallerExecutionError::InvalidState)?;
+    let bootstrapped = bootstrap_upgrade_receipt(&outer, data_root, expected_owner_id)
+        .map_err(|error| InstallerExecutionError::UpgradeBootstrap(error.code()))?;
+    let (upgrade_store, mut upgrade_receipt) = bootstrapped.into_parts();
+    let mut bound = BoundUpgradeExecution::new(&upgrade_store, &mut upgrade_receipt, upgrade_port);
+    execute_authorized_intent(
+        intent,
+        install_store,
+        programs,
+        preflight,
+        operation_ids,
+        &mut bound,
+    )
 }
 
 pub fn execute_authorized_intent<P, F, I, U>(

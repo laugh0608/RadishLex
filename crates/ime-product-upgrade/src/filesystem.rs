@@ -321,6 +321,27 @@ impl UpgradeReceiptStore {
         Ok(receipt)
     }
 
+    pub fn load_guarded(
+        &self,
+        guard: &UpgradeProcessGuard,
+    ) -> Result<Option<UpgradeReceipt>, UpgradeFilesystemError> {
+        self.revalidate()?;
+        if !guard.belongs_to(self) {
+            return Err(error(UpgradeFilesystemErrorCode::IdentityChanged));
+        }
+        guard.revalidate()?;
+        self.validate_known_entries()?;
+        if path_exists(&self.staged_receipt_path())? {
+            return Err(error(UpgradeFilesystemErrorCode::InterruptedReceiptWrite));
+        }
+        let receipt = self.load_current_internal()?.map(|(receipt, _, _)| receipt);
+        snapshot::validate_snapshot_state(self, receipt.as_ref())?;
+        candidate::validate_candidate_state(self, receipt.as_ref())?;
+        settings::validate_settings_backup_state(self, receipt.as_ref())?;
+        switch::validate_switch_state(self, receipt.as_ref())?;
+        Ok(receipt)
+    }
+
     pub fn persist(
         &self,
         guard: &UpgradeProcessGuard,

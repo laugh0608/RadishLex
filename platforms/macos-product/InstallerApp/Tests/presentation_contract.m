@@ -1,5 +1,6 @@
 #import <Foundation/Foundation.h>
 
+#import "RLXInstallerBridge.h"
 #import "RLXInstallerPresentation.h"
 
 static void Require(BOOL condition, NSString *message) {
@@ -32,6 +33,16 @@ static NSDictionary<NSString *, id> *Snapshot(NSString *phase,
 
 int main(void) {
     @autoreleasepool {
+        RLXInstallerPresentation *bridge = [[RLXInstallerPresentation alloc]
+            initWithDriverSnapshot:RLXInstallerBridgeSnapshot()];
+        Require(bridge.failedClosed, @"production bridge must fail closed");
+        Require([bridge.errorCode isEqualToString:@"driver_unavailable"],
+                @"production bridge must expose stable unavailable error");
+        RLXInstallerPresentation *unknownBridge = [[RLXInstallerPresentation alloc]
+            initWithDriverSnapshot:RLXInstallerBridgePerformAction(@"not_an_action")];
+        Require([unknownBridge.errorCode isEqualToString:@"unknown_driver_result"],
+                @"unknown native action must fail closed");
+
         RLXInstallerPresentation *prepared = [[RLXInstallerPresentation alloc]
             initWithDriverSnapshot:Snapshot(
                 @"awaiting_user_action", @"confirm_quiescence", @"none",

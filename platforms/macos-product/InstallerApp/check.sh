@@ -9,7 +9,10 @@ output_root="${repo_root}/target/macos-product/installer-app"
 module_cache="${output_root}/clang-module-cache"
 contract_test="${output_root}/installer-presentation-contract"
 bundle="${output_root}/RadishLex Installer.app"
+bridge_library="${repo_root}/target/release/libradishlex_macos_installer_bridge.a"
 source_files=(
+  "${script_dir}/Sources/RLXInstallerBridge.h"
+  "${script_dir}/Sources/RLXInstallerBridge.m"
   "${script_dir}/Sources/RLXInstallerPresentation.h"
   "${script_dir}/Sources/RLXInstallerPresentation.m"
   "${script_dir}/Sources/main.m"
@@ -31,9 +34,13 @@ CLANG_MODULE_CACHE_PATH="${module_cache}" clang \
   -fobjc-arc -fblocks -fmodules -Wall -Wextra -Werror \
   "-mmacosx-version-min=${minimum_macos}" \
   -I "${script_dir}/Sources" \
+  -I "${repo_root}/platforms/macos-product/InstallerBridge/include" \
+  "${script_dir}/Sources/RLXInstallerBridge.m" \
   "${script_dir}/Sources/RLXInstallerPresentation.m" \
   "${script_dir}/Tests/presentation_contract.m" \
+  "${bridge_library}" \
   -framework Foundation \
+  -framework Security \
   -o "${contract_test}"
 "${contract_test}"
 
@@ -46,6 +53,12 @@ fi
 cmp -s "${repo_root}/packaging/macos/install-layout.json" \
   "${bundle}/Contents/Resources/InstallLayout.json"
 codesign --verify --deep --strict "${bundle}"
+for symbol in \
+  radishlex_installer_bridge_contract_version \
+  radishlex_installer_bridge_snapshot_v1 \
+  radishlex_installer_bridge_perform_v1; do
+  nm -gU "${bundle}/Contents/MacOS/RadishLex Installer" | rg -Fq "_${symbol}"
+done
 
 set +e
 boundary_matches="$(rg -n 'TISSelectInputSource|TISRegisterInputSource|kTISPropertyInputSourceIsEnabled|NSTask|Process\(|/bin/(rm|sh)|rm -rf|HOME|NSHomeDirectory|expandTilde|receipt\.json|operation_id' \

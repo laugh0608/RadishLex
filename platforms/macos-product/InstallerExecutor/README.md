@@ -1,6 +1,6 @@
 # macOS Installer 执行器
 
-本文说明 `radishlex-macos-installer-executor` 如何把已授权的 Installer intent 接入外层程序事务、manifest-bound 平台 port、只读 preflight 与既有 M4-P02 数据事务。读者是 Installer、平台适配和 M4-P03 门禁维护者。本文不包含 AppKit bridge、真实用户目录、进程停止、输入源修改、Developer ID、公证、DMG 或终态材料清理。
+本文说明 `radishlex-macos-installer-executor` 如何把已授权的 Installer intent 接入外层程序事务、manifest-bound 平台 port、只读 preflight 与既有 M4-P02 数据事务。读者是 Installer、平台适配和 M4-P03 门禁维护者。本文不包含真实用户目录、进程停止、输入源修改、Developer ID、公证、DMG 或终态材料清理。
 
 ## 两阶段执行
 
@@ -11,7 +11,7 @@
 3. 执行器在 guard 内打开固定 Manager/InputMethod `ProgramSwitchStore`，从当前 receipt 重放 source evidence、staging、preserve、逐端 commit、数据协调和两段终态；
 4. 非 `prepared` 中断只接受 driver 重新授权的 `ResumeOperation`，沿原 operation ID 和已持久化 evidence 幂等续跑。
 
-first install、repair 和 remove 在 `programs_committed` 后共用核心终态 port。upgrade 必须绑定已经以同一 operation ID 持久化的 M4-P02 receipt；数据 `completed` 后才进入外层 `data_settled -> final_verified -> completed`。若中断在 `final_verified`，重启只重新证明 data terminal、root/release 与双 bundle，不重新进入数据 migration。
+first install、repair 和 remove 在 `programs_committed` 后共用核心终态 port。upgrade bootstrap 只从外层 source/target release、固定 data root、只读 userdb schema/identity 与可选 settings/Rime identity 创建 `preflighted` M4-P02 receipt；重启时只接受同 operation、root、release 与 target schema 的既有 receipt。数据 `completed` 后才进入外层 `data_settled -> final_verified -> completed`。若中断在 `final_verified`，重启可重绑 progressed data receipt，只重新证明 data terminal、root/release 与双 bundle，不重新进入数据 migration。
 
 ## 失败关闭
 
@@ -21,7 +21,7 @@ first install、repair 和 remove 在 `programs_committed` 后共用核心终态
 - `InstallerExecutionError::code()` 只输出稳定类别，不包含路径、operation ID、签名正文或底层命令输出；
 - 执行器不清理 staging、backup、receipt 或历史 operation 材料。
 
-当前 `InstallerApp` 默认 bridge 仍为 `driver_unavailable`。本 crate 只建立可由后续稳定 bridge 调用的隔离执行契约，不把 Rust 文件系统逻辑复制到 AppDelegate。
+`InstallerBridge` 已调用本 crate 的稳定入口；真实用户域 bootstrap 尚未授权，因此生产 FFI 仍返回 `driver_unavailable`，不把 Rust 文件系统逻辑复制到 AppDelegate。
 
 ## 验证
 

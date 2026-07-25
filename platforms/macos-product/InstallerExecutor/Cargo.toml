@@ -15,10 +15,8 @@ path = "src/lib.rs"
 getrandom = "0.2.17"
 radishlex-ime-product-install = { path = "../../../crates/ime-product-install" }
 radishlex-ime-product-upgrade = { path = "../../../crates/ime-product-upgrade" }
+radishlex-ime-userdb = { path = "../../../crates/ime-userdb" }
 radishlex-macos-installer-driver = { path = "../InstallerDriver" }
 radishlex-macos-product-install = { path = "../InstallAdapter" }
 radishlex-macos-product-install-coordinator = { path = "../InstallCoordinatorAdapter" }
 radishlex-macos-upgrade-coordinator = { path = "../UpgradeCoordinatorAdapter" }
-
-[dev-dependencies]
-radishlex-ime-userdb = { path = "../../../crates/ime-userdb" }

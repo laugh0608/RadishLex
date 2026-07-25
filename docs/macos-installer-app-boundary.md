@@ -96,13 +96,15 @@ refresh 是唯一不要求确认的 action。first install、upgrade、repair、
 - 拒绝任何命令行参数；
 - 使用 ad-hoc 签名只完成构建完整性验证。
 
-当前默认 bridge 固定为 `driver_unavailable`，因此该 bundle 是 UI/driver contract shell，不执行真实安装。独立 `InstallerExecutor` 已在隔离合成用户域把 authorized intent 接入现有 manifest-bound port、事务核心与 preflight；后续 bridge 只能调用该稳定入口，不能在 AppDelegate 中补复制、rename、删除、receipt 或 TIS 逻辑。
+AppKit 已静态链接 `radishlex-macos-installer-bridge` ABI v1，并通过三个已绑定 symbol 读取 snapshot、刷新和提交确认。ABI 只使用固定整数 enum 与 POD snapshot；Objective-C 只映射已知值，未知 contract/action/error/state/prompt/进度统一失败关闭。AppDelegate 不含复制、rename、删除、receipt 或 TIS 逻辑。
+
+Rust bridge 每次从 fresh status projection 重新授权 action，再进入 `InstallerExecutor`；隔离门禁已证明 `prepared` 持久化、重启投影、stale action 和 active guard。真实用户域 bootstrap 尚未授权，生产导出入口因此仍返回 `blocked + driver_unavailable`，已绑定不等于已经开放真实安装。
 
 ## 隔离执行器
 
 begin/retry/remove intent 先在外层 guard 内回读 current receipt、验证 operation/source/target chain，并要求 target-only manifest-bound preflight 的 version/build 与 InstallPayload target 精确匹配，再持久化新的 `prepared` 并返回 UI。只有重新投影出的 `ConfirmQuiescence` intent 能推进 `quiesced`；执行前再次 preflight，随后按 receipt evidence 幂等完成双 bundle 切换。
 
-first install、repair、remove 进入统一程序终态。upgrade 要求调用边界已经提供同 operation ID、root/release 精确绑定的 M4-P02 receipt，执行器组合数据协调和 upgrade 两段终态；中断在 `final_verified` 时只重新验证 data `completed` 与双程序，不重复 migration。active guard、stale intent、缺失 upgrade context、platform preflight 失败或任何 receipt/identity 漂移均失败关闭，错误日志只能使用稳定 code。
+first install、repair、remove 进入统一程序终态。upgrade 在外层 `prepared` 后从外层 source/target、固定 data root、只读 `userdb.sqlite3` schema/identity 与可选 settings/Rime identity bootstrap M4-P02 `preflighted` receipt；若 data receipt 已存在，则只接受同 operation、root、source/target release 与当前 target schema 的持久化链。中断在 `final_verified` 时可重新打开已到 `completed` 的 data receipt，只重新验证终态与双程序，不重复 migration。active guard、stale intent、缺失/漂移 context、platform preflight 失败或任何 receipt/identity 漂移均失败关闭，错误日志只能使用稳定 code。
 
 ## 验证
 
@@ -112,4 +114,4 @@ cargo test --locked -p radishlex-ime-product-install --all-targets
 ./scripts/check-repo.sh
 ```
 
-门禁覆盖 absent root 零写入、active/stale guard、非终态重启投影、completed receipt 与后续 operation、产品情况分支、stale/unconfirmed action、四类执行、preflight 阻断、程序 staging 与 upgrade `final_verified` 重启续跑、移除数据保留授权、稳定摘要、未知 snapshot、原生 bundle metadata、固定 layout 和 UI 源码禁止边界。普通门禁不启动 GUI、不访问真实用户目录或系统输入源。
+门禁覆盖 absent root 零写入、active/stale guard、非终态重启投影、completed receipt 与后续 operation、产品情况分支、fresh reauthorization、四类执行、preflight 阻断、程序 staging、upgrade receipt bootstrap 与 `final_verified` 重启续跑、移除数据保留授权、ABI enum 映射、未知 snapshot/action、原生 bundle metadata、固定 layout、已绑定 Rust symbol 和 UI 源码禁止边界。普通门禁不启动 GUI、不访问真实用户目录或系统输入源。

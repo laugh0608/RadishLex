@@ -1,0 +1,21 @@
+[package]
+name = "radishlex-macos-installer-bridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../../LICENSE"
+description = "Versioned native bridge for the RadishLex macOS Installer."
+
+[lib]
+name = "radishlex_macos_installer_bridge"
+path = "src/lib.rs"
+crate-type = ["rlib", "staticlib"]
+
+[dependencies]
+radishlex-ime-product-install = { path = "../../../crates/ime-product-install" }
+radishlex-macos-installer-driver = { path = "../InstallerDriver" }
+radishlex-macos-installer-executor = { path = "../InstallerExecutor" }
+
+[dev-dependencies]
+radishlex-ime-product-upgrade = { path = "../../../crates/ime-product-upgrade" }

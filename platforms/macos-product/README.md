@@ -31,6 +31,10 @@ platforms/macos-product/
   InstallerExecutor/
     src/                     authorized intent to restartable transaction execution
     Cargo.toml
+  InstallerBridge/
+    include/                 versioned native ABI
+    src/                     fresh authorization and executor dispatch
+    Cargo.toml
   InstallerApp/
     Sources/                 independent AppKit presentation shell
     Tests/                   snapshot and fail-closed contract
@@ -100,9 +104,13 @@ upgrade 产品终态在 `final_verified` 与 `completed` 前分别复验外层/d
 
 ## InstallerExecutor
 
-执行器只接受 `InstallerDriver` 已授权的 intent，但仍在 guard 内重新读取 current receipt 并执行 manifest-bound preflight。begin/retry/remove 先持久化 `prepared` 并返回；用户重新确认静止后才进入 `quiesced` 和程序 mutation。first install、repair、remove 共用外层程序终态，upgrade 绑定同一 operation ID 的既有 M4-P02 receipt，并从任一已持久化状态继续数据协调、程序恢复或两段终态。
+执行器只接受 `InstallerDriver` 已授权的 intent，但仍在 guard 内重新读取 current receipt 并执行 manifest-bound preflight。begin/retry/remove 先持久化 `prepared` 并返回；用户重新确认静止后才进入 `quiesced` 和程序 mutation。first install、repair、remove 共用外层程序终态；upgrade 从外层 receipt 和固定 data root bootstrap 或重绑同 operation 的 M4-P02 receipt，并从任一已持久化状态继续数据协调、程序恢复或两段终态。
 
-执行器不接受 UI 路径、`HOME`、release、bundle identity 或 available bytes 自报值。随机 operation ID 来自系统熵；active guard、stale intent、缺失 upgrade context、preflight/receipt/identity 失败均关闭。当前 AppKit 默认 bridge 仍未绑定该 crate，因此产品壳不会执行真实安装。
+执行器不接受 UI 路径、`HOME`、release、bundle identity 或 available bytes 自报值。随机 operation ID 来自系统熵；active guard、stale intent、缺失 upgrade context、preflight/receipt/identity 失败均关闭。
+
+## InstallerBridge
+
+ABI v1 固定整数 enum、POD snapshot 与 contract/snapshot/perform 三个 symbol。AppKit 已静态链接并实际调用；Objective-C 不解释 receipt，只把已知 enum 映射为 driver snapshot。Rust dispatch 每次重新投影并授权 fresh action，再调用 executor。隔离测试证明 prepared/restart/stale/active guard；生产导出入口在真实用户域 bootstrap 尚未授权时保持 `blocked + driver_unavailable`。
 
 ## 构建与验证
 

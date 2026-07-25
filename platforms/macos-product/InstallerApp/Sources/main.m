@@ -1,5 +1,6 @@
 #import <Cocoa/Cocoa.h>
 
+#import "RLXInstallerBridge.h"
 #import "RLXInstallerPresentation.h"
 
 static NSString *const RLXManagerTarget = @"Applications/RadishLex Manager.app";
@@ -24,19 +25,8 @@ static NSString *const RLXDataRoot = @"Library/Application Support/RadishLex";
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     (void)notification;
-    NSDictionary<NSString *, id> *failClosedSnapshot = @{
-        RLXInstallerDriverContractVersionKey: @1,
-        RLXInstallerDriverPhaseKey: @"blocked",
-        RLXInstallerDriverPrimaryActionKey: @"refresh",
-        RLXInstallerDriverSecondaryActionKey: @"none",
-        RLXInstallerDriverErrorKey: @"driver_unavailable",
-        RLXInstallerDriverStateKey: @"none",
-        RLXInstallerDriverOperationKey: @"none",
-        RLXInstallerDriverProgressKey: @0,
-        RLXInstallerDriverManualPromptKey: @"none",
-    };
     self.presentation =
-        [[RLXInstallerPresentation alloc] initWithDriverSnapshot:failClosedSnapshot];
+        [[RLXInstallerPresentation alloc] initWithDriverSnapshot:RLXInstallerBridgeSnapshot()];
 
     NSRect frame = NSMakeRect(0, 0, 680, 520);
     self.window = [[NSWindow alloc]
@@ -157,6 +147,8 @@ static NSString *const RLXDataRoot = @"Library/Application Support/RadishLex";
         return;
     }
     if (![self.presentation requiresConfirmationForAction:actionCode]) {
+        self.presentation = [[RLXInstallerPresentation alloc]
+            initWithDriverSnapshot:RLXInstallerBridgePerformAction(actionCode)];
         [self renderPresentation];
         return;
     }
@@ -167,6 +159,8 @@ static NSString *const RLXDataRoot = @"Library/Application Support/RadishLex";
     [alert addButtonWithTitle:@"取消"];
     [alert beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse response) {
         if (response == NSAlertFirstButtonReturn) {
+            self.presentation = [[RLXInstallerPresentation alloc]
+                initWithDriverSnapshot:RLXInstallerBridgePerformAction(actionCode)];
             [self renderPresentation];
         }
     }];

@@ -28,9 +28,11 @@ M4-P03 已接受 DMG + 独立用户域 Installer app：Manager、InputMethod 和
 
 隔离端到端资格复用真实双 bundle、独立 source/target manifest/payload 和合成 Application Support，覆盖 `final_verified` 中断、candidate 失败恢复 source、部分程序提交重启，以及 active guard、非终态和 completed 身份决策。qualification ad-hoc identity 只在 feature、固定 marker、temp/owner/mode/symlink 约束全部成立时可用；production Developer ID 路径未放宽，也不清理 staging/backup/历史 operation。
 
-Installer UI/driver contract 已落地。零写入 status projection 和 Rust driver 把 verified product situation、receipt/guard、operation、持久化进度、稳定错误、手动提示和保留数据策略形成 snapshot v1；mutation 拒绝 stale UI 和缺失确认。AppKit bundle 展示目标、重启继续与稳定诊断，未知结果失败关闭；默认 bridge 为 `driver_unavailable`，门禁只构建 contract shell，不执行真实安装或 TIS 操作。
+Installer UI/driver contract 已落地。零写入 status projection 和 Rust driver 把 verified product situation、receipt/guard、operation、持久化进度、稳定错误、手动提示和保留数据策略形成 snapshot v1；mutation 拒绝 stale UI 和缺失确认。AppKit bundle 展示目标、重启继续与稳定诊断，未知结果失败关闭。
 
-隔离 restartable executor 已落地。begin/retry/remove 在 guard 内回读 current receipt、执行 manifest-bound target preflight，只生成 operation ID 并持久化 `prepared`；重新投影并确认中立输入源/Manager 关闭后，`ConfirmQuiescence` 再次 preflight，才沿同一 receipt 执行双 bundle staging/preserve/commit。first install、repair、remove 共用程序终态；upgrade 绑定同 operation ID 的既有 M4-P02 receipt，组合数据协调、程序恢复与两段终态，`final_verified` 中断后只重新证明 data `completed` 与双程序。completed receipt 会与当前真实产品情况交叉判定，继续提供 upgrade/repair/remove；矛盾身份失败关闭。AppKit 默认 bridge 尚未接入 executor，也没有数据 receipt bootstrap 或真实用户域写入。
+隔离 restartable executor 与版本化 App bridge 已落地。begin/retry/remove 在 guard 内回读 current receipt、执行 manifest-bound target preflight，只生成 operation ID 并持久化 `prepared`；重新投影并确认中立输入源/Manager 关闭后，`ConfirmQuiescence` 再次 preflight，才沿同一 receipt 执行双 bundle staging/preserve/commit。first install、repair、remove 共用程序终态；upgrade 从外层 receipt、固定 data root、只读 userdb 与可选 settings/Rime 身份自动 bootstrap M4-P02 receipt，既有 progressed receipt 则按 operation/root/release/schema 精确重绑。`final_verified` 中断后可重开 data `completed` receipt，只重新证明终态与双程序。completed receipt 会与当前真实产品情况交叉判定，矛盾身份失败关闭。
+
+`radishlex-macos-installer-bridge` ABI v1 使用固定整数 enum 和 POD snapshot；AppKit 已静态链接并实际调用三个版本化 symbol，Objective-C 只做已知枚举到 presentation 字段映射，未知版本、action、state、error、prompt 或进度失败关闭。隔离合成域证明 fresh snapshot 重新授权、`prepared` 重启投影、stale action、active guard 和 upgrade data receipt 续跑。真实用户域 bootstrap 尚未授权，因此生产导出入口仍稳定返回 `blocked + driver_unavailable`，不执行真实安装或 TIS 操作。
 
 M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
@@ -59,8 +61,8 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v9、userd
 
 ## 下一步顺位
 
-1. M4-P03 下一切面固定 Installer App 到 Rust driver/executor 的版本化 bridge 与 upgrade data-receipt bootstrap，先在隔离合成用户域证明 snapshot 重新授权、prepared/confirm、错误映射和异常退出重启；UI 仍不能成为 receipt、运行身份、路径或 available-bytes 真相源。
-2. 隔离 bridge 门禁完成后，再单独授权真实用户目录安装、进程停止/输入源交互、Developer ID/Hardened Runtime、公证、Gatekeeper 和 DMG 发布证据。
+1. M4-P03 下一切面先固定真实用户域 Installer bootstrap、显式系统交互与可回退验收 runbook；在获得单独授权前继续保持生产 bridge `driver_unavailable`，不得把隔离路径、`CFFIXED_USER_HOME` 或测试签名带入产品。
+2. 随后独立推进 Developer ID/Hardened Runtime、嵌套签名、公证、staple、Gatekeeper 与 DMG 发布证据；真实安装 smoke 必须保留/恢复用户数据和输入源状态，并继续禁止自动清理历史事务材料。
 3. 普通用户同步、恢复/授权/撤销/轮换继续关闭；在真实不支持 Secure Enclave 的环境可得时再补 unsupported，首版发布后且准备生产同步前再验收正式域名/证书。
 
 ## 验证入口
