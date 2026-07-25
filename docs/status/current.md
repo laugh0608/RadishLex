@@ -16,6 +16,8 @@ M4-P02 已闭合只读 inspection、SQLite 一致快照、隔离 migration candi
 
 隔离产品协调资格已用真实 Manager/InputMethod 装配和 helper 在合成 Application Support 上覆盖完整成功、Manager/InputMethod 端点失败、静止丢失后续跑、切换后回滚、source evidence 暂不可得后的重启恢复和临时根清理。InputMethod 只把锁定 YAML 部署到短生命周期验证 user data；产品 RimeData、candidate 和 Application Support 保持只读。首发 source qualification 具有独立版本、签名和 manifest，但使用当前 native code/schema；它证明 source/target 路由与恢复编排，不冒充尚不存在的历史发布二进制。未来形成实际上一版发布包后，真实跨发布 source bundle 复验必须成为后续升级门禁。
 
+M4-P03 已接受 DMG + 独立用户域 Installer app：Manager、InputMethod 和 install state 固定在 current-user home 下，不请求管理员权限，也不让 `.pkg` script 承担明文数据协调。committed `install-layout.json` 与确定性 `InstallPayloadManifest.json` 已绑定产品 manifest、版本/build、Installer bundle ID、两个安装目标和默认保留数据语义；7 项 contract 覆盖确定性装配、额外文件、内容变更、layout 替换、bundle symlink 和覆盖拒绝。该 payload 仍不是 Installer/DMG，不证明签名、公证或真实安装。
+
 M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
 ## M3 退出结论
@@ -55,8 +57,8 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v8、userd
 
 ## 下一步顺位
 
-1. M4-P03 先在现有产品包边界内完成安装载体决策，明确 Manager/InputMethod 固定目标、preflight/协调器安置、权限与提权边界、程序 bundle 切换/回滚、默认保留 Application Support 的移除语义，以及 `.pkg`、`.dmg` 或安装器应用的取舍；在边界与退出标准固定前不写真实安装脚本。
-2. 按选定载体建立不修改系统安装位置的 payload/layout、签名顺序和离线升级 contract，证明产品根来源、source/target 程序恢复、数据协调结果与安装事务一致；真实安装、系统设置、Developer ID、notarization 和 Gatekeeper 复验另行授权。
+1. M4-P03 下一切面先固定外层 installation transaction 专题：独立 `ime-product-install` 核心拥有严格 receipt/guard、program artifact identity、operation kind 和 startup decision；M4-P02 继续只负责数据，Installer/macOS adapter 只负责固定路径、签名与进程端口。
+2. 随后实现合成用户域内双 bundle staging/切换、部分切换重启恢复和 source 程序回滚，再把 M4-P02 数据协调结果纳入外层终态；没有外层非终态 startup gate 前不实现真实安装。
 3. 普通用户同步、恢复/授权/撤销/轮换继续关闭；在真实不支持 Secure Enclave 的环境可得时再补 unsupported，首版发布后且准备生产同步前再验收正式域名/证书。
 
 ## 验证入口
@@ -66,6 +68,7 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v8、userd
 ./scripts/check-manager-ffi-smoke.sh
 ./scripts/check-manager-product.sh
 ./scripts/check-macos-product-metadata.sh
+./scripts/check-macos-install-layout.sh
 ./scripts/check-macos-imk.sh
 ./scripts/check-macos-upgrade-coordinator.sh
 ./scripts/check-macos-upgrade-product-coordination.sh
@@ -92,5 +95,6 @@ cmp -s AGENTS.md CLAUDE.md
 - [M2 manager 验收 runbook](../runbooks/macos-m2-manager-product-acceptance.md)：关闭证据与回滚流程。
 - [macOS 平台边界](../macos-inputmethodkit-boundary.md)：M1/M2 输入与隐私稳定结论。
 - [macOS 产品包边界](../macos-product-package-boundary.md)：M4 组件、版本、数据、签名与装配停止线。
+- [macOS 安装载体 ADR](../adr/0008-macos-installation-carrier.md)：M4-P03 用户域 Installer、固定目标、程序事务与移除边界。
 - [macOS 数据升级协调器](../macos-data-upgrade-coordinator.md)：M4-P02 状态机、receipt、SQLite 快照、双端验证与回滚边界。
 - [本周周志](../devlogs/2026-W30.md)：本周 M3 退出、M4-P01 装配与 M4-P02 升级协调器的验证和交接流水。

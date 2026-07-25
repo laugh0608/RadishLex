@@ -75,7 +75,7 @@ receipt 的 `candidate_verified` 状态本身是双端成功的持久化证明�
 
 ### 安装载体
 
-M4-P03 选择的 `.pkg`、`.dmg` 或安装器应用只能调用稳定协调入口并展示结果。它负责程序 bundle 的安装与恢复，不创建数据库 migration SQL，不解析 receipt 内部字段，不删除真实用户数据。
+M4-P03 已选择签名、公证 DMG 中的独立用户域 Installer app。Installer 只能调用稳定协调入口并展示结果；它负责程序 bundle 的安装与恢复，不创建数据库 migration SQL，不解析数据 receipt 内部字段，不删除真实用户数据。载体、固定目标与外层程序事务见 [ADR 0008](adr/0008-macos-installation-carrier.md)。
 
 ## 受控数据范围
 
@@ -379,7 +379,7 @@ macOS adapter 只接受两个已经形成产品装配的根目录，不接受独
 9. 已补齐 settings/snapshot/candidate evidence-only 恢复，并实现同一 guard 下逐 checkpoint 复验静止的核心协调驱动；
 10. 已实现 macOS 固定 host adapter、source/target manifest 绑定、target Manager preflight 装配和 adapter contract；
 11. 已在隔离合成 Application Support 中以真实产品 helper 完成成功、双端失败、静止丢失、回滚和重启恢复协调资格；
-12. M4-P03 选定安装载体后再编写真实安装升级 runbook。
+12. M4-P03 已选定安装载体并建立未安装 payload 装配说明；真实安装升级 runbook 要在外层程序事务、Installer 和授权实机入口完成后编写。
 
 ## M4-P02 退出标准
 

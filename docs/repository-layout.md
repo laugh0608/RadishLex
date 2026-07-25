@@ -311,9 +311,9 @@ apps/radishlex-manager/
 
 ## 产品打包目录
 
-`packaging/macos/product.json` 是 macOS 产品版本、build、最低系统、bundle ID、FFI ABI、userdb schema 和 manifest 格式的单一元数据真相源。`packaging/rime/product-rime-data.json` 绑定产品 schema、Apache 词典来源 commit/hash、运行时路径和逐资产许可证；`scripts/rime-product/product_data.py` 负责离线校验与装配。
+`packaging/macos/product.json` 是 macOS 产品版本、build、最低系统、bundle ID、FFI ABI、userdb schema 和 manifest 格式的单一元数据真相源。`packaging/macos/install-layout.json` 固定 M4-P03 的 DMG + 独立用户域 Installer、两个 component-to-target 映射、Application Support、安装事务状态和移除语义。`packaging/rime/product-rime-data.json` 绑定产品 schema、Apache 词典来源 commit/hash、运行时路径和逐资产许可证；`scripts/rime-product/product_data.py` 负责离线校验与装配。
 
-`scripts/macos-product/product_manifest.py` 校验源码声明、生成/复验无绝对路径的 `ProductManifest.json`，`scripts/build-macos-product.sh` 从 committed RimeData 输入装配双 bundle 产品目录。该目录不承担安装、签名凭据、公证上传或用户数据迁移；具体构建和复验步骤见 [macOS 产品装配 Runbook](runbooks/macos-product-assembly.md)。
+`scripts/macos-product/product_manifest.py` 校验源码声明、生成/复验无绝对路径的 `ProductManifest.json`，`scripts/build-macos-product.sh` 从 committed RimeData 输入装配双 bundle 产品目录。`scripts/macos-product/install_layout.py` 严格校验用户域目标，并以 layout/ProductManifest hash 生成确定性 `InstallPayloadManifest.json`；`scripts/build-macos-install-payload.sh` 只把已验证产品装配成 `target/` payload，不执行安装。上述目录不承担签名凭据、公证上传或用户数据迁移；具体产品构建见 [macOS 产品装配 Runbook](runbooks/macos-product-assembly.md)，安装载体见 [ADR 0008](adr/0008-macos-installation-carrier.md)。
 
 ## 平台目录
 

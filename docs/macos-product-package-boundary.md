@@ -1,6 +1,6 @@
 # macOS 产品包边界
 
-本文定义 RadishLex M4 macOS 产品发布候选的组件、版本、数据、签名和验证边界，读者是产品构建、InputMethodKit、Manager 与发布门禁的维护者。本文不记录具体构建流水、Apple 凭据、真实安装操作或历史验收结果；可重复构建与复验步骤见 [macOS 产品装配 Runbook](runbooks/macos-product-assembly.md)。
+本文定义 RadishLex M4 macOS 产品发布候选的组件、版本、数据、安装、签名和验证边界，读者是产品构建、InputMethodKit、Manager、Installer 与发布门禁的维护者。本文不记录具体构建流水、Apple 凭据、真实安装操作或历史验收结果；可重复构建与复验步骤见 [macOS 产品装配 Runbook](runbooks/macos-product-assembly.md)，安装载体决策见 [ADR 0008](adr/0008-macos-installation-carrier.md)。
 
 ## 目标与范围
 
@@ -29,9 +29,9 @@ InputMethod 与 Manager 是同一产品版本下的两个独立 bundle，不互�
 - InputMethod 额外携带 `librime`、RimeData 与对应许可证；
 - Manager 只携带其真实调用所需的 native dependency，不为目录对称复制 `librime`。
 
-M4-P01 的稳定装配产物是版本化产品目录及其 manifest。面向用户的 `.pkg`、`.dmg` 或安装器应用属于后续安装批次；在安装位置、权限和回滚语义完成实证前，不能把装配目录称为普通用户安装包。
+M4-P01 的稳定装配产物是版本化产品目录及其 manifest。M4-P03 已选择签名、公证 DMG 中的独立用户域 Installer app 作为首个候选载体；在 Installer、外层事务、发布签名和真实安装证据完成前，产品装配目录与 InstallPayload 都不能称为普通用户安装包。
 
-只读 `RadishLexUpgradePreflightHost` 是后续升级载体调用的平台协调宿主，不属于任一业务 bundle，也不自动进入双 bundle 装配目录。发布载体必须明确安置和调用它，不能临时改成脚本、UI 进程检查或调用方自报容量。平台宿主的固定输入与只读边界见 [macOS 产品升级宿主说明](../platforms/macos-product/README.md)。
+只读 `RadishLexUpgradePreflightHost` 是 Installer/协调器调用的平台宿主，固定嵌入 target Manager 并进入产品 manifest，但不参与 Manager 普通业务。Installer 必须通过 manifest-bound adapter 调用它，不能临时改成脚本、UI 进程检查或调用方自报容量。平台宿主的固定输入与只读边界见 [macOS 产品升级宿主说明](../platforms/macos-product/README.md)。
 
 ### 产品 manifest
 
@@ -156,25 +156,37 @@ M4 数据升级必须覆盖当前布局内的 schema 演进与程序版本切换
 
 ## 安装与移除边界
 
-M4-P01 不修改真实系统安装位置。后续安装批次必须在以下约束下选择并验证分发载体：
+M4-P03 首个候选固定使用签名并公证的 UDIF DMG，内部只提供独立 `RadishLex Installer.app`。Installer 在当前用户会话运行，不请求管理员权限，也不把自身安装为持久产品组件。纯拖拽 DMG、ZIP、Manager 自安装和 `.pkg` 均不作为首个候选主路径；取舍与未来 `.pkg` 重新评估条件见 [ADR 0008](adr/0008-macos-installation-carrier.md)。
 
-- Manager 和 InputMethod 的目标位置固定且可审计；
-- 用户能在安装前看到将写入的程序路径和所需权限；
+`packaging/macos/install-layout.json` 是安装目标真相源，路径均相对 authoritative current-user home：
+
+```text
+Applications/RadishLex Manager.app
+Library/Input Methods/RadishLexInputMethod.app
+Library/Application Support/RadishLex
+Library/Application Support/RadishLex/.radishlex-install-v1
+```
+
+安装与移除继续遵守：
+
+- Installer 不接受自定义目标，用户能在变更前看到两个程序路径和保留数据语义；
 - 工具不得程序化选择或模拟切换输入源；
 - 升级前后使用公开 API 只读确认输入源状态；
 - 默认移除只删除产品 bundle，保留 Application Support 数据；
 - “移除程序并删除数据”必须单独授权、检查 receipt、关闭数据库并限制到固定文件集合；
 - 安装、升级和回滚脚本不得暴露通用递归删除或调用方自定义删除路径。
 
-真实安装、系统设置、进程停止、签名、公证和数据清理仍遵守仓库授权规则。
+InstallPayload 固定包含 committed layout、外层 payload manifest 和完整 Product 目录。payload manifest 绑定产品 manifest hash、layout hash、版本/build、Installer bundle ID、两个 component-to-target 映射和移除语义；产品 manifest 继续绑定 bundle 内全部文件。`./scripts/build-macos-install-payload.sh` 只写 `target/`，不执行安装。
+
+程序切换还需要 `.radishlex-install-v1` 外层 receipt/guard。两端 startup gate 必须在业务初始化前拒绝非终态、损坏或身份漂移的程序事务；数据 receipt 终态不能绕过尚未完成的程序切换。真实安装、系统设置、进程停止、签名、公证和数据清理仍遵守仓库授权规则。
 
 ## 签名、公证与供应链
 
-开发构建可以使用 ad-hoc 或 Apple Development，但必须明确标记，不能作为发布证据。直接分发的发布候选要求：
+开发构建可以使用 ad-hoc 或 Apple Development，但必须明确标记，不能作为发布证据。当前 DMG 直接分发候选要求：
 
-- 所有嵌套 Mach-O 先签名，再签主 executable 和外层 bundle；
+- 所有嵌套 Mach-O 先签名，再签两个产品 bundle、Installer app 和 DMG；
 - 使用 Developer ID Application 身份和 Hardened Runtime；
-- 若采用 installer package，使用独立的 Developer ID Installer 身份；
+- DMG 采用 UDIF 且签名；未来若另行采用 `.pkg`，再使用独立 Developer ID Installer 身份；
 - 使用 Apple 当前支持的 `notarytool` 或 Notary API 提交；
 - 验证 notary log，staple ticket，并在隔离环境执行 Gatekeeper 评估；
 - 发布证据只记录固定状态、产品 hash、submission ID 和结果，不保存凭据。
@@ -187,7 +199,7 @@ Apple 官方边界参考：
 
 签名身份、notary credential、公开上传和正式分发不进入普通仓库验证，需要发布授权。
 
-## M4-P01 已执行顺序
+## M4 已执行顺序
 
 1. 固定 `packaging/macos/product.json` 与 source contract 门禁；
 2. 对齐 Manager、InputMethod、FFI、userdb 和最低 macOS 版本；
@@ -195,7 +207,8 @@ Apple 官方边界参考：
 4. 生成并复验 `ProductManifest.json`；
 5. 把 source contract 单元测试接入仓库门禁；
 6. 在可用的隔离 RimeData/native dependency 环境运行完整装配验证；
-7. M4-P01 退出后完成 M4-P02 数据升级协调器、manifest-bound macOS adapter 与隔离真实产品协调资格；当前进入 M4-P03，先固定安装载体、程序版本切换/回滚、签名、公证、Gatekeeper 和默认保留用户数据的移除边界。
+7. M4-P01 退出后完成 M4-P02 数据升级协调器、manifest-bound macOS adapter 与隔离真实产品协调资格；
+8. M4-P03 已固定 DMG + 独立用户域 Installer、两个目标路径、外层事务边界与 InstallPayload manifest；下一步实现外层 receipt/guard 和双端 startup gate。
 
 ## M4-P01 退出标准
 

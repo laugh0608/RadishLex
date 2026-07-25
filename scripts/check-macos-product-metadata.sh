@@ -10,5 +10,6 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/macos-product/test_product_manifest.py"
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/rime-product/test_product_data.py"
+"${repo_root}/scripts/check-macos-install-layout.sh"
 
 echo "macOS product metadata contract passed."

@@ -41,8 +41,9 @@ target/macos-product/<product-version>-<build-number>/
 该门禁会验证：
 
 - `packaging/macos/product.json` 的字段和各版本声明一致；
+- `packaging/macos/install-layout.json` 的用户域目标、载体、Installer bundle ID 和移除语义与 ADR 0008 一致；
 - committed RimeData inventory、hash、来源和许可证映射一致；
-- product manifest 与 RimeData 工具的拒绝路径测试通过。
+- product manifest、InstallPayload manifest 与 RimeData 工具的拒绝路径测试通过。
 
 这一步不构建 app bundle，也不修改系统状态。
 
@@ -107,6 +108,25 @@ RADISHLEX_RIME_SHARED_DATA="${radish_rime_dir}/RimeData" \
 
 `RADISHLEX_RIME_SHARED_DATA` 必须来自 `prepare-rime-product-data.sh assemble` 生成的隔离目录，不得指向用户或运行时数据目录。
 
+## 第四步：装配 InstallPayload
+
+只有当前版本的产品目录已经独立复验后，才执行：
+
+```bash
+./scripts/build-macos-install-payload.sh
+```
+
+入口固定读取 `target/macos-product/<version>-<build>/`，生成：
+
+```text
+target/macos-install-payload/<version>-<build>/
+  InstallLayout.json
+  InstallPayloadManifest.json
+  Product/
+```
+
+`InstallPayloadManifest.json` 绑定 committed layout 与 ProductManifest 的大小/hash，并重复记录版本、build、Installer bundle ID、两个 component-to-target 映射和移除语义。装配拒绝输出覆盖、产品根额外条目、layout 替换、产品 manifest 漂移和 symlink 根。该目录是未来 Installer app 的资源输入，不是 Installer app、DMG 或安装包，不执行任何真实路径复制。
+
 ## 复验结果解释
 
 成功装配至少证明：
@@ -117,11 +137,13 @@ RADISHLEX_RIME_SHARED_DATA="${radish_rime_dir}/RimeData" \
 - bundle 不依赖 Homebrew 或构建机绝对 library path；
 - committed schema、词典、来源 manifest 和逐资产许可证进入 InputMethod；
 - `ProductManifest.json` 能复算两个 bundle、内部安全 symlink 和许可证文件。
+- InstallPayload 能确定性绑定产品内容与固定用户域目标，不包含构建机或用户绝对路径。
 
 它不证明：
 
 - bundle 已使用 Developer ID 或 Hardened Runtime 发布配置；
 - Apple notarization、stapling 或 Gatekeeper 隔离环境验证通过；
+- 独立 Installer app、外层 install receipt/guard 或程序 bundle 切换已实现；
 - 安装、升级、回滚、移除和真实用户数据 migration 可用；
 - validation helper 已被执行、真实 candidate 已被访问，或 startup gate 的现场恢复已经可用；
 - 真实用户同步已经开放。
@@ -133,6 +155,7 @@ RADISHLEX_RIME_SHARED_DATA="${radish_rime_dir}/RimeData" \
 - `RimeData ... differs from source lock`：committed 数据、来源、许可证或 hash 与锁不一致；应审阅输入变更，不得跳过校验。
 - `external absolute dependency`：某个 Mach-O 仍指向构建机路径；修正 dylib 收集或 install name，不能把本机路径加入 allowlist。
 - `product manifest does not match assembled artifacts`：产物在 manifest 生成后被修改、缺失或版本不一致；重新从受控输入装配，不手改 manifest。
+- `install payload ... does not match`：产品根、layout 或 payload manifest 不一致；重新从已验证产品装配生成，不复制或手改外层 manifest。
 - `missing ... RadishLexUpgradeValidationHost` 或 upgrade validation symbol 缺失：对应 bundle 未完成 ABI v8 helper 装配；修正组件构建，不能从另一 bundle 复制 helper 代替。
 - codesign 验证失败：检查嵌套 dylib、主 executable 和外层 bundle 的签名顺序；不要把 `--deep --force` 当作发布修复策略。
 

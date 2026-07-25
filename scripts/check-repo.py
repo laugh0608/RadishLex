@@ -48,6 +48,7 @@ REQUIRED_FILES = [
     "docs/technical-plan.md",
     "docs/macos-product-package-boundary.md",
     "docs/macos-data-upgrade-coordinator.md",
+    "docs/adr/0008-macos-installation-carrier.md",
     "docs/adr/0007-apple-secure-enclave-p256-backend.md",
     "docs/runbooks/apple-secure-enclave-p256-backend.md",
     "docs/runbooks/apple-secure-enclave-key-agreement-backend.md",
@@ -76,7 +77,9 @@ REQUIRED_FILES = [
     "scripts/check-manager-ffi-smoke.sh",
     "scripts/check-manager-product.sh",
     "scripts/build-macos-product.sh",
+    "scripts/build-macos-install-payload.sh",
     "scripts/check-macos-product-metadata.sh",
+    "scripts/check-macos-install-layout.sh",
     "scripts/check-macos-upgrade-preflight.sh",
     "scripts/check-macos-upgrade-coordinator.sh",
     "scripts/check-macos-upgrade-product-coordination.sh",
@@ -94,10 +97,14 @@ REQUIRED_FILES = [
     "scripts/macos-imk/test_native_manifest.py",
     "scripts/macos-product/product_manifest.py",
     "scripts/macos-product/test_product_manifest.py",
+    "scripts/macos-product/install_layout.py",
+    "scripts/macos-product/test_install_layout.py",
     "scripts/prepare-rime-product-data.sh",
     "scripts/rime-product/product_data.py",
     "scripts/rime-product/test_product_data.py",
     "packaging/macos/product.json",
+    "packaging/macos/install-layout.json",
+    "packaging/macos/README.md",
     "packaging/rime/README.md",
     "packaging/rime/product-rime-data.json",
     "packaging/rime/data/default.yaml",
@@ -264,18 +271,7 @@ def check_manager_product_runtime_contract() -> None:
 
 
 def check_macos_product_metadata() -> None:
-    run_command(
-        [sys.executable, str(REPO_ROOT / "scripts/macos-product/product_manifest.py"), "validate-source"]
-    )
-    run_command(
-        [sys.executable, str(REPO_ROOT / "scripts/macos-product/test_product_manifest.py")]
-    )
-    run_command(
-        [sys.executable, str(REPO_ROOT / "scripts/rime-product/product_data.py"), "validate"]
-    )
-    run_command(
-        [sys.executable, str(REPO_ROOT / "scripts/rime-product/test_product_data.py")]
-    )
+    run_command([str(REPO_ROOT / "scripts/check-macos-product-metadata.sh")])
 
 
 def check_macos_upgrade_preflight() -> None:
