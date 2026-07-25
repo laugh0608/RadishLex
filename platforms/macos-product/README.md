@@ -1,6 +1,6 @@
-# macOS 产品升级宿主说明
+# macOS 产品平台宿主与安装适配说明
 
-本文说明 `platforms/macos-product/` 内的平台宿主、固定输入、输出与验证边界，面向维护 M4 数据升级协调器、Manager/InputMethod 产品构建和仓库门禁的开发者。本文不包含真实用户目录演练、安装器操作、进程停止授权、Developer ID 或公证步骤；完整状态机见 [macOS 数据升级协调器边界](../../docs/macos-data-upgrade-coordinator.md)。
+本文说明 `platforms/macos-product/` 内的平台宿主、固定输入、输出与验证边界，面向维护 M4 数据升级协调器、程序安装事务、Manager/InputMethod 产品构建和仓库门禁的开发者。本文不包含真实用户目录演练、Installer UI、进程停止授权、Developer ID 凭据或公证步骤；数据状态机见 [macOS 数据升级协调器边界](../../docs/macos-data-upgrade-coordinator.md)，程序事务见 [macOS 程序安装事务](../../docs/macos-installation-transaction.md)。
 
 ## 目录职责
 
@@ -18,6 +18,9 @@ platforms/macos-product/
       input_method_main.m
   UpgradeCoordinatorAdapter/
     src/                     manifest-bound Rust platform port
+    Cargo.toml
+  InstallAdapter/
+    src/                     layout/manifest/signature/staging platform port
     Cargo.toml
 ```
 
@@ -65,6 +68,14 @@ M4-P02 的 manifest 绑定只解决“执行哪一代、哪一端产品代码”
 
 `qualification-harness` Cargo feature 仅供隔离产品协调门禁。它要求 canonical temp 根下的固定 marker 与 `0700` 合成 user home，并只对子进程设置 `CFFIXED_USER_HOME`；普通 `load` 始终清除该变量。资格场景使用真实 manifest-bound helper，故障只在 helper 返回后的 port 结果边界注入。source qualification 与 target 使用同一份当前 native code/schema，但具有独立 bundle 版本、重新签名和 manifest，因此只证明产品路由与恢复编排，不替代历史 source binary 或旧 schema migration 测试。
 
+## InstallAdapter
+
+adapter 组合 `ime-product-install`，但不接受自定义最终路径、bundle 名或数据路径。构造时要求 authoritative current-user home、uid、InstallPayload 根，以及 Manager/InputMethod 各自的 Developer ID designated requirement 和同一 Team ID。它逐字节绑定 committed install layout，严格复验 payload/product manifest、完整 bundle tree、许可证和 component-to-target 映射。
+
+production code identity 使用 `/usr/bin/codesign --verify --deep --strict -R=<requirement>`，再从固定 Identifier、TeamIdentifier、CDHash、Signature、CodeDirectory 和 designated requirement 形成脱敏 SHA-256；原始输出不进入 receipt、日志或错误。没有冻结发布要求时只能运行注入合成 verifier 的单元测试，当前 ad-hoc 产品不自动获得发布资格。
+
+staging 使用 `/usr/bin/ditto` 保留 resource fork、extended attributes、ACL、quarantine 和 HFS compression。复制前后都复验 payload target，复制后对 staged tree/code identity 重新形成与 receipt target 相同的逻辑身份，递归 `fsync` 后才调用核心记录 filesystem evidence。完整但未记录的 staged bundle 可以在重启后补记；部分或漂移对象保持现场，不覆盖、不自动清理。
+
 ## 构建与验证
 
 Manager helper 由 Xcode native library 嵌入阶段构建并签名：
@@ -83,6 +94,12 @@ InputMethod helper 由 bundle 构建入口装配并签名：
 
 ```bash
 ./scripts/check-macos-upgrade-product-coordination.sh
+```
+
+安装适配器的普通门禁只使用合成 home、payload、bundle 和注入 verifier/copy port，不调用真实签名身份或用户目录：
+
+```bash
+./scripts/check-macos-install-adapter.sh
 ```
 
 两个产品门禁都会先执行 `UpgradeValidationHosts/check.sh`，验证仅允许的两种参数形式和固定路径映射，并拒绝任意路径及多余参数。带真实 native Rime 的候选信号验证仍需使用隔离的 locked RimeData 和产品门禁；不得把 `RADISHLEX_RIME_SHARED_DATA` 指向用户 Rime 或 RadishLex Application Support。上述普通检查不安装、不启动真实 Manager/InputMethod，也不调度 validation host 访问真实 candidate。

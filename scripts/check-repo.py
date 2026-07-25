@@ -71,6 +71,11 @@ REQUIRED_FILES = [
     "platforms/macos-product/UpgradeCoordinatorAdapter/tests/product_coordination.rs",
     "platforms/macos-product/UpgradeCoordinatorAdapter/fixtures/qualification.marker",
     "platforms/macos-product/UpgradeCoordinatorAdapter/fixtures/source-product.json",
+    "platforms/macos-product/InstallAdapter/Cargo.toml",
+    "platforms/macos-product/InstallAdapter/README.md",
+    "platforms/macos-product/InstallAdapter/src/lib.rs",
+    "platforms/macos-product/InstallAdapter/src/manifest.rs",
+    "platforms/macos-product/InstallAdapter/src/codesign.rs",
     "scripts/check-android-target.py",
     "scripts/check-android-target.sh",
     "scripts/check-docs.py",
@@ -81,6 +86,7 @@ REQUIRED_FILES = [
     "scripts/build-macos-install-payload.sh",
     "scripts/check-macos-product-metadata.sh",
     "scripts/check-macos-install-layout.sh",
+    "scripts/check-macos-install-adapter.sh",
     "scripts/check-product-install-core.sh",
     "scripts/check-macos-upgrade-preflight.sh",
     "scripts/check-macos-upgrade-coordinator.sh",
@@ -284,6 +290,12 @@ def check_product_install_core() -> None:
     run_command([str(REPO_ROOT / "scripts/check-product-install-core.sh")])
 
 
+def check_macos_install_adapter() -> None:
+    if sys.platform != "darwin":
+        return
+    run_command([str(REPO_ROOT / "scripts/check-macos-install-adapter.sh")])
+
+
 def check_macos_upgrade_preflight() -> None:
     if sys.platform != "darwin":
         return
@@ -451,6 +463,7 @@ def main() -> int:
     check_manager_product_runtime_contract()
     check_macos_product_metadata()
     check_product_install_core()
+    check_macos_install_adapter()
     check_macos_upgrade_preflight()
     check_ruleset_and_workflows()
     check_path_budget()

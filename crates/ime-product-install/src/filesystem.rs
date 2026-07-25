@@ -331,10 +331,7 @@ impl InstallReceiptStore {
         Ok(())
     }
 
-    pub(crate) fn verify_guard(
-        &self,
-        guard: &InstallProcessGuard,
-    ) -> Result<(), InstallFilesystemError> {
+    pub fn verify_guard(&self, guard: &InstallProcessGuard) -> Result<(), InstallFilesystemError> {
         self.revalidate()?;
         if !guard.belongs_to(self) {
             return Err(error(InstallFilesystemErrorCode::IdentityChanged));

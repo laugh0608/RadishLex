@@ -20,6 +20,8 @@ M4-P03 已接受 DMG + 独立用户域 Installer app：Manager、InputMethod 和
 
 独立 `ime-product-install` 已固定首次安装、升级、修复和默认程序移除的 source/target 关系，以及 `prepared` 到三类终态的外层状态机。严格 receipt 绑定 data-root identity、ProductManifest/bundle tree/code identity hash、source/staged/backup/installed 文件系统身份和 previous-operation chain；原子存储与 Unix socket guard 拒绝中断写、未知对象、身份漂移和并发 operation。两个 component 各自在目标父目录使用 `0700` 私有事务目录，核心按精确 inode 执行 source preserve、Manager/InputMethod 逐端 rename/fsync 和程序 rollback。25 项合成测试覆盖首次安装与移除恢复、升级部分提交恢复，以及 preserve/commit/rollback 每个 rename、目标目录 fsync、源目录 fsync 边界；不触碰真实 bundle、Application Support 或用户域安装目标。
 
+独立 `radishlex-macos-product-install` adapter 已内嵌 committed install layout，严格复验 InstallPayloadManifest、ProductManifest、许可证和完整双 bundle tree，并只从 authoritative current-user home 形成固定目标。production code identity 要求 exact Developer ID designated requirement 与 Team ID，经 strict `codesign` 后只把固定字段 hash 交给核心；没有 ad-hoc fallback。staging 使用 metadata-preserving `ditto`，复制前后复验并递归 fsync；完整但未记录的 staged bundle 可恢复 evidence，部分/漂移对象保持现场。9 项合成测试覆盖首次安装、完整升级回滚、source/target/restored 复验、manifest/tree/signature/path 漂移和 staging 中断；没有读取真实用户目录或签名身份。
+
 M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
 ## M3 退出结论
@@ -59,8 +61,8 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v8、userd
 
 ## 下一步顺位
 
-1. M4-P03 下一切面建立 macOS 固定路径、InstallPayloadManifest/ProductManifest 与 code-signature adapter：只允许 committed user-domain 目标，向核心 staging 槽位填充保留 bundle metadata 的已验签 target，并在 source/staged/installed/restore 各阶段重新形成逻辑身份。
-2. 随后把 M4-P02 数据协调结果映射到外层 `data_coordinating` / `data_settled` 与 rollback，并将 Manager/InputMethod 产品启动接入外层只读 gate；完成隔离双 bundle + 合成 Application Support 的端到端故障恢复门禁前不实现真实安装。
+1. M4-P03 下一切面把 M4-P02 数据协调结果映射到外层 `data_coordinating` / `data_settled` 与 rollback：同一 guard 内持续证明静止，程序回滚与数据 `aborted_preserved` / `rolled_back` 必须形成一致终态。
+2. 随后将 Manager/InputMethod 产品启动接入外层只读 gate，并建立隔离双 bundle + 合成 Application Support 的端到端故障恢复门禁；完成这些证据前不实现真实安装或 Installer UI。
 3. 普通用户同步、恢复/授权/撤销/轮换继续关闭；在真实不支持 Secure Enclave 的环境可得时再补 unsupported，首版发布后且准备生产同步前再验收正式域名/证书。
 
 ## 验证入口
@@ -72,6 +74,7 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v8、userd
 ./scripts/check-macos-product-metadata.sh
 ./scripts/check-macos-install-layout.sh
 ./scripts/check-product-install-core.sh
+./scripts/check-macos-install-adapter.sh
 ./scripts/check-macos-imk.sh
 ./scripts/check-macos-upgrade-coordinator.sh
 ./scripts/check-macos-upgrade-product-coordination.sh

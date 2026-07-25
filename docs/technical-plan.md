@@ -139,9 +139,9 @@ M4-P03 以签名、公证 DMG 内的独立用户域 Installer app 承担程序�
 
 ### ime-product-install
 
-`ime-product-install` 是独立于数据协调器的程序事务核心。它显式区分首次安装、升级、修复和默认程序移除，以 source/target ProductManifest、bundle tree 与 canonical code identity evidence 的 SHA-256 表达逻辑产品身份；receipt 不保存绝对路径、签名输出或用户数据。staged、backup 和 installed evidence 只能按 operation 阶段追加，首个程序目标提交后失败必须进入程序回滚。
+`ime-product-install` 是独立于数据协调器的程序事务核心。它显式区分首次安装、升级、修复和默认程序移除，以 source/target ProductManifest、bundle tree 与 canonical code identity evidence 的 SHA-256 表达逻辑产品身份；receipt 不保存绝对路径、签名输出或用户数据。source、staged、backup 和 installed evidence 只能按 operation 阶段追加，首个程序目标提交后失败必须进入程序回滚。
 
-外层 receipt 固定在 `.radishlex-install-v1`，绑定 data-root identity、operation chain、程序身份与稳定失败分类。Unix socket guard 拒绝同一 root 并发 operation；终态 receipt 只能由 `previous_operation_id` 与实际结果产品匹配的新 operation 替换。只读 startup decision 除阻止 active/non-terminal/损坏现场外，还要求当前运行 Manager/InputMethod 身份匹配 `completed` target 或 `aborted_preserved` / `rolled_back` source。完整字段、状态与停止线见 [macOS 程序安装事务](macos-installation-transaction.md)。
+外层 receipt 固定在 `.radishlex-install-v1`，绑定 data-root identity、operation chain、程序逻辑/文件系统身份与稳定失败分类。两个程序目标各自在同文件系统私有目录执行 source preserve、逐端 rename/fsync 和精确 inode 回滚；Unix socket guard 拒绝同一 root 并发 operation。macOS install adapter 逐字节绑定 committed layout，严格复验 payload/product manifest、完整 bundle tree 与 exact Developer ID requirement，使用 metadata-preserving copy 填充 staging，并在 source/installed/restored 阶段重复验证。只读 startup decision 除阻止 active/non-terminal/损坏现场外，还要求当前运行 Manager/InputMethod 身份匹配 `completed` target 或 `aborted_preserved` / `rolled_back` source。完整字段、状态与停止线见 [macOS 程序安装事务](macos-installation-transaction.md)。
 
 ### ime-ranker
 

@@ -139,6 +139,10 @@ impl ProgramSwitchStore {
         self.target.component
     }
 
+    pub fn operation_id(&self) -> &str {
+        &self.operation_id
+    }
+
     pub fn target_path(&self) -> &Path {
         &self.target.target
     }

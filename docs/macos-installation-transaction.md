@@ -116,6 +116,49 @@ rollback 对每个已经提交的 target 先把失败 target 原 inode 移回 `s
 
 当前切面不递归清理 staged/backup 或历史 operation 目录。成功、回滚和诊断材料的身份绑定清理必须使用后续独立终态动作；不能为了开始下一次 operation 删除未知目录或未复验的 bundle。
 
+## macOS manifest-bound adapter
+
+macOS adapter 的输入只允许：
+
+- 从系统 user-domain API 得到的 authoritative current-user home 与 uid；
+- Installer 自身已验证资源中的 `InstallPayload/` 根；
+- 发布构建固定的 Manager/InputMethod Developer ID designated requirement 与 Team ID；
+- 已持有的外层 receipt store、guard 和对应 component 的 `ProgramSwitchStore`。
+
+adapter 内嵌 committed `packaging/macos/install-layout.json` 字节。payload 内 `InstallLayout.json` 必须逐字节一致，`InstallPayloadManifest.json` 必须严格绑定 layout、`ProductManifest.json`、版本/build、两个 component-to-target 映射和保留数据语义。payload/product 根、manifest、bundle 与路径链中的真实目录不得由 symlink 或 hardlink 替换；未知顶层对象、字段、component、文件记录或目标映射均失败关闭。
+
+authoritative home 必须是 canonical、非 symlink、目标 uid 所有且不可由 group/other 写入的真实目录。adapter 只从 committed 相对路径形成：
+
+```text
+<home>/Applications
+<home>/Library/Input Methods
+<home>/Library/Application Support/RadishLex
+```
+
+它不读取 `HOME`、不展开 `~`、不接受自定义 bundle 名、父目录或删除目标。本切面要求两个程序目标父目录与 data root 已由受控 Installer bootstrap 安全创建；任一缺失、alias、owner/mode 或 inode 漂移都拒绝，不在身份验证过程中顺便创建或 chmod。
+
+### Bundle tree 与 code identity
+
+adapter 对 payload target、已安装 source、staged、installed 和 restored bundle 使用同一 bundle tree v1 算法：按 UTF-8 相对路径排序，对每个单 link 普通文件绑定 path、size、SHA-256，对每个内部相对 symlink 绑定 path 与 target，并拒绝其他对象、绝对/逃逸/broken symlink 和路径重复。目录本身不进入 tree hash；其内容和路径链安全性仍须复验。target tree 必须与 `ProductManifest.json` 的完整 component file records 一致。
+
+code signature 验证固定为：
+
+1. 发布要求只接受五段 `and` 连接的 Developer ID Application designated requirement：精确 bundle identifier、`anchor apple generic`、Developer ID 中间证书 OID、Developer ID Application leaf OID 和匹配 Team ID 的 leaf OU；不接受 `or`、ad-hoc 或宽泛 requirement；
+2. `/usr/bin/codesign --verify --deep --strict -R=<expected designated requirement> <bundle>`；
+3. 独立读取 Identifier、TeamIdentifier、CDHash、Signature、CodeDirectory 与 designated requirement；
+4. 要求 bundle ID、Team ID 和 designated requirement 与该 component 的发布要求精确一致；
+5. 将上述固定字段编码为 `radishlex-macos-code-identity-v1` 后只把 SHA-256 写入逻辑程序身份。
+
+receipt 不保存 requirement、Team ID、Authority、CDHash 或 `codesign` 输出原文。验证进程的 stdout/stderr 不进入错误、日志或诊断。Developer ID 要求尚未冻结时只能使用测试注入的合成 verifier，不提供 production ad-hoc fallback，也不把当前 ad-hoc 产品装配冒充发布身份。
+
+### Staging 填充与阶段复验
+
+production copy 使用系统 `/usr/bin/ditto`，保留 resource fork、extended attributes、ACL、quarantine 与 HFS compression，不叠加覆盖既有 `staged.app`。复制前必须复验 guard、operation/component/固定目标、payload manifest、target tree 与 target code identity；复制完成后对 staged tree 和 code identity 重新形成同一逻辑身份，递归同步普通文件与目录，再由核心记录 staged filesystem evidence。
+
+重启时若 `staged.app` 已存在但 receipt 尚无 staged evidence，adapter 只接受完整 tree/code identity 与 target 精确匹配的对象，完成同步后补记 evidence；部分复制、内容漂移、签名失败或未知对象保持现场并失败关闭。本切面不递归删除或覆盖无 evidence 的失败 staging；恢复/清理必须在后续以固定 operation、精确对象身份和显式动作实现。
+
+source evidence 记录前、target commit 后和 source restore 后都必须由 adapter 重新计算 tree hash 并复验 code signature，分别匹配 receipt source、target、source logical identity。核心的 inode evidence 证明“同一个目录对象被移动”，adapter 的 tree/code evidence 证明“该对象仍是预期程序”；两者不能互相替代。
+
 ## 状态机
 
 通用状态按外部可持久化边界推进：
