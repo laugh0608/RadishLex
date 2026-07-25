@@ -9,6 +9,7 @@ const CODESIGN_PATH: &str = "/usr/bin/codesign";
 const MAX_CODESIGN_OUTPUT_BYTES: usize = 64 * 1024;
 const MAX_REQUIREMENT_BYTES: usize = 4096;
 pub const RADISHLEX_DEVELOPER_TEAM_ID: &str = "WF9UUN335P";
+pub const RADISHLEX_COMMUNITY_DISTRIBUTION_IDENTITY: &str = "community-adhoc-v1";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MacOsCodeIdentity {
@@ -54,6 +55,53 @@ pub struct DeveloperIdApplicationIdentity {
     bundle_id: String,
     team_identifier: String,
     designated_requirement: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommunityAdHocApplicationIdentity {
+    bundle_id: String,
+    designated_requirement: String,
+}
+
+impl CommunityAdHocApplicationIdentity {
+    pub fn bundle_id(&self) -> &str {
+        &self.bundle_id
+    }
+
+    pub fn designated_requirement(&self) -> &str {
+        &self.designated_requirement
+    }
+}
+
+pub fn inspect_community_ad_hoc_application(
+    bundle: &std::path::Path,
+    expected_bundle_id: &str,
+) -> Result<CommunityAdHocApplicationIdentity, MacOsInstallAdapterError> {
+    if !bundle.is_absolute() || !valid_bundle_id(expected_bundle_id) {
+        return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
+    }
+    let verified = Command::new(CODESIGN_PATH)
+        .env_clear()
+        .args(["--verify", "--deep", "--strict"])
+        .arg(bundle)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::SignatureRejected))?;
+    if !verified.success() {
+        return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
+    }
+    let parsed = inspect_code_identity(bundle)?;
+    if parsed.identifier != expected_bundle_id || !parsed.is_community_ad_hoc() {
+        return Err(error(
+            MacOsInstallAdapterErrorCode::SignatureIdentityChanged,
+        ));
+    }
+    Ok(CommunityAdHocApplicationIdentity {
+        bundle_id: parsed.identifier,
+        designated_requirement: parsed.designated_requirement,
+    })
 }
 
 impl DeveloperIdApplicationIdentity {
@@ -107,9 +155,15 @@ pub fn inspect_developer_id_application(
 
 #[derive(Debug, Clone)]
 pub struct CodeSignatureRequirements {
-    team_identifier: String,
-    manager_designated_requirement: String,
-    input_method_designated_requirement: String,
+    identity: RequiredCodeIdentity,
+    manager_designated_requirements: Vec<String>,
+    input_method_designated_requirements: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum RequiredCodeIdentity {
+    DeveloperId { team_identifier: String },
+    CommunityAdHoc,
 }
 
 impl CodeSignatureRequirements {
@@ -119,36 +173,65 @@ impl CodeSignatureRequirements {
         input_method_designated_requirement: impl Into<String>,
     ) -> Result<Self, MacOsInstallAdapterError> {
         let requirements = Self {
-            team_identifier: team_identifier.into(),
-            manager_designated_requirement: manager_designated_requirement.into(),
-            input_method_designated_requirement: input_method_designated_requirement.into(),
+            identity: RequiredCodeIdentity::DeveloperId {
+                team_identifier: team_identifier.into(),
+            },
+            manager_designated_requirements: vec![manager_designated_requirement.into()],
+            input_method_designated_requirements: vec![input_method_designated_requirement.into()],
         };
-        if requirements.team_identifier != RADISHLEX_DEVELOPER_TEAM_ID
-            || requirements.team_identifier.len() != 10
-            || !requirements
-                .team_identifier
+        let RequiredCodeIdentity::DeveloperId { team_identifier } = &requirements.identity else {
+            unreachable!()
+        };
+        if team_identifier != RADISHLEX_DEVELOPER_TEAM_ID
+            || team_identifier.len() != 10
+            || !team_identifier
                 .bytes()
                 .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit())
             || !valid_developer_id_requirement(
-                &requirements.manager_designated_requirement,
-                &requirements.team_identifier,
+                &requirements.manager_designated_requirements[0],
+                team_identifier,
             )
             || !valid_developer_id_requirement(
-                &requirements.input_method_designated_requirement,
-                &requirements.team_identifier,
+                &requirements.input_method_designated_requirements[0],
+                team_identifier,
             )
-            || requirements.manager_designated_requirement
-                == requirements.input_method_designated_requirement
+            || requirements.manager_designated_requirements[0]
+                == requirements.input_method_designated_requirements[0]
         {
             return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
         }
         Ok(requirements)
     }
 
-    fn requirement(&self, component: ProgramComponent) -> &str {
+    pub fn community_ad_hoc(
+        manager_designated_requirements: Vec<String>,
+        input_method_designated_requirements: Vec<String>,
+    ) -> Result<Self, MacOsInstallAdapterError> {
+        let requirements = Self {
+            identity: RequiredCodeIdentity::CommunityAdHoc,
+            manager_designated_requirements,
+            input_method_designated_requirements,
+        };
+        if !valid_requirement_set(&requirements.manager_designated_requirements)
+            || !valid_requirement_set(&requirements.input_method_designated_requirements)
+            || requirements
+                .manager_designated_requirements
+                .iter()
+                .any(|value| {
+                    requirements
+                        .input_method_designated_requirements
+                        .contains(value)
+                })
+        {
+            return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
+        }
+        Ok(requirements)
+    }
+
+    fn requirements(&self, component: ProgramComponent) -> &[String] {
         match component {
-            ProgramComponent::Manager => &self.manager_designated_requirement,
-            ProgramComponent::InputMethod => &self.input_method_designated_requirement,
+            ProgramComponent::Manager => &self.manager_designated_requirements,
+            ProgramComponent::InputMethod => &self.input_method_designated_requirements,
         }
     }
 }
@@ -193,12 +276,7 @@ impl CodesignRunningIdentityInspector {
             return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
         }
         let parsed = inspect_code_identity(bundle)?;
-        if parsed.team_identifier != RADISHLEX_DEVELOPER_TEAM_ID
-            || !valid_developer_id_requirement(
-                &parsed.designated_requirement,
-                &parsed.team_identifier,
-            )
-        {
+        if !parsed.is_developer_id() && !parsed.is_community_ad_hoc() {
             return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
         }
         let evidence_sha256 = parsed.evidence_sha256(component);
@@ -216,12 +294,9 @@ impl MacOsCodeSignatureVerifier for CodesignCodeSignatureVerifier {
         if !bundle.is_absolute() || !valid_bundle_id(expected_bundle_id) {
             return Err(error(MacOsInstallAdapterErrorCode::SignatureRejected));
         }
-        let requirement = self.requirements.requirement(component);
-        let requirement_argument = format!("-R={requirement}");
         let verified = Command::new(CODESIGN_PATH)
             .env_clear()
             .args(["--verify", "--deep", "--strict"])
-            .arg(requirement_argument)
             .arg(bundle)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -233,9 +308,18 @@ impl MacOsCodeSignatureVerifier for CodesignCodeSignatureVerifier {
         }
 
         let parsed = inspect_code_identity(bundle)?;
+        let identity_matches = match &self.requirements.identity {
+            RequiredCodeIdentity::DeveloperId { team_identifier } => {
+                parsed.team_identifier == *team_identifier && parsed.is_developer_id()
+            }
+            RequiredCodeIdentity::CommunityAdHoc => parsed.is_community_ad_hoc(),
+        };
         if parsed.identifier != expected_bundle_id
-            || parsed.team_identifier != self.requirements.team_identifier
-            || parsed.designated_requirement != requirement
+            || !identity_matches
+            || !self
+                .requirements
+                .requirements(component)
+                .contains(&parsed.designated_requirement)
         {
             return Err(error(
                 MacOsInstallAdapterErrorCode::SignatureIdentityChanged,
@@ -360,7 +444,9 @@ impl ParsedCodeIdentity {
             code_directory: unique_line(details, "CodeDirectory ")?,
             designated_requirement: unique_designated_requirement(details)?,
         };
-        if parsed.has_valid_common_fields() && parsed.team_identifier.len() == 10 {
+        if parsed.has_valid_common_fields()
+            && (parsed.team_identifier.len() == 10 || parsed.team_identifier == "not set")
+        {
             Ok(parsed)
         } else {
             Err(error(MacOsInstallAdapterErrorCode::SignatureRejected))
@@ -398,6 +484,18 @@ impl ParsedCodeIdentity {
             && valid_requirement(&self.designated_requirement)
     }
 
+    fn is_developer_id(&self) -> bool {
+        self.team_identifier == RADISHLEX_DEVELOPER_TEAM_ID
+            && valid_developer_id_requirement(&self.designated_requirement, &self.team_identifier)
+    }
+
+    fn is_community_ad_hoc(&self) -> bool {
+        self.team_identifier == "not set"
+            && self.signature == "Signature=adhoc"
+            && self.code_directory.contains(" flags=0x2(adhoc) ")
+            && valid_ad_hoc_requirement(&self.designated_requirement, &self.cdhash)
+    }
+
     fn evidence_sha256(&self, component: ProgramComponent) -> String {
         let mut digest = Sha256::new();
         update_field(&mut digest, b"radishlex-macos-code-identity-v1");
@@ -422,7 +520,6 @@ impl ParsedCodeIdentity {
     }
 }
 
-#[cfg(feature = "qualification-harness")]
 fn valid_ad_hoc_requirement(value: &str, primary_cdhash: &str) -> bool {
     let mut found_primary = false;
     let clauses: Vec<_> = value.split(" or ").collect();
@@ -442,6 +539,27 @@ fn valid_ad_hoc_requirement(value: &str, primary_cdhash: &str) -> bool {
         found_primary |= hash.eq_ignore_ascii_case(primary_cdhash);
     }
     found_primary
+}
+
+fn valid_ad_hoc_requirement_without_primary(value: &str) -> bool {
+    let clauses: Vec<_> = value.split(" or ").collect();
+    !clauses.is_empty()
+        && clauses.len() <= 16
+        && clauses.into_iter().all(|clause| {
+            clause
+                .strip_prefix("cdhash H\"")
+                .and_then(|value| value.strip_suffix('"'))
+                .is_some_and(valid_cdhash)
+        })
+}
+
+fn valid_requirement_set(values: &[String]) -> bool {
+    !values.is_empty()
+        && values.len() <= 65
+        && values
+            .iter()
+            .all(|value| valid_ad_hoc_requirement_without_primary(value))
+        && values.windows(2).all(|pair| pair[0] < pair[1])
 }
 
 fn unique_value(details: &str, prefix: &str) -> Result<String, MacOsInstallAdapterError> {
@@ -597,6 +715,19 @@ mod tests {
         )
         .is_err());
         assert!(CodeSignatureRequirements::new("ZZZZZZZZZZ", manager, input_method,).is_err());
+        assert!(CodeSignatureRequirements::community_ad_hoc(
+            vec!["cdhash H\"0000000000000000000000000000000000000000\"".to_owned()],
+            vec!["cdhash H\"1111111111111111111111111111111111111111\"".to_owned()],
+        )
+        .is_ok());
+        assert!(CodeSignatureRequirements::community_ad_hoc(
+            vec![
+                "cdhash H\"2222222222222222222222222222222222222222\"".to_owned(),
+                "cdhash H\"1111111111111111111111111111111111111111\"".to_owned(),
+            ],
+            vec!["cdhash H\"3333333333333333333333333333333333333333\"".to_owned()],
+        )
+        .is_err());
     }
 
     #[cfg(feature = "qualification-harness")]
@@ -611,7 +742,9 @@ mod tests {
             "# designated => cdhash H\"0123456789abcdef0123456789abcdef01234567\"\n",
         );
         assert!(ParsedCodeIdentity::parse_qualification(details).is_ok());
-        assert!(ParsedCodeIdentity::parse(details).is_err());
+        assert!(ParsedCodeIdentity::parse(details)
+            .expect("production parser")
+            .is_community_ad_hoc());
         assert!(ParsedCodeIdentity::parse_qualification(
             &details.replace("Signature=adhoc", "Signature size=9000")
         )

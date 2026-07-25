@@ -6,8 +6,7 @@ repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
 product_tool="${repo_root}/scripts/macos-product/product_manifest.py"
 layout_tool="${repo_root}/scripts/macos-product/install_layout.py"
 identity_tool="${repo_root}/scripts/macos-product/release_identity.py"
-carrier_tool="${repo_root}/scripts/macos-product/release_carrier.py"
-codesign_identity="${RADISHLEX_DEVELOPER_ID_APPLICATION:-}"
+community_tool="${repo_root}/scripts/macos-product/community_release.py"
 
 if [[ $# -ne 0 ]]; then
   echo "macOS release DMG build does not accept arguments" >&2
@@ -17,20 +16,6 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "macOS is required for the release DMG build" >&2
   exit 2
 fi
-if [[ -z "${codesign_identity}" || "${codesign_identity}" == "-" ]]; then
-  echo "RADISHLEX_DEVELOPER_ID_APPLICATION must name a Developer ID Application identity" >&2
-  exit 2
-fi
-if [[ "${codesign_identity}" != Developer\ ID\ Application:* ]]; then
-  echo "release signing identity must be Developer ID Application" >&2
-  exit 2
-fi
-valid_identities="$(security find-identity -v -p codesigning)"
-if ! grep -Fq "\"${codesign_identity}\"" <<<"${valid_identities}"; then
-  echo "RADISHLEX_DEVELOPER_ID_APPLICATION is not a valid local code-signing identity" >&2
-  exit 2
-fi
-
 product_version="$(python3 "${product_tool}" field product_version)"
 product_build="$(python3 "${product_tool}" field build_number)"
 release_root="${repo_root}/target/macos-release/${product_version}-${product_build}"
@@ -41,12 +26,13 @@ manager_bundle="${product_root}/Components/radishlex_manager.app"
 input_method_bundle="${product_root}/Components/RadishLexInputMethod.app"
 carrier_name="RadishLex-${product_version}-${product_build}.dmg"
 carrier="${release_root}/${carrier_name}"
+evidence="${release_root}/CommunityReleaseEvidence.json"
 
 if [[ ! -d "${release_root}" || -L "${release_root}" ]]; then
   echo "signed release Installer root is required" >&2
   exit 1
 fi
-if [[ -e "${carrier}" || -L "${carrier}" ]]; then
+if [[ -e "${carrier}" || -L "${carrier}" || -e "${evidence}" || -L "${evidence}" ]]; then
   echo "release DMG output already exists" >&2
   exit 2
 fi
@@ -87,11 +73,6 @@ hdiutil create \
   -volname "RadishLex Installer" \
   -nospotlight \
   "${temporary_carrier}" >/dev/null
-codesign --force --sign "${codesign_identity}" --timestamp "${temporary_carrier}"
-codesign --verify --strict --verbose=2 "${temporary_carrier}"
-PYTHONDONTWRITEBYTECODE=1 python3 "${carrier_tool}" verify-carrier-team \
-  --carrier "${temporary_carrier}" \
-  --identity "${installer_bundle}/Contents/Resources/ReleaseIdentity.json"
 hdiutil verify "${temporary_carrier}" >/dev/null
 
 hdiutil attach \
@@ -127,6 +108,14 @@ hdiutil detach "${mount_point}" >/dev/null
 attached=false
 
 mv "${temporary_carrier}" "${carrier}"
+PYTHONDONTWRITEBYTECODE=1 python3 "${community_tool}" create \
+  --carrier "${carrier}" \
+  --identity "${installer_bundle}/Contents/Resources/ReleaseIdentity.json" \
+  --output "${evidence}"
+PYTHONDONTWRITEBYTECODE=1 python3 "${community_tool}" verify \
+  --carrier "${carrier}" \
+  --identity "${installer_bundle}/Contents/Resources/ReleaseIdentity.json" \
+  --evidence "${evidence}"
 trap - EXIT
 rm -rf -- "${staging}"
-echo "RadishLex signed release DMG is ready."
+echo "RadishLex unnotarized community DMG and SHA-256 evidence are ready."

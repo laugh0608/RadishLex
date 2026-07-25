@@ -375,37 +375,19 @@ fn bootstrap_accepts_only_strict_release_identity_resource() {
     let owner_id = fs::metadata(&home).expect("home metadata").uid();
     let context = InstallerBootstrapContext::discover_from(&executable, owner_id, &home)
         .expect("fixed bootstrap context");
-    let manager_requirement = concat!(
-        "identifier \"dev.radishlex.radishlexManager\" and anchor apple generic and ",
-        "certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and ",
-        "certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and ",
-        "certificate leaf[subject.OU] = WF9UUN335P"
-    );
-    let input_method_requirement = concat!(
-        "identifier \"org.radishlex.inputmethod.macos\" and anchor apple generic and ",
-        "certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and ",
-        "certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and ",
-        "certificate leaf[subject.OU] = \"WF9UUN335P\""
-    );
-    let installer_requirement = concat!(
-        "identifier \"org.radishlex.installer.macos\" and anchor apple generic and ",
-        "certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and ",
-        "certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and ",
-        "certificate leaf[subject.OU] = WF9UUN335P"
-    );
+    let manager_requirement = "cdhash H\"0000000000000000000000000000000000000000\"";
+    let input_method_requirement = "cdhash H\"1111111111111111111111111111111111111111\"";
     fs::write(
         resources.join("ReleaseIdentity.json"),
         format!(
             concat!(
                 "{{\n",
-                "  \"format_version\": 1,\n",
-                "  \"team_identifier\": \"WF9UUN335P\",\n",
-                "  \"installer_designated_requirement\": {installer:?},\n",
-                "  \"manager_designated_requirement\": {manager:?},\n",
-                "  \"input_method_designated_requirement\": {input_method:?}\n",
+                "  \"format_version\": 2,\n",
+                "  \"distribution_identity\": \"community-adhoc-v1\",\n",
+                "  \"manager_designated_requirements\": [{manager:?}],\n",
+                "  \"input_method_designated_requirements\": [{input_method:?}]\n",
                 "}}\n"
             ),
-            installer = installer_requirement,
             manager = manager_requirement,
             input_method = input_method_requirement,
         ),
@@ -423,24 +405,27 @@ fn bootstrap_accepts_only_strict_release_identity_resource() {
 
     let identity_path = resources.join("ReleaseIdentity.json");
     let identity = fs::read_to_string(&identity_path).expect("read identity");
-    fs::write(&identity_path, identity.replace("WF9UUN335P", "ABCDEFGHIJ"))
-        .expect("replace release Team");
+    fs::write(
+        &identity_path,
+        identity.replace("community-adhoc-v1", "developer-id-v1"),
+    )
+    .expect("replace distribution identity");
     assert_eq!(
         context
             .unsealed_release_requirements_for_test()
-            .expect_err("foreign Developer ID Team must fail"),
+            .expect_err("foreign distribution identity must fail"),
         InstallerBootstrapError::ReleaseIdentityUnavailable
     );
 
     fs::write(
         identity_path,
-        b"{\"format_version\":1,\"team_identifier\":\"not set\",\"manager_designated_requirement\":\"adhoc\",\"input_method_designated_requirement\":\"adhoc\"}\n",
+        b"{\"format_version\":2,\"distribution_identity\":\"community-adhoc-v1\",\"manager_designated_requirements\":[\"adhoc\"],\"input_method_designated_requirements\":[\"adhoc\"]}\n",
     )
     .expect("replace release identity");
     assert_eq!(
         context
             .release_requirements()
-            .expect_err("ad-hoc identity must fail"),
+            .expect_err("malformed ad-hoc requirements must fail"),
         InstallerBootstrapError::ReleaseIdentityUnavailable
     );
 

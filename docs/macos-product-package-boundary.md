@@ -29,7 +29,7 @@ InputMethod 与 Manager 是同一产品版本下的两个独立 bundle，不互�
 - InputMethod 额外携带 `librime`、RimeData 与对应许可证；
 - Manager 只携带其真实调用所需的 native dependency，不为目录对称复制 `librime`。
 
-M4-P01 的稳定装配产物是版本化产品目录及其 manifest。M4-P03 已选择签名、公证 DMG 中的独立用户域 Installer app 作为首个候选载体；在 Installer、外层事务、发布签名和真实安装证据完成前，产品装配目录与 InstallPayload 都不能称为普通用户安装包。
+M4-P01 的稳定装配产物是版本化产品目录及其 manifest。M4-P03 首发选择社区 ad-hoc DMG 中的独立用户域 Installer app；该载体需要人工放行，不具备 Apple 发布者认证或公证资格。产品装配目录与 InstallPayload 仍不能单独称为用户安装包。
 
 只读 `RadishLexUpgradePreflightHost` 是 Installer/协调器调用的平台宿主，固定嵌入 target Manager 并进入产品 manifest，但不参与 Manager 普通业务。Installer 必须通过 manifest-bound adapter 调用它，不能临时改成脚本、UI 进程检查或调用方自报容量。平台宿主的固定输入与只读边界见 [macOS 产品升级宿主说明](../platforms/macos-product/README.md)。
 
@@ -37,19 +37,19 @@ M4-P01 的稳定装配产物是版本化产品目录及其 manifest。M4-P03 已
 
 产品装配必须生成 `ProductManifest.json`，至少绑定：
 
-- manifest format、产品 ID、产品版本、build number、最低 macOS 和固定发布者 Team ID；
+- manifest format、产品 ID、产品版本、build number、最低 macOS 和 distribution identity；
 - Manager 与 InputMethod 的 bundle ID、版本和 build；
 - FFI ABI、userdb schema、Rime schema ID、RimeData manifest 和 native libraries manifest 版本；
 - 两个 bundle 内所有普通文件的相对路径、大小和 SHA-256，以及安全内部 symlink 的相对目标；
 - 仓库许可证文件的相对路径、大小和 SHA-256。
 
-manifest 不包含证书、私钥、designated requirement、Apple 凭据、构建机绝对路径、用户目录、时间戳或输入数据。稳定 Team ID 是公开发布者锚点，不是凭据；相同输入 bundle 必须生成字节一致的 manifest，具体签名和公证证据另行记录。
+manifest 不包含证书、私钥、designated requirement、Apple 凭据、构建机绝对路径、用户目录、时间戳或输入数据。format v3 只声明 `distribution_identity=community-adhoc-v1`；相同输入 bundle 必须生成字节一致的 manifest，具体 ad-hoc requirement 由 sealed release identity 另行记录。
 
-manifest 是产品完整性与兼容性证据，不替代 Apple code signature、notarization ticket 或 Gatekeeper 验证。
+manifest 是产品完整性与兼容性证据，不构成 Apple code signature、notarization ticket 或 Gatekeeper 验证。
 
 ### InstallPayload 与历史升级源
 
-`InstallPayloadManifest.json` format v2 固定 target `Product/` 与 `UpgradeSources/`。历史 source 必须作为构建时显式输入复制进 payload；每项绑定精确 product version/build、规范化 `UpgradeSources/<version>-<build>` 路径和自己的 ProductManifest。ProductManifest 再绑定许可证、Manager/InputMethod 完整文件树与 upgrade validation host；运行时还必须与当前发布的双 component exact Developer ID designated requirement 和 Team ID 一致。
+`InstallPayloadManifest.json` format v2 固定 target `Product/` 与 `UpgradeSources/`。历史 source 必须作为构建时显式输入复制进 payload；每项绑定精确 product version/build、规范化 `UpgradeSources/<version>-<build>` 路径和自己的 ProductManifest。ProductManifest 再绑定许可证、Manager/InputMethod 完整文件树与 upgrade validation host；运行时还必须命中 sealed release identity 中对应 component 的严格 ad-hoc designated requirement。
 
 source build 必须唯一、严格早于 target，不能使用 target 副本、qualification fixture、调用方路径或只改版本号的当前代码替代。source 只供旧版本 validation/rollback host 执行，不作为 target staging 内容。首发没有历史正式发布时，`UpgradeSources` 保持空集合；这会让 production upgrade 在外层 receipt 或程序 mutation 前稳定阻断，而不是降级到未绑定 helper。
 
@@ -63,24 +63,26 @@ source build 必须唯一、严格早于 target，不能使用 target 副本、q
 
 ## 单一版本真相源
 
-`packaging/macos/product.json` 是 M4 macOS 产品元数据真相源。其他文件可以保留语言或构建系统要求的版本字段，但门禁必须验证它们与真相源一致。
+仓库根 `version.json` 是产品版本与 Flutter build number 的唯一人工真相源；`packaging/macos/product.json` 是 macOS ABI、schema、布局和 distribution identity 真相源。门禁必须验证两者及各构建系统镜像一致。
 
 当前首个 M4 候选固定：
 
 | 字段 | 值 | 约束 |
 | --- | --- | --- |
 | product ID | `radishlex-macos` | manifest 稳定标识 |
-| ProductManifest format | `2` | v2 新增固定发布者 Team ID；旧结构失败关闭 |
-| product version | `0.1.0` | Manager 与 InputMethod 相同 |
+| ProductManifest format | `3` | v3 使用显式 distribution identity；旧结构失败关闭 |
+| product version | `26.7.1` | Radish `YY.M.RELEASE`，Manager 与 InputMethod 相同 |
 | build number | `35` | 正整数且两个 bundle 相同 |
 | minimum macOS | `13.0` | 取两端真实支持范围的交集 |
 | FFI ABI | `9` | 保留数据 startup/validation contract，增加独立外层 install startup gate |
 | userdb schema | `9` | 不允许旧产品打开未来 schema |
 | RimeData manifest | `2` | 绑定来源锁、多许可证与完整数据 hash |
 | data layout | `application-support-v1` | 首版继续使用已验证布局 |
-| Developer Team ID | `WF9UUN335P` | 唯一允许生成和运行正式候选的 Apple Team |
+| distribution identity | `community-adhoc-v1` | 未使用 Apple 发布者认证或公证 |
 
 build number 只描述产品构建，不替代 schema 或 ABI。任何 ABI、数据库、RimeData 或 native manifest 格式变化都必须独立递增对应版本，并更新兼容测试。
+
+Cargo workspace 中的 `0.1.0` 是未独立发布 crates 的内部包版本，不是 RadishLex 产品版本或 macOS bundle 版本；它不进入用户发布文件名、ProductManifest、receipt release 或 tag。
 
 ## 兼容性与启动失败语义
 
@@ -164,7 +166,7 @@ M4 数据升级必须覆盖当前布局内的 schema 演进与程序版本切换
 
 ## 安装与移除边界
 
-M4-P03 首个候选固定使用签名并公证的 UDIF DMG，内部只提供独立 `RadishLex Installer.app`。Installer 在当前用户会话运行，不请求管理员权限，也不把自身安装为持久产品组件。纯拖拽 DMG、ZIP、Manager 自安装和 `.pkg` 均不作为首个候选主路径；取舍与未来 `.pkg` 重新评估条件见 [ADR 0008](adr/0008-macos-installation-carrier.md)。
+M4-P03 首个候选固定使用未公证的 APFS/UDZO UDIF DMG，内部只提供独立 `RadishLex Installer.app`。Installer 在当前用户会话运行，不请求管理员权限，也不把自身安装为持久产品组件。用户必须先核对 SHA-256，再通过“隐私与安全性 → 仍要打开”或精确用户域 `xattr` fallback 放行。纯拖拽 DMG、ZIP、Manager 自安装和 `.pkg` 均不作为首个候选主路径；取舍与未来 `.pkg` 重新评估条件见 [ADR 0008](adr/0008-macos-installation-carrier.md)。
 
 `packaging/macos/install-layout.json` 是安装目标真相源，路径均相对 authoritative current-user home：
 
@@ -190,24 +192,19 @@ InstallPayload 固定包含 committed layout、外层 payload manifest 和完整
 
 独立 Installer 的 UI/驱动 contract 已固定。UI 只消费版本化 snapshot，展示 verified operation、receipt 进度、固定目标、稳定错误和默认保留数据语义；未知 snapshot 失败关闭。所有 mutation action 都重新验证当前 snapshot 并要求显式确认，remove 额外确认保留 Application Support，手动静止确认不能替代公开平台 API 的重新取证。详细边界见 [macOS Installer App UI 与驱动边界](macos-installer-app-boundary.md)。
 
-## 签名、公证与供应链
+## 社区身份与发布供应链
 
-开发构建可以使用 ad-hoc 或 Apple Development，但必须明确标记，不能作为发布证据。当前 DMG 直接分发候选要求：
+首发 `community-adhoc-v1` 不要求付费 Apple Developer Program：
 
-- 所有嵌套 Mach-O 先签名，再签两个产品 bundle、Installer app 和 DMG；
-- 使用 Developer ID Application 身份和 Hardened Runtime；
-- DMG 采用 UDIF 且签名；未来若另行采用 `.pkg`，再使用独立 Developer ID Installer 身份；
-- 使用 Apple 当前支持的 `notarytool` 或 Notary API 提交；
-- 验证 notary log，staple ticket，并在隔离环境执行 Gatekeeper 评估；
-- 发布证据只记录固定状态、产品 hash、submission ID 和结果，不保存凭据。
+- Installer、Manager 与 InputMethod 仅使用严格 ad-hoc code signature；它用于结构和事务 identity 复验，不提供发布者认证；
+- `ReleaseIdentity.json` format v2 绑定 target 与全部历史 source 的双 component requirement 有界集合，不自绑定 Installer `cdhash`，避免签名内容循环；
+- DMG 不签名、不公证、不 staple；`notarize-macos-release-dmg.sh` 在社区模式稳定拒绝执行；
+- `CommunityReleaseEvidence.json` 绑定版本、DMG 文件名、大小、SHA-256 和 release identity SHA-256；
+- 发布说明必须明确提示未签名/未公证、人工放行和 SHA-256 核对，不得暗示 Apple 已验证。
 
-仓库发布构建入口 `./scripts/build-macos-release-installer.sh` 只接受环境中的 `RADISHLEX_DEVELOPER_ID_APPLICATION`，且该值必须精确命中本机有效的 `Developer ID Application:` identity。脚本先用本地无 timestamp probe 验证证书 OU 等于产品 metadata 固定的 `WF9UUN335P`，再进入产品 staging；其他有效 Developer ID Team 也会失败。随后按嵌套顺序启用 Hardened Runtime/trusted timestamp，重新生成 ProductManifest/InstallPayloadManifest、首次签 Installer、从三份 target bundle 生成 `ReleaseIdentity.json`，最后封存资源并重签 Installer。历史 assembly 保留原签名，且必须与 target exact requirement 和固定 Team 一致。
+`./scripts/build-macos-release-installer.sh` 不读取 Developer ID 环境变量，按嵌套顺序重新生成 strict ad-hoc identity、ProductManifest、InstallPayloadManifest 与 sealed release identity。`./scripts/build-macos-release-dmg.sh` 生成根目录精确只有 Installer 的 APFS/UDZO DMG，挂载复验后写出社区发布证据。详细操作见 [macOS 社区 ad-hoc DMG Runbook](runbooks/macos-release-carrier.md)。
 
-`./scripts/build-macos-release-dmg.sh` 只接受上述固定 release root 和同一 Developer ID Application identity，不接受路径参数。它生成 APFS/UDZO UDIF，根目录精确只有 `RadishLex Installer.app`，对 DMG 使用 trusted timestamp 签名，并在发布前挂载复验唯一根对象、Installer strict signature、内嵌 payload 和 release identity。
-
-`./scripts/notarize-macos-release-dmg.sh` 只接受 `RADISHLEX_NOTARY_KEYCHAIN_PROFILE` 指向的 Keychain profile，不接受 Apple ID/password 或 API private key 参数。它只接受 `Accepted` submission，要求 notary log 的 UUID、archive name、提交 SHA-256、status code 与空 issues 精确匹配，之后才 staple、验证 ticket、执行 DMG open 与挂载 Installer execute 两层 Gatekeeper。`NotarizationSubmission.json` 使中断后按同 UUID 续跑而不重复上传；`ReleaseQualification.json` 同时绑定 staple 前提交 hash、staple 后分发 hash、Installer tree、submission ID 和稳定结果，不保存凭据或原始 log。详细步骤见 [macOS DMG、公证与 Gatekeeper Runbook](runbooks/macos-release-carrier.md)。
-
-缺失身份、`-`、Apple Development、ad-hoc、非 `WF9UUN335P` Team、requirement 漂移、任一 executable 缺少 runtime flag、未知/非终态 notary 结果、log 漂移、ticket 或 Gatekeeper 失败均不得留下成功资格。普通仓库门禁只执行 parser/失败关闭与 ad-hoc 产品检查，不要求凭据、不访问 timestamp/notary 服务，也不把未执行的发布脚本记作 Developer ID、公证或 Gatekeeper 成功证据。
+unknown distribution identity、非 ad-hoc TeamIdentifier/Signature/CodeDirectory、requirement 集合乱序/重复/重叠、manifest/tree/bundle ID 漂移、DMG/evidence 漂移都失败关闭。未来 Developer ID 路径必须使用新的 distribution identity 和版本治理重新开放，不能静默改变社区包语义。
 
 Apple 官方边界参考：
 
@@ -215,7 +212,7 @@ Apple 官方边界参考：
 - [Packaging Mac software for distribution](https://developer.apple.com/documentation/xcode/packaging-mac-software-for-distribution)
 - [Notarizing macOS software before distribution](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)
 
-签名身份、notary credential、公开上传和正式分发不进入普通仓库验证，需要发布授权。
+公开上传和正式分发不进入普通仓库验证，需要发布授权。
 
 ## M4 已执行顺序
 
@@ -232,10 +229,10 @@ Apple 官方边界参考：
 11. 已建立隔离双 bundle + 合成 Application Support 的端到端恢复门禁，覆盖程序部分提交、数据失败回滚、两段终态中断与双端启动决策；
 12. 已固定 Installer UI/驱动 contract、可重启 operation 展示、稳定错误、显式用户授权与独立 AppKit contract shell；
 13. 已把 authorized intent 接入隔离 restartable executor 与版本化原生 bridge；
-14. 已接入 authoritative current-user 只读 bootstrap、完整内嵌 InstallPayload、严格 release identity resource 和可回退实机验收 runbook；ad-hoc 构建以 `product_identity_unavailable` 失败关闭；
-15. 已固定 Developer ID/Hardened Runtime 发布构建、三 bundle sealed release identity，并开放 first install/repair/default remove 的 production mutation port；
+14. 已接入 authoritative current-user bootstrap、完整内嵌 InstallPayload、strict ad-hoc release identity 和可回退实机验收 runbook；普通开发构建因缺失 sealed identity 失败关闭；
+15. 已固定 community ad-hoc 发布构建、双 component sealed release identity 与 DMG SHA-256 evidence，并开放 first install/repair/default remove 的 production mutation port；
 16. 已将历史 source assembly 纳入 payload v2，按外层 receipt 精确选源并开放 production upgrade port；
-17. 已固定签名 APFS/UDZO DMG、Keychain-profile notary 提交、可续跑 submission receipt、notary log、staple 与双层 Gatekeeper 证据契约；下一步在真实历史发布与身份可用时形成同一冻结产物的正向跨发布与发布供应链证据。
+17. 已固定未公证 APFS/UDZO DMG、社区发布证据和用户人工放行 runbook；下一步形成首发冻结产物与真实用户域首次安装/修复/移除证据。
 
 ## M4-P01 退出标准
 

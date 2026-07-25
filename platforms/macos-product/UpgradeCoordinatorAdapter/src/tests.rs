@@ -472,7 +472,7 @@ fn write_product(root: &Path, version: &str, build: &str, schema: u32, include_p
         ));
     }
     let manifest = json!({
-        "format_version": 2,
+        "format_version": 3,
         "product_id": "radishlex-macos",
         "product_version": version,
         "build_number": build,
@@ -482,7 +482,7 @@ fn write_product(root: &Path, version: &str, build: &str, schema: u32, include_p
         "rime_data_manifest_version": 2,
         "native_libraries_manifest_version": 1,
         "data_layout": "application-support-v1",
-        "developer_team_id": "WF9UUN335P",
+        "distribution_identity": "community-adhoc-v1",
         "rime_schema_id": "radishlex_pinyin",
         "components": [
             {

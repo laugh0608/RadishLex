@@ -146,7 +146,7 @@ class InstallLayoutTest(unittest.TestCase):
         self.assertTrue((first / install_layout.UPGRADE_SOURCES_DIRECTORY).is_dir())
 
     def test_payload_binds_historical_product_assemblies_by_exact_release(self) -> None:
-        source = self.make_historical_product("0.0.9", "34")
+        source = self.make_historical_product("26.6.1", "34")
         payload = self.root / "payload-with-source"
         install_layout.assemble_payload(
             self.product,
@@ -167,19 +167,19 @@ class InstallLayoutTest(unittest.TestCase):
                     "product_manifest": install_layout.regular_file_record(
                         payload
                         / install_layout.UPGRADE_SOURCES_DIRECTORY
-                        / "0.0.9-34"
+                        / "26.6.1-34"
                         / "ProductManifest.json",
-                        "UpgradeSources/0.0.9-34/ProductManifest.json",
+                        "UpgradeSources/26.6.1-34/ProductManifest.json",
                     ),
-                    "product_path": "UpgradeSources/0.0.9-34",
-                    "product_version": "0.0.9",
+                    "product_path": "UpgradeSources/26.6.1-34",
+                    "product_version": "26.6.1",
                 }
             ],
         )
         source_program = (
             payload
             / install_layout.UPGRADE_SOURCES_DIRECTORY
-            / "0.0.9-34"
+            / "26.6.1-34"
             / self.layout.manager_component_path
             / "Contents/MacOS/component"
         )
@@ -191,7 +191,7 @@ class InstallLayoutTest(unittest.TestCase):
             install_layout.verify_payload(payload)
 
     def test_payload_rejects_duplicate_or_nonhistorical_source_builds(self) -> None:
-        source = self.make_historical_product("0.0.9", "34")
+        source = self.make_historical_product("26.6.1", "34")
         with self.assertRaisesRegex(
             install_layout.InstallLayoutError,
             "must be distinct",
@@ -201,7 +201,7 @@ class InstallLayoutTest(unittest.TestCase):
                 self.root / "duplicate-source-payload",
                 upgrade_source_product_roots=[source, source],
             )
-        target_release = self.make_historical_product("0.1.0", "35")
+        target_release = self.make_historical_product("26.7.1", "35")
         with self.assertRaisesRegex(
             install_layout.InstallLayoutError,
             "must be older",
@@ -213,8 +213,8 @@ class InstallLayoutTest(unittest.TestCase):
             )
 
     def test_multiple_historical_sources_are_sorted_and_keep_distinct_paths(self) -> None:
-        older = self.make_historical_product("0.0.8", "33")
-        newer = self.make_historical_product("0.0.9", "34")
+        older = self.make_historical_product("26.5.1", "33")
+        newer = self.make_historical_product("26.6.1", "34")
         payload = self.root / "multiple-source-payload"
         install_layout.assemble_payload(
             self.product,
@@ -232,8 +232,8 @@ class InstallLayoutTest(unittest.TestCase):
                 for source in manifest["upgrade_sources"]
             ],
             [
-                ("33", "UpgradeSources/0.0.8-33"),
-                ("34", "UpgradeSources/0.0.9-34"),
+                ("33", "UpgradeSources/26.5.1-33"),
+                ("34", "UpgradeSources/26.6.1-34"),
             ],
         )
         install_layout.verify_payload(payload)
@@ -254,7 +254,7 @@ class InstallLayoutTest(unittest.TestCase):
 
     def test_payload_can_bind_an_explicit_source_release_metadata(self) -> None:
         metadata_path = self.write_metadata(
-            product_version="0.0.9",
+            product_version="26.6.1",
             build_number="34",
         )
         source_metadata = product_manifest.ProductMetadata.load(metadata_path)

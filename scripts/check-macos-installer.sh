@@ -15,16 +15,6 @@ fi
 
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/macos-product/test_release_identity.py"
-set +e
-env RADISHLEX_DEVELOPER_ID_APPLICATION=- \
-  "${repo_root}/scripts/build-macos-release-installer.sh" >/dev/null 2>&1
-release_without_identity_status=$?
-set -e
-if [[ ${release_without_identity_status} -ne 2 ]]; then
-  echo "release Installer build must reject a missing Developer ID identity" >&2
-  exit 1
-fi
-
 (
   cd "${repo_root}"
   cargo test --locked -p radishlex-macos-installer-driver --all-targets

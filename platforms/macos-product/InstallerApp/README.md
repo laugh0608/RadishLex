@@ -14,9 +14,9 @@
 
 ABI 使用固定整数 enum、POD snapshot 与三个已绑定 symbol。Objective-C 只做已知值映射；未知版本、action、error、state、prompt 或进度失败关闭。Rust 隔离 dispatch 已把 fresh snapshot 授权接入 restartable executor，UI controller 不含文件操作。
 
-App 嵌入完整 `InstallPayload` format v2。Rust bridge 从当前 executable 和系统用户数据库固定形成 current-user bootstrap，不读取 `HOME`；ad-hoc 开发构建不含 `ReleaseIdentity.json`，因此稳定返回 `product_identity_unavailable`。Developer ID 身份、sealed resource 和 payload 通过后，四类 operation 都进入真实 restartable mutation port；upgrade 只按外层 receipt release 选择内嵌 `UpgradeSources`，缺失 source 在写入前返回 `driver_unavailable`，错误身份失败关闭。App 每次 render 只向 stderr 输出 `phase/action/error/state` 稳定摘要，不输出路径、PID、operation ID 或签名正文。
+App 嵌入完整 `InstallPayload` format v2。Rust bridge 从当前 executable 和系统用户数据库固定形成 current-user bootstrap，不读取 `HOME`；普通开发构建不含 `ReleaseIdentity.json`，因此稳定返回 `product_identity_unavailable`。社区发布构建的 Installer strict ad-hoc identity、sealed resource 和 payload 通过后，四类 operation 都进入真实 restartable mutation port；upgrade 只按外层 receipt release 选择内嵌 `UpgradeSources`，缺失 source在写入前返回 `driver_unavailable`，错误身份失败关闭。
 
-发布候选构建入口为 `RADISHLEX_DEVELOPER_ID_APPLICATION="Developer ID Application: …" ./scripts/build-macos-release-installer.sh`。它不接受 ad-hoc fallback，并负责嵌套 Hardened Runtime/trusted timestamp 签名、manifest 重冻结、release identity 生成与最终封存；身份凭据、公证和上传不进入脚本参数或仓库。
+社区发布候选构建入口为 `./scripts/build-macos-release-installer.sh`。它负责嵌套 strict ad-hoc 签名、manifest 重冻结、release identity 生成与最终封存；不读取 Developer ID、Keychain、timestamp 或 notary 凭据。
 
 真实用户域负向验收、人工输入源步骤和回退边界见 [Installer 真实用户域验收 Runbook](../../../docs/runbooks/macos-installer-user-domain-acceptance.md)。
 

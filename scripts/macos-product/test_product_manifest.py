@@ -150,23 +150,23 @@ class ProductManifestTest(unittest.TestCase):
         ):
             product_manifest.ProductMetadata.load(path)
 
-    def test_metadata_rejects_invalid_release_team(self) -> None:
+    def test_metadata_rejects_unknown_distribution_identity(self) -> None:
         value = json.loads(product_manifest.METADATA_PATH.read_text(encoding="utf-8"))
-        for team in ("", "wf9uun335p", "ABCDEFGHIJK"):
-            value["developer_team_id"] = team
-            path = self.root / f"product-{len(team)}.json"
+        for identity in ("", "developer-id-v1", "community-adhoc-v2"):
+            value["distribution_identity"] = identity
+            path = self.root / f"product-{len(identity)}.json"
             path.write_text(json.dumps(value), encoding="utf-8")
             with self.assertRaisesRegex(
-                product_manifest.ProductManifestError, "developer_team_id"
+                product_manifest.ProductManifestError, "distribution_identity"
             ):
                 product_manifest.ProductMetadata.load(path)
 
-    def test_source_contract_rejects_release_team_drift(self) -> None:
+    def test_source_contract_rejects_distribution_identity_drift(self) -> None:
         with self.assertRaisesRegex(
-            product_manifest.ProductManifestError, "Rust release Team ID"
+            product_manifest.ProductManifestError, "Rust distribution identity"
         ):
             product_manifest.validate_source_contract(
-                replace(self.metadata, developer_team_id="ABCDEFGHIJ")
+                replace(self.metadata, distribution_identity="community-adhoc-v2")
             )
 
 

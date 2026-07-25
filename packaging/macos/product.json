@@ -1,7 +1,7 @@
 {
-  "format_version": 2,
+  "format_version": 3,
   "product_id": "radishlex-macos",
-  "product_version": "0.1.0",
+  "product_version": "26.7.1",
   "build_number": "35",
   "minimum_macos": "13.0",
   "ffi_abi_version": 9,
@@ -9,7 +9,7 @@
   "rime_data_manifest_version": 2,
   "native_libraries_manifest_version": 1,
   "data_layout": "application-support-v1",
-  "developer_team_id": "WF9UUN335P",
+  "distribution_identity": "community-adhoc-v1",
   "manager_bundle_id": "dev.radishlex.radishlexManager",
   "input_method_bundle_id": "org.radishlex.inputmethod.macos"
 }

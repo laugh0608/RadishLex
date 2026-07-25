@@ -16,6 +16,11 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "macOS is required for release notarization" >&2
   exit 2
 fi
+if [[ "$(python3 "${product_tool}" field distribution_identity)" == \
+  "community-adhoc-v1" ]]; then
+  echo "community-adhoc-v1 is intentionally unsigned and cannot be notarized" >&2
+  exit 2
+fi
 if [[ -z "${keychain_profile}" || \
   ! "${keychain_profile}" =~ ^[A-Za-z0-9][A-Za-z0-9._\ -]{0,127}$ ]]; then
   echo "RADISHLEX_NOTARY_KEYCHAIN_PROFILE must name a stored Keychain profile" >&2

@@ -248,18 +248,18 @@ def verify_historical_product_root(
         "rime_data_manifest_version",
         "native_libraries_manifest_version",
         "data_layout",
-        "developer_team_id",
+        "distribution_identity",
         "rime_schema_id",
         "components",
         "licenses",
     }
     if not isinstance(manifest, dict) or set(manifest) != expected_manifest_keys:
-        raise InstallLayoutError("historical product manifest fields do not match format v2")
+        raise InstallLayoutError("historical product manifest fields do not match format v3")
     current_metadata = product_manifest.ProductMetadata.load()
     product_version = manifest["product_version"]
     build_number = manifest["build_number"]
     if (
-        manifest["format_version"] != 2
+        manifest["format_version"] != 3
         or manifest["product_id"] != current_metadata.product_id
         or not isinstance(product_version, str)
         or product_manifest.SEMVER_PATTERN.fullmatch(product_version) is None
@@ -269,7 +269,8 @@ def verify_historical_product_root(
         or not isinstance(manifest["minimum_macos"], str)
         or product_manifest.MACOS_PATTERN.fullmatch(manifest["minimum_macos"]) is None
         or manifest["data_layout"] != "application-support-v1"
-        or manifest["developer_team_id"] != current_metadata.developer_team_id
+        or manifest["distribution_identity"]
+        != current_metadata.distribution_identity
         or not isinstance(manifest["rime_schema_id"], str)
         or not manifest["rime_schema_id"]
     ):

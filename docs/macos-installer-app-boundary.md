@@ -98,9 +98,9 @@ refresh 是唯一不要求确认的 action。first install、upgrade、repair、
 
 AppKit 已静态链接 `radishlex-macos-installer-bridge` ABI v1，并通过三个已绑定 symbol 读取 snapshot、刷新和提交确认。ABI 只使用固定整数 enum 与 POD snapshot；Objective-C 只映射已知值，未知 contract/action/error/state/prompt/进度统一失败关闭。AppDelegate 不含复制、rename、删除、receipt 或 TIS 逻辑。
 
-Rust bridge 每次从 fresh status projection 重新授权 action，再进入 `InstallerExecutor`；隔离门禁已证明 `prepared` 持久化、重启投影、stale action 和 active guard。真实用户域只读 bootstrap 使用 `geteuid/getpwuid_r` 取得 authoritative home，只从当前 executable 固定反推 Installer resources，并复验签名资源 `ReleaseIdentity.json` 与内嵌 InstallPayload；不读取 `HOME`、UI 路径或调用方身份。ad-hoc 构建稳定返回 `blocked + product_identity_unavailable`，没有 production fallback。身份资源通过后四类 operation 都进入真实 mutation port；upgrade 只从 fresh 外层 receipt 的 source/installed release 精确选择 payload v2 `UpgradeSources`，先复验历史 ProductManifest、完整 tree、exact Developer ID 和 source/target host adapter，再允许创建或续跑 receipt。缺失 source 在任何写入前返回 `driver_unavailable`，错误 source 返回产品身份阻断。
+Rust bridge 每次从 fresh status projection 重新授权 action，再进入 `InstallerExecutor`；隔离门禁已证明 `prepared` 持久化、重启投影、stale action 和 active guard。真实用户域 bootstrap 使用 `geteuid/getpwuid_r` 取得 authoritative home，只从当前 executable 固定反推 Installer resources，并复验 sealed `ReleaseIdentity.json` 与内嵌 InstallPayload；不读取 `HOME`、UI 路径或调用方身份。普通开发构建因缺失 identity resource 返回 `product_identity_unavailable`；社区发布构建通过后四类 operation 进入真实 mutation port。upgrade 先复验历史 ProductManifest、完整 tree、strict ad-hoc identity 和 source/target host adapter；缺失 source 在写入前返回 `driver_unavailable`。
 
-`ReleaseIdentity.json` format v1 固定 Team ID，以及 Installer、Manager、InputMethod 各自的 exact designated requirement；只有 Installer 自身先通过 strict Developer ID 验证，且资源进入最终 Installer code signature 后才可作为 bootstrap 输入。缺失、额外字段、非普通单链接文件、owner 漂移、Team/requirement 不一致、ad-hoc requirement 或 payload signature/tree 漂移全部失败关闭。
+`ReleaseIdentity.json` format v2 固定 `community-adhoc-v1`，并记录 target 与全部历史 source 的 Manager/InputMethod exact requirement 有界集合；Installer 自身先通过 strict ad-hoc 结构验证。Installer 不在自身资源内绑定内容相关 `cdhash`。缺失、额外字段、非普通单链接文件、owner 漂移、集合乱序/重复/重叠或 payload signature/tree 漂移全部失败关闭。
 
 first install 的零写入 snapshot 允许固定 data root 尚不存在；只有用户显式确认后，platform adapter 才逐级验证既有 `Library` / `Application Support`，并以 `0700` 创建缺失的 `Applications`、`Library/Input Methods` 和 RadishLex data root。既有目录必须原样满足 owner、canonical path、symlink 和 mode 约束，bridge 不 chmod、不覆盖、不递归创建未知父链。
 

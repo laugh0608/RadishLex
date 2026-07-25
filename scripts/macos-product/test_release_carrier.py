@@ -126,7 +126,7 @@ class ReleaseCarrierTests(unittest.TestCase):
                 release_carrier.parse_codesign_team(output)
 
         identity = self.root / "ReleaseIdentity.json"
-        team = release_carrier.load_metadata().developer_team_id
+        team = release_carrier.LEGACY_DEVELOPER_TEAM_ID
         identity.write_text(
             json.dumps(
                 {

@@ -63,7 +63,7 @@ operation 必须显式声明，不通过目标存在性推断：
 
 macOS adapter 负责从固定 bundle 和签名 API 形成 canonical evidence，再交给核心。核心只接受 64 位小写十六进制 SHA-256、稳定 bundle ID、正确 component 配对和同一 release。hash 不能替代发布者要求；平台每次 staging、切换、恢复和启动仍须重新验证 code signature、ProductManifest 与固定来源。
 
-`ProductManifest.json` format v2 以公开元数据固定 RadishLex 发布者 Team ID `WF9UUN335P`。该值是证书 leaf OU 与 `TeamIdentifier` 的信任锚，不包含证书、私钥或公证凭据；另一有效 Developer ID Team 即使能形成内部一致的双 bundle、Installer 与 DMG，也不能通过产品门禁。
+`ProductManifest.json` format v3 以公开元数据固定 `distribution_identity=community-adhoc-v1`。它明确声明当前包没有 Apple 发布者认证或公证，不包含证书、私钥、requirement 或凭据；未知 identity 不能通过产品门禁。
 
 receipt 初始保存 source/target product identity。后续 artifact evidence 只能按 slot 追加：
 
@@ -120,7 +120,7 @@ macOS adapter 的输入只允许：
 
 - 从系统 user-domain API 得到的 authoritative current-user home 与 uid；
 - Installer 自身已验证资源中的 `InstallPayload/` 根；
-- 发布构建固定的 Manager/InputMethod Developer ID designated requirement，以及 `ProductManifest.json` v2 绑定的 Team ID `WF9UUN335P`；
+- sealed release identity 固定的 Manager/InputMethod ad-hoc designated requirement 集合，以及 `ProductManifest.json` v3 绑定的 distribution identity；
 - 已持有的外层 receipt store、guard 和对应 component 的 `ProgramSwitchStore`。
 
 adapter 内嵌 committed `packaging/macos/install-layout.json` 字节。payload 内 `InstallLayout.json` 必须逐字节一致，`InstallPayloadManifest.json` format v2 必须严格绑定 layout、target `ProductManifest.json`、版本/build、两个 component-to-target 映射、保留数据语义和 `UpgradeSources` 集合。每个历史 source 绑定精确 version/build、规范化固定目录、自己的 ProductManifest、许可证、完整双 bundle tree 和同发布要求 code identity；build 必须唯一、严格递增并早于 target。payload/product/source 根、manifest、bundle 与路径链中的真实目录不得由 symlink 或 hardlink 替换；未知顶层对象、字段、component、文件记录、source 或目标映射均失败关闭。
@@ -143,13 +143,13 @@ adapter 对 payload target、已安装 source、staged、installed 和 restored 
 
 code signature 验证固定为：
 
-1. 发布要求只接受五段 `and` 连接的 Developer ID Application designated requirement：精确 bundle identifier、`anchor apple generic`、Developer ID 中间证书 OID、Developer ID Application leaf OID 和固定 Team ID `WF9UUN335P` 的 leaf OU；不接受其他 Team、`or`、ad-hoc 或宽泛 requirement；
+1. 当前发布要求 strict ad-hoc：`TeamIdentifier=not set`、`Signature=adhoc`、CodeDirectory ad-hoc flag、primary CDHash 与 designated requirement 一致，并命中对应 component 的 sealed 有界排序集合；
 2. `/usr/bin/codesign --verify --deep --strict -R=<expected designated requirement> <bundle>`；
 3. 独立读取 Identifier、TeamIdentifier、CDHash、Signature、CodeDirectory 与 designated requirement；
 4. 要求 bundle ID、Team ID 和 designated requirement 与该 component 的发布要求精确一致，且 Team ID 必须等于产品元数据固定值；
 5. 将上述固定字段编码为 `radishlex-macos-code-identity-v1` 后只把 SHA-256 写入逻辑程序身份。
 
-receipt 不保存 requirement、Team ID、Authority、CDHash 或 `codesign` 输出原文。验证进程的 stdout/stderr 不进入错误、日志或诊断。Developer ID 要求尚未冻结时只能使用测试注入的合成 verifier，不提供 production ad-hoc fallback，也不把当前 ad-hoc 产品装配冒充发布身份。
+receipt 不保存 requirement、Team ID、Authority、CDHash 或 `codesign` 输出原文，只保存稳定 evidence hash。验证进程 stdout/stderr 不进入错误、日志或诊断。ad-hoc 只证明当前 artifact identity，不得表述为 Apple 发布者认证。
 
 ### Staging 填充与阶段复验
 
@@ -212,7 +212,7 @@ M4-P02 数据 receipt 只能在 `upgrade` 的 `data_coordinating` 阶段运行�
 
 ## Startup decision
 
-Manager 与 InputMethod 必须在 M4-P02 数据 gate、userdb、settings、Rime runtime 和 Flutter/IMK 业务初始化之前调用 ABI v9 外层只读 gate。FFI 不接受运行 identity 字段；macOS 实现只从当前 executable 反向绑定固定用户域 Manager/InputMethod bundle，再读取 Info.plist、计算完整 bundle tree 并形成严格 Developer ID code identity。UI、settings、`HOME` 环境变量或调用方自报 bundle/release/hash 均不能成为身份输入。
+Manager 与 InputMethod 必须在 M4-P02 数据 gate、userdb、settings、Rime runtime 和 Flutter/IMK 业务初始化之前调用 ABI v9 外层只读 gate。FFI 不接受运行 identity 字段；macOS 实现只从当前 executable 反向绑定固定用户域 bundle，再读取 Info.plist、计算完整 tree 并形成 strict ad-hoc code identity。UI、settings、`HOME` 或调用方自报 bundle/release/hash 均不能成为身份输入。
 
 只读结果：
 
@@ -254,4 +254,4 @@ receipt format 固定为 `radishlex-product-install-receipt-v1`，最大 64 KiB�
 - preserve、逐端 commit 和 rollback 的每个 rename、目标目录 fsync、源目录 fsync 边界均可注入故障并从精确 inode 现场重试；
 - startup gate 对缺失、非终态、终态身份匹配/漂移、remove、损坏、未知对象和中断写均有稳定结果；
 - 普通测试只使用合成 `0700` 临时目录；隔离产品资格只在带固定 marker 的系统临时根内使用真实构建 bundle、ad-hoc qualification identity 与合成 Application Support，不访问真实用户目录、程序目标、系统设置、Keychain 或发布签名凭据。
-- macOS adapter、真实 bundle 内容/签名复验、M4-P02 状态映射、两段终态、双端 startup 接线与隔离端到端恢复资格已落地；Installer 只读状态投影、显式授权 contract、restartable executor、upgrade data receipt bootstrap、版本化原生 bridge 与独立 AppKit 壳已落地。executor 先持久化 `prepared` 等待重新确认，再从 guard 内 receipt 续跑四类 operation。生产 bridge 已验证 Installer/双 component Developer ID 身份并接入四类 operation 的真实 user-domain mutation port；upgrade 还要求 payload v2 中存在 receipt release 精确匹配的历史 source，并在写入前构造 manifest-bound source/target coordinator。默认首发 payload source 集为空，缺失时稳定返回 `driver_unavailable`。Developer ID 成功产物、真实跨发布 source、正向安装、进程/输入源交互与身份绑定终态清理仍属于后续证据。
+- macOS adapter、真实 bundle 内容/strict ad-hoc 复验、M4-P02 状态映射、两段终态、双端 startup 接线与隔离恢复资格已落地；Installer status projection、显式授权、restartable executor、upgrade data receipt bootstrap、版本化原生 bridge 与 AppKit 壳已落地。生产 bridge 验证 Installer/双 component 社区 identity 后接入四类 user-domain mutation port；upgrade 仍要求 payload v2 存在 receipt release 精确匹配的历史 source。首发 source 集为空，缺失时返回 `driver_unavailable`。冻结社区 DMG、真实跨发布 source、正向安装、进程/输入源交互与身份绑定终态清理仍属于后续证据。

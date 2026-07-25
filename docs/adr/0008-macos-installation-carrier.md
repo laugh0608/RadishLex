@@ -4,7 +4,7 @@
 
 ## 状态
 
-Accepted
+Accepted，2026-07-25 修订为社区 ad-hoc 首发
 
 ## 背景
 
@@ -25,9 +25,9 @@ Apple 当前直接分发支持 ZIP、DMG 和 Installer package；其中 DMG 与 
 首个发布候选使用：
 
 ```text
-Developer ID Application 签名的 RadishLex Installer.app
+strict ad-hoc 签名的 RadishLex Installer.app
   inside
-签名并公证、已 staple ticket 的 UDIF DMG
+未签名、未公证的 UDIF DMG + 独立 SHA-256 evidence
 ```
 
 `RadishLex Installer.app` 是独立产品宿主，不是 Manager 的普通页面，也不进入输入热路径。它可以从只读 DMG 运行；完成或失败后不把自身安装到持久产品位置。
@@ -79,7 +79,7 @@ Contents/Resources/InstallPayload/
       ProductManifest.json
 ```
 
-`ProductManifest.json` format v2 绑定两个产品 bundle、native dependency、RimeData、许可证和公开发布者 Team ID `WF9UUN335P`。`InstallPayloadManifest.json` format v2 再绑定 target product manifest、安装 layout、版本/build、Installer bundle ID、目标路径和显式历史 source 列表；每个 source 由自己的 ProductManifest 绑定完整旧产品，只用于旧版本 validation/rollback host。发布装配顺序必须是签名嵌套 Mach-O 与 target 两个产品 bundle、验证历史 source 的既有 exact Developer ID、冻结 product/payload manifest、签名 Installer bundle、创建并签名 DMG；任何后续修改都要求重新生成受影响的外层 manifest、重新签名并重新公证。
+`ProductManifest.json` format v3 绑定两个产品 bundle、native dependency、RimeData、许可证和 `distribution_identity=community-adhoc-v1`。`InstallPayloadManifest.json` format v2 再绑定 target、安装 layout、版本/build、Installer bundle ID、目标路径和显式历史 source；每个 source 由自己的 ProductManifest 绑定完整旧产品。发布装配按嵌套顺序 strict ad-hoc 签名，冻结 product/payload manifest 与双 component requirement 集合，再创建未签名 DMG 和 SHA-256 evidence；任何后续修改都要求重新生成受影响的外层证据。
 
 ### 外层安装事务
 
@@ -108,24 +108,23 @@ M4-P02 的数据 receipt 不能单独证明两个程序 bundle 已完成切换�
 
 ## 发布身份与验证
 
-发布候选要求两个产品 bundle、Installer app 和全部 executable 使用 Team ID 精确为 `WF9UUN335P` 的 Developer ID Application、Hardened Runtime 与 trusted timestamp。另一有效 Developer ID Team 不能因载体内部身份一致而取得发布资格。DMG 单独签名并提交 Apple notary service；使用 `notarytool` 或 Notary API，检查 notary log，staple ticket，并在隔离下载环境执行 Gatekeeper 评估。
+首发不加入付费 Apple Developer Program，采用 `community-adhoc-v1`。两个产品 bundle、Installer app 和 executable 必须通过 strict ad-hoc 验证；该身份只证明包内一致性，不证明 Apple 发布者。sealed release identity 绑定 target 与历史 source 的双 component requirement 有界集合，Installer 不自绑定其内容相关 `cdhash`。
 
-DMG 固定为 APFS/UDZO UDIF，volume name 为 `RadishLex Installer`，根目录只允许 `RadishLex Installer.app`。notary 凭据只从已存入 Keychain 的 profile 读取；稳定 submission receipt 绑定提交时 DMG hash 与 Installer tree，staple 后 qualification 再绑定最终分发 hash。DMG open assessment 和挂载 Installer execute assessment 必须同时通过，且最终下载环境仍需按 qualification hash 独立复验。
+DMG 固定为 APFS/UDZO UDIF，volume name 为 `RadishLex Installer`，根目录只允许 Installer app。DMG 不签名、不提交 notary、不 staple；社区 evidence 绑定版本、文件名、大小、DMG SHA-256 与 sealed identity SHA-256。用户必须先核对 SHA-256，再通过“隐私与安全性 → 仍要打开”人工放行；精确用户域 `xattr` 只是显式 fallback，不使用 `sudo`。
 
-当前 payload/layout 门禁只证明确定性内容和目标映射，不证明 Developer ID、notarization、stapling、Gatekeeper、真实安装或 TIS 会话刷新。签名身份、凭据、上传和真实系统动作仍须另行授权。
+当前门禁不证明 Developer ID、notarization、Gatekeeper 自动放行、真实安装或 TIS 会话刷新。公开上传和真实系统动作仍须另行授权；未来 Developer ID 需要新 distribution identity 与 ADR 修订。
 
 Apple 官方依据：
 
 - [Packaging Mac software for distribution](https://developer.apple.com/documentation/xcode/packaging-mac-software-for-distribution)
-- [Notarizing macOS software before distribution](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)
-- [Developer ID certificates](https://developer.apple.com/help/account/certificates/create-developer-id-certificates)
+- [Safely open apps on your Mac](https://support.apple.com/guide/mac-help/mh40616/mac)
 
 ## 后果
 
 - 首个候选无需管理员权限，且不会让 root installer script 接触用户明文数据。
 - 仓库需要新增独立 Installer app、外层 receipt/guard、双端 startup gate 扩展和程序 bundle 切换恢复测试。
 - `.pkg` 不再阻塞首个候选，但未来系统域/企业分发需要新的 ADR 和独立证据。
-- DMG 只是分发容器；在 Installer、外层事务、签名公证和真实安装门禁完成前，payload 仍不能称为普通用户安装包。
+- DMG 只是分发容器；社区包必须持续提示未签名/未公证，payload 仍不能单独称为用户安装包。
 
 ## M4-P03 实现顺序
 
@@ -135,7 +134,7 @@ Apple 官方依据：
 4. 实现双 bundle staging、切换、逐边界故障注入和 source 程序恢复；
 5. 把 M4-P02 数据协调器纳入外层事务，覆盖成功、数据失败、程序失败和重启恢复；
 6. 已实现独立 Installer app 的状态 UI/驱动 contract、手动输入源提示、默认程序移除授权和脱敏诊断；隔离写 executor 继续按同一边界接入；
-7. 已固定 Developer ID/Hardened Runtime、DMG、公证、stapling 与 Gatekeeper 的构建和证据契约；待真实身份、历史 release 与发布授权可用后执行同一冻结产物的正向供应链和安装/升级/移除验收。
+7. 已固定 community ad-hoc、DMG SHA-256 evidence 与人工放行契约；待冻结首发产物后执行安装/修复/移除验收。
 
 ## M4-P03 退出标准
 
@@ -144,5 +143,5 @@ Apple 官方依据：
 - 外层非终态事务能在两端业务初始化前失败关闭；
 - source/target 程序与数据版本始终配对，不存在旧程序打开未来 schema 的窗口；
 - 默认移除保留 Application Support，数据删除只能走独立授权；
-- Developer ID、Hardened Runtime、notarization、stapling 和 Gatekeeper 证据绑定同一冻结产物；
+- 社区 identity、DMG SHA-256 evidence 与用户提示绑定同一冻结产物；
 - 授权实机完成安装、人工添加/切换、升级、程序回滚和移除，且不使用私有 TIS 数据库或自动输入冒充验收。

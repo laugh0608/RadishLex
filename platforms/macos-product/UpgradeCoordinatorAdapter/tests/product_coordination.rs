@@ -17,9 +17,9 @@ use radishlex_macos_upgrade_coordinator::MacOsUpgradeCoordinatorAdapter;
 const QUALIFICATION_ROOT_ENV: &str = "RADISHLEX_UPGRADE_QUALIFICATION_ROOT";
 const SOURCE_PRODUCT_ENV: &str = "RADISHLEX_UPGRADE_QUALIFICATION_SOURCE_PRODUCT";
 const TARGET_PRODUCT_ENV: &str = "RADISHLEX_UPGRADE_QUALIFICATION_TARGET_PRODUCT";
-const SOURCE_VERSION: &str = "0.0.9";
+const SOURCE_VERSION: &str = "26.6.1";
 const SOURCE_BUILD: u64 = 34;
-const TARGET_VERSION: &str = "0.1.0";
+const TARGET_VERSION: &str = "26.7.1";
 const TARGET_BUILD: u64 = 35;
 
 #[test]

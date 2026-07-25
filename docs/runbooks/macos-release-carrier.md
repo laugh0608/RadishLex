@@ -1,98 +1,89 @@
-# macOS DMG、公证与 Gatekeeper Runbook
+# macOS 社区 ad-hoc DMG Runbook
 
-本文指导发布维护者把同一份已冻结 Developer ID Installer 形成签名 DMG，并取得可复验的 notarization、staple 与 Gatekeeper 证据。本文不授权申请/导出证书、写入公证凭据、上传、公开分发、安装产品、修改输入源或清理历史事务材料；执行真实签名和公证前仍需单独授权。
+本文指导发布维护者构建、复验和分发 `community-adhoc-v1` macOS DMG，读者是没有加入 Apple Developer Program 的项目维护者与安装用户。本文不宣称 Apple 开发者身份、notarization、Gatekeeper 自动放行或恶意软件扫描，也不授权上传 Release、修改系统输入源或清理历史安装事务材料。
 
-## 固定输入与输出
+## 发布口径
 
-输入必须来自同一版本的发布构建：
+- 产品版本由仓库根 `version.json` 唯一确定；首发基线为 `26.7.1 (35)`，标准 tag 为 `v26.7.1-release`。
+- `ProductManifest.json` format v3 固定 `distribution_identity=community-adhoc-v1`。
+- Installer、Manager 与 InputMethod 使用严格 ad-hoc code signature。该签名用于检测包内意外变化和绑定事务 identity，不提供 Apple 认可的发布者认证。
+- DMG 不签名、不提交公证、不含 ticket。`notarize-macos-release-dmg.sh` 在当前模式必须稳定失败关闭。
+- 对外必须同时发布 DMG 与 `CommunityReleaseEvidence.json`；后者精确绑定版本、文件名、大小、DMG SHA-256 和 sealed release identity SHA-256。
 
-```text
-target/macos-release/<version>-<build>/
-  Product/
-  InstallPayload/
-  RadishLex Installer.app/
-```
+## 构建
 
-`ProductManifest.json`、`InstallPayloadManifest.json`、`ReleaseIdentity.json`、三份 bundle designated requirement 与 Team ID 必须仍能精确复验。DMG 构建不接受路径参数，不从其他目录搜索 Installer，也不重签 Installer。
-
-固定输出为：
-
-```text
-target/macos-release/<version>-<build>/
-  RadishLex-<version>-<build>.dmg
-  NotarizationSubmission.json
-  ReleaseQualification.json
-```
-
-`NotarizationSubmission.json` 在 Apple 返回 `Accepted` 后以新文件原子写入，绑定 submission UUID、提交时 DMG SHA-256/size 和 Installer tree SHA-256。后续中断从该 receipt 读取 UUID、重新拉取 notary log，不重复上传。
-
-staple 会修改 DMG，所以 `ReleaseQualification.json` 同时保留提交前 SHA-256 与最终分发 SHA-256。它只记录稳定状态、submission ID、hash 和 size，不保存 Keychain profile、凭据、notary 原始响应、log 正文、路径或签名正文。
-
-## 前置条件
-
-- macOS 13 或更高版本，Xcode command-line tools 中存在 `codesign`、`hdiutil`、`notarytool`、`stapler` 和 `spctl`；
-- `RADISHLEX_DEVELOPER_ID_APPLICATION` 精确命中本机有效、证书 OU 为产品固定 Team `WF9UUN335P` 的 `Developer ID Application:` identity；
-- Installer 发布根已由 `build-macos-release-installer.sh` 生成，所有嵌套 executable 具有 Hardened Runtime 与 trusted timestamp；
-- notary 凭据已由维护者使用 `notarytool store-credentials` 存入 Keychain；执行时只提供 profile 名称，不向脚本传 Apple ID、password、API private key 或 issuer；
-- 网络、Apple 服务和 timestamp/notary 资格已单独授权。
-
-普通仓库门禁只运行 parser、shell 语法和缺失身份/凭据失败关闭测试，不调用 timestamp/notary 服务、不挂载真实发布 DMG，也不生成正向证据。
-
-## A. 构建签名 DMG
-
-在工作区干净且发布 Installer 已冻结后执行：
+先完成产品装配门禁，再构建社区 Installer 与 DMG：
 
 ```bash
-RADISHLEX_DEVELOPER_ID_APPLICATION="Developer ID Application: …" \
-  ./scripts/build-macos-release-dmg.sh
+./scripts/build-macos-product.sh
+./scripts/build-macos-release-installer.sh
+./scripts/build-macos-release-dmg.sh
 ```
 
-入口按固定顺序：
+首发输出固定在：
 
-1. 复验 Product、InstallPayload、ReleaseIdentity 与 Installer strict signature；
-2. 只把 `RadishLex Installer.app` 复制到私有 staging；
-3. 生成 volume name 为 `RadishLex Installer` 的 APFS/UDZO UDIF；
-4. 使用同一 Developer ID Application 与 trusted timestamp 签名 DMG；
-5. 执行 `codesign --verify --strict` 与 `hdiutil verify`；
-6. 只读挂载，要求根目录精确只有一份 Installer app，并复验其 strict signature、内嵌 payload 与 release identity；
-7. 通过原子 rename 写入固定 DMG 路径。
+```text
+target/macos-release/26.7.1-35/
+├── RadishLex Installer.app
+├── RadishLex-26.7.1-35.dmg
+├── CommunityReleaseEvidence.json
+├── InstallPayload/
+└── Product/
+```
 
-目标已存在时入口拒绝覆盖。任何失败只清理本次私有 staging，不修改发布 Installer、产品 assembly 或历史 source。
+构建脚本不读取 `RADISHLEX_DEVELOPER_ID_APPLICATION`，不访问 Keychain、timestamp 或 notary 服务。若目标目录已存在，脚本拒绝覆盖；需要保留既有产物并使用新的 build number 重新构建。
 
-## B. 提交、staple 与 Gatekeeper
-
-确认 Keychain profile 后执行：
+## 发布前复验
 
 ```bash
-RADISHLEX_NOTARY_KEYCHAIN_PROFILE="<stored-profile-name>" \
-  ./scripts/notarize-macos-release-dmg.sh
+./scripts/check-macos-release-carrier.sh
+
+python3 scripts/macos-product/community_release.py verify \
+  --carrier "$PWD/target/macos-release/26.7.1-35/RadishLex-26.7.1-35.dmg" \
+  --identity "$PWD/target/macos-release/26.7.1-35/RadishLex Installer.app/Contents/Resources/ReleaseIdentity.json" \
+  --evidence "$PWD/target/macos-release/26.7.1-35/CommunityReleaseEvidence.json"
 ```
 
-入口只使用 `--keychain-profile`，并执行：
+发布页必须明确写明“未使用 Apple Developer ID、未公证，需要用户手动批准”，并直接列出 DMG SHA-256。不能使用“已签名”“Apple 已验证”“通过 Gatekeeper”或等价表述。
 
-1. 再次复验 DMG signature 与 UDIF；
-2. 若没有 submission receipt，使用 `notarytool submit --wait --output-format json` 提交；
-3. 只接受字段集合已知、canonical UUID 且 `status=Accepted` 的结果，再原子持久化 receipt；
-4. 按 receipt UUID 获取 notary log，要求 job ID、archive name、提交 SHA-256、`Accepted`、status code `0` 和空 issues 精确匹配；
-5. 已有有效 ticket 时直接续跑，否则 staple；随后必须通过 `stapler validate`；
-6. 重新验证签名与 UDIF，执行 DMG `spctl --type open --context context:primary-signature`；
-7. 只读挂载并要求根对象精确唯一，比较挂载 Installer 与冻结 Installer 的完整 tree，复验 strict signature、内嵌 release identity，并执行 Installer `spctl --type execute`；
-8. 最后写入并回读 `ReleaseQualification.json`。
+## 用户安装
 
-已有 qualification 时入口只复验证据、当前 DMG 和 stapled ticket，成功后幂等返回。未知 submission 字段、非终态/Invalid 状态、log 缺字段、UUID/hash/name 漂移、issues、ticket 缺失、挂载内容漂移或任一 Gatekeeper 拒绝都会失败关闭，不生成 qualification。
+用户应先对下载文件执行：
 
-## C. 隔离下载复验
+```bash
+shasum -a 256 "$HOME/Downloads/RadishLex-26.7.1-35.dmg"
+```
 
-本机 qualification 不能替代最终下载隔离证据。公开候选上传后，还必须在未建立本地产物信任的干净 macOS 用户环境：
+结果必须与发布页及 `CommunityReleaseEvidence.json` 的 `carrier_sha256` 完全一致。随后打开 DMG 并尝试启动 `RadishLex Installer.app`。macOS 阻止启动时，首选系统支持的人工路径：
 
-1. 通过正式下载路径取得同名 DMG；
-2. 计算 SHA-256，要求等于 `ReleaseQualification.json` 的 `distribution_sha256`；
-3. 运行 `stapler validate` 与 DMG Gatekeeper assessment；
-4. Finder 打开 DMG，人工启动 Installer，确认系统不显示未公证/来源不明阻断；
-5. 在任何安装 mutation 前，核对 Installer 展示的版本、固定双目标和默认保留数据语义。
+1. 打开“系统设置 → 隐私与安全性”；
+2. 在安全性区域确认刚才被阻止的是 `RadishLex Installer.app`；
+3. 选择“仍要打开”，再次确认。
 
-该阶段不得移除 quarantine xattr、使用 `spctl --add`、关闭 Gatekeeper、手工重签或复制出另一份 DMG来绕过拒绝。首次安装、修复、升级和移除继续按 [真实用户域验收 Runbook](macos-installer-user-domain-acceptance.md) 执行。
+只有在 SHA-256 已核对、且用户理解该构建没有 Apple 发布者认证时，才使用终端 fallback。先把 Installer 从只读 DMG 复制到当前用户目录，再只移除这一个精确 bundle 的 quarantine：
 
-## 当前证据
+```bash
+mkdir -p "$HOME/Applications"
+ditto "/Volumes/RadishLex Installer/RadishLex Installer.app" \
+  "$HOME/Applications/RadishLex Installer.app"
+xattr -dr com.apple.quarantine \
+  "$HOME/Applications/RadishLex Installer.app"
+open "$HOME/Applications/RadishLex Installer.app"
+```
 
-截至 2026-07-25，仓库已经具备 DMG、公证、staple、双层 Gatekeeper 与稳定证据的失败关闭契约，普通门禁通过。当前机器没有可用 Developer ID Application identity，也没有真实上一发布 assembly，因此没有执行签名 DMG 构建、notary 上传、staple、Gatekeeper 正向验收或隔离下载；仓库不得据此宣称发布供应链完成。
+该用户域路径不需要 `sudo`。不得对 `/Applications`、`$HOME/Applications`、下载目录或磁盘根执行宽泛递归 `xattr`；不得把移除 quarantine 描述为签名或公证替代品。
+
+## 升级与失败关闭
+
+`ReleaseIdentity.json` format v2 记录 target 与全部显式历史 source 的 Manager/InputMethod ad-hoc designated requirement 集合。集合必须有界、排序、无重复，且两端不能重叠；运行时仍逐项复验 manifest、完整 tree、bundle ID、strict ad-hoc identity 和 release 顺序。
+
+首发 `UpgradeSources` 为空。未来升级必须显式提供真实上一发布 assembly，不得用当前二进制改版本号伪造历史 source。identity、manifest、载体 evidence、receipt 或 startup gate 任一漂移都失败关闭，且不自动清理 staging、backup 或历史 operation。
+
+## 未来 Developer ID 路径
+
+仓库保留 Developer ID 解析和 notarization 证据模块作为未来可选能力，但它们不是当前 `community-adhoc-v1` 发布路径。未来若加入 Apple Developer Program，必须以新的 distribution identity/manifest 版本重新评审，不得静默把社区包升级为 Developer ID 包。
+
+Apple 对未通过 App Store 分发的软件建议使用 Developer ID 与 notarization；对被阻止 App 的人工放行说明见：
+
+- [Safely open apps on your Mac](https://support.apple.com/guide/mac-help/mh40616/mac)
+- [Distributing software on macOS](https://developer.apple.com/documentation/xcode/distributing-your-app-for-beta-testing-and-releases)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Contract tests for Developer ID release identity parsing and encoding."""
+"""Contract tests for community ad-hoc release identity parsing and encoding."""
 
 from __future__ import annotations
 
@@ -8,104 +8,72 @@ import unittest
 import release_identity
 
 
-def details(bundle_id: str, team: str) -> bytes:
-    requirement = (
-        f'identifier "{bundle_id}" and anchor apple generic and '
-        "certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and "
-        "certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and "
-        f'certificate leaf[subject.OU] = "{team}"'
-    )
+def details(bundle_id: str, cdhash: str, *, ad_hoc: bool = True) -> bytes:
+    signature = "adhoc" if ad_hoc else "size=9000"
+    flags = "0x2(adhoc)" if ad_hoc else "0x10000(runtime)"
     return (
         f"Identifier={bundle_id}\n"
-        f"TeamIdentifier={team}\n"
-        "Signature size=9000\n"
-        f"# designated => {requirement}\n"
+        f"CodeDirectory v=20400 size=663 flags={flags} hashes=10+7 location=embedded\n"
+        f"CDHash={cdhash}\n"
+        f"Signature={signature}\n"
+        "TeamIdentifier=not set\n"
+        f'# designated => cdhash H"{cdhash}"\n'
     ).encode()
 
 
 class ReleaseIdentityTests(unittest.TestCase):
-    def test_builds_deterministic_identity_for_one_team(self) -> None:
-        team = release_identity.product_manifest.ProductMetadata.load().developer_team_id
-        identities = [
-            release_identity.parse_codesign_output(
-                details(bundle_id, team), bundle_id
-            )
-            for bundle_id in release_identity.EXPECTED_BUNDLE_IDS.values()
-        ]
-        identity = release_identity.build_identity(*identities)
+    def identity(self, component: str, digit: str) -> release_identity.SignedBundleIdentity:
+        bundle_id = release_identity.EXPECTED_BUNDLE_IDS[component]
+        return release_identity.parse_codesign_output(
+            details(bundle_id, digit * 40), bundle_id
+        )
+
+    def test_builds_deterministic_sorted_identity_sets(self) -> None:
+        installer = self.identity("installer", "0")
+        manager = self.identity("manager", "2")
+        older_manager = self.identity("manager", "1")
+        input_method = self.identity("input_method", "3")
+        identity = release_identity.build_identity(
+            installer, [manager, older_manager, manager], [input_method]
+        )
         encoded = release_identity.encoded_identity(identity)
         self.assertTrue(encoded.endswith(b"\n"))
-        self.assertIn(b'"installer_designated_requirement"', encoded)
-        self.assertEqual(encoded, release_identity.encoded_identity(identity))
+        self.assertIn(b'"distribution_identity": "community-adhoc-v1"', encoded)
+        self.assertNotIn(b"installer_designated_requirement", encoded)
+        self.assertEqual(
+            identity["manager_designated_requirements"],
+            [
+                older_manager.designated_requirement,
+                manager.designated_requirement,
+            ],
+        )
 
-    def test_rejects_ad_hoc_mixed_team_and_identifier_drift(self) -> None:
+    def test_rejects_non_ad_hoc_identifier_drift_and_missing_primary_hash(self) -> None:
         installer_id = release_identity.EXPECTED_BUNDLE_IDS["installer"]
         with self.assertRaises(release_identity.ReleaseIdentityError):
             release_identity.parse_codesign_output(
-                details(installer_id, "not set"), installer_id
+                details(installer_id, "0" * 40, ad_hoc=False), installer_id
             )
         with self.assertRaises(release_identity.ReleaseIdentityError):
             release_identity.parse_codesign_output(
-                details(
-                    "org.example.other",
-                    release_identity.product_manifest.ProductMetadata.load().developer_team_id,
-                ),
-                installer_id,
+                details("org.example.other", "0" * 40), installer_id
             )
-        team = release_identity.product_manifest.ProductMetadata.load().developer_team_id
+        value = details(installer_id, "0" * 40).replace(
+            b'cdhash H"0000000000000000000000000000000000000000"',
+            b'cdhash H"1111111111111111111111111111111111111111"',
+        )
+        with self.assertRaises(release_identity.ReleaseIdentityError):
+            release_identity.parse_codesign_output(value, installer_id)
 
-        identities = [
-            release_identity.parse_codesign_output(
-                details(bundle_id, team), bundle_id
-            )
-            for bundle_id in release_identity.EXPECTED_BUNDLE_IDS.values()
-        ]
-        with self.assertRaises(release_identity.ReleaseIdentityError):
-            release_identity.parse_codesign_output(
-                details(
-                    release_identity.EXPECTED_BUNDLE_IDS["manager"],
-                    "KLMNOPQRST",
-                ),
-                release_identity.EXPECTED_BUNDLE_IDS["manager"],
-            )
-        changed_manager = release_identity.SignedBundleIdentity(
-            identities[1].bundle_id,
-            "KLMNOPQRST",
-            identities[1].designated_requirement.replace(team, "KLMNOPQRST"),
+    def test_rejects_requirement_overlap_between_components(self) -> None:
+        installer = self.identity("installer", "0")
+        manager = self.identity("manager", "1")
+        input_method = release_identity.SignedBundleIdentity(
+            release_identity.EXPECTED_BUNDLE_IDS["input_method"],
+            manager.designated_requirement,
         )
         with self.assertRaises(release_identity.ReleaseIdentityError):
-            release_identity.build_identity(
-                identities[0], changed_manager, identities[2]
-            )
-
-    def test_upgrade_source_requires_exact_component_identities(self) -> None:
-        manager_id = release_identity.EXPECTED_BUNDLE_IDS["manager"]
-        input_method_id = release_identity.EXPECTED_BUNDLE_IDS["input_method"]
-        team = release_identity.product_manifest.ProductMetadata.load().developer_team_id
-        manager = release_identity.parse_codesign_output(
-            details(manager_id, team), manager_id
-        )
-        input_method = release_identity.parse_codesign_output(
-            details(input_method_id, team), input_method_id
-        )
-        release_identity.verify_upgrade_source_identity(
-            manager,
-            input_method,
-            manager,
-            input_method,
-        )
-        drifted_manager = release_identity.SignedBundleIdentity(
-            manager.bundle_id,
-            manager.team_identifier,
-            manager.designated_requirement + " and true",
-        )
-        with self.assertRaises(release_identity.ReleaseIdentityError):
-            release_identity.verify_upgrade_source_identity(
-                manager,
-                input_method,
-                drifted_manager,
-                input_method,
-            )
+            release_identity.build_identity(installer, [manager], [input_method])
 
 
 if __name__ == "__main__":

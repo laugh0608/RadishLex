@@ -14,6 +14,7 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 METADATA_PATH = REPO_ROOT / "packaging/macos/product.json"
+VERSION_PATH = REPO_ROOT / "version.json"
 EXPECTED_KEYS = {
     "format_version",
     "product_id",
@@ -25,11 +26,12 @@ EXPECTED_KEYS = {
     "rime_data_manifest_version",
     "native_libraries_manifest_version",
     "data_layout",
-    "developer_team_id",
+    "distribution_identity",
     "manager_bundle_id",
     "input_method_bundle_id",
 }
 SEMVER_PATTERN = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
+CALVER_PATTERN = re.compile(r"[0-9]{2}\.(?:[1-9]|1[0-2])\.[1-9][0-9]*")
 MACOS_PATTERN = re.compile(r"[0-9]+\.[0-9]+")
 IDENTIFIER_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9.-]*")
 
@@ -50,7 +52,7 @@ class ProductMetadata:
     rime_data_manifest_version: int
     native_libraries_manifest_version: int
     data_layout: str
-    developer_team_id: str
+    distribution_identity: str
     manager_bundle_id: str
     input_method_bundle_id: str
 
@@ -61,7 +63,7 @@ class ProductMetadata:
         except Exception as exc:
             raise ProductManifestError(f"invalid product metadata: {exc}") from exc
         if not isinstance(value, dict) or set(value) != EXPECTED_KEYS:
-            raise ProductManifestError("product metadata fields do not match format v2")
+            raise ProductManifestError("product metadata fields do not match format v3")
 
         for key in (
             "format_version",
@@ -74,7 +76,7 @@ class ProductMetadata:
                 raise ProductManifestError(f"{key} must be an integer")
             if value[key] <= 0:
                 raise ProductManifestError(f"{key} must be positive")
-        if value["format_version"] != 2:
+        if value["format_version"] != 3:
             raise ProductManifestError("unsupported product metadata format")
 
         for key in (
@@ -83,7 +85,7 @@ class ProductMetadata:
             "build_number",
             "minimum_macos",
             "data_layout",
-            "developer_team_id",
+            "distribution_identity",
             "manager_bundle_id",
             "input_method_bundle_id",
         ):
@@ -92,8 +94,8 @@ class ProductMetadata:
             if value[key] != value[key].strip():
                 raise ProductManifestError(f"{key} must not contain outer whitespace")
 
-        if not SEMVER_PATTERN.fullmatch(value["product_version"]):
-            raise ProductManifestError("product_version must use numeric major.minor.patch")
+        if not CALVER_PATTERN.fullmatch(value["product_version"]):
+            raise ProductManifestError("product_version must use Radish YY.M.RELEASE CalVer")
         if not value["build_number"].isdigit() or int(value["build_number"]) <= 0:
             raise ProductManifestError("build_number must be a positive decimal string")
         if not MACOS_PATTERN.fullmatch(value["minimum_macos"]):
@@ -101,8 +103,10 @@ class ProductMetadata:
         for key in ("product_id", "data_layout"):
             if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", value[key]):
                 raise ProductManifestError(f"{key} contains unsupported characters")
-        if not re.fullmatch(r"[A-Z0-9]{10}", value["developer_team_id"]):
-            raise ProductManifestError("developer_team_id must be a 10-character Team ID")
+        if value["distribution_identity"] != "community-adhoc-v1":
+            raise ProductManifestError(
+                "distribution_identity must be community-adhoc-v1"
+            )
         for key in ("manager_bundle_id", "input_method_bundle_id"):
             if not IDENTIFIER_PATTERN.fullmatch(value[key]) or "." not in value[key]:
                 raise ProductManifestError(f"{key} is not a stable bundle identifier")
@@ -120,7 +124,7 @@ class ProductMetadata:
             "rime_data_manifest_version": self.rime_data_manifest_version,
             "native_libraries_manifest_version": self.native_libraries_manifest_version,
             "data_layout": self.data_layout,
-            "developer_team_id": self.developer_team_id,
+            "distribution_identity": self.distribution_identity,
         }
 
 
@@ -141,6 +145,23 @@ def required_match(pattern: str, text: str, label: str) -> str:
 def validate_source_contract(
     metadata: ProductMetadata, repo_root: Path = REPO_ROOT
 ) -> None:
+    try:
+        version = json.loads((repo_root / "version.json").read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise ProductManifestError(f"invalid version.json: {exc}") from exc
+    if (
+        not isinstance(version, dict)
+        or set(version) != {
+            "schemaVersion",
+            "productVersion",
+            "flutterBuildNumber",
+        }
+        or version["schemaVersion"] != 1
+        or version["productVersion"] != metadata.product_version
+        or version["flutterBuildNumber"] != int(metadata.build_number)
+    ):
+        raise ProductManifestError("version.json differs from product metadata")
+
     pubspec = read_text(repo_root / "apps/radishlex-manager/pubspec.yaml")
     manager_version_match = re.search(
         r"^version:\s*([^\s+]+)\+([^\s]+)\s*$", pubspec, re.MULTILINE
@@ -262,22 +283,16 @@ def validate_source_contract(
             "native libraries manifest version differs from product metadata"
         )
 
-    expected_team_constant = (
-        'pub const RADISHLEX_DEVELOPER_TEAM_ID: &str = '
-        f'"{metadata.developer_team_id}";'
-    )
     codesign_adapter = read_text(
         repo_root / "platforms/macos-product/InstallAdapter/src/codesign.rs"
     )
     upgrade_adapter = read_text(
         repo_root / "platforms/macos-product/UpgradeCoordinatorAdapter/src/manifest.rs"
     )
-    if expected_team_constant not in codesign_adapter or (
-        f'self.developer_team_id != "{metadata.developer_team_id}"'
-        not in upgrade_adapter
-    ):
+    expected_identity = f'"{metadata.distribution_identity}"'
+    if expected_identity not in codesign_adapter or expected_identity not in upgrade_adapter:
         raise ProductManifestError(
-            "Rust release Team ID differs from product metadata"
+            "Rust distribution identity differs from product metadata"
         )
 
 

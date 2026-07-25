@@ -6,7 +6,6 @@ repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
 product_tool="${repo_root}/scripts/macos-product/product_manifest.py"
 layout_tool="${repo_root}/scripts/macos-product/install_layout.py"
 identity_tool="${repo_root}/scripts/macos-product/release_identity.py"
-codesign_identity="${RADISHLEX_DEVELOPER_ID_APPLICATION:-}"
 
 upgrade_source_args=()
 upgrade_source_roots=()
@@ -33,34 +32,6 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "macOS is required for the release Installer build" >&2
   exit 2
 fi
-if [[ -z "${codesign_identity}" || "${codesign_identity}" == "-" ]]; then
-  echo "RADISHLEX_DEVELOPER_ID_APPLICATION must name a Developer ID Application identity" >&2
-  exit 2
-fi
-valid_identities="$(security find-identity -v -p codesigning)"
-if ! grep -Fq "\"${codesign_identity}\"" <<<"${valid_identities}"; then
-  echo "RADISHLEX_DEVELOPER_ID_APPLICATION is not a valid local code-signing identity" >&2
-  exit 2
-fi
-if [[ "${codesign_identity}" != Developer\ ID\ Application:* ]]; then
-  echo "release signing identity must be Developer ID Application" >&2
-  exit 2
-fi
-
-identity_probe_root="$(mktemp -d /private/tmp/radishlex-release-identity.XXXXXX)"
-identity_probe="${identity_probe_root}/probe"
-cleanup_identity_probe() {
-  rm -rf -- "${identity_probe_root}"
-}
-trap cleanup_identity_probe EXIT
-ditto /usr/bin/true "${identity_probe}"
-codesign --force --sign "${codesign_identity}" --timestamp=none --options runtime \
-  "${identity_probe}"
-PYTHONDONTWRITEBYTECODE=1 python3 "${identity_tool}" verify-team \
-  --signed-code "${identity_probe}"
-cleanup_identity_probe
-trap - EXIT
-
 product_version="$(python3 "${product_tool}" field product_version)"
 product_build="$(python3 "${product_tool}" field build_number)"
 source_product="${repo_root}/target/macos-product/${product_version}-${product_build}"
@@ -111,21 +82,19 @@ sign_nested_macho() {
   local nested=""
   while IFS= read -r -d '' candidate; do
     if file -b "${candidate}" | grep -Fq "Mach-O"; then
-      codesign --force --sign "${codesign_identity}" --timestamp --options runtime \
-        "${candidate}"
+      codesign --force --sign - --timestamp=none "${candidate}"
     fi
   done < <(find "${bundle}" -type f -print0 | sort -z)
   while IFS= read -r -d '' nested; do
     if [[ "${nested}" != "${bundle}" ]]; then
-      codesign --force --sign "${codesign_identity}" --timestamp --options runtime \
-        "${nested}"
+      codesign --force --sign - --timestamp=none "${nested}"
     fi
   done < <(
     find "${bundle}" -type d \
       \( -name '*.framework' -o -name '*.app' -o -name '*.xpc' -o -name '*.appex' \) \
       -print0 | sort -zr
   )
-  codesign --force --sign "${codesign_identity}" --timestamp --options runtime "${bundle}"
+  codesign --force --sign - --timestamp=none "${bundle}"
   codesign --verify --deep --strict --verbose=2 "${bundle}"
 }
 
@@ -180,7 +149,7 @@ fi
 
 env \
   RADISHLEX_INSTALLER_PAYLOAD_ROOT="${payload_root}" \
-  RADISHLEX_INSTALLER_CODESIGN_IDENTITY="${codesign_identity}" \
+  RADISHLEX_INSTALLER_CODESIGN_IDENTITY="-" \
   "${repo_root}/platforms/macos-product/InstallerApp/build.sh"
 ditto \
   "${repo_root}/target/macos-product/installer-app/RadishLex Installer.app" \
@@ -192,8 +161,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 "${identity_tool}" create \
   --manager-bundle "${manager_bundle}" \
   --input-method-bundle "${input_method_bundle}" \
   --output "${release_identity}"
-codesign --force --sign "${codesign_identity}" --timestamp --options runtime \
-  "${installer_bundle}"
+codesign --force --sign - --timestamp=none "${installer_bundle}"
 codesign --verify --deep --strict --verbose=2 "${installer_bundle}"
 PYTHONDONTWRITEBYTECODE=1 python3 "${identity_tool}" verify \
   --installer-bundle "${installer_bundle}" \
@@ -202,23 +170,18 @@ PYTHONDONTWRITEBYTECODE=1 python3 "${identity_tool}" verify \
   --identity "${release_identity}"
 
 for bundle in "${manager_bundle}" "${input_method_bundle}" "${installer_bundle}"; do
-  if ! codesign -d --verbose=4 "${bundle}" 2>&1 | grep -Eq \
-    'CodeDirectory .* flags=.*\\(runtime\\)'; then
-    echo "Hardened Runtime is unavailable: ${bundle}" >&2
+  bundle_identity="$(codesign -d --verbose=4 "${bundle}" 2>&1)"
+  if ! grep -Fq 'Signature=adhoc' <<<"${bundle_identity}"; then
+    echo "community ad-hoc identity is unavailable: ${bundle}" >&2
     exit 1
   fi
   while IFS= read -r -d '' candidate; do
     if file -b "${candidate}" | grep -Fq "Mach-O"; then
       codesign --verify --strict "${candidate}"
-      if ! codesign -d --verbose=4 "${candidate}" 2>&1 | grep -Eq \
-        'CodeDirectory .* flags=.*\\(runtime\\)'; then
-        echo "nested executable lacks Hardened Runtime: ${candidate}" >&2
-        exit 1
-      fi
     fi
   done < <(find "${bundle}" -type f -print0 | sort -z)
 done
 
 mv "${staging}" "${release_root}"
 trap - EXIT
-echo "RadishLex signed release Installer: ${release_root}"
+echo "RadishLex community ad-hoc release Installer: ${release_root}"

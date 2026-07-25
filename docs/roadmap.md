@@ -133,7 +133,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 目标：
 
 - 把 macOS 输入法、manager、Rust native library、librime 和合法 schema/data 形成可安装、可升级、可移除的产品包。
-- 统一版本、兼容性诊断、签名、权限和发布门禁。
+- 统一版本、兼容性诊断、distribution identity、权限和发布门禁。
 
 交付：
 
@@ -143,7 +143,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 - 安装、升级、回滚、移除、数据迁移和故障恢复 runbook。
 - 外层程序 receipt 与数据 receipt 分层，产品终态分步持久化；Manager/InputMethod 在业务初始化前依次执行外层 install 与数据 upgrade gate。
 - InstallPayload 显式绑定可支持的历史 source assembly；production upgrade 只按外层 receipt 的精确 release 选择旧版本 validation/rollback host，缺失或身份漂移在事务写入前失败关闭。
-- 产品 metadata 与 ProductManifest 固定唯一发布者 Team ID；同一冻结 Installer 的签名 UDIF、notary submission/log、staple、Gatekeeper 与隔离下载证据以该 Team 为可信锚点。
+- 产品 metadata 与 ProductManifest 固定版本化 distribution identity；首发 `community-adhoc-v1` 的 strict ad-hoc bundle、未公证 UDIF、SHA-256 evidence、人工放行提示与隔离下载复验绑定同一冻结产物。
 - Rust fmt/check/test/clippy/MSRV、Go test/race/vet、Flutter format/analyze/test、native-rime 和 macOS bundle CI。
 - 依赖安全、许可证和必要供应链检查。
 
@@ -153,7 +153,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 - 输入法与 manager 加载匹配版本的 Rust/native 依赖，升级后用户数据保持。
 - FFI、数据库、权限、schema、版本和 bundle 缺失均有明确错误，不静默回退 fixture。
 - active/nonterminal/损坏事务、运行 bundle 身份漂移和 completed remove 均在 Flutter/IMK、settings、userdb、Rime 初始化前失败关闭。
-- Developer ID Team、Hardened Runtime、trusted timestamp、notarization、staple 和 DMG/Installer 双层 Gatekeeper 证据精确绑定同一发布候选。
+- distribution identity、双 bundle/Installer identity、DMG SHA-256 evidence 和用户安装提示精确绑定同一发布候选；社区模式不得宣称 Developer ID、公证或 Gatekeeper 自动通过。
 - 发布候选通过自动门禁、安装 smoke 和非敏感日常输入复验。
 
 ## 第二平台选择门禁

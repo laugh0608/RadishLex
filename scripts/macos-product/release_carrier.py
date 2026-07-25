@@ -18,6 +18,7 @@ import release_identity
 
 
 FORMAT_VERSION = 1
+LEGACY_DEVELOPER_TEAM_ID = "WF9UUN335P"
 MAX_JSON_BYTES = 1024 * 1024
 SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 EXPECTED_SUBMISSION_KEYS = {"id", "message", "status"}
@@ -167,7 +168,7 @@ def release_identity_team(path: Path) -> str:
     if set(value) != EXPECTED_RELEASE_IDENTITY_KEYS or value["format_version"] != 1:
         raise ReleaseCarrierError("release identity fields changed")
     team = value["team_identifier"]
-    expected_team = load_metadata().developer_team_id
+    expected_team = LEGACY_DEVELOPER_TEAM_ID
     if (
         not isinstance(team, str)
         or not release_identity.TEAM_PATTERN.fullmatch(team)

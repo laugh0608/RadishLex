@@ -28,9 +28,11 @@ mod manifest;
 #[cfg(feature = "qualification-harness")]
 use codesign::CodesignQualificationCodeSignatureVerifier;
 pub use codesign::{
-    inspect_developer_id_application, CodeSignatureRequirements, CodesignCodeSignatureVerifier,
-    CodesignRunningIdentityInspector, DeveloperIdApplicationIdentity, MacOsCodeIdentity,
-    MacOsCodeSignatureVerifier, RADISHLEX_DEVELOPER_TEAM_ID,
+    inspect_community_ad_hoc_application, inspect_developer_id_application,
+    CodeSignatureRequirements, CodesignCodeSignatureVerifier, CodesignRunningIdentityInspector,
+    CommunityAdHocApplicationIdentity, DeveloperIdApplicationIdentity, MacOsCodeIdentity,
+    MacOsCodeSignatureVerifier, RADISHLEX_COMMUNITY_DISTRIBUTION_IDENTITY,
+    RADISHLEX_DEVELOPER_TEAM_ID,
 };
 use copy::{sync_bundle_tree, BundleCopier, DittoBundleCopier};
 use manifest::{inspect_bundle_tree, VerifiedInstallPayload};

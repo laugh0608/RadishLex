@@ -145,7 +145,7 @@ struct ProductManifest {
     rime_data_manifest_version: u32,
     native_libraries_manifest_version: u32,
     data_layout: String,
-    developer_team_id: String,
+    distribution_identity: String,
     rime_schema_id: String,
     components: Vec<ComponentManifest>,
     licenses: Vec<LicenseRecord>,
@@ -153,10 +153,10 @@ struct ProductManifest {
 
 impl ProductManifest {
     fn validate(&self) -> Result<(), MacOsUpgradeAdapterError> {
-        if self.format_version != 2
+        if self.format_version != 3
             || self.product_id != PRODUCT_ID
             || self.data_layout != DATA_LAYOUT
-            || self.developer_team_id != "WF9UUN335P"
+            || self.distribution_identity != "community-adhoc-v1"
             || !valid_version(&self.product_version, 3)
             || !valid_decimal(&self.build_number)
             || !valid_version(&self.minimum_macos, 2)

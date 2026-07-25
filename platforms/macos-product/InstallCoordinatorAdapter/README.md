@@ -38,4 +38,4 @@
 - Manager target 已提交而 InputMethod 尚未提交时释放 guard，外层 gate 阻止双端，再从 receipt 续跑到完整 target 终态；
 - active install/data guard、外层非终态与终态 target/source 身份的两层只读 gate 决策。
 
-资格入口只接受固定 temp marker、私有合成 home/payload 和严格 ad-hoc identity；production Developer ID 路径不变。两类测试均不会访问真实用户目录、系统设置、发布签名身份、Keychain 或网络，也不清理 staging/backup/历史 operation 材料。
+资格入口只接受固定 temp marker、私有合成 home/payload 和严格 ad-hoc identity；production 还要求 sealed requirement 集合。两类测试均不会访问真实用户目录、系统设置、Keychain 或网络，也不清理 staging/backup/历史 operation 材料。

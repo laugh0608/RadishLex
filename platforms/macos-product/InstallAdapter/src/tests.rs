@@ -453,7 +453,7 @@ fn layout_payload_and_product_mutations_fail_closed() {
     let mut product_manifest: Value =
         serde_json::from_slice(&fs::read(&product_manifest_path).expect("product manifest"))
             .expect("product JSON");
-    product_manifest["developer_team_id"] = json!("ABCDEFGHIJ");
+    product_manifest["distribution_identity"] = json!("developer-id-v1");
     write_json(&product_manifest_path, &product_manifest);
     let payload_manifest_path = publisher_fixture
         .payload
@@ -803,7 +803,7 @@ fn build_product_root(root: &Path, version: &str, build: &str, marker: &str) {
     create_bundle(&input_method, "input-method", marker);
     fs::write(root.join("LICENSE"), b"synthetic license\n").expect("license");
     let product_manifest = json!({
-        "format_version": 2,
+        "format_version": 3,
         "product_id": INSTALL_PRODUCT_ID,
         "product_version": version,
         "build_number": build,
@@ -813,7 +813,7 @@ fn build_product_root(root: &Path, version: &str, build: &str, marker: &str) {
         "rime_data_manifest_version": 2,
         "native_libraries_manifest_version": 1,
         "data_layout": "application-support-v1",
-        "developer_team_id": "WF9UUN335P",
+        "distribution_identity": "community-adhoc-v1",
         "rime_schema_id": "radishlex_pinyin",
         "components": [
             {

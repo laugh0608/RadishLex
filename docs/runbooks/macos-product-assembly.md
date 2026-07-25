@@ -70,12 +70,12 @@ RIME_LIB_DIR=<librime-library-dir> \
 
 入口按以下顺序工作：
 
-1. 校验 format v2 产品元数据、固定发布者 Team ID 和 RimeData source lock；
+1. 校验 format v3 产品元数据、`community-adhoc-v1` 和 RimeData source lock；
 2. 在 `target/macos-product/` 下创建隔离 RimeData；
 3. 构建 product mode Manager bundle及其固定候选验证 helper；
 4. 构建 native-rime InputMethod bundle及其固定候选验证 helper，并递归收集非系统 dylib 与许可证；
 5. 复制两个独立 bundle 和仓库许可证到 staging；
-6. 生成并复验包含 `developer_team_id=WF9UUN335P` 的 format v2 `ProductManifest.json`；
+6. 生成并复验包含 `distribution_identity=community-adhoc-v1` 的 format v3 `ProductManifest.json`；
 7. 通过同文件系统原子 rename 发布版本化装配目录。
 
 脚本不会安装或启动任何 bundle。目标版本目录已存在时会拒绝覆盖；需要比较重复构建时，应使用干净 worktree 或先把既有产物归档到明确位置，不能让脚本静默删除旧结果。
@@ -162,4 +162,4 @@ target/macos-install-payload/<version>-<build>/
 
 任何需要安装输入法、修改系统设置、使用 Developer ID、提交公证或操作真实 Application Support 数据的后续步骤，都必须进入对应专用 runbook 并另行取得授权。
 
-Developer ID Installer 已冻结后，DMG、公证、staple 与 Gatekeeper 的固定输入、可续跑 receipt 和隔离下载复验见 [macOS DMG、公证与 Gatekeeper Runbook](macos-release-carrier.md)；普通产品装配不得直接调用其中的上传或系统评估步骤。
+社区 Installer 已冻结后，DMG、SHA-256 evidence 与人工放行步骤见 [macOS 社区 ad-hoc DMG Runbook](macos-release-carrier.md)；普通产品装配不得把 ad-hoc 结果表述为 Apple 签名或公证证据。
