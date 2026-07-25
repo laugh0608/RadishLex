@@ -206,6 +206,17 @@ impl fmt::Debug for MacOsProductInstallAdapter {
 }
 
 impl MacOsProductInstallAdapter {
+    pub fn inspect_payload_product(
+        payload_root: &Path,
+        requirements: CodeSignatureRequirements,
+    ) -> Result<ProductArtifactIdentity, MacOsInstallAdapterError> {
+        VerifiedInstallPayload::load(
+            payload_root,
+            &CodesignCodeSignatureVerifier::new(requirements),
+        )
+        .map(|payload| payload.target_product().clone())
+    }
+
     pub fn load(
         payload_root: &Path,
         authoritative_user_home: &Path,

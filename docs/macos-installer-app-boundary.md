@@ -91,14 +91,16 @@ refresh 是唯一不要求确认的 action。first install、upgrade、repair、
 `platforms/macos-product/InstallerApp/` 是独立 AppKit bundle，不依赖 Flutter/Manager。它：
 
 - 从产品/install layout 元数据生成版本、build、最低 macOS 与 Installer bundle ID；
-- 把 committed `InstallLayout.json` 原样嵌入 Resources；
+- 把 committed `InstallLayout.json` 和完整 `InstallPayload/` 嵌入 Resources；
 - 显示固定双程序目标、保留的数据根、operation、进度、恢复动作和稳定摘要；
 - 拒绝任何命令行参数；
 - 使用 ad-hoc 签名只完成构建完整性验证。
 
 AppKit 已静态链接 `radishlex-macos-installer-bridge` ABI v1，并通过三个已绑定 symbol 读取 snapshot、刷新和提交确认。ABI 只使用固定整数 enum 与 POD snapshot；Objective-C 只映射已知值，未知 contract/action/error/state/prompt/进度统一失败关闭。AppDelegate 不含复制、rename、删除、receipt 或 TIS 逻辑。
 
-Rust bridge 每次从 fresh status projection 重新授权 action，再进入 `InstallerExecutor`；隔离门禁已证明 `prepared` 持久化、重启投影、stale action 和 active guard。真实用户域 bootstrap 尚未授权，生产导出入口因此仍返回 `blocked + driver_unavailable`，已绑定不等于已经开放真实安装。
+Rust bridge 每次从 fresh status projection 重新授权 action，再进入 `InstallerExecutor`；隔离门禁已证明 `prepared` 持久化、重启投影、stale action 和 active guard。真实用户域只读 bootstrap 使用 `geteuid/getpwuid_r` 取得 authoritative home，只从当前 executable 固定反推 Installer resources，并复验签名资源 `ReleaseIdentity.json` 与内嵌 InstallPayload；不读取 `HOME`、UI 路径或调用方身份。ad-hoc 构建稳定返回 `blocked + product_identity_unavailable`，没有 production fallback；身份资源通过但 mutation port 尚未开放时返回 `driver_unavailable`。
+
+`ReleaseIdentity.json` format v1 固定 Team ID、Manager designated requirement 和 InputMethod designated requirement；只有进入 Installer code signature 的 sealed resources 后才可作为 bootstrap 输入。缺失、额外字段、非普通单链接文件、owner 漂移、ad-hoc requirement 或 payload signature/tree 漂移全部失败关闭。
 
 ## 隔离执行器
 
@@ -114,4 +116,6 @@ cargo test --locked -p radishlex-ime-product-install --all-targets
 ./scripts/check-repo.sh
 ```
 
-门禁覆盖 absent root 零写入、active/stale guard、非终态重启投影、completed receipt 与后续 operation、产品情况分支、fresh reauthorization、四类执行、preflight 阻断、程序 staging、upgrade receipt bootstrap 与 `final_verified` 重启续跑、移除数据保留授权、ABI enum 映射、未知 snapshot/action、原生 bundle metadata、固定 layout、已绑定 Rust symbol 和 UI 源码禁止边界。普通门禁不启动 GUI、不访问真实用户目录或系统输入源。
+门禁覆盖 absent root 零写入、active/stale guard、非终态重启投影、completed receipt 与后续 operation、产品情况分支、fresh reauthorization、四类执行、preflight 阻断、程序 staging、upgrade receipt bootstrap 与 `final_verified` 重启续跑、移除数据保留授权、ABI enum 映射、未知 snapshot/action、原生 bundle metadata、固定 layout、完整内嵌 payload、release identity 失败关闭、已绑定 Rust symbol 和 UI 源码禁止边界。普通门禁不启动 GUI、不访问真实用户目录或系统输入源。
+
+真实用户域负向验收、人工输入源交互、静止检查和回退顺序见 [macOS Installer 真实用户域验收 Runbook](runbooks/macos-installer-user-domain-acceptance.md)。

@@ -258,7 +258,7 @@ fn bridge_reauthorizes_fresh_snapshot_and_recovers_prepared_state() {
 }
 
 #[test]
-fn ffi_contract_is_versioned_and_fails_closed_without_user_domain_bootstrap() {
+fn ffi_contract_is_versioned_and_fails_closed_without_release_identity() {
     assert_eq!(
         radishlex_installer_bridge_contract_version(),
         INSTALLER_BRIDGE_CONTRACT_VERSION
@@ -267,11 +267,118 @@ fn ffi_contract_is_versioned_and_fails_closed_without_user_domain_bootstrap() {
     assert_eq!(snapshot.contract_version, 1);
     assert_eq!(snapshot.phase, 6);
     assert_eq!(snapshot.primary_action, 1);
-    assert_eq!(snapshot.stable_error, 12);
+    assert_eq!(snapshot.stable_error, 10);
 
     let unknown = radishlex_installer_bridge_perform_v1(99, 0);
     assert_eq!(unknown.phase, 6);
     assert_eq!(unknown.stable_error, 13);
+}
+
+#[test]
+fn bootstrap_derives_only_fixed_bundle_and_user_domain_paths() {
+    let root = fs::canonicalize(std::env::temp_dir())
+        .expect("temporary root")
+        .join(format!(
+            "radishlex-installer-bootstrap-{}-{}",
+            std::process::id(),
+            TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+    let home = root.join("home");
+    let executable = root.join("RadishLex Installer.app/Contents/MacOS/RadishLex Installer");
+    let resources = root.join("RadishLex Installer.app/Contents/Resources");
+    create_directory(&home, 0o700);
+    create_directory(executable.parent().expect("executable parent"), 0o700);
+    create_directory(&resources, 0o700);
+    fs::write(&executable, b"synthetic executable").expect("write executable");
+    let owner_id = fs::metadata(&home).expect("home metadata").uid();
+
+    let context = InstallerBootstrapContext::discover_from(&executable, owner_id, &home)
+        .expect("fixed bootstrap context");
+    assert_eq!(context.owner_id(), owner_id);
+    assert_eq!(context.user_home(), home);
+    assert_eq!(
+        context.data_root(),
+        home.join("Library/Application Support/RadishLex")
+    );
+    assert_eq!(context.payload_root(), resources.join("InstallPayload"));
+    assert_eq!(
+        context.product_root(),
+        resources.join("InstallPayload/Product")
+    );
+    assert_eq!(
+        context
+            .release_requirements()
+            .expect_err("missing release identity"),
+        InstallerBootstrapError::ReleaseIdentityUnavailable
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn bootstrap_accepts_only_strict_release_identity_resource() {
+    let root = fs::canonicalize(std::env::temp_dir())
+        .expect("temporary root")
+        .join(format!(
+            "radishlex-installer-release-identity-{}-{}",
+            std::process::id(),
+            TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
+        ));
+    let home = root.join("home");
+    let executable = root.join("RadishLex Installer.app/Contents/MacOS/RadishLex Installer");
+    let resources = root.join("RadishLex Installer.app/Contents/Resources");
+    create_directory(&home, 0o700);
+    create_directory(executable.parent().expect("executable parent"), 0o700);
+    create_directory(&resources, 0o700);
+    fs::write(&executable, b"synthetic executable").expect("write executable");
+    let owner_id = fs::metadata(&home).expect("home metadata").uid();
+    let context = InstallerBootstrapContext::discover_from(&executable, owner_id, &home)
+        .expect("fixed bootstrap context");
+    let manager_requirement = concat!(
+        "identifier \"dev.radishlex.radishlexManager\" and anchor apple generic and ",
+        "certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and ",
+        "certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and ",
+        "certificate leaf[subject.OU] = ABCDEFGHIJ"
+    );
+    let input_method_requirement = concat!(
+        "identifier \"org.radishlex.inputmethod.macos\" and anchor apple generic and ",
+        "certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and ",
+        "certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and ",
+        "certificate leaf[subject.OU] = \"ABCDEFGHIJ\""
+    );
+    fs::write(
+        resources.join("ReleaseIdentity.json"),
+        format!(
+            concat!(
+                "{{\n",
+                "  \"format_version\": 1,\n",
+                "  \"team_identifier\": \"ABCDEFGHIJ\",\n",
+                "  \"manager_designated_requirement\": {manager:?},\n",
+                "  \"input_method_designated_requirement\": {input_method:?}\n",
+                "}}\n"
+            ),
+            manager = manager_requirement,
+            input_method = input_method_requirement,
+        ),
+    )
+    .expect("write release identity");
+    context
+        .release_requirements()
+        .expect("strict release identity");
+
+    fs::write(
+        resources.join("ReleaseIdentity.json"),
+        b"{\"format_version\":1,\"team_identifier\":\"not set\",\"manager_designated_requirement\":\"adhoc\",\"input_method_designated_requirement\":\"adhoc\"}\n",
+    )
+    .expect("replace release identity");
+    assert_eq!(
+        context
+            .release_requirements()
+            .expect_err("ad-hoc identity must fail"),
+        InstallerBootstrapError::ReleaseIdentityUnavailable
+    );
+
+    let _ = fs::remove_dir_all(root);
 }
 
 fn product() -> ProductArtifactIdentity {

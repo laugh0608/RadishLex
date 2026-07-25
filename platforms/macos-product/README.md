@@ -110,7 +110,9 @@ upgrade 产品终态在 `final_verified` 与 `completed` 前分别复验外层/d
 
 ## InstallerBridge
 
-ABI v1 固定整数 enum、POD snapshot 与 contract/snapshot/perform 三个 symbol。AppKit 已静态链接并实际调用；Objective-C 不解释 receipt，只把已知 enum 映射为 driver snapshot。Rust dispatch 每次重新投影并授权 fresh action，再调用 executor。隔离测试证明 prepared/restart/stale/active guard；生产导出入口在真实用户域 bootstrap 尚未授权时保持 `blocked + driver_unavailable`。
+ABI v1 固定整数 enum、POD snapshot 与 contract/snapshot/perform 三个 symbol。AppKit 已静态链接并实际调用；Objective-C 不解释 receipt，只把已知 enum 映射为 driver snapshot。Rust dispatch 每次重新投影并授权 fresh action，再调用 executor。隔离测试证明 prepared/restart/stale/active guard。
+
+生产只读 bootstrap 通过 `geteuid/getpwuid_r` 取得 authoritative current-user home，从当前 executable 固定推导 Installer resources，并严格读取 sealed `ReleaseIdentity.json` 与内嵌 InstallPayload。ad-hoc 构建不携带 release identity，稳定返回 `product_identity_unavailable`；不存在 `HOME`、`CFFIXED_USER_HOME`、UI/caller path 或 ad-hoc production fallback。身份资源与 payload 通过后，在真实 mutation port 开放前继续以 `driver_unavailable` 阻断。
 
 ## 构建与验证
 

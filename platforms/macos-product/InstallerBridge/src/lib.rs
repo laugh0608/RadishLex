@@ -16,6 +16,12 @@ use radishlex_macos_installer_executor::{
     InstallerExecutionSummary, InstallerOperationIdSource, InstallerPreflightPort,
     InstallerProgramPort, UpgradeCoordinatorPort,
 };
+use radishlex_macos_product_install::MacOsProductInstallAdapter;
+
+mod bootstrap;
+use bootstrap::InstallerBootstrapContext;
+#[cfg(test)]
+use bootstrap::InstallerBootstrapError;
 
 pub const INSTALLER_BRIDGE_CONTRACT_VERSION: u32 = 1;
 
@@ -108,7 +114,7 @@ pub extern "C" fn radishlex_installer_bridge_contract_version() -> u32 {
 
 #[no_mangle]
 pub extern "C" fn radishlex_installer_bridge_snapshot_v1() -> RadishLexInstallerBridgeSnapshotV1 {
-    unavailable_snapshot(false)
+    production_snapshot()
 }
 
 #[no_mangle]
@@ -116,20 +122,59 @@ pub extern "C" fn radishlex_installer_bridge_perform_v1(
     action: u32,
     _authorization_flags: u32,
 ) -> RadishLexInstallerBridgeSnapshotV1 {
-    unavailable_snapshot(action > 8)
+    if action > 8 {
+        return unavailable_snapshot(InstallerStableError::UnknownDriverResult);
+    }
+    production_snapshot()
 }
 
-fn unavailable_snapshot(unknown_result: bool) -> RadishLexInstallerBridgeSnapshotV1 {
+fn production_snapshot() -> RadishLexInstallerBridgeSnapshotV1 {
+    let context = match InstallerBootstrapContext::discover() {
+        Ok(context) => context,
+        Err(_) => {
+            return unavailable_snapshot(InstallerStableError::ProductIdentityUnavailable);
+        }
+    };
+    let requirements = match context.release_requirements() {
+        Ok(requirements) => requirements,
+        Err(_) => {
+            return unavailable_snapshot(InstallerStableError::ProductIdentityUnavailable);
+        }
+    };
+    if MacOsProductInstallAdapter::inspect_payload_product(&context.payload_root(), requirements)
+        .is_err()
+    {
+        return unavailable_snapshot(InstallerStableError::ProductIdentityUnavailable);
+    }
+    let state_snapshot = inspect_installer_view(
+        context.data_root(),
+        context.owner_id(),
+        InstallerProductSituation::IdentityUnavailable,
+    );
+    if matches!(
+        state_snapshot.stable_error(),
+        InstallerStableError::OperationActive
+            | InstallerStableError::UnsafeDataRoot
+            | InstallerStableError::UnsafeStateDirectory
+            | InstallerStableError::InterruptedReceipt
+            | InstallerStableError::InvalidReceipt
+            | InstallerStableError::UnexpectedStateObject
+            | InstallerStableError::RootIdentityChanged
+            | InstallerStableError::Io
+            | InstallerStableError::ManualRecoveryRequired
+    ) {
+        return encode_installer_snapshot(state_snapshot);
+    }
+    unavailable_snapshot(InstallerStableError::DriverUnavailable)
+}
+
+fn unavailable_snapshot(error: InstallerStableError) -> RadishLexInstallerBridgeSnapshotV1 {
     RadishLexInstallerBridgeSnapshotV1 {
         contract_version: INSTALLER_VIEW_CONTRACT_VERSION,
         phase: phase_value(InstallerViewPhase::Blocked),
         primary_action: action_value(InstallerAction::Refresh),
         secondary_action: action_value(InstallerAction::None),
-        stable_error: error_value(if unknown_result {
-            InstallerStableError::UnknownDriverResult
-        } else {
-            InstallerStableError::DriverUnavailable
-        }),
+        stable_error: error_value(error),
         operation_kind: 0,
         receipt_state: 0,
         progress_step: 0,

@@ -1,4 +1,5 @@
 #import <Cocoa/Cocoa.h>
+#include <stdio.h>
 
 #import "RLXInstallerBridge.h"
 #import "RLXInstallerPresentation.h"
@@ -130,6 +131,8 @@ static NSString *const RLXDataRoot = @"Library/Application Support/RadishLex";
     self.secondaryButton.enabled =
         [self.presentation isActionEnabled:self.presentation.secondaryActionCode];
     self.secondaryButton.hidden = !self.secondaryButton.enabled;
+    fprintf(stderr, "%s\n",
+            self.presentation.stableDiagnosticSummary.UTF8String);
 }
 
 - (void)performPrimary:(id)sender {

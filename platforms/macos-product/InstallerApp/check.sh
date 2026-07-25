@@ -52,6 +52,9 @@ if [[ "${actual_bundle_id}" != "${expected_bundle_id}" ]]; then
 fi
 cmp -s "${repo_root}/packaging/macos/install-layout.json" \
   "${bundle}/Contents/Resources/InstallLayout.json"
+PYTHONDONTWRITEBYTECODE=1 python3 "${layout_tool}" verify \
+  --payload-root "${bundle}/Contents/Resources/InstallPayload"
+test ! -e "${bundle}/Contents/Resources/ReleaseIdentity.json"
 codesign --verify --deep --strict "${bundle}"
 for symbol in \
   radishlex_installer_bridge_contract_version \

@@ -21,7 +21,7 @@ first install、repair 和 remove 在 `programs_committed` 后共用核心终态
 - `InstallerExecutionError::code()` 只输出稳定类别，不包含路径、operation ID、签名正文或底层命令输出；
 - 执行器不清理 staging、backup、receipt 或历史 operation 材料。
 
-`InstallerBridge` 已调用本 crate 的稳定入口；真实用户域 bootstrap 尚未授权，因此生产 FFI 仍返回 `driver_unavailable`，不把 Rust 文件系统逻辑复制到 AppDelegate。
+`InstallerBridge` 已调用本 crate 的稳定入口；真实用户域只读 bootstrap 已接入，但 ad-hoc 构建会先以 `product_identity_unavailable` 失败关闭。Developer ID 资源身份通过后，在真实 mutation port 开放前仍返回 `driver_unavailable`，不把 Rust 文件系统逻辑复制到 AppDelegate。
 
 ## 验证
 

@@ -36,8 +36,8 @@ int main(void) {
         RLXInstallerPresentation *bridge = [[RLXInstallerPresentation alloc]
             initWithDriverSnapshot:RLXInstallerBridgeSnapshot()];
         Require(bridge.failedClosed, @"production bridge must fail closed");
-        Require([bridge.errorCode isEqualToString:@"driver_unavailable"],
-                @"production bridge must expose stable unavailable error");
+        Require([bridge.errorCode isEqualToString:@"product_identity_unavailable"],
+                @"unsigned development build must expose missing release identity");
         RLXInstallerPresentation *unknownBridge = [[RLXInstallerPresentation alloc]
             initWithDriverSnapshot:RLXInstallerBridgePerformAction(@"not_an_action")];
         Require([unknownBridge.errorCode isEqualToString:@"unknown_driver_result"],

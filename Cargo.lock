@@ -756,6 +756,9 @@ dependencies = [
  "radishlex-ime-product-upgrade",
  "radishlex-macos-installer-driver",
  "radishlex-macos-installer-executor",
+ "radishlex-macos-product-install",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

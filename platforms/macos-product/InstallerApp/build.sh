@@ -26,9 +26,15 @@ product_version="$(python3 "${product_tool}" field product_version)"
 build_number="$(python3 "${product_tool}" field build_number)"
 minimum_macos="$(python3 "${product_tool}" field minimum_macos)"
 bridge_library="${repo_root}/target/release/libradishlex_macos_installer_bridge.a"
+payload_root="${repo_root}/target/macos-install-payload/${product_version}-${build_number}"
 
 cargo build --locked --release -p radishlex-macos-installer-bridge \
   --manifest-path "${repo_root}/Cargo.toml"
+if [[ ! -d "${payload_root}" ]]; then
+  "${repo_root}/scripts/build-macos-install-payload.sh"
+fi
+PYTHONDONTWRITEBYTECODE=1 python3 "${layout_tool}" verify \
+  --payload-root "${payload_root}"
 
 rm -rf -- "${bundle}"
 mkdir -p "${contents}/MacOS" "${contents}/Resources" "${module_cache}"
@@ -41,6 +47,7 @@ sed \
 plutil -lint "${plist}" >/dev/null
 install -m 644 "${repo_root}/packaging/macos/install-layout.json" \
   "${contents}/Resources/InstallLayout.json"
+ditto "${payload_root}" "${contents}/Resources/InstallPayload"
 
 CLANG_MODULE_CACHE_PATH="${module_cache}" clang \
   -fobjc-arc -fblocks -fmodules -Wall -Wextra -Werror \

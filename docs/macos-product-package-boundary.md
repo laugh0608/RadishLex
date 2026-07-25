@@ -215,7 +215,9 @@ Apple 官方边界参考：
 10. 已完成外层两段产品终态动作、upgrade data receipt/双 guard 最终绑定、ABI v9 外层只读 gate 与双端最前置接线；
 11. 已建立隔离双 bundle + 合成 Application Support 的端到端恢复门禁，覆盖程序部分提交、数据失败回滚、两段终态中断与双端启动决策；
 12. 已固定 Installer UI/驱动 contract、可重启 operation 展示、稳定错误、显式用户授权与独立 AppKit contract shell；
-13. 下一步把 authorized intent 接入隔离 restartable executor，再进入发布身份与授权实机验收。
+13. 已把 authorized intent 接入隔离 restartable executor 与版本化原生 bridge；
+14. 已接入 authoritative current-user 只读 bootstrap、完整内嵌 InstallPayload、严格 release identity resource 和可回退实机验收 runbook；ad-hoc 构建以 `product_identity_unavailable` 失败关闭；
+15. 下一步完成 Developer ID/Hardened Runtime、真实 mutation port、DMG/公证/staple/Gatekeeper 与正向实机验收。
 
 ## M4-P01 退出标准
 
