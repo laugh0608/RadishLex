@@ -73,6 +73,24 @@ open "$HOME/Applications/RadishLex Installer.app"
 
 该用户域路径不需要 `sudo`。不得对 `/Applications`、`$HOME/Applications`、下载目录或磁盘根执行宽泛递归 `xattr`；不得把移除 quarantine 描述为签名或公证替代品。
 
+## Installer 操作与故障处理
+
+Installer 只管理以下当前用户对象，不写 `/Applications` 或系统级目录：
+
+```text
+~/Applications/RadishLex Manager.app
+~/Library/Input Methods/RadishLexInputMethod.app
+~/Library/Application Support/RadishLex
+```
+
+- 首次安装先持久化 `prepared`，提示用户手动切换到中立输入源并关闭 Manager；用户再次确认后才执行双 bundle 切换。安装完成后，用户仍需在系统设置中手动添加并选择 RadishLex 输入源。
+- repair 只接受已安装的同一 release，重新复验并替换程序 bundle，不把它当作升级，也不删除 Application Support。
+- upgrade 只在发布 payload 显式携带当前已安装 release 的历史 assembly 时可用。首发 payload 没有伪造的上一版本；缺少精确 source 时会在写 receipt 或切换程序前阻断。
+- “移除程序”默认只移除 Manager 和 InputMethod，保留 userdb、settings、Rime 数据、receipt、staging、backup 与历史 operation。用户应先在系统设置中手动移除输入源；删除个人数据不是该动作的一部分。
+- Installer 被关闭或异常退出后，应重新打开同一冻结 artifact，按显示的“继续”或“重试”从已持久化状态恢复。不要手工删除 receipt、`.radishlex-install-*`、staging、backup 或 Application Support 来绕过门禁。
+
+`product_identity_unavailable` 表示当前 Installer/payload/sealed identity 缺失或漂移，应重新核对 DMG SHA-256 和发布来源；`driver_unavailable` 常见于请求升级但 payload 没有匹配的历史 source。active guard、非终态/损坏 receipt、未知对象、身份漂移或 completed remove 都会失败关闭。日志只输出稳定 `phase/action/error/state`，不会提供可安全复制执行的底层路径修复命令。
+
 ## 升级与失败关闭
 
 `ReleaseIdentity.json` format v2 记录 target 与全部显式历史 source 的 Manager/InputMethod ad-hoc designated requirement 集合。集合必须有界、排序、无重复，且两端不能重叠；运行时仍逐项复验 manifest、完整 tree、bundle ID、strict ad-hoc identity 和 release 顺序。

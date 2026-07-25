@@ -394,7 +394,7 @@ M4-P02 只有同时满足以下条件才可退出：
 - 备份清理是有版本、receipt 与固定目标的后续动作，默认升级不删除恢复材料；
 - 全部证据来自隔离合成数据和产品 host，不触碰真实用户数据。
 
-截至 2026-07-25，上述条件已由核心 61 项测试、manifest-bound adapter contract 与真实双产品协调资格覆盖，M4-P02 对首个发布候选退出。资格 source 使用独立 `0.0.9 (34)` metadata、重新签名与 manifest，但因尚不存在上一版正式发布包，native code/schema 与 target 同源；这一限制不影响首发数据协调器退出，也不得被描述成历史二进制兼容证据。M4-P03 必须保留 source/target 程序版本回滚边界；从首个发布包形成后，后续版本必须用实际 source release 装配重跑跨发布资格。
+截至 2026-07-25，上述条件已由核心 61 项测试、manifest-bound adapter contract 与真实双产品协调资格覆盖，M4-P02 对首个发布候选退出。资格 source 使用独立 `26.6.1 (34)` metadata、重新 ad-hoc 签名与 manifest，但因尚不存在上一版正式发布包，native code/schema 与 target 同源；这一限制不影响首发数据协调器退出，也不得被描述成历史二进制兼容证据。M4-P03 保留 source/target 程序版本回滚边界；从首个发布包形成后，后续版本必须用实际 source release 装配重跑跨发布资格。
 
 稳定验证入口：
 

@@ -254,4 +254,4 @@ receipt format 固定为 `radishlex-product-install-receipt-v1`，最大 64 KiB�
 - preserve、逐端 commit 和 rollback 的每个 rename、目标目录 fsync、源目录 fsync 边界均可注入故障并从精确 inode 现场重试；
 - startup gate 对缺失、非终态、终态身份匹配/漂移、remove、损坏、未知对象和中断写均有稳定结果；
 - 普通测试只使用合成 `0700` 临时目录；隔离产品资格只在带固定 marker 的系统临时根内使用真实构建 bundle、ad-hoc qualification identity 与合成 Application Support，不访问真实用户目录、程序目标、系统设置、Keychain 或发布签名凭据。
-- macOS adapter、真实 bundle 内容/strict ad-hoc 复验、M4-P02 状态映射、两段终态、双端 startup 接线与隔离恢复资格已落地；Installer status projection、显式授权、restartable executor、upgrade data receipt bootstrap、版本化原生 bridge 与 AppKit 壳已落地。生产 bridge 验证 Installer/双 component 社区 identity 后接入四类 user-domain mutation port；upgrade 仍要求 payload v2 存在 receipt release 精确匹配的历史 source。首发 source 集为空，缺失时返回 `driver_unavailable`。冻结社区 DMG、真实跨发布 source、正向安装、进程/输入源交互与身份绑定终态清理仍属于后续证据。
+- macOS adapter、真实 bundle 内容/strict ad-hoc 复验、M4-P02 状态映射、两段终态、双端 startup 接线、隔离恢复资格、Installer status/授权/executor/bridge/AppKit 和社区 DMG evidence 已落地。生产 bridge 验证 Installer/双 component 社区 identity 后接入四类 user-domain mutation port；upgrade 仍要求 payload v2 存在 receipt release 精确匹配的历史 source。首发 source 集为空，缺失时返回 `driver_unavailable`。真实跨发布 source、正向安装、进程/输入源交互与身份绑定终态清理仍属于独立证据。

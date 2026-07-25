@@ -115,7 +115,7 @@ RADISHLEX_RIME_SCHEMA=radishlex_pinyin \
 
 `RADISHLEX_RIME_DEPLOY_ON_START` 可显式设为 `0` 或 `1`，默认 `1`。构建产物位于 `target/macos-imk/native/RadishLexInputMethod.app`；bundle 保存 locked data、`SourceManifest.json`、`Licenses/` 与 RimeData manifest v2，并拒绝额外文件、hash 漂移和 symlink。native 门禁以临时隔离 user data 运行真实 FFI smoke，要求 snapshot 候选页恰好为 5 项。native build 从显式 `RIME_LIB_DIR` 解析依赖，但运行产物会递归复制全部非系统 dylib 到 `Contents/Frameworks`、重写为 bundle 内 `@rpath`，并保存逐库许可证和签名后哈希清单；门禁拒绝残留外部绝对依赖。脚本对每个 dylib、主程序和完整 bundle 依次签名与严格复验，可通过 `RADISHLEX_CODESIGN_IDENTITY` 显式提供 Apple Development identity。
 
-bundle metadata 固定正式 Bundle ID `org.radishlex.inputmethod.macos` 与单一 `org.radishlex.inputmethod.macos.Pinyin` 模式，包含简体中文 script/repertoire、图标、本地化标签和 `LSUIElement`。正式 bundle 文件名固定为 `RadishLexInputMethod.app`；开发期不再复用已被 macOS 26 TIS 负缓存的旧 ID 或 `RadishLex.app` 路径。contract/native 门禁会验证 mode id 的 reverse-DNS 字符范围，避免把允许下划线的 `pinyin_simp` schema id 直接用作 TIS mode id。构建脚本不启动或安装 bundle；普通用户分发、Developer ID、公证和发布级供应链门禁仍属于 M4。
+bundle metadata 固定正式 Bundle ID `org.radishlex.inputmethod.macos` 与单一 `org.radishlex.inputmethod.macos.Pinyin` 模式，包含简体中文 script/repertoire、图标、本地化标签和 `LSUIElement`。正式 bundle 文件名固定为 `RadishLexInputMethod.app`；开发期不再复用已被 macOS 26 TIS 负缓存的旧 ID 或 `RadishLex.app` 路径。contract/native 门禁会验证 mode id 的 reverse-DNS 字符范围，避免把允许下划线的 `pinyin_simp` schema id 直接用作 TIS mode id。开发构建脚本不启动或安装 bundle；普通用户分发由 M4 社区 ad-hoc Installer/DMG 承担，未来 Developer ID/公证必须使用新的 distribution identity 独立治理。
 
 双 bundle 离线产品装配与 manifest 复验见 [macOS 产品装配 Runbook](../../docs/runbooks/macos-product-assembly.md)。安装、启用、真实应用输入和移除会修改本机状态，必须另行取得授权后按独立 runbook 执行。
 

@@ -12,7 +12,7 @@ adapter 实现 `UpgradeCoordinatorPort`，把平台无关协调核心绑定到�
 - 每次执行前重新校验 helper 的普通文件身份、长度和 SHA-256；
 - host 输出、绝对路径和底层错误不进入 receipt。
 
-调用方应先执行 `inspect_preflight()` 取得容量，再把同一 adapter 交给 `UpgradeReceiptStore::resume_userdb_upgrade`。M4-P03 安装载体还必须在调用前证明产品根的固定来源与 code signature；本 crate 不把 manifest hash 当作发布者身份。
+调用方应先执行 `inspect_preflight()` 取得容量，再把同一 adapter 交给 `UpgradeReceiptStore::resume_userdb_upgrade`。M4-P03 安装载体还必须在调用前证明产品根的固定来源、版本化 distribution identity 与 strict ad-hoc code identity；本 crate 不把 manifest hash 当作发布 identity。
 
 验证入口：
 

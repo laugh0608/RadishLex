@@ -111,11 +111,11 @@ RadishLex/
 
 | 范围 | 已有工程形态 | 尚未形成的产品能力 |
 | --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v9、Manager 产品状态与隔离资格 run、管理查询和共库证据；M4-P02 数据协调、M4-P03 外层 receipt/guard、双程序切换/恢复、两段终态、manifest/code-signature adapter、跨核心协调与 Installer 只读驱动已形成独立边界 | M4-P03 Installer 隔离写 executor 和发布复验 |
+| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v9、Manager 产品状态与隔离资格 run、管理查询和共库证据；M4-P02 数据协调、M4-P03 外层 receipt/guard、双程序切换/恢复、两段终态、manifest/code-signature adapter、跨核心协调、Installer driver/executor/bridge 已形成独立边界 | 身份绑定的终态材料清理与真实跨发布兼容证据 |
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
 | 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
-| Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁 | M4 数据升级、安装载体与发布分发 |
-| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；M4-P01 双 bundle 与 locked RimeData；M4-P02 数据 gate/validation；M4-P03 外层 install gate、运行 bundle 身份、最前置双端接线、隔离恢复资格与 Installer AppKit contract shell；Android Keystore 能力验证桥 | M4-P03 Installer 隔离写 executor、发布供应链和普通用户安装包；其他系统输入法 |
+| Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁；M4 外层 install gate、数据 gate 与升级 validation helper | 真实用户同步入口与首版后的目标部署证据 |
+| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；M4-P01 双 bundle与 locked RimeData；M4-P02 数据 gate/validation；M4-P03 外层 install gate、运行身份、Installer AppKit/bridge/executor、社区 ad-hoc identity 与 DMG evidence；Android Keystore 能力验证桥 | 真实用户域安装/修复/移除、跨发布升级实机证据；其他系统输入法 |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
 
@@ -329,9 +329,9 @@ apps/radishlex-manager/
 
 ## 产品打包目录
 
-`packaging/macos/product.json` 是 macOS 产品版本、build、最低系统、bundle ID、FFI ABI、userdb schema 和 manifest 格式的单一元数据真相源。`packaging/macos/install-layout.json` 固定 M4-P03 的 DMG + 独立用户域 Installer、两个 component-to-target 映射、Application Support、安装事务状态和移除语义。`packaging/rime/product-rime-data.json` 绑定产品 schema、Apache 词典来源 commit/hash、运行时路径和逐资产许可证；`scripts/rime-product/product_data.py` 负责离线校验与装配。
+仓库根 `version.json` 是产品版本与 Flutter build number 的唯一人工真相源。`packaging/macos/product.json` format v3 是其 macOS 镜像，并固定最低系统、bundle ID、FFI ABI、userdb schema、manifest 版本、数据布局与 `community-adhoc-v1`；`packaging/macos/install-layout.json` 固定 DMG + 独立用户域 Installer、两个 component-to-target 映射、Application Support、安装事务状态和移除语义。`packaging/rime/product-rime-data.json` 绑定产品 schema、Apache 词典来源 commit/hash、运行时路径和逐资产许可证；`scripts/rime-product/product_data.py` 负责离线校验与装配。
 
-`scripts/macos-product/product_manifest.py` 校验源码声明、生成/复验无绝对路径的 `ProductManifest.json`，`scripts/build-macos-product.sh` 从 committed RimeData 输入装配双 bundle 产品目录。`scripts/macos-product/install_layout.py` 严格校验用户域目标，并以 layout、target ProductManifest 与显式历史 source assembly 生成确定性 `InstallPayloadManifest.json` format v2；`scripts/build-macos-install-payload.sh` 只把已验证产品装配成 `target/` payload，不执行安装。上述目录不承担签名凭据、公证上传或用户数据迁移；具体产品构建见 [macOS 产品装配 Runbook](runbooks/macos-product-assembly.md)，安装载体见 [ADR 0008](adr/0008-macos-installation-carrier.md)。
+`scripts/macos-product/product_manifest.py` 校验版本镜像与源码声明，生成/复验无绝对路径的 ProductManifest v3；`install_layout.py` 以 committed layout、target 与显式历史 source assembly 生成 InstallPayloadManifest v2；`release_identity.py` 固定双 component strict ad-hoc requirement 集合；`community_release.py` 生成/复验 DMG SHA-256 evidence。四层证据都不保存签名凭据、公证上传或用户数据；具体产品构建见 [macOS 产品装配 Runbook](runbooks/macos-product-assembly.md)，用户安装与发布载体见 [macOS 社区 ad-hoc DMG Runbook](runbooks/macos-release-carrier.md)。
 
 ## 平台目录
 

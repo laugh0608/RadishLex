@@ -34,6 +34,7 @@ RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支�
 - [macOS 程序安装事务](docs/macos-installation-transaction.md)：外层 operation、产品身份、receipt/guard 与启动门禁。
 - [macOS 数据升级协调器](docs/macos-data-upgrade-coordinator.md)：M4-P02 状态机、receipt、隔离 migration 与回滚边界。
 - [macOS 产品装配 Runbook](docs/runbooks/macos-product-assembly.md)：锁定输入、双 bundle 构建、manifest 复验和失败处理。
+- [macOS 社区包安装与发布](docs/runbooks/macos-release-carrier.md)：DMG/SHA-256 复验、人工放行、Installer 操作和故障处理。
 - [RimeData 产品输入](packaging/rime/README.md)：固定 schema、Apache 词典、来源锁与逐资产许可证。
 - [仓库结构](docs/repository-layout.md)：实际目录、模块职责和未落地边界。
 - [隐私与同步](docs/privacy-sync.md)：数据分级、密钥、删除、恢复和威胁模型。
@@ -53,13 +54,30 @@ RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支�
 核心组件的就地开发说明：
 
 - [产品数据升级核心](crates/ime-product-upgrade/README.md)：receipt、guard、snapshot/candidate、startup gate 和 validation evidence。
+- [产品程序事务核心](crates/ime-product-install/README.md)：外层 receipt/guard、双 bundle 切换恢复、两段终态和 startup gate。
 - [Rust 同步客户端](crates/ime-sync/README.md)：cycle 编排、产品密码装载、transport 和验证入口。
 - [Manager 同步组合层](crates/ime-sync-runtime/README.md)：合成资格 request、状态机、错误、取消和清理契约。
 - [Go 同步服务](server/sync-server/README.md)：服务边界、配置、存储和开发验证。
 - [同步服务部署](deploy/sync-server/README.md)：本地 HTTPS 与自部署反向代理拓扑。
 - [Flutter Manager](apps/radishlex-manager/README.md)：页面能力、FFI bridge、产品路径和本地验证。
 - [macOS InputMethodKit](platforms/macos-imk/README.md)：平台薄壳、构建、安装与实机验收边界。
-- [macOS 产品升级宿主](platforms/macos-product/README.md)：只读 preflight、双端 validation、manifest 绑定 adapter 和产品构建接线。
+- [macOS 产品安装与升级宿主](platforms/macos-product/README.md)：preflight/validation、程序/数据 adapter、Installer bridge 与社区发布接线。
+
+## macOS 社区包说明
+
+macOS 首发采用 `community-adhoc-v1`：Installer、Manager 与 InputMethod 使用 strict ad-hoc code identity，DMG 不使用 Apple Developer ID、不公证，也不会自动通过 Gatekeeper。ad-hoc identity 用于约束发布包内部一致性和安装事务，不能证明 Apple 已验证发布者或软件内容。
+
+发布页提供 DMG 后，用户必须先核对同时公布的 SHA-256，再通过“系统设置 → 隐私与安全性 → 仍要打开”明确放行 `RadishLex Installer.app`。终端 fallback 只允许对复制到 `$HOME/Applications` 的精确 Installer bundle 移除 quarantine，不使用 `sudo`，也不能对 `/Applications`、下载目录或整个用户 Applications 目录递归执行 `xattr`。
+
+Installer 只写当前用户域：
+
+```text
+~/Applications/RadishLex Manager.app
+~/Library/Input Methods/RadishLexInputMethod.app
+~/Library/Application Support/RadishLex
+```
+
+首次安装、修复、升级和“只移除程序并保留数据”均由独立 Installer 驱动；系统输入源的添加、切换与移除仍由用户在系统设置中手动完成。完整安装步骤、操作含义和失败处理见 [macOS 社区包安装与发布](docs/runbooks/macos-release-carrier.md)。
 
 ## 开发验证入口
 
@@ -136,7 +154,7 @@ RadishLex 按用户可见纵向链分阶段交付，不要求同步、完整 man
 1. **M1 macOS 离线输入 Alpha**：真实应用中完成 composition、候选、选择、commit 和未消费按键回传；输入热路径完全离线。
 2. **M2 本地个人化 MVP**：真实选择安全写入 userdb 并影响后续候选；用户可在 manager 中管理词库、学习和隐私设置。
 3. **M3 加密同步 Beta**：两个真实客户端完成端到端加密同步、冲突收敛、删除传播、设备授权、恢复与撤销。
-4. **M4 产品发布候选**：输入法、manager、Rust native library、`librime`、schema、签名、升级和发布门禁形成可重复产品包。
+4. **M4 产品发布候选**：输入法、manager、Rust native library、`librime`、schema、版本化 distribution identity、安装升级和发布载体形成可重复产品包。
 
 v1 不重写完整中文输入引擎。拼音切分、基础候选和长句转换可由成熟底层引擎提供，RadishLex 聚焦稳定 Rust 输入核心与 engine adapter、用户词库、候选重排、个人化学习、端到端加密同步和至少一个可日常使用的真实平台输入法。
 
