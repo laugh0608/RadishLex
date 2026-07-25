@@ -56,6 +56,7 @@ REQUIRED_FILES = [
     "docs/runbooks/apple-secure-enclave-key-agreement-backend.md",
     "docs/runbooks/macos-m2-manager-product-acceptance.md",
     "docs/runbooks/macos-installer-user-domain-acceptance.md",
+    "docs/runbooks/macos-release-carrier.md",
     "platforms/macos-imk/Sources/main.m",
     "platforms/macos-imk/Tools/tis_source_status.m",
     "platforms/macos-imk/Tools/test_data_cleanup.c",
@@ -114,13 +115,18 @@ REQUIRED_FILES = [
     "scripts/build-macos-product.sh",
     "scripts/build-macos-install-payload.sh",
     "scripts/build-macos-release-installer.sh",
+    "scripts/build-macos-release-dmg.sh",
+    "scripts/notarize-macos-release-dmg.sh",
     "scripts/macos-product/release_identity.py",
     "scripts/macos-product/test_release_identity.py",
+    "scripts/macos-product/release_carrier.py",
+    "scripts/macos-product/test_release_carrier.py",
     "scripts/check-macos-product-metadata.sh",
     "scripts/check-macos-install-layout.sh",
     "scripts/check-macos-install-adapter.sh",
     "scripts/check-macos-install-coordinator.sh",
     "scripts/check-macos-installer.sh",
+    "scripts/check-macos-release-carrier.sh",
     "scripts/check-product-install-core.sh",
     "scripts/check-macos-upgrade-preflight.sh",
     "scripts/check-macos-upgrade-coordinator.sh",
@@ -342,6 +348,10 @@ def check_macos_installer() -> None:
     run_command([str(REPO_ROOT / "scripts/check-macos-installer.sh")])
 
 
+def check_macos_release_carrier() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-macos-release-carrier.sh")])
+
+
 def check_macos_upgrade_preflight() -> None:
     if sys.platform != "darwin":
         return
@@ -512,6 +522,7 @@ def main() -> int:
     check_macos_install_adapter()
     check_macos_install_coordinator()
     check_macos_installer()
+    check_macos_release_carrier()
     check_macos_upgrade_preflight()
     check_ruleset_and_workflows()
     check_path_budget()

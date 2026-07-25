@@ -201,7 +201,11 @@ InstallPayload 固定包含 committed layout、外层 payload manifest 和完整
 
 仓库发布构建入口 `./scripts/build-macos-release-installer.sh` 只接受环境中的 `RADISHLEX_DEVELOPER_ID_APPLICATION`，且该值必须精确命中本机有效的 `Developer ID Application:` identity。脚本在隔离 staging 中重签每个 target Mach-O 与嵌套 code container，启用 Hardened Runtime/trusted timestamp，再签双产品 bundle；可重复传入 `--upgrade-source-product-root` 的历史 assembly 保留原签名，并必须与 target 双 component exact designated requirement/Team ID 一致。随后脚本重新生成 ProductManifest/InstallPayloadManifest、首次签 Installer、从三份 target bundle 生成 `ReleaseIdentity.json`，最后封存资源并重签 Installer。release identity format v1 绑定同一 Team ID 与 Installer/Manager/InputMethod 三份 exact designated requirement；bridge 必须先验证 Installer 自身签名，再信任该资源。
 
-缺失身份、`-`、Apple Development、ad-hoc、Team 漂移、requirement 漂移或任一 executable 缺少 runtime flag 均不得留下 release 输出。普通仓库门禁只执行 parser/失败关闭与 ad-hoc 产品检查，不要求凭据、不访问 timestamp/notary 服务，也不把未执行的发布脚本记作 Developer ID 成功证据。
+`./scripts/build-macos-release-dmg.sh` 只接受上述固定 release root 和同一 Developer ID Application identity，不接受路径参数。它生成 APFS/UDZO UDIF，根目录精确只有 `RadishLex Installer.app`，对 DMG 使用 trusted timestamp 签名，并在发布前挂载复验唯一根对象、Installer strict signature、内嵌 payload 和 release identity。
+
+`./scripts/notarize-macos-release-dmg.sh` 只接受 `RADISHLEX_NOTARY_KEYCHAIN_PROFILE` 指向的 Keychain profile，不接受 Apple ID/password 或 API private key 参数。它只接受 `Accepted` submission，要求 notary log 的 UUID、archive name、提交 SHA-256、status code 与空 issues 精确匹配，之后才 staple、验证 ticket、执行 DMG open 与挂载 Installer execute 两层 Gatekeeper。`NotarizationSubmission.json` 使中断后按同 UUID 续跑而不重复上传；`ReleaseQualification.json` 同时绑定 staple 前提交 hash、staple 后分发 hash、Installer tree、submission ID 和稳定结果，不保存凭据或原始 log。详细步骤见 [macOS DMG、公证与 Gatekeeper Runbook](runbooks/macos-release-carrier.md)。
+
+缺失身份、`-`、Apple Development、ad-hoc、Team 漂移、requirement 漂移、任一 executable 缺少 runtime flag、未知/非终态 notary 结果、log 漂移、ticket 或 Gatekeeper 失败均不得留下成功资格。普通仓库门禁只执行 parser/失败关闭与 ad-hoc 产品检查，不要求凭据、不访问 timestamp/notary 服务，也不把未执行的发布脚本记作 Developer ID、公证或 Gatekeeper 成功证据。
 
 Apple 官方边界参考：
 
@@ -228,7 +232,8 @@ Apple 官方边界参考：
 13. 已把 authorized intent 接入隔离 restartable executor 与版本化原生 bridge；
 14. 已接入 authoritative current-user 只读 bootstrap、完整内嵌 InstallPayload、严格 release identity resource 和可回退实机验收 runbook；ad-hoc 构建以 `product_identity_unavailable` 失败关闭；
 15. 已固定 Developer ID/Hardened Runtime 发布构建、三 bundle sealed release identity，并开放 first install/repair/default remove 的 production mutation port；
-16. 已将历史 source assembly 纳入 payload v2，按外层 receipt 精确选源并开放 production upgrade port；下一步在真实历史发布与身份可用时完成跨发布签名产物、DMG/公证/staple/Gatekeeper 与正向实机验收。
+16. 已将历史 source assembly 纳入 payload v2，按外层 receipt 精确选源并开放 production upgrade port；
+17. 已固定签名 APFS/UDZO DMG、Keychain-profile notary 提交、可续跑 submission receipt、notary log、staple 与双层 Gatekeeper 证据契约；下一步在真实历史发布与身份可用时形成同一冻结产物的正向跨发布与发布供应链证据。
 
 ## M4-P01 退出标准
 

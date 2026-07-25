@@ -44,6 +44,8 @@ platforms/macos-product/
 
 平台宿主只吸收 macOS 路径解析、Foundation/AppKit 进程与容量 API、bundle 资源定位和 native executable 生命周期。receipt、文件身份、状态转换和候选证据属于 `ime-product-upgrade`；SQLite schema/migration 属于 `ime-userdb`；宿主不得成为新的业务真相源。
 
+发布载体入口位于 `scripts/`：`build-macos-release-installer.sh` 冻结 Developer ID Installer，`build-macos-release-dmg.sh` 生成并复验签名 APFS/UDZO DMG，`notarize-macos-release-dmg.sh` 完成 notary log、staple 与双层 Gatekeeper 资格。纯解析、证据编码和漂移拒绝集中在 `scripts/macos-product/release_carrier.py`，不进入 Installer runtime，也不读取用户数据。真实凭据、上传和挂载只在专用发布 runbook 获授权后执行。
+
 ## UpgradePreflightHost
 
 生产 executable 不接受参数，只从用户域 `Application Support/RadishLex` 解析固定 data root，并使用从 `packaging/macos/product.json` 编译注入的 Manager/InputMethod bundle ID。它执行：

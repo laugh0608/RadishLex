@@ -8,7 +8,7 @@
 
 1. ad-hoc 开发构建只证明当前用户域解析、嵌入 payload 和发布身份缺失时失败关闭；
 2. Developer ID 构建才允许证明首次安装、修复、程序移除和升级事务；
-3. 公证、staple、Gatekeeper 与 DMG 下载隔离证据进入后续发布切面。
+3. 公证、staple、Gatekeeper 与 DMG 下载隔离使用已固定的 [发布载体 runbook](macos-release-carrier.md)，只有正向证据形成后才进入来自分发载体的最终实机验收。
 
 ad-hoc、Apple Development 或缺少 `ReleaseIdentity.json` 的 Installer 必须显示：
 
@@ -128,4 +128,4 @@ RADISHLEX_DEVELOPER_ID_APPLICATION="Developer ID Application: …" \
 - 两个固定程序目标均 absent；Application Support/RadishLex 为 empty directory、mode `0755`。该目录不满足事务核心要求的 `0700`，本轮没有静默 chmod 或删除。
 - 重建的 Installer 为 `Signature=adhoc`、`TeamIdentifier=not set`，嵌入完整 InstallPayload，且不含 `ReleaseIdentity.json`；原生/UI 门禁稳定投影 `product_identity_unavailable`。
 
-因此本轮只关闭真实用户域 bootstrap 的负向验收和回退方案，不记录首次安装、升级、修复、移除、Developer ID、公证、Gatekeeper 或 DMG 成功证据。
+因此本轮只关闭真实用户域 bootstrap 的负向验收和回退方案。后续虽已固定 DMG/notary/staple/Gatekeeper 契约，仍不记录首次安装、升级、修复、移除、Developer ID、公证、Gatekeeper 或 DMG 成功证据。

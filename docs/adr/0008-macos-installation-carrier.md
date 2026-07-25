@@ -110,6 +110,8 @@ M4-P02 的数据 receipt 不能单独证明两个程序 bundle 已完成切换�
 
 发布候选要求两个产品 bundle、Installer app 和全部 executable 使用 Developer ID Application、Hardened Runtime 与 trusted timestamp。DMG 单独签名并提交 Apple notary service；使用 `notarytool` 或 Notary API，检查 notary log，staple ticket，并在隔离下载环境执行 Gatekeeper 评估。
 
+DMG 固定为 APFS/UDZO UDIF，volume name 为 `RadishLex Installer`，根目录只允许 `RadishLex Installer.app`。notary 凭据只从已存入 Keychain 的 profile 读取；稳定 submission receipt 绑定提交时 DMG hash 与 Installer tree，staple 后 qualification 再绑定最终分发 hash。DMG open assessment 和挂载 Installer execute assessment 必须同时通过，且最终下载环境仍需按 qualification hash 独立复验。
+
 当前 payload/layout 门禁只证明确定性内容和目标映射，不证明 Developer ID、notarization、stapling、Gatekeeper、真实安装或 TIS 会话刷新。签名身份、凭据、上传和真实系统动作仍须另行授权。
 
 Apple 官方依据：
@@ -133,7 +135,7 @@ Apple 官方依据：
 4. 实现双 bundle staging、切换、逐边界故障注入和 source 程序恢复；
 5. 把 M4-P02 数据协调器纳入外层事务，覆盖成功、数据失败、程序失败和重启恢复；
 6. 已实现独立 Installer app 的状态 UI/驱动 contract、手动输入源提示、默认程序移除授权和脱敏诊断；隔离写 executor 继续按同一边界接入；
-7. 完成 Developer ID/Hardened Runtime、DMG、公证、stapling、Gatekeeper 与授权真实安装/升级/移除验收。
+7. 已固定 Developer ID/Hardened Runtime、DMG、公证、stapling 与 Gatekeeper 的构建和证据契约；待真实身份、历史 release 与发布授权可用后执行同一冻结产物的正向供应链和安装/升级/移除验收。
 
 ## M4-P03 退出标准
 

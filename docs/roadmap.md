@@ -143,6 +143,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 - 安装、升级、回滚、移除、数据迁移和故障恢复 runbook。
 - 外层程序 receipt 与数据 receipt 分层，产品终态分步持久化；Manager/InputMethod 在业务初始化前依次执行外层 install 与数据 upgrade gate。
 - InstallPayload 显式绑定可支持的历史 source assembly；production upgrade 只按外层 receipt 的精确 release 选择旧版本 validation/rollback host，缺失或身份漂移在事务写入前失败关闭。
+- 同一冻结 Installer 的签名 UDIF、notary submission/log、staple、Gatekeeper 与隔离下载证据；凭据只经 Keychain profile 使用，稳定证据同时绑定提交前与最终分发 hash。
 - Rust fmt/check/test/clippy/MSRV、Go test/race/vet、Flutter format/analyze/test、native-rime 和 macOS bundle CI。
 - 依赖安全、许可证和必要供应链检查。
 
@@ -152,6 +153,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 - 输入法与 manager 加载匹配版本的 Rust/native 依赖，升级后用户数据保持。
 - FFI、数据库、权限、schema、版本和 bundle 缺失均有明确错误，不静默回退 fixture。
 - active/nonterminal/损坏事务、运行 bundle 身份漂移和 completed remove 均在 Flutter/IMK、settings、userdb、Rime 初始化前失败关闭。
+- Developer ID、Hardened Runtime、trusted timestamp、notarization、staple 和 DMG/Installer 双层 Gatekeeper 证据精确绑定同一发布候选。
 - 发布候选通过自动门禁、安装 smoke 和非敏感日常输入复验。
 
 ## 第二平台选择门禁

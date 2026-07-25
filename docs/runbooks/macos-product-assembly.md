@@ -161,3 +161,5 @@ target/macos-install-payload/<version>-<build>/
 - codesign 验证失败：检查嵌套 dylib、主 executable 和外层 bundle 的签名顺序；不要把 `--deep --force` 当作发布修复策略。
 
 任何需要安装输入法、修改系统设置、使用 Developer ID、提交公证或操作真实 Application Support 数据的后续步骤，都必须进入对应专用 runbook 并另行取得授权。
+
+Developer ID Installer 已冻结后，DMG、公证、staple 与 Gatekeeper 的固定输入、可续跑 receipt 和隔离下载复验见 [macOS DMG、公证与 Gatekeeper Runbook](macos-release-carrier.md)；普通产品装配不得直接调用其中的上传或系统评估步骤。

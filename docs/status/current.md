@@ -36,7 +36,7 @@ Installer UI/driver contract 已落地。零写入 status projection 和 Rust dr
 
 生产 bridge 已接通 manifest-bound adapter、target preflight、随机 operation ID、外层事务和 executor。first install 只在显式 action 后创建缺失的固定目录，既有对象不 chmod；repair、默认程序移除和三者恢复使用真实 mutation port。upgrade 只从当前外层 receipt 的 source/installed product release 选择 payload 中精确匹配的历史 assembly，在任何 receipt/program mutation 前复验 source manifest/tree/Developer ID，并构造 source/target coordinator；缺失 source 返回 `driver_unavailable`，错误、重复、身份漂移或非历史 source 返回产品身份阻断。默认首发 payload 的 `UpgradeSources` 为空，因此不会伪造上一版本。
 
-发布脚本已固定 Developer ID 输入、嵌套 Hardened Runtime/trusted timestamp、签名后 manifest 重冻结、release identity 生成、Installer 终签和逐 executable 复验；无效身份在构建前失败，ad-hoc Installer 仍返回 `product_identity_unavailable`。当前机器仍为 `0 valid identities found`，所以只有契约与负向证据；此前 TIS/双 bundle/进程零基线和空 `0755` data root 均未修改。
+发布脚本已固定 Developer ID/Hardened Runtime/trusted timestamp、sealed identity、单 Installer 签名 DMG、Keychain-profile notary、可续跑 receipt、严格 log、staple 与双层 Gatekeeper。当前机器仍为 `0 valid identities found`，普通门禁只证明失败关闭；此前真实用户零基线未修改，也没有正向发布资格证据。
 
 M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
@@ -66,7 +66,7 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v9、userd
 ## 下一步顺位
 
 1. 可用 Developer ID Application 身份与一份真实上一发布 assembly 到位后，使用已固定的历史 source 构建输入执行嵌套签名/Hardened Runtime，并证明正向跨发布 upgrade、重启续跑与 source 回滚；当前机器没有身份，也没有可冒充的历史正式发布。
-2. 随后完成 DMG、公证、staple、Gatekeeper 与正向实机首次安装、修复和移除证据；smoke 必须保留/恢复用户数据和输入源状态，并继续禁止自动清理历史事务材料。
+2. 对同一冻结发布执行已固定的签名 DMG、公证、staple、双层 Gatekeeper 与隔离下载复验，再完成正向实机首次安装、修复和移除证据；smoke 必须保留/恢复用户数据和输入源状态，并继续禁止自动清理历史事务材料。
 3. 普通用户同步、恢复/授权/撤销/轮换继续关闭；在真实不支持 Secure Enclave 的环境可得时再补 unsupported，首版发布后且准备生产同步前再验收正式域名/证书。
 
 ## 验证入口
@@ -81,6 +81,7 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v9、userd
 ./scripts/check-macos-install-adapter.sh
 ./scripts/check-macos-install-coordinator.sh
 ./scripts/check-macos-installer.sh
+./scripts/check-macos-release-carrier.sh
 ./scripts/check-macos-imk.sh
 ./scripts/check-macos-upgrade-coordinator.sh
 ./scripts/check-macos-upgrade-product-coordination.sh
