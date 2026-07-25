@@ -1,0 +1,24 @@
+[package]
+name = "radishlex-macos-installer-executor"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../../LICENSE"
+description = "Restartable isolated executor for authorized RadishLex macOS Installer intents."
+
+[lib]
+name = "radishlex_macos_installer_executor"
+path = "src/lib.rs"
+
+[dependencies]
+getrandom = "0.2.17"
+radishlex-ime-product-install = { path = "../../../crates/ime-product-install" }
+radishlex-ime-product-upgrade = { path = "../../../crates/ime-product-upgrade" }
+radishlex-macos-installer-driver = { path = "../InstallerDriver" }
+radishlex-macos-product-install = { path = "../InstallAdapter" }
+radishlex-macos-product-install-coordinator = { path = "../InstallCoordinatorAdapter" }
+radishlex-macos-upgrade-coordinator = { path = "../UpgradeCoordinatorAdapter" }
+
+[dev-dependencies]
+radishlex-ime-userdb = { path = "../../../crates/ime-userdb" }

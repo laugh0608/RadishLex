@@ -9,9 +9,9 @@
 - 手动切到中立输入源并关闭 Manager 的提示；
 - 默认移除仅删除程序、保留 Application Support 的数据策略。
 
-UI 不得解析 `receipt.json`、读取 `HOME`、接受自定义路径或根据 bundle 缺失猜测 operation。无 receipt 时，平台必须先以固定目标和产品身份形成 `InstallerProductSituation`；身份不可得或已安装版本更新时失败关闭。
+UI 不得解析 `receipt.json`、读取 `HOME`、接受自定义路径或根据 bundle 缺失猜测 operation。无 receipt 或前一 receipt 已终态时，平台必须以固定目标和产品身份形成 `InstallerProductSituation`；completed install/upgrade/repair 会按当前真实产品重新提供 upgrade/repair/remove，receipt 与实际产品矛盾、身份不可得或已安装版本更新时失败关闭。
 
-`authorize_installer_action` 会重新验证当前 snapshot 是否仍提供该动作。除 refresh 外，所有动作都要求显式确认；移除还要求用户确认保留数据，并确认已手动切换输入源、关闭 Manager。确认只形成 `AuthorizedInstallerIntent`，不能替代公开平台 API 和固定 preflight 的重新取证。
+`authorize_installer_action` 会重新验证当前 snapshot 是否仍提供该动作。除 refresh 外，所有动作都要求显式确认；upgrade、repair、retry、remove 和 prepared 后的 confirm 还要求确认已手动切换输入源并关闭 Manager，移除另须确认保留数据。确认只形成 `AuthorizedInstallerIntent`，不能替代公开平台 API 和固定 preflight 的重新取证。
 
 ```bash
 cargo test --locked -p radishlex-macos-installer-driver --all-targets

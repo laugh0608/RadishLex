@@ -123,6 +123,32 @@ fn preflight_accepts_only_strict_ready_summary() {
 }
 
 #[test]
+fn target_only_preflight_uses_the_same_manifest_bound_host() {
+    let fixture = Fixture::new();
+    let (runner, state) = FakeRunner::new([ready_preflight(456_789)]);
+    let mut adapter = MacOsProductPreflightAdapter::with_runner(&fixture.target, Box::new(runner))
+        .expect("load target-only preflight adapter");
+
+    let summary = adapter.inspect_preflight().expect("target-only preflight");
+
+    assert_eq!(summary.available_bytes(), 456_789);
+    assert!(adapter.matches_release("0.1.0", 35));
+    assert!(!adapter.matches_release("0.1.1", 36));
+    assert_eq!(
+        state.borrow().calls,
+        vec![(
+            "RadishLexUpgradePreflightHost".to_owned(),
+            HostMode::Preflight
+        )]
+    );
+    assert_eq!(
+        MacOsProductPreflightAdapter::load(&fixture.source)
+            .expect_err("source product has no preflight host"),
+        MacOsUpgradeAdapterError::InvalidManifest
+    );
+}
+
+#[test]
 fn preflight_rejects_extra_fields_and_nonempty_stderr() {
     let fixture = Fixture::new();
     let extra = HostOutput {

@@ -15,6 +15,7 @@ members = [
     "platforms/macos-product/InstallAdapter",
     "platforms/macos-product/InstallCoordinatorAdapter",
     "platforms/macos-product/InstallerDriver",
+    "platforms/macos-product/InstallerExecutor",
     "platforms/macos-product/UpgradeCoordinatorAdapter",
 ]
 resolver = "2"

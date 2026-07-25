@@ -472,6 +472,16 @@ impl InstallReceipt {
         self.target_product.as_ref()
     }
 
+    pub fn installed_product(&self) -> Option<&ProductArtifactIdentity> {
+        match self.state {
+            InstallState::Completed => self.target_product.as_ref(),
+            InstallState::AbortedPreserved | InstallState::RolledBack => {
+                self.source_product.as_ref()
+            }
+            _ => None,
+        }
+    }
+
     pub const fn state(&self) -> InstallState {
         self.state
     }
@@ -660,21 +670,11 @@ impl InstallReceipt {
             && self.state == InstallState::Prepared
             && self.root_identity == current.root_identity
             && self.previous_operation_id.as_deref() == Some(current.operation_id())
-            && self.source_product.as_ref() == current.resulting_product()
+            && self.source_product.as_ref() == current.installed_product()
             && self.artifacts.is_empty()
             && self.failure_code.is_none()
             && self.failure_after_state.is_none()
             && !self.manual_recovery_required
-    }
-
-    fn resulting_product(&self) -> Option<&ProductArtifactIdentity> {
-        match self.state {
-            InstallState::Completed => self.target_product.as_ref(),
-            InstallState::AbortedPreserved | InstallState::RolledBack => {
-                self.source_product.as_ref()
-            }
-            _ => None,
-        }
     }
 
     fn validate(&self) -> Result<(), InstallReceiptError> {

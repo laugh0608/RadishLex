@@ -248,6 +248,23 @@ impl InstallReceiptStore {
             .map(|current| current.map(|(receipt, _, _)| receipt))
     }
 
+    pub fn load_guarded(
+        &self,
+        guard: &InstallProcessGuard,
+    ) -> Result<Option<InstallReceipt>, InstallFilesystemError> {
+        self.revalidate()?;
+        if !guard.belongs_to(self) {
+            return Err(error(InstallFilesystemErrorCode::IdentityChanged));
+        }
+        guard.revalidate()?;
+        self.validate_known_entries()?;
+        if path_exists(&self.staged_receipt_path())? {
+            return Err(error(InstallFilesystemErrorCode::InterruptedReceiptWrite));
+        }
+        self.load_current_internal()
+            .map(|current| current.map(|(receipt, _, _)| receipt))
+    }
+
     pub fn persist(
         &self,
         guard: &InstallProcessGuard,

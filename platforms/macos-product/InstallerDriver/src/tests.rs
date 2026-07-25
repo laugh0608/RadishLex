@@ -176,6 +176,36 @@ fn prepared_receipt_projects_manual_prompt_and_restart_action() {
 }
 
 #[test]
+fn completed_receipt_reprojects_actions_from_verified_installed_product() {
+    let upgrade = completed_snapshot(
+        InstallOperationKind::FirstInstall,
+        InstallerProductSituation::OlderReleaseInstalled,
+        None,
+    );
+    assert_eq!(upgrade.phase(), InstallerViewPhase::Ready);
+    assert_eq!(upgrade.primary_action(), InstallerAction::BeginUpgrade);
+
+    let repair = completed_snapshot(
+        InstallOperationKind::Upgrade,
+        InstallerProductSituation::MatchingReleaseInstalled,
+        None,
+    );
+    assert_eq!(repair.primary_action(), InstallerAction::BeginRepair);
+    assert_eq!(repair.secondary_action(), InstallerAction::RemovePrograms);
+
+    let drift = completed_snapshot(
+        InstallOperationKind::Repair,
+        InstallerProductSituation::NotInstalled,
+        None,
+    );
+    assert_eq!(drift.phase(), InstallerViewPhase::Blocked);
+    assert_eq!(
+        drift.stable_error(),
+        InstallerStableError::ProductIdentityUnavailable
+    );
+}
+
+#[test]
 fn action_authorization_rejects_stale_or_unconfirmed_mutations() {
     let fixture = Fixture::new(false);
     let snapshot = inspect_installer_view(
@@ -204,6 +234,8 @@ fn action_authorization_rejects_stale_or_unconfirmed_mutations() {
         InstallerAction::BeginRepair,
         InstallerUserAuthorization {
             explicit_action_confirmed: true,
+            neutral_input_source_selected: true,
+            manager_closed: true,
             ..InstallerUserAuthorization::default()
         },
     )

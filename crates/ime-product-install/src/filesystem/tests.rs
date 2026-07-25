@@ -281,6 +281,10 @@ fn status_inspection_projects_restart_state_without_creating_or_mutating() {
     let mut receipt = first_install_receipt(&store);
     let guard = store.acquire_guard().expect("guard");
     store.persist(&guard, &receipt).expect("persist prepared");
+    assert_eq!(
+        store.load_guarded(&guard).expect("guarded load"),
+        Some(receipt.clone())
+    );
     let active = inspect_install_status(&fixture.data_root, fixture.owner_id);
     assert_eq!(
         active.decision(),

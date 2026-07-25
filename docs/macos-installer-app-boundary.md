@@ -17,9 +17,14 @@ InstallerDriver
   └─ stale-action authorization
                     │
                     ▼
+InstallerExecutor
+  ├─ guard 内重新读取 receipt 与平台 preflight
+  ├─ prepared 后等待人工静止确认
+  └─ 重放程序事务、数据协调与两段终态
+                    │
+                    ▼
 ime-product-install / macOS adapters
-  ├─ receipt、guard、程序身份与状态机真相源
-  └─ 后续隔离 executor 重新执行平台 preflight 与持久化动作
+  └─ receipt、guard、程序身份与状态机真相源
 ```
 
 UI 不直接读取 `.radishlex-install-v1/receipt.json`，不根据 bundle 是否存在猜测 operation，也不接收绝对路径、`HOME`、settings、Manager 页面或调用方自报身份。固定目标仍逐字节来自 `packaging/macos/install-layout.json`。
@@ -58,7 +63,7 @@ UI 不直接读取 `.radishlex-install-v1/receipt.json`，不根据 bundle 是�
 - stable error、manual prompt；
 - `retain_application_support` 数据策略。
 
-进度只表示已持久化状态，不预测耗时，也不能在 UI 定时器中自行前进。重启后必须重新读取 receipt：`prepared` 要求用户完成手动静止步骤；其他非终态提供 resume；`aborted_preserved` / `rolled_back` 提供 retry；completed remove 可再次 first install。
+进度只表示已持久化状态，不预测耗时，也不能在 UI 定时器中自行前进。重启后必须重新读取 receipt：`prepared` 要求用户完成手动静止步骤；其他非终态提供 resume；`aborted_preserved` / `rolled_back` 提供 retry；completed remove 可再次 first install。completed install/upgrade/repair 必须与当前固定双目标产品身份交叉判定，分别重新提供 upgrade、repair/remove 或失败关闭，不能因存在 terminal receipt 永久隐藏后续 operation。
 
 稳定诊断摘要只允许：
 
@@ -76,7 +81,7 @@ refresh 是唯一不要求确认的 action。first install、upgrade、repair、
 
 - mutation action 必须显式确认；
 - remove 必须确认默认只删除两个程序并保留 Application Support；
-- remove 与 `confirm_quiescence` 必须确认已手动切到中立输入源并关闭 Manager；
+- upgrade、repair、retry、remove 与 `confirm_quiescence` 必须确认已手动切到中立输入源并关闭 Manager；
 - 所有 mutation intent 都标记为必须重新执行平台 preflight。
 
 确认框和勾选不是静止、运行身份或 TIS 状态证据。后续 executor 仍须使用公开平台 API、固定 bundle ID 和 manifest-bound adapter 重新取证。Installer 不程序化选择、注册、启用或移除输入源。
@@ -91,7 +96,13 @@ refresh 是唯一不要求确认的 action。first install、upgrade、repair、
 - 拒绝任何命令行参数；
 - 使用 ad-hoc 签名只完成构建完整性验证。
 
-当前默认 bridge 固定为 `driver_unavailable`，因此该 bundle 是 UI/driver contract shell，不执行真实安装。下一切面必须在隔离合成用户域内把 authorized intent 接入现有 manifest-bound adapter、事务核心与 preflight；不能在 AppDelegate 中补复制、rename、删除、receipt 或 TIS 逻辑。
+当前默认 bridge 固定为 `driver_unavailable`，因此该 bundle 是 UI/driver contract shell，不执行真实安装。独立 `InstallerExecutor` 已在隔离合成用户域把 authorized intent 接入现有 manifest-bound port、事务核心与 preflight；后续 bridge 只能调用该稳定入口，不能在 AppDelegate 中补复制、rename、删除、receipt 或 TIS 逻辑。
+
+## 隔离执行器
+
+begin/retry/remove intent 先在外层 guard 内回读 current receipt、验证 operation/source/target chain，并要求 target-only manifest-bound preflight 的 version/build 与 InstallPayload target 精确匹配，再持久化新的 `prepared` 并返回 UI。只有重新投影出的 `ConfirmQuiescence` intent 能推进 `quiesced`；执行前再次 preflight，随后按 receipt evidence 幂等完成双 bundle 切换。
+
+first install、repair、remove 进入统一程序终态。upgrade 要求调用边界已经提供同 operation ID、root/release 精确绑定的 M4-P02 receipt，执行器组合数据协调和 upgrade 两段终态；中断在 `final_verified` 时只重新验证 data `completed` 与双程序，不重复 migration。active guard、stale intent、缺失 upgrade context、platform preflight 失败或任何 receipt/identity 漂移均失败关闭，错误日志只能使用稳定 code。
 
 ## 验证
 
@@ -101,4 +112,4 @@ cargo test --locked -p radishlex-ime-product-install --all-targets
 ./scripts/check-repo.sh
 ```
 
-门禁覆盖 absent root 零写入、active/stale guard、非终态重启投影、completed receipt、产品情况分支、stale/unconfirmed action、移除数据保留授权、稳定摘要、未知 snapshot、原生 bundle metadata、固定 layout 和 UI 源码禁止边界。普通门禁不启动 GUI、不访问真实用户目录或系统输入源。
+门禁覆盖 absent root 零写入、active/stale guard、非终态重启投影、completed receipt 与后续 operation、产品情况分支、stale/unconfirmed action、四类执行、preflight 阻断、程序 staging 与 upgrade `final_verified` 重启续跑、移除数据保留授权、稳定摘要、未知 snapshot、原生 bundle metadata、固定 layout 和 UI 源码禁止边界。普通门禁不启动 GUI、不访问真实用户目录或系统输入源。

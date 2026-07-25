@@ -92,6 +92,10 @@ impl VerifiedProductAssembly {
         self.schema_version
     }
 
+    pub(crate) fn release(&self) -> &ProductRelease {
+        &self.release
+    }
+
     pub(crate) fn manager_validation(&self) -> &VerifiedExecutable {
         &self.manager_validation
     }

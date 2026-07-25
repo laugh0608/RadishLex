@@ -756,6 +756,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "radishlex-macos-installer-executor"
+version = "0.1.0"
+dependencies = [
+ "getrandom",
+ "radishlex-ime-product-install",
+ "radishlex-ime-product-upgrade",
+ "radishlex-ime-userdb",
+ "radishlex-macos-installer-driver",
+ "radishlex-macos-product-install",
+ "radishlex-macos-product-install-coordinator",
+ "radishlex-macos-upgrade-coordinator",
+]
+
+[[package]]
 name = "radishlex-macos-product-install"
 version = "0.1.0"
 dependencies = [

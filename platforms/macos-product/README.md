@@ -28,6 +28,9 @@ platforms/macos-product/
   InstallerDriver/
     src/                     read-only snapshot and action authorization
     Cargo.toml
+  InstallerExecutor/
+    src/                     authorized intent to restartable transaction execution
+    Cargo.toml
   InstallerApp/
     Sources/                 independent AppKit presentation shell
     Tests/                   snapshot and fail-closed contract
@@ -95,9 +98,15 @@ staging 使用 `/usr/bin/ditto` 保留 resource fork、extended attributes、ACL
 
 upgrade 产品终态在 `final_verified` 与 `completed` 前分别复验外层/data receipt、双 guard、Application Support identity、source/target release、data `completed` 和 installed 双 bundle。ABI v9 外层 startup gate 不接收运行 identity；它只从当前 executable 所在固定用户域 bundle 形成 Info.plist release、完整 tree 与 Developer ID code identity，并在 Manager/InputMethod 的既有数据 gate 和全部业务初始化之前执行。
 
+## InstallerExecutor
+
+执行器只接受 `InstallerDriver` 已授权的 intent，但仍在 guard 内重新读取 current receipt 并执行 manifest-bound preflight。begin/retry/remove 先持久化 `prepared` 并返回；用户重新确认静止后才进入 `quiesced` 和程序 mutation。first install、repair、remove 共用外层程序终态，upgrade 绑定同一 operation ID 的既有 M4-P02 receipt，并从任一已持久化状态继续数据协调、程序恢复或两段终态。
+
+执行器不接受 UI 路径、`HOME`、release、bundle identity 或 available bytes 自报值。随机 operation ID 来自系统熵；active guard、stale intent、缺失 upgrade context、preflight/receipt/identity 失败均关闭。当前 AppKit 默认 bridge 仍未绑定该 crate，因此产品壳不会执行真实安装。
+
 ## 构建与验证
 
-Installer 的只读驱动和独立 AppKit 壳使用专用门禁。它验证 restart snapshot、stale action、remove 数据保留授权、未知结果失败关闭、固定 bundle metadata/layout 和禁止 UI 跨越 receipt/TIS/路径边界；不会启动 GUI 或执行真实安装：
+Installer 的只读驱动、restartable executor 和独立 AppKit 壳使用专用门禁。它验证四类 operation、restart snapshot、stale action、preflight/active guard 阻断、staging 与 `final_verified` 中断续跑、remove 数据保留授权、未知结果失败关闭、固定 bundle metadata/layout 和禁止 UI 跨越 receipt/TIS/路径边界；不会启动 GUI 或执行真实安装：
 
 ```bash
 ./scripts/check-macos-installer.sh

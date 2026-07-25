@@ -30,27 +30,17 @@ M4-P03 已接受 DMG + 独立用户域 Installer app：Manager、InputMethod 和
 
 Installer UI/driver contract 已落地。零写入 status projection 和 Rust driver 把 verified product situation、receipt/guard、operation、持久化进度、稳定错误、手动提示和保留数据策略形成 snapshot v1；mutation 拒绝 stale UI 和缺失确认。AppKit bundle 展示目标、重启继续与稳定诊断，未知结果失败关闭；默认 bridge 为 `driver_unavailable`，门禁只构建 contract shell，不执行真实安装或 TIS 操作。
 
+隔离 restartable executor 已落地。begin/retry/remove 在 guard 内回读 current receipt、执行 manifest-bound target preflight，只生成 operation ID 并持久化 `prepared`；重新投影并确认中立输入源/Manager 关闭后，`ConfirmQuiescence` 再次 preflight，才沿同一 receipt 执行双 bundle staging/preserve/commit。first install、repair、remove 共用程序终态；upgrade 绑定同 operation ID 的既有 M4-P02 receipt，组合数据协调、程序恢复与两段终态，`final_verified` 中断后只重新证明 data `completed` 与双程序。completed receipt 会与当前真实产品情况交叉判定，继续提供 upgrade/repair/remove；矛盾身份失败关闭。AppKit 默认 bridge 尚未接入 executor，也没有数据 receipt bootstrap 或真实用户域写入。
+
 M1 已完成真实 macOS 离线输入；副屏与 VoiceOver 候选操作仍不受支持。M2 manager 已通过共享 userdb、migration、隐私、导入审计、删除恢复、并发和重启验收，并于 2026-07-18 回滚到零基线。
 
 ## M3 退出结论
 
-M3 已具备 P2 envelope、signed manifest、Go 密文服务与关闭态 `sync_once`。对象 `change_sequence` 与设备 `lifecycle_sequence` 隔离；userdb schema v9 原子持久化 cursor、journal/outbox、可信公开 lifecycle 和 wrapped ciphertext cache，不保存明文 master key。失败不推进 cursor、不清除 dirty；`409 stale_base_version` 必须重新发现、验签解密、合并并签名。
+M3 已闭合 P2 envelope/signed manifest、Go 密文服务、signed lifecycle/epoch distribution/recovery v2、关闭态 `sync_once` 和 userdb schema v9 的 cursor/journal/outbox。失败不推进 cursor 或清除 dirty；stale base 必须重新发现、验签解密、合并并签名。A/B/C 集成链覆盖撤销、epoch 轮换、恢复设备激活、单次恢复、重启和日志脱敏。
 
-产品 crypto 装载组合可信 lifecycle、独立 epoch material store 与平台 signing backend。preflight 在读取 secret 前验证本机 active、backend 资格和 public key。独立 P-256 key-agreement backend 解封 wrapped epoch；错误身份/AAD/密文、locked/unavailable、异常 epoch 和 revoked 本机均失败关闭。secret 只短暂存在于 Rust snapshot。
+平台 crypto preflight 在读取 secret 前验证本机 active、backend 资格和 public key；P-256 backend 对错误身份/AAD/密文、locked/unavailable、异常 epoch 和 revoked 设备失败关闭。一个受支持 macOS 设备上的两条 Secure Enclave backend 已完成真实产品资格；普通可导出 DPK 被拒，unsupported 环境保留后续补测。
 
-Go metadata schema v9 已落地 signed lifecycle、`profile-sha256-v1` 公钥绑定、signed epoch distribution、recovery v2、recovered-device activation 与 recovery record revocation。Rust 从本地信任锚拒绝乱序、缺口、epoch 跳变、公钥替换、inactive signer、重复恢复和 cursor 分叉。
-
-A/B/C Go HTTP 已证明 B 撤销后仅 A/C 取得 epoch 2，历史/当前 epoch 可验签解封并在重启后恢复。恢复链覆盖 Argon2id possession proof、全新设备 profile、完整 active cohort 分发、单次使用、原子轮换/撤销、activation/revocation 线性化与日志脱敏。
-
-部署 hardening 与本地 HTTPS 子阶段已通过：Compose/Caddy internal TLS、bearer 负向响应、loopback-only、非 root/只读/cap drop、`0700/0600`、symlink 拒绝、冷备份/隔离恢复、日志脱敏和资源清理均有真实门禁。Rust `HttpSyncRemoteTransport` 现支持 rustls HTTPS、Mozilla root 与进程内附加本地 CA，严格校验证书链和主机名；真实门禁已用临时 Caddy CA 完成无 token `401`、有 token `404` 和退出资源清零，不提供 insecure bypass。
-
-Apple signing/key-agreement adapters 已接线。独立 key-agreement ABI、六场景调度与脱敏摘要已落地。ad-hoc denied 返回 missing-entitlement `-34018`；Team/profile 资格 bundle 下 lifecycle 完成 fresh public key、ECDH、wrapped epoch 往返、删除与 missing，设备锁定态返回 `PrivateKeyLocked/-25308`，解锁 cleanup 零残留。普通 DPK 可导出而被拒；两条 Secure Enclave backend 已按一个受支持 macOS 设备的真实主路径评审为 product qualified，unsupported 保留为延期兼容性补测。
-
-Manager ABI v9 保留只读 `radishlex_manager_sync_product_status`、隔离的本地合成资格 start/poll/cancel/free 和 ABI v8 数据 startup/validation contract，并增加独立外层 install startup gate。`ime-sync-runtime` 仍只在临时双客户端验证冲突恢复与两轮收敛，不触碰真实 userdb 或平台 key item；产品摘要 blocker 固定为 `user_sync_closed_current_phase`，用户同步 gate 始终 blocked。
-
-真实 Caddy 门禁已完成 TLS、bearer 负向/授权响应、建域、双设备授权、v1/v2 上传、`conflict_stale_base_version`、A 重发现与 v3 上传、B 合并 v4、第二轮双方零上传、日志脱敏与 Compose 资源清零。跨进程 socket guard 保证同时仅一条资格 run；新进程只清理同用户、精确命名且 marker 匹配的旧工作区，覆盖异常退出后的重启清理，不扫描其他 temp 内容。M3 路线图退出项已闭环，但这些仍是合成/本地资格证据，不开放真实用户同步。
-
-平台 backend 外部资格已不再阻塞当前开发。开发者没有真实 unsupported 环境，现有支持设备不得模拟该证据；有合适目标时再按保留 harness 补测。锁屏链结束后的受限环境 trust 假象已由真实登录会话复核排除，同一冻结 hash bundle 严格验签通过。正式域名、公开证书和目标生产演练按产品决策后移到首版发布后；当前 `product_qualified=true`、`user_sync_enabled=false`。
+本地 HTTPS/部署门禁已覆盖 Caddy TLS、bearer、loopback-only、非 root/只读/cap drop、权限、symlink、备份恢复、冲突收敛、日志脱敏与资源清零。正式域名、公开证书和生产演练后移到首版发布后；Manager 产品 blocker 固定为 `user_sync_closed_current_phase`，当前 `product_qualified=true`、`user_sync_enabled=false`。
 
 ## M4-P01 退出结论
 
@@ -69,8 +59,8 @@ macOS 产品元数据已统一为 `0.1.0 (35)`、macOS 13.0、FFI ABI v9、userd
 
 ## 下一步顺位
 
-1. M4-P03 下一切面在隔离合成用户域内把 authorized Installer intent 接入现有 manifest-bound adapter、外层事务和只读 preflight，打通 first install、upgrade、repair、remove 的 restartable executor；UI 仍不能成为 receipt、运行身份或路径真相源。
-2. 隔离 executor 门禁完成后，再单独授权真实用户目录安装、进程停止/输入源交互、Developer ID/Hardened Runtime、公证、Gatekeeper 和 DMG 发布证据。
+1. M4-P03 下一切面固定 Installer App 到 Rust driver/executor 的版本化 bridge 与 upgrade data-receipt bootstrap，先在隔离合成用户域证明 snapshot 重新授权、prepared/confirm、错误映射和异常退出重启；UI 仍不能成为 receipt、运行身份、路径或 available-bytes 真相源。
+2. 隔离 bridge 门禁完成后，再单独授权真实用户目录安装、进程停止/输入源交互、Developer ID/Hardened Runtime、公证、Gatekeeper 和 DMG 发布证据。
 3. 普通用户同步、恢复/授权/撤销/轮换继续关闭；在真实不支持 Secure Enclave 的环境可得时再补 unsupported，首版发布后且准备生产同步前再验收正式域名/证书。
 
 ## 验证入口

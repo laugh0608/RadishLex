@@ -74,6 +74,79 @@ pub struct MacOsUpgradeCoordinatorAdapter {
     runner: Box<dyn ProductHostRunner>,
 }
 
+pub struct MacOsProductPreflightAdapter {
+    product: VerifiedProductAssembly,
+    runner: Box<dyn ProductHostRunner>,
+}
+
+impl fmt::Debug for MacOsProductPreflightAdapter {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("MacOsProductPreflightAdapter")
+            .field("schema_version", &self.product.schema_version())
+            .finish_non_exhaustive()
+    }
+}
+
+impl MacOsProductPreflightAdapter {
+    pub fn load(product_root: &Path) -> Result<Self, MacOsUpgradeAdapterError> {
+        Ok(Self {
+            product: VerifiedProductAssembly::load(product_root, ProductRole::Target)?,
+            runner: Box::new(ProcessProductHostRunner::production()),
+        })
+    }
+
+    #[cfg(feature = "qualification-harness")]
+    pub fn load_for_qualification(
+        product_root: &Path,
+        qualification_root: &Path,
+        synthetic_user_home: &Path,
+    ) -> Result<Self, MacOsUpgradeAdapterError> {
+        let qualification_root_input = qualification_root.to_path_buf();
+        let qualification_root = verify_qualification_root(qualification_root)?;
+        let synthetic_user_home = verify_qualification_path(
+            &qualification_root_input,
+            &qualification_root,
+            synthetic_user_home,
+            0o700,
+        )?;
+        let product_root = verify_qualification_path(
+            &qualification_root_input,
+            &qualification_root,
+            product_root,
+            0o700,
+        )?;
+        Ok(Self {
+            product: VerifiedProductAssembly::load(&product_root, ProductRole::Target)?,
+            runner: Box::new(ProcessProductHostRunner::qualification(synthetic_user_home)),
+        })
+    }
+
+    pub fn inspect_preflight(&mut self) -> Result<MacOsUpgradePreflight, MacOsUpgradeAdapterError> {
+        let executable = self
+            .product
+            .preflight()
+            .ok_or(MacOsUpgradeAdapterError::InvalidManifest)?;
+        executable.revalidate()?;
+        parse_preflight(self.runner.run(executable, HostMode::Preflight))
+    }
+
+    pub fn matches_release(&self, product_version: &str, build_number: u64) -> bool {
+        self.product.release().product_version() == product_version
+            && self.product.release().build_number() == build_number
+    }
+
+    #[cfg(test)]
+    fn with_runner(
+        product_root: &Path,
+        runner: Box<dyn ProductHostRunner>,
+    ) -> Result<Self, MacOsUpgradeAdapterError> {
+        let mut adapter = Self::load(product_root)?;
+        adapter.runner = runner;
+        Ok(adapter)
+    }
+}
+
 impl fmt::Debug for MacOsUpgradeCoordinatorAdapter {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter

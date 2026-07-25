@@ -285,24 +285,9 @@ pub fn inspect_installer_view(
                 return blocked_snapshot(InstallerStableError::InvalidReceipt);
             };
             match state {
-                InstallState::Completed => snapshot(
-                    InstallerViewPhase::Completed,
-                    if kind == InstallOperationKind::RemovePrograms {
-                        InstallerAction::BeginFirstInstall
-                    } else {
-                        InstallerAction::None
-                    },
-                    if kind == InstallOperationKind::RemovePrograms {
-                        InstallerAction::None
-                    } else {
-                        InstallerAction::RemovePrograms
-                    },
-                    InstallerStableError::None,
-                    InstallerManualPrompt::None,
-                    Some(kind),
-                    Some(state),
-                    status.failure_code(),
-                ),
+                InstallState::Completed => {
+                    completed_snapshot(kind, product_situation, status.failure_code())
+                }
                 InstallState::AbortedPreserved | InstallState::RolledBack => snapshot(
                     InstallerViewPhase::RecoveryAvailable,
                     InstallerAction::RetryOperation,
@@ -319,6 +304,36 @@ pub fn inspect_installer_view(
         InstallStatusDecision::FailedClosed => {
             blocked_snapshot(map_status_error(status.error_code()))
         }
+    }
+}
+
+fn completed_snapshot(
+    completed_kind: InstallOperationKind,
+    product_situation: InstallerProductSituation,
+    failure_code: Option<InstallFailureCode>,
+) -> InstallerViewSnapshot {
+    match (completed_kind, product_situation) {
+        (InstallOperationKind::RemovePrograms, InstallerProductSituation::NotInstalled) => {
+            snapshot(
+                InstallerViewPhase::Completed,
+                InstallerAction::BeginFirstInstall,
+                InstallerAction::None,
+                InstallerStableError::None,
+                InstallerManualPrompt::None,
+                Some(InstallOperationKind::FirstInstall),
+                Some(InstallState::Completed),
+                failure_code,
+            )
+        }
+        (
+            InstallOperationKind::FirstInstall
+            | InstallOperationKind::Upgrade
+            | InstallOperationKind::Repair,
+            InstallerProductSituation::OlderReleaseInstalled
+            | InstallerProductSituation::MatchingReleaseInstalled
+            | InstallerProductSituation::NewerReleaseInstalled,
+        ) => ready_snapshot(product_situation),
+        _ => blocked_snapshot(InstallerStableError::ProductIdentityUnavailable),
     }
 }
 
@@ -339,7 +354,7 @@ fn ready_snapshot(product_situation: InstallerProductSituation) -> InstallerView
             InstallerAction::BeginUpgrade,
             InstallerAction::RemovePrograms,
             InstallerStableError::None,
-            InstallerManualPrompt::None,
+            InstallerManualPrompt::SelectNeutralInputSourceAndCloseManager,
             Some(InstallOperationKind::Upgrade),
             None,
             None,
@@ -349,7 +364,7 @@ fn ready_snapshot(product_situation: InstallerProductSituation) -> InstallerView
             InstallerAction::BeginRepair,
             InstallerAction::RemovePrograms,
             InstallerStableError::None,
-            InstallerManualPrompt::None,
+            InstallerManualPrompt::SelectNeutralInputSourceAndCloseManager,
             Some(InstallOperationKind::Repair),
             None,
             None,
@@ -468,7 +483,11 @@ pub fn authorize_installer_action(
     }
     if matches!(
         action,
-        InstallerAction::ConfirmQuiescence | InstallerAction::RemovePrograms
+        InstallerAction::BeginUpgrade
+            | InstallerAction::BeginRepair
+            | InstallerAction::ConfirmQuiescence
+            | InstallerAction::RetryOperation
+            | InstallerAction::RemovePrograms
     ) && (!authorization.neutral_input_source_selected || !authorization.manager_closed)
     {
         return Err(InstallerAuthorizationError::ManualQuiescenceAcknowledgementRequired);
