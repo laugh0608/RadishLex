@@ -153,9 +153,9 @@ receipt 不保存 requirement、Team ID、Authority、CDHash 或 `codesign` 输�
 
 ### Staging 填充与阶段复验
 
-production copy 使用系统 `/usr/bin/ditto`，先原样保留 resource fork、extended attributes、ACL、quarantine 与 HFS compression，不叠加覆盖既有 `staged.app`。复制前必须复验 guard、operation/component/固定目标、payload manifest、target tree 与 target code identity；复制完成后先确认 staged tree/code identity 与 target 精确一致，再仅对这个固定 staging tree 递归移除 `com.apple.quarantine`，且不跟随 symlink。该归一化用于阻止下载载体的 quarantine 传播到最终程序并触发 App Translocation，不修改其他 extended attribute，也不放宽 strict ad-hoc identity 或固定运行路径门禁。归一化后必须再次复验完整 tree/code identity，递归同步普通文件与目录，最后才由核心记录 staged filesystem evidence。
+production copy 使用系统 `/usr/bin/ditto --extattr --noqtn`，保留 resource fork、quarantine 之外的 extended attributes、ACL 与 HFS compression，同时禁止下载祖先的 quarantine 传播到 staging，不叠加覆盖既有 `staged.app`。复制前必须复验 guard、operation/component/固定目标、payload manifest、target tree 与 target code identity；复制完成后先确认 staged tree/code identity 与 target 精确一致，再对固定 tree 的每个目录、普通文件和 symlink 逐项审计，任一节点仍有 `com.apple.quarantine` 都失败关闭。审计不修改权限或 xattr，不跟随 symlink，也不放宽 strict ad-hoc identity 或固定运行路径门禁。审计后必须再次复验完整 tree/code identity，递归同步普通文件与目录，最后才由核心记录 staged filesystem evidence。
 
-重启时若 `staged.app` 已存在但 receipt 尚无 staged evidence，adapter 只接受完整 tree/code identity 与 target 精确匹配的对象，幂等重复 quarantine 归一化、复验和同步后补记 evidence。复制、归一化或复验任一步失败都不记录 staged evidence；部分复制、内容漂移、签名失败或未知对象保持现场并失败关闭。本切面不递归删除或覆盖无 evidence 的失败 staging；恢复/清理必须在后续以固定 operation、精确对象身份和显式动作实现。
+重启时若 `staged.app` 已存在但 receipt 尚无 staged evidence，adapter 只接受完整 tree/code identity 与 target 精确匹配且完全不含 quarantine 的对象，重复审计、复验和同步后补记 evidence。复制、审计或复验任一步失败都不记录 staged evidence；残留 quarantine、部分复制、内容漂移、签名失败或未知对象保持现场并失败关闭。本切面不修改、递归删除或覆盖无 evidence 的失败 staging；恢复/清理必须在后续以固定 operation、精确对象身份和显式动作实现。
 
 source evidence 记录前、target commit 后和 source restore 后都必须由 adapter 重新计算 tree hash 并复验 code signature，分别匹配 receipt source、target、source logical identity。核心的 inode evidence 证明“同一个目录对象被移动”，adapter 的 tree/code evidence 证明“该对象仍是预期程序”；两者不能互相替代。
 

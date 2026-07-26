@@ -94,7 +94,7 @@ adapter 组合 `ime-product-install`，但不接受自定义最终路径、bundl
 
 production code identity 使用 `/usr/bin/codesign --verify --deep --strict`，要求 `TeamIdentifier=not set`、`Signature=adhoc`、CodeDirectory ad-hoc flag、primary CDHash 与 designated requirement 精确一致，并命中 sealed 集合。固定字段形成脱敏 SHA-256；原始输出不进入 receipt、日志或错误。Developer ID、Apple Development、未知 requirement 或集合漂移均失败关闭。
 
-staging 使用 `/usr/bin/ditto` 先完整复制 resource fork、extended attributes、ACL、quarantine 和 HFS compression。复制后先复验 staged tree/code identity，再只对该固定 tree 以不跟随 symlink 的方式移除 `com.apple.quarantine`，从而避免下载载体把最终 Manager/InputMethod 置于 App Translocation；其他 xattr、ACL 和签名边界不变。归一化后重复 tree/code identity 复验并递归 `fsync`，才调用核心记录 filesystem evidence。完整但未记录的 staged bundle 可以在重启后幂等归一化并补记；归一化失败、部分或漂移对象保持现场，不覆盖、不自动清理。
+staging 使用 `/usr/bin/ditto --extattr --noqtn` 复制 resource fork、quarantine 之外的 extended attributes、ACL 和 HFS compression，从源头阻止下载祖先的 quarantine 传播。复制后先复验 staged tree/code identity，再逐节点审计固定 tree 中不存在 `com.apple.quarantine`；审计不修改文件 mode/xattr，也不跟随 symlink。随后重复 tree/code identity 复验并递归 `fsync`，才调用核心记录 filesystem evidence。完整、无 quarantine 但尚未记录的 staged bundle 可以在重启后补记；残留 quarantine、部分或漂移对象保持现场，不覆盖、不自动清理。
 
 ## InstallCoordinatorAdapter
 

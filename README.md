@@ -69,7 +69,7 @@ macOS 首发采用 `community-adhoc-v1`：Installer、Manager 与 InputMethod �
 
 发布页提供 DMG 后，用户必须先核对同时公布的 SHA-256，再通过“系统设置 → 隐私与安全性 → 仍要打开”明确放行 `RadishLex Installer.app`。终端 fallback 只允许对复制到 `$HOME/Applications` 的精确 Installer bundle 移除 quarantine，不使用 `sudo`，也不能对 `/Applications`、下载目录或整个用户 Applications 目录递归执行 `xattr`。
 
-用户不应再逐个放行已安装的 Manager 或 InputMethod。Installer 会在 payload manifest、完整 tree 和 strict ad-hoc identity 已复验的固定 staging tree 中，只移除 `com.apple.quarantine` 并再次复验；若最终程序仍被隔离或从 App Translocation 启动，应停止使用该候选并报告发布缺陷。
+用户不应再逐个放行已安装的 Manager 或 InputMethod。Installer 使用 `ditto --noqtn` 阻止下载 quarantine 传播到固定 staging，并在 payload manifest、完整 tree 和 strict ad-hoc identity 复验后逐节点审计无 quarantine，才允许提交；若最终程序仍被隔离或从 App Translocation 启动，应停止使用该候选并报告发布缺陷。
 
 Installer 只写当前用户域：
 

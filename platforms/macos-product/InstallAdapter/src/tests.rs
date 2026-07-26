@@ -116,8 +116,8 @@ impl MacOsCodeSignatureVerifier for FakeSignatureVerifier {
 struct CopyState {
     calls: AtomicUsize,
     fail_after_root: AtomicBool,
-    normalization_calls: AtomicUsize,
-    fail_normalization: AtomicBool,
+    metadata_verification_calls: AtomicUsize,
+    reject_staged_metadata: AtomicBool,
 }
 
 struct FakeBundleCopier {
@@ -138,13 +138,16 @@ impl BundleCopier for FakeBundleCopier {
         copy_tree(source, destination)
     }
 
-    fn normalize_staged_bundle(&self, _staged: &Path) -> Result<(), MacOsInstallAdapterError> {
+    fn verify_staged_bundle_metadata(
+        &self,
+        _staged: &Path,
+    ) -> Result<(), MacOsInstallAdapterError> {
         self.state
-            .normalization_calls
+            .metadata_verification_calls
             .fetch_add(1, Ordering::SeqCst);
-        if self.state.fail_normalization.load(Ordering::SeqCst) {
+        if self.state.reject_staged_metadata.load(Ordering::SeqCst) {
             return Err(error(
-                MacOsInstallAdapterErrorCode::QuarantineNormalizationFailed,
+                MacOsInstallAdapterErrorCode::StagedQuarantineRejected,
             ));
         }
         Ok(())
@@ -641,11 +644,11 @@ fn partial_or_replaced_staging_is_preserved_and_not_overwritten() {
 }
 
 #[test]
-fn quarantine_normalization_failure_preserves_verified_staging_for_retry() {
+fn staged_quarantine_rejection_preserves_verified_staging_for_retry() {
     let fixture = Fixture::new("0.1.0", "35", "target");
     let signature = Arc::new(SignatureState::default());
     let copy = Arc::new(CopyState::default());
-    copy.fail_normalization.store(true, Ordering::SeqCst);
+    copy.reject_staged_metadata.store(true, Ordering::SeqCst);
     let adapter = fixture
         .adapter(signature, copy.clone())
         .expect("install adapter");
@@ -670,50 +673,87 @@ fn quarantine_normalization_failure_preserves_verified_staging_for_retry() {
     assert_eq!(
         adapter
             .prepare_and_record_staged(&receipt_store, &guard, &manager, &mut receipt)
-            .expect_err("quarantine normalization")
+            .expect_err("staged quarantine")
             .code(),
-        MacOsInstallAdapterErrorCode::QuarantineNormalizationFailed
+        MacOsInstallAdapterErrorCode::StagedQuarantineRejected
     );
     assert!(manager.staged_bundle_path().is_dir());
     assert_eq!(copy.calls.load(Ordering::SeqCst), 1);
-    assert_eq!(copy.normalization_calls.load(Ordering::SeqCst), 1);
+    assert_eq!(copy.metadata_verification_calls.load(Ordering::SeqCst), 1);
 
-    copy.fail_normalization.store(false, Ordering::SeqCst);
+    copy.reject_staged_metadata.store(false, Ordering::SeqCst);
     adapter
         .prepare_and_record_staged(&receipt_store, &guard, &manager, &mut receipt)
         .expect("retry verified staging");
     assert_eq!(copy.calls.load(Ordering::SeqCst), 1);
-    assert_eq!(copy.normalization_calls.load(Ordering::SeqCst), 2);
+    assert_eq!(copy.metadata_verification_calls.load(Ordering::SeqCst), 2);
 }
 
 #[cfg(target_os = "macos")]
 #[test]
-fn quarantine_normalization_is_exact_idempotent_and_does_not_follow_symlinks() {
+fn ditto_excludes_quarantine_from_read_only_files_without_following_symlinks() {
     let fixture = Fixture::new("0.1.0", "35", "target");
+    let downloaded_container = fixture.container.join("downloaded-container");
+    let source = downloaded_container.join("payload-source.app");
     let staged = fixture.container.join("verified-staged.app");
-    let child = staged.join("Contents/child");
+    let child = source.join("Contents/child");
     let external = fixture.container.join("external-target");
-    create_directory(&staged, 0o755);
-    create_directory(&staged.join("Contents"), 0o755);
+    create_directory(&downloaded_container, 0o755);
+    create_directory(&source, 0o755);
+    create_directory(&source.join("Contents"), 0o755);
     fs::write(&child, b"staged child\n").expect("staged child");
     fs::write(&external, b"external target\n").expect("external target");
-    symlink(&external, staged.join("Contents/external-link")).expect("external symlink");
-    write_test_xattr(&staged, "com.apple.quarantine", "root-quarantine");
-    write_test_xattr(&child, "com.apple.quarantine", "child-quarantine");
+    symlink(&external, source.join("Contents/external-link")).expect("external symlink");
+    write_test_xattr(
+        &downloaded_container,
+        "com.apple.quarantine",
+        "container-quarantine",
+    );
     write_test_xattr(&child, "org.radishlex.test", "keep");
     write_test_xattr(&external, "com.apple.quarantine", "external-quarantine");
+    fs::set_permissions(&child, fs::Permissions::from_mode(0o444)).expect("read-only child");
 
     DittoBundleCopier
-        .normalize_staged_bundle(&staged)
-        .expect("normalize staged quarantine");
+        .copy_bundle(&source, &staged)
+        .expect("copy without quarantine");
     DittoBundleCopier
-        .normalize_staged_bundle(&staged)
-        .expect("repeat normalization");
+        .verify_staged_bundle_metadata(&staged)
+        .expect("verify staged metadata");
 
+    let staged_child = staged.join("Contents/child");
     assert!(!test_xattr_exists(&staged, "com.apple.quarantine"));
-    assert!(!test_xattr_exists(&child, "com.apple.quarantine"));
-    assert!(test_xattr_exists(&child, "org.radishlex.test"));
+    assert!(!test_xattr_exists(&staged_child, "com.apple.quarantine"));
+    assert!(test_xattr_exists(&staged_child, "org.radishlex.test"));
     assert!(test_xattr_exists(&external, "com.apple.quarantine"));
+    assert!(test_xattr_exists(
+        &downloaded_container,
+        "com.apple.quarantine"
+    ));
+    assert_eq!(
+        fs::metadata(&staged_child)
+            .expect("staged child metadata")
+            .permissions()
+            .mode()
+            & 0o7777,
+        0o444
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn staged_metadata_audit_rejects_any_residual_quarantine() {
+    let fixture = Fixture::new("0.1.0", "35", "target");
+    let staged = fixture.container.join("quarantined-staged.app");
+    create_directory(&staged, 0o755);
+    write_test_xattr(&staged, "com.apple.quarantine", "residual");
+
+    assert_eq!(
+        DittoBundleCopier
+            .verify_staged_bundle_metadata(&staged)
+            .expect_err("residual quarantine")
+            .code(),
+        MacOsInstallAdapterErrorCode::StagedQuarantineRejected
+    );
 }
 
 #[test]

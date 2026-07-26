@@ -16,7 +16,7 @@ pub(crate) trait BundleCopier: Send + Sync {
         destination: &Path,
     ) -> Result<(), MacOsInstallAdapterError>;
 
-    fn normalize_staged_bundle(&self, staged: &Path) -> Result<(), MacOsInstallAdapterError>;
+    fn verify_staged_bundle_metadata(&self, staged: &Path) -> Result<(), MacOsInstallAdapterError>;
 }
 
 #[derive(Debug)]
@@ -42,7 +42,7 @@ impl BundleCopier for DittoBundleCopier {
                 "-X",
                 "--rsrc",
                 "--extattr",
-                "--qtn",
+                "--noqtn",
                 "--acl",
                 "--preserveHFSCompression",
                 "--nocache",
@@ -60,35 +60,61 @@ impl BundleCopier for DittoBundleCopier {
         Ok(())
     }
 
-    fn normalize_staged_bundle(&self, staged: &Path) -> Result<(), MacOsInstallAdapterError> {
+    fn verify_staged_bundle_metadata(&self, staged: &Path) -> Result<(), MacOsInstallAdapterError> {
         if !staged.is_absolute() {
             return Err(error(
-                MacOsInstallAdapterErrorCode::QuarantineNormalizationFailed,
+                MacOsInstallAdapterErrorCode::StagedQuarantineRejected,
             ));
         }
         let metadata = fs::symlink_metadata(staged)
-            .map_err(|_| error(MacOsInstallAdapterErrorCode::QuarantineNormalizationFailed))?;
+            .map_err(|_| error(MacOsInstallAdapterErrorCode::StagedQuarantineRejected))?;
         if !metadata.file_type().is_dir() {
             return Err(error(
-                MacOsInstallAdapterErrorCode::QuarantineNormalizationFailed,
+                MacOsInstallAdapterErrorCode::StagedQuarantineRejected,
             ));
         }
-        let status = Command::new(XATTR_PATH)
-            .env_clear()
-            .args(["-d", "-r", "-s", QUARANTINE_ATTRIBUTE])
-            .arg(staged)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .map_err(|_| error(MacOsInstallAdapterErrorCode::QuarantineNormalizationFailed))?;
-        if !status.success() {
-            return Err(error(
-                MacOsInstallAdapterErrorCode::QuarantineNormalizationFailed,
-            ));
-        }
-        Ok(())
+        verify_quarantine_absent(staged)
     }
+}
+
+fn verify_quarantine_absent(path: &Path) -> Result<(), MacOsInstallAdapterError> {
+    let metadata = fs::symlink_metadata(path)
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::StagedQuarantineRejected))?;
+    let output = Command::new(XATTR_PATH)
+        .env_clear()
+        .arg("-s")
+        .arg(path)
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::StagedQuarantineRejected))?;
+    if !output.status.success()
+        || output
+            .stdout
+            .split(|byte| *byte == b'\n')
+            .any(|attribute| attribute == QUARANTINE_ATTRIBUTE.as_bytes())
+    {
+        return Err(error(
+            MacOsInstallAdapterErrorCode::StagedQuarantineRejected,
+        ));
+    }
+    if metadata.file_type().is_symlink() || metadata.file_type().is_file() {
+        return Ok(());
+    }
+    if !metadata.file_type().is_dir() {
+        return Err(error(
+            MacOsInstallAdapterErrorCode::StagedQuarantineRejected,
+        ));
+    }
+    let mut entries: Vec<_> = fs::read_dir(path)
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::StagedQuarantineRejected))?
+        .collect::<Result<_, _>>()
+        .map_err(|_| error(MacOsInstallAdapterErrorCode::StagedQuarantineRejected))?;
+    entries.sort_by_key(|entry| entry.file_name());
+    for entry in entries {
+        verify_quarantine_absent(&entry.path())?;
+    }
+    Ok(())
 }
 
 pub(crate) fn sync_bundle_tree(root: &Path) -> Result<(), MacOsInstallAdapterError> {
