@@ -67,10 +67,11 @@ build 37 的 first install 与 repair 均先到 `prepared` 静止边界，再完
 ## 下一步顺位
 
 1. build 37 首次安装、固定路径启动、双端 startup gate、Manager/输入 smoke、repair 与默认 remove 证据链已闭合；当前停在保留 Application Support 和历史事务材料的 completed remove 现场。
-2. 恢复空数据基线、清理本轮 operation 或处置历史材料必须另取固定白名单与 receipt 绑定授权；不得把默认保留数据的 remove 冒充数据卸载。
-3. 复核 Installer 中 `⌘Q` 未生效、窗口关闭可正常退出的 UX 现象，判断是否需要在发布前修正。
-4. 整理发布说明；tag、正式 Release、远端推送仍需另行授权。
-5. 首发形成后把该 assembly 作为下一版本真实历史 source，证明跨发布 upgrade、重启续跑与 source 回滚；真实用户同步继续关闭。
+2. 代码审阅已确认 Installer AppKit 壳实现了关闭最后窗口后退出，但没有创建标准 Application 菜单，因此 `⌘Q` 没有 Quit action。下一开发切面先固定退出/恢复 UX 契约，再补标准菜单、自动门禁和冻结候选人工复验；退出不得清理或改写持久化事务。
+3. Installer bundle 如发生代码变化，build 37 继续保留为 quarantine、安装事务和数据保留证据，但不再作为最终发布载体；必须递增 build，重新执行 Installer、DMG、载体、独立下载和真实用户域相关门禁。
+4. 新候选通过后整理发布说明，明确社区 ad-hoc、未公证、SHA-256、人工放行、默认 remove 保留数据和真实用户同步关闭；tag、正式 Release、远端推送仍需另行授权。
+5. 恢复空数据基线、清理本轮 operation 或处置历史材料必须另取固定白名单与 receipt 绑定授权；不得把默认保留数据的 remove 冒充数据卸载。
+6. 首发形成后把该 assembly 作为下一版本真实历史 source，证明跨发布 upgrade、重启续跑与 source 回滚；真实用户同步继续关闭。
 
 ## 验证入口
 
