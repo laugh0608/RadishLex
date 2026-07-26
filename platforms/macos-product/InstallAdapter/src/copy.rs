@@ -6,6 +6,8 @@ use std::process::{Command, Stdio};
 use crate::{error, MacOsInstallAdapterError, MacOsInstallAdapterErrorCode};
 
 const DITTO_PATH: &str = "/usr/bin/ditto";
+const XATTR_PATH: &str = "/usr/bin/xattr";
+const QUARANTINE_ATTRIBUTE: &str = "com.apple.quarantine";
 
 pub(crate) trait BundleCopier: Send + Sync {
     fn copy_bundle(
@@ -13,6 +15,8 @@ pub(crate) trait BundleCopier: Send + Sync {
         source: &Path,
         destination: &Path,
     ) -> Result<(), MacOsInstallAdapterError>;
+
+    fn normalize_staged_bundle(&self, staged: &Path) -> Result<(), MacOsInstallAdapterError>;
 }
 
 #[derive(Debug)]
@@ -52,6 +56,36 @@ impl BundleCopier for DittoBundleCopier {
             .map_err(|_| error(MacOsInstallAdapterErrorCode::CopyFailed))?;
         if !status.success() {
             return Err(error(MacOsInstallAdapterErrorCode::CopyFailed));
+        }
+        Ok(())
+    }
+
+    fn normalize_staged_bundle(&self, staged: &Path) -> Result<(), MacOsInstallAdapterError> {
+        if !staged.is_absolute() {
+            return Err(error(
+                MacOsInstallAdapterErrorCode::QuarantineNormalizationFailed,
+            ));
+        }
+        let metadata = fs::symlink_metadata(staged)
+            .map_err(|_| error(MacOsInstallAdapterErrorCode::QuarantineNormalizationFailed))?;
+        if !metadata.file_type().is_dir() {
+            return Err(error(
+                MacOsInstallAdapterErrorCode::QuarantineNormalizationFailed,
+            ));
+        }
+        let status = Command::new(XATTR_PATH)
+            .env_clear()
+            .args(["-d", "-r", "-s", QUARANTINE_ATTRIBUTE])
+            .arg(staged)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map_err(|_| error(MacOsInstallAdapterErrorCode::QuarantineNormalizationFailed))?;
+        if !status.success() {
+            return Err(error(
+                MacOsInstallAdapterErrorCode::QuarantineNormalizationFailed,
+            ));
         }
         Ok(())
     }

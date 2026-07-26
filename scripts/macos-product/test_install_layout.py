@@ -201,7 +201,9 @@ class InstallLayoutTest(unittest.TestCase):
                 self.root / "duplicate-source-payload",
                 upgrade_source_product_roots=[source, source],
             )
-        target_release = self.make_historical_product("26.7.1", "35")
+        target_release = self.make_historical_product(
+            self.metadata.product_version, self.metadata.build_number
+        )
         with self.assertRaisesRegex(
             install_layout.InstallLayoutError,
             "must be older",

@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核日期：2026-07-25（Asia/Shanghai）
+- 复核日期：2026-07-26（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前里程碑：M4 产品发布候选
 - 当前主批次：M4-P03 安装载体与发布供应链
@@ -13,7 +13,7 @@
 
 ## M4 稳定事实
 
-M4-P01 已形成离线双 bundle 产品装配。根 `version.json` 是版本/build 唯一人工真相源，首发为 Radish CalVer `26.7.1 (35)`。产品 metadata 固定 macOS 13.0、FFI ABI v9、userdb v9、RimeData v2 和 `community-adhoc-v1`；ProductManifest v3 绑定双 bundle tree、许可证、版本与 schema。
+M4-P01 已形成离线双 bundle 产品装配。根 `version.json` 是版本/build 唯一人工真相源；当前修复候选递增为 Radish CalVer `26.7.1 (36)`。产品 metadata 固定 macOS 13.0、FFI ABI v9、userdb v9、RimeData v2 和 `community-adhoc-v1`；ProductManifest v3 绑定双 bundle tree、许可证、版本与 schema。
 
 RimeData 来源锁固定 `radishlex_pinyin`、Apache-2.0 `pinyin_simp` 词典和逐资产许可证；首发不携带 LGPL `prelude`、`stroke`。真实 `librime 1.17.0`、native FFI、递归 dylib 与 manifest 门禁已通过。
 
@@ -41,7 +41,7 @@ Library/Application Support/RadishLex/.radishlex-install-v1
 - `ReleaseIdentity.json` format v2 绑定 target 与全部显式历史 source 的 Manager/InputMethod requirement 有界、排序、去重集合；两端集合不得重叠；
 - Developer ID、Apple Development、unknown requirement、manifest/tree/bundle ID 漂移均失败关闭。
 
-ad-hoc 只提供包内完整性与安装事务 identity，不提供 Apple 发布者认证。DMG 不签名、不公证、不 staple；`notarize-macos-release-dmg.sh` 在当前模式稳定拒绝执行。本机已生成并挂载复验 `26.7.1 (35)` DMG，SHA-256 为 `1137b14f284275723a5d019447c70cd926638937944b73e749cce81c8975b4ec`；`CommunityReleaseEvidence.json` 绑定版本、文件名、大小、该摘要与 release identity，产物保留在 ignored `target/`，尚未公开上传。
+ad-hoc 只提供包内完整性与事务 identity，不提供 Apple 发布者认证；DMG 不签名、不公证。`26.7.1 (35)` 首次安装把 quarantine 传播给双 bundle，Manager 从 App Translocation 启动后被固定路径门禁正确拒绝，故候选失效。adapter 现只在固定 staging 通过 manifest/tree/code identity 复验后移除 `com.apple.quarantine`，再次复验才记录 evidence。新 `26.7.1 (36)` DMG 已冻结，SHA-256 为 `2fa479fe261bc20666c058807d01eebc28631a641e3c2210c253f89f6acea255`。
 
 用户安装必须先核对 SHA-256，再使用“系统设置 → 隐私与安全性 → 仍要打开”。终端 fallback 只作用于复制到 `$HOME/Applications` 的精确 `RadishLex Installer.app`，不使用 `sudo`，不得对宽泛目录递归移除 quarantine。完整步骤见 [macOS 社区 ad-hoc DMG Runbook](../runbooks/macos-release-carrier.md)。
 
@@ -64,10 +64,11 @@ upgrade 只从当前外层 receipt 精确选择 `UpgradeSources/<version>-<build
 
 ## 下一步顺位
 
-1. 从同一 `26.7.1 (35)` 冻结候选完成独立下载 SHA-256 复验、人工“仍要打开”与真实用户域验收；不得以重新构建或本机复制替代下载载体证据。
-2. 依次证明 first install、重启双端 startup gate、Manager/输入 smoke、repair、默认 remove 与数据/输入源基线恢复；失败先保留现场并修正根因。
-3. 验收通过后整理发布说明、DMG/evidence/checksum 和安装警示；上传、tag、Release 与远端操作另行授权。
-4. 首发形成后把该 assembly 作为下一版本真实历史 source，证明跨发布 upgrade、重启续跑与 source 回滚；真实用户同步继续关闭。
+1. 提交并推送 build 36 修复，替换 draft Release 的 build 35 失效资产，再取得独立下载 SHA-256 与真实 quarantine 证据。
+2. 清理 build 35 失败安装现场，从空用户域基线只人工放行 build 36 Installer。
+3. 依次证明 first install 后双 bundle 无 quarantine、固定路径启动、双端 startup gate、Manager/输入 smoke、repair、默认 remove 与数据/输入源基线恢复。
+4. 验收通过后整理发布说明；tag 与正式 Release 仍另行授权。
+5. 首发形成后把该 assembly 作为下一版本真实历史 source，证明跨发布 upgrade、重启续跑与 source 回滚；真实用户同步继续关闭。
 
 ## 验证入口
 

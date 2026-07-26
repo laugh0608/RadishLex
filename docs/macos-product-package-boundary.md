@@ -180,6 +180,7 @@ Library/Application Support/RadishLex/.radishlex-install-v1
 安装与移除继续遵守：
 
 - Installer 不接受自定义目标，用户能在变更前看到两个程序路径和保留数据语义；
+- 用户只需人工放行已核对摘要的 Installer；安装事务在 staged bundle 通过 manifest/tree/strict ad-hoc identity 复验后，只移除固定 staging tree 的 `com.apple.quarantine` 并再次复验，最终 Manager/InputMethod 不得继承下载 quarantine 或从 App Translocation 启动；
 - 工具不得程序化选择或模拟切换输入源；
 - 升级前后使用公开 API 只读确认输入源状态；
 - 默认移除只删除产品 bundle，保留 Application Support 数据；
@@ -232,7 +233,8 @@ Apple 官方边界参考：
 14. 已接入 authoritative current-user bootstrap、完整内嵌 InstallPayload、strict ad-hoc release identity 和可回退实机验收 runbook；普通开发构建因缺失 sealed identity 失败关闭；
 15. 已固定 community ad-hoc 发布构建、双 component sealed release identity 与 DMG SHA-256 evidence，并开放 first install/repair/default remove 的 production mutation port；
 16. 已将历史 source assembly 纳入 payload v2，按外层 receipt 精确选源并开放 production upgrade port；
-17. 已生成并挂载复验 `26.7.1 (35)` 未公证 APFS/UDZO DMG、社区发布证据和用户人工放行 runbook；下一步从同一冻结候选形成独立下载核验与真实用户域首次安装/修复/移除证据。
+17. `26.7.1 (35)` 未公证 APFS/UDZO DMG 已完成独立下载核验和 Installer 人工放行，但真实首次安装证明其把 quarantine 传播给双 bundle，Manager 因 App Translocation 被固定路径 startup gate 正确拒绝；该候选已失效，不作为首发 assembly。
+18. 安装事务已增加 manifest/identity 复验后的精确 staging quarantine 归一化与失败恢复门禁；`26.7.1 (36)` 新 DMG/evidence 已通过完整仓库门禁，下一步从独立下载与空用户域基线重新证明首次安装、启动、修复与移除。
 
 ## M4-P01 退出标准
 

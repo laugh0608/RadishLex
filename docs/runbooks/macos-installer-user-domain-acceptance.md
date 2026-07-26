@@ -39,6 +39,7 @@ Installer 自身只从当前 executable 反推 `Contents/Resources/InstallPayloa
 - 固定路径或任一父目录是 symlink、owner 异常，或 Application Support 已存在但不是可归属的私有目录；
 - TIS、bundle、进程、receipt、staging、backup 或 userdb 现场无法归属；
 - Manager/InputMethod 仍运行，或开发者尚未手动切换到中立输入源；
+- 安装后的 Manager/InputMethod 仍带 `com.apple.quarantine`，系统要求逐个放行，或任一程序从 App Translocation 启动；
 - Installer snapshot 不是已知 ABI/枚举，或日志出现路径、PID、operation ID、签名正文和底层命令输出；
 - 任一步要求程序化选择/注册/停用输入源、编辑 TIS 私有数据库、删除历史 operation 材料或查看用户数据正文。
 
@@ -91,9 +92,11 @@ Installer 自身只从当前 executable 反推 `Contents/Resources/InstallPayloa
 1. 开发者手动切换到中立输入源并关闭 Manager；AI 只读复验。
 2. 在 Installer 中显式确认首次安装。`prepared` 必须先持久化并等待人工步骤，不能一次点击越过静止边界。
 3. 再次确认后，Installer 重新执行平台 preflight，按 receipt 完成双 bundle staging、逐端 commit、两段终态并到达 `completed`。
-4. 开发者在系统设置中手动添加并选择 RadishLex；AI 不点击、不模拟按键、不调用 TIS 注册或选择 API。
-5. 开发者用公开合成文本完成最小输入 smoke，再切回中立输入源。
-6. 关闭 Manager/InputMethod 后复验双端 install startup gate 和 data startup gate 均允许；日志只保留稳定 decision/error/state。
+4. 在打开双端前，只读确认两个固定 bundle 均无 `com.apple.quarantine`，完整 tree/code identity 与 receipt target 不变；用户不应再单独放行 Manager/InputMethod。
+5. 从固定用户域路径启动 Manager，确认进程 executable 不位于 App Translocation，且 install startup gate 和 data startup gate 均允许。
+6. 开发者在系统设置中手动添加并选择 RadishLex；AI 不点击、不模拟按键、不调用 TIS 注册或选择 API。
+7. 开发者用公开合成文本完成最小输入 smoke，再切回中立输入源。
+8. 关闭 Manager/InputMethod 后复验双端 startup gate；日志只保留稳定 decision/error/state。
 
 ## E. 升级、故障恢复与回滚
 
@@ -121,11 +124,13 @@ Installer 自身只从当前 executable 反推 `Contents/Resources/InstallPayloa
 4. 若验收基线原先已有受 receipt 证明的 bundle，只能通过对应 source backup/receipt 恢复；不得从构建目录任意复制冒充回滚。
 5. 数据删除不属于本 runbook。需要恢复空基线时，另行取得固定白名单与 receipt 绑定的删除授权。
 
-## 当前实机证据（2026-07-25）
+## 当前实机证据（2026-07-26）
 
 - 普通开发构建已证明缺少 sealed identity 时稳定投影 `product_identity_unavailable`，且没有改变 TIS、双 bundle、Application Support 数据或进程基线。
-- HEAD `ad5ce37` 已构建 `26.7.1 (35)` community Installer 与 APFS/UDZO DMG；只读挂载、唯一根对象、Installer/payload/release identity 复验和完整仓库门禁通过。
-- 当前本机候选 DMG SHA-256 为 `1137b14f284275723a5d019447c70cd926638937944b73e749cce81c8975b4ec`，evidence 明确记录 `apple_notarized=false`；产物保留在 ignored `target/`，未公开上传。
-- 尚未形成独立下载副本、用户人工放行、真实 first install/repair/remove、重启双端 startup gate 或跨发布 upgrade 成功证据。
+- `26.7.1 (35)` community DMG 已上传到 GitHub draft Release，并由 Chrome 形成独立下载副本；下载文件与本地冻结 artifact、发布页 evidence 的大小和 SHA-256 `1137b14f284275723a5d019447c70cd926638937944b73e749cce81c8975b4ec` 逐字节一致，且保留真实下载 quarantine。
+- 用户通过“隐私与安全性 → 仍要打开”放行 Installer，首次安装事务到达 `completed`，双 bundle 版本、build、strict ad-hoc code identity、receipt 和 TIS 自动发现均符合预期。
+- 失败证据：安装事务保留了 payload 的 quarantine，导致固定目标双 bundle 继续带 `com.apple.quarantine`；Manager 被系统从 App Translocation 启动后，由固定用户域 startup gate 正确拒绝并退出，没有 crash report。`26.7.1 (35)` 因此失效，不能作为首发或未来 upgrade source。
+- 已停止后续输入 smoke、repair 和 remove 验收。修复要求只在已验证的固定 staging tree 上归一化 quarantine，随后重复 tree/code identity 复验；必须使用递增 build 和新的 DMG/evidence，从空用户域基线重新执行全部正向验收。
+- `26.7.1 (36)` 修复候选已生成并通过完整仓库门禁；本地 DMG 大小为 `32181986` bytes，SHA-256 为 `2fa479fe261bc20666c058807d01eebc28631a641e3c2210c253f89f6acea255`，`apple_notarized=false`。尚未替换 draft asset，也未形成 build 36 独立下载或真实安装证据。
 
-下一次实机验收必须从 A 重新采集只读基线，并只使用上述同一冻结候选。若候选内容或版本变化，应生成新的 evidence 与验收记录，不能沿用本节 SHA-256。
+下一次实机验收必须从 A 重新采集只读基线，只使用新的 `26.7.1 (36)` 冻结候选及其独立下载副本。不得沿用 build 35 的 SHA-256、draft asset 或安装成功断言。

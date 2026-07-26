@@ -2,6 +2,8 @@ use std::fs::{self, DirBuilder, OpenOptions};
 use std::io::Write;
 use std::os::unix::fs::{symlink, DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
+#[cfg(target_os = "macos")]
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -15,6 +17,8 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 use super::copy::BundleCopier;
+#[cfg(target_os = "macos")]
+use super::copy::DittoBundleCopier;
 use super::*;
 
 const COMMITTED_LAYOUT: &[u8] = include_bytes!("../../../../packaging/macos/install-layout.json");
@@ -112,6 +116,8 @@ impl MacOsCodeSignatureVerifier for FakeSignatureVerifier {
 struct CopyState {
     calls: AtomicUsize,
     fail_after_root: AtomicBool,
+    normalization_calls: AtomicUsize,
+    fail_normalization: AtomicBool,
 }
 
 struct FakeBundleCopier {
@@ -130,6 +136,18 @@ impl BundleCopier for FakeBundleCopier {
             return Err(error(MacOsInstallAdapterErrorCode::CopyFailed));
         }
         copy_tree(source, destination)
+    }
+
+    fn normalize_staged_bundle(&self, _staged: &Path) -> Result<(), MacOsInstallAdapterError> {
+        self.state
+            .normalization_calls
+            .fetch_add(1, Ordering::SeqCst);
+        if self.state.fail_normalization.load(Ordering::SeqCst) {
+            return Err(error(
+                MacOsInstallAdapterErrorCode::QuarantineNormalizationFailed,
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -623,6 +641,82 @@ fn partial_or_replaced_staging_is_preserved_and_not_overwritten() {
 }
 
 #[test]
+fn quarantine_normalization_failure_preserves_verified_staging_for_retry() {
+    let fixture = Fixture::new("0.1.0", "35", "target");
+    let signature = Arc::new(SignatureState::default());
+    let copy = Arc::new(CopyState::default());
+    copy.fail_normalization.store(true, Ordering::SeqCst);
+    let adapter = fixture
+        .adapter(signature, copy.clone())
+        .expect("install adapter");
+    let receipt_store = InstallReceiptStore::open(
+        VerifiedInstallRoot::verify(fixture.data_root(), fixture.owner_id)
+            .expect("verified data root"),
+    )
+    .expect("receipt store");
+    let guard = receipt_store.acquire_guard().expect("guard");
+    let mut receipt = first_install_receipt(&adapter, &receipt_store);
+    receipt_store
+        .persist(&guard, &receipt)
+        .expect("prepared receipt");
+    receipt.advance(InstallState::Quiesced).expect("quiesced");
+    receipt_store
+        .persist(&guard, &receipt)
+        .expect("quiesced receipt");
+    let manager = adapter
+        .open_program_store(&receipt_store, &guard, ProgramComponent::Manager, &receipt)
+        .expect("Manager store");
+
+    assert_eq!(
+        adapter
+            .prepare_and_record_staged(&receipt_store, &guard, &manager, &mut receipt)
+            .expect_err("quarantine normalization")
+            .code(),
+        MacOsInstallAdapterErrorCode::QuarantineNormalizationFailed
+    );
+    assert!(manager.staged_bundle_path().is_dir());
+    assert_eq!(copy.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(copy.normalization_calls.load(Ordering::SeqCst), 1);
+
+    copy.fail_normalization.store(false, Ordering::SeqCst);
+    adapter
+        .prepare_and_record_staged(&receipt_store, &guard, &manager, &mut receipt)
+        .expect("retry verified staging");
+    assert_eq!(copy.calls.load(Ordering::SeqCst), 1);
+    assert_eq!(copy.normalization_calls.load(Ordering::SeqCst), 2);
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn quarantine_normalization_is_exact_idempotent_and_does_not_follow_symlinks() {
+    let fixture = Fixture::new("0.1.0", "35", "target");
+    let staged = fixture.container.join("verified-staged.app");
+    let child = staged.join("Contents/child");
+    let external = fixture.container.join("external-target");
+    create_directory(&staged, 0o755);
+    create_directory(&staged.join("Contents"), 0o755);
+    fs::write(&child, b"staged child\n").expect("staged child");
+    fs::write(&external, b"external target\n").expect("external target");
+    symlink(&external, staged.join("Contents/external-link")).expect("external symlink");
+    write_test_xattr(&staged, "com.apple.quarantine", "root-quarantine");
+    write_test_xattr(&child, "com.apple.quarantine", "child-quarantine");
+    write_test_xattr(&child, "org.radishlex.test", "keep");
+    write_test_xattr(&external, "com.apple.quarantine", "external-quarantine");
+
+    DittoBundleCopier
+        .normalize_staged_bundle(&staged)
+        .expect("normalize staged quarantine");
+    DittoBundleCopier
+        .normalize_staged_bundle(&staged)
+        .expect("repeat normalization");
+
+    assert!(!test_xattr_exists(&staged, "com.apple.quarantine"));
+    assert!(!test_xattr_exists(&child, "com.apple.quarantine"));
+    assert!(test_xattr_exists(&child, "org.radishlex.test"));
+    assert!(test_xattr_exists(&external, "com.apple.quarantine"));
+}
+
+#[test]
 fn home_alias_permissions_and_bundle_hardlinks_are_rejected() {
     let fixture = Fixture::new("0.1.0", "35", "target");
     let alias = fixture.container.join("home-alias");
@@ -942,6 +1036,34 @@ fn write_executable(path: &Path, bytes: &[u8]) {
         .open(path)
         .expect("create executable");
     file.write_all(bytes).expect("write executable");
+}
+
+#[cfg(target_os = "macos")]
+fn write_test_xattr(path: &Path, name: &str, value: &str) {
+    let status = Command::new("/usr/bin/xattr")
+        .env_clear()
+        .args(["-w", name, value])
+        .arg(path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .expect("launch xattr");
+    assert!(status.success(), "write test xattr");
+}
+
+#[cfg(target_os = "macos")]
+fn test_xattr_exists(path: &Path, name: &str) -> bool {
+    Command::new("/usr/bin/xattr")
+        .env_clear()
+        .args(["-p", "-s", name])
+        .arg(path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .expect("launch xattr")
+        .success()
 }
 
 fn copy_tree(source: &Path, destination: &Path) -> Result<(), MacOsInstallAdapterError> {
