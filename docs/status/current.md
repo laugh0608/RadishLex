@@ -41,7 +41,7 @@ Library/Application Support/RadishLex/.radishlex-install-v1
 - `ReleaseIdentity.json` format v2 绑定 target 与全部显式历史 source 的 Manager/InputMethod requirement 有界、排序、去重集合；两端集合不得重叠；
 - Developer ID、Apple Development、unknown requirement、manifest/tree/bundle ID 漂移均失败关闭。
 
-ad-hoc 只提供包内完整性与事务 identity，不提供 Apple 发布者认证；DMG 不签名、不公证。build 35 把 quarantine 传播到最终程序；build 36 的复制后清理又无法处理 `0444` dylib，事务在提交前失败关闭，其 receipt 与两个 operation staging 已原样移入 ignored 可恢复备份。adapter 现以 `ditto --noqtn` 源头排除传播，再逐节点只读审计无 quarantine，并重复 tree/code identity 复验后才记录 evidence。`26.7.1 (37)` 已形成冻结候选：DMG 大小 `32194418` bytes，SHA-256 `c3977796b717f58a191d68755048b316c771a283bb2bfece6d0172db48d20a41`，等待独立下载与真实用户域验收。
+ad-hoc 只提供包内完整性与事务 identity，不提供 Apple 发布者认证；DMG 不签名、不公证。build 35 把 quarantine 传播到最终程序；build 36 的复制后清理又无法处理 `0444` dylib，事务在提交前失败关闭，其 receipt 与两个 operation staging 已原样移入 ignored 可恢复备份。adapter 现以 `ditto --noqtn` 源头排除传播，再逐节点只读审计无 quarantine，并重复 tree/code identity 复验后才记录 evidence。`26.7.1 (37)` 已形成冻结候选：DMG 大小 `32194418` bytes，SHA-256 `c3977796b717f58a191d68755048b316c771a283bb2bfece6d0172db48d20a41`；draft Release 已只保留三个 build 37 资产，仍未发布、无 Git tag，等待独立下载与真实用户域验收。
 
 用户安装必须先核对 SHA-256，再使用“系统设置 → 隐私与安全性 → 仍要打开”。终端 fallback 只作用于复制到 `$HOME/Applications` 的精确 `RadishLex Installer.app`，不使用 `sudo`，不得对宽泛目录递归移除 quarantine。完整步骤见 [macOS 社区 ad-hoc DMG Runbook](../runbooks/macos-release-carrier.md)。
 
@@ -64,7 +64,7 @@ upgrade 只从当前外层 receipt 精确选择 `UpgradeSources/<version>-<build
 
 ## 下一步顺位
 
-1. 经授权推送 build 37 修复并替换 draft asset，再取得独立下载证据。
+1. 从 draft Release 取得 build 37 独立下载副本，核对大小、SHA-256、字节一致性与真实 quarantine。
 2. 证明 first install、固定路径启动、双端 startup gate、Manager/输入 smoke、repair、默认 remove 与基线恢复。
 3. 验收通过后整理发布说明；tag 与正式 Release 另行授权。
 4. 首发形成后把该 assembly 作为下一版本真实历史 source，证明跨发布 upgrade、重启续跑与 source 回滚；真实用户同步继续关闭。

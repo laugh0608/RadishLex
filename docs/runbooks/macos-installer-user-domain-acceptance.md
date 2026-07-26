@@ -133,6 +133,6 @@ Installer 自身只从当前 executable 反推 `Contents/Resources/InstallPayloa
 - `26.7.1 (36)` DMG 大小为 `32181986` bytes，SHA-256 为 `2fa479fe261bc20666c058807d01eebc28631a641e3c2210c253f89f6acea255`，已完成 draft asset 替换、Chrome 独立下载、摘要核对和 Installer 人工放行。
 - build 36 首次安装在 `quiesced` 可恢复边界失败关闭：Manager staging 已清除 quarantine 并记录 evidence；InputMethod 的 8 个 `0444` 第三方 dylib 仍保留 quarantine，故 adapter 未记录 InputMethod evidence，双程序均未提交。用户没有点击续跑。
 - 根因是 `xattr -drs` 对只读文件返回权限错误且会留下部分修改。后续实现不得临时 chmod 或逐项修改 staging；改为 `ditto --noqtn` 从复制源头排除传播，并对每个节点只读审计无 quarantine，随后重复 tree/code identity 复验。
-- `26.7.1 (37)` 冻结候选已通过完整仓库与载体门禁；本地 DMG 大小为 `32194418` bytes，SHA-256 为 `c3977796b717f58a191d68755048b316c771a283bb2bfece6d0172db48d20a41`，尚未替换 draft asset 或形成独立下载证据。
+- `26.7.1 (37)` 冻结候选已通过完整仓库与载体门禁；本地 DMG 大小为 `32194418` bytes，SHA-256 为 `c3977796b717f58a191d68755048b316c771a283bb2bfece6d0172db48d20a41`。draft Release 已只保留 build 37 的 DMG、checksum 与 evidence，仍未发布且没有 Git tag；尚未形成独立下载证据。
 
 下一次实机验收必须从 A 重新采集只读基线，只使用新的 `26.7.1 (37)` 冻结候选及其独立下载副本。不得沿用 build 35/36 的 SHA-256、draft asset 或安装成功断言。
