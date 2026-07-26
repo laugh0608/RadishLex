@@ -41,7 +41,7 @@ Library/Application Support/RadishLex/.radishlex-install-v1
 - `ReleaseIdentity.json` format v2 绑定 target 与全部显式历史 source 的 Manager/InputMethod requirement 有界、排序、去重集合；两端集合不得重叠；
 - Developer ID、Apple Development、unknown requirement、manifest/tree/bundle ID 漂移均失败关闭。
 
-ad-hoc 只提供包内完整性与事务 identity，不提供 Apple 发布者认证；DMG 不签名、不公证。build 35 传播 quarantine；build 36 对 `0444` dylib 清理失败并在提交前关闭，失败 receipt/staging 已移入可恢复备份。adapter 现以 `ditto --noqtn` 排除传播，逐节点审计无 quarantine，并重复 identity 复验后才记录 evidence。`26.7.1 (37)` DMG 大小 `32194418` bytes，SHA-256 `c3977796b717f58a191d68755048b316c771a283bb2bfece6d0172db48d20a41`；draft 仅含三个 build 37 资产且未发布、无 Git tag。Chrome 独立下载副本已证明摘要与字节一致并带真实 quarantine，等待人工放行与用户域验收。
+ad-hoc 只提供包内完整性与事务 identity，不提供 Apple 发布者认证；DMG 不签名、不公证。build 35 传播 quarantine；build 36 对 `0444` dylib 清理失败并在提交前关闭，失败 receipt/staging 已移入可恢复备份。adapter 现以 `ditto --noqtn` 排除传播，逐节点审计无 quarantine，并重复 identity 复验后才记录 evidence。`26.7.1 (37)` DMG 大小 `32194418` bytes，SHA-256 `c3977796b717f58a191d68755048b316c771a283bb2bfece6d0172db48d20a41`；draft 仅含三个 build 37 资产且未发布、无 Git tag。Chrome 独立下载副本已证明摘要与字节一致并带真实 quarantine；用户人工放行后的首次安装、固定路径启动、输入 smoke、repair 和默认程序移除均已通过真实用户域验收。
 
 用户安装必须先核对 SHA-256，再使用“系统设置 → 隐私与安全性 → 仍要打开”。终端 fallback 只作用于复制到 `$HOME/Applications` 的精确 `RadishLex Installer.app`，不使用 `sudo`，不得对宽泛目录递归移除 quarantine。完整步骤见 [macOS 社区 ad-hoc DMG Runbook](../runbooks/macos-release-carrier.md)。
 
@@ -52,6 +52,8 @@ Installer UI/driver snapshot v1、restartable executor 与原生 bridge ABI v1 �
 生产 bootstrap 使用 `geteuid/getpwuid_r` 和当前 executable 固定形成 home/resources，严格读取 sealed release identity 与内嵌 InstallPayload。first install 只在显式 action 后创建缺失的固定目录；既有对象不 chmod。repair、默认程序移除和恢复共用真实 mutation port。
 
 upgrade 只从当前外层 receipt 精确选择 `UpgradeSources/<version>-<build>`，在任何 mutation 前复验历史 source manifest/tree/ad-hoc identity、release 顺序与 helper。缺失 source 返回 `driver_unavailable`；错误、重复、身份漂移或非历史 source 返回产品身份阻断。首发 `UpgradeSources` 为空，不伪造上一版本。
+
+build 37 的 first install 与 repair 均先到 `prepared` 静止边界，再完成双 bundle 事务；安装后逐节点 quarantine 为零，ProductManifest、sealed release identity、strict ad-hoc identity 和固定用户域启动均通过。公开合成输入 `zhongwen` 正常展示候选并提交“中文”。repair 替换双 bundle但保留 Application Support、Rime 与 userdb inode；默认 remove 到达 `remove_programs/completed`，双 bundle 与 TIS 已清零，数据、receipt、sidecar 和历史 operation 保留。
 
 ## 当前停止线
 
@@ -64,10 +66,11 @@ upgrade 只从当前外层 receipt 精确选择 `UpgradeSources/<version>-<build
 
 ## 下一步顺位
 
-1. 人工放行已核对摘要的 build 37 Installer，确认首次安装 ready/prepared 静止边界。
-2. 证明 first install、固定路径启动、双端 startup gate、Manager/输入 smoke、repair、默认 remove 与基线恢复。
-3. 验收通过后整理发布说明；tag 与正式 Release 另行授权。
-4. 首发形成后把该 assembly 作为下一版本真实历史 source，证明跨发布 upgrade、重启续跑与 source 回滚；真实用户同步继续关闭。
+1. build 37 首次安装、固定路径启动、双端 startup gate、Manager/输入 smoke、repair 与默认 remove 证据链已闭合；当前停在保留 Application Support 和历史事务材料的 completed remove 现场。
+2. 恢复空数据基线、清理本轮 operation 或处置历史材料必须另取固定白名单与 receipt 绑定授权；不得把默认保留数据的 remove 冒充数据卸载。
+3. 复核 Installer 中 `⌘Q` 未生效、窗口关闭可正常退出的 UX 现象，判断是否需要在发布前修正。
+4. 整理发布说明；tag、正式 Release、远端推送仍需另行授权。
+5. 首发形成后把该 assembly 作为下一版本真实历史 source，证明跨发布 upgrade、重启续跑与 source 回滚；真实用户同步继续关闭。
 
 ## 验证入口
 

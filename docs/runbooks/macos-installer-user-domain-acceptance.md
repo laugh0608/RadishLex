@@ -135,5 +135,10 @@ Installer 自身只从当前 executable 反推 `Contents/Resources/InstallPayloa
 - 根因是 `xattr -drs` 对只读文件返回权限错误且会留下部分修改。后续实现不得临时 chmod 或逐项修改 staging；改为 `ditto --noqtn` 从复制源头排除传播，并对每个节点只读审计无 quarantine，随后重复 tree/code identity 复验。
 - `26.7.1 (37)` 冻结候选已通过完整仓库与载体门禁；本地 DMG 大小为 `32194418` bytes，SHA-256 为 `c3977796b717f58a191d68755048b316c771a283bb2bfece6d0172db48d20a41`。draft Release 已只保留 build 37 的 DMG、checksum 与 evidence，仍未发布且没有 Git tag。
 - Chrome 独立下载文件名无后缀，大小、SHA-256 与本地冻结产物完全一致，`cmp` 证明逐字节相同；xattr 记录 GitHub Release asset 来源、Chrome provenance 与真实 quarantine，`hdiutil verify` 通过。安装前 TIS、正式双 bundle、Application Support、runtime data、userdb 与进程均为空/停止；保留的 build 35 operation 目录已由 completed remove receipt 精确归属。
+- 用户人工放行 build 37 Installer 后，first install 先稳定停在 `prepared`，再次确认才到达 `completed`。安装后 Manager 53 个节点、InputMethod 48 个节点均无 quarantine；ProductManifest、sealed release identity、strict ad-hoc identity 与版本 `26.7.1 (37)` 复验通过。
+- Manager 从固定 `~/Applications` 路径启动且不在 App Translocation；InputMethod 从固定 `~/Library/Input Methods` 路径启动。双端 startup gate 均允许，TIS 人工选择成立，公开合成输入 `zhongwen` 正常出现候选并提交“中文”，切回中立输入源后无稳定 failure/rejection 日志。
+- repair 同样先停在 `prepared`，完成后双 bundle 使用新 inode 且 quarantine 为零；Application Support、Rime、userdb、WAL 与 SHM inode 全部保持不变。repair 终态 Manager 再次从固定路径启动，并读取保留的本地数据。
+- 用户在系统设置中手动移除输入源后执行默认程序 remove。终态为 `remove_programs/completed`，双 bundle 不存在，TIS `matches/enabled/selected=0/0/0`，Manager/InputMethod 进程停止；Application Support、Rime、userdb、sidecar、receipt 和两侧各 5 个 operation 目录全部保留。
+- bundle 仍存在时，TIS 只读刷新可能异步拉起 InputMethod；mutation 前必须在 TIS 查询之后再通过真实进程表复验，不能仅沿用状态脚本内部的瞬时 `process=stopped`。Installer 本轮 `⌘Q` 未生效，但关闭窗口后进程确实退出，作为发布前 UX 复核项保留。
 
-下一次实机验收必须从 A 重新采集只读基线，只使用新的 `26.7.1 (37)` 冻结候选及其独立下载副本。不得沿用 build 35/36 的 SHA-256、draft asset 或安装成功断言。
+build 37 已完成本 runbook D 与 F.3 的真实用户域证据。当前是默认保留数据的 completed remove 现场，不是空数据基线；数据删除、build 37 operation 清理和历史材料处置仍需另行取得固定白名单与 receipt 绑定授权。不得沿用 build 35/36 的 SHA-256、draft asset 或安装成功断言。
