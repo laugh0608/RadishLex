@@ -1,5 +1,7 @@
+#[cfg(target_os = "macos")]
 use std::ffi::CStr;
 use std::fs;
+#[cfg(target_os = "macos")]
 use std::os::raw::{c_char, c_int};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
@@ -16,6 +18,7 @@ const INSTALLER_BUNDLE_ID: &str = "org.radishlex.installer.macos";
 const RELEASE_IDENTITY_NAME: &str = "ReleaseIdentity.json";
 const PAYLOAD_DIRECTORY_NAME: &str = "InstallPayload";
 const MAX_RELEASE_IDENTITY_BYTES: u64 = 16 * 1024;
+#[cfg(target_os = "macos")]
 const PASSWD_BUFFER_BYTES: usize = 16 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
