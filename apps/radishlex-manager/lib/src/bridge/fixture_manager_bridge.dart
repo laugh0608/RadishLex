@@ -189,6 +189,15 @@ class FixtureManagerBridge implements ManagerBridge {
     _snapshot = _snapshotWithSettingsDraft(_snapshot, draft.normalized());
     return _snapshot;
   }
+
+  @override
+  ManagerSyncQualificationRun startSyncQualification(
+    ManagerSyncQualificationRequest request,
+  ) {
+    throw UnsupportedError(
+      'fixture bridge does not execute local HTTPS sync qualification',
+    );
+  }
 }
 
 ManagerSnapshot _snapshotWithDiagnostics(

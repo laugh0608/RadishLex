@@ -359,7 +359,51 @@ final class _RadishLexSyncSymbols {
               ffi.Pointer<_RadishLexManagerSyncProductStatus>,
               ffi.Pointer<ffi.Pointer<_RadishLexError>>,
             )
-          >('radishlex_manager_sync_product_status');
+          >('radishlex_manager_sync_product_status'),
+      qualificationStart = library
+          .lookupFunction<
+            ffi.Pointer<_RadishLexManagerSyncQualificationRun> Function(
+              ffi.Pointer<_RadishLexManagerSyncQualificationRequest>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            ),
+            ffi.Pointer<_RadishLexManagerSyncQualificationRun> Function(
+              ffi.Pointer<_RadishLexManagerSyncQualificationRequest>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            )
+          >('radishlex_manager_sync_qualification_start'),
+      qualificationPoll = library
+          .lookupFunction<
+            ffi.Int32 Function(
+              ffi.Pointer<_RadishLexManagerSyncQualificationRun>,
+              ffi.Pointer<_RadishLexManagerSyncQualificationSnapshot>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            ),
+            int Function(
+              ffi.Pointer<_RadishLexManagerSyncQualificationRun>,
+              ffi.Pointer<_RadishLexManagerSyncQualificationSnapshot>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            )
+          >('radishlex_manager_sync_qualification_poll'),
+      qualificationCancel = library
+          .lookupFunction<
+            ffi.Int32 Function(
+              ffi.Pointer<_RadishLexManagerSyncQualificationRun>,
+              ffi.Pointer<ffi.Uint32>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            ),
+            int Function(
+              ffi.Pointer<_RadishLexManagerSyncQualificationRun>,
+              ffi.Pointer<ffi.Uint32>,
+              ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+            )
+          >('radishlex_manager_sync_qualification_cancel'),
+      qualificationFree = library
+          .lookupFunction<
+            ffi.Void Function(
+              ffi.Pointer<_RadishLexManagerSyncQualificationRun>,
+            ),
+            void Function(ffi.Pointer<_RadishLexManagerSyncQualificationRun>)
+          >('radishlex_manager_sync_qualification_free');
 
   final int Function(
     ffi.Pointer<ffi.Char>,
@@ -372,6 +416,25 @@ final class _RadishLexSyncSymbols {
     ffi.Pointer<ffi.Pointer<_RadishLexError>>,
   )
   productStatus;
+  final ffi.Pointer<_RadishLexManagerSyncQualificationRun> Function(
+    ffi.Pointer<_RadishLexManagerSyncQualificationRequest>,
+    ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+  )
+  qualificationStart;
+  final int Function(
+    ffi.Pointer<_RadishLexManagerSyncQualificationRun>,
+    ffi.Pointer<_RadishLexManagerSyncQualificationSnapshot>,
+    ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+  )
+  qualificationPoll;
+  final int Function(
+    ffi.Pointer<_RadishLexManagerSyncQualificationRun>,
+    ffi.Pointer<ffi.Uint32>,
+    ffi.Pointer<ffi.Pointer<_RadishLexError>>,
+  )
+  qualificationCancel;
+  final void Function(ffi.Pointer<_RadishLexManagerSyncQualificationRun>)
+  qualificationFree;
 }
 
 final class _RadishLexRankSymbols {

@@ -5,7 +5,6 @@ import FlutterMacOS
 @main
 class AppDelegate: FlutterAppDelegate {
   override func applicationWillFinishLaunching(_ notification: Notification) {
-    super.applicationWillFinishLaunching(notification)
     if RadishLexAppleSecureEnclaveKeyAgreementProductSmoke.isRequested(
       arguments: CommandLine.arguments
     ) {
@@ -26,6 +25,19 @@ class AppDelegate: FlutterAppDelegate {
       exit(result.passed ? EXIT_SUCCESS : EXIT_FAILURE)
     }
     guard RadishLexAppleP256ProductSmoke.isRequested(arguments: CommandLine.arguments) else {
+      let installGate = RadishLexProductInstallStartupGate.inspect()
+      guard installGate.installAllowed else {
+        fputs("RadishLex install startup gate \(installGate.safeFields)\n", stderr)
+        fflush(stderr)
+        exit(EXIT_FAILURE)
+      }
+      let dataGate = RadishLexProductUpgradeStartupGate.inspect()
+      guard dataGate.dataAllowed else {
+        fputs("RadishLex data startup gate \(dataGate.safeFields)\n", stderr)
+        fflush(stderr)
+        exit(EXIT_FAILURE)
+      }
+      super.applicationWillFinishLaunching(notification)
       return
     }
     guard
@@ -50,6 +62,102 @@ class AppDelegate: FlutterAppDelegate {
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
     return true
   }
+}
+
+private struct RadishLexStartupGateRequest {
+  let version: UInt32
+  let dataRootPath: UnsafePointer<CChar>?
+  let expectedOwnerID: UInt32
+}
+
+private struct RadishLexStartupGateResult {
+  var version: UInt32 = 0
+  var decision: UInt32 = 0
+  var errorCode: UInt32 = 0
+  var receiptState: UInt32 = 0
+
+  var installAllowed: Bool {
+    guard version == 1 && errorCode == 0 else { return false }
+    switch decision {
+    case 1, 2:
+      return receiptState == 0
+    case 3:
+      return [10, 11, 14].contains(receiptState)
+    default:
+      return false
+    }
+  }
+
+  var dataAllowed: Bool {
+    guard version == 1 && errorCode == 0 else { return false }
+    switch decision {
+    case 1, 2:
+      return receiptState == 0
+    case 3:
+      return [9, 10, 12].contains(receiptState)
+    default:
+      return false
+    }
+  }
+
+  var safeFields: String {
+    "decision=\(decision) error=\(errorCode) state=\(receiptState)"
+  }
+}
+
+private enum RadishLexProductInstallStartupGate {
+  static func inspect() -> RadishLexStartupGateResult {
+    inspectStartupGate(symbolName: "radishlex_product_install_startup_gate")
+  }
+}
+
+private enum RadishLexProductUpgradeStartupGate {
+  static func inspect() -> RadishLexStartupGateResult {
+    inspectStartupGate(symbolName: "radishlex_product_upgrade_startup_gate")
+  }
+}
+
+private typealias RadishLexStartupGateFunction = @convention(c) (
+    UnsafeRawPointer?,
+    UnsafeMutableRawPointer?,
+    UnsafeMutablePointer<UnsafeMutableRawPointer?>?
+  ) -> UInt32
+
+private func inspectStartupGate(symbolName: String) -> RadishLexStartupGateResult {
+  var result = RadishLexStartupGateResult()
+  guard
+    let applicationSupport = FileManager.default.urls(
+      for: .applicationSupportDirectory,
+      in: .userDomainMask
+    ).first,
+    let frameworks = Bundle.main.privateFrameworksURL
+  else { return result }
+  let dataRoot = applicationSupport.appendingPathComponent("RadishLex", isDirectory: true)
+  let library = frameworks.appendingPathComponent("libradishlex_ime_ffi.dylib")
+  guard let handle = dlopen(library.path, RTLD_NOW | RTLD_LOCAL) else { return result }
+  defer { dlclose(handle) }
+  guard let symbol = symbolName.withCString({ dlsym(handle, $0) }) else { return result }
+  let gate = unsafeBitCast(symbol, to: RadishLexStartupGateFunction.self)
+  let status = dataRoot.path.withCString { path in
+    var request = RadishLexStartupGateRequest(
+      version: 1,
+      dataRootPath: path,
+      expectedOwnerID: geteuid()
+    )
+    return withUnsafePointer(to: &request) { requestPointer in
+      withUnsafeMutablePointer(to: &result) { resultPointer in
+        gate(
+          UnsafeRawPointer(requestPointer),
+          UnsafeMutableRawPointer(resultPointer),
+          nil
+        )
+      }
+    }
+  }
+  if status != 0 {
+    result = RadishLexStartupGateResult()
+  }
+  return result
 }
 
 private struct RadishLexAppleKeyAgreementSmokeSummary {

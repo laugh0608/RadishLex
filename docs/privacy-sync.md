@@ -156,7 +156,7 @@ Sync Master Key + object identity + key epoch
 
 禁止从平台名称推断算法一定可用，也禁止 unavailable backend 静默回退到内存私钥或普通文件。
 
-状态必须区分：当前 target 是否编译 backend、当前进程是否具备创建/签名运行时能力、产品 bundle 是否经过真实环境资格评审，以及 M3 用户同步总 gate。前两层为 true 不推出后两层为 true；`test-memory-v1` 即使运行时可用也永远不能获得产品资格。
+状态必须区分：当前 target 是否编译 backend、当前进程是否具备创建/签名运行时能力、产品 bundle 是否经过真实环境资格评审，以及真实用户同步产品总 gate。前两层为 true 不推出后两层为 true；`test-memory-v1` 即使运行时可用也永远不能获得产品资格。
 
 协议必须允许算法演进。平台原生 P-256 与“由平台密钥封装的 Ed25519 seed”具有不同保护语义，必须使用不同 backend/algorithm ID 和测试矩阵。
 

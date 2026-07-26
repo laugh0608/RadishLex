@@ -10,20 +10,45 @@ use radishlex_ime_ffi::{
     radishlex_key_result_consumed, radishlex_key_result_free,
     radishlex_key_result_learning_disposition, radishlex_key_result_snapshot,
     radishlex_key_result_version, radishlex_manager_sync_product_status,
-    radishlex_rime_runtime_shutdown, radishlex_session_handle_key_event,
-    RadishLexAppleP256ProductSmokeSummary, RadishLexAppleP256ProductStatus,
-    RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary,
+    radishlex_manager_sync_qualification_cancel, radishlex_manager_sync_qualification_free,
+    radishlex_manager_sync_qualification_poll, radishlex_manager_sync_qualification_start,
+    radishlex_product_install_startup_gate, radishlex_rime_runtime_shutdown,
+    radishlex_session_handle_key_event, RadishLexAppleP256ProductSmokeSummary,
+    RadishLexAppleP256ProductStatus, RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary,
     RadishLexAppleSecureEnclaveKeyAgreementProductStatus, RadishLexError, RadishLexFfiContract,
-    RadishLexKeyEvent, RadishLexKeyResult, RadishLexManagerSyncProductStatus, RadishLexSession,
-    RadishLexSessionOptions, RadishLexSnapshot, RadishLexStatusCode, RadishLexStringView,
-    RADISHLEX_ABI_CONTRACT_VERSION, RADISHLEX_KEY_RESULT_VERSION,
-    RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_NONE,
+    RadishLexKeyEvent, RadishLexKeyResult, RadishLexManagerSyncProductStatus,
+    RadishLexManagerSyncQualificationRequest, RadishLexManagerSyncQualificationRun,
+    RadishLexManagerSyncQualificationSnapshot, RadishLexProductInstallStartupGateRequest,
+    RadishLexProductInstallStartupGateResult, RadishLexSession, RadishLexSessionOptions,
+    RadishLexSnapshot, RadishLexStatusCode, RadishLexStringView, RADISHLEX_ABI_CONTRACT_VERSION,
+    RADISHLEX_INSTALL_RECEIPT_STATE_ABORTED_PRESERVED, RADISHLEX_INSTALL_RECEIPT_STATE_COMPLETED,
+    RADISHLEX_INSTALL_RECEIPT_STATE_ROLLED_BACK, RADISHLEX_KEY_RESULT_VERSION,
+    RADISHLEX_MANAGER_SYNC_PRODUCT_BLOCKER_NONE, RADISHLEX_STARTUP_GATE_ERROR_NONE,
+    RADISHLEX_UPGRADE_RECEIPT_STATE_ABORTED_PRESERVED, RADISHLEX_UPGRADE_RECEIPT_STATE_COMPLETED,
+    RADISHLEX_UPGRADE_RECEIPT_STATE_ROLLED_BACK,
 };
 
 #[test]
 fn rust_input_abi_layout_matches_the_checked_header_contract() {
-    assert_eq!(RADISHLEX_ABI_CONTRACT_VERSION, 6);
+    assert_eq!(RADISHLEX_ABI_CONTRACT_VERSION, 9);
     assert_eq!(RADISHLEX_KEY_RESULT_VERSION, 2);
+    assert_eq!(RADISHLEX_STARTUP_GATE_ERROR_NONE, 0);
+    assert_eq!(
+        (
+            RADISHLEX_INSTALL_RECEIPT_STATE_COMPLETED,
+            RADISHLEX_INSTALL_RECEIPT_STATE_ABORTED_PRESERVED,
+            RADISHLEX_INSTALL_RECEIPT_STATE_ROLLED_BACK,
+        ),
+        (10, 11, 14)
+    );
+    assert_eq!(
+        (
+            RADISHLEX_UPGRADE_RECEIPT_STATE_COMPLETED,
+            RADISHLEX_UPGRADE_RECEIPT_STATE_ABORTED_PRESERVED,
+            RADISHLEX_UPGRADE_RECEIPT_STATE_ROLLED_BACK,
+        ),
+        (9, 10, 12)
+    );
     assert_eq!(size_of::<RadishLexFfiContract>(), 3 * size_of::<u32>());
     assert_eq!(size_of::<RadishLexSessionOptions>(), 2 * size_of::<u32>());
     assert_eq!(size_of::<RadishLexKeyEvent>(), 5 * size_of::<u32>());
@@ -46,6 +71,20 @@ fn rust_input_abi_layout_matches_the_checked_header_contract() {
     assert_eq!(
         size_of::<RadishLexManagerSyncProductStatus>(),
         19 * size_of::<u32>()
+    );
+    assert_eq!(size_of::<RadishLexManagerSyncQualificationRequest>(), 56);
+    assert_eq!(size_of::<RadishLexManagerSyncQualificationSnapshot>(), 96);
+    assert_eq!(
+        size_of::<RadishLexProductInstallStartupGateRequest>(),
+        if cfg!(target_pointer_width = "64") {
+            24
+        } else {
+            12
+        }
+    );
+    assert_eq!(
+        size_of::<RadishLexProductInstallStartupGateResult>(),
+        4 * size_of::<u32>()
     );
 
     let _: unsafe extern "C" fn(
@@ -91,6 +130,27 @@ fn rust_input_abi_layout_matches_the_checked_header_contract() {
         *mut RadishLexManagerSyncProductStatus,
         *mut *mut RadishLexError,
     ) -> RadishLexStatusCode = radishlex_manager_sync_product_status;
+    let _: unsafe extern "C" fn(
+        *const RadishLexManagerSyncQualificationRequest,
+        *mut *mut RadishLexError,
+    ) -> *mut RadishLexManagerSyncQualificationRun = radishlex_manager_sync_qualification_start;
+    let _: unsafe extern "C" fn(
+        *const RadishLexManagerSyncQualificationRun,
+        *mut RadishLexManagerSyncQualificationSnapshot,
+        *mut *mut RadishLexError,
+    ) -> RadishLexStatusCode = radishlex_manager_sync_qualification_poll;
+    let _: unsafe extern "C" fn(
+        *const RadishLexManagerSyncQualificationRun,
+        *mut u32,
+        *mut *mut RadishLexError,
+    ) -> RadishLexStatusCode = radishlex_manager_sync_qualification_cancel;
+    let _: unsafe extern "C" fn(*mut RadishLexManagerSyncQualificationRun) =
+        radishlex_manager_sync_qualification_free;
+    let _: unsafe extern "C" fn(
+        *const RadishLexProductInstallStartupGateRequest,
+        *mut RadishLexProductInstallStartupGateResult,
+        *mut *mut RadishLexError,
+    ) -> RadishLexStatusCode = radishlex_product_install_startup_gate;
 }
 
 #[test]
@@ -182,8 +242,15 @@ fn compile_header(language: &str) {
 const HEADER_SMOKE_SOURCE: &str = r#"
 #include "radishlex_input.h"
 
-_Static_assert(RADISHLEX_ABI_CONTRACT_VERSION == 6u, "ABI version mismatch");
+_Static_assert(RADISHLEX_ABI_CONTRACT_VERSION == 9u, "ABI version mismatch");
 _Static_assert(RADISHLEX_KEY_RESULT_VERSION == 2u, "key result version mismatch");
+_Static_assert(RADISHLEX_STARTUP_GATE_ERROR_NONE == 0u, "startup error mismatch");
+_Static_assert(RADISHLEX_INSTALL_RECEIPT_STATE_COMPLETED == 10u, "install completed state mismatch");
+_Static_assert(RADISHLEX_INSTALL_RECEIPT_STATE_ABORTED_PRESERVED == 11u, "install aborted state mismatch");
+_Static_assert(RADISHLEX_INSTALL_RECEIPT_STATE_ROLLED_BACK == 14u, "install rollback state mismatch");
+_Static_assert(RADISHLEX_UPGRADE_RECEIPT_STATE_COMPLETED == 9u, "upgrade completed state mismatch");
+_Static_assert(RADISHLEX_UPGRADE_RECEIPT_STATE_ABORTED_PRESERVED == 10u, "upgrade aborted state mismatch");
+_Static_assert(RADISHLEX_UPGRADE_RECEIPT_STATE_ROLLED_BACK == 12u, "upgrade rollback state mismatch");
 _Static_assert(sizeof(RadishLexFfiContract) == 3u * sizeof(uint32_t), "contract layout mismatch");
 _Static_assert(sizeof(RadishLexSessionOptions) == 2u * sizeof(uint32_t), "session options layout mismatch");
 _Static_assert(sizeof(RadishLexKeyEvent) == 5u * sizeof(uint32_t), "key event layout mismatch");
@@ -192,6 +259,8 @@ _Static_assert(sizeof(RadishLexAppleP256ProductSmokeSummary) == 26u * sizeof(uin
 _Static_assert(sizeof(RadishLexAppleSecureEnclaveKeyAgreementProductStatus) == 9u * sizeof(uint32_t), "Apple key-agreement status layout mismatch");
 _Static_assert(sizeof(RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary) == 25u * sizeof(uint32_t), "Apple key-agreement smoke layout mismatch");
 _Static_assert(sizeof(RadishLexManagerSyncProductStatus) == 19u * sizeof(uint32_t), "Manager sync product status layout mismatch");
+_Static_assert(sizeof(RadishLexManagerSyncQualificationRequest) == 56u, "Manager sync qualification request layout mismatch");
+_Static_assert(sizeof(RadishLexManagerSyncQualificationSnapshot) == 96u, "Manager sync qualification snapshot layout mismatch");
 
 RadishLexStatusCode radishlex_compile_input_contract(
     RadishLexSession *session,
@@ -213,6 +282,14 @@ RadishLexStatusCode radishlex_compile_input_contract(
       radishlex_apple_secure_enclave_key_agreement_product_smoke;
   RadishLexStatusCode (*manager_sync_status)(RadishLexManagerSyncProductStatus *, RadishLexError **) =
       radishlex_manager_sync_product_status;
+  RadishLexManagerSyncQualificationRun *(*qualification_start)(const RadishLexManagerSyncQualificationRequest *, RadishLexError **) =
+      radishlex_manager_sync_qualification_start;
+  RadishLexStatusCode (*qualification_poll)(const RadishLexManagerSyncQualificationRun *, RadishLexManagerSyncQualificationSnapshot *, RadishLexError **) =
+      radishlex_manager_sync_qualification_poll;
+  RadishLexStatusCode (*qualification_cancel)(const RadishLexManagerSyncQualificationRun *, uint32_t *, RadishLexError **) =
+      radishlex_manager_sync_qualification_cancel;
+  void (*qualification_free)(RadishLexManagerSyncQualificationRun *) =
+      radishlex_manager_sync_qualification_free;
   RadishLexKeyResult *result = NULL;
   RadishLexStatusCode status =
       radishlex_session_handle_key_event(session, event, &result, error_out);
@@ -246,6 +323,10 @@ RadishLexStatusCode radishlex_compile_input_contract(
   (void)key_agreement_status;
   (void)key_agreement_smoke;
   (void)manager_sync_status;
+  (void)qualification_start;
+  (void)qualification_poll;
+  (void)qualification_cancel;
+  (void)qualification_free;
   return status;
 }
 "#;

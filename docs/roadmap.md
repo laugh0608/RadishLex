@@ -64,7 +64,7 @@ M0 只证明方向与工程基础可继续演进，不证明任何产品里程�
 
 - 真实用户同步、恢复码、设备授权和撤销。
 - 完整 manager 产品化。
-- 面向普通用户的 librime/schema 最终分发方案、签名和发布安装包；这些必须在 M4 前完成。
+- 面向普通用户的 librime/schema 最终分发方案、签名和发布安装包；这些属于 M4 交付，必须在 M4 退出前完成。
 - VoiceOver 候选导航与 accessibility press 的完整可用性；M1 Alpha 必须如实记录已知限制，不得声明或宣传 VoiceOver 支持。该能力进入受支持范围前必须完成修复和真实辅助功能验收。
 
 ## M2：本地个人化 MVP
@@ -126,14 +126,14 @@ M2 是首个本地个人化 MVP。它不要求远端同步已经开放。
 
 M3 的部署子阶段以短生命周期本地 Compose、Caddy internal TLS、bearer 认证负向响应、权限、备份恢复和日志脱敏通过为退出证据。首个正式版本保持真实用户同步关闭；真实域名、公开 CA 证书、目标生产备份恢复与升级回滚在该版本发布后、准备启用生产同步前单独验收，不能用本地证据冒充。
 
-在 M3 退出标准全部满足前，真实用户同步保持关闭。允许使用合成数据、loopback、短生命周期服务和受控集成测试实现并验证成功路径，但这些不能解锁产品入口。
+M3 开发期间，真实用户同步在退出标准全部满足前保持关闭。合成数据、loopback、短生命周期服务和受控集成测试可以实现并验证成功路径，但不能自行解锁产品入口；M3 退出后是否开放仍由后续产品阶段和生产部署证据决定。
 
 ## M4：产品发布候选
 
 目标：
 
 - 把 macOS 输入法、manager、Rust native library、librime 和合法 schema/data 形成可安装、可升级、可移除的产品包。
-- 统一版本、兼容性诊断、签名、权限和发布门禁。
+- 统一版本、兼容性诊断、distribution identity、权限和发布门禁。
 
 交付：
 
@@ -141,6 +141,9 @@ M3 的部署子阶段以短生命周期本地 Compose、Caddy internal TLS、bea
 - librime 动态/静态链接、schema/data 来源、许可证、完整性和更新策略。
 - App Group、App Support、sandbox entitlement、文件选择和数据库所有权边界。
 - 安装、升级、回滚、移除、数据迁移和故障恢复 runbook。
+- 外层程序 receipt 与数据 receipt 分层，产品终态分步持久化；Manager/InputMethod 在业务初始化前依次执行外层 install 与数据 upgrade gate。
+- InstallPayload 显式绑定可支持的历史 source assembly；production upgrade 只按外层 receipt 的精确 release 选择旧版本 validation/rollback host，缺失或身份漂移在事务写入前失败关闭。
+- 产品 metadata 与 ProductManifest 固定版本化 distribution identity；首发 `community-adhoc-v1` 的 strict ad-hoc bundle、未公证 UDIF、SHA-256 evidence、人工放行提示与隔离下载复验绑定同一冻结产物。
 - Rust fmt/check/test/clippy/MSRV、Go test/race/vet、Flutter format/analyze/test、native-rime 和 macOS bundle CI。
 - 依赖安全、许可证和必要供应链检查。
 
@@ -149,6 +152,8 @@ M3 的部署子阶段以短生命周期本地 Compose、Caddy internal TLS、bea
 - 新环境无需手工配置 Homebrew 路径或 shell 环境变量即可安装和使用。
 - 输入法与 manager 加载匹配版本的 Rust/native 依赖，升级后用户数据保持。
 - FFI、数据库、权限、schema、版本和 bundle 缺失均有明确错误，不静默回退 fixture。
+- active/nonterminal/损坏事务、运行 bundle 身份漂移和 completed remove 均在 Flutter/IMK、settings、userdb、Rime 初始化前失败关闭。
+- distribution identity、双 bundle/Installer identity、DMG SHA-256 evidence 和用户安装提示精确绑定同一发布候选；社区模式不得宣称 Developer ID、公证或 Gatekeeper 自动通过。
 - 发布候选通过自动门禁、安装 smoke 和非敏感日常输入复验。
 
 ## 第二平台选择门禁

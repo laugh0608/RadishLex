@@ -7,20 +7,24 @@
 - 产品同步的状态与执行真相源固定在 Rust；Flutter、平台壳和 Go server 不复制编排、合并、cursor 或密钥策略。
 - `apple-secure-enclave-p256-v1` 已按一个受支持 macOS 设备的真实 signing/key-agreement 主路径完成产品资格评审；无 Secure Enclave 环境的 unsupported 改为延期兼容性补测，不得在支持设备上模拟。
 - backend `product_qualified` 只表达已评审的平台私钥能力，不自动开放用户同步。
-- 在 Rust 编排、两个真实客户端、设备生命周期和产品入口边界全部闭环前，`user_sync_enabled` 保持关闭；发布级正式域名/证书/目标部署证据按产品决策后移到首版发布后。
-- 关闭态 `sync_once`、稳定 discovery cursor、持久化 journal/outbox、默认关闭的通用 crypto processor/provider、可信 lifecycle/wrapped material 产品装载、signed epoch distribution remote 边界和严格 HTTPS transport 已经落地；恢复链、macOS backend 主路径、本地部署与双客户端证据也已闭合。剩余产品缺口是受控 Manager 资格执行链与真实用户入口退出评审。
+- `user_sync_enabled` 只由真实用户产品入口决策控制，不能从 Rust 编排、两个合成客户端、设备生命周期、平台 backend 或资格运行结果推导；正式域名、证书和目标部署证据在准备开放真实用户同步前独立验收。
+- 关闭态 `sync_once`、稳定 discovery cursor、持久化 journal/outbox、默认关闭的通用 crypto processor/provider、可信 lifecycle/wrapped material 产品装载、signed epoch distribution remote 边界和严格 HTTPS transport 已经落地；恢复链、macOS backend 主路径、本地部署、双客户端证据与 Manager 受控资格执行链也已闭合。剩余产品缺口是真实用户入口退出评审和发布级目标部署。
 
 ## 职责与依赖方向
 
 调用方向固定为：
 
 ```text
-Manager（后续）
-  -> narrow FFI command/status（后续）
-     -> ime-sync orchestration service
-        -> local repository port
-        -> ime-crypto encryption/signing boundary
-        -> SyncRemoteClient / SyncRemoteTransport
+Manager 本地合成资格入口
+  -> ime-ffi qualification handle
+     -> ime-sync-runtime product composition
+        -> ime-sync orchestration service
+           -> local repository port
+           -> ime-crypto encryption/signing boundary
+           -> SyncRemoteClient / SyncRemoteTransport
+
+真实用户 Manager 命令（未开放）
+  -> 必须复用同一 Rust 真相源，不得另建 Flutter 状态机
 
 ime-userdb
   -> implements local repository port
@@ -202,7 +206,7 @@ Preflight 只能返回计数、状态和阻塞原因，不返回明文 P2、P1 �
 7. 已落地：独立 lifecycle sequence、Rust trust-anchor signed record 验证、userdb public cache、wrapped epoch material store、Apple signing/key-agreement adapters 与精确远端读取；真实 Go HTTP 组合测试覆盖授权、同步、撤销、缓存和重启恢复。
 8. 已落地：独立 signed epoch distribution batch、完整 active cohort、原子 metadata、幂等/分叉冲突和 Rust distributor/recipient 验证边界；A/B/C Go HTTP 证据覆盖坏签名无部分可读、漏发拒绝、A/C 轮换重启和 revoked B 无新 epoch。
 9. 已落地：recovery-record-v2 原子轮换、recovered-device possession proof/activation、signed recovery record revocation、完整 active cohort 当前 epoch 分发、并发线性化和文件 userdb 重启恢复。
-10. 已落地：macOS signing/key-agreement 主路径产品资格、Compose/Caddy 本地 HTTPS、Rust 严格 TLS transport、部署私有存储和 Manager status-only 产品摘要。下一开发批进入 Manager 受控本地 HTTPS 资格执行链；普通用户同步、恢复/授权/撤销成功入口和 `user_sync_enabled` 继续关闭。
+10. 已落地：macOS signing/key-agreement 主路径产品资格、Compose/Caddy 本地 HTTPS、Rust 严格 TLS transport、部署私有存储、Manager status-only 产品摘要和受控本地 HTTPS 合成资格执行链；普通用户同步、恢复/授权/撤销成功入口和 `user_sync_enabled` 继续关闭。
 
 ## 验证矩阵
 
@@ -222,6 +226,6 @@ Preflight 只能返回计数、状态和阻塞原因，不返回明文 P2、P1 �
 
 - 本文允许的是关闭产品入口的 Rust/Go 本地实现与合成集成验证，不是用户可用同步授权。
 - unsupported 环境证据只允许在真实不支持目标上补测；缺失不会降级已由支持设备主路径评审的 `product_qualified`，也不允许在当前设备伪造。本地 orchestration 测试通过仍不允许改写 `user_sync_enabled`。
-- 只允许新增 localhost、合成 P2、单次调用内存参数的受控资格命令；普通用户成功入口、真实设备配对和后台自动同步继续缺席。
+- 当前唯一可执行的 Manager 网络入口是 localhost、合成 P2、单次调用内存参数的受控资格命令；不得把它扩展为普通用户成功入口、真实设备配对或后台自动同步。
 - 不实现 plaintext HTTP/CLI/FFI 上传，不持久化解密 payload，不把 token、附加 CA 或 key material 放入 manager settings。
-- 不在本批实现恢复码 UI、设备加入/授权/撤销 UI、真实 key epoch 轮换入口、M4 发布包或第二平台。
+- 恢复码 UI、设备加入/授权/撤销 UI、真实 key epoch 轮换入口、普通用户安装发布和第二平台都必须按各自产品边界独立进入，不能附带在资格运行中实现。

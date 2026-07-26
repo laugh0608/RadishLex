@@ -39,6 +39,7 @@ ime-engine-rime                 ime-sync + ime-crypto
 
 Flutter Manager
   -> controlled manager bridge / ime-ffi
+  -> ime-sync-runtime product composition
   -> local settings, dictionary, diagnostics, device and sync management
 ```
 
@@ -110,6 +111,40 @@ Flutter Manager
 
 P1 原始事件只在本地用于学习，不得通过 FFI 管理接口或同步 payload 暴露。P2 导出只允许从明确的压缩摘要与用户可管理数据生成。
 
+M4 产品升级把运行时打开与产品迁移分开：`ime-userdb` 提供不配置 WAL、不改权限且不执行 migration 的只读文件 inspection、基于 SQLite backup API 的一致 snapshot，以及只供隔离候选使用的显式 migration/validation summary。snapshot 在只读事务中纳入 WAL 可见内容，输出通过 `quick_check(1)` 的 standalone `DELETE` journal 文件；产品协调层不得用运行时 `UserDb::open` 对原库做升级 preflight。
+
+### ime-product-upgrade
+
+`ime-product-upgrade` 保存产品数据升级的状态机、版本化 receipt、固定对象身份与稳定失败分类：
+
+- 状态只能按 preflight、静止、快照、候选 migration、双端验证、切换和最终验证的证据顺序推进；
+- 切换前失败保留原数据，切换后失败只能进入显式 rollback；
+- receipt 严格解析且不保存真实路径、数据正文、内容 hash、输入历史或 secret；
+- data root 与状态目录在每次加载/持久化前重验对象身份，receipt 以私有临时文件、文件/目录 `fsync` 和原子 rename 落盘；
+- 跨进程 Unix socket guard 绑定用户与固定 data root 身份，只恢复精确失活 socket，非 socket 或身份漂移失败关闭；
+- snapshot 只读固定 `userdb.sqlite3`，空间预算覆盖三份逻辑工作副本和 64 MiB reserve，并按临时文件、backup、rename、receipt evidence、状态推进顺序提供故障注入；
+- 完全只读的 startup gate 必须在 Manager/InputMethod 的 userdb、settings、Rime runtime 和业务初始化之前执行，首次启动与终态允许，其余不确定升级现场失败关闭；
+- 双端产品 validation host 无参数只读取固定 migration candidate，`--post-switch` 只读取最终 `userdb.sqlite3`；协调器只在 guard、receipt、目标 identity 和 sidecar 仍一致时消费 validation evidence v1；
+- 原子切换固定旧库 backup、candidate 与最终 userdb 路径，先持久化 `switch_prepared`，再按同文件系统双 rename 和目标/源目录 `fsync` 推进 `switched`；中断恢复只接受 receipt 与精确 inode 证明的四类现场；
+- 最终双端验证先推进 `post_switch_verified`，独立完成动作再次复验现场后推进 `completed`；验证或完成复验失败进入显式 rollback；
+- rollback 先把失败新库移回 candidate，再把旧库原 inode 恢复到最终路径；只有 source-release evidence 与核心 schema/integrity 同时通过才进入 `rolled_back`，不自动删除恢复材料；
+- settings、snapshot 和 candidate 的 identity 已持久化但下一状态未落盘时，只复验既有证据并补写状态，不重建对象或猜测无 identity 现场；
+- guard-bound 驱动在每个写入、产品 validation 前后与 rollback validation 前后通过平台 port 重新证明静止；核心不定位或启动平台 executable；
+- macOS adapter 从 source/target `ProductManifest.json` 固定解析双端 helper，target preflight 负责全部 checkpoint，target/source 双端分别形成升级与回滚 evidence；执行前复验 manifest 长度/hash，版本化 distribution identity 与固定安装来源由 M4-P03 绑定；
+- 平台 host 负责固定路径、进程静止和文件系统适配，`ime-userdb` 继续独占 schema 与 migration 语义。
+
+该 crate 不进入输入热路径，不承载安装器 UI、SQLite migration SQL、macOS 进程控制或调用方自定义路径。完整边界见 [macOS 数据升级协调器](macos-data-upgrade-coordinator.md)。
+
+M4-P03 以未公证社区 ad-hoc DMG 内的独立用户域 Installer app 承担程序安装事务；Manager、InputMethod 和 Application Support 分别固定到 current-user home 下的 `Applications`、`Library/Input Methods` 与 `Library/Application Support/RadishLex`。`InstallPayloadManifest.json` format v2 绑定 committed layout、target ProductManifest 与显式历史 source assembly 集合；production upgrade 只从外层 receipt 精确 release 选取旧版本 validation/rollback host。`.radishlex-install-v1` 外层 receipt/guard 负责两处程序切换和数据协调的一致性。非终态程序事务必须进入双端 startup gate，不能让旧程序在数据切换后重新启动。完整决策见 [ADR 0008](adr/0008-macos-installation-carrier.md)。
+
+### ime-product-install
+
+`ime-product-install` 是独立于数据协调器的程序事务核心。它显式区分首次安装、升级、修复和默认程序移除，以 source/target ProductManifest、bundle tree 与 canonical code identity evidence 的 SHA-256 表达逻辑产品身份；receipt 不保存绝对路径、签名输出或用户数据。source、staged、backup 和 installed evidence 只能按 operation 阶段追加，首个程序目标提交后失败必须进入程序回滚。
+
+外层 receipt 固定在 `.radishlex-install-v1`，绑定 data-root identity、operation chain、程序逻辑/文件系统身份与稳定失败分类。两个程序目标各自在同文件系统私有目录执行 source preserve、逐端 rename/fsync 和精确 inode 回滚；Unix socket guard 拒绝同一 root 并发 operation。macOS install adapter 逐字节绑定 committed layout，严格复验 payload/product manifest、完整 bundle tree、strict ad-hoc code identity 与 sealed requirement 集合，使用 metadata-preserving copy 填充 staging，并在 source/installed/restored 阶段重复验证。
+
+独立 macOS install coordinator 同时持有外层与数据 guard，以同一 operation ID、data-root inode 和 source/target release 绑定 M4-P02 receipt。每个数据 quiescence checkpoint 同时复验 installed target；数据失败必须先达到 `aborted_preserved` / `rolled_back`，再恢复并复验 source 双程序，外层才能进入 `rolled_back`。两个核心不互相依赖或解释对方 receipt。只读 startup decision 除阻止 active/non-terminal/损坏现场外，还要求当前运行 Manager/InputMethod 身份匹配 `completed` target 或 `aborted_preserved` / `rolled_back` source。完整字段、状态与停止线见 [macOS 程序安装事务](macos-installation-transaction.md)。
+
 ### ime-ranker
 
 `ime-ranker` 只消费 RadishLex candidate 和经过 userdb 整理的摘要，不访问 SQLite、Rime 或平台生命周期。
@@ -151,6 +186,19 @@ P1 原始事件只在本地用于学习，不得通过 FFI 管理接口或同步
 - transport trait 与生产 HTTPS 实现。
 
 同步 merge 必须包含本地当前状态，并定义与输入顺序无关的稳定版本顺序。至少使用 key epoch、逻辑时钟或对象版本、device ID 和确定性 tie-break；测试必须覆盖交换律、结合律和幂等性。
+
+### ime-sync-runtime
+
+`ime-sync-runtime` 是 Manager 同步执行的产品组合层，依赖 `ime-sync`、`ime-userdb` 与 `ime-crypto` 的稳定公开边界：
+
+- 组合 HTTPS transport、同步 orchestration、crypto provider 和文件型 userdb；
+- 管理 Rust-owned run、worker、取消、超时和临时资源生命周期；
+- 为受控资格执行生成隔离合成身份与 P2 数据，不能接受调用方提供 payload、userdb 路径、device/domain/key id 或 key material；
+- 只向 FFI 返回固定 phase/outcome/error、受限计数与清理结果，不返回 HTTP body、路径、身份、payload 或 secret。
+
+该 crate 不进入输入热路径，不承载 C ABI、Flutter 状态或 Go server DTO。`ime-sync` 不反向依赖 `ime-userdb`，`ime-ffi` 也不直接建立网络和数据库组合；真实用户同步开放前，资格 provider 必须与生产 backend 明确区分并保持 `user_sync_enabled=false`。
+
+资格 request、phase/error、并发取消和清理 contract 见 [ime-sync-runtime 组件说明](../crates/ime-sync-runtime/README.md)。
 
 ### ime-ffi
 
@@ -219,7 +267,7 @@ Flutter manager 负责：
 - 同步状态、设备、恢复和后端连接；
 - 安全诊断、导入导出和备份恢复入口。
 
-manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学习、隐私和诊断，并让正常本地产品运行态携带 native library、使用固定平台目录和真实持久化数据；M3 再交付同步、设备与恢复；M4 闭合发布签名、公证、安装升级和最终产品打包。fixture 只能由显式开发开关启用并持续显示演示标识。manager 不进入输入热路径，也不承担排序、合并或密钥策略真相源。
+manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学习、隐私和诊断，并让正常本地产品运行态携带 native library、使用固定平台目录和真实持久化数据；M3 再交付同步、设备与恢复；M4 闭合版本化 distribution identity、安装升级、发布载体和最终产品打包。首发采用社区 ad-hoc 路径，未来 Developer ID/公证必须作为新的 identity 独立治理。fixture 只能由显式开发开关启用并持续显示演示标识。manager 不进入输入热路径，也不承担排序、合并或密钥策略真相源。
 
 ## 平台策略
 
@@ -227,7 +275,9 @@ manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学�
 
 第一真实平台使用 InputMethodKit。Swift / Objective-C 外壳只负责系统输入法生命周期、按键、候选、commit 和 Rust FFI。候选 UI 是输入法进程内唯一的 nonactivating AppKit panel；controller 维护单一 display index，键盘视觉与 Space 选择读取同一 index，鼠标点击也把目标 index 送入同一 controller/Rust selection 路径，不能让平台显示状态与 Rust engine selection 分叉。
 
-候选锚点必须区分 inline session 内的现存字符索引与文档绝对插入位置：前者用于获取当前全局行矩形，后者只用于公开 fallback。panel 最终限制在目标 `NSScreen.visibleFrame` 内，不以屏幕原点代替无效定位。TIS 状态和测试期间 current source 归属由平台目录中的只读工具记录；输入源选择仍由开发者手动完成，工具不得进入输入热路径或修改系统配置。M2 manager 使用非 App Sandbox 本地分发 profile，与输入法共享已验证的用户 Application Support userdb，并固定文件权限、锁和 schema migration 所有权；M4 若转为 App Group 或其他容器，必须先设计迁移、回滚和双端复验，不能静默复制数据。进程级 runtime、session、按键结果、候选窗、TIS 与验收边界见 [macOS InputMethodKit 平台边界](macos-inputmethodkit-boundary.md)。
+候选锚点必须区分 inline session 内的现存字符索引与文档绝对插入位置：前者用于获取当前全局行矩形，后者只用于公开 fallback。panel 最终限制在目标 `NSScreen.visibleFrame` 内，不以屏幕原点代替无效定位。TIS 状态和测试期间 current source 归属由平台目录中的只读工具记录；输入源选择仍由开发者手动完成，工具不得进入输入热路径或修改系统配置。M2 manager 使用非 App Sandbox 本地分发 profile，与输入法共享已验证的用户 Application Support userdb，并固定文件权限、锁和 schema migration 所有权。M4 首个候选继续使用该 Application Support v1；未来只有 App Sandbox、Mac App Store 或其他明确产品要求成立时才通过 ADR 进入 App Group，并先完成迁移、回滚和双端复验。进程级 runtime、session、按键结果、候选窗、TIS 与验收边界见 [macOS InputMethodKit 平台边界](macos-inputmethodkit-boundary.md)，产品装配与发布边界见 [macOS 产品包边界](macos-product-package-boundary.md)。
+
+首个产品 RimeData 使用 committed 来源锁离线装配：RadishLex 维护全拼 schema 与产品配置，词典固定到 Apache-2.0 `rime-pinyin-simp` 完整 commit/hash，并携带逐资产 LICENSE/AUTHORS。upstream `stroke` reverse lookup、`prelude` preset 与其 LGPL 依赖不进入当前候选；未来扩展必须重新完成行为规格、来源、许可证和真实候选验证。
 
 ### Linux
 
@@ -316,7 +366,7 @@ M2 不以远端同步、设备授权或最终发布包为退出条件。
 
 - `KeyOutcome`、FFI 生命周期和 librime 全局生命周期未闭合前，不把平台壳视为可用输入法。
 - userdb 事务、ranker 评测和删除语义未稳定前，不开放生产同步。
-- merge 收敛、签名绑定、KDF 上限、macOS 平台私钥主路径和本地 HTTPS 编排已有验证；Manager 受控资格执行链、真实设备产品流程与用户入口退出评审完成前，仍不开放真实用户同步。上述任一证据回归时同样失败关闭。
+- merge 收敛、签名绑定、KDF 上限、macOS 平台私钥主路径、本地 HTTPS 编排和 Manager 受控资格执行链已有验证；真实用户入口仍须经过独立产品决策与发布级目标部署评审。该评审完成前保持关闭，上述任一既有证据回归时同样失败关闭。
 - 第一真实平台未达到可日常输入前，不并行启动第二平台。
 - manager 产品模式不得用静默 fixture fallback 代替真实失败。
 

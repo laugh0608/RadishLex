@@ -1,12 +1,12 @@
 # Manager 同步产品状态参考
 
-本文定义 ABI v6 中 `radishlex_manager_sync_product_status` 的结构、常量、调用规则和隐私边界，面向维护 Rust FFI、Dart binding 与 Manager 状态映射的开发者。本文不包含资格 smoke 操作、同步命令设计、页面布局、阶段进度或用户同步开放决策；通用 ABI 所有权和错误规则见 [FFI Boundary](ffi-boundary.md)。
+本文定义当前 ABI v9 保留的 `radishlex_manager_sync_product_status` 结构、常量、调用规则和隐私边界，面向维护 Rust FFI、Dart binding 与 Manager 状态映射的开发者。本文不包含资格 smoke 操作、同步命令设计、页面布局、阶段进度或用户同步开放决策；通用 ABI 所有权和错误规则见 [FFI Boundary](ffi-boundary.md)。
 
 ## 调用契约
 
 `radishlex_manager_sync_product_status` 接收一个调用方分配的 `RadishLexManagerSyncProductStatus*`，成功时写入 status schema v1。它无输入参数，不创建、读取、使用或删除平台 key item，只允许读取 backend 的 metadata-only capability。结构中所有 flag 都使用 `u32` 的 `0/1`，不能按 C/Rust `bool` 布局解释。
 
-调用方必须先校验 ABI contract v6、status symbol 和 `version`，再按 C header 常量映射字段。传入空 `status_out` 返回 `RADISHLEX_STATUS_INVALID_ARGUMENT`；`error_out` 的读取和释放遵循通用 FFI 错误所有权规则。
+调用方必须先校验 ABI contract v9、status symbol 和 `version`，再按 C header 常量映射字段。传入空 `status_out` 返回 `RADISHLEX_STATUS_INVALID_ARGUMENT`；`error_out` 的读取和释放遵循通用 FFI 错误所有权规则。该 status schema 仍为 v1；本地合成资格 run 最初由 ABI v7 引入，ABI v8 增加数据升级门禁，ABI v9 增加外层 install 门禁，均保持本 status 布局和语义不变。
 
 ## 字段
 

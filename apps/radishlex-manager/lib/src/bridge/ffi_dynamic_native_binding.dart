@@ -1,5 +1,6 @@
 import 'dart:ffi' as ffi;
 import 'dart:io' show Platform;
+import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
@@ -341,6 +342,39 @@ final class DynamicRadishLexManagerNativeBinding
   }
 
   @override
+  NativeSyncQualificationRun startSyncQualification({
+    required String endpoint,
+    required Uint8List accessToken,
+    required Uint8List? localCaDer,
+    required int timeoutMs,
+  }) {
+    return _withNativeString(endpoint, (endpointPointer) {
+      return _withNativeBytes(accessToken, (tokenPointer, tokenLength) {
+        return _withOptionalNativeBytes(localCaDer, (caPointer, caLength) {
+          final request = calloc<_RadishLexManagerSyncQualificationRequest>();
+          try {
+            request.ref
+              ..version = 1
+              ..endpoint = endpointPointer
+              ..accessTokenData = tokenPointer
+              ..accessTokenLen = tokenLength
+              ..localCaDerData = caPointer
+              ..localCaDerLen = caLength
+              ..timeoutMs = timeoutMs;
+            final handle = _callPointer<_RadishLexManagerSyncQualificationRun>(
+              _api.errors,
+              (errorOut) => _api.sync.qualificationStart(request, errorOut),
+            );
+            return _DynamicNativeSyncQualificationRun(_api, handle);
+          } finally {
+            calloc.free(request);
+          }
+        });
+      });
+    });
+  }
+
+  @override
   NativeRankExplainSummary rankExplain({
     required String dbPath,
     required String inputCode,
@@ -384,6 +418,91 @@ final class DynamicRadishLexManagerNativeBinding
         });
       });
     });
+  }
+}
+
+final class _DynamicNativeSyncQualificationRun
+    implements NativeSyncQualificationRun {
+  _DynamicNativeSyncQualificationRun(this._api, this._handle);
+
+  final _RadishLexNativeApi _api;
+  ffi.Pointer<_RadishLexManagerSyncQualificationRun> _handle;
+
+  @override
+  NativeSyncQualificationSnapshot poll() {
+    _ensureOpen();
+    final snapshotOut = calloc<_RadishLexManagerSyncQualificationSnapshot>();
+    try {
+      _callStatus(
+        _api.errors,
+        (errorOut) =>
+            _api.sync.qualificationPoll(_handle, snapshotOut, errorOut),
+      );
+      final snapshot = snapshotOut.ref;
+      return NativeSyncQualificationSnapshot(
+        version: snapshot.version,
+        state: snapshot.state,
+        phase: snapshot.phase,
+        discovered: snapshot.discovered,
+        downloaded: snapshot.downloaded,
+        applied: snapshot.applied,
+        uploaded: snapshot.uploaded,
+        conflicts: snapshot.conflicts,
+        retries: snapshot.retries,
+        convergenceRounds: snapshot.convergenceRounds,
+        temporaryFilesCleaned: snapshot.temporaryFilesCleaned,
+        workerStopped: snapshot.workerStopped,
+        transientInputsCleared: snapshot.transientInputsCleared,
+        errorCode: snapshot.errorCode,
+        errorPhase: snapshot.errorPhase,
+        errorRetryable: snapshot.errorRetryable,
+      );
+    } finally {
+      calloc.free(snapshotOut);
+    }
+  }
+
+  @override
+  bool cancel() {
+    _ensureOpen();
+    final requestedOut = calloc<ffi.Uint32>();
+    try {
+      _callStatus(
+        _api.errors,
+        (errorOut) =>
+            _api.sync.qualificationCancel(_handle, requestedOut, errorOut),
+      );
+      final value = requestedOut.value;
+      if (value != 0 && value != 1) {
+        throw const FfiManagerBridgeException(
+          statusCode: 2,
+          code: 'invalid_state',
+          message: 'RadishLex FFI returned a non-canonical cancel flag',
+        );
+      }
+      return value == 1;
+    } finally {
+      calloc.free(requestedOut);
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_handle == ffi.nullptr) {
+      return;
+    }
+    _api.sync.qualificationFree(_handle);
+    _handle = ffi.nullptr;
+  }
+
+  void _ensureOpen() {
+    if (_handle == ffi.nullptr) {
+      throw const FfiManagerBridgeException(
+        statusCode: 2,
+        code: 'invalid_state',
+        message: 'sync qualification run is already disposed',
+      );
+    }
   }
 }
 

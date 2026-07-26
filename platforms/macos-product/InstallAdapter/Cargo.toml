@@ -1,0 +1,22 @@
+[package]
+name = "radishlex-macos-product-install"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../../LICENSE"
+description = "Manifest-bound macOS adapter for RadishLex product installation."
+
+[features]
+default = []
+qualification-harness = []
+
+[lib]
+name = "radishlex_macos_product_install"
+path = "src/lib.rs"
+
+[dependencies]
+radishlex-ime-product-install = { path = "../../../crates/ime-product-install" }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+sha2 = "0.10.9"

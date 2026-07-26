@@ -46,22 +46,93 @@ REQUIRED_FILES = [
     "docs/repository-layout.md",
     "docs/roadmap.md",
     "docs/technical-plan.md",
+    "docs/macos-product-package-boundary.md",
+    "docs/macos-data-upgrade-coordinator.md",
+    "docs/macos-installation-transaction.md",
+    "docs/macos-installer-app-boundary.md",
+    "docs/adr/0008-macos-installation-carrier.md",
     "docs/adr/0007-apple-secure-enclave-p256-backend.md",
     "docs/runbooks/apple-secure-enclave-p256-backend.md",
     "docs/runbooks/apple-secure-enclave-key-agreement-backend.md",
     "docs/runbooks/macos-m2-manager-product-acceptance.md",
+    "docs/runbooks/macos-installer-user-domain-acceptance.md",
+    "docs/runbooks/macos-release-carrier.md",
     "platforms/macos-imk/Sources/main.m",
     "platforms/macos-imk/Tools/tis_source_status.m",
     "platforms/macos-imk/Tools/test_data_cleanup.c",
     "platforms/macos-imk/build-bundle.sh",
     "platforms/macos-imk/cleanup-m2-manager-test-data.sh",
     "platforms/macos-imk/cleanup-user-install.sh",
+    "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.h",
+    "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.m",
+    "platforms/macos-product/UpgradePreflightHost/Sources/main.m",
+    "platforms/macos-product/UpgradePreflightHost/Tests/contract_smoke.m",
+    "platforms/macos-product/UpgradePreflightHost/build.sh",
+    "platforms/macos-product/UpgradePreflightHost/check.sh",
+    "platforms/macos-product/UpgradeCoordinatorAdapter/Cargo.toml",
+    "platforms/macos-product/UpgradeCoordinatorAdapter/src/lib.rs",
+    "platforms/macos-product/UpgradeCoordinatorAdapter/tests/product_coordination.rs",
+    "platforms/macos-product/UpgradeCoordinatorAdapter/fixtures/qualification.marker",
+    "platforms/macos-product/UpgradeCoordinatorAdapter/fixtures/source-product.json",
+    "platforms/macos-product/InstallAdapter/Cargo.toml",
+    "platforms/macos-product/InstallAdapter/README.md",
+    "platforms/macos-product/InstallAdapter/src/lib.rs",
+    "platforms/macos-product/InstallAdapter/src/manifest.rs",
+    "platforms/macos-product/InstallAdapter/src/codesign.rs",
+    "platforms/macos-product/InstallCoordinatorAdapter/Cargo.toml",
+    "platforms/macos-product/InstallCoordinatorAdapter/README.md",
+    "platforms/macos-product/InstallCoordinatorAdapter/src/lib.rs",
+    "platforms/macos-product/InstallCoordinatorAdapter/src/tests.rs",
+    "platforms/macos-product/InstallerDriver/Cargo.toml",
+    "platforms/macos-product/InstallerDriver/README.md",
+    "platforms/macos-product/InstallerDriver/src/lib.rs",
+    "platforms/macos-product/InstallerDriver/src/tests.rs",
+    "platforms/macos-product/InstallerExecutor/Cargo.toml",
+    "platforms/macos-product/InstallerExecutor/README.md",
+    "platforms/macos-product/InstallerExecutor/src/lib.rs",
+    "platforms/macos-product/InstallerExecutor/src/tests.rs",
+    "platforms/macos-product/InstallerBridge/Cargo.toml",
+    "platforms/macos-product/InstallerBridge/README.md",
+    "platforms/macos-product/InstallerBridge/include/radishlex_installer_bridge.h",
+    "platforms/macos-product/InstallerBridge/src/lib.rs",
+    "platforms/macos-product/InstallerBridge/src/tests.rs",
+    "platforms/macos-product/InstallerApp/README.md",
+    "platforms/macos-product/InstallerApp/Resources/Info.plist.in",
+    "platforms/macos-product/InstallerApp/Sources/RLXInstallerPresentation.h",
+    "platforms/macos-product/InstallerApp/Sources/RLXInstallerPresentation.m",
+    "platforms/macos-product/InstallerApp/Sources/RLXInstallerBridge.h",
+    "platforms/macos-product/InstallerApp/Sources/RLXInstallerBridge.m",
+    "platforms/macos-product/InstallerApp/Sources/main.m",
+    "platforms/macos-product/InstallerApp/Tests/presentation_contract.m",
+    "platforms/macos-product/InstallerApp/build.sh",
+    "platforms/macos-product/InstallerApp/check.sh",
     "scripts/check-android-target.py",
     "scripts/check-android-target.sh",
     "scripts/check-docs.py",
     "scripts/check-docs.sh",
     "scripts/check-manager-ffi-smoke.sh",
     "scripts/check-manager-product.sh",
+    "scripts/build-macos-product.sh",
+    "scripts/build-macos-install-payload.sh",
+    "scripts/build-macos-release-installer.sh",
+    "scripts/build-macos-release-dmg.sh",
+    "scripts/notarize-macos-release-dmg.sh",
+    "scripts/macos-product/release_identity.py",
+    "scripts/macos-product/test_release_identity.py",
+    "scripts/macos-product/community_release.py",
+    "scripts/macos-product/test_community_release.py",
+    "scripts/macos-product/release_carrier.py",
+    "scripts/macos-product/test_release_carrier.py",
+    "scripts/check-macos-product-metadata.sh",
+    "scripts/check-macos-install-layout.sh",
+    "scripts/check-macos-install-adapter.sh",
+    "scripts/check-macos-install-coordinator.sh",
+    "scripts/check-macos-installer.sh",
+    "scripts/check-macos-release-carrier.sh",
+    "scripts/check-product-install-core.sh",
+    "scripts/check-macos-upgrade-preflight.sh",
+    "scripts/check-macos-upgrade-coordinator.sh",
+    "scripts/check-macos-upgrade-product-coordination.sh",
     "scripts/check-manager.sh",
     "scripts/build-manager-macos-product.sh",
     "scripts/build-manager-macos-dpk-qualified-product.sh",
@@ -74,6 +145,28 @@ REQUIRED_FILES = [
     "scripts/run-manager-apple-secure-enclave-key-agreement-product-smoke.sh",
     "scripts/macos-imk/native_manifest.py",
     "scripts/macos-imk/test_native_manifest.py",
+    "scripts/macos-product/product_manifest.py",
+    "scripts/macos-product/test_product_manifest.py",
+    "scripts/macos-product/install_layout.py",
+    "scripts/macos-product/test_install_layout.py",
+    "scripts/prepare-rime-product-data.sh",
+    "scripts/rime-product/product_data.py",
+    "scripts/rime-product/test_product_data.py",
+    "version.json",
+    "packaging/macos/product.json",
+    "packaging/macos/install-layout.json",
+    "packaging/macos/README.md",
+    "packaging/rime/README.md",
+    "packaging/rime/product-rime-data.json",
+    "packaging/rime/data/default.yaml",
+    "packaging/rime/data/radishlex_pinyin.schema.yaml",
+    "packaging/rime/data/pinyin_simp.dict.yaml",
+    "packaging/rime/licenses/rime-pinyin-simp/LICENSE",
+    "packaging/rime/licenses/rime-pinyin-simp/AUTHORS",
+    "crates/ime-product-install/Cargo.toml",
+    "crates/ime-product-install/README.md",
+    "crates/ime-product-install/src/lib.rs",
+    "crates/ime-product-install/src/filesystem.rs",
     "scripts/check-repo.py",
     "scripts/check-repo.sh",
     "scripts/check-sync-deployment-evidence.py",
@@ -230,6 +323,42 @@ def check_manager_product_runtime_contract() -> None:
     ):
         if symbol not in embed_script:
             raise SystemExit(f"manager native bundle gate is missing symbol: {symbol}")
+
+
+def check_macos_product_metadata() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-macos-product-metadata.sh")])
+
+
+def check_product_install_core() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-product-install-core.sh")])
+
+
+def check_macos_install_adapter() -> None:
+    if sys.platform != "darwin":
+        return
+    run_command([str(REPO_ROOT / "scripts/check-macos-install-adapter.sh")])
+
+
+def check_macos_install_coordinator() -> None:
+    if sys.platform != "darwin":
+        return
+    run_command([str(REPO_ROOT / "scripts/check-macos-install-coordinator.sh")])
+
+
+def check_macos_installer() -> None:
+    if sys.platform != "darwin":
+        return
+    run_command([str(REPO_ROOT / "scripts/check-macos-installer.sh")])
+
+
+def check_macos_release_carrier() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-macos-release-carrier.sh")])
+
+
+def check_macos_upgrade_preflight() -> None:
+    if sys.platform != "darwin":
+        return
+    run_command([str(REPO_ROOT / "scripts/check-macos-upgrade-coordinator.sh")])
 
 
 def required_status_contexts(ruleset: dict[str, Any]) -> set[str]:
@@ -391,6 +520,13 @@ def main() -> int:
     check_collaboration_docs()
     check_license_wording()
     check_manager_product_runtime_contract()
+    check_macos_product_metadata()
+    check_product_install_core()
+    check_macos_install_adapter()
+    check_macos_install_coordinator()
+    check_macos_installer()
+    check_macos_release_carrier()
+    check_macos_upgrade_preflight()
     check_ruleset_and_workflows()
     check_path_budget()
     check_deployment_evidence()

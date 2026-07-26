@@ -31,6 +31,11 @@ fi
 source_library="${target_dir}/${profile}/libradishlex_ime_ffi.dylib"
 frameworks_dir="${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}"
 bundled_library="${frameworks_dir}/libradishlex_ime_ffi.dylib"
+app_contents="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}"
+helpers_dir="${app_contents}/Helpers"
+validation_sources="${repo_root}/platforms/macos-product/UpgradeValidationHosts/Sources"
+preflight_sources="${repo_root}/platforms/macos-product/UpgradePreflightHost/Sources"
+product_tool="${repo_root}/scripts/macos-product/product_manifest.py"
 
 if [ ! -f "${source_library}" ]; then
   echo "RadishLex manager native library is missing: ${source_library}" >&2
@@ -40,6 +45,28 @@ fi
 install -d -m 755 "${frameworks_dir}"
 install -m 755 "${source_library}" "${bundled_library}"
 install_name_tool -id "@rpath/libradishlex_ime_ffi.dylib" "${bundled_library}"
+install -d -m 755 "${helpers_dir}"
+clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+  -mmacosx-version-min=13.0 \
+  -I"${validation_sources}" \
+  -I"${repo_root}/crates/ime-ffi/include" \
+  "${validation_sources}/RLXUpgradeValidationSupport.m" \
+  "${validation_sources}/manager_main.m" \
+  -L"${frameworks_dir}" -lradishlex_ime_ffi \
+  -Wl,-rpath,@executable_path/../Frameworks \
+  -framework Foundation \
+  -o "${helpers_dir}/RadishLexUpgradeValidationHost"
+manager_bundle_id="$(python3 "${product_tool}" field manager_bundle_id)"
+input_method_bundle_id="$(python3 "${product_tool}" field input_method_bundle_id)"
+clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+  -mmacosx-version-min=13.0 \
+  "-DRLX_MANAGER_BUNDLE_ID=${manager_bundle_id}" \
+  "-DRLX_INPUT_METHOD_BUNDLE_ID=${input_method_bundle_id}" \
+  -I"${preflight_sources}" \
+  "${preflight_sources}/RLXUpgradePreflight.m" \
+  "${preflight_sources}/main.m" \
+  -framework Cocoa \
+  -o "${helpers_dir}/RadishLexUpgradePreflightHost"
 
 required_symbols=(
   _radishlex_apple_p256_product_smoke
@@ -47,7 +74,14 @@ required_symbols=(
   _radishlex_apple_secure_enclave_key_agreement_product_smoke
   _radishlex_apple_secure_enclave_key_agreement_product_status
   _radishlex_ffi_contract
+  _radishlex_product_install_startup_gate
+  _radishlex_product_upgrade_startup_gate
+  _radishlex_manager_upgrade_validate_candidate
   _radishlex_manager_sync_product_status
+  _radishlex_manager_sync_qualification_start
+  _radishlex_manager_sync_qualification_poll
+  _radishlex_manager_sync_qualification_cancel
+  _radishlex_manager_sync_qualification_free
   _radishlex_userdb_terms_new
   _radishlex_userdb_deleted_terms_new
   _radishlex_userdb_delete_term
@@ -89,3 +123,7 @@ fi
 
 codesign_identity="${EXPANDED_CODE_SIGN_IDENTITY:--}"
 codesign --force --sign "${codesign_identity}" --timestamp=none "${bundled_library}"
+codesign --force --sign "${codesign_identity}" --timestamp=none \
+  "${helpers_dir}/RadishLexUpgradeValidationHost"
+codesign --force --sign "${codesign_identity}" --timestamp=none \
+  "${helpers_dir}/RadishLexUpgradePreflightHost"

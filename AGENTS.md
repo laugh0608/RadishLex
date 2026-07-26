@@ -29,10 +29,10 @@
 
 ## 快速认知
 
-- 当前阶段：M3 加密同步 Beta；主批次为设备签名 profile 与 macOS 私钥 backend，实时状态见 `docs/status/current.md`
-- 当前代码状态：macOS 离线 Alpha 与 M2 本地个人化 MVP 已完成；密文同步基础已落地，生产私钥 backend、产品 orchestration 与部署证据未闭环
+- 当前阶段：M4 产品发布候选；M4-P01/P02 已完成，推进 M4-P03 安装载体与发布供应链，实时状态见 `docs/status/current.md`
+- 当前代码状态：M1-M3、M4-P01/P02 完成；双 bundle、RimeData、产品 manifest、数据协调资格与安装事务核心已闭合；真实用户同步关闭，程序切换、Installer 与发布供应链未闭环
 - 当前交付：工程原型，不是可安装 MVP；阶段证据以真实输入、数据正确性、安全同步和产品构建为准
-- 交付梯度：macOS 离线 Alpha 与本地个人化 MVP 已完成；推进 M3 加密同步，产品包属于 M4
+- 交付梯度：macOS 离线 Alpha、本地个人化 MVP 与 M3 加密同步 Beta 已完成；当前推进 M4 产品包
 - 第一真实平台：macOS InputMethodKit；Linux Fcitx5 与 Android 后续，Windows、iOS 后置
 - 底层引擎策略：v1 可接 `librime`，但必须通过 engine adapter 隔离；长期保留 Rust 自研引擎替换空间
 - 隐私立场：服务端默认不可信，客户端才是数据真相源
@@ -141,7 +141,7 @@
 
 当前正式落地：
 
-- 根 README / LICENSE / 协作入口，以及 `docs/status/current.md`、技术方案、路线图、仓库结构和隐私同步等正式文档
+- 根 README、LICENSE、协作入口和 `docs/` 稳定文档
 
 已落地核心结构：
 
@@ -149,7 +149,7 @@
 - `crates/ime-core/`：输入会话、候选模型、提交模型、engine trait、学习事件等核心领域模型
 - `crates/ime-engine-rime/`：`librime` adapter，屏蔽 C++ 细节和底层引擎状态
 - `crates/ime-ranker/`：候选重排、权重合成、解释能力
-- `crates/ime-userdb/`：SQLite 用户词库、事件日志、导入导出
+- `crates/ime-userdb/`、`ime-product-upgrade/`：用户数据与产品升级 contract
 - `crates/ime-sync/`：同步客户端、版本管理、冲突合并
 - `crates/ime-crypto/`：主密钥、设备密钥、blob 加密、签名和校验
 - `crates/ime-ffi/`：C ABI、Flutter bridge、Swift / Kotlin / C++ 调用边界
@@ -162,7 +162,7 @@
 - `scripts/`：仓库检查、格式和构建脚本
 - `tests/fixtures/`：跨模块合成 fixture
 
-尚未落地：Linux/Windows/iOS 平台壳、完整 Android IME、`examples/`；M2 manager 已完成，生产同步与产品包尚未闭合。
+尚未落地：Linux/Windows/iOS 平台壳、完整 Android IME、`examples/`；M3 已完成，真实用户同步仍关闭，M4 产品包尚未闭合。
 
 ## 架构边界
 

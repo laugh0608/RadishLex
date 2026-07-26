@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "product_id": "radishlex-macos",
+  "distribution_container": "dmg",
+  "installer_kind": "dedicated-user-domain-app",
+  "installation_scope": "current-user",
+  "installer_bundle_id": "org.radishlex.installer.macos",
+  "manager_component_path": "Components/radishlex_manager.app",
+  "manager_target_path": "Applications/RadishLex Manager.app",
+  "input_method_component_path": "Components/RadishLexInputMethod.app",
+  "input_method_target_path": "Library/Input Methods/RadishLexInputMethod.app",
+  "data_root_path": "Library/Application Support/RadishLex",
+  "install_state_path": "Library/Application Support/RadishLex/.radishlex-install-v1",
+  "default_removal": "programs-only",
+  "data_removal": "separate-authorized-flow"
+}

@@ -6,6 +6,8 @@ repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
 manager_dir="${repo_root}/apps/radishlex-manager"
 app_bundle="${manager_dir}/build/macos/Build/Products/Release/radishlex_manager.app"
 native_library="${app_bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib"
+validation_host="${app_bundle}/Contents/Helpers/RadishLexUpgradeValidationHost"
+preflight_host="${app_bundle}/Contents/Helpers/RadishLexUpgradePreflightHost"
 smoke_dir="$(mktemp -d "${TMPDIR:-/tmp}/radishlex-manager-product-smoke.XXXXXX")"
 m2_cleanup="${repo_root}/platforms/macos-imk/cleanup-m2-manager-test-data.sh"
 m2_cleanup_wrapper="${repo_root}/scripts/cleanup-macos-m2-manager-test-data.sh"
@@ -21,6 +23,10 @@ key_agreement_product_smoke="${repo_root}/scripts/run-manager-apple-secure-encla
 apple_qualified_build="${repo_root}/scripts/build-manager-macos-dpk-qualified-product.sh"
 apple_qualified_entitlements="${manager_dir}/macos/Runner/DPKQualification.entitlements"
 manager_app_delegate="${manager_dir}/macos/Runner/AppDelegate.swift"
+product_tool="${repo_root}/scripts/macos-product/product_manifest.py"
+product_version="$(python3 "${product_tool}" field product_version)"
+product_build="$(python3 "${product_tool}" field build_number)"
+minimum_macos="$(python3 "${product_tool}" field minimum_macos)"
 
 cleanup() {
   rm -rf "${smoke_dir}"
@@ -143,14 +149,12 @@ clang -std=c11 -Wall -Wextra -Werror -fsyntax-only \
   "${m2_cleanup_source}"
 "${m2_cleanup_helper_contract}"
 "${m2_cleanup_orchestration_contract}"
+"${repo_root}/platforms/macos-product/UpgradeValidationHosts/check.sh"
 
-(
-  cd "${manager_dir}"
-  flutter build macos --release --dart-define=RADISHLEX_MANAGER_MODE=product
-)
+"${repo_root}/scripts/build-manager-macos-product.sh"
 
-if [ ! -f "${native_library}" ]; then
-  echo "manager product bundle is missing its native library." >&2
+if [ ! -f "${native_library}" ] || [ ! -x "${validation_host}" ] || [ ! -x "${preflight_host}" ]; then
+  echo "manager product bundle is missing its native library or upgrade hosts." >&2
   exit 1
 fi
 
@@ -160,19 +164,47 @@ if codesign -d --entitlements :- "${app_bundle}" 2>&1 | grep -Fq "com.apple.secu
 fi
 
 codesign --verify --deep --strict "${app_bundle}"
+codesign --verify --strict "${validation_host}"
+codesign --verify --strict "${preflight_host}"
+set +e
+"${preflight_host}" --caller-path-is-forbidden >/dev/null 2>&1
+preflight_argument_status=$?
+set -e
+if [[ ${preflight_argument_status} -ne 2 ]]; then
+  echo "bundled upgrade preflight host must reject every argument." >&2
+  exit 1
+fi
+manager_bundle_id="$(python3 "${product_tool}" field manager_bundle_id)"
+input_method_bundle_id="$(python3 "${product_tool}" field input_method_bundle_id)"
+strings "${preflight_host}" | grep -Fxq "${manager_bundle_id}"
+strings "${preflight_host}" | grep -Fxq "${input_method_bundle_id}"
+test "$(plutil -extract CFBundleShortVersionString raw \
+  "${app_bundle}/Contents/Info.plist")" = "${product_version}"
+test "$(plutil -extract CFBundleVersion raw \
+  "${app_bundle}/Contents/Info.plist")" = "${product_build}"
+test "$(plutil -extract LSMinimumSystemVersion raw \
+  "${app_bundle}/Contents/Info.plist")" = "${minimum_macos}"
 for symbol in \
+  _radishlex_product_install_startup_gate \
+  _radishlex_product_upgrade_startup_gate \
+  _radishlex_manager_upgrade_validate_candidate \
   _radishlex_apple_p256_product_status \
   _radishlex_apple_p256_product_smoke \
   _radishlex_apple_secure_enclave_p256_product_status \
   _radishlex_apple_secure_enclave_p256_product_smoke \
   _radishlex_apple_secure_enclave_key_agreement_product_status \
   _radishlex_apple_secure_enclave_key_agreement_product_smoke \
-  _radishlex_manager_sync_product_status; do
+  _radishlex_manager_sync_product_status \
+  _radishlex_manager_sync_qualification_start \
+  _radishlex_manager_sync_qualification_poll \
+  _radishlex_manager_sync_qualification_cancel \
+  _radishlex_manager_sync_qualification_free; do
   if ! nm -gU "${native_library}" | grep -Eq "(^|[[:space:]])${symbol}$"; then
     echo "manager product native library is missing required symbol: ${symbol}" >&2
     exit 1
   fi
 done
+python3 "${repo_root}/scripts/macos-product/test_startup_gate_order.py"
 if rg -n 'radishlex_apple_(p256|secure_enclave_p256|secure_enclave_key_agreement)_product_(smoke|status)' \
   "${manager_dir}/lib" "${manager_dir}/tool/ffi_bridge_smoke.dart"; then
   echo "Apple P-256 product validation ABI must not be bound by Dart." >&2

@@ -4,6 +4,11 @@ set -euo pipefail
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
 platform_dir="${repo_root}/platforms/macos-imk"
+product_tool="${repo_root}/scripts/macos-product/product_manifest.py"
+rime_data_tool="${repo_root}/scripts/rime-product/product_data.py"
+product_version="$(python3 "${product_tool}" field product_version)"
+product_build="$(python3 "${product_tool}" field build_number)"
+minimum_macos="$(python3 "${product_tool}" field minimum_macos)"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "macOS is required for the native InputMethodKit bundle check." >&2
@@ -13,8 +18,12 @@ fi
 : "${RIME_INCLUDE_DIR:?native check requires RIME_INCLUDE_DIR}"
 : "${RIME_LIB_DIR:?native check requires RIME_LIB_DIR}"
 : "${RADISHLEX_RIME_SHARED_DATA:?native check requires isolated RADISHLEX_RIME_SHARED_DATA}"
-: "${RADISHLEX_RIME_SCHEMA:?native check requires RADISHLEX_RIME_SCHEMA}"
-: "${RADISHLEX_RIME_DATA_LICENSE:?native check requires RADISHLEX_RIME_DATA_LICENSE}"
+expected_schema="$(python3 "${rime_data_tool}" field schema_id)"
+schema="${RADISHLEX_RIME_SCHEMA:-${expected_schema}}"
+if [[ "${schema}" != "${expected_schema}" ]]; then
+  echo "native check schema must match pinned product RimeData: ${expected_schema}." >&2
+  exit 2
+fi
 
 shared_data="$(CDPATH= cd -- "${RADISHLEX_RIME_SHARED_DATA}" && pwd -P)"
 case "${shared_data}" in
@@ -28,6 +37,7 @@ case "${shared_data}" in
     exit 2
     ;;
 esac
+python3 "${rime_data_tool}" verify --data-dir "${shared_data}"
 
 "${platform_dir}/build-bundle.sh" native
 
@@ -94,13 +104,11 @@ test -s "${resources}/zh-Hans.lproj/InfoPlist.strings"
 test -s "${resources}/en.lproj/InfoPlist.strings"
 codesign --verify --deep --strict --verbose=2 "${bundle}"
 test -f "${resources}/RimeData/default.yaml"
-cmp -s \
-  <(sed "s/__RADISHLEX_RIME_SCHEMA__/${RADISHLEX_RIME_SCHEMA}/g" \
-    "${platform_dir}/Resources/Rime/default.yaml.in") \
-  "${resources}/RimeData/default.yaml"
 grep -Fqx '  page_size: 5' "${resources}/RimeData/default.yaml"
-test -f "${resources}/RimeData/${RADISHLEX_RIME_SCHEMA}.schema.yaml"
-test -s "${resources}/RimeData.LICENSE"
+test -f "${resources}/RimeData/${schema}.schema.yaml"
+test -s "${resources}/RimeData/SourceManifest.json"
+test -s "${resources}/RimeData/Licenses/rime-pinyin-simp/LICENSE"
+test -s "${resources}/RimeData/Licenses/rime-pinyin-simp/AUTHORS"
 test -s "${resources}/RadishLex.LICENSE"
 test -d "${native_licenses}"
 if strings "${executable}" | grep -Eq \
@@ -111,10 +119,15 @@ fi
 plutil -lint "${contents}/Info.plist" "${manifest}" "${native_manifest}" \
   "${resources}/zh-Hans.lproj/InfoPlist.strings" \
   "${resources}/en.lproj/InfoPlist.strings" >/dev/null
-test "$(plutil -extract CFBundleVersion raw "${contents}/Info.plist")" = "34"
+test "$(plutil -extract CFBundleShortVersionString raw \
+  "${contents}/Info.plist")" = "${product_version}"
+test "$(plutil -extract CFBundleVersion raw \
+  "${contents}/Info.plist")" = "${product_build}"
+test "$(plutil -extract LSMinimumSystemVersion raw \
+  "${contents}/Info.plist")" = "${minimum_macos}"
 test "$(plutil -extract RadishLexRimeSchema raw "${contents}/Info.plist")" = \
-  "${RADISHLEX_RIME_SCHEMA}"
-test "$(plutil -extract schema_id raw "${manifest}")" = "${RADISHLEX_RIME_SCHEMA}"
+  "${schema}"
+test "$(plutil -extract schema_id raw "${manifest}")" = "${schema}"
 test "$(plutil -extract tsInputMethodCharacterRepertoireKey.0 raw \
   "${contents}/Info.plist")" = "Hans"
 test "$(plutil -extract TISIntendedLanguage raw \
@@ -182,10 +195,10 @@ done
 
 python3 "${repo_root}/scripts/macos-imk/native_manifest.py" verify \
   --data-dir "${resources}/RimeData" \
-  --license "${resources}/RimeData.LICENSE" \
-  --schema "${RADISHLEX_RIME_SCHEMA}" \
+  --schema "${schema}" \
   --deploy-on-start "${deploy_on_start}" \
   --manifest "${manifest}"
+python3 "${rime_data_tool}" verify --data-dir "${resources}/RimeData"
 
 python3 "${repo_root}/scripts/macos-imk/bundle_dylibs.py" verify \
   --frameworks-dir "${contents}/Frameworks" \
@@ -201,7 +214,7 @@ trap 'rm -rf "${native_user_data}"' EXIT
     RIME_LIB_DIR="${RIME_LIB_DIR}" \
     RADISHLEX_RIME_SHARED_DATA="${resources}/RimeData" \
     RADISHLEX_RIME_USER_DATA="${native_user_data}" \
-    RADISHLEX_RIME_SCHEMA="${RADISHLEX_RIME_SCHEMA}" \
+    RADISHLEX_RIME_SCHEMA="${schema}" \
     RADISHLEX_EXPECTED_CANDIDATE_PAGE_SIZE=5 \
     cargo test -p radishlex-ime-ffi --features native-rime \
       rime_session_native_smoke_uses_ffi_entrypoint -- --ignored

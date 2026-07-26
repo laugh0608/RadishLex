@@ -5,6 +5,7 @@ import 'ffi_manager_learning_mapper.dart';
 import 'ffi_manager_native_models.dart';
 import 'ffi_manager_runtime_diagnostics.dart';
 import 'ffi_manager_snapshot_mapper.dart';
+import 'ffi_manager_sync_qualification_mapper.dart';
 import 'manager_bridge.dart';
 import 'manager_diagnostics_export.dart';
 import 'manager_platform_control.dart';
@@ -159,6 +160,19 @@ class FfiManagerBridge implements ManagerBridge {
     return _loadSnapshot();
   }
 
+  @override
+  ManagerSyncQualificationRun startSyncQualification(
+    ManagerSyncQualificationRequest request,
+  ) {
+    final nativeRun = _native.startSyncQualification(
+      endpoint: request.endpoint,
+      accessToken: request.accessToken,
+      localCaDer: request.localCaDer,
+      timeoutMs: request.timeoutMs,
+    );
+    return _FfiManagerSyncQualificationRun(nativeRun);
+  }
+
   Future<ManagerSnapshot> _loadSnapshot() async {
     var settingsDraft = _settingsStore.load();
     final platform = platformControl;
@@ -195,4 +209,74 @@ class FfiManagerBridge implements ManagerBridge {
       contextKind: 'general',
     );
   }
+}
+
+final class _FfiManagerSyncQualificationRun
+    implements ManagerSyncQualificationRun {
+  _FfiManagerSyncQualificationRun(this._native);
+
+  final NativeSyncQualificationRun _native;
+  ManagerSyncQualificationState? _lastState;
+  bool _disposed = false;
+
+  @override
+  ManagerSyncQualificationSnapshot poll() {
+    _ensureOpen();
+    final snapshot = managerSyncQualificationFromNative(_native.poll());
+    if (!_validTransition(_lastState, snapshot.state)) {
+      throw const FfiManagerBridgeException(
+        statusCode: 2,
+        code: 'sync_qualification_transition_invalid',
+        message: 'native sync qualification state transition is invalid',
+      );
+    }
+    _lastState = snapshot.state;
+    return snapshot;
+  }
+
+  @override
+  bool cancel() {
+    _ensureOpen();
+    return _native.cancel();
+  }
+
+  @override
+  void dispose() {
+    if (_disposed) {
+      return;
+    }
+    _native.dispose();
+    _disposed = true;
+  }
+
+  void _ensureOpen() {
+    if (_disposed) {
+      throw const FfiManagerBridgeException(
+        statusCode: 2,
+        code: 'invalid_state',
+        message: 'sync qualification run is already disposed',
+      );
+    }
+  }
+}
+
+bool _validTransition(
+  ManagerSyncQualificationState? previous,
+  ManagerSyncQualificationState next,
+) {
+  if (previous == null || previous == next) {
+    return true;
+  }
+  return switch (previous) {
+    ManagerSyncQualificationState.created =>
+      next == ManagerSyncQualificationState.running ||
+          next == ManagerSyncQualificationState.cancelling ||
+          next.isTerminal,
+    ManagerSyncQualificationState.running =>
+      next == ManagerSyncQualificationState.cancelling || next.isTerminal,
+    ManagerSyncQualificationState.cancelling => next.isTerminal,
+    ManagerSyncQualificationState.completed ||
+    ManagerSyncQualificationState.failed ||
+    ManagerSyncQualificationState.cancelled => false,
+  };
 }

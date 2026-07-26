@@ -4,9 +4,10 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use rusqlite::{params, Connection, ErrorCode, Transaction, TransactionBehavior};
+use rusqlite::{params, Connection, ErrorCode, OpenFlags, Transaction, TransactionBehavior};
 
 use crate::error::{UserDbError, UserDbResult};
+use crate::model::{UserDbFileInspection, UserDbMigrationSummary, UserDbSchemaCompatibility};
 
 use super::identity::legacy_stable_hash_hex;
 use super::UserDb;
@@ -16,6 +17,79 @@ pub(super) const BUSY_TIMEOUT: Duration = Duration::from_millis(5_000);
 pub(super) const MAX_LEARNING_COUNT: i64 = 1_000_000;
 
 impl UserDb {
+    /// Returns the schema version supported by this library build.
+    pub const fn supported_schema_version() -> i64 {
+        SCHEMA_VERSION
+    }
+
+    /// Inspects an existing database without configuring WAL, changing file
+    /// permissions, or running migrations.
+    ///
+    /// Product callers remain responsible for rejecting unsafe paths and for
+    /// proving that no product process is concurrently using the database.
+    pub fn inspect_file(path: impl AsRef<Path>) -> UserDbResult<UserDbFileInspection> {
+        let path = path.as_ref();
+        let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(|error| preserved_database_error(path, "open read-only", error))?;
+        connection
+            .busy_timeout(BUSY_TIMEOUT)
+            .map_err(|error| preserved_database_error(path, "configure read-only", error))?;
+        let version = read_schema_version(&connection)
+            .map_err(|error| preserved_database_error(path, "read schema version", error))?;
+        if version < 0 {
+            return Err(UserDbError::invalid_input(
+                "schema_version",
+                format!("database version must be non-negative, got {version}"),
+            ));
+        }
+        verify_integrity(&connection)
+            .map_err(|error| preserved_database_error(path, "integrity check", error))?;
+        if version == SCHEMA_VERSION {
+            validate_current_schema_on(&connection)
+                .map_err(|error| preserved_userdb_error(path, "validate schema", error))?;
+        }
+
+        let compatibility = match version.cmp(&SCHEMA_VERSION) {
+            std::cmp::Ordering::Less => UserDbSchemaCompatibility::MigrationRequired,
+            std::cmp::Ordering::Equal => UserDbSchemaCompatibility::Current,
+            std::cmp::Ordering::Greater => UserDbSchemaCompatibility::Future,
+        };
+        Ok(UserDbFileInspection {
+            schema_version: version,
+            supported_schema_version: SCHEMA_VERSION,
+            compatibility,
+        })
+    }
+
+    /// Migrates and validates a caller-owned candidate database.
+    ///
+    /// This operation mutates `path`. Product callers must only pass an
+    /// isolated candidate produced by the upgrade coordinator, never the live
+    /// Application Support database.
+    pub fn migrate_and_validate(path: impl AsRef<Path>) -> UserDbResult<UserDbMigrationSummary> {
+        let path = path.as_ref();
+        let source = Self::inspect_file(path)?;
+        let database = Self::open(path)?;
+        let target_schema_version = database.schema_version()?;
+        drop(database);
+        finalize_standalone_candidate(path)?;
+        let target = Self::inspect_file(path)?;
+        if target.compatibility != UserDbSchemaCompatibility::Current
+            || target.schema_version != target_schema_version
+        {
+            return Err(UserDbError::invalid_input(
+                "schema_version",
+                "candidate database did not validate at the supported schema version",
+            ));
+        }
+
+        Ok(UserDbMigrationSummary {
+            source_schema_version: source.schema_version,
+            target_schema_version,
+            migrated: source.schema_version != target_schema_version,
+        })
+    }
+
     pub fn open(path: impl AsRef<Path>) -> UserDbResult<Self> {
         let path = path.as_ref().to_path_buf();
         let connection = Connection::open(&path)
@@ -39,6 +113,39 @@ impl UserDb {
         restrict_database_permissions(&path)?;
         restrict_sqlite_sidecar_permissions(&path)?;
         Ok(db)
+    }
+
+    /// Opens an already-migrated product validation candidate without WAL,
+    /// permission, schema, or content changes.
+    pub fn open_read_only_current(path: impl AsRef<Path>) -> UserDbResult<Self> {
+        let path = path.as_ref();
+        let connection = Connection::open_with_flags(
+            path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(|error| preserved_database_error(path, "open validation candidate", error))?;
+        connection.busy_timeout(BUSY_TIMEOUT).map_err(|error| {
+            preserved_database_error(path, "configure validation candidate", error)
+        })?;
+        connection
+            .pragma_update(None, "query_only", true)
+            .map_err(|error| {
+                preserved_database_error(path, "protect validation candidate", error)
+            })?;
+        let version = read_schema_version(&connection)
+            .map_err(|error| preserved_database_error(path, "read validation schema", error))?;
+        if version != SCHEMA_VERSION {
+            return Err(UserDbError::invalid_input(
+                "schema_version",
+                format!("validation candidate must use schema {SCHEMA_VERSION}"),
+            ));
+        }
+        verify_integrity(&connection).map_err(|error| {
+            preserved_database_error(path, "validate candidate integrity", error)
+        })?;
+        validate_current_schema_on(&connection)
+            .map_err(|error| preserved_userdb_error(path, "validate candidate schema", error))?;
+        Ok(Self { connection })
     }
 
     pub fn open_in_memory() -> UserDbResult<Self> {
@@ -104,6 +211,39 @@ impl UserDb {
     fn validate_current_schema(&self) -> UserDbResult<()> {
         validate_current_schema_on(&self.connection)
     }
+}
+
+fn finalize_standalone_candidate(path: &Path) -> UserDbResult<()> {
+    let connection = Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )
+    .map_err(|error| preserved_database_error(path, "open migrated candidate", error))?;
+    connection
+        .busy_timeout(BUSY_TIMEOUT)
+        .map_err(|error| preserved_database_error(path, "configure migrated candidate", error))?;
+    let journal_mode: String = connection
+        .query_row("PRAGMA journal_mode = DELETE", [], |row| row.get(0))
+        .map_err(|error| preserved_database_error(path, "finalize candidate journal", error))?;
+    if !journal_mode.eq_ignore_ascii_case("delete") {
+        return Err(UserDbError::invalid_input(
+            "candidate",
+            "migrated candidate must finish as one standalone SQLite file",
+        ));
+    }
+    verify_integrity(&connection)
+        .map_err(|error| preserved_database_error(path, "validate migrated candidate", error))?;
+    drop(connection);
+    restrict_database_permissions(path)?;
+    for sidecar in standalone_sqlite_sidecar_paths(path) {
+        if sidecar.exists() {
+            return Err(UserDbError::invalid_input(
+                "candidate",
+                "migrated candidate retained a SQLite sidecar",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn validate_current_schema_on(connection: &Connection) -> UserDbResult<()> {
@@ -343,7 +483,7 @@ fn configure_common_connection(connection: &Connection) -> rusqlite::Result<()> 
     Ok(())
 }
 
-fn read_schema_version(connection: &Connection) -> rusqlite::Result<i64> {
+pub(super) fn read_schema_version(connection: &Connection) -> rusqlite::Result<i64> {
     connection.query_row("PRAGMA user_version", [], |row| row.get(0))
 }
 
@@ -363,7 +503,7 @@ fn reject_future_schema(version: i64) -> UserDbResult<()> {
     Ok(())
 }
 
-fn verify_integrity(connection: &Connection) -> rusqlite::Result<()> {
+pub(super) fn verify_integrity(connection: &Connection) -> rusqlite::Result<()> {
     let result: String = connection.query_row("PRAGMA quick_check(1)", [], |row| row.get(0))?;
     if result == "ok" {
         Ok(())
@@ -372,7 +512,7 @@ fn verify_integrity(connection: &Connection) -> rusqlite::Result<()> {
     }
 }
 
-fn preserved_database_error(
+pub(super) fn preserved_database_error(
     path: &Path,
     stage: &'static str,
     source: rusqlite::Error,
@@ -1122,5 +1262,14 @@ fn sqlite_sidecar_paths(path: &Path) -> [PathBuf; 2] {
     [
         PathBuf::from(format!("{path}-wal")),
         PathBuf::from(format!("{path}-shm")),
+    ]
+}
+
+fn standalone_sqlite_sidecar_paths(path: &Path) -> [PathBuf; 3] {
+    let path = path.as_os_str().to_string_lossy();
+    [
+        PathBuf::from(format!("{path}-wal")),
+        PathBuf::from(format!("{path}-shm")),
+        PathBuf::from(format!("{path}-journal")),
     ]
 }

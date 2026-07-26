@@ -661,9 +661,31 @@ dependencies = [
  "radishlex-ime-core",
  "radishlex-ime-crypto",
  "radishlex-ime-engine-rime",
+ "radishlex-ime-product-install",
+ "radishlex-ime-product-upgrade",
  "radishlex-ime-ranker",
  "radishlex-ime-runtime",
+ "radishlex-ime-sync-runtime",
  "radishlex-ime-userdb",
+ "radishlex-macos-product-install",
+ "serde_json",
+]
+
+[[package]]
+name = "radishlex-ime-product-install"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "radishlex-ime-product-upgrade"
+version = "0.1.0"
+dependencies = [
+ "radishlex-ime-userdb",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -697,6 +719,20 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "webpki-roots",
+ "zeroize",
+]
+
+[[package]]
+name = "radishlex-ime-sync-runtime"
+version = "0.1.0"
+dependencies = [
+ "base64ct",
+ "radishlex-ime-crypto",
+ "radishlex-ime-sync",
+ "radishlex-ime-userdb",
+ "serde",
+ "serde_json",
+ "zeroize",
 ]
 
 [[package]]
@@ -708,6 +744,73 @@ dependencies = [
  "radishlex-ime-crypto",
  "radishlex-ime-sync",
  "rusqlite",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
+name = "radishlex-macos-installer-bridge"
+version = "0.1.0"
+dependencies = [
+ "radishlex-ime-product-install",
+ "radishlex-ime-product-upgrade",
+ "radishlex-macos-installer-driver",
+ "radishlex-macos-installer-executor",
+ "radishlex-macos-product-install",
+ "radishlex-macos-upgrade-coordinator",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "radishlex-macos-installer-driver"
+version = "0.1.0"
+dependencies = [
+ "radishlex-ime-product-install",
+]
+
+[[package]]
+name = "radishlex-macos-installer-executor"
+version = "0.1.0"
+dependencies = [
+ "getrandom",
+ "radishlex-ime-product-install",
+ "radishlex-ime-product-upgrade",
+ "radishlex-ime-userdb",
+ "radishlex-macos-installer-driver",
+ "radishlex-macos-product-install",
+ "radishlex-macos-product-install-coordinator",
+ "radishlex-macos-upgrade-coordinator",
+]
+
+[[package]]
+name = "radishlex-macos-product-install"
+version = "0.1.0"
+dependencies = [
+ "radishlex-ime-product-install",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
+name = "radishlex-macos-product-install-coordinator"
+version = "0.1.0"
+dependencies = [
+ "radishlex-ime-product-install",
+ "radishlex-ime-product-upgrade",
+ "radishlex-ime-userdb",
+ "radishlex-macos-product-install",
+ "radishlex-macos-upgrade-coordinator",
+]
+
+[[package]]
+name = "radishlex-macos-upgrade-coordinator"
+version = "0.1.0"
+dependencies = [
+ "radishlex-ime-product-upgrade",
+ "radishlex-ime-userdb",
+ "serde",
  "serde_json",
  "sha2 0.10.9",
 ]

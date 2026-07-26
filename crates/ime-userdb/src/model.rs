@@ -308,6 +308,50 @@ pub struct SyncPreflightSummary {
     pub local_import_batches: usize,
 }
 
+/// Compatibility of an inspected on-disk user database with this library.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UserDbSchemaCompatibility {
+    MigrationRequired,
+    Current,
+    Future,
+}
+
+/// Read-only structural inspection of one existing SQLite user database.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UserDbFileInspection {
+    pub schema_version: i64,
+    pub supported_schema_version: i64,
+    pub compatibility: UserDbSchemaCompatibility,
+}
+
+/// Result of explicitly migrating and validating a caller-owned candidate file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UserDbMigrationSummary {
+    pub source_schema_version: i64,
+    pub target_schema_version: i64,
+    pub migrated: bool,
+}
+
+/// Logical size of one consistent SQLite snapshot before it is created.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UserDbSnapshotEstimate {
+    pub schema_version: i64,
+    pub page_size_bytes: u64,
+    pub page_count: u64,
+    pub logical_size_bytes: u64,
+}
+
+/// Result of copying one source database through SQLite's backup API.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UserDbSnapshotSummary {
+    pub source_schema_version: i64,
+    pub snapshot_schema_version: i64,
+    pub page_size_bytes: u64,
+    pub page_count: u64,
+    pub logical_size_bytes: u64,
+    pub snapshot_file_bytes: u64,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UserDbSyncPayloadObjectType {
     DictionaryUserTerms,

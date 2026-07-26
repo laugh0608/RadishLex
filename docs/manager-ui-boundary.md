@@ -10,12 +10,12 @@ Flutter manager 是 RadishLex 的管理界面，不进入输入热路径，不�
 
 管理端的职责是把 Rust core 和本地 userdb 已经具备的能力以可审计、可删除、可解释的方式呈现给用户，并在同步能力具备生产条件前清楚显示不可用原因。
 
-manager 分层交付：M2 先完成本地词库、学习、隐私和诊断管理，并让正常本地产品运行态携带 native library、使用固定平台目录；M3 再完成同步、设备、恢复与撤销；M4 闭合发布签名、公证、安装升级和最终产品打包。fixture 与开发期 Dart FFI smoke 只承担显式演示和开发验证，Release 产品 bundle 与真实平台验收承担产品证据。后续代码继续遵守以下边界：
+manager 分层交付：M2 先完成本地词库、学习、隐私和诊断管理，并让正常本地产品运行态携带 native library、使用固定平台目录；M3 再完成同步、设备、恢复与撤销；M4 闭合版本化 distribution identity、安装升级、发布载体和最终产品打包。首发使用社区 ad-hoc 路径，未来 Developer ID/公证必须作为新的 identity 独立治理。fixture 与开发期 Dart FFI smoke 只承担显式演示和开发验证，Release 产品 bundle 与真实平台验收承担产品证据。后续代码继续遵守以下边界：
 
 - 本地 userdb 管理优先于远端同步开关。
 - 学习记录摘要优先于 P1 原始事件明细。
 - 同步预检、本地 Docker / 本地 HTTPS 联调状态和部署配置检查优先于真实远端启用。
-- 恢复码和设备授权 UI 必须等待受控资格执行链、交互安全与对应产品流程退出评审；macOS 平台私钥 backend 主路径已经通过，但不单独解锁 UI。
+- 恢复码和设备授权 UI 必须等待交互安全与对应产品流程退出评审；受控资格执行链和 macOS 平台私钥 backend 主路径已经通过，但都不单独解锁 UI。
 - 用户可用同步主操作必须等待产品入口退出评审；发布级目标部署证据按首版后计划补齐。非上传的同步入口状态、阻塞说明和本地联调展示可以继续推进。
 
 ## M2 产品运行态契约
@@ -53,7 +53,7 @@ M2 本地管理能力应优先覆盖：
 - 查看 sync preflight 摘要。
 - 查看 import batches、词条 tombstone 和本地 sync 影响摘要。
 
-M3 同步管理能力在安全退出条件满足后覆盖。当前 backend 产品资格和 Rust 严格 HTTPS transport 已闭合，但 `user_sync_enabled=false`；下一批只允许本地 HTTPS、合成 P2 和单次内存参数下的受控资格执行链，不开放普通用户成功入口：
+同步管理能力保持 `user_sync_enabled=false`。当前唯一可执行网络入口是本地 HTTPS、合成 P2 和单次内存参数下的受控资格 run；它与普通用户同步分区，不开放真实用户成功入口：
 
 - 配置自部署服务端地址和本地连接参数草案。
 - 查看本地同步服务连接健康摘要，只展示 endpoint 状态、access token 存在性、transport 分类、server state 摘要和结构化错误码。
@@ -129,7 +129,11 @@ M3 同步管理能力在安全退出条件满足后覆盖。当前 backend 产�
 
 管理端应通过 `ime-ffi` 或后续受控 bridge 调用 Rust 能力，不直接读写 Rust 内部结构。
 
-当前 Flutter 工程已抽出 `ManagerBridge`，UI 只依赖 snapshot 加载、词条删除、explicit restore、词库导入检查、词库导入、词库导出、设置草案保存、诊断报告预览和诊断报告导出这组受控方法。现有 `FixtureManagerBridge` 只在显式 demo 与测试中使用合成数据验证调用边界和 UI 状态；真实 Dart FFI bridge 已覆盖本地 userdb active/deleted list、delete、restore、dictionary inspect/import/export、import batches、learning status、rank explain、sync preflight、status-only 产品 backend 摘要、非 secret settings JSON 和脱敏诊断报告。产品 bootstrap 还通过受控平台 bridge 解析固定路径、收紧文件权限并读写输入 runtime 的隐私偏好。Dart 绑定层通过 ABI v6 复制 Rust user-term view 的可选 `import_batch_id` 后释放 handle，并把固定数值产品摘要映射为 `DeviceSecuritySummary`；不得把 Rust 内部指针、未脱敏错误字符串或明文同步 payload 透传给 widget 层。manager Release dylib 中的 Apple P-256 validation ABI 仍只由原生产品自检路径使用，Dart 不直接绑定；Manager 读取的是不触发系统 API 的独立 `radishlex_manager_sync_product_status`。
+macOS 正常产品启动在 native `applicationWillFinishLaunching` 最前依次调用 ABI v9 外层 install gate 与数据 upgrade gate，早于 Flutter delegate、settings、userdb 和所有 Manager 业务初始化。外层运行身份由 FFI 从当前 executable 的固定 bundle 形成；任一 gate 的 active guard、非终态/损坏 receipt、中断 artifact、未知对象、身份漂移、FFI 失败或未知 result 都失败关闭，不能由 Flutter 错误页、demo mode 或创建空目录绕过。
+
+bundle 内无参数 `Contents/Helpers/RadishLexUpgradeValidationHost` 只供升级协调器读取固定 candidate/settings backup 并执行真实管理查询与 settings format v1 兼容检查。该 helper 不进入 `ManagerBridge` 或 Dart binding，不启动 Flutter，不接受任意路径，也不能直接写 receipt；协调核心必须在 guard 下复验证据后才能推进状态。
+
+当前 Flutter 工程已抽出 `ManagerBridge`，UI 依赖 snapshot 加载、词条删除、explicit restore、词库导入检查/导入/导出、设置草案保存、诊断报告预览/导出，以及隔离的本地合成同步资格 run。现有 `FixtureManagerBridge` 只在显式 demo 与测试中使用合成数据验证调用边界和 UI 状态，不能执行资格网络链；真实 Dart FFI bridge 已覆盖本地 userdb、学习、rank explain、sync preflight、status-only 产品 backend 摘要、非 secret settings、脱敏诊断和资格 start/poll/cancel/free。产品 bootstrap 还通过受控平台 bridge 解析固定路径、收紧文件权限并读写输入 runtime 的隐私偏好。Dart 绑定层通过当前 ABI v9 复制 native view/snapshot 后释放 handle，只把固定数值产品摘要映射为 `DeviceSecuritySummary`；资格 token/CA 在一次调用后覆写，不进入 snapshot/settings/diagnostics。manager Release dylib 中的 Apple validation ABI 仍只由原生产品自检路径使用，Dart 不直接绑定。
 
 settings JSON schema、部署证据来源 allowlist、诊断报告字段索引和脱敏规则见 `docs/manager-settings-diagnostics.md`。
 
@@ -217,17 +221,17 @@ native 产品摘要同样不改变 `ManagerBridge` 方法集：`FfiManagerBridge
 1. 已固定本文档，并同步路线图、技术计划、仓库结构和周志。
 2. `apps/radishlex-manager/` 默认以 `product` mode 启动，产品失败进入结构化不可用态；显式 `demo` 构建通过 `ManagerBridge` contract 接入合成 fixture，并持续显示演示标识。
 3. 已验证词库搜索 / 空态、词条审计详情、导入历史筛选 / 排序 / 批次联动审计、本地 sync preflight 影响摘要、学习状态聚合摘要、rank explain 筛选和候选贡献项详情、同步页 gate 状态来源 / 本地 P2 对象分类 / 连接健康 / 设备 backend 门禁审计、设置页 gate 草案预览、部署证据来源标签、诊断报告 gate source / stop line、词条删除确认、词库导入检查、词库导入后刷新、词库导入 / 导出结果摘要和操作失败分类提示经由 fixture bridge 完成受控调用。
-4. 真实 Dart FFI bridge 已接入 userdb active/deleted list、delete、explicit restore、用户词库 inspect/import/export、import batches、learning status、rank explain、sync preflight 和 status-only 产品摘要；绑定初始化会验证 ABI v6、owner-thread 和 panic boundary，词条与导入批次按可选 batch id 关联，产品摘要始终映射为关闭态 gate。
+4. 真实 Dart FFI bridge 已接入 userdb active/deleted list、delete、explicit restore、用户词库 inspect/import/export、import batches、learning status、rank explain、sync preflight、status-only 产品摘要和本地合成资格 run；绑定初始化会验证 ABI v9、owner-thread 和 panic boundary，产品摘要始终映射为关闭态 gate。
 5. `scripts/check-manager-ffi-smoke.sh` 使用临时合成数据复验开发期真实 bridge；`scripts/check-manager-product.sh` 构建 Release app，校验非 sandbox M2 profile、嵌套签名、bundle native library、ABI/符号/架构/依赖，并直接对 bundle dylib 执行重启、删除、tombstone 和恢复 smoke，不启动 GUI。
 6. `rank explain` 区域已通过专用 `ime-ffi` ABI 读取单候选贡献项，Flutter 只展示复制后的非敏感摘要，不持有 Rust view 指针。
 7. 已补设置页配置来源诊断、sync gate 草案预览、部署证据来源标签、设置草案保存、脱敏诊断报告分组预览 / 筛选 / 复制 / 导出和 bridge 失败结构化错误分类展示；UI 不透传 native 错误明细。
 8. 同步配置页继续保持真实上传按钮禁用，状态由设置草案、隐私模式、平台私钥 backend gate 和部署证据来源草案派生，可显示 `local_only`、`sync_disabled_by_policy`、`backend_unavailable`、`deployment_unverified` 或 `preflight_ready`。
-9. 已接入 sync entry state、服务连接健康、`sync_connection_health.v1` 摘要回填、恢复码 / 设备授权准备态、四条 readiness 聚合、settings 内存态 readiness 导入和只读交互进入状态；macOS 平台私钥 backend 主路径已通过，下一步先完成 localhost 合成 P2 受控资格命令，再评审真实设备授权、恢复码和用户同步命令。
+9. 已接入 sync entry state、服务连接健康、`sync_connection_health.v1` 摘要回填、恢复码 / 设备授权准备态、四条 readiness 聚合、settings 内存态 readiness 导入、只读交互进入状态和 localhost 合成 P2 受控资格 run；macOS 平台私钥 backend 主路径已通过，真实设备授权、恢复码和用户同步命令仍须独立产品评审。
 10. macOS 原生平台 bridge 已固定 Application Support 与 bundle Frameworks 路径、`0700`/`0600` 权限、symlink 拒绝和 `CFPreferences` 隐私键读写回滚；Rust 双连接测试已覆盖并发 schema 初始化、WAL 可见性、输入侧选择、manager 删除和恢复。manager 页头刷新会重新加载真实 bridge snapshot，widget 回归覆盖输入 runtime 外部更新后的聚合可见性；正常 Release GUI 与输入法共库实机已进一步证明外部刷新、delete 防复活、explicit restore、双进程重启、隐私零增量与最终回滚，M2 于 2026-07-18 关闭。
 
 ## 停止线
 
-- 受控资格执行链、交互安全与产品入口退出评审完成前，不提供用户可用同步开关、恢复码创建 UI 或设备授权成功路径。
+- 交互安全、真实设备流程与产品入口退出评审完成前，不提供用户可用同步开关、恢复码创建 UI 或设备授权成功路径；受控资格执行成功不能替代这些条件。
 - 没有发布级目标部署运行证据前，不把远端同步展示为生产可用；本地 Docker / 本地 HTTPS 联调状态可以作为非生产证据展示。
 - 没有 FFI / bridge 明确错误语义前，不让 Flutter 直接解析 Rust 内部错误字符串。
 - 任何会展示、记录、上传或导出 P0、P1 原始事件、恢复码、token、私钥或明文同步 payload 的设计都必须停止并回退。

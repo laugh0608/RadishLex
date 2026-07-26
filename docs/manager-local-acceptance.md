@@ -38,7 +38,7 @@ clean HEAD `a7e385e` 的正常 Release app 已按 [macOS manager 产品验收 ru
 | M2 能力 | 当前证据 | 证据入口 |
 | --- | --- | --- |
 | 产品启动不伪装成功 | 默认 product；native/path/userdb/ABI 失败进入 `UnavailableManagerBridge`；fixture 仅由显式 demo 构建启用并显示常驻标识。 | `manager_bridge_factory.dart`、`unavailable_manager_bridge.dart`、`widget_test.dart`、`./scripts/check-manager.sh` |
-| 产品 bundle 可加载真实 Rust 能力 | Xcode 构建阶段嵌入 native library，校验 ABI v6、owner-thread、panic boundary、架构、必需符号和依赖；Release bundle smoke 使用其中的 dylib。 | `embed-manager-native-library.sh`、`check-manager-product.sh`、`ffi_dynamic_native_binding.dart` |
+| 产品 bundle 可加载真实 Rust 能力 | Xcode 构建阶段嵌入 native library，校验 ABI v9、owner-thread、panic boundary、架构、必需符号和依赖；Release bundle smoke 使用其中的 dylib，并验证隔离资格 run 的失败清理与释放。 | `embed-manager-native-library.sh`、`check-manager-product.sh`、`ffi_dynamic_native_binding.dart` |
 | 用户能管理真实本地词条 | UI 和 FFI 覆盖 active/suppressed/deleted、删除、tombstone 查询、明确恢复、导入导出、按本地 batch id 关联导入审计与重启后的状态保持。 | `dictionary_test.dart`、`ffi_manager_bridge_test.dart`、`ffi_bridge_smoke.dart` |
 | 输入法与 manager 共享数据语义 | 独立 `UserDb` 连接覆盖八路并发 schema 初始化、短时初始化锁等待、WAL 可见性、选择、删除、防复活和恢复；busy timeout 在任何 schema/integrity SQL 前生效，首次 WAL 协商只在固定预算内重试锁竞争。页头刷新重新调用 bridge snapshot，widget 回归覆盖输入侧外部更新后的可见性。 | `ime-userdb` store tests、`widget_test.dart`、`cargo test -p radishlex-ime-userdb` |
 | 隐私设置作用于输入 runtime | Flutter 通过 MethodChannel 调用 macOS `CFPreferences` 的 CurrentUser/AnyHost 层，保存后读回；settings/权限失败会回滚。 | `MainFlutterWindow.swift`、`method_channel_manager_platform_control.dart`、对应 Flutter tests |
@@ -72,10 +72,10 @@ git diff --check
 - Authorization B/C 后，TIS、bundle、Rime、进程、隐私键、测试 userdb、settings、sidecars、receipts 和 M2 临时目录全部恢复基线，父目录 empty/`0755`。全程未读取 P1 原始行或数据库正文。
 - cleanup receipt 的跨登录成对 `st_dev` 漂移已由共享 helper 的精确兼容规则和 M2/R01B contract 关闭；单侧 device drift、inode/权限/白名单漂移仍失败关闭。
 
-M3 可以依赖上述本地产品能力，但不能在 Flutter 层复制同步、加密、设备授权或密钥真相源。下一批先关闭设备签名算法 profile 与 macOS 生产私钥 backend，再进入真实产品 sync orchestration 和 `ManagerBridge` 命令。
+后续同步与产品升级可以依赖上述本地产品能力，但不能在 Flutter 层复制同步、加密、设备授权、migration 或密钥真相源。设备签名 profile、macOS 生产私钥主路径、Rust sync orchestration 与受控合成资格 run 已有独立契约；真实用户命令仍须另行评审。
 
-## M3 停止线
+## 后续同步停止线
 
-- `apple-keychain-v1`、Android Keystore、恢复码、设备授权、设备撤销和 key epoch 的生产证据仍按 M3 专题推进。
-- 发布级目标部署和真实 sync client 尚未进入用户产品链路。
-- 安全证据齐备前，不打开真实用户同步开关，也不把 `preflight_ready` 表述为可同步。
+- 平台 backend、受控资格 run 和本地 HTTPS 证据都不能自行打开真实用户同步。
+- 恢复码、设备授权、设备撤销、key epoch 用户交互和发布级目标部署尚未进入普通用户产品链路。
+- 产品入口退出评审前，不打开真实用户同步开关，也不把 `preflight_ready` 或合成资格成功表述为可同步。

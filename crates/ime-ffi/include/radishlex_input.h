@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-#define RADISHLEX_ABI_CONTRACT_VERSION 6u
+#define RADISHLEX_ABI_CONTRACT_VERSION 9u
 #define RADISHLEX_SESSION_THREAD_POLICY_OWNER_THREAD 1u
 #define RADISHLEX_FFI_PANIC_BOUNDARY_CATCH_UNWIND 1u
 
@@ -28,6 +28,43 @@ extern "C" {
 #define RADISHLEX_APPLE_SECURE_ENCLAVE_KEY_AGREEMENT_PRODUCT_STATUS_VERSION 1u
 #define RADISHLEX_APPLE_SECURE_ENCLAVE_KEY_AGREEMENT_PRODUCT_SMOKE_VERSION 1u
 #define RADISHLEX_MANAGER_SYNC_PRODUCT_STATUS_VERSION 1u
+#define RADISHLEX_MANAGER_SYNC_QUALIFICATION_REQUEST_VERSION 1u
+#define RADISHLEX_MANAGER_SYNC_QUALIFICATION_SNAPSHOT_VERSION 1u
+#define RADISHLEX_PRODUCT_UPGRADE_STARTUP_GATE_REQUEST_VERSION 1u
+#define RADISHLEX_PRODUCT_UPGRADE_STARTUP_GATE_RESULT_VERSION 1u
+#define RADISHLEX_PRODUCT_INSTALL_STARTUP_GATE_REQUEST_VERSION 1u
+#define RADISHLEX_PRODUCT_INSTALL_STARTUP_GATE_RESULT_VERSION 1u
+#define RADISHLEX_MANAGER_UPGRADE_VALIDATION_REQUEST_VERSION 1u
+#define RADISHLEX_INPUT_METHOD_UPGRADE_VALIDATION_REQUEST_VERSION 1u
+
+#define RADISHLEX_STARTUP_GATE_ALLOWED_FIRST_LAUNCH 1u
+#define RADISHLEX_STARTUP_GATE_ALLOWED_NO_UPGRADE_STATE 2u
+#define RADISHLEX_STARTUP_GATE_ALLOWED_TERMINAL_RECEIPT 3u
+#define RADISHLEX_STARTUP_GATE_BLOCKED_UPGRADE_IN_PROGRESS 4u
+#define RADISHLEX_STARTUP_GATE_FAILED_CLOSED 5u
+
+#define RADISHLEX_INSTALL_GATE_ALLOWED_FIRST_LAUNCH 1u
+#define RADISHLEX_INSTALL_GATE_ALLOWED_NO_INSTALL_STATE 2u
+#define RADISHLEX_INSTALL_GATE_ALLOWED_TERMINAL_RECEIPT 3u
+#define RADISHLEX_INSTALL_GATE_BLOCKED_IN_PROGRESS 4u
+#define RADISHLEX_INSTALL_GATE_FAILED_CLOSED 5u
+
+#define RADISHLEX_STARTUP_GATE_ERROR_NONE 0u
+
+#define RADISHLEX_INSTALL_RECEIPT_STATE_COMPLETED 10u
+#define RADISHLEX_INSTALL_RECEIPT_STATE_ABORTED_PRESERVED 11u
+#define RADISHLEX_INSTALL_RECEIPT_STATE_ROLLED_BACK 14u
+
+#define RADISHLEX_UPGRADE_RECEIPT_STATE_COMPLETED 9u
+#define RADISHLEX_UPGRADE_RECEIPT_STATE_ABORTED_PRESERVED 10u
+#define RADISHLEX_UPGRADE_RECEIPT_STATE_ROLLED_BACK 12u
+
+#define RADISHLEX_MANAGER_SYNC_QUALIFICATION_STATE_CREATED 1u
+#define RADISHLEX_MANAGER_SYNC_QUALIFICATION_STATE_RUNNING 2u
+#define RADISHLEX_MANAGER_SYNC_QUALIFICATION_STATE_CANCELLING 3u
+#define RADISHLEX_MANAGER_SYNC_QUALIFICATION_STATE_COMPLETED 4u
+#define RADISHLEX_MANAGER_SYNC_QUALIFICATION_STATE_FAILED 5u
+#define RADISHLEX_MANAGER_SYNC_QUALIFICATION_STATE_CANCELLED 6u
 
 #define RADISHLEX_MANAGER_SIGNING_BACKEND_UNAVAILABLE 0u
 #define RADISHLEX_MANAGER_SIGNING_BACKEND_APPLE_SECURE_ENCLAVE_P256_V1 1u
@@ -151,6 +188,56 @@ typedef struct RadishLexKeyResult RadishLexKeyResult;
 typedef struct RadishLexSnapshot RadishLexSnapshot;
 typedef struct RadishLexBuffer RadishLexBuffer;
 typedef struct RadishLexError RadishLexError;
+typedef struct RadishLexManagerSyncQualificationRun RadishLexManagerSyncQualificationRun;
+
+typedef struct RadishLexProductUpgradeStartupGateRequest {
+  uint32_t version;
+  const char *data_root_path;
+  uint32_t expected_owner_id;
+} RadishLexProductUpgradeStartupGateRequest;
+
+typedef struct RadishLexProductUpgradeStartupGateResult {
+  uint32_t version;
+  uint32_t decision;
+  uint32_t error_code;
+  uint32_t receipt_state;
+} RadishLexProductUpgradeStartupGateResult;
+
+typedef struct RadishLexProductInstallStartupGateRequest {
+  uint32_t version;
+  const char *data_root_path;
+  uint32_t expected_owner_id;
+} RadishLexProductInstallStartupGateRequest;
+
+typedef struct RadishLexProductInstallStartupGateResult {
+  uint32_t version;
+  uint32_t decision;
+  uint32_t error_code;
+  uint32_t receipt_state;
+} RadishLexProductInstallStartupGateResult;
+
+typedef struct RadishLexManagerUpgradeValidationRequest {
+  uint32_t version;
+  const char *candidate_path;
+  const char *settings_path;
+} RadishLexManagerUpgradeValidationRequest;
+
+typedef struct RadishLexInputMethodUpgradeValidationRequest {
+  uint32_t version;
+  const char *candidate_path;
+  const char *shared_data_path;
+  const char *validation_user_data_path;
+  const char *schema;
+} RadishLexInputMethodUpgradeValidationRequest;
+
+typedef struct RadishLexUpgradeValidationSummary {
+  uint32_t version;
+  int64_t schema_version;
+  uint32_t management_queries_checked;
+  uint32_t settings_checked;
+  uint32_t personalized_runtime_checked;
+  uint32_t candidate_signals_read;
+} RadishLexUpgradeValidationSummary;
 
 typedef struct RadishLexAppleP256ProductStatus {
   uint32_t version;
@@ -257,6 +344,35 @@ typedef struct RadishLexManagerSyncProductStatus {
   uint32_t blocker;
 } RadishLexManagerSyncProductStatus;
 
+typedef struct RadishLexManagerSyncQualificationRequest {
+  uint32_t version;
+  const char *endpoint;
+  const uint8_t *access_token_data;
+  size_t access_token_len;
+  const uint8_t *local_ca_der_data;
+  size_t local_ca_der_len;
+  uint64_t timeout_ms;
+} RadishLexManagerSyncQualificationRequest;
+
+typedef struct RadishLexManagerSyncQualificationSnapshot {
+  uint32_t version;
+  uint32_t state;
+  uint32_t phase;
+  uint64_t discovered;
+  uint64_t downloaded;
+  uint64_t applied;
+  uint64_t uploaded;
+  uint64_t conflicts;
+  uint64_t retries;
+  uint64_t convergence_rounds;
+  uint32_t temporary_files_cleaned;
+  uint32_t worker_stopped;
+  uint32_t transient_inputs_cleared;
+  uint32_t error_code;
+  uint32_t error_phase;
+  uint32_t error_retryable;
+} RadishLexManagerSyncQualificationSnapshot;
+
 typedef enum RadishLexStatusCode {
   RADISHLEX_STATUS_OK = 0,
   RADISHLEX_STATUS_INVALID_ARGUMENT = 1,
@@ -336,6 +452,23 @@ RadishLexStatusCode radishlex_ffi_contract(
     RadishLexFfiContract *contract_out,
     RadishLexError **error_out);
 
+RadishLexStatusCode radishlex_product_upgrade_startup_gate(
+    const RadishLexProductUpgradeStartupGateRequest *request,
+    RadishLexProductUpgradeStartupGateResult *result_out,
+    RadishLexError **error_out);
+RadishLexStatusCode radishlex_product_install_startup_gate(
+    const RadishLexProductInstallStartupGateRequest *request,
+    RadishLexProductInstallStartupGateResult *result_out,
+    RadishLexError **error_out);
+RadishLexStatusCode radishlex_manager_upgrade_validate_candidate(
+    const RadishLexManagerUpgradeValidationRequest *request,
+    RadishLexUpgradeValidationSummary *summary_out,
+    RadishLexError **error_out);
+RadishLexStatusCode radishlex_input_method_upgrade_validate_candidate(
+    const RadishLexInputMethodUpgradeValidationRequest *request,
+    RadishLexUpgradeValidationSummary *summary_out,
+    RadishLexError **error_out);
+
 /*
  * Status-only Manager snapshot input. This call does not create, read, use, or
  * delete platform key items and never returns identifiers or secret material.
@@ -343,6 +476,26 @@ RadishLexStatusCode radishlex_ffi_contract(
 RadishLexStatusCode radishlex_manager_sync_product_status(
     RadishLexManagerSyncProductStatus *status_out,
     RadishLexError **error_out);
+
+/*
+ * Local HTTPS synthetic qualification only. Inputs are copied for one run and
+ * never become settings, diagnostics, user sync state, or platform key calls.
+ * Calls may move between threads but must be serialized by the caller. free
+ * must not overlap poll/cancel; it cancels and joins before releasing.
+ */
+RadishLexManagerSyncQualificationRun *radishlex_manager_sync_qualification_start(
+    const RadishLexManagerSyncQualificationRequest *request,
+    RadishLexError **error_out);
+RadishLexStatusCode radishlex_manager_sync_qualification_poll(
+    const RadishLexManagerSyncQualificationRun *run,
+    RadishLexManagerSyncQualificationSnapshot *snapshot_out,
+    RadishLexError **error_out);
+RadishLexStatusCode radishlex_manager_sync_qualification_cancel(
+    const RadishLexManagerSyncQualificationRun *run,
+    uint32_t *requested_out,
+    RadishLexError **error_out);
+void radishlex_manager_sync_qualification_free(
+    RadishLexManagerSyncQualificationRun *run);
 
 /*
  * Product-validation ABI only. It returns fixed capability/lifecycle flags and

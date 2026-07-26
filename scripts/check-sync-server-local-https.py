@@ -195,6 +195,7 @@ def run_rust_transport_probe(
     env.update(
         {
             "RADISHLEX_RUN_LOCAL_HTTPS_TRANSPORT_TEST": "1",
+            "RADISHLEX_RUN_LOCAL_HTTPS_QUALIFICATION_TEST": "1",
             "RADISHLEX_LOCAL_HTTPS_ENDPOINT": endpoint,
             "RADISHLEX_LOCAL_HTTPS_ACCESS_TOKEN": access_token,
             "RADISHLEX_LOCAL_HTTPS_ROOT_DER_PATH": str(root_der_path),
@@ -217,6 +218,23 @@ def run_rust_transport_probe(
     )
     if result.returncode != 0:
         raise LocalHttpsSmokeError("Rust client failed the local verified HTTPS transport probe")
+    result = run_command(
+        [
+            "cargo",
+            "test",
+            "-p",
+            "radishlex-ime-sync-runtime",
+            "--test",
+            "local_https_qualification",
+            "manager_runner_completes_synthetic_two_client_https_qualification",
+            "--",
+            "--exact",
+        ],
+        capture=True,
+        env=env,
+    )
+    if result.returncode != 0:
+        raise LocalHttpsSmokeError("Manager runner failed the local HTTPS qualification probe")
 
 
 def inspect_container(project_name: str, env_path: Path, service: str) -> dict[str, Any]:
@@ -366,6 +384,7 @@ def run_smoke(args: argparse.Namespace) -> int:
     print("bearer_unauthenticated_401: passed")
     print("bearer_authorized_backend_response: passed")
     print("rust_verified_tls_transport: passed")
+    print("manager_sync_qualification: passed")
     print("loopback_only: passed")
     print("container_hardening: passed")
     print("log_redaction: passed")

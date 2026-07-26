@@ -309,7 +309,7 @@ API 和 storage 字段见 `docs/sync-server-api-storage.md`，本文件只固定
 5. 已补 Go server recovery latest handler，覆盖 wrapped material 读取、状态、限速和日志脱敏验证。
 6. 已实现 `recovery-record-v2`、activation public key 派生、原子轮换、verified remote 读取与恢复解封；v1 只迁移保留，当前产品客户端失败关闭。
 7. 已实现 recovered-device activation、`recovery_record_rotated` / `device_recovered` lifecycle 归约、完整 active cohort 当前 epoch 分发和文件 userdb 重启证据。
-8. 已实现 signed recovery record 撤销及其 lifecycle/activation/rotation 并发、幂等、历史记录和重启语义；本地 Compose/Caddy HTTPS、Rust 严格 TLS transport 与 macOS 平台 backend 主路径资格也已通过。下一批先完成 Manager 受控合成资格执行链；用户可见恢复流程仍需另行完成 transient secret 交互、真实设备流程和产品入口退出评审。目标生产部署证据后移到首个正式版本发布后。
+8. 已实现 signed recovery record 撤销及其 lifecycle/activation/rotation 并发、幂等、历史记录和重启语义；本地 Compose/Caddy HTTPS、Rust 严格 TLS transport、macOS 平台 backend 主路径资格与 Manager 受控合成资格执行链也已通过。用户可见恢复流程仍需另行完成 transient secret 交互、真实设备流程和产品入口退出评审，不能由合成资格结果解锁；目标生产部署证据在准备开放真实用户同步前独立验收。
 
 ## 验证口径
 

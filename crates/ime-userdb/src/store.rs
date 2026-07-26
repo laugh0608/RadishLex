@@ -14,6 +14,7 @@ mod connection;
 mod identity;
 mod learning;
 mod ranking;
+mod snapshot;
 mod sync_apply;
 mod sync_payload;
 mod sync_repository;

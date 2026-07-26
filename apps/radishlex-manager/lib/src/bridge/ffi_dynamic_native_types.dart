@@ -10,6 +10,8 @@ final class _RadishLexImportBatchList extends ffi.Opaque {}
 
 final class _RadishLexRankExplain extends ffi.Opaque {}
 
+final class _RadishLexManagerSyncQualificationRun extends ffi.Opaque {}
+
 final class _RadishLexFfiContract extends ffi.Struct {
   @ffi.Uint32()
   external int version;
@@ -319,6 +321,75 @@ final class _RadishLexManagerSyncProductStatus extends ffi.Struct {
 
   @ffi.Uint32()
   external int blocker;
+}
+
+final class _RadishLexManagerSyncQualificationRequest extends ffi.Struct {
+  @ffi.Uint32()
+  external int version;
+
+  external ffi.Pointer<ffi.Char> endpoint;
+  external ffi.Pointer<ffi.Uint8> accessTokenData;
+
+  @ffi.Size()
+  external int accessTokenLen;
+
+  external ffi.Pointer<ffi.Uint8> localCaDerData;
+
+  @ffi.Size()
+  external int localCaDerLen;
+
+  @ffi.Uint64()
+  external int timeoutMs;
+}
+
+final class _RadishLexManagerSyncQualificationSnapshot extends ffi.Struct {
+  @ffi.Uint32()
+  external int version;
+
+  @ffi.Uint32()
+  external int state;
+
+  @ffi.Uint32()
+  external int phase;
+
+  @ffi.Uint64()
+  external int discovered;
+
+  @ffi.Uint64()
+  external int downloaded;
+
+  @ffi.Uint64()
+  external int applied;
+
+  @ffi.Uint64()
+  external int uploaded;
+
+  @ffi.Uint64()
+  external int conflicts;
+
+  @ffi.Uint64()
+  external int retries;
+
+  @ffi.Uint64()
+  external int convergenceRounds;
+
+  @ffi.Uint32()
+  external int temporaryFilesCleaned;
+
+  @ffi.Uint32()
+  external int workerStopped;
+
+  @ffi.Uint32()
+  external int transientInputsCleared;
+
+  @ffi.Uint32()
+  external int errorCode;
+
+  @ffi.Uint32()
+  external int errorPhase;
+
+  @ffi.Uint32()
+  external int errorRetryable;
 }
 
 final class _RadishLexRankExplainView extends ffi.Struct {

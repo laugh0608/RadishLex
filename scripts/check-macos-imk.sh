@@ -4,6 +4,10 @@ set -euo pipefail
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
 platform_dir="${repo_root}/platforms/macos-imk"
+product_tool="${repo_root}/scripts/macos-product/product_manifest.py"
+product_version="$(python3 "${product_tool}" field product_version)"
+product_build="$(python3 "${product_tool}" field build_number)"
+minimum_macos="$(python3 "${product_tool}" field minimum_macos)"
 cleanup_script="${platform_dir}/cleanup-user-install.sh"
 cleanup_wrapper="${repo_root}/scripts/cleanup-macos-imk.sh"
 stop_wrapper="${repo_root}/scripts/stop-macos-imk-process.sh"
@@ -314,10 +318,14 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   -o "${smoke_dir}/input-controller-contract"
 "${smoke_dir}/input-controller-contract"
 "${platform_dir}/ValidationHost/check.sh"
+"${repo_root}/platforms/macos-product/UpgradeValidationHosts/check.sh"
 
 bundle="${repo_root}/target/macos-imk/contract/RadishLexInputMethod.app"
 test -x "${bundle}/Contents/MacOS/RadishLex"
+test -x "${bundle}/Contents/Helpers/RadishLexUpgradeValidationHost"
 test -f "${bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib"
+nm -u "${bundle}/Contents/Helpers/RadishLexUpgradeValidationHost" | \
+  rg -q '_radishlex_input_method_upgrade_validate_candidate'
 test -s "${bundle}/Contents/Resources/RadishLexInputIcon.tiff"
 test "$(sips -g pixelWidth "${bundle}/Contents/Resources/RadishLexInputIcon.tiff" 2>/dev/null | awk '/pixelWidth:/ { print $2 }')" = "32"
 test "$(sips -g pixelHeight "${bundle}/Contents/Resources/RadishLexInputIcon.tiff" 2>/dev/null | awk '/pixelHeight:/ { print $2 }')" = "32"
@@ -328,9 +336,14 @@ test -s "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings"
 test -s "${bundle}/Contents/Resources/zh-Hans.lproj/Localizable.strings"
 test -s "${bundle}/Contents/Resources/en.lproj/Localizable.strings"
 grep -Fqx '  page_size: 5' \
-  "${platform_dir}/Resources/Rime/default.yaml.in"
+  "${repo_root}/packaging/rime/data/default.yaml"
 plutil -lint "${bundle}/Contents/Info.plist" >/dev/null
-test "$(plutil -extract CFBundleVersion raw "${bundle}/Contents/Info.plist")" = "34"
+test "$(plutil -extract CFBundleShortVersionString raw \
+  "${bundle}/Contents/Info.plist")" = "${product_version}"
+test "$(plutil -extract CFBundleVersion raw \
+  "${bundle}/Contents/Info.plist")" = "${product_build}"
+test "$(plutil -extract LSMinimumSystemVersion raw \
+  "${bundle}/Contents/Info.plist")" = "${minimum_macos}"
 plutil -lint "${bundle}/Contents/Resources/zh-Hans.lproj/InfoPlist.strings" \
   "${bundle}/Contents/Resources/en.lproj/InfoPlist.strings" \
   "${bundle}/Contents/Resources/zh-Hans.lproj/Localizable.strings" \
@@ -380,6 +393,11 @@ otool -L "${bundle}/Contents/MacOS/RadishLex" | grep -q \
   "@rpath/libradishlex_ime_ffi.dylib"
 nm -gU "${bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib" | grep -q \
   "_radishlex_session_handle_key_event"
+nm -gU "${bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib" | grep -q \
+  "_radishlex_product_install_startup_gate"
+nm -gU "${bundle}/Contents/Frameworks/libradishlex_ime_ffi.dylib" | grep -q \
+  "_radishlex_product_upgrade_startup_gate"
+python3 "${repo_root}/scripts/macos-product/test_startup_gate_order.py"
 
 product_sources=(
   "${platform_dir}/Sources/RadishLexInputController.m"
