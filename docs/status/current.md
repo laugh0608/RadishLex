@@ -41,9 +41,9 @@ Library/Application Support/RadishLex/.radishlex-install-v1
 - `ReleaseIdentity.json` format v2 绑定 target 与全部显式历史 source 的 Manager/InputMethod requirement 有界、排序、去重集合；两端集合不得重叠；
 - Developer ID、Apple Development、unknown requirement、manifest/tree/bundle ID 漂移均失败关闭。
 
-ad-hoc 只提供包内完整性与事务 identity，不提供 Apple 发布者认证；DMG 不签名、不公证。build 35 传播 quarantine；build 36 对 `0444` dylib 清理失败并在提交前关闭，失败 receipt/staging 已移入可恢复备份。adapter 现以 `ditto --noqtn` 排除传播，逐节点审计无 quarantine，并重复 identity 复验后才记录 evidence。build 37 已完成独立下载与真实用户域安装、输入、repair、remove 证据，但因 Installer 生命周期代码变化不再作为最终载体；远端 draft 仍只含 build 37 三项资产且未发布、无 Git tag。
+ad-hoc 只提供包内完整性与事务 identity，不提供 Apple 发布者认证；DMG 不签名、不公证。build 35 传播 quarantine；build 36 对 `0444` dylib 清理失败并在提交前关闭，失败 receipt/staging 已移入可恢复备份。adapter 现以 `ditto --noqtn` 排除传播，逐节点审计无 quarantine，并重复 identity 复验后才记录 evidence。build 37 已完成独立下载与真实用户域安装、输入、repair、remove 证据，但因 Installer 生命周期代码变化不再作为最终载体。
 
-`26.7.1 (38)` 已在本地重新装配双 bundle、Installer 和社区 DMG。DMG 大小 `32196093` bytes，SHA-256 `f171e74bdc0a429655a84b30429481bce3926b17076d09298feed77d9ce4ce4e`，evidence 明确 `apple_notarized=false`；ProductManifest、InstallPayload、strict ad-hoc identity、挂载复验、载体 contract、Installer 精准门禁与完整仓库基线均通过。该候选尚未上传、独立下载、人工放行或进入真实用户域验收，不能继承 build 37 的对应证据。
+`26.7.1 (38)` 已重新装配双 bundle、Installer 和社区 DMG。DMG 大小 `32196093` bytes，SHA-256 `f171e74bdc0a429655a84b30429481bce3926b17076d09298feed77d9ce4ce4e`，evidence 明确 `apple_notarized=false`；ProductManifest、InstallPayload、strict ad-hoc identity、挂载复验、载体 contract、Installer 精准门禁与完整仓库基线均通过。`dev` 已推送到 `642cbb4`，远端 draft 已改名为 build 38 并仅含 DMG、checksum、evidence 三项匹配资产；Release 仍为 draft、`publishedAt=null`，无正式 Git tag。该候选尚未形成独立下载、人工放行或真实用户域验收证据，不能继承 build 37 的对应成功断言。
 
 用户安装必须先核对 SHA-256，再使用“系统设置 → 隐私与安全性 → 仍要打开”。终端 fallback 只作用于复制到 `$HOME/Applications` 的精确 `RadishLex Installer.app`，不使用 `sudo`，不得对宽泛目录递归移除 quarantine。完整步骤见 [macOS 社区 ad-hoc DMG Runbook](../runbooks/macos-release-carrier.md)。
 
@@ -69,7 +69,7 @@ build 37 的 first install 与 repair 均先到 `prepared` 静止边界，再完
 ## 下一步顺位
 
 1. build 37 首次安装、固定路径启动、双端 startup gate、Manager/输入 smoke、repair 与默认 remove 证据链已闭合；当前真实用户域停在保留 Application Support 和历史事务材料的 completed remove 现场。
-2. build 38 已完成标准 Application 菜单、`⌘Q`、版本传播、本地双 bundle/Installer/DMG 装配和自动门禁。下一步先经授权更新远端 draft 资产，再用浏览器形成真实独立下载副本，核对字节、摘要和 quarantine。
+2. build 38 已完成标准 Application 菜单、`⌘Q`、版本传播、双 bundle/Installer/DMG 装配、自动门禁、`dev` 推送与远端 draft 三项资产替换。下一步由用户在已登录 Chrome 中点击 draft DMG，形成真实独立下载副本，再核对字节、摘要和 quarantine；浏览器安全策略禁止自动化从空白来源直接触发下载，不以 CLI/API 回读冒充该证据。
 3. 同一 build 38 下载副本随后人工复验 `⌘Q`、关闭最后窗口、`prepared` 退出后重新打开续跑、首次安装、固定路径启动、输入 smoke、repair 与默认程序 remove；不得复用 build 37 的 bundle identity、载体摘要或实机成功断言。
 4. 新候选通过后整理发布说明，明确社区 ad-hoc、未公证、SHA-256、人工放行、默认 remove 保留数据和真实用户同步关闭；push、tag 和正式 Release 仍需分别授权。
 5. 恢复空数据基线、清理本轮 operation 或处置历史材料必须另取固定白名单与 receipt 绑定授权；不得把默认保留数据的 remove 冒充数据卸载。
