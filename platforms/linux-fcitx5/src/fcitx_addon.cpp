@@ -26,7 +26,7 @@ using radishlex::linux_platform::PlatformNamedKey;
 using radishlex::linux_platform::ProjectionError;
 using radishlex::linux_platform::SnapshotProjection;
 
-constexpr std::array<fcitx::Key, 10> kSelectionKeys{
+const std::array<fcitx::Key, 10> kSelectionKeys{
     fcitx::Key{FcitxKey_1}, fcitx::Key{FcitxKey_2},
     fcitx::Key{FcitxKey_3}, fcitx::Key{FcitxKey_4},
     fcitx::Key{FcitxKey_5}, fcitx::Key{FcitxKey_6},

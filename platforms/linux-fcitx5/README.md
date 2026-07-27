@@ -4,14 +4,15 @@
 
 ## 当前证据
 
-M5-P02 首个实现批次已经建立真实 C++ 源码、CMake target、addon/input method metadata 和自动 contract，不是占位目录。当前机器是 macOS，未安装 CMake、Fcitx5 development package 或 Linux runtime，因此目前只证明：
+M5-P02 已经建立真实 C++ 源码、CMake target、addon/input method metadata、自动 contract 和可复验的 Debian 13 ARM64 开发镜像。当前证据包括：
 
 - Apple clang 的 C++17 严格编译通过；
 - ABI v9 contract、key projection、owned `KeyResult`/snapshot、display-index selection、owner-thread 和 reset/free/shutdown 顺序通过 fake-FFI contract；
 - XDG 默认路径、显式 XDG 根、`0700`/`0600`、relative path、symlink、宽权限和 production/test override 隔离通过；
-- CMake source 固定 Fcitx5 Core、native-rime `ime-ffi`、锁定 RimeData 和框架 input panel 依赖。
+- Debian 13 ARM64 使用 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 和 librime 1.13.1，真实编译并动态链接启用 `native-rime` 的 `libradishlex_ime_ffi.so` 与 `radishlex.so`；
+- CTest 在相同 Linux 环境复验 FFI projection 与 XDG resolver contract。
 
-这些结果不是 Fcitx5 addon 的 Linux 编译或运行证据，也不证明 Wayland、X11 或真实应用输入。
+这些结果是 Linux ARM64 编译/链接证据，不是 Fcitx5 daemon 或桌面运行证据，也不证明 Wayland、X11、真实应用输入或发行安装。
 
 ## 组件结构
 
@@ -29,6 +30,8 @@ src/
 config/
   radishlex-addon.conf.in
   radishlex.conf.in
+dev/
+  Dockerfile            pinned Debian 13 ARM64 development environment
 tests/
   ffi_projection_test.cpp
   xdg_paths_test.cpp
@@ -83,6 +86,14 @@ production resolver 使用 `geteuid` + `getpwuid_r` 取得 authoritative home，
 ./scripts/check-linux-fcitx5.sh
 ```
 
+Apple Silicon macOS 的固定 Linux ARM64 编译门禁：
+
+```bash
+./scripts/build-linux-fcitx5-container.sh
+```
+
+该入口构建固定 digest 的 Debian 13 镜像，以只读方式挂载仓库，并使用 `radishlex-linux-fcitx5-cargo`、`radishlex-linux-fcitx5-target` 两个 Docker named volume 缓存依赖和产物。它会构建 `native-rime` FFI、检查两个 ARM64 ELF 的动态依赖、编译 Fcitx5 addon 并运行 CTest；不会安装/启用输入法，不写宿主仓库，也不提供桌面 session。首次执行需要下载 Debian 镜像与软件包，之后复用 Docker/Cargo 缓存。
+
 真实 Linux 开发构建需要既有 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、librime development environment，以及启用 `native-rime` 的 Rust cdylib。命令只生成开发 build，不安装 addon：
 
 ```bash
@@ -91,4 +102,4 @@ RADISHLEX_IME_FFI_LIBRARY="$PWD/target/release/libradishlex_ime_ffi.so" \
   ./scripts/check-linux-fcitx5.sh --require-fcitx
 ```
 
-`--require-fcitx` 在非 Linux、缺失 CMake、缺失 cdylib 或 Fcitx5 CMake package 时失败，不自动下载依赖、不启动容器、不写系统目录。开发安装、Fcitx 重启、输入法启用和真实应用交互需要单独授权与 M5-P03 runbook。
+`--require-fcitx` 在非 Linux、缺失 CMake、缺失 cdylib 或 Fcitx5 CMake package 时失败，不自动下载依赖、不启动容器、不写系统目录。Docker wrapper 才负责显式建立依赖环境。开发安装、Fcitx 重启、输入法启用和真实应用交互需要单独授权与 M5-P03 runbook。

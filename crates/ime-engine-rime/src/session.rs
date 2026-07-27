@@ -1,4 +1,4 @@
-use std::ffi::{CStr, CString};
+use std::ffi::{c_char, CStr, CString};
 use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
@@ -323,7 +323,7 @@ fn rime_context() -> RimeContext {
     }
 }
 
-unsafe fn c_string_field(field: &'static str, value: *const i8) -> RimeEngineResult<String> {
+unsafe fn c_string_field(field: &'static str, value: *const c_char) -> RimeEngineResult<String> {
     if value.is_null() {
         return Err(RimeEngineError::EncodingFailure {
             field,
@@ -340,7 +340,7 @@ unsafe fn c_string_field(field: &'static str, value: *const i8) -> RimeEngineRes
         })
 }
 
-unsafe fn optional_c_string(value: *const i8) -> RimeEngineResult<Option<String>> {
+unsafe fn optional_c_string(value: *const c_char) -> RimeEngineResult<Option<String>> {
     if value.is_null() {
         Ok(None)
     } else {

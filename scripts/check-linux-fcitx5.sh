@@ -64,6 +64,17 @@ rg -q 'inputPanel\(\)' "${platform_dir}/src/fcitx_addon.cpp"
 rg -q 'session_select_candidate' \
   "${platform_dir}/src/ffi_projection.cpp" \
   "${platform_dir}/src/linked_ffi_api.cpp"
+for source in runtime.rs session.rs; do
+  rg -q 'use std::ffi::.*c_char' \
+    "${repo_root}/crates/ime-engine-rime/src/${source}"
+done
+
+if rg -n '\*const i8|\*mut i8|0_i8' \
+  "${repo_root}/crates/ime-engine-rime/src/runtime.rs" \
+  "${repo_root}/crates/ime-engine-rime/src/session.rs"; then
+  echo "Rime C char values must use std::ffi::c_char across targets." >&2
+  exit 1
+fi
 
 if rg -n '#include[[:space:]]*[<"].*(rime|sqlite|curl)' \
   "${platform_dir}/src/fcitx_addon.cpp" \
@@ -89,7 +100,10 @@ if [[ "${require_fcitx}" -eq 1 ]]; then
     -DRADISHLEX_BUILD_FCITX_ADDON=ON \
     -DRADISHLEX_BUILD_CONTRACT_TESTS=ON \
     "-DRADISHLEX_IME_FFI_LIBRARY=${RADISHLEX_IME_FFI_LIBRARY}"
-  cmake --build "${temp_dir}/cmake-build" --target radishlex
+  cmake --build "${temp_dir}/cmake-build"
+  test -f "${temp_dir}/cmake-build/radishlex.so"
+  file "${temp_dir}/cmake-build/radishlex.so"
+  ldd "${temp_dir}/cmake-build/radishlex.so"
   ctest --test-dir "${temp_dir}/cmake-build" --output-on-failure
   echo "Linux Fcitx5 addon build and contracts passed."
 else

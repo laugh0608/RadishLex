@@ -148,13 +148,11 @@ bool knownCandidateSource(std::uint32_t source) {
 }
 
 bool knownPersonalizationStatus(std::uint32_t status) {
-  return status >= RADISHLEX_PERSONALIZATION_STATUS_NOT_ENABLED &&
-         status <= RADISHLEX_PERSONALIZATION_STATUS_RANK_FAILED;
+  return status <= RADISHLEX_PERSONALIZATION_STATUS_RANK_FAILED;
 }
 
 bool knownLearningDisposition(std::uint32_t disposition) {
-  return disposition >= RADISHLEX_LEARNING_NOT_APPLICABLE &&
-         disposition <= RADISHLEX_LEARNING_FAILED;
+  return disposition <= RADISHLEX_LEARNING_FAILED;
 }
 
 SnapshotProjection copySnapshot(const FfiApi &api,

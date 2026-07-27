@@ -4,7 +4,7 @@
 
 ## 状态与产品范围
 
-状态：M5-P02 首个实现批次。平台无关 C++ contract 已通过；真实 Linux/Fcitx5 编译与运行尚未验证。
+状态：M5-P02 开发构建批次。平台无关 C++ contract 与 Debian 13 ARM64 的 Fcitx5 编译/链接已通过；真实桌面运行尚未验证。
 
 M5 要证明 Linux 平台能够复用现有产品核心完成：
 
@@ -66,7 +66,7 @@ Linux 继续使用 `ime-ffi` ABI v9 已有的：
 - PageUp/PageDown 作为稳定 named key 进入 Rust 后用新 snapshot 重建列表；
 - reset/free/shutdown 已足以表达 per-context session 与进程 teardown。
 
-当前真实缺口不在 ABI，而在 Linux/Fcitx5 编译与运行证据、Linux Manager privacy 配置来源、产品 startup gate 和发行安装事务。后三项分别留在 P04/P05，不为 P02 增加平台私有 ABI。
+当前真实缺口不在 ABI 或 addon 编译，而在 Fcitx5 桌面运行证据、Linux Manager privacy 配置来源、产品 startup gate 和发行安装事务。后三项分别留在 P04/P05，不为 P02 增加平台私有 ABI。
 
 ### Flutter Manager
 
@@ -186,9 +186,11 @@ M5-P02 的开发构建必须形成可复验依赖图：
 - 开发安装与正式发行载体分开，P02 不把本地复制命令称为产品安装；
 - 发行版包、签名、系统域目标、升级与移除在 M5-P05 单独固定。
 
-当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境编译 projection/XDG contract；`--require-fcitx` 只在 Linux 且调用方提供既有 native-rime cdylib 时配置、构建 addon 并运行 CTest，不下载依赖、不安装或启用输入法。
+当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境编译 projection/XDG contract；`--require-fcitx` 只在 Linux 且调用方提供既有 native-rime cdylib 时配置、构建 addon、检查 ELF 动态依赖并运行 CTest，不下载依赖、不安装或启用输入法。
 
-2026-07-27 的 macOS 开发机只有 Apple clang 和 Docker CLI，缺失 CMake、pkg-config 与 Fcitx5 development package。本机平台无关 contract 已通过，但 addon target 没有在 Fcitx5 headers/library 下编译，不能记为 Linux 平台验证。
+`platforms/linux-fcitx5/dev/Dockerfile` 以 digest 固定 Debian 13 ARM64 基础镜像，安装发行版提供的 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 和 librime 1.13.1 development package。`./scripts/build-linux-fcitx5-container.sh` 只读挂载仓库，使用独立 named volume 缓存 Cargo registry/target，构建启用 `native-rime` 的 ARM64 ELF cdylib，再执行 `--require-fcitx` 强门禁。该环境已真实编译并动态链接 `libradishlex_ime_ffi.so` 与 `radishlex.so`，也修正了 Linux ARM64 `c_char` signedness、GCC 14 enum boundary 和 `fcitx::Key` 非 literal type 差异。
+
+Docker Desktop 提供的 Linux VM 是 M5-P02 可持续编译环境，不是桌面验收环境：容器没有 Fcitx daemon、Wayland/X11 session 或真实应用 input context。因此当前只能记为 Linux ARM64 编译/链接验证，不能记为 Fcitx5 平台运行或 M5 退出。
 
 ## 验证分层
 
@@ -240,7 +242,7 @@ M5-P03/P04 至少覆盖：
 
 - P01 只冻结设计，不创建占位平台目录或宣称 Linux 已实现。
 - P02 先完成 addon/FFI/build contract，不提前并行做 Android IME。
-- 未取得真实 Linux 环境前，不把编译通过写成平台验收。
+- 不把 Docker 编译通过写成 Fcitx5 桌面或平台验收。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。
 - 不把同步、云端候选或远端配置引入输入热路径。

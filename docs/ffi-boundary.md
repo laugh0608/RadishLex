@@ -279,7 +279,7 @@ M5-P02 首批审计确认 Fcitx5 addon 可以直接复用 ABI v9，不增加平�
 - 可见 candidate cursor 属于 Fcitx input panel 状态，不进入 ABI；数字、Space 与鼠标都把 cursor 对应的 Rust display index 送回 selection，PageUp/PageDown 用新 snapshot 替换旧列表；
 - deactivate/reset 销毁 UI 状态并调用 session reset，input context property 注销后先释放所有 session，再 shutdown Rime runtime。
 
-因此 snapshot 不需要增加 Fcitx page、candidate object 或窗口引用。Linux XDG resolver、Fcitx capability 到 `LearningContext` 的映射和开发构建属于平台层缺口，不扩展 Rust ABI。当前普通非 terminal context 没有可靠分类信号时传 `context_known = 0`，不会以 program name 或窗口文本补足。
+因此 snapshot 不需要增加 Fcitx page、candidate object 或窗口引用。Linux XDG resolver、Fcitx capability 到 `LearningContext` 的映射和开发构建属于平台层职责，不扩展 Rust ABI。当前普通非 terminal context 没有可靠分类信号时传 `context_known = 0`，不会以 program name 或窗口文本补足。Debian 13 ARM64 构建还确认 Rime C header 的 `char` 指针不能在 Rust adapter 中硬编码为 `i8`；buffer 和 helper 统一使用 `std::ffi::c_char`，由目标平台决定 signedness。
 
 ### Snapshot 与 candidate view
 
