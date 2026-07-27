@@ -9,7 +9,7 @@
 - Installer、Manager 与 InputMethod 使用严格 ad-hoc code signature。该签名用于检测包内意外变化和绑定事务 identity，不提供 Apple 认可的发布者认证。
 - DMG 不签名、不提交公证、不含 ticket。`notarize-macos-release-dmg.sh` 在当前模式必须稳定失败关闭。
 - 对外必须同时发布 DMG 与 `CommunityReleaseEvidence.json`；后者精确绑定版本、文件名、大小、DMG SHA-256 和 sealed release identity SHA-256。
-- 当前候选 `RadishLex-26.7.1-38.dmg` 大小为 `32196093` bytes，SHA-256 为 `f171e74bdc0a429655a84b30429481bce3926b17076d09298feed77d9ce4ce4e`；远端 draft 仅含匹配的 DMG、checksum 和 evidence，仍未发布且没有正式 Git tag。Chrome 独立下载副本已同时匹配大小与 SHA-256，逐字节比较一致，并带有真实 quarantine 和 GitHub Release 来源元数据；该副本的标准 Application 菜单、`⌘Q`、关闭最后窗口终止进程与 `prepared` 重启续跑已通过人工复验，完整人工验收尚未闭合，不能称为正式冻结发布。
+- 当前候选 `RadishLex-26.7.1-38.dmg` 大小为 `32196093` bytes，SHA-256 为 `f171e74bdc0a429655a84b30429481bce3926b17076d09298feed77d9ce4ce4e`；远端 draft 仅含匹配的 DMG、checksum 和 evidence，仍未发布且没有正式 Git tag。Chrome 独立下载副本已同时匹配大小与 SHA-256，逐字节比较一致，并带有真实 quarantine 和 GitHub Release 来源元数据；该副本的标准 Application 菜单、`⌘Q`、关闭最后窗口终止进程、`prepared` 重启续跑与首次安装已通过人工复验。安装后双 bundle 精确匹配 manifest/release identity 且无 quarantine；完整人工验收尚未闭合，不能称为正式冻结发布。
 
 ## 构建
 
