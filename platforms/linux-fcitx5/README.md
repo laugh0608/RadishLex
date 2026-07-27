@@ -10,9 +10,11 @@ M5-P02 已经建立真实 C++ 源码、CMake target、addon/input method metadat
 - ABI v9 contract、key projection、owned `KeyResult`/snapshot、display-index selection、owner-thread 和 reset/free/shutdown 顺序通过 fake-FFI contract；
 - XDG 默认路径、显式 XDG 根、`0700`/`0600`、relative path、symlink、宽权限和 production/test override 隔离通过；
 - Debian 13 ARM64 使用 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 和 librime 1.13.1，真实编译并动态链接启用 `native-rime` 的 `libradishlex_ime_ffi.so` 与 `radishlex.so`；
-- CTest 在相同 Linux 环境复验 FFI projection 与 XDG resolver contract。
+- CMake staged install 把 addon、共享 FFI、锁定 RimeData 与两份 Fcitx metadata 形成同一开发装配，addon 只使用 `$ORIGIN` 定位 sibling FFI，不保留仓库或临时构建路径；
+- `radishlex_runtime_probe` 在相同 Linux 环境先校验装配文件、symlink 和权限，再对 staged `radishlex.so` 执行 `dlopen(RTLD_NOW)`；
+- CTest 在相同 Linux 环境复验 FFI projection、XDG resolver 与 runtime layout contract。
 
-这些结果是 Linux ARM64 编译/链接证据，不是 Fcitx5 daemon 或桌面运行证据，也不证明 Wayland、X11、真实应用输入或发行安装。
+这些结果是 Linux ARM64 编译、装配和 headless native loader 证据，不是 Fcitx5 daemon 或桌面运行证据，也不证明 Wayland、X11、真实应用输入或发行安装。
 
 ## 组件结构
 
@@ -20,12 +22,14 @@ M5-P02 已经建立真实 C++ 源码、CMake target、addon/input method metadat
 include/radishlex/linux/
   ffi_projection.h    ABI v9 owned C++ projection
   key_projection.h    platform key to RadishLex key contract
+  runtime_layout.h    addon-relative native/RimeData layout contract
   xdg_paths.h         addon/Manager shared XDG resolver
 src/
   fcitx_addon.*       Fcitx lifecycle, input panel and commit adapter
   ffi_projection.cpp  KeyResult/snapshot copy and owner-thread guard
   key_projection.cpp  Unicode/named key/modifier/phase validation
   linked_ffi_api.cpp  only direct C ABI symbol table
+  runtime_layout.cpp  loaded addon identity and resource validation
   xdg_paths.cpp       effective-user XDG and private path enforcement
 config/
   radishlex-addon.conf.in
@@ -34,7 +38,10 @@ dev/
   Dockerfile            pinned Debian 13 ARM64 development environment
 tests/
   ffi_projection_test.cpp
+  runtime_layout_test.cpp
   xdg_paths_test.cpp
+tools/
+  runtime_probe.cpp    staged addon resource and dlopen diagnostic
 ```
 
 `fcitx_addon.cpp` 不包含 Rime、SQLite、ranker、userdb、privacy policy 或同步实现。它只映射 Fcitx capability、按键和生命周期，消费 Rust-owned snapshot，使用 Fcitx input panel，并把 Rust commit 交给当前 input context。
@@ -78,6 +85,27 @@ production resolver 使用 `geteuid` + `getpwuid_r` 取得 authoritative home，
 
 未来 Linux Manager host 必须链接同一个 `xdg_paths.h`/`xdg_paths.cpp` 组件，不得在 Dart 或 Flutter runner 中重新拼接 XDG 字符串。
 
+## 开发装配
+
+addon 不再从编译期仓库绝对路径读取 RimeData。CMake build 和 staged install 使用同一职责结构：
+
+```text
+<fcitx-libdir>/fcitx5/
+  radishlex.so
+  libradishlex_ime_ffi.so
+  radishlex-rime/
+    default.yaml
+    radishlex_pinyin.schema.yaml
+    pinyin_simp.dict.yaml
+<prefix>/share/fcitx5/
+  addon/radishlex.conf
+  inputmethod/radishlex.conf
+```
+
+`radishlex.so` 的 ELF runpath 只允许 `$ORIGIN`。运行时从实际已加载 addon 路径派生 sibling FFI 和 `radishlex-rime`，要求固定文件名、绝对规范路径、regular file/目录、无 leaf symlink、addon 目录与资源不允许 group/other 写入；缺失或不安全时 addon 失败关闭，不回退到仓库、当前工作目录或在线下载。
+
+`radishlex_runtime_probe` 是开发诊断而不是 Fcitx daemon 替代品。它对 staged layout 执行相同校验并使用 `dlopen(RTLD_NOW)` 验证 native dependency closure，只输出稳定原因类别，不输出用户数据路径。probe 成功不代表 Engine 已实例化，也不代表 Fcitx input context、Wayland/X11 或真实应用提交已经运行。
+
 ## 开发验证
 
 不需要 Fcitx5 或 native library的平台无关 contract：
@@ -92,7 +120,7 @@ Apple Silicon macOS 的固定 Linux ARM64 编译门禁：
 ./scripts/build-linux-fcitx5-container.sh
 ```
 
-该入口构建固定 digest 的 Debian 13 镜像，以只读方式挂载仓库，并使用 `radishlex-linux-fcitx5-cargo`、`radishlex-linux-fcitx5-target` 两个 Docker named volume 缓存依赖和产物。它会构建 `native-rime` FFI、检查两个 ARM64 ELF 的动态依赖、编译 Fcitx5 addon 并运行 CTest；不会安装/启用输入法，不写宿主仓库，也不提供桌面 session。首次执行需要下载 Debian 镜像与软件包，之后复用 Docker/Cargo 缓存。
+该入口构建固定 digest 的 Debian 13 镜像，以只读方式挂载仓库，并使用 `radishlex-linux-fcitx5-cargo`、`radishlex-linux-fcitx5-target` 两个 Docker named volume 缓存依赖和产物。它会构建 `native-rime` FFI、形成临时 staged install、检查 ARM64 ELF 依赖与 `$ORIGIN`、运行 native loader probe 和三项 CTest；不会写系统目录、安装/启用输入法、写宿主仓库或提供桌面 session。首次执行需要下载 Debian 镜像与软件包，之后复用 Docker/Cargo 缓存。
 
 真实 Linux 开发构建需要既有 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、librime development environment，以及启用 `native-rime` 的 Rust cdylib。命令只生成开发 build，不安装 addon：
 

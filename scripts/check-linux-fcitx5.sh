@@ -48,6 +48,20 @@ common_flags=(
   -o "${temp_dir}/xdg_paths_test"
 "${temp_dir}/xdg_paths_test"
 
+if [[ "$(uname -s)" == "Linux" ]]; then
+  "${cxx}" "${common_flags[@]}" \
+    "${platform_dir}/tests/runtime_layout_test.cpp" \
+    "${platform_dir}/src/runtime_layout.cpp" \
+    -ldl \
+    -o "${temp_dir}/runtime_layout_test"
+else
+  "${cxx}" "${common_flags[@]}" \
+    "${platform_dir}/tests/runtime_layout_test.cpp" \
+    "${platform_dir}/src/runtime_layout.cpp" \
+    -o "${temp_dir}/runtime_layout_test"
+fi
+"${temp_dir}/runtime_layout_test"
+
 "${cxx}" "${common_flags[@]}" -c \
   "${platform_dir}/src/linked_ffi_api.cpp" \
   -o "${temp_dir}/linked_ffi_api.o"
@@ -61,6 +75,7 @@ rg -q 'find_package\(Fcitx5Core 5\.1\.9 REQUIRED\)' \
 rg -q 'Fcitx5::Core' "${platform_dir}/CMakeLists.txt"
 rg -q 'radishlex_ime_ffi' "${platform_dir}/CMakeLists.txt"
 rg -q 'inputPanel\(\)' "${platform_dir}/src/fcitx_addon.cpp"
+rg -q 'resolveLoadedRuntimeLayout' "${platform_dir}/src/fcitx_addon.cpp"
 rg -q 'session_select_candidate' \
   "${platform_dir}/src/ffi_projection.cpp" \
   "${platform_dir}/src/linked_ffi_api.cpp"
@@ -97,6 +112,7 @@ if [[ "${require_fcitx}" -eq 1 ]]; then
     exit 1
   fi
   cmake -S "${platform_dir}" -B "${temp_dir}/cmake-build" \
+    -DCMAKE_INSTALL_PREFIX=/usr \
     -DRADISHLEX_BUILD_FCITX_ADDON=ON \
     -DRADISHLEX_BUILD_CONTRACT_TESTS=ON \
     "-DRADISHLEX_IME_FFI_LIBRARY=${RADISHLEX_IME_FFI_LIBRARY}"
@@ -104,8 +120,35 @@ if [[ "${require_fcitx}" -eq 1 ]]; then
   test -f "${temp_dir}/cmake-build/radishlex.so"
   file "${temp_dir}/cmake-build/radishlex.so"
   ldd "${temp_dir}/cmake-build/radishlex.so"
+  DESTDIR="${temp_dir}/stage" \
+    cmake --install "${temp_dir}/cmake-build"
+  addon_library="$(
+    find "${temp_dir}/stage" -type f -name radishlex.so -print -quit
+  )"
+  test -n "${addon_library}"
+  addon_directory="$(dirname "${addon_library}")"
+  test -f "${addon_directory}/libradishlex_ime_ffi.so"
+  for asset in default.yaml radishlex_pinyin.schema.yaml pinyin_simp.dict.yaml; do
+    test -f "${addon_directory}/radishlex-rime/${asset}"
+  done
+  test -f "${temp_dir}/stage/usr/share/fcitx5/addon/radishlex.conf"
+  test -f "${temp_dir}/stage/usr/share/fcitx5/inputmethod/radishlex.conf"
+  file "${addon_library}"
+  ldd "${addon_library}"
+  "${temp_dir}/cmake-build/radishlex_runtime_probe" "${addon_library}"
+  readelf -d "${addon_library}" | rg -q '\$ORIGIN'
+  if readelf -d "${addon_library}" |
+      rg -n '/tmp|/workspace|RadishLex'; then
+    echo "Installed addon dynamic metadata contains a build path." >&2
+    exit 1
+  fi
+  if strings "${addon_library}" |
+      rg -n '/tmp/radishlex|/workspace/RadishLex'; then
+    echo "Installed addon contains a temporary or repository path." >&2
+    exit 1
+  fi
   ctest --test-dir "${temp_dir}/cmake-build" --output-on-failure
-  echo "Linux Fcitx5 addon build and contracts passed."
+  echo "Linux Fcitx5 addon build, assembly, and contracts passed."
 else
   echo "Linux platform-independent Fcitx5 contracts passed."
   echo "The real Fcitx5 addon target was not built; use --require-fcitx on Linux."

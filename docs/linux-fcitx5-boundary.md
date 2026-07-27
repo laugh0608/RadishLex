@@ -4,7 +4,7 @@
 
 ## 状态与产品范围
 
-状态：M5-P02 开发构建批次。平台无关 C++ contract 与 Debian 13 ARM64 的 Fcitx5 编译/链接已通过；真实桌面运行尚未验证。
+状态：M5-P02 开发构建批次。平台无关 C++ contract、Debian 13 ARM64 编译、staged 开发装配与 headless native loader 已通过；真实 Fcitx daemon 和桌面运行尚未验证。
 
 M5 要证明 Linux 平台能够复用现有产品核心完成：
 
@@ -182,13 +182,16 @@ M5-P02 的开发构建必须形成可复验依赖图：
 - `librime` 只由 Rust engine adapter 使用，C++ addon 不直接链接其业务 API；
 - RimeData 使用仓库已锁定的产品来源、hash 和逐资产许可证；
 - native library、ABI version、userdb schema、RimeData version 和 addon metadata 在构建时一致；
+- addon、共享 FFI 与锁定 RimeData 形成单一 addon-relative 开发装配，不从编译期仓库绝对路径加载；
+- ELF runpath 只允许 `$ORIGIN`，动态 metadata 不保留仓库或临时构建路径；
+- 运行时拒绝缺失资源、leaf symlink、group/other 可写 addon 目录或资源，并以稳定原因失败关闭；
 - 构建不从运行时下载 schema、词库、模型或二进制；
 - 开发安装与正式发行载体分开，P02 不把本地复制命令称为产品安装；
 - 发行版包、签名、系统域目标、升级与移除在 M5-P05 单独固定。
 
-当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境编译 projection/XDG contract；`--require-fcitx` 只在 Linux 且调用方提供既有 native-rime cdylib 时配置、构建 addon、检查 ELF 动态依赖并运行 CTest，不下载依赖、不安装或启用输入法。
+当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境编译 projection/XDG/runtime-layout contract；`--require-fcitx` 只在 Linux 且调用方提供既有 native-rime cdylib 时配置、构建并 staged install addon/FFI/RimeData/metadata，检查 ELF 动态依赖、`$ORIGIN`、构建路径泄漏，运行 `dlopen(RTLD_NOW)` probe 与 CTest，不下载依赖、不写系统目录或启用输入法。
 
-`platforms/linux-fcitx5/dev/Dockerfile` 以 digest 固定 Debian 13 ARM64 基础镜像，安装发行版提供的 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 和 librime 1.13.1 development package。`./scripts/build-linux-fcitx5-container.sh` 只读挂载仓库，使用独立 named volume 缓存 Cargo registry/target，构建启用 `native-rime` 的 ARM64 ELF cdylib，再执行 `--require-fcitx` 强门禁。该环境已真实编译并动态链接 `libradishlex_ime_ffi.so` 与 `radishlex.so`，也修正了 Linux ARM64 `c_char` signedness、GCC 14 enum boundary 和 `fcitx::Key` 非 literal type 差异。
+`platforms/linux-fcitx5/dev/Dockerfile` 以 digest 固定 Debian 13 ARM64 基础镜像，安装发行版提供的 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 和 librime 1.13.1 development package。`./scripts/build-linux-fcitx5-container.sh` 只读挂载仓库，使用独立 named volume 缓存 Cargo registry/target，构建启用 `native-rime` 的 ARM64 ELF cdylib，再执行 `--require-fcitx` 强门禁。该环境已真实编译、staged install 并以 native loader 打开 `libradishlex_ime_ffi.so` 与 `radishlex.so`，也修正了 Linux ARM64 `c_char` signedness、GCC 14 enum boundary 和 `fcitx::Key` 非 literal type 差异。
 
 Docker Desktop 提供的 Linux VM 是 M5-P02 可持续编译环境，不是桌面验收环境：容器没有 Fcitx daemon、Wayland/X11 session 或真实应用 input context。因此当前只能记为 Linux ARM64 编译/链接验证，不能记为 Fcitx5 平台运行或 M5 退出。
 
@@ -207,6 +210,7 @@ M5-P02 至少覆盖：
 - secure/sensitive/unknown/privacy mode；
 - XDG resolver、权限、symlink 和生产/test override 隔离；
 - addon metadata、native dependency 和 RimeData presence；
+- staged addon-relative layout、`$ORIGIN`、权限/symlink、构建路径泄漏和 `dlopen(RTLD_NOW)`；
 - macOS 与仓库既有 ABI 回归。
 
 ### 真实平台

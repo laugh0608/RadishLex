@@ -17,7 +17,7 @@
 
 ABI 审计确认 personalized Rime session、`LearningContext`、同事件 snapshot 与 display-index selection 可直接复用 v9，本批没有增加 Fcitx 私有 ABI。候选内容和顺序只来自 Rust snapshot；Fcitx candidate list 维护可见 cursor，数字、Space 和鼠标最终统一回传 Rust display index，C++ 不解释 engine index。
 
-macOS 主机现通过固定 digest 的 Debian 13 ARM64 Docker 开发环境复验 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 与 librime 1.13.1。启用 `native-rime` 的共享 FFI 和 `radishlex.so` 均完成 ARM64 ELF 编译、动态链接与 CTest；真实 Linux headers 同时暴露并修正了 Rime `c_char` signedness、GCC 14 enum boundary 和 `fcitx::Key` 非 literal type 差异。该证据只证明 Linux 编译/链接，不证明 Fcitx daemon、Wayland/X11、真实应用输入或安装。普通非 terminal context 暂以 `context_known = 0` 失败关闭个人化；Linux Manager privacy 配置、真实桌面输入和安装维护分别留在 P04、P03 与 P05。
+macOS 主机现通过固定 digest 的 Debian 13 ARM64 Docker 开发环境复验 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 与 librime 1.13.1。启用 `native-rime` 的共享 FFI 和 `radishlex.so` 均完成 ARM64 ELF 编译；CMake staged install 形成 addon、sibling FFI、锁定 RimeData 与 metadata 的开发装配，`$ORIGIN`、构建路径泄漏、资源权限/symlink、`dlopen(RTLD_NOW)` 和三项 CTest 通过。真实 Linux headers 同时暴露并修正了 Rime `c_char` signedness、GCC 14 enum boundary 和 `fcitx::Key` 非 literal type 差异。该证据只证明 Linux 编译、装配与 headless loader，不证明 Fcitx daemon、Wayland/X11、真实应用输入或系统安装。普通非 terminal context 暂以 `context_known = 0` 失败关闭个人化；Linux Manager privacy 配置、真实桌面输入和安装维护分别留在 P04、P03 与 P05。
 
 ## macOS 冻结基线
 
@@ -88,7 +88,7 @@ build 37 的 first install 与 repair 均先到 `prepared` 静止边界，再完
 ## 下一步顺位
 
 1. M5-P01 已固定 [第二平台 ADR](../adr/0009-second-platform-linux-fcitx5.md)、[Linux Fcitx5 平台边界](../linux-fcitx5-boundary.md)、路线图、架构职责、XDG 数据语义、验证分层和停止线，并通过文档与完整仓库门禁。
-2. M5-P02 已完成 ABI v9 审计、C++/CMake addon、owner-thread/session、Fcitx input panel、共享 XDG resolver、平台无关 contract，以及 Debian 13 ARM64 的 native-rime cdylib + Fcitx5 addon 编译/链接基线；下一批收口开发装配与可诊断性后进入 P03。
+2. M5-P02 已完成 ABI v9 审计、C++/CMake addon、owner-thread/session、Fcitx input panel、共享 XDG resolver、平台无关 contract，以及 Debian 13 ARM64 的 native-rime cdylib、addon-relative staged 装配和 native loader 基线；下一步建立可持续真实 Linux 桌面基线并进入 P03。
 3. M5-P03 在可持续复验的真实 Linux 环境完成 Wayland 主路径、X11 兼容、常见应用输入、切换/重启、断网和 secure/unknown 上下文验收。
 4. M5-P04/P05 依次推进 Linux Manager 同库个人化与 Linux 安装、升级、修复、移除、数据保留；不提前并行 Android IME。
 

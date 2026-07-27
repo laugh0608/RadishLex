@@ -11,6 +11,7 @@
 #include <memory>
 
 #include "radishlex/linux/ffi_projection.h"
+#include "radishlex/linux/runtime_layout.h"
 #include "radishlex/linux/xdg_paths.h"
 
 namespace radishlex::linux_fcitx5 {
@@ -65,6 +66,7 @@ class Engine final : public fcitx::InputMethodEngineV2 {
   fcitx::Instance *instance_;
   radishlex::linux_platform::FfiApi ffi_api_;
   radishlex::linux_platform::XdgPaths paths_;
+  radishlex::linux_platform::RuntimeLayout runtime_layout_;
   fcitx::FactoryFor<InputContextState> state_factory_;
   std::uint64_t next_session_id_;
 };

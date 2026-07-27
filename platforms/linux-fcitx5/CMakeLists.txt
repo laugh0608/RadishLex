@@ -10,11 +10,16 @@ get_filename_component(RADISHLEX_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.."
 set(RADISHLEX_IME_FFI_INCLUDE_DIR
     "${RADISHLEX_REPO_ROOT}/crates/ime-ffi/include"
     CACHE PATH "Directory containing radishlex_input.h")
-set(RADISHLEX_RIME_SHARED_DATA_DIR
+set(RADISHLEX_RIME_DATA_SOURCE_DIR
     "${RADISHLEX_REPO_ROOT}/packaging/rime/data"
-    CACHE PATH "Prepared immutable RadishLex Rime shared data")
+    CACHE PATH "Prepared immutable RadishLex RimeData source")
 set(RADISHLEX_RIME_SCHEMA "radishlex_pinyin"
     CACHE STRING "Locked RadishLex Rime schema")
+set(RADISHLEX_RIME_ASSETS
+  default.yaml
+  radishlex_pinyin.schema.yaml
+  pinyin_simp.dict.yaml
+)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(RADISHLEX_FCITX_ADDON_DEFAULT ON)
@@ -29,6 +34,7 @@ add_library(radishlex_linux_platform STATIC
   src/ffi_projection.cpp
   src/key_projection.cpp
   src/linked_ffi_api.cpp
+  src/runtime_layout.cpp
   src/xdg_paths.cpp
 )
 target_include_directories(radishlex_linux_platform
@@ -39,6 +45,9 @@ target_include_directories(radishlex_linux_platform
 target_compile_options(radishlex_linux_platform PRIVATE
   -Wall -Wextra -Wpedantic -Werror
 )
+if(CMAKE_DL_LIBS)
+  target_link_libraries(radishlex_linux_platform PUBLIC "${CMAKE_DL_LIBS}")
+endif()
 set_target_properties(radishlex_linux_platform PROPERTIES
   POSITION_INDEPENDENT_CODE ON
 )
@@ -56,8 +65,8 @@ if(RADISHLEX_BUILD_FCITX_ADDON)
     message(FATAL_ERROR
       "RADISHLEX_IME_FFI_LIBRARY must identify the native-rime cdylib")
   endif()
-  foreach(asset default.yaml radishlex_pinyin.schema.yaml pinyin_simp.dict.yaml)
-    if(NOT EXISTS "${RADISHLEX_RIME_SHARED_DATA_DIR}/${asset}")
+  foreach(asset IN LISTS RADISHLEX_RIME_ASSETS)
+    if(NOT EXISTS "${RADISHLEX_RIME_DATA_SOURCE_DIR}/${asset}")
       message(FATAL_ERROR "missing locked RimeData asset: ${asset}")
     endif()
   endforeach()
@@ -72,7 +81,6 @@ if(RADISHLEX_BUILD_FCITX_ADDON)
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
   )
   target_compile_definitions(radishlex PRIVATE
-    RADISHLEX_RIME_SHARED_DATA_DIR="${RADISHLEX_RIME_SHARED_DATA_DIR}"
     RADISHLEX_RIME_SCHEMA="${RADISHLEX_RIME_SCHEMA}"
   )
   target_link_libraries(radishlex PRIVATE
@@ -80,11 +88,35 @@ if(RADISHLEX_BUILD_FCITX_ADDON)
     radishlex_linux_platform
     radishlex_ime_ffi
   )
-  set_target_properties(radishlex PROPERTIES PREFIX "")
+  set_target_properties(radishlex PROPERTIES
+    PREFIX ""
+    BUILD_WITH_INSTALL_RPATH ON
+    INSTALL_RPATH "$ORIGIN"
+    INSTALL_RPATH_USE_LINK_PATH OFF
+  )
+  add_custom_command(TARGET radishlex POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "${RADISHLEX_IME_FFI_LIBRARY}"
+            "$<TARGET_FILE_DIR:radishlex>/libradishlex_ime_ffi.so"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory
+            "$<TARGET_FILE_DIR:radishlex>/radishlex-rime"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "${RADISHLEX_RIME_DATA_SOURCE_DIR}/default.yaml"
+            "${RADISHLEX_RIME_DATA_SOURCE_DIR}/radishlex_pinyin.schema.yaml"
+            "${RADISHLEX_RIME_DATA_SOURCE_DIR}/pinyin_simp.dict.yaml"
+            "$<TARGET_FILE_DIR:radishlex>/radishlex-rime"
+    VERBATIM
+  )
 
   configure_file(config/radishlex-addon.conf.in radishlex-addon.conf)
   configure_file(config/radishlex.conf.in radishlex.conf COPYONLY)
   install(TARGETS radishlex DESTINATION "${FCITX_INSTALL_LIBDIR}/fcitx5")
+  install(FILES "${RADISHLEX_IME_FFI_LIBRARY}"
+          DESTINATION "${FCITX_INSTALL_LIBDIR}/fcitx5")
+  foreach(asset IN LISTS RADISHLEX_RIME_ASSETS)
+    install(FILES "${RADISHLEX_RIME_DATA_SOURCE_DIR}/${asset}"
+            DESTINATION "${FCITX_INSTALL_LIBDIR}/fcitx5/radishlex-rime")
+  endforeach()
   install(FILES "${CMAKE_CURRENT_BINARY_DIR}/radishlex-addon.conf"
           RENAME radishlex.conf
           DESTINATION "${FCITX_INSTALL_PKGDATADIR}/addon")
@@ -122,4 +154,37 @@ if(RADISHLEX_BUILD_CONTRACT_TESTS)
     -Wall -Wextra -Wpedantic -Werror
   )
   add_test(NAME xdg_paths COMMAND radishlex_xdg_paths_contract)
+
+  add_executable(radishlex_runtime_layout_contract
+    tests/runtime_layout_test.cpp
+    src/runtime_layout.cpp
+  )
+  target_include_directories(radishlex_runtime_layout_contract PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+  )
+  target_compile_options(radishlex_runtime_layout_contract PRIVATE
+    -Wall -Wextra -Wpedantic -Werror
+  )
+  if(CMAKE_DL_LIBS)
+    target_link_libraries(radishlex_runtime_layout_contract PRIVATE
+      "${CMAKE_DL_LIBS}"
+    )
+  endif()
+  add_test(NAME runtime_layout COMMAND radishlex_runtime_layout_contract)
+
+  add_executable(radishlex_runtime_probe
+    tools/runtime_probe.cpp
+    src/runtime_layout.cpp
+  )
+  target_include_directories(radishlex_runtime_probe PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+  )
+  target_compile_options(radishlex_runtime_probe PRIVATE
+    -Wall -Wextra -Wpedantic -Werror
+  )
+  if(CMAKE_DL_LIBS)
+    target_link_libraries(radishlex_runtime_probe PRIVATE
+      "${CMAKE_DL_LIBS}"
+    )
+  endif()
 endif()

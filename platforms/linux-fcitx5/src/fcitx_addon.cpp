@@ -345,6 +345,8 @@ Engine::Engine(fcitx::Instance *instance)
     : instance_(instance),
       ffi_api_(radishlex::linux_platform::linkedFfiApi()),
       paths_(radishlex::linux_platform::resolveProductionXdgPaths()),
+      runtime_layout_(
+          radishlex::linux_platform::resolveLoadedRuntimeLayout()),
       state_factory_([this](fcitx::InputContext &input_context) {
         return new InputContextState(*this, input_context);
       }),
@@ -398,7 +400,7 @@ fcitx::FactoryFor<InputContextState> *Engine::stateFactory() {
 
 radishlex::linux_platform::PersonalizedSessionConfig Engine::sessionConfig() {
   return radishlex::linux_platform::PersonalizedSessionConfig{
-      RADISHLEX_RIME_SHARED_DATA_DIR,
+      runtime_layout_.rime_shared_data_dir.string(),
       paths_.rime_user_data_dir.string(),
       RADISHLEX_RIME_SCHEMA,
       std::nullopt,
