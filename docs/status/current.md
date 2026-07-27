@@ -7,11 +7,11 @@
 - 复核日期：2026-07-27（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品
-- 当前主批次：M5-P02 Fcitx5 addon、共享 FFI 与开发构建
-- 已退出：M0-M3；M4 macOS build 38 单版本产品验收已冻结；M5-P01 第二平台决策与运行边界
+- 当前主批次：M5-P03 真实 Linux 桌面输入与隐私验收
+- 已退出：M0-M3；M4 macOS build 38 单版本产品验收已冻结；M5-P01 第二平台决策与运行边界；M5-P02 Fcitx5 addon、共享 FFI 与开发构建
 - 真实用户同步：保持关闭；只允许合成数据与受控集成测试
 
-## M5-P02 当前实现
+## M5-P02 完成证据与 M5-P03 入口
 
 首个可审阅批次已经建立 `platforms/linux-fcitx5/` 的真实 C++17/CMake addon 工程、ABI v9 owned projection、Fcitx input panel/session 接线、共享 XDG resolver、addon/input method metadata 和 `./scripts/check-linux-fcitx5.sh`。自动 contract 覆盖 Unicode/named key、modifier/phase、owned `KeyResult`/snapshot、display-index selection、owner-thread、reset/free/shutdown，以及 XDG 默认/override、`0700`/`0600`、relative path、symlink、宽权限和 production/test override 隔离。
 

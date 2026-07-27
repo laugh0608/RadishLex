@@ -29,8 +29,8 @@
 
 ## 快速认知
 
-- 当前阶段：M5 Linux Fcitx5 第二平台；M5-P01 已完成，推进 M5-P02 addon、共享 FFI 与开发构建，实时状态见 `docs/status/current.md`
-- 代码：M1-M3 完成；macOS build 38 冻结；Linux addon/XDG/ARM64 编译通过，桌面未验证；同步/发布关闭
+- 当前阶段：M5 Linux Fcitx5；M5-P01/P02 已完成，推进 M5-P03 桌面输入与隐私验收，实时状态见 `docs/status/current.md`
+- 代码：M1-M3 完成；macOS build 38 冻结；Linux addon/XDG/ARM64 开发装配与无头加载通过，真实桌面未验证；同步/发布关闭
 - 当前交付：macOS 可安装内部候选，不是公开发布版本；阶段证据以真实输入、数据正确性、安全同步和产品构建为准
 - 交付梯度：macOS 输入、个人化、同步资格与产品候选已完成；当前推进 Linux Fcitx5 产品线
 - 真实平台顺序：macOS InputMethodKit、Linux Fcitx5、Android、Windows、iOS；每次只推进一条主线

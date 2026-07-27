@@ -352,12 +352,13 @@ platforms/linux-fcitx5/
   config/              addon/inputmethod metadata 的 committed source
   dev/                 固定 digest 的 Debian 13 ARM64 开发镜像
   tests/               key、candidate、lifecycle、privacy 与 XDG contract
+  tools/               staged addon runtime layout 与 native loader 诊断
   README.md            开发构建、非安装 smoke 和边界索引
 ```
 
 该目录不包含 userdb schema、ranker、Rime 私有候选逻辑、同步状态机或自绘候选 UI。`include/radishlex/linux/xdg_paths.h` 与 `src/xdg_paths.cpp` 是 addon、未来 Flutter Linux host、诊断和安装协调层的单一 XDG resolver；test injection 只在测试编译态可见。`ffi_projection` 复制 ABI v9 owned result 并守住 owner thread，`fcitx_addon` 只使用 framework input panel、commit 和 lifecycle。Linux 正式产品 metadata 与发行载体只有在 M5-P05 固定格式后才进入 `packaging/linux/`，P02 的开发构建不得提前冒充产品安装。
 
-当前 macOS 机器不直接安装 Linux 工具链；`./scripts/build-linux-fcitx5-container.sh` 在 Docker Desktop 的 Linux VM 中以 Debian 13 ARM64、Fcitx5 Core 5.1.12 和 librime 1.13.1 编译/链接 native-rime FFI 与 `radishlex.so`，仓库只读挂载，Cargo cache/target 使用独立 named volume。该结果不是 Wayland/X11、Fcitx daemon 或真实应用输入证据。开发入口与停止线见 [Fcitx5 addon README](../platforms/linux-fcitx5/README.md)。
+当前 macOS 机器不直接安装 Linux 工具链；`./scripts/build-linux-fcitx5-container.sh` 在 Docker Desktop 的 Linux VM 中以 Debian 13 ARM64、Fcitx5 Core 5.1.12 和 librime 1.13.1 编译 native-rime FFI 与 `radishlex.so`，仓库只读挂载，Cargo cache/target 使用独立 named volume。该入口还执行 staged addon-relative 装配、ELF `$ORIGIN`/依赖/构建路径门禁和 headless native loader probe；这些结果不是 Wayland/X11、Fcitx daemon 或真实应用输入证据。开发入口与停止线见 [Fcitx5 addon README](../platforms/linux-fcitx5/README.md)。
 
 当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build、不安装系统输入法的 wrapper contract、公开 TIS 只读状态/监视工具、生产 `LearningContext`、privacy CFPreferences receipt、精确进程 stop、R01B userdb 与 M2 manager 固定测试数据 receipt 清理入口，以及合成 reference probe 和 unknown/P0 `ValidationHost`。两个数据 profile 复用同一 hardened helper：R01B 只允许四个 SQLite 名称，M2 另允许 manager settings 与原子写临时文件；二者都不接受调用方路径。分类 contract 直接编译 controller 使用的生产源码，并以两个 host 的固定 Bundle ID 覆盖 unknown/P0；host 本体只构建不启动，也不读取或保存输入框内容。正式薄壳已在 Apple Development build 32 完成 R01A；R01B 以同一 Apple Development build 34 完成真实重排、重启、删除/恢复、隐私/unknown/P0/secure 系统路由与零残留退出。曾冻结的 build 33 只保留历史意义。
 
@@ -377,7 +378,7 @@ R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-
 
 平台目录按主线顺序创建：
 
-1. `platforms/linux-fcitx5/`：M5 当前设计已固定，M5-P02 开始实现。
+1. `platforms/linux-fcitx5/`：M5-P02 addon、共享 FFI 与开发构建已完成，当前推进 M5-P03 真实桌面输入与隐私验收。
 2. `platforms/android-ime/`：在现有 keystore bridge 之外补完整 IME。
 3. `platforms/windows-tsf/`。
 4. `platforms/ios-keyboard/`。

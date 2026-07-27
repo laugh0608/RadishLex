@@ -4,7 +4,7 @@
 
 ## 状态与产品范围
 
-状态：M5-P02 开发构建批次。平台无关 C++ contract、Debian 13 ARM64 编译、staged 开发装配与 headless native loader 已通过；真实 Fcitx daemon 和桌面运行尚未验证。
+状态：M5-P02 开发构建批次已完成，当前进入 M5-P03 真实桌面输入与隐私验收。平台无关 C++ contract、Debian 13 ARM64 编译、staged 开发装配与 headless native loader 已通过；真实 Fcitx daemon、Wayland/X11 和应用输入尚未验证。
 
 M5 要证明 Linux 平台能够复用现有产品核心完成：
 
@@ -193,7 +193,7 @@ M5-P02 的开发构建必须形成可复验依赖图：
 
 `platforms/linux-fcitx5/dev/Dockerfile` 以 digest 固定 Debian 13 ARM64 基础镜像，安装发行版提供的 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 和 librime 1.13.1 development package。`./scripts/build-linux-fcitx5-container.sh` 只读挂载仓库，使用独立 named volume 缓存 Cargo registry/target，构建启用 `native-rime` 的 ARM64 ELF cdylib，再执行 `--require-fcitx` 强门禁。该环境已真实编译、staged install 并以 native loader 打开 `libradishlex_ime_ffi.so` 与 `radishlex.so`，也修正了 Linux ARM64 `c_char` signedness、GCC 14 enum boundary 和 `fcitx::Key` 非 literal type 差异。
 
-Docker Desktop 提供的 Linux VM 是 M5-P02 可持续编译环境，不是桌面验收环境：容器没有 Fcitx daemon、Wayland/X11 session 或真实应用 input context。因此当前只能记为 Linux ARM64 编译/链接验证，不能记为 Fcitx5 平台运行或 M5 退出。
+Docker Desktop 提供的 Linux VM 是 M5-P02 可持续编译环境，不是桌面验收环境：容器没有 Fcitx daemon、Wayland/X11 session 或真实应用 input context。因此当前只能记为 Linux ARM64 编译、staged 装配与 headless loader 验证，不能记为 Fcitx5 平台运行或 M5 退出。
 
 ## 验证分层
 
