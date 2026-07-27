@@ -269,6 +269,18 @@ snapshot: *const RadishLexSnapshot
 
 现有只返回 `RadishLexStatusCode` 的按键函数只作为兼容或测试入口，不能作为 InputMethodKit 等真实平台壳的主契约。输入侧声明由 `crates/ime-ffi/include/radishlex_input.h` 提供，并通过 C11、Objective-C 编译和 Rust function pointer 测试约束；Swift / Objective-C 不手抄 Rust `repr(C)` 布局。
 
+### Linux Fcitx5 ABI v9 审计
+
+M5-P02 首批审计确认 Fcitx5 addon 可以直接复用 ABI v9，不增加平台私有结构或 symbol：
+
+- C++ 层把 Fcitx normalized key 投影为已有 `RadishLexKeyEvent`，平台保留或无法证明的键直接交还宿主；
+- 每个 input context 创建 `radishlex_session_new_personalized_rime` session 并保持 owner thread；`radishlex_session_handle_key_event` 的 owned result 被一次性复制为 C++ value 后立即释放，不缓存 Rust view；
+- Fcitx candidate list 只展示 snapshot candidate，选择只调用 `radishlex_session_select_candidate(display_index)`；
+- 可见 candidate cursor 属于 Fcitx input panel 状态，不进入 ABI；数字、Space 与鼠标都把 cursor 对应的 Rust display index 送回 selection，PageUp/PageDown 用新 snapshot 替换旧列表；
+- deactivate/reset 销毁 UI 状态并调用 session reset，input context property 注销后先释放所有 session，再 shutdown Rime runtime。
+
+因此 snapshot 不需要增加 Fcitx page、candidate object 或窗口引用。Linux XDG resolver、Fcitx capability 到 `LearningContext` 的映射和开发构建属于平台层缺口，不扩展 Rust ABI。当前普通非 terminal context 没有可靠分类信号时传 `context_known = 0`，不会以 program name 或窗口文本补足。
+
 ### Snapshot 与 candidate view
 
 `RadishLexCandidateView`：

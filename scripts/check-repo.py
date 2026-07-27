@@ -63,6 +63,21 @@ REQUIRED_FILES = [
     "platforms/macos-imk/build-bundle.sh",
     "platforms/macos-imk/cleanup-m2-manager-test-data.sh",
     "platforms/macos-imk/cleanup-user-install.sh",
+    "platforms/linux-fcitx5/CMakeLists.txt",
+    "platforms/linux-fcitx5/README.md",
+    "platforms/linux-fcitx5/include/radishlex/linux/ffi_projection.h",
+    "platforms/linux-fcitx5/include/radishlex/linux/key_projection.h",
+    "platforms/linux-fcitx5/include/radishlex/linux/xdg_paths.h",
+    "platforms/linux-fcitx5/config/radishlex-addon.conf.in",
+    "platforms/linux-fcitx5/config/radishlex.conf.in",
+    "platforms/linux-fcitx5/src/fcitx_addon.cpp",
+    "platforms/linux-fcitx5/src/fcitx_addon.h",
+    "platforms/linux-fcitx5/src/ffi_projection.cpp",
+    "platforms/linux-fcitx5/src/key_projection.cpp",
+    "platforms/linux-fcitx5/src/linked_ffi_api.cpp",
+    "platforms/linux-fcitx5/src/xdg_paths.cpp",
+    "platforms/linux-fcitx5/tests/ffi_projection_test.cpp",
+    "platforms/linux-fcitx5/tests/xdg_paths_test.cpp",
     "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.h",
     "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.m",
     "platforms/macos-product/UpgradePreflightHost/Sources/main.m",
@@ -114,6 +129,7 @@ REQUIRED_FILES = [
     "scripts/check-docs.sh",
     "scripts/check-manager-ffi-smoke.sh",
     "scripts/check-manager-product.sh",
+    "scripts/check-linux-fcitx5.sh",
     "scripts/build-macos-product.sh",
     "scripts/build-macos-install-payload.sh",
     "scripts/build-macos-release-installer.sh",
@@ -363,6 +379,10 @@ def check_macos_upgrade_preflight() -> None:
     run_command([str(REPO_ROOT / "scripts/check-macos-upgrade-coordinator.sh")])
 
 
+def check_linux_fcitx5() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-linux-fcitx5.sh")])
+
+
 def required_status_contexts(ruleset: dict[str, Any]) -> set[str]:
     for rule in ruleset.get("rules", []):
         if rule.get("type") != "required_status_checks":
@@ -529,6 +549,7 @@ def main() -> int:
     check_macos_installer()
     check_macos_release_carrier()
     check_macos_upgrade_preflight()
+    check_linux_fcitx5()
     check_ruleset_and_workflows()
     check_path_budget()
     check_deployment_evidence()

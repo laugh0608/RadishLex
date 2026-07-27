@@ -1,0 +1,9 @@
+[Addon]
+Name=RadishLex
+Name[zh_CN]=萝卜词核
+Category=InputMethod
+Version=@PROJECT_VERSION@
+Library=radishlex
+Type=SharedLibrary
+OnDemand=True
+Configurable=False

@@ -4,7 +4,7 @@
 
 ## 状态与产品范围
 
-状态：M5-P01 设计基线，平台实现尚未开始。
+状态：M5-P02 首个实现批次。平台无关 C++ contract 已通过；真实 Linux/Fcitx5 编译与运行尚未验证。
 
 M5 要证明 Linux 平台能够复用现有产品核心完成：
 
@@ -56,6 +56,17 @@ Linux 继续使用 `ime-ffi` ABI v9 已有的：
 - `radishlex_session_reset`、session free 与 Rime runtime shutdown。
 
 如果 M5 实现发现现有 ABI 无法表达 Fcitx5 必需行为，应先补平台无关语义和 ABI contract，再由 macOS 与 Linux 共同验证。不得增加只传 Fcitx 私有对象、原始 key symbol、窗口指针或数据库路径的业务入口。
+
+首批 ABI 审计结论是 v9 足以表达当前 addon 输入链，不需要新增 symbol 或版本：
+
+- Fcitx normalized key 在 C++ 转成稳定 char/named/modifier/phase；
+- owned `KeyResult` 同时提供 consumed、commit、learning disposition 与 snapshot；
+- snapshot 的 candidate `index` 已是 Rust display index，`engine_index` 只复制到只读投影，不回传；
+- Fcitx candidate list 维护可见 cursor，数字、Space 和鼠标选择最终调用同一个 display-index selection；
+- PageUp/PageDown 作为稳定 named key 进入 Rust 后用新 snapshot 重建列表；
+- reset/free/shutdown 已足以表达 per-context session 与进程 teardown。
+
+当前真实缺口不在 ABI，而在 Linux/Fcitx5 编译与运行证据、Linux Manager privacy 配置来源、产品 startup gate 和发行安装事务。后三项分别留在 P04/P05，不为 P02 增加平台私有 ABI。
 
 ### Flutter Manager
 
@@ -149,6 +160,18 @@ Linux 不复用 macOS `Application Support`。M5-P02 先实现单一、可测试
 - 保持测试 override 与生产 resolver 隔离，生产构建不读取 fixture 路径；
 - 在 M5-P05 前固定具体子目录、receipt、安装目标和 migration 清单。
 
+M5-P02 已固定当前数据子路径：
+
+```text
+${XDG_DATA_HOME:-$HOME/.local/share}/radishlex/userdb.sqlite3
+${XDG_DATA_HOME:-$HOME/.local/share}/radishlex/rime
+${XDG_CONFIG_HOME:-$HOME/.config}/radishlex/settings.json
+${XDG_STATE_HOME:-$HOME/.local/state}/radishlex
+${XDG_CACHE_HOME:-$HOME/.cache}/radishlex
+```
+
+production resolver 使用 `geteuid` + `getpwuid_r` 取得 authoritative home，不读取 `HOME` 或 `RADISHLEX_*` fixture override。四个 XDG 环境变量只接受绝对且无 dot component 的路径；既有 symlink、错误 owner、非目录节点、product 目录 group/other 权限和 userdb group/other 权限失败关闭。product/Rime 目录以 `0700` 创建，userdb 以 `0600`、`O_EXCL`、`O_NOFOLLOW` 创建。测试注入 API 只在 `RADISHLEX_XDG_TESTING` 编译态存在；未来 Linux Manager host 必须链接同一 resolver 源码，不得在 Dart 中重复拼接。
+
 配置与数据分居多个 XDG 根时，升级协调必须显式覆盖两者的一致性，不能只迁移 userdb 后假定 settings 兼容。P02/P03 不以未设计的自动升级写入真实用户数据。
 
 ## Native library、RimeData 与构建
@@ -162,6 +185,10 @@ M5-P02 的开发构建必须形成可复验依赖图：
 - 构建不从运行时下载 schema、词库、模型或二进制；
 - 开发安装与正式发行载体分开，P02 不把本地复制命令称为产品安装；
 - 发行版包、签名、系统域目标、升级与移除在 M5-P05 单独固定。
+
+当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境编译 projection/XDG contract；`--require-fcitx` 只在 Linux 且调用方提供既有 native-rime cdylib 时配置、构建 addon 并运行 CTest，不下载依赖、不安装或启用输入法。
+
+2026-07-27 的 macOS 开发机只有 Apple clang 和 Docker CLI，缺失 CMake、pkg-config 与 Fcitx5 development package。本机平台无关 contract 已通过，但 addon target 没有在 Fcitx5 headers/library 下编译，不能记为 Linux 平台验证。
 
 ## 验证分层
 
