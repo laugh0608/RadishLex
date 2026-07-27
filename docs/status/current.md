@@ -6,12 +6,12 @@
 
 - 复核日期：2026-07-27（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
-- 当前里程碑：M4 产品发布候选
-- 当前主批次：M4-P03 安装载体与发布供应链
-- 已退出：M0-M3、M4-P01 双 bundle 产品装配、M4-P02 Application Support v1 数据升级协调器
+- 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品
+- 当前主批次：M5-P02 Fcitx5 addon、共享 FFI 与开发构建
+- 已退出：M0-M3；M4 macOS build 38 单版本产品验收已冻结；M5-P01 第二平台决策与运行边界
 - 真实用户同步：保持关闭；只允许合成数据与受控集成测试
 
-## M4 稳定事实
+## macOS 冻结基线
 
 M4-P01 已形成离线双 bundle 产品装配。根 `version.json` 是版本/build 唯一人工真相源；当前修复候选递增为 Radish CalVer `26.7.1 (38)`。产品 metadata 固定 macOS 13.0、FFI ABI v9、userdb v9、RimeData v2 和 `community-adhoc-v1`；ProductManifest v3 绑定双 bundle tree、许可证、版本与 schema。
 
@@ -41,9 +41,9 @@ Library/Application Support/RadishLex/.radishlex-install-v1
 - `ReleaseIdentity.json` format v2 绑定 target 与全部显式历史 source 的 Manager/InputMethod requirement 有界、排序、去重集合；两端集合不得重叠；
 - Developer ID、Apple Development、unknown requirement、manifest/tree/bundle ID 漂移均失败关闭。
 
-ad-hoc 只提供包内完整性与事务 identity，不提供 Apple 发布者认证；DMG 不签名、不公证。build 35 传播 quarantine；build 36 对 `0444` dylib 清理失败并在提交前关闭，失败 receipt/staging 已移入可恢复备份。adapter 现以 `ditto --noqtn` 排除传播，逐节点审计无 quarantine，并重复 identity 复验后才记录 evidence。build 37 已完成独立下载与真实用户域安装、输入、repair、remove 证据，但因 Installer 生命周期代码变化不再作为最终载体。
+ad-hoc 只提供包内完整性与事务 identity，不提供 Apple 发布者认证；DMG 不签名、不公证。历史 build 35-37 的 quarantine、只读 dylib 清理失败和 Installer 生命周期证据进入周志保留，不作为当前载体。
 
-`26.7.1 (38)` 已重新装配双 bundle、Installer 和社区 DMG。DMG 大小 `32196093` bytes，SHA-256 `f171e74bdc0a429655a84b30429481bce3926b17076d09298feed77d9ce4ce4e`，evidence 明确 `apple_notarized=false`；ProductManifest、InstallPayload、strict ad-hoc identity、挂载复验、载体 contract、Installer 精准门禁与完整仓库基线均通过。`dev` 已推送，远端 draft 已改名为 build 38 并仅含 DMG、checksum、evidence 三项匹配资产；Release 仍为 draft、`publishedAt=null`，无正式 Git tag。用户通过已登录 Chrome 形成的独立下载副本大小与 SHA-256 精确匹配本地候选，逐字节比较一致，并带有 Chrome 写入的真实 quarantine 和 GitHub Release 来源元数据；该副本已成功启动 Installer，标准 Application 菜单、`⌘Q` 与关闭最后窗口终止进程均通过人工复验且没有异常提示。首次安装事务到达 `prepared` 后经 `⌘Q` 退出并重新打开，前后均稳定恢复 `awaiting_user_action/confirm_quiescence/none/prepared`，证明事务续跑入口成立。
+`26.7.1 (38)` 已重新装配双 bundle、Installer 和社区 DMG。DMG 大小 `32196093` bytes，SHA-256 `f171e74bdc0a429655a84b30429481bce3926b17076d09298feed77d9ce4ce4e`，evidence 明确 `apple_notarized=false`；ProductManifest、InstallPayload、strict ad-hoc identity、挂载复验、载体 contract、Installer 精准门禁与完整仓库基线均通过。远端现有 build 38 draft 仍未发布、`publishedAt=null`，无正式 Git tag；当前本地 `dev` 另有 7 个实机证据提交尚未推送。Chrome 独立下载副本与本地候选逐字节一致，并带有真实 quarantine 和 GitHub Release 来源元数据；标准 Application 菜单、`⌘Q`、关闭最后窗口和 `prepared` 事务重开续跑均通过。
 
 build 38 首次安装已到达 `first_install/completed`，receipt 精确绑定 `26.7.1 (38)` 且无 failure/manual recovery；固定 Manager/InputMethod 双 bundle 均通过严格 codesign、ProductManifest、ReleaseIdentity 与逐节点无 quarantine 复验。Manager 已从固定用户域 executable 启动，正常通过双 startup gate、加载保留的合成词库并显示 `local_only`，`⌘Q` 后进程停止且 userdb sidecar 清零。用户手动切换到 RadishLex 拼音后以公开合成输入 `zhongwen` 正常展示候选并提交“中文”，随后切回系统拼音；公开 API 监视确认完整切换序列。
 
@@ -52,6 +52,8 @@ build 38 repair 已到达 `repair/completed`，source/target 均为 `26.7.1 (38)
 用户在系统设置中手动移除输入源后完成 build 38 默认程序 remove。receipt 为 `remove_programs/completed`，source 为 `26.7.1 (38)`、target 为空且无 failure/manual recovery；双 bundle 不存在，TIS `matches/enabled/selected=0/0/0`，Manager/InputMethod 进程停止。Application Support、Rime、userdb inode 与 runtime/sidecar/receipt 均保留；这是默认保留数据的 completed remove 现场，不是数据卸载或空数据基线。
 
 用户安装必须先核对 SHA-256，再使用“系统设置 → 隐私与安全性 → 仍要打开”。终端 fallback 只作用于复制到 `$HOME/Applications` 的精确 `RadishLex Installer.app`，不使用 `sudo`，不得对宽泛目录递归移除 quarantine。完整步骤见 [macOS 社区 ad-hoc DMG Runbook](../runbooks/macos-release-carrier.md)。
+
+build 38 现作为 macOS 冻结参考产品，不继续公开发布。真实跨发布 upgrade、source rollback、Developer ID/公证和正式 Release 作为后续 macOS 兼容与统一发布评审事项保留，不冒充已有证据，也不阻塞 M5 第二平台开发。
 
 ## Installer 与升级
 
@@ -65,19 +67,22 @@ build 37 的 first install 与 repair 均先到 `prepared` 静止边界，再完
 
 ## 当前停止线
 
+- 不发布 build 38，不创建正式 Git tag，不修改远端 draft；本地 7 个提交不推送，任何远端动作仍需另行授权。
+- 保留 build 38 assembly、hash/evidence、验收记录与默认 remove 后的数据语义，不清理或改写为其他基线。
 - 不宣称社区包具备 Developer ID、Apple 公证、Gatekeeper 自动通过或 Apple 已验证。
 - 首个正式版本继续关闭真实用户同步，不开放恢复码、设备授权、撤销或轮换的产品成功入口。
 - P0 永不学习/同步；P1 原始事件只留本地；P2 只允许端到端加密对象。
 - 输入热路径保持完全本地；Go server 不解密、不排序、不保存明文用户词或候选偏好。
-- 不同时展开第二真实平台主线，不为形式统一把 Application Support v1 迁入 App Group。
+- M5 只推进 Linux Fcitx5，不并行实现 Android、Windows 或 iOS，不为形式统一把 Application Support v1 迁入 App Group。
+- Fcitx5 addon 只承担平台生命周期、按键、框架候选面板、commit 与 FFI；不得复制 engine、ranker、userdb、privacy 或同步逻辑。
 - 不自动清理 staging、backup、历史 operation 或身份绑定终态材料。
 
 ## 下一步顺位
 
-1. build 38 已完成标准 Application 菜单、`⌘Q`、版本传播、双 bundle/Installer/DMG 装配、自动门禁、`dev` 推送、远端 draft 三项资产替换、Chrome 独立下载、首次安装、固定路径 Manager 启动、公开合成输入、repair 与默认程序 remove；下载副本、生命周期、`prepared` 续跑、安装后身份链、数据对象保持与最终 TIS 清零均已复验。
-2. 下一步整理社区首发说明，明确社区 ad-hoc、未公证、SHA-256、人工放行、默认 remove 保留数据和真实用户同步关闭；本地尚有实机证据提交未推送，push、tag 和正式 Release 仍需分别授权。
-3. 恢复空数据基线、清理本轮 operation 或处置历史材料必须另取固定白名单与 receipt 绑定授权；不得把默认保留数据的 remove 冒充数据卸载。
-4. 首发形成后把 build 38 assembly 作为下一版本真实历史 source，证明跨发布 upgrade、重启续跑与 source 回滚；真实用户同步继续关闭。
+1. M5-P01 已固定 [第二平台 ADR](../adr/0009-second-platform-linux-fcitx5.md)、[Linux Fcitx5 平台边界](../linux-fcitx5-boundary.md)、路线图、架构职责、XDG 数据语义、验证分层和停止线，并通过文档与完整仓库门禁。
+2. M5-P02 审计并复用 ABI v9，实现 `platforms/linux-fcitx5/` C++/CMake addon、owner-thread/session 生命周期、Fcitx input panel 接线和确定性开发构建；目录必须由真实实现与 contract 同时建立。
+3. M5-P03 在可持续复验的真实 Linux 环境完成 Wayland 主路径、X11 兼容、常见应用输入、切换/重启、断网和 secure/unknown 上下文验收。
+4. M5-P04/P05 依次推进 Linux Manager 同库个人化与 Linux 安装、升级、修复、移除、数据保留；不提前并行 Android IME。
 
 ## 验证入口
 
@@ -102,6 +107,8 @@ git diff --check
 ## 阅读索引
 
 - [路线图](../roadmap.md)
+- [第二平台 Linux Fcitx5 ADR](../adr/0009-second-platform-linux-fcitx5.md)
+- [Linux Fcitx5 平台边界](../linux-fcitx5-boundary.md)
 - [macOS 产品包边界](../macos-product-package-boundary.md)
 - [macOS 程序安装事务](../macos-installation-transaction.md)
 - [macOS Installer App 边界](../macos-installer-app-boundary.md)

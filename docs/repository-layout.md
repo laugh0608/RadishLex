@@ -115,7 +115,7 @@ RadishLex/
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
 | 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
 | Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁；M4 外层 install gate、数据 gate 与升级 validation helper | 真实用户同步入口与首版后的目标部署证据 |
-| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；M4-P01 双 bundle与 locked RimeData；M4-P02 数据 gate/validation；M4-P03 外层 install gate、运行身份、Installer AppKit/bridge/executor、社区 ad-hoc identity 与 DMG evidence；Android Keystore 能力验证桥 | 真实用户域安装/修复/移除、跨发布升级实机证据；其他系统输入法 |
+| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；build 38 双 bundle、locked RimeData、数据/安装 gate、Installer、社区 ad-hoc identity、DMG evidence、首次安装/输入/修复/默认移除实机证据；Android Keystore 能力验证桥 | macOS 真实跨发布升级；Linux Fcitx5、完整 Android IME、Windows TSF 与 iOS Keyboard Extension |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
 
@@ -335,6 +335,20 @@ apps/radishlex-manager/
 
 ## 平台目录
 
+M5-P01 已固定下一实现目录 `platforms/linux-fcitx5/` 的职责，但当前尚未创建。M5-P02 进入代码后建议保持浅层结构：
+
+```text
+platforms/linux-fcitx5/
+  CMakeLists.txt
+  src/                 Fcitx5 addon、input context/session 与 FFI 投影
+  include/             仅平台内部 header；公共 ABI 仍来自 ime-ffi
+  config/              addon/inputmethod metadata 的 committed source
+  tests/               key、candidate、lifecycle、privacy 与 XDG contract
+  README.md            开发构建、非安装 smoke 和边界索引
+```
+
+该目录不能包含 userdb schema、ranker、Rime 私有候选逻辑、同步状态机或自绘候选 UI。Linux XDG resolver 应形成单一可复用平台组件，供 addon、Flutter Linux host、诊断与未来安装协调层调用；具体归属在 M5-P02 根据依赖方向确定，不先建立泛化 `helper`/`manager` 模块。Linux 正式产品 metadata 与发行载体只有在 M5-P05 固定格式后才进入 `packaging/linux/`，P02 的开发构建不得提前冒充产品安装。
+
 当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build、不安装系统输入法的 wrapper contract、公开 TIS 只读状态/监视工具、生产 `LearningContext`、privacy CFPreferences receipt、精确进程 stop、R01B userdb 与 M2 manager 固定测试数据 receipt 清理入口，以及合成 reference probe 和 unknown/P0 `ValidationHost`。两个数据 profile 复用同一 hardened helper：R01B 只允许四个 SQLite 名称，M2 另允许 manager settings 与原子写临时文件；二者都不接受调用方路径。分类 contract 直接编译 controller 使用的生产源码，并以两个 host 的固定 Bundle ID 覆盖 unknown/P0；host 本体只构建不启动，也不读取或保存输入框内容。正式薄壳已在 Apple Development build 32 完成 R01A；R01B 以同一 Apple Development build 34 完成真实重排、重启、删除/恢复、隐私/unknown/P0/secure 系统路由与零残留退出。曾冻结的 build 33 只保留历史意义。
 
 `platforms/macos-product/UpgradePreflightHost/` 是 M4-P02 双 bundle 之外的只读升级平台端口。生产 executable 不接受路径或其他参数，只解析用户域固定 `Application Support/RadishLex`；Manager/InputMethod bundle ID 从 `packaging/macos/product.json` 编译进入二进制。host 验证私有数据根和受控普通文件，查询卷级可用容量，并以 `NSRunningApplication` 与固定 `lsof` 检查双端进程和 SQLite/settings 打开句柄；只输出固定 JSON 状态，不创建目录、不停止进程、不修改文件。contract 使用合成目录验证容量、打开/关闭句柄、symlink 拒绝和无参数边界，生产 host 不在仓库门禁中对真实数据根执行。
@@ -351,14 +365,14 @@ apps/radishlex-manager/
 
 R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-acceptance.md) 的授权 A/B：授权 A 才允许签名、安装、系统设置、人工交互和保留 userdb 的普通清理；授权 B 只在 receipt 归属、设置恢复和数据库关闭条件满足后删除本轮四个固定 SQLite 文件并把预存空父目录恢复为 `0755`，不得删除父目录。该 runbook 现在作为关闭证据与回归边界保留。副屏和 VoiceOver 仍按平台边界文档的已知限制处理，自动 contract 不能替代对应实机证据。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
 
-后续平台目录按进入顺序创建：
+平台目录按主线顺序创建：
 
-1. `platforms/linux-fcitx5/`：macOS 达到退出标准后的桌面候选。
+1. `platforms/linux-fcitx5/`：M5 当前设计已固定，M5-P02 开始实现。
 2. `platforms/android-ime/`：在现有 keystore bridge 之外补完整 IME。
 3. `platforms/windows-tsf/`。
 4. `platforms/ios-keyboard/`。
 
-只有对应平台设计边界和退出标准明确后才创建目录。空目录、占位文件或安装脚本不构成平台进度证据。
+只有对应平台设计边界和退出标准明确后才创建目录；M5-P01 的文档完成不自动创建 Linux 目录。空目录、占位文件或安装脚本不构成平台进度证据。第二平台顺序与发布关系见 [ADR 0009](adr/0009-second-platform-linux-fcitx5.md)，Linux 运行职责见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)。
 
 ## 文档目录
 

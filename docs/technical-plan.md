@@ -52,9 +52,11 @@ Flutter Manager
 1. M1 先打通 macOS 离线输入，闭合按键消费、候选、commit、FFI、进程级 engine runtime 和平台壳。
 2. M2 再闭合本地个人化，让真实选择、删除和反馈以正确事务语义影响后续候选，并提供本地 manager 管理界面。
 3. M3 在本地数据语义稳定后开放端到端加密同步、设备授权、恢复、撤销和 manager 同步界面。
-4. M4 最后闭合 native library、`librime`、schema、manager、签名、升级和供应链发布门禁。
+4. M4 闭合 macOS native library、`librime`、schema、manager、签名、升级和供应链门禁，并冻结可回归参考产品。
+5. M5 以 Linux Fcitx5 验证第二平台的原生薄壳、共享 FFI、XDG 数据、个人化和安装维护能力。
+6. M5 退出后依次推进 Android、Windows 和 iOS；每次只推进一条真实平台主线。
 
-同步原型、loopback、短生命周期服务和跨语言测试可以在 M1/M2 期间继续演进，但不能进入真实用户产品入口，也不能替代 M3 的退出证据。2026 年 7 月整改专题只负责修复 M1/M2 前置问题和首批质量门禁，不承担 M3/M4 的长期项目管理。
+同步原型、loopback、短生命周期服务和跨语言测试可以继续演进，但不能进入真实用户产品入口，也不能替代 M3 的退出证据。公开发布与各平台验收分离：当前统一发布评审延期到计划内平台分别退出之后，已冻结平台仍必须持续通过共享代码回归。
 
 ## Rust 模块职责
 
@@ -267,7 +269,7 @@ Flutter manager 负责：
 - 同步状态、设备、恢复和后端连接；
 - 安全诊断、导入导出和备份恢复入口。
 
-manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学习、隐私和诊断，并让正常本地产品运行态携带 native library、使用固定平台目录和真实持久化数据；M3 再交付同步、设备与恢复；M4 闭合版本化 distribution identity、安装升级、发布载体和最终产品打包。首发采用社区 ad-hoc 路径，未来 Developer ID/公证必须作为新的 identity 独立治理。fixture 只能由显式开发开关启用并持续显示演示标识。manager 不进入输入热路径，也不承担排序、合并或密钥策略真相源。
+manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学习、隐私和诊断，并让正常本地产品运行态携带 native library、使用固定平台目录和真实持久化数据；M3 再交付同步、设备与恢复；M4 闭合 macOS 版本化 distribution identity、安装升级、发布载体和产品打包；M5 增加 Linux Flutter host，并与 Fcitx5 addon 共用 XDG resolver、native library 和同一 userdb。macOS 社区 ad-hoc 继续作为冻结参考 identity，未来 Developer ID/公证必须独立治理。fixture 只能由显式开发开关启用并持续显示演示标识。manager 不进入输入热路径，也不承担排序、合并或密钥策略真相源。
 
 ## 平台策略
 
@@ -281,7 +283,11 @@ manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学�
 
 ### Linux
 
-第二桌面候选优先 Fcitx5，其次 IBus。Wayland 下优先使用输入法框架 panel，不自行发明浮窗协议。
+第二真实平台已通过 [ADR 0009](adr/0009-second-platform-linux-fcitx5.md) 固定为 Fcitx5。原生 C++/CMake addon 只处理 input context、按键规范化、候选面板、commit、session 生命周期和 Rust FFI；它不直接调用 Rime 私有 API，不读取 SQLite，也不实现 ranker、学习、隐私或同步。
+
+Linux 复用 ABI v9 的 owner-thread personalized Rime session、owned `KeyResult`、display-index selection 与 `LearningContext`。每个活动 input context 使用独立 Rust session；Fcitx5 input panel 消费同次 snapshot，Wayland 与 X11 都不自行发明浮窗协议。addon、Flutter Manager、诊断和未来安装协调层通过单一 XDG resolver 取得数据、配置、持久状态和缓存路径，不能分别拼接 `$HOME` 或复制数据库。
+
+M5 先形成 addon/FFI/build contract，再进入真实 Wayland、X11、常见应用、secure/unknown 上下文和同库个人化验收，最后治理 Linux 安装、升级、修复、移除和数据保留。IBus 只有在 Fcitx5 退出后存在明确需求时再评估。完整职责、路径与验证边界见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)。
 
 ### Android
 
@@ -367,7 +373,8 @@ M2 不以远端同步、设备授权或最终发布包为退出条件。
 - `KeyOutcome`、FFI 生命周期和 librime 全局生命周期未闭合前，不把平台壳视为可用输入法。
 - userdb 事务、ranker 评测和删除语义未稳定前，不开放生产同步。
 - merge 收敛、签名绑定、KDF 上限、macOS 平台私钥主路径、本地 HTTPS 编排和 Manager 受控资格执行链已有验证；真实用户入口仍须经过独立产品决策与发布级目标部署评审。该评审完成前保持关闭，上述任一既有证据回归时同样失败关闭。
-- 第一真实平台未达到可日常输入前，不并行启动第二平台。
+- 每次只推进一条真实平台主线；M5 期间不并行实现 Android、Windows 或 iOS 平台壳。
+- Linux addon 不复制共享业务真相源，不自绘候选浮窗，不以合成 host 或编译通过替代真实桌面证据。
 - manager 产品模式不得用静默 fixture fallback 代替真实失败。
 
 临时批次的更严格停止线见 `docs/status/current.md` 当前引用的整改专题。
@@ -377,6 +384,8 @@ M2 不以远端同步、设备授权或最终发布包为退出条件。
 - [当前状态](status/current.md)：当前批次、验证基线、停止线和近期顺位。
 - [产品交付路线图](roadmap.md)：产品里程碑、交付物和退出标准。
 - [仓库结构](repository-layout.md)：实际目录与模块职责。
+- [第二平台 Linux Fcitx5 ADR](adr/0009-second-platform-linux-fcitx5.md)：第二平台选择、进入顺序和发布关系。
+- [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)：addon、FFI、XDG、隐私、构建和验收边界。
 - [Engine Boundary](engine-boundary.md)：engine trait 和核心模型。
 - [Rime Adapter](engine-rime-adapter.md)：librime adapter、构建与 native smoke。
 - [个人化学习](personalization-learning.md)：userdb、ranker、学习和删除语义。

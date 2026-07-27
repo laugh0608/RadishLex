@@ -5,10 +5,11 @@
 ## 路线原则
 
 - 里程碑以用户可见纵向链为单位，不以 crate、服务或页面目录存在作为完成证据。
-- 首个可用版本先证明真实离线输入，再补本地个人化、同步和产品发布闭环。
+- 首个可用版本先证明真实离线输入，再补本地个人化、同步和产品发布供应链。
 - 自部署同步保留为 v1 重要能力，但不阻塞首个 macOS 离线 Alpha。
 - Manager 的本地管理能力与同步管理能力分开验收；本地词库、学习和隐私管理可以先于真实同步 UI 产品化。
 - 第一平台达到可重复日常输入前，不启动第二平台实现。
+- 各平台独立取得输入、个人化、隐私、数据和安装维护证据；对外公开发布可以延期，但不能用统一发布评审替代平台退出标准。
 - 合成 fixture、CLI 输出、设计草案和 local smoke 只能证明对应边界，不替代真实平台、真实 bundle、真实客户端或目标部署证据。
 - 个人开发阶段按平台类型维护一条真实主路径证据，不要求为同一平台凑齐所有硬件、虚拟化或 CI 负向矩阵；暂不可得的环境证据必须标记为延期补测，不能伪造，但不得无限冻结后续里程碑开发。
 
@@ -156,11 +157,54 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 - distribution identity、双 bundle/Installer identity、DMG SHA-256 evidence 和用户安装提示精确绑定同一发布候选；社区模式不得宣称 Developer ID、公证或 Gatekeeper 自动通过。
 - 发布候选通过自动门禁、安装 smoke 和非敏感日常输入复验。
 
-## 第二平台选择门禁
+## M5：Linux Fcitx5 离线输入与个人化产品
 
-只有 M2 达到可重复日常输入、稳定本地学习和真实数据管理退出标准后，才评估第二平台。候选优先考虑 Linux Fcitx5 或 Android，依据目标用户、维护成本、平台能力和首个平台证据选择；不得同时展开多条真实平台主线。
+第二平台选择已通过 [ADR 0009](adr/0009-second-platform-linux-fcitx5.md) 固定为 Linux Fcitx5。macOS `26.7.1 (38)` 作为冻结参考产品保留；公开发布、Git tag 和真实跨发布升级证据延期，不阻塞 M5 开发。
 
-Windows TSF 与 iOS Keyboard Extension 后置。任何第二平台都必须复用 Rust core、userdb、ranker、sync 和 privacy 边界，平台壳不得复制业务真相源。
+目标：
+
+- 在真实 Linux 桌面和普通应用中完成稳定、离线的中文输入。
+- 证明 Rust input runtime、FFI、userdb、ranker、privacy 和 Manager 没有依赖 macOS 私有生命周期。
+- 使用 Fcitx5 原生 addon 与 input panel，保持平台薄壳。
+- 形成 Linux XDG 数据、并发访问、安装、升级、修复、移除和数据保留边界。
+
+批次：
+
+1. `M5-P01`：固定第二平台决策、Fcitx5 平台边界、XDG 数据语义、验证分层和停止线。
+2. `M5-P02`：实现 C++/CMake addon、Rust FFI 接线、确定性开发构建和自动 contract。
+3. `M5-P03`：完成真实 Wayland 主路径、X11 兼容、常见应用输入、生命周期和隐私验收。
+4. `M5-P04`：完成 Linux Flutter Manager、同库并发、本地学习、删除/恢复、导入导出和 explain 验收。
+5. `M5-P05`：完成安装、升级、修复、默认移除、数据保留和发行载体。
+
+交付：
+
+- `platforms/linux-fcitx5/` 原生 addon，只处理 Fcitx 生命周期、按键、候选面板、commit 和 Rust FFI。
+- 复用 ABI contract、personalized Rime session、owned KeyResult、display-index selection 和 LearningContext。
+- addon、Manager、诊断和安装协调共用的 XDG resolver。
+- Wayland 与 X11 的真实应用输入证据。
+- Linux Manager 与 addon 共用 userdb 的并发、重启和个人化证据。
+- native dependency、RimeData、版本/schema、许可证和产品 metadata 一致性门禁。
+- Linux 安装维护事务与默认保留数据语义。
+
+退出标准：
+
+- Fcitx5 addon 在真实 Wayland 与 X11 主路径稳定完成 composition、候选导航、选择、commit、cancel、reset 和输入法切换。
+- 候选使用 Fcitx5 input panel；C++ addon 不复制 engine、ranker、userdb、privacy 或同步实现。
+- 多 input context 使用独立 session，Rime runtime owner-thread、reset、释放和 shutdown 顺序可复验。
+- addon 与 Manager 使用同一 XDG 产品数据和同一 userdb；并发访问、重启与 migration 不损坏数据。
+- 真实选择可以影响后续候选，用户能查看、导出、删除和恢复，删除不会被旧本地状态复活。
+- password、secure、sensitive 和无法可靠判断的上下文不读取或写入个人化数据。
+- 断网输入、Fcitx 重启、桌面会话重启和常见 GTK/Qt/Electron/浏览器/终端输入通过。
+- 安装、升级、修复、默认程序移除和数据保留具有自动门禁与实机证据。
+- macOS 冻结参考基线与仓库门禁继续通过，真实用户同步继续关闭。
+
+完整运行边界见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)。
+
+## 后续平台与统一发布评审
+
+M5 退出后依次推进 Android `InputMethodService`、Windows TSF 和 iOS Keyboard Extension；不得并行展开多条真实平台主线。每个平台都必须复用 Rust core、userdb、ranker、sync、privacy 和稳定 FFI，平台壳不得复制业务真相源。
+
+当前对外正式发布延期到计划内 macOS、Linux Fcitx5、Android、Windows 与 iOS 均达到各自退出标准之后。届时单独评审平台兼容矩阵、签名/商店/发行身份、跨版本升级、隐私披露和真实用户同步开关；达到平台退出标准不会自动触发公开发布。
 
 ## Future Topic：自研 Rust Engine
 
