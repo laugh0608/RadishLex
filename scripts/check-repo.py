@@ -98,6 +98,8 @@ REQUIRED_FILES = [
     "platforms/macos-product/InstallerBridge/src/tests.rs",
     "platforms/macos-product/InstallerApp/README.md",
     "platforms/macos-product/InstallerApp/Resources/Info.plist.in",
+    "platforms/macos-product/InstallerApp/Sources/RLXInstallerApplicationMenu.h",
+    "platforms/macos-product/InstallerApp/Sources/RLXInstallerApplicationMenu.m",
     "platforms/macos-product/InstallerApp/Sources/RLXInstallerPresentation.h",
     "platforms/macos-product/InstallerApp/Sources/RLXInstallerPresentation.m",
     "platforms/macos-product/InstallerApp/Sources/RLXInstallerBridge.h",

@@ -1,5 +1,6 @@
-#import <Foundation/Foundation.h>
+#import <Cocoa/Cocoa.h>
 
+#import "RLXInstallerApplicationMenu.h"
 #import "RLXInstallerBridge.h"
 #import "RLXInstallerPresentation.h"
 
@@ -33,6 +34,26 @@ static NSDictionary<NSString *, id> *Snapshot(NSString *phase,
 
 int main(void) {
     @autoreleasepool {
+        NSMenu *mainMenu = RLXCreateInstallerMainMenu(@"RadishLex Installer");
+        Require(mainMenu.numberOfItems == 1,
+                @"main menu must expose one standard application menu");
+        NSMenu *applicationMenu = mainMenu.itemArray.firstObject.submenu;
+        Require(applicationMenu != nil, @"application menu must have a submenu");
+        NSMenuItem *quitItem = nil;
+        for (NSMenuItem *item in applicationMenu.itemArray) {
+            if (item.action == @selector(terminate:)) {
+                quitItem = item;
+                break;
+            }
+        }
+        Require(quitItem != nil, @"application menu must expose a Quit action");
+        Require([quitItem.keyEquivalent isEqualToString:@"q"],
+                @"Quit action must use the q key equivalent");
+        Require((quitItem.keyEquivalentModifierMask & NSEventModifierFlagCommand) != 0,
+                @"Quit action must require the Command modifier");
+        Require([quitItem.title isEqualToString:@"退出 RadishLex Installer"],
+                @"Quit action must name the Installer");
+
         RLXInstallerPresentation *bridge = [[RLXInstallerPresentation alloc]
             initWithDriverSnapshot:RLXInstallerBridgeSnapshot()];
         Require(bridge.failedClosed, @"production bridge must fail closed");

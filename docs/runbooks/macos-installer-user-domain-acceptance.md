@@ -139,6 +139,8 @@ Installer 自身只从当前 executable 反推 `Contents/Resources/InstallPayloa
 - Manager 从固定 `~/Applications` 路径启动且不在 App Translocation；InputMethod 从固定 `~/Library/Input Methods` 路径启动。双端 startup gate 均允许，TIS 人工选择成立，公开合成输入 `zhongwen` 正常出现候选并提交“中文”，切回中立输入源后无稳定 failure/rejection 日志。
 - repair 同样先停在 `prepared`，完成后双 bundle 使用新 inode 且 quarantine 为零；Application Support、Rime、userdb、WAL 与 SHM inode 全部保持不变。repair 终态 Manager 再次从固定路径启动，并读取保留的本地数据。
 - 用户在系统设置中手动移除输入源后执行默认程序 remove。终态为 `remove_programs/completed`，双 bundle 不存在，TIS `matches/enabled/selected=0/0/0`，Manager/InputMethod 进程停止；Application Support、Rime、userdb、sidecar、receipt 和两侧各 5 个 operation 目录全部保留。
-- bundle 仍存在时，TIS 只读刷新可能异步拉起 InputMethod；mutation 前必须在 TIS 查询之后再通过真实进程表复验，不能仅沿用状态脚本内部的瞬时 `process=stopped`。Installer 本轮 `⌘Q` 未生效，但关闭窗口后进程确实退出，作为发布前 UX 复核项保留。
+- bundle 仍存在时，TIS 只读刷新可能异步拉起 InputMethod；mutation 前必须在 TIS 查询之后再通过真实进程表复验，不能仅沿用状态脚本内部的瞬时 `process=stopped`。Installer 本轮 `⌘Q` 未生效，但关闭窗口后进程确实退出；该现象是 build 38 生命周期修复与重新验收的来源。
 
 build 37 已完成本 runbook D 与 F.3 的真实用户域证据。当前是默认保留数据的 completed remove 现场，不是空数据基线；数据删除、build 37 operation 清理和历史材料处置仍需另行取得固定白名单与 receipt 绑定授权。不得沿用 build 35/36 的 SHA-256、draft asset 或安装成功断言。
+
+`26.7.1 (38)` 已补标准 Application 菜单和 `⌘Q` Quit action，并完成本地双 bundle、Installer、DMG、载体及完整仓库自动门禁；DMG 大小为 `32196093` bytes，SHA-256 为 `f171e74bdc0a429655a84b30429481bce3926b17076d09298feed77d9ce4ce4e`。它尚未形成独立下载或真实用户域证据，必须重新执行本 runbook C、D 与 F，并额外覆盖 `⌘Q`、关闭窗口和 `prepared` 退出后重启续跑；不得继承 build 37 的对应成功断言。

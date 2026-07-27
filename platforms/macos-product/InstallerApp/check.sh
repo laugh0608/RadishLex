@@ -11,6 +11,8 @@ contract_test="${output_root}/installer-presentation-contract"
 bundle="${output_root}/RadishLex Installer.app"
 bridge_library="${repo_root}/target/release/libradishlex_macos_installer_bridge.a"
 source_files=(
+  "${script_dir}/Sources/RLXInstallerApplicationMenu.h"
+  "${script_dir}/Sources/RLXInstallerApplicationMenu.m"
   "${script_dir}/Sources/RLXInstallerBridge.h"
   "${script_dir}/Sources/RLXInstallerBridge.m"
   "${script_dir}/Sources/RLXInstallerPresentation.h"
@@ -37,11 +39,12 @@ CLANG_MODULE_CACHE_PATH="${module_cache}" clang \
   "-mmacosx-version-min=${minimum_macos}" \
   -I "${script_dir}/Sources" \
   -I "${repo_root}/platforms/macos-product/InstallerBridge/include" \
+  "${script_dir}/Sources/RLXInstallerApplicationMenu.m" \
   "${script_dir}/Sources/RLXInstallerBridge.m" \
   "${script_dir}/Sources/RLXInstallerPresentation.m" \
   "${script_dir}/Tests/presentation_contract.m" \
   "${bridge_library}" \
-  -framework Foundation \
+  -framework Cocoa \
   -framework Security \
   -o "${contract_test}"
 "${contract_test}"
@@ -84,6 +87,7 @@ rg -Fq 'Applications/RadishLex Manager.app' "${script_dir}/Sources/main.m"
 rg -Fq 'Library/Input Methods/RadishLexInputMethod.app' "${script_dir}/Sources/main.m"
 rg -Fq 'Library/Application Support/RadishLex' "${script_dir}/Sources/main.m"
 rg -Fq 'if (argc != 1)' "${script_dir}/Sources/main.m"
+rg -Fq 'applicationShouldTerminateAfterLastWindowClosed' "${script_dir}/Sources/main.m"
 
 set +e
 "${bundle}/Contents/MacOS/RadishLex Installer" --path-is-forbidden >/dev/null 2>&1

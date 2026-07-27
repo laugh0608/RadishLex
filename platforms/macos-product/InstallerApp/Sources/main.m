@@ -1,9 +1,11 @@
 #import <Cocoa/Cocoa.h>
 #include <stdio.h>
 
+#import "RLXInstallerApplicationMenu.h"
 #import "RLXInstallerBridge.h"
 #import "RLXInstallerPresentation.h"
 
+static NSString *const RLXInstallerApplicationName = @"RadishLex Installer";
 static NSString *const RLXManagerTarget = @"Applications/RadishLex Manager.app";
 static NSString *const RLXInputMethodTarget = @"Library/Input Methods/RadishLexInputMethod.app";
 static NSString *const RLXDataRoot = @"Library/Application Support/RadishLex";
@@ -180,6 +182,7 @@ int main(int argc, const char *argv[]) {
         NSApplication *application = NSApplication.sharedApplication;
         RLXInstallerAppDelegate *delegate = [[RLXInstallerAppDelegate alloc] init];
         application.delegate = delegate;
+        application.mainMenu = RLXCreateInstallerMainMenu(RLXInstallerApplicationName);
         [application run];
     }
     return 0;

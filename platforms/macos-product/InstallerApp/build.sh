@@ -56,6 +56,7 @@ CLANG_MODULE_CACHE_PATH="${module_cache}" clang \
   "-mmacosx-version-min=${minimum_macos}" \
   -I "${script_dir}/Sources" \
   -I "${repo_root}/platforms/macos-product/InstallerBridge/include" \
+  "${script_dir}/Sources/RLXInstallerApplicationMenu.m" \
   "${script_dir}/Sources/RLXInstallerBridge.m" \
   "${script_dir}/Sources/RLXInstallerPresentation.m" \
   "${script_dir}/Sources/main.m" \

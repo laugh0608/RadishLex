@@ -4,12 +4,12 @@
 
 ## 发布口径
 
-- 产品版本由仓库根 `version.json` 唯一确定；当前修复候选为 `26.7.1 (37)`，标准 tag 为 `v26.7.1-release`。`26.7.1 (35)` 把 quarantine 传播到最终程序，`26.7.1 (36)` 又无法清除只读 dylib 的 quarantine；二者均失效，不得作为首发 assembly。
+- 产品版本由仓库根 `version.json` 唯一确定；当前修复候选为 `26.7.1 (38)`，标准 tag 为 `v26.7.1-release`。`26.7.1 (35)` 把 quarantine 传播到最终程序，`26.7.1 (36)` 又无法清除只读 dylib 的 quarantine；二者均失效，不得作为首发 assembly。build 37 已完成真实安装证据，但因 Installer 生命周期代码变化不再作为最终发布载体。
 - `ProductManifest.json` format v3 固定 `distribution_identity=community-adhoc-v1`。
 - Installer、Manager 与 InputMethod 使用严格 ad-hoc code signature。该签名用于检测包内意外变化和绑定事务 identity，不提供 Apple 认可的发布者认证。
 - DMG 不签名、不提交公证、不含 ticket。`notarize-macos-release-dmg.sh` 在当前模式必须稳定失败关闭。
 - 对外必须同时发布 DMG 与 `CommunityReleaseEvidence.json`；后者精确绑定版本、文件名、大小、DMG SHA-256 和 sealed release identity SHA-256。
-- 当前冻结候选 `RadishLex-26.7.1-37.dmg` 大小为 `32194418` bytes，SHA-256 为 `c3977796b717f58a191d68755048b316c771a283bb2bfece6d0172db48d20a41`；独立下载副本必须与这两个值同时一致。
+- 当前本地候选 `RadishLex-26.7.1-38.dmg` 大小为 `32196093` bytes，SHA-256 为 `f171e74bdc0a429655a84b30429481bce3926b17076d09298feed77d9ce4ce4e`；独立下载副本必须与这两个值同时一致。该候选尚未上传或完成人工验收，不能称为正式冻结发布。
 
 ## 构建
 
@@ -24,9 +24,9 @@
 首发输出固定在：
 
 ```text
-target/macos-release/26.7.1-37/
+target/macos-release/26.7.1-38/
 ├── RadishLex Installer.app
-├── RadishLex-26.7.1-37.dmg
+├── RadishLex-26.7.1-38.dmg
 ├── CommunityReleaseEvidence.json
 ├── InstallPayload/
 └── Product/
@@ -40,9 +40,9 @@ target/macos-release/26.7.1-37/
 ./scripts/check-macos-release-carrier.sh
 
 python3 scripts/macos-product/community_release.py verify \
-  --carrier "$PWD/target/macos-release/26.7.1-37/RadishLex-26.7.1-37.dmg" \
-  --identity "$PWD/target/macos-release/26.7.1-37/RadishLex Installer.app/Contents/Resources/ReleaseIdentity.json" \
-  --evidence "$PWD/target/macos-release/26.7.1-37/CommunityReleaseEvidence.json"
+  --carrier "$PWD/target/macos-release/26.7.1-38/RadishLex-26.7.1-38.dmg" \
+  --identity "$PWD/target/macos-release/26.7.1-38/RadishLex Installer.app/Contents/Resources/ReleaseIdentity.json" \
+  --evidence "$PWD/target/macos-release/26.7.1-38/CommunityReleaseEvidence.json"
 ```
 
 发布页必须明确写明“未使用 Apple Developer ID、未公证，需要用户手动批准”，并直接列出 DMG SHA-256。不能使用“已签名”“Apple 已验证”“通过 Gatekeeper”或等价表述。
@@ -52,7 +52,7 @@ python3 scripts/macos-product/community_release.py verify \
 用户应先对下载文件执行：
 
 ```bash
-shasum -a 256 "$HOME/Downloads/RadishLex-26.7.1-37.dmg"
+shasum -a 256 "$HOME/Downloads/RadishLex-26.7.1-38.dmg"
 ```
 
 结果必须与发布页及 `CommunityReleaseEvidence.json` 的 `carrier_sha256` 完全一致。随后打开 DMG 并尝试启动 `RadishLex Installer.app`。macOS 阻止启动时，首选系统支持的人工路径：
