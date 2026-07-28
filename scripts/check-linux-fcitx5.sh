@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Keep staged runtime resources non-writable by group or other regardless of
+# the invoking developer account's default umask.
+umask 022
+
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
 platform_dir="${repo_root}/platforms/linux-fcitx5"
