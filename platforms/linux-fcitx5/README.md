@@ -130,4 +130,4 @@ RADISHLEX_IME_FFI_LIBRARY="$PWD/target/release/libradishlex_ime_ffi.so" \
   ./scripts/check-linux-fcitx5.sh --require-fcitx
 ```
 
-`--require-fcitx` 在非 Linux、缺失 CMake、缺失 cdylib 或 Fcitx5 CMake package 时失败，不自动下载依赖、不启动容器、不写系统目录。Docker wrapper 才负责显式建立依赖环境。开发安装、Fcitx 重启、输入法启用和真实应用交互需要单独授权与 M5-P03 runbook。
+`--require-fcitx` 在非 Linux、缺失 CMake、缺失 cdylib 或 Fcitx5 CMake package 时失败，不自动下载依赖、不启动容器、不写系统目录。脚本固定 `umask 022`，避免开发账号的宽松默认 umask 把 group/other writable 权限泄漏进临时 stage；runtime probe 对这类宽权限的拒绝规则不放宽。Docker wrapper 才负责显式建立依赖环境。开发安装、Fcitx 重启、输入法启用和真实应用交互需要单独授权与 M5-P03 runbook。

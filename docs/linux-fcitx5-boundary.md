@@ -189,7 +189,7 @@ M5-P02 的开发构建必须形成可复验依赖图：
 - 开发安装与正式发行载体分开，P02 不把本地复制命令称为产品安装；
 - 发行版包、签名、系统域目标、升级与移除在 M5-P05 单独固定。
 
-当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境编译 projection/XDG/runtime-layout contract；`--require-fcitx` 只在 Linux 且调用方提供既有 native-rime cdylib 时配置、构建并 staged install addon/FFI/RimeData/metadata，检查 ELF 动态依赖、`$ORIGIN`、构建路径泄漏，运行 `dlopen(RTLD_NOW)` probe 与 CTest，不下载依赖、不写系统目录或启用输入法。
+当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境编译 projection/XDG/runtime-layout contract；`--require-fcitx` 只在 Linux 且调用方提供既有 native-rime cdylib 时配置、构建并 staged install addon/FFI/RimeData/metadata，检查 ELF 动态依赖、`$ORIGIN`、构建路径泄漏，运行 `dlopen(RTLD_NOW)` probe 与 CTest，不下载依赖、不写系统目录或启用输入法。脚本以 `umask 022` 固定临时装配权限，不继承开发账号的宽松 umask；runtime validator 仍拒绝任何 group/other writable addon 目录或资源。
 
 `platforms/linux-fcitx5/dev/Dockerfile` 以 digest 固定 Debian 13 ARM64 基础镜像，安装发行版提供的 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 和 librime 1.13.1 development package。`./scripts/build-linux-fcitx5-container.sh` 只读挂载仓库，使用独立 named volume 缓存 Cargo registry/target，构建启用 `native-rime` 的 ARM64 ELF cdylib，再执行 `--require-fcitx` 强门禁。该环境已真实编译、staged install 并以 native loader 打开 `libradishlex_ime_ffi.so` 与 `radishlex.so`，也修正了 Linux ARM64 `c_char` signedness、GCC 14 enum boundary 和 `fcitx::Key` 非 literal type 差异。
 
