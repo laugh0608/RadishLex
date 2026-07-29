@@ -14,7 +14,7 @@ M5-P02 已经建立真实 C++ 源码、CMake target、addon/input method metadat
 - `radishlex_runtime_probe` 在相同 Linux 环境先校验装配文件、symlink 和权限，再对 staged `radishlex.so` 执行 `dlopen(RTLD_NOW)`；
 - CTest 在相同 Linux 环境复验 FFI projection、XDG resolver 与 runtime layout contract。
 
-以上自动结果只证明 Linux ARM64 编译、装配和 headless native loader。2026-07-29 的 M5-P03 实机批次另已在 Debian 13 ARM64 GNOME/Wayland 中完成用户级开发装配，并取得 GTK4 文本编辑器、终端、Firefox、切换/重启、unknown/password 与进程级离线的首轮人工证据；这仍不证明完整 Wayland 矩阵、X11 或发行安装。实时状态和剩余停止线见 [`docs/status/current.md`](../../docs/status/current.md)，详细流水见本周周志。
+以上自动结果只证明 Linux ARM64 编译、装配和 headless native loader。2026-07-29 的 M5-P03 实机批次另已在 Debian 13 ARM64 GNOME/Wayland 中完成用户级开发装配，并取得 GTK4 文本编辑器、终端、Firefox、Qt6/FeatherPad、候选交互、切换/重启、unknown/password 与进程级离线的人工证据；这仍不证明 Electron、Sensitive、桌面会话重启、整机断网、X11 或发行安装。实时状态和剩余停止线见 [`docs/status/current.md`](../../docs/status/current.md)，详细流水见本周周志。
 
 ## 组件结构
 
@@ -57,7 +57,7 @@ tools/
 - `radishlex_session_select_candidate`：只接受 Rust display index；
 - `radishlex_session_reset`、`radishlex_session_free` 与 `radishlex_rime_runtime_shutdown`：形成确定生命周期。
 
-本批没有扩展 ABI。snapshot 不输出 Fcitx 私有对象或 UI cursor。Fcitx candidate list 维护当前可见 cursor；数字键、Space 和鼠标选择最终都调用同一个 display-index selection，PageUp/PageDown 仍作为稳定 named key 交给 Rust engine 后重建 candidate list。这避免在 C++ 中推断 engine index 或复制 Rime highlight 逻辑。
+本批没有扩展 ABI。snapshot 不输出 Fcitx 私有对象或候选 UI cursor。Fcitx candidate list 维护当前可见 cursor；数字键、Space 和鼠标选择最终都调用同一个 display-index selection，PageUp/PageDown 仍作为稳定 named key 交给 Rust engine 后重建 candidate list。这避免在 C++ 中推断 engine index 或复制 Rime highlight 逻辑。client preedit 只投影同一 snapshot 的 composition 与 UTF-8 字节 cursor，并携带 Fcitx `DontCommit`，避免 input context 失焦时提交未完成的原始拼音。
 
 尚未进入共享 ABI 的 Linux 产品能力：
 

@@ -4,7 +4,7 @@
 
 ## 状态与产品范围
 
-状态：M5-P02 开发构建批次已完成，当前推进 M5-P03 真实桌面输入与隐私验收。平台无关 C++ contract、Debian 13 ARM64 编译、staged 开发装配与 headless native loader 已通过；真实 Fcitx daemon 与 Wayland 首轮 GTK/终端/浏览器输入、切换/重启、unknown/password 和进程级离线证据已取得。完整 Wayland 交互矩阵、Sensitive、Qt/Electron、桌面会话重启、整机断网与 X11 兼容仍待验证。
+状态：M5-P02 开发构建批次已完成，当前推进 M5-P03 真实桌面输入与隐私验收。平台无关 C++ contract、Debian 13 ARM64 编译、staged 开发装配与 headless native loader 已通过；真实 Fcitx daemon 与 Wayland GTK/终端/浏览器/Qt6 输入、候选交互、切换/重启、unknown/password 和进程级离线证据已取得。Electron、Sensitive、桌面会话重启、整机断网与 X11 兼容仍待验证。
 
 M5 要证明 Linux 平台能够复用现有产品核心完成：
 
@@ -101,7 +101,7 @@ addon 必须按 `docs/ffi-boundary.md` 的稳定模型形成字符键、named ke
 - Space、Enter、Backspace、Escape、Tab、方向键和 PageUp/PageDown 映射到稳定 named key；
 - Shift、Control、Alt、Meta 只使用 ABI 已知 bit；
 - 未知 key、未知 modifier、无有效文本的快捷键和平台保留组合不得猜测为普通字符；
-- release 是否送入 runtime 由明确 contract 决定，不能和 press 重复提交；
+- release 是否送入 runtime 由明确 contract 决定；addon 或 Rust 已接受的 press 只配对消费同 key release，未匹配 release 保持原路径，reset/deactivate 清除配对状态；
 - `consumed = 0` 时把原始事件交还 Fcitx/宿主应用；
 - `consumed = 1` 时不得让同一事件再次进入应用；
 - `commit_present = 1` 时只提交同一次结果携带的 UTF-8 commit。
@@ -112,7 +112,8 @@ FFI status、结构版本、UTF-8 或 snapshot 校验失败时，addon 清除不
 
 Fcitx5 input panel 是候选展示真相，Rust snapshot 是候选内容与排序真相：
 
-- preedit 来自 snapshot composition；
+- preedit text 与 cursor 来自同一 snapshot；cursor 必须是可由 Fcitx 表达的 UTF-8 字节边界，非法位置失败关闭；
+- preedit 使用 Fcitx `DontCommit`，防止 input context 失焦时把未完成 composition 当作原始文本提交；
 - candidate 的 text、reading、comment 和排序来自 Rust snapshot，不从 Rime 私有对象补字段；
 - 当前页和 highlight 使用 Fcitx5 candidate list 能力；
 - 选择只把 Rust display index 传给 `radishlex_session_select_candidate`；
