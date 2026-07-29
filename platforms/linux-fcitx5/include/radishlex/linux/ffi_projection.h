@@ -30,6 +30,12 @@ struct SnapshotProjection {
   std::uint32_t personalization_status;
 };
 
+struct ClientPreeditProjection {
+  std::string text;
+  int cursor;
+  bool prevent_commit_on_unfocus;
+};
+
 struct KeyResultProjection {
   bool consumed;
   std::optional<std::string> commit;
@@ -64,6 +70,9 @@ class ProjectionError final : public std::runtime_error {
  private:
   RadishLexStatusCode status_;
 };
+
+ClientPreeditProjection projectClientPreedit(
+    const SnapshotProjection &snapshot);
 
 struct FfiApi {
   RadishLexStatusCode (*ffi_contract)(RadishLexFfiContract *,

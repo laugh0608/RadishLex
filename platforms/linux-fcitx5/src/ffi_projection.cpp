@@ -219,6 +219,21 @@ ProjectionError::ProjectionError(RadishLexStatusCode status,
 
 RadishLexStatusCode ProjectionError::status() const noexcept { return status_; }
 
+ClientPreeditProjection projectClientPreedit(
+    const SnapshotProjection &snapshot) {
+  if (!isUtf8Boundary(snapshot.preedit, snapshot.cursor) ||
+      snapshot.cursor >
+          static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+    throw ProjectionError(RADISHLEX_STATUS_INVALID_STATE,
+                          "client preedit cursor is invalid");
+  }
+  return ClientPreeditProjection{
+      snapshot.preedit,
+      static_cast<int>(snapshot.cursor),
+      true,
+  };
+}
+
 void validateFfiContract(const FfiApi &api) {
   RadishLexFfiContract contract{};
   OwnedError error(api);

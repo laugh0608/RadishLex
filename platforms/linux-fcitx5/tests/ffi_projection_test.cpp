@@ -408,6 +408,39 @@ void testConsumedPressLifecycle() {
           "reset or deactivate must clear consumed press state");
 }
 
+void testClientPreeditProjection() {
+  radishlex::linux_platform::SnapshotProjection snapshot{
+      "radishlex_pinyin",
+      "ceshi",
+      5,
+      {},
+      RADISHLEX_PERSONALIZATION_STATUS_READY,
+  };
+  const auto projected =
+      radishlex::linux_platform::projectClientPreedit(snapshot);
+  require(projected.text == "ceshi",
+          "client preedit text must match the Rust snapshot");
+  require(projected.cursor == 5,
+          "client preedit cursor must preserve the UTF-8 byte offset");
+  require(projected.prevent_commit_on_unfocus,
+          "raw composition must not commit when the context loses focus");
+
+  snapshot.preedit = "测a";
+  snapshot.cursor = snapshot.preedit.size();
+  require(radishlex::linux_platform::projectClientPreedit(snapshot).cursor == 4,
+          "multibyte client preedit cursor must remain a byte offset");
+
+  snapshot.cursor = 1;
+  bool rejected_cursor = false;
+  try {
+    (void)radishlex::linux_platform::projectClientPreedit(snapshot);
+  } catch (const ProjectionError &error) {
+    rejected_cursor = error.status() == RADISHLEX_STATUS_INVALID_STATE;
+  }
+  require(rejected_cursor,
+          "client preedit must reject a cursor inside a UTF-8 codepoint");
+}
+
 void testSessionProjection() {
   runtime = FakeRuntime{};
   const FfiApi api = fakeApi();
@@ -517,6 +550,7 @@ void testSessionProjection() {
 int main() {
   testKeyProjection();
   testConsumedPressLifecycle();
+  testClientPreeditProjection();
   testSessionProjection();
   std::cout << "Linux FFI projection contract passed.\n";
   return 0;

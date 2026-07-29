@@ -19,6 +19,7 @@ namespace radishlex::linux_fcitx5 {
 namespace {
 
 using radishlex::linux_platform::CandidateProjection;
+using radishlex::linux_platform::ClientPreeditProjection;
 using radishlex::linux_platform::KeyResultProjection;
 using radishlex::linux_platform::LearningContextProjection;
 using radishlex::linux_platform::PlatformKeyInput;
@@ -287,10 +288,18 @@ void InputContextState::updateInputPanel(const SnapshotProjection &snapshot) {
   if (!snapshot.candidates.empty()) {
     panel.setCandidateList(candidateList(*this, snapshot));
   }
+  const ClientPreeditProjection projected_preedit =
+      radishlex::linux_platform::projectClientPreedit(snapshot);
+  fcitx::Text preedit(
+      projected_preedit.text,
+      projected_preedit.prevent_commit_on_unfocus
+          ? fcitx::TextFormatFlag::DontCommit
+          : fcitx::TextFormatFlag::NoFlag);
+  preedit.setCursor(projected_preedit.cursor);
   if (input_context_.capabilityFlags().test(fcitx::CapabilityFlag::Preedit)) {
-    panel.setClientPreedit(fcitx::Text(snapshot.preedit));
+    panel.setClientPreedit(preedit);
   } else {
-    panel.setPreedit(fcitx::Text(snapshot.preedit));
+    panel.setPreedit(preedit);
   }
   input_context_.updateUserInterface(
       fcitx::UserInterfaceComponent::InputPanel);
