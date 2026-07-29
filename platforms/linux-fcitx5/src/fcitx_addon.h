@@ -11,6 +11,7 @@
 #include <memory>
 
 #include "radishlex/linux/ffi_projection.h"
+#include "radishlex/linux/key_projection.h"
 #include "radishlex/linux/runtime_layout.h"
 #include "radishlex/linux/xdg_paths.h"
 
@@ -35,12 +36,14 @@ class InputContextState final : public fcitx::InputContextProperty {
       const radishlex::linux_platform::SnapshotProjection &snapshot);
   bool moveVisibleCursor(bool next);
   bool selectVisibleCursor();
+  void acceptKeyEvent(fcitx::KeyEvent &event);
   void clearInputPanel();
   void handleProjectionFailure(bool had_composition, fcitx::KeyEvent *event);
 
   Engine &engine_;
   fcitx::InputContext &input_context_;
   std::unique_ptr<radishlex::linux_platform::SessionProjection> session_;
+  radishlex::linux_platform::ConsumedPressTracker consumed_presses_;
 };
 
 class Engine final : public fcitx::InputMethodEngineV2 {

@@ -21,7 +21,7 @@ macOS 主机现通过固定 digest 的 Debian 13 ARM64 Docker 开发环境复验
 
 M5-P03 已建立可持续复验的 UTM Debian 13.6 ARM64 GNOME/Wayland 桌面基线，并在真实 guest 完成 native FFI/addon 构建、staged loader 与 3 项 CTest。经授权安装最小 Fcitx5/GTK runtime、从 IBus 切换到 Fcitx5，并形成不写 `/usr` 的用户级开发装配；daemon 经持久 `FCITX_ADDON_DIRS` 加载 addon、sibling FFI 与锁定 RimeData，产品 XDG 目录/文件保持 `0700`/`0600`。
 
-Wayland 首轮人工验收已覆盖 GNOME Text Editor、GNOME Terminal 和 Firefox 的 composition、框架候选、Space commit、输入法切换、Fcitx 重启与 context 重连。unknown、terminal 和真实 password field 后的 userdb v9 学习聚合均为零；password 路由只使用 `keyboard-us` 且无候选。仅允许 `AF_UNIX/AF_NETLINK` 的进程级离线态仍可输入，随后已恢复普通进程。X11、Qt/Electron、Sensitive、完整候选交互、桌面会话重启与整机断网仍待验证；详细版本和流水见本周周志。
+Wayland 首轮人工验收已覆盖 GNOME Text Editor、GNOME Terminal 和 Firefox 的 composition、框架候选、Space commit、输入法切换、Fcitx 重启与 context 重连。候选专项已修复 addon 接受 press 后仍把配对 release 送入 Rust、导致旧 snapshot 重建并重置可见 cursor 的生命周期缺口；Down+Space、数字选择和默认 Space 提交均经用户实体按键复验通过。unknown、terminal 和真实 password field 后的 userdb v9 学习聚合均为零；password 路由只使用 `keyboard-us` 且无候选。仅允许 `AF_UNIX/AF_NETLINK` 的进程级离线态仍可输入，随后已恢复普通进程。X11、Qt/Electron、Sensitive、翻页/鼠标选择、cancel/reset、桌面会话重启与整台 guest 断网仍待验证；详细版本和流水见本周周志。
 
 ## macOS 冻结基线
 
@@ -93,7 +93,7 @@ build 37 的 first install 与 repair 均先到 `prepared` 静止边界，再完
 
 1. M5-P01 已固定 [第二平台 ADR](../adr/0009-second-platform-linux-fcitx5.md)、[Linux Fcitx5 平台边界](../linux-fcitx5-boundary.md)、路线图、架构职责、XDG 数据语义、验证分层和停止线，并通过文档与完整仓库门禁。
 2. M5-P02 已完成 ABI v9 审计、C++/CMake addon、owner-thread/session、Fcitx input panel、共享 XDG resolver、平台无关 contract，以及 Debian 13 ARM64 的 native-rime cdylib、addon-relative staged 装配和 native loader 基线；真实桌面基线已在 P03 建立。
-3. M5-P03 已完成最小 Fcitx5 runtime、用户级开发装配和 Wayland 首轮真实输入/切换/重启/unknown/password/进程级离线证据。下一步补齐候选导航、翻页、数字/鼠标选择、cancel/reset、Qt/Electron、Sensitive capability、桌面会话重启与整台 guest 断网；Wayland 矩阵稳定后再进入 X11 兼容路径。
+3. M5-P03 已完成最小 Fcitx5 runtime、用户级开发装配、Wayland 首轮真实输入/切换/重启/unknown/password/进程级离线，以及 Down+Space、数字选择和默认 Space 提交证据。下一步补齐翻页/鼠标选择、cancel/reset、Qt/Electron、Sensitive capability、桌面会话重启与整台 guest 断网；Wayland 矩阵稳定后再进入 X11 兼容路径。
 4. M5-P04/P05 依次推进 Linux Manager 同库个人化与 Linux 安装、升级、修复、移除、数据保留；不提前并行 Android IME。
 
 ## 验证入口

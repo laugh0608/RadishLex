@@ -186,24 +186,32 @@ InputContextState::~InputContextState() {
 }
 
 void InputContextState::handleKey(fcitx::KeyEvent &event) {
+  const std::uint32_t key_symbol =
+      static_cast<std::uint32_t>(event.key().sym());
+  if (event.isRelease() &&
+      consumed_presses_.consumeRelease(key_symbol)) {
+    acceptKeyEvent(event);
+    return;
+  }
+
   if (!event.isRelease()) {
     const fcitx::Key key = event.key();
     const auto list = input_context_.inputPanel().candidateList();
     if (list && key.states().toInteger() == 0) {
       const int digit = key.digitSelection();
       if (digit >= 0 && digit < list->size()) {
-        event.filterAndAccept();
+        acceptKeyEvent(event);
         list->candidate(digit).select(&input_context_);
         return;
       }
       if (key.check(FcitxKey_Up) || key.check(FcitxKey_Down)) {
         if (moveVisibleCursor(key.check(FcitxKey_Down))) {
-          event.filterAndAccept();
+          acceptKeyEvent(event);
           return;
         }
       }
       if (key.check(FcitxKey_space) && selectVisibleCursor()) {
-        event.filterAndAccept();
+        acceptKeyEvent(event);
         return;
       }
     }
@@ -219,7 +227,7 @@ void InputContextState::handleKey(fcitx::KeyEvent &event) {
         session_->handleKeyEvent(*normalized, learningContext());
     applyResult(result);
     if (result.consumed) {
-      event.filterAndAccept();
+      acceptKeyEvent(event);
     }
   } catch (const ProjectionError &error) {
     FCITX_ERROR() << "radishlex_key_projection_failed status="
@@ -240,6 +248,7 @@ void InputContextState::selectCandidate(std::size_t display_index) {
 }
 
 void InputContextState::reset() {
+  consumed_presses_.clear();
   try {
     session_->reset();
   } catch (const ProjectionError &error) {
@@ -320,6 +329,14 @@ bool InputContextState::selectVisibleCursor() {
   return true;
 }
 
+void InputContextState::acceptKeyEvent(fcitx::KeyEvent &event) {
+  if (!event.isRelease()) {
+    consumed_presses_.recordPress(
+        static_cast<std::uint32_t>(event.key().sym()));
+  }
+  event.filterAndAccept();
+}
+
 void InputContextState::clearInputPanel() {
   input_context_.inputPanel().reset();
   input_context_.updateUserInterface(
@@ -329,6 +346,7 @@ void InputContextState::clearInputPanel() {
 
 void InputContextState::handleProjectionFailure(bool had_composition,
                                                 fcitx::KeyEvent *event) {
+  consumed_presses_.clear();
   try {
     session_->reset();
   } catch (const ProjectionError &error) {
@@ -337,7 +355,7 @@ void InputContextState::handleProjectionFailure(bool had_composition,
   }
   clearInputPanel();
   if (had_composition && event != nullptr) {
-    event->filterAndAccept();
+    acceptKeyEvent(*event);
   }
 }
 

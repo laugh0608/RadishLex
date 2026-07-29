@@ -9,6 +9,7 @@
 
 namespace {
 
+using radishlex::linux_platform::ConsumedPressTracker;
 using radishlex::linux_platform::FfiApi;
 using radishlex::linux_platform::LearningContextProjection;
 using radishlex::linux_platform::PersonalizedSessionConfig;
@@ -372,6 +373,41 @@ void testKeyProjection() {
           "platform-reserved key must pass through");
 }
 
+void testConsumedPressLifecycle() {
+  constexpr std::uint32_t kArrowDown = 0xff54U;
+  constexpr std::uint32_t kArrowUp = 0xff52U;
+  constexpr std::uint32_t kDigitTwo = 0x32U;
+  constexpr std::uint32_t kSpace = 0x20U;
+  ConsumedPressTracker tracker;
+
+  tracker.recordPress(kArrowDown);
+  require(!tracker.consumeRelease(kArrowUp),
+          "Up release must not match a consumed Down press");
+  require(tracker.consumeRelease(kArrowDown),
+          "Down release must match its consumed navigation press");
+  require(!tracker.consumeRelease(kArrowDown),
+          "a matched Down release must be removed");
+
+  tracker.recordPress(kArrowUp);
+  require(tracker.consumeRelease(kArrowUp),
+          "Up release must match its consumed navigation press");
+
+  tracker.recordPress(kDigitTwo);
+  require(tracker.consumeRelease(kDigitTwo),
+          "digit selection release must match its consumed press");
+
+  tracker.recordPress(kSpace);
+  require(tracker.consumeRelease(kSpace),
+          "Space commit release must match its consumed press");
+
+  tracker.recordPress(kArrowDown);
+  tracker.recordPress(kDigitTwo);
+  tracker.clear();
+  require(!tracker.consumeRelease(kArrowDown) &&
+              !tracker.consumeRelease(kDigitTwo),
+          "reset or deactivate must clear consumed press state");
+}
+
 void testSessionProjection() {
   runtime = FakeRuntime{};
   const FfiApi api = fakeApi();
@@ -480,6 +516,7 @@ void testSessionProjection() {
 
 int main() {
   testKeyProjection();
+  testConsumedPressLifecycle();
   testSessionProjection();
   std::cout << "Linux FFI projection contract passed.\n";
   return 0;

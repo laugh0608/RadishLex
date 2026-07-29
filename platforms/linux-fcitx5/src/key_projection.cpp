@@ -52,6 +52,16 @@ std::uint32_t namedKeyCode(PlatformNamedKey key) {
 
 }  // namespace
 
+void ConsumedPressTracker::recordPress(std::uint32_t key_symbol) {
+  pressed_key_symbols_.insert(key_symbol);
+}
+
+bool ConsumedPressTracker::consumeRelease(std::uint32_t key_symbol) {
+  return pressed_key_symbols_.erase(key_symbol) != 0;
+}
+
+void ConsumedPressTracker::clear() { pressed_key_symbols_.clear(); }
+
 std::optional<RadishLexKeyEvent> projectKeyEvent(
     const PlatformKeyInput &input) {
   if (input.platform_reserved || (input.modifiers & ~kAllModifiers) != 0) {
