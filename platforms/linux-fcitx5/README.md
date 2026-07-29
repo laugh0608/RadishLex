@@ -14,7 +14,7 @@ M5-P02 已经建立真实 C++ 源码、CMake target、addon/input method metadat
 - `radishlex_runtime_probe` 在相同 Linux 环境先校验装配文件、symlink 和权限，再对 staged `radishlex.so` 执行 `dlopen(RTLD_NOW)`；
 - CTest 在相同 Linux 环境复验 FFI projection、XDG resolver 与 runtime layout contract。
 
-这些结果是 Linux ARM64 编译、装配和 headless native loader 证据，不是 Fcitx5 daemon 或桌面运行证据，也不证明 Wayland、X11、真实应用输入或发行安装。
+以上自动结果只证明 Linux ARM64 编译、装配和 headless native loader。2026-07-29 的 M5-P03 实机批次另已在 Debian 13 ARM64 GNOME/Wayland 中完成用户级开发装配，并取得 GTK4 文本编辑器、终端、Firefox、切换/重启、unknown/password 与进程级离线的首轮人工证据；这仍不证明完整 Wayland 矩阵、X11 或发行安装。实时状态和剩余停止线见 [`docs/status/current.md`](../../docs/status/current.md)，详细流水见本周周志。
 
 ## 组件结构
 

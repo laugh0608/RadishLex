@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核日期：2026-07-28（Asia/Shanghai）
+- 复核日期：2026-07-29（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品
 - 当前主批次：M5-P03 真实 Linux 桌面输入与隐私验收
@@ -19,7 +19,9 @@ ABI 审计确认 personalized Rime session、`LearningContext`、同事件 snaps
 
 macOS 主机现通过固定 digest 的 Debian 13 ARM64 Docker 开发环境复验 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 与 librime 1.13.1。启用 `native-rime` 的共享 FFI 和 `radishlex.so` 均完成 ARM64 ELF 编译；CMake staged install 形成 addon、sibling FFI、锁定 RimeData 与 metadata 的开发装配，`$ORIGIN`、构建路径泄漏、资源权限/symlink、`dlopen(RTLD_NOW)` 和三项 CTest 通过。真实 Linux headers 同时暴露并修正了 Rime `c_char` signedness、GCC 14 enum boundary 和 `fcitx::Key` 非 literal type 差异。该证据只证明 Linux 编译、装配与 headless loader，不证明 Fcitx daemon、Wayland/X11、真实应用输入或系统安装。普通非 terminal context 暂以 `context_known = 0` 失败关闭个人化；Linux Manager privacy 配置、真实桌面输入和安装维护分别留在 P04、P03 与 P05。
 
-M5-P03 已建立可持续复验的 UTM Debian 13.6 ARM64 GNOME/Wayland 桌面基线：4 核、4 GiB 内存、50 GiB 磁盘，宿主仓库只读共享，guest 内保留独立可写 `dev` 工作副本。真实 guest 以 Rust/Cargo 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 和 librime 1.13.1 完成 `native-rime` release FFI、Fcitx5 addon staged install、ARM64 loader probe 与 3 项 CTest。首次门禁暴露默认 `umask=0002` 会生成 group-writable stage；验证脚本现固定 `umask 022`，安全探针不放宽，修复后在原默认用户环境无额外前缀通过。桌面当前仍由 IBus 提供输入框架，`fcitx5` runtime、GTK frontend 和 `fcitx5-diagnose` 尚未安装；VM 已正常关机。该进展仍未安装或启用 addon，也未运行 Fcitx daemon、应用 input context、Wayland 输入或 X11 兼容验收。
+M5-P03 已建立可持续复验的 UTM Debian 13.6 ARM64 GNOME/Wayland 桌面基线，并在真实 guest 完成 native FFI/addon 构建、staged loader 与 3 项 CTest。经授权安装最小 Fcitx5/GTK runtime、从 IBus 切换到 Fcitx5，并形成不写 `/usr` 的用户级开发装配；daemon 经持久 `FCITX_ADDON_DIRS` 加载 addon、sibling FFI 与锁定 RimeData，产品 XDG 目录/文件保持 `0700`/`0600`。
+
+Wayland 首轮人工验收已覆盖 GNOME Text Editor、GNOME Terminal 和 Firefox 的 composition、框架候选、Space commit、输入法切换、Fcitx 重启与 context 重连。unknown、terminal 和真实 password field 后的 userdb v9 学习聚合均为零；password 路由只使用 `keyboard-us` 且无候选。仅允许 `AF_UNIX/AF_NETLINK` 的进程级离线态仍可输入，随后已恢复普通进程。X11、Qt/Electron、Sensitive、完整候选交互、桌面会话重启与整机断网仍待验证；详细版本和流水见本周周志。
 
 ## macOS 冻结基线
 
@@ -91,7 +93,7 @@ build 37 的 first install 与 repair 均先到 `prepared` 静止边界，再完
 
 1. M5-P01 已固定 [第二平台 ADR](../adr/0009-second-platform-linux-fcitx5.md)、[Linux Fcitx5 平台边界](../linux-fcitx5-boundary.md)、路线图、架构职责、XDG 数据语义、验证分层和停止线，并通过文档与完整仓库门禁。
 2. M5-P02 已完成 ABI v9 审计、C++/CMake addon、owner-thread/session、Fcitx input panel、共享 XDG resolver、平台无关 contract，以及 Debian 13 ARM64 的 native-rime cdylib、addon-relative staged 装配和 native loader 基线；真实桌面基线已在 P03 建立。
-3. M5-P03 已建立 Debian 13.6 ARM64 GNOME/Wayland 可写开发基线并通过真实 guest staged loader 门禁；下一步经授权安装最小 Fcitx5 runtime/GTK frontend、把当前用户输入框架从 IBus 切换到 Fcitx5 并重新登录，再使用 `fcitx5-diagnose` 固定开发加载路径。之后完成 Wayland 主路径、X11 兼容、常见应用输入、切换/重启、断网和 secure/unknown 上下文验收。
+3. M5-P03 已完成最小 Fcitx5 runtime、用户级开发装配和 Wayland 首轮真实输入/切换/重启/unknown/password/进程级离线证据。下一步补齐候选导航、翻页、数字/鼠标选择、cancel/reset、Qt/Electron、Sensitive capability、桌面会话重启与整台 guest 断网；Wayland 矩阵稳定后再进入 X11 兼容路径。
 4. M5-P04/P05 依次推进 Linux Manager 同库个人化与 Linux 安装、升级、修复、移除、数据保留；不提前并行 Android IME。
 
 ## 验证入口

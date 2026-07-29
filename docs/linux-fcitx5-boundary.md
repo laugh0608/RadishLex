@@ -4,7 +4,7 @@
 
 ## 状态与产品范围
 
-状态：M5-P02 开发构建批次已完成，当前进入 M5-P03 真实桌面输入与隐私验收。平台无关 C++ contract、Debian 13 ARM64 编译、staged 开发装配与 headless native loader 已通过；真实 Fcitx daemon、Wayland/X11 和应用输入尚未验证。
+状态：M5-P02 开发构建批次已完成，当前推进 M5-P03 真实桌面输入与隐私验收。平台无关 C++ contract、Debian 13 ARM64 编译、staged 开发装配与 headless native loader 已通过；真实 Fcitx daemon 与 Wayland 首轮 GTK/终端/浏览器输入、切换/重启、unknown/password 和进程级离线证据已取得。完整 Wayland 交互矩阵、Sensitive、Qt/Electron、桌面会话重启、整机断网与 X11 兼容仍待验证。
 
 M5 要证明 Linux 平台能够复用现有产品核心完成：
 
