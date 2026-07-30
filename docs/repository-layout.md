@@ -122,7 +122,7 @@ RadishLex/
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
 | 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
 | Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁；M4 外层 install gate、数据 gate 与升级 validation helper | 真实用户同步入口与首版后的目标部署证据 |
-| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；build 38 双 bundle、locked RimeData、数据/安装 gate、Installer、社区 ad-hoc identity、DMG evidence、首次安装/输入/修复/默认移除实机证据；Linux Fcitx5 C++/CMake addon、ABI/XDG/runtime-layout contract、Debian 13 ARM64 staged 装配与 headless loader 基线；Android Keystore 能力验证桥 | macOS 真实跨发布升级；Linux Fcitx5 Wayland/X11 输入、Manager、安装维护；完整 Android IME、Windows TSF 与 iOS Keyboard Extension |
+| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；build 38 双 bundle、locked RimeData、数据/安装 gate、Installer、社区 ad-hoc identity、DMG evidence、首次安装/输入/修复/默认移除实机证据；Linux Fcitx5 C++/CMake addon、ABI/XDG/runtime-layout contract、Debian 13 ARM64 staged 装配/headless loader 与 Wayland/X11 输入/隐私实机证据；Android Keystore 能力验证桥 | macOS 真实跨发布升级；Linux Manager 与安装维护；完整 Android IME、Windows TSF 与 iOS Keyboard Extension |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
 
@@ -378,7 +378,7 @@ R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-
 
 平台目录按主线顺序创建：
 
-1. `platforms/linux-fcitx5/`：M5-P02 addon、共享 FFI 与开发构建已完成，当前推进 M5-P03 真实桌面输入与隐私验收。
+1. `platforms/linux-fcitx5/`：M5-P02 addon、共享 FFI 与开发构建及 M5-P03 真实桌面输入/隐私验收已完成，当前推进 M5-P04 Linux Manager 与同库个人化。
 2. `platforms/android-ime/`：在现有 keystore bridge 之外补完整 IME。
 3. `platforms/windows-tsf/`。
 4. `platforms/ios-keyboard/`。

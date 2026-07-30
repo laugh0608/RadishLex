@@ -4,7 +4,9 @@
 
 ## 状态与产品范围
 
-状态：M5-P02 开发构建批次已完成，当前推进 M5-P03 真实桌面输入与隐私验收。平台无关 C++ contract、Debian 13 ARM64 编译、staged 开发装配与 headless native loader 已通过；真实 Fcitx daemon 与 Wayland GTK/终端/浏览器/Qt6 输入、候选交互、切换/重启、unknown/password 和进程级离线证据已取得。Electron、Sensitive、桌面会话重启、整机断网与 X11 兼容仍待验证。
+状态：M5-P01/P02/P03 已完成，当前推进 M5-P04 Linux Manager、同库个人化与本地管理验收。平台无关 C++ contract、Debian 13 ARM64 编译、staged 开发装配、headless native loader，以及真实 Fcitx daemon 的 Wayland/X11 输入均已通过。
+
+P03 实机证据覆盖 GTK、Qt、Electron、浏览器和终端，包含完整候选交互、焦点/输入法切换、Fcitx/桌面会话重启、进程级地址族限制与整台 guest 断网。password、terminal、unknown 与 Qt `Sensitive` 后的 userdb 聚合保持全零；当前 GTK4 frontend 未把 `PRIVATE` 传播为 Fcitx `Sensitive`，因此依赖既有 unknown 失败关闭而非虚构 capability。Qt backend 只以 QPA、会话类型和 input-context plugin 的组合证据判定，不能因进程映射 `libQt6WaylandClient` 就声明原生 Wayland。快速 X11→Wayland 登录暴露的 `im-launch` 跳过 daemon 问题已用 Debian 官方 desktop entry 的用户级 autostart 副本闭合；该开发设置不替代 P05 产品安装与维护设计。
 
 M5 要证明 Linux 平台能够复用现有产品核心完成：
 
@@ -216,7 +218,7 @@ M5-P02 至少覆盖：
 
 ### 真实平台
 
-M5-P03/P04 至少覆盖：
+M5-P03 已覆盖：
 
 - 一套可持续复验的 Linux 桌面和 Fcitx5 版本；
 - Wayland 主路径与 X11 兼容路径；
@@ -225,6 +227,9 @@ M5-P03/P04 至少覆盖：
 - 应用切换、input method 切换、Fcitx 重启和桌面会话重启；
 - 断网输入；
 - password/secure/unknown 上下文不学习；
+
+M5-P04 继续覆盖：
+
 - Manager 与 addon 并发读取、写入、删除、恢复及重启保持；
 - 合成词学习后排序变化、删除不复活和 explain 一致；
 - 不含真实输入历史的脱敏诊断。
@@ -245,9 +250,9 @@ M5-P03/P04 至少覆盖：
 
 ## 当前停止线
 
-- P01 只冻结设计，不创建占位平台目录或宣称 Linux 已实现。
-- P02 先完成 addon/FFI/build contract，不提前并行做 Android IME。
-- 不把 Docker 编译通过写成 Fcitx5 桌面或平台验收。
+- P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
+- P04 先固定 Linux Manager host、共享 XDG/userdb、并发与隐私验收矩阵，再进入实现。
+- 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。
 - 不把同步、云端候选或远端配置引入输入热路径。

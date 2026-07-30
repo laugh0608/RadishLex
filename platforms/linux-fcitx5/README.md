@@ -1,6 +1,6 @@
 # RadishLex Fcitx5 addon
 
-本文说明 Linux Fcitx5 addon 的职责、开发构建、XDG 数据路径和验证入口，读者是平台壳、Rust FFI 与未来 Linux Manager host 的维护者。本文不包含发行版安装、系统输入法启用、真实桌面验收或 Linux 产品升级；这些分别属于 M5-P03 与 M5-P05。
+本文说明 Linux Fcitx5 addon 的职责、开发构建、XDG 数据路径和验证入口，读者是平台壳、Rust FFI 与 Linux Manager host 的维护者。本文不包含发行版安装步骤、系统输入法启用操作、逐日桌面验收流水或 Linux 产品升级；实时阶段见当前状态，详细证据见本周周志。
 
 ## 当前证据
 
@@ -14,7 +14,7 @@ M5-P02 已经建立真实 C++ 源码、CMake target、addon/input method metadat
 - `radishlex_runtime_probe` 在相同 Linux 环境先校验装配文件、symlink 和权限，再对 staged `radishlex.so` 执行 `dlopen(RTLD_NOW)`；
 - CTest 在相同 Linux 环境复验 FFI projection、XDG resolver 与 runtime layout contract。
 
-以上自动结果只证明 Linux ARM64 编译、装配和 headless native loader。2026-07-29 的 M5-P03 实机批次另已在 Debian 13 ARM64 GNOME/Wayland 中完成用户级开发装配，并取得 GTK4 文本编辑器、终端、Firefox、Qt6/FeatherPad、候选交互、切换/重启、unknown/password 与进程级离线的人工证据；这仍不证明 Electron、Sensitive、桌面会话重启、整机断网、X11 或发行安装。实时状态和剩余停止线见 [`docs/status/current.md`](../../docs/status/current.md)，详细流水见本周周志。
+以上自动结果只证明 Linux ARM64 编译、装配和 headless native loader。M5-P03 另已在 Debian 13 ARM64 GNOME 中完成不写 `/usr` 的用户级开发装配，并取得 Wayland/X11、GTK/Qt/Electron/浏览器/终端、完整候选交互、切换/重启、进程级与整机离线、password/unknown/terminal/`Sensitive` 的人工证据。原生 Qt6 Wayland 只由明确的 Wayland QPA、Fcitx Qt6 input-context 与会话类型共同证明；FeatherPad 映射 `libQt6WaylandClient` 本身不作为 backend 证据。快速跨 X11→Wayland 会话的 daemon 自启动使用 Debian 官方 Fcitx5 desktop entry 的用户级副本闭合；这仍是开发装配，不证明发行安装、升级或移除。实时状态见 [`docs/status/current.md`](../../docs/status/current.md)，详细流水见本周周志。
 
 ## 组件结构
 
@@ -130,4 +130,4 @@ RADISHLEX_IME_FFI_LIBRARY="$PWD/target/release/libradishlex_ime_ffi.so" \
   ./scripts/check-linux-fcitx5.sh --require-fcitx
 ```
 
-`--require-fcitx` 在非 Linux、缺失 CMake、缺失 cdylib 或 Fcitx5 CMake package 时失败，不自动下载依赖、不启动容器、不写系统目录。脚本固定 `umask 022`，避免开发账号的宽松默认 umask 把 group/other writable 权限泄漏进临时 stage；runtime probe 对这类宽权限的拒绝规则不放宽。Docker wrapper 才负责显式建立依赖环境。开发安装、Fcitx 重启、输入法启用和真实应用交互需要单独授权与 M5-P03 runbook。
+`--require-fcitx` 在非 Linux、缺失 CMake、缺失 cdylib 或 Fcitx5 CMake package 时失败，不自动下载依赖、不启动容器、不写系统目录。脚本固定 `umask 022`，避免开发账号的宽松默认 umask 把 group/other writable 权限泄漏进临时 stage；runtime probe 对这类宽权限的拒绝规则不放宽。Docker wrapper 才负责显式建立依赖环境。开发装配、Fcitx 重启、输入法启用和真实应用交互仍需单独授权；产品安装与维护属于 M5-P05。
