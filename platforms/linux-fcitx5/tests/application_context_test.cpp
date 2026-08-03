@@ -1,4 +1,5 @@
 #include "radishlex/linux/application_context.h"
+#include "radishlex/linux/application_evidence.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -46,6 +47,51 @@ void testProductionStartsFailClosed() {
                                   "org.radishlex.synthetic.editor"});
   requireUnknown(context,
                  "unreviewed production identities must remain unknown");
+}
+
+void testApplicationEvidenceCandidatesAreExactAndOpaque() {
+  using radishlex::linux_platform::ApplicationEvidenceCandidate;
+  using radishlex::linux_platform::applicationEvidenceCandidateCode;
+  using radishlex::linux_platform::matchApplicationEvidenceCandidate;
+
+  const struct {
+    const char *program;
+    ApplicationEvidenceCandidate candidate;
+    const char *code;
+  } cases[] = {
+      {"firefox-esr", ApplicationEvidenceCandidate::FirefoxEsrExecutable,
+       "browser_candidate_01"},
+      {"/usr/lib/firefox-esr/firefox-esr",
+       ApplicationEvidenceCandidate::FirefoxEsrPath,
+       "browser_candidate_02"},
+      {"firefox", ApplicationEvidenceCandidate::FirefoxExecutable,
+       "browser_candidate_03"},
+      {"org.mozilla.firefox",
+       ApplicationEvidenceCandidate::MozillaFirefoxIdentity,
+       "browser_candidate_04"},
+  };
+
+  for (const auto &item : cases) {
+    const auto candidate = matchApplicationEvidenceCandidate(item.program);
+    const auto code = applicationEvidenceCandidateCode(candidate);
+    require(candidate == item.candidate,
+            "evidence candidate must use an exact reviewed comparison");
+    require(code == item.code,
+            "evidence candidate must emit its stable opaque token");
+    require(code.find(item.program) == std::string_view::npos,
+            "evidence token must not contain the raw program identity");
+  }
+
+  const char *unmatched[] = {"", "FIREFOX-ESR", "wrapper:firefox-esr",
+                             "firefox-esr.desktop"};
+  for (const char *program : unmatched) {
+    require(matchApplicationEvidenceCandidate(program) ==
+                ApplicationEvidenceCandidate::Unmatched,
+            "unreviewed evidence identity variants must remain unmatched");
+  }
+  require(applicationEvidenceCandidateCode(
+              ApplicationEvidenceCandidate::Unmatched) == "unmatched",
+          "unmatched evidence must emit only a stable generic token");
 }
 
 void testReviewedRulesAreExactAndCoarse() {
@@ -118,6 +164,7 @@ void testCapabilityAndPrivacyPriority() {
 
 int main() {
   testProductionStartsFailClosed();
+  testApplicationEvidenceCandidatesAreExactAndOpaque();
   testReviewedRulesAreExactAndCoarse();
   testCapabilityAndPrivacyPriority();
   return 0;

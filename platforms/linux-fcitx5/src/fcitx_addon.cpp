@@ -6,6 +6,7 @@
 #include <fcitx-utils/keysym.h>
 #include <fcitx-utils/log.h>
 #include <fcitx/candidatelist.h>
+#include <fcitx/event.h>
 #include <fcitx/inputpanel.h>
 #include <fcitx/userinterface.h>
 
@@ -17,6 +18,9 @@
 #include <utility>
 
 #include "radishlex/linux/application_context.h"
+#if defined(RADISHLEX_APPLICATION_EVIDENCE)
+#include "radishlex/linux/application_evidence.h"
+#endif
 #include "radishlex/linux/key_projection.h"
 
 namespace radishlex::linux_fcitx5 {
@@ -283,7 +287,16 @@ void InputContextState::applyPrivacyMode(bool enabled) {
 }
 
 LearningContextProjection InputContextState::learningContext(
-    bool privacy_mode) const {
+    bool privacy_mode) {
+  const auto input = applicationContextInput(privacy_mode);
+#if defined(RADISHLEX_APPLICATION_EVIDENCE)
+  logApplicationEvidence(input);
+#endif
+  return radishlex::linux_platform::projectApplicationContext(input);
+}
+
+radishlex::linux_platform::ApplicationContextInput
+InputContextState::applicationContextInput(bool privacy_mode) const {
   const fcitx::CapabilityFlags capabilities =
       input_context_.capabilityFlags();
   radishlex::linux_platform::ApplicationContextInput input;
@@ -296,8 +309,36 @@ LearningContextProjection InputContextState::learningContext(
       !input.terminal) {
     input.program = input_context_.program();
   }
-  return radishlex::linux_platform::projectApplicationContext(input);
+  return input;
 }
+
+#if defined(RADISHLEX_APPLICATION_EVIDENCE)
+void InputContextState::recordApplicationEvidence() {
+  logApplicationEvidence(applicationContextInput(false));
+}
+
+void InputContextState::logApplicationEvidence(
+    const radishlex::linux_platform::ApplicationContextInput &input) {
+  std::string_view code;
+  if (input.secure_input) {
+    code = "password_program_unread";
+  } else if (input.sensitive_application) {
+    code = "sensitive_program_unread";
+  } else if (input.terminal) {
+    code = "terminal_program_unread";
+  } else {
+    code = radishlex::linux_platform::applicationEvidenceCandidateCode(
+        radishlex::linux_platform::matchApplicationEvidenceCandidate(
+            input.program));
+  }
+  if (logged_application_evidence_.has_value() &&
+      *logged_application_evidence_ == code) {
+    return;
+  }
+  logged_application_evidence_ = std::string(code);
+  FCITX_INFO() << "radishlex_application_evidence state=" << code;
+}
+#endif
 
 void InputContextState::applyResult(const KeyResultProjection &result) {
   if (result.commit.has_value()) {
@@ -436,9 +477,47 @@ Engine::Engine(fcitx::Instance *instance)
           "radishlexLinuxSession", &state_factory_)) {
     throw std::runtime_error("unable to register RadishLex input context state");
   }
+#if defined(RADISHLEX_APPLICATION_EVIDENCE)
+  application_evidence_watcher_ = instance_->watchEvent(
+      fcitx::EventType::InputContextCapabilityChanged,
+      fcitx::EventWatcherPhase::Default, [](fcitx::Event &event) {
+        const auto &capability_event =
+            static_cast<const fcitx::CapabilityChangedEvent &>(event);
+        const auto old_flags = capability_event.oldFlags();
+        const auto new_flags = capability_event.newFlags();
+        if (old_flags.test(fcitx::CapabilityFlag::Password) !=
+            new_flags.test(fcitx::CapabilityFlag::Password)) {
+          FCITX_INFO() << "radishlex_capability_evidence state=password_"
+                       << (new_flags.test(fcitx::CapabilityFlag::Password)
+                               ? "on"
+                               : "off");
+        }
+        if (old_flags.test(fcitx::CapabilityFlag::Sensitive) !=
+            new_flags.test(fcitx::CapabilityFlag::Sensitive)) {
+          FCITX_INFO() << "radishlex_capability_evidence state=sensitive_"
+                       << (new_flags.test(fcitx::CapabilityFlag::Sensitive)
+                               ? "on"
+                               : "off");
+        }
+        if (old_flags.test(fcitx::CapabilityFlag::Terminal) !=
+            new_flags.test(fcitx::CapabilityFlag::Terminal)) {
+          FCITX_INFO() << "radishlex_capability_evidence state=terminal_"
+                       << (new_flags.test(fcitx::CapabilityFlag::Terminal)
+                               ? "on"
+                               : "off");
+        }
+      });
+  if (!application_evidence_watcher_) {
+    throw std::runtime_error(
+        "unable to register application capability evidence watcher");
+  }
+#endif
 }
 
 Engine::~Engine() {
+#if defined(RADISHLEX_APPLICATION_EVIDENCE)
+  application_evidence_watcher_.reset();
+#endif
   privacy_event_source_.reset();
   state_factory_.unregister();
   try {
@@ -455,17 +534,30 @@ void Engine::keyEvent(const fcitx::InputMethodEntry &, fcitx::KeyEvent &event) {
 
 void Engine::activate(const fcitx::InputMethodEntry &,
                       fcitx::InputContextEvent &event) {
+#if defined(RADISHLEX_APPLICATION_EVIDENCE)
+  auto *state = event.inputContext()->propertyFor(&state_factory_);
+  state->recordApplicationEvidence();
+#else
   event.inputContext()->propertyFor(&state_factory_);
+#endif
 }
 
 void Engine::deactivate(const fcitx::InputMethodEntry &,
                         fcitx::InputContextEvent &event) {
-  event.inputContext()->propertyFor(&state_factory_)->reset();
+  auto *state = event.inputContext()->propertyFor(&state_factory_);
+#if defined(RADISHLEX_APPLICATION_EVIDENCE)
+  state->recordApplicationEvidence();
+#endif
+  state->reset();
 }
 
 void Engine::reset(const fcitx::InputMethodEntry &,
                    fcitx::InputContextEvent &event) {
-  event.inputContext()->propertyFor(&state_factory_)->reset();
+  auto *state = event.inputContext()->propertyFor(&state_factory_);
+#if defined(RADISHLEX_APPLICATION_EVIDENCE)
+  state->recordApplicationEvidence();
+#endif
+  state->reset();
 }
 
 radishlex::linux_platform::SessionProjection *Engine::newSession() {

@@ -3,6 +3,7 @@
 
 #include <fcitx/addonfactory.h>
 #include <fcitx/addonmanager.h>
+#include <fcitx-utils/handlertable.h>
 #include <fcitx-utils/event.h>
 #include <fcitx/inputcontext.h>
 #include <fcitx/inputcontextproperty.h>
@@ -11,6 +12,7 @@
 
 #include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "radishlex/linux/application_context.h"
@@ -33,10 +35,19 @@ class InputContextState final : public fcitx::InputContextProperty {
   void selectCandidate(std::size_t display_index);
   void reset();
   void applyPrivacyMode(bool enabled);
+#if defined(RADISHLEX_APPLICATION_EVIDENCE)
+  void recordApplicationEvidence();
+#endif
 
  private:
   radishlex::linux_platform::LearningContextProjection learningContext(
+      bool privacy_mode);
+  radishlex::linux_platform::ApplicationContextInput applicationContextInput(
       bool privacy_mode) const;
+#if defined(RADISHLEX_APPLICATION_EVIDENCE)
+  void logApplicationEvidence(
+      const radishlex::linux_platform::ApplicationContextInput &input);
+#endif
   void applyResult(
       const radishlex::linux_platform::KeyResultProjection &result);
   void updateInputPanel(
@@ -51,6 +62,9 @@ class InputContextState final : public fcitx::InputContextProperty {
   fcitx::InputContext &input_context_;
   std::unique_ptr<radishlex::linux_platform::SessionProjection> session_;
   radishlex::linux_platform::ConsumedPressTracker consumed_presses_;
+#if defined(RADISHLEX_APPLICATION_EVIDENCE)
+  std::optional<std::string> logged_application_evidence_;
+#endif
 };
 
 class Engine final : public fcitx::InputMethodEngineV2 {
@@ -90,6 +104,10 @@ class Engine final : public fcitx::InputMethodEngineV2 {
   fcitx::FactoryFor<InputContextState> state_factory_;
   std::vector<InputContextState *> states_;
   std::uint64_t next_session_id_;
+#if defined(RADISHLEX_APPLICATION_EVIDENCE)
+  std::unique_ptr<fcitx::HandlerTableEntry<fcitx::EventHandler>>
+      application_evidence_watcher_;
+#endif
 };
 
 class EngineFactory final : public fcitx::AddonFactory {

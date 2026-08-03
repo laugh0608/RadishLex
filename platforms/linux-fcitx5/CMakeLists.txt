@@ -29,6 +29,8 @@ endif()
 option(RADISHLEX_BUILD_FCITX_ADDON "Build the Linux Fcitx5 shared addon"
        ${RADISHLEX_FCITX_ADDON_DEFAULT})
 option(RADISHLEX_BUILD_CONTRACT_TESTS "Build platform-independent contracts" ON)
+option(RADISHLEX_APPLICATION_EVIDENCE
+       "Log only fixed candidate tokens for an authorized desktop review" OFF)
 
 add_library(radishlex_linux_platform STATIC
   src/application_context.cpp
@@ -85,6 +87,12 @@ if(RADISHLEX_BUILD_FCITX_ADDON)
   )
 
   add_library(radishlex SHARED src/fcitx_addon.cpp)
+  if(RADISHLEX_APPLICATION_EVIDENCE)
+    target_sources(radishlex PRIVATE src/application_evidence.cpp)
+    target_compile_definitions(radishlex PRIVATE
+      RADISHLEX_APPLICATION_EVIDENCE=1
+    )
+  endif()
   target_include_directories(radishlex PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
   )
@@ -137,6 +145,7 @@ if(RADISHLEX_BUILD_CONTRACT_TESTS)
   add_executable(radishlex_application_context_contract
     tests/application_context_test.cpp
     src/application_context.cpp
+    src/application_evidence.cpp
   )
   target_include_directories(radishlex_application_context_contract PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/include"

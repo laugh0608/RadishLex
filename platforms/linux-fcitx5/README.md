@@ -22,6 +22,7 @@ M5-P02 已经建立真实 C++ 源码、CMake target、addon/input method metadat
 ```text
 include/radishlex/linux/
   application_context.h reviewed program-to-coarse-context contract
+  application_evidence.h fixed-candidate desktop evidence contract
   ffi_projection.h    ABI v9 owned C++ projection
   key_projection.h    platform key to RadishLex key contract
   manager_runtime.h   Manager bundle/XDG product bootstrap contract
@@ -31,6 +32,7 @@ include/radishlex/linux/
   xdg_paths.h         addon/Manager shared XDG resolver
 src/
   application_context.cpp exact production allowlist projection
+  application_evidence.cpp opt-in opaque identity evidence matcher
   fcitx_addon.*       Fcitx lifecycle, privacy event loop and commit adapter
   ffi_projection.cpp  KeyResult/snapshot copy and owner-thread guard
   key_projection.cpp  Unicode/named key/modifier/phase validation
@@ -45,6 +47,8 @@ config/
   radishlex.conf.in
 dev/
   Dockerfile            pinned Debian 13 ARM64 development environment
+evidence/
+  firefox-context.html  offline ordinary/password field fixture
 tests/
   application_context_test.cpp
   ffi_projection_test.cpp
@@ -78,6 +82,10 @@ tools/
 - 发行版包、系统域路径与升级 receipt：M5-P05。
 
 在普通 context 无已评审生产身份时，addon 传 `context_known = 0`；Rust 因而使用 engine 顺序且不读写 userdb。生产 allowlist 当前有意为空，合成 contract 只证明 exact-match 与粗类别边界。Fcitx 明确提供 `Password`、`Sensitive` 或 `Terminal` capability 时先返回受控摘要且不读取 `program()`；Terminal 固定投影为 `terminal + context_known = 0`，不传 program name、窗口标题或正文。
+
+经单独授权做真实桌面身份评审时，可在开发 build 显式设置 `-DRADISHLEX_APPLICATION_EVIDENCE=ON`。该模式只把源码中固定候选的精确匹配投影为不含原值的稳定 token，未命中统一输出 `unmatched`；Password、Sensitive 与 Terminal 只输出 `*_program_unread`，保持不读取 `InputContext::program()`。同一模式还订阅 Fcitx 公共 capability change 事件，只输出 `password_on/off`、`sensitive_on/off` 与 `terminal_on/off`，不关联或记录任意原始程序身份。该选项默认关闭，不改变生产 allowlist，也不能作为应用已通过 Wayland/X11、frontend 和敏感字段传播评审的替代证据。
+
+`evidence/firefox-context.html` 是无脚本、无表单提交和无外部资源的离线普通/密码字段夹具。它只用于用户实体操作，不记录输入内容；验收必须使用公开合成文本，并结合固定 token、frontend、会话类型、capability 和学习聚合证据，不能凭页面行为单独加入生产 allowlist。
 
 ## XDG 路径
 

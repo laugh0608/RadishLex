@@ -9,6 +9,11 @@ script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
 platform_dir="${repo_root}/platforms/linux-fcitx5"
 manager_linux_dir="${repo_root}/apps/radishlex-manager/linux"
+firefox_evidence_fixture="${platform_dir}/evidence/firefox-context.html"
+evidence_log_pattern='browser_candidate_[0-9]'
+evidence_log_pattern+='|radishlex_application_evidence'
+evidence_log_pattern+='|radishlex_capability_evidence'
+evidence_log_pattern+='|password_program_unread'
 require_fcitx=0
 
 if [[ "${1:-}" == "--require-fcitx" ]]; then
@@ -44,6 +49,7 @@ common_flags=(
   -DRADISHLEX_APPLICATION_CONTEXT_TESTING=1 \
   "${platform_dir}/tests/application_context_test.cpp" \
   "${platform_dir}/src/application_context.cpp" \
+  "${platform_dir}/src/application_evidence.cpp" \
   -o "${temp_dir}/application_context_test"
 "${temp_dir}/application_context_test"
 
@@ -128,6 +134,15 @@ rg -q 'inputPanel\(\)' "${platform_dir}/src/fcitx_addon.cpp"
 rg -q 'projectApplicationContext' "${platform_dir}/src/fcitx_addon.cpp"
 rg -q 'addIOEvent' "${platform_dir}/src/fcitx_addon.cpp"
 rg -q 'program\(\)' "${platform_dir}/src/fcitx_addon.cpp"
+rg -q 'InputContextCapabilityChanged' "${platform_dir}/src/fcitx_addon.cpp"
+rg -q 'radishlex_capability_evidence state=password_' \
+  "${platform_dir}/src/fcitx_addon.cpp"
+rg -Fq 'type="text"' "${firefox_evidence_fixture}"
+rg -Fq 'type="password"' "${firefox_evidence_fixture}"
+if rg -ni '<script|<form|https?://|src=|href=' "${firefox_evidence_fixture}"; then
+  echo "Firefox context evidence fixture must remain offline and inert." >&2
+  exit 1
+fi
 rg -q 'resolveLoadedRuntimeLayout' "${platform_dir}/src/fcitx_addon.cpp"
 rg -q 'session_select_candidate' \
   "${platform_dir}/src/ffi_projection.cpp" \
@@ -198,6 +213,11 @@ if [[ "${require_fcitx}" -eq 1 ]]; then
   if strings "${addon_library}" |
       rg -n '/tmp/radishlex|/workspace/RadishLex'; then
     echo "Installed addon contains a temporary or repository path." >&2
+    exit 1
+  fi
+  if strings "${addon_library}" |
+      rg -n "${evidence_log_pattern}"; then
+    echo "Default addon must not contain application evidence logging." >&2
     exit 1
   fi
   ctest --test-dir "${temp_dir}/cmake-build" --output-on-failure
