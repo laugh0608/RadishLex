@@ -34,6 +34,8 @@ add_library(radishlex_linux_platform STATIC
   src/ffi_projection.cpp
   src/key_projection.cpp
   src/linked_ffi_api.cpp
+  src/manager_runtime.cpp
+  src/privacy_mode.cpp
   src/runtime_layout.cpp
   src/xdg_paths.cpp
 )
@@ -154,6 +156,24 @@ if(RADISHLEX_BUILD_CONTRACT_TESTS)
     -Wall -Wextra -Wpedantic -Werror
   )
   add_test(NAME xdg_paths COMMAND radishlex_xdg_paths_contract)
+
+  add_executable(radishlex_manager_runtime_contract
+    tests/manager_runtime_test.cpp
+    src/manager_runtime.cpp
+    src/privacy_mode.cpp
+    src/xdg_paths.cpp
+  )
+  target_include_directories(radishlex_manager_runtime_contract PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+  )
+  target_compile_definitions(radishlex_manager_runtime_contract PRIVATE
+    RADISHLEX_MANAGER_RUNTIME_TESTING=1
+    RADISHLEX_XDG_TESTING=1
+  )
+  target_compile_options(radishlex_manager_runtime_contract PRIVATE
+    -Wall -Wextra -Wpedantic -Werror
+  )
+  add_test(NAME manager_runtime COMMAND radishlex_manager_runtime_contract)
 
   add_executable(radishlex_runtime_layout_contract
     tests/runtime_layout_test.cpp

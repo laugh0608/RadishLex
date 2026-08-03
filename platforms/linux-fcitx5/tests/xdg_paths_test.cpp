@@ -97,6 +97,10 @@ void testDefaultsAndPermissions() {
           "default cache root must follow XDG");
   require(paths.userdb_path == paths.data_root / "userdb.sqlite3",
           "userdb path must be fixed");
+  require(paths.settings_path == paths.config_root / "settings.json",
+          "settings path must be fixed");
+  require(paths.privacy_path == paths.config_root / "privacy-mode.json",
+          "privacy path must be fixed");
 
   radishlex::linux_platform::preparePrivateProductPaths(paths);
   require(permissions(paths.data_root) == 0700,
@@ -107,6 +111,8 @@ void testDefaultsAndPermissions() {
           "Rime user directory must be private");
   require(permissions(paths.userdb_path) == 0600,
           "userdb must be private");
+  radishlex::linux_platform::validatePrivateRegularFileIfPresent(
+      paths.settings_path, paths.owner_id);
 }
 
 void testCustomRootsAndInvalidInput() {

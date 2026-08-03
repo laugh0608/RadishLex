@@ -36,6 +36,7 @@ struct XdgPaths {
   std::filesystem::path rime_user_data_dir;
   std::filesystem::path userdb_path;
   std::filesystem::path settings_path;
+  std::filesystem::path privacy_path;
   std::uint32_t owner_id;
 };
 
@@ -43,6 +44,8 @@ XdgPaths resolveProductionXdgPaths();
 void preparePrivateProductPaths(const XdgPaths &paths);
 void validatePrivateRegularFile(const std::filesystem::path &path,
                                 std::uint32_t expected_owner_id);
+void validatePrivateRegularFileIfPresent(const std::filesystem::path &path,
+                                         std::uint32_t expected_owner_id);
 
 #if defined(RADISHLEX_XDG_TESTING)
 struct XdgTestEnvironment {

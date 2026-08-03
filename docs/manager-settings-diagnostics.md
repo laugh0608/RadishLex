@@ -6,6 +6,7 @@
 
 - `ManagerBridge` contract 不暴露 settings JSON 字段级接口；UI 通过 `saveSettingsDraft` 保存完整草案。
 - settings draft 只保存本地管理端非 secret 草案和 access token 存在性，不保存 token 文本、恢复码、私钥、signature bytes、wrapped material、payload bytes、证书、运行日志、文件路径或用户词条。
+- `privacy_mode` 在 settings JSON 中只是 UI/sync gate 投影：macOS 以受控 CFPreferences、Linux 以独立 `privacy-mode.json` 为平台真相源；Manager snapshot 必须用平台读回值覆盖投影，输入法壳不得解析完整 settings draft。
 - 诊断报告只输出聚合计数、状态码、非敏感来源标签、聚合阻塞码和脱敏策略，不输出用户词、导入 / 导出文件内容、本机真实路径、请求 / 响应体或 native 原始错误明细。
 - 诊断报告预览按本文字段索引展示分组、字段筛选和脱敏文本复制入口；复制内容与导出文本一致，仍只包含脱敏摘要。
 - 设置页可以导入 `manager_sync_readiness.v1` 非敏感摘要用于本地开发联调；该摘要只保存在当前 manager 内存态，驱动同步页、设置页 gate preview 和诊断报告的派生字段，不写入 settings draft，也不改变 `ManagerBridge` contract 或 C ABI。

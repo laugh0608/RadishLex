@@ -4,7 +4,7 @@
 
 ## 状态与产品范围
 
-状态：M5-P01/P02/P03 已完成，当前推进 M5-P04 Linux Manager、同库个人化与本地管理验收。平台无关 C++ contract、Debian 13 ARM64 编译、staged 开发装配、headless native loader，以及真实 Fcitx daemon 的 Wayland/X11 输入均已通过。
+状态：M5-P01/P02/P03 已完成，当前推进 M5-P04 Linux Manager、同库个人化与本地管理验收。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 的源码和平台无关 contract 已落地；真实 Linux Flutter bundle 构建与桌面 Manager 验收尚未执行。既有 addon 的 Debian 13 ARM64 编译、staged 开发装配、headless native loader，以及真实 Fcitx daemon 的 Wayland/X11 输入均已通过。
 
 P03 实机证据覆盖 GTK、Qt、Electron、浏览器和终端，包含完整候选交互、焦点/输入法切换、Fcitx/桌面会话重启、进程级地址族限制与整台 guest 断网。password、terminal、unknown 与 Qt `Sensitive` 后的 userdb 聚合保持全零；当前 GTK4 frontend 未把 `PRIVATE` 传播为 Fcitx `Sensitive`，因此依赖既有 unknown 失败关闭而非虚构 capability。Qt backend 只以 QPA、会话类型和 input-context plugin 的组合证据判定，不能因进程映射 `libQt6WaylandClient` 就声明原生 Wayland。快速 X11→Wayland 登录暴露的 `im-launch` 跳过 daemon 问题已用 Debian 官方 desktop entry 的用户级 autostart 副本闭合；该开发设置不替代 P05 产品安装与维护设计。
 
@@ -72,7 +72,7 @@ Linux 继续使用 `ime-ffi` ABI v9 已有的：
 
 ### Flutter Manager
 
-Linux Manager 复用现有 Dart models、ManagerBridge 和 Rust userdb 管理能力。Linux host 只负责：
+Linux Manager 的 product bootstrap、privacy 配置、受控应用粗分类、同库并发与验收矩阵由 [Linux Manager 本地验收边界](linux-manager-local-acceptance.md) 固定。现有 Dart models、ManagerBridge 和 Rust userdb 管理能力直接复用。Linux host 只负责：
 
 - 通过统一 XDG resolver 取得固定产品路径；
 - 加载与产品 metadata 匹配的 Rust native library；
@@ -81,6 +81,8 @@ Linux Manager 复用现有 Dart models、ManagerBridge 和 Rust userdb 管理能
 - 显示 Linux 产品诊断，不重新解释 ranker、删除或同步语义。
 
 Manager 与 addon 必须打开同一 userdb，使用现有 WAL、busy timeout 和 migration 所有权；不得各建一份数据库或通过网络协调本地状态。
+
+普通应用不能为了开启学习而默认归为 known。addon 只可短暂使用 Fcitx 公开 program identity 做经过实机评审的固定粗分类，原始值不得跨 FFI、持久化或进入日志；未知与当前 GTK4 `PRIVATE` 传播缺口继续失败关闭。Linux privacy 使用独立的 XDG 平台配置真相源，不让 addon 解析持续演进的 Manager settings。
 
 ## 生命周期与线程
 
@@ -169,6 +171,7 @@ M5-P02 已固定当前数据子路径：
 ${XDG_DATA_HOME:-$HOME/.local/share}/radishlex/userdb.sqlite3
 ${XDG_DATA_HOME:-$HOME/.local/share}/radishlex/rime
 ${XDG_CONFIG_HOME:-$HOME/.config}/radishlex/settings.json
+${XDG_CONFIG_HOME:-$HOME/.config}/radishlex/privacy-mode.json
 ${XDG_STATE_HOME:-$HOME/.local/state}/radishlex
 ${XDG_CACHE_HOME:-$HOME/.cache}/radishlex
 ```
@@ -252,6 +255,7 @@ M5-P04 继续覆盖：
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
 - P04 先固定 Linux Manager host、共享 XDG/userdb、并发与隐私验收矩阵，再进入实现。
+- P04 的设计门禁已经由 `docs/linux-manager-local-acceptance.md` 固定；实现按 host/共享数据、privacy/分类、桌面个人化三段推进，不以空 runner 或 fixture 冒充完成。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。

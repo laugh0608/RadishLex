@@ -15,16 +15,18 @@ class ManagerProductPaths {
     if (value is! Map) {
       throw const ManagerPlatformException(
         code: 'platform_paths_invalid',
-        message: 'macOS runtime path response is not a map',
+        message: 'platform runtime path response is not a map',
       );
     }
     final userDbPath = _requiredPath(value, 'userDbPath');
     final settingsFilePath = _requiredPath(value, 'settingsFilePath');
     final nativeLibraryPath = _requiredPath(value, 'nativeLibraryPath');
-    if (!nativeLibraryPath.endsWith('/libradishlex_ime_ffi.dylib')) {
+    final nativeLibraryName = nativeLibraryPath.split('/').last;
+    if (nativeLibraryName != 'libradishlex_ime_ffi.dylib' &&
+        nativeLibraryName != 'libradishlex_ime_ffi.so') {
       throw const ManagerPlatformException(
         code: 'platform_paths_invalid',
-        message: 'macOS native library path has an unexpected filename',
+        message: 'platform native library path has an unexpected filename',
       );
     }
     return ManagerProductPaths(
@@ -47,7 +49,7 @@ class ManagerPrivacyModeState {
         value['enabled'] is! bool) {
       throw const ManagerPlatformException(
         code: 'privacy_read_failed',
-        message: 'macOS privacy preference returned an invalid value',
+        message: 'platform privacy setting returned an invalid value',
       );
     }
     final present = value['present'] as bool;
@@ -55,7 +57,7 @@ class ManagerPrivacyModeState {
     if (!present && enabled) {
       throw const ManagerPlatformException(
         code: 'privacy_read_failed',
-        message: 'macOS privacy preference returned an inconsistent value',
+        message: 'platform privacy setting returned an inconsistent value',
       );
     }
     return ManagerPrivacyModeState(present: present, enabled: enabled);

@@ -8,6 +8,7 @@ umask 022
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
 platform_dir="${repo_root}/platforms/linux-fcitx5"
+manager_linux_dir="${repo_root}/apps/radishlex-manager/linux"
 require_fcitx=0
 
 if [[ "${1:-}" == "--require-fcitx" ]]; then
@@ -52,6 +53,16 @@ common_flags=(
   -o "${temp_dir}/xdg_paths_test"
 "${temp_dir}/xdg_paths_test"
 
+"${cxx}" "${common_flags[@]}" \
+  -DRADISHLEX_MANAGER_RUNTIME_TESTING=1 \
+  -DRADISHLEX_XDG_TESTING=1 \
+  "${platform_dir}/tests/manager_runtime_test.cpp" \
+  "${platform_dir}/src/manager_runtime.cpp" \
+  "${platform_dir}/src/privacy_mode.cpp" \
+  "${platform_dir}/src/xdg_paths.cpp" \
+  -o "${temp_dir}/manager_runtime_test"
+"${temp_dir}/manager_runtime_test"
+
 if [[ "$(uname -s)" == "Linux" ]]; then
   "${cxx}" "${common_flags[@]}" \
     "${platform_dir}/tests/runtime_layout_test.cpp" \
@@ -78,6 +89,24 @@ rg -q 'find_package\(Fcitx5Core 5\.1\.9 REQUIRED\)' \
   "${platform_dir}/CMakeLists.txt"
 rg -q 'Fcitx5::Core' "${platform_dir}/CMakeLists.txt"
 rg -q 'radishlex_ime_ffi' "${platform_dir}/CMakeLists.txt"
+rg -Fq 'umask(0077);' "${manager_linux_dir}/runner/main.cc"
+rg -Fq 'dev.radishlex.manager/runtime' \
+  "${manager_linux_dir}/runner/manager_runtime_bridge.cc"
+rg -Fq 'resolveManagerRuntimePaths' \
+  "${manager_linux_dir}/runner/manager_runtime_bridge.cc"
+rg -Fq 'RADISHLEX_MANAGER_FFI_LIBRARY' \
+  "${manager_linux_dir}/CMakeLists.txt"
+if rg -n 'RADISHLEX_MANAGER_FFI_LIBRARY|LD_LIBRARY_PATH' \
+  "${repo_root}/apps/radishlex-manager/lib" \
+  "${manager_linux_dir}/runner" \
+  "${platform_dir}/src/manager_runtime.cpp"; then
+  echo "Linux Manager runtime must not accept a native-library path override." >&2
+  exit 1
+fi
+rg -Fq 'readlink("/proc/self/exe"' \
+  "${platform_dir}/src/manager_runtime.cpp"
+rg -Fq 'libradishlex_ime_ffi.so' \
+  "${platform_dir}/src/manager_runtime.cpp"
 rg -q 'inputPanel\(\)' "${platform_dir}/src/fcitx_addon.cpp"
 rg -q 'resolveLoadedRuntimeLayout' "${platform_dir}/src/fcitx_addon.cpp"
 rg -q 'session_select_candidate' \

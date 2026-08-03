@@ -135,6 +135,8 @@ REQUIRED_FILES = [
     "scripts/check-manager-ffi-smoke.sh",
     "scripts/check-manager-product.sh",
     "scripts/check-linux-fcitx5.sh",
+    "scripts/build-manager-linux-product.sh",
+    "scripts/check-manager-linux-product.sh",
     "scripts/build-linux-fcitx5-container.sh",
     "scripts/build-macos-product.sh",
     "scripts/build-macos-install-payload.sh",

@@ -9,6 +9,7 @@ M5-P02 已经建立真实 C++ 源码、CMake target、addon/input method metadat
 - Apple clang 的 C++17 严格编译通过；
 - ABI v9 contract、key projection、owned `KeyResult`/snapshot、display-index selection、owner-thread 和 reset/free/shutdown 顺序通过 fake-FFI contract；
 - XDG 默认路径、显式 XDG 根、`0700`/`0600`、relative path、symlink、宽权限和 production/test override 隔离通过；
+- M5-P04 已增加 Flutter Linux runner 源码、固定 bundle `.so`、共享 XDG/Manager runtime 和独立 privacy format contract；平台无关 contract 已通过，真实 Linux Flutter bundle 构建与桌面启动仍待 Linux 工具链复验；
 - Debian 13 ARM64 使用 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 和 librime 1.13.1，真实编译并动态链接启用 `native-rime` 的 `libradishlex_ime_ffi.so` 与 `radishlex.so`；
 - CMake staged install 把 addon、共享 FFI、锁定 RimeData 与两份 Fcitx metadata 形成同一开发装配，addon 只使用 `$ORIGIN` 定位 sibling FFI，不保留仓库或临时构建路径；
 - `radishlex_runtime_probe` 在相同 Linux 环境先校验装配文件、symlink 和权限，再对 staged `radishlex.so` 执行 `dlopen(RTLD_NOW)`；
@@ -22,6 +23,8 @@ M5-P02 已经建立真实 C++ 源码、CMake target、addon/input method metadat
 include/radishlex/linux/
   ffi_projection.h    ABI v9 owned C++ projection
   key_projection.h    platform key to RadishLex key contract
+  manager_runtime.h   Manager bundle/XDG product bootstrap contract
+  privacy_mode.h      strict Linux privacy truth-source contract
   runtime_layout.h    addon-relative native/RimeData layout contract
   xdg_paths.h         addon/Manager shared XDG resolver
 src/
@@ -29,6 +32,8 @@ src/
   ffi_projection.cpp  KeyResult/snapshot copy and owner-thread guard
   key_projection.cpp  Unicode/named key/modifier/phase validation
   linked_ffi_api.cpp  only direct C ABI symbol table
+  manager_runtime.cpp fixed Manager bundle and private local paths
+  privacy_mode.cpp    atomic privacy file read/write/rollback
   runtime_layout.cpp  loaded addon identity and resource validation
   xdg_paths.cpp       effective-user XDG and private path enforcement
 config/
@@ -38,6 +43,7 @@ dev/
   Dockerfile            pinned Debian 13 ARM64 development environment
 tests/
   ffi_projection_test.cpp
+  manager_runtime_test.cpp
   runtime_layout_test.cpp
   xdg_paths_test.cpp
 tools/
@@ -59,10 +65,10 @@ tools/
 
 本批没有扩展 ABI。snapshot 不输出 Fcitx 私有对象或候选 UI cursor。Fcitx candidate list 维护当前可见 cursor；数字键、Space 和鼠标选择最终都调用同一个 display-index selection，PageUp/PageDown 仍作为稳定 named key 交给 Rust engine 后重建 candidate list。这避免在 C++ 中推断 engine index 或复制 Rime highlight 逻辑。client preedit 只投影同一 snapshot 的 composition 与 UTF-8 字节 cursor，并携带 Fcitx `DontCommit`，避免 input context 失焦时提交未完成的原始拼音。
 
-尚未进入共享 ABI 的 Linux 产品能力：
+不需要进入共享 ABI 的 Linux 产品能力：
 
 - Linux install/data startup gate 和版本化产品 identity：M5-P05；
-- Linux Manager 的 privacy mode 配置来源：M5-P04；
+- Linux Manager privacy 已固定为独立 XDG 文件；addon 变更感知与生产分类仍在 M5-P04 后续批次；
 - 发行版包、系统域路径与升级 receipt：M5-P05。
 
 在普通、非 terminal context 无可靠分类信号时，addon 当前传 `context_known = 0`；Rust 因而使用 engine 顺序且不读写 userdb。Fcitx 明确提供 `Password`、`Sensitive` 或 `Terminal` capability 时只投影对应受控摘要，不传 program name、窗口标题或正文。
@@ -78,12 +84,13 @@ production resolver 使用 `geteuid` + `getpwuid_r` 取得 authoritative home，
 | Rime user data | `$HOME/.local/share/radishlex/rime` |
 | 产品配置 | `$HOME/.config/radishlex` |
 | settings | `$HOME/.config/radishlex/settings.json` |
+| privacy truth source | `$HOME/.config/radishlex/privacy-mode.json` |
 | 持久状态 | `$HOME/.local/state/radishlex` |
 | 缓存 | `$HOME/.cache/radishlex` |
 
 所有 production 输入必须为绝对、无 `.`/`..` 的路径。既有 symlink、错误 owner、非目录节点、product 目录的 group/other 权限，以及 userdb 的 group/other 权限均失败关闭。product/Rime 目录以 `0700` 创建，userdb 以 `0600`、`O_EXCL`、`O_NOFOLLOW` 创建。测试注入接口只有定义 `RADISHLEX_XDG_TESTING` 的测试编译单元可见，production library 不读取 fixture 路径。
 
-未来 Linux Manager host 必须链接同一个 `xdg_paths.h`/`xdg_paths.cpp` 组件，不得在 Dart 或 Flutter runner 中重新拼接 XDG 字符串。
+Linux Manager host 直接编译同一个 `xdg_paths.h`/`xdg_paths.cpp` 组件，不在 Dart 或 Flutter runner 中重新拼接 XDG 字符串。`privacy-mode.json` 使用严格 format v1、`0600`、无 symlink/hardlink、原子替换与读回；非法状态失败关闭，不让 addon 解析完整 Manager settings。
 
 ## 开发装配
 
@@ -112,6 +119,13 @@ addon 不再从编译期仓库绝对路径读取 RimeData。CMake build 和 stag
 
 ```bash
 ./scripts/check-linux-fcitx5.sh
+```
+
+真实 Linux Flutter staged bundle 与不启动 GUI 的产品 smoke：
+
+```bash
+./scripts/build-manager-linux-product.sh
+./scripts/check-manager-linux-product.sh
 ```
 
 Apple Silicon macOS 的固定 Linux ARM64 编译门禁：

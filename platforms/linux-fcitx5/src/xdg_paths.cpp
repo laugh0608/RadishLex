@@ -113,6 +113,7 @@ XdgPaths resolve(const ResolverEnvironment &environment) {
       data_root / "rime",
       data_root / "userdb.sqlite3",
       config_root / "settings.json",
+      config_root / "privacy-mode.json",
       environment.owner_id,
   };
 }
@@ -269,7 +270,8 @@ void preparePrivateProductPaths(const XdgPaths &paths) {
   }
   if (paths.rime_user_data_dir.parent_path() != paths.data_root ||
       paths.userdb_path.parent_path() != paths.data_root ||
-      paths.settings_path.parent_path() != paths.config_root) {
+      paths.settings_path.parent_path() != paths.config_root ||
+      paths.privacy_path.parent_path() != paths.config_root) {
     throw XdgPathException(XdgPathError::UnsafePath,
                            "derived XDG product paths are inconsistent");
   }
@@ -294,6 +296,14 @@ void validatePrivateRegularFile(const std::filesystem::path &path,
     throw XdgPathException(XdgPathError::UnsafePermissions,
                            "private product file grants group or other access");
   }
+}
+
+void validatePrivateRegularFileIfPresent(
+    const std::filesystem::path &path, std::uint32_t expected_owner_id) {
+  if (!noFollowStatus(path).exists) {
+    return;
+  }
+  validatePrivateRegularFile(path, expected_owner_id);
 }
 
 #if defined(RADISHLEX_XDG_TESTING)

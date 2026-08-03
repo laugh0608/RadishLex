@@ -285,9 +285,9 @@ manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学�
 
 第二真实平台已通过 [ADR 0009](adr/0009-second-platform-linux-fcitx5.md) 固定为 Fcitx5。原生 C++/CMake addon 只处理 input context、按键规范化、候选面板、commit、session 生命周期和 Rust FFI；它不直接调用 Rime 私有 API，不读取 SQLite，也不实现 ranker、学习、隐私或同步。
 
-Linux 复用 ABI v9 的 owner-thread personalized Rime session、owned `KeyResult`、display-index selection 与 `LearningContext`。每个活动 input context 使用独立 Rust session；Fcitx5 input panel 消费同次 snapshot，Wayland 与 X11 都不自行发明浮窗协议。addon、Flutter Manager、诊断和未来安装协调层通过单一 XDG resolver 取得数据、配置、持久状态和缓存路径，不能分别拼接 `$HOME` 或复制数据库。
+Linux 复用 ABI v9 的 owner-thread personalized Rime session、owned `KeyResult`、display-index selection 与 `LearningContext`。每个活动 input context 使用独立 Rust session；Fcitx5 input panel 消费同次 snapshot，Wayland 与 X11 都不自行发明浮窗协议。addon、Flutter Manager、诊断和未来安装协调层通过单一 XDG resolver 取得数据、配置、持久状态和缓存路径，不能分别拼接 `$HOME` 或复制数据库。Linux privacy 使用独立、严格、原子替换的平台配置真相源，不让输入热路径解析 Manager settings；程序身份只在平台层按经实机评审的固定 allowlist 映射为粗分类，原始值不跨 FFI、不持久化，unknown 继续失败关闭。
 
-M5 先形成 addon/FFI/build contract，再进入真实 Wayland、X11、常见应用、secure/unknown 上下文和同库个人化验收，最后治理 Linux 安装、升级、修复、移除和数据保留。IBus 只有在 Fcitx5 退出后存在明确需求时再评估。完整职责、路径与验证边界见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)。
+M5 先形成 addon/FFI/build contract，再进入真实 Wayland、X11、常见应用、secure/unknown 上下文和同库个人化验收，最后治理 Linux 安装、升级、修复、移除和数据保留。IBus 只有在 Fcitx5 退出后存在明确需求时再评估。完整平台职责见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)，Manager host、privacy、同库并发和产品验收见 [Linux Manager 本地验收边界](linux-manager-local-acceptance.md)。
 
 ### Android
 
