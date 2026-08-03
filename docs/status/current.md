@@ -11,27 +11,19 @@
 - 已退出：M0-M3；M4 macOS build 38 单版本产品验收已冻结；M5-P01 第二平台决策与运行边界；M5-P02 Fcitx5 addon、共享 FFI 与开发构建；M5-P03 真实 Linux 桌面输入与隐私验收
 - 真实用户同步：保持关闭；只允许合成数据与受控集成测试
 
-## M5-P03 完成证据与 M5-P04 入口
+## M5-P03 完成证据与 M5-P04 当前进度
 
-M5-P02 已建立 `platforms/linux-fcitx5/` 的 C++17/CMake addon、ABI v9 owned projection、Fcitx input panel/session、共享 XDG resolver、addon/input method metadata 与自动门禁。固定 Debian 13 ARM64 环境已通过 native-rime FFI、addon-relative staged 装配、`$ORIGIN`、资源权限/symlink、构建路径泄漏、`dlopen(RTLD_NOW)` 和三项 CTest；容器证据只承担可持续构建与无头加载，不替代桌面验收。
+M5-P02 已建立 C++17/CMake addon、ABI v9 owned projection、Fcitx input panel/session、共享 XDG resolver 和可持续 ARM64 构建。M5-P03 随后在 UTM Debian 13.6 ARM64 完成 GNOME Wayland/X11、GTK4/Qt6/Electron/Firefox/Terminal、候选交互、生命周期、整机断网和隐私实机验收；用户级开发装配不写 `/usr`，也不冒充 M5-P05 产品安装。
 
-M5-P03 在 UTM Debian 13.6 ARM64 建立了 GNOME Wayland/X11 真实桌面基线和不写 `/usr` 的用户级开发装配。Fcitx5 daemon 实际加载已校验的 `radishlex.so`、sibling FFI 与锁定 RimeData；产品 XDG 目录/文件保持 `0700`/`0600`。候选 press/release 配对与 preedit UTF-8 cursor/`DontCommit` 两项修复均通过宿主 contract、guest 强门禁和用户实体操作复验，ABI 仍为 v9，候选内容、排序与 display-index 选择仍由 Rust 真相源负责。
+P03 的 password、terminal、unknown 与 Qt `Sensitive` 路径均未产生学习；GTK4 `PRIVATE` 因未传播敏感 bit 而继续按 unknown 失败关闭。候选内容、排序、display-index 选择、userdb 与隐私策略仍分别由 Rust 和独立平台 privacy 真相源负责，平台壳没有复制业务逻辑。
 
-Wayland 主路径已覆盖 GTK4、Terminal、Firefox、原生 Qt6 和官方 Electron ARM64 runtime；X11 对照与候选、commit、reset、焦点、Fcitx/桌面重启矩阵通过。Qt 结论只采用明确 Wayland QPA 与 Fcitx Qt6 plugin 证据，不以 FeatherPad 的库映射代替 backend 取证。
+M5-P04 已落地 Linux Flutter runner、engine 前 `umask(0077)`、固定 bundle `.so`、共享 XDG/Manager runtime、严格 `privacy-mode.json` 原子读写/回滚，以及“runtime 写入—Manager C ABI 管理—新 runtime 观察”的同库自动证据。Debian ARM64 的 Flutter 3.44.0 Release bundle、ELF closure、`$ORIGIN/lib`、正式 ABI symbol、native-rime FFI 与 Dart smoke 已通过；首轮门禁暴露的两处 ABI 缩写漂移也已修正并纳入静态检查。桌面 Manager 尚未启动，不能宣称 P04 完成。
 
-隐私验收覆盖 unknown、terminal、Firefox password 和 Qt `Sensitive`；GTK4 `PRIVATE` 未传播敏感 bit，因此继续由 `context_known = 0` 失败关闭。受限网络与整机断网后 userdb v9 学习聚合始终为零。跨会话 autostart 已按 Debian 官方 desktop entry 修复并复验，但仅是可逆开发基线，不冒充 M5-P05 产品安装。
+第二个子批建立了先 watch 后初读的 privacy 变更感知和失败关闭的应用粗分类。Password、Sensitive 与 Terminal 在读取 `InputContext::program()` 前返回；Terminal 保持 `context_known=0`。生产 allowlist 仍为空，unknown 与 GTK4 `PRIVATE` 继续不读写个人化数据。
 
-M5-P04 已在 [Linux Manager 本地验收边界](../linux-manager-local-acceptance.md) 固定 product bootstrap、bundle `.so`、共享 XDG/userdb、独立 privacy 配置、受控程序粗分类、WAL 并发和验收矩阵。现有 Flutter 页面、ManagerBridge、ABI v9 与 Rust 业务能力直接复用。当前入口是完整 Linux host/真实 bridge/同库自动证据，不先建空 runner；普通应用保持 unknown，直到程序身份和敏感字段传播经实机评审。
+第三个子批增加默认关闭的 `RADISHLEX_APPLICATION_EVIDENCE`：只把源码内固定候选的精确匹配投影为 opaque token，只记录 capability 的稳定 on/off 变化；默认产品 addon 由门禁保证不含取证日志字符串。Wayland Firefox 实机得到 `browser_candidate_01`，其源码候选精确对应 `firefox-esr`；进程会话与 GTK3 Fcitx frontend 证据支持原生 Wayland，密码字段产生 `password_on`/`password_off`。用户确认普通字段显示候选，密码字段仅显示圆点且无候选，前后 userdb v9 学习聚合均为零。
 
-首个代码子批已落 Linux runner、engine 前 `umask(0077)`、固定 bundle `.so`、共享 XDG/Manager runtime、严格 `privacy-mode.json` 原子读写/回滚和平台中立 Dart 路径契约。平台无关 C++ contract、Flutter analyze/97 项测试、仓库基线及“runtime 学习—Manager C ABI 管理—新 runtime 观察”的 native-rime 同库链已通过。
-
-UTM Debian 13 ARM64 已使用官方 Flutter 3.44.0 / Dart 3.12.0 与 clang 19 完成 `check-manager-linux-product.sh`：真实 ARM64 Release bundle、固定 sibling `.so`、动态依赖、`$ORIGIN/lib`、正式 ABI symbol、native-rime FFI 和 Dart Manager FFI smoke 全部通过，未启动 GUI。首轮实机门禁发现 Linux 脚本把 `radishlex_userdb_terms_new` / `radishlex_userdb_rank_explain_new` 误写为不存在的缩写名；现已对齐正式 ABI，并把 Linux required-symbol 口径纳入仓库静态基线。首个 host/真实 bridge/同库自动证据子批至此闭合，并进入 privacy/classifier 自动子批；桌面双进程验收仍未完成，不能宣称 M5-P04 或 Linux Manager 产品完成。
-
-第二个代码子批已建立 addon privacy 变更感知和受控应用粗分类框架。Linux-only monitor 先监听 config 目录、再读取初始 snapshot，消费同目录原子替换；Fcitx event loop 与每次 FFI 操作前的非阻塞事件 drain 共同避免旧状态继续进入学习，只有检测到目标事件时才重新解析 JSON。非法格式、文件身份、IO、目录 watch 丢失或事件队列异常均投影为 privacy enabled，并只输出稳定错误分类；有效 privacy 位变化会立即刷新现存 session 的 `LearningContext`、清除已消费按键和旧候选面板，Rust 既有 context-change 语义负责清除待学习选择。
-
-粗分类只输出固定类别，Password、Sensitive 与 Terminal 优先且不读取 `InputContext::program()`；Terminal 已从错误的 `context_known=1` 收回为 `terminal + context_known=0`，继续保持不学习。精确、大小写敏感的合成 allowlist contract 已覆盖 general/browser/chat/code/editor/office、privacy、unknown/empty/包装器变体和安全 capability 优先级；生产 allowlist 仍有意为空，等待 Wayland/X11 程序身份与敏感字段传播实机评审，unknown 与 GTK4 `PRIVATE` 继续失败关闭。
-
-最终代码在宿主平台 contract 通过，并在同一 Debian 13 ARM64 验证副本完成真实 `radishlex.so` 编译、staged install、ELF closure、`$ORIGIN`、headless `dlopen` 和六项 CTest；随后 Manager ARM64 Release bundle、native-rime ignored smoke 与 Dart FFI smoke 组合回归再次通过。全程未启动 GUI、未安装/启用输入法、未修改系统配置。privacy/classifier 自动子批闭合，生产分类取证与桌面双进程验收仍是 M5-P04 剩余工作。
+Wayland 证据只闭合了评审矩阵的一半；同一 Firefox 身份、frontend 与密码传播仍须在 X11 复验，因此生产 allowlist 暂不加入任何项。guest 日终已恢复默认关闭取证的最新 addon 与生产临时服务，staging、backup 和旧脏工作副本保持原状；剩余主线是 X11 对照、生产 allowlist、桌面学习与 Manager 双进程验收。
 
 ## macOS 冻结参考
 
@@ -53,11 +45,11 @@ build 38 的详细身份、事务、载体与实机流水由 [macOS 产品包边
 
 ## 下一步顺位
 
-1. 在单独授权的 Debian 桌面会话中，以不记录原始输入/窗口标题的受控方式取得普通应用 `program()` 与对应 frontend、Wayland/X11、普通字段和敏感字段传播证据；只把完整通过评审的精确身份加入生产 allowlist，GTK4 `PRIVATE` 缺口继续排除。
-2. 生产 allowlist 形成后复跑 classifier、Fcitx5 与 Manager 强门禁，再在已评审普通应用中验证学习影响排序、Manager 刷新和 privacy 开关零增量；不以 unknown 或 Terminal 代替可学习场景。
-3. 同一桌面批继续闭合删除不复活、显式恢复、导入导出、explain、双进程 WAL/并发、Manager/Fcitx/桌面重启；每次系统输入法、GUI 和实体交互仍逐项授权，由用户完成来源切换与输入。
-4. Electron/敏感字段临时资产清理仍需单独授权，只删除 P03 临时材料并保留 Fcitx/Qt runtime、用户级开发装配、userdb 零基线和可复验 VM；该清理不阻塞 P04 代码。
-5. M5-P05 再推进 Linux 安装、升级、修复、默认移除和数据保留；不把 P03 的用户 autostart/开发复制或 P04 staged bundle 冒充产品安装，也不提前并行 Android IME。
+1. 2026-08-04 首先在另行授权并保存现有工作的前提下停止当前临时服务，由用户注销、选择 GNOME on Xorg 并重新登录；AI 不自动切换会话或合成实体操作。
+2. 在 X11 复用同一默认关闭、显式启用的取证模式和离线 Firefox 夹具，核对精确身份、frontend、普通/密码字段 capability 与 userdb 零增量；不记录输入正文、窗口标题或原始程序名。
+3. 只有 Wayland/X11 两侧均通过时，才加入精确 `firefox-esr -> browser` 生产 allowlist，并复跑 classifier、Fcitx5、Manager 和默认产品二进制排除门禁；任一证据漂移都保持 unknown 失败关闭。
+4. allowlist 闭合后再验证学习影响排序、Manager 刷新、privacy 零增量、删除不复活、显式恢复、导入导出、explain、WAL/并发及重启；每次 GUI、输入法与实体交互仍逐项授权。
+5. M5-P05 安装维护、P03 临时资产清理、远端推送和其他平台均不进入明日首批；对应动作继续单独授权。
 
 ## 验证入口
 

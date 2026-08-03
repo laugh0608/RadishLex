@@ -6,9 +6,11 @@
 
 截至 2026-08-03，M5-P03 已完成 Fcitx5 Wayland/X11 输入、常见应用、生命周期、离线与隐私实机验收，M5-P04 进入 Linux Manager 与同库个人化实现。现有 Flutter 页面、`ManagerBridge`、ABI v9、Rust userdb/ranker、导入导出、删除/tombstone/explicit restore、学习摘要和 rank explain 均直接复用；本批不重写业务真相源，也不通过新增平台私有 ABI 复制既有能力。
 
-首个源码子批已建立 Linux Flutter runner、共享 XDG/Manager runtime、bundle `.so` 约束、Linux privacy 配置与同库 native-rime contract。第二个源码子批已建立先 watch 后初读的 inotify/event-loop privacy 变更感知、失败关闭 runtime 和精确 allowlist 粗分类框架。UTM Debian 13 ARM64 已使用 Flutter 3.44.0 / Dart 3.12.0 完成真实 Release bundle、Fcitx5 addon、ELF closure、`$ORIGIN`、正式 ABI symbol、六项 CTest、native-rime FFI 与 Dart Manager FFI smoke；两批自动证据已经闭合，未启动 GUI，也未写系统安装目录。生产 allowlist 仍为空，普通应用程序身份/敏感传播评审和桌面双进程产品证据尚未形成。P04 后续按以下顺序推进：
+首个源码子批已建立 Linux Flutter runner、共享 XDG/Manager runtime、bundle `.so` 约束、Linux privacy 配置与同库 native-rime contract。第二个子批已建立先 watch 后初读的 privacy 变更感知、失败关闭 runtime 和精确 allowlist 粗分类框架；第三个子批增加默认关闭、只输出 opaque token 与 capability on/off 的受控桌面取证模式。UTM Debian 13 ARM64 已完成真实 Flutter 3.44.0 Release bundle、Fcitx5 addon、ELF/`$ORIGIN`、正式 ABI symbol、六项 CTest、native-rime 与 Dart smoke。
 
-1. 真实桌面程序身份、frontend 与敏感字段传播取证，只将完整评审项加入生产 allowlist。
+Wayland Firefox 已取得精确 `firefox-esr` 身份、GTK3 Fcitx frontend、原生 Wayland、password capability 和 userdb 零增量证据；生产 allowlist 仍为空，因为同一矩阵的 X11 半侧和桌面双进程产品证据尚未形成。P04 后续按以下顺序推进：
+
+1. 在 X11 完成同一 Firefox 身份、frontend 与敏感字段传播对照，只将 Wayland/X11 完整评审项加入生产 allowlist。
 2. 生产分类后的 Fcitx5/Manager 自动回归与 privacy 学习策略实证。
 3. 真实桌面上的学习、排序、刷新、删除、恢复、导入导出、explain、并发与重启验收。
 
@@ -127,7 +129,11 @@ Fcitx `InputContext::program()` 是平台可用但可能为空的程序身份。
 
 首批 allowlist 不能凭进程名猜测。实现批次先用合成 classifier contract 覆盖允许、未知、空值和 capability 优先级，再在 guest 只读记录程序身份摘要；只有取得 GTK/Qt/浏览器对应 frontend 与 sensitive 行为证据后，才把所需固定项写入生产表和测试。GTK4 `PRIVATE` 在当前 Debian frontend 未传播 `Sensitive` 的事实继续保留，不能因应用进入 allowlist 就宣称该字段安全。
 
-合成 classifier contract 已实现并通过：精确、大小写敏感的规则只输出固定粗类别，empty、unknown、大小写和包装器变体均失败关闭；Password、Sensitive 和 Terminal 在分类前返回，addon 因而不会读取这些上下文的原始 `program()`。Terminal 使用 `context_kind=terminal, context_known=0`，保持 EngineOnly。生产表当前仍为空，不能据此宣称普通应用学习已开放。
+合成 classifier contract 已实现并通过：精确、大小写敏感的规则只输出固定粗类别，empty、unknown、大小写和包装器变体均失败关闭；Password、Sensitive 和 Terminal 在分类前返回，addon 因而不会读取这些上下文的原始 `program()`。Terminal 使用 `context_kind=terminal, context_known=0`，保持 EngineOnly。
+
+真实桌面评审使用默认关闭的 `RADISHLEX_APPLICATION_EVIDENCE`。它只把源码内固定候选的精确匹配转换为 opaque token，未命中统一输出 `unmatched`；capability 只输出稳定 on/off 变化。默认产品 addon 的强门禁禁止出现这些日志字符串，该模式不修改生产 allowlist，也不记录原始程序身份、窗口标题或正文。
+
+Wayland Firefox 已得到精确对应 `firefox-esr` 的 `browser_candidate_01`，会话和库映射支持原生 Wayland/GTK3 Fcitx frontend；密码字段产生 `password_on`/`password_off`，用户观察与 userdb 全零结果一致。X11 对照尚未执行，因此生产表仍为空，不能据此宣称普通应用学习已开放。
 
 ## 同库并发与个人化语义
 
@@ -149,7 +155,7 @@ Manager 和 addon 必须把同一 `XdgPaths.userdb_path` 交给现有 Rust FFI�
 | --- | --- | --- |
 | A1 | 共享 XDG contract | data/config/state/cache、privacy path、owner、权限、symlink、invalid XDG 与 production/test 隔离通过 |
 | A2 | privacy store contract | absent、true/false、非法 JSON/版本/类型/大小、权限、原子替换、读回和 rollback 通过 |
-| A3 | classifier contract | Password/Sensitive/Terminal 优先级、privacy、allowlist、unknown/empty 和无原始身份输出通过 |
+| A3 | classifier/evidence contract | Password/Sensitive/Terminal 优先级、privacy、allowlist、unknown/empty、opaque token、默认关闭和产品二进制日志排除通过 |
 | A4 | Dart platform bridge | macOS `.dylib`、Linux `.so`、错误码、privacy read/write/restore 与 product/demo 隔离通过 |
 | A5 | Linux bundle smoke | Release bundle 含固定 `.so`，无仓库/构建路径回退，ABI v9、required symbols、ELF closure 与启动 snapshot 通过 |
 | A6 | 同库双端 contract | 独立 addon/runtime 与 Manager 查询连接覆盖 WAL、选择、刷新、删除、防复活、恢复、并发初始化和重启通过 |

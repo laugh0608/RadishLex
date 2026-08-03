@@ -4,7 +4,7 @@
 
 ## 状态与产品范围
 
-状态：M5-P01/P02/P03 已完成，当前推进 M5-P04 Linux Manager、同库个人化与本地管理验收。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 的源码和平台无关 contract 已落地；真实 Linux Flutter bundle 构建与桌面 Manager 验收尚未执行。既有 addon 的 Debian 13 ARM64 编译、staged 开发装配、headless native loader，以及真实 Fcitx daemon 的 Wayland/X11 输入均已通过。
+状态：M5-P01/P02/P03 已完成，当前推进 M5-P04 Linux Manager、同库个人化与本地管理验收。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release bundle、native/ELF/FFI smoke 已通过，桌面 Manager 与同库个人化验收尚未执行。既有 addon 的 staged 开发装配、headless native loader，以及真实 Fcitx daemon 的 Wayland/X11 输入均已通过。
 
 P03 实机证据覆盖 GTK、Qt、Electron、浏览器和终端，包含完整候选交互、焦点/输入法切换、Fcitx/桌面会话重启、进程级地址族限制与整台 guest 断网。password、terminal、unknown 与 Qt `Sensitive` 后的 userdb 聚合保持全零；当前 GTK4 frontend 未把 `PRIVATE` 传播为 Fcitx `Sensitive`，因此依赖既有 unknown 失败关闭而非虚构 capability。Qt backend 只以 QPA、会话类型和 input-context plugin 的组合证据判定，不能因进程映射 `libQt6WaylandClient` 就声明原生 Wayland。快速 X11→Wayland 登录暴露的 `im-launch` 跳过 daemon 问题已用 Debian 官方 desktop entry 的用户级 autostart 副本闭合；该开发设置不替代 P05 产品安装与维护设计。
 
@@ -68,7 +68,7 @@ Linux 继续使用 `ime-ffi` ABI v9 已有的：
 - PageUp/PageDown 作为稳定 named key 进入 Rust 后用新 snapshot 重建列表；
 - reset/free/shutdown 已足以表达 per-context session 与进程 teardown。
 
-当前真实缺口不在 ABI 或 addon 编译，而在 Fcitx5 桌面运行证据、Linux Manager privacy 配置来源、产品 startup gate 和发行安装事务。后三项分别留在 P04/P05，不为 P02 增加平台私有 ABI。
+当前真实缺口不在 ABI、addon 编译、Manager privacy 来源或 startup gate，而在生产应用分类的 X11 对照、桌面 Manager/同库个人化，以及 P05 发行安装事务。这些缺口不需要增加平台私有 ABI。
 
 ### Flutter Manager
 
@@ -82,7 +82,7 @@ Linux Manager 的 product bootstrap、privacy 配置、受控应用粗分类、�
 
 Manager 与 addon 必须打开同一 userdb，使用现有 WAL、busy timeout 和 migration 所有权；不得各建一份数据库或通过网络协调本地状态。
 
-普通应用不能为了开启学习而默认归为 known。addon 只可短暂使用 Fcitx 公开 program identity 做经过实机评审的固定粗分类，原始值不得跨 FFI、持久化或进入日志；未知与当前 GTK4 `PRIVATE` 传播缺口继续失败关闭。Linux privacy 使用独立的 XDG 平台配置真相源，不让 addon 解析持续演进的 Manager settings。
+普通应用不能为了开启学习而默认归为 known。addon 只可短暂使用 Fcitx 公开 program identity 做经过实机评审的固定粗分类，原始值不得跨 FFI、持久化或进入日志；未知与当前 GTK4 `PRIVATE` 传播缺口继续失败关闭。Linux privacy 使用独立的 XDG 平台配置真相源，不让 addon 解析持续演进的 Manager settings。真实评审只能显式启用默认关闭的固定候选取证模式，默认产品构建必须排除其日志字符串。
 
 ## 生命周期与线程
 
@@ -142,6 +142,10 @@ Wayland 下不得自行定位或绘制候选浮窗。X11 兼容也继续使用 F
 - privacy mode 可以使用既有本地摘要，但不产生新学习写入。
 
 Fcitx5 或桌面协议无法提供可靠 secure signal 的环境不得标记为普通上下文。该环境只能以 unknown 的失败关闭策略继续输入，并在平台兼容矩阵中记录个人化受限。
+
+受控应用身份取证只允许精确匹配源码内固定候选并输出 opaque token，未命中输出 `unmatched`；capability 只记录 password/sensitive/terminal 的 on/off 变化。Password、Sensitive 与 Terminal 路径不得为取证读取 `InputContext::program()`。该模式默认关闭、不改变生产 allowlist，默认 addon 还要通过二进制字符串排除门禁。
+
+2026-08-03 的 Wayland Firefox 证据确认 `browser_candidate_01` 精确对应 `firefox-esr`，进程会话与库映射支持原生 Wayland/GTK3 Fcitx frontend，密码字段产生 `password_on`/`password_off`；用户实体观察与 userdb v9 全零一致。X11 同序对照尚未执行，所以生产 allowlist 继续为空。
 
 ## XDG 产品路径
 
@@ -214,6 +218,7 @@ M5-P02 至少覆盖：
 - input context/session 隔离；
 - reset、deactivate、drop 与 runtime shutdown 顺序；
 - secure/sensitive/unknown/privacy mode；
+- 应用粗分类、固定候选 opaque evidence、capability 变化、默认关闭与产品 addon 日志字符串排除；
 - XDG resolver、权限、symlink 和生产/test override 隔离；
 - addon metadata、native dependency 和 RimeData presence；
 - staged addon-relative layout、`$ORIGIN`、权限/symlink、构建路径泄漏和 `dlopen(RTLD_NOW)`；
@@ -233,6 +238,7 @@ M5-P03 已覆盖：
 
 M5-P04 继续覆盖：
 
+- Firefox 在 Wayland/X11 的精确程序身份、frontend、密码 capability 与 userdb 零增量对照；
 - Manager 与 addon 并发读取、写入、删除、恢复及重启保持；
 - 合成词学习后排序变化、删除不复活和 explain 一致；
 - 不含真实输入历史的脱敏诊断。
