@@ -20,6 +20,8 @@ using radishlex::linux_platform::ManagerRuntimeError;
 using radishlex::linux_platform::ManagerRuntimeException;
 using radishlex::linux_platform::PrivacyModeError;
 using radishlex::linux_platform::PrivacyModeException;
+using radishlex::linux_platform::PrivacyModeRuntime;
+using radishlex::linux_platform::PrivacyModeRuntimeStatus;
 using radishlex::linux_platform::PrivacyModeState;
 using radishlex::linux_platform::XdgPaths;
 using radishlex::linux_platform::XdgTestEnvironment;
@@ -215,6 +217,42 @@ void testPrivacyRejectsMalformedAndUnsafeFiles() {
       "privacy write must not replace an unsafe existing file");
 }
 
+void testPrivacyRuntimeFailsClosedAndRecovers() {
+  TemporaryDirectory temporary;
+  const XdgPaths paths = testPaths(temporary.path() / "home");
+  radishlex::linux_platform::preparePrivateProductPaths(paths);
+  PrivacyModeRuntime runtime(paths);
+
+  runtime.refresh();
+  require(!runtime.snapshot().enabled &&
+              runtime.snapshot().status == PrivacyModeRuntimeStatus::Ready,
+          "runtime must treat an absent privacy file as valid and disabled");
+
+  writeFile(paths.privacy_path,
+            "{\"format_version\":1,\"privacy_mode\":true,}\n");
+  runtime.refresh();
+  require(runtime.snapshot().enabled &&
+              runtime.snapshot().status ==
+                  PrivacyModeRuntimeStatus::InvalidFormat,
+          "runtime must fail closed on invalid privacy JSON");
+  require(std::string(radishlex::linux_platform::privacyModeRuntimeStatusCode(
+                          runtime.snapshot().status)) == "invalid_format",
+          "runtime errors must expose only a stable category");
+
+  writeFile(paths.privacy_path,
+            "{\"format_version\":1,\"privacy_mode\":false}\n");
+  runtime.refresh();
+  require(!runtime.snapshot().enabled &&
+              runtime.snapshot().status == PrivacyModeRuntimeStatus::Ready,
+          "runtime must recover only after a valid strict read");
+
+  runtime.markMonitorUnavailable();
+  require(runtime.snapshot().enabled &&
+              runtime.snapshot().status ==
+                  PrivacyModeRuntimeStatus::MonitorUnavailable,
+          "unavailable change monitoring must fail closed");
+}
+
 void testManagerBundleResolution() {
   TemporaryDirectory temporary;
   const XdgPaths paths = testPaths(temporary.path() / "home");
@@ -281,6 +319,7 @@ void testManagerBundleResolution() {
 int main() {
   testPrivacyRoundTripAndRollback();
   testPrivacyRejectsMalformedAndUnsafeFiles();
+  testPrivacyRuntimeFailsClosedAndRecovers();
   testManagerBundleResolution();
   std::cout << "Linux Manager runtime contract passed.\n";
   return 0;

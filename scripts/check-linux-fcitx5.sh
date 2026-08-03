@@ -41,6 +41,13 @@ common_flags=(
 )
 
 "${cxx}" "${common_flags[@]}" \
+  -DRADISHLEX_APPLICATION_CONTEXT_TESTING=1 \
+  "${platform_dir}/tests/application_context_test.cpp" \
+  "${platform_dir}/src/application_context.cpp" \
+  -o "${temp_dir}/application_context_test"
+"${temp_dir}/application_context_test"
+
+"${cxx}" "${common_flags[@]}" \
   "${platform_dir}/tests/ffi_projection_test.cpp" \
   "${platform_dir}/src/ffi_projection.cpp" \
   "${platform_dir}/src/key_projection.cpp" \
@@ -62,6 +69,16 @@ common_flags=(
   "${platform_dir}/src/xdg_paths.cpp" \
   -o "${temp_dir}/manager_runtime_test"
 "${temp_dir}/manager_runtime_test"
+
+if [[ "$(uname -s)" == "Linux" ]]; then
+  "${cxx}" "${common_flags[@]}" -DRADISHLEX_XDG_TESTING=1 \
+    "${platform_dir}/tests/privacy_monitor_test.cpp" \
+    "${platform_dir}/src/privacy_monitor.cpp" \
+    "${platform_dir}/src/privacy_mode.cpp" \
+    "${platform_dir}/src/xdg_paths.cpp" \
+    -o "${temp_dir}/privacy_monitor_test"
+  "${temp_dir}/privacy_monitor_test"
+fi
 
 if [[ "$(uname -s)" == "Linux" ]]; then
   "${cxx}" "${common_flags[@]}" \
@@ -108,6 +125,9 @@ rg -Fq 'readlink("/proc/self/exe"' \
 rg -Fq 'libradishlex_ime_ffi.so' \
   "${platform_dir}/src/manager_runtime.cpp"
 rg -q 'inputPanel\(\)' "${platform_dir}/src/fcitx_addon.cpp"
+rg -q 'projectApplicationContext' "${platform_dir}/src/fcitx_addon.cpp"
+rg -q 'addIOEvent' "${platform_dir}/src/fcitx_addon.cpp"
+rg -q 'program\(\)' "${platform_dir}/src/fcitx_addon.cpp"
 rg -q 'resolveLoadedRuntimeLayout' "${platform_dir}/src/fcitx_addon.cpp"
 rg -q 'session_select_candidate' \
   "${platform_dir}/src/ffi_projection.cpp" \

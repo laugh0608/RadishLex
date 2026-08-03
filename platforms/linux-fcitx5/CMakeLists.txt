@@ -31,6 +31,7 @@ option(RADISHLEX_BUILD_FCITX_ADDON "Build the Linux Fcitx5 shared addon"
 option(RADISHLEX_BUILD_CONTRACT_TESTS "Build platform-independent contracts" ON)
 
 add_library(radishlex_linux_platform STATIC
+  src/application_context.cpp
   src/ffi_projection.cpp
   src/key_projection.cpp
   src/linked_ffi_api.cpp
@@ -39,6 +40,11 @@ add_library(radishlex_linux_platform STATIC
   src/runtime_layout.cpp
   src/xdg_paths.cpp
 )
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  target_sources(radishlex_linux_platform PRIVATE
+    src/privacy_monitor.cpp
+  )
+endif()
 target_include_directories(radishlex_linux_platform
   PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
@@ -128,6 +134,23 @@ endif()
 
 if(RADISHLEX_BUILD_CONTRACT_TESTS)
   enable_testing()
+  add_executable(radishlex_application_context_contract
+    tests/application_context_test.cpp
+    src/application_context.cpp
+  )
+  target_include_directories(radishlex_application_context_contract PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    "${RADISHLEX_IME_FFI_INCLUDE_DIR}"
+  )
+  target_compile_definitions(radishlex_application_context_contract PRIVATE
+    RADISHLEX_APPLICATION_CONTEXT_TESTING=1
+  )
+  target_compile_options(radishlex_application_context_contract PRIVATE
+    -Wall -Wextra -Wpedantic -Werror
+  )
+  add_test(NAME application_context
+           COMMAND radishlex_application_context_contract)
+
   add_executable(radishlex_ffi_projection_contract
     tests/ffi_projection_test.cpp
     src/ffi_projection.cpp
@@ -174,6 +197,25 @@ if(RADISHLEX_BUILD_CONTRACT_TESTS)
     -Wall -Wextra -Wpedantic -Werror
   )
   add_test(NAME manager_runtime COMMAND radishlex_manager_runtime_contract)
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_executable(radishlex_privacy_monitor_contract
+      tests/privacy_monitor_test.cpp
+      src/privacy_monitor.cpp
+      src/privacy_mode.cpp
+      src/xdg_paths.cpp
+    )
+    target_include_directories(radishlex_privacy_monitor_contract PRIVATE
+      "${CMAKE_CURRENT_SOURCE_DIR}/include"
+    )
+    target_compile_definitions(radishlex_privacy_monitor_contract PRIVATE
+      RADISHLEX_XDG_TESTING=1
+    )
+    target_compile_options(radishlex_privacy_monitor_contract PRIVATE
+      -Wall -Wextra -Wpedantic -Werror
+    )
+    add_test(NAME privacy_monitor COMMAND radishlex_privacy_monitor_contract)
+  endif()
 
   add_executable(radishlex_runtime_layout_contract
     tests/runtime_layout_test.cpp

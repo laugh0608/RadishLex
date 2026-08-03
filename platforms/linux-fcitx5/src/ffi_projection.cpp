@@ -319,6 +319,12 @@ KeyResultProjection SessionProjection::selectCandidate(
   return copyResult(result);
 }
 
+void SessionProjection::updateLearningContext(
+    const LearningContextProjection &context) {
+  requireOwnerThread();
+  setLearningContext(context);
+}
+
 void SessionProjection::reset() {
   requireOwnerThread();
   OwnedError error(api_);

@@ -1,6 +1,7 @@
 #include "fcitx_addon.h"
 
 #include <fcitx-utils/capabilityflags.h>
+#include <fcitx-utils/event.h>
 #include <fcitx-utils/key.h>
 #include <fcitx-utils/keysym.h>
 #include <fcitx-utils/log.h>
@@ -8,11 +9,14 @@
 #include <fcitx/inputpanel.h>
 #include <fcitx/userinterface.h>
 
+#include <algorithm>
 #include <array>
+#include <exception>
 #include <optional>
 #include <string>
 #include <utility>
 
+#include "radishlex/linux/application_context.h"
 #include "radishlex/linux/key_projection.h"
 
 namespace radishlex::linux_fcitx5 {
@@ -175,9 +179,12 @@ InputContextState::InputContextState(Engine &engine,
                                      fcitx::InputContext &input_context)
     : engine_(engine),
       input_context_(input_context),
-      session_(engine.newSession()) {}
+      session_(engine.newSession()) {
+  engine_.registerState(this);
+}
 
 InputContextState::~InputContextState() {
+  engine_.unregisterState(this);
   try {
     session_->reset();
   } catch (const ProjectionError &error) {
@@ -225,7 +232,9 @@ void InputContextState::handleKey(fcitx::KeyEvent &event) {
   const bool had_composition = session_->hasComposition();
   try {
     const KeyResultProjection result =
-        session_->handleKeyEvent(*normalized, learningContext());
+        session_->handleKeyEvent(*normalized,
+                                 learningContext(
+                                     engine_.synchronizedPrivacyMode()));
     applyResult(result);
     if (result.consumed) {
       acceptKeyEvent(event);
@@ -240,7 +249,8 @@ void InputContextState::handleKey(fcitx::KeyEvent &event) {
 void InputContextState::selectCandidate(std::size_t display_index) {
   const bool had_composition = session_->hasComposition();
   try {
-    applyResult(session_->selectCandidate(display_index, learningContext()));
+    applyResult(session_->selectCandidate(
+        display_index, learningContext(engine_.synchronizedPrivacyMode())));
   } catch (const ProjectionError &error) {
     FCITX_ERROR() << "radishlex_candidate_projection_failed status="
                   << static_cast<int>(error.status());
@@ -259,20 +269,34 @@ void InputContextState::reset() {
   clearInputPanel();
 }
 
-LearningContextProjection InputContextState::learningContext() const {
+void InputContextState::applyPrivacyMode(bool enabled) {
+  consumed_presses_.clear();
+  const bool had_composition = session_->hasComposition();
+  try {
+    session_->updateLearningContext(learningContext(enabled));
+    clearInputPanel();
+  } catch (const ProjectionError &error) {
+    FCITX_ERROR() << "radishlex_privacy_context_refresh_failed status="
+                  << static_cast<int>(error.status());
+    handleProjectionFailure(had_composition, nullptr);
+  }
+}
+
+LearningContextProjection InputContextState::learningContext(
+    bool privacy_mode) const {
   const fcitx::CapabilityFlags capabilities =
       input_context_.capabilityFlags();
-  LearningContextProjection context;
-  context.secure_input =
-      capabilities.test(fcitx::CapabilityFlag::Password);
-  context.sensitive_application =
+  radishlex::linux_platform::ApplicationContextInput input;
+  input.secure_input = capabilities.test(fcitx::CapabilityFlag::Password);
+  input.sensitive_application =
       capabilities.test(fcitx::CapabilityFlag::Sensitive);
-  context.privacy_mode = false;
-  if (capabilities.test(fcitx::CapabilityFlag::Terminal)) {
-    context.context_known = true;
-    context.context_kind = "terminal";
+  input.terminal = capabilities.test(fcitx::CapabilityFlag::Terminal);
+  input.privacy_mode = privacy_mode;
+  if (!input.secure_input && !input.sensitive_application &&
+      !input.terminal) {
+    input.program = input_context_.program();
   }
-  return context;
+  return radishlex::linux_platform::projectApplicationContext(input);
 }
 
 void InputContextState::applyResult(const KeyResultProjection &result) {
@@ -374,11 +398,38 @@ Engine::Engine(fcitx::Instance *instance)
       paths_(radishlex::linux_platform::resolveProductionXdgPaths()),
       runtime_layout_(
           radishlex::linux_platform::resolveLoadedRuntimeLayout()),
+      privacy_monitor_(nullptr),
+      privacy_event_source_(nullptr),
       state_factory_([this](fcitx::InputContext &input_context) {
         return new InputContextState(*this, input_context);
       }),
       next_session_id_(1) {
   radishlex::linux_platform::preparePrivateProductPaths(paths_);
+  privacy_monitor_ =
+      std::make_unique<radishlex::linux_platform::PrivacyModeMonitor>(paths_);
+  logPrivacyStatus();
+  if (privacy_monitor_->active()) {
+    try {
+      privacy_event_source_ = instance_->eventLoop().addIOEvent(
+          privacy_monitor_->descriptor(),
+          fcitx::IOEventFlags{fcitx::IOEventFlag::In,
+                              fcitx::IOEventFlag::Err,
+                              fcitx::IOEventFlag::Hup},
+          [this](fcitx::EventSourceIO *, int, fcitx::IOEventFlags flags) {
+            synchronizePrivacyMonitor(
+                flags.testAny(fcitx::IOEventFlags{fcitx::IOEventFlag::Err,
+                                                  fcitx::IOEventFlag::Hup}));
+            return true;
+          });
+      if (!privacy_event_source_) {
+        privacy_monitor_->markUnavailable();
+        logPrivacyStatus();
+      }
+    } catch (...) {
+      privacy_monitor_->markUnavailable();
+      logPrivacyStatus();
+    }
+  }
   std::unique_ptr<radishlex::linux_platform::SessionProjection> probe(
       newSession());
   if (!instance_->inputContextManager().registerProperty(
@@ -388,6 +439,7 @@ Engine::Engine(fcitx::Instance *instance)
 }
 
 Engine::~Engine() {
+  privacy_event_source_.reset();
   state_factory_.unregister();
   try {
     radishlex::linux_platform::shutdownRimeRuntime(ffi_api_);
@@ -423,6 +475,71 @@ radishlex::linux_platform::SessionProjection *Engine::newSession() {
 
 fcitx::FactoryFor<InputContextState> *Engine::stateFactory() {
   return &state_factory_;
+}
+
+bool Engine::synchronizedPrivacyMode() {
+  synchronizePrivacyMonitor(false);
+  if (!privacy_monitor_) {
+    return true;
+  }
+  return privacy_monitor_->snapshot().enabled;
+}
+
+void Engine::registerState(InputContextState *state) {
+  states_.push_back(state);
+}
+
+void Engine::unregisterState(InputContextState *state) {
+  states_.erase(std::remove(states_.begin(), states_.end(), state),
+                states_.end());
+}
+
+void Engine::synchronizePrivacyMonitor(bool event_source_failed) {
+  if (!privacy_monitor_) {
+    return;
+  }
+  const bool previous_enabled = privacy_monitor_->snapshot().enabled;
+  if (event_source_failed) {
+    privacy_monitor_->markUnavailable();
+  } else {
+    static_cast<void>(privacy_monitor_->consumeEvents());
+  }
+  if (!privacy_monitor_->active() && privacy_event_source_) {
+    privacy_event_source_->setEnabled(false);
+  }
+  logPrivacyStatus();
+  const bool enabled = privacy_monitor_->snapshot().enabled;
+  if (previous_enabled == enabled) {
+    return;
+  }
+  const std::vector<InputContextState *> current_states = states_;
+  for (InputContextState *state : current_states) {
+    if (std::find(states_.begin(), states_.end(), state) != states_.end()) {
+      state->applyPrivacyMode(enabled);
+    }
+  }
+}
+
+void Engine::logPrivacyStatus() {
+  if (!privacy_monitor_) {
+    return;
+  }
+  const auto status = privacy_monitor_->snapshot().status;
+  if (logged_privacy_status_ == status) {
+    return;
+  }
+  const bool recovered = logged_privacy_status_.has_value() &&
+                         status == radishlex::linux_platform::
+                                       PrivacyModeRuntimeStatus::Ready;
+  logged_privacy_status_ = status;
+  if (status !=
+      radishlex::linux_platform::PrivacyModeRuntimeStatus::Ready) {
+    FCITX_ERROR() << "radishlex_privacy_state_failed category="
+                  << radishlex::linux_platform::privacyModeRuntimeStatusCode(
+                         status);
+  } else if (recovered) {
+    FCITX_INFO() << "radishlex_privacy_state_recovered category=ready";
+  }
 }
 
 radishlex::linux_platform::PersonalizedSessionConfig Engine::sessionConfig() {

@@ -25,7 +25,13 @@ M5-P04 已在 [Linux Manager 本地验收边界](../linux-manager-local-acceptan
 
 首个代码子批已落 Linux runner、engine 前 `umask(0077)`、固定 bundle `.so`、共享 XDG/Manager runtime、严格 `privacy-mode.json` 原子读写/回滚和平台中立 Dart 路径契约。平台无关 C++ contract、Flutter analyze/97 项测试、仓库基线及“runtime 学习—Manager C ABI 管理—新 runtime 观察”的 native-rime 同库链已通过。
 
-UTM Debian 13 ARM64 已使用官方 Flutter 3.44.0 / Dart 3.12.0 与 clang 19 完成 `check-manager-linux-product.sh`：真实 ARM64 Release bundle、固定 sibling `.so`、动态依赖、`$ORIGIN/lib`、正式 ABI symbol、native-rime FFI 和 Dart Manager FFI smoke 全部通过，未启动 GUI。首轮实机门禁发现 Linux 脚本把 `radishlex_userdb_terms_new` / `radishlex_userdb_rank_explain_new` 误写为不存在的缩写名；现已对齐正式 ABI，并把 Linux required-symbol 口径纳入仓库静态基线。首个 host/真实 bridge/同库自动证据子批至此闭合，但普通应用分类、addon privacy 变更感知和桌面双进程验收仍未完成，不能宣称 M5-P04 或 Linux Manager 产品完成。
+UTM Debian 13 ARM64 已使用官方 Flutter 3.44.0 / Dart 3.12.0 与 clang 19 完成 `check-manager-linux-product.sh`：真实 ARM64 Release bundle、固定 sibling `.so`、动态依赖、`$ORIGIN/lib`、正式 ABI symbol、native-rime FFI 和 Dart Manager FFI smoke 全部通过，未启动 GUI。首轮实机门禁发现 Linux 脚本把 `radishlex_userdb_terms_new` / `radishlex_userdb_rank_explain_new` 误写为不存在的缩写名；现已对齐正式 ABI，并把 Linux required-symbol 口径纳入仓库静态基线。首个 host/真实 bridge/同库自动证据子批至此闭合，并进入 privacy/classifier 自动子批；桌面双进程验收仍未完成，不能宣称 M5-P04 或 Linux Manager 产品完成。
+
+第二个代码子批已建立 addon privacy 变更感知和受控应用粗分类框架。Linux-only monitor 先监听 config 目录、再读取初始 snapshot，消费同目录原子替换；Fcitx event loop 与每次 FFI 操作前的非阻塞事件 drain 共同避免旧状态继续进入学习，只有检测到目标事件时才重新解析 JSON。非法格式、文件身份、IO、目录 watch 丢失或事件队列异常均投影为 privacy enabled，并只输出稳定错误分类；有效 privacy 位变化会立即刷新现存 session 的 `LearningContext`、清除已消费按键和旧候选面板，Rust 既有 context-change 语义负责清除待学习选择。
+
+粗分类只输出固定类别，Password、Sensitive 与 Terminal 优先且不读取 `InputContext::program()`；Terminal 已从错误的 `context_known=1` 收回为 `terminal + context_known=0`，继续保持不学习。精确、大小写敏感的合成 allowlist contract 已覆盖 general/browser/chat/code/editor/office、privacy、unknown/empty/包装器变体和安全 capability 优先级；生产 allowlist 仍有意为空，等待 Wayland/X11 程序身份与敏感字段传播实机评审，unknown 与 GTK4 `PRIVATE` 继续失败关闭。
+
+最终代码在宿主平台 contract 通过，并在同一 Debian 13 ARM64 验证副本完成真实 `radishlex.so` 编译、staged install、ELF closure、`$ORIGIN`、headless `dlopen` 和六项 CTest；随后 Manager ARM64 Release bundle、native-rime ignored smoke 与 Dart FFI smoke 组合回归再次通过。全程未启动 GUI、未安装/启用输入法、未修改系统配置。privacy/classifier 自动子批闭合，生产分类取证与桌面双进程验收仍是 M5-P04 剩余工作。
 
 ## macOS 冻结参考
 
@@ -42,14 +48,14 @@ build 38 的详细身份、事务、载体与实机流水由 [macOS 产品包边
 - P0 永不学习/同步；P1 原始事件只留本地；P2 只允许端到端加密对象。
 - 输入热路径保持完全本地；Go server 不解密、不排序、不保存明文用户词或候选偏好。
 - M5 只推进 Linux Fcitx5，不并行实现 Android、Windows 或 iOS，不为形式统一把 Application Support v1 迁入 App Group。
-- Fcitx5 addon 只承担平台生命周期、按键、框架候选面板、commit 与 FFI；不得复制 engine、ranker、userdb、privacy 或同步逻辑。
+- Fcitx5 addon 只承担平台生命周期、按键、框架候选面板、commit、共享 privacy snapshot 与 FFI 接线；不得复制 engine、ranker、userdb、Rust 学习策略或同步逻辑。
 - 不自动清理 staging、backup、历史 operation 或身份绑定终态材料。
 
 ## 下一步顺位
 
-1. 实现 addon 对 `privacy-mode.json` 的安全变更感知和受控应用粗分类，先闭合平台 contract、串行更新与失败关闭；unknown 与 GTK4 `PRIVATE` 传播缺口继续失败关闭。
-2. 新自动 contract 通过后，在既有 Debian ARM64 环境复跑 Fcitx5 与 Manager 强门禁，确认 privacy/classifier 没有污染 Rust 真相源、热路径或 staged bundle。
-3. 自动门禁稳定后，在单独授权的 Debian guest 中完成学习影响排序、Manager 刷新、删除不复活、显式恢复、导入导出、explain、privacy 零增量、并发和重启桌面验收。
+1. 在单独授权的 Debian 桌面会话中，以不记录原始输入/窗口标题的受控方式取得普通应用 `program()` 与对应 frontend、Wayland/X11、普通字段和敏感字段传播证据；只把完整通过评审的精确身份加入生产 allowlist，GTK4 `PRIVATE` 缺口继续排除。
+2. 生产 allowlist 形成后复跑 classifier、Fcitx5 与 Manager 强门禁，再在已评审普通应用中验证学习影响排序、Manager 刷新和 privacy 开关零增量；不以 unknown 或 Terminal 代替可学习场景。
+3. 同一桌面批继续闭合删除不复活、显式恢复、导入导出、explain、双进程 WAL/并发、Manager/Fcitx/桌面重启；每次系统输入法、GUI 和实体交互仍逐项授权，由用户完成来源切换与输入。
 4. Electron/敏感字段临时资产清理仍需单独授权，只删除 P03 临时材料并保留 Fcitx/Qt runtime、用户级开发装配、userdb 零基线和可复验 VM；该清理不阻塞 P04 代码。
 5. M5-P05 再推进 Linux 安装、升级、修复、默认移除和数据保留；不把 P03 的用户 autostart/开发复制或 P04 staged bundle 冒充产品安装，也不提前并行 Android IME。
 

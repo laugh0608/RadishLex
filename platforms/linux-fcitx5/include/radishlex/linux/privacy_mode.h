@@ -33,9 +33,37 @@ struct PrivacyModeState {
   }
 };
 
+enum class PrivacyModeRuntimeStatus {
+  Ready,
+  InvalidFormat,
+  UnsafeFile,
+  IoFailure,
+  MonitorUnavailable,
+};
+
+struct PrivacyModeRuntimeSnapshot {
+  bool enabled = true;
+  PrivacyModeRuntimeStatus status = PrivacyModeRuntimeStatus::IoFailure;
+};
+
+class PrivacyModeRuntime final {
+ public:
+  explicit PrivacyModeRuntime(XdgPaths paths);
+
+  void refresh() noexcept;
+  void markMonitorUnavailable() noexcept;
+  const PrivacyModeRuntimeSnapshot &snapshot() const noexcept;
+
+ private:
+  XdgPaths paths_;
+  PrivacyModeRuntimeSnapshot snapshot_;
+};
+
 PrivacyModeState readPrivacyMode(const XdgPaths &paths);
 void writePrivacyMode(const XdgPaths &paths, bool enabled);
 void restorePrivacyMode(const XdgPaths &paths, PrivacyModeState state);
+const char *privacyModeRuntimeStatusCode(
+    PrivacyModeRuntimeStatus status) noexcept;
 
 }  // namespace radishlex::linux_platform
 

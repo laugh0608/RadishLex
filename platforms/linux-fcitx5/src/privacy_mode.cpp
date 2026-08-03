@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace radishlex::linux_platform {
@@ -260,6 +261,62 @@ PrivacyModeException::PrivacyModeException(PrivacyModeError code,
     : std::runtime_error(message), code_(code) {}
 
 PrivacyModeError PrivacyModeException::code() const noexcept { return code_; }
+
+PrivacyModeRuntime::PrivacyModeRuntime(XdgPaths paths)
+    : paths_(std::move(paths)) {}
+
+void PrivacyModeRuntime::refresh() noexcept {
+  PrivacyModeRuntimeSnapshot next;
+  try {
+    const PrivacyModeState persisted = readPrivacyMode(paths_);
+    next.enabled = persisted.enabled;
+    next.status = PrivacyModeRuntimeStatus::Ready;
+  } catch (const PrivacyModeException &error) {
+    next.enabled = true;
+    switch (error.code()) {
+      case PrivacyModeError::InvalidFormat:
+        next.status = PrivacyModeRuntimeStatus::InvalidFormat;
+        break;
+      case PrivacyModeError::UnsafeFile:
+        next.status = PrivacyModeRuntimeStatus::UnsafeFile;
+        break;
+      case PrivacyModeError::IoFailure:
+        next.status = PrivacyModeRuntimeStatus::IoFailure;
+        break;
+    }
+  } catch (...) {
+    next.enabled = true;
+    next.status = PrivacyModeRuntimeStatus::IoFailure;
+  }
+  snapshot_ = next;
+}
+
+void PrivacyModeRuntime::markMonitorUnavailable() noexcept {
+  snapshot_ = PrivacyModeRuntimeSnapshot{
+      true, PrivacyModeRuntimeStatus::MonitorUnavailable};
+}
+
+const PrivacyModeRuntimeSnapshot &PrivacyModeRuntime::snapshot()
+    const noexcept {
+  return snapshot_;
+}
+
+const char *privacyModeRuntimeStatusCode(
+    PrivacyModeRuntimeStatus status) noexcept {
+  switch (status) {
+    case PrivacyModeRuntimeStatus::Ready:
+      return "ready";
+    case PrivacyModeRuntimeStatus::InvalidFormat:
+      return "invalid_format";
+    case PrivacyModeRuntimeStatus::UnsafeFile:
+      return "unsafe_file";
+    case PrivacyModeRuntimeStatus::IoFailure:
+      return "io_failure";
+    case PrivacyModeRuntimeStatus::MonitorUnavailable:
+      return "monitor_unavailable";
+  }
+  return "io_failure";
+}
 
 PrivacyModeState readPrivacyMode(const XdgPaths &paths) {
   int descriptor =

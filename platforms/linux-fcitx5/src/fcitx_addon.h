@@ -3,15 +3,20 @@
 
 #include <fcitx/addonfactory.h>
 #include <fcitx/addonmanager.h>
+#include <fcitx-utils/event.h>
 #include <fcitx/inputcontext.h>
 #include <fcitx/inputcontextproperty.h>
 #include <fcitx/inputmethodengine.h>
 #include <fcitx/instance.h>
 
 #include <memory>
+#include <optional>
+#include <vector>
 
+#include "radishlex/linux/application_context.h"
 #include "radishlex/linux/ffi_projection.h"
 #include "radishlex/linux/key_projection.h"
+#include "radishlex/linux/privacy_monitor.h"
 #include "radishlex/linux/runtime_layout.h"
 #include "radishlex/linux/xdg_paths.h"
 
@@ -27,9 +32,11 @@ class InputContextState final : public fcitx::InputContextProperty {
   void handleKey(fcitx::KeyEvent &event);
   void selectCandidate(std::size_t display_index);
   void reset();
+  void applyPrivacyMode(bool enabled);
 
  private:
-  radishlex::linux_platform::LearningContextProjection learningContext() const;
+  radishlex::linux_platform::LearningContextProjection learningContext(
+      bool privacy_mode) const;
   void applyResult(
       const radishlex::linux_platform::KeyResultProjection &result);
   void updateInputPanel(
@@ -62,15 +69,26 @@ class Engine final : public fcitx::InputMethodEngineV2 {
 
   radishlex::linux_platform::SessionProjection *newSession();
   fcitx::FactoryFor<InputContextState> *stateFactory();
+  bool synchronizedPrivacyMode();
+  void registerState(InputContextState *state);
+  void unregisterState(InputContextState *state);
 
  private:
   radishlex::linux_platform::PersonalizedSessionConfig sessionConfig();
+  void synchronizePrivacyMonitor(bool event_source_failed);
+  void logPrivacyStatus();
 
   fcitx::Instance *instance_;
   radishlex::linux_platform::FfiApi ffi_api_;
   radishlex::linux_platform::XdgPaths paths_;
   radishlex::linux_platform::RuntimeLayout runtime_layout_;
+  std::unique_ptr<radishlex::linux_platform::PrivacyModeMonitor>
+      privacy_monitor_;
+  std::unique_ptr<fcitx::EventSourceIO> privacy_event_source_;
+  std::optional<radishlex::linux_platform::PrivacyModeRuntimeStatus>
+      logged_privacy_status_;
   fcitx::FactoryFor<InputContextState> state_factory_;
+  std::vector<InputContextState *> states_;
   std::uint64_t next_session_id_;
 };
 

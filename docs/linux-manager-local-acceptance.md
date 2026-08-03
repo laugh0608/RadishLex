@@ -6,10 +6,10 @@
 
 截至 2026-08-03，M5-P03 已完成 Fcitx5 Wayland/X11 输入、常见应用、生命周期、离线与隐私实机验收，M5-P04 进入 Linux Manager 与同库个人化实现。现有 Flutter 页面、`ManagerBridge`、ABI v9、Rust userdb/ranker、导入导出、删除/tombstone/explicit restore、学习摘要和 rank explain 均直接复用；本批不重写业务真相源，也不通过新增平台私有 ABI 复制既有能力。
 
-首个源码子批已建立 Linux Flutter runner、共享 XDG/Manager runtime、bundle `.so` 约束、Linux privacy 配置与同库 native-rime contract。UTM Debian 13 ARM64 已使用 Flutter 3.44.0 / Dart 3.12.0 完成真实 Release bundle、ELF closure、`$ORIGIN/lib`、正式 ABI symbol、native-rime FFI 与 Dart Manager FFI smoke；该批的 host、真实 bridge 和同库自动证据已经闭合，未启动 GUI，也未写系统安装目录。普通应用受控粗分类、addon privacy 变更感知和桌面双进程产品证据仍未形成。P04 按以下顺序推进：
+首个源码子批已建立 Linux Flutter runner、共享 XDG/Manager runtime、bundle `.so` 约束、Linux privacy 配置与同库 native-rime contract。第二个源码子批已建立先 watch 后初读的 inotify/event-loop privacy 变更感知、失败关闭 runtime 和精确 allowlist 粗分类框架。UTM Debian 13 ARM64 已使用 Flutter 3.44.0 / Dart 3.12.0 完成真实 Release bundle、Fcitx5 addon、ELF closure、`$ORIGIN`、正式 ABI symbol、六项 CTest、native-rime FFI 与 Dart Manager FFI smoke；两批自动证据已经闭合，未启动 GUI，也未写系统安装目录。生产 allowlist 仍为空，普通应用程序身份/敏感传播评审和桌面双进程产品证据尚未形成。P04 后续按以下顺序推进：
 
-1. 独立 privacy 配置、addon 变更感知、受控应用粗分类与学习策略证据。
-2. Fcitx5 与 Manager 自动门禁在真实 ARM64 环境的组合回归。
+1. 真实桌面程序身份、frontend 与敏感字段传播取证，只将完整评审项加入生产 allowlist。
+2. 生产分类后的 Fcitx5/Manager 自动回归与 privacy 学习策略实证。
 3. 真实桌面上的学习、排序、刷新、删除、恢复、导入导出、explain、并发与重启验收。
 
 任何一步都不能用空 `linux/` 目录、fixture mode、手工传入 native library 路径或单连接 SQLite 测试冒充完成。
@@ -111,6 +111,8 @@ Linux host 的 `writePrivacyMode` / `restorePrivacyModeState` 必须在 config p
 
 addon 必须在启动时读取 privacy，并在同目录原子替换后使新状态作用于下一次可能产生学习的操作；状态变更期间不能短暂按旧的“允许写入”状态学习。实现可以使用 Fcitx/event-loop 可控的文件通知或等价串行机制，但不得在每个按键同步解析 JSON，也不得增加网络或 Manager 进程依赖。切换状态时清除未提交选择意图并刷新当前 session 的 `LearningContext`。
 
+当前实现先建立 config 目录 inotify watch，再读取初始 snapshot，避免 read/watch 启动窗口漏事件；event-loop callback 与每次 FFI 操作前的非阻塞 drain 串行消费目标文件替换，未发生事件时不读文件、不解析 JSON。目标文件替换/删除/权限变化触发严格重读；非法文件或 watch/队列异常保持本次 addon 进程失败关闭。有效 privacy 位变化会同步现存 session 的学习上下文并移除旧候选面板，Rust context-change contract 清除待学习选择。
+
 ## 受控应用粗分类
 
 Fcitx `InputContext::program()` 是平台可用但可能为空的程序身份。P04 只允许在 C++ 平台层短暂使用它做固定 allowlist 粗分类；原始值不得跨 FFI、写 userdb/settings、进入诊断或日志。分类输出只允许 `general`、`browser`、`chat`、`code`、`editor`、`office`、`terminal`、`other`。
@@ -124,6 +126,8 @@ Fcitx `InputContext::program()` 是平台可用但可能为空的程序身份。
 5. 空值、未知值、大小写/包装器变体未显式列入或 frontend 证据不足时，一律 `context_known=0, context_kind=other`。
 
 首批 allowlist 不能凭进程名猜测。实现批次先用合成 classifier contract 覆盖允许、未知、空值和 capability 优先级，再在 guest 只读记录程序身份摘要；只有取得 GTK/Qt/浏览器对应 frontend 与 sensitive 行为证据后，才把所需固定项写入生产表和测试。GTK4 `PRIVATE` 在当前 Debian frontend 未传播 `Sensitive` 的事实继续保留，不能因应用进入 allowlist 就宣称该字段安全。
+
+合成 classifier contract 已实现并通过：精确、大小写敏感的规则只输出固定粗类别，empty、unknown、大小写和包装器变体均失败关闭；Password、Sensitive 和 Terminal 在分类前返回，addon 因而不会读取这些上下文的原始 `program()`。Terminal 使用 `context_kind=terminal, context_known=0`，保持 EngineOnly。生产表当前仍为空，不能据此宣称普通应用学习已开放。
 
 ## 同库并发与个人化语义
 
@@ -166,7 +170,7 @@ A6 必须至少有一条从 personalized runtime 写入、经 Manager bridge 读
 
 需要启动 VM、安装依赖、修改输入框架、启用输入法、运行 GUI 或清理 guest 资产时继续逐项获得授权。AI 只读监视并等待用户完成来源切换和实体输入，不合成操作冒充桌面验收。
 
-## 首个实现批次
+## 首个实现批次（已完成）
 
 文档门禁通过后的第一个纵向批次只做 Linux host 与共享数据启动链，但必须完整闭合：
 
@@ -176,7 +180,7 @@ A6 必须至少有一条从 personalized runtime 写入、经 Manager bridge 读
 4. Linux staged Release bundle 携带 workspace native-rime `.so`，完成 ABI/symbol/ELF 与无路径 override smoke。
 5. 使用临时合成库形成“runtime 写入—Manager bridge 刷新—另一 runtime 观察”的产品双端自动证据。
 
-该批不顺带实现 package/安装，也不以能打开空窗口结束。privacy watcher、生产 classifier 与完整桌面个人化可以在后续 P04 子批进入，但第一批必须为它们提供同一 host、XDG 和真实 bridge 基线。
+该批不顺带实现 package/安装，也不以能打开空窗口结束。后续 privacy watcher 与 classifier contract 子批已复用同一 host、XDG 和真实 bridge 基线并闭合；生产 allowlist 与完整桌面个人化仍按本文停止线继续。
 
 ## 当前停止线
 

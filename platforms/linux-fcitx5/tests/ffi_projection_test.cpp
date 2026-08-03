@@ -454,6 +454,13 @@ void testSessionProjection() {
     context.context_known = false;
     context.context_kind = "general";
 
+    session.updateLearningContext(context);
+    require(runtime.last_context.secure_input &&
+                runtime.last_context.sensitive_application &&
+                runtime.last_context.privacy_mode &&
+                !runtime.last_context.context_known,
+            "learning context must support event-loop refresh before input");
+
     RadishLexKeyEvent key{
         RADISHLEX_KEY_KIND_CHAR,
         static_cast<std::uint32_t>('l'),

@@ -9,11 +9,11 @@ M5-P02 已经建立真实 C++ 源码、CMake target、addon/input method metadat
 - Apple clang 的 C++17 严格编译通过；
 - ABI v9 contract、key projection、owned `KeyResult`/snapshot、display-index selection、owner-thread 和 reset/free/shutdown 顺序通过 fake-FFI contract；
 - XDG 默认路径、显式 XDG 根、`0700`/`0600`、relative path、symlink、宽权限和 production/test override 隔离通过；
-- M5-P04 已增加 Flutter Linux runner 源码、固定 bundle `.so`、共享 XDG/Manager runtime 和独立 privacy format contract；平台无关 contract 已通过，真实 Linux Flutter bundle 构建与桌面启动仍待 Linux 工具链复验；
+- M5-P04 已增加 Flutter Linux runner、固定 bundle `.so`、共享 XDG/Manager runtime、独立 privacy format、inotify/event-loop 变更感知与受控粗分类 contract；真实 ARM64 Manager Release/FFI smoke 和 addon 自动门禁均通过，GUI/桌面双进程验收仍待单独授权；
 - Debian 13 ARM64 使用 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 和 librime 1.13.1，真实编译并动态链接启用 `native-rime` 的 `libradishlex_ime_ffi.so` 与 `radishlex.so`；
 - CMake staged install 把 addon、共享 FFI、锁定 RimeData 与两份 Fcitx metadata 形成同一开发装配，addon 只使用 `$ORIGIN` 定位 sibling FFI，不保留仓库或临时构建路径；
 - `radishlex_runtime_probe` 在相同 Linux 环境先校验装配文件、symlink 和权限，再对 staged `radishlex.so` 执行 `dlopen(RTLD_NOW)`；
-- CTest 在相同 Linux 环境复验 FFI projection、XDG resolver 与 runtime layout contract。
+- CTest 在相同 Linux 环境复验 application context、FFI projection、XDG resolver、Manager runtime、privacy monitor 与 runtime layout 六项 contract。
 
 以上自动结果只证明 Linux ARM64 编译、装配和 headless native loader。M5-P03 另已在 Debian 13 ARM64 GNOME 中完成不写 `/usr` 的用户级开发装配，并取得 Wayland/X11、GTK/Qt/Electron/浏览器/终端、完整候选交互、切换/重启、进程级与整机离线、password/unknown/terminal/`Sensitive` 的人工证据。原生 Qt6 Wayland 只由明确的 Wayland QPA、Fcitx Qt6 input-context 与会话类型共同证明；FeatherPad 映射 `libQt6WaylandClient` 本身不作为 backend 证据。快速跨 X11→Wayland 会话的 daemon 自启动使用 Debian 官方 Fcitx5 desktop entry 的用户级副本闭合；这仍是开发装配，不证明发行安装、升级或移除。实时状态见 [`docs/status/current.md`](../../docs/status/current.md)，详细流水见本周周志。
 
@@ -21,19 +21,23 @@ M5-P02 已经建立真实 C++ 源码、CMake target、addon/input method metadat
 
 ```text
 include/radishlex/linux/
+  application_context.h reviewed program-to-coarse-context contract
   ffi_projection.h    ABI v9 owned C++ projection
   key_projection.h    platform key to RadishLex key contract
   manager_runtime.h   Manager bundle/XDG product bootstrap contract
-  privacy_mode.h      strict Linux privacy truth-source contract
+  privacy_mode.h      strict store and fail-closed runtime snapshot
+  privacy_monitor.h   Linux directory change monitor contract
   runtime_layout.h    addon-relative native/RimeData layout contract
   xdg_paths.h         addon/Manager shared XDG resolver
 src/
-  fcitx_addon.*       Fcitx lifecycle, input panel and commit adapter
+  application_context.cpp exact production allowlist projection
+  fcitx_addon.*       Fcitx lifecycle, privacy event loop and commit adapter
   ffi_projection.cpp  KeyResult/snapshot copy and owner-thread guard
   key_projection.cpp  Unicode/named key/modifier/phase validation
   linked_ffi_api.cpp  only direct C ABI symbol table
   manager_runtime.cpp fixed Manager bundle and private local paths
-  privacy_mode.cpp    atomic privacy file read/write/rollback
+  privacy_mode.cpp    atomic privacy store and runtime failure categories
+  privacy_monitor.cpp inotify serialization for atomic replacements
   runtime_layout.cpp  loaded addon identity and resource validation
   xdg_paths.cpp       effective-user XDG and private path enforcement
 config/
@@ -42,15 +46,17 @@ config/
 dev/
   Dockerfile            pinned Debian 13 ARM64 development environment
 tests/
+  application_context_test.cpp
   ffi_projection_test.cpp
   manager_runtime_test.cpp
+  privacy_monitor_test.cpp
   runtime_layout_test.cpp
   xdg_paths_test.cpp
 tools/
   runtime_probe.cpp    staged addon resource and dlopen diagnostic
 ```
 
-`fcitx_addon.cpp` 不包含 Rime、SQLite、ranker、userdb、privacy policy 或同步实现。它只映射 Fcitx capability、按键和生命周期，消费 Rust-owned snapshot，使用 Fcitx input panel，并把 Rust commit 交给当前 input context。
+`fcitx_addon.cpp` 不包含 Rime、SQLite、ranker、userdb、privacy 文件解析或同步实现。它只映射 Fcitx capability、按键和生命周期，把共享 privacy monitor 接入 Fcitx event loop，消费 Rust-owned snapshot，使用 Fcitx input panel，并把 Rust commit 交给当前 input context。
 
 ## ABI v9 审计结论
 
@@ -68,10 +74,10 @@ tools/
 不需要进入共享 ABI 的 Linux 产品能力：
 
 - Linux install/data startup gate 和版本化产品 identity：M5-P05；
-- Linux Manager privacy 已固定为独立 XDG 文件；addon 变更感知与生产分类仍在 M5-P04 后续批次；
+- Linux Manager privacy 已固定为独立 XDG 文件，addon 变更感知与分类框架已落地；生产 allowlist 仍等待真实 frontend/敏感传播评审；
 - 发行版包、系统域路径与升级 receipt：M5-P05。
 
-在普通、非 terminal context 无可靠分类信号时，addon 当前传 `context_known = 0`；Rust 因而使用 engine 顺序且不读写 userdb。Fcitx 明确提供 `Password`、`Sensitive` 或 `Terminal` capability 时只投影对应受控摘要，不传 program name、窗口标题或正文。
+在普通 context 无已评审生产身份时，addon 传 `context_known = 0`；Rust 因而使用 engine 顺序且不读写 userdb。生产 allowlist 当前有意为空，合成 contract 只证明 exact-match 与粗类别边界。Fcitx 明确提供 `Password`、`Sensitive` 或 `Terminal` capability 时先返回受控摘要且不读取 `program()`；Terminal 固定投影为 `terminal + context_known = 0`，不传 program name、窗口标题或正文。
 
 ## XDG 路径
 
@@ -91,6 +97,8 @@ production resolver 使用 `geteuid` + `getpwuid_r` 取得 authoritative home，
 所有 production 输入必须为绝对、无 `.`/`..` 的路径。既有 symlink、错误 owner、非目录节点、product 目录的 group/other 权限，以及 userdb 的 group/other 权限均失败关闭。product/Rime 目录以 `0700` 创建，userdb 以 `0600`、`O_EXCL`、`O_NOFOLLOW` 创建。测试注入接口只有定义 `RADISHLEX_XDG_TESTING` 的测试编译单元可见，production library 不读取 fixture 路径。
 
 Linux Manager host 直接编译同一个 `xdg_paths.h`/`xdg_paths.cpp` 组件，不在 Dart 或 Flutter runner 中重新拼接 XDG 字符串。`privacy-mode.json` 使用严格 format v1、`0600`、无 symlink/hardlink、原子替换与读回；非法状态失败关闭，不让 addon 解析完整 Manager settings。
+
+addon 的 Linux-only monitor 先监听 config 目录再读取初始 snapshot，避免启动窗口漏掉原子替换；同一 Fcitx event loop 和 FFI 操作前的非阻塞 drain 只在目标事件出现时严格重读。格式、owner/权限、IO、watch 丢失、目录变化或队列异常都转为 privacy enabled，并且日志只保留稳定错误类别。privacy 位变化会刷新已有 session 的 `LearningContext`，防止旧待选择状态继续学习。
 
 ## 开发装配
 
@@ -134,7 +142,7 @@ Apple Silicon macOS 的固定 Linux ARM64 编译门禁：
 ./scripts/build-linux-fcitx5-container.sh
 ```
 
-该入口构建固定 digest 的 Debian 13 镜像，以只读方式挂载仓库，并使用 `radishlex-linux-fcitx5-cargo`、`radishlex-linux-fcitx5-target` 两个 Docker named volume 缓存依赖和产物。它会构建 `native-rime` FFI、形成临时 staged install、检查 ARM64 ELF 依赖与 `$ORIGIN`、运行 native loader probe 和三项 CTest；不会写系统目录、安装/启用输入法、写宿主仓库或提供桌面 session。首次执行需要下载 Debian 镜像与软件包，之后复用 Docker/Cargo 缓存。
+该入口构建固定 digest 的 Debian 13 镜像，以只读方式挂载仓库，并使用 `radishlex-linux-fcitx5-cargo`、`radishlex-linux-fcitx5-target` 两个 Docker named volume 缓存依赖和产物。它会构建 `native-rime` FFI、形成临时 staged install、检查 ARM64 ELF 依赖与 `$ORIGIN`、运行 native loader probe 和六项 CTest；不会写系统目录、安装/启用输入法、写宿主仓库或提供桌面 session。首次执行需要下载 Debian 镜像与软件包，之后复用 Docker/Cargo 缓存。
 
 真实 Linux 开发构建需要既有 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、librime development environment，以及启用 `native-rime` 的 Rust cdylib。命令只生成开发 build，不安装 addon：
 

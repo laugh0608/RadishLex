@@ -135,6 +135,7 @@ class SessionProjection final {
   KeyResultProjection selectCandidate(
       std::size_t display_index,
       const LearningContextProjection &learning_context);
+  void updateLearningContext(const LearningContextProjection &context);
   void reset();
   bool hasComposition() const noexcept;
 
