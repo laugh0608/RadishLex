@@ -350,6 +350,20 @@ def check_manager_product_runtime_contract() -> None:
         if symbol not in embed_script:
             raise SystemExit(f"manager native bundle gate is missing symbol: {symbol}")
 
+    linux_product_build = read_text("scripts/build-manager-linux-product.sh")
+    for symbol in (
+        "radishlex_ffi_contract",
+        "radishlex_userdb_terms_new",
+        "radishlex_userdb_learning_status",
+        "radishlex_userdb_rank_explain_new",
+        "radishlex_manager_sync_product_status",
+        "radishlex_manager_sync_qualification_start",
+    ):
+        if symbol not in linux_product_build:
+            raise SystemExit(
+                f"manager Linux native bundle gate is missing symbol: {symbol}"
+            )
+
 
 def check_macos_product_metadata() -> None:
     run_command([str(REPO_ROOT / "scripts/check-macos-product-metadata.sh")])

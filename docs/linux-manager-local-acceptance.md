@@ -6,10 +6,10 @@
 
 截至 2026-08-03，M5-P03 已完成 Fcitx5 Wayland/X11 输入、常见应用、生命周期、离线与隐私实机验收，M5-P04 进入 Linux Manager 与同库个人化实现。现有 Flutter 页面、`ManagerBridge`、ABI v9、Rust userdb/ranker、导入导出、删除/tombstone/explicit restore、学习摘要和 rank explain 均直接复用；本批不重写业务真相源，也不通过新增平台私有 ABI 复制既有能力。
 
-首个源码子批已建立 Linux Flutter runner、共享 XDG/Manager runtime、bundle `.so` 约束、Linux privacy 配置与同库 native-rime contract；真实 Linux Release bundle 尚未构建，普通应用受控粗分类、addon privacy 变更感知和桌面双进程产品证据仍未形成。P04 按以下顺序推进：
+首个源码子批已建立 Linux Flutter runner、共享 XDG/Manager runtime、bundle `.so` 约束、Linux privacy 配置与同库 native-rime contract。UTM Debian 13 ARM64 已使用 Flutter 3.44.0 / Dart 3.12.0 完成真实 Release bundle、ELF closure、`$ORIGIN/lib`、正式 ABI symbol、native-rime FFI 与 Dart Manager FFI smoke；该批的 host、真实 bridge 和同库自动证据已经闭合，未启动 GUI，也未写系统安装目录。普通应用受控粗分类、addon privacy 变更感知和桌面双进程产品证据仍未形成。P04 按以下顺序推进：
 
-1. Linux host、真实 platform bridge、共享 XDG resolver、bundle 内 native library 与同库自动证据。
-2. 独立 privacy 配置、addon 变更感知、受控应用粗分类与学习策略证据。
+1. 独立 privacy 配置、addon 变更感知、受控应用粗分类与学习策略证据。
+2. Fcitx5 与 Manager 自动门禁在真实 ARM64 环境的组合回归。
 3. 真实桌面上的学习、排序、刷新、删除、恢复、导入导出、explain、并发与重启验收。
 
 任何一步都不能用空 `linux/` 目录、fixture mode、手工传入 native library 路径或单连接 SQLite 测试冒充完成。

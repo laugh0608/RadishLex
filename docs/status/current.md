@@ -23,7 +23,9 @@ Wayland 主路径已覆盖 GTK4、Terminal、Firefox、原生 Qt6 和官方 Elec
 
 M5-P04 已在 [Linux Manager 本地验收边界](../linux-manager-local-acceptance.md) 固定 product bootstrap、bundle `.so`、共享 XDG/userdb、独立 privacy 配置、受控程序粗分类、WAL 并发和验收矩阵。现有 Flutter 页面、ManagerBridge、ABI v9 与 Rust 业务能力直接复用。当前入口是完整 Linux host/真实 bridge/同库自动证据，不先建空 runner；普通应用保持 unknown，直到程序身份和敏感字段传播经实机评审。
 
-首个代码子批已落 Linux runner、engine 前 `umask(0077)`、固定 bundle `.so`、共享 XDG/Manager runtime、严格 `privacy-mode.json` 原子读写/回滚和平台中立 Dart 路径契约。平台无关 C++ contract、Flutter analyze/97 项测试、仓库基线及“runtime 学习—Manager C ABI 管理—新 runtime 观察”的 native-rime 同库链已通过；真实 Linux Flutter bundle 尚未构建，因此本子批未退出，也未宣称 Linux Manager 可用。
+首个代码子批已落 Linux runner、engine 前 `umask(0077)`、固定 bundle `.so`、共享 XDG/Manager runtime、严格 `privacy-mode.json` 原子读写/回滚和平台中立 Dart 路径契约。平台无关 C++ contract、Flutter analyze/97 项测试、仓库基线及“runtime 学习—Manager C ABI 管理—新 runtime 观察”的 native-rime 同库链已通过。
+
+UTM Debian 13 ARM64 已使用官方 Flutter 3.44.0 / Dart 3.12.0 与 clang 19 完成 `check-manager-linux-product.sh`：真实 ARM64 Release bundle、固定 sibling `.so`、动态依赖、`$ORIGIN/lib`、正式 ABI symbol、native-rime FFI 和 Dart Manager FFI smoke 全部通过，未启动 GUI。首轮实机门禁发现 Linux 脚本把 `radishlex_userdb_terms_new` / `radishlex_userdb_rank_explain_new` 误写为不存在的缩写名；现已对齐正式 ABI，并把 Linux required-symbol 口径纳入仓库静态基线。首个 host/真实 bridge/同库自动证据子批至此闭合，但普通应用分类、addon privacy 变更感知和桌面双进程验收仍未完成，不能宣称 M5-P04 或 Linux Manager 产品完成。
 
 ## macOS 冻结参考
 
@@ -45,8 +47,8 @@ build 38 的详细身份、事务、载体与实机流水由 [macOS 产品包边
 
 ## 下一步顺位
 
-1. 在既有 Debian ARM64 环境补齐 Flutter Linux 工具链前置检查，执行 `check-manager-linux-product.sh`，取得真实 Release bundle、`.so`/ELF/ABI、无路径 override 和 FFI smoke；不启动 GUI或安装系统文件。
-2. Linux bundle 自动门禁通过后，再实现 addon 对 `privacy-mode.json` 的安全变更感知和受控应用粗分类；unknown 与 GTK4 `PRIVATE` 传播缺口继续失败关闭。
+1. 实现 addon 对 `privacy-mode.json` 的安全变更感知和受控应用粗分类，先闭合平台 contract、串行更新与失败关闭；unknown 与 GTK4 `PRIVATE` 传播缺口继续失败关闭。
+2. 新自动 contract 通过后，在既有 Debian ARM64 环境复跑 Fcitx5 与 Manager 强门禁，确认 privacy/classifier 没有污染 Rust 真相源、热路径或 staged bundle。
 3. 自动门禁稳定后，在单独授权的 Debian guest 中完成学习影响排序、Manager 刷新、删除不复活、显式恢复、导入导出、explain、privacy 零增量、并发和重启桌面验收。
 4. Electron/敏感字段临时资产清理仍需单独授权，只删除 P03 临时材料并保留 Fcitx/Qt runtime、用户级开发装配、userdb 零基线和可复验 VM；该清理不阻塞 P04 代码。
 5. M5-P05 再推进 Linux 安装、升级、修复、默认移除和数据保留；不把 P03 的用户 autostart/开发复制或 P04 staged bundle 冒充产品安装，也不提前并行 Android IME。
@@ -65,6 +67,7 @@ build 38 的详细身份、事务、载体与实机流水由 [macOS 产品包边
 ./scripts/check-macos-imk.sh
 ./scripts/check-macos-upgrade-product-coordination.sh
 ./scripts/check-linux-fcitx5.sh
+./scripts/check-manager-linux-product.sh
 ./scripts/build-linux-fcitx5-container.sh
 ./scripts/check-repo.sh
 ./scripts/check-docs.sh

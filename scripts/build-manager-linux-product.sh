@@ -62,9 +62,9 @@ readelf -d "${executable}" | rg -q '\$ORIGIN/lib'
 
 for symbol in \
   radishlex_ffi_contract \
-  radishlex_userdb_list_terms \
+  radishlex_userdb_terms_new \
   radishlex_userdb_learning_status \
-  radishlex_userdb_rank_explain \
+  radishlex_userdb_rank_explain_new \
   radishlex_manager_sync_product_status \
   radishlex_manager_sync_qualification_start; do
   if ! nm -D --defined-only "${bundled_ffi}" | \
