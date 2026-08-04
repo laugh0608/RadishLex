@@ -4,15 +4,15 @@
 
 ## 当前结论
 
-截至 2026-08-03，M5-P03 已完成 Fcitx5 Wayland/X11 输入、常见应用、生命周期、离线与隐私实机验收，M5-P04 进入 Linux Manager 与同库个人化实现。现有 Flutter 页面、`ManagerBridge`、ABI v9、Rust userdb/ranker、导入导出、删除/tombstone/explicit restore、学习摘要和 rank explain 均直接复用；本批不重写业务真相源，也不通过新增平台私有 ABI 复制既有能力。
+截至 2026-08-04，M5-P03 已完成 Fcitx5 Wayland/X11 输入、常见应用、生命周期、离线与隐私实机验收，M5-P04 进入 Linux Manager 与同库个人化实现。现有 Flutter 页面、`ManagerBridge`、ABI v9、Rust userdb/ranker、导入导出、删除/tombstone/explicit restore、学习摘要和 rank explain 均直接复用；本批不重写业务真相源，也不通过新增平台私有 ABI 复制既有能力。
 
 首个源码子批已建立 Linux Flutter runner、共享 XDG/Manager runtime、bundle `.so` 约束、Linux privacy 配置与同库 native-rime contract。第二个子批已建立先 watch 后初读的 privacy 变更感知、失败关闭 runtime 和精确 allowlist 粗分类框架；第三个子批增加默认关闭、只输出 opaque token 与 capability on/off 的受控桌面取证模式。UTM Debian 13 ARM64 已完成真实 Flutter 3.44.0 Release bundle、Fcitx5 addon、ELF/`$ORIGIN`、正式 ABI symbol、六项 CTest、native-rime 与 Dart smoke。
 
-Wayland Firefox 已取得精确 `firefox-esr` 身份、GTK3 Fcitx frontend、原生 Wayland、password capability 和 userdb 零增量证据；生产 allowlist 仍为空，因为同一矩阵的 X11 半侧和桌面双进程产品证据尚未形成。P04 后续按以下顺序推进：
+Firefox 已在 Wayland/X11 两侧取得相同的精确 `firefox-esr` 身份、GTK3 Fcitx frontend、password capability 和 userdb 零增量证据；生产 allowlist 因而只加入 `firefox-esr -> browser`，其他候选与变体继续失败关闭。桌面双进程产品证据尚未形成，P04 后续按以下顺序推进：
 
-1. 在 X11 完成同一 Firefox 身份、frontend 与敏感字段传播对照，只将 Wayland/X11 完整评审项加入生产 allowlist。
-2. 生产分类后的 Fcitx5/Manager 自动回归与 privacy 学习策略实证。
-3. 真实桌面上的学习、排序、刷新、删除、恢复、导入导出、explain、并发与重启验收。
+1. 完成生产分类后的 Fcitx5/Manager 自动回归与 Firefox 学习、排序、刷新和 privacy 零增量实证。
+2. 在真实桌面闭合 Manager 与 addon 同库、删除、恢复、导入导出和 explain。
+3. 完成双进程并发、Manager/Fcitx/桌面重启与无重复学习验收。
 
 任何一步都不能用空 `linux/` 目录、fixture mode、手工传入 native library 路径或单连接 SQLite 测试冒充完成。
 
@@ -133,7 +133,7 @@ Fcitx `InputContext::program()` 是平台可用但可能为空的程序身份。
 
 真实桌面评审使用默认关闭的 `RADISHLEX_APPLICATION_EVIDENCE`。它只把源码内固定候选的精确匹配转换为 opaque token，未命中统一输出 `unmatched`；capability 只输出稳定 on/off 变化。默认产品 addon 的强门禁禁止出现这些日志字符串，该模式不修改生产 allowlist，也不记录原始程序身份、窗口标题或正文。
 
-Wayland Firefox 已得到精确对应 `firefox-esr` 的 `browser_candidate_01`，会话和库映射支持原生 Wayland/GTK3 Fcitx frontend；密码字段产生 `password_on`/`password_off`，用户观察与 userdb 全零结果一致。X11 对照尚未执行，因此生产表仍为空，不能据此宣称普通应用学习已开放。
+Wayland Firefox 已得到精确对应 `firefox-esr` 的 `browser_candidate_01`，会话和库映射支持原生 Wayland/GTK3 Fcitx frontend。X11 对照得到同一 token，Firefox 为 X11 client，加载 GTK3 `im-fcitx5.so` 与 `libFcitx5GClient`，且未设置 Wayland display。两侧密码字段均产生 `password_on`/`password_off`，普通字段显示候选、密码字段只显示遮罩且无候选，前后 userdb 七项聚合全零。因此生产表只加入精确 `firefox-esr -> browser`；路径、大小写、wrapper、其他 Firefox 候选、unknown 与 GTK4 `PRIVATE` 仍失败关闭。
 
 ## 同库并发与个人化语义
 
@@ -186,7 +186,7 @@ A6 必须至少有一条从 personalized runtime 写入、经 Manager bridge 读
 4. Linux staged Release bundle 携带 workspace native-rime `.so`，完成 ABI/symbol/ELF 与无路径 override smoke。
 5. 使用临时合成库形成“runtime 写入—Manager bridge 刷新—另一 runtime 观察”的产品双端自动证据。
 
-该批不顺带实现 package/安装，也不以能打开空窗口结束。后续 privacy watcher 与 classifier contract 子批已复用同一 host、XDG 和真实 bridge 基线并闭合；生产 allowlist 与完整桌面个人化仍按本文停止线继续。
+该批不顺带实现 package/安装，也不以能打开空窗口结束。后续 privacy watcher、classifier contract、Wayland/X11 身份评审与精确 Firefox 生产规则已复用同一 host、XDG 和真实 bridge 基线闭合；完整桌面个人化仍按本文停止线继续。
 
 ## 当前停止线
 

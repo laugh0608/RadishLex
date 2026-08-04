@@ -14,7 +14,9 @@ struct ApplicationRule {
 
 // Production entries are added only after the corresponding Wayland/X11
 // frontend identity and sensitive-field propagation have been reviewed.
-constexpr std::array<ApplicationRule, 0> kReviewedApplications{};
+constexpr std::array<ApplicationRule, 1> kReviewedApplications{{
+    {"firefox-esr", ReviewedApplicationKind::Browser},
+}};
 
 std::string_view contextKindName(ReviewedApplicationKind kind) {
   switch (kind) {

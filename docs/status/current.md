@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核日期：2026-08-03（Asia/Shanghai）
+- 复核日期：2026-08-04（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品
 - 当前主批次：M5-P04 Linux Manager、同库个人化与本地管理验收
@@ -19,11 +19,11 @@ P03 的 password、terminal、unknown 与 Qt `Sensitive` 路径均未产生学�
 
 M5-P04 已落地 Linux Flutter runner、engine 前 `umask(0077)`、固定 bundle `.so`、共享 XDG/Manager runtime、严格 `privacy-mode.json` 原子读写/回滚，以及“runtime 写入—Manager C ABI 管理—新 runtime 观察”的同库自动证据。Debian ARM64 的 Flutter 3.44.0 Release bundle、ELF closure、`$ORIGIN/lib`、正式 ABI symbol、native-rime FFI 与 Dart smoke 已通过；首轮门禁暴露的两处 ABI 缩写漂移也已修正并纳入静态检查。桌面 Manager 尚未启动，不能宣称 P04 完成。
 
-第二个子批建立了先 watch 后初读的 privacy 变更感知和失败关闭的应用粗分类。Password、Sensitive 与 Terminal 在读取 `InputContext::program()` 前返回；Terminal 保持 `context_known=0`。生产 allowlist 仍为空，unknown 与 GTK4 `PRIVATE` 继续不读写个人化数据。
+第二个子批建立了先 watch 后初读的 privacy 变更感知和失败关闭的应用粗分类。Password、Sensitive 与 Terminal 在读取 `InputContext::program()` 前返回；Terminal 保持 `context_known=0`。Wayland/X11 实机评审后，生产 allowlist 只加入精确 `firefox-esr -> browser`；其他 Firefox 变体、unknown 与 GTK4 `PRIVATE` 继续不读写个人化数据。
 
-第三个子批增加默认关闭的 `RADISHLEX_APPLICATION_EVIDENCE`：只把源码内固定候选的精确匹配投影为 opaque token，只记录 capability 的稳定 on/off 变化；默认产品 addon 由门禁保证不含取证日志字符串。Wayland Firefox 实机得到 `browser_candidate_01`，其源码候选精确对应 `firefox-esr`；进程会话与 GTK3 Fcitx frontend 证据支持原生 Wayland，密码字段产生 `password_on`/`password_off`。用户确认普通字段显示候选，密码字段仅显示圆点且无候选，前后 userdb v9 学习聚合均为零。
+第三个子批增加默认关闭的 `RADISHLEX_APPLICATION_EVIDENCE`：只把源码内固定候选的精确匹配投影为 opaque token，只记录 capability 的稳定 on/off 变化；默认产品 addon 由门禁保证不含取证日志字符串。Wayland Firefox 实机得到 `browser_candidate_01`，进程会话与 GTK3 Fcitx frontend 证据支持原生 Wayland。2026-08-04 的 X11 对照再次得到同一 token；Firefox 为 `DISPLAY=:0`、`XDG_SESSION_TYPE=x11`、X11 client，并加载 GTK3 `im-fcitx5.so` 与 `libFcitx5GClient`，未设置 `WAYLAND_DISPLAY` 或 `MOZ_ENABLE_WAYLAND`。
 
-Wayland 证据只闭合了评审矩阵的一半；同一 Firefox 身份、frontend 与密码传播仍须在 X11 复验，因此生产 allowlist 暂不加入任何项。guest 日终已恢复默认关闭取证的最新 addon 与生产临时服务，staging、backup 和旧脏工作副本保持原状；剩余主线是 X11 对照、生产 allowlist、桌面学习与 Manager 双进程验收。
+Wayland/X11 两侧均产生 `password_on`/`password_off`；用户确认普通字段显示候选，密码字段只显示遮罩且无候选，完整往返前后 userdb v9 七项学习聚合保持全零。精确生产规则的宿主 contract 与 Debian ARM64 addon、ELF、runtime probe、六项 CTest 和默认二进制 evidence 排除已通过；guest 已停止 evidence unit 并恢复未改动的默认 production transient service，私有 evidence stage、P03 staging/backup 和旧脏工作副本均保留。桌面 Manager 尚未启动，剩余主线是生产分类后的学习、Manager 刷新、privacy 零增量及完整本地管理验收。
 
 ## macOS 冻结参考
 
@@ -45,11 +45,11 @@ build 38 的详细身份、事务、载体与实机流水由 [macOS 产品包边
 
 ## 下一步顺位
 
-1. 2026-08-04 首先在另行授权并保存现有工作的前提下停止当前临时服务，由用户注销、选择 GNOME on Xorg 并重新登录；AI 不自动切换会话或合成实体操作。
-2. 在 X11 复用同一默认关闭、显式启用的取证模式和离线 Firefox 夹具，核对精确身份、frontend、普通/密码字段 capability 与 userdb 零增量；不记录输入正文、窗口标题或原始程序名。
-3. 只有 Wayland/X11 两侧均通过时，才加入精确 `firefox-esr -> browser` 生产 allowlist，并复跑 classifier、Fcitx5、Manager 和默认产品二进制排除门禁；任一证据漂移都保持 unknown 失败关闭。
-4. allowlist 闭合后再验证学习影响排序、Manager 刷新、privacy 零增量、删除不复活、显式恢复、导入导出、explain、WAL/并发及重启；每次 GUI、输入法与实体交互仍逐项授权。
-5. M5-P05 安装维护、P03 临时资产清理、远端推送和其他平台均不进入明日首批；对应动作继续单独授权。
+1. 在私有 stage 构建并受控启用含精确 Firefox 规则的默认产品 addon，验证一次公开合成选择产生一次预期学习、新 session 排序变化且 explain 一致；不扩大 allowlist。
+2. 从 staged Linux bundle 启动 product Manager，确认与 addon 使用同一 XDG userdb，页头刷新能观察同一聚合变化且 fixture 标识不出现。
+3. 通过 Manager 开启 privacy，验证 addon 下一次学习机会零增量；关闭后一次合成选择只恢复一次预期增量。
+4. 前述纵向链稳定后再推进删除不复活、显式恢复、导入导出、WAL/并发及 Manager/Fcitx/桌面重启；每次 GUI、输入法与实体交互仍逐项授权。
+5. M5-P05 安装维护、P03 临时资产清理、远端推送和其他平台均不进入当前批次；对应动作继续单独授权。
 
 ## 验证入口
 

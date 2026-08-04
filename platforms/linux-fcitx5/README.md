@@ -78,10 +78,10 @@ tools/
 不需要进入共享 ABI 的 Linux 产品能力：
 
 - Linux install/data startup gate 和版本化产品 identity：M5-P05；
-- Linux Manager privacy 已固定为独立 XDG 文件，addon 变更感知与分类框架已落地；生产 allowlist 仍等待真实 frontend/敏感传播评审；
+- Linux Manager privacy 已固定为独立 XDG 文件，addon 变更感知与分类框架已落地；生产 allowlist 只包含经 Wayland/X11 评审的精确 `firefox-esr -> browser`；
 - 发行版包、系统域路径与升级 receipt：M5-P05。
 
-在普通 context 无已评审生产身份时，addon 传 `context_known = 0`；Rust 因而使用 engine 顺序且不读写 userdb。生产 allowlist 当前有意为空，合成 contract 只证明 exact-match 与粗类别边界。Fcitx 明确提供 `Password`、`Sensitive` 或 `Terminal` capability 时先返回受控摘要且不读取 `program()`；Terminal 固定投影为 `terminal + context_known = 0`，不传 program name、窗口标题或正文。
+在普通 context 无已评审生产身份时，addon 传 `context_known = 0`；Rust 因而使用 engine 顺序且不读写 userdb。当前只有精确 `firefox-esr` 映射为 `browser + context_known = 1`；路径、大小写、wrapper、其他 Firefox 候选和 unknown 仍失败关闭。Fcitx 明确提供 `Password`、`Sensitive` 或 `Terminal` capability 时先返回受控摘要且不读取 `program()`；Terminal 固定投影为 `terminal + context_known = 0`，不传 program name、窗口标题或正文。
 
 经单独授权做真实桌面身份评审时，可在开发 build 显式设置 `-DRADISHLEX_APPLICATION_EVIDENCE=ON`。该模式只把源码中固定候选的精确匹配投影为不含原值的稳定 token，未命中统一输出 `unmatched`；Password、Sensitive 与 Terminal 只输出 `*_program_unread`，保持不读取 `InputContext::program()`。同一模式还订阅 Fcitx 公共 capability change 事件，只输出 `password_on/off`、`sensitive_on/off` 与 `terminal_on/off`，不关联或记录任意原始程序身份。该选项默认关闭，不改变生产 allowlist，也不能作为应用已通过 Wayland/X11、frontend 和敏感字段传播评审的替代证据。
 

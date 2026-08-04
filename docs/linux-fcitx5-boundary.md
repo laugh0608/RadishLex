@@ -68,7 +68,7 @@ Linux 继续使用 `ime-ffi` ABI v9 已有的：
 - PageUp/PageDown 作为稳定 named key 进入 Rust 后用新 snapshot 重建列表；
 - reset/free/shutdown 已足以表达 per-context session 与进程 teardown。
 
-当前真实缺口不在 ABI、addon 编译、Manager privacy 来源或 startup gate，而在生产应用分类的 X11 对照、桌面 Manager/同库个人化，以及 P05 发行安装事务。这些缺口不需要增加平台私有 ABI。
+当前真实缺口不在 ABI、addon 编译、Manager privacy 来源、startup gate 或首条生产应用分类，而在桌面 Manager/同库个人化，以及 P05 发行安装事务。这些缺口不需要增加平台私有 ABI。
 
 ### Flutter Manager
 
@@ -145,7 +145,7 @@ Fcitx5 或桌面协议无法提供可靠 secure signal 的环境不得标记为�
 
 受控应用身份取证只允许精确匹配源码内固定候选并输出 opaque token，未命中输出 `unmatched`；capability 只记录 password/sensitive/terminal 的 on/off 变化。Password、Sensitive 与 Terminal 路径不得为取证读取 `InputContext::program()`。该模式默认关闭、不改变生产 allowlist，默认 addon 还要通过二进制字符串排除门禁。
 
-2026-08-03 的 Wayland Firefox 证据确认 `browser_candidate_01` 精确对应 `firefox-esr`，进程会话与库映射支持原生 Wayland/GTK3 Fcitx frontend，密码字段产生 `password_on`/`password_off`；用户实体观察与 userdb v9 全零一致。X11 同序对照尚未执行，所以生产 allowlist 继续为空。
+2026-08-03 的 Wayland Firefox 证据确认 `browser_candidate_01` 精确对应 `firefox-esr`，进程会话与库映射支持原生 Wayland/GTK3 Fcitx frontend。2026-08-04 的 X11 同序对照得到相同 token，Firefox 为真实 X11 client，并加载 GTK3 `im-fcitx5.so` 与 `libFcitx5GClient`。两侧密码字段均产生 `password_on`/`password_off`；普通字段候选、密码遮罩无候选与 userdb v9 七项全零一致。生产 allowlist 因而只加入精确 `firefox-esr -> browser`，其他候选和值变体继续失败关闭。
 
 ## XDG 产品路径
 
@@ -236,9 +236,12 @@ M5-P03 已覆盖：
 - 断网输入；
 - password/secure/unknown 上下文不学习；
 
-M5-P04 继续覆盖：
+M5-P04 已覆盖：
 
 - Firefox 在 Wayland/X11 的精确程序身份、frontend、密码 capability 与 userdb 零增量对照；
+
+M5-P04 继续覆盖：
+
 - Manager 与 addon 并发读取、写入、删除、恢复及重启保持；
 - 合成词学习后排序变化、删除不复活和 explain 一致；
 - 不含真实输入历史的脱敏诊断。

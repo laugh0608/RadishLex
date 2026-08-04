@@ -40,13 +40,54 @@ void requireUnknown(const LearningContextProjection &context,
   require(!context.context_known && context.context_kind == "other", message);
 }
 
-void testProductionStartsFailClosed() {
-  const auto context =
-      radishlex::linux_platform::projectApplicationContext(
-          ApplicationContextInput{false, false, false, false,
-                                  "org.radishlex.synthetic.editor"});
-  requireUnknown(context,
-                 "unreviewed production identities must remain unknown");
+void testProductionReviewedIdentitiesAreExactAndCoarse() {
+  using radishlex::linux_platform::projectApplicationContext;
+
+  const auto browser = projectApplicationContext(
+      ApplicationContextInput{false, false, false, false, "firefox-esr"});
+  require(browser.context_known && browser.context_kind == "browser",
+          "reviewed Firefox ESR identity must project to browser");
+
+  const auto private_browser = projectApplicationContext(
+      ApplicationContextInput{false, false, false, true, "firefox-esr"});
+  require(private_browser.privacy_mode && private_browser.context_known &&
+              private_browser.context_kind == "browser",
+          "privacy must retain the reviewed browser category for read-only use");
+
+  const char *unreviewed[] = {
+      "",          "FIREFOX-ESR", "wrapper:firefox-esr",
+      "firefox",   "firefox-esr.desktop",
+      "/usr/lib/firefox-esr/firefox-esr",
+      "org.mozilla.firefox",
+      "org.radishlex.synthetic.editor",
+  };
+  for (const char *program : unreviewed) {
+    requireUnknown(
+        projectApplicationContext(
+            ApplicationContextInput{false, false, false, false, program}),
+        "unreviewed production identity variants must remain unknown");
+  }
+
+  const auto password = projectApplicationContext(
+      ApplicationContextInput{true, false, false, false, "firefox-esr"});
+  require(password.secure_input,
+          "password capability must remain visible for reviewed Firefox ESR");
+  requireUnknown(password,
+                 "password capability must bypass production classification");
+
+  const auto sensitive = projectApplicationContext(
+      ApplicationContextInput{false, true, false, false, "firefox-esr"});
+  require(sensitive.sensitive_application,
+          "sensitive capability must remain visible for reviewed Firefox ESR");
+  requireUnknown(
+      sensitive,
+      "sensitive capability must bypass production classification");
+
+  const auto terminal = projectApplicationContext(
+      ApplicationContextInput{false, false, true, false, "firefox-esr"});
+  require(!terminal.context_known && terminal.context_kind == "terminal",
+          "terminal capability must stay non-learning ahead of production "
+          "identity");
 }
 
 void testApplicationEvidenceCandidatesAreExactAndOpaque() {
@@ -163,7 +204,7 @@ void testCapabilityAndPrivacyPriority() {
 }  // namespace
 
 int main() {
-  testProductionStartsFailClosed();
+  testProductionReviewedIdentitiesAreExactAndCoarse();
   testApplicationEvidenceCandidatesAreExactAndOpaque();
   testReviewedRulesAreExactAndCoarse();
   testCapabilityAndPrivacyPriority();
