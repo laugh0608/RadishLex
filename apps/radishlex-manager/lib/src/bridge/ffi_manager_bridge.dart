@@ -200,13 +200,13 @@ class FfiManagerBridge implements ManagerBridge {
     );
   }
 
-  NativeRankExplainSummary _rankExplainTerm(UserTerm term) {
+  NativeRankExplainSummary _rankExplainTerm(UserTerm term, String contextKind) {
     return _native.rankExplain(
       dbPath: dbPath,
       inputCode: term.inputCode,
       candidateText: term.text,
       reading: managerRankExplainReading(term),
-      contextKind: 'general',
+      contextKind: contextKind,
     );
   }
 }

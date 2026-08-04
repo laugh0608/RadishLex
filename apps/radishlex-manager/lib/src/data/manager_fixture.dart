@@ -75,12 +75,14 @@ ManagerSnapshot createManagerFixture() {
       RankerExplanation(
         inputCode: 'luobo',
         candidate: '萝卜词核',
+        contextKind: 'general',
         score: 0.92,
         signals: ['manual_user_term', 'frequency_boost', 'recent_selection'],
       ),
       RankerExplanation(
         inputCode: 'tongbu',
         candidate: '同步预检',
+        contextKind: 'chat',
         score: 0.76,
         signals: ['selection_history', 'context_summary'],
       ),

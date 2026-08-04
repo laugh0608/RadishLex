@@ -34,12 +34,14 @@ class RankerExplanation {
   const RankerExplanation({
     required this.inputCode,
     required this.candidate,
+    required this.contextKind,
     required this.score,
     required this.signals,
   });
 
   final String inputCode;
   final String candidate;
+  final String contextKind;
   final double score;
   final List<String> signals;
 }

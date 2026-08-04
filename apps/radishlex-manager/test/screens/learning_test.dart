@@ -23,6 +23,8 @@ void main() {
     expect(find.text('manager-import'), findsNothing);
     expect(find.text('selection events'), findsOneWidget);
     expect(find.text('manual_user_term'), findsOneWidget);
+    expect(find.text('context=general'), findsOneWidget);
+    expect(find.text('context=chat'), findsOneWidget);
     expect(find.text('仅展示聚合学习摘要，不展示 P1 原始选择事件、原始输入历史或应用窗口信息。'), findsOneWidget);
     expect(find.text('选择一个候选查看 rank explain 贡献项'), findsOneWidget);
   });
@@ -43,7 +45,7 @@ void main() {
 
     await tester.enterText(
       find.byKey(const Key('rank-explain-filter')),
-      'context',
+      'chat',
     );
     await tester.pump();
 
@@ -56,11 +58,57 @@ void main() {
     await tester.pump();
 
     expect(find.text('summary only'), findsOneWidget);
+    expect(find.text('general'), findsOneWidget);
     expect(
       find.text('manual_user_term, frequency_boost, recent_selection'),
       findsOneWidget,
     );
     expect(find.text('不展示 P1 原始事件明细'), findsOneWidget);
+  });
+
+  testWidgets('learning rank explain keeps same candidate contexts distinct', (
+    WidgetTester tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final snapshot = createManagerFixture().copyWith(
+      explanations: const [
+        RankerExplanation(
+          inputCode: 'ba',
+          candidate: '把',
+          contextKind: 'general',
+          score: 1,
+          signals: ['user=1.000'],
+        ),
+        RankerExplanation(
+          inputCode: 'ba',
+          candidate: '把',
+          contextKind: 'browser',
+          score: 1.793,
+          signals: ['user=1.000', 'context=0.300'],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      RadishLexManagerApp(
+        bridge: FixtureManagerBridge(initialSnapshot: snapshot),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.psychology_alt_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('context=general'), findsOneWidget);
+    expect(find.text('context=browser'), findsOneWidget);
+
+    await tester.tap(find.text('context=browser'));
+    await tester.pump();
+
+    expect(find.text('browser'), findsOneWidget);
+    expect(find.text('1.79'), findsNWidgets(3));
   });
 
   testWidgets('learning view exposes empty aggregate states', (

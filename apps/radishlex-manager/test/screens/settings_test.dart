@@ -24,6 +24,17 @@ void main() {
     await tester.tap(find.byIcon(Icons.tune_outlined));
     await tester.pumpAndSettle();
 
+    final theme = Theme.of(tester.element(find.byType(Scaffold).first));
+    expect(
+      theme.textTheme.bodyMedium?.fontFamilyFallback,
+      radishLexFontFallbacks,
+    );
+    expect(
+      radishLexFontFallbacks.indexOf('DejaVu Sans'),
+      lessThan(radishLexFontFallbacks.indexOf('Droid Sans Fallback')),
+    );
+    expect(find.text('保存时写入当前平台输入法隐私设置，并以读回结果为准。'), findsOneWidget);
+    expect(find.textContaining('macOS 输入法隐私偏好'), findsNothing);
     expect(find.text('配置来源'), findsOneWidget);
     expect(find.text('fixture'), findsOneWidget);
     expect(find.text('synthetic demo userdb'), findsOneWidget);

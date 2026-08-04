@@ -8,27 +8,31 @@ class RankerExplanationKey {
   const RankerExplanationKey({
     required this.inputCode,
     required this.candidate,
+    required this.contextKind,
   });
 
   factory RankerExplanationKey.from(RankerExplanation explanation) {
     return RankerExplanationKey(
       inputCode: explanation.inputCode,
       candidate: explanation.candidate,
+      contextKind: explanation.contextKind,
     );
   }
 
   final String inputCode;
   final String candidate;
+  final String contextKind;
 
   @override
   bool operator ==(Object other) {
     return other is RankerExplanationKey &&
         other.inputCode == inputCode &&
-        other.candidate == candidate;
+        other.candidate == candidate &&
+        other.contextKind == contextKind;
   }
 
   @override
-  int get hashCode => Object.hash(inputCode, candidate);
+  int get hashCode => Object.hash(inputCode, candidate, contextKind);
 }
 
 List<RankerExplanation> filterRankerExplanations({
@@ -43,6 +47,7 @@ List<RankerExplanation> filterRankerExplanations({
       .where((explanation) {
         return explanation.inputCode.toLowerCase().contains(normalizedQuery) ||
             explanation.candidate.toLowerCase().contains(normalizedQuery) ||
+            explanation.contextKind.toLowerCase().contains(normalizedQuery) ||
             explanation.signals.any(
               (signal) => signal.toLowerCase().contains(normalizedQuery),
             );
@@ -93,7 +98,7 @@ class RankExplainSection extends StatelessWidget {
           controller: controller,
           decoration: const InputDecoration(
             prefixIcon: Icon(Icons.search),
-            labelText: '筛选 input code / candidate / signal',
+            labelText: '筛选 input code / candidate / context / signal',
           ),
           onChanged: onFilterChanged,
         ),
@@ -171,6 +176,10 @@ class RankerExplanationDetail extends StatelessWidget {
           value: selectedExplanation.candidate,
         ),
         ManagerKeyValueRow(
+          label: 'context',
+          value: selectedExplanation.contextKind,
+        ),
+        ManagerKeyValueRow(
           label: 'score',
           value: selectedExplanation.score.toStringAsFixed(2),
         ),
@@ -225,9 +234,12 @@ class _RankerExplanationRow extends StatelessWidget {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: explanation.signals
-                          .map((signal) => Chip(label: Text(signal)))
-                          .toList(),
+                      children: [
+                        Chip(label: Text('context=${explanation.contextKind}')),
+                        ...explanation.signals.map(
+                          (signal) => Chip(label: Text(signal)),
+                        ),
+                      ],
                     ),
                   ],
                 ),

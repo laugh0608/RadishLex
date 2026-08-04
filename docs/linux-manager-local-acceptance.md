@@ -8,10 +8,10 @@
 
 首个源码子批已建立 Linux Flutter runner、共享 XDG/Manager runtime、bundle `.so` 约束、Linux privacy 配置与同库 native-rime contract。第二个子批已建立先 watch 后初读的 privacy 变更感知、失败关闭 runtime 和精确 allowlist 粗分类框架；第三个子批增加默认关闭、只输出 opaque token 与 capability on/off 的受控桌面取证模式。UTM Debian 13 ARM64 已完成真实 Flutter 3.44.0 Release bundle、Fcitx5 addon、ELF/`$ORIGIN`、正式 ABI symbol、六项 CTest、native-rime 与 Dart smoke。
 
-Firefox 已在 Wayland/X11 两侧取得相同的精确 `firefox-esr` 身份、GTK3 Fcitx frontend、password capability 和 userdb 零增量证据；生产 allowlist 因而只加入 `firefox-esr -> browser`，其他候选与变体继续失败关闭。桌面双进程产品证据尚未形成，P04 后续按以下顺序推进：
+Firefox 已在 Wayland/X11 两侧取得相同的精确 `firefox-esr` 身份、GTK3 Fcitx frontend、password capability 和 userdb 零增量证据；生产 allowlist 因而只加入 `firefox-esr -> browser`，其他候选与变体继续失败关闭。生产分类后的桌面纵向链已完成第一段：Firefox 选择公开合成候选后，Linux Release Manager 刷新看见同一 userdb 聚合，后续候选提升与 `browser` rank explain 一致。P04 后续按以下顺序推进：
 
-1. 完成生产分类后的 Fcitx5/Manager 自动回归与 Firefox 学习、排序、刷新和 privacy 零增量实证。
-2. 在真实桌面闭合 Manager 与 addon 同库、删除、恢复、导入导出和 explain。
+1. 完成 Manager privacy 写入读回、addon 零增量与关闭后单次恢复学习实证。
+2. 在真实桌面闭合 Manager 与 addon 同库的删除、恢复和导入导出。
 3. 完成双进程并发、Manager/Fcitx/桌面重启与无重复学习验收。
 
 任何一步都不能用空 `linux/` 目录、fixture mode、手工传入 native library 路径或单连接 SQLite 测试冒充完成。
@@ -49,6 +49,8 @@ M5-P04 不纳入：
 | Rust FFI/runtime/userdb/ranker | 业务真相源、并发 SQLite、学习策略、删除语义、explain 与管理查询 | Fcitx/GTK/Flutter 生命周期或平台文件选择 |
 
 Linux host 和 addon 可以链接同一份浅层 C++ platform source/target；不得把 resolver 复制到 `apps/radishlex-manager/linux` 后独立演化。Flutter generated runner 只保留平台启动和 channel 接线，较长实现继续放在 `platforms/linux-fcitx5` 的共享职责模块中。
+
+Linux Manager 的主题必须显式提供兼顾 Latin、数字和简体中文的字体 fallback，不能依赖 Flutter/GTK 偶然选中单一系统字体。P04 staged product 可使用受控系统字体族验证可读性；M5-P05 必须在“随包携带字体”和“发行包声明字体依赖”之间形成明确安装契约，并复验中文标题、正文、英文状态码、数字计数和候选解释。只修复中文而让 Latin/数字显示方框，或反之，都不算通过。
 
 ## Linux product bootstrap
 
@@ -147,6 +149,8 @@ Manager 和 addon 必须把同一 `XdgPaths.userdb_path` 交给现有 Rust FFI�
 
 产品验收不使用主库/WAL 文件哈希推断语义。Manager 通过页头刷新重新调用 `loadSnapshot()`；addon 使用新 session 或刷新后的同次 Rust snapshot 观察变化。测试只使用合成词、虚构程序身份和临时 userdb，不读取开发者真实数据库正文。
 
+Manager rank explain 不得固定按 `general` 解释所有词条。当前 Dart bridge 复用现有 ABI，对最多六个可见词条依次查询 `general`、`browser`、`chat`、`code`、`editor`、`office`；存在 frequency、recency、context 或 negative 信号的粗类别分别保留，无上下文信号时只保留 `general` 回退。UI 的筛选、行 identity 与详情都必须包含 context，确保 Firefox `browser` 排序可以和同类别 explain 对照。该过程不新增 ABI、不读取 P1 事件行、不输出上下文分布计数或原始程序身份，learning status 继续保持 `context_stats=false`；`terminal` 与 `other` 不属于允许学习的查询类别。
+
 ## 验收矩阵
 
 ### 自动门禁
@@ -186,7 +190,7 @@ A6 必须至少有一条从 personalized runtime 写入、经 Manager bridge 读
 4. Linux staged Release bundle 携带 workspace native-rime `.so`，完成 ABI/symbol/ELF 与无路径 override smoke。
 5. 使用临时合成库形成“runtime 写入—Manager bridge 刷新—另一 runtime 观察”的产品双端自动证据。
 
-该批不顺带实现 package/安装，也不以能打开空窗口结束。后续 privacy watcher、classifier contract、Wayland/X11 身份评审与精确 Firefox 生产规则已复用同一 host、XDG 和真实 bridge 基线闭合；完整桌面个人化仍按本文停止线继续。
+该批不顺带实现 package/安装，也不以能打开空窗口结束。后续 privacy watcher、classifier contract、Wayland/X11 身份评审与精确 Firefox 生产规则已复用同一 host、XDG 和真实 bridge 基线闭合；Firefox 学习、Manager 刷新、`browser` explain 与中英文界面已形成第一段桌面证据，privacy、删除/恢复、导入导出、并发和重启仍按本文停止线继续。
 
 ## 当前停止线
 
