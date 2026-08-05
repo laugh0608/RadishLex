@@ -86,7 +86,10 @@ if(RADISHLEX_BUILD_FCITX_ADDON)
     IMPORTED_LOCATION "${RADISHLEX_IME_FFI_LIBRARY}"
   )
 
-  add_library(radishlex SHARED src/fcitx_addon.cpp)
+  add_library(radishlex SHARED
+    src/fcitx_addon.cpp
+    src/fcitx_candidate_key.cpp
+  )
   if(RADISHLEX_APPLICATION_EVIDENCE)
     target_sources(radishlex PRIVATE src/application_evidence.cpp)
     target_compile_definitions(radishlex PRIVATE
@@ -224,6 +227,24 @@ if(RADISHLEX_BUILD_CONTRACT_TESTS)
       -Wall -Wextra -Wpedantic -Werror
     )
     add_test(NAME privacy_monitor COMMAND radishlex_privacy_monitor_contract)
+  endif()
+
+  if(RADISHLEX_BUILD_FCITX_ADDON)
+    add_executable(radishlex_fcitx_candidate_key_contract
+      tests/fcitx_candidate_key_test.cpp
+      src/fcitx_candidate_key.cpp
+    )
+    target_include_directories(radishlex_fcitx_candidate_key_contract PRIVATE
+      "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    )
+    target_compile_options(radishlex_fcitx_candidate_key_contract PRIVATE
+      -Wall -Wextra -Wpedantic -Werror
+    )
+    target_link_libraries(radishlex_fcitx_candidate_key_contract PRIVATE
+      Fcitx5::Core
+    )
+    add_test(NAME fcitx_candidate_key
+             COMMAND radishlex_fcitx_candidate_key_contract)
   endif()
 
   add_executable(radishlex_runtime_layout_contract

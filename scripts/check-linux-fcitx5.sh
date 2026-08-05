@@ -131,6 +131,14 @@ rg -Fq 'readlink("/proc/self/exe"' \
 rg -Fq 'libradishlex_ime_ffi.so' \
   "${platform_dir}/src/manager_runtime.cpp"
 rg -q 'inputPanel\(\)' "${platform_dir}/src/fcitx_addon.cpp"
+rg -q 'candidateListHandlesKey' \
+  "${platform_dir}/src/fcitx_addon.cpp" \
+  "${platform_dir}/src/fcitx_candidate_key.cpp"
+if rg -n 'states\(\)\.toInteger\(\)[[:space:]]*==[[:space:]]*0' \
+  "${platform_dir}/src/fcitx_addon.cpp"; then
+  echo "Fcitx candidate keys must use Fcitx matching semantics." >&2
+  exit 1
+fi
 rg -q 'projectApplicationContext' "${platform_dir}/src/fcitx_addon.cpp"
 rg -q 'addIOEvent' "${platform_dir}/src/fcitx_addon.cpp"
 rg -q 'program\(\)' "${platform_dir}/src/fcitx_addon.cpp"

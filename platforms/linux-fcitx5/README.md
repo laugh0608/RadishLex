@@ -9,11 +9,11 @@ M5-P02 已经建立真实 C++ 源码、CMake target、addon/input method metadat
 - Apple clang 的 C++17 严格编译通过；
 - ABI v9 contract、key projection、owned `KeyResult`/snapshot、display-index selection、owner-thread 和 reset/free/shutdown 顺序通过 fake-FFI contract；
 - XDG 默认路径、显式 XDG 根、`0700`/`0600`、relative path、symlink、宽权限和 production/test override 隔离通过；
-- M5-P04 已增加 Flutter Linux runner、固定 bundle `.so`、共享 XDG/Manager runtime、独立 privacy format、inotify/event-loop 变更感知与受控粗分类 contract；真实 ARM64 Manager Release/FFI smoke 和 addon 自动门禁均通过，GUI/桌面双进程验收仍待单独授权；
+- M5-P04 已增加 Flutter Linux runner、固定 bundle `.so`、共享 XDG/Manager runtime、独立 privacy format、inotify/event-loop 变更感知与受控粗分类 contract；真实 ARM64 Manager Release/FFI smoke、桌面 privacy、删除/恢复和 Fcitx 重启已通过，尚余导入导出、Manager 与桌面会话重启；
 - Debian 13 ARM64 使用 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 和 librime 1.13.1，真实编译并动态链接启用 `native-rime` 的 `libradishlex_ime_ffi.so` 与 `radishlex.so`；
 - CMake staged install 把 addon、共享 FFI、锁定 RimeData 与两份 Fcitx metadata 形成同一开发装配，addon 只使用 `$ORIGIN` 定位 sibling FFI，不保留仓库或临时构建路径；
 - `radishlex_runtime_probe` 在相同 Linux 环境先校验装配文件、symlink 和权限，再对 staged `radishlex.so` 执行 `dlopen(RTLD_NOW)`；
-- CTest 在相同 Linux 环境复验 application context、FFI projection、XDG resolver、Manager runtime、privacy monitor 与 runtime layout 六项 contract。
+- CTest 在相同 Linux 环境复验 application context、FFI projection、XDG resolver、Manager runtime、privacy monitor、Fcitx candidate key 与 runtime layout 七项 contract。
 
 以上自动结果只证明 Linux ARM64 编译、装配和 headless native loader。M5-P03 另已在 Debian 13 ARM64 GNOME 中完成不写 `/usr` 的用户级开发装配，并取得 Wayland/X11、GTK/Qt/Electron/浏览器/终端、完整候选交互、切换/重启、进程级与整机离线、password/unknown/terminal/`Sensitive` 的人工证据。原生 Qt6 Wayland 只由明确的 Wayland QPA、Fcitx Qt6 input-context 与会话类型共同证明；FeatherPad 映射 `libQt6WaylandClient` 本身不作为 backend 证据。快速跨 X11→Wayland 会话的 daemon 自启动使用 Debian 官方 Fcitx5 desktop entry 的用户级副本闭合；这仍是开发装配，不证明发行安装、升级或移除。实时状态见 [`docs/status/current.md`](../../docs/status/current.md)，详细流水见本周周志。
 
@@ -34,6 +34,7 @@ src/
   application_context.cpp exact production allowlist projection
   application_evidence.cpp opt-in opaque identity evidence matcher
   fcitx_addon.*       Fcitx lifecycle, privacy event loop and commit adapter
+  fcitx_candidate_key.* Fcitx candidate-key matching boundary
   ffi_projection.cpp  KeyResult/snapshot copy and owner-thread guard
   key_projection.cpp  Unicode/named key/modifier/phase validation
   linked_ffi_api.cpp  only direct C ABI symbol table
@@ -51,6 +52,7 @@ evidence/
   firefox-context.html  offline ordinary/password field fixture
 tests/
   application_context_test.cpp
+  fcitx_candidate_key_test.cpp
   ffi_projection_test.cpp
   manager_runtime_test.cpp
   privacy_monitor_test.cpp
@@ -73,7 +75,7 @@ tools/
 - `radishlex_session_select_candidate`：只接受 Rust display index；
 - `radishlex_session_reset`、`radishlex_session_free` 与 `radishlex_rime_runtime_shutdown`：形成确定生命周期。
 
-本批没有扩展 ABI。snapshot 不输出 Fcitx 私有对象或候选 UI cursor。Fcitx candidate list 维护当前可见 cursor；数字键、Space 和鼠标选择最终都调用同一个 display-index selection，PageUp/PageDown 仍作为稳定 named key 交给 Rust engine 后重建 candidate list。这避免在 C++ 中推断 engine index 或复制 Rime highlight 逻辑。client preedit 只投影同一 snapshot 的 composition 与 UTF-8 字节 cursor，并携带 Fcitx `DontCommit`，避免 input context 失焦时提交未完成的原始拼音。
+本批没有扩展 ABI。snapshot 不输出 Fcitx 私有对象或候选 UI cursor。Fcitx candidate list 维护当前可见 cursor；数字键、Space 和鼠标选择最终都调用同一个 display-index selection，PageUp/PageDown 仍作为稳定 named key 交给 Rust engine 后重建 candidate list。候选键使用 Fcitx 自身的 `Key::check` / `digitSelection` 语义，允许锁定键与内部投递状态、拒绝命令修饰键，不能以原始 states 严格等于零作为前置条件。这避免 GTK 正常 Space commit 绕过学习，也避免在 C++ 中推断 engine index 或复制 Rime highlight 逻辑。client preedit 只投影同一 snapshot 的 composition 与 UTF-8 字节 cursor，并携带 Fcitx `DontCommit`，避免 input context 失焦时提交未完成的原始拼音。
 
 不需要进入共享 ABI 的 Linux 产品能力：
 
@@ -150,7 +152,7 @@ Apple Silicon macOS 的固定 Linux ARM64 编译门禁：
 ./scripts/build-linux-fcitx5-container.sh
 ```
 
-该入口构建固定 digest 的 Debian 13 镜像，以只读方式挂载仓库，并使用 `radishlex-linux-fcitx5-cargo`、`radishlex-linux-fcitx5-target` 两个 Docker named volume 缓存依赖和产物。它会构建 `native-rime` FFI、形成临时 staged install、检查 ARM64 ELF 依赖与 `$ORIGIN`、运行 native loader probe 和六项 CTest；不会写系统目录、安装/启用输入法、写宿主仓库或提供桌面 session。首次执行需要下载 Debian 镜像与软件包，之后复用 Docker/Cargo 缓存。
+该入口构建固定 digest 的 Debian 13 镜像，以只读方式挂载仓库，并使用 `radishlex-linux-fcitx5-cargo`、`radishlex-linux-fcitx5-target` 两个 Docker named volume 缓存依赖和产物。它会构建 `native-rime` FFI、形成临时 staged install、检查 ARM64 ELF 依赖与 `$ORIGIN`、运行 native loader probe 和七项 CTest；不会写系统目录、安装/启用输入法、写宿主仓库或提供桌面 session。首次执行需要下载 Debian 镜像与软件包，之后复用 Docker/Cargo 缓存。
 
 真实 Linux 开发构建需要既有 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、librime development environment，以及启用 `native-rime` 的 Rust cdylib。命令只生成开发 build，不安装 addon：
 

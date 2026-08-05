@@ -1,4 +1,5 @@
 #include "fcitx_addon.h"
+#include "fcitx_candidate_key.h"
 
 #include <fcitx-utils/capabilityflags.h>
 #include <fcitx-utils/event.h>
@@ -209,7 +210,7 @@ void InputContextState::handleKey(fcitx::KeyEvent &event) {
   if (!event.isRelease()) {
     const fcitx::Key key = event.key();
     const auto list = input_context_.inputPanel().candidateList();
-    if (list && key.states().toInteger() == 0) {
+    if (list && candidateListHandlesKey(key)) {
       const int digit = key.digitSelection();
       if (digit >= 0 && digit < list->size()) {
         acceptKeyEvent(event);

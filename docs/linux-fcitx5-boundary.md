@@ -4,7 +4,7 @@
 
 ## 状态与产品范围
 
-状态：M5-P01/P02/P03 已完成，当前推进 M5-P04 Linux Manager、同库个人化与本地管理验收。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release bundle、native/ELF/FFI smoke 已通过，桌面 Manager 与同库个人化验收尚未执行。既有 addon 的 staged 开发装配、headless native loader，以及真实 Fcitx daemon 的 Wayland/X11 输入均已通过。
+状态：M5-P01/P02/P03 已完成，当前推进 M5-P04 Linux Manager、同库个人化与本地管理验收。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release、native/ELF/FFI smoke、桌面 privacy、删除防复活、explicit restore 与 Fcitx 重启已通过。P04 尚余导入导出、Manager 重启与桌面会话重启；P05 安装维护仍未进入。
 
 P03 实机证据覆盖 GTK、Qt、Electron、浏览器和终端，包含完整候选交互、焦点/输入法切换、Fcitx/桌面会话重启、进程级地址族限制与整台 guest 断网。password、terminal、unknown 与 Qt `Sensitive` 后的 userdb 聚合保持全零；当前 GTK4 frontend 未把 `PRIVATE` 传播为 Fcitx `Sensitive`，因此依赖既有 unknown 失败关闭而非虚构 capability。Qt backend 只以 QPA、会话类型和 input-context plugin 的组合证据判定，不能因进程映射 `libQt6WaylandClient` 就声明原生 Wayland。快速 X11→Wayland 登录暴露的 `im-launch` 跳过 daemon 问题已用 Debian 官方 desktop entry 的用户级 autostart 副本闭合；该开发设置不替代 P05 产品安装与维护设计。
 
@@ -68,7 +68,7 @@ Linux 继续使用 `ime-ffi` ABI v9 已有的：
 - PageUp/PageDown 作为稳定 named key 进入 Rust 后用新 snapshot 重建列表；
 - reset/free/shutdown 已足以表达 per-context session 与进程 teardown。
 
-当前真实缺口不在 ABI、addon 编译、Manager privacy 来源、startup gate 或首条生产应用分类，而在桌面 Manager/同库个人化，以及 P05 发行安装事务。这些缺口不需要增加平台私有 ABI。
+当前真实缺口不在 ABI、addon 编译、Manager privacy、删除恢复或首条生产应用分类，而在剩余导入导出、Manager/桌面会话重启，以及 P05 发行安装事务。这些缺口不需要增加平台私有 ABI。
 
 ### Flutter Manager
 
@@ -104,6 +104,7 @@ addon 必须按 `docs/ffi-boundary.md` 的稳定模型形成字符键、named ke
 - 只有可验证的 Unicode scalar value 才形成 char event；
 - Space、Enter、Backspace、Escape、Tab、方向键和 PageUp/PageDown 映射到稳定 named key；
 - Shift、Control、Alt、Meta 只使用 ABI 已知 bit；
+- Fcitx candidate-list 快捷键必须使用 `Key::check` / `digitSelection` 语义；CapsLock、NumLock 与 Fcitx 内部投递状态不能因原始 states 非零而绕过 display-index selection，Shift/Ctrl/Alt/Super/Meta 等命令修饰键必须拒绝；
 - 未知 key、未知 modifier、无有效文本的快捷键和平台保留组合不得猜测为普通字符；
 - release 是否送入 runtime 由明确 contract 决定；addon 或 Rust 已接受的 press 只配对消费同 key release，未匹配 release 保持原路径，reset/deactivate 清除配对状态；
 - `consumed = 0` 时把原始事件交还 Fcitx/宿主应用；
@@ -239,11 +240,13 @@ M5-P03 已覆盖：
 M5-P04 已覆盖：
 
 - Firefox 在 Wayland/X11 的精确程序身份、frontend、密码 capability 与 userdb 零增量对照；
+- Linux Manager 与 addon 同库学习、`browser` explain、privacy 开关零增量和关闭后单次恢复学习；
+- Manager 删除、既有/新 Fcitx session 防复活、explicit restore、恢复后重新学习与多次 Fcitx 重启；
 
 M5-P04 继续覆盖：
 
-- Manager 与 addon 并发读取、写入、删除、恢复及重启保持；
-- 合成词学习后排序变化、删除不复活和 explain 一致；
+- Manager 导入检查、导入、导出及 tombstone 防导入复活；
+- Manager 进程重启、桌面会话重启和最终并发状态保持；
 - 不含真实输入历史的脱敏诊断。
 
 容器、headless 测试和合成 input context 只能证明局部 contract，不替代真实桌面证据。需要用户手动切换输入法或实体输入时，AI 只读监视并等待结果，不合成操作冒充验收。
@@ -263,8 +266,7 @@ M5-P04 继续覆盖：
 ## 当前停止线
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
-- P04 先固定 Linux Manager host、共享 XDG/userdb、并发与隐私验收矩阵，再进入实现。
-- P04 的设计门禁已经由 `docs/linux-manager-local-acceptance.md` 固定；实现按 host/共享数据、privacy/分类、桌面个人化三段推进，不以空 runner 或 fixture 冒充完成。
+- P04 继续以 `docs/linux-manager-local-acceptance.md` 为验收门禁；剩余导入导出和重启证据不得用 fixture 或单连接 SQLite 测试冒充完成。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。

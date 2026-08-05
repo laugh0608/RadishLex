@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核日期：2026-08-04（Asia/Shanghai）
+- 复核日期：2026-08-05（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品
 - 当前主批次：M5-P04 Linux Manager、同库个人化与本地管理验收
@@ -13,19 +13,17 @@
 
 ## M5-P03 完成证据与 M5-P04 当前进度
 
-M5-P02 已建立 C++17/CMake addon、ABI v9 owned projection、Fcitx input panel/session、共享 XDG resolver 和可持续 ARM64 构建。M5-P03 随后在 UTM Debian 13.6 ARM64 完成 GNOME Wayland/X11、GTK4/Qt6/Electron/Firefox/Terminal、候选交互、生命周期、整机断网和隐私实机验收；用户级开发装配不写 `/usr`，也不冒充 M5-P05 产品安装。
+M5-P02/P03 已建立 C++17/CMake addon、ABI v9 owned projection、Fcitx input panel/session、共享 XDG resolver，并在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firefox/Terminal、候选交互、生命周期、断网和隐私实机验收。password、terminal、unknown 与 Qt `Sensitive` 均不学习；GTK4 `PRIVATE` 继续按 unknown 失败关闭。用户级开发装配不写 `/usr`，也不冒充 M5-P05 产品安装。
 
-P03 的 password、terminal、unknown 与 Qt `Sensitive` 路径均未产生学习；GTK4 `PRIVATE` 因未传播敏感 bit 而继续按 unknown 失败关闭。候选内容、排序、display-index 选择、userdb 与隐私策略仍分别由 Rust 和独立平台 privacy 真相源负责，平台壳没有复制业务逻辑。
+M5-P04 已落地 Linux Flutter runner、engine 前 `umask(0077)`、固定 bundle `.so`、共享 XDG/Manager runtime、严格 `privacy-mode.json`、变更感知和失败关闭的应用粗分类。Wayland/X11 评审后，生产 allowlist 只加入精确 `firefox-esr -> browser`；默认关闭的 evidence 模式只输出固定 opaque token 与 capability 变化，产品二进制不含取证字符串。Debian ARM64 Flutter 3.44.0 Release bundle、ELF、正式 ABI、native-rime 与 Dart smoke 均通过。
 
-M5-P04 已落地 Linux Flutter runner、engine 前 `umask(0077)`、固定 bundle `.so`、共享 XDG/Manager runtime、严格 `privacy-mode.json` 原子读写/回滚，以及“runtime 写入—Manager C ABI 管理—新 runtime 观察”的同库自动证据。Debian ARM64 的 Flutter 3.44.0 Release bundle、ELF closure、`$ORIGIN/lib`、正式 ABI symbol、native-rime FFI 与 Dart smoke 已通过；首轮门禁暴露的两处 ABI 缩写漂移也已修正并纳入静态检查。
+2026-08-04 的生产纵向实机已证明 Firefox 选择公开合成候选后，Linux Release Manager 可刷新同一 XDG userdb，后续候选提升与 `browser` rank explain 的 user/frequency/recency/context 信号一致。Manager bridge 已按六个允许粗类别查询 explain；Linux 设置文案和字体 fallback 同时覆盖中文、Latin 与数字。
 
-第二个子批建立了先 watch 后初读的 privacy 变更感知和失败关闭的应用粗分类。Password、Sensitive 与 Terminal 在读取 `InputContext::program()` 前返回；Terminal 保持 `context_known=0`。Wayland/X11 实机评审后，生产 allowlist 只加入精确 `firefox-esr -> browser`；其他 Firefox 变体、unknown 与 GTK4 `PRIVATE` 继续不读写个人化数据。
+2026-08-05 继续闭合 privacy 与删除恢复链：Manager 写入 `privacy=true` 后一次 Firefox 候选选择保持 selection/frequency 零增量，写回 `false` 后一次选择只各增加 1。首次 Space 提交暴露 addon 以原始 `states == 0` 判断候选键、导致 GTK/Fcitx 内部状态绕过 display-index selection；实现已改用 Fcitx key matching 语义，并增加第七项真实 Fcitx CTest，ARM64 staged build、loader probe 与 7/7 CTest 通过。
 
-第三个子批增加默认关闭的 `RADISHLEX_APPLICATION_EVIDENCE`：只把源码内固定候选的精确匹配投影为 opaque token，只记录 capability 的稳定 on/off 变化；默认产品 addon 由门禁保证不含取证日志字符串。Wayland Firefox 实机得到 `browser_candidate_01`，进程会话与 GTK3 Fcitx frontend 证据支持原生 Wayland。2026-08-04 的 X11 对照再次得到同一 token；Firefox 为 `DISPLAY=:0`、`XDG_SESSION_TYPE=x11`、X11 client，并加载 GTK3 `im-fcitx5.so` 与 `libFcitx5GClient`，未设置 `WAYLAND_DISPLAY` 或 `MOZ_ENABLE_WAYLAND`。
+同一修复 addon 随后完成 Manager 删除、既有 session 防复活、Fcitx 重启后新 session 防复活、explicit restore 与恢复后新 session 重新学习。删除期间普通选择只增加 P1 selection，不恢复 term/ranker 或改写 tombstone；恢复版本严格晚于删除版本，旧 frequency 不复活，首次新选择从 frequency 1 重新开始。Manager 终态刷新为 user terms 1、selection events 5、suppressed 0、deleted 0，多次 Fcitx 重启与 Manager 并发期间无投影、busy 或 migration 错误。
 
-Wayland/X11 两侧均产生 `password_on`/`password_off`；用户确认普通字段显示候选，密码字段只显示遮罩且无候选，完整往返前后 userdb v9 七项学习聚合保持全零。精确生产规则的宿主 contract 与 Debian ARM64 addon、ELF、runtime probe、六项 CTest 和默认二进制 evidence 排除已通过；guest 已停止 evidence unit 并恢复未改动的默认 production transient service，私有 evidence stage、P03 staging/backup 和旧脏工作副本均保留。
-
-2026-08-04 的生产分类后纵向实机已证明同库学习与解释：Firefox 普通字段以公开合成 code `ba` 选择第二候选“把”后，userdb 的 active term、selection event 和 ranker weight 各增加一项；下一次输入同 code 时“把”提升到首位，Escape 取消未重复学习。Linux Release Manager 刷新读取同一 XDG userdb，并把该项解释为 `browser`，最终分数约 `1.79`，其中 user、frequency、recency 与 context 信号和输入侧排序一致。此前固定查询 `general` 的 Dart bridge 已改为查询六个允许的粗类别并明确显示 context；Linux 设置文案改为平台中立，主题字体 fallback 同时覆盖 Latin、数字与简体中文，ARM64 product 复验通过。M5-P04 仍未完成：Manager 写入 privacy 后的零增量、删除/恢复、导入导出、并发和重启仍待实机闭合。
+M5-P04 尚未完成：真实 Manager 导入检查/导入/导出、Manager 进程重启和桌面会话重启仍待闭合；M5-P05 安装维护继续关闭。
 
 ## macOS 冻结参考
 
@@ -47,11 +45,10 @@ build 38 的详细身份、事务、载体与实机流水由 [macOS 产品包边
 
 ## 下一步顺位
 
-1. 通过 Manager 开启 privacy 并保存，验证平台真相源读回为开启、addon 下一次公开合成学习机会零增量；关闭并保存后，一次新的公开合成选择只恢复一次预期增量。
-2. 在同一 XDG userdb 上依次闭合删除不复活、explicit restore、导入检查/导入/导出，并对照 Fcitx 新 session 与 Manager 刷新结果。
-3. 覆盖 Manager/Fcitx 双进程并发、WAL/busy、Manager 重启、Fcitx 重启和桌面会话重启，确认没有重复学习、迁移漂移或状态丢失。
-4. M5-P05 需明确 Linux CJK 字体是随包交付还是由发行依赖保证；P04 当前系统字体 fallback 的实机通过不能替代安装产品依赖治理。
-5. M5-P05 安装维护、P03 临时资产清理、远端推送和其他平台均不进入当前批次；对应动作继续单独授权。
+1. 在同一 XDG userdb 上闭合 Manager 导入检查、导入与导出，确认普通导入不能复活 tombstone，导出只含用户明确请求的 P2 词条视图。
+2. 完成 Manager 进程重启和桌面会话重启；复核现有 Fcitx 重启、双进程 WAL/busy 与终态刷新证据没有重复学习、迁移漂移或状态丢失。
+3. M5-P05 需明确 Linux CJK 字体是随包交付还是由发行依赖保证；P04 当前系统字体 fallback 的实机通过不能替代安装产品依赖治理。
+4. M5-P05 安装维护、旧临时资产清理、远端推送和其他平台均不进入当前批次；对应动作继续单独授权。
 
 ## 验证入口
 
