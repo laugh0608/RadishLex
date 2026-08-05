@@ -379,7 +379,7 @@ R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-
 
 平台目录按主线顺序创建：
 
-1. `platforms/linux-fcitx5/`：M5-P02 addon、共享 FFI 与开发构建及 M5-P03 真实桌面输入/隐私验收已完成，当前推进 M5-P04 Linux Manager 与同库个人化。
+1. `platforms/linux-fcitx5/`：M5-P02 addon、共享 FFI 与开发构建、M5-P03 真实桌面输入/隐私验收及 M5-P04 Linux Manager 与同库个人化均已完成；M5-P05 安装维护未进入。
 2. `platforms/android-ime/`：在现有 keystore bridge 之外补完整 IME。
 3. `platforms/windows-tsf/`。
 4. `platforms/ios-keyboard/`。

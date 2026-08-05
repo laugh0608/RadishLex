@@ -4,16 +4,15 @@
 
 ## 当前结论
 
-截至 2026-08-05，M5-P03 已完成 Fcitx5 Wayland/X11 输入、常见应用、生命周期、离线与隐私实机验收，M5-P04 正在闭合 Linux Manager 与同库个人化。现有 Flutter 页面、`ManagerBridge`、ABI v9、Rust userdb/ranker、导入导出、删除/tombstone/explicit restore、学习摘要和 rank explain 均直接复用；本批不重写业务真相源，也不通过新增平台私有 ABI 复制既有能力。
+截至 2026-08-05，M5-P03 已完成 Fcitx5 Wayland/X11 输入、常见应用、生命周期、离线与隐私实机验收，M5-P04 已完成 Linux Manager 与同库个人化验收。现有 Flutter 页面、`ManagerBridge`、ABI v9、Rust userdb/ranker、导入导出、删除/tombstone/explicit restore、学习摘要和 rank explain 均直接复用；本批没有重写业务真相源，也没有通过新增平台私有 ABI 复制既有能力。
 
 首个源码子批已建立 Linux Flutter runner、共享 XDG/Manager runtime、bundle `.so` 约束、Linux privacy 配置与同库 native-rime contract。后续子批建立先 watch 后初读的 privacy 感知、失败关闭 runtime、精确 allowlist 粗分类和默认关闭的受控取证模式。UTM Debian 13 ARM64 已完成真实 Flutter 3.44.0 Release bundle、Fcitx5 addon、ELF/`$ORIGIN`、正式 ABI symbol、native-rime 与 Dart smoke；候选键状态回归加入后真实 Fcitx CTest 为七项。
 
-Firefox 已在 Wayland/X11 两侧取得相同的精确 `firefox-esr` 身份、GTK3 Fcitx frontend、password capability 和 userdb 零增量证据；生产 allowlist 因而只加入 `firefox-esr -> browser`，其他候选与变体继续失败关闭。生产分类后的桌面纵向链已证明 Manager 刷新、privacy 开关、单次恢复学习、删除、既有/新 Fcitx session 防复活、explicit restore 和恢复后重新学习均读取同一 userdb。P04 后续按以下顺序推进：
+Firefox 已在 Wayland/X11 两侧取得相同的精确 `firefox-esr` 身份、GTK3 Fcitx frontend、password capability 和 userdb 零增量证据；生产 allowlist 因而只加入 `firefox-esr -> browser`，其他候选与变体继续失败关闭。生产分类后的桌面纵向链已证明 Manager 刷新、privacy 开关、单次恢复学习、删除、既有/新 Fcitx session 防复活、explicit restore 和恢复后重新学习均读取同一 userdb。
 
-1. 在真实桌面闭合 Manager 导入检查、导入与导出，并验证导入不能复活 tombstone。
-2. 完成 Manager 进程与桌面会话重启；复核已通过的 Fcitx 重启、双进程并发和无重复学习证据。
+同一 guest 与 XDG userdb 上的真实 Manager I/O 已用两条公开合成词闭合：dry run 检查不落库；普通导入后删除“爸”，再次普通导入只更新仍 active 的“巴”并跳过 tombstone；显式导出只含 active P2 词条“巴”和“把”，不含 tombstone 或 P1 明细。Manager 进程重启与完整桌面 X11 session 重启后，新 Manager/Fcitx 进程继续读取同一 schema v9/WAL 数据库，候选排序、rank explain、导入批次和聚合终态一致，Escape 取消未增加 selection。
 
-任何一步都不能用空 `linux/` 目录、fixture mode、手工传入 native library 路径或单连接 SQLite 测试冒充完成。
+本结论来自固定 Release bundle、实际 addon/FFI 映射和用户实体输入，没有使用空 `linux/` 目录、fixture mode、手工 native library 路径或单连接 SQLite 测试冒充完成。最终 Manager 聚合为 user terms 2、selection events 5、suppressed 0、deleted 1，另有 import batches 2、negative feedback 2、ranker weights 1；`integrity_check=ok`，没有非预期 `SQLITE_BUSY`、migration 漂移、投影错误、丢失或重复学习。
 
 ## 验收范围
 
@@ -189,7 +188,7 @@ A6 必须至少有一条从 personalized runtime 写入、经 Manager bridge 读
 4. Linux staged Release bundle 携带 workspace native-rime `.so`，完成 ABI/symbol/ELF 与无路径 override smoke。
 5. 使用临时合成库形成“runtime 写入—Manager bridge 刷新—另一 runtime 观察”的产品双端自动证据。
 
-该批不顺带实现 package/安装，也不以能打开空窗口结束。privacy watcher、classifier、Wayland/X11 身份、精确 Firefox 生产规则、同库学习/解释、privacy 零增量、删除防复活、explicit restore 与 Fcitx 重启已复用同一 host、XDG 和真实 bridge 闭合；导入导出、Manager 重启与桌面会话重启仍按本文停止线继续。
+该批没有顺带实现 package/安装，也没有以能打开空窗口结束。privacy watcher、classifier、Wayland/X11 身份、精确 Firefox 生产规则、同库学习/解释、privacy 零增量、删除防复活、explicit restore、导入导出、Fcitx/Manager 重启与桌面会话重启均已复用同一 host、XDG 和真实 bridge 闭合。M5-P04 验收矩阵据此退出；现有 staging、backup、userdb、导入导出文件和 transient service 终态继续保留，M5-P05 仍需另行授权。
 
 ## 当前停止线
 
