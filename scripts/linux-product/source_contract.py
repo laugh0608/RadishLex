@@ -247,6 +247,10 @@ def validate_source_contract(
         repo_root / "scripts/linux-product/deb_artifact.py",
         "Linux Debian artifact source",
     )
+    shlibdeps_diagnostics = read_text(
+        repo_root / "scripts/linux-product/shlibdeps_diagnostics.py",
+        "Linux Debian dependency diagnostic verifier",
+    )
     required_scripts = {
         "Linux Manager product builder": (
             manager_builder,
@@ -290,7 +294,8 @@ def validate_source_contract(
                 'mkdir -m 0755 "${analysis_root}/DEBIAN"',
                 'mkdir -m 0755 "${temp_dir}/debian"',
                 'cp "${temp_dir}/debian/control" "${analysis_root}/DEBIAN/control"',
-                'if [[ -s "${shlibs_diagnostics}" ]]',
+                "LC_ALL=C",
+                "shlibdeps_diagnostics.py",
                 '"${repo_root}/scripts/linux-product/rootfs.py" verify',
                 '"${repo_root}/scripts/linux-product/deb_artifact.py" build',
                 '"${repo_root}/scripts/linux-product/deb_artifact.py" verify',
@@ -302,6 +307,7 @@ def validate_source_contract(
             artifact_gate,
             (
                 "test_deb_artifact.py",
+                "test_shlibdeps_diagnostics.py",
                 "bash -n",
             ),
         ),
@@ -314,6 +320,16 @@ def validate_source_contract(
                 "data.tar",
                 "rootfs_contract.verify",
                 "dpkg-shlibdeps evidence",
+            ),
+        ),
+        "Linux Debian dependency diagnostic verifier": (
+            shlibdeps_diagnostics,
+            (
+                "EXPECTED_DIAGNOSTICS",
+                "require_private_libraries",
+                "require_libc6_usrmerge",
+                "dpkg-query",
+                "dpkg-divert",
             ),
         ),
     }
@@ -344,6 +360,7 @@ def validate_source_contract(
         "tar_format": "ustar",
         "compression": "none",
         "source_date_epoch": 0,
+        "dependency_analysis_profile": "dpkg-shlibdeps-debian13-arm64-v1",
         "package_filename": (
             f"{metadata.package_name}_{metadata.package_version}_"
             f"{metadata.debian_architecture}.deb"

@@ -29,6 +29,7 @@ ARTIFACT_CONTRACT_KEYS = {
     "tar_format",
     "compression",
     "source_date_epoch",
+    "dependency_analysis_profile",
     "package_filename",
     "evidence_filename",
     "control_members",
@@ -41,6 +42,7 @@ EVIDENCE_KEYS = {
     "package",
     "control",
     "product_manifest",
+    "dependency_analysis",
 }
 CONTROL_FIELDS = (
     "Package",
@@ -78,6 +80,7 @@ class DebianArtifactContract:
     tar_format: str
     compression: str
     source_date_epoch: int
+    dependency_analysis_profile: str
     package_filename: str
     evidence_filename: str
     control_members: tuple[str, ...]
@@ -119,6 +122,9 @@ class DebianArtifactContract:
             "tar_format": "ustar",
             "compression": "none",
             "source_date_epoch": 0,
+            "dependency_analysis_profile": (
+                "dpkg-shlibdeps-debian13-arm64-v1"
+            ),
             "package_filename": (
                 f"{metadata.package_name}_{metadata.package_version}_"
                 f"{metadata.debian_architecture}.deb"
@@ -552,6 +558,16 @@ def artifact_evidence(
     return {
         "format_version": contract.evidence_format_version,
         "distribution_identity": metadata.distribution_identity,
+        "dependency_analysis": {
+            "loader_owner": "libc6:arm64",
+            "private_libraries": [
+                "libflutter_linux_gtk.so",
+                "libradishlex_ime_ffi.so",
+            ],
+            "profile": contract.dependency_analysis_profile,
+            "stderr_policy": "exact-private-libraries-and-libc6-usrmerge-v1",
+            "tool": "dpkg-shlibdeps",
+        },
         "archive": {
             "compression": contract.compression,
             "format": contract.archive_format,

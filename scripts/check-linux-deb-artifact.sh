@@ -14,6 +14,8 @@ fi
 "${repo_root}/scripts/check-linux-product-metadata.sh"
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_deb_artifact.py"
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/linux-product/test_shlibdeps_diagnostics.py"
 bash -n "${repo_root}/scripts/build-linux-deb-artifact.sh"
 
 echo "Linux deterministic Debian artifact contract passed."

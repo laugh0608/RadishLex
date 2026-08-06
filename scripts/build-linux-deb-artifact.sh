@@ -83,7 +83,7 @@ for relative_path in "${payload_relative_paths[@]}"; do
 done
 if ! (
   cd "${temp_dir}"
-  DPKG_COLORS=never DPKG_NLS=0 dpkg-shlibdeps \
+  LC_ALL=C DPKG_COLORS=never DPKG_NLS=0 dpkg-shlibdeps \
     --warnings=0 \
     --package="${package_name}" \
     -O \
@@ -97,9 +97,12 @@ if ! (
   echo "dpkg-shlibdeps failed for the product package tree." >&2
   exit 1
 fi
-if [[ -s "${shlibs_diagnostics}" ]]; then
+if ! PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/linux-product/shlibdeps_diagnostics.py" \
+  --rootfs "${product_rootfs}" \
+  --diagnostics "${shlibs_diagnostics}"; then
   cat "${shlibs_diagnostics}" >&2
-  echo "dpkg-shlibdeps produced an unexpected diagnostic." >&2
+  echo "dpkg-shlibdeps diagnostic verification failed." >&2
   exit 1
 fi
 

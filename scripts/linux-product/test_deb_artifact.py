@@ -116,6 +116,10 @@ class DebianArtifactTest(unittest.TestCase):
         )
         self.assertEqual(evidence["archive"]["compression"], "none")
         self.assertEqual(evidence["archive"]["source_date_epoch"], 0)
+        self.assertEqual(
+            evidence["dependency_analysis"]["profile"],
+            "dpkg-shlibdeps-debian13-arm64-v1",
+        )
 
     def test_binary_control_resolves_substvars_and_keeps_fixed_dependencies(self) -> None:
         package, evidence_path = self.build()
