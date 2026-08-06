@@ -31,5 +31,12 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/product_metadata.py" \
   render-control --output "${temp_dir}/control.second"
 cmp "${temp_dir}/control.first" "${temp_dir}/control.second"
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/linux-product/product_metadata.py" \
+  render-shlibdeps-control --output "${temp_dir}/shlibdeps-control.first"
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/linux-product/product_metadata.py" \
+  render-shlibdeps-control --output "${temp_dir}/shlibdeps-control.second"
+cmp "${temp_dir}/shlibdeps-control.first" "${temp_dir}/shlibdeps-control.second"
 
 echo "Linux product metadata contract passed."

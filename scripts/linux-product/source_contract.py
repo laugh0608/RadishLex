@@ -285,6 +285,7 @@ def validate_source_contract(
             (
                 "dpkg-shlibdeps",
                 "--warnings=0",
+                "render-shlibdeps-control",
                 '"${repo_root}/scripts/linux-product/rootfs.py" verify',
                 '"${repo_root}/scripts/linux-product/deb_artifact.py" build',
                 '"${repo_root}/scripts/linux-product/deb_artifact.py" verify',

@@ -505,6 +505,22 @@ def render_control(
     return rendered
 
 
+def render_shlibdeps_control(metadata: LinuxProductMetadata) -> str:
+    return (
+        f"Source: {metadata.package_name}\n"
+        "Section: utils\n"
+        "Priority: optional\n"
+        "Maintainer: RadishLex <laugh0608@foxmail.com>\n"
+        "Standards-Version: 4.7.2.0\n"
+        "Rules-Requires-Root: no\n"
+        "\n"
+        f"Package: {metadata.package_name}\n"
+        f"Architecture: {metadata.debian_architecture}\n"
+        "Description: Dependency analysis view for the local acceptance carrier\n"
+        " This ephemeral control view is used only by dpkg-shlibdeps.\n"
+    )
+
+
 def expected_desktop_entry(
     metadata: LinuxProductMetadata, layout: dict[str, Any]
 ) -> str:
@@ -637,6 +653,8 @@ def parse_args() -> argparse.Namespace:
     )
     control = subparsers.add_parser("render-control")
     control.add_argument("--output", type=Path)
+    shlibdeps_control = subparsers.add_parser("render-shlibdeps-control")
+    shlibdeps_control.add_argument("--output", type=Path, required=True)
     return parser.parse_args()
 
 
@@ -646,8 +664,12 @@ def main() -> int:
         metadata, _ = validate_source_contract()
         if args.command == "field":
             print(getattr(metadata, args.name))
-        elif args.command == "render-control":
-            value = render_control(metadata)
+        elif args.command in ("render-control", "render-shlibdeps-control"):
+            value = (
+                render_control(metadata)
+                if args.command == "render-control"
+                else render_shlibdeps_control(metadata)
+            )
             if args.output is None:
                 print(value, end="")
             else:

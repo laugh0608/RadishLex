@@ -32,6 +32,17 @@ class LinuxProductMetadataTest(unittest.TestCase):
         self.assertNotIn("Recommends:", first)
         self.assertNotRegex(first, r"@[A-Z_]+@")
 
+    def test_shlibdeps_control_is_a_fixed_ephemeral_source_view(self) -> None:
+        metadata = product_metadata.LinuxProductMetadata.load()
+        rendered = product_metadata.render_shlibdeps_control(metadata)
+
+        self.assertIn("Source: radishlex\n", rendered)
+        self.assertIn("Package: radishlex\n", rendered)
+        self.assertIn("Architecture: arm64\n", rendered)
+        self.assertIn("Rules-Requires-Root: no\n", rendered)
+        self.assertIn("used only by dpkg-shlibdeps", rendered)
+        self.assertNotIn("Depends:", rendered)
+
     def test_metadata_rejects_unknown_field(self) -> None:
         value = json.loads(product_metadata.METADATA_PATH.read_text(encoding="utf-8"))
         value["unexpected"] = True

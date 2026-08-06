@@ -66,10 +66,15 @@ cleanup() {
 }
 trap cleanup EXIT
 shlibs_evidence="${temp_dir}/shlibs-depends.txt"
+mkdir -m 0755 "${temp_dir}/debian"
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/linux-product/product_metadata.py" \
+  render-shlibdeps-control --output "${temp_dir}/debian/control"
 (
   cd "${temp_dir}"
   DPKG_COLORS=never DPKG_NLS=0 dpkg-shlibdeps \
     --warnings=0 \
+    --package="${package_name}" \
     -O \
     -x"${package_name}" \
     -x"${librime_package}" \
