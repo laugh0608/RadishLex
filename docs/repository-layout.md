@@ -128,7 +128,7 @@ RadishLex/
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
 | 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
 | Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁；M4 外层 install gate、数据 gate 与升级 validation helper；M5 Linux runner、固定 `.so`、共享 XDG/privacy source contract、ARM64 Release bundle、同库学习/删除/导入导出与重启实机证据 | Linux startup gate 与 system package 实机；真实用户同步入口与首版后的目标部署证据 |
-| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；build 38 双 bundle、locked RimeData、数据/安装 gate、Installer、社区 ad-hoc identity、DMG evidence、首次安装/输入/修复/默认移除实机证据；Linux Fcitx5 C++/CMake addon、ABI/XDG/staged/system runtime-layout/Manager runtime/privacy/classifier contract、Debian 13 ARM64 staged 装配/headless loader、Wayland/X11 输入/隐私及 Manager 同库个人化实机证据；Linux metadata/rootfs portable gate；Android Keystore 能力验证桥 | macOS 真实跨发布升级；Linux 真实 ARM64 product payload gate、package transaction 与独立安装实机；完整 Android IME、Windows TSF 与 iOS Keyboard Extension |
+| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；build 38 双 bundle、locked RimeData、数据/安装 gate、Installer、社区 ad-hoc identity、DMG evidence、首次安装/输入/修复/默认移除实机证据；Linux Fcitx5 C++/CMake addon、ABI/XDG/staged/system runtime-layout/Manager runtime/privacy/classifier contract、Debian 13 ARM64 staged 装配/headless loader、Wayland/X11 输入/隐私及 Manager 同库个人化实机证据；Linux metadata/rootfs、真实 ARM64 product payload 与确定性 `.deb` 载体门禁；Android Keystore 能力验证桥 | macOS 真实跨发布升级；Linux package transaction/startup gate、隔离 matrix 与独立安装实机；完整 Android IME、Windows TSF 与 iOS Keyboard Extension |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
 
@@ -346,7 +346,7 @@ apps/radishlex-manager/
 
 `scripts/macos-product/product_manifest.py` 校验版本镜像与源码声明，生成/复验无绝对路径的 ProductManifest v3；`install_layout.py` 以 committed layout、target 与显式历史 source assembly 生成 InstallPayloadManifest v2；`release_identity.py` 固定双 component strict ad-hoc requirement 集合；`community_release.py` 生成/复验 DMG SHA-256 evidence。四层证据都不保存签名凭据、公证上传或用户数据；具体产品构建见 [macOS 产品装配 Runbook](runbooks/macos-product-assembly.md)，用户安装与发布载体见 [macOS 社区 ad-hoc DMG Runbook](runbooks/macos-release-carrier.md)。
 
-`packaging/linux/` 保存 format v1 Linux product mirror、`debian-system-v1` component layout、Debian control template、desktop/icon source 和 `debian-local-deb-v1` identity；不保存 `.deb`、rootfs 构建物、apt repository metadata、签名凭据或用户数据。`scripts/linux-product/product_metadata.py` 负责格式与派生值，`source_contract.py` 交叉验证 version/build、ABI/schema、RimeData lock、dependency/font profile 与源码身份，`rootfs.py` 从显式 Manager/addon 输入离线装配临时 `DESTDIR` 并生成 canonical product manifest。Rust/Cargo 与 C++ 产品构建路径会映射为稳定 identity，强门禁扫描全部 ELF 的 repo/home/staging 泄漏；真实 Debian 13.6 ARM64 载荷已通过。三者不写真实 `/usr`、`/var`，也不把 rootfs 称为安装完成。完整边界见 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)。
+`packaging/linux/` 保存 format v1 Linux product mirror、`debian-system-v1` component layout、Debian control/artifact contract、desktop/icon source 和 `debian-local-deb-v1` identity；不保存生成的 `.deb`、rootfs 构建物、apt repository metadata、签名凭据或用户数据。`scripts/linux-product/product_metadata.py` 负责格式与派生值，`source_contract.py` 交叉验证 version/build、ABI/schema、RimeData lock、dependency/font profile 与源码身份，`rootfs.py` 从显式 Manager/addon 输入离线装配临时 `DESTDIR` 并生成 canonical product manifest；`deb_artifact.py` 生成和重验 canonical ar/USTAR、control、md5sums 与 SHA-256 evidence，`shlibdeps_diagnostics.py` 精确核验私有未版本库和 Debian 13 ARM64 libc6 usrmerge 诊断。Rust/Cargo 与 C++ 产品构建路径映射为稳定 identity，强门禁扫描全部 ELF 的 repo/home/staging 泄漏；真实 Debian 13.6 ARM64 载荷与重复 `.deb` 构建已通过。以上入口不写真实 `/usr`、`/var`、dpkg database 或 XDG，也不把载体生成称为安装完成。完整边界见 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)。
 
 ## 平台目录
 
@@ -387,7 +387,7 @@ R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-
 
 平台目录按主线顺序创建：
 
-1. `platforms/linux-fcitx5/`：M5-P02 addon、共享 FFI 与开发构建、M5-P03 真实桌面输入/隐私验收、M5-P04 Linux Manager 与同库个人化及 M5-P05A metadata/rootfs/真实 ARM64 产品载荷门禁均已完成；当前进入 P05B package transaction/startup gate。
+1. `platforms/linux-fcitx5/`：M5-P02 addon、共享 FFI 与开发构建、M5-P03 真实桌面输入/隐私验收、M5-P04 Linux Manager 与同库个人化及 M5-P05A metadata/rootfs/真实 ARM64 产品载荷门禁均已完成；P05B 的确定性 `.deb` 载体已归属 `packaging/linux/` 与 `scripts/linux-product/`，当前继续 package transaction/startup gate。
 2. `platforms/android-ime/`：在现有 keystore bridge 之外补完整 IME。
 3. `platforms/windows-tsf/`。
 4. `platforms/ios-keyboard/`。
@@ -415,7 +415,7 @@ R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-
 - `examples/`：只有形成可维护的公开 schema、词库或配置样例后创建。
 - 顶层 `tests/integration/`：只有跨语言测试无法合理归属现有 crate/server 时创建。
 - `apps/desktop-tools/`：不为一次性调试工具提前建目录。
-- `platforms/linux-product/`：只在 M5-P05B 实现 Debian artifact 取证、receipt/guard、dpkg adapter、恢复与 startup decision 时创建；Fcitx addon 和 Flutter host 不接管这些 mutation。
+- `platforms/linux-product/`：只在 M5-P05B 开始实现 receipt/guard、dpkg adapter、恢复与 startup decision 时创建；已完成的 Debian artifact 取证留在 `packaging/linux/` 与 `scripts/linux-product/`，Fcitx addon 和 Flutter host 不接管这些 mutation。
 - 未进入当前顺位的平台壳目录。
 
 规划名称不构成承诺。新增目录前应先确认职责不能由现有模块清晰承担。

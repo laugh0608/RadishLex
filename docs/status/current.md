@@ -7,7 +7,7 @@
 - 复核日期：2026-08-06（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品
-- 当前主批次：M5-P05B Linux package transaction/startup gate；停在首个实现批次前，真实安装与系统写入仍关闭
+- 当前主批次：M5-P05B Linux package transaction/startup gate；确定性 `.deb` 载体与依赖身份已完成，下一批进入 receipt/guard 与 fake dpkg port，真实安装与系统写入仍关闭
 - 已退出：M0-M3；M4 macOS build 38 单版本产品验收已冻结；M5-P01 第二平台决策与运行边界；M5-P02 Fcitx5 addon、共享 FFI 与开发构建；M5-P03 真实 Linux 桌面输入与隐私验收；M5-P04 Linux Manager 与同库个人化验收；M5-P05A Linux metadata/rootfs 与真实产品载荷门禁
 - 真实用户同步：保持关闭；只允许合成数据与受控集成测试
 
@@ -33,6 +33,12 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 - rootfs 装配器严格验证 Manager/addon 输入，离线装配 RimeData，生成并复验 canonical manifest、inventory、mode/owner、链接、双 FFI、metadata、desktop、字体例外和禁止路径。
 - committed `e1ce740` 已在隔离 Debian 13.6 ARM64 从全新源码构建 Manager、system-profile addon 并通过真实 rootfs 强门禁：ARM64 ELF、RPATH/closure、ABI symbol、双 FFI、构建路径、权限和 DejaVu/Noto CJK 解析均通过。P05A 已退出；该证据不生成 `.deb`，不证明 package transaction 或系统安装。
 
+## M5-P05B 载体实现状态
+
+- `packaging/linux/debian/artifact.json` 与 `build-linux-deb-artifact.sh` 已固定 `debian-binary`、`control.tar`、`data.tar` 的 canonical ar/USTAR 载体，root owner/mode、`md5sums` 兼容 inventory、SHA-256 evidence、原子输出和解包后 rootfs 重验；构建只接受显式空输出目录，不执行安装。
+- `dpkg-shlibdeps` 在临时 package tree 解析全部六个 ELF；依赖输出必须完全解析，私有未版本化 Flutter/FFI 库与 Debian 13 ARM64 `libc6` usrmerge 只接受精确诊断集合，并独立复验私有 ELF、副本 hash、loader owner 与 diversion。未知、缺失或新增诊断全部失败关闭。
+- committed `ce74981` 已在 Debian 13.6 ARM64 对同一真实 rootfs 连续构建两次。`.deb` 与 evidence 分别逐字节相同，package SHA-256 为 `b56ba9494e715df847a778a59a09bea2ccef091ce023a596849c13c9f1db27cd`，evidence SHA-256 为 `858fe66515f41b20b29b023c53970a7cb23219575fb077aba2107db3eb045fba`；`dpkg-deb` 可读，package database 仍为 `not-installed`。本子批不证明 receipt、operation、startup gate 或安装成功。
+
 ## macOS 冻结参考
 
 macOS `26.7.1 (38)` 保持冻结参考产品；DMG SHA-256 为 `f171e74bdc0a429655a84b30429481bce3926b17076d09298feed77d9ce4ce4e`，未使用 Developer ID/公证，远端 draft 未发布且无正式 tag。详细身份、事务与实机流水见 [macOS 产品包边界](../macos-product-package-boundary.md) 和历史周志。
@@ -51,9 +57,9 @@ macOS `26.7.1 (38)` 保持冻结参考产品；DMG SHA-256 为 `f171e74bdc0a4296
 ## 下一步顺位
 
 1. 保持 P04 guest 与 macOS build 38 冻结现场不变。
-2. P05B 首先实现确定性本地 `.deb` artifact、control/manifest 交叉验证和 source artifact identity；构建物只进入显式输出目录，不安装到当前 guest。
-3. 接着实现 Linux receipt/guard、五类 operation、dpkg adapter fake port、crash/retry/rollback contract，以及 Manager/Fcitx 业务初始化前的同一 startup decision。
-4. 自动合同稳定后，在隔离 Debian rootfs/container 完成 install→upgrade→repair→rollback→remove→reinstall matrix；真实 P05C 仍使用独立 clone/snapshot 或另一台 guest 并逐项授权。
+2. P05B 下一批建立 Linux system receipt/guard、五类 operation 状态机与 fake dpkg port；先固定 artifact staging、source/target 身份、crash/retry、source restore 和 unknown package state 拒绝，再接任何真实 package manager。
+3. transaction contract 稳定后，让 Manager/Fcitx product build 在业务初始化前消费同一只读 startup decision，并覆盖 terminal、nonterminal、remove、half-configured 和 identity drift。
+4. 上述自动合同闭合后，在隔离 Debian rootfs/container 完成 install→upgrade→repair→rollback→remove→reinstall matrix；真实 P05C 仍使用独立 clone/snapshot 或另一台 guest 并逐项授权。
 5. 旧临时资产清理、远端推送、tag/Release、真实同步和其他平台均保持独立授权与后续顺位。
 
 ## 当前验证入口
@@ -72,6 +78,7 @@ macOS `26.7.1 (38)` 保持冻结参考产品；DMG SHA-256 为 `f171e74bdc0a4296
 ./scripts/check-linux-fcitx5.sh
 ./scripts/check-linux-product-metadata.sh
 ./scripts/check-linux-product-layout.sh
+./scripts/check-linux-deb-artifact.sh
 ./scripts/check-manager-linux-product.sh
 ./scripts/build-linux-fcitx5-container.sh
 ./scripts/check-repo.sh
@@ -79,7 +86,7 @@ macOS `26.7.1 (38)` 保持冻结参考产品；DMG SHA-256 为 `f171e74bdc0a4296
 git diff --check
 ```
 
-前两个 Linux product 入口的无参数模式验证 committed metadata 与平台无关 rootfs contract；2026-08-06 已另在 Debian 13.6 ARM64 以真实 Manager/addon 输入通过强门禁。真实系统安装、输入源变更、用户数据、公开上传和 Release 仍需对应授权。
+前三个 Linux product 入口依次验证 committed metadata、平台无关 rootfs contract 与确定性 Debian artifact/依赖诊断；2026-08-06 已另在 Debian 13.6 ARM64 以真实 Manager/addon 输入通过 rootfs 强门禁，并重复生成字节一致的未安装 `.deb`。真实系统安装、输入源变更、用户数据、公开上传和 Release 仍需对应授权。
 
 ## 阅读索引
 

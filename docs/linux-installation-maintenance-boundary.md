@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-截至 2026-08-06，M5-P05A 已完成 committed metadata、system rootfs 装配器、staged/system 两类 addon 构建身份，并通过真实 Debian 13.6 ARM64 Manager/addon 载荷门禁。当前进入 P05B；`.deb` artifact、dpkg transaction、startup gate、RadishLex 系统安装和 P05C 实机仍未开始。以下决策继续约束实现与后续批次：
+截至 2026-08-06，M5-P05A 已完成 committed metadata、system rootfs 装配器、staged/system 两类 addon 构建身份与真实 Debian 13.6 ARM64 Manager/addon 载荷门禁；P05B 已完成确定性 `.deb` artifact 与 dependency-analysis identity。当前下一批是 receipt/guard、五类 operation 与 fake dpkg port；startup gate、package mutation、RadishLex 系统安装和 P05C 实机仍未开始。以下决策继续约束实现与后续批次：
 
 - 首个完整产品安装载体固定为 Debian 13 ARM64 的单一系统级本地 `.deb`，package 名固定为 `radishlex`；它是未发布的本地验收载体，不是 apt repository、正式 Release 或通用 Linux 安装包。
 - Fcitx addon、两份产品 FFI、Manager bundle、锁定 RimeData、desktop entry、图标和产品 manifest 由同一个 package 绑定；不拆成可独立漂移的 Manager/addon 包。
@@ -295,7 +295,11 @@ M5-P05 最终需要以下分层证据：
 
 容器或隔离 rootfs 可以执行 package mutation contract，但不能证明桌面 menu、真实 Fcitx daemon、Wayland/X11、用户 profile、重启或数据保留实机体验。真实系统目录、服务与输入法配置仍只由授权实机批次证明。
 
-P05A 已在 2026-08-06 使用 committed `e1ce740` 的全新源码通过 Debian 13.6 ARM64 L1-L3：真实 Manager bundle、product-profile addon、双 FFI、ARM64 ELF、RPATH、依赖闭包、ABI symbol、系统字体解析、构建路径与临时 rootfs manifest 均通过。首次真实构建暴露的 Rust/Cargo/C++ 路径泄漏和调用方 `umask=0002` 漂移已在门禁层修复，权限规则未放宽。授权安装的 `fonts-noto-cjk` 只是目标环境 hard dependency，不是 RadishLex package 安装事实。L4-L6 仍属于 P05B/P05C，未实现也未运行。
+P05A 已在 2026-08-06 使用 committed `e1ce740` 的全新源码通过 Debian 13.6 ARM64 L1-L3 rootfs/载荷层：真实 Manager bundle、product-profile addon、双 FFI、ARM64 ELF、RPATH、依赖闭包、ABI symbol、系统字体解析、构建路径与临时 rootfs manifest 均通过。首次真实构建暴露的 Rust/Cargo/C++ 路径泄漏和调用方 `umask=0002` 漂移已在门禁层修复，权限规则未放宽。授权安装的 `fonts-noto-cjk` 只是目标环境 hard dependency，不是 RadishLex package 安装事实。
+
+P05B 载体子批随后以 committed `ce74981` 固定 `debian-local-deb-v1`：ar 成员只允许 `debian-binary`、`control.tar`、`data.tar` 且顺序固定；control/data 使用无压缩 canonical USTAR、epoch 0、root owner/mode，`md5sums` 只作 dpkg 兼容 inventory，产品和 evidence 身份使用 SHA-256。`dpkg-shlibdeps` 在临时 Debian package tree 扫描全部六个 ELF，必须输出单一已解析依赖行；私有未版本化 Flutter/FFI 库与 `libc6` usrmerge 只接受固定诊断 multiset，并独立复验私有 ELF、副本 hash、loader owner 与 diversion，未使用 `--ignore-missing-info` 或伪造公共 shlibs mapping。
+
+同一真实 rootfs 连续两次构建的 `.deb` 与 evidence 均逐字节一致；package SHA-256 为 `b56ba9494e715df847a778a59a09bea2ccef091ce023a596849c13c9f1db27cd`，evidence SHA-256 为 `858fe66515f41b20b29b023c53970a7cb23219575fb077aba2107db3eb045fba`，product manifest SHA-256 仍为 `41b5d98ce0bc77ad2b2138737b5891a7d862c28edec5d7ae603618492a34a6de`。`dpkg-deb` 结构检查通过，guest package database 明确为 `not-installed`。该证据补齐载体输出与 L1-L3 交叉身份，不创建 receipt，不进入 L4-L6，也不证明系统安装。
 
 ## M5-P05A 完成状态
 
@@ -307,7 +311,7 @@ P05A 已在 2026-08-06 使用 committed `e1ce740` 的全新源码通过 Debian 1
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 的完成只证明同一 committed 产品输入能形成 Debian 目标布局并受负向门禁约束，不证明 package transaction 或系统安装。P05B 按“确定性 `.deb` artifact 与 manifest → receipt/guard、五类 operation 和 fake dpkg port → Manager/Fcitx 共用 startup decision → 隔离 Debian install/upgrade/repair/rollback/remove/reinstall matrix”顺序推进；各层同时覆盖 crash/retry、source artifact rollback、默认数据保留与 unknown state 拒绝。P05C 才在独立 guest 完成授权实机，不复用或清理 P04 冻结现场。
+P05A 的完成只证明同一 committed 产品输入能形成 Debian 目标布局并受负向门禁约束，不证明 package transaction 或系统安装。P05B 的确定性 `.deb` artifact 与 manifest/依赖身份已经完成，后续按“receipt/guard、五类 operation 和 fake dpkg port → Manager/Fcitx 共用 startup decision → 隔离 Debian install/upgrade/repair/rollback/remove/reinstall matrix”顺序推进；各层同时覆盖 crash/retry、source artifact rollback、默认数据保留与 unknown state 拒绝。P05C 才在独立 guest 完成授权实机，不复用或清理 P04 冻结现场。
 
 ## 实机授权边界
 

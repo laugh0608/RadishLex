@@ -30,7 +30,7 @@
 ## 快速认知
 
 - 当前阶段：M5-P01-P05A 已完成；当前为 M5-P05B；详见 `docs/status/current.md`
-- 代码：macOS build 38 冻结；Linux 输入、Manager 与 P05A 载荷门禁通过；transaction、安装、同步/发布关闭
+- 代码：macOS build 38 冻结；Linux 输入、Manager、P05A 载荷与 P05B 确定性 `.deb` 门禁通过；transaction、安装、同步/发布关闭
 - 当前交付：macOS 内部候选；Linux 用户级开发装配；均非公开发布版本
 - 交付梯度：macOS 输入、个人化、同步资格与产品候选已完成；当前推进 Linux Fcitx5 产品线
 - 真实平台顺序：macOS InputMethodKit、Linux Fcitx5、Android、Windows、iOS；每次只推进一条主线
