@@ -43,17 +43,16 @@ package_version="$(PYTHONDONTWRITEBYTECODE=1 python3 \
 architecture="$(PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/product_metadata.py" field debian_architecture)"
 
-manager_root="${product_rootfs}/usr/lib/${multiarch}/radishlex/manager"
-addon_root="${product_rootfs}/usr/lib/${multiarch}/fcitx5"
-payload_binaries=(
-  "${manager_root}/radishlex_manager"
-  "${manager_root}/lib/libapp.so"
-  "${manager_root}/lib/libflutter_linux_gtk.so"
-  "${manager_root}/lib/libradishlex_ime_ffi.so"
-  "${addon_root}/radishlex.so"
-  "${addon_root}/libradishlex_ime_ffi.so"
+payload_relative_paths=(
+  "usr/lib/${multiarch}/radishlex/manager/radishlex_manager"
+  "usr/lib/${multiarch}/radishlex/manager/lib/libapp.so"
+  "usr/lib/${multiarch}/radishlex/manager/lib/libflutter_linux_gtk.so"
+  "usr/lib/${multiarch}/radishlex/manager/lib/libradishlex_ime_ffi.so"
+  "usr/lib/${multiarch}/fcitx5/radishlex.so"
+  "usr/lib/${multiarch}/fcitx5/libradishlex_ime_ffi.so"
 )
-for binary in "${payload_binaries[@]}"; do
+for relative_path in "${payload_relative_paths[@]}"; do
+  binary="${product_rootfs}/${relative_path}"
   if [[ ! -f "${binary}" || -L "${binary}" ]]; then
     echo "Debian artifact ELF input is unavailable: ${binary}" >&2
     exit 1
@@ -66,11 +65,21 @@ cleanup() {
 }
 trap cleanup EXIT
 shlibs_evidence="${temp_dir}/shlibs-depends.txt"
-mkdir -m 0755 "${temp_dir}/debian"
+shlibs_diagnostics="${temp_dir}/shlibs-diagnostics.txt"
+analysis_root="${temp_dir}/package-root"
+mkdir -m 0755 "${analysis_root}"
+cp -a "${product_rootfs}/." "${analysis_root}/"
+mkdir -m 0755 "${analysis_root}/DEBIAN"
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/product_metadata.py" \
-  render-shlibdeps-control --output "${temp_dir}/debian/control"
-(
+  render-shlibdeps-control --output "${analysis_root}/DEBIAN/control"
+manager_root="${analysis_root}/usr/lib/${multiarch}/radishlex/manager"
+addon_root="${analysis_root}/usr/lib/${multiarch}/fcitx5"
+payload_binaries=()
+for relative_path in "${payload_relative_paths[@]}"; do
+  payload_binaries+=("${analysis_root}/${relative_path}")
+done
+if ! (
   cd "${temp_dir}"
   DPKG_COLORS=never DPKG_NLS=0 dpkg-shlibdeps \
     --warnings=0 \
@@ -81,7 +90,16 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
     -l"${manager_root}/lib" \
     -l"${addon_root}" \
     "${payload_binaries[@]}"
-) >"${shlibs_evidence}"
+) >"${shlibs_evidence}" 2>"${shlibs_diagnostics}"; then
+  cat "${shlibs_diagnostics}" >&2
+  echo "dpkg-shlibdeps failed for the product package tree." >&2
+  exit 1
+fi
+if [[ -s "${shlibs_diagnostics}" ]]; then
+  cat "${shlibs_diagnostics}" >&2
+  echo "dpkg-shlibdeps produced an unexpected diagnostic." >&2
+  exit 1
+fi
 
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/deb_artifact.py" build \
