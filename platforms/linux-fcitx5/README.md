@@ -1,6 +1,6 @@
 # RadishLex Fcitx5 addon
 
-本文说明 Linux Fcitx5 addon 的职责、开发构建、XDG 数据路径和验证入口，读者是平台壳、Rust FFI 与 Linux Manager host 的维护者。本文不包含发行版安装步骤、系统输入法启用操作、逐日桌面验收流水或 Linux 产品升级；实时阶段见当前状态，详细证据见本周周志。
+本文说明 Linux Fcitx5 addon 的职责、开发构建、XDG 数据路径和验证入口，读者是平台壳、Rust FFI 与 Linux Manager host 的维护者。本文不包含发行版安装步骤、系统输入法启用操作、逐日桌面验收流水或 Linux 产品升级；安装职责见 [`docs/linux-installation-maintenance-boundary.md`](../../docs/linux-installation-maintenance-boundary.md)，实时阶段见当前状态，详细证据见本周周志。
 
 ## 当前证据
 
@@ -9,7 +9,7 @@ M5-P02 已经建立真实 C++ 源码、CMake target、addon/input method metadat
 - Apple clang 的 C++17 严格编译通过；
 - ABI v9 contract、key projection、owned `KeyResult`/snapshot、display-index selection、owner-thread 和 reset/free/shutdown 顺序通过 fake-FFI contract；
 - XDG 默认路径、显式 XDG 根、`0700`/`0600`、relative path、symlink、宽权限和 production/test override 隔离通过；
-- M5-P04 已增加 Flutter Linux runner、固定 bundle `.so`、共享 XDG/Manager runtime、独立 privacy format、inotify/event-loop 变更感知与受控粗分类 contract；真实 ARM64 Manager Release/FFI smoke、桌面 privacy、删除/恢复和 Fcitx 重启已通过，尚余导入导出、Manager 与桌面会话重启；
+- M5-P04 已增加 Flutter Linux runner、固定 bundle `.so`、共享 XDG/Manager runtime、独立 privacy format、inotify/event-loop 变更感知与受控粗分类 contract；真实 ARM64 Manager Release/FFI smoke、桌面 privacy、删除/恢复、导入导出、Manager/Fcitx 与完整桌面会话重启均已通过；
 - Debian 13 ARM64 使用 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 和 librime 1.13.1，真实编译并动态链接启用 `native-rime` 的 `libradishlex_ime_ffi.so` 与 `radishlex.so`；
 - CMake staged install 把 addon、共享 FFI、锁定 RimeData 与两份 Fcitx metadata 形成同一开发装配，addon 只使用 `$ORIGIN` 定位 sibling FFI，不保留仓库或临时构建路径；
 - `radishlex_runtime_probe` 在相同 Linux 环境先校验装配文件、symlink 和权限，再对 staged `radishlex.so` 执行 `dlopen(RTLD_NOW)`；
@@ -79,9 +79,9 @@ tools/
 
 不需要进入共享 ABI 的 Linux 产品能力：
 
-- Linux install/data startup gate 和版本化产品 identity：M5-P05；
+- Linux install/data startup gate 和版本化产品 identity：M5-P05 前置边界已固定，源码尚未实现；
 - Linux Manager privacy 已固定为独立 XDG 文件，addon 变更感知与分类框架已落地；生产 allowlist 只包含经 Wayland/X11 评审的精确 `firefox-esr -> browser`；
-- 发行版包、系统域路径与升级 receipt：M5-P05。
+- 发行版 package、系统域路径与升级 receipt：M5-P05 文档已固定，metadata/transaction 实现尚未开始。
 
 在普通 context 无已评审生产身份时，addon 传 `context_known = 0`；Rust 因而使用 engine 顺序且不读写 userdb。当前只有精确 `firefox-esr` 映射为 `browser + context_known = 1`；路径、大小写、wrapper、其他 Firefox 候选和 unknown 仍失败关闭。Fcitx 明确提供 `Password`、`Sensitive` 或 `Terminal` capability 时先返回受控摘要且不读取 `program()`；Terminal 固定投影为 `terminal + context_known = 0`，不传 program name、窗口标题或正文。
 
@@ -162,4 +162,4 @@ RADISHLEX_IME_FFI_LIBRARY="$PWD/target/release/libradishlex_ime_ffi.so" \
   ./scripts/check-linux-fcitx5.sh --require-fcitx
 ```
 
-`--require-fcitx` 在非 Linux、缺失 CMake、缺失 cdylib 或 Fcitx5 CMake package 时失败，不自动下载依赖、不启动容器、不写系统目录。脚本固定 `umask 022`，避免开发账号的宽松默认 umask 把 group/other writable 权限泄漏进临时 stage；runtime probe 对这类宽权限的拒绝规则不放宽。Docker wrapper 才负责显式建立依赖环境。开发装配、Fcitx 重启、输入法启用和真实应用交互仍需单独授权；产品安装与维护属于 M5-P05。
+`--require-fcitx` 在非 Linux、缺失 CMake、缺失 cdylib 或 Fcitx5 CMake package 时失败，不自动下载依赖、不启动容器、不写系统目录。脚本固定 `umask 022`，避免开发账号的宽松默认 umask 把 group/other writable 权限泄漏进临时 stage；runtime probe 对这类宽权限的拒绝规则不放宽。Docker wrapper 才负责显式建立依赖环境。开发装配、Fcitx 重启、输入法启用和真实应用交互仍需单独授权。M5-P05 当前只允许按独立安装边界先实现 metadata/rootfs 自动门禁；任何 package/system mutation 仍未授权。

@@ -121,8 +121,8 @@ RadishLex/
 | Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v9、Manager 产品状态与隔离资格 run、管理查询和共库证据；M4-P02 数据协调、M4-P03 外层 receipt/guard、双程序切换/恢复、两段终态、manifest/code-signature adapter、跨核心协调、Installer driver/executor/bridge 已形成独立边界 | 身份绑定的终态材料清理与真实跨发布兼容证据 |
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
 | 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
-| Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁；M4 外层 install gate、数据 gate 与升级 validation helper；M5 Linux runner、固定 `.so`、共享 XDG/privacy source contract 与 ARM64 Release bundle smoke | Linux 桌面 Manager/双进程产品验收；真实用户同步入口与首版后的目标部署证据 |
-| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；build 38 双 bundle、locked RimeData、数据/安装 gate、Installer、社区 ad-hoc identity、DMG evidence、首次安装/输入/修复/默认移除实机证据；Linux Fcitx5 C++/CMake addon、ABI/XDG/runtime-layout/Manager runtime/privacy/classifier contract、Debian 13 ARM64 staged 装配/headless loader 与 Wayland/X11 输入/隐私实机证据；Android Keystore 能力验证桥 | macOS 真实跨发布升级；Linux Manager 桌面/同库个人化验收与安装维护；完整 Android IME、Windows TSF 与 iOS Keyboard Extension |
+| Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁；M4 外层 install gate、数据 gate 与升级 validation helper；M5 Linux runner、固定 `.so`、共享 XDG/privacy source contract、ARM64 Release bundle、同库学习/删除/导入导出与重启实机证据 | Linux system package/startup gate；真实用户同步入口与首版后的目标部署证据 |
+| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；build 38 双 bundle、locked RimeData、数据/安装 gate、Installer、社区 ad-hoc identity、DMG evidence、首次安装/输入/修复/默认移除实机证据；Linux Fcitx5 C++/CMake addon、ABI/XDG/runtime-layout/Manager runtime/privacy/classifier contract、Debian 13 ARM64 staged 装配/headless loader、Wayland/X11 输入/隐私及 Manager 同库个人化实机证据；Android Keystore 能力验证桥 | macOS 真实跨发布升级；Linux 安装维护 metadata、package transaction 与独立实机；完整 Android IME、Windows TSF 与 iOS Keyboard Extension |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
 
@@ -340,6 +340,8 @@ apps/radishlex-manager/
 
 `scripts/macos-product/product_manifest.py` 校验版本镜像与源码声明，生成/复验无绝对路径的 ProductManifest v3；`install_layout.py` 以 committed layout、target 与显式历史 source assembly 生成 InstallPayloadManifest v2；`release_identity.py` 固定双 component strict ad-hoc requirement 集合；`community_release.py` 生成/复验 DMG SHA-256 evidence。四层证据都不保存签名凭据、公证上传或用户数据；具体产品构建见 [macOS 产品装配 Runbook](runbooks/macos-product-assembly.md)，用户安装与发布载体见 [macOS 社区 ad-hoc DMG Runbook](runbooks/macos-release-carrier.md)。
 
+M5-P05 前置设计已固定未来 `packaging/linux/` 的职责：保存 Linux product mirror、system install layout、Debian control template 与本地 `.deb` identity，不保存 package 构建物、apt repository metadata、签名凭据或用户数据。该目录在本次纯文档批次尚未创建；首个 P05A 实现只能先形成临时 `DESTDIR` rootfs 与 metadata/layout 门禁，不得写真实 `/usr`、`/var` 或把 staged rootfs 称为安装完成。完整边界见 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)。
+
 ## 平台目录
 
 M5-P02 已以真实实现和 contract 建立 `platforms/linux-fcitx5/`：
@@ -357,7 +359,7 @@ platforms/linux-fcitx5/
   README.md            开发构建、非安装 smoke 和边界索引
 ```
 
-该目录不包含 userdb schema、ranker、Rime 私有候选逻辑、同步状态机或自绘候选 UI。`include/radishlex/linux/xdg_paths.h` 与 `src/xdg_paths.cpp` 是 addon、Flutter Linux host、诊断和安装协调层的单一 XDG resolver；test injection 只在测试编译态可见。`ffi_projection` 复制 ABI v9 owned result 并守住 owner thread，`fcitx_addon` 只使用 framework input panel、commit 和 lifecycle。应用身份 evidence 仅用于默认关闭的固定候选桌面评审，不能进入默认产品日志或替代生产 allowlist 复核。Linux 正式产品 metadata 与发行载体只有在 M5-P05 固定格式后才进入 `packaging/linux/`，P02/P04 的开发装配不得提前冒充产品安装。
+该目录不包含 userdb schema、ranker、Rime 私有候选逻辑、同步状态机或自绘候选 UI。`include/radishlex/linux/xdg_paths.h` 与 `src/xdg_paths.cpp` 是 addon、Flutter Linux host、诊断和安装协调层的单一 XDG resolver；test injection 只在测试编译态可见。`ffi_projection` 复制 ABI v9 owned result 并守住 owner thread，`fcitx_addon` 只使用 framework input panel、commit 和 lifecycle。应用身份 evidence 仅用于默认关闭的固定候选桌面评审，不能进入默认产品日志或替代生产 allowlist 复核。M5-P05 已固定系统级 Debian layout 和 `debian-local-deb-v1` 边界，但 `packaging/linux/`、package transaction 与 startup gate 尚未实现；P02/P04 的开发装配不得提前冒充产品安装。
 
 当前 macOS 机器不直接安装 Linux 工具链；`./scripts/build-linux-fcitx5-container.sh` 在 Docker Desktop 的 Linux VM 中以 Debian 13 ARM64、Fcitx5 Core 5.1.12 和 librime 1.13.1 编译 native-rime FFI 与 `radishlex.so`，仓库只读挂载，Cargo cache/target 使用独立 named volume。该入口还执行 staged addon-relative 装配、ELF `$ORIGIN`/依赖/构建路径门禁和 headless native loader probe；这些结果不是 Wayland/X11、Fcitx daemon 或真实应用输入证据。开发入口与停止线见 [Fcitx5 addon README](../platforms/linux-fcitx5/README.md)。
 
@@ -379,7 +381,7 @@ R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-
 
 平台目录按主线顺序创建：
 
-1. `platforms/linux-fcitx5/`：M5-P02 addon、共享 FFI 与开发构建、M5-P03 真实桌面输入/隐私验收及 M5-P04 Linux Manager 与同库个人化均已完成；M5-P05 安装维护未进入。
+1. `platforms/linux-fcitx5/`：M5-P02 addon、共享 FFI 与开发构建、M5-P03 真实桌面输入/隐私验收及 M5-P04 Linux Manager 与同库个人化均已完成；M5-P05 只完成安装维护前置设计，停在 P05A 实现前。
 2. `platforms/android-ime/`：在现有 keystore bridge 之外补完整 IME。
 3. `platforms/windows-tsf/`。
 4. `platforms/ios-keyboard/`。
@@ -407,6 +409,8 @@ R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-
 - `examples/`：只有形成可维护的公开 schema、词库或配置样例后创建。
 - 顶层 `tests/integration/`：只有跨语言测试无法合理归属现有 crate/server 时创建。
 - `apps/desktop-tools/`：不为一次性调试工具提前建目录。
+- `packaging/linux/`：只在 M5-P05A 实现 committed metadata、rootfs layout 与纯自动门禁时创建；本次设计文档不以空目录占位。
+- `platforms/linux-product/`：只在 M5-P05B 实现 Debian artifact 取证、receipt/guard、dpkg adapter、恢复与 startup decision 时创建；Fcitx addon 和 Flutter host 不接管这些 mutation。
 - 未进入当前顺位的平台壳目录。
 
 规划名称不构成承诺。新增目录前应先确认职责不能由现有模块清晰承担。

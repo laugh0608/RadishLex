@@ -174,7 +174,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 2. `M5-P02`：实现 C++/CMake addon、Rust FFI 接线、确定性开发构建和自动 contract。
 3. `M5-P03`：完成真实 Wayland 主路径、X11 兼容、常见应用输入、生命周期和隐私验收。
 4. `M5-P04`：完成 Linux Flutter Manager、同库并发、本地学习、删除/恢复、导入导出和 explain 验收。
-5. `M5-P05`：完成安装、升级、修复、默认移除、数据保留和发行载体。
+5. `M5-P05`：完成安装、升级、修复、默认移除、rollback、数据保留和发行载体。前置设计已固定首个载体为 Debian 13 ARM64 的系统级本地 `.deb`：P05A 先建立 metadata/rootfs assembly 与纯自动门禁，P05B 再实现 package transaction/startup gate，P05C 最后进入独立 guest 授权实机。
 
 交付：
 
@@ -184,7 +184,8 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 - Wayland 与 X11 的真实应用输入证据。
 - Linux Manager 与 addon 共用 userdb 的并发、重启和个人化证据。
 - native dependency、RimeData、版本/schema、许可证和产品 metadata 一致性门禁。
-- Linux 安装维护事务与默认保留数据语义。
+- Linux system package 绑定 Manager、两份同版 FFI、Fcitx addon、完整 RimeData、desktop entry、icon、字体/系统依赖与版本化 product manifest。
+- Linux install、upgrade、repair、remove、rollback 事务、startup gate 与默认保留用户 XDG 数据语义。
 
 退出标准：
 
@@ -195,10 +196,12 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 - 真实选择可以影响后续候选，用户能查看、导出、删除和恢复，删除不会被旧本地状态复活。
 - password、secure、sensitive 和无法可靠判断的上下文不读取或写入个人化数据。
 - 断网输入、Fcitx 重启、桌面会话重启和常见 GTK/Qt/Electron/浏览器/终端输入通过。
-- 安装、升级、修复、默认程序移除和数据保留具有自动门禁与实机证据。
+- Debian 13 ARM64 的安装、同数据 contract 升级、修复、rollback、默认程序移除和 reinstall 具有自动门禁与独立实机证据。
+- 默认 remove/purge 不遍历 home、不删除用户 XDG 数据；package 不自动改 Fcitx profile、autostart、输入源或桌面会话。
+- Manager 与 Fcitx panel 的中文、Latin 和数字字体依赖可复验；首个 Debian profile 使用发行版硬依赖，不把系统字体偶然 fallback 写成产品证据。
 - macOS 冻结参考基线与仓库门禁继续通过，真实用户同步继续关闭。
 
-完整运行边界见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)。
+完整运行边界见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)，安装维护边界见 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)。
 
 ## 后续平台与统一发布评审
 

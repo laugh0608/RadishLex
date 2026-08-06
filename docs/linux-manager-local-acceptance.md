@@ -1,6 +1,6 @@
 # Linux Manager 本地验收边界
 
-本文定义 M5-P04 的 Linux Flutter Manager 产品 host、共享 XDG 数据、隐私配置、应用粗分类、同库并发和本地个人化验收边界。读者是维护 `apps/radishlex-manager`、`platforms/linux-fcitx5`、`ime-ffi` 与 Linux 验证入口的协作者。本文不定义发行版安装、系统级路径、包签名、升级移除、真实用户同步、恢复码、设备授权或新的 Manager 页面设计；这些能力分别留在 M5-P05 和后续同步开放评审。
+本文定义 M5-P04 的 Linux Flutter Manager 产品 host、共享 XDG 数据、隐私配置、应用粗分类、同库并发和本地个人化验收边界。读者是维护 `apps/radishlex-manager`、`platforms/linux-fcitx5`、`ime-ffi` 与 Linux 验证入口的协作者。本文不定义发行版安装、系统级路径、package transaction、升级移除、真实用户同步、恢复码、设备授权或新的 Manager 页面设计；M5-P05 见 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)，同步能力仍留在后续开放评审。
 
 ## 当前结论
 
@@ -48,7 +48,7 @@ M5-P04 不纳入：
 
 Linux host 和 addon 可以链接同一份浅层 C++ platform source/target；不得把 resolver 复制到 `apps/radishlex-manager/linux` 后独立演化。Flutter generated runner 只保留平台启动和 channel 接线，较长实现继续放在 `platforms/linux-fcitx5` 的共享职责模块中。
 
-Linux Manager 的主题必须显式提供兼顾 Latin、数字和简体中文的字体 fallback，不能依赖 Flutter/GTK 偶然选中单一系统字体。P04 staged product 可使用受控系统字体族验证可读性；M5-P05 必须在“随包携带字体”和“发行包声明字体依赖”之间形成明确安装契约，并复验中文标题、正文、英文状态码、数字计数和候选解释。只修复中文而让 Latin/数字显示方框，或反之，都不算通过。
+Linux Manager 的主题必须显式提供兼顾 Latin、数字和简体中文的字体 fallback，不能依赖 Flutter/GTK 偶然选中单一系统字体。P04 staged product 已使用受控系统字体族验证可读性；M5-P05 进一步固定为发行版 hard dependency：Debian profile 使用 `fonts-dejavu-core` 与 `fonts-noto-cjk`，RadishLex payload 不携带或注册字体。产品门禁仍须复验中文标题、正文、英文状态码、数字计数和候选解释；只修复中文而让 Latin/数字显示方框，或反之，都不算通过。
 
 ## Linux product bootstrap
 
@@ -188,11 +188,11 @@ A6 必须至少有一条从 personalized runtime 写入、经 Manager bridge 读
 4. Linux staged Release bundle 携带 workspace native-rime `.so`，完成 ABI/symbol/ELF 与无路径 override smoke。
 5. 使用临时合成库形成“runtime 写入—Manager bridge 刷新—另一 runtime 观察”的产品双端自动证据。
 
-该批没有顺带实现 package/安装，也没有以能打开空窗口结束。privacy watcher、classifier、Wayland/X11 身份、精确 Firefox 生产规则、同库学习/解释、privacy 零增量、删除防复活、explicit restore、导入导出、Fcitx/Manager 重启与桌面会话重启均已复用同一 host、XDG 和真实 bridge 闭合。M5-P04 验收矩阵据此退出；现有 staging、backup、userdb、导入导出文件和 transient service 终态继续保留，M5-P05 仍需另行授权。
+该批没有顺带实现 package/安装，也没有以能打开空窗口结束。privacy watcher、classifier、Wayland/X11 身份、精确 Firefox 生产规则、同库学习/解释、privacy 零增量、删除防复活、explicit restore、导入导出、Fcitx/Manager 重启与桌面会话重启均已复用同一 host、XDG 和真实 bridge 闭合。M5-P04 验收矩阵据此退出；现有 staging、backup、userdb、导入导出文件和 transient service 终态继续保留。M5-P05 仅完成前置设计，后续 metadata/rootfs 代码与任何实机仍需各自授权。
 
 ## 当前停止线
 
-- 不进入 M5-P05，不把 staged bundle、用户级 addon 复制或 autostart 写成安装产品。
+- 不把 staged bundle、用户级 addon 复制、环境覆盖或 autostart 写成 M5-P05 安装产品；系统级 Debian 实现必须遵守独立安装边界。
 - 不启用真实用户同步，不新增恢复码、设备授权或网络输入热路径。
 - 不在 Dart、Flutter UI 或 C++ addon 复制 Rust userdb、ranker、删除和 explain 语义。
 - 不为开启学习把 unknown、GTK4 `PRIVATE` 或未验证程序身份默认归为 known。

@@ -1,10 +1,10 @@
 # Linux Fcitx5 平台边界
 
-本文定义 RadishLex 第二真实平台的运行职责、FFI 接线、输入语义、XDG 数据、隐私、构建和验收边界，读者是 `platforms/linux-fcitx5/`、`ime-ffi`、Linux Flutter host 与验证入口的实现者。本文不包含发行版安装命令、包管理仓库发布、具体 UI 样式、远端同步启用或逐日验证流水；平台选择见 [ADR 0009](adr/0009-second-platform-linux-fcitx5.md)，当前批次见 [当前状态](status/current.md)。
+本文定义 RadishLex 第二真实平台的运行职责、FFI 接线、输入语义、XDG 数据、隐私、构建和验收边界，读者是 `platforms/linux-fcitx5/`、`ime-ffi`、Linux Flutter host 与验证入口的实现者。本文不包含发行版安装命令、package transaction、具体 UI 样式、远端同步启用或逐日验证流水；安装职责见 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)，平台选择见 [ADR 0009](adr/0009-second-platform-linux-fcitx5.md)，当前批次见 [当前状态](status/current.md)。
 
 ## 状态与产品范围
 
-状态：M5-P01/P02/P03/P04 已完成，停在 M5-P05 前。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release、native/ELF/FFI smoke、桌面 privacy、删除防复活、explicit restore、导入导出以及 Fcitx/Manager/桌面会话重启均已通过。P05 安装维护仍未进入。
+状态：M5-P01/P02/P03/P04 已完成。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release、native/ELF/FFI smoke、桌面 privacy、删除防复活、explicit restore、导入导出以及 Fcitx/Manager/桌面会话重启均已通过。M5-P05 前置设计已收口，首个系统级 Debian layout、字体依赖、维护事务和停止线已经固定，但 metadata、package、startup gate 与任何系统安装均未实现。
 
 P03 实机证据覆盖 GTK、Qt、Electron、浏览器和终端，包含完整候选交互、焦点/输入法切换、Fcitx/桌面会话重启、进程级地址族限制与整台 guest 断网。password、terminal、unknown 与 Qt `Sensitive` 后的 userdb 聚合保持全零；当前 GTK4 frontend 未把 `PRIVATE` 传播为 Fcitx `Sensitive`，因此依赖既有 unknown 失败关闭而非虚构 capability。Qt backend 只以 QPA、会话类型和 input-context plugin 的组合证据判定，不能因进程映射 `libQt6WaylandClient` 就声明原生 Wayland。快速 X11→Wayland 登录暴露的 `im-launch` 跳过 daemon 问题已用 Debian 官方 desktop entry 的用户级 autostart 副本闭合；该开发设置不替代 P05 产品安装与维护设计。
 
@@ -68,7 +68,7 @@ Linux 继续使用 `ime-ffi` ABI v9 已有的：
 - PageUp/PageDown 作为稳定 named key 进入 Rust 后用新 snapshot 重建列表；
 - reset/free/shutdown 已足以表达 per-context session 与进程 teardown。
 
-当前真实缺口不在 ABI、addon 编译、Manager privacy、删除恢复或首条生产应用分类，而在剩余导入导出、Manager/桌面会话重启，以及 P05 发行安装事务。这些缺口不需要增加平台私有 ABI。
+当前真实缺口不在 ABI、addon 编译、Manager privacy、删除恢复、导入导出或重启矩阵，而在 P05 metadata、package transaction、startup gate 与安装实机。这些能力不需要增加平台私有输入 ABI。
 
 ### Flutter Manager
 
@@ -168,7 +168,7 @@ Linux 不复用 macOS `Application Support`。M5-P02 先实现单一、可测试
 - 明确新建目录/文件的权限与所有权；
 - 返回结构化路径对象，不让 C++、Dart 与 Rust 分别拼接字符串；
 - 保持测试 override 与生产 resolver 隔离，生产构建不读取 fixture 路径；
-- 在 M5-P05 前固定具体子目录、receipt、安装目标和 migration 清单。
+- M5-P05 已在独立安装边界中固定系统程序 layout、root receipt 与零用户数据 mutation；本节的 XDG 用户路径保持不变。
 
 M5-P02 已固定当前数据子路径：
 
@@ -198,7 +198,7 @@ M5-P02 的开发构建必须形成可复验依赖图：
 - 运行时拒绝缺失资源、leaf symlink、group/other 可写 addon 目录或资源，并以稳定原因失败关闭；
 - 构建不从运行时下载 schema、词库、模型或二进制；
 - 开发安装与正式发行载体分开，P02 不把本地复制命令称为产品安装；
-- 发行版包、签名、系统域目标、升级与移除在 M5-P05 单独固定。
+- 发行版 package、系统域目标、升级与移除已由 M5-P05 文档固定，源码实现与实机仍未开始。
 
 当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境编译 projection/XDG/runtime-layout contract；`--require-fcitx` 只在 Linux 且调用方提供既有 native-rime cdylib 时配置、构建并 staged install addon/FFI/RimeData/metadata，检查 ELF 动态依赖、`$ORIGIN`、构建路径泄漏，运行 `dlopen(RTLD_NOW)` probe 与 CTest，不下载依赖、不写系统目录或启用输入法。脚本以 `umask 022` 固定临时装配权限，不继承开发账号的宽松 umask；runtime validator 仍拒绝任何 group/other writable addon 目录或资源。
 
@@ -243,7 +243,7 @@ M5-P04 已覆盖：
 - Linux Manager 与 addon 同库学习、`browser` explain、privacy 开关零增量和关闭后单次恢复学习；
 - Manager 删除、既有/新 Fcitx session 防复活、explicit restore、恢复后重新学习与多次 Fcitx 重启；
 
-M5-P04 继续覆盖：
+M5-P04 已覆盖：
 
 - Manager 导入检查、导入、导出及 tombstone 防导入复活；
 - Manager 进程重启、桌面会话重启和最终并发状态保持；
@@ -266,7 +266,8 @@ M5-P04 继续覆盖：
 ## 当前停止线
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
-- P04 继续以 `docs/linux-manager-local-acceptance.md` 为验收门禁；剩余导入导出和重启证据不得用 fixture 或单连接 SQLite 测试冒充完成。
+- P04 已按 `docs/linux-manager-local-acceptance.md` 冻结完成，不重复其导入导出、同库和重启实机；既有 guest 资产不得清理、覆盖或改作 P05 载体。
+- P05 当前只允许文档边界；`packaging/linux/`、metadata/rootfs assembly、package transaction 和 startup gate 必须按 [Linux 安装维护边界](linux-installation-maintenance-boundary.md) 分批实现。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。

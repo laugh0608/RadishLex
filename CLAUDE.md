@@ -29,7 +29,7 @@
 
 ## 快速认知
 
-- 当前阶段：M5-P01/P02/P03/P04 已完成，停在 M5-P05 Linux 安装维护前；实时状态见 `docs/status/current.md`
+- 当前阶段：M5-P01/P02/P03/P04 已完成，M5-P05 安装维护前置设计已收口，停在首个实现子批前；实时状态见 `docs/status/current.md`
 - 代码：macOS build 38 冻结；Linux addon/XDG/ARM64 装配、输入/隐私与 Manager 验收通过；安装、同步/发布关闭
 - 当前交付：macOS 内部候选；Linux 用户级开发装配；均非公开发布版本
 - 交付梯度：macOS 输入、个人化、同步资格与产品候选已完成；当前推进 Linux Fcitx5 产品线
