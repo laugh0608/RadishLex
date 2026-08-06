@@ -174,7 +174,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 2. `M5-P02`：实现 C++/CMake addon、Rust FFI 接线、确定性开发构建和自动 contract。
 3. `M5-P03`：完成真实 Wayland 主路径、X11 兼容、常见应用输入、生命周期和隐私验收。
 4. `M5-P04`：完成 Linux Flutter Manager、同库并发、本地学习、删除/恢复、导入导出和 explain 验收。
-5. `M5-P05`：完成安装、升级、修复、默认移除、rollback、数据保留和发行载体。前置设计已固定首个载体为 Debian 13 ARM64 的系统级本地 `.deb`：P05A 先建立 metadata/rootfs assembly 与纯自动门禁，P05B 再实现 package transaction/startup gate，P05C 最后进入独立 guest 授权实机。
+5. `M5-P05`：完成安装、升级、修复、默认移除、rollback、数据保留和发行载体。首个载体固定为 Debian 13 ARM64 的系统级本地 `.deb`；P05A 的 committed metadata、rootfs assembly、staged/system 构建身份和平台无关门禁已实现，仍须通过真实 ARM64 Manager/addon 载荷门禁后退出。P05B 再实现 package transaction/startup gate，P05C 最后进入独立 guest 授权实机。
 
 交付：
 

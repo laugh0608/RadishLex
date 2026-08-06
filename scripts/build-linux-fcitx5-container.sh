@@ -56,4 +56,8 @@ docker run --rm \
     ldd "${ffi_library}"
     RADISHLEX_IME_FFI_LIBRARY="${ffi_library}" \
       ./scripts/check-linux-fcitx5.sh --require-fcitx
+    ./scripts/check-linux-product-layout.sh
+    ./scripts/build-linux-product-addon-stage.sh \
+      --ffi-library "${ffi_library}" \
+      --output /tmp/radishlex-product-addon-stage
   '

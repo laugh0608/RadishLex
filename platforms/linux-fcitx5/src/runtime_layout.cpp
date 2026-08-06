@@ -12,7 +12,12 @@ namespace {
 
 constexpr const char *kAddonLibrary = "radishlex.so";
 constexpr const char *kFfiLibrary = "libradishlex_ime_ffi.so";
+#ifdef RADISHLEX_SYSTEM_RIME_DATA_DIR
+constexpr const char *kSystemRimeDataDirectory =
+    RADISHLEX_SYSTEM_RIME_DATA_DIR;
+#else
 constexpr const char *kRimeDataDirectory = "radishlex-rime";
+#endif
 constexpr std::array<const char *, 3> kRimeAssets{
     "default.yaml",
     "radishlex_pinyin.schema.yaml",
@@ -116,10 +121,18 @@ RuntimeLayout runtimeLayoutFromAddonLibrary(
                                  "addon library name is not fixed");
   }
   const std::filesystem::path addon_directory = addon_library.parent_path();
+#ifdef RADISHLEX_SYSTEM_RIME_DATA_DIR
+  const std::filesystem::path rime_data_directory =
+      std::filesystem::path(kSystemRimeDataDirectory);
+  validateAbsoluteNormalized(rime_data_directory, "RimeData directory");
+#else
+  const std::filesystem::path rime_data_directory =
+      addon_directory / kRimeDataDirectory;
+#endif
   return RuntimeLayout{
       addon_library,
       addon_directory / kFfiLibrary,
-      addon_directory / kRimeDataDirectory,
+      rime_data_directory,
   };
 }
 
@@ -142,7 +155,7 @@ void validateRuntimeLayout(const RuntimeLayout &layout) {
   if (layout.ffi_library != expected.ffi_library ||
       layout.rime_shared_data_dir != expected.rime_shared_data_dir) {
     throw RuntimeLayoutException(RuntimeLayoutError::InvalidAddonPath,
-                                 "runtime resources are not addon-relative");
+                                 "runtime resources do not match the build profile");
   }
   requireDirectory(layout.addon_library.parent_path());
   requireRegularFile(layout.addon_library);

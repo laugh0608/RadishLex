@@ -1,0 +1,11 @@
+Package: @PACKAGE_NAME@
+Version: @PACKAGE_VERSION@
+Architecture: @DEBIAN_ARCHITECTURE@
+Maintainer: RadishLex <laugh0608@foxmail.com>
+Section: utils
+Priority: optional
+Depends: @HARD_DEPENDENCIES@
+Homepage: https://github.com/laugh0608/RadishLex
+Description: Local-first Chinese input system for Fcitx5
+ RadishLex combines a native Fcitx5 addon with a local management application.
+ This template describes the Debian 13 ARM64 local acceptance carrier only.

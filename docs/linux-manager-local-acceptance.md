@@ -48,7 +48,7 @@ M5-P04 不纳入：
 
 Linux host 和 addon 可以链接同一份浅层 C++ platform source/target；不得把 resolver 复制到 `apps/radishlex-manager/linux` 后独立演化。Flutter generated runner 只保留平台启动和 channel 接线，较长实现继续放在 `platforms/linux-fcitx5` 的共享职责模块中。
 
-Linux Manager 的主题必须显式提供兼顾 Latin、数字和简体中文的字体 fallback，不能依赖 Flutter/GTK 偶然选中单一系统字体。P04 staged product 已使用受控系统字体族验证可读性；M5-P05 进一步固定为发行版 hard dependency：Debian profile 使用 `fonts-dejavu-core` 与 `fonts-noto-cjk`，RadishLex payload 不携带或注册字体。产品门禁仍须复验中文标题、正文、英文状态码、数字计数和候选解释；只修复中文而让 Latin/数字显示方框，或反之，都不算通过。
+Linux Manager 的主题必须显式提供兼顾 Latin、数字和简体中文的字体 fallback，不能依赖 Flutter/GTK 偶然选中单一系统字体。P04 staged product 已使用受控系统字体族验证可读性；M5-P05 进一步固定为发行版 hard dependency：Debian profile 使用 `fonts-dejavu-core` 与 `fonts-noto-cjk`，payload 只保留 Flutter `Icons.*` 所需的固定 Material Icons 图标字形，不携带或注册其他字体。产品门禁仍须复验中文标题、正文、英文状态码、数字计数和候选解释；只修复中文而让 Latin/数字显示方框，或反之，都不算通过。
 
 ## Linux product bootstrap
 
@@ -69,7 +69,7 @@ P04 staged Flutter bundle 使用固定布局：
 <bundle>/data/...
 ```
 
-Linux host 从当前 executable 的 canonical parent 派生 sibling `lib/libradishlex_ime_ffi.so`，不读取工作目录、`LD_LIBRARY_PATH`、仓库路径或调用方参数。目标必须是 bundle 内非 symlink regular file，且不得 group/other writable；Dart binding 继续验证 ABI contract version 与 Manager 所需 symbol 集。P04 只证明 staged product bundle 与 workspace native library 一致，发行身份、root-owned 系统布局和 package manifest 留给 P05。
+Linux host 从当前 executable 的 canonical parent 派生 sibling `lib/libradishlex_ime_ffi.so`，不读取工作目录、`LD_LIBRARY_PATH`、仓库路径或调用方参数。目标必须是 bundle 内非 symlink regular file，且不得 group/other writable；Dart binding 继续验证 ABI contract version 与 Manager 所需 symbol 集。P04 只证明 staged product bundle 与 workspace native library 一致；P05A 已固定 root-owned 目标布局和 product manifest，但真实 ARM64 bundle 载荷门禁、package transaction 与 startup gate 仍未完成。
 
 Dart `ManagerProductPaths` 必须接受平台明确返回的固定 `.dylib` 或 `.so` basename，拒绝其他文件名；错误文案改为平台中立。该调整不得削弱 macOS `Contents/Frameworks/libradishlex_ime_ffi.dylib` 的既有测试和产品门禁。
 
@@ -188,7 +188,7 @@ A6 必须至少有一条从 personalized runtime 写入、经 Manager bridge 读
 4. Linux staged Release bundle 携带 workspace native-rime `.so`，完成 ABI/symbol/ELF 与无路径 override smoke。
 5. 使用临时合成库形成“runtime 写入—Manager bridge 刷新—另一 runtime 观察”的产品双端自动证据。
 
-该批没有顺带实现 package/安装，也没有以能打开空窗口结束。privacy watcher、classifier、Wayland/X11 身份、精确 Firefox 生产规则、同库学习/解释、privacy 零增量、删除防复活、explicit restore、导入导出、Fcitx/Manager 重启与桌面会话重启均已复用同一 host、XDG 和真实 bridge 闭合。M5-P04 验收矩阵据此退出；现有 staging、backup、userdb、导入导出文件和 transient service 终态继续保留。M5-P05 仅完成前置设计，后续 metadata/rootfs 代码与任何实机仍需各自授权。
+该批没有顺带实现 package/安装，也没有以能打开空窗口结束。privacy watcher、classifier、Wayland/X11 身份、精确 Firefox 生产规则、同库学习/解释、privacy 零增量、删除防复活、explicit restore、导入导出、Fcitx/Manager 重启与桌面会话重启均已复用同一 host、XDG 和真实 bridge 闭合。M5-P04 验收矩阵据此退出；现有 staging、backup、userdb、导入导出文件和 transient service 终态继续保留。M5-P05A metadata/rootfs 代码已落地，后续真实 ARM64 payload gate 与任何安装实机仍需各自授权。
 
 ## 当前停止线
 

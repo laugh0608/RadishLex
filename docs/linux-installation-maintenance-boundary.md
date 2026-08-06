@@ -1,16 +1,16 @@
 # Linux 安装维护边界
 
-本文定义 M5-P05 的 Linux 产品安装域、Debian 载体、固定布局、版本身份、安装维护事务、数据保留、失败关闭、自动门禁与实机授权边界，读者是 `packaging/linux/`、Linux 平台适配层、安装协调器和发布验证入口的维护者。本文不提供可直接执行的系统安装命令，不实现 package、安装器或数据清理，也不证明任何公开发布能力；Fcitx 运行职责见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)，M5-P04 冻结证据见 [Linux Manager 本地验收边界](linux-manager-local-acceptance.md)。
+本文定义 M5-P05 的 Linux 产品安装域、Debian 载体、固定布局、版本身份、安装维护事务、数据保留、失败关闭、自动门禁与实机授权边界，读者是 `packaging/linux/`、Linux 平台适配层、安装协调器和发布验证入口的维护者。本文不提供可直接执行的系统安装命令，不定义公开发布流程，也不把 P05A rootfs 装配称为 package 安装成功；Fcitx 运行职责见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)，M5-P04 冻结证据见 [Linux Manager 本地验收边界](linux-manager-local-acceptance.md)。
 
 ## 当前结论
 
-截至 2026-08-06，M5-P05 只完成前置设计与边界收口，安装实现、系统写入和实机验收均未开始。以下决策作为首个实现子批的输入：
+截至 2026-08-06，M5-P05A 已实现 committed metadata、system rootfs 装配器、staged/system 两类 addon 构建身份和平台无关自动门禁；真实 Debian 13 ARM64 Manager/addon 载荷门禁尚未获授权执行，因此 P05A 尚未退出。`.deb`、dpkg transaction、startup gate、系统写入和安装实机仍未开始。以下决策继续约束实现与后续批次：
 
 - 首个完整产品安装载体固定为 Debian 13 ARM64 的单一系统级本地 `.deb`，package 名固定为 `radishlex`；它是未发布的本地验收载体，不是 apt repository、正式 Release 或通用 Linux 安装包。
 - Fcitx addon、两份产品 FFI、Manager bundle、锁定 RimeData、desktop entry、图标和产品 manifest 由同一个 package 绑定；不拆成可独立漂移的 Manager/addon 包。
 - 不提供完整用户级程序安装。M5-P02/P04 使用 `FCITX_ADDON_DIRS`、用户级 staging、autostart 副本或 transient service 的装配继续只属于开发/验收环境，不能升级为产品成功路径。
 - 用户数据、配置和状态始终留在现有 XDG 用户域；系统 package 和 root 维护脚本不得遍历 home、打开 userdb、改写 privacy/settings、编辑 Fcitx 用户 profile 或清理 P04 guest 资产。
-- CJK 字体采用发行版硬依赖，不随 RadishLex package 携带字体文件。Debian 13 profile 必须依赖 `fonts-noto-cjk`，并固定兼顾 Latin/数字的 `fonts-dejavu-core`；不能只写 `Recommends` 或依赖桌面环境偶然 fallback。
+- CJK/Latin 文本字体采用发行版硬依赖，不随 RadishLex package 携带。Debian 13 profile 必须依赖 `fonts-noto-cjk`，并固定兼顾 Latin/数字的 `fonts-dejavu-core`；不能只写 `Recommends` 或依赖桌面环境偶然 fallback。Flutter 生成的 `MaterialIcons-Regular.otf` 只承担图标字形，按下文固定例外处理。
 - 首批 distribution identity 固定为 `debian-local-deb-v1`：只证明 Debian package 结构、内容 hash 与本地事务身份，不宣称 repository 签名、发布者认证或公开分发资格。
 - 首批 upgrade 与 release rollback 只允许数据 contract 完全相同的 source/target；userdb schema、XDG layout、settings/privacy format、Rime schema 与 RimeData identity 任一变化都在系统 mutation 前失败关闭，等待独立的 Linux 用户态数据协调设计。
 
@@ -43,12 +43,12 @@ Fcitx5 的 addon metadata 会按 XDG data 目录查找，但 shared-library addo
 - Manager 继续显式声明 Latin 优先、CJK 后备的 family 顺序；
 - Fcitx 原生候选 panel 继续使用桌面/Fcitx 字体栈，不由 addon 自绘或私自注册字体。
 
-`radishlex` package 内不得出现 `.ttf`、`.otf`、`.ttc` 或自带 fontconfig 配置，也不得在 maintainer script 中直接调用 `fc-cache`。字体安装、升级与缓存刷新由发行版 package 与 dpkg trigger 管理。这样 Manager 和 Fcitx panel 使用同一系统字体能力，也避免在仓库和载体中新增大体积字体、重复许可证与私有注册生命周期。
+`radishlex` package 不得携带 CJK、Latin 或数字文本字体，也不得自带 fontconfig 配置或在 maintainer script 中直接调用 `fc-cache`。唯一例外是 Flutter `uses-material-design` 为现有 `Icons.*` 生成的 `data/flutter_assets/fonts/MaterialIcons-Regular.otf`：它只提供图标字形，路径必须精确固定，`FontManifest.json` 只能声明 `MaterialIcons`，并由非空 `NOTICES.Z` 绑定生成资产通知。任何其他 `.ttf`、`.otf`、`.ttc` 仍失败关闭。文本字体安装、升级与缓存刷新由发行版 package 与 dpkg trigger 管理；Manager 和 Fcitx panel 因而继续使用同一系统文本字体能力，不引入 CJK 字体复制、重复许可证或私有注册生命周期。
 
 自动门禁必须同时检查：
 
 - Debian control 的两个字体项均为 hard dependency；
-- package payload 不含字体文件或 fontconfig mutation；
+- package payload 除固定 Material Icons 图标字形外不含字体文件，也不含 fontconfig mutation；
 - 干净 Debian 13 ARM64 容器/guest 在只安装声明依赖后，fontconfig 能解析预期 family；
 - Manager 对“萝卜词核 / RadishLex / ABI v9 / 12345”以及学习计数、状态码和候选解释的实际渲染无缺字。
 
@@ -68,6 +68,9 @@ Fcitx5 的 addon metadata 会按 XDG data 目录查找，但 shared-library addo
     <locked Flutter/plugin runtime libraries>
   data/
     flutter_assets/
+      FontManifest.json
+      NOTICES.Z
+      fonts/MaterialIcons-Regular.otf
     icudtl.dat
 
 /usr/lib/<multiarch>/fcitx5/
@@ -127,7 +130,7 @@ Fcitx5 的 addon metadata 会按 XDG data 目录查找，但 shared-library addo
 
 ## 产品与载体身份
 
-仓库根 `version.json` 继续是产品版本/build 的唯一人工真相源。首个实现子批新增但本会话不创建：
+仓库根 `version.json` 继续是产品版本/build 的唯一人工真相源。P05A 已建立：
 
 ```text
 packaging/linux/
@@ -136,7 +139,16 @@ packaging/linux/
   install-layout.json
   debian/
     control.in
-    <deterministic package metadata>
+  assets/
+    dev.radishlex.radishlexManager.desktop
+    radishlex.svg
+
+scripts/linux-product/
+  product_metadata.py
+  source_contract.py
+  rootfs.py
+  test_product_metadata.py
+  test_rootfs.py
 ```
 
 `packaging/linux/product.json` 是 Linux 镜像，不可独立改版本；至少固定：
@@ -146,12 +158,12 @@ packaging/linux/
 - Debian package name、package revision、architecture 与 multiarch tuple；
 - Fcitx minimum version、librime dependency profile 与 Manager application ID；
 - FFI ABI、userdb schema、XDG data layout、settings/privacy format；
-- Rime schema ID、RimeData source/manifest identity；
+- Rime schema ID、RimeData lock SHA-256 与 manifest identity；
 - 字体 dependency profile；
 - Manager、addon、FFI、RimeData、metadata、desktop entry、icons 与 licenses 的固定 component-to-path 映射；
 - 默认 remove 保留全部用户 XDG 数据的语义。
 
-装配后的 `product-manifest.json` 必须以 canonical UTF-8 JSON 绑定上述字段、完整 package 文件 inventory、相对逻辑路径、size、mode 与 SHA-256。它不保存构建机路径、用户名、时间戳、用户数据、原始 `ldd` 输出或 secret。
+装配后的 `product-manifest.json` 必须以 canonical UTF-8 JSON 绑定上述字段、完整 rootfs 文件 inventory、规范化系统目标路径、size、mode、预期 uid/gid 与 SHA-256。它不保存构建机路径、用户名、时间戳、用户数据、原始 `ldd` 输出或 secret。
 
 本地 `.deb` artifact evidence 另绑定 package 文件名、size、SHA-256、control metadata 与 product manifest SHA-256。`debian-local-deb-v1` 不包含 repository Release/InRelease 签名或开发者证书；任何公开 apt repository、正式下载页或发行签名必须切换新的 distribution identity 并重新评审，不能给现有 identity 增补宣传含义。
 
@@ -283,17 +295,19 @@ M5-P05 最终需要以下分层证据：
 
 容器或隔离 rootfs 可以执行 package mutation contract，但不能证明桌面 menu、真实 Fcitx daemon、Wayland/X11、用户 profile、重启或数据保留实机体验。真实系统目录、服务与输入法配置仍只由授权实机批次证明。
 
+P05A 当前已通过 L1、平台无关 L2、RimeData source/license 和 staged/system runtime layout contract；`check-linux-product-layout.sh` 的真实载荷模式已经固定 ARM64 ELF、RPATH、依赖闭包、FFI symbol/hash、系统字体解析和构建路径检查，但尚未用真实 Debian ARM64 Manager bundle 与 product-profile addon stage 执行。该强门禁通过前不得宣称 L2/L3 或 P05A 完整退出。L4-L6 仍属于 P05B/P05C，未实现也未运行。
+
 ## 首个可实施子批
 
-`M5-P05A` 只建立可复验的 metadata 与 rootfs assembly，不安装 `.deb`：
+`M5-P05A` 只建立可复验的 metadata 与 rootfs assembly，不安装 `.deb`。当前实现为：
 
 1. 新建 `packaging/linux/`，固定 `product.json`、`install-layout.json`、Debian control template、字体/dependency profile 与文档入口。
-2. 从现有 Manager Release bundle、Linux addon、两份同版 FFI 和锁定 RimeData 形成临时 `DESTDIR` rootfs；不写宿主 `/usr`、`/var`、user XDG 或 guest。
+2. `build-linux-product-addon-stage.sh` 以 CMake `system` profile 生成不携带 sibling RimeData 的 addon/FFI/metadata stage；`rootfs.py` 再从显式 Manager Release bundle、该 stage 和锁定 RimeData 形成临时 `DESTDIR` rootfs，不写宿主 `/usr`、`/var`、user XDG 或 guest。
 3. 生成 canonical Linux product manifest，复验 version/build、完整 inventory、mode/link、双 FFI hash、Fcitx metadata、desktop entry、ELF closure 与 RimeData/license。
-4. 新增稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh`，并加入缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏的负向测试。
+4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 退出只证明“同一产品输入能形成 Debian 目标布局并被拒绝测试约束”，不证明 package transaction 或系统安装。后续 P05B 才实现 `.deb`、receipt/guard、五类 operation、startup gate 与 ephemeral Debian matrix；P05C 在独立 guest 完成授权实机，不复用或清理 P04 冻结现场。
+P05A 还需在另行授权的隔离 Debian 13 ARM64 环境中依次运行真实 Manager product build、product-profile addon stage 和真实载荷 rootfs 门禁。退出后也只证明“同一产品输入能形成 Debian 目标布局并被拒绝测试约束”，不证明 package transaction 或系统安装。后续 P05B 才实现 `.deb`、receipt/guard、五类 operation、startup gate 与 ephemeral Debian matrix；P05C 在独立 guest 完成授权实机，不复用或清理 P04 冻结现场。
 
 ## 实机授权边界
 

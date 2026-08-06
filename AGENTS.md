@@ -29,8 +29,8 @@
 
 ## 快速认知
 
-- 当前阶段：M5-P01/P02/P03/P04 已完成，M5-P05 安装维护前置设计已收口，停在首个实现子批前；实时状态见 `docs/status/current.md`
-- 代码：macOS build 38 冻结；Linux addon/XDG/ARM64 装配、输入/隐私与 Manager 验收通过；安装、同步/发布关闭
+- 当前阶段：M5-P01-P04 已完成；M5-P05A 已实现，停在真实 ARM64 载荷门禁前；详见 `docs/status/current.md`
+- 代码：macOS build 38 冻结；Linux 输入/Manager 与 P05A portable 门禁通过；transaction、安装、同步/发布关闭
 - 当前交付：macOS 内部候选；Linux 用户级开发装配；均非公开发布版本
 - 交付梯度：macOS 输入、个人化、同步资格与产品候选已完成；当前推进 Linux Fcitx5 产品线
 - 真实平台顺序：macOS InputMethodKit、Linux Fcitx5、Android、Windows、iOS；每次只推进一条主线
@@ -162,7 +162,7 @@
 - `scripts/`：仓库检查、格式和构建脚本
 - `tests/fixtures/`：跨模块合成 fixture
 
-尚未落地：Linux 产品安装维护、Windows/iOS 壳、完整 Android IME、`examples/`；macOS build 38 已冻结，真实用户同步和公开发布仍关闭。
+尚未落地：Linux package transaction/startup gate 与安装实机、Windows/iOS 壳、完整 Android IME、`examples/`；macOS build 38 已冻结，真实用户同步和公开发布仍关闭。
 
 ## 架构边界
 

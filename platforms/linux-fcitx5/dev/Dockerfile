@@ -5,6 +5,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get -o Acquire::Retries=3 update \
     && apt-get -o Dpkg::Use-Pty=0 install -y --no-install-recommends \
         build-essential \
+        binutils \
         ca-certificates \
         cargo \
         cmake \
@@ -15,6 +16,7 @@ RUN apt-get -o Acquire::Retries=3 update \
         librime-dev \
         ninja-build \
         pkg-config \
+        python3 \
         ripgrep \
         rustc \
     && rm -rf /var/lib/apt/lists/*

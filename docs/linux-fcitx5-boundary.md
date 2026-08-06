@@ -4,7 +4,7 @@
 
 ## 状态与产品范围
 
-状态：M5-P01/P02/P03/P04 已完成。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release、native/ELF/FFI smoke、桌面 privacy、删除防复活、explicit restore、导入导出以及 Fcitx/Manager/桌面会话重启均已通过。M5-P05 前置设计已收口，首个系统级 Debian layout、字体依赖、维护事务和停止线已经固定，但 metadata、package、startup gate 与任何系统安装均未实现。
+状态：M5-P01/P02/P03/P04 已完成。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release、native/ELF/FFI smoke、桌面 privacy、删除防复活、explicit restore、导入导出以及 Fcitx/Manager/桌面会话重启均已通过。M5-P05A 已实现 Linux metadata/rootfs、产品版本渲染与 `system` runtime profile，平台无关门禁通过；真实 ARM64 产品载荷门禁、package、startup gate 与任何系统安装仍未完成。
 
 P03 实机证据覆盖 GTK、Qt、Electron、浏览器和终端，包含完整候选交互、焦点/输入法切换、Fcitx/桌面会话重启、进程级地址族限制与整台 guest 断网。password、terminal、unknown 与 Qt `Sensitive` 后的 userdb 聚合保持全零；当前 GTK4 frontend 未把 `PRIVATE` 传播为 Fcitx `Sensitive`，因此依赖既有 unknown 失败关闭而非虚构 capability。Qt backend 只以 QPA、会话类型和 input-context plugin 的组合证据判定，不能因进程映射 `libQt6WaylandClient` 就声明原生 Wayland。快速 X11→Wayland 登录暴露的 `im-launch` 跳过 daemon 问题已用 Debian 官方 desktop entry 的用户级 autostart 副本闭合；该开发设置不替代 P05 产品安装与维护设计。
 
@@ -68,7 +68,7 @@ Linux 继续使用 `ime-ffi` ABI v9 已有的：
 - PageUp/PageDown 作为稳定 named key 进入 Rust 后用新 snapshot 重建列表；
 - reset/free/shutdown 已足以表达 per-context session 与进程 teardown。
 
-当前真实缺口不在 ABI、addon 编译、Manager privacy、删除恢复、导入导出或重启矩阵，而在 P05 metadata、package transaction、startup gate 与安装实机。这些能力不需要增加平台私有输入 ABI。
+当前真实缺口不在 ABI、addon 编译、Manager privacy、删除恢复、导入导出或重启矩阵，而在 P05A 真实产品载荷门禁、P05B package transaction/startup gate 与 P05C 安装实机。这些能力不需要增加平台私有输入 ABI。
 
 ### Flutter Manager
 
@@ -193,16 +193,16 @@ M5-P02 的开发构建必须形成可复验依赖图：
 - `librime` 只由 Rust engine adapter 使用，C++ addon 不直接链接其业务 API；
 - RimeData 使用仓库已锁定的产品来源、hash 和逐资产许可证；
 - native library、ABI version、userdb schema、RimeData version 和 addon metadata 在构建时一致；
-- addon、共享 FFI 与锁定 RimeData 形成单一 addon-relative 开发装配，不从编译期仓库绝对路径加载；
+- 默认 `staged` profile 让 addon、共享 FFI 与锁定 RimeData 形成单一 addon-relative 开发装配；`system` product profile 只装配 addon/FFI/metadata，并把 Rime shared data 固定为 `/usr/share/radishlex/rime`；两者都不从编译期仓库绝对路径加载；
 - ELF runpath 只允许 `$ORIGIN`，动态 metadata 不保留仓库或临时构建路径；
 - 运行时拒绝缺失资源、leaf symlink、group/other 可写 addon 目录或资源，并以稳定原因失败关闭；
 - 构建不从运行时下载 schema、词库、模型或二进制；
 - 开发安装与正式发行载体分开，P02 不把本地复制命令称为产品安装；
-- 发行版 package、系统域目标、升级与移除已由 M5-P05 文档固定，源码实现与实机仍未开始。
+- 系统域目标与 metadata/rootfs 源码已由 M5-P05A 固定，真实载荷强门禁尚未执行；发行版 package transaction、升级移除与实机仍未开始。
 
-当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境编译 projection/XDG/runtime-layout contract；`--require-fcitx` 只在 Linux 且调用方提供既有 native-rime cdylib 时配置、构建并 staged install addon/FFI/RimeData/metadata，检查 ELF 动态依赖、`$ORIGIN`、构建路径泄漏，运行 `dlopen(RTLD_NOW)` probe 与 CTest，不下载依赖、不写系统目录或启用输入法。脚本以 `umask 022` 固定临时装配权限，不继承开发账号的宽松 umask；runtime validator 仍拒绝任何 group/other writable addon 目录或资源。
+当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境同时编译 staged 与 system runtime-layout contract；`--require-fcitx` 继续只证明 staged addon/FFI/RimeData/metadata、ELF `$ORIGIN`、构建路径和 `dlopen(RTLD_NOW)`。`./scripts/build-linux-product-addon-stage.sh` 另以 metadata 中的产品版本和 `system` profile 形成临时 addon stage，不复制 sibling RimeData；两个入口都不写系统目录或启用输入法。
 
-`platforms/linux-fcitx5/dev/Dockerfile` 以 digest 固定 Debian 13 ARM64 基础镜像，安装发行版提供的 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 和 librime 1.13.1 development package。`./scripts/build-linux-fcitx5-container.sh` 只读挂载仓库，使用独立 named volume 缓存 Cargo registry/target，构建启用 `native-rime` 的 ARM64 ELF cdylib，再执行 `--require-fcitx` 强门禁。该环境已真实编译、staged install 并以 native loader 打开 `libradishlex_ime_ffi.so` 与 `radishlex.so`，也修正了 Linux ARM64 `c_char` signedness、GCC 14 enum boundary 和 `fcitx::Key` 非 literal type 差异。
+`platforms/linux-fcitx5/dev/Dockerfile` 以 digest 固定 Debian 13 ARM64 基础镜像，安装发行版提供的 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12、librime 1.13.1 development package 和 P05A metadata 工具。`./scripts/build-linux-fcitx5-container.sh` 只读挂载仓库，使用独立 named volume 缓存 Cargo registry/target，构建启用 `native-rime` 的 ARM64 ELF cdylib，再执行 staged 强门禁、平台无关 rootfs contract 和 system-profile addon stage。该环境此前已证明 staged native loader；新增 product stage 尚未在本批授权运行。
 
 Docker Desktop 提供的 Linux VM 是 M5-P02 可持续编译环境，不是桌面验收环境：容器没有 Fcitx daemon、Wayland/X11 session 或真实应用 input context。因此当前只能记为 Linux ARM64 编译、staged 装配与 headless loader 验证，不能记为 Fcitx5 平台运行或 M5 退出。
 
@@ -221,8 +221,8 @@ M5-P02 至少覆盖：
 - secure/sensitive/unknown/privacy mode；
 - 应用粗分类、固定候选 opaque evidence、capability 变化、默认关闭与产品 addon 日志字符串排除；
 - XDG resolver、权限、symlink 和生产/test override 隔离；
-- addon metadata、native dependency 和 RimeData presence；
-- staged addon-relative layout、`$ORIGIN`、权限/symlink、构建路径泄漏和 `dlopen(RTLD_NOW)`；
+- addon metadata、产品版本、native dependency 和 RimeData presence；
+- staged addon-relative 与 system fixed-Rime layout、`$ORIGIN`、权限/symlink、构建路径泄漏和 staged `dlopen(RTLD_NOW)`；
 - macOS 与仓库既有 ABI 回归。
 
 ### 真实平台
@@ -267,7 +267,7 @@ M5-P04 已覆盖：
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
 - P04 已按 `docs/linux-manager-local-acceptance.md` 冻结完成，不重复其导入导出、同库和重启实机；既有 guest 资产不得清理、覆盖或改作 P05 载体。
-- P05 当前只允许文档边界；`packaging/linux/`、metadata/rootfs assembly、package transaction 和 startup gate 必须按 [Linux 安装维护边界](linux-installation-maintenance-boundary.md) 分批实现。
+- P05A metadata/rootfs assembly 已实现，但真实 ARM64 payload gate 仍须另行授权；package transaction 和 startup gate 必须留在 P05B，不能提前写系统。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。

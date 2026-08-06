@@ -100,6 +100,13 @@ else
 fi
 "${temp_dir}/runtime_layout_test"
 
+"${cxx}" "${common_flags[@]}" \
+  '-DRADISHLEX_SYSTEM_RIME_DATA_DIR="/usr/share/radishlex/rime"' \
+  "${platform_dir}/tests/system_runtime_layout_test.cpp" \
+  "${platform_dir}/src/runtime_layout.cpp" \
+  -o "${temp_dir}/system_runtime_layout_test"
+"${temp_dir}/system_runtime_layout_test"
+
 "${cxx}" "${common_flags[@]}" -c \
   "${platform_dir}/src/linked_ffi_api.cpp" \
   -o "${temp_dir}/linked_ffi_api.o"
@@ -109,6 +116,10 @@ for asset in default.yaml radishlex_pinyin.schema.yaml pinyin_simp.dict.yaml; do
 done
 
 rg -q 'find_package\(Fcitx5Core 5\.1\.9 REQUIRED\)' \
+  "${platform_dir}/CMakeLists.txt"
+rg -Fq 'RADISHLEX_RUNTIME_LAYOUT_PROFILE "staged"' \
+  "${platform_dir}/CMakeLists.txt"
+rg -Fq 'RADISHLEX_SYSTEM_RIME_DATA_DIR="/usr/share/radishlex/rime"' \
   "${platform_dir}/CMakeLists.txt"
 rg -q 'Fcitx5::Core' "${platform_dir}/CMakeLists.txt"
 rg -q 'radishlex_ime_ffi' "${platform_dir}/CMakeLists.txt"

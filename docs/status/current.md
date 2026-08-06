@@ -7,7 +7,7 @@
 - 复核日期：2026-08-06（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品
-- 当前主批次：M5-P05 Linux 安装维护；前置设计与边界已收口，安装实现尚未开始，停在 P05A metadata/rootfs assembly 前
+- 当前主批次：M5-P05A Linux metadata/rootfs assembly；committed 实现与平台无关门禁已完成，停在真实 Debian 13 ARM64 Manager/addon 载荷门禁前
 - 已退出：M0-M3；M4 macOS build 38 单版本产品验收已冻结；M5-P01 第二平台决策与运行边界；M5-P02 Fcitx5 addon、共享 FFI 与开发构建；M5-P03 真实 Linux 桌面输入与隐私验收；M5-P04 Linux Manager 与同库个人化验收
 - 真实用户同步：保持关闭；只允许合成数据与受控集成测试
 
@@ -23,22 +23,23 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 
 完整边界见 [Linux 安装维护边界](../linux-installation-maintenance-boundary.md)，当前固定：
 
-- 首个完整产品载体为 Debian 13 ARM64 的系统级单 package 本地 `.deb`，identity 为 `debian-local-deb-v1`；它不构成公开 apt repository、正式 Release 或通用 Linux 包。
-- 不提供完整用户级程序安装；P02/P04 的 `FCITX_ADDON_DIRS`、用户 staging、autostart 副本和 transient service 仍是开发/验收机制。用户数据、配置和状态继续只在现有 XDG 用户域。
-- CJK 字体走发行版 hard dependency：Debian profile 固定 `fonts-noto-cjk`，并以 `fonts-dejavu-core` 保证 Latin/数字；RadishLex payload 不携带字体，也不直接刷新系统 font cache。
-- 系统 layout 固定绑定 Manager bundle、两个字节相同但非 hardlink 的 FFI、Fcitx addon、完整 RimeData/source/license、desktop entry、icon、Linux product manifest 和 root-owned transaction receipt。
-- install、upgrade、repair、remove、rollback 都必须有显式 source/target、幂等 receipt/guard、静止检查、完整身份复验与失败关闭；默认 remove/purge 不遍历 home，保留全部用户 XDG 数据。
-- 首批 upgrade/rollback 只接受 ABI v9、userdb schema v9、XDG/settings/privacy/Rime contract 完全相同的 release pair；跨数据 contract 升降级继续关闭。
+- 首个载体为 Debian 13 ARM64 系统级单 package 本地 `.deb`，identity 为 `debian-local-deb-v1`；不构成公开 repository、Release 或通用 Linux 包。P02/P04 用户 staging 与 transient service 仍只属于开发/验收。
+- 程序 layout 绑定 Manager、两份同 hash/不同 inode 的 FFI、addon、完整 RimeData/source/license、desktop/icon 和 manifest；文本字体硬依赖 `fonts-dejavu-core`/`fonts-noto-cjk`，payload 只例外保留 Flutter Material Icons 图标字形。
+- 五类维护 operation 必须有显式身份、guard/receipt、静止复验与失败关闭；默认保留全部 XDG 数据。首批升降级只接受 ABI/schema/XDG/settings/privacy/Rime contract 完全相同的 release pair。
+
+## M5-P05A 实现状态
+
+- `packaging/linux/` 已绑定 `26.7.1+38-1`、ARM64 multiarch、依赖、组件路径、ABI/schema/settings/privacy 和 RimeData lock；Fcitx CMake 保留默认 `staged`，新增固定 `/usr/share/radishlex/rime` 的 `system` profile。
+- rootfs 装配器严格验证 Manager/addon 输入，离线装配 RimeData，生成并复验 canonical manifest、inventory、mode/owner、链接、双 FFI、metadata、desktop、字体例外和禁止路径。
+- 两个 Linux product 无参数门禁已通过；真实模式的 ARM64 ELF、RPATH/closure、ABI symbol、构建路径与系统字体检查尚未获授权执行。P05A 未退出，`.deb`、transaction/startup gate 和安装实机仍关闭。
 
 ## macOS 冻结参考
 
-macOS `26.7.1 (38)` 保持冻结参考产品；安装、Manager、输入、repair、移除与数据保留证据不变。DMG SHA-256 为 `f171e74bdc0a429655a84b30429481bce3926b17076d09298feed77d9ce4ce4e`，未使用 Developer ID 或 Apple 公证；远端 draft 未发布、没有正式 Git tag。
-
-build 38 的详细身份、事务、载体与实机流水由 [macOS 产品包边界](../macos-product-package-boundary.md)、[macOS 程序安装事务](../macos-installation-transaction.md)、[社区载体 runbook](../runbooks/macos-release-carrier.md) 和历史周志维护。真实跨发布升级、source rollback、Developer ID/公证和正式 Release 仍属于后续兼容与统一发布评审。
+macOS `26.7.1 (38)` 保持冻结参考产品；DMG SHA-256 为 `f171e74bdc0a429655a84b30429481bce3926b17076d09298feed77d9ce4ce4e`，未使用 Developer ID/公证，远端 draft 未发布且无正式 tag。详细身份、事务与实机流水见 [macOS 产品包边界](../macos-product-package-boundary.md) 和历史周志。
 
 ## 当前停止线
 
-- 本会话只完成 P05 文档边界；不创建 `packaging/linux/`、package、安装脚本或事务代码，不运行 `dpkg`，不写 `/usr`、`/var`、用户 XDG、Fcitx profile/autostart 或 systemd 配置。
+- P05A 只允许仓库 metadata、构建 profile、临时 rootfs 与自动门禁；不生成 `.deb` 或安装成功事实，不实现 transaction/startup gate，不运行 `dpkg`，不写 `/usr`、`/var`、用户 XDG、Fcitx profile/autostart 或 systemd 配置。
 - 不启动、停止或重启 Fcitx/Manager/桌面会话，不安装依赖，不执行真实 repair/remove/rollback；所有实机与系统变更继续逐项授权。
 - 不复跑 M5-P04 实机验收，不清理、reset、覆盖或改写其 guest staging、backup、userdb、导入导出文件和临时服务。
 - 不发布 build 38 或 Linux package，不推送本地提交，不创建 tag/Release，不修改远端 draft 或仓库设置。
@@ -50,8 +51,8 @@ build 38 的详细身份、事务、载体与实机流水由 [macOS 产品包边
 ## 下一步顺位
 
 1. 保持 P04 guest 与 macOS build 38 冻结现场不变。
-2. 单独授权代码实现后进入 M5-P05A：新增 `packaging/linux/` metadata/layout，在临时 `DESTDIR` 形成 rootfs assembly，并建立纯自动 metadata/layout/ELF/RimeData/字体依赖负向门禁；仍不安装 `.deb`。
-3. P05A 通过后再设计评审 P05B 的 `.deb`、receipt/guard、五类 operation、startup gate 与 ephemeral Debian matrix；不能在首批顺带写系统。
+2. 另行授权隔离 Debian 13 ARM64 构建后，使用全新输出目录运行 Manager product build、product-profile addon stage 与 `check-linux-product-layout.sh` 真实载荷模式；不安装 package、不启动 GUI/Fcitx，也不复用 P04 staging 作为产品输入。
+3. 真实载荷门禁通过并记录身份后退出 P05A，再设计评审 P05B 的 `.deb`、receipt/guard、五类 operation、startup gate 与 ephemeral Debian matrix；不能顺带写真实系统。
 4. P05C 必须使用 P04 guest 的独立 clone/snapshot 或另一台 guest，并逐项取得依赖安装、dpkg、服务/输入法配置、注销和故障注入授权。
 5. 旧临时资产清理、远端推送、tag/Release、真实同步和其他平台均保持独立授权与后续顺位。
 
@@ -69,6 +70,8 @@ build 38 的详细身份、事务、载体与实机流水由 [macOS 产品包边
 ./scripts/check-macos-imk.sh
 ./scripts/check-macos-upgrade-product-coordination.sh
 ./scripts/check-linux-fcitx5.sh
+./scripts/check-linux-product-metadata.sh
+./scripts/check-linux-product-layout.sh
 ./scripts/check-manager-linux-product.sh
 ./scripts/build-linux-fcitx5-container.sh
 ./scripts/check-repo.sh
@@ -76,7 +79,7 @@ build 38 的详细身份、事务、载体与实机流水由 [macOS 产品包边
 git diff --check
 ```
 
-P05A 规划中的 Linux metadata/layout 门禁尚未实现，不应写入当前可执行入口。真实系统安装、输入源变更、用户数据、公开上传和 Release 仍需对应授权。
+前两个 Linux product 入口的无参数模式只验证 committed metadata 与平台无关 rootfs contract；带真实 Manager/addon 输入的 ARM64 强门禁尚未执行。真实系统安装、输入源变更、用户数据、公开上传和 Release 仍需对应授权。
 
 ## 阅读索引
 

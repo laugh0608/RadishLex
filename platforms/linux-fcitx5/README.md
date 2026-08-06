@@ -12,8 +12,9 @@ M5-P02 已经建立真实 C++ 源码、CMake target、addon/input method metadat
 - M5-P04 已增加 Flutter Linux runner、固定 bundle `.so`、共享 XDG/Manager runtime、独立 privacy format、inotify/event-loop 变更感知与受控粗分类 contract；真实 ARM64 Manager Release/FFI smoke、桌面 privacy、删除/恢复、导入导出、Manager/Fcitx 与完整桌面会话重启均已通过；
 - Debian 13 ARM64 使用 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 和 librime 1.13.1，真实编译并动态链接启用 `native-rime` 的 `libradishlex_ime_ffi.so` 与 `radishlex.so`；
 - CMake staged install 把 addon、共享 FFI、锁定 RimeData 与两份 Fcitx metadata 形成同一开发装配，addon 只使用 `$ORIGIN` 定位 sibling FFI，不保留仓库或临时构建路径；
+- P05A 新增独立 `system` profile：产品 addon 仍以 `$ORIGIN` 定位 sibling FFI，但 Rime shared data 固定为 `/usr/share/radishlex/rime`，metadata 使用 Linux product version；默认 staged profile 不变；
 - `radishlex_runtime_probe` 在相同 Linux 环境先校验装配文件、symlink 和权限，再对 staged `radishlex.so` 执行 `dlopen(RTLD_NOW)`；
-- CTest 在相同 Linux 环境复验 application context、FFI projection、XDG resolver、Manager runtime、privacy monitor、Fcitx candidate key 与 runtime layout 七项 contract。
+- CTest 在相同 Linux 环境复验 application context、FFI projection、XDG resolver、Manager runtime、privacy monitor、Fcitx candidate key，以及 staged/system runtime layout 八项 contract。
 
 以上自动结果只证明 Linux ARM64 编译、装配和 headless native loader。M5-P03 另已在 Debian 13 ARM64 GNOME 中完成不写 `/usr` 的用户级开发装配，并取得 Wayland/X11、GTK/Qt/Electron/浏览器/终端、完整候选交互、切换/重启、进程级与整机离线、password/unknown/terminal/`Sensitive` 的人工证据。原生 Qt6 Wayland 只由明确的 Wayland QPA、Fcitx Qt6 input-context 与会话类型共同证明；FeatherPad 映射 `libQt6WaylandClient` 本身不作为 backend 证据。快速跨 X11→Wayland 会话的 daemon 自启动使用 Debian 官方 Fcitx5 desktop entry 的用户级副本闭合；这仍是开发装配，不证明发行安装、升级或移除。实时状态见 [`docs/status/current.md`](../../docs/status/current.md)，详细流水见本周周志。
 
@@ -28,7 +29,7 @@ include/radishlex/linux/
   manager_runtime.h   Manager bundle/XDG product bootstrap contract
   privacy_mode.h      strict store and fail-closed runtime snapshot
   privacy_monitor.h   Linux directory change monitor contract
-  runtime_layout.h    addon-relative native/RimeData layout contract
+  runtime_layout.h    staged/system native/RimeData layout contract
   xdg_paths.h         addon/Manager shared XDG resolver
 src/
   application_context.cpp exact production allowlist projection
@@ -57,6 +58,7 @@ tests/
   manager_runtime_test.cpp
   privacy_monitor_test.cpp
   runtime_layout_test.cpp
+  system_runtime_layout_test.cpp
   xdg_paths_test.cpp
 tools/
   runtime_probe.cpp    staged addon resource and dlopen diagnostic
@@ -79,9 +81,9 @@ tools/
 
 不需要进入共享 ABI 的 Linux 产品能力：
 
-- Linux install/data startup gate 和版本化产品 identity：M5-P05 前置边界已固定，源码尚未实现；
+- Linux install/data startup gate 不进入输入 ABI；P05A 已实现版本化 metadata/rootfs identity，startup decision 留在 P05B；
 - Linux Manager privacy 已固定为独立 XDG 文件，addon 变更感知与分类框架已落地；生产 allowlist 只包含经 Wayland/X11 评审的精确 `firefox-esr -> browser`；
-- 发行版 package、系统域路径与升级 receipt：M5-P05 文档已固定，metadata/transaction 实现尚未开始。
+- 系统域路径与 product manifest 已由 P05A 实现；发行版 package、升级 receipt 与 dpkg transaction 尚未开始。
 
 在普通 context 无已评审生产身份时，addon 传 `context_known = 0`；Rust 因而使用 engine 顺序且不读写 userdb。当前只有精确 `firefox-esr` 映射为 `browser + context_known = 1`；路径、大小写、wrapper、其他 Firefox 候选和 unknown 仍失败关闭。Fcitx 明确提供 `Password`、`Sensitive` 或 `Terminal` capability 时先返回受控摘要且不读取 `program()`；Terminal 固定投影为 `terminal + context_known = 0`，不传 program name、窗口标题或正文。
 
@@ -131,6 +133,8 @@ addon 不再从编译期仓库绝对路径读取 RimeData。CMake build 和 stag
 
 `radishlex_runtime_probe` 是开发诊断而不是 Fcitx daemon 替代品。它对 staged layout 执行相同校验并使用 `dlopen(RTLD_NOW)` 验证 native dependency closure，只输出稳定原因类别，不输出用户数据路径。probe 成功不代表 Engine 已实例化，也不代表 Fcitx input context、Wayland/X11 或真实应用提交已经运行。
 
+P05A `system` profile 不把 RimeData 放在 addon 旁，而是只生成 addon、同目录 FFI 和两份 metadata；完整 RimeData/source/license 由 `scripts/linux-product/rootfs.py` 从 committed lock 离线装配到 `/usr/share/radishlex/rime`。该 profile 仍只写显式临时 stage，不写真实系统目录。
+
 ## 开发验证
 
 不需要 Fcitx5 或 native library的平台无关 contract：
@@ -152,7 +156,16 @@ Apple Silicon macOS 的固定 Linux ARM64 编译门禁：
 ./scripts/build-linux-fcitx5-container.sh
 ```
 
-该入口构建固定 digest 的 Debian 13 镜像，以只读方式挂载仓库，并使用 `radishlex-linux-fcitx5-cargo`、`radishlex-linux-fcitx5-target` 两个 Docker named volume 缓存依赖和产物。它会构建 `native-rime` FFI、形成临时 staged install、检查 ARM64 ELF 依赖与 `$ORIGIN`、运行 native loader probe 和七项 CTest；不会写系统目录、安装/启用输入法、写宿主仓库或提供桌面 session。首次执行需要下载 Debian 镜像与软件包，之后复用 Docker/Cargo 缓存。
+该入口构建固定 digest 的 Debian 13 镜像，以只读方式挂载仓库，并使用 `radishlex-linux-fcitx5-cargo`、`radishlex-linux-fcitx5-target` 两个 Docker named volume 缓存依赖和产物。它会构建 `native-rime` FFI、形成临时 staged install、检查 ARM64 ELF 依赖与 `$ORIGIN`、运行 native loader probe、八项 CTest、P05A portable rootfs contract 和 system-profile addon stage；不会写系统目录、安装/启用输入法、写宿主仓库或提供桌面 session。首次执行需要下载 Debian 镜像与软件包，之后复用 Docker/Cargo 缓存；新增 product stage 尚未在本批授权运行。
+
+P05A 在任意开发宿主可先执行 metadata 与平台无关 rootfs contract：
+
+```bash
+./scripts/check-linux-product-metadata.sh
+./scripts/check-linux-product-layout.sh
+```
+
+真实 Debian 13 ARM64 环境必须先产生 product Manager bundle 与 system-profile addon stage，再把两者作为显式输入交给强门禁。该流程只构建并复验临时 rootfs，不调用 dpkg，也不形成安装完成事实；运行前仍按当前状态取得实机授权。
 
 真实 Linux 开发构建需要既有 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、librime development environment，以及启用 `native-rime` 的 Rust cdylib。命令只生成开发 build，不安装 addon：
 
@@ -162,4 +175,4 @@ RADISHLEX_IME_FFI_LIBRARY="$PWD/target/release/libradishlex_ime_ffi.so" \
   ./scripts/check-linux-fcitx5.sh --require-fcitx
 ```
 
-`--require-fcitx` 在非 Linux、缺失 CMake、缺失 cdylib 或 Fcitx5 CMake package 时失败，不自动下载依赖、不启动容器、不写系统目录。脚本固定 `umask 022`，避免开发账号的宽松默认 umask 把 group/other writable 权限泄漏进临时 stage；runtime probe 对这类宽权限的拒绝规则不放宽。Docker wrapper 才负责显式建立依赖环境。开发装配、Fcitx 重启、输入法启用和真实应用交互仍需单独授权。M5-P05 当前只允许按独立安装边界先实现 metadata/rootfs 自动门禁；任何 package/system mutation 仍未授权。
+`--require-fcitx` 在非 Linux、缺失 CMake、缺失 cdylib 或 Fcitx5 CMake package 时失败，不自动下载依赖、不启动容器、不写系统目录。脚本固定 `umask 022`，避免开发账号的宽松默认 umask 把 group/other writable 权限泄漏进临时 stage；runtime probe 对这类宽权限的拒绝规则不放宽。Docker wrapper 才负责显式建立依赖环境。开发装配、真实产品载荷构建、Fcitx 重启、输入法启用和真实应用交互仍按各自边界授权；任何 package/system mutation 仍未授权。
