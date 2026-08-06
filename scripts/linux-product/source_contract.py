@@ -288,6 +288,8 @@ def validate_source_contract(
                 "render-shlibdeps-control",
                 'analysis_root="${temp_dir}/package-root"',
                 'mkdir -m 0755 "${analysis_root}/DEBIAN"',
+                'mkdir -m 0755 "${temp_dir}/debian"',
+                'cp "${temp_dir}/debian/control" "${analysis_root}/DEBIAN/control"',
                 'if [[ -s "${shlibs_diagnostics}" ]]',
                 '"${repo_root}/scripts/linux-product/rootfs.py" verify',
                 '"${repo_root}/scripts/linux-product/deb_artifact.py" build',

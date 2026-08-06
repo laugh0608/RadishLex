@@ -70,9 +70,11 @@ analysis_root="${temp_dir}/package-root"
 mkdir -m 0755 "${analysis_root}"
 cp -a "${product_rootfs}/." "${analysis_root}/"
 mkdir -m 0755 "${analysis_root}/DEBIAN"
+mkdir -m 0755 "${temp_dir}/debian"
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/product_metadata.py" \
-  render-shlibdeps-control --output "${analysis_root}/DEBIAN/control"
+  render-shlibdeps-control --output "${temp_dir}/debian/control"
+cp "${temp_dir}/debian/control" "${analysis_root}/DEBIAN/control"
 manager_root="${analysis_root}/usr/lib/${multiarch}/radishlex/manager"
 addon_root="${analysis_root}/usr/lib/${multiarch}/fcitx5"
 payload_binaries=()
