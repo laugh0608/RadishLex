@@ -346,7 +346,7 @@ apps/radishlex-manager/
 
 `scripts/macos-product/product_manifest.py` 校验版本镜像与源码声明，生成/复验无绝对路径的 ProductManifest v3；`install_layout.py` 以 committed layout、target 与显式历史 source assembly 生成 InstallPayloadManifest v2；`release_identity.py` 固定双 component strict ad-hoc requirement 集合；`community_release.py` 生成/复验 DMG SHA-256 evidence。四层证据都不保存签名凭据、公证上传或用户数据；具体产品构建见 [macOS 产品装配 Runbook](runbooks/macos-product-assembly.md)，用户安装与发布载体见 [macOS 社区 ad-hoc DMG Runbook](runbooks/macos-release-carrier.md)。
 
-`packaging/linux/` 保存 format v1 Linux product mirror、`debian-system-v1` component layout、Debian control template、desktop/icon source 和 `debian-local-deb-v1` identity；不保存 `.deb`、rootfs 构建物、apt repository metadata、签名凭据或用户数据。`scripts/linux-product/product_metadata.py` 负责格式与派生值，`source_contract.py` 交叉验证 version/build、ABI/schema、RimeData lock、dependency/font profile 与源码身份，`rootfs.py` 从显式 Manager/addon 输入离线装配临时 `DESTDIR` 并生成 canonical product manifest。三者不写真实 `/usr`、`/var`，也不把 rootfs 称为安装完成。完整边界见 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)。
+`packaging/linux/` 保存 format v1 Linux product mirror、`debian-system-v1` component layout、Debian control template、desktop/icon source 和 `debian-local-deb-v1` identity；不保存 `.deb`、rootfs 构建物、apt repository metadata、签名凭据或用户数据。`scripts/linux-product/product_metadata.py` 负责格式与派生值，`source_contract.py` 交叉验证 version/build、ABI/schema、RimeData lock、dependency/font profile 与源码身份，`rootfs.py` 从显式 Manager/addon 输入离线装配临时 `DESTDIR` 并生成 canonical product manifest。Rust/Cargo 与 C++ 产品构建路径会映射为稳定 identity，强门禁扫描全部 ELF 的 repo/home/staging 泄漏；真实 Debian 13.6 ARM64 载荷已通过。三者不写真实 `/usr`、`/var`，也不把 rootfs 称为安装完成。完整边界见 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)。
 
 ## 平台目录
 
@@ -387,7 +387,7 @@ R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-
 
 平台目录按主线顺序创建：
 
-1. `platforms/linux-fcitx5/`：M5-P02 addon、共享 FFI 与开发构建、M5-P03 真实桌面输入/隐私验收及 M5-P04 Linux Manager 与同库个人化均已完成；M5-P05A metadata/rootfs 与双运行布局已实现，停在真实 ARM64 产品载荷门禁前。
+1. `platforms/linux-fcitx5/`：M5-P02 addon、共享 FFI 与开发构建、M5-P03 真实桌面输入/隐私验收、M5-P04 Linux Manager 与同库个人化及 M5-P05A metadata/rootfs/真实 ARM64 产品载荷门禁均已完成；当前进入 P05B package transaction/startup gate。
 2. `platforms/android-ime/`：在现有 keystore bridge 之外补完整 IME。
 3. `platforms/windows-tsf/`。
 4. `platforms/ios-keyboard/`。

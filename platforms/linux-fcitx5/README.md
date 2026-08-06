@@ -13,6 +13,7 @@ M5-P02 已经建立真实 C++ 源码、CMake target、addon/input method metadat
 - Debian 13 ARM64 使用 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12 和 librime 1.13.1，真实编译并动态链接启用 `native-rime` 的 `libradishlex_ime_ffi.so` 与 `radishlex.so`；
 - CMake staged install 把 addon、共享 FFI、锁定 RimeData 与两份 Fcitx metadata 形成同一开发装配，addon 只使用 `$ORIGIN` 定位 sibling FFI，不保留仓库或临时构建路径；
 - P05A 新增独立 `system` profile：产品 addon 仍以 `$ORIGIN` 定位 sibling FFI，但 Rime shared data 固定为 `/usr/share/radishlex/rime`，metadata 使用 Linux product version；默认 staged profile 不变；
+- P05A 已从 committed `e1ce740` 的全新 Debian 13.6 ARM64 源码构建真实 Manager/addon，通过双 FFI、ELF/closure、RPATH、系统字体和无 repo/home/staging 路径的临时 rootfs 强门禁；
 - `radishlex_runtime_probe` 在相同 Linux 环境先校验装配文件、symlink 和权限，再对 staged `radishlex.so` 执行 `dlopen(RTLD_NOW)`；
 - CTest 在相同 Linux 环境复验 application context、FFI projection、XDG resolver、Manager runtime、privacy monitor、Fcitx candidate key，以及 staged/system runtime layout 八项 contract。
 
@@ -156,7 +157,7 @@ Apple Silicon macOS 的固定 Linux ARM64 编译门禁：
 ./scripts/build-linux-fcitx5-container.sh
 ```
 
-该入口构建固定 digest 的 Debian 13 镜像，以只读方式挂载仓库，并使用 `radishlex-linux-fcitx5-cargo`、`radishlex-linux-fcitx5-target` 两个 Docker named volume 缓存依赖和产物。它会构建 `native-rime` FFI、形成临时 staged install、检查 ARM64 ELF 依赖与 `$ORIGIN`、运行 native loader probe、八项 CTest、P05A portable rootfs contract 和 system-profile addon stage；不会写系统目录、安装/启用输入法、写宿主仓库或提供桌面 session。首次执行需要下载 Debian 镜像与软件包，之后复用 Docker/Cargo 缓存；新增 product stage 尚未在本批授权运行。
+该入口构建固定 digest 的 Debian 13 镜像，以只读方式挂载仓库，并使用 `radishlex-linux-fcitx5-cargo`、`radishlex-linux-fcitx5-target` 两个 Docker named volume 缓存依赖和产物。它会构建 `native-rime` FFI、形成临时 staged install、检查 ARM64 ELF 依赖与 `$ORIGIN`、运行 native loader probe、八项 CTest、P05A portable rootfs contract 和 system-profile addon stage；不会写系统目录、安装/启用输入法、写宿主仓库或提供桌面 session。首次执行需要下载 Debian 镜像与软件包，之后复用 Docker/Cargo 缓存；真实 Manager product payload 证据仍由显式 ARM64 bundle 门禁提供。
 
 P05A 在任意开发宿主可先执行 metadata 与平台无关 rootfs contract：
 
@@ -165,7 +166,7 @@ P05A 在任意开发宿主可先执行 metadata 与平台无关 rootfs contract�
 ./scripts/check-linux-product-layout.sh
 ```
 
-真实 Debian 13 ARM64 环境必须先产生 product Manager bundle 与 system-profile addon stage，再把两者作为显式输入交给强门禁。该流程只构建并复验临时 rootfs，不调用 dpkg，也不形成安装完成事实；运行前仍按当前状态取得实机授权。
+真实 Debian 13 ARM64 环境必须先产生 product Manager bundle 与 system-profile addon stage，再把两者作为显式输入交给强门禁。P05A 已按该流程完成一次 committed-source 证据；后续复验仍只构建临时 rootfs，不调用产品 dpkg，也不形成安装完成事实，任何新的实机变更继续按当前状态授权。
 
 真实 Linux 开发构建需要既有 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、librime development environment，以及启用 `native-rime` 的 Rust cdylib。命令只生成开发 build，不安装 addon：
 

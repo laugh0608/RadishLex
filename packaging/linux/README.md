@@ -20,6 +20,8 @@
 
 第一个入口在所有受支持宿主验证 committed metadata 与负向测试。第二个入口默认运行平台无关 rootfs contract；只有显式提供真实 Linux Manager bundle 与 product-profile addon stage 时，才装配并复验临时 `DESTDIR`。两个入口都不读取用户 XDG、不写 `/usr` 或 `/var`，也不启动 Fcitx、Manager 或桌面会话。
 
+2026-08-06 已使用 committed `e1ce740` 的全新 Debian 13.6 ARM64 Manager/addon 输入通过真实载荷模式；该证据包含路径映射、双 FFI、ELF closure、系统字体与临时 manifest，不生成 `.deb` 或安装 receipt。
+
 ## 字体边界
 
 Manager 的中文、Latin 与数字文本继续使用系统 `fonts-noto-cjk` 和 `fonts-dejavu-core`。Flutter 因 `Icons.*` 生成的 `MaterialIcons-Regular.otf` 只承担图标字形，必须位于固定 `flutter_assets/fonts` 路径并由 `FontManifest.json` 与 `NOTICES.Z` 绑定；除此以外的 `.otf`、`.ttf` 或 `.ttc` 一律拒绝，产品也不携带 fontconfig 配置或调用 `fc-cache`。
