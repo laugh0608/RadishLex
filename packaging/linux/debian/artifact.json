@@ -1,0 +1,16 @@
+{
+  "format_version": 1,
+  "evidence_format_version": 1,
+  "distribution_identity": "debian-local-deb-v1",
+  "archive_format": "debian-binary-2.0-ar-v1",
+  "tar_format": "ustar",
+  "compression": "none",
+  "source_date_epoch": 0,
+  "package_filename": "radishlex_26.7.1+38-1_arm64.deb",
+  "evidence_filename": "radishlex_26.7.1+38-1_arm64.deb.evidence.json",
+  "control_members": [
+    "control",
+    "md5sums"
+  ],
+  "installed_size_model": "sum-file-ceil-kib-v1"
+}

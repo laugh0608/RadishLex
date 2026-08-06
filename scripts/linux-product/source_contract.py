@@ -235,6 +235,18 @@ def validate_source_contract(
         repo_root / "scripts/check-linux-product-layout.sh",
         "Linux product layout gate",
     )
+    artifact_builder = read_text(
+        repo_root / "scripts/build-linux-deb-artifact.sh",
+        "Linux Debian artifact builder",
+    )
+    artifact_gate = read_text(
+        repo_root / "scripts/check-linux-deb-artifact.sh",
+        "Linux Debian artifact gate",
+    )
+    artifact_source = read_text(
+        repo_root / "scripts/linux-product/deb_artifact.py",
+        "Linux Debian artifact source",
+    )
     required_scripts = {
         "Linux Manager product builder": (
             manager_builder,
@@ -268,6 +280,36 @@ def validate_source_contract(
                 "nm -D --defined-only",
             ),
         ),
+        "Linux Debian artifact builder": (
+            artifact_builder,
+            (
+                "dpkg-shlibdeps",
+                "--warnings=0",
+                '"${repo_root}/scripts/linux-product/rootfs.py" verify',
+                '"${repo_root}/scripts/linux-product/deb_artifact.py" build',
+                '"${repo_root}/scripts/linux-product/deb_artifact.py" verify',
+                "dpkg-deb --info",
+                "dpkg-deb --contents",
+            ),
+        ),
+        "Linux Debian artifact gate": (
+            artifact_gate,
+            (
+                "test_deb_artifact.py",
+                "bash -n",
+            ),
+        ),
+        "Linux Debian artifact source": (
+            artifact_source,
+            (
+                "DebianArtifactContract",
+                "debian-binary",
+                "control.tar",
+                "data.tar",
+                "rootfs_contract.verify",
+                "dpkg-shlibdeps evidence",
+            ),
+        ),
     }
     for label, (script, phrases) in required_scripts.items():
         for phrase in phrases:
@@ -276,13 +318,41 @@ def validate_source_contract(
                     f"{label} is missing contract phrase: {phrase}"
                 )
         if re.search(
-            r"^[ \t]*(?:sudo|apt|apt-get|dpkg|systemctl|service|fcitx5)\b",
+            r"^[ \t]*(?:sudo|apt|apt-get|dpkg(?:[ \t]|$)|systemctl|service|fcitx5)\b",
             script,
             re.MULTILINE,
         ):
             raise LinuxProductMetadataError(
                 f"{label} must not mutate packages, services, or sessions"
             )
+
+    artifact_contract = load_json_object(
+        repo_root / "packaging/linux/debian/artifact.json",
+        "Linux Debian artifact contract",
+    )
+    expected_artifact_contract = {
+        "format_version": 1,
+        "evidence_format_version": 1,
+        "distribution_identity": metadata.distribution_identity,
+        "archive_format": "debian-binary-2.0-ar-v1",
+        "tar_format": "ustar",
+        "compression": "none",
+        "source_date_epoch": 0,
+        "package_filename": (
+            f"{metadata.package_name}_{metadata.package_version}_"
+            f"{metadata.debian_architecture}.deb"
+        ),
+        "evidence_filename": (
+            f"{metadata.package_name}_{metadata.package_version}_"
+            f"{metadata.debian_architecture}.deb.evidence.json"
+        ),
+        "control_members": ["control", "md5sums"],
+        "installed_size_model": "sum-file-ceil-kib-v1",
+    }
+    if artifact_contract != expected_artifact_contract:
+        raise LinuxProductMetadataError(
+            "Linux Debian artifact contract differs from product metadata"
+        )
 
     rime_lock_path = repo_root / "packaging/rime/product-rime-data.json"
     rime_lock = product_data.validate_source(

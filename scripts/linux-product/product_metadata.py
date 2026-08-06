@@ -627,8 +627,10 @@ def parse_args() -> argparse.Namespace:
         "name",
         choices=(
             "debian_architecture",
+            "librime_package",
             "manager_application_id",
             "multiarch_tuple",
+            "package_name",
             "package_version",
             "product_version",
         ),
