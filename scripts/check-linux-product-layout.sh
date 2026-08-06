@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+umask 022
+
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
 
@@ -63,13 +65,15 @@ manager_ffi="${manager_root}/lib/libradishlex_ime_ffi.so"
 addon_library="${assembled_rootfs}/usr/lib/aarch64-linux-gnu/fcitx5/radishlex.so"
 addon_ffi="${assembled_rootfs}/usr/lib/aarch64-linux-gnu/fcitx5/libradishlex_ime_ffi.so"
 
-for library in \
-  "${manager_executable}" \
-  "${manager_root}/lib/libapp.so" \
-  "${manager_root}/lib/libflutter_linux_gtk.so" \
-  "${manager_ffi}" \
-  "${addon_library}" \
-  "${addon_ffi}"; do
+payload_binaries=(
+  "${manager_executable}"
+  "${manager_root}/lib/libapp.so"
+  "${manager_root}/lib/libflutter_linux_gtk.so"
+  "${manager_ffi}"
+  "${addon_library}"
+  "${addon_ffi}"
+)
+for library in "${payload_binaries[@]}"; do
   file "${library}" | rg -q 'ELF 64-bit.*ARM aarch64'
   if ! dependency_output="$(ldd "${library}" 2>&1)"; then
     echo "Linux product dependency inspection failed: ${library}" >&2
@@ -91,7 +95,7 @@ for binary in "${manager_executable}" "${addon_library}"; do
     exit 1
   fi
 done
-for binary in "${manager_executable}" "${manager_ffi}" "${addon_library}"; do
+for binary in "${payload_binaries[@]}"; do
   if strings "${binary}" | rg -F "${repo_root}" >/dev/null; then
     echo "Linux product payload contains the repository path." >&2
     exit 1
@@ -102,6 +106,11 @@ for binary in "${manager_executable}" "${manager_ffi}" "${addon_library}"; do
   fi
   if strings "${binary}" | rg -F "${addon_stage}" >/dev/null; then
     echo "Linux product payload contains the addon staging path." >&2
+    exit 1
+  fi
+  if [[ "${HOME:-}" == /* ]] && \
+      strings "${binary}" | rg -F "${HOME}/" >/dev/null; then
+    echo "Linux product payload contains the build home path." >&2
     exit 1
   fi
 done

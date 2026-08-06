@@ -6,6 +6,7 @@ umask 022
 script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
 manager_dir="${repo_root}/apps/radishlex-manager"
+cargo_home="${CARGO_HOME:-${HOME:-}/.cargo}"
 
 if [[ "$(uname -s)" != "Linux" ]]; then
   echo "RadishLex Manager Linux product build requires Linux." >&2
@@ -25,7 +26,18 @@ case "$(uname -m)" in
     ;;
 esac
 
-cargo build --manifest-path "${repo_root}/Cargo.toml" \
+if [[ "${cargo_home}" != /* ]]; then
+  echo "Linux Manager product build requires an absolute Cargo home." >&2
+  exit 1
+fi
+
+rust_flag_separator=$'\x1f'
+encoded_rustflags="--remap-path-prefix=${repo_root}=/usr/src/radishlex"
+encoded_rustflags+="${rust_flag_separator}--remap-path-prefix=${cargo_home}=/usr/src/cargo"
+
+env -u RUSTFLAGS \
+  CARGO_ENCODED_RUSTFLAGS="${encoded_rustflags}" \
+  cargo build --manifest-path "${repo_root}/Cargo.toml" \
   --locked \
   -p radishlex-ime-ffi \
   --release \

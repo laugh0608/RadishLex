@@ -223,6 +223,10 @@ def validate_source_contract(
             "Linux runtime layout does not separate staged and system profiles"
         )
 
+    manager_builder = read_text(
+        repo_root / "scripts/build-manager-linux-product.sh",
+        "Linux Manager product builder",
+    )
     addon_builder = read_text(
         repo_root / "scripts/build-linux-product-addon-stage.sh",
         "Linux product addon builder",
@@ -231,23 +235,41 @@ def validate_source_contract(
         repo_root / "scripts/check-linux-product-layout.sh",
         "Linux product layout gate",
     )
-    required_script_phrases = {
+    required_scripts = {
+        "Linux Manager product builder": (
+            manager_builder,
+            (
+                "CARGO_ENCODED_RUSTFLAGS",
+                "--remap-path-prefix=${repo_root}=",
+                "--remap-path-prefix=${cargo_home}=",
+                "env -u RUSTFLAGS",
+            ),
+        ),
         "Linux product addon builder": (
-            "field product_version",
-            "-DRADISHLEX_RUNTIME_LAYOUT_PROFILE=system",
-            'DESTDIR="${stage_dir}" cmake --install',
-            "validate-addon-stage --addon-stage",
+            addon_builder,
+            (
+                "field product_version",
+                "-ffile-prefix-map=${repo_root}=",
+                "-ffile-prefix-map=${temp_dir}=",
+                "-DRADISHLEX_RUNTIME_LAYOUT_PROFILE=system",
+                'DESTDIR="${stage_dir}" cmake --install',
+                "validate-addon-stage --addon-stage",
+            ),
         ),
         "Linux product layout gate": (
-            "--manager-bundle",
-            "--addon-stage",
-            '"${repo_root}/scripts/linux-product/rootfs.py" assemble',
-            "fc-match",
-            "nm -D --defined-only",
+            layout_gate,
+            (
+                "umask 022",
+                "--manager-bundle",
+                "--addon-stage",
+                '"${repo_root}/scripts/linux-product/rootfs.py" assemble',
+                'rg -F "${HOME}/"',
+                "fc-match",
+                "nm -D --defined-only",
+            ),
         ),
     }
-    for label, phrases in required_script_phrases.items():
-        script = addon_builder if label.endswith("builder") else layout_gate
+    for label, (script, phrases) in required_scripts.items():
         for phrase in phrases:
             if phrase not in script:
                 raise LinuxProductMetadataError(

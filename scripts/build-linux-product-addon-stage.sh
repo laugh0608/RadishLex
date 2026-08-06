@@ -66,8 +66,11 @@ trap cleanup EXIT
 
 build_dir="${temp_dir}/build"
 stage_dir="${temp_dir}/stage"
+path_map_flags="-ffile-prefix-map=${repo_root}=/usr/src/radishlex"
+path_map_flags+=" -ffile-prefix-map=${temp_dir}=/usr/src/radishlex-build"
 cmake -S "${repo_root}/platforms/linux-fcitx5" -B "${build_dir}" \
   -DCMAKE_BUILD_TYPE=Release \
+  "-DCMAKE_CXX_FLAGS=${path_map_flags}" \
   -DCMAKE_INSTALL_PREFIX=/usr \
   -DCMAKE_INSTALL_LIBDIR=lib/aarch64-linux-gnu \
   -DRADISHLEX_BUILD_FCITX_ADDON=ON \
@@ -110,6 +113,11 @@ for library in "${addon_library}" "${staged_ffi}"; do
   fi
   if strings "${library}" | rg -F "${temp_dir}" >/dev/null; then
     echo "Linux product addon stage contains its temporary build path." >&2
+    exit 1
+  fi
+  if [[ "${HOME:-}" == /* ]] && \
+      strings "${library}" | rg -F "${HOME}/" >/dev/null; then
+    echo "Linux product addon stage contains the build home path." >&2
     exit 1
   fi
 done

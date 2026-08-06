@@ -14,6 +14,7 @@ import rootfs
 
 class LinuxRootfsTest(unittest.TestCase):
     def setUp(self) -> None:
+        self.previous_umask = os.umask(0o022)
         temporary_root = Path(tempfile.gettempdir()).resolve()
         self.temporary = tempfile.TemporaryDirectory(
             prefix="radishlex-linux-rootfs-test.", dir=temporary_root
@@ -27,7 +28,10 @@ class LinuxRootfsTest(unittest.TestCase):
         self.create_addon_stage()
 
     def tearDown(self) -> None:
-        self.temporary.cleanup()
+        try:
+            self.temporary.cleanup()
+        finally:
+            os.umask(self.previous_umask)
 
     def write_file(
         self, root: Path, relative: Path | str, value: bytes, mode: int = 0o644
