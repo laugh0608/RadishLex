@@ -667,6 +667,7 @@ dependencies = [
  "radishlex-ime-runtime",
  "radishlex-ime-sync-runtime",
  "radishlex-ime-userdb",
+ "radishlex-linux-product-install",
  "radishlex-macos-product-install",
  "serde_json",
 ]

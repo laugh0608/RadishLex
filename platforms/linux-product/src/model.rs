@@ -157,6 +157,30 @@ impl DataContractIdentity {
         self.userdb_schema_version
     }
 
+    pub fn runtime_layout(&self) -> &str {
+        &self.runtime_layout
+    }
+
+    pub fn data_layout(&self) -> &str {
+        &self.data_layout
+    }
+
+    pub const fn settings_format_version(&self) -> u32 {
+        self.settings_format_version
+    }
+
+    pub const fn privacy_format_version(&self) -> u32 {
+        self.privacy_format_version
+    }
+
+    pub fn rime_schema_id(&self) -> &str {
+        &self.rime_schema_id
+    }
+
+    pub fn rime_data_lock_sha256(&self) -> &str {
+        &self.rime_data_lock_sha256
+    }
+
     fn validate(&self) -> Result<(), LinuxInstallReceiptError> {
         if self.ffi_abi_version == 0
             || self.userdb_schema_version == 0
@@ -251,6 +275,18 @@ impl LinuxArtifactIdentity {
 
     pub fn evidence_sha256(&self) -> &str {
         &self.evidence_sha256
+    }
+
+    pub fn package_name(&self) -> &str {
+        &self.package_name
+    }
+
+    pub fn architecture(&self) -> &str {
+        &self.architecture
+    }
+
+    pub fn product_manifest_sha256(&self) -> &str {
+        &self.product_manifest_sha256
     }
 
     pub fn data_contract(&self) -> &DataContractIdentity {
@@ -507,6 +543,41 @@ impl ArtifactFileIdentity {
         &self.sha256
     }
 
+    #[cfg(any(target_os = "linux", all(test, unix)))]
+    pub(crate) const fn device_id(&self) -> u64 {
+        self.device_id
+    }
+
+    #[cfg(any(target_os = "linux", all(test, unix)))]
+    pub(crate) const fn inode(&self) -> u64 {
+        self.inode
+    }
+
+    #[cfg(any(target_os = "linux", all(test, unix)))]
+    pub(crate) const fn owner_id(&self) -> u32 {
+        self.owner_id
+    }
+
+    #[cfg(any(target_os = "linux", all(test, unix)))]
+    pub(crate) const fn group_id(&self) -> u32 {
+        self.group_id
+    }
+
+    #[cfg(any(target_os = "linux", all(test, unix)))]
+    pub(crate) const fn mode(&self) -> u32 {
+        self.mode
+    }
+
+    #[cfg(any(target_os = "linux", all(test, unix)))]
+    pub(crate) const fn hardlink_count(&self) -> u64 {
+        self.hardlink_count
+    }
+
+    #[cfg(any(target_os = "linux", all(test, unix)))]
+    pub(crate) const fn size(&self) -> u64 {
+        self.size
+    }
+
     fn validate(&self) -> Result<(), LinuxInstallReceiptError> {
         if self.inode == 0 || self.mode != 0o600 || self.hardlink_count != 1 || self.size == 0 {
             return Err(LinuxInstallReceiptError::invalid(
@@ -561,6 +632,16 @@ impl StagedArtifactEvidence {
 
     pub fn artifact(&self) -> &LinuxArtifactIdentity {
         &self.artifact
+    }
+
+    #[cfg(any(target_os = "linux", all(test, unix)))]
+    pub(crate) fn package_file(&self) -> &ArtifactFileIdentity {
+        &self.package_file
+    }
+
+    #[cfg(any(target_os = "linux", all(test, unix)))]
+    pub(crate) fn evidence_file(&self) -> &ArtifactFileIdentity {
+        &self.evidence_file
     }
 }
 

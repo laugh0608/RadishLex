@@ -60,6 +60,15 @@ common_flags=(
   -o "${temp_dir}/ffi_projection_test"
 "${temp_dir}/ffi_projection_test"
 
+for startup_identity in 1 2; do
+  "${cxx}" "${common_flags[@]}" \
+    "-DRADISHLEX_LINUX_STARTUP_BUILD_IDENTITY=${startup_identity}" \
+    "${platform_dir}/tests/product_startup_test.cpp" \
+    "${platform_dir}/src/product_startup.cpp" \
+    -o "${temp_dir}/product_startup_test_${startup_identity}"
+  "${temp_dir}/product_startup_test_${startup_identity}"
+done
+
 "${cxx}" "${common_flags[@]}" -DRADISHLEX_XDG_TESTING=1 \
   "${platform_dir}/tests/xdg_paths_test.cpp" \
   "${platform_dir}/src/xdg_paths.cpp" \
@@ -110,6 +119,9 @@ fi
 "${cxx}" "${common_flags[@]}" -c \
   "${platform_dir}/src/linked_ffi_api.cpp" \
   -o "${temp_dir}/linked_ffi_api.o"
+"${cxx}" "${common_flags[@]}" -c \
+  "${platform_dir}/src/linked_product_startup.cpp" \
+  -o "${temp_dir}/linked_product_startup.o"
 
 for asset in default.yaml radishlex_pinyin.schema.yaml pinyin_simp.dict.yaml; do
   test -f "${repo_root}/packaging/rime/data/${asset}"
@@ -121,9 +133,12 @@ rg -Fq 'RADISHLEX_RUNTIME_LAYOUT_PROFILE "staged"' \
   "${platform_dir}/CMakeLists.txt"
 rg -Fq 'RADISHLEX_SYSTEM_RIME_DATA_DIR="/usr/share/radishlex/rime"' \
   "${platform_dir}/CMakeLists.txt"
+rg -Fq 'RADISHLEX_LINUX_STARTUP_BUILD_IDENTITY=2' \
+  "${platform_dir}/CMakeLists.txt"
 rg -q 'Fcitx5::Core' "${platform_dir}/CMakeLists.txt"
 rg -q 'radishlex_ime_ffi' "${platform_dir}/CMakeLists.txt"
 rg -Fq 'umask(0077);' "${manager_linux_dir}/runner/main.cc"
+rg -Fq 'authorizeLinkedStartup' "${manager_linux_dir}/runner/main.cc"
 rg -Fq 'dev.radishlex.manager/runtime' \
   "${manager_linux_dir}/runner/manager_runtime_bridge.cc"
 rg -Fq 'resolveManagerRuntimePaths' \

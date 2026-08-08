@@ -4,6 +4,8 @@
 
 mod coordinator;
 mod model;
+#[cfg(any(target_os = "linux", all(test, unix)))]
+mod startup;
 #[cfg(unix)]
 mod store;
 
@@ -17,6 +19,13 @@ pub use model::{
     LinuxInstallReceiptError, LinuxInstallRootIdentity, LinuxInstallState, LinuxOperationKind,
     LinuxOperationRequest, PackageSnapshot, StagedArtifactEvidence, LINUX_DISTRIBUTION_IDENTITY,
     LINUX_INSTALL_PRODUCT_ID, LINUX_INSTALL_RECEIPT_FORMAT, MAX_LINUX_INSTALL_RECEIPT_BYTES,
+};
+#[cfg(any(target_os = "linux", all(test, unix)))]
+pub use startup::{
+    inspect_linux_startup, LinuxPackageObservation, LinuxStartupBuildIdentity,
+    LinuxStartupComponent, LinuxStartupDecision, LinuxStartupOutcome, LinuxStartupPaths,
+    LinuxStartupPort, LinuxStartupPortError, LinuxStartupPortErrorCode, LinuxStartupReason,
+    LinuxSystemStartupPort,
 };
 #[cfg(unix)]
 pub use store::{

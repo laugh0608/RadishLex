@@ -48,8 +48,10 @@ add_library(radishlex_linux_platform STATIC
   src/ffi_projection.cpp
   src/key_projection.cpp
   src/linked_ffi_api.cpp
+  src/linked_product_startup.cpp
   src/manager_runtime.cpp
   src/privacy_mode.cpp
+  src/product_startup.cpp
   src/runtime_layout.cpp
   src/xdg_paths.cpp
 )
@@ -68,7 +70,12 @@ target_compile_options(radishlex_linux_platform PRIVATE
 )
 if(RADISHLEX_RUNTIME_LAYOUT_PROFILE STREQUAL "system")
   target_compile_definitions(radishlex_linux_platform PRIVATE
+    RADISHLEX_LINUX_STARTUP_BUILD_IDENTITY=2
     RADISHLEX_SYSTEM_RIME_DATA_DIR="/usr/share/radishlex/rime"
+  )
+else()
+  target_compile_definitions(radishlex_linux_platform PRIVATE
+    RADISHLEX_LINUX_STARTUP_BUILD_IDENTITY=1
   )
 endif()
 if(CMAKE_DL_LIBS)
@@ -199,6 +206,28 @@ if(RADISHLEX_BUILD_CONTRACT_TESTS)
     -Wall -Wextra -Wpedantic -Werror
   )
   add_test(NAME ffi_projection COMMAND radishlex_ffi_projection_contract)
+
+  foreach(startup_identity IN ITEMS 1 2)
+    add_executable(radishlex_product_startup_contract_${startup_identity}
+      tests/product_startup_test.cpp
+      src/product_startup.cpp
+    )
+    target_include_directories(
+      radishlex_product_startup_contract_${startup_identity} PRIVATE
+      "${CMAKE_CURRENT_SOURCE_DIR}/include"
+      "${RADISHLEX_IME_FFI_INCLUDE_DIR}"
+    )
+    target_compile_definitions(
+      radishlex_product_startup_contract_${startup_identity} PRIVATE
+      RADISHLEX_LINUX_STARTUP_BUILD_IDENTITY=${startup_identity}
+    )
+    target_compile_options(
+      radishlex_product_startup_contract_${startup_identity} PRIVATE
+      -Wall -Wextra -Wpedantic -Werror
+    )
+    add_test(NAME product_startup_${startup_identity}
+             COMMAND radishlex_product_startup_contract_${startup_identity})
+  endforeach()
 
   add_executable(radishlex_xdg_paths_contract
     tests/xdg_paths_test.cpp

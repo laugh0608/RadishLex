@@ -187,6 +187,8 @@ def validate_source_contract(
         'RADISHLEX_RUNTIME_LAYOUT_PROFILE "staged"',
         'RADISHLEX_SYSTEM_RIME_DATA_DIR="/usr/share/radishlex/rime"',
         'RADISHLEX_RUNTIME_LAYOUT_PROFILE STREQUAL "system"',
+        "RADISHLEX_LINUX_STARTUP_BUILD_IDENTITY=1",
+        "RADISHLEX_LINUX_STARTUP_BUILD_IDENTITY=2",
     )
     for phrase in required_cmake_phrases:
         if phrase not in platform_cmake:
@@ -258,6 +260,10 @@ def validate_source_contract(
                 "CARGO_ENCODED_RUSTFLAGS",
                 "--remap-path-prefix=${repo_root}=",
                 "--remap-path-prefix=${cargo_home}=",
+                "--development-staged",
+                "--system-product",
+                "RADISHLEX_MANAGER_NATIVE_PROFILE",
+                "radishlex_linux_product_startup_gate",
                 "env -u RUSTFLAGS",
             ),
         ),
@@ -270,6 +276,7 @@ def validate_source_contract(
                 "-DRADISHLEX_RUNTIME_LAYOUT_PROFILE=system",
                 'DESTDIR="${stage_dir}" cmake --install',
                 "validate-addon-stage --addon-stage",
+                "radishlex-linux-startup:debian-system-product-v1",
             ),
         ),
         "Linux product layout gate": (
@@ -282,6 +289,7 @@ def validate_source_contract(
                 'rg -F "${HOME}/"',
                 "fc-match",
                 "nm -D --defined-only",
+                "radishlex-linux-startup:debian-system-product-v1",
             ),
         ),
         "Linux Debian artifact builder": (

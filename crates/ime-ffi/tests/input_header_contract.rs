@@ -9,14 +9,16 @@ use radishlex_ime_ffi::{
     radishlex_key_result_commit, radishlex_key_result_commit_present,
     radishlex_key_result_consumed, radishlex_key_result_free,
     radishlex_key_result_learning_disposition, radishlex_key_result_snapshot,
-    radishlex_key_result_version, radishlex_manager_sync_product_status,
-    radishlex_manager_sync_qualification_cancel, radishlex_manager_sync_qualification_free,
-    radishlex_manager_sync_qualification_poll, radishlex_manager_sync_qualification_start,
-    radishlex_product_install_startup_gate, radishlex_rime_runtime_shutdown,
-    radishlex_session_handle_key_event, RadishLexAppleP256ProductSmokeSummary,
-    RadishLexAppleP256ProductStatus, RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary,
+    radishlex_key_result_version, radishlex_linux_product_startup_gate,
+    radishlex_manager_sync_product_status, radishlex_manager_sync_qualification_cancel,
+    radishlex_manager_sync_qualification_free, radishlex_manager_sync_qualification_poll,
+    radishlex_manager_sync_qualification_start, radishlex_product_install_startup_gate,
+    radishlex_rime_runtime_shutdown, radishlex_session_handle_key_event,
+    RadishLexAppleP256ProductSmokeSummary, RadishLexAppleP256ProductStatus,
+    RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary,
     RadishLexAppleSecureEnclaveKeyAgreementProductStatus, RadishLexError, RadishLexFfiContract,
-    RadishLexKeyEvent, RadishLexKeyResult, RadishLexManagerSyncProductStatus,
+    RadishLexKeyEvent, RadishLexKeyResult, RadishLexLinuxProductStartupRequest,
+    RadishLexLinuxProductStartupResult, RadishLexManagerSyncProductStatus,
     RadishLexManagerSyncQualificationRequest, RadishLexManagerSyncQualificationRun,
     RadishLexManagerSyncQualificationSnapshot, RadishLexProductInstallStartupGateRequest,
     RadishLexProductInstallStartupGateResult, RadishLexSession, RadishLexSessionOptions,
@@ -86,6 +88,18 @@ fn rust_input_abi_layout_matches_the_checked_header_contract() {
         size_of::<RadishLexProductInstallStartupGateResult>(),
         4 * size_of::<u32>()
     );
+    assert_eq!(
+        size_of::<RadishLexLinuxProductStartupRequest>(),
+        if cfg!(target_pointer_width = "64") {
+            24
+        } else {
+            16
+        }
+    );
+    assert_eq!(
+        size_of::<RadishLexLinuxProductStartupResult>(),
+        4 * size_of::<u32>()
+    );
 
     let _: unsafe extern "C" fn(
         *mut RadishLexSession,
@@ -151,6 +165,11 @@ fn rust_input_abi_layout_matches_the_checked_header_contract() {
         *mut RadishLexProductInstallStartupGateResult,
         *mut *mut RadishLexError,
     ) -> RadishLexStatusCode = radishlex_product_install_startup_gate;
+    let _: unsafe extern "C" fn(
+        *const RadishLexLinuxProductStartupRequest,
+        *mut RadishLexLinuxProductStartupResult,
+        *mut *mut RadishLexError,
+    ) -> RadishLexStatusCode = radishlex_linux_product_startup_gate;
 }
 
 #[test]
@@ -251,6 +270,11 @@ _Static_assert(RADISHLEX_INSTALL_RECEIPT_STATE_ROLLED_BACK == 14u, "install roll
 _Static_assert(RADISHLEX_UPGRADE_RECEIPT_STATE_COMPLETED == 9u, "upgrade completed state mismatch");
 _Static_assert(RADISHLEX_UPGRADE_RECEIPT_STATE_ABORTED_PRESERVED == 10u, "upgrade aborted state mismatch");
 _Static_assert(RADISHLEX_UPGRADE_RECEIPT_STATE_ROLLED_BACK == 12u, "upgrade rollback state mismatch");
+_Static_assert(RADISHLEX_LINUX_STARTUP_ALLOWED_PRODUCT == 2u, "Linux product startup decision mismatch");
+_Static_assert(RADISHLEX_LINUX_STARTUP_FAILED_CLOSED == 4u, "Linux failed-closed decision mismatch");
+_Static_assert(RADISHLEX_LINUX_STARTUP_RECEIPT_COMPLETED == 6u, "Linux completed receipt state mismatch");
+_Static_assert(RADISHLEX_LINUX_STARTUP_RECEIPT_ABORTED_PRESERVED == 7u, "Linux aborted receipt state mismatch");
+_Static_assert(RADISHLEX_LINUX_STARTUP_RECEIPT_ROLLED_BACK == 11u, "Linux rolled-back receipt state mismatch");
 _Static_assert(sizeof(RadishLexFfiContract) == 3u * sizeof(uint32_t), "contract layout mismatch");
 _Static_assert(sizeof(RadishLexSessionOptions) == 2u * sizeof(uint32_t), "session options layout mismatch");
 _Static_assert(sizeof(RadishLexKeyEvent) == 5u * sizeof(uint32_t), "key event layout mismatch");
@@ -261,6 +285,7 @@ _Static_assert(sizeof(RadishLexAppleSecureEnclaveKeyAgreementProductSmokeSummary
 _Static_assert(sizeof(RadishLexManagerSyncProductStatus) == 19u * sizeof(uint32_t), "Manager sync product status layout mismatch");
 _Static_assert(sizeof(RadishLexManagerSyncQualificationRequest) == 56u, "Manager sync qualification request layout mismatch");
 _Static_assert(sizeof(RadishLexManagerSyncQualificationSnapshot) == 96u, "Manager sync qualification snapshot layout mismatch");
+_Static_assert(sizeof(RadishLexLinuxProductStartupResult) == 4u * sizeof(uint32_t), "Linux startup result layout mismatch");
 
 RadishLexStatusCode radishlex_compile_input_contract(
     RadishLexSession *session,
@@ -290,6 +315,8 @@ RadishLexStatusCode radishlex_compile_input_contract(
       radishlex_manager_sync_qualification_cancel;
   void (*qualification_free)(RadishLexManagerSyncQualificationRun *) =
       radishlex_manager_sync_qualification_free;
+  RadishLexStatusCode (*linux_startup)(const RadishLexLinuxProductStartupRequest *, RadishLexLinuxProductStartupResult *, RadishLexError **) =
+      radishlex_linux_product_startup_gate;
   RadishLexKeyResult *result = NULL;
   RadishLexStatusCode status =
       radishlex_session_handle_key_event(session, event, &result, error_out);
@@ -327,6 +354,7 @@ RadishLexStatusCode radishlex_compile_input_contract(
   (void)qualification_poll;
   (void)qualification_cancel;
   (void)qualification_free;
+  (void)linux_startup;
   return status;
 }
 "#;

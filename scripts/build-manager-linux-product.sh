@@ -8,6 +8,25 @@ repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd)"
 manager_dir="${repo_root}/apps/radishlex-manager"
 cargo_home="${CARGO_HOME:-${HOME:-}/.cargo}"
 
+case "${1:-}" in
+  --development-staged)
+    native_profile="development-staged"
+    startup_identity_marker="development-staged"
+    ;;
+  --system-product)
+    native_profile="system-product"
+    startup_identity_marker="debian-system-product"
+    ;;
+  *)
+    echo "usage: $0 --development-staged|--system-product" >&2
+    exit 2
+    ;;
+esac
+if [[ "$#" -ne 1 ]]; then
+  echo "usage: $0 --development-staged|--system-product" >&2
+  exit 2
+fi
+
 if [[ "$(uname -s)" != "Linux" ]]; then
   echo "RadishLex Manager Linux product build requires Linux." >&2
   exit 1
@@ -52,6 +71,7 @@ fi
 (
   cd "${manager_dir}"
   RADISHLEX_MANAGER_FFI_LIBRARY="${ffi_library}" \
+  RADISHLEX_MANAGER_NATIVE_PROFILE="${native_profile}" \
     flutter build linux \
       --release \
       --dart-define=RADISHLEX_MANAGER_MODE=product
@@ -71,6 +91,8 @@ if ldd "${executable}" "${bundled_ffi}" | rg -n 'not found'; then
   exit 1
 fi
 readelf -d "${executable}" | rg -q '\$ORIGIN/lib'
+strings "${executable}" | \
+  rg -Fq "radishlex-linux-startup:${startup_identity_marker}-v1"
 
 for symbol in \
   radishlex_ffi_contract \
@@ -78,6 +100,7 @@ for symbol in \
   radishlex_userdb_learning_status \
   radishlex_userdb_rank_explain_new \
   radishlex_manager_sync_product_status \
+  radishlex_linux_product_startup_gate \
   radishlex_manager_sync_qualification_start; do
   if ! nm -D --defined-only "${bundled_ffi}" | \
       rg -q "[[:space:]]${symbol}$"; then
@@ -86,4 +109,4 @@ for symbol in \
   fi
 done
 
-echo "RadishLex Manager Linux staged bundle: ${bundle}"
+echo "RadishLex Manager Linux ${native_profile} bundle: ${bundle}"

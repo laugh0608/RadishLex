@@ -19,6 +19,7 @@
 #include "radishlex/linux/ffi_projection.h"
 #include "radishlex/linux/key_projection.h"
 #include "radishlex/linux/privacy_monitor.h"
+#include "radishlex/linux/product_startup.h"
 #include "radishlex/linux/runtime_layout.h"
 #include "radishlex/linux/xdg_paths.h"
 
@@ -69,7 +70,8 @@ class InputContextState final : public fcitx::InputContextProperty {
 
 class Engine final : public fcitx::InputMethodEngineV2 {
  public:
-  explicit Engine(fcitx::Instance *instance);
+  Engine(fcitx::Instance *instance,
+         radishlex::linux_platform::StartupPermit startup_permit);
   ~Engine() override;
 
   void keyEvent(const fcitx::InputMethodEntry &entry,

@@ -106,6 +106,8 @@ if readelf -d "${addon_library}" | rg -n '/tmp|/workspace|RadishLex'; then
   exit 1
 fi
 strings "${addon_library}" | rg -F '/usr/share/radishlex/rime' >/dev/null
+strings "${addon_library}" | \
+  rg -F 'radishlex-linux-startup:debian-system-product-v1' >/dev/null
 for library in "${addon_library}" "${staged_ffi}"; do
   if strings "${library}" | rg -F "${repo_root}" >/dev/null; then
     echo "Linux product addon stage contains the repository path." >&2

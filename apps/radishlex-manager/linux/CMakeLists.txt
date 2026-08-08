@@ -27,6 +27,22 @@ if(NOT RADISHLEX_MANAGER_FFI_NAME STREQUAL "libradishlex_ime_ffi.so")
   message(FATAL_ERROR
     "RADISHLEX_MANAGER_FFI_LIBRARY must use the fixed product filename")
 endif()
+set(RADISHLEX_MANAGER_NATIVE_PROFILE
+  "$ENV{RADISHLEX_MANAGER_NATIVE_PROFILE}"
+  CACHE STRING "Linux Manager native startup profile" FORCE)
+if(RADISHLEX_MANAGER_NATIVE_PROFILE STREQUAL "development-staged")
+  set(RADISHLEX_MANAGER_STARTUP_BUILD_IDENTITY 1)
+elseif(RADISHLEX_MANAGER_NATIVE_PROFILE STREQUAL "system-product")
+  set(RADISHLEX_MANAGER_STARTUP_BUILD_IDENTITY 2)
+else()
+  message(FATAL_ERROR
+    "RADISHLEX_MANAGER_NATIVE_PROFILE must be development-staged or system-product")
+endif()
+
+add_library(radishlex_manager_ffi SHARED IMPORTED GLOBAL)
+set_target_properties(radishlex_manager_ffi PROPERTIES
+  IMPORTED_LOCATION "${RADISHLEX_MANAGER_FFI_LIBRARY}"
+)
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.

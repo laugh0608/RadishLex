@@ -434,7 +434,8 @@ void InputContextState::handleProjectionFailure(bool had_composition,
   }
 }
 
-Engine::Engine(fcitx::Instance *instance)
+Engine::Engine(fcitx::Instance *instance,
+               radishlex::linux_platform::StartupPermit startup_permit)
     : instance_(instance),
       ffi_api_(radishlex::linux_platform::linkedFfiApi()),
       paths_(radishlex::linux_platform::resolveProductionXdgPaths()),
@@ -446,6 +447,7 @@ Engine::Engine(fcitx::Instance *instance)
         return new InputContextState(*this, input_context);
       }),
       next_session_id_(1) {
+  (void)startup_permit;
   radishlex::linux_platform::preparePrivateProductPaths(paths_);
   privacy_monitor_ =
       std::make_unique<radishlex::linux_platform::PrivacyModeMonitor>(paths_);
@@ -648,7 +650,19 @@ radishlex::linux_platform::PersonalizedSessionConfig Engine::sessionConfig() {
 }
 
 fcitx::AddonInstance *EngineFactory::create(fcitx::AddonManager *manager) {
-  return new Engine(manager->instance());
+  try {
+    auto startup_permit =
+        radishlex::linux_platform::authorizeLinkedStartup(
+            radishlex::linux_platform::StartupComponent::FcitxAddon);
+    return new Engine(manager->instance(), std::move(startup_permit));
+  } catch (const radishlex::linux_platform::StartupError &error) {
+    FCITX_ERROR() << "radishlex_startup_blocked status="
+                  << static_cast<int>(error.status())
+                  << " decision=" << error.decision()
+                  << " reason=" << error.reason()
+                  << " receipt_state=" << error.receiptState();
+    throw;
+  }
 }
 
 }  // namespace radishlex::linux_fcitx5

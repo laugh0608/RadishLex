@@ -90,6 +90,10 @@ readelf -d "${manager_executable}" | rg -q '\[\$ORIGIN/lib\]'
 readelf -d "${addon_library}" | rg -q '\[\$ORIGIN\]'
 strings "${addon_library}" | rg -F '/usr/share/radishlex/rime' >/dev/null
 for binary in "${manager_executable}" "${addon_library}"; do
+  strings "${binary}" | \
+    rg -F 'radishlex-linux-startup:debian-system-product-v1' >/dev/null
+done
+for binary in "${manager_executable}" "${addon_library}"; do
   if readelf -d "${binary}" | rg -n '/tmp|/workspace|RadishLex'; then
     echo "Linux product payload contains a build path in dynamic metadata." >&2
     exit 1
@@ -120,6 +124,7 @@ for symbol in \
   radishlex_userdb_learning_status \
   radishlex_userdb_rank_explain_new \
   radishlex_manager_sync_product_status \
+  radishlex_linux_product_startup_gate \
   radishlex_manager_sync_qualification_start; do
   if ! nm -D --defined-only "${manager_ffi}" | \
       rg "[[:space:]]${symbol}$" >/dev/null; then

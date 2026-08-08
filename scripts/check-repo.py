@@ -69,6 +69,7 @@ REQUIRED_FILES = [
     "platforms/linux-fcitx5/dev/Dockerfile",
     "platforms/linux-fcitx5/include/radishlex/linux/ffi_projection.h",
     "platforms/linux-fcitx5/include/radishlex/linux/key_projection.h",
+    "platforms/linux-fcitx5/include/radishlex/linux/product_startup.h",
     "platforms/linux-fcitx5/include/radishlex/linux/runtime_layout.h",
     "platforms/linux-fcitx5/include/radishlex/linux/xdg_paths.h",
     "platforms/linux-fcitx5/config/radishlex-addon.conf.in",
@@ -78,9 +79,12 @@ REQUIRED_FILES = [
     "platforms/linux-fcitx5/src/ffi_projection.cpp",
     "platforms/linux-fcitx5/src/key_projection.cpp",
     "platforms/linux-fcitx5/src/linked_ffi_api.cpp",
+    "platforms/linux-fcitx5/src/linked_product_startup.cpp",
+    "platforms/linux-fcitx5/src/product_startup.cpp",
     "platforms/linux-fcitx5/src/runtime_layout.cpp",
     "platforms/linux-fcitx5/src/xdg_paths.cpp",
     "platforms/linux-fcitx5/tests/ffi_projection_test.cpp",
+    "platforms/linux-fcitx5/tests/product_startup_test.cpp",
     "platforms/linux-fcitx5/tests/runtime_layout_test.cpp",
     "platforms/linux-fcitx5/tests/system_runtime_layout_test.cpp",
     "platforms/linux-fcitx5/tests/xdg_paths_test.cpp",
@@ -90,6 +94,16 @@ REQUIRED_FILES = [
     "platforms/linux-product/src/coordinator.rs",
     "platforms/linux-product/src/lib.rs",
     "platforms/linux-product/src/model.rs",
+    "platforms/linux-product/src/startup/decision.rs",
+    "platforms/linux-product/src/startup/mod.rs",
+    "platforms/linux-product/src/startup/read_only_state.rs",
+    "platforms/linux-product/src/startup/system_port.rs",
+    "platforms/linux-product/src/startup/system_port/manifest.rs",
+    "platforms/linux-product/src/startup/tests/core.rs",
+    "platforms/linux-product/src/startup/tests/helper.rs",
+    "platforms/linux-product/src/startup/tests/mod.rs",
+    "platforms/linux-product/src/startup/tests/system.rs",
+    "platforms/linux-product/src/startup/types.rs",
     "platforms/linux-product/src/store.rs",
     "platforms/linux-product/src/tests.rs",
     "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.h",
@@ -148,10 +162,12 @@ REQUIRED_FILES = [
     "scripts/check-linux-product-layout.sh",
     "scripts/check-linux-deb-artifact.sh",
     "scripts/check-linux-package-transaction.sh",
+    "scripts/check-linux-startup-gate.sh",
     "scripts/build-linux-product-addon-stage.sh",
     "scripts/build-linux-deb-artifact.sh",
     "scripts/linux-product/product_metadata.py",
     "scripts/linux-product/source_contract.py",
+    "scripts/linux-product/test_startup_gate_order.py",
     "scripts/linux-product/rootfs.py",
     "scripts/linux-product/deb_artifact.py",
     "scripts/linux-product/test_product_metadata.py",
@@ -386,6 +402,7 @@ def check_manager_product_runtime_contract() -> None:
         "radishlex_userdb_learning_status",
         "radishlex_userdb_rank_explain_new",
         "radishlex_manager_sync_product_status",
+        "radishlex_linux_product_startup_gate",
         "radishlex_manager_sync_qualification_start",
     ):
         if symbol not in linux_product_build:
@@ -444,6 +461,10 @@ def check_linux_deb_artifact() -> None:
 
 def check_linux_package_transaction() -> None:
     run_command([str(REPO_ROOT / "scripts/check-linux-package-transaction.sh")])
+
+
+def check_linux_startup_gate() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-linux-startup-gate.sh")])
 
 
 def required_status_contexts(ruleset: dict[str, Any]) -> set[str]:
@@ -616,6 +637,7 @@ def main() -> int:
     check_linux_product_layout()
     check_linux_deb_artifact()
     check_linux_package_transaction()
+    check_linux_startup_gate()
     check_ruleset_and_workflows()
     check_path_budget()
     check_deployment_evidence()

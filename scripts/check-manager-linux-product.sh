@@ -11,7 +11,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-"${repo_root}/scripts/build-manager-linux-product.sh"
+"${repo_root}/scripts/build-manager-linux-product.sh" --development-staged
 
 case "$(uname -m)" in
   x86_64)
