@@ -66,10 +66,15 @@ pub enum LinuxFailureCode {
     ReceiptInconsistent,
     ArtifactInvalid,
     ArtifactStagingFailed,
+    EnvironmentUnsupported,
+    DependencyUnavailable,
+    VersionRelationInvalid,
     ProgramsRunning,
+    ProcessInspectionUnavailable,
     PackageStateUnavailable,
     PackageStateUnknown,
     PackageStateUnexpected,
+    CommandInvalid,
     PackageMutationFailed,
     TargetValidationFailed,
     SourceRestoreFailed,
@@ -781,6 +786,12 @@ impl LinuxInstallReceipt {
                 "artifact slot is already recorded",
             ));
         }
+        if !required_slots(self.operation_kind).contains(&evidence.slot) {
+            return Err(LinuxInstallReceiptError::invalid(
+                "staged_artifacts",
+                "artifact slot is not required by this operation",
+            ));
+        }
         let expected = self.artifact_for_slot(evidence.slot).ok_or_else(|| {
             LinuxInstallReceiptError::invalid(
                 "staged_artifacts",
@@ -1084,7 +1095,8 @@ impl LinuxInstallReceipt {
     fn validate_staged_artifacts(&self) -> Result<(), LinuxInstallReceiptError> {
         let mut slots = BTreeSet::new();
         for evidence in &self.staged_artifacts {
-            if !slots.insert(evidence.slot)
+            if !required_slots(self.operation_kind).contains(&evidence.slot)
+                || !slots.insert(evidence.slot)
                 || self.artifact_for_slot(evidence.slot) != Some(&evidence.artifact)
             {
                 return Err(LinuxInstallReceiptError::invalid(

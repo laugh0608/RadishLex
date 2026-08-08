@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::fs::{self, File};
 use std::io::{self, Read};
-use std::os::unix::fs::{FileTypeExt, MetadataExt};
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
@@ -123,7 +123,10 @@ impl ReadOnlyStateView {
                 let valid = metadata.file_type().is_file()
                     && metadata.uid() == paths.expected_owner_id
                     && metadata.gid() == paths.expected_group_id
-                    && matches!(metadata.mode() & 0o7777, 0o600 | 0o644)
+                    && matches!(
+                        metadata.mode() & 0o7777,
+                        0o000 | 0o200 | 0o400 | 0o600 | 0o644
+                    )
                     && metadata.nlink() == 1
                     && metadata.len() <= MAX_LINUX_INSTALL_RECEIPT_BYTES as u64;
                 Some(LinuxStartupOutcome::new(
@@ -230,11 +233,12 @@ pub(super) fn inspect_guard(paths: &LinuxStartupPaths) -> Option<LinuxStartupOut
         true,
     )
     .is_ok()
-        && metadata.file_type().is_socket()
+        && metadata.file_type().is_file()
         && metadata.uid() == paths.expected_owner_id
         && metadata.gid() == paths.expected_group_id
-        && metadata.mode() & 0o7777 == 0o600
-        && metadata.nlink() == 1;
+        && matches!(metadata.mode() & 0o7777, 0o000 | 0o200 | 0o400 | 0o600)
+        && metadata.nlink() == 1
+        && metadata.len() == 0;
     Some(LinuxStartupOutcome::new(
         if valid {
             LinuxStartupDecision::MaintenanceRequired

@@ -155,6 +155,46 @@ class DebianArtifactTest(unittest.TestCase):
         ):
             deb_artifact.DebianArtifactContract.load(self.metadata, path)
 
+    def test_artifact_contract_rejects_custom_lifecycle_control_members(self) -> None:
+        original = json.loads(
+            deb_artifact.ARTIFACT_CONTRACT_PATH.read_text(encoding="utf-8")
+        )
+        self.assertEqual(original["control_members"], ["control", "md5sums"])
+        for member in deb_artifact.FORBIDDEN_CONTROL_MEMBERS:
+            with self.subTest(member=member):
+                value = {
+                    **original,
+                    "control_members": ["control", "md5sums", member],
+                }
+                path = self.write_file(
+                    self.work,
+                    f"artifact-{member}.json",
+                    (json.dumps(value, indent=2) + "\n").encode("utf-8"),
+                )
+                with self.assertRaisesRegex(
+                    deb_artifact.DebianArtifactError,
+                    "custom Debian lifecycle control members are forbidden",
+                ):
+                    deb_artifact.DebianArtifactContract.load(self.metadata, path)
+
+    def test_control_tar_rejects_every_custom_lifecycle_member(self) -> None:
+        control = b"Package: radishlex\n"
+        md5sums = b"d41d8cd98f00b204e9800998ecf8427e  empty\n"
+        for member in deb_artifact.FORBIDDEN_CONTROL_MEMBERS:
+            with self.subTest(member=member):
+                control_tar = deb_artifact.build_tar(
+                    [
+                        ("./control", 0o644, control),
+                        ("./md5sums", 0o644, md5sums),
+                        (f"./{member}", 0o755, b"#!/bin/sh\nexit 0\n"),
+                    ]
+                )
+                with self.assertRaisesRegex(
+                    deb_artifact.DebianArtifactError,
+                    "custom Debian lifecycle control members are forbidden",
+                ):
+                    deb_artifact.control_tar_values(control_tar)
+
     def test_builder_rejects_unresolved_or_overlapping_shlibs(self) -> None:
         unresolved = self.write_file(
             self.work,

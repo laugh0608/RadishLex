@@ -2,17 +2,39 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(any(target_os = "linux", all(test, unix)))]
 mod coordinator;
+#[cfg(any(target_os = "linux", all(test, unix)))]
+mod debian;
+#[cfg(any(target_os = "linux", all(test, unix)))]
 mod model;
 #[cfg(any(target_os = "linux", all(test, unix)))]
 mod startup;
-#[cfg(unix)]
+#[cfg(any(target_os = "linux", all(test, unix)))]
 mod store;
 
+#[cfg(any(target_os = "linux", all(test, unix)))]
 pub use coordinator::{
-    prepare_operation, resume_operation, DpkgPortError, DpkgTransactionPort, TransactionError,
-    TransactionOutcome,
+    prepare_operation, resume_operation, DpkgExpectedProductState, DpkgOperationContext,
+    DpkgPortError, DpkgPortErrorCode, DpkgPortPhase, DpkgProductValidationPhase,
+    DpkgQuiescencePhase, DpkgRestoreRequest, DpkgStagedOperation, DpkgStagedPackage,
+    DpkgTransactionPort, TransactionError, TransactionOutcome,
 };
+#[cfg(any(target_os = "linux", all(test, unix)))]
+pub use debian::{
+    compare_debian_versions, project_debian_lifecycle, validate_dpkg_configuration,
+    validate_operation_relation, BinaryControlSnapshot, BoundedDiagnostics,
+    DebianCommandContractError, DebianCommandInvocation, DebianInvocationPhase,
+    DebianLifecycleObservation, DebianLifecycleProjection, DebianRelationshipError,
+    DebianRelationshipErrorCode, DebianVersion, DebianVersionComparison, DebianVersionConstraint,
+    DebianVersionOperator, DirectDependency, DpkgConfigurationError, DpkgConfigurationErrorKind,
+    DpkgCurrentState, DpkgDesiredState, DpkgErrorState, DpkgMultiArch, DpkgPackageRecord,
+    DpkgStatusSnapshot, PrivateStagedDeb, ProductDataContract, StagedDebSlot, StandardInputPolicy,
+    ValidatedDpkgConfiguration, VerifiedArtifactRelationship, DPKG_ARCHITECTURE, DPKG_PACKAGE,
+    DPKG_PROGRAM, DPKG_STATE_ROOT, MAX_DIAGNOSTIC_BYTES, MAX_DPKG_CONFIG_BYTES,
+    MAX_DPKG_CONFIG_LINES, MAX_DPKG_CONFIG_LINE_BYTES, NULL_DEVICE,
+};
+#[cfg(any(target_os = "linux", all(test, unix)))]
 pub use model::{
     ArtifactFileIdentity, ArtifactSlot, ArtifactVersionRelation, DataContractIdentity,
     DpkgPackageState, LinuxArtifactIdentity, LinuxFailureCode, LinuxInstallReceipt,
@@ -27,11 +49,11 @@ pub use startup::{
     LinuxStartupPort, LinuxStartupPortError, LinuxStartupPortErrorCode, LinuxStartupReason,
     LinuxSystemStartupPort,
 };
-#[cfg(unix)]
+#[cfg(any(target_os = "linux", all(test, unix)))]
 pub use store::{
     LinuxInstallGuard, LinuxInstallStore, LinuxInstallStoreError, LinuxInstallStoreErrorCode,
     StagedArtifactPaths, SYSTEM_GUARD_PATH, SYSTEM_STATE_ROOT,
 };
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests;

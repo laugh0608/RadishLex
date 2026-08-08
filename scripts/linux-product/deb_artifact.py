@@ -56,6 +56,17 @@ CONTROL_FIELDS = (
     "Homepage",
     "Description",
 )
+CONTROL_MEMBERS = ("control", "md5sums")
+FORBIDDEN_CONTROL_MEMBERS = (
+    "preinst",
+    "postinst",
+    "prerm",
+    "postrm",
+    "config",
+    "templates",
+    "conffiles",
+    "triggers",
+)
 DEPENDENCY_PATTERN = re.compile(
     r"[a-z0-9][a-z0-9+.-]*(?::[a-z0-9][a-z0-9-]*)?"
     r"(?: \((?:>=|<=|=|<<|>>) [A-Za-z0-9.+:~_-]+\))?"
@@ -114,6 +125,18 @@ class DebianArtifactContract:
         return contract
 
     def validate(self, metadata: product_metadata.LinuxProductMetadata) -> None:
+        forbidden_members = sorted(
+            {
+                member.removeprefix("./")
+                for member in self.control_members
+                if member.removeprefix("./") in FORBIDDEN_CONTROL_MEMBERS
+            }
+        )
+        if forbidden_members:
+            raise DebianArtifactError(
+                "custom Debian lifecycle control members are forbidden: "
+                + ", ".join(forbidden_members)
+            )
         exact = {
             "format_version": 1,
             "evidence_format_version": 1,
@@ -133,7 +156,7 @@ class DebianArtifactContract:
                 f"{metadata.package_name}_{metadata.package_version}_"
                 f"{metadata.debian_architecture}.deb.evidence.json"
             ),
-            "control_members": ("control", "md5sums"),
+            "control_members": CONTROL_MEMBERS,
             "installed_size_model": "sum-file-ceil-kib-v1",
         }
         for field, expected in exact.items():
@@ -536,7 +559,17 @@ def extract_data_tar(value: bytes, destination: Path) -> None:
 
 def control_tar_values(value: bytes) -> tuple[bytes, bytes]:
     members = read_tar(value, "control.tar")
-    if [member.name for member, _ in members] != ["./control", "./md5sums"]:
+    raw_member_names = [member.name for member, _ in members]
+    member_names = [name.removeprefix("./") for name in raw_member_names]
+    forbidden_members = sorted(
+        set(member_names) & set(FORBIDDEN_CONTROL_MEMBERS)
+    )
+    if forbidden_members:
+        raise DebianArtifactError(
+            "custom Debian lifecycle control members are forbidden: "
+            + ", ".join(forbidden_members)
+        )
+    if raw_member_names != ["./control", "./md5sums"]:
         raise DebianArtifactError("control.tar inventory or order differs from contract")
     for member, _ in members:
         if member.mode != 0o644:

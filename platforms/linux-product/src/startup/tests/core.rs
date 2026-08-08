@@ -1,7 +1,6 @@
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-use std::os::unix::net::UnixListener;
 
 use super::super::read_only_state::RECEIPT_TMP_FILENAME;
 use super::super::*;
@@ -249,9 +248,11 @@ fn guard_and_temporary_receipt_have_stable_precedence_without_cleanup() {
         .open(&temporary)
         .expect("create temporary receipt");
     file.write_all(b"partial").expect("write temporary receipt");
-    let listener = UnixListener::bind(&site.paths.guard_path).expect("bind startup guard");
-    fs::set_permissions(&site.paths.guard_path, fs::Permissions::from_mode(0o600))
-        .expect("set guard mode");
+    file.set_permissions(fs::Permissions::from_mode(0o400))
+        .expect("simulate temporary receipt before canonical mode commit");
+    fs::write(&site.paths.guard_path, b"").expect("create startup guard");
+    fs::set_permissions(&site.paths.guard_path, fs::Permissions::from_mode(0o400))
+        .expect("simulate guard before canonical mode commit");
     let before = site.tree_fingerprint();
     let port = FakeStartupPort::new(LinuxPackageObservation::not_installed());
     let outcome = inspect_linux_startup(
@@ -267,7 +268,6 @@ fn guard_and_temporary_receipt_have_stable_precedence_without_cleanup() {
     assert_eq!(outcome.reason(), LinuxStartupReason::ActiveGuard);
     assert_eq!(port.package_calls.get(), 0);
     assert_eq!(site.tree_fingerprint(), before);
-    drop(listener);
     fs::remove_file(&site.paths.guard_path).expect("remove test guard");
 
     let outcome = inspect_linux_startup(
@@ -286,7 +286,9 @@ fn malformed_guard_tmp_receipt_and_state_entries_fail_closed() {
         let site = TestSite::new(case);
         site.create_state_root();
         match case {
-            "guard" => fs::write(&site.paths.guard_path, b"not a socket").expect("write guard"),
+            "guard" => {
+                fs::write(&site.paths.guard_path, b"not an empty guard").expect("write guard")
+            }
             "tmp" => {
                 let path = site.paths.state_root.join(RECEIPT_TMP_FILENAME);
                 fs::write(&path, b"unsafe tmp").expect("write tmp");
@@ -314,6 +316,47 @@ fn malformed_guard_tmp_receipt_and_state_entries_fail_closed() {
                 _ => unreachable!(),
             }
         );
+        assert_eq!(port.package_calls.get(), 0);
+    }
+}
+
+#[test]
+fn guard_regular_file_identity_is_strictly_read_only_validated() {
+    for case in ["directory", "mode", "hardlink", "size"] {
+        let site = TestSite::new(&format!("guard-{case}"));
+        site.create_state_root();
+        match case {
+            "directory" => fs::create_dir(&site.paths.guard_path).expect("create guard directory"),
+            "mode" => {
+                fs::write(&site.paths.guard_path, b"").expect("create guard file");
+                fs::set_permissions(&site.paths.guard_path, fs::Permissions::from_mode(0o644))
+                    .expect("set wide guard mode");
+            }
+            "hardlink" => {
+                fs::write(&site.paths.guard_path, b"").expect("create guard file");
+                fs::set_permissions(&site.paths.guard_path, fs::Permissions::from_mode(0o600))
+                    .expect("set guard mode");
+                fs::hard_link(&site.paths.guard_path, site.root.join("guard-alias"))
+                    .expect("create guard hardlink");
+            }
+            "size" => {
+                fs::write(&site.paths.guard_path, b"x").expect("create nonempty guard");
+                fs::set_permissions(&site.paths.guard_path, fs::Permissions::from_mode(0o600))
+                    .expect("set guard mode");
+            }
+            _ => unreachable!(),
+        }
+        let before = site.tree_fingerprint();
+        let port = FakeStartupPort::new(LinuxPackageObservation::not_installed());
+        let outcome = inspect_linux_startup(
+            &site.paths,
+            LinuxStartupBuildIdentity::DebianSystemProduct,
+            LinuxStartupComponent::Manager,
+            &port,
+        );
+        assert_eq!(outcome.decision(), LinuxStartupDecision::FailedClosed);
+        assert_eq!(outcome.reason(), LinuxStartupReason::GuardInvalid);
+        assert_eq!(site.tree_fingerprint(), before);
         assert_eq!(port.package_calls.get(), 0);
     }
 }
