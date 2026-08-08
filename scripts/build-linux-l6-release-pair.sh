@@ -84,17 +84,32 @@ build_release() {
   local rootfs="${role_work}/rootfs"
   local artifacts="${staging}/${role}/artifacts"
   local manager_bundle="${root}/apps/radishlex-manager/build/linux/arm64/release/bundle"
+  local -a source_ffi_include_environment=()
+
+  # The frozen source predates the Manager's explicit workspace FFI include.
+  # Keep that compatibility input confined to the source root; the target must
+  # consume its committed CMake include contract without ambient include paths.
+  if [[ "${role}" == "source" ]]; then
+    source_ffi_include_environment=(
+      "CPLUS_INCLUDE_PATH=${root}/crates/ime-ffi/include"
+    )
+  fi
 
   mkdir -m 0755 "${role_work}"
   mkdir -p -m 0755 "${artifacts}"
   "${root}/scripts/check-linux-product-metadata.sh"
   env \
+    -u CPATH \
+    -u C_INCLUDE_PATH \
+    -u CPLUS_INCLUDE_PATH \
+    -u OBJC_INCLUDE_PATH \
     -u CARGO_BUILD_RUSTC \
     -u CARGO_BUILD_TARGET \
     -u RUSTC_WORKSPACE_WRAPPER \
     -u RUSTC_WRAPPER \
     CARGO_INCREMENTAL=0 \
     CARGO_TARGET_DIR="${root}/target" \
+    "${source_ffi_include_environment[@]}" \
     "${root}/scripts/build-manager-linux-product.sh" --system-product
   "${root}/scripts/build-linux-product-addon-stage.sh" \
     --ffi-library "${manager_bundle}/lib/libradishlex_ime_ffi.so" \

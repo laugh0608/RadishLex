@@ -64,6 +64,28 @@ class L6ReleasePairSourceContractTests(unittest.TestCase):
                         replace(self.sources, builder=mutation)
                     )
 
+    def test_source_ffi_include_is_root_local_and_ambient_paths_are_scrubbed(self) -> None:
+        mutations = (
+            self.sources.builder.replace(
+                'if [[ "${role}" == "source" ]]',
+                'if [[ "${role}" == "target" ]]',
+            ),
+            self.sources.builder.replace(
+                '"CPLUS_INCLUDE_PATH=${root}/crates/ime-ffi/include"',
+                '"CPLUS_INCLUDE_PATH=/usr/include"',
+            ),
+            self.sources.builder.replace("-u CPATH", ""),
+            self.sources.builder.replace("-u C_INCLUDE_PATH", ""),
+            self.sources.builder.replace("-u CPLUS_INCLUDE_PATH", ""),
+            self.sources.builder.replace("-u OBJC_INCLUDE_PATH", ""),
+        )
+        for mutation in mutations:
+            with self.subTest():
+                with self.assertRaises(L6ReleasePairContractError):
+                    validate_release_pair_contract(
+                        replace(self.sources, builder=mutation)
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()

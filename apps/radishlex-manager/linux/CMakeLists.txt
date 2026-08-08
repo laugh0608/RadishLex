@@ -13,6 +13,12 @@ get_filename_component(RADISHLEX_REPO_ROOT
   "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
 set(RADISHLEX_LINUX_PLATFORM_DIR
   "${RADISHLEX_REPO_ROOT}/platforms/linux-fcitx5")
+set(RADISHLEX_IME_FFI_INCLUDE_DIR
+  "${RADISHLEX_REPO_ROOT}/crates/ime-ffi/include")
+if(NOT EXISTS "${RADISHLEX_IME_FFI_INCLUDE_DIR}/radishlex_input.h")
+  message(FATAL_ERROR
+    "RADISHLEX_IME_FFI_INCLUDE_DIR must contain the workspace FFI header")
+endif()
 set(RADISHLEX_MANAGER_FFI_LIBRARY
   "$ENV{RADISHLEX_MANAGER_FFI_LIBRARY}"
   CACHE FILEPATH "Workspace native-rime library for the staged Manager bundle"

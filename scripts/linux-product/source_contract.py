@@ -77,6 +77,10 @@ def validate_source_contract(
         repo_root / "apps/radishlex-manager/linux/CMakeLists.txt",
         "Manager Linux CMake",
     )
+    manager_runner_cmake = read_text(
+        repo_root / "apps/radishlex-manager/linux/runner/CMakeLists.txt",
+        "Manager Linux runner CMake",
+    )
     binary_name = required_match(
         r'^set\(BINARY_NAME\s+"([^"]+)"\)$', manager_cmake, "Manager binary name"
     )
@@ -90,6 +94,15 @@ def validate_source_contract(
     if application_id != metadata.manager_application_id:
         raise LinuxProductMetadataError(
             "Manager Linux application ID differs from product metadata"
+        )
+    if (
+        '"${RADISHLEX_REPO_ROOT}/crates/ime-ffi/include"' not in manager_cmake
+        or '"${RADISHLEX_IME_FFI_INCLUDE_DIR}/radishlex_input.h"'
+        not in manager_cmake
+        or '"${RADISHLEX_IME_FFI_INCLUDE_DIR}"' not in manager_runner_cmake
+    ):
+        raise LinuxProductMetadataError(
+            "Manager Linux CMake does not bind the workspace FFI header"
         )
 
     contract = read_text(

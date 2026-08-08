@@ -40,4 +40,5 @@ endif()
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 target_include_directories(${BINARY_NAME} PRIVATE
   "${RADISHLEX_LINUX_PLATFORM_DIR}/include"
+  "${RADISHLEX_IME_FFI_INCLUDE_DIR}"
 )
