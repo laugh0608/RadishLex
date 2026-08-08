@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-截至 2026-08-06，M5-P05A 已完成 committed metadata、system rootfs 装配器、staged/system 两类 addon 构建身份与真实 Debian 13.6 ARM64 Manager/addon 载荷门禁；P05B 已完成确定性 `.deb` artifact 与 dependency-analysis identity。当前下一批是 receipt/guard、五类 operation 与 fake dpkg port；startup gate、package mutation、RadishLex 系统安装和 P05C 实机仍未开始。以下决策继续约束实现与后续批次：
+截至 2026-08-08，M5-P05A 已完成 committed metadata、system rootfs 装配器、staged/system 两类 addon 构建身份与真实 Debian 13.6 ARM64 Manager/addon 载荷门禁；P05B 已完成确定性 `.deb` artifact、dependency-analysis identity，以及仓库内 receipt/guard、五类 operation 与 fake dpkg port。当前下一批是 Manager/Fcitx 共用的只读 startup decision；真实 dpkg adapter、package mutation、RadishLex 系统安装和 P05C 实机仍未开始。以下决策继续约束实现与后续批次：
 
 - 首个完整产品安装载体固定为 Debian 13 ARM64 的单一系统级本地 `.deb`，package 名固定为 `radishlex`；它是未发布的本地验收载体，不是 apt repository、正式 Release 或通用 Linux 安装包。
 - Fcitx addon、两份产品 FFI、Manager bundle、锁定 RimeData、desktop entry、图标和产品 manifest 由同一个 package 绑定；不拆成可独立漂移的 Manager/addon 包。
@@ -109,7 +109,9 @@ Fcitx5 的 addon metadata 会按 XDG data 目录查找，但 shared-library addo
   operations/
     <operation-id>/
       target.deb
+      target.evidence.json
       source.deb
+      source.evidence.json
 
 /run/lock/
   radishlex-install-v1.lock
@@ -175,7 +177,7 @@ package version 固定由 `<product-version>+<build>-<debian-revision>` 形成�
 | --- | --- | --- |
 | `packaging/linux/` | product mirror、install layout、Debian metadata、依赖与字体 profile | 执行 dpkg、读取用户数据、保存构建物或签名凭据 |
 | Debian `dpkg`/trigger | package database、dependency、文件 unpack/remove、desktop/icon/system cache 标准生命周期 | RadishLex 业务 receipt、用户 XDG、Fcitx profile 或产品兼容判断 |
-| 规划中的 `platforms/linux-product/` | 固定系统路径、artifact 取证、quiescence、dpkg adapter、receipt/guard、恢复与 startup decision | input key、Rime 候选、userdb/ranker、Flutter 页面或远端同步 |
+| `platforms/linux-product/` | 固定系统路径、artifact 暂存与取证、quiescence port、package state 投影、receipt/guard 与恢复；后续承载真实 dpkg adapter 和 startup decision | input key、Rime 候选、userdb/ranker、Flutter 页面或远端同步 |
 | Fcitx addon / Linux Manager host | 在业务初始化前读取同一 startup decision，并验证自身 component identity | 安装、repair、remove、rollback 或改写 root receipt |
 | XDG resolver / Rust userdb | 每个有效用户的固定数据路径、权限、schema 与本地业务语义 | 枚举系统用户、解释 dpkg 状态或修改系统程序 |
 | 用户/管理员 | 授权 package/system mutation，关闭程序，手动配置/切换输入法 | 通过手工复制或删除 receipt 绕过产品门禁 |
@@ -196,7 +198,7 @@ package version 固定由 `<product-version>+<build>-<debian-revision>` 形成�
 | terminal/nonterminal `receipt.json` | `root:root` | `0644` | 单 link、非敏感、供用户进程只读 gate |
 | 写入中的 `receipt.json.tmp` | `root:root` | 创建时 `0600` | fsync 后改为 `0644` 再同目录原子替换；残留即阻断新 operation |
 | `operations/<operation-id>` 与本地 package 副本 | `root:root` | 目录 `0700`、文件 `0600` | 只接受固定 source/target 名称与单 link 普通文件 |
-| `/run/lock/radishlex-install-v1.lock` | `root:root` | `0600` | root-only advisory guard，不保存持久完成事实 |
+| `/run/lock/radishlex-install-v1.lock` | `root:root` | `0600` | root-only Unix socket guard，以精确 inode 释放，不保存持久完成事实 |
 
 所有 RadishLex-owned payload 节点禁止 symlink、hardlink、device、FIFO、socket、setuid/setgid bit、file capability 和 group/other write。外部发行版 shared library 的内部 symlink 由对应 package 管理，不进入 RadishLex tree hash，但 ELF closure 必须解析到已安装 package 的系统 library root，不能落入 `/tmp`、home、仓库或自定义 `LD_LIBRARY_PATH`。
 
@@ -217,7 +219,9 @@ Debian `dpkg` 负责 package database、依赖关系、文件 unpack/remove 和�
 
 直接运行未经过产品前置验证的任意 copy script、把 staged rootfs 当作 installed、或只看 `dpkg` 退出码，都不能形成产品完成证据。协调层不替代 dpkg，也不能改写 dpkg database 冒充回滚。
 
-首批受支持的 mutation 入口只能是 P05B 定义的维护协调器，它接收显式本地 `.deb`、先固定 artifact 与 receipt，再调用 dpkg。直接执行 `dpkg -i`、`dpkg -r` 或等价 apt 旁路即使让 package database 进入 Installed/Not-Installed，也不得由 maintainer script 猜测调用方 artifact 路径或补写 `completed`；product startup gate 必须返回 `maintenance_required`，只能由重新提供精确 artifact 的受控 `repair`/恢复流程收口。首次安装时协调器如何从本地构建产物启动、如何与 package 内同版组件绑定，是 P05B 写事务代码前必须单独固定并测试的 bootstrap contract；P05A 不得把它藏进 shell fallback 或未验证的 maintainer-script 行为。
+首批受支持的 mutation 入口只能是 P05B 定义的维护协调器，它接收显式本地 `.deb`、先固定 artifact 与 receipt，再调用 dpkg。直接执行 `dpkg -i`、`dpkg -r` 或等价 apt 旁路即使让 package database 进入 Installed/Not-Installed，也不得由 maintainer script 猜测调用方 artifact 路径或补写 `completed`；product startup gate 必须返回 `maintenance_required`，只能由重新提供精确 artifact 的受控 `repair`/恢复流程收口。
+
+首次 bootstrap 已固定为：取得系统 guard 并复验 state root 后，先让 package port 验证 operation、source/target identity、版本关系与环境前提，再读取明确的 package snapshot；只有 snapshot 与 operation source 一致时才原子写入 `prepared` receipt。随后逐项把调用方 `.deb` 和同名 evidence 复制为 operation 私有 `source`/`target` 文件，记录 size、SHA-256、owner/group、mode、device/inode 与 link count；全部必需 artifact 复验后才进入 `artifacts_staged`。任何 package mutation 都晚于该持久状态与 quiescence evidence，不能由 shell fallback、maintainer script 或调用方临时路径绕过。
 
 ### Operation kind
 
@@ -241,12 +245,12 @@ Debian `dpkg` 负责 package database、依赖关系、文件 unpack/remove 和�
 2. 拒绝任何正在运行的 RadishLex Manager、任何已加载 RadishLex addon/FFI 的 Fcitx 进程，以及无法可靠判断映射身份的相关进程。
 3. 不自动 kill、restart 或跨用户 session 操作；返回稳定 `programs_running`，由用户/管理员另行授权处理。
 4. 取得系统级独占 guard，确认没有 nonterminal receipt、`receipt.json.tmp` 或未知 operation 对象。
-5. 将 target `.deb`，以及 upgrade/rollback 必需的 source `.deb`，复制到 root-owned 私有 operation staging 后以打开的固定 inode复验；不从调用方路径反复读取可替换文件。
+5. 将 target `.deb`，以及 upgrade/rollback/remove 恢复必需的 source `.deb` 和各自 evidence，复制到 root-owned 私有 operation staging 后以固定 inode 与 receipt hash 复验；不从调用方路径反复读取可替换文件。
 
 稳定状态至少覆盖：
 
 ```text
-prepared -> quiesced -> package_mutating -> package_verified -> completed
+prepared -> artifacts_staged -> quiesced -> package_mutating -> package_verified -> completed
 
 pre-mutation failure -> aborted_preserved
 post-mutation uncertainty -> rollback_required
@@ -301,7 +305,11 @@ P05B 载体子批随后以 committed `ce74981` 固定 `debian-local-deb-v1`：ar
 
 同一真实 rootfs 连续两次构建的 `.deb` 与 evidence 均逐字节一致；package SHA-256 为 `b56ba9494e715df847a778a59a09bea2ccef091ce023a596849c13c9f1db27cd`，evidence SHA-256 为 `858fe66515f41b20b29b023c53970a7cb23219575fb077aba2107db3eb045fba`，product manifest SHA-256 仍为 `41b5d98ce0bc77ad2b2138737b5891a7d862c28edec5d7ae603618492a34a6de`。`dpkg-deb` 结构检查通过，guest package database 明确为 `not-installed`。该证据补齐载体输出与 L1-L3 交叉身份，不创建 receipt，不进入 L4-L6，也不证明系统安装。
 
-## M5-P05A 完成状态
+P05B transaction 子批已建立独立 Rust crate `platforms/linux-product/`。它没有复用 macOS 双 `.app` rename/inode switch，只复用 operation identity、append-only receipt、独占 guard、终态与失败关闭原则；Linux 侧显式投影 Not-Installed、Config-Files、Installed、Unpacked、Half-Configured、Half-Installed 与 trigger 状态。收据使用 canonical JSON、固定 root identity、最多 128 项 operation chain、稳定 failure code、source/target package proof 和不自动清理的私有 staging；相同证据写入可幂等重试，只有终态才能追加下一 operation。
+
+`DpkgTransactionPort` 当前只由合成 fake 实现。自动合同覆盖五类 operation、install→upgrade 连续收据链、repair 重装、remove absence、显式 rollback、运行进程前置中止、active guard、未知 package state、暂存篡改/hardlink、package mutation 中断、source restore 再次中断，以及在 target proof 已持久化后的无重复 mutation 恢复；测试 API 不接收 XDG 或 home 路径。稳定入口为 `./scripts/check-linux-package-transaction.sh`，并已纳入仓库门禁。该证据形成 L4 的平台无关事务核心，但不证明真实 dpkg 命令、Debian maintainer-script 调用、系统 owner 映射、L5 startup gate 或 L6 matrix。
+
+## M5-P05 实现状态
 
 `M5-P05A` 只建立可复验的 metadata 与 rootfs assembly，不安装 `.deb`。当前实现为：
 
@@ -311,7 +319,7 @@ P05B 载体子批随后以 committed `ce74981` 固定 `debian-local-deb-v1`：ar
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 的完成只证明同一 committed 产品输入能形成 Debian 目标布局并受负向门禁约束，不证明 package transaction 或系统安装。P05B 的确定性 `.deb` artifact 与 manifest/依赖身份已经完成，后续按“receipt/guard、五类 operation 和 fake dpkg port → Manager/Fcitx 共用 startup decision → 隔离 Debian install/upgrade/repair/rollback/remove/reinstall matrix”顺序推进；各层同时覆盖 crash/retry、source artifact rollback、默认数据保留与 unknown state 拒绝。P05C 才在独立 guest 完成授权实机，不复用或清理 P04 冻结现场。
+P05A 的完成只证明同一 committed 产品输入能形成 Debian 目标布局并受负向门禁约束，不证明 package transaction 或系统安装。P05B 的确定性 `.deb` artifact、manifest/依赖身份与平台无关事务核心已经完成；后续按“Manager/Fcitx 共用 startup decision → 真实 dpkg adapter 与隔离 Debian install/upgrade/repair/rollback/remove/reinstall matrix”顺序推进，并继续覆盖完整 crash/retry、source artifact rollback、默认数据保留与 unknown state 拒绝。P05C 才在独立 guest 完成授权实机，不复用或清理 P04 冻结现场。
 
 ## 实机授权边界
 

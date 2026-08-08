@@ -82,9 +82,9 @@ tools/
 
 不需要进入共享 ABI 的 Linux 产品能力：
 
-- Linux install/data startup gate 不进入输入 ABI；P05A 已实现版本化 metadata/rootfs identity，startup decision 留在 P05B；
+- Linux install/data startup gate 不进入输入 ABI；P05A 已实现版本化 metadata/rootfs identity，P05B 已实现独立 receipt/guard/fake dpkg 事务核心，startup decision 仍留在 P05B；
 - Linux Manager privacy 已固定为独立 XDG 文件，addon 变更感知与分类框架已落地；生产 allowlist 只包含经 Wayland/X11 评审的精确 `firefox-esr -> browser`；
-- 系统域路径与 product manifest 已由 P05A 实现；发行版 package、升级 receipt 与 dpkg transaction 尚未开始。
+- 系统域路径与 product manifest 已由 P05A 实现；确定性 package 与升级 receipt/fake dpkg transaction 已由 P05B 实现，真实 dpkg adapter 和系统安装尚未开始。
 
 在普通 context 无已评审生产身份时，addon 传 `context_known = 0`；Rust 因而使用 engine 顺序且不读写 userdb。当前只有精确 `firefox-esr` 映射为 `browser + context_known = 1`；路径、大小写、wrapper、其他 Firefox 候选和 unknown 仍失败关闭。Fcitx 明确提供 `Password`、`Sensitive` 或 `Terminal` capability 时先返回受控摘要且不读取 `program()`；Terminal 固定投影为 `terminal + context_known = 0`，不传 program name、窗口标题或正文。
 

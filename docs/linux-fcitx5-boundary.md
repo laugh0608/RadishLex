@@ -4,7 +4,7 @@
 
 ## 状态与产品范围
 
-状态：M5-P01/P02/P03/P04/P05A 已完成。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release、native/ELF/FFI smoke、桌面 privacy、删除防复活、explicit restore、导入导出以及 Fcitx/Manager/桌面会话重启均已通过。P05A 的 Linux metadata/rootfs、产品版本渲染、`system` runtime profile 与真实 ARM64 产品载荷门禁也已通过；P05B 的确定性 `.deb` 载体与 dependency-analysis identity 已完成但未安装，package transaction、startup gate 与任何 RadishLex 系统安装仍未完成。
+状态：M5-P01/P02/P03/P04/P05A 已完成。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release、native/ELF/FFI smoke、桌面 privacy、删除防复活、explicit restore、导入导出以及 Fcitx/Manager/桌面会话重启均已通过。P05A 的 Linux metadata/rootfs、产品版本渲染、`system` runtime profile 与真实 ARM64 产品载荷门禁也已通过；P05B 已完成未安装的确定性 `.deb`、receipt/guard、五类 operation 与 fake dpkg 事务合同。Manager/Fcitx startup gate、真实 dpkg adapter 与任何 RadishLex 系统安装仍未完成。
 
 P03 实机证据覆盖 GTK、Qt、Electron、浏览器和终端，包含完整候选交互、焦点/输入法切换、Fcitx/桌面会话重启、进程级地址族限制与整台 guest 断网。password、terminal、unknown 与 Qt `Sensitive` 后的 userdb 聚合保持全零；当前 GTK4 frontend 未把 `PRIVATE` 传播为 Fcitx `Sensitive`，因此依赖既有 unknown 失败关闭而非虚构 capability。Qt backend 只以 QPA、会话类型和 input-context plugin 的组合证据判定，不能因进程映射 `libQt6WaylandClient` 就声明原生 Wayland。快速 X11→Wayland 登录暴露的 `im-launch` 跳过 daemon 问题已用 Debian 官方 desktop entry 的用户级 autostart 副本闭合；该开发设置不替代 P05 产品安装与维护设计。
 
@@ -68,7 +68,7 @@ Linux 继续使用 `ime-ffi` ABI v9 已有的：
 - PageUp/PageDown 作为稳定 named key 进入 Rust 后用新 snapshot 重建列表；
 - reset/free/shutdown 已足以表达 per-context session 与进程 teardown。
 
-当前真实缺口不在 ABI、addon 编译、Manager privacy、删除恢复、导入导出、重启矩阵或 P05A 产品载荷，而在 P05B package transaction/startup gate 与 P05C 安装实机。这些能力不需要增加平台私有输入 ABI。
+当前真实缺口不在 ABI、addon 编译、Manager privacy、删除恢复、导入导出、重启矩阵、P05A 产品载荷或 P05B 平台无关事务核心，而在 Manager/Fcitx startup gate、真实 dpkg adapter、隔离 matrix 与 P05C 安装实机。这些能力不需要增加平台私有输入 ABI。
 
 ### Flutter Manager
 
@@ -198,7 +198,7 @@ M5-P02 的开发构建必须形成可复验依赖图：
 - 运行时拒绝缺失资源、leaf symlink、group/other 可写 addon 目录或资源，并以稳定原因失败关闭；
 - 构建不从运行时下载 schema、词库、模型或二进制；
 - 开发安装与正式发行载体分开，P02 不把本地复制命令称为产品安装；
-- 系统域目标、metadata/rootfs 与真实载荷强门禁已由 M5-P05A 固定并通过；P05B 已形成未安装的确定性 `.deb`，发行版 package transaction、升级移除与实机仍未开始。
+- 系统域目标、metadata/rootfs 与真实载荷强门禁已由 M5-P05A 固定并通过；P05B 已形成未安装的确定性 `.deb` 与 fake dpkg 事务合同，真实 dpkg、startup gate、升级移除 matrix 与实机仍未开始。
 
 当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境同时编译 staged 与 system runtime-layout contract；`--require-fcitx` 继续只证明 staged addon/FFI/RimeData/metadata、ELF `$ORIGIN`、构建路径和 `dlopen(RTLD_NOW)`。`./scripts/build-linux-product-addon-stage.sh` 另以 metadata 中的产品版本和 `system` profile 形成临时 addon stage，不复制 sibling RimeData；两个入口都不写系统目录或启用输入法。
 
@@ -267,7 +267,7 @@ M5-P04 已覆盖：
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
 - P04 已按 `docs/linux-manager-local-acceptance.md` 冻结完成，不重复其导入导出、同库和重启实机；既有 guest 资产不得清理、覆盖或改作 P05 载体。
-- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb` 载体已完成；package transaction 和 startup gate 继续留在 P05B，未获授权不能在真实系统执行。
+- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、receipt/guard/fake dpkg 事务合同已完成；startup gate 与真实 dpkg adapter 继续留在 P05B，未获授权不能在真实系统执行。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。

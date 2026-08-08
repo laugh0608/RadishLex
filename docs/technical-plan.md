@@ -287,7 +287,7 @@ manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学�
 
 Linux 复用 ABI v9 的 owner-thread personalized Rime session、owned `KeyResult`、display-index selection 与 `LearningContext`。每个活动 input context 使用独立 Rust session；Fcitx5 input panel 消费同次 snapshot，Wayland 与 X11 都不自行发明浮窗协议。addon、Flutter Manager、诊断和未来安装协调层通过单一 XDG resolver 取得数据、配置、持久状态和缓存路径，不能分别拼接 `$HOME` 或复制数据库。Linux privacy 使用独立、严格、原子替换的平台配置真相源，不让输入热路径解析 Manager settings；程序身份只在平台层按经实机评审的固定 allowlist 映射为粗分类，原始值不跨 FFI、不持久化，unknown 继续失败关闭。
 
-M5 先形成 addon/FFI/build contract，再进入真实 Wayland、X11、常见应用、secure/unknown 上下文和同库个人化验收，最后治理 Linux 安装、升级、修复、移除和数据保留。IBus 只有在 Fcitx5 退出后存在明确需求时再评估。完整平台职责见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)，Manager host、privacy、同库并发和产品验收见 [Linux Manager 本地验收边界](linux-manager-local-acceptance.md)。
+M5 先形成 addon/FFI/build contract，再进入真实 Wayland、X11、常见应用、secure/unknown 上下文和同库个人化验收，最后治理 Linux 安装、升级、修复、移除和数据保留。系统 package 事务由独立 `platforms/linux-product/` 承担：它以 root state identity、canonical append-only receipt、Unix socket guard、私有 source/target artifact staging 和 `DpkgTransactionPort` 隔离 Debian package 状态；不复用 macOS 双 bundle rename，不读取用户 XDG，也不进入输入热路径。Manager/Fcitx product build 后续只在业务初始化前消费同一只读 startup decision，不取得 mutation 能力。IBus 只有在 Fcitx5 退出后存在明确需求时再评估。完整平台职责见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)，Manager host、privacy、同库并发和产品验收见 [Linux Manager 本地验收边界](linux-manager-local-acceptance.md)，系统安装事务见 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)。
 
 ### Android
 
