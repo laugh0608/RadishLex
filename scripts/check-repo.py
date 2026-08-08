@@ -150,6 +150,7 @@ REQUIRED_FILES = [
     "platforms/linux-product/src/tests/mod.rs",
     "platforms/linux-product/src/tests/recovery.rs",
     "platforms/linux-product/src/tests/system_port.rs",
+    "packaging/linux/l6-release-pair.json",
     "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.h",
     "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.m",
     "platforms/macos-product/UpgradePreflightHost/Sources/main.m",
@@ -209,10 +210,14 @@ REQUIRED_FILES = [
     "scripts/check-linux-startup-gate.sh",
     "scripts/check-linux-l6-contract.sh",
     "scripts/check-linux-l6-controller.sh",
+    "scripts/check-linux-l6-release-pair.sh",
     "scripts/build-linux-product-addon-stage.sh",
     "scripts/build-linux-deb-artifact.sh",
+    "scripts/build-linux-l6-release-pair.sh",
     "scripts/linux-product/l6_contract.py",
     "scripts/linux-product/l6_controller_contract.py",
+    "scripts/linux-product/l6_release_pair.py",
+    "scripts/linux-product/l6_release_pair_contract.py",
     "scripts/linux-product/product_metadata.py",
     "scripts/linux-product/source_contract.py",
     "scripts/linux-product/test_startup_gate_order.py",
@@ -223,6 +228,8 @@ REQUIRED_FILES = [
     "scripts/linux-product/test_deb_artifact.py",
     "scripts/linux-product/test_l6_contract.py",
     "scripts/linux-product/test_l6_controller_contract.py",
+    "scripts/linux-product/test_l6_release_pair.py",
+    "scripts/linux-product/test_l6_release_pair_contract.py",
     "scripts/build-manager-linux-product.sh",
     "scripts/check-manager-linux-product.sh",
     "scripts/build-linux-fcitx5-container.sh",
@@ -526,6 +533,10 @@ def check_linux_l6_controller() -> None:
     run_command([str(REPO_ROOT / "scripts/check-linux-l6-controller.sh")])
 
 
+def check_linux_l6_release_pair() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-linux-l6-release-pair.sh")])
+
+
 def required_status_contexts(ruleset: dict[str, Any]) -> set[str]:
     for rule in ruleset.get("rules", []):
         if rule.get("type") != "required_status_checks":
@@ -699,6 +710,7 @@ def main() -> int:
     check_linux_startup_gate()
     check_linux_l6_contract()
     check_linux_l6_controller()
+    check_linux_l6_release_pair()
     check_ruleset_and_workflows()
     check_path_budget()
     check_deployment_evidence()

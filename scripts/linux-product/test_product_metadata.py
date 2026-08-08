@@ -15,7 +15,7 @@ class LinuxProductMetadataTest(unittest.TestCase):
 
         self.assertEqual(metadata.product_version, "26.7.1")
         self.assertEqual(metadata.build_number, "38")
-        self.assertEqual(metadata.package_version, "26.7.1+38-1")
+        self.assertEqual(metadata.package_version, "26.7.1+38-2")
         self.assertEqual(layout["layout_id"], "debian-system-v1")
         self.assertEqual(layout["installation_scope"], "system")
 
@@ -26,7 +26,7 @@ class LinuxProductMetadataTest(unittest.TestCase):
         second = product_metadata.render_control(metadata)
 
         self.assertEqual(first, second)
-        self.assertIn("Version: 26.7.1+38-1\n", first)
+        self.assertIn("Version: 26.7.1+38-2\n", first)
         self.assertIn("Architecture: arm64\n", first)
         self.assertIn("fonts-dejavu-core, fonts-noto-cjk\n", first)
         self.assertNotIn("Recommends:", first)
@@ -55,7 +55,7 @@ class LinuxProductMetadataTest(unittest.TestCase):
 
     def test_metadata_rejects_derived_version_drift(self) -> None:
         value = json.loads(product_metadata.METADATA_PATH.read_text(encoding="utf-8"))
-        value["package_version"] = "26.7.1+38-2"
+        value["package_version"] = "26.7.1+38-1"
         with self.temporary_file("product.json", value) as path:
             with self.assertRaisesRegex(
                 product_metadata.LinuxProductMetadataError,

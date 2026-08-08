@@ -31,7 +31,7 @@ RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支�
 - [产品交付路线图](docs/roadmap.md)：产品里程碑、交付物和退出标准。
 - [第二平台 Linux Fcitx5 ADR](docs/adr/0009-second-platform-linux-fcitx5.md)：第二平台选择、串行推进顺序与统一发布关系。
 - [Linux Fcitx5 平台边界](docs/linux-fcitx5-boundary.md)：addon、FFI、XDG、隐私、构建与验收边界。
-- [Linux 安装维护边界](docs/linux-installation-maintenance-boundary.md)与 [L6 package matrix](docs/runbooks/linux-l6-package-matrix.md)：Debian 事务、startup gate、隔离 guest、八点 controller 和系统停止线。
+- [Linux 安装维护边界](docs/linux-installation-maintenance-boundary.md)与 [L6 package matrix](docs/runbooks/linux-l6-package-matrix.md)：Debian 事务、startup gate、相邻 revision release pair、八点 controller、隔离 guest 和系统停止线。
 - [macOS 产品包边界](docs/macos-product-package-boundary.md)：M4 组件、版本、数据与发布停止线。
 - [macOS 安装载体 ADR](docs/adr/0008-macos-installation-carrier.md)：M4-P03 用户域 Installer、固定目标、程序事务与移除边界。
 - [macOS 程序安装事务](docs/macos-installation-transaction.md)：外层 operation、产品身份、receipt/guard 与启动门禁。

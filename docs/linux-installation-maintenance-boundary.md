@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-截至 2026-08-08，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。L6 format v1 及 compile-isolated acceptance checkpoint/evidence controller 已固定独立 guest、release pair、主序列、八点确定性 crash/recovery、完整进程组终止与 canonical 脱敏证据边界；ARM64 source/target 重建和真实 package mutation 尚未开始，P05C 仍关闭。
+截至 2026-08-08，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。L6 format v1 及 compile-isolated acceptance checkpoint/evidence controller 已固定独立 guest、release pair、主序列、八点确定性 crash/recovery、完整进程组终止与 canonical 脱敏证据边界；source `55351f2` revision 1、target revision 2 及双 clean-root ARM64 builder/evidence verifier 已冻结在仓库，但真实 pair 重建和 package mutation 尚未开始，P05C 仍关闭。
 
 - 首个完整产品安装载体固定为 Debian 13 ARM64 的单一系统级本地 `.deb`，package 名固定为 `radishlex`；它是未发布的本地验收载体，不是 apt repository、正式 Release 或通用 Linux 安装包。
 - Fcitx addon、两份产品 FFI、Manager bundle、锁定 RimeData、desktop entry、图标和产品 manifest 由同一个 package 绑定；不拆成可独立漂移的 Manager/addon 包。
@@ -170,7 +170,7 @@ scripts/linux-product/
 
 本地 `.deb` artifact evidence 另绑定 package 文件名、size、SHA-256、control metadata 与 product manifest SHA-256。`debian-local-deb-v1` 不包含 repository Release/InRelease 签名或开发者证书；任何公开 apt repository、正式下载页或发行签名必须切换新的 distribution identity 并重新评审，不能给现有 identity 增补宣传含义。
 
-package version 固定由 `<product-version>+<build>-<debian-revision>` 形成，例如当前元数据的示意值为 `26.7.1+38-1`；示意值不是 Linux 已发布版本。product version/build、control Version、Fcitx addon Version、Manager version 和 manifest 任一漂移均失败关闭。
+package version 固定由 `<product-version>+<build>-<debian-revision>` 形成；L6 source/target 当前分别为 `26.7.1+38-1` 与 `26.7.1+38-2`，二者都是未发布的本地验收身份。product version/build、control Version、Fcitx addon Version、Manager version 和 manifest 任一漂移均失败关闭。
 
 ## 职责所有者
 
@@ -334,6 +334,8 @@ L5 当前由 `./scripts/check-linux-startup-gate.sh` 闭合仓库内只读 decis
 
 L6 输入合同由 `packaging/linux/l6-matrix.json`、`scripts/linux-product/l6_contract.py` 与 `./scripts/check-linux-l6-contract.sh` 固定：profile 为 `debian13-arm64-ephemeral-v1`，专用用户为 `radishlex-l6`；source/target 必须来自不同 commit 的相邻 Debian revision并保持 product/build/data contract相同；主序列固定 install→upgrade→repair→rollback→remove→reinstall，另有八个完成/回退 crash checkpoint。probe 同时覆盖 actual dependency、字体 family/glyph/owner、Manager/Fcitx startup 正负向、XDG fingerprint、dpkg/procfs 与完整 inventory。该门禁只验证 matrix、不运行 controller或连接 guest，也不证明 L6 已执行；详细步骤见 [Linux L6 Debian package matrix runbook](runbooks/linux-l6-package-matrix.md)。
 
+release-pair 输入合同由 `packaging/linux/l6-release-pair.json` 固定 source commit `55351f2`/revision 1、target clean descendant/revision 2、相同 ABI/schema/XDG/settings/privacy/Rime contract 和两个 executable build profile。`scripts/build-linux-l6-release-pair.sh` 只能在 Debian 13 ARM64 上接受两个不同的 canonical clean root 与 absent output；它分别走各 commit 的真实 payload/`.deb` verifier，再从 target 构建默认 feature 为空的 production maintenance ELF 与 compile-isolated acceptance ELF。`l6_release_pair.py` 强校验两份 package/evidence、相邻版本、AArch64 loader、mode/link、production marker 缺席与 acceptance marker 完整，并在原子 publish 前重新哈希全部 handoff 文件。`radishlex-linux-l6-release-pair-evidence-v1` 只记录版本化构建环境、commit/version、artifact/manifest/dependency 摘要和 executable SHA-256，不记录本机路径、operation ID、PID、proc/dpkg 原文或用户数据。专项门禁只使用 synthetic ELF/artifact evidence 和篡改负例；当前尚无真实 ARM64 pair record。
+
 checkpoint/evidence controller 归属独立 `platforms/linux-l6-acceptance/` crate 和 executable identity。production crate 的 `l6-acceptance-checkpoints` feature 默认关闭，production maintenance main 只绑定 disabled sink；它不识别 acceptance 参数，也不读取环境变量或路径覆盖。acceptance worker 只通过该 compile feature 接入：`prepared` 在全部必需 artifact 已复制、取证且 receipt 仍为 prepared 时发出，随后七点分别绑定 `artifacts_staged`、`quiesced`、persisted package mutation、target dpkg 返回、`rollback_required`、source dpkg 前与 source dpkg 返回后。controller 从继承 pipe 得到 typed notification并暂停 worker，不读取 receipt 抢时机。
 
 controller 为 worker 创建独立 process group，命中 checkpoint 后以固定 `/usr/bin/kill` 对完整 group 发送 `SIGKILL`，等待 worker signal 终止，再连续扫描 `/proc/*/stat`，只有 group member 为零且无 `dpkg` child 才生成 `radishlex-linux-l6-checkpoint-evidence-v1`。envelope 使用 canonical JSON、deny-unknown fields，只保存 matrix/build/scenario/checkpoint、repository/guest/snapshot identity、operation ID SHA-256、授权/fault/termination 分类与 expected terminal；不保存 operation ID 原值、PID、artifact/staging 路径、proc maps/dpkg stdout/stderr 或用户数据。controller 仍不替换 `/usr/bin/dpkg`、不使用 shell/`PATH`/`--force-*`，实际运行继续需要 crash 与 system mutation 两层明确授权。
@@ -350,7 +352,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual package/manifest/dependency/version/status relationship、恢复事务、production system port/host、共用只读 startup gate、L6 format v1 与 compile-isolated checkpoint/evidence controller，且 dependency relationship 已进入 startup permit 前置链。下一顺位是从两个不同 commit 重建相邻 Debian revision 的 source/target与 acceptance executable identity，再逐项授权执行。L6 覆盖真实 process/dpkg、完整 crash/retry、source rollback、字体 family/glyph/owner、外部 package lifecycle 与默认数据保留；P05C 才在独立 guest 授权实机，不复用或清理 P04 现场。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual package/manifest/dependency/version/status relationship、恢复事务、production system port/host、共用只读 startup gate、L6 format v1、compile-isolated checkpoint/evidence controller 与 release-pair repository builder/verifier，且 dependency relationship 已进入 startup permit 前置链。下一顺位是在获准 ARM64 构建环境从 source `55351f2` 与本批 target commit 实际生成 pair，复验后才逐项授权 L6。L6 覆盖真实 process/dpkg、完整 crash/retry、source rollback、字体 family/glyph/owner、外部 package lifecycle 与默认数据保留；P05C 才在独立 guest 授权实机，不复用或清理 P04 现场。
 
 ## 实机授权边界
 

@@ -1,0 +1,55 @@
+{
+  "build": {
+    "environment_profile": "debian13-arm64-release-pair-build-v1",
+    "network_policy": "dependency-frozen-before-build",
+    "output_policy": "private-staging-then-atomic-publish-v1",
+    "separate_clean_roots": true
+  },
+  "executables": [
+    {
+      "binary": "radishlex-linux-maintenance",
+      "build_identity": "radishlex-linux-maintenance-production-v1",
+      "cargo_package": "radishlex-linux-product-install",
+      "feature_profile": "no-default-features",
+      "role": "production-maintenance"
+    },
+    {
+      "binary": "radishlex-linux-l6-acceptance",
+      "build_identity": "radishlex-linux-l6-acceptance-v1",
+      "cargo_package": "radishlex-linux-l6-acceptance",
+      "feature_profile": "compile-isolated-l6-acceptance-checkpoints",
+      "role": "acceptance-controller"
+    }
+  ],
+  "format_version": 1,
+  "matrix_profile": "debian13-arm64-ephemeral-v1",
+  "profile": "debian13-arm64-release-pair-v1",
+  "shared_contract": {
+    "build_number": "38",
+    "data_layout": "xdg-v1",
+    "data_removal": "separate-authorized-flow",
+    "debian_architecture": "arm64",
+    "default_removal": "programs-only",
+    "distribution_identity": "debian-local-deb-v1",
+    "ffi_abi_version": 9,
+    "multiarch_tuple": "aarch64-linux-gnu",
+    "privacy_format_version": 1,
+    "product_id": "radishlex-linux",
+    "product_version": "26.7.1",
+    "rime_data_lock_sha256": "5d5a2959f7d40256ae8b530e9bcaada57cc40d5c2608c49104b2c4a804f6759d",
+    "rime_schema_id": "radishlex_pinyin",
+    "runtime_layout": "debian-system-v1",
+    "settings_format_version": 1,
+    "userdb_schema_version": 9
+  },
+  "source": {
+    "debian_revision": "1",
+    "package_version": "26.7.1+38-1",
+    "repository_commit": "55351f21536d6dca3f90ab053c2a81e2b9bea354"
+  },
+  "target": {
+    "commit_policy": "clean-descendant-head-distinct-from-source-v1",
+    "debian_revision": "2",
+    "package_version": "26.7.1+38-2"
+  }
+}

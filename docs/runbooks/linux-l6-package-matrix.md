@@ -7,9 +7,10 @@
 ```bash
 ./scripts/check-linux-l6-contract.sh
 ./scripts/check-linux-l6-controller.sh
+./scripts/check-linux-l6-release-pair.sh
 ```
 
-两个入口分别验证 matrix format 与 compile-isolated controller 合同；都不连接 guest、不读取真实 `/proc`、不执行 package 命令，也不证明 L6 已通过。
+三个入口分别验证 matrix format、compile-isolated controller 与 release-pair 构建/证据合同；都不连接 guest、不读取真实 `/proc`、不执行 package mutation，也不证明真实 pair 或 L6 已通过。
 
 ## 当前执行状态
 
@@ -18,7 +19,8 @@
 - production transaction/startup 代码、actual `.deb` verifier 和 fake command/crash matrix 已完成；
 - L6 guest、release pair、六步事务顺序、八个 crash checkpoint、字体/startup/XDG probe 和证据保留规则已由 format v1 固定；
 - compile-identity 隔离的 acceptance checkpoint/evidence controller 已完成，八点合成中断/恢复与 canonical 脱敏 envelope 已通过专项门禁；
-- source/target ARM64 载体尚未按本 runbook 重新构建和冻结；
+- source 已冻结为 commit `55351f2`、Debian revision 1，target metadata 已推进到相邻 revision 2；双 clean-root ARM64 builder、actual `.deb`/ELF verifier 与 `radishlex-linux-l6-release-pair-evidence-v1` 合同已进入仓库；
+- source/target ARM64 载体与 target executable 尚未按本 runbook 实际构建和冻结；
 - 没有打开或修改 Linux VM，没有执行真实 `dpkg`、`/proc` probe、字体 probe、Manager/Fcitx 启动或系统安装。
 
 ## 1. 环境身份
@@ -49,7 +51,16 @@ L6 只能使用新建 guest、P04 guest 的独立 clone，或同等的可丢弃 
 
 ## 3. Release pair 冻结
 
-source/target 必须是两个不同 commit 形成的真实载体，不允许复制同一 `.deb` 后改名或只手写 evidence：
+source/target 必须是两个不同 commit 形成的真实载体，不允许复制同一 `.deb` 后改名或只手写 evidence。仓库真相源为 [`packaging/linux/l6-release-pair.json`](../../packaging/linux/l6-release-pair.json)：source 固定 `55351f2`/`26.7.1+38-1`，target 是本子批 clean descendant/`26.7.1+38-2`。在获准的 Debian 13 ARM64 构建环境准备两个独立 clean root 后，唯一入口为：
+
+```bash
+./scripts/build-linux-l6-release-pair.sh \
+  --source-root /absolute/clean/source \
+  --target-root /absolute/clean/target \
+  --output /absolute/absent/release-pair
+```
+
+该命令只构建、验证并原子发布私有 handoff 目录，不安装 package、不运行 maintenance/acceptance CLI、不创建/打开 VM，也不读写用户 XDG。运行前仍需单独准备构建环境；本 runbook 不授权下载依赖或修改全局工具链。构建规则为：
 
 1. source 与 target 使用相同 `productVersion`、Flutter build number、ABI v9、userdb schema v9、XDG/settings/privacy/RimeData contract；
 2. source 使用 Debian revision `N`，target 使用相邻 revision `N+1`，Debian version 比较必须证明 target 大于 source；
@@ -59,7 +70,9 @@ source/target 必须是两个不同 commit 形成的真实载体，不允许复�
 6. target maintenance 与 acceptance executable 分别记录 compile identity、commit、size、SHA-256、ELF architecture/loader 和 root-owned handoff identity；二者都不是 package payload或公开 installer；
 7. 两个 artifact pair 在 guest 固定进入 `/var/tmp/radishlex-l6-inputs`，复制后改为 root ownership，再由 production verifier 重新打开和取证。
 
-source/target 的 build number 相同不表示两者是同一 package：Debian revision、manifest、control、package/evidence hash 必须不同。该 pair 只证明首版 Linux package 事务兼容，不宣称跨数据 schema 升级或公开发行兼容。
+builder 先分别调用各自 commit 的 metadata、Manager、addon、rootfs、layout 与 deterministic `.deb` 门禁；随后仅从 target clean root 以 `--no-default-features` 构建 production maintenance ELF，并另行构建链接 acceptance feature 的 controller ELF。record 阶段再次调用各 root 自有 actual artifact verifier，解析两个 ELF 的 ELF64/AArch64 与 `/lib/ld-linux-aarch64.so.1`，要求 production 不含 acceptance markers、acceptance 同时含 build identity 与授权 marker；最后重哈希发布目录中的 package、artifact evidence、build-environment 和两个 executable。任一 root 不干净、commit 不符、revision 不相邻、contract 漂移、hash 相同、ELF/mode/link/marker 或 canonical JSON 不符均失败关闭且不发布输出。
+
+pair envelope format 为 `radishlex-linux-l6-release-pair-evidence-v1` 对应的 format v1/profile v1 组合；只保存 commit、revision/version、package/evidence/manifest/dependency 摘要、无路径 tool version，以及 executable build profile/ELF/size/SHA-256。它不保存源码/构建/staging 绝对路径、operation ID、PID、proc maps、dpkg 原文或用户数据。source/target 的 build number 相同不表示两者是同一 package：Debian revision、manifest、control、package/evidence hash 必须不同。该 pair 只证明首版 Linux package 事务兼容，不宣称跨数据 schema 升级或公开发行兼容。
 
 ## 4. 证据 envelope
 
