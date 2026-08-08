@@ -58,6 +58,7 @@ REQUIRED_FILES = [
     "docs/runbooks/macos-m2-manager-product-acceptance.md",
     "docs/runbooks/macos-installer-user-domain-acceptance.md",
     "docs/runbooks/macos-release-carrier.md",
+    "docs/runbooks/linux-l6-package-matrix.md",
     "platforms/macos-imk/Sources/main.m",
     "platforms/macos-imk/Tools/tis_source_status.m",
     "platforms/macos-imk/Tools/test_data_cleanup.c",
@@ -195,8 +196,10 @@ REQUIRED_FILES = [
     "scripts/check-linux-deb-artifact.sh",
     "scripts/check-linux-package-transaction.sh",
     "scripts/check-linux-startup-gate.sh",
+    "scripts/check-linux-l6-contract.sh",
     "scripts/build-linux-product-addon-stage.sh",
     "scripts/build-linux-deb-artifact.sh",
+    "scripts/linux-product/l6_contract.py",
     "scripts/linux-product/product_metadata.py",
     "scripts/linux-product/source_contract.py",
     "scripts/linux-product/test_startup_gate_order.py",
@@ -205,6 +208,7 @@ REQUIRED_FILES = [
     "scripts/linux-product/test_product_metadata.py",
     "scripts/linux-product/test_rootfs.py",
     "scripts/linux-product/test_deb_artifact.py",
+    "scripts/linux-product/test_l6_contract.py",
     "scripts/build-manager-linux-product.sh",
     "scripts/check-manager-linux-product.sh",
     "scripts/build-linux-fcitx5-container.sh",
@@ -255,6 +259,7 @@ REQUIRED_FILES = [
     "packaging/linux/README.md",
     "packaging/linux/product.json",
     "packaging/linux/install-layout.json",
+    "packaging/linux/l6-matrix.json",
     "packaging/linux/debian/control.in",
     "packaging/linux/debian/artifact.json",
     "packaging/linux/assets/dev.radishlex.radishlexManager.desktop",
@@ -499,6 +504,10 @@ def check_linux_startup_gate() -> None:
     run_command([str(REPO_ROOT / "scripts/check-linux-startup-gate.sh")])
 
 
+def check_linux_l6_contract() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-linux-l6-contract.sh")])
+
+
 def required_status_contexts(ruleset: dict[str, Any]) -> set[str]:
     for rule in ruleset.get("rules", []):
         if rule.get("type") != "required_status_checks":
@@ -670,6 +679,7 @@ def main() -> int:
     check_linux_deb_artifact()
     check_linux_package_transaction()
     check_linux_startup_gate()
+    check_linux_l6_contract()
     check_ruleset_and_workflows()
     check_path_budget()
     check_deployment_evidence()
