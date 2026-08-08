@@ -194,6 +194,17 @@ impl ProductManifestV1 {
         })
     }
 
+    pub(super) fn installed_file_paths(&self) -> Vec<String> {
+        let mut paths = self
+            .files
+            .iter()
+            .map(|record| record.path.clone())
+            .collect::<Vec<_>>();
+        paths.push(self.manifest_path.clone());
+        paths.sort();
+        paths
+    }
+
     fn validate_inventory(&self) -> Result<(), DebianRelationshipError> {
         if self.directories.is_empty()
             || self.files.is_empty()

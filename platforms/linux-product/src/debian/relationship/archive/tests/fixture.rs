@@ -10,8 +10,8 @@ use crate::debian::relationship::{
 };
 
 pub(super) const VERSION: &str = "26.7.1+39-1";
-pub(super) const PACKAGE_FILENAME: &str = "radishlex_26.7.1+39-1_arm64.deb";
-pub(super) const EVIDENCE_FILENAME: &str = "radishlex_26.7.1+39-1_arm64.deb.evidence.json";
+pub(crate) const PACKAGE_FILENAME: &str = "radishlex_26.7.1+39-1_arm64.deb";
+pub(crate) const EVIDENCE_FILENAME: &str = "radishlex_26.7.1+39-1_arm64.deb.evidence.json";
 pub(super) const MAX_PACKAGE_BYTES: u64 = 512 * 1024 * 1024;
 
 const DEPENDENCIES: [&str; 6] = [
@@ -70,9 +70,9 @@ pub(super) struct CanonicalParts {
     pub(super) data_entries: Vec<TarEntrySpec>,
 }
 
-pub(super) struct ArchiveFixture {
-    pub(super) package: Vec<u8>,
-    pub(super) evidence: Vec<u8>,
+pub(crate) struct ArchiveFixture {
+    pub(crate) package: Vec<u8>,
+    pub(crate) evidence: Vec<u8>,
     pub(super) members: Vec<(String, Vec<u8>)>,
     pub(super) control: Vec<u8>,
     pub(super) md5sums: Vec<u8>,
@@ -80,7 +80,7 @@ pub(super) struct ArchiveFixture {
 }
 
 impl ArchiveFixture {
-    pub(super) fn canonical() -> Self {
+    pub(crate) fn canonical() -> Self {
         let parts = canonical_parts(VERSION);
         Self::from_parts(parts, 0)
     }

@@ -14,7 +14,7 @@ pub(super) const DEPENDENCIES: [&str; 6] = [
     "fonts-noto-cjk",
 ];
 
-pub(super) struct ArtifactFixture {
+pub(crate) struct ArtifactFixture {
     pub(super) package_filename: String,
     pub(super) evidence_filename: String,
     pub(super) package: Vec<u8>,
@@ -25,7 +25,7 @@ pub(super) struct ArtifactFixture {
 }
 
 impl ArtifactFixture {
-    pub(super) fn new(version: &str) -> Self {
+    pub(crate) fn new(version: &str) -> Self {
         Self::build(version, &DEPENDENCIES, 9)
     }
 
@@ -291,12 +291,12 @@ impl ArtifactFixture {
         }
     }
 
-    pub(super) fn verify(&self) -> VerifiedArtifactRelationship {
+    pub(crate) fn verify(&self) -> VerifiedArtifactRelationship {
         VerifiedArtifactRelationship::verify(self.input()).expect("verify artifact relationship")
     }
 }
 
-pub(super) fn status_snapshot(
+pub(crate) fn status_snapshot(
     artifact: &VerifiedArtifactRelationship,
     status_override: Option<(&str, &str)>,
     folded_depends: bool,

@@ -454,7 +454,46 @@ fn partial_unknown_and_identity_drift_never_reach_business_initialization() {
                 _ => unreachable!(),
             }
         );
+        assert_eq!(port.relationship_calls.get(), 1);
         assert_eq!(port.component_calls.get(), 1);
+    }
+}
+
+#[test]
+fn package_relationship_failure_precedes_component_validation() {
+    for (error, reason) in [
+        (
+            LinuxStartupPortErrorCode::PackageIdentityChanged,
+            LinuxStartupReason::PackageIdentityChanged,
+        ),
+        (
+            LinuxStartupPortErrorCode::DependencyUnavailable,
+            LinuxStartupReason::DependencyUnavailable,
+        ),
+    ] {
+        let site = TestSite::new(&format!("relationship-{error:?}"));
+        let root_identity = site.create_state_root();
+        let target = artifact("26.7.1+38-1", 0x68);
+        let mut receipt = prepared_receipt(
+            root_identity,
+            LinuxOperationKind::Install,
+            None,
+            Some(target.clone()),
+        );
+        advance_to(&site, &mut receipt, LinuxInstallState::Completed);
+        site.write_receipt(&receipt);
+        let port = FakeStartupPort::new(LinuxPackageObservation::installed(&target))
+            .with_relationship_error(error);
+        let outcome = inspect_linux_startup(
+            &site.paths,
+            LinuxStartupBuildIdentity::DebianSystemProduct,
+            LinuxStartupComponent::Manager,
+            &port,
+        );
+        assert_eq!(outcome.decision(), LinuxStartupDecision::FailedClosed);
+        assert_eq!(outcome.reason(), reason);
+        assert_eq!(port.relationship_calls.get(), 1);
+        assert_eq!(port.component_calls.get(), 0);
     }
 }
 

@@ -119,8 +119,10 @@ impl Drop for TestSite {
 
 pub(super) struct FakeStartupPort {
     package: LinuxPackageObservation,
+    relationship_error: Option<LinuxStartupPortErrorCode>,
     component_error: Option<LinuxStartupPortErrorCode>,
     pub(super) package_calls: Cell<usize>,
+    pub(super) relationship_calls: Cell<usize>,
     pub(super) component_calls: Cell<usize>,
 }
 
@@ -128,10 +130,17 @@ impl FakeStartupPort {
     pub(super) fn new(package: LinuxPackageObservation) -> Self {
         Self {
             package,
+            relationship_error: None,
             component_error: None,
             package_calls: Cell::new(0),
+            relationship_calls: Cell::new(0),
             component_calls: Cell::new(0),
         }
+    }
+
+    pub(super) fn with_relationship_error(mut self, code: LinuxStartupPortErrorCode) -> Self {
+        self.relationship_error = Some(code);
+        self
     }
 
     pub(super) fn with_component_error(mut self, code: LinuxStartupPortErrorCode) -> Self {
@@ -144,6 +153,22 @@ impl LinuxStartupPort for FakeStartupPort {
     fn inspect_package(&self) -> Result<LinuxPackageObservation, LinuxStartupPortError> {
         self.package_calls.set(self.package_calls.get() + 1);
         Ok(self.package.clone())
+    }
+
+    fn validate_package_relationship(
+        &self,
+        _receipt: &LinuxInstallReceipt,
+        _artifact: &LinuxArtifactIdentity,
+    ) -> Result<(), LinuxStartupPortError> {
+        self.relationship_calls
+            .set(self.relationship_calls.get() + 1);
+        match self.relationship_error {
+            Some(code) => Err(LinuxStartupPortError::new(
+                code,
+                "synthetic package relationship failure",
+            )),
+            None => Ok(()),
+        }
     }
 
     fn validate_component(
@@ -391,6 +416,38 @@ pub(super) fn stage_required(site: &TestSite, receipt: &mut LinuxInstallReceipt)
             ))
             .expect("stage target evidence");
     }
+}
+
+pub(super) fn stage_exact_bytes(
+    site: &TestSite,
+    receipt: &mut LinuxInstallReceipt,
+    slot: ArtifactSlot,
+    package: &[u8],
+    evidence: &[u8],
+) {
+    let operation_directory = site
+        .paths
+        .state_root
+        .join(OPERATIONS_DIRECTORY)
+        .join(receipt.operation_id());
+    fs::create_dir_all(&operation_directory).expect("create staged operation directory");
+    fs::set_permissions(&operation_directory, fs::Permissions::from_mode(0o700))
+        .expect("set staged operation directory mode");
+    let artifact = receipt
+        .artifact_for_slot(slot)
+        .expect("artifact for exact staged slot")
+        .clone();
+    let (package_path, evidence_path) = staged_paths(site, slot);
+    write_mode(&package_path, package, 0o600);
+    write_mode(&evidence_path, evidence, 0o600);
+    receipt
+        .record_staged_artifact(staged_evidence(
+            slot,
+            &artifact,
+            &package_path,
+            &evidence_path,
+        ))
+        .expect("record exact staged artifact");
 }
 
 pub(super) fn advance_to(

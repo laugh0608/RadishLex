@@ -7,7 +7,14 @@ use serde_json::{json, Value};
 use super::super::system_port::inspect_dpkg_status;
 use super::super::*;
 use super::helper::*;
-use crate::model::{DpkgPackageState, LinuxArtifactIdentity};
+use crate::debian::{
+    status_snapshot, ArchiveFixture, VerifiedArtifactRelationship, ARCHIVE_EVIDENCE_FILENAME,
+    ARCHIVE_PACKAGE_FILENAME,
+};
+use crate::model::{
+    ArtifactSlot, DpkgPackageState, LinuxArtifactIdentity, LinuxFailureCode, LinuxInstallState,
+    LinuxOperationKind, PackageSnapshot,
+};
 
 #[test]
 fn dpkg_status_reader_projects_exact_debian_states() {
@@ -31,6 +38,123 @@ fn dpkg_status_reader_projects_exact_debian_states() {
         let observation = inspect_dpkg_status(&site.paths).expect("inspect dpkg status");
         assert_eq!(observation.state(), expected);
     }
+}
+
+#[test]
+fn startup_relationship_revalidates_actual_terminal_package_and_dependencies() {
+    let fixture = ArchiveFixture::canonical();
+    let mut package_reader = fixture.package.as_slice();
+    let relationship = VerifiedArtifactRelationship::verify_package(
+        ARCHIVE_PACKAGE_FILENAME,
+        ARCHIVE_EVIDENCE_FILENAME,
+        &mut package_reader,
+        &fixture.evidence,
+    )
+    .expect("verify canonical package fixture");
+    let artifact = relationship
+        .to_linux_artifact_identity()
+        .expect("project actual package identity");
+
+    let site = TestSite::new("startup-relationship");
+    let root_identity = site.create_state_root();
+    let mut receipt = prepared_receipt(
+        root_identity,
+        LinuxOperationKind::Install,
+        None,
+        Some(artifact.clone()),
+    );
+    stage_exact_bytes(
+        &site,
+        &mut receipt,
+        ArtifactSlot::Target,
+        &fixture.package,
+        &fixture.evidence,
+    );
+    receipt
+        .advance(LinuxInstallState::ArtifactsStaged)
+        .expect("advance exact package staging");
+    receipt
+        .advance(LinuxInstallState::Quiesced)
+        .expect("advance exact package quiescence");
+    receipt
+        .advance(LinuxInstallState::PackageMutating)
+        .expect("advance exact package mutation");
+    receipt
+        .record_target_proof(PackageSnapshot::exact_installed(artifact.clone()))
+        .expect("record exact package proof");
+    receipt
+        .advance(LinuxInstallState::PackageVerified)
+        .expect("advance exact package proof");
+    receipt
+        .advance(LinuxInstallState::Completed)
+        .expect("complete exact package receipt");
+    write_mode(
+        &site.paths.dpkg_status_path,
+        status_snapshot(&relationship, None, false).as_bytes(),
+        0o644,
+    );
+    let port = LinuxSystemStartupPort::new(
+        site.paths.clone(),
+        site.paths.manager_component_path.clone(),
+        9,
+    );
+    port.validate_package_relationship(&receipt, &artifact)
+        .expect("validate actual terminal package relationship");
+
+    let repair_site = TestSite::new("startup-aborted-repair-relationship");
+    let root_identity = repair_site.create_state_root();
+    let mut repair = prepared_receipt(
+        root_identity,
+        LinuxOperationKind::Repair,
+        Some(artifact.clone()),
+        Some(artifact.clone()),
+    );
+    stage_exact_bytes(
+        &repair_site,
+        &mut repair,
+        ArtifactSlot::Target,
+        &fixture.package,
+        &fixture.evidence,
+    );
+    repair
+        .advance(LinuxInstallState::ArtifactsStaged)
+        .expect("advance repair staging");
+    repair
+        .abort_preserved(LinuxFailureCode::ProgramsRunning)
+        .expect("abort repair before mutation");
+    write_mode(
+        &repair_site.paths.dpkg_status_path,
+        status_snapshot(&relationship, None, false).as_bytes(),
+        0o644,
+    );
+    LinuxSystemStartupPort::new(
+        repair_site.paths.clone(),
+        repair_site.paths.manager_component_path.clone(),
+        9,
+    )
+    .validate_package_relationship(&repair, &artifact)
+    .expect("aborted repair reuses the identical staged target as source proof");
+
+    let status = status_snapshot(&relationship, None, false);
+    let missing_font = status
+        .split("\n\n")
+        .filter(|paragraph| !paragraph.starts_with("Package: fonts-noto-cjk\n"))
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    let mut missing_font = missing_font.trim_end_matches('\n').to_owned();
+    missing_font.push('\n');
+    fs::write(&site.paths.dpkg_status_path, missing_font).expect("remove font dependency record");
+    fs::set_permissions(
+        &site.paths.dpkg_status_path,
+        fs::Permissions::from_mode(0o644),
+    )
+    .expect("restore dpkg status mode");
+    assert_eq!(
+        port.validate_package_relationship(&receipt, &artifact)
+            .expect_err("missing package dependency must close startup")
+            .code(),
+        LinuxStartupPortErrorCode::DependencyUnavailable
+    );
 }
 
 #[test]

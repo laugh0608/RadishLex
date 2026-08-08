@@ -83,6 +83,9 @@ pub fn inspect_linux_startup(
             receipt_state,
         );
     }
+    if let Err(error) = port.validate_package_relationship(&receipt, installed_artifact) {
+        return port_error_outcome(error.code(), receipt_state);
+    }
     if let Err(error) = port.validate_component(component, installed_artifact) {
         return port_error_outcome(error.code(), receipt_state);
     }

@@ -1,18 +1,22 @@
 use std::fmt;
 use std::path::PathBuf;
 
-use crate::model::{DpkgPackageState, LinuxArtifactIdentity, LinuxInstallState};
+use crate::model::{
+    DpkgPackageState, LinuxArtifactIdentity, LinuxInstallReceipt, LinuxInstallState,
+};
 
-const SYSTEM_DPKG_STATUS_PATH: &str = "/var/lib/dpkg/status";
-const SYSTEM_PRODUCT_MANIFEST_PATH: &str = "/usr/share/radishlex/product-manifest.json";
-const SYSTEM_MANAGER_PATH: &str = "/usr/lib/aarch64-linux-gnu/radishlex/manager/radishlex_manager";
-const SYSTEM_MANAGER_FFI_PATH: &str =
+pub(crate) const SYSTEM_DPKG_STATUS_PATH: &str = "/var/lib/dpkg/status";
+pub(crate) const SYSTEM_PRODUCT_MANIFEST_PATH: &str = "/usr/share/radishlex/product-manifest.json";
+pub(crate) const SYSTEM_MANAGER_PATH: &str =
+    "/usr/lib/aarch64-linux-gnu/radishlex/manager/radishlex_manager";
+pub(crate) const SYSTEM_MANAGER_FFI_PATH: &str =
     "/usr/lib/aarch64-linux-gnu/radishlex/manager/lib/libradishlex_ime_ffi.so";
-const SYSTEM_FCITX_ADDON_PATH: &str = "/usr/lib/aarch64-linux-gnu/fcitx5/radishlex.so";
-const SYSTEM_FCITX_FFI_PATH: &str = "/usr/lib/aarch64-linux-gnu/fcitx5/libradishlex_ime_ffi.so";
-const SYSTEM_RIME_DATA_ROOT: &str = "/usr/share/radishlex/rime";
-const SYSTEM_FCITX_ADDON_METADATA_PATH: &str = "/usr/share/fcitx5/addon/radishlex.conf";
-const SYSTEM_FCITX_INPUT_METHOD_METADATA_PATH: &str =
+pub(crate) const SYSTEM_FCITX_ADDON_PATH: &str = "/usr/lib/aarch64-linux-gnu/fcitx5/radishlex.so";
+pub(crate) const SYSTEM_FCITX_FFI_PATH: &str =
+    "/usr/lib/aarch64-linux-gnu/fcitx5/libradishlex_ime_ffi.so";
+pub(crate) const SYSTEM_RIME_DATA_ROOT: &str = "/usr/share/radishlex/rime";
+pub(crate) const SYSTEM_FCITX_ADDON_METADATA_PATH: &str = "/usr/share/fcitx5/addon/radishlex.conf";
+pub(crate) const SYSTEM_FCITX_INPUT_METHOD_METADATA_PATH: &str =
     "/usr/share/fcitx5/inputmethod/radishlex.conf";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -220,6 +224,12 @@ impl std::error::Error for LinuxStartupPortError {}
 
 pub trait LinuxStartupPort {
     fn inspect_package(&self) -> Result<LinuxPackageObservation, LinuxStartupPortError>;
+
+    fn validate_package_relationship(
+        &self,
+        receipt: &LinuxInstallReceipt,
+        artifact: &LinuxArtifactIdentity,
+    ) -> Result<(), LinuxStartupPortError>;
 
     fn validate_component(
         &self,

@@ -716,6 +716,10 @@ impl LinuxInstallReceipt {
         self.operation_kind
     }
 
+    pub const fn version_relation(&self) -> ArtifactVersionRelation {
+        self.version_relation
+    }
+
     pub const fn state(&self) -> LinuxInstallState {
         self.state
     }

@@ -149,6 +149,7 @@ pub struct VerifiedArtifactRelationship {
     product_manifest_sha256: String,
     data_contract: ProductDataContract,
     dependencies: Vec<DirectDependency>,
+    installed_file_paths: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -295,6 +296,10 @@ impl VerifiedArtifactRelationship {
 
     pub fn dependencies(&self) -> &[DirectDependency] {
         &self.dependencies
+    }
+
+    pub fn installed_file_paths(&self) -> &[String] {
+        &self.installed_file_paths
     }
 
     pub fn to_linux_artifact_identity(
@@ -454,4 +459,10 @@ use evidence::{
 };
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
+
+#[cfg(test)]
+pub(crate) use archive::tests::fixture::{
+    ArchiveFixture, EVIDENCE_FILENAME as ARCHIVE_EVIDENCE_FILENAME,
+    PACKAGE_FILENAME as ARCHIVE_PACKAGE_FILENAME,
+};

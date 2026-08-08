@@ -105,6 +105,42 @@ pub(super) fn validate_system_component(
     if component_path != expected_component_path {
         return Err(component_identity_error());
     }
+    let manifest = read_and_validate_manifest(paths, runtime_ffi_abi_version, artifact)?;
+    validate_ffi_equivalence(paths, &manifest)?;
+    match component {
+        LinuxStartupComponent::Manager => validate_manager_inventory(paths, &manifest),
+        LinuxStartupComponent::FcitxAddon => validate_fcitx_inventory(paths, &manifest),
+    }
+}
+
+pub(crate) fn validate_system_product(
+    paths: &LinuxStartupPaths,
+    runtime_ffi_abi_version: u32,
+    artifact: &LinuxArtifactIdentity,
+) -> Result<(), LinuxStartupPortError> {
+    let manifest = read_and_validate_manifest(paths, runtime_ffi_abi_version, artifact)?;
+    validate_ffi_equivalence(paths, &manifest)?;
+    validate_manager_inventory(paths, &manifest)?;
+    validate_fcitx_inventory(paths, &manifest)?;
+    for record in &manifest.directories {
+        validate_manifest_directory_record(record, paths)?;
+    }
+    for record in &manifest.files {
+        let mode = match record.mode.as_str() {
+            "0644" => 0o644,
+            "0755" => 0o755,
+            _ => return Err(component_identity_error()),
+        };
+        validate_manifest_file_record(record, Path::new(&record.path), mode, paths)?;
+    }
+    Ok(())
+}
+
+fn read_and_validate_manifest(
+    paths: &LinuxStartupPaths,
+    runtime_ffi_abi_version: u32,
+    artifact: &LinuxArtifactIdentity,
+) -> Result<ProductManifest, LinuxStartupPortError> {
     let manifest_bytes = read_owned_regular_file(
         &paths.product_manifest_path,
         paths.expected_owner_id,
@@ -129,11 +165,7 @@ pub(super) fn validate_system_component(
     }
     validate_manifest_identity(paths, &manifest, artifact, runtime_ffi_abi_version)?;
     validate_manifest_record_order(&manifest)?;
-    validate_ffi_equivalence(paths, &manifest)?;
-    match component {
-        LinuxStartupComponent::Manager => validate_manager_inventory(paths, &manifest),
-        LinuxStartupComponent::FcitxAddon => validate_fcitx_inventory(paths, &manifest),
-    }
+    Ok(manifest)
 }
 
 fn validate_manifest_identity(

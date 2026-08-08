@@ -183,4 +183,4 @@ fn payload_mismatch() -> DebianRelationshipError {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

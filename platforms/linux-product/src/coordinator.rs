@@ -50,6 +50,13 @@ impl<'a> DpkgOperationContext<'a> {
         }
     }
 
+    pub const fn version_relation(self) -> crate::model::ArtifactVersionRelation {
+        match self {
+            Self::Preparing { request, .. } => request.version_relation(),
+            Self::Resuming { receipt } => receipt.version_relation(),
+        }
+    }
+
     pub const fn previous_receipt(self) -> Option<&'a LinuxInstallReceipt> {
         match self {
             Self::Preparing { previous, .. } => previous,
@@ -112,6 +119,18 @@ impl<'a> DpkgStagedPackage<'a> {
         }
     }
 
+    pub(crate) const fn from_paths(
+        artifact: &'a LinuxArtifactIdentity,
+        package_path: &'a Path,
+        evidence_path: &'a Path,
+    ) -> Self {
+        Self {
+            artifact,
+            package_path,
+            evidence_path,
+        }
+    }
+
     pub const fn artifact(self) -> &'a LinuxArtifactIdentity {
         self.artifact
     }
@@ -132,6 +151,13 @@ pub struct DpkgStagedOperation<'a> {
 }
 
 impl<'a> DpkgStagedOperation<'a> {
+    pub(crate) const fn from_packages(
+        source: Option<DpkgStagedPackage<'a>>,
+        target: Option<DpkgStagedPackage<'a>>,
+    ) -> Self {
+        Self { source, target }
+    }
+
     pub const fn source(self) -> Option<DpkgStagedPackage<'a>> {
         self.source
     }
@@ -155,6 +181,16 @@ pub struct DpkgRestoreRequest<'a> {
 }
 
 impl<'a> DpkgRestoreRequest<'a> {
+    pub(crate) const fn from_packages(
+        desired_source: Option<DpkgStagedPackage<'a>>,
+        recovery_target: Option<DpkgStagedPackage<'a>>,
+    ) -> Self {
+        Self {
+            desired_source,
+            recovery_target,
+        }
+    }
+
     pub const fn desired_source(self) -> Option<DpkgStagedPackage<'a>> {
         self.desired_source
     }

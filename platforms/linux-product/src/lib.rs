@@ -12,6 +12,8 @@ mod model;
 mod startup;
 #[cfg(any(target_os = "linux", all(test, unix)))]
 mod store;
+#[cfg(any(target_os = "linux", all(test, unix)))]
+mod system;
 
 #[cfg(any(target_os = "linux", all(test, unix)))]
 pub use coordinator::{
@@ -53,6 +55,14 @@ pub use startup::{
 pub use store::{
     LinuxInstallGuard, LinuxInstallStore, LinuxInstallStoreError, LinuxInstallStoreErrorCode,
     StagedArtifactPaths, SYSTEM_GUARD_PATH, SYSTEM_STATE_ROOT,
+};
+#[cfg(any(target_os = "linux", all(test, unix)))]
+pub use system::{
+    run_linux_maintenance, DebianCommandExecutor, DebianCommandOutput, DebianCommandTermination,
+    DebianExecutionError, DebianExecutionErrorCode, DpkgSystemObserver, LinuxDpkgTransactionPort,
+    LinuxMaintenanceArtifactInput, LinuxMaintenanceCommand, LinuxMaintenanceHostError,
+    LinuxMaintenanceHostErrorCode, LinuxSystemCommandExecutor, LinuxSystemObservationError,
+    LinuxSystemObservationErrorCode, LinuxSystemObserver, LinuxSystemQuiescencePermit,
 };
 
 #[cfg(all(test, unix))]

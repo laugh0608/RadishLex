@@ -1,3 +1,3 @@
 mod artifact;
-mod helper;
+pub(crate) mod helper;
 mod status_version;

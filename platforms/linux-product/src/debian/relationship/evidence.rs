@@ -64,6 +64,7 @@ pub(super) fn verify_artifact_relationship(
     validate_dependency_profile(&control.dependencies)?;
     let product_manifest = ProductManifestV1::parse(input.product_manifest_bytes)?;
     let data_contract = product_manifest.validate_profile(&control)?;
+    let installed_file_paths = product_manifest.installed_file_paths();
 
     let expected_package_filename = format!(
         "{}_{}_{}.deb",
@@ -111,6 +112,7 @@ pub(super) fn verify_artifact_relationship(
         product_manifest_sha256,
         data_contract,
         dependencies: control.dependencies,
+        installed_file_paths,
     })
 }
 

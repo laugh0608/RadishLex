@@ -4,7 +4,13 @@ use std::io::{self, Read};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
-use crate::model::{DpkgPackageState, LinuxArtifactIdentity};
+use crate::debian::{DebianRelationshipError, DebianRelationshipErrorCode, DpkgStatusSnapshot};
+use crate::model::{
+    ArtifactSlot, DpkgPackageState, LinuxArtifactIdentity, LinuxInstallReceipt, LinuxInstallState,
+};
+use crate::system::{
+    verify_owned_artifact, LinuxSystemObservationError, LinuxSystemObservationErrorCode,
+};
 
 use super::read_only_state::same_file_identity;
 
@@ -15,6 +21,7 @@ use super::types::{
     LinuxStartupPortError, LinuxStartupPortErrorCode,
 };
 use manifest::validate_system_component;
+pub(crate) use manifest::validate_system_product;
 
 const MAX_DPKG_STATUS_BYTES: u64 = 64 * 1024 * 1024;
 
@@ -42,6 +49,75 @@ impl LinuxSystemStartupPort {
 impl LinuxStartupPort for LinuxSystemStartupPort {
     fn inspect_package(&self) -> Result<LinuxPackageObservation, LinuxStartupPortError> {
         inspect_dpkg_status(&self.paths)
+    }
+
+    fn validate_package_relationship(
+        &self,
+        receipt: &LinuxInstallReceipt,
+        artifact: &LinuxArtifactIdentity,
+    ) -> Result<(), LinuxStartupPortError> {
+        let preferred_slot = match receipt.state() {
+            LinuxInstallState::Completed => ArtifactSlot::Target,
+            LinuxInstallState::AbortedPreserved | LinuxInstallState::RolledBack => {
+                ArtifactSlot::Source
+            }
+            _ => {
+                return Err(LinuxStartupPortError::new(
+                    LinuxStartupPortErrorCode::PackageIdentityChanged,
+                    "startup package relationship requires a terminal receipt",
+                ))
+            }
+        };
+        let slot = [preferred_slot, alternate_slot(preferred_slot)]
+            .into_iter()
+            .find(|slot| {
+                receipt
+                    .staged_artifact(*slot)
+                    .is_some_and(|staged| staged.artifact() == artifact)
+            })
+            .ok_or_else(|| {
+                LinuxStartupPortError::new(
+                    LinuxStartupPortErrorCode::PackageIdentityChanged,
+                    "startup package relationship lacks its installed staged proof",
+                )
+            })?;
+        let operation = self
+            .paths
+            .state_root
+            .join("operations")
+            .join(receipt.operation_id());
+        let (package_name, evidence_name) = match slot {
+            ArtifactSlot::Source => ("source.deb", "source.evidence.json"),
+            ArtifactSlot::Target => ("target.deb", "target.evidence.json"),
+        };
+        let relationship = verify_owned_artifact(
+            &operation.join(package_name),
+            &operation.join(evidence_name),
+            artifact,
+            &[0o600],
+            self.paths.expected_owner_id,
+            self.paths.expected_group_id,
+        )
+        .map_err(startup_observation_error)?;
+        let status = read_owned_regular_file(
+            &self.paths.dpkg_status_path,
+            self.paths.expected_owner_id,
+            self.paths.expected_group_id,
+            &[0o644],
+            1,
+            MAX_DPKG_STATUS_BYTES,
+            LinuxStartupPortErrorCode::PackageStateUnknown,
+        )?
+        .ok_or_else(|| {
+            LinuxStartupPortError::new(
+                LinuxStartupPortErrorCode::PackageStateUnavailable,
+                "dpkg status database is unavailable",
+            )
+        })?;
+        let status = DpkgStatusSnapshot::parse(&status).map_err(startup_relationship_error)?;
+        status
+            .validate_installed_relationship(&relationship)
+            .map_err(startup_relationship_error)
     }
 
     fn validate_component(
@@ -250,4 +326,38 @@ fn port_io_error(error: io::Error) -> LinuxStartupPortError {
         },
         "Linux startup inspection failed",
     )
+}
+
+const fn alternate_slot(slot: ArtifactSlot) -> ArtifactSlot {
+    match slot {
+        ArtifactSlot::Source => ArtifactSlot::Target,
+        ArtifactSlot::Target => ArtifactSlot::Source,
+    }
+}
+
+fn startup_relationship_error(error: DebianRelationshipError) -> LinuxStartupPortError {
+    let code = match error.code() {
+        DebianRelationshipErrorCode::DependencyUnavailable
+        | DebianRelationshipErrorCode::DependencyVersionUnsatisfied
+        | DebianRelationshipErrorCode::DependencyArchitectureMismatch => {
+            LinuxStartupPortErrorCode::DependencyUnavailable
+        }
+        DebianRelationshipErrorCode::DpkgStatusInvalid
+        | DebianRelationshipErrorCode::PackageStateInvalid => {
+            LinuxStartupPortErrorCode::PackageStateUnknown
+        }
+        _ => LinuxStartupPortErrorCode::PackageIdentityChanged,
+    };
+    LinuxStartupPortError::new(code, "Linux startup package relationship is invalid")
+}
+
+fn startup_observation_error(error: LinuxSystemObservationError) -> LinuxStartupPortError {
+    let code = match error.code() {
+        LinuxSystemObservationErrorCode::PermissionDenied => {
+            LinuxStartupPortErrorCode::PermissionDenied
+        }
+        LinuxSystemObservationErrorCode::Io => LinuxStartupPortErrorCode::Io,
+        _ => LinuxStartupPortErrorCode::PackageIdentityChanged,
+    };
+    LinuxStartupPortError::new(code, "Linux startup staged package identity changed")
 }
