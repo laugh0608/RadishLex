@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-截至 2026-08-08，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。production 代码尚未在 Linux 执行真实 package mutation；L6 和 P05C 均未开始。
+截至 2026-08-08，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。L6 format v1 已固定独立 guest、release pair、主序列、crash/probe 与证据边界；acceptance checkpoint controller、ARM64 source/target 重建和真实 package mutation 尚未开始，P05C 仍关闭。
 
 - 首个完整产品安装载体固定为 Debian 13 ARM64 的单一系统级本地 `.deb`，package 名固定为 `radishlex`；它是未发布的本地验收载体，不是 apt repository、正式 Release 或通用 Linux 安装包。
 - Fcitx addon、两份产品 FFI、Manager bundle、锁定 RimeData、desktop entry、图标和产品 manifest 由同一个 package 绑定；不拆成可独立漂移的 Manager/addon 包。
@@ -331,6 +331,8 @@ privileged host 只暴露不可直接构造的 `LinuxMaintenanceCommand`。CLI �
 
 L5 当前由 `./scripts/check-linux-startup-gate.sh` 闭合仓库内只读 decision 与初始化顺序合同：Rust fake/system-port 测试覆盖状态矩阵、staging proof、真实格式的 synthetic Manager bundle/Fcitx component scope、双 FFI equivalence 与目录零写入；C++ contract 分别编译 `development-staged`、`debian-system-product` 两种身份并拒绝交叉 allow，另以编译和源码合同固定 sibling symbol-origin 校验先于 gate 调用；源码顺序门禁固定 Manager 的 `umask -> gate -> Flutter` 与 Fcitx 的 `gate -> Engine/input FFI/XDG/Rime`。动态 preload/错误 sibling 拒绝仍须在新的 Linux payload 中复验；该 L5 不等于全 package runtime inventory、ARM64 product payload、Debian package lifecycle 或真实桌面启动证据。
 
+L6 输入合同由 `packaging/linux/l6-matrix.json`、`scripts/linux-product/l6_contract.py` 与 `./scripts/check-linux-l6-contract.sh` 固定：profile 为 `debian13-arm64-ephemeral-v1`，专用用户为 `radishlex-l6`；source/target 必须来自不同 commit 的相邻 Debian revision并保持 product/build/data contract相同；主序列固定 install→upgrade→repair→rollback→remove→reinstall，另有八个完成/回退 crash checkpoint。probe 同时覆盖 actual dependency、字体 family/glyph/owner、Manager/Fcitx startup 正负向、XDG fingerprint、dpkg/procfs 与完整 inventory。该门禁不连接 guest、不实现 checkpoint controller，也不证明 L6 已执行；详细步骤见 [Linux L6 Debian package matrix runbook](runbooks/linux-l6-package-matrix.md)。
+
 ## M5-P05 实现状态
 
 `M5-P05A` 只建立可复验的 metadata 与 rootfs assembly，不安装 `.deb`。当前实现为：
@@ -341,7 +343,7 @@ L5 当前由 `./scripts/check-linux-startup-gate.sh` 闭合仓库内只读 decis
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual package/manifest/dependency/version/status relationship、恢复事务、production system port/host 与共用只读 startup gate，且 dependency relationship 已进入 startup permit 前置链。下一顺位是先固定隔离 Debian ARM64 L6 的全新 rootfs/VM、版本对与 crash/probe 清单，再逐项授权执行。L6 覆盖真实 process/dpkg、完整 crash/retry、source rollback、字体 family/glyph/owner、外部 package lifecycle 与默认数据保留；P05C 才在独立 guest 授权实机，不复用或清理 P04 现场。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual package/manifest/dependency/version/status relationship、恢复事务、production system port/host、共用只读 startup gate与 L6 format v1，且 dependency relationship 已进入 startup permit 前置链。下一顺位是实现 acceptance-only checkpoint/evidence controller，再从两个不同 commit 重建相邻 Debian revision 的 source/target并逐项授权执行。L6 覆盖真实 process/dpkg、完整 crash/retry、source rollback、字体 family/glyph/owner、外部 package lifecycle 与默认数据保留；P05C 才在独立 guest 授权实机，不复用或清理 P04 现场。
 
 ## 实机授权边界
 

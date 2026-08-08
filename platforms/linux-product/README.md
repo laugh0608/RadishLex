@@ -15,5 +15,6 @@
 - `radishlex-linux-maintenance` command 类型不可由调用方直接构造，CLI 同时要求小写 32 hex operation ID、root-owned canonical package/evidence、`--authorized-system-mutation` 与 `--preserve-user-data`；它不是公开 installer，本批未执行；
 - v1 package 不允许 RadishLex 自有 maintainer scripts。外部 dependency scripts/triggers 只形成 dpkg observation，不能推进 product receipt 或代表完成；
 - startup observer 只读固定 `/var/lib/dpkg/status`、guard/tmp/receipt、terminal actual package/dependency relationship 与 component identity；Manager/Fcitx 在 Flutter/Engine/input FFI/XDG/Rime 之前消费 additive request/result v1，输入 session/key ABI 仍为 v9。
+- L6 format v1 固定独立 Debian 13 ARM64 guest、不同 commit 的相邻 Debian revision、六步主序列、八个 crash checkpoint、字体/startup/XDG/procfs probe 与逐 mutation 授权；实现和执行说明见 [`docs/runbooks/linux-l6-package-matrix.md`](../../docs/runbooks/linux-l6-package-matrix.md)。
 
-当前 production 代码与 fake command/crash matrix 已闭合，但真实 Linux `/proc`、mutable `dpkg`、字体 family/glyph/owner、外部 package lifecycle 和 Debian ARM64 L6 均未执行。仓库测试只使用 actual 合成 package、fake executor/observer 与临时目录；不得据此宣称系统安装。完整边界见 [`docs/linux-installation-maintenance-boundary.md`](../../docs/linux-installation-maintenance-boundary.md)。
+当前 production 代码、fake command/crash matrix 与 L6 contract gate 已闭合，但 acceptance checkpoint/evidence controller、真实 Linux `/proc`、mutable `dpkg`、字体 family/glyph/owner、外部 package lifecycle 和 Debian ARM64 L6 均未执行。仓库测试只使用 actual 合成 package、fake executor/observer 与临时目录；不得据此宣称系统安装。完整边界见 [`docs/linux-installation-maintenance-boundary.md`](../../docs/linux-installation-maintenance-boundary.md)。

@@ -1,6 +1,6 @@
 # Linux 产品元数据、rootfs 与 Debian 载体
 
-本目录保存 M5-P05A/P05B 的 Debian 13 ARM64 产品镜像、系统布局、control/artifact contract 和仓库自有桌面资产，读者是 Linux 产品装配与验证入口的维护者。这里不提交生成的 `.deb`、构建缓存、签名材料、用户数据、事务 receipt 或可直接修改系统的安装命令；安装维护事务见 [`docs/linux-installation-maintenance-boundary.md`](../../docs/linux-installation-maintenance-boundary.md)。
+本目录保存 M5-P05A/P05B 的 Debian 13 ARM64 产品镜像、系统布局、control/artifact contract、L6 matrix 和仓库自有桌面资产，读者是 Linux 产品装配与验证入口的维护者。这里不提交生成的 `.deb`、构建缓存、签名材料、用户数据、事务 receipt 或可直接修改系统的安装命令；安装维护事务见 [`docs/linux-installation-maintenance-boundary.md`](../../docs/linux-installation-maintenance-boundary.md)。
 
 ## 真相源关系
 
@@ -8,6 +8,7 @@
 - `install-layout.json` 固定 `debian-system-v1` 的 component-to-path、预期 owner/mode、链接关系与禁止目标。
 - `scripts/linux-product/product_metadata.py` 负责 metadata/layout 格式和确定性渲染；`source_contract.py` 单独负责跨 Rust、Dart、CMake、RimeData 与构建入口的一致性审计。
 - `debian/control.in` 形成可验证的 binary control 输入，`debian/artifact.json` 固定 canonical ar/USTAR、文件名、epoch、control inventory 与 dependency-analysis profile；两者都不表示安装成功。
+- `l6-matrix.json` 固定 `debian13-arm64-ephemeral-v1` 的 guest、不同 commit release pair、六步主序列、八个 crash checkpoint、probe/evidence 与逐 mutation 授权；它不是可执行安装脚本。
 - `assets/radishlex.svg` 是 Linux Manager 与 Fcitx 图标的共同源码，rootfs 中必须复制为两个独立普通文件。
 - RimeData 继续由 `packaging/rime/product-rime-data.json` 和 `scripts/rime-product/product_data.py` 独占来源、hash、许可证与装配语义。
 
@@ -17,9 +18,10 @@
 ./scripts/check-linux-product-metadata.sh
 ./scripts/check-linux-product-layout.sh
 ./scripts/check-linux-deb-artifact.sh
+./scripts/check-linux-l6-contract.sh
 ```
 
-第一个入口在所有受支持宿主验证 committed metadata 与负向测试。第二个入口默认运行平台无关 rootfs contract；只有显式提供真实 Linux Manager bundle 与 product-profile addon stage 时，才装配并复验临时 `DESTDIR`。第三个入口验证 canonical `.deb`、依赖输出、诊断分类、篡改拒绝和重复构建 contract；真实 ARM64 Linux 可另以 `build-linux-deb-artifact.sh --rootfs ABSOLUTE_PATH --output-dir ABSOLUTE_EMPTY_PATH` 写入显式 `0755` 空目录。所有入口都不读取用户 XDG、不写 `/usr`、`/var` 或 dpkg database，也不启动 Fcitx、Manager 或桌面会话。
+第一个入口在所有受支持宿主验证 committed metadata 与负向测试。第二个入口默认运行平台无关 rootfs contract；只有显式提供真实 Linux Manager bundle 与 product-profile addon stage 时，才装配并复验临时 `DESTDIR`。第三个入口验证 canonical `.deb`、依赖输出、诊断分类、篡改拒绝和重复构建 contract；第四个入口只验证 L6 matrix 与负向边界。真实 ARM64 Linux 可另以 `build-linux-deb-artifact.sh --rootfs ABSOLUTE_PATH --output-dir ABSOLUTE_EMPTY_PATH` 写入显式 `0755` 空目录。所有入口都不读取用户 XDG、不写 `/usr`、`/var` 或 dpkg database，也不启动 Fcitx、Manager 或桌面会话。
 
 2026-08-06 已使用 committed `e1ce740` 的全新 Debian 13.6 ARM64 Manager/addon 输入通过真实载荷模式；随后 committed `ce74981` 对该产品 rootfs 连续生成两份逐字节相同的 `radishlex_26.7.1+38-1_arm64.deb` 与 evidence。包 SHA-256 为 `b56ba9494e715df847a778a59a09bea2ccef091ce023a596849c13c9f1db27cd`；只执行结构、解包与 package database 只读检查，未安装 package，也未生成 receipt。
 

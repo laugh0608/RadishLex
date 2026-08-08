@@ -70,7 +70,7 @@ Linux 继续使用 `ime-ffi` ABI v9 已有的：
 
 P05B 后续增加了独立 `radishlex_linux_product_startup_gate` request/result v1。它是与输入热路径分离的 additive Linux 产品启动 ABI，读取编译 build identity、component 与 host 解析的 loaded component path；session/key ABI contract 仍为 v9。Manager 和 Fcitx 共用浅层 C++ binding；binding 在调用 startup ABI 前用 `dladdr` 与 canonical path 证明 startup/error symbols 来自 component 的精确 sibling FFI，Fcitx 还证明全部输入热路径 FFI symbols 来自同一 sibling，拒绝 `LD_LIBRARY_PATH`、preload 或其他 loader interposition。只有与 `development-staged` 或 `debian-system-product` 编译身份精确对应的 allow result 才形成 move-only permit，未知 result、交叉身份或 symbol origin 漂移均失败关闭。
 
-当前真实缺口不在输入 ABI、addon 编译、Manager privacy、删除恢复、导入导出、重启矩阵、P05A 产品载荷，或 P05B 的 package relationship/system port/startup gate，而在隔离 L6 的真实 process/dpkg/crash/font/XDG 证据与 P05C。这些能力不需要增加平台私有输入 ABI。
+当前真实缺口不在输入 ABI、addon 编译、Manager privacy、删除恢复、导入导出、重启矩阵、P05A 产品载荷，或 P05B 的 package relationship/system port/startup gate。L6 format v1 已固定，但 acceptance checkpoint/evidence controller、真实 process/dpkg/crash/font/XDG 证据与 P05C 尚未完成；这些能力不需要增加平台私有输入 ABI。
 
 ### Flutter Manager
 
@@ -200,7 +200,7 @@ M5-P02 的开发构建必须形成可复验依赖图：
 - 运行时拒绝缺失资源、leaf symlink、group/other 可写 addon 目录或资源，并以稳定原因失败关闭；
 - 构建不从运行时下载 schema、词库、模型或二进制；
 - 开发安装与正式发行载体分开，P02 不把本地复制命令称为产品安装；
-- 系统域目标、metadata/rootfs 与真实载荷强门禁已由 M5-P05A 固定并通过；P05B 已形成未安装的确定性 `.deb`、actual package relationship、恢复型 fake transaction 与只读 startup gate，mutable dpkg、升级移除 L6 与实机仍未开始。
+- 系统域目标、metadata/rootfs 与真实载荷强门禁已由 M5-P05A 固定并通过；P05B 已形成未安装的确定性 `.deb`、actual package relationship、恢复型事务、production mutable port/CLI、只读 startup gate 与 L6 format v1，真实 mutable dpkg、升级移除 L6 与实机仍未开始。
 
 当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境同时编译 staged/system runtime-layout、development/system startup identity，以及 symbol-origin binding 对象；`--require-fcitx` 继续只证明 staged addon/FFI/RimeData/metadata、ELF `$ORIGIN`、构建路径和 `dlopen(RTLD_NOW)`。`./scripts/build-linux-product-addon-stage.sh` 另以 metadata 中的产品版本、`system` runtime profile 与 `debian-system-product` startup identity 形成临时 addon stage，不复制 sibling RimeData；两个入口都不写系统目录或启用输入法。当前 CMake/CTest 合同总数为 10 项，新增的两项固定两种 startup 编译身份及 allow 映射；精确 sibling origin 的动态正负证据留给新的 Linux payload，尚无 startup-enabled ARM64 实机证据。
 
@@ -270,7 +270,7 @@ M5-P04 已覆盖：
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
 - P04 已按 `docs/linux-manager-local-acceptance.md` 冻结完成，不重复其导入导出、同库和重启实机；既有 guest 资产不得清理、覆盖或改作 P05 载体。
-- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、advisory guard、production observer/executor/mutable port、process parser、authorized CLI 和 startup dependency gate 已完成；隔离 L6 继续留在 P05B，未获授权不能运行 CLI、`dpkg` 或写真实系统。
+- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、advisory guard、production observer/executor/mutable port、process parser、authorized CLI、startup dependency gate 和 L6 format v1 已完成；checkpoint/evidence controller 与隔离 L6 继续留在 P05B，未获授权不能运行 CLI、`dpkg` 或写真实系统。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。
