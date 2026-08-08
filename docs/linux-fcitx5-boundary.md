@@ -200,9 +200,9 @@ M5-P02 的开发构建必须形成可复验依赖图：
 - 运行时拒绝缺失资源、leaf symlink、group/other 可写 addon 目录或资源，并以稳定原因失败关闭；
 - 构建不从运行时下载 schema、词库、模型或二进制；
 - 开发安装与正式发行载体分开，P02 不把本地复制命令称为产品安装；
-- 系统域目标、metadata/rootfs 与真实载荷强门禁已由 M5-P05A 固定并通过；P05B 已形成未安装的确定性 `.deb`、actual package relationship、恢复型事务、production mutable port/CLI、只读 startup gate、L6 format v1 与 compile-isolated controller，真实 mutable dpkg、升级移除 L6 与实机仍未开始。
+- 系统域目标、metadata/rootfs 与真实载荷强门禁已由 M5-P05A 固定并通过；P05B 已形成未安装的确定性 `.deb`、actual package relationship、恢复型事务、production mutable port/CLI、只读 startup gate、L6 format v1、compile-isolated controller 与真实 ARM64 release pair，独立 guest/handoff/S0 也已准备；真实 mutable dpkg、升级移除 L6 与实机仍未开始。
 
-当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境同时编译 staged/system runtime-layout、development/system startup identity，以及 symbol-origin binding 对象；`--require-fcitx` 继续只证明 staged addon/FFI/RimeData/metadata、ELF `$ORIGIN`、构建路径和 `dlopen(RTLD_NOW)`。`./scripts/build-linux-product-addon-stage.sh` 另以 metadata 中的产品版本、`system` runtime profile 与 `debian-system-product` startup identity 形成临时 addon stage，不复制 sibling RimeData；两个入口都不写系统目录或启用输入法。当前 CMake/CTest 合同总数为 10 项，新增的两项固定两种 startup 编译身份及 allow 映射；精确 sibling origin 的动态正负证据留给新的 Linux payload，尚无 startup-enabled ARM64 实机证据。
+当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境同时编译 staged/system runtime-layout、development/system startup identity，以及 symbol-origin binding 对象；`--require-fcitx` 继续只证明 staged addon/FFI/RimeData/metadata、ELF `$ORIGIN`、构建路径和 `dlopen(RTLD_NOW)`。`./scripts/build-linux-product-addon-stage.sh` 另以 metadata 中的产品版本、`system` runtime profile 与 `debian-system-product` startup identity 形成临时 addon stage，不复制 sibling RimeData；两个入口都不写系统目录或启用输入法。当前 CMake/CTest 合同总数为 10 项，新增的两项固定两种 startup 编译身份及 allow 映射；真实 ARM64 pair 已复验含该 identity 的 payload，精确 sibling origin 与 installed startup 的动态正负证据仍未形成。
 
 `platforms/linux-fcitx5/dev/Dockerfile` 以 digest 固定 Debian 13 ARM64 基础镜像，安装发行版提供的 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12、librime 1.13.1 development package 和 P05A metadata 工具。`./scripts/build-linux-fcitx5-container.sh` 只读挂载仓库，使用独立 named volume 缓存 Cargo registry/target，构建启用 `native-rime` 的 ARM64 ELF cdylib，再执行 staged 强门禁、平台无关 rootfs contract 和 system-profile addon stage。真实 product Manager/addon/rootfs 强门禁由 Debian 13.6 ARM64 guest 的全新 committed-source 目录另行完成，不把容器结果冒充桌面或安装证据。
 
@@ -270,7 +270,7 @@ M5-P04 已覆盖：
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
 - P04 已按 `docs/linux-manager-local-acceptance.md` 冻结完成，不重复其导入导出、同库和重启实机；既有 guest 资产不得清理、覆盖或改作 P05 载体。
-- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、advisory guard、production observer/executor/mutable port、process parser、authorized CLI、startup dependency gate、L6 format v1、compile-isolated checkpoint/evidence controller 和 ARM64 release pair 已完成；隔离 L6 继续留在 P05B，未获授权不能准备 handoff、运行 acceptance/maintenance CLI、`dpkg` 或写真实系统。
+- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、advisory guard、production observer/executor/mutable port、process parser、authorized CLI、startup dependency gate、L6 format v1、compile-isolated checkpoint/evidence controller 和 ARM64 release pair 已完成；独立 L6 guest、handoff 与 S0 已准备。隔离 L6 继续留在 P05B，未获逐项授权不能运行 acceptance/maintenance CLI、`dpkg`、产品进程或写真实系统。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。

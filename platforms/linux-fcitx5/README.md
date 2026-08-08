@@ -142,7 +142,7 @@ addon 不再从编译期仓库绝对路径读取 RimeData。CMake build 和 stag
 
 `radishlex_runtime_probe` 是开发诊断而不是 Fcitx daemon 替代品。它对 staged layout 执行相同校验并使用 `dlopen(RTLD_NOW)` 验证 native dependency closure，只输出稳定原因类别，不输出用户数据路径。probe 成功不代表 Engine 已实例化，也不代表 Fcitx input context、Wayland/X11 或真实应用提交已经运行。
 
-P05A `system` profile 不把 RimeData 放在 addon 旁，而是只生成 addon、同目录 FFI 和两份 metadata；完整 RimeData/source/license 由 `scripts/linux-product/rootfs.py` 从 committed lock 离线装配到 `/usr/share/radishlex/rime`。P05B 进一步把 staged profile 编译为 `development-staged` startup identity，把 system profile 编译为 `debian-system-product`；profile 仍只写显式临时 stage，不写真实系统目录，也不等同 startup-enabled payload 已通过 ARM64 实机。
+P05A `system` profile 不把 RimeData 放在 addon 旁，而是只生成 addon、同目录 FFI 和两份 metadata；完整 RimeData/source/license 由 `scripts/linux-product/rootfs.py` 从 committed lock 离线装配到 `/usr/share/radishlex/rime`。P05B 进一步把 staged profile 编译为 `development-staged` startup identity，把 system profile 编译为 `debian-system-product`；真实 ARM64 release pair 已绑定后者的 payload 身份，但 profile 入口本身仍只写显式临时 stage，不写真实系统目录，也不证明 package-installed startup 行为。
 
 ## 开发验证
 

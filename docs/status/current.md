@@ -51,11 +51,12 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步顺位
+## 明日事项（2026-08-09）
 
-1. 独立 Debian 13 ARM64 L6 guest、专用用户、root-owned pair handoff 与 `S0-clean` 已准备；下一步另行授权执行 source revision 1 的首次 install mutation，并在任何产品进程启动前复验 terminal receipt、dpkg/package inventory、字体与五个 XDG absent。
-2. 再按 matrix 逐项授权 upgrade、repair、rollback、remove、reinstall、八个 controller crash/retry、source restore、startup、重启与 XDG 对照；每一步单独授权并保留现场。
-3. L6 自动证据闭合后另行授权 P05C 独立 guest 实机；旧资产清理、远端、发布、真实同步和其他平台继续独立排期。
+1. 保持 P04、CleanBase、DependencyFrozen 与构建 VM 关机；启动 L6 前先确认没有其他 VM 运行、恢复 `127.0.0.1:2222 -> guest:22`，只读 SSH 复验 guest、S0、pair、dpkg baseline 与五个 XDG absent。
+2. 单独列出 source revision 1 首次 install 的 operation ID、精确 package/evidence 输入、maintenance argv、系统写入范围、失败现场与回退影响，取得当次授权后才执行 mutation。
+3. mutation 后先闭合 terminal receipt、guard/tmp、dpkg status/audit、依赖/字体、完整 package inventory、startup 只读 decision 与五个 XDG absent；在这些结果通过前不启动 Manager、Fcitx 或桌面会话。
+4. 首次 install 完成后停止，不自动进入 upgrade。其余五步、八个 crash/retry、产品启动、重启、恢复 S0 与任何清理都继续逐项授权；P05C、旧资产、远端与发布保持关闭。
 
 ## 验证入口
 

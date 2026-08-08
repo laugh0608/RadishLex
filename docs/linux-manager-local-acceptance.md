@@ -6,7 +6,7 @@
 
 截至 2026-08-05，M5-P03 已完成 Fcitx5 Wayland/X11 输入、常见应用、生命周期、离线与隐私实机验收，M5-P04 已完成 Linux Manager 与同库个人化验收。现有 Flutter 页面、`ManagerBridge`、ABI v9、Rust userdb/ranker、导入导出、删除/tombstone/explicit restore、学习摘要和 rank explain 均直接复用；本批没有重写业务真相源，也没有通过新增平台私有 ABI 复制既有能力。
 
-首个源码子批已建立 Linux Flutter runner、共享 XDG/Manager runtime、bundle `.so` 约束、Linux privacy 配置与同库 native-rime contract。后续子批建立先 watch 后初读的 privacy 感知、失败关闭 runtime、精确 allowlist 粗分类和默认关闭的受控取证模式。UTM Debian 13 ARM64 已完成真实 Flutter 3.44.0 Release bundle、Fcitx5 addon、ELF/`$ORIGIN`、正式 ABI symbol、native-rime 与 Dart smoke；P04 实机时 Fcitx CTest 为七项，当前仓库在 staged/system runtime layout 与两种 startup 编译身份加入后为 10 项。后两项尚未形成新的 ARM64 startup-enabled payload 实机证据。
+首个源码子批已建立 Linux Flutter runner、共享 XDG/Manager runtime、bundle `.so` 约束、Linux privacy 配置与同库 native-rime contract。后续子批建立先 watch 后初读的 privacy 感知、失败关闭 runtime、精确 allowlist 粗分类和默认关闭的受控取证模式。UTM Debian 13 ARM64 已完成真实 Flutter 3.44.0 Release bundle、Fcitx5 addon、ELF/`$ORIGIN`、正式 ABI symbol、native-rime 与 Dart smoke；P04 实机时 Fcitx CTest 为七项，当前仓库在 staged/system runtime layout 与两种 startup 编译身份加入后为 10 项。P05B 真实 ARM64 release pair 已绑定 startup-enabled payload 身份，但尚未形成 package-installed startup 动态证据。
 
 Firefox 已在 Wayland/X11 两侧取得相同的精确 `firefox-esr` 身份、GTK3 Fcitx frontend、password capability 和 userdb 零增量证据；生产 allowlist 因而只加入 `firefox-esr -> browser`，其他候选与变体继续失败关闭。生产分类后的桌面纵向链已证明 Manager 刷新、privacy 开关、单次恢复学习、删除、既有/新 Fcitx session 防复活、explicit restore 和恢复后重新学习均读取同一 userdb。
 
