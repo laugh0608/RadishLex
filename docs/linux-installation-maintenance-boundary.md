@@ -352,7 +352,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual package/manifest/dependency/version/status relationship、恢复事务、production system port/host、共用只读 startup gate、L6 format v1、compile-isolated checkpoint/evidence controller 与真实 ARM64 release pair，且 dependency relationship 已进入 startup permit 前置链。独立 L6 guest、专用用户与 root-owned pair handoff 已准备；下一顺位是另行授权创建 S0 并冻结 baseline，再逐项执行真实 process/dpkg、完整 crash/retry、source rollback、字体 family/glyph/owner、外部 package lifecycle 与默认数据保留。P05C 才在另一独立 guest 授权实机，不复用或清理 P04 现场。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual package/manifest/dependency/version/status relationship、恢复事务、production system port/host、共用只读 startup gate、L6 format v1、compile-isolated checkpoint/evidence controller 与真实 ARM64 release pair，且 dependency relationship 已进入 startup permit 前置链。独立 L6 guest、专用用户、root-owned pair handoff 与 S0 已准备；下一顺位是另行授权首次 source install，再逐项执行真实 process/dpkg、完整 crash/retry、source rollback、字体 family/glyph/owner、外部 package lifecycle 与默认数据保留。P05C 才在另一独立 guest 授权实机，不复用或清理 P04 现场。
 
 ## 实机授权边界
 

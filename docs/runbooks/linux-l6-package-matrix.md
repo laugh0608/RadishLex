@@ -21,7 +21,7 @@
 - compile-identity 隔离的 acceptance checkpoint/evidence controller 已完成，八点合成中断/恢复与 canonical 脱敏 envelope 已通过专项门禁；
 - 真实 pair 已从 source commit `55351f2` revision 1 与 target commit `e5b6da1` revision 2 的独立 clean root 断网构建、原子发布并独立复验；
 - canonical pair record、两份 ARM64 package 与 production/acceptance executable identity 已冻结，具体 hash 见本 runbook 第 3 节；
-- 构建 VM 只新增 per-user SDK/cache、私有源码/build/output；独立 L6 guest、专用用户与 root-owned pair handoff 已准备，但 S0 尚未创建，真实 `dpkg`、`/proc` probe、字体 probe、Manager/Fcitx 启动与系统安装均未执行。
+- 构建 VM 只新增 per-user SDK/cache、私有源码/build/output；独立 L6 guest、专用用户、root-owned pair handoff 与 `S0-clean-e5b6da1-deff08b1` 已准备并复验，真实 `dpkg` mutation、`/proc` product probe、字体 probe、Manager/Fcitx 启动与系统安装均未执行。
 
 ### 当前本地资产登记（非发布证据）
 
@@ -33,10 +33,11 @@
 | `Debian13-ARM64-CleanBase.utm` | 已注册；rescue | 依赖安装前的纯 Debian 13 救援基线；不是 L6 S0，不写入 |
 | `Debian13-ARM64-DependencyFrozen.utm` | 未注册 | 工作 VM 的 dependency-frozen APFS COW 恢复源；不是执行 guest，不启动或改写 |
 | `Debian13-ARM64.utm` | 已注册；builder | Flutter/cache/source/build 与真实 release pair 的构建 VM；不执行 L6 package transaction |
-| `Debian13-ARM64-L6.utm` | 已注册；L6 | 唯一 L6 执行 guest；用户 `radishlex-l6` 与 root-owned `/var/tmp/radishlex-l6-inputs` 已准备，installed package、controller evidence root 与 S0 仍 absent |
+| `Debian13-ARM64-L6.utm` | 已注册；L6 | 唯一 L6 执行 guest；用户 `radishlex-l6` 与 root-owned `/var/tmp/radishlex-l6-inputs` 已准备，installed package 与 controller evidence root 仍 absent |
+| `RadishLex-L6-Snapshots/S0-clean-e5b6da1` | 非 VM；S0 | 未注册、不可启动的 APFS COW 恢复点；绑定 config/EFI/qcow、guest/dpkg/XDG/handoff baseline，恢复须另行授权 |
 | `RadishLex-L6-Handoff-e5b6da1` | 非 VM | host 上冻结的 canonical pair 副本；只用于逐哈希交接，不安装或执行 |
 
-当前阶段六项均有独立职责，不因 UTM 面板是否显示而删除。L6 闭合后可另行授权评估构建 VM、DependencyFrozen 与 host handoff 的保留期；P04、CleanBase、L6 故障现场和任何 S0/S1/S2/S3 恢复点仍按各自停止线保留。该表只登记本机运维角色，不进入 canonical pair/checkpoint/session evidence。
+当前阶段七项均有独立职责，不因 UTM 面板是否显示而删除。L6 闭合后可另行授权评估构建 VM、DependencyFrozen 与 host handoff 的保留期；P04、CleanBase、L6 故障现场和任何 S0/S1/S2/S3 恢复点仍按各自停止线保留。该表只登记本机运维角色，不进入 canonical pair/checkpoint/session evidence。
 
 ## 1. 环境身份
 
@@ -63,6 +64,8 @@ L6 只能使用新建 guest、P04 guest 的独立 clone，或同等的可丢弃 
 | `S3-target-installed` | target terminal completed；合成 XDG 未变 | repair、rollback 与 startup 负向 |
 
 每个 crash scenario 必须从声明的 snapshot clone 开始，完成取证后恢复或丢弃该 clone。不得让 crash receipt、dpkg half-state、operation staging 或测试注入继续进入主序列。
+
+当前 `S0-clean` identity 为 `S0-clean-e5b6da1-deff08b1`。恢复目录中的 config、EFI、qcow2 SHA-256 分别为 `d3d7fb4946361b0c9a87a2a0611ef9ed085b3635c4331e254f5cbe359ecf88c6`、`35fa4cdbbd72ba81c00da179cd4327cccaf30007eedc871d37b701c02f8dcafb`、`deff08b1da61043a838f71474d350f83998a34d8de59a42091a99005af070e22`；disposable 只读启动冻结 dpkg status SHA-256 `2c31c35c262b2b2761055fa12a55361f3d47ebfa1923dbb3cc3691499d2ce572` 与五个 XDG absent。`local-snapshot.evidence.json` SHA-256 为 `50dcc48bfba7f65fce56184b2a21183f8e263611eb0f86d62cdafc6f306b1f08`，明确属于本机恢复记录而非 canonical L6 session evidence。
 
 ## 3. Release pair 冻结
 
