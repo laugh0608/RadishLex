@@ -7,7 +7,7 @@
 - 复核日期：2026-08-08（Asia/Shanghai）
 - 常态分支：`dev`；稳定主线：`master`
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品
-- 当前主批次：M5-P05B Linux package transaction/startup gate；确定性 `.deb`、receipt/guard、五类 operation 与 fake dpkg port 已完成，下一批进入 Manager/Fcitx 共用只读 startup decision，真实 dpkg 与系统写入仍关闭
+- 当前主批次：M5-P05B Linux package transaction/startup gate；确定性 `.deb`、receipt/guard、五类 operation、fake dpkg port 与 Manager/Fcitx 共用只读 startup gate 已完成，下一批进入 mutable dpkg adapter、依赖/版本关系复验和 maintainer-script 投影，真实 dpkg 与系统写入仍关闭
 - 已退出：M0-M3；M4 macOS build 38 单版本产品验收已冻结；M5-P01 第二平台决策与运行边界；M5-P02 Fcitx5 addon、共享 FFI 与开发构建；M5-P03 真实 Linux 桌面输入与隐私验收；M5-P04 Linux Manager 与同库个人化验收；M5-P05A Linux metadata/rootfs 与真实产品载荷门禁
 - 真实用户同步：保持关闭；只允许合成数据与受控集成测试
 
@@ -43,7 +43,13 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 
 - `platforms/linux-product/` 已独立实现 Linux package 事务合同，不复用 macOS 双 bundle rename：先持久化 `prepared`，再把 source/target `.deb` 与 evidence 复制到 root-only operation staging，全部取证后进入 `artifacts_staged`；canonical receipt、最多 128 项终态链和 mode `0600` Unix socket guard 均绑定系统 state-root inode。
 - `install`、`upgrade`、`repair`、`remove`、显式 `rollback` 共用可恢复状态机；mutation 后任何不确定性进入 source restore，target/source proof 已持久化时重入不重复 mutation。未知 package state、active guard、receipt/root/artifact identity、symlink/hardlink、宽权限或篡改全部失败关闭。
-- `DpkgTransactionPort` 的仓库 fake 覆盖五类调用矩阵、install→upgrade 收据追加、程序未静止、package mutation/source restore 双中断、target-proof crash retry 和用户 XDG 零接口；`./scripts/check-linux-package-transaction.sh` 已进入仓库门禁。真实 dpkg adapter、maintainer-script、system owner 映射、startup gate 与 Debian matrix 尚未实现，不能据此运行或宣称系统安装。
+- `DpkgTransactionPort` 的仓库 fake 覆盖五类调用矩阵、install→upgrade 收据追加、程序未静止、package mutation/source restore 双中断、target-proof crash retry 和用户 XDG 零接口；`./scripts/check-linux-package-transaction.sh` 已进入仓库门禁。mutable dpkg adapter、maintainer-script、system owner 映射与 Debian matrix 尚未实现，不能据此运行或宣称系统安装。
+
+## M5-P05B 只读启动门禁状态
+
+- `platforms/linux-product/` 已提供 Manager/Fcitx 共用 startup observer：直接只读解析 `/var/lib/dpkg/status`，并复验 guard/tmp/receipt、terminal staging proof、package 状态、canonical manifest 与 component scope。Manager scope 覆盖完整 bundle tree；Fcitx scope 覆盖 addon/FFI/RimeData/两份 metadata，并验证两份产品 FFI equivalence、owner/mode/link/hash、ABI 与 data contract；不调用 `dpkg`，不创建或清理 state，也不读取或写入用户 XDG。该 scope 不冒充外部字体/dependency 的全 package runtime inventory。
+- Manager 在 `umask(0077)` 后、创建 Flutter application/engine 前执行门禁；Fcitx factory 在构造 `Engine`、调用 input FFI、解析 XDG 或初始化 Rime 前取得不可伪造的启动许可。C++ binding 用 `dladdr`/canonical path 把 startup/error symbols 绑定到精确 sibling FFI，Fcitx 另复验全部输入 FFI symbol origins，拒绝 loader interposition。`development-staged` 与 `debian-system-product` 是编译身份，前者只在严格 `NotInstalled` 且 system state/receipt 均不存在时允许，product 缺 receipt、active guard、非终态、Config-Files/半配置、completed remove 或身份漂移均失败关闭或要求维护。
+- `radishlex_linux_product_startup_gate` 是独立 request/result v1 的 additive Linux ABI；输入 session/key ABI contract 仍为 v9。当前自动证据覆盖仓库合成状态、只读副作用、双编译身份、symbol-origin 绑定源码合同与启动顺序；尚未执行动态 preload/错误 sibling 负向测试，没有生成或实机运行新的 ARM64 startup-enabled payload，也没有验证 dependency/font/version relationship。
 
 ## macOS 冻结参考
 
@@ -63,9 +69,9 @@ macOS `26.7.1 (38)` 保持冻结参考产品；DMG SHA-256 为 `f171e74bdc0a4296
 ## 下一步顺位
 
 1. 保持 P04 guest 与 macOS build 38 冻结现场不变。
-2. P05B 下一批让 Manager/Fcitx product build 在业务初始化前消费同一只读 startup decision，并覆盖 receipt absent/terminal/nonterminal、active guard、completed remove、half-configured、artifact/component identity drift 和 product/dev 编译身份隔离。
-3. startup decision 稳定后实现真实 dpkg adapter、依赖/版本关系复验和 maintainer-script 投影；只先进入隔离 rootfs/container 的 install→upgrade→repair→rollback→remove→reinstall matrix，不直接写现有 guest。
-4. 自动合同与隔离 matrix 闭合后再进入 P05C；真实实机使用独立 clone/snapshot 或另一台 guest，并对系统写入、进程/会话操作和人工输入逐项授权。
+2. P05B 下一批实现 mutable dpkg transaction adapter，并同时固定 dependency/font/version relationship validation、maintainer-script 状态投影和 privileged maintenance command 的授权边界。
+3. 上述 adapter 与投影稳定后，在隔离 Debian 13 ARM64 环境执行 L6 install→upgrade→repair→rollback→remove→reinstall matrix，覆盖 crash/retry、source restore、启动门禁与用户 XDG 零写入/默认保留；不直接写现有 P04 guest。
+4. L6 自动证据闭合后再进入 P05C；真实实机使用独立 clone/snapshot 或另一台 guest，并对系统写入、进程/会话操作和人工输入逐项授权。
 5. 旧临时资产清理、远端推送、tag/Release、真实同步和其他平台均保持独立授权与后续顺位。
 
 ## 当前验证入口
@@ -86,6 +92,7 @@ macOS `26.7.1 (38)` 保持冻结参考产品；DMG SHA-256 为 `f171e74bdc0a4296
 ./scripts/check-linux-product-layout.sh
 ./scripts/check-linux-deb-artifact.sh
 ./scripts/check-linux-package-transaction.sh
+./scripts/check-linux-startup-gate.sh
 ./scripts/check-manager-linux-product.sh
 ./scripts/build-linux-fcitx5-container.sh
 ./scripts/check-repo.sh
@@ -93,7 +100,7 @@ macOS `26.7.1 (38)` 保持冻结参考产品；DMG SHA-256 为 `f171e74bdc0a4296
 git diff --check
 ```
 
-前四个 Linux product 入口依次验证 committed metadata、平台无关 rootfs contract、确定性 Debian artifact/依赖诊断与不调用真实 dpkg 的事务核心；2026-08-06 已另在 Debian 13.6 ARM64 以真实 Manager/addon 输入通过 rootfs 强门禁，并重复生成字节一致的未安装 `.deb`。真实系统安装、输入源变更、用户数据、公开上传和 Release 仍需对应授权。
+Linux product 入口分别验证 committed metadata、平台无关 rootfs contract、确定性 Debian artifact/依赖诊断、不调用真实 dpkg 的事务核心，以及 Manager/Fcitx 共用的只读 startup gate；2026-08-06 已另在 Debian 13.6 ARM64 以真实 Manager/addon 输入通过 rootfs 强门禁，并重复生成字节一致的未安装 `.deb`。新 startup-enabled payload 尚未在 ARM64 guest 构建或运行；真实系统安装、输入源变更、用户数据、公开上传和 Release 仍需对应授权。
 
 ## 阅读索引
 

@@ -6,7 +6,7 @@
 
 截至 2026-08-05，M5-P03 已完成 Fcitx5 Wayland/X11 输入、常见应用、生命周期、离线与隐私实机验收，M5-P04 已完成 Linux Manager 与同库个人化验收。现有 Flutter 页面、`ManagerBridge`、ABI v9、Rust userdb/ranker、导入导出、删除/tombstone/explicit restore、学习摘要和 rank explain 均直接复用；本批没有重写业务真相源，也没有通过新增平台私有 ABI 复制既有能力。
 
-首个源码子批已建立 Linux Flutter runner、共享 XDG/Manager runtime、bundle `.so` 约束、Linux privacy 配置与同库 native-rime contract。后续子批建立先 watch 后初读的 privacy 感知、失败关闭 runtime、精确 allowlist 粗分类和默认关闭的受控取证模式。UTM Debian 13 ARM64 已完成真实 Flutter 3.44.0 Release bundle、Fcitx5 addon、ELF/`$ORIGIN`、正式 ABI symbol、native-rime 与 Dart smoke；候选键状态回归加入后真实 Fcitx CTest 为七项。
+首个源码子批已建立 Linux Flutter runner、共享 XDG/Manager runtime、bundle `.so` 约束、Linux privacy 配置与同库 native-rime contract。后续子批建立先 watch 后初读的 privacy 感知、失败关闭 runtime、精确 allowlist 粗分类和默认关闭的受控取证模式。UTM Debian 13 ARM64 已完成真实 Flutter 3.44.0 Release bundle、Fcitx5 addon、ELF/`$ORIGIN`、正式 ABI symbol、native-rime 与 Dart smoke；P04 实机时 Fcitx CTest 为七项，当前仓库在 staged/system runtime layout 与两种 startup 编译身份加入后为 10 项。后两项尚未形成新的 ARM64 startup-enabled payload 实机证据。
 
 Firefox 已在 Wayland/X11 两侧取得相同的精确 `firefox-esr` 身份、GTK3 Fcitx frontend、password capability 和 userdb 零增量证据；生产 allowlist 因而只加入 `firefox-esr -> browser`，其他候选与变体继续失败关闭。生产分类后的桌面纵向链已证明 Manager 刷新、privacy 开关、单次恢复学习、删除、既有/新 Fcitx session 防复活、explicit restore 和恢复后重新学习均读取同一 userdb。
 
@@ -43,7 +43,7 @@ M5-P04 不纳入：
 | Flutter UI / Dart bridge | 复用现有页面与 `ManagerBridge`，显示本地真相源和结构化失败 | 直接拼 XDG 路径、解析 SQLite、复制 ranker/privacy 规则 |
 | Linux Flutter host | 启动前收紧 umask，解析固定 bundle/XDG 路径，实现 runtime method channel 与平台 privacy 原子读写 | 候选排序、学习、删除、同步或安装事务 |
 | Fcitx5 addon | 消费 capability、受控程序粗分类和 privacy 摘要，向 ABI v9 投影 `LearningContext` | 保存原始程序身份、解析 Manager settings、复制 userdb/ranker |
-| 共享 Linux platform code | XDG、private file、bundle layout、privacy format 与分类 contract | Flutter widget、Rime 私有状态或远端配置 |
+| 共享 Linux platform code | XDG、private file、bundle layout、privacy format、分类与只读 startup binding contract | Flutter widget、Rime 私有状态、package mutation 或远端配置 |
 | Rust FFI/runtime/userdb/ranker | 业务真相源、并发 SQLite、学习策略、删除语义、explain 与管理查询 | Fcitx/GTK/Flutter 生命周期或平台文件选择 |
 
 Linux host 和 addon 可以链接同一份浅层 C++ platform source/target；不得把 resolver 复制到 `apps/radishlex-manager/linux` 后独立演化。Flutter generated runner 只保留平台启动和 channel 接线，较长实现继续放在 `platforms/linux-fcitx5` 的共享职责模块中。
@@ -54,7 +54,9 @@ Linux Manager 的主题必须显式提供兼顾 Latin、数字和简体中文的
 
 ### 启动顺序
 
-Linux runner 必须在创建 Flutter engine、Dart isolate、settings store 或 userdb 前设置进程 `umask(0077)`，随后注册 `dev.radishlex.manager/runtime` method channel。`createDefaultManagerBootstrap()` 仍是 Dart 唯一产品入口，依次取得平台路径、加载 native binding 并形成真实 `FfiManagerBridge`。
+Linux runner 必须先设置进程 `umask(0077)`，再执行共用 Linux product startup gate，只有取得与编译身份一致的 move-only permit 后才可创建 Flutter application/engine、Dart isolate、settings store 或 userdb，随后注册 `dev.radishlex.manager/runtime` method channel。`createDefaultManagerBootstrap()` 仍是 Dart 唯一业务产品入口，依次取得平台路径、加载 native binding 并形成真实 `FfiManagerBridge`。
+
+startup gate 直接复用 bundle FFI 的 additive request/result v1，在 C++ host 中从当前 executable 取得 canonical component path；调用前以 `dladdr` 与 canonical path 证明 startup/error symbols 确实来自 executable 的精确 sibling FFI，拒绝 `LD_LIBRARY_PATH`、preload 或其他 loader interposition。输入 session/key ABI contract 仍为 v9。`development-staged` 只在 system receipt/state 均不存在且 package 严格未安装时允许，`debian-system-product` 只接受 terminal receipt、Installed package、严格 staging proof、完整 Manager bundle tree、manifest/同侧 FFI 与双 FFI equivalence。active guard、tmp/nonterminal receipt、Config-Files/半配置、completed remove、缺 receipt 或身份漂移都在 Flutter 初始化前退出；gate 不调用 `dpkg`，不创建 state，不解析 XDG，也不打开 userdb/settings/privacy/Rime。外部字体与系统 dependency relationship 仍由下一批 validator 负责，startup scope 不冒充全 package runtime inventory。
 
 任一前置失败都返回稳定 `ManagerPlatformException` / `ManagerStartupException`；正常 `product` 构建不得读取 `RADISHLEX_MANAGER_MODE` 以外的运行期路径 override，也不得切换 `FixtureManagerBridge`。显式编译期 `demo` 继续只用于测试和合成演示，并保留全程标识。
 
@@ -69,7 +71,7 @@ P04 staged Flutter bundle 使用固定布局：
 <bundle>/data/...
 ```
 
-Linux host 从当前 executable 的 canonical parent 派生 sibling `lib/libradishlex_ime_ffi.so`，不读取工作目录、`LD_LIBRARY_PATH`、仓库路径或调用方参数。目标必须是 bundle 内非 symlink regular file，且不得 group/other writable；Dart binding 继续验证 ABI contract version 与 Manager 所需 symbol 集。P04 证明 staged product bundle 与 workspace native library 一致；P05A 又以全新 committed-source ARM64 bundle 通过 root-owned 目标布局、product manifest、ELF/closure、双 FFI 和构建路径强门禁。P05B 的平台无关 package transaction 已形成独立 receipt/guard/fake dpkg 合同；Linux Manager 尚未接只读 system startup decision，也未执行真实安装。
+Linux host 从当前 executable 的 canonical parent 派生 sibling `lib/libradishlex_ime_ffi.so`，不读取工作目录、`LD_LIBRARY_PATH`、仓库路径或调用方参数。目标必须是 bundle 内非 symlink regular file，且不得 group/other writable；Dart binding 继续验证 ABI contract version 与 Manager 所需 symbol 集。P04 证明 staged product bundle 与 workspace native library 一致；P05A 又以全新 committed-source ARM64 bundle 通过 root-owned 目标布局、product manifest、ELF/closure、双 FFI 和构建路径强门禁。P05B 的平台无关 package transaction 已形成独立 receipt/guard/fake dpkg 合同，Linux Manager 也已在 Flutter application 前接入只读 system startup decision；尚未实现 mutable dpkg adapter，也未构建或实机运行新的 ARM64 startup-enabled product bundle。
 
 Dart `ManagerProductPaths` 必须接受平台明确返回的固定 `.dylib` 或 `.so` basename，拒绝其他文件名；错误文案改为平台中立。该调整不得削弱 macOS `Contents/Frameworks/libradishlex_ime_ffi.dylib` 的既有测试和产品门禁。
 
@@ -188,7 +190,7 @@ A6 必须至少有一条从 personalized runtime 写入、经 Manager bridge 读
 4. Linux staged Release bundle 携带 workspace native-rime `.so`，完成 ABI/symbol/ELF 与无路径 override smoke。
 5. 使用临时合成库形成“runtime 写入—Manager bridge 刷新—另一 runtime 观察”的产品双端自动证据。
 
-该批没有顺带实现 package/安装，也没有以能打开空窗口结束。privacy watcher、classifier、Wayland/X11 身份、精确 Firefox 生产规则、同库学习/解释、privacy 零增量、删除防复活、explicit restore、导入导出、Fcitx/Manager 重启与桌面会话重启均已复用同一 host、XDG 和真实 bridge 闭合。M5-P04 验收矩阵据此退出；现有 staging、backup、userdb、导入导出文件和 transient service 终态继续保留。M5-P05A metadata/rootfs 与真实 ARM64 payload gate、P05B 平台无关 package transaction 后续已独立完成；startup gate、真实 dpkg adapter 与任何安装实机仍需对应实现和授权。
+该批没有顺带实现 package/安装，也没有以能打开空窗口结束。privacy watcher、classifier、Wayland/X11 身份、精确 Firefox 生产规则、同库学习/解释、privacy 零增量、删除防复活、explicit restore、导入导出、Fcitx/Manager 重启与桌面会话重启均已复用同一 host、XDG 和真实 bridge 闭合。M5-P04 验收矩阵据此退出；现有 staging、backup、userdb、导入导出文件和 transient service 终态继续保留。M5-P05A metadata/rootfs 与真实 ARM64 payload gate、P05B 平台无关 package transaction 和共用只读 startup gate 后续已独立完成；mutable dpkg adapter、依赖/版本关系复验、隔离 matrix 与任何安装实机仍需对应实现和授权。
 
 ## 当前停止线
 

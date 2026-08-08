@@ -4,7 +4,7 @@
 
 ## 状态与产品范围
 
-状态：M5-P01/P02/P03/P04/P05A 已完成。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release、native/ELF/FFI smoke、桌面 privacy、删除防复活、explicit restore、导入导出以及 Fcitx/Manager/桌面会话重启均已通过。P05A 的 Linux metadata/rootfs、产品版本渲染、`system` runtime profile 与真实 ARM64 产品载荷门禁也已通过；P05B 已完成未安装的确定性 `.deb`、receipt/guard、五类 operation 与 fake dpkg 事务合同。Manager/Fcitx startup gate、真实 dpkg adapter 与任何 RadishLex 系统安装仍未完成。
+状态：M5-P01/P02/P03/P04/P05A 已完成。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release、native/ELF/FFI smoke、桌面 privacy、删除防复活、explicit restore、导入导出以及 Fcitx/Manager/桌面会话重启均已通过。P05A 的 Linux metadata/rootfs、产品版本渲染、`system` runtime profile 与真实 ARM64 产品载荷门禁也已通过；P05B 已完成未安装的确定性 `.deb`、receipt/guard、五类 operation、fake dpkg 事务合同与 Manager/Fcitx 共用只读 startup gate。mutable dpkg adapter、maintainer scripts、依赖/版本关系复验、隔离 Debian matrix 与任何 RadishLex 系统安装仍未完成。
 
 P03 实机证据覆盖 GTK、Qt、Electron、浏览器和终端，包含完整候选交互、焦点/输入法切换、Fcitx/桌面会话重启、进程级地址族限制与整台 guest 断网。password、terminal、unknown 与 Qt `Sensitive` 后的 userdb 聚合保持全零；当前 GTK4 frontend 未把 `PRIVATE` 传播为 Fcitx `Sensitive`，因此依赖既有 unknown 失败关闭而非虚构 capability。Qt backend 只以 QPA、会话类型和 input-context plugin 的组合证据判定，不能因进程映射 `libQt6WaylandClient` 就声明原生 Wayland。快速 X11→Wayland 登录暴露的 `im-launch` 跳过 daemon 问题已用 Debian 官方 desktop entry 的用户级 autostart 副本闭合；该开发设置不替代 P05 产品安装与维护设计。
 
@@ -59,7 +59,7 @@ Linux 继续使用 `ime-ffi` ABI v9 已有的：
 
 如果 M5 实现发现现有 ABI 无法表达 Fcitx5 必需行为，应先补平台无关语义和 ABI contract，再由 macOS 与 Linux 共同验证。不得增加只传 Fcitx 私有对象、原始 key symbol、窗口指针或数据库路径的业务入口。
 
-首批 ABI 审计结论是 v9 足以表达当前 addon 输入链，不需要新增 symbol 或版本：
+首批 ABI 审计结论是 v9 足以表达当前 addon 输入链，不需要新增 Fcitx 私有输入 symbol 或提高 session/key contract 版本：
 
 - Fcitx normalized key 在 C++ 转成稳定 char/named/modifier/phase；
 - owned `KeyResult` 同时提供 consumed、commit、learning disposition 与 snapshot；
@@ -68,7 +68,9 @@ Linux 继续使用 `ime-ffi` ABI v9 已有的：
 - PageUp/PageDown 作为稳定 named key 进入 Rust 后用新 snapshot 重建列表；
 - reset/free/shutdown 已足以表达 per-context session 与进程 teardown。
 
-当前真实缺口不在 ABI、addon 编译、Manager privacy、删除恢复、导入导出、重启矩阵、P05A 产品载荷或 P05B 平台无关事务核心，而在 Manager/Fcitx startup gate、真实 dpkg adapter、隔离 matrix 与 P05C 安装实机。这些能力不需要增加平台私有输入 ABI。
+P05B 后续增加了独立 `radishlex_linux_product_startup_gate` request/result v1。它是与输入热路径分离的 additive Linux 产品启动 ABI，读取编译 build identity、component 与 host 解析的 loaded component path；session/key ABI contract 仍为 v9。Manager 和 Fcitx 共用浅层 C++ binding；binding 在调用 startup ABI 前用 `dladdr` 与 canonical path 证明 startup/error symbols 来自 component 的精确 sibling FFI，Fcitx 还证明全部输入热路径 FFI symbols 来自同一 sibling，拒绝 `LD_LIBRARY_PATH`、preload 或其他 loader interposition。只有与 `development-staged` 或 `debian-system-product` 编译身份精确对应的 allow result 才形成 move-only permit，未知 result、交叉身份或 symbol origin 漂移均失败关闭。
+
+当前真实缺口不在输入 ABI、addon 编译、Manager privacy、删除恢复、导入导出、重启矩阵、P05A 产品载荷、P05B 平台无关事务核心或只读 startup gate，而在 mutable dpkg adapter、maintainer scripts、依赖/版本关系复验、隔离 matrix 与 P05C 安装实机。这些能力不需要增加平台私有输入 ABI。
 
 ### Flutter Manager
 
@@ -198,9 +200,9 @@ M5-P02 的开发构建必须形成可复验依赖图：
 - 运行时拒绝缺失资源、leaf symlink、group/other 可写 addon 目录或资源，并以稳定原因失败关闭；
 - 构建不从运行时下载 schema、词库、模型或二进制；
 - 开发安装与正式发行载体分开，P02 不把本地复制命令称为产品安装；
-- 系统域目标、metadata/rootfs 与真实载荷强门禁已由 M5-P05A 固定并通过；P05B 已形成未安装的确定性 `.deb` 与 fake dpkg 事务合同，真实 dpkg、startup gate、升级移除 matrix 与实机仍未开始。
+- 系统域目标、metadata/rootfs 与真实载荷强门禁已由 M5-P05A 固定并通过；P05B 已形成未安装的确定性 `.deb`、fake dpkg 事务合同与只读 startup gate，mutable dpkg、升级移除 matrix 与实机仍未开始。
 
-当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境同时编译 staged 与 system runtime-layout contract；`--require-fcitx` 继续只证明 staged addon/FFI/RimeData/metadata、ELF `$ORIGIN`、构建路径和 `dlopen(RTLD_NOW)`。`./scripts/build-linux-product-addon-stage.sh` 另以 metadata 中的产品版本和 `system` profile 形成临时 addon stage，不复制 sibling RimeData；两个入口都不写系统目录或启用输入法。
+当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境同时编译 staged/system runtime-layout、development/system startup identity，以及 symbol-origin binding 对象；`--require-fcitx` 继续只证明 staged addon/FFI/RimeData/metadata、ELF `$ORIGIN`、构建路径和 `dlopen(RTLD_NOW)`。`./scripts/build-linux-product-addon-stage.sh` 另以 metadata 中的产品版本、`system` runtime profile 与 `debian-system-product` startup identity 形成临时 addon stage，不复制 sibling RimeData；两个入口都不写系统目录或启用输入法。当前 CMake/CTest 合同总数为 10 项，新增的两项固定两种 startup 编译身份及 allow 映射；精确 sibling origin 的动态正负证据留给新的 Linux payload，尚无 startup-enabled ARM64 实机证据。
 
 `platforms/linux-fcitx5/dev/Dockerfile` 以 digest 固定 Debian 13 ARM64 基础镜像，安装发行版提供的 Rust 1.85.0、CMake 3.31.6、Fcitx5 Core 5.1.12、librime 1.13.1 development package 和 P05A metadata 工具。`./scripts/build-linux-fcitx5-container.sh` 只读挂载仓库，使用独立 named volume 缓存 Cargo registry/target，构建启用 `native-rime` 的 ARM64 ELF cdylib，再执行 staged 强门禁、平台无关 rootfs contract 和 system-profile addon stage。真实 product Manager/addon/rootfs 强门禁由 Debian 13.6 ARM64 guest 的全新 committed-source 目录另行完成，不把容器结果冒充桌面或安装证据。
 
@@ -223,6 +225,7 @@ M5-P02 至少覆盖：
 - XDG resolver、权限、symlink 和生产/test override 隔离；
 - addon metadata、产品版本、native dependency 和 RimeData presence；
 - staged addon-relative 与 system fixed-Rime layout、`$ORIGIN`、权限/symlink、构建路径泄漏和 staged `dlopen(RTLD_NOW)`；
+- development/system startup 编译身份、只接受对应 allow、精确 sibling startup/error/input FFI symbol origins、Manager/Fcitx 业务初始化前顺序与只读零 XDG 副作用；
 - macOS 与仓库既有 ABI 回归。
 
 ### 真实平台
@@ -267,7 +270,7 @@ M5-P04 已覆盖：
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
 - P04 已按 `docs/linux-manager-local-acceptance.md` 冻结完成，不重复其导入导出、同库和重启实机；既有 guest 资产不得清理、覆盖或改作 P05 载体。
-- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、receipt/guard/fake dpkg 事务合同已完成；startup gate 与真实 dpkg adapter 继续留在 P05B，未获授权不能在真实系统执行。
+- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、receipt/guard/fake dpkg 事务、只读 startup gate 已完成；mutable dpkg adapter、maintainer scripts、依赖/版本关系复验与隔离 matrix 继续留在 P05B，未获授权不能在真实系统执行。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。

@@ -29,8 +29,8 @@
 
 ## 快速认知
 
-- 当前阶段：M5-P01-P05A 已完成；当前为 M5-P05B；详见 `docs/status/current.md`
-- 代码：macOS build 38 冻结；Linux P05B 已通过 `.deb` 与 fake dpkg 事务门禁；startup gate、真实安装、同步/发布关闭
+- 阶段：M5-P01-P05A 已完成；当前 M5-P05B
+- 代码：macOS build 38 冻结；Linux 已过 `.deb`、fake dpkg 事务和共用只读 startup gate；mutable dpkg、实装、同步/发布关闭
 - 当前交付：macOS 内部候选；Linux 用户级开发装配；均非公开发布版本
 - 交付梯度：macOS 输入、个人化、同步资格与产品候选已完成；当前推进 Linux Fcitx5 产品线
 - 真实平台顺序：macOS InputMethodKit、Linux Fcitx5、Android、Windows、iOS；每次只推进一条主线
@@ -159,11 +159,11 @@
 - `deploy/sync-server/`：本地与部署态 Compose、反向代理示例
 - `platforms/android-ime/keystore-bridge/`：Android Keystore 能力验证桥，不是完整 IME
 - `platforms/macos-imk/`：InputMethodKit 薄壳、bundle build 与 contract smoke
-- `platforms/linux-product/`：receipt/guard 与 fake dpkg 事务
+- `platforms/linux-product/`：package 事务与只读 startup decision
 - `scripts/`：仓库检查、格式和构建脚本
 - `tests/fixtures/`：跨模块合成 fixture
 
-尚未落地：Linux startup gate/dpkg/安装实机、Windows/iOS 壳、完整 Android IME、`examples/`；同步/发布关闭。
+尚未落地：Linux mutable dpkg、maintainer scripts、L6 matrix 与安装实机，Windows/iOS 壳、Android IME、`examples/`；同步/发布关闭。
 
 ## 架构边界
 

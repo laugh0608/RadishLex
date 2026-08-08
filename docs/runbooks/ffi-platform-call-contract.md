@@ -7,7 +7,7 @@
 当前 runbook 适用于已落地的 C ABI host smoke：
 
 - `radishlex_ffi_contract`
-- 产品 install/upgrade startup gate、Manager/InputMethod candidate validation
+- macOS install/upgrade startup gate、Linux product startup gate、Manager/InputMethod candidate validation
 - legacy/Rime/personalized Rime session 创建、版本化学习上下文和释放
 - 版本化 key result、snapshot、commit、学习处置和个人化状态
 - structured snapshot / candidate view 的 display/engine index 映射
@@ -27,7 +27,7 @@ Rust host smoke 只能证明 ABI 契约；每个平台绑定层仍须按本 runb
 
 ## 调用顺序
 
-### 0. 产品业务初始化前依次执行两层门禁
+### 0a. macOS 产品业务初始化前依次执行两层门禁
 
 macOS Manager 与 InputMethod 的正常产品启动必须先调用：
 
@@ -57,6 +57,27 @@ RADISHLEX_STARTUP_GATE_ALLOWED_TERMINAL_RECEIPT
 任一层出现 active guard、非终态 receipt、损坏 receipt、中断 artifact、未知对象、unsafe root/state 或 identity drift 都必须阻止启动；外层 `completed remove` 同样阻断。非 `Ok` status、result version 不是 v1、未知 decision/error/state 或 native symbol 缺失同样失败关闭。平台不能为了恢复启动而创建目录、chmod、删除 sidecar/receipt 或改用 fixture；现场处置只能交给对应协调器。
 
 两层 gate 都完全只读。首次启动时 data root 不存在属于正常允许结果，平台只能在两层门禁通过后由既有产品 bootstrap 创建正常数据目录。
+
+### 0b. Linux 产品业务初始化前执行共用门禁
+
+Linux Manager 与 Fcitx addon 使用同一 additive C ABI：
+
+```text
+radishlex_linux_product_startup_gate(request_v1, result_v1, error_out)
+```
+
+request 的 build identity 必须由 native target 在编译期固定为 `development-staged` 或 `debian-system-product`，component 固定为 Manager 或 Fcitx addon；component path 只能由 host 从当前 loaded executable/shared object 取得 canonical 路径，不能由 Dart、UI、环境变量或命令行传入。调用 startup ABI 前，binding 必须以 `dladdr` 与 canonical path 验证 startup/error symbols 来自 component 的精确 sibling FFI；Fcitx 还必须验证全部输入热路径 FFI symbols 来自同一 sibling，拒绝 `LD_LIBRARY_PATH`、preload 或其他 loader interposition。该 symbol 与 request/result v1 是独立 Linux 产品启动控制面，不改变 `radishlex_ffi_contract.version = 9` 或 session/key ABI。
+
+调用顺序必须为：
+
+```text
+Manager: umask(0077) -> Linux startup gate -> Flutter application/engine -> Dart/settings/userdb
+Fcitx:   factory startup gate -> move-only permit -> Engine -> linked FFI/XDG/privacy/Rime
+```
+
+Rust gate 直接只读解析固定 `/var/lib/dpkg/status`、`/var/lib/radishlex/install-v1` 与产品 manifest/component；terminal receipt 的 source/target staging 必须按 receipt proof 复验。Manager component scope 覆盖完整 bundle tree；Fcitx scope 覆盖 addon、FFI、RimeData 与两份 metadata，并验证 Manager/Fcitx 两份 FFI equivalence、ABI 与 data contract。该 scope 不是全 package runtime inventory，外部字体与系统 dependency relationship 仍待下一批 validator。gate 不得执行 `dpkg`、创建/修改 state、删除 guard/tmp/receipt、解析 XDG 或打开 userdb/settings/privacy/Rime。development build 只有在 system state/receipt 均不存在且 package 严格 `NotInstalled` 时接受 `AllowedDevelopment + DevelopmentStateAbsent`；product build 只有 terminal installed artifact、Installed package/version/architecture 和上述 scope 全部一致时接受 `AllowedProduct + InstalledReceiptVerified`。
+
+active/异常 guard、临时或非终态 receipt、Config-Files/半配置/未知 package state、completed remove、product receipt 缺失、development/system 身份交叉、任何 identity drift、未知 result/version/value 或非 `Ok` status 都阻止业务初始化。platform binding 不能自行恢复、降级到 staged profile、创建状态目录或清理现场；维护交给后续 privileged coordinator。当前该调用顺序与只读副作用只由仓库合成状态和 C++ contract 证明，尚无新的 ARM64 startup-enabled payload 实机证据。
 
 ### 1. 进程启动后读取 ABI contract
 
@@ -316,6 +337,7 @@ radishlex_input_method_upgrade_validate_candidate(request_v1, summary_v1, error_
 
 - contract 查询成功，能识别 `version = 9`、key result v2、按键/候选选择共用的 owned result 和 owner-thread policy。
 - 外层 install gate 与数据 upgrade gate 分别覆盖 data root absent、状态目录 absent、终态允许、非终态阻止、active guard、损坏 receipt、中断 artifact 和 identity drift；外层另覆盖 `completed remove`，并检查两层门禁前后目录树与字节保持不变。
+- Linux startup gate 覆盖 development/system 编译身份、receipt absent/terminal/nonterminal、guard/tmp、Config-Files/半配置、completed remove、staging proof、Manager bundle/Fcitx scope、双 FFI equivalence、sibling/input FFI symbol-origin 绑定源码合同、未知结果、Manager/Fcitx 顺序和 state/XDG 零写入；动态 preload/错误 sibling 正负测试随新的 Linux payload 补齐。
 - Manager/InputMethod validation host 拒绝参数，只读固定 candidate；覆盖候选损坏、双端打开失败、字节保持不变和 sidecar 零残留。
 - 创建 session 后在 owner thread 上 handle key，核对 consumed / commit / 同事件 snapshot，提交候选并释放所有 owned handle。
 - personalized session smoke 覆盖受控 learning context、display/engine index 不同仍提交正确候选、selection 的 `recorded/deferred`、学习失败不丢 commit，以及 storage/read/rank 退化状态。
