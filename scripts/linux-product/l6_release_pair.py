@@ -245,7 +245,7 @@ def require_real_file(path: Path, label: str, mode: int) -> Path:
     return path
 
 
-def require_clean_root(path: Path, label: str) -> tuple[Path, str]:
+def require_repository_root(path: Path, label: str) -> tuple[Path, str]:
     if not path.is_absolute() or path.is_symlink() or not path.is_dir():
         raise L6ReleasePairError(f"{label} must be an absolute real directory")
     canonical = path.resolve()
@@ -256,6 +256,11 @@ def require_clean_root(path: Path, label: str) -> tuple[Path, str]:
         raise L6ReleasePairError(f"{label} HEAD is invalid")
     if run_git(path, "status", "--porcelain=v1", "--untracked-files=all"):
         raise L6ReleasePairError(f"{label} must be clean")
+    return path, commit
+
+
+def require_clean_root(path: Path, label: str) -> tuple[Path, str]:
+    path, commit = require_repository_root(path, label)
     require_clean_build_outputs(path, label)
     return path, commit
 
@@ -269,9 +274,17 @@ def require_clean_build_outputs(root: Path, label: str) -> None:
             )
 
 
-def verify_repository_roots(source: Path, target: Path) -> tuple[str, str]:
-    source, source_commit = require_clean_root(source, "source repository root")
-    target, target_commit = require_clean_root(target, "target repository root")
+def verify_repository_roots(
+    source: Path,
+    target: Path,
+    *,
+    require_absent_build_outputs: bool = True,
+) -> tuple[str, str]:
+    root_verifier = (
+        require_clean_root if require_absent_build_outputs else require_repository_root
+    )
+    source, source_commit = root_verifier(source, "source repository root")
+    target, target_commit = root_verifier(target, "target repository root")
     if source == target:
         raise L6ReleasePairError("source and target require separate clean roots")
     if target != REPO_ROOT.resolve():
@@ -513,7 +526,11 @@ def build_record(
     verifier: Callable[[ReleaseInput], dict[str, Any]] = verify_debian_artifact,
 ) -> dict[str, Any]:
     validate_environment(environment)
-    source_commit, target_commit = commits or verify_repository_roots(source.root, target.root)
+    source_commit, target_commit = commits or verify_repository_roots(
+        source.root,
+        target.root,
+        require_absent_build_outputs=False,
+    )
     if commits is None:
         source_metadata = load_json(
             source.root / METADATA_RELATIVE, "source Linux product metadata"

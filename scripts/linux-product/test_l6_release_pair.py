@@ -5,9 +5,11 @@ import copy
 import json
 import stat
 import struct
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import l6_release_pair
 
@@ -186,6 +188,72 @@ class L6ReleasePairTests(unittest.TestCase):
             l6_release_pair.L6ReleasePairError, "preexisting build output"
         ):
             l6_release_pair.require_clean_build_outputs(clean, "synthetic root")
+
+    def test_record_revalidates_git_identity_after_builder_outputs_exist(self) -> None:
+        source = self.root / "source-repository"
+        target = self.root / "target-repository"
+        source.mkdir(mode=0o755)
+
+        def git(root: Path, *arguments: str) -> str:
+            result = subprocess.run(
+                ["/usr/bin/git", "-C", str(root), *arguments],
+                check=True,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            return result.stdout.strip()
+
+        git(source, "init", "--quiet")
+        git(source, "config", "user.name", "RadishLex L6 Test")
+        git(source, "config", "user.email", "l6-test@radishlex.invalid")
+        (source / ".gitignore").write_text("target/\n", encoding="utf-8")
+        (source / "identity.txt").write_text("source\n", encoding="utf-8")
+        git(source, "add", ".gitignore", "identity.txt")
+        git(source, "commit", "--quiet", "-m", "source")
+        source_commit = git(source, "rev-parse", "HEAD")
+
+        subprocess.run(
+            ["/usr/bin/git", "clone", "--quiet", str(source), str(target)],
+            check=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        git(target, "config", "user.name", "RadishLex L6 Test")
+        git(target, "config", "user.email", "l6-test@radishlex.invalid")
+        (target / "identity.txt").write_text("target\n", encoding="utf-8")
+        git(target, "add", "identity.txt")
+        git(target, "commit", "--quiet", "-m", "target")
+
+        (source / "target").mkdir(mode=0o755)
+        (target / "target").mkdir(mode=0o755)
+        with patch.object(l6_release_pair, "REPO_ROOT", target), patch.object(
+            l6_release_pair, "SOURCE_COMMIT", source_commit
+        ):
+            with self.assertRaisesRegex(
+                l6_release_pair.L6ReleasePairError, "preexisting build output"
+            ):
+                l6_release_pair.verify_repository_roots(source, target)
+            commits = l6_release_pair.verify_repository_roots(
+                source,
+                target,
+                require_absent_build_outputs=False,
+            )
+            self.assertEqual(commits[0], source_commit)
+            self.assertEqual(commits[1], git(target, "rev-parse", "HEAD"))
+
+            (target / "identity.txt").write_text("dirty\n", encoding="utf-8")
+            with self.assertRaisesRegex(
+                l6_release_pair.L6ReleasePairError, "must be clean"
+            ):
+                l6_release_pair.verify_repository_roots(
+                    source,
+                    target,
+                    require_absent_build_outputs=False,
+                )
 
     def test_record_is_canonical_redacted_and_compile_identity_separated(self) -> None:
         record = self.fixture.record()

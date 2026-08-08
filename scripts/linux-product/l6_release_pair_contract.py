@@ -127,6 +127,7 @@ def validate_release_pair_contract(
         'CLEAN_OUTPUT_RELATIVES',
         '"target commit must differ from source"',
         '"target commit is not a descendant of source"',
+        "require_absent_build_outputs=False",
         '"source and target Debian revisions are not adjacent"',
         'verify_debian_artifact',
         'parse_aarch64_elf',

@@ -63,6 +63,15 @@ class L6ReleasePairSourceContractTests(unittest.TestCase):
                     validate_release_pair_contract(
                         replace(self.sources, builder=mutation)
                     )
+        with self.assertRaises(L6ReleasePairContractError):
+            validate_release_pair_contract(
+                replace(
+                    self.sources,
+                    tool=self.sources.tool.replace(
+                        "require_absent_build_outputs=False", ""
+                    ),
+                )
+            )
 
     def test_source_ffi_include_is_root_local_and_ambient_paths_are_scrubbed(self) -> None:
         mutations = (
