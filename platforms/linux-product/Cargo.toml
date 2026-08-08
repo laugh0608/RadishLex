@@ -1,0 +1,17 @@
+[package]
+name = "radishlex-linux-product-install"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license-file = "../../LICENSE"
+description = "Linux Debian package transaction contracts for RadishLex."
+
+[lib]
+name = "radishlex_linux_product_install"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.150"
+sha2 = "0.10.9"

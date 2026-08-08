@@ -85,6 +85,13 @@ REQUIRED_FILES = [
     "platforms/linux-fcitx5/tests/system_runtime_layout_test.cpp",
     "platforms/linux-fcitx5/tests/xdg_paths_test.cpp",
     "platforms/linux-fcitx5/tools/runtime_probe.cpp",
+    "platforms/linux-product/Cargo.toml",
+    "platforms/linux-product/README.md",
+    "platforms/linux-product/src/coordinator.rs",
+    "platforms/linux-product/src/lib.rs",
+    "platforms/linux-product/src/model.rs",
+    "platforms/linux-product/src/store.rs",
+    "platforms/linux-product/src/tests.rs",
     "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.h",
     "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.m",
     "platforms/macos-product/UpgradePreflightHost/Sources/main.m",
@@ -140,6 +147,7 @@ REQUIRED_FILES = [
     "scripts/check-linux-product-metadata.sh",
     "scripts/check-linux-product-layout.sh",
     "scripts/check-linux-deb-artifact.sh",
+    "scripts/check-linux-package-transaction.sh",
     "scripts/build-linux-product-addon-stage.sh",
     "scripts/build-linux-deb-artifact.sh",
     "scripts/linux-product/product_metadata.py",
@@ -434,6 +442,10 @@ def check_linux_deb_artifact() -> None:
     run_command([str(REPO_ROOT / "scripts/check-linux-deb-artifact.sh")])
 
 
+def check_linux_package_transaction() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-linux-package-transaction.sh")])
+
+
 def required_status_contexts(ruleset: dict[str, Any]) -> set[str]:
     for rule in ruleset.get("rules", []):
         if rule.get("type") != "required_status_checks":
@@ -603,6 +615,7 @@ def main() -> int:
     check_linux_fcitx5()
     check_linux_product_layout()
     check_linux_deb_artifact()
+    check_linux_package_transaction()
     check_ruleset_and_workflows()
     check_path_budget()
     check_deployment_evidence()
