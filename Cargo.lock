@@ -770,6 +770,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "radishlex-linux-l6-acceptance"
+version = "0.1.0"
+dependencies = [
+ "radishlex-linux-product-install",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "radishlex-linux-product-install"
 version = "0.1.0"
 dependencies = [

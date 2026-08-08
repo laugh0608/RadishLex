@@ -1,9 +1,7 @@
 use std::fmt;
 use std::io::Read;
 
-use crate::model::{
-    ArtifactVersionRelation, DataContractIdentity, LinuxArtifactIdentity, LinuxOperationKind,
-};
+use crate::model::{DataContractIdentity, LinuxArtifactIdentity};
 
 mod archive;
 mod evidence;

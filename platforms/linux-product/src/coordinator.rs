@@ -1,6 +1,9 @@
 use std::fmt;
 use std::path::Path;
 
+use crate::checkpoint::{
+    DisabledLinuxL6Checkpoints, LinuxL6Checkpoint, LinuxL6CheckpointError, LinuxL6CheckpointSink,
+};
 use crate::model::{
     ArtifactSlot, DpkgPackageState, LinuxArtifactIdentity, LinuxFailureCode, LinuxInstallReceipt,
     LinuxInstallReceiptError, LinuxInstallState, LinuxOperationKind, LinuxOperationRequest,
@@ -151,6 +154,7 @@ pub struct DpkgStagedOperation<'a> {
 }
 
 impl<'a> DpkgStagedOperation<'a> {
+    #[cfg(test)]
     pub(crate) const fn from_packages(
         source: Option<DpkgStagedPackage<'a>>,
         target: Option<DpkgStagedPackage<'a>>,
@@ -181,6 +185,7 @@ pub struct DpkgRestoreRequest<'a> {
 }
 
 impl<'a> DpkgRestoreRequest<'a> {
+    #[cfg(test)]
     pub(crate) const fn from_packages(
         desired_source: Option<DpkgStagedPackage<'a>>,
         recovery_target: Option<DpkgStagedPackage<'a>>,
@@ -373,6 +378,7 @@ pub enum TransactionError {
         failure: LinuxFailureCode,
         source: DpkgPortError,
     },
+    Checkpoint(LinuxL6CheckpointError),
     OperationNotStaged,
 }
 
@@ -380,7 +386,9 @@ impl TransactionError {
     pub const fn failure_code(&self) -> Option<LinuxFailureCode> {
         match self {
             Self::Port { failure, .. } | Self::RecoveryBlocked { failure, .. } => Some(*failure),
-            Self::Store(_) | Self::Receipt(_) | Self::OperationNotStaged => None,
+            Self::Store(_) | Self::Receipt(_) | Self::Checkpoint(_) | Self::OperationNotStaged => {
+                None
+            }
         }
     }
 }
@@ -397,6 +405,7 @@ impl fmt::Display for TransactionError {
                 formatter,
                 "source recovery remains blocked ({failure:?}): {source}"
             ),
+            Self::Checkpoint(error) => write!(formatter, "L6 checkpoint control: {error}"),
             Self::OperationNotStaged => {
                 formatter.write_str("Linux install operation is still awaiting artifact staging")
             }
@@ -415,6 +424,12 @@ impl From<LinuxInstallStoreError> for TransactionError {
 impl From<LinuxInstallReceiptError> for TransactionError {
     fn from(value: LinuxInstallReceiptError) -> Self {
         Self::Receipt(value)
+    }
+}
+
+impl From<LinuxL6CheckpointError> for TransactionError {
+    fn from(value: LinuxL6CheckpointError) -> Self {
+        Self::Checkpoint(value)
     }
 }
 
@@ -464,6 +479,16 @@ pub fn resume_operation<P: DpkgTransactionPort>(
     guard: &LinuxInstallGuard,
     port: &mut P,
 ) -> Result<TransactionOutcome, TransactionError> {
+    let mut checkpoints = DisabledLinuxL6Checkpoints;
+    resume_operation_with_checkpoints(store, guard, port, &mut checkpoints)
+}
+
+pub(crate) fn resume_operation_with_checkpoints<P: DpkgTransactionPort>(
+    store: &LinuxInstallStore,
+    guard: &LinuxInstallGuard,
+    port: &mut P,
+    checkpoints: &mut impl LinuxL6CheckpointSink,
+) -> Result<TransactionOutcome, TransactionError> {
     store.verify_guard(guard)?;
     let mut receipt = store
         .load_receipt()?
@@ -474,6 +499,7 @@ pub fn resume_operation<P: DpkgTransactionPort>(
         match receipt.state() {
             LinuxInstallState::Prepared => return Err(TransactionError::OperationNotStaged),
             LinuxInstallState::ArtifactsStaged => {
+                checkpoints.reached(LinuxL6Checkpoint::ArtifactsStaged)?;
                 if let Err(error) = validate_staged_preflight(store, port, &receipt) {
                     receipt.abort_preserved(error.failure_code())?;
                     store.persist_receipt(guard, &receipt)?;
@@ -490,6 +516,7 @@ pub fn resume_operation<P: DpkgTransactionPort>(
                 }
                 receipt.advance(LinuxInstallState::Quiesced)?;
                 store.persist_receipt(guard, &receipt)?;
+                checkpoints.reached(LinuxL6Checkpoint::Quiesced)?;
             }
             LinuxInstallState::Quiesced => {
                 if target_permit.is_none() {
@@ -510,13 +537,18 @@ pub fn resume_operation<P: DpkgTransactionPort>(
                 }
                 receipt.advance(LinuxInstallState::PackageMutating)?;
                 store.persist_receipt(guard, &receipt)?;
+                checkpoints.reached(LinuxL6Checkpoint::PackageMutatingBeforeDpkg)?;
             }
             LinuxInstallState::PackageMutating => {
-                if let Err(failure) = drive_target(store, port, &mut receipt, target_permit.take())
-                {
-                    receipt.require_rollback(failure)?;
-                    store.persist_receipt(guard, &receipt)?;
-                    continue;
+                match drive_target(store, port, &mut receipt, target_permit.take(), checkpoints) {
+                    Ok(()) => {}
+                    Err(DriveTargetError::Failure(failure)) => {
+                        receipt.require_rollback(failure)?;
+                        store.persist_receipt(guard, &receipt)?;
+                        checkpoints.reached(LinuxL6Checkpoint::RollbackRequired)?;
+                        continue;
+                    }
+                    Err(DriveTargetError::Checkpoint(error)) => return Err(error.into()),
                 }
                 store.persist_receipt(guard, &receipt)?;
                 receipt.advance(LinuxInstallState::PackageVerified)?;
@@ -527,6 +559,7 @@ pub fn resume_operation<P: DpkgTransactionPort>(
                 if let Some(failure) = failure {
                     receipt.require_rollback(failure)?;
                     store.persist_receipt(guard, &receipt)?;
+                    checkpoints.reached(LinuxL6Checkpoint::RollbackRequired)?;
                     continue;
                 }
                 receipt.advance(LinuxInstallState::Completed)?;
@@ -538,8 +571,12 @@ pub fn resume_operation<P: DpkgTransactionPort>(
                 store.persist_receipt(guard, &receipt)?;
             }
             LinuxInstallState::SourceRestoring => {
-                if let Err((failure, source)) = drive_source(store, port, &mut receipt) {
-                    return Err(TransactionError::RecoveryBlocked { failure, source });
+                match drive_source(store, port, &mut receipt, checkpoints) {
+                    Ok(()) => {}
+                    Err(DriveSourceError::Port { failure, source }) => {
+                        return Err(TransactionError::RecoveryBlocked { failure, source });
+                    }
+                    Err(DriveSourceError::Checkpoint(error)) => return Err(error.into()),
                 }
                 store.persist_receipt(guard, &receipt)?;
                 receipt.advance(LinuxInstallState::SourceVerified)?;
@@ -568,7 +605,8 @@ fn drive_target<P: DpkgTransactionPort>(
     port: &mut P,
     receipt: &mut LinuxInstallReceipt,
     permit: Option<P::QuiescencePermit>,
-) -> Result<(), LinuxFailureCode> {
+    checkpoints: &mut impl LinuxL6CheckpointSink,
+) -> Result<(), DriveTargetError> {
     let context = DpkgOperationContext::Resuming { receipt };
     let resolved_staged =
         ResolvedStagedOperation::load(store, receipt).map_err(|error| error.failure_code())?;
@@ -581,7 +619,7 @@ fn drive_target<P: DpkgTransactionPort>(
         .inspect_package(context)
         .map_err(|error| error.failure_code())?;
     if snapshot.state() == DpkgPackageState::Unknown {
-        return Err(LinuxFailureCode::PackageStateUnknown);
+        return Err(LinuxFailureCode::PackageStateUnknown.into());
     }
     if receipt.matches_target(&snapshot) {
         let expected = target_expectation(receipt)?;
@@ -602,14 +640,14 @@ fn drive_target<P: DpkgTransactionPort>(
             Err(error)
                 if receipt.operation_kind() == LinuxOperationKind::Repair
                     && error.code() == DpkgPortErrorCode::ProductValidationFailed => {}
-            Err(error) => return Err(error.failure_code()),
+            Err(error) => return Err(error.failure_code().into()),
         }
     }
 
     if !receipt.source_snapshot_is_mutation_precondition(&snapshot)
         && !target_is_recoverable(receipt, &snapshot)
     {
-        return Err(LinuxFailureCode::PackageStateUnexpected);
+        return Err(LinuxFailureCode::PackageStateUnexpected.into());
     }
     let permit = permit
         .map_or_else(
@@ -628,6 +666,9 @@ fn drive_target<P: DpkgTransactionPort>(
         port.apply_package(context, target, permit)
             .map_err(|error| error.failure_code())?;
     }
+    checkpoints
+        .reached(LinuxL6Checkpoint::TargetAppliedBeforeProof)
+        .map_err(DriveTargetError::Checkpoint)?;
 
     let context = DpkgOperationContext::Resuming { receipt };
     let target_snapshot = port
@@ -635,7 +676,7 @@ fn drive_target<P: DpkgTransactionPort>(
         .map_err(|error| error.failure_code())?;
     let expected = target_expectation(receipt)?;
     if !receipt.matches_target(&target_snapshot) {
-        return Err(LinuxFailureCode::TargetValidationFailed);
+        return Err(LinuxFailureCode::TargetValidationFailed.into());
     }
     port.validate_product(
         context,
@@ -646,14 +687,26 @@ fn drive_target<P: DpkgTransactionPort>(
     .map_err(|error| error.failure_code())?;
     receipt
         .record_target_proof(target_snapshot)
-        .map_err(|_| LinuxFailureCode::ReceiptInconsistent)
+        .map_err(|_| LinuxFailureCode::ReceiptInconsistent.into())
+}
+
+enum DriveTargetError {
+    Failure(LinuxFailureCode),
+    Checkpoint(LinuxL6CheckpointError),
+}
+
+impl From<LinuxFailureCode> for DriveTargetError {
+    fn from(value: LinuxFailureCode) -> Self {
+        Self::Failure(value)
+    }
 }
 
 fn drive_source<P: DpkgTransactionPort>(
     store: &LinuxInstallStore,
     port: &mut P,
     receipt: &mut LinuxInstallReceipt,
-) -> Result<(), (LinuxFailureCode, DpkgPortError)> {
+    checkpoints: &mut impl LinuxL6CheckpointSink,
+) -> Result<(), DriveSourceError> {
     let context = DpkgOperationContext::Resuming { receipt };
     let resolved_staged = ResolvedStagedOperation::load(store, receipt)
         .map_err(|error| (error.failure_code(), error))?;
@@ -678,7 +731,7 @@ fn drive_source<P: DpkgTransactionPort>(
         ) {
             Ok(()) => true,
             Err(error) if error.code() == DpkgPortErrorCode::ProductValidationFailed => false,
-            Err(error) => return Err((error.failure_code(), error)),
+            Err(error) => return Err((error.failure_code(), error).into()),
         }
     } else {
         false
@@ -695,6 +748,9 @@ fn drive_source<P: DpkgTransactionPort>(
         let permit = port
             .prove_quiescent(context, DpkgQuiescencePhase::SourceRestore)
             .map_err(|error| (error.failure_code(), error))?;
+        checkpoints
+            .reached(LinuxL6Checkpoint::SourceRestoringBeforeDpkg)
+            .map_err(DriveSourceError::Checkpoint)?;
         port.restore_source(
             context,
             DpkgRestoreRequest {
@@ -704,14 +760,17 @@ fn drive_source<P: DpkgTransactionPort>(
             permit,
         )
         .map_err(|error| (error.failure_code(), error))?;
+        checkpoints
+            .reached(LinuxL6Checkpoint::SourceAppliedBeforeProof)
+            .map_err(DriveSourceError::Checkpoint)?;
         snapshot = port
             .inspect_package(context)
             .map_err(|error| (error.failure_code(), error))?;
     }
     if !receipt.matches_source(&snapshot) {
-        return Err(source_validation_error(
-            "source package state does not match the receipt",
-        ));
+        return Err(
+            source_validation_error("source package state does not match the receipt").into(),
+        );
     }
     port.validate_product(
         context,
@@ -722,7 +781,21 @@ fn drive_source<P: DpkgTransactionPort>(
     .map_err(|error| (error.failure_code(), error))?;
     receipt
         .record_source_proof(snapshot)
-        .map_err(|_| receipt_port_error(LinuxFailureCode::ReceiptInconsistent))
+        .map_err(|_| receipt_port_error(LinuxFailureCode::ReceiptInconsistent).into())
+}
+
+enum DriveSourceError {
+    Port {
+        failure: LinuxFailureCode,
+        source: DpkgPortError,
+    },
+    Checkpoint(LinuxL6CheckpointError),
+}
+
+impl From<(LinuxFailureCode, DpkgPortError)> for DriveSourceError {
+    fn from((failure, source): (LinuxFailureCode, DpkgPortError)) -> Self {
+        Self::Port { failure, source }
+    }
 }
 
 struct ResolvedStagedOperation {

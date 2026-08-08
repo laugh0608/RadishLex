@@ -548,37 +548,65 @@ impl ArtifactFileIdentity {
         &self.sha256
     }
 
-    #[cfg(any(target_os = "linux", all(test, unix)))]
+    #[cfg(any(
+        target_os = "linux",
+        all(feature = "l6-acceptance-checkpoints", unix),
+        all(test, unix)
+    ))]
     pub(crate) const fn device_id(&self) -> u64 {
         self.device_id
     }
 
-    #[cfg(any(target_os = "linux", all(test, unix)))]
+    #[cfg(any(
+        target_os = "linux",
+        all(feature = "l6-acceptance-checkpoints", unix),
+        all(test, unix)
+    ))]
     pub(crate) const fn inode(&self) -> u64 {
         self.inode
     }
 
-    #[cfg(any(target_os = "linux", all(test, unix)))]
+    #[cfg(any(
+        target_os = "linux",
+        all(feature = "l6-acceptance-checkpoints", unix),
+        all(test, unix)
+    ))]
     pub(crate) const fn owner_id(&self) -> u32 {
         self.owner_id
     }
 
-    #[cfg(any(target_os = "linux", all(test, unix)))]
+    #[cfg(any(
+        target_os = "linux",
+        all(feature = "l6-acceptance-checkpoints", unix),
+        all(test, unix)
+    ))]
     pub(crate) const fn group_id(&self) -> u32 {
         self.group_id
     }
 
-    #[cfg(any(target_os = "linux", all(test, unix)))]
+    #[cfg(any(
+        target_os = "linux",
+        all(feature = "l6-acceptance-checkpoints", unix),
+        all(test, unix)
+    ))]
     pub(crate) const fn mode(&self) -> u32 {
         self.mode
     }
 
-    #[cfg(any(target_os = "linux", all(test, unix)))]
+    #[cfg(any(
+        target_os = "linux",
+        all(feature = "l6-acceptance-checkpoints", unix),
+        all(test, unix)
+    ))]
     pub(crate) const fn hardlink_count(&self) -> u64 {
         self.hardlink_count
     }
 
-    #[cfg(any(target_os = "linux", all(test, unix)))]
+    #[cfg(any(
+        target_os = "linux",
+        all(feature = "l6-acceptance-checkpoints", unix),
+        all(test, unix)
+    ))]
     pub(crate) const fn size(&self) -> u64 {
         self.size
     }
@@ -639,12 +667,20 @@ impl StagedArtifactEvidence {
         &self.artifact
     }
 
-    #[cfg(any(target_os = "linux", all(test, unix)))]
+    #[cfg(any(
+        target_os = "linux",
+        all(feature = "l6-acceptance-checkpoints", unix),
+        all(test, unix)
+    ))]
     pub(crate) fn package_file(&self) -> &ArtifactFileIdentity {
         &self.package_file
     }
 
-    #[cfg(any(target_os = "linux", all(test, unix)))]
+    #[cfg(any(
+        target_os = "linux",
+        all(feature = "l6-acceptance-checkpoints", unix),
+        all(test, unix)
+    ))]
     pub(crate) fn evidence_file(&self) -> &ArtifactFileIdentity {
         &self.evidence_file
     }

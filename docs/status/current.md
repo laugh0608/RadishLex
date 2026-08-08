@@ -7,7 +7,7 @@
 - 复核日期：2026-08-08（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- production 代码与合成门禁已闭合；L6 format v1 已固定独立 guest、release pair、六步主序列、八个 crash checkpoint 与 probe/证据边界。acceptance checkpoint controller、ARM64 source/target 重建和真实 Linux `/proc`、`dpkg` mutation、外部 package lifecycle、系统安装与 P05C 尚未执行。真实用户同步继续关闭。
+- production 代码与合成门禁已闭合；L6 format v1、compile-isolated acceptance checkpoint/evidence controller、六步主序列、八点确定性 crash/recovery 合成矩阵与 canonical 脱敏 evidence 已完成。ARM64 source/target 重建和真实 Linux `/proc`、`dpkg` mutation、外部 package lifecycle、系统安装与 P05C 尚未执行。真实用户同步继续关闭。
 
 ## P04 冻结基线
 
@@ -40,7 +40,9 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 - process quiescence 扫描 `/proc/*/maps` 的固定路径与 device/inode，匿名映射不误报，缺权限、畸形或竞态不确定性失败关闭；它不 kill、restart 或操作会话。受控 CLI 是 opaque command，只接受精确 operation ID、root-owned 同名 `.deb`/evidence，以及 `--authorized-system-mutation` 与 `--preserve-user-data` 双显式授权。
 - 只读 startup observer 已把 terminal staging 中的 actual `.deb`、完整 dpkg dependency relationship 与 component inventory 串联；Manager 在 Flutter 前、Fcitx 在 Engine/input FFI/XDG/Rime 前取得 permit。字体 family/glyph/owner 与真实 process/package-manager 行为仍留给 L6。
 - 未知 package state、半配置、active/异常 guard、tmp/nonterminal receipt、缺失/多余 slot、symlink/hardlink、宽权限或 owner/mode/link/hash/version/ABI 漂移均失败关闭并保留现场。
-- `packaging/linux/l6-matrix.json` 已固定 `debian13-arm64-ephemeral-v1`：专用 `radishlex-l6` 用户、不同 commit 的相邻 Debian revision、install→upgrade→repair→rollback→remove→reinstall、八个完成/回退 crash case、字体/startup/XDG/procfs 证据与逐 mutation 授权。当前门禁只验证合同；不得用 receipt 轮询竞态替代尚未实现的确定性 checkpoint controller。
+- `packaging/linux/l6-matrix.json` 已固定 `debian13-arm64-ephemeral-v1`：专用 `radishlex-l6` 用户、不同 commit 的相邻 Debian revision、install→upgrade→repair→rollback→remove→reinstall、八个完成/回退 crash case、字体/startup/XDG/procfs 证据与逐 mutation 授权。matrix 门禁只验证合同；controller 门禁只验证编译身份与合成中断/恢复，二者都不证明真实 L6 已执行。
+- 独立 `platforms/linux-l6-acceptance/` 只通过默认关闭的 `l6-acceptance-checkpoints` compile feature 取得八个 hook；production maintenance binary 不识别 acceptance 参数，也没有环境变量或路径开关。`prepared` 只在全部必需 artifact 已私有取证且 receipt 尚未进入 `artifacts_staged` 时通知；其余位置分别绑定 persisted state 或真实 target/source dpkg 调用前后，不轮询 receipt。
+- acceptance worker 以继承 pipe 发送 typed checkpoint 并暂停，controller 终止 worker 新建的完整 process group、等待 `SIGKILL`，再连续复验 `/proc/*/stat` 中 group member 为零且无 `dpkg` child，之后才形成 `radishlex-linux-l6-checkpoint-evidence-v1`。evidence 只保存 operation ID SHA-256 与稳定分类，不保存原值、PID、路径、proc/dpkg 原文或用户数据；实际 controller/CLI 仍未运行。
 
 ## 停止线
 
@@ -51,8 +53,8 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 
 ## 下一步顺位
 
-1. 实现独立 compile identity 的 L6 acceptance checkpoint controller 与 canonical evidence envelope，不给 production runtime 增加环境变量/路径覆盖或竞态信号注入。
-2. 另行授权准备隔离 Debian 13 ARM64 guest，分别从两个不同 commit 重建并冻结相邻 Debian revision 的 source/target；随后按 matrix 逐项授权真实 `/proc`、dpkg lifecycle、crash/retry、source restore、startup、字体与 XDG 对照。
+1. 另行授权准备隔离 Debian 13 ARM64 guest，分别从两个不同 commit 重建并冻结相邻 Debian revision 的 source/target 与 acceptance executable identity。
+2. 按 matrix 逐项授权真实 `/proc`、dpkg lifecycle、六步主序列、八个 controller crash/retry、source restore、startup、字体、重启与 XDG 对照；每一步单独授权并保留现场。
 3. L6 自动证据闭合后另行授权 P05C 独立 guest 实机；旧资产清理、远端、发布、真实同步和其他平台继续独立排期。
 
 ## 验证入口
@@ -64,6 +66,7 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 ./scripts/check-linux-package-transaction.sh
 ./scripts/check-linux-startup-gate.sh
 ./scripts/check-linux-l6-contract.sh
+./scripts/check-linux-l6-controller.sh
 ./scripts/check-linux-fcitx5.sh
 ./scripts/check-manager-linux-product.sh
 ./scripts/check-repo.sh
@@ -72,7 +75,7 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 git diff --check
 ```
 
-上述入口只证明仓库合同、production 代码可编译、合成命令/进程/crash 状态、L6 matrix 与已记录的未安装载体证据；本批没有调用维护 CLI 或 `/usr/bin/dpkg`，不证明 checkpoint controller、新的 ARM64 startup-enabled release pair、真实 mutation、桌面安装或公开发布。
+上述入口只证明仓库合同、production/acceptance compile identity、合成命令/进程/crash/recovery/evidence 状态、L6 matrix 与已记录的未安装载体证据；本批没有调用 maintenance/acceptance CLI 或 `/usr/bin/dpkg`，不证明新的 ARM64 startup-enabled release pair、真实 process-group/dpkg mutation、桌面安装或公开发布。
 
 ## 阅读索引
 

@@ -6,9 +6,10 @@
 
 ```bash
 ./scripts/check-linux-l6-contract.sh
+./scripts/check-linux-l6-controller.sh
 ```
 
-该入口只验证矩阵结构与负向合同，不连接 guest、不读取真实 `/proc`、不执行 package 命令，也不证明 L6 已通过。
+两个入口分别验证 matrix format 与 compile-isolated controller 合同；都不连接 guest、不读取真实 `/proc`、不执行 package 命令，也不证明 L6 已通过。
 
 ## 当前执行状态
 
@@ -16,8 +17,8 @@
 
 - production transaction/startup 代码、actual `.deb` verifier 和 fake command/crash matrix 已完成；
 - L6 guest、release pair、六步事务顺序、八个 crash checkpoint、字体/startup/XDG probe 和证据保留规则已由 format v1 固定；
+- compile-identity 隔离的 acceptance checkpoint/evidence controller 已完成，八点合成中断/恢复与 canonical 脱敏 envelope 已通过专项门禁；
 - source/target ARM64 载体尚未按本 runbook 重新构建和冻结；
-- acceptance checkpoint controller 尚未实现，不能用轮询 receipt 后抢时机发送信号冒充确定性 crash；
 - 没有打开或修改 Linux VM，没有执行真实 `dpkg`、`/proc` probe、字体 probe、Manager/Fcitx 启动或系统安装。
 
 ## 1. 环境身份
@@ -55,14 +56,14 @@ source/target 必须是两个不同 commit 形成的真实载体，不允许复�
 3. 两个 commit 都必须已经包含 production startup gate、system port 和受控维护 host；
 4. 每个 commit 独立从干净源码构建 Manager、system-profile addon、rootfs、`.deb` 和 evidence，并分别通过 L1-L5；
 5. 两个 package SHA-256、evidence SHA-256、product manifest SHA-256、control version、文件大小、构建 commit 与构建环境进入 L6 input record；
-6. target maintenance executable 另行记录 commit、size、SHA-256、ELF architecture/loader 和 root-owned handoff identity；它不是 package payload或公开 installer；
+6. target maintenance 与 acceptance executable 分别记录 compile identity、commit、size、SHA-256、ELF architecture/loader 和 root-owned handoff identity；二者都不是 package payload或公开 installer；
 7. 两个 artifact pair 在 guest 固定进入 `/var/tmp/radishlex-l6-inputs`，复制后改为 root ownership，再由 production verifier 重新打开和取证。
 
 source/target 的 build number 相同不表示两者是同一 package：Debian revision、manifest、control、package/evidence hash 必须不同。该 pair 只证明首版 Linux package 事务兼容，不宣称跨数据 schema 升级或公开发行兼容。
 
 ## 4. 证据 envelope
 
-一次 L6 session 只产生一个 canonical JSON evidence envelope，至少绑定：
+每个 crash case 先由 controller 产生一个 `radishlex-linux-l6-checkpoint-evidence-v1` canonical JSON envelope；完整 L6 session 再把八份 checkpoint envelope 与主序列/probe 结果收敛进唯一 session envelope。session 至少绑定：
 
 - matrix format/profile 与仓库 commit；
 - guest/snapshot identity；
@@ -76,6 +77,8 @@ source/target 的 build number 相同不表示两者是同一 package：Debian r
 - 执行者授权时间、命令退出分类和停止线事件。
 
 证据不得包含 `.deb` 正文、receipt operation ID、绝对构建路径、PID、`/proc/*/maps` 正文、dpkg stdout/stderr、用户词、选择事件、导入导出内容或真实用户目录内容。
+
+checkpoint envelope 只保存 matrix/build/scenario/checkpoint、repository/guest/snapshot identity、operation ID SHA-256、授权/fault/termination 分类、完整 process group 清空结论和 expected terminal。固定 writer 使用 deny-unknown-fields 的 canonical pretty JSON 与末尾换行；不接受调用方提供输出根。合成门禁验证该格式，但不会写固定 evidence root。
 
 ## 5. XDG 对照
 
@@ -132,7 +135,7 @@ checkpoint controller 必须是显式 acceptance 构建身份，以不可由 pro
 - 使用 `--force-*`、手工改 dpkg status、手工改 receipt 或删除 staging 让恢复“通过”；
 - 在同一 clone 连续执行多个 crash case。
 
-acceptance checkpoint controller 尚未实现，因此本节当前只是已经门禁化的下一实现输入，不是可执行授权。
+实现位于独立 `platforms/linux-l6-acceptance/` crate。production crate 的 `l6-acceptance-checkpoints` feature 默认关闭，production main 只连接 disabled sink，不识别 acceptance 参数；acceptance worker 通过继承 pipe 发送 typed checkpoint 并暂停。controller 创建独立 process group，命中后用固定 `/usr/bin/kill` 发送 `SIGKILL`，等待 worker signal 终止，并连续复验 `/proc/*/stat` 中 group member 为零且没有 `dpkg` child，满足全部条件后才允许写 evidence。`crash` 命令还必须同时具备 `--authorized-l6-crash` 与 production mutation/data-preservation 授权；本节仍不构成运行授权。
 
 ## 8. 系统、字体与 startup probe
 

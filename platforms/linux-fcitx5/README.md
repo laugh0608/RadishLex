@@ -15,6 +15,7 @@ M5-P02 已经建立真实 C++ 源码、CMake target、addon/input method metadat
 - P05A 新增独立 `system` profile：产品 addon 仍以 `$ORIGIN` 定位 sibling FFI，但 Rime shared data 固定为 `/usr/share/radishlex/rime`，metadata 使用 Linux product version；默认 staged profile 不变；
 - P05A 已从 committed `e1ce740` 的全新 Debian 13.6 ARM64 源码构建真实 Manager/addon，通过双 FFI、ELF/closure、RPATH、系统字体和无 repo/home/staging 路径的临时 rootfs 强门禁；
 - P05B 新增 Manager/Fcitx 共用只读 startup binding：`development-staged`/`debian-system-product` 编译身份分别只接受对应 allow，调用 startup ABI 前以 `dladdr`/canonical path 绑定精确 sibling FFI，Fcitx 另复验全部输入 FFI symbol origins；factory 在 Engine、input FFI、XDG、privacy 与 Rime 初始化前取得 move-only permit；
+- P05B 的 L6 format v1 与独立 acceptance compile identity 已固定八个确定 checkpoint、完整测试 process group 终止和 canonical 脱敏 evidence；该 controller 不进入 addon 或 production maintenance runtime，也尚未在真实 ARM64 guest 执行；
 - `radishlex_runtime_probe` 在相同 Linux 环境先校验装配文件、symlink 和权限，再对 staged `radishlex.so` 执行 `dlopen(RTLD_NOW)`；
 - 当前 CMake/CTest 复验 application context、FFI projection、两种 startup 编译身份、XDG resolver、Manager runtime、privacy monitor、Fcitx candidate key，以及 staged/system runtime layout 共 10 项 contract。
 

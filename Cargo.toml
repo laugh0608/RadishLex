@@ -19,6 +19,7 @@ members = [
     "platforms/macos-product/InstallerBridge",
     "platforms/macos-product/UpgradeCoordinatorAdapter",
     "platforms/linux-product",
+    "platforms/linux-l6-acceptance",
 ]
 resolver = "2"
 

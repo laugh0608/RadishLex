@@ -3,8 +3,12 @@ use std::fs;
 use std::io;
 use std::path::{Component, Path, PathBuf};
 
+#[cfg(feature = "l6-acceptance-checkpoints")]
+use crate::checkpoint::RejectingTargetValidationPort;
+use crate::checkpoint::{DisabledLinuxL6Checkpoints, LinuxL6Checkpoint, LinuxL6CheckpointSink};
 use crate::coordinator::{
-    prepare_operation, resume_operation, TransactionError, TransactionOutcome,
+    prepare_operation, resume_operation_with_checkpoints, DpkgTransactionPort, TransactionError,
+    TransactionOutcome,
 };
 use crate::debian::{validate_operation_relation, VerifiedArtifactRelationship};
 use crate::model::{ArtifactSlot, LinuxFailureCode, LinuxOperationKind, LinuxOperationRequest};
@@ -211,11 +215,58 @@ impl LinuxMaintenanceCommand {
             _ => Err(argument_invalid()),
         }
     }
+
+    pub fn operation_id(&self) -> &str {
+        match &self.action {
+            LinuxMaintenanceAction::Start { operation_id, .. }
+            | LinuxMaintenanceAction::Resume { operation_id } => operation_id,
+        }
+    }
+
+    pub const fn operation_kind(&self) -> Option<LinuxOperationKind> {
+        match &self.action {
+            LinuxMaintenanceAction::Start { kind, .. } => Some(*kind),
+            LinuxMaintenanceAction::Resume { .. } => None,
+        }
+    }
+
+    pub const fn is_start(&self) -> bool {
+        matches!(&self.action, LinuxMaintenanceAction::Start { .. })
+    }
 }
 
 pub fn run_linux_maintenance(
     command: LinuxMaintenanceCommand,
 ) -> Result<TransactionOutcome, LinuxMaintenanceHostError> {
+    let mut checkpoints = DisabledLinuxL6Checkpoints;
+    run_linux_maintenance_with_port_factory(command, &mut checkpoints, |relationships| {
+        LinuxDpkgTransactionPort::system(relationships)
+    })
+}
+
+#[cfg(feature = "l6-acceptance-checkpoints")]
+pub fn run_linux_maintenance_with_l6_checkpoints(
+    command: LinuxMaintenanceCommand,
+    checkpoints: &mut impl LinuxL6CheckpointSink,
+    reject_target_validation: bool,
+) -> Result<TransactionOutcome, LinuxMaintenanceHostError> {
+    run_linux_maintenance_with_port_factory(command, checkpoints, |relationships| {
+        RejectingTargetValidationPort::new(
+            LinuxDpkgTransactionPort::system(relationships),
+            reject_target_validation,
+        )
+    })
+}
+
+fn run_linux_maintenance_with_port_factory<P, F>(
+    command: LinuxMaintenanceCommand,
+    checkpoints: &mut impl LinuxL6CheckpointSink,
+    mut port_factory: F,
+) -> Result<TransactionOutcome, LinuxMaintenanceHostError>
+where
+    P: DpkgTransactionPort,
+    F: FnMut(Vec<VerifiedArtifactRelationship>) -> P,
+{
     validate_effective_root().map_err(observation_error)?;
     match command.action {
         LinuxMaintenanceAction::Start {
@@ -223,17 +274,32 @@ pub fn run_linux_maintenance(
             kind,
             source,
             target,
-        } => start_operation(operation_id, kind, source, target),
-        LinuxMaintenanceAction::Resume { operation_id } => resume_existing(operation_id),
+        } => start_operation(
+            operation_id,
+            kind,
+            source,
+            target,
+            checkpoints,
+            &mut port_factory,
+        ),
+        LinuxMaintenanceAction::Resume { operation_id } => {
+            resume_existing(operation_id, checkpoints, &mut port_factory)
+        }
     }
 }
 
-fn start_operation(
+fn start_operation<P, F>(
     operation_id: String,
     kind: LinuxOperationKind,
     source: Option<LinuxMaintenanceArtifactInput>,
     target: Option<LinuxMaintenanceArtifactInput>,
-) -> Result<TransactionOutcome, LinuxMaintenanceHostError> {
+    checkpoints: &mut impl LinuxL6CheckpointSink,
+    port_factory: &mut F,
+) -> Result<TransactionOutcome, LinuxMaintenanceHostError>
+where
+    P: DpkgTransactionPort,
+    F: FnMut(Vec<VerifiedArtifactRelationship>) -> P,
+{
     let source_relationship = source.as_ref().map(verify_input).transpose()?;
     let target_relationship = target.as_ref().map(verify_input).transpose()?;
     let effective_source = if kind == LinuxOperationKind::Repair {
@@ -278,7 +344,7 @@ fn start_operation(
     }
     let store = LinuxInstallStore::bootstrap_system().map_err(store_error)?;
     let guard = store.acquire_guard().map_err(store_error)?;
-    let mut port = LinuxDpkgTransactionPort::system(relationships);
+    let mut port = port_factory(relationships);
     prepare_operation(&store, &guard, request, &mut port).map_err(transaction_error)?;
     if matches!(
         kind,
@@ -305,11 +371,35 @@ fn start_operation(
             )
             .map_err(store_error)?;
     }
-    store.finish_staging(&guard).map_err(store_error)?;
-    resume_operation(&store, &guard, &mut port).map_err(transaction_error)
+    finish_staging_at_prepared_checkpoint(&store, &guard, checkpoints)?;
+    resume_operation_with_checkpoints(&store, &guard, &mut port, checkpoints)
+        .map_err(transaction_error)
 }
 
-fn resume_existing(operation_id: String) -> Result<TransactionOutcome, LinuxMaintenanceHostError> {
+pub(crate) fn finish_staging_at_prepared_checkpoint(
+    store: &LinuxInstallStore,
+    guard: &crate::store::LinuxInstallGuard,
+    checkpoints: &mut impl LinuxL6CheckpointSink,
+) -> Result<(), LinuxMaintenanceHostError> {
+    store
+        .verify_prepared_staging_complete(guard)
+        .map_err(store_error)?;
+    checkpoints
+        .reached(LinuxL6Checkpoint::Prepared)
+        .map_err(checkpoint_error)?;
+    store.finish_staging(guard).map_err(store_error)?;
+    Ok(())
+}
+
+fn resume_existing<P, F>(
+    operation_id: String,
+    checkpoints: &mut impl LinuxL6CheckpointSink,
+    port_factory: &mut F,
+) -> Result<TransactionOutcome, LinuxMaintenanceHostError>
+where
+    P: DpkgTransactionPort,
+    F: FnMut(Vec<VerifiedArtifactRelationship>) -> P,
+{
     match fs::symlink_metadata(SYSTEM_STATE_ROOT) {
         Ok(_) => {}
         Err(error) if error.kind() == io::ErrorKind::NotFound => {
@@ -343,8 +433,21 @@ fn resume_existing(operation_id: String) -> Result<TransactionOutcome, LinuxMain
             "maintenance operation identity differs from the receipt",
         ));
     }
-    let mut port = LinuxDpkgTransactionPort::system(Vec::new());
-    resume_operation(&store, &guard, &mut port).map_err(transaction_error)
+    if receipt.state() == crate::model::LinuxInstallState::Prepared {
+        store.finish_staging(&guard).map_err(store_error)?;
+    }
+    let mut port = port_factory(Vec::new());
+    resume_operation_with_checkpoints(&store, &guard, &mut port, checkpoints)
+        .map_err(transaction_error)
+}
+
+fn checkpoint_error(
+    _error: crate::checkpoint::LinuxL6CheckpointError,
+) -> LinuxMaintenanceHostError {
+    LinuxMaintenanceHostError::new(
+        LinuxMaintenanceHostErrorCode::Transaction,
+        "L6 checkpoint control failed",
+    )
 }
 
 fn verify_input(

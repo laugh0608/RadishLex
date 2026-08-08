@@ -1,3 +1,4 @@
+#[cfg(any(target_os = "linux", all(test, unix)))]
 use std::collections::BTreeSet;
 #[cfg(target_os = "linux")]
 use std::fs::{self, File};
@@ -110,6 +111,7 @@ fn read_process_maps(path: &Path) -> Result<String, LinuxSystemObservationError>
     })
 }
 
+#[cfg(any(target_os = "linux", all(test, unix)))]
 fn mapping_matches_product(
     line: &str,
     target_paths: &[&str],
@@ -139,6 +141,7 @@ fn mapping_matches_product(
     Ok(inode != 0 && target_files.contains(&(device_major, device_minor, inode)))
 }
 
+#[cfg(any(target_os = "linux", all(test, unix)))]
 fn take_mapping_token(value: &str) -> Result<(&str, &str), LinuxSystemObservationError> {
     let value = value.trim_start();
     let end = value
@@ -151,6 +154,7 @@ fn take_mapping_token(value: &str) -> Result<(&str, &str), LinuxSystemObservatio
     Ok((token, &value[end..]))
 }
 
+#[cfg(any(target_os = "linux", all(test, unix)))]
 fn take_final_mapping_token(value: &str) -> Result<(&str, &str), LinuxSystemObservationError> {
     let value = value.trim_start();
     if value.is_empty() {
@@ -162,6 +166,7 @@ fn take_final_mapping_token(value: &str) -> Result<(&str, &str), LinuxSystemObse
     })
 }
 
+#[cfg(any(target_os = "linux", all(test, unix)))]
 fn malformed_mapping() -> LinuxSystemObservationError {
     LinuxSystemObservationError::new(
         LinuxSystemObservationErrorCode::ProcessInspectionUnavailable,

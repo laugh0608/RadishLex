@@ -582,6 +582,37 @@ impl LinuxInstallStore {
                 "artifact staging cannot finish from the current operation state",
             ));
         }
+        self.verify_prepared_staging(&receipt)?;
+        receipt.advance(LinuxInstallState::ArtifactsStaged)?;
+        self.persist_receipt(guard, &receipt)?;
+        Ok(receipt)
+    }
+
+    pub(crate) fn verify_prepared_staging_complete(
+        &self,
+        guard: &LinuxInstallGuard,
+    ) -> Result<LinuxInstallReceipt, LinuxInstallStoreError> {
+        self.verify_guard(guard)?;
+        let receipt = self.load_receipt()?.ok_or_else(|| {
+            LinuxInstallStoreError::new(
+                LinuxInstallStoreErrorCode::ReceiptInvalid,
+                "artifact staging requires a prepared receipt",
+            )
+        })?;
+        if receipt.state() != LinuxInstallState::Prepared {
+            return Err(LinuxInstallStoreError::new(
+                LinuxInstallStoreErrorCode::ReceiptReplacementDenied,
+                "prepared staging checkpoint requires the prepared state",
+            ));
+        }
+        self.verify_prepared_staging(&receipt)?;
+        Ok(receipt)
+    }
+
+    fn verify_prepared_staging(
+        &self,
+        receipt: &LinuxInstallReceipt,
+    ) -> Result<(), LinuxInstallStoreError> {
         for slot in receipt.required_slots() {
             if receipt.staged_artifact(*slot).is_none() {
                 return Err(LinuxInstallStoreError::new(
@@ -591,9 +622,7 @@ impl LinuxInstallStore {
             }
             self.staged_artifact_paths(receipt.operation_id(), *slot)?;
         }
-        receipt.advance(LinuxInstallState::ArtifactsStaged)?;
-        self.persist_receipt(guard, &receipt)?;
-        Ok(receipt)
+        Ok(())
     }
 
     pub fn staged_artifact_paths(

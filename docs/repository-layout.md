@@ -58,6 +58,10 @@ RadishLex/
       Cargo.toml
       README.md
       src/
+    linux-l6-acceptance/
+      Cargo.toml
+      README.md
+      src/
     macos-imk/
       Sources/
       Resources/
@@ -132,7 +136,7 @@ RadishLex/
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
 | 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
 | Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁；M4 外层 install gate、数据 gate 与升级 validation helper；M5 Linux runner、固定 `.so`、共享 XDG/privacy source contract、ARM64 Release bundle、同库学习/删除/导入导出与重启实机证据，以及 Flutter 初始化前的 Linux 只读 startup gate | Linux system package 实机；真实用户同步入口与首版后的目标部署证据 |
-| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；build 38 双 bundle、locked RimeData、数据/安装 gate、Installer、社区 ad-hoc identity、DMG evidence、首次安装/输入/修复/默认移除实机证据；Linux Fcitx5 C++/CMake addon、ABI/XDG/staged/system runtime-layout/Manager runtime/privacy/classifier contract、Debian 13 ARM64 Wayland/X11 输入及 Manager 同库个人化证据；Linux metadata/rootfs、真实 ARM64 product payload、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控 CLI、Manager/Fcitx 共用 startup gate 与 L6 format v1；Android Keystore 能力验证桥 | macOS 真实跨发布升级；Linux acceptance checkpoint/evidence controller、隔离 L6 真实 process/dpkg/crash/font/XDG matrix 与独立安装实机；完整 Android IME、Windows TSF 与 iOS Keyboard Extension |
+| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；build 38 双 bundle、locked RimeData、数据/安装 gate、Installer、社区 ad-hoc identity、DMG evidence、首次安装/输入/修复/默认移除实机证据；Linux Fcitx5 C++/CMake addon、ABI/XDG/staged/system runtime-layout/Manager runtime/privacy/classifier contract、Debian 13 ARM64 Wayland/X11 输入及 Manager 同库个人化证据；Linux metadata/rootfs、真实 ARM64 product payload、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控 CLI、Manager/Fcitx 共用 startup gate、L6 format v1 与 compile-isolated checkpoint/evidence controller；Android Keystore 能力验证桥 | macOS 真实跨发布升级；Linux ARM64 release pair、隔离 L6 真实 process/dpkg/crash/font/XDG matrix 与独立安装实机；完整 Android IME、Windows TSF 与 iOS Keyboard Extension |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
 
@@ -378,7 +382,9 @@ production-only `VerifiedArtifactRelationship::verify_package` 从 actual `.deb`
 
 startup observer 只读 `/var/lib/dpkg/status`、guard/tmp/receipt、terminal actual package/dependency relationship 与 component identity；Manager/Fcitx 在业务初始化前通过 additive request/result v1 取得 decision，C++ binding 以 `dladdr`/canonical path 拒绝错误 sibling symbol。production system 实现与 fake command/crash matrix 已进入 crate，但尚未在 Linux 执行真实 `/proc` 或 `dpkg`；普通门禁只用 actual 合成 artifact、fake executor/observer 与临时目录，不写 `/usr`、`/var`、XDG 或既有 guest。
 
-`packaging/linux/l6-matrix.json` 与 `scripts/linux-product/l6_contract.py` 固定独立 Debian 13 ARM64 guest、不同 commit 的相邻 Debian revision、六步主序列、八个 crash checkpoint、字体/startup/XDG/procfs probe 和逐 mutation 授权；`./scripts/check-linux-l6-contract.sh` 只验证该合同。执行说明位于 [Linux L6 Debian package matrix runbook](runbooks/linux-l6-package-matrix.md)。acceptance checkpoint/evidence controller 和真实 guest 证据尚未落地，不能把 matrix gate 写成 L6 通过。
+`platforms/linux-l6-acceptance/` 是独立 workspace crate 和二进制 compile identity。它只通过 production crate 默认关闭的 `l6-acceptance-checkpoints` feature 取得八个 hook；production maintenance main 不链接调用入口、不识别参数，也没有环境/路径开关。worker 通过继承 pipe 在确定位置暂停，controller 杀独立完整 process group、等待 `SIGKILL` 并复验 `/proc/*/stat` 中 group member 为零且无 `dpkg` child，之后才形成 canonical `radishlex-linux-l6-checkpoint-evidence-v1`。envelope 只保存 operation ID hash 与稳定分类，不保存 PID、原始路径、proc/dpkg 原文或用户数据。
+
+`packaging/linux/l6-matrix.json` 与 `scripts/linux-product/l6_contract.py` 固定独立 Debian 13 ARM64 guest、不同 commit 的相邻 Debian revision、六步主序列、八个 crash checkpoint、字体/startup/XDG/procfs probe 和逐 mutation 授权；`scripts/linux-product/l6_controller_contract.py` 另固定 compile identity、进程组终止、无 runtime override 与 evidence 字段边界。`./scripts/check-linux-l6-contract.sh` 与 `./scripts/check-linux-l6-controller.sh` 只验证合同和合成恢复。执行说明位于 [Linux L6 Debian package matrix runbook](runbooks/linux-l6-package-matrix.md)；真实 guest 证据尚未落地，不能把任一门禁写成 L6 通过。
 
 当前 macOS 机器不直接安装 Linux 工具链；`./scripts/build-linux-fcitx5-container.sh` 在 Docker Desktop 的 Linux VM 中以 Debian 13 ARM64、Fcitx5 Core 5.1.12 和 librime 1.13.1 编译 native-rime FFI 与 `radishlex.so`，仓库只读挂载，Cargo cache/target 使用独立 named volume。该入口还执行 staged addon-relative 装配、ELF `$ORIGIN`/依赖/构建路径门禁和 headless native loader probe；这些结果不是 Wayland/X11、Fcitx daemon 或真实应用输入证据。开发入口与停止线见 [Fcitx5 addon README](../platforms/linux-fcitx5/README.md)。
 
@@ -400,7 +406,7 @@ R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-
 
 平台目录按主线顺序创建：
 
-1. `platforms/linux-fcitx5/` 与 `platforms/linux-product/`：前者承载 M5-P02-P04 输入/Manager 主线、system runtime profile 与共用 C++ startup binding；后者承载 actual `.deb` relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable port、`/proc` 静止、受控 CLI 与只读 startup decision。确定性载体与 L6 matrix 归属 `packaging/linux/`，验证/执行辅助归属 `scripts/linux-product/`；当前下一实现是 acceptance checkpoint/evidence controller，随后才进入隔离 Debian ARM64 L6。
+1. `platforms/linux-fcitx5/`、`platforms/linux-product/` 与 `platforms/linux-l6-acceptance/`：前者承载 M5-P02-P04 输入/Manager 主线、system runtime profile 与共用 C++ startup binding；中者承载 actual `.deb` relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable port、`/proc` 静止、受控 CLI 与只读 startup decision；后者只承载 compile-isolated L6 checkpoint/process-group/evidence controller。确定性载体与 L6 matrix 归属 `packaging/linux/`，验证辅助归属 `scripts/linux-product/`；当前下一步是冻结 ARM64 release pair 并逐项授权隔离 L6。
 2. `platforms/android-ime/`：在现有 keystore bridge 之外补完整 IME。
 3. `platforms/windows-tsf/`。
 4. `platforms/ios-keyboard/`。

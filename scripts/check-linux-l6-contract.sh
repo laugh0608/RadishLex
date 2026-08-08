@@ -13,5 +13,9 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/l6_contract.py" validate
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_contract.py"
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/linux-product/l6_controller_contract.py" validate
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/linux-product/test_l6_controller_contract.py"
 
-echo "Linux L6 acceptance contract passed without guest or system mutation."
+echo "Linux L6 matrix and compile-identity contract passed without guest or system mutation."

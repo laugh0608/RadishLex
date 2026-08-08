@@ -56,7 +56,7 @@ Linux Manager 的主题必须显式提供兼顾 Latin、数字和简体中文的
 
 Linux runner 必须先设置进程 `umask(0077)`，再执行共用 Linux product startup gate，只有取得与编译身份一致的 move-only permit 后才可创建 Flutter application/engine、Dart isolate、settings store 或 userdb，随后注册 `dev.radishlex.manager/runtime` method channel。`createDefaultManagerBootstrap()` 仍是 Dart 唯一业务产品入口，依次取得平台路径、加载 native binding 并形成真实 `FfiManagerBridge`。
 
-startup gate 直接复用 bundle FFI 的 additive request/result v1，在 C++ host 中从当前 executable 取得 canonical component path；调用前以 `dladdr` 与 canonical path 证明 startup/error symbols 确实来自 executable 的精确 sibling FFI，拒绝 loader interposition。输入 session/key ABI 仍为 v9。`development-staged` 只在 system state/receipt 缺失且 package 严格未安装时允许，`debian-system-product` 只接受 terminal receipt、Installed package、严格 staging proof、完整 Manager bundle tree、manifest/同侧 FFI 与双 FFI equivalence。active advisory guard、receipt/stage tmp、nonterminal、半配置、completed remove、缺 receipt 或身份漂移都在 Flutter 初始化前退出；gate 不调用 `dpkg`，不创建 state，不解析 XDG，也不打开 userdb/settings/privacy/Rime。pure dependency/font/version relationship 已实现但尚未接入 startup，当前 scope 不冒充全 package runtime inventory。
+startup gate 直接复用 bundle FFI 的 additive request/result v1，在 C++ host 中从当前 executable 取得 canonical component path；调用前以 `dladdr` 与 canonical path 证明 startup/error symbols 确实来自 executable 的精确 sibling FFI，拒绝 loader interposition。输入 session/key ABI 仍为 v9。`development-staged` 只在 system state/receipt 缺失且 package 严格未安装时允许，`debian-system-product` 只接受 terminal receipt、Installed package、严格 staging proof、完整 dependency/version relationship、Manager bundle tree、manifest/同侧 FFI 与双 FFI equivalence。active advisory guard、receipt/stage tmp、nonterminal、半配置、completed remove、缺 receipt 或身份/dependency 漂移都在 Flutter 初始化前退出；gate 不调用 `dpkg`，不创建 state，不解析 XDG，也不打开 userdb/settings/privacy/Rime。字体 family/glyph/owner 仍留给 L6，不由 component scope 冒充。
 
 任一前置失败都返回稳定 `ManagerPlatformException` / `ManagerStartupException`；正常 `product` 构建不得读取 `RADISHLEX_MANAGER_MODE` 以外的运行期路径 override，也不得切换 `FixtureManagerBridge`。显式编译期 `demo` 继续只用于测试和合成演示，并保留全程标识。
 
@@ -190,7 +190,7 @@ A6 必须至少有一条从 personalized runtime 写入、经 Manager bridge 读
 4. Linux staged Release bundle 携带 workspace native-rime `.so`，完成 ABI/symbol/ELF 与无路径 override smoke。
 5. 使用临时合成库形成“runtime 写入—Manager bridge 刷新—另一 runtime 观察”的产品双端自动证据。
 
-该批没有顺带实现 package/安装，也没有以能打开空窗口结束。privacy watcher、classifier、Wayland/X11 身份、精确 Firefox 生产规则、同库学习/解释、privacy 零增量、删除防复活、explicit restore、导入导出、Fcitx/Manager 重启与桌面会话重启均已复用同一 host、XDG 和真实 bridge 闭合。M5-P04 验收矩阵据此退出；现有 staging、backup、userdb、导入导出文件和 transient service 终态继续保留。后续 P05A payload gate 与 P05B actual package relationship、恢复事务、production system port/CLI、共用 startup gate 和 L6 format v1 已独立完成；checkpoint/evidence controller、真实 Linux process/dpkg、L6 与安装实机仍需对应授权和证据。
+该批没有顺带实现 package/安装，也没有以能打开空窗口结束。privacy watcher、classifier、Wayland/X11 身份、精确 Firefox 生产规则、同库学习/解释、privacy 零增量、删除防复活、explicit restore、导入导出、Fcitx/Manager 重启与桌面会话重启均已复用同一 host、XDG 和真实 bridge 闭合。M5-P04 验收矩阵据此退出；现有 staging、backup、userdb、导入导出文件和 transient service 终态继续保留。后续 P05A payload gate 与 P05B actual package relationship、恢复事务、production system port/CLI、共用 startup gate、L6 format v1 和 compile-isolated checkpoint/evidence controller 已独立完成；新的 ARM64 release pair、真实 Linux process/dpkg、L6 与安装实机仍需对应授权和证据。
 
 ## 当前停止线
 

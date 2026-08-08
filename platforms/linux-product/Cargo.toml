@@ -7,6 +7,10 @@ repository.workspace = true
 license-file = "../../LICENSE"
 description = "Linux Debian package transaction contracts for RadishLex."
 
+[features]
+default = []
+l6-acceptance-checkpoints = []
+
 [lib]
 name = "radishlex_linux_product_install"
 path = "src/lib.rs"

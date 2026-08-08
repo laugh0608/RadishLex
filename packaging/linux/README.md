@@ -19,9 +19,10 @@
 ./scripts/check-linux-product-layout.sh
 ./scripts/check-linux-deb-artifact.sh
 ./scripts/check-linux-l6-contract.sh
+./scripts/check-linux-l6-controller.sh
 ```
 
-第一个入口在所有受支持宿主验证 committed metadata 与负向测试。第二个入口默认运行平台无关 rootfs contract；只有显式提供真实 Linux Manager bundle 与 product-profile addon stage 时，才装配并复验临时 `DESTDIR`。第三个入口验证 canonical `.deb`、依赖输出、诊断分类、篡改拒绝和重复构建 contract；第四个入口只验证 L6 matrix 与负向边界。真实 ARM64 Linux 可另以 `build-linux-deb-artifact.sh --rootfs ABSOLUTE_PATH --output-dir ABSOLUTE_EMPTY_PATH` 写入显式 `0755` 空目录。所有入口都不读取用户 XDG、不写 `/usr`、`/var` 或 dpkg database，也不启动 Fcitx、Manager 或桌面会话。
+第一个入口在所有受支持宿主验证 committed metadata 与负向测试。第二个入口默认运行平台无关 rootfs contract；只有显式提供真实 Linux Manager bundle 与 product-profile addon stage 时，才装配并复验临时 `DESTDIR`。第三个入口验证 canonical `.deb`、依赖输出、诊断分类、篡改拒绝和重复构建 contract；第四个入口只验证 L6 matrix 与负向边界；第五个入口编译隔离的 acceptance identity 并验证八点合成中断/恢复、进程组顺序与 evidence redaction。真实 ARM64 Linux 可另以 `build-linux-deb-artifact.sh --rootfs ABSOLUTE_PATH --output-dir ABSOLUTE_EMPTY_PATH` 写入显式 `0755` 空目录。所有检查入口都不读取用户 XDG、不写 `/usr`、`/var` 或 dpkg database，也不启动 Fcitx、Manager 或桌面会话。
 
 2026-08-06 已使用 committed `e1ce740` 的全新 Debian 13.6 ARM64 Manager/addon 输入通过真实载荷模式；随后 committed `ce74981` 对该产品 rootfs 连续生成两份逐字节相同的 `radishlex_26.7.1+38-1_arm64.deb` 与 evidence。包 SHA-256 为 `b56ba9494e715df847a778a59a09bea2ccef091ce023a596849c13c9f1db27cd`；只执行结构、解包与 package database 只读检查，未安装 package，也未生成 receipt。
 
