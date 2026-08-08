@@ -28,6 +28,8 @@
 
 2026-08-06 已使用 committed `e1ce740` 的全新 Debian 13.6 ARM64 Manager/addon 输入通过真实载荷模式；随后 committed `ce74981` 对该产品 rootfs 连续生成两份逐字节相同的 `radishlex_26.7.1+38-1_arm64.deb` 与 evidence。包 SHA-256 为 `b56ba9494e715df847a778a59a09bea2ccef091ce023a596849c13c9f1db27cd`；只执行结构、解包与 package database 只读检查，未安装 package，也未生成 receipt。
 
+2026-08-08 已在 Debian 13 ARM64 从 source `55351f2` revision 1 与 target `e5b6da1` revision 2 的独立 clean root 断网生成并复验真实 release pair。canonical record SHA-256 为 `a9bcf35762b460a23ad9bc062611f8d5edb57e7303861bbcb99e1efb40703dfd`，source/target package 分别为 `b41e32db76388ad18cdeb60e4b40fb8e28710556df87d53bfa5b275ff2ce028c`、`8209c0161609fde3b798628e5c3460e6237c8618f2d26f1452063540c7541295`。该 pair 仍是未安装的私有 L6 输入；没有运行 maintenance/acceptance CLI、`dpkg` 或产品进程。
+
 2026-08-08 仓库元数据已将 L6 target 推进为 `26.7.1+38-2`，并冻结上述 pair builder/verifier；该 revision 2 仍未在 ARM64 环境构建，旧 revision 1 的 P05A/P05B evidence 只保留为历史未安装载体，不能充当 L6 source/target pair record。
 
 ## 字体边界

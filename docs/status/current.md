@@ -7,7 +7,7 @@
 - 复核日期：2026-08-08（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- production 代码与合成门禁已闭合；L6 format v1、compile-isolated acceptance checkpoint/evidence controller、六步主序列、八点确定性 crash/recovery 合成矩阵与 canonical 脱敏 evidence 已完成。仓库已冻结 source commit `55351f2` revision 1、target metadata revision 2，以及双干净源码根的 ARM64 pair builder/版本化 evidence 合同；真实 pair 尚未在 ARM64 环境产出，Linux `/proc`、`dpkg` mutation、外部 package lifecycle、系统安装与 P05C 也未执行。真实用户同步继续关闭。
+- production 代码与合成门禁已闭合；L6 format v1、compile-isolated acceptance checkpoint/evidence controller、六步主序列、八点确定性 crash/recovery 合成矩阵与 canonical 脱敏 evidence 已完成。Debian 13 ARM64 已从 source `55351f2` revision 1 与 target `e5b6da1` revision 2 的独立 clean root 原子生成并独立复验真实 pair；Linux `/proc`、`dpkg` mutation、外部 package lifecycle、系统安装与 P05C 仍未执行。真实用户同步继续关闭。
 
 ## P04 冻结基线
 
@@ -41,7 +41,7 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 - 只读 startup observer 已把 terminal staging 中的 actual `.deb`、完整 dpkg dependency relationship 与 component inventory 串联；Manager 在 Flutter 前、Fcitx 在 Engine/input FFI/XDG/Rime 前取得 permit。字体 family/glyph/owner 与真实 process/package-manager 行为仍留给 L6。
 - 未知 package state、半配置、active/异常 guard、tmp/nonterminal receipt、缺失/多余 slot、symlink/hardlink、宽权限或 owner/mode/link/hash/version/ABI 漂移均失败关闭并保留现场。
 - L6 matrix 已固定独立 guest、相邻 revision 六步主序列、八个 crash case、probe/evidence 与逐 mutation 授权。acceptance crate 只经默认关闭的 compile feature 取得精确 hook，不轮询 receipt；controller 终止并等待完整 process group，再证明 group 为空且无 `dpkg` child。canonical checkpoint evidence 只保存 operation ID hash 与稳定分类，不含原值、PID、路径、proc/dpkg 原文或用户数据；实际 controller/CLI 仍未运行。
-- release-pair contract 固定 source `55351f2`/`26.7.1+38-1` 与 target clean descendant/`26.7.1+38-2`。ARM64 builder 从两个 clean root 强校验实际 `.deb`，分别冻结 production `--no-default-features` 与 acceptance ELF，发布前重哈希全部 handoff；当前只有合同与合成 ELF/篡改测试，没有真实 pair record。
+- release-pair contract 固定 source `55351f2`/`26.7.1+38-1` 与 target `e5b6da1`/`26.7.1+38-2`。真实 pair record SHA-256 为 `a9bcf35762b460a23ad9bc062611f8d5edb57e7303861bbcb99e1efb40703dfd`；source/target package 分别为 `b41e32db76388ad18cdeb60e4b40fb8e28710556df87d53bfa5b275ff2ce028c`、`8209c0161609fde3b798628e5c3460e6237c8618f2d26f1452063540c7541295`，production/acceptance ELF 分别为 `037199abe73559e2cd10013f0930f1f44cf9126ac7987169da11f2933a706fc1`、`c4f6282341c6f68f997b1f5d8d2d1b5dec2d96b60e2f387717594d5a0a9523f4`。该记录只冻结 L6 输入，不证明 package mutation 或 startup。
 
 ## 停止线
 
@@ -52,8 +52,8 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 
 ## 下一步顺位
 
-1. 在另行准备的 Debian 13 ARM64 构建环境，以 source `55351f2` 和本批 target commit 的两个独立干净源码根运行 release-pair builder，冻结真实 package/executable hash；该步骤不打开或修改 guest，也不安装 package。
-2. pair 复验后另行授权准备独立 guest，再按 matrix 逐项授权真实 `/proc`、dpkg lifecycle、六步主序列、八个 controller crash/retry、source restore、startup、字体、重启与 XDG 对照；每一步单独授权并保留现场。
+1. 另行授权准备独立 Debian 13 ARM64 L6 guest、S0 与 root-owned pair handoff；不得复用构建 VM、DependencyFrozen 副本、CleanBase 或 P04 guest。
+2. 再按 matrix 逐项授权真实 `/proc`、dpkg lifecycle、六步主序列、八个 controller crash/retry、source restore、startup、字体、重启与 XDG 对照；每一步单独授权并保留现场。
 3. L6 自动证据闭合后另行授权 P05C 独立 guest 实机；旧资产清理、远端、发布、真实同步和其他平台继续独立排期。
 
 ## 验证入口
@@ -75,7 +75,7 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 git diff --check
 ```
 
-上述入口只证明仓库合同、production/acceptance compile identity、release-pair 生成/复验规则、合成命令/进程/crash/recovery/evidence 状态、L6 matrix 与已记录的未安装载体证据；本批没有在 ARM64 环境运行 pair builder，没有调用 maintenance/acceptance CLI 或 `/usr/bin/dpkg`，不证明新的 ARM64 startup-enabled release pair、真实 process-group/dpkg mutation、桌面安装或公开发布。
+上述仓库入口本身只证明合同与合成状态；另行形成的 canonical ARM64 pair record 已冻结真实 package/executable identity。当前仍没有调用 maintenance/acceptance CLI 或 `/usr/bin/dpkg`，不证明真实 process-group/dpkg mutation、桌面安装、L6 完成或公开发布。
 
 ## 阅读索引
 

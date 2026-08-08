@@ -10,7 +10,7 @@
 ./scripts/check-linux-l6-release-pair.sh
 ```
 
-三个入口分别验证 matrix format、compile-isolated controller 与 release-pair 构建/证据合同；都不连接 guest、不读取真实 `/proc`、不执行 package mutation，也不证明真实 pair 或 L6 已通过。
+三个入口分别验证 matrix format、compile-isolated controller 与 release-pair 构建/证据合同；入口自身都不连接 guest、不读取真实 `/proc`、不执行 package mutation，也不能单独证明下述真实 pair 或 L6 已通过。
 
 ## 当前执行状态
 
@@ -19,9 +19,9 @@
 - production transaction/startup 代码、actual `.deb` verifier 和 fake command/crash matrix 已完成；
 - L6 guest、release pair、六步事务顺序、八个 crash checkpoint、字体/startup/XDG probe 和证据保留规则已由 format v1 固定；
 - compile-identity 隔离的 acceptance checkpoint/evidence controller 已完成，八点合成中断/恢复与 canonical 脱敏 envelope 已通过专项门禁；
-- source 已冻结为 commit `55351f2`、Debian revision 1，target metadata 已推进到相邻 revision 2；双 clean-root ARM64 builder、actual `.deb`/ELF verifier 与 `radishlex-linux-l6-release-pair-evidence-v1` 合同已进入仓库；
-- source/target ARM64 载体与 target executable 尚未按本 runbook 实际构建和冻结；
-- 没有打开或修改 Linux VM，没有执行真实 `dpkg`、`/proc` probe、字体 probe、Manager/Fcitx 启动或系统安装。
+- 真实 pair 已从 source commit `55351f2` revision 1 与 target commit `e5b6da1` revision 2 的独立 clean root 断网构建、原子发布并独立复验；
+- canonical pair record、两份 ARM64 package 与 production/acceptance executable identity 已冻结，具体 hash 见本 runbook 第 3 节；
+- 构建 VM 只新增 per-user SDK/cache、私有源码/build/output；没有执行真实 `dpkg`、`/proc` probe、字体 probe、Manager/Fcitx 启动或系统安装，独立 L6 guest 与 S0 尚未准备。
 
 ## 1. 环境身份
 
@@ -73,6 +73,8 @@ source/target 必须是两个不同 commit 形成的真实载体，不允许复�
 builder 先分别调用各自 commit 的 metadata、Manager、addon、rootfs、layout 与 deterministic `.deb` 门禁；随后仅从 target clean root 以 `--no-default-features` 构建 production maintenance ELF，并另行构建链接 acceptance feature 的 controller ELF。record 阶段再次调用各 root 自有 actual artifact verifier，解析两个 ELF 的 ELF64/AArch64 与 `/lib/ld-linux-aarch64.so.1`，要求 production 不含 acceptance markers、acceptance 同时含 build identity 与授权 marker；最后重哈希发布目录中的 package、artifact evidence、build-environment 和两个 executable。任一 root 不干净、commit 不符、revision 不相邻、contract 漂移、hash 相同、ELF/mode/link/marker 或 canonical JSON 不符均失败关闭且不发布输出。
 
 pair envelope format 为 `radishlex-linux-l6-release-pair-evidence-v1` 对应的 format v1/profile v1 组合；只保存 commit、revision/version、package/evidence/manifest/dependency 摘要、无路径 tool version，以及 executable build profile/ELF/size/SHA-256。它不保存源码/构建/staging 绝对路径、operation ID、PID、proc maps、dpkg 原文或用户数据。source/target 的 build number 相同不表示两者是同一 package：Debian revision、manifest、control、package/evidence hash 必须不同。该 pair 只证明首版 Linux package 事务兼容，不宣称跨数据 schema 升级或公开发行兼容。
+
+2026-08-08 的真实 Debian 13 ARM64 record 使用 Rust/Cargo 1.85.0、CMake 3.31.6、Flutter 3.44.0，target 为 `e5b6da1`。canonical record SHA-256 为 `a9bcf35762b460a23ad9bc062611f8d5edb57e7303861bbcb99e1efb40703dfd`；source/target package 分别为 `b41e32db76388ad18cdeb60e4b40fb8e28710556df87d53bfa5b275ff2ce028c`、`8209c0161609fde3b798628e5c3460e6237c8618f2d26f1452063540c7541295`；production/acceptance executable 分别为 `037199abe73559e2cd10013f0930f1f44cf9126ac7987169da11f2933a706fc1`、`c4f6282341c6f68f997b1f5d8d2d1b5dec2d96b60e2f387717594d5a0a9523f4`。两份 package 依赖摘要相同，package、artifact evidence 与 product manifest identity 均不同；独立 verifier 复验发布 inventory、mode/link、AArch64 loader 和全部 hash 后通过。该 record 是后续 root-owned handoff 的唯一 pair 身份，不授权复制、安装或执行其中任何文件。
 
 ## 4. 证据 envelope
 
