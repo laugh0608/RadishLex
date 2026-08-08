@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-截至 2026-08-08，M5-P05A 已完成 committed metadata、system rootfs 装配器、staged/system 两类 addon 构建身份与真实 Debian 13.6 ARM64 Manager/addon 载荷门禁；P05B 已完成确定性 `.deb` artifact、dependency-analysis identity、仓库内 receipt/guard、五类 operation、fake dpkg port，以及 Manager/Fcitx 共用的只读 startup observer/gate。当前下一批是 mutable dpkg adapter、dependency/font/version relationship validation 与 maintainer-script 投影；真实 package mutation、RadishLex 系统安装、Debian ARM64 L6 matrix 和 P05C 实机仍未开始。以下决策继续约束实现与后续批次：
+截至 2026-08-08，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、五类 fake transaction，以及 Manager/Fcitx 共用只读 startup gate；typed dpkg argv/env/config/lifecycle 仍只是无执行能力的合同。下一子批是 production fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、真实 process quiescence、privileged host/CLI 与 fake crash-command matrix。真实 package mutation、L6 和 P05C 均未开始。
 
 - 首个完整产品安装载体固定为 Debian 13 ARM64 的单一系统级本地 `.deb`，package 名固定为 `radishlex`；它是未发布的本地验收载体，不是 apt repository、正式 Release 或通用 Linux 安装包。
 - Fcitx addon、两份产品 FFI、Manager bundle、锁定 RimeData、desktop entry、图标和产品 manifest 由同一个 package 绑定；不拆成可独立漂移的 Manager/addon 包。
@@ -13,6 +13,7 @@
 - CJK/Latin 文本字体采用发行版硬依赖，不随 RadishLex package 携带。Debian 13 profile 必须依赖 `fonts-noto-cjk`，并固定兼顾 Latin/数字的 `fonts-dejavu-core`；不能只写 `Recommends` 或依赖桌面环境偶然 fallback。Flutter 生成的 `MaterialIcons-Regular.otf` 只承担图标字形，按下文固定例外处理。
 - 首批 distribution identity 固定为 `debian-local-deb-v1`：只证明 Debian package 结构、内容 hash 与本地事务身份，不宣称 repository 签名、发布者认证或公开分发资格。
 - 首批 upgrade 与 release rollback 只允许数据 contract 完全相同的 source/target；userdb schema、XDG layout、settings/privacy format、Rime schema 与 RimeData identity 任一变化都在系统 mutation 前失败关闭，等待独立的 Linux 用户态数据协调设计。
+- v1 package 不携带 RadishLex 自有 `preinst`/`postinst`/`prerm`/`postrm`、`config`、`templates`、`conffiles` 或 `triggers`；外部 dependency 的 scripts/triggers 只作为 dpkg lifecycle observation，不能写产品 receipt 或冒充事务完成。
 
 M5-P04 最终同库状态继续冻结为 user terms 2、selection events 5、suppressed 0、deleted 1、import batches 2。既有 guest staging、backup、userdb、导入导出文件与临时服务不属于 P05 安装源、回滚源或清理目标。
 
@@ -177,7 +178,7 @@ package version 固定由 `<product-version>+<build>-<debian-revision>` 形成�
 | --- | --- | --- |
 | `packaging/linux/` | product mirror、install layout、Debian metadata、依赖与字体 profile | 执行 dpkg、读取用户数据、保存构建物或签名凭据 |
 | Debian `dpkg`/trigger | package database、dependency、文件 unpack/remove、desktop/icon/system cache 标准生命周期 | RadishLex 业务 receipt、用户 XDG、Fcitx profile 或产品兼容判断 |
-| `platforms/linux-product/` | 固定系统路径、artifact 暂存与取证、quiescence port、package state 投影、receipt/guard、恢复与共用只读 startup decision；后续承载 mutable dpkg adapter | input key、Rime 候选、userdb/ranker、Flutter 页面或远端同步 |
+| `platforms/linux-product/` | actual `.deb`/manifest/dependency/version/status 关系校验、artifact staging、quiescence port、receipt/advisory guard、恢复、typed command contract 与共用只读 startup decision；后续承载 production observer/executor 和 mutable port | input key、Rime 候选、userdb/ranker、Flutter 页面、远端同步或用户 XDG mutation |
 | Fcitx addon / Linux Manager host | 在业务初始化前读取同一 startup decision，并验证自身 component identity | 安装、repair、remove、rollback 或改写 root receipt |
 | XDG resolver / Rust userdb | 每个有效用户的固定数据路径、权限、schema 与本地业务语义 | 枚举系统用户、解释 dpkg 状态或修改系统程序 |
 | 用户/管理员 | 授权 package/system mutation，关闭程序，手动配置/切换输入法 | 通过手工复制或删除 receipt 绕过产品门禁 |
@@ -198,11 +199,11 @@ package version 固定由 `<product-version>+<build>-<debian-revision>` 形成�
 | terminal/nonterminal `receipt.json` | `root:root` | `0644` | 单 link、非敏感、供用户进程只读 gate |
 | 写入中的 `receipt.json.tmp` | `root:root` | 创建时 `0600` | fsync 后改为 `0644` 再同目录原子替换；残留即阻断新 operation |
 | `operations/<operation-id>` 与本地 package 副本 | `root:root` | 目录 `0700`、文件 `0600` | 只接受固定 source/target 名称与单 link 普通文件 |
-| `/run/lock/radishlex-install-v1.lock` | `root:root` | `0600` | root-only Unix socket guard，以精确 inode 释放，不保存持久完成事实 |
+| `/run/lock/radishlex-install-v1.lock` | `root:root` | `0600` | 零长度、单 link regular file 上的 advisory exclusive lock；以精确 inode 释放，不保存完成事实 |
 
 所有 RadishLex-owned payload 节点禁止 symlink、hardlink、device、FIFO、socket、setuid/setgid bit、file capability 和 group/other write。外部发行版 shared library 的内部 symlink 由对应 package 管理，不进入 RadishLex tree hash，但 ELF closure 必须解析到已安装 package 的系统 library root，不能落入 `/tmp`、home、仓库或自定义 `LD_LIBRARY_PATH`。
 
-用户 XDG 目录继续为当前用户 `0700`，userdb/settings/privacy 等敏感普通文件继续为 `0600`、单 link、非 symlink；已有对象 owner/mode/link 不合格时失败关闭，不由 root maintainer script 或产品启动顺便 `chown`/`chmod` 修正。系统 receipt 只记录版本、状态、稳定错误和 artifact hash，不记录绝对 home、uid 列表、用户词、P1/P2 内容或进程命令行。
+用户 XDG 目录继续为当前用户 `0700`，userdb/settings/privacy 等敏感普通文件继续为 `0600`、单 link、非 symlink；已有对象 owner/mode/link 不合格时失败关闭，不由 root transaction 或产品启动顺便 `chown`/`chmod` 修正。系统 receipt 只记录版本、状态、稳定错误和 artifact hash，不记录绝对 home、uid 列表、用户词、P1/P2 内容或进程命令行。
 
 ## 安装维护事务
 
@@ -213,15 +214,19 @@ Debian `dpkg` 负责 package database、依赖关系、文件 unpack/remove 和�
 - 在 package mutation 前验证 operation、source/target artifact、兼容矩阵、静止条件和固定系统根；
 - 以 root-owned receipt/guard 记录可重试状态；
 - 把 Debian 的 Installed、Unpacked、Half-Configured、Config-Files 等结果投影为稳定产品状态；
-- 在 `postinst` 后复验完整 manifest、ELF closure、metadata 和权限，只有全部通过才写 `completed`；
+- 在 dpkg target apply 后复验完整 manifest、ELF closure、metadata 和权限，只有全部通过才写 `completed`；
 - 失败时只使用操作开始前已提供并验证的本地 source `.deb` 做 rollback，不在恢复中联网下载或从已安装文件猜造 source package；
-- 保持 maintainer script 幂等，正确处理 install/upgrade/downgrade、abort-upgrade、failed-upgrade、remove、abort-remove 与 purge 调用。
+- 把 dpkg 与外部 dependency scripts/triggers 的结果投影为 lifecycle observation；它们不能接收 RadishLex receipt 路径，也不能替协调器推进状态。
 
 直接运行未经过产品前置验证的任意 copy script、把 staged rootfs 当作 installed、或只看 `dpkg` 退出码，都不能形成产品完成证据。协调层不替代 dpkg，也不能改写 dpkg database 冒充回滚。
 
-首批受支持的 mutation 入口只能是 P05B 定义的维护协调器，它接收显式本地 `.deb`、先固定 artifact 与 receipt，再调用 dpkg。直接执行 `dpkg -i`、`dpkg -r` 或等价 apt 旁路即使让 package database 进入 Installed/Not-Installed，也不得由 maintainer script 猜测调用方 artifact 路径或补写 `completed`；product startup gate 必须返回 `maintenance_required`，只能由重新提供精确 artifact 的受控 `repair`/恢复流程收口。
+首批受支持的 mutation 入口只能是 P05B 定义的维护协调器，它接收显式本地 `.deb`、先固定 artifact 与 receipt，再调用 dpkg。直接执行 `dpkg -i`、`dpkg -r` 或等价 apt 旁路即使让 package database 进入 Installed/Not-Installed，也没有自有 maintainer script 可以猜测 artifact 或补写 `completed`；product startup gate 必须返回 `maintenance_required`，只能由重新提供精确 artifact 的受控 `repair`/恢复流程收口。
 
-首次 bootstrap 已固定为：取得系统 guard 并复验 state root 后，先让 package port 验证 operation、source/target identity、版本关系与环境前提，再读取明确的 package snapshot；只有 snapshot 与 operation source 一致时才原子写入 `prepared` receipt。随后逐项把调用方 `.deb` 和同名 evidence 复制为 operation 私有 `source`/`target` 文件，记录 size、SHA-256、owner/group、mode、device/inode 与 link count；全部必需 artifact 复验后才进入 `artifacts_staged`。任何 package mutation 都晚于该持久状态与 quiescence evidence，不能由 shell fallback、maintainer script 或调用方临时路径绕过。
+首次 bootstrap 已固定为：取得 advisory guard 并复验 state root 后，先验证 operation、source/target identity、版本关系与 package snapshot；只有 snapshot 与 operation source 一致时才原子写入 `prepared` receipt。随后把 `.deb` 和同名 evidence 复制为私有 `source`/`target`，记录 size、SHA-256、owner/group、mode、device/inode 与 link count；全部必需 artifact 复验后才进入 `artifacts_staged`。首次安装失败的 source 为空，但恢复请求必须携带已取证 target 以判断 target apply 的不确定结果。
+
+production 载体入口唯一为 `VerifiedArtifactRelationship::verify_package`。它在同一个有界 `.deb` 流上计算 size/SHA-256，严格要求三成员 ar、canonical uncompressed USTAR、control 仅含 `control`/`md5sums`、data 含唯一 product manifest，并把 actual payload inventory 与 manifest/evidence/control、canonical md5 inventory 和 actual `Installed-Size` 逐项交叉；禁止从调用方提交 detached digest 或 detached control/manifest 字节代替 actual package。同域 pure relationship 再校验依赖、Debian version relation 与 dpkg status。每次 target/source mutation、retry 或已匹配 package 的恢复短路之前都必须重跑 staged relationship，并消费仅对当次 quiescence 有效的 move-only permit。
+
+state 持久化允许识别 `receipt.json.tmp`、artifact stage tmp、单侧 artifact 已 rename 与 canonical mode 提交前 owner-only mode 的明确崩溃窗口；维护入口只能在取得 advisory guard、复验 owner/group/type/link/inode/size 后恢复 mode 或补齐另一侧，startup observer 只读阻断且不清理。current operation 必需 slot 必须精确，不得缺失或多余。receipt 内容 `fsync` 后提交 mode、再次 `fsync`，再 rename 并同步直接父目录；新 operation 目录与 staged 文件同样同步直接父目录。v1 旧 operation 只保存 structure/pair metadata，没有历史 `ArtifactFileIdentity` hash proof，也不参与 current recovery。
 
 ### Operation kind
 
@@ -279,7 +284,7 @@ Manager 与 addon 的 product build 必须在 Flutter engine/settings/userdb 或
 | 无 system receipt 的明确 development build | 仅允许既有显式开发模式 |
 | nonterminal、guard active、tmp receipt、dpkg 非 Installed | `maintenance_required` |
 | completed remove、未知 receipt/identity、manifest/hash/owner/link/ABI 漂移 | 失败关闭 |
-| 字体或系统 dependency 不满足 | 产品兼容性失败，不宣称安装可用；实际 relationship validator 仍待实现 |
+| 字体或系统 dependency 不满足 | pure package relationship 已能拒绝；startup 尚未连接该判断，真实 family/glyph/owner 留 L6 |
 
 production build 不得把“receipt 缺失”解释为首次启动成功，也不得回退 fixture、仓库 `.so`、`LD_LIBRARY_PATH`、用户级 staging 或在线下载。开发 build 与 product build 的 gate 必须在编译身份上分离。
 
@@ -288,11 +293,11 @@ production build 不得把“receipt 缺失”解释为首次启动成功，也�
 - `LinuxSystemStartupPort` 直接读取并严格解析 `/var/lib/dpkg/status`，不执行 `dpkg-query`、`dpkg`、shell 或其他 package mutation 命令；状态文件不可读、重复 package paragraph、未知 tuple 或不完整 identity 都失败关闭。
 - 检查顺序先于业务初始化：root/state、active/异常 guard、`receipt.json.tmp`、receipt 与 operation state，再检查 package state、terminal installed artifact、canonical product manifest 与当前 component scope。terminal receipt 引用的 source/target staging 必须按 receipt proof 重新验证固定 slot、file identity、owner/mode/link/size/hash，不能只信 receipt 文本或遗留路径。observer 不创建 state root、不清理 stale guard/tmp/receipt、不打开 XDG/userdb/settings/privacy/Rime。
 - `development-staged` 只在 system receipt/state 均不存在且 package 严格为 `NotInstalled` 时得到 `AllowedDevelopment`；`debian-system-product` 缺 receipt 失败关闭。开发 build 遇到任何 system receipt 也按身份隔离拒绝，不能借 development profile 绕过维护现场。
-- terminal install/upgrade/repair/rollback 的目标，或失败恢复后的 source，只有 package/version/architecture 与 component 身份完全一致才得到 `AllowedProduct`；nonterminal、active guard、Config-Files/半配置、unmanaged package、completed remove、首次安装失败无 source 和任何身份漂移均要求维护或失败关闭。Manager scope 复验完整 bundle tree；Fcitx scope 复验 addon、同目录 FFI、固定 RimeData、两份 metadata，并交叉验证 Manager/Fcitx 两份 FFI equivalence。该 scope 不冒充全 package runtime inventory，外部字体与系统 dependency 仍由下一批 relationship validator 负责。
+- terminal install/upgrade/repair/rollback 的目标，或失败恢复后的 source，只有 package/version/architecture 与 component 身份完全一致才得到 `AllowedProduct`；nonterminal、active guard、Config-Files/半配置、unmanaged package、completed remove、首次安装失败无 source 和任何身份漂移均要求维护或失败关闭。Manager scope 复验完整 bundle tree；Fcitx scope 复验 addon、同目录 FFI、固定 RimeData、两份 metadata，并交叉验证 Manager/Fcitx 两份 FFI equivalence。pure dependency/font/version relationship 已实现，但尚未接入 startup observer；当前 scope 仍不能冒充全 package runtime inventory。
 - Manager runner 在设置 `umask(0077)` 后、创建 Flutter application/engine 前调用；Fcitx factory 在构造 `Engine` 前取得 move-only startup permit，因此 Engine constructor 内的 input FFI、XDG、privacy 与 Rime 初始化均晚于 gate。共用 C++ binding 在调用 startup ABI 前用 `dladdr` 与 canonical path 验证 startup/error symbols 确实来自当前 component 的精确 sibling FFI；Fcitx 还验证全部输入热路径 FFI symbol origin，拒绝 `LD_LIBRARY_PATH`、preload 或其他 loader interposition。
 - `radishlex_linux_product_startup_gate` 使用独立 request/result v1，携带编译 build identity、component 与由 host 从已加载 executable/shared object 取得的 canonical component path；它是 additive Linux startup ABI，输入 session/key ABI contract 仍为 v9。
 
-仓库合同覆盖 receipt absent/terminal/nonterminal、active guard、tmp receipt、completed remove、Config-Files/半配置、未知 package state、staging proof、Manager bundle/Fcitx component scope、双 FFI equivalence、symbol-origin 绑定源码合同、开发/产品身份隔离、只读目录指纹与 Manager/Fcitx 调用顺序。当前尚未执行动态 preload/错误 sibling 负向测试，也没有生成或实机运行新的 startup-enabled ARM64 payload；外部 dependency/font/version relationship、mutable `DpkgTransactionPort`、maintainer scripts 与 privileged maintenance command 仍未实现。
+仓库合同覆盖 receipt absent/terminal/nonterminal、advisory guard、receipt/stage tmp、completed remove、半配置状态、exact current slots、actual `.deb`/manifest/dependency/version relationship、Manager/Fcitx component scope、双 FFI equivalence、symbol-origin、开发/产品身份隔离、只读目录指纹与调用顺序。当前尚无 dynamic preload/错误 sibling 新 ARM64 证据，也没有 production fixed-path observer/executor、concrete mutable port、真实 process quiescence、privileged host/CLI 或 startup dependency 连接。
 
 ## 自动门禁
 
@@ -316,9 +321,11 @@ P05B 载体子批随后以 committed `ce74981` 固定 `debian-local-deb-v1`：ar
 
 同一真实 rootfs 连续两次构建的 `.deb` 与 evidence 均逐字节一致；package SHA-256 为 `b56ba9494e715df847a778a59a09bea2ccef091ce023a596849c13c9f1db27cd`，evidence SHA-256 为 `858fe66515f41b20b29b023c53970a7cb23219575fb077aba2107db3eb045fba`，product manifest SHA-256 仍为 `41b5d98ce0bc77ad2b2138737b5891a7d862c28edec5d7ae603618492a34a6de`。`dpkg-deb` 结构检查通过，guest package database 明确为 `not-installed`。该证据补齐载体输出与 L1-L3 交叉身份，不创建 receipt，不进入 L4-L6，也不证明系统安装。
 
-P05B transaction 子批已建立独立 Rust crate `platforms/linux-product/`。它没有复用 macOS 双 `.app` rename/inode switch，只复用 operation identity、append-only receipt、独占 guard、终态与失败关闭原则；Linux 侧显式投影 Not-Installed、Config-Files、Installed、Unpacked、Half-Configured、Half-Installed 与 trigger 状态。收据使用 canonical JSON、固定 root identity、最多 128 项 operation chain、稳定 failure code、source/target package proof 和不自动清理的私有 staging；相同证据写入可幂等重试，只有终态才能追加下一 operation。
+P05B transaction 子批已建立独立 Rust crate `platforms/linux-product/`。它没有复用 macOS 双 `.app` rename，只复用 operation identity、append-only receipt、独占 guard、终态与失败关闭原则；Linux 侧显式投影 Not-Installed、Config-Files、Installed、Unpacked、Half-Configured、Half-Installed 与 trigger 状态。收据使用 canonical JSON、固定 root identity、最多 128 项 operation chain、稳定 failure、source/target proof 和不自动清理的私有 staging；只有终态才能追加下一 operation。
 
-`DpkgTransactionPort` 当前只由合成 fake 实现。自动合同覆盖五类 operation、install→upgrade 连续收据链、repair 重装、remove absence、显式 rollback、运行进程前置中止、active guard、未知 package state、暂存篡改/hardlink、package mutation 中断、source restore 再次中断，以及在 target proof 已持久化后的无重复 mutation 恢复；测试 API 不接收 XDG 或 home 路径。稳定入口为 `./scripts/check-linux-package-transaction.sh`，并已纳入仓库门禁。该证据形成 L4 的平台无关事务核心，但不证明真实 dpkg 命令、Debian maintainer-script 调用、系统 owner 映射或 L6 matrix。
+当前 guard 是 regular-file advisory lock，消除了 Unix socket backlog 不能证明唯一 owner 的竞争窗口；active lock 失败关闭，stale unlocked inode 只能由维护 acquisition 重新锁定与收口。store 已覆盖 restrictive umask、并发 contender、tmp 恢复、exact current required slots、原子 mode 与直接父目录 `fsync` 顺序。每次恢复都重新验证 staged actual package relationship并重新取得 quiescence permit，不把旧 permit、已安装目标或已恢复 source 当作绕过条件。
+
+`DpkgTransactionPort` 当前仍只由合成 fake 实现。自动合同覆盖五类 operation、连续 receipt、程序未静止、actual `.deb` 篡改/混配、package/source restore 双中断、首次安装 recovery target、target proof crash retry 与 XDG 零接口。typed command contract 已固定 dpkg program/argv/env/config/stdin/diagnostics/lifecycle，但没有 executor。该证据加强 L4 的平台无关事务核心，不证明真实 dpkg、系统路径 owner、进程枚举、外部 script/trigger 行为或 L6。
 
 L5 当前由 `./scripts/check-linux-startup-gate.sh` 闭合仓库内只读 decision 与初始化顺序合同：Rust fake/system-port 测试覆盖状态矩阵、staging proof、真实格式的 synthetic Manager bundle/Fcitx component scope、双 FFI equivalence 与目录零写入；C++ contract 分别编译 `development-staged`、`debian-system-product` 两种身份并拒绝交叉 allow，另以编译和源码合同固定 sibling symbol-origin 校验先于 gate 调用；源码顺序门禁固定 Manager 的 `umask -> gate -> Flutter` 与 Fcitx 的 `gate -> Engine/input FFI/XDG/Rime`。动态 preload/错误 sibling 拒绝仍须在新的 Linux payload 中复验；该 L5 不等于全 package runtime inventory、ARM64 product payload、Debian package lifecycle 或真实桌面启动证据。
 
@@ -332,7 +339,7 @@ L5 当前由 `./scripts/check-linux-startup-gate.sh` 闭合仓库内只读 decis
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 的完成只证明同一 committed 产品输入能形成 Debian 目标布局并受负向门禁约束，不证明 package transaction 或系统安装。P05B 的确定性 `.deb` artifact、manifest/依赖分析身份、平台无关事务核心与 Manager/Fcitx 共用只读 startup gate 已经完成；后续按“mutable dpkg adapter + dependency/font/version relationship validation + maintainer-script projection → 隔离 Debian ARM64 L6 install/upgrade/repair/rollback/remove/reinstall matrix”推进，并继续覆盖完整 crash/retry、source artifact rollback、默认数据保留与 unknown state 拒绝。privileged maintenance command 随 adapter 固定授权边界；P05C 才在独立 guest 完成授权实机，不复用或清理 P04 冻结现场。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual package/manifest/dependency/version/status pure relationship、恢复型 fake transaction 与共用只读 startup gate；pure relationship 尚未连接 startup。下一顺位按“production fixed-path observer/executor + concrete mutable port + process quiescence/privileged host + fake crash-command matrix → 隔离 Debian ARM64 L6”推进。L6 覆盖完整 crash/retry、source rollback、字体 family/glyph/owner、外部 package lifecycle 与默认数据保留；P05C 才在独立 guest 授权实机，不复用或清理 P04 现场。
 
 ## 实机授权边界
 

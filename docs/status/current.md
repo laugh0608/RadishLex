@@ -1,115 +1,80 @@
 # RadishLex 当前状态
 
-本文是日常推进短入口，供维护者判断里程碑、验证基线、停止线和下一步。详细设计与历史进入边界文档、runbook 和周志。
+本文是维护者判断当前里程碑、证据、停止线和下一步的短入口；设计细节进入专题文档，历史流水进入周志。
 
 ## 当前判断
 
-- 复核日期：2026-08-08（Asia/Shanghai）
-- 常态分支：`dev`；稳定主线：`master`
-- 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品
-- 当前主批次：M5-P05B Linux package transaction/startup gate；确定性 `.deb`、receipt/guard、五类 operation、fake dpkg port 与 Manager/Fcitx 共用只读 startup gate 已完成，下一批进入 mutable dpkg adapter、依赖/版本关系复验和 maintainer-script 投影，真实 dpkg 与系统写入仍关闭
-- 已退出：M0-M3；M4 macOS build 38 单版本产品验收已冻结；M5-P01 第二平台决策与运行边界；M5-P02 Fcitx5 addon、共享 FFI 与开发构建；M5-P03 真实 Linux 桌面输入与隐私验收；M5-P04 Linux Manager 与同库个人化验收；M5-P05A Linux metadata/rootfs 与真实产品载荷门禁
-- 真实用户同步：保持关闭；只允许合成数据与受控集成测试
+- 复核日期：2026-08-08（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
+- 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
+- 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心与 Manager/Fcitx 共用只读 startup gate。
+- production mutable `DpkgTransactionPort`、固定路径系统 observer/executor、真实进程静止、privileged host/CLI、L6 matrix、系统安装与 P05C 尚未开始。真实用户同步继续关闭。
 
-## M5-P04 冻结基线
+## P04 冻结基线
 
-M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firefox/Terminal、候选交互、生命周期、断网、隐私、Linux Release Manager、同库学习、删除/恢复、导入导出与重启验收。生产 allowlist 只包含精确 `firefox-esr -> browser`；password、terminal、unknown 与 Qt `Sensitive` 不学习，GTK4 `PRIVATE` 继续按 unknown 失败关闭。
+M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firefox/Terminal、候选交互、生命周期、断网、隐私、Linux Release Manager、同库学习、删除/恢复、导入导出与重启验收。生产 allowlist 仅为精确 `firefox-esr -> browser`；password、terminal、unknown 与 Qt `Sensitive` 不学习，GTK4 `PRIVATE` 按 unknown 失败关闭。
 
-同一 guest/XDG userdb 的最终状态为 user terms 2、selection events 5、suppressed 0、deleted 1、import batches 2。Manager 导入检查零写入、普通导入防 tombstone 复活、P2 导出、Manager/Fcitx 与完整桌面会话重启均已通过；schema v9/WAL 与 `integrity_check=ok` 保持，无 busy、migration、projection、重复学习或状态丢失。
+同一 guest/XDG userdb 最终为 user terms 2、selection events 5、suppressed 0、deleted 1、import batches 2。Manager 导入检查零写入、普通导入防 tombstone 复活、P2 导出、Manager/Fcitx 与桌面会话重启均已通过。该证据不再复跑；guest staging、backup、userdb、导入导出文件和临时服务继续原样保留，不作为 P05 安装、回滚或清理目标。
 
-上述证据不再复跑。guest staging、backup、userdb、导入导出文件、公开合成输入和临时服务继续原样保留，不作为 P05 安装源、回滚源或清理目标。
+## P05 固定边界
 
-## M5-P05 设计结论
+- 首个载体为 Debian 13 ARM64 系统级本地单 package `.deb`，identity `debian-local-deb-v1`；不是公开 repository、Release 或通用 Linux 包。
+- layout 绑定 Manager、两份同 hash/不同 inode FFI、addon、完整 RimeData/source/license、desktop/icon 与 product manifest。
+- CJK/Latin 文本字体使用发行版 hard dependency `fonts-noto-cjk`、`fonts-dejavu-core`；payload 仅允许固定 Material Icons 图标字形。
+- `install`、`upgrade`、`repair`、`remove`、`rollback` 默认对用户 XDG 零写入并完整保留数据；首批升降级只接受 ABI/schema/XDG/settings/privacy/Rime contract 完全相同的 release pair。
+- v1 package 明确不含 RadishLex 自有 maintainer scripts；外部 package scripts/triggers 只投影 dpkg lifecycle，不能代表产品事务完成。
 
-完整边界见 [Linux 安装维护边界](../linux-installation-maintenance-boundary.md)，当前固定：
+## P05A 与载体证据
 
-- 首个载体为 Debian 13 ARM64 系统级单 package 本地 `.deb`，identity 为 `debian-local-deb-v1`；不构成公开 repository、Release 或通用 Linux 包。P02/P04 用户 staging 与 transient service 仍只属于开发/验收。
-- 程序 layout 绑定 Manager、两份同 hash/不同 inode 的 FFI、addon、完整 RimeData/source/license、desktop/icon 和 manifest；文本字体硬依赖 `fonts-dejavu-core`/`fonts-noto-cjk`，payload 只例外保留 Flutter Material Icons 图标字形。
-- 五类维护 operation 必须有显式身份、guard/receipt、静止复验与失败关闭；默认保留全部 XDG 数据。首批升降级只接受 ABI/schema/XDG/settings/privacy/Rime contract 完全相同的 release pair。
+`packaging/linux/` 已固定产品版本、ARM64 multiarch、依赖、组件路径、ABI/schema/settings/privacy 和 RimeData lock；rootfs 装配器复验 Manager/addon、canonical manifest、inventory、owner/mode/link、双 FFI、metadata、desktop、字体例外和禁止路径。committed `e1ce740` 已在 Debian 13.6 ARM64 由全新源码形成真实 Manager/addon rootfs 证据，但未安装 package。
 
-## M5-P05A 实现状态
+确定性载体固定三成员 ar 与 canonical uncompressed USTAR、root owner/mode、`md5sums`、SHA-256 evidence 和解包 rootfs 重验。committed `ce74981` 的同一真实 rootfs 连续两次生成逐字节一致的 `.deb` 与 evidence；package database 保持 `not-installed`。
 
-- `packaging/linux/` 已绑定 `26.7.1+38-1`、ARM64 multiarch、依赖、组件路径、ABI/schema/settings/privacy 和 RimeData lock；Fcitx CMake 保留默认 `staged`，新增固定 `/usr/share/radishlex/rime` 的 `system` profile。
-- rootfs 装配器严格验证 Manager/addon 输入，离线装配 RimeData，生成并复验 canonical manifest、inventory、mode/owner、链接、双 FFI、metadata、desktop、字体例外和禁止路径。
-- committed `e1ce740` 已在隔离 Debian 13.6 ARM64 从全新源码构建 Manager、system-profile addon 并通过真实 rootfs 强门禁：ARM64 ELF、RPATH/closure、ABI symbol、双 FFI、构建路径、权限和 DejaVu/Noto CJK 解析均通过。P05A 已退出；该证据不生成 `.deb`，不证明 package transaction 或系统安装。
+新增 production-only `VerifiedArtifactRelationship::verify_package`：在同一有界流中计算 `.deb` size/SHA-256，严格解析精确三成员 ar、canonical USTAR、仅含 `control`/`md5sums` 的 control、actual data inventory 与唯一 manifest，并逐项交叉 evidence、control、manifest、payload、canonical md5 inventory 与 actual `Installed-Size`。同域 pure relationship 另行校验依赖、Debian 版本关系和 dpkg status。两者都不写文件、不调用命令；尚未接入 concrete system port 或 startup observer。
 
-## M5-P05B 载体实现状态
+## P05B 事务与启动状态
 
-- `packaging/linux/debian/artifact.json` 与 `build-linux-deb-artifact.sh` 已固定 `debian-binary`、`control.tar`、`data.tar` 的 canonical ar/USTAR 载体，root owner/mode、`md5sums` 兼容 inventory、SHA-256 evidence、原子输出和解包后 rootfs 重验；构建只接受显式空输出目录，不执行安装。
-- `dpkg-shlibdeps` 在临时 package tree 解析全部六个 ELF；依赖输出必须完全解析，私有未版本化 Flutter/FFI 库与 Debian 13 ARM64 `libc6` usrmerge 只接受精确诊断集合，并独立复验私有 ELF、副本 hash、loader owner 与 diversion。未知、缺失或新增诊断全部失败关闭。
-- committed `ce74981` 已在 Debian 13.6 ARM64 对同一真实 rootfs 连续构建两次。`.deb` 与 evidence 分别逐字节相同，package SHA-256 为 `b56ba9494e715df847a778a59a09bea2ccef091ce023a596849c13c9f1db27cd`，evidence SHA-256 为 `858fe66515f41b20b29b023c53970a7cb23219575fb077aba2107db3eb045fba`；`dpkg-deb` 可读，package database 仍为 `not-installed`。本子批不证明 receipt、operation、startup gate 或安装成功。
+- receipt 在 mutation 前持久化 `prepared`，source/target `.deb` 与 evidence 进入 root-owned operation staging 并取证。`receipt.json.tmp`、stage tmp、单侧 artifact 已持久化与 canonical mode 提交前的 owner-only 崩溃窗口均由 guard 下的维护入口复验恢复；startup 只读阻断且不清理。current operation 必需 slot 必须精确，历史旧 operation v1 只验证 structure/pair metadata，不保存旧 hash proof且不用于恢复。
+- guard 已改为 mode `0600`、零长度、单 link regular file 的 advisory exclusive lock；active contender 拒绝，stale unlocked file 可由维护流程重新取得。目录/文件创建固定 mode，原子替换和新目录项后同步直接父目录。
+- 五类 operation 共用可恢复状态机；每次 mutation 或 retry 都重新验证 staged relationship并取得 move-only quiescence permit。首次安装失败恢复携带已取证 recovery target；target/source proof 已持久化时重入不重复 mutation。
+- typed Debian command contract 固定 `/usr/bin/dpkg`、私有 staged path、argv、清空后的允许环境、null stdin、有界诊断、配置与 lifecycle 投影；当前不执行命令，也没有 concrete mutable port、系统 owner observer、进程检查或 privileged host。
+- 只读 startup observer 仍直接解析固定 dpkg status、receipt/guard/staging 与 component identity；Manager 在 Flutter 前、Fcitx 在 Engine/input FFI/XDG/Rime 前取得 permit。它尚未连接完整 dependency relationship，字体 family/glyph/owner 与真实 process/package-manager 行为留给 L6。
+- 未知 package state、半配置、active/异常 guard、tmp/nonterminal receipt、缺失/多余 slot、symlink/hardlink、宽权限或 owner/mode/link/hash/version/ABI 漂移均失败关闭并保留现场。
 
-## M5-P05B 事务核心状态
+## 停止线
 
-- `platforms/linux-product/` 已独立实现 Linux package 事务合同，不复用 macOS 双 bundle rename：先持久化 `prepared`，再把 source/target `.deb` 与 evidence 复制到 root-only operation staging，全部取证后进入 `artifacts_staged`；canonical receipt、最多 128 项终态链和 mode `0600` Unix socket guard 均绑定系统 state-root inode。
-- `install`、`upgrade`、`repair`、`remove`、显式 `rollback` 共用可恢复状态机；mutation 后任何不确定性进入 source restore，target/source proof 已持久化时重入不重复 mutation。未知 package state、active guard、receipt/root/artifact identity、symlink/hardlink、宽权限或篡改全部失败关闭。
-- `DpkgTransactionPort` 的仓库 fake 覆盖五类调用矩阵、install→upgrade 收据追加、程序未静止、package mutation/source restore 双中断、target-proof crash retry 和用户 XDG 零接口；`./scripts/check-linux-package-transaction.sh` 已进入仓库门禁。mutable dpkg adapter、maintainer-script、system owner 映射与 Debian matrix 尚未实现，不能据此运行或宣称系统安装。
-
-## M5-P05B 只读启动门禁状态
-
-- `platforms/linux-product/` 已提供 Manager/Fcitx 共用 startup observer：直接只读解析 `/var/lib/dpkg/status`，并复验 guard/tmp/receipt、terminal staging proof、package 状态、canonical manifest 与 component scope。Manager scope 覆盖完整 bundle tree；Fcitx scope 覆盖 addon/FFI/RimeData/两份 metadata，并验证两份产品 FFI equivalence、owner/mode/link/hash、ABI 与 data contract；不调用 `dpkg`，不创建或清理 state，也不读取或写入用户 XDG。该 scope 不冒充外部字体/dependency 的全 package runtime inventory。
-- Manager 在 `umask(0077)` 后、创建 Flutter application/engine 前执行门禁；Fcitx factory 在构造 `Engine`、调用 input FFI、解析 XDG 或初始化 Rime 前取得不可伪造的启动许可。C++ binding 用 `dladdr`/canonical path 把 startup/error symbols 绑定到精确 sibling FFI，Fcitx 另复验全部输入 FFI symbol origins，拒绝 loader interposition。`development-staged` 与 `debian-system-product` 是编译身份，前者只在严格 `NotInstalled` 且 system state/receipt 均不存在时允许，product 缺 receipt、active guard、非终态、Config-Files/半配置、completed remove 或身份漂移均失败关闭或要求维护。
-- `radishlex_linux_product_startup_gate` 是独立 request/result v1 的 additive Linux ABI；输入 session/key ABI contract 仍为 v9。当前自动证据覆盖仓库合成状态、只读副作用、双编译身份、symbol-origin 绑定源码合同与启动顺序；尚未执行动态 preload/错误 sibling 负向测试，没有生成或实机运行新的 ARM64 startup-enabled payload，也没有验证 dependency/font/version relationship。
-
-## macOS 冻结参考
-
-macOS `26.7.1 (38)` 保持冻结参考产品；DMG SHA-256 为 `f171e74bdc0a429655a84b30429481bce3926b17076d09298feed77d9ce4ce4e`，未使用 Developer ID/公证，远端 draft 未发布且无正式 tag。详细身份、事务与实机流水见 [macOS 产品包边界](../macos-product-package-boundary.md) 和历史周志。
-
-## 当前停止线
-
-- P05B 只允许仓库内 package builder、transaction/startup 实现、合成端口和隔离 Debian matrix；未获授权不得在真实 guest 运行产品 `dpkg`、写 `/usr`/`/var`、用户 XDG、Fcitx profile/autostart 或 systemd 配置。
-- 不启动、停止或重启 Fcitx/Manager/桌面会话，不执行真实 install/repair/remove/rollback；后续依赖安装及其他实机与系统变更继续逐项授权。
-- 不复跑 M5-P04 实机验收，不清理、reset、覆盖或改写其 guest staging、backup、userdb、导入导出文件和临时服务。
-- 不发布 build 38 或 Linux package，不推送本地提交，不创建 tag/Release，不修改远端 draft 或仓库设置。
-- 首个正式版本继续关闭真实用户同步；P0 永不学习/同步，P1 原始事件只留本地，P2 只允许端到端加密对象。
-- 输入热路径保持完全本地；Fcitx addon 不复制 engine、ranker、userdb、privacy 或同步逻辑，安装协调层不打开用户数据库。
-- M5 只推进 Linux Fcitx5，不并行实现 Android、Windows 或 iOS。
-- 不自动清理 staging、backup、历史 operation、receipt 或身份绑定终态材料。
+- 未获授权不得在真实 guest 运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 install/repair/remove/rollback。
+- 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
+- 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
+- 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步顺位
 
-1. 保持 P04 guest 与 macOS build 38 冻结现场不变。
-2. P05B 下一批实现 mutable dpkg transaction adapter，并同时固定 dependency/font/version relationship validation、maintainer-script 状态投影和 privileged maintenance command 的授权边界。
-3. 上述 adapter 与投影稳定后，在隔离 Debian 13 ARM64 环境执行 L6 install→upgrade→repair→rollback→remove→reinstall matrix，覆盖 crash/retry、source restore、启动门禁与用户 XDG 零写入/默认保留；不直接写现有 P04 guest。
-4. L6 自动证据闭合后再进入 P05C；真实实机使用独立 clone/snapshot 或另一台 guest，并对系统写入、进程/会话操作和人工输入逐项授权。
-5. 旧临时资产清理、远端推送、tag/Release、真实同步和其他平台均保持独立授权与后续顺位。
+1. 实现 production fixed-path observer/executor、concrete `DpkgTransactionPort`、真实 process quiescence 与 privileged host/CLI，并补齐 fake command/crash matrix。
+2. 在隔离 Debian 13 ARM64 环境执行 L6 install→upgrade→repair→rollback→remove→reinstall，覆盖 crash/retry、source restore、startup gate、字体/依赖和 XDG 零写入/默认保留；不写现有 P04 guest。
+3. L6 自动证据闭合后另行授权 P05C 独立 guest 实机；旧资产清理、远端、发布、真实同步和其他平台继续独立排期。
 
-## 当前验证入口
+## 验证入口
 
 ```bash
-./scripts/check-macos-product-metadata.sh
-./scripts/check-macos-install-layout.sh
-./scripts/check-product-install-core.sh
-./scripts/check-macos-install-adapter.sh
-./scripts/check-macos-install-coordinator.sh
-./scripts/check-macos-installer.sh
-./scripts/check-macos-release-carrier.sh
-./scripts/check-manager-product.sh
-./scripts/check-macos-imk.sh
-./scripts/check-macos-upgrade-product-coordination.sh
-./scripts/check-linux-fcitx5.sh
 ./scripts/check-linux-product-metadata.sh
 ./scripts/check-linux-product-layout.sh
 ./scripts/check-linux-deb-artifact.sh
 ./scripts/check-linux-package-transaction.sh
 ./scripts/check-linux-startup-gate.sh
+./scripts/check-linux-fcitx5.sh
 ./scripts/check-manager-linux-product.sh
-./scripts/build-linux-fcitx5-container.sh
 ./scripts/check-repo.sh
 ./scripts/check-docs.sh
+./scripts/check-text-files.sh
 git diff --check
 ```
 
-Linux product 入口分别验证 committed metadata、平台无关 rootfs contract、确定性 Debian artifact/依赖诊断、不调用真实 dpkg 的事务核心，以及 Manager/Fcitx 共用的只读 startup gate；2026-08-06 已另在 Debian 13.6 ARM64 以真实 Manager/addon 输入通过 rootfs 强门禁，并重复生成字节一致的未安装 `.deb`。新 startup-enabled payload 尚未在 ARM64 guest 构建或运行；真实系统安装、输入源变更、用户数据、公开上传和 Release 仍需对应授权。
+上述入口只证明仓库合同、合成状态和已记录的未安装载体证据，不证明新的 ARM64 startup-enabled payload、真实 dpkg mutation、桌面安装或公开发布。
 
 ## 阅读索引
 
 - [路线图](../roadmap.md)
 - [Linux 安装维护边界](../linux-installation-maintenance-boundary.md)
-- [第二平台 Linux Fcitx5 ADR](../adr/0009-second-platform-linux-fcitx5.md)
 - [Linux Fcitx5 平台边界](../linux-fcitx5-boundary.md)
 - [Linux Manager 本地验收边界](../linux-manager-local-acceptance.md)
-- [macOS 产品包边界](../macos-product-package-boundary.md)
-- [macOS 程序安装事务](../macos-installation-transaction.md)
-- [macOS 社区 ad-hoc DMG Runbook](../runbooks/macos-release-carrier.md)
 - [本周周志](../devlogs/2026-W32.md)

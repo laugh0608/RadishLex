@@ -56,7 +56,7 @@ Linux Manager 的主题必须显式提供兼顾 Latin、数字和简体中文的
 
 Linux runner 必须先设置进程 `umask(0077)`，再执行共用 Linux product startup gate，只有取得与编译身份一致的 move-only permit 后才可创建 Flutter application/engine、Dart isolate、settings store 或 userdb，随后注册 `dev.radishlex.manager/runtime` method channel。`createDefaultManagerBootstrap()` 仍是 Dart 唯一业务产品入口，依次取得平台路径、加载 native binding 并形成真实 `FfiManagerBridge`。
 
-startup gate 直接复用 bundle FFI 的 additive request/result v1，在 C++ host 中从当前 executable 取得 canonical component path；调用前以 `dladdr` 与 canonical path 证明 startup/error symbols 确实来自 executable 的精确 sibling FFI，拒绝 `LD_LIBRARY_PATH`、preload 或其他 loader interposition。输入 session/key ABI contract 仍为 v9。`development-staged` 只在 system receipt/state 均不存在且 package 严格未安装时允许，`debian-system-product` 只接受 terminal receipt、Installed package、严格 staging proof、完整 Manager bundle tree、manifest/同侧 FFI 与双 FFI equivalence。active guard、tmp/nonterminal receipt、Config-Files/半配置、completed remove、缺 receipt 或身份漂移都在 Flutter 初始化前退出；gate 不调用 `dpkg`，不创建 state，不解析 XDG，也不打开 userdb/settings/privacy/Rime。外部字体与系统 dependency relationship 仍由下一批 validator 负责，startup scope 不冒充全 package runtime inventory。
+startup gate 直接复用 bundle FFI 的 additive request/result v1，在 C++ host 中从当前 executable 取得 canonical component path；调用前以 `dladdr` 与 canonical path 证明 startup/error symbols 确实来自 executable 的精确 sibling FFI，拒绝 loader interposition。输入 session/key ABI 仍为 v9。`development-staged` 只在 system state/receipt 缺失且 package 严格未安装时允许，`debian-system-product` 只接受 terminal receipt、Installed package、严格 staging proof、完整 Manager bundle tree、manifest/同侧 FFI 与双 FFI equivalence。active advisory guard、receipt/stage tmp、nonterminal、半配置、completed remove、缺 receipt 或身份漂移都在 Flutter 初始化前退出；gate 不调用 `dpkg`，不创建 state，不解析 XDG，也不打开 userdb/settings/privacy/Rime。pure dependency/font/version relationship 已实现但尚未接入 startup，当前 scope 不冒充全 package runtime inventory。
 
 任一前置失败都返回稳定 `ManagerPlatformException` / `ManagerStartupException`；正常 `product` 构建不得读取 `RADISHLEX_MANAGER_MODE` 以外的运行期路径 override，也不得切换 `FixtureManagerBridge`。显式编译期 `demo` 继续只用于测试和合成演示，并保留全程标识。
 
@@ -71,7 +71,7 @@ P04 staged Flutter bundle 使用固定布局：
 <bundle>/data/...
 ```
 
-Linux host 从当前 executable 的 canonical parent 派生 sibling `lib/libradishlex_ime_ffi.so`，不读取工作目录、`LD_LIBRARY_PATH`、仓库路径或调用方参数。目标必须是 bundle 内非 symlink regular file，且不得 group/other writable；Dart binding 继续验证 ABI contract version 与 Manager 所需 symbol 集。P04 证明 staged product bundle 与 workspace native library 一致；P05A 又以全新 committed-source ARM64 bundle 通过 root-owned 目标布局、product manifest、ELF/closure、双 FFI 和构建路径强门禁。P05B 的平台无关 package transaction 已形成独立 receipt/guard/fake dpkg 合同，Linux Manager 也已在 Flutter application 前接入只读 system startup decision；尚未实现 mutable dpkg adapter，也未构建或实机运行新的 ARM64 startup-enabled product bundle。
+Linux host 从当前 executable 的 canonical parent 派生 sibling `lib/libradishlex_ime_ffi.so`，不读取工作目录、`LD_LIBRARY_PATH`、仓库路径或调用方参数。目标必须是 bundle 内非 symlink regular file，且不得 group/other writable；Dart binding 继续验证 ABI contract version 与 Manager 所需 symbol 集。P04 证明 staged product bundle 与 workspace native library 一致；P05A 又以全新 committed-source ARM64 bundle 通过 root-owned 目标布局、product manifest、ELF/closure、双 FFI 和构建路径强门禁。P05B 已形成 actual `.deb` relationship、恢复型 receipt/advisory guard/fake transaction，Manager 也在 Flutter 前接入只读 startup decision；尚无 production mutable port、系统 executor、真实进程静止或新的 ARM64 startup-enabled product bundle。
 
 Dart `ManagerProductPaths` 必须接受平台明确返回的固定 `.dylib` 或 `.so` basename，拒绝其他文件名；错误文案改为平台中立。该调整不得削弱 macOS `Contents/Frameworks/libradishlex_ime_ffi.dylib` 的既有测试和产品门禁。
 
@@ -190,7 +190,7 @@ A6 必须至少有一条从 personalized runtime 写入、经 Manager bridge 读
 4. Linux staged Release bundle 携带 workspace native-rime `.so`，完成 ABI/symbol/ELF 与无路径 override smoke。
 5. 使用临时合成库形成“runtime 写入—Manager bridge 刷新—另一 runtime 观察”的产品双端自动证据。
 
-该批没有顺带实现 package/安装，也没有以能打开空窗口结束。privacy watcher、classifier、Wayland/X11 身份、精确 Firefox 生产规则、同库学习/解释、privacy 零增量、删除防复活、explicit restore、导入导出、Fcitx/Manager 重启与桌面会话重启均已复用同一 host、XDG 和真实 bridge 闭合。M5-P04 验收矩阵据此退出；现有 staging、backup、userdb、导入导出文件和 transient service 终态继续保留。M5-P05A metadata/rootfs 与真实 ARM64 payload gate、P05B 平台无关 package transaction 和共用只读 startup gate 后续已独立完成；mutable dpkg adapter、依赖/版本关系复验、隔离 matrix 与任何安装实机仍需对应实现和授权。
+该批没有顺带实现 package/安装，也没有以能打开空窗口结束。privacy watcher、classifier、Wayland/X11 身份、精确 Firefox 生产规则、同库学习/解释、privacy 零增量、删除防复活、explicit restore、导入导出、Fcitx/Manager 重启与桌面会话重启均已复用同一 host、XDG 和真实 bridge 闭合。M5-P04 验收矩阵据此退出；现有 staging、backup、userdb、导入导出文件和 transient service 终态继续保留。后续 P05A payload gate 与 P05B actual package relationship、恢复型 fake transaction、共用只读 startup gate 已独立完成；production observer/executor、concrete mutable port、process quiescence、privileged host、L6 与安装实机仍需对应实现和授权。
 
 ## 当前停止线
 

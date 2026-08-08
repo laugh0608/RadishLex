@@ -1,17 +1,17 @@
 # RadishLex Linux product transaction
 
-本目录承载 Debian 系统级产品安装维护的事务合同与 Manager/Fcitx 共用只读 startup decision，不承载 `.deb` 组包，也不直接实现 mutable `dpkg`、服务启停或桌面会话操作。
+本目录承载 Debian 系统级产品的 package relationship、维护事务合同与 Manager/Fcitx 共用只读 startup decision。它不生成 `.deb`，不直接执行 mutable `dpkg`，不启停服务或桌面会话，也不读取/写入用户 XDG。
 
-当前 crate 固定以下边界：
+当前合同：
 
-- `install`、`upgrade`、`repair`、`remove`、`rollback` 五类操作共用可恢复状态机；
-- 首次系统状态检查后先写入 `prepared` 收据，再把 source / target `.deb` 与 evidence 复制到当前操作的 root-only 私有暂存目录；
-- `/var/lib/radishlex/install-v1/receipt.json` 为 append-only 当前收据，`operation_chain` 只允许从终态追加新操作；
-- `/run/lock/radishlex-install-v1.lock` 是 mode `0600` 的 Unix socket guard，用 inode 身份阻止并发事务和错误清理；
-- `dpkg`、产品载荷验证和恢复动作经 `DpkgTransactionPort` 注入；仓库测试只使用 fake port 与临时目录；
-- startup observer 直接读取固定 `/var/lib/dpkg/status`，严格检查 root/guard/tmp/receipt、package 状态与 terminal staging proof；Manager scope 复验完整 bundle tree，Fcitx scope 复验 addon/FFI/RimeData/两份 metadata，并验证两份产品 FFI equivalence、owner/mode/link/hash、ABI 与 data contract；
-- observer 不调用 `dpkg`，不创建或清理 state，不读取或写入 XDG/userdb/settings/privacy/Rime；`development-staged` 与 `debian-system-product` 由编译身份隔离；
-- additive `radishlex_linux_product_startup_gate` request/result v1 由 Manager 在 Flutter 初始化前、Fcitx factory 在 Engine/input FFI/XDG/Rime 初始化前消费；C++ binding 用 `dladdr`/canonical path 把 startup/error 与全部 Fcitx input symbols 绑定到精确 sibling FFI，拒绝 loader interposition；输入 session/key ABI contract 仍为 v9；
-- Manager、Fcitx5、用户 XDG 数据、Rime 用户数据、备份和 P04 guest 资产均不在本 crate 的读写范围。
+- canonical receipt 绑定 state-root identity、operation chain、source/target artifact、稳定 failure 与 terminal proof；`receipt.json.tmp` 和 artifact stage tmp 只按明确崩溃窗口恢复；
+- 私有 operation staging 使用目录 `0700`、文件 `0600`、单 link/固定 inode/size/SHA-256；current operation required slots 必须精确，旧 operation v1 只验证 structure/pair metadata且不用于恢复；
+- `/run/lock/radishlex-install-v1.lock` 是 mode `0600`、零长度、单 link regular file 上的 advisory exclusive lock；active contender 拒绝，stale unlocked file 只能由维护 acquisition 重新取得；
+- 目录/文件创建固定 mode，receipt 与 staging 的原子替换、新目录项均同步直接父目录；
+- 五类 operation 共用恢复状态机。每次 target/source mutation 或 retry 都重新验证 staged relationship并消费 move-only quiescence permit；首次安装恢复携带已取证 recovery target；
+- `VerifiedArtifactRelationship::verify_package` 是 production actual-package 唯一入口：从同一有界 `.deb` 流计算 size/SHA-256，严格解析精确三成员 ar、canonical uncompressed USTAR、仅 `control`/`md5sums` 的 control、actual data inventory 和唯一 product manifest，并交叉 evidence、canonical md5 inventory 与 actual `Installed-Size`；同域 pure relationship 另行校验依赖、Debian version 与 dpkg status；两者都不写文件、不调用命令；
+- typed Debian command contract 固定 `/usr/bin/dpkg`、私有 staged path、argv、清空后的允许环境、null stdin、有界诊断、dpkg config 与 lifecycle projection，但没有 executor；
+- v1 package 不允许 RadishLex 自有 maintainer scripts。外部 dependency scripts/triggers 只形成 dpkg observation，不能推进 product receipt 或代表完成；
+- startup observer 继续只读固定 `/var/lib/dpkg/status`、guard/tmp/receipt、terminal staging 与 component identity；Manager/Fcitx 在 Flutter/Engine/input FFI/XDG/Rime 之前消费 additive request/result v1，输入 session/key ABI 仍为 v9。
 
-当前 startup scope 不冒充全 package runtime inventory；mutable `DpkgTransactionPort`、maintainer scripts、外部 dependency/font/version relationship validation、privileged maintenance command、Debian ARM64 L6 matrix、安装命令或系统集成尚未实现，也没有构建或实机运行新的 ARM64 startup-enabled payload。不得把本 crate 的自动测试等同于 Linux 实机安装验收。完整边界见 `docs/linux-installation-maintenance-boundary.md`。
+当前未实现 production fixed-path system observer/executor、concrete mutable `DpkgTransactionPort`、真实 process quiescence、privileged host/CLI、startup dependency relationship 连接、字体 family/glyph/owner、外部 package lifecycle 或 Debian ARM64 L6。仓库测试只使用合成 package、fake port 与临时目录；不得据此运行或宣称系统安装。完整边界见 [`docs/linux-installation-maintenance-boundary.md`](../../docs/linux-installation-maintenance-boundary.md)。

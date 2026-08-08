@@ -1,420 +1,85 @@
 # RadishLex 协作约定
 
-本文件为 RadishLex 仓库中的 AI 协作者与人工协作者提供统一协作规范。
-它只约束本仓库的工作方式，不代表其他项目，也不复用其他项目的实现边界。
+本文件统一约束本仓库的人工与 AI 协作。对话开始或结束总结时称呼用户为 `萝卜SAMA`。
 
-## 称呼
+## 项目与当前阶段
 
-- 对话开始或结束总结时，请称呼我为 `萝卜SAMA`
-
-## 语言规范
-
-- 默认使用中文进行讨论、说明、提交总结和开发日志记录
-- 代码、命令、路径、配置键、类型名、接口名、URL 和外部项目名保留原文
-- 新增文档默认使用中文，除非该文件天然要求英文
-- 新增文件名、目录名和稳定锚点优先使用英文
-- 文档语言应直接说明结论、边界、下一步和阻塞项；阶段事实、推进顺序和停止线统一写入 `docs/`
-- 阶段目标、完成总结和推进建议不使用弱化交付质量的短平快完成类表述；优先写清楚阶段证据链、必要验证、可复验链路和停止线
-
-## 项目定位
-
-- RadishLex 是一个以 Rust 为输入核心、Go 为自部署同步后端、Flutter 为管理界面的源代码可见中文输入系统
-- 中文定位：萝卜词核
-- 核心目标：让输入法逐步理解用户的词库、语气、场景和候选偏好，达到可解释、可删除、可自部署的个人化输入体验
-- 技术主轴：Rust + Go + Flutter + 平台原生薄壳
-- v1 不从零重写完整中文输入引擎，优先接入成熟底层引擎，并在 Rust core 中建立稳定抽象、用户词库、候选重排和学习能力
-- 平台端只做系统输入法薄壳，不承载用户词库、同步、候选排序和隐私策略真相源
-- 输入热路径必须本地可用，后端只做同步、备份、设备管理和模型 / 词库包分发
-- 许可条款以仓库根 `LICENSE` 文件为准，当前采用 RadishLex Source-Available License
-
-## 快速认知
-
-- 阶段：M5-P01-P05A 已完成；当前 M5-P05B
-- 代码：macOS build 38 冻结；Linux 已过 `.deb`、fake dpkg 事务和共用只读 startup gate；mutable dpkg、实装、同步/发布关闭
-- 当前交付：macOS 内部候选；Linux 用户级开发装配；均非公开发布版本
-- 交付梯度：macOS 输入、个人化、同步资格与产品候选已完成；当前推进 Linux Fcitx5 产品线
-- 真实平台顺序：macOS InputMethodKit、Linux Fcitx5、Android、Windows、iOS；每次只推进一条主线
-- 底层引擎策略：v1 可接 `librime`，但必须通过 engine adapter 隔离；长期保留 Rust 自研引擎替换空间
-- 隐私立场：服务端默认不可信，客户端才是数据真相源
+- RadishLex（萝卜词核）是 Rust 输入核心、Go 自部署同步后端、Flutter Manager 与平台原生薄壳组成的源代码可见中文输入系统。
+- 许可条款以根 `LICENSE` 为准，当前采用 RadishLex Source-Available License。
+- 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
+- v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
+- 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、实际载体流式关系校验、fake package transaction 与共用只读 startup gate。
+- 尚未完成 production mutable `DpkgTransactionPort`、固定系统路径 observer/executor、真实进程静止、privileged host/CLI、L6 matrix 或系统安装；v1 package 明确不含 RadishLex 自有 maintainer scripts。
+- 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
 
-`docs/` 与根 `README.md` 是本仓库正式文档源。新会话默认只优先读取最小入口文档，避免为获取背景而消耗过多上下文。
-
-当前稳定入口：
-
-1. `README.md`：项目定位、设计原则、交付梯度和非目标
-2. `docs/status/current.md`：当前阶段、验证基线、停止线、主批次和近期顺位
-3. `docs/technical-plan.md`：总体架构、平台策略、学习设计、同步方案、clean-room 原则和风险
-4. `docs/roadmap.md`：阶段路线、交付物和退出标准
-5. `docs/repository-layout.md`：实际仓库结构、crate / server / app / platform 职责和未落地目录
-6. `docs/privacy-sync.md`：数据分级、加密对象、设备授权、删除语义和威胁模型
-
-临时专题仅在 `docs/status/current.md` 引用时进入阅读链，不自动成为长期真相源。
-
-按任务选读：
-
-- 涉及架构、模块职责或技术栈分工：先读 `docs/technical-plan.md`，再读 `docs/repository-layout.md`
-- 涉及阶段顺序、MVP 范围或下一步计划：先读 `docs/roadmap.md`
-- 涉及同步、加密、设备授权、删除语义、日志和敏感数据：先读 `docs/privacy-sync.md`
-- 涉及 engine adapter、底层输入引擎或 clean-room 边界：先读 `docs/technical-plan.md` 中底层引擎策略与 clean-room 实现原则
-- 当前阶段、当前验证基线和日常推进入口统一维护在 `docs/status/current.md`；本文件只保留长期稳定规则和一行级当前认知
-
-规则：
-
-- 若 README、docs 和实现冲突，先判断是实现偏离文档，还是文档已过期，再统一修正
-- 优先更新已有文档，不为一次性讨论创建大量散文档
-- 修改规则、架构、协议、目录职责、MVP 范围、隐私边界、平台落地策略或协作文档时，优先保持与 `docs/` 中现有正式文档一致
-- 架构、协议、阶段目标、隐私边界、平台落地策略或协作规则变化时，必须同步更新对应文档
-- `docs/` 的关键入口文档必须尽可能简约，只描述当前阶段、最近进度、稳定边界、下一步和必要索引
-- 历史背景、详细过程、长篇推演、命令输出和验证流水应放入专题文档、周志、记录或归档，不反复复制进入入口文档
-- 更新关键入口文档时，应优先删减过期背景和重复叙述，避免让 AI / Agent 在新会话中读取大量低价值上下文
-- 每篇新增或大改文档应在开头说明用途、读者和不包含内容，避免把使用说明、字段参考、架构推演与历史流水混写进同一篇文档
-- 文档中提到兄弟 Radish 项目时，默认使用项目名和在线仓库 URL，不写开发者本机绝对路径或相对路径
-- 如需读取本地外部项目资料，应由开发者在当次任务临时提供具体路径；该路径只作为临时输入，不写入正式文档
-
-## 文档篇幅治理
-
-- 协作入口文件只保留长期稳定规则；阶段性口径优先写入当前状态文档和对应专题文档
-- 文档篇幅按“默认阅读成本”和“职责单一性”治理，不照搬源码行数上限
-- `AGENTS.md` / `CLAUDE.md` 目标上限为 14k 字符；超过上限时先删减重复背景、历史流水和低价值细节
-- 后续若新增 `docs/status/current.md`，目标上限为 8k 字符
-- 后续若新增 `docs/README.md`，目标上限为 10k 字符
-- Guide / Runbook 单篇目标上限为 15k 字符
-- Reference / Architecture / Boundary 单篇目标上限为 25k-30k 字符
-- ADR 单篇目标上限为 12k 字符
-- 普通活跃 Markdown 接近 500 行时应优先拆分职责；超过 800 行时除历史记录和参考资料外，不应继续追加内容
-- 周志和历史草案可更长，但必须有顶部摘要和清晰索引
-- 超过目标上限的专题文档应优先拆成“入口摘要 + 专题正文”，或降级为历史材料并从默认阅读链移除
-
-## 开发节奏
-
-- 当前常态节奏为“方案 / 边界文档先行”：长期功能、重要模块、跨语言能力或阶段性开发目标，在进入代码实现前应先确认对应文档存在且边界清楚
-- 总体规划文档负责方向、阶段、优先级和退出标准，不承载具体功能的长期实现细节
-- 架构 / 边界文档负责模块职责、接口契约、数据模型、隐私策略、平台边界和验证口径
-- 记录 / 周志只记录批次事实、验证证据、历史流水和交接信息，不作为功能设计主文档
-- 回答“下一步做什么”时，应先通过现有路线图判断当前阶段与候选顺位，再判断要推进或补齐哪份功能设计 / 边界文档
-- 若对应专题文档缺失或明显过期，应先补设计边界，再进入代码
-- 小规模 bug 修复、低风险文案调整、纯清理或不改变功能边界的验证补漏，不强制先新增专题文档；如果暴露出现有说明与实现不一致，应同步修正文档口径
-- 不要把“建目录”“接占位文件”“补第一包命名”当成阶段完成证据；输入链路、隐私边界、同步语义、候选质量或真实平台可用性必须有可复验证据
-
-## 协作流程
-
-- 开始任何任务前，先检查仓库状态，并阅读与当前任务直接相关的文档
-- 若用户没有明确要求直接修改，编写任何代码之前，必须先说明方案并等待批准
-- 若用户明确要求直接修改，且范围清晰、风险可控，则直接实施，不必先停在纯建议阶段
-- 小规模、低风险、需求明确的文档、配置或清理类变更，可直接实施
-- 若需求不明确，或改动会影响架构、阶段边界、协议口径、隐私边界、平台接入方式、许可证、验证基线或协作规则，则先说明判断并做必要澄清
-- 每次新增 / 修改功能、修复 bug 或处理其他任务时，优先从根因、长期维护性和系统一致性出发，选择更完整、更稳妥的治理方案；不要把“最小修复”当作默认优先级，也不要无节制地层层增加兜底来掩盖问题
-- 每做完一个可分割子步骤，都应进行匹配的必要验证
-- 只有改动较大、发布前，或影响治理口径、协议、架构、阶段边界与文档真相源时，才补跑全量验证
-- 不要把 fast / quick mode 当成最终门禁
-- 重要阶段性决策除了改代码，还应同步更新对应文档；如果属于本周重要推进，追加到周志
-
-## Agent 协同文件
-
-- `AGENTS.md` 与 `CLAUDE.md` 应保持基本复制和长期同步
-- 这些同类协作文件不应演化出彼此冲突的规则口径
-- 若某个协作文件更新了通用协作规则、执行边界、验证基线或阶段约束，另一个文件也应尽快同步
-- 两个文件只允许保留与入口名称直接相关的极少量表述差异，不应借此分叉实际协作规范
-
-## 外部参考与 clean-room 原则
-
-- 兄弟 Radish 项目只作为协作方式、仓库治理、产品经验和工程组织方式参考
-- 默认不跨工作区修改其他项目；确需跨仓库操作时必须先获得明确授权
-- 不把其他项目代码、目录结构或实现细节整包迁入本仓库
-- 外部输入法、底层引擎、词库、平台适配和 UI 行为调研应沉淀为行为规格、接口约束和测试用例，而不是复制实现
-- 允许阅读公开文档、观察公开软件行为、总结输入法交互规格、自己设计数据结构和模块边界、使用兼容许可证的库作为可选 adapter
-- 不复制源码，不复制私有函数结构，不复制带版权风险的词库或测试数据
-- 不从 GPL / LGPL 项目搬实现进 permissive core，也不把开源项目的实现细节逐行翻译成 Rust
-- 调研流程应遵循：调研已有项目 -> 写行为规格文档 -> 根据规格重新设计 Rust API -> 实现自己的模块 -> 用黑盒测试验证行为
-
-## 分支与 PR 约定
-
-- `dev` 是常态开发分支，`master` 是稳定主线；常规改动不直接进入 `master`
-- 阶段稳定后发起 `dev -> master` PR；合并后、下一批开发前必须将最新 `master` merge 回 `dev` 并推送，保持 `master` 是 `dev` 的祖先
-- 共享 `dev` 只用 merge 回同步，不做 rebase 或 force push
-- 完整分支与 PR 规则见 `docs/adr/0001-branch-and-pr-governance.md`
-- 不执行破坏性 Git 操作；推送远端、创建 Release 或修改远端设置与保护规则前，必须先告知并获得授权
-
-## 仓库结构速记
-
-当前正式落地：
-
-- 根 README、LICENSE、协作入口和 `docs/` 稳定文档
-
-已落地核心结构：
-
-- `crates/`：Rust 核心和跨端复用库
-- `crates/ime-core/`：输入会话、候选模型、提交模型、engine trait、学习事件等核心领域模型
-- `crates/ime-engine-rime/`：`librime` adapter，屏蔽 C++ 细节和底层引擎状态
-- `crates/ime-ranker/`：候选重排、权重合成、解释能力
-- `crates/ime-userdb/`、`ime-product-upgrade/`：用户数据与产品升级 contract
-- `crates/ime-sync/`：同步客户端、版本管理、冲突合并
-- `crates/ime-crypto/`：主密钥、设备密钥、blob 加密、签名和校验
-- `crates/ime-ffi/`：C ABI、Flutter bridge、Swift / Kotlin / C++ 调用边界
-- `crates/ime-cli/`：输入 demo、词库管理、同步测试、ranker explain
-- `server/sync-server/`：Go 自部署同步服务
-- `apps/radishlex-manager/`：Flutter 桌面 / 移动管理器
-- `deploy/sync-server/`：本地与部署态 Compose、反向代理示例
-- `platforms/android-ime/keystore-bridge/`：Android Keystore 能力验证桥，不是完整 IME
-- `platforms/macos-imk/`：InputMethodKit 薄壳、bundle build 与 contract smoke
-- `platforms/linux-product/`：package 事务与只读 startup decision
-- `scripts/`：仓库检查、格式和构建脚本
-- `tests/fixtures/`：跨模块合成 fixture
-
-尚未落地：Linux mutable dpkg、maintainer scripts、L6 matrix 与安装实机，Windows/iOS 壳、Android IME、`examples/`；同步/发布关闭。
-
-## 架构边界
-
-- Rust core 负责输入会话、composition、候选模型、提交模型、候选重排、用户词库、个人化学习、同步客户端、加密和 FFI 边界
-- Engine adapter 负责屏蔽底层输入引擎差异；v1 可接 `librime`，但 Rust core 不应依赖具体引擎实现细节
-- Go server 只负责用户 / 设备注册、设备公钥登记、密文 blob 存储、同步版本号、冲突检测、备份恢复、审计日志和包分发
-- Go server 不参与每次按键，不做云端实时转换，不保存明文输入历史、明文用户词库、明文候选偏好或明文上下文片段
-- Flutter manager 只负责设置、词库管理、学习记录可视化、隐私控制台、同步状态、设备管理、后端连接和备份恢复，不进入输入热路径
-- 平台壳只负责系统输入法生命周期、按键事件接收、候选窗展示、文本提交和调用 Rust core
-- 候选窗优先使用平台原生机制，不强行统一 Windows、macOS、Linux、Android、iOS 候选窗 UI
-- CLI / debug 工具可以暴露内部状态用于开发，但不得把调试接口做成正式输入热路径依赖
-
-## Engine 边界约束
-
-- Rust core 必须通过稳定 trait / interface 调用底层 engine，不直接散落 `librime` 概念
-- Engine trait 至少应清楚覆盖 reset、push key、composition、candidates、commit、schema 切换和状态查询
-- Engine candidate 转换到 RadishLex candidate 时，应保留必要的稳定字段，避免把底层私有状态透传成核心模型
-- 候选重排只在 RadishLex candidate 层进行；底层 engine score 可作为输入因子，但不是唯一真相源
-- 个人化学习记录应绑定输入 code、候选 text、reading、上下文类别和反馈事件，不绑定某个 engine 的私有对象 ID
-- v1 可优先支持全拼和常见拼音路径，不提前承诺五笔、粤拼、仓颉等全部方案
-- 自研 Rust engine 属于后续阶段，不能在 v1 抢占 Rust core、用户词库、ranker、同步和真实平台落地的优先级
-
-## 隐私与同步约束
-
-- 输入法数据高度敏感，服务端必须默认不可信
-- 输入热路径必须本地可用，后端不得成为实时输入依赖
-- 服务端只应看到设备 ID、加密对象 ID、加密 blob 大小、对象版本、更新时间和必要同步元数据
-- 服务端不应看到明文用户词、明文输入历史、明文候选偏好、明文应用上下文、明文短语或联系人信息
-- P0 数据永不同步，包括密码框输入、银行 / 支付 / 证件类敏感 App、系统 secure text entry、用户开启隐私模式期间的输入
-- P1 数据默认只本地学习，包括应用上下文统计、原始选择事件日志和负反馈详细事件
-- P2 数据可加密同步，包括用户词库、候选权重摘要、输入方案配置、自定义短语和设备设置
-- P3 数据可公开下载，包括官方词库包、输入方案模板、模型包和 UI 主题
-- 用户词库、权重摘要、输入方案配置和设备设置只能以加密对象同步
-- 删除必须同步，使用 tombstone 或等价语义，避免旧设备或旧备份复活用户已删除词条
-- 新设备加入必须通过已有设备授权或恢复码，不能用服务端明文账号密码直接解密用户数据
-- 单台设备丢失后应允许撤销设备，并在后续对象上轮换同步密钥
-- 日志、测试 fixture、错误报告和截图不得包含明文输入历史、联系人、密码、证件、支付或其他敏感内容
-- 加密、同步、删除语义、设备撤销和恢复码相关改动必须有更高强度测试和文档说明
-
-## 平台落地约束
-
-- Windows 使用 TSF 薄壳，候选窗优先使用平台原生能力；不作为第一个真实平台
-- macOS 使用 InputMethodKit，外壳使用 Swift / Objective-C 薄层，适合作为第一批桌面平台之一
-- Linux 优先接 Fcitx5，其次考虑 IBus；Wayland 下尽量走输入法框架 panel，不自造浮窗协议
-- Android 使用 Kotlin InputMethodService 薄壳，Rust core 通过 NDK 编译为 `.so`，键盘 UI v1 优先原生实现
-- iOS 使用 Swift / UIKit Keyboard Extension，Rust core 编译为 XCFramework；默认离线可用，同步需要用户开启 full access
-- 平台壳不承担用户词库逻辑、同步逻辑、候选排序逻辑、隐私策略或业务配置真相源
-- 平台差异应通过 FFI / bridge 和 platform shell 边界吸收，不向 Rust core 注入平台私有生命周期细节
-- 修改系统输入法、权限、Keychain 或系统目录必须先获明确授权。授权实机中，AI 负责构建、签名、用户级安装、系统设置添加、只读监视及最终清理；用户负责聚焦、手动切换 source 和实体交互
-- AI 每次只给一组步骤并等待结果，不用程序化选择、合成按键或自动点击冒充验收；菜单栏仅供参考，来源用公开 API 只读记录。显示冲突时用户经中立 source 重选；注销或重启前必须保存工作并另行授权
-
-## AI 执行边界
-
-### 可直接执行
-
-- 读取本仓库代码、文档和配置
-- 修改本仓库内代码、文档、配置和脚本
-- `git status`、`git diff`、`git log` 等只读 Git 操作
-- `cargo fmt --check`、`cargo check`、`cargo test`、`cargo clippy` 等 Rust 静态验证和测试
-- `gofmt`、`go test ./...` 等 Go 格式化和测试
-- `dart format`、`flutter analyze`、`flutter test` 等 Flutter / Dart 验证
-- 项目已存在验证入口时，执行对应格式化、构建、测试和仓库检查命令
-- 简洁明确的小规模提交操作
-
-### 需要先告知用户再执行
-
-- 安装依赖、下载 SDK / 模型 / 数据、修改全局工具链或需要网络引入依赖变更的命令，例如 `cargo add`、`cargo update`、`go get`、`flutter pub add`、`npm install`
-- 启动长期运行或需要人工交互的命令，例如 `cargo run`、Go server、Flutter desktop、移动端模拟器、输入法守护进程、平台服务或浏览器 dev server
-- 修改本机环境，例如安装输入法、修改系统输入法配置、注册 / 反注册 TSF、写系统目录、写注册表、安装证书、修改 Keychain、修改全局 Git 配置或编辑器全局配置
-- 打包、签名、发布、上传、创建 Release、推送远端分支、修改远程仓库设置或配置 GitHub ruleset
-- 更改许可证、商标、版权声明或第三方依赖授权口径
-- 批量改写外部参考资料、词库、生成资产或大体积 fixture
-
-### 默认不做
-
-- 跨工作区编辑兄弟 Radish 项目、历史旧仓库、参考仓库或其他项目
-- 把旧仓库代码整包迁入当前仓库
-- 复制外部项目源码、GPL / LGPL 实现细节或有版权风险的词库数据
-- 未经明确要求执行破坏性 Git 操作
-- 未经明确要求下载大型模型、词库、语料、数据集或二进制 SDK
-- 上传原始输入流、明文用户词库、明文候选偏好或敏感上下文
-- 在 v1 阶段把完整拼音引擎自研、全平台输入法端和复杂云服务同时压入主线
-
-### 沙盒验证与提权规则
-
-- 默认优先在当前沙盒环境内执行构建、测试与最小验证
-- 如果因沙盒限制、PATH 缺失、权限隔离、网络或证书限制，导致无法确认代码是否真实可编译、可测试、可验证，可申请提权复验
-- 提权用途必须限制在“构建 / 测试 / 必要验证”或用户明确要求的 Git / 发布动作，不得扩大到安装依赖、长期运行服务或其他高风险动作
-- 如果关键构建、测试或 smoke 在沙盒环境中失败，且失败现象明显带有沙盒限制、受限下载、native 加载路径差异或权限隔离特征，应优先在获得授权后用真实环境复验，而不是直接归因到代码
-
-## 验证基线
-
-- 仓库级验证入口补齐后，优先使用 `./scripts/check-repo.sh` 或对应平台脚本
-- 在仓库级脚本补齐前，按改动范围执行最小验证，并在总结中说明已验证内容和未验证风险
-- 只改文档或治理文件时，至少确认工作区状态，并检查 `AGENTS.md` 与 `CLAUDE.md` 是否同步
-- 涉及 `docs/`、根 `README.md`、`AGENTS.md` 或 `CLAUDE.md` 时，应额外检查文档入口、术语和许可证口径没有互相冲突
-- Rust 改动优先执行 `cargo fmt --check`、`cargo check` 和相关 `cargo test`
-- Rust 公共模块、ranker、userdb、sync、crypto、FFI 或 engine adapter 改动，应扩大到相关 crate 测试和必要集成测试
-- Go server 改动优先执行 `gofmt`、`go test ./...` 和相关 API / migration 检查
-- Flutter manager 改动优先执行 `dart format`、`flutter analyze` 和相关 widget / unit test
-- 平台壳改动应至少覆盖对应平台的 build / smoke；涉及真实系统输入法行为时，需要人工或实机复核记录
-- 隐私、同步、加密、删除语义、候选排序和 FFI 边界改动需要更高强度测试，不应只靠静态编译通过
-- 发布、合并到稳定主线或形成阶段交付前，应补齐仓库级检查和必要 smoke 记录
-
-## 实现与代码风格
-
-- 新增 Rust、Go、Dart、Swift、Kotlin、C / C++、Shell、PowerShell 或前端代码时，应遵循对应语言主流、清晰、可维护实践
-- 优先使用语言和标准库已有表达能力，不自造晦涩框架
-- 命名必须表达真实领域职责，避免 `process_data`、`handle_item`、`manager`、`helper`、`processor`、`context` 这类无法说明边界的泛名
-- 禁止乱写不明意义的方法、空转 wrapper、多层转发、过度泛化 factory / manager 或晦涩抽象封装
-- 抽象只在能稳定表达职责边界、消除真实重复或明显降低复杂度时引入；不要为了“看起来通用”增加理解成本
-- 能用 schema、明确类型、标准库或直接函数解决的问题，不应写成难追踪的动态包装或隐式 fallback 链
-- Rust 代码优先使用类型系统、`Result` / `Option`、所有权和小而明确的模块边界表达约束，避免通过字符串标记、全局状态或多层 fallback 掩盖模型问题
-- Go server 优先保持简单、可审计、可自部署，默认单用户 SQLite 模式先行；不要提前引入复杂多租户、云厂商绑定或不必要微服务拆分
-- Flutter UI 不承载业务真相源，状态与配置边界应通过明确 bridge / API 表达
-- FFI 边界必须明确所有权、生命周期、错误语义、字符串编码、线程模型和释放责任
-- 加密、同步、ranker、userdb 和 FFI 相关错误不得被静默吞掉；需要可诊断、可测试、可解释
-- 单个源码文件原则上不超过 1500 行；文件接近 1000 行时，后续新增实现应优先拆分职责、提取子模块或测试 helper
-- `src/` 下源码按职责做浅层目录分组，优先使用 1 层子目录收纳同域模块，避免长期把所有模块平铺在 `src/` 根下，也避免为了“整齐”堆出过深目录树
-- `scripts/` 根目录优先只保留稳定入口、跨平台包装脚本和少量高频直达命令；较长实现、内部 helper 与静态 fixture 应优先放入浅层分类子目录
-- committed 相对路径默认不得超过 180 个字符；若接近该预算，应优先缩短目录语义、提炼短键或把长描述迁回结构化元数据
-
-## 文件与文本规范
-
-- 仓库自有文本文件默认使用 UTF-8，无 BOM
-- 换行符遵循仓库根 `.editorconfig` 与 `.gitattributes`：默认使用 LF
-- 保持文件末尾换行；非 Markdown 文本避免尾随空格
-- 新增仓库文件优先使用英文文件名，正文可以使用中文
-- 面向人工审阅的 JSON、配置文本和本地持久化文本优先保持 UTF-8 可读文本，中文默认直写，仅保留语法必需或序列化器仍要求保留的转义
-- 若怀疑当前修改引入乱码、换行漂移、BOM 或尾随空格问题，应优先执行仓库文本检查；脚本尚未补齐时，至少使用 `git diff --check`
-- 不为通过文本门禁而批量改写外部参考资料、上游词库、第三方生成文件或保留其原始格式有意义的资料
-
-## 日志、数据与测试 fixture
-
-- 禁止在 committed 日志、fixture、截图、错误报告、golden 数据中放入真实明文输入历史、联系人、密码、证件、支付信息或敏感上下文
-- 需要测试个人化学习时，使用合成词、虚构联系人、虚构 App ID 和可公开样例
-- 需要测试删除语义时，应同时覆盖 tombstone、防旧设备复活、冲突合并和备份恢复边界
-- 需要测试同步时，应覆盖多设备版本、base version、冲突、离线写入、恢复码、设备撤销和密钥轮换
-- 需要测试 ranker 时，应覆盖正反馈、负反馈、recency、frequency、app context、phrase context 和 explain 输出
-- 性能测试不应上传真实输入流；如需长期统计，默认只保留本地合成数据或匿名聚合指标
-
-## 常见偏航点
-
-- 不要把 RadishLex 做成云端实时输入法 API
-- 不要默认上传原始输入流、明文用户词库或明文上下文
-- 不要用 Flutter 或 egui 强行统一系统候选窗
-- 不要在 v1 阶段重写完整拼音引擎
-- 不要把 `librime` 作为不可替换核心或让其实现细节污染 Rust core
-- 不要把 Go server 做成候选排序服务或在线转换服务
-- 不要让平台壳承载用户词库、同步、排序或隐私策略
-- 不要为了“全平台”同时开 Windows、macOS、Linux、Android、iOS 五条真实输入法端主线
-- 不要在没有 engine boundary 和 CLI 可复验链路前直接推进复杂平台壳
-- 不要在没有评测和 explain 能力前只凭主观体验调 ranker 权重
-- 不要为单次需求扩张无关能力、引入复杂抽象或提前压入后续阶段复杂度
-
-## Git 提交规范
-
-- 使用简洁明确的 Conventional Commits 风格
-- 常用类型：`feat`、`fix`、`docs`、`refactor`、`test`、`chore`、`ci`、`build`、`perf`、`revert`
-- 优先把代码改动、文档改动和仓库治理改动按主题拆分，而不是混成大提交
-- 小修改提交时，commit message 保持一条简洁说明即可
-- 大修改提交时，除了首行 commit message 外，优先补充 3 到 6 条简短说明，概括本次主要变更点
-- 必须使用当前用户 Git 身份
-- 不添加 AI 协作者署名
-- 提交前至少确认本次改动对应的必要验证已经执行
-
-示例：
-
-```text
-docs: 更新项目协作与治理文档
-
-- 对齐 AGENTS 与 CLAUDE 协作规则
-- 补充隐私同步与平台薄壳约束
-- 明确文档入口和验证分层
-```
-
-```text
-chore: bootstrap RadishLex repository
-```
-
-```text
-ci(ruleset): add repository governance checks
-```
-
-## 文档与开发日志更新要求
-
-- 架构、边界、阶段目标变化时，必须同步更新 `docs/`
-- 影响协作方式或工作流的变更，应同步更新 `AGENTS.md` 和 `CLAUDE.md`
-- 若该协作规则同时存在于多个 Agent 入口协作文件中，也应一并同步更新
-- 每周重要推进应记录到对应周志
-- 周志按 `docs/devlogs/YYYY-Www.md` 命名；如后续采用月目录，应在文档入口中统一说明
-- 周志记录应包含：本周目标、完成情况、关键决策、验证记录、风险与未完成项、下周建议
-- 更新日志和周志使用 Asia/Shanghai（UTC+8）日期
-
-## 变更方向判断标准
-
-如果一个改动同时满足以下条件，则方向通常是正确的：
-
-- 本地优先和隐私边界更清晰
-- Rust core、Go server、Flutter manager、平台壳职责没有互相污染
-- engine boundary、同步协议、文档和阶段目标一致
-- workspace 或当前文档基线仍可验证
-- 没有把尚未进入当前阶段的复杂度提前压进主线
-- 仓库规则、验证入口和协作说明仍能保持同步
-
-## 开发原则
-
-1. 不做“玩具式最小实现”
-
-- 交付必须覆盖用户真实需求和主要使用路径
-- 可以控制修改范围，但不能用临时方案、占位逻辑或半成品糊弄完成
-
-2. 测试和验证按风险分层
-
-- 不要求任何改动都跑完整测试
-- 小改动优先做精准验证；涉及核心流程、公共模块、数据一致性、安全隐私或用户可见行为时，再扩大测试范围
-- 说明已验证的内容，以及未验证但存在风险的部分
-
-3. 代码优先清晰、直观、易维护
-
-- 避免为了炫技引入复杂设计模式、过度抽象或晦涩写法
-- 代码应让新人和实习生也能顺着业务逻辑读懂
-- 只有在能明显降低复杂度、减少重复或符合现有架构时，才新增抽象
-
-4. 保持架构清晰
-
-- 修改前先理解现有模块边界和调用关系
-- 优先沿用项目已有风格、目录结构和设计习惯
-- 不做无关重构，但遇到影响当前需求的结构问题时，应做小范围、必要的架构修正
-
-5. 不做无意义的“安全兜底”
-
-- 不要为了表面稳妥到处吞异常、返回默认值或隐藏错误
-- 对明确的外部输入、边界条件、IO、网络、权限、并发、加密和 FFI 风险点，应做必要校验和错误处理
-- 兜底逻辑必须有明确目的，并且不能掩盖真实问题
-
-6. 避免不必要的函数嵌套
-
-- 不写函数套函数、回调套回调等影响可读性的结构
-- 优先使用命名清晰的普通函数、早返回和顺序流程
-- 只有在闭包能明显简化状态管理且不影响阅读时，才允许局部函数
-
-7. 优先最小化修改范围
-
-- 在满足需求和质量保证的前提下，尽量少改文件、少引入新变量、少新增函数
-- 不为单次需求扩展无关能力
-- 每个新增结构都应有明确用途，避免“顺手优化”和范围蔓延
-
-8. 决策顺序
-
-- 先保证需求完整正确
-- 再保证隐私、安全和架构边界清晰
-- 再控制修改范围和实现复杂度
-- 最后根据风险选择合适的验证方式
+默认入口：`README.md`、`docs/status/current.md`、`docs/technical-plan.md`、`docs/roadmap.md`、`docs/repository-layout.md`、`docs/privacy-sync.md`。按任务补读：
+
+- 阶段与顺位读 `current`、`roadmap`；架构与目录读 `technical-plan`、`repository-layout`；同步与敏感数据读 `privacy-sync`。
+- Linux 当前安装工作读 `docs/linux-installation-maintenance-boundary.md`，平台/Manager 分别读 `docs/linux-fcitx5-boundary.md` 与 `docs/linux-manager-local-acceptance.md`。
+- 优先更新既有文档。入口只保留当前判断、停止线和索引；设计进专题，流水进 `docs/devlogs/YYYY-Www.md`，历史段不回写成新事实。
+- 架构、协议、隐私、平台、目录、里程碑或验证口径变化必须同步文档；每周重要推进追加 Asia/Shanghai 周志。
+- 新增或大改文档开头说明用途、读者和不包含内容。兄弟项目只写项目名和在线 URL，不写本机路径。
+- `AGENTS.md` 与 `CLAUDE.md` 保持逐字一致，目标均小于 14k 字节；`current` 目标 8k，Guide/Runbook 15k，Boundary 25k-30k。普通活跃 Markdown 接近 500 行优先拆职责。
+
+## 开发节奏与协作
+
+- 开始任务先检查 Git 状态并阅读直接相关文档。若基线与用户给出的 commit、ahead 或 clean 状态不一致，不 reset、覆盖或清理，先报告差异。
+- 长期功能、跨语言能力、平台或重要模块先固定边界再实现。小型 bug、文案、纯清理或不改变边界的验证补漏可直接推进。
+- 用户未明确要求修改代码时，先说明方案并等待批准；范围清晰且用户要求直接修改时可实施。影响架构、协议、隐私、许可证、平台接入或阶段边界而意图不明时先澄清。
+- 从根因、长期维护和系统一致性出发，完整覆盖真实主路径；不得用占位、半成品或“短平快”表述冒充交付。
+- 每个可分割步骤做匹配验证；核心、数据一致性、安全、隐私、用户可见行为或阶段交付扩大门禁。fast/quick 不能作为最终门禁。
+- 工作区可能含用户改动或并行改动；只修改本批文件，保留无关变更。禁止未授权 `git reset --hard`、checkout 覆盖、force push 等破坏性操作。
+- 提交使用当前用户身份和 Conventional Commits，不加 AI 署名。代码、文档、治理按主题拆分；提交前复验范围与必要门禁。推送、PR、Release、tag 或远端设置须另行授权。
+
+## 架构与 Engine 边界约束
+
+- `crates/ime-core`：session、composition、candidate、commit、engine trait 与领域模型。
+- `ime-engine-rime`：隔离 Rime 生命周期与类型；`ime-runtime`：组合 engine、ranker、userdb、privacy；`ime-ranker`：确定性重排与 explain；`ime-userdb`：SQLite、学习、tombstone、导入导出和同步投影。
+- `ime-sync`/`ime-crypto`：客户端 P2 协议、合并、设备与密钥；`server/sync-server` 只存密文与必要元数据，不参与按键或明文合并。
+- `ime-ffi` 必须明确 ABI、所有权、生命周期、线程、UTF-8、释放和错误；不得静默吞掉 crypto/sync/ranker/userdb/FFI 错误。
+- Flutter Manager 负责设置、词库、学习视图、隐私、同步状态、设备和备份入口，不进入热路径。平台壳只处理系统生命周期、按键、候选、commit 和 FFI。
+- Linux 优先 Fcitx5，候选使用 input panel；Wayland 不自造浮窗协议。`platforms/linux-product` 只承担 Debian product transaction、关系校验与 startup decision，不接管输入业务或 XDG 数据。
+
+## 隐私与数据
+
+- P0 数据永不同步：密码、支付、证件、secure text 与隐私模式输入也永不学习；P1 原始选择/上下文默认只本地；P2 用户词、摘要、配置只作为端到端加密对象；P3 可公开下载。
+- 删除必须以 tombstone 或等价语义同步，防旧设备/备份复活。新设备由已有设备或恢复码授权；撤销后轮换后续对象密钥。
+- 日志、fixture、截图、诊断与 golden 禁止真实输入历史、联系人、密码、证件、支付或密钥；使用合成词、虚构 App/设备与脱敏聚合。
+- 同步测试覆盖多设备、base version、冲突、离线、恢复、撤销、轮换；删除覆盖 tombstone、旧状态、冲突和备份；ranker 覆盖正负反馈、recency、frequency、context 与 explain。
+
+## Linux P05B 边界
+
+- 首个载体是 Debian 13 ARM64 系统级本地单 package，identity `debian-local-deb-v1`，不是公开 repository 或通用 Linux 包。
+- CJK/Latin 字体使用发行版 hard dependency：`fonts-noto-cjk`、`fonts-dejavu-core`；payload 只允许固定 Material Icons 图标字形，不注册字体或调用 `fc-cache`。
+- package 绑定 Manager、两份同 hash/不同 inode FFI、addon、完整 RimeData/source/license、desktop/icon 与 product manifest。
+- `install`、`upgrade`、`repair`、`remove`、`rollback` 默认对用户 XDG 零写入并保留数据；首批升降级要求 ABI/schema/XDG/settings/privacy/Rime contract 完全相同。
+- actual `.deb` 校验必须同一流计算 identity，严格解析三成员 ar、canonical USTAR、仅 `control`/`md5sums` 的 control，并交叉完整 payload inventory/manifest/evidence、canonical md5 inventory 与 `Installed-Size`；依赖、版本和 dpkg status 由同域 pure relationship 另行验证，不得退回 detached 字节声明。
+- 每次 mutation/retry 重新验证私有 staged relationship，并消费 move-only quiescence permit。首次安装恢复必须保留 recovery target。
+- state 使用 root-owned receipt、`receipt.json.tmp`/stage tmp 恢复、精确 current required slots、原子 mode 与父目录 `fsync`；guard 是 mode `0600`、零长度、单 link regular file 上的 advisory exclusive lock，不是 Unix socket。
+- 旧 operation v1 只保留结构与 pair metadata，不存历史 hash proof，也不用于当前恢复。任何未知、半配置、身份/owner/mode/link/hash 漂移均失败关闭并保留现场。
+- 固定 `dpkg` argv/env/config/lifecycle 当前只是 typed contract，不执行命令。外部 package scripts/triggers 只作为 dpkg lifecycle observation，不能代表 RadishLex transaction completed。
+- startup observer 尚未连接完整 dependency relationship；字体 family/glyph/owner 与真实 package manager/process 证据留到 L6。
+- 不要把 RadishLex 做成云端实时输入法 API，也不要让同步后端进入按键热路径。
+
+## 实机与系统边界
+
+- 可直接读取/修改仓库，运行只读 Git、现有格式化、静态检查、测试和 smoke，并做范围清楚的小型本地提交。
+- 安装依赖、下载 SDK/模型/数据、改变全局工具链、启动长期服务或 GUI 前先告知；网络或沙盒导致关键验证失真时，只为构建/测试申请受限提权。
+- 修改系统输入法、权限、Keychain、`/usr`/`/var`、dpkg、systemd、Fcitx profile/autostart、会话、证书或全局配置必须取得明确授权。不得自动 kill/restart、合成按键或点击冒充人工验收。
+- P04 guest staging、backup、userdb、导入导出文件和临时服务保持原样，不复跑或清理。任何 L6/P05C 使用独立 clone/snapshot 或另一台 guest，并逐步授权系统写入、进程/会话和人工输入。
+
+## 实现、文件与验证
+
+- 代码优先直观命名、早返回、明确类型与浅层职责；不写空转 wrapper、晦涩 factory、动态字符串状态、异常吞噬或无目的 fallback。抽象只为稳定边界、真实重复或明显降复杂度。
+- 单源码原则上不超过 1500 行，接近 1000 行优先拆分；`src/` 与 `scripts/` 使用浅层职责目录；committed 相对路径默认不超过 180 字符。
+- 仓库文本 UTF-8 无 BOM、LF、末尾换行；非 Markdown 无尾随空格。不得为过门禁批量改写第三方或保留原格式资料。
+- Rust：`cargo fmt --check`、`cargo check`、相关 `cargo test`/`clippy`；Go：`gofmt`、`go test ./...`；Flutter：`dart format`、`flutter analyze`、相关 test；平台壳覆盖 build/smoke，真实行为留人工证据。
+- 涉及 docs/入口需检查术语、链接、许可证与 AGENTS/CLAUDE 同步；文本至少跑 `git diff --check`。阶段性或高风险交付补 `./scripts/check-repo.sh`，并说明已验证项与未验证风险。
+
+## 当前顺位
+
+1. 实现 production fixed-path observer/executor、concrete `DpkgTransactionPort`、真实 process quiescence 与 privileged host/CLI，并补 fake command/crash matrix。
+2. 在隔离 Debian 13 ARM64 执行 L6 install→upgrade→repair→rollback→remove→reinstall、crash/retry、startup gate 与 XDG 零写入/默认保留矩阵。
+3. L6 证据闭合后另行授权 P05C；公开发布、推送、旧资产清理、真实同步及其他平台仍独立排期。

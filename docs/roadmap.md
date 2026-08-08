@@ -174,7 +174,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 2. `M5-P02`：实现 C++/CMake addon、Rust FFI 接线、确定性开发构建和自动 contract。
 3. `M5-P03`：完成真实 Wayland 主路径、X11 兼容、常见应用输入、生命周期和隐私验收。
 4. `M5-P04`：完成 Linux Flutter Manager、同库并发、本地学习、删除/恢复、导入导出和 explain 验收。
-5. `M5-P05`：完成安装、升级、修复、默认移除、rollback、数据保留和发行载体。首个载体固定为 Debian 13 ARM64 的系统级本地 `.deb`；P05A 已完成 committed metadata、rootfs assembly、staged/system 构建身份与真实 ARM64 Manager/addon 载荷门禁，P05B 已完成确定性 package artifact、dependency-analysis identity、receipt/guard、五类 operation、fake dpkg port 与 Manager/Fcitx 共用只读 startup gate。当前继续实现 mutable dpkg adapter、依赖/版本关系复验和 maintainer-script 投影，再进入隔离 Debian ARM64 L6 matrix；P05C 最后进入独立 guest 授权实机。
+5. `M5-P05`：完成安装、升级、修复、默认移除、rollback、数据保留和发行载体。首个载体固定为 Debian 13 ARM64 的系统级本地 `.deb`；P05A 已完成 metadata/rootfs、双构建身份与真实 ARM64 载荷门禁。P05B 已完成确定性载体、实际 `.deb` 流式 inventory/evidence/dependency/version 关系校验、恢复型 receipt/advisory guard、五类 fake transaction 与共用只读 startup gate。下一子批实现固定系统路径 observer/executor、concrete mutable `DpkgTransactionPort`、真实进程静止、privileged host/CLI 和 fake command/crash matrix；随后进入隔离 Debian ARM64 L6。v1 不携带 RadishLex 自有 maintainer scripts，外部 scripts/triggers 不能替代事务完成证据；P05C 最后进入独立 guest 授权实机。
 
 交付：
 
@@ -186,6 +186,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 - native dependency、RimeData、版本/schema、许可证和产品 metadata 一致性门禁。
 - Linux system package 绑定 Manager、两份同版 FFI、Fcitx addon、完整 RimeData、desktop entry、icon、字体/系统依赖与版本化 product manifest。
 - Linux install、upgrade、repair、remove、rollback 事务、startup gate 与默认保留用户 XDG 数据语义。
+- production adapter 在每次 mutation/retry 前重验实际 staged package relationship并消费静止许可；typed `dpkg` 命令合同不能在 executor 落地前被称为可安装入口。
 
 退出标准：
 
@@ -199,6 +200,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 - Debian 13 ARM64 的安装、同数据 contract 升级、修复、rollback、默认程序移除和 reinstall 具有自动门禁与独立实机证据。
 - 默认 remove/purge 不遍历 home、不删除用户 XDG 数据；package 不自动改 Fcitx profile、autostart、输入源或桌面会话。
 - Manager 与 Fcitx panel 的中文、Latin 和数字字体依赖可复验；首个 Debian profile 使用发行版硬依赖，不把系统字体偶然 fallback 写成产品证据。
+- L6 必须补齐 startup dependency 连接、发行版字体 family/glyph/owner、真实 process/package-manager lifecycle 与 crash-command 证据。
 - macOS 冻结参考基线与仓库门禁继续通过，真实用户同步继续关闭。
 
 完整运行边界见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)，安装维护边界见 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)。
