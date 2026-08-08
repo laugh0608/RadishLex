@@ -21,7 +21,22 @@
 - compile-identity 隔离的 acceptance checkpoint/evidence controller 已完成，八点合成中断/恢复与 canonical 脱敏 envelope 已通过专项门禁；
 - 真实 pair 已从 source commit `55351f2` revision 1 与 target commit `e5b6da1` revision 2 的独立 clean root 断网构建、原子发布并独立复验；
 - canonical pair record、两份 ARM64 package 与 production/acceptance executable identity 已冻结，具体 hash 见本 runbook 第 3 节；
-- 构建 VM 只新增 per-user SDK/cache、私有源码/build/output；没有执行真实 `dpkg`、`/proc` probe、字体 probe、Manager/Fcitx 启动或系统安装，独立 L6 guest 与 S0 尚未准备。
+- 构建 VM 只新增 per-user SDK/cache、私有源码/build/output；独立 L6 guest、专用用户与 root-owned pair handoff 已准备，但 S0 尚未创建，真实 `dpkg`、`/proc` probe、字体 probe、Manager/Fcitx 启动与系统安装均未执行。
+
+### 当前本地资产登记（非发布证据）
+
+2026-08-08 的宿主根为 `/Users/luobo/VirtualMachines`。磁盘上有五个 `.utm` bundle，但 UTM 面板只注册四个：`Debian13-ARM64-DependencyFrozen.utm` 故意未注册，并保留工作 VM 的同一 UUID，因此不能与工作 VM 同时注册或启动。另有 `RadishLex-L6-Handoff-e5b6da1`，它是 8 文件/约 81 MiB 的 host handoff，不是 VM。
+
+| 相对路径 | UTM 状态 | 唯一职责与保留线 |
+| --- | --- | --- |
+| `RadishLex/VMs/RadishLex-Debian13-ARM64.utm` | 已注册；P04 | P04 验收现场；staging、backup、userdb、导入导出与临时服务原样保留，不复跑或清理 |
+| `Debian13-ARM64-CleanBase.utm` | 已注册；rescue | 依赖安装前的纯 Debian 13 救援基线；不是 L6 S0，不写入 |
+| `Debian13-ARM64-DependencyFrozen.utm` | 未注册 | 工作 VM 的 dependency-frozen APFS COW 恢复源；不是执行 guest，不启动或改写 |
+| `Debian13-ARM64.utm` | 已注册；builder | Flutter/cache/source/build 与真实 release pair 的构建 VM；不执行 L6 package transaction |
+| `Debian13-ARM64-L6.utm` | 已注册；L6 | 唯一 L6 执行 guest；用户 `radishlex-l6` 与 root-owned `/var/tmp/radishlex-l6-inputs` 已准备，installed package、controller evidence root 与 S0 仍 absent |
+| `RadishLex-L6-Handoff-e5b6da1` | 非 VM | host 上冻结的 canonical pair 副本；只用于逐哈希交接，不安装或执行 |
+
+当前阶段六项均有独立职责，不因 UTM 面板是否显示而删除。L6 闭合后可另行授权评估构建 VM、DependencyFrozen 与 host handoff 的保留期；P04、CleanBase、L6 故障现场和任何 S0/S1/S2/S3 恢复点仍按各自停止线保留。该表只登记本机运维角色，不进入 canonical pair/checkpoint/session evidence。
 
 ## 1. 环境身份
 

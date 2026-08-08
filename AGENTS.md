@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 代码、合成门禁、L6 format v1、compile-identity 隔离的 acceptance controller 与双 clean-root release-pair builder/verifier 已闭合；真实 ARM64 pair 已从 source `55351f2` revision 1 与 target `e5b6da1` revision 2 生成并复验，但 Linux `/proc`/`dpkg`、L6 执行与系统安装尚未完成。v1 package 明确不含 RadishLex 自有 maintainer scripts。
+- production 代码、合成门禁、L6 format v1、compile-identity 隔离的 acceptance controller 与双 clean-root release-pair builder/verifier 已闭合；真实 ARM64 pair 已从 source `55351f2` revision 1 与 target `e5b6da1` revision 2 生成并复验，独立 L6 guest 与 root-owned handoff 已准备但 S0 尚未创建，Linux `/proc`/`dpkg`、L6 执行与系统安装尚未完成。v1 package 明确不含 RadishLex 自有 maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -80,6 +80,6 @@
 
 ## 当前顺位
 
-1. 以已冻结的 source `55351f2`/target `e5b6da1` ARM64 pair 为唯一输入，另行授权准备独立 Debian 13 ARM64 L6 guest、S0 与 root-owned handoff；不复用构建 VM、DependencyFrozen 副本、CleanBase 或 P04 guest。
+1. 以已冻结的 source `55351f2`/target `e5b6da1` ARM64 pair 为唯一输入；独立 Debian 13 ARM64 L6 guest 与 root-owned handoff 已准备，下一步另行授权创建 S0 并冻结 guest/snapshot/dpkg baseline；不复用构建 VM、DependencyFrozen 副本、CleanBase 或 P04 guest。
 2. 再逐项授权执行 install→upgrade→repair→rollback→remove→reinstall、真实 process/dpkg lifecycle、八点 controller crash/retry、startup、字体与 XDG 对照。
 3. L6 证据闭合后另行授权 P05C；公开发布、推送、旧资产清理、真实同步及其他平台仍独立排期。
