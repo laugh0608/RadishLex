@@ -1,6 +1,6 @@
 # RadishLex Linux product transaction
 
-本目录承载 Debian 系统级产品的 package relationship、维护事务合同与 Manager/Fcitx 共用只读 startup decision。它不生成 `.deb`，不直接执行 mutable `dpkg`，不启停服务或桌面会话，也不读取/写入用户 XDG。
+本目录承载 Debian 系统级产品的 package relationship、维护事务、固定系统 observer/executor、受控维护 CLI 与 Manager/Fcitx 共用只读 startup decision。它不生成 `.deb`，不启停服务或桌面会话，也不读取/写入用户 XDG；真实 `dpkg` 只允许由 opaque authorized command 进入。
 
 当前合同：
 
@@ -10,8 +10,10 @@
 - 目录/文件创建固定 mode，receipt 与 staging 的原子替换、新目录项均同步直接父目录；
 - 五类 operation 共用恢复状态机。每次 target/source mutation 或 retry 都重新验证 staged relationship并消费 move-only quiescence permit；首次安装恢复携带已取证 recovery target；
 - `VerifiedArtifactRelationship::verify_package` 是 production actual-package 唯一入口：从同一有界 `.deb` 流计算 size/SHA-256，严格解析精确三成员 ar、canonical uncompressed USTAR、仅 `control`/`md5sums` 的 control、actual data inventory 和唯一 product manifest，并交叉 evidence、canonical md5 inventory 与 actual `Installed-Size`；同域 pure relationship 另行校验依赖、Debian version 与 dpkg status；两者都不写文件、不调用命令；
-- typed Debian command contract 固定 `/usr/bin/dpkg`、私有 staged path、argv、清空后的允许环境、null stdin、有界诊断、dpkg config 与 lifecycle projection，但没有 executor；
+- production executor 固定 `/usr/bin/dpkg` identity、私有 staged path、argv、清空后的允许环境、null stdin、15 分钟上限与有界诊断；system observer 只读固定 dpkg status/config、root-owned staging 和完整产品 inventory；
+- concrete `LinuxDpkgTransactionPort` 在 prepare、retry、target/source mutation 与验证阶段重建 actual relationship，检查依赖/版本，消费 move-only `/proc/*/maps` quiescence permit；不自动 kill、restart 或操作用户会话；
+- `radishlex-linux-maintenance` command 类型不可由调用方直接构造，CLI 同时要求小写 32 hex operation ID、root-owned canonical package/evidence、`--authorized-system-mutation` 与 `--preserve-user-data`；它不是公开 installer，本批未执行；
 - v1 package 不允许 RadishLex 自有 maintainer scripts。外部 dependency scripts/triggers 只形成 dpkg observation，不能推进 product receipt 或代表完成；
-- startup observer 继续只读固定 `/var/lib/dpkg/status`、guard/tmp/receipt、terminal staging 与 component identity；Manager/Fcitx 在 Flutter/Engine/input FFI/XDG/Rime 之前消费 additive request/result v1，输入 session/key ABI 仍为 v9。
+- startup observer 只读固定 `/var/lib/dpkg/status`、guard/tmp/receipt、terminal actual package/dependency relationship 与 component identity；Manager/Fcitx 在 Flutter/Engine/input FFI/XDG/Rime 之前消费 additive request/result v1，输入 session/key ABI 仍为 v9。
 
-当前未实现 production fixed-path system observer/executor、concrete mutable `DpkgTransactionPort`、真实 process quiescence、privileged host/CLI、startup dependency relationship 连接、字体 family/glyph/owner、外部 package lifecycle 或 Debian ARM64 L6。仓库测试只使用合成 package、fake port 与临时目录；不得据此运行或宣称系统安装。完整边界见 [`docs/linux-installation-maintenance-boundary.md`](../../docs/linux-installation-maintenance-boundary.md)。
+当前 production 代码与 fake command/crash matrix 已闭合，但真实 Linux `/proc`、mutable `dpkg`、字体 family/glyph/owner、外部 package lifecycle 和 Debian ARM64 L6 均未执行。仓库测试只使用 actual 合成 package、fake executor/observer 与临时目录；不得据此宣称系统安装。完整边界见 [`docs/linux-installation-maintenance-boundary.md`](../../docs/linux-installation-maintenance-boundary.md)。

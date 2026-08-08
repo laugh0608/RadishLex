@@ -8,8 +8,8 @@
 - 许可条款以根 `LICENSE` 为准，当前采用 RadishLex Source-Available License。
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
-- 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、实际载体流式关系校验、fake package transaction 与共用只读 startup gate。
-- 尚未完成 production mutable `DpkgTransactionPort`、固定系统路径 observer/executor、真实进程静止、privileged host/CLI、L6 matrix 或系统安装；v1 package 明确不含 RadishLex 自有 maintainer scripts。
+- 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
+- production 代码与合成门禁已闭合，但尚未执行真实 Linux `/proc`/`dpkg`、L6 matrix 或系统安装；v1 package 明确不含 RadishLex 自有 maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -59,8 +59,8 @@
 - 每次 mutation/retry 重新验证私有 staged relationship，并消费 move-only quiescence permit。首次安装恢复必须保留 recovery target。
 - state 使用 root-owned receipt、`receipt.json.tmp`/stage tmp 恢复、精确 current required slots、原子 mode 与父目录 `fsync`；guard 是 mode `0600`、零长度、单 link regular file 上的 advisory exclusive lock，不是 Unix socket。
 - 旧 operation v1 只保留结构与 pair metadata，不存历史 hash proof，也不用于当前恢复。任何未知、半配置、身份/owner/mode/link/hash 漂移均失败关闭并保留现场。
-- 固定 `dpkg` argv/env/config/lifecycle 当前只是 typed contract，不执行命令。外部 package scripts/triggers 只作为 dpkg lifecycle observation，不能代表 RadishLex transaction completed。
-- startup observer 尚未连接完整 dependency relationship；字体 family/glyph/owner 与真实 package manager/process 证据留到 L6。
+- production executor 只接受固定 `/usr/bin/dpkg`、typed argv、清空环境、null stdin、超时和有界诊断；system observer/port 复验 root identity、actual staging、依赖/版本、`/proc/*/maps` 静止与完整安装结果。外部 scripts/triggers 不能代表 transaction completed。
+- 维护 command 是 opaque 类型，CLI 要求精确 operation ID、root-owned 同名 package/evidence、`--authorized-system-mutation` 与 `--preserve-user-data`；本批不得实际运行。startup 已连接 terminal actual package 与完整 dependency relationship；字体 family/glyph/owner 和真实 package-manager/process 证据留到 L6。
 - 不要把 RadishLex 做成云端实时输入法 API，也不要让同步后端进入按键热路径。
 
 ## 实机与系统边界
@@ -80,6 +80,6 @@
 
 ## 当前顺位
 
-1. 实现 production fixed-path observer/executor、concrete `DpkgTransactionPort`、真实 process quiescence 与 privileged host/CLI，并补 fake command/crash matrix。
-2. 在隔离 Debian 13 ARM64 执行 L6 install→upgrade→repair→rollback→remove→reinstall、crash/retry、startup gate 与 XDG 零写入/默认保留矩阵。
+1. 固定隔离 Debian 13 ARM64 L6 的全新 rootfs/VM、版本对、crash points、字体 probe、startup 与 XDG 对照，不复用 P04 guest。
+2. 逐项授权执行 L6 install→upgrade→repair→rollback→remove→reinstall、真实 process/dpkg lifecycle、crash/retry、startup gate 与 XDG 零写入/默认保留矩阵。
 3. L6 证据闭合后另行授权 P05C；公开发布、推送、旧资产清理、真实同步及其他平台仍独立排期。

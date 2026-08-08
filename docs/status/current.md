@@ -6,8 +6,8 @@
 
 - 复核日期：2026-08-08（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
-- 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心与 Manager/Fcitx 共用只读 startup gate。
-- production mutable `DpkgTransactionPort`、固定路径系统 observer/executor、真实进程静止、privileged host/CLI、L6 matrix、系统安装与 P05C 尚未开始。真实用户同步继续关闭。
+- 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
+- production 代码与合成门禁已闭合，但真实 Linux `/proc`、`dpkg` mutation、外部 package lifecycle、L6 matrix、系统安装与 P05C 尚未执行。真实用户同步继续关闭。
 
 ## P04 冻结基线
 
@@ -29,15 +29,16 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 
 确定性载体固定三成员 ar 与 canonical uncompressed USTAR、root owner/mode、`md5sums`、SHA-256 evidence 和解包 rootfs 重验。committed `ce74981` 的同一真实 rootfs 连续两次生成逐字节一致的 `.deb` 与 evidence；package database 保持 `not-installed`。
 
-新增 production-only `VerifiedArtifactRelationship::verify_package`：在同一有界流中计算 `.deb` size/SHA-256，严格解析精确三成员 ar、canonical USTAR、仅含 `control`/`md5sums` 的 control、actual data inventory 与唯一 manifest，并逐项交叉 evidence、control、manifest、payload、canonical md5 inventory 与 actual `Installed-Size`。同域 pure relationship 另行校验依赖、Debian 版本关系和 dpkg status。两者都不写文件、不调用命令；尚未接入 concrete system port 或 startup observer。
+新增 production-only `VerifiedArtifactRelationship::verify_package`：在同一有界流中计算 `.deb` size/SHA-256，严格解析精确三成员 ar、canonical USTAR、仅含 `control`/`md5sums` 的 control、actual data inventory 与唯一 manifest，并逐项交叉 evidence、control、manifest、payload、canonical md5 inventory 与 actual `Installed-Size`。同域 relationship 校验依赖、Debian 版本关系和 dpkg status；现已同时接入 mutable system port 与只读 startup observer。
 
 ## P05B 事务与启动状态
 
 - receipt 在 mutation 前持久化 `prepared`，source/target `.deb` 与 evidence 进入 root-owned operation staging 并取证。`receipt.json.tmp`、stage tmp、单侧 artifact 已持久化与 canonical mode 提交前的 owner-only 崩溃窗口均由 guard 下的维护入口复验恢复；startup 只读阻断且不清理。current operation 必需 slot 必须精确，历史旧 operation v1 只验证 structure/pair metadata，不保存旧 hash proof且不用于恢复。
 - guard 已改为 mode `0600`、零长度、单 link regular file 的 advisory exclusive lock；active contender 拒绝，stale unlocked file 可由维护流程重新取得。目录/文件创建固定 mode，原子替换和新目录项后同步直接父目录。
 - 五类 operation 共用可恢复状态机；每次 mutation 或 retry 都重新验证 staged relationship并取得 move-only quiescence permit。首次安装失败恢复携带已取证 recovery target；target/source proof 已持久化时重入不重复 mutation。
-- typed Debian command contract 固定 `/usr/bin/dpkg`、私有 staged path、argv、清空后的允许环境、null stdin、有界诊断、配置与 lifecycle 投影；当前不执行命令，也没有 concrete mutable port、系统 owner observer、进程检查或 privileged host。
-- 只读 startup observer 仍直接解析固定 dpkg status、receipt/guard/staging 与 component identity；Manager 在 Flutter 前、Fcitx 在 Engine/input FFI/XDG/Rime 前取得 permit。它尚未连接完整 dependency relationship，字体 family/glyph/owner 与真实 process/package-manager 行为留给 L6。
+- production system observer 只读固定 dpkg status/config、root owner/mode/link 与 actual staged `.deb`；executor 仅接受固定 `/usr/bin/dpkg`、typed argv、清空环境、null stdin、15 分钟上限和有界诊断。concrete port 在每次 retry 重建 relationship、检查依赖/版本、消费 quiescence permit，并以完整 manifest 验证 installed/absent 结果。
+- process quiescence 扫描 `/proc/*/maps` 的固定路径与 device/inode，匿名映射不误报，缺权限、畸形或竞态不确定性失败关闭；它不 kill、restart 或操作会话。受控 CLI 是 opaque command，只接受精确 operation ID、root-owned 同名 `.deb`/evidence，以及 `--authorized-system-mutation` 与 `--preserve-user-data` 双显式授权。
+- 只读 startup observer 已把 terminal staging 中的 actual `.deb`、完整 dpkg dependency relationship 与 component inventory 串联；Manager 在 Flutter 前、Fcitx 在 Engine/input FFI/XDG/Rime 前取得 permit。字体 family/glyph/owner 与真实 process/package-manager 行为仍留给 L6。
 - 未知 package state、半配置、active/异常 guard、tmp/nonterminal receipt、缺失/多余 slot、symlink/hardlink、宽权限或 owner/mode/link/hash/version/ABI 漂移均失败关闭并保留现场。
 
 ## 停止线
@@ -49,8 +50,8 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 
 ## 下一步顺位
 
-1. 实现 production fixed-path observer/executor、concrete `DpkgTransactionPort`、真实 process quiescence 与 privileged host/CLI，并补齐 fake command/crash matrix。
-2. 在隔离 Debian 13 ARM64 环境执行 L6 install→upgrade→repair→rollback→remove→reinstall，覆盖 crash/retry、source restore、startup gate、字体/依赖和 XDG 零写入/默认保留；不写现有 P04 guest。
+1. 为 L6 固定隔离 Debian 13 ARM64 的全新 rootfs/VM 输入、五类 package 版本对、crash points、字体 glyph/owner probe、startup 与 XDG 对照，不复用现有 P04 guest。
+2. 在该隔离环境执行 install→upgrade→repair→rollback→remove→reinstall，覆盖真实 `/proc` 静止、dpkg lifecycle、crash/retry、source restore、startup gate、依赖与默认数据保留；每次系统 mutation 另行授权。
 3. L6 自动证据闭合后另行授权 P05C 独立 guest 实机；旧资产清理、远端、发布、真实同步和其他平台继续独立排期。
 
 ## 验证入口
@@ -69,7 +70,7 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 git diff --check
 ```
 
-上述入口只证明仓库合同、合成状态和已记录的未安装载体证据，不证明新的 ARM64 startup-enabled payload、真实 dpkg mutation、桌面安装或公开发布。
+上述入口只证明仓库合同、production 代码可编译、合成命令/进程/crash 状态和已记录的未安装载体证据；本批没有调用维护 CLI 或 `/usr/bin/dpkg`，不证明新的 ARM64 startup-enabled payload、真实 mutation、桌面安装或公开发布。
 
 ## 阅读索引
 

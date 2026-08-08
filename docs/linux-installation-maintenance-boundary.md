@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-截至 2026-08-08，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、五类 fake transaction，以及 Manager/Fcitx 共用只读 startup gate；typed dpkg argv/env/config/lifecycle 仍只是无执行能力的合同。下一子批是 production fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、真实 process quiescence、privileged host/CLI 与 fake crash-command matrix。真实 package mutation、L6 和 P05C 均未开始。
+截至 2026-08-08，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。production 代码尚未在 Linux 执行真实 package mutation；L6 和 P05C 均未开始。
 
 - 首个完整产品安装载体固定为 Debian 13 ARM64 的单一系统级本地 `.deb`，package 名固定为 `radishlex`；它是未发布的本地验收载体，不是 apt repository、正式 Release 或通用 Linux 安装包。
 - Fcitx addon、两份产品 FFI、Manager bundle、锁定 RimeData、desktop entry、图标和产品 manifest 由同一个 package 绑定；不拆成可独立漂移的 Manager/addon 包。
@@ -178,7 +178,7 @@ package version 固定由 `<product-version>+<build>-<debian-revision>` 形成�
 | --- | --- | --- |
 | `packaging/linux/` | product mirror、install layout、Debian metadata、依赖与字体 profile | 执行 dpkg、读取用户数据、保存构建物或签名凭据 |
 | Debian `dpkg`/trigger | package database、dependency、文件 unpack/remove、desktop/icon/system cache 标准生命周期 | RadishLex 业务 receipt、用户 XDG、Fcitx profile 或产品兼容判断 |
-| `platforms/linux-product/` | actual `.deb`/manifest/dependency/version/status 关系校验、artifact staging、quiescence port、receipt/advisory guard、恢复、typed command contract 与共用只读 startup decision；后续承载 production observer/executor 和 mutable port | input key、Rime 候选、userdb/ranker、Flutter 页面、远端同步或用户 XDG mutation |
+| `platforms/linux-product/` | actual `.deb`/manifest/dependency/version/status 关系校验、artifact staging、receipt/advisory guard、恢复、production observer/executor/mutable port、`/proc` quiescence、authorized CLI 与共用只读 startup decision | input key、Rime 候选、userdb/ranker、Flutter 页面、远端同步或用户 XDG mutation |
 | Fcitx addon / Linux Manager host | 在业务初始化前读取同一 startup decision，并验证自身 component identity | 安装、repair、remove、rollback 或改写 root receipt |
 | XDG resolver / Rust userdb | 每个有效用户的固定数据路径、权限、schema 与本地业务语义 | 枚举系统用户、解释 dpkg 状态或修改系统程序 |
 | 用户/管理员 | 授权 package/system mutation，关闭程序，手动配置/切换输入法 | 通过手工复制或删除 receipt 绕过产品门禁 |
@@ -284,7 +284,7 @@ Manager 与 addon 的 product build 必须在 Flutter engine/settings/userdb 或
 | 无 system receipt 的明确 development build | 仅允许既有显式开发模式 |
 | nonterminal、guard active、tmp receipt、dpkg 非 Installed | `maintenance_required` |
 | completed remove、未知 receipt/identity、manifest/hash/owner/link/ABI 漂移 | 失败关闭 |
-| 字体或系统 dependency 不满足 | pure package relationship 已能拒绝；startup 尚未连接该判断，真实 family/glyph/owner 留 L6 |
+| 字体或系统 dependency 不满足 | startup 已从 terminal actual package/evidence 重建 relationship并拒绝；真实 family/glyph/owner 留 L6 |
 
 production build 不得把“receipt 缺失”解释为首次启动成功，也不得回退 fixture、仓库 `.so`、`LD_LIBRARY_PATH`、用户级 staging 或在线下载。开发 build 与 product build 的 gate 必须在编译身份上分离。
 
@@ -293,11 +293,11 @@ production build 不得把“receipt 缺失”解释为首次启动成功，也�
 - `LinuxSystemStartupPort` 直接读取并严格解析 `/var/lib/dpkg/status`，不执行 `dpkg-query`、`dpkg`、shell 或其他 package mutation 命令；状态文件不可读、重复 package paragraph、未知 tuple 或不完整 identity 都失败关闭。
 - 检查顺序先于业务初始化：root/state、active/异常 guard、`receipt.json.tmp`、receipt 与 operation state，再检查 package state、terminal installed artifact、canonical product manifest 与当前 component scope。terminal receipt 引用的 source/target staging 必须按 receipt proof 重新验证固定 slot、file identity、owner/mode/link/size/hash，不能只信 receipt 文本或遗留路径。observer 不创建 state root、不清理 stale guard/tmp/receipt、不打开 XDG/userdb/settings/privacy/Rime。
 - `development-staged` 只在 system receipt/state 均不存在且 package 严格为 `NotInstalled` 时得到 `AllowedDevelopment`；`debian-system-product` 缺 receipt 失败关闭。开发 build 遇到任何 system receipt 也按身份隔离拒绝，不能借 development profile 绕过维护现场。
-- terminal install/upgrade/repair/rollback 的目标，或失败恢复后的 source，只有 package/version/architecture 与 component 身份完全一致才得到 `AllowedProduct`；nonterminal、active guard、Config-Files/半配置、unmanaged package、completed remove、首次安装失败无 source 和任何身份漂移均要求维护或失败关闭。Manager scope 复验完整 bundle tree；Fcitx scope 复验 addon、同目录 FFI、固定 RimeData、两份 metadata，并交叉验证 Manager/Fcitx 两份 FFI equivalence。pure dependency/font/version relationship 已实现，但尚未接入 startup observer；当前 scope 仍不能冒充全 package runtime inventory。
+- terminal install/upgrade/repair/rollback 的目标，或失败恢复后的 source，只有 actual staged `.deb`/evidence、package/version/architecture、完整 dependency relationship 与 component 身份完全一致才得到 `AllowedProduct`；nonterminal、active guard、Config-Files/半配置、unmanaged package、completed remove、首次安装失败无 source 和任何身份漂移均要求维护或失败关闭。Manager scope 复验完整 bundle tree；Fcitx scope 复验 addon、同目录 FFI、固定 RimeData、两份 metadata，并交叉验证 Manager/Fcitx 两份 FFI equivalence。该运行时 scope 不执行 fontconfig family/glyph probe，也不冒充 L6 的全系统验证。
 - Manager runner 在设置 `umask(0077)` 后、创建 Flutter application/engine 前调用；Fcitx factory 在构造 `Engine` 前取得 move-only startup permit，因此 Engine constructor 内的 input FFI、XDG、privacy 与 Rime 初始化均晚于 gate。共用 C++ binding 在调用 startup ABI 前用 `dladdr` 与 canonical path 验证 startup/error symbols 确实来自当前 component 的精确 sibling FFI；Fcitx 还验证全部输入热路径 FFI symbol origin，拒绝 `LD_LIBRARY_PATH`、preload 或其他 loader interposition。
 - `radishlex_linux_product_startup_gate` 使用独立 request/result v1，携带编译 build identity、component 与由 host 从已加载 executable/shared object 取得的 canonical component path；它是 additive Linux startup ABI，输入 session/key ABI contract 仍为 v9。
 
-仓库合同覆盖 receipt absent/terminal/nonterminal、advisory guard、receipt/stage tmp、completed remove、半配置状态、exact current slots、actual `.deb`/manifest/dependency/version relationship、Manager/Fcitx component scope、双 FFI equivalence、symbol-origin、开发/产品身份隔离、只读目录指纹与调用顺序。当前尚无 dynamic preload/错误 sibling 新 ARM64 证据，也没有 production fixed-path observer/executor、concrete mutable port、真实 process quiescence、privileged host/CLI 或 startup dependency 连接。
+仓库合同覆盖 receipt absent/terminal/nonterminal、advisory guard、receipt/stage tmp、completed remove、半配置状态、exact current slots、actual `.deb`/manifest/dependency/version relationship、fixed dpkg argv/env/timeout/diagnostics、fake executor、`/proc` maps parser、opaque CLI authorization、Manager/Fcitx component scope、双 FFI equivalence、symbol-origin、开发/产品身份隔离、只读目录指纹与调用顺序。当前尚无 dynamic preload/错误 sibling 新 ARM64 证据，也没有真实 Linux process/package mutation、外部 lifecycle 或 L6 证据。
 
 ## 自动门禁
 
@@ -325,7 +325,9 @@ P05B transaction 子批已建立独立 Rust crate `platforms/linux-product/`。�
 
 当前 guard 是 regular-file advisory lock，消除了 Unix socket backlog 不能证明唯一 owner 的竞争窗口；active lock 失败关闭，stale unlocked inode 只能由维护 acquisition 重新锁定与收口。store 已覆盖 restrictive umask、并发 contender、tmp 恢复、exact current required slots、原子 mode 与直接父目录 `fsync` 顺序。每次恢复都重新验证 staged actual package relationship并重新取得 quiescence permit，不把旧 permit、已安装目标或已恢复 source 当作绕过条件。
 
-`DpkgTransactionPort` 当前仍只由合成 fake 实现。自动合同覆盖五类 operation、连续 receipt、程序未静止、actual `.deb` 篡改/混配、package/source restore 双中断、首次安装 recovery target、target proof crash retry 与 XDG 零接口。typed command contract 已固定 dpkg program/argv/env/config/stdin/diagnostics/lifecycle，但没有 executor。该证据加强 L4 的平台无关事务核心，不证明真实 dpkg、系统路径 owner、进程枚举、外部 script/trigger 行为或 L6。
+`LinuxDpkgTransactionPort` 已组合 production fixed-path observer 与 executor。observer 稳定读取 root-owned dpkg status/config 和 staged package，重建 actual relationship、依赖与版本；executor 只运行 fixed `/usr/bin/dpkg` typed invocation，清空继承环境、使用 null stdin、并发 drain 两路有界诊断并设 15 分钟上限。process permit 扫描 `/proc/*/maps` 的固定路径与 device/inode；匿名映射不误报，缺权限、畸形与不确定竞态失败关闭，且不 kill/restart。自动合同覆盖五类 operation、连续 receipt、actual `.deb` 篡改/混配、command exit/signal/overflow、package/source restore 双中断、首次安装 recovery target、target proof crash retry 与 XDG 零接口。该证据证明 production 代码和 L4 合成矩阵，不证明真实 dpkg、真实 `/proc`、外部 script/trigger 或 L6。
+
+privileged host 只暴露不可直接构造的 `LinuxMaintenanceCommand`。CLI 的 `start`/`resume` 同时要求 `--authorized-system-mutation`、`--preserve-user-data`、小写 32 hex operation ID；start 还要求 operation kind 对应的 root-owned canonical package/evidence pair，evidence 必须与 `.deb` 同目录同名。host 先从 actual package 推导身份与版本关系，再 bootstrap fixed state、取得 advisory guard、写 prepared receipt、复制私有 staging并进入 coordinator；resume 必须与现有 receipt operation ID 精确相同。输出只含稳定 outcome/error/failure code，不含路径、hash、dpkg 原文或用户数据。该 CLI 不是公开 installer，也不会被仓库门禁实际运行。
 
 L5 当前由 `./scripts/check-linux-startup-gate.sh` 闭合仓库内只读 decision 与初始化顺序合同：Rust fake/system-port 测试覆盖状态矩阵、staging proof、真实格式的 synthetic Manager bundle/Fcitx component scope、双 FFI equivalence 与目录零写入；C++ contract 分别编译 `development-staged`、`debian-system-product` 两种身份并拒绝交叉 allow，另以编译和源码合同固定 sibling symbol-origin 校验先于 gate 调用；源码顺序门禁固定 Manager 的 `umask -> gate -> Flutter` 与 Fcitx 的 `gate -> Engine/input FFI/XDG/Rime`。动态 preload/错误 sibling 拒绝仍须在新的 Linux payload 中复验；该 L5 不等于全 package runtime inventory、ARM64 product payload、Debian package lifecycle 或真实桌面启动证据。
 
@@ -339,7 +341,7 @@ L5 当前由 `./scripts/check-linux-startup-gate.sh` 闭合仓库内只读 decis
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual package/manifest/dependency/version/status pure relationship、恢复型 fake transaction 与共用只读 startup gate；pure relationship 尚未连接 startup。下一顺位按“production fixed-path observer/executor + concrete mutable port + process quiescence/privileged host + fake crash-command matrix → 隔离 Debian ARM64 L6”推进。L6 覆盖完整 crash/retry、source rollback、字体 family/glyph/owner、外部 package lifecycle 与默认数据保留；P05C 才在独立 guest 授权实机，不复用或清理 P04 现场。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual package/manifest/dependency/version/status relationship、恢复事务、production system port/host 与共用只读 startup gate，且 dependency relationship 已进入 startup permit 前置链。下一顺位是先固定隔离 Debian ARM64 L6 的全新 rootfs/VM、版本对与 crash/probe 清单，再逐项授权执行。L6 覆盖真实 process/dpkg、完整 crash/retry、source rollback、字体 family/glyph/owner、外部 package lifecycle 与默认数据保留；P05C 才在独立 guest 授权实机，不复用或清理 P04 现场。
 
 ## 实机授权边界
 

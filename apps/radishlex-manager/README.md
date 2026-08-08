@@ -65,7 +65,7 @@ Linux runner 在 `umask(0077)` 后、创建 `MyApplication`/Flutter engine 前�
 
 gate 直接只读 `/var/lib/dpkg/status`、root receipt/advisory guard、strict terminal staging proof、canonical product manifest、完整 Manager bundle tree、同 bundle FFI 与双产品 FFI equivalence；不调用 `dpkg`，不创建或清理 state，不解析 XDG，也不打开 settings/userdb/privacy/Rime。development build 只接受 system state/receipt 缺失且 package 严格未安装，system product 只接受 terminal receipt、Installed package/version/architecture 与 bundle identity 完全一致。pure dependency/font/version relationship 已实现但尚未接入 startup，因此 component scope 不冒充全 package runtime inventory；active guard、receipt/stage tmp、nonterminal、半配置、completed remove、缺 receipt、staging/bundle/symbol 漂移、unknown result 或 FFI error 都在 Flutter 初始化前退出。
 
-当前仓库已通过双编译身份、只读状态矩阵与 `umask -> gate -> Flutter` 源码顺序门禁，但没有构建或实机运行新的 ARM64 startup-enabled Manager payload。actual `.deb` relationship 与恢复型 fake transaction 已完成；production fixed-path observer/executor、concrete mutable port、真实 process quiescence、privileged host/CLI、startup dependency 连接、隔离 L6 与 P05C 仍属后续批次。v1 package 不携带 RadishLex 自有 maintainer scripts。
+当前仓库已通过双编译身份、只读状态矩阵与 `umask -> gate -> Flutter` 源码顺序门禁，但没有构建或实机运行新的 ARM64 startup-enabled Manager payload。actual `.deb` relationship、恢复事务、fixed-path observer/executor、mutable port、受控 CLI 与 startup dependency 连接已完成；真实 Linux process/dpkg、隔离 L6 与 P05C 仍属后续批次。v1 package 不携带 RadishLex 自有 maintainer scripts。
 
 ## FFI bridge
 
