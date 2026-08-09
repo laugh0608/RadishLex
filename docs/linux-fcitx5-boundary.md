@@ -4,7 +4,7 @@
 
 ## 状态与产品范围
 
-状态：M5-P01/P02/P03/P04/P05A 已完成。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release、输入/隐私/同库个人化与重启矩阵均已通过。P05A 的 metadata/rootfs、`system` profile 与真实 ARM64 载荷门禁也已通过；P05B 已完成确定性 `.deb`、actual package relationship、恢复事务、fixed-path observer/executor、mutable port、受控 CLI、Manager/Fcitx 共用 startup gate、compile-isolated L6 checkpoint/evidence controller 与真实 ARM64 release pair。第三套 source `55351f2`/target `512e8ab` 已在独立 guest 完成 source revision 1 真实 install 与 terminal postflight；S1、upgrade、完整 L6 与 P05C 系统验收仍未完成。v1 package 明确没有 RadishLex 自有 maintainer scripts。
+状态：M5-P01/P02/P03/P04/P05A 已完成。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release、输入/隐私/同库个人化与重启矩阵均已通过。P05A 的 metadata/rootfs、`system` profile 与真实 ARM64 载荷门禁也已通过；P05B 已完成确定性 `.deb`、actual package relationship、恢复事务、fixed-path observer/executor、mutable port、受控 CLI、Manager/Fcitx 共用 startup gate、compile-isolated L6 checkpoint/evidence controller 与真实 ARM64 release pair。第三套 source `55351f2`/target `512e8ab` 已在独立 guest 完成 source revision 1 真实 install、terminal postflight 与 source-installed S1；S2、upgrade、完整 L6 与 P05C 系统验收仍未完成。v1 package 明确没有 RadishLex 自有 maintainer scripts。
 
 P03 实机证据覆盖 GTK、Qt、Electron、浏览器和终端，包含完整候选交互、焦点/输入法切换、Fcitx/桌面会话重启、进程级地址族限制与整台 guest 断网。password、terminal、unknown 与 Qt `Sensitive` 后的 userdb 聚合保持全零；当前 GTK4 frontend 未把 `PRIVATE` 传播为 Fcitx `Sensitive`，因此依赖既有 unknown 失败关闭而非虚构 capability。Qt backend 只以 QPA、会话类型和 input-context plugin 的组合证据判定，不能因进程映射 `libQt6WaylandClient` 就声明原生 Wayland。快速 X11→Wayland 登录暴露的 `im-launch` 跳过 daemon 问题已用 Debian 官方 desktop entry 的用户级 autostart 副本闭合；该开发设置不替代 P05 产品安装与维护设计。
 
@@ -70,7 +70,7 @@ Linux 继续使用 `ime-ffi` ABI v9 已有的：
 
 P05B 后续增加了独立 `radishlex_linux_product_startup_gate` request/result v1。它是与输入热路径分离的 additive Linux 产品启动 ABI，读取编译 build identity、component 与 host 解析的 loaded component path；session/key ABI contract 仍为 v9。Manager 和 Fcitx 共用浅层 C++ binding；binding 在调用 startup ABI 前用 `dladdr` 与 canonical path 证明 startup/error symbols 来自 component 的精确 sibling FFI，Fcitx 还证明全部输入热路径 FFI symbols 来自同一 sibling，拒绝 `LD_LIBRARY_PATH`、preload 或其他 loader interposition。只有与 `development-staged` 或 `debian-system-product` 编译身份精确对应的 allow result 才形成 move-only permit，未知 result、交叉身份或 symbol origin 漂移均失败关闭。
 
-当前真实缺口不在输入 ABI、addon 编译、Manager privacy、删除恢复、导入导出、重启矩阵、P05A 产品载荷，或 P05B 的 package relationship/system port/startup gate/controller/release pair。L6 format v1、compile-isolated acceptance checkpoint/evidence controller、真实双 clean-root ARM64 pair 与首次 source install 已完成；S1/S2、upgrade/remove/rollback、crash/retry、产品 linked startup 正负向、重启与 P05C 仍未完成，这些能力不需要增加平台私有输入 ABI。
+当前真实缺口不在输入 ABI、addon 编译、Manager privacy、删除恢复、导入导出、重启矩阵、P05A 产品载荷，或 P05B 的 package relationship/system port/startup gate/controller/release pair。L6 format v1、compile-isolated acceptance checkpoint/evidence controller、真实双 clean-root ARM64 pair、首次 source install 与 S1 已完成；S2、upgrade/remove/rollback、crash/retry、产品 linked startup 正负向、重启与 P05C 仍未完成，这些能力不需要增加平台私有输入 ABI。
 
 ### Flutter Manager
 
