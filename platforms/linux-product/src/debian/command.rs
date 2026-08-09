@@ -358,17 +358,36 @@ pub fn validate_dpkg_configuration(
                 line_number,
             ));
         }
-        if !matches!(line, "no-pager" | "log=/var/log/dpkg.log") {
+        let Some(option) = canonical_allowed_dpkg_option(line) else {
             return Err(DpkgConfigurationError::at_line(
                 DpkgConfigurationErrorKind::UnknownOption,
                 line_number,
             ));
-        }
-        if !options.iter().any(|existing| existing == line) {
-            options.push(line.to_owned());
+        };
+        if !options.iter().any(|existing| existing == option) {
+            options.push(option.to_owned());
         }
     }
     Ok(ValidatedDpkgConfiguration { options })
+}
+
+fn canonical_allowed_dpkg_option(value: &str) -> Option<&'static str> {
+    match value {
+        "no-pager" => Some("no-pager"),
+        "no-debsig" => Some("no-debsig"),
+        "log=/var/log/dpkg.log" => Some("log=/var/log/dpkg.log"),
+        _ => {
+            let mut fields = value.split_ascii_whitespace();
+            if fields.next() == Some("log")
+                && fields.next() == Some("/var/log/dpkg.log")
+                && fields.next().is_none()
+            {
+                Some("log=/var/log/dpkg.log")
+            } else {
+                None
+            }
+        }
+    }
 }
 
 fn prohibited_dpkg_option(value: &str) -> bool {
@@ -612,7 +631,7 @@ mod tests {
     }
 
     #[test]
-    fn dpkg_configuration_accepts_only_inert_bounded_options() {
+    fn dpkg_configuration_accepts_only_fixed_bounded_options() {
         let configuration = validate_dpkg_configuration(
             "# Debian default\n\nno-pager\nlog=/var/log/dpkg.log\nno-pager\n",
         )
@@ -647,6 +666,47 @@ mod tests {
         let unknown =
             validate_dpkg_configuration("no-act").expect_err("unknown option must fail closed");
         assert_eq!(unknown.kind(), DpkgConfigurationErrorKind::UnknownOption);
+    }
+
+    #[test]
+    fn dpkg_configuration_accepts_debian_13_default_spelling() {
+        let configuration = validate_dpkg_configuration(
+            "# dpkg configuration file\n\
+#\n\
+# This file can contain default options for dpkg.  All command-line\n\
+# options are allowed.  Values can be specified by putting them after\n\
+# the option, separated by whitespace and/or an `=' sign.\n\
+#\n\
+\n\
+# Do not enable debsig-verify by default; since the distribution is not using\n\
+# embedded signatures, debsig-verify would reject all packages.\n\
+no-debsig\n\
+\n\
+# Log status changes and actions to a file.\n\
+log /var/log/dpkg.log\n",
+        )
+        .expect("Debian 13 default dpkg configuration");
+        assert_eq!(
+            configuration.options(),
+            ["no-debsig", "log=/var/log/dpkg.log"]
+        );
+
+        let equivalent = validate_dpkg_configuration(
+            "log\t/var/log/dpkg.log\nlog=/var/log/dpkg.log\nno-debsig\n",
+        )
+        .expect("equivalent safe dpkg spelling");
+        assert_eq!(equivalent.options(), ["log=/var/log/dpkg.log", "no-debsig"]);
+
+        for unknown in [
+            "no-debsig=true",
+            "log=/tmp/dpkg.log",
+            "log /var/log/dpkg.log extra",
+        ] {
+            let error = validate_dpkg_configuration(unknown)
+                .expect_err("noncanonical allowed option must fail closed");
+            assert_eq!(error.kind(), DpkgConfigurationErrorKind::UnknownOption);
+            assert_eq!(error.line(), Some(1));
+        }
     }
 
     #[test]
