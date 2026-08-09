@@ -174,7 +174,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 2. `M5-P02`：实现 C++/CMake addon、Rust FFI 接线、确定性开发构建和自动 contract。
 3. `M5-P03`：完成真实 Wayland 主路径、X11 兼容、常见应用输入、生命周期和隐私验收。
 4. `M5-P04`：完成 Linux Flutter Manager、同库并发、本地学习、删除/恢复、导入导出和 explain 验收。
-5. `M5-P05`：完成安装、升级、修复、默认移除、rollback、数据保留和发行载体。首个载体固定为 Debian 13 ARM64 的系统级本地 `.deb`；P05A 已完成 metadata/rootfs、双构建身份与真实 ARM64 载荷门禁。P05B 已完成确定性载体、实际 `.deb` 流式关系校验、恢复型 receipt/advisory guard、固定系统 observer/executor、concrete mutable port、`/proc` 静止检查、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix；L6 format v1、compile-isolated acceptance checkpoint/evidence controller、八点确定性中断/恢复与 canonical 脱敏 envelope 也已完成。target `e5b6da1` 与修复后的 `2fa1b8c` 两次真实首次 install 分别暴露 Debian 默认 `dpkg.cfg` 与 `root:root 01777` `/run/lock` 前置缺口，均在 receipt/package mutation 前失败关闭；`f0415ad` 已收紧修复 sticky 共享锁父目录，下一步是重建第三个 pair/handoff/guest/S0。v1 不携带 RadishLex 自有 maintainer scripts，外部 scripts/triggers 不能替代事务完成证据；P05C 最后进入独立 guest 授权实机。
+5. `M5-P05`：完成安装、升级、修复、默认移除、rollback、数据保留和发行载体。首个载体固定为 Debian 13 ARM64 的系统级本地 `.deb`；P05A 已完成 metadata/rootfs、双构建身份与真实 ARM64 载荷门禁。P05B 已完成确定性载体、实际 `.deb` 流式关系校验、恢复型 receipt/advisory guard、固定系统 observer/executor、concrete mutable port、`/proc` 静止检查、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix；L6 format v1、compile-isolated acceptance checkpoint/evidence controller、八点确定性中断/恢复与 canonical 脱敏 envelope 也已完成。target `e5b6da1` 与 `2fa1b8c` 两次真实首次 install 分别暴露 Debian 默认 `dpkg.cfg` 与 `root:root 01777` `/run/lock` 前置缺口，均在 receipt/package mutation 前失败关闭；包含 `f0415ad` 的 target `512e8ab` 已形成第三套真实 pair/handoff/guest/S0 并通过断网只读 preflight，下一步是另行生成 operation ID、单步授权 source install。v1 不携带 RadishLex 自有 maintainer scripts，外部 scripts/triggers 不能替代事务完成证据；P05C 最后进入独立 guest 授权实机。
 
 交付：
 

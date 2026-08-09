@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 代码、合成门禁、L6 format v1、compile-identity 隔离的 acceptance controller 与双 clean-root release-pair builder/verifier 已闭合。旧 target `e5b6da1` 首次 install 因 Debian 默认 `dpkg.cfg` 失败；修复后的 target `2fa1b8c` pair 通过断网 preflight，但第二次 install 因 store 拒绝 Debian `root:root 01777` `/run/lock` 而 pre-receipt 失败。`f0415ad` 只额外接受精确 sticky 共享锁父目录；两次均未进入 package mutation，两个离线 failure overlay 保持运行，新的 pair/handoff/S0 尚未重建。v1 package 明确不含 RadishLex 自有 maintainer scripts。
+- production 代码、合成门禁、L6 format v1、compile-identity 隔离的 acceptance controller 与双 clean-root release-pair builder/verifier 已闭合。旧 target `e5b6da1` 与 `2fa1b8c` 的两次 install 均在 receipt/package mutation 前暴露并修复 Debian 环境缺口，两个离线 failure overlay 继续保留。包含 `f0415ad` 的 target `512e8ab` 已形成第三套真实 ARM64 pair、独立 handoff/guest 与 `S0-clean-512e8ab-84d59494`，断网 dpkg/XDG/20 项依赖/字体/sticky lock preflight 通过；尚未生成 operation ID、运行第三次 maintenance/acceptance CLI 或进入真实 `dpkg` mutation。v1 package 明确不含 RadishLex 自有 maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -80,6 +80,6 @@
 
 ## 当前顺位
 
-1. 保留 `e5b6da1` 与 `2fa1b8c` 两个离线 pre-receipt failure overlay 及各自 pair/handoff/S0；以 source `55351f2` 和包含 `f0415ad` 的最终 clean descendant 另行授权重建真实 ARM64 pair，再准备第三套独立 handoff/guest/S0，不热替换既有 executable。
-2. 在第三套 S0 上另行授权断网 preflight 与 source revision 1 首次 install；通过 terminal/XDG/font/dpkg 对照后，再逐项授权 upgrade→repair→rollback→remove→reinstall、真实 process lifecycle 与八点 controller crash/retry。
+1. 保留 `e5b6da1` 与 `2fa1b8c` 两个离线 pre-receipt failure overlay 及各自 pair/handoff/S0；以已冻结的 source `55351f2`、target `512e8ab`、第三套 handoff/guest 与 `S0-clean-512e8ab-84d59494` 为唯一新输入，不热替换既有 executable。
+2. 另行生成新的 operation ID，并单步授权 source revision 1 首次 install mutation 与 terminal/XDG/font/dpkg 对照；完成后停止，不自动进入 upgrade，再逐项授权 upgrade→repair→rollback→remove→reinstall、真实 process lifecycle 与八点 controller crash/retry。
 3. L6 证据闭合后另行授权 P05C；公开发布、推送、旧资产清理、真实同步及其他平台仍独立排期。
