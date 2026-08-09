@@ -363,6 +363,35 @@ fn fixed_state_parent_can_be_created_before_the_first_receipt() {
 }
 
 #[test]
+fn shared_lock_parent_accepts_only_exact_sticky_world_writable_mode() {
+    let site = TestSite::new("shared-lock-parent");
+    let metadata = fs::metadata(&site.root).expect("inspect test root");
+    let lock_parent = site.root.join("run-lock");
+    fs::create_dir(&lock_parent).expect("create synthetic lock parent");
+
+    for mode in [0o755, 0o775, 0o1777] {
+        fs::set_permissions(&lock_parent, fs::Permissions::from_mode(mode))
+            .expect("set accepted lock parent mode");
+        validate_secure_parent(&lock_parent, metadata.uid(), metadata.gid(), true)
+            .expect("accept supported root-owned lock parent mode");
+    }
+
+    for mode in [0o777, 0o1703, 0o1733, 0o1757] {
+        fs::set_permissions(&lock_parent, fs::Permissions::from_mode(mode))
+            .expect("set rejected lock parent mode");
+        let error = validate_secure_parent(&lock_parent, metadata.uid(), metadata.gid(), true)
+            .expect_err("reject unsafe shared lock parent mode");
+        assert_eq!(error.code(), LinuxInstallStoreErrorCode::PermissionDenied);
+    }
+
+    fs::set_permissions(&lock_parent, fs::Permissions::from_mode(0o1777))
+        .expect("restore Debian lock parent mode");
+    let error = validate_secure_parent(&lock_parent, metadata.uid(), metadata.gid(), false)
+        .expect_err("private state parents must reject sticky world-writable mode");
+    assert_eq!(error.code(), LinuxInstallStoreErrorCode::PermissionDenied);
+}
+
+#[test]
 fn directory_creation_modes_are_exact_under_restrictive_umask() {
     const CHILD_ENV: &str = "RADISHLEX_STORE_UMASK_CHILD";
     if std::env::var_os(CHILD_ENV).is_some() {

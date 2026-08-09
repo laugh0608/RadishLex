@@ -99,7 +99,7 @@ pub(super) fn validate_secure_parent(
     path: &Path,
     owner_id: u32,
     group_id: u32,
-    allow_group_write: bool,
+    allow_shared_lock_parent: bool,
 ) -> Result<(), LinuxInstallStoreError> {
     let canonical = fs::canonicalize(path)
         .map_err(|error| LinuxInstallStoreError::io("canonicalize parent directory", error))?;
@@ -112,15 +112,18 @@ pub(super) fn validate_secure_parent(
     let metadata = fs::symlink_metadata(path)
         .map_err(|error| LinuxInstallStoreError::io("inspect parent directory", error))?;
     let mode = metadata.mode() & 0o7777;
-    let writable = if allow_group_write {
-        mode & 0o002
+    // Debian exposes /run/lock as root-owned 01777. The sticky bit prevents
+    // other users from replacing a root-owned 0600 guard; a pre-created
+    // non-root entry is still rejected by the guard identity checks.
+    let permissions_are_safe = if allow_shared_lock_parent {
+        mode & 0o002 == 0 || mode == 0o1777
     } else {
-        mode & 0o022
+        mode & 0o022 == 0
     };
     if !metadata.file_type().is_dir()
         || metadata.uid() != owner_id
         || metadata.gid() != group_id
-        || writable != 0
+        || !permissions_are_safe
     {
         return Err(LinuxInstallStoreError::new(
             LinuxInstallStoreErrorCode::PermissionDenied,
