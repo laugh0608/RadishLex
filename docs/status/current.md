@@ -55,11 +55,12 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步事项（2026-08-09）
+## 明天事项（2026-08-10）
 
-1. 七台注册 VM 保持停止；保留两个旧 failure disk、三套 handoff/S0、第三套 receipt/staging/S1/S2，不清理或复用现场。
-2. 下一步单独授权从当前 source-data S2 前态执行 source→target upgrade：新 operation ID、单 VM/断网 preflight、一次 `dpkg` mutation、terminal/package/XDG fingerprint postflight，随后关机停止。
-3. upgrade 后再分别授权 repair→rollback→remove→reinstall、八个 crash/retry、产品启动、重启及 P05C；旧资产、远端与发布保持关闭。
+1. 开始前只用 plain `utmctl list` 确认七台注册 VM 全部停止；只启动第三套 L6 guest，其余 VM 保持关机。三套 handoff/S0 与第三套 receipt/staging/S1/S2 均保留。
+2. 从 source-data S2 前态先做断网只读 preflight：复验 source `26.7.1+38-1`、terminal receipt、第三套 package/evidence、依赖、字体、零产品进程/映射及 XDG fingerprint `f3df287fa0f1da1d5f1fb3169fe607a84ad7fb9b60aab1308ba2eeb410d0b86b`；任何漂移都停止并保留现场。
+3. 另行取得本次系统 mutation 授权后，生成新 operation ID，只执行一次 upgrade 到 `26.7.1+38-2`。复验 terminal receipt、target inventory、依赖/字体/startup、`dpkg -V`/audit、零产品进程及 XDG fingerprint 不变后关机；不顺带执行其他 operation 或 crash controller。
+4. 此后再分别授权 repair→rollback→remove→reinstall、八个 crash/retry、产品启动、重启及 P05C；旧资产、远端、推送与发布保持关闭。
 
 ## 验证入口
 
