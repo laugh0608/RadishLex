@@ -26,11 +26,11 @@
 - 第二次执行因 store 拒绝 Debian 标准 `root:root 01777` `/run/lock` 而在 receipt/guard/package mutation 前失败关闭。package 仍 absent、dpkg status hash 未变，receipt、operation、guard/tmp、evidence 与五个 XDG 路径均 absent，仅创建空 state/operations root；`f0415ad` 只额外接受 root-owned 精确 `01777` sticky 共享锁父目录；
 - 包含该修复的 source `55351f2`/target `512e8ab` 第三套 pair 已从双 clean root 断网构建并独立复验，随后冻结独立 handoff、guest 与 `S0-clean-512e8ab-84d59494`。第三个 guest 启动后 DHCP 曾重新拉起 `enp0s1`；在 operation ID 生成和任何 mutation 前已将接口关闭并复验路由为空，随后八项 input、dpkg status/config/audit、20 项依赖、字体、state/XDG absent preflight 再次通过。
 - production maintenance CLI 已获单步授权执行 source revision 1 install。operation ID 只登记 SHA-256 `79efc4ab6d0f0f452f4f63e7e764282cca3c246a7ed80f0579d75738edea0057`；CLI stdout 为空，未据此推断结果，而是以进程退出、canonical receipt、dpkg 与 inventory postflight 判定。receipt 为 `completed`、SHA-256 `e58b144e2d148a7bc37790045c27ef6746308cfdea2e4e0924aa9ed9afa63ab8`，target proof 精确绑定 source package `09ed1228…bec`/evidence `fe3d6297…cf94`，post-install dpkg status SHA-256 为 `33c4973d4bcccc1932de35b2b326c61140037ee46613c7a925f2cbdbd3d5cff1`。
-- `radishlex 26.7.1+38-1` installed，`dpkg -V` 返回 0、audit 为空；manifest、双 FFI 同 hash/不同 inode、owner/mode/link、20 项依赖、DejaVu/Noto family/file/owner 均通过。Manager/Fcitx 两份 installed FFI 的只读 production startup gate 都返回 `AllowedProduct + InstalledReceiptVerified + completed`；guard/tmp/evidence 与五个 XDG 路径 absent，未启动 Manager、Fcitx、Flutter、Engine 或 Rime。第三个 guest 已停止，并从该关机终态冻结未注册 APFS COW `S1-source-installed-512e8ab-28328a58`；尚未创建 S2 或进入 upgrade/acceptance。
+- `radishlex 26.7.1+38-1` installed，`dpkg -V` 返回 0、audit 为空；manifest、双 FFI 同 hash/不同 inode、owner/mode/link、20 项依赖、DejaVu/Noto family/file/owner 均通过。Manager/Fcitx 两份 installed FFI 的只读 production startup gate 都返回 `AllowedProduct + InstalledReceiptVerified + completed`；guard/tmp/evidence 与五个 XDG 路径 absent，未启动 Manager、Fcitx、Flutter、Engine 或 Rime。第三个 guest 已先冻结 `S1-source-installed-512e8ab-28328a58`，随后在单 VM、断网条件下创建公开合成 XDG fixture 并冻结 `S2-source-data-512e8ab-0c2cefd6`；尚未进入 upgrade/acceptance。
 
 ### 当前本地资产登记（非发布证据）
 
-2026-08-09 的宿主根为 `/Users/luobo/VirtualMachines`。UTM 当前注册七个 VM；`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。两个 failure L6 均保持运行且离线，builder 与 source-installed 第三个 guest 停止；三套 handoff、S0 与第三套 S1 同时保留且不得混用。
+2026-08-09 的宿主根为 `/Users/luobo/VirtualMachines`。UTM 当前注册七个 VM；`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。两个 failure L6 已按单 VM 约束正常停止，运行内存状态不再保留但磁盘取证仍在；七台注册 VM 当前全部停止，三套 handoff/S0 与第三套 S1/S2 同时保留且不得混用。UTM 只使用 `PATH` 中的 plain `utmctl`，任何时刻最多运行一台 VM，启动前必须先复验其他注册 VM 全停。
 
 | 相对路径 | UTM 状态 | 唯一职责与保留线 |
 | --- | --- | --- |
@@ -38,16 +38,17 @@
 | `Debian13-ARM64-CleanBase.utm` | 已注册；rescue | 依赖安装前的纯 Debian 13 救援基线；不是 L6 S0，不写入 |
 | `Debian13-ARM64-DependencyFrozen.utm` | 未注册 | 工作 VM 的 dependency-frozen APFS COW 恢复源；不是执行 guest，不启动或改写 |
 | `Debian13-ARM64.utm` | 已注册；builder | Flutter/cache/source/build 与真实 release pair 的构建 VM；不执行 L6 package transaction |
-| `Debian13-ARM64-L6.utm` | 已注册；旧 L6 | 旧执行 guest；当前 disposable failure overlay 保持运行且离线，package/evidence root 与 controller evidence 仍 absent，不停止或清理 |
+| `Debian13-ARM64-L6.utm` | 已注册；旧 L6 stopped | 旧 pre-receipt failure disk；运行内存状态不再保留，package/evidence root 与 controller evidence 仍 absent，不重启、清理或复用 |
 | `RadishLex-L6-Snapshots/S0-clean-e5b6da1` | 非 VM；旧 S0 | 未注册、不可启动的 APFS COW 恢复点；绑定旧 pair 的 config/EFI/qcow、guest/dpkg/XDG/handoff baseline，只作取证，不用于修复后重试 |
 | `RadishLex-L6-Handoff-e5b6da1` | 非 VM；旧 handoff | host 上冻结的旧 canonical pair 副本；作为失败输入保留，不覆盖、安装或执行 |
 | `RadishLex-L6-PairBuilder-2fa1b8c-v2.utm` | 已注册；builder stopped | 2223 隔离 builder；旧输出不覆盖，新增长短两套 `512e8ab` roots 与第三个已发布 pair；不执行 package transaction |
-| `Debian13-ARM64-L6-2fa1b8c.utm` | 已注册；第二个 L6 failure | 从 DependencyFrozen 独立 COW 创建，2224 转发；disposable failure overlay 保持运行且离线，仅有空 state/operations root，不停止、清理或复用 |
+| `Debian13-ARM64-L6-2fa1b8c.utm` | 已注册；第二个 L6 failure stopped | 从 DependencyFrozen 独立 COW 创建，2224 转发；仅有空 state/operations root，运行内存状态不再保留，不重启、清理或复用 |
 | `RadishLex-L6-Snapshots/S0-clean-2fa1b8c` | 非 VM；第二个 S0 | 未注册、不可启动；identity `S0-clean-2fa1b8c-5683d120`，现只作第二次失败的基线与取证，不用于原地重试 |
 | `RadishLex-L6-Handoff-2fa1b8c` | 非 VM；第二个 handoff | host 上独立复验的 8 文件 canonical pair；现作为第二次失败输入保留，不覆盖或执行 |
-| `Debian13-ARM64-L6-512e8ab.utm` | 已注册；第三个 L6 stopped | 从 DependencyFrozen 独立 COW 创建，UUID `99FF4B3F-4894-4913-BBE3-4934DC27BEEB`、2226 转发；source revision 1 terminal installed，receipt/staging 保留，S1 已从关机终态冻结 |
+| `Debian13-ARM64-L6-512e8ab.utm` | 已注册；第三个 L6 stopped | 从 DependencyFrozen 独立 COW 创建，UUID `99FF4B3F-4894-4913-BBE3-4934DC27BEEB`、2226 转发；source revision 1 terminal installed，receipt/staging 与合成 XDG fixture 保留，S1/S2 已冻结 |
 | `RadishLex-L6-Snapshots/S0-clean-512e8ab` | 非 VM；第三个 S0 | 未注册、不可启动；identity `S0-clean-512e8ab-84d59494`，继续作为第三套 clean baseline，不覆盖为 installed 终态 |
 | `RadishLex-L6-Snapshots/S1-source-installed-512e8ab` | 非 VM；第三个 S1 | 未注册、不可启动；identity `S1-source-installed-512e8ab-28328a58`，绑定 source terminal completed、package/dpkg/startup/XDG 与 guest identity，作为 S2/upgrade 前恢复点 |
+| `RadishLex-L6-Snapshots/S2-source-data-512e8ab` | 非 VM；第三个 S2 | 未注册、不可启动；identity `S2-source-data-512e8ab-0c2cefd6`，绑定公开合成 XDG fingerprint、source terminal package 与单 VM/断网停止线，作为 upgrade 数据保留起点 |
 | `RadishLex-L6-Handoff-512e8ab` | 非 VM；第三个 handoff | host 上独立复验的 8 文件 canonical pair；record `2f2deaed…697`，是第三个 guest 的唯一 artifact input |
 
 两个在 QEMU 引导前因缓存 2222 转发失败、从未运行 guest 的旧 PairBuilder clone 已在单独授权后从 UTM 注册表和磁盘删除；它们不含 package transaction 或 canonical evidence。当前资产仍各有独立职责，不因 UTM 面板是否显示而删除。L6 闭合后可另行授权评估剩余 builder、DependencyFrozen 与 host handoff 的保留期；P04、CleanBase、两个 failure L6 和任何 S0/S1/S2/S3 恢复点仍按各自停止线保留。该表只登记本机运维角色，不进入 canonical pair/checkpoint/session evidence。
@@ -85,6 +86,8 @@ L6 只能使用新建 guest、P04 guest 的独立 clone，或同等的可丢弃 
 第三个 `S0-clean` identity 为 `S0-clean-512e8ab-84d59494`，同样从未注册 DependencyFrozen 独立 COW 创建，不恢复前两个 S0。config、EFI、qcow2 SHA-256 分别为 `5111741c54a49068dbbacfd131891b0990a531001769db21942eb88ac6767d2b`、`35fa4cdbbd72ba81c00da179cd4327cccaf30007eedc871d37b701c02f8dcafb`、`84d59494e13058d2f3a33311d70fd72170f98f211773c5730b55663fc7a5170a`，local evidence SHA-256 为 `5946b1ecb4c50f32ecaee595d747c89d627ea352ad7f65354b006889585e7e8b`。disposable 断网 preflight 后 source/S0 三项 hash 仍一致且 qcow 打开句柄为零；dpkg status/config SHA-256 分别为 `2c31c35c262b2b2761055fa12a55361f3d47ebfa1923dbb3cc3691499d2ce572`、`fead43b89af3ea5691c48f32d7fe1ba0f7ab229fb5d230f612d76fe8e6f5a015`，package/state/evidence/五项 XDG absent。它已作为本次首次 install 的 clean 起点，继续保留为原始基线；installed 终态没有覆盖 S0。
 
 第三个 `S1-source-installed` identity 为 `S1-source-installed-512e8ab-28328a58`。它只从第三个 guest 的关机、qcow 零打开句柄终态创建，未恢复 S0、未启动 guest 或产品；config、EFI、qcow2 SHA-256 分别为 `5111741c54a49068dbbacfd131891b0990a531001769db21942eb88ac6767d2b`、`eb94763ab95bdc17afdca66e812d9fe6bf953ab9c55f9258adc7b03b82d3b3ef`、`28328a58ba12249e378db02b2fe8828c7f676cf9cd3dccb6e52be4a8e1fc331d`。mode `0600` 的 local evidence SHA-256 为 `a759e4135db265398d3beba95ad4635c30dab78463c988f4d63db0062cfa1613`，只保存 operation ID hash，并绑定 receipt `e58b144e…ab8`、post-install dpkg status `33c4973d…ff1`、package/dependency/font/startup/XDG terminal 结果；它仍是本机恢复记录，不是 canonical L6 session evidence。
+
+第三个 `S2-source-data` identity 为 `S2-source-data-512e8ab-0c2cefd6`。S2 mutation 前先停止两个旧 failure VM，确认七台全停，再只以持久模式启动第三个 guest；任何 XDG 写入前网卡 down、路由为空、package/receipt/dpkg 与 S1 一致、固定 XDG absent、产品映射为零。fixture 只含一条公开合成 active term、合法 v1 settings/privacy、四个 `0700` 产品根与三个 `0600` 文件；userdb schema v9、quick_check、1 active/0 deleted、WAL/SHM absent，Fcitx profile 继续 absent。完整 XDG fingerprint SHA-256 为 `f3df287fa0f1da1d5f1fb3169fe607a84ad7fb9b60aab1308ba2eeb410d0b86b`。关机后 config、EFI、qcow2 SHA-256 分别为 `5111741c54a49068dbbacfd131891b0990a531001769db21942eb88ac6767d2b`、`365b5a170dca95bdf07c0e5e940fafd4580a353e43c141abede71c95f91261bc`、`0c2cefd6b63420adf143e1f1d6e4e70f59841bf1ba56cb54e86d2e7a226f3eea`；mode `0600` 的 local evidence SHA-256 为 `d164de0f5e6e88afbfa76ccd1c7d321d7064bbfd3ee1e275d3d4842d0dfa5c74`，仍不是 canonical L6 session evidence。
 
 ## 3. Release pair 冻结
 
@@ -233,7 +236,7 @@ checkpoint controller 必须是显式 acceptance 构建身份，以不可由 pro
 
 UTM guest-agent 的传输返回码或空输出不能单独证明 transaction completed。长命令结束后必须同时确认 maintenance 进程已退出，并以 canonical receipt、dpkg status/audit 与完整 package inventory 判定结果；缺少 receipt 即使 `utmctl exec` 返回 0 也按失败关闭，不推断或补写成功状态。
 
-前两个 L6 分别处于 `dpkg` 配置与 guard parent 不匹配停止线：disposable failure overlay 都必须保持运行且离线，两个旧 pair/handoff/S0 原样保留。第三个 guest 已在 source revision 1 terminal installed 后停止，receipt/staging、clean S0 与 source-installed S1 均保留；下一步只能另行授权创建公开合成 XDG fixture 并冻结 `S2-source-data`。恢复旧 S0、再次 install、启动产品、执行 upgrade、停止/恢复/清理任一 failure 或剩余构建现场，以及后续每个 mutation 都分别需要新的明确授权。
+前两个 L6 分别处于 `dpkg` 配置与 guard parent 不匹配停止线：两个 failure VM 已按单 VM 约束停止，旧 pair/handoff/S0 与磁盘现场原样保留。第三个 guest 已在 source revision 1 terminal installed、公开合成 XDG fixture 与 S2 冻结后停止，receipt/staging、clean S0、S1 与 S2 均保留；下一步只能另行授权从当前 S2 前态执行 source→target upgrade。恢复旧 S0、再次 install、启动产品、重启/清理任一 failure 或剩余构建现场，以及后续每个 mutation 都分别需要新的明确授权。
 
 ## 10. L6 完成与后续
 

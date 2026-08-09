@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 代码、合成门禁、L6 format v1、compile-identity 隔离的 acceptance controller 与双 clean-root release-pair builder/verifier 已闭合。旧 target `e5b6da1` 与 `2fa1b8c` 的两次 install 均在 receipt/package mutation 前暴露并修复 Debian 环境缺口，两个离线 failure overlay 继续保留。包含 `f0415ad` 的 target `512e8ab` 第三套真实 ARM64 pair 已在独立 guest 从 `S0-clean-512e8ab-84d59494` 完成 source revision 1 首次真实 `dpkg` install；receipt、package/inventory、20 项依赖、字体、Manager/Fcitx startup decision 与五个 XDG absent postflight 均通过，guest 已停止并冻结未注册 APFS COW `S1-source-installed-512e8ab-28328a58`，尚未创建 S2 或进入 upgrade。v1 package 明确不含 RadishLex 自有 maintainer scripts。
+- production 代码、合成门禁、L6 format v1、compile-identity 隔离的 acceptance controller 与双 clean-root release-pair builder/verifier 已闭合。旧 target `e5b6da1` 与 `2fa1b8c` 的两次 install 均在 receipt/package mutation 前暴露并修复 Debian 环境缺口，两个 failure disk 继续保留且 VM 已停止。包含 `f0415ad` 的 target `512e8ab` 第三套真实 ARM64 pair 已在独立 guest 完成 source revision 1 首次真实 `dpkg` install、terminal postflight、`S1-source-installed-512e8ab-28328a58` 与公开合成 XDG 的 `S2-source-data-512e8ab-0c2cefd6`；七台注册 VM 当前全部停止，尚未进入 upgrade。v1 package 明确不含 RadishLex 自有 maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -69,6 +69,7 @@
 - 安装依赖、下载 SDK/模型/数据、改变全局工具链、启动长期服务或 GUI 前先告知；网络或沙盒导致关键验证失真时，只为构建/测试申请受限提权。
 - 修改系统输入法、权限、Keychain、`/usr`/`/var`、dpkg、systemd、Fcitx profile/autostart、会话、证书或全局配置必须取得明确授权。不得自动 kill/restart、合成按键或点击冒充人工验收。
 - P04 guest staging、backup、userdb、导入导出文件和临时服务保持原样，不复跑或清理。任何 L6/P05C 使用独立 clone/snapshot 或另一台 guest，并逐步授权系统写入、进程/会话和人工输入。
+- UTM 只通过 `PATH` 中的 plain `utmctl` 操作，不直接调用 app bundle 可执行文件；任何时刻最多运行一台 VM，启动前先用 `utmctl list` 确认其他注册 VM 全部停止。
 
 ## 实现、文件与验证
 
@@ -80,6 +81,6 @@
 
 ## 当前顺位
 
-1. 保留 `e5b6da1` 与 `2fa1b8c` 两个离线 pre-receipt failure overlay 及各自 pair/handoff/S0；第三套 guest 保持 source revision 1 terminal installed 且关机，保留 receipt/staging、clean S0 与 source-installed S1，也不从旧 S0 原地重试。
-2. 下一步另行授权在第三个 guest 创建合成 XDG fixture 并冻结 `S2-source-data`；再分别授权 upgrade→repair→rollback→remove→reinstall、真实 process lifecycle 与八点 controller crash/retry，不自动跨步。
+1. 保留 `e5b6da1` 与 `2fa1b8c` 两个 stopped pre-receipt failure disk 及各自 pair/handoff/S0；第三套 guest 保持 source revision 1 terminal installed 且关机，保留 receipt/staging、clean S0、source-installed S1 与 source-data S2，也不从旧 S0 原地重试。
+2. 下一步另行授权从当前 S2 前态执行 source→target upgrade；必须新建 operation ID、复验单 VM/断网/package/receipt/XDG fingerprint，完成 postflight 后停止，不自动进入 repair 或 crash/retry。
 3. L6 证据闭合后另行授权 P05C；公开发布、推送、旧资产清理、真实同步及其他平台仍独立排期。
