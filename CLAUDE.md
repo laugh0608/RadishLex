@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 代码、合成门禁、L6 format v1、compile-identity 隔离的 acceptance controller 与双 clean-root release-pair builder/verifier 已闭合。旧 source `55351f2`/target `e5b6da1` pair 的首次授权 install 在真实 Debian 13 默认 `dpkg.cfg` validation 处 pre-receipt 失败关闭，未调用 `dpkg`、package 仍 absent；修复已进入 target `2fa1b8c`，新 pair、独立 root-owned handoff 与 `S0-clean-2fa1b8c-5683d120` 已复验，旧离线 L6 failure 现场继续保持运行。v1 package 明确不含 RadishLex 自有 maintainer scripts。
+- production 代码、合成门禁、L6 format v1、compile-identity 隔离的 acceptance controller 与双 clean-root release-pair builder/verifier 已闭合。旧 target `e5b6da1` 首次 install 因 Debian 默认 `dpkg.cfg` 失败；修复后的 target `2fa1b8c` pair 通过断网 preflight，但第二次 install 因 store 拒绝 Debian `root:root 01777` `/run/lock` 而 pre-receipt 失败。`f0415ad` 只额外接受精确 sticky 共享锁父目录；两次均未进入 package mutation，两个离线 failure overlay 保持运行，新的 pair/handoff/S0 尚未重建。v1 package 明确不含 RadishLex 自有 maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -57,7 +57,7 @@
 - `install`、`upgrade`、`repair`、`remove`、`rollback` 默认对用户 XDG 零写入并保留数据；首批升降级要求 ABI/schema/XDG/settings/privacy/Rime contract 完全相同。
 - actual `.deb` 校验必须同一流计算 identity，严格解析三成员 ar、canonical USTAR、仅 `control`/`md5sums` 的 control，并交叉完整 payload inventory/manifest/evidence、canonical md5 inventory 与 `Installed-Size`；依赖、版本和 dpkg status 由同域 pure relationship 另行验证，不得退回 detached 字节声明。
 - 每次 mutation/retry 重新验证私有 staged relationship，并消费 move-only quiescence permit。首次安装恢复必须保留 recovery target。
-- state 使用 root-owned receipt、`receipt.json.tmp`/stage tmp 恢复、精确 current required slots、原子 mode 与父目录 `fsync`；guard 是 mode `0600`、零长度、单 link regular file 上的 advisory exclusive lock，不是 Unix socket。
+- state 使用 root-owned receipt、`receipt.json.tmp`/stage tmp 恢复、精确 current required slots、原子 mode 与父目录 `fsync`；guard 是 mode `0600`、零长度、单 link regular file 上的 advisory exclusive lock，不是 Unix socket。共享锁父目录只接受非 world-writable 或 root-owned 精确 `01777` sticky mode。
 - 旧 operation v1 只保留结构与 pair metadata，不存历史 hash proof，也不用于当前恢复。任何未知、半配置、身份/owner/mode/link/hash 漂移均失败关闭并保留现场。
 - production executor 只接受固定 `/usr/bin/dpkg`、typed argv、清空环境、null stdin、超时和有界诊断；system observer/port 复验 root identity、actual staging、依赖/版本、`/proc/*/maps` 静止与完整安装结果。外部 scripts/triggers 不能代表 transaction completed。
 - 维护 command 是 opaque 类型，CLI 要求精确 operation ID、root-owned 同名 package/evidence、`--authorized-system-mutation` 与 `--preserve-user-data`；未获单步授权不得实际运行。startup 已连接 terminal actual package 与完整 dependency relationship；L6 matrix 固定独立 guest、相邻 Debian revision、六步主序列和八个 crash checkpoint，acceptance controller 使用独立编译身份与完整 process group 终止；pair builder 只接受两个独立 clean root并已冻结 canonical 脱敏 artifact/ELF evidence，真实字体/package-manager/process 证据仍未执行。
@@ -80,6 +80,6 @@
 
 ## 当前顺位
 
-1. 保留当前离线 L6 pre-receipt failure 现场和旧 pair/handoff/S0；新 source `55351f2`/target `2fa1b8c` pair、独立 guest/handoff 与 `S0-clean-2fa1b8c-5683d120` 是下一次执行的唯一输入，不热替换旧 executable。
-2. 另行授权从新 S0 disposable 启动、关闭网络、只读 preflight 与 source revision 1 首次 install；通过 terminal/XDG/font/dpkg 对照后，再逐项授权 upgrade→repair→rollback→remove→reinstall、真实 process lifecycle 与八点 controller crash/retry。
+1. 保留 `e5b6da1` 与 `2fa1b8c` 两个离线 pre-receipt failure overlay 及各自 pair/handoff/S0；以 source `55351f2` 和包含 `f0415ad` 的最终 clean descendant 另行授权重建真实 ARM64 pair，再准备第三套独立 handoff/guest/S0，不热替换既有 executable。
+2. 在第三套 S0 上另行授权断网 preflight 与 source revision 1 首次 install；通过 terminal/XDG/font/dpkg 对照后，再逐项授权 upgrade→repair→rollback→remove→reinstall、真实 process lifecycle 与八点 controller crash/retry。
 3. L6 证据闭合后另行授权 P05C；公开发布、推送、旧资产清理、真实同步及其他平台仍独立排期。
