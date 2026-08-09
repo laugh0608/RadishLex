@@ -7,7 +7,7 @@
 - 复核日期：2026-08-09（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- production 代码与合成门禁已闭合；L6 format v1、compile-isolated acceptance checkpoint/evidence controller、六步主序列、八点确定性 crash/recovery 合成矩阵与 canonical 脱敏 evidence 已完成。2026-08-09 的 target `e5b6da1` 与 `2fa1b8c` 两次 install 分别暴露默认 `dpkg.cfg` 与 `root:root 01777` `/run/lock` 缺口，均停在 receipt/package mutation 前；两个 disposable failure overlay 保持运行且离线。包含 `f0415ad` 的 target `512e8ab` 已从双 clean root 形成第三套真实 ARM64 pair、独立 handoff/guest 与 `S0-clean-512e8ab-84d59494`，断网 dpkg/XDG/20 项依赖/字体/sticky lock preflight 通过；第三次 operation ID、maintenance/acceptance CLI 与真实 package mutation 均未开始，真实用户同步继续关闭。
+- production 代码与合成门禁已闭合；L6 format v1、compile-isolated acceptance checkpoint/evidence controller、六步主序列、八点确定性 crash/recovery 合成矩阵与 canonical 脱敏 evidence 已完成。2026-08-09 的 target `e5b6da1` 与 `2fa1b8c` 两次 install 分别暴露默认 `dpkg.cfg` 与 `root:root 01777` `/run/lock` 缺口，均停在 receipt/package mutation 前；两个 disposable failure overlay 保持运行且离线。包含 `f0415ad` 的 target `512e8ab` 第三套真实 ARM64 pair 已从 `S0-clean-512e8ab-84d59494` 完成 source revision 1 首次真实 install：receipt terminal completed、source package/inventory、依赖/字体、Manager/Fcitx startup decision 与五个 XDG absent postflight 均通过，第三个 guest 已停止；S1、upgrade、acceptance controller 与真实用户同步继续关闭。
 
 ## P04 冻结基线
 
@@ -39,15 +39,15 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 - production system observer 只读固定 dpkg status/config、root owner/mode/link 与 actual staged `.deb`；executor 仅接受固定 `/usr/bin/dpkg`、typed argv、清空环境、null stdin、15 分钟上限和有界诊断。concrete port 在每次 retry 重建 relationship、检查依赖/版本、消费 quiescence permit，并以完整 manifest 验证 installed/absent 结果。
 - `bb84d4a` 将真实 Debian 13 默认 `no-debsig` 与固定 `/var/log/dpkg.log` 的空白/等号写法规范化为受控配置；`f0415ad` 接受 Debian 标准 `root:root 01777` `/run/lock`，但继续拒绝非 sticky world-writable、异常 sticky mode 与不安全 owner/group。target `2fa1b8c` 的旧 production maintenance identity `919b55dc46958ca55520e0cb9a0fae5c8080f9b58e1bd9142b662af10b7c48eb` 不能用于该修复；第三个 target `512e8ab` 已冻结新的 production identity `f716fad30b6657e108272fd1f7361826773b0ca42e4ac1ce6f78a7ad20aade62`。
 - process quiescence 扫描 `/proc/*/maps` 的固定路径与 device/inode，匿名映射不误报，缺权限、畸形或竞态不确定性失败关闭；它不 kill、restart 或操作会话。受控 CLI 是 opaque command，只接受精确 operation ID、root-owned 同名 `.deb`/evidence，以及 `--authorized-system-mutation` 与 `--preserve-user-data` 双显式授权。
-- 只读 startup observer 已把 terminal staging 中的 actual `.deb`、完整 dpkg dependency relationship 与 component inventory 串联；Manager 在 Flutter 前、Fcitx 在 Engine/input FFI/XDG/Rime 前取得 permit。第三套 S0 的安装前字体 family/glyph/owner 已通过，package mutation 后字体、startup 与真实 process/package-manager 行为仍留给 L6 postflight。
+- 只读 startup observer 已把 terminal staging 中的 actual `.deb`、完整 dpkg dependency relationship 与 component inventory 串联；Manager 在 Flutter 前、Fcitx 在 Engine/input FFI/XDG/Rime 前取得 permit。第三次 install 后两份已安装 FFI 均通过只读 production gate，返回 `AllowedProduct + InstalledReceiptVerified + completed`；未启动 Manager、Fcitx、Flutter、Engine 或用户数据层。
 - 未知 package state、半配置、active/异常 guard、tmp/nonterminal receipt、缺失/多余 slot、symlink/hardlink、宽权限或 owner/mode/link/hash/version/ABI 漂移均失败关闭并保留现场。
-- L6 matrix 已固定独立 guest、相邻 revision 六步主序列、八个 crash case、probe/evidence 与逐 mutation 授权。acceptance crate 只经默认关闭的 compile feature 取得精确 hook，不轮询 receipt；controller 终止并等待完整 process group，再证明 group 为空且无 `dpkg` child。canonical checkpoint evidence 只保存 operation ID hash 与稳定分类，不含原值、PID、路径、proc/dpkg 原文或用户数据；production maintenance CLI 已真实运行两次但都停在 receipt 前，acceptance controller 仍未运行。
+- L6 matrix 已固定独立 guest、相邻 revision 六步主序列、八个 crash case、probe/evidence 与逐 mutation 授权。acceptance crate 只经默认关闭的 compile feature 取得精确 hook，不轮询 receipt；controller 终止并等待完整 process group，再证明 group 为空且无 `dpkg` child。canonical checkpoint evidence 只保存 operation ID hash 与稳定分类，不含原值、PID、路径、proc/dpkg 原文或用户数据；production maintenance CLI 已真实运行三次，前两次停在 receipt 前，第三次完成 source install，acceptance controller 仍未运行。
 - target `e5b6da1` 与 `2fa1b8c` 的两个旧 pair、handoff 和 `S0-clean-e5b6da1-deff08b1`/`S0-clean-2fa1b8c-5683d120` 现只作失败取证；其 VM `6F73F6DC-66DF-40EC-86B8-228C1FDA1195`、`EBF12F50-33B1-4711-B693-B57D419EAE2A` 均保持运行且离线。两次 package/status/XDG 未变，只留下各自空 state/operations root；详细 artifact/operation/S0 hash 见 L6 runbook。
-- 第三个 pair 固定 source `55351f2`/target `512e8ab`，record SHA-256 为 `2f2deaed6c8886cfcc4751ccc56439bda95f311767587dc74103645664258697`；builder、host handoff 与 root-owned guest input 已逐哈希复验。执行 VM `99FF4B3F-4894-4913-BBE3-4934DC27BEEB` 当前停止，唯一 S0 为 `S0-clean-512e8ab-84d59494`；断网复验后 source/S0 无漂移且 qcow 无句柄，package/state/evidence/五项 XDG absent，dpkg status/audit、20 项依赖、字体与 `01777 root:root` `/run/lock` 均通过。完整 package/ELF/S0/local evidence hash 见 L6 runbook与本周周志。
+- 第三个 pair 固定 source `55351f2`/target `512e8ab`，record SHA-256 为 `2f2deaed6c8886cfcc4751ccc56439bda95f311767587dc74103645664258697`。首次 source install 的 operation ID 只登记 SHA-256 `79efc4ab6d0f0f452f4f63e7e764282cca3c246a7ed80f0579d75738edea0057`；canonical receipt SHA-256 为 `e58b144e2d148a7bc37790045c27ef6746308cfdea2e4e0924aa9ed9afa63ab8`，post-install dpkg status SHA-256 为 `33c4973d4bcccc1932de35b2b326c61140037ee46613c7a925f2cbdbd3d5cff1`。执行 VM `99FF4B3F-4894-4913-BBE3-4934DC27BEEB` 当前停止；source `26.7.1+38-1` installed、`dpkg -V`/audit 为 0/空、guard/tmp/evidence 与五项 XDG absent，20 项依赖、字体 owner、完整 manifest 和 startup decision 通过；S1 尚未创建。
 
 ## 停止线
 
-- 未获授权不得在真实 guest 运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 install/repair/remove/rollback。
+- 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
 - 不停止、恢复、清理或复用当前两个 disposable L6 failure 现场；其两个旧 pair/handoff/S0 只保留取证，不得在原处替换 maintenance executable 后重试。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
@@ -55,9 +55,9 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 
 ## 下一步事项（2026-08-09）
 
-1. 保持 `e5b6da1` 与 `2fa1b8c` 两个 L6 failure overlay 运行且离线，P04、CleanBase、DependencyFrozen、builders 与第三个基线 guest 关机；不清理任一空 state root，不恢复或覆盖既有 S0/handoff。
-2. 只从 `S0-clean-512e8ab-84d59494` 启动第三个 disposable guest，另行生成新的 operation ID，并单步授权 source revision 1 首次 install mutation；复验 terminal receipt、guard/tmp、dpkg status/audit、依赖/字体、完整 inventory、startup decision 与五个 XDG absent 前不启动产品。
-3. 首次 install 完成后仍停止，不自动进入 upgrade。其余五步、八个 crash/retry、产品启动、重启、任何 failure 现场处置与 P05C 都继续逐项授权；旧资产、远端与发布保持关闭。
+1. 保持 `e5b6da1` 与 `2fa1b8c` 两个 L6 failure overlay 运行且离线，P04、CleanBase、DependencyFrozen、builder 与 source-installed 第三个 guest 关机；不清理 receipt/staging、任一旧空 state root 或既有 S0/handoff。
+2. 下一步单独授权从第三个 guest 当前关机终态冻结 `S1-source-installed`，绑定 receipt/package/dpkg/XDG/guest identity；不得恢复旧 S0、启动产品或顺带进入 upgrade。
+3. S1 后再分别授权合成 XDG fixture 与 `S2-source-data`、upgrade→repair→rollback→remove→reinstall、八个 crash/retry、产品启动、重启及 P05C；旧资产、远端与发布保持关闭。
 
 ## 验证入口
 
@@ -78,7 +78,7 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 git diff --check
 ```
 
-上述仓库入口本身只证明合同与合成状态。前两个 canonical ARM64 pair 已在真实 guest 暴露 pre-receipt 环境缺口；第三个包含 `f0415ad` 的 package/executable identity、独立 S0 与断网 preflight 已闭合，但尚未生成 operation ID 或运行 production/acceptance CLI。当前仍不证明 process-group/dpkg mutation、桌面安装、L6 完成或公开发布。
+上述仓库入口本身只证明合同与合成状态。前两个 canonical ARM64 pair 已在真实 guest 暴露 pre-receipt 环境缺口；第三个包含 `f0415ad` 的 production maintenance CLI 已真实完成一次 source `dpkg` install 与 terminal postflight，但 acceptance process-group/crash、其余五步、真实桌面启动、重启、完整 L6 与公开发布仍未证明。
 
 ## 阅读索引
 

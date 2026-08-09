@@ -6,7 +6,7 @@
 
 截至 2026-08-05，M5-P03 已完成 Fcitx5 Wayland/X11 输入、常见应用、生命周期、离线与隐私实机验收，M5-P04 已完成 Linux Manager 与同库个人化验收。现有 Flutter 页面、`ManagerBridge`、ABI v9、Rust userdb/ranker、导入导出、删除/tombstone/explicit restore、学习摘要和 rank explain 均直接复用；本批没有重写业务真相源，也没有通过新增平台私有 ABI 复制既有能力。
 
-首个源码子批已建立 Linux Flutter runner、共享 XDG/Manager runtime、bundle `.so` 约束、Linux privacy 配置与同库 native-rime contract。后续子批建立先 watch 后初读的 privacy 感知、失败关闭 runtime、精确 allowlist 粗分类和默认关闭的受控取证模式。UTM Debian 13 ARM64 已完成真实 Flutter 3.44.0 Release bundle、Fcitx5 addon、ELF/`$ORIGIN`、正式 ABI symbol、native-rime 与 Dart smoke；P04 实机时 Fcitx CTest 为七项，当前仓库在 staged/system runtime layout 与两种 startup 编译身份加入后为 10 项。P05B 真实 ARM64 release pair 已绑定 startup-enabled payload 身份，但尚未形成 package-installed startup 动态证据。
+首个源码子批已建立 Linux Flutter runner、共享 XDG/Manager runtime、bundle `.so` 约束、Linux privacy 配置与同库 native-rime contract。后续子批建立先 watch 后初读的 privacy 感知、失败关闭 runtime、精确 allowlist 粗分类和默认关闭的受控取证模式。UTM Debian 13 ARM64 已完成真实 Flutter 3.44.0 Release bundle、Fcitx5 addon、ELF/`$ORIGIN`、正式 ABI symbol、native-rime 与 Dart smoke；P04 实机时 Fcitx CTest 为七项，当前仓库在 staged/system runtime layout 与两种 startup 编译身份加入后为 10 项。P05B source package 已真实安装，两份 installed FFI 的 production read-only gate 已形成 package-installed allow decision；Manager executable 与 Flutter 的 linked startup 仍未启动。
 
 Firefox 已在 Wayland/X11 两侧取得相同的精确 `firefox-esr` 身份、GTK3 Fcitx frontend、password capability 和 userdb 零增量证据；生产 allowlist 因而只加入 `firefox-esr -> browser`，其他候选与变体继续失败关闭。生产分类后的桌面纵向链已证明 Manager 刷新、privacy 开关、单次恢复学习、删除、既有/新 Fcitx session 防复活、explicit restore 和恢复后重新学习均读取同一 userdb。
 
@@ -71,7 +71,7 @@ P04 staged Flutter bundle 使用固定布局：
 <bundle>/data/...
 ```
 
-Linux host 从当前 executable 的 canonical parent 派生 sibling `lib/libradishlex_ime_ffi.so`，不读取工作目录、`LD_LIBRARY_PATH`、仓库路径或调用方参数。目标必须是 bundle 内非 symlink regular file，且不得 group/other writable；Dart binding 继续验证 ABI contract version 与 Manager 所需 symbol 集。P04 证明 staged product bundle 与 workspace native library 一致；P05A 又以全新 committed-source ARM64 bundle 通过 root-owned 目标布局、product manifest、ELF/closure、双 FFI 和构建路径强门禁。P05B 已形成 actual `.deb` relationship、恢复型事务、production mutable port/system executor、Flutter 前只读 startup decision，以及 source `55351f2` revision 1/target `e5b6da1` revision 2 的真实双 clean-root ARM64 pair；L6 format v1 已固定，但真实进程/dpkg 与 Manager package startup 证据仍未形成。
+Linux host 从当前 executable 的 canonical parent 派生 sibling `lib/libradishlex_ime_ffi.so`，不读取工作目录、`LD_LIBRARY_PATH`、仓库路径或调用方参数。目标必须是 bundle 内非 symlink regular file，且不得 group/other writable；Dart binding 继续验证 ABI contract version 与 Manager 所需 symbol 集。P04 证明 staged product bundle 与 workspace native library 一致；P05A 又以全新 committed-source ARM64 bundle 通过 root-owned 目标布局、product manifest、ELF/closure、双 FFI 和构建路径强门禁。P05B 已形成 actual `.deb` relationship、恢复型事务、production mutable port/system executor、Flutter 前只读 startup decision，以及 source `55351f2` revision 1/target `512e8ab` revision 2 的真实双 clean-root ARM64 pair；source package 已真实安装，Manager component 的 installed FFI gate 返回 `AllowedProduct + InstalledReceiptVerified`，但 Manager executable/Flutter 尚未启动。
 
 Dart `ManagerProductPaths` 必须接受平台明确返回的固定 `.dylib` 或 `.so` basename，拒绝其他文件名；错误文案改为平台中立。该调整不得削弱 macOS `Contents/Frameworks/libradishlex_ime_ffi.dylib` 的既有测试和产品门禁。
 
