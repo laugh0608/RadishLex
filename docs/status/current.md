@@ -4,10 +4,10 @@
 
 ## 当前判断
 
-- 复核日期：2026-08-08（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
+- 复核日期：2026-08-09（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- production 代码与合成门禁已闭合；L6 format v1、compile-isolated acceptance checkpoint/evidence controller、六步主序列、八点确定性 crash/recovery 合成矩阵与 canonical 脱敏 evidence 已完成。Debian 13 ARM64 已从 source `55351f2` revision 1 与 target `e5b6da1` revision 2 的独立 clean root 原子生成并独立复验真实 pair；独立 L6 guest、专用用户、root-owned handoff 与 `S0-clean-e5b6da1-deff08b1` 已准备并复验，Linux `/proc`、`dpkg` mutation、外部 package lifecycle、系统安装与 P05C 仍未执行。真实用户同步继续关闭。
+- production 代码与合成门禁已闭合；L6 format v1、compile-isolated acceptance checkpoint/evidence controller、六步主序列、八点确定性 crash/recovery 合成矩阵与 canonical 脱敏 evidence 已完成。2026-08-09 使用旧 source `55351f2`/target `e5b6da1` pair 的首次授权 install 在真实 Debian 13 默认 `dpkg.cfg` validation 处 pre-receipt 失败关闭：actual artifact、dpkg status parser 与 20 项依赖均通过，但旧 validator 不接受发行版默认 `no-debsig`/空白分隔 `log`；未调用 `/usr/bin/dpkg`，package、receipt、operation、guard/tmp 与产品路径均 absent，仅留下空 state/operations root。修复从 `bb84d4a` 开始，旧 pair/handoff/S0 不得重试；当前唯一 L6 guest 保持运行、离线并保留 failure 现场。真实用户同步继续关闭。
 
 ## P04 冻结基线
 
@@ -37,26 +37,28 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 - guard 已改为 mode `0600`、零长度、单 link regular file 的 advisory exclusive lock；active contender 拒绝，stale unlocked file 可由维护流程重新取得。目录/文件创建固定 mode，原子替换和新目录项后同步直接父目录。
 - 五类 operation 共用可恢复状态机；每次 mutation 或 retry 都重新验证 staged relationship并取得 move-only quiescence permit。首次安装失败恢复携带已取证 recovery target；target/source proof 已持久化时重入不重复 mutation。
 - production system observer 只读固定 dpkg status/config、root owner/mode/link 与 actual staged `.deb`；executor 仅接受固定 `/usr/bin/dpkg`、typed argv、清空环境、null stdin、15 分钟上限和有界诊断。concrete port 在每次 retry 重建 relationship、检查依赖/版本、消费 quiescence permit，并以完整 manifest 验证 installed/absent 结果。
+- `bb84d4a` 将真实 Debian 13 默认 `no-debsig` 与固定 `/var/log/dpkg.log` 的空白/等号写法规范化为受控配置；其他日志路径、额外参数、未知选项及 `root`/`admindir`/`instdir`/`force-*`/hook/path include-exclude 继续失败关闭。该修复只通过仓库门禁，尚未形成新的 ARM64 maintenance identity。
 - process quiescence 扫描 `/proc/*/maps` 的固定路径与 device/inode，匿名映射不误报，缺权限、畸形或竞态不确定性失败关闭；它不 kill、restart 或操作会话。受控 CLI 是 opaque command，只接受精确 operation ID、root-owned 同名 `.deb`/evidence，以及 `--authorized-system-mutation` 与 `--preserve-user-data` 双显式授权。
 - 只读 startup observer 已把 terminal staging 中的 actual `.deb`、完整 dpkg dependency relationship 与 component inventory 串联；Manager 在 Flutter 前、Fcitx 在 Engine/input FFI/XDG/Rime 前取得 permit。字体 family/glyph/owner 与真实 process/package-manager 行为仍留给 L6。
 - 未知 package state、半配置、active/异常 guard、tmp/nonterminal receipt、缺失/多余 slot、symlink/hardlink、宽权限或 owner/mode/link/hash/version/ABI 漂移均失败关闭并保留现场。
-- L6 matrix 已固定独立 guest、相邻 revision 六步主序列、八个 crash case、probe/evidence 与逐 mutation 授权。acceptance crate 只经默认关闭的 compile feature 取得精确 hook，不轮询 receipt；controller 终止并等待完整 process group，再证明 group 为空且无 `dpkg` child。canonical checkpoint evidence 只保存 operation ID hash 与稳定分类，不含原值、PID、路径、proc/dpkg 原文或用户数据；实际 controller/CLI 仍未运行。
-- release-pair contract 固定 source `55351f2`/`26.7.1+38-1` 与 target `e5b6da1`/`26.7.1+38-2`。真实 pair record SHA-256 为 `a9bcf35762b460a23ad9bc062611f8d5edb57e7303861bbcb99e1efb40703dfd`；source/target package 分别为 `b41e32db76388ad18cdeb60e4b40fb8e28710556df87d53bfa5b275ff2ce028c`、`8209c0161609fde3b798628e5c3460e6237c8618f2d26f1452063540c7541295`，production/acceptance ELF 分别为 `037199abe73559e2cd10013f0930f1f44cf9126ac7987169da11f2933a706fc1`、`c4f6282341c6f68f997b1f5d8d2d1b5dec2d96b60e2f387717594d5a0a9523f4`。该记录只冻结 L6 输入，不证明 package mutation 或 startup。
-- 本地 L6 VM 固定为 `/Users/luobo/VirtualMachines/Debian13-ARM64-L6.utm`，UTM UUID `6F73F6DC-66DF-40EC-86B8-228C1FDA1195`；guest 用户为 `radishlex-l6`，root-owned pair 位于 `/var/tmp/radishlex-l6-inputs`。未注册 S0 恢复点固定为 `/Users/luobo/VirtualMachines/RadishLex-L6-Snapshots/S0-clean-e5b6da1`，local evidence SHA-256 为 `50dcc48bfba7f65fce56184b2a21183f8e263611eb0f86d62cdafc6f306b1f08`；当前所有 VM 均关机，controller evidence root 与 RadishLex package 均 absent。
+- L6 matrix 已固定独立 guest、相邻 revision 六步主序列、八个 crash case、probe/evidence 与逐 mutation 授权。acceptance crate 只经默认关闭的 compile feature 取得精确 hook，不轮询 receipt；controller 终止并等待完整 process group，再证明 group 为空且无 `dpkg` child。canonical checkpoint evidence 只保存 operation ID hash 与稳定分类，不含原值、PID、路径、proc/dpkg 原文或用户数据；production maintenance CLI 已真实运行一次但停在 receipt 前，acceptance controller 仍未运行。
+- 旧 release-pair 固定 source `55351f2`/`26.7.1+38-1` 与 target `e5b6da1`/`26.7.1+38-2`。pair record SHA-256 为 `a9bcf35762b460a23ad9bc062611f8d5edb57e7303861bbcb99e1efb40703dfd`；source/target package 分别为 `b41e32db76388ad18cdeb60e4b40fb8e28710556df87d53bfa5b275ff2ce028c`、`8209c0161609fde3b798628e5c3460e6237c8618f2d26f1452063540c7541295`，production/acceptance ELF 分别为 `037199abe73559e2cd10013f0930f1f44cf9126ac7987169da11f2933a706fc1`、`c4f6282341c6f68f997b1f5d8d2d1b5dec2d96b60e2f387717594d5a0a9523f4`。它现为失败输入与取证材料，不得热替换 executable 或用于重试；下一 pair 仍保留 source `55351f2`，target 必须是包含 `bb84d4a` 的本批最终 clean descendant。
+- 本地 L6 VM 仍为 `/Users/luobo/VirtualMachines/Debian13-ARM64-L6.utm`，UTM UUID `6F73F6DC-66DF-40EC-86B8-228C1FDA1195`；当前唯一 L6 以 disposable 模式运行且 `enp0s1` down、路由为空。旧 root-owned pair 与 `S0-clean-e5b6da1-deff08b1` 原样保留；failure overlay 中 RadishLex package/evidence root 与五个 XDG/Fcitx 路径未变，package absent、dpkg status SHA-256 仍为 `2c31c35c262b2b2761055fa12a55361f3d47ebfa1923dbb3cc3691499d2ce572`，只新增空 `/var/lib/radishlex/install-v1/operations`。
 
 ## 停止线
 
 - 未获授权不得在真实 guest 运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 install/repair/remove/rollback。
+- 不停止、恢复、清理或复用当前 disposable L6 failure 现场；旧 pair/handoff/S0 只保留取证，不得在原处替换 maintenance executable 后重试。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 明日事项（2026-08-09）
+## 下一步事项（2026-08-09）
 
-1. 保持 P04、CleanBase、DependencyFrozen 与构建 VM 关机；启动 L6 前先确认没有其他 VM 运行、恢复 `127.0.0.1:2222 -> guest:22`，只读 SSH 复验 guest、S0、pair、dpkg baseline 与五个 XDG absent。
-2. 单独列出 source revision 1 首次 install 的 operation ID、精确 package/evidence 输入、maintenance argv、系统写入范围、失败现场与回退影响，取得当次授权后才执行 mutation。
-3. mutation 后先闭合 terminal receipt、guard/tmp、dpkg status/audit、依赖/字体、完整 package inventory、startup 只读 decision 与五个 XDG absent；在这些结果通过前不启动 Manager、Fcitx 或桌面会话。
-4. 首次 install 完成后停止，不自动进入 upgrade。其余五步、八个 crash/retry、产品启动、重启、恢复 S0 与任何清理都继续逐项授权；P05C、旧资产、远端与发布保持关闭。
+1. 保持当前 L6 failure overlay 运行且离线，P04、CleanBase、DependencyFrozen 与构建 VM 继续关机；不清理空 state root、不恢复旧 S0。
+2. 以 source `55351f2` 与包含 `bb84d4a` 的本批最终 clean descendant，另行授权在双 clean root 重建并独立复验真实 ARM64 release pair；旧 pair record/handoff 不覆盖。
+3. 为新 pair 准备新的独立 handoff 与 S0，再以新的 operation ID、精确 argv 和单步授权重做 source revision 1 首次 install；terminal receipt、guard/tmp、dpkg status/audit、依赖/字体、完整 inventory、startup decision 与五个 XDG absent 未闭合前不启动产品。
+4. 首次 install 完成后仍停止，不自动进入 upgrade。其余五步、八个 crash/retry、产品启动、重启、任何 failure 现场处置与 P05C 都继续逐项授权；旧资产、远端与发布保持关闭。
 
 ## 验证入口
 
@@ -77,7 +79,7 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 git diff --check
 ```
 
-上述仓库入口本身只证明合同与合成状态；另行形成的 canonical ARM64 pair record 已冻结真实 package/executable identity。当前仍没有调用 maintenance/acceptance CLI 或 `/usr/bin/dpkg`，不证明真实 process-group/dpkg mutation、桌面安装、L6 完成或公开发布。
+上述仓库入口本身只证明合同与合成状态。旧 canonical ARM64 pair 已证明旧 package/executable identity并暴露真实 Debian 配置缺口；production maintenance CLI 已调用一次，但未形成 receipt、未调用 `/usr/bin/dpkg`。当前不证明 process-group/dpkg mutation、桌面安装、L6 完成或公开发布，新的 ARM64 pair/guest handoff/S0 仍未形成。
 
 ## 阅读索引
 

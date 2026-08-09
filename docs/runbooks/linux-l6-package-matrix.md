@@ -14,14 +14,15 @@
 
 ## 当前执行状态
 
-截至 2026-08-08：
+截至 2026-08-09：
 
 - production transaction/startup 代码、actual `.deb` verifier 和 fake command/crash matrix 已完成；
 - L6 guest、release pair、六步事务顺序、八个 crash checkpoint、字体/startup/XDG probe 和证据保留规则已由 format v1 固定；
 - compile-identity 隔离的 acceptance checkpoint/evidence controller 已完成，八点合成中断/恢复与 canonical 脱敏 envelope 已通过专项门禁；
-- 真实 pair 已从 source commit `55351f2` revision 1 与 target commit `e5b6da1` revision 2 的独立 clean root 断网构建、原子发布并独立复验；
-- canonical pair record、两份 ARM64 package 与 production/acceptance executable identity 已冻结，具体 hash 见本 runbook 第 3 节；
-- 构建 VM 只新增 per-user SDK/cache、私有源码/build/output；独立 L6 guest、专用用户、root-owned pair handoff 与 `S0-clean-e5b6da1-deff08b1` 已准备并复验，真实 `dpkg` mutation、`/proc` product probe、字体 probe、Manager/Fcitx 启动与系统安装均未执行。
+- 旧 pair 已从 source commit `55351f2` revision 1 与 target commit `e5b6da1` revision 2 的独立 clean root 断网构建、原子发布并独立复验；其 record、两份 ARM64 package 与 production/acceptance executable identity 现作为失败输入保留，具体 hash 见本 runbook 第 3 节；
+- 独立 L6 guest、专用用户、root-owned handoff 与 `S0-clean-e5b6da1-deff08b1` 已准备；在网络关闭、guest/S0/pair/dpkg/XDG/20 项依赖 preflight 通过后，production maintenance CLI 获授权执行首次 source install；
+- 该次执行在写 `prepared` receipt 前因旧 validator 拒绝 Debian 13 默认 `no-debsig` 而失败关闭，operation ID 仅登记 SHA-256 `0a75defd7596a08892a6a526dad1cc59d355d84c02c6a609320e8aa55d14a383`。未调用 `/usr/bin/dpkg`，package、receipt、guard/tmp、operation 与产品/XDG 路径均未改变，仅新增空 state/operations root；
+- `bb84d4a` 已规范化发行版默认 `no-debsig` 与固定 `/var/log/dpkg.log` 的空白/等号写法，并保留其他路径、额外参数、未知或危险 override 的失败关闭。旧 pair/handoff/S0 不得热替换或用于重试；下一 pair 的 target 必须是包含该修复的本批最终 clean descendant。
 
 ### 当前本地资产登记（非发布证据）
 
@@ -33,9 +34,9 @@
 | `Debian13-ARM64-CleanBase.utm` | 已注册；rescue | 依赖安装前的纯 Debian 13 救援基线；不是 L6 S0，不写入 |
 | `Debian13-ARM64-DependencyFrozen.utm` | 未注册 | 工作 VM 的 dependency-frozen APFS COW 恢复源；不是执行 guest，不启动或改写 |
 | `Debian13-ARM64.utm` | 已注册；builder | Flutter/cache/source/build 与真实 release pair 的构建 VM；不执行 L6 package transaction |
-| `Debian13-ARM64-L6.utm` | 已注册；L6 | 唯一 L6 执行 guest；用户 `radishlex-l6` 与 root-owned `/var/tmp/radishlex-l6-inputs` 已准备，installed package 与 controller evidence root 仍 absent |
-| `RadishLex-L6-Snapshots/S0-clean-e5b6da1` | 非 VM；S0 | 未注册、不可启动的 APFS COW 恢复点；绑定 config/EFI/qcow、guest/dpkg/XDG/handoff baseline，恢复须另行授权 |
-| `RadishLex-L6-Handoff-e5b6da1` | 非 VM | host 上冻结的 canonical pair 副本；只用于逐哈希交接，不安装或执行 |
+| `Debian13-ARM64-L6.utm` | 已注册；L6 | 唯一 L6 执行 guest；当前 disposable failure overlay 保持运行且离线，package/evidence root 与 controller evidence 仍 absent，不停止或清理 |
+| `RadishLex-L6-Snapshots/S0-clean-e5b6da1` | 非 VM；旧 S0 | 未注册、不可启动的 APFS COW 恢复点；绑定旧 pair 的 config/EFI/qcow、guest/dpkg/XDG/handoff baseline，只作取证，不用于修复后重试 |
+| `RadishLex-L6-Handoff-e5b6da1` | 非 VM；旧 handoff | host 上冻结的旧 canonical pair 副本；作为失败输入保留，不覆盖、安装或执行 |
 
 当前阶段七项均有独立职责，不因 UTM 面板是否显示而删除。L6 闭合后可另行授权评估构建 VM、DependencyFrozen 与 host handoff 的保留期；P04、CleanBase、L6 故障现场和任何 S0/S1/S2/S3 恢复点仍按各自停止线保留。该表只登记本机运维角色，不进入 canonical pair/checkpoint/session evidence。
 
@@ -65,7 +66,7 @@ L6 只能使用新建 guest、P04 guest 的独立 clone，或同等的可丢弃 
 
 每个 crash scenario 必须从声明的 snapshot clone 开始，完成取证后恢复或丢弃该 clone。不得让 crash receipt、dpkg half-state、operation staging 或测试注入继续进入主序列。
 
-当前 `S0-clean` identity 为 `S0-clean-e5b6da1-deff08b1`。恢复目录中的 config、EFI、qcow2 SHA-256 分别为 `d3d7fb4946361b0c9a87a2a0611ef9ed085b3635c4331e254f5cbe359ecf88c6`、`35fa4cdbbd72ba81c00da179cd4327cccaf30007eedc871d37b701c02f8dcafb`、`deff08b1da61043a838f71474d350f83998a34d8de59a42091a99005af070e22`；disposable 只读启动冻结 dpkg status SHA-256 `2c31c35c262b2b2761055fa12a55361f3d47ebfa1923dbb3cc3691499d2ce572` 与五个 XDG absent。`local-snapshot.evidence.json` SHA-256 为 `50dcc48bfba7f65fce56184b2a21183f8e263611eb0f86d62cdafc6f306b1f08`，明确属于本机恢复记录而非 canonical L6 session evidence。
+旧 `S0-clean` identity 为 `S0-clean-e5b6da1-deff08b1`。恢复目录中的 config、EFI、qcow2 SHA-256 分别为 `d3d7fb4946361b0c9a87a2a0611ef9ed085b3635c4331e254f5cbe359ecf88c6`、`35fa4cdbbd72ba81c00da179cd4327cccaf30007eedc871d37b701c02f8dcafb`、`deff08b1da61043a838f71474d350f83998a34d8de59a42091a99005af070e22`；disposable 只读启动冻结 dpkg status SHA-256 `2c31c35c262b2b2761055fa12a55361f3d47ebfa1923dbb3cc3691499d2ce572` 与五个 XDG absent。`local-snapshot.evidence.json` SHA-256 为 `50dcc48bfba7f65fce56184b2a21183f8e263611eb0f86d62cdafc6f306b1f08`，明确属于本机恢复记录而非 canonical L6 session evidence。它继续保留为旧 pair 基线与失败取证，但修复后必须为新 pair 另建独立 handoff 与 S0。
 
 ## 3. Release pair 冻结
 
@@ -92,7 +93,7 @@ builder 先分别调用各自 commit 的 metadata、Manager、addon、rootfs、l
 
 pair envelope format 为 `radishlex-linux-l6-release-pair-evidence-v1` 对应的 format v1/profile v1 组合；只保存 commit、revision/version、package/evidence/manifest/dependency 摘要、无路径 tool version，以及 executable build profile/ELF/size/SHA-256。它不保存源码/构建/staging 绝对路径、operation ID、PID、proc maps、dpkg 原文或用户数据。source/target 的 build number 相同不表示两者是同一 package：Debian revision、manifest、control、package/evidence hash 必须不同。该 pair 只证明首版 Linux package 事务兼容，不宣称跨数据 schema 升级或公开发行兼容。
 
-2026-08-08 的真实 Debian 13 ARM64 record 使用 Rust/Cargo 1.85.0、CMake 3.31.6、Flutter 3.44.0，target 为 `e5b6da1`。canonical record SHA-256 为 `a9bcf35762b460a23ad9bc062611f8d5edb57e7303861bbcb99e1efb40703dfd`；source/target package 分别为 `b41e32db76388ad18cdeb60e4b40fb8e28710556df87d53bfa5b275ff2ce028c`、`8209c0161609fde3b798628e5c3460e6237c8618f2d26f1452063540c7541295`；production/acceptance executable 分别为 `037199abe73559e2cd10013f0930f1f44cf9126ac7987169da11f2933a706fc1`、`c4f6282341c6f68f997b1f5d8d2d1b5dec2d96b60e2f387717594d5a0a9523f4`。两份 package 依赖摘要相同，package、artifact evidence 与 product manifest identity 均不同；独立 verifier 复验发布 inventory、mode/link、AArch64 loader 和全部 hash 后通过。该 record 是后续 root-owned handoff 的唯一 pair 身份，不授权复制、安装或执行其中任何文件。
+2026-08-08 的真实 Debian 13 ARM64 record 使用 Rust/Cargo 1.85.0、CMake 3.31.6、Flutter 3.44.0，target 为 `e5b6da1`。canonical record SHA-256 为 `a9bcf35762b460a23ad9bc062611f8d5edb57e7303861bbcb99e1efb40703dfd`；source/target package 分别为 `b41e32db76388ad18cdeb60e4b40fb8e28710556df87d53bfa5b275ff2ce028c`、`8209c0161609fde3b798628e5c3460e6237c8618f2d26f1452063540c7541295`；production/acceptance executable 分别为 `037199abe73559e2cd10013f0930f1f44cf9126ac7987169da11f2933a706fc1`、`c4f6282341c6f68f997b1f5d8d2d1b5dec2d96b60e2f387717594d5a0a9523f4`。两份 package 依赖摘要相同，package、artifact evidence 与 product manifest identity 均不同；独立 verifier 复验发布 inventory、mode/link、AArch64 loader 和全部 hash 后通过。该 record 现是失败输入与取证材料，不授权在旧 handoff 中替换 executable 或继续执行；下一 record 必须从 source `55351f2` 与包含 `bb84d4a` 的最终 clean descendant重新构建并独立复验。
 
 ## 4. 证据 envelope
 
@@ -205,6 +206,8 @@ checkpoint controller 必须是显式 acceptance 构建身份，以不可由 pro
 - 重启、注销、网络切换和任何现场清理。
 
 出现以下任一情况立即停止并保留 clone：guest identity、artifact hash、dpkg config/status、receipt/guard/tmp、operation ID、process quiescence、dependency/font、XDG fingerprint、startup decision 或 expected terminal 不匹配；命令超时、输出溢出、权限不足、未知 lifecycle 也不能自动重试或降级。
+
+当前即处于 `dpkg` 配置不匹配的停止线：L6 disposable failure overlay 必须保持运行且离线，旧 pair/handoff/S0 原样保留。停止、恢复、清理、重建 pair/handoff/S0 或再次 install 都分别需要新的明确授权。
 
 ## 10. L6 完成与后续
 

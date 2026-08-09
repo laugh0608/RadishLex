@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 代码、合成门禁、L6 format v1、compile-identity 隔离的 acceptance controller 与双 clean-root release-pair builder/verifier 已闭合；真实 ARM64 pair、独立 L6 guest、root-owned handoff 与 `S0-clean-e5b6da1-deff08b1` 已准备并复验，但真实 `/proc` product probe、`dpkg` mutation、L6 transaction 与系统安装尚未执行。v1 package 明确不含 RadishLex 自有 maintainer scripts。
+- production 代码、合成门禁、L6 format v1、compile-identity 隔离的 acceptance controller 与双 clean-root release-pair builder/verifier 已闭合。旧 source `55351f2`/target `e5b6da1` pair 的首次授权 install 在真实 Debian 13 默认 `dpkg.cfg` validation 处 pre-receipt 失败关闭，未调用 `dpkg`、package 仍 absent；修复从 `bb84d4a` 开始，旧 handoff/S0 不得用于重试，当前离线 L6 failure 现场保持运行。v1 package 明确不含 RadishLex 自有 maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -80,6 +80,6 @@
 
 ## 当前顺位
 
-1. 以已冻结的 source `55351f2`/target `e5b6da1` ARM64 pair 与 `S0-clean-e5b6da1-deff08b1` 为唯一输入；下一步另行授权 source revision 1 的首次 install mutation 与 terminal/XDG/font/dpkg 对照，不复用构建 VM、DependencyFrozen、CleanBase 或 P04 guest。
-2. 再逐项授权 upgrade→repair→rollback→remove→reinstall、真实 process/dpkg lifecycle、八点 controller crash/retry、startup、字体与 XDG 对照。
+1. 保留当前离线 L6 pre-receipt failure 现场和旧 pair/handoff/S0；以 source `55351f2` 与包含 `bb84d4a` 的最终 clean descendant 另行授权重建真实 ARM64 pair，再准备新的 root-owned handoff 与 S0，不热替换旧 executable。
+2. 在新 S0 上另行授权 source revision 1 首次 install；通过 terminal/XDG/font/dpkg 对照后，再逐项授权 upgrade→repair→rollback→remove→reinstall、真实 process lifecycle 与八点 controller crash/retry。
 3. L6 证据闭合后另行授权 P05C；公开发布、推送、旧资产清理、真实同步及其他平台仍独立排期。
