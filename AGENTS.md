@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 代码、L6 format v1、acceptance controller 与 release-pair builder 已闭合。target `e5b6da1`/`2fa1b8c` 两次 install 在 receipt/package mutation 前暴露 Debian 环境缺口；target `512e8ab` 已完成 source revision 1 install、S1 与公开合成 XDG 的 S2，但首次 upgrade 又在 receipt 前暴露 manifest verifier 的 revision `1` 硬编码。三台 failure disk、三套失败 handoff/S0、S1/S2 与 WAL-drift snapshot 均保留；修复后的 source `55351f2`/target `56dd4de` 第四套真实 ARM64 pair 已由双 clean root 断网构建、production Rust 双侧解析并冻结独立 handoff，七台注册 VM 全部停止。尚未创建新 L6 clone 或写入 guest input。v1 package 不含 RadishLex maintainer scripts。
+- production 代码、L6 format v1、acceptance controller 与 release-pair builder 已闭合。target `e5b6da1`/`2fa1b8c` 两次 install 在 receipt/package mutation 前暴露 Debian 环境缺口；target `512e8ab` 已完成 source revision 1 install、S1 与公开合成 XDG 的 S2，但首次 upgrade 又在 receipt 前暴露 manifest verifier 的 revision `1` 硬编码。三台 failure disk、三套失败 handoff/S0、S1/S2 与 WAL-drift snapshot 均保留；修复后的 source `55351f2`/target `56dd4de` 第四套真实 ARM64 pair 已冻结，独立 S2 clone 已写入 8 项 root-owned input 并通过断网只读 preflight，八台注册 VM 全部停止。尚未生成新 operation ID 或执行 upgrade。v1 package 不含 RadishLex maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -60,7 +60,7 @@
 - state 使用 root-owned receipt、`receipt.json.tmp`/stage tmp 恢复、精确 current required slots、原子 mode 与父目录 `fsync`；guard 是 mode `0600`、零长度、单 link regular file 上的 advisory exclusive lock，不是 Unix socket。共享锁父目录只接受非 world-writable 或 root-owned 精确 `01777` sticky mode。
 - 旧 operation v1 只保留结构与 pair metadata，不存历史 hash proof，也不用于当前恢复。任何未知、半配置、身份/owner/mode/link/hash 漂移均失败关闭并保留现场。
 - production executor 只接受固定 `/usr/bin/dpkg`、typed argv、清空环境、null stdin、超时和有界诊断；system observer/port 复验 root identity、actual staging、依赖/版本、`/proc/*/maps` 静止与完整安装结果。外部 scripts/triggers 不能代表 transaction completed。
-- 维护 command 是 opaque 类型，CLI 要求精确 operation ID、root-owned 同名 package/evidence 与双显式授权。startup 连接 terminal actual package/dependency；L6 固定独立 guest、相邻 revision、六步主序列和八个 crash checkpoint。pair builder 只接受两个 clean root，并在 record 前用 target production Rust verifier 逐侧解析 actual pair。真实 source install、dpkg、字体与 startup 已取证；upgrade 在新 receipt 前失败，剩余主序列与 crash/retry 尚未执行。
+- 维护 command 是 opaque 类型，CLI 要求精确 operation ID、root-owned 同名 package/evidence 与双显式授权。startup 连接 terminal actual package/dependency；L6 固定独立 guest、相邻 revision、六步主序列和八个 crash checkpoint。pair builder 只接受两个 clean root，并在 record 前用 target production Rust verifier 逐侧解析 actual pair。真实 source install、dpkg、字体与 startup 已取证；第三套 upgrade 在新 receipt 前失败，第四套独立 clone preflight 已通过，剩余主序列与 crash/retry 尚未执行。
 - 不要把 RadishLex 做成云端实时输入法 API，也不要让同步后端进入按键热路径。
 
 ## 实机与系统边界
@@ -81,6 +81,6 @@
 
 ## 当前顺位
 
-1. 保留三个 stopped pre-receipt failure disk、三套失败 pair/handoff/S0、第三套 receipt/staging/S1/S2 与 WAL-drift snapshot；不得热替换旧 target executable、恢复或原地重试。
-2. source `55351f2`/target `56dd4de` 第四套 pair 与 handoff 已冻结；下一步另行授权从冻结 S2 新建独立 clone、写入第四套 root-owned input并完成断网只读 preflight，upgrade 仍须新的单步 mutation 授权。
+1. 保留三个 stopped pre-receipt failure disk、三套失败 pair/handoff/S0、第三套 receipt/staging/S1/S2 与 WAL-drift snapshot；第四套 pre-upgrade clone、两套 guest input 与 root-only preflight 报告也保持原样，不热替换或清理。
+2. source `55351f2`/target `56dd4de` 第四套 pair、handoff、独立 clone 与断网 preflight 已冻结；下一步另行授权只生成一个新 operation ID 并执行一次 source→target upgrade，完成 postflight 后停止，不自动进入 repair 或 crash/retry。
 3. L6 证据闭合后另行授权 P05C；公开发布、推送、旧资产清理、真实同步及其他平台仍独立排期。

@@ -7,7 +7,7 @@
 - 复核日期：2026-08-10（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format v1、compile-isolated acceptance controller、六步主序列与八点 crash/recovery 合成矩阵已完成。target `e5b6da1`/`2fa1b8c` 的两次 install 分别暴露默认 `dpkg.cfg` 与 `root:root 01777` `/run/lock` 缺口；target `512e8ab` 已完成 source revision 1 install、S1 与公开合成 XDG 的 S2，但 2026-08-10 的首次 upgrade 又在 receipt/package mutation 前暴露 product manifest verifier 将 Debian revision 错误硬编码为 `1`。三台 failure disk 均保留；修复后的第四套真实 ARM64 pair 已从双 clean root 断网构建并冻结独立 handoff，七台注册 VM 全部停止。新 L6 clone、guest input 与 upgrade 重试尚未开始。
+- L6 format v1、compile-isolated acceptance controller、六步主序列与八点 crash/recovery 合成矩阵已完成。target `e5b6da1`/`2fa1b8c` 的两次 install 分别暴露默认 `dpkg.cfg` 与 `root:root 01777` `/run/lock` 缺口；target `512e8ab` 已完成 source revision 1 install、S1 与公开合成 XDG 的 S2，但 2026-08-10 的首次 upgrade 又在 receipt/package mutation 前暴露 product manifest verifier 将 Debian revision 错误硬编码为 `1`。三台 failure disk 均保留；修复后的第四套真实 ARM64 pair 已冻结，独立 S2 clone 已写入 root-owned input 并通过断网只读 preflight。八台注册 VM 全部停止，新的 upgrade 尚未开始。
 
 ## P04 冻结基线
 
@@ -44,13 +44,14 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 - L6 matrix 已固定独立 guest、相邻 revision 六步主序列、八个 crash case、probe/evidence 与逐 mutation 授权。acceptance crate 只经默认关闭的 compile feature 取得 hook；controller 终止并等待完整 process group，再证明 group 为空且无 `dpkg` child。production maintenance CLI 已真实运行四次：前两次 install 与本次 upgrade 停在 receipt 前，第三次 source install 完成；acceptance controller 仍未运行。
 - target `e5b6da1` 与 `2fa1b8c` 的两个旧 pair、handoff 和 `S0-clean-e5b6da1-deff08b1`/`S0-clean-2fa1b8c-5683d120` 现只作失败取证；其 VM `6F73F6DC-66DF-40EC-86B8-228C1FDA1195`、`EBF12F50-33B1-4711-B693-B57D419EAE2A` 已按单 VM 约束正常停止，运行内存状态不再保留，磁盘、package/status/XDG 与各自空 state/operations root 仍保留；详细 artifact/operation/S0 hash 见 L6 runbook。
 - 第三个 pair 固定 source `55351f2`/target `512e8ab`，record SHA-256 `2f2deaed…697`。source install 的 receipt/dpkg status SHA-256 为 `e58b144e…ab8`/`33c4973d…ff1`。本次 upgrade operation ID 只登记 SHA-256 `f3306a5a…fd1`；CLI 返回 1/`ArtifactInvalid`，没有新 operation、receipt、staging 或 dpkg mutation，source package、receipt、dpkg status 与三份 XDG 内容哈希均未变。失败 guest 已关机，config/EFI/qcow2 SHA-256 为 `5111741c…d2b`、`8f36df35…1ee`、`0cb75b38…f387`。
-- 第四个 pair 固定 source `55351f2`/target `56dd4de`，在 Debian 13.6 ARM64、仅 loopback 的 user/network namespace 中由两套 `umask 0022` clean root 构建。record SHA-256 为 `70a394ea…139a`；source/target package 为 `55fba51b…280f`/`58ba3589…2814`，production/acceptance ELF 为 `3bb2925f…401c`/`29cb1b1a…ae76`。builder 与宿主独立 verifier、target production Rust 双侧 actual-package parser、8 项逐哈希、mode/link/ELF 与构建后冻结依赖实体均通过；独立 handoff 已原子发布，尚未写入任何 L6 guest。
+- 第四个 pair 固定 source `55351f2`/target `56dd4de`，在 Debian 13.6 ARM64、仅 loopback 的 user/network namespace 中由两套 `umask 0022` clean root 构建。record SHA-256 为 `70a394ea…139a`；source/target package 为 `55fba51b…280f`/`58ba3589…2814`，production/acceptance ELF 为 `3bb2925f…401c`/`29cb1b1a…ae76`。builder 与宿主独立 verifier、target production Rust 双侧 actual-package parser、8 项逐哈希、mode/link/ELF 与构建后冻结依赖实体均通过；独立 handoff 已原子发布并逐哈希写入第四套 clone。
+- 第四套 clone `A3F757B1-CE75-4F23-9509-CAD033260AA1` 从冻结 S2 磁盘建立；UTM clone 保留源 VM 的离线 MAC/2226 转发，配置与运行态已收敛且单 VM 约束始终成立。第三套 input 经 8 项哈希复验后保留为 root `0700` 历史目录，第四套固定 input 为 root `0700`、普通文件 `0644`、两个 ELF `0755`。source package、receipt/dpkg、20 项依赖、字体、双 startup gate、XDG fingerprint `f3df287f…b86b` 与产品映射只读 preflight 全部通过；未打开 SQLite、生成 operation ID、运行 maintenance/acceptance CLI 或触发 dpkg。关机后 config/EFI/qcow2 SHA-256 为 `61daca92…9239`/`8f36df35…1ee`/`55575c8e…b114`，qcow2 零打开句柄，八台 VM 全停。
 - S2 identity 为 `S2-source-data-512e8ab-0c2cefd6`；config/EFI/qcow2 SHA-256 分别为 `5111741c54a49068dbbacfd131891b0990a531001769db21942eb88ac6767d2b`、`365b5a170dca95bdf07c0e5e940fafd4580a353e43c141abede71c95f91261bc`、`0c2cefd6b63420adf143e1f1d6e4e70f59841bf1ba56cb54e86d2e7a226f3eea`，local evidence SHA-256 为 `d164de0f5e6e88afbfa76ccd1c7d321d7064bbfd3ee1e275d3d4842d0dfa5c74`。公开合成 XDG fingerprint 为 `f3df287fa0f1da1d5f1fb3169fe607a84ad7fb9b60aab1308ba2eeb410d0b86b`：userdb schema v9/quick_check、1 active/0 deleted、settings/privacy、四个 `0700` 根与三个 `0600` 文件通过，WAL/SHM 和 Fcitx profile absent；package/receipt/dpkg 未变且产品映射为 0。
 
 ## 停止线
 
 - 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
-- 不重新启动、恢复、清理或复用当前三个 stopped L6 failure disk；三套失败 pair/handoff/S0、第三套 S1/S2 与额外 WAL-drift snapshot 只保留取证，不得热替换 executable 或在原 guest 重试。第四套 handoff 只能写入后续独立 clone。
+- 不重新启动、恢复、清理或复用当前三个 stopped L6 failure disk；三套失败 pair/handoff/S0、第三套 S1/S2 与额外 WAL-drift snapshot 只保留取证，不得热替换 executable 或在原 guest 重试。第四套 handoff、pre-upgrade clone、两套 guest input 与 preflight 报告保持原样，下一次只能按单步授权进入 upgrade。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
@@ -58,10 +59,10 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 
 ## 下一事项
 
-1. revision/profile 修复、pair 双侧生产解析门禁与 source `55351f2`/target `56dd4de` 第四套 handoff 已冻结；不得修改或覆盖第三套失败 handoff、guest input、失败盘和 S2。
-2. 另行授权从冻结 S2 建立独立 clone，写入第四套 root-owned input并完成断网只读 preflight；该步骤不生成 operation ID、不运行 maintenance/acceptance CLI 或 `dpkg`。
-3. preflight 通过后另行取得 mutation 授权，只执行一次 upgrade，不自动进入 repair 或 crash/retry。
-4. 此后再分别授权其余主序列、八个 crash/retry、产品启动、重启及 P05C；旧资产、远端、推送与发布保持关闭。
+1. revision/profile 修复、pair 双侧生产解析门禁、第四套 handoff、独立 clone、root-owned input 与断网只读 preflight 已冻结；不得修改或覆盖第三套失败现场、S2 或第四套 pre-upgrade 前态。
+2. 另行取得单步 mutation 授权后，只生成一个新的 32 hex operation ID 并运行一次 production maintenance `upgrade`；复验 terminal receipt/package、dpkg audit/inventory、startup、XDG fingerprint 与进程静止后立即关机。
+3. 本次授权不得自动进入 repair、rollback、remove、reinstall、acceptance controller 或 crash/retry；这些步骤仍分别授权。
+4. 完整 L6 后再另行授权 P05C；旧资产、远端、推送、发布、真实同步及其他平台保持关闭。
 
 ## 验证入口
 
@@ -82,7 +83,7 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 git diff --check
 ```
 
-上述仓库入口本身只证明合同与合成状态。第三套真实 pair 已证明 source install，并在 upgrade 前暴露 revision profile 缺口；第四套真实 pair 已由修复后的 production Rust parser 对两侧实际包验证并冻结 handoff，但尚未进入独立 guest。upgrade、acceptance process-group/crash、其余主序列、真实桌面启动、重启、完整 L6 与公开发布仍未证明。
+上述仓库入口本身只证明合同与合成状态。第三套真实 pair 已证明 source install，并在 upgrade 前暴露 revision profile 缺口；第四套真实 pair 已由修复后的 production Rust parser 对两侧实际包验证，独立 clone/input/断网 preflight 也已完成。新的 upgrade、acceptance process-group/crash、其余主序列、真实桌面启动、重启、完整 L6 与公开发布仍未证明。
 
 ## 阅读索引
 

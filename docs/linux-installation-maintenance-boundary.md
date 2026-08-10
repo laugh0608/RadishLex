@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-截至 2026-08-10，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。source `55351f2` 与 target `e5b6da1`/`2fa1b8c` 的两次授权 install 分别在真实 Debian 默认 `dpkg.cfg` 与 `root:root 01777` `/run/lock` validation 处 pre-receipt 失败关闭；target `512e8ab` 第三套 ARM64 pair 已在独立 guest 完成 source revision 1 install 并冻结 S1/S2，但首次 upgrade 在 receipt 前暴露 revision profile 缺口。修复后的 target `56dd4de` 第四套真实 ARM64 pair 已由双 clean root 断网构建、production Rust 双侧解析并冻结独立 handoff；新 clone、upgrade、acceptance controller 与 P05C 仍关闭。
+截至 2026-08-10，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。source `55351f2` 与 target `e5b6da1`/`2fa1b8c` 的两次授权 install 分别在真实 Debian 默认 `dpkg.cfg` 与 `root:root 01777` `/run/lock` validation 处 pre-receipt 失败关闭；target `512e8ab` 第三套 ARM64 pair 已在独立 guest 完成 source revision 1 install 并冻结 S1/S2，但首次 upgrade 在 receipt 前暴露 revision profile 缺口。修复后的 target `56dd4de` 第四套真实 ARM64 pair、独立 S2 clone、root-owned input 与断网只读 preflight 已冻结；新的 upgrade、acceptance controller 与 P05C 仍关闭。
 
 - 首个完整产品安装载体固定为 Debian 13 ARM64 的单一系统级本地 `.deb`，package 名固定为 `radishlex`；它是未发布的本地验收载体，不是 apt repository、正式 Release 或通用 Linux 安装包。
 - Fcitx addon、两份产品 FFI、Manager bundle、锁定 RimeData、desktop entry、图标和产品 manifest 由同一个 package 绑定；不拆成可独立漂移的 Manager/addon 包。
@@ -354,7 +354,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual package/manifest/dependency/version/status relationship、恢复事务、production system port/host、共用只读 startup gate、L6 format v1 与 compile-isolated checkpoint/evidence controller。前两个 pair 的真实 CLI 分别在 Debian 默认配置与 guard parent validation 处 pre-receipt 失败关闭，package/status/XDG 均未变；两个 stopped failure disk 及各自 handoff/S0 保留。第三个 target `512e8ab` pair 已真实完成 source revision 1 install、terminal postflight、S1 与 S2；下一顺位是从 source-data S2 另行授权 upgrade，再逐项准备真实 process lifecycle、完整 crash/retry、source rollback、外部 package lifecycle 与默认数据保留。P05C 仍在另一独立 guest 授权实机，不复用或清理 P04 现场。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual package/manifest/dependency/version/status relationship、恢复事务、production system port/host、共用只读 startup gate、L6 format v1 与 compile-isolated checkpoint/evidence controller。前两个 pair 的真实 CLI 分别在 Debian 默认配置与 guard parent validation 处 pre-receipt 失败关闭，package/status/XDG 均未变；两个 stopped failure disk 及各自 handoff/S0 保留。第三个 target `512e8ab` pair 已真实完成 source revision 1 install、terminal postflight、S1 与 S2 并暴露 revision profile 缺口；修复后的第四套 pair 已在独立 clone 完成断网 preflight。下一顺位是另行授权一次 source→target upgrade，再逐项准备真实 process lifecycle、完整 crash/retry、source rollback、外部 package lifecycle 与默认数据保留。P05C 仍在另一独立 guest 授权实机，不复用或清理 P04 现场。
 
 ## 实机授权边界
 
