@@ -59,9 +59,8 @@ impl ArtifactFixture {
             sha256_bytes(&package),
         )
         .expect("build package content identity");
-        let (upstream, debian_revision) = version.rsplit_once('-').expect("Debian revision");
+        let (upstream, _) = version.rsplit_once('-').expect("Debian revision");
         let (product_version, build_number) = upstream.rsplit_once('+').expect("build number");
-        assert_eq!(debian_revision, "1", "manifest profile fixes revision 1");
         let ffi_sha256 = "aa".repeat(32);
         let files = vec![
             manifest_file(

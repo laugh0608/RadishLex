@@ -144,6 +144,7 @@ REQUIRED_FILES = [
     "platforms/linux-product/src/system/port.rs",
     "platforms/linux-product/src/system/process.rs",
     "platforms/linux-product/src/bin/radishlex-linux-maintenance.rs",
+    "platforms/linux-product/src/bin/radishlex-linux-artifact-verifier.rs",
     "platforms/linux-product/src/tests/core.rs",
     "platforms/linux-product/src/tests/checkpoints.rs",
     "platforms/linux-product/src/tests/helper.rs",

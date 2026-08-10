@@ -49,6 +49,10 @@ class L6ReleasePairSourceContractTests(unittest.TestCase):
         mutations = (
             self.sources.builder.replace("--no-default-features", ""),
             self.sources.builder.replace(
+                'verify_release_artifact target "${target_package}"',
+                'verify_release_artifact target omitted',
+            ),
+            self.sources.builder.replace(
                 'python3 "${pair_tool}" verify',
                 'python3 "${pair_tool}" omitted',
             ),

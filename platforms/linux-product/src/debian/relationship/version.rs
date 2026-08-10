@@ -151,6 +151,20 @@ pub(super) fn validate_radishlex_package_version(
     Ok(())
 }
 
+pub(super) fn validate_radishlex_package_release(
+    value: &str,
+    expected_product_version: &str,
+    expected_build_number: &str,
+) -> Result<(), DebianRelationshipError> {
+    validate_radishlex_package_version(value)?;
+    let (upstream, _) = value.rsplit_once('-').ok_or_else(version_error)?;
+    let (product_version, build_number) = upstream.rsplit_once('+').ok_or_else(version_error)?;
+    if product_version != expected_product_version || build_number != expected_build_number {
+        return Err(version_error());
+    }
+    Ok(())
+}
+
 fn version_error() -> DebianRelationshipError {
     DebianRelationshipError::new(
         DebianRelationshipErrorCode::VersionInvalid,

@@ -20,6 +20,18 @@ fn artifact_relationship_is_derived_from_all_immutable_inputs() {
 }
 
 #[test]
+fn artifact_relationship_accepts_adjacent_positive_debian_revisions() {
+    let source = ArtifactFixture::new("26.7.1+38-1").verify();
+    let target = ArtifactFixture::new("26.7.1+38-2").verify();
+    assert_eq!(source.data_contract(), target.data_contract());
+    assert_eq!(
+        validate_operation_relation(LinuxOperationKind::Upgrade, Some(&source), Some(&target))
+            .expect("adjacent target revision must be upgrade-compatible"),
+        ArtifactVersionRelation::TargetNewer
+    );
+}
+
+#[test]
 fn verified_relationship_bridges_only_the_exact_linux_artifact_identity() {
     let verified = ArtifactFixture::new("26.7.1+38-1").verify();
     let exact = verified
@@ -157,6 +169,12 @@ fn product_manifest_rejects_unknown_fields_and_control_identity_drift() {
             .code(),
         DebianRelationshipErrorCode::ProductManifestInvalid
     );
+
+    for (field, value) in [("product_version", "26.7.2"), ("build_number", "39")] {
+        let mut invalid: Value = serde_json::from_slice(&fixture.manifest).expect("parse manifest");
+        invalid["product"][field] = json!(value);
+        assert_manifest_error(&fixture, &invalid);
+    }
 
     for ffi_abi_version in [8, 10] {
         let invalid = ArtifactFixture::with_ffi_abi("26.7.1+38-1", ffi_abi_version);

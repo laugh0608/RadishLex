@@ -153,7 +153,8 @@ env \
   cargo build --manifest-path "${target_root}/Cargo.toml" \
   --locked --release --no-default-features \
   -p radishlex-linux-product-install \
-  --bin radishlex-linux-maintenance
+  --bin radishlex-linux-maintenance \
+  --bin radishlex-linux-artifact-verifier
 cp "${target_root}/target/release/radishlex-linux-maintenance" \
   "${staging}/radishlex-linux-maintenance"
 chmod 0755 "${staging}/radishlex-linux-maintenance"
@@ -186,6 +187,17 @@ metadata_field() {
 }
 source_package="$(metadata_field "${source_root}" package_name)_$(metadata_field "${source_root}" package_version)_$(metadata_field "${source_root}" debian_architecture).deb"
 target_package="$(metadata_field "${target_root}" package_name)_$(metadata_field "${target_root}" package_version)_$(metadata_field "${target_root}" debian_architecture).deb"
+
+artifact_verifier="${target_root}/target/release/radishlex-linux-artifact-verifier"
+verify_release_artifact() {
+  local role="$1"
+  local package="$2"
+  "${artifact_verifier}" \
+    --package "${staging}/${role}/artifacts/${package}" \
+    --evidence "${staging}/${role}/artifacts/${package}.evidence.json"
+}
+verify_release_artifact source "${source_package}"
+verify_release_artifact target "${target_package}"
 
 PYTHONDONTWRITEBYTECODE=1 python3 "${pair_tool}" record \
   --source-root "${source_root}" \

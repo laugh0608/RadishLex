@@ -4,7 +4,7 @@ use std::path::{Component, Path};
 use serde::{Deserialize, Serialize};
 
 use super::evidence::BinaryControlSnapshot;
-use super::version::validate_radishlex_package_version;
+use super::version::validate_radishlex_package_release;
 use super::{
     is_sha256, DebianRelationshipError, DebianRelationshipErrorCode, ProductDataContract,
     DISTRIBUTION_IDENTITY, PRODUCT_MANIFEST_PATH,
@@ -150,15 +150,12 @@ impl ProductManifestV1 {
         {
             return Err(product_manifest_error());
         }
-        validate_radishlex_package_version(&product.package_version)
-            .map_err(|_| product_manifest_error())?;
-        let expected_package_version = format!(
-            "{}+{}-{}",
-            product.product_version, product.build_number, "1"
-        );
-        if expected_package_version != product.package_version {
-            return Err(product_manifest_error());
-        }
+        validate_radishlex_package_release(
+            &product.package_version,
+            &product.product_version,
+            &product.build_number,
+        )
+        .map_err(|_| product_manifest_error())?;
         let expected_hard_dependencies = [
             "${shlibs:Depends}".to_owned(),
             "${misc:Depends}".to_owned(),
