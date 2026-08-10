@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 代码、L6 format v1、acceptance controller 与 release-pair verifier 已闭合。前三套真实推进暴露两个 Debian 环境缺口与 revision profile 缺口；第四套又在 operation ID/CLI 前确认重建 source 不等于 S2 terminal installed source，零 mutation 停止。第五套已以 prior-terminal source `09ed1228…bec`/`fe3d6297…cf94` 与 clean target `1ebbdab` 形成 chain-continuous ARM64 pair，record `d2661cc0…ed15`、target package `cdac2f32…7c26` 经 builder/宿主逐项复验并原子冻结；未启动 L6 guest。四个 stopped L6 现场与全部恢复/取证资产保留，八台注册 VM 全停。v1 package 不含 RadishLex maintainer scripts。
+- production 代码、L6 format v1、acceptance controller 与 release-pair verifier 已闭合。前三套真实推进暴露两个 Debian 环境缺口与 revision profile 缺口；第四套又在 operation ID/CLI 前确认重建 source 不等于 S2 terminal installed source，零 mutation 停止。第五套 chain-continuous pair `d2661cc0…ed15` 已写入独立 S2 clone `9C5638D7-…-AC6C`，terminal source、target、20 项依赖、字体、双 startup gate、XDG 与进程只读 preflight 全通过；未生成 operation ID、运行 maintenance/acceptance CLI 或调用 dpkg mutation。四个旧 stopped L6 现场与全部恢复/取证资产保留，九台注册 VM 全停。v1 package 不含 RadishLex maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -81,6 +81,6 @@
 
 ## 当前顺位
 
-1. 保留四个 stopped L6 failure/mismatch disk、前三套失败 pair/handoff/S0、第三套 receipt/staging/S1/S2、第四套 handoff/input/preflight 与 WAL-drift snapshot；不热替换、覆盖、恢复或清理。
-2. 第五套 chain-continuous handoff 已冻结；下一步另行授权从原始 S2 建立新的独立 clone、写入第五套 pair并完成单 VM/断网/package/receipt/XDG/startup/process preflight，不执行 upgrade。
-3. preflight 冻结后仍需新的单步 upgrade 授权；L6 闭合后再排 P05C。公开发布、推送、旧资产清理、真实同步及其他平台保持关闭。
+1. 保留四个 stopped L6 failure/mismatch disk、前三套失败 pair/handoff/S0、第三套 receipt/staging/S1/S2、第四套 handoff/input/preflight、WAL-drift snapshot 与第五套 stopped clone/preflight；不热替换、覆盖、恢复或清理。
+2. 第五套 clone 已完成 chain-continuous 断网只读 preflight；下一步另行授权只在该 clone 执行一次 source→target upgrade，mutation 前重新验证单 VM、网络、pair/receipt、依赖、XDG 与进程静止，并使用新的 operation ID。
+3. upgrade terminal postflight 后立即停止，不自动进入 repair、rollback、remove、reinstall 或 crash/retry；L6 闭合后再排 P05C。公开发布、推送、旧资产清理、真实同步及其他平台保持关闭。

@@ -71,7 +71,7 @@ P04 staged Flutter bundle 使用固定布局：
 <bundle>/data/...
 ```
 
-Linux host 从当前 executable 的 canonical parent 派生 sibling `lib/libradishlex_ime_ffi.so`，不读取工作目录、`LD_LIBRARY_PATH`、仓库路径或调用方参数。目标必须是 bundle 内非 symlink regular file，且不得 group/other writable；Dart binding 继续验证 ABI contract version 与 Manager 所需 symbol 集。P04 证明 staged product bundle 与 workspace native library 一致；P05A 又以全新 committed-source ARM64 bundle 通过 root-owned 目标布局、product manifest、ELF/closure、双 FFI 和构建路径强门禁。P05B 已形成 actual `.deb` relationship、恢复型事务、production mutable port/system executor 与 Flutter 前只读 startup decision；source `55351f2` revision 1 package 已真实安装，Manager component 的 installed FFI gate 返回 `AllowedProduct + InstalledReceiptVerified`。第四套因 source chain 不连续未升级；第五套 chain-continuous pair 已冻结，但其新 clone、installed Manager executable 与 Flutter 启动仍未完成。
+Linux host 从当前 executable 的 canonical parent 派生 sibling `lib/libradishlex_ime_ffi.so`，不读取工作目录、`LD_LIBRARY_PATH`、仓库路径或调用方参数。目标必须是 bundle 内非 symlink regular file，且不得 group/other writable；Dart binding 继续验证 ABI contract version 与 Manager 所需 symbol 集。P04 证明 staged product bundle 与 workspace native library 一致；P05A 又以全新 committed-source ARM64 bundle 通过 root-owned 目标布局、product manifest、ELF/closure、双 FFI 和构建路径强门禁。P05B 已形成 actual `.deb` relationship、恢复型事务、production mutable port/system executor 与 Flutter 前只读 startup decision；source `55351f2` revision 1 package 已真实安装。第五套独立 clone 以精确 sibling FFI 对 installed Manager component 得到 `AllowedProduct + InstalledReceiptVerified + completed`，但仍未执行 target upgrade或启动 Manager/Flutter。
 
 Dart `ManagerProductPaths` 必须接受平台明确返回的固定 `.dylib` 或 `.so` basename，拒绝其他文件名；错误文案改为平台中立。该调整不得削弱 macOS `Contents/Frameworks/libradishlex_ime_ffi.dylib` 的既有测试和产品门禁。
 

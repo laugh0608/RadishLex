@@ -35,10 +35,12 @@
 - 从冻结 S2 创建的第四套 clone `A3F757B1-CE75-4F23-9509-CAD033260AA1` 已逐哈希写入该 record，并完成断网只读 preflight。source package `26.7.1+38-1`、receipt/dpkg、20 项依赖、字体、双 startup gate、XDG fingerprint `f3df287f…b86b`、WAL/SHM/profile absence 与产品映射均通过；没有新 operation ID、maintenance/acceptance CLI 或 dpkg mutation。clone 关机后八台注册 VM 全部停止。
 - 获得单步 upgrade 授权后，只启动第四套 clone 并立即关闭网络。operation ID/CLI 前对照 production `LinuxInstallReceipt::can_replace` 发现：新 operation 的 source artifact 必须精确等于 current terminal receipt 的 installed artifact，但第四套重建 source `55fba51b…280f` 不等于 S2 已安装 source `09ed1228…bec`。因此没有生成 operation ID、运行 maintenance/acceptance ELF、创建 guard/receipt/staging 或调用 dpkg；正常关机后 config/EFI/qcow2 SHA-256 为 `61daca92…9239`/`d32181b0…1960`/`5afb3356…b6d0`，qcow2 零打开句柄，八台 VM 全停。
 - repository release-pair contract 已改为 prior-terminal source anchor；第五套只从 clean target `1ebbdab` 构建，精确复用 S2 source package/evidence `09ed1228…bec`/`fe3d6297…cf94`。record `d2661cc0…ed15`、target package/evidence `cdac2f32…7c26`/`7786847c…2d5f` 已通过 target production Rust 双侧解析、builder/宿主 verifier、8 文件 mode/link/hash 与 absent-output 原子 handoff 冻结；未启动 L6 guest或执行 package transaction。
+- 从原始 S2 新建第五套 clone `9C5638D7-0F97-4BD8-8A83-ABCDFCADAC6C`，在未启动时精确替换冻结 EFI/qcow2并从磁盘配置移除 Network。首次启动仍观察到 UTM 注册态缓存的源网卡、DHCP 与默认路由；在任何 handoff 写入前立即将 `enp0s1` down并确认 IPv4/IPv6 路由为空，之后才原子保留第三套输入、切入第五套 8 文件并执行正式只读 preflight。
+- 第五套 terminal source/target chain、receipt/dpkg、20 项依赖、字体 owner/glyph、manifest/双 FFI、Manager/Fcitx startup `0:1:2:2:6`、XDG `f3df287f…b86b`、WAL/SHM/profile absence 与产品映射均通过。没有生成新 operation ID、运行 maintenance/acceptance CLI 或调用 dpkg mutation。host local evidence `74932b8c…4f51` 已原子冻结；clone 关机后 config/EFI/qcow2 为 `27cbca50…c3c`/`c496eae6…345`/`77c434de…d1f`，qcow2 零打开句柄，九台注册 VM 全停。
 
 ### 当前本地资产登记（非发布证据）
 
-2026-08-10 的冻结资产宿主根为 `/Users/luobo/VirtualMachines`；第四套已注册 clone 位于 UTM 默认 Documents 目录，不移动到该根。UTM 当前注册八个 VM；`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。三个 failure L6 与第四套 artifact-chain mismatch clone 均已正常停止，运行内存状态不再保留但磁盘取证仍在；四套失败/mismatch handoff、第五套 chain-continuous handoff、第三套 S0/S1/S2 与额外 WAL-drift snapshot 同时保留且不得混用。UTM 只使用 `PATH` 中的 plain `utmctl`，任何时刻最多运行一台 VM。
+2026-08-10 的冻结资产宿主根为 `/Users/luobo/VirtualMachines`；第四、第五套已注册 clone 位于 UTM 默认 Documents 目录，不移动到该根。UTM 当前注册九个 VM；`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。三个 failure L6、第四套 artifact-chain mismatch clone 与第五套 preflight clone 均已正常停止；前四个只作取证，第五个是下一次单步 upgrade 的唯一连续现场。四套失败/mismatch handoff、第五套 chain-continuous handoff、第三套 S0/S1/S2、额外 WAL-drift snapshot 与第五套 host preflight evidence 同时保留且不得混用。UTM 只使用 `PATH` 中的 plain `utmctl`，任何时刻最多运行一台 VM。
 
 | 相对路径 | UTM 状态 | 唯一职责与保留线 |
 | --- | --- | --- |
@@ -61,7 +63,9 @@
 | `RadishLex-L6-Handoff-512e8ab` | 非 VM；第三个 handoff | record `2f2deaed…697`；source install 已消费，但 target 被其 production profile 拒绝，整套只作失败输入，不覆盖或执行 |
 | `RadishLex-L6-Handoff-56dd4de` | 非 VM；第四个 mismatch handoff | record `70a394ea…139a`；双侧 actual-package parser 与逐哈希通过，但 source bytes 不等于 S2 terminal installed artifact，不能直接用于该 chain 的 upgrade，也不得与旧 source 跨 pair 混搭 |
 | `RadishLex-L6-Handoff-1ebbdab` | 非 VM；第五个 canonical handoff | record `d2661cc0…ed15`；source 精确等于 S2 terminal installed artifact，target package `cdac2f32…7c26`，builder/宿主 verifier 与 8 文件 mode/link/hash 通过；下一套独立 clone 的唯一 pair 输入，不覆盖旧 handoff |
+| `RadishLex-L6-Preflight-1ebbdab` | 非 VM；第五套 host local evidence | local evidence `74932b8c…4f51`，input-switch/readonly evidence `70833344…70f8`/`6e44f027…6e48`；记录 UTM runtime adapter 偏差、断网边界、chain/startup/XDG 与关机磁盘身份，不是 canonical session evidence |
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-56dd4de.utm` | 已注册；第四套 mismatch stopped | UUID `A3F757B1-CE75-4F23-9509-CAD033260AA1`；operation ID/CLI 前确认 artifact chain 不连续并停止。config/EFI/qcow2 SHA-256 为 `61daca92…9239`/`d32181b0…1960`/`5afb3356…b6d0`；不重启、覆盖、恢复或复用 |
+| `UTM Documents/RadishLex-Debian13-ARM64-L6-1ebbdab.utm` | 已注册；第五套 preflight stopped | UUID `9C5638D7-0F97-4BD8-8A83-ABCDFCADAC6C`；第五套输入与旧输入分开保留，chain/package/receipt/dependency/font/startup/XDG/process 只读 preflight 通过。未生成新 operation ID或执行 mutation；仅在后续单步 upgrade 授权下重启 |
 
 两个在 QEMU 引导前因缓存 2222 转发失败、从未运行 guest 的旧 PairBuilder clone 已在单独授权后从 UTM 注册表和磁盘删除；它们不含 package transaction 或 canonical evidence。当前资产仍各有独立职责，不因 UTM 面板是否显示而删除。L6 闭合后可另行授权评估剩余 builder、DependencyFrozen 与 host handoff 的保留期；P04、CleanBase、四个 failure/mismatch L6 和任何 S0/S1/S2/S3 恢复点仍按各自停止线保留。该表只登记本机运维角色，不进入 canonical pair/checkpoint/session evidence。
 
@@ -257,7 +261,7 @@ checkpoint controller 必须是显式 acceptance 构建身份，以不可由 pro
 
 UTM guest-agent 的传输返回码或空输出不能单独证明 transaction completed。长命令结束后必须同时确认 maintenance 进程已退出，并以 canonical receipt、dpkg status/audit 与完整 package inventory 判定结果；缺少 receipt 即使 `utmctl exec` 返回 0 也按失败关闭，不推断或补写成功状态。
 
-三个旧 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个 clone 处于 operation ID/CLI 前的 artifact-chain mismatch 停止线，均已停止并原样保留。不得热替换、恢复、跨 pair 混搭或原地重试。第五套 chain-continuous canonical handoff 已冻结；下一步另行授权从原始 S2 建立新的独立 clone、写入该 pair并完成断网 preflight，不执行 upgrade。之后仍需逐次 mutation 授权。
+三个旧 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个 clone 处于 operation ID/CLI 前的 artifact-chain mismatch 停止线，均已停止并原样保留。不得热替换、恢复、跨 pair 混搭或原地重试。第五套 chain-continuous clone/preflight 已冻结；下一步另行授权只在该 stopped clone 复验单 VM/断网/pair/receipt/XDG/process 后执行一次 source→target upgrade，terminal postflight 后停止。repair、rollback、remove、reinstall 与 crash/retry 仍需逐次授权。
 
 ## 10. L6 完成与后续
 

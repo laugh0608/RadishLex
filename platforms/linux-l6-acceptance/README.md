@@ -10,7 +10,7 @@ controller command 只接受 matrix scenario、repository/guest/snapshot 的非�
 
 checkpoint evidence format 固定为 `radishlex-linux-l6-checkpoint-evidence-v1`。它只记录 matrix/build/scenario/checkpoint、repository/guest/snapshot identity、operation ID 的 SHA-256、授权分类、fault 分类、`SIGKILL`/空 process group/无 dpkg child 结论和预期终态；不记录 operation ID 原值、PID、绝对 artifact/staging 路径、`/proc` 或 dpkg 原文、命令诊断和用户数据。Linux 执行时只写固定 `/var/tmp/radishlex-l6-evidence/checkpoints`，目录/文件要求 root ownership、`0700`/`0600`、单 link 与 create-new；测试没有 production 路径 override。
 
-L6 handoff 另由 [`packaging/linux/l6-release-pair.json`](../../packaging/linux/l6-release-pair.json) 与 `build-linux-l6-release-pair.sh` 冻结：source `55351f2` revision 1、target revision 2，target 的 production maintenance binary 必须不含 acceptance markers，只有本 crate 的独立 ELF 同时含 build identity/授权 marker。`radishlex-linux-l6-release-pair-evidence-v1` 记录两份 package 与两个 ELF 的 SHA-256/size/commit/build profile，不记录本机路径、operation ID、PID、proc/dpkg 原文或用户数据；当前 chain-continuous source `55351f2`/target `1ebbdab` record `d2661cc0…ed15` 已生成并独立复验，但尚未进入新 L6 guest、真实 controller、`dpkg` 或 startup 执行。
+L6 handoff 另由 [`packaging/linux/l6-release-pair.json`](../../packaging/linux/l6-release-pair.json) 与 `build-linux-l6-release-pair.sh` 冻结：source `55351f2` revision 1、target revision 2，target 的 production maintenance binary 必须不含 acceptance markers，只有本 crate 的独立 ELF 同时含 build identity/授权 marker。`radishlex-linux-l6-release-pair-evidence-v1` 记录两份 package 与两个 ELF 的 SHA-256/size/commit/build profile，不记录本机路径、operation ID、PID、proc/dpkg 原文或用户数据；当前 chain-continuous source `55351f2`/target `1ebbdab` record `d2661cc0…ed15` 已进入独立 S2 clone并完成只读 startup/chain preflight，但尚未运行真实 controller、target `dpkg` mutation或产品启动。
 
 仓库验证入口：
 
