@@ -30,10 +30,12 @@
 - 首轮 S2 只读 preflight 误以 Python SQLite `mode=ro`/`query_only` 打开 userdb，SQLite 仍创建 `-wal`/`-shm`。现场立即停止，未运行 upgrade；漂移盘另存为 `S2-preflight-wal-drift-512e8ab-8fe4d9a1`，随后从冻结 S2 原子恢复第三个 guest。第二轮不再打开数据库，只核对固定节点、元数据和内容哈希，package/receipt/dpkg、XDG、依赖、字体、startup 与进程静止全部通过。
 - 获得单步 mutation 授权后只执行一次 source→target upgrade。operation ID 仅登记 SHA-256 `f3306a5a0d4a78459fce4277e89bbc7d548b2dc17b1e63b57b13074edc8a9fd1`；production CLI 返回 1，stderr 34 bytes。没有新 operation、receipt、staging、guard 或 dpkg 进程，package 保持 `26.7.1+38-1`，receipt/dpkg status 与三份 XDG 内容哈希精确不变。
 - 离线用同一 production Rust parser 复现为 target `.deb` 的 `ProductManifestInvalid`：manifest profile 将合法 package version 错误固定为 `product+build-1`，因而拒绝 target revision 2；旧 release-pair builder 只调用 Python artifact verifier，未让 target production parser 逐侧读取 actual pair。代码现改为接受 canonical positive revision 并精确绑定 product/build，builder 新增 production Rust 双侧验证。旧 target ELF/pair/guest 不热替换或重试，七台注册 VM 全部停止。
+- 修复后的第四套 pair 使用 source `55351f2`/target `56dd4de`。builder 从 SHA-256 `3d1bd6db9f42c17219f2922509fda9fbb36aff8f8f838cd9ec891ef51370f475` 的完整 Git bundle，在两套 `umask 0022` clean root 和仅 loopback、无路由的 user/network namespace 中构建；crate 实体、pub cache 与 Flutter bin cache 在构建前后均匹配冻结清单。
+- 第四个 record SHA-256 为 `70a394eae293cf95924fa250bca8daf0e11fe45c46342bc8e6f94a03db38139a`。source/target package 分别为 `55fba51b05970e6726e24b7485b65bf608317fd9b086dec4b4a9fe20572c280f`、`58ba35891492a864f36d44df37ab30a9bac5cdee18dd4105ba3a2a56a6452814`，artifact evidence 分别为 `c5a805d24fc0b1e9eaf9f2046221373987f0972fed5988a981e7481f5eb40ad6`、`838afa00554d0e5e9d4c4eb094921a6dc4134ecf7194de49903043fed70fe64e`，production/acceptance ELF 分别为 `3bb2925fca8a88cc7a1c2f107aab7a072faf1f90c68dca1c506040185bcf401c`、`29cb1b1a4c4cab73c80a7dd25803053d9065c07017c897622d8a4d848f69ae76`。target production Rust verifier 对 source/target actual package 均通过，builder 与宿主 verifier、8 项逐哈希及 mode/link/ELF 复验一致；独立 handoff 已原子发布。builder 已停止，七台注册 VM 全部停止，尚未创建新 L6 clone 或写入 guest input。
 
 ### 当前本地资产登记（非发布证据）
 
-2026-08-10 的宿主根为 `/Users/luobo/VirtualMachines`。UTM 当前注册七个 VM；`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。三个 failure L6 均已正常停止，运行内存状态不再保留但磁盘取证仍在；三套 handoff/S0、第三套 S1/S2 与额外 WAL-drift snapshot 同时保留且不得混用。UTM 只使用 `PATH` 中的 plain `utmctl`，任何时刻最多运行一台 VM。
+2026-08-10 的宿主根为 `/Users/luobo/VirtualMachines`。UTM 当前注册七个 VM；`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。三个 failure L6 均已正常停止，运行内存状态不再保留但磁盘取证仍在；三套失败 handoff/S0、第四套候选 handoff、第三套 S1/S2 与额外 WAL-drift snapshot 同时保留且不得混用。UTM 只使用 `PATH` 中的 plain `utmctl`，任何时刻最多运行一台 VM。
 
 | 相对路径 | UTM 状态 | 唯一职责与保留线 |
 | --- | --- | --- |
@@ -44,7 +46,7 @@
 | `Debian13-ARM64-L6.utm` | 已注册；旧 L6 stopped | 旧 pre-receipt failure disk；运行内存状态不再保留，package/evidence root 与 controller evidence 仍 absent，不重启、清理或复用 |
 | `RadishLex-L6-Snapshots/S0-clean-e5b6da1` | 非 VM；旧 S0 | 未注册、不可启动的 APFS COW 恢复点；绑定旧 pair 的 config/EFI/qcow、guest/dpkg/XDG/handoff baseline，只作取证，不用于修复后重试 |
 | `RadishLex-L6-Handoff-e5b6da1` | 非 VM；旧 handoff | host 上冻结的旧 canonical pair 副本；作为失败输入保留，不覆盖、安装或执行 |
-| `RadishLex-L6-PairBuilder-2fa1b8c-v2.utm` | 已注册；builder stopped | 2223 隔离 builder；旧输出不覆盖，新增长短两套 `512e8ab` roots 与第三个已发布 pair；不执行 package transaction |
+| `RadishLex-L6-PairBuilder-2fa1b8c-v2.utm` | 已注册；builder stopped | 2223 隔离 builder；旧输出不覆盖，新增 source `55351f2`/target `56dd4de` clean roots 与第四个已发布 pair；不执行 package transaction |
 | `Debian13-ARM64-L6-2fa1b8c.utm` | 已注册；第二个 L6 failure stopped | 从 DependencyFrozen 独立 COW 创建，2224 转发；仅有空 state/operations root，运行内存状态不再保留，不重启、清理或复用 |
 | `RadishLex-L6-Snapshots/S0-clean-2fa1b8c` | 非 VM；第二个 S0 | 未注册、不可启动；identity `S0-clean-2fa1b8c-5683d120`，现只作第二次失败的基线与取证，不用于原地重试 |
 | `RadishLex-L6-Handoff-2fa1b8c` | 非 VM；第二个 handoff | host 上独立复验的 8 文件 canonical pair；现作为第二次失败输入保留，不覆盖或执行 |
@@ -54,6 +56,7 @@
 | `RadishLex-L6-Snapshots/S2-source-data-512e8ab` | 非 VM；第三个 S2 | 未注册、不可启动；identity `S2-source-data-512e8ab-0c2cefd6`，绑定公开合成 XDG fingerprint、source terminal package 与单 VM/断网停止线，作为 upgrade 数据保留起点 |
 | `RadishLex-L6-Snapshots/S2-preflight-wal-drift-512e8ab` | 非 VM；误读漂移取证 | identity `S2-preflight-wal-drift-512e8ab-8fe4d9a1`；保留 SQLite WAL/SHM 副作用现场，不作为恢复或继续执行起点 |
 | `RadishLex-L6-Handoff-512e8ab` | 非 VM；第三个 handoff | record `2f2deaed…697`；source install 已消费，但 target 被其 production profile 拒绝，整套只作失败输入，不覆盖或执行 |
+| `RadishLex-L6-Handoff-56dd4de` | 非 VM；第四个候选 handoff | record `70a394ea…139a`；builder/host verifier、target production Rust 双侧 actual-package parser 与逐哈希通过，只允许后续写入独立 S2 clone，不覆盖旧 handoff |
 
 两个在 QEMU 引导前因缓存 2222 转发失败、从未运行 guest 的旧 PairBuilder clone 已在单独授权后从 UTM 注册表和磁盘删除；它们不含 package transaction 或 canonical evidence。当前资产仍各有独立职责，不因 UTM 面板是否显示而删除。L6 闭合后可另行授权评估剩余 builder、DependencyFrozen 与 host handoff 的保留期；P04、CleanBase、三个 failure L6 和任何 S0/S1/S2/S3 恢复点仍按各自停止线保留。该表只登记本机运维角色，不进入 canonical pair/checkpoint/session evidence。
 
@@ -116,7 +119,7 @@ source/target 必须是两个不同 commit 形成的真实载体，不允许复�
 6. target maintenance 与 acceptance executable 分别记录 compile identity、commit、size、SHA-256、ELF architecture/loader 和 root-owned handoff identity；二者都不是 package payload或公开 installer；
 7. builder 必须用 target commit 编译的 `radishlex-linux-artifact-verifier` 逐侧读取 source/target actual `.deb` 与 evidence；两侧都通过后才允许形成 record。artifact pair 在 guest 固定进入 `/var/tmp/radishlex-l6-inputs`，复制后改为 root ownership，再由 maintenance production verifier 重新打开和取证。
 
-builder 先分别调用各自 commit 的 metadata、Manager、addon、rootfs、layout 与 deterministic `.deb` 门禁；随后仅从 target clean root 以 `--no-default-features` 构建 production maintenance ELF，并另行构建链接 acceptance feature 的 controller ELF。record 阶段再次调用各 root 自有 actual artifact verifier，解析两个 ELF 的 ELF64/AArch64 与 `/lib/ld-linux-aarch64.so.1`，要求 production 不含 acceptance markers、acceptance 同时含 build identity 与授权 marker；最后重哈希发布目录中的 package、artifact evidence、build-environment 和两个 executable。任一 root 不干净、commit 不符、revision 不相邻、contract 漂移、hash 相同、ELF/mode/link/marker 或 canonical JSON 不符均失败关闭且不发布输出。
+builder 先分别调用各自 commit 的 metadata、Manager、addon、rootfs、layout 与 deterministic `.deb` 门禁；随后仅从 target clean root 以 `--no-default-features` 构建 production maintenance ELF 和只读 actual artifact verifier，并另行构建链接 acceptance feature 的 controller ELF。record 阶段由 target production Rust verifier 分别解析 source/target actual `.deb` 与 evidence；Python verifier 另行解析两个 ELF 的 ELF64/AArch64 与 `/lib/ld-linux-aarch64.so.1`，要求 production 不含 acceptance markers、acceptance 同时含 build identity 与授权 marker，最后重哈希发布目录中的 package、artifact evidence、build-environment 和两个 executable。任一 root 不干净、commit 不符、revision 不相邻、contract 漂移、hash 相同、actual package、ELF/mode/link/marker 或 canonical JSON 不符均失败关闭且不发布输出。
 
 pair envelope format 为 `radishlex-linux-l6-release-pair-evidence-v1` 对应的 format v1/profile v1 组合；只保存 commit、revision/version、package/evidence/manifest/dependency 摘要、无路径 tool version，以及 executable build profile/ELF/size/SHA-256。它不保存源码/构建/staging 绝对路径、operation ID、PID、proc maps、dpkg 原文或用户数据。source/target 的 build number 相同不表示两者是同一 package：Debian revision、manifest、control、package/evidence hash 必须不同。该 pair 只证明首版 Linux package 事务兼容，不宣称跨数据 schema 升级或公开发行兼容。
 
@@ -125,6 +128,8 @@ pair envelope format 为 `radishlex-linux-l6-release-pair-evidence-v1` 对应的
 2026-08-09 的第二个 record 使用相同工具版本，source `55351f2`/target `2fa1b8c`；canonical record SHA-256 为 `a5a0ee0deeb48a1e82e87e0bb9eb848e118d21c83274dc2689fcc136dcb38664`。source/target package 分别为 `08205ad712ea7bde08b19a56e42c42ce0c15440f61fae2efd610d024188c0ad1`、`44e0f3da48502dad7d4ea22eb05e0e87f77dfddf98910c098e8f536128ecca42`，artifact evidence 分别为 `42a4d2135454e0181421fdc42fbcabeccfa53077255a7d516a000596ad3a17f1`、`282e4f150b5c800cb58855f82a8986a8d442bf91490518fd0a8db6987bc796ed`，production/acceptance executable 分别为 `919b55dc46958ca55520e0cb9a0fae5c8080f9b58e1bd9142b662af10b7c48eb`、`29c2007b860e506a4ee1dbfe2608e4e18bd5e37edb5c3bbe8fddd4c3b3e2e867`。builder、host handoff 与 guest input 逐哈希一致；独立 verifier 复验 inventory、mode/link、AArch64 loader 与全部 identity 后通过。它现是第二次 pre-receipt 失败输入，不授权热替换 executable 或继续执行。
 
 2026-08-09 的第三个 record 使用相同冻结工具版本，source `55351f2`/target `512e8ab`；canonical record SHA-256 为 `2f2deaed6c8886cfcc4751ccc56439bda95f311767587dc74103645664258697`。source/target package 分别为 `09ed122804b11767b8ac7cd69c323c1f6eef511fd6ae7284d75756fb60569bec`、`6382003e6932b4be7b171f922179c760947fde58eb01ba7771c9f829f3f62ca5`，artifact evidence 分别为 `fe3d6297c08dccd8cacba13d50aa44dbb1c94b0ca8c2ab4df3a5c605466fcf94`、`f1ca686f96335d2c6b3f85bdd6871cc3904bf746ad86307775c5cebc98cae8f4`，production/acceptance executable 分别为 `f716fad30b6657e108272fd1f7361826773b0ca42e4ac1ce6f78a7ad20aade62`、`c3ac9c1a848a29d1bbe70bcac046164f00060b76a62ff8bd4c0c9a51383f4bc2`。该 record 的 Python verifier、host/guest hash 与 source install 均通过，但 target production parser 在 upgrade 前拒绝 revision 2；因此整个 record/handoff/guest 现只作失败取证。修复后的 Rust parser 已在宿主只读复验这两份冻结 actual package 均通过，但这不能替代新 target ELF、双 clean-root pair 与独立 guest 证据。
+
+2026-08-10 的第四个 record 使用同一冻结工具版本，source `55351f2`/target `56dd4de`；canonical record SHA-256 为 `70a394eae293cf95924fa250bca8daf0e11fe45c46342bc8e6f94a03db38139a`。source/target package 分别为 `55fba51b05970e6726e24b7485b65bf608317fd9b086dec4b4a9fe20572c280f`、`58ba35891492a864f36d44df37ab30a9bac5cdee18dd4105ba3a2a56a6452814`，artifact evidence 分别为 `c5a805d24fc0b1e9eaf9f2046221373987f0972fed5988a981e7481f5eb40ad6`、`838afa00554d0e5e9d4c4eb094921a6dc4134ecf7194de49903043fed70fe64e`，production/acceptance executable 分别为 `3bb2925fca8a88cc7a1c2f107aab7a072faf1f90c68dca1c506040185bcf401c`、`29cb1b1a4c4cab73c80a7dd25803053d9065c07017c897622d8a4d848f69ae76`。两侧 actual package 均由 target production Rust verifier 解析通过，builder/host verifier 与 8 项逐哈希一致；它是后续独立 clone 的唯一候选输入，但尚无 guest/S0/input 或 transaction 证据。
 
 同一 source 在不同长度 clean-root 下重建时，旧/new canonical md5 inventory 只有 Manager runner 及其 manifest 不同：CMake install RPATH 的动态字符串内容相同，新 ELF 仅多 18 个尾部 NUL 预留，继而改变 PLT relocation 与 Build-ID；只读数据、data、eh_frame、FFI、Rime 与 dependency 摘要一致，且无构建路径字节。该观察不放宽任何验证，也不把跨绝对构建根 payload bit-repeat 写成已有保证；L6 只消费新 record 绑定的精确字节。
 
@@ -242,7 +247,7 @@ checkpoint controller 必须是显式 acceptance 构建身份，以不可由 pro
 
 UTM guest-agent 的传输返回码或空输出不能单独证明 transaction completed。长命令结束后必须同时确认 maintenance 进程已退出，并以 canonical receipt、dpkg status/audit 与完整 package inventory 判定结果；缺少 receipt 即使 `utmctl exec` 返回 0 也按失败关闭，不推断或补写成功状态。
 
-三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线，均已停止并原样保留。第三个 guest 不热替换、不恢复、不重试；S0/S1/S2 与 WAL-drift snapshot 保留。revision/profile 修复已提交为 `56dd4de`；下一步另行授权 source `55351f2`/target `56dd4de` 的双 clean-root 第四套 pair，再从冻结 S2 新建独立 clone。创建/写入 clone 与每个 mutation 都需要新的明确授权。
+三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线，均已停止并原样保留。第三个 guest 不热替换、不恢复、不重试；S0/S1/S2 与 WAL-drift snapshot 保留。revision/profile 修复与 source `55351f2`/target `56dd4de` 第四套 handoff 已冻结；下一步另行授权从冻结 S2 新建独立 clone并写入新 input。创建/写入 clone 与每个 mutation 都需要新的明确授权。
 
 ## 10. L6 完成与后续
 

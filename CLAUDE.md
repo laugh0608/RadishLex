@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 代码、L6 format v1、acceptance controller 与 release-pair builder 已闭合。target `e5b6da1`/`2fa1b8c` 两次 install 在 receipt/package mutation 前暴露 Debian 环境缺口；target `512e8ab` 已完成 source revision 1 install、S1 与公开合成 XDG 的 S2，但首次 upgrade 又在 receipt 前暴露 manifest verifier 的 revision `1` 硬编码。三台 failure disk、三套 handoff/S0、S1/S2 与 WAL-drift snapshot 均保留，七台注册 VM 全部停止。修复已接受 canonical positive revision，并给 pair builder 增加 target production Rust 双侧解析；旧 pair/guest 不重试。v1 package 不含 RadishLex maintainer scripts。
+- production 代码、L6 format v1、acceptance controller 与 release-pair builder 已闭合。target `e5b6da1`/`2fa1b8c` 两次 install 在 receipt/package mutation 前暴露 Debian 环境缺口；target `512e8ab` 已完成 source revision 1 install、S1 与公开合成 XDG 的 S2，但首次 upgrade 又在 receipt 前暴露 manifest verifier 的 revision `1` 硬编码。三台 failure disk、三套失败 handoff/S0、S1/S2 与 WAL-drift snapshot 均保留；修复后的 source `55351f2`/target `56dd4de` 第四套真实 ARM64 pair 已由双 clean root 断网构建、production Rust 双侧解析并冻结独立 handoff，七台注册 VM 全部停止。尚未创建新 L6 clone 或写入 guest input。v1 package 不含 RadishLex maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -81,6 +81,6 @@
 
 ## 当前顺位
 
-1. 保留三个 stopped pre-receipt failure disk、三套 pair/handoff/S0、第三套 receipt/staging/S1/S2 与 WAL-drift snapshot；不得热替换旧 target executable、恢复或原地重试。
-2. revision/profile 与 pair 双侧解析门禁已提交为 `56dd4de`；下一步另行授权从 source `55351f2` 和 target `56dd4de` 的两个 clean root 构建第四套 pair，之后从冻结 S2 新建独立 clone、写入新 input并逐步授权 upgrade。
+1. 保留三个 stopped pre-receipt failure disk、三套失败 pair/handoff/S0、第三套 receipt/staging/S1/S2 与 WAL-drift snapshot；不得热替换旧 target executable、恢复或原地重试。
+2. source `55351f2`/target `56dd4de` 第四套 pair 与 handoff 已冻结；下一步另行授权从冻结 S2 新建独立 clone、写入第四套 root-owned input并完成断网只读 preflight，upgrade 仍须新的单步 mutation 授权。
 3. L6 证据闭合后另行授权 P05C；公开发布、推送、旧资产清理、真实同步及其他平台仍独立排期。
