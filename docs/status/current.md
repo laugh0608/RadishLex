@@ -7,7 +7,7 @@
 - 复核日期：2026-08-10（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format v1、compile-isolated acceptance controller、六步主序列与八点 crash/recovery 合成矩阵已完成。前三次真实推进依次暴露默认 `dpkg.cfg`、`/run/lock` 与 target revision profile 缺口；第四套又在 operation ID/CLI 前确认重建 source `55fba51b…280f` 不等于 S2 terminal source `09ed1228…bec`，零 mutation 停止。repository release-pair builder 现已精确绑定并冻结 prior-terminal source package/evidence、只构建 clean target，21 项行为测试与 6 项源码合同测试通过；第五套真实 ARM64 pair/handoff 尚未构建。四个 stopped L6 现场保留，八台 VM 全停。
+- L6 format v1、compile-isolated acceptance controller、六步主序列与八点 crash/recovery 合成矩阵已完成。前三次真实推进依次暴露默认 `dpkg.cfg`、`/run/lock` 与 target revision profile 缺口；第四套又在 operation ID/CLI 前暴露 source chain 不连续并零 mutation 停止。第五套已用 S2 精确 source anchor 与 clean target `1ebbdab` 形成真实 ARM64 pair/handoff，record `d2661cc0…ed15` 经 target production Rust verifier、builder/宿主 Python verifier 与 8 文件逐哈希复验；未启动 L6 guest。四个 stopped L6 现场保留，八台 VM 全停。
 
 ## P04 冻结基线
 
@@ -47,6 +47,7 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 - 第四个 pair 固定 source `55351f2`/target `56dd4de`，record `70a394ea…139a`、source/target package `55fba51b…280f`/`58ba3589…2814`；双 clean-root 构建、target production Rust 双侧解析、handoff/guest 逐哈希均通过。独立 S2 clone `A3F757B1-CE75-4F23-9509-CAD033260AA1` 的 root-owned input、package/receipt/dpkg、依赖/字体、startup、XDG 与进程断网 preflight 通过。
 - 单步 upgrade 启动前的 chain preflight 对照 production `LinuxInstallReceipt::can_replace`：新 receipt 的 source 必须精确等于 current installed artifact，而第四套 source 与 S2 receipt 分别为 `55fba51b…280f`/`09ed1228…bec`。没有生成 operation ID、运行 maintenance/acceptance CLI、创建 guard/receipt/staging 或调用 dpkg；不能用旧 source+新 target 的未记录混搭冒充 canonical pair。正常关机后 config/EFI/qcow2 SHA-256 为 `61daca92…9239`/`d32181b0…1960`/`5afb3356…b6d0`，qcow2 零打开句柄，八台 VM 全停。
 - release-pair contract 现将 S2 source package/evidence 的文件名、size、SHA-256 与 `prior-terminal-installed-artifact-v1` policy 固定进 committed JSON。builder CLI 只接受这两个 source 文件、一个 clean target root 与 absent output；先以独立 helper 做 canonical evidence/identity/exclusive-copy/fsync，再构建 target，并以 target production Rust verifier 逐侧解析 actual `.deb`。同版本 source bytes 或 evidence 漂移均在发布前失败。
+- 第五套 pair 固定 source `55351f2`/target `1ebbdab`，source package/evidence 仍为 `09ed1228…bec`/`fe3d6297…cf94`，target 为 `cdac2f32…7c26`/`7786847c…2d5f`。production/acceptance ELF 为 `3bb2925f…401c`/`29cb1b1a…ae76`；构建位于仅 loopback、零路由 namespace，冻结依赖清单构建前后通过，builder package/state/XDG 未创建。宿主以 absent `.incoming` 接收、复验后同父目录原子发布，旧四套 handoff 未覆盖。
 - S2 identity `S2-source-data-512e8ab-0c2cefd6` 与公开合成 XDG fingerprint `f3df287f…b86b` 保持冻结：userdb schema v9/quick_check、1 active/0 deleted、settings/privacy 与固定 metadata 通过，WAL/SHM/Fcitx profile absent；完整磁盘/evidence hash 见 L6 runbook。
 
 ## 停止线
@@ -60,9 +61,9 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 
 ## 下一事项
 
-1. prior-terminal source anchor、target-only builder 与回归门禁已完成；完整仓库验证通过，保持不推送。
-2. 另行授权后，在独立 Debian 13 ARM64 builder 以精确 source `09ed1228…bec`/`fe3d6297…cf94` 与新的 clean target commit 构建、复验并 absent-output 原子发布第五套 canonical handoff；旧四套不覆盖。
-3. 新 handoff 冻结后再以 S2 建立独立 clone、写入 pair并完成断网 preflight；upgrade、repair、rollback、remove、reinstall、acceptance controller 与 crash/retry仍分别授权。
+1. prior-terminal source anchor、target-only builder 与第五套 chain-continuous canonical handoff 已完成，保持不推送。
+2. 另行授权后，从原始 S2 建立新的独立 clone、写入第五套 pair并完成断网只读 preflight；本步不生成 operation ID、不执行 upgrade 或 acceptance controller。
+3. 新 preflight 冻结后，upgrade、repair、rollback、remove、reinstall、acceptance controller 与 crash/retry仍分别授权。
 4. 完整 L6 后再另行授权 P05C；旧资产、远端、推送、发布、真实同步及其他平台保持关闭。
 
 ## 验证入口
@@ -84,7 +85,7 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 git diff --check
 ```
 
-上述仓库入口本身只证明 prior-terminal anchor、target-only builder、拒绝重建漂移与其他合成合同。第三套真实 pair 已证明 source install；第四套证明 parser/pair/clone/input/preflight，但其重建 source 不能替代 terminal chain anchor。第五套 chain-continuous pair、新的 upgrade、acceptance process-group/crash、其余主序列、真实桌面启动、重启、完整 L6 与公开发布仍未证明。
+上述仓库入口本身只证明 prior-terminal anchor、target-only builder、拒绝重建漂移与其他合成合同。第三套真实 pair 已证明 source install，第四套暴露 chain mismatch，第五套已证明 chain-continuous pair 构建与 handoff 冻结；新的 clone/preflight、upgrade、acceptance process-group/crash、其余主序列、真实桌面启动、重启、完整 L6 与公开发布仍未证明。
 
 ## 阅读索引
 

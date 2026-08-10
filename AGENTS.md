@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 代码、L6 format v1、acceptance controller 与 release-pair verifier 已闭合。前三套真实推进暴露两个 Debian 环境缺口与 revision profile 缺口；第四套又在 operation ID/CLI 前确认重建 source `55fba51b…280f` 不等于 S2 terminal receipt 锚定的 installed source `09ed1228…bec`，因此零 mutation 停止。repository builder 现改为精确冻结 prior-terminal source package/evidence、只从 clean target 构建，并拒绝同版本 source/evidence 漂移；第五套真实 ARM64 pair/handoff 尚未构建。四个 stopped L6 现场与全部恢复/取证资产保留，八台注册 VM 全停。v1 package 不含 RadishLex maintainer scripts。
+- production 代码、L6 format v1、acceptance controller 与 release-pair verifier 已闭合。前三套真实推进暴露两个 Debian 环境缺口与 revision profile 缺口；第四套又在 operation ID/CLI 前确认重建 source 不等于 S2 terminal installed source，零 mutation 停止。第五套已以 prior-terminal source `09ed1228…bec`/`fe3d6297…cf94` 与 clean target `1ebbdab` 形成 chain-continuous ARM64 pair，record `d2661cc0…ed15`、target package `cdac2f32…7c26` 经 builder/宿主逐项复验并原子冻结；未启动 L6 guest。四个 stopped L6 现场与全部恢复/取证资产保留，八台注册 VM 全停。v1 package 不含 RadishLex maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -82,5 +82,5 @@
 ## 当前顺位
 
 1. 保留四个 stopped L6 failure/mismatch disk、前三套失败 pair/handoff/S0、第三套 receipt/staging/S1/S2、第四套 handoff/input/preflight 与 WAL-drift snapshot；不热替换、覆盖、恢复或清理。
-2. prior-terminal source anchor 与拒绝重建漂移的 repository 门禁已实现；下一步另行授权在独立 ARM64 builder 以精确 source `09ed1228…bec`/`fe3d6297…cf94` 和 clean target 构建、复验并原子冻结第五套 canonical handoff，不启动 L6 guest。
-3. 新 handoff 完成后仍需独立 S2 clone/preflight 与新的单步 upgrade 授权；L6 闭合后再排 P05C。公开发布、推送、旧资产清理、真实同步及其他平台保持关闭。
+2. 第五套 chain-continuous handoff 已冻结；下一步另行授权从原始 S2 建立新的独立 clone、写入第五套 pair并完成单 VM/断网/package/receipt/XDG/startup/process preflight，不执行 upgrade。
+3. preflight 冻结后仍需新的单步 upgrade 授权；L6 闭合后再排 P05C。公开发布、推送、旧资产清理、真实同步及其他平台保持关闭。
