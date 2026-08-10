@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 代码、L6 format v1、acceptance controller 与 release-pair verifier 已闭合。target `e5b6da1`/`2fa1b8c` 两次 install 在 receipt/package mutation 前暴露 Debian 环境缺口；target `512e8ab` 已完成 source revision 1 install、S1/S2，但首次 upgrade 又在 receipt 前暴露 revision profile 缺口。第四套 source `55351f2`/target `56dd4de` pair 与独立 clone 已完成构建/input/断网 preflight；单步 upgrade 授权后又在 operation ID/CLI 前确认 pair source `55fba51b…280f` 不等于 S2 terminal receipt 锚定的 installed source `09ed1228…bec`，因此未执行 mutation。四个 stopped L6 现场、S0/S1/S2、handoff 与 WAL-drift snapshot 均保留，八台注册 VM 全停。v1 package 不含 RadishLex maintainer scripts。
+- production 代码、L6 format v1、acceptance controller 与 release-pair verifier 已闭合。前三套真实推进暴露两个 Debian 环境缺口与 revision profile 缺口；第四套又在 operation ID/CLI 前确认重建 source `55fba51b…280f` 不等于 S2 terminal receipt 锚定的 installed source `09ed1228…bec`，因此零 mutation 停止。repository builder 现改为精确冻结 prior-terminal source package/evidence、只从 clean target 构建，并拒绝同版本 source/evidence 漂移；第五套真实 ARM64 pair/handoff 尚未构建。四个 stopped L6 现场与全部恢复/取证资产保留，八台注册 VM 全停。v1 package 不含 RadishLex maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -60,7 +60,7 @@
 - state 使用 root-owned receipt、`receipt.json.tmp`/stage tmp 恢复、精确 current required slots、原子 mode 与父目录 `fsync`；guard 是 mode `0600`、零长度、单 link regular file 上的 advisory exclusive lock，不是 Unix socket。共享锁父目录只接受非 world-writable 或 root-owned 精确 `01777` sticky mode。
 - 旧 operation v1 只保留结构与 pair metadata，不存历史 hash proof，也不用于当前恢复。任何未知、半配置、身份/owner/mode/link/hash 漂移均失败关闭并保留现场。
 - production executor 只接受固定 `/usr/bin/dpkg`、typed argv、清空环境、null stdin、超时和有界诊断；system observer/port 复验 root identity、actual staging、依赖/版本、`/proc/*/maps` 静止与完整安装结果。外部 scripts/triggers 不能代表 transaction completed。
-- 维护 command 是 opaque 类型，CLI 要求精确 operation ID、root-owned 同名 package/evidence 与双显式授权。startup 连接 terminal actual package/dependency；L6 固定独立 guest、相邻 revision、六步主序列和八个 crash checkpoint。新 operation 的 source artifact 必须与前一 terminal receipt 的 installed artifact 精确相同；同版本重建字节不能替代 chain anchor。release-pair 必须由 target production Rust verifier 逐侧解析，并显式绑定该 prior-terminal source。真实 source install、dpkg、字体与 startup 已取证；剩余主序列与 crash/retry 尚未执行。
+- 维护 command 是 opaque 类型，CLI 要求精确 operation ID、root-owned 同名 package/evidence 与双显式授权。startup 连接 terminal actual package/dependency；L6 固定独立 guest、相邻 revision、六步主序列和八个 crash checkpoint。新 operation 的 source artifact 必须与前一 terminal receipt 的 installed artifact 精确相同；同版本重建字节不能替代 chain anchor。release-pair builder 只冻结 contract 指定的 prior-terminal source package/evidence，只从单一 clean target 构建，并由 target production Rust verifier 逐侧解析。真实 source install、dpkg、字体与 startup 已取证；剩余主序列与 crash/retry 尚未执行。
 - 不要把 RadishLex 做成云端实时输入法 API，也不要让同步后端进入按键热路径。
 
 ## 实机与系统边界
@@ -82,5 +82,5 @@
 ## 当前顺位
 
 1. 保留四个 stopped L6 failure/mismatch disk、前三套失败 pair/handoff/S0、第三套 receipt/staging/S1/S2、第四套 handoff/input/preflight 与 WAL-drift snapshot；不热替换、覆盖、恢复或清理。
-2. 下一步先修复 release-pair chain-anchor 合同：精确复用 S2 receipt 已安装 source `09ed1228…bec`，配对修复后的 target revision 2，并增加拒绝同版本 source 重建漂移的回归门禁。冻结新 canonical handoff 后，仍需独立 clone 与新的单步 upgrade 授权。
-3. L6 证据闭合后另行授权 P05C；公开发布、推送、旧资产清理、真实同步及其他平台仍独立排期。
+2. prior-terminal source anchor 与拒绝重建漂移的 repository 门禁已实现；下一步另行授权在独立 ARM64 builder 以精确 source `09ed1228…bec`/`fe3d6297…cf94` 和 clean target 构建、复验并原子冻结第五套 canonical handoff，不启动 L6 guest。
+3. 新 handoff 完成后仍需独立 S2 clone/preflight 与新的单步 upgrade 授权；L6 闭合后再排 P05C。公开发布、推送、旧资产清理、真实同步及其他平台保持关闭。

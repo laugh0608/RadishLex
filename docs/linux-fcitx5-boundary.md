@@ -70,7 +70,7 @@ Linux 继续使用 `ime-ffi` ABI v9 已有的：
 
 P05B 后续增加了独立 `radishlex_linux_product_startup_gate` request/result v1。它是与输入热路径分离的 additive Linux 产品启动 ABI，读取编译 build identity、component 与 host 解析的 loaded component path；session/key ABI contract 仍为 v9。Manager 和 Fcitx 共用浅层 C++ binding；binding 在调用 startup ABI 前用 `dladdr` 与 canonical path 证明 startup/error symbols 来自 component 的精确 sibling FFI，Fcitx 还证明全部输入热路径 FFI symbols 来自同一 sibling，拒绝 `LD_LIBRARY_PATH`、preload 或其他 loader interposition。只有与 `development-staged` 或 `debian-system-product` 编译身份精确对应的 allow result 才形成 move-only permit，未知 result、交叉身份或 symbol origin 漂移均失败关闭。
 
-当前真实缺口不在输入 ABI、addon 编译、Manager privacy、删除恢复、导入导出、重启矩阵、P05A 产品载荷，或 P05B 的 package relationship/system port/startup gate/controller/release pair。L6 format v1、compile-isolated acceptance checkpoint/evidence controller、真实双 clean-root ARM64 pair、首次 source install、S1 与 S2 已完成；upgrade/remove/rollback、crash/retry、产品 linked startup 正负向、重启与 P05C 仍未完成，这些能力不需要增加平台私有输入 ABI。
+当前真实缺口不在输入 ABI、addon 编译、Manager privacy、删除恢复、导入导出、重启矩阵、P05A 产品载荷，或 P05B 的 package relationship/system port/startup gate/controller。L6 format v1、compile-isolated acceptance checkpoint/evidence controller、首次 source install、S1/S2 与 prior-terminal source anchor repository 门禁已完成；第五套 chain-continuous ARM64 pair、upgrade/remove/rollback、crash/retry、产品 linked startup 正负向、重启与 P05C 仍未完成，这些能力不需要增加平台私有输入 ABI。
 
 ### Flutter Manager
 

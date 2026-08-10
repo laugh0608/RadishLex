@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from l6_source_anchor import SourceAnchorStageError, stage_exact_source_anchor
+
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = REPO_ROOT / "packaging/linux/l6-release-pair.json"
@@ -27,6 +29,19 @@ CLEAN_OUTPUT_RELATIVES = (
     Path("apps/radishlex-manager/linux/flutter/ephemeral"),
 )
 SOURCE_COMMIT = "55351f21536d6dca3f90ab053c2a81e2b9bea354"
+SOURCE_CHAIN_ANCHOR = {
+    "artifact_evidence": {
+        "filename": "radishlex_26.7.1+38-1_arm64.deb.evidence.json",
+        "sha256": "fe3d6297c08dccd8cacba13d50aa44dbb1c94b0ca8c2ab4df3a5c605466fcf94",
+        "size": 2376,
+    },
+    "package": {
+        "filename": "radishlex_26.7.1+38-1_arm64.deb",
+        "sha256": "09ed122804b11767b8ac7cd69c323c1f6eef511fd6ae7284d75756fb60569bec",
+        "size": 40806592,
+    },
+    "policy": "prior-terminal-installed-artifact-v1",
+}
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
 VERSION_PATTERN = re.compile(r"[ -~]{1,160}")
@@ -197,7 +212,9 @@ def load_contract(
         "environment_profile": "debian13-arm64-release-pair-build-v1",
         "network_policy": "dependency-frozen-before-build",
         "output_policy": "private-staging-then-atomic-publish-v1",
-        "separate_clean_roots": True,
+        "source_artifact_policy": "prior-terminal-installed-artifact-v1",
+        "source_rebuild": False,
+        "target_clean_root": True,
     }
     if contract.get("build") != expected_build:
         raise L6ReleasePairError("release pair build contract has drifted")
@@ -219,9 +236,20 @@ def load_contract(
     ]
     if contract.get("executables") != expected_executables:
         raise L6ReleasePairError("release pair executable identities have drifted")
-    if contract.get("target", {}).get("commit_policy") != (
-        "clean-descendant-head-distinct-from-source-v1"
-    ):
+    expected_source = {
+        "chain_anchor": SOURCE_CHAIN_ANCHOR,
+        "debian_revision": "1",
+        "package_version": "26.7.1+38-1",
+        "repository_commit": SOURCE_COMMIT,
+    }
+    if contract.get("source") != expected_source:
+        raise L6ReleasePairError("prior-terminal source contract has drifted")
+    expected_target = {
+        "commit_policy": "clean-descendant-head-distinct-from-source-v1",
+        "debian_revision": "2",
+        "package_version": "26.7.1+38-2",
+    }
+    if contract.get("target") != expected_target:
         raise L6ReleasePairError("target commit policy has drifted")
     source_metadata = source_metadata or git_json_at_commit(
         repository_root, SOURCE_COMMIT, METADATA_RELATIVE
@@ -274,30 +302,30 @@ def require_clean_build_outputs(root: Path, label: str) -> None:
             )
 
 
-def verify_repository_roots(
-    source: Path,
-    target: Path,
-    *,
-    require_absent_build_outputs: bool = True,
-) -> tuple[str, str]:
+def verify_target_root(
+    target: Path, *, require_absent_build_outputs: bool = True
+) -> str:
     root_verifier = (
         require_clean_root if require_absent_build_outputs else require_repository_root
     )
-    source, source_commit = root_verifier(source, "source repository root")
     target, target_commit = root_verifier(target, "target repository root")
-    if source == target:
-        raise L6ReleasePairError("source and target require separate clean roots")
     if target != REPO_ROOT.resolve():
         raise L6ReleasePairError(
             "target root must be the repository that owns the pair builder"
         )
-    if source_commit != SOURCE_COMMIT:
-        raise L6ReleasePairError("source root is not the frozen source commit")
-    if target_commit == source_commit:
+    if target_commit == SOURCE_COMMIT:
         raise L6ReleasePairError("target commit must differ from source")
     try:
         subprocess.run(
-            ["/usr/bin/git", "-C", str(target), "merge-base", "--is-ancestor", source_commit, target_commit],
+            [
+                "/usr/bin/git",
+                "-C",
+                str(target),
+                "merge-base",
+                "--is-ancestor",
+                SOURCE_COMMIT,
+                target_commit,
+            ],
             check=True,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
@@ -306,7 +334,7 @@ def verify_repository_roots(
         )
     except (OSError, subprocess.CalledProcessError) as exc:
         raise L6ReleasePairError("target commit is not a descendant of source") from exc
-    return source_commit, target_commit
+    return target_commit
 
 
 def safe_version(value: str, label: str) -> str:
@@ -469,6 +497,16 @@ def verify_debian_artifact(release: ReleaseInput) -> dict[str, Any]:
     return load_json(release.artifact_evidence, f"{release.role} Debian evidence", canonical=True)
 
 
+def load_source_anchor_evidence(release: ReleaseInput) -> dict[str, Any]:
+    if release.role != "source":
+        raise L6ReleasePairError("prior-terminal artifact loader accepts only source")
+    return load_json(
+        release.artifact_evidence,
+        "prior-terminal source Debian evidence",
+        canonical=True,
+    )
+
+
 def release_record(
     release: ReleaseInput,
     commit: str,
@@ -496,12 +534,28 @@ def release_record(
     if not isinstance(dependencies, list) or not dependencies or not all(isinstance(item, str) for item in dependencies):
         raise L6ReleasePairError(f"{release.role} package dependencies are invalid")
     evidence_bytes = evidence_path.read_bytes()
+    artifact_evidence_value = {
+        "filename": evidence_path.name,
+        "sha256": sha256_bytes(evidence_bytes),
+        "size": len(evidence_bytes),
+    }
+    if release.role == "source":
+        anchor = expected.get("chain_anchor")
+        if not isinstance(anchor, dict) or anchor.get("policy") != (
+            "prior-terminal-installed-artifact-v1"
+        ):
+            raise L6ReleasePairError("prior-terminal source anchor is unavailable")
+        actual_anchor = {
+            "artifact_evidence": artifact_evidence_value,
+            "package": package_value,
+            "policy": anchor["policy"],
+        }
+        if actual_anchor != anchor:
+            raise L6ReleasePairError(
+                "source artifact differs from prior-terminal chain anchor"
+            )
     return {
-        "artifact_evidence": {
-            "filename": evidence_path.name,
-            "sha256": sha256_bytes(evidence_bytes),
-            "size": len(evidence_bytes),
-        },
+        "artifact_evidence": artifact_evidence_value,
         "debian_revision": expected["debian_revision"],
         "dependencies": {
             "count": len(dependencies),
@@ -522,25 +576,32 @@ def build_record(
     maintenance: Path,
     acceptance: Path,
     *,
-    commits: tuple[str, str] | None = None,
-    verifier: Callable[[ReleaseInput], dict[str, Any]] = verify_debian_artifact,
+    target_commit: str | None = None,
+    source_verifier: Callable[
+        [ReleaseInput], dict[str, Any]
+    ] = load_source_anchor_evidence,
+    target_verifier: Callable[
+        [ReleaseInput], dict[str, Any]
+    ] = verify_debian_artifact,
 ) -> dict[str, Any]:
     validate_environment(environment)
-    source_commit, target_commit = commits or verify_repository_roots(
-        source.root,
-        target.root,
-        require_absent_build_outputs=False,
-    )
-    if commits is None:
-        source_metadata = load_json(
-            source.root / METADATA_RELATIVE, "source Linux product metadata"
+    if target_commit is None:
+        target_commit = verify_target_root(
+            target.root, require_absent_build_outputs=False
+        )
+        source_metadata = git_json_at_commit(
+            target.root, SOURCE_COMMIT, METADATA_RELATIVE
         )
         target_metadata = load_json(
             target.root / METADATA_RELATIVE, "target Linux product metadata"
         )
         validate_metadata_pair(source_metadata, target_metadata, contract)
-    source_release = release_record(source, source_commit, contract["source"], verifier)
-    target_release = release_record(target, target_commit, contract["target"], verifier)
+    source_release = release_record(
+        source, SOURCE_COMMIT, contract["source"], source_verifier
+    )
+    target_release = release_record(
+        target, target_commit, contract["target"], target_verifier
+    )
     if source_release["package"]["sha256"] == target_release["package"]["sha256"]:
         raise L6ReleasePairError("source and target Debian artifacts must be distinct")
     if source_release["artifact_evidence"]["sha256"] == target_release["artifact_evidence"]["sha256"]:
@@ -713,6 +774,16 @@ def validate_record(
                     raise L6ReleasePairError(f"{role} release {field} differs from contract")
         if releases["source"]["repository_commit"] != contract["source"]["repository_commit"]:
             raise L6ReleasePairError("source evidence commit differs from contract")
+        expected_anchor = contract["source"].get("chain_anchor")
+        actual_anchor = {
+            "artifact_evidence": releases["source"]["artifact_evidence"],
+            "package": releases["source"]["package"],
+            "policy": "prior-terminal-installed-artifact-v1",
+        }
+        if actual_anchor != expected_anchor:
+            raise L6ReleasePairError(
+                "source evidence differs from prior-terminal chain anchor"
+            )
         if releases["target"]["repository_commit"] == releases["source"]["repository_commit"]:
             raise L6ReleasePairError("target evidence commit must differ from source")
         for executable, expected in zip(executables, contract["executables"], strict=True):
@@ -801,20 +872,53 @@ def require_output(path: Path) -> Path:
     return path
 
 
+def stage_source_anchor(
+    package: Path,
+    artifact_evidence: Path,
+    target_root: Path,
+    output_directory: Path,
+    contract: dict[str, Any],
+) -> None:
+    verify_target_root(target_root)
+    try:
+        staged_package, staged_evidence = stage_exact_source_anchor(
+            package,
+            artifact_evidence,
+            output_directory,
+            contract["source"]["chain_anchor"],
+        )
+    except SourceAnchorStageError as exc:
+        raise L6ReleasePairError(str(exc)) from exc
+    release = ReleaseInput(
+        "source", target_root, staged_package, staged_evidence
+    )
+    release_record(
+        release,
+        SOURCE_COMMIT,
+        contract["source"],
+        load_source_anchor_evidence,
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Freeze or verify an ARM64 L6 release pair identity.")
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("validate-contract")
-    roots = subparsers.add_parser("validate-roots")
-    roots.add_argument("--source-root", type=Path, required=True)
-    roots.add_argument("--target-root", type=Path, required=True)
+    target = subparsers.add_parser("validate-target")
+    target.add_argument("--target-root", type=Path, required=True)
+    stage = subparsers.add_parser("stage-source")
+    stage.add_argument("--source-package", type=Path, required=True)
+    stage.add_argument("--source-artifact-evidence", type=Path, required=True)
+    stage.add_argument("--target-root", type=Path, required=True)
+    stage.add_argument("--output-dir", type=Path, required=True)
     environment = subparsers.add_parser("environment")
     environment.add_argument("--output", type=Path, required=True)
     record = subparsers.add_parser("record")
-    for role in ("source", "target"):
-        record.add_argument(f"--{role}-root", type=Path, required=True)
-        record.add_argument(f"--{role}-package", type=Path, required=True)
-        record.add_argument(f"--{role}-artifact-evidence", type=Path, required=True)
+    record.add_argument("--source-package", type=Path, required=True)
+    record.add_argument("--source-artifact-evidence", type=Path, required=True)
+    record.add_argument("--target-root", type=Path, required=True)
+    record.add_argument("--target-package", type=Path, required=True)
+    record.add_argument("--target-artifact-evidence", type=Path, required=True)
     record.add_argument("--environment", type=Path, required=True)
     record.add_argument("--maintenance-executable", type=Path, required=True)
     record.add_argument("--acceptance-executable", type=Path, required=True)
@@ -830,17 +934,25 @@ def main() -> int:
         contract = load_contract()
         if args.command == "validate-contract":
             return 0
-        if args.command == "validate-roots":
-            verify_repository_roots(args.source_root, args.target_root)
-            source_metadata = load_json(
-                args.source_root / METADATA_RELATIVE,
-                "source Linux product metadata",
+        if args.command == "validate-target":
+            verify_target_root(args.target_root)
+            source_metadata = git_json_at_commit(
+                args.target_root, SOURCE_COMMIT, METADATA_RELATIVE
             )
             target_metadata = load_json(
                 args.target_root / METADATA_RELATIVE,
                 "target Linux product metadata",
             )
             validate_metadata_pair(source_metadata, target_metadata, contract)
+            return 0
+        if args.command == "stage-source":
+            stage_source_anchor(
+                args.source_package,
+                args.source_artifact_evidence,
+                args.target_root,
+                args.output_dir,
+                contract,
+            )
             return 0
         if args.command == "environment":
             output = require_output(args.output)
@@ -854,7 +966,12 @@ def main() -> int:
             return 0
         output = require_output(args.output)
         environment = load_json(args.environment, "release pair build environment", canonical=True)
-        source = ReleaseInput("source", args.source_root, args.source_package, args.source_artifact_evidence)
+        source = ReleaseInput(
+            "source",
+            args.target_root,
+            args.source_package,
+            args.source_artifact_evidence,
+        )
         target = ReleaseInput("target", args.target_root, args.target_package, args.target_artifact_evidence)
         evidence = build_record(
             contract,

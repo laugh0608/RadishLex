@@ -3,7 +3,9 @@
     "environment_profile": "debian13-arm64-release-pair-build-v1",
     "network_policy": "dependency-frozen-before-build",
     "output_policy": "private-staging-then-atomic-publish-v1",
-    "separate_clean_roots": true
+    "source_artifact_policy": "prior-terminal-installed-artifact-v1",
+    "source_rebuild": false,
+    "target_clean_root": true
   },
   "executables": [
     {
@@ -43,6 +45,19 @@
     "userdb_schema_version": 9
   },
   "source": {
+    "chain_anchor": {
+      "artifact_evidence": {
+        "filename": "radishlex_26.7.1+38-1_arm64.deb.evidence.json",
+        "sha256": "fe3d6297c08dccd8cacba13d50aa44dbb1c94b0ca8c2ab4df3a5c605466fcf94",
+        "size": 2376
+      },
+      "package": {
+        "filename": "radishlex_26.7.1+38-1_arm64.deb",
+        "sha256": "09ed122804b11767b8ac7cd69c323c1f6eef511fd6ae7284d75756fb60569bec",
+        "size": 40806592
+      },
+      "policy": "prior-terminal-installed-artifact-v1"
+    },
     "debian_revision": "1",
     "package_version": "26.7.1+38-1",
     "repository_commit": "55351f21536d6dca3f90ab053c2a81e2b9bea354"

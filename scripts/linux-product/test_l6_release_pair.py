@@ -67,12 +67,25 @@ class ReleasePairFixture:
         source_metadata = copy.deepcopy(target_metadata)
         source_metadata["debian_revision"] = "1"
         source_metadata["package_version"] = "26.7.1+38-1"
-        self.contract = l6_release_pair.load_contract(
+        self.repository_contract = l6_release_pair.load_contract(
             source_metadata=source_metadata,
             target_metadata=target_metadata,
         )
         self.source = self.release("source", "1", b"source-package")
         self.target = self.release("target", "2", b"target-package")
+        self.contract = copy.deepcopy(self.repository_contract)
+        source_evidence = self.verifier(self.source)
+        self.contract["source"]["chain_anchor"] = {
+            "artifact_evidence": {
+                "filename": self.source.artifact_evidence.name,
+                "sha256": l6_release_pair.sha256_bytes(
+                    self.source.artifact_evidence.read_bytes()
+                ),
+                "size": self.source.artifact_evidence.stat().st_size,
+            },
+            "package": source_evidence["package"],
+            "policy": "prior-terminal-installed-artifact-v1",
+        }
         self.maintenance = root / "radishlex-linux-maintenance"
         self.acceptance = root / "radishlex-linux-l6-acceptance"
         write_elf(self.maintenance, acceptance=False)
@@ -129,8 +142,9 @@ class ReleasePairFixture:
             self.target,
             self.maintenance,
             self.acceptance,
-            commits=(l6_release_pair.SOURCE_COMMIT, TARGET_COMMIT),
-            verifier=self.verifier,
+            target_commit=TARGET_COMMIT,
+            source_verifier=self.verifier,
+            target_verifier=self.verifier,
         )
 
     def publish(self, record: dict[str, object]) -> Path:
@@ -173,9 +187,14 @@ class L6ReleasePairTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def test_contract_binds_adjacent_revision_and_shared_product_identity(self) -> None:
-        contract = self.fixture.contract
+        contract = self.fixture.repository_contract
         self.assertEqual(contract["source"]["repository_commit"], l6_release_pair.SOURCE_COMMIT)
         self.assertEqual(contract["source"]["package_version"], "26.7.1+38-1")
+        self.assertEqual(
+            contract["source"]["chain_anchor"]["package"]["sha256"],
+            "09ed122804b11767b8ac7cd69c323c1f6eef511fd6ae7284d75756fb60569bec",
+        )
+        self.assertFalse(contract["build"]["source_rebuild"])
         self.assertEqual(contract["target"]["package_version"], "26.7.1+38-2")
         self.assertEqual(contract["shared_contract"]["ffi_abi_version"], 9)
 
@@ -188,6 +207,49 @@ class L6ReleasePairTests(unittest.TestCase):
             l6_release_pair.L6ReleasePairError, "preexisting build output"
         ):
             l6_release_pair.require_clean_build_outputs(clean, "synthetic root")
+
+    def test_stage_source_anchor_copies_only_exact_frozen_bytes(self) -> None:
+        output = self.root / "staged-source"
+        with patch.object(
+            l6_release_pair, "verify_target_root", return_value=TARGET_COMMIT
+        ):
+            l6_release_pair.stage_source_anchor(
+                self.fixture.source.package,
+                self.fixture.source.artifact_evidence,
+                self.root,
+                output,
+                self.fixture.contract,
+            )
+        for source in (
+            self.fixture.source.package,
+            self.fixture.source.artifact_evidence,
+        ):
+            staged = output / source.name
+            self.assertEqual(staged.read_bytes(), source.read_bytes())
+            self.assertEqual(stat.S_IMODE(staged.stat().st_mode), 0o644)
+
+    def test_stage_source_anchor_rejects_rebuilt_bytes_before_output(self) -> None:
+        rebuilt = b"same-version-rebuilt-source"
+        self.fixture.source.package.write_bytes(rebuilt)
+        evidence = self.fixture.verifier(self.fixture.source)
+        evidence["package"]["sha256"] = l6_release_pair.sha256_bytes(rebuilt)
+        evidence["package"]["size"] = len(rebuilt)
+        write_canonical(self.fixture.source.artifact_evidence, evidence)
+        output = self.root / "rejected-source"
+        with patch.object(
+            l6_release_pair, "verify_target_root", return_value=TARGET_COMMIT
+        ):
+            with self.assertRaisesRegex(
+                l6_release_pair.L6ReleasePairError, "chain anchor"
+            ):
+                l6_release_pair.stage_source_anchor(
+                    self.fixture.source.package,
+                    self.fixture.source.artifact_evidence,
+                    self.root,
+                    output,
+                    self.fixture.contract,
+                )
+        self.assertFalse(output.exists())
 
     def test_record_revalidates_git_identity_after_builder_outputs_exist(self) -> None:
         source = self.root / "source-repository"
@@ -236,21 +298,18 @@ class L6ReleasePairTests(unittest.TestCase):
             with self.assertRaisesRegex(
                 l6_release_pair.L6ReleasePairError, "preexisting build output"
             ):
-                l6_release_pair.verify_repository_roots(source, target)
-            commits = l6_release_pair.verify_repository_roots(
-                source,
+                l6_release_pair.verify_target_root(target)
+            target_commit = l6_release_pair.verify_target_root(
                 target,
                 require_absent_build_outputs=False,
             )
-            self.assertEqual(commits[0], source_commit)
-            self.assertEqual(commits[1], git(target, "rev-parse", "HEAD"))
+            self.assertEqual(target_commit, git(target, "rev-parse", "HEAD"))
 
             (target / "identity.txt").write_text("dirty\n", encoding="utf-8")
             with self.assertRaisesRegex(
                 l6_release_pair.L6ReleasePairError, "must be clean"
             ):
-                l6_release_pair.verify_repository_roots(
-                    source,
+                l6_release_pair.verify_target_root(
                     target,
                     require_absent_build_outputs=False,
                 )
@@ -346,6 +405,27 @@ class L6ReleasePairTests(unittest.TestCase):
         with self.assertRaisesRegex(l6_release_pair.L6ReleasePairError, "must be distinct"):
             self.fixture.record()
 
+    def test_same_version_rebuilt_source_is_rejected_by_chain_anchor(self) -> None:
+        rebuilt = b"same-version-rebuilt-source"
+        self.fixture.source.package.write_bytes(rebuilt)
+        evidence = self.fixture.verifier(self.fixture.source)
+        evidence["package"]["sha256"] = l6_release_pair.sha256_bytes(rebuilt)
+        evidence["package"]["size"] = len(rebuilt)
+        write_canonical(self.fixture.source.artifact_evidence, evidence)
+        with self.assertRaisesRegex(
+            l6_release_pair.L6ReleasePairError, "prior-terminal chain anchor"
+        ):
+            self.fixture.record()
+
+    def test_source_evidence_drift_is_rejected_by_chain_anchor(self) -> None:
+        evidence = self.fixture.verifier(self.fixture.source)
+        evidence["dependency_analysis"] = {"profile": "synthetic-drift"}
+        write_canonical(self.fixture.source.artifact_evidence, evidence)
+        with self.assertRaisesRegex(
+            l6_release_pair.L6ReleasePairError, "prior-terminal chain anchor"
+        ):
+            self.fixture.record()
+
     def test_same_manifest_identity_is_rejected(self) -> None:
         source_evidence = self.fixture.verifier(self.fixture.source)
         target_evidence = self.fixture.verifier(self.fixture.target)
@@ -397,8 +477,9 @@ class L6ReleasePairTests(unittest.TestCase):
                 self.fixture.target,
                 self.fixture.maintenance,
                 self.fixture.acceptance,
-                commits=(l6_release_pair.SOURCE_COMMIT, TARGET_COMMIT),
-                verifier=reject,
+                target_commit=TARGET_COMMIT,
+                source_verifier=reject,
+                target_verifier=reject,
             )
 
     def test_executable_mode_is_part_of_identity(self) -> None:

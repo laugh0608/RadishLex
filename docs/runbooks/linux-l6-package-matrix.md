@@ -34,6 +34,7 @@
 - 第四个 record SHA-256 为 `70a394eae293cf95924fa250bca8daf0e11fe45c46342bc8e6f94a03db38139a`。source/target package 分别为 `55fba51b05970e6726e24b7485b65bf608317fd9b086dec4b4a9fe20572c280f`、`58ba35891492a864f36d44df37ab30a9bac5cdee18dd4105ba3a2a56a6452814`，artifact evidence 分别为 `c5a805d24fc0b1e9eaf9f2046221373987f0972fed5988a981e7481f5eb40ad6`、`838afa00554d0e5e9d4c4eb094921a6dc4134ecf7194de49903043fed70fe64e`，production/acceptance ELF 分别为 `3bb2925fca8a88cc7a1c2f107aab7a072faf1f90c68dca1c506040185bcf401c`、`29cb1b1a4c4cab73c80a7dd25803053d9065c07017c897622d8a4d848f69ae76`。target production Rust verifier 对 source/target actual package 均通过，builder 与宿主 verifier、8 项逐哈希及 mode/link/ELF 复验一致；独立 handoff 已原子发布。
 - 从冻结 S2 创建的第四套 clone `A3F757B1-CE75-4F23-9509-CAD033260AA1` 已逐哈希写入该 record，并完成断网只读 preflight。source package `26.7.1+38-1`、receipt/dpkg、20 项依赖、字体、双 startup gate、XDG fingerprint `f3df287f…b86b`、WAL/SHM/profile absence 与产品映射均通过；没有新 operation ID、maintenance/acceptance CLI 或 dpkg mutation。clone 关机后八台注册 VM 全部停止。
 - 获得单步 upgrade 授权后，只启动第四套 clone 并立即关闭网络。operation ID/CLI 前对照 production `LinuxInstallReceipt::can_replace` 发现：新 operation 的 source artifact 必须精确等于 current terminal receipt 的 installed artifact，但第四套重建 source `55fba51b…280f` 不等于 S2 已安装 source `09ed1228…bec`。因此没有生成 operation ID、运行 maintenance/acceptance ELF、创建 guard/receipt/staging 或调用 dpkg；正常关机后 config/EFI/qcow2 SHA-256 为 `61daca92…9239`/`d32181b0…1960`/`5afb3356…b6d0`，qcow2 零打开句柄，八台 VM 全停。
+- repository release-pair contract 已改为 prior-terminal source anchor：committed JSON 精确绑定 S2 source package/evidence 的文件名、size 与 SHA-256，builder 先用独立 helper 做 canonical evidence、单链接/mode、exclusive copy 与 `fsync`，只从一个 clean target root 构建 target/production/acceptance，再由 target production Rust verifier 逐侧解析。21 项行为测试与 6 项源码合同测试覆盖同版本 source 重建、evidence 漂移、错误输入、发布 inventory 与重哈希拒绝；第五套真实 ARM64 pair/handoff 尚未构建。
 
 ### 当前本地资产登记（非发布证据）
 
@@ -103,28 +104,29 @@ L6 只能使用新建 guest、P04 guest 的独立 clone，或同等的可丢弃 
 
 ## 3. Release pair 冻结
 
-source/target 必须是两个不同 commit 形成的真实载体，不允许复制同一 `.deb` 后改名或只手写 evidence。仓库真相源为 [`packaging/linux/l6-release-pair.json`](../../packaging/linux/l6-release-pair.json)：source 固定 `55351f2`/`26.7.1+38-1`，target 是本子批 clean descendant/`26.7.1+38-2`。当前 builder 只支持同时从两个独立 clean root 重建 source/target；第四套现场证明这不足以延续已经安装的 receipt chain。下次构建前必须先实现显式 prior-terminal source anchor：精确复用 S2 receipt 已安装 source package/evidence `09ed1228…bec`/`fe3d6297…cf94`，只从 clean target 生成修复后的 revision 2，并由 target production verifier 对两侧 actual package 与 chain continuity 一并验证。该能力尚未实现，因此当前没有可继续该 S2 upgrade 的 canonical pair。
+source/target 必须来自两个不同 commit 的真实载体，不允许复制后改名、只手写 evidence 或以相同版本重建物替代 terminal 前态。仓库真相源为 [`packaging/linux/l6-release-pair.json`](../../packaging/linux/l6-release-pair.json)：source 固定为 S2 terminal receipt 已安装的 `55351f2`/`26.7.1+38-1` package/evidence 精确字节，target 是本子批 clean descendant/`26.7.1+38-2`。source package `09ed1228…bec`、evidence `fe3d6297…cf94` 及各自文件名/size 全部进入 committed chain anchor；builder 不再重建 source，只构建 target。
 
-现有双 clean-root builder 的入口为：
+在获准的 Debian 13 ARM64 构建环境中，唯一入口为：
 
 ```bash
 ./scripts/build-linux-l6-release-pair.sh \
-  --source-root /absolute/clean/source \
+  --source-package /absolute/frozen/radishlex_26.7.1+38-1_arm64.deb \
+  --source-artifact-evidence /absolute/frozen/radishlex_26.7.1+38-1_arm64.deb.evidence.json \
   --target-root /absolute/clean/target \
   --output /absolute/absent/release-pair
 ```
 
 该命令只构建、验证并原子发布私有 handoff 目录，不安装 package、不运行 maintenance/acceptance CLI、不创建/打开 VM，也不读写用户 XDG。运行前仍需单独准备构建环境；本 runbook 不授权下载依赖或修改全局工具链。构建规则为：
 
-1. source 与 target 使用相同 `productVersion`、Flutter build number、ABI v9、userdb schema v9、XDG/settings/privacy/RimeData contract；
-2. source 使用 Debian revision `N`，target 使用相邻 revision `N+1`，Debian version 比较必须证明 target 大于 source；
-3. 两个 commit 都必须已经包含 production startup gate、system port 和受控维护 host；
-4. 每个 commit 独立从干净源码构建 Manager、system-profile addon、rootfs、`.deb` 和 evidence，并分别通过 L1-L5；
-5. 两个 package SHA-256、evidence SHA-256、product manifest SHA-256、control version、文件大小、构建 commit 与构建环境进入 L6 input record；
-6. target maintenance 与 acceptance executable 分别记录 compile identity、commit、size、SHA-256、ELF architecture/loader 和 root-owned handoff identity；二者都不是 package payload或公开 installer；
-7. builder 必须用 target commit 编译的 `radishlex-linux-artifact-verifier` 逐侧读取 source/target actual `.deb` 与 evidence；两侧都通过后才允许形成 record。artifact pair 在 guest 固定进入 `/var/tmp/radishlex-l6-inputs`，复制后改为 root ownership，再由 maintenance production verifier 重新打开和取证。
+1. source 输入必须是 committed chain anchor 指定的 package/evidence：absolute canonical single-link `0644` regular file，文件名、size、SHA-256、canonical evidence 与 evidence 内 package identity精确；
+2. helper 只向私有 absent staging directory 做 exclusive copy、固定 `0644` 与 file/directory `fsync`；任何同版本重建字节、evidence 漂移或额外文件都在 target 构建前失败；
+3. target 使用 source commit 的 clean descendant与相邻 Debian revision `N+1`，并保持相同 product/build、ABI v9、userdb schema v9、XDG/settings/privacy/RimeData contract；
+4. 只有 target 从干净源码构建 Manager、system-profile addon、rootfs、`.deb` 和 evidence并通过 L1-L5；source 不运行 Manager/addon/rootfs/package 构建；
+5. target commit 同时构建 production maintenance、只读 artifact verifier 与 compile-isolated acceptance ELF；记录 compile identity、commit、size、SHA-256 与 AArch64 loader；
+6. target production `radishlex-linux-artifact-verifier` 必须逐侧读取 staged source/target actual `.deb` 与 evidence；两侧都通过后才形成 record并重哈希完整 handoff inventory；
+7. artifact pair 后续在新 guest 固定进入 `/var/tmp/radishlex-l6-inputs`，复制后改为 root ownership，再由 maintenance production verifier 重新打开和取证。
 
-builder 先分别调用各自 commit 的 metadata、Manager、addon、rootfs、layout 与 deterministic `.deb` 门禁；随后仅从 target clean root 以 `--no-default-features` 构建 production maintenance ELF 和只读 actual artifact verifier，并另行构建链接 acceptance feature 的 controller ELF。record 阶段由 target production Rust verifier 分别解析 source/target actual `.deb` 与 evidence；Python verifier 另行解析两个 ELF 的 ELF64/AArch64 与 `/lib/ld-linux-aarch64.so.1`，要求 production 不含 acceptance markers、acceptance 同时含 build identity 与授权 marker，最后重哈希发布目录中的 package、artifact evidence、build-environment 和两个 executable。任一 root 不干净、commit 不符、revision 不相邻、contract 漂移、hash 相同、actual package、ELF/mode/link/marker 或 canonical JSON 不符均失败关闭且不发布输出。
+builder 先冻结 source anchor，再从 target clean root 依次调用 metadata、Manager、addon、rootfs、layout 与 deterministic `.deb` 门禁；随后以 `--no-default-features` 构建 production maintenance ELF 和只读 actual artifact verifier，并另行构建链接 acceptance feature 的 controller ELF。record 阶段再次验证 target Git identity/谱系/clean 状态、source anchor 与两侧 artifact；Python verifier 解析两个 ELF 的 ELF64/AArch64 与 `/lib/ld-linux-aarch64.so.1`，要求 production 不含 acceptance markers、acceptance 同时含 build identity 与授权 marker，最后重哈希发布目录中的 package、artifact evidence、build-environment 和两个 executable。target root 不干净、commit/anchor/revision/contract 漂移、actual package、ELF/mode/link/marker 或 canonical JSON 不符均失败关闭且不发布输出。
 
 pair envelope format 为 `radishlex-linux-l6-release-pair-evidence-v1` 对应的 format v1/profile v1 组合；只保存 commit、revision/version、package/evidence/manifest/dependency 摘要、无路径 tool version，以及 executable build profile/ELF/size/SHA-256。它不保存源码/构建/staging 绝对路径、operation ID、PID、proc maps、dpkg 原文或用户数据。source/target 的 build number 相同不表示两者是同一 package：Debian revision、manifest、control、package/evidence hash 必须不同。该 pair 只证明首版 Linux package 事务兼容，不宣称跨数据 schema 升级或公开发行兼容。
 
@@ -252,7 +254,7 @@ checkpoint controller 必须是显式 acceptance 构建身份，以不可由 pro
 
 UTM guest-agent 的传输返回码或空输出不能单独证明 transaction completed。长命令结束后必须同时确认 maintenance 进程已退出，并以 canonical receipt、dpkg status/audit 与完整 package inventory 判定结果；缺少 receipt 即使 `utmctl exec` 返回 0 也按失败关闭，不推断或补写成功状态。
 
-三个旧 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个 clone 处于 operation ID/CLI 前的 artifact-chain mismatch 停止线，均已停止并原样保留。不得热替换、恢复、跨 pair 混搭或原地重试。下一步先实现并验证 prior-terminal source anchor，冻结新的 chain-continuous canonical handoff，再从 S2 建立独立 clone；之后的 upgrade 与每个 mutation 仍分别授权。
+三个旧 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个 clone 处于 operation ID/CLI 前的 artifact-chain mismatch 停止线，均已停止并原样保留。不得热替换、恢复、跨 pair 混搭或原地重试。prior-terminal source anchor 的 repository 实现已通过专项门禁；下一步另行授权在独立 ARM64 builder 冻结第五套 chain-continuous canonical handoff，不启动 L6 guest。之后仍需新的 S2 clone/preflight 与逐次 mutation 授权。
 
 ## 10. L6 完成与后续
 

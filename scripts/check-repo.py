@@ -218,6 +218,7 @@ REQUIRED_FILES = [
     "scripts/linux-product/l6_contract.py",
     "scripts/linux-product/l6_controller_contract.py",
     "scripts/linux-product/l6_release_pair.py",
+    "scripts/linux-product/l6_source_anchor.py",
     "scripts/linux-product/l6_release_pair_contract.py",
     "scripts/linux-product/product_metadata.py",
     "scripts/linux-product/source_contract.py",

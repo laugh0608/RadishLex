@@ -15,6 +15,7 @@ class L6ReleasePairContractError(ValueError):
 
 @dataclass(frozen=True)
 class ReleasePairSources:
+    anchor: str
     builder: str
     tool: str
     contract: str
@@ -22,6 +23,7 @@ class ReleasePairSources:
     @classmethod
     def load(cls, root: Path = REPO_ROOT) -> ReleasePairSources:
         paths = {
+            "anchor": "scripts/linux-product/l6_source_anchor.py",
             "builder": "scripts/build-linux-l6-release-pair.sh",
             "tool": "scripts/linux-product/l6_release_pair.py",
             "contract": "packaging/linux/l6-release-pair.json",
@@ -52,23 +54,23 @@ def validate_release_pair_contract(
 ) -> ReleasePairSources:
     sources = sources or ReleasePairSources.load()
     for token in (
-        '--source-root ABSOLUTE_PATH --target-root ABSOLUTE_PATH --output ABSENT_ABSOLUTE_PATH',
+        '--source-package ABSOLUTE_FILE --source-artifact-evidence ABSOLUTE_FILE --target-root ABSOLUTE_PATH --output ABSENT_ABSOLUTE_PATH',
         '"$(uname -s)" != "Linux"',
         '"$(uname -m)" != "aarch64"',
-        'if [[ "${source_root}" == "${target_root}" ]]',
-        'python3 "${pair_tool}" validate-roots',
+        'python3 "${pair_tool}" validate-target',
+        'python3 "${pair_tool}" stage-source',
+        '--source-package "${source_package_input}"',
+        '--source-artifact-evidence "${source_artifact_evidence_input}"',
+        '--output-dir "${staging}/source/artifacts"',
         'export CARGO_NET_OFFLINE=true',
         'CARGO_TARGET_DIR="${root}/target"',
         'CARGO_TARGET_DIR="${target_root}/target"',
-        'if [[ "${role}" == "source" ]]',
-        '"CPLUS_INCLUDE_PATH=${root}/crates/ime-ffi/include"',
         '-u CPATH',
         '-u C_INCLUDE_PATH',
         '-u CPLUS_INCLUDE_PATH',
         '-u OBJC_INCLUDE_PATH',
         '-u RUSTC_WRAPPER',
-        'build_release source "${source_root}"',
-        'build_release target "${target_root}"',
+        'build_target_release "${target_root}"',
         'build-manager-linux-product.sh" --system-product',
         'build-linux-product-addon-stage.sh"',
         'rootfs.py" assemble',
@@ -90,8 +92,8 @@ def validate_release_pair_contract(
             f"release pair builder contract is incomplete: {token}",
         )
     ordered = (
-        'build_release source "${source_root}"',
-        'build_release target "${target_root}"',
+        'python3 "${pair_tool}" stage-source',
+        'build_target_release "${target_root}"',
         '-p radishlex-linux-product-install',
         '-p radishlex-linux-l6-acceptance',
         'verify_release_artifact source "${source_package}"',
@@ -125,14 +127,25 @@ def validate_release_pair_contract(
             forbidden,
             "release pair builder must not mutate a guest, package database, or receipt",
         )
+    for forbidden in ("source_root=", "${source_root}", "--source-root"):
+        forbid(
+            sources.builder,
+            forbidden,
+            "release pair builder must not accept or rebuild a source root",
+        )
 
     for token in (
+        "from l6_source_anchor import SourceAnchorStageError, stage_exact_source_anchor",
         'SOURCE_COMMIT = "55351f21536d6dca3f90ab053c2a81e2b9bea354"',
-        '"source and target require separate clean roots"',
+        '"09ed122804b11767b8ac7cd69c323c1f6eef511fd6ae7284d75756fb60569bec"',
+        '"fe3d6297c08dccd8cacba13d50aa44dbb1c94b0ca8c2ab4df3a5c605466fcf94"',
         'CLEAN_OUTPUT_RELATIVES',
         '"target commit must differ from source"',
         '"target commit is not a descendant of source"',
         "require_absent_build_outputs=False",
+        'stage_source_anchor',
+        '"source artifact differs from prior-terminal chain anchor"',
+        '"source evidence differs from prior-terminal chain anchor"',
         '"source and target Debian revisions are not adjacent"',
         'verify_debian_artifact',
         'parse_aarch64_elf',
@@ -144,6 +157,20 @@ def validate_release_pair_contract(
         'proc_maps',
     ):
         require(sources.tool, token, "release pair identity/evidence verifier is incomplete")
+    for token in (
+        "class SourceAnchorStageError",
+        "def read_exact_file",
+        "def stage_exact_source_anchor",
+        '"source package identity differs from artifact evidence"',
+        "os.O_EXCL",
+        "os.fsync",
+        "canonical_json_bytes",
+    ):
+        require(
+            sources.anchor,
+            token,
+            "prior-terminal source anchor staging contract is incomplete",
+        )
     for forbidden in (
         "RADISHLEX_L6_",
         "--state-root",
@@ -160,8 +187,12 @@ def validate_release_pair_contract(
 
     for token in (
         '"profile": "debian13-arm64-release-pair-v1"',
-        '"separate_clean_roots": true',
+        '"source_artifact_policy": "prior-terminal-installed-artifact-v1"',
+        '"source_rebuild": false',
+        '"target_clean_root": true',
         '"repository_commit": "55351f21536d6dca3f90ab053c2a81e2b9bea354"',
+        '"sha256": "09ed122804b11767b8ac7cd69c323c1f6eef511fd6ae7284d75756fb60569bec"',
+        '"sha256": "fe3d6297c08dccd8cacba13d50aa44dbb1c94b0ca8c2ab4df3a5c605466fcf94"',
         '"package_version": "26.7.1+38-1"',
         '"package_version": "26.7.1+38-2"',
         '"build_identity": "radishlex-linux-maintenance-production-v1"',

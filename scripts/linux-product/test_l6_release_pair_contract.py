@@ -45,6 +45,22 @@ class L6ReleasePairSourceContractTests(unittest.TestCase):
                         replace(self.sources, tool=self.sources.tool + token)
                     )
 
+    def test_source_anchor_staging_identity_drift_is_rejected(self) -> None:
+        for token in (
+            "def read_exact_file",
+            "def stage_exact_source_anchor",
+            "os.O_EXCL",
+            "os.fsync",
+        ):
+            with self.subTest(token=token):
+                with self.assertRaises(L6ReleasePairContractError):
+                    validate_release_pair_contract(
+                        replace(
+                            self.sources,
+                            anchor=self.sources.anchor.replace(token, "omitted"),
+                        )
+                    )
+
     def test_compile_identity_and_publish_order_drift_is_rejected(self) -> None:
         mutations = (
             self.sources.builder.replace("--no-default-features", ""),
@@ -57,8 +73,8 @@ class L6ReleasePairSourceContractTests(unittest.TestCase):
                 'python3 "${pair_tool}" omitted',
             ),
             self.sources.builder.replace(
-                'build_release source "${source_root}"',
-                'build_release source "${target_root}"',
+                'python3 "${pair_tool}" stage-source',
+                'python3 "${pair_tool}" omitted-source-stage',
             ),
         )
         for mutation in mutations:
@@ -77,15 +93,16 @@ class L6ReleasePairSourceContractTests(unittest.TestCase):
                 )
             )
 
-    def test_source_ffi_include_is_root_local_and_ambient_paths_are_scrubbed(self) -> None:
+    def test_source_anchor_inputs_and_target_build_environment_are_fixed(self) -> None:
         mutations = (
+            self.sources.builder + "\nsource_root=/tmp/rebuilt-source\n",
             self.sources.builder.replace(
-                'if [[ "${role}" == "source" ]]',
-                'if [[ "${role}" == "target" ]]',
+                '--source-package "${source_package_input}"',
+                '--source-package "${target_package}"',
             ),
             self.sources.builder.replace(
-                '"CPLUS_INCLUDE_PATH=${root}/crates/ime-ffi/include"',
-                '"CPLUS_INCLUDE_PATH=/usr/include"',
+                '--source-artifact-evidence "${source_artifact_evidence_input}"',
+                '--source-artifact-evidence "${target_package}.evidence.json"',
             ),
             self.sources.builder.replace("-u CPATH", ""),
             self.sources.builder.replace("-u C_INCLUDE_PATH", ""),

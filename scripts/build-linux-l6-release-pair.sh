@@ -8,17 +8,18 @@ repo_root="$(CDPATH= cd -- "${script_dir}/.." && pwd -P)"
 pair_tool="${repo_root}/scripts/linux-product/l6_release_pair.py"
 
 usage() {
-  echo "usage: $0 --source-root ABSOLUTE_PATH --target-root ABSOLUTE_PATH --output ABSENT_ABSOLUTE_PATH" >&2
+  echo "usage: $0 --source-package ABSOLUTE_FILE --source-artifact-evidence ABSOLUTE_FILE --target-root ABSOLUTE_PATH --output ABSENT_ABSOLUTE_PATH" >&2
 }
 
-if [[ $# -ne 6 || "$1" != "--source-root" || "$3" != "--target-root" || "$5" != "--output" ]]; then
+if [[ $# -ne 8 || "$1" != "--source-package" || "$3" != "--source-artifact-evidence" || "$5" != "--target-root" || "$7" != "--output" ]]; then
   usage
   exit 2
 fi
 
-source_root="$2"
-target_root="$4"
-output="$6"
+source_package_input="$2"
+source_artifact_evidence_input="$4"
+target_root="$6"
+output="$8"
 
 if [[ "$(uname -s)" != "Linux" || "$(uname -m)" != "aarch64" ]]; then
   echo "The L6 release pair builder requires Debian 13 ARM64 Linux." >&2
@@ -30,19 +31,13 @@ for command in cargo cmake dpkg-deb dpkg-shlibdeps file flutter git python3 read
     exit 1
   fi
 done
-for root in "${source_root}" "${target_root}"; do
-  if [[ "${root}" != /* || ! -d "${root}" || -L "${root}" ]]; then
-    echo "Release pair roots must be absolute real directories." >&2
-    exit 1
-  fi
-  canonical_root="$(CDPATH= cd -- "${root}" && pwd -P)"
-  if [[ "${canonical_root}" != "${root}" ]]; then
-    echo "Release pair roots must not traverse symlinked components." >&2
-    exit 1
-  fi
-done
-if [[ "${source_root}" == "${target_root}" ]]; then
-  echo "Source and target require separate clean repository roots." >&2
+if [[ "${target_root}" != /* || ! -d "${target_root}" || -L "${target_root}" ]]; then
+  echo "The target root must be an absolute real directory." >&2
+  exit 1
+fi
+canonical_target_root="$(CDPATH= cd -- "${target_root}" && pwd -P)"
+if [[ "${canonical_target_root}" != "${target_root}" ]]; then
+  echo "The target root must not traverse symlinked components." >&2
   exit 1
 fi
 if [[ "${output}" != /* || -e "${output}" || -L "${output}" ]]; then
@@ -62,8 +57,7 @@ if [[ "${canonical_output}" != "${output}" ]]; then
 fi
 
 PYTHONDONTWRITEBYTECODE=1 python3 "${pair_tool}" validate-contract
-PYTHONDONTWRITEBYTECODE=1 python3 "${pair_tool}" validate-roots \
-  --source-root "${source_root}" \
+PYTHONDONTWRITEBYTECODE=1 python3 "${pair_tool}" validate-target \
   --target-root "${target_root}"
 export CARGO_NET_OFFLINE=true
 
@@ -75,25 +69,20 @@ trap cleanup EXIT
 staging="${temporary}/release-pair"
 work_root="${temporary}/work"
 mkdir -m 0755 "${staging}" "${work_root}"
+mkdir -m 0755 "${staging}/source"
+PYTHONDONTWRITEBYTECODE=1 python3 "${pair_tool}" stage-source \
+  --source-package "${source_package_input}" \
+  --source-artifact-evidence "${source_artifact_evidence_input}" \
+  --target-root "${target_root}" \
+  --output-dir "${staging}/source/artifacts"
 
-build_release() {
-  local role="$1"
-  local root="$2"
-  local role_work="${work_root}/${role}"
+build_target_release() {
+  local root="$1"
+  local role_work="${work_root}/target"
   local addon_stage="${role_work}/addon"
   local rootfs="${role_work}/rootfs"
-  local artifacts="${staging}/${role}/artifacts"
+  local artifacts="${staging}/target/artifacts"
   local manager_bundle="${root}/apps/radishlex-manager/build/linux/arm64/release/bundle"
-  local -a source_ffi_include_environment=()
-
-  # The frozen source predates the Manager's explicit workspace FFI include.
-  # Keep that compatibility input confined to the source root; the target must
-  # consume its committed CMake include contract without ambient include paths.
-  if [[ "${role}" == "source" ]]; then
-    source_ffi_include_environment=(
-      "CPLUS_INCLUDE_PATH=${root}/crates/ime-ffi/include"
-    )
-  fi
 
   mkdir -m 0755 "${role_work}"
   mkdir -p -m 0755 "${artifacts}"
@@ -109,7 +98,6 @@ build_release() {
     -u RUSTC_WRAPPER \
     CARGO_INCREMENTAL=0 \
     CARGO_TARGET_DIR="${root}/target" \
-    "${source_ffi_include_environment[@]}" \
     "${root}/scripts/build-manager-linux-product.sh" --system-product
   "${root}/scripts/build-linux-product-addon-stage.sh" \
     --ffi-library "${manager_bundle}/lib/libradishlex_ime_ffi.so" \
@@ -130,8 +118,7 @@ build_release() {
     --output-dir "${artifacts}"
 }
 
-build_release source "${source_root}"
-build_release target "${target_root}"
+build_target_release "${target_root}"
 
 cargo_home="${CARGO_HOME:-${HOME:-}/.cargo}"
 if [[ "${cargo_home}" != /* ]]; then
@@ -185,7 +172,7 @@ metadata_field() {
   PYTHONDONTWRITEBYTECODE=1 python3 \
     "${root}/scripts/linux-product/product_metadata.py" field "${field}"
 }
-source_package="$(metadata_field "${source_root}" package_name)_$(metadata_field "${source_root}" package_version)_$(metadata_field "${source_root}" debian_architecture).deb"
+source_package="$(basename -- "${source_package_input}")"
 target_package="$(metadata_field "${target_root}" package_name)_$(metadata_field "${target_root}" package_version)_$(metadata_field "${target_root}" debian_architecture).deb"
 
 artifact_verifier="${target_root}/target/release/radishlex-linux-artifact-verifier"
@@ -200,7 +187,6 @@ verify_release_artifact source "${source_package}"
 verify_release_artifact target "${target_package}"
 
 PYTHONDONTWRITEBYTECODE=1 python3 "${pair_tool}" record \
-  --source-root "${source_root}" \
   --source-package "${staging}/source/artifacts/${source_package}" \
   --source-artifact-evidence "${staging}/source/artifacts/${source_package}.evidence.json" \
   --target-root "${target_root}" \
