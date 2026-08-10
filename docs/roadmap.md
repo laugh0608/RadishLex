@@ -188,7 +188,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 - Linux install、upgrade、repair、remove、rollback 事务、startup gate 与默认保留用户 XDG 数据语义。
 - production adapter 在每次 mutation/retry 前重验实际 staged package relationship并消费静止许可；typed `dpkg` 命令合同不能在 executor 落地前被称为可安装入口。
 - committed L6 matrix、acceptance-only checkpoint controller 与 canonical evidence envelope；controller 不得由 production 环境变量开启，也不得替换 fixed `/usr/bin/dpkg`。
-- committed release-pair contract 与 builder 从不同 clean commit 形成相邻 revision；production/acceptance AArch64 ELF 分别记录 build profile、loader、size 与 SHA-256，pair envelope 不保存构建路径、operation ID、PID、proc/dpkg 原文或用户数据。
+- committed release-pair contract 精确冻结 prior-terminal source package/evidence，只从 clean descendant 构建相邻 target revision；production/acceptance AArch64 ELF 分别记录 build profile、loader、size 与 SHA-256，pair envelope 不保存构建路径、operation ID、PID、proc/dpkg 原文或用户数据。
 
 退出标准：
 

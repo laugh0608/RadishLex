@@ -261,6 +261,8 @@ checkpoint controller 必须是显式 acceptance 构建身份，以不可由 pro
 
 UTM guest-agent 的传输返回码或空输出不能单独证明 transaction completed。长命令结束后必须同时确认 maintenance 进程已退出，并以 canonical receipt、dpkg status/audit 与完整 package inventory 判定结果；缺少 receipt 即使 `utmctl exec` 返回 0 也按失败关闭，不推断或补写成功状态。
 
+UTM 磁盘配置中没有 Network 不能单独证明 guest 运行态断网；注册缓存仍可能在首次启动挂回虚拟网卡并取得 DHCP。每次启动后、写入 artifact input 或生成 operation ID 前，都必须在 guest 内复验目标接口 down 且 IPv4/IPv6 路由为空；任一网络状态不明立即停止，不把后续断网状态倒推成“从启动起全程离线”。
+
 三个旧 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个 clone 处于 operation ID/CLI 前的 artifact-chain mismatch 停止线，均已停止并原样保留。不得热替换、恢复、跨 pair 混搭或原地重试。第五套 chain-continuous clone/preflight 已冻结；下一步另行授权只在该 stopped clone 复验单 VM/断网/pair/receipt/XDG/process 后执行一次 source→target upgrade，terminal postflight 后停止。repair、rollback、remove、reinstall 与 crash/retry 仍需逐次授权。
 
 ## 10. L6 完成与后续

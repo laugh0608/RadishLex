@@ -60,12 +60,12 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一事项
+## 明日事项（2026-08-11）
 
-1. prior-terminal source anchor、第五套 canonical handoff、独立 S2 clone 与断网只读 preflight 已完成，保持不推送。
-2. 另行授权后，只在第五套 stopped clone 重新验证单 VM、断网、pair/receipt、依赖、XDG 与进程静止，生成新的 operation ID并执行一次 source→target upgrade；terminal postflight 后立即停止。
-3. repair、rollback、remove、reinstall、acceptance controller 与 crash/retry仍分别授权，不随 upgrade 自动进入。
-4. 完整 L6 后再另行授权 P05C；旧资产、远端、推送、发布、真实同步及其他平台保持关闭。
+1. 开始前复验仓库 clean、第五套证据未漂移且九台 VM 全停；不推送、不清理旧资产。
+2. 另行授权后只启动第五套 clone；不能从磁盘配置推断断网，guest 内必须先确认接口 down、IPv4/IPv6 路由为空，再复验 pair/receipt、依赖、XDG 与进程静止。
+3. 生成新的 operation ID，只执行一次 source→target upgrade；以 terminal receipt、dpkg、inventory、startup 与 XDG postflight 判定结果，随后立即停机。
+4. repair、rollback、remove、reinstall、acceptance controller、crash/retry 与 P05C 均保持关闭，分别等待后续授权。
 
 ## 验证入口
 
