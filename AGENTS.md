@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 代码、L6 format v1、acceptance controller 与 release-pair verifier 已闭合。前三套真实推进暴露两个 Debian 环境缺口与 revision profile 缺口；第四套又在 operation ID/CLI 前确认 source chain 不连续并停止。第五套 chain-continuous pair `d2661cc0…ed15` 与独立 S2 clone `9C5638D7-…-AC6C` 的只读 preflight 已通过。2026-08-11 mutation 前该 clone 冷加载失败；根因是磁盘配置删除了 UTM 4.7.5 必填的 `Network` 键，先前只依赖注册态缓存运行。经授权备份并以 `Network=[]` 修复、重建注册后，同一 UUID 恢复为 stopped；config/EFI/qcow2 为 `402a5840…3e9`/`c496eae6…345`/`77c434de…d1f`，九台 VM 全停。未启动 VM、生成 operation ID 或执行 guest/package mutation。v1 package 不含 RadishLex maintainer scripts。
+- production 代码、L6 format v1、acceptance controller 与 release-pair verifier 已闭合。前三套真实推进暴露两个 Debian 环境缺口与 revision profile 缺口；第四套又在 operation ID/CLI 前确认 source chain 不连续并停止。第五套 chain-continuous pair `d2661cc0…ed15` 已写入独立 S2 clone `9C5638D7-…-AC6C`。其磁盘 config 经 `Network=[]` 冷加载修复后，2026-08-11 修复后只读 preflight 从启动起仅有 loopback、IPv4/IPv6 路由为空；terminal chain、20 项依赖、字体、双 startup gate、XDG 与进程静止全部通过。未生成 operation ID、运行 maintenance/acceptance CLI 或调用 dpkg mutation；关机后 config/EFI/qcow2 为 `402a5840…3e9`/`bcdab060…ce8`/`fc552276…8f10`，九台 VM 全停。v1 package 不含 RadishLex maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -71,6 +71,7 @@
 - P04 guest staging、backup、userdb、导入导出文件和临时服务保持原样，不复跑或清理。任何 L6/P05C 使用独立 clone/snapshot 或另一台 guest，并逐步授权系统写入、进程/会话和人工输入。
 - UTM 只通过 `PATH` 中的 plain `utmctl` 操作，不直接调用 app bundle 可执行文件；任何时刻最多运行一台 VM，启动前先用 `utmctl list` 确认其他注册 VM 全部停止。磁盘配置移除 Network 不能替代 guest 运行态证据；每次启动后、写入 input 或生成 operation ID 前都要复验接口 down 且 IPv4/IPv6 路由为空。
 - UTM 库条目 unavailable、UUID not found 或 data error 时必须停止并保留 package；不得把通用错误直接归因于 bookmark，也不得用磁盘目录存在替代 registered-stopped 证据。QEMU 配置集合键必须满足目标 UTM 的冷解码合同；无网卡使用 `Network=[]`，不能删除必填键。注册/config 修复须单独授权并在前后复验 UUID、config/EFI/qcow2 identity。
+- UTM guest-agent 的命令返回码或空输出不能单独作为成功证据；关键字节、结构化检查和 startup 结果须以文件回读、可靠退出合同及正负向对照独立复验。
 
 ## 实现、文件与验证
 
@@ -82,6 +83,6 @@
 
 ## 当前顺位
 
-1. 保留四个 stopped L6 failure/mismatch disk、前三套失败 pair/handoff/S0、第三套 receipt/staging/S1/S2、第四套 handoff/input/preflight、WAL-drift snapshot 与第五套 stopped clone/preflight；不热替换、覆盖、恢复或清理。
-2. 第五套已以 `Network=[]` 完成冷加载/config 修复并由同一 UUID 重建注册；旧 host evidence 的 `27cb…c3c` config 身份只作历史，当前 config 为 `402a…3e9`，EFI/qcow2 未变，九台均 stopped。下一步须另行授权只启动该 clone 并重做断网与完整只读 preflight，不直接生成 operation ID。
-3. 修复后 preflight 冻结通过再单独授权一次 source→target upgrade；terminal postflight 后立即停止。repair、rollback、remove、reinstall、crash/retry、P05C、发布、推送、清理、真实同步及其他平台保持关闭。
+1. 保留四个 stopped L6 failure/mismatch disk、前三套失败 pair/handoff/S0、第三套 receipt/staging/S1/S2、第四套 handoff/input/preflight、WAL-drift snapshot 与第五套 stopped clone/两套 preflight；不热替换、覆盖、恢复或清理。
+2. 第五套修复后只读 preflight 已通过并冻结：从启动起仅 loopback、双路由为空，chain/receipt/依赖/字体/startup/XDG/进程均未漂移；当前 config/EFI/qcow2 为 `402a…3e9`/`bcda…ce8`/`fc55…8f10`，九台均 stopped。下一步另行授权只在该 clone 执行一次 source→target upgrade，mutation 前重新验证单 VM、网络、pair/receipt、依赖、XDG 与进程静止，并使用新的 operation ID。
+3. upgrade terminal postflight 后立即停止，不自动进入 repair、rollback、remove、reinstall 或 crash/retry；L6 闭合后再排 P05C。发布、推送、清理、真实同步及其他平台保持关闭。
