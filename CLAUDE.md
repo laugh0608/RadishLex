@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 代码、L6 format v1、acceptance controller 与 release-pair verifier 已闭合。前三套真实推进暴露两个 Debian 环境缺口与 revision profile 缺口；第四套又在 operation ID/CLI 前确认重建 source 不等于 S2 terminal installed source，零 mutation 停止。第五套 chain-continuous pair `d2661cc0…ed15` 已写入独立 S2 clone `9C5638D7-…-AC6C`，terminal source、target、20 项依赖、字体、双 startup gate、XDG 与进程只读 preflight 全通过；未生成 operation ID、运行 maintenance/acceptance CLI 或调用 dpkg mutation。四个旧 stopped L6 现场与全部恢复/取证资产保留，九台注册 VM 全停。v1 package 不含 RadishLex maintainer scripts。
+- production 代码、L6 format v1、acceptance controller 与 release-pair verifier 已闭合。前三套真实推进暴露两个 Debian 环境缺口与 revision profile 缺口；第四套又在 operation ID/CLI 前确认 source chain 不连续并停止。第五套 chain-continuous pair `d2661cc0…ed15` 与独立 S2 clone `9C5638D7-…-AC6C` 的 package/dependency/font/startup/XDG/process preflight 已通过。2026-08-11 mutation 前发现该 clone 的 UTM 注册书签失效；库保留九个条目但第五套 unavailable，plain `utmctl` 只列出其余八台 stopped。Finder/UTM 精确打开均报数据丢失，config/EFI/qcow2 三哈希未漂移且零打开句柄；未启动 VM、生成 operation ID 或执行 guest/package mutation。v1 package 不含 RadishLex maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -70,6 +70,7 @@
 - 修改系统输入法、权限、Keychain、`/usr`/`/var`、dpkg、systemd、Fcitx profile/autostart、会话、证书或全局配置必须取得明确授权。不得自动 kill/restart、合成按键或点击冒充人工验收。
 - P04 guest staging、backup、userdb、导入导出文件和临时服务保持原样，不复跑或清理。任何 L6/P05C 使用独立 clone/snapshot 或另一台 guest，并逐步授权系统写入、进程/会话和人工输入。
 - UTM 只通过 `PATH` 中的 plain `utmctl` 操作，不直接调用 app bundle 可执行文件；任何时刻最多运行一台 VM，启动前先用 `utmctl list` 确认其他注册 VM 全部停止。磁盘配置移除 Network 不能替代 guest 运行态证据；每次启动后、写入 input 或生成 operation ID 前都要复验接口 down 且 IPv4/IPv6 路由为空。
+- UTM 库条目 unavailable、UUID not found 或 bookmark/data error 时必须停止并保留 package；不得自动点击 `移除`、移动、覆盖、重建或用磁盘目录存在替代 registered-stopped 证据。注册修复须单独授权并在前后复验 package、config/EFI/qcow2 identity。
 
 ## 实现、文件与验证
 
@@ -82,5 +83,5 @@
 ## 当前顺位
 
 1. 保留四个 stopped L6 failure/mismatch disk、前三套失败 pair/handoff/S0、第三套 receipt/staging/S1/S2、第四套 handoff/input/preflight、WAL-drift snapshot 与第五套 stopped clone/preflight；不热替换、覆盖、恢复或清理。
-2. 第五套 clone 已完成 chain-continuous 断网只读 preflight；下一步另行授权只在该 clone 执行一次 source→target upgrade，mutation 前重新验证单 VM、网络、pair/receipt、依赖、XDG 与进程静止，并使用新的 operation ID。
-3. upgrade terminal postflight 后立即停止，不自动进入 repair、rollback、remove、reinstall 或 crash/retry；L6 闭合后再排 P05C。公开发布、推送、旧资产清理、真实同步及其他平台保持关闭。
+2. 第五套 package 三哈希未漂移但 UTM 注册书签 unavailable；下一步先设计并另行授权可恢复的注册修复，不点击 `移除`、不移动或复制磁盘。只有同一 UUID 恢复为 stopped、九台全停且三哈希不变后才可启动。
+3. 注册恢复后重新授权一次 source→target upgrade，mutation 前复验单 VM、网络、pair/receipt、依赖、XDG 与进程静止并使用新 operation ID；terminal postflight 后立即停止。repair、rollback、remove、reinstall、crash/retry、P05C、发布、推送、清理、真实同步及其他平台保持关闭。
