@@ -37,11 +37,11 @@
 - repository release-pair contract 已改为 prior-terminal source anchor；第五套只从 clean target `1ebbdab` 构建，精确复用 S2 source package/evidence `09ed1228…bec`/`fe3d6297…cf94`。record `d2661cc0…ed15`、target package/evidence `cdac2f32…7c26`/`7786847c…2d5f` 已通过 target production Rust 双侧解析、builder/宿主 verifier、8 文件 mode/link/hash 与 absent-output 原子 handoff 冻结；未启动 L6 guest或执行 package transaction。
 - 从原始 S2 新建第五套 clone `9C5638D7-0F97-4BD8-8A83-ABCDFCADAC6C`，在未启动时精确替换冻结 EFI/qcow2并从磁盘配置移除 Network。首次启动仍观察到 UTM 注册态缓存的源网卡、DHCP 与默认路由；在任何 handoff 写入前立即将 `enp0s1` down并确认 IPv4/IPv6 路由为空，之后才原子保留第三套输入、切入第五套 8 文件并执行正式只读 preflight。
 - 第五套 terminal source/target chain、receipt/dpkg、20 项依赖、字体 owner/glyph、manifest/双 FFI、Manager/Fcitx startup `0:1:2:2:6`、XDG `f3df287f…b86b`、WAL/SHM/profile absence 与产品映射均通过。没有生成新 operation ID、运行 maintenance/acceptance CLI 或调用 dpkg mutation。host local evidence `74932b8c…4f51` 已原子冻结；clone 关机后 config/EFI/qcow2 为 `27cbca50…c3c`/`c496eae6…345`/`77c434de…d1f`，qcow2 零打开句柄，九台注册 VM 全停。
-- 2026-08-11 mutation 前宿主复核发现第五套 UTM security-scoped bookmark 失效：库面板保留九个条目但第五套 unavailable，plain `utmctl` 只枚举其余八台 stopped并对第五套 UUID 返回 not found。经额外授权从 Finder 与 UTM `打开…` 精确选择现存 package，均返回数据丢失；未点击 `移除` 或修改 package。config/EFI/qcow2 三哈希前后不变且 qcow2 零打开句柄，未启动 VM、生成 operation ID 或执行 guest mutation。
+- 2026-08-11 mutation 前第五套在 UTM app 冷启动后 unavailable，plain `utmctl` 只枚举其余八台 stopped。Finder/UTM 的“数据丢失”是通用加载错误；空 bookmark 与仅重建 registry 均未恢复。对照 UTM 4.7.5 源码确认 QEMU config 对 `Network` 使用必填 decode，而第五套此前删除该键并只依赖注册态缓存运行。经授权备份 preference/config、移除旧 registry并以唯一差异 `Network=[]` 原子修复后，同一 UUID 由默认 Documents 自动重建注册；config/EFI/qcow2 为 `402a5840…3e9`/`c496eae6…345`/`77c434de…d1f`，九台均 stopped，未启动 VM、生成 operation ID 或执行 guest mutation。
 
 ### 当前本地资产登记（非发布证据）
 
-2026-08-10 的冻结资产宿主根为 `/Users/luobo/VirtualMachines`；第四、第五套 clone package 位于 UTM 默认 Documents 目录，不移动到该根。2026-08-11 UTM 库面板有九个条目，其中第五套 unavailable；plain `utmctl` 只枚举其余八台且全部 stopped。`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。三个 failure L6、第四套 artifact-chain mismatch clone 与第五套 package 均保留；前四个只作取证，第五个是下一次单步 upgrade 的唯一连续现场，但必须先另行修复注册书签。四套失败/mismatch handoff、第五套 chain-continuous handoff、第三套 S0/S1/S2、额外 WAL-drift snapshot 与第五套 host preflight evidence 同时保留且不得混用。UTM 只使用 `PATH` 中的 plain `utmctl`，任何时刻最多运行一台 VM。
+2026-08-10 的冻结资产宿主根为 `/Users/luobo/VirtualMachines`；第四、第五套 clone package 位于 UTM 默认 Documents 目录，不移动到该根。2026-08-11 第五套已修复冷加载必填键并由同一 UUID 重建注册，plain `utmctl` 枚举九台且全部 stopped。`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。三个 failure L6、第四套 artifact-chain mismatch clone 与第五套 package 均保留；前四个只作取证，第五个仍是下一次单步 upgrade 的唯一连续现场，但修复前 host evidence 的旧 config 身份只作历史。四套失败/mismatch handoff、第五套 chain-continuous handoff、第三套 S0/S1/S2、额外 WAL-drift snapshot 与第五套 host preflight evidence 同时保留且不得混用。UTM 只使用 `PATH` 中的 plain `utmctl`，任何时刻最多运行一台 VM。
 
 | 相对路径 | UTM 状态 | 唯一职责与保留线 |
 | --- | --- | --- |
@@ -64,9 +64,9 @@
 | `RadishLex-L6-Handoff-512e8ab` | 非 VM；第三个 handoff | record `2f2deaed…697`；source install 已消费，但 target 被其 production profile 拒绝，整套只作失败输入，不覆盖或执行 |
 | `RadishLex-L6-Handoff-56dd4de` | 非 VM；第四个 mismatch handoff | record `70a394ea…139a`；双侧 actual-package parser 与逐哈希通过，但 source bytes 不等于 S2 terminal installed artifact，不能直接用于该 chain 的 upgrade，也不得与旧 source 跨 pair 混搭 |
 | `RadishLex-L6-Handoff-1ebbdab` | 非 VM；第五个 canonical handoff | record `d2661cc0…ed15`；source 精确等于 S2 terminal installed artifact，target package `cdac2f32…7c26`，builder/宿主 verifier 与 8 文件 mode/link/hash 通过；下一套独立 clone 的唯一 pair 输入，不覆盖旧 handoff |
-| `RadishLex-L6-Preflight-1ebbdab` | 非 VM；第五套 host local evidence | local evidence `74932b8c…4f51`，input-switch/readonly evidence `70833344…70f8`/`6e44f027…6e48`；记录 UTM runtime adapter 偏差、断网边界、chain/startup/XDG 与关机磁盘身份，不是 canonical session evidence |
+| `RadishLex-L6-Preflight-1ebbdab` | 非 VM；修复前 host local evidence | local evidence `74932b8c…4f51`，input-switch/readonly evidence `70833344…70f8`/`6e44f027…6e48`；记录 UTM runtime adapter 偏差、断网边界、chain/startup/XDG 与旧 config `27cb…c3c`，不是修复后 config 身份或 canonical session evidence |
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-56dd4de.utm` | 已注册；第四套 mismatch stopped | UUID `A3F757B1-CE75-4F23-9509-CAD033260AA1`；operation ID/CLI 前确认 artifact chain 不连续并停止。config/EFI/qcow2 SHA-256 为 `61daca92…9239`/`d32181b0…1960`/`5afb3356…b6d0`；不重启、覆盖、恢复或复用 |
-| `UTM Documents/RadishLex-Debian13-ARM64-L6-1ebbdab.utm` | UTM 条目 unavailable；package 保留 | UUID `9C5638D7-0F97-4BD8-8A83-ABCDFCADAC6C`；第五套输入与旧输入分开保留，chain/package/receipt/dependency/font/startup/XDG/process 只读 preflight 通过。config/EFI/qcow2 为 `27cbca50…c3c`/`c496eae6…345`/`77c434de…d1f`；注册修复前不得启动、移除、移动或覆盖 |
+| `UTM Documents/RadishLex-Debian13-ARM64-L6-1ebbdab.utm` | 已注册；第五套 repaired stopped | UUID `9C5638D7-0F97-4BD8-8A83-ABCDFCADAC6C`；`Network=[]` 可由 UTM 4.7.5 冷加载，config/EFI/qcow2 为 `402a5840…3e9`/`c496eae6…345`/`77c434de…d1f`。修复后 guest preflight 前不得启动或执行 operation |
 
 两个在 QEMU 引导前因缓存 2222 转发失败、从未运行 guest 的旧 PairBuilder clone 已在单独授权后从 UTM 注册表和磁盘删除；它们不含 package transaction 或 canonical evidence。当前资产仍各有独立职责，不因 UTM 面板是否显示而删除。L6 闭合后可另行授权评估剩余 builder、DependencyFrozen 与 host handoff 的保留期；P04、CleanBase、四个 failure/mismatch L6 和任何 S0/S1/S2/S3 恢复点仍按各自停止线保留。该表只登记本机运维角色，不进入 canonical pair/checkpoint/session evidence。
 
@@ -262,9 +262,9 @@ checkpoint controller 必须是显式 acceptance 构建身份，以不可由 pro
 
 UTM guest-agent 的传输返回码或空输出不能单独证明 transaction completed。长命令结束后必须同时确认 maintenance 进程已退出，并以 canonical receipt、dpkg status/audit 与完整 package inventory 判定结果；缺少 receipt 即使 `utmctl exec` 返回 0 也按失败关闭，不推断或补写成功状态。
 
-UTM 磁盘配置中没有 Network 不能单独证明 guest 运行态断网；注册缓存仍可能在首次启动挂回虚拟网卡并取得 DHCP。每次启动后、写入 artifact input 或生成 operation ID 前，都必须在 guest 内复验目标接口 down 且 IPv4/IPv6 路由为空；任一网络状态不明立即停止，不把后续断网状态倒推成“从启动起全程离线”。
+UTM 磁盘配置使用空 `Network` 数组也不能单独证明 guest 运行态断网；删除整个必填键会使 UTM 4.7.5 冷加载失败，注册缓存仍可能在首次启动挂回虚拟网卡并取得 DHCP。每次启动后、写入 artifact input 或生成 operation ID 前，都必须在 guest 内复验目标接口 down 且 IPv4/IPv6 路由为空；任一网络状态不明立即停止，不把后续断网状态倒推成“从启动起全程离线”。
 
-三个旧 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个 clone 处于 operation ID/CLI 前的 artifact-chain mismatch 停止线，均已停止并原样保留。不得热替换、恢复、跨 pair 混搭或原地重试。第五套 chain-continuous package/preflight 已冻结，但其 UTM 注册书签当前 unavailable；必须先另行设计并授权可恢复的注册修复，保持 package 与三哈希不变。只有同一 UUID 可由 plain `utmctl` 查询为 stopped、九台全停后，才重新授权在该 clone 执行一次 source→target upgrade并在 terminal postflight 后停止。repair、rollback、remove、reinstall 与 crash/retry 仍需逐次授权。
+三个旧 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个 clone 处于 operation ID/CLI 前的 artifact-chain mismatch 停止线，均已停止并原样保留。不得热替换、恢复、跨 pair 混搭或原地重试。第五套已以 `Network=[]` 恢复同 UUID 注册，当前 config 为 `402a…3e9`、EFI/qcow2 未变，九台全停；旧 host evidence 只证明修复前 preflight。下一步须另行授权只启动第五套并冻结修复后完整 preflight，不生成 operation ID；通过后再单独授权一次 source→target upgrade并在 terminal postflight 后停止。repair、rollback、remove、reinstall 与 crash/retry 仍需逐次授权。
 
 ## 10. L6 完成与后续
 

@@ -7,7 +7,7 @@
 - 复核日期：2026-08-11（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format v1、compile-isolated acceptance controller、六步主序列与八点 crash/recovery 合成矩阵已完成。前三次真实推进依次暴露默认 `dpkg.cfg`、`/run/lock` 与 target revision profile 缺口；第四套又在 operation ID/CLI 前暴露 source chain 不连续并零 mutation 停止。第五套 chain-continuous pair `d2661cc0…ed15` 已写入独立 S2 clone `9C5638D7-…-AC6C`，source/target、receipt/dpkg、20 项依赖、字体、双 startup gate、XDG 与进程只读 preflight 全通过。2026-08-11 mutation 前宿主复核发现该 clone 的 UTM 注册书签失效；库面板保留九个条目但第五套不可用，`utmctl list` 只列出其余八台且全部 stopped。第五套 package 与 config/EFI/qcow2 三哈希未漂移、qcow2 零打开句柄；未启动 VM、生成 operation ID 或执行 package mutation。
+- L6 format v1、acceptance controller、六步主序列与八点 crash/recovery 合成矩阵已完成。前三次真实推进依次暴露 `dpkg.cfg`、`/run/lock` 与 revision profile 缺口；第四套在 operation ID/CLI 前因 source chain 不连续零 mutation 停止。第五套 pair `d2661cc0…ed15` 与独立 S2 clone `9C5638D7-…-AC6C` 的只读 preflight 已通过。2026-08-11 mutation 前确认冷加载失败源于磁盘配置删除 UTM 4.7.5 必填的 `Network` 键；经授权改为 `Network=[]` 并重建注册后，同一 UUID 恢复为 stopped，九台 VM 全停。config/EFI/qcow2 为 `402a5840…3e9`/`c496eae6…345`/`77c434de…d1f`；未启动 VM、生成 operation ID 或执行 package mutation。
 
 ## P04 冻结基线
 
@@ -46,13 +46,13 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 - release-pair contract 现将 S2 source package/evidence 的文件名、size、SHA-256 与 `prior-terminal-installed-artifact-v1` policy 固定进 committed JSON。builder CLI 只接受这两个 source 文件、一个 clean target root 与 absent output；先以独立 helper 做 canonical evidence/identity/exclusive-copy/fsync，再构建 target，并以 target production Rust verifier 逐侧解析 actual `.deb`。同版本 source bytes 或 evidence 漂移均在发布前失败。
 - 第五套 pair 固定 source `55351f2`/target `1ebbdab`，source package/evidence 仍为 `09ed1228…bec`/`fe3d6297…cf94`，target 为 `cdac2f32…7c26`/`7786847c…2d5f`。production/acceptance ELF 为 `3bb2925f…401c`/`29cb1b1a…ae76`；构建位于仅 loopback、零路由 namespace，冻结依赖清单构建前后通过，builder package/state/XDG 未创建。宿主以 absent `.incoming` 接收、复验后同父目录原子发布，旧四套 handoff 未覆盖。
 - 第五套 clone `9C5638D7-0F97-4BD8-8A83-ABCDFCADAC6C` 从原始 S2 精确 EFI/qcow2 建立并保留旧输入。UTM 启动时仍从注册态带出源虚拟网卡并短暂取得 DHCP；该偏差在任何 handoff 写入前发现，随后 `enp0s1` down 且 IPv4/IPv6 路由为空，正式 input switch/preflight 才开始。chain source 精确等于 terminal receipt installed artifact；Manager/Fcitx startup 均为 `0:1:2:2:6`，XDG fingerprint `f3df287f…b86b`、receipt `e58b144e…ab8` 与 dpkg status `33c4973d…ff1` 前后不变。host evidence `74932b8c…4f51` 已原子冻结；关机后 config/EFI/qcow2 为 `27cbca50…c3c`/`c496eae6…345`/`77c434de…d1f`，qcow2 零打开句柄。
-- 2026-08-11 upgrade 授权后的首轮宿主 preflight 发现 `utmctl status 9C5638D7-…-AC6C` 返回 `Virtual machine not found`，UTM 面板将同名条目标为 unavailable。经额外单步授权，Finder 与 UTM 自身 `打开…` 面板分别精确打开现存 `.utm`，均返回“未能读取数据，因为数据丢失”；没有点击移除、移动或复制 package。重新注册前后三哈希仍为 `27cbca50…c3c`/`c496eae6…345`/`77c434de…d1f`，qcow2 零打开句柄。该宿主注册异常是当前更早停止线，不反推 guest、pair 或 preflight 失效。
+- 2026-08-11 首轮宿主 preflight 发现第五套 UUID not found、面板 unavailable。Finder/UTM 的通用“数据丢失”不能证明 bookmark 损坏；清空 bookmark 与仅重建 registry 均无效。UTM 4.7.5 源码确认 `Network` 使用必填 decode，而第五套 config 删除了该键、此前仅依赖注册态缓存启动。经授权备份 preference/config、移除旧 registry并原子写入唯一差异 `Network=[]` 后，同一 UUID 冷加载并重建注册。config 由 `27cbca50…c3c` 更新为 `402a5840…3e9`，EFI/qcow2 未变且零打开句柄；旧 host evidence 只作修复前历史。
 - S2 identity `S2-source-data-512e8ab-0c2cefd6` 与公开合成 XDG fingerprint `f3df287f…b86b` 保持冻结：userdb schema v9/quick_check、1 active/0 deleted、settings/privacy 与固定 metadata 通过，WAL/SHM/Fcitx profile absent；完整磁盘/evidence hash 见 L6 runbook。
 
 ## 停止线
 
 - 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
-- 不重新启动、恢复、清理或复用当前四个 stopped L6 failure/mismatch disk；前三套失败 pair/handoff/S0、第三套 S1/S2、第四套 handoff/input/preflight 与额外 WAL-drift snapshot 只保留取证。第五套 `.utm` 是后续单步 upgrade 的唯一连续现场，当前注册书签不可用；不得点击 UTM `移除`、移动、覆盖、重建或启动，注册修复必须另行授权并保持三哈希精确不变。
+- 不重新启动、恢复、清理或复用当前四个 stopped L6 failure/mismatch disk；前三套失败 pair/handoff/S0、第三套 S1/S2、第四套 handoff/input/preflight 与额外 WAL-drift snapshot 只保留取证。第五套 `.utm` 仍是后续单步 upgrade 的唯一连续现场；当前已恢复同 UUID 注册，但 config 身份已受控更新为 `402a…3e9`，未获新授权不得启动。修复前 host evidence 不得冒充修复后 preflight。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
@@ -60,9 +60,9 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 
 ## 下一步（2026-08-11）
 
-1. 保留第五套 unavailable 库条目与现存 `.utm`；先设计并单独授权可恢复的注册书签修复，不点击 `移除`、不移动或复制磁盘、不启动 VM。
-2. 注册修复后必须先证明同一 UUID 唯一、九台均 stopped、config/EFI/qcow2 三哈希未变且 qcow2 零打开句柄；任一不符继续失败关闭。
-3. 只有宿主身份恢复后，才重新取得单步 upgrade 授权并只启动第五套 clone；guest 内先复验断网、pair/receipt、依赖、XDG 与进程静止，再生成新 operation ID 并执行一次 source→target upgrade。
+1. 保留第五套现存 `.utm`、修复前 preference/config 备份与历史 host evidence；当前同一 UUID 唯一、九台均 stopped，EFI/qcow2 未变，config 固定为 `Network=[]`/`402a…3e9`。
+2. 另行授权后只启动第五套 clone；guest 内先复验接口 down、IPv4/IPv6 零路由、pair/receipt、依赖、XDG 与进程静止，并冻结修复后的完整 preflight。任一不符继续失败关闭，不生成 operation ID。
+3. 修复后 preflight 通过再单独授权一次 source→target upgrade；生成新 operation ID，只执行 upgrade，并以 terminal receipt、dpkg、inventory、startup 与 XDG postflight 判定。
 4. terminal postflight 后立即停机；repair、rollback、remove、reinstall、acceptance controller、crash/retry 与 P05C 均保持关闭。
 
 ## 验证入口
@@ -84,7 +84,7 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 git diff --check
 ```
 
-上述仓库入口本身只证明 prior-terminal anchor、target-only builder、拒绝重建漂移与其他合成合同。第三套真实 pair 已证明 source install，第四套暴露 chain mismatch，第五套已证明 chain-continuous pair、handoff 与独立 clone preflight；2026-08-11 upgrade 在 VM 启动前由 UTM 注册书签停止线阻断。upgrade、acceptance process-group/crash、其余主序列、真实桌面启动、重启、完整 L6 与公开发布仍未证明。
+上述仓库入口本身只证明 prior-terminal anchor、target-only builder、拒绝重建漂移与其他合成合同。第三套真实 pair 已证明 source install，第四套暴露 chain mismatch，第五套已证明 chain-continuous pair、handoff 与修复前独立 clone preflight；2026-08-11 已在 VM 启动前修复 UTM 冷加载必填键并恢复注册。修复后 guest preflight、upgrade、acceptance process-group/crash、其余主序列、真实桌面启动、重启、完整 L6 与公开发布仍未证明。
 
 ## 阅读索引
 
