@@ -7,7 +7,7 @@
 - 复核日期：2026-08-11（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format v1、acceptance controller、六步主序列与八点 crash/recovery 合成矩阵已完成。前三次真实推进依次暴露 `dpkg.cfg`、`/run/lock` 与 revision profile 缺口；第四套在 operation ID/CLI 前因 source chain 不连续零 mutation 停止。第五套 pair `d2661cc0…ed15` 与独立 S2 clone `9C5638D7-…-AC6C` 已闭合修复后只读 preflight：`Network=[]` 从启动起仅有 loopback、IPv4/IPv6 零路由，chain/receipt/依赖/字体/startup/XDG/进程均通过。未生成 operation ID 或执行 package mutation；正常关机后九台 VM 全停。
+- L6 format v1、acceptance controller、六步主序列与八点 crash/recovery 合成矩阵已完成。前三次真实推进依次暴露 `dpkg.cfg`、`/run/lock` 与 revision profile 缺口；第四套在 operation ID/CLI 前因 source chain 不连续零 mutation 停止。第五套 pair `d2661cc0…ed15` 的修复后 preflight 通过后只执行一次 upgrade：dpkg 安装 target `38-2` 后 production target validation 失败，事务自动恢复 source `38-1` 并形成 terminal `rolled_back`；source startup/XDG/网络 postflight 通过，九台 VM 全停。
 
 ## P04 冻结基线
 
@@ -45,14 +45,14 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 - 前两套分别在 dpkg config 与 guard parent 停止；第三套完成 source install 后由 target revision profile 在新 receipt 前失败关闭；第四套双侧 actual package/preflight 通过，但重建 source 不等于 terminal installed artifact，因 chain 不连续在 operation ID/CLI 前停止。四套现场、pair、handoff、snapshot 与 XDG 均保留，精确 identity/hashes 见 L6 runbook。
 - release-pair contract 现将 S2 source package/evidence 的文件名、size、SHA-256 与 `prior-terminal-installed-artifact-v1` policy 固定进 committed JSON。builder CLI 只接受这两个 source 文件、一个 clean target root 与 absent output；先以独立 helper 做 canonical evidence/identity/exclusive-copy/fsync，再构建 target，并以 target production Rust verifier 逐侧解析 actual `.deb`。同版本 source bytes 或 evidence 漂移均在发布前失败。
 - 第五套 pair 固定 source `55351f2`/target `1ebbdab`，source package/evidence 仍为 `09ed1228…bec`/`fe3d6297…cf94`，target 为 `cdac2f32…7c26`/`7786847c…2d5f`。production/acceptance ELF 为 `3bb2925f…401c`/`29cb1b1a…ae76`；构建位于仅 loopback、零路由 namespace，冻结依赖清单构建前后通过，builder package/state/XDG 未创建。宿主以 absent `.incoming` 接收、复验后同父目录原子发布，旧四套 handoff 未覆盖。
-- 第五套 clone `9C5638D7-0F97-4BD8-8A83-ABCDFCADAC6C` 从原始 S2 精确 EFI/qcow2 建立并保留旧输入。UTM 启动时仍从注册态带出源虚拟网卡并短暂取得 DHCP；该偏差在任何 handoff 写入前发现，随后 `enp0s1` down 且 IPv4/IPv6 路由为空，正式 input switch/preflight 才开始。chain source 精确等于 terminal receipt installed artifact；Manager/Fcitx startup 均为 `0:1:2:2:6`，XDG fingerprint `f3df287f…b86b`、receipt `e58b144e…ab8` 与 dpkg status `33c4973d…ff1` 前后不变。host evidence `74932b8c…4f51` 已原子冻结；关机后 config/EFI/qcow2 为 `27cbca50…c3c`/`c496eae6…345`/`77c434de…d1f`，qcow2 零打开句柄。
 - 2026-08-11 确认 unavailable 根因是 UTM 4.7.5 必填 `Network` 键被删除，而非已证实的 bookmark 损坏；经授权以唯一差异 `Network=[]` 修复并重建同 UUID 注册。修复后 preflight 从启动起仅 `lo` 且双路由为空；record/source/target、receipt/dpkg、20 项依赖、字体、双 startup gate `0:1:2:2:6`、XDG `f3df287f…b86b`、WAL/SHM/profile absence 与产品映射全部通过。UTM guest-agent 的命令级返回/空输出偏差以大文件回读、可靠退出合同和 startup 正负对照消除；临时 probe 仅在 guest tmpfs，已删除并证明 absent。宿主证据 `9ecd7f54…3089`/`bf2e0591…d09f` 以 `0600` 冻结；关机后 config/EFI/qcow2 为 `402a5840…3e9`/`bcdab060…ce8`/`fc552276…8f10`，qcow2 零打开句柄、九台全停。
+- 获得单步授权后 mutation 前各项只读 gate 再次通过；resolved 20 项依赖清单文本摘要为 `28fe1065…6aac`，release-pair 的 production relationship 摘要 `2ee2b7e5…5743` 不是同一序列化口径。production maintenance 只调用一次，exit 0/stdout 为 `maintenance_outcome=rolled_back`：dpkg log 证明先安装 `38-2`，随后恢复 `38-1`。新 receipt `55171bef…6611` 为 `upgrade/target_newer/rolled_back`，failure `target_validation_failed` after `package_mutating`，source proof installed、target proof null、manual recovery false；双 startup `0:1:2:2:11`、XDG/网络/进程静止通过。证据 `98319405…2378`/`64d5395f…e3d8` 已冻结；关机后 disk 为 `402a5840…3e9`/`cb8a697b…bd65`/`e684f829…8904`。
 - S2 identity `S2-source-data-512e8ab-0c2cefd6` 与公开合成 XDG fingerprint `f3df287f…b86b` 保持冻结：userdb schema v9/quick_check、1 active/0 deleted、settings/privacy 与固定 metadata 通过，WAL/SHM/Fcitx profile absent；完整磁盘/evidence hash 见 L6 runbook。
 
 ## 停止线
 
 - 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
-- 不重新启动、恢复、清理或复用当前四个 stopped L6 failure/mismatch disk；前三套失败 pair/handoff/S0、第三套 S1/S2、第四套 handoff/input/preflight 与额外 WAL-drift snapshot 只保留取证。第五套 `.utm` 是后续单步 upgrade 的唯一连续现场；修复前与修复后 evidence 分属不同 config/boot 身份，不得混用，未获 upgrade 单步授权不得启动。
+- 不重新启动、恢复、清理或复用前四个 stopped L6 failure/mismatch disk；第五套已形成 terminal `rolled_back` 现场，同样只作失败/恢复取证，未完成离线根因分析前不得启动、重试或复用。各套 evidence 分属不同 config/boot/receipt 身份，不得混用。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
@@ -60,10 +60,10 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 
 ## 下一步（2026-08-11）
 
-1. 保留第五套 `.utm`、修复备份、修复前历史证据与修复后 evidence；当前同一 UUID 唯一，config/EFI/qcow2 固定为 `402a…3e9`/`bcda…ce8`/`fc55…8f10`，九台均 stopped。
-2. 另行授权后只启动第五套；重新验证单 VM、从启动起 loopback-only/双路由为空、pair/receipt、20 项依赖、XDG 与进程静止，任一不符失败关闭且不生成 operation ID。
-3. preflight 通过后生成新的 operation ID，只执行一次 production source→target upgrade；以 terminal receipt、dpkg、完整 inventory、双 startup gate 与 XDG postflight 判定，随后立即停机。
-4. repair、rollback、remove、reinstall、acceptance controller、crash/retry、产品启动与 P05C 保持关闭。
+1. 原样保留第五套 `rolled_back` clone、operation staging/receipt、三套本地 evidence 与修复备份；当前 config/EFI/qcow2 为 `402a…3e9`/`cb8a…bd65`/`e684…8904`，九台均 stopped。
+2. 只在宿主离线分析 target `38-2` 已安装后 production target validation 的精确失败条件；先从现有 actual package、manifest/inventory、observer 与 snapshot/relationship 路径建立可重复的合成失败，不启动 guest。
+3. 修复后补回归门禁，重新形成合规 pair/handoff 与独立 clone，再另行逐步授权；不得原地重试第五套。
+4. repair、rollback operation、remove、reinstall、acceptance controller、crash/retry、产品启动与 P05C 保持关闭。
 
 ## 验证入口
 
@@ -84,7 +84,7 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 git diff --check
 ```
 
-上述仓库入口本身只证明 prior-terminal anchor、target-only builder、拒绝重建漂移与其他合成合同。第三套真实 pair 已证明 source install，第四套暴露 chain mismatch，第五套已证明 chain-continuous pair、handoff 与修复后独立 clone preflight。upgrade、acceptance process-group/crash、其余主序列、真实桌面启动、重启、完整 L6 与公开发布仍未证明。
+上述仓库入口本身只证明 prior-terminal anchor、target-only builder、拒绝重建漂移与其他合成合同。第三套真实 pair 已证明 source install，第四套暴露 chain mismatch，第五套已证明 target dpkg apply、production target validation 失败与自动 source recovery；upgrade target terminal completed 仍未证明。精确 target-validation 根因、acceptance process-group/crash、其余主序列、真实桌面启动、重启、完整 L6 与公开发布仍未闭合。
 
 ## 阅读索引
 
