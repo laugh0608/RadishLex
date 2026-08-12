@@ -4,10 +4,10 @@
 
 ## 当前判断
 
-- 复核日期：2026-08-11（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
+- 复核日期：2026-08-12（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format v1、acceptance controller、六步主序列与八点 crash/recovery 合成矩阵已完成。前三次真实推进依次暴露 `dpkg.cfg`、`/run/lock` 与 revision profile 缺口；第四套在 operation ID/CLI 前因 source chain 不连续零 mutation 停止。第五套 pair `d2661cc0…ed15` 的修复后 preflight 通过后只执行一次 upgrade：dpkg 安装 target `38-2` 后 production target validation 失败，事务自动恢复 source `38-1` 并形成 terminal `rolled_back`；source startup/XDG/网络 postflight 通过，九台 VM 全停。
+- L6 format v1、acceptance controller、六步主序列与八点 crash/recovery 合成矩阵已完成。前三次真实推进依次暴露 `dpkg.cfg`、`/run/lock` 与 revision profile 缺口；第四套在 operation ID/CLI 前因 source chain 不连续零 mutation 停止。第五套 pair `d2661cc0…ed15` 的修复后 preflight 通过后只执行一次 upgrade：dpkg 安装 target `38-2` 后 production target validation 失败，事务自动恢复 source `38-1` 并形成 terminal `rolled_back`；source startup/XDG/网络 postflight 通过，九台 VM 全停。离线回归已确认 startup manifest 独立固定 revision `1`，并统一至 relationship 的 canonical release 规则。
 
 ## P04 冻结基线
 
@@ -52,17 +52,17 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 ## 停止线
 
 - 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
-- 不重新启动、恢复、清理或复用前四个 stopped L6 failure/mismatch disk；第五套已形成 terminal `rolled_back` 现场，同样只作失败/恢复取证，未完成离线根因分析前不得启动、重试或复用。各套 evidence 分属不同 config/boot/receipt 身份，不得混用。
+- 不重新启动、恢复、清理或复用前四个 stopped L6 failure/mismatch disk；第五套 terminal `rolled_back` 现场只作失败/恢复取证，仍不得启动、重试或复用。各套 evidence 分属不同 config/boot/receipt 身份，不得混用。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步（2026-08-11）
+## 下一步（2026-08-12）
 
 1. 原样保留第五套 `rolled_back` clone、operation staging/receipt、三套本地 evidence 与修复备份；当前 config/EFI/qcow2 为 `402a…3e9`/`cb8a…bd65`/`e684…8904`，九台均 stopped。
-2. 只在宿主离线分析 target `38-2` 已安装后 production target validation 的精确失败条件；先从现有 actual package、manifest/inventory、observer 与 snapshot/relationship 路径建立可重复的合成失败，不启动 guest。
-3. 修复后补回归门禁，重新形成合规 pair/handoff 与独立 clone，再另行逐步授权；不得原地重试第五套。
+2. 合成回归已复现 target revision `2` 被 startup `-1` 规则拒绝；现与 actual-package relationship 共用 canonical release 校验，第五套只作证据。
+3. 下一批从修复后的 clean commit 重建合规 pair/handoff 与独立 S2 clone，只读 preflight 后再另行授权；本批不启动 clone。
 4. repair、rollback operation、remove、reinstall、acceptance controller、crash/retry、产品启动与 P05C 保持关闭。
 
 ## 验证入口
@@ -84,7 +84,7 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 git diff --check
 ```
 
-上述仓库入口本身只证明 prior-terminal anchor、target-only builder、拒绝重建漂移与其他合成合同。第三套真实 pair 已证明 source install，第四套暴露 chain mismatch，第五套已证明 target dpkg apply、production target validation 失败与自动 source recovery；upgrade target terminal completed 仍未证明。精确 target-validation 根因、acceptance process-group/crash、其余主序列、真实桌面启动、重启、完整 L6 与公开发布仍未闭合。
+上述入口证明 prior-terminal anchor、target-only builder、canonical revision 等合成合同。第三套证明 source install，第四套暴露 chain mismatch，第五套证明 target apply、validation failure 与自动 source recovery；离线根因已闭合，但修复后的 target terminal 尚未证明。acceptance process-group/crash、其余主序列、真实桌面启动、重启、完整 L6 与公开发布仍未闭合。
 
 ## 阅读索引
 

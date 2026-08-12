@@ -16,6 +16,7 @@ pub use status::{
     DpkgCurrentState, DpkgDesiredState, DpkgErrorState, DpkgMultiArch, DpkgPackageRecord,
     DpkgStatusSnapshot,
 };
+pub(crate) use version::validate_radishlex_package_release;
 pub use version::{compare_debian_versions, validate_operation_relation};
 
 const MAX_ARTIFACT_BYTES: u64 = 512 * 1024 * 1024;

@@ -70,7 +70,7 @@ Linux 继续使用 `ime-ffi` ABI v9 已有的：
 
 P05B 后续增加了独立 `radishlex_linux_product_startup_gate` request/result v1。它是与输入热路径分离的 additive Linux 产品启动 ABI，读取编译 build identity、component 与 host 解析的 loaded component path；session/key ABI contract 仍为 v9。Manager 和 Fcitx 共用浅层 C++ binding；binding 在调用 startup ABI 前用 `dladdr` 与 canonical path 证明 startup/error symbols 来自 component 的精确 sibling FFI，Fcitx 还证明全部输入热路径 FFI symbols 来自同一 sibling，拒绝 `LD_LIBRARY_PATH`、preload 或其他 loader interposition。只有与 `development-staged` 或 `debian-system-product` 编译身份精确对应的 allow result 才形成 move-only permit，未知 result、交叉身份或 symbol origin 漂移均失败关闭。
 
-当前真实缺口不在输入 ABI、addon 编译、Manager privacy、删除恢复、导入导出、重启矩阵、P05A 产品载荷，或 P05B 的 package relationship/system port/startup gate/controller。L6 format v1、compile-isolated acceptance checkpoint/evidence controller、首次 source install、S1/S2、prior-terminal source anchor，以及第五套 target apply/validation failure/自动 source recovery 已完成；精确 target-validation 根因、upgrade target terminal、remove/显式 rollback、crash/retry、产品 linked startup 动态负向、真实产品启动、重启与 P05C 仍未完成，这些能力不需要增加平台私有输入 ABI。
+当前真实缺口不在输入 ABI、addon 编译、Manager privacy、删除恢复、导入导出、重启矩阵、P05A 产品载荷，或 P05B 的 package relationship/system port/startup gate/controller。L6 format v1、compile-isolated acceptance checkpoint/evidence controller、首次 source install、S1/S2、prior-terminal source anchor、第五套 target apply/validation failure/自动 source recovery，以及 startup revision 根因与合成回归门禁已完成；修复后的 upgrade target terminal、remove/显式 rollback、crash/retry、产品 linked startup 动态负向、真实产品启动、重启与 P05C 仍未完成，这些能力不需要增加平台私有输入 ABI。
 
 ### Flutter Manager
 
@@ -270,7 +270,7 @@ M5-P04 已覆盖：
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
 - P04 已按 `docs/linux-manager-local-acceptance.md` 冻结完成，不重复其导入导出、同库和重启实机；既有 guest 资产不得清理、覆盖或改作 P05 载体。
-- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、advisory guard、production observer/executor/mutable port、process parser、authorized CLI、startup dependency gate、L6 format v1、compile-isolated checkpoint/evidence controller 和 ARM64 release pair 已完成；五套独立 L6 现场均已停止并保留取证，第五套不得原地重试。当前只做宿主离线根因分析；未获后续逐项授权不能运行 acceptance/maintenance CLI、`dpkg`、产品进程或写真实系统。
+- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、advisory guard、production observer/executor/mutable port、process parser、authorized CLI、startup dependency gate、L6 format v1、compile-isolated checkpoint/evidence controller 和 ARM64 release pair 已完成；五套独立 L6 现场均已停止并保留取证，第五套不得原地重试。startup revision 根因与合成回归已闭合，下一步只从修复后的 clean commit 重建 pair/clone；未获后续逐项授权不能运行 acceptance/maintenance CLI、`dpkg`、产品进程或写真实系统。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。

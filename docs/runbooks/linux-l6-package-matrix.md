@@ -68,7 +68,7 @@
 | `RadishLex-L6-Handoff-1ebbdab` | 非 VM；第五个 canonical handoff | record `d2661cc0…ed15`；source 精确等于 S2 terminal installed artifact，target package `cdac2f32…7c26`，builder/宿主 verifier 与 8 文件 mode/link/hash 通过；下一套独立 clone 的唯一 pair 输入，不覆盖旧 handoff |
 | `RadishLex-L6-Preflight-1ebbdab` | 非 VM；修复前 host local evidence | local evidence `74932b8c…4f51`，input-switch/readonly evidence `70833344…70f8`/`6e44f027…6e48`；记录 UTM runtime adapter 偏差、断网边界、chain/startup/XDG 与旧 config `27cb…c3c`，不是修复后 config 身份或 canonical session evidence |
 | `RadishLex-L6-Preflight-1ebbdab-post-repair` | 非 VM；修复后 host local evidence | readonly/JSON evidence `9ecd7f54…3089`/`bf2e0591…d09f`；绑定 `Network=[]` 冷启动、loopback-only/双路由为空、chain/startup/XDG/进程静止与 postflight disk identity；`0700` 目录、`0600` 文件，不是 canonical session evidence |
-| `RadishLex-L6-Upgrade-1ebbdab-rolled-back` | 非 VM；upgrade failure/recovery evidence | text/JSON `98319405…2378`/`64d5395f…e3d8`；CLI、dpkg log、receipt 摘要与 rolled-back startup/XDG postflight 均为 `0600`，只含 operation ID SHA-256；精确 target-validation 根因尚未隔离 |
+| `RadishLex-L6-Upgrade-1ebbdab-rolled-back` | 非 VM；upgrade failure/recovery evidence | text/JSON `98319405…2378`/`64d5395f…e3d8`；CLI、dpkg log、receipt 摘要与 rolled-back startup/XDG postflight 均为 `0600`，只含 operation ID SHA-256；startup revision `1` 根因已离线复现并补门禁，现场仍不得复用 |
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-56dd4de.utm` | 已注册；第四套 mismatch stopped | UUID `A3F757B1-CE75-4F23-9509-CAD033260AA1`；operation ID/CLI 前确认 artifact chain 不连续并停止。config/EFI/qcow2 SHA-256 为 `61daca92…9239`/`d32181b0…1960`/`5afb3356…b6d0`；不重启、覆盖、恢复或复用 |
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-1ebbdab.utm` | 已注册；第五套 rolled-back stopped | UUID `9C5638D7-0F97-4BD8-8A83-ABCDFCADAC6C`；target validation 失败后自动恢复 source，terminal receipt/source startup/XDG 通过；config/EFI/qcow2 `402a5840…3e9`/`cb8a697b…bd65`/`e684f829…8904`。不启动或重试 |
 
@@ -268,7 +268,7 @@ UTM guest-agent 的传输返回码或空输出不能单独证明 transaction com
 
 UTM 磁盘配置使用空 `Network` 数组也不能单独证明 guest 运行态断网；删除整个必填键会使 UTM 4.7.5 冷加载失败，注册缓存仍可能在首次启动挂回虚拟网卡并取得 DHCP。每次启动后、写入 artifact input 或生成 operation ID 前，都必须在 guest 内复验目标接口 down 且 IPv4/IPv6 路由为空；任一网络状态不明立即停止，不把后续断网状态倒推成“从启动起全程离线”。
 
-前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个 clone 处于 operation ID/CLI 前的 artifact-chain mismatch；第五个 clone 在 target installed 后 production validation 失败并自动恢复 source，terminal `rolled_back`。五个现场均已停止并原样保留，不得热替换、恢复、跨 pair 混搭或原地重试。下一步只在宿主离线隔离 target-validation 精确失败条件，修复与合成门禁通过后重新形成 pair/handoff/独立 clone。repair、rollback operation、remove、reinstall 与 crash/retry 仍需逐次授权。
+前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个 clone 处于 operation ID/CLI 前的 artifact-chain mismatch；第五个 clone 在 target installed 后 production validation 失败并自动恢复 source，terminal `rolled_back`。五个现场均已停止并原样保留，不得热替换、恢复、跨 pair 混搭或原地重试。target-validation 已离线复现为 startup installed-product manifest 固定 revision `1`，共享 canonical release 修复与合成门禁已通过；下一步从修复后的 clean commit 重新形成 pair/handoff/独立 clone。repair、rollback operation、remove、reinstall 与 crash/retry 仍需逐次授权。
 
 ## 10. L6 完成与后续
 

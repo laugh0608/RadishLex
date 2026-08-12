@@ -151,7 +151,7 @@ pub(super) fn validate_radishlex_package_version(
     Ok(())
 }
 
-pub(super) fn validate_radishlex_package_release(
+pub(crate) fn validate_radishlex_package_release(
     value: &str,
     expected_product_version: &str,
     expected_build_number: &str,

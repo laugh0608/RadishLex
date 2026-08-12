@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::debian::validate_radishlex_package_release;
 use crate::model::LinuxArtifactIdentity;
 
 use super::super::read_only_state::same_file_identity;
@@ -211,8 +212,6 @@ fn validate_manifest_identity(
         "fonts-dejavu-core",
         "fonts-noto-cjk",
     ];
-    let expected_package_version =
-        format!("{}+{}-1", product.product_version, product.build_number);
     if normalized_strings
         .iter()
         .any(|value| value.is_empty() || value.trim() != *value)
@@ -227,7 +226,12 @@ fn validate_manifest_identity(
         || product.multiarch_tuple != "aarch64-linux-gnu"
         || product.package_name != artifact.package_name()
         || product.package_version != artifact.package_version()
-        || product.package_version != expected_package_version
+        || validate_radishlex_package_release(
+            &product.package_version,
+            &product.product_version,
+            &product.build_number,
+        )
+        .is_err()
         || product.debian_architecture != artifact.architecture()
         || product.runtime_layout != data_contract.runtime_layout()
         || product.data_layout != data_contract.data_layout()

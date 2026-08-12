@@ -207,6 +207,35 @@ fn system_component_reader_binds_complete_product_inventories() {
 }
 
 #[test]
+fn installed_product_validation_accepts_adjacent_positive_debian_revision() {
+    let target = SystemProductFixture::with_package_version(
+        "installed-product-adjacent-revision",
+        "26.7.1+38-2",
+    );
+    validate_system_product(&target.site.paths, 9, &target.artifact)
+        .expect("validate the complete installed target revision inventory");
+}
+
+#[test]
+fn installed_product_validation_rejects_noncanonical_or_mismatched_release() {
+    for (label, package_version) in [
+        ("zero-revision", "26.7.1+38-0"),
+        ("leading-zero-revision", "26.7.1+38-02"),
+        ("product-version-mismatch", "26.7.2+38-2"),
+        ("build-number-mismatch", "26.7.1+39-2"),
+    ] {
+        let fixture = SystemProductFixture::with_package_version(label, package_version);
+        assert_eq!(
+            validate_system_product(&fixture.site.paths, 9, &fixture.artifact)
+                .expect_err("noncanonical or mismatched package release must fail")
+                .code(),
+            LinuxStartupPortErrorCode::PackageIdentityChanged,
+            "unexpected validation result for {package_version}",
+        );
+    }
+}
+
+#[test]
 fn system_component_reader_rejects_untracked_tree_entries_and_payload_drift() {
     let manager_extra = SystemProductFixture::new("manager-extra");
     write_mode(
@@ -402,6 +431,10 @@ struct SystemProductFixture {
 
 impl SystemProductFixture {
     fn new(label: &str) -> Self {
+        Self::with_package_version(label, "26.7.1+38-1")
+    }
+
+    fn with_package_version(label: &str, package_version: &str) -> Self {
         let site = TestSite::new(label);
         let manager_root = site
             .paths
@@ -615,7 +648,7 @@ impl SystemProductFixture {
                 "manager_application_id": "dev.radishlex.radishlexManager",
                 "multiarch_tuple": "aarch64-linux-gnu",
                 "package_name": "radishlex",
-                "package_version": "26.7.1+38-1",
+                "package_version": package_version,
                 "privacy_format_version": 1,
                 "product_id": "radishlex-linux",
                 "product_manifest_format_version": 1,
@@ -630,7 +663,7 @@ impl SystemProductFixture {
         });
         let manifest_bytes = canonical_manifest_bytes(&manifest);
         write_mode(&site.paths.product_manifest_path, &manifest_bytes, 0o644);
-        let artifact = artifact_with_manifest_hash("26.7.1+38-1", 0x7a, sha256(&manifest_bytes));
+        let artifact = artifact_with_manifest_hash(package_version, 0x7a, sha256(&manifest_bytes));
         Self { site, artifact }
     }
 
@@ -673,6 +706,7 @@ impl SystemProductFixture {
     }
 
     fn rewrite_manifest(&self, mutate: impl FnOnce(&mut Value)) -> LinuxArtifactIdentity {
+        let package_version = self.artifact.package_version().to_owned();
         let mut manifest: Value = serde_json::from_slice(
             &fs::read(&self.site.paths.product_manifest_path).expect("read product manifest"),
         )
@@ -686,7 +720,7 @@ impl SystemProductFixture {
             fs::Permissions::from_mode(0o644),
         )
         .expect("restore product manifest mode");
-        artifact_with_manifest_hash("26.7.1+38-1", 0x7a, sha256(&bytes))
+        artifact_with_manifest_hash(&package_version, 0x7a, sha256(&bytes))
     }
 }
 
