@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 代码、L6 format v1、acceptance controller 与 release-pair verifier 已闭合。前三套真实推进暴露两个 Debian 环境缺口与 revision profile 缺口；第四套在 operation ID/CLI 前确认 source chain 不连续。第五套 chain-continuous pair `d2661cc0…ed15` 的修复后 preflight 通过后，2026-08-11 只执行一次 production source→target upgrade；dpkg 已安装 target `38-2`，但 production target validation 失败，事务自动恢复 source `38-1` 并形成 terminal `rolled_back`。2026-08-12 离线回归确认 startup installed-product manifest 仍固定 revision `1`，现已统一 canonical release 校验并补门禁。source proof、双 startup gate `0:1:2:2:11`、XDG 与进程静止通过；未重试或进入其他 operation。关机后 config/EFI/qcow2 为 `402a5840…3e9`/`cb8a697b…bd65`/`e684f829…8904`，九台 VM 全停。v1 package 不含 RadishLex maintainer scripts。
+- production 代码、L6 format v1、acceptance controller 与 release-pair verifier 已闭合。前三套真实推进暴露两个 Debian 环境缺口与 revision profile 缺口；第四套在 operation ID/CLI 前确认 source chain 不连续。第五套 chain-continuous pair `d2661cc0…ed15` 只执行一次 upgrade；target validation 失败后自动恢复 source，terminal 为 `rolled_back`。2026-08-12 已统一 startup/relationship canonical release 校验并补门禁；修复 commit `80e49ce` 的第六套 pair/handoff `cda70afa…659b` 已在断网 builder 构建、双 verifier 复验并原子发布，尚未创建 clone 或运行 transaction。第五套现场保持停止，九台 VM 全停。v1 package 不含 RadishLex maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -85,4 +85,4 @@
 
 1. 保留前四个 stopped L6 failure/mismatch disk 与全部 pair/handoff/S0/S1/S2/WAL-drift 资产，并原样保留第五套 `rolled_back` clone、staging、两套 preflight 与 upgrade failure/recovery evidence；不热替换、覆盖、恢复或清理。
 2. 第五套只执行过一次 upgrade：target `38-2` 安装后在 production target validation 失败，自动恢复 source `38-1`；receipt 为 `rolled_back`、`manual_recovery_required=false`，XDG 零漂移，当前 config/EFI/qcow2 为 `402a…3e9`/`cb8a…bd65`/`e684…8904`，九台均 stopped。精确失败条件已离线定位为 startup manifest 独立固定 revision `1`，不得启动或重试该 clone。
-3. 共享 canonical release 修复与合成门禁闭合后，下一步从 clean commit 重新形成合规 pair/handoff 与独立 clone，再逐步授权真实推进。repair、rollback operation、remove、reinstall、crash/retry、P05C、发布、推送、清理、真实同步及其他平台保持关闭。
+3. 修复 commit `80e49ce` 的合规 pair/handoff `cda70afa…659b` 已形成；下一步只从冻结 S2 创建独立 clone、切入该 handoff 并完成断网只读 preflight，真实 transaction 另行授权。repair、rollback operation、remove、reinstall、crash/retry、P05C、发布、推送、清理、真实同步及其他平台保持关闭。

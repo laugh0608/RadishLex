@@ -7,7 +7,7 @@
 - 复核日期：2026-08-12（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format v1、acceptance controller、六步主序列与八点 crash/recovery 合成矩阵已完成。前三次真实推进依次暴露 `dpkg.cfg`、`/run/lock` 与 revision profile 缺口；第四套在 operation ID/CLI 前因 source chain 不连续零 mutation 停止。第五套 pair `d2661cc0…ed15` 的修复后 preflight 通过后只执行一次 upgrade：dpkg 安装 target `38-2` 后 production target validation 失败，事务自动恢复 source `38-1` 并形成 terminal `rolled_back`；source startup/XDG/网络 postflight 通过，九台 VM 全停。离线回归已确认 startup manifest 独立固定 revision `1`，并统一至 relationship 的 canonical release 规则。
+- L6 format v1、acceptance controller、六步主序列与八点 crash/recovery 合成矩阵已完成。第五套 pair `d2661cc0…ed15` 只执行一次 upgrade；target validation 失败后自动恢复 source 并形成 terminal `rolled_back`。离线回归已统一 startup/relationship canonical release 规则；修复 commit `80e49ce` 的第六套 pair/handoff `cda70afa…659b` 已在断网 builder 构建、双 verifier 复验并原子发布，尚未创建 clone 或运行 transaction，九台 VM 全停。
 
 ## P04 冻结基线
 
@@ -44,9 +44,10 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 - L6 matrix 已固定独立 guest、相邻 revision 六步主序列、八个 crash case、probe/evidence 与逐 mutation 授权。acceptance crate 只经默认关闭的 compile feature 取得 hook；controller 终止并等待完整 process group，再证明 group 为空且无 `dpkg` child。production maintenance CLI 已真实运行四次：前两次 install 与第三套首次 upgrade 停在 receipt 前，第三次 source install 完成；acceptance controller 仍未运行。
 - 前两套分别在 dpkg config 与 guard parent 停止；第三套完成 source install 后由 target revision profile 在新 receipt 前失败关闭；第四套双侧 actual package/preflight 通过，但重建 source 不等于 terminal installed artifact，因 chain 不连续在 operation ID/CLI 前停止。四套现场、pair、handoff、snapshot 与 XDG 均保留，精确 identity/hashes 见 L6 runbook。
 - release-pair contract 现将 S2 source package/evidence 的文件名、size、SHA-256 与 `prior-terminal-installed-artifact-v1` policy 固定进 committed JSON。builder CLI 只接受这两个 source 文件、一个 clean target root 与 absent output；先以独立 helper 做 canonical evidence/identity/exclusive-copy/fsync，再构建 target，并以 target production Rust verifier 逐侧解析 actual `.deb`。同版本 source bytes 或 evidence 漂移均在发布前失败。
-- 第五套 pair 固定 source `55351f2`/target `1ebbdab`，source package/evidence 仍为 `09ed1228…bec`/`fe3d6297…cf94`，target 为 `cdac2f32…7c26`/`7786847c…2d5f`。production/acceptance ELF 为 `3bb2925f…401c`/`29cb1b1a…ae76`；构建位于仅 loopback、零路由 namespace，冻结依赖清单构建前后通过，builder package/state/XDG 未创建。宿主以 absent `.incoming` 接收、复验后同父目录原子发布，旧四套 handoff 未覆盖。
+- 第五套 pair `d2661cc0…ed15` 精确复用 S2 source `09ed1228…bec`，target 为 `cdac2f32…7c26`；断网构建、双 verifier 与 absent `.incoming` 原子发布通过，builder package/state/XDG 未创建，旧 handoff 未覆盖。
 - 2026-08-11 确认 unavailable 根因是 UTM 4.7.5 必填 `Network` 键被删除，而非已证实的 bookmark 损坏；经授权以唯一差异 `Network=[]` 修复并重建同 UUID 注册。修复后 preflight 从启动起仅 `lo` 且双路由为空；record/source/target、receipt/dpkg、20 项依赖、字体、双 startup gate `0:1:2:2:6`、XDG `f3df287f…b86b`、WAL/SHM/profile absence 与产品映射全部通过。UTM guest-agent 的命令级返回/空输出偏差以大文件回读、可靠退出合同和 startup 正负对照消除；临时 probe 仅在 guest tmpfs，已删除并证明 absent。宿主证据 `9ecd7f54…3089`/`bf2e0591…d09f` 以 `0600` 冻结；关机后 config/EFI/qcow2 为 `402a5840…3e9`/`bcdab060…ce8`/`fc552276…8f10`，qcow2 零打开句柄、九台全停。
 - 获得单步授权后 mutation 前各项只读 gate 再次通过；resolved 20 项依赖清单文本摘要为 `28fe1065…6aac`，release-pair 的 production relationship 摘要 `2ee2b7e5…5743` 不是同一序列化口径。production maintenance 只调用一次，exit 0/stdout 为 `maintenance_outcome=rolled_back`：dpkg log 证明先安装 `38-2`，随后恢复 `38-1`。新 receipt `55171bef…6611` 为 `upgrade/target_newer/rolled_back`，failure `target_validation_failed` after `package_mutating`，source proof installed、target proof null、manual recovery false；双 startup `0:1:2:2:11`、XDG/网络/进程静止通过。证据 `98319405…2378`/`64d5395f…e3d8` 已冻结；关机后 disk 为 `402a5840…3e9`/`cb8a697b…bd65`/`e684f829…8904`。
+- 第六套从同一 source anchor 与 clean target `80e49ce` 构建；record `cda70afa…659b`、target `b211d940…d09c`，双 verifier、8 文件 identity 与 archive 回读通过并原子发布。builder package/state absent，旧 handoff 未覆盖。
 - S2 identity `S2-source-data-512e8ab-0c2cefd6` 与公开合成 XDG fingerprint `f3df287f…b86b` 保持冻结：userdb schema v9/quick_check、1 active/0 deleted、settings/privacy 与固定 metadata 通过，WAL/SHM/Fcitx profile absent；完整磁盘/evidence hash 见 L6 runbook。
 
 ## 停止线
@@ -61,8 +62,8 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 ## 下一步（2026-08-12）
 
 1. 原样保留第五套 `rolled_back` clone、operation staging/receipt、三套本地 evidence 与修复备份；当前 config/EFI/qcow2 为 `402a…3e9`/`cb8a…bd65`/`e684…8904`，九台均 stopped。
-2. 合成回归已复现 target revision `2` 被 startup `-1` 规则拒绝；现与 actual-package relationship 共用 canonical release 校验，第五套只作证据。
-3. 下一批从修复后的 clean commit 重建合规 pair/handoff 与独立 S2 clone，只读 preflight 后再另行授权；本批不启动 clone。
+2. 原样保留第六套 handoff `cda70afa…659b`；它绑定修复 commit `80e49ce`、prior-terminal source 与 target `b211d940…d09c`，不得与旧 pair 混搭。
+3. 下一批只从冻结 S2 创建独立 clone、切入第六套 handoff 并完成断网只读 preflight；不在同批生成 operation ID 或运行 transaction。
 4. repair、rollback operation、remove、reinstall、acceptance controller、crash/retry、产品启动与 P05C 保持关闭。
 
 ## 验证入口
@@ -84,7 +85,7 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 git diff --check
 ```
 
-上述入口证明 prior-terminal anchor、target-only builder、canonical revision 等合成合同。第三套证明 source install，第四套暴露 chain mismatch，第五套证明 target apply、validation failure 与自动 source recovery；离线根因已闭合，但修复后的 target terminal 尚未证明。acceptance process-group/crash、其余主序列、真实桌面启动、重启、完整 L6 与公开发布仍未闭合。
+上述入口证明 prior-terminal anchor、target-only builder、canonical revision 等合成合同。第三套证明 source install，第四套暴露 chain mismatch，第五套证明 target apply、validation failure 与自动 source recovery；第六套只证明修复后的可执行文件与 pair/handoff 构建链，尚未证明 guest preflight 或 target terminal。acceptance process-group/crash、其余主序列、真实桌面启动、重启、完整 L6 与公开发布仍未闭合。
 
 ## 阅读索引
 
