@@ -399,6 +399,29 @@ fn staged_upgrade_recomputes_relation_and_checks_both_dependency_profiles() {
 }
 
 #[test]
+fn staged_repair_uses_its_only_target_as_the_effective_source() {
+    let target = ArtifactFixture::new("26.7.1+38-1").verify();
+    let receipt = receipt(
+        LinuxOperationKind::Repair,
+        Some(&target),
+        Some(&target),
+        LinuxInstallState::ArtifactsStaged,
+    );
+    let context = DpkgOperationContext::Resuming { receipt: &receipt };
+    let staged = DpkgStagedOperation::from_packages(
+        None,
+        Some(staged_package(&target, StagedDebSlot::Target)),
+    );
+    let observer = FakeObserver::new([installed_status(&target)], vec![target.clone()]);
+    let mut port = LinuxDpkgTransactionPort::with_parts(observer, FakeExecutor::new([]), vec![]);
+
+    port.validate_staged_operation(context, staged)
+        .expect("single-target staged repair relationship");
+
+    assert_eq!(port.observer().staged_calls, 1);
+}
+
+#[test]
 fn quiescence_failures_never_reach_the_command_executor() {
     let target = ArtifactFixture::new("26.7.1+38-1").verify();
     let receipt = receipt(

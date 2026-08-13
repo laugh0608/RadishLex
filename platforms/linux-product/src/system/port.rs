@@ -10,8 +10,8 @@ use crate::debian::{
     DebianRelationshipErrorCode, DpkgCurrentState, DpkgStatusSnapshot, PrivateStagedDeb,
     StagedDebSlot, VerifiedArtifactRelationship, DPKG_ARCHITECTURE,
 };
-use crate::model::LinuxInstallState;
 use crate::model::{ArtifactSlot, DpkgPackageState, LinuxArtifactIdentity, PackageSnapshot};
+use crate::model::{LinuxInstallState, LinuxOperationKind};
 
 use super::executor::{
     DebianCommandExecutor, DebianExecutionError, DebianExecutionErrorCode,
@@ -98,11 +98,17 @@ where
             .target_artifact()
             .map(|artifact| self.prepared_relationship(artifact).cloned())
             .transpose()?;
-        let relation =
-            validate_operation_relation(context.operation_kind(), source.as_ref(), target.as_ref())
-                .map_err(|error| {
-                    relationship_port_error(error, DpkgPortPhase::OperationValidation)
-                })?;
+        let effective_source = effective_source_relationship(
+            context.operation_kind(),
+            source.as_ref(),
+            target.as_ref(),
+        );
+        let relation = validate_operation_relation(
+            context.operation_kind(),
+            effective_source,
+            target.as_ref(),
+        )
+        .map_err(|error| relationship_port_error(error, DpkgPortPhase::OperationValidation))?;
         if relation != context.version_relation() {
             return Err(port_error(
                 DpkgPortErrorCode::VersionRelationInvalid,
@@ -116,7 +122,7 @@ where
             .map_err(|error| observation_port_error(error, DpkgPortPhase::PackageInspection))?;
         validate_relationship_dependencies(
             &status,
-            source.as_ref(),
+            effective_source,
             target.as_ref(),
             DpkgPortPhase::OperationValidation,
         )
@@ -146,11 +152,19 @@ where
             .target()
             .map(|package| self.verify_staged(package))
             .transpose()?;
-        let relation =
-            validate_operation_relation(context.operation_kind(), source.as_ref(), target.as_ref())
-                .map_err(|error| {
-                    relationship_port_error(error, DpkgPortPhase::StagedOperationValidation)
-                })?;
+        let effective_source = effective_source_relationship(
+            context.operation_kind(),
+            source.as_ref(),
+            target.as_ref(),
+        );
+        let relation = validate_operation_relation(
+            context.operation_kind(),
+            effective_source,
+            target.as_ref(),
+        )
+        .map_err(|error| {
+            relationship_port_error(error, DpkgPortPhase::StagedOperationValidation)
+        })?;
         if relation != context.version_relation() {
             return Err(port_error(
                 DpkgPortErrorCode::VersionRelationInvalid,
@@ -163,7 +177,7 @@ where
         })?;
         validate_relationship_dependencies(
             &status,
-            source.as_ref(),
+            effective_source,
             target.as_ref(),
             DpkgPortPhase::StagedOperationValidation,
         )?;
@@ -504,6 +518,18 @@ fn validate_relationship_dependencies(
             .map_err(|error| relationship_port_error(error, phase))?;
     }
     Ok(())
+}
+
+fn effective_source_relationship<'a>(
+    kind: LinuxOperationKind,
+    source: Option<&'a VerifiedArtifactRelationship>,
+    target: Option<&'a VerifiedArtifactRelationship>,
+) -> Option<&'a VerifiedArtifactRelationship> {
+    if kind == LinuxOperationKind::Repair {
+        target
+    } else {
+        source
+    }
 }
 
 fn require_fixed_staged_package(
