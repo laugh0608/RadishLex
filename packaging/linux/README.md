@@ -30,7 +30,7 @@
 
 2026-08-08 已在 Debian 13 ARM64 从 source `55351f2` revision 1 与 target `e5b6da1` revision 2 的独立 clean root 断网生成并复验真实 release pair。canonical record SHA-256 为 `a9bcf35762b460a23ad9bc062611f8d5edb57e7303861bbcb99e1efb40703dfd`，source/target package 分别为 `b41e32db76388ad18cdeb60e4b40fb8e28710556df87d53bfa5b275ff2ce028c`、`8209c0161609fde3b798628e5c3460e6237c8618f2d26f1452063540c7541295`。该 pair 仍是未安装的私有 L6 输入；没有运行 maintenance/acceptance CLI、`dpkg` 或产品进程。
 
-随后第三套 pair 的 source `09ed1228…bec` 已真实安装并形成 terminal S1/S2。第四套在 upgrade operation ID 前证明同版本重建 source `55fba51b…280f` 不能替代该 terminal artifact；builder 因此改为精确冻结 committed source package/evidence 并只构建 clean target。第五套 source `09ed1228…bec`/target `cdac2f32…7c26` 的真实 ARM64 pair 已通过双侧 parser、独立 verifier、原子 handoff 与独立 S2 clone preflight；单次 transaction 已安装 target，但 production validation 失败并自动恢复 source，terminal 为 `rolled_back`。离线回归已确认 startup installed-product manifest 仍固定 revision `1`，现与 actual-package relationship 共用 canonical release 校验。修复 commit `80e49ce` 的第六套 source `09ed1228…bec`/target `b211d940…d09c` pair/handoff 已形成，独立 S2 clone 的断网只读 preflight 也已通过；第五套现场只作取证，下一步只在另行授权后执行一次第六套 source→target upgrade。
+随后第三套 pair 的 source `09ed1228…bec` 已真实安装并形成 terminal S1/S2。第四套证明同版本重建 source 不能替代 terminal artifact；builder 因此改为精确冻结 committed source并只构建 clean target。第五套 transaction 在 target validation 失败后自动恢复 source，terminal 为 `rolled_back`。共享 canonical release 校验修复后，第六套 source `09ed1228…bec`/target `b211d940…d09c` pair/clone 已在断网边界只执行一次 upgrade并形成 target `completed` terminal；第五套只作取证，下一步另行授权冻结 S3 target-installed snapshot。
 
 仓库中较早的 revision 1 P05A/P05B evidence 只保留为历史未安装载体，不能替代上述 source revision 1/target revision 2 的 L6 pair record，也不能作为 package transaction、startup 或系统安装证据。
 
