@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 代码、L6 format v1、acceptance controller 与 release-pair verifier 已闭合。前三套真实推进暴露两个 Debian 环境缺口与 revision profile 缺口；第四套在 operation ID/CLI 前确认 source chain 不连续。第五套 upgrade 在 target validation 失败后自动恢复 source，terminal 为 `rolled_back`。修复 commit `80e49ce` 的第六套只执行一次 upgrade并形成 target `completed`；S3 target-installed snapshot 已从 stopped disk 原子冻结，XDG 零漂移，十台 VM 全停。v1 package 不含 RadishLex maintainer scripts。
+- production 代码、L6 format v1、acceptance controller 与 release-pair verifier 已闭合。前三套真实推进暴露两个 Debian 环境缺口与 revision profile 缺口；第四套在 operation ID/CLI 前确认 source chain 不连续。第五套 upgrade 在 target validation 失败后自动恢复 source，terminal 为 `rolled_back`。修复 commit `80e49ce` 的第六套只执行一次 upgrade并形成 target `completed`；S3 target-installed snapshot 与独立 repair clone 断网只读 preflight 已冻结，XDG 零漂移，十一台 VM 全停。v1 package 不含 RadishLex maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -85,4 +85,4 @@
 
 1. 保留前四个 stopped L6 failure/mismatch disk 与全部 pair/handoff/S0/S1/S2/WAL-drift 资产，并原样保留第五套 `rolled_back` clone、staging、两套 preflight 与 upgrade failure/recovery evidence；不热替换、覆盖、恢复或清理。
 2. 第五套只执行过一次 upgrade：target `38-2` 安装后在 production target validation 失败，自动恢复 source `38-1`；receipt 为 `rolled_back`、`manual_recovery_required=false`，XDG 零漂移，当前 config/EFI/qcow2 为 `402a…3e9`/`cb8a…bd65`/`e684…8904`。精确失败条件已离线定位为 startup manifest 独立固定 revision `1`，不得启动或重试该 clone。
-3. 第六套 clone `193179D5…EC05` 只执行一次 source→target upgrade并形成 `completed`；S3 `S3-target-installed-80e49ce-6b22499b` 已从 stopped disk 以 APFS COW 原子冻结，evidence `79a3…494b` 绑定 receipt/package/XDG 与 config/EFI/qcow2 `00ba…6456`/`0846…9741`/`6b22…b137`。冻结过程未启动 VM，十台均 stopped。下一步只可另行授权从 S3 创建独立 repair clone并完成断网只读 preflight；repair transaction、rollback operation、remove、reinstall、crash/retry、P05C、发布、推送、清理、真实同步及其他平台保持关闭。
+3. 第六套 clone `193179D5…EC05` 只执行一次 source→target upgrade并形成 `completed`；S3 `S3-target-installed-80e49ce-6b22499b` 与独立 repair clone `A3022255…3107` 的断网只读 preflight 已冻结。preflight evidence `aa10…69e8` 证明 target package/receipt/startup/XDG 不变、operation 目录仍为 2、无 guard，且未生成 operation ID、运行 CLI 或执行 dpkg mutation；repair clone 当前 config/EFI/qcow2 为 `584b…f59b`/`a73a…9155`/`ee6c…5d68`，十一台均 stopped。下一步只可另行授权在该 clone 上重验 mutation preflight并执行单次 repair transaction；rollback operation、remove、reinstall、crash/retry、P05C、发布、推送、清理、真实同步及其他平台保持关闭。

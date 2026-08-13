@@ -4,7 +4,7 @@
 
 ## 状态与产品范围
 
-状态：M5-P01/P02/P03/P04/P05A 已完成。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release、输入/隐私/同库个人化与重启矩阵均已通过。P05A 的 metadata/rootfs、`system` profile 与真实 ARM64 载荷门禁也已通过；P05B 已完成确定性 `.deb`、actual package relationship、恢复事务、fixed-path observer/executor、mutable port、受控 CLI、Manager/Fcitx 共用 startup gate、compile-isolated L6 controller 与真实 ARM64 pair。第三套已完成 source install/S1/S2；第五套形成 `rolled_back`；修复后的第六套已形成 target `completed` terminal。repair、完整 L6 与 P05C 系统验收仍未完成。v1 package 明确没有 RadishLex 自有 maintainer scripts。
+状态：M5-P01/P02/P03/P04/P05A 已完成。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release、输入/隐私/同库个人化与重启矩阵均已通过。P05A 的 metadata/rootfs、`system` profile 与真实 ARM64 载荷门禁也已通过；P05B 已完成确定性 `.deb`、actual package relationship、恢复事务、fixed-path observer/executor、mutable port、受控 CLI、Manager/Fcitx 共用 startup gate、compile-isolated L6 controller 与真实 ARM64 pair。第三套已完成 source install/S1/S2；第五套形成 `rolled_back`；修复后的第六套已形成 target `completed` terminal、S3 与 repair 前只读现场。repair、完整 L6 与 P05C 系统验收仍未完成。v1 package 明确没有 RadishLex 自有 maintainer scripts。
 
 P03 实机证据覆盖 GTK、Qt、Electron、浏览器和终端，包含完整候选交互、焦点/输入法切换、Fcitx/桌面会话重启、进程级地址族限制与整台 guest 断网。password、terminal、unknown 与 Qt `Sensitive` 后的 userdb 聚合保持全零；当前 GTK4 frontend 未把 `PRIVATE` 传播为 Fcitx `Sensitive`，因此依赖既有 unknown 失败关闭而非虚构 capability。Qt backend 只以 QPA、会话类型和 input-context plugin 的组合证据判定，不能因进程映射 `libQt6WaylandClient` 就声明原生 Wayland。快速 X11→Wayland 登录暴露的 `im-launch` 跳过 daemon 问题已用 Debian 官方 desktop entry 的用户级 autostart 副本闭合；该开发设置不替代 P05 产品安装与维护设计。
 
@@ -270,7 +270,7 @@ M5-P04 已覆盖：
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
 - P04 已按 `docs/linux-manager-local-acceptance.md` 冻结完成，不重复其导入导出、同库和重启实机；既有 guest 资产不得清理、覆盖或改作 P05 载体。
-- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、恢复事务、production port/CLI、startup gate、L6 format/controller 和 ARM64 pair 已完成；前五套现场只作取证，第五套不得原地重试。第六套 source→target upgrade 与 S3 target-installed snapshot 已完成；下一步只在另行授权后从 S3 创建独立 repair clone并完成断网只读 preflight，未获授权不能再运行 maintenance/acceptance CLI、`dpkg`、产品进程或写真实系统。
+- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、恢复事务、production port/CLI、startup gate、L6 format/controller 和 ARM64 pair 已完成；前五套现场只作取证，第五套不得原地重试。第六套 source→target upgrade、S3 与独立 repair clone 断网只读 preflight 已完成；下一步只在另行授权后重验 mutation preflight并执行单次 repair，未获授权不能再运行 maintenance/acceptance CLI、`dpkg`、产品进程或写真实系统。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。

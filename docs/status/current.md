@@ -7,7 +7,7 @@
 - 复核日期：2026-08-13（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format v1、acceptance controller 与合成矩阵已完成。第五套 upgrade 自动恢复 source并形成 `rolled_back`；修复后的第六套只执行一次 upgrade并形成 target `completed`，S3 target-installed snapshot 已从 stopped disk 原子冻结，十台 VM 全停。
+- L6 format v1、acceptance controller 与合成矩阵已完成。第五套形成 `rolled_back`；第六套单次 upgrade 形成 target `completed`，S3 与独立 repair preflight 已冻结，十一台 VM 全停。
 
 ## P04 冻结基线
 
@@ -48,7 +48,8 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 - 2026-08-11 确认 unavailable 根因是 UTM 4.7.5 必填 `Network` 键被删除，而非已证实的 bookmark 损坏；经授权以唯一差异 `Network=[]` 修复并重建同 UUID 注册。修复后 preflight 从启动起仅 `lo` 且双路由为空；record/source/target、receipt/dpkg、20 项依赖、字体、双 startup gate `0:1:2:2:6`、XDG `f3df287f…b86b`、WAL/SHM/profile absence 与产品映射全部通过。UTM guest-agent 的命令级返回/空输出偏差以大文件回读、可靠退出合同和 startup 正负对照消除；临时 probe 仅在 guest tmpfs，已删除并证明 absent。宿主证据 `9ecd7f54…3089`/`bf2e0591…d09f` 以 `0600` 冻结；关机后 config/EFI/qcow2 为 `402a5840…3e9`/`bcdab060…ce8`/`fc552276…8f10`，qcow2 零打开句柄、九台全停。
 - 获得单步授权后 mutation 前各项只读 gate 再次通过；resolved 20 项依赖清单文本摘要为 `28fe1065…6aac`，release-pair 的 production relationship 摘要 `2ee2b7e5…5743` 不是同一序列化口径。production maintenance 只调用一次，exit 0/stdout 为 `maintenance_outcome=rolled_back`：dpkg log 证明先安装 `38-2`，随后恢复 `38-1`。新 receipt `55171bef…6611` 为 `upgrade/target_newer/rolled_back`，failure `target_validation_failed` after `package_mutating`，source proof installed、target proof null、manual recovery false；双 startup `0:1:2:2:11`、XDG/网络/进程静止通过。证据 `98319405…2378`/`64d5395f…e3d8` 已冻结；关机后 disk 为 `402a5840…3e9`/`cb8a697b…bd65`/`e684f829…8904`。
 - 第六套只执行一次 production upgrade，exit 0/stdout `maintenance_outcome=completed`。receipt `ccbc4cd0…1e60` 为 `upgrade/target_newer/completed`，target proof `b211d940…d09c`；dpkg audit/verify、startup 正负向、XDG `f3df…b86b`、网络与进程 postflight 通过。evidence `044c7a25…64e`/`9cc50665…f695` 已冻结；关机后 config/EFI/qcow2 为 `00ba…6456`/`0846…9741`/`6b22…b137`，十台全停。
-- S3 `S3-target-installed-80e49ce-6b22499b` 已在不启动 VM 下从第六套 stopped disk 原子冻结；三项磁盘哈希与 source 一致，evidence `79a3…494b` 绑定 receipt/package/XDG。源盘/快照零句柄，十台全停；权限与完整哈希见 L6 runbook。
+- S3 `S3-target-installed-80e49ce-6b22499b` 已原子冻结，evidence `79a3…494b` 绑定 receipt/package/XDG 与恢复字节。
+- 独立 repair clone `A3022255…3107` 的断网文件回读 preflight 已通过；package/receipt/startup/XDG 未漂移，未生成 operation ID、运行 CLI 或执行 dpkg mutation。evidence `aa10…69e8` 已冻结，十一台全停；完整磁盘身份见 L6 runbook。
 - S2 identity `S2-source-data-512e8ab-0c2cefd6` 与公开合成 XDG fingerprint `f3df287f…b86b` 保持冻结：userdb schema v9/quick_check、1 active/0 deleted、settings/privacy 与固定 metadata 通过，WAL/SHM/Fcitx profile absent；完整磁盘/evidence hash 见 L6 runbook。
 
 ## 停止线
@@ -63,9 +64,9 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 ## 下一步（2026-08-13）
 
 1. 原样保留第五套 `rolled_back` clone、operation staging/receipt、三套本地 evidence 与修复备份；不得启动、重试或与第六套证据混用。
-2. 原样保留第六套 target-completed clone、handoff、旧 input、preflight/upgrade evidence与冻结 S3；S3 identity 为 `S3-target-installed-80e49ce-6b22499b`，十台均 stopped。
-3. 下一批必须另行授权，只从冻结 S3 创建独立 repair clone并完成断网只读 preflight；不在同批生成 operation ID 或运行 repair。
-4. repair transaction、rollback operation、remove、reinstall、acceptance controller、crash/retry、产品启动与 P05C 保持关闭。
+2. 原样保留第六套 target-completed clone、handoff、旧 input、preflight/upgrade evidence、冻结 S3、repair clone 与 repair-preflight evidence；十一台均 stopped。
+3. 下一批须另行授权：在 repair clone 重验 mutation preflight，生成新 operation ID并只执行一次 production repair；本次只读 preflight 不包含该授权。
+4. 第二次 repair、rollback operation、remove、reinstall、acceptance controller、crash/retry、产品启动与 P05C 保持关闭。
 
 ## 验证入口
 
@@ -86,7 +87,7 @@ M5-P03/P04 已在 UTM Debian 13 ARM64 完成 Wayland/X11、GTK/Qt/Electron/Firef
 git diff --check
 ```
 
-上述入口证明 prior-terminal anchor、target-only builder、canonical revision 等合成合同。第三套证明 source install，第四套暴露 chain mismatch，第五套证明 target apply/failure/recovery；第六套已证明修复后的 target terminal。repair 及其后主序列、八个真实 crash case、桌面启动、重启、完整 L6 与公开发布仍未闭合。
+上述入口证明 prior-terminal anchor、target-only builder、canonical revision 等合成合同。第三套证明 source install，第四套暴露 chain mismatch，第五套证明 target apply/failure/recovery；第六套已证明修复后的 target terminal与 repair 前只读现场。repair transaction 及其后主序列、八个真实 crash case、桌面启动、重启、完整 L6 与公开发布仍未闭合。
 
 ## 阅读索引
 

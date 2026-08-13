@@ -14,7 +14,7 @@
 
 ## 当前执行状态
 
-截至 2026-08-12：
+截至 2026-08-13：
 
 - production transaction/startup 代码、actual `.deb` verifier 和 fake command/crash matrix 已完成；
 - L6 guest、release pair、六步事务顺序、八个 crash checkpoint、字体/startup/XDG probe 和证据保留规则已由 format v1 固定；
@@ -45,10 +45,13 @@
 - 另行授权后只启动第六套 clone，重新闭合断网、pair/receipt/dependency/font/startup/XDG/process preflight，再在 guest 内生成随机 operation ID；宿主 evidence 只保存 SHA-256 `d22cad12…1b04`。带不可重复 marker 的 executor 只调用一次 production maintenance，exit 0、stderr 空、stdout `maintenance_outcome=completed`；dpkg log 证明 target `38-2` installed。receipt `ccbc4cd0…1e60` 为 `upgrade/target_newer/completed`、chain 2、target proof `b211d940…d09c`、failure null、manual recovery false。
 - target terminal postflight 证明 package `38-2`、dpkg status `c09365b3…cece`、audit/verify clean、20 项依赖、manifest `9f08c7fb…0196`、双 FFI `f51dc0f1…50d3`、startup 正向 `0:1:2:2:6`/负向 component 9、XDG `f3df287f…b86b`、WAL/SHM/profile absence、进程与网络静止全部通过。command/local evidence `044c7a25…64e`/`9cc50665…f695` 已从 absent `.incoming` 原子冻结；正常关机后 config/EFI/qcow2 `00bac87d…456`/`0846b1d3…9741`/`6b22499b…b137`，qcow2 零打开句柄，十台全停。没有 repair 或第二次 maintenance invocation。
 - 在后续独立授权中未启动任何 VM，只从第六套 stopped disk 以 APFS clonefile 复制 config/EFI/qcow2 到 absent `S3-target-installed-80e49ce.incoming`，逐项 SHA-256 与 source `00bac87d…456`/`0846b1d3…9741`/`6b22499b…b137` 一致后原子发布。S3 identity 为 `S3-target-installed-80e49ce-6b22499b`；mode `0600` local evidence SHA-256 `79a3a170…494b` 绑定 parent S2、receipt `ccbc4cd0…1e60`、target package/evidence `b211d940…d09c`/`2a1132c6…0e1b`、XDG `f3df287f…b86b` 与磁盘 identity，不含 raw operation ID、raw receipt 或完整 dpkg log。源盘/快照 qcow2 零打开句柄，十台仍全停，repair 未开始。
+- 另一次独立授权先确认十台 VM 全停，再由 plain `utmctl clone` 从三项恢复字节与 S3 一致的 registered target-terminal VM 创建 repair clone `A3022255-ED08-4C66-92D3-075A6BB93107`。新 clone 启动前 EFI/qcow 与 S3 逐字节相同，config 除 `Information.Name`/`UUID` 外语义相同且 `Network=[]`；注册数增至十一。第一条 guest 命令即证明只有 `lo`、IPv4/IPv6 路由为空，之后才向 noexec `/run` 写入已哈希的只读脚本与 startup probe。
+- 首次直接执行 `/run` stage1 因 noexec 返回 126，target 未运行；改由解释器后 stage1 通过，target 又停在超出正式合同的本地 `4e00-9fff` charset 字符串假设。只读诊断证明 `fonts-noto-cjk 1:20240730+repack1-1` 已安装、owner 与 `Noto Sans CJK SC` family 精确解析，TTC 实际声明 `4e00-9fef`；删除该额外字符串假设后，正式 package/owner/family 合同未放宽。两次诊断均未进入 CLI、dpkg 或产品状态。
+- 最终文件回读证明 stage1/target exit 均为 0：pair/input、target package `38-2`、receipt `ccbc4cd0…1e60`、dpkg audit/verify、20 项依赖、字体、manifest/双 FFI、startup 正负向、XDG `f3df287f…b86b`、WAL/SHM/profile absence、进程与断网状态均通过；operation 目录仍为 2、guard absent，未生成 operation ID、运行 maintenance/acceptance CLI、调用 dpkg mutation、启动产品或写用户 XDG。local evidence/accepted bundle SHA-256 为 `aa10e919…69e8`/`180c19ad…0cd`；正常关机后 config/EFI/qcow2 为 `584bf2b5…f59b`/`a73a3266…9155`/`ee6cedf8…5d68`，qcow2 零句柄，十一台全停。
 
 ### 当前本地资产登记（非发布证据）
 
-冻结资产宿主根为 `/Users/luobo/VirtualMachines`；第四、第五和第六套 clone package 位于 UTM 默认 Documents 目录。第五套为 `rolled_back` failure/recovery 现场；第六套已形成 target `completed` terminal与 S3 snapshot。plain `utmctl` 枚举十台且全部 stopped。`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。前五个 failure/mismatch/rolled-back 现场只作取证；第六套原现场与 S3 不直接执行 repair，后续只能从 S3 新建独立 clone。全部 handoff、snapshot 与 host evidence 继续保留且不得混用。UTM 只使用 `PATH` 中的 plain `utmctl`，任何时刻最多运行一台 VM。
+冻结资产宿主根为 `/Users/luobo/VirtualMachines`；第四、第五、第六套与 repair clone package 位于 UTM 默认 Documents 目录。第五套为 `rolled_back` failure/recovery 现场；第六套已形成 target `completed` terminal、S3 snapshot 与 repair 前只读现场。plain `utmctl` 枚举十一台且全部 stopped。`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。前五个 failure/mismatch/rolled-back 现场只作取证；第六套原现场与 S3 不直接执行 repair，下一次 mutation 只允许使用已通过预检的 repair clone。全部 handoff、snapshot 与 host evidence 继续保留且不得混用。UTM 只使用 `PATH` 中的 plain `utmctl`，任何时刻最多运行一台 VM。
 
 | 相对路径 | UTM 状态 | 唯一职责与保留线 |
 | --- | --- | --- |
@@ -75,12 +78,14 @@
 | `RadishLex-L6-Handoff-80e49ce` | 非 VM；第六个 canonical handoff | record `cda70afa…659b`；修复 commit `80e49ce`、prior-terminal source `09ed1228…bec`、target `b211d940…d09c`，双 verifier 与 8 文件 mode/link/hash 通过；已作为第六套独立 S2 clone 的唯一 pair 输入 |
 | `RadishLex-L6-Preflight-80e49ce` | 非 VM；第六套 host local evidence | readonly/local evidence `9e84eaf2…e3f`/`dcdd5acb…df36`；绑定 loopback-only/零路由、input switch、chain/dependency/font/startup/XDG/process 静止、probe 清理与 postflight disk identity；`0700` 目录、`0600` 单 link 文件，不是 transaction evidence |
 | `RadishLex-L6-Upgrade-80e49ce-completed` | 非 VM；第六套 upgrade evidence | command/local evidence `044c7a25…64e`/`9cc50665…f695`；只保存 operation ID hash、单次 invocation、receipt/dpkg/startup/XDG/网络 terminal 摘要与 postflight disk identity，不保存 raw operation ID、raw receipt 或完整 dpkg log；`0700` 目录、9 个 `0600` 单 link 文件 |
+| `RadishLex-L6-Repair-Preflight-80e49ce` | 非 VM；repair host local evidence | local/accepted bundle `aa10e919…69e8`/`180c19ad…0cd`；绑定 S3、clone 前后磁盘、断网、pair/package/receipt/dependency/font/startup/XDG/process 与 operation/guard absence；另保留 noexec/charset 两次只读诊断 bundle `39733904…4097`，不含 raw operation ID、raw receipt 或完整 dpkg log；目录 `0700`、3 文件 `0600` 单 link |
 | `RadishLex-L6-Preflight-1ebbdab` | 非 VM；修复前 host local evidence | local evidence `74932b8c…4f51`，input-switch/readonly evidence `70833344…70f8`/`6e44f027…6e48`；记录 UTM runtime adapter 偏差、断网边界、chain/startup/XDG 与旧 config `27cb…c3c`，不是修复后 config 身份或 canonical session evidence |
 | `RadishLex-L6-Preflight-1ebbdab-post-repair` | 非 VM；修复后 host local evidence | readonly/JSON evidence `9ecd7f54…3089`/`bf2e0591…d09f`；绑定 `Network=[]` 冷启动、loopback-only/双路由为空、chain/startup/XDG/进程静止与 postflight disk identity；`0700` 目录、`0600` 文件，不是 canonical session evidence |
 | `RadishLex-L6-Upgrade-1ebbdab-rolled-back` | 非 VM；upgrade failure/recovery evidence | text/JSON `98319405…2378`/`64d5395f…e3d8`；CLI、dpkg log、receipt 摘要与 rolled-back startup/XDG postflight 均为 `0600`，只含 operation ID SHA-256；startup revision `1` 根因已离线复现并补门禁，现场仍不得复用 |
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-56dd4de.utm` | 已注册；第四套 mismatch stopped | UUID `A3F757B1-CE75-4F23-9509-CAD033260AA1`；operation ID/CLI 前确认 artifact chain 不连续并停止。config/EFI/qcow2 SHA-256 为 `61daca92…9239`/`d32181b0…1960`/`5afb3356…b6d0`；不重启、覆盖、恢复或复用 |
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-1ebbdab.utm` | 已注册；第五套 rolled-back stopped | UUID `9C5638D7-0F97-4BD8-8A83-ABCDFCADAC6C`；target validation 失败后自动恢复 source，terminal receipt/source startup/XDG 通过；config/EFI/qcow2 `402a5840…3e9`/`cb8a697b…bd65`/`e684f829…8904`。不启动或重试 |
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-80e49ce.utm` | 已注册；第六套 target completed stopped | UUID `193179D5-2595-4628-A063-9EFB73F8EC05`；单次 upgrade 后 target `38-2`、receipt/startup/XDG postflight 通过；config/EFI/qcow2 `00bac87d…456`/`0846b1d3…9741`/`6b22499b…b137`。S3 已冻结，原现场继续保留且不直接 repair |
+| `UTM Documents/RadishLex-Debian13-ARM64-L6-80e49ce-repair.utm` | 已注册；repair preflight stopped | UUID `A3022255-ED08-4C66-92D3-075A6BB93107`；启动前 EFI/qcow 与 S3 一致、config 仅 Name/UUID 差异且 `Network=[]`。只读 preflight 通过，operation/guard/CLI/dpkg mutation 均未新增；关机后 config/EFI/qcow2 `584bf2b5…f59b`/`a73a3266…9155`/`ee6cedf8…5d68`。下一次只可另行授权单次 repair |
 
 两个在 QEMU 引导前因缓存 2222 转发失败、从未运行 guest 的旧 PairBuilder clone 已在单独授权后从 UTM 注册表和磁盘删除；它们不含 package transaction 或 canonical evidence。当前资产仍各有独立职责，不因 UTM 面板是否显示而删除。L6 闭合后可另行授权评估剩余 builder、DependencyFrozen 与 host handoff 的保留期；P04、CleanBase、四个 failure/mismatch L6 和任何 S0/S1/S2/S3 恢复点仍按各自停止线保留。该表只登记本机运维角色，不进入 canonical pair/checkpoint/session evidence。
 
@@ -282,7 +287,7 @@ UTM guest-agent 的传输返回码或空输出不能单独证明 transaction com
 
 UTM 磁盘配置使用空 `Network` 数组也不能单独证明 guest 运行态断网；删除整个必填键会使 UTM 4.7.5 冷加载失败，注册缓存仍可能在首次启动挂回虚拟网卡并取得 DHCP。每次启动后、写入 artifact input 或生成 operation ID 前，都必须在 guest 内复验目标接口 down 且 IPv4/IPv6 路由为空；任一网络状态不明立即停止，不把后续断网状态倒推成“从启动起全程离线”。
 
-前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个在 target validation 失败后自动恢复 source，terminal `rolled_back`。五个现场均停止并原样保留，不得热替换、恢复、跨 pair 混搭或原地重试。共享 canonical release 修复后的第六套已形成 target `completed` terminal并冻结 S3；下一步只在独立授权中从 S3 创建 repair clone并完成断网只读 preflight，不在同批生成 operation ID 或执行 repair。repair、rollback operation、remove、reinstall 与 crash/retry 仍需逐次授权。
+前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个在 target validation 失败后自动恢复 source，terminal `rolled_back`。五个现场均停止并原样保留，不得热替换、恢复、跨 pair 混搭或原地重试。共享 canonical release 修复后的第六套已形成 target `completed` terminal、S3 与独立 repair 只读现场；下一步只在独立授权中于 repair clone 重验 mutation preflight、生成新 operation ID并执行一次 production repair。第二次 repair、rollback operation、remove、reinstall 与 crash/retry 仍需逐次授权。
 
 ## 10. L6 完成与后续
 

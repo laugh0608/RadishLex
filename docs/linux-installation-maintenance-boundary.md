@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-截至 2026-08-13，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。第四套确认 source chain 不连续；第五套 upgrade 自动恢复 source并形成 `rolled_back`。共享 canonical release 修复后的第六套 pair/clone 已在断网 preflight 后只执行一次 upgrade，target `38-2` terminal 为 `completed`、XDG 零漂移。第五套仍只作取证，repair、acceptance controller 实机与 P05C 继续关闭。
+截至 2026-08-13，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。第四套确认 source chain 不连续；第五套 upgrade 自动恢复 source并形成 `rolled_back`。共享 canonical release 修复后的第六套只执行一次 upgrade并形成 target `completed`；S3 与独立 repair clone 断网只读 preflight 已冻结，XDG 零漂移。第五套仍只作取证，repair transaction、acceptance controller 实机与 P05C 继续关闭。
 
 - 首个完整产品安装载体固定为 Debian 13 ARM64 的单一系统级本地 `.deb`，package 名固定为 `radishlex`；它是未发布的本地验收载体，不是 apt repository、正式 Release 或通用 Linux 安装包。
 - Fcitx addon、两份产品 FFI、Manager bundle、锁定 RimeData、desktop entry、图标和产品 manifest 由同一个 package 绑定；不拆成可独立漂移的 Manager/addon 包。
@@ -354,7 +354,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual package/manifest/dependency/version/status relationship、恢复事务、production system port/host、共用只读 startup gate、L6 format v1 与 compile-isolated checkpoint/evidence controller。前两套 pre-receipt 失败关闭；第三套完成 source install/S1/S2；第四套暴露 chain mismatch；第五套 upgrade 自动恢复 source并形成 `rolled_back`，均未污染 XDG。共享 canonical release validator、prior-terminal source anchor、target-only builder 与第六套 handoff已闭合；第六套独立 clone 只执行一次 upgrade并形成 target `completed` terminal，S3 target-installed snapshot 已冻结。下一顺位仅在另行授权后从 S3 创建独立 repair clone并完成断网只读 preflight，再逐项准备 repair、process lifecycle、完整 crash/retry、显式 rollback、外部 package lifecycle 与数据保留。P05C 仍在另一独立 guest 授权实机，不复用或清理 P04/L6 现场。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual package/manifest/dependency/version/status relationship、恢复事务、production system port/host、共用只读 startup gate、L6 format v1 与 compile-isolated checkpoint/evidence controller。前两套 pre-receipt 失败关闭；第三套完成 source install/S1/S2；第四套暴露 chain mismatch；第五套 upgrade 自动恢复 source并形成 `rolled_back`，均未污染 XDG。共享 canonical release validator、prior-terminal source anchor、target-only builder 与第六套 handoff已闭合；第六套只执行一次 upgrade并形成 target `completed` terminal，S3 与独立 repair clone 断网只读 preflight 已冻结。下一顺位仅在另行授权后重验 mutation preflight并执行单次 repair，再逐项准备 process lifecycle、完整 crash/retry、显式 rollback、外部 package lifecycle 与数据保留。P05C 仍在另一独立 guest 授权实机，不复用或清理 P04/L6 现场。
 
 ## 实机授权边界
 
