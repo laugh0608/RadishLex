@@ -7,7 +7,7 @@
 - 复核日期：2026-08-13（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format v1、acceptance controller 与合成矩阵已完成。第五套形成 `rolled_back`；第六套 upgrade 形成 target `completed`。独立 repair clone 只调用一次 production maintenance，但在 staged preflight 以 `version_relation_invalid` 进入 `aborted_preserved`，未调用 dpkg；源码根因与回归测试已修复，修复后 ARM64 handoff 和新 S3 clone 尚未形成，十一台 VM 全停。
+- L6 format v1、acceptance controller 与合成矩阵已完成。第五套形成 `rolled_back`；第六套 upgrade 形成 target `completed`。独立 repair clone 只调用一次 production maintenance，但在 staged preflight 以 `version_relation_invalid` 进入 `aborted_preserved`，未调用 dpkg；源码根因与回归测试已修复。现有 release-pair v1 无法表示冻结 target artifact 与较新维护 ELF 的组合；maintenance-only refresh 合同、ARM64 handoff 和新 S3 clone 尚未形成，十一台 VM 全停。
 
 ## 冻结基线与固定边界
 
@@ -34,12 +34,12 @@
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步（2026-08-13）
+## 下一步（2026-08-14）
 
 1. 原样保留第五套 `rolled_back` clone、operation staging/receipt、三套本地 evidence 与修复备份；不得启动、重试或与第六套证据混用。
 2. 原样保留第六套 target-completed clone、handoff、旧 input、preflight/upgrade evidence与冻结 S3；repair clone 作为 staged-preflight `aborted_preserved` 现场保留，不 resume、重试、恢复或复用。十一台均 stopped。
-3. 下一批先闭合修复后执行载体：在隔离 builder 形成绑定既有 target package/evidence `b211d940…d09c`/`2a1132c6…0e1b` 的新 ARM64 production maintenance handoff，并以 verifier、commit、mode/link/hash 与原子发布取证；不得用同版本重建 package替代当前 installed artifact。
-4. handoff 冻结后才可另行授权从未改写 S3 创建全新 clone并做只读 preflight。真实 repair、rollback、remove、reinstall、acceptance controller、crash/retry、产品启动与 P05C 继续关闭。
+3. 先固定并实现 maintenance-only refresh 合同。现有 release-pair v1 要求 executable commit 等于 target release commit，且 builder 同批构建 target package 与双 executable；新合同必须锚定旧 record `cda70afa…659b` 和既有 target package/evidence `b211d940…d09c`/`2a1132c6…0e1b`，只允许较新 production maintenance ELF进入独立 handoff，不改写旧 record、不重建或替换 package。
+4. 合同、verifier和合成门禁闭合后，才另行授权隔离 builder 形成 ARM64 handoff并验证 source commit、ELF identity、mode/link/hash 与原子发布。handoff 冻结后再另行授权从未改写 S3 创建全新 clone并做只读 preflight；真实 repair及其余矩阵继续关闭。
 
 ## 验证入口
 

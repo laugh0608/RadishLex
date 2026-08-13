@@ -49,7 +49,7 @@
 - 首次直接执行 `/run` stage1 因 noexec 返回 126，target 未运行；改由解释器后 stage1 通过，target 又停在超出正式合同的本地 `4e00-9fff` charset 字符串假设。只读诊断证明 `fonts-noto-cjk 1:20240730+repack1-1` 已安装、owner 与 `Noto Sans CJK SC` family 精确解析，TTC 实际声明 `4e00-9fef`；删除该额外字符串假设后，正式 package/owner/family 合同未放宽。两次诊断均未进入 CLI、dpkg 或产品状态。
 - 最终文件回读证明 stage1/target exit 均为 0：pair/input、target package `38-2`、receipt `ccbc4cd0…1e60`、dpkg audit/verify、20 项依赖、字体、manifest/双 FFI、startup 正负向、XDG `f3df287f…b86b`、WAL/SHM/profile absence、进程与断网状态均通过；operation 目录仍为 2、guard absent，未生成 operation ID、运行 maintenance/acceptance CLI、调用 dpkg mutation、启动产品或写用户 XDG。local evidence/accepted bundle SHA-256 为 `aa10e919…69e8`/`180c19ad…0cd`；正常关机后 config/EFI/qcow2 为 `584bf2b5…f59b`/`a73a3266…9155`/`ee6cedf8…5d68`，qcow2 零句柄，十一台全停。
 - 后续单步授权重新闭合 mutation preflight 后，在 guest 内生成唯一 operation ID并只调用一次 production maintenance。CLI exit 0、stderr 空、stdout `maintenance_outcome=aborted_preserved`；receipt `ba7a9637…f17c` 为 `repair/same_release/aborted_preserved`、failure `version_relation_invalid` after `artifacts_staged`、chain 3、target-only staging、proof null、manual recovery false。dpkg status/log 与调用前完全相同，startup `0:1:2:2:7`、XDG、网络、进程与映射 postflight 通过，因此没有 package mutation、恢复或第二次 invocation。
-- 根因是 production `validate_staged_operation` 对 repair 直接使用物理 staged source；而 repair 按合同只 stage target，host prepare 已把 target 同时作为 effective source。源码现统一该投影并增加 single-target system-port 回归。失败 clone 不 resume、重试或复用；冻结 handoff 的 ARM64 maintenance ELF 仍是旧字节，下一步必须先形成“修复后 ELF + 精确既有 target package/evidence”的新 handoff，再从未改写 S3 创建独立 clone。
+- 根因是 production `validate_staged_operation` 对 repair 直接使用物理 staged source；而 repair 按合同只 stage target，host prepare 已把 target 同时作为 effective source。源码现统一该投影并增加 single-target system-port 回归。失败 clone 不 resume、重试或复用；冻结 handoff 的 ARM64 maintenance ELF 仍是旧字节。现有 release-pair v1 要求 executable commit 等于 target release commit并同批构建package，不能直接形成“冻结target package/evidence + 较新ELF”的可信组合；下一步必须先固定maintenance-only refresh合同，再构建独立handoff并从未改写S3创建新clone。
 
 ### 当前本地资产登记（非发布证据）
 
@@ -290,7 +290,7 @@ UTM guest-agent 的传输返回码或空输出不能单独证明 transaction com
 
 UTM 磁盘配置使用空 `Network` 数组也不能单独证明 guest 运行态断网；删除整个必填键会使 UTM 4.7.5 冷加载失败，注册缓存仍可能在首次启动挂回虚拟网卡并取得 DHCP。每次启动后、写入 artifact input 或生成 operation ID 前，都必须在 guest 内复验目标接口 down 且 IPv4/IPv6 路由为空；任一网络状态不明立即停止，不把后续断网状态倒推成“从启动起全程离线”。
 
-前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个在 target validation 失败后自动恢复 source，terminal `rolled_back`。这些现场均停止并原样保留，不得热替换、恢复、跨 pair 混搭或原地重试。第六套已形成 target `completed` terminal与S3；其首次repair在dpkg前因旧production staged verifier缺口`aborted_preserved`，失败clone同样只作取证。源码回归已修复，但下一步先在隔离builder形成绑定既有target artifact的修复后ARM64 maintenance handoff，再从S3建全新clone；真实repair、rollback、remove、reinstall与crash/retry仍需逐次授权。
+前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个在 target validation 失败后自动恢复 source，terminal `rolled_back`。这些现场均停止并原样保留，不得热替换、恢复、跨 pair 混搭或原地重试。第六套已形成 target `completed` terminal与S3；其首次repair在dpkg前因旧production staged verifier缺口`aborted_preserved`，失败clone同样只作取证。源码回归已修复，但下一步先固定maintenance-only refresh合同，显式锚定第六套record与既有target artifact、只允许修复后production maintenance ELF进入新handoff；不得改写旧pair或重建package。合同和builder证据闭合后才从S3建全新clone；真实repair、rollback、remove、reinstall与crash/retry仍需逐次授权。
 
 ## 10. L6 完成与后续
 

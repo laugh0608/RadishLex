@@ -270,7 +270,7 @@ M5-P04 已覆盖：
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
 - P04 已按 `docs/linux-manager-local-acceptance.md` 冻结完成，不重复其导入导出、同库和重启实机；既有 guest 资产不得清理、覆盖或改作 P05 载体。
-- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、恢复事务、production port/CLI、startup gate、L6 format/controller 和 ARM64 pair 已完成；前五套现场只作取证，第五套不得原地重试。第六套 source→target upgrade 与 S3 已完成；首次 repair 在 dpkg 前因 production staged verifier 缺口 `aborted_preserved`，源码回归已修复但旧 ARM64 ELF 与失败 clone 均不得复用。下一步先形成绑定既有 target artifact 的修复后 maintenance handoff并从 S3 新 clone，未获逐步授权不能再运行 maintenance/acceptance CLI、`dpkg`、产品进程或写真实系统。
+- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、恢复事务、production port/CLI、startup gate、L6 format/controller 和 ARM64 pair 已完成；前五套现场只作取证，第五套不得原地重试。第六套 source→target upgrade 与 S3 已完成；首次 repair 在 dpkg 前因 production staged verifier 缺口 `aborted_preserved`，源码回归已修复但旧 ARM64 ELF 与失败 clone 均不得复用。下一步先固定 maintenance-only refresh 合同，在不改写旧 pair、不重建 package的前提下形成绑定既有 target artifact 的修复后 handoff，再从 S3 新 clone；未获逐步授权不能运行 maintenance/acceptance CLI、`dpkg`、产品进程或写真实系统。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。
