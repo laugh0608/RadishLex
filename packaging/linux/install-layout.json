@@ -1,0 +1,131 @@
+{
+  "format_version": 1,
+  "layout_id": "debian-system-v1",
+  "installation_scope": "system",
+  "owner": {
+    "uid": 0,
+    "gid": 0
+  },
+  "modes": {
+    "directory": "0755",
+    "executable": "0755",
+    "regular_file": "0644"
+  },
+  "paths": {
+    "manager_root": "/usr/lib/aarch64-linux-gnu/radishlex/manager",
+    "manager_executable": "/usr/lib/aarch64-linux-gnu/radishlex/manager/radishlex_manager",
+    "manager_ffi": "/usr/lib/aarch64-linux-gnu/radishlex/manager/lib/libradishlex_ime_ffi.so",
+    "addon_library": "/usr/lib/aarch64-linux-gnu/fcitx5/radishlex.so",
+    "addon_ffi": "/usr/lib/aarch64-linux-gnu/fcitx5/libradishlex_ime_ffi.so",
+    "rime_data_root": "/usr/share/radishlex/rime",
+    "product_manifest": "/usr/share/radishlex/product-manifest.json",
+    "addon_metadata": "/usr/share/fcitx5/addon/radishlex.conf",
+    "input_method_metadata": "/usr/share/fcitx5/inputmethod/radishlex.conf",
+    "desktop_entry": "/usr/share/applications/dev.radishlex.radishlexManager.desktop",
+    "manager_icon": "/usr/share/icons/hicolor/scalable/apps/dev.radishlex.radishlexManager.svg",
+    "input_method_icon": "/usr/share/icons/hicolor/scalable/apps/fcitx-radishlex.svg",
+    "copyright": "/usr/share/doc/radishlex/copyright"
+  },
+  "components": [
+    {
+      "component_id": "manager-bundle",
+      "source_id": "manager_bundle",
+      "source_path": ".",
+      "target_path": "/usr/lib/aarch64-linux-gnu/radishlex/manager",
+      "kind": "tree"
+    },
+    {
+      "component_id": "fcitx-addon",
+      "source_id": "addon_stage",
+      "source_path": "usr/lib/aarch64-linux-gnu/fcitx5/radishlex.so",
+      "target_path": "/usr/lib/aarch64-linux-gnu/fcitx5/radishlex.so",
+      "kind": "file"
+    },
+    {
+      "component_id": "fcitx-ffi",
+      "source_id": "addon_stage",
+      "source_path": "usr/lib/aarch64-linux-gnu/fcitx5/libradishlex_ime_ffi.so",
+      "target_path": "/usr/lib/aarch64-linux-gnu/fcitx5/libradishlex_ime_ffi.so",
+      "kind": "file"
+    },
+    {
+      "component_id": "rime-data",
+      "source_id": "product_rime_data",
+      "source_path": ".",
+      "target_path": "/usr/share/radishlex/rime",
+      "kind": "tree"
+    },
+    {
+      "component_id": "fcitx-addon-metadata",
+      "source_id": "addon_stage",
+      "source_path": "usr/share/fcitx5/addon/radishlex.conf",
+      "target_path": "/usr/share/fcitx5/addon/radishlex.conf",
+      "kind": "file"
+    },
+    {
+      "component_id": "fcitx-input-method-metadata",
+      "source_id": "addon_stage",
+      "source_path": "usr/share/fcitx5/inputmethod/radishlex.conf",
+      "target_path": "/usr/share/fcitx5/inputmethod/radishlex.conf",
+      "kind": "file"
+    },
+    {
+      "component_id": "manager-desktop-entry",
+      "source_id": "linux_packaging",
+      "source_path": "assets/dev.radishlex.radishlexManager.desktop",
+      "target_path": "/usr/share/applications/dev.radishlex.radishlexManager.desktop",
+      "kind": "file"
+    },
+    {
+      "component_id": "manager-icon",
+      "source_id": "linux_packaging",
+      "source_path": "assets/radishlex.svg",
+      "target_path": "/usr/share/icons/hicolor/scalable/apps/dev.radishlex.radishlexManager.svg",
+      "kind": "file"
+    },
+    {
+      "component_id": "input-method-icon",
+      "source_id": "linux_packaging",
+      "source_path": "assets/radishlex.svg",
+      "target_path": "/usr/share/icons/hicolor/scalable/apps/fcitx-radishlex.svg",
+      "kind": "file"
+    },
+    {
+      "component_id": "product-license",
+      "source_id": "repository",
+      "source_path": "LICENSE",
+      "target_path": "/usr/share/doc/radishlex/copyright",
+      "kind": "file"
+    }
+  ],
+  "ffi_equivalence": {
+    "relationship": "same-content-distinct-inode",
+    "paths": [
+      "/usr/lib/aarch64-linux-gnu/radishlex/manager/lib/libradishlex_ime_ffi.so",
+      "/usr/lib/aarch64-linux-gnu/fcitx5/libradishlex_ime_ffi.so"
+    ]
+  },
+  "forbidden_prefixes": [
+    "/etc",
+    "/home",
+    "/opt",
+    "/root",
+    "/run",
+    "/tmp",
+    "/usr/lib/systemd",
+    "/usr/local",
+    "/usr/share/autostart",
+    "/usr/share/xdg/autostart",
+    "/var"
+  ],
+  "forbidden_font_suffixes": [
+    ".otf",
+    ".ttc",
+    ".ttf"
+  ],
+  "allowed_embedded_font_paths": [
+    "/usr/lib/aarch64-linux-gnu/radishlex/manager/data/flutter_assets/fonts/MaterialIcons-Regular.otf"
+  ],
+  "default_removal": "programs-only",
+  "data_removal": "separate-authorized-flow"
+}

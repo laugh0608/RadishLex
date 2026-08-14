@@ -1,4 +1,4 @@
-use std::ffi::{CStr, CString};
+use std::ffi::{c_char, CStr, CString};
 use std::fmt;
 use std::ptr;
 use std::slice;
@@ -373,7 +373,7 @@ pub(crate) fn ensure_true(stage: &'static str, value: Bool) -> RimeEngineResult<
 
 pub(crate) fn current_schema(api: &RimeApi, session_id: RimeSessionId) -> RimeEngineResult<String> {
     const SCHEMA_BUFFER_SIZE: usize = 256;
-    let mut buffer = [0_i8; SCHEMA_BUFFER_SIZE];
+    let mut buffer = [0 as c_char; SCHEMA_BUFFER_SIZE];
 
     // SAFETY: buffer is valid for SCHEMA_BUFFER_SIZE writes and session_id
     // belongs to the runtime that supplied api.
@@ -489,7 +489,7 @@ fn ensure_schema_available(api: &RimeApi, requested: &str) -> RimeEngineResult<(
 mod tests {
     use std::collections::HashMap;
     use std::ffi::CStr;
-    use std::os::raw::{c_char, c_int};
+    use std::os::raw::c_int;
     use std::sync::{Mutex, OnceLock};
 
     use radishlex_ime_core::{Engine, SchemaId};

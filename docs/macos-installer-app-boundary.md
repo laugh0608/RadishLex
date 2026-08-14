@@ -98,6 +98,8 @@ refresh 是唯一不要求确认的 action。first install、upgrade、repair、
 
 AppKit 已静态链接 `radishlex-macos-installer-bridge` ABI v1，并通过三个已绑定 symbol 读取 snapshot、刷新和提交确认。ABI 只使用固定整数 enum 与 POD snapshot；Objective-C 只映射已知值，未知 contract/action/error/state/prompt/进度统一失败关闭。AppDelegate 不含复制、rename、删除、receipt 或 TIS 逻辑。
 
+Installer 必须提供标准 Application 菜单和“退出”命令，`⌘Q` 与关闭最后一个窗口都应终止当前 Installer 进程。正常退出不等价于取消事务：UI 不删除 receipt、guard、staging、backup 或历史 operation，也不把内存 snapshot 写回磁盘；重新打开后始终从持久化 receipt 和 fresh status projection 恢复。若 mutation 正在同步执行，UI 不伪造取消完成或绕过 executor 的持久化边界，异常终止仍由既有 restartable executor 语义接管。
+
 Rust bridge 每次从 fresh status projection 重新授权 action，再进入 `InstallerExecutor`；隔离门禁已证明 `prepared` 持久化、重启投影、stale action 和 active guard。真实用户域 bootstrap 使用 `geteuid/getpwuid_r` 取得 authoritative home，只从当前 executable 固定反推 Installer resources，并复验 sealed `ReleaseIdentity.json` 与内嵌 InstallPayload；不读取 `HOME`、UI 路径或调用方身份。普通开发构建因缺失 identity resource 返回 `product_identity_unavailable`；社区发布构建通过后四类 operation 进入真实 mutation port。upgrade 先复验历史 ProductManifest、完整 tree、strict ad-hoc identity 和 source/target host adapter；缺失 source 在写入前返回 `driver_unavailable`。
 
 `ReleaseIdentity.json` format v2 固定 `community-adhoc-v1`，并记录 target 与全部历史 source 的 Manager/InputMethod exact requirement 有界集合；Installer 自身先通过 strict ad-hoc 结构验证。Installer 不在自身资源内绑定内容相关 `cdhash`。缺失、额外字段、非普通单链接文件、owner 漂移、集合乱序/重复/重叠或 payload signature/tree 漂移全部失败关闭。
@@ -118,6 +120,6 @@ cargo test --locked -p radishlex-ime-product-install --all-targets
 ./scripts/check-repo.sh
 ```
 
-门禁覆盖 absent root 零写入、显式 first-install 固定目录 provisioning、active/stale guard、非终态重启投影、completed receipt 与后续 operation、产品情况分支、fresh reauthorization、四类执行、preflight 阻断、程序 staging、upgrade receipt bootstrap 与 `final_verified` 重启续跑、历史 source 成功/缺失/重复/内容漂移/receipt release 选择、移除数据保留授权、ABI enum 映射、未知 snapshot/action/authorization bits、原生 bundle metadata、固定 layout、完整内嵌 payload、Installer/双 component release identity 失败关闭、已绑定 Rust symbol 和 UI 源码禁止边界。普通门禁不启动 GUI、不访问真实用户目录或系统输入源。
+门禁覆盖 absent root 零写入、显式 first-install 固定目录 provisioning、active/stale guard、非终态重启投影、completed receipt 与后续 operation、产品情况分支、fresh reauthorization、四类执行、preflight 阻断、程序 staging、upgrade receipt bootstrap 与 `final_verified` 重启续跑、历史 source 成功/缺失/重复/内容漂移/receipt release 选择、移除数据保留授权、ABI enum 映射、未知 snapshot/action/authorization bits、原生 bundle metadata、固定 layout、完整内嵌 payload、Installer/双 component release identity 失败关闭、已绑定 Rust symbol、标准退出菜单和 UI 源码禁止边界。普通门禁不启动 GUI、不访问真实用户目录或系统输入源；`⌘Q`、关闭窗口和重启恢复仍需在冻结候选上做人工 UX 复验。
 
 真实用户域负向验收、人工输入源交互、静止检查和回退顺序见 [macOS Installer 真实用户域验收 Runbook](runbooks/macos-installer-user-domain-acceptance.md)。

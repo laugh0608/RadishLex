@@ -1,0 +1,217 @@
+{
+  "format_version": 1,
+  "profile": "debian13-arm64-ephemeral-v1",
+  "product": {
+    "package_name": "radishlex",
+    "distribution_identity": "debian-local-deb-v1",
+    "runtime_layout": "debian-system-v1",
+    "data_layout": "xdg-v1"
+  },
+  "guest": {
+    "os_id": "debian",
+    "version_id": "13",
+    "version_codename": "trixie",
+    "architecture": "arm64",
+    "multiarch_tuple": "aarch64-linux-gnu",
+    "acceptance_user": "radishlex-l6",
+    "acceptance_home": "/home/radishlex-l6",
+    "initial_package_state": "not-installed",
+    "initial_state_root": "absent",
+    "clean_snapshot_required": true,
+    "p04_guest_reuse": false
+  },
+  "release_pair": {
+    "strategy": "successive-debian-revisions-from-distinct-commits-v1",
+    "source_role": "source",
+    "target_role": "target",
+    "product_version_equal": true,
+    "build_number_equal": true,
+    "data_contract_equal": true,
+    "package_hash_distinct": true,
+    "target_version_relation": "greater-than-source"
+  },
+  "operations": [
+    {
+      "step": 1,
+      "id": "install_source",
+      "kind": "install",
+      "installed_before": "absent",
+      "source": null,
+      "target": "source",
+      "installed_after": "source",
+      "terminal": "completed"
+    },
+    {
+      "step": 2,
+      "id": "upgrade_target",
+      "kind": "upgrade",
+      "installed_before": "source",
+      "source": "source",
+      "target": "target",
+      "installed_after": "target",
+      "terminal": "completed"
+    },
+    {
+      "step": 3,
+      "id": "repair_target",
+      "kind": "repair",
+      "installed_before": "target",
+      "source": null,
+      "target": "target",
+      "installed_after": "target",
+      "terminal": "completed"
+    },
+    {
+      "step": 4,
+      "id": "rollback_source",
+      "kind": "rollback",
+      "installed_before": "target",
+      "source": "target",
+      "target": "source",
+      "installed_after": "source",
+      "terminal": "completed"
+    },
+    {
+      "step": 5,
+      "id": "remove_source",
+      "kind": "remove",
+      "installed_before": "source",
+      "source": "source",
+      "target": null,
+      "installed_after": "absent",
+      "terminal": "completed"
+    },
+    {
+      "step": 6,
+      "id": "reinstall_target",
+      "kind": "install",
+      "installed_before": "absent",
+      "source": null,
+      "target": "target",
+      "installed_after": "target",
+      "terminal": "completed"
+    }
+  ],
+  "crash_scenarios": [
+    {
+      "id": "install_prepared",
+      "operation": "install_source",
+      "checkpoint": "prepared",
+      "fault": "process_group_terminated",
+      "expected_terminal": "completed",
+      "restore_snapshot_after": true
+    },
+    {
+      "id": "install_artifacts_staged",
+      "operation": "install_source",
+      "checkpoint": "artifacts_staged",
+      "fault": "process_group_terminated",
+      "expected_terminal": "completed",
+      "restore_snapshot_after": true
+    },
+    {
+      "id": "upgrade_quiesced",
+      "operation": "upgrade_target",
+      "checkpoint": "quiesced",
+      "fault": "process_group_terminated",
+      "expected_terminal": "completed",
+      "restore_snapshot_after": true
+    },
+    {
+      "id": "upgrade_before_dpkg",
+      "operation": "upgrade_target",
+      "checkpoint": "package_mutating_before_dpkg",
+      "fault": "process_group_terminated",
+      "expected_terminal": "completed",
+      "restore_snapshot_after": true
+    },
+    {
+      "id": "upgrade_after_dpkg",
+      "operation": "upgrade_target",
+      "checkpoint": "target_applied_before_proof",
+      "fault": "process_group_terminated",
+      "expected_terminal": "completed",
+      "restore_snapshot_after": true
+    },
+    {
+      "id": "upgrade_rollback_required",
+      "operation": "upgrade_target",
+      "checkpoint": "rollback_required",
+      "fault": "target_validation_rejected_then_process_group_terminated",
+      "expected_terminal": "rolled_back",
+      "restore_snapshot_after": true
+    },
+    {
+      "id": "upgrade_before_source_restore",
+      "operation": "upgrade_target",
+      "checkpoint": "source_restoring_before_dpkg",
+      "fault": "target_validation_rejected_then_process_group_terminated",
+      "expected_terminal": "rolled_back",
+      "restore_snapshot_after": true
+    },
+    {
+      "id": "upgrade_after_source_restore",
+      "operation": "upgrade_target",
+      "checkpoint": "source_applied_before_proof",
+      "fault": "target_validation_rejected_then_process_group_terminated",
+      "expected_terminal": "rolled_back",
+      "restore_snapshot_after": true
+    }
+  ],
+  "probes": {
+    "dependency_relationship": "all-evidence-control-depends-v1",
+    "font_roles": [
+      {
+        "package": "fonts-dejavu-core",
+        "family": "DejaVu Sans",
+        "sample": "RadishLex ABI v9 12345",
+        "owner_required": true
+      },
+      {
+        "package": "fonts-noto-cjk",
+        "family": "Noto Sans CJK SC",
+        "sample": "萝卜词核中文输入",
+        "owner_required": true
+      }
+    ],
+    "startup_components": [
+      "manager",
+      "fcitx-addon"
+    ],
+    "startup_cases": [
+      "installed-allowed-product",
+      "nonterminal-maintenance-required",
+      "removed-failed-closed",
+      "wrong-sibling-failed-closed",
+      "preload-interposition-failed-closed"
+    ],
+    "xdg_paths": [
+      "/home/radishlex-l6/.local/share/radishlex",
+      "/home/radishlex-l6/.config/radishlex",
+      "/home/radishlex-l6/.local/state/radishlex",
+      "/home/radishlex-l6/.cache/radishlex",
+      "/home/radishlex-l6/.config/fcitx5/profile"
+    ],
+    "xdg_fingerprint": "metadata-size-sha256-without-content-export-v1",
+    "system_observations": [
+      "os-release",
+      "dpkg-status",
+      "dpkg-audit",
+      "product-inventory",
+      "receipt-summary",
+      "proc-maps",
+      "font-family-glyph-owner"
+    ]
+  },
+  "execution": {
+    "operation_id_format": "lowercase-hex-32",
+    "checkpoint_mechanism": "acceptance-checkpoint-process-group-stop-v1",
+    "artifact_input_root": "/var/tmp/radishlex-l6-inputs",
+    "evidence_root": "/var/tmp/radishlex-l6-evidence",
+    "state_root": "/var/lib/radishlex/install-v1",
+    "one_mutation_per_authorization": true,
+    "network_policy": "offline-after-dependency-freeze",
+    "cleanup_policy": "preserve-until-separate-authorization",
+    "evidence_format": "canonical-json-with-artifact-hashes-v1"
+  }
+}

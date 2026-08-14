@@ -52,9 +52,11 @@ Flutter Manager
 1. M1 先打通 macOS 离线输入，闭合按键消费、候选、commit、FFI、进程级 engine runtime 和平台壳。
 2. M2 再闭合本地个人化，让真实选择、删除和反馈以正确事务语义影响后续候选，并提供本地 manager 管理界面。
 3. M3 在本地数据语义稳定后开放端到端加密同步、设备授权、恢复、撤销和 manager 同步界面。
-4. M4 最后闭合 native library、`librime`、schema、manager、签名、升级和供应链发布门禁。
+4. M4 闭合 macOS native library、`librime`、schema、manager、签名、升级和供应链门禁，并冻结可回归参考产品。
+5. M5 以 Linux Fcitx5 验证第二平台的原生薄壳、共享 FFI、XDG 数据、个人化和安装维护能力。
+6. M5 退出后依次推进 Android、Windows 和 iOS；每次只推进一条真实平台主线。
 
-同步原型、loopback、短生命周期服务和跨语言测试可以在 M1/M2 期间继续演进，但不能进入真实用户产品入口，也不能替代 M3 的退出证据。2026 年 7 月整改专题只负责修复 M1/M2 前置问题和首批质量门禁，不承担 M3/M4 的长期项目管理。
+同步原型、loopback、短生命周期服务和跨语言测试可以继续演进，但不能进入真实用户产品入口，也不能替代 M3 的退出证据。公开发布与各平台验收分离：当前统一发布评审延期到计划内平台分别退出之后，已冻结平台仍必须持续通过共享代码回归。
 
 ## Rust 模块职责
 
@@ -267,7 +269,7 @@ Flutter manager 负责：
 - 同步状态、设备、恢复和后端连接；
 - 安全诊断、导入导出和备份恢复入口。
 
-manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学习、隐私和诊断，并让正常本地产品运行态携带 native library、使用固定平台目录和真实持久化数据；M3 再交付同步、设备与恢复；M4 闭合版本化 distribution identity、安装升级、发布载体和最终产品打包。首发采用社区 ad-hoc 路径，未来 Developer ID/公证必须作为新的 identity 独立治理。fixture 只能由显式开发开关启用并持续显示演示标识。manager 不进入输入热路径，也不承担排序、合并或密钥策略真相源。
+manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学习、隐私和诊断，并让正常本地产品运行态携带 native library、使用固定平台目录和真实持久化数据；M3 再交付同步、设备与恢复；M4 闭合 macOS 版本化 distribution identity、安装升级、发布载体和产品打包；M5 增加 Linux Flutter host，并与 Fcitx5 addon 共用 XDG resolver、native library 和同一 userdb。macOS 社区 ad-hoc 继续作为冻结参考 identity，未来 Developer ID/公证必须独立治理。fixture 只能由显式开发开关启用并持续显示演示标识。manager 不进入输入热路径，也不承担排序、合并或密钥策略真相源。
 
 ## 平台策略
 
@@ -281,7 +283,15 @@ manager 通过受控 bridge 使用 Rust 能力。M2 先交付本地词库、学�
 
 ### Linux
 
-第二桌面候选优先 Fcitx5，其次 IBus。Wayland 下优先使用输入法框架 panel，不自行发明浮窗协议。
+第二真实平台已通过 [ADR 0009](adr/0009-second-platform-linux-fcitx5.md) 固定为 Fcitx5。原生 C++/CMake addon 只处理 input context、按键规范化、候选面板、commit、session 生命周期和 Rust FFI；它不直接调用 Rime 私有 API，不读取 SQLite，也不实现 ranker、学习、隐私或同步。
+
+Linux 复用 ABI v9 的 owner-thread personalized Rime session、owned `KeyResult`、display-index selection 与 `LearningContext`。每个活动 input context 使用独立 Rust session；Fcitx5 input panel 消费同次 snapshot，Wayland 与 X11 都不自行发明浮窗协议。addon、Flutter Manager、诊断和未来安装协调层通过单一 XDG resolver 取得数据、配置、持久状态和缓存路径，不能分别拼接 `$HOME` 或复制数据库。Linux privacy 使用独立、严格、原子替换的平台配置真相源，不让输入热路径解析 Manager settings；程序身份只在平台层按经实机评审的固定 allowlist 映射为粗分类，原始值不跨 FFI、不持久化，unknown 继续失败关闭。
+
+M5 先形成 addon/FFI/build contract，再进入真实 Wayland、X11、常见应用、secure/unknown 上下文和同库个人化验收，最后治理 Linux 安装、升级、修复、移除和数据保留。系统 package 事务由独立 `platforms/linux-product/` 承担：它以 root state identity、canonical append-only receipt、regular-file advisory guard、私有 source/target staging 和 `DpkgTransactionPort` 隔离 Debian package 状态；不复用 macOS 双 bundle rename，不读取用户 XDG，也不进入输入热路径。
+
+P05B 已把 actual `.deb` 验证固定为单次有界流：同链计算 package size/SHA-256，严格解析精确三成员 ar、canonical uncompressed USTAR、仅 `control`/`md5sums` 的 control、actual payload inventory 与唯一 manifest，并交叉 evidence、canonical md5 inventory 与 actual `Installed-Size`；同域 pure relationship 另行验证依赖、Debian version 和 dpkg status。事务在每次 mutation/retry 前重验 staged relationship并消费 move-only quiescence permit；store 对 receipt/stage tmp、单侧 artifact crash window、current required slots、mode 提交与直接父目录 `fsync` 失败关闭或在 guard 下精确恢复。旧 operation v1 只保存 structure/pair metadata，不作为恢复 proof。
+
+production Debian 层已固定 `/usr/bin/dpkg` identity、私有 staged argv、清空环境、null stdin、超时、有界诊断、配置与 lifecycle projection；system observer/port 复验 actual package、依赖/版本、root identity、`/proc/*/maps` 静止和完整安装结果。配置验证只规范化 Debian 13 默认 `no-debsig` 与固定 `/var/log/dpkg.log` 的空白/等号写法，其他日志路径、未知项及 root/admindir/force/hook/path override 失败关闭。guard 父目录只接受非 world-writable 或 root-owned 精确 `01777` sticky mode，预创建非 root guard 仍失败关闭。opaque maintenance command 只有在双显式授权、精确 operation ID 与 root-owned package/evidence 输入成立时才可进入 executor。v1 package 不携带 RadishLex 自有 maintainer scripts；外部 scripts/triggers 不构成 transaction completion。共用 startup observer 已把 terminal actual package/dependency relationship 与 component scope 串联；Manager/Fcitx 在业务初始化前通过 additive request/result v1 消费 decision，输入 session/key ABI 仍为 v9。第三套 pair 已完成 source install/S1/S2；第四套暴露 source chain 不连续；第五套 upgrade 自动恢复 source并形成 `rolled_back`；第六套 upgrade 形成 target `completed` 与冻结 S3。首次 production repair 在 staged preflight 因 physical target-only staging 未投影为同 release effective source而 `aborted_preserved`，未进入 dpkg且 XDG 不变；system port 现与 host prepare 共用同一 repair 投影语义并有直接回归。现有 release-pair v1 强制 executable commit 等于 target release commit，不能表达冻结 installed target artifact 与较新 maintenance ELF 的组合；下一步须先固定 maintenance-only refresh 合同，显式锚定旧 record、target package/evidence与新 ELF身份，不改写旧 pair、不重建 package。该合同、handoff 与全新 S3 clone闭合后才逐项授权真实 repair和八个 crash checkpoint。IBus 仅在 Fcitx5 退出后有明确需求时评估。完整边界见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)、[Linux Manager 本地验收边界](linux-manager-local-acceptance.md)、[Linux 安装维护边界](linux-installation-maintenance-boundary.md) 与 [L6 runbook](runbooks/linux-l6-package-matrix.md)。
 
 ### Android
 
@@ -367,7 +377,8 @@ M2 不以远端同步、设备授权或最终发布包为退出条件。
 - `KeyOutcome`、FFI 生命周期和 librime 全局生命周期未闭合前，不把平台壳视为可用输入法。
 - userdb 事务、ranker 评测和删除语义未稳定前，不开放生产同步。
 - merge 收敛、签名绑定、KDF 上限、macOS 平台私钥主路径、本地 HTTPS 编排和 Manager 受控资格执行链已有验证；真实用户入口仍须经过独立产品决策与发布级目标部署评审。该评审完成前保持关闭，上述任一既有证据回归时同样失败关闭。
-- 第一真实平台未达到可日常输入前，不并行启动第二平台。
+- 每次只推进一条真实平台主线；M5 期间不并行实现 Android、Windows 或 iOS 平台壳。
+- Linux addon 不复制共享业务真相源，不自绘候选浮窗，不以合成 host 或编译通过替代真实桌面证据。
 - manager 产品模式不得用静默 fixture fallback 代替真实失败。
 
 临时批次的更严格停止线见 `docs/status/current.md` 当前引用的整改专题。
@@ -377,6 +388,8 @@ M2 不以远端同步、设备授权或最终发布包为退出条件。
 - [当前状态](status/current.md)：当前批次、验证基线、停止线和近期顺位。
 - [产品交付路线图](roadmap.md)：产品里程碑、交付物和退出标准。
 - [仓库结构](repository-layout.md)：实际目录与模块职责。
+- [第二平台 Linux Fcitx5 ADR](adr/0009-second-platform-linux-fcitx5.md)：第二平台选择、进入顺序和发布关系。
+- [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)：addon、FFI、XDG、隐私、构建和验收边界。
 - [Engine Boundary](engine-boundary.md)：engine trait 和核心模型。
 - [Rime Adapter](engine-rime-adapter.md)：librime adapter、构建与 native smoke。
 - [个人化学习](personalization-learning.md)：userdb、ranker、学习和删除语义。

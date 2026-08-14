@@ -6,7 +6,7 @@
 
 `ime-ffi` 是 Rust 输入 runtime、平台输入法壳和 Flutter manager 的唯一稳定跨语言边界。平台按键入口必须无损返回 `KeyOutcome` 的 `consumed`、可选即时 commit 与同一事件后的 snapshot；只返回状态码再单独查询状态不能作为真实平台契约。Manager 同步资格执行由 `ime-sync-runtime` 组合网络、crypto 与 userdb，`ime-ffi` 只校验/复制版本化参数并包装 Rust-owned handle，不能自行实现同步状态机或直接连接 Go server。
 
-平台壳只能通过 FFI 调用 Rust runtime，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。M3 的 ABI v7 已增加与普通用户同步入口隔离的 Manager 本地合成资格 run；M4-P02 的 ABI v8 增加数据 startup gate 与双端候选验证；当前 ABI v9 兼容保留这些结构，并新增不接受调用方 identity 的外层 install startup gate。固定产品路径由 Manager/InputMethod 原生层解析，不能把接口扩展成任意路径数据库工具。approval、preview、migration review 和 no-symbol 证明不属于生产 ABI。Apple P-256 产品 validation ABI 是例外的受控自检面，只返回固定 capability/lifecycle flags，不执行真实同步，也不直接进入 Dart binding。当前 ABI v9 继续保留不带入参、不访问系统条目的 `radishlex_manager_sync_product_status`。平台绑定层调用规则见 `docs/runbooks/ffi-platform-call-contract.md`。
+平台壳只能通过 FFI 调用 Rust runtime，不得直接访问 SQLite、Rime 私有对象或 ranker 内部状态。M3 的 ABI v7 已增加与普通用户同步入口隔离的 Manager 本地合成资格 run；M4-P02 的 ABI v8 增加数据 startup gate 与双端候选验证；当前 ABI v9 兼容保留这些结构，并新增不接受调用方 identity 的外层 install startup gate。P05B 另增加 request/result v1 的 additive Linux product startup ABI；它不进入 session/key 热路径，也不改变 ABI contract v9。固定产品路径由 Manager/InputMethod 原生层解析，不能把接口扩展成任意路径数据库工具。approval、preview、migration review 和 no-symbol 证明不属于生产 ABI。Apple P-256 产品 validation ABI 是例外的受控自检面，只返回固定 capability/lifecycle flags，不执行真实同步，也不直接进入 Dart binding。当前 ABI v9 继续保留不带入参、不访问系统条目的 `radishlex_manager_sync_product_status`。平台绑定层调用规则见 `docs/runbooks/ffi-platform-call-contract.md`。
 
 ## 职责边界
 
@@ -44,7 +44,7 @@ RadishLexError*
 当前已落地函数按能力分组：
 
 - ABI contract 与 Manager 只读产品状态：`radishlex_ffi_contract`、`radishlex_manager_sync_product_status`
-- 产品事务启动与候选验证：`radishlex_product_install_startup_gate`、`radishlex_product_upgrade_startup_gate`、`radishlex_manager_upgrade_validate_candidate`、`radishlex_input_method_upgrade_validate_candidate`
+- 产品事务启动与候选验证：`radishlex_product_install_startup_gate`、`radishlex_product_upgrade_startup_gate`、`radishlex_linux_product_startup_gate`、`radishlex_manager_upgrade_validate_candidate`、`radishlex_input_method_upgrade_validate_candidate`
 - Manager 本地 HTTPS 合成资格 run：`radishlex_manager_sync_qualification_start`、`radishlex_manager_sync_qualification_poll`、`radishlex_manager_sync_qualification_cancel`、`radishlex_manager_sync_qualification_free`
 - session / Rime runtime 生命周期：`radishlex_session_new`、`radishlex_session_new_with_options`、`radishlex_session_new_rime`、`radishlex_session_new_personalized_rime`、`radishlex_session_free`、`radishlex_rime_runtime_shutdown`、`radishlex_session_engine_kind`、`radishlex_session_reset`、`radishlex_session_set_schema`、`radishlex_session_set_learning_context`
 - 输入、候选选择与快照：`radishlex_session_handle_key_event`、`radishlex_session_select_candidate`、`radishlex_key_result_*`、兼容 `radishlex_session_push_key_event`、`radishlex_session_snapshot_new`、`radishlex_snapshot_*`
@@ -58,15 +58,15 @@ RadishLexError*
 
 ### FFI contract
 
-`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v9 保留 v7 的 Manager 资格、v8 的数据 startup/validation 与全部既有布局，并增加版本化外层 install startup gate。产品绑定必须同时校验 contract 与所需 symbol 集。当前 `session_thread_policy = owner_thread` 仍只约束 `RadishLexSession*`；资格 run 为 caller-serialized，可在异步轮询之间迁移线程，但 start/poll/cancel/free 不得由调用方并发，`free` 不得与其他调用重叠。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
+`radishlex_ffi_contract` 返回当前 ABI 契约版本、session 线程策略和 panic 边界策略。ABI contract v9 保留 v7 的 Manager 资格、v8 的数据 startup/validation 与全部既有布局，并增加版本化外层 install startup gate。Linux product startup 使用独立 version-v1 request/result 和新 symbol，但不改变 session/key 结构或 `radishlex_ffi_contract.version = 9`。产品绑定必须同时校验 contract 与所需 symbol 集。当前 `session_thread_policy = owner_thread` 仍只约束 `RadishLexSession*`；资格 run 为 caller-serialized，可在异步轮询之间迁移线程，但 start/poll/cancel/free 不得由调用方并发，`free` 不得与其他调用重叠。当前 `panic_boundary = catch_unwind`，表示带错误返回的入口和释放入口都不得让 panic 穿过 C ABI。
 
 Apple 产品验证使用独立原生自检结构：普通 DPK 的 `radishlex_apple_p256_product_status/smoke` 分别使用 status schema v1 与 smoke schema v4；Secure Enclave signing 的 `radishlex_apple_secure_enclave_p256_product_status/smoke` 分别使用独立 status schema v1 与 smoke schema v1；Secure Enclave key-agreement 另用 `radishlex_apple_secure_enclave_key_agreement_product_status/smoke`，不得继承 signing 资格。三组 status 都是 metadata-only；smoke 只有 manager 产品进程显式场景与各自环境门同时满足才执行。key-agreement 使用独立固定摘要，只返回错误分类、数值 OSStatus、wrapped epoch 往返与 cleanup 布尔值，不返回 CFError 文本、private/public key、shared secret、wrapping key、master key、nonce 或 ciphertext。Dart dynamic binding、`ManagerBridge` 和 Flutter method channel 不得直接声明或调用这些 validation symbol；Dart 只绑定当前 ABI v9 的脱敏业务摘要和隔离资格 run。
 
 ### 产品事务门禁与候选验证
 
-`radishlex_product_install_startup_gate` 使用独立 request/result v1，只读检查外层 receipt/guard，并在终态时由当前 executable 所在固定安装 bundle 形成运行身份。接口没有 identity 字段，不读取 UI、settings 或 `HOME`。Manager/InputMethod 必须先执行该 gate；active guard、非终态/损坏 receipt、中断写、未知对象、identity drift、completed remove、未知 result 或 FFI 失败都阻止后续业务初始化。
+`radishlex_product_install_startup_gate` 使用独立 request/result v1，只读检查外层 receipt/guard，并在终态时由当前 executable 所在固定安装 bundle 形成运行身份。接口没有 identity 字段，不读取 UI、settings 或 `HOME`。Manager/InputMethod 必须先执行该 gate；active guard、非终态/损坏 receipt、中断写、未知对象、identity drift、completed remove、未知 result 或 FFI 失败都阻止后续业务初始化。`radishlex_product_upgrade_startup_gate` 使用 startup request/result v1，只读检查固定 data root 和升级状态目录。数据根或状态目录不存在、以及 receipt 已处于终态时允许启动；active guard、非终态或损坏 receipt、中断 artifact、未知对象、unsafe root/state 和身份漂移必须失败关闭。调用不得创建目录、修改权限、清理现场或打开 userdb/settings/Rime runtime，产品必须在任何业务初始化之前消费结果。
 
-`radishlex_product_upgrade_startup_gate` 使用 startup request/result v1，只读检查固定 data root 和升级状态目录。数据根或状态目录不存在、以及 receipt 已处于终态时允许启动；active guard、非终态或损坏 receipt、中断 artifact、未知对象、unsafe root/state 和身份漂移必须失败关闭。调用不得创建目录、修改权限、清理现场或打开 userdb/settings/Rime runtime，产品必须在任何业务初始化之前消费结果。
+`radishlex_linux_product_startup_gate` 使用独立 request/result v1。request 只接受编译态 `development-staged` / `debian-system-product` identity、Manager/Fcitx component 和 host 从当前 loaded executable/shared object 取得的 NUL-terminated canonical component path；普通业务层、Dart 或 UI 不得提供路径。C++ binding 在调用前用 `dladdr` 与 canonical path 证明 startup/error symbols 来自 component 精确 sibling FFI，Fcitx 还验证全部输入热路径 FFI symbol origins，拒绝 `LD_LIBRARY_PATH`、preload interposition。Rust 端使用固定系统路径，只读解析 `/var/lib/dpkg/status` 与 root receipt/guard，严格复验 terminal staging 中的 actual `.deb`/evidence、完整 dependency relationship 和 receipt proof；Manager scope 覆盖完整 bundle tree，Fcitx scope 覆盖 addon/FFI/RimeData/两份 metadata，并验证两份产品 FFI equivalence、ABI 与 data contract。该 scope 不运行 fontconfig family/glyph probe，也不冒充 L6 全系统证据。result v1 只包含 version、decision、稳定 reason 与 receipt state code。C++ binding 只有在 development build 得到 `AllowedDevelopment + DevelopmentStateAbsent`，或 product build 得到 `AllowedProduct + InstalledReceiptVerified` 且 terminal state 合法时，才形成 move-only startup permit；所有未知 version/value、交叉身份、active guard、tmp/nonterminal receipt、Config-Files/半配置、completed remove、缺 product receipt、staging/package/dependency/manifest/component drift 或 FFI error 都失败关闭。Manager 调用位置在 `umask(0077)` 后、Flutter application/engine 前；Fcitx factory 在构造 Engine 前调用，因此 input FFI、XDG、privacy 和 Rime runtime 均晚于 permit。gate 不执行 `dpkg`、不创建或清理 state、不解析 XDG 或打开 userdb/settings/privacy/Rime。
 
 `radishlex_manager_upgrade_validate_candidate` 与 `radishlex_input_method_upgrade_validate_candidate` 使用 validation request/evidence/summary v1。两者只接受原生 host 解析的固定 migration candidate：Manager 复用真实管理查询和 settings v1 兼容检查；InputMethod 复用 native Rime、personalized runtime 与只读候选信号，bundle 内锁定 YAML 只部署到调用方创建且随后删除的隔离 Rime user data。两端都不得学习、同步、写 settings、修改 candidate、产品 RimeData 或 Application Support，也不得留下 WAL/SHM/journal。validation evidence 由协调器在 guard、receipt、candidate identity 与 sidecar 仍一致时消费，成功才能推进 `candidate_verified`，明确失败进入 `aborted_preserved`。这些入口不属于普通 Dart UI 或输入热路径，也不接受调用方自定义路径。
 
@@ -269,6 +269,18 @@ snapshot: *const RadishLexSnapshot
 
 现有只返回 `RadishLexStatusCode` 的按键函数只作为兼容或测试入口，不能作为 InputMethodKit 等真实平台壳的主契约。输入侧声明由 `crates/ime-ffi/include/radishlex_input.h` 提供，并通过 C11、Objective-C 编译和 Rust function pointer 测试约束；Swift / Objective-C 不手抄 Rust `repr(C)` 布局。
 
+### Linux Fcitx5 ABI v9 审计
+
+M5-P02 首批审计确认 Fcitx5 addon 可以直接复用 ABI v9，不增加平台私有结构或 symbol：
+
+- C++ 层把 Fcitx normalized key 投影为已有 `RadishLexKeyEvent`，平台保留或无法证明的键直接交还宿主；
+- 每个 input context 创建 `radishlex_session_new_personalized_rime` session 并保持 owner thread；`radishlex_session_handle_key_event` 的 owned result 被一次性复制为 C++ value 后立即释放，不缓存 Rust view；
+- Fcitx candidate list 只展示 snapshot candidate，选择只调用 `radishlex_session_select_candidate(display_index)`；
+- 可见 candidate cursor 属于 Fcitx input panel 状态，不进入 ABI；数字、Space 与鼠标都把 cursor 对应的 Rust display index 送回 selection，PageUp/PageDown 用新 snapshot 替换旧列表；
+- deactivate/reset 销毁 UI 状态并调用 session reset，input context property 注销后先释放所有 session，再 shutdown Rime runtime。
+
+因此 snapshot 不需要增加 Fcitx page、candidate object 或窗口引用。Linux XDG resolver、Fcitx capability 到 `LearningContext` 的映射和开发构建属于平台层职责，不扩展 Rust ABI。当前普通非 terminal context 没有可靠分类信号时传 `context_known = 0`，不会以 program name 或窗口文本补足。Debian 13 ARM64 构建还确认 Rime C header 的 `char` 指针不能在 Rust adapter 中硬编码为 `i8`；buffer 和 helper 统一使用 `std::ffi::c_char`，由目标平台决定 signedness。P05B 的 Linux startup ABI 是产品进程启动控制面，不是上述 Fcitx 输入模型扩展。它使用同一 `ime-ffi` cdylib/header 以避免 Manager 与 addon 分叉安装判断，binding 还把 product/input symbols 绑定到精确 sibling FFI；request/result 自带 v1 身份，自动门禁分别编译 development/system C++ contract。startup Rust 实现已在签发 permit 前复验 terminal actual package 与 dependency relationship，但不执行 mutable adapter。真实 ARM64 release pair 已冻结 startup-enabled payload 身份，package-installed startup 动态验证仍未执行；v1 package 不携带 RadishLex 自有 maintainer scripts。
+
 ### Snapshot 与 candidate view
 
 `RadishLexCandidateView`：
@@ -469,7 +481,7 @@ InternalError
 - librime setup/initialize/finalize 已收口为进程级 runtime，多 session 生命周期可复验。
 - FFI 文档明确所有权、生命周期、错误语义、字符串编码和释放责任。
 - 仓库提供受编译测试约束的 C header 或等价平台模块边界，并由具体 wrapper 复验线程调度、字符串复制和释放规则。
-- `ime-ffi` 有 C ABI 单元测试或 host smoke，覆盖 key result、snapshot、candidate view、normalized key event、session options、ABI contract、owner-thread、copy/release 和错误路径。
+- `ime-ffi` 有 C ABI 单元测试或 host smoke，覆盖 key result、snapshot、candidate view、normalized key event、session options、ABI contract、Linux startup request/result、owner-thread、copy/release 和错误路径。
 
 userdb/ranker 正确性已由 R02L 收口，R01B 通过产品个人化 session 把它们接入 macOS 输入链，并由 build 34 完成真实应用学习、重启持久化、删除/恢复、隐私/unknown/P0 零写入和 secure 系统路由证据。M2 manager 正常产品运行态与同库实机已关闭；当前 M3 的同步 payload、设备授权和平台私钥仍不进入输入热路径。
 

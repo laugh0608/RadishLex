@@ -22,13 +22,16 @@ RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支�
 - **Flutter**：本地词库、学习、隐私、同步、设备和诊断管理界面。
 - **平台原生薄壳**：macOS InputMethodKit、Linux Fcitx5/IBus、Android IME、Windows TSF、iOS Keyboard Extension。
 
-当前工程成熟度、停止线和下一步只在 [当前状态](docs/status/current.md) 维护。仓库已有 Rust、Go、Flutter 工程原型、macOS 离线输入 Alpha、本地个人化 MVP 与 M3 端到端加密同步 Beta 退出证据；当前进入 M4 产品发布候选，真实用户同步仍保持关闭。
+当前工程成熟度、停止线和下一步只在 [当前状态](docs/status/current.md) 维护。macOS `26.7.1 (38)` 已作为安装、输入、修复、默认移除和数据保留均通过的冻结参考产品；当前进入 M5 Linux Fcitx5 第二平台，公开发布与真实用户同步继续保持关闭。
 
 ## 稳定入口
 
 - [当前状态](docs/status/current.md)：当前批次、验证基线、停止线和下一步。
 - [技术方案](docs/technical-plan.md)：稳定架构、职责、输入链和平台策略。
 - [产品交付路线图](docs/roadmap.md)：产品里程碑、交付物和退出标准。
+- [第二平台 Linux Fcitx5 ADR](docs/adr/0009-second-platform-linux-fcitx5.md)：第二平台选择、串行推进顺序与统一发布关系。
+- [Linux Fcitx5 平台边界](docs/linux-fcitx5-boundary.md)：addon、FFI、XDG、隐私、构建与验收边界。
+- [Linux 安装维护边界](docs/linux-installation-maintenance-boundary.md)与 [L6 package matrix](docs/runbooks/linux-l6-package-matrix.md)：Debian 事务、startup gate、相邻 revision release pair、八点 controller、隔离 guest 和系统停止线。
 - [macOS 产品包边界](docs/macos-product-package-boundary.md)：M4 组件、版本、数据与发布停止线。
 - [macOS 安装载体 ADR](docs/adr/0008-macos-installation-carrier.md)：M4-P03 用户域 Installer、固定目标、程序事务与移除边界。
 - [macOS 程序安装事务](docs/macos-installation-transaction.md)：外层 operation、产品身份、receipt/guard 与启动门禁。
@@ -68,6 +71,8 @@ RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支�
 macOS 首发采用 `community-adhoc-v1`：Installer、Manager 与 InputMethod 使用 strict ad-hoc code identity，DMG 不使用 Apple Developer ID、不公证，也不会自动通过 Gatekeeper。ad-hoc identity 用于约束发布包内部一致性和安装事务，不能证明 Apple 已验证发布者或软件内容。
 
 发布页提供 DMG 后，用户必须先核对同时公布的 SHA-256，再通过“系统设置 → 隐私与安全性 → 仍要打开”明确放行 `RadishLex Installer.app`。终端 fallback 只允许对复制到 `$HOME/Applications` 的精确 Installer bundle 移除 quarantine，不使用 `sudo`，也不能对 `/Applications`、下载目录或整个用户 Applications 目录递归执行 `xattr`。
+
+用户不应再逐个放行已安装的 Manager 或 InputMethod。Installer 使用 `ditto --noqtn` 阻止下载 quarantine 传播到固定 staging，并在 payload manifest、完整 tree 和 strict ad-hoc identity 复验后逐节点审计无 quarantine，才允许提交；若最终程序仍被隔离或从 App Translocation 启动，应停止使用该候选并报告发布缺陷。
 
 Installer 只写当前用户域：
 
@@ -155,10 +160,11 @@ RadishLex 按用户可见纵向链分阶段交付，不要求同步、完整 man
 2. **M2 本地个人化 MVP**：真实选择安全写入 userdb 并影响后续候选；用户可在 manager 中管理词库、学习和隐私设置。
 3. **M3 加密同步 Beta**：两个真实客户端完成端到端加密同步、冲突收敛、删除传播、设备授权、恢复与撤销。
 4. **M4 产品发布候选**：输入法、manager、Rust native library、`librime`、schema、版本化 distribution identity、安装升级和发布载体形成可重复产品包。
+5. **M5 Linux Fcitx5 离线输入与个人化产品**：以原生 addon、共享 Rust FFI、XDG 数据、框架候选面板和 Linux Manager 形成第二平台产品能力。
 
-v1 不重写完整中文输入引擎。拼音切分、基础候选和长句转换可由成熟底层引擎提供，RadishLex 聚焦稳定 Rust 输入核心与 engine adapter、用户词库、候选重排、个人化学习、端到端加密同步和至少一个可日常使用的真实平台输入法。
+v1 不重写完整中文输入引擎。拼音切分、基础候选和长句转换可由成熟底层引擎提供，RadishLex 聚焦稳定 Rust 输入核心与 engine adapter、用户词库、候选重排、个人化学习、端到端加密同步和可日常使用的真实平台输入法。
 
-第一真实平台固定为 macOS InputMethodKit。同步不阻塞 M1/M2 的本地输入与个人化交付；第二平台只有在第一平台达到退出标准后再选择和启动。
+第一真实平台是 macOS InputMethodKit，第二平台已固定为 Linux Fcitx5；其后按 Android、Windows、iOS 串行推进。各平台分别验收，当前对外正式发布延期到计划内平台均达到各自退出标准之后再统一评审。
 
 ## 非目标
 

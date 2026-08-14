@@ -50,6 +50,7 @@ REQUIRED_FILES = [
     "docs/macos-data-upgrade-coordinator.md",
     "docs/macos-installation-transaction.md",
     "docs/macos-installer-app-boundary.md",
+    "docs/linux-installation-maintenance-boundary.md",
     "docs/adr/0008-macos-installation-carrier.md",
     "docs/adr/0007-apple-secure-enclave-p256-backend.md",
     "docs/runbooks/apple-secure-enclave-p256-backend.md",
@@ -57,12 +58,100 @@ REQUIRED_FILES = [
     "docs/runbooks/macos-m2-manager-product-acceptance.md",
     "docs/runbooks/macos-installer-user-domain-acceptance.md",
     "docs/runbooks/macos-release-carrier.md",
+    "docs/runbooks/linux-l6-package-matrix.md",
     "platforms/macos-imk/Sources/main.m",
     "platforms/macos-imk/Tools/tis_source_status.m",
     "platforms/macos-imk/Tools/test_data_cleanup.c",
     "platforms/macos-imk/build-bundle.sh",
     "platforms/macos-imk/cleanup-m2-manager-test-data.sh",
     "platforms/macos-imk/cleanup-user-install.sh",
+    "platforms/linux-fcitx5/CMakeLists.txt",
+    "platforms/linux-fcitx5/README.md",
+    "platforms/linux-fcitx5/dev/Dockerfile",
+    "platforms/linux-fcitx5/include/radishlex/linux/ffi_projection.h",
+    "platforms/linux-fcitx5/include/radishlex/linux/key_projection.h",
+    "platforms/linux-fcitx5/include/radishlex/linux/product_startup.h",
+    "platforms/linux-fcitx5/include/radishlex/linux/runtime_layout.h",
+    "platforms/linux-fcitx5/include/radishlex/linux/xdg_paths.h",
+    "platforms/linux-fcitx5/config/radishlex-addon.conf.in",
+    "platforms/linux-fcitx5/config/radishlex.conf.in",
+    "platforms/linux-fcitx5/src/fcitx_addon.cpp",
+    "platforms/linux-fcitx5/src/fcitx_addon.h",
+    "platforms/linux-fcitx5/src/ffi_projection.cpp",
+    "platforms/linux-fcitx5/src/key_projection.cpp",
+    "platforms/linux-fcitx5/src/linked_ffi_api.cpp",
+    "platforms/linux-fcitx5/src/linked_product_startup.cpp",
+    "platforms/linux-fcitx5/src/product_startup.cpp",
+    "platforms/linux-fcitx5/src/runtime_layout.cpp",
+    "platforms/linux-fcitx5/src/xdg_paths.cpp",
+    "platforms/linux-fcitx5/tests/ffi_projection_test.cpp",
+    "platforms/linux-fcitx5/tests/product_startup_test.cpp",
+    "platforms/linux-fcitx5/tests/runtime_layout_test.cpp",
+    "platforms/linux-fcitx5/tests/system_runtime_layout_test.cpp",
+    "platforms/linux-fcitx5/tests/xdg_paths_test.cpp",
+    "platforms/linux-fcitx5/tools/runtime_probe.cpp",
+    "platforms/linux-l6-acceptance/Cargo.toml",
+    "platforms/linux-l6-acceptance/README.md",
+    "platforms/linux-l6-acceptance/src/lib.rs",
+    "platforms/linux-l6-acceptance/src/command.rs",
+    "platforms/linux-l6-acceptance/src/controller.rs",
+    "platforms/linux-l6-acceptance/src/evidence.rs",
+    "platforms/linux-l6-acceptance/src/process.rs",
+    "platforms/linux-l6-acceptance/src/scenario.rs",
+    "platforms/linux-l6-acceptance/src/bin/radishlex-linux-l6-acceptance.rs",
+    "platforms/linux-product/Cargo.toml",
+    "platforms/linux-product/README.md",
+    "platforms/linux-product/src/checkpoint.rs",
+    "platforms/linux-product/src/coordinator.rs",
+    "platforms/linux-product/src/debian/command.rs",
+    "platforms/linux-product/src/debian/mod.rs",
+    "platforms/linux-product/src/debian/relationship/archive/ar.rs",
+    "platforms/linux-product/src/debian/relationship/archive/mod.rs",
+    "platforms/linux-product/src/debian/relationship/archive/tar.rs",
+    "platforms/linux-product/src/debian/relationship/archive/tests/fixture.rs",
+    "platforms/linux-product/src/debian/relationship/archive/tests/mod.rs",
+    "platforms/linux-product/src/debian/relationship/evidence.rs",
+    "platforms/linux-product/src/debian/relationship/manifest.rs",
+    "platforms/linux-product/src/debian/relationship/mod.rs",
+    "platforms/linux-product/src/debian/relationship/status.rs",
+    "platforms/linux-product/src/debian/relationship/tests/artifact.rs",
+    "platforms/linux-product/src/debian/relationship/tests/helper.rs",
+    "platforms/linux-product/src/debian/relationship/tests/mod.rs",
+    "platforms/linux-product/src/debian/relationship/tests/status_version.rs",
+    "platforms/linux-product/src/debian/relationship/version.rs",
+    "platforms/linux-product/src/lib.rs",
+    "platforms/linux-product/src/model.rs",
+    "platforms/linux-product/src/startup/decision.rs",
+    "platforms/linux-product/src/startup/mod.rs",
+    "platforms/linux-product/src/startup/read_only_state.rs",
+    "platforms/linux-product/src/startup/system_port.rs",
+    "platforms/linux-product/src/startup/system_port/manifest.rs",
+    "platforms/linux-product/src/startup/tests/core.rs",
+    "platforms/linux-product/src/startup/tests/helper.rs",
+    "platforms/linux-product/src/startup/tests/mod.rs",
+    "platforms/linux-product/src/startup/tests/system.rs",
+    "platforms/linux-product/src/startup/types.rs",
+    "platforms/linux-product/src/store.rs",
+    "platforms/linux-product/src/store/filesystem.rs",
+    "platforms/linux-product/src/store/guard.rs",
+    "platforms/linux-product/src/store/mode.rs",
+    "platforms/linux-product/src/store/operation.rs",
+    "platforms/linux-product/src/store_tests.rs",
+    "platforms/linux-product/src/system/executor.rs",
+    "platforms/linux-product/src/system/host.rs",
+    "platforms/linux-product/src/system/mod.rs",
+    "platforms/linux-product/src/system/observer.rs",
+    "platforms/linux-product/src/system/port.rs",
+    "platforms/linux-product/src/system/process.rs",
+    "platforms/linux-product/src/bin/radishlex-linux-maintenance.rs",
+    "platforms/linux-product/src/bin/radishlex-linux-artifact-verifier.rs",
+    "platforms/linux-product/src/tests/core.rs",
+    "platforms/linux-product/src/tests/checkpoints.rs",
+    "platforms/linux-product/src/tests/helper.rs",
+    "platforms/linux-product/src/tests/mod.rs",
+    "platforms/linux-product/src/tests/recovery.rs",
+    "platforms/linux-product/src/tests/system_port.rs",
+    "packaging/linux/l6-release-pair.json",
     "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.h",
     "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.m",
     "platforms/macos-product/UpgradePreflightHost/Sources/main.m",
@@ -98,6 +187,8 @@ REQUIRED_FILES = [
     "platforms/macos-product/InstallerBridge/src/tests.rs",
     "platforms/macos-product/InstallerApp/README.md",
     "platforms/macos-product/InstallerApp/Resources/Info.plist.in",
+    "platforms/macos-product/InstallerApp/Sources/RLXInstallerApplicationMenu.h",
+    "platforms/macos-product/InstallerApp/Sources/RLXInstallerApplicationMenu.m",
     "platforms/macos-product/InstallerApp/Sources/RLXInstallerPresentation.h",
     "platforms/macos-product/InstallerApp/Sources/RLXInstallerPresentation.m",
     "platforms/macos-product/InstallerApp/Sources/RLXInstallerBridge.h",
@@ -112,6 +203,38 @@ REQUIRED_FILES = [
     "scripts/check-docs.sh",
     "scripts/check-manager-ffi-smoke.sh",
     "scripts/check-manager-product.sh",
+    "scripts/check-linux-fcitx5.sh",
+    "scripts/check-linux-product-metadata.sh",
+    "scripts/check-linux-product-layout.sh",
+    "scripts/check-linux-deb-artifact.sh",
+    "scripts/check-linux-package-transaction.sh",
+    "scripts/check-linux-startup-gate.sh",
+    "scripts/check-linux-l6-contract.sh",
+    "scripts/check-linux-l6-controller.sh",
+    "scripts/check-linux-l6-release-pair.sh",
+    "scripts/build-linux-product-addon-stage.sh",
+    "scripts/build-linux-deb-artifact.sh",
+    "scripts/build-linux-l6-release-pair.sh",
+    "scripts/linux-product/l6_contract.py",
+    "scripts/linux-product/l6_controller_contract.py",
+    "scripts/linux-product/l6_release_pair.py",
+    "scripts/linux-product/l6_source_anchor.py",
+    "scripts/linux-product/l6_release_pair_contract.py",
+    "scripts/linux-product/product_metadata.py",
+    "scripts/linux-product/source_contract.py",
+    "scripts/linux-product/test_startup_gate_order.py",
+    "scripts/linux-product/rootfs.py",
+    "scripts/linux-product/deb_artifact.py",
+    "scripts/linux-product/test_product_metadata.py",
+    "scripts/linux-product/test_rootfs.py",
+    "scripts/linux-product/test_deb_artifact.py",
+    "scripts/linux-product/test_l6_contract.py",
+    "scripts/linux-product/test_l6_controller_contract.py",
+    "scripts/linux-product/test_l6_release_pair.py",
+    "scripts/linux-product/test_l6_release_pair_contract.py",
+    "scripts/build-manager-linux-product.sh",
+    "scripts/check-manager-linux-product.sh",
+    "scripts/build-linux-fcitx5-container.sh",
     "scripts/build-macos-product.sh",
     "scripts/build-macos-install-payload.sh",
     "scripts/build-macos-release-installer.sh",
@@ -156,6 +279,14 @@ REQUIRED_FILES = [
     "packaging/macos/product.json",
     "packaging/macos/install-layout.json",
     "packaging/macos/README.md",
+    "packaging/linux/README.md",
+    "packaging/linux/product.json",
+    "packaging/linux/install-layout.json",
+    "packaging/linux/l6-matrix.json",
+    "packaging/linux/debian/control.in",
+    "packaging/linux/debian/artifact.json",
+    "packaging/linux/assets/dev.radishlex.radishlexManager.desktop",
+    "packaging/linux/assets/radishlex.svg",
     "packaging/rime/README.md",
     "packaging/rime/product-rime-data.json",
     "packaging/rime/data/default.yaml",
@@ -324,6 +455,21 @@ def check_manager_product_runtime_contract() -> None:
         if symbol not in embed_script:
             raise SystemExit(f"manager native bundle gate is missing symbol: {symbol}")
 
+    linux_product_build = read_text("scripts/build-manager-linux-product.sh")
+    for symbol in (
+        "radishlex_ffi_contract",
+        "radishlex_userdb_terms_new",
+        "radishlex_userdb_learning_status",
+        "radishlex_userdb_rank_explain_new",
+        "radishlex_manager_sync_product_status",
+        "radishlex_linux_product_startup_gate",
+        "radishlex_manager_sync_qualification_start",
+    ):
+        if symbol not in linux_product_build:
+            raise SystemExit(
+                f"manager Linux native bundle gate is missing symbol: {symbol}"
+            )
+
 
 def check_macos_product_metadata() -> None:
     run_command([str(REPO_ROOT / "scripts/check-macos-product-metadata.sh")])
@@ -359,6 +505,38 @@ def check_macos_upgrade_preflight() -> None:
     if sys.platform != "darwin":
         return
     run_command([str(REPO_ROOT / "scripts/check-macos-upgrade-coordinator.sh")])
+
+
+def check_linux_fcitx5() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-linux-fcitx5.sh")])
+
+
+def check_linux_product_layout() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-linux-product-layout.sh")])
+
+
+def check_linux_deb_artifact() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-linux-deb-artifact.sh")])
+
+
+def check_linux_package_transaction() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-linux-package-transaction.sh")])
+
+
+def check_linux_startup_gate() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-linux-startup-gate.sh")])
+
+
+def check_linux_l6_contract() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-linux-l6-contract.sh")])
+
+
+def check_linux_l6_controller() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-linux-l6-controller.sh")])
+
+
+def check_linux_l6_release_pair() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-linux-l6-release-pair.sh")])
 
 
 def required_status_contexts(ruleset: dict[str, Any]) -> set[str]:
@@ -527,6 +705,14 @@ def main() -> int:
     check_macos_installer()
     check_macos_release_carrier()
     check_macos_upgrade_preflight()
+    check_linux_fcitx5()
+    check_linux_product_layout()
+    check_linux_deb_artifact()
+    check_linux_package_transaction()
+    check_linux_startup_gate()
+    check_linux_l6_contract()
+    check_linux_l6_controller()
+    check_linux_l6_release_pair()
     check_ruleset_and_workflows()
     check_path_budget()
     check_deployment_evidence()

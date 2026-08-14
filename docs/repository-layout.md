@@ -47,6 +47,21 @@ RadishLex/
   apps/
     radishlex-manager/
   platforms/
+    linux-fcitx5/
+      CMakeLists.txt
+      include/
+      src/
+      config/
+      tests/
+      README.md
+    linux-product/
+      Cargo.toml
+      README.md
+      src/
+    linux-l6-acceptance/
+      Cargo.toml
+      README.md
+      src/
     macos-imk/
       Sources/
       Resources/
@@ -70,6 +85,11 @@ RadishLex/
     android-ime/
       keystore-bridge/
   packaging/
+    linux/
+      assets/
+      debian/
+      product.json
+      install-layout.json
     macos/
       product.json
       install-layout.json
@@ -84,6 +104,7 @@ RadishLex/
     runbooks/
     devlogs/
   scripts/
+    linux-product/
     macos-product/
     rime-product/
   tests/
@@ -114,8 +135,8 @@ RadishLex/
 | Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v9、Manager 产品状态与隔离资格 run、管理查询和共库证据；M4-P02 数据协调、M4-P03 外层 receipt/guard、双程序切换/恢复、两段终态、manifest/code-signature adapter、跨核心协调、Installer driver/executor/bridge 已形成独立边界 | 身份绑定的终态材料清理与真实跨发布兼容证据 |
 | 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
 | 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
-| Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁；M4 外层 install gate、数据 gate 与升级 validation helper | 真实用户同步入口与首版后的目标部署证据 |
-| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；M4-P01 双 bundle与 locked RimeData；M4-P02 数据 gate/validation；M4-P03 外层 install gate、运行身份、Installer AppKit/bridge/executor、社区 ad-hoc identity 与 DMG evidence；Android Keystore 能力验证桥 | 真实用户域安装/修复/移除、跨发布升级实机证据；其他系统输入法 |
+| Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁；M4 外层 install gate、数据 gate 与升级 validation helper；M5 Linux runner、固定 `.so`、共享 XDG/privacy source contract、ARM64 Release bundle、同库学习/删除/导入导出与重启实机证据，以及 Flutter 初始化前的 Linux 只读 startup gate | Linux system package 实机；真实用户同步入口与首版后的目标部署证据 |
+| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；build 38 双 bundle、locked RimeData、数据/安装 gate、Installer、社区 ad-hoc identity、DMG evidence、首次安装/输入/修复/默认移除实机证据；Linux Fcitx5 C++/CMake addon、ABI/XDG/staged/system runtime-layout/Manager runtime/privacy/classifier contract、Debian 13 ARM64 Wayland/X11 输入及 Manager 同库个人化证据；Linux metadata/rootfs、真实 ARM64 product payload、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控 CLI、Manager/Fcitx 共用 startup gate、L6 format v1、compile-isolated checkpoint/evidence controller、真实 ARM64 release pair、独立 L6 guest/handoff/S0；Android Keystore 能力验证桥 | macOS 真实跨发布升级；Linux 隔离 L6 真实 process/dpkg/crash/font/XDG matrix 与独立安装实机；完整 Android IME、Windows TSF 与 iOS Keyboard Extension |
 
 具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
 
@@ -264,6 +285,7 @@ C ABI 与 host contract：
 - string/buffer/view ownership
 - structured errors 与 panic boundary
 - thread policy 与 release functions
+- additive request/result v1 Linux product startup ABI；输入 session/key ABI contract 仍为 v9
 - Apple 普通 DPK / Secure Enclave 独立产品 validation status/smoke（仅原生 gated host，不进入 Dart）
 
 生产源码只保存真实 ABI 和必要兼容层。审批流程、未来 symbol 列表和“尚未导出”证明应放文档或历史材料，不应长期存在于 `src/`。
@@ -333,7 +355,38 @@ apps/radishlex-manager/
 
 `scripts/macos-product/product_manifest.py` 校验版本镜像与源码声明，生成/复验无绝对路径的 ProductManifest v3；`install_layout.py` 以 committed layout、target 与显式历史 source assembly 生成 InstallPayloadManifest v2；`release_identity.py` 固定双 component strict ad-hoc requirement 集合；`community_release.py` 生成/复验 DMG SHA-256 evidence。四层证据都不保存签名凭据、公证上传或用户数据；具体产品构建见 [macOS 产品装配 Runbook](runbooks/macos-product-assembly.md)，用户安装与发布载体见 [macOS 社区 ad-hoc DMG Runbook](runbooks/macos-release-carrier.md)。
 
+`packaging/linux/` 保存 format v1 Linux product mirror、`debian-system-v1` component layout、Debian control/artifact contract、desktop/icon source 和 `debian-local-deb-v1` identity；不保存生成的 `.deb`、rootfs 构建物、apt repository metadata、签名凭据或用户数据。`scripts/linux-product/product_metadata.py` 负责格式与派生值，`source_contract.py` 交叉验证 version/build、ABI/schema、RimeData lock、dependency/font profile 与源码身份，`rootfs.py` 从显式 Manager/addon 输入离线装配临时 `DESTDIR` 并生成 canonical product manifest；`deb_artifact.py` 生成和重验 canonical ar/USTAR、control、md5sums 与 SHA-256 evidence，`shlibdeps_diagnostics.py` 精确核验私有未版本库和 Debian 13 ARM64 libc6 usrmerge 诊断。Rust/Cargo 与 C++ 产品构建路径映射为稳定 identity，强门禁扫描全部 ELF 的 repo/home/staging 泄漏；真实 Debian 13.6 ARM64 载荷与重复 `.deb` 构建已通过。以上入口不写真实 `/usr`、`/var`、dpkg database 或 XDG，也不把载体生成称为安装完成。完整边界见 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)。
+
 ## 平台目录
+
+M5-P02 已以真实实现和 contract 建立 `platforms/linux-fcitx5/`：
+
+```text
+platforms/linux-fcitx5/
+  CMakeLists.txt
+  src/                 Fcitx5 addon、input context/session、FFI、privacy 与 XDG 实现
+  include/             Linux addon/Manager 共用 XDG 与投影 header；公共 ABI 仍来自 ime-ffi
+  config/              addon/inputmethod metadata 的 committed source
+  dev/                 固定 digest 的 Debian 13 ARM64 开发镜像
+  evidence/            默认不加载的离线桌面取证夹具
+  tests/               key、candidate、lifecycle、privacy、classifier 与 XDG contract
+  tools/               staged addon runtime layout 与 native loader 诊断
+  README.md            开发构建、非安装 smoke 和边界索引
+```
+
+该目录不包含 userdb schema、ranker、Rime 私有候选逻辑、同步状态机或自绘候选 UI。`include/radishlex/linux/xdg_paths.h` 与 `src/xdg_paths.cpp` 是 addon、Flutter Linux host 和诊断的单一 XDG resolver；test injection 只在测试编译态可见。`ffi_projection` 复制 ABI v9 owned result 并守住 owner thread，`fcitx_addon` 只使用 framework input panel、commit 和 lifecycle。应用身份 evidence 仅用于默认关闭的固定候选桌面评审，不能进入默认产品日志或替代生产 allowlist 复核。CMake 默认 `staged` profile 继续服务 P02/P04，`system` profile 则把 Rime shared data 固定到 `/usr/share/radishlex/rime` 并使用产品版本渲染 metadata；两类 profile 均不构成安装成功。
+
+`platforms/linux-product/` 是 M5-P05B 的 Debian package 事务、关系校验与只读 startup decision 层。Rust crate 固定 canonical receipt、operation chain、source/target 私有 staging、root/state identity、regular-file advisory guard、五类 operation 与恢复状态机；每次 mutation/retry 重验 staged relationship，并以 move-only permit 绑定静止证明。state store 处理 receipt/stage 临时文件崩溃窗口、current required-slot 精确集合、原子 mode 与直接父目录 `fsync`；v1 历史 operation 只验证 structure/pair metadata，不作为当前恢复材料。新 operation 只有在 source artifact 精确等于 current terminal receipt 的 installed artifact 时才能追加；相同 package version/data contract 的重建字节不能替代该 chain anchor。
+
+production-only `VerifiedArtifactRelationship::verify_package` 从 actual `.deb` 同一有界流计算 size/SHA-256，严格解析三成员 ar、canonical uncompressed USTAR、仅 `control`/`md5sums` 的 control 和 actual payload inventory，并把唯一 product manifest 与 evidence、control、canonical md5 inventory 和 actual `Installed-Size` 逐项交叉；同域 relationship 另行校验依赖、Debian version 与 dpkg status。`src/bin/radishlex-linux-artifact-verifier.rs` 让 release-pair builder 用 target production parser 只读验证 source/target 两侧，`src/bin/radishlex-linux-maintenance.rs` 只消费 opaque authorized command；`src/system/` 固定 `/usr/bin/dpkg`、私有 staging、清空环境、超时、root identity、`/proc/*/maps` 与产品结果。v1 package 无 RadishLex maintainer scripts。
+
+startup observer 只读 `/var/lib/dpkg/status`、guard/tmp/receipt、terminal actual package/dependency relationship 与 component identity；Manager/Fcitx 在业务初始化前通过 additive request/result v1 取得 decision，C++ binding 以 `dladdr`/canonical path 拒绝错误 sibling symbol。production system 实现已在独立 L6 guest 完成真实 source install、target apply、target-validation failure 后的自动 source restore、`/proc` 静止与 terminal `rolled_back` proof；fake command/crash matrix 仍只使用 actual 合成 artifact、fake executor/observer 与临时目录，不写 `/usr`、`/var`、XDG 或既有 guest。
+
+`platforms/linux-l6-acceptance/` 是独立 workspace crate 和二进制 compile identity。它只通过 production crate 默认关闭的 `l6-acceptance-checkpoints` feature 取得八个 hook；production maintenance main 不链接调用入口、不识别参数，也没有环境/路径开关。worker 通过继承 pipe 在确定位置暂停，controller 杀独立完整 process group、等待 `SIGKILL` 并复验 `/proc/*/stat` 中 group member 为零且无 `dpkg` child，之后才形成 canonical `radishlex-linux-l6-checkpoint-evidence-v1`。envelope 只保存 operation ID hash 与稳定分类，不保存 PID、原始路径、proc/dpkg 原文或用户数据。
+
+`packaging/linux/l6-matrix.json` 与 `scripts/linux-product/l6_contract.py` 固定独立 Debian 13 ARM64 guest、不同 commit 的相邻 Debian revision、六步主序列、八个 crash checkpoint、字体/startup/XDG/procfs probe 和逐 mutation 授权；controller 合同另固定 compile identity、进程组终止与 evidence 边界。release-pair builder 以 `l6_source_anchor.py` 精确冻结 committed prior-terminal source package/evidence，只从 clean target 构建载体与双 executable，再运行 target production Rust verifier 逐侧解析 `.deb`。第四套确认 source chain 不连续；第五套 upgrade 自动恢复 source并形成 `rolled_back`。第六套已完成 target `completed` 与 S3；首次 repair 在 staged preflight `aborted_preserved`，暴露并修复 production system port 的 target-only effective-source 缺口。现有 release-pair v1 同时绑定 target package与同 commit双 executable，不能承载 package冻结后的单 ELF 修复；下一步先固定 maintenance-only refresh 合同，锚定旧 record和target artifact且只刷新production maintenance executable，再从 S3 新 clone。真实 repair、主序列和 crash matrix 尚未闭合。
+
+当前 macOS 机器不直接安装 Linux 工具链；`./scripts/build-linux-fcitx5-container.sh` 在 Docker Desktop 的 Linux VM 中以 Debian 13 ARM64、Fcitx5 Core 5.1.12 和 librime 1.13.1 编译 native-rime FFI 与 `radishlex.so`，仓库只读挂载，Cargo cache/target 使用独立 named volume。该入口还执行 staged addon-relative 装配、ELF `$ORIGIN`/依赖/构建路径门禁和 headless native loader probe；这些结果不是 Wayland/X11、Fcitx daemon 或真实应用输入证据。开发入口与停止线见 [Fcitx5 addon README](../platforms/linux-fcitx5/README.md)。
 
 当前 `platforms/macos-imk/` 已包含 Objective-C InputMethodKit 薄壳、bundle build、不安装系统输入法的 wrapper contract、公开 TIS 只读状态/监视工具、生产 `LearningContext`、privacy CFPreferences receipt、精确进程 stop、R01B userdb 与 M2 manager 固定测试数据 receipt 清理入口，以及合成 reference probe 和 unknown/P0 `ValidationHost`。两个数据 profile 复用同一 hardened helper：R01B 只允许四个 SQLite 名称，M2 另允许 manager settings 与原子写临时文件；二者都不接受调用方路径。分类 contract 直接编译 controller 使用的生产源码，并以两个 host 的固定 Bundle ID 覆盖 unknown/P0；host 本体只构建不启动，也不读取或保存输入框内容。正式薄壳已在 Apple Development build 32 完成 R01A；R01B 以同一 Apple Development build 34 完成真实重排、重启、删除/恢复、隐私/unknown/P0/secure 系统路由与零残留退出。曾冻结的 build 33 只保留历史意义。
 
@@ -351,14 +404,14 @@ apps/radishlex-manager/
 
 R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-acceptance.md) 的授权 A/B：授权 A 才允许签名、安装、系统设置、人工交互和保留 userdb 的普通清理；授权 B 只在 receipt 归属、设置恢复和数据库关闭条件满足后删除本轮四个固定 SQLite 文件并把预存空父目录恢复为 `0755`，不得删除父目录。该 runbook 现在作为关闭证据与回归边界保留。副屏和 VoiceOver 仍按平台边界文档的已知限制处理，自动 contract 不能替代对应实机证据。`platforms/android-ime/keystore-bridge/` 只是 Android Keystore 算法与 JNI 能力验证工程，不是完整 Android IME。
 
-后续平台目录按进入顺序创建：
+平台目录按主线顺序创建：
 
-1. `platforms/linux-fcitx5/`：macOS 达到退出标准后的桌面候选。
+1. `platforms/linux-fcitx5/`、`platforms/linux-product/` 与 `platforms/linux-l6-acceptance/`：前者承载 M5-P02-P04 输入/Manager 主线、system runtime profile 与共用 C++ startup binding；中者承载 actual `.deb` relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable port、`/proc` 静止、受控 CLI 与只读 startup decision；后者只承载 compile-isolated L6 checkpoint/process-group/evidence controller。确定性载体、release-pair identity 与 L6 matrix 归属 `packaging/linux/`，验证/构建辅助归属 `scripts/linux-product/` 与 `scripts/build-linux-l6-release-pair.sh`；前三套完成 source install/S1/S2并转为失败取证，第四套为 chain mismatch，第五套为 target-validation failure/recovery。第六套 target terminal与S3已闭合；首次repair暴露的target-only staged关系缺口已在production port和回归测试修复。当前下一步是先为package冻结后的单ELF修复固定maintenance-only refresh合同，而非复用release-pair builder、失败clone或同版本重建package。
 2. `platforms/android-ime/`：在现有 keystore bridge 之外补完整 IME。
 3. `platforms/windows-tsf/`。
 4. `platforms/ios-keyboard/`。
 
-只有对应平台设计边界和退出标准明确后才创建目录。空目录、占位文件或安装脚本不构成平台进度证据。
+只有对应平台设计边界和退出标准明确后才创建目录；M5-P01 的文档完成不自动创建 Linux 目录。空目录、占位文件或安装脚本不构成平台进度证据。第二平台顺序与发布关系见 [ADR 0009](adr/0009-second-platform-linux-fcitx5.md)，Linux 运行职责见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)。
 
 ## 文档目录
 

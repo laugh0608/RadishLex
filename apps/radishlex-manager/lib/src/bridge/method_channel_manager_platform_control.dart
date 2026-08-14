@@ -19,12 +19,12 @@ class MethodChannelManagerPlatformControl implements ManagerPlatformControl {
     } on PlatformException catch (error) {
       throw ManagerPlatformException(
         code: error.code.isEmpty ? 'platform_paths_unavailable' : error.code,
-        message: 'macOS product paths are unavailable',
+        message: 'platform product paths are unavailable',
       );
     } on MissingPluginException {
       throw const ManagerPlatformException(
         code: 'platform_bridge_unavailable',
-        message: 'macOS runtime bridge is unavailable',
+        message: 'platform runtime bridge is unavailable',
       );
     }
   }
@@ -40,7 +40,7 @@ class MethodChannelManagerPlatformControl implements ManagerPlatformControl {
     } on PlatformException {
       throw const ManagerPlatformException(
         code: 'privacy_read_failed',
-        message: 'macOS privacy preference could not be read',
+        message: 'platform privacy setting could not be read',
       );
     }
   }
@@ -56,7 +56,7 @@ class MethodChannelManagerPlatformControl implements ManagerPlatformControl {
       if (!state.present || state.enabled != enabled) {
         throw const ManagerPlatformException(
           code: 'privacy_write_failed',
-          message: 'macOS privacy preference read-back did not match',
+          message: 'platform privacy setting read-back did not match',
         );
       }
     } on ManagerPlatformException {
@@ -64,7 +64,7 @@ class MethodChannelManagerPlatformControl implements ManagerPlatformControl {
     } on PlatformException {
       throw const ManagerPlatformException(
         code: 'privacy_write_failed',
-        message: 'macOS privacy preference could not be updated',
+        message: 'platform privacy setting could not be updated',
       );
     }
   }
@@ -82,7 +82,7 @@ class MethodChannelManagerPlatformControl implements ManagerPlatformControl {
           restored.enabled != state.enabled) {
         throw const ManagerPlatformException(
           code: 'privacy_rollback_failed',
-          message: 'macOS privacy preference rollback did not match',
+          message: 'platform privacy setting rollback did not match',
         );
       }
     } on ManagerPlatformException {
@@ -90,7 +90,7 @@ class MethodChannelManagerPlatformControl implements ManagerPlatformControl {
     } on PlatformException {
       throw const ManagerPlatformException(
         code: 'privacy_rollback_failed',
-        message: 'macOS privacy preference could not be restored',
+        message: 'platform privacy setting could not be restored',
       );
     }
   }

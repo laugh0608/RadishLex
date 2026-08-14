@@ -1,6 +1,6 @@
 # RadishLex Manager
 
-RadishLex Manager 是萝卜词核的 Flutter 本地管理端。macOS 正常构建默认进入 `product` mode：从 app bundle 的 `Contents/Frameworks` 加载匹配 ABI 的 `libradishlex_ime_ffi.dylib`，通过 macOS 原生 bridge 解析固定 Application Support 路径，并与 InputMethodKit 薄壳共享同一 `userdb.sqlite3`。native library、路径、权限或 userdb 初始化失败会显示结构化启动错误，不会退回 fixture。
+RadishLex Manager 是萝卜词核的 Flutter 本地管理端。macOS 正常构建默认从 app bundle 的 `Contents/Frameworks` 加载匹配 ABI 的 `libradishlex_ime_ffi.dylib`，通过原生 bridge 解析固定 Application Support 路径，并与 InputMethodKit 薄壳共享同一 `userdb.sqlite3`。M5-P04 已加入 Linux product host 源码：runner 先设置 `umask(0077)`，P05B 再要求其在创建 Flutter application/engine 前通过共用只读 startup gate；通过后才复用 Fcitx5 addon 的 XDG resolver，从固定 bundle `lib/libradishlex_ime_ffi.so` 加载 native binding，并与 addon 共用 XDG userdb。两端的 startup identity、native library、路径、权限或 userdb 初始化失败都会结构化退出，不会退回 fixture。
 
 合成 fixture 只允许通过编译期 `RADISHLEX_MANAGER_MODE=demo` 显式启用，运行期间持续显示“合成演示数据”横幅。当前本地产品能力包括：
 
@@ -16,7 +16,7 @@ RadishLex Manager 是萝卜词核的 Flutter 本地管理端。macOS 正常构�
 - 脱敏诊断摘要预览 / 导出，预览支持字段分组、筛选和复制脱敏文本。
 - 自部署服务端配置草案、sync gate 草案预览和状态来源。
 
-真实远端同步、恢复码和设备授权产品成功路径尚未开放；平台私钥只通过脱敏产品状态与独立 gated validation 取证，不由普通 Manager UI 执行。相关停止线见仓库根 `docs/manager-ui-boundary.md`；本地验收口径见 `docs/manager-local-acceptance.md`；settings JSON 与诊断报告字段见 `docs/manager-settings-diagnostics.md`。
+真实远端同步、恢复码和设备授权产品成功路径尚未开放；平台私钥只通过脱敏产品状态与独立 gated validation 取证，不由普通 Manager UI 执行。相关停止线见仓库根 `docs/manager-ui-boundary.md`；跨平台本地口径见 `docs/manager-local-acceptance.md`，Linux host 与同库验收见 `docs/linux-manager-local-acceptance.md`；settings JSON 与诊断报告字段见 `docs/manager-settings-diagnostics.md`。
 当前 FFI bridge 覆盖 active / suppressed 词条与 deleted tombstone 查询、delete、explicit restore、用户词库 inspect / import / export、import batches、learning status 摘要、rank explain 摘要、sync preflight 摘要、隔离资格 run、设置持久化和脱敏诊断报告导出。`rank explain` 区域通过专用 `ime-ffi` ABI 读取单候选贡献项，Flutter 只展示复制后的非敏感摘要，并支持筛选和候选详情；学习页只展示聚合计数和贡献信号，不展示 P1 原始选择事件、原始输入历史或应用窗口信息。词库页会显示导入检查、词条 key / source / status / import batch / tombstone / sync 分类审计详情、导入历史筛选 / 排序 / 批次联动审计、本地 sync preflight 影响摘要、导入 / 导出结果摘要、删除确认、独立恢复确认和操作失败分类提示；同步页会显示 sync gate 状态来源、本地 P2 对象分类、local-only 事件计数、服务连接健康、设备 backend capability、production gate 阻断原因、恢复码准备清单、设备授权准备清单和只读操作进入计划，真实同步按钮继续禁用；设置页会显示配置来源诊断和同步门禁草案预览，可记录 allowlist 形式的部署证据来源标签，可回填净化后的 `sync_connection_health.v1` 摘要，并可按诊断字段索引分组预览、筛选、复制和导出包含 gate source / stop line 但不含用户词、文件路径、token、恢复码、签名、wrapped material 或 payload bytes 的诊断摘要。macOS 隐私模式通过 InputMethodKit 使用的 CFPreferences 域写入并读回，不以 settings JSON 镜像作为真相源。bridge 失败按操作和分类展示结构化错误码，不把 native 错误明细透传给 widget 层。sync gate 状态由设置草案、隐私模式、平台私钥 backend gate、部署证据来源草案、连接健康摘要和恢复 / 授权只读 readiness 共同派生；真实远端同步、恢复码生成 / 输入、join request 创建、设备授权成功和设备撤销 UI 继续关闭。
 
 ## 页面与操作说明
@@ -49,6 +49,8 @@ RadishLex Manager 是萝卜词核的 Flutter 本地管理端。macOS 正常构�
 
 ## 产品启动与升级门禁
 
+### macOS
+
 macOS 正常 product mode 在 `applicationWillFinishLaunching` 最前先执行 ABI v9 `radishlex_product_install_startup_gate`，再执行兼容保留的数据 `radishlex_product_upgrade_startup_gate`。平台层只从用户域解析固定 `Application Support/RadishLex` 和当前 effective uid；外层运行身份由 FFI 从当前 executable 的固定 bundle 形成。两层检查都发生在 Flutter delegate、settings、userdb 和所有 Manager 业务初始化之前。
 
 data root 不存在、两层状态目录/receipt 不存在，或两层 receipt 均处于允许启动的终态时才可继续。active guard、非终态或损坏 receipt、中断 artifact、未知对象、unsafe root/state、identity drift、completed remove、FFI 失败或未知 result 都直接退出，不能通过创建目录、修改权限、删除 receipt/sidecar 或切换到 demo fixture 绕过。失败日志只包含稳定 decision/error/state 数值，不输出路径或数据内容。
@@ -57,6 +59,14 @@ Apple P-256 与 Secure Enclave key-agreement 的显式 gated product smoke 是�
 
 Manager bundle 另携带 `Contents/Helpers/RadishLexUpgradeValidationHost`。无参数模式固定读取 `.radishlex-upgrade-v1/migration-candidate.sqlite3` 与可选 `source-settings.json`；唯一参数 `--post-switch` 固定读取最终 `userdb.sqlite3` 与 `manager-settings.json`。两种模式都复用 bundle 内 native library 执行 current-schema 管理查询和 settings format v1 兼容检查，不接受调用方路径、不启动 Flutter、不写数据库/settings，也不产生 WAL/SHM/journal；数据库字节变化或 sidecar 残留均失败。
 
+### Linux
+
+Linux runner 在 `umask(0077)` 后、创建 `MyApplication`/Flutter engine 前调用 additive `radishlex_linux_product_startup_gate` request/result v1。native target 必须显式编译为 `development-staged` 或 `debian-system-product`；component 固定为 Manager，component path 由当前 executable 取得，不由 Dart、UI、命令行或运行时环境提供。调用前 C++ binding 以 `dladdr` 与 canonical path 证明 startup/error symbols 来自 executable 的精确 sibling FFI，拒绝 `LD_LIBRARY_PATH`、preload 或其他 loader interposition。该控制面不改变输入 session/key ABI contract v9。
+
+gate 直接只读 `/var/lib/dpkg/status`、root receipt/advisory guard、strict terminal staging proof、canonical product manifest、完整 dependency/version relationship、Manager bundle tree、同 bundle FFI 与双产品 FFI equivalence；不调用 `dpkg`，不创建或清理 state，不解析 XDG，也不打开 settings/userdb/privacy/Rime。development build 只接受 system state/receipt 缺失且 package 严格未安装，system product 只接受 terminal receipt、Installed package/version/architecture、全部 hard dependency 与 bundle identity 完全一致。字体 family/glyph/owner 仍只由 L6 probe 证明；active guard、receipt/stage tmp、nonterminal、半配置、completed remove、缺 receipt、staging/bundle/symbol/dependency 漂移、unknown result 或 FFI error 都在 Flutter 初始化前退出。
+
+当前仓库已通过双编译身份、只读状态矩阵与 `umask -> gate -> Flutter` 源码顺序门禁，但没有构建或实机运行新的 ARM64 startup-enabled Manager payload。actual `.deb` relationship、恢复事务、fixed-path observer/executor、mutable port、受控 CLI、startup dependency 连接与 compile-isolated L6 checkpoint/evidence controller 已完成；真实 Linux process/dpkg、隔离 L6 与 P05C 仍属后续批次。v1 package 不携带 RadishLex 自有 maintainer scripts。
+
 ## FFI bridge
 
 macOS 正常 product 构建使用仓库稳定入口：
@@ -64,6 +74,21 @@ macOS 正常 product 构建使用仓库稳定入口：
 ```bash
 ../../scripts/build-manager-macos-product.sh
 ```
+
+Linux staged product bundle 使用 Linux 环境中的仓库稳定入口：
+
+```bash
+../../scripts/build-manager-linux-product.sh --development-staged
+../../scripts/check-manager-linux-product.sh
+```
+
+system-profile 产品载荷输入必须显式使用：
+
+```bash
+../../scripts/build-manager-linux-product.sh --system-product
+```
+
+构建入口先形成 workspace native-rime `.so`，再以仅限构建期的 `RADISHLEX_MANAGER_FFI_LIBRARY` 与严格 native profile 传给 CMake，并复制到 Flutter bundle。`--development-staged` / `--system-product` 不能省略或在运行时切换；builder 会分别验证稳定 startup identity marker 与 bundled FFI 的 startup symbol。正常运行期不读取构建变量，也不接受 db/settings/native library 路径 override。Linux privacy 真相源是 `${XDG_CONFIG_HOME:-$HOME/.config}/radishlex/privacy-mode.json`；`settings.json` 中同名字段只是 UI 投影，Manager snapshot 以平台文件读回覆盖，Fcitx addon 不解析完整 settings。
 
 Xcode 构建阶段会编译 `radishlex-ime-ffi`；macOS 产品 dylib 显式启用 `apple-keychain` feature，再修正 install name，检查目标架构、依赖与 manager 所需 symbol 集，把库复制到 app bundle 的 `Contents/Frameworks` 后签名。Dart 启动时读取 `radishlex_ffi_contract`，要求 ABI v9、owner-thread policy 和 panic boundary 与 manager 预期一致。普通 DPK 与 Secure Enclave P-256 status/product smoke symbol 只服务原生 gated validation，Dart 不直接绑定；现有 snapshot 只读取 `radishlex_manager_sync_product_status` 的固定脱敏状态。同步页另提供只连接 loopback HTTPS、只使用合成数据的资格 run，不触发系统 key 操作，也不返回 key、canonical、signature、wrapped material、payload 或 HTTP body。
 

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=RadishLex Manager
+Name[zh_CN]=萝卜词核管理器
+Comment=Manage local RadishLex dictionaries, learning and privacy
+Comment[zh_CN]=管理萝卜词核本地词库、学习与隐私设置
+Exec=/usr/lib/aarch64-linux-gnu/radishlex/manager/radishlex_manager
+TryExec=/usr/lib/aarch64-linux-gnu/radishlex/manager/radishlex_manager
+Icon=dev.radishlex.radishlexManager
+Terminal=false
+Categories=Settings;Utility;
+StartupNotify=true

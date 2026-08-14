@@ -79,10 +79,11 @@ void main() {
       expect(snapshot.explanations.single.signals, contains('user=2.000'));
       expect(snapshot.explanations.single.signals, contains('freq=0.350'));
       expect(snapshot.explanations.single.score, 2.9);
+      expect(snapshot.explanations.single.contextKind, 'browser');
       expect(native.explainInputCode, 'luobo');
       expect(native.explainCandidateText, '萝卜词核');
       expect(native.explainReading, isNull);
-      expect(native.explainContextKind, 'general');
+      expect(native.explainContextKinds, managerRankExplainContextKinds);
       expect(snapshot.settings.runtimeDiagnostics.bridgeMode, 'ffi_injected');
 
       final report = await bridge.loadDiagnosticsReport();
@@ -693,6 +694,7 @@ void main() {
       ]),
     );
     expect(explanation.signals, contains('negative=-0.500'));
+    expect(explanation.contextKind, 'general');
     expect(managerRankExplainReading(term), isNull);
     expect(diagnostics.nativeLibrary, 'app bundle Frameworks native library');
     expect(diagnostics.syncEndpoint, 'sync endpoint draft configured');
@@ -702,6 +704,69 @@ void main() {
       ).serverEndpoint,
       'https://draft.example.invalid',
     );
+  });
+
+  test('rank explain summaries keep signal contexts and general fallback', () {
+    const terms = [
+      UserTerm(
+        inputCode: 'ba',
+        text: '把',
+        reading: '',
+        weight: 1,
+        source: 'selection',
+        lastUsed: '2026-08-04 20:50',
+      ),
+      UserTerm(
+        inputCode: 'cihe',
+        text: '词核',
+        reading: '',
+        weight: 1,
+        source: 'manual',
+        lastUsed: '未使用',
+      ),
+    ];
+    final calls = <String>[];
+
+    final explanations = managerRankerExplanationSummaries(
+      terms: terms,
+      explainTerm: (term, contextKind) {
+        calls.add('${term.inputCode}:$contextKind');
+        final browserSignal =
+            term.inputCode == 'ba' && contextKind == 'browser';
+        return NativeRankExplainSummary(
+          inputCode: term.inputCode,
+          candidateText: term.text,
+          reading: null,
+          readingPresent: false,
+          contextKind: contextKind,
+          originalIndex: 0,
+          finalScore: browserSignal ? 1.793 : 1,
+          engineOrderFactor: 0,
+          userTermBoost: 1,
+          frequencyBoost: browserSignal ? 0.243 : 0,
+          recencyBoost: browserSignal ? 0.25 : 0,
+          contextBoost: browserSignal ? 0.3 : 0,
+          negativeFeedbackPenalty: 0,
+          suppressedPenalty: 0,
+          deletedPenalty: 0,
+        );
+      },
+    );
+
+    expect(
+      calls,
+      hasLength(terms.length * managerRankExplainContextKinds.length),
+    );
+    expect(
+      explanations
+          .map(
+            (explanation) =>
+                '${explanation.inputCode}:${explanation.contextKind}',
+          )
+          .toList(),
+      ['ba:browser', 'cihe:general'],
+    );
+    expect(explanations.first.score, 1.793);
   });
 }
 
@@ -768,7 +833,7 @@ final class _FakeNativeBinding implements RadishLexManagerNativeBinding {
   String? explainInputCode;
   String? explainCandidateText;
   String? explainReading;
-  String? explainContextKind;
+  final List<String> explainContextKinds = [];
   String? listedBatchesDbPath;
 
   @override
@@ -961,20 +1026,21 @@ final class _FakeNativeBinding implements RadishLexManagerNativeBinding {
     explainInputCode = inputCode;
     explainCandidateText = candidateText;
     explainReading = reading;
-    explainContextKind = contextKind;
-    return const NativeRankExplainSummary(
+    explainContextKinds.add(contextKind);
+    final contextual = contextKind == 'browser';
+    return NativeRankExplainSummary(
       inputCode: 'luobo',
       candidateText: '萝卜词核',
       reading: null,
       readingPresent: false,
-      contextKind: 'general',
+      contextKind: contextKind,
       originalIndex: 0,
-      finalScore: 2.9,
+      finalScore: contextual ? 2.9 : 2.0,
       engineOrderFactor: 0.0,
       userTermBoost: 2.0,
-      frequencyBoost: 0.35,
-      recencyBoost: 0.25,
-      contextBoost: 0.3,
+      frequencyBoost: contextual ? 0.35 : 0.0,
+      recencyBoost: contextual ? 0.25 : 0.0,
+      contextBoost: contextual ? 0.3 : 0.0,
       negativeFeedbackPenalty: 0.0,
       suppressedPenalty: 0.0,
       deletedPenalty: 0.0,

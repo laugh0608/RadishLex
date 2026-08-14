@@ -180,6 +180,7 @@ Library/Application Support/RadishLex/.radishlex-install-v1
 安装与移除继续遵守：
 
 - Installer 不接受自定义目标，用户能在变更前看到两个程序路径和保留数据语义；
+- 用户只需人工放行已核对摘要的 Installer；安装事务使用 `ditto --noqtn` 阻止下载 quarantine 传播，随后对固定 staging tree 逐节点审计无 quarantine，并重复 manifest/tree/strict ad-hoc identity 复验；最终 Manager/InputMethod 不得被隔离或从 App Translocation 启动；
 - 工具不得程序化选择或模拟切换输入源；
 - 升级前后使用公开 API 只读确认输入源状态；
 - 默认移除只删除产品 bundle，保留 Application Support 数据；
@@ -232,7 +233,11 @@ Apple 官方边界参考：
 14. 已接入 authoritative current-user bootstrap、完整内嵌 InstallPayload、strict ad-hoc release identity 和可回退实机验收 runbook；普通开发构建因缺失 sealed identity 失败关闭；
 15. 已固定 community ad-hoc 发布构建、双 component sealed release identity 与 DMG SHA-256 evidence，并开放 first install/repair/default remove 的 production mutation port；
 16. 已将历史 source assembly 纳入 payload v2，按外层 receipt 精确选源并开放 production upgrade port；
-17. 已生成并挂载复验 `26.7.1 (35)` 未公证 APFS/UDZO DMG、社区发布证据和用户人工放行 runbook；下一步从同一冻结候选形成独立下载核验与真实用户域首次安装/修复/移除证据。
+17. `26.7.1 (35)` 未公证 APFS/UDZO DMG 已完成独立下载核验和 Installer 人工放行，但真实首次安装证明其把 quarantine 传播给双 bundle，Manager 因 App Translocation 被固定路径 startup gate 正确拒绝；该候选已失效，不作为首发 assembly。
+18. `26.7.1 (36)` 在独立下载首次安装中证明“复制后递归移除”无法处理 `0444` 第三方 dylib；事务在 InputMethod staged evidence 前失败关闭，双程序均未提交，该候选继续失效。
+19. 安装事务改为 `ditto --noqtn` 源头排除传播，并逐节点只读审计无 quarantine；`26.7.1 (37)` 新 DMG/evidence 已通过完整仓库门禁、Chrome 独立下载逐字节复验和真实 quarantine 载体验证。
+20. build 37 已从空用户域完成首次安装、固定路径双端启动、公开合成输入、repair 与默认程序 remove；双 bundle 无 quarantine，repair 保留数据 inode，remove 保留 Application Support 与历史事务材料。实机同时确认 Installer 缺少标准 `⌘Q` 退出命令，因此该 build 只保留既有安全与事务证据，不再作为最终载体。
+21. Installer 已补标准 Application 菜单与 Quit action，正常退出继续保持事务只读；版本递增为 `26.7.1 (38)`，本地双 bundle、Installer、DMG、SHA-256 evidence、载体和完整仓库门禁已通过。独立下载、真实 quarantine、`prepared` 退出续跑及完整实机复验仍是冻结前置。
 
 ## M4-P01 退出标准
 

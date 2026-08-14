@@ -58,6 +58,7 @@ pub enum MacOsInstallAdapterErrorCode {
     SignatureIdentityChanged,
     StagingConflict,
     CopyFailed,
+    StagedQuarantineRejected,
     InvalidOperation,
     CoreRejected,
     #[cfg(feature = "qualification-harness")]
@@ -108,6 +109,9 @@ impl fmt::Display for MacOsInstallAdapterError {
             }
             MacOsInstallAdapterErrorCode::CopyFailed => {
                 "macOS metadata-preserving bundle copy failed"
+            }
+            MacOsInstallAdapterErrorCode::StagedQuarantineRejected => {
+                "macOS staged bundle retained quarantine metadata"
             }
             MacOsInstallAdapterErrorCode::InvalidOperation => {
                 "macOS install adapter operation binding is invalid"
@@ -442,6 +446,8 @@ impl MacOsProductInstallAdapter {
             Ok(_) => {}
             Err(_) => return Err(error(MacOsInstallAdapterErrorCode::Io)),
         }
+        self.verify_program(staged_path, expected)?;
+        self.copier.verify_staged_bundle_metadata(staged_path)?;
         self.verify_program(staged_path, expected)?;
         sync_bundle_tree(staged_path)?;
         sync_parent(staged_path)?;

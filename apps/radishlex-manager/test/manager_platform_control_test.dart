@@ -82,6 +82,27 @@ void main() {
     );
   });
 
+  test('product paths accept the fixed Linux shared library basename', () {
+    final paths = ManagerProductPaths.fromPlatformValue({
+      'userDbPath': '/home/test/.local/share/radishlex/userdb.sqlite3',
+      'settingsFilePath': '/home/test/.config/radishlex/settings.json',
+      'nativeLibraryPath': '/opt/radishlex-manager/lib/libradishlex_ime_ffi.so',
+    });
+
+    expect(paths.nativeLibraryPath, endsWith('/libradishlex_ime_ffi.so'));
+  });
+
+  test('product paths reject an arbitrary shared library basename', () {
+    expect(
+      () => ManagerProductPaths.fromPlatformValue({
+        'userDbPath': '/home/test/.local/share/radishlex/userdb.sqlite3',
+        'settingsFilePath': '/home/test/.config/radishlex/settings.json',
+        'nativeLibraryPath': '/opt/radishlex-manager/lib/untrusted.so',
+      }),
+      throwsA(isA<ManagerPlatformException>()),
+    );
+  });
+
   test('privacy state rejects enabled value without a stored key', () {
     expect(
       () => ManagerPrivacyModeState.fromPlatformValue({

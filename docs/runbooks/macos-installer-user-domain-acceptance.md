@@ -39,6 +39,7 @@ Installer 自身只从当前 executable 反推 `Contents/Resources/InstallPayloa
 - 固定路径或任一父目录是 symlink、owner 异常，或 Application Support 已存在但不是可归属的私有目录；
 - TIS、bundle、进程、receipt、staging、backup 或 userdb 现场无法归属；
 - Manager/InputMethod 仍运行，或开发者尚未手动切换到中立输入源；
+- 安装后的 Manager/InputMethod 仍带 `com.apple.quarantine`，系统要求逐个放行，或任一程序从 App Translocation 启动；
 - Installer snapshot 不是已知 ABI/枚举，或日志出现路径、PID、operation ID、签名正文和底层命令输出；
 - 任一步要求程序化选择/注册/停用输入源、编辑 TIS 私有数据库、删除历史 operation 材料或查看用户数据正文。
 
@@ -91,9 +92,11 @@ Installer 自身只从当前 executable 反推 `Contents/Resources/InstallPayloa
 1. 开发者手动切换到中立输入源并关闭 Manager；AI 只读复验。
 2. 在 Installer 中显式确认首次安装。`prepared` 必须先持久化并等待人工步骤，不能一次点击越过静止边界。
 3. 再次确认后，Installer 重新执行平台 preflight，按 receipt 完成双 bundle staging、逐端 commit、两段终态并到达 `completed`。
-4. 开发者在系统设置中手动添加并选择 RadishLex；AI 不点击、不模拟按键、不调用 TIS 注册或选择 API。
-5. 开发者用公开合成文本完成最小输入 smoke，再切回中立输入源。
-6. 关闭 Manager/InputMethod 后复验双端 install startup gate 和 data startup gate 均允许；日志只保留稳定 decision/error/state。
+4. 在打开双端前，只读确认两个固定 bundle 均无 `com.apple.quarantine`，完整 tree/code identity 与 receipt target 不变；用户不应再单独放行 Manager/InputMethod。
+5. 从固定用户域路径启动 Manager，确认进程 executable 不位于 App Translocation，且 install startup gate 和 data startup gate 均允许。
+6. 开发者在系统设置中手动添加并选择 RadishLex；AI 不点击、不模拟按键、不调用 TIS 注册或选择 API。
+7. 开发者用公开合成文本完成最小输入 smoke，再切回中立输入源。
+8. 关闭 Manager/InputMethod 后复验双端 startup gate；日志只保留稳定 decision/error/state。
 
 ## E. 升级、故障恢复与回滚
 
@@ -121,11 +124,28 @@ Installer 自身只从当前 executable 反推 `Contents/Resources/InstallPayloa
 4. 若验收基线原先已有受 receipt 证明的 bundle，只能通过对应 source backup/receipt 恢复；不得从构建目录任意复制冒充回滚。
 5. 数据删除不属于本 runbook。需要恢复空基线时，另行取得固定白名单与 receipt 绑定的删除授权。
 
-## 当前实机证据（2026-07-25）
+## 当前实机证据（2026-07-26）
 
 - 普通开发构建已证明缺少 sealed identity 时稳定投影 `product_identity_unavailable`，且没有改变 TIS、双 bundle、Application Support 数据或进程基线。
-- HEAD `ad5ce37` 已构建 `26.7.1 (35)` community Installer 与 APFS/UDZO DMG；只读挂载、唯一根对象、Installer/payload/release identity 复验和完整仓库门禁通过。
-- 当前本机候选 DMG SHA-256 为 `1137b14f284275723a5d019447c70cd926638937944b73e749cce81c8975b4ec`，evidence 明确记录 `apple_notarized=false`；产物保留在 ignored `target/`，未公开上传。
-- 尚未形成独立下载副本、用户人工放行、真实 first install/repair/remove、重启双端 startup gate 或跨发布 upgrade 成功证据。
+- `26.7.1 (35)` community DMG 已上传到 GitHub draft Release，并由 Chrome 形成独立下载副本；下载文件与本地冻结 artifact、发布页 evidence 的大小和 SHA-256 `1137b14f284275723a5d019447c70cd926638937944b73e749cce81c8975b4ec` 逐字节一致，且保留真实下载 quarantine。
+- 用户通过“隐私与安全性 → 仍要打开”放行 Installer，首次安装事务到达 `completed`，双 bundle 版本、build、strict ad-hoc code identity、receipt 和 TIS 自动发现均符合预期。
+- 失败证据：安装事务保留了 payload 的 quarantine，导致固定目标双 bundle 继续带 `com.apple.quarantine`；Manager 被系统从 App Translocation 启动后，由固定用户域 startup gate 正确拒绝并退出，没有 crash report。`26.7.1 (35)` 因此失效，不能作为首发或未来 upgrade source。
+- `26.7.1 (36)` DMG 大小为 `32181986` bytes，SHA-256 为 `2fa479fe261bc20666c058807d01eebc28631a641e3c2210c253f89f6acea255`，已完成 draft asset 替换、Chrome 独立下载、摘要核对和 Installer 人工放行。
+- build 36 首次安装在 `quiesced` 可恢复边界失败关闭：Manager staging 已清除 quarantine 并记录 evidence；InputMethod 的 8 个 `0444` 第三方 dylib 仍保留 quarantine，故 adapter 未记录 InputMethod evidence，双程序均未提交。用户没有点击续跑。
+- 根因是 `xattr -drs` 对只读文件返回权限错误且会留下部分修改。后续实现不得临时 chmod 或逐项修改 staging；改为 `ditto --noqtn` 从复制源头排除传播，并对每个节点只读审计无 quarantine，随后重复 tree/code identity 复验。
+- `26.7.1 (37)` 冻结候选已通过完整仓库与载体门禁；本地 DMG 大小为 `32194418` bytes，SHA-256 为 `c3977796b717f58a191d68755048b316c771a283bb2bfece6d0172db48d20a41`。draft Release 已只保留 build 37 的 DMG、checksum 与 evidence，仍未发布且没有 Git tag。
+- Chrome 独立下载文件名无后缀，大小、SHA-256 与本地冻结产物完全一致，`cmp` 证明逐字节相同；xattr 记录 GitHub Release asset 来源、Chrome provenance 与真实 quarantine，`hdiutil verify` 通过。安装前 TIS、正式双 bundle、Application Support、runtime data、userdb 与进程均为空/停止；保留的 build 35 operation 目录已由 completed remove receipt 精确归属。
+- 用户人工放行 build 37 Installer 后，first install 先稳定停在 `prepared`，再次确认才到达 `completed`。安装后 Manager 53 个节点、InputMethod 48 个节点均无 quarantine；ProductManifest、sealed release identity、strict ad-hoc identity 与版本 `26.7.1 (37)` 复验通过。
+- Manager 从固定 `~/Applications` 路径启动且不在 App Translocation；InputMethod 从固定 `~/Library/Input Methods` 路径启动。双端 startup gate 均允许，TIS 人工选择成立，公开合成输入 `zhongwen` 正常出现候选并提交“中文”，切回中立输入源后无稳定 failure/rejection 日志。
+- repair 同样先停在 `prepared`，完成后双 bundle 使用新 inode 且 quarantine 为零；Application Support、Rime、userdb、WAL 与 SHM inode 全部保持不变。repair 终态 Manager 再次从固定路径启动，并读取保留的本地数据。
+- 用户在系统设置中手动移除输入源后执行默认程序 remove。终态为 `remove_programs/completed`，双 bundle 不存在，TIS `matches/enabled/selected=0/0/0`，Manager/InputMethod 进程停止；Application Support、Rime、userdb、sidecar、receipt 和两侧各 5 个 operation 目录全部保留。
+- bundle 仍存在时，TIS 只读刷新可能异步拉起 InputMethod；mutation 前必须在 TIS 查询之后再通过真实进程表复验，不能仅沿用状态脚本内部的瞬时 `process=stopped`。Installer 本轮 `⌘Q` 未生效，但关闭窗口后进程确实退出；该现象是 build 38 生命周期修复与重新验收的来源。
 
-下一次实机验收必须从 A 重新采集只读基线，并只使用上述同一冻结候选。若候选内容或版本变化，应生成新的 evidence 与验收记录，不能沿用本节 SHA-256。
+build 37 已完成本 runbook D 与 F.3 的历史真实用户域证据，但因 Installer 生命周期缺口不再作为最终载体。不得沿用 build 35/36/37 的 SHA-256、draft asset 或最终载体断言。
+
+- `26.7.1 (38)` 已补标准 Application 菜单和 `⌘Q` Quit action；DMG 大小为 `32196093` bytes，SHA-256 为 `f171e74bdc0a429655a84b30429481bce3926b17076d09298feed77d9ce4ce4e`。远端 draft 三项资产匹配且未发布、无 Git tag；Chrome 独立下载副本大小、摘要、字节与真实 quarantine 通过。
+- 下载副本的标准菜单、`⌘Q`、关闭最后窗口与 `prepared` 退出重开续跑通过。首次安装为 `first_install/completed`；双 bundle manifest/release identity/无 quarantine、固定路径 Manager、`local_only`、公开合成 `zhongwen` 候选及“中文”提交通过。
+- repair 为 `repair/completed`；source/target 均为 build 38，Application Support、Rime、userdb inode 始终为 `18234715`、`18250146`、`18237317`，双 bundle 身份与无 quarantine 再次通过。
+- 用户手动移除输入源后，默认 remove 达到 `remove_programs/completed`。终态双 bundle 不存在，TIS `matches/enabled/selected=0/0/0`，双端进程停止；Application Support、Rime、userdb、sidecar 与 receipt 保留。
+
+build 38 已完成本 runbook C、D 与 F.3 的真实用户域证据。当前是默认保留数据的 completed remove 现场，不是空数据基线；数据删除、本轮 operation 清理和历史材料处置仍需另行取得固定白名单与 receipt 绑定授权。

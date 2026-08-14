@@ -35,6 +35,8 @@ macOS 产品路径由原生 `FileManager` 与 app bundle 解析，不依赖 shel
 
 M2 设置页中的同步配置仍是非 secret 草案；隐私模式不是普通草案字段。macOS 隐私模式必须通过受控平台 bridge 读写 InputMethodKit 使用的 `org.radishlex.inputmethod.macos` / `RadishLexPrivacyMode` 偏好，写入后读回确认，失败时保持原状态并显示结构化错误。manager 不展示 P1 原始行，也不通过隐私开关直接读取 userdb 正文。
 
+M5 Linux Manager 继续复用同一 product bootstrap 和 `ManagerBridge`，但平台路径、bundle `.so` 与 privacy 真相源按 [Linux Manager 本地验收边界](linux-manager-local-acceptance.md) 实现。Linux host 必须调用共享 XDG resolver；privacy 使用独立平台配置文件，`settings.json` 中同名字段只作为 UI 投影并在 snapshot 加载时被平台真相源覆盖。Fcitx addon 不解析 Manager settings，也不因平台增加而改写 Flutter 页面或 Rust 管理语义。Manager 主题必须显式声明兼顾 Latin、数字与简体中文的字体 fallback；[Linux 安装维护边界](linux-installation-maintenance-boundary.md) 已固定 Debian profile 使用 `fonts-dejavu-core` 与 `fonts-noto-cjk` hard dependency，payload 只允许 Flutter 生成的固定 Material Icons 图标字形，不能依赖桌面环境偶然 fallback。
+
 词库产品视图必须来自 Rust 真相源并区分 active、suppressed 和 deleted tombstone。suppressed 与 deleted 只能经独立确认调用 explicit restore；普通新增、导入或学习不得隐式恢复。deleted tombstone 查询只返回 identity、删除时间和非敏感原因分类，不返回 P1 原始事件。词条审计通过 Rust 持久化的可选 `import_batch_id` 关联本地导入批次；`source` 是来源枚举，批次 `source_name` 是用户提供的审计标签，两者不得按字符串相等推断关联。
 
 M2 产品运行态的验收至少覆盖：无 shell 环境变量启动、bundle 内 native library 加载、固定路径与权限、空库初始化与既有 schema 打开、active / suppressed / deleted 查询、删除后重启、explicit restore 后重启、隐私偏好写入读回、输入法与 manager 双连接读写、失败可见性，以及 demo/product 隔离。测试数据只能使用合成词和临时目录；自动化不得读取开发者真实 userdb 正文。
@@ -120,6 +122,8 @@ M2 本地管理能力应优先覆盖：
 - 普通新增、选择学习和导入都不得清除 tombstone 或 suppressed；恢复必须使用独立的用户确认动作并调用 `restore_term`，界面需要明确展示这是恢复已删除/已抑制词条，不得在其他操作成功后隐式触发。
 - 词库导出只导出用户显式请求的 P2 用户词条视图，不作为诊断报告的一部分混入。
 - 学习页、同步页和诊断报告只能展示聚合计数、状态码、来源标签和解释性摘要，不展示 P1 原始事件或明文同步 payload。
+- 学习页的 rank explain 必须明确标注 `general`、`browser`、`chat`、`code`、`editor`、`office` 之一，不能把 `general` 硬编码结果冒充当前候选的实际上下文解释。Manager 可通过既有只读 explain ABI 查询这些稳定粗类别，只展示存在 frequency、recency、context 或 negative 信号的类别；全部没有上下文信号时仅回退一条 `general`。该摘要不改变 learning status 的 `context_stats=false`，不展示上下文分布计数、原始 App ID、窗口标题或 P1 事件行。
+- 页面可读性验收必须同时覆盖中文标题/正文、英文状态码与数字计数；不能用只覆盖 CJK 或只覆盖 Latin 的单一 fallback 修复另一类字符。
 - manager 与输入 runtime 共用 userdb 时，页头必须提供显式刷新动作并重新调用 bridge `loadSnapshot`；不得把启动时 snapshot 当作长期真相源，也不得在 Flutter 层复制输入侧学习状态来伪造实时可见性。
 - 设置页保存的是本地草案；`retain_sync_config`、`server_endpoint`、`access_token_configured`、`privacy_mode`、`diagnostics_export` 和部署证据来源只用于派生 UI 状态，不启用真实上传。
 - 诊断报告预览的 section 筛选和关键字筛选只影响当前对话框字段列表，不改变 `ManagerDiagnosticsReport` 数据模型、脱敏文本、剪贴板内容或导出内容。

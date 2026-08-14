@@ -4,11 +4,12 @@
 
 ## 发布口径
 
-- 产品版本由仓库根 `version.json` 唯一确定；首发基线为 `26.7.1 (35)`，标准 tag 为 `v26.7.1-release`。
+- 产品版本由仓库根 `version.json` 唯一确定；当前修复候选为 `26.7.1 (38)`，标准 tag 为 `v26.7.1-release`。`26.7.1 (35)` 把 quarantine 传播到最终程序，`26.7.1 (36)` 又无法清除只读 dylib 的 quarantine；二者均失效，不得作为首发 assembly。build 37 已完成真实安装证据，但因 Installer 生命周期代码变化不再作为最终发布载体。
 - `ProductManifest.json` format v3 固定 `distribution_identity=community-adhoc-v1`。
 - Installer、Manager 与 InputMethod 使用严格 ad-hoc code signature。该签名用于检测包内意外变化和绑定事务 identity，不提供 Apple 认可的发布者认证。
 - DMG 不签名、不提交公证、不含 ticket。`notarize-macos-release-dmg.sh` 在当前模式必须稳定失败关闭。
 - 对外必须同时发布 DMG 与 `CommunityReleaseEvidence.json`；后者精确绑定版本、文件名、大小、DMG SHA-256 和 sealed release identity SHA-256。
+- 当前候选 `RadishLex-26.7.1-38.dmg` 大小为 `32196093` bytes，SHA-256 为 `f171e74bdc0a429655a84b30429481bce3926b17076d09298feed77d9ce4ce4e`；远端 draft 仅含匹配的 DMG、checksum 和 evidence，仍未发布且没有正式 Git tag。Chrome 独立下载副本已同时匹配大小与 SHA-256，逐字节比较一致，并带有真实 quarantine 和 GitHub Release 来源元数据；该副本的标准 Application 菜单、`⌘Q`、关闭最后窗口终止进程、`prepared` 重启续跑、首次安装、固定路径 Manager 启动、公开合成输入、repair 与默认程序 remove 已通过人工复验。双 bundle 在安装与 repair 后均精确匹配 manifest/release identity 且无 quarantine，repair 保持 Application Support、Rime 与 userdb inode；默认 remove 后双 bundle/TIS/进程清零且数据对象继续保留。候选证据链已闭合，但正式发布、tag 与 Release 仍需独立授权。
 
 ## 构建
 
@@ -23,9 +24,9 @@
 首发输出固定在：
 
 ```text
-target/macos-release/26.7.1-35/
+target/macos-release/26.7.1-38/
 ├── RadishLex Installer.app
-├── RadishLex-26.7.1-35.dmg
+├── RadishLex-26.7.1-38.dmg
 ├── CommunityReleaseEvidence.json
 ├── InstallPayload/
 └── Product/
@@ -39,9 +40,9 @@ target/macos-release/26.7.1-35/
 ./scripts/check-macos-release-carrier.sh
 
 python3 scripts/macos-product/community_release.py verify \
-  --carrier "$PWD/target/macos-release/26.7.1-35/RadishLex-26.7.1-35.dmg" \
-  --identity "$PWD/target/macos-release/26.7.1-35/RadishLex Installer.app/Contents/Resources/ReleaseIdentity.json" \
-  --evidence "$PWD/target/macos-release/26.7.1-35/CommunityReleaseEvidence.json"
+  --carrier "$PWD/target/macos-release/26.7.1-38/RadishLex-26.7.1-38.dmg" \
+  --identity "$PWD/target/macos-release/26.7.1-38/RadishLex Installer.app/Contents/Resources/ReleaseIdentity.json" \
+  --evidence "$PWD/target/macos-release/26.7.1-38/CommunityReleaseEvidence.json"
 ```
 
 发布页必须明确写明“未使用 Apple Developer ID、未公证，需要用户手动批准”，并直接列出 DMG SHA-256。不能使用“已签名”“Apple 已验证”“通过 Gatekeeper”或等价表述。
@@ -51,7 +52,7 @@ python3 scripts/macos-product/community_release.py verify \
 用户应先对下载文件执行：
 
 ```bash
-shasum -a 256 "$HOME/Downloads/RadishLex-26.7.1-35.dmg"
+shasum -a 256 "$HOME/Downloads/RadishLex-26.7.1-38.dmg"
 ```
 
 结果必须与发布页及 `CommunityReleaseEvidence.json` 的 `carrier_sha256` 完全一致。随后打开 DMG 并尝试启动 `RadishLex Installer.app`。macOS 阻止启动时，首选系统支持的人工路径：
@@ -66,12 +67,14 @@ shasum -a 256 "$HOME/Downloads/RadishLex-26.7.1-35.dmg"
 mkdir -p "$HOME/Applications"
 ditto "/Volumes/RadishLex Installer/RadishLex Installer.app" \
   "$HOME/Applications/RadishLex Installer.app"
-xattr -dr com.apple.quarantine \
+xattr -drs com.apple.quarantine \
   "$HOME/Applications/RadishLex Installer.app"
 open "$HOME/Applications/RadishLex Installer.app"
 ```
 
 该用户域路径不需要 `sudo`。不得对 `/Applications`、`$HOME/Applications`、下载目录或磁盘根执行宽泛递归 `xattr`；不得把移除 quarantine 描述为签名或公证替代品。
+
+用户人工放行只针对已核对摘要的 Installer。Installer 使用 `ditto --noqtn` 排除下载 quarantine，同时保留其他 xattr；固定 staging bundle 还必须通过 manifest、完整 tree、strict ad-hoc identity 和逐节点无 quarantine 审计。它不会修改文件权限或全局 Gatekeeper 设置。安装完成后若系统仍要求单独放行 Manager/InputMethod，或日志显示程序从 App Translocation 启动，应立即停止该候选，不要通过逐个“仍要打开”或宽泛 `xattr` 绕过。
 
 ## Installer 操作与故障处理
 

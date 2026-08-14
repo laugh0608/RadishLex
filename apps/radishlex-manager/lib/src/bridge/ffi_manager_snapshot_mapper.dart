@@ -15,7 +15,8 @@ ManagerSnapshot managerSnapshotFromNative({
   required NativeSyncProductStatus nativeSyncProductStatus,
   required ManagerSettingsDraft settingsDraft,
   required ManagerRuntimeDiagnostics runtimeDiagnostics,
-  required NativeRankExplainSummary Function(UserTerm term) explainTerm,
+  required NativeRankExplainSummary Function(UserTerm term, String contextKind)
+  explainTerm,
 }) {
   final terms = nativeTerms
       .map(managerUserTermFromNative)

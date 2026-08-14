@@ -7,7 +7,6 @@ use std::ptr;
 use std::slice;
 
 use radishlex_ime_ffi::*;
-use radishlex_ime_userdb::UserDb;
 
 #[test]
 #[ignore = "requires RADISHLEX_RIME_SHARED_DATA and RADISHLEX_RIME_USER_DATA"]
@@ -98,7 +97,8 @@ fn rime_session_native_smoke_uses_ffi_entrypoint() {
     push_text(session, "shi", &mut error);
     let snapshot = radishlex_session_snapshot_new(session, &mut error);
     assert!(radishlex_snapshot_candidate_count(snapshot) > 1);
-    let expected_non_first = unsafe { candidate_text(snapshot, 1, &mut error) };
+    let (expected_non_first, expected_non_first_reading) =
+        unsafe { candidate_identity(snapshot, 1, &mut error) };
     let mut non_first = ptr::null_mut();
     assert_eq!(
         unsafe { radishlex_session_select_candidate(session, 1, &mut non_first, &mut error) },
@@ -120,10 +120,152 @@ fn rime_session_native_smoke_uses_ffi_entrypoint() {
         radishlex_snapshot_free(snapshot);
     }
 
-    let db = UserDb::open(&userdb_path_text).expect("personalized userdb opens");
-    let learned_selection_count = db.selection_event_count().expect("selection count");
+    let manager_summary = manager_learning_status(&userdb_path, &mut error);
+    let learned_selection_count = manager_summary.selection_events;
     assert_eq!(learned_selection_count, 1);
-    drop(db);
+    assert!(manager_summary.active_user_terms > 0);
+    unsafe {
+        radishlex_session_free(session);
+    }
+
+    let second_session_id = CString::new("native-rime-manager-observer").expect("session id");
+    let second_options = RadishLexPersonalizedRimeSessionOptions {
+        version: RADISHLEX_PERSONALIZED_RIME_SESSION_OPTIONS_VERSION,
+        shared_data_dir: shared_data.as_ptr(),
+        user_data_dir: user_data.as_ptr(),
+        schema: schema.as_ptr(),
+        log_dir: ptr::null(),
+        deploy_on_start: 1,
+        userdb_path: userdb_path.as_ptr(),
+        session_id: second_session_id.as_ptr(),
+    };
+    let second_session = radishlex_session_new_personalized_rime(&second_options, &mut error);
+    assert!(
+        !second_session.is_null(),
+        "second runtime session opens: {}",
+        unsafe { error_message(error) }
+    );
+    set_learning_context(second_session, false, false, true, &mut error);
+    push_text(second_session, "shi", &mut error);
+    let second_snapshot = radishlex_session_snapshot_new(second_session, &mut error);
+    assert_eq!(
+        unsafe { candidate_text(second_snapshot, 0, &mut error) },
+        expected_non_first,
+        "a second runtime session must observe the learned order"
+    );
+    unsafe {
+        radishlex_snapshot_free(second_snapshot);
+    }
+    assert_eq!(
+        radishlex_session_reset(second_session, &mut error),
+        RadishLexStatusCode::Ok
+    );
+    unsafe {
+        radishlex_session_free(second_session);
+    }
+
+    let input_code = CString::new("shi").expect("input code");
+    let selected_text = CString::new(expected_non_first.as_bytes()).expect("candidate text");
+    let selected_reading = expected_non_first_reading
+        .as_ref()
+        .map(|value| CString::new(value.as_bytes()).expect("candidate reading"));
+    assert_eq!(
+        radishlex_userdb_delete_term(
+            userdb_path.as_ptr(),
+            input_code.as_ptr(),
+            selected_text.as_ptr(),
+            selected_reading
+                .as_ref()
+                .map_or(ptr::null(), |value| value.as_ptr()),
+            &mut error,
+        ),
+        RadishLexStatusCode::Ok,
+        "Manager delete endpoint must accept the learned identity"
+    );
+    let deleted_summary = manager_learning_status(&userdb_path, &mut error);
+    assert_eq!(deleted_summary.deleted_term_tombstones, 1);
+
+    let deleted_observer_id = CString::new("native-rime-deleted-observer").expect("session id");
+    let deleted_observer_options = RadishLexPersonalizedRimeSessionOptions {
+        version: RADISHLEX_PERSONALIZED_RIME_SESSION_OPTIONS_VERSION,
+        shared_data_dir: shared_data.as_ptr(),
+        user_data_dir: user_data.as_ptr(),
+        schema: schema.as_ptr(),
+        log_dir: ptr::null(),
+        deploy_on_start: 1,
+        userdb_path: userdb_path.as_ptr(),
+        session_id: deleted_observer_id.as_ptr(),
+    };
+    let deleted_observer =
+        radishlex_session_new_personalized_rime(&deleted_observer_options, &mut error);
+    assert!(
+        !deleted_observer.is_null(),
+        "deleted observer session opens: {}",
+        unsafe { error_message(error) }
+    );
+    set_learning_context(deleted_observer, false, false, true, &mut error);
+    push_text(deleted_observer, "shi", &mut error);
+    let deleted_snapshot = radishlex_session_snapshot_new(deleted_observer, &mut error);
+    assert_ne!(
+        unsafe { candidate_text(deleted_snapshot, 0, &mut error) },
+        expected_non_first,
+        "Manager deletion must remove the stale learned promotion"
+    );
+    unsafe {
+        radishlex_snapshot_free(deleted_snapshot);
+        radishlex_session_free(deleted_observer);
+    }
+
+    assert_eq!(
+        radishlex_userdb_restore_term(
+            userdb_path.as_ptr(),
+            input_code.as_ptr(),
+            selected_text.as_ptr(),
+            selected_reading
+                .as_ref()
+                .map_or(ptr::null(), |value| value.as_ptr()),
+            &mut error,
+        ),
+        RadishLexStatusCode::Ok,
+        "Manager explicit restore endpoint must reactivate the identity"
+    );
+    assert_eq!(
+        manager_learning_status(&userdb_path, &mut error).deleted_term_tombstones,
+        0
+    );
+
+    let restored_session_id = CString::new("native-rime-restored-observer").expect("session id");
+    let restored_session_options = RadishLexPersonalizedRimeSessionOptions {
+        version: RADISHLEX_PERSONALIZED_RIME_SESSION_OPTIONS_VERSION,
+        shared_data_dir: shared_data.as_ptr(),
+        user_data_dir: user_data.as_ptr(),
+        schema: schema.as_ptr(),
+        log_dir: ptr::null(),
+        deploy_on_start: 1,
+        userdb_path: userdb_path.as_ptr(),
+        session_id: restored_session_id.as_ptr(),
+    };
+    let session = radishlex_session_new_personalized_rime(&restored_session_options, &mut error);
+    assert!(
+        !session.is_null(),
+        "restored observer session opens: {}",
+        unsafe { error_message(error) }
+    );
+    set_learning_context(session, false, false, true, &mut error);
+    push_text(session, "shi", &mut error);
+    let restored_snapshot = radishlex_session_snapshot_new(session, &mut error);
+    assert_eq!(
+        unsafe { candidate_text(restored_snapshot, 0, &mut error) },
+        expected_non_first,
+        "explicit restore must be visible to a new runtime session"
+    );
+    unsafe {
+        radishlex_snapshot_free(restored_snapshot);
+    }
+    assert_eq!(
+        radishlex_session_reset(session, &mut error),
+        RadishLexStatusCode::Ok
+    );
 
     set_learning_context(session, false, true, true, &mut error);
     push_text(session, "shi", &mut error);
@@ -147,12 +289,10 @@ fn rime_session_native_smoke_uses_ffi_entrypoint() {
         radishlex_key_result_free(private_selection);
         radishlex_snapshot_free(private_snapshot);
     }
-    let db = UserDb::open(&userdb_path_text).expect("personalized userdb reopens");
     assert_eq!(
-        db.selection_event_count().expect("selection count"),
+        manager_learning_status(&userdb_path, &mut error).selection_events,
         learned_selection_count
     );
-    drop(db);
 
     set_learning_context(session, true, false, true, &mut error);
     push_text(session, "shi", &mut error);
@@ -351,6 +491,33 @@ unsafe fn candidate_text(
         RadishLexStatusCode::Ok
     );
     view_to_string(candidate.text)
+}
+
+unsafe fn candidate_identity(
+    snapshot: *const RadishLexSnapshot,
+    index: usize,
+    error: &mut *mut RadishLexError,
+) -> (String, Option<String>) {
+    let mut candidate = RadishLexCandidateView::empty();
+    assert_eq!(
+        radishlex_snapshot_candidate(snapshot, index, &mut candidate, error),
+        RadishLexStatusCode::Ok
+    );
+    let reading = (candidate.reading_present == 1).then(|| view_to_string(candidate.reading));
+    (view_to_string(candidate.text), reading)
+}
+
+fn manager_learning_status(
+    userdb_path: &CString,
+    error: &mut *mut RadishLexError,
+) -> RadishLexLearningStatusSummary {
+    let mut summary = RadishLexLearningStatusSummary::empty();
+    assert_eq!(
+        unsafe { radishlex_userdb_learning_status(userdb_path.as_ptr(), &mut summary, error) },
+        RadishLexStatusCode::Ok,
+        "Manager learning summary must open the shared userdb"
+    );
+    summary
 }
 
 unsafe fn view_to_string(view: RadishLexStringView) -> String {

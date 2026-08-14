@@ -4,6 +4,18 @@ import 'bridge/manager_bridge.dart';
 import 'bridge/manager_bridge_factory.dart';
 import 'screens/manager_home_screen.dart';
 
+const radishLexFontFallbacks = <String>[
+  'Roboto',
+  'DejaVu Sans',
+  'Noto Sans CJK SC',
+  'Noto Sans SC',
+  'Source Han Sans SC',
+  'WenQuanYi Zen Hei',
+  'Droid Sans Fallback',
+  'PingFang SC',
+  'Microsoft YaHei',
+];
+
 class RadishLexManagerApp extends StatelessWidget {
   const RadishLexManagerApp({
     super.key,
@@ -28,6 +40,7 @@ class RadishLexManagerApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: colorScheme,
+        fontFamilyFallback: radishLexFontFallbacks,
         scaffoldBackgroundColor: const Color(0xFFF6F7F8),
         cardTheme: CardThemeData(
           color: Colors.white,
