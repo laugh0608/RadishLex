@@ -76,7 +76,7 @@ impl<R: Read> PackageReader<R> {
         if member_size % 2 == 1 {
             let mut padding = [0_u8; 1];
             read_exact(self, &mut padding)?;
-            if padding != [b'\n'] {
+            if padding != *b"\n" {
                 return Err(archive_error());
             }
         }
