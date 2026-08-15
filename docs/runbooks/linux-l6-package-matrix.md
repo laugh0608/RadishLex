@@ -51,7 +51,8 @@
 - 最终文件回读证明 stage1/target exit 均为 0：pair/input、target package `38-2`、receipt `ccbc4cd0…1e60`、dpkg audit/verify、20 项依赖、字体、manifest/双 FFI、startup 正负向、XDG `f3df287f…b86b`、WAL/SHM/profile absence、进程与断网状态均通过；operation 目录仍为 2、guard absent，未生成 operation ID、运行 maintenance/acceptance CLI、调用 dpkg mutation、启动产品或写用户 XDG。local evidence/accepted bundle SHA-256 为 `aa10e919…69e8`/`180c19ad…0cd`；正常关机后 config/EFI/qcow2 为 `584bf2b5…f59b`/`a73a3266…9155`/`ee6cedf8…5d68`，qcow2 零句柄，十一台全停。
 - 后续单步授权重新闭合 mutation preflight 后，在 guest 内生成唯一 operation ID并只调用一次 production maintenance。CLI exit 0、stderr 空、stdout `maintenance_outcome=aborted_preserved`；receipt `ba7a9637…f17c` 为 `repair/same_release/aborted_preserved`、failure `version_relation_invalid` after `artifacts_staged`、chain 3、target-only staging、proof null、manual recovery false。dpkg status/log 与调用前完全相同，startup `0:1:2:2:7`、XDG、网络、进程与映射 postflight 通过，因此没有 package mutation、恢复或第二次 invocation。
 - 根因是 production `validate_staged_operation` 对 repair 直接使用物理 staged source；而 repair 按合同只 stage target，host prepare 已把 target 同时作为 effective source。源码现统一该投影并增加 single-target system-port 回归。失败 clone 不 resume、重试或复用；release-pair v1 继续要求 executable commit 等于 target release commit并同批构建package。maintenance-only refresh v1 已另行闭合“冻结target package/evidence + 较新production ELF”的可信组合；commit `b891ed1` 的 ARM64 handoff record/ELF `4b41d1c0…fb2cd`/`9a657510…54585` 已冻结，旧 pair/package 未改写。
-- 新 clone `BE3579E0-B150-438D-ABE0-53A8D46137F8` 从未改写 S3 建立并通过断网preflight后，只调用一次production maintenance。CLI与receipt返回`repair/same_release/completed`，但dpkg status/log/mtime均未变化；源码复核确认`drive_target`在installed target已匹配且product validation成功时，于`apply_package`前返回，既有repair测试又通过强制`target_valid=false`规避了健康路径。该结果分类为`completed_without_package_reapply`，不满足repair重装合同。clone与证据只作取证，不重试或复用；下一步先修复首次健康repair必须apply、已有target proof的crash retry不得重复apply，再形成新refresh handoff与S3 clone。
+- 新 clone `BE3579E0-B150-438D-ABE0-53A8D46137F8` 从未改写 S3 建立并通过断网preflight后，只调用一次production maintenance。CLI与receipt返回`repair/same_release/completed`，但dpkg status/log/mtime均未变化；源码复核确认`drive_target`在installed target已匹配且product validation成功时，于`apply_package`前返回，既有repair测试又通过强制`target_valid=false`规避了健康路径。该结果分类为`completed_without_package_reapply`，不满足repair重装合同。clone与证据只作取证，不重试或复用。
+- `698fe1f`现只让非repair或已有target proof的恢复采用valid-target快捷路径；首次repair即使产品健康也继续消费quiescence permit并apply一次。直接测试同时固定fresh healthy repair单次apply、proof-backed repair retry零mutation和五类operation既有语义，Linux product 118 tests与clippy通过。`f19cea7`再把maintenance-refresh required ancestor前移到`698fe1f`，旧`b891ed1` handoff不再满足当前构建合同；下一步另行授权新ARM64 refresh handoff与S3 clone。
 
 ### 当前本地资产登记（非发布证据）
 
@@ -182,7 +183,7 @@ pair envelope format 为 `radishlex-linux-l6-release-pair-evidence-v1` 对应的
 
 ### 3.1 Package 冻结后的 maintenance refresh
 
-第六套 target 已形成 terminal receipt 后，repair 修复不能再通过 release-pair builder重建 `38-2` package，也不能改写 `cda70afa…659b` record或热替换失败clone。仓库真相源 [`packaging/linux/l6-maintenance-refresh.json`](../../packaging/linux/l6-maintenance-refresh.json) 固定 `debian13-arm64-maintenance-refresh-v1`：base record、target package/evidence、旧 production ELF分别为 `cda70afa…659b`、`b211d940…d09c`/`2a1132c6…0e1b`、`b060c240…7d81`，refresh root必须是包含 `b0197f5` repair fix、product metadata与target commit `80e49ce`逐字段相同的clean descendant。
+第六套 target 已形成 terminal receipt 后，repair 修复不能再通过 release-pair builder重建 `38-2` package，也不能改写 `cda70afa…659b` record或热替换失败clone。仓库真相源 [`packaging/linux/l6-maintenance-refresh.json`](../../packaging/linux/l6-maintenance-refresh.json) 固定 `debian13-arm64-maintenance-refresh-v1`：base record、target package/evidence、旧 production ELF分别为 `cda70afa…659b`、`b211d940…d09c`/`2a1132c6…0e1b`、`b060c240…7d81`，refresh root必须是包含 `698fe1f` healthy-repair fix、product metadata与target commit `80e49ce`逐字段相同的clean descendant。旧`b891ed1` handoff是在前一required ancestor下形成的历史证据，不能作为下一次transaction输入。
 
 获单独 builder 授权后，唯一入口为：
 
@@ -319,7 +320,7 @@ UTM guest-agent 的传输返回码或空输出不能单独证明 transaction com
 
 UTM 磁盘配置使用空 `Network` 数组也不能单独证明 guest 运行态断网；删除整个必填键会使 UTM 4.7.5 冷加载失败，注册缓存仍可能在首次启动挂回虚拟网卡并取得 DHCP。每次启动后、写入 artifact input 或生成 operation ID 前，都必须在 guest 内复验目标接口 down 且 IPv4/IPv6 路由为空；任一网络状态不明立即停止，不把后续断网状态倒推成“从启动起全程离线”。
 
-前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个在 target validation 失败后自动恢复 source，terminal `rolled_back`。这些现场均停止并原样保留，不得热替换、恢复、跨 pair 混搭或原地重试。第六套已形成 target `completed` terminal与S3；其首次repair在dpkg前因旧production staged verifier缺口`aborted_preserved`，第二台repair clone的唯一调用又因健康product validation短路形成`completed_without_package_reapply`。两台clone均只作取证。下一步先修复首次健康repair必须单次apply、已有target proof的crash retry不得重复apply，并补两侧回归；再形成新的maintenance refresh handoff与S3 clone后另行授权真实repair。rollback、remove、reinstall与crash/retry仍需逐次授权。
+前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个在 target validation 失败后自动恢复 source，terminal `rolled_back`。这些现场均停止并原样保留，不得热替换、恢复、跨 pair 混搭或原地重试。第六套已形成 target `completed` terminal与S3；其首次repair在dpkg前因旧production staged verifier缺口`aborted_preserved`，第二台repair clone的唯一调用又因健康product validation短路形成`completed_without_package_reapply`。两台clone均只作取证。源码与refresh ancestry门禁现已闭合首次repair/retry分流；下一步另行授权形成新maintenance refresh handoff，再从S3新建clone并分别授权preflight与真实repair。rollback、remove、reinstall与crash/retry仍需逐次授权。
 
 ## 10. L6 完成与后续
 
