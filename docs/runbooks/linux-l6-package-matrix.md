@@ -8,13 +8,14 @@
 ./scripts/check-linux-l6-contract.sh
 ./scripts/check-linux-l6-controller.sh
 ./scripts/check-linux-l6-release-pair.sh
+./scripts/check-linux-l6-maintenance-refresh.sh
 ```
 
-三个入口分别验证 matrix format、compile-isolated controller 与 release-pair 构建/证据合同；入口自身都不连接 guest、不读取真实 `/proc`、不执行 package mutation，也不能单独证明下述真实 pair 或 L6 已通过。
+四个入口分别验证 matrix format、compile-isolated controller、release-pair 与 package-preserving maintenance-refresh 构建/证据合同；入口自身都不连接 guest、不读取真实 `/proc`、不执行 package mutation，也不能单独证明下述真实 pair、refresh handoff 或 L6 已通过。
 
 ## 当前执行状态
 
-截至 2026-08-13：
+截至 2026-08-15：
 
 - production transaction/startup 代码、actual `.deb` verifier 和 fake command/crash matrix 已完成；
 - L6 guest、release pair、六步事务顺序、八个 crash checkpoint、字体/startup/XDG probe 和证据保留规则已由 format v1 固定；
@@ -49,7 +50,7 @@
 - 首次直接执行 `/run` stage1 因 noexec 返回 126，target 未运行；改由解释器后 stage1 通过，target 又停在超出正式合同的本地 `4e00-9fff` charset 字符串假设。只读诊断证明 `fonts-noto-cjk 1:20240730+repack1-1` 已安装、owner 与 `Noto Sans CJK SC` family 精确解析，TTC 实际声明 `4e00-9fef`；删除该额外字符串假设后，正式 package/owner/family 合同未放宽。两次诊断均未进入 CLI、dpkg 或产品状态。
 - 最终文件回读证明 stage1/target exit 均为 0：pair/input、target package `38-2`、receipt `ccbc4cd0…1e60`、dpkg audit/verify、20 项依赖、字体、manifest/双 FFI、startup 正负向、XDG `f3df287f…b86b`、WAL/SHM/profile absence、进程与断网状态均通过；operation 目录仍为 2、guard absent，未生成 operation ID、运行 maintenance/acceptance CLI、调用 dpkg mutation、启动产品或写用户 XDG。local evidence/accepted bundle SHA-256 为 `aa10e919…69e8`/`180c19ad…0cd`；正常关机后 config/EFI/qcow2 为 `584bf2b5…f59b`/`a73a3266…9155`/`ee6cedf8…5d68`，qcow2 零句柄，十一台全停。
 - 后续单步授权重新闭合 mutation preflight 后，在 guest 内生成唯一 operation ID并只调用一次 production maintenance。CLI exit 0、stderr 空、stdout `maintenance_outcome=aborted_preserved`；receipt `ba7a9637…f17c` 为 `repair/same_release/aborted_preserved`、failure `version_relation_invalid` after `artifacts_staged`、chain 3、target-only staging、proof null、manual recovery false。dpkg status/log 与调用前完全相同，startup `0:1:2:2:7`、XDG、网络、进程与映射 postflight 通过，因此没有 package mutation、恢复或第二次 invocation。
-- 根因是 production `validate_staged_operation` 对 repair 直接使用物理 staged source；而 repair 按合同只 stage target，host prepare 已把 target 同时作为 effective source。源码现统一该投影并增加 single-target system-port 回归。失败 clone 不 resume、重试或复用；冻结 handoff 的 ARM64 maintenance ELF 仍是旧字节。现有 release-pair v1 要求 executable commit 等于 target release commit并同批构建package，不能直接形成“冻结target package/evidence + 较新ELF”的可信组合；下一步必须先固定maintenance-only refresh合同，再构建独立handoff并从未改写S3创建新clone。
+- 根因是 production `validate_staged_operation` 对 repair 直接使用物理 staged source；而 repair 按合同只 stage target，host prepare 已把 target 同时作为 effective source。源码现统一该投影并增加 single-target system-port 回归。失败 clone 不 resume、重试或复用；冻结 handoff 的 ARM64 maintenance ELF 仍是旧字节。release-pair v1 继续要求 executable commit 等于 target release commit并同批构建package；新增maintenance-only refresh v1已另行闭合“冻结target package/evidence + 较新production ELF”的可信组合。下一步必须单独授权构建并冻结ARM64 refresh handoff，再从未改写S3创建新clone。
 
 ### 当前本地资产登记（非发布证据）
 
@@ -174,6 +175,23 @@ pair envelope format 为 `radishlex-linux-l6-release-pair-evidence-v1` 对应的
 
 同一 source 在不同长度 clean-root 下重建时，旧/new canonical md5 inventory 只有 Manager runner 及其 manifest 不同：CMake install RPATH 的动态字符串内容相同，新 ELF 仅多 18 个尾部 NUL 预留，继而改变 PLT relocation 与 Build-ID；只读数据、data、eh_frame、FFI、Rime 与 dependency 摘要一致，且无构建路径字节。该观察不放宽任何验证，也不把跨绝对构建根 payload bit-repeat 写成已有保证；已经形成 terminal receipt 后，后续 pair 必须消费其绑定的精确 source 字节，不能以同版本重建物替代。
 
+### 3.1 Package 冻结后的 maintenance refresh
+
+第六套 target 已形成 terminal receipt 后，repair 修复不能再通过 release-pair builder重建 `38-2` package，也不能改写 `cda70afa…659b` record或热替换失败clone。仓库真相源 [`packaging/linux/l6-maintenance-refresh.json`](../../packaging/linux/l6-maintenance-refresh.json) 固定 `debian13-arm64-maintenance-refresh-v1`：base record、target package/evidence、旧 production ELF分别为 `cda70afa…659b`、`b211d940…d09c`/`2a1132c6…0e1b`、`b060c240…7d81`，refresh root必须是包含 `b0197f5` repair fix、product metadata与target commit `80e49ce`逐字段相同的clean descendant。
+
+获单独 builder 授权后，唯一入口为：
+
+```bash
+./scripts/build-linux-l6-maintenance-refresh.sh \
+  --base-record /absolute/frozen/release-pair.evidence.json \
+  --target-package /absolute/frozen/radishlex_26.7.1+38-2_arm64.deb \
+  --target-artifact-evidence /absolute/frozen/radishlex_26.7.1+38-2_arm64.deb.evidence.json \
+  --refresh-root /absolute/clean/refresh \
+  --output /absolute/absent/maintenance-refresh
+```
+
+builder 先验证并exclusive-copy三份 `0644` single-link frozen input，再在Debian 13 ARM64、offline Cargo模式下只构建 `--no-default-features` production maintenance与临时actual-package verifier。旧target `.deb`由新production parser再次解析；handoff仅包含旧record、旧target package/evidence、build environment、新maintenance和canonical `radishlex-linux-l6-maintenance-refresh-evidence-v1`。新ELF必须是 `/lib/ld-linux-aarch64.so.1` 的AArch64 ELF、与旧ELF hash不同且不含acceptance markers。完整inventory通过后，Python verifier在同文件系统no-replace rename、同步父目录并发布后重验；不构建Manager/addon/rootfs/package，不产出acceptance executable，也不运行maintenance CLI、guest或dpkg。当前26项仓库测试只证明合同与合成行为，真实ARM64 handoff尚未形成。
+
 ## 4. 证据 envelope
 
 每个 crash case 先由 controller 产生一个 `radishlex-linux-l6-checkpoint-evidence-v1` canonical JSON envelope；完整 L6 session 再把八份 checkpoint envelope 与主序列/probe 结果收敛进唯一 session envelope。session 至少绑定：
@@ -290,7 +308,7 @@ UTM guest-agent 的传输返回码或空输出不能单独证明 transaction com
 
 UTM 磁盘配置使用空 `Network` 数组也不能单独证明 guest 运行态断网；删除整个必填键会使 UTM 4.7.5 冷加载失败，注册缓存仍可能在首次启动挂回虚拟网卡并取得 DHCP。每次启动后、写入 artifact input 或生成 operation ID 前，都必须在 guest 内复验目标接口 down 且 IPv4/IPv6 路由为空；任一网络状态不明立即停止，不把后续断网状态倒推成“从启动起全程离线”。
 
-前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个在 target validation 失败后自动恢复 source，terminal `rolled_back`。这些现场均停止并原样保留，不得热替换、恢复、跨 pair 混搭或原地重试。第六套已形成 target `completed` terminal与S3；其首次repair在dpkg前因旧production staged verifier缺口`aborted_preserved`，失败clone同样只作取证。源码回归已修复，但下一步先固定maintenance-only refresh合同，显式锚定第六套record与既有target artifact、只允许修复后production maintenance ELF进入新handoff；不得改写旧pair或重建package。合同和builder证据闭合后才从S3建全新clone；真实repair、rollback、remove、reinstall与crash/retry仍需逐次授权。
+前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个在 target validation 失败后自动恢复 source，terminal `rolled_back`。这些现场均停止并原样保留，不得热替换、恢复、跨 pair 混搭或原地重试。第六套已形成 target `completed` terminal与S3；其首次repair在dpkg前因旧production staged verifier缺口`aborted_preserved`，失败clone同样只作取证。源码回归和maintenance-only refresh合成合同已修复/闭合，但新ARM64 handoff尚未形成；下一步须单独授权隔离builder并在输出冻结后停止。之后才从S3建全新clone；真实repair、rollback、remove、reinstall与crash/retry仍需逐次授权。
 
 ## 10. L6 完成与后续
 

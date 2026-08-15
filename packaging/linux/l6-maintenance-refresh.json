@@ -1,0 +1,44 @@
+{
+  "base_release_pair": {
+    "record": {
+      "filename": "release-pair.evidence.json",
+      "sha256": "cda70afa89b3f0ee05235b95dcc346eaeea9805c4b87af9d451ce1900f00659b"
+    },
+    "target": {
+      "artifact_evidence": {
+        "filename": "radishlex_26.7.1+38-2_arm64.deb.evidence.json",
+        "sha256": "2a1132c6fb27d4ca2e5e4bbd76864e3e753749c2bb43cae82287635b1c2d0e1b"
+      },
+      "debian_revision": "2",
+      "package": {
+        "filename": "radishlex_26.7.1+38-2_arm64.deb",
+        "sha256": "b211d9406825515b2ba1c473b5f98069de00fa709505e2ba3ed3cb9b8af7d09c"
+      },
+      "package_version": "26.7.1+38-2",
+      "production_maintenance_sha256": "b060c2403424560e9ac0c11f890838894d19d153a89541575ade9afd87fe7d81",
+      "repository_commit": "80e49ced45b316eaa801f913c659142528a32c08"
+    }
+  },
+  "build": {
+    "base_artifact_policy": "frozen-release-pair-target-v1",
+    "environment_profile": "debian13-arm64-maintenance-refresh-build-v1",
+    "network_policy": "dependency-frozen-before-build",
+    "output_policy": "private-staging-then-atomic-publish-v1",
+    "package_rebuild": false,
+    "refresh_clean_root": true
+  },
+  "executable": {
+    "binary": "radishlex-linux-maintenance",
+    "build_identity": "radishlex-linux-maintenance-production-v1",
+    "cargo_package": "radishlex-linux-product-install",
+    "feature_profile": "no-default-features",
+    "role": "production-maintenance"
+  },
+  "format_version": 1,
+  "matrix_profile": "debian13-arm64-ephemeral-v1",
+  "profile": "debian13-arm64-maintenance-refresh-v1",
+  "refresh": {
+    "commit_policy": "clean-descendant-head-containing-repair-fix-v1",
+    "required_ancestor_commit": "b0197f5a0f0a88e53cf4b6bf862252a4374197de"
+  }
+}
