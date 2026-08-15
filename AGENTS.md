@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 源码、L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 合同已闭合。第四套确认 source chain 不连续，第五套为 `rolled_back`，第六套为 target `completed`；两台旧 repair clone 分别冻结 `aborted_preserved` 与 `completed_without_package_reapply` 现场。`698fe1f` 已修复健康 repair 短路；`823afca` ARM64 refresh handoff 已在全新 S3 clone 完成一次真实 `repair/same_release/completed` 与 dpkg 同版重装。首台 rollback preflight clone 已因必需结果证据缺失失败关闭，十四台 VM 全停。v1 package不含RadishLex maintainer scripts。
+- production 源码、L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 合同已闭合。第四套确认 source chain 不连续，第五套为 `rolled_back`，第六套为 target `completed`；两台旧 repair clone 分别冻结 `aborted_preserved` 与 `completed_without_package_reapply` 现场。`698fe1f` 已修复健康 repair 短路；`823afca` ARM64 refresh handoff 已在全新 S3 clone 完成一次真实 `repair/same_release/completed` 与 dpkg 同版重装。首台 rollback VM 已授权删除并保留失败证据，第二台在传输根身份断言失败关闭，十四台 VM 全停。v1 package不含RadishLex maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -85,4 +85,4 @@
 
 1. 保留前四个 stopped L6 failure/mismatch disk 与全部 pair/handoff/S0/S1/S2/WAL-drift 资产，并原样保留第五套 `rolled_back` clone、staging、两套 preflight 与 upgrade failure/recovery evidence；不热替换、覆盖、恢复或清理。
 2. 第五套只执行过一次 upgrade：target `38-2` 安装后在 production target validation 失败，自动恢复 source `38-1`；receipt 为 `rolled_back`、`manual_recovery_required=false`，XDG 零漂移，当前 config/EFI/qcow2 为 `402a…3e9`/`cb8a…bd65`/`e684…8904`。精确失败条件已离线定位为 startup manifest 独立固定 revision `1`，不得启动或重试该 clone。
-3. 第六套 upgrade为`completed`，S3保持未改写。三台repair clone均冻结且不得复用；`394217A7…B6FB`的唯一production repair已形成`repair/same_release/completed`、同版dpkg重装与XDG零漂移，host manifest为`116e3f06…5e90f`。首台rollback clone `9FE6265D…AE28`已从S3建立且运行态断网通过，但完整只读preflight在guest-agent exit 0/空输出后没有必需结果文件，按边界失败关闭；host manifest `6b7ac641…a51d`、关机盘`fdfc…23a5`/`a73a…9155`/`2b32…bb4a`已冻结，S3未漂移且十四台均stopped。旧证据证明push初始mode可为`0666`，而本次probe要求`0600`却未先归一化，只能作为高概率触发点，不能改写成已证实guest predicate。下一次仍须另行授权从S3建立全新rollback clone，并先采用私有传输根、mode归一化及分阶段terminal result；不得启动或重试该clone。其余矩阵、P05C、发布、推送、清理、真实同步及其他平台保持关闭。
+3. 第六套 upgrade为`completed`，S3保持未改写。三台repair clone均冻结且不得复用；`394217A7…B6FB`的唯一production repair已形成`repair/same_release/completed`、同版dpkg重装与XDG零漂移，host manifest为`116e3f06…5e90f`。首台rollback `9FE6265D…AE28`在必需result缺失后失败关闭，VM已按明确授权删除，host manifest `6b7ac641…a51d`保留。第二台`BFB3EF09…2720`运行态断网、package/receipt与进程静止通过，却在正式preflight前因传输根`root-identity`断言失败关闭；目录link count为1是高概率控制缺陷，guest实际值未冻结。host manifest `40dab9b…680e`、关机盘`5258…005`/`a73a…9155`/`1d20…57b`已冻结，S3未漂移且十四台stopped。下一次须另行授权从S3建立第三台rollback clone，目录身份不得套用普通文件single-link条件；不得启动或重试第二台。其余矩阵、P05C、发布、推送、进一步清理、真实同步及其他平台保持关闭。
