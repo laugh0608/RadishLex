@@ -7,7 +7,7 @@
 - 复核日期：2026-08-15（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 已完成。第五套为`rolled_back`，第六套upgrade为target `completed`；两台repair clone分别冻结`aborted_preserved`与`completed_without_package_reapply`。`698fe1f`已让首次健康repair强制单次apply且保留proof-backed retry幂等性，`f19cea7`将refresh ancestry锚点同步前移；尚未形成新ARM64 ELF，十二台VM全停。
+- L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 已完成。第五套为`rolled_back`，第六套upgrade为target `completed`；两台repair clone分别冻结`aborted_preserved`与`completed_without_package_reapply`。`698fe1f`已让首次健康repair强制单次apply且保留proof-backed retry幂等性；包含该修复的`823afca` ARM64 refresh handoff已形成，十二台VM全停。
 
 ## 冻结基线与固定边界
 
@@ -22,8 +22,8 @@
 - 前三套暴露 dpkg config、guard parent 与 revision profile 缺口；第四套暴露 source chain不连续；第五套 upgrade在target validation失败后自动恢复source，terminal为`rolled_back`。这些现场原样保留，精确身份见runbook/devlog。
 - 第六套 upgrade形成 `38-2 completed`；receipt `ccbc4cd0…1e60`、target package/evidence `b211d940…d09c`/`2a1132c6…0e1b`、startup/XDG postflight通过。S3 `S3-target-installed-80e49ce-6b22499b` 已冻结且未改写。
 - repair clone `A3022255…3107` 在完整 mutation preflight 后只调用一次旧 production ELF，receipt `ba7a9637…f17c` 为 `repair/same_release/aborted_preserved`、failure `version_relation_invalid` after `artifacts_staged`。dpkg status/log逐字节未变，startup `0:1:2:2:7`、XDG `f3df…b86b`、网络/进程postflight通过；evidence `87190852…881f`/`2d300ae6…c8da` 已冻结。
-- 根因是 staged repair只物理保存target，但system port未像host prepare一样把target投影为effective source。源码与single-target system-port回归已修复；116 tests和clippy通过。冻结ARM64 maintenance ELF仍是旧字节，不能热替换或复用失败clone。
-- maintenance-refresh v1 继续锚定旧 record、target artifact/ELF，但required ancestor已由`b0197f5`前移到`698fe1f`；26项合成测试拒绝package rebuild、缺失新修复、acceptance、身份漂移和覆盖式/非原子发布。既有`b891ed1` record/ELF `4b41d1c0…fb2cd`/`9a657510…54585`只作历史取证，target package/evidence仍为`b211d940…d09c`/`2a1132c6…0e1b`。
+- 根因是 staged repair只物理保存target，但system port未像host prepare一样把target投影为effective source。源码与single-target system-port回归已修复；116 tests和clippy通过。该失败clone内的ARM64 maintenance仍是旧字节，不能热替换或复用；新字节只存在于独立refresh handoff。
+- maintenance-refresh v1 继续锚定旧 record、target artifact/ELF，required ancestor为`698fe1f`；26项合成测试拒绝package rebuild、缺失修复、acceptance、身份漂移和覆盖式/非原子发布。新`823afca` handoff record/ELF/archive/local evidence为`b3852845…a146`/`1f37b6f9…cca7`/`e917f1a9…6ad7`/`e581dec4…315f`，target package/evidence仍为`b211d940…d09c`/`2a1132c6…0e1b`；旧`b891ed1` handoff只作历史取证。
 - 新clone `BE3579E0…37F8`只调用一次新maintenance，operation hash `615d768a…b528`，receipt `75c2152f…af21`/chain 3且startup/XDG通过；dpkg status/log/mtime逐字节未变，terminal分类为`completed_without_package_reapply`。local/guest evidence `655f19f4…b428`/`a331fdf1…3481`，关机盘`b06691d1…0ea9`/`3b117def…a8f0`/`3ddd82a8…4ddf`；S3未改写，十二台均stopped。
 
 ## 停止线
@@ -40,7 +40,7 @@
 1. 原样保留第五套 `rolled_back` clone、operation staging/receipt、三套本地 evidence 与修复备份；不得启动、重试或与第六套证据混用。
 2. 原样保留第六套 terminal/S3与旧 repair failure clone；后者不 resume、重试、恢复或复用。
 3. 新clone已形成`completed_without_package_reapply`终态；不得resume、重试、恢复或复用，也不得把receipt completed写成repair闭合。S3、旧pair/package与用户XDG未改写。
-4. 仓库修复与refresh ancestry门禁已闭合；下一步须另行授权隔离Debian 13 ARM64 builder形成新refresh handoff。本步不得复用旧handoff/clone、重建package或启动transaction guest；其余矩阵继续关闭。
+4. 新`823afca` ARM64 refresh handoff已冻结且未启动transaction guest。下一步须另行授权只从未改写S3建立全新clone并完成断网只读preflight；不得生成operation ID、运行maintenance/acceptance CLI、调用dpkg或写用户XDG，其余矩阵继续关闭。
 
 ## 验证入口
 
@@ -62,7 +62,7 @@
 git diff --check
 ```
 
-上述入口证明 prior-terminal anchor、target-only builder、canonical revision、single-target repair effective-source与production-only refresh合同。Linux product现有118项测试直接覆盖首次健康repair单次apply与已有target proof的repair retry零重复mutation；refresh合同只接受包含`698fe1f`的clean descendant。新ARM64 handoff、真实repair、其后主序列、八个crash case、桌面启动、重启、完整L6与公开发布仍未闭合。
+上述入口证明 prior-terminal anchor、target-only builder、canonical revision、single-target repair effective-source与production-only refresh合同。Linux product现有118项测试直接覆盖首次健康repair单次apply与已有target proof的repair retry零重复mutation；refresh合同只接受包含`698fe1f`的clean descendant。新S3 clone及其只读preflight、真实repair、其后主序列、八个crash case、桌面启动、重启、完整L6与公开发布仍未闭合。
 
 ## 阅读索引
 

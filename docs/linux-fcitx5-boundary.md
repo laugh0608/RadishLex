@@ -270,7 +270,7 @@ M5-P04 已覆盖：
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
 - P04 已按 `docs/linux-manager-local-acceptance.md` 冻结完成，不重复其导入导出、同库和重启实机；既有 guest 资产不得清理、覆盖或改作 P05 载体。
-- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、恢复事务、production port/CLI、startup gate、L6 format/controller 和 ARM64 pair 已完成；前五套现场只作取证。第六套upgrade与S3已完成，两台repair clone分别冻结staged failure与completed-noop。`698fe1f`已让首次健康repair单次apply、proof-backed retry不重复，refresh ancestry合同也已前移；旧handoff/clone不复用。下一步另行授权新ARM64 refresh handoff。未获逐步授权不能运行maintenance/acceptance CLI、`dpkg`、产品进程或写真实系统。
+- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、恢复事务、production port/CLI、startup gate、L6 format/controller 和 ARM64 pair 已完成；前五套现场只作取证。第六套upgrade与S3已完成，两台repair clone分别冻结staged failure与completed-noop。`698fe1f`已让首次健康repair单次apply、proof-backed retry不重复；`823afca` ARM64 refresh handoff已闭合且旧handoff/clone不复用。下一步另行授权从S3建立全新clone并完成断网只读preflight。未获逐步授权不能运行maintenance/acceptance CLI、`dpkg`、产品进程或写真实系统。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。
