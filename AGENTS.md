@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 源码、L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 合同已闭合。第四套确认 source chain 不连续，第五套为 `rolled_back`，第六套为 target `completed`；两台旧 repair clone 分别冻结 `aborted_preserved` 与 `completed_without_package_reapply` 现场。`698fe1f` 已修复健康 repair 短路；`823afca` ARM64 refresh handoff 与全新 S3 clone 断网只读 preflight 已闭合，十三台 VM 全停。v1 package不含RadishLex maintainer scripts。
+- production 源码、L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 合同已闭合。第四套确认 source chain 不连续，第五套为 `rolled_back`，第六套为 target `completed`；两台旧 repair clone 分别冻结 `aborted_preserved` 与 `completed_without_package_reapply` 现场。`698fe1f` 已修复健康 repair 短路；`823afca` ARM64 refresh handoff 已在全新 S3 clone 完成一次真实 `repair/same_release/completed` 与 dpkg 同版重装，十三台 VM 全停。v1 package不含RadishLex maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -85,4 +85,4 @@
 
 1. 保留前四个 stopped L6 failure/mismatch disk 与全部 pair/handoff/S0/S1/S2/WAL-drift 资产，并原样保留第五套 `rolled_back` clone、staging、两套 preflight 与 upgrade failure/recovery evidence；不热替换、覆盖、恢复或清理。
 2. 第五套只执行过一次 upgrade：target `38-2` 安装后在 production target validation 失败，自动恢复 source `38-1`；receipt 为 `rolled_back`、`manual_recovery_required=false`，XDG 零漂移，当前 config/EFI/qcow2 为 `402a…3e9`/`cb8a…bd65`/`e684…8904`。精确失败条件已离线定位为 startup manifest 独立固定 revision `1`，不得启动或重试该 clone。
-3. 第六套 upgrade为`completed`，S3保持未改写。旧repair clone `A3022255…3107`只作`aborted_preserved`取证；`BE3579E0…37F8`只作`completed_without_package_reapply`取证，receipt `75c2…af21`不能代表repair闭合。源码已让首次健康repair恰好apply一次、已有target proof的retry不重复；新`823afca` handoff record/ELF为`b385…a146`/`1f37…cca7`。全新clone `394217A7…B6FB`只完成断网只读preflight，host/guest evidence为`878056b2…32f4`/`79cdf8d6…e406`，operation仍为2，十三台均stopped；它是下一次真实repair的唯一候选，须另行单步授权后才可生成operation ID并调用一次production repair。旧clone不得复用，其余矩阵、P05C、发布、推送、清理、真实同步及其他平台保持关闭。
+3. 第六套 upgrade为`completed`，S3保持未改写。旧repair clone `A3022255…3107`只作`aborted_preserved`取证；`BE3579E0…37F8`只作`completed_without_package_reapply`取证。源码已让首次健康repair恰好apply一次、已有target proof的retry不重复；新`823afca` handoff record/ELF为`b385…a146`/`1f37…cca7`。clone `394217A7…B6FB`已只调用一次production repair，receipt `4e23…133b`为`repair/same_release/completed`，dpkg同版重装、startup与XDG零漂移通过；host/guest evidence为`116e3f06…5e90f`/`4e46a101…608b`，关机盘`818d…7425`/`3b11…8f0`/`79ad…03f6`，十三台均stopped。三台repair clone均不得复用；下一步须另行授权从S3建立独立rollback clone并先做只读preflight，其余矩阵、P05C、发布、推送、清理、真实同步及其他平台保持关闭。
