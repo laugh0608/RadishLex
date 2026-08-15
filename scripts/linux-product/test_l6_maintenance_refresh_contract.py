@@ -51,7 +51,7 @@ class L6MaintenanceRefreshSourceContractTests(unittest.TestCase):
             "b211d9406825515b2ba1c473b5f98069de00fa709505e2ba3ed3cb9b8af7d09c",
             "2a1132c6fb27d4ca2e5e4bbd76864e3e753749c2bb43cae82287635b1c2d0e1b",
             "b060c2403424560e9ac0c11f890838894d19d153a89541575ade9afd87fe7d81",
-            "b0197f5a0f0a88e53cf4b6bf862252a4374197de",
+            "698fe1fbc3adecd024e452942a101cb6e96d3660",
         ):
             with self.subTest(token=token):
                 with self.assertRaises(L6MaintenanceRefreshContractError):

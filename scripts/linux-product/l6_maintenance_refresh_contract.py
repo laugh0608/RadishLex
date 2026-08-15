@@ -132,7 +132,7 @@ def validate_maintenance_refresh_contract(
     for token in (
         "import l6_release_pair",
         'BASE_TARGET_COMMIT = "80e49ced45b316eaa801f913c659142528a32c08"',
-        'REPAIR_FIX_COMMIT = "b0197f5a0f0a88e53cf4b6bf862252a4374197de"',
+        'REPAIR_FIX_COMMIT = "698fe1fbc3adecd024e452942a101cb6e96d3660"',
         'BASE_RECORD_SHA256 = "cda70afa89b3f0ee05235b95dcc346eaeea9805c4b87af9d451ce1900f00659b"',
         'BASE_PACKAGE_SHA256 = "b211d9406825515b2ba1c473b5f98069de00fa709505e2ba3ed3cb9b8af7d09c"',
         '"2a1132c6fb27d4ca2e5e4bbd76864e3e753749c2bb43cae82287635b1c2d0e1b"',
@@ -210,7 +210,7 @@ def validate_maintenance_refresh_contract(
         '"sha256": "2a1132c6fb27d4ca2e5e4bbd76864e3e753749c2bb43cae82287635b1c2d0e1b"',
         '"production_maintenance_sha256": "b060c2403424560e9ac0c11f890838894d19d153a89541575ade9afd87fe7d81"',
         '"repository_commit": "80e49ced45b316eaa801f913c659142528a32c08"',
-        '"required_ancestor_commit": "b0197f5a0f0a88e53cf4b6bf862252a4374197de"',
+        '"required_ancestor_commit": "698fe1fbc3adecd024e452942a101cb6e96d3660"',
         '"role": "production-maintenance"',
     ):
         require(

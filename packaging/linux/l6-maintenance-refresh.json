@@ -39,6 +39,6 @@
   "profile": "debian13-arm64-maintenance-refresh-v1",
   "refresh": {
     "commit_policy": "clean-descendant-head-containing-repair-fix-v1",
-    "required_ancestor_commit": "b0197f5a0f0a88e53cf4b6bf862252a4374197de"
+    "required_ancestor_commit": "698fe1fbc3adecd024e452942a101cb6e96d3660"
   }
 }
