@@ -35,11 +35,11 @@
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步（2026-08-15）
+## 明日事项（2026-08-16）
 
 1. 所有failure/mismatch/rolled-back、三台repair clone、前两台rollback现场、S3及证据原样保留，不启动、重试、恢复、清理、复用或混用；首台rollback clone只保留host证据。
-2. 下一次连续主序列只允许另行授权启动remove clone `5EA2BAA2…27A2`，再次闭合单VM、运行态断网与mutation preflight后，才可生成唯一operation ID并单次调用production remove；当前不得启动或执行operation。
-3. reinstall、八个crash checkpoint、P05C、发布、推送、清理、真实同步及其他平台继续关闭。
+2. 取得新的单步授权后，只启动remove clone `5EA2BAA2…27A2`；先复验十六台registered VM中其余全部stopped、`Network=[]`、运行态仅loopback、IPv4/IPv6 main route为空，并重新闭合source package/receipt、依赖/字体、startup、XDG、进程静止与mutation preflight。全部通过后才生成唯一operation ID，并只调用一次production remove。
+3. operation后必须以receipt `remove/not_applicable/completed`、package/product tree absent、startup `RemovedProgram`失败关闭、XDG原样保留、进程与网络静止作为terminal postflight；正常关机并冻结guest/host证据、磁盘身份和零句柄。不得自动继续reinstall、八个crash checkpoint、P05C、清理、发布、推送、真实同步或其他平台。
 
 ## 验证入口
 
