@@ -630,12 +630,17 @@ fn drive_target<P: DpkgTransactionPort>(
             &snapshot,
         ) {
             Ok(()) => {
-                if receipt.target_proof().is_none() {
-                    receipt
-                        .record_target_proof(snapshot)
-                        .map_err(|_| LinuxFailureCode::ReceiptInconsistent)?;
+                let fresh_repair_requires_reapply = receipt.operation_kind()
+                    == LinuxOperationKind::Repair
+                    && receipt.target_proof().is_none();
+                if !fresh_repair_requires_reapply {
+                    if receipt.target_proof().is_none() {
+                        receipt
+                            .record_target_proof(snapshot)
+                            .map_err(|_| LinuxFailureCode::ReceiptInconsistent)?;
+                    }
+                    return Ok(());
                 }
-                return Ok(());
             }
             Err(error)
                 if receipt.operation_kind() == LinuxOperationKind::Repair
