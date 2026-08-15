@@ -32,7 +32,7 @@
 
 2026-08-08 已在 Debian 13 ARM64 从 source `55351f2` revision 1 与 target `e5b6da1` revision 2 的独立 clean root 断网生成并复验真实 release pair。canonical record SHA-256 为 `a9bcf35762b460a23ad9bc062611f8d5edb57e7303861bbcb99e1efb40703dfd`，source/target package 分别为 `b41e32db76388ad18cdeb60e4b40fb8e28710556df87d53bfa5b275ff2ce028c`、`8209c0161609fde3b798628e5c3460e6237c8618f2d26f1452063540c7541295`。该 pair 仍是未安装的私有 L6 输入；没有运行 maintenance/acceptance CLI、`dpkg` 或产品进程。
 
-随后第三套 pair 的 source `09ed1228…bec` 已真实安装并形成 terminal S1/S2。第四套证明同版本重建 source 不能替代 terminal artifact；builder 因此改为精确冻结 committed source并只构建 clean target。第五套 transaction 在 target validation 失败后自动恢复 source，terminal 为 `rolled_back`。第六套 source `09ed1228…bec`/target `b211d940…d09c` 的 upgrade形成 target `completed` 与冻结 S3；首次 repair 在 dpkg 前因旧 production ELF 的 target-only staged relation 缺口 `aborted_preserved`，源码已修复。第五套与旧repair clone只作取证。maintenance-refresh v1 已锚定旧record/target artifact并形成 `b891ed1` ARM64 production-only handoff；S3新clone已完成断网只读preflight，旧pair/package未改写。下一步仍须单独授权真实repair，不能复用失败clone或重建package。
+随后第三套 pair 的 source `09ed1228…bec` 已真实安装并形成 terminal S1/S2。第四套证明同版本重建 source 不能替代 terminal artifact；builder 因此改为精确冻结 committed source并只构建 clean target。第五套transaction为`rolled_back`，第六套upgrade形成target `completed`与S3；首次repair的target-only staged relation缺口已修复。maintenance-refresh v1形成`b891ed1` production-only handoff；S3新clone唯一调用虽返回completed，但installed product提前验证成功使dpkg未运行，故不满足repair重装合同。该clone只作取证；下一步先修复健康repair短路，再形成新refresh/clone，不能复用旧clone或重建package。
 
 仓库中较早的 revision 1 P05A/P05B evidence 只保留为历史未安装载体，不能替代上述 source revision 1/target revision 2 的 L6 pair record，也不能作为 package transaction、startup 或系统安装证据。
 
