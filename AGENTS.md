@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 源码、L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 合同已闭合。第四套确认 source chain 不连续，第五套为 `rolled_back`，第六套为 target `completed`；`823afca` handoff 的真实 repair 已形成 `repair/same_release/completed` 与 dpkg 同版重装。第三台 rollback clone 已完成唯一 `rollback/target_older/completed` 与 `38-2 → 38-1` 降级；独立 remove clone 已完成唯一 `remove/not_applicable/completed`，程序载荷 absent、startup 失败关闭且 XDG 零漂移，十六台 VM 全停。v1 package不含RadishLex maintainer scripts。
+- production 源码、L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 合同已闭合。第五套为 `rolled_back`，第六套为 target `completed`；真实 repair/rollback/remove 已依次闭合。独立 reinstall clone 的 absent-terminal 只读资格已通过并冻结，真实 reinstall 尚未开始；十七台 VM 全停。v1 package不含RadishLex maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -85,4 +85,4 @@
 
 1. 保留前四个 stopped L6 failure/mismatch disk 与全部 pair/handoff/S0/S1/S2/WAL-drift 资产，并原样保留第五套 `rolled_back` clone、staging、两套 preflight 与 upgrade failure/recovery evidence；不热替换、覆盖、恢复或清理。
 2. 第五套只执行过一次 upgrade：target `38-2` 安装后在 production target validation 失败，自动恢复 source `38-1`；receipt 为 `rolled_back`、`manual_recovery_required=false`，XDG 零漂移，当前 config/EFI/qcow2 为 `402a…3e9`/`cb8a…bd65`/`e684…8904`。精确失败条件已离线定位为 startup manifest 独立固定 revision `1`，不得启动或重试该 clone。
-3. 第六套 upgrade为`completed`，S3保持未改写。三台repair clone均冻结；`394217A7…B6FB`的真实repair已形成`repair/same_release/completed`与host manifest `116e3f06…5e90f`。第三台rollback clone `EFD15599…BBDD`的唯一production调用形成`rollback/target_older/completed`与`38-2 → 38-1`降级，host manifest为`fef4ea32…851d`。独立remove clone `5EA2BAA2…27A2`只调用一次production remove，receipt `770a27b7…b40e`为`remove/not_applicable/completed`、chain 4；package/product tree absent，startup为`RemovedProgram`失败关闭，XDG指纹未变。guest/host evidence为`529ee42c…9b8e`/`be498439…97a1`；关机盘`9256…626a`/`abea…c8fc`/`ad8a…55fa`，v3/S3未漂移、三盘零句柄且十六台stopped。该clone现为冻结remove terminal；下一步须另行授权从它建立独立reinstall clone并先做只读preflight。P05C、发布、推送、清理、真实同步及其他平台保持关闭。
+3. 第六套upgrade、三台repair、第三台rollback与remove terminal均冻结。独立reinstall clone `E671DB9C…D465`的唯一只读attempt为`passed/postflight`，证据`8ed9d43a…86b25`闭合package/product tree absent、remove receipt chain 4、依赖/字体、`RemovedProgram` startup、XDG、进程与断网；未生成operation ID或执行maintenance/acceptance/dpkg/reinstall。host manifest `a98dbec6…5006a`；关机盘`db1e…13b90`/`d9bd…97463`/`cdf0…72dd`两次一致，remove/v3/S3未漂移、四盘零句柄且十七台stopped。下一步须另行授权只在该clone重新闭合mutation preflight并单次执行真实`reinstall_target`。P05C、发布、推送、清理、真实同步及其他平台保持关闭。
