@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 源码、L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 合同已闭合。六类 operation 均有独立证据。首个 `install_prepared` crash checkpoint 已唯一执行，但实机暴露 startup 对 Debian `root:root 01777` `/run/lock` 的合同漂移；未 resume 或调用 dpkg，`a6622d4` 已统一父目录策略。旧 pair 不再继续，连续完整 L6 与八个 crash/retry 尚未闭合；十九台 VM 全停。v1 package不含RadishLex maintainer scripts。
+- production 源码、L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 合同已闭合。六类 operation 均有独立证据。首个 `install_prepared` checkpoint 因 startup 遗漏 Debian `01777` 锁目录合同而在 resume/dpkg 前失败关闭；`a6622d4` 已修复，新 target `d75818f` 的 pair record `c74fac12…9849` 已冻结，尚未创建重试 clone。连续完整 L6 与八个 crash/retry 尚未闭合；十九台 VM 全停。v1 package不含RadishLex maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -85,4 +85,4 @@
 
 1. 保留前四个 stopped L6 failure/mismatch disk 与全部 pair/handoff/S0/S1/S2/WAL-drift 资产，并原样保留第五套 `rolled_back` clone、staging、两套 preflight 与 upgrade failure/recovery evidence；不热替换、覆盖、恢复或清理。
 2. 第五套只执行过一次 upgrade：target `38-2` 安装后在 production target validation 失败，自动恢复 source `38-1`；receipt 为 `rolled_back`、`manual_recovery_required=false`，XDG 零漂移，当前 config/EFI/qcow2 为 `402a…3e9`/`cb8a…bd65`/`e684…8904`。精确失败条件已离线定位为 startup manifest 独立固定 revision `1`，不得启动或重试该 clone。
-3. 第六套及repair/rollback/remove/reinstall terminal均冻结。首个crash的注册探针clone `C0D96C0A…23A1F8`因UTM缓存网卡只作失败资产；独立v2 `FD24ADFF…17C056`只执行一次`install_prepared` checkpoint，operation ID宿主仅存hash `9429b171…9145a`，未resume/dpkg。startup实际为`FailedClosed/GuardInvalid`，根因是只读校验遗漏合同允许的`root:root 01777`父目录；证据manifest `5d8c914a…3e42a`冻结，关机盘恢复到prestart且十九台stopped。`a6622d4`已提交修复；下一步从新clean target重建release pair，再从新clone重启该case。旧pair/clone不得resume、热替换或复用；连续完整L6、P05C、发布、推送、清理、真实同步及其他平台保持关闭。
+3. 第六套及repair/rollback/remove/reinstall terminal均冻结。首个crash的注册探针clone `C0D96C0A…23A1F8`因UTM缓存网卡只作失败资产；独立v2 `FD24ADFF…17C056`只执行一次`install_prepared` checkpoint，operation ID宿主仅存hash `9429b171…9145a`，未resume/dpkg。startup因遗漏合同允许的`root:root 01777`父目录而返回`GuardInvalid`；manifest `5d8c914a…3e42a`冻结。`a6622d4`修复后的新handoff `RadishLex-L6-Handoff-d75818f`已由record `c74fac12…9849`和双production verifier闭合；下一步只可另建clean absent clone并重新闭合preflight。旧pair/clone不得resume、热替换或复用；连续完整L6、P05C、发布、推送、清理、真实同步及其他平台保持关闭。

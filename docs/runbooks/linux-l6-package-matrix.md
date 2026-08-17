@@ -74,7 +74,8 @@
 - 后续boot的network/transfer/mutation-preflight `11c00403…be2`/`db9b3c59…3e50`/`fca225a7…3a01`通过后，guest生成唯一operation ID，宿主只保存hash `fafb05ad…79c8`。one-shot只调用一次production `reinstall_target`，receipt `3eb44171…e274c`为`install/not_applicable/completed`、chain 5；1,512-byte dpkg delta `b0338d25…116a`、完整payload、startup、XDG零漂移与strict postflight `b4bf57ba…09f93`通过。guest archive/host manifest为`4ea296fa…fd3ba`/`54f1e952…6685`；关机盘`db1e59ae…13b90`/`76753750…a1c3`/`feb2ba7e…aaa5`稳定，remove/rollback v3/S3未漂移、四盘零句柄且十七台VM全停。该clone现为冻结reinstall terminal，不resume、重试、再次调用、清理或复用。
 - 首个`install_prepared` crash准备新增两台clone。`C0D96C0A…23A1F8`虽有磁盘config `Network=[]`，UTM注册缓存仍继承网卡，故在input与operation ID前停止并只作失败资产。v2 `FD24ADFF…17C056`从无网卡registered terminal取得注册身份，再换入DependencyFrozen absent EFI/qcow2；断网、package/state/XDG absent、输入回读与mutation preflight均通过。
 - v2只调用一次acceptance controller，checkpoint envelope记录`install_prepared/prepared`、完整process group `SIGKILL`和无dpkg child；operation ID宿主仅存hash `9429b171…9145a`。首次crash-state探针因`/run`为`noexec`不能映射FFI，保留失败控制后将同hash probe复制到`/var/tmp`，未重跑transaction。第二次检查得到Manager/Fcitx `0:1:4:11:0`，独立证据确认合法guard位于canonical `root:root 01777 /run/lock`；这是startup只读validator与store共享父目录合同漂移。
-- 该case在resume前失败关闭：dpkg mutation、resume、postflight均未执行，crash-state成功证据未产生，不能计为通过。host manifest `5d8c914a…3e42a`与summary `dab8cde5…1905`冻结失败/诊断控制且不含raw operation ID；v2关机盘恢复prestart `cfb5d343…1f2d`/`0b797641…1418`/`4967234b…4b18`并零句柄，十九台VM全停。`a6622d4`已让store/startup消费同一权限策略；旧pair与两台clone不得resume、热替换或复用，须从修复后的新clean target重建pair并用新clone从头执行。
+- 该case在resume前失败关闭：dpkg mutation、resume、postflight均未执行，crash-state成功证据未产生，不能计为通过。host manifest `5d8c914a…3e42a`与summary `dab8cde5…1905`冻结失败/诊断控制且不含raw operation ID；v2关机盘恢复prestart `cfb5d343…1f2d`/`0b797641…1418`/`4967234b…4b18`并零句柄，十九台VM全停。`a6622d4`已让store/startup消费同一权限策略；旧pair与两台clone不得resume、热替换或复用，该步当时停止在“重建pair后另建clone”。
+- 修复target `d75818f`的新pair在唯一2223 builder中只构建一次。完整dev bundle `a03ac739…b901`、冻结source package/evidence `09ed1228…bec`/`fe3d6297…cf94`和三套cache先后通过；外层接口down/双路由为空，namespace内loopback down、零路由且Cargo offline。record/target package/target evidence/production/acceptance/canonical USTAR为`c74fac12…9849`/`4dd00540…dcec`/`9e646c86…3f17`/`422a5080…7f3`/`5ca804e6…c7a6`/`bbc96507…b4db`。guest Python与双production Rust、宿主Python和8文件mode/link/hash均通过，handoff从absent incoming以no-replace rename发布。builder未安装package或执行transaction，关机盘`1f509c73…d4f`/`ecaefd2a…0699`/`84314201…573d`稳定且零句柄，十九台VM全停；尚未创建新crash clone。
 
 ### 当前本地资产登记（非发布证据）
 
@@ -89,7 +90,7 @@
 | `Debian13-ARM64-L6.utm` | 已注册；旧 L6 stopped | 旧 pre-receipt failure disk；运行内存状态不再保留，package/evidence root 与 controller evidence 仍 absent，不重启、清理或复用 |
 | `RadishLex-L6-Snapshots/S0-clean-e5b6da1` | 非 VM；旧 S0 | 未注册、不可启动的 APFS COW 恢复点；绑定旧 pair 的 config/EFI/qcow、guest/dpkg/XDG/handoff baseline，只作取证，不用于修复后重试 |
 | `RadishLex-L6-Handoff-e5b6da1` | 非 VM；旧 handoff | host 上冻结的旧 canonical pair 副本；作为失败输入保留，不覆盖、安装或执行 |
-| `RadishLex-L6-PairBuilder-2fa1b8c-v2.utm` | 已注册；builder stopped | 2223 隔离 builder；保留第四套、第六套与`823afca` refresh build root/控制证据，不覆盖旧输出。最新关机后config/EFI/qcow2为`1f509c73…d4f`/`04a67b0f…02a`/`e903b56d…499`且qcow2零句柄；不执行package transaction |
+| `RadishLex-L6-PairBuilder-2fa1b8c-v2.utm` | 已注册；builder stopped | 2223 隔离 builder；保留第四套、第六套、`823afca` refresh与`d75818f` pair build root/控制证据，不覆盖旧输出。最新关机后config/EFI/qcow2为`1f509c73…d4f`/`ecaefd2a…0699`/`84314201…573d`且qcow2复算一致、零句柄；不执行package transaction |
 | `Debian13-ARM64-L6-2fa1b8c.utm` | 已注册；第二个 L6 failure stopped | 从 DependencyFrozen 独立 COW 创建，2224 转发；仅有空 state/operations root，运行内存状态不再保留，不重启、清理或复用 |
 | `RadishLex-L6-Snapshots/S0-clean-2fa1b8c` | 非 VM；第二个 S0 | 未注册、不可启动；identity `S0-clean-2fa1b8c-5683d120`，现只作第二次失败的基线与取证，不用于原地重试 |
 | `RadishLex-L6-Handoff-2fa1b8c` | 非 VM；第二个 handoff | host 上独立复验的 8 文件 canonical pair；现作为第二次失败输入保留，不覆盖或执行 |
@@ -103,6 +104,7 @@
 | `RadishLex-L6-Handoff-56dd4de` | 非 VM；第四个 mismatch handoff | record `70a394ea…139a`；双侧 actual-package parser 与逐哈希通过，但 source bytes 不等于 S2 terminal installed artifact，不能直接用于该 chain 的 upgrade，也不得与旧 source 跨 pair 混搭 |
 | `RadishLex-L6-Handoff-1ebbdab` | 非 VM；第五个 rolled-back handoff | record `d2661cc0…ed15`；source 精确等于 S2 terminal installed artifact，target package `cdac2f32…7c26`；对应 clone 已转为 target-validation failure/recovery 取证，不覆盖或复用 |
 | `RadishLex-L6-Handoff-80e49ce` | 非 VM；第六个 canonical handoff | record `cda70afa…659b`；修复 commit `80e49ce`、prior-terminal source `09ed1228…bec`、target `b211d940…d09c`，双 verifier 与 8 文件 mode/link/hash 通过；已作为第六套独立 S2 clone 的唯一 pair 输入 |
+| `RadishLex-L6-Handoff-d75818f` | 非 VM；startup-lock修复后的canonical handoff | record `c74fac12…9849`；target commit `d75818f`包含`a6622d4`，source仍为prior-terminal `09ed1228…bec`，target package/evidence `4dd00540…dcec`/`9e646c86…3f17`。guest/host verifier、双production Rust、8文件mode/link/hash与canonical USTAR `bbc96507…b4db`通过并no-replace原子发布；尚未写入任何transaction clone |
 | `RadishLex-L6-Maintenance-Refresh-b891ed1` | 非 VM；历史 package-preserving refresh handoff | record `4b41d1c0…fb2cd`、production maintenance ELF `9a657510…54585`；精确复用 target package/evidence `b211d940…d09c`/`2a1132c6…0e1b`，local evidence `a495e6a2…1cbb`。它缺少`698fe1f` ancestry要求，只作completed-noop根因取证，不再作为transaction输入 |
 | `RadishLex-L6-Maintenance-Refresh-823afca` | 非 VM；当前 package-preserving refresh handoff | record `b3852845…a146`、production maintenance ELF `1f37b6f9…cca7`、canonical USTAR `e917f1a9…6ad7`；精确复用 target package/evidence `b211d940…d09c`/`2a1132c6…0e1b`并要求`698fe1f`祖先。guest/host verifier与mode/link/hash通过，local evidence `e581dec4…315f`；未重建package、启动transaction guest或产出acceptance executable |
 | `RadishLex-L6-Repair-Preflight-b891ed1` | 非 VM；refresh repair host/guest evidence | local/guest evidence `7db3a16d…7502`/`4a92116f…1c62`；绑定 S3/refresh handoff、断网 input switch、target package/receipt/dependency/font/startup/XDG/process静止、operation/guard absence与关机磁盘身份；目录`0700`、文件`0600` single link，不是repair transaction evidence |
@@ -360,7 +362,7 @@ checkpoint controller 必须是显式 acceptance 构建身份，以不可由 pro
 
 实现位于独立 `platforms/linux-l6-acceptance/` crate。production crate 的 `l6-acceptance-checkpoints` feature 默认关闭，production main 只连接 disabled sink，不识别 acceptance 参数；acceptance worker 通过继承 pipe 发送 typed checkpoint 并暂停。controller 创建独立 process group，命中后用固定 `/usr/bin/kill` 发送 `SIGKILL`，等待 worker signal 终止，并连续复验 `/proc/*/stat` 中 group member 为零且没有 `dpkg` child，满足全部条件后才允许写 evidence。`crash` 命令还必须同时具备 `--authorized-l6-crash` 与 production mutation/data-preservation 授权；本节仍不构成运行授权。
 
-首个实机case没有通过。`prepared` checkpoint与process-group终止证据有效，但后续startup读取合法stale guard时暴露共享父目录策略漂移，因此在resume前停止。失败现场不得通过替换FFI或改写期望tuple继续；只有包含修复的新release pair、新absent clone与新的逐case授权才能重新开始`install_prepared`，其通过后才可进入`install staged`。
+首个实机case没有通过。`prepared` checkpoint与process-group终止证据有效，但后续startup读取合法stale guard时暴露共享父目录策略漂移，因此在resume前停止。包含修复的新release pair已经冻结；失败现场仍不得通过替换FFI或改写期望tuple继续，只有新absent clone完成注册身份、运行态断网、input switch和preflight并取得新的逐case授权后，才能重新开始`install_prepared`，其通过后才可进入`install staged`。
 
 ## 8. 系统、字体与 startup probe
 
@@ -413,7 +415,7 @@ guest-agent push 到达guest后的owner/mode也不是可信输入；既有第六
 
 UTM 磁盘配置使用空 `Network` 数组也不能单独证明 guest 运行态断网；删除整个必填键会使 UTM 4.7.5 冷加载失败，注册缓存仍可能在首次启动挂回虚拟网卡并取得 DHCP。每次启动后、写入 artifact input 或生成 operation ID 前，都必须在 guest 内复验目标接口 down 且 IPv4/IPv6 路由为空；任一网络状态不明立即停止，不把后续断网状态倒推成“从启动起全程离线”。
 
-前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个为`rolled_back`，第六套形成target `completed`与S3。独立clone又闭合真实repair、rollback、remove和reinstall，六类operation已有分散证据但不是同一session。首个`install_prepared` checkpoint只形成失败关闭证据并暴露startup `01777`策略漂移，不计通过；旧pair和两台crash clone不再调用或复用。下一步先重建修复后的pair，再逐case授权从新clone重启八个crash/retry。
+前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个为`rolled_back`，第六套形成target `completed`与S3。独立clone又闭合真实repair、rollback、remove和reinstall，六类operation已有分散证据但不是同一session。首个`install_prepared` checkpoint只形成失败关闭证据并暴露startup `01777`策略漂移，不计通过；旧pair和两台crash clone不再调用或复用。修复后的`d75818f` pair已冻结，下一步逐步授权新absent clone的preflight与该case重启。
 
 ## 10. L6 完成与后续
 
