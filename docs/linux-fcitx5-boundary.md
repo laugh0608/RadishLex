@@ -4,7 +4,7 @@
 
 ## 状态与产品范围
 
-状态：M5-P01/P02/P03/P04/P05A 已完成。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release、输入/隐私/同库个人化与重启矩阵均已通过。P05A 的 metadata/rootfs、`system` profile 与真实 ARM64 载荷门禁也已通过；P05B 已完成确定性 `.deb`、actual package relationship、恢复事务、fixed-path observer/executor、mutable port、受控 CLI、Manager/Fcitx 共用 startup gate、compile-isolated L6 controller 与真实 ARM64 pair。真实upgrade、repair、rollback与默认remove现已闭合，remove后package/product tree absent、startup失败关闭且XDG零漂移；reinstall的absent-terminal只读资格已冻结，真实reinstall、完整 L6 与 P05C 系统验收仍未完成。v1 package 明确没有 RadishLex 自有 maintainer scripts。
+状态：M5-P01/P02/P03/P04/P05A 已完成。Linux Flutter runner、固定 bundle `.so`、共享 XDG/Manager runtime 与独立 privacy file 已落地；Debian 13 ARM64 的真实 Flutter Release、输入/隐私/同库个人化与重启矩阵均已通过。P05A 的 metadata/rootfs、`system` profile 与真实 ARM64 载荷门禁也已通过；P05B 已完成确定性 `.deb`、actual package relationship、恢复事务、fixed-path observer/executor、mutable port、受控 CLI、Manager/Fcitx 共用 startup gate、compile-isolated L6 controller 与真实 ARM64 pair。真实upgrade、repair、rollback、默认remove与reinstall均已闭合，六类operation各有独立证据且XDG零漂移。首个`install_prepared` crash checkpoint因startup遗漏Debian精确`01777`共享锁父目录合同而在resume/dpkg前失败关闭；`a6622d4`已统一store/startup策略，修复target `d75818f`的新pair已冻结。完整 L6、八个crash/retry与P05C系统验收仍未完成。v1 package 明确没有 RadishLex 自有 maintainer scripts。
 
 P03 实机证据覆盖 GTK、Qt、Electron、浏览器和终端，包含完整候选交互、焦点/输入法切换、Fcitx/桌面会话重启、进程级地址族限制与整台 guest 断网。password、terminal、unknown 与 Qt `Sensitive` 后的 userdb 聚合保持全零；当前 GTK4 frontend 未把 `PRIVATE` 传播为 Fcitx `Sensitive`，因此依赖既有 unknown 失败关闭而非虚构 capability。Qt backend 只以 QPA、会话类型和 input-context plugin 的组合证据判定，不能因进程映射 `libQt6WaylandClient` 就声明原生 Wayland。快速 X11→Wayland 登录暴露的 `im-launch` 跳过 daemon 问题已用 Debian 官方 desktop entry 的用户级 autostart 副本闭合；该开发设置不替代 P05 产品安装与维护设计。
 
@@ -70,7 +70,7 @@ Linux 继续使用 `ime-ffi` ABI v9 已有的：
 
 P05B 后续增加了独立 `radishlex_linux_product_startup_gate` request/result v1。它是与输入热路径分离的 additive Linux 产品启动 ABI，读取编译 build identity、component 与 host 解析的 loaded component path；session/key ABI contract 仍为 v9。Manager 和 Fcitx 共用浅层 C++ binding；binding 在调用 startup ABI 前用 `dladdr` 与 canonical path 证明 startup/error symbols 来自 component 的精确 sibling FFI，Fcitx 还证明全部输入热路径 FFI symbols 来自同一 sibling，拒绝 `LD_LIBRARY_PATH`、preload 或其他 loader interposition。只有与 `development-staged` 或 `debian-system-product` 编译身份精确对应的 allow result 才形成 move-only permit，未知 result、交叉身份或 symbol origin 漂移均失败关闭。
 
-当前真实缺口不在输入 ABI、addon 编译、Manager privacy、删除恢复、导入导出、重启矩阵、P05A 产品载荷，或 P05B 的 package relationship/system port/startup gate/controller。L6 format v1、controller、source install/S1/S2、prior-terminal anchor、第五套 failure/recovery、startup revision 回归、第六套 target terminal、真实repair/rollback/remove以及reinstall absent-terminal只读资格已完成；真实reinstall、crash/retry、产品 linked startup 动态负向、真实产品启动、重启与 P05C 仍未完成，这些能力不需要增加平台私有输入 ABI。
+当前真实缺口不在输入 ABI、addon 编译、Manager privacy、删除恢复、导入导出、重启矩阵、P05A 产品载荷，或 P05B 的 package relationship/system port/startup gate/controller。L6 format v1、controller、source install/S1/S2、prior-terminal anchor、第五套 failure/recovery、startup revision 回归、第六套 target terminal，以及真实repair/rollback/remove/reinstall均已完成。首个crash checkpoint只形成resume/dpkg前的失败关闭证据；共享锁父目录策略修复与新pair已经冻结，但八个crash/retry、产品 linked startup 动态负向、真实产品启动、重启与 P05C 仍未完成，这些能力不需要增加平台私有输入 ABI。
 
 ### Flutter Manager
 
@@ -200,7 +200,7 @@ M5-P02 的开发构建必须形成可复验依赖图：
 - 运行时拒绝缺失资源、leaf symlink、group/other 可写 addon 目录或资源，并以稳定原因失败关闭；
 - 构建不从运行时下载 schema、词库、模型或二进制；
 - 开发安装与正式发行载体分开，P02 不把本地复制命令称为产品安装；
-- 系统域目标、metadata/rootfs 与真实载荷强门禁已由 M5-P05A 固定并通过；P05B 已形成确定性 `.deb`、actual package relationship、恢复型事务、production mutable port/CLI、只读 startup gate、L6 format v1、compile-isolated controller 与真实 ARM64 release pair；独立 guest 已真实完成 source install、一次自动 source recovery、修复后的 target terminal、repair、rollback与默认remove，reinstall absent-terminal只读资格也已冻结。真实reinstall、crash/retry、linked product startup 与 P05C 仍未完成。
+- 系统域目标、metadata/rootfs 与真实载荷强门禁已由 M5-P05A 固定并通过；P05B 已形成确定性 `.deb`、actual package relationship、恢复型事务、production mutable port/CLI、只读 startup gate、L6 format v1、compile-isolated controller 与真实 ARM64 release pair；独立 guest 已真实完成 source install、一次自动 source recovery、修复后的 target terminal、repair、rollback、默认remove与reinstall。首个`install_prepared`实机case在startup误报`GuardInvalid`后失败关闭；共享父目录策略已修复并冻结新pair，八个crash/retry、linked product startup 与 P05C 仍未完成。
 
 当前 `platforms/linux-fcitx5/CMakeLists.txt` 已固定 C++17、CMake 3.21+、Fcitx5 Core 5.1.9+、native-rime `libradishlex_ime_ffi` 显式路径和仓库锁定 RimeData。`./scripts/check-linux-fcitx5.sh` 在无 Fcitx 环境同时编译 staged/system runtime-layout、development/system startup identity，以及 symbol-origin binding 对象；`--require-fcitx` 继续只证明 staged addon/FFI/RimeData/metadata、ELF `$ORIGIN`、构建路径和 `dlopen(RTLD_NOW)`。`./scripts/build-linux-product-addon-stage.sh` 另以 metadata 中的产品版本、`system` runtime profile 与 `debian-system-product` startup identity 形成临时 addon stage，不复制 sibling RimeData；两个入口都不写系统目录或启用输入法。当前 CMake/CTest 合同总数为 10 项，新增的两项固定两种 startup 编译身份及 allow 映射；真实 ARM64 source package 已安装，两份 installed FFI 的 production read-only gate 均返回 `AllowedProduct + InstalledReceiptVerified`。精确 C++ linked sibling origin、preload/错误 sibling 与实际 Manager/Fcitx 进程启动的动态正负证据仍未形成。
 
@@ -270,7 +270,7 @@ M5-P04 已覆盖：
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
 - P04 已按 `docs/linux-manager-local-acceptance.md` 冻结完成，不重复其导入导出、同库和重启实机；既有 guest 资产不得清理、覆盖或改作 P05 载体。
-- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、恢复事务、production port/CLI、startup gate、L6 format/controller 和 ARM64 pair 已完成；前五套现场只作取证。第六套upgrade与S3已完成，两台旧repair clone分别冻结staged failure与completed-noop。`698fe1f`已让首次健康repair单次apply、proof-backed retry不重复；`823afca` ARM64 refresh handoff、第三台真实repair、独立rollback、默认remove与reinstall absent-terminal只读资格现已闭合。下一步只在新授权下重新闭合mutation preflight并单次执行真实`reinstall_target`；未获逐步授权不能运行maintenance/acceptance CLI、`dpkg`、产品进程或写真实系统。
+- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、恢复事务、production port/CLI、startup gate、L6 format/controller 和 ARM64 pair 已完成；前五套现场只作取证。第六套upgrade与S3、第三台真实repair、独立rollback、默认remove与reinstall terminal均已冻结。首个`install_prepared`只形成`GuardInvalid`失败关闭证据；`a6622d4`修复后的`d75818f` pair已冻结，旧pair与两台crash clone不得热替换、resume或复用。下一步只可另建clean absent clone，逐步闭合注册、断网、input与preflight后，再单独授权一次`install_prepared`；未获逐步授权不能运行maintenance/acceptance CLI、`dpkg`、产品进程或写真实系统。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。
