@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-截至 2026-08-17，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。第四套确认source chain不连续；第五套upgrade为`rolled_back`，第六套upgrade形成target `completed`与S3。两台旧repair clone分别冻结staged verifier失败与healthy product completed-noop。`698fe1f`已修复首次健康repair短路，`823afca` ARM64 refresh handoff绑定冻结target package/evidence与新production ELF；全新S3 clone完成真实`repair/same_release/completed`与dpkg同版重装。后续独立clone依次完成`rollback/target_older/completed`、`remove/not_applicable/completed`和`install/not_applicable/completed`，降级、移除、reinstall、startup与XDG零漂移均有独立证据。六类真实operation已取证；连续完整L6、八个crash/retry、acceptance controller实机与P05C继续关闭。
+截至 2026-08-17，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。第六套与独立clone已让六类真实operation分别取证。首个`install_prepared` acceptance checkpoint实机执行后，startup读取合法`root:root 01777 /run/lock`时误报`GuardInvalid`；case在resume/dpkg前失败关闭，源码现已统一store/startup父目录权限策略。旧pair不能继续，连续完整L6、八个crash/retry与P05C仍未闭合。
 
 - 首个完整产品安装载体固定为 Debian 13 ARM64 的单一系统级本地 `.deb`，package 名固定为 `radishlex`；它是未发布的本地验收载体，不是 apt repository、正式 Release 或通用 Linux 安装包。
 - Fcitx addon、两份产品 FFI、Manager bundle、锁定 RimeData、desktop entry、图标和产品 manifest 由同一个 package 绑定；不拆成可独立漂移的 Manager/addon 包。
@@ -298,7 +298,7 @@ production build 不得把“receipt 缺失”解释为首次启动成功，也�
 - Manager runner 在设置 `umask(0077)` 后、创建 Flutter application/engine 前调用；Fcitx factory 在构造 `Engine` 前取得 move-only startup permit，因此 Engine constructor 内的 input FFI、XDG、privacy 与 Rime 初始化均晚于 gate。共用 C++ binding 在调用 startup ABI 前用 `dladdr` 与 canonical path 验证 startup/error symbols 确实来自当前 component 的精确 sibling FFI；Fcitx 还验证全部输入热路径 FFI symbol origin，拒绝 `LD_LIBRARY_PATH`、preload 或其他 loader interposition。
 - `radishlex_linux_product_startup_gate` 使用独立 request/result v1，携带编译 build identity、component 与由 host 从已加载 executable/shared object 取得的 canonical component path；它是 additive Linux startup ABI，输入 session/key ABI contract 仍为 v9。
 
-仓库合同覆盖 receipt absent/terminal/nonterminal、advisory guard、receipt/stage tmp、completed remove、半配置状态、exact current slots、actual `.deb`/manifest/dependency/version relationship、startup/relationship 共用 canonical product/build/positive-revision 规则、fixed dpkg argv/env/timeout/diagnostics、fake executor、`/proc` maps parser、opaque CLI authorization、Manager/Fcitx component scope、双 FFI equivalence、symbol-origin、开发/产品身份隔离、只读目录指纹与调用顺序；acceptance 专项再覆盖八个确定 checkpoint、compile identity、授权参数、完整 process group 终止顺序、无残留 dpkg child 和 canonical evidence redaction。真实 L6 已覆盖 source install、target apply、target-validation failure 后自动恢复 source、修复后 target terminal、首次健康repair同版重装、rollback降级、默认remove、reinstall、terminal startup 与 XDG 零漂移；尚无dynamic preload/错误 sibling 新 ARM64、外部 lifecycle、连续完整主序列或 crash/retry 实机证据。
+仓库合同覆盖 receipt absent/terminal/nonterminal、advisory guard、receipt/stage tmp、completed remove、半配置状态、exact current slots、actual `.deb`/manifest/dependency/version relationship、startup/relationship 共用 canonical product/build/positive-revision 规则、fixed dpkg argv/env/timeout/diagnostics、fake executor、`/proc` maps parser、opaque CLI authorization、Manager/Fcitx component scope、双 FFI equivalence、symbol-origin、开发/产品身份隔离、只读目录指纹与调用顺序；acceptance 专项再覆盖八个确定 checkpoint、compile identity、授权参数、完整 process group 终止顺序、无残留 dpkg child 和 canonical evidence redaction。真实 L6 已覆盖六类分散operation、terminal startup与XDG零漂移；首个crash只证明checkpoint和缺陷下失败关闭，不是恢复通过证据。
 
 ## 自动门禁
 
@@ -390,6 +390,10 @@ checkpoint/evidence controller 归属独立 `platforms/linux-l6-acceptance/` cra
 
 controller 为 worker 创建独立 process group，命中 checkpoint 后以固定 `/usr/bin/kill` 对完整 group 发送 `SIGKILL`，等待 worker signal 终止，再连续扫描 `/proc/*/stat`，只有 group member 为零且无 `dpkg` child 才生成 `radishlex-linux-l6-checkpoint-evidence-v1`。envelope 使用 canonical JSON、deny-unknown fields，只保存 matrix/build/scenario/checkpoint、repository/guest/snapshot identity、operation ID SHA-256、授权/fault/termination 分类与 expected terminal；不保存 operation ID 原值、PID、artifact/staging 路径、proc maps/dpkg stdout/stderr 或用户数据。controller 仍不替换 `/usr/bin/dpkg`、不使用 shell/`PATH`/`--force-*`，实际运行继续需要 crash 与 system mutation 两层明确授权。
 
+首个`install_prepared`实机case在独立v2 clone只执行一次controller，operation ID宿主只存hash `9429b171…9145a`，checkpoint与process-group终止通过且没有dpkg child。crash-state首次探针因`/run`为`noexec`失败；将同hash probe复制到`/var/tmp`后未重跑transaction，Manager/Fcitx仍返回`FailedClosed/GuardInvalid`。独立证据固定guard为`root:root 0600`零长度单链接文件，父目录为canonical `root:root 01777 /run/lock`，故根因是startup只读validator遗漏store已接受的共享父目录合同。case未resume、未调用dpkg，也未生成成功crash-state/postflight。
+
+`a6622d4`把父目录权限判定收敛为store/startup共用纯策略：非world-writable仍按既有规则接受；world-writable只接受root-owned精确`01777`，guard自身的owner/mode/type/link/size检查不放宽。startup回归接受`0755`、`0775`、`01777`并拒绝`0777`、`01703`、`01733`、`01757`，保持只读且不调用package/component observer。默认119项与L6-feature 124项Linux product测试、acceptance 10项及clippy/controller合同通过。
+
 `./scripts/check-linux-l6-controller.sh` 编译 production feature 边界与独立 acceptance crate，并运行八点中断/恢复、无重复 mutation、target validation acceptance rejection、参数授权、进程组顺序、无 dpkg child、canonical/redaction 与源码边界正负向测试。它只使用 fake port/backend 和临时目录，不运行 acceptance/maintenance executable，不写 fixed evidence root，也不证明 Linux process group 或 dpkg lifecycle 已实测。
 
 ## M5-P05 实现状态
@@ -402,7 +406,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual package/manifest/dependency/version/status relationship、恢复事务、production system port/host、共用只读 startup gate、L6 format v1 与 compile-isolated checkpoint/evidence controller。前两套 pre-receipt 失败关闭；第三套完成source install/S1/S2；第四套暴露chain mismatch；第五套upgrade为`rolled_back`；第六套upgrade形成target `completed`与S3，均未污染XDG。两次旧repair依次暴露target-only effective-source与healthy validation短路；前者早已修复，后者现由`698fe1f`区分首次repair和已有target proof的恢复。直接回归证明首次健康repair消费permit并恰好apply一次，proof-backed retry零重复mutation，Linux product共118项测试与clippy通过；`823afca` ARM64 refresh handoff与真实同版repair已闭合。独立clone随后依次形成真实rollback、remove与reinstall terminal，六类operation都有独立证据且XDG零漂移。十七台VM全停，reinstall/remove/rollback v3/S3均冻结。下一步只在新的逐case授权下推进crash/retry与连续完整L6；process lifecycle、外部package lifecycle与P05C继续关闭。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash checkpoint暴露startup共享锁父目录漂移，已在resume前失败关闭并补共享策略与回归。十九台VM全停，全部terminal与两台crash clone冻结。下一步先从修复后的clean target重建release pair，再以新clone、新授权重启`install_prepared`；旧pair不得热替换或继续。连续完整L6、process/external lifecycle与P05C继续关闭。
 
 ## 实机授权边界
 

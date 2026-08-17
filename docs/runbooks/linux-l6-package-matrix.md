@@ -72,10 +72,13 @@
 - startup按`RemovedProgram`失败关闭，进程/映射与loopback-only网络静止。postflight v1只因同hash FFI位于`noexec`的`/run`失败，失败控制保留；移至`/var/tmp`后terminal evidence `eef62072…e80d`通过且未重跑maintenance。guest archive/host manifest `529ee42c…9b8e`/`be498439…97a1`已冻结；正常关机后config/EFI/qcow2 `92568d22…626a`/`abea62d2…c8fc`/`ad8a6c6b…55fa`，v3/S3未漂移、三盘零句柄且十六台VM全停。该clone现为冻结remove terminal，后续只另行授权从它建立独立reinstall clone并先做只读preflight。
 - 独立reinstall clone `E671DB9C-5E2C-447B-9425-8D91D2CFD465`的absent-terminal只读资格由evidence `8ed9d43a…86b25`与host manifest `a98dbec6…5006a`冻结；remove receipt chain 4、package/product tree absent、`RemovedProgram` startup、XDG、依赖/字体、进程与断网均通过，未创建新operation ID或执行maintenance/dpkg。
 - 后续boot的network/transfer/mutation-preflight `11c00403…be2`/`db9b3c59…3e50`/`fca225a7…3a01`通过后，guest生成唯一operation ID，宿主只保存hash `fafb05ad…79c8`。one-shot只调用一次production `reinstall_target`，receipt `3eb44171…e274c`为`install/not_applicable/completed`、chain 5；1,512-byte dpkg delta `b0338d25…116a`、完整payload、startup、XDG零漂移与strict postflight `b4bf57ba…09f93`通过。guest archive/host manifest为`4ea296fa…fd3ba`/`54f1e952…6685`；关机盘`db1e59ae…13b90`/`76753750…a1c3`/`feb2ba7e…aaa5`稳定，remove/rollback v3/S3未漂移、四盘零句柄且十七台VM全停。该clone现为冻结reinstall terminal，不resume、重试、再次调用、清理或复用。
+- 首个`install_prepared` crash准备新增两台clone。`C0D96C0A…23A1F8`虽有磁盘config `Network=[]`，UTM注册缓存仍继承网卡，故在input与operation ID前停止并只作失败资产。v2 `FD24ADFF…17C056`从无网卡registered terminal取得注册身份，再换入DependencyFrozen absent EFI/qcow2；断网、package/state/XDG absent、输入回读与mutation preflight均通过。
+- v2只调用一次acceptance controller，checkpoint envelope记录`install_prepared/prepared`、完整process group `SIGKILL`和无dpkg child；operation ID宿主仅存hash `9429b171…9145a`。首次crash-state探针因`/run`为`noexec`不能映射FFI，保留失败控制后将同hash probe复制到`/var/tmp`，未重跑transaction。第二次检查得到Manager/Fcitx `0:1:4:11:0`，独立证据确认合法guard位于canonical `root:root 01777 /run/lock`；这是startup只读validator与store共享父目录合同漂移。
+- 该case在resume前失败关闭：dpkg mutation、resume、postflight均未执行，crash-state成功证据未产生，不能计为通过。host manifest `5d8c914a…3e42a`与summary `dab8cde5…1905`冻结失败/诊断控制且不含raw operation ID；v2关机盘恢复prestart `cfb5d343…1f2d`/`0b797641…1418`/`4967234b…4b18`并零句柄，十九台VM全停。`a6622d4`已让store/startup消费同一权限策略；旧pair与两台clone不得resume、热替换或复用，须从修复后的新clean target重建pair并用新clone从头执行。
 
 ### 当前本地资产登记（非发布证据）
 
-冻结资产宿主根为 `/Users/luobo/VirtualMachines`；第四、第五、第六套、三台 repair clone、第二/第三台rollback clone与独立remove/reinstall clone package 位于 UTM 默认 Documents 目录。第五套为 `rolled_back` failure/recovery 现场；第六套已形成 target `completed` terminal与未改写 S3；三台 repair clone依次冻结为 staged-preflight `aborted_preserved`、`completed_without_package_reapply`与真实`completed`现场，第二台rollback clone冻结为transfer-setup failed-closed现场，均不得复用。第三台rollback、remove与reinstall clone分别为source、absent和target terminal。首台rollback package已按授权删除，只保留host证据。plain `utmctl` 枚举十七台且全部 stopped。`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。前五个 failure/mismatch/rolled-back 现场、所有 terminal clone、第六套原现场和S3都只作真相源，不启动、重试、清理或复用。全部 handoff、snapshot 与host evidence继续保留且不得混用。UTM只使用`PATH`中的plain `utmctl`，任何时刻最多运行一台VM。
+冻结资产宿主根为 `/Users/luobo/VirtualMachines`；第四、第五、第六套、三台 repair clone、第二/第三台rollback clone、独立remove/reinstall及两台首个crash clone位于 UTM 默认 Documents 目录。第五套为 `rolled_back` failure/recovery 现场；第六套已形成 target `completed` terminal与未改写 S3；其余terminal与失败现场均不得复用。首台rollback package已按授权删除，只保留host证据。plain `utmctl` 枚举十九台且全部 stopped。`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。全部 failure/mismatch/rolled-back/terminal/crash clone、handoff、snapshot与host evidence只作各自真相源，不启动、重试、清理或混用。UTM只使用`PATH`中的plain `utmctl`，任何时刻最多运行一台VM。
 
 | 相对路径 | UTM 状态 | 唯一职责与保留线 |
 | --- | --- | --- |
@@ -130,6 +133,9 @@
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-80e49ce-rollback-v3.utm` | 已注册；rollback completed stopped | UUID `EFD15599-7177-4D55-BF17-173EE1F0BBDD`；唯一production invocation形成`rollback/target_older/completed`，package精确回到source `38-1`、operation count 3，startup/XDG postflight通过。关机后config/EFI/qcow2 `6295c4ed…29ae`/`3b117def…a8f0`/`9a28509a…995a`，qcow2复算一致且零句柄；不resume、重试、再次调用、清理或直接复用，后续只作remove clone的registered terminal来源 |
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-80e49ce-remove.utm` | 已注册；remove completed stopped | UUID `5EA2BAA2-B9A1-46CC-B496-B37826DD27A2`；唯一production invocation形成`remove/not_applicable/completed`，operation count 4，package/product tree absent、startup失败关闭、XDG不变。关机后config/EFI/qcow2 `92568d22…626a`/`abea62d2…c8fc`/`ad8a6c6b…55fa`，qcow2复算一致且零句柄；不resume、重试、再次调用、清理或直接复用，后续只作独立reinstall clone的registered terminal来源 |
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-80e49ce-reinstall.utm` | 已注册；reinstall completed stopped | UUID `E671DB9C-5E2C-447B-9425-8D91D2CFD465`；唯一production invocation形成`install/not_applicable/completed`，operation count 5，target `38-2`完整恢复、startup与XDG postflight通过。关机后config/EFI/qcow2 `db1e59ae…13b90`/`76753750…a1c3`/`feb2ba7e…aaa5`，qcow2复算一致且零句柄；不resume、重试、再次调用、清理、恢复或复用 |
+| `RadishLex-L6-Crash-Install-Prepared-80e49ce-Failed-Closed` | 非 VM；首个crash失败关闭证据 | host manifest `5d8c914a…3e42a`覆盖checkpoint、两次inspection失败、noexec relocation、startup/guard父目录诊断、输入与关机身份；summary `dab8cde5…1905`只保存operation ID hash。该目录证明失败关闭与根因，不是crash/retry通过或transaction terminal证据 |
+| `UTM Documents/RadishLex-Debian13-ARM64-L6-80e49ce-crash-install-prepared.utm` | 已注册；network setup failed stopped | UUID `C0D96C0A-EC5C-4809-86A0-733C4523A1F8`；UTM注册缓存继承网卡，在input与operation ID前停止。只作adapter失败取证，不启动、修复、清理或复用 |
+| `UTM Documents/RadishLex-Debian13-ARM64-L6-80e49ce-crash-install-prepared-v2.utm` | 已注册；startup contract failed-closed stopped | UUID `FD24ADFF-B160-46F0-B100-10BAAF17C056`；唯一`install_prepared` checkpoint后未resume/dpkg，startup误报`GuardInvalid`并暴露`01777`合同漂移。disposable关机后config/EFI/qcow2恢复`cfb5d343…1f2d`/`0b797641…1418`/`4967234b…4b18`且零句柄；不启动、resume、热替换、补证或复用 |
 
 两个在 QEMU 引导前因缓存 2222 转发失败、从未运行 guest 的旧 PairBuilder clone 已在单独授权后从 UTM 注册表和磁盘删除；它们不含 package transaction 或 canonical evidence。当前资产仍各有独立职责，不因 UTM 面板是否显示而删除。L6 闭合后可另行授权评估剩余 builder、DependencyFrozen 与 host handoff 的保留期；P04、CleanBase、四个 failure/mismatch L6 和任何 S0/S1/S2/S3 恢复点仍按各自停止线保留。该表只登记本机运维角色，不进入 canonical pair/checkpoint/session evidence。
 
@@ -354,6 +360,8 @@ checkpoint controller 必须是显式 acceptance 构建身份，以不可由 pro
 
 实现位于独立 `platforms/linux-l6-acceptance/` crate。production crate 的 `l6-acceptance-checkpoints` feature 默认关闭，production main 只连接 disabled sink，不识别 acceptance 参数；acceptance worker 通过继承 pipe 发送 typed checkpoint 并暂停。controller 创建独立 process group，命中后用固定 `/usr/bin/kill` 发送 `SIGKILL`，等待 worker signal 终止，并连续复验 `/proc/*/stat` 中 group member 为零且没有 `dpkg` child，满足全部条件后才允许写 evidence。`crash` 命令还必须同时具备 `--authorized-l6-crash` 与 production mutation/data-preservation 授权；本节仍不构成运行授权。
 
+首个实机case没有通过。`prepared` checkpoint与process-group终止证据有效，但后续startup读取合法stale guard时暴露共享父目录策略漂移，因此在resume前停止。失败现场不得通过替换FFI或改写期望tuple继续；只有包含修复的新release pair、新absent clone与新的逐case授权才能重新开始`install_prepared`，其通过后才可进入`install staged`。
+
 ## 8. 系统、字体与 startup probe
 
 ### Package 与 process
@@ -405,7 +413,7 @@ guest-agent push 到达guest后的owner/mode也不是可信输入；既有第六
 
 UTM 磁盘配置使用空 `Network` 数组也不能单独证明 guest 运行态断网；删除整个必填键会使 UTM 4.7.5 冷加载失败，注册缓存仍可能在首次启动挂回虚拟网卡并取得 DHCP。每次启动后、写入 artifact input 或生成 operation ID 前，都必须在 guest 内复验目标接口 down 且 IPv4/IPv6 路由为空；任一网络状态不明立即停止，不把后续断网状态倒推成“从启动起全程离线”。
 
-前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个在 target validation 失败后自动恢复 source，terminal `rolled_back`。这些现场均停止并原样保留，不得热替换、恢复、跨 pair 混搭或原地重试。第六套已形成 target `completed` terminal与S3；三台repair clone依次冻结为`aborted_preserved`、`completed_without_package_reapply`和真实`repair/same_release/completed`，后者有同版dpkg重装与XDG零漂移证据。第三台rollback、独立remove和独立reinstall clone又以各自唯一production invocation形成`rollback/target_older/completed`、`remove/not_applicable/completed`与`install/not_applicable/completed`；六类真实operation因此均已有独立证据，但它们不是同一连续session。所有clone只作终态取证，不再调用或复用；八个crash/retry仍须逐case授权。
+前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个为`rolled_back`，第六套形成target `completed`与S3。独立clone又闭合真实repair、rollback、remove和reinstall，六类operation已有分散证据但不是同一session。首个`install_prepared` checkpoint只形成失败关闭证据并暴露startup `01777`策略漂移，不计通过；旧pair和两台crash clone不再调用或复用。下一步先重建修复后的pair，再逐case授权从新clone重启八个crash/retry。
 
 ## 10. L6 完成与后续
 
