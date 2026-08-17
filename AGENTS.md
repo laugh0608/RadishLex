@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 源码、L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 合同已闭合。第五套为 `rolled_back`，第六套为 target `completed`；真实 repair/rollback/remove 已依次闭合。独立 reinstall clone 的 absent-terminal 只读资格已通过并冻结，真实 reinstall 尚未开始；十七台 VM 全停。v1 package不含RadishLex maintainer scripts。
+- production 源码、L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 合同已闭合。第五套为 `rolled_back`，第六套为 target `completed`；真实 repair/rollback/remove/reinstall 已依次闭合，六类 operation 均有独立证据。连续完整 L6 与八个 crash/retry 尚未闭合；十七台 VM 全停。v1 package不含RadishLex maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -60,7 +60,7 @@
 - state 使用 root-owned receipt、`receipt.json.tmp`/stage tmp 恢复、精确 current required slots、原子 mode 与父目录 `fsync`；guard 是 mode `0600`、零长度、单 link regular file 上的 advisory exclusive lock，不是 Unix socket。共享锁父目录只接受非 world-writable 或 root-owned 精确 `01777` sticky mode。
 - 旧 operation v1 只保留结构与 pair metadata，不存历史 hash proof，也不用于当前恢复。任何未知、半配置、身份/owner/mode/link/hash 漂移均失败关闭并保留现场。
 - production executor 只接受固定 `/usr/bin/dpkg`、typed argv、清空环境、null stdin、超时和有界诊断；system observer/port 复验 root identity、actual staging、依赖/版本、`/proc/*/maps` 静止与完整安装结果。外部 scripts/triggers 不能代表 transaction completed。
-- 维护 command 是 opaque 类型，CLI 要求精确 operation ID、root-owned 同名 package/evidence 与双显式授权。startup 连接 terminal actual package/dependency；L6 固定独立 guest、相邻 revision、六步主序列和八个 crash checkpoint。新 operation 的 source artifact 必须与前一 terminal receipt 的 installed artifact 精确相同；同版本重建字节不能替代 chain anchor。release-pair builder 只冻结 contract 指定的 prior-terminal source package/evidence，只从单一 clean target 构建，并由 target production Rust verifier 逐侧解析。真实 source install、dpkg、字体与 startup 已取证；剩余主序列与 crash/retry 尚未执行。
+- 维护 command 是 opaque 类型，CLI 要求精确 operation ID、root-owned 同名 package/evidence 与双显式授权。startup 连接 terminal actual package/dependency；L6 固定独立 guest、相邻 revision、六步主序列和八个 crash checkpoint。新 operation 的 source artifact 必须与前一 terminal receipt 的 installed artifact 精确相同；同版本重建字节不能替代 chain anchor。release-pair builder 只冻结 contract 指定的 prior-terminal source package/evidence，只从单一 clean target 构建，并由 target production Rust verifier 逐侧解析。六类真实 operation 已分别取证；不得冒充同一连续 session，八个 crash/retry 仍未执行。
 - 不要把 RadishLex 做成云端实时输入法 API，也不要让同步后端进入按键热路径。
 
 ## 实机与系统边界
@@ -85,4 +85,4 @@
 
 1. 保留前四个 stopped L6 failure/mismatch disk 与全部 pair/handoff/S0/S1/S2/WAL-drift 资产，并原样保留第五套 `rolled_back` clone、staging、两套 preflight 与 upgrade failure/recovery evidence；不热替换、覆盖、恢复或清理。
 2. 第五套只执行过一次 upgrade：target `38-2` 安装后在 production target validation 失败，自动恢复 source `38-1`；receipt 为 `rolled_back`、`manual_recovery_required=false`，XDG 零漂移，当前 config/EFI/qcow2 为 `402a…3e9`/`cb8a…bd65`/`e684…8904`。精确失败条件已离线定位为 startup manifest 独立固定 revision `1`，不得启动或重试该 clone。
-3. 第六套upgrade、三台repair、第三台rollback与remove terminal均冻结。独立reinstall clone `E671DB9C…D465`的唯一只读attempt为`passed/postflight`，证据`8ed9d43a…86b25`闭合package/product tree absent、remove receipt chain 4、依赖/字体、`RemovedProgram` startup、XDG、进程与断网；未生成operation ID或执行maintenance/acceptance/dpkg/reinstall。host manifest `a98dbec6…5006a`；关机盘`db1e…13b90`/`d9bd…97463`/`cdf0…72dd`两次一致，remove/v3/S3未漂移、四盘零句柄且十七台stopped。下一步须另行授权只在该clone重新闭合mutation preflight并单次执行真实`reinstall_target`。P05C、发布、推送、清理、真实同步及其他平台保持关闭。
+3. 第六套upgrade、三台repair、第三台rollback、remove与reinstall terminal均冻结。`E671DB9C…D465`的mutation preflight `fca225a7…3a01`通过；唯一production调用形成`install/not_applicable/completed` receipt `3eb44171…e274c`、chain 5，target `38-2`、startup、XDG和断网postflight均通过。host manifest `54f1e952…6685`；关机盘`db1e…13b90`/`7675…a1c3`/`feb2…aaa5`两次一致，remove/v3/S3未漂移、四盘零句柄且十七台stopped。下一步须另行逐case授权准备八个crash/retry，先从`install_prepared`独立clone/snapshot开始；连续完整L6、P05C、发布、推送、清理、真实同步及其他平台保持关闭。

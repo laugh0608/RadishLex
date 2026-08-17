@@ -15,7 +15,7 @@
 
 ## 当前执行状态
 
-截至 2026-08-16：
+截至 2026-08-17：
 
 - production transaction/startup 代码、actual `.deb` verifier 和 fake command/crash matrix 已完成；
 - L6 guest、release pair、六步事务顺序、八个 crash checkpoint、字体/startup/XDG probe 和证据保留规则已由 format v1 固定；
@@ -70,10 +70,12 @@
 - 私有传输根、incoming脚本回读和root-owned `0600` single-link归一化均通过；正式只读preflight只执行一次，attempt/phase/terminal `5cd96f54…d079`/`f783172b…c532`/`bc65fdb0…fcbc`固定`passed/postflight`，完整证据`35f58ca3…ed12`闭合canonical pair、source/target artifact、`38-1` package、`rollback/target_older/completed` receipt、依赖/字体、startup正负向、XDG、进程/映射与断网。未创建新operation ID或执行maintenance/acceptance、dpkg、remove、Manager/Fcitx及用户XDG写入。guest archive/host manifest `14506554…d676`/`ade5743b…9dd8`已冻结；正常关机后config/EFI/qcow2 `92568d22…626a`/`4b6292f0…d726`/`91db6f02…6bab`，qcow2复算一致、三盘零句柄，rollback source与S3未漂移，十六台VM全停。
 - 后续单步授权只启动该remove clone；运行态断网与mutation preflight `0be5e2a8…7f8d`通过后，guest生成唯一operation ID而宿主只保存hash `93fc5b83…ef3d`。one-shot只调用一次production remove，形成receipt `770a27b7…b40e`：`remove/not_applicable/completed`、chain 4；dpkg delta `c5dd0066…3ad4`记录完整remove lifecycle，package、28项payload、product tree与dpkg info absent，依赖/字体及XDG指纹保持。
 - startup按`RemovedProgram`失败关闭，进程/映射与loopback-only网络静止。postflight v1只因同hash FFI位于`noexec`的`/run`失败，失败控制保留；移至`/var/tmp`后terminal evidence `eef62072…e80d`通过且未重跑maintenance。guest archive/host manifest `529ee42c…9b8e`/`be498439…97a1`已冻结；正常关机后config/EFI/qcow2 `92568d22…626a`/`abea62d2…c8fc`/`ad8a6c6b…55fa`，v3/S3未漂移、三盘零句柄且十六台VM全停。该clone现为冻结remove terminal，后续只另行授权从它建立独立reinstall clone并先做只读preflight。
+- 独立reinstall clone `E671DB9C-5E2C-447B-9425-8D91D2CFD465`的absent-terminal只读资格由evidence `8ed9d43a…86b25`与host manifest `a98dbec6…5006a`冻结；remove receipt chain 4、package/product tree absent、`RemovedProgram` startup、XDG、依赖/字体、进程与断网均通过，未创建新operation ID或执行maintenance/dpkg。
+- 后续boot的network/transfer/mutation-preflight `11c00403…be2`/`db9b3c59…3e50`/`fca225a7…3a01`通过后，guest生成唯一operation ID，宿主只保存hash `fafb05ad…79c8`。one-shot只调用一次production `reinstall_target`，receipt `3eb44171…e274c`为`install/not_applicable/completed`、chain 5；1,512-byte dpkg delta `b0338d25…116a`、完整payload、startup、XDG零漂移与strict postflight `b4bf57ba…09f93`通过。guest archive/host manifest为`4ea296fa…fd3ba`/`54f1e952…6685`；关机盘`db1e59ae…13b90`/`76753750…a1c3`/`feb2ba7e…aaa5`稳定，remove/rollback v3/S3未漂移、四盘零句柄且十七台VM全停。该clone现为冻结reinstall terminal，不resume、重试、再次调用、清理或复用。
 
 ### 当前本地资产登记（非发布证据）
 
-冻结资产宿主根为 `/Users/luobo/VirtualMachines`；第四、第五、第六套、三台 repair clone、第二/第三台rollback clone与独立remove clone package 位于 UTM 默认 Documents 目录。第五套为 `rolled_back` failure/recovery 现场；第六套已形成 target `completed` terminal与未改写 S3；三台 repair clone依次冻结为 staged-preflight `aborted_preserved`、`completed_without_package_reapply`与真实`completed`现场，第二台rollback clone冻结为transfer-setup failed-closed现场，均不得复用。第三台rollback clone为source `38-1` terminal；独立remove clone现已形成真实`remove/not_applicable/completed`并作为absent terminal冻结。首台rollback package已按授权删除，只保留host证据。plain `utmctl` 枚举十六台且全部 stopped。`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。前五个 failure/mismatch/rolled-back 现场、三台 repair clone与第二台rollback clone只作取证；第六套原现场和S3继续只作真相源。后续只允许另行授权从冻结remove terminal建立独立reinstall clone并先做只读preflight，其他资产不得复用。全部 handoff、snapshot 与host evidence继续保留且不得混用。UTM只使用`PATH`中的plain `utmctl`，任何时刻最多运行一台VM。
+冻结资产宿主根为 `/Users/luobo/VirtualMachines`；第四、第五、第六套、三台 repair clone、第二/第三台rollback clone与独立remove/reinstall clone package 位于 UTM 默认 Documents 目录。第五套为 `rolled_back` failure/recovery 现场；第六套已形成 target `completed` terminal与未改写 S3；三台 repair clone依次冻结为 staged-preflight `aborted_preserved`、`completed_without_package_reapply`与真实`completed`现场，第二台rollback clone冻结为transfer-setup failed-closed现场，均不得复用。第三台rollback、remove与reinstall clone分别为source、absent和target terminal。首台rollback package已按授权删除，只保留host证据。plain `utmctl` 枚举十七台且全部 stopped。`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。前五个 failure/mismatch/rolled-back 现场、所有 terminal clone、第六套原现场和S3都只作真相源，不启动、重试、清理或复用。全部 handoff、snapshot 与host evidence继续保留且不得混用。UTM只使用`PATH`中的plain `utmctl`，任何时刻最多运行一台VM。
 
 | 相对路径 | UTM 状态 | 唯一职责与保留线 |
 | --- | --- | --- |
@@ -127,6 +129,7 @@
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-80e49ce-rollback-v2.utm` | 已注册；transfer setup failed-closed stopped | UUID `BFB3EF09-2F13-4F75-9909-1F3EE2432720`；运行态断网、package/receipt与进程静止通过，私有传输根建立后触发`root-identity`断言，正式preflight未开始。关机后config/EFI/qcow2 `5258c84a…005`/`a73a3266…9155`/`1d20869b…57b`，qcow2复算一致且零句柄；不启动、重试、诊断、恢复、清理或复用 |
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-80e49ce-rollback-v3.utm` | 已注册；rollback completed stopped | UUID `EFD15599-7177-4D55-BF17-173EE1F0BBDD`；唯一production invocation形成`rollback/target_older/completed`，package精确回到source `38-1`、operation count 3，startup/XDG postflight通过。关机后config/EFI/qcow2 `6295c4ed…29ae`/`3b117def…a8f0`/`9a28509a…995a`，qcow2复算一致且零句柄；不resume、重试、再次调用、清理或直接复用，后续只作remove clone的registered terminal来源 |
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-80e49ce-remove.utm` | 已注册；remove completed stopped | UUID `5EA2BAA2-B9A1-46CC-B496-B37826DD27A2`；唯一production invocation形成`remove/not_applicable/completed`，operation count 4，package/product tree absent、startup失败关闭、XDG不变。关机后config/EFI/qcow2 `92568d22…626a`/`abea62d2…c8fc`/`ad8a6c6b…55fa`，qcow2复算一致且零句柄；不resume、重试、再次调用、清理或直接复用，后续只作独立reinstall clone的registered terminal来源 |
+| `UTM Documents/RadishLex-Debian13-ARM64-L6-80e49ce-reinstall.utm` | 已注册；reinstall completed stopped | UUID `E671DB9C-5E2C-447B-9425-8D91D2CFD465`；唯一production invocation形成`install/not_applicable/completed`，operation count 5，target `38-2`完整恢复、startup与XDG postflight通过。关机后config/EFI/qcow2 `db1e59ae…13b90`/`76753750…a1c3`/`feb2ba7e…aaa5`，qcow2复算一致且零句柄；不resume、重试、再次调用、清理、恢复或复用 |
 
 两个在 QEMU 引导前因缓存 2222 转发失败、从未运行 guest 的旧 PairBuilder clone 已在单独授权后从 UTM 注册表和磁盘删除；它们不含 package transaction 或 canonical evidence。当前资产仍各有独立职责，不因 UTM 面板是否显示而删除。L6 闭合后可另行授权评估剩余 builder、DependencyFrozen 与 host handoff 的保留期；P04、CleanBase、四个 failure/mismatch L6 和任何 S0/S1/S2/S3 恢复点仍按各自停止线保留。该表只登记本机运维角色，不进入 canonical pair/checkpoint/session evidence。
 
@@ -267,6 +270,14 @@ Manager/Fcitx startup均为`FailedClosed + RemovedProgram + completed`，XDG fin
 
 host evidence目录`RadishLex-L6-Remove-80e49ce`从absent staging原子发布，目录`0700`，`files.sha256`为`be498439…97a1`并覆盖其余36项，逐项hash全过。宿主冻结脚本的内嵌`utmctl list`曾退出134并留下零长度registered文件；plain direct枚举仍得到相同十六台stopped清单，替换后由host summary明确记录并完成发布，未改变guest、transaction或磁盘。正常request关机后clone config/EFI/qcow2为`92568d22…626a`/`abea62d2…c8fc`/`ad8a6c6b…55fa`，qcow2复算一致；rollback v3与S3三项未漂移、三盘零句柄且十六台VM全停。该clone已是冻结remove terminal，不resume、重试、再次调用、清理或直接复用；后续只另行授权从它建立独立reinstall clone并先做只读preflight。
 
+独立reinstall clone的先前只读资格由`8ed9d43a…86b25`/`a98dbec6…5006a`冻结。真实mutation从clean `c5b6631`、该manifest、十七台VM全停和四盘零句柄开始；只启动`E671DB9C…D465`。文件回读network evidence `11c00403…be2`固定boot `3e278249…623d`、仅`lo`、IPv4/IPv6 main route为空、package absent与remove receipt chain 4；transfer gate `db9b3c59…3e50`再固定控制文件为root-owned `0600` single-link及精确size/hash。
+
+正式mutation preflight `fca225a7…3a01`为`passed/postflight/reason=none`，闭合canonical pair/target artifact、28项payload/product tree/dpkg info absent、direct dpkg status/log、依赖/字体、`RemovedProgram` startup、XDG `f3df287f…b86b`、WAL/SHM/profile absence、进程/映射与断网；此时仍未创建新operation ID或执行maintenance/acceptance/dpkg mutation。guest随后生成唯一operation ID，宿主只保存hash `fafb05ad…79c8`；不可重复wrapper只调用一次production `reinstall_target`，exit 0、stderr空、stdout精确为`maintenance_outcome=completed`，没有retry、resume、acceptance或手工dpkg。
+
+receipt `3eb44171…e274c`、3,926 bytes，为`install/not_applicable/completed`、chain 5、staged target only、target proof installed、failure null、manual recovery false。package为target `38-2`，dpkg status `c09365b3…cece`；log增长至`906fba41…560c`/887,476 bytes，1,512-byte delta `b0338d25…116a`只记录absent→target install/configure/installed与发行版triggers。target MD5 inventory `bc36eff3…71f1`的28项完整通过。
+
+strict postflight `b4bf57ba…09f93`闭合target manifest/双FFI、依赖/字体、startup正负向、XDG零漂移、进程/映射与loopback-only。脱敏guest archive `4ea296fa…fd3ba`为81,920 bytes、19项；host目录`RadishLex-L6-Reinstall-80e49ce`从absent staging原子发布，manifest `54f1e952…6685`覆盖其余34项并排除raw operation ID、raw receipt/status/full log。正常request关机后clone config/EFI/qcow2为`db1e59ae…13b90`/`76753750…a1c3`/`feb2ba7e…aaa5`，qcow2两次复算一致；remove、rollback v3与S3未漂移，四盘零句柄且十七台VM全停。该clone为冻结reinstall terminal，不resume、重试、再次调用、清理、恢复或复用。
+
 ## 4. 证据 envelope
 
 每个 crash case 先由 controller 产生一个 `radishlex-linux-l6-checkpoint-evidence-v1` canonical JSON envelope；完整 L6 session 再把八份 checkpoint envelope 与主序列/probe 结果收敛进唯一 session envelope。session 至少绑定：
@@ -394,7 +405,7 @@ guest-agent push 到达guest后的owner/mode也不是可信输入；既有第六
 
 UTM 磁盘配置使用空 `Network` 数组也不能单独证明 guest 运行态断网；删除整个必填键会使 UTM 4.7.5 冷加载失败，注册缓存仍可能在首次启动挂回虚拟网卡并取得 DHCP。每次启动后、写入 artifact input 或生成 operation ID 前，都必须在 guest 内复验目标接口 down 且 IPv4/IPv6 路由为空；任一网络状态不明立即停止，不把后续断网状态倒推成“从启动起全程离线”。
 
-前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个在 target validation 失败后自动恢复 source，terminal `rolled_back`。这些现场均停止并原样保留，不得热替换、恢复、跨 pair 混搭或原地重试。第六套已形成 target `completed` terminal与S3；其前两台repair clone分别因旧production staged verifier缺口形成`aborted_preserved`、因健康product validation短路形成`completed_without_package_reapply`。源码、refresh ancestry门禁与`823afca` ARM64 handoff闭合后，第三台clone的唯一调用已形成真实`repair/same_release/completed`、同版dpkg重装和XDG零漂移证据。三台repair clone均只作终态取证，不再调用或复用。首台rollback clone在必需result缺失后失败关闭，VM已授权删除而host证据保留；第二台运行态断网通过，却在正式preflight前因传输根`root-identity`断言失败关闭，不得启动、重试、诊断或复用。第三台先按目录/普通文件分离、传输mode归一化与分阶段terminal result合同形成唯一`passed/postflight`只读证据，后续唯一production invocation已形成真实`rollback/target_older/completed`、`38-2 → 38-1` dpkg降级、source payload精确恢复和XDG零漂移。独立remove clone随后以唯一production invocation形成`remove/not_applicable/completed`，package/product tree absent、startup按`RemovedProgram`失败关闭且XDG零漂移；下一步只另行授权从该stopped terminal建立独立reinstall clone并先做只读preflight，真实reinstall与crash/retry仍需逐次授权。
+前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个在 target validation 失败后自动恢复 source，terminal `rolled_back`。这些现场均停止并原样保留，不得热替换、恢复、跨 pair 混搭或原地重试。第六套已形成 target `completed` terminal与S3；三台repair clone依次冻结为`aborted_preserved`、`completed_without_package_reapply`和真实`repair/same_release/completed`，后者有同版dpkg重装与XDG零漂移证据。第三台rollback、独立remove和独立reinstall clone又以各自唯一production invocation形成`rollback/target_older/completed`、`remove/not_applicable/completed`与`install/not_applicable/completed`；六类真实operation因此均已有独立证据，但它们不是同一连续session。所有clone只作终态取证，不再调用或复用；八个crash/retry仍须逐case授权。
 
 ## 10. L6 完成与后续
 
