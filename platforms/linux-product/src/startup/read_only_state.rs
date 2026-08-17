@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 
+use crate::filesystem_policy::parent_permissions_are_safe;
 use crate::model::{
     ArtifactFileIdentity, ArtifactSlot, LinuxInstallReceipt, LinuxInstallRootIdentity,
     LinuxInstallState, StagedArtifactEvidence, MAX_LINUX_INSTALL_RECEIPT_BYTES,
@@ -279,7 +280,7 @@ fn validate_parent(
     path: &Path,
     owner_id: u32,
     group_id: u32,
-    allow_group_write: bool,
+    allow_shared_lock_parent: bool,
 ) -> Result<(), StartupInspectionError> {
     let canonical =
         fs::canonicalize(path).map_err(|error| StartupInspectionError::from_io(&error))?;
@@ -290,11 +291,10 @@ fn validate_parent(
     }
     let metadata =
         fs::symlink_metadata(path).map_err(|error| StartupInspectionError::from_io(&error))?;
-    let unsafe_write_bits = if allow_group_write { 0o002 } else { 0o022 };
     if !metadata.file_type().is_dir()
         || metadata.uid() != owner_id
         || metadata.gid() != group_id
-        || metadata.mode() & unsafe_write_bits != 0
+        || !parent_permissions_are_safe(metadata.mode() & 0o7777, allow_shared_lock_parent)
     {
         return Err(StartupInspectionError::new(
             LinuxStartupReason::PermissionDenied,

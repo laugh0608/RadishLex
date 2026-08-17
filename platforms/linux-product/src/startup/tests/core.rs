@@ -362,6 +362,51 @@ fn guard_regular_file_identity_is_strictly_read_only_validated() {
 }
 
 #[test]
+fn guard_parent_uses_the_shared_lock_permission_contract() {
+    let site = TestSite::new("guard-parent-permissions");
+    fs::write(&site.paths.guard_path, b"").expect("create guard file");
+    fs::set_permissions(&site.paths.guard_path, fs::Permissions::from_mode(0o600))
+        .expect("set guard mode");
+    let port = FakeStartupPort::new(LinuxPackageObservation::not_installed());
+
+    for mode in [0o755, 0o775, 0o1777] {
+        fs::set_permissions(&site.root, fs::Permissions::from_mode(mode))
+            .expect("set accepted guard parent mode");
+        let before = site.tree_fingerprint();
+        let outcome = inspect_linux_startup(
+            &site.paths,
+            LinuxStartupBuildIdentity::DebianSystemProduct,
+            LinuxStartupComponent::Manager,
+            &port,
+        );
+        assert_eq!(
+            outcome.decision(),
+            LinuxStartupDecision::MaintenanceRequired
+        );
+        assert_eq!(outcome.reason(), LinuxStartupReason::ActiveGuard);
+        assert_eq!(site.tree_fingerprint(), before);
+    }
+
+    for mode in [0o777, 0o1703, 0o1733, 0o1757] {
+        fs::set_permissions(&site.root, fs::Permissions::from_mode(mode))
+            .expect("set rejected guard parent mode");
+        let before = site.tree_fingerprint();
+        let outcome = inspect_linux_startup(
+            &site.paths,
+            LinuxStartupBuildIdentity::DebianSystemProduct,
+            LinuxStartupComponent::Manager,
+            &port,
+        );
+        assert_eq!(outcome.decision(), LinuxStartupDecision::FailedClosed);
+        assert_eq!(outcome.reason(), LinuxStartupReason::GuardInvalid);
+        assert_eq!(site.tree_fingerprint(), before);
+    }
+
+    assert_eq!(port.package_calls.get(), 0);
+    assert_eq!(port.component_calls.get(), 0);
+}
+
+#[test]
 fn partial_unknown_and_identity_drift_never_reach_business_initialization() {
     for state in [
         DpkgPackageState::NotInstalled,

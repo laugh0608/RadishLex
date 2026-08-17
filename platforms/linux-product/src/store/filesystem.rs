@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 
+use crate::filesystem_policy::parent_permissions_are_safe;
 use crate::model::{ArtifactFileIdentity, ArtifactSlot, MAX_LINUX_INSTALL_RECEIPT_BYTES};
 
 use super::{
@@ -111,15 +112,8 @@ pub(super) fn validate_secure_parent(
     }
     let metadata = fs::symlink_metadata(path)
         .map_err(|error| LinuxInstallStoreError::io("inspect parent directory", error))?;
-    let mode = metadata.mode() & 0o7777;
-    // Debian exposes /run/lock as root-owned 01777. The sticky bit prevents
-    // other users from replacing a root-owned 0600 guard; a pre-created
-    // non-root entry is still rejected by the guard identity checks.
-    let permissions_are_safe = if allow_shared_lock_parent {
-        mode & 0o002 == 0 || mode == 0o1777
-    } else {
-        mode & 0o022 == 0
-    };
+    let permissions_are_safe =
+        parent_permissions_are_safe(metadata.mode() & 0o7777, allow_shared_lock_parent);
     if !metadata.file_type().is_dir()
         || metadata.uid() != owner_id
         || metadata.gid() != group_id
