@@ -4,10 +4,10 @@
 
 ## 当前判断
 
-- 复核日期：2026-08-17（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
+- 复核日期：2026-08-18（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 已完成，六类真实operation均有独立证据。首个`install_prepared` crash checkpoint因startup共享锁目录漂移在resume/dpkg前失败关闭；修复后的新pair已冻结，尚未建立重试clone。连续完整L6与八个crash/retry尚未闭合；十九台VM全停。
+- L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 已完成，六类真实operation均有独立证据。首个`install_prepared` checkpoint暴露的startup共享锁目录漂移已修复，新pair已冻结；首台新pair重试clone又因host harness输入清单不一致在input switch/preflight前失败关闭。连续完整L6与八个crash/retry尚未闭合。
 
 ## 冻结基线与固定边界
 
@@ -24,7 +24,8 @@
 - reinstall clone `E671DB9C…D465`唯一production调用形成`install/not_applicable/completed` receipt `3eb44171…e274c`、chain 5，target `38-2`完整恢复且startup/XDG/断网postflight通过。guest/host evidence为`4ea296fa…fd3ba`/`54f1e952…6685`；terminal与关机盘已冻结，精确过程见runbook/devlog。
 - 首个crash的第一次clone `C0D96C0A…23A1F8`因UTM注册缓存继承网卡，在写入input前停止并只作失败资产。v2 clone `FD24ADFF…17C056`以`Network=[]`和DependencyFrozen absent盘闭合断网/preflight，唯一acceptance调用形成`install_prepared` checkpoint；operation ID宿主只存hash `9429b171…9145a`，dpkg mutation与resume均为0。
 - crash-state检查先因`/run`为`noexec`导致同hash startup probe不可映射；复制到`/var/tmp`后未重跑transaction，Manager/Fcitx均返回`0:1:4:11:0`即`FailedClosed/GuardInvalid`。guard本身为`root:root 0600`零长度单链接，父目录为canonical `root:root 01777 /run/lock`，确认startup读路径遗漏已冻结共享父目录合同。源码现让store/startup消费同一权限策略，119项默认与124项L6-feature测试通过；旧pair上的case不计通过。
-- crash失败目录manifest `5d8c914a…3e42a`与v2关机盘已冻结。修复target `d75818f`的新handoff已原子发布：record `c74fac12…9849`、target package `4dd00540…dcec`，guest双production/宿主verifier通过。builder关机盘为`1f509c73…d4f`/`ecaefd2a…0699`/`84314201…573d`，qcow2复算一致且零句柄；十九台VM全部stopped。
+- crash失败目录manifest `5d8c914a…3e42a`与v2关机盘已冻结。修复target `d75818f`的新handoff已原子发布：record `c74fac12…9849`、target package `4dd00540…dcec`，guest双production/宿主verifier通过。
+- 新pair首台重试clone `45D8205F…F2B4`从DependencyFrozen absent盘建立，`Network=[]`且运行态仅`lo`、双main route为空。92,827,648-byte bundle `f6200a49…ec9f`完整解包到incoming，但transfer expected literal未按canonical sort排列，且后续case把`build-environment.json`误写为`.evidence.json`；input switch与preflight均未发生。probe `4ebeb11c…f227`/`ecdd5540…0a89`证明无残留进程、operation ID、state、checkpoint或guard。二十台VM中仅该离线clone运行，待授权停止冻结。
 
 ## 停止线
 
@@ -32,16 +33,16 @@
 - 不重新启动、恢复、清理或复用前四个 stopped L6 failure/mismatch disk；第五套 terminal `rolled_back` 现场只作失败/恢复取证，仍不得启动、重试或复用。各套 evidence 分属不同 config/boot/receipt 身份，不得混用。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
 - 首台rollback只保留host证据；第二台只作失败关闭取证。第三台`EFD15599…BBDD`、remove clone `5EA2BAA2…27A2`与reinstall clone `E671DB9C…D465`均为冻结terminal；不得resume、重试、再次调用、清理、恢复、直接复用或用于其他矩阵。
-- 两台`install_prepared` clone也只作失败取证；不得在旧pair上resume、替换FFI、补写crash-state evidence、再次执行acceptance或用于后续case。
+- 旧pair的两台`install_prepared` clone只作失败取证；不得resume、替换FFI、补写crash-state evidence、再次执行acceptance或用于后续case。新pair首台重试clone也不得原地修补、补写input或重试，停止后作为host harness失败资产冻结。
 - 新`d75818f` handoff只允许作为后续独立clone的冻结输入；不得覆盖、热替换到旧clone、直接执行宿主ELF或与旧pair跨套混搭。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步（2026-08-17）
+## 下一步（2026-08-18）
 
-1. startup策略修复与新`d75818f` release pair已闭合；旧`80e49ce` pair和两台crash clone继续冻结，不resume、热替换或把失败证据写成通过。
-2. 另行授权后，只从未改写DependencyFrozen absent盘建立新clone，先闭合注册身份、运行态断网、input switch与只读/mutation preflight；通过前不生成operation ID或运行acceptance。之后再单独授权从头执行一次`install_prepared`。
+1. 停止并保留`45D8205F…F2B4`，不得把完整解包或guest-agent空输出写成transfer/preflight通过；修正canonical inventory、`build-environment.json`路径，并让host只以回读result/evidence判断guest结果。
+2. 只从未改写DependencyFrozen absent盘另建新clone，重新闭合注册身份、运行态断网、input switch与只读/mutation preflight；通过前不生成operation ID或运行acceptance。之后再单独授权从头执行一次`install_prepared`。
 3. 连续完整L6、guest reboot、dynamic preload/错误sibling、外部package lifecycle、P05C、桌面启动、清理、发布、推送、真实同步及其他平台继续关闭；不得用六类分散operation证据冒充完整session。
 
 ## 验证入口
