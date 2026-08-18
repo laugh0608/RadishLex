@@ -270,7 +270,7 @@ M5-P04 已覆盖：
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
 - P04 已按 `docs/linux-manager-local-acceptance.md` 冻结完成，不重复其导入导出、同库和重启实机；既有 guest 资产不得清理、覆盖或改作 P05 载体。
-- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、恢复事务、production port/CLI、startup gate、L6 format/controller 和 ARM64 pair 已完成；前五套现场只作取证。第六套upgrade与S3、第三台真实repair、独立rollback、默认remove与reinstall terminal均已冻结。旧pair首个`install_prepared`只形成`GuardInvalid`失败关闭证据；`d75818f` pair两台retry又分别在input与preflight阶段失败，均无transaction且已停止。当前二十一台VM全部stopped；随后只可修正fresh-absent预期并另建clean clone，逐步闭合注册、断网、input与preflight后，再单独授权一次`install_prepared`。未获逐步授权不能运行maintenance/acceptance CLI、`dpkg`、产品进程或写真实系统。
+- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、恢复事务、production port/CLI、startup gate、L6 format/controller 和 ARM64 pair 已完成；前五套现场只作取证。第六套upgrade与S3、第三台真实repair、独立rollback、默认remove与reinstall terminal均已冻结。旧pair首个`install_prepared`只形成`GuardInvalid`失败关闭证据；`d75818f` pair两台retry又分别在input与preflight阶段失败，均无transaction。低价值失败clone在持久归档后已按授权删除，当前十七台VM全部stopped；随后只可修正fresh-absent预期并另建clean clone，逐步闭合注册、断网、input与preflight后，再单独授权一次`install_prepared`。未获逐步授权不能运行maintenance/acceptance CLI、`dpkg`、产品进程或写真实系统。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。
