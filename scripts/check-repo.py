@@ -330,13 +330,14 @@ REQUIRED_FILES = [
     "apps/radishlex-manager/tool/ffi_bridge_smoke.dart",
     "apps/radishlex-manager/test/widget_test.dart",
 ]
-REQUIRED_STATUS_CHECKS = {
+PR_QUALITY_COMPONENTS = {
     "Repo Hygiene",
     "Repository Baseline",
     "Rust Clippy",
     "Flutter Manager",
     "Go Quality",
 }
+REQUIRED_STATUS_CHECKS = {"Candidate Quality"}
 CONVENTIONAL_COMMIT_PATTERN = "^(feat|fix|docs|refactor|test|chore|ci|build|perf|revert)(\\([a-z0-9._/-]+\\))?!?: .+"
 
 
@@ -589,10 +590,20 @@ def check_ruleset_and_workflows() -> None:
     if commit_message_pattern(ruleset) != CONVENTIONAL_COMMIT_PATTERN:
         raise SystemExit("ruleset conventional commit pattern does not match repository convention")
 
+    pull_request_rule = next(
+        (rule for rule in ruleset.get("rules", []) if rule.get("type") == "pull_request"),
+        None,
+    )
+    approving_review_count = (pull_request_rule or {}).get("parameters", {}).get(
+        "required_approving_review_count"
+    )
+    if approving_review_count != 0:
+        raise SystemExit("ruleset must not require extra approval during single-maintainer stage")
+
     pr_workflow = read_text(".github/workflows/pr-check.yml")
     if not pr_workflow.startswith("name: PR Checks\n"):
         raise SystemExit("pr-check workflow must use the PR Checks name")
-    for context in REQUIRED_STATUS_CHECKS:
+    for context in PR_QUALITY_COMPONENTS | REQUIRED_STATUS_CHECKS:
         if f"name: {context}" not in pr_workflow:
             raise SystemExit(f"pr-check workflow is missing job name: {context}")
     if "push:" in pr_workflow or "workflow_dispatch:" in pr_workflow:
@@ -606,6 +617,16 @@ def check_ruleset_and_workflows() -> None:
         raise SystemExit("pr-check workflow must not run for main pull requests")
     if "git diff --check" not in pr_workflow:
         raise SystemExit("pr-check workflow must check PR diff whitespace")
+
+    candidate_quality_needs = """    needs:
+      - repo-hygiene
+      - repository-baseline
+      - rust-clippy
+      - flutter-manager
+      - go-quality
+"""
+    if candidate_quality_needs not in pr_workflow:
+        raise SystemExit("pr-check Candidate Quality dependencies drifted")
 
     release_workflow = read_text(".github/workflows/release-check.yml")
     forbidden_release_triggers = ("pull_request:", "branches:", "workflow_dispatch:")

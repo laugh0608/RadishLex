@@ -134,3 +134,53 @@ jobs:
       - name: Test sync server with race detector
         working-directory: server/sync-server
         run: go test -race ./...
+
+  candidate-quality:
+    name: Candidate Quality
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - repo-hygiene
+      - repository-baseline
+      - rust-clippy
+      - flutter-manager
+      - go-quality
+    steps:
+      - name: Summarize PR quality gate
+        shell: bash
+        env:
+          REPO_HYGIENE_RESULT: ${{ needs.repo-hygiene.result }}
+          REPOSITORY_BASELINE_RESULT: ${{ needs.repository-baseline.result }}
+          RUST_CLIPPY_RESULT: ${{ needs.rust-clippy.result }}
+          FLUTTER_MANAGER_RESULT: ${{ needs.flutter-manager.result }}
+          GO_QUALITY_RESULT: ${{ needs.go-quality.result }}
+        run: |
+          failed=false
+          {
+            echo "## PR Quality Gate"
+            echo
+            echo "| Check | Result |"
+            echo "| --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          append_result() {
+            local check_name="$1"
+            local check_result="$2"
+            echo "| ${check_name} | ${check_result} |" >> "$GITHUB_STEP_SUMMARY"
+            if [[ "${check_result}" != "success" ]]; then
+              failed=true
+            fi
+          }
+
+          append_result "Repo Hygiene" "${REPO_HYGIENE_RESULT}"
+          append_result "Repository Baseline" "${REPOSITORY_BASELINE_RESULT}"
+          append_result "Rust Clippy" "${RUST_CLIPPY_RESULT}"
+          append_result "Flutter Manager" "${FLUTTER_MANAGER_RESULT}"
+          append_result "Go Quality" "${GO_QUALITY_RESULT}"
+
+          if [[ "${failed}" == "true" ]]; then
+            echo "One or more PR quality components did not succeed." >&2
+            exit 1
+          fi
+
+          echo "All PR quality components succeeded."
