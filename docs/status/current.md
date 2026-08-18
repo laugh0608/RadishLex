@@ -39,9 +39,9 @@
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步（2026-08-18）
+## 下一步（2026-08-19）
 
-1. 开发继续时，把case的fresh absent startup预期固定为`FailedClosed/ReceiptMissing/no receipt`，保留remove-terminal `RemovedProgram/Completed`为独立场景；再从未改写DependencyFrozen absent盘另建clone，重闭合注册、断网、input与mutation preflight。通过前不生成operation ID或运行acceptance，之后再单独授权一次`install_prepared`。
+1. 开发继续时，先把fresh absent的`FailedClosed/ReceiptMissing/no receipt`与remove-terminal的`RemovedProgram/Completed`拆成committed离线harness回归，并同时固定canonical input inventory与`build-environment.json`命名；门禁通过后再从未改写DependencyFrozen absent盘另建clone，重闭合注册、断网、input与mutation preflight。通过前不生成operation ID或运行acceptance，之后再单独授权一次`install_prepared`。
 2. 第二批repair历史clone `A3022255…3107`/`BE3579E0…37F8`仍含独立真实operation，只作后续清理候选；没有新的精确授权不得删除。DependencyFrozen、builder、terminal、旧pair真实checkpoint与前四套L6现场继续保留。
 3. 连续完整L6、guest reboot、dynamic preload/错误sibling、外部package lifecycle、P05C、桌面启动、进一步清理、发布、推送、真实同步及其他平台继续关闭；不得用六类分散operation证据冒充完整session。
 
