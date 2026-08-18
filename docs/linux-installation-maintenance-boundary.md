@@ -396,7 +396,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 
 修复target `d75818f`的新pair只在唯一离线ARM64 builder中构建一次。外层网卡down、双main route为空；user/network namespace内loopback down、零路由且`CARGO_NET_OFFLINE=true`，Cargo/pub/Flutter冻结cache前后稳定。record `c74fac12…9849`、canonical USTAR `bbc96507…b4db`和八文件mode/link/hash经guest Python、双production Rust及宿主Python verifier一致通过，再从absent incoming以内核级no-replace rename发布`RadishLex-L6-Handoff-d75818f`。builder package/state始终absent，未运行maintenance/acceptance/dpkg；关机盘已冻结。
 
-新pair首台retry `45D8205F…F2B4`因host inventory未按canonical sort且case误写build-environment文件名，在input switch前失败并已停止。第二台`0BB24317…307C`使用修正版transfer闭合断网与input switch，但preflight把fresh absent错误预期成remove-terminal `RemovedProgram/Completed`；target startup gate实际对Manager/Fcitx均返回`FailedClosed/ReceiptMissing/no receipt`，与源码合同一致。failure manifest `66212f2c…a8a3e`绑定实际tuple、phase failure与guest state；mutation preflight evidence、operation ID、state、checkpoint、guard及transaction均absent。该clone是二十一台VM中唯一started且保持离线，须先另行授权停止冻结；两台retry均不得原地修补或复用。
+新pair首台retry `45D8205F…F2B4`因host inventory未按canonical sort且case误写build-environment文件名，在input switch前失败并已停止。第二台`0BB24317…307C`使用修正版transfer闭合断网与input switch，但preflight把fresh absent错误预期成remove-terminal `RemovedProgram/Completed`；target startup gate实际对Manager/Fcitx均返回`FailedClosed/ReceiptMissing/no receipt`，与源码合同一致。failure manifest `66212f2c…a8a3e`绑定实际tuple、phase failure与guest state；mutation preflight evidence、operation ID、state、checkpoint、guard及transaction均absent。正常关机freeze `65157b95…cb2b`固定磁盘双重哈希与零句柄，二十一台VM全部stopped；两台retry均不得原地修补或复用，删除前还须把临时证据归档到持久host root并另行授权。
 
 `./scripts/check-linux-l6-controller.sh` 编译 production feature 边界与独立 acceptance crate，并运行八点中断/恢复、无重复 mutation、target validation acceptance rejection、参数授权、进程组顺序、无 dpkg child、canonical/redaction 与源码边界正负向测试。它只使用 fake port/backend 和临时目录，不运行 acceptance/maintenance executable，不写 fixed evidence root，也不证明 Linux process group 或 dpkg lifecycle 已实测。
 
@@ -410,7 +410,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash checkpoint暴露的startup共享锁父目录漂移已修复并冻结`d75818f` pair；新pair两台retry又分别在input switch前和preflight内失败关闭，均未进入transaction。当前二十一台VM中仅第二台retry离线运行，须先授权停止冻结；之后只可修正fresh-absent预期并另建clean clone。连续完整L6、process/external lifecycle与P05C继续关闭。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash checkpoint暴露的startup共享锁父目录漂移已修复并冻结`d75818f` pair；新pair两台retry又分别在input switch前和preflight内失败关闭，均未进入transaction且已停止。当前二十一台VM全部stopped；清理须按持久证据与唯一职责另行授权，开发下一步仍只可修正fresh-absent预期并另建clean clone。连续完整L6、process/external lifecycle与P05C继续关闭。
 
 ## 实机授权边界
 

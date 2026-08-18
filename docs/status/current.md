@@ -25,7 +25,7 @@
 - 首个crash的第一次clone `C0D96C0A…23A1F8`因UTM注册缓存继承网卡，在写入input前停止并只作失败资产。v2 clone `FD24ADFF…17C056`以`Network=[]`和DependencyFrozen absent盘闭合断网/preflight，唯一acceptance调用形成`install_prepared` checkpoint；operation ID宿主只存hash `9429b171…9145a`，dpkg mutation与resume均为0。
 - crash-state检查先因`/run`为`noexec`导致同hash startup probe不可映射；复制到`/var/tmp`后未重跑transaction，Manager/Fcitx均返回`0:1:4:11:0`即`FailedClosed/GuardInvalid`。guard本身为`root:root 0600`零长度单链接，父目录为canonical `root:root 01777 /run/lock`，确认startup读路径遗漏已冻结共享父目录合同。源码现让store/startup消费同一权限策略，119项默认与124项L6-feature测试通过；旧pair上的case不计通过。
 - crash失败目录manifest `5d8c914a…3e42a`与v2关机盘已冻结。修复target `d75818f`的新handoff已原子发布：record `c74fac12…9849`、target package `4dd00540…dcec`，guest双production/宿主verifier通过。
-- 新pair首台retry `45D8205F…F2B4`因canonical inventory顺序与`build-environment.json`路径错误在input switch前停止，现已stopped并作为失败资产保留。第二台`0BB24317…307C`闭合`Network=[]`、仅`lo`、双main route为空与input switch，transfer evidence为`2e7a4272…5100`；preflight随后因case把fresh absent错误预期为remove-terminal `0:1:4:24:6`而失败，Manager/Fcitx实际均正确返回`0:1:4:15:0`即`ReceiptMissing`。manifest `66212f2c…a8a3e`及guest state `434541c5…75ae`证明mutation preflight evidence、operation ID、state、checkpoint与guard均absent，未进入acceptance/maintenance/dpkg。二十一台VM中仅第二台离线运行，待授权停止冻结。
+- 新pair首台retry `45D8205F…F2B4`因canonical inventory顺序与`build-environment.json`路径错误在input switch前停止。第二台`0BB24317…307C`闭合断网与input switch后，因case把fresh absent错误预期为remove-terminal `0:1:4:24:6`而失败；Manager/Fcitx实际均正确返回`0:1:4:15:0`即`ReceiptMissing`。manifest `66212f2c…a8a3e`及guest state `434541c5…75ae`证明mutation preflight evidence、operation ID、state、checkpoint与guard均absent，未进入acceptance/maintenance/dpkg。关机freeze `65157b95…cb2b`固定config/EFI/qcow2 `4f69bf98…6e2a`/`f762ee52…e76`/`b0ffd920…bbfe`、双重qcow2复算与零句柄；二十一台VM现全部stopped。
 
 ## 停止线
 
@@ -41,8 +41,8 @@
 
 ## 下一步（2026-08-18）
 
-1. 先经授权正常停止`0BB24317…307C`并冻结config/EFI/qcow2与零句柄，保留`66212f2c…a8a3e`现场；不得把input switch通过写成preflight通过。
-2. 把case的fresh absent startup预期固定为`FailedClosed/ReceiptMissing/no receipt`，保留remove-terminal `RemovedProgram/Completed`为独立场景；再从未改写DependencyFrozen absent盘另建clone，重闭合注册、断网、input与mutation preflight。通过前不生成operation ID或运行acceptance，之后再单独授权一次`install_prepared`。
+1. 若先清理UTM，必须逐台复验stopped、零句柄与持久host evidence；两台新pair retry的有效证据仍位于临时任务根，删除package前须先归档并另行授权。不得清理DependencyFrozen、builder、terminal、旧pair真实checkpoint或前四套L6现场。
+2. 开发继续时，把case的fresh absent startup预期固定为`FailedClosed/ReceiptMissing/no receipt`，保留remove-terminal `RemovedProgram/Completed`为独立场景；再从未改写DependencyFrozen absent盘另建clone，重闭合注册、断网、input与mutation preflight。通过前不生成operation ID或运行acceptance，之后再单独授权一次`install_prepared`。
 3. 连续完整L6、guest reboot、dynamic preload/错误sibling、外部package lifecycle、P05C、桌面启动、清理、发布、推送、真实同步及其他平台继续关闭；不得用六类分散operation证据冒充完整session。
 
 ## 验证入口
