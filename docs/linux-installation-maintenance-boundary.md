@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-截至 2026-08-17，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。第六套与独立clone已让六类真实operation分别取证。首个`install_prepared` acceptance checkpoint实机执行后，startup读取合法`root:root 01777 /run/lock`时误报`GuardInvalid`；case在resume/dpkg前失败关闭，源码现已统一store/startup父目录权限策略。修复target `d75818f`的新pair已冻结，尚未建立重试clone；连续完整L6、八个crash/retry与P05C仍未闭合。
+截至 2026-08-18，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。第六套与独立clone已让六类真实operation分别取证。首个`install_prepared` acceptance checkpoint暴露的合法`root:root 01777 /run/lock`误报已修复，target `d75818f`的新pair已冻结；其两台retry又分别因input harness与fresh-absent startup预期错误在transaction前失败关闭。连续完整L6、八个crash/retry与P05C仍未闭合。
 
 - 首个完整产品安装载体固定为 Debian 13 ARM64 的单一系统级本地 `.deb`，package 名固定为 `radishlex`；它是未发布的本地验收载体，不是 apt repository、正式 Release 或通用 Linux 安装包。
 - Fcitx addon、两份产品 FFI、Manager bundle、锁定 RimeData、desktop entry、图标和产品 manifest 由同一个 package 绑定；不拆成可独立漂移的 Manager/addon 包。
@@ -394,7 +394,9 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 
 `a6622d4`把父目录权限判定收敛为store/startup共用纯策略：非world-writable仍按既有规则接受；world-writable只接受root-owned精确`01777`，guard自身的owner/mode/type/link/size检查不放宽。startup回归接受`0755`、`0775`、`01777`并拒绝`0777`、`01703`、`01733`、`01757`，保持只读且不调用package/component observer。默认119项与L6-feature 124项Linux product测试、acceptance 10项及clippy/controller合同通过。
 
-修复target `d75818f`的新pair只在唯一离线ARM64 builder中构建一次。外层网卡down、双main route为空；user/network namespace内loopback down、零路由且`CARGO_NET_OFFLINE=true`，Cargo/pub/Flutter冻结cache前后稳定。record `c74fac12…9849`、canonical USTAR `bbc96507…b4db`和八文件mode/link/hash经guest Python、双production Rust及宿主Python verifier一致通过，再从absent incoming以内核级no-replace rename发布`RadishLex-L6-Handoff-d75818f`。builder package/state始终absent，未运行maintenance/acceptance/dpkg；关机盘已冻结且十九台VM全停。该pair尚未进入任何transaction clone。
+修复target `d75818f`的新pair只在唯一离线ARM64 builder中构建一次。外层网卡down、双main route为空；user/network namespace内loopback down、零路由且`CARGO_NET_OFFLINE=true`，Cargo/pub/Flutter冻结cache前后稳定。record `c74fac12…9849`、canonical USTAR `bbc96507…b4db`和八文件mode/link/hash经guest Python、双production Rust及宿主Python verifier一致通过，再从absent incoming以内核级no-replace rename发布`RadishLex-L6-Handoff-d75818f`。builder package/state始终absent，未运行maintenance/acceptance/dpkg；关机盘已冻结。
+
+新pair首台retry `45D8205F…F2B4`因host inventory未按canonical sort且case误写build-environment文件名，在input switch前失败并已停止。第二台`0BB24317…307C`使用修正版transfer闭合断网与input switch，但preflight把fresh absent错误预期成remove-terminal `RemovedProgram/Completed`；target startup gate实际对Manager/Fcitx均返回`FailedClosed/ReceiptMissing/no receipt`，与源码合同一致。failure manifest `66212f2c…a8a3e`绑定实际tuple、phase failure与guest state；mutation preflight evidence、operation ID、state、checkpoint、guard及transaction均absent。该clone是二十一台VM中唯一started且保持离线，须先另行授权停止冻结；两台retry均不得原地修补或复用。
 
 `./scripts/check-linux-l6-controller.sh` 编译 production feature 边界与独立 acceptance crate，并运行八点中断/恢复、无重复 mutation、target validation acceptance rejection、参数授权、进程组顺序、无 dpkg child、canonical/redaction 与源码边界正负向测试。它只使用 fake port/backend 和临时目录，不运行 acceptance/maintenance executable，不写 fixed evidence root，也不证明 Linux process group 或 dpkg lifecycle 已实测。
 
@@ -408,7 +410,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash checkpoint暴露startup共享锁父目录漂移，已在resume前失败关闭并补共享策略与回归；修复后的`d75818f` pair已冻结。十九台VM全停，全部terminal与两台crash clone冻结。下一步只可另建新absent clone并逐步授权preflight与`install_prepared`重试；旧pair不得热替换或继续。连续完整L6、process/external lifecycle与P05C继续关闭。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash checkpoint暴露的startup共享锁父目录漂移已修复并冻结`d75818f` pair；新pair两台retry又分别在input switch前和preflight内失败关闭，均未进入transaction。当前二十一台VM中仅第二台retry离线运行，须先授权停止冻结；之后只可修正fresh-absent预期并另建clean clone。连续完整L6、process/external lifecycle与P05C继续关闭。
 
 ## 实机授权边界
 
