@@ -6,6 +6,11 @@ import json
 from pathlib import Path
 from typing import Any
 
+from l6_guest_case_contract import (
+    BUILD_ENVIRONMENT_FILENAME,
+    GUEST_AGENT_TRUST_POLICY,
+    INPUT_INVENTORY_ORDER,
+)
 from product_metadata import (
     PACKAGE_ROOT,
     LinuxProductMetadata,
@@ -66,6 +71,9 @@ def expected_matrix(metadata: LinuxProductMetadata) -> dict[str, Any]:
             "operation_id_format": "lowercase-hex-32",
             "checkpoint_mechanism": "acceptance-checkpoint-process-group-stop-v1",
             "artifact_input_root": "/var/tmp/radishlex-l6-inputs",
+            "input_inventory_order": INPUT_INVENTORY_ORDER,
+            "build_environment_filename": BUILD_ENVIRONMENT_FILENAME,
+            "guest_agent_trust_policy": GUEST_AGENT_TRUST_POLICY,
             "evidence_root": "/var/tmp/radishlex-l6-evidence",
             "state_root": "/var/lib/radishlex/install-v1",
             "one_mutation_per_authorization": True,
@@ -194,6 +202,7 @@ def expected_probes() -> dict[str, Any]:
         "startup_components": ["manager", "fcitx-addon"],
         "startup_cases": [
             "installed-allowed-product",
+            "fresh-absent-failed-closed",
             "nonterminal-maintenance-required",
             "removed-failed-closed",
             "wrong-sibling-failed-closed",

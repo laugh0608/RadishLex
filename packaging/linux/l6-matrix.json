@@ -180,6 +180,7 @@
     ],
     "startup_cases": [
       "installed-allowed-product",
+      "fresh-absent-failed-closed",
       "nonterminal-maintenance-required",
       "removed-failed-closed",
       "wrong-sibling-failed-closed",
@@ -207,6 +208,9 @@
     "operation_id_format": "lowercase-hex-32",
     "checkpoint_mechanism": "acceptance-checkpoint-process-group-stop-v1",
     "artifact_input_root": "/var/tmp/radishlex-l6-inputs",
+    "input_inventory_order": "utf8-bytewise-relative-path-v1",
+    "build_environment_filename": "build-environment.json",
+    "guest_agent_trust_policy": "result-and-evidence-file-readback-v1",
     "evidence_root": "/var/tmp/radishlex-l6-evidence",
     "state_root": "/var/lib/radishlex/install-v1",
     "one_mutation_per_authorization": true,

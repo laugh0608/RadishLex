@@ -4,10 +4,10 @@
 
 ## 当前判断
 
-- 复核日期：2026-08-18（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
+- 复核日期：2026-08-19（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 已完成，六类真实operation均有独立证据。首个`install_prepared` checkpoint暴露的startup共享锁目录漂移已修复，新pair已冻结；两台新pair retry又分别暴露input harness与fresh-absent startup预期错误，均在transaction前失败关闭。连续完整L6与八个crash/retry尚未闭合。
+- L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 已完成，六类真实operation均有独立证据。首个`install_prepared` checkpoint暴露的startup共享锁目录漂移已修复，新pair已冻结；两台新pair retry分别暴露的input harness与fresh-absent startup预期错误现已收敛为committed离线guest-case合同，连续完整L6与八个crash/retry尚未闭合。
 
 ## 冻结基线与固定边界
 
@@ -19,13 +19,10 @@
 ## 当前证据
 
 - P05A carrier、production relationship、恢复事务、system port/CLI/startup gate、L6 format/controller/pair/refresh均已闭合；合成矩阵不替代真实现场。
-- 前五套failure/mismatch/`rolled_back`与两台旧repair现场原样保留。第六套形成`38-2 completed`与S3；`394217A7…B6FB`的单次真实repair完成同版重装，第三台rollback的单次production调用完成`38-2 → 38-1`。精确身份见runbook/devlog。
-- remove clone `5EA2BAA2…27A2`的one-shot单次调用形成receipt `770a27b7…b40e`：`remove/not_applicable/completed`、chain 4。28项payload/product tree均absent，startup为`RemovedProgram`，XDG零漂移；guest/host evidence为`529ee42c…9b8e`/`be498439…97a1`。
-- reinstall clone `E671DB9C…D465`唯一production调用形成`install/not_applicable/completed` receipt `3eb44171…e274c`、chain 5，target `38-2`完整恢复且startup/XDG/断网postflight通过。guest/host evidence为`4ea296fa…fd3ba`/`54f1e952…6685`；terminal与关机盘已冻结，精确过程见runbook/devlog。
-- 首个crash的第一次clone `C0D96C0A…23A1F8`因UTM注册缓存继承网卡，在写入input前停止；其package已在持久证据逐项复验后按授权删除。v2 clone `FD24ADFF…17C056`仍保留，以`Network=[]`和DependencyFrozen absent盘闭合断网/preflight，唯一acceptance调用形成`install_prepared` checkpoint；operation ID宿主只存hash `9429b171…9145a`，dpkg mutation与resume均为0。
-- crash-state检查先因`/run`为`noexec`导致同hash startup probe不可映射；复制到`/var/tmp`后未重跑transaction，Manager/Fcitx均返回`0:1:4:11:0`即`FailedClosed/GuardInvalid`。guard本身为`root:root 0600`零长度单链接，父目录为canonical `root:root 01777 /run/lock`，确认startup读路径遗漏已冻结共享父目录合同。源码现让store/startup消费同一权限策略，119项默认与124项L6-feature测试通过；旧pair上的case不计通过。
-- crash失败目录manifest `5d8c914a…3e42a`与v2关机盘已冻结。修复target `d75818f`的新handoff已原子发布：record `c74fac12…9849`、target package `4dd00540…dcec`，guest双production/宿主verifier通过。
-- 新pair首台retry `45D8205F…F2B4`因canonical inventory顺序与`build-environment.json`路径错误在input switch前停止。第二台`0BB24317…307C`闭合断网与input switch后，因case把fresh absent错误预期为remove-terminal `0:1:4:24:6`而失败；Manager/Fcitx实际均正确返回`0:1:4:15:0`即`ReceiptMissing`。manifest `66212f2c…a8a3e`及guest state `434541c5…75ae`证明mutation preflight evidence、operation ID、state、checkpoint与guard均absent，未进入acceptance/maintenance/dpkg。两套临时证据已持久归档为manifest `ae4d1da2…ab8d`/`d99cbfad…324c`；随后连同旧network与rollback transfer失败clone按授权删除注册项和package。cleanup manifest `e1930d6c…41f7c`证明四套host evidence删除后复验通过、未授权注册项无差异，当前十七台VM全部stopped。
+- 六类真实operation均有分散证据：第六套形成target completed/S3，独立clone闭合repair、rollback、remove与reinstall；这些不能冒充同一连续session。精确receipt、package、guest/host manifest和磁盘身份进入L6 runbook/周志。
+- 旧pair唯一`install_prepared`调用形成prepared checkpoint且未触发dpkg；后续startup因遗漏合法`01777 /run/lock`失败关闭，manifest `5d8c914a…3e42a`与clone `FD24ADFF…17C056`冻结。store/startup现共用权限策略且119项默认/124项L6-feature测试通过，旧case仍不计通过。
+- 修复target `d75818f`的handoff record `c74fac12…9849`、target package `4dd00540…dcec`已冻结并通过guest/host verifier。两台新pair retry分别在input switch和fresh-absent preflight暴露harness缺陷，均未生成operation ID或进入transaction；证据manifest `ae4d1da2…ab8d`/`d99cbfad…324c`冻结后，四台低价值失败clone已按授权清理，cleanup manifest `e1930d6c…41f7c`证明其余注册项未漂移且十七台VM全停。
+- repository-only guest-case合同现固定UTF-8 bytewise canonical input inventory、唯一`build-environment.json`、guest-agent仅作观察量且result/evidence文件回读为真相源，并把fresh absent的`ReceiptMissing/no receipt`与remove terminal的`RemovedProgram/completed`拆成互斥回归。合同已接入L6与`check-repo`门禁，未修改production startup语义或任何guest/system状态。
 
 ## 停止线
 
@@ -41,7 +38,7 @@
 
 ## 下一步（2026-08-19）
 
-1. 开发继续时，先把fresh absent的`FailedClosed/ReceiptMissing/no receipt`与remove-terminal的`RemovedProgram/Completed`拆成committed离线harness回归，并同时固定canonical input inventory与`build-environment.json`命名；门禁通过后再从未改写DependencyFrozen absent盘另建clone，重闭合注册、断网、input与mutation preflight。通过前不生成operation ID或运行acceptance，之后再单独授权一次`install_prepared`。
+1. 离线guest-case合同与门禁提交闭合后，下一笔系统动作须另行授权：只从未改写DependencyFrozen absent盘另建第三台clone并固定注册、config/EFI/qcow2 identity与`Network=[]`，该批次不启动。后续启动、断网/input/mutation preflight与单次`install_prepared`仍逐步独立授权；preflight通过前不生成operation ID或运行acceptance。
 2. 第二批repair历史clone `A3022255…3107`/`BE3579E0…37F8`仍含独立真实operation，只作后续清理候选；没有新的精确授权不得删除。DependencyFrozen、builder、terminal、旧pair真实checkpoint与前四套L6现场继续保留。
 3. 连续完整L6、guest reboot、dynamic preload/错误sibling、外部package lifecycle、P05C、桌面启动、进一步清理、发布、推送、真实同步及其他平台继续关闭；不得用六类分散operation证据冒充完整session。
 

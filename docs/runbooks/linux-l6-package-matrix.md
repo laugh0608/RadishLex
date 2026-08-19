@@ -370,6 +370,8 @@ checkpoint controller 必须是显式 acceptance 构建身份，以不可由 pro
 
 首个实机case没有通过。旧pair的`prepared` checkpoint与process-group终止证据有效，但后续startup读取合法stale guard时暴露共享父目录策略漂移，因此在resume前停止。修复pair的两台retry又分别暴露input harness与fresh-absent预期缺陷；第二台实际返回的`ReceiptMissing/no receipt`符合产品合同，不能为通过harness而改成remove-terminal语义。三台现场均不得替换FFI、改写guest或原地继续；只有第三台clean absent clone重闭合input/preflight并取得逐case授权后，才能重新开始`install_prepared`，其通过后才可进入`install staged`。
 
+repository-only `l6_guest_case_contract.py`现把实机case共同输入固定为UTF-8 bytewise canonical inventory，环境文件只接受`build-environment.json`；guest-agent exit/stdout/stderr只保留为观察量，缺少非空canonical result/evidence文件回读一律失败关闭。startup预期也按状态拆分：fresh absent固定`FailedClosed/ReceiptMissing/no receipt`与wire `0:1:4:15:0|error-absent`，remove terminal固定`FailedClosed/RemovedProgram/completed`与wire `0:1:4:24:6|error-absent`。该合同进入默认L6/repository门禁，不替代每个clone的identity、hash、权限、断网与现场文件回读，也不构成系统动作授权。
+
 ## 8. 系统、字体与 startup probe
 
 ### Package 与 process
@@ -421,7 +423,7 @@ guest-agent push 到达guest后的owner/mode也不是可信输入；既有第六
 
 UTM 磁盘配置使用空 `Network` 数组也不能单独证明 guest 运行态断网；删除整个必填键会使 UTM 4.7.5 冷加载失败，注册缓存仍可能在首次启动挂回虚拟网卡并取得 DHCP。每次启动后、写入 artifact input 或生成 operation ID 前，都必须在 guest 内复验目标接口 down 且 IPv4/IPv6 路由为空；任一网络状态不明立即停止，不把后续断网状态倒推成“从启动起全程离线”。
 
-前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个为`rolled_back`，第六套形成target `completed`与S3。独立clone又闭合真实repair、rollback、remove和reinstall，六类operation已有分散证据但不是同一session。首个`install_prepared` checkpoint只形成失败关闭证据并暴露startup `01777`策略漂移，不计通过；修复pair两台retry又在transaction前暴露harness缺陷。四台低价值失败clone已完成持久归档与授权清理；开发下一步先用committed离线回归固定canonical input与fresh-absent/remove-terminal两套startup预期，再从第三台clean clone重闭合preflight，进一步清理仍需单独授权。
+前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个为`rolled_back`，第六套形成target `completed`与S3。独立clone又闭合真实repair、rollback、remove和reinstall，六类operation已有分散证据但不是同一session。首个`install_prepared` checkpoint只形成失败关闭证据并暴露startup `01777`策略漂移，不计通过；修复pair两台retry又在transaction前暴露harness缺陷。四台低价值失败clone已完成持久归档与授权清理，committed guest-case离线回归也已闭合；开发下一步经独立授权从第三台clean clone重闭合preflight，进一步清理仍需单独授权。
 
 ## 10. L6 完成与后续
 
