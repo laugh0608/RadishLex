@@ -400,7 +400,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 
 离线guest-case合同闭合后，第三台clean retry `3EC83EB9…593B9`在单独clone-only授权下从未改写DependencyFrozen盘创建，借用冻结reinstall terminal的注册壳但不复用其磁盘。config/EFI/qcow2为`62040cc9…eb9`/`0b797641…418`/`4967234b…b18`，`Network=[]`，qcow2复算一致且source/registration/clone文件零句柄。clone-only manifest `13f2e3e9…954a2`覆盖17→18注册清单、最终config与三次冻结器尝试；前两次均在正式目录原子发布前因宿主验证器兼容性失败关闭并完整记录。
 
-后续单步授权只启动该clone；启动前全量重算source/clone磁盘并确认十八台全停，启动后第一项guest命令只关闭非loopback接口并原子生成root-owned `0600`证据。首次与独立第二次file pull均为`711f850c…b9d15`，固定Debian 13 ARM64、仅`lo`、IPv4/IPv6 main route为空；host manifest `4b7081d5…7291`覆盖启动前后/独立postverify清单、observer诊断与双重回读。当前仅该clone started、其余十七台stopped；未传input、生成operation ID或运行preflight/acceptance/maintenance/dpkg，停止和后续guest动作仍须另行授权。
+后续单步授权只启动该clone；启动前全量重算source/clone磁盘并确认十八台全停，启动后第一项guest命令只关闭非loopback接口并原子生成root-owned `0600`证据。首次与独立第二次file pull均为`711f850c…b9d15`，固定Debian 13 ARM64、仅`lo`、IPv4/IPv6 main route为空；host manifest `4b7081d5…7291`覆盖启动前后/独立postverify清单、observer诊断与双重回读。随后同一boot内用canonical bundle `7e52f445…dd7a`原子切入12项input；fresh-absent mutation/negative preflight `24724002…f9807`/`0ee3d34c…2fb0`均得到`ReceiptMissing`，持久host manifest `0b703d10…5027`覆盖65项控制与回读。当前仅该clone started、其余十七台stopped；operation ID、state、checkpoint与guard均absent，未运行acceptance/maintenance/dpkg或写用户XDG，checkpoint与停止仍须另行授权。
 
 `./scripts/check-linux-l6-controller.sh` 编译 production feature 边界与独立 acceptance crate，并运行八点中断/恢复、无重复 mutation、target validation acceptance rejection、参数授权、进程组顺序、无 dpkg child、canonical/redaction 与源码边界正负向测试。它只使用 fake port/backend 和临时目录，不运行 acceptance/maintenance executable，不写 fixed evidence root，也不证明 Linux process group 或 dpkg lifecycle 已实测。
 
@@ -414,7 +414,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash checkpoint暴露的startup共享锁父目录漂移已修复并冻结`d75818f` pair；新pair两台harness失败retry已归档并删除，第三台clean retry现为唯一started且运行态断网。其余十七台VM全部stopped；进一步清理与停止仍须另行授权，开发下一步须在同一boot经独立授权投影input并重闭合只读/mutation preflight。连续完整L6、process/external lifecycle与P05C继续关闭。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash checkpoint暴露的startup共享锁父目录漂移已修复并冻结`d75818f` pair；新pair两台harness失败retry已归档并删除。第三台clean retry `3EC83EB9…593B9`现为唯一started且保持断网；同一boot的canonical input switch与fresh-absent双preflight已通过，host manifest `0b703d10…5027`证明package/state/checkpoint/guard/operation ID absent、startup为`ReceiptMissing`，其余十七台VM stopped。进一步清理与停止仍须另行授权，开发下一步只允许在新授权下执行一次`install_prepared` checkpoint；resume/dpkg后续、连续完整L6、process/external lifecycle与P05C继续关闭。
 
 ## 实机授权边界
 

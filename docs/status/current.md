@@ -7,7 +7,7 @@
 - 复核日期：2026-08-19（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 已完成，六类真实operation均有独立证据。首个`install_prepared` checkpoint暴露的startup共享锁目录漂移已修复，新pair与离线guest-case合同已冻结；第三台clean retry现为唯一started VM并已证明运行态断网，连续完整L6与八个crash/retry尚未闭合。
+- L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 已完成，六类真实operation均有独立证据。首个`install_prepared` checkpoint暴露的startup共享锁目录漂移已修复，新pair与离线guest-case合同已冻结；第三台clean retry现为唯一started VM，同一断网boot的canonical input与fresh-absent preflight已闭合，连续完整L6与八个crash/retry尚未闭合。
 
 ## 冻结基线与固定边界
 
@@ -21,8 +21,8 @@
 - P05A carrier、production relationship、恢复事务、system port/CLI/startup gate、L6 format/controller/pair/refresh均已闭合；合成矩阵不替代真实现场。
 - 六类真实operation均有分散证据：第六套形成target completed/S3，独立clone闭合repair、rollback、remove与reinstall；这些不能冒充同一连续session。精确receipt、package、guest/host manifest和磁盘身份进入L6 runbook/周志。
 - 旧pair唯一`install_prepared`调用形成prepared checkpoint且未触发dpkg；后续startup因遗漏合法`01777 /run/lock`失败关闭，manifest `5d8c914a…3e42a`与clone `FD24ADFF…17C056`冻结。store/startup现共用权限策略且119项默认/124项L6-feature测试通过，旧case仍不计通过。
-- 修复target `d75818f`的handoff record `c74fac12…9849`、target package `4dd00540…dcec`已冻结并通过guest/host verifier。两台harness失败retry未进入transaction，持久归档后连同两台旧失败clone按授权清理。第三台clean clone `3EC83EB9…593B9`的clone-only manifest为`13f2e3e9…954a2`；现已单独授权启动，network evidence `711f850c…b9d15`经双重回读一致，host manifest `4b7081d5…7291`证明仅`lo`、双main route为空、其余十七台stopped。
-- repository-only guest-case合同现固定UTF-8 bytewise canonical input inventory、唯一`build-environment.json`、guest-agent仅作观察量且result/evidence文件回读为真相源，并把fresh absent的`ReceiptMissing/no receipt`与remove terminal的`RemovedProgram/completed`拆成互斥回归。合同已接入L6与`check-repo`门禁，未修改production startup语义或任何guest/system状态。
+- 修复target `d75818f`的handoff record `c74fac12…9849`已冻结。第三台clone `3EC83EB9…593B9`的clone/network manifest为`13f2e3e9…954a2`/`4b7081d5…7291`；同一boot内12项input bundle `7e52f445…dd7a`完成原子切换，双preflight得到`ReceiptMissing`与`0:1:4:15:0|error-absent`。持久manifest `0b703d10…5027`绑定guest/transfer/mutation/negative evidence `c9f680c7…59328`/`d808589e…3b969`/`24724002…f9807`/`0ee3d34c…2fb0`，证明package/state/checkpoint/guard/operation ID均absent、仅`lo`且其余十七台stopped。
+- repository-only guest-case合同固定canonical inventory、唯一`build-environment.json`、文件回读真相源及fresh absent/remove terminal互斥预期，已接入L6与`check-repo`门禁；production startup语义未改。
 
 ## 停止线
 
@@ -31,14 +31,14 @@
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
 - 首台与第二台rollback只保留host evidence；第三台`EFD15599…BBDD`、remove clone `5EA2BAA2…27A2`与reinstall clone `E671DB9C…D465`均为冻结terminal；不得resume、重试、再次调用、清理、恢复、直接复用或用于其他矩阵。
 - 旧pair的network失败clone只保留host evidence；真实checkpoint clone `FD24ADFF…17C056`不得resume、替换FFI、补写crash-state evidence、再次执行acceptance或用于后续case。新pair两台retry也只保留持久host evidence，不得据此恢复package或复用。
-- 新`d75818f` handoff只允许作为独立clone的冻结输入；第三台clone当前保持started/断网，未获授权不得传input、生成operation ID、停止或执行其他guest命令，也不得覆盖、热替换或与旧pair跨套混搭。
+- 新`d75818f` handoff只允许作为该独立clone的冻结输入；第三台clone当前保持started/断网且input/preflight ready，未获授权不得生成operation ID、停止、运行checkpoint或执行其他guest命令，也不得覆盖、热替换或与旧pair跨套混搭。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（2026-08-19）
 
-1. 下一笔系统动作须另行授权：在同一断网boot先再次回读网络证据，再把冻结handoff投影为canonical input并闭合input switch、fresh-absent只读与mutation preflight。任一predicate失败即保留现场；通过前不生成operation ID或运行acceptance，`install_prepared`仍须下一笔独立授权。
+1. 下一笔系统动作须另行授权：在同一断网boot再次回读网络与preflight证据后，只生成一次operation ID并只调用一次production acceptance controller的`install_prepared` checkpoint。预期完整process group已终止、无`dpkg` child、receipt停在prepared且startup为`MaintenanceRequired + ActiveGuard`；任一差异即保留现场，不resume、不调用dpkg、不停止VM。
 2. 第二批repair历史clone `A3022255…3107`/`BE3579E0…37F8`仍含独立真实operation，只作后续清理候选；没有新的精确授权不得删除。DependencyFrozen、builder、terminal、旧pair真实checkpoint与前四套L6现场继续保留。
 3. 连续完整L6、guest reboot、dynamic preload/错误sibling、外部package lifecycle、P05C、桌面启动、进一步清理、发布、推送、真实同步及其他平台继续关闭；不得用六类分散operation证据冒充完整session。
 
@@ -62,7 +62,7 @@
 git diff --check
 ```
 
-上述入口证明 prior-terminal anchor、single-target repair、production-only refresh及共享父目录策略；新pair与第三台clone另由ARM64 builder/宿主证据固定。真实repair、rollback、默认remove与reinstall均已闭合；首个crash仅形成失败关闭证据，八个case、连续完整L6、桌面启动/重启与公开发布仍未闭合。
+上述入口证明 prior-terminal anchor、single-target repair、production-only refresh及共享父目录策略；新pair、第三台clone与input/preflight另由ARM64 builder/宿主证据固定。真实repair、rollback、默认remove与reinstall均已闭合；首个crash仅形成失败关闭证据，八个case、连续完整L6、桌面启动/重启与公开发布仍未闭合。
 
 ## 阅读索引
 
