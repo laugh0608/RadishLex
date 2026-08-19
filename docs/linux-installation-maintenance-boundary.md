@@ -398,6 +398,8 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 
 新pair首台retry `45D8205F…F2B4`因host inventory未按canonical sort且case误写build-environment文件名，在input switch前失败。第二台`0BB24317…307C`使用修正版transfer闭合断网与input switch，但preflight把fresh absent错误预期成remove-terminal `RemovedProgram/Completed`；target startup gate实际对Manager/Fcitx均返回`FailedClosed/ReceiptMissing/no receipt`，与源码合同一致。failure manifest `66212f2c…a8a3e`绑定实际tuple、phase failure与guest state；mutation preflight evidence、operation ID、state、checkpoint、guard及transaction均absent。两台正常关机后，完整临时证据已归档到持久host root，manifest为`ae4d1da2…ab8d`/`d99cbfad…324c`。随后在精确授权下连同旧network与rollback transfer失败clone一起由plain `utmctl delete`移除；cleanup manifest `e1930d6c…41f7c`证明四个package absent、其余注册项无差异且十七台VM全部stopped。
 
+离线guest-case合同闭合后，第三台clean retry `3EC83EB9…593B9`在单独clone-only授权下从未改写DependencyFrozen盘创建，借用冻结reinstall terminal的注册壳但不复用其磁盘。config/EFI/qcow2为`62040cc9…eb9`/`0b797641…418`/`4967234b…b18`，`Network=[]`，qcow2复算一致且source/registration/clone文件零句柄。host manifest `13f2e3e9…954a2`覆盖17→18注册清单、最终config与三次冻结器尝试；前两次均在正式目录原子发布前因宿主验证器兼容性失败关闭并完整记录。该clone从未启动、传input、生成operation ID或运行acceptance/maintenance/dpkg，当前十八台VM全部stopped。
+
 `./scripts/check-linux-l6-controller.sh` 编译 production feature 边界与独立 acceptance crate，并运行八点中断/恢复、无重复 mutation、target validation acceptance rejection、参数授权、进程组顺序、无 dpkg child、canonical/redaction 与源码边界正负向测试。它只使用 fake port/backend 和临时目录，不运行 acceptance/maintenance executable，不写 fixed evidence root，也不证明 Linux process group 或 dpkg lifecycle 已实测。
 
 ## M5-P05 实现状态
@@ -410,7 +412,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash checkpoint暴露的startup共享锁父目录漂移已修复并冻结`d75818f` pair；新pair两台retry又分别在input switch前和preflight内失败关闭，均未进入transaction，其VM package已在持久归档后按授权删除。当前十七台VM全部stopped；进一步清理仍须按持久证据与唯一职责另行授权，开发下一步只可修正fresh-absent预期并另建clean clone。连续完整L6、process/external lifecycle与P05C继续关闭。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash checkpoint暴露的startup共享锁父目录漂移已修复并冻结`d75818f` pair；新pair两台harness失败retry已归档并删除，第三台clean retry现为未启动的clone-prepared stopped。当前十八台VM全部stopped；进一步清理仍须按持久证据与唯一职责另行授权，开发下一步须另行授权启动该clone，先证明运行态断网并重闭合input/preflight。连续完整L6、process/external lifecycle与P05C继续关闭。
 
 ## 实机授权边界
 
