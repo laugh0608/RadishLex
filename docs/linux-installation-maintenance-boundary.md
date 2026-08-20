@@ -404,7 +404,9 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 
 第二个case仅在clone-only授权内创建`B0B826F6…87B3`。控制从十八台all-stopped、冻结handoff/terminal manifest与未改写DependencyFrozen开始，只调用一次plain clone，借用reinstall注册壳后把新clone EFI/qcow2固定为DependencyFrozen字节。启动前config/EFI/qcow2为`038274cb…af32`/`0b797641…418`/`4967234b…b18`、`Network=[]`，clone-only manifest为`ce430efb…aeb8`。
 
-首次start批次从clean `58e33af`和十九台all-stopped开始，控制入口只有一次start、status/list、第一项guest断网exec与file pull。`utmctl start`在事件层报告OSStatus `-1712`，后续status始终为stopped，控制以`clone-did-not-start`退出；因此没有到达guest exec、证据pull、input或operation ID。不得把该通用错误直接归因为bookmark、注册或磁盘问题。失败后config/EFI/qcow2仍为启动前字节，qcow2双重复算一致、source/clone零句柄、十九台全stopped；manifest `34c0918d…c8d8`从absent incoming不可覆盖发布。下一步先离线固定捕获start返回/诊断与逐次status的retry控制，新的start仍须单独授权。
+首次start批次从clean `58e33af`和十九台all-stopped开始，控制入口只有一次start、status/list、第一项guest断网exec与file pull。`utmctl start`在事件层报告OSStatus `-1712`，后续status始终为stopped，控制以`clone-did-not-start`退出；因此没有到达guest exec、证据pull、input或operation ID。不得把该通用错误直接归因为bookmark、注册或磁盘问题。失败后config/EFI/qcow2仍为启动前字节，qcow2双重复算一致、source/clone零句柄、十九台全stopped；manifest `34c0918d…c8d8`从absent incoming不可覆盖发布。
+
+新的repository-only `l6_utm_start_once.py`只允许plain `utmctl` list/status/start，要求双显式授权并绑定clean head、失败manifest逐项identity/hash、精确VM数、全停清单与target stopped。它只调用一次start，将命令exit/timeout及64KiB有界stdout/stderr前缀、完整size/hash、每次status和terminal list分别以exclusive `0600` JSON写入absent `0700`根并`fsync`，最后生成manifest。status和清单同时确认仅target started才返回0；始终未started且terminal全停返回10，前置拒绝返回11，其余状态返回12。任何终态都不自动stop/retry，不进入guest、传input或生成operation ID。七项合成测试与L6默认门禁已通过，真实失败manifest的7个条目也通过新验证器；这不构成再次start授权。
 
 `./scripts/check-linux-l6-controller.sh` 编译 production feature 边界与独立 acceptance crate，并运行八点中断/恢复、无重复 mutation、target validation acceptance rejection、参数授权、进程组顺序、无 dpkg child、canonical/redaction 与源码边界正负向测试。它只使用 fake port/backend 和临时目录，不运行 acceptance/maintenance executable，不写 fixed evidence root，也不证明 Linux process group 或 dpkg lifecycle 已实测。
 
@@ -418,7 +420,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash已在第三台clean retry闭合。`install_artifacts_staged`由repository-only typed合同与首次安装Rust回归固定中断态、恢复重验和host case差异；独立clone `B0B826F6…87B3`首次start以UTM `-1712`失败关闭，当前十九台全部stopped且磁盘未变。开发下一步先固定可判定retry控制，再经新授权启动并闭合运行态断网。其他crash、连续完整L6、process/external lifecycle与P05C继续关闭。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash已在第三台clean retry闭合。`install_artifacts_staged`由typed guest合同、首次安装Rust回归与单次host start控制固定；clone `B0B826F6…87B3`首次start以UTM `-1712`失败关闭，当前十九台全部stopped且磁盘未变。开发下一步须经新授权只启动一次，并在成功后闭合运行态断网。其他crash、连续完整L6、process/external lifecycle与P05C继续关闭。
 
 ## 实机授权边界
 

@@ -270,7 +270,7 @@ M5-P04 已覆盖：
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
 - P04 已按 `docs/linux-manager-local-acceptance.md` 冻结完成，不重复其导入导出、同库和重启实机；既有 guest 资产不得清理、覆盖或改作 P05 载体。
-- P05A metadata/rootfs、真实 ARM64 payload gate 与 P05B 确定性 `.deb`、actual package relationship、恢复事务、production port/CLI、startup gate、L6 format/controller 和 ARM64 pair 已完成；前五套现场只作取证。第六套upgrade与S3、第三台真实repair、独立rollback、默认remove与reinstall terminal均已冻结。旧pair首个`install_prepared`形成`GuardInvalid`失败关闭证据；修复pair两台retry均在transaction前暴露harness缺陷并已归档删除。第三台clean clone已完成source `38-1` terminal并正常停止；terminal/关机manifest `679b7e04…c544`/`036bace8…f3b8`证明receipt completed、guard absent、Manager/Fcitx `AllowedProduct`、XDG零写入、三项磁盘稳定与零句柄，当前十八台全stopped。下一步先离线固定`install_artifacts_staged`，未获新授权不能创建或启动下一clone、运行guest命令、maintenance、`dpkg`或产品进程。
+- P05A载荷门禁与P05B载体、恢复事务、production port/CLI、startup、L6 controller/pair已完成；六类operation各有独立证据。第三台clean clone已闭合首个crash并冻结source terminal。`install_artifacts_staged`合同及独立clone已闭合，但首次start以UTM `-1712`失败且未进入guest；失败manifest `34c0918d…c8d8`、十九台全停和磁盘未变均已冻结，repository-only单次start控制也已通过合成门禁。再次start及首条guest断网仍须新授权；不得自动stop/retry、运行maintenance/`dpkg`或产品进程。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。
