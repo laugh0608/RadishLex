@@ -9,7 +9,7 @@
 - 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
 - v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
 - 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 源码、L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 合同已闭合。六类 operation 均有独立证据。首个 `install_prepared` 暴露的 Debian `01777` startup 缺陷已由 `a6622d4` 修复，target `d75818f` 的 pair record `c74fac12…9849` 已冻结。第三台clean clone `3EC83EB9…593B9`已闭合checkpoint exact resume；第二个case两次start均未进入guest，单次控制retry以timeout/全停返回10并由manifest `337007ff…7ebbb`冻结，当前十九台VM全部stopped。v1 package不含RadishLex maintainer scripts。
+- production 源码、L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 合同已闭合。六类 operation 均有独立证据。首个 `install_prepared` 暴露的 Debian `01777` startup 缺陷已由 `a6622d4` 修复，target `d75818f` 的 pair record `c74fac12…9849` 已冻结。第三台clean clone `3EC83EB9…593B9`已闭合checkpoint exact resume；第二个case两次start均未进入guest并由`337007ff…7ebbb`冻结。后续v2 clone唯一调用返回0但stderr为`-1712`且注册/package均absent，后置失败由manifest `65160b12…c1859`冻结，当前十九台VM全部stopped。v1 package不含RadishLex maintainer scripts。
 - 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
 
 ## 文档真相源
@@ -71,7 +71,7 @@
 - P04 guest staging、backup、userdb、导入导出文件和临时服务保持原样，不复跑或清理。任何 L6/P05C 使用独立 clone/snapshot 或另一台 guest，并逐步授权系统写入、进程/会话和人工输入。
 - UTM 只通过 `PATH` 中的 plain `utmctl` 操作，不直接调用 app bundle 可执行文件；任何时刻最多运行一台 VM，启动前先用 `utmctl list` 确认其他注册 VM 全部停止。磁盘配置移除 Network 不能替代 guest 运行态证据；每次启动后、写入 input 或生成 operation ID 前都要复验接口 down 且 IPv4/IPv6 路由为空。
 - UTM 库条目 unavailable、UUID not found 或 data error 时必须停止并保留 package；不得把通用错误直接归因于 bookmark，也不得用磁盘目录存在替代 registered-stopped 证据。QEMU 配置集合键必须满足目标 UTM 的冷解码合同；无网卡使用 `Network=[]`，不能删除必填键。注册/config 修复须单独授权并在前后复验 UUID、config/EFI/qcow2 identity。
-- UTM guest-agent 的命令返回码或空输出不能单独作为成功证据；关键字节、结构化检查和 startup 结果须以文件回读、可靠退出合同及正负向对照独立复验。
+- UTM/guest-agent 的命令返回码或空输出不能单独作为成功证据；关键字节、注册/文件后置条件、结构化检查和 startup 结果须以文件回读、可靠退出合同及正负向对照独立复验。
 
 ## 实现、文件与验证
 
@@ -85,4 +85,4 @@
 
 1. 保留前四个 stopped L6 failure/mismatch disk 与全部 pair/handoff/S0/S1/S2/WAL-drift 资产，并原样保留第五套 `rolled_back` clone、staging、两套 preflight 与 upgrade failure/recovery evidence；不热替换、覆盖、恢复或清理。
 2. 第五套只执行过一次 upgrade：target `38-2` 安装后在 production target validation 失败，自动恢复 source `38-1`；receipt 为 `rolled_back`、`manual_recovery_required=false`，XDG 零漂移，当前 config/EFI/qcow2 为 `402a…3e9`/`cb8a…bd65`/`e684…8904`。精确失败条件已离线定位为 startup manifest 独立固定 revision `1`，不得启动或重试该 clone。
-3. 第六套及repair/rollback/remove/reinstall terminal均冻结。旧pair的`FD24ADFF…17C056`只执行一次`install_prepared` checkpoint，因startup遗漏合法`01777`父目录而失败，manifest `5d8c914a…3e42a`冻结。第三台clean clone `3EC83EB9…593B9`已闭合首个有效crash case。`install_artifacts_staged`的`B0B826F6…87B3`首次start以`-1712`失败，单次控制retry又以90秒timeout/60次stopped返回10；两次均未进入guest，manifest `337007ff…7ebbb`冻结且该clone不得再启动或复用。下一步经新授权只从DependencyFrozen建立另一台独立clean clone；启动与首条guest断网继续分批授权。连续完整L6、P05C、发布、推送、清理、真实同步及其他平台保持关闭。
+3. 第六套及repair/rollback/remove/reinstall terminal均冻结。旧pair的`FD24ADFF…17C056`只执行一次`install_prepared` checkpoint，因startup遗漏合法`01777`父目录而失败，manifest `5d8c914a…3e42a`冻结。第三台clean clone `3EC83EB9…593B9`已闭合首个有效crash case。`install_artifacts_staged`的`B0B826F6…87B3`两次start均未进入guest，manifest `337007ff…7ebbb`冻结且不得再启动或复用。后续v2 clone-only唯一调用出现exit 0/stderr `-1712`，后置确认无新注册/package，失败manifest `65160b12…c1859`冻结。下一步先离线固定clone-once控制与回归；再次clone、启动及首条guest断网分别授权。连续完整L6、P05C、发布、推送、清理、真实同步及其他平台保持关闭。

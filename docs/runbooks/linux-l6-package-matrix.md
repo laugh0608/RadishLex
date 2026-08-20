@@ -428,7 +428,7 @@ repository-only `l6_guest_case_contract.py`现把实机case共同输入固定为
 
 出现以下任一情况立即停止并保留 clone：guest identity、artifact hash、dpkg config/status、receipt/guard/tmp、operation ID、process quiescence、dependency/font、XDG fingerprint、startup decision 或 expected terminal 不匹配；命令超时、输出溢出、权限不足、未知 lifecycle 也不能自动重试或降级。
 
-UTM guest-agent 的传输返回码或空输出不能单独证明 transaction completed。第五套修复后 preflight 已观察到部分命令 exit status、stdout 与 stdin payload 转发不可靠；不得使用 Python/空输出/单一返回码直接判定。关键 package/receipt/status 字节须回读，结构化检查须有独立可靠退出合同，startup 调用须含正负向对照。长命令结束后还要确认 maintenance 进程退出，并以 canonical receipt、dpkg status/audit 与完整 package inventory 判定结果；缺少 receipt 即使 `utmctl exec` 返回 0 也按失败关闭，不推断或补写成功状态。
+UTM/guest-agent 的返回码或空输出不能单独证明系统动作或transaction completed。第五套修复后 preflight 已观察到部分命令 exit status、stdout 与 stdin payload 转发不可靠；v2 clone又观察到plain `utmctl clone` exit 0、stderr `-1712`但注册与package均absent。不得使用单一返回码直接判定；host clone/start须复验注册、package和状态，guest关键package/receipt/status字节须回读，结构化检查须有独立可靠退出合同。长命令结束后还要确认maintenance进程退出，并以canonical receipt、dpkg status/audit与完整package inventory判定结果；缺少后置事实即使返回0也按失败关闭，不推断或补写成功状态。
 
 guest-agent push 到达guest后的owner/mode也不是可信输入；既有第六套证据曾记录初始mode `0666`。每个新clone必须先创建root-owned `0700`私有传输根，把脚本与probe受控复制/安装为`0600` single-link regular file，并在执行前独立复验owner、mode、link count、size和SHA-256；不能直接对push落点施加最终mode断言后将失败静默吞掉。
 
@@ -443,7 +443,7 @@ guest-agent push 到达guest后的owner/mode也不是可信输入；既有第六
 
 UTM 磁盘配置使用空 `Network` 数组也不能单独证明 guest 运行态断网；删除整个必填键会使 UTM 4.7.5 冷加载失败，注册缓存仍可能在首次启动挂回虚拟网卡并取得 DHCP。每次启动后、写入 artifact input 或生成 operation ID 前，都必须在 guest 内复验目标接口 down 且 IPv4/IPv6 路由为空；任一网络状态不明立即停止，不把后续断网状态倒推成“从启动起全程离线”。
 
-前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个为`rolled_back`，第六套形成target `completed`与S3。独立clone又闭合真实repair、rollback、remove和reinstall，六类operation已有分散证据但不是同一session。第三台clean clone `3EC83EB9…593B9`已闭合首个有效crash case。`install_artifacts_staged`同一clone两次start均失败关闭；manifest `337007ff…7ebbb`证明单次控制返回10、十九台全停、磁盘未变且未进入guest。下一步经新授权另建独立clean clone，启动/断网继续分批；其他case与进一步清理仍关闭。
+前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个为`rolled_back`，第六套形成target `completed`与S3。独立clone又闭合真实repair、rollback、remove和reinstall，六类operation已有分散证据但不是同一session。第三台clean clone `3EC83EB9…593B9`已闭合首个有效crash case。`install_artifacts_staged`同一clone两次start均失败关闭；后续v2 clone唯一调用exit 0/stderr `-1712`且无注册/package，manifest `65160b12…c1859`证明后置拒绝、十九台全停且未进入guest。下一步先离线闭合clone-once控制，再分批授权新clone与启动/断网；其他case与进一步清理仍关闭。
 
 ## 10. L6 完成与后续
 
