@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-截至 2026-08-20，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。第六套与独立clone已让六类真实operation分别取证。首个`install_prepared`已在修复pair闭合；`install_artifacts_staged`的repository-only合同与clone身份也已闭合，但首次start返回UTM `-1712`且未进入guest。失败现场已冻结，连续完整L6、其余七个crash实机case与P05C仍未闭合。
+截至 2026-08-20，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。第六套与独立clone已让六类真实operation分别取证。首个`install_prepared`已在修复pair闭合；`install_artifacts_staged`的repository-only合同已闭合，但同一clone两次start均未进入guest，当前冻结为宿主启动失败现场。连续完整L6、其余七个crash实机case与P05C仍未闭合。
 
 - 首个完整产品安装载体固定为 Debian 13 ARM64 的单一系统级本地 `.deb`，package 名固定为 `radishlex`；它是未发布的本地验收载体，不是 apt repository、正式 Release 或通用 Linux 安装包。
 - Fcitx addon、两份产品 FFI、Manager bundle、锁定 RimeData、desktop entry、图标和产品 manifest 由同一个 package 绑定；不拆成可独立漂移的 Manager/addon 包。
@@ -408,6 +408,8 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 
 新的repository-only `l6_utm_start_once.py`只允许plain `utmctl` list/status/start，要求双显式授权并绑定clean head、executed-control固定路径/regular single-link identity、失败manifest逐项identity/hash、精确VM数、全停清单与target stopped。它只调用一次start，将命令exit/timeout及64KiB有界stdout/stderr前缀、完整size/hash、每次status和terminal list分别以exclusive `0600` JSON写入absent `0700`根并`fsync`，最后生成manifest。status和清单同时确认仅target started才返回0；始终未started且terminal全停返回10，前置拒绝返回11，其余状态返回12。任何终态都不自动stop/retry，不进入guest、传input或生成operation ID。八项合成测试与L6默认门禁已通过，真实失败manifest的7个条目也通过新验证器；这不构成再次start授权。
 
+获准的真实单次调用从clean `053018d`与十九台all-stopped开始，唯一start在90秒内无stdout/stderr并timeout；后续60次status与terminal list均确认目标及其余十八台stopped，控制按合同返回10，没有进入guest断网分支。失败后config/EFI/qcow2仍为`038274cb…af32`/`0b797641…418`/`4967234b…b18`，qcow2双重复算一致且source/clone零句柄；完整轮询与postverify由manifest `337007ff…7ebbb`不可覆盖冻结。离线差分确认目标config除Name/UUID外与已成功启动的第三台clone及reinstall壳逐字段相同，Registry可见结构也一致；限定统一日志只看到获准AppleEvent与status查询，没有可归因的UTM/QEMU内部根因。不得第三次start、修补或复用该clone；后续只可经新授权从DependencyFrozen建立另一台独立clean clone，clone-only与启动/断网继续分批。
+
 `./scripts/check-linux-l6-controller.sh` 编译 production feature 边界与独立 acceptance crate，并运行八点中断/恢复、无重复 mutation、target validation acceptance rejection、参数授权、进程组顺序、无 dpkg child、canonical/redaction 与源码边界正负向测试。它只使用 fake port/backend 和临时目录，不运行 acceptance/maintenance executable，不写 fixed evidence root，也不证明 Linux process group 或 dpkg lifecycle 已实测。
 
 ## M5-P05 实现状态
@@ -420,7 +422,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash已在第三台clean retry闭合。`install_artifacts_staged`由typed guest合同、首次安装Rust回归与单次host start控制固定；clone `B0B826F6…87B3`首次start以UTM `-1712`失败关闭，当前十九台全部stopped且磁盘未变。开发下一步须经新授权只启动一次，并在成功后闭合运行态断网。其他crash、连续完整L6、process/external lifecycle与P05C继续关闭。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash已在第三台clean retry闭合。`install_artifacts_staged`由typed guest合同、首次安装Rust回归与单次host start控制固定；clone `B0B826F6…87B3`两次start均失败关闭，第二次manifest `337007ff…7ebbb`证明十九台全停、磁盘未变且未进入guest。开发下一步须经新授权从DependencyFrozen只建立另一台独立clean clone；启动与运行态断网另批。其他crash、连续完整L6、process/external lifecycle与P05C继续关闭。
 
 ## 实机授权边界
 
