@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-截至 2026-08-20，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。第六套与独立clone已让六类真实operation分别取证。首个`install_prepared`暴露的合法`root:root 01777 /run/lock`误报已修复；target `d75818f`第三台clean retry已从prepared checkpoint exact resume到source terminal并关机冻结。`install_artifacts_staged`的repository-only精确中断/恢复合同与独立clone身份也已闭合；该clone尚未启动，连续完整L6、其余七个crash实机case与P05C仍未闭合。
+截至 2026-08-20，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。第六套与独立clone已让六类真实operation分别取证。首个`install_prepared`已在修复pair闭合；`install_artifacts_staged`的repository-only合同与clone身份也已闭合，但首次start返回UTM `-1712`且未进入guest。失败现场已冻结，连续完整L6、其余七个crash实机case与P05C仍未闭合。
 
 - 首个完整产品安装载体固定为 Debian 13 ARM64 的单一系统级本地 `.deb`，package 名固定为 `radishlex`；它是未发布的本地验收载体，不是 apt repository、正式 Release 或通用 Linux 安装包。
 - Fcitx addon、两份产品 FFI、Manager bundle、锁定 RimeData、desktop entry、图标和产品 manifest 由同一个 package 绑定；不拆成可独立漂移的 Manager/addon 包。
@@ -402,7 +402,9 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 
 后续单步授权只启动该clone；启动前全量重算source/clone磁盘并确认十八台全停，启动后第一项guest命令只关闭非loopback接口并原子生成root-owned `0600`证据。首次与独立第二次file pull均为`711f850c…b9d15`，固定Debian 13 ARM64、仅`lo`、IPv4/IPv6 main route为空；host manifest `4b7081d5…7291`覆盖启动前后/独立postverify清单、observer诊断与双重回读。随后同一boot内用canonical bundle `7e52f445…dd7a`原子切入12项input；fresh-absent双preflight `24724002…f9807`/`0ee3d34c…2fb0`均得到`ReceiptMissing`。再经独立授权只调用一次controller；checkpoint/crash-state `3fd5df67…4a70`/`e18bde6c…8719`证明process group已SIGKILL且成员0、无dpkg child，receipt为prepared，status/log未变，startup为`ActiveGuard`，manifest `a36b0cbc…8396`覆盖73项。最后一次独立授权只执行一次production exact resume；terminal postflight/postverify `5319db07…52a0`/`001b5be1…e2cc`证明source `38-1` installed、receipt `5277acb3…207f` completed、guard absent、`AllowedProduct`、XDG零写入与断网稳定。host manifest `679b7e04…c544`覆盖117项。正常停止后关机manifest `036bace8…f3b8`固定十八台all-stopped、config/EFI/qcow2 `62040cc9…eb9`/`f762ee52…e76`/`95e89df3…cb69`、双重qcow2与零句柄；该clone不得重启或复用。
 
-第二个case仅在clone-only授权内创建`B0B826F6…87B3`。控制从十八台all-stopped、冻结handoff/terminal manifest与未改写DependencyFrozen开始，只调用一次plain `utmctl clone`，借用reinstall terminal注册壳后把新clone EFI/qcow2固定为DependencyFrozen字节。启动前config/EFI/qcow2为`038274cb…af32`/`0b797641…418`/`4967234b…b18`、`Network=[]`，qcow2独立复算一致且source/registration/clone零句柄；十九台VM全部stopped。host manifest `ce430efb…aeb8`还保留一次只读UTM sandbox exit 134的失败关闭记录，并明确未启动、未传input、未生成operation ID或运行acceptance/maintenance/dpkg。该clone下一步须另行授权，启动后第一项guest动作仍是断开非loopback接口并通过文件回读证明仅`lo`和双main route为空。
+第二个case仅在clone-only授权内创建`B0B826F6…87B3`。控制从十八台all-stopped、冻结handoff/terminal manifest与未改写DependencyFrozen开始，只调用一次plain clone，借用reinstall注册壳后把新clone EFI/qcow2固定为DependencyFrozen字节。启动前config/EFI/qcow2为`038274cb…af32`/`0b797641…418`/`4967234b…b18`、`Network=[]`，clone-only manifest为`ce430efb…aeb8`。
+
+首次start批次从clean `58e33af`和十九台all-stopped开始，控制入口只有一次start、status/list、第一项guest断网exec与file pull。`utmctl start`在事件层报告OSStatus `-1712`，后续status始终为stopped，控制以`clone-did-not-start`退出；因此没有到达guest exec、证据pull、input或operation ID。不得把该通用错误直接归因为bookmark、注册或磁盘问题。失败后config/EFI/qcow2仍为启动前字节，qcow2双重复算一致、source/clone零句柄、十九台全stopped；manifest `34c0918d…c8d8`从absent incoming不可覆盖发布。下一步先离线固定捕获start返回/诊断与逐次status的retry控制，新的start仍须单独授权。
 
 `./scripts/check-linux-l6-controller.sh` 编译 production feature 边界与独立 acceptance crate，并运行八点中断/恢复、无重复 mutation、target validation acceptance rejection、参数授权、进程组顺序、无 dpkg child、canonical/redaction 与源码边界正负向测试。它只使用 fake port/backend 和临时目录，不运行 acceptance/maintenance executable，不写 fixed evidence root，也不证明 Linux process group 或 dpkg lifecycle 已实测。
 
@@ -416,7 +418,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash checkpoint暴露的startup共享锁父目录漂移已修复并冻结`d75818f` pair；新pair两台harness失败retry已归档删除。第三台clean retry `3EC83EB9…593B9`的input/preflight、`install_prepared` checkpoint、exact resume terminal与关机冻结均已通过。`install_artifacts_staged`现由repository-only typed合同与首次安装Rust回归精确固定中断态、恢复重验和host case最小差异，独立clone `B0B826F6…87B3`也已冻结为stopped；当前十九台全部stopped，开发下一步须经新授权只启动该clone并先闭合运行态断网。其他crash、连续完整L6、process/external lifecycle与P05C继续关闭。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash已在第三台clean retry闭合。`install_artifacts_staged`由repository-only typed合同与首次安装Rust回归固定中断态、恢复重验和host case差异；独立clone `B0B826F6…87B3`首次start以UTM `-1712`失败关闭，当前十九台全部stopped且磁盘未变。开发下一步先固定可判定retry控制，再经新授权启动并闭合运行态断网。其他crash、连续完整L6、process/external lifecycle与P05C继续关闭。
 
 ## 实机授权边界
 

@@ -7,7 +7,7 @@
 - 复核日期：2026-08-20（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format/controller、release-pair与maintenance refresh已完成，六类operation均有独立证据。首个crash已闭合；`install_artifacts_staged`合同与clone身份已冻结。十九台VM全部stopped，其余七个crash实机case和连续完整L6未闭合。
+- L6 format/controller、release-pair与maintenance refresh已完成，六类operation均有独立证据。首个crash已闭合；`install_artifacts_staged`合同与clone身份已冻结，但首次start在UTM事件层返回`-1712`并失败关闭。十九台VM全部stopped，其余七个crash实机case和连续完整L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -23,7 +23,7 @@
 - 旧pair唯一`install_prepared`调用形成prepared checkpoint且未触发dpkg；后续startup因遗漏合法`01777 /run/lock`失败关闭，manifest `5d8c914a…3e42a`与clone `FD24ADFF…17C056`冻结。store/startup现共用权限策略且119项默认/124项L6-feature测试通过，旧case仍不计通过。
 - 修复target `d75818f`的handoff record `c74fac12…9849`已冻结。第三台clone `3EC83EB9…593B9`只生成一次operation ID、只调用一次controller与一次production exact resume；checkpoint/crash-state `3fd5df67…4a70`/`e18bde6c…8719`先证明prepared与无dpkg child。terminal postflight/postverify `5319db07…52a0`/`001b5be1…e2cc`再证明source `38-1` installed、receipt `completed`、guard absent、startup `AllowedProduct`、XDG/进程/断网稳定；terminal/关机manifest为`679b7e04…c544`/`036bace8…f3b8`，后者固定config/EFI/qcow2 `62040cc9…eb9`/`f762ee52…e76`/`95e89df3…cb69`、双重qcow2与零句柄。
 - repository-only guest-case合同除canonical input/readback/startup预期外，现固定`install_artifacts_staged`的target-only staging、package/dpkg未变、合法guard、XDG/process/network零漂移与resume重验/单次apply，并与matrix交叉校验。首次安装精确Rust回归通过，production语义无需修改。
-- 第二个case clone `B0B826F6…87B3`仅经一次plain clone建立；manifest `ce430efb…aeb8`固定三项磁盘、`Network=[]`、十九台全停、双重qcow2/零句柄和零guest动作。
+- 第二个case clone-only manifest为`ce430efb…aeb8`。首次start未到达started或guest exec；失败manifest `34c0918d…c8d8`证明三项磁盘未变、双重qcow2、零句柄、十九台全停且无input/operation/transaction。
 
 ## 停止线
 
@@ -33,14 +33,14 @@
 - 首台与第二台rollback只保留host evidence；第三台`EFD15599…BBDD`、remove clone `5EA2BAA2…27A2`与reinstall clone `E671DB9C…D465`均为冻结terminal；不得resume、重试、再次调用、清理、恢复、直接复用或用于其他矩阵。
 - 旧pair的network失败clone只保留host evidence；真实checkpoint clone `FD24ADFF…17C056`不得resume、替换FFI、补写crash-state evidence、再次执行acceptance或用于后续case。新pair两台retry也只保留持久host evidence，不得据此恢复package或复用。
 - 新`d75818f` handoff只允许作为独立clean clone的冻结输入；第三台clone现为stopped source terminal，不得重启、复用、运行下一checkpoint、覆盖、热替换或与旧pair跨套混搭。
-- 第二个case clone `B0B826F6…87B3`须保持stopped，未授权不得进入guest或与第一case混用。
+- 第二个case clone `B0B826F6…87B3`须保持stopped；不得自动retry、进入guest或与第一case混用。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（2026-08-20）
 
-1. `install_artifacts_staged` clone `B0B826F6…87B3`已stopped冻结。新授权后先复验Git、十九台all-stopped、manifest和磁盘，再只启动它；第一项guest动作关闭非loopback接口，并回读证明仅`lo`且双main route为空。
+1. 先离线固定start retry控制：绑定失败manifest、捕获start返回与诊断、逐次记录status且超时失败关闭。取得新retry授权前不得再次start；不能把`-1712`直接归因为bookmark或磁盘问题。
 2. 后续input/preflight、controller checkpoint、是否resume与关机冻结继续逐笔授权；input前再次回读断网证据，checkpoint必须精确命中`install_artifacts_staged/artifacts_staged`，任一receipt/staging/guard/package/dpkg/startup/XDG/process差异即保留现场且不自动进入下一步。
 3. 第二批repair清理、连续完整L6、guest reboot、dynamic preload/错误sibling、P05C、发布、推送、真实同步及其他平台继续关闭；不得用六类分散operation证据或首个crash terminal冒充完整session。
 
@@ -64,7 +64,7 @@
 git diff --check
 ```
 
-上述入口证明 prior-terminal anchor、repair/refresh、共享父目录策略及第二个case离线合同；真实repair、rollback、remove与reinstall均已闭合。第二个case只完成clone且未启动，八case整体、连续完整L6、桌面启动/重启与发布仍未闭合。
+上述入口证明 prior-terminal anchor、repair/refresh、共享父目录策略及第二个case离线合同；真实repair、rollback、remove与reinstall均已闭合。第二个case首次start失败且未进入guest，八case整体、连续完整L6、桌面启动/重启与发布仍未闭合。
 
 ## 阅读索引
 
