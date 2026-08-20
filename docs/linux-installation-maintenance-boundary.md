@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-截至 2026-08-19，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。第六套与独立clone已让六类真实operation分别取证。首个`install_prepared`暴露的合法`root:root 01777 /run/lock`误报已修复；target `d75818f`第三台clean retry已从prepared checkpoint exact resume到source terminal并关机冻结。连续完整L6、其余七个crash case与P05C仍未闭合。
+截至 2026-08-20，M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix。第六套与独立clone已让六类真实operation分别取证。首个`install_prepared`暴露的合法`root:root 01777 /run/lock`误报已修复；target `d75818f`第三台clean retry已从prepared checkpoint exact resume到source terminal并关机冻结。`install_artifacts_staged`的repository-only精确中断/恢复合同也已闭合；连续完整L6、其余七个crash实机case与P05C仍未闭合。
 
 - 首个完整产品安装载体固定为 Debian 13 ARM64 的单一系统级本地 `.deb`，package 名固定为 `radishlex`；它是未发布的本地验收载体，不是 apt repository、正式 Release 或通用 Linux 安装包。
 - Fcitx addon、两份产品 FFI、Manager bundle、锁定 RimeData、desktop entry、图标和产品 manifest 由同一个 package 绑定；不拆成可独立漂移的 Manager/addon 包。
@@ -414,7 +414,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash checkpoint暴露的startup共享锁父目录漂移已修复并冻结`d75818f` pair；新pair两台harness失败retry已归档删除。第三台clean retry `3EC83EB9…593B9`的input/preflight、`install_prepared` checkpoint、exact resume terminal与关机冻结均已通过，当前十八台全部stopped。开发下一步先离线固定`install_artifacts_staged`的精确中断态与host case差异，再经新授权建立独立clean clone；其他crash、连续完整L6、process/external lifecycle与P05C继续关闭。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash checkpoint暴露的startup共享锁父目录漂移已修复并冻结`d75818f` pair；新pair两台harness失败retry已归档删除。第三台clean retry `3EC83EB9…593B9`的input/preflight、`install_prepared` checkpoint、exact resume terminal与关机冻结均已通过，当前十八台全部stopped。`install_artifacts_staged`现由repository-only typed合同与首次安装Rust回归精确固定中断态、恢复重验和host case最小差异；开发下一步须经新授权建立独立clean clone。其他crash、连续完整L6、process/external lifecycle与P05C继续关闭。
 
 ## 实机授权边界
 
