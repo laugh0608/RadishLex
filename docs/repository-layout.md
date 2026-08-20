@@ -98,6 +98,7 @@ RadishLex/
       licenses/
       product-rime-data.json
   docs/
+    README.md
     status/
     remediation/
     adr/
@@ -415,6 +416,7 @@ R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-
 
 ## 文档目录
 
+- `docs/README.md`：文档职责、默认阅读顺序和按任务导航，不保存阶段快照。
 - `docs/status/current.md`：唯一当前阶段短入口。
 - `docs/remediation/`：仅在当前状态明确引用活动临时专题时使用；当前无活动专题。
 - `docs/archive/`：已关闭且退出默认阅读链的历史专题与 review-only 材料。
@@ -423,7 +425,7 @@ R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-
 - `docs/devlogs/`：周内事实、命令、提交和历史流水。
 - `docs/*.md`：稳定架构、边界、协议、guide 或 reference。
 
-新增或大改文档必须在开头说明用途、读者和不包含内容。状态事实不得复制到多个稳定专题；详细实现流水不得进入 roadmap 或协作入口。
+新增或大改文档必须在开头说明用途、读者和不包含内容。状态事实不得复制到多个稳定专题；详细实现流水不得进入 roadmap 或协作入口。`AGENTS.md` / `CLAUDE.md` 只在长期协作约束变化时同步修改，不随阶段、证据或顺位推进更新。
 
 ## 规划但尚未落地
 

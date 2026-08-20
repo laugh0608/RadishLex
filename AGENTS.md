@@ -2,26 +2,20 @@
 
 本文件统一约束本仓库的人工与 AI 协作。对话开始或结束总结时称呼用户为 `萝卜SAMA`。
 
-## 项目与当前阶段
+## 适用范围
 
-- RadishLex（萝卜词核）是 Rust 输入核心、Go 自部署同步后端、Flutter Manager 与平台原生薄壳组成的源代码可见中文输入系统。
-- 许可条款以根 `LICENSE` 为准，当前采用 RadishLex Source-Available License。
-- 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
-- v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
-- 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 源码、L6 format v1、acceptance controller、release-pair 与 maintenance-only refresh v1 合同已闭合。六类 operation 均有独立证据。首个 `install_prepared` 暴露的 Debian `01777` startup 缺陷已由 `a6622d4` 修复，target `d75818f` 的 pair record `c74fac12…9849` 已冻结。第三台clean clone `3EC83EB9…593B9`已闭合checkpoint exact resume；第二个case两次start均未进入guest并由`337007ff…7ebbb`冻结。后续v2 clone唯一调用返回0但stderr为`-1712`且注册/package均absent，后置失败由manifest `65160b12…c1859`冻结，当前十九台VM全部stopped。v1 package不含RadishLex maintainer scripts。
-- 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
+本文件只保存跨阶段、长期有效的协作约束，不记录当前里程碑、批次、日期、提交、证据编号、实机现场或下一步。项目介绍见 `README.md`，许可条款以根 `LICENSE` 的 RadishLex Source-Available License 为准，文档导航见 `docs/README.md`，当前判断与临时停止线只读 `docs/status/current.md`。
 
 ## 文档真相源
 
-默认入口：`README.md`、`docs/status/current.md`、`docs/technical-plan.md`、`docs/roadmap.md`、`docs/repository-layout.md`、`docs/privacy-sync.md`。按任务补读：
+默认从 `docs/README.md` 按任务进入；项目定位读 `README.md`，当前阶段读 `docs/status/current.md`。其余规则：
 
 - 阶段与顺位读 `current`、`roadmap`；架构与目录读 `technical-plan`、`repository-layout`；同步与敏感数据读 `privacy-sync`。
-- Linux 当前安装工作读 `docs/linux-installation-maintenance-boundary.md`，平台/Manager 分别读 `docs/linux-fcitx5-boundary.md` 与 `docs/linux-manager-local-acceptance.md`。
 - 优先更新既有文档。入口只保留当前判断、停止线和索引；设计进专题，流水进 `docs/devlogs/YYYY-Www.md`，历史段不回写成新事实。
 - 架构、协议、隐私、平台、目录、里程碑或验证口径变化必须同步文档；每周重要推进追加 Asia/Shanghai 周志。
+- 阶段、现场和顺位变化不得回写 `AGENTS.md` / `CLAUDE.md`；只有长期协作规则变化才同步修改两份文件。临时高优先级约束写入 `current` 或其引用专题。
 - 新增或大改文档开头说明用途、读者和不包含内容。兄弟项目只写项目名和在线 URL，不写本机路径。
-- `AGENTS.md` 与 `CLAUDE.md` 保持逐字一致，目标均小于 14k 字节；`current` 目标 8k，Guide/Runbook 15k，Boundary 25k-30k。普通活跃 Markdown 接近 500 行优先拆职责。
+- `AGENTS.md` 与 `CLAUDE.md` 保持逐字一致并尽量精简；`current` 目标 8k，Guide/Runbook 15k，Boundary 25k-30k。普通活跃 Markdown 接近 500 行优先拆职责。
 
 ## 开发节奏与协作
 
@@ -41,6 +35,7 @@
 - `ime-ffi` 必须明确 ABI、所有权、生命周期、线程、UTF-8、释放和错误；不得静默吞掉 crypto/sync/ranker/userdb/FFI 错误。
 - Flutter Manager 负责设置、词库、学习视图、隐私、同步状态、设备和备份入口，不进入热路径。平台壳只处理系统生命周期、按键、候选、commit 和 FFI。
 - Linux 优先 Fcitx5，候选使用 input panel；Wayland 不自造浮窗协议。`platforms/linux-product` 只承担 Debian product transaction、关系校验与 startup decision，不接管输入业务或 XDG 数据。
+- 不要把 RadishLex 做成云端实时输入法 API，也不要让同步后端进入按键热路径。
 
 ## 隐私与数据
 
@@ -49,26 +44,21 @@
 - 日志、fixture、截图、诊断与 golden 禁止真实输入历史、联系人、密码、证件、支付或密钥；使用合成词、虚构 App/设备与脱敏聚合。
 - 同步测试覆盖多设备、base version、冲突、离线、恢复、撤销、轮换；删除覆盖 tombstone、旧状态、冲突和备份；ranker 覆盖正负反馈、recency、frequency、context 与 explain。
 
-## Linux P05B 边界
+## 安装与系统事务边界
 
-- 首个载体是 Debian 13 ARM64 系统级本地单 package，identity `debian-local-deb-v1`，不是公开 repository 或通用 Linux 包。
-- CJK/Latin 字体使用发行版 hard dependency：`fonts-noto-cjk`、`fonts-dejavu-core`；payload 只允许固定 Material Icons 图标字形，不注册字体或调用 `fc-cache`。
-- package 绑定 Manager、两份同 hash/不同 inode FFI、addon、完整 RimeData/source/license、desktop/icon 与 product manifest。
-- `install`、`upgrade`、`repair`、`remove`、`rollback` 默认对用户 XDG 零写入并保留数据；首批升降级要求 ABI/schema/XDG/settings/privacy/Rime contract 完全相同。
-- actual `.deb` 校验必须同一流计算 identity，严格解析三成员 ar、canonical USTAR、仅 `control`/`md5sums` 的 control，并交叉完整 payload inventory/manifest/evidence、canonical md5 inventory 与 `Installed-Size`；依赖、版本和 dpkg status 由同域 pure relationship 另行验证，不得退回 detached 字节声明。
-- 每次 mutation/retry 重新验证私有 staged relationship，并消费 move-only quiescence permit。首次安装恢复必须保留 recovery target。
-- state 使用 root-owned receipt、`receipt.json.tmp`/stage tmp 恢复、精确 current required slots、原子 mode 与父目录 `fsync`；guard 是 mode `0600`、零长度、单 link regular file 上的 advisory exclusive lock，不是 Unix socket。共享锁父目录只接受非 world-writable 或 root-owned 精确 `01777` sticky mode。
-- 旧 operation v1 只保留结构与 pair metadata，不存历史 hash proof，也不用于当前恢复。任何未知、半配置、身份/owner/mode/link/hash 漂移均失败关闭并保留现场。
-- production executor 只接受固定 `/usr/bin/dpkg`、typed argv、清空环境、null stdin、超时和有界诊断；system observer/port 复验 root identity、actual staging、依赖/版本、`/proc/*/maps` 静止与完整安装结果。外部 scripts/triggers 不能代表 transaction completed。
-- 维护 command 是 opaque 类型，CLI 要求精确 operation ID、root-owned 同名 package/evidence 与双显式授权。startup 连接 terminal actual package/dependency；L6 固定独立 guest、相邻 revision、六步主序列和八个 crash checkpoint。新 operation 的 source artifact 必须与前一 terminal receipt 的 installed artifact 精确相同；同版本重建字节不能替代 chain anchor。release-pair builder 只冻结 contract 指定的 prior-terminal source package/evidence，只从单一 clean target 构建，并由 target production Rust verifier 逐侧解析。六类真实 operation 已分别取证；不得冒充同一连续 session。首个 crash 只证明 checkpoint/失败关闭并暴露 startup 缺陷，不计通过，旧 pair 不得继续。
-- 不要把 RadishLex 做成云端实时输入法 API，也不要让同步后端进入按键热路径。
+- 安装、升级、修复、移除和回滚默认保留用户数据；任何例外都必须由明确产品合同和用户授权定义。
+- 载体、依赖、安装状态、receipt、staging、guard 与运行中程序必须从实际系统状态交叉验证；detached 声明、脚本退出码或外部 trigger 不能单独代表事务完成。
+- mutation 与 retry 前重新验证私有 staged relationship 和静止条件；未知状态、半配置、身份/owner/mode/link/hash 漂移均失败关闭并保留现场。
+- production executor 只接受固定系统工具、typed argv、最小环境、null stdin、超时和有界诊断；维护 CLI 使用 opaque command、精确 operation identity 与双显式授权。
+- 升降级 chain 必须锚定前一终态实际安装产物；同版本重建字节不能替代 source artifact。分散实机证据不得冒充同一连续 session。
+- 具体载体、平台 transaction、startup gate、验收矩阵和当前现场以 `docs/README.md` 导向的专题、runbook 与 `current` 为准。
 
 ## 实机与系统边界
 
 - 可直接读取/修改仓库，运行只读 Git、现有格式化、静态检查、测试和 smoke，并做范围清楚的小型本地提交。
 - 安装依赖、下载 SDK/模型/数据、改变全局工具链、启动长期服务或 GUI 前先告知；网络或沙盒导致关键验证失真时，只为构建/测试申请受限提权。
 - 修改系统输入法、权限、Keychain、`/usr`/`/var`、dpkg、systemd、Fcitx profile/autostart、会话、证书或全局配置必须取得明确授权。不得自动 kill/restart、合成按键或点击冒充人工验收。
-- P04 guest staging、backup、userdb、导入导出文件和临时服务保持原样，不复跑或清理。任何 L6/P05C 使用独立 clone/snapshot 或另一台 guest，并逐步授权系统写入、进程/会话和人工输入。
+- 已冻结或作为证据保留的 guest、staging、backup、userdb、导入导出文件和临时服务不得复跑、覆盖或清理；具体资产清单只在 `current` 与 runbook 维护。新系统验收使用独立 clone/snapshot 或另一台 guest，并逐步授权系统写入、进程/会话和人工输入。
 - UTM 只通过 `PATH` 中的 plain `utmctl` 操作，不直接调用 app bundle 可执行文件；任何时刻最多运行一台 VM，启动前先用 `utmctl list` 确认其他注册 VM 全部停止。磁盘配置移除 Network 不能替代 guest 运行态证据；每次启动后、写入 input 或生成 operation ID 前都要复验接口 down 且 IPv4/IPv6 路由为空。
 - UTM 库条目 unavailable、UUID not found 或 data error 时必须停止并保留 package；不得把通用错误直接归因于 bookmark，也不得用磁盘目录存在替代 registered-stopped 证据。QEMU 配置集合键必须满足目标 UTM 的冷解码合同；无网卡使用 `Network=[]`，不能删除必填键。注册/config 修复须单独授权并在前后复验 UUID、config/EFI/qcow2 identity。
 - UTM/guest-agent 的命令返回码或空输出不能单独作为成功证据；关键字节、注册/文件后置条件、结构化检查和 startup 结果须以文件回读、可靠退出合同及正负向对照独立复验。
@@ -79,10 +69,4 @@
 - 单源码原则上不超过 1500 行，接近 1000 行优先拆分；`src/` 与 `scripts/` 使用浅层职责目录；committed 相对路径默认不超过 180 字符。
 - 仓库文本 UTF-8 无 BOM、LF、末尾换行；非 Markdown 无尾随空格。不得为过门禁批量改写第三方或保留原格式资料。
 - Rust：`cargo fmt --check`、`cargo check`、相关 `cargo test`/`clippy`；Go：`gofmt`、`go test ./...`；Flutter：`dart format`、`flutter analyze`、相关 test；平台壳覆盖 build/smoke，真实行为留人工证据。
-- 涉及 docs/入口需检查术语、链接、许可证与 AGENTS/CLAUDE 同步；文本至少跑 `git diff --check`。阶段性或高风险交付补 `./scripts/check-repo.sh`，并说明已验证项与未验证风险。
-
-## 当前顺位
-
-1. 保留前四个 stopped L6 failure/mismatch disk 与全部 pair/handoff/S0/S1/S2/WAL-drift 资产，并原样保留第五套 `rolled_back` clone、staging、两套 preflight 与 upgrade failure/recovery evidence；不热替换、覆盖、恢复或清理。
-2. 第五套只执行过一次 upgrade：target `38-2` 安装后在 production target validation 失败，自动恢复 source `38-1`；receipt 为 `rolled_back`、`manual_recovery_required=false`，XDG 零漂移，当前 config/EFI/qcow2 为 `402a…3e9`/`cb8a…bd65`/`e684…8904`。精确失败条件已离线定位为 startup manifest 独立固定 revision `1`，不得启动或重试该 clone。
-3. 第六套及repair/rollback/remove/reinstall terminal均冻结。旧pair的`FD24ADFF…17C056`只执行一次`install_prepared` checkpoint，因startup遗漏合法`01777`父目录而失败，manifest `5d8c914a…3e42a`冻结。第三台clean clone `3EC83EB9…593B9`已闭合首个有效crash case。`install_artifacts_staged`的`B0B826F6…87B3`两次start均未进入guest，manifest `337007ff…7ebbb`冻结且不得再启动或复用。后续v2 clone-only唯一调用出现exit 0/stderr `-1712`，后置确认无新注册/package，失败manifest `65160b12…c1859`冻结。下一步先离线固定clone-once控制与回归；再次clone、启动及首条guest断网分别授权。连续完整L6、P05C、发布、推送、清理、真实同步及其他平台保持关闭。
+- 涉及文档入口需检查术语、链接和许可证；只有长期协作规则变化时才检查并同步 `AGENTS.md` / `CLAUDE.md`。文本至少跑 `git diff --check`。阶段性或高风险交付补 `./scripts/check-repo.sh`，并说明已验证项与未验证风险。
