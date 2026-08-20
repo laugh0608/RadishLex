@@ -277,6 +277,14 @@ class LinuxL6UtmStartOnceTests(unittest.TestCase):
             with self.assertRaises(l6_utm_start_once.StartControlError):
                 l6_utm_start_once._verify_sha256_manifest(evidence, manifest)
 
+    def test_executed_control_is_bound_to_the_repository_copy(self) -> None:
+        repository_root = Path(__file__).resolve().parents[2]
+        digest = l6_utm_start_once._validate_control_identity(repository_root)
+        self.assertRegex(digest, r"^[0-9a-f]{64}$")
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaises(l6_utm_start_once.StartControlError):
+                l6_utm_start_once._validate_control_identity(Path(temporary))
+
     def request(self, root: Path, **overrides: object) -> l6_utm_start_once.StartRequest:
         values: dict[str, object] = {
             "repository_root": root / "repo",

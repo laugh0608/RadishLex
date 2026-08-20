@@ -19,6 +19,7 @@ from typing import BinaryIO, Callable, Protocol, Sequence
 
 
 EVIDENCE_FORMAT = "radishlex-linux-l6-utm-start-once-v1"
+CONTROL_RELATIVE_PATH = Path("scripts/linux-product/l6_utm_start_once.py")
 MAX_CAPTURE_BYTES = 64 * 1024
 EXIT_STARTED = 0
 EXIT_FAILED_CLOSED_STOPPED = 10
@@ -466,6 +467,7 @@ def validate_start_bindings(request: StartRequest) -> dict[str, object]:
     )
     if repository_status:
         raise StartControlError("repository-not-clean")
+    control_sha256 = _validate_control_identity(request.repository_root)
 
     manifest_path = request.prior_failure_root / "files.sha256"
     if _sha256_file(manifest_path) != request.prior_failure_manifest_sha256:
@@ -474,6 +476,7 @@ def validate_start_bindings(request: StartRequest) -> dict[str, object]:
         request.prior_failure_root, manifest_path
     )
     return {
+        "control_sha256": control_sha256,
         "format": EVIDENCE_FORMAT,
         "prior_failure_entries_verified": entries,
         "prior_failure_manifest_sha256": request.prior_failure_manifest_sha256,
@@ -614,6 +617,25 @@ def _run_git(repository_root: Path, arguments: tuple[str, ...]) -> bytes:
     )
     _require_successful_observation(observation, "git")
     return observation.stdout.prefix
+
+
+def _validate_control_identity(repository_root: Path) -> str:
+    expected_path = repository_root / CONTROL_RELATIVE_PATH
+    invoked_path = Path(__file__).absolute()
+    if invoked_path != expected_path:
+        raise StartControlError("executed-control-path-mismatch")
+    try:
+        control_stat = expected_path.lstat()
+    except OSError as exc:
+        raise StartControlError("executed-control-unavailable") from exc
+    if (
+        not stat.S_ISREG(control_stat.st_mode)
+        or stat.S_ISLNK(control_stat.st_mode)
+        or control_stat.st_nlink != 1
+        or stat.S_IMODE(control_stat.st_mode) & 0o022
+    ):
+        raise StartControlError("executed-control-identity-invalid")
+    return _sha256_file(expected_path)
 
 
 def _verify_sha256_manifest(root: Path, manifest: Path) -> int:
