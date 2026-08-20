@@ -109,6 +109,85 @@ class LinuxL6GuestCaseContractTests(unittest.TestCase):
         self.assertEqual(removed.wire_output, "0:1:4:24:6|error-absent")
         self.assertNotEqual(fresh, removed)
 
+    def test_install_artifacts_staged_checkpoint_is_exact(self) -> None:
+        expectation = l6_guest_case_contract.crash_checkpoint_expectation(
+            "install_artifacts_staged"
+        )
+
+        self.assertEqual(expectation.matrix_operation, "install_source")
+        self.assertEqual(expectation.checkpoint, "artifacts_staged")
+        self.assertEqual(expectation.receipt.operation_kind, "install")
+        self.assertEqual(expectation.receipt.version_relation, "not_applicable")
+        self.assertEqual(expectation.receipt.state, "artifacts_staged")
+        self.assertEqual(expectation.receipt.operation_chain_length, 1)
+        self.assertEqual(expectation.receipt.required_staged_slots, ("target",))
+        self.assertFalse(expectation.receipt.source_artifact_present)
+        self.assertTrue(expectation.receipt.target_artifact_present)
+        self.assertEqual(expectation.receipt.staged_slots, ("target",))
+        self.assertFalse(expectation.receipt.target_proof_present)
+        self.assertFalse(expectation.receipt.source_proof_present)
+        self.assertIsNone(expectation.receipt.failure_code)
+        self.assertFalse(expectation.receipt.manual_recovery_required)
+        self.assertEqual(expectation.package_state, "not_installed")
+        self.assertEqual(expectation.dpkg_status, "unchanged_from_preflight")
+        self.assertEqual(expectation.dpkg_log, "unchanged_from_preflight")
+        self.assertEqual(expectation.guard.owner, "root:root")
+        self.assertEqual(expectation.guard.mode, "0600")
+        self.assertEqual(expectation.guard.size_bytes, 0)
+        self.assertEqual(expectation.guard.link_count, 1)
+        self.assertEqual(
+            expectation.guard.advisory_lock, "unlocked_after_worker_exit"
+        )
+        self.assertEqual(expectation.startup_case, "active-guard")
+        self.assertEqual(expectation.process_group, "terminated")
+        self.assertEqual(expectation.process_group_member_count, 0)
+        self.assertEqual(expectation.dpkg_child, "absent")
+        self.assertEqual(expectation.xdg, "unchanged_from_preflight")
+        self.assertEqual(
+            expectation.product_processes, "unchanged_from_preflight"
+        )
+        self.assertEqual(expectation.network, "unchanged_from_preflight")
+        self.assertEqual(
+            expectation.resume_steps,
+            (
+                "validate_staged_relationship",
+                "prove_target_quiescence",
+                "apply_target_once",
+                "verify_target",
+                "complete",
+            ),
+        )
+        self.assertEqual(expectation.expected_terminal, "completed")
+        l6_guest_case_contract.validate_crash_checkpoint_matrix(
+            [
+                {
+                    "id": "install_artifacts_staged",
+                    "operation": "install_source",
+                    "checkpoint": "artifacts_staged",
+                    "fault": "process_group_terminated",
+                    "expected_terminal": "completed",
+                    "restore_snapshot_after": True,
+                }
+            ]
+        )
+
+    def test_install_artifacts_staged_rejects_matrix_drift(self) -> None:
+        with self.assertRaises(
+            l6_guest_case_contract.LinuxL6GuestCaseContractError
+        ):
+            l6_guest_case_contract.validate_crash_checkpoint_matrix(
+                [
+                    {
+                        "id": "install_artifacts_staged",
+                        "operation": "install_source",
+                        "checkpoint": "prepared",
+                        "fault": "process_group_terminated",
+                        "expected_terminal": "completed",
+                        "restore_snapshot_after": True,
+                    }
+                ]
+            )
+
     def test_unknown_startup_case_is_rejected(self) -> None:
         with self.assertRaises(
             l6_guest_case_contract.LinuxL6GuestCaseContractError

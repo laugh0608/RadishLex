@@ -10,6 +10,8 @@ from l6_guest_case_contract import (
     BUILD_ENVIRONMENT_FILENAME,
     GUEST_AGENT_TRUST_POLICY,
     INPUT_INVENTORY_ORDER,
+    LinuxL6GuestCaseContractError,
+    validate_crash_checkpoint_matrix,
 )
 from product_metadata import (
     PACKAGE_ROOT,
@@ -281,6 +283,10 @@ def validate_semantics(matrix: dict[str, Any]) -> None:
         checkpoints.add(scenario["checkpoint"])
         if not scenario["restore_snapshot_after"]:
             raise LinuxL6ContractError("every L6 crash scenario must restore its snapshot")
+    try:
+        validate_crash_checkpoint_matrix(matrix["crash_scenarios"])
+    except LinuxL6GuestCaseContractError as exc:
+        raise LinuxL6ContractError(str(exc)) from exc
 
     xdg_paths = matrix["probes"]["xdg_paths"]
     acceptance_home = matrix["guest"]["acceptance_home"] + "/"

@@ -48,6 +48,52 @@ class StartupExpectation:
     wire_output: str
 
 
+@dataclass(frozen=True)
+class CrashReceiptExpectation:
+    operation_kind: str
+    version_relation: str
+    state: str
+    operation_chain_length: int
+    required_staged_slots: tuple[str, ...]
+    source_artifact_present: bool
+    target_artifact_present: bool
+    staged_slots: tuple[str, ...]
+    target_proof_present: bool
+    source_proof_present: bool
+    failure_code: str | None
+    manual_recovery_required: bool
+
+
+@dataclass(frozen=True)
+class CrashGuardExpectation:
+    owner: str
+    mode: str
+    size_bytes: int
+    link_count: int
+    advisory_lock: str
+
+
+@dataclass(frozen=True)
+class CrashCheckpointExpectation:
+    matrix_operation: str
+    checkpoint: str
+    fault: str
+    receipt: CrashReceiptExpectation
+    package_state: str
+    dpkg_status: str
+    dpkg_log: str
+    guard: CrashGuardExpectation
+    startup_case: str
+    process_group: str
+    process_group_member_count: int
+    dpkg_child: str
+    xdg: str
+    product_processes: str
+    network: str
+    resume_steps: tuple[str, ...]
+    expected_terminal: str
+
+
 STARTUP_EXPECTATIONS = {
     "fresh-absent": StartupExpectation(
         decision="FailedClosed",
@@ -60,6 +106,60 @@ STARTUP_EXPECTATIONS = {
         reason="RemovedProgram",
         receipt_terminal="completed",
         wire_output="0:1:4:24:6|error-absent",
+    ),
+    "active-guard": StartupExpectation(
+        decision="MaintenanceRequired",
+        reason="ActiveGuard",
+        receipt_terminal=None,
+        wire_output="0:1:3:10:0|error-absent",
+    ),
+}
+
+
+CRASH_CHECKPOINT_EXPECTATIONS = {
+    "install_artifacts_staged": CrashCheckpointExpectation(
+        matrix_operation="install_source",
+        checkpoint="artifacts_staged",
+        fault="process_group_terminated",
+        receipt=CrashReceiptExpectation(
+            operation_kind="install",
+            version_relation="not_applicable",
+            state="artifacts_staged",
+            operation_chain_length=1,
+            required_staged_slots=("target",),
+            source_artifact_present=False,
+            target_artifact_present=True,
+            staged_slots=("target",),
+            target_proof_present=False,
+            source_proof_present=False,
+            failure_code=None,
+            manual_recovery_required=False,
+        ),
+        package_state="not_installed",
+        dpkg_status="unchanged_from_preflight",
+        dpkg_log="unchanged_from_preflight",
+        guard=CrashGuardExpectation(
+            owner="root:root",
+            mode="0600",
+            size_bytes=0,
+            link_count=1,
+            advisory_lock="unlocked_after_worker_exit",
+        ),
+        startup_case="active-guard",
+        process_group="terminated",
+        process_group_member_count=0,
+        dpkg_child="absent",
+        xdg="unchanged_from_preflight",
+        product_processes="unchanged_from_preflight",
+        network="unchanged_from_preflight",
+        resume_steps=(
+            "validate_staged_relationship",
+            "prove_target_quiescence",
+            "apply_target_once",
+            "verify_target",
+            "complete",
+        ),
+        expected_terminal="completed",
     ),
 }
 
@@ -102,6 +202,36 @@ def startup_expectation(case: str) -> StartupExpectation:
         ) from exc
 
 
+def crash_checkpoint_expectation(scenario: str) -> CrashCheckpointExpectation:
+    try:
+        return CRASH_CHECKPOINT_EXPECTATIONS[scenario]
+    except KeyError as exc:
+        raise LinuxL6GuestCaseContractError(
+            f"unknown L6 guest crash checkpoint case: {scenario}"
+        ) from exc
+
+
+def validate_crash_checkpoint_matrix(
+    matrix_scenarios: list[dict[str, object]],
+) -> None:
+    for scenario, expectation in CRASH_CHECKPOINT_EXPECTATIONS.items():
+        matrix_scenario = next(
+            (item for item in matrix_scenarios if item.get("id") == scenario),
+            None,
+        )
+        if matrix_scenario is None or (
+            matrix_scenario.get("operation") != expectation.matrix_operation
+            or matrix_scenario.get("checkpoint") != expectation.checkpoint
+            or matrix_scenario.get("fault") != expectation.fault
+            or matrix_scenario.get("expected_terminal")
+            != expectation.expected_terminal
+            or matrix_scenario.get("restore_snapshot_after") is not True
+        ):
+            raise LinuxL6GuestCaseContractError(
+                f"L6 guest crash checkpoint case differs from the matrix: {scenario}"
+            )
+
+
 def validate_guest_case_contract() -> None:
     inventory = canonical_input_inventory(
         "radishlex_26.7.1+38-1_arm64.deb",
@@ -131,6 +261,23 @@ def validate_guest_case_contract() -> None:
     if fresh == removed or fresh.receipt_terminal is not None:
         raise LinuxL6GuestCaseContractError(
             "fresh absent and removed terminal startup states must remain distinct"
+        )
+
+    staged = crash_checkpoint_expectation("install_artifacts_staged")
+    active_guard = startup_expectation(staged.startup_case)
+    if (
+        staged.receipt.state != staged.checkpoint
+        or staged.receipt.required_staged_slots != staged.receipt.staged_slots
+        or staged.package_state != "not_installed"
+        or staged.process_group != "terminated"
+        or staged.process_group_member_count != 0
+        or staged.dpkg_child != "absent"
+        or active_guard.decision != "MaintenanceRequired"
+        or active_guard.reason != "ActiveGuard"
+        or active_guard.receipt_terminal is not None
+    ):
+        raise LinuxL6GuestCaseContractError(
+            "install artifacts-staged crash state is inconsistent"
         )
 
 
