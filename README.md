@@ -22,7 +22,7 @@ RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支�
 - **Flutter**：本地词库、学习、隐私、同步、设备和诊断管理界面。
 - **平台原生薄壳**：macOS InputMethodKit、Linux Fcitx5/IBus、Android IME、Windows TSF、iOS Keyboard Extension。
 
-当前工程成熟度、停止线和下一步只在 [当前状态](docs/status/current.md) 维护；完整文档导航见 [文档入口](docs/README.md)。
+当前工程成熟度、停止线和下一步只在 [当前状态](docs/status/current.md) 维护；完整文档导航见 [文档入口](docs/README.md)。参与项目请阅读[贡献指南](CONTRIBUTING.md)与[社区行为准则](CODE_OF_CONDUCT.md)，安全问题按[安全策略](SECURITY.md)私下报告。
 
 ## 稳定入口
 

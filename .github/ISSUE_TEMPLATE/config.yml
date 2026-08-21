@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 私下报告安全问题
+    url: https://github.com/laugh0608/RadishLex/security/policy
+    about: 不要公开披露尚未修复的漏洞、真实输入、用户词库、凭据、密钥或恢复码。

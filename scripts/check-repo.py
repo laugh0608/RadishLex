@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from repository_governance import check_community_governance, check_markdown_links
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MAX_COMMITTED_PATH_LENGTH = 180
@@ -15,6 +17,9 @@ REQUIRED_FILES = [
     ".editorconfig",
     ".gitattributes",
     ".gitignore",
+    ".github/ISSUE_TEMPLATE/bug-report.yml",
+    ".github/ISSUE_TEMPLATE/change-proposal.yml",
+    ".github/ISSUE_TEMPLATE/config.yml",
     ".github/PULL_REQUEST_TEMPLATE.md",
     ".github/rulesets/README.md",
     ".github/rulesets/master-protection.json",
@@ -22,6 +27,8 @@ REQUIRED_FILES = [
     ".github/workflows/release-check.yml",
     "AGENTS.md",
     "CLAUDE.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
     "Cargo.lock",
     "Cargo.toml",
     "server/sync-server/go.mod",
@@ -32,6 +39,7 @@ REQUIRED_FILES = [
     "crates/ime-cli/src/main.rs",
     "LICENSE",
     "README.md",
+    "SECURITY.md",
     "crates/ime-core/Cargo.toml",
     "crates/ime-core/src/lib.rs",
     "crates/ime-runtime/Cargo.toml",
@@ -313,6 +321,9 @@ REQUIRED_FILES = [
     "crates/ime-product-install/src/filesystem.rs",
     "scripts/check-repo.py",
     "scripts/check-repo.sh",
+    "scripts/repository_governance.py",
+    "scripts/test_repository_checkers.py",
+    "scripts/test_repository_governance.py",
     "scripts/check-sync-deployment-evidence.py",
     "scripts/check-sync-deployment-evidence.sh",
     "scripts/check-sync-server-deployment-rehearsal.py",
@@ -378,6 +389,30 @@ def check_required_files() -> None:
     for relative_path in REQUIRED_FILES:
         if not (REPO_ROOT / relative_path).is_file():
             raise SystemExit(f"missing required file: {relative_path}")
+
+
+def check_repository_governance() -> None:
+    paths = iter_repository_paths()
+    errors = check_community_governance(REPO_ROOT)
+    errors.extend(check_markdown_links(REPO_ROOT, paths))
+    if errors:
+        detail = "\n".join(f"- {error}" for error in errors)
+        raise SystemExit(f"repository governance checks failed:\n{detail}")
+
+
+def check_repository_checker_tests() -> None:
+    run_command(
+        [
+            sys.executable,
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            str(REPO_ROOT / "scripts"),
+            "-p",
+            "test_repository_*.py",
+        ]
+    )
 
 
 def check_collaboration_docs() -> None:
@@ -733,6 +768,8 @@ def main() -> int:
         run_script("check-docs.py", [str(REPO_ROOT)])
 
     check_required_files()
+    check_repository_governance()
+    check_repository_checker_tests()
     check_collaboration_docs()
     check_license_wording()
     check_manager_product_runtime_contract()

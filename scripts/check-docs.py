@@ -7,7 +7,10 @@ from pathlib import Path
 
 COLLABORATION_DOCS = {"AGENTS.md", "CLAUDE.md"}
 ENTRY_DOCS = {
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
     "README.md",
+    "SECURITY.md",
     "docs/README.md",
     "docs/status/current.md",
 }
@@ -37,7 +40,14 @@ def doc_kind(relative_path: str) -> str:
 
 
 def iter_markdown_files(repo_root: Path) -> list[Path]:
-    paths = [repo_root / "AGENTS.md", repo_root / "CLAUDE.md", repo_root / "README.md"]
+    paths = [
+        repo_root / "AGENTS.md",
+        repo_root / "CLAUDE.md",
+        repo_root / "CODE_OF_CONDUCT.md",
+        repo_root / "CONTRIBUTING.md",
+        repo_root / "README.md",
+        repo_root / "SECURITY.md",
+    ]
     docs_root = repo_root / "docs"
     if docs_root.is_dir():
         paths.extend(sorted(docs_root.rglob("*.md")))

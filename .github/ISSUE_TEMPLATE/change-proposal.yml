@@ -1,0 +1,84 @@
+name: 变更提案
+description: 提议产品、架构、协议、隐私、平台或仓库治理的长期变化
+title: "[Proposal] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提案用于澄清问题、边界、证据和停止线，不代表方案已经接受。安全漏洞请使用 SECURITY.md 中的私密渠道。
+  - type: dropdown
+    id: area
+    attributes:
+      label: 主要领域
+      options:
+        - 产品目标与用户场景
+        - 输入核心与 Engine boundary
+        - 用户词库、学习与 ranker
+        - 隐私、同步、加密与设备
+        - Go sync server 与部署
+        - Flutter Manager
+        - 平台壳、FFI 与系统接入
+        - 安装、升级与发布载体
+        - 文档、CI 与仓库治理
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题、目标与非目标
+      description: 说明要解决的问题、用户价值，以及本提案明确不解决的内容。
+    validations:
+      required: true
+  - type: textarea
+    id: baseline
+    attributes:
+      label: 当前基线与边界
+      description: 指向 current、ADR、Boundary、Guide 或 Runbook，区分当前事实、候选和未验证结论。
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 提议方案
+      description: 描述职责、接口、数据流、状态、失败关闭方式和明确停止线。
+    validations:
+      required: true
+  - type: textarea
+    id: privacy
+    attributes:
+      label: 隐私、安全与数据生命周期
+      description: 说明 P0-P3、学习、日志、端到端加密、设备授权、tombstone、备份恢复和数据保留影响；不适用时填写“不适用”。
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: 兼容性、迁移与失败模式
+      description: 说明协议、ABI、schema、平台、安装升级、旧设备和回滚影响。
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 证据与验证计划
+      description: 列出正向、负向、边界和失败路径验证，区分静态、合成、实机、连续事务及人工证据。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 替代方案与权衡
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: 边界确认
+      options:
+        - label: 我没有把目标、候选、局部检查或分散证据写成已经完成的产品能力
+          required: true
+        - label: 若涉及架构、协议、隐私、许可证、平台、FFI 或安装事务，我已明确说明影响
+          required: true
+        - label: 我没有附带真实输入、秘密、用户数据或无法确认授权的第三方材料
+          required: true

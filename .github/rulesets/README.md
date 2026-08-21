@@ -21,7 +21,7 @@
 - 仅允许通过 Pull Request 合并。
 - 单人维护阶段不要求额外审批，但仍要求已解决会话。
 - 仅要求聚合检查 `Candidate Quality` 通过，并启用 strict/up-to-date policy；它会汇总 `Repo Hygiene`、`Repository Baseline`、`Rust Clippy`、`Flutter Manager` 与 `Go Quality` 五个组件结果。
-- `Repo Hygiene` 覆盖文本、文档和 PR diff 空白检查；其余 job 分别覆盖 portable baseline、严格 Rust lint、Flutter format/analyze/test 和 Go vet/race。
+- `Repo Hygiene` 覆盖文本、文档预算和 PR diff 空白检查；`Repository Baseline` 额外覆盖必需治理文件、Issue Forms、Markdown 相对链接及检查器单测，其余 job 分别覆盖 portable baseline、严格 Rust lint、Flutter format/analyze/test 和 Go vet/race。
 - 允许 `merge` 与 `rebase` 两种合并方式，禁用 `squash`。
 - 管理员仅可通过 Pull Request 方式绕过规则，不开放直接 push。
 
