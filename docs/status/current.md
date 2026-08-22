@@ -7,7 +7,7 @@
 - 复核日期：2026-08-22（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format/controller、release-pair与maintenance refresh已完成，六类operation均有独立证据。首个crash已闭合；`install_artifacts_staged`旧clone两次start及后续v2 clone均在host失败关闭，未进入guest。repository-only start-once/clone-once控制均已闭合；新v3 clean clone已冻结，二十台VM全部stopped，其余七个crash实机case和连续完整L6未闭合。
+- L6 format/controller、release-pair与maintenance refresh已完成，六类operation均有独立证据。首个crash已闭合；`install_artifacts_staged`旧clone两次start、v2 clone及新v3 clean clone的首次start均在host失败关闭，未进入guest。repository-only start-once/clone-once控制均已闭合；二十台VM全部stopped，其余七个crash实机case和连续完整L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -27,6 +27,7 @@
 - 后续v2 clone-only从clean `992a307`、`337007ff…7ebbb`、十九台全停及冻结DependencyFrozen开始；唯一`utmctl clone`进程exit 0却在stderr报告OSStatus `-1712`，后置清单仍为原十九台且目标注册/package均absent，因此没有替换磁盘、启动或进入guest。失败目录不可覆盖发布，manifest `65160b12…c1859`逐项通过；这证明返回码不能替代注册与package后置条件，不证明具体UTM根因。
 - repository-only `l6_utm_clone_once.py`要求双显式授权并绑定clean head、前序manifest、canonical全停清单、registered source、目标name/package absent与executed-control identity；唯一clone的exit/timeout、64KiB stdout/stderr前缀、完整size/hash、pre/terminal list和package后置状态均持久化。只有命令确定成功、stderr空、注册精确增加一个唯一stopped目标且精确`.utm`目录存在才返回created；零落地失败、前置拒绝和部分/不确定落地分别返回10/11/12，任何终态都不自动retry/delete/start。十一项合成回归已接入默认L6门禁，不调用真实UTM。
 - 实机前核对UTM官方CLI后以`b86d72f`修正clone名称为精确`--name`参数；修正前没有消耗真实调用。随后从clean `b86d72f`、`65160b12…c1859`、十九台canonical全停清单与冻结DependencyFrozen开始，唯一clone以exit 0、空stderr、唯一新UUID `5B19AEF1…7DAB` stopped和精确package返回created，manifest `7ce53048…e5b7`逐项通过。只对该新clone原子换入DependencyFrozen EFI/qcow2后，prepared manifest `b065c7ac…32db`固定config/EFI/qcow2 `d04b00e1…1ff4`/`0b797641…1418`/`4967234b…4b18`、`Network=[]`、双重qcow2、source/registration/target零句柄及二十台全停；独立复核再次通过。该批没有start、guest、input、operation ID、transaction、retry或delete。
+- v3首次start从clean `27087c3`、clone/prepared manifest与二十台canonical全停清单开始。唯一start在90秒内无stdout/stderr并timeout，60次status及terminal list始终为二十台全stopped，控制返回10与`failed-closed-stopped`；start/failure manifest为`870f56dd…f3a5`/`59c62c14…bba05`。成功门未成立，因此guest断网exec和file pull均为0次，也没有input、operation ID或transaction。独立postverify manifest `8e3d5ced…8386`再次确认config/EFI/qcow2未变、qcow2双重复算、source对照、`Network=[]`、零句柄和二十台全停；该结果仍不能归因具体UTM/QEMU根因。
 
 ## 停止线
 
@@ -38,16 +39,16 @@
 - 新`d75818f` handoff只允许作为独立clean clone的冻结输入；第三台clone现为stopped source terminal，不得重启、复用、运行下一checkpoint、覆盖、热替换或与旧pair跨套混搭。
 - 第二个case clone `B0B826F6…87B3`须保持stopped并冻结为双start失败现场；不得第三次start、进入guest、修补注册/config、复用或与第一case混用。
 - v2 clone失败证据`65160b12…c1859`须原样保留；不得沿用本批授权重试clone、重启UTM或把exit 0记为成功。
-- 新v3 clean clone `5B19AEF1…7DAB`只允许作为第二个case的stopped起点；clone与DependencyFrozen物化授权已经结束，不得自动启动、重复物化、替换config/磁盘、传input或进入transaction。
+- 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（2026-08-22）
 
-1. 下一项系统动作须另行授权v3 clean clone `5B19AEF1…7DAB`的单次start与首条guest断网；启动前重新绑定committed clean head、clone/prepared manifest `7ce53048…e5b7`/`b065c7ac…32db`、二十台全停清单及config/EFI/qcow2/`Network=[]`。启动批次不得继承clone授权，也不得retry、delete、传input或生成operation ID。
-2. 只有target started、其余十九台stopped且双重文件回读证明仅`lo`/IPv4与IPv6 main route为空，才可再分批进入canonical input与只读/mutation preflight；任一状态不确定立即失败关闭并保留现场。
-3. checkpoint仍须精确命中`install_artifacts_staged/artifacts_staged`，之后的resume、正常停止与关机冻结继续分别授权；其余六个crash case、连续完整L6、P05C、发布、推送和其他平台继续关闭。
+1. 下一项开发先保持repository-only：以v3 start/failure/postverify manifest `870f56dd…f3a5`/`59c62c14…bba05`/`8e3d5ced…8386`为冻结输入，收敛host launch诊断边界与合成回归；只记录可验证的UTM进程、事件与状态事实，不预设bookmark、config、磁盘或权限根因，也不调用真实UTM。
+2. repository-only诊断闭合不构成系统授权。后续任何host诊断采集、新独立clone或首次start均须重新说明目标、命令、证据和失败保留线并单独授权；不得复用或第二次启动`5B19AEF1…7DAB`。
+3. 只有未来独立target唯一started、其余VM全stopped且双重文件回读证明仅`lo`/IPv4与IPv6 main route为空，才可再分批进入canonical input与只读/mutation preflight。checkpoint仍须精确命中`install_artifacts_staged/artifacts_staged`；其余六个crash case、连续完整L6、P05C、发布、推送和其他平台继续关闭。
 
 ## 验证入口
 
@@ -69,7 +70,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器证明单次start/clone、各自确定与失败关闭terminal，以及零自动stop/retry/delete/start。新v3 clone的真实创建与stopped磁盘冻结已有独立host evidence，但仍未启动或进入guest；八case整体、连续完整L6与发布未闭合。
+上述入口以合成执行器证明单次start/clone、各自确定与失败关闭terminal，以及零自动stop/retry/delete/start。新v3 clone的真实创建、磁盘冻结与单次start失败关闭已有独立host evidence，始终未进入guest；八case整体、连续完整L6与发布未闭合。
 
 ## 阅读索引
 
