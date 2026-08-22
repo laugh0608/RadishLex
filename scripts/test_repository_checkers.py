@@ -62,6 +62,16 @@ class DocumentationCheckerTests(CheckerFixture):
         for relative_path in ("CODE_OF_CONDUCT.md", "CONTRIBUTING.md", "SECURITY.md"):
             self.assertEqual(check_docs.doc_kind(relative_path), "entry")
 
+    def test_collaboration_documents_must_be_identical(self) -> None:
+        self.write("AGENTS.md", "# Shared\n")
+        self.write("CLAUDE.md", "# Shared\n")
+
+        self.assertTrue(check_docs.collaboration_docs_match(self.repo_root))
+
+        self.write("CLAUDE.md", "# Drifted\n")
+
+        self.assertFalse(check_docs.collaboration_docs_match(self.repo_root))
+
 
 class TextCheckerTests(CheckerFixture):
     def test_repository_files_include_tracked_and_untracked_but_not_ignored_files(self) -> None:

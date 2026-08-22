@@ -54,10 +54,23 @@ def iter_markdown_files(repo_root: Path) -> list[Path]:
     return [path for path in paths if path.is_file()]
 
 
+def collaboration_docs_match(repo_root: Path) -> bool:
+    agents_path = repo_root / "AGENTS.md"
+    claude_path = repo_root / "CLAUDE.md"
+    return (
+        agents_path.is_file()
+        and claude_path.is_file()
+        and agents_path.read_bytes() == claude_path.read_bytes()
+    )
+
+
 def main() -> int:
     repo_root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parents[1]
     errors: list[str] = []
     warnings: list[str] = []
+
+    if not collaboration_docs_match(repo_root):
+        errors.append("AGENTS.md and CLAUDE.md must be byte-for-byte identical")
 
     for full_path in iter_markdown_files(repo_root):
         relative_path = full_path.relative_to(repo_root).as_posix()
