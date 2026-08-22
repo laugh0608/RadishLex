@@ -7,7 +7,7 @@
 - 复核日期：2026-08-22（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format/controller、release-pair与maintenance refresh已完成，六类operation均有独立证据。首个crash已闭合；`install_artifacts_staged`两次start及后续v2 clone均在host失败关闭，未进入guest。repository-only start-once/clone-once控制均已闭合；十九台VM全部stopped，其余七个crash实机case和连续完整L6未闭合。
+- L6 format/controller、release-pair与maintenance refresh已完成，六类operation均有独立证据。首个crash已闭合；`install_artifacts_staged`旧clone两次start及后续v2 clone均在host失败关闭，未进入guest。repository-only start-once/clone-once控制均已闭合；新v3 clean clone已冻结，二十台VM全部stopped，其余七个crash实机case和连续完整L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -26,6 +26,7 @@
 - 第二个case clone-only/首次start/单次控制retry manifest为`ce430efb…aeb8`/`34c0918d…c8d8`/`337007ff…7ebbb`。retry唯一start在90秒无stdout/stderr后timeout，60次status与terminal list均为stopped，返回10；失败后磁盘未变、十九台全停且无guest/input/operation/transaction。离线差分确认其config除Name/UUID外与已成功启动的第三台及reinstall壳相同，Registry可见结构也一致，未获得可归因的UTM/QEMU根因。
 - 后续v2 clone-only从clean `992a307`、`337007ff…7ebbb`、十九台全停及冻结DependencyFrozen开始；唯一`utmctl clone`进程exit 0却在stderr报告OSStatus `-1712`，后置清单仍为原十九台且目标注册/package均absent，因此没有替换磁盘、启动或进入guest。失败目录不可覆盖发布，manifest `65160b12…c1859`逐项通过；这证明返回码不能替代注册与package后置条件，不证明具体UTM根因。
 - repository-only `l6_utm_clone_once.py`要求双显式授权并绑定clean head、前序manifest、canonical全停清单、registered source、目标name/package absent与executed-control identity；唯一clone的exit/timeout、64KiB stdout/stderr前缀、完整size/hash、pre/terminal list和package后置状态均持久化。只有命令确定成功、stderr空、注册精确增加一个唯一stopped目标且精确`.utm`目录存在才返回created；零落地失败、前置拒绝和部分/不确定落地分别返回10/11/12，任何终态都不自动retry/delete/start。十一项合成回归已接入默认L6门禁，不调用真实UTM。
+- 实机前核对UTM官方CLI后以`b86d72f`修正clone名称为精确`--name`参数；修正前没有消耗真实调用。随后从clean `b86d72f`、`65160b12…c1859`、十九台canonical全停清单与冻结DependencyFrozen开始，唯一clone以exit 0、空stderr、唯一新UUID `5B19AEF1…7DAB` stopped和精确package返回created，manifest `7ce53048…e5b7`逐项通过。只对该新clone原子换入DependencyFrozen EFI/qcow2后，prepared manifest `b065c7ac…32db`固定config/EFI/qcow2 `d04b00e1…1ff4`/`0b797641…1418`/`4967234b…4b18`、`Network=[]`、双重qcow2、source/registration/target零句柄及二十台全停；独立复核再次通过。该批没有start、guest、input、operation ID、transaction、retry或delete。
 
 ## 停止线
 
@@ -37,15 +38,16 @@
 - 新`d75818f` handoff只允许作为独立clean clone的冻结输入；第三台clone现为stopped source terminal，不得重启、复用、运行下一checkpoint、覆盖、热替换或与旧pair跨套混搭。
 - 第二个case clone `B0B826F6…87B3`须保持stopped并冻结为双start失败现场；不得第三次start、进入guest、修补注册/config、复用或与第一case混用。
 - v2 clone失败证据`65160b12…c1859`须原样保留；不得沿用本批授权重试clone、重启UTM或把exit 0记为成功。
+- 新v3 clean clone `5B19AEF1…7DAB`只允许作为第二个case的stopped起点；clone与DependencyFrozen物化授权已经结束，不得自动启动、重复物化、替换config/磁盘、传input或进入transaction。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（2026-08-22）
 
-1. repository-only clone-once控制闭合后仍须新授权，才可从未改写DependencyFrozen建立另一台独立clean clone；调用前精确绑定committed clean head、`65160b12…c1859`前序manifest、十九台全停canonical清单、registered source、目标name/package absent与create-new输出根。clone-only只冻结新UUID/config/EFI/qcow2/`Network=[]`，不得启动、retry、delete、传input、生成operation ID或运行controller。
-2. 新clone只有在控制返回created且独立postverify再次证明唯一新UUID/name stopped、精确package存在、其余十九台身份/状态未漂移后，才可另行申请单次start与首条guest断网授权；启动批次不得继承clone授权。
-3. 只有target started、其余全停且双重文件回读证明仅`lo`/双main route为空，才可再分批进入input/preflight。checkpoint仍须精确命中`install_artifacts_staged/artifacts_staged`；resume、关机、其余crash、连续完整L6、P05C、发布、推送和其他平台继续关闭。
+1. 下一项系统动作须另行授权v3 clean clone `5B19AEF1…7DAB`的单次start与首条guest断网；启动前重新绑定committed clean head、clone/prepared manifest `7ce53048…e5b7`/`b065c7ac…32db`、二十台全停清单及config/EFI/qcow2/`Network=[]`。启动批次不得继承clone授权，也不得retry、delete、传input或生成operation ID。
+2. 只有target started、其余十九台stopped且双重文件回读证明仅`lo`/IPv4与IPv6 main route为空，才可再分批进入canonical input与只读/mutation preflight；任一状态不确定立即失败关闭并保留现场。
+3. checkpoint仍须精确命中`install_artifacts_staged/artifacts_staged`，之后的resume、正常停止与关机冻结继续分别授权；其余六个crash case、连续完整L6、P05C、发布、推送和其他平台继续关闭。
 
 ## 验证入口
 
@@ -67,7 +69,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器证明单次start/clone、各自确定与失败关闭terminal，以及零自动stop/retry/delete/start，不调用真实UTM。第二个case仍未进入guest，八case整体、连续完整L6与发布未闭合。
+上述入口以合成执行器证明单次start/clone、各自确定与失败关闭terminal，以及零自动stop/retry/delete/start。新v3 clone的真实创建与stopped磁盘冻结已有独立host evidence，但仍未启动或进入guest；八case整体、连续完整L6与发布未闭合。
 
 ## 阅读索引
 

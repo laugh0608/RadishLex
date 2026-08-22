@@ -414,6 +414,8 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 
 新的repository-only `l6_utm_clone_once.py`只允许PATH中的plain `utmctl` list/clone，要求clone与禁止自动retry/delete/start两项显式授权，并绑定clean 40位head、executed-control固定路径/regular single-link identity、前序manifest逐项identity/hash、canonical全停清单、精确VM数、registered source及目标name/package absent。它只调用一次clone，将命令exit/timeout、64KiB有界stdout/stderr前缀、完整size/hash、pre/terminal list及目标package状态分别以exclusive `0600` JSON写入absent `0700`根并`fsync`，最后生成manifest。只有命令exit 0、未timeout、stderr空、既有清单不漂移、唯一新增UUID/name stopped且精确`.utm`目录存在才返回0；命令确定结束且注册/package均无变化返回10，前置拒绝返回11，timeout、registry/package单侧、数量/名称漂移和其他不确定状态返回12。任何终态都不自动retry/delete/start，不进入guest、传input、替换磁盘或生成operation ID。十一项合成测试与L6默认门禁已通过；这不构成真实clone授权。
 
+取得新clone授权后，实机前按UTM官方CLI把名称参数修正为`utmctl clone UUID --name NAME`并提交`b86d72f`，修正前未发出真实clone。唯一调用绑定clean `b86d72f`、`65160b12…c1859`、十九台canonical all-stopped清单和冻结registered source；exit 0、空stderr、唯一新增UUID `5B19AEF1…7DAB` stopped与精确package共同返回created，manifest `7ce53048…e5b7`逐项通过。随后只对该新package原子换入未改写DependencyFrozen EFI/qcow2；prepared manifest `b065c7ac…32db`固定config/EFI/qcow2 `d04b00e1…1ff4`/`0b797641…1418`/`4967234b…4b18`、`Network=[]`、双重qcow2、source/registration/target零句柄及二十台前后同清单，独立复核再次通过。该批没有start、guest、input、operation ID、transaction、retry或delete；新clone只能作为stopped clean起点，单次start和首条guest断网仍须另行授权。
+
 `./scripts/check-linux-l6-controller.sh` 编译 production feature 边界与独立 acceptance crate，并运行八点中断/恢复、无重复 mutation、target validation acceptance rejection、参数授权、进程组顺序、无 dpkg child、canonical/redaction 与源码边界正负向测试。它只使用 fake port/backend 和临时目录，不运行 acceptance/maintenance executable，不写 fixed evidence root，也不证明 Linux process group 或 dpkg lifecycle 已实测。
 
 ## M5-P05 实现状态
