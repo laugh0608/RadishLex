@@ -231,6 +231,7 @@ REQUIRED_FILES = [
     "scripts/linux-product/l6_utm_start_once.py",
     "scripts/linux-product/l6_utm_clone_once.py",
     "scripts/linux-product/l6_utm_launch_diagnostics.py",
+    "scripts/linux-product/l6_utm_launch_diagnostic_bindings.py",
     "scripts/linux-product/l6_controller_contract.py",
     "scripts/linux-product/l6_release_pair.py",
     "scripts/linux-product/l6_maintenance_refresh.py",

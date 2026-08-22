@@ -93,6 +93,7 @@ class LinuxL6UtmLaunchDiagnosticsTests(unittest.TestCase):
             serialized_processes = json.dumps(processes, sort_keys=True)
             self.assertNotIn("/Applications/UTM.app", serialized_processes)
             self.assertNotIn("/opt/homebrew", serialized_processes)
+            self.assertNotIn("path", serialized_processes)
             events = read_json(request.output_root / "unified-log.json")
             self.assertEqual(events["event_count"], 2)
             serialized_events = json.dumps(events, sort_keys=True)
@@ -359,6 +360,70 @@ class LinuxL6UtmLaunchDiagnosticsTests(unittest.TestCase):
                     tampered_request
                 )
 
+    def test_prior_incomplete_diagnostic_is_semantically_bound(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            diagnostic_root, manifest_hash = write_prior_diagnostic_evidence(
+                root
+            )
+            request = self.request(
+                root,
+                prior_diagnostic_root=diagnostic_root,
+                prior_diagnostic_manifest_sha256=manifest_hash,
+            )
+
+            result = (
+                l6_utm_launch_diagnostics._validate_prior_diagnostic_evidence(
+                    request
+                )
+            )
+
+            self.assertEqual(result["prior_diagnostic_entries_verified"], 6)
+            self.assertEqual(
+                result["prior_diagnostic_outcome"], "diagnostics-incomplete"
+            )
+
+            prior_request = diagnostic_root / "request.json"
+            value = json.loads(prior_request.read_text(encoding="utf-8"))
+            value["log_start"] = "2026-08-22 09:59:59+0000"
+            prior_request.write_text(json.dumps(value) + "\n", encoding="utf-8")
+            prior_request.chmod(0o600)
+            drifted_manifest_hash = rewrite_json_manifest(diagnostic_root)
+            drifted_request = self.request(
+                root,
+                prior_diagnostic_root=diagnostic_root,
+                prior_diagnostic_manifest_sha256=drifted_manifest_hash,
+            )
+            with self.assertRaises(
+                l6_utm_launch_diagnostics.LaunchDiagnosticError
+            ):
+                l6_utm_launch_diagnostics._validate_prior_diagnostic_evidence(
+                    drifted_request
+                )
+
+            value["log_start"] = LOG_START
+            prior_request.write_text(json.dumps(value) + "\n", encoding="utf-8")
+            prior_request.chmod(0o600)
+            rewrite_json_manifest(diagnostic_root)
+
+            terminal = diagnostic_root / "terminal.json"
+            value = json.loads(terminal.read_text(encoding="utf-8"))
+            value["unified_log_observation"] = "performed"
+            terminal.write_text(json.dumps(value) + "\n", encoding="utf-8")
+            terminal.chmod(0o600)
+            manifest_hash = rewrite_json_manifest(diagnostic_root)
+            tampered_request = self.request(
+                root,
+                prior_diagnostic_root=diagnostic_root,
+                prior_diagnostic_manifest_sha256=manifest_hash,
+            )
+            with self.assertRaises(
+                l6_utm_launch_diagnostics.LaunchDiagnosticError
+            ):
+                l6_utm_launch_diagnostics._validate_prior_diagnostic_evidence(
+                    tampered_request
+                )
+
     def test_executed_control_is_bound_to_repository_copy(self) -> None:
         repository_root = Path(__file__).resolve().parents[2]
         digest = l6_utm_launch_diagnostics._validate_control_identity(
@@ -385,6 +450,8 @@ class LinuxL6UtmLaunchDiagnosticsTests(unittest.TestCase):
             "prior_failure_manifest_sha256": "d" * 64,
             "prior_postverify_root": root / "postverify-evidence",
             "prior_postverify_manifest_sha256": "e" * 64,
+            "prior_diagnostic_root": root / "diagnostic-evidence",
+            "prior_diagnostic_manifest_sha256": "f" * 64,
             "output_root": root / "launch-diagnostics",
             "attempt_id": "synthetic-diagnostics",
             "target_uuid": TARGET_UUID,
@@ -415,6 +482,7 @@ def valid_binding(
     request: l6_utm_launch_diagnostics.LaunchDiagnosticRequest,
 ) -> dict[str, object]:
     return {
+        "binding_control_sha256": "a" * 64,
         "control_sha256": "c" * 64,
         "format": l6_utm_launch_diagnostics.EVIDENCE_FORMAT,
         "prior_start_entries_verified": 65,
@@ -428,6 +496,11 @@ def valid_binding(
         "prior_postverify_manifest_sha256": (
             request.prior_postverify_manifest_sha256
         ),
+        "prior_diagnostic_entries_verified": 6,
+        "prior_diagnostic_manifest_sha256": (
+            request.prior_diagnostic_manifest_sha256
+        ),
+        "prior_diagnostic_outcome": "diagnostics-incomplete",
         "repository_clean": True,
         "repository_head": request.expected_repository_head,
     }
@@ -460,11 +533,10 @@ def vm_list(target_status: str) -> bytes:
 
 def process_inventory() -> bytes:
     return (
-        "101 1 501 /Applications/UTM.app/Contents/MacOS/UTM\n"
-        "102 101 501 /Applications/UTM.app/Contents/XPCServices/"
-        "QEMUHelper.xpc/Contents/MacOS/qemu-aarch64-softmmu\n"
-        "103 1 501 /opt/homebrew/bin/utmctl\n"
-        "104 1 501 /System/Library/CoreServices/Finder.app/Contents/MacOS/Finder\n"
+        "101 1 501 UTM\n"
+        "102 101 501 qemu-aarch64-so\n"
+        "103 1 501 utmctl\n"
+        "104 1 501 Finder\n"
     ).encode("utf-8")
 
 
@@ -565,6 +637,97 @@ def write_prior_start_evidence(root: Path) -> tuple[Path, str]:
 def rewrite_prior_start_manifest(evidence: Path) -> str:
     manifest = evidence / "files.sha256"
     payloads = (evidence / "request.json", evidence / "terminal.json")
+    manifest.write_text(
+        "".join(
+            f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n"
+            for path in payloads
+        ),
+        encoding="ascii",
+    )
+    manifest.chmod(0o600)
+    return hashlib.sha256(manifest.read_bytes()).hexdigest()
+
+
+def write_prior_diagnostic_evidence(root: Path) -> tuple[Path, str]:
+    evidence = root / "prior-diagnostic"
+    evidence.mkdir(mode=0o700)
+    values: dict[str, dict[str, object]] = {
+        "request.json": {
+            "authorization": {
+                "host_launch_diagnostics": True,
+                "read_system_log": True,
+            },
+            "expected_repository_head": "a" * 40,
+            "expected_vm_count": 2,
+            "format": l6_utm_launch_diagnostics.PRIOR_EVIDENCE_FORMAT,
+            "log_end": LOG_END,
+            "log_start": LOG_START,
+            "prior_failure_manifest_sha256": "d" * 64,
+            "prior_postverify_manifest_sha256": "e" * 64,
+            "prior_start_manifest_sha256": "b" * 64,
+            "target_name": TARGET_NAME,
+            "target_uuid": TARGET_UUID,
+        },
+        "binding-preflight.json": {
+            "control_sha256": "c" * 64,
+            "format": l6_utm_launch_diagnostics.PRIOR_EVIDENCE_FORMAT,
+            "prior_failure_manifest_sha256": "d" * 64,
+            "prior_postverify_manifest_sha256": "e" * 64,
+            "prior_start_manifest_sha256": "b" * 64,
+            "repository_clean": True,
+            "repository_head": "a" * 40,
+        },
+        "utmctl-list-live.json": {"synthetic": True},
+        "utmctl-status-live.json": {"synthetic": True},
+        "host-process-command.json": {
+            "argv": list(l6_utm_launch_diagnostics.PRIOR_PROCESS_COMMAND),
+            "exit_code": 0,
+            "stderr": {
+                "prefix_utf8": "",
+                "sha256": hashlib.sha256(b"").hexdigest(),
+                "total_bytes": 0,
+                "truncated": False,
+            },
+            "stdout": {
+                "sha256": "1" * 64,
+                "total_bytes": 95_549,
+                "truncated": True,
+            },
+            "timed_out": False,
+        },
+        "terminal.json": {
+            "automatic_delete": "not-performed",
+            "automatic_retry": "not-performed",
+            "format": l6_utm_launch_diagnostics.PRIOR_EVIDENCE_FORMAT,
+            "guest_exec": "not-performed",
+            "host_process_observation": "attempted",
+            "input_transfer": "not-performed",
+            "operation_id": "not-generated",
+            "outcome": "diagnostics-incomplete",
+            "reason": (
+                "host-process-observation:"
+                "host-process-observation-output-truncated"
+            ),
+            "root_cause": "unattributed",
+            "target_name": TARGET_NAME,
+            "target_uuid": TARGET_UUID,
+            "transaction": "not-performed",
+            "unified_log_observation": "not-performed",
+            "utm_clone": "not-performed",
+            "utm_start": "not-performed",
+            "utm_stop": "not-performed",
+        },
+    }
+    for name, value in values.items():
+        path = evidence / name
+        path.write_text(json.dumps(value) + "\n", encoding="utf-8")
+        path.chmod(0o600)
+    return evidence, rewrite_json_manifest(evidence)
+
+
+def rewrite_json_manifest(evidence: Path) -> str:
+    manifest = evidence / "files.sha256"
+    payloads = sorted(evidence.glob("*.json"))
     manifest.write_text(
         "".join(
             f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n"

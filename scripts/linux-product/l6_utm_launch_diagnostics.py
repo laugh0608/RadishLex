@@ -5,7 +5,6 @@ import argparse
 import hashlib
 import json
 import re
-import stat
 import sys
 import uuid
 from dataclasses import dataclass
@@ -13,14 +12,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
+import l6_utm_launch_diagnostic_bindings as diagnostic_bindings
 import l6_utm_start_once as start_control
 
 
-EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v1"
-CONTROL_RELATIVE_PATH = Path(
-    "scripts/linux-product/l6_utm_launch_diagnostics.py"
-)
-PROCESS_COMMAND = ("/bin/ps", "-axo", "pid=,ppid=,uid=,comm=")
+PRIOR_EVIDENCE_FORMAT = diagnostic_bindings.PRIOR_EVIDENCE_FORMAT
+EVIDENCE_FORMAT = diagnostic_bindings.EVIDENCE_FORMAT
+PRIOR_PROCESS_COMMAND = diagnostic_bindings.PRIOR_PROCESS_COMMAND
+PROCESS_COMMAND = ("/bin/ps", "-axo", "pid=,ppid=,uid=,ucomm=")
 LOG_PREDICATE = (
     '(process == "UTM") OR (process == "utmctl") OR '
     '(process BEGINSWITH "qemu")'
@@ -60,6 +59,8 @@ class LaunchDiagnosticRequest:
     prior_failure_manifest_sha256: str
     prior_postverify_root: Path
     prior_postverify_manifest_sha256: str
+    prior_diagnostic_root: Path
+    prior_diagnostic_manifest_sha256: str
     output_root: Path
     attempt_id: str
     target_uuid: str
@@ -78,6 +79,7 @@ class LaunchDiagnosticRequest:
             (self.prior_start_root, "prior-start-root"),
             (self.prior_failure_root, "prior-failure-root"),
             (self.prior_postverify_root, "prior-postverify-root"),
+            (self.prior_diagnostic_root, "prior-diagnostic-root"),
             (self.output_root, "output-root"),
         ):
             if not path.is_absolute():
@@ -90,6 +92,7 @@ class LaunchDiagnosticRequest:
             (self.prior_start_root, "prior-start"),
             (self.prior_failure_root, "prior-failure"),
             (self.prior_postverify_root, "prior-postverify"),
+            (self.prior_diagnostic_root, "prior-diagnostic"),
         ):
             if _path_is_within(self.output_root, root):
                 raise LaunchDiagnosticError(
@@ -104,6 +107,10 @@ class LaunchDiagnosticRequest:
         if not HEX_64.fullmatch(self.prior_postverify_manifest_sha256):
             raise LaunchDiagnosticError(
                 "prior-postverify-manifest-sha256-invalid"
+            )
+        if not HEX_64.fullmatch(self.prior_diagnostic_manifest_sha256):
+            raise LaunchDiagnosticError(
+                "prior-diagnostic-manifest-sha256-invalid"
             )
         if not SAFE_ATTEMPT_ID.fullmatch(self.attempt_id):
             raise LaunchDiagnosticError("attempt-id-invalid")
@@ -153,6 +160,9 @@ class LaunchDiagnosticRequest:
             "log_timeout_seconds": self.log_timeout_seconds,
             "prior_failure_manifest_sha256": (
                 self.prior_failure_manifest_sha256
+            ),
+            "prior_diagnostic_manifest_sha256": (
+                self.prior_diagnostic_manifest_sha256
             ),
             "prior_postverify_manifest_sha256": (
                 self.prior_postverify_manifest_sha256
@@ -318,241 +328,43 @@ def run_launch_diagnostics(
 def validate_diagnostic_bindings(
     request: LaunchDiagnosticRequest,
 ) -> dict[str, object]:
-    repository_head = _run_git(
-        request.repository_root, ("rev-parse", "HEAD")
-    ).decode("ascii").strip()
-    if repository_head != request.expected_repository_head:
-        raise LaunchDiagnosticError("repository-head-drift")
-    if _run_git(request.repository_root, ("status", "--porcelain")):
-        raise LaunchDiagnosticError("repository-not-clean")
-    control_sha256 = _validate_control_identity(request.repository_root)
-    prior = _validate_prior_start_evidence(request)
-    related = _validate_related_evidence(request)
-    return {
-        "control_sha256": control_sha256,
-        "format": EVIDENCE_FORMAT,
-        **prior,
-        **related,
-        "repository_clean": True,
-        "repository_head": repository_head,
-    }
+    return _translate_binding_result(
+        diagnostic_bindings.validate_diagnostic_bindings, request
+    )
 
 
 def _validate_prior_start_evidence(
     request: LaunchDiagnosticRequest,
 ) -> dict[str, object]:
-    entry_names = _verify_bound_manifest(
-        request.prior_start_root,
-        request.prior_start_manifest_sha256,
-        "prior-start",
+    return _translate_binding_result(
+        diagnostic_bindings.validate_prior_start_evidence, request
     )
-    _require_manifest_entries(
-        entry_names,
-        frozenset(("request.json", "terminal.json")),
-        "prior-start",
-    )
-
-    request_value = _read_json_object(
-        request.prior_start_root / "request.json", "prior-start-request"
-    )
-    terminal_value = _read_json_object(
-        request.prior_start_root / "terminal.json", "prior-start-terminal"
-    )
-    for value, label in (
-        (request_value, "prior-start-request"),
-        (terminal_value, "prior-start-terminal"),
-    ):
-        if value.get("format") != start_control.EVIDENCE_FORMAT:
-            raise LaunchDiagnosticError(f"{label}-format")
-        if value.get("clone_uuid") != request.target_uuid:
-            raise LaunchDiagnosticError(f"{label}-target-uuid")
-        if value.get("clone_name") != request.target_name:
-            raise LaunchDiagnosticError(f"{label}-target-name")
-
-    expected_terminal = {
-        "automatic_retry": "not-performed",
-        "automatic_stop": "not-performed",
-        "guest_exec": "not-performed",
-        "input_transfer": "not-performed",
-        "operation_id": "not-generated",
-        "outcome": "failed-closed-stopped",
-        "reason": "started-not-observed-and-all-vms-stopped",
-        "start_invocations": 1,
-        "transaction": "not-performed",
-    }
-    for field, expected in expected_terminal.items():
-        if terminal_value.get(field) != expected:
-            raise LaunchDiagnosticError(
-                f"prior-start-terminal-field:{field}"
-            )
-    status_poll_count = terminal_value.get("status_poll_count")
-    if (
-        not isinstance(status_poll_count, int)
-        or isinstance(status_poll_count, bool)
-        or not 1 <= status_poll_count <= 300
-    ):
-        raise LaunchDiagnosticError("prior-start-terminal-status-poll-count")
-    if not isinstance(terminal_value.get("start_command_timed_out"), bool):
-        raise LaunchDiagnosticError("prior-start-terminal-timeout")
-    start_exit = terminal_value.get("start_command_exit_code")
-    if start_exit is not None and (
-        not isinstance(start_exit, int) or isinstance(start_exit, bool)
-    ):
-        raise LaunchDiagnosticError("prior-start-terminal-exit-code")
-    return {
-        "prior_start_entries_verified": len(entry_names),
-        "prior_start_manifest_sha256": request.prior_start_manifest_sha256,
-        "prior_start_outcome": terminal_value["outcome"],
-        "prior_start_status_poll_count": status_poll_count,
-    }
 
 
 def _validate_related_evidence(
     request: LaunchDiagnosticRequest,
 ) -> dict[str, object]:
-    failure_entry_names = _verify_bound_manifest(
-        request.prior_failure_root,
-        request.prior_failure_manifest_sha256,
-        "prior-failure",
+    return _translate_binding_result(
+        diagnostic_bindings.validate_related_evidence, request
     )
-    _require_manifest_entries(
-        failure_entry_names,
-        frozenset(("failure.evidence.txt",)),
-        "prior-failure",
-    )
-    postverify_entry_names = _verify_bound_manifest(
-        request.prior_postverify_root,
-        request.prior_postverify_manifest_sha256,
-        "prior-postverify",
-    )
-    _require_manifest_entries(
-        postverify_entry_names,
-        frozenset(("postverify.evidence.txt",)),
-        "prior-postverify",
-    )
-    failure_lines = _read_key_value_evidence(
-        request.prior_failure_root / "failure.evidence.txt",
-        "prior-failure-summary",
-    )
-    _require_evidence_fields(
-        failure_lines,
-        {
-            "target_uuid": request.target_uuid,
-            "failure_stage": "start-controller",
-            "controller_invocations": "1",
-            "guest_exec_invocations": "0",
-            "file_pull_invocations": "0",
-            "automatic_stop": "not-performed",
-            "automatic_retry": "not-performed",
-            "automatic_delete": "not-performed",
-            "input_transfer": "not-performed",
-            "operation_id": "not-generated",
-        },
-        "prior-failure-summary",
-    )
-    postverify_lines = _read_key_value_evidence(
-        request.prior_postverify_root / "postverify.evidence.txt",
-        "prior-postverify-summary",
-    )
-    _require_evidence_fields(
-        postverify_lines,
-        {
-            "start_manifest_sha256": request.prior_start_manifest_sha256,
-            "failure_manifest_sha256": request.prior_failure_manifest_sha256,
-            "target_uuid": request.target_uuid,
-            "registered_vms": "all-stopped",
-            "target_vm": "stopped",
-            "terminal": "failed-closed-stopped",
-            "guest_exec": "not-performed",
-            "file_pull_invocations": "0",
-            "input_transfer": "not-performed",
-            "operation_id": "not-generated",
-            "transaction": "not-performed",
-            "postverify": "failed-closed-preserved",
-        },
-        "prior-postverify-summary",
-    )
-    return {
-        "prior_failure_entries_verified": len(failure_entry_names),
-        "prior_failure_manifest_sha256": request.prior_failure_manifest_sha256,
-        "prior_postverify_entries_verified": len(postverify_entry_names),
-        "prior_postverify_manifest_sha256": (
-            request.prior_postverify_manifest_sha256
-        ),
-    }
 
 
-def _verify_bound_manifest(
-    root: Path, expected_manifest_sha256: str, label: str
-) -> frozenset[str]:
-    manifest_path = root / "files.sha256"
+def _validate_prior_diagnostic_evidence(
+    request: LaunchDiagnosticRequest,
+) -> dict[str, object]:
+    return _translate_binding_result(
+        diagnostic_bindings.validate_prior_diagnostic_evidence, request
+    )
+
+
+def _translate_binding_result(
+    validator: Callable[[LaunchDiagnosticRequest], dict[str, object]],
+    request: LaunchDiagnosticRequest,
+) -> dict[str, object]:
     try:
-        if start_control._sha256_file(manifest_path) != expected_manifest_sha256:
-            raise LaunchDiagnosticError(f"{label}-manifest-drift")
-        verified_entries = start_control._verify_sha256_manifest(
-            root, manifest_path
-        )
-    except start_control.StartControlError as exc:
-        raise LaunchDiagnosticError(f"{label}:{exc}") from exc
-    try:
-        entry_names = frozenset(
-            line[66:]
-            for line in manifest_path.read_text(encoding="ascii").splitlines()
-        )
-    except (OSError, UnicodeDecodeError) as exc:
-        raise LaunchDiagnosticError(f"{label}-manifest-unreadable") from exc
-    if len(entry_names) != verified_entries:
-        raise LaunchDiagnosticError(f"{label}-manifest-entry-count")
-    return entry_names
-
-
-def _require_manifest_entries(
-    actual: frozenset[str], required: frozenset[str], label: str
-) -> None:
-    missing = sorted(required - actual)
-    if missing:
-        raise LaunchDiagnosticError(
-            f"{label}-manifest-required-entry:{missing[0]}"
-        )
-
-
-def _read_key_value_evidence(path: Path, label: str) -> dict[str, str]:
-    try:
-        payload = path.read_bytes()
-    except OSError as exc:
-        raise LaunchDiagnosticError(f"{label}-unavailable") from exc
-    if not payload or len(payload) > 64 * 1024 or not payload.endswith(b"\n"):
-        raise LaunchDiagnosticError(f"{label}-size-or-newline")
-    try:
-        lines = payload.decode("utf-8").splitlines()
-    except UnicodeDecodeError as exc:
-        raise LaunchDiagnosticError(f"{label}-not-utf8") from exc
-    if len(lines) > 128:
-        raise LaunchDiagnosticError(f"{label}-line-budget")
-    values: dict[str, str] = {}
-    for line in lines:
-        if line.count("=") != 1:
-            raise LaunchDiagnosticError(f"{label}-line-invalid")
-        key, value = line.split("=", maxsplit=1)
-        if (
-            not re.fullmatch(r"[a-z][a-z0-9_]*", key)
-            or not value
-            or any(character in "\x00\r\n" for character in value)
-            or key in values
-        ):
-            raise LaunchDiagnosticError(f"{label}-field-invalid")
-        values[key] = value
-    return values
-
-
-def _require_evidence_fields(
-    actual: dict[str, str],
-    expected: dict[str, str],
-    label: str,
-) -> None:
-    for key, value in expected.items():
-        if actual.get(key) != value:
-            raise LaunchDiagnosticError(f"{label}-field:{key}")
+        return validator(request)
+    except diagnostic_bindings.BindingError as exc:
+        raise LaunchDiagnosticError(str(exc)) from exc
 
 
 def parse_relevant_processes(
@@ -569,7 +381,7 @@ def parse_relevant_processes(
         fields = line.split(maxsplit=3)
         if len(fields) != 4:
             raise LaunchDiagnosticError("host-process-row-invalid")
-        pid_text, parent_text, uid_text, executable_path = fields
+        pid_text, parent_text, uid_text, accounting_name = fields
         if not all(value.isascii() and value.isdigit() for value in fields[:3]):
             raise LaunchDiagnosticError("host-process-identifier-invalid")
         pid = int(pid_text)
@@ -578,16 +390,18 @@ def parse_relevant_processes(
         if pid <= 0 or parent_pid < 0 or uid < 0 or pid in seen_pids:
             raise LaunchDiagnosticError("host-process-identifier-invalid")
         seen_pids.add(pid)
-        executable_name = Path(executable_path).name
-        role = _process_role(executable_name)
+        if (
+            not accounting_name
+            or len(accounting_name.encode("utf-8")) > 256
+            or any(character in "\x00\r\n/" for character in accounting_name)
+        ):
+            raise LaunchDiagnosticError("host-process-accounting-name-invalid")
+        role = _process_role(accounting_name)
         if role is None:
             continue
         records.append(
             {
-                "executable_name": executable_name,
-                "executable_path_sha256": hashlib.sha256(
-                    executable_path.encode("utf-8")
-                ).hexdigest(),
+                "accounting_name": accounting_name,
                 "parent_pid": parent_pid,
                 "pid": pid,
                 "role": role,
@@ -726,43 +540,11 @@ def _require_success(observation: CommandObservation, label: str) -> None:
         raise LaunchDiagnosticError(str(exc)) from exc
 
 
-def _run_git(repository_root: Path, arguments: tuple[str, ...]) -> bytes:
-    try:
-        return start_control._run_git(repository_root, arguments)
-    except start_control.StartControlError as exc:
-        raise LaunchDiagnosticError(str(exc)) from exc
-
-
 def _validate_control_identity(repository_root: Path) -> str:
-    expected_path = repository_root / CONTROL_RELATIVE_PATH
-    invoked_path = Path(__file__).absolute()
-    if invoked_path != expected_path:
-        raise LaunchDiagnosticError("executed-control-path-mismatch")
     try:
-        control_stat = expected_path.lstat()
-    except OSError as exc:
-        raise LaunchDiagnosticError("executed-control-unavailable") from exc
-    if (
-        not stat.S_ISREG(control_stat.st_mode)
-        or stat.S_ISLNK(control_stat.st_mode)
-        or control_stat.st_nlink != 1
-        or stat.S_IMODE(control_stat.st_mode) & 0o022
-    ):
-        raise LaunchDiagnosticError("executed-control-identity-invalid")
-    try:
-        return start_control._sha256_file(expected_path)
-    except start_control.StartControlError as exc:
+        return diagnostic_bindings.validate_control_identity(repository_root)
+    except diagnostic_bindings.BindingError as exc:
         raise LaunchDiagnosticError(str(exc)) from exc
-
-
-def _read_json_object(path: Path, label: str) -> dict[str, object]:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise LaunchDiagnosticError(f"{label}-invalid") from exc
-    if not isinstance(value, dict):
-        raise LaunchDiagnosticError(f"{label}-not-object")
-    return value
 
 
 def _parse_utc_timestamp(value: str, label: str) -> datetime:
@@ -859,6 +641,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prior-failure-manifest-sha256", required=True)
     parser.add_argument("--prior-postverify-root", type=Path, required=True)
     parser.add_argument("--prior-postverify-manifest-sha256", required=True)
+    parser.add_argument("--prior-diagnostic-root", type=Path, required=True)
+    parser.add_argument("--prior-diagnostic-manifest-sha256", required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--attempt-id", required=True)
     parser.add_argument("--target-uuid", required=True)
@@ -887,6 +671,10 @@ def main() -> int:
         prior_postverify_root=args.prior_postverify_root,
         prior_postverify_manifest_sha256=(
             args.prior_postverify_manifest_sha256
+        ),
+        prior_diagnostic_root=args.prior_diagnostic_root,
+        prior_diagnostic_manifest_sha256=(
+            args.prior_diagnostic_manifest_sha256
         ),
         output_root=args.output_root,
         attempt_id=args.attempt_id,
