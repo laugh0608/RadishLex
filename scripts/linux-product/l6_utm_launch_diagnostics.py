@@ -18,9 +18,11 @@ import l6_utm_start_once as start_control
 
 INITIAL_EVIDENCE_FORMAT = diagnostic_bindings.INITIAL_EVIDENCE_FORMAT
 PRIOR_EVIDENCE_FORMAT = diagnostic_bindings.PRIOR_EVIDENCE_FORMAT
+LATEST_EVIDENCE_FORMAT = diagnostic_bindings.LATEST_EVIDENCE_FORMAT
 EVIDENCE_FORMAT = diagnostic_bindings.EVIDENCE_FORMAT
 INITIAL_PROCESS_COMMAND = diagnostic_bindings.INITIAL_PROCESS_COMMAND
 PRIOR_PROCESS_COMMAND = diagnostic_bindings.PRIOR_PROCESS_COMMAND
+LATEST_PROCESS_COMMAND = diagnostic_bindings.LATEST_PROCESS_COMMAND
 PROCESS_COMMAND = ("/bin/ps", "-axo", "pid=,ppid=,uid=,ucomm=")
 LOG_PREDICATE = (
     '(process == "UTM") OR (process == "utmctl") OR '
@@ -65,6 +67,8 @@ class LaunchDiagnosticRequest:
     initial_diagnostic_manifest_sha256: str
     prior_diagnostic_root: Path
     prior_diagnostic_manifest_sha256: str
+    latest_diagnostic_root: Path
+    latest_diagnostic_manifest_sha256: str
     output_root: Path
     attempt_id: str
     target_uuid: str
@@ -85,6 +89,7 @@ class LaunchDiagnosticRequest:
             (self.prior_postverify_root, "prior-postverify-root"),
             (self.initial_diagnostic_root, "initial-diagnostic-root"),
             (self.prior_diagnostic_root, "prior-diagnostic-root"),
+            (self.latest_diagnostic_root, "latest-diagnostic-root"),
             (self.output_root, "output-root"),
         ):
             if not path.is_absolute():
@@ -99,6 +104,7 @@ class LaunchDiagnosticRequest:
             (self.prior_postverify_root, "prior-postverify"),
             (self.initial_diagnostic_root, "initial-diagnostic"),
             (self.prior_diagnostic_root, "prior-diagnostic"),
+            (self.latest_diagnostic_root, "latest-diagnostic"),
         ):
             if _path_is_within(self.output_root, root):
                 raise LaunchDiagnosticError(
@@ -121,6 +127,10 @@ class LaunchDiagnosticRequest:
         if not HEX_64.fullmatch(self.prior_diagnostic_manifest_sha256):
             raise LaunchDiagnosticError(
                 "prior-diagnostic-manifest-sha256-invalid"
+            )
+        if not HEX_64.fullmatch(self.latest_diagnostic_manifest_sha256):
+            raise LaunchDiagnosticError(
+                "latest-diagnostic-manifest-sha256-invalid"
             )
         if not SAFE_ATTEMPT_ID.fullmatch(self.attempt_id):
             raise LaunchDiagnosticError("attempt-id-invalid")
@@ -170,6 +180,9 @@ class LaunchDiagnosticRequest:
             "log_timeout_seconds": self.log_timeout_seconds,
             "initial_diagnostic_manifest_sha256": (
                 self.initial_diagnostic_manifest_sha256
+            ),
+            "latest_diagnostic_manifest_sha256": (
+                self.latest_diagnostic_manifest_sha256
             ),
             "prior_failure_manifest_sha256": (
                 self.prior_failure_manifest_sha256
@@ -378,6 +391,14 @@ def _validate_initial_diagnostic_evidence(
     )
 
 
+def _validate_latest_diagnostic_evidence(
+    request: LaunchDiagnosticRequest,
+) -> dict[str, object]:
+    return _translate_binding_result(
+        diagnostic_bindings.validate_latest_diagnostic_evidence, request
+    )
+
+
 def _translate_binding_result(
     validator: Callable[[LaunchDiagnosticRequest], dict[str, object]],
     request: LaunchDiagnosticRequest,
@@ -403,12 +424,23 @@ def parse_relevant_processes(
         if len(fields) != 4:
             raise LaunchDiagnosticError("host-process-row-invalid")
         pid_text, parent_text, uid_text, accounting_name = fields
-        if not all(value.isascii() and value.isdigit() for value in fields[:3]):
+        if not all(
+            value.isascii() and value.isdigit()
+            for value in (pid_text, parent_text)
+        ) or not (
+            uid_text.isascii()
+            and (uid_text.isdigit() or uid_text == "-2")
+        ):
             raise LaunchDiagnosticError("host-process-identifier-invalid")
         pid = int(pid_text)
         parent_pid = int(parent_text)
         uid = int(uid_text)
-        if pid < 0 or parent_pid < 0 or uid < 0 or pid in seen_pids:
+        if (
+            pid < 0
+            or parent_pid < 0
+            or (uid < 0 and uid != -2)
+            or pid in seen_pids
+        ):
             raise LaunchDiagnosticError("host-process-identifier-invalid")
         seen_pids.add(pid)
         if (
@@ -670,6 +702,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--initial-diagnostic-manifest-sha256", required=True)
     parser.add_argument("--prior-diagnostic-root", type=Path, required=True)
     parser.add_argument("--prior-diagnostic-manifest-sha256", required=True)
+    parser.add_argument("--latest-diagnostic-root", type=Path, required=True)
+    parser.add_argument("--latest-diagnostic-manifest-sha256", required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--attempt-id", required=True)
     parser.add_argument("--target-uuid", required=True)
@@ -706,6 +740,10 @@ def main() -> int:
         prior_diagnostic_root=args.prior_diagnostic_root,
         prior_diagnostic_manifest_sha256=(
             args.prior_diagnostic_manifest_sha256
+        ),
+        latest_diagnostic_root=args.latest_diagnostic_root,
+        latest_diagnostic_manifest_sha256=(
+            args.latest_diagnostic_manifest_sha256
         ),
         output_root=args.output_root,
         attempt_id=args.attempt_id,

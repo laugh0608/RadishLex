@@ -367,12 +367,17 @@ class LinuxL6UtmLaunchDiagnosticsTests(unittest.TestCase):
             diagnostic_root, manifest_hash = write_prior_diagnostic_evidence(
                 root, initial_hash
             )
+            latest_root, latest_hash = write_latest_diagnostic_evidence(
+                root, initial_hash, manifest_hash
+            )
             request = self.request(
                 root,
                 initial_diagnostic_root=initial_root,
                 initial_diagnostic_manifest_sha256=initial_hash,
                 prior_diagnostic_root=diagnostic_root,
                 prior_diagnostic_manifest_sha256=manifest_hash,
+                latest_diagnostic_root=latest_root,
+                latest_diagnostic_manifest_sha256=latest_hash,
             )
 
             initial_result = (
@@ -385,6 +390,11 @@ class LinuxL6UtmLaunchDiagnosticsTests(unittest.TestCase):
                     request
                 )
             )
+            latest_result = (
+                l6_utm_launch_diagnostics._validate_latest_diagnostic_evidence(
+                    request
+                )
+            )
 
             self.assertEqual(
                 initial_result["initial_diagnostic_entries_verified"], 6
@@ -393,6 +403,25 @@ class LinuxL6UtmLaunchDiagnosticsTests(unittest.TestCase):
             self.assertEqual(
                 result["prior_diagnostic_outcome"], "diagnostics-incomplete"
             )
+            self.assertEqual(
+                latest_result["latest_diagnostic_entries_verified"], 6
+            )
+
+            latest_parent_drift = self.request(
+                root,
+                initial_diagnostic_root=initial_root,
+                initial_diagnostic_manifest_sha256=initial_hash,
+                prior_diagnostic_root=diagnostic_root,
+                prior_diagnostic_manifest_sha256="9" * 64,
+                latest_diagnostic_root=latest_root,
+                latest_diagnostic_manifest_sha256=latest_hash,
+            )
+            with self.assertRaises(
+                l6_utm_launch_diagnostics.LaunchDiagnosticError
+            ):
+                l6_utm_launch_diagnostics._validate_latest_diagnostic_evidence(
+                    latest_parent_drift
+                )
 
             prior_request = diagnostic_root / "request.json"
             value = json.loads(prior_request.read_text(encoding="utf-8"))
@@ -439,7 +468,7 @@ class LinuxL6UtmLaunchDiagnosticsTests(unittest.TestCase):
                     tampered_request
                 )
 
-    def test_process_inventory_accepts_pid_zero_and_rejects_invalid_ids(
+    def test_process_inventory_accepts_macos_system_ids_and_rejects_invalid_ids(
         self,
     ) -> None:
         parsed = l6_utm_launch_diagnostics.parse_relevant_processes(
@@ -455,6 +484,8 @@ class LinuxL6UtmLaunchDiagnosticsTests(unittest.TestCase):
                 b"-1 0 0 kernel_task\n",
                 b"1 -1 0 launchd\n",
                 b"1 0 -1 launchd\n",
+                b"1 0 -02 launchd\n",
+                b"1 0 -3 launchd\n",
                 b"1 0 0 launchd\n1 0 0 duplicate\n",
                 b"0 1 0 kernel_task\n",
                 b"0 0 501 kernel_task\n",
@@ -501,6 +532,8 @@ class LinuxL6UtmLaunchDiagnosticsTests(unittest.TestCase):
             "initial_diagnostic_manifest_sha256": "f" * 64,
             "prior_diagnostic_root": root / "diagnostic-evidence",
             "prior_diagnostic_manifest_sha256": "1" * 64,
+            "latest_diagnostic_root": root / "latest-diagnostic-evidence",
+            "latest_diagnostic_manifest_sha256": "2" * 64,
             "output_root": root / "launch-diagnostics",
             "attempt_id": "synthetic-diagnostics",
             "target_uuid": TARGET_UUID,
@@ -555,6 +588,11 @@ def valid_binding(
             request.prior_diagnostic_manifest_sha256
         ),
         "prior_diagnostic_outcome": "diagnostics-incomplete",
+        "latest_diagnostic_entries_verified": 6,
+        "latest_diagnostic_manifest_sha256": (
+            request.latest_diagnostic_manifest_sha256
+        ),
+        "latest_diagnostic_outcome": "diagnostics-incomplete",
         "repository_clean": True,
         "repository_head": request.expected_repository_head,
     }
@@ -592,6 +630,7 @@ def process_inventory() -> bytes:
         "102 101 501 qemu-aarch64-so\n"
         "103 1 501 utmctl\n"
         "104 1 501 Finder\n"
+        "105 1 -2 nobody-helper\n"
     ).encode("utf-8")
 
 
@@ -727,7 +766,54 @@ def write_prior_diagnostic_evidence(
         process_stdout_size=31_570,
         process_stdout_truncated=False,
         reason="host-process-observation:host-process-identifier-invalid",
-        parent_manifest_sha256=initial_manifest_sha256,
+        request_diagnostic_fields={
+            "prior_diagnostic_manifest_sha256": initial_manifest_sha256,
+        },
+        binding_diagnostic_fields={
+            "binding_control_sha256": "a" * 64,
+            "prior_diagnostic_entries_verified": 6,
+            "prior_diagnostic_manifest_sha256": initial_manifest_sha256,
+            "prior_diagnostic_outcome": "diagnostics-incomplete",
+            "prior_diagnostic_reason": (
+                "host-process-observation:"
+                "host-process-observation-output-truncated"
+            ),
+        },
+    )
+
+
+def write_latest_diagnostic_evidence(
+    root: Path,
+    initial_manifest_sha256: str,
+    prior_manifest_sha256: str,
+) -> tuple[Path, str]:
+    return write_diagnostic_evidence(
+        root / "latest-diagnostic",
+        evidence_format=l6_utm_launch_diagnostics.LATEST_EVIDENCE_FORMAT,
+        process_command=l6_utm_launch_diagnostics.LATEST_PROCESS_COMMAND,
+        process_stdout_size=31_080,
+        process_stdout_truncated=False,
+        reason="host-process-observation:host-process-identifier-invalid",
+        request_diagnostic_fields={
+            "initial_diagnostic_manifest_sha256": initial_manifest_sha256,
+            "prior_diagnostic_manifest_sha256": prior_manifest_sha256,
+        },
+        binding_diagnostic_fields={
+            "binding_control_sha256": "a" * 64,
+            "initial_diagnostic_entries_verified": 6,
+            "initial_diagnostic_manifest_sha256": initial_manifest_sha256,
+            "initial_diagnostic_outcome": "diagnostics-incomplete",
+            "initial_diagnostic_reason": (
+                "host-process-observation:"
+                "host-process-observation-output-truncated"
+            ),
+            "prior_diagnostic_entries_verified": 6,
+            "prior_diagnostic_manifest_sha256": prior_manifest_sha256,
+            "prior_diagnostic_outcome": "diagnostics-incomplete",
+            "prior_diagnostic_reason": (
+                "host-process-observation:host-process-identifier-invalid"
+            ),
+        },
     )
 
 
@@ -739,7 +825,8 @@ def write_diagnostic_evidence(
     process_stdout_size: int,
     process_stdout_truncated: bool,
     reason: str,
-    parent_manifest_sha256: str | None = None,
+    request_diagnostic_fields: dict[str, object] | None = None,
+    binding_diagnostic_fields: dict[str, object] | None = None,
 ) -> tuple[Path, str]:
     evidence.mkdir(mode=0o700)
     values: dict[str, dict[str, object]] = {
@@ -806,22 +893,10 @@ def write_diagnostic_evidence(
             "utm_stop": "not-performed",
         },
     }
-    if parent_manifest_sha256 is not None:
-        values["request.json"]["prior_diagnostic_manifest_sha256"] = (
-            parent_manifest_sha256
-        )
-        values["binding-preflight.json"].update(
-            {
-                "binding_control_sha256": "a" * 64,
-                "prior_diagnostic_entries_verified": 6,
-                "prior_diagnostic_manifest_sha256": parent_manifest_sha256,
-                "prior_diagnostic_outcome": "diagnostics-incomplete",
-                "prior_diagnostic_reason": (
-                    "host-process-observation:"
-                    "host-process-observation-output-truncated"
-                ),
-            }
-        )
+    if request_diagnostic_fields is not None:
+        values["request.json"].update(request_diagnostic_fields)
+    if binding_diagnostic_fields is not None:
+        values["binding-preflight.json"].update(binding_diagnostic_fields)
     for name, value in values.items():
         path = evidence / name
         path.write_text(json.dumps(value) + "\n", encoding="utf-8")

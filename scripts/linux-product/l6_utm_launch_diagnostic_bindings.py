@@ -13,7 +13,8 @@ import l6_utm_start_once as start_control
 
 INITIAL_EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v1"
 PRIOR_EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v2"
-EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v3"
+LATEST_EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v3"
+EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v4"
 CONTROL_RELATIVE_PATH = Path(
     "scripts/linux-product/l6_utm_launch_diagnostics.py"
 )
@@ -22,6 +23,7 @@ BINDING_CONTROL_RELATIVE_PATH = Path(
 )
 INITIAL_PROCESS_COMMAND = ("/bin/ps", "-axo", "pid=,ppid=,uid=,comm=")
 PRIOR_PROCESS_COMMAND = ("/bin/ps", "-axo", "pid=,ppid=,uid=,ucomm=")
+LATEST_PROCESS_COMMAND = PRIOR_PROCESS_COMMAND
 HEX_40 = re.compile(r"[0-9a-f]{40}")
 HEX_64 = re.compile(r"[0-9a-f]{64}")
 
@@ -43,6 +45,8 @@ class LaunchDiagnosticBindingRequest(Protocol):
     initial_diagnostic_manifest_sha256: str
     prior_diagnostic_root: Path
     prior_diagnostic_manifest_sha256: str
+    latest_diagnostic_root: Path
+    latest_diagnostic_manifest_sha256: str
     target_uuid: str
     target_name: str
     expected_vm_count: int
@@ -68,6 +72,7 @@ def validate_diagnostic_bindings(
     related = validate_related_evidence(request)
     initial_diagnostic = validate_initial_diagnostic_evidence(request)
     prior_diagnostic = validate_prior_diagnostic_evidence(request)
+    latest_diagnostic = validate_latest_diagnostic_evidence(request)
     return {
         "binding_control_sha256": binding_control_sha256,
         "control_sha256": control_sha256,
@@ -76,6 +81,7 @@ def validate_diagnostic_bindings(
         **related,
         **initial_diagnostic,
         **prior_diagnostic,
+        **latest_diagnostic,
         "repository_clean": True,
         "repository_head": repository_head,
     }
@@ -239,7 +245,8 @@ def validate_initial_diagnostic_evidence(
         ),
         result_prefix="initial_diagnostic",
         stdout_must_be_truncated=True,
-        parent_manifest_sha256=None,
+        request_diagnostic_fields={},
+        binding_diagnostic_fields={},
     )
 
 
@@ -258,7 +265,67 @@ def validate_prior_diagnostic_evidence(
         ),
         result_prefix="prior_diagnostic",
         stdout_must_be_truncated=False,
-        parent_manifest_sha256=request.initial_diagnostic_manifest_sha256,
+        request_diagnostic_fields={
+            "prior_diagnostic_manifest_sha256": (
+                request.initial_diagnostic_manifest_sha256
+            ),
+        },
+        binding_diagnostic_fields={
+            "prior_diagnostic_entries_verified": 6,
+            "prior_diagnostic_manifest_sha256": (
+                request.initial_diagnostic_manifest_sha256
+            ),
+            "prior_diagnostic_outcome": "diagnostics-incomplete",
+            "prior_diagnostic_reason": (
+                "host-process-observation:"
+                "host-process-observation-output-truncated"
+            ),
+        },
+    )
+
+
+def validate_latest_diagnostic_evidence(
+    request: LaunchDiagnosticBindingRequest,
+) -> dict[str, object]:
+    return _validate_incomplete_diagnostic_evidence(
+        request,
+        root=request.latest_diagnostic_root,
+        manifest_sha256=request.latest_diagnostic_manifest_sha256,
+        label="latest-diagnostic",
+        evidence_format=LATEST_EVIDENCE_FORMAT,
+        process_command=LATEST_PROCESS_COMMAND,
+        expected_reason=(
+            "host-process-observation:host-process-identifier-invalid"
+        ),
+        result_prefix="latest_diagnostic",
+        stdout_must_be_truncated=False,
+        request_diagnostic_fields={
+            "initial_diagnostic_manifest_sha256": (
+                request.initial_diagnostic_manifest_sha256
+            ),
+            "prior_diagnostic_manifest_sha256": (
+                request.prior_diagnostic_manifest_sha256
+            ),
+        },
+        binding_diagnostic_fields={
+            "initial_diagnostic_entries_verified": 6,
+            "initial_diagnostic_manifest_sha256": (
+                request.initial_diagnostic_manifest_sha256
+            ),
+            "initial_diagnostic_outcome": "diagnostics-incomplete",
+            "initial_diagnostic_reason": (
+                "host-process-observation:"
+                "host-process-observation-output-truncated"
+            ),
+            "prior_diagnostic_entries_verified": 6,
+            "prior_diagnostic_manifest_sha256": (
+                request.prior_diagnostic_manifest_sha256
+            ),
+            "prior_diagnostic_outcome": "diagnostics-incomplete",
+            "prior_diagnostic_reason": (
+                "host-process-observation:host-process-identifier-invalid"
+            ),
+        },
     )
 
 
@@ -273,7 +340,8 @@ def _validate_incomplete_diagnostic_evidence(
     expected_reason: str,
     result_prefix: str,
     stdout_must_be_truncated: bool,
-    parent_manifest_sha256: str | None,
+    request_diagnostic_fields: dict[str, object],
+    binding_diagnostic_fields: dict[str, object],
 ) -> dict[str, object]:
     entry_names = _verify_bound_manifest(root, manifest_sha256, label)
     _require_manifest_entries(
@@ -312,10 +380,7 @@ def _validate_incomplete_diagnostic_evidence(
         "target_name": request.target_name,
         "target_uuid": request.target_uuid,
     }
-    if parent_manifest_sha256 is not None:
-        request_fields["prior_diagnostic_manifest_sha256"] = (
-            parent_manifest_sha256
-        )
+    request_fields.update(request_diagnostic_fields)
     _require_json_fields(prior_request, request_fields, f"{label}-request")
     prior_repository_head = prior_request.get("expected_repository_head")
     if (
@@ -339,21 +404,10 @@ def _validate_incomplete_diagnostic_evidence(
         "repository_clean": True,
         "repository_head": prior_repository_head,
     }
-    if parent_manifest_sha256 is not None:
-        binding_fields.update(
-            {
-                "prior_diagnostic_entries_verified": 6,
-                "prior_diagnostic_manifest_sha256": parent_manifest_sha256,
-                "prior_diagnostic_outcome": "diagnostics-incomplete",
-                "prior_diagnostic_reason": (
-                    "host-process-observation:"
-                    "host-process-observation-output-truncated"
-                ),
-            }
-        )
+    binding_fields.update(binding_diagnostic_fields)
     _require_json_fields(prior_binding, binding_fields, f"{label}-binding")
     control_fields = ["control_sha256"]
-    if evidence_format == PRIOR_EVIDENCE_FORMAT:
+    if evidence_format in (PRIOR_EVIDENCE_FORMAT, LATEST_EVIDENCE_FORMAT):
         control_fields.append("binding_control_sha256")
     for field in control_fields:
         digest = prior_binding.get(field)
