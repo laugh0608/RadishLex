@@ -410,7 +410,9 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 
 获准的真实单次调用从clean `053018d`与十九台all-stopped开始，唯一start在90秒内无stdout/stderr并timeout；后续60次status与terminal list均确认目标及其余十八台stopped，控制按合同返回10，没有进入guest断网分支。失败后config/EFI/qcow2仍为`038274cb…af32`/`0b797641…418`/`4967234b…b18`，qcow2双重复算一致且source/clone零句柄；完整轮询与postverify由manifest `337007ff…7ebbb`不可覆盖冻结。离线差分确认目标config除Name/UUID外与已成功启动的第三台clone及reinstall壳逐字段相同，Registry可见结构也一致；限定统一日志只看到获准AppleEvent与status查询，没有可归因的UTM/QEMU内部根因。不得第三次start、修补或复用该clone；后续只可经新授权从DependencyFrozen建立另一台独立clean clone，clone-only与启动/断网继续分批。
 
-后续v2 clone-only从clean `992a307`、上述失败manifest、十九台all-stopped与冻结DependencyFrozen开始，控制只发出一次plain clone。该进程exit 0但stderr精确为OSStatus `-1712`；terminal list仍与preclone相同，目标注册与`.utm` package均absent，因此后置数量检查拒绝继续，未替换磁盘、启动或进入guest。source、reinstall注册壳与旧clone三域磁盘hash/零句柄复验通过，失败manifest `65160b12…c1859`从absent incoming不可覆盖发布。不得把exit 0当作clone成功，也不得沿用本批授权retry、重启UTM或删除既有现场；下一步先在repository-only闭合clone-once控制与合成回归，再分别授权真实clone和启动/断网。
+后续v2 clone-only从clean `992a307`、上述失败manifest、十九台all-stopped与冻结DependencyFrozen开始，控制只发出一次plain clone。该进程exit 0但stderr精确为OSStatus `-1712`；terminal list仍与preclone相同，目标注册与`.utm` package均absent，因此后置数量检查拒绝继续，未替换磁盘、启动或进入guest。source、reinstall注册壳与旧clone三域磁盘hash/零句柄复验通过，失败manifest `65160b12…c1859`从absent incoming不可覆盖发布。不得把exit 0当作clone成功，也不得沿用本批授权retry、重启UTM或删除既有现场。
+
+新的repository-only `l6_utm_clone_once.py`只允许PATH中的plain `utmctl` list/clone，要求clone与禁止自动retry/delete/start两项显式授权，并绑定clean 40位head、executed-control固定路径/regular single-link identity、前序manifest逐项identity/hash、canonical全停清单、精确VM数、registered source及目标name/package absent。它只调用一次clone，将命令exit/timeout、64KiB有界stdout/stderr前缀、完整size/hash、pre/terminal list及目标package状态分别以exclusive `0600` JSON写入absent `0700`根并`fsync`，最后生成manifest。只有命令exit 0、未timeout、stderr空、既有清单不漂移、唯一新增UUID/name stopped且精确`.utm`目录存在才返回0；命令确定结束且注册/package均无变化返回10，前置拒绝返回11，timeout、registry/package单侧、数量/名称漂移和其他不确定状态返回12。任何终态都不自动retry/delete/start，不进入guest、传input、替换磁盘或生成operation ID。十一项合成测试与L6默认门禁已通过；这不构成真实clone授权。
 
 `./scripts/check-linux-l6-controller.sh` 编译 production feature 边界与独立 acceptance crate，并运行八点中断/恢复、无重复 mutation、target validation acceptance rejection、参数授权、进程组顺序、无 dpkg child、canonical/redaction 与源码边界正负向测试。它只使用 fake port/backend 和临时目录，不运行 acceptance/maintenance executable，不写 fixed evidence root，也不证明 Linux process group 或 dpkg lifecycle 已实测。
 
@@ -424,7 +426,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash已在第三台clean retry闭合。`install_artifacts_staged`由typed guest合同、首次安装Rust回归与单次host start控制固定；clone `B0B826F6…87B3`两次start均失败关闭，后续v2 clone的exit 0/stderr `-1712`假成功又由注册/package后置条件拒绝并以`65160b12…c1859`冻结。开发下一步先离线闭合clone-once控制；真实clone、启动和运行态断网分别授权。其他crash、连续完整L6、process/external lifecycle与P05C继续关闭。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移。首个crash已在第三台clean retry闭合。`install_artifacts_staged`由typed guest合同、首次安装Rust回归与单次host start/clone控制固定；clone `B0B826F6…87B3`两次start均失败关闭，后续v2 clone的exit 0/stderr `-1712`假成功又由注册/package后置条件拒绝并以`65160b12…c1859`冻结。开发下一步须另行授权真实clean clone、启动和运行态断网。其他crash、连续完整L6、process/external lifecycle与P05C继续关闭。
 
 ## 实机授权边界
 

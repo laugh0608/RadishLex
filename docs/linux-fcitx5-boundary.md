@@ -270,7 +270,7 @@ M5-P04 已覆盖：
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
 - P04 已按 `docs/linux-manager-local-acceptance.md` 冻结完成，不重复其导入导出、同库和重启实机；既有 guest 资产不得清理、覆盖或改作 P05 载体。
-- P05A载荷门禁与P05B载体、恢复事务、production port/CLI、startup、L6 controller/pair已完成；六类operation各有独立证据。第三台clean clone已闭合首个crash并冻结source terminal。`install_artifacts_staged`合同已闭合，但既有clone两次start均未进入guest，后续v2 clone的exit 0/stderr `-1712`假成功又因无注册/package而失败关闭；manifest `337007ff…7ebbb`/`65160b12…c1859`、十九台全停和现场未变均已冻结。下一步先离线闭合clone-once控制；不得自动clone/start/stop/retry、运行maintenance/`dpkg`或产品进程。
+- P05A载荷门禁与P05B载体、恢复事务、production port/CLI、startup、L6 controller/pair已完成；六类operation各有独立证据。第三台clean clone已闭合首个crash并冻结source terminal。`install_artifacts_staged`合同已闭合，但既有clone两次start均未进入guest，后续v2 clone的exit 0/stderr `-1712`假成功又因无注册/package而失败关闭；manifest `337007ff…7ebbb`/`65160b12…c1859`、十九台全停和现场未变均已冻结。repository-only clone-once控制已闭合；下一步须另行授权新clean clone，不得自动clone/start/stop/retry、运行maintenance/`dpkg`或产品进程。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。

@@ -4,10 +4,10 @@
 
 ## 当前判断
 
-- 复核日期：2026-08-20（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
+- 复核日期：2026-08-22（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format/controller、release-pair与maintenance refresh已完成，六类operation均有独立证据。首个crash已闭合；`install_artifacts_staged`两次start及后续v2 clone均在host失败关闭，未进入guest。十九台VM全部stopped，其余七个crash实机case和连续完整L6未闭合。
+- L6 format/controller、release-pair与maintenance refresh已完成，六类operation均有独立证据。首个crash已闭合；`install_artifacts_staged`两次start及后续v2 clone均在host失败关闭，未进入guest。repository-only start-once/clone-once控制均已闭合；十九台VM全部stopped，其余七个crash实机case和连续完整L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -25,6 +25,7 @@
 - repository-only guest-case合同除canonical input/readback/startup预期外，现固定`install_artifacts_staged`的target-only staging、package/dpkg未变、合法guard、XDG/process/network零漂移与resume重验/单次apply，并与matrix交叉校验。首次安装精确Rust回归通过，production语义无需修改。
 - 第二个case clone-only/首次start/单次控制retry manifest为`ce430efb…aeb8`/`34c0918d…c8d8`/`337007ff…7ebbb`。retry唯一start在90秒无stdout/stderr后timeout，60次status与terminal list均为stopped，返回10；失败后磁盘未变、十九台全停且无guest/input/operation/transaction。离线差分确认其config除Name/UUID外与已成功启动的第三台及reinstall壳相同，Registry可见结构也一致，未获得可归因的UTM/QEMU根因。
 - 后续v2 clone-only从clean `992a307`、`337007ff…7ebbb`、十九台全停及冻结DependencyFrozen开始；唯一`utmctl clone`进程exit 0却在stderr报告OSStatus `-1712`，后置清单仍为原十九台且目标注册/package均absent，因此没有替换磁盘、启动或进入guest。失败目录不可覆盖发布，manifest `65160b12…c1859`逐项通过；这证明返回码不能替代注册与package后置条件，不证明具体UTM根因。
+- repository-only `l6_utm_clone_once.py`要求双显式授权并绑定clean head、前序manifest、canonical全停清单、registered source、目标name/package absent与executed-control identity；唯一clone的exit/timeout、64KiB stdout/stderr前缀、完整size/hash、pre/terminal list和package后置状态均持久化。只有命令确定成功、stderr空、注册精确增加一个唯一stopped目标且精确`.utm`目录存在才返回created；零落地失败、前置拒绝和部分/不确定落地分别返回10/11/12，任何终态都不自动retry/delete/start。十一项合成回归已接入默认L6门禁，不调用真实UTM。
 
 ## 停止线
 
@@ -40,10 +41,10 @@
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步（2026-08-20）
+## 下一步（2026-08-22）
 
-1. 先在repository-only范围固定clone-once控制：精确绑定clean head/前序manifest/全停清单/source与注册壳，单次调用同时捕获exit、timeout、stdout/stderr和terminal list；stderr诊断、注册/package缺失或数量漂移均失败关闭，任何终态不自动retry/delete/start。以合成UTM回归覆盖exit 0伴随`-1712`、正常注册、部分落地和并发状态后再提交。
-2. 控制闭合后仍须新授权，才可从DependencyFrozen建立另一台独立clean clone并冻结UUID/config/EFI/qcow2/`Network=[]`；clone-only不得启动、传input、生成operation ID或运行controller。新clone启动与首条guest断网继续单独授权。
+1. repository-only clone-once控制闭合后仍须新授权，才可从未改写DependencyFrozen建立另一台独立clean clone；调用前精确绑定committed clean head、`65160b12…c1859`前序manifest、十九台全停canonical清单、registered source、目标name/package absent与create-new输出根。clone-only只冻结新UUID/config/EFI/qcow2/`Network=[]`，不得启动、retry、delete、传input、生成operation ID或运行controller。
+2. 新clone只有在控制返回created且独立postverify再次证明唯一新UUID/name stopped、精确package存在、其余十九台身份/状态未漂移后，才可另行申请单次start与首条guest断网授权；启动批次不得继承clone授权。
 3. 只有target started、其余全停且双重文件回读证明仅`lo`/双main route为空，才可再分批进入input/preflight。checkpoint仍须精确命中`install_artifacts_staged/artifacts_staged`；resume、关机、其余crash、连续完整L6、P05C、发布、推送和其他平台继续关闭。
 
 ## 验证入口
@@ -66,7 +67,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器证明单次start、四类terminal和零自动stop/retry，不调用真实UTM。clone-once控制尚待repository-only闭合；第二个case未进入guest，八case整体、连续完整L6与发布未闭合。
+上述入口以合成执行器证明单次start/clone、各自确定与失败关闭terminal，以及零自动stop/retry/delete/start，不调用真实UTM。第二个case仍未进入guest，八case整体、连续完整L6与发布未闭合。
 
 ## 阅读索引
 

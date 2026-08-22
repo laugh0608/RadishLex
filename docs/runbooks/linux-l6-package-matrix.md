@@ -86,7 +86,7 @@
 - 失败后只读冻结再次确认十九台all-stopped、config/EFI/qcow2仍为`038274cb…af32`/`0b797641…418`/`4967234b…b18`、`Network=[]`、qcow2双重复算一致且source/clone零句柄。八项持久证据（含manifest）从absent incoming不可覆盖发布为`RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-Start-Failed`，manifest `34c0918d…c8d8`逐项通过；不得把`-1712`直接归因为bookmark或磁盘问题，也不得自动retry。
 - repository-only `l6_utm_start_once.py`把再次start固定为单次可判定状态机：双显式授权，绑定clean 40位head、executed-control固定路径/regular single-link identity、上述失败manifest及其`0700`/`0600`单link条目；output必须absent且位于repo/旧证据之外。控制先要求精确VM数、全停和target独立status stopped，再只调用一次plain start；stdout/stderr以64KiB前缀、完整size/hash、timeout/exit落盘，每次status各有独立JSON，最后另取完整list。status与list同时确认仅target started才返回0；started始终未观察且terminal全停返回10，前置拒绝返回11，其他状态返回12。证据文件为`0600`、root为`0700`并逐文件`fsync`，末尾生成manifest；所有terminal均写明未自动stop/retry、未进入guest、未传input或生成operation ID。八项合成测试覆盖成功、`-1712`全停、start timeout后started、清单/status不一致、并发VM拒绝、证据及控制身份约束，不调用真实UTM。
 - 真实单次控制从clean `053018d`、首次失败manifest与十九台all-stopped开始。唯一start在90秒内无stdout/stderr并timeout，60次status与terminal list仍全为stopped，按合同返回10；guest断网分支、input、operation与transaction均未到达。postverify确认三项磁盘未变、qcow2双重复算一致、source/clone零句柄；包含全部poll JSON的持久manifest为`337007ff…7ebbb`。离线config/Registry/限定统一日志差分未取得可归因根因，因此该clone冻结为双start失败现场，不得第三次调用、修补或复用；下一台须从DependencyFrozen独立创建且clone-only/start仍分批授权。
-- 后续v2 clone-only从clean `992a307`、前序失败manifest、十九台all-stopped和冻结DependencyFrozen开始，只调用一次plain clone。进程exit 0但stderr为OSStatus `-1712`，紧随其后的list仍与preclone相同，目标注册和`.utm` package均absent；控制在数量后置条件失败关闭，未替换磁盘、启动或进入guest，也未retry/delete。source/reinstall/旧clone磁盘与零句柄复验通过，失败manifest `65160b12…c1859`不可覆盖发布。下一步先离线固定clone-once控制，真实clone与start继续分批授权。
+- 后续v2 clone-only从clean `992a307`、前序失败manifest、十九台all-stopped和冻结DependencyFrozen开始，只调用一次plain clone。进程exit 0但stderr为OSStatus `-1712`，紧随其后的list仍与preclone相同，目标注册和`.utm` package均absent；控制在数量后置条件失败关闭，未替换磁盘、启动或进入guest，也未retry/delete。source/reinstall/旧clone磁盘与零句柄复验通过，失败manifest `65160b12…c1859`不可覆盖发布。repository-only clone-once控制已闭合，真实clone与start继续分批授权。
 
 ### 当前本地资产登记（非发布证据）
 
@@ -390,9 +390,11 @@ checkpoint controller 必须是显式 acceptance 构建身份，以不可由 pro
 
 实现位于独立 `platforms/linux-l6-acceptance/` crate。production crate 的 `l6-acceptance-checkpoints` feature 默认关闭，production main 只连接 disabled sink，不识别 acceptance 参数；acceptance worker 通过继承 pipe 发送 typed checkpoint 并暂停。controller 创建独立 process group，命中后用固定 `/usr/bin/kill` 发送 `SIGKILL`，等待 worker signal 终止，并连续复验 `/proc/*/stat` 中 group member 为零且没有 `dpkg` child，满足全部条件后才允许写 evidence。`crash` 命令还必须同时具备 `--authorized-l6-crash` 与 production mutation/data-preservation 授权；本节仍不构成运行授权。
 
-首个实机case已在修复pair第三台retry形成terminal并关机冻结。旧pair的`prepared` checkpoint有效，但startup读取合法stale guard时暴露共享父目录策略漂移并在resume前停止；修复pair两台retry又分别暴露input harness与fresh-absent预期缺陷，三台旧现场均不得改写或继续。第三台clean retry `3EC83EB9…593B9`在同一断网boot中完成canonical input、双preflight、单次`install_prepared` checkpoint与单次exact resume。第二个case `install_artifacts_staged`已固定repository-only状态；clone `B0B826F6…87B3`两次start均失败关闭，后续v2 clone又以exit 0/stderr `-1712`且无注册/package失败关闭，十九台仍全stopped。下一步先离线闭合clone-once控制，真实clone、启动与guest断网分别授权。
+首个实机case已在修复pair第三台retry形成terminal并关机冻结。旧pair的`prepared` checkpoint有效，但startup读取合法stale guard时暴露共享父目录策略漂移并在resume前停止；修复pair两台retry又分别暴露input harness与fresh-absent预期缺陷，三台旧现场均不得改写或继续。第三台clean retry `3EC83EB9…593B9`在同一断网boot中完成canonical input、双preflight、单次`install_prepared` checkpoint与单次exact resume。第二个case `install_artifacts_staged`已固定repository-only状态；clone `B0B826F6…87B3`两次start均失败关闭，后续v2 clone又以exit 0/stderr `-1712`且无注册/package失败关闭，十九台仍全stopped。repository-only clone-once控制已闭合，真实clone、启动与guest断网分别授权。
 
 repository-only `l6_guest_case_contract.py`现把实机case共同输入固定为UTF-8 bytewise canonical inventory，环境文件只接受`build-environment.json`；guest-agent exit/stdout/stderr只保留为观察量，缺少非空canonical result/evidence文件回读一律失败关闭。startup预期按状态拆分：fresh absent固定`FailedClosed/ReceiptMissing/no receipt`，remove terminal固定`FailedClosed/RemovedProgram/completed`，合法stale guard固定`MaintenanceRequired/ActiveGuard/no receipt state`。第二个case的typed crash expectation与matrix单向交叉校验，首次安装Rust回归另证明checkpoint先于staged validation/quiescence/apply且exact resume只apply一次。该合同进入默认L6/repository门禁，不替代每个clone的identity、hash、权限、断网与现场文件回读，也不构成系统动作授权。
+
+repository-only `l6_utm_clone_once.py`把host clone固定为双显式授权下的一次plain `utmctl clone`。控制在调用前绑定clean head、前序manifest逐项hash/identity、canonical全停注册清单、精确source UUID/name、目标name与`.utm` package absent；调用后联合exit/timeout、stderr、terminal注册清单和精确package存在性判定。只有命令确定成功且注册精确增加一个唯一stopped目标、既有VM不漂移、package精确存在才为created；exit 0伴随`-1712`且零落地为failed-closed-absent，timeout、registry/package单侧、重复name、数量或并发状态漂移均为state-indeterminate。输出以create-new `0700`根、exclusive `0600` JSON、64KiB诊断前缀与完整size/hash、逐文件`fsync`和manifest持久化；任何终态都不自动retry/delete/start，不替换磁盘或进入guest。默认门禁只用fake runner和临时package目录，不调用真实UTM，也不构成clone授权。
 
 ## 8. 系统、字体与 startup probe
 
@@ -445,7 +447,7 @@ guest-agent push 到达guest后的owner/mode也不是可信输入；既有第六
 
 UTM 磁盘配置使用空 `Network` 数组也不能单独证明 guest 运行态断网；删除整个必填键会使 UTM 4.7.5 冷加载失败，注册缓存仍可能在首次启动挂回虚拟网卡并取得 DHCP。每次启动后、写入 artifact input 或生成 operation ID 前，都必须在 guest 内复验目标接口 down 且 IPv4/IPv6 路由为空；任一网络状态不明立即停止，不把后续断网状态倒推成“从启动起全程离线”。
 
-前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个为`rolled_back`，第六套形成target `completed`与S3。独立clone又闭合真实repair、rollback、remove和reinstall，六类operation已有分散证据但不是同一session。第三台clean clone `3EC83EB9…593B9`已闭合首个有效crash case。`install_artifacts_staged`同一clone两次start均失败关闭；后续v2 clone唯一调用exit 0/stderr `-1712`且无注册/package，manifest `65160b12…c1859`证明后置拒绝、十九台全停且未进入guest。下一步先离线闭合clone-once控制，再分批授权新clone与启动/断网；其他case与进一步清理仍关闭。
+前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个为`rolled_back`，第六套形成target `completed`与S3。独立clone又闭合真实repair、rollback、remove和reinstall，六类operation已有分散证据但不是同一session。第三台clean clone `3EC83EB9…593B9`已闭合首个有效crash case。`install_artifacts_staged`同一clone两次start均失败关闭；后续v2 clone唯一调用exit 0/stderr `-1712`且无注册/package，manifest `65160b12…c1859`证明后置拒绝、十九台全停且未进入guest。repository-only clone-once控制已闭合；下一步须另行授权新clean clone，再分批授权启动/断网，其他case与进一步清理仍关闭。
 
 ## 10. L6 完成与后续
 
