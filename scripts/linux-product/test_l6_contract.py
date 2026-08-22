@@ -80,6 +80,9 @@ class LinuxL6ContractTests(unittest.TestCase):
         self.assert_rejected(changed)
 
     def test_font_startup_and_xdg_probes_cannot_be_weakened(self) -> None:
+        self.assertIn(
+            "fresh-absent-failed-closed", self.matrix["probes"]["startup_cases"]
+        )
         for section in ("font_roles", "startup_cases", "xdg_paths"):
             changed = copy.deepcopy(self.matrix)
             changed["probes"][section].pop()
@@ -89,6 +92,18 @@ class LinuxL6ContractTests(unittest.TestCase):
         self.assert_rejected(changed)
 
     def test_authorization_offline_and_preservation_policies_are_fixed(self) -> None:
+        self.assertEqual(
+            self.matrix["execution"]["input_inventory_order"],
+            "utf8-bytewise-relative-path-v1",
+        )
+        self.assertEqual(
+            self.matrix["execution"]["build_environment_filename"],
+            "build-environment.json",
+        )
+        self.assertEqual(
+            self.matrix["execution"]["guest_agent_trust_policy"],
+            "result-and-evidence-file-readback-v1",
+        )
         for key, value in (
             ("one_mutation_per_authorization", False),
             ("network_policy", "online"),

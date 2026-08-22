@@ -58,7 +58,7 @@ git rev-list --left-right --count origin/master...dev
 
 - 直接 push 到 `dev` 不触发 GitHub Actions；日常直接推进继续依赖风险匹配的本地验证。
 - 以 `dev` 或 `master` 为目标的 Pull Request 触发同一套 `PR Checks`。`dev` 检查为协作反馈，`master` 检查由 ruleset 配置为 strict required checks。
-- `master` 禁止直接 push，只能通过通过五项检查、审批和会话解决门禁的 Pull Request 进入；合并后的 `master` push 不重复触发 `PR Checks`。
+- `master` 禁止直接 push，只能通过聚合 `Candidate Quality` 和会话解决门禁的 Pull Request 进入；单人维护阶段不要求额外审批，合并后的 `master` push 不重复触发 `PR Checks`。
 - `Release Checks` 只监听 `v*-dev`、`v*-test` 与 `v*-release` tag。普通分支 push、非发布 tag 和 PR 不触发发布工作流。
 - 准备阶段性 `dev -> master` PR 时，仍须先在本地执行完整仓库门禁并在 PR 中记录真实结果，不能只依赖远端检查发现问题。
 

@@ -7,7 +7,10 @@ from pathlib import Path
 
 COLLABORATION_DOCS = {"AGENTS.md", "CLAUDE.md"}
 ENTRY_DOCS = {
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
     "README.md",
+    "SECURITY.md",
     "docs/README.md",
     "docs/status/current.md",
 }
@@ -37,17 +40,37 @@ def doc_kind(relative_path: str) -> str:
 
 
 def iter_markdown_files(repo_root: Path) -> list[Path]:
-    paths = [repo_root / "AGENTS.md", repo_root / "CLAUDE.md", repo_root / "README.md"]
+    paths = [
+        repo_root / "AGENTS.md",
+        repo_root / "CLAUDE.md",
+        repo_root / "CODE_OF_CONDUCT.md",
+        repo_root / "CONTRIBUTING.md",
+        repo_root / "README.md",
+        repo_root / "SECURITY.md",
+    ]
     docs_root = repo_root / "docs"
     if docs_root.is_dir():
         paths.extend(sorted(docs_root.rglob("*.md")))
     return [path for path in paths if path.is_file()]
 
 
+def collaboration_docs_match(repo_root: Path) -> bool:
+    agents_path = repo_root / "AGENTS.md"
+    claude_path = repo_root / "CLAUDE.md"
+    return (
+        agents_path.is_file()
+        and claude_path.is_file()
+        and agents_path.read_bytes() == claude_path.read_bytes()
+    )
+
+
 def main() -> int:
     repo_root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parents[1]
     errors: list[str] = []
     warnings: list[str] = []
+
+    if not collaboration_docs_match(repo_root):
+        errors.append("AGENTS.md and CLAUDE.md must be byte-for-byte identical")
 
     for full_path in iter_markdown_files(repo_root):
         relative_path = full_path.relative_to(repo_root).as_posix()

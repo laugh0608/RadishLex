@@ -10,6 +10,7 @@
 - `debian/control.in` 形成可验证的 binary control 输入，`debian/artifact.json` 固定 canonical ar/USTAR、文件名、epoch、control inventory 与 dependency-analysis profile；两者都不表示安装成功。
 - `l6-matrix.json` 固定 `debian13-arm64-ephemeral-v1` 的 guest、不同 commit release pair、六步主序列、八个 crash checkpoint、probe/evidence 与逐 mutation 授权；它不是可执行安装脚本。
 - `l6-release-pair.json` 固定 S2 terminal source `55351f2` revision 1 的 package/evidence chain anchor、target clean descendant revision 2、共享 data contract 与 production/acceptance executable profile；它不包含生成物或运行授权。
+- `l6-maintenance-refresh.json` 固定第六套 release-pair record、已安装 target package/evidence、旧 production ELF与repair fix祖先，只允许从metadata不变的clean descendant生成较新production maintenance ELF；它不重建package、不携带acceptance或运行授权。
 - `assets/radishlex.svg` 是 Linux Manager 与 Fcitx 图标的共同源码，rootfs 中必须复制为两个独立普通文件。
 - RimeData 继续由 `packaging/rime/product-rime-data.json` 和 `scripts/rime-product/product_data.py` 独占来源、hash、许可证与装配语义。
 
@@ -22,15 +23,16 @@
 ./scripts/check-linux-l6-contract.sh
 ./scripts/check-linux-l6-controller.sh
 ./scripts/check-linux-l6-release-pair.sh
+./scripts/check-linux-l6-maintenance-refresh.sh
 ```
 
-第一个入口在所有受支持宿主验证 committed metadata 与负向测试。第二个入口默认运行平台无关 rootfs contract；只有显式提供真实 Linux Manager bundle 与 product-profile addon stage 时，才装配并复验临时 `DESTDIR`。第三个入口验证 canonical `.deb`、依赖输出、诊断分类、篡改拒绝和重复构建 contract；第四个入口只验证 L6 matrix 与负向边界；第五个入口编译隔离的 acceptance identity 并验证八点合成中断/恢复、进程组顺序与 evidence redaction；第六个入口以 synthetic AArch64 ELF/artifact evidence 验证 prior-terminal source anchor、target-only build、compile identity、canonical envelope 与发布后重哈希。真实 Debian 13 ARM64 构建环境另以 `build-linux-l6-release-pair.sh --source-package ABSOLUTE_FILE --source-artifact-evidence ABSOLUTE_FILE --target-root ABSOLUTE_CLEAN_PATH --output ABSENT_ABSOLUTE_PATH` 形成私有 pair；它不创建 guest、不安装 package、不运行维护 CLI。所有检查入口都不读取用户 XDG、不写 `/usr`、`/var` 或 dpkg database，也不启动 Fcitx、Manager 或桌面会话。
+第一个入口在所有受支持宿主验证 committed metadata 与负向测试。第二个入口默认运行平台无关 rootfs contract；只有显式提供真实 Linux Manager bundle 与 product-profile addon stage 时，才装配并复验临时 `DESTDIR`。第三个入口验证 canonical `.deb`、依赖输出、诊断分类、篡改拒绝和重复构建 contract；第四个入口验证 L6 matrix、guest-case 与 repository-only UTM start-once 控制及其负向边界，不调用真实UTM；第五个入口编译隔离的 acceptance identity 并验证八点合成中断/恢复、进程组顺序与 evidence redaction；第六个入口以 synthetic AArch64 ELF/artifact evidence 验证 prior-terminal source anchor、target-only build、compile identity、canonical envelope 与发布后重哈希；第七个入口验证 frozen pair/target anchor、repair fix ancestry、production-only ELF、exclusive staging与原子发布。真实 Debian 13 ARM64 构建环境分别以 `build-linux-l6-release-pair.sh` 形成私有 pair，或以 `build-linux-l6-maintenance-refresh.sh --base-record ABSOLUTE_FILE --target-package ABSOLUTE_FILE --target-artifact-evidence ABSOLUTE_FILE --refresh-root ABSOLUTE_CLEAN_PATH --output ABSENT_ABSOLUTE_PATH` 形成 package-preserving refresh；两者都不创建guest、不安装package、不运行维护CLI。所有检查入口都不读取用户 XDG、不写 `/usr`、`/var` 或 dpkg database，也不启动 Fcitx、Manager 或桌面会话。
 
 2026-08-06 已使用 committed `e1ce740` 的全新 Debian 13.6 ARM64 Manager/addon 输入通过真实载荷模式；随后 committed `ce74981` 对该产品 rootfs 连续生成两份逐字节相同的 `radishlex_26.7.1+38-1_arm64.deb` 与 evidence。包 SHA-256 为 `b56ba9494e715df847a778a59a09bea2ccef091ce023a596849c13c9f1db27cd`；只执行结构、解包与 package database 只读检查，未安装 package，也未生成 receipt。
 
 2026-08-08 已在 Debian 13 ARM64 从 source `55351f2` revision 1 与 target `e5b6da1` revision 2 的独立 clean root 断网生成并复验真实 release pair。canonical record SHA-256 为 `a9bcf35762b460a23ad9bc062611f8d5edb57e7303861bbcb99e1efb40703dfd`，source/target package 分别为 `b41e32db76388ad18cdeb60e4b40fb8e28710556df87d53bfa5b275ff2ce028c`、`8209c0161609fde3b798628e5c3460e6237c8618f2d26f1452063540c7541295`。该 pair 仍是未安装的私有 L6 输入；没有运行 maintenance/acceptance CLI、`dpkg` 或产品进程。
 
-随后第三套 pair 的 source `09ed1228…bec` 已真实安装并形成 terminal S1/S2。第四套证明同版本重建 source 不能替代 terminal artifact；builder 因此改为精确冻结 committed source并只构建 clean target。第五套 transaction 在 target validation 失败后自动恢复 source，terminal 为 `rolled_back`。第六套 source `09ed1228…bec`/target `b211d940…d09c` 的 upgrade形成 target `completed` 与冻结 S3；首次 repair 在 dpkg 前因旧 production ELF 的 target-only staged relation 缺口 `aborted_preserved`，源码已修复。第五套与repair clone只作取证。release-pair v1 强制双 executable与target release同commit，不能表达冻结package后的修复；下一步先固定maintenance-only refresh合同，再形成锚定既有target package/evidence、只刷新production maintenance ELF的ARM64 handoff，不能改写旧pair或用同版本重建package替代installed artifact。
+随后第三套 pair 的 source `09ed1228…bec` 已真实安装并形成 terminal S1/S2。第四套证明同版本重建 source 不能替代 terminal artifact；builder 因此改为精确冻结 committed source并只构建 clean target。第五套transaction为`rolled_back`，第六套upgrade形成target `completed`与S3；第三台repair及独立rollback、remove、reinstall均已真实闭合，六类operation各有证据且XDG零漂移。首个`install_prepared`的startup共享锁父目录漂移已由`a6622d4`修复，第三台clean absent clone已闭合prepared checkpoint、exact resume terminal与关机冻结。第二个`install_artifacts_staged`已闭合typed合同和首次安装回归，但既有clone两次start均未进入guest，后续v2 clone又出现exit 0/stderr `-1712`且无注册/package的host假成功；失败manifest `65160b12…c1859`已冻结。下一步先离线固定clone-once控制，不能复用旧crash资产、热替换旧pair或重建source package。
 
 仓库中较早的 revision 1 P05A/P05B evidence 只保留为历史未安装载体，不能替代上述 source revision 1/target revision 2 的 L6 pair record，也不能作为 package transaction、startup 或系统安装证据。
 

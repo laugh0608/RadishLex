@@ -61,9 +61,6 @@ fn five_operations_complete_without_touching_user_data() {
             PackageSnapshot::exact_installed(source.identity.clone())
         });
         let mut port = FakeDpkg::new(initial);
-        if kind == LinuxOperationKind::Repair {
-            port.target_valid = false;
-        }
         let guard = environment.store.acquire_guard().expect("acquire guard");
         prepare_operation(
             &environment.store,
@@ -100,6 +97,47 @@ fn five_operations_complete_without_touching_user_data() {
             [DpkgQuiescencePhase::TargetMutation]
         );
     }
+}
+
+#[test]
+fn healthy_repair_reapplies_the_same_release_exactly_once() {
+    let environment = TestEnvironment::new("healthy-repair-reapply");
+    let target = artifact(&environment, "0.2.0-1", "target");
+    let case = OperationCase {
+        kind: LinuxOperationKind::Repair,
+        relation: ArtifactVersionRelation::SameRelease,
+        source: Some(&target),
+        target: Some(&target),
+    };
+    let mut port = FakeDpkg::new(PackageSnapshot::exact_installed(target.identity.clone()));
+    let guard = environment.store.acquire_guard().expect("acquire guard");
+    prepare_operation(
+        &environment.store,
+        &guard,
+        request(&case, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"),
+        &mut port,
+    )
+    .expect("prepare healthy repair");
+    stage_case(&environment, &guard, &case);
+
+    assert_eq!(
+        resume_operation(&environment.store, &guard, &mut port).expect("complete healthy repair"),
+        TransactionOutcome::Completed
+    );
+    assert_eq!(port.apply_calls, 1);
+    assert_eq!(port.remove_calls, 0);
+    assert_eq!(port.consumed_permits.len(), 1);
+    assert_eq!(
+        port.quiescence_phases,
+        [DpkgQuiescencePhase::TargetMutation]
+    );
+    let receipt = environment
+        .store
+        .load_receipt()
+        .expect("load repair receipt")
+        .expect("repair receipt exists");
+    assert_eq!(receipt.state(), LinuxInstallState::Completed);
+    assert!(receipt.target_proof().is_some());
 }
 
 #[test]

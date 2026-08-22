@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from repository_governance import check_community_governance, check_markdown_links
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MAX_COMMITTED_PATH_LENGTH = 180
@@ -15,6 +17,9 @@ REQUIRED_FILES = [
     ".editorconfig",
     ".gitattributes",
     ".gitignore",
+    ".github/ISSUE_TEMPLATE/bug-report.yml",
+    ".github/ISSUE_TEMPLATE/change-proposal.yml",
+    ".github/ISSUE_TEMPLATE/config.yml",
     ".github/PULL_REQUEST_TEMPLATE.md",
     ".github/rulesets/README.md",
     ".github/rulesets/master-protection.json",
@@ -22,6 +27,8 @@ REQUIRED_FILES = [
     ".github/workflows/release-check.yml",
     "AGENTS.md",
     "CLAUDE.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
     "Cargo.lock",
     "Cargo.toml",
     "server/sync-server/go.mod",
@@ -32,6 +39,7 @@ REQUIRED_FILES = [
     "crates/ime-cli/src/main.rs",
     "LICENSE",
     "README.md",
+    "SECURITY.md",
     "crates/ime-core/Cargo.toml",
     "crates/ime-core/src/lib.rs",
     "crates/ime-runtime/Cargo.toml",
@@ -152,6 +160,7 @@ REQUIRED_FILES = [
     "platforms/linux-product/src/tests/recovery.rs",
     "platforms/linux-product/src/tests/system_port.rs",
     "packaging/linux/l6-release-pair.json",
+    "packaging/linux/l6-maintenance-refresh.json",
     "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.h",
     "platforms/macos-product/UpgradePreflightHost/Sources/RLXUpgradePreflight.m",
     "platforms/macos-product/UpgradePreflightHost/Sources/main.m",
@@ -212,14 +221,22 @@ REQUIRED_FILES = [
     "scripts/check-linux-l6-contract.sh",
     "scripts/check-linux-l6-controller.sh",
     "scripts/check-linux-l6-release-pair.sh",
+    "scripts/check-linux-l6-maintenance-refresh.sh",
     "scripts/build-linux-product-addon-stage.sh",
     "scripts/build-linux-deb-artifact.sh",
     "scripts/build-linux-l6-release-pair.sh",
+    "scripts/build-linux-l6-maintenance-refresh.sh",
     "scripts/linux-product/l6_contract.py",
+    "scripts/linux-product/l6_guest_case_contract.py",
+    "scripts/linux-product/l6_utm_start_once.py",
     "scripts/linux-product/l6_controller_contract.py",
     "scripts/linux-product/l6_release_pair.py",
+    "scripts/linux-product/l6_maintenance_refresh.py",
+    "scripts/linux-product/l6_maintenance_refresh_environment.py",
+    "scripts/linux-product/l6_maintenance_refresh_io.py",
     "scripts/linux-product/l6_source_anchor.py",
     "scripts/linux-product/l6_release_pair_contract.py",
+    "scripts/linux-product/l6_maintenance_refresh_contract.py",
     "scripts/linux-product/product_metadata.py",
     "scripts/linux-product/source_contract.py",
     "scripts/linux-product/test_startup_gate_order.py",
@@ -229,9 +246,13 @@ REQUIRED_FILES = [
     "scripts/linux-product/test_rootfs.py",
     "scripts/linux-product/test_deb_artifact.py",
     "scripts/linux-product/test_l6_contract.py",
+    "scripts/linux-product/test_l6_guest_case_contract.py",
+    "scripts/linux-product/test_l6_utm_start_once.py",
     "scripts/linux-product/test_l6_controller_contract.py",
     "scripts/linux-product/test_l6_release_pair.py",
     "scripts/linux-product/test_l6_release_pair_contract.py",
+    "scripts/linux-product/test_l6_maintenance_refresh.py",
+    "scripts/linux-product/test_l6_maintenance_refresh_contract.py",
     "scripts/build-manager-linux-product.sh",
     "scripts/check-manager-linux-product.sh",
     "scripts/build-linux-fcitx5-container.sh",
@@ -300,6 +321,9 @@ REQUIRED_FILES = [
     "crates/ime-product-install/src/filesystem.rs",
     "scripts/check-repo.py",
     "scripts/check-repo.sh",
+    "scripts/repository_governance.py",
+    "scripts/test_repository_checkers.py",
+    "scripts/test_repository_governance.py",
     "scripts/check-sync-deployment-evidence.py",
     "scripts/check-sync-deployment-evidence.sh",
     "scripts/check-sync-server-deployment-rehearsal.py",
@@ -321,13 +345,14 @@ REQUIRED_FILES = [
     "apps/radishlex-manager/tool/ffi_bridge_smoke.dart",
     "apps/radishlex-manager/test/widget_test.dart",
 ]
-REQUIRED_STATUS_CHECKS = {
+PR_QUALITY_COMPONENTS = {
     "Repo Hygiene",
     "Repository Baseline",
     "Rust Clippy",
     "Flutter Manager",
     "Go Quality",
 }
+REQUIRED_STATUS_CHECKS = {"Candidate Quality"}
 CONVENTIONAL_COMMIT_PATTERN = "^(feat|fix|docs|refactor|test|chore|ci|build|perf|revert)(\\([a-z0-9._/-]+\\))?!?: .+"
 
 
@@ -364,6 +389,30 @@ def check_required_files() -> None:
     for relative_path in REQUIRED_FILES:
         if not (REPO_ROOT / relative_path).is_file():
             raise SystemExit(f"missing required file: {relative_path}")
+
+
+def check_repository_governance() -> None:
+    paths = iter_repository_paths()
+    errors = check_community_governance(REPO_ROOT)
+    errors.extend(check_markdown_links(REPO_ROOT, paths))
+    if errors:
+        detail = "\n".join(f"- {error}" for error in errors)
+        raise SystemExit(f"repository governance checks failed:\n{detail}")
+
+
+def check_repository_checker_tests() -> None:
+    run_command(
+        [
+            sys.executable,
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            str(REPO_ROOT / "scripts"),
+            "-p",
+            "test_repository_*.py",
+        ]
+    )
 
 
 def check_collaboration_docs() -> None:
@@ -539,6 +588,10 @@ def check_linux_l6_release_pair() -> None:
     run_command([str(REPO_ROOT / "scripts/check-linux-l6-release-pair.sh")])
 
 
+def check_linux_l6_maintenance_refresh() -> None:
+    run_command([str(REPO_ROOT / "scripts/check-linux-l6-maintenance-refresh.sh")])
+
+
 def required_status_contexts(ruleset: dict[str, Any]) -> set[str]:
     for rule in ruleset.get("rules", []):
         if rule.get("type") != "required_status_checks":
@@ -576,10 +629,20 @@ def check_ruleset_and_workflows() -> None:
     if commit_message_pattern(ruleset) != CONVENTIONAL_COMMIT_PATTERN:
         raise SystemExit("ruleset conventional commit pattern does not match repository convention")
 
+    pull_request_rule = next(
+        (rule for rule in ruleset.get("rules", []) if rule.get("type") == "pull_request"),
+        None,
+    )
+    approving_review_count = (pull_request_rule or {}).get("parameters", {}).get(
+        "required_approving_review_count"
+    )
+    if approving_review_count != 0:
+        raise SystemExit("ruleset must not require extra approval during single-maintainer stage")
+
     pr_workflow = read_text(".github/workflows/pr-check.yml")
     if not pr_workflow.startswith("name: PR Checks\n"):
         raise SystemExit("pr-check workflow must use the PR Checks name")
-    for context in REQUIRED_STATUS_CHECKS:
+    for context in PR_QUALITY_COMPONENTS | REQUIRED_STATUS_CHECKS:
         if f"name: {context}" not in pr_workflow:
             raise SystemExit(f"pr-check workflow is missing job name: {context}")
     if "push:" in pr_workflow or "workflow_dispatch:" in pr_workflow:
@@ -593,6 +656,16 @@ def check_ruleset_and_workflows() -> None:
         raise SystemExit("pr-check workflow must not run for main pull requests")
     if "git diff --check" not in pr_workflow:
         raise SystemExit("pr-check workflow must check PR diff whitespace")
+
+    candidate_quality_needs = """    needs:
+      - repo-hygiene
+      - repository-baseline
+      - rust-clippy
+      - flutter-manager
+      - go-quality
+"""
+    if candidate_quality_needs not in pr_workflow:
+        raise SystemExit("pr-check Candidate Quality dependencies drifted")
 
     release_workflow = read_text(".github/workflows/release-check.yml")
     forbidden_release_triggers = ("pull_request:", "branches:", "workflow_dispatch:")
@@ -695,6 +768,8 @@ def main() -> int:
         run_script("check-docs.py", [str(REPO_ROOT)])
 
     check_required_files()
+    check_repository_governance()
+    check_repository_checker_tests()
     check_collaboration_docs()
     check_license_wording()
     check_manager_product_runtime_contract()
@@ -713,6 +788,7 @@ def main() -> int:
     check_linux_l6_contract()
     check_linux_l6_controller()
     check_linux_l6_release_pair()
+    check_linux_l6_maintenance_refresh()
     check_ruleset_and_workflows()
     check_path_budget()
     check_deployment_evidence()

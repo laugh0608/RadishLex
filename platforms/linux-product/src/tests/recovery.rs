@@ -615,3 +615,66 @@ fn retry_after_target_proof_does_not_repeat_package_mutation() {
     assert_eq!(port.apply_calls, 0);
     assert_eq!(port.remove_calls, 0);
 }
+
+#[test]
+fn repair_retry_after_target_proof_does_not_repeat_package_mutation() {
+    let environment = TestEnvironment::new("repair-target-proof-retry");
+    let target = artifact(&environment, "0.2.0-1", "target");
+    let case = OperationCase {
+        kind: LinuxOperationKind::Repair,
+        relation: ArtifactVersionRelation::SameRelease,
+        source: Some(&target),
+        target: Some(&target),
+    };
+    let target_snapshot = PackageSnapshot::exact_installed(target.identity.clone());
+    let mut port = FakeDpkg::new(target_snapshot.clone());
+    let guard = environment.store.acquire_guard().expect("acquire guard");
+    prepare_operation(
+        &environment.store,
+        &guard,
+        request(&case, "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"),
+        &mut port,
+    )
+    .expect("prepare repair");
+    stage_case(&environment, &guard, &case);
+    environment
+        .store
+        .finish_staging(&guard)
+        .expect("finishing staging is idempotent");
+
+    let mut receipt = environment
+        .store
+        .load_receipt()
+        .expect("load receipt")
+        .expect("receipt exists");
+    receipt
+        .advance(LinuxInstallState::Quiesced)
+        .expect("record quiescence");
+    environment
+        .store
+        .persist_receipt(&guard, &receipt)
+        .expect("persist quiescence");
+    receipt
+        .advance(LinuxInstallState::PackageMutating)
+        .expect("enter package mutation");
+    environment
+        .store
+        .persist_receipt(&guard, &receipt)
+        .expect("persist package mutation");
+    receipt
+        .record_target_proof(target_snapshot)
+        .expect("record target proof before simulated repair crash");
+    environment
+        .store
+        .persist_receipt(&guard, &receipt)
+        .expect("persist repair target proof before simulated crash");
+
+    assert_eq!(
+        resume_operation(&environment.store, &guard, &mut port)
+            .expect("resume repair from persisted target proof"),
+        TransactionOutcome::Completed
+    );
+    assert_eq!(port.apply_calls, 0);
+    assert_eq!(port.remove_calls, 0);
+    assert!(port.consumed_permits.is_empty());
+}

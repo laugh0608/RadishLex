@@ -1,0 +1,82 @@
+name: 缺陷报告
+description: 报告可复现的输入、学习、同步、Manager、平台、文档或工具问题
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢报告问题。可利用的安全漏洞请使用仓库 Security 页面私下报告，不要填写公开 Issue。示例、日志和截图只能使用合成数据或脱敏聚合。
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已确认这不是需要私下报告的安全漏洞
+          required: true
+        - label: 我已搜索现有 Issue，并阅读 docs/status/current.md 和相关专题
+          required: true
+        - label: 本报告不含真实输入历史、联系人、凭据、密钥、恢复码、用户词库或未经授权的材料
+          required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 主要领域
+      options:
+        - 输入核心、composition、候选或 commit
+        - Engine adapter 或 RimeData
+        - 用户词库、学习、ranker 或隐私
+        - 同步、加密、设备或恢复
+        - Go sync server 或部署
+        - Flutter Manager
+        - 平台壳、FFI 或系统生命周期
+        - 安装、升级、修复、移除或回滚
+        - 文档、CI 或仓库治理
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题摘要
+      description: 简明说明实际问题及其用户或工程影响。
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境与条件
+      description: 提供提交或版本、操作系统、架构、桌面会话、输入框类型、相关组件和必要配置；不要粘贴秘密或本机私有路径。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 最小复现
+      description: 使用合成输入和隔离数据提供最小、可重复步骤，并说明是否涉及真实系统操作。
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为与证据
+      description: 附上已脱敏的错误、日志或测试结果，并明确证据未覆盖的范围。
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: 隐私、安全、数据与兼容性影响
+      description: 说明 P0-P3、学习、删除防复活、密文同步、ABI、平台或安装事务影响；不适用时填写“不适用”。
+    validations:
+      required: true
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: 临时缓解与补充信息

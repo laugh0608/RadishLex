@@ -1,88 +1,95 @@
 # RadishLex 协作约定
 
-本文件统一约束本仓库的人工与 AI 协作。对话开始或结束总结时称呼用户为 `萝卜SAMA`。
+本文件为人工与 AI 协作者提供 RadishLex 的启动级长期约束。对话开始或结束总结时称呼项目所有者为 `萝卜SAMA`。
 
-## 项目与当前阶段
+## 定位与优先级
 
-- RadishLex（萝卜词核）是 Rust 输入核心、Go 自部署同步后端、Flutter Manager 与平台原生薄壳组成的源代码可见中文输入系统。
-- 许可条款以根 `LICENSE` 为准，当前采用 RadishLex Source-Available License。
-- 输入热路径必须本地可用；服务端默认不可信，只承担密文同步、备份、设备和包分发。平台壳不承载 userdb、排序、同步或隐私真相源。
-- v1 通过稳定 engine adapter 接入成熟引擎，可用 `librime`；不得让其私有模型污染 core，也不提前重写完整拼音引擎。
-- 当前为 M5-P05B：macOS build 38 冻结；Linux 已完成 P01-P05A、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控维护 CLI 与共用只读 startup gate。
-- production 源码、L6 format v1、acceptance controller 与 release-pair verifier 已闭合。前三套真实推进暴露两个 Debian 环境缺口与 revision profile 缺口；第四套在 operation ID/CLI 前确认 source chain 不连续。第五套 upgrade 在 target validation 失败后自动恢复 source，terminal 为 `rolled_back`。修复 commit `80e49ce` 的第六套 upgrade 形成 target `completed`；随后单次 repair 在 staged preflight 因 production system port 未把唯一 target 投影为 effective source而 `aborted_preserved`，未进入 dpkg，package/startup/XDG 零漂移。源码缺口与回归已修复；现有 release-pair v1 不能表示冻结 target artifact 与较新 ELF 的组合，maintenance-only refresh 合同、ARM64 handoff、全新 S3 clone 与真实 repair 重试尚未形成，十一台 VM 全停。v1 package 不含 RadishLex maintainer scripts。
-- 真实用户同步、公开发布、tag/Release 与远端推送保持关闭。平台顺序为 macOS、Linux Fcitx5、Android、Windows、iOS，每次只推进一条主线。
+- 本文件只保留任何任务开始时都必须知道、跨任务且跨阶段成立的约束，不承载当前里程碑、批次、日期、提交、证据编号、实机清单、临时门禁或下一步。
+- 当前任务中项目所有者的明确要求优先于仓库默认流程；若要求会改变架构、协议、隐私、许可证、依赖、平台或运行时边界，仍应先说明影响并确认范围。
+- 项目定位以 `README.md` 为准，许可条款以根 `LICENSE` 的 RadishLex Source-Available License 为准，文档导航以 `docs/README.md` 为准，当前阶段、顺位、停止线和“当前不做”只读 `docs/status/current.md`。
+- 只读取当前任务需要的最少文档；历史事实需要追溯时再进入 `docs/devlogs/`、`docs/archive/` 或由 `current` 激活的临时专题。
+- 详细任务推进、授权、文档分层和交付规则见 `docs/agent-collaboration.md`。
 
-## 文档真相源
+## 称呼与语言
 
-默认入口：`README.md`、`docs/status/current.md`、`docs/technical-plan.md`、`docs/roadmap.md`、`docs/repository-layout.md`、`docs/privacy-sync.md`。按任务补读：
+- 对话开始或结束总结时称呼项目所有者为 `萝卜SAMA`。
+- 默认使用中文说明、讨论和编写文档。
+- 代码、技术标识、配置键、命令、路径和引用名保留原文。
 
-- 阶段与顺位读 `current`、`roadmap`；架构与目录读 `technical-plan`、`repository-layout`；同步与敏感数据读 `privacy-sync`。
-- Linux 当前安装工作读 `docs/linux-installation-maintenance-boundary.md`，平台/Manager 分别读 `docs/linux-fcitx5-boundary.md` 与 `docs/linux-manager-local-acceptance.md`。
-- 优先更新既有文档。入口只保留当前判断、停止线和索引；设计进专题，流水进 `docs/devlogs/YYYY-Www.md`，历史段不回写成新事实。
-- 架构、协议、隐私、平台、目录、里程碑或验证口径变化必须同步文档；每周重要推进追加 Asia/Shanghai 周志。
-- 新增或大改文档开头说明用途、读者和不包含内容。兄弟项目只写项目名和在线 URL，不写本机路径。
-- `AGENTS.md` 与 `CLAUDE.md` 保持逐字一致，目标均小于 14k 字节；`current` 目标 8k，Guide/Runbook 15k，Boundary 25k-30k。普通活跃 Markdown 接近 500 行优先拆职责。
+## 协作原则
 
-## 开发节奏与协作
-
+- 先判断请求属于回答、诊断、设计、实现、验证、发布还是系统操作；回答、诊断和评审不自动授权修改、提交、外部写入或系统动作。
 - 开始任务先检查 Git 状态并阅读直接相关文档。若基线与用户给出的 commit、ahead 或 clean 状态不一致，不 reset、覆盖或清理，先报告差异。
-- 长期功能、跨语言能力、平台或重要模块先固定边界再实现。小型 bug、文案、纯清理或不改变边界的验证补漏可直接推进。
-- 用户未明确要求修改代码时，先说明方案并等待批准；范围清晰且用户要求直接修改时可实施。影响架构、协议、隐私、许可证、平台接入或阶段边界而意图不明时先澄清。
-- 从根因、长期维护和系统一致性出发，完整覆盖真实主路径；不得用占位、半成品或“短平快”表述冒充交付。
-- 每个可分割步骤做匹配验证；核心、数据一致性、安全、隐私、用户可见行为或阶段交付扩大门禁。fast/quick 不能作为最终门禁。
-- 工作区可能含用户改动或并行改动；只修改本批文件，保留无关变更。禁止未授权 `git reset --hard`、checkout 覆盖、force push 等破坏性操作。
-- 提交使用当前用户身份和 Conventional Commits，不加 AI 署名。代码、文档、治理按主题拆分；提交前复验范围与必要门禁。推送、PR、Release、tag 或远端设置须另行授权。
+- 架构、公共协议、隐私、加密、许可证、平台接入、FFI ABI、安装事务、依赖或阶段边界变更，实施前说明目标、边界、影响和验证方式并等待批准。
+- 小型缺陷、文案、纯清理或不改变既有边界的验证补漏，在需求与范围明确时可以直接推进。
+- 不同合理解释会明显改变用户行为、数据模型、兼容边界、外部影响或风险时先澄清；已批准方案发生实质范围变化时重新确认。
+- 从根因、长期维护、系统一致性和可验证性出发，完整覆盖真实主路径；不得用占位、半成品、玩具实现、异常吞噬或层层 fallback 冒充交付。
+- 在满足需求和质量的前提下控制修改范围；不做无关重构，不为“架构感”增加没有真实收益的抽象。
+- 工作区可能含用户或并行任务的改动；只修改本批文件，保留无关变化，遇到重叠先查明来源与影响。
 
-## 架构与 Engine 边界约束
+## 必须单独授权的操作
 
-- `crates/ime-core`：session、composition、candidate、commit、engine trait 与领域模型。
-- `ime-engine-rime`：隔离 Rime 生命周期与类型；`ime-runtime`：组合 engine、ranker、userdb、privacy；`ime-ranker`：确定性重排与 explain；`ime-userdb`：SQLite、学习、tombstone、导入导出和同步投影。
-- `ime-sync`/`ime-crypto`：客户端 P2 协议、合并、设备与密钥；`server/sync-server` 只存密文与必要元数据，不参与按键或明文合并。
-- `ime-ffi` 必须明确 ABI、所有权、生命周期、线程、UTF-8、释放和错误；不得静默吞掉 crypto/sync/ranker/userdb/FFI 错误。
-- Flutter Manager 负责设置、词库、学习视图、隐私、同步状态、设备和备份入口，不进入热路径。平台壳只处理系统生命周期、按键、候选、commit 和 FFI。
-- Linux 优先 Fcitx5，候选使用 input panel；Wayland 不自造浮窗协议。`platforms/linux-product` 只承担 Debian product transaction、关系校验与 startup decision，不接管输入业务或 XDG 数据。
+- 安装或更新依赖，下载 SDK、模型或数据，改变全局工具链，或新增会修改 lockfile、系统环境和外部缓存的命令。
+- 启动长期服务或 GUI，修改系统输入法、权限、Keychain、证书、会话、全局配置、`/usr`、`/var`、dpkg、systemd 或 Fcitx profile/autostart。
+- kill、restart、合成按键、自动点击或其他可能干扰用户会话、进程和人工验收的动作。
+- 推送、创建或更新 Pull Request、Release、tag、远端设置，以及任何对外发布、部署或消息发送。
+- 授权只覆盖当前任务中已说明的目标、命令、环境和影响；命令、目标或运行影响发生实质变化时必须重新确认，不沿用历史会话授权。
+- 可直接读写仓库，运行只读 Git、既有格式化、静态检查、测试和 repository-only smoke，并做范围清楚的小型本地提交。
+- 默认先在沙盒内验证；权限、网络、证书或 PATH 限制导致关键构建或测试失真时，只为必要验证申请最小范围提权，提权不扩大任务授权。
 
-## 隐私与数据
+## 任务文档路由
 
-- P0 数据永不同步：密码、支付、证件、secure text 与隐私模式输入也永不学习；P1 原始选择/上下文默认只本地；P2 用户词、摘要、配置只作为端到端加密对象；P3 可公开下载。
-- 删除必须以 tombstone 或等价语义同步，防旧设备/备份复活。新设备由已有设备或恢复码授权；撤销后轮换后续对象密钥。
-- 日志、fixture、截图、诊断与 golden 禁止真实输入历史、联系人、密码、证件、支付或密钥；使用合成词、虚构 App/设备与脱敏聚合。
-- 同步测试覆盖多设备、base version、冲突、离线、恢复、撤销、轮换；删除覆盖 tombstone、旧状态、冲突和备份；ranker 覆盖正负反馈、recency、frequency、context 与 explain。
+| 任务 | 优先读取 |
+| --- | --- |
+| 当前阶段、停止线、下一步 | [当前状态](docs/status/current.md)；不足时再读[路线图](docs/roadmap.md) |
+| 项目定位、架构与目录 | [项目说明](README.md)、[技术方案](docs/technical-plan.md)、[仓库结构](docs/repository-layout.md) |
+| Agent 协作、授权与验证 | [Agent 协作与执行规则](docs/agent-collaboration.md)、[文档入口](docs/README.md) |
+| Engine、runtime、ranker、userdb | [Engine 边界](docs/engine-boundary.md)、[Rime adapter](docs/engine-rime-adapter.md)、相关专题 |
+| 隐私、同步、加密与设备 | [隐私与同步](docs/privacy-sync.md)、[加密边界](docs/crypto-boundary.md)、同步与密钥专题 |
+| FFI、Manager 与平台壳 | [FFI 边界](docs/ffi-boundary.md)、Manager 专题、对应平台 Boundary |
+| 安装、升级、实机与系统操作 | 对应平台安装 Boundary、`docs/runbooks/` 及 `current` 明确引用的现场入口 |
+| 分支、贡献与发布流程 | [贡献指南](CONTRIBUTING.md)、[分支与 PR ADR](docs/adr/0001-branch-and-pr-governance.md) |
 
-## Linux P05B 边界
+## 项目长期边界与 Engine 边界约束
 
-- 首个载体是 Debian 13 ARM64 系统级本地单 package，identity `debian-local-deb-v1`，不是公开 repository 或通用 Linux 包。
-- CJK/Latin 字体使用发行版 hard dependency：`fonts-noto-cjk`、`fonts-dejavu-core`；payload 只允许固定 Material Icons 图标字形，不注册字体或调用 `fc-cache`。
-- package 绑定 Manager、两份同 hash/不同 inode FFI、addon、完整 RimeData/source/license、desktop/icon 与 product manifest。
-- `install`、`upgrade`、`repair`、`remove`、`rollback` 默认对用户 XDG 零写入并保留数据；首批升降级要求 ABI/schema/XDG/settings/privacy/Rime contract 完全相同。
-- actual `.deb` 校验必须同一流计算 identity，严格解析三成员 ar、canonical USTAR、仅 `control`/`md5sums` 的 control，并交叉完整 payload inventory/manifest/evidence、canonical md5 inventory 与 `Installed-Size`；依赖、版本和 dpkg status 由同域 pure relationship 另行验证，不得退回 detached 字节声明。
-- 每次 mutation/retry 重新验证私有 staged relationship，并消费 move-only quiescence permit。首次安装恢复必须保留 recovery target。
-- state 使用 root-owned receipt、`receipt.json.tmp`/stage tmp 恢复、精确 current required slots、原子 mode 与父目录 `fsync`；guard 是 mode `0600`、零长度、单 link regular file 上的 advisory exclusive lock，不是 Unix socket。共享锁父目录只接受非 world-writable 或 root-owned 精确 `01777` sticky mode。
-- 旧 operation v1 只保留结构与 pair metadata，不存历史 hash proof，也不用于当前恢复。任何未知、半配置、身份/owner/mode/link/hash 漂移均失败关闭并保留现场。
-- production executor 只接受固定 `/usr/bin/dpkg`、typed argv、清空环境、null stdin、超时和有界诊断；system observer/port 复验 root identity、actual staging、依赖/版本、`/proc/*/maps` 静止与完整安装结果。外部 scripts/triggers 不能代表 transaction completed。
-- 维护 command 是 opaque 类型，CLI 要求精确 operation ID、root-owned 同名 package/evidence 与双显式授权。startup 连接 terminal actual package/dependency；L6 固定独立 guest、相邻 revision、六步主序列和八个 crash checkpoint。新 operation 的 source artifact 必须与前一 terminal receipt 的 installed artifact 精确相同；同版本重建字节不能替代 chain anchor。release-pair builder 只冻结 contract 指定的 prior-terminal source package/evidence，只从单一 clean target 构建，并由 target production Rust verifier 逐侧解析。真实 source install、dpkg、字体与 startup 已取证；剩余主序列与 crash/retry 尚未执行。
-- 不要把 RadishLex 做成云端实时输入法 API，也不要让同步后端进入按键热路径。
+- 输入、候选、学习和 commit 热路径必须本地可用；不要把 RadishLex 做成云端实时输入法 API，同步后端不得进入按键热路径或参与明文合并。
+- `ime-core` 管理 session、composition、candidate、commit 和 engine trait；具体引擎生命周期隔离在 adapter，runtime 组合 engine、ranker、userdb 与 privacy。
+- `ime-userdb` 是本地学习、删除和同步投影真相源；`ime-ranker` 负责确定性重排与 explain；`ime-sync` / `ime-crypto` 负责客户端协议、合并、设备和密钥。
+- `server/sync-server` 只存密文与必要元数据；Flutter Manager 负责设置与管理入口但不进入热路径；平台壳只处理系统生命周期、按键、候选、commit 和 FFI。
+- Linux 输入平台优先 Fcitx5，候选使用 input panel；Wayland 不自造浮窗协议。Linux product transaction 不接管输入业务或用户 XDG 数据。
+- 模块、目录和平台职责的完整定义以技术方案、仓库结构及对应 Boundary 为准，不在根入口复制实现细节。
 
-## 实机与系统边界
+## 隐私、数据与错误红线
 
-- 可直接读取/修改仓库，运行只读 Git、现有格式化、静态检查、测试和 smoke，并做范围清楚的小型本地提交。
-- 安装依赖、下载 SDK/模型/数据、改变全局工具链、启动长期服务或 GUI 前先告知；网络或沙盒导致关键验证失真时，只为构建/测试申请受限提权。
-- 修改系统输入法、权限、Keychain、`/usr`/`/var`、dpkg、systemd、Fcitx profile/autostart、会话、证书或全局配置必须取得明确授权。不得自动 kill/restart、合成按键或点击冒充人工验收。
-- P04 guest staging、backup、userdb、导入导出文件和临时服务保持原样，不复跑或清理。任何 L6/P05C 使用独立 clone/snapshot 或另一台 guest，并逐步授权系统写入、进程/会话和人工输入。
-- UTM 只通过 `PATH` 中的 plain `utmctl` 操作，不直接调用 app bundle 可执行文件；任何时刻最多运行一台 VM，启动前先用 `utmctl list` 确认其他注册 VM 全部停止。磁盘配置移除 Network 不能替代 guest 运行态证据；每次启动后、写入 input 或生成 operation ID 前都要复验接口 down 且 IPv4/IPv6 路由为空。
-- UTM 库条目 unavailable、UUID not found 或 data error 时必须停止并保留 package；不得把通用错误直接归因于 bookmark，也不得用磁盘目录存在替代 registered-stopped 证据。QEMU 配置集合键必须满足目标 UTM 的冷解码合同；无网卡使用 `Network=[]`，不能删除必填键。注册/config 修复须单独授权并在前后复验 UUID、config/EFI/qcow2 identity。
-- UTM guest-agent 的命令返回码或空输出不能单独作为成功证据；关键字节、结构化检查和 startup 结果须以文件回读、可靠退出合同及正负向对照独立复验。
+- P0 数据永不同步，也永不学习：密码、支付、证件、secure text 与隐私模式输入均属于此边界；P1 原始选择和上下文默认只在本地；P2 用户词、摘要和配置只作为端到端加密对象；P3 才可公开下载。
+- 删除必须保留 tombstone 或等价的防复活语义并覆盖旧设备、离线冲突和备份恢复；新设备由已有设备或恢复码授权，撤销后轮换后续对象密钥或 key epoch。
+- 日志、fixture、截图、诊断和 golden 禁止使用真实输入历史、联系人、密码、证件、支付、密钥、恢复码或生产凭据；只使用合成数据、虚构身份和脱敏聚合。
+- FFI 必须明确 ABI、所有权、生命周期、线程、UTF-8、释放和错误语义；crypto、sync、ranker、userdb、平台和安装错误不得静默吞掉或伪装成功。
+
+## 安装、实机与证据红线
+
+- 安装、升级、修复、移除和回滚默认保留用户数据；任何例外必须由明确产品合同和用户授权定义。
+- 载体、依赖、安装状态、receipt、staging、guard 与运行中程序必须从实际系统状态交叉验证；脚本退出码、detached 声明、外部 trigger 或分散证据不能单独证明事务完成。
+- mutation、retry 和恢复前重新验证输入身份、私有 staged relationship、静止条件和授权；未知状态、半配置或身份、owner、mode、link、hash 漂移均失败关闭并保留现场。
+- 被 `current` 或 runbook 标记为冻结的 guest、staging、backup、userdb、导入导出文件、临时服务和证据不得复跑、覆盖、恢复、清理或混用。
+- UTM、guest-agent、隔离网络、具体载体、transaction、startup gate、验收矩阵和当前资产规则只以对应 Boundary、runbook 与 `current` 为准；根入口不保存现场副本。
+- 静态检查、合成执行器、repository-only 测试和分散实机证据不得表述为真实系统、连续事务、端到端安全或正式发布已经通过。
 
 ## 实现、文件与验证
 
-- 代码优先直观命名、早返回、明确类型与浅层职责；不写空转 wrapper、晦涩 factory、动态字符串状态、异常吞噬或无目的 fallback。抽象只为稳定边界、真实重复或明显降复杂度。
-- 单源码原则上不超过 1500 行，接近 1000 行优先拆分；`src/` 与 `scripts/` 使用浅层职责目录；committed 相对路径默认不超过 180 字符。
-- 仓库文本 UTF-8 无 BOM、LF、末尾换行；非 Markdown 无尾随空格。不得为过门禁批量改写第三方或保留原格式资料。
-- Rust：`cargo fmt --check`、`cargo check`、相关 `cargo test`/`clippy`；Go：`gofmt`、`go test ./...`；Flutter：`dart format`、`flutter analyze`、相关 test；平台壳覆盖 build/smoke，真实行为留人工证据。
-- 涉及 docs/入口需检查术语、链接、许可证与 AGENTS/CLAUDE 同步；文本至少跑 `git diff --check`。阶段性或高风险交付补 `./scripts/check-repo.sh`，并说明已验证项与未验证风险。
+- 代码优先直观命名、早返回、明确类型和浅层职责；不写空转 wrapper、晦涩 factory、动态字符串状态、无目的 fallback 或只转发参数的抽象。
+- 单个源码原则上不超过 1500 行，接近 1000 行优先按真实职责拆分；`src/` 与 `scripts/` 使用浅层目录，committed 相对路径默认不超过 180 字符。
+- 仓库文本使用 UTF-8 无 BOM、规定换行和文件末尾换行；非 Markdown 不留尾随空格，不为通过门禁批量改写第三方或需保留原格式的材料。
+- 每个可分割步骤执行与风险匹配的验证；核心、数据一致性、安全、隐私、用户可见行为和阶段交付扩大门禁，fast/quick 入口不能作为最终门禁。
+- Rust 执行格式化、check、相关 test / clippy；Go 执行 gofmt 与相关 test；Flutter 执行 dart format、analyze 与相关 test；平台壳覆盖适用 build / smoke，真实行为保留人工或实机证据。
+- 交付时说明实际完成、验证结果、未验证内容和残余风险；没有执行的检查、系统动作或人工验收不得写成通过。
+- 架构、协议、隐私、平台、目录、里程碑或验证口径变化时同步对应真相源；每周重要推进追加 Asia/Shanghai 周志。
+- 文档改动至少运行 `./scripts/check-docs.sh`、`./scripts/check-text-files.sh` 和 `git diff --check`；阶段性或高风险交付再运行 `./scripts/check-repo.sh`。
 
-## 当前顺位
+## Git 与入口维护
 
-1. 保留前四个 stopped L6 failure/mismatch disk 与全部 pair/handoff/S0/S1/S2/WAL-drift 资产，并原样保留第五套 `rolled_back` clone、staging、两套 preflight 与 upgrade failure/recovery evidence；不热替换、覆盖、恢复或清理。
-2. 第五套只执行过一次 upgrade：target `38-2` 安装后在 production target validation 失败，自动恢复 source `38-1`；receipt 为 `rolled_back`、`manual_recovery_required=false`，XDG 零漂移，当前 config/EFI/qcow2 为 `402a…3e9`/`cb8a…bd65`/`e684…8904`。精确失败条件已离线定位为 startup manifest 独立固定 revision `1`，不得启动或重试该 clone。
-3. 第六套 clone `193179D5…EC05` 的 upgrade 为 `completed`；S3 `S3-target-installed-80e49ce-6b22499b` 保持未改写。repair clone `A3022255…3107` 只调用一次旧 production ELF，receipt `ba7a…f17c` 为 `repair/same_release/aborted_preserved`、failure `version_relation_invalid` after `artifacts_staged`；dpkg status/log 完全未变，startup/XDG 通过，evidence `8719…881f`/`2d30…8da` 已冻结，当前 disk `584b…f59b`/`3b11…8f0`/`adcc…3a4`，十一台均 stopped。该 clone 不得 resume、重试或复用。下一步先固定并实现 maintenance-only refresh 合同，再形成绑定既有 target package/evidence 的 ARM64 handoff；不得改写旧 pair 或重建 package。之后才从 S3 建独立 clone并另行授权真实 repair；其余矩阵、P05C、发布、推送、清理、真实同步及其他平台保持关闭。
+- 提交使用当前用户身份和 Conventional Commits，不添加 AI 署名；代码、文档和治理按主题拆分，提交前复验范围与必要门禁。
+- 禁止未授权 `git reset --hard`、checkout 覆盖、force push 或其他破坏性操作；推送、PR、Release、tag 和远端设置始终另行授权。
+- 一条规则只有同时满足“跨任务成立、跨阶段成立、必须启动即生效、无法仅由任务路由可靠承载”时，才进入 `AGENTS.md` / `CLAUDE.md`。
+- 稳定但按需读取的协作细则进入 `docs/agent-collaboration.md` 或对应专题；阶段状态、临时门禁、“当前不做”和批次事实进入 `current`、runbook 或 devlog，不复制回根入口。
+- `AGENTS.md` 与 `CLAUDE.md` 必须逐字一致；修改任一文件时同步另一份，并通过文档检查器验证。

@@ -22,11 +22,11 @@ RadishLex（萝卜词核）是一款本地优先、可解释、可删除、支�
 - **Flutter**：本地词库、学习、隐私、同步、设备和诊断管理界面。
 - **平台原生薄壳**：macOS InputMethodKit、Linux Fcitx5/IBus、Android IME、Windows TSF、iOS Keyboard Extension。
 
-当前工程成熟度、停止线和下一步只在 [当前状态](docs/status/current.md) 维护。macOS `26.7.1 (38)` 已作为安装、输入、修复、默认移除和数据保留均通过的冻结参考产品；当前进入 M5 Linux Fcitx5 第二平台，公开发布与真实用户同步继续保持关闭。
+当前工程成熟度、停止线和下一步只在 [当前状态](docs/status/current.md) 维护；完整文档导航见 [文档入口](docs/README.md)。参与项目请阅读[贡献指南](CONTRIBUTING.md)与[社区行为准则](CODE_OF_CONDUCT.md)，安全问题按[安全策略](SECURITY.md)私下报告。
 
 ## 稳定入口
 
-- [当前状态](docs/status/current.md)：当前批次、验证基线、停止线和下一步。
+- [文档入口](docs/README.md)：文档职责、默认阅读顺序和按任务导航；[当前状态](docs/status/current.md) 是唯一阶段快照。
 - [技术方案](docs/technical-plan.md)：稳定架构、职责、输入链和平台策略。
 - [产品交付路线图](docs/roadmap.md)：产品里程碑、交付物和退出标准。
 - [第二平台 Linux Fcitx5 ADR](docs/adr/0009-second-platform-linux-fcitx5.md)：第二平台选择、串行推进顺序与统一发布关系。

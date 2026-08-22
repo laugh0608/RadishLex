@@ -25,6 +25,12 @@ mod debian;
     all(feature = "l6-acceptance-checkpoints", unix),
     all(test, unix)
 ))]
+mod filesystem_policy;
+#[cfg(any(
+    target_os = "linux",
+    all(feature = "l6-acceptance-checkpoints", unix),
+    all(test, unix)
+))]
 mod model;
 #[cfg(any(
     target_os = "linux",

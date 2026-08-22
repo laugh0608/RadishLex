@@ -3,9 +3,10 @@ use crate::checkpoint::RejectingTargetValidationPort;
 use crate::coordinator::resume_operation_with_checkpoints;
 use crate::system::finish_staging_at_prepared_checkpoint;
 use crate::{
-    prepare_operation, resume_operation, ArtifactSlot, ArtifactVersionRelation, LinuxInstallState,
-    LinuxL6Checkpoint, LinuxL6CheckpointError, LinuxL6CheckpointSink, LinuxOperationKind,
-    PackageSnapshot, TransactionError, TransactionOutcome,
+    prepare_operation, resume_operation, ArtifactSlot, ArtifactVersionRelation, DpkgPackageState,
+    DpkgQuiescencePhase, LinuxInstallState, LinuxL6Checkpoint, LinuxL6CheckpointError,
+    LinuxL6CheckpointSink, LinuxOperationKind, PackageSnapshot, TransactionError,
+    TransactionOutcome,
 };
 
 const OPERATION_ID: &str = "10101010101010101010101010101010";
@@ -127,6 +128,105 @@ fn prepared_checkpoint_is_not_emitted_for_incomplete_staging() {
             .expect("receipt exists")
             .state(),
         LinuxInstallState::Prepared
+    );
+}
+
+#[test]
+fn install_artifacts_staged_checkpoint_preserves_absent_package_and_resumes_once() {
+    let environment = TestEnvironment::new("l6-install-artifacts-staged");
+    let target = artifact(
+        &environment,
+        "0.1.0-1",
+        "l6-install-artifacts-staged-target",
+    );
+    let case = OperationCase {
+        kind: LinuxOperationKind::Install,
+        relation: ArtifactVersionRelation::NotApplicable,
+        source: None,
+        target: Some(&target),
+    };
+    let guard = environment.store.acquire_guard().expect("acquire guard");
+    let mut port = FakeDpkg::new(PackageSnapshot::absent());
+    prepare_operation(
+        &environment.store,
+        &guard,
+        request(&case, OPERATION_ID),
+        &mut port,
+    )
+    .expect("prepare install");
+    stage_case(&environment, &guard, &case);
+
+    let mut checkpoints = InterruptAt::new(LinuxL6Checkpoint::ArtifactsStaged);
+    let error =
+        resume_operation_with_checkpoints(&environment.store, &guard, &mut port, &mut checkpoints)
+            .expect_err("artifacts-staged checkpoint simulates process termination");
+    assert!(matches!(error, TransactionError::Checkpoint(_)));
+    assert_eq!(
+        checkpoints.reached,
+        vec![LinuxL6Checkpoint::ArtifactsStaged]
+    );
+    assert_eq!(port.staged_validation_calls, 0);
+    assert!(port.quiescence_phases.is_empty());
+    assert_eq!(port.apply_calls, 0);
+    assert_eq!(port.snapshot.state(), DpkgPackageState::NotInstalled);
+
+    let receipt = environment
+        .store
+        .load_receipt()
+        .expect("load receipt")
+        .expect("receipt exists");
+    assert_eq!(receipt.operation_kind(), LinuxOperationKind::Install);
+    assert_eq!(
+        receipt.version_relation(),
+        ArtifactVersionRelation::NotApplicable
+    );
+    assert_eq!(receipt.state(), LinuxInstallState::ArtifactsStaged);
+    assert_eq!(receipt.operation_chain(), [OPERATION_ID]);
+    assert!(receipt.source_artifact().is_none());
+    assert_eq!(receipt.target_artifact(), Some(&target.identity));
+    assert!(receipt.staged_artifact(ArtifactSlot::Source).is_none());
+    assert!(receipt.staged_artifact(ArtifactSlot::Target).is_some());
+    assert!(receipt.target_proof().is_none());
+    assert!(receipt.source_proof().is_none());
+    assert!(receipt.failure_code().is_none());
+    assert!(!receipt.manual_recovery_required());
+    drop(guard);
+
+    let guard = environment.store.acquire_guard().expect("reacquire guard");
+    let mut fresh_port = FakeDpkg::new(PackageSnapshot::absent());
+    assert_eq!(
+        resume_operation(&environment.store, &guard, &mut fresh_port)
+            .expect("resume artifacts-staged install"),
+        TransactionOutcome::Completed
+    );
+    assert_eq!(fresh_port.staged_validation_calls, 2);
+    assert_eq!(
+        fresh_port.staged_validation_states,
+        [
+            LinuxInstallState::ArtifactsStaged,
+            LinuxInstallState::PackageMutating,
+        ]
+    );
+    assert_eq!(
+        fresh_port.quiescence_phases,
+        [DpkgQuiescencePhase::TargetMutation]
+    );
+    assert_eq!(fresh_port.consumed_permits.len(), 1);
+    assert!(fresh_port.issued_permits.is_empty());
+    assert_eq!(fresh_port.apply_calls, 1);
+    assert_eq!(fresh_port.user_data_touches, 0);
+    assert_eq!(fresh_port.snapshot.state(), DpkgPackageState::Installed);
+    assert_eq!(fresh_port.snapshot.artifact(), Some(&target.identity));
+
+    let completed = environment
+        .store
+        .load_receipt()
+        .expect("load completed receipt")
+        .expect("completed receipt exists");
+    assert_eq!(completed.state(), LinuxInstallState::Completed);
+    assert_eq!(
+        completed.target_proof().and_then(PackageSnapshot::artifact),
+        Some(&target.identity)
     );
 }
 
