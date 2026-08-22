@@ -409,7 +409,7 @@ def observation(
 
 
 def clone_argv() -> tuple[str, ...]:
-    return ("utmctl", "clone", SOURCE_UUID, TARGET_NAME)
+    return ("utmctl", "clone", SOURCE_UUID, "--name", TARGET_NAME)
 
 
 def preclone_list(*, other_status: str = "stopped") -> bytes:

@@ -351,7 +351,13 @@ def run_clone_once(
         stage = "utmctl-clone"
         clone_invocations = 1
         clone_observation = command_runner.run(
-            ("utmctl", "clone", request.source_uuid, request.target_name),
+            (
+                "utmctl",
+                "clone",
+                request.source_uuid,
+                "--name",
+                request.target_name,
+            ),
             request.clone_timeout_seconds,
         )
         writer.write_json("utmctl-clone.json", clone_observation.as_json())
