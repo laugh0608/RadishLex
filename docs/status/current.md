@@ -7,7 +7,7 @@
 - 复核日期：2026-08-22（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format/controller、release-pair与maintenance refresh已完成，六类operation均有独立证据。首个crash已闭合；`install_artifacts_staged`旧clone两次start、v2 clone及新v3 clean clone的首次start均在host失败关闭，未进入guest。v3首次真实只读host诊断又因进程清单超过捕获上限而失败关闭、未读取system log；v2仓库控制已收敛并等待新的单步授权。二十台VM全部stopped，其余七个crash实机case和连续完整L6未闭合。
+- L6 format/controller、release-pair与maintenance refresh已完成，六类operation均有独立证据。首个crash已闭合；`install_artifacts_staged`旧clone两次start、v2 clone及新v3 clean clone的首次start均在host失败关闭，未进入guest。两次真实只读host诊断分别在进程输出截断与标识解析处失败关闭，均未读取system log；诊断控制v3已收敛并等待新的单步授权。二十台VM全部stopped，其余七个crash实机case和连续完整L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -29,7 +29,8 @@
 - 实机前核对UTM官方CLI后以`b86d72f`修正clone名称为精确`--name`参数；修正前没有消耗真实调用。随后从clean `b86d72f`、`65160b12…c1859`、十九台canonical全停清单与冻结DependencyFrozen开始，唯一clone以exit 0、空stderr、唯一新UUID `5B19AEF1…7DAB` stopped和精确package返回created，manifest `7ce53048…e5b7`逐项通过。只对该新clone原子换入DependencyFrozen EFI/qcow2后，prepared manifest `b065c7ac…32db`固定config/EFI/qcow2 `d04b00e1…1ff4`/`0b797641…1418`/`4967234b…4b18`、`Network=[]`、双重qcow2、source/registration/target零句柄及二十台全停；独立复核再次通过。该批没有start、guest、input、operation ID、transaction、retry或delete。
 - v3首次start从clean `27087c3`、clone/prepared manifest与二十台canonical全停清单开始。唯一start在90秒内无stdout/stderr并timeout，60次status及terminal list始终为二十台全stopped，控制返回10与`failed-closed-stopped`；start/failure manifest为`870f56dd…f3a5`/`59c62c14…bba05`。成功门未成立，因此guest断网exec和file pull均为0次，也没有input、operation ID或transaction。独立postverify manifest `8e3d5ced…8386`再次确认config/EFI/qcow2未变、qcow2双重复算、source对照、`Network=[]`、零句柄和二十台全停；该结果仍不能归因具体UTM/QEMU根因。
 - 首次真实只读host诊断从clean `a828be2`与start/failure/postverify三份manifest开始，先重验二十台及目标均stopped；随后`/bin/ps -axo pid=,ppid=,uid=,comm=`成功返回95,549 bytes，超过64KiB捕获上限并以`host-process-observation-output-truncated`失败关闭，因此没有执行`/usr/bin/log show`。create-new证据manifest `158fe177…77c`逐项覆盖6个payload，terminal保持`root_cause=unattributed`并明确clone/start/stop/guest/input/operation/transaction/retry/delete均未执行。
-- repository-only `l6_utm_launch_diagnostics.py` v2现额外绑定首次不完整诊断manifest及其授权、clean HEAD、固定历史时间窗、二十台数量、旧进程命令、95,549-byte截断和日志未执行终态；主控制与独立binding模块都校验committed identity。后续进程观察改用紧凑、无路径的`/bin/ps -axo pid=,ppid=,uid=,ucomm=`，只保存accounting name、role与PID/PPID/UID，再读取同一有界fixed-predicate unified log；任何漂移、stderr、截断或格式错误继续失败关闭。九项fake-runner/临时目录回归与真实四份冻结manifest的67/14/11/6项只读语义校验通过。
+- v2真实只读诊断从clean `5ab391d`绑定start/failure/postverify与首次诊断manifest，在同一UTC窗口再次确认二十台及目标均stopped。紧凑`/bin/ps -axo pid=,ppid=,uid=,ucomm=` exit 0、stderr空，stdout 31,570 bytes且未截断，但解析器以`host-process-identifier-invalid`失败关闭，因此仍未执行`/usr/bin/log show`；六项manifest `8ccdbb9f…dc7`逐项通过，stdout完整hash `9d21798f…ed62`，所有VM/guest/transaction动作仍未执行。
+- repository-only诊断控制v3现同时绑定首次与v2诊断manifest、双授权、clean HEAD、固定时间窗/VM数量、两代命令及各自失败终态。进程解析允许macOS全量清单中的合法PID 0系统行，但不把无关进程写入证据；负PID/PPID/UID与重复PID仍失败关闭。十项fake-runner/临时目录回归、默认L6门禁及真实67/14/11/6/6项证据链语义校验通过。
 
 ## 停止线
 
@@ -42,15 +43,15 @@
 - 第二个case clone `B0B826F6…87B3`须保持stopped并冻结为双start失败现场；不得第三次start、进入guest、修补注册/config、复用或与第一case混用。
 - v2 clone失败证据`65160b12…c1859`须原样保留；不得沿用本批授权重试clone、重启UTM或把exit 0记为成功。
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
-- 首次host launch诊断证据`158fe177…77c`须原样冻结，不覆盖、补写或复用输出根；其失败不授权自动retry。v2真实采集仍须限定同一历史时间窗、目标、四份manifest与新的create-new输出根并单独授权；日志事件只能作为观察量，不能凭单条文本归因或放宽v3冻结线。
+- 两次host launch诊断证据`158fe177…77c`/`8ccdbb9f…dc7`均须原样冻结，不覆盖、补写或复用输出根；失败不授权自动retry。v3真实采集仍须限定同一历史时间窗、目标、五份manifest与新的create-new输出根并单独授权；日志事件只能作为观察量，不能凭单条文本归因或放宽v3目标冻结线。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（2026-08-22）
 
-1. 下一项系统动作须重新单独授权一次v2真实只读host诊断：只针对冻结v3 `5B19AEF1…7DAB`，绑定clean committed head、start/failure/postverify/首次诊断manifest `870f56dd…f3a5`/`59c62c14…bba05`/`8e3d5ced…8386`/`158fe177…77c`，固定UTC `2026-08-22 08:12:00+0000`至`08:18:00+0000`，写入当前absent私有根`RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v3-Host-Launch-Diagnostics-v2`。依次只执行`utmctl list`、目标`utmctl status`、紧凑`ucomm`进程观察和固定predicate `/usr/bin/log show`；不含start、stop、clone、guest exec/file、input、operation ID、transaction、retry或delete。
-2. v2结果只记录可验证的UTM/utmctl/QEMU进程、事件和全停状态；即使存在错误文本，缺少独立事实交叉证明时仍保持`root_cause=unattributed`，不预设bookmark、config、磁盘或权限根因，也不得复用或第二次启动v3。首次不完整输出继续独立冻结。
+1. 下一项系统动作须重新单独授权一次诊断控制v3真实只读采集：只针对冻结目标`5B19AEF1…7DAB`，绑定clean committed head、start/failure/postverify/首次/v2诊断manifest `870f56dd…f3a5`/`59c62c14…bba05`/`8e3d5ced…8386`/`158fe177…77c`/`8ccdbb9f…dc7`，固定UTC `2026-08-22 08:12:00+0000`至`08:18:00+0000`，写入当前absent私有根`RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v3-Host-Launch-Diagnostics-v3`。依次只执行`utmctl list`、目标`utmctl status`、紧凑`ucomm`进程观察和固定predicate `/usr/bin/log show`；不含start、stop、clone、guest exec/file、input、operation ID、transaction、retry或delete。
+2. v3诊断结果只记录可验证的UTM/utmctl/QEMU进程、事件和全停状态；即使存在错误文本，缺少独立事实交叉证明时仍保持`root_cause=unattributed`，不预设bookmark、config、磁盘或权限根因，也不得复用或第二次启动冻结目标。前两次不完整输出继续分别冻结。
 3. 只读诊断闭合后再依据结果决定是否设计并单独授权新的独立clean target。只有未来独立target唯一started、其余VM全stopped且双重文件回读证明仅`lo`/IPv4与IPv6 main route为空，才可再分批进入canonical input与只读/mutation preflight；其余六个crash case、连续完整L6、P05C、发布、推送和其他平台继续关闭。
 
 ## 验证入口
@@ -73,7 +74,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器证明单次start/clone、v2只读host launch诊断、各自确定与失败关闭terminal，以及零越界自动动作。新v3 clone的真实创建、磁盘冻结、单次start与首次诊断失败关闭已有独立host evidence，始终未进入guest；首次诊断在进程清单截断处停止，真实system log尚未读取，八case整体、连续完整L6与发布未闭合。
+上述入口以合成执行器证明单次start/clone、v3只读host launch诊断、各自确定与失败关闭terminal，以及零越界自动动作。新v3 clone的真实创建、磁盘冻结、单次start与两次诊断失败关闭已有独立host evidence，始终未进入guest；两次诊断均在进程阶段停止，真实system log尚未读取，八case整体、连续完整L6与发布未闭合。
 
 ## 阅读索引
 

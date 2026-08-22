@@ -11,15 +11,17 @@ from typing import Protocol
 import l6_utm_start_once as start_control
 
 
-PRIOR_EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v1"
-EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v2"
+INITIAL_EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v1"
+PRIOR_EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v2"
+EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v3"
 CONTROL_RELATIVE_PATH = Path(
     "scripts/linux-product/l6_utm_launch_diagnostics.py"
 )
 BINDING_CONTROL_RELATIVE_PATH = Path(
     "scripts/linux-product/l6_utm_launch_diagnostic_bindings.py"
 )
-PRIOR_PROCESS_COMMAND = ("/bin/ps", "-axo", "pid=,ppid=,uid=,comm=")
+INITIAL_PROCESS_COMMAND = ("/bin/ps", "-axo", "pid=,ppid=,uid=,comm=")
+PRIOR_PROCESS_COMMAND = ("/bin/ps", "-axo", "pid=,ppid=,uid=,ucomm=")
 HEX_40 = re.compile(r"[0-9a-f]{40}")
 HEX_64 = re.compile(r"[0-9a-f]{64}")
 
@@ -37,6 +39,8 @@ class LaunchDiagnosticBindingRequest(Protocol):
     prior_failure_manifest_sha256: str
     prior_postverify_root: Path
     prior_postverify_manifest_sha256: str
+    initial_diagnostic_root: Path
+    initial_diagnostic_manifest_sha256: str
     prior_diagnostic_root: Path
     prior_diagnostic_manifest_sha256: str
     target_uuid: str
@@ -62,6 +66,7 @@ def validate_diagnostic_bindings(
     )
     prior = validate_prior_start_evidence(request)
     related = validate_related_evidence(request)
+    initial_diagnostic = validate_initial_diagnostic_evidence(request)
     prior_diagnostic = validate_prior_diagnostic_evidence(request)
     return {
         "binding_control_sha256": binding_control_sha256,
@@ -69,6 +74,7 @@ def validate_diagnostic_bindings(
         "format": EVIDENCE_FORMAT,
         **prior,
         **related,
+        **initial_diagnostic,
         **prior_diagnostic,
         "repository_clean": True,
         "repository_head": repository_head,
@@ -217,14 +223,59 @@ def validate_related_evidence(
     }
 
 
+def validate_initial_diagnostic_evidence(
+    request: LaunchDiagnosticBindingRequest,
+) -> dict[str, object]:
+    return _validate_incomplete_diagnostic_evidence(
+        request,
+        root=request.initial_diagnostic_root,
+        manifest_sha256=request.initial_diagnostic_manifest_sha256,
+        label="initial-diagnostic",
+        evidence_format=INITIAL_EVIDENCE_FORMAT,
+        process_command=INITIAL_PROCESS_COMMAND,
+        expected_reason=(
+            "host-process-observation:"
+            "host-process-observation-output-truncated"
+        ),
+        result_prefix="initial_diagnostic",
+        stdout_must_be_truncated=True,
+        parent_manifest_sha256=None,
+    )
+
+
 def validate_prior_diagnostic_evidence(
     request: LaunchDiagnosticBindingRequest,
 ) -> dict[str, object]:
-    entry_names = _verify_bound_manifest(
-        request.prior_diagnostic_root,
-        request.prior_diagnostic_manifest_sha256,
-        "prior-diagnostic",
+    return _validate_incomplete_diagnostic_evidence(
+        request,
+        root=request.prior_diagnostic_root,
+        manifest_sha256=request.prior_diagnostic_manifest_sha256,
+        label="prior-diagnostic",
+        evidence_format=PRIOR_EVIDENCE_FORMAT,
+        process_command=PRIOR_PROCESS_COMMAND,
+        expected_reason=(
+            "host-process-observation:host-process-identifier-invalid"
+        ),
+        result_prefix="prior_diagnostic",
+        stdout_must_be_truncated=False,
+        parent_manifest_sha256=request.initial_diagnostic_manifest_sha256,
     )
+
+
+def _validate_incomplete_diagnostic_evidence(
+    request: LaunchDiagnosticBindingRequest,
+    *,
+    root: Path,
+    manifest_sha256: str,
+    label: str,
+    evidence_format: str,
+    process_command: tuple[str, ...],
+    expected_reason: str,
+    result_prefix: str,
+    stdout_must_be_truncated: bool,
+    parent_manifest_sha256: str | None,
+) -> dict[str, object]:
+    entry_names = _verify_bound_manifest(root, manifest_sha256, label)
     _require_manifest_entries(
         entry_names,
         frozenset(
@@ -237,99 +288,99 @@ def validate_prior_diagnostic_evidence(
                 "terminal.json",
             )
         ),
-        "prior-diagnostic",
+        label,
     )
     prior_request = _read_json_object(
-        request.prior_diagnostic_root / "request.json",
-        "prior-diagnostic-request",
+        root / "request.json", f"{label}-request"
     )
-    _require_json_fields(
-        prior_request,
-        {
-            "authorization": {
-                "host_launch_diagnostics": True,
-                "read_system_log": True,
-            },
-            "expected_vm_count": request.expected_vm_count,
-            "format": PRIOR_EVIDENCE_FORMAT,
-            "log_end": request.log_end,
-            "log_start": request.log_start,
-            "prior_failure_manifest_sha256": (
-                request.prior_failure_manifest_sha256
-            ),
-            "prior_postverify_manifest_sha256": (
-                request.prior_postverify_manifest_sha256
-            ),
-            "prior_start_manifest_sha256": (
-                request.prior_start_manifest_sha256
-            ),
-            "target_name": request.target_name,
-            "target_uuid": request.target_uuid,
+    request_fields: dict[str, object] = {
+        "authorization": {
+            "host_launch_diagnostics": True,
+            "read_system_log": True,
         },
-        "prior-diagnostic-request",
-    )
+        "expected_vm_count": request.expected_vm_count,
+        "format": evidence_format,
+        "log_end": request.log_end,
+        "log_start": request.log_start,
+        "prior_failure_manifest_sha256": (
+            request.prior_failure_manifest_sha256
+        ),
+        "prior_postverify_manifest_sha256": (
+            request.prior_postverify_manifest_sha256
+        ),
+        "prior_start_manifest_sha256": request.prior_start_manifest_sha256,
+        "target_name": request.target_name,
+        "target_uuid": request.target_uuid,
+    }
+    if parent_manifest_sha256 is not None:
+        request_fields["prior_diagnostic_manifest_sha256"] = (
+            parent_manifest_sha256
+        )
+    _require_json_fields(prior_request, request_fields, f"{label}-request")
     prior_repository_head = prior_request.get("expected_repository_head")
     if (
         not isinstance(prior_repository_head, str)
         or not HEX_40.fullmatch(prior_repository_head)
     ):
-        raise BindingError("prior-diagnostic-request-repository-head")
+        raise BindingError(f"{label}-request-repository-head")
+
     prior_binding = _read_json_object(
-        request.prior_diagnostic_root / "binding-preflight.json",
-        "prior-diagnostic-binding",
+        root / "binding-preflight.json", f"{label}-binding"
     )
-    _require_json_fields(
-        prior_binding,
-        {
-            "format": PRIOR_EVIDENCE_FORMAT,
-            "prior_failure_manifest_sha256": (
-                request.prior_failure_manifest_sha256
-            ),
-            "prior_postverify_manifest_sha256": (
-                request.prior_postverify_manifest_sha256
-            ),
-            "prior_start_manifest_sha256": (
-                request.prior_start_manifest_sha256
-            ),
-            "repository_clean": True,
-            "repository_head": prior_repository_head,
-        },
-        "prior-diagnostic-binding",
-    )
-    prior_control_sha256 = prior_binding.get("control_sha256")
-    if (
-        not isinstance(prior_control_sha256, str)
-        or not HEX_64.fullmatch(prior_control_sha256)
-    ):
-        raise BindingError("prior-diagnostic-binding-control-sha256")
+    binding_fields: dict[str, object] = {
+        "format": evidence_format,
+        "prior_failure_manifest_sha256": (
+            request.prior_failure_manifest_sha256
+        ),
+        "prior_postverify_manifest_sha256": (
+            request.prior_postverify_manifest_sha256
+        ),
+        "prior_start_manifest_sha256": request.prior_start_manifest_sha256,
+        "repository_clean": True,
+        "repository_head": prior_repository_head,
+    }
+    if parent_manifest_sha256 is not None:
+        binding_fields.update(
+            {
+                "prior_diagnostic_entries_verified": 6,
+                "prior_diagnostic_manifest_sha256": parent_manifest_sha256,
+                "prior_diagnostic_outcome": "diagnostics-incomplete",
+                "prior_diagnostic_reason": (
+                    "host-process-observation:"
+                    "host-process-observation-output-truncated"
+                ),
+            }
+        )
+    _require_json_fields(prior_binding, binding_fields, f"{label}-binding")
+    control_fields = ["control_sha256"]
+    if evidence_format == PRIOR_EVIDENCE_FORMAT:
+        control_fields.append("binding_control_sha256")
+    for field in control_fields:
+        digest = prior_binding.get(field)
+        if not isinstance(digest, str) or not HEX_64.fullmatch(digest):
+            raise BindingError(f"{label}-binding-{field.replace('_', '-')}")
+
     host_command = _read_json_object(
-        request.prior_diagnostic_root / "host-process-command.json",
-        "prior-diagnostic-host-process",
+        root / "host-process-command.json", f"{label}-host-process"
     )
     _require_json_fields(
         host_command,
         {
-            "argv": list(PRIOR_PROCESS_COMMAND),
+            "argv": list(process_command),
             "exit_code": 0,
             "timed_out": False,
         },
-        "prior-diagnostic-host-process",
+        f"{label}-host-process",
     )
     stdout = host_command.get("stdout")
     stderr = host_command.get("stderr")
     if not isinstance(stdout, dict) or not isinstance(stderr, dict):
-        raise BindingError("prior-diagnostic-host-process-streams")
-    stdout_size = stdout.get("total_bytes")
-    stdout_hash = stdout.get("sha256")
-    if (
-        stdout.get("truncated") is not True
-        or not isinstance(stdout_size, int)
-        or isinstance(stdout_size, bool)
-        or stdout_size <= start_control.MAX_CAPTURE_BYTES
-        or not isinstance(stdout_hash, str)
-        or not HEX_64.fullmatch(stdout_hash)
-    ):
-        raise BindingError("prior-diagnostic-host-process-stdout")
+        raise BindingError(f"{label}-host-process-streams")
+    _validate_process_stdout(
+        stdout,
+        label,
+        must_be_truncated=stdout_must_be_truncated,
+    )
     _require_json_fields(
         stderr,
         {
@@ -338,45 +389,63 @@ def validate_prior_diagnostic_evidence(
             "total_bytes": 0,
             "truncated": False,
         },
-        "prior-diagnostic-host-process-stderr",
+        f"{label}-host-process-stderr",
     )
-    terminal = _read_json_object(
-        request.prior_diagnostic_root / "terminal.json",
-        "prior-diagnostic-terminal",
-    )
-    expected_terminal = {
-        "automatic_delete": "not-performed",
-        "automatic_retry": "not-performed",
-        "format": PRIOR_EVIDENCE_FORMAT,
-        "guest_exec": "not-performed",
-        "host_process_observation": "attempted",
-        "input_transfer": "not-performed",
-        "operation_id": "not-generated",
-        "outcome": "diagnostics-incomplete",
-        "reason": (
-            "host-process-observation:"
-            "host-process-observation-output-truncated"
-        ),
-        "root_cause": "unattributed",
-        "target_name": request.target_name,
-        "target_uuid": request.target_uuid,
-        "transaction": "not-performed",
-        "unified_log_observation": "not-performed",
-        "utm_clone": "not-performed",
-        "utm_start": "not-performed",
-        "utm_stop": "not-performed",
-    }
+
+    terminal = _read_json_object(root / "terminal.json", f"{label}-terminal")
     _require_json_fields(
-        terminal, expected_terminal, "prior-diagnostic-terminal"
+        terminal,
+        {
+            "automatic_delete": "not-performed",
+            "automatic_retry": "not-performed",
+            "format": evidence_format,
+            "guest_exec": "not-performed",
+            "host_process_observation": "attempted",
+            "input_transfer": "not-performed",
+            "operation_id": "not-generated",
+            "outcome": "diagnostics-incomplete",
+            "reason": expected_reason,
+            "root_cause": "unattributed",
+            "target_name": request.target_name,
+            "target_uuid": request.target_uuid,
+            "transaction": "not-performed",
+            "unified_log_observation": "not-performed",
+            "utm_clone": "not-performed",
+            "utm_start": "not-performed",
+            "utm_stop": "not-performed",
+        },
+        f"{label}-terminal",
     )
     return {
-        "prior_diagnostic_entries_verified": len(entry_names),
-        "prior_diagnostic_manifest_sha256": (
-            request.prior_diagnostic_manifest_sha256
-        ),
-        "prior_diagnostic_outcome": terminal["outcome"],
-        "prior_diagnostic_reason": terminal["reason"],
+        f"{result_prefix}_entries_verified": len(entry_names),
+        f"{result_prefix}_manifest_sha256": manifest_sha256,
+        f"{result_prefix}_outcome": terminal["outcome"],
+        f"{result_prefix}_reason": terminal["reason"],
     }
+
+
+def _validate_process_stdout(
+    stdout: dict[str, object], label: str, *, must_be_truncated: bool
+) -> None:
+    stdout_size = stdout.get("total_bytes")
+    stdout_hash = stdout.get("sha256")
+    if (
+        stdout.get("truncated") is not must_be_truncated
+        or not isinstance(stdout_size, int)
+        or isinstance(stdout_size, bool)
+        or stdout_size <= 0
+        or (
+            must_be_truncated
+            and stdout_size <= start_control.MAX_CAPTURE_BYTES
+        )
+        or (
+            not must_be_truncated
+            and stdout_size > start_control.MAX_CAPTURE_BYTES
+        )
+        or not isinstance(stdout_hash, str)
+        or not HEX_64.fullmatch(stdout_hash)
+    ):
+        raise BindingError(f"{label}-host-process-stdout")
 
 
 def validate_control_identity(repository_root: Path) -> str:

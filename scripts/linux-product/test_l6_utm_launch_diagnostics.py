@@ -363,21 +363,32 @@ class LinuxL6UtmLaunchDiagnosticsTests(unittest.TestCase):
     def test_prior_incomplete_diagnostic_is_semantically_bound(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            initial_root, initial_hash = write_initial_diagnostic_evidence(root)
             diagnostic_root, manifest_hash = write_prior_diagnostic_evidence(
-                root
+                root, initial_hash
             )
             request = self.request(
                 root,
+                initial_diagnostic_root=initial_root,
+                initial_diagnostic_manifest_sha256=initial_hash,
                 prior_diagnostic_root=diagnostic_root,
                 prior_diagnostic_manifest_sha256=manifest_hash,
             )
 
+            initial_result = (
+                l6_utm_launch_diagnostics._validate_initial_diagnostic_evidence(
+                    request
+                )
+            )
             result = (
                 l6_utm_launch_diagnostics._validate_prior_diagnostic_evidence(
                     request
                 )
             )
 
+            self.assertEqual(
+                initial_result["initial_diagnostic_entries_verified"], 6
+            )
             self.assertEqual(result["prior_diagnostic_entries_verified"], 6)
             self.assertEqual(
                 result["prior_diagnostic_outcome"], "diagnostics-incomplete"
@@ -391,6 +402,8 @@ class LinuxL6UtmLaunchDiagnosticsTests(unittest.TestCase):
             drifted_manifest_hash = rewrite_json_manifest(diagnostic_root)
             drifted_request = self.request(
                 root,
+                initial_diagnostic_root=initial_root,
+                initial_diagnostic_manifest_sha256=initial_hash,
                 prior_diagnostic_root=diagnostic_root,
                 prior_diagnostic_manifest_sha256=drifted_manifest_hash,
             )
@@ -414,6 +427,8 @@ class LinuxL6UtmLaunchDiagnosticsTests(unittest.TestCase):
             manifest_hash = rewrite_json_manifest(diagnostic_root)
             tampered_request = self.request(
                 root,
+                initial_diagnostic_root=initial_root,
+                initial_diagnostic_manifest_sha256=initial_hash,
                 prior_diagnostic_root=diagnostic_root,
                 prior_diagnostic_manifest_sha256=manifest_hash,
             )
@@ -422,6 +437,38 @@ class LinuxL6UtmLaunchDiagnosticsTests(unittest.TestCase):
             ):
                 l6_utm_launch_diagnostics._validate_prior_diagnostic_evidence(
                     tampered_request
+                )
+
+    def test_process_inventory_accepts_pid_zero_and_rejects_invalid_ids(
+        self,
+    ) -> None:
+        parsed = l6_utm_launch_diagnostics.parse_relevant_processes(
+            observation(
+                l6_utm_launch_diagnostics.PROCESS_COMMAND,
+                stdout=process_inventory(),
+            )
+        )
+        self.assertEqual(len(parsed), 3)
+
+        for index, payload in enumerate(
+            (
+                b"-1 0 0 kernel_task\n",
+                b"1 -1 0 launchd\n",
+                b"1 0 -1 launchd\n",
+                b"1 0 0 launchd\n1 0 0 duplicate\n",
+                b"0 1 0 kernel_task\n",
+                b"0 0 501 kernel_task\n",
+                b"0 0 0 UTM\n",
+            )
+        ):
+            with self.subTest(index=index), self.assertRaises(
+                l6_utm_launch_diagnostics.LaunchDiagnosticError
+            ):
+                l6_utm_launch_diagnostics.parse_relevant_processes(
+                    observation(
+                        l6_utm_launch_diagnostics.PROCESS_COMMAND,
+                        stdout=payload,
+                    )
                 )
 
     def test_executed_control_is_bound_to_repository_copy(self) -> None:
@@ -450,8 +497,10 @@ class LinuxL6UtmLaunchDiagnosticsTests(unittest.TestCase):
             "prior_failure_manifest_sha256": "d" * 64,
             "prior_postverify_root": root / "postverify-evidence",
             "prior_postverify_manifest_sha256": "e" * 64,
+            "initial_diagnostic_root": root / "initial-diagnostic-evidence",
+            "initial_diagnostic_manifest_sha256": "f" * 64,
             "prior_diagnostic_root": root / "diagnostic-evidence",
-            "prior_diagnostic_manifest_sha256": "f" * 64,
+            "prior_diagnostic_manifest_sha256": "1" * 64,
             "output_root": root / "launch-diagnostics",
             "attempt_id": "synthetic-diagnostics",
             "target_uuid": TARGET_UUID,
@@ -496,6 +545,11 @@ def valid_binding(
         "prior_postverify_manifest_sha256": (
             request.prior_postverify_manifest_sha256
         ),
+        "initial_diagnostic_entries_verified": 6,
+        "initial_diagnostic_manifest_sha256": (
+            request.initial_diagnostic_manifest_sha256
+        ),
+        "initial_diagnostic_outcome": "diagnostics-incomplete",
         "prior_diagnostic_entries_verified": 6,
         "prior_diagnostic_manifest_sha256": (
             request.prior_diagnostic_manifest_sha256
@@ -533,6 +587,7 @@ def vm_list(target_status: str) -> bytes:
 
 def process_inventory() -> bytes:
     return (
+        "0 0 0 kernel_task\n"
         "101 1 501 UTM\n"
         "102 101 501 qemu-aarch64-so\n"
         "103 1 501 utmctl\n"
@@ -648,8 +703,44 @@ def rewrite_prior_start_manifest(evidence: Path) -> str:
     return hashlib.sha256(manifest.read_bytes()).hexdigest()
 
 
-def write_prior_diagnostic_evidence(root: Path) -> tuple[Path, str]:
-    evidence = root / "prior-diagnostic"
+def write_initial_diagnostic_evidence(root: Path) -> tuple[Path, str]:
+    return write_diagnostic_evidence(
+        root / "initial-diagnostic",
+        evidence_format=l6_utm_launch_diagnostics.INITIAL_EVIDENCE_FORMAT,
+        process_command=l6_utm_launch_diagnostics.INITIAL_PROCESS_COMMAND,
+        process_stdout_size=95_549,
+        process_stdout_truncated=True,
+        reason=(
+            "host-process-observation:"
+            "host-process-observation-output-truncated"
+        ),
+    )
+
+
+def write_prior_diagnostic_evidence(
+    root: Path, initial_manifest_sha256: str
+) -> tuple[Path, str]:
+    return write_diagnostic_evidence(
+        root / "prior-diagnostic",
+        evidence_format=l6_utm_launch_diagnostics.PRIOR_EVIDENCE_FORMAT,
+        process_command=l6_utm_launch_diagnostics.PRIOR_PROCESS_COMMAND,
+        process_stdout_size=31_570,
+        process_stdout_truncated=False,
+        reason="host-process-observation:host-process-identifier-invalid",
+        parent_manifest_sha256=initial_manifest_sha256,
+    )
+
+
+def write_diagnostic_evidence(
+    evidence: Path,
+    *,
+    evidence_format: str,
+    process_command: tuple[str, ...],
+    process_stdout_size: int,
+    process_stdout_truncated: bool,
+    reason: str,
+    parent_manifest_sha256: str | None = None,
+) -> tuple[Path, str]:
     evidence.mkdir(mode=0o700)
     values: dict[str, dict[str, object]] = {
         "request.json": {
@@ -659,7 +750,7 @@ def write_prior_diagnostic_evidence(root: Path) -> tuple[Path, str]:
             },
             "expected_repository_head": "a" * 40,
             "expected_vm_count": 2,
-            "format": l6_utm_launch_diagnostics.PRIOR_EVIDENCE_FORMAT,
+            "format": evidence_format,
             "log_end": LOG_END,
             "log_start": LOG_START,
             "prior_failure_manifest_sha256": "d" * 64,
@@ -670,7 +761,7 @@ def write_prior_diagnostic_evidence(root: Path) -> tuple[Path, str]:
         },
         "binding-preflight.json": {
             "control_sha256": "c" * 64,
-            "format": l6_utm_launch_diagnostics.PRIOR_EVIDENCE_FORMAT,
+            "format": evidence_format,
             "prior_failure_manifest_sha256": "d" * 64,
             "prior_postverify_manifest_sha256": "e" * 64,
             "prior_start_manifest_sha256": "b" * 64,
@@ -680,7 +771,7 @@ def write_prior_diagnostic_evidence(root: Path) -> tuple[Path, str]:
         "utmctl-list-live.json": {"synthetic": True},
         "utmctl-status-live.json": {"synthetic": True},
         "host-process-command.json": {
-            "argv": list(l6_utm_launch_diagnostics.PRIOR_PROCESS_COMMAND),
+            "argv": list(process_command),
             "exit_code": 0,
             "stderr": {
                 "prefix_utf8": "",
@@ -690,24 +781,21 @@ def write_prior_diagnostic_evidence(root: Path) -> tuple[Path, str]:
             },
             "stdout": {
                 "sha256": "1" * 64,
-                "total_bytes": 95_549,
-                "truncated": True,
+                "total_bytes": process_stdout_size,
+                "truncated": process_stdout_truncated,
             },
             "timed_out": False,
         },
         "terminal.json": {
             "automatic_delete": "not-performed",
             "automatic_retry": "not-performed",
-            "format": l6_utm_launch_diagnostics.PRIOR_EVIDENCE_FORMAT,
+            "format": evidence_format,
             "guest_exec": "not-performed",
             "host_process_observation": "attempted",
             "input_transfer": "not-performed",
             "operation_id": "not-generated",
             "outcome": "diagnostics-incomplete",
-            "reason": (
-                "host-process-observation:"
-                "host-process-observation-output-truncated"
-            ),
+            "reason": reason,
             "root_cause": "unattributed",
             "target_name": TARGET_NAME,
             "target_uuid": TARGET_UUID,
@@ -718,6 +806,22 @@ def write_prior_diagnostic_evidence(root: Path) -> tuple[Path, str]:
             "utm_stop": "not-performed",
         },
     }
+    if parent_manifest_sha256 is not None:
+        values["request.json"]["prior_diagnostic_manifest_sha256"] = (
+            parent_manifest_sha256
+        )
+        values["binding-preflight.json"].update(
+            {
+                "binding_control_sha256": "a" * 64,
+                "prior_diagnostic_entries_verified": 6,
+                "prior_diagnostic_manifest_sha256": parent_manifest_sha256,
+                "prior_diagnostic_outcome": "diagnostics-incomplete",
+                "prior_diagnostic_reason": (
+                    "host-process-observation:"
+                    "host-process-observation-output-truncated"
+                ),
+            }
+        )
     for name, value in values.items():
         path = evidence / name
         path.write_text(json.dumps(value) + "\n", encoding="utf-8")

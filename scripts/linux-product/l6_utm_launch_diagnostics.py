@@ -16,8 +16,10 @@ import l6_utm_launch_diagnostic_bindings as diagnostic_bindings
 import l6_utm_start_once as start_control
 
 
+INITIAL_EVIDENCE_FORMAT = diagnostic_bindings.INITIAL_EVIDENCE_FORMAT
 PRIOR_EVIDENCE_FORMAT = diagnostic_bindings.PRIOR_EVIDENCE_FORMAT
 EVIDENCE_FORMAT = diagnostic_bindings.EVIDENCE_FORMAT
+INITIAL_PROCESS_COMMAND = diagnostic_bindings.INITIAL_PROCESS_COMMAND
 PRIOR_PROCESS_COMMAND = diagnostic_bindings.PRIOR_PROCESS_COMMAND
 PROCESS_COMMAND = ("/bin/ps", "-axo", "pid=,ppid=,uid=,ucomm=")
 LOG_PREDICATE = (
@@ -59,6 +61,8 @@ class LaunchDiagnosticRequest:
     prior_failure_manifest_sha256: str
     prior_postverify_root: Path
     prior_postverify_manifest_sha256: str
+    initial_diagnostic_root: Path
+    initial_diagnostic_manifest_sha256: str
     prior_diagnostic_root: Path
     prior_diagnostic_manifest_sha256: str
     output_root: Path
@@ -79,6 +83,7 @@ class LaunchDiagnosticRequest:
             (self.prior_start_root, "prior-start-root"),
             (self.prior_failure_root, "prior-failure-root"),
             (self.prior_postverify_root, "prior-postverify-root"),
+            (self.initial_diagnostic_root, "initial-diagnostic-root"),
             (self.prior_diagnostic_root, "prior-diagnostic-root"),
             (self.output_root, "output-root"),
         ):
@@ -92,6 +97,7 @@ class LaunchDiagnosticRequest:
             (self.prior_start_root, "prior-start"),
             (self.prior_failure_root, "prior-failure"),
             (self.prior_postverify_root, "prior-postverify"),
+            (self.initial_diagnostic_root, "initial-diagnostic"),
             (self.prior_diagnostic_root, "prior-diagnostic"),
         ):
             if _path_is_within(self.output_root, root):
@@ -107,6 +113,10 @@ class LaunchDiagnosticRequest:
         if not HEX_64.fullmatch(self.prior_postverify_manifest_sha256):
             raise LaunchDiagnosticError(
                 "prior-postverify-manifest-sha256-invalid"
+            )
+        if not HEX_64.fullmatch(self.initial_diagnostic_manifest_sha256):
+            raise LaunchDiagnosticError(
+                "initial-diagnostic-manifest-sha256-invalid"
             )
         if not HEX_64.fullmatch(self.prior_diagnostic_manifest_sha256):
             raise LaunchDiagnosticError(
@@ -158,6 +168,9 @@ class LaunchDiagnosticRequest:
             "log_end": self.log_end,
             "log_start": self.log_start,
             "log_timeout_seconds": self.log_timeout_seconds,
+            "initial_diagnostic_manifest_sha256": (
+                self.initial_diagnostic_manifest_sha256
+            ),
             "prior_failure_manifest_sha256": (
                 self.prior_failure_manifest_sha256
             ),
@@ -357,6 +370,14 @@ def _validate_prior_diagnostic_evidence(
     )
 
 
+def _validate_initial_diagnostic_evidence(
+    request: LaunchDiagnosticRequest,
+) -> dict[str, object]:
+    return _translate_binding_result(
+        diagnostic_bindings.validate_initial_diagnostic_evidence, request
+    )
+
+
 def _translate_binding_result(
     validator: Callable[[LaunchDiagnosticRequest], dict[str, object]],
     request: LaunchDiagnosticRequest,
@@ -387,7 +408,7 @@ def parse_relevant_processes(
         pid = int(pid_text)
         parent_pid = int(parent_text)
         uid = int(uid_text)
-        if pid <= 0 or parent_pid < 0 or uid < 0 or pid in seen_pids:
+        if pid < 0 or parent_pid < 0 or uid < 0 or pid in seen_pids:
             raise LaunchDiagnosticError("host-process-identifier-invalid")
         seen_pids.add(pid)
         if (
@@ -396,6 +417,10 @@ def parse_relevant_processes(
             or any(character in "\x00\r\n/" for character in accounting_name)
         ):
             raise LaunchDiagnosticError("host-process-accounting-name-invalid")
+        if pid == 0 and (
+            parent_pid != 0 or uid != 0 or accounting_name != "kernel_task"
+        ):
+            raise LaunchDiagnosticError("host-process-identifier-invalid")
         role = _process_role(accounting_name)
         if role is None:
             continue
@@ -641,6 +666,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prior-failure-manifest-sha256", required=True)
     parser.add_argument("--prior-postverify-root", type=Path, required=True)
     parser.add_argument("--prior-postverify-manifest-sha256", required=True)
+    parser.add_argument("--initial-diagnostic-root", type=Path, required=True)
+    parser.add_argument("--initial-diagnostic-manifest-sha256", required=True)
     parser.add_argument("--prior-diagnostic-root", type=Path, required=True)
     parser.add_argument("--prior-diagnostic-manifest-sha256", required=True)
     parser.add_argument("--output-root", type=Path, required=True)
@@ -671,6 +698,10 @@ def main() -> int:
         prior_postverify_root=args.prior_postverify_root,
         prior_postverify_manifest_sha256=(
             args.prior_postverify_manifest_sha256
+        ),
+        initial_diagnostic_root=args.initial_diagnostic_root,
+        initial_diagnostic_manifest_sha256=(
+            args.initial_diagnostic_manifest_sha256
         ),
         prior_diagnostic_root=args.prior_diagnostic_root,
         prior_diagnostic_manifest_sha256=(
