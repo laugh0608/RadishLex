@@ -7,7 +7,7 @@
 - 复核日期：2026-08-23（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh与六类operation已有证据。首个crash已闭合；`install_artifacts_staged`未进入guest。前三次只读诊断停在进程阶段，v4/v5停在日志捕获与空分类门，v6停在NDJSON `finished`门。v7已兼容精确整数`1`并新增无正文结构摘要。二十台VM全停，其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh与六类operation已有证据。首个crash已闭合；`install_artifacts_staged`未进入guest。v7已完整收集4,040条脱敏事件：唯一start AppleEvent由UTM接收后约351ms触发AppKit主窗口断言，未见对应reply或QEMU事件。二十台VM全停，其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -34,7 +34,7 @@
 - v4真实只读诊断从clean `bf42768`绑定前六份manifest，并再次确认二十台及目标全部stopped。紧凑进程观察exit 0、stderr空、stdout 31,605 bytes且未截断；macOS legacy UID `-2`兼容使解析完成，脱敏结果确认相关UTM/utmctl/QEMU进程为0。随后固定predicate的`log show` exit 0、stderr空且未超时，但stdout 3,916,860 bytes、SHA-256 `0dbed63a…e9c`超过旧64KiB捕获上限，故未生成`unified-log.json`并以`unified-log-observation-output-truncated`失败关闭；八项manifest `34ae0563…743e`逐项通过，root cause保持unattributed，所有VM/guest/transaction动作均未执行。
 - v5真实只读诊断从clean `a111377`绑定前七份manifest，确认二十台全停、31,150-byte进程观察完整且相关进程为0。`log show`完整返回3,916,860 bytes、SHA-256 `0dbed63a…e9c`，随后因可选`category`空字符串以`unified-log-category-invalid`失败关闭；八项manifest `9da78f78…08ae`通过，root cause未归属且所有VM/guest/transaction动作未执行。
 - v6真实只读诊断从clean `f47dbd2`绑定前八份manifest，确认二十台全停、31,605-byte进程观察完整且相关进程为0；同一`log show`仍完整返回3,916,860 bytes与SHA-256 `0dbed63a…e9c`。空分类已规范化，随后以`unified-log-finished-invalid`失败关闭；八项manifest `44043282…4ae8`通过，root cause未归属且所有VM/guest/transaction动作未执行。
-- repository-only v7强绑定v6八项manifest；按本机`log(1)`合同，仅新增精确整数`1`与布尔`true`等价支持。解析前写入无正文的record/marker数量、末尾状态和值类型；其余捕获、事件与隐私门不放宽。定向回归和真实v6证据链校验通过。
+- v7真实只读诊断从clean `5ab68b1`绑定九份前序manifest，确认二十台全停、31,640-byte进程观察完整且相关进程为0。相同`log show`完整返回3,916,860 bytes与SHA-256 `0dbed63a…e9c`；4,041条NDJSON记录以唯一末尾整数`1`闭合，形成4,040条脱敏事件。08:13:48.432的`UTMv,star`由UTM接收后出现`[self canBecomeMainWindow]`断言与`NSInternalInconsistencyException`，没有对应start reply或QEMU事件。十项manifest `206aa335…7b56c`通过；terminal仍保守记录`root_cause=unattributed`且所有VM/guest/transaction动作未执行。
 
 ## 停止线
 
@@ -47,16 +47,16 @@
 - 第二个case clone `B0B826F6…87B3`须保持stopped并冻结为双start失败现场；不得第三次start、进入guest、修补注册/config、复用或与第一case混用。
 - v2 clone失败证据`65160b12…c1859`须原样保留；不得沿用本批授权重试clone、重启UTM或把exit 0记为成功。
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
-- 六次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`均须冻结，不覆盖、补写或复用；失败不授权retry。v7仍限同一窗口、目标、九份manifest与新输出根并单独授权；日志不能单独归因或放宽目标冻结线。
+- 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（2026-08-23）
 
-1. 下一项系统动作须重新单独授权一次诊断控制v7真实只读采集：只针对冻结目标`5B19AEF1…7DAB`，绑定clean committed head、start/failure/postverify与v1-v6诊断manifest `870f56dd…f3a5`/`59c62c14…bba05`/`8e3d5ced…8386`/`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`，固定UTC `2026-08-22 08:12:00+0000`至`08:18:00+0000`，写入当前absent私有根`RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v3-Host-Launch-Diagnostics-v7`。依次只执行`utmctl list`、目标`utmctl status`、紧凑`ucomm`进程观察和固定predicate `/usr/bin/log show`；不含start、stop、clone、guest exec/file、input、operation ID、transaction、retry或delete。
-2. v7只记录进程、脱敏事件、日志结构摘要和全停状态；无独立证据时保持`root_cause=unattributed`，不得预设根因、复用或再启动目标。前六次输出冻结。
-3. 只读诊断闭合后再依据结果决定是否设计并单独授权新的独立clean target。只有未来独立target唯一started、其余VM全stopped且双重文件回读证明仅`lo`/IPv4与IPv6 main route为空，才可再分批进入canonical input与只读/mutation preflight；其余六个crash case、连续完整L6、P05C、发布、推送和其他平台继续关闭。
+1. 下一批先在repository-only范围设计并评审host launch transport v2：强绑定v7 manifest与UTM `4.7.5 (118)`，明确plain `utmctl start`已阻塞，不能把官方仅“Hide the main UTM window”的`--hide`选项当作已验证修复。控制必须使用新的独立clean target、单一精确transport、create-new证据和零自动stop/retry/delete。
+2. 方案与合成门禁通过后，再分别申请clone、载体物化与唯一start的系统授权；不得沿用本轮授权，也不得对`5B19AEF1…7DAB`重试。若transport不能在调用前后证明UTM/target/peer状态，继续失败关闭而不创建新target。
+3. 只有未来独立target唯一started、其余VM全stopped且双重guest文件回读证明仅`lo`、IPv4与IPv6 main route为空，才可再分批进入canonical input与只读/mutation preflight；其余六个crash case、连续完整L6、P05C、发布、推送和其他平台继续关闭。
 
 ## 验证入口
 
@@ -78,7 +78,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器证明单次start/clone、v7只读诊断、失败关闭terminal与零越界动作。新v3 clone的创建、磁盘、单次start与六次诊断已有独立host evidence，始终未进入guest；v6完整读取日志但在`finished`门失败。八case、连续L6与发布未闭合。
+上述入口以合成执行器证明单次start/clone、v7只读诊断、失败关闭terminal与零越界动作。新v3 clone始终未进入guest；v7已完整读取并脱敏日志，定位start AppleEvent后的UTM AppKit断言，但terminal仍不扩张为更深根因。八case、连续L6与发布未闭合。
 
 ## 阅读索引
 
