@@ -7,7 +7,7 @@
 - 复核日期：2026-08-23（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh与六类operation已有证据。首个crash已闭合；`install_artifacts_staged`的v4已消耗唯一foreground transport与canonical transfer attempt。v2证明当前boot断网；bundle唯一push和双回读完成，但installer result缺失使input状态为`state-indeterminate`，operation ID与transaction均未发生。旧二十台仍以launch后最新持久观察为stopped；其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh与六类operation已有证据，首个crash已闭合。`install_artifacts_staged` v4已消耗唯一foreground transport/transfer attempt；network v2证明当前boot断网，但result缺失使input仍为`state-indeterminate`。repository-only消歧v1已闭合但未真实执行；无operation ID/transaction。旧二十台最近持久观察为stopped；其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -35,6 +35,7 @@
 - canonical input transfer v1强绑定v2 manifest `40be3f3f…38383`、live network双回读和授权source绝对路径/size/SHA-256；同一`O_NOFOLLOW` descriptor前后复验12项USTAR。bundle唯一push、双完整回读后，root installer在私有`0700`staging解包并以`RENAME_NOREPLACE`发布固定input root；host/guest证据create-new，任一漂移失败关闭且不生成operation ID、不进入transaction、不自动retry/stop。10项回归已接入默认L6门禁。
 - canonical source bundle已由clean `59eaab3`在create-new根`…-v4-Canonical-Input-v1`冻结：92,825,600 bytes、SHA-256 `7bbeb291…403c`，七文件manifest `ffc990a3…e0de`。12项USTAR、双重bundle hash、owner/mode/link、零xattr与manifest均独立回读通过；terminal固定零`utmctl`、guest、input transfer、operation/transaction及VM启停。
 - clean `6a23c37`的唯一attempt `d75818f-v4-input-20260823-v1`通过network/target/process/句柄、installer readback、bundle唯一push/双回读及source postflight。installer调用exit 0且空输出，但同秒首次pull报告`transfer.evidence.json`不存在，第二次result回读未执行，input root状态未知。create-new根`…-v4-Input-Transfer-v1`的19项及manifest `d1090e8d…dc09`通过，权限`0700`/`0600`、single-link且零xattr；terminal为`state-indeterminate`，无list/status/start、断网复跑、operation/transaction、retry/stop/quit。
+- repository-only消歧v1绑定transfer manifest `d1090e8d…dc09`、原clean `6a23c37`、19项语义、source与target；先双回读旧result，缺失/漂移不建probe，稳定才运行一次create-new只读probe检查installer静止与原路径身份。任何漂移保持`state-indeterminate`；不调用原installer或push bundle。
 
 ## 停止线
 
@@ -49,7 +50,7 @@
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
 - v4 clone/prepared/launch、network-ready v1/v2、canonical bundle及input transfer v1证据与UUID `50B75F88…8038`须原样冻结；不得第二次start、重复断网、覆盖bundle/证据或把活动qcow2哈希当terminal。transfer v1的result缺失使guest input状态未知；不得把bundle双回读、installer exit 0或事后等待倒推为原子发布成功。
-- repository-only canonical input控制与测试不是后续系统动作授权。不得沿用已消耗的attempt授权重跑installer、bundle push或transfer，也不得自行pull补证、探测input root、生成operation ID、执行preflight/transaction、retry、stop或quit；任何只读状态消歧也须先由新控制绑定冻结terminal并另行取得精确授权。
+- repository-only transfer/resolution控制与测试不是系统授权。不得重跑installer、bundle push/transfer、自行补证或进入operation/transaction；真实只读resolution只可使用committed v1、全新absent host/guest根和单独精确授权。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
@@ -57,8 +58,8 @@
 ## 下一步（2026-08-23）
 
 1. 冻结launch/network v1/v2/canonical bundle/input transfer v1 manifest `6dbbdf40…fc3c`/`d5d33212…7348`/`40be3f3f…38383`/`ffc990a3…e0de`/`d1090e8d…dc09`，不覆盖、不复跑断网或transfer；prepared哈希只代表启动前，活动EFI/qcow2不得恢复或宣称clean。
-2. 下一批先repository-only设计一次性状态消歧控制：绑定clean head、上述manifest、target、attempt与source三元组；只读验证installer静止、guest路径身份并双重pull既有result。任一活跃、缺失或身份/语义漂移继续保持不确定；不得重跑installer、push、清理或切换路径。
-3. 状态消歧控制与负向回归提交后，才可另行授权一次真实只读resolution；只有它闭合`input-ready`才可再授权mutation/negative preflight。operation ID、第二个crash checkpoint、受控停止继续分批关闭。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
+2. repository-only消歧v1与14项回归已闭合，本批不执行真实resolution。下一系统批须另行授权：旧result缺失/漂移立即停止且不建probe；稳定才建立新私有根、运行一次probe并双回读新证据。
+3. 只有真实resolution闭合`input-ready`才可再授权mutation/negative preflight；`transfer-failed-closed`或`state-indeterminate`均停止。operation ID、第二个crash checkpoint、受控停止继续分批关闭。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
 
 ## 验证入口
 
@@ -80,7 +81,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器证明单次start/clone、v7只读诊断、prepared/live target双重绑定、foreground transport、延迟backend轮询、guest网络命令面/双重回读、canonical input精确source/readback/no-replace switch及失败关闭terminal。v4 launch原终态仍为`state-indeterminate`，但独立句柄事实与v2 guest双重回读已证明当前boot真实运行且断网；真实input transfer v1也因guest result缺失保持`state-indeterminate`，尚不能宣称input已就绪，八case、连续L6与发布仍未闭合。
+上述入口以合成执行器覆盖单次start/clone、v7诊断、target绑定、foreground transport、延迟backend、guest断网双回读、canonical transfer与一次性消歧。独立句柄与network v2已证明当前boot运行且断网；真实transfer仍因result缺失为`state-indeterminate`，repository-only实现不改变现场，input、八case、连续L6与发布均未闭合。
 
 ## 阅读索引
 
