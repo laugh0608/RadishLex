@@ -7,7 +7,7 @@
 - 复核日期：2026-08-23（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh与六类operation已有证据，首个crash已闭合。`install_artifacts_staged` v4已消耗唯一foreground transport/transfer/resolution/negative preflight；network v2证明当前boot断网，resolution与preflight已分别闭合`input-ready`/`preflight-ready`。仍无operation ID/checkpoint/transaction，其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh与六类operation已有证据，首个crash已闭合。`install_artifacts_staged` v4已消耗唯一foreground transport/transfer/resolution/negative preflight；network v2证明当前boot断网，resolution与preflight已分别闭合`input-ready`/`preflight-ready`。repository-only checkpoint v1控制已闭合；真实现场仍无operation ID/checkpoint/transaction，其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -37,6 +37,7 @@
 - clean `6a23c37`的唯一attempt `d75818f-v4-input-20260823-v1`通过network/target/process/句柄、installer readback、bundle唯一push/双回读及source postflight。installer调用exit 0且空输出，但同秒首次pull报告`transfer.evidence.json`不存在，第二次result回读未执行，input root状态未知。create-new根`…-v4-Input-Transfer-v1`的19项及manifest `d1090e8d…dc09`通过，权限`0700`/`0600`、single-link且零xattr；terminal为`state-indeterminate`，无list/status/start、断网复跑、operation/transaction、retry/stop/quit。
 - clean `ca57dce`的唯一resolution双回读稳定passed result；一次probe证明installer/可疑进程均0、staging absent、final私有且12项inventory逐文件匹配。create-new host根`…-v4-Input-Resolution-v1`的21项与manifest `7bab8f20…4e4a`通过，权限`0700`/`0600`、single-link、零xattr；terminal为`input-ready`，原installer/bundle、operation/transaction、retry/stop/quit均未执行。
 - clean `8bd9e65`的唯一negative preflight绑定resolution `7bab8f20…4e4a`及全部前序身份；one-shot probe只读重验input/pair/package/dependency/font/startup/XDG/process/network。guest双回读为`passed`，host为`preflight-ready`；create-new根25项manifest `aba59811…0d7a`逐项通过。未执行case/maintenance/acceptance/dpkg/installer、operation/checkpoint/transaction或自动补救/VM动作。
+- repository-only checkpoint v1控制逐项绑定上述25项manifest、三份前序manifest、source bundle三元组和固定v4 target；host只允许create-new证据、network/preflight双回读、driver私有staging/逐字回读及一次调用。guest driver以exclusive marker运行canonical `preflight`/`crash`/`inspect-crash`各一次，在生成operation ID前把dpkg status/log绑定回negative preflight；成功只导出ID hash并验证target-only staging、receipt `artifacts_staged`、合法未锁guard、进程组SIGKILL、零dpkg mutation、startup/XDG/process/network静止。14项正负测试已进入L6门禁；本批没有真实guest/operation/checkpoint/transaction/VM动作。
 
 ## 停止线
 
@@ -59,8 +60,8 @@
 ## 下一步（2026-08-23）
 
 1. 冻结launch/network/bundle/transfer/resolution/preflight manifest `6dbbdf40…fc3c`/`40be3f3f…38383`/`ffc990a3…e0de`/`d1090e8d…dc09`/`7bab8f20…4e4a`/`aba59811…0d7a`，不覆盖或复跑；prepared哈希只代表启动前，活动EFI/qcow2不得恢复或宣称clean。
-2. 下一批仅repository-only绑定preflight 25项与`preflight-ready`，设计一次性`install_artifacts_staged` checkpoint控制：未来真实调用才可生成operation ID；checkpoint前后重验输入、断网、package/dpkg/startup/XDG/process与target staging，证据create-new、漂移失败关闭。本批不调用`utmctl`/guest，不生成真实operation ID或执行checkpoint/transaction/VM动作。
-3. repository-only控制提交后，真实operation ID与单次checkpoint须另行精确授权；exact resume与受控停止仍各自分批。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
+2. 下一批仅在新的单独精确授权下，执行一次attempt `d75818f-v4-install-artifacts-staged-checkpoint-20260823-v1`，输出根固定为create-new `/Users/luobo/VirtualMachines/RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Checkpoint-Prepared-v1`：绑定clean committed HEAD和全部冻结manifest，重验source/target/process/句柄，双回读既有network/preflight，私有发布并逐字回读唯一driver；guest仅生成一个operation ID、调用一次acceptance checkpoint并终止其进程组，再双回读marker/terminal/phase/checkpoint与crash artifacts及做network/source postflight。任一漂移失败关闭并保留现场。
+3. 该授权不得包含resume、maintenance retry、dpkg apply、cleanup、stop、quit、plain list/status/start或自动补救；不得重复断网/preflight/transfer。exact resume与受控停止仍各自分批授权；旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
 
 ## 验证入口
 
@@ -82,7 +83,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器覆盖单次start/clone、v7诊断、target绑定、foreground transport、延迟backend、guest断网、canonical transfer、消歧与negative preflight。真实resolution/preflight已证明当前boot断网、input ready及负向前置条件成立；operation/checkpoint、其余七个case、连续L6与发布仍未闭合。
+上述入口以合成执行器覆盖单次start/clone、v7诊断、target绑定、foreground transport、延迟backend、guest断网、canonical transfer、消歧、negative preflight与checkpoint控制。真实resolution/preflight已证明当前boot断网、input ready及负向前置条件成立；真实operation/checkpoint、其余七个case、连续L6与发布仍未闭合。
 
 ## 阅读索引
 

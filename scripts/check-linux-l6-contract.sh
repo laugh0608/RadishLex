@@ -46,10 +46,14 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_v4_canonical_input_preflight_probe.py"
 PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/linux-product/test_l6_utm_install_artifacts_staged_checkpoint.py"
+PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/linux-product/test_l6_v4_install_artifacts_staged_checkpoint_driver.py"
+PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_v4_canonical_input_bundle.py"
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/l6_controller_contract.py" validate
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_controller_contract.py"
 
-echo "Linux L6 matrix, guest-case, UTM start/clone/launch/network/input transfer/resolution/negative preflight controls and bundle builder, and compile-identity contracts passed without guest or system mutation."
+echo "Linux L6 matrix, guest-case, UTM start/clone/launch/network/input transfer/resolution/negative preflight/checkpoint controls and bundle builder, and compile-identity contracts passed without guest or system mutation."
