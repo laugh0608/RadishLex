@@ -27,13 +27,13 @@
 - repository-only `l6_utm_clone_once.py`要求双显式授权并绑定clean head、前序manifest、canonical全停清单、registered source、目标name/package absent与executed-control identity；唯一clone的exit/timeout、64KiB stdout/stderr前缀、完整size/hash、pre/terminal list和package后置状态均持久化。只有命令确定成功、stderr空、注册精确增加一个唯一stopped目标且精确`.utm`目录存在才返回created；零落地失败、前置拒绝和部分/不确定落地分别返回10/11/12，任何终态都不自动retry/delete/start。十一项合成回归已接入默认L6门禁，不调用真实UTM。
 - v3 clone/prepared manifest `7ce53048…e5b7`/`b065c7ac…32db`已冻结；唯一start timeout并保持二十台全stopped，start/failure/postverify `870f56dd…f3a5`/`59c62c14…bba05`/`8e3d5ced…8386`确认磁盘未变且零guest/input/transaction，仍不能归因具体UTM/QEMU根因。
 - v1-v6只读host诊断逐步补齐进程、UID、日志上限、空category与finished marker合同；六份manifest见L6 runbook并保持冻结。每次均为二十台全停、`root_cause=unattributed`与零VM/guest/transaction mutation。
-- v7真实只读诊断从clean `5ab68b1`绑定九份前序manifest，确认二十台全停、31,640-byte进程观察完整且相关进程为0。相同`log show`完整返回3,916,860 bytes与SHA-256 `0dbed63a…e9c`；4,041条NDJSON记录以唯一末尾整数`1`闭合，形成4,040条脱敏事件。08:13:48.432的`UTMv,star`由UTM接收后出现`[self canBecomeMainWindow]`断言与`NSInternalInconsistencyException`，没有对应start reply或QEMU事件。十项manifest `206aa335…7b56c`通过；terminal仍保守记录`root_cause=unattributed`且所有VM/guest/transaction动作未执行。
+- v7只读诊断绑定九份前序manifest，确认二十台全停和相关进程为0；完整脱敏日志闭合到UTM接收start后的AppKit主窗口断言，没有对应reply或QEMU事件。十项manifest `206aa335…7b56c`通过；terminal仍为`root_cause=unattributed`及零VM/guest/transaction动作。
 - v4 clone/prepared manifest `f76d1943…ff6e2`/`c40c55d9…144b`曾固定UUID `50B75F88…8038`、`Network=[]`及config/EFI/qcow2 `2de7280b…6195`/`0b797641…1418`/`4967234b…4b18`；21台全停、双重qcow2与零句柄独立复核通过。clean `ea46c9d`后的系统只读门再确认app已不驻留、前后零相关进程，未发送quit。
 - 从clean `296a1c5`执行唯一`foreground-applescript-v1`：prepared/live身份、两次descriptor和双进程门均通过；osascript只调用1次、exit 0、空输出。冻结目录`…-v4-Foreground-Launch-Transport-v2`含16项，manifest `6dbbdf40…fc3c`逐项通过且权限为`0700`/`0600`；首轮status与terminal list已见target started，但terminal进程为0，故原控制返回12/`state-indeterminate`，没有quit/stop/retry/delete/guest/input/operation/transaction。
 - 后续只读交叉验证始终只有v4登记started；QEMU backend延迟出现并持有EFI/qcow2，活动磁盘的多次变化hash均不是terminal身份。plain list/status后backend可能再次出现，故不再循环查询；修复`2eea62f`只改善未来延迟轮询，不回写本次终态。
 - clean `e75509a`的network v1在宿主`utmctl exec`参数解析阶段失败关闭，8项manifest `d5d33212…7348`确认network script/push/pull均为0。修正控制在clean `3286268`逐项绑定launch 16项及v1失败7项后只执行一次v2：脚本push后逐字回读SHA-256 `d0bb5c28…1f28a`，network script仅调用1次，两个301-byte回读均为`2f9abfbe…d0e8e`。结构化证据固定boot `1bcbd795…26ae3`、active仅`lo`、nonloop接口/UP均0、IPv4/IPv6 main route均0；15项manifest `40be3f3f…38383`逐项通过，业务input/operation/transaction/stop/retry/quit及plain list/status/start均未执行。
 - canonical input transfer v1现强绑定上述v2 manifest SHA-256 `40be3f3f…38383`、clean `3286268`与当前boot的两份冻结network evidence；调用前须再次双重file pull逐字匹配，不能重跑断网脚本。source由授权明确的绝对路径、size和SHA-256三元组固定，同一`O_NOFOLLOW` descriptor在guest动作前后复验身份/hash及12项USTAR inventory。guest installer只接受root、`0700`私有staging、root-owned安全regular files与精确USTAR；bundle唯一push后完整回读两次，再以`renameat2(RENAME_NOREPLACE)`把同文件系统staging切入固定`/var/tmp/radishlex-l6-inputs`。host输出根与guest attempt/evidence均create-new；任何漂移失败关闭并保留现场，且不生成operation ID、不进入transaction、不自动retry/stop。10项正负回归已接入默认L6门禁；本批没有调用真实UTM、进入guest、传输input或改变VM。
-- bundle builder固定handoff `c74fac12…9849`、v3模板manifest `0b703d10…5027`与v4 prepared manifest `c40c55d9…144b`；它从target `.deb`重提取startup FFI，并以精确计数派生`install_artifacts_staged/artifacts_staged` case，初始dispatch仍不开放resume。12项root-owned USTAR经私有incoming、逐项回读和no-replace发布到absent host根；9项回归进入L6门禁。该控制不调用`utmctl`或进入guest。
+- canonical source bundle已由clean `59eaab3`在create-new根`…-v4-Canonical-Input-v1`冻结：92,825,600 bytes、SHA-256 `7bbeb291…403c`，七文件manifest `ffc990a3…e0de`。12项USTAR、双重bundle hash、owner/mode/link、零xattr与manifest均独立回读通过；terminal固定零`utmctl`、guest、input transfer、operation/transaction及VM启停。
 
 ## 停止线
 
@@ -47,7 +47,7 @@
 - v2 clone失败证据`65160b12…c1859`须原样保留；不得沿用本批授权重试clone、重启UTM或把exit 0记为成功。
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
-- v4 clone/prepared/launch、network-ready v1失败及v2成功证据与UUID `50B75F88…8038`须原样冻结；唯一transport和两个network输出根均已消耗，不得第二次start、重复断网、覆盖证据或把活动qcow2哈希当terminal。v2只证明当前boot断网，不授权canonical input、preflight、operation、transaction、stop或quit；这些动作仍须按顺序分别授权。
+- v4 clone/prepared/launch、network-ready v1/v2及canonical bundle证据与UUID `50B75F88…8038`须原样冻结；不得第二次start、重复断网、覆盖bundle/证据或把活动qcow2哈希当terminal。v2只证明当前boot断网，bundle只证明host source，不授权transfer、preflight、operation、transaction、stop或quit。
 - repository-only canonical input控制与测试不是系统动作授权。未在授权中逐字固定source绝对路径、size、SHA-256、attempt ID及absent host输出根前，不得运行真实transfer；即使transfer通过，也不得顺带生成operation ID、执行preflight/transaction、retry、stop或quit。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
@@ -56,7 +56,7 @@
 ## 下一步（2026-08-23）
 
 1. 冻结launch/network v1/v2 manifest `6dbbdf40…fc3c`/`d5d33212…7348`/`40be3f3f…38383`，不覆盖、不复跑断网；prepared哈希只代表启动前，活动EFI/qcow2不得恢复或宣称clean。
-2. 先在用户已授权的host-only批次以clean committed head运行一次bundle builder，把create-new source bundle路径/size/SHA-256及其manifest冻结；该步不调用`utmctl`、不进入guest。随后才可请求真实transfer的独立授权，逐字列出v4 UUID/name/package、该source三元组、attempt ID、此前absent的host输出根和v2 manifest SHA-256。真实动作面只含两次既有network evidence live pull、既有target/process/双句柄只读门、guest私有根与installer的push/归一化/回读、source bundle唯一push及两次完整回读、installer唯一调用与两次result回读；不含list/status/start、断网脚本、operation ID、preflight/transaction、retry/stop/quit/delete。
+2. canonical bundle已冻结；下一批必须另行授权一次真实transfer，并逐字固定该source绝对路径/92,825,600/`7bbeb291…403c`、v4 UUID/name/package、attempt ID、absent host输出根及v2 manifest `40be3f3f…38383`。动作只含两次既有network evidence live pull、target/process/双句柄只读门、guest私有根与installer的push/归一化/回读、bundle唯一push及两次完整回读、installer唯一调用与两次result回读；不含list/status/start、断网脚本、operation ID、preflight/transaction、retry/stop/quit/delete。
 3. canonical input terminal与create-new manifest闭合后，才可另行授权只读mutation/negative preflight；operation ID、第二个crash checkpoint、受控停止继续分批关闭。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
 
 ## 验证入口
