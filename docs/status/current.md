@@ -33,6 +33,7 @@
 - repository-only launch transport v2固定`foreground-applescript-v1`：唯一`/usr/bin/osascript`调用先`activate` UTM，再按精确UUID执行一次`start ... saving true recovery false`；plain `utmctl start`与`--hide`均不在命令面。binding除v7与UTM身份外，现强制prepared manifest `c40c55d9…144b`七项语义、精确v4 UUID/name/package路径、21台为v7冻结20台加唯一stopped target，并以两次descriptor重算包围live list/status，随后最终进程零门才允许osascript；身份变化提前拒绝。16项回归与真实prepared/live双次只读复核通过；尚未执行osascript、start或GUI动作，仍是待实机验证的transport假设。
 - 新v4 clone manifest `f76d1943…ff6e2`绑定clean `83f037a`、v7、二十台全停清单和唯一clone，联合确认新增UUID `50B75F88…8038` stopped及精确package；没有物化、start、guest、transaction、retry或delete。该manifest不含host进程payload，不能证明后续transport进程门。
 - v4物化从clean `e4ca1bd`、clone manifest与二十一台canonical all-stopped清单开始；冻结控制只对该target以target-local incoming加`clonefile`/`mv`换入DependencyFrozen EFI/qcow2，共两次replacement。prepared manifest `c40c55d9…144b`逐项固定config/EFI/qcow2 `2de7280b…6195`/`0b797641…1418`/`4967234b…4b18`、`Network=[]`、qcow2双重复算、source/registration/target九文件零句柄及物化前后同一二十一台全停清单。独立manifest、live list/status、磁盘hash与零句柄复核再次通过；没有start、guest、input、operation ID、transaction、retry、rollback或delete。独立精确`ucomm`复核同时发现一个驻留UTM app进程，但无utmctl或QEMU backend；因此prepared成立，foreground transport的调用前零相关进程门尚未成立。
+- clean `ea46c9d`复验prepared/live绑定后，系统权限只读list/status确认21台全部stopped及v4唯一匹配，前后两次`ucomm`均为零相关进程；app已不驻留，故未发送quit或其他GUI/VM动作。沙盒`-6`与权限重验细节见runbook；瞬时观察不替代launch现场门。
 
 ## 停止线
 
@@ -46,7 +47,7 @@
 - v2 clone失败证据`65160b12…c1859`须原样保留；不得沿用本批授权重试clone、重启UTM或把exit 0记为成功。
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
-- launch transport v2代码与合成通过不构成start授权。旧target不得运行该transport；v4 clone/prepared证据`f76d1943…ff6e2`/`c40c55d9…144b`与UUID `50B75F88…8038`须冻结。当前驻留UTM app不自动退出；只有prepared身份重新绑定、UTM/utmctl/QEMU相关进程精确为0且live清单仍是v7冻结20台加该唯一新target时，才可另行授权唯一start。任一门未成立必须失败关闭且不得自动quit/stop/retry/delete。
+- launch transport v2代码与合成通过不构成start授权。旧target不得运行该transport；v4 clone/prepared证据`f76d1943…ff6e2`/`c40c55d9…144b`与UUID `50B75F88…8038`须冻结。当前只读观察虽为零相关进程，但只有控制内prepared/live身份、双进程门及v7冻结20台加唯一新target清单再次同时成立，才可在另一授权下执行唯一start。任一门未成立必须失败关闭且不得自动quit/stop/retry/delete。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
@@ -54,7 +55,7 @@
 ## 下一步（2026-08-23）
 
 1. 新v4 clone `50B75F88…8038`已以clone/prepared manifest `f76d1943…ff6e2`/`c40c55d9…144b`冻结；DependencyFrozen config/EFI/qcow2、`Network=[]`、双重qcow2、九文件零句柄与二十一台全停均已独立复核，不得再次物化、重试clone、删除或复用旧v3。
-2. repository-only prepared/target绑定与launch transport命令面已经闭合。下一批先单独申请关闭当前驻留UTM app；进程归零及控制内双重live target校验通过后，再单独申请一次`foreground-applescript-v1`系统动作。任一prepared/live inventory、config/EFI/qcow2或进程门漂移即停止，不调用plain start、`--hide`、自动quit/stop/retry/delete。
+2. UTM关闭门已以21台全停和两次零相关进程闭合，app不驻留且未发送quit。下一批单独申请一次`foreground-applescript-v1`；控制仍从clean head重做prepared/live、磁盘与双进程门，任一漂移即在osascript前停止。
 3. 只有新target唯一started、冻结二十台均stopped且backend进程事实一致，才可再申请guest断网双重文件回读；旧`5B19AEF1…7DAB`、其余crash、连续L6、P05C、发布、推送和其他平台继续关闭。
 
 ## 验证入口
