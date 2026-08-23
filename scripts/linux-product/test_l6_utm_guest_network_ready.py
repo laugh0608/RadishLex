@@ -97,6 +97,13 @@ class LinuxL6UtmGuestNetworkReadyTests(unittest.TestCase):
                     for call in runner.calls
                 )
             )
+            self.assertTrue(
+                all(
+                    len(call) >= 5 and call[3] == "--cmd"
+                    for call in runner.calls
+                    if call[:2] == ("utmctl", "exec")
+                )
+            )
             terminal = read_json(request.output_root / "terminal.json")
             self.assertEqual(terminal["network_evidence_outcome"], "passed")
             self.assertEqual(terminal["business_input"], "not-performed")
@@ -271,6 +278,7 @@ def successful_prefix(
                 "utmctl",
                 "exec",
                 request.target_uuid,
+                "--cmd",
                 "/bin/mkdir",
                 "-m",
                 "0700",
@@ -292,6 +300,7 @@ def successful_prefix(
                 "utmctl",
                 "exec",
                 request.target_uuid,
+                "--cmd",
                 "/usr/bin/install",
                 "-o",
                 "root",
@@ -323,6 +332,7 @@ def network_exec_argv(
         "utmctl",
         "exec",
         request.target_uuid,
+        "--cmd",
         "/bin/sh",
         f"{request.guest_root}/network-ready.sh",
         request.guest_root,
