@@ -7,7 +7,7 @@
 - 复核日期：2026-08-23（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh与六类operation已有证据。首个crash已闭合；`install_artifacts_staged`仍未进入guest。v4已消耗唯一foreground transport：登记先显示started、backend延迟出现并持续写盘，原控制按合同记为`state-indeterminate`。首次guest网络门又在宿主`utmctl exec`参数解析阶段失败关闭，未执行guest命令；旧二十台仍stopped，v4不得重启、沿用证据根重试或直接进入case，其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh与六类operation已有证据。首个crash已闭合；`install_artifacts_staged`的v4已消耗唯一foreground transport并进入guest，v2双重文件回读证明仅`lo`且IPv4/IPv6 main route为空；尚未传canonical input、生成operation ID或进入transaction。旧二十台仍以launch后最新持久观察为stopped；其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -31,7 +31,7 @@
 - v4 clone/prepared manifest `f76d1943…ff6e2`/`c40c55d9…144b`曾固定UUID `50B75F88…8038`、`Network=[]`及config/EFI/qcow2 `2de7280b…6195`/`0b797641…1418`/`4967234b…4b18`；21台全停、双重qcow2与零句柄独立复核通过。clean `ea46c9d`后的系统只读门再确认app已不驻留、前后零相关进程，未发送quit。
 - 从clean `296a1c5`执行唯一`foreground-applescript-v1`：prepared/live身份、两次descriptor和双进程门均通过；osascript只调用1次、exit 0、空输出。冻结目录`…-v4-Foreground-Launch-Transport-v2`含16项，manifest `6dbbdf40…fc3c`逐项通过且权限为`0700`/`0600`；首轮status与terminal list已见target started，但terminal进程为0，故原控制返回12/`state-indeterminate`，没有quit/stop/retry/delete/guest/input/operation/transaction。
 - 后续只读交叉验证始终只有v4登记started、旧二十台stopped；QEMUHelper/QEMULauncher延迟出现，`lsof`确认其持有EFI/qcow2。config仍为`2de7280b…6195`，EFI变为`f762ee52…8e76`；qcow2先后出现`bd03adb0…9fde`、`96ed9100…e22`、`2c9a8c56…a2b5`且尺寸曾增至10,089,594,880 bytes，均不是terminal身份。最终快照在list/status前进程为0、之后却再次捕获QEMULauncher双句柄，提示started登记下的plain查询可能重新拉起app/backend，后续不再循环查询。VM已实际写盘但guest断网未证明；修复`2eea62f`使未来控制在started后继续有界轮询backend，17项launch/prepared回归通过，但不回写本次终态。
-- clean `e75509a`新增一次性guest网络控制：绑定launch manifest `6dbbdf40…fc3c`、live target文件与QEMULauncher双句柄，只允许建立私有guest根、逐字回读脚本、关闭非loopback接口和两次回读结构化网络证据。真实create-new目录`…-v4-Network-Ready-v1`的8项均为`0600`，manifest `d5d33212…7348`逐项通过；绑定、target、进程和句柄门通过后，首个`utmctl exec`因缺少本机CLI要求的`--cmd`在宿主exit 64，故network script/push/pull均为0，guest命令未发送，业务input/operation/transaction/stop/retry/quit均未执行。代码已在repository-only补正`--cmd`并增加固定命令面断言，但本现场未重跑，断网仍未证明。
+- clean `e75509a`的network v1在宿主`utmctl exec`参数解析阶段失败关闭，8项manifest `d5d33212…7348`确认network script/push/pull均为0。修正控制在clean `3286268`逐项绑定launch 16项及v1失败7项后只执行一次v2：脚本push后逐字回读SHA-256 `d0bb5c28…1f28a`，network script仅调用1次，两个301-byte回读均为`2f9abfbe…d0e8e`。结构化证据固定boot `1bcbd795…26ae3`、active仅`lo`、nonloop接口/UP均0、IPv4/IPv6 main route均0；15项manifest `40be3f3f…38383`逐项通过，业务input/operation/transaction/stop/retry/quit及plain list/status/start均未执行。
 
 ## 停止线
 
@@ -45,16 +45,16 @@
 - v2 clone失败证据`65160b12…c1859`须原样保留；不得沿用本批授权重试clone、重启UTM或把exit 0记为成功。
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
-- v4 clone/prepared/launch证据、network-ready v1失败证据与UUID `50B75F88…8038`须原样冻结；唯一transport已经消耗，既有network输出根也已消耗，不得第二次start、覆盖或原根重试、把活动qcow2哈希当terminal或直接执行case。当前运行/guest状态不确定；以修正控制在全新输出根重新申请guest断网核验、停止VM或退出UTM都必须分别重新授权，任一门不成立仍失败关闭且不得自动补救。
+- v4 clone/prepared/launch、network-ready v1失败及v2成功证据与UUID `50B75F88…8038`须原样冻结；唯一transport和两个network输出根均已消耗，不得第二次start、重复断网、覆盖证据或把活动qcow2哈希当terminal。v2只证明当前boot断网，不授权canonical input、preflight、operation、transaction、stop或quit；这些动作仍须按顺序分别授权。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（2026-08-23）
 
-1. 冻结v4唯一launch manifest `6dbbdf40…fc3c`及network v1 manifest `d5d33212…7348`，不覆盖、不沿用输出根；prepared哈希只代表启动前，活动EFI/qcow2已变化，不得据此恢复或宣称clean。
-2. repository-only修正已把三条`utmctl exec`固定为本机4.7.5要求的`UUID --cmd <cmd>...`并增加回归。完成文档与门禁提交后，下一系统批仍须另行授权，使用全新absent输出根只做guest断网与双重文件回读；不得plain list/status循环、业务input、operation ID、transaction、stop、retry或quit。
-3. 只有新的断网证据闭合后才讨论canonical input与第二个crash checkpoint；证据不完整即保留现场，受控停止仍须另一授权。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台继续关闭。
+1. 冻结launch/network v1/v2 manifest `6dbbdf40…fc3c`/`d5d33212…7348`/`40be3f3f…38383`，不覆盖、不复跑断网；prepared哈希只代表启动前，活动EFI/qcow2不得恢复或宣称clean。
+2. 下一批先repository-only绑定v2断网证据，固定canonical input的源bundle、guest私有根、逐字回读、原子切换、失败停止线与零operation/transaction语义；通过门禁并提交后，再单独申请真实input transfer授权。
+3. canonical input闭合后才可另行授权只读mutation/negative preflight；operation ID、第二个crash checkpoint、受控停止继续分批关闭。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
 
 ## 验证入口
 
@@ -76,7 +76,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器证明单次start/clone、v7只读诊断、prepared/live target双重绑定、foreground transport、延迟backend轮询、guest网络命令面/双重回读及失败关闭terminal。v4已实际写盘但launch终态仍为`state-indeterminate`，network v1又在宿主参数解析阶段失败关闭，尚未执行guest命令或transaction；八case、连续L6与发布未闭合。
+上述入口以合成执行器证明单次start/clone、v7只读诊断、prepared/live target双重绑定、foreground transport、延迟backend轮询、guest网络命令面/双重回读及失败关闭terminal。v4 launch原终态仍为`state-indeterminate`，但独立句柄事实与v2 guest双重回读已证明当前boot真实运行且断网；尚未传canonical input或执行transaction，八case、连续L6与发布未闭合。
 
 ## 阅读索引
 
