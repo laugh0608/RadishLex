@@ -7,7 +7,7 @@
 - 复核日期：2026-08-23（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh与六类operation已有证据。首个crash已闭合；`install_artifacts_staged`未进入guest。v7已完整定位plain start的UTM/AppKit失败机制，repository-only launch transport v2及12项合成门禁已闭合；新的v4独立clone已完成DependencyFrozen物化并保持stopped，prepared证据已冻结但尚未启动。二十一台VM保持全停，其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh与六类operation已有证据。首个crash已闭合；`install_artifacts_staged`未进入guest。v7已完整定位plain start的UTM/AppKit失败机制，repository-only launch transport v2现已强绑定v4 prepared证据与live target身份，16项合成门禁闭合；新的v4独立clone已完成DependencyFrozen物化并保持stopped，尚未启动。二十一台VM保持全停，其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -30,7 +30,7 @@
 - v3首次start从clean `27087c3`、clone/prepared manifest与二十台canonical全停清单开始。唯一start在90秒内无stdout/stderr并timeout，60次status及terminal list始终为二十台全stopped，控制返回10与`failed-closed-stopped`；start/failure manifest为`870f56dd…f3a5`/`59c62c14…bba05`。成功门未成立，因此guest断网exec和file pull均为0次，也没有input、operation ID或transaction。独立postverify manifest `8e3d5ced…8386`再次确认config/EFI/qcow2未变、qcow2双重复算、source对照、`Network=[]`、零句柄和二十台全停；该结果仍不能归因具体UTM/QEMU根因。
 - v1-v6只读host诊断依次暴露进程输出上限、PID/legacy UID解析、日志捕获上限、空category与finished marker合同缺口；manifest `158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`均冻结。每次均保持二十台全停、`root_cause=unattributed`与零VM/guest/transaction mutation；完整流水只见L6 runbook与周志。
 - v7真实只读诊断从clean `5ab68b1`绑定九份前序manifest，确认二十台全停、31,640-byte进程观察完整且相关进程为0。相同`log show`完整返回3,916,860 bytes与SHA-256 `0dbed63a…e9c`；4,041条NDJSON记录以唯一末尾整数`1`闭合，形成4,040条脱敏事件。08:13:48.432的`UTMv,star`由UTM接收后出现`[self canBecomeMainWindow]`断言与`NSInternalInconsistencyException`，没有对应start reply或QEMU事件。十项manifest `206aa335…7b56c`通过；terminal仍保守记录`root_cause=unattributed`且所有VM/guest/transaction动作未执行。
-- repository-only launch transport v2固定`foreground-applescript-v1`：唯一`/usr/bin/osascript`调用先`activate` UTM，再按精确UUID执行一次`start ... saving true recovery false`；plain `utmctl start`与`--hide`均不在命令面。binding强制v7 manifest `206aa335…7b56c`、UTM `4.7.5 (118)`及Info/sdef/App Intent身份，live inventory只能是冻结20台加一个全新target；transport前相关UTM/utmctl/QEMU进程必须为0，terminal同时交叉验证status、21台清单与QEMUHelper/QEMULauncher/qemu进程。12项fake-runner/临时目录回归已进入默认L6门禁；真实v7十项证据和本机UTM bundle只读绑定通过，但尚未执行osascript、start或GUI动作，因此仍是待实机验证的transport假设。
+- repository-only launch transport v2固定`foreground-applescript-v1`：唯一`/usr/bin/osascript`调用先`activate` UTM，再按精确UUID执行一次`start ... saving true recovery false`；plain `utmctl start`与`--hide`均不在命令面。binding除v7与UTM身份外，现强制prepared manifest `c40c55d9…144b`七项语义、精确v4 UUID/name/package路径、21台为v7冻结20台加唯一stopped target，并以两次descriptor重算包围live list/status，随后最终进程零门才允许osascript；身份变化提前拒绝。16项回归与真实prepared/live双次只读复核通过；尚未执行osascript、start或GUI动作，仍是待实机验证的transport假设。
 - 新v4 clone manifest `f76d1943…ff6e2`绑定clean `83f037a`、v7、二十台全停清单和唯一clone，联合确认新增UUID `50B75F88…8038` stopped及精确package；没有物化、start、guest、transaction、retry或delete。该manifest不含host进程payload，不能证明后续transport进程门。
 - v4物化从clean `e4ca1bd`、clone manifest与二十一台canonical all-stopped清单开始；冻结控制只对该target以target-local incoming加`clonefile`/`mv`换入DependencyFrozen EFI/qcow2，共两次replacement。prepared manifest `c40c55d9…144b`逐项固定config/EFI/qcow2 `2de7280b…6195`/`0b797641…1418`/`4967234b…4b18`、`Network=[]`、qcow2双重复算、source/registration/target九文件零句柄及物化前后同一二十一台全停清单。独立manifest、live list/status、磁盘hash与零句柄复核再次通过；没有start、guest、input、operation ID、transaction、retry、rollback或delete。独立精确`ucomm`复核同时发现一个驻留UTM app进程，但无utmctl或QEMU backend；因此prepared成立，foreground transport的调用前零相关进程门尚未成立。
 
@@ -54,7 +54,7 @@
 ## 下一步（2026-08-23）
 
 1. 新v4 clone `50B75F88…8038`已以clone/prepared manifest `f76d1943…ff6e2`/`c40c55d9…144b`冻结；DependencyFrozen config/EFI/qcow2、`Network=[]`、双重qcow2、九文件零句柄与二十一台全停均已独立复核，不得再次物化、重试clone、删除或复用旧v3。
-2. 下一批先在repository-only复验prepared绑定与launch transport命令面；随后单独申请关闭当前驻留UTM app，进程归零复核通过后再单独申请一次`foreground-applescript-v1`系统动作。任一prepared/live inventory或进程门漂移即停止，不调用plain start、`--hide`、自动quit/stop/retry/delete。
+2. repository-only prepared/target绑定与launch transport命令面已经闭合。下一批先单独申请关闭当前驻留UTM app；进程归零及控制内双重live target校验通过后，再单独申请一次`foreground-applescript-v1`系统动作。任一prepared/live inventory、config/EFI/qcow2或进程门漂移即停止，不调用plain start、`--hide`、自动quit/stop/retry/delete。
 3. 只有新target唯一started、冻结二十台均stopped且backend进程事实一致，才可再申请guest断网双重文件回读；旧`5B19AEF1…7DAB`、其余crash、连续L6、P05C、发布、推送和其他平台继续关闭。
 
 ## 验证入口
@@ -77,7 +77,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器证明单次start/clone、v7只读诊断、foreground AppleScript transport、失败关闭terminal与零越界动作。新v4现仅闭合clone与prepared磁盘身份，仍未进入guest；v7已定位start AppleEvent后的UTM AppKit断言，v2仍仅为未实机验证的新transport。八case、连续L6与发布未闭合。
+上述入口以合成执行器证明单次start/clone、v7只读诊断、prepared/live target双重绑定、foreground AppleScript transport、失败关闭terminal与零越界动作。新v4仍未启动或进入guest；v7已定位start AppleEvent后的UTM AppKit断言，v2仍仅为未实机验证的新transport。八case、连续L6与发布未闭合。
 
 ## 阅读索引
 

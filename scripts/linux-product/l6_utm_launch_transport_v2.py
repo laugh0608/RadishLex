@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import re
 import sys
 import time
@@ -25,6 +26,11 @@ EXPECTED_UTM_VERSION = transport_bindings.EXPECTED_UTM_VERSION
 EXPECTED_UTM_BUILD = transport_bindings.EXPECTED_UTM_BUILD
 V7_EVIDENCE_FORMAT = transport_bindings.V7_EVIDENCE_FORMAT
 REQUIRED_V7_MANIFEST_SHA256 = transport_bindings.REQUIRED_V7_MANIFEST_SHA256
+REQUIRED_PREPARED_MANIFEST_SHA256 = (
+    transport_bindings.REQUIRED_PREPARED_MANIFEST_SHA256
+)
+REQUIRED_TARGET_UUID = transport_bindings.REQUIRED_TARGET_UUID
+REQUIRED_TARGET_NAME = transport_bindings.REQUIRED_TARGET_NAME
 FROZEN_V7_TARGET_UUID = transport_bindings.FROZEN_V7_TARGET_UUID
 FROZEN_V7_TARGET_NAME = transport_bindings.FROZEN_V7_TARGET_NAME
 V7_LOG_START = transport_bindings.V7_LOG_START
@@ -48,10 +54,13 @@ class LaunchTransportRequest:
     expected_repository_head: str
     prior_v7_root: Path
     prior_v7_manifest_sha256: str
+    prior_prepared_root: Path
+    prior_prepared_manifest_sha256: str
     output_root: Path
     attempt_id: str
     target_uuid: str
     target_name: str
+    target_package_path: Path
     expected_vm_count: int
     poll_attempts: int
     poll_interval_seconds: int
@@ -65,7 +74,9 @@ class LaunchTransportRequest:
         for path, label in (
             (self.repository_root, "repository-root"),
             (self.prior_v7_root, "prior-v7-root"),
+            (self.prior_prepared_root, "prior-prepared-root"),
             (self.output_root, "output-root"),
+            (self.target_package_path, "target-package-path"),
         ):
             if not path.is_absolute():
                 raise LaunchTransportError(f"{label}-must-be-absolute")
@@ -75,18 +86,53 @@ class LaunchTransportRequest:
             raise LaunchTransportError("output-root-must-be-outside-repository")
         if _path_is_within(self.output_root, self.prior_v7_root):
             raise LaunchTransportError("output-root-must-not-modify-prior-v7")
+        if _path_is_within(self.output_root, self.prior_prepared_root):
+            raise LaunchTransportError(
+                "output-root-must-not-modify-prior-prepared"
+            )
+        if _path_is_within(
+            self.output_root, self.target_package_path
+        ) or _path_is_within(self.target_package_path, self.output_root):
+            raise LaunchTransportError(
+                "output-root-and-target-package-must-not-overlap"
+            )
         if not HEX_40.fullmatch(self.expected_repository_head):
             raise LaunchTransportError("expected-repository-head-invalid")
         if self.prior_v7_manifest_sha256 != REQUIRED_V7_MANIFEST_SHA256:
             raise LaunchTransportError("required-v7-manifest-sha256-mismatch")
+        if (
+            self.prior_prepared_manifest_sha256
+            != REQUIRED_PREPARED_MANIFEST_SHA256
+        ):
+            raise LaunchTransportError(
+                "required-prepared-manifest-sha256-mismatch"
+            )
         if not SAFE_ATTEMPT_ID.fullmatch(self.attempt_id):
             raise LaunchTransportError("attempt-id-invalid")
         _validate_uuid(self.target_uuid, "target-uuid")
         if self.target_uuid == FROZEN_V7_TARGET_UUID:
             raise LaunchTransportError("frozen-v7-target-reuse-forbidden")
+        if self.target_uuid != REQUIRED_TARGET_UUID:
+            raise LaunchTransportError("required-target-uuid-mismatch")
         _validate_vm_name(self.target_name, "target-name")
         if self.target_name == FROZEN_V7_TARGET_NAME:
             raise LaunchTransportError("frozen-v7-target-reuse-forbidden")
+        if self.target_name != REQUIRED_TARGET_NAME:
+            raise LaunchTransportError("required-target-name-mismatch")
+        try:
+            expected_target_package = (
+                transport_bindings.expected_target_package_path(
+                    self.target_name
+                )
+            )
+        except transport_bindings.BindingError as exc:
+            raise LaunchTransportError(str(exc)) from exc
+        if self.target_package_path != expected_target_package:
+            raise LaunchTransportError("target-package-path-mismatch")
+        if self.target_package_path.name != f"{self.target_name}.utm":
+            raise LaunchTransportError("target-package-name-mismatch")
+        if self.expected_vm_count != 21:
+            raise LaunchTransportError("expected-vm-count-must-be-21")
         if not 2 <= self.expected_vm_count <= 128:
             raise LaunchTransportError("expected-vm-count-out-of-range")
         if not 1 <= self.poll_attempts <= 300:
@@ -126,7 +172,14 @@ class LaunchTransportRequest:
             "poll_attempts": self.poll_attempts,
             "poll_interval_seconds": self.poll_interval_seconds,
             "prior_v7_manifest_sha256": self.prior_v7_manifest_sha256,
+            "prior_prepared_manifest_sha256": (
+                self.prior_prepared_manifest_sha256
+            ),
             "target_name": self.target_name,
+            "target_package_name": self.target_package_path.name,
+            "target_package_path_sha256": _sha256_text(
+                str(self.target_package_path)
+            ),
             "target_uuid": self.target_uuid,
             "transport_id": TRANSPORT_ID,
             "transport_timeout_seconds": self.transport_timeout_seconds,
@@ -150,6 +203,9 @@ class CommandRunner(Protocol):
 
 
 BindingValidator = Callable[[LaunchTransportRequest], dict[str, object]]
+TargetIdentityValidator = Callable[
+    [LaunchTransportRequest, dict[str, object]], dict[str, object]
+]
 Sleeper = Callable[[float], None]
 
 
@@ -159,6 +215,7 @@ def run_launch_transport_once(
     runner: CommandRunner | None = None,
     sleeper: Sleeper | None = None,
     binding_validator: BindingValidator | None = None,
+    target_identity_validator: TargetIdentityValidator | None = None,
 ) -> LaunchTransportResult:
     request.validate()
     writer = start_control.EvidenceWriter.create(request.output_root)
@@ -166,9 +223,11 @@ def run_launch_transport_once(
     command_runner = runner or start_control.SubprocessCommandRunner()
     sleep = sleeper or time.sleep
     validate_bindings = binding_validator or validate_launch_bindings
+    validate_target = target_identity_validator or validate_target_identity
 
     launch_invocations = 0
     status_poll_count = 0
+    target_identity_checks = 0
     stage = "binding-preflight"
     reason = "not-run"
     outcome = "precondition-rejected"
@@ -199,6 +258,13 @@ def run_launch_transport_once(
         if preflight_processes:
             raise LaunchTransportError("relevant-host-process-before-preflight")
 
+        stage = "target-identity-preflight"
+        target_identity_preflight = validate_target(request, binding)
+        target_identity_checks = 1
+        writer.write_json(
+            "target-identity-preflight.json", target_identity_preflight
+        )
+
         stage = "utmctl-list-prestart"
         prestart_list = command_runner.run(
             ("utmctl", "list"), request.command_timeout_seconds
@@ -222,6 +288,13 @@ def run_launch_transport_once(
         )
         if start_control.parse_utmctl_status(prestart_status) != "stopped":
             raise LaunchTransportError("target-not-stopped-before-transport")
+
+        stage = "target-identity-ready"
+        target_identity_ready = validate_target(request, binding)
+        target_identity_checks = 2
+        writer.write_json("target-identity-ready.json", target_identity_ready)
+        if target_identity_ready != target_identity_preflight:
+            raise LaunchTransportError("target-identity-changed-before-transport")
 
         stage = "host-process-ready"
         ready_process_observation = command_runner.run(
@@ -348,6 +421,7 @@ def run_launch_transport_once(
         "reason": reason,
         "status_poll_count": status_poll_count,
         "target_name": request.target_name,
+        "target_identity_checks": target_identity_checks,
         "target_uuid": request.target_uuid,
         "terminal_relevant_process_count": len(terminal_processes),
         "transaction": "not-performed",
@@ -389,9 +463,23 @@ def validate_launch_bindings(
         raise LaunchTransportError(str(exc)) from exc
 
 
+def validate_target_identity(
+    request: LaunchTransportRequest,
+    prepared_binding: dict[str, object],
+) -> dict[str, object]:
+    try:
+        return transport_bindings.validate_live_target_identity(
+            request, prepared_binding
+        )
+    except transport_bindings.BindingError as exc:
+        raise LaunchTransportError(str(exc)) from exc
+
+
 validate_control_identity = transport_bindings.validate_control_identity
 validate_v7_evidence = transport_bindings.validate_v7_evidence
+validate_prepared_evidence = transport_bindings.validate_prepared_evidence
 validate_utm_bundle = transport_bindings.validate_utm_bundle
+expected_target_package_path = transport_bindings.expected_target_package_path
 
 
 def transport_argv(request: LaunchTransportRequest) -> tuple[str, ...]:
@@ -604,6 +692,10 @@ def _path_is_within(path: Path, root: Path) -> bool:
     return True
 
 
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -616,10 +708,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expected-repository-head", required=True)
     parser.add_argument("--prior-v7-root", type=Path, required=True)
     parser.add_argument("--prior-v7-manifest-sha256", required=True)
+    parser.add_argument("--prior-prepared-root", type=Path, required=True)
+    parser.add_argument("--prior-prepared-manifest-sha256", required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--attempt-id", required=True)
     parser.add_argument("--target-uuid", required=True)
     parser.add_argument("--target-name", required=True)
+    parser.add_argument("--target-package-path", type=Path, required=True)
     parser.add_argument("--expected-vm-count", type=int, required=True)
     parser.add_argument("--poll-attempts", type=int, default=60)
     parser.add_argument("--poll-interval-seconds", type=int, default=1)
@@ -642,10 +737,15 @@ def main() -> int:
         expected_repository_head=args.expected_repository_head,
         prior_v7_root=args.prior_v7_root,
         prior_v7_manifest_sha256=args.prior_v7_manifest_sha256,
+        prior_prepared_root=args.prior_prepared_root,
+        prior_prepared_manifest_sha256=(
+            args.prior_prepared_manifest_sha256
+        ),
         output_root=args.output_root,
         attempt_id=args.attempt_id,
         target_uuid=args.target_uuid,
         target_name=args.target_name,
+        target_package_path=args.target_package_path,
         expected_vm_count=args.expected_vm_count,
         poll_attempts=args.poll_attempts,
         poll_interval_seconds=args.poll_interval_seconds,

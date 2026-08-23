@@ -11,6 +11,7 @@ import xml.etree.ElementTree as element_tree
 from pathlib import Path
 from typing import Protocol
 
+import l6_utm_launch_prepared_bindings as prepared_bindings
 import l6_utm_start_once as start_control
 
 
@@ -21,6 +22,9 @@ CONTROL_RELATIVE_PATH = Path(
 )
 BINDING_CONTROL_RELATIVE_PATH = Path(
     "scripts/linux-product/l6_utm_launch_transport_bindings.py"
+)
+PREPARED_BINDING_RELATIVE_PATH = Path(
+    "scripts/linux-product/l6_utm_launch_prepared_bindings.py"
 )
 TRANSPORT_RELATIVE_PATH = Path(
     "scripts/linux-product/l6_utm_launch_transport_v2.applescript"
@@ -52,6 +56,21 @@ FROZEN_V7_TARGET_NAME = (
 )
 V7_LOG_START = "2026-08-22 08:12:00+0000"
 V7_LOG_END = "2026-08-22 08:18:00+0000"
+PREPARED_EVIDENCE_FORMAT = prepared_bindings.PREPARED_EVIDENCE_FORMAT
+PREPARED_PREFLIGHT_FORMAT = prepared_bindings.PREPARED_PREFLIGHT_FORMAT
+REQUIRED_PREPARED_MANIFEST_SHA256 = (
+    prepared_bindings.REQUIRED_PREPARED_MANIFEST_SHA256
+)
+REQUIRED_CLONE_MANIFEST_SHA256 = (
+    prepared_bindings.REQUIRED_CLONE_MANIFEST_SHA256
+)
+REQUIRED_PREPARED_REPOSITORY_HEAD = (
+    prepared_bindings.REQUIRED_PREPARED_REPOSITORY_HEAD
+)
+REQUIRED_TARGET_UUID = prepared_bindings.REQUIRED_TARGET_UUID
+REQUIRED_TARGET_NAME = prepared_bindings.REQUIRED_TARGET_NAME
+TARGET_DISK_IDENTIFIER = prepared_bindings.TARGET_DISK_IDENTIFIER
+TARGET_DISK_IMAGE_NAME = prepared_bindings.TARGET_DISK_IMAGE_NAME
 HEX_64 = re.compile(r"[0-9a-f]{64}")
 
 
@@ -64,6 +83,9 @@ class LaunchTransportBindingRequest(Protocol):
     expected_repository_head: str
     prior_v7_root: Path
     prior_v7_manifest_sha256: str
+    prior_prepared_root: Path
+    prior_prepared_manifest_sha256: str
+    target_package_path: Path
     target_uuid: str
     target_name: str
     expected_vm_count: int
@@ -87,6 +109,7 @@ def validate_launch_bindings(
         raise BindingError("repository-not-clean")
     control_identity = validate_control_identity(request.repository_root)
     v7_identity = validate_v7_evidence(request)
+    prepared_identity = validate_prepared_evidence(request, v7_identity)
     utm_identity = validate_utm_bundle(UTM_BUNDLE_ROOT)
     return {
         **control_identity,
@@ -94,6 +117,7 @@ def validate_launch_bindings(
         "format": EVIDENCE_FORMAT,
         "repository_clean": True,
         "repository_head": repository_head,
+        **prepared_identity,
         **utm_identity,
         **v7_identity,
     }
@@ -102,10 +126,12 @@ def validate_launch_bindings(
 def validate_control_identity(repository_root: Path) -> dict[str, object]:
     control_path = repository_root / CONTROL_RELATIVE_PATH
     binding_path = repository_root / BINDING_CONTROL_RELATIVE_PATH
+    prepared_binding_path = repository_root / PREPARED_BINDING_RELATIVE_PATH
     transport_path = repository_root / TRANSPORT_RELATIVE_PATH
     for path, label in (
         (control_path, "executed-control"),
         (binding_path, "binding-control"),
+        (prepared_binding_path, "prepared-binding-control"),
         (transport_path, "transport-source"),
     ):
         try:
@@ -121,6 +147,8 @@ def validate_control_identity(repository_root: Path) -> dict[str, object]:
             raise BindingError(f"{label}-identity-invalid")
     if Path(__file__).absolute() != binding_path:
         raise BindingError("executed-binding-control-path-mismatch")
+    if Path(prepared_bindings.__file__).absolute() != prepared_binding_path:
+        raise BindingError("executed-prepared-binding-control-path-mismatch")
     try:
         transport_source = transport_path.read_bytes()
     except OSError as exc:
@@ -130,6 +158,9 @@ def validate_control_identity(repository_root: Path) -> dict[str, object]:
     return {
         "binding_control_sha256": _sha256_file(binding_path),
         "control_sha256": _sha256_file(control_path),
+        "prepared_binding_control_sha256": _sha256_file(
+            prepared_binding_path
+        ),
         "transport_id": TRANSPORT_ID,
         "transport_sha256": hashlib.sha256(transport_source).hexdigest(),
     }
@@ -304,6 +335,18 @@ def validate_v7_evidence(
     }
 
 
+def validate_prepared_evidence(
+    request: LaunchTransportBindingRequest,
+    v7_identity: dict[str, object],
+) -> dict[str, object]:
+    try:
+        return prepared_bindings.validate_prepared_evidence(
+            request, v7_identity
+        )
+    except prepared_bindings.PreparedBindingError as exc:
+        raise BindingError(str(exc)) from exc
+
+
 def validate_utm_bundle(bundle_root: Path) -> dict[str, object]:
     try:
         bundle_stat = bundle_root.lstat()
@@ -390,6 +433,25 @@ def validate_utm_bundle(bundle_root: Path) -> dict[str, object]:
         "utm_sdef_sha256": _sha256_file(sdef_path),
         "utm_version": EXPECTED_UTM_VERSION,
     }
+
+
+def expected_target_package_path(target_name: str) -> Path:
+    try:
+        return prepared_bindings.expected_target_package_path(target_name)
+    except prepared_bindings.PreparedBindingError as exc:
+        raise BindingError(str(exc)) from exc
+
+
+def validate_live_target_identity(
+    request: LaunchTransportBindingRequest,
+    prepared_binding: dict[str, object],
+) -> dict[str, object]:
+    try:
+        return prepared_bindings.validate_live_target_identity(
+            request, prepared_binding
+        )
+    except prepared_bindings.PreparedBindingError as exc:
+        raise BindingError(str(exc)) from exc
 
 
 def _command_observation_from_json(

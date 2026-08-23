@@ -15,13 +15,13 @@ import l6_utm_launch_transport_v2 as launch_transport
 import l6_utm_start_once as start_control
 
 
-TARGET_UUID = "22222222-2222-4222-8222-222222222222"
-TARGET_NAME = (
-    "RadishLex-Debian13-ARM64-L6-d75818f-"
-    "crash-install-artifacts-staged-v4"
+TARGET_UUID = launch_transport.REQUIRED_TARGET_UUID
+TARGET_NAME = launch_transport.REQUIRED_TARGET_NAME
+PEERS = tuple(
+    (str(uuid.UUID(int=index)).upper(), f"Synthetic-Frozen-Peer-{index:02d}")
+    for index in range(1, 21)
 )
-PEER_UUID = "11111111-1111-4111-8111-111111111111"
-PEER_NAME = "Synthetic-Frozen-Peer"
+PEER_UUID, PEER_NAME = PEERS[0]
 
 
 class FakeRunner:
@@ -74,6 +74,7 @@ class LinuxL6UtmLaunchTransportV2Tests(unittest.TestCase):
                 runner=runner,
                 sleeper=lambda _: None,
                 binding_validator=valid_binding,
+                target_identity_validator=valid_target_identity,
             )
 
             self.assertEqual(result.outcome, "started-observed")
@@ -130,6 +131,7 @@ class LinuxL6UtmLaunchTransportV2Tests(unittest.TestCase):
                 runner=runner,
                 sleeper=lambda _: None,
                 binding_validator=valid_binding,
+                target_identity_validator=valid_target_identity,
             )
 
             self.assertEqual(result.outcome, "failed-closed-stopped")
@@ -174,6 +176,7 @@ class LinuxL6UtmLaunchTransportV2Tests(unittest.TestCase):
                 request,
                 runner=runner,
                 binding_validator=valid_binding,
+                target_identity_validator=valid_target_identity,
             )
 
             self.assertEqual(result.outcome, "started-observed")
@@ -199,6 +202,7 @@ class LinuxL6UtmLaunchTransportV2Tests(unittest.TestCase):
                 request,
                 runner=runner,
                 binding_validator=valid_binding,
+                target_identity_validator=valid_target_identity,
             )
 
             self.assertEqual(result.outcome, "state-indeterminate")
@@ -225,6 +229,7 @@ class LinuxL6UtmLaunchTransportV2Tests(unittest.TestCase):
                 request,
                 runner=runner,
                 binding_validator=valid_binding,
+                target_identity_validator=valid_target_identity,
             )
 
             self.assertEqual(result.outcome, "state-indeterminate")
@@ -238,6 +243,7 @@ class LinuxL6UtmLaunchTransportV2Tests(unittest.TestCase):
                 request,
                 runner=runner,
                 binding_validator=valid_binding,
+                target_identity_validator=valid_target_identity,
             )
 
             self.assertEqual(result.outcome, "precondition-rejected")
@@ -263,10 +269,61 @@ class LinuxL6UtmLaunchTransportV2Tests(unittest.TestCase):
                 request,
                 runner=runner,
                 binding_validator=valid_binding,
+                target_identity_validator=valid_target_identity,
             )
 
             self.assertEqual(result.outcome, "precondition-rejected")
             self.assertEqual(result.launch_invocations, 0)
+
+    def test_target_identity_drift_before_transport_rejects_launch(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            request = self.request(Path(temporary))
+            runner = FakeRunner(
+                [
+                    process_observation(),
+                    observation(("utmctl", "list"), stdout=vm_list("stopped")),
+                    observation(
+                        ("utmctl", "status", TARGET_UUID),
+                        stdout=b"stopped\n",
+                    ),
+                    process_observation(),
+                ]
+            )
+            calls = 0
+
+            def drifting_target_identity(
+                candidate: launch_transport.LaunchTransportRequest,
+                binding: dict[str, object],
+            ) -> dict[str, object]:
+                nonlocal calls
+                calls += 1
+                value = valid_target_identity(candidate, binding)
+                if calls == 2:
+                    value["target_qcow2"] = {"sha256": "f" * 64}
+                return value
+
+            result = launch_transport.run_launch_transport_once(
+                request,
+                runner=runner,
+                binding_validator=valid_binding,
+                target_identity_validator=drifting_target_identity,
+            )
+
+            self.assertEqual(result.outcome, "precondition-rejected")
+            self.assertEqual(result.launch_invocations, 0)
+            self.assertEqual(calls, 2)
+            self.assertFalse(
+                any(
+                    call == launch_transport.transport_argv(request)
+                    for call in runner.calls
+                )
+            )
+            terminal = read_json(request.output_root / "terminal.json")
+            self.assertEqual(terminal["target_identity_checks"], 2)
+            self.assertIn(
+                "target-identity-changed-before-transport",
+                str(terminal["reason"]),
+            )
 
     def test_inventory_must_be_exact_v7_plus_one_new_target(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -287,6 +344,7 @@ class LinuxL6UtmLaunchTransportV2Tests(unittest.TestCase):
                 request,
                 runner=runner,
                 binding_validator=valid_binding,
+                target_identity_validator=valid_target_identity,
             )
 
             self.assertEqual(result.outcome, "precondition-rejected")
@@ -312,6 +370,10 @@ class LinuxL6UtmLaunchTransportV2Tests(unittest.TestCase):
         identity = launch_transport.validate_control_identity(repository_root)
 
         self.assertEqual(identity["transport_id"], launch_transport.TRANSPORT_ID)
+        self.assertRegex(
+            str(identity["prepared_binding_control_sha256"]),
+            r"^[0-9a-f]{64}$",
+        )
         self.assertRegex(str(identity["transport_sha256"]), r"^[0-9a-f]{64}$")
 
     def test_utm_bundle_contract_binds_version_sdef_and_start_intent(self) -> None:
@@ -401,11 +463,18 @@ class LinuxL6UtmLaunchTransportV2Tests(unittest.TestCase):
             "prior_v7_manifest_sha256": (
                 launch_transport.REQUIRED_V7_MANIFEST_SHA256
             ),
+            "prior_prepared_root": temporary_root / "prior-prepared",
+            "prior_prepared_manifest_sha256": (
+                launch_transport.REQUIRED_PREPARED_MANIFEST_SHA256
+            ),
             "output_root": temporary_root / "evidence",
             "attempt_id": "synthetic-launch-transport-v2",
             "target_uuid": TARGET_UUID,
             "target_name": TARGET_NAME,
-            "expected_vm_count": 2,
+            "target_package_path": (
+                launch_transport.expected_target_package_path(TARGET_NAME)
+            ),
+            "expected_vm_count": 21,
             "poll_attempts": 1,
             "poll_interval_seconds": 1,
             "transport_timeout_seconds": 15,
@@ -451,16 +520,42 @@ def valid_binding(
 ) -> dict[str, object]:
     return {
         "baseline_inventory": [
-            {"name": PEER_NAME, "status": "stopped", "uuid": PEER_UUID}
+            {"name": name, "status": "stopped", "uuid": vm_uuid}
+            for vm_uuid, name in PEERS
         ],
         "expected_current_vm_count": request.expected_vm_count,
         "format": launch_transport.EVIDENCE_FORMAT,
+        "prepared_target_config_sha256": "c" * 64,
+        "prepared_target_efi_sha256": "d" * 64,
+        "prepared_target_qcow2_sha256": "e" * 64,
+        "prior_prepared_manifest_sha256": (
+            request.prior_prepared_manifest_sha256
+        ),
         "prior_v7_manifest_sha256": request.prior_v7_manifest_sha256,
         "repository_clean": True,
         "repository_head": request.expected_repository_head,
         "transport_id": launch_transport.TRANSPORT_ID,
         "utm_build": launch_transport.EXPECTED_UTM_BUILD,
         "utm_version": launch_transport.EXPECTED_UTM_VERSION,
+    }
+
+
+def valid_target_identity(
+    request: launch_transport.LaunchTransportRequest,
+    binding: dict[str, object],
+) -> dict[str, object]:
+    del binding
+    return {
+        "format": launch_transport.EVIDENCE_FORMAT,
+        "target_config": {"sha256": "c" * 64},
+        "target_efi": {"sha256": "d" * 64},
+        "target_name": request.target_name,
+        "target_package_name": request.target_package_path.name,
+        "target_package_path_sha256": hashlib.sha256(
+            str(request.target_package_path).encode("utf-8")
+        ).hexdigest(),
+        "target_qcow2": {"sha256": "e" * 64},
+        "target_uuid": request.target_uuid,
     }
 
 
@@ -495,7 +590,9 @@ def vm_list(target_status: str) -> bytes:
     return (
         "UUID Status Name\n"
         f"{TARGET_UUID} {target_status} {TARGET_NAME}\n"
-        f"{PEER_UUID} stopped {PEER_NAME}\n"
+        + "".join(
+            f"{vm_uuid} stopped {name}\n" for vm_uuid, name in PEERS
+        )
     ).encode("utf-8")
 
 
