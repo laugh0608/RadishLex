@@ -16,7 +16,8 @@ PRIOR_EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v2"
 LATEST_EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v3"
 PRIOR_LOG_EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v4"
 PRIOR_SCHEMA_EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v5"
-EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v6"
+PRIOR_FINISHED_EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v6"
+EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v7"
 CONTROL_RELATIVE_PATH = Path(
     "scripts/linux-product/l6_utm_launch_diagnostics.py"
 )
@@ -58,6 +59,8 @@ class LaunchDiagnosticBindingRequest(Protocol):
     prior_log_diagnostic_manifest_sha256: str
     prior_schema_diagnostic_root: Path
     prior_schema_diagnostic_manifest_sha256: str
+    prior_finished_diagnostic_root: Path
+    prior_finished_diagnostic_manifest_sha256: str
     target_uuid: str
     target_name: str
     expected_vm_count: int
@@ -86,6 +89,9 @@ def validate_diagnostic_bindings(
     latest_diagnostic = validate_latest_diagnostic_evidence(request)
     prior_log_diagnostic = validate_prior_log_diagnostic_evidence(request)
     prior_schema_diagnostic = validate_prior_schema_diagnostic_evidence(request)
+    prior_finished_diagnostic = validate_prior_finished_diagnostic_evidence(
+        request
+    )
     return {
         "binding_control_sha256": binding_control_sha256,
         "control_sha256": control_sha256,
@@ -97,6 +103,7 @@ def validate_diagnostic_bindings(
         **latest_diagnostic,
         **prior_log_diagnostic,
         **prior_schema_diagnostic,
+        **prior_finished_diagnostic,
         "repository_clean": True,
         "repository_head": repository_head,
     }
@@ -360,8 +367,7 @@ def validate_prior_log_diagnostic_evidence(
         ),
         log_stdout_must_be_truncated=True,
         log_capture_bytes=start_control.MAX_CAPTURE_BYTES,
-        request_diagnostic_fields={},
-        binding_diagnostic_fields={},
+        prior_post_processes=(),
     )
 
 
@@ -375,27 +381,46 @@ def validate_prior_schema_diagnostic_evidence(
         label="prior-schema-diagnostic",
         evidence_format=PRIOR_SCHEMA_EVIDENCE_FORMAT,
         result_prefix="prior_schema_diagnostic",
-        expected_reason=(
-            "unified-log-observation:unified-log-category-invalid"
-        ),
+        expected_reason="unified-log-observation:unified-log-category-invalid",
         log_stdout_must_be_truncated=False,
         log_capture_bytes=LOG_CAPTURE_BYTES,
-        request_diagnostic_fields={
-            "prior_log_diagnostic_manifest_sha256": (
-                request.prior_log_diagnostic_manifest_sha256
-            ),
-        },
-        binding_diagnostic_fields={
-            "prior_log_diagnostic_entries_verified": 8,
-            "prior_log_diagnostic_manifest_sha256": (
-                request.prior_log_diagnostic_manifest_sha256
-            ),
-            "prior_log_diagnostic_outcome": "diagnostics-incomplete",
-            "prior_log_diagnostic_reason": (
+        prior_post_processes=(
+            (
+                "prior_log_diagnostic",
+                request.prior_log_diagnostic_manifest_sha256,
                 "unified-log-observation:"
-                "unified-log-observation-output-truncated"
+                "unified-log-observation-output-truncated",
             ),
-        },
+        ),
+    )
+
+
+def validate_prior_finished_diagnostic_evidence(
+    request: LaunchDiagnosticBindingRequest,
+) -> dict[str, object]:
+    return _validate_post_process_diagnostic_evidence(
+        request,
+        root=request.prior_finished_diagnostic_root,
+        manifest_sha256=request.prior_finished_diagnostic_manifest_sha256,
+        label="prior-finished-diagnostic",
+        evidence_format=PRIOR_FINISHED_EVIDENCE_FORMAT,
+        result_prefix="prior_finished_diagnostic",
+        expected_reason="unified-log-observation:unified-log-finished-invalid",
+        log_stdout_must_be_truncated=False,
+        log_capture_bytes=LOG_CAPTURE_BYTES,
+        prior_post_processes=(
+            (
+                "prior_log_diagnostic",
+                request.prior_log_diagnostic_manifest_sha256,
+                "unified-log-observation:"
+                "unified-log-observation-output-truncated",
+            ),
+            (
+                "prior_schema_diagnostic",
+                request.prior_schema_diagnostic_manifest_sha256,
+                "unified-log-observation:unified-log-category-invalid",
+            ),
+        ),
     )
 
 
@@ -410,8 +435,7 @@ def _validate_post_process_diagnostic_evidence(
     expected_reason: str,
     log_stdout_must_be_truncated: bool,
     log_capture_bytes: int,
-    request_diagnostic_fields: dict[str, object],
-    binding_diagnostic_fields: dict[str, object],
+    prior_post_processes: tuple[tuple[str, str, str], ...],
 ) -> dict[str, object]:
     entry_names = _verify_bound_manifest(
         root,
@@ -466,7 +490,8 @@ def _validate_post_process_diagnostic_evidence(
         "target_name": request.target_name,
         "target_uuid": request.target_uuid,
     }
-    request_fields.update(request_diagnostic_fields)
+    for prefix, digest, _ in prior_post_processes:
+        request_fields[f"{prefix}_manifest_sha256"] = digest
     _require_json_fields(
         prior_request, request_fields, f"{label}-request"
     )
@@ -508,7 +533,15 @@ def _validate_post_process_diagnostic_evidence(
         "repository_clean": True,
         "repository_head": prior_repository_head,
     }
-    binding_fields.update(binding_diagnostic_fields)
+    for prefix, digest, reason in prior_post_processes:
+        binding_fields.update(
+            {
+                f"{prefix}_entries_verified": 8,
+                f"{prefix}_manifest_sha256": digest,
+                f"{prefix}_outcome": "diagnostics-incomplete",
+                f"{prefix}_reason": reason,
+            }
+        )
     _require_json_fields(
         prior_binding, binding_fields, f"{label}-binding"
     )

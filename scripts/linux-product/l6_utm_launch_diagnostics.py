@@ -23,6 +23,9 @@ PRIOR_LOG_EVIDENCE_FORMAT = diagnostic_bindings.PRIOR_LOG_EVIDENCE_FORMAT
 PRIOR_SCHEMA_EVIDENCE_FORMAT = (
     diagnostic_bindings.PRIOR_SCHEMA_EVIDENCE_FORMAT
 )
+PRIOR_FINISHED_EVIDENCE_FORMAT = (
+    diagnostic_bindings.PRIOR_FINISHED_EVIDENCE_FORMAT
+)
 EVIDENCE_FORMAT = diagnostic_bindings.EVIDENCE_FORMAT
 INITIAL_PROCESS_COMMAND = diagnostic_bindings.INITIAL_PROCESS_COMMAND
 PRIOR_PROCESS_COMMAND = diagnostic_bindings.PRIOR_PROCESS_COMMAND
@@ -76,6 +79,8 @@ class LaunchDiagnosticRequest:
     prior_log_diagnostic_manifest_sha256: str
     prior_schema_diagnostic_root: Path
     prior_schema_diagnostic_manifest_sha256: str
+    prior_finished_diagnostic_root: Path
+    prior_finished_diagnostic_manifest_sha256: str
     output_root: Path
     attempt_id: str
     target_uuid: str
@@ -105,6 +110,10 @@ class LaunchDiagnosticRequest:
                 self.prior_schema_diagnostic_root,
                 "prior-schema-diagnostic-root",
             ),
+            (
+                self.prior_finished_diagnostic_root,
+                "prior-finished-diagnostic-root",
+            ),
             (self.output_root, "output-root"),
         ):
             if not path.is_absolute():
@@ -122,6 +131,10 @@ class LaunchDiagnosticRequest:
             (self.latest_diagnostic_root, "latest-diagnostic"),
             (self.prior_log_diagnostic_root, "prior-log-diagnostic"),
             (self.prior_schema_diagnostic_root, "prior-schema-diagnostic"),
+            (
+                self.prior_finished_diagnostic_root,
+                "prior-finished-diagnostic",
+            ),
         ):
             if _path_is_within(self.output_root, root):
                 raise LaunchDiagnosticError(
@@ -158,6 +171,12 @@ class LaunchDiagnosticRequest:
         ):
             raise LaunchDiagnosticError(
                 "prior-schema-diagnostic-manifest-sha256-invalid"
+            )
+        if not HEX_64.fullmatch(
+            self.prior_finished_diagnostic_manifest_sha256
+        ):
+            raise LaunchDiagnosticError(
+                "prior-finished-diagnostic-manifest-sha256-invalid"
             )
         if not SAFE_ATTEMPT_ID.fullmatch(self.attempt_id):
             raise LaunchDiagnosticError("attempt-id-invalid")
@@ -216,6 +235,9 @@ class LaunchDiagnosticRequest:
             ),
             "prior_schema_diagnostic_manifest_sha256": (
                 self.prior_schema_diagnostic_manifest_sha256
+            ),
+            "prior_finished_diagnostic_manifest_sha256": (
+                self.prior_finished_diagnostic_manifest_sha256
             ),
             "prior_failure_manifest_sha256": (
                 self.prior_failure_manifest_sha256
@@ -322,6 +344,10 @@ def run_launch_diagnostics(
             _redacted_command_metadata(log_observation),
         )
         _require_success(log_observation, "unified-log-observation")
+        writer.write_json(
+            "unified-log-structure.json",
+            summarize_unified_log_structure(log_observation),
+        )
         events = parse_unified_log_events(log_observation)
         writer.write_json(
             "unified-log.json",
@@ -452,6 +478,15 @@ def _validate_prior_schema_diagnostic_evidence(
     )
 
 
+def _validate_prior_finished_diagnostic_evidence(
+    request: LaunchDiagnosticRequest,
+) -> dict[str, object]:
+    return _translate_binding_result(
+        diagnostic_bindings.validate_prior_finished_diagnostic_evidence,
+        request,
+    )
+
+
 def _translate_binding_result(
     validator: Callable[[LaunchDiagnosticRequest], dict[str, object]],
     request: LaunchDiagnosticRequest,
@@ -527,26 +562,15 @@ def parse_unified_log_events(
     _require_success(observation, "unified-log-observation")
     events: list[dict[str, object]] = []
     redacted_bytes = 0
-    raw_lines = tuple(
-        raw_line
-        for raw_line in observation.stdout.prefix.splitlines()
-        if raw_line
-    )
+    raw_lines = _unified_log_lines(observation)
     finished_seen = False
     for line_index, raw_line in enumerate(raw_lines):
-        if len(raw_line) > MAX_LOG_LINE_BYTES:
-            raise LaunchDiagnosticError("unified-log-line-too-large")
-        try:
-            value = json.loads(raw_line)
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise LaunchDiagnosticError("unified-log-line-invalid") from exc
-        if not isinstance(value, dict):
-            raise LaunchDiagnosticError("unified-log-event-not-object")
+        value = _decode_unified_log_record(raw_line)
         if "finished" in value:
             if (
                 finished_seen
                 or line_index != len(raw_lines) - 1
-                or value.get("finished") is not True
+                or not _finished_marker_supported(value["finished"])
             ):
                 raise LaunchDiagnosticError("unified-log-finished-invalid")
             finished_seen = True
@@ -606,6 +630,78 @@ def parse_unified_log_events(
     if not finished_seen:
         raise LaunchDiagnosticError("unified-log-finished-missing")
     return tuple(events)
+
+
+def summarize_unified_log_structure(
+    observation: CommandObservation,
+) -> dict[str, object]:
+    _require_success(observation, "unified-log-observation")
+    raw_lines = _unified_log_lines(observation)
+    finished: list[tuple[int, object]] = []
+    for line_index, raw_line in enumerate(raw_lines):
+        value = _decode_unified_log_record(raw_line)
+        if "finished" in value:
+            finished.append((line_index, value["finished"]))
+    return {
+        "finished_marker_count": len(finished),
+        "finished_marker_is_terminal": (
+            len(finished) == 1 and finished[0][0] == len(raw_lines) - 1
+        ),
+        "finished_value_kind": _finished_value_kind(finished),
+        "format": EVIDENCE_FORMAT,
+        "record_count": len(raw_lines),
+    }
+
+
+def _unified_log_lines(
+    observation: CommandObservation,
+) -> tuple[bytes, ...]:
+    return tuple(
+        raw_line
+        for raw_line in observation.stdout.prefix.splitlines()
+        if raw_line
+    )
+
+
+def _decode_unified_log_record(raw_line: bytes) -> dict[str, object]:
+    if len(raw_line) > MAX_LOG_LINE_BYTES:
+        raise LaunchDiagnosticError("unified-log-line-too-large")
+    try:
+        value = json.loads(raw_line)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise LaunchDiagnosticError("unified-log-line-invalid") from exc
+    if not isinstance(value, dict):
+        raise LaunchDiagnosticError("unified-log-event-not-object")
+    return value
+
+
+def _finished_marker_supported(value: object) -> bool:
+    return value is True or (type(value) is int and value == 1)
+
+
+def _finished_value_kind(
+    finished: list[tuple[int, object]],
+) -> str:
+    if not finished:
+        return "missing"
+    if len(finished) != 1:
+        return "multiple"
+    value = finished[0][1]
+    if value is True:
+        return "boolean-true"
+    if value is False:
+        return "boolean-false"
+    if type(value) is int:
+        return "integer-one" if value == 1 else "integer-other"
+    if value is None:
+        return "null"
+    if isinstance(value, str):
+        return "string"
+    if isinstance(value, float):
+        return "number"
+    if isinstance(value, list):
+        return "array"
+    return "object"
 
 
 def _require_inventory_stopped(
@@ -776,6 +872,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--prior-schema-diagnostic-manifest-sha256", required=True
     )
+    parser.add_argument(
+        "--prior-finished-diagnostic-root", type=Path, required=True
+    )
+    parser.add_argument(
+        "--prior-finished-diagnostic-manifest-sha256", required=True
+    )
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--attempt-id", required=True)
     parser.add_argument("--target-uuid", required=True)
@@ -824,6 +926,10 @@ def main() -> int:
         prior_schema_diagnostic_root=args.prior_schema_diagnostic_root,
         prior_schema_diagnostic_manifest_sha256=(
             args.prior_schema_diagnostic_manifest_sha256
+        ),
+        prior_finished_diagnostic_root=args.prior_finished_diagnostic_root,
+        prior_finished_diagnostic_manifest_sha256=(
+            args.prior_finished_diagnostic_manifest_sha256
         ),
         output_root=args.output_root,
         attempt_id=args.attempt_id,
