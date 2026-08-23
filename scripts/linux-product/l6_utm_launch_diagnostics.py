@@ -20,6 +20,9 @@ INITIAL_EVIDENCE_FORMAT = diagnostic_bindings.INITIAL_EVIDENCE_FORMAT
 PRIOR_EVIDENCE_FORMAT = diagnostic_bindings.PRIOR_EVIDENCE_FORMAT
 LATEST_EVIDENCE_FORMAT = diagnostic_bindings.LATEST_EVIDENCE_FORMAT
 PRIOR_LOG_EVIDENCE_FORMAT = diagnostic_bindings.PRIOR_LOG_EVIDENCE_FORMAT
+PRIOR_SCHEMA_EVIDENCE_FORMAT = (
+    diagnostic_bindings.PRIOR_SCHEMA_EVIDENCE_FORMAT
+)
 EVIDENCE_FORMAT = diagnostic_bindings.EVIDENCE_FORMAT
 INITIAL_PROCESS_COMMAND = diagnostic_bindings.INITIAL_PROCESS_COMMAND
 PRIOR_PROCESS_COMMAND = diagnostic_bindings.PRIOR_PROCESS_COMMAND
@@ -37,7 +40,7 @@ UTC_TIMESTAMP = re.compile(
 )
 HOME_PATH = re.compile(r"/(?:Users|home)/[^/\s\"']+")
 MAX_LOG_WINDOW_SECONDS = 15 * 60
-MAX_DIAGNOSTIC_CAPTURE_BYTES = 8 * 1024 * 1024
+MAX_DIAGNOSTIC_CAPTURE_BYTES = diagnostic_bindings.LOG_CAPTURE_BYTES
 MAX_LOG_EVENTS = 16 * 1024
 MAX_LOG_LINE_BYTES = 16 * 1024
 MAX_LOG_MESSAGE_BYTES = 32 * 1024
@@ -71,6 +74,8 @@ class LaunchDiagnosticRequest:
     latest_diagnostic_manifest_sha256: str
     prior_log_diagnostic_root: Path
     prior_log_diagnostic_manifest_sha256: str
+    prior_schema_diagnostic_root: Path
+    prior_schema_diagnostic_manifest_sha256: str
     output_root: Path
     attempt_id: str
     target_uuid: str
@@ -96,6 +101,10 @@ class LaunchDiagnosticRequest:
                 self.prior_log_diagnostic_root,
                 "prior-log-diagnostic-root",
             ),
+            (
+                self.prior_schema_diagnostic_root,
+                "prior-schema-diagnostic-root",
+            ),
             (self.output_root, "output-root"),
         ):
             if not path.is_absolute():
@@ -112,6 +121,7 @@ class LaunchDiagnosticRequest:
             (self.prior_diagnostic_root, "prior-diagnostic"),
             (self.latest_diagnostic_root, "latest-diagnostic"),
             (self.prior_log_diagnostic_root, "prior-log-diagnostic"),
+            (self.prior_schema_diagnostic_root, "prior-schema-diagnostic"),
         ):
             if _path_is_within(self.output_root, root):
                 raise LaunchDiagnosticError(
@@ -142,6 +152,12 @@ class LaunchDiagnosticRequest:
         if not HEX_64.fullmatch(self.prior_log_diagnostic_manifest_sha256):
             raise LaunchDiagnosticError(
                 "prior-log-diagnostic-manifest-sha256-invalid"
+            )
+        if not HEX_64.fullmatch(
+            self.prior_schema_diagnostic_manifest_sha256
+        ):
+            raise LaunchDiagnosticError(
+                "prior-schema-diagnostic-manifest-sha256-invalid"
             )
         if not SAFE_ATTEMPT_ID.fullmatch(self.attempt_id):
             raise LaunchDiagnosticError("attempt-id-invalid")
@@ -197,6 +213,9 @@ class LaunchDiagnosticRequest:
             ),
             "prior_log_diagnostic_manifest_sha256": (
                 self.prior_log_diagnostic_manifest_sha256
+            ),
+            "prior_schema_diagnostic_manifest_sha256": (
+                self.prior_schema_diagnostic_manifest_sha256
             ),
             "prior_failure_manifest_sha256": (
                 self.prior_failure_manifest_sha256
@@ -421,6 +440,15 @@ def _validate_prior_log_diagnostic_evidence(
 ) -> dict[str, object]:
     return _translate_binding_result(
         diagnostic_bindings.validate_prior_log_diagnostic_evidence, request
+    )
+
+
+def _validate_prior_schema_diagnostic_evidence(
+    request: LaunchDiagnosticRequest,
+) -> dict[str, object]:
+    return _translate_binding_result(
+        diagnostic_bindings.validate_prior_schema_diagnostic_evidence,
+        request,
     )
 
 
@@ -660,7 +688,7 @@ def _bounded_string(value: object, label: str, maximum_bytes: int) -> str:
 def _optional_bounded_string(
     value: object, label: str, maximum_bytes: int
 ) -> str | None:
-    if value is None:
+    if value is None or value == "":
         return None
     return _bounded_string(value, label, maximum_bytes)
 
@@ -742,6 +770,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--prior-log-diagnostic-manifest-sha256", required=True
     )
+    parser.add_argument(
+        "--prior-schema-diagnostic-root", type=Path, required=True
+    )
+    parser.add_argument(
+        "--prior-schema-diagnostic-manifest-sha256", required=True
+    )
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--attempt-id", required=True)
     parser.add_argument("--target-uuid", required=True)
@@ -786,6 +820,10 @@ def main() -> int:
         prior_log_diagnostic_root=args.prior_log_diagnostic_root,
         prior_log_diagnostic_manifest_sha256=(
             args.prior_log_diagnostic_manifest_sha256
+        ),
+        prior_schema_diagnostic_root=args.prior_schema_diagnostic_root,
+        prior_schema_diagnostic_manifest_sha256=(
+            args.prior_schema_diagnostic_manifest_sha256
         ),
         output_root=args.output_root,
         attempt_id=args.attempt_id,
