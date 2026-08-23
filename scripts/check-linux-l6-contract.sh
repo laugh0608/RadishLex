@@ -30,8 +30,10 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_utm_launch_diagnostics_v7.py"
 PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/linux-product/test_l6_utm_launch_transport_v2.py"
+PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/l6_controller_contract.py" validate
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_controller_contract.py"
 
-echo "Linux L6 matrix, guest-case, UTM start/clone/launch-diagnostic controls, and compile-identity contracts passed without guest or system mutation."
+echo "Linux L6 matrix, guest-case, UTM start/clone/launch-diagnostic/transport controls, and compile-identity contracts passed without guest or system mutation."
