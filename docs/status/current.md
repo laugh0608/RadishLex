@@ -7,7 +7,7 @@
 - 复核日期：2026-08-23（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh与六类operation已有证据，首个crash已闭合。`install_artifacts_staged` v4已消耗唯一foreground transport/transfer/resolution/negative preflight；network v2证明当前boot断网，resolution与preflight已分别闭合`input-ready`/`preflight-ready`。repository-only checkpoint v1控制已闭合；真实现场仍无operation ID/checkpoint/transaction，其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh与六类operation已有证据，首个crash已闭合。`install_artifacts_staged` v4已消耗唯一foreground transport/transfer/resolution/negative preflight/checkpoint；单次真实checkpoint已闭合`artifacts_staged`且未触发dpkg，仍待exact resume后才计完整case。其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -38,6 +38,7 @@
 - clean `ca57dce`的唯一resolution双回读稳定passed result；一次probe证明installer/可疑进程均0、staging absent、final私有且12项inventory逐文件匹配。create-new host根`…-v4-Input-Resolution-v1`的21项与manifest `7bab8f20…4e4a`通过，权限`0700`/`0600`、single-link、零xattr；terminal为`input-ready`，原installer/bundle、operation/transaction、retry/stop/quit均未执行。
 - clean `8bd9e65`的唯一negative preflight绑定resolution `7bab8f20…4e4a`及全部前序身份；one-shot probe只读重验input/pair/package/dependency/font/startup/XDG/process/network。guest双回读为`passed`，host为`preflight-ready`；create-new根25项manifest `aba59811…0d7a`逐项通过。未执行case/maintenance/acceptance/dpkg/installer、operation/checkpoint/transaction或自动补救/VM动作。
 - repository-only checkpoint v1控制逐项绑定上述25项manifest、三份前序manifest、source bundle三元组和固定v4 target；host只允许create-new证据、network/preflight双回读、driver私有staging/逐字回读及一次调用。guest driver以exclusive marker运行canonical `preflight`/`crash`/`inspect-crash`各一次，在生成operation ID前把dpkg status/log绑定回negative preflight；成功只导出ID hash并验证target-only staging、receipt `artifacts_staged`、合法未锁guard、进程组SIGKILL、零dpkg mutation、startup/XDG/process/network静止。14项正负测试已进入L6门禁；本批没有真实guest/operation/checkpoint/transaction/VM动作。
+- clean `7bf6e04`的唯一checkpoint attempt `d75818f-v4-install-artifacts-staged-checkpoint-20260823-v1`通过全部冻结绑定与双回读；guest-local operation ID宿主只存hash `21041a89…111a`。acceptance调用1次并在`artifacts_staged`后SIGKILL完整进程组；checkpoint/receipt为`9cb4acb8…25e0`/`c759b5c6…5d34`，target-only staging、合法未锁guard、package absent、dpkg status/log未变、`ActiveGuard`双startup、XDG/process/network静止。create-new host根49项manifest `3aca0576…0a4f7`逐项通过且raw operation ID扫描为0；未resume、dpkg apply、retry、cleanup、stop、quit或plain list/status/start。
 
 ## 停止线
 
@@ -51,17 +52,17 @@
 - v2 clone失败证据`65160b12…c1859`须原样保留；不得沿用本批授权重试clone、重启UTM或把exit 0记为成功。
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
-- v4 clone/prepared/launch、network v1/v2、bundle、transfer v1、resolution v1与negative preflight v1证据及UUID `50B75F88…8038`须冻结；不得第二次start、重复断网/transfer/resolution/preflight、覆盖guest/host证据或把活动qcow2哈希当terminal。input/preflight现只由`7bab8f20…4e4a`/`aba59811…0d7a`证明ready；它们不授权operation/checkpoint/transaction。
-- repository-only控制与测试不是系统授权。不得重跑installer、bundle push/transfer/probe、自行补证或进入operation/transaction；后续真实动作仍须committed控制、create-new证据与单独精确授权。
+- v4 clone/prepared/launch、network v1/v2、bundle、transfer、resolution、negative preflight与checkpoint证据及UUID `50B75F88…8038`须冻结；不得第二次start、重复断网/transfer/resolution/preflight/checkpoint、覆盖guest/host证据或把活动qcow2哈希当terminal。当前唯一有效transaction为manifest `3aca0576…0a4f7`证明的`artifacts_staged`现场；未经新授权不得读取raw ID、resume、运行maintenance/dpkg、补证或停止VM。
+- repository-only控制与测试不是系统授权。后续exact resume必须先有committed一次性控制、create-new证据与单独精确授权；受控停止继续独立授权。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（2026-08-23）
 
-1. 冻结launch/network/bundle/transfer/resolution/preflight manifest `6dbbdf40…fc3c`/`40be3f3f…38383`/`ffc990a3…e0de`/`d1090e8d…dc09`/`7bab8f20…4e4a`/`aba59811…0d7a`，不覆盖或复跑；prepared哈希只代表启动前，活动EFI/qcow2不得恢复或宣称clean。
-2. 下一批仅在新的单独精确授权下，执行一次attempt `d75818f-v4-install-artifacts-staged-checkpoint-20260823-v1`，输出根固定为create-new `/Users/luobo/VirtualMachines/RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Checkpoint-Prepared-v1`：绑定clean committed HEAD和全部冻结manifest，重验source/target/process/句柄，双回读既有network/preflight，私有发布并逐字回读唯一driver；guest仅生成一个operation ID、调用一次acceptance checkpoint并终止其进程组，再双回读marker/terminal/phase/checkpoint与crash artifacts及做network/source postflight。任一漂移失败关闭并保留现场。
-3. 该授权不得包含resume、maintenance retry、dpkg apply、cleanup、stop、quit、plain list/status/start或自动补救；不得重复断网/preflight/transfer。exact resume与受控停止仍各自分批授权；旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
+1. 冻结launch/network/bundle/transfer/resolution/preflight/checkpoint manifest `6dbbdf40…fc3c`/`40be3f3f…38383`/`ffc990a3…e0de`/`d1090e8d…dc09`/`7bab8f20…4e4a`/`aba59811…0d7a`/`3aca0576…0a4f7`，不覆盖、复跑或补拉；活动EFI/qcow2不得恢复或宣称terminal。
+2. 下一批仅repository-only绑定checkpoint 49项与`checkpoint-prepared`，设计一次性exact resume控制：guest内部重验secret hash、receipt/staged target/guard/package/dpkg/startup/XDG/process/network后才允许一次canonical `resume`和一次postflight；host始终不接收raw operation ID，证据create-new且任何漂移失败关闭。本批不调用`utmctl`/guest，不执行真实resume、maintenance、dpkg mutation或VM动作。
+3. repository-only控制提交后，真实exact resume与随后的受控停止仍须各自精确授权；不得自动retry/cleanup/stop/quit或复跑checkpoint。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
 
 ## 验证入口
 
@@ -83,7 +84,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器覆盖单次start/clone、v7诊断、target绑定、foreground transport、延迟backend、guest断网、canonical transfer、消歧、negative preflight与checkpoint控制。真实resolution/preflight已证明当前boot断网、input ready及负向前置条件成立；真实operation/checkpoint、其余七个case、连续L6与发布仍未闭合。
+上述入口以合成执行器覆盖单次start/clone、v7诊断、target绑定、foreground transport、延迟backend、guest断网、canonical transfer、消歧、negative preflight与checkpoint控制。真实`install_artifacts_staged`已闭合checkpoint但尚未resume；该case、其余七个case、连续L6与发布仍未闭合。
 
 ## 阅读索引
 
