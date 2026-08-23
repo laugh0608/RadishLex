@@ -7,7 +7,7 @@
 - 复核日期：2026-08-23（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh与六类operation已有证据。首个crash已闭合；`install_artifacts_staged`未进入guest。v7已完整定位plain start的UTM/AppKit失败机制，repository-only launch transport v2现已强绑定v4 prepared证据与live target身份，16项合成门禁闭合；新的v4独立clone已完成DependencyFrozen物化并保持stopped，尚未启动。二十一台VM保持全停，其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh与六类operation已有证据。首个crash已闭合；`install_artifacts_staged`仍未进入guest。v4已消耗唯一foreground transport：登记先显示started、backend延迟出现并持续写盘，原控制按合同记为`state-indeterminate`。旧二十台仍stopped；v4不得重启、重试或直接进入case，其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -23,17 +23,14 @@
 - 旧pair唯一`install_prepared`调用形成prepared checkpoint且未触发dpkg；后续startup因遗漏合法`01777 /run/lock`失败关闭，manifest `5d8c914a…3e42a`与clone `FD24ADFF…17C056`冻结。store/startup现共用权限策略且119项默认/124项L6-feature测试通过，旧case仍不计通过。
 - 修复target `d75818f`的handoff record `c74fac12…9849`已冻结。第三台clone `3EC83EB9…593B9`只生成一次operation ID、只调用一次controller与一次production exact resume；checkpoint/crash-state `3fd5df67…4a70`/`e18bde6c…8719`先证明prepared与无dpkg child。terminal postflight/postverify `5319db07…52a0`/`001b5be1…e2cc`再证明source `38-1` installed、receipt `completed`、guard absent、startup `AllowedProduct`、XDG/进程/断网稳定；terminal/关机manifest为`679b7e04…c544`/`036bace8…f3b8`，后者固定config/EFI/qcow2 `62040cc9…eb9`/`f762ee52…e76`/`95e89df3…cb69`、双重qcow2与零句柄。
 - repository-only guest-case合同除canonical input/readback/startup预期外，现固定`install_artifacts_staged`的target-only staging、package/dpkg未变、合法guard、XDG/process/network零漂移与resume重验/单次apply，并与matrix交叉校验。首次安装精确Rust回归通过，production语义无需修改。
-- 第二个case clone-only/首次start/单次控制retry manifest为`ce430efb…aeb8`/`34c0918d…c8d8`/`337007ff…7ebbb`。retry唯一start在90秒无stdout/stderr后timeout，60次status与terminal list均为stopped，返回10；失败后磁盘未变、十九台全停且无guest/input/operation/transaction。离线差分确认其config除Name/UUID外与已成功启动的第三台及reinstall壳相同，Registry可见结构也一致，未获得可归因的UTM/QEMU根因。
-- 后续v2 clone-only从clean `992a307`、`337007ff…7ebbb`、十九台全停及冻结DependencyFrozen开始；唯一`utmctl clone`进程exit 0却在stderr报告OSStatus `-1712`，后置清单仍为原十九台且目标注册/package均absent，因此没有替换磁盘、启动或进入guest。失败目录不可覆盖发布，manifest `65160b12…c1859`逐项通过；这证明返回码不能替代注册与package后置条件，不证明具体UTM根因。
+- 第二个case旧clone两次start均失败关闭且未改盘/进入guest；v2唯一clone又以exit 0、stderr OSStatus `-1712`但零注册/package落地失败关闭。manifest `337007ff…7ebbb`/`65160b12…c1859`冻结，未获得可归因根因。
 - repository-only `l6_utm_clone_once.py`要求双显式授权并绑定clean head、前序manifest、canonical全停清单、registered source、目标name/package absent与executed-control identity；唯一clone的exit/timeout、64KiB stdout/stderr前缀、完整size/hash、pre/terminal list和package后置状态均持久化。只有命令确定成功、stderr空、注册精确增加一个唯一stopped目标且精确`.utm`目录存在才返回created；零落地失败、前置拒绝和部分/不确定落地分别返回10/11/12，任何终态都不自动retry/delete/start。十一项合成回归已接入默认L6门禁，不调用真实UTM。
-- 实机前核对UTM官方CLI后以`b86d72f`修正clone名称为精确`--name`参数；修正前没有消耗真实调用。随后从clean `b86d72f`、`65160b12…c1859`、十九台canonical全停清单与冻结DependencyFrozen开始，唯一clone以exit 0、空stderr、唯一新UUID `5B19AEF1…7DAB` stopped和精确package返回created，manifest `7ce53048…e5b7`逐项通过。只对该新clone原子换入DependencyFrozen EFI/qcow2后，prepared manifest `b065c7ac…32db`固定config/EFI/qcow2 `d04b00e1…1ff4`/`0b797641…1418`/`4967234b…4b18`、`Network=[]`、双重qcow2、source/registration/target零句柄及二十台全停；独立复核再次通过。该批没有start、guest、input、operation ID、transaction、retry或delete。
-- v3首次start从clean `27087c3`、clone/prepared manifest与二十台canonical全停清单开始。唯一start在90秒内无stdout/stderr并timeout，60次status及terminal list始终为二十台全stopped，控制返回10与`failed-closed-stopped`；start/failure manifest为`870f56dd…f3a5`/`59c62c14…bba05`。成功门未成立，因此guest断网exec和file pull均为0次，也没有input、operation ID或transaction。独立postverify manifest `8e3d5ced…8386`再次确认config/EFI/qcow2未变、qcow2双重复算、source对照、`Network=[]`、零句柄和二十台全停；该结果仍不能归因具体UTM/QEMU根因。
+- v3 clone/prepared manifest `7ce53048…e5b7`/`b065c7ac…32db`已冻结；唯一start timeout并保持二十台全stopped，start/failure/postverify `870f56dd…f3a5`/`59c62c14…bba05`/`8e3d5ced…8386`确认磁盘未变且零guest/input/transaction，仍不能归因具体UTM/QEMU根因。
 - v1-v6只读host诊断依次暴露进程输出上限、PID/legacy UID解析、日志捕获上限、空category与finished marker合同缺口；manifest `158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`均冻结。每次均保持二十台全停、`root_cause=unattributed`与零VM/guest/transaction mutation；完整流水只见L6 runbook与周志。
 - v7真实只读诊断从clean `5ab68b1`绑定九份前序manifest，确认二十台全停、31,640-byte进程观察完整且相关进程为0。相同`log show`完整返回3,916,860 bytes与SHA-256 `0dbed63a…e9c`；4,041条NDJSON记录以唯一末尾整数`1`闭合，形成4,040条脱敏事件。08:13:48.432的`UTMv,star`由UTM接收后出现`[self canBecomeMainWindow]`断言与`NSInternalInconsistencyException`，没有对应start reply或QEMU事件。十项manifest `206aa335…7b56c`通过；terminal仍保守记录`root_cause=unattributed`且所有VM/guest/transaction动作未执行。
-- repository-only launch transport v2固定`foreground-applescript-v1`：唯一`/usr/bin/osascript`调用先`activate` UTM，再按精确UUID执行一次`start ... saving true recovery false`；plain `utmctl start`与`--hide`均不在命令面。binding除v7与UTM身份外，现强制prepared manifest `c40c55d9…144b`七项语义、精确v4 UUID/name/package路径、21台为v7冻结20台加唯一stopped target，并以两次descriptor重算包围live list/status，随后最终进程零门才允许osascript；身份变化提前拒绝。16项回归与真实prepared/live双次只读复核通过；尚未执行osascript、start或GUI动作，仍是待实机验证的transport假设。
-- 新v4 clone manifest `f76d1943…ff6e2`绑定clean `83f037a`、v7、二十台全停清单和唯一clone，联合确认新增UUID `50B75F88…8038` stopped及精确package；没有物化、start、guest、transaction、retry或delete。该manifest不含host进程payload，不能证明后续transport进程门。
-- v4物化从clean `e4ca1bd`、clone manifest与二十一台canonical all-stopped清单开始；冻结控制只对该target以target-local incoming加`clonefile`/`mv`换入DependencyFrozen EFI/qcow2，共两次replacement。prepared manifest `c40c55d9…144b`逐项固定config/EFI/qcow2 `2de7280b…6195`/`0b797641…1418`/`4967234b…4b18`、`Network=[]`、qcow2双重复算、source/registration/target九文件零句柄及物化前后同一二十一台全停清单。独立manifest、live list/status、磁盘hash与零句柄复核再次通过；没有start、guest、input、operation ID、transaction、retry、rollback或delete。独立精确`ucomm`复核同时发现一个驻留UTM app进程，但无utmctl或QEMU backend；因此prepared成立，foreground transport的调用前零相关进程门尚未成立。
-- clean `ea46c9d`复验prepared/live绑定后，系统权限只读list/status确认21台全部stopped及v4唯一匹配，前后两次`ucomm`均为零相关进程；app已不驻留，故未发送quit或其他GUI/VM动作。沙盒`-6`与权限重验细节见runbook；瞬时观察不替代launch现场门。
+- v4 clone/prepared manifest `f76d1943…ff6e2`/`c40c55d9…144b`曾固定UUID `50B75F88…8038`、`Network=[]`及config/EFI/qcow2 `2de7280b…6195`/`0b797641…1418`/`4967234b…4b18`；21台全停、双重qcow2与零句柄独立复核通过。clean `ea46c9d`后的系统只读门再确认app已不驻留、前后零相关进程，未发送quit。
+- 从clean `296a1c5`执行唯一`foreground-applescript-v1`：prepared/live身份、两次descriptor和双进程门均通过；osascript只调用1次、exit 0、空输出。冻结目录`…-v4-Foreground-Launch-Transport-v2`含16项，manifest `6dbbdf40…fc3c`逐项通过且权限为`0700`/`0600`；首轮status与terminal list已见target started，但terminal进程为0，故原控制返回12/`state-indeterminate`，没有quit/stop/retry/delete/guest/input/operation/transaction。
+- 后续只读交叉验证始终只有v4登记started、旧二十台stopped；QEMUHelper/QEMULauncher延迟出现，`lsof`确认其持有EFI/qcow2。config仍为`2de7280b…6195`，EFI变为`f762ee52…8e76`；qcow2先后出现`bd03adb0…9fde`、`96ed9100…e22`、`2c9a8c56…a2b5`且尺寸曾增至10,089,594,880 bytes，均不是terminal身份。最终快照在list/status前进程为0、之后却再次捕获QEMULauncher双句柄，提示started登记下的plain查询可能重新拉起app/backend，后续不再循环查询。VM已实际写盘但guest断网未证明；修复`2eea62f`使未来控制在started后继续有界轮询backend，17项launch/prepared回归通过，但不回写本次终态。
 
 ## 停止线
 
@@ -47,16 +44,16 @@
 - v2 clone失败证据`65160b12…c1859`须原样保留；不得沿用本批授权重试clone、重启UTM或把exit 0记为成功。
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
-- launch transport v2代码与合成通过不构成start授权。旧target不得运行该transport；v4 clone/prepared证据`f76d1943…ff6e2`/`c40c55d9…144b`与UUID `50B75F88…8038`须冻结。当前只读观察虽为零相关进程，但只有控制内prepared/live身份、双进程门及v7冻结20台加唯一新target清单再次同时成立，才可在另一授权下执行唯一start。任一门未成立必须失败关闭且不得自动quit/stop/retry/delete。
+- v4 clone/prepared/launch证据与UUID `50B75F88…8038`须原样冻结；唯一transport已经消耗，不得第二次start、重试、覆盖证据、把活动qcow2哈希当terminal或直接执行case。当前运行/guest状态不确定；进入guest断网核验、停止VM或退出UTM都必须分别重新授权，任一门不成立仍失败关闭且不得自动补救。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（2026-08-23）
 
-1. 新v4 clone `50B75F88…8038`已以clone/prepared manifest `f76d1943…ff6e2`/`c40c55d9…144b`冻结；DependencyFrozen config/EFI/qcow2、`Network=[]`、双重qcow2、九文件零句柄与二十一台全停均已独立复核，不得再次物化、重试clone、删除或复用旧v3。
-2. UTM关闭门已以21台全停和两次零相关进程闭合，app不驻留且未发送quit。下一批单独申请一次`foreground-applescript-v1`；控制仍从clean head重做prepared/live、磁盘与双进程门，任一漂移即在osascript前停止。
-3. 只有新target唯一started、冻结二十台均stopped且backend进程事实一致，才可再申请guest断网双重文件回读；旧`5B19AEF1…7DAB`、其余crash、连续L6、P05C、发布、推送和其他平台继续关闭。
+1. 冻结v4唯一launch manifest `6dbbdf40…fc3c`及其`state-indeterminate`终态，不重试、不覆盖；prepared哈希只代表启动前，活动EFI/qcow2已变化，不得据此恢复或宣称clean。
+2. 最新快照已同时确认v4唯一started、旧二十台stopped及QEMULauncher持有EFI/qcow2。下一系统批单独申请仅进入guest关闭/核验非loopback网络并双重文件回读，不再以plain list/status循环资格查询，不传业务input、不生成operation ID、不执行transaction；guest证据不完整即保留现场，停止仍须另一授权。
+3. 只有断网证据闭合后才讨论canonical input与第二个crash checkpoint；旧v3、其余crash、连续L6、P05C、发布、推送和其他平台继续关闭。
 
 ## 验证入口
 
@@ -78,7 +75,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器证明单次start/clone、v7只读诊断、prepared/live target双重绑定、foreground AppleScript transport、失败关闭terminal与零越界动作。新v4仍未启动或进入guest；v7已定位start AppleEvent后的UTM AppKit断言，v2仍仅为未实机验证的新transport。八case、连续L6与发布未闭合。
+上述入口以合成执行器证明单次start/clone、v7只读诊断、prepared/live target双重绑定、foreground transport与延迟backend轮询、失败关闭terminal及零越界动作。v4已实际写盘但原终态仍为`state-indeterminate`，尚未进入guest或执行transaction；八case、连续L6与发布未闭合。
 
 ## 阅读索引
 
