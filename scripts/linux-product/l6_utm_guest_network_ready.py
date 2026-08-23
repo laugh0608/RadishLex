@@ -31,6 +31,9 @@ GUEST_SCRIPT_RELATIVE_PATH = Path(
 REQUIRED_PRIOR_LAUNCH_MANIFEST_SHA256 = (
     "6dbbdf404c30cfc4718dc99161c1d60fd8a063bd453fd0c5fb69ebb083b5fc3c"
 )
+REQUIRED_PRIOR_NETWORK_FAILURE_MANIFEST_SHA256 = (
+    "d5d332120cadea7fe795f15ec31ca2d9eebb3a2565b109d42c133fb6fd127348"
+)
 REQUIRED_TARGET_UUID = transport_bindings.REQUIRED_TARGET_UUID
 REQUIRED_TARGET_NAME = transport_bindings.REQUIRED_TARGET_NAME
 REQUIRED_TARGET_CONFIG_SHA256 = (
@@ -57,6 +60,8 @@ class NetworkReadyRequest:
     expected_repository_head: str
     prior_launch_root: Path
     prior_launch_manifest_sha256: str
+    prior_network_failure_root: Path
+    prior_network_failure_manifest_sha256: str
     output_root: Path
     attempt_id: str
     target_uuid: str
@@ -75,6 +80,7 @@ class NetworkReadyRequest:
         for path, label in (
             (self.repository_root, "repository-root"),
             (self.prior_launch_root, "prior-launch-root"),
+            (self.prior_network_failure_root, "prior-network-failure-root"),
             (self.output_root, "output-root"),
             (self.target_package_path, "target-package-path"),
         ):
@@ -84,6 +90,10 @@ class NetworkReadyRequest:
             raise NetworkReadyError("output-root-must-be-outside-repository")
         if _path_is_within(self.output_root, self.prior_launch_root):
             raise NetworkReadyError("output-root-must-not-modify-prior-launch")
+        if _path_is_within(self.output_root, self.prior_network_failure_root):
+            raise NetworkReadyError(
+                "output-root-must-not-modify-prior-network-failure"
+            )
         if _paths_overlap(self.output_root, self.target_package_path):
             raise NetworkReadyError("output-root-must-not-overlap-target")
         if not HEX_40.fullmatch(self.expected_repository_head):
@@ -93,6 +103,13 @@ class NetworkReadyRequest:
             != REQUIRED_PRIOR_LAUNCH_MANIFEST_SHA256
         ):
             raise NetworkReadyError("required-prior-launch-manifest-mismatch")
+        if (
+            self.prior_network_failure_manifest_sha256
+            != REQUIRED_PRIOR_NETWORK_FAILURE_MANIFEST_SHA256
+        ):
+            raise NetworkReadyError(
+                "required-prior-network-failure-manifest-mismatch"
+            )
         if not SAFE_ATTEMPT_ID.fullmatch(self.attempt_id):
             raise NetworkReadyError("attempt-id-invalid")
         try:
@@ -137,6 +154,9 @@ class NetworkReadyRequest:
             "guest_root": self.guest_root,
             "prior_launch_manifest_sha256": (
                 self.prior_launch_manifest_sha256
+            ),
+            "prior_network_failure_manifest_sha256": (
+                self.prior_network_failure_manifest_sha256
             ),
             "target_name": self.target_name,
             "target_package_path_sha256": _sha256_text(
@@ -550,11 +570,71 @@ def validate_network_bindings(
         != "296a1c5f8b705d3e42debf123e3d048e87f36024"
     ):
         raise NetworkReadyError("prior-launch-request-semantics-invalid")
+    failure_manifest = request.prior_network_failure_root / "files.sha256"
+    if (
+        _sha256_file(failure_manifest)
+        != request.prior_network_failure_manifest_sha256
+    ):
+        raise NetworkReadyError("prior-network-failure-manifest-drift")
+    failure_entries = start_control._verify_sha256_manifest(
+        request.prior_network_failure_root, failure_manifest
+    )
+    if failure_entries != 7:
+        raise NetworkReadyError("prior-network-failure-entry-count-invalid")
+    failure_terminal = _read_json(
+        request.prior_network_failure_root / "terminal.json"
+    )
+    required_failure_terminal = {
+        "automatic_quit": "not-performed",
+        "automatic_retry": "not-performed",
+        "automatic_stop": "not-performed",
+        "business_input": "not-performed",
+        "file_pull_invocations": 0,
+        "file_push_invocations": 0,
+        "guest_exec_invocations": 1,
+        "network_evidence_outcome": None,
+        "network_script_invocations": 0,
+        "operation_id": "not-generated",
+        "outcome": "precondition-rejected",
+        "plain_utmctl_list": "not-performed",
+        "plain_utmctl_start": "not-performed",
+        "plain_utmctl_status": "not-performed",
+        "reason": "guest-root-create:guest-root-create-exit-64",
+        "target_name": request.target_name,
+        "target_uuid": request.target_uuid,
+        "transaction": "not-performed",
+    }
+    if any(
+        failure_terminal.get(key) != value
+        for key, value in required_failure_terminal.items()
+    ):
+        raise NetworkReadyError(
+            "prior-network-failure-terminal-semantics-invalid"
+        )
+    failure_request = _read_json(
+        request.prior_network_failure_root / "request.json"
+    )
+    if (
+        failure_request.get("attempt_id") != "d75818f-v4-20260823"
+        or failure_request.get("expected_repository_head")
+        != "e75509aba0160bddfbdeb72ed9543f08b9e97ae6"
+        or failure_request.get("prior_launch_manifest_sha256")
+        != request.prior_launch_manifest_sha256
+        or failure_request.get("target_uuid") != request.target_uuid
+        or failure_request.get("target_name") != request.target_name
+    ):
+        raise NetworkReadyError(
+            "prior-network-failure-request-semantics-invalid"
+        )
     return {
         "format": EVIDENCE_FORMAT,
         **identities,
         "prior_launch_entries_verified": entries,
         "prior_launch_manifest_sha256": request.prior_launch_manifest_sha256,
+        "prior_network_failure_entries_verified": failure_entries,
+        "prior_network_failure_manifest_sha256": (
+            request.prior_network_failure_manifest_sha256
+        ),
         "repository_clean": True,
         "repository_head": repository_head,
     }
@@ -897,6 +977,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--prior-launch-manifest-sha256", required=True
     )
+    parser.add_argument("--prior-network-failure-root", type=Path, required=True)
+    parser.add_argument(
+        "--prior-network-failure-manifest-sha256", required=True
+    )
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--attempt-id", required=True)
     parser.add_argument("--target-uuid", required=True)
@@ -922,6 +1006,10 @@ def main() -> int:
         expected_repository_head=args.expected_repository_head,
         prior_launch_root=args.prior_launch_root,
         prior_launch_manifest_sha256=args.prior_launch_manifest_sha256,
+        prior_network_failure_root=args.prior_network_failure_root,
+        prior_network_failure_manifest_sha256=(
+            args.prior_network_failure_manifest_sha256
+        ),
         output_root=args.output_root,
         attempt_id=args.attempt_id,
         target_uuid=args.target_uuid,

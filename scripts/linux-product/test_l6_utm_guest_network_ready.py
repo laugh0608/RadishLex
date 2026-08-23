@@ -219,17 +219,35 @@ class LinuxL6UtmGuestNetworkReadyTests(unittest.TestCase):
             ):
                 request.validate()
 
+            failure_root = Path(temporary) / "failure-drift"
+            failure_root.mkdir()
+            drifted_failure = self.request(
+                failure_root,
+                prior_network_failure_manifest_sha256="b" * 64,
+            )
+            with self.assertRaisesRegex(
+                network_ready.NetworkReadyError,
+                "required-prior-network-failure-manifest-mismatch",
+            ):
+                drifted_failure.validate()
+
     def request(
         self, temporary_root: Path, **overrides: object
     ) -> network_ready.NetworkReadyRequest:
         prior = temporary_root / "prior-launch"
         prior.mkdir()
+        prior_failure = temporary_root / "prior-network-failure"
+        prior_failure.mkdir()
         values: dict[str, object] = {
             "repository_root": Path(__file__).resolve().parents[2],
             "expected_repository_head": "a" * 40,
             "prior_launch_root": prior,
             "prior_launch_manifest_sha256": (
                 network_ready.REQUIRED_PRIOR_LAUNCH_MANIFEST_SHA256
+            ),
+            "prior_network_failure_root": prior_failure,
+            "prior_network_failure_manifest_sha256": (
+                network_ready.REQUIRED_PRIOR_NETWORK_FAILURE_MANIFEST_SHA256
             ),
             "output_root": temporary_root / "network-evidence",
             "attempt_id": "d75818f-v4-20260823",
