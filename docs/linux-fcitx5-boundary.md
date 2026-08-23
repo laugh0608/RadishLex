@@ -270,7 +270,7 @@ M5-P04 已覆盖：
 
 - P03 的用户级开发装配、autostart 和临时验收 runtime 不得写成 P05 产品安装或发行载体。
 - P04 已按 `docs/linux-manager-local-acceptance.md` 冻结完成，不重复其导入导出、同库和重启实机；既有 guest 资产不得清理、覆盖或改作 P05 载体。
-- P05A载荷门禁与P05B载体、恢复事务、production port/CLI、startup、L6 controller/pair已完成；六类operation各有独立证据。第三台clean clone已闭合首个crash并冻结source terminal。`install_artifacts_staged`合同已闭合，但既有clone、v2 clone与新v3 clone均在host失败关闭且未进入guest。v7完整诊断manifest `206aa335…7b56c`确认唯一start AppleEvent由UTM接收后触发AppKit主窗口断言，未见对应reply或QEMU事件且零mutation；foreground launch transport v2已通过repository-only合成门禁但未实机。下一步只为全新target分批授权clone、物化与唯一start，不得原地start或运行maintenance/`dpkg`/产品进程。
+- P05A载荷门禁与P05B载体、恢复事务、production port/CLI、startup、L6 controller/pair已完成；六类operation各有独立证据。第三台clean clone已闭合首个crash并冻结source terminal。`install_artifacts_staged`合同已闭合，但既有clone、v2 clone与新v3 clone均在host失败关闭且未进入guest。v7完整诊断manifest `206aa335…7b56c`确认唯一start AppleEvent由UTM接收后触发AppKit主窗口断言，未见对应reply或QEMU事件且零mutation；foreground launch transport v2已通过repository-only合成门禁但未实机。新v4 clone `50B75F88…8038`已唯一创建并以`f76d1943…ff6e2`冻结为stopped壳；下一步只为该v4分批授权物化与唯一start，不得原地启动旧target或运行maintenance/`dpkg`/产品进程。
 - 不因单一共享库映射或环境变量声明 Qt/GTK 使用了某个 display backend；必须结合 QPA/session/input-context 证据。
 - 不复制 Fcitx5 或其他输入法实现；只依据公开 API、行为规格和自己的测试实现。
 - 不把系统级安装、包管理写入或桌面设置变更纳入无授权自动验证。

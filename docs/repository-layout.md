@@ -407,7 +407,7 @@ R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-
 
 平台目录按主线顺序创建：
 
-1. `platforms/linux-fcitx5/`、`platforms/linux-product/` 与 `platforms/linux-l6-acceptance/`：前者承载输入/Manager与C++ startup binding；中者承载actual `.deb` relationship、恢复事务、system port、受控CLI和startup decision；后者只承载compile-isolated checkpoint/process-group/evidence controller。载体、pair、refresh与matrix归属`packaging/linux/`，验证/构建及host一次性start/clone/只读launch诊断/foreground transport控制归属`scripts/linux-product/`。第六套terminal/S3及真实repair、rollback、remove、reinstall已冻结，第三台clean clone闭合首个crash；第二个case未进入guest。launch transport v2已通过repository-only门禁，下一步只为全新target分批授权clone、物化与唯一start，而非重试旧clone、热替换pair或重建source package。
+1. `platforms/linux-fcitx5/`、`platforms/linux-product/` 与 `platforms/linux-l6-acceptance/`：前者承载输入/Manager与C++ startup binding；中者承载actual `.deb` relationship、恢复事务、system port、受控CLI和startup decision；后者只承载compile-isolated checkpoint/process-group/evidence controller。载体、pair、refresh与matrix归属`packaging/linux/`，验证/构建及host一次性start/clone/只读launch诊断/foreground transport控制归属`scripts/linux-product/`。第六套terminal/S3及真实repair、rollback、remove、reinstall已冻结，第三台clean clone闭合首个crash；第二个case未进入guest。launch transport v2已通过repository-only门禁，新v4 clone也已唯一创建并冻结为stopped壳；下一步只为该v4分批授权物化与唯一start，而非重试旧clone、热替换pair或重建source package。
 2. `platforms/android-ime/`：在现有 keystore bridge 之外补完整 IME。
 3. `platforms/windows-tsf/`。
 4. `platforms/ios-keyboard/`。

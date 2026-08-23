@@ -428,6 +428,8 @@ v7证据闭合后，下一host批次不得直接把plain `utmctl start`复制到
 
 transport的exit/timeout与64KiB有界stream单独持久化，不替代后置事实；每次status、terminal list和terminal process均写入absent `0700`根中的exclusive `0600`JSON并最终生成manifest。只有status观察started、terminal清单为新target唯一started/旧20台全stopped、且至少一个QEMUHelper/QEMULauncher/qemu backend进程而无utmctl残留才返回0；21台全stopped、无backend/utmctl时返回10；调用前拒绝返回11；其余返回12。UTM app自身可作为失败后残留被记录，但控制永不自动quit/stop/retry/delete，也不进入guest、传input或生成operation ID。12项fake-runner/临时目录回归覆盖成功、transport error、timeout后真实started、缺backend、stopped却残留backend、两阶段进程拒绝、inventory漂移、冻结target、脚本identity、UTM bundle与v7完整绑定；真实v7和本机UTM仅完成只读绑定，未执行osascript或VM动作。
 
+取得clone-only系统授权后，从clean `83f037a`、精确v7 manifest `206aa335…7b56c`、canonical inventory `f4d84049…f8303`的二十台all-stopped现场开始。source为冻结reinstall terminal `E671DB9C…D465`；新名称`RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v4`、对应`.utm` package与create-new输出根均先证实absent。`l6_utm_clone_once.py`只调用一次`utmctl clone E671DB9C…D465 --name ...-v4`，exit 0、空stdout/stderr且未超时；terminal清单与package联合确认唯一新增UUID `50B75F88-493D-42C0-A1DC-054DEC478038` stopped，既有二十台身份/状态不漂移。八项payload及manifest `f76d1943…ff6e2`逐项校验通过；随后独立live list/status和紧凑进程复核再次确认二十一台全stopped、UTM/utmctl/QEMU相关进程为0。该v4仅是尚未物化的reinstall壳副本；本批没有替换EFI/qcow2、start、guest、input、operation ID、transaction、retry或delete。下一步只可在新授权下对该v4物化DependencyFrozen并形成prepared证据。
+
 ## 8. 系统、字体与 startup probe
 
 ### Package 与 process
@@ -479,7 +481,7 @@ guest-agent push 到达guest后的owner/mode也不是可信输入；既有第六
 
 UTM 磁盘配置使用空 `Network` 数组也不能单独证明 guest 运行态断网；删除整个必填键会使 UTM 4.7.5 冷加载失败，注册缓存仍可能在首次启动挂回虚拟网卡并取得 DHCP。每次启动后、写入 artifact input 或生成 operation ID 前，都必须在 guest 内复验目标接口 down 且 IPv4/IPv6 路由为空；任一网络状态不明立即停止，不把后续断网状态倒推成“从启动起全程离线”。
 
-前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个为`rolled_back`，第六套形成target `completed`与S3。独立clone又闭合真实repair、rollback、remove和reinstall，六类operation已有分散证据但不是同一session。第三台clean clone `3EC83EB9…593B9`已闭合首个有效crash case。`install_artifacts_staged`旧clone两次start均失败关闭；v2 clone唯一调用exit 0/stderr `-1712`且无注册/package，manifest `65160b12…c1859`证明后置拒绝。新v3 clone `5B19AEF1…7DAB`唯一start失败且未进入guest。v7 manifest `206aa335…7b56c`已完整固定start AppleEvent后的UTM AppKit断言、零QEMU与零mutation；launch transport v2及12项合成门禁现已闭合但未实机。下一步只为新独立target分批授权clone、DependencyFrozen物化与唯一foreground transport；其他case、旧target start及进一步清理仍关闭。
+前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个为`rolled_back`，第六套形成target `completed`与S3。独立clone又闭合真实repair、rollback、remove和reinstall，六类operation已有分散证据但不是同一session。第三台clean clone `3EC83EB9…593B9`已闭合首个有效crash case。`install_artifacts_staged`旧clone两次start均失败关闭；v2 clone唯一调用exit 0/stderr `-1712`且无注册/package，manifest `65160b12…c1859`证明后置拒绝。新v3 clone `5B19AEF1…7DAB`唯一start失败且未进入guest。v7 manifest `206aa335…7b56c`已完整固定start AppleEvent后的UTM AppKit断言、零QEMU与零mutation；launch transport v2及12项合成门禁现已闭合。新的v4 clone `50B75F88…8038`已唯一创建并以`f76d1943…ff6e2`冻结为未物化、stopped壳；下一步只为该v4分别授权DependencyFrozen物化与唯一foreground transport。其他case、旧target start及进一步清理仍关闭。
 
 ## 10. L6 完成与后续
 
