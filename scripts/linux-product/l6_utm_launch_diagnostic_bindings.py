@@ -14,7 +14,8 @@ import l6_utm_start_once as start_control
 INITIAL_EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v1"
 PRIOR_EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v2"
 LATEST_EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v3"
-EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v4"
+PRIOR_LOG_EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v4"
+EVIDENCE_FORMAT = "radishlex-linux-l6-utm-launch-diagnostics-v5"
 CONTROL_RELATIVE_PATH = Path(
     "scripts/linux-product/l6_utm_launch_diagnostics.py"
 )
@@ -24,6 +25,10 @@ BINDING_CONTROL_RELATIVE_PATH = Path(
 INITIAL_PROCESS_COMMAND = ("/bin/ps", "-axo", "pid=,ppid=,uid=,comm=")
 PRIOR_PROCESS_COMMAND = ("/bin/ps", "-axo", "pid=,ppid=,uid=,ucomm=")
 LATEST_PROCESS_COMMAND = PRIOR_PROCESS_COMMAND
+LOG_PREDICATE = (
+    '(process == "UTM") OR (process == "utmctl") OR '
+    '(process BEGINSWITH "qemu")'
+)
 HEX_40 = re.compile(r"[0-9a-f]{40}")
 HEX_64 = re.compile(r"[0-9a-f]{64}")
 
@@ -47,6 +52,8 @@ class LaunchDiagnosticBindingRequest(Protocol):
     prior_diagnostic_manifest_sha256: str
     latest_diagnostic_root: Path
     latest_diagnostic_manifest_sha256: str
+    prior_log_diagnostic_root: Path
+    prior_log_diagnostic_manifest_sha256: str
     target_uuid: str
     target_name: str
     expected_vm_count: int
@@ -73,6 +80,7 @@ def validate_diagnostic_bindings(
     initial_diagnostic = validate_initial_diagnostic_evidence(request)
     prior_diagnostic = validate_prior_diagnostic_evidence(request)
     latest_diagnostic = validate_latest_diagnostic_evidence(request)
+    prior_log_diagnostic = validate_prior_log_diagnostic_evidence(request)
     return {
         "binding_control_sha256": binding_control_sha256,
         "control_sha256": control_sha256,
@@ -82,6 +90,7 @@ def validate_diagnostic_bindings(
         **initial_diagnostic,
         **prior_diagnostic,
         **latest_diagnostic,
+        **prior_log_diagnostic,
         "repository_clean": True,
         "repository_head": repository_head,
     }
@@ -329,6 +338,209 @@ def validate_latest_diagnostic_evidence(
     )
 
 
+def validate_prior_log_diagnostic_evidence(
+    request: LaunchDiagnosticBindingRequest,
+) -> dict[str, object]:
+    label = "prior-log-diagnostic"
+    entry_names = _verify_bound_manifest(
+        request.prior_log_diagnostic_root,
+        request.prior_log_diagnostic_manifest_sha256,
+        label,
+    )
+    _require_manifest_entries(
+        entry_names,
+        frozenset(
+            (
+                "request.json",
+                "binding-preflight.json",
+                "utmctl-list-live.json",
+                "utmctl-status-live.json",
+                "host-process-command.json",
+                "host-processes.json",
+                "unified-log-command.json",
+                "terminal.json",
+            )
+        ),
+        label,
+    )
+    prior_request = _read_json_object(
+        request.prior_log_diagnostic_root / "request.json",
+        f"{label}-request",
+    )
+    _require_json_fields(
+        prior_request,
+        {
+            "authorization": {
+                "host_launch_diagnostics": True,
+                "read_system_log": True,
+            },
+            "expected_vm_count": request.expected_vm_count,
+            "format": PRIOR_LOG_EVIDENCE_FORMAT,
+            "initial_diagnostic_manifest_sha256": (
+                request.initial_diagnostic_manifest_sha256
+            ),
+            "latest_diagnostic_manifest_sha256": (
+                request.latest_diagnostic_manifest_sha256
+            ),
+            "log_end": request.log_end,
+            "log_start": request.log_start,
+            "prior_diagnostic_manifest_sha256": (
+                request.prior_diagnostic_manifest_sha256
+            ),
+            "prior_failure_manifest_sha256": (
+                request.prior_failure_manifest_sha256
+            ),
+            "prior_postverify_manifest_sha256": (
+                request.prior_postverify_manifest_sha256
+            ),
+            "prior_start_manifest_sha256": (
+                request.prior_start_manifest_sha256
+            ),
+            "target_name": request.target_name,
+            "target_uuid": request.target_uuid,
+        },
+        f"{label}-request",
+    )
+    prior_repository_head = prior_request.get("expected_repository_head")
+    if (
+        not isinstance(prior_repository_head, str)
+        or not HEX_40.fullmatch(prior_repository_head)
+    ):
+        raise BindingError(f"{label}-request-repository-head")
+
+    prior_binding = _read_json_object(
+        request.prior_log_diagnostic_root / "binding-preflight.json",
+        f"{label}-binding",
+    )
+    _require_json_fields(
+        prior_binding,
+        {
+            "format": PRIOR_LOG_EVIDENCE_FORMAT,
+            "initial_diagnostic_entries_verified": 6,
+            "initial_diagnostic_manifest_sha256": (
+                request.initial_diagnostic_manifest_sha256
+            ),
+            "initial_diagnostic_outcome": "diagnostics-incomplete",
+            "latest_diagnostic_entries_verified": 6,
+            "latest_diagnostic_manifest_sha256": (
+                request.latest_diagnostic_manifest_sha256
+            ),
+            "latest_diagnostic_outcome": "diagnostics-incomplete",
+            "prior_diagnostic_entries_verified": 6,
+            "prior_diagnostic_manifest_sha256": (
+                request.prior_diagnostic_manifest_sha256
+            ),
+            "prior_diagnostic_outcome": "diagnostics-incomplete",
+            "prior_failure_manifest_sha256": (
+                request.prior_failure_manifest_sha256
+            ),
+            "prior_postverify_manifest_sha256": (
+                request.prior_postverify_manifest_sha256
+            ),
+            "prior_start_manifest_sha256": (
+                request.prior_start_manifest_sha256
+            ),
+            "repository_clean": True,
+            "repository_head": prior_repository_head,
+        },
+        f"{label}-binding",
+    )
+    for field in ("binding_control_sha256", "control_sha256"):
+        digest = prior_binding.get(field)
+        if not isinstance(digest, str) or not HEX_64.fullmatch(digest):
+            raise BindingError(f"{label}-binding-{field.replace('_', '-')}")
+
+    host_command = _read_json_object(
+        request.prior_log_diagnostic_root / "host-process-command.json",
+        f"{label}-host-process",
+    )
+    _require_json_fields(
+        host_command,
+        {
+            "argv": list(LATEST_PROCESS_COMMAND),
+            "exit_code": 0,
+            "timed_out": False,
+        },
+        f"{label}-host-process",
+    )
+    _validate_successful_command_streams(
+        host_command,
+        label=f"{label}-host-process",
+        stdout_must_be_truncated=False,
+    )
+    host_processes = _read_json_object(
+        request.prior_log_diagnostic_root / "host-processes.json",
+        f"{label}-host-processes",
+    )
+    _require_json_fields(
+        host_processes,
+        {
+            "format": PRIOR_LOG_EVIDENCE_FORMAT,
+            "relevant_process_count": 0,
+            "relevant_processes": [],
+        },
+        f"{label}-host-processes",
+    )
+
+    log_command = _read_json_object(
+        request.prior_log_diagnostic_root / "unified-log-command.json",
+        f"{label}-unified-log",
+    )
+    _require_json_fields(
+        log_command,
+        {
+            "argv": list(_log_command(request)),
+            "exit_code": 0,
+            "timed_out": False,
+        },
+        f"{label}-unified-log",
+    )
+    _validate_successful_command_streams(
+        log_command,
+        label=f"{label}-unified-log",
+        stdout_must_be_truncated=True,
+    )
+
+    terminal = _read_json_object(
+        request.prior_log_diagnostic_root / "terminal.json",
+        f"{label}-terminal",
+    )
+    expected_reason = (
+        "unified-log-observation:unified-log-observation-output-truncated"
+    )
+    _require_json_fields(
+        terminal,
+        {
+            "automatic_delete": "not-performed",
+            "automatic_retry": "not-performed",
+            "format": PRIOR_LOG_EVIDENCE_FORMAT,
+            "guest_exec": "not-performed",
+            "host_process_observation": "performed",
+            "input_transfer": "not-performed",
+            "operation_id": "not-generated",
+            "outcome": "diagnostics-incomplete",
+            "reason": expected_reason,
+            "root_cause": "unattributed",
+            "target_name": request.target_name,
+            "target_uuid": request.target_uuid,
+            "transaction": "not-performed",
+            "unified_log_observation": "attempted",
+            "utm_clone": "not-performed",
+            "utm_start": "not-performed",
+            "utm_stop": "not-performed",
+        },
+        f"{label}-terminal",
+    )
+    return {
+        "prior_log_diagnostic_entries_verified": len(entry_names),
+        "prior_log_diagnostic_manifest_sha256": (
+            request.prior_log_diagnostic_manifest_sha256
+        ),
+        "prior_log_diagnostic_outcome": terminal["outcome"],
+        "prior_log_diagnostic_reason": terminal["reason"],
+    }
+
+
 def _validate_incomplete_diagnostic_evidence(
     request: LaunchDiagnosticBindingRequest,
     *,
@@ -500,6 +712,54 @@ def _validate_process_stdout(
         or not HEX_64.fullmatch(stdout_hash)
     ):
         raise BindingError(f"{label}-host-process-stdout")
+
+
+def _validate_successful_command_streams(
+    command: dict[str, object], *, label: str, stdout_must_be_truncated: bool
+) -> None:
+    stdout = command.get("stdout")
+    stderr = command.get("stderr")
+    if not isinstance(stdout, dict) or not isinstance(stderr, dict):
+        raise BindingError(f"{label}-streams")
+    _validate_process_stdout(
+        stdout,
+        label,
+        must_be_truncated=stdout_must_be_truncated,
+    )
+    _require_json_fields(
+        stderr,
+        {
+            "prefix_utf8": "",
+            "sha256": hashlib.sha256(b"").hexdigest(),
+            "total_bytes": 0,
+            "truncated": False,
+        },
+        f"{label}-stderr",
+    )
+
+
+def _log_command(
+    request: LaunchDiagnosticBindingRequest,
+) -> tuple[str, ...]:
+    return (
+        "/usr/bin/log",
+        "show",
+        "--style",
+        "ndjson",
+        "--no-pager",
+        "--timezone",
+        "UTC",
+        "--info",
+        "--no-debug",
+        "--no-signpost",
+        "--no-loss",
+        "--start",
+        request.log_start,
+        "--end",
+        request.log_end,
+        "--predicate",
+        LOG_PREDICATE,
+    )
 
 
 def validate_control_identity(repository_root: Path) -> str:

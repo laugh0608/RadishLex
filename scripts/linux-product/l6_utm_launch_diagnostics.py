@@ -19,15 +19,13 @@ import l6_utm_start_once as start_control
 INITIAL_EVIDENCE_FORMAT = diagnostic_bindings.INITIAL_EVIDENCE_FORMAT
 PRIOR_EVIDENCE_FORMAT = diagnostic_bindings.PRIOR_EVIDENCE_FORMAT
 LATEST_EVIDENCE_FORMAT = diagnostic_bindings.LATEST_EVIDENCE_FORMAT
+PRIOR_LOG_EVIDENCE_FORMAT = diagnostic_bindings.PRIOR_LOG_EVIDENCE_FORMAT
 EVIDENCE_FORMAT = diagnostic_bindings.EVIDENCE_FORMAT
 INITIAL_PROCESS_COMMAND = diagnostic_bindings.INITIAL_PROCESS_COMMAND
 PRIOR_PROCESS_COMMAND = diagnostic_bindings.PRIOR_PROCESS_COMMAND
 LATEST_PROCESS_COMMAND = diagnostic_bindings.LATEST_PROCESS_COMMAND
 PROCESS_COMMAND = ("/bin/ps", "-axo", "pid=,ppid=,uid=,ucomm=")
-LOG_PREDICATE = (
-    '(process == "UTM") OR (process == "utmctl") OR '
-    '(process BEGINSWITH "qemu")'
-)
+LOG_PREDICATE = diagnostic_bindings.LOG_PREDICATE
 EXIT_COLLECTED = 0
 EXIT_DIAGNOSTICS_INCOMPLETE = 10
 EXIT_PRECONDITION_REJECTED = 11
@@ -39,10 +37,12 @@ UTC_TIMESTAMP = re.compile(
 )
 HOME_PATH = re.compile(r"/(?:Users|home)/[^/\s\"']+")
 MAX_LOG_WINDOW_SECONDS = 15 * 60
-MAX_LOG_EVENTS = 512
+MAX_DIAGNOSTIC_CAPTURE_BYTES = 8 * 1024 * 1024
+MAX_LOG_EVENTS = 16 * 1024
 MAX_LOG_LINE_BYTES = 16 * 1024
 MAX_LOG_MESSAGE_BYTES = 32 * 1024
 MAX_REDACTED_MESSAGE_CHARS = 1024
+MAX_REDACTED_LOG_BYTES = 16 * 1024 * 1024
 
 CommandObservation = start_control.CommandObservation
 CommandRunner = start_control.CommandRunner
@@ -69,6 +69,8 @@ class LaunchDiagnosticRequest:
     prior_diagnostic_manifest_sha256: str
     latest_diagnostic_root: Path
     latest_diagnostic_manifest_sha256: str
+    prior_log_diagnostic_root: Path
+    prior_log_diagnostic_manifest_sha256: str
     output_root: Path
     attempt_id: str
     target_uuid: str
@@ -90,6 +92,10 @@ class LaunchDiagnosticRequest:
             (self.initial_diagnostic_root, "initial-diagnostic-root"),
             (self.prior_diagnostic_root, "prior-diagnostic-root"),
             (self.latest_diagnostic_root, "latest-diagnostic-root"),
+            (
+                self.prior_log_diagnostic_root,
+                "prior-log-diagnostic-root",
+            ),
             (self.output_root, "output-root"),
         ):
             if not path.is_absolute():
@@ -105,6 +111,7 @@ class LaunchDiagnosticRequest:
             (self.initial_diagnostic_root, "initial-diagnostic"),
             (self.prior_diagnostic_root, "prior-diagnostic"),
             (self.latest_diagnostic_root, "latest-diagnostic"),
+            (self.prior_log_diagnostic_root, "prior-log-diagnostic"),
         ):
             if _path_is_within(self.output_root, root):
                 raise LaunchDiagnosticError(
@@ -131,6 +138,10 @@ class LaunchDiagnosticRequest:
         if not HEX_64.fullmatch(self.latest_diagnostic_manifest_sha256):
             raise LaunchDiagnosticError(
                 "latest-diagnostic-manifest-sha256-invalid"
+            )
+        if not HEX_64.fullmatch(self.prior_log_diagnostic_manifest_sha256):
+            raise LaunchDiagnosticError(
+                "prior-log-diagnostic-manifest-sha256-invalid"
             )
         if not SAFE_ATTEMPT_ID.fullmatch(self.attempt_id):
             raise LaunchDiagnosticError("attempt-id-invalid")
@@ -184,6 +195,9 @@ class LaunchDiagnosticRequest:
             "latest_diagnostic_manifest_sha256": (
                 self.latest_diagnostic_manifest_sha256
             ),
+            "prior_log_diagnostic_manifest_sha256": (
+                self.prior_log_diagnostic_manifest_sha256
+            ),
             "prior_failure_manifest_sha256": (
                 self.prior_failure_manifest_sha256
             ),
@@ -223,6 +237,9 @@ def run_launch_diagnostics(
         raise LaunchDiagnosticError(str(exc)) from exc
     writer.write_json("request.json", request.as_json())
     command_runner = runner or SubprocessCommandRunner()
+    log_runner = runner or SubprocessCommandRunner(
+        max_capture_bytes=MAX_DIAGNOSTIC_CAPTURE_BYTES
+    )
     validate_bindings = binding_validator or validate_diagnostic_bindings
 
     stage = "binding-preflight"
@@ -277,7 +294,7 @@ def run_launch_diagnostics(
         host_process_observation = "performed"
 
         stage = "unified-log-observation"
-        log_observation = command_runner.run(
+        log_observation = log_runner.run(
             _log_command(request), request.log_timeout_seconds
         )
         unified_log_observation = "attempted"
@@ -399,6 +416,14 @@ def _validate_latest_diagnostic_evidence(
     )
 
 
+def _validate_prior_log_diagnostic_evidence(
+    request: LaunchDiagnosticRequest,
+) -> dict[str, object]:
+    return _translate_binding_result(
+        diagnostic_bindings.validate_prior_log_diagnostic_evidence, request
+    )
+
+
 def _translate_binding_result(
     validator: Callable[[LaunchDiagnosticRequest], dict[str, object]],
     request: LaunchDiagnosticRequest,
@@ -473,6 +498,7 @@ def parse_unified_log_events(
 ) -> tuple[dict[str, object], ...]:
     _require_success(observation, "unified-log-observation")
     events: list[dict[str, object]] = []
+    redacted_bytes = 0
     raw_lines = tuple(
         raw_line
         for raw_line in observation.stdout.prefix.splitlines()
@@ -516,31 +542,37 @@ def parse_unified_log_events(
         timestamp = _bounded_string(
             value.get("timestamp"), "unified-log-timestamp", 128
         )
-        events.append(
-            {
-                "category": _optional_bounded_string(
-                    value.get("category"), "unified-log-category", 256
-                ),
-                "message_prefix": _redact_home_paths(message)[
-                    :MAX_REDACTED_MESSAGE_CHARS
-                ],
-                "message_sha256": hashlib.sha256(
-                    message.encode("utf-8")
-                ).hexdigest(),
-                "message_type": _optional_bounded_string(
-                    value.get("messageType"), "unified-log-message-type", 64
-                ),
-                "process_name": process_name,
-                "process_path_sha256": hashlib.sha256(
-                    process_path.encode("utf-8")
-                ).hexdigest(),
-                "role": role,
-                "subsystem": _optional_bounded_string(
-                    value.get("subsystem"), "unified-log-subsystem", 256
-                ),
-                "timestamp": timestamp,
-            }
+        event = {
+            "category": _optional_bounded_string(
+                value.get("category"), "unified-log-category", 256
+            ),
+            "message_prefix": _redact_home_paths(message)[
+                :MAX_REDACTED_MESSAGE_CHARS
+            ],
+            "message_sha256": hashlib.sha256(
+                message.encode("utf-8")
+            ).hexdigest(),
+            "message_type": _optional_bounded_string(
+                value.get("messageType"), "unified-log-message-type", 64
+            ),
+            "process_name": process_name,
+            "process_path_sha256": hashlib.sha256(
+                process_path.encode("utf-8")
+            ).hexdigest(),
+            "role": role,
+            "subsystem": _optional_bounded_string(
+                value.get("subsystem"), "unified-log-subsystem", 256
+            ),
+            "timestamp": timestamp,
+        }
+        redacted_bytes += len(
+            json.dumps(
+                event, ensure_ascii=False, separators=(",", ":")
+            ).encode("utf-8")
         )
+        if redacted_bytes > MAX_REDACTED_LOG_BYTES:
+            raise LaunchDiagnosticError("unified-log-redacted-budget-exceeded")
+        events.append(event)
         if len(events) > MAX_LOG_EVENTS:
             raise LaunchDiagnosticError("unified-log-event-budget-exceeded")
     if not finished_seen:
@@ -704,6 +736,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prior-diagnostic-manifest-sha256", required=True)
     parser.add_argument("--latest-diagnostic-root", type=Path, required=True)
     parser.add_argument("--latest-diagnostic-manifest-sha256", required=True)
+    parser.add_argument(
+        "--prior-log-diagnostic-root", type=Path, required=True
+    )
+    parser.add_argument(
+        "--prior-log-diagnostic-manifest-sha256", required=True
+    )
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--attempt-id", required=True)
     parser.add_argument("--target-uuid", required=True)
@@ -744,6 +782,10 @@ def main() -> int:
         latest_diagnostic_root=args.latest_diagnostic_root,
         latest_diagnostic_manifest_sha256=(
             args.latest_diagnostic_manifest_sha256
+        ),
+        prior_log_diagnostic_root=args.prior_log_diagnostic_root,
+        prior_log_diagnostic_manifest_sha256=(
+            args.prior_log_diagnostic_manifest_sha256
         ),
         output_root=args.output_root,
         attempt_id=args.attempt_id,

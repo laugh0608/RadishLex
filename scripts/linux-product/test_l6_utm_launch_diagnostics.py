@@ -534,6 +534,8 @@ class LinuxL6UtmLaunchDiagnosticsTests(unittest.TestCase):
             "prior_diagnostic_manifest_sha256": "1" * 64,
             "latest_diagnostic_root": root / "latest-diagnostic-evidence",
             "latest_diagnostic_manifest_sha256": "2" * 64,
+            "prior_log_diagnostic_root": root / "prior-log-diagnostic-evidence",
+            "prior_log_diagnostic_manifest_sha256": "3" * 64,
             "output_root": root / "launch-diagnostics",
             "attempt_id": "synthetic-diagnostics",
             "target_uuid": TARGET_UUID,
@@ -593,6 +595,11 @@ def valid_binding(
             request.latest_diagnostic_manifest_sha256
         ),
         "latest_diagnostic_outcome": "diagnostics-incomplete",
+        "prior_log_diagnostic_entries_verified": 8,
+        "prior_log_diagnostic_manifest_sha256": (
+            request.prior_log_diagnostic_manifest_sha256
+        ),
+        "prior_log_diagnostic_outcome": "diagnostics-incomplete",
         "repository_clean": True,
         "repository_head": request.expected_repository_head,
     }

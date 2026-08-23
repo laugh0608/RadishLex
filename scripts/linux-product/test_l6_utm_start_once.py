@@ -42,6 +42,25 @@ class FakeRunner:
 
 
 class LinuxL6UtmStartOnceTests(unittest.TestCase):
+    def test_capture_limit_is_explicit_and_defaults_remain_bounded(self) -> None:
+        payload = b"x" * (l6_utm_start_once.MAX_CAPTURE_BYTES + 1)
+
+        default_capture = l6_utm_start_once.CapturedOutput.from_bytes(payload)
+        expanded_capture = l6_utm_start_once.CapturedOutput.from_bytes(
+            payload, max_capture_bytes=len(payload)
+        )
+
+        self.assertTrue(default_capture.truncated)
+        self.assertEqual(
+            len(default_capture.prefix), l6_utm_start_once.MAX_CAPTURE_BYTES
+        )
+        self.assertFalse(expanded_capture.truncated)
+        self.assertEqual(expanded_capture.prefix, payload)
+        with self.assertRaises(ValueError):
+            l6_utm_start_once.CapturedOutput.from_bytes(
+                payload, max_capture_bytes=0
+            )
+
     def test_started_requires_status_and_terminal_inventory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             request = self.request(Path(temporary), poll_attempts=3)

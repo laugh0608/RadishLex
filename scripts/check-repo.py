@@ -253,6 +253,7 @@ REQUIRED_FILES = [
     "scripts/linux-product/test_l6_utm_start_once.py",
     "scripts/linux-product/test_l6_utm_clone_once.py",
     "scripts/linux-product/test_l6_utm_launch_diagnostics.py",
+    "scripts/linux-product/test_l6_utm_launch_diagnostics_v5.py",
     "scripts/linux-product/test_l6_controller_contract.py",
     "scripts/linux-product/test_l6_release_pair.py",
     "scripts/linux-product/test_l6_release_pair_contract.py",
