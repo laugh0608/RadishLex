@@ -32,6 +32,7 @@
 - 从clean `296a1c5`执行唯一`foreground-applescript-v1`：prepared/live身份、两次descriptor和双进程门均通过；osascript只调用1次、exit 0、空输出。冻结目录`…-v4-Foreground-Launch-Transport-v2`含16项，manifest `6dbbdf40…fc3c`逐项通过且权限为`0700`/`0600`；首轮status与terminal list已见target started，但terminal进程为0，故原控制返回12/`state-indeterminate`，没有quit/stop/retry/delete/guest/input/operation/transaction。
 - 后续只读交叉验证始终只有v4登记started、旧二十台stopped；QEMUHelper/QEMULauncher延迟出现，`lsof`确认其持有EFI/qcow2。config仍为`2de7280b…6195`，EFI变为`f762ee52…8e76`；qcow2先后出现`bd03adb0…9fde`、`96ed9100…e22`、`2c9a8c56…a2b5`且尺寸曾增至10,089,594,880 bytes，均不是terminal身份。最终快照在list/status前进程为0、之后却再次捕获QEMULauncher双句柄，提示started登记下的plain查询可能重新拉起app/backend，后续不再循环查询。VM已实际写盘但guest断网未证明；修复`2eea62f`使未来控制在started后继续有界轮询backend，17项launch/prepared回归通过，但不回写本次终态。
 - clean `e75509a`的network v1在宿主`utmctl exec`参数解析阶段失败关闭，8项manifest `d5d33212…7348`确认network script/push/pull均为0。修正控制在clean `3286268`逐项绑定launch 16项及v1失败7项后只执行一次v2：脚本push后逐字回读SHA-256 `d0bb5c28…1f28a`，network script仅调用1次，两个301-byte回读均为`2f9abfbe…d0e8e`。结构化证据固定boot `1bcbd795…26ae3`、active仅`lo`、nonloop接口/UP均0、IPv4/IPv6 main route均0；15项manifest `40be3f3f…38383`逐项通过，业务input/operation/transaction/stop/retry/quit及plain list/status/start均未执行。
+- canonical input transfer v1现强绑定上述v2 manifest SHA-256 `40be3f3f…38383`、clean `3286268`与当前boot的两份冻结network evidence；调用前须再次双重file pull逐字匹配，不能重跑断网脚本。source由授权明确的绝对路径、size和SHA-256三元组固定，同一`O_NOFOLLOW` descriptor在guest动作前后复验身份/hash及12项USTAR inventory。guest installer只接受root、`0700`私有staging、root-owned安全regular files与精确USTAR；bundle唯一push后完整回读两次，再以`renameat2(RENAME_NOREPLACE)`把同文件系统staging切入固定`/var/tmp/radishlex-l6-inputs`。host输出根与guest attempt/evidence均create-new；任何漂移失败关闭并保留现场，且不生成operation ID、不进入transaction、不自动retry/stop。10项正负回归已接入默认L6门禁；本批没有调用真实UTM、进入guest、传输input或改变VM。
 
 ## 停止线
 
@@ -46,6 +47,7 @@
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
 - v4 clone/prepared/launch、network-ready v1失败及v2成功证据与UUID `50B75F88…8038`须原样冻结；唯一transport和两个network输出根均已消耗，不得第二次start、重复断网、覆盖证据或把活动qcow2哈希当terminal。v2只证明当前boot断网，不授权canonical input、preflight、operation、transaction、stop或quit；这些动作仍须按顺序分别授权。
+- repository-only canonical input控制与测试不是系统动作授权。未在授权中逐字固定source绝对路径、size、SHA-256、attempt ID及absent host输出根前，不得运行真实transfer；即使transfer通过，也不得顺带生成operation ID、执行preflight/transaction、retry、stop或quit。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
@@ -53,8 +55,8 @@
 ## 下一步（2026-08-23）
 
 1. 冻结launch/network v1/v2 manifest `6dbbdf40…fc3c`/`d5d33212…7348`/`40be3f3f…38383`，不覆盖、不复跑断网；prepared哈希只代表启动前，活动EFI/qcow2不得恢复或宣称clean。
-2. 下一批先repository-only绑定v2断网证据，固定canonical input的源bundle、guest私有根、逐字回读、原子切换、失败停止线与零operation/transaction语义；通过门禁并提交后，再单独申请真实input transfer授权。
-3. canonical input闭合后才可另行授权只读mutation/negative preflight；operation ID、第二个crash checkpoint、受控停止继续分批关闭。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
+2. repository-only canonical input控制已闭合。下一次真实批次只能运行一次该committed控制；授权须精确列出v4 UUID/name/package、source bundle绝对路径/size/SHA-256、attempt ID、此前absent的host输出根和v2 manifest SHA-256。动作面只含两次既有network evidence live pull、既有target/process/双句柄只读门、guest私有根与installer的push/归一化/回读、source bundle唯一push及两次完整回读、installer唯一调用与两次result回读；不含list/status/start、断网脚本、operation ID、preflight/transaction、retry/stop/quit/delete。
+3. canonical input terminal与create-new manifest闭合后，才可另行授权只读mutation/negative preflight；operation ID、第二个crash checkpoint、受控停止继续分批关闭。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
 
 ## 验证入口
 
@@ -76,7 +78,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器证明单次start/clone、v7只读诊断、prepared/live target双重绑定、foreground transport、延迟backend轮询、guest网络命令面/双重回读及失败关闭terminal。v4 launch原终态仍为`state-indeterminate`，但独立句柄事实与v2 guest双重回读已证明当前boot真实运行且断网；尚未传canonical input或执行transaction，八case、连续L6与发布未闭合。
+上述入口以合成执行器证明单次start/clone、v7只读诊断、prepared/live target双重绑定、foreground transport、延迟backend轮询、guest网络命令面/双重回读、canonical input精确source/readback/no-replace switch及失败关闭terminal。v4 launch原终态仍为`state-indeterminate`，但独立句柄事实与v2 guest双重回读已证明当前boot真实运行且断网；repository-only input控制通过不等于真实input已传输，八case、连续L6与发布仍未闭合。
 
 ## 阅读索引
 

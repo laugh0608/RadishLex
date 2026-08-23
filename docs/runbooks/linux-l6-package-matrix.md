@@ -15,7 +15,7 @@
 
 ## 当前执行状态
 
-截至 2026-08-17：
+截至 2026-08-23：
 
 - production transaction/startup 代码、actual `.deb` verifier 和 fake command/crash matrix 已完成；
 - L6 guest、release pair、六步事务顺序、八个 crash checkpoint、字体/startup/XDG probe 和证据保留规则已由 format v1 固定；
@@ -426,7 +426,7 @@ repository-only `l6_utm_clone_once.py`把host clone固定为双显式授权下�
 
 repository-only `l6_utm_launch_diagnostics.py`只用于冻结start失败后的host观察，不包裹、不重放也不触发start。v7控制要求两项显式授权，并在任何host命令前绑定clean committed head、主控制与binding模块identity、start/failure/postverify及v1-v6六次不完整诊断九份manifest逐项hash与关键终态语义；六次诊断还必须固定同一授权、20台数量、UTC时间窗、各自命令、进程/日志阶段失败与零mutation终态。随后先以`utmctl list`与目标`utmctl status`重验全停，再且仅执行固定紧凑`ps`与最长15分钟、固定predicate的`log show --style ndjson`。输出根必须absent且位于仓库及九份冻结证据之外，目录/文件为`0700`/`0600`；list/status/process保持64KiB捕获，system log为8MiB。process只保存脱敏角色与标识；log只保存受限metadata、message hash及home路径脱敏prefix，并受16,384事件、16KiB单行、32KiB消息和16MiB脱敏总量限制。可选日志字段空字符串规范化为缺失值；`finished`只接受末尾唯一布尔`true`或精确整数`1`，解析前另持久化无正文的record/marker数量、是否末尾和值类型分类，原始stdout不进入证据。任何漂移均失败关闭；terminal保持root cause未归属与所有mutation未执行。fake-runner不读取真实system log；每次真实采集仍需独立系统授权，单条日志不能自行证明根因。
 
-v7证据闭合后，下一host批次不得直接把plain `utmctl start`复制到新target。UTM 4.7.5 build 118的官方`utmctl`源码显示其通过ScriptingBridge以`.andHide`拉起UTM并直接调用`startSaving`；`--hide`只关闭名为UTM的主窗口，不承诺绕过VM窗口主化。官方同版本`UTMStartActionIntent`则在`data.run`前显式`NSApp.activate`，因此repository-only launch transport v2选择`foreground-applescript-v1`作为单一待验证假设：committed AppleScript只接受一个UUID，先`activate`，再执行一次`start ... saving true recovery false`。这不是已证实修复，也不是`--hide`或任意GUI自动化。
+v7证据闭合后，下一host批次不得直接把plain `utmctl start`复制到新target。UTM 4.7.5 build 118的官方`utmctl`源码显示其通过ScriptingBridge以`.andHide`拉起UTM并直接调用`startSaving`；`--hide`只关闭名为UTM的主窗口，不承诺绕过VM窗口主化。官方同版本`UTMStartActionIntent`则在`data.run`前显式`NSApp.activate`，因此repository-only launch transport v2选择`foreground-applescript-v1`作为单一待验证假设：committed AppleScript只接受一个UUID，先`activate`，再执行一次`start ... saving true recovery false`。v4已通过该唯一transport实际运行，并由network v2双重回读闭合当前boot断网；原launch terminal仍保持`state-indeterminate`且不回写，transport、断网与证据根均不得复跑或覆盖。
 
 `l6_utm_launch_transport_v2.py`、通用bindings与prepared bindings模块固定以下合同：三项显式授权；clean committed head；主控制/binding/AppleScript regular single-link identity；精确v7 manifest `206aa335…7b56c`的十项、20台all-stopped清单、4,040事件、唯一start send/receive、AppKit断言和零QEMU语义；精确prepared manifest `c40c55d9…144b`的七项、clone/prepared控制身份、禁止自动动作语义、物化前后同一21台全停清单及v7+唯一v4 target关系；本机UTM bundle ID、4.7.5 build 118、Info.plist、`UTM.sdef`中`UTMvstar`/saving/recovery及App Intent metadata。target固定UUID `50B75F88…8038`和authoritative UTM Documents下精确package，故冻结`5B19AEF1…7DAB`不能复用；expected count为21。transport前两次固定`ucomm`观察都必须没有UTM、utmctl、QEMUHelper、QEMULauncher或qemu相关进程；首次零门后通过`O_NOFOLLOW` descriptor复验package/Data目录及config/EFI/qcow2的owner、mode、single-link、size、inode与prepared SHA-256，再只读调用plain list/status并重复相同target校验，两次身份必须逐字段相同；随后执行最终进程零门，且仅在通过后调用一次`/usr/bin/osascript committed-script UUID`。
 
@@ -487,7 +487,7 @@ guest-agent push 到达guest后的owner/mode也不是可信输入；既有第六
 
 UTM 磁盘配置使用空 `Network` 数组也不能单独证明 guest 运行态断网；删除整个必填键会使 UTM 4.7.5 冷加载失败，注册缓存仍可能在首次启动挂回虚拟网卡并取得 DHCP。每次启动后、写入 artifact input 或生成 operation ID 前，都必须在 guest 内复验目标接口 down 且 IPv4/IPv6 路由为空；任一网络状态不明立即停止，不把后续断网状态倒推成“从启动起全程离线”。
 
-前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个为`rolled_back`，第六套形成target `completed`与S3。独立clone又闭合真实repair、rollback、remove和reinstall，六类operation已有分散证据但不是同一session。第三台clean clone `3EC83EB9…593B9`已闭合首个有效crash case。`install_artifacts_staged`旧clone与v3 start均失败关闭；v7 manifest `206aa335…7b56c`固定plain start后的UTM AppKit断言。v4 `50B75F88…8038`唯一foreground transport的manifest `6dbbdf40…fc3c`冻结为`state-indeterminate`：登记started先于backend，随后QEMU延迟出现并改写EFI/qcow2，guest尚未进入。修正版控制通过17项launch/prepared合成门禁，但不授权重试；下一步只能在重新核对唯一VM/backend/target handles后，分别申请guest断网核验或受控停止。其他case、旧target start及清理继续关闭。
+前三个 L6 分别处于 dpkg config、guard parent 与 target manifest profile 停止线；第四个为 artifact-chain mismatch；第五个为`rolled_back`，第六套形成target `completed`与S3。独立clone又闭合真实repair、rollback、remove和reinstall，六类operation已有分散证据但不是同一session。第三台clean clone `3EC83EB9…593B9`已闭合首个有效crash case。`install_artifacts_staged`旧clone与v3 start均失败关闭；v7 manifest `206aa335…7b56c`固定plain start后的UTM AppKit断言。v4 `50B75F88…8038`唯一foreground transport的manifest `6dbbdf40…fc3c`保持`state-indeterminate`，但随后QEMU双句柄与network v2 manifest `40be3f3f…38383`已独立证明当前boot运行且仅`lo`、双main route为空。repository-only canonical input控制现精确绑定该manifest与两份live readback；source只接受授权逐字固定的绝对路径/size/SHA-256，以同一`O_NOFOLLOW` descriptor前后复验12项USTAR。唯一push和两次完整回读后，root guest installer只在私有`0700`同文件系统staging以exclusive/no-follow解包，并以`renameat2(RENAME_NOREPLACE)`切入固定input root；host/guest证据均create-new，任一漂移失败关闭且不自动补救。10项合成回归已进入默认L6门禁，但真实input尚未传输。下一步只有在授权再固定attempt ID和absent输出根后，才可执行一次该控制；input证据闭合前不得plain list/status/start、重跑断网、preflight、生成operation ID、进入transaction或停止VM，其他case、旧target start及清理继续关闭。
 
 ## 10. L6 完成与后续
 
