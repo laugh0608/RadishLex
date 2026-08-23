@@ -7,7 +7,7 @@
 - 复核日期：2026-08-23（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh与六类operation已有证据。首个crash已闭合；`install_artifacts_staged`未进入guest。v7已完整定位plain start的UTM/AppKit失败机制，repository-only launch transport v2及12项合成门禁已闭合；新的v4独立clone已创建并保持stopped，但尚未物化DependencyFrozen或启动。二十一台VM保持全停，其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh与六类operation已有证据。首个crash已闭合；`install_artifacts_staged`未进入guest。v7已完整定位plain start的UTM/AppKit失败机制，repository-only launch transport v2及12项合成门禁已闭合；新的v4独立clone已完成DependencyFrozen物化并保持stopped，prepared证据已冻结但尚未启动。二十一台VM保持全停，其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -31,7 +31,8 @@
 - v1-v6只读host诊断依次暴露进程输出上限、PID/legacy UID解析、日志捕获上限、空category与finished marker合同缺口；manifest `158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`均冻结。每次均保持二十台全停、`root_cause=unattributed`与零VM/guest/transaction mutation；完整流水只见L6 runbook与周志。
 - v7真实只读诊断从clean `5ab68b1`绑定九份前序manifest，确认二十台全停、31,640-byte进程观察完整且相关进程为0。相同`log show`完整返回3,916,860 bytes与SHA-256 `0dbed63a…e9c`；4,041条NDJSON记录以唯一末尾整数`1`闭合，形成4,040条脱敏事件。08:13:48.432的`UTMv,star`由UTM接收后出现`[self canBecomeMainWindow]`断言与`NSInternalInconsistencyException`，没有对应start reply或QEMU事件。十项manifest `206aa335…7b56c`通过；terminal仍保守记录`root_cause=unattributed`且所有VM/guest/transaction动作未执行。
 - repository-only launch transport v2固定`foreground-applescript-v1`：唯一`/usr/bin/osascript`调用先`activate` UTM，再按精确UUID执行一次`start ... saving true recovery false`；plain `utmctl start`与`--hide`均不在命令面。binding强制v7 manifest `206aa335…7b56c`、UTM `4.7.5 (118)`及Info/sdef/App Intent身份，live inventory只能是冻结20台加一个全新target；transport前相关UTM/utmctl/QEMU进程必须为0，terminal同时交叉验证status、21台清单与QEMUHelper/QEMULauncher/qemu进程。12项fake-runner/临时目录回归已进入默认L6门禁；真实v7十项证据和本机UTM bundle只读绑定通过，但尚未执行osascript、start或GUI动作，因此仍是待实机验证的transport假设。
-- 新v4 clone从clean `83f037a`、v7 manifest `206aa335…7b56c`和二十台canonical all-stopped清单开始；唯一`utmctl clone E671DB9C…D465 --name ...-v4` exit 0、空stdout/stderr且未超时，注册与精确package联合确认唯一新增UUID `50B75F88…8038` stopped。八项证据manifest `f76d1943…ff6e2`逐项通过；独立live list/status与进程复核确认二十一台全停、相关UTM/utmctl/QEMU进程为0。本批没有物化、start、guest、input、operation ID、transaction、retry或delete。
+- 新v4 clone manifest `f76d1943…ff6e2`绑定clean `83f037a`、v7、二十台全停清单和唯一clone，联合确认新增UUID `50B75F88…8038` stopped及精确package；没有物化、start、guest、transaction、retry或delete。该manifest不含host进程payload，不能证明后续transport进程门。
+- v4物化从clean `e4ca1bd`、clone manifest与二十一台canonical all-stopped清单开始；冻结控制只对该target以target-local incoming加`clonefile`/`mv`换入DependencyFrozen EFI/qcow2，共两次replacement。prepared manifest `c40c55d9…144b`逐项固定config/EFI/qcow2 `2de7280b…6195`/`0b797641…1418`/`4967234b…4b18`、`Network=[]`、qcow2双重复算、source/registration/target九文件零句柄及物化前后同一二十一台全停清单。独立manifest、live list/status、磁盘hash与零句柄复核再次通过；没有start、guest、input、operation ID、transaction、retry、rollback或delete。独立精确`ucomm`复核同时发现一个驻留UTM app进程，但无utmctl或QEMU backend；因此prepared成立，foreground transport的调用前零相关进程门尚未成立。
 
 ## 停止线
 
@@ -45,16 +46,16 @@
 - v2 clone失败证据`65160b12…c1859`须原样保留；不得沿用本批授权重试clone、重启UTM或把exit 0记为成功。
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
-- launch transport v2代码与合成通过不构成start授权。旧target不得运行该transport；v4 clone证据`f76d1943…ff6e2`与UUID `50B75F88…8038`须冻结，载体物化和唯一start必须分别授权。若物化身份/零句柄/全停门未成立，或transport前存在相关host进程、live清单不是v7精确20台加该唯一新target，必须失败关闭且不得自动quit/stop/retry/delete。
+- launch transport v2代码与合成通过不构成start授权。旧target不得运行该transport；v4 clone/prepared证据`f76d1943…ff6e2`/`c40c55d9…144b`与UUID `50B75F88…8038`须冻结。当前驻留UTM app不自动退出；只有prepared身份重新绑定、UTM/utmctl/QEMU相关进程精确为0且live清单仍是v7冻结20台加该唯一新target时，才可另行授权唯一start。任一门未成立必须失败关闭且不得自动quit/stop/retry/delete。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（2026-08-23）
 
-1. 新v4 clone `50B75F88…8038`已唯一创建并以manifest `f76d1943…ff6e2`冻结；当前仅为reinstall terminal壳的stopped副本，尚未物化DependencyFrozen，也不得启动、重试clone、删除或复用旧v3。
-2. 下一批单独申请载体物化；只对v4换入DependencyFrozen EFI/qcow2并形成config/EFI/qcow2、`Network=[]`、双重qcow2、source/target零句柄和二十一台全停的prepared证据。物化门未成立不进入transport。
-3. prepared证据独立复核后，才单独申请一次`foreground-applescript-v1`系统授权。只有新target唯一started、冻结二十台均stopped且backend进程事实一致，才可再申请guest断网双重文件回读；旧`5B19AEF1…7DAB`、`--hide`、自动补救、其余crash、连续L6、P05C、发布、推送和其他平台继续关闭。
+1. 新v4 clone `50B75F88…8038`已以clone/prepared manifest `f76d1943…ff6e2`/`c40c55d9…144b`冻结；DependencyFrozen config/EFI/qcow2、`Network=[]`、双重qcow2、九文件零句柄与二十一台全停均已独立复核，不得再次物化、重试clone、删除或复用旧v3。
+2. 下一批先在repository-only复验prepared绑定与launch transport命令面；随后单独申请关闭当前驻留UTM app，进程归零复核通过后再单独申请一次`foreground-applescript-v1`系统动作。任一prepared/live inventory或进程门漂移即停止，不调用plain start、`--hide`、自动quit/stop/retry/delete。
+3. 只有新target唯一started、冻结二十台均stopped且backend进程事实一致，才可再申请guest断网双重文件回读；旧`5B19AEF1…7DAB`、其余crash、连续L6、P05C、发布、推送和其他平台继续关闭。
 
 ## 验证入口
 
@@ -76,7 +77,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器证明单次start/clone、v7只读诊断、foreground AppleScript transport、失败关闭terminal与零越界动作。新v3 clone始终未进入guest；v7已定位start AppleEvent后的UTM AppKit断言，v2仍仅为未实机验证的新transport。八case、连续L6与发布未闭合。
+上述入口以合成执行器证明单次start/clone、v7只读诊断、foreground AppleScript transport、失败关闭terminal与零越界动作。新v4现仅闭合clone与prepared磁盘身份，仍未进入guest；v7已定位start AppleEvent后的UTM AppKit断言，v2仍仅为未实机验证的新transport。八case、连续L6与发布未闭合。
 
 ## 阅读索引
 
