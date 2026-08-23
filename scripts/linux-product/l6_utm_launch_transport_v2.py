@@ -339,7 +339,27 @@ def run_launch_transport_once(
                 observed_status = None
             if observed_status == "started":
                 observed_started = True
-                break
+                stage = "host-process-poll"
+                poll_process_observation = command_runner.run(
+                    PROCESS_COMMAND, request.command_timeout_seconds
+                )
+                writer.write_json(
+                    f"host-process-command-poll-{attempt:03d}.json",
+                    poll_process_observation.as_json(),
+                )
+                poll_processes = parse_relevant_processes(
+                    poll_process_observation
+                )
+                writer.write_json(
+                    f"host-processes-poll-{attempt:03d}.json",
+                    _process_evidence(poll_processes),
+                )
+                if (
+                    _backend_process_count(poll_processes) >= 1
+                    and _role_count(poll_processes, "utmctl") == 0
+                ):
+                    break
+                stage = "utmctl-status-poll"
             if attempt < request.poll_attempts:
                 sleep(request.poll_interval_seconds)
 

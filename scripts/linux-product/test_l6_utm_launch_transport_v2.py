@@ -64,6 +64,7 @@ class LinuxL6UtmLaunchTransportV2Tests(unittest.TestCase):
                         ("utmctl", "status", TARGET_UUID),
                         stdout=b"started\n",
                     ),
+                    process_observation("QEMULauncher"),
                     observation(("utmctl", "list"), stdout=vm_list("started")),
                     process_observation("UTM", "QEMULauncher"),
                 ]
@@ -167,6 +168,7 @@ class LinuxL6UtmLaunchTransportV2Tests(unittest.TestCase):
                         ("utmctl", "status", TARGET_UUID),
                         stdout=b"started\n",
                     ),
+                    process_observation("QEMULauncher"),
                     observation(("utmctl", "list"), stdout=vm_list("started")),
                     process_observation("QEMULauncher"),
                 ]
@@ -193,6 +195,7 @@ class LinuxL6UtmLaunchTransportV2Tests(unittest.TestCase):
                         ("utmctl", "status", TARGET_UUID),
                         stdout=b"started\n",
                     ),
+                    process_observation(),
                     observation(("utmctl", "list"), stdout=vm_list("started")),
                     process_observation("UTM"),
                 ]
@@ -208,6 +211,49 @@ class LinuxL6UtmLaunchTransportV2Tests(unittest.TestCase):
             self.assertEqual(result.outcome, "state-indeterminate")
             self.assertEqual(
                 result.exit_code, launch_transport.EXIT_STATE_INDETERMINATE
+            )
+
+    def test_started_status_waits_for_delayed_backend(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            request = self.request(Path(temporary), poll_attempts=2)
+            runner = FakeRunner(
+                successful_prefix(request)
+                + [
+                    observation(
+                        ("utmctl", "status", TARGET_UUID),
+                        stdout=b"started\n",
+                    ),
+                    process_observation(),
+                    observation(
+                        ("utmctl", "status", TARGET_UUID),
+                        stdout=b"started\n",
+                    ),
+                    process_observation("QEMULauncher"),
+                    observation(
+                        ("utmctl", "list"), stdout=vm_list("started")
+                    ),
+                    process_observation("QEMULauncher"),
+                ]
+            )
+
+            result = launch_transport.run_launch_transport_once(
+                request,
+                runner=runner,
+                sleeper=lambda _: None,
+                binding_validator=valid_binding,
+                target_identity_validator=valid_target_identity,
+            )
+
+            self.assertEqual(result.outcome, "started-observed")
+            self.assertEqual(result.status_poll_count, 2)
+            self.assertEqual(
+                runner.calls.count(launch_transport.transport_argv(request)), 1
+            )
+            self.assertTrue(
+                (request.output_root / "host-processes-poll-001.json").is_file()
+            )
+            self.assertTrue(
+                (request.output_root / "host-processes-poll-002.json").is_file()
             )
 
     def test_stopped_inventory_with_backend_is_indeterminate(self) -> None:
