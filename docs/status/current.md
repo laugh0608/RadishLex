@@ -7,7 +7,7 @@
 - 复核日期：2026-08-23（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh与六类operation已有证据，首个crash已闭合。`install_artifacts_staged` v4已消耗唯一foreground transport/transfer/resolution；network v2证明当前boot断网，resolution已把input闭合为`input-ready`。repository-only negative preflight v1控制已闭合但尚未真实调用；仍无operation ID/transaction，其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh与六类operation已有证据，首个crash已闭合。`install_artifacts_staged` v4已消耗唯一foreground transport/transfer/resolution/negative preflight；network v2证明当前boot断网，resolution与preflight已分别闭合`input-ready`/`preflight-ready`。仍无operation ID/checkpoint/transaction，其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -36,7 +36,7 @@
 - canonical source bundle已由clean `59eaab3`在create-new根`…-v4-Canonical-Input-v1`冻结：92,825,600 bytes、SHA-256 `7bbeb291…403c`，七文件manifest `ffc990a3…e0de`。12项USTAR、双重bundle hash、owner/mode/link、零xattr与manifest均独立回读通过；terminal固定零`utmctl`、guest、input transfer、operation/transaction及VM启停。
 - clean `6a23c37`的唯一attempt `d75818f-v4-input-20260823-v1`通过network/target/process/句柄、installer readback、bundle唯一push/双回读及source postflight。installer调用exit 0且空输出，但同秒首次pull报告`transfer.evidence.json`不存在，第二次result回读未执行，input root状态未知。create-new根`…-v4-Input-Transfer-v1`的19项及manifest `d1090e8d…dc09`通过，权限`0700`/`0600`、single-link且零xattr；terminal为`state-indeterminate`，无list/status/start、断网复跑、operation/transaction、retry/stop/quit。
 - clean `ca57dce`的唯一resolution双回读稳定passed result；一次probe证明installer/可疑进程均0、staging absent、final私有且12项inventory逐文件匹配。create-new host根`…-v4-Input-Resolution-v1`的21项与manifest `7bab8f20…4e4a`通过，权限`0700`/`0600`、single-link、零xattr；terminal为`input-ready`，原installer/bundle、operation/transaction、retry/stop/quit均未执行。
-- repository-only negative preflight v1已绑定resolution 21项/`7bab8f20…4e4a`及全部前序身份；one-shot probe以exclusive marker、原子phase/no-replace result只读重验input/pair/package/dependency/font/startup/XDG/process/network。8项host与5项probe回归已进入L6门禁；未调用真实`utmctl`或guest，完整边界见runbook。
+- clean `8bd9e65`的唯一negative preflight绑定resolution `7bab8f20…4e4a`及全部前序身份；one-shot probe只读重验input/pair/package/dependency/font/startup/XDG/process/network。guest双回读为`passed`，host为`preflight-ready`；create-new根25项manifest `aba59811…0d7a`逐项通过。未执行case/maintenance/acceptance/dpkg/installer、operation/checkpoint/transaction或自动补救/VM动作。
 
 ## 停止线
 
@@ -50,7 +50,7 @@
 - v2 clone失败证据`65160b12…c1859`须原样保留；不得沿用本批授权重试clone、重启UTM或把exit 0记为成功。
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
-- v4 clone/prepared/launch、network v1/v2、bundle、transfer v1与resolution v1证据及UUID `50B75F88…8038`须冻结；不得第二次start、重复断网/transfer/resolution、覆盖guest/host证据或把活动qcow2哈希当terminal。input现只由`7bab8f20…4e4a`证明ready；repository-only negative preflight控制不是guest preflight证据，也不授权operation/transaction。
+- v4 clone/prepared/launch、network v1/v2、bundle、transfer v1、resolution v1与negative preflight v1证据及UUID `50B75F88…8038`须冻结；不得第二次start、重复断网/transfer/resolution/preflight、覆盖guest/host证据或把活动qcow2哈希当terminal。input/preflight现只由`7bab8f20…4e4a`/`aba59811…0d7a`证明ready；它们不授权operation/checkpoint/transaction。
 - repository-only控制与测试不是系统授权。不得重跑installer、bundle push/transfer/probe、自行补证或进入operation/transaction；后续真实动作仍须committed控制、create-new证据与单独精确授权。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
@@ -58,9 +58,9 @@
 
 ## 下一步（2026-08-23）
 
-1. 冻结launch/network/bundle/transfer/resolution manifest `6dbbdf40…fc3c`/`40be3f3f…38383`/`ffc990a3…e0de`/`d1090e8d…dc09`/`7bab8f20…4e4a`，不覆盖或复跑；prepared哈希只代表启动前，活动EFI/qcow2不得恢复或宣称clean。
-2. 下一步只可另行授权一次真实negative preflight：attempt `d75818f-v4-negative-preflight-20260823-v1`，create-new host根`…-v4-Negative-Preflight-v1`、guest根`/var/tmp/radishlex-l6-v4-negative-preflight-d75818f-v4-negative-preflight-20260823-v1`。只允许committed门禁、冻结network/resolution回读及单一probe push/回读/调用；不得执行`case.sh`、maintenance、acceptance、`dpkg`/`dpkg-query`、installer、transfer、operation/transaction、retry/cleanup/stop/quit/list/status/start。精确绝对host路径与控制范围见runbook。
-3. negative preflight闭合为`preflight-ready`后，operation ID、`install_artifacts_staged` checkpoint、exact resume与受控停止仍分批授权。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
+1. 冻结launch/network/bundle/transfer/resolution/preflight manifest `6dbbdf40…fc3c`/`40be3f3f…38383`/`ffc990a3…e0de`/`d1090e8d…dc09`/`7bab8f20…4e4a`/`aba59811…0d7a`，不覆盖或复跑；prepared哈希只代表启动前，活动EFI/qcow2不得恢复或宣称clean。
+2. 下一批仅repository-only绑定preflight 25项与`preflight-ready`，设计一次性`install_artifacts_staged` checkpoint控制：未来真实调用才可生成operation ID；checkpoint前后重验输入、断网、package/dpkg/startup/XDG/process与target staging，证据create-new、漂移失败关闭。本批不调用`utmctl`/guest，不生成真实operation ID或执行checkpoint/transaction/VM动作。
+3. repository-only控制提交后，真实operation ID与单次checkpoint须另行精确授权；exact resume与受控停止仍各自分批。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
 
 ## 验证入口
 
@@ -82,7 +82,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器覆盖单次start/clone、v7诊断、target绑定、foreground transport、延迟backend、guest断网、canonical transfer、消歧与negative preflight。真实resolution已证明当前boot断网且input ready；真实negative preflight、operation、八case、连续L6与发布仍未闭合。
+上述入口以合成执行器覆盖单次start/clone、v7诊断、target绑定、foreground transport、延迟backend、guest断网、canonical transfer、消歧与negative preflight。真实resolution/preflight已证明当前boot断网、input ready及负向前置条件成立；operation/checkpoint、其余七个case、连续L6与发布仍未闭合。
 
 ## 阅读索引
 
