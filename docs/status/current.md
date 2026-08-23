@@ -20,14 +20,9 @@
 
 - P05A carrier、production relationship、恢复事务、system port/CLI/startup gate、L6 format/controller/pair/refresh均已闭合；合成矩阵不替代真实现场。
 - 六类真实operation均有分散证据：第六套形成target completed/S3，独立clone闭合repair、rollback、remove与reinstall；这些不能冒充同一连续session。精确receipt、package、guest/host manifest和磁盘身份进入L6 runbook/周志。
-- 旧pair唯一`install_prepared`调用形成prepared checkpoint且未触发dpkg；后续startup因遗漏合法`01777 /run/lock`失败关闭，manifest `5d8c914a…3e42a`与clone `FD24ADFF…17C056`冻结。store/startup现共用权限策略且119项默认/124项L6-feature测试通过，旧case仍不计通过。
-- 修复target `d75818f`的handoff `c74fac12…9849`已冻结。第三台clone `3EC83EB9…593B9`只生成一次operation ID并闭合prepared checkpoint与exact resume；terminal/关机manifest `679b7e04…c544`/`036bace8…f3b8`证明source `38-1` installed、receipt completed、startup/XDG/进程/断网稳定、磁盘双回读与零句柄，细项见runbook。
-- repository-only guest-case合同除canonical input/readback/startup预期外，现固定`install_artifacts_staged`的target-only staging、package/dpkg未变、合法guard、XDG/process/network零漂移与resume重验/单次apply，并与matrix交叉校验。首次安装精确Rust回归通过，production语义无需修改。
-- 第二个case旧clone两次start均失败关闭且未改盘/进入guest；v2唯一clone又以exit 0、stderr OSStatus `-1712`但零注册/package落地失败关闭。manifest `337007ff…7ebbb`/`65160b12…c1859`冻结，未获得可归因根因。
-- repository-only `l6_utm_clone_once.py`以双授权绑定clean head、前序manifest、全停清单、source与目标absence；只有命令成功、stderr空、唯一stopped注册增量及精确package存在才返回created，失败/拒绝/不确定分别返回10/11/12且不自动retry/delete/start。11项回归已进入L6门禁。
-- v3 clone/prepared manifest `7ce53048…e5b7`/`b065c7ac…32db`已冻结；唯一start timeout并保持二十台全stopped，start/failure/postverify `870f56dd…f3a5`/`59c62c14…bba05`/`8e3d5ced…8386`确认磁盘未变且零guest/input/transaction，仍不能归因具体UTM/QEMU根因。
-- v1-v6只读host诊断逐步补齐进程、UID、日志上限、空category与finished marker合同；六份manifest见L6 runbook并保持冻结。每次均为二十台全停、`root_cause=unattributed`与零VM/guest/transaction mutation。
-- v7只读诊断绑定九份前序manifest，确认二十台全停和相关进程为0；完整脱敏日志闭合到UTM接收start后的AppKit主窗口断言，没有对应reply或QEMU事件。十项manifest `206aa335…7b56c`通过；terminal仍为`root_cause=unattributed`及零VM/guest/transaction动作。
+- 旧pair的`install_prepared`在dpkg前因startup未接受合法`01777 /run/lock`失败关闭；修复target `d75818f`的第三台clone只生成一次operation ID并闭合checkpoint、exact resume与关机冻结，细项见runbook。
+- `install_artifacts_staged`的typed guest合同固定target-only staging、package/dpkg未变、合法guard、XDG/process/network零漂移与resume重验/单次apply；首次安装精确Rust回归通过，production语义无需修改。
+- 第二个case的旧clone、v2和v3均在host失败关闭且未进入guest。v1-v7诊断最终只定位到UTM接收start后的AppKit主窗口断言，未证实更深根因；全部失败现场与manifest冻结，不再原地start/clone或试跑`--hide`。
 - v4 clone/prepared manifest `f76d1943…ff6e2`/`c40c55d9…144b`曾固定UUID `50B75F88…8038`、`Network=[]`及config/EFI/qcow2 `2de7280b…6195`/`0b797641…1418`/`4967234b…4b18`；21台全停、双重qcow2与零句柄独立复核通过。clean `ea46c9d`后的系统只读门再确认app已不驻留、前后零相关进程，未发送quit。
 - 从clean `296a1c5`执行唯一`foreground-applescript-v1`：prepared/live身份、两次descriptor和双进程门均通过；osascript只调用1次、exit 0、空输出。冻结目录`…-v4-Foreground-Launch-Transport-v2`含16项，manifest `6dbbdf40…fc3c`逐项通过且权限为`0700`/`0600`；首轮status与terminal list已见target started，但terminal进程为0，故原控制返回12/`state-indeterminate`，没有quit/stop/retry/delete/guest/input/operation/transaction。
 - 后续只读交叉验证始终只有v4登记started；QEMU backend延迟出现并持有EFI/qcow2，活动磁盘的多次变化hash均不是terminal身份。plain list/status后backend可能再次出现，故不再循环查询；修复`2eea62f`只改善未来延迟轮询，不回写本次终态。
@@ -58,10 +53,10 @@
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步（2026-08-23）
+## 明日事项（2026-08-24）
 
 1. 冻结launch/network/bundle/transfer/resolution/preflight/checkpoint manifest `6dbbdf40…fc3c`/`40be3f3f…38383`/`ffc990a3…e0de`/`d1090e8d…dc09`/`7bab8f20…4e4a`/`aba59811…0d7a`/`3aca0576…0a4f7`，不覆盖、复跑或补拉；活动EFI/qcow2不得恢复或宣称terminal。
-2. 下一批仅repository-only绑定checkpoint 49项与`checkpoint-prepared`，设计一次性exact resume控制：guest内部重验secret hash、receipt/staged target/guard/package/dpkg/startup/XDG/process/network后才允许一次canonical `resume`和一次postflight；host始终不接收raw operation ID，证据create-new且任何漂移失败关闭。本批不调用`utmctl`/guest，不执行真实resume、maintenance、dpkg mutation或VM动作。
+2. 明日第一批仅repository-only绑定checkpoint 49项与`checkpoint-prepared`，设计一次性exact resume控制：guest内部重验secret hash、receipt/staged target/guard/package/dpkg/startup/XDG/process/network后才允许一次canonical `resume`和一次postflight；host始终不接收raw operation ID，证据create-new且任何漂移失败关闭。本批不调用`utmctl`/guest，不执行真实resume、maintenance、dpkg mutation或VM动作。
 3. repository-only控制提交后，真实exact resume与随后的受控停止仍须各自精确授权；不得自动retry/cleanup/stop/quit或复跑checkpoint。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
 
 ## 验证入口
