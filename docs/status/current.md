@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核日期：2026-08-23（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
+- 复核日期：2026-08-24（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - L6 controller/pair/refresh与六类operation已有证据，首个crash已闭合。`install_artifacts_staged` v4已消耗唯一foreground transport/transfer/resolution/negative preflight/checkpoint；单次真实checkpoint已闭合`artifacts_staged`且未触发dpkg，仍待exact resume后才计完整case。其余七个crash与连续L6未闭合。
@@ -34,6 +34,7 @@
 - clean `8bd9e65`的唯一negative preflight绑定resolution `7bab8f20…4e4a`及全部前序身份；one-shot probe只读重验input/pair/package/dependency/font/startup/XDG/process/network。guest双回读为`passed`，host为`preflight-ready`；create-new根25项manifest `aba59811…0d7a`逐项通过。未执行case/maintenance/acceptance/dpkg/installer、operation/checkpoint/transaction或自动补救/VM动作。
 - repository-only checkpoint v1控制逐项绑定上述25项manifest、三份前序manifest、source bundle三元组和固定v4 target；host只允许create-new证据、network/preflight双回读、driver私有staging/逐字回读及一次调用。guest driver以exclusive marker运行canonical `preflight`/`crash`/`inspect-crash`各一次，在生成operation ID前把dpkg status/log绑定回negative preflight；成功只导出ID hash并验证target-only staging、receipt `artifacts_staged`、合法未锁guard、进程组SIGKILL、零dpkg mutation、startup/XDG/process/network静止。14项正负测试已进入L6门禁；本批没有真实guest/operation/checkpoint/transaction/VM动作。
 - clean `7bf6e04`的唯一checkpoint attempt `d75818f-v4-install-artifacts-staged-checkpoint-20260823-v1`通过全部冻结绑定与双回读；guest-local operation ID宿主只存hash `21041a89…111a`。acceptance调用1次并在`artifacts_staged`后SIGKILL完整进程组；checkpoint/receipt为`9cb4acb8…25e0`/`c759b5c6…5d34`，target-only staging、合法未锁guard、package absent、dpkg status/log未变、`ActiveGuard`双startup、XDG/process/network静止。create-new host根49项manifest `3aca0576…0a4f7`逐项通过且raw operation ID扫描为0；未resume、dpkg apply、retry、cleanup、stop、quit或plain list/status/start。
+- repository-only exact resume v1已逐项绑定49项checkpoint、`checkpoint-prepared`及operation/checkpoint/crash/receipt/boot/dpkg身份。guest仅在内部重验raw secret、staging与系统静止条件，再至多执行一次canonical `resume`和一次postflight；host只保存ID hash并双回读证据，任何漂移失败关闭。7项host、9项driver及相邻门禁通过；本批未调用真实`utmctl`、进入guest、resume/dpkg或操作VM。
 
 ## 停止线
 
@@ -48,16 +49,16 @@
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
 - v4 clone/prepared/launch、network v1/v2、bundle、transfer、resolution、negative preflight与checkpoint证据及UUID `50B75F88…8038`须冻结；不得第二次start、重复断网/transfer/resolution/preflight/checkpoint、覆盖guest/host证据或把活动qcow2哈希当terminal。当前唯一有效transaction为manifest `3aca0576…0a4f7`证明的`artifacts_staged`现场；未经新授权不得读取raw ID、resume、运行maintenance/dpkg、补证或停止VM。
-- repository-only控制与测试不是系统授权。后续exact resume必须先有committed一次性控制、create-new证据与单独精确授权；受控停止继续独立授权。
+- repository-only控制与测试不是系统授权。一次性exact resume控制虽已实现，真实调用仍须以最终clean committed HEAD、固定attempt与create-new证据根取得单独精确授权；受控停止继续独立授权。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 明日事项（2026-08-24）
+## 当前下一步（2026-08-24）
 
 1. 冻结launch/network/bundle/transfer/resolution/preflight/checkpoint manifest `6dbbdf40…fc3c`/`40be3f3f…38383`/`ffc990a3…e0de`/`d1090e8d…dc09`/`7bab8f20…4e4a`/`aba59811…0d7a`/`3aca0576…0a4f7`，不覆盖、复跑或补拉；活动EFI/qcow2不得恢复或宣称terminal。
-2. 明日第一批仅repository-only绑定checkpoint 49项与`checkpoint-prepared`，设计一次性exact resume控制：guest内部重验secret hash、receipt/staged target/guard/package/dpkg/startup/XDG/process/network后才允许一次canonical `resume`和一次postflight；host始终不接收raw operation ID，证据create-new且任何漂移失败关闭。本批不调用`utmctl`/guest，不执行真实resume、maintenance、dpkg mutation或VM动作。
-3. repository-only控制提交后，真实exact resume与随后的受控停止仍须各自精确授权；不得自动retry/cleanup/stop/quit或复跑checkpoint。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
+2. 控制已提交并在clean HEAD通过49项冻结证据只读绑定。真实调用须另行授权，且仅限attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`、当前v4 UUID、新absent根`…-Exact-Resume-v1`及一次`resume`加一次postflight；前置漂移拒绝resume，开始后的缺证固定为`state-indeterminate`且不得重试。
+3. 真实exact resume不自动包含cleanup、stop、quit、next checkpoint或下一case；只有终态证据独立闭合后，才为受控停止另行请求精确授权。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
 
 ## 验证入口
 
@@ -88,4 +89,4 @@ git diff --check
 - [Linux Fcitx5 平台边界](../linux-fcitx5-boundary.md)
 - [Linux Manager 本地验收边界](../linux-manager-local-acceptance.md)
 - [Linux L6 Debian package matrix runbook](../runbooks/linux-l6-package-matrix.md)
-- [本周周志](../devlogs/2026-W34.md)
+- [本周周志](../devlogs/2026-W35.md)
