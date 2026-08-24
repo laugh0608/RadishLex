@@ -34,7 +34,7 @@
 - clean `7bf6e04`的唯一checkpoint attempt `d75818f-v4-install-artifacts-staged-checkpoint-20260823-v1`通过全部冻结绑定与双回读；guest-local operation ID宿主只存hash `21041a89…111a`。acceptance调用1次并在`artifacts_staged`后SIGKILL完整进程组；checkpoint/receipt为`9cb4acb8…25e0`/`c759b5c6…5d34`，target-only staging、合法未锁guard、package absent、dpkg status/log未变、`ActiveGuard`双startup、XDG/process/network静止。create-new host根49项manifest `3aca0576…0a4f7`逐项通过且raw operation ID扫描为0；未resume、dpkg apply、retry、cleanup、stop、quit或plain list/status/start。
 - repository-only exact resume v1已逐项绑定49项checkpoint、`checkpoint-prepared`及operation/checkpoint/crash/receipt/boot/dpkg身份。guest仅在内部重验raw secret、staging与系统静止条件，再至多执行一次canonical `resume`和一次postflight；host只保存ID hash并双回读证据，任何漂移失败关闭。7项host、9项driver及相邻门禁通过；本批未调用真实`utmctl`、进入guest、resume/dpkg或操作VM。
 - clean `7309313`的唯一exact resume attempt在host `target-handles-preflight`失败关闭：冻结绑定、source、target与process门通过，但相关进程为0且`lsof` exit 1。create-new根7项manifest `a436677c…adc7`逐项通过；file pull/push、guest exec、maintenance resume与postflight均为0，transaction仍为`artifacts-staged-preserved`。该观察只证明当时backend/句柄不满足资格，不证明VM已停止；未调用plain list/status/start、retry、stop或quit。
-- repository-only backend resolution v1已绑定7项失败manifest及上游身份，7项回归进入L6门禁。新attempt只允许一次目标UUID `status`并计为潜在backend激活动作，以零进程/句柄门及有界`ps`/`lsof`分类。`started`+backend+双句柄才为`runtime-reactivated`，`stopped`+全窗口静止才为`registered-stopped`；`started`但无backend保持不确定且不推断saved。控制无list/start/guest/resume/retry/stop/quit路径，本批未真实调用。
+- clean `92e82e2`的唯一backend resolution attempt完成全部冻结绑定，只调用一次目标UUID `status`并得到canonical `stopped`；随后10轮`ps`/target `lsof`均为零相关进程/句柄absent，target身份前后不变。create-new根30项manifest `0193b435…63e9`逐项通过，权限`0700`/`0600`、single-link、零xattr且raw ID扫描为0；terminal为`registered-stopped`但不推断saved。未list/start、进入guest、resume、retry、stop或quit。
 
 ## 停止线
 
@@ -49,16 +49,16 @@
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
 - v4 launch至checkpoint及exact resume失败证据与UUID `50B75F88…8038`须冻结；不得复跑、覆盖、循环list/status、主动拉起backend或把无句柄归因为stopped。当前唯一有效transaction仍是manifest `3aca0576…0a4f7`证明的`artifacts_staged`；attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`及输出根`…-Exact-Resume-v1`已消费，不得重试或复用。
-- 后续backend状态消歧、exact resume与受控停止均是新的独立系统动作；backend控制虽已实现，真实单次`status`仍须精确授权，且不得与resume或停止合并。未经授权不得读取raw ID、进入guest、运行maintenance/dpkg、补证或操作VM。
+- backend resolution attempt与根已消费并冻结；重新激活、exact resume与受控停止仍是后续独立系统动作。未经授权不得读取raw ID、进入guest、运行maintenance/dpkg、补证或操作VM。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 当前下一步（2026-08-24）
 
-1. 冻结launch至checkpoint manifest及exact resume失败manifest `a436677c…adc7`，不覆盖、复跑、补拉或查询VM；活动EFI/qcow2不得恢复或宣称terminal。
-2. 下一系统批只可在create-new根`…-Backend-Resolution-v1`与单独精确授权下运行committed控制；唯一`status`按潜在激活动作处理，前置binding/source/target/process/句柄任一漂移即不调用，也不进入guest或resume。
-3. backend证据闭合后，再按其终态决定是否另行设计并授权新的exact resume；saved或runtime仍不明确时保持失败关闭。受控停止继续是更后的独立批次；不得自动retry/cleanup/start/stop/quit或推进下一checkpoint。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
+1. 冻结checkpoint、exact resume失败与backend resolution manifest `0193b435…63e9`，不覆盖、复跑、补拉或再查询VM；`registered-stopped`不等于saved状态已知。
+2. 下一批仅repository-only绑定30项新证据，设计registered-stopped后的单次重新激活控制；任何start/restore前必须独立证明其他注册VM全停，并在进入guest前区分原boot恢复与新boot，不能复用已消费的resume attempt。
+3. 控制提交后，重新激活、全新exact resume与受控停止仍分别精确授权；不得自动retry/cleanup/start/stop/quit或推进下一checkpoint。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
 
 ## 验证入口
 
