@@ -35,7 +35,7 @@
 - repository-only exact resume v1已逐项绑定49项checkpoint、`checkpoint-prepared`及operation/checkpoint/crash/receipt/boot/dpkg身份。guest仅在内部重验raw secret、staging与系统静止条件，再至多执行一次canonical `resume`和一次postflight；host只保存ID hash并双回读证据，任何漂移失败关闭。7项host、9项driver及相邻门禁通过；本批未调用真实`utmctl`、进入guest、resume/dpkg或操作VM。
 - clean `7309313`的唯一exact resume attempt在host `target-handles-preflight`失败关闭：冻结绑定、source、target与process门通过，但相关进程为0且`lsof` exit 1。create-new根7项manifest `a436677c…adc7`逐项通过；file pull/push、guest exec、maintenance resume与postflight均为0，transaction仍为`artifacts-staged-preserved`。该观察只证明当时backend/句柄不满足资格，不证明VM已停止；未调用plain list/status/start、retry、stop或quit。
 - clean `92e82e2`的backend resolution以唯一`status`闭合registered stopped且不推断saved。clean `e6305e8`的唯一reactivation以一次`list`证明其余20台全停，再调用一次foreground start；其后30轮target `lsof`均有稳定QEMU双句柄，但固定`ucomm`解析始终为0，故失败关闭为`state-indeterminate`且未观察boot。94项manifest `2a477730…c5c4c`通过；未补查、进入guest、resume、retry或停止，VM/UTM可能仍运行。
-- clean `b056402`的repository-only runtime resolution已绑定上述94项和原boot hash，要求一次`list`、唯一target PID及3次targeted确认后才允许一次boot hash和终态复核；禁止start/status/resume/业务guest/file transfer/retry/stop/quit。11项回归、L6与全仓门禁通过，本批未再操作VM。
+- clean `ab151a9`的唯一runtime resolution以一次`list`证明v4 started、其余20台stopped；PID `61666`的QEMU双句柄发现与3次targeted确认均稳定，且无活动`utmctl`。唯一guest boot hash输出未满足精确64-hex合同，在写入boot observation前失败关闭为`state-indeterminate`；未执行终态PID/target复核。17项manifest `bc83a806…c766`通过，未start/status/resume/业务guest/file transfer/retry/stop/quit，VM仍可能运行。
 
 ## 停止线
 
@@ -50,16 +50,16 @@
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
 - v4 launch至checkpoint及exact resume失败证据与UUID `50B75F88…8038`须冻结；不得复跑、覆盖、循环list/status、主动拉起backend或把无句柄归因为stopped。当前唯一有效transaction仍是manifest `3aca0576…0a4f7`证明的`artifacts_staged`；attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`及输出根`…-Exact-Resume-v1`已消费，不得重试或复用。
-- backend resolution与reactivation attempt/根均已消费并冻结；运行态仍未闭合，不得沿用旧授权补查、重启、resume、retry、停止或退出UTM。runtime resolution、全新exact resume与受控停止仍须分别授权。
+- backend resolution、reactivation与runtime resolution attempt/根均已消费并冻结；boot身份仍未闭合，不得沿用旧授权补查、重跑hash、resume、retry、停止或退出UTM。后续真实动作仍须分别授权。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 当前下一步（2026-08-24）
 
-1. 冻结checkpoint、resume失败及reactivation manifest `2a477730…c5c4c`；不复跑、补拉或沿用旧授权操作VM。矛盾观察不证明VM终态或boot身份。
-2. 下一真实批须另行授权UUID `50B75F88…8038`、attempt `d75818f-v4-install-artifacts-staged-runtime-resolution-20260824-v1`与全新absent根；仅允许一次潜在副作用`list`、固定PID发现/3次确认、一次boot hash及终态复核。禁止start/status/resume/业务guest/file transfer/retry/stop/quit；任一歧义保持`state-indeterminate`。
-3. 只有`original-boot-restored`才另行设计和授权exact resume；`new-boot-started`进入独立恢复决策，`state-indeterminate`不得继续。受控停止继续独立；其余crash、连续L6、P05C、发布、推送和其他平台不推进。
+1. 冻结runtime resolution manifest `bc83a806…c766`及全部前序现场；不补查、重跑guest hash或沿用旧授权操作VM，invalid output不等于原boot或新boot。
+2. 下一批先repository-only逐项绑定17项证据，并把guest hash observation元数据先落盘、再解析分流；本批不再调用`utmctl`或进入guest。未来重试必须使用新attempt、全新absent根和单独精确授权。
+3. 只有新控制闭合`original-boot-restored`才另行设计exact resume；`new-boot-started`进入独立恢复决策，`state-indeterminate`不得继续。受控停止继续独立；其余crash、连续L6、P05C、发布、推送和其他平台不推进。
 
 ## 验证入口
 
