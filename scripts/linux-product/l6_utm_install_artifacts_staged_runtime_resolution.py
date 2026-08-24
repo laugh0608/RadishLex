@@ -25,6 +25,12 @@ BINDINGS_RELATIVE_PATH = bindings.BINDINGS_RELATIVE_PATH
 REQUIRED_PRIOR_REACTIVATION_MANIFEST_SHA256 = (
     bindings.REQUIRED_PRIOR_REACTIVATION_MANIFEST_SHA256
 )
+REQUIRED_PRIOR_RUNTIME_RESOLUTION_MANIFEST_SHA256 = (
+    bindings.REQUIRED_PRIOR_RUNTIME_RESOLUTION_MANIFEST_SHA256
+)
+REQUIRED_PRIOR_RUNTIME_RESOLUTION_ATTEMPT_ID = (
+    bindings.REQUIRED_PRIOR_RUNTIME_RESOLUTION_ATTEMPT_ID
+)
 REQUIRED_RUNTIME_RESOLUTION_ATTEMPT_ID = (
     bindings.REQUIRED_RUNTIME_RESOLUTION_ATTEMPT_ID
 )
@@ -63,6 +69,8 @@ class RuntimeResolutionRequest:
     prior_backend_resolution_manifest_sha256: str
     prior_reactivation_root: Path
     prior_reactivation_manifest_sha256: str
+    prior_runtime_resolution_root: Path
+    prior_runtime_resolution_manifest_sha256: str
     source_bundle_path: Path
     source_bundle_size: int
     source_bundle_sha256: str
@@ -74,6 +82,7 @@ class RuntimeResolutionRequest:
     resume_attempt_id: str
     backend_resolution_attempt_id: str
     reactivation_attempt_id: str
+    prior_runtime_resolution_attempt_id: str
     runtime_resolution_attempt_id: str
     target_uuid: str
     target_name: str
@@ -92,6 +101,10 @@ class RuntimeResolutionRequest:
         _prior_reactivation_request_view(self).validate()
         for path, label in (
             (self.prior_reactivation_root, "prior-reactivation-root"),
+            (
+                self.prior_runtime_resolution_root,
+                "prior-runtime-resolution-root",
+            ),
             (self.output_root, "output-root"),
         ):
             if not path.is_absolute() or ".." in path.parts:
@@ -113,6 +126,10 @@ class RuntimeResolutionRequest:
                 "prior-backend-resolution-root",
             ),
             (self.prior_reactivation_root, "prior-reactivation-root"),
+            (
+                self.prior_runtime_resolution_root,
+                "prior-runtime-resolution-root",
+            ),
             (self.source_bundle_path, "source-bundle-path"),
             (self.target_package_path, "target-package-path"),
         )
@@ -127,6 +144,23 @@ class RuntimeResolutionRequest:
         ):
             raise RuntimeResolutionError(
                 "required-prior-reactivation-manifest-mismatch"
+            )
+        if (
+            self.prior_runtime_resolution_manifest_sha256
+            != REQUIRED_PRIOR_RUNTIME_RESOLUTION_MANIFEST_SHA256
+        ):
+            raise RuntimeResolutionError(
+                "required-prior-runtime-resolution-manifest-mismatch"
+            )
+        if (
+            self.prior_runtime_resolution_attempt_id
+            != REQUIRED_PRIOR_RUNTIME_RESOLUTION_ATTEMPT_ID
+            or not SAFE_ATTEMPT_ID.fullmatch(
+                self.prior_runtime_resolution_attempt_id
+            )
+        ):
+            raise RuntimeResolutionError(
+                "required-prior-runtime-resolution-attempt-id-mismatch"
             )
         if (
             self.runtime_resolution_attempt_id
@@ -146,6 +180,7 @@ class RuntimeResolutionRequest:
             self.resume_attempt_id,
             self.backend_resolution_attempt_id,
             self.reactivation_attempt_id,
+            self.prior_runtime_resolution_attempt_id,
         )
         if self.runtime_resolution_attempt_id in upstream_attempts:
             raise RuntimeResolutionError("attempt-id-overlap")
@@ -224,6 +259,12 @@ class RuntimeResolutionRequest:
             "prior_reactivation_manifest_sha256": (
                 self.prior_reactivation_manifest_sha256
             ),
+            "prior_runtime_resolution_attempt_id": (
+                self.prior_runtime_resolution_attempt_id
+            ),
+            "prior_runtime_resolution_manifest_sha256": (
+                self.prior_runtime_resolution_manifest_sha256
+            ),
             "prior_resolution_manifest_sha256": (
                 self.prior_resolution_manifest_sha256
             ),
@@ -282,6 +323,7 @@ def run_runtime_resolution(
     source_opener=None,
     source_revalidator=None,
     target_validator=None,
+    boot_hash_parser=None,
     sleeper: Sleeper = time.sleep,
 ) -> RuntimeResolutionResult:
     request.validate()
@@ -294,6 +336,9 @@ def run_runtime_resolution(
         source_revalidator or input_transfer.revalidate_open_source_bundle
     )
     validate_target = target_validator or network_ready.validate_target_files
+    parse_boot_hash = (
+        boot_hash_parser or reactivation_control.parse_boot_id_hash
+    )
 
     stage = "binding-preflight"
     reason = "not-run"
@@ -308,6 +353,8 @@ def run_runtime_resolution(
     terminal_handles = "not-observed"
     terminal_processes: tuple[dict[str, object], ...] = ()
     observed_boot_hash: str | None = None
+    guest_boot_observation = "not-performed"
+    guest_boot_classification = "not-performed"
 
     try:
         binding = validate_bindings(request)
@@ -416,26 +463,34 @@ def run_runtime_resolution(
             reactivation_control.boot_id_hash_argv(request),
             request.command_timeout_seconds,
         )
-        observed_boot_hash = reactivation_control.parse_boot_id_hash(
-            boot_observation
+        writer.write_json(
+            "guest-boot-id-hash-observation.json",
+            {
+                "format": EVIDENCE_FORMAT,
+                "invocation_count": 1,
+                "observation": network_ready._observation_metadata(
+                    boot_observation
+                ),
+                "raw_output_persisted": False,
+            },
         )
+        guest_boot_observation = "persisted-before-parse"
+        observed_boot_hash = parse_boot_hash(boot_observation)
         classification = (
             "original-boot-restored"
             if observed_boot_hash == binding.expected_boot_id_sha256
             else "new-boot-started"
         )
         writer.write_json(
-            "guest-boot-id-hash-once.json",
+            "guest-boot-id-hash-classification.json",
             {
                 "classification": classification,
                 "expected_boot_id_sha256": binding.expected_boot_id_sha256,
                 "format": EVIDENCE_FORMAT,
-                "observation": network_ready._observation_metadata(
-                    boot_observation
-                ),
                 "observed_boot_id_sha256": observed_boot_hash,
             },
         )
+        guest_boot_classification = "persisted-after-strict-parse"
 
         stage = "target-handle-pid-terminal"
         terminal_handle_observation = command_runner.run(
@@ -529,7 +584,9 @@ def run_runtime_resolution(
         "file_push_invocations": 0,
         "foreground_start_invocations": 0,
         "format": EVIDENCE_FORMAT,
+        "guest_boot_classification": guest_boot_classification,
         "guest_boot_hash_invocations": guest_boot_hash_invocations,
+        "guest_boot_observation": guest_boot_observation,
         "identity_observation_count": identity_observation_count,
         "inventory_probe_invocations": inventory_probe_invocations,
         "maintenance_resume_invocations": 0,
@@ -862,6 +919,7 @@ def parse_args() -> argparse.Namespace:
         "prior-resume-failure-root",
         "prior-backend-resolution-root",
         "prior-reactivation-root",
+        "prior-runtime-resolution-root",
         "source-bundle-path",
         "output-root",
         "target-package-path",
@@ -879,6 +937,7 @@ def parse_args() -> argparse.Namespace:
         "prior-resume-failure-manifest-sha256",
         "prior-backend-resolution-manifest-sha256",
         "prior-reactivation-manifest-sha256",
+        "prior-runtime-resolution-manifest-sha256",
         "source-bundle-sha256",
         "transfer-attempt-id",
         "resolution-attempt-id",
@@ -887,6 +946,7 @@ def parse_args() -> argparse.Namespace:
         "resume-attempt-id",
         "backend-resolution-attempt-id",
         "reactivation-attempt-id",
+        "prior-runtime-resolution-attempt-id",
         "runtime-resolution-attempt-id",
         "target-uuid",
         "target-name",

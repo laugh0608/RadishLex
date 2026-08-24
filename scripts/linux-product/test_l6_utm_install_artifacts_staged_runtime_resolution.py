@@ -118,6 +118,19 @@ class RuntimeResolutionTests(unittest.TestCase):
             self.assertEqual(result.guest_boot_hash_invocations, 1)
             self.assertEqual(result.identity_observation_count, 3)
             self.assertTrue(source.file_object.closed)
+            observation = read_json(
+                request.output_root / "guest-boot-id-hash-observation.json"
+            )
+            self.assertEqual(
+                observation["raw_output_persisted"], False
+            )
+            self.assertNotIn("prefix_base64", json.dumps(observation))
+            classification = read_json(
+                request.output_root / "guest-boot-id-hash-classification.json"
+            )
+            self.assertEqual(
+                classification["classification"], "original-boot-restored"
+            )
             self.assert_terminal_safety(request, runner.calls)
             assert_manifest_valid(self, request.output_root)
 
@@ -130,7 +143,9 @@ class RuntimeResolutionTests(unittest.TestCase):
 
             self.assertEqual(result.outcome, "new-boot-started")
             self.assertEqual(result.exit_code, resolution.EXIT_NEW_BOOT_STARTED)
-            boot = read_json(request.output_root / "guest-boot-id-hash-once.json")
+            boot = read_json(
+                request.output_root / "guest-boot-id-hash-classification.json"
+            )
             self.assertEqual(boot["classification"], "new-boot-started")
             self.assertEqual(boot["observed_boot_id_sha256"], NEW_BOOT_HASH)
 
@@ -256,6 +271,37 @@ class RuntimeResolutionTests(unittest.TestCase):
 
             self.assertEqual(result.outcome, "state-indeterminate")
             self.assertEqual(result.guest_boot_hash_invocations, 1)
+            observation_path = (
+                request.output_root / "guest-boot-id-hash-observation.json"
+            )
+            classification_path = (
+                request.output_root / "guest-boot-id-hash-classification.json"
+            )
+            self.assertTrue(observation_path.is_file())
+            self.assertFalse(classification_path.exists())
+            observation = read_json(observation_path)
+            self.assertEqual(observation["invocation_count"], 1)
+            self.assertEqual(observation["raw_output_persisted"], False)
+            metadata = observation["observation"]
+            self.assertIsInstance(metadata, dict)
+            assert isinstance(metadata, dict)
+            stdout = metadata["stdout"]
+            self.assertIsInstance(stdout, dict)
+            assert isinstance(stdout, dict)
+            self.assertEqual(stdout["total_bytes"], len(b"not-a-boot-hash\n"))
+            self.assertEqual(
+                stdout["sha256"],
+                hashlib.sha256(b"not-a-boot-hash\n").hexdigest(),
+            )
+            self.assertNotIn("not-a-boot-hash", observation_path.read_text())
+            terminal = read_json(request.output_root / "terminal.json")
+            self.assertEqual(
+                terminal["guest_boot_observation"],
+                "persisted-before-parse",
+            )
+            self.assertEqual(
+                terminal["guest_boot_classification"], "not-performed"
+            )
             self.assertEqual(
                 sum(
                     call
@@ -266,6 +312,37 @@ class RuntimeResolutionTests(unittest.TestCase):
                 ),
                 1,
             )
+
+    def test_observation_is_persisted_before_boot_parser_runs(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            request = make_request(Path(temporary))
+            runner = success_runner(request)
+            parser_called = False
+
+            def parse_after_evidence(
+                observation: start_control.CommandObservation,
+            ) -> str:
+                nonlocal parser_called
+                parser_called = True
+                path = (
+                    request.output_root
+                    / "guest-boot-id-hash-observation.json"
+                )
+                self.assertTrue(path.is_file())
+                persisted = read_json(path)
+                self.assertEqual(persisted["raw_output_persisted"], False)
+                return resolution.reactivation_control.parse_boot_id_hash(
+                    observation
+                )
+
+            result, _ = run_case(
+                request,
+                runner,
+                boot_hash_parser=parse_after_evidence,
+            )
+
+            self.assertTrue(parser_called)
+            self.assertEqual(result.outcome, "original-boot-restored")
 
     def test_terminal_pid_drift_is_indeterminate(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -314,6 +391,16 @@ class RuntimeResolutionTests(unittest.TestCase):
             ):
                 overlapping.validate()
 
+            wrong_prior = replace_request(
+                request,
+                prior_runtime_resolution_manifest_sha256="0" * 64,
+            )
+            with self.assertRaisesRegex(
+                resolution.RuntimeResolutionError,
+                "required-prior-runtime-resolution-manifest-mismatch",
+            ):
+                wrong_prior.validate()
+
     def assert_terminal_safety(
         self,
         request: resolution.RuntimeResolutionRequest,
@@ -342,6 +429,8 @@ class RuntimeResolutionTests(unittest.TestCase):
 def run_case(
     request: resolution.RuntimeResolutionRequest,
     runner: FakeRunner,
+    *,
+    boot_hash_parser=None,
 ) -> tuple[resolution.RuntimeResolutionResult, SyntheticSource]:
     source = SyntheticSource(CloseTracker())
     result = resolution.run_runtime_resolution(
@@ -361,6 +450,7 @@ def run_case(
             "size": resolution.reactivation_control.REQUIRED_SOURCE_BUNDLE_SIZE,
         },
         target_validator=lambda _: target_identity(request),
+        boot_hash_parser=boot_hash_parser,
         sleeper=lambda _: None,
     )
     return result, source
@@ -410,6 +500,10 @@ def make_request(root: Path) -> resolution.RuntimeResolutionRequest:
         prior_reactivation_manifest_sha256=(
             resolution.REQUIRED_PRIOR_REACTIVATION_MANIFEST_SHA256
         ),
+        prior_runtime_resolution_root=root / "prior-runtime-resolution",
+        prior_runtime_resolution_manifest_sha256=(
+            resolution.REQUIRED_PRIOR_RUNTIME_RESOLUTION_MANIFEST_SHA256
+        ),
         source_bundle_path=root / "source.tar",
         source_bundle_size=old.REQUIRED_SOURCE_BUNDLE_SIZE,
         source_bundle_sha256=old.REQUIRED_SOURCE_BUNDLE_SHA256,
@@ -423,6 +517,9 @@ def make_request(root: Path) -> resolution.RuntimeResolutionRequest:
             old.REQUIRED_BACKEND_RESOLUTION_ATTEMPT_ID
         ),
         reactivation_attempt_id=old.REQUIRED_REACTIVATION_ATTEMPT_ID,
+        prior_runtime_resolution_attempt_id=(
+            resolution.REQUIRED_PRIOR_RUNTIME_RESOLUTION_ATTEMPT_ID
+        ),
         runtime_resolution_attempt_id=(
             resolution.REQUIRED_RUNTIME_RESOLUTION_ATTEMPT_ID
         ),
