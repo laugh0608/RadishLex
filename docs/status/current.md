@@ -35,7 +35,7 @@
 - repository-only exact resume v1已逐项绑定49项checkpoint、`checkpoint-prepared`及operation/checkpoint/crash/receipt/boot/dpkg身份。guest仅在内部重验raw secret、staging与系统静止条件，再至多执行一次canonical `resume`和一次postflight；host只保存ID hash并双回读证据，任何漂移失败关闭。7项host、9项driver及相邻门禁通过；本批未调用真实`utmctl`、进入guest、resume/dpkg或操作VM。
 - clean `7309313`的唯一exact resume attempt在host `target-handles-preflight`失败关闭：冻结绑定、source、target与process门通过，但相关进程为0且`lsof` exit 1。create-new根7项manifest `a436677c…adc7`逐项通过；file pull/push、guest exec、maintenance resume与postflight均为0，transaction仍为`artifacts-staged-preserved`。该观察只证明当时backend/句柄不满足资格，不证明VM已停止；未调用plain list/status/start、retry、stop或quit。
 - clean `92e82e2`的backend resolution以唯一`status`闭合registered stopped且不推断saved。clean `e6305e8`的唯一reactivation以一次`list`证明其余20台全停，再调用一次foreground start；其后30轮target `lsof`均有稳定QEMU双句柄，但固定`ucomm`解析始终为0，故失败关闭为`state-indeterminate`且未观察boot。94项manifest `2a477730…c5c4c`通过；未补查、进入guest、resume、retry或停止，VM/UTM可能仍运行。
-- clean `ab151a9`的唯一runtime resolution以一次`list`证明v4 started、其余20台stopped；PID `61666`的QEMU双句柄发现与3次targeted确认均稳定，且无活动`utmctl`。唯一guest boot hash输出未满足精确64-hex合同，在写入boot observation前失败关闭为`state-indeterminate`；未执行终态PID/target复核。17项manifest `bc83a806…c766`通过，未start/status/resume/业务guest/file transfer/retry/stop/quit，VM仍可能运行。
+- clean `ab151a9`的runtime resolution以一次`list`闭合v4 started/其余20台stopped及3次targeted确认；guest boot hash格式无效，在observation落盘前失败关闭，17项manifest `bc83a806…c766`通过，VM可能运行。clean `e21c518`的repository-only v2递归绑定这17项，先保存raw-free observation、再解析分类；12项回归、L6合同及离线binding通过，未操作VM。
 
 ## 停止线
 
@@ -58,8 +58,8 @@
 ## 当前下一步（2026-08-24）
 
 1. 冻结runtime resolution manifest `bc83a806…c766`及全部前序现场；不补查、重跑guest hash或沿用旧授权操作VM，invalid output不等于原boot或新boot。
-2. 下一批先repository-only逐项绑定17项证据，并把guest hash observation元数据先落盘、再解析分流；本批不再调用`utmctl`或进入guest。未来重试必须使用新attempt、全新absent根和单独精确授权。
-3. 只有新控制闭合`original-boot-restored`才另行设计exact resume；`new-boot-started`进入独立恢复决策，`state-indeterminate`不得继续。受控停止继续独立；其余crash、连续L6、P05C、发布、推送和其他平台不推进。
+2. 下一真实批须另行授权v2 attempt `d75818f-v4-install-artifacts-staged-runtime-resolution-20260824-v2`与absent根；只允许一次`list`、固定PID/3次确认、一次boot hash及终态复核，禁止start/status/resume、业务guest、file transfer、retry、stop或quit。
+3. 只有v2闭合`original-boot-restored`才另行设计exact resume；`new-boot-started`进入独立恢复决策，`state-indeterminate`不得继续。受控停止继续独立；其余crash、连续L6、P05C、发布、推送和其他平台不推进。
 
 ## 验证入口
 
