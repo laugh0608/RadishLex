@@ -55,11 +55,11 @@
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 当前下一步（2026-08-24）
+## 明日事项（2026-08-25）
 
-1. 冻结runtime resolution v2 manifest `e2e41235…c49e`及全部前序现场；空输出不证明原boot、新boot或guest状态，不补查、重跑或沿用旧授权操作VM。
-2. 下一批先repository-only绑定18项证据，并针对exec成功但双流为空设计独立boot transport resolution；本批不再调用`utmctl`或进入guest。未来真实动作须新attempt、absent根和单独精确授权。
-3. 只有新控制闭合`original-boot-restored`才另行设计exact resume；`new-boot-started`进入独立恢复决策，`state-indeterminate`不得继续。受控停止继续独立；其余crash、连续L6、P05C、发布、推送和其他平台不推进。
+1. 先做repository-only v3 binding：绑定runtime resolution v2的18项，并递归重验v1的17项、reactivation的94项与全部上游；为“exec exit 0、双流为空、observation已落盘、classification未生成”补精确回归。
+2. 在仓库内设计独立boot transport resolution，将guest执行与boot hash交付解耦；评审guest私有create-new证据、只存boot ID SHA-256、host独立双回读、严格分类与终态target复核，不存raw boot ID、不自动retry。
+3. 明日先停在实现、合成测试、默认L6门禁与文档闭环；不得调用`utmctl`、进入guest或操作VM。未来真实控制须用新attempt、absent host/guest根和单独授权；只有闭合`original-boot-restored`才另行设计exact resume。
 
 ## 验证入口
 
