@@ -23,9 +23,7 @@
 - 旧pair的`install_prepared`在dpkg前因startup未接受合法`01777 /run/lock`失败关闭；修复target `d75818f`的第三台clone只生成一次operation ID并闭合checkpoint、exact resume与关机冻结，细项见runbook。
 - `install_artifacts_staged`的typed guest合同固定target-only staging、package/dpkg未变、合法guard、XDG/process/network零漂移与resume重验/单次apply；首次安装精确Rust回归通过，production语义无需修改。
 - 第二个case的旧clone、v2和v3均在host失败关闭且未进入guest。v1-v7诊断最终只定位到UTM接收start后的AppKit主窗口断言，未证实更深根因；全部失败现场与manifest冻结，不再原地start/clone或试跑`--hide`。
-- v4 clone/prepared manifest `f76d1943…ff6e2`/`c40c55d9…144b`曾固定UUID `50B75F88…8038`、`Network=[]`及config/EFI/qcow2 `2de7280b…6195`/`0b797641…1418`/`4967234b…4b18`；21台全停、双重qcow2与零句柄独立复核通过。clean `ea46c9d`后的系统只读门再确认app已不驻留、前后零相关进程，未发送quit。
-- 从clean `296a1c5`执行唯一`foreground-applescript-v1`：prepared/live身份、两次descriptor和双进程门均通过；osascript只调用1次、exit 0、空输出。冻结目录`…-v4-Foreground-Launch-Transport-v2`含16项，manifest `6dbbdf40…fc3c`逐项通过且权限为`0700`/`0600`；首轮status与terminal list已见target started，但terminal进程为0，故原控制返回12/`state-indeterminate`，没有quit/stop/retry/delete/guest/input/operation/transaction。
-- 后续只读交叉验证始终只有v4登记started；QEMU backend延迟出现并持有EFI/qcow2，活动磁盘的多次变化hash均不是terminal身份。plain list/status后backend可能再次出现，故不再循环查询；修复`2eea62f`只改善未来延迟轮询，不回写本次终态。
+- v4 clone/prepared/foreground launch固定UUID `50B75F88…8038`、`Network=[]`与载体身份；launch manifest `6dbbdf40…fc3c`保持`state-indeterminate`，后续QEMU双句柄与network v2独立证明当前boot运行且仅loopback。plain list/status曾使backend再次出现，故不循环查询，也不把活动磁盘hash当terminal。
 - clean `e75509a`的network v1在宿主`utmctl exec`参数解析阶段失败关闭，8项manifest `d5d33212…7348`确认network script/push/pull均为0。修正控制在clean `3286268`逐项绑定launch 16项及v1失败7项后只执行一次v2：脚本push后逐字回读SHA-256 `d0bb5c28…1f28a`，network script仅调用1次，两个301-byte回读均为`2f9abfbe…d0e8e`。结构化证据固定boot `1bcbd795…26ae3`、active仅`lo`、nonloop接口/UP均0、IPv4/IPv6 main route均0；15项manifest `40be3f3f…38383`逐项通过，业务input/operation/transaction/stop/retry/quit及plain list/status/start均未执行。
 - canonical input transfer v1强绑定v2 manifest `40be3f3f…38383`、live network双回读和授权source绝对路径/size/SHA-256；同一`O_NOFOLLOW` descriptor前后复验12项USTAR。bundle唯一push、双完整回读后，root installer在私有`0700`staging解包并以`RENAME_NOREPLACE`发布固定input root；host/guest证据create-new，任一漂移失败关闭且不生成operation ID、不进入transaction、不自动retry/stop。10项回归已接入默认L6门禁。
 - canonical source bundle已由clean `59eaab3`在create-new根`…-v4-Canonical-Input-v1`冻结：92,825,600 bytes、SHA-256 `7bbeb291…403c`，七文件manifest `ffc990a3…e0de`。12项USTAR、双重bundle hash、owner/mode/link、零xattr与manifest均独立回读通过；terminal固定零`utmctl`、guest、input transfer、operation/transaction及VM启停。
@@ -35,6 +33,7 @@
 - repository-only checkpoint v1控制逐项绑定上述25项manifest、三份前序manifest、source bundle三元组和固定v4 target；host只允许create-new证据、network/preflight双回读、driver私有staging/逐字回读及一次调用。guest driver以exclusive marker运行canonical `preflight`/`crash`/`inspect-crash`各一次，在生成operation ID前把dpkg status/log绑定回negative preflight；成功只导出ID hash并验证target-only staging、receipt `artifacts_staged`、合法未锁guard、进程组SIGKILL、零dpkg mutation、startup/XDG/process/network静止。14项正负测试已进入L6门禁；本批没有真实guest/operation/checkpoint/transaction/VM动作。
 - clean `7bf6e04`的唯一checkpoint attempt `d75818f-v4-install-artifacts-staged-checkpoint-20260823-v1`通过全部冻结绑定与双回读；guest-local operation ID宿主只存hash `21041a89…111a`。acceptance调用1次并在`artifacts_staged`后SIGKILL完整进程组；checkpoint/receipt为`9cb4acb8…25e0`/`c759b5c6…5d34`，target-only staging、合法未锁guard、package absent、dpkg status/log未变、`ActiveGuard`双startup、XDG/process/network静止。create-new host根49项manifest `3aca0576…0a4f7`逐项通过且raw operation ID扫描为0；未resume、dpkg apply、retry、cleanup、stop、quit或plain list/status/start。
 - repository-only exact resume v1已逐项绑定49项checkpoint、`checkpoint-prepared`及operation/checkpoint/crash/receipt/boot/dpkg身份。guest仅在内部重验raw secret、staging与系统静止条件，再至多执行一次canonical `resume`和一次postflight；host只保存ID hash并双回读证据，任何漂移失败关闭。7项host、9项driver及相邻门禁通过；本批未调用真实`utmctl`、进入guest、resume/dpkg或操作VM。
+- clean `7309313`的唯一exact resume attempt在host `target-handles-preflight`失败关闭：冻结绑定、source、target与process门通过，但相关进程为0且`lsof` exit 1。create-new根7项manifest `a436677c…adc7`逐项通过；file pull/push、guest exec、maintenance resume与postflight均为0，transaction仍为`artifacts-staged-preserved`。该观察只证明当时backend/句柄不满足资格，不证明VM已停止；未调用plain list/status/start、retry、stop或quit。
 
 ## 停止线
 
@@ -48,17 +47,17 @@
 - v2 clone失败证据`65160b12…c1859`须原样保留；不得沿用本批授权重试clone、重启UTM或把exit 0记为成功。
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
-- v4 clone/prepared/launch、network v1/v2、bundle、transfer、resolution、negative preflight与checkpoint证据及UUID `50B75F88…8038`须冻结；不得第二次start、重复断网/transfer/resolution/preflight/checkpoint、覆盖guest/host证据或把活动qcow2哈希当terminal。当前唯一有效transaction为manifest `3aca0576…0a4f7`证明的`artifacts_staged`现场；未经新授权不得读取raw ID、resume、运行maintenance/dpkg、补证或停止VM。
-- repository-only控制与测试不是系统授权。一次性exact resume控制虽已实现，真实调用仍须以最终clean committed HEAD、固定attempt与create-new证据根取得单独精确授权；受控停止继续独立授权。
+- v4 launch至checkpoint及exact resume失败证据与UUID `50B75F88…8038`须冻结；不得复跑、覆盖、循环list/status、主动拉起backend或把无句柄归因为stopped。当前唯一有效transaction仍是manifest `3aca0576…0a4f7`证明的`artifacts_staged`；attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`及输出根`…-Exact-Resume-v1`已消费，不得重试或复用。
+- 后续backend状态消歧、重新激活、exact resume与受控停止均是新的独立系统动作；须先有committed一次性控制与精确授权。未经授权不得读取raw ID、进入guest、运行maintenance/dpkg、补证或操作VM。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 当前下一步（2026-08-24）
 
-1. 冻结launch/network/bundle/transfer/resolution/preflight/checkpoint manifest `6dbbdf40…fc3c`/`40be3f3f…38383`/`ffc990a3…e0de`/`d1090e8d…dc09`/`7bab8f20…4e4a`/`aba59811…0d7a`/`3aca0576…0a4f7`，不覆盖、复跑或补拉；活动EFI/qcow2不得恢复或宣称terminal。
-2. 控制已提交并在clean HEAD通过49项冻结证据只读绑定。真实调用须另行授权，且仅限attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`、当前v4 UUID、新absent根`…-Exact-Resume-v1`及一次`resume`加一次postflight；前置漂移拒绝resume，开始后的缺证固定为`state-indeterminate`且不得重试。
-3. 真实exact resume不自动包含cleanup、stop、quit、next checkpoint或下一case；只有终态证据独立闭合后，才为受控停止另行请求精确授权。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
+1. 冻结launch至checkpoint manifest及exact resume失败manifest `a436677c…adc7`，不覆盖、复跑、补拉或查询VM；活动EFI/qcow2不得恢复或宣称terminal。
+2. 下一批仅repository-only绑定这7项失败证据，设计一次性backend状态消歧控制；它必须区分“无句柄观察”与真实stopped/saved/registered状态，不得以plain list/status的潜在拉起副作用冒充只读，也不进入guest或resume。
+3. 控制提交后，backend消歧/激活、再次exact resume与受控停止仍分别精确授权；不得自动retry/cleanup/stop/quit或推进下一checkpoint。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
 
 ## 验证入口
 
