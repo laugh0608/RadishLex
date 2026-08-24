@@ -26,15 +26,15 @@
 - v4 clone/prepared/foreground launch固定UUID `50B75F88…8038`、`Network=[]`与载体身份；launch manifest `6dbbdf40…fc3c`保持`state-indeterminate`，后续QEMU双句柄与network v2独立证明当前boot运行且仅loopback。plain list/status曾使backend再次出现，故不循环查询，也不把活动磁盘hash当terminal。
 - clean `e75509a`的network v1在宿主`utmctl exec`参数解析阶段失败关闭，8项manifest `d5d33212…7348`确认network script/push/pull均为0。修正控制在clean `3286268`逐项绑定launch 16项及v1失败7项后只执行一次v2：脚本push后逐字回读SHA-256 `d0bb5c28…1f28a`，network script仅调用1次，两个301-byte回读均为`2f9abfbe…d0e8e`。结构化证据固定boot `1bcbd795…26ae3`、active仅`lo`、nonloop接口/UP均0、IPv4/IPv6 main route均0；15项manifest `40be3f3f…38383`逐项通过，业务input/operation/transaction/stop/retry/quit及plain list/status/start均未执行。
 - canonical input transfer v1强绑定v2 manifest `40be3f3f…38383`、live network双回读和授权source绝对路径/size/SHA-256；同一`O_NOFOLLOW` descriptor前后复验12项USTAR。bundle唯一push、双完整回读后，root installer在私有`0700`staging解包并以`RENAME_NOREPLACE`发布固定input root；host/guest证据create-new，任一漂移失败关闭且不生成operation ID、不进入transaction、不自动retry/stop。10项回归已接入默认L6门禁。
-- canonical source bundle已由clean `59eaab3`在create-new根`…-v4-Canonical-Input-v1`冻结：92,825,600 bytes、SHA-256 `7bbeb291…403c`，七文件manifest `ffc990a3…e0de`。12项USTAR、双重bundle hash、owner/mode/link、零xattr与manifest均独立回读通过；terminal固定零`utmctl`、guest、input transfer、operation/transaction及VM启停。
+- canonical source bundle已由clean `59eaab3`在`…-v4-Canonical-Input-v1`冻结：92,825,600 bytes、SHA-256 `7bbeb291…403c`，七文件manifest `ffc990a3…e0de`；12项USTAR和文件身份通过，且未调用`utmctl`、guest或VM动作。
 - clean `6a23c37`的唯一attempt `d75818f-v4-input-20260823-v1`通过network/target/process/句柄、installer readback、bundle唯一push/双回读及source postflight。installer调用exit 0且空输出，但同秒首次pull报告`transfer.evidence.json`不存在，第二次result回读未执行，input root状态未知。create-new根`…-v4-Input-Transfer-v1`的19项及manifest `d1090e8d…dc09`通过，权限`0700`/`0600`、single-link且零xattr；terminal为`state-indeterminate`，无list/status/start、断网复跑、operation/transaction、retry/stop/quit。
 - clean `ca57dce`的唯一resolution双回读稳定passed result；一次probe证明installer/可疑进程均0、staging absent、final私有且12项inventory逐文件匹配。create-new host根`…-v4-Input-Resolution-v1`的21项与manifest `7bab8f20…4e4a`通过，权限`0700`/`0600`、single-link、零xattr；terminal为`input-ready`，原installer/bundle、operation/transaction、retry/stop/quit均未执行。
 - clean `8bd9e65`的唯一negative preflight绑定resolution `7bab8f20…4e4a`及全部前序身份；one-shot probe只读重验input/pair/package/dependency/font/startup/XDG/process/network。guest双回读为`passed`，host为`preflight-ready`；create-new根25项manifest `aba59811…0d7a`逐项通过。未执行case/maintenance/acceptance/dpkg/installer、operation/checkpoint/transaction或自动补救/VM动作。
-- repository-only checkpoint v1控制逐项绑定上述25项manifest、三份前序manifest、source bundle三元组和固定v4 target；host只允许create-new证据、network/preflight双回读、driver私有staging/逐字回读及一次调用。guest driver以exclusive marker运行canonical `preflight`/`crash`/`inspect-crash`各一次，在生成operation ID前把dpkg status/log绑定回negative preflight；成功只导出ID hash并验证target-only staging、receipt `artifacts_staged`、合法未锁guard、进程组SIGKILL、零dpkg mutation、startup/XDG/process/network静止。14项正负测试已进入L6门禁；本批没有真实guest/operation/checkpoint/transaction/VM动作。
+- repository-only checkpoint v1绑定25项preflight及前序manifest、source三元组和v4 target；guest driver以exclusive marker运行canonical `preflight`/`crash`/`inspect-crash`各一次，成功只导出operation ID hash并验证target-only staging、`artifacts_staged` receipt、合法guard、进程组SIGKILL、零dpkg mutation及系统静止。14项测试进入L6门禁；该批无真实系统动作。
 - clean `7bf6e04`的唯一checkpoint attempt `d75818f-v4-install-artifacts-staged-checkpoint-20260823-v1`通过全部冻结绑定与双回读；guest-local operation ID宿主只存hash `21041a89…111a`。acceptance调用1次并在`artifacts_staged`后SIGKILL完整进程组；checkpoint/receipt为`9cb4acb8…25e0`/`c759b5c6…5d34`，target-only staging、合法未锁guard、package absent、dpkg status/log未变、`ActiveGuard`双startup、XDG/process/network静止。create-new host根49项manifest `3aca0576…0a4f7`逐项通过且raw operation ID扫描为0；未resume、dpkg apply、retry、cleanup、stop、quit或plain list/status/start。
 - repository-only exact resume v1已逐项绑定49项checkpoint、`checkpoint-prepared`及operation/checkpoint/crash/receipt/boot/dpkg身份。guest仅在内部重验raw secret、staging与系统静止条件，再至多执行一次canonical `resume`和一次postflight；host只保存ID hash并双回读证据，任何漂移失败关闭。7项host、9项driver及相邻门禁通过；本批未调用真实`utmctl`、进入guest、resume/dpkg或操作VM。
 - clean `7309313`的唯一exact resume attempt在host `target-handles-preflight`失败关闭：冻结绑定、source、target与process门通过，但相关进程为0且`lsof` exit 1。create-new根7项manifest `a436677c…adc7`逐项通过；file pull/push、guest exec、maintenance resume与postflight均为0，transaction仍为`artifacts-staged-preserved`。该观察只证明当时backend/句柄不满足资格，不证明VM已停止；未调用plain list/status/start、retry、stop或quit。
-- clean `92e82e2`的唯一backend resolution attempt完成全部冻结绑定，只调用一次目标UUID `status`并得到canonical `stopped`；随后10轮`ps`/target `lsof`均为零相关进程/句柄absent，target身份前后不变。create-new根30项manifest `0193b435…63e9`逐项通过，权限`0700`/`0600`、single-link、零xattr且raw ID扫描为0；terminal为`registered-stopped`但不推断saved。未list/start、进入guest、resume、retry、stop或quit。
+- clean `92e82e2`的唯一backend resolution只调用一次目标`status`并得到canonical `stopped`；10轮`ps`/target `lsof`均静止，30项manifest `0193b435…63e9`通过，仍不推断saved。clean `924118c`的repository-only reactivation v1已绑定这30项及全部上游、v7/prepared和原boot hash，固定一次潜在副作用`list`、至多一次foreground start及一次不暴露raw boot ID的guest hash分流；10项回归和全仓门禁通过，本批未调用真实`utmctl`、查询/启动VM或进入guest。
 
 ## 停止线
 
@@ -57,8 +57,8 @@
 ## 当前下一步（2026-08-24）
 
 1. 冻结checkpoint、exact resume失败与backend resolution manifest `0193b435…63e9`，不覆盖、复跑、补拉或再查询VM；`registered-stopped`不等于saved状态已知。
-2. 下一批仅repository-only绑定30项新证据，设计registered-stopped后的单次重新激活控制；任何start/restore前必须独立证明其他注册VM全停，并在进入guest前区分原boot恢复与新boot，不能复用已消费的resume attempt。
-3. 控制提交后，重新激活、全新exact resume与受控停止仍分别精确授权；不得自动retry/cleanup/start/stop/quit或推进下一checkpoint。旧v3、其余crash、连续L6、P05C、发布、推送和其他平台不推进。
+2. 下一真实系统批须另行精确授权固定UUID、attempt `d75818f-v4-install-artifacts-staged-reactivation-20260824-v1`与absent `…-v4-Reactivation-v1`根；只允许一次`list`证明其余20台全停，必要时一次foreground start，再以唯一只读guest hash在任何业务guest动作前区分原boot/新boot。任一歧义不启动、不重试。
+3. 原boot分支才可另做全新exact resume控制与授权；新boot分支须另行设计恢复决策，不沿用旧boot假设。受控停止继续独立；不得自动resume/retry/cleanup/stop/quit或推进下一checkpoint，其余crash、连续L6、P05C、发布、推送和其他平台不推进。
 
 ## 验证入口
 
@@ -80,7 +80,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器覆盖单次start/clone、v7诊断、target绑定、foreground transport、延迟backend、guest断网、canonical transfer、input与backend消歧、negative preflight及checkpoint/resume控制。真实`install_artifacts_staged`已闭合checkpoint但尚未resume；该case、其余七个case、连续L6与发布仍未闭合。
+上述入口以合成执行器覆盖单次start/clone、v7诊断、target绑定、foreground transport、延迟backend、guest断网、canonical transfer、input/backend消歧、reactivation boot分流、negative preflight及checkpoint/resume控制。真实`install_artifacts_staged`已闭合checkpoint但尚未resume；该case、其余七个case、连续L6与发布仍未闭合。
 
 ## 阅读索引
 
