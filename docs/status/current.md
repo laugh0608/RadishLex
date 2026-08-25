@@ -24,8 +24,8 @@
 - `install_artifacts_staged`的typed guest合同固定target-only staging、package/dpkg未变、合法guard、XDG/process/network零漂移与resume重验/单次apply；首次安装精确Rust回归通过，production语义无需修改。
 - 第二个case的旧clone、v2和v3均在host失败关闭且未进入guest。v1-v7诊断最终只定位到UTM接收start后的AppKit主窗口断言，未证实更深根因；全部失败现场与manifest冻结，不再原地start/clone或试跑`--hide`。
 - v4 clone/prepared/foreground launch固定UUID `50B75F88…8038`、`Network=[]`与载体身份；launch manifest `6dbbdf40…fc3c`保持`state-indeterminate`，后续QEMU双句柄与network v2独立证明当前boot运行且仅loopback。plain list/status曾使backend再次出现，故不循环查询，也不把活动磁盘hash当terminal。
-- clean `e75509a`的network v1在宿主`utmctl exec`参数解析阶段失败关闭，8项manifest `d5d33212…7348`确认network script/push/pull均为0。修正控制在clean `3286268`逐项绑定launch 16项及v1失败7项后只执行一次v2：脚本push后逐字回读SHA-256 `d0bb5c28…1f28a`，network script仅调用1次，两个301-byte回读均为`2f9abfbe…d0e8e`。结构化证据固定boot `1bcbd795…26ae3`、active仅`lo`、nonloop接口/UP均0、IPv4/IPv6 main route均0；15项manifest `40be3f3f…38383`逐项通过，业务input/operation/transaction/stop/retry/quit及plain list/status/start均未执行。
-- canonical input transfer v1强绑定v2 manifest `40be3f3f…38383`、live network双回读和授权source绝对路径/size/SHA-256；同一`O_NOFOLLOW` descriptor前后复验12项USTAR。bundle唯一push、双完整回读后，root installer在私有`0700`staging解包并以`RENAME_NOREPLACE`发布固定input root；host/guest证据create-new，任一漂移失败关闭且不生成operation ID、不进入transaction、不自动retry/stop。10项回归已接入默认L6门禁。
+- network v1在宿主参数解析失败关闭且guest调用为0；修正后的唯一v2完成脚本push/逐字回读、一次network probe与双结果回读。manifest `40be3f3f…38383`固定boot `1bcbd795…26ae3`、active仅`lo`且无nonloop接口或route；未进入业务input/operation/transaction或自动补救。
+- canonical input transfer强绑定network、source descriptor与12项USTAR；bundle唯一push/双回读后只允许私有staging和`RENAME_NOREPLACE`发布，host/guest证据均create-new，漂移即失败关闭且不进入operation/transaction。10项回归进入L6门禁。
 - canonical source bundle已由clean `59eaab3`在`…-v4-Canonical-Input-v1`冻结：92,825,600 bytes、SHA-256 `7bbeb291…403c`，七文件manifest `ffc990a3…e0de`；12项USTAR和文件身份通过，且未调用`utmctl`、guest或VM动作。
 - clean `6a23c37`的唯一attempt `d75818f-v4-input-20260823-v1`通过network/target/process/句柄、installer readback、bundle唯一push/双回读及source postflight。installer调用exit 0且空输出，但同秒首次pull报告`transfer.evidence.json`不存在，第二次result回读未执行，input root状态未知。create-new根`…-v4-Input-Transfer-v1`的19项及manifest `d1090e8d…dc09`通过，权限`0700`/`0600`、single-link且零xattr；terminal为`state-indeterminate`，无list/status/start、断网复跑、operation/transaction、retry/stop/quit。
 - clean `ca57dce`的唯一resolution双回读稳定passed result；一次probe证明installer/可疑进程均0、staging absent、final私有且12项inventory逐文件匹配。create-new host根`…-v4-Input-Resolution-v1`的21项与manifest `7bab8f20…4e4a`通过，权限`0700`/`0600`、single-link、零xattr；terminal为`input-ready`，原installer/bundle、operation/transaction、retry/stop/quit均未执行。
@@ -36,7 +36,8 @@
 - clean `7309313`的唯一exact resume attempt在host `target-handles-preflight`失败关闭：冻结绑定、source、target与process门通过，但相关进程为0且`lsof` exit 1。create-new根7项manifest `a436677c…adc7`逐项通过；file pull/push、guest exec、maintenance resume与postflight均为0，transaction仍为`artifacts-staged-preserved`。该观察只证明当时backend/句柄不满足资格，不证明VM已停止；未调用plain list/status/start、retry、stop或quit。
 - backend resolution单次`status`证明registered stopped；reactivation单次`list`与foreground start后出现稳定QEMU句柄，但process合同矛盾，manifest `2a477730…c5c4c`闭合`state-indeterminate`且未进入guest/resume/retry/stop。
 - runtime resolution v1/v2曾以唯一`list`观察v4 started、其余20台stopped及PID `61666`三次稳定确认，但两次boot hash均无有效输出；v2的18项manifest `e2e41235…c49e`闭合`state-indeterminate`，不证明boot或后续运行状态。
-- clean `dbce3a5`的repository-only boot transport绑定上述18项和全部上游，8项host与3项probe回归进入L6门禁。clean `8f59825`的唯一真实attempt只执行一次`list`，观察21台均registered stopped；target未过inventory gate，PID/probe/guest/file/result均为0。8项manifest `6a1ad09f…5140`闭合`state-indeterminate`，未resume/retry/stop/quit/cleanup。
+- clean `dbce3a5`的repository-only boot transport绑定上述18项和全部上游。clean `8f59825`的唯一真实attempt只执行一次`list`，观察21台均registered stopped；target未过inventory gate，PID/probe/guest/file/result均为0，8项manifest `6a1ad09f…5140`闭合`state-indeterminate`。
+- clean `38b1bb8`新增repository-only boot start resolution：先证明全停与三轮静止，再至多一次foreground start、bounded runtime/PID确认及私有probe双回读；7项回归进入L6门禁。真实冻结链离线binding为8项/stopped/probe 0/result 0，新host根absent；未调用`utmctl`、guest或VM。
 
 ## 停止线
 
@@ -51,16 +52,16 @@
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
 - v4 launch至checkpoint及exact resume失败证据与UUID `50B75F88…8038`须冻结；不得复跑、覆盖、循环list/status、主动拉起backend或把无句柄归因为stopped。当前唯一有效transaction仍是manifest `3aca0576…0a4f7`证明的`artifacts_staged`；attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`及输出根`…-Exact-Resume-v1`已消费，不得重试或复用。
-- backend、reactivation、runtime与boot transport attempt/根均已消费并冻结；最新单次inventory只证明当时target registered stopped，不证明boot、saved state或连续终态。不得沿用旧授权补查、重跑、start/resume/retry/stop/quit；新boot决策、后续transport、exact resume与受控停止仍须分别授权。
+- backend、reactivation、runtime与boot transport attempt/根均已消费并冻结；单次inventory只证明当时target registered stopped，不证明boot、saved state或连续终态。boot start仓库控制不构成实机授权；不得沿用旧授权补查、重跑、start/resume/retry/stop/quit。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（2026-08-26）
 
-1. 冻结boot transport manifest `6a1ad09f…5140`、attempt及host根；不复用、不补查，boot仍未识别。
-2. 先在repository-only评审“保持stopped”或“授权一次新boot”的恢复分流；后者必须使用新attempt、absent host/guest根并重新固定start、transport与终态动作次数。
-3. 未单独批准新boot前不启动target；更不得直接resume。后续transport、exact resume与受控停止继续分别设计和授权。
+1. 复核clean `38b1bb8`、boot transport 8项及全部上游；固定新attempt/host/guest根，不复用旧授权或证据根。
+2. 真实boot start须单独授权：一次`list`、三轮静止、一次foreground start、最多60轮runtime、PID三次确认、probe一次、result两次；不含status/resume、业务guest、retry/stop/quit。
+3. `original-boot-restored`才另行设计exact resume；`new-boot-started`进入重启恢复决策，`state-indeterminate`停止。三类后续动作分别授权。
 
 ## 验证入口
 

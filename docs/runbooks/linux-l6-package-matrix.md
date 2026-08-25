@@ -523,6 +523,10 @@ repository-only boot transport resolution v1从clean `dbce3a5`建立独立v3 bin
 
 从clean `8f59825`执行该唯一授权attempt。binding、source、target与零相关host process前置门通过；唯一plain `list` exit 0且观察21台注册VM全部stopped，target UUID `50B75F88…8038`亦为stopped，因此在`utmctl-list-once` inventory gate以`target-not-registered-started-for-boot-transport`失败关闭。PID发现/确认、guest root创建、probe push/normalize/readback/exec、marker/result回读均为0，未生成boot classification，也未执行start/status/resume、业务guest、retry/stop/quit或cleanup。create-new host根`/Users/luobo/VirtualMachines/RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Boot-Transport-v1`含8个manifest成员，SHA-256 `6a1ad09f1db4b5e0b5d9edb9c4a9d1102fa8dfbf333a819f9961e759352e5140`逐项通过；根/文件为`0700`/`0600`、uid 501/gid 20且single-link。该结果只证明单次inventory时target registered stopped，不证明boot身份、saved state或连续终态；attempt与host根冻结，guest根未由本次控制创建。后续若选择新boot，须先进行独立恢复决策，再以新attempt、absent根和新的start/transport授权推进，不能重试本attempt或直接resume。
 
+repository-only恢复分流选择“单次启动与boot transport合并”，而非保持stopped无限补查。clean `38b1bb8`新增boot start binding/control：binding先递归重验boot transport前全部链，再逐项固定manifest `6a1ad09f…5140`的8个成员、原clean `8f59825`、唯一list的21台全停、target stopped、guest/file/PID/result均0及精确失败terminal。clean committed HEAD对真实冻结链的纯离线调用返回8项、target/peers stopped、probe 0、result 0和原boot hash `18f1ba06…022a`；计划host根`…-v4-Boot-Start-v1` absent，没有调用`utmctl`、观察live process/handle、进入guest或操作VM。
+
+新控制固定attempt `d75818f-v4-install-artifacts-staged-boot-start-20260825-v1`。它在clean binding、source/target、零相关process与target handles absent后只允许一次可能激活backend的plain `list`；必须证明21台全停并连续三轮process/handles静止，才调用一次既有foreground AppleScript transport。启动后不再list/status，而以最多60轮host process/target `lsof`寻找无活动`utmctl`的唯一QEMULauncher双句柄，再以同一PID三次定向确认。随后复用私有`0700` create-new guest根、committed probe唯一push/normalize/readback/exec、marker回读与result双回读，分类后复核PID、无活动`utmctl`及target descriptor。原/新boot分别交付`original-boot-restored`/`new-boot-started`；任一前置、启动、runtime、transport、格式、双回读或终态漂移均失败关闭，不自动retry/stop/quit，也不进入resume、业务guest或dpkg。7项回归进入默认L6门禁；真实启动及后续三类结果动作仍分别授权。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
