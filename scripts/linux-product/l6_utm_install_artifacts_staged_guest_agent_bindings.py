@@ -310,7 +310,7 @@ def _validate_prior_runtime(
         runtime_bindings._require_process_state(
             root / name,
             0,
-            expected_format=boot_bindings.EVIDENCE_FORMAT,
+            expected_format=runtime_control.EVIDENCE_FORMAT,
             error_label="prior-boot-start",
         )
 
