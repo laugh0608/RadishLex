@@ -37,8 +37,8 @@
 - backend resolution单次`status`证明registered stopped；reactivation单次`list`与foreground start后出现稳定QEMU句柄，但process合同矛盾，manifest `2a477730…c5c4c`闭合`state-indeterminate`且未进入guest/resume/retry/stop。
 - runtime resolution v1/v2曾以唯一`list`观察v4 started、其余20台stopped及PID `61666`三次稳定确认，但两次boot hash均无有效输出；v2的18项manifest `e2e41235…c49e`闭合`state-indeterminate`，不证明boot或后续运行状态。
 - clean `dbce3a5`的repository-only boot transport绑定上述18项和全部上游。clean `8f59825`的唯一真实attempt只执行一次`list`，观察21台均registered stopped；target未过inventory gate，PID/probe/guest/file/result均为0，8项manifest `6a1ad09f…5140`闭合`state-indeterminate`。
-- clean `38b1bb8`新增repository-only boot start resolution：先证明全停与三轮静止，再至多一次foreground start、bounded runtime/PID确认及私有probe双回读；7项回归进入L6门禁。真实冻结链离线binding为8项/stopped/probe 0/result 0，新host根absent；未调用`utmctl`、guest或VM。
-- clean `f972371`的唯一boot start以一次`list`证明21台全停、三轮静止后唯一start；PID `39591`的target双句柄三次稳定确认。首次guest root创建遇到`OSStatus -2700`/agent不可用，probe/file/result均为0；29项manifest `97959c55…c57d`闭合`state-indeterminate`。
+- clean `38b1bb8`新增boot start控制；clean `f972371`的唯一实机调用在21台全停后start，PID `39591`双句柄三次稳定，但首次guest root遇到`OSStatus -2700`/agent不可用；29项manifest `97959c55…c57d`闭合`state-indeterminate`。
+- clean `5051234`新增guest-agent resolution及9项回归：不调用list/status/start，以稳定PID门和最多60次只读readiness限定私有probe。真实29项纯离线binding返回PID `39591`、agent unavailable、probe/result 0和原boot hash，新根absent；未操作VM。
 
 ## 停止线
 
@@ -60,9 +60,9 @@
 
 ## 下一步（2026-08-26）
 
-1. 先repository-only绑定boot start manifest `97959c55…c57d`的29项、clean `f972371`、一次list/start、PID `39591`三次确认、guest root失败及全部零调用/禁止动作。
-2. 在不补查真实VM的前提下设计独立guest-agent transport resolution：只能从新attempt/absent根开始，以稳定target PID/双句柄为资格门，固定有界agent readiness与私有boot probe；不得list/status/start/resume、业务guest、retry/stop/quit。
-3. 只有新控制repository-only闭合并另行授权后才可真实执行；`original-boot-restored`再设计exact resume，`new-boot-started`进入重启恢复决策，任何`state-indeterminate`继续停止。
+1. 复核clean `5051234`、boot start 29项及全部上游，固定attempt `…-guest-agent-20260825-v1`与新host/guest根。
+2. 真实guest-agent resolution须单独授权：PID/双句柄三次确认，最多60次只读readiness且每次复核PID/无活动`utmctl`；ready后才允许私有probe与result双回读。不得list/status/start/resume、业务guest、retry/stop/quit。
+3. `original-boot-restored`再设计exact resume；`new-boot-started`进入重启恢复决策；`state-indeterminate`继续停止。三类后续动作分别授权。
 
 ## 验证入口
 
