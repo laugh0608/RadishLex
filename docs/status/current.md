@@ -38,7 +38,7 @@
 - runtime resolution v1/v2曾以唯一`list`观察v4 started、其余20台stopped及PID `61666`三次稳定确认，但两次boot hash均无有效输出；v2的18项manifest `e2e41235…c49e`闭合`state-indeterminate`，不证明boot或后续运行状态。
 - clean `dbce3a5`的repository-only boot transport绑定上述18项和全部上游。clean `8f59825`的唯一真实attempt只执行一次`list`，观察21台均registered stopped；target未过inventory gate，PID/probe/guest/file/result均为0，8项manifest `6a1ad09f…5140`闭合`state-indeterminate`。
 - clean `38b1bb8`新增boot start控制；clean `f972371`的唯一实机调用在21台全停后start，PID `39591`双句柄三次稳定，但首次guest root遇到`OSStatus -2700`/agent不可用；29项manifest `97959c55…c57d`闭合`state-indeterminate`。
-- clean `5051234`新增guest-agent resolution及9项回归：不调用list/status/start，以稳定PID门和最多60次只读readiness限定私有probe。真实29项纯离线binding返回PID `39591`、agent unavailable、probe/result 0和原boot hash，新根absent；未操作VM。
+- clean `1d64916`最终离线binding闭合boot start 29项。唯一真实resolution一次readiness即ready，PID `39591`与双句柄稳定；私有根、probe传输/回读和唯一probe调用均返回成功，但marker回读报告`OSStatus -2700`且文件不存在。结果回读0、boot分类未生成；26项manifest `eb7c42f1…d053`闭合`state-indeterminate`，未list/status/start/resume/retry/stop/quit。
 
 ## 停止线
 
@@ -53,16 +53,16 @@
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
 - v4 launch至checkpoint及exact resume失败证据与UUID `50B75F88…8038`须冻结；不得复跑、覆盖、循环list/status、主动拉起backend或把无句柄归因为stopped。当前唯一有效transaction仍是manifest `3aca0576…0a4f7`证明的`artifacts_staged`；attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`及输出根`…-Exact-Resume-v1`已消费，不得重试或复用。
-- backend至boot start的attempt/根均已消费并冻结。boot start只证明调用内曾全停、随后有稳定target双句柄且agent门失败；不证明boot身份、当前运行状态或agent永久缺失。不得沿用旧授权补查、重跑、list/status/start/resume、guest probe、retry/stop/quit。
+- backend至guest-agent resolution的attempt、host根和新guest根均已消费并冻结。最新证据只证明readiness、私有probe传输及调用前PID/双句柄门通过；marker缺失使boot与调用后终态未知。不得补拉、重跑probe、复用guest根、list/status/start/resume、retry/stop/quit。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（2026-08-26）
 
-1. 复核clean `5051234`、boot start 29项及全部上游，固定attempt `…-guest-agent-20260825-v1`与新host/guest根。
-2. 真实guest-agent resolution须单独授权：PID/双句柄三次确认，最多60次只读readiness且每次复核PID/无活动`utmctl`；ready后才允许私有probe与result双回读。不得list/status/start/resume、业务guest、retry/stop/quit。
-3. `original-boot-restored`再设计exact resume；`new-boot-started`进入重启恢复决策；`state-indeterminate`继续停止。三类后续动作分别授权。
+1. 先在仓库内绑定新manifest `eb7c42f1…d053`的26项，固定一次readiness、一次probe、marker absent、结果回读0和禁止动作。
+2. 只设计“既有probe结果消歧”：不得重跑probe或写新guest对象；未来若需有界只读marker/result回读及PID门，须使用新attempt、absent host根并单独授权。
+3. 当前保持`state-indeterminate`且不resume；只有稳定双回读生成原/new boot分类后，才分别设计exact resume或重启恢复。受控停止继续独立授权。
 
 ## 验证入口
 

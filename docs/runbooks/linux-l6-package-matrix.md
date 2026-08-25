@@ -533,6 +533,10 @@ repository-only guest-agent transport resolution由`c2d7113`实现，随后`78dc
 
 新控制固定attempt `d75818f-v4-install-artifacts-staged-guest-agent-20260825-v1`与计划host根`/Users/luobo/VirtualMachines/RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Guest-Agent-Transport-v1`。它不调用list/status/start，先以target全局句柄发现唯一QEMULauncher PID，再三次定向复核双句柄、无活动`utmctl`及target descriptor。随后最多60次执行只读`/usr/bin/test -r /proc/sys/kernel/random/boot_id`；仅接受空输出成功或逐字固定的`OSStatus -2700` agent unavailable，每次后都复核同一PID/双句柄及无活动`utmctl`。readiness成功才创建新私有guest根、唯一push/normalize/readback/boot probe、marker及result双回读，并在分类后再次闭合PID/process/target；未知输出、预算耗尽或任一漂移均`state-indeterminate`且不自动retry/stop/quit，也不进入resume、业务guest或dpkg。仓库闭合不构成真实授权。
 
+从clean `1d64916`执行唯一授权guest-agent resolution。最终纯离线binding先重验boot start的29项manifest `97959c55…c57d`及全部上游，固定PID `39591`、首次agent unavailable、probe/result 0、原boot hash `18f1ba06…022a`和新host根absent；该步未调用`utmctl`。真实控制不调用list/status/start，target全局发现与三次定向确认均闭合同一`QEMULauncher` PID及EFI/qcow2双句柄，同轮无活动`utmctl`。首次readiness即以exit 0、未超时、双流0 bytes闭合ready；随后的PID/双句柄和host process门仍稳定。
+
+ready后只建立固定新guest根`/var/tmp/radishlex-l6-v4-guest-agent-d75818f-v4-install-artifacts-staged-guest-agent-20260825-v1`，一次probe push、root-owned `0600`归一化及7451-byte逐字回读通过。唯一probe调用exit 0、未超时且双流为空，但紧随其后的marker pull报告`OSStatus -2700`并明确`attempt.marker.json`不存在；控制因此在`guest-marker-readback`失败关闭，result readback为0、observed boot hash为null、classification未生成，调用后的PID/process/target postflight也未执行。host terminal为`state-indeterminate`，guest exec/push/pull/probe分别为4/1/2/1；无inventory、resume、业务guest、operation ID、dpkg、retry/cleanup/stop/quit。create-new host根`/Users/luobo/VirtualMachines/RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Guest-Agent-Transport-v1`含26个manifest成员，SHA-256 `eb7c42f1b74701ce585188687b8cb18be6ecd2cddba8c4340fb09f775038d053`逐项通过；根/文件为`0700`/`0600`、uid 501/gid 20、single-link、零xattr，raw operation ID扫描通过。attempt、host根和guest根冻结，不补拉、不重跑probe或复用。下一批只先repository-only绑定26项并设计不写guest、不重跑probe的既有marker/result有界只读消歧；任何真实回读、exact resume或受控停止继续分别授权。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
