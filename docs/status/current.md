@@ -4,10 +4,10 @@
 
 ## 当前判断
 
-- 复核日期：2026-08-24（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
+- 复核日期：2026-08-25（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh与六类operation已有证据，首个crash已闭合。`install_artifacts_staged` v4已消耗唯一foreground transport/transfer/resolution/negative preflight/checkpoint；单次真实checkpoint已闭合`artifacts_staged`且未触发dpkg，仍待exact resume后才计完整case。其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh与六类operation已有证据，首个crash已闭合。`install_artifacts_staged` v4真实checkpoint闭合`artifacts_staged`且未触发dpkg；repository-only boot transport已闭合，但boot身份、exact resume、其余七个crash与连续L6仍未闭合。
 
 ## 冻结基线与固定边界
 
@@ -36,6 +36,7 @@
 - clean `7309313`的唯一exact resume attempt在host `target-handles-preflight`失败关闭：冻结绑定、source、target与process门通过，但相关进程为0且`lsof` exit 1。create-new根7项manifest `a436677c…adc7`逐项通过；file pull/push、guest exec、maintenance resume与postflight均为0，transaction仍为`artifacts-staged-preserved`。该观察只证明当时backend/句柄不满足资格，不证明VM已停止；未调用plain list/status/start、retry、stop或quit。
 - clean `92e82e2`的backend resolution以唯一`status`闭合registered stopped且不推断saved。clean `e6305e8`的唯一reactivation以一次`list`证明其余20台全停，再调用一次foreground start；其后30轮target `lsof`均有稳定QEMU双句柄，但固定`ucomm`解析始终为0，故失败关闭为`state-indeterminate`且未观察boot。94项manifest `2a477730…c5c4c`通过；未补查、进入guest、resume、retry或停止，VM/UTM可能仍运行。
 - runtime resolution v1/v2均以唯一`list`闭合v4 started/其余20台stopped及PID `61666`的3次确认；两次guest boot hash均无有效64-hex。v2从clean `61b24a9`先落盘raw-free observation，确证唯一exec exit 0、未超时且双流0 bytes；无classification/终态复核，18项manifest `e2e41235…c49e`通过，仍为`state-indeterminate`，VM可能运行。
+- clean `dbce3a5`的repository-only boot transport绑定v2的18项及全部上游，以私有probe/hash双回读和终态身份复核替代stdout；8项host与3项probe回归进入L6门禁。真实冻结根离线binding为18/exit 0/stdout 0/no classification；未调用`utmctl`、guest或VM，细项见runbook。
 
 ## 停止线
 
@@ -50,16 +51,16 @@
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
 - v4 launch至checkpoint及exact resume失败证据与UUID `50B75F88…8038`须冻结；不得复跑、覆盖、循环list/status、主动拉起backend或把无句柄归因为stopped。当前唯一有效transaction仍是manifest `3aca0576…0a4f7`证明的`artifacts_staged`；attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`及输出根`…-Exact-Resume-v1`已消费，不得重试或复用。
-- backend resolution、reactivation与runtime resolution attempt/根均已消费并冻结；boot身份仍未闭合，不得沿用旧授权补查、重跑hash、resume、retry、停止或退出UTM。后续真实动作仍须分别授权。
+- backend resolution、reactivation与runtime resolution attempt/根均已消费并冻结；boot身份仍未闭合，不得沿用旧授权补查、重跑hash、resume、retry、停止或退出UTM。repository-only boot transport控制不构成真实动作授权；后续真实boot transport、exact resume与受控停止仍须分别授权。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 明日事项（2026-08-25）
+## 下一步（2026-08-26）
 
-1. 先做repository-only v3 binding：绑定runtime resolution v2的18项，并递归重验v1的17项、reactivation的94项与全部上游；为“exec exit 0、双流为空、observation已落盘、classification未生成”补精确回归。
-2. 在仓库内设计独立boot transport resolution，将guest执行与boot hash交付解耦；评审guest私有create-new证据、只存boot ID SHA-256、host独立双回读、严格分类与终态target复核，不存raw boot ID、不自动retry。
-3. 明日先停在实现、合成测试、默认L6门禁与文档闭环；不得调用`utmctl`、进入guest或操作VM。未来真实控制须用新attempt、absent host/guest根和单独授权；只有闭合`original-boot-restored`才另行设计exact resume。
+1. 复核clean `dbce3a5`、v2/上游及新host/guest根absence；旧attempt/根不复用，仓库结果不等于boot已识别。
+2. 真实boot transport须单独授权：`list`一次、PID确认三次、probe一次、result回读两次；不含start/status/resume、业务guest、retry/stop/quit。
+3. 仅original boot及终态target稳定后设计resume；new boot独立决策，indeterminate停止，三类动作分别授权。
 
 ## 验证入口
 
@@ -81,7 +82,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器覆盖单次start/clone、v7诊断、target绑定、foreground transport、延迟backend、guest断网、canonical transfer、input/backend/runtime消歧、reactivation boot分流、negative preflight及checkpoint/resume控制。真实`install_artifacts_staged`已闭合checkpoint但尚未resume；该case、其余七个case、连续L6与发布仍未闭合。
+上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流及checkpoint/resume控制，但不替代实机。真实`install_artifacts_staged`已闭合checkpoint，尚未识别boot或resume；其余case、连续L6与发布仍未闭合。
 
 ## 阅读索引
 
