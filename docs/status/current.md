@@ -38,6 +38,7 @@
 - runtime resolution v1/v2曾以唯一`list`观察v4 started、其余20台stopped及PID `61666`三次稳定确认，但两次boot hash均无有效输出；v2的18项manifest `e2e41235…c49e`闭合`state-indeterminate`，不证明boot或后续运行状态。
 - clean `dbce3a5`的repository-only boot transport绑定上述18项和全部上游。clean `8f59825`的唯一真实attempt只执行一次`list`，观察21台均registered stopped；target未过inventory gate，PID/probe/guest/file/result均为0，8项manifest `6a1ad09f…5140`闭合`state-indeterminate`。
 - clean `38b1bb8`新增repository-only boot start resolution：先证明全停与三轮静止，再至多一次foreground start、bounded runtime/PID确认及私有probe双回读；7项回归进入L6门禁。真实冻结链离线binding为8项/stopped/probe 0/result 0，新host根absent；未调用`utmctl`、guest或VM。
+- clean `f972371`的唯一boot start以一次`list`证明21台全停、三轮静止后唯一start；PID `39591`的target双句柄三次稳定确认。首次guest root创建遇到`OSStatus -2700`/agent不可用，probe/file/result均为0；29项manifest `97959c55…c57d`闭合`state-indeterminate`。
 
 ## 停止线
 
@@ -52,16 +53,16 @@
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
 - v4 launch至checkpoint及exact resume失败证据与UUID `50B75F88…8038`须冻结；不得复跑、覆盖、循环list/status、主动拉起backend或把无句柄归因为stopped。当前唯一有效transaction仍是manifest `3aca0576…0a4f7`证明的`artifacts_staged`；attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`及输出根`…-Exact-Resume-v1`已消费，不得重试或复用。
-- backend、reactivation、runtime与boot transport attempt/根均已消费并冻结；单次inventory只证明当时target registered stopped，不证明boot、saved state或连续终态。boot start仓库控制不构成实机授权；不得沿用旧授权补查、重跑、start/resume/retry/stop/quit。
+- backend至boot start的attempt/根均已消费并冻结。boot start只证明调用内曾全停、随后有稳定target双句柄且agent门失败；不证明boot身份、当前运行状态或agent永久缺失。不得沿用旧授权补查、重跑、list/status/start/resume、guest probe、retry/stop/quit。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（2026-08-26）
 
-1. 复核clean `38b1bb8`、boot transport 8项及全部上游；固定新attempt/host/guest根，不复用旧授权或证据根。
-2. 真实boot start须单独授权：一次`list`、三轮静止、一次foreground start、最多60轮runtime、PID三次确认、probe一次、result两次；不含status/resume、业务guest、retry/stop/quit。
-3. `original-boot-restored`才另行设计exact resume；`new-boot-started`进入重启恢复决策，`state-indeterminate`停止。三类后续动作分别授权。
+1. 先repository-only绑定boot start manifest `97959c55…c57d`的29项、clean `f972371`、一次list/start、PID `39591`三次确认、guest root失败及全部零调用/禁止动作。
+2. 在不补查真实VM的前提下设计独立guest-agent transport resolution：只能从新attempt/absent根开始，以稳定target PID/双句柄为资格门，固定有界agent readiness与私有boot probe；不得list/status/start/resume、业务guest、retry/stop/quit。
+3. 只有新控制repository-only闭合并另行授权后才可真实执行；`original-boot-restored`再设计exact resume，`new-boot-started`进入重启恢复决策，任何`state-indeterminate`继续停止。
 
 ## 验证入口
 
