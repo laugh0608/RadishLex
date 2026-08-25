@@ -312,6 +312,39 @@ class GuestAgentResolutionTests(unittest.TestCase):
             ):
                 bindings._validate_prior_terminal(request, root)
 
+    def test_prior_handle_requires_runtime_v2_format(self) -> None:
+        request = make_request(Path("/tmp/radishlex-guest-agent-test"))
+        argv = resolution.network_ready._lsof_argv(request)
+        value = {
+            "backend_command": "QEMULauncher",
+            "backend_pid": bindings.REQUIRED_BACKEND_PID,
+            "efi_handle_count": 1,
+            "format": resolution.runtime_control.EVIDENCE_FORMAT,
+            "observation": {
+                "argv": list(argv),
+                "exit_code": 0,
+                "stderr": stream_metadata(b""),
+                "stdout": stream_metadata(b"synthetic-handle"),
+                "timed_out": False,
+            },
+            "process_record_count": 1,
+            "qcow2_handle_count": 1,
+            "state": "present",
+        }
+        self.assertEqual(
+            bindings._require_prior_handle_state(
+                value, argv, bindings.REQUIRED_BACKEND_PID
+            ),
+            hashlib.sha256(b"synthetic-handle").hexdigest(),
+        )
+        value["format"] = resolution.runtime_bindings.PRIOR_EVIDENCE_FORMAT
+        with self.assertRaisesRegex(
+            ValueError, "prior-boot-start-handle-semantics-invalid"
+        ):
+            bindings._require_prior_handle_state(
+                value, argv, bindings.REQUIRED_BACKEND_PID
+            )
+
     def assert_forbidden_actions_absent(
         self, calls: list[tuple[str, ...]]
     ) -> None:
@@ -471,6 +504,14 @@ def observation(
     return start_control.CommandObservation.from_bytes(
         argv, stdout=stdout, stderr=stderr, exit_code=exit_code
     )
+
+
+def stream_metadata(value: bytes) -> dict[str, object]:
+    return {
+        "sha256": hashlib.sha256(value).hexdigest(),
+        "total_bytes": len(value),
+        "truncated": False,
+    }
 
 
 def prior_terminal(

@@ -329,7 +329,7 @@ def _validate_prior_runtime(
     discovery = network_ready._read_json(
         root / "target-handle-pid-discovery.json"
     )
-    discovery_sha256 = runtime_bindings._require_runtime_handle_state(
+    discovery_sha256 = _require_prior_handle_state(
         discovery,
         network_ready._lsof_argv(request),
         REQUIRED_BACKEND_PID,
@@ -346,13 +346,44 @@ def _validate_prior_runtime(
             root / f"target-handle-pid-confirmation-{index:03d}.json"
         )
         confirmation_hashes.append(
-            runtime_bindings._require_runtime_handle_state(
+            _require_prior_handle_state(
                 value, targeted_argv, REQUIRED_BACKEND_PID
             )
         )
     if len(set(confirmation_hashes)) != 1:
         raise ValueError("prior-boot-start-confirmation-hash-drift")
     return confirmation_hashes[0]
+
+
+def _require_prior_handle_state(
+    value: dict[str, object],
+    expected_argv: tuple[str, ...],
+    expected_pid: int,
+) -> str:
+    observation = value.get("observation")
+    if (
+        value.get("format") != runtime_control.EVIDENCE_FORMAT
+        or value.get("state") != "present"
+        or value.get("backend_command") != "QEMULauncher"
+        or value.get("backend_pid") != expected_pid
+        or value.get("efi_handle_count") != 1
+        or value.get("process_record_count") != 1
+        or value.get("qcow2_handle_count") != 1
+        or not isinstance(observation, dict)
+        or observation.get("argv") != list(expected_argv)
+        or observation.get("exit_code") != 0
+        or observation.get("timed_out") is not False
+        or not runtime_bindings._empty_stream(observation.get("stderr"))
+        or not runtime_bindings._complete_stream(observation.get("stdout"))
+    ):
+        raise ValueError("prior-boot-start-handle-semantics-invalid")
+    stdout = observation.get("stdout")
+    if not isinstance(stdout, dict):
+        raise ValueError("prior-boot-start-handle-stdout-invalid")
+    digest = stdout.get("sha256")
+    if not isinstance(digest, str):
+        raise ValueError("prior-boot-start-handle-hash-invalid")
+    return digest
 
 
 def _validate_prior_agent_failure(
