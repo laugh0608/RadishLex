@@ -549,6 +549,10 @@ ready后只建立固定新guest根`/var/tmp/radishlex-l6-v4-guest-agent-d75818f-
 
 `93f81d8`新增boot classification result binding，逐项固定72项manifest、原clean `8a04d02`、全停inventory/单次start、PID发现前后handle差异、9次unavailable+第10次ready、固定scope probe/marker/双result、新boot分类及全部禁止动作。真实冻结链纯离线复核先暴露上游层级少取一层，由`f78a253`改为具名`BootTransport -> RuntimeResolution -> Reactivation`链并补回归；第二次又暴露PID发现前的首份全局handle本就不含`backend_pid`，由`3e31540`以精确阶段语义修正。最终clean `3e31540`对全部真实根返回72项、`new-boot-started`、PID `92422`和binding SHA-256 `0400774c955005ea213ba7fe4f9a2e091ceb96eb0868dcbcfd0771b737c019e0`，没有调用`utmctl`、进入guest或改写证据。既有exact-resume driver绑定原boot并要求同boot guard，不能用于本次新boot；下一批先repository-only设计只读恢复资格预检，重新绑定持久receipt/staging/checkpoint、package/dpkg、process/network与跨重启`/run/lock`语义。真实预检、canonical resume和受控停止继续分别授权。
 
+`4ba55cb`新增new-boot recovery qualification binding、host control与guest probe。probe不依赖重启后消失的`/run`测试secret，而从持久`receipt.json`重新验证operation hash、单一operation chain、target-only staged package/evidence及`artifacts_staged`状态；raw operation ID只在guest内存与既有路径中使用，host evidence仍只允许固定hash。跨重启guard只接受两种精确状态：`/run/lock/radishlex-install-v1.lock`缺失时，Manager/Fcitx startup必须同时为`0:1:3:14:2|error-absent`；guard为root-owned `0600`、regular、single-link、zero-size且可临时取得非阻塞锁时，两者必须同时为`0:1:3:10:0|error-absent`。控制不创建、删除或写产品guard，也不调用旧driver的terminal-case、resume或postflight路径。
+
+host control要求clean committed binding递归复核72项真实boot classification，再绑定旧resume driver SHA-256 `0b649ecd…d05b`与当前probe。未来真实调用不做inventory/list/status/start；它先固定已有target PID/双句柄、无活动`utmctl`、source/target身份与有界agent readiness，再向create-new私有guest根各交付一次旧driver和只读probe、逐字回读、probe唯一执行、marker及result双回读，最后复核同一PID/process/target。6项host与5项guest测试及默认L6门禁通过；clean `4ba55cb`对真实冻结链纯离线binding返回72项、`new-boot-started`、PID `92422`、旧/new boot hash与binding evidence SHA-256 `18cc48a2…40d6`。本批没有调用`utmctl`、进入guest、创建新现场根或改写冻结证据；真实预检、后续resume及受控停止继续分别使用新attempt、absent根和单独系统授权。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：

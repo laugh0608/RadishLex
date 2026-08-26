@@ -7,7 +7,7 @@
 - 复核日期：2026-08-26（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh与六类operation已有证据，首个crash已闭合。`install_artifacts_staged` v4真实checkpoint闭合`artifacts_staged`且未触发dpkg；唯一boot classification已识别为`new-boot-started`，新boot恢复资格、exact resume、其余七个crash与连续L6仍未闭合。
+- L6 controller/pair/refresh与六类operation已有证据，首个crash已闭合。`install_artifacts_staged` v4真实checkpoint闭合`artifacts_staged`且未触发dpkg；boot classification为`new-boot-started`，恢复资格控制已仓库闭合，真实预检、resume、其余七个crash与连续L6仍未闭合。
 
 ## 冻结基线与固定边界
 
@@ -39,7 +39,7 @@
 - clean `dbce3a5`的repository-only boot transport绑定上述18项和全部上游。clean `8f59825`的唯一真实attempt只执行一次`list`，观察21台均registered stopped；target未过inventory gate，PID/probe/guest/file/result均为0，8项manifest `6a1ad09f…5140`闭合`state-indeterminate`。
 - clean `38b1bb8`新增boot start控制；clean `f972371`的唯一实机调用在21台全停后start，PID `39591`双句柄三次稳定，但首次guest root遇到`OSStatus -2700`/agent不可用；29项manifest `97959c55…c57d`闭合`state-indeterminate`。
 - clean `1d64916`最终离线binding闭合boot start 29项。唯一真实resolution一次readiness即ready，PID `39591`与双句柄稳定；probe传输/回读和调用返回成功，但marker不存在，26项manifest `eb7c42f1…d053`闭合`state-indeterminate`。日终审阅确认共享probe CLI只接受`boot-transport`根，而本控制传入`guest-agent`根，精确合成argv在marker前返回`control-root-invalid`；随后正常request关机，21台全停且零相关进程/target句柄。
-- 唯一boot classification从全停只启动target一次；第10次readiness就绪后，固定probe与双回读识别旧/new boot `18f1ba06…022a`/`b757c8fc…4758`，manifest `a17920bd…0e17`闭合`new-boot-started`。`3e31540`最终离线绑定72项；未resume/dpkg/stop，terminal后未查询UTM。
+- boot classification从全停单次启动target；第10次readiness后双回读固定旧/new boot `18f1ba06…022a`/`b757c8fc…4758`，manifest `a17920bd…0e17`闭合`new-boot-started`。`4ba55cb`闭合只读恢复资格控制；clean binding重验72项、PID `92422`、两类guard/startup语义及旧driver/probe身份，真实预检未运行，terminal后未查询UTM。
 
 ## 停止线
 
@@ -61,9 +61,9 @@
 
 ## 下一步（2026-08-26）
 
-1. 冻结manifest `a17920bd…0e17`、attempt及证据根；后续VM状态未知。
-2. 当前不resume；先repository-only设计新boot只读恢复资格预检，绑定持久事务、系统静止与跨重启guard语义。
-3. 真实预检、canonical resume与受控停止分别使用新attempt、absent根和单独授权；漂移即保留现场。
+1. 冻结manifest `a17920bd…0e17`、attempt及证据根；VM状态未知。
+2. repository-only恢复资格合同已闭合；真实guest预检未运行，当前不resume。
+3. 真实预检、resume与受控停止分别使用新attempt、absent根和单独授权；漂移即保留现场。
 
 ## 验证入口
 
@@ -85,7 +85,7 @@
 git diff --check
 ```
 
-上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、stopped-inventory boot classification、冻结结果binding及checkpoint/resume控制，但不替代实机。真实`install_artifacts_staged`已闭合checkpoint并识别为新boot，尚未闭合新boot恢复资格或resume；其余case、连续L6与发布仍未闭合。
+上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、boot classification、冻结结果binding、恢复资格及checkpoint/resume控制，但不替代实机。真实`install_artifacts_staged`已识别为新boot，尚未闭合真实恢复资格或resume；其余case、连续L6与发布仍未闭合。
 
 ## 阅读索引
 
