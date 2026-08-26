@@ -98,7 +98,9 @@ def validate_guest_agent_result_bindings(
     ):
         raise ValueError("required-prior-guest-agent-attempt-id-mismatch")
 
-    upstream = guest_bindings.validate_guest_agent_bindings(request)
+    upstream = guest_bindings.validate_guest_agent_bindings(
+        _PriorGuestAgentRequestView(request)
+    )
     identities: dict[str, object] = {}
     for relative_path, label in (
         (BINDINGS_RELATIVE_PATH, "guest_agent_result_bindings"),
@@ -587,3 +589,15 @@ def _guest_control_root(request: GuestAgentResultBindingRequest) -> str:
         "/var/tmp/radishlex-l6-v4-guest-agent-"
         + request.prior_guest_agent_attempt_id
     )
+
+
+class _PriorGuestAgentRequestView:
+    def __init__(self, request: GuestAgentResultBindingRequest) -> None:
+        self._request = request
+
+    @property
+    def boot_start_attempt_id(self) -> str:
+        return self._request.prior_boot_start_attempt_id
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._request, name)

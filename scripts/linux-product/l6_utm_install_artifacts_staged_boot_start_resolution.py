@@ -132,7 +132,11 @@ class BootStartResolutionRequest:
     def guest_result_path(self) -> str:
         return f"{self.guest_control_root}/boot-identity.evidence.json"
 
-    def validate(self) -> None:
+    def validate(
+        self,
+        *,
+        expected_boot_start_attempt_id: str = bindings.REQUIRED_BOOT_START_ATTEMPT_ID,
+    ) -> None:
         paths = (
             (self.repository_root, "repository-root"),
             (self.prior_v7_root, "prior-v7-root"),
@@ -242,7 +246,7 @@ class BootStartResolutionRequest:
             ),
             (
                 self.boot_start_attempt_id,
-                bindings.REQUIRED_BOOT_START_ATTEMPT_ID,
+                expected_boot_start_attempt_id,
                 "boot-start",
             ),
         )
@@ -409,6 +413,7 @@ def run_boot_start_resolution(
     source_revalidator=None,
     target_validator=None,
     sleeper: Sleeper = time.sleep,
+    evidence_format: str = EVIDENCE_FORMAT,
 ) -> BootStartResolutionResult:
     request.validate()
     writer = start_control.EvidenceWriter.create(request.output_root)
@@ -439,6 +444,9 @@ def run_boot_start_resolution(
     terminal_processes: tuple[dict[str, object], ...] = ()
     observed_boot_hash: str | None = None
     boot_classification = "not-generated"
+    agent_readiness_invocations = 0
+    agent_readiness_state = "not-observed"
+    readiness_identity_observation_count = 0
     source_bundle: input_transfer.SourceBundle | None = None
     target_preflight: dict[str, object] | None = None
 
@@ -497,7 +505,10 @@ def run_boot_start_resolution(
         writer.write_json(
             "target-handles-preflight.json",
             _handle_state_evidence(
-                handle_observation, handle_state, handle_details
+                handle_observation,
+                handle_state,
+                handle_details,
+                evidence_format=evidence_format,
             ),
         )
         if handle_state != "absent":
@@ -523,7 +534,7 @@ def run_boot_start_resolution(
         writer.write_json(
             "inventory-classification.json",
             {
-                "format": EVIDENCE_FORMAT,
+                "format": evidence_format,
                 "other_registered_vm_count": 20,
                 "other_registered_vms": "all-stopped",
                 "registered_vm_count": 21,
@@ -549,7 +560,10 @@ def run_boot_start_resolution(
             writer.write_json(
                 f"target-handles-quiescence-{index:03d}.json",
                 _handle_state_evidence(
-                    handle_observation, handle_state, handle_details
+                    handle_observation,
+                    handle_state,
+                    handle_details,
+                    evidence_format=evidence_format,
                 ),
             )
             if terminal_processes or handle_state != "absent":
@@ -595,7 +609,10 @@ def run_boot_start_resolution(
             writer.write_json(
                 f"target-handles-runtime-{index:03d}.json",
                 _handle_state_evidence(
-                    handle_observation, handle_state, handle_details
+                    handle_observation,
+                    handle_state,
+                    handle_details,
+                    evidence_format=evidence_format,
                 ),
             )
             utmctl_active = (
@@ -663,6 +680,104 @@ def run_boot_start_resolution(
         runtime_control._require_live_target_identity_stable(
             target_ready, target_started
         )
+
+        agent_readiness_attempts = int(
+            getattr(request, "agent_readiness_attempts", 0)
+        )
+        if agent_readiness_attempts > 0:
+            import l6_utm_install_artifacts_staged_guest_agent_resolution as guest_agent_control
+
+            stage = "guest-agent-readiness"
+            for index in range(1, agent_readiness_attempts + 1):
+                agent_readiness_invocations = index
+                guest_exec_invocations += 1
+                readiness_observation = command_runner.run(
+                    guest_agent_control.readiness_argv(request),
+                    request.command_timeout_seconds,
+                )
+                writer.write_json(
+                    f"guest-agent-readiness-{index:03d}.json",
+                    readiness_observation.as_json(),
+                )
+
+                readiness_argv = runtime_control.targeted_lsof_argv(
+                    request, backend_pid
+                )
+                readiness_handle_observation = command_runner.run(
+                    readiness_argv, request.command_timeout_seconds
+                )
+                readiness_identity = (
+                    runtime_control.parse_target_handle_process(
+                        readiness_handle_observation,
+                        request,
+                        expected_argv=readiness_argv,
+                    )
+                )
+                readiness_identity_observation_count = index
+                readiness_handle_evidence = (
+                    runtime_control._handle_identity_evidence(
+                        readiness_handle_observation,
+                        readiness_identity,
+                    )
+                )
+                readiness_handle_evidence["format"] = evidence_format
+                writer.write_json(
+                    f"target-handle-readiness-{index:03d}.json",
+                    readiness_handle_evidence,
+                )
+                if int(readiness_identity["backend_pid"]) != backend_pid:
+                    raise BootStartResolutionError(
+                        "target-backend-pid-readiness-drift"
+                    )
+
+                process_observation, terminal_processes = (
+                    runtime_control._observe_processes(
+                        command_runner, request
+                    )
+                )
+                writer.write_json(
+                    f"host-process-readiness-{index:03d}.json",
+                    runtime_control._process_evidence(
+                        process_observation, terminal_processes
+                    ),
+                )
+                runtime_control._require_no_utmctl(
+                    terminal_processes, f"readiness-{index:03d}"
+                )
+
+                agent_readiness_state = (
+                    guest_agent_control.classify_agent_readiness(
+                        readiness_observation, request
+                    )
+                )
+                if agent_readiness_state == "ready":
+                    writer.write_json(
+                        "guest-agent-ready.json",
+                        {
+                            "attempt": index,
+                            "format": evidence_format,
+                            "predicate": "canonical-boot-id-readable",
+                            "state": "ready",
+                            "target_uuid": request.target_uuid,
+                        },
+                    )
+                    break
+                if index < agent_readiness_attempts:
+                    sleeper(float(request.poll_interval_seconds))
+            if agent_readiness_state != "ready":
+                raise BootStartResolutionError(
+                    "guest-agent-readiness-budget-exhausted"
+                )
+
+            stage = "target-files-agent-ready"
+            target_agent_ready = validate_target(request)
+            writer.write_json(
+                "target-files-agent-ready.json", target_agent_ready
+            )
+            runtime_control._require_live_target_identity_stable(
+                target_started, target_agent_ready
+            )
+            target_started = target_agent_ready
 
         stage = "guest-control-root-create"
         guest_exec_invocations += 1
@@ -743,7 +858,7 @@ def run_boot_start_resolution(
         writer.write_json(
             f"{stage}.json",
             {
-                "format": EVIDENCE_FORMAT,
+                "format": evidence_format,
                 "observation": network_ready._observation_metadata(
                     probe_observation
                 ),
@@ -786,7 +901,7 @@ def run_boot_start_resolution(
             {
                 "classification": boot_classification,
                 "expected_boot_id_sha256": binding.expected_boot_id_sha256,
-                "format": EVIDENCE_FORMAT,
+                "format": evidence_format,
                 "observed_boot_id_sha256": observed_boot_hash,
                 "transport": "foreground-start-private-double-readback",
             },
@@ -898,7 +1013,7 @@ def run_boot_start_resolution(
         "file_pull_invocations": file_pull_invocations,
         "file_push_invocations": file_push_invocations,
         "foreground_start_invocations": foreground_start_invocations,
-        "format": EVIDENCE_FORMAT,
+        "format": evidence_format,
         "guest_exec_invocations": guest_exec_invocations,
         "guest_probe_invocations": guest_probe_invocations,
         "identity_observation_count": identity_observation_count,
@@ -923,6 +1038,16 @@ def run_boot_start_resolution(
         "terminal_relevant_host_process_count": len(terminal_processes),
         "transaction": "artifacts-staged-preserved-no-resume",
     }
+    if int(getattr(request, "agent_readiness_attempts", 0)) > 0:
+        terminal.update(
+            {
+                "agent_readiness_invocations": agent_readiness_invocations,
+                "agent_readiness_state": agent_readiness_state,
+                "readiness_identity_observation_count": (
+                    readiness_identity_observation_count
+                ),
+            }
+        )
     writer.write_json("terminal.json", terminal)
     runtime_control._require_no_raw_operation_id(request.output_root)
     manifest_sha256 = writer.write_manifest()
@@ -976,9 +1101,11 @@ def _handle_state_evidence(
     observation: start_control.CommandObservation,
     state: str,
     details: dict[str, object],
+    *,
+    evidence_format: str = EVIDENCE_FORMAT,
 ) -> dict[str, object]:
     return {
-        "format": EVIDENCE_FORMAT,
+        "format": evidence_format,
         "observation": network_ready._observation_metadata(observation),
         "state": state,
         **details,
