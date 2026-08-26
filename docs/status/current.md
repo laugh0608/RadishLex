@@ -7,7 +7,7 @@
 - 复核日期：2026-08-26（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh与六类operation已有证据，首个crash已闭合。`install_artifacts_staged` v4真实checkpoint闭合`artifacts_staged`且未触发dpkg；boot transport实机在stopped inventory失败关闭，boot身份、exact resume、其余七个crash与连续L6仍未闭合。
+- L6 controller/pair/refresh与六类operation已有证据，首个crash已闭合。`install_artifacts_staged` v4真实checkpoint闭合`artifacts_staged`且未触发dpkg；唯一boot classification已识别为`new-boot-started`，新boot恢复资格、exact resume、其余七个crash与连续L6仍未闭合。
 
 ## 冻结基线与固定边界
 
@@ -39,7 +39,7 @@
 - clean `dbce3a5`的repository-only boot transport绑定上述18项和全部上游。clean `8f59825`的唯一真实attempt只执行一次`list`，观察21台均registered stopped；target未过inventory gate，PID/probe/guest/file/result均为0，8项manifest `6a1ad09f…5140`闭合`state-indeterminate`。
 - clean `38b1bb8`新增boot start控制；clean `f972371`的唯一实机调用在21台全停后start，PID `39591`双句柄三次稳定，但首次guest root遇到`OSStatus -2700`/agent不可用；29项manifest `97959c55…c57d`闭合`state-indeterminate`。
 - clean `1d64916`最终离线binding闭合boot start 29项。唯一真实resolution一次readiness即ready，PID `39591`与双句柄稳定；probe传输/回读和调用返回成功，但marker不存在，26项manifest `eb7c42f1…d053`闭合`state-indeterminate`。日终审阅确认共享probe CLI只接受`boot-transport`根，而本控制传入`guest-agent`根，精确合成argv在marker前返回`control-root-invalid`；随后正常request关机，21台全停且零相关进程/target句柄。
-- `25e1608`绑定26项及probe三类scope/root。boot classification允许单次start、有限readiness和probe双回读。离线binding为`state-indeterminate`、计划根absent；未操作VM/guest。
+- 唯一boot classification从全停只启动target一次；第10次readiness就绪后，固定probe与双回读识别旧/new boot `18f1ba06…022a`/`b757c8fc…4758`，manifest `a17920bd…0e17`闭合`new-boot-started`。`3e31540`最终离线绑定72项；未resume/dpkg/stop，terminal后未查询UTM。
 
 ## 停止线
 
@@ -54,16 +54,16 @@
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
 - v4 launch至checkpoint及exact resume失败证据与UUID `50B75F88…8038`须冻结；不得复跑、覆盖、循环list/status、主动拉起backend或把无句柄归因为stopped。当前唯一有效transaction仍是manifest `3aca0576…0a4f7`证明的`artifacts_staged`；attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`及输出根`…-Exact-Resume-v1`已消费，不得重试或复用。
-- backend至guest-agent resolution的attempt、host根和guest根均已消费并冻结；当前21台registered VM均stopped。新boot classification只完成repository-only合同与冻结链binding，不构成真实动作授权；不得补拉、重跑旧probe、复用旧根、list/status/start/resume、retry/stop/quit。
+- boot classification及上游attempt与证据根均冻结；terminal只证明PID `92422`、双句柄和新boot，后续VM状态未知。不得补拉、复跑、复用或沿用授权查询、resume、retry/stop/quit。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（2026-08-26）
 
-1. 冻结manifest `eb7c42f1…d053`、旧attempt及旧根；不得倒写旧probe已在guest成功执行。
-2. 若继续实机，须另行授权新attempt/absent根、单次全停inventory/start、有限readiness及probe双回读。
-3. 当前不resume；新attempt稳定分类后再设计后续。`state-indeterminate`立即停止，受控停止另行授权。
+1. 冻结manifest `a17920bd…0e17`、attempt及证据根；后续VM状态未知。
+2. 当前不resume；先repository-only设计新boot只读恢复资格预检，绑定持久事务、系统静止与跨重启guard语义。
+3. 真实预检、canonical resume与受控停止分别使用新attempt、absent根和单独授权；漂移即保留现场。
 
 ## 验证入口
 
@@ -85,7 +85,7 @@
 git diff --check
 ```
 
-上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、stopped-inventory boot classification及checkpoint/resume控制，但不替代实机。真实`install_artifacts_staged`已闭合checkpoint，尚未识别boot或resume；其余case、连续L6与发布仍未闭合。
+上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、stopped-inventory boot classification、冻结结果binding及checkpoint/resume控制，但不替代实机。真实`install_artifacts_staged`已闭合checkpoint并识别为新boot，尚未闭合新boot恢复资格或resume；其余case、连续L6与发布仍未闭合。
 
 ## 阅读索引
 
