@@ -191,6 +191,16 @@ class BootClassificationResolutionTests(unittest.TestCase):
             ):
                 overlapping.validate()
 
+            wrong_prior_boot_start = replace_request(
+                request,
+                prior_boot_start_attempt_id="wrong-prior-boot-start",
+            )
+            with self.assertRaisesRegex(
+                resolution.boot_control.BootStartResolutionError,
+                "required-prior-boot-start-attempt-id-mismatch",
+            ):
+                wrong_prior_boot_start.validate()
+
     def assert_forbidden_actions_absent(
         self, calls: list[tuple[str, ...]]
     ) -> None:
@@ -216,6 +226,13 @@ def make_request(
         output_root=root / "boot-classification-output",
         boot_start_attempt_id=(
             bindings.REQUIRED_BOOT_CLASSIFICATION_ATTEMPT_ID
+        ),
+        prior_boot_start_root=root / "prior-boot-start",
+        prior_boot_start_manifest_sha256=(
+            resolution.guest_bindings.REQUIRED_PRIOR_BOOT_START_MANIFEST_SHA256
+        ),
+        prior_boot_start_attempt_id=(
+            resolution.guest_bindings.REQUIRED_PRIOR_BOOT_START_ATTEMPT_ID
         ),
         prior_guest_agent_root=root / "prior-guest-agent",
         prior_guest_agent_manifest_sha256=(

@@ -8,6 +8,7 @@ from pathlib import Path
 
 import l6_utm_install_artifacts_staged_boot_classification_bindings as bindings
 import l6_utm_install_artifacts_staged_boot_start_resolution as boot_control
+import l6_utm_install_artifacts_staged_guest_agent_bindings as guest_bindings
 import l6_utm_install_artifacts_staged_guest_agent_result_bindings as result_bindings
 import l6_utm_install_artifacts_staged_runtime_resolution as runtime_control
 import l6_v4_boot_transport_probe as guest_probe
@@ -27,6 +28,9 @@ EXIT_STATE_INDETERMINATE = boot_control.EXIT_STATE_INDETERMINATE
 class BootClassificationResolutionRequest(
     boot_control.BootStartResolutionRequest
 ):
+    prior_boot_start_root: Path
+    prior_boot_start_manifest_sha256: str
+    prior_boot_start_attempt_id: str
     prior_guest_agent_root: Path
     prior_guest_agent_manifest_sha256: str
     guest_agent_attempt_id: str
@@ -43,18 +47,24 @@ class BootClassificationResolutionRequest(
                 bindings.REQUIRED_BOOT_CLASSIFICATION_ATTEMPT_ID
             )
         )
+        for root, label in (
+            (self.prior_boot_start_root, "prior-boot-start-root"),
+            (self.prior_guest_agent_root, "prior-guest-agent-root"),
+        ):
+            if not root.is_absolute() or ".." in root.parts:
+                raise boot_control.BootStartResolutionError(
+                    f"{label}-must-be-absolute-normalized"
+                )
+            if runtime_control._paths_overlap(self.output_root, root):
+                raise boot_control.BootStartResolutionError(
+                    f"output-root-must-not-overlap-{label}"
+                )
         if (
-            not self.prior_guest_agent_root.is_absolute()
-            or ".." in self.prior_guest_agent_root.parts
+            self.prior_boot_start_manifest_sha256
+            != guest_bindings.REQUIRED_PRIOR_BOOT_START_MANIFEST_SHA256
         ):
             raise boot_control.BootStartResolutionError(
-                "prior-guest-agent-root-must-be-absolute-normalized"
-            )
-        if runtime_control._paths_overlap(
-            self.output_root, self.prior_guest_agent_root
-        ):
-            raise boot_control.BootStartResolutionError(
-                "output-root-must-not-overlap-prior-guest-agent-root"
+                "required-prior-boot-start-manifest-mismatch"
             )
         if (
             self.prior_guest_agent_manifest_sha256
@@ -64,6 +74,11 @@ class BootClassificationResolutionRequest(
                 "required-prior-guest-agent-manifest-mismatch"
             )
         for value, expected, label in (
+            (
+                self.prior_boot_start_attempt_id,
+                guest_bindings.REQUIRED_PRIOR_BOOT_START_ATTEMPT_ID,
+                "prior-boot-start",
+            ),
             (
                 self.guest_agent_attempt_id,
                 bindings.REQUIRED_PRIOR_GUEST_AGENT_ATTEMPT_ID,
@@ -131,6 +146,12 @@ class BootClassificationResolutionRequest(
                 ),
                 "format": EVIDENCE_FORMAT,
                 "guest_agent_attempt_id": self.guest_agent_attempt_id,
+                "prior_boot_start_attempt_id": (
+                    self.prior_boot_start_attempt_id
+                ),
+                "prior_boot_start_manifest_sha256": (
+                    self.prior_boot_start_manifest_sha256
+                ),
                 "prior_guest_agent_attempt_id": (
                     self.prior_guest_agent_attempt_id
                 ),
@@ -206,6 +227,7 @@ def parse_args() -> argparse.Namespace:
         "prior-runtime-resolution-root",
         "prior-runtime-resolution-v2-root",
         "prior-boot-transport-root",
+        "prior-boot-start-root",
         "prior-guest-agent-root",
         "source-bundle-path",
         "output-root",
@@ -227,6 +249,7 @@ def parse_args() -> argparse.Namespace:
         "prior-runtime-resolution-manifest-sha256",
         "prior-runtime-resolution-v2-manifest-sha256",
         "prior-boot-transport-manifest-sha256",
+        "prior-boot-start-manifest-sha256",
         "prior-guest-agent-manifest-sha256",
         "source-bundle-sha256",
         "transfer-attempt-id",
@@ -242,6 +265,7 @@ def parse_args() -> argparse.Namespace:
         "boot-transport-attempt-id",
         "prior-boot-transport-attempt-id",
         "boot-start-attempt-id",
+        "prior-boot-start-attempt-id",
         "guest-agent-attempt-id",
         "prior-guest-agent-attempt-id",
         "boot-classification-attempt-id",
