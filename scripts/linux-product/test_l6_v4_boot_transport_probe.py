@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import io
 import os
 import tempfile
 import unittest
@@ -13,12 +15,17 @@ import l6_v4_boot_transport_probe as probe
 ATTEMPT_ID = "synthetic-boot-transport-attempt-v1"
 TARGET_UUID = "12345678-1234-4234-8234-123456789ABC"
 BOOT_ID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+CONTROL_SCOPE = probe.CONTROL_SCOPE_BOOT_TRANSPORT
 
 
 class BootTransportProbeTests(unittest.TestCase):
     def test_writes_only_canonical_boot_hash_with_create_new_files(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary) / "control"
+            root = probe.control_root_for(
+                CONTROL_SCOPE,
+                ATTEMPT_ID,
+                parent=Path(temporary),
+            )
             root.mkdir(mode=0o700)
             boot_path = Path(temporary) / "boot_id"
             boot_path.write_text(BOOT_ID + "\n", encoding="ascii")
@@ -30,12 +37,13 @@ class BootTransportProbeTests(unittest.TestCase):
                 attempt_id=ATTEMPT_ID,
                 target_uuid=TARGET_UUID,
                 expected_probe_sha256=probe_sha256,
+                control_scope=CONTROL_SCOPE,
                 control_root=root,
                 boot_id_path=boot_path,
                 probe_path=probe_path,
                 expected_owner_uid=os.getuid(),
                 expected_owner_gid=os.getgid(),
-                expected_control_root=root,
+                control_root_parent=Path(temporary),
             )
 
             expected_hash = hashlib.sha256(BOOT_ID.encode("ascii")).hexdigest()
@@ -66,12 +74,13 @@ class BootTransportProbeTests(unittest.TestCase):
                 "attempt_id": ATTEMPT_ID,
                 "target_uuid": TARGET_UUID,
                 "expected_probe_sha256": probe_sha256,
+                "control_scope": CONTROL_SCOPE,
                 "control_root": root,
                 "boot_id_path": boot_path,
                 "probe_path": probe_path,
                 "expected_owner_uid": os.getuid(),
                 "expected_owner_gid": os.getgid(),
-                "expected_control_root": root,
+                "control_root_parent": Path(temporary),
             }
             probe.run_probe(**arguments)
             before = (root / "boot-identity.evidence.json").read_bytes()
@@ -97,12 +106,13 @@ class BootTransportProbeTests(unittest.TestCase):
                     attempt_id=ATTEMPT_ID,
                     target_uuid=TARGET_UUID,
                     expected_probe_sha256=probe_sha256,
+                    control_scope=CONTROL_SCOPE,
                     control_root=root,
                     boot_id_path=boot_path,
                     probe_path=probe_path,
                     expected_owner_uid=os.getuid(),
                     expected_owner_gid=os.getgid(),
-                    expected_control_root=root,
+                    control_root_parent=Path(temporary),
                 )
 
             self.assertTrue((root / "attempt.marker.json").is_file())
@@ -112,11 +122,80 @@ class BootTransportProbeTests(unittest.TestCase):
                 (root / "attempt.marker.json").read_text(encoding="ascii"),
             )
 
+    def test_scope_and_root_must_match_before_marker_write(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            root, boot_path, probe_path, probe_sha256 = prepare(temporary)
+            mismatched_root = probe.control_root_for(
+                probe.CONTROL_SCOPE_GUEST_AGENT,
+                ATTEMPT_ID,
+                parent=parent,
+            )
+
+            with self.assertRaisesRegex(
+                probe.BootTransportProbeError, "control-root-invalid"
+            ):
+                probe.run_probe(
+                    attempt_id=ATTEMPT_ID,
+                    target_uuid=TARGET_UUID,
+                    expected_probe_sha256=probe_sha256,
+                    control_scope=probe.CONTROL_SCOPE_GUEST_AGENT,
+                    control_root=root,
+                    boot_id_path=boot_path,
+                    probe_path=probe_path,
+                    expected_owner_uid=os.getuid(),
+                    expected_owner_gid=os.getgid(),
+                    control_root_parent=parent,
+                )
+
+            self.assertFalse((root / "attempt.marker.json").exists())
+            self.assertFalse(mismatched_root.exists())
+
+    def test_cli_requires_one_supported_control_scope(self) -> None:
+        base = (
+            "--attempt-id",
+            ATTEMPT_ID,
+            "--target-uuid",
+            TARGET_UUID,
+            "--expected-probe-sha256",
+            "a" * 64,
+        )
+        for control_scope in probe.CONTROL_SCOPES:
+            with self.subTest(control_scope=control_scope):
+                root = probe.control_root_for(control_scope, ATTEMPT_ID)
+                args = probe.parse_args(
+                    (
+                        *base,
+                        "--control-scope",
+                        control_scope,
+                        "--control-root",
+                        str(root),
+                    )
+                )
+                self.assertEqual(args.control_scope, control_scope)
+                self.assertEqual(args.control_root, root)
+
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                probe.parse_args(
+                    (
+                        *base,
+                        "--control-scope",
+                        "unknown",
+                        "--control-root",
+                        "/var/tmp/x",
+                    )
+                )
+
 
 def prepare(
     temporary: str,
 ) -> tuple[Path, Path, Path, str]:
-    root = Path(temporary) / "control"
+    root = probe.control_root_for(
+        CONTROL_SCOPE,
+        ATTEMPT_ID,
+        parent=Path(temporary),
+    )
     root.mkdir(mode=0o700)
     boot_path = Path(temporary) / "boot_id"
     boot_path.write_text(BOOT_ID + "\n", encoding="ascii")

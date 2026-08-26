@@ -136,6 +136,25 @@ class FakeRunner:
 
 
 class GuestAgentResolutionTests(unittest.TestCase):
+    def test_probe_cli_uses_guest_agent_scope_root_contract(self) -> None:
+        request = make_request(Path("/tmp/radishlex-guest-agent-cli-test"))
+        argv = resolution.probe_argv(request, make_binding())
+
+        args = guest_probe.parse_args(argv[8:])
+
+        self.assertEqual(
+            args.control_scope,
+            guest_probe.CONTROL_SCOPE_GUEST_AGENT,
+        )
+        self.assertEqual(args.control_root, Path(request.guest_control_root))
+        self.assertEqual(
+            guest_probe.control_root_for(
+                args.control_scope,
+                args.attempt_id,
+            ),
+            args.control_root,
+        )
+
     def test_delayed_agent_ready_classifies_new_boot(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             request = make_request(Path(temporary))

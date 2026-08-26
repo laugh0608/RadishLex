@@ -148,6 +148,25 @@ class FakeRunner:
 
 
 class BootTransportResolutionTests(unittest.TestCase):
+    def test_probe_cli_uses_boot_transport_scope_root_contract(self) -> None:
+        request = make_request(Path("/tmp/radishlex-boot-transport-cli-test"))
+        argv = resolution.probe_argv(request, make_binding())
+
+        args = guest_probe.parse_args(argv[8:])
+
+        self.assertEqual(
+            args.control_scope,
+            guest_probe.CONTROL_SCOPE_BOOT_TRANSPORT,
+        )
+        self.assertEqual(args.control_root, Path(request.guest_control_root))
+        self.assertEqual(
+            guest_probe.control_root_for(
+                args.control_scope,
+                args.attempt_id,
+            ),
+            args.control_root,
+        )
+
     def test_empty_exec_output_uses_private_double_readback(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             request = make_request(Path(temporary))

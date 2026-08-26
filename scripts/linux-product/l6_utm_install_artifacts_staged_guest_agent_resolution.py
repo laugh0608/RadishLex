@@ -993,6 +993,8 @@ def probe_argv(
         request.target_uuid,
         "--expected-probe-sha256",
         hashlib.sha256(binding.probe_bytes).hexdigest(),
+        "--control-scope",
+        guest_probe.CONTROL_SCOPE_GUEST_AGENT,
         "--control-root",
         request.guest_control_root,
     )

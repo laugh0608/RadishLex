@@ -10,11 +10,21 @@ import stat
 import sys
 import uuid
 from pathlib import Path
+from typing import Sequence
 
 
 EVIDENCE_FORMAT = "radishlex-linux-l6-v4-boot-transport-evidence-v1"
 MARKER_FORMAT = "radishlex-linux-l6-v4-boot-transport-marker-v1"
 BOOT_ID_PATH = Path("/proc/sys/kernel/random/boot_id")
+CONTROL_ROOT_PARENT = Path("/var/tmp")
+CONTROL_SCOPE_BOOT_TRANSPORT = "boot-transport"
+CONTROL_SCOPE_BOOT_START = "boot-start"
+CONTROL_SCOPE_GUEST_AGENT = "guest-agent"
+CONTROL_SCOPES = (
+    CONTROL_SCOPE_BOOT_TRANSPORT,
+    CONTROL_SCOPE_BOOT_START,
+    CONTROL_SCOPE_GUEST_AGENT,
+)
 SAFE_ATTEMPT_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,95}")
 HEX_64 = re.compile(r"[0-9a-f]{64}")
 
@@ -68,12 +78,13 @@ def run_probe(
     attempt_id: str,
     target_uuid: str,
     expected_probe_sha256: str,
+    control_scope: str,
     control_root: Path,
     boot_id_path: Path = BOOT_ID_PATH,
     probe_path: Path | None = None,
     expected_owner_uid: int = 0,
     expected_owner_gid: int = 0,
-    expected_control_root: Path | None = None,
+    control_root_parent: Path = CONTROL_ROOT_PARENT,
 ) -> str:
     if not SAFE_ATTEMPT_ID.fullmatch(attempt_id):
         raise BootTransportProbeError("attempt-id-invalid")
@@ -85,8 +96,10 @@ def run_probe(
         raise BootTransportProbeError("target-uuid-not-canonical")
     if not HEX_64.fullmatch(expected_probe_sha256):
         raise BootTransportProbeError("expected-probe-sha256-invalid")
-    expected_root = expected_control_root or Path(
-        "/var/tmp/radishlex-l6-v4-boot-transport-" + attempt_id
+    expected_root = control_root_for(
+        control_scope,
+        attempt_id,
+        parent=control_root_parent,
     )
     if control_root != expected_root:
         raise BootTransportProbeError("control-root-invalid")
@@ -124,6 +137,19 @@ def run_probe(
         expected_owner_gid=expected_owner_gid,
     )
     return boot_id_sha256
+
+
+def control_root_for(
+    control_scope: str,
+    attempt_id: str,
+    *,
+    parent: Path = CONTROL_ROOT_PARENT,
+) -> Path:
+    if control_scope not in CONTROL_SCOPES:
+        raise BootTransportProbeError("control-scope-invalid")
+    if not SAFE_ATTEMPT_ID.fullmatch(attempt_id):
+        raise BootTransportProbeError("attempt-id-invalid")
+    return parent / f"radishlex-l6-v4-{control_scope}-{attempt_id}"
 
 
 def _validate_private_root(
@@ -217,7 +243,7 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Write one create-new SHA-256 of the canonical guest boot ID "
@@ -227,8 +253,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--attempt-id", required=True)
     parser.add_argument("--target-uuid", required=True)
     parser.add_argument("--expected-probe-sha256", required=True)
+    parser.add_argument(
+        "--control-scope",
+        choices=CONTROL_SCOPES,
+        required=True,
+    )
     parser.add_argument("--control-root", type=Path, required=True)
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def main() -> int:
@@ -238,6 +269,7 @@ def main() -> int:
             attempt_id=args.attempt_id,
             target_uuid=args.target_uuid,
             expected_probe_sha256=args.expected_probe_sha256,
+            control_scope=args.control_scope,
             control_root=args.control_root,
         )
     except BootTransportProbeError as exc:
