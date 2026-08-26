@@ -553,6 +553,10 @@ ready后只建立固定新guest根`/var/tmp/radishlex-l6-v4-guest-agent-d75818f-
 
 host control要求clean committed binding递归复核72项真实boot classification，再绑定旧resume driver SHA-256 `0b649ecd…d05b`与当前probe。未来真实调用不做inventory/list/status/start；它先固定已有target PID/双句柄、无活动`utmctl`、source/target身份与有界agent readiness，再向create-new私有guest根各交付一次旧driver和只读probe、逐字回读、probe唯一执行、marker及result双回读，最后复核同一PID/process/target。6项host与5项guest测试及默认L6门禁通过；clean `4ba55cb`对真实冻结链纯离线binding返回72项、`new-boot-started`、PID `92422`、旧/new boot hash与binding evidence SHA-256 `18cc48a2…40d6`。本批没有调用`utmctl`、进入guest、创建新现场根或改写冻结证据；真实预检、后续resume及受控停止继续分别使用新attempt、absent根和单独系统授权。
 
+用户随后只授权UUID `50B75F88…8038`上的一次真实只读恢复预检：固定attempt `d75818f-v4-install-artifacts-staged-new-boot-recovery-preflight-20260826-v1`，不含inventory/list/status/start、resume、dpkg mutation、retry/cleanup/stop/quit。控制一次readiness即ready，PID `92422`与双句柄从preflight至probe前稳定；只创建一个guest私有根，各push/readback旧driver与probe一次，probe、marker及两份result/phase回读各按合同执行。guest canonical terminal在`persistent-transaction`阶段以`ResumeDriverError:directory-identity-invalid:state-root`交付`recovery-rejected`，guard尚未观察，resume与dpkg mutation均为0；但`utmctl exec`传输层返回假exit 0，旧host比较预期10后把已确定拒绝升级为`state-indeterminate`，故没有执行terminal PID/process/target postflight。create-new host根`…-v4-New-Boot-Recovery-Preflight-v1`含38项，manifest `1d593a8f7a9ce725320954257e763862703d43e89a3e82c7fa5cd94391f233c7`逐项通过；调用后没有再次查询或停止UTM，VM状态未知，attempt与host/guest根全部冻结。
+
+复核production `store.rs`与安装边界确认`/var/lib/radishlex/install-v1`及`operations/`合同为root-owned `0755`，只有具体`operations/<operation-id>`为`0700`；旧probe错误复用了exact-resume driver的private-directory helper，因而在读取receipt/staging前拒绝。`c523fb3`改由probe按层校验`0755/0755/0700`，不修改已冻结的旧driver；host则以已验证marker、两份逐字相同terminal及匹配phase为权威结果，仅记录不可靠的exec transport exit。新增5项result binding、1项host与1项guest回归并进入默认L6门禁；clean committed `c523fb3`对38项及全部递归上游纯离线验证通过，明确同时保留guest `recovery-rejected`、transport exit 0和旧host `state-indeterminate`，且没有调用`utmctl`或改写现场。该修复不倒写旧attempt为资格通过；第二次真实预检必须使用新attempt与absent host/guest根并重新授权，resume及受控停止继续独立。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
