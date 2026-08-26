@@ -541,6 +541,10 @@ ready后只建立固定新guest根`/var/tmp/radishlex-l6-v4-guest-agent-d75818f-
 
 用户授权日终关闭全部VM后，首次plain `list`只见v4为started、其余20台stopped；宿主只对UUID `50B75F88…8038`执行一次`utmctl stop … --request`，未使用默认force或kill。终态plain `list`显示21台全部stopped，随后`ps`相关QEMU/`utmctl`为0且target EFI/qcow2 `lsof`为空。该观察只证明日终registered/host静止，不是新的manifest、boot身份或磁盘内容证据，也不授权明日start、guest回读或resume。
 
+2026-08-26的repository-only收口先以`862b003`把共享probe根改为显式封闭scope：`boot-transport`、`boot-start`和`guest-agent`分别只派生自己的固定`/var/tmp`根，三类host生成argv必须通过committed CLI parser与根重算，未知scope或root错配均在marker前拒绝。`5b8d074`再逐项绑定guest-agent manifest `eb7c42f1…d053`的26个固定成员、原clean `1d64916`、一次readiness/一次probe、marker absent、result 0、postflight未执行及全部禁止动作；clean HEAD对真实冻结根的纯离线调用返回26项、`absent-after-probe-exec`和旧`state-indeterminate`，没有创建新根或调用UTM。
+
+`65c7699`/`25e1608`新增并补齐stopped-inventory boot classification binding/control。新attempt固定为`d75818f-v4-install-artifacts-staged-boot-classification-20260826-v1`，计划host根固定为`…-v4-Boot-Classification-v1`；binding递归重验旧boot-start与guest-agent根、manifest和attempt身份，并要求clean committed HEAD。真实控制仍须新的逐项授权：唯一plain `list`必须证明21台全停，三轮静止后只允许一次foreground start；随后有界发现并三次确认唯一QEMULauncher双句柄，每次最多60轮只读agent readiness，ready后才执行一次固定`boot-start` scope probe、marker与result双回读及终态复核。预算耗尽或任一身份/transport/格式漂移都闭合`state-indeterminate`，不自动resume/retry/stop/quit，不进入业务guest或dpkg。clean `25e1608`对真实冻结链的纯离线binding返回26项、marker absent、旧`state-indeterminate`且计划根absent；今日未调用`utmctl`、进入guest、启动或操作VM。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
