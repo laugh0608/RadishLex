@@ -17,6 +17,14 @@ import test_l6_utm_install_artifacts_staged_boot_classification_resolution as cl
 
 
 class BootClassificationResultBindingTests(unittest.TestCase):
+    def test_inventory_baseline_uses_reactivation_binding(self) -> None:
+        upstream = make_upstream()
+
+        baseline = bindings._baseline_inventory(upstream)
+
+        self.assertEqual(len(baseline), 20)
+        self.assertEqual(baseline[0].uuid, "uuid-0")
+
     def test_manifest_binds_all_seventy_two_members_before_semantics(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             request = make_request(Path(temporary))

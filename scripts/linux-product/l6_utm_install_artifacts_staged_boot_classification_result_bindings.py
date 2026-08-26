@@ -379,7 +379,7 @@ def _validate_prior_inventory_and_start(
         "prior-boot-classification-list",
     )
     inventory = start_control.parse_utmctl_list(list_observation)
-    baseline = upstream.upstream.upstream.baseline_inventory
+    baseline = _baseline_inventory(upstream)
     if (
         classification_control.boot_control.reactivation_control._require_inventory(
             inventory, baseline, request
@@ -445,6 +445,15 @@ def _validate_prior_runtime(
             targeted_argv,
             runtime_bindings.EVIDENCE_FORMAT,
         )
+
+
+def _baseline_inventory(
+    binding: classification_bindings.BootClassificationBinding,
+) -> tuple[start_control.RegisteredVm, ...]:
+    boot_transport = binding.upstream
+    runtime_resolution = boot_transport.upstream
+    reactivation = runtime_resolution.upstream
+    return reactivation.baseline_inventory
 
 
 def _validate_prior_readiness(
