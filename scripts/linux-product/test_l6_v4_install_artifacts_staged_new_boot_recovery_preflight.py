@@ -13,6 +13,92 @@ import l6_v4_install_artifacts_staged_new_boot_recovery_preflight as probe
 
 
 class NewBootRecoveryPreflightProbeTests(unittest.TestCase):
+    def test_persistent_transaction_uses_product_directory_modes(self) -> None:
+        operation_id = "a" * 32
+        state_root = Path("/var/lib/radishlex/install-v1")
+        operations_root = state_root / "operations"
+        operation_root = operations_root / operation_id
+        receipt = {
+            "failure_after_state": None,
+            "failure_code": None,
+            "distribution_identity": "debian-local-deb-v1",
+            "initial_package": {"artifact": None, "state": "not_installed"},
+            "manual_recovery_required": False,
+            "operation_chain": [operation_id],
+            "operation_id": operation_id,
+            "operation_kind": "install",
+            "product_id": "radishlex-linux",
+            "receipt_format": "radishlex-linux-install-receipt-v1",
+            "source_artifact": None,
+            "source_proof": None,
+            "staged_artifacts": [
+                {
+                    "artifact": {
+                        "evidence_sha256": "evidence",
+                        "package_sha256": "package",
+                    },
+                    "slot": "target",
+                }
+            ],
+            "state": "artifacts_staged",
+            "target_artifact": {
+                "evidence_sha256": "evidence",
+                "package_sha256": "package",
+                "package_version": "26.7.1+38-1",
+            },
+            "target_proof": None,
+            "version_relation": "not_applicable",
+        }
+        driver = SimpleNamespace(
+            STATE_ROOT=state_root,
+            RECEIPT_PATH=state_root / "receipt.json",
+            EXPECTED_RECEIPT_SIZE=1,
+            EXPECTED_RECEIPT_SHA256="receipt",
+            EXPECTED_OPERATION_ID_SHA256=probe.EXPECTED_OPERATION_ID_SHA256,
+            EXPECTED_SOURCE_PACKAGE_SHA256="package",
+            EXPECTED_SOURCE_EVIDENCE_SHA256="evidence",
+            HEX_32=probe.re.compile(r"[0-9a-f]{32}"),
+            read_bounded=mock.Mock(return_value=probe.json.dumps(receipt).encode()),
+            sha256_bytes=mock.Mock(
+                return_value=probe.EXPECTED_OPERATION_ID_SHA256
+            ),
+            require_regular=mock.Mock(),
+        )
+        directory_modes: list[tuple[Path, str, int]] = []
+        with mock.patch.object(
+            probe,
+            "require_directory",
+            side_effect=lambda path, label, mode: directory_modes.append(
+                (path, label, mode)
+            ),
+        ), mock.patch.object(
+            probe, "require_private_directory"
+        ) as private, mock.patch.object(
+            probe.Path, "exists", return_value=False
+        ), mock.patch.object(
+            probe.Path,
+            "iterdir",
+            side_effect=(
+                (operation_root,),
+                (
+                    operation_root / "target.deb",
+                    operation_root / "target.evidence.json",
+                ),
+            ),
+        ):
+            result = probe.validate_persistent_transaction(driver)
+
+        self.assertEqual(result, operation_id)
+        self.assertEqual(
+            directory_modes,
+            [
+                (state_root, "state-root", 0o755),
+                (operations_root, "operations-root", 0o755),
+            ],
+        )
+        private.assert_called_once_with(operation_root, "operation-root")
+        self.assertFalse(any("/run/" in str(call) for call in directory_modes))
+
     def test_absent_guard_maps_to_operation_in_progress_startup(self) -> None:
         guard = mock.Mock()
         guard.lstat.side_effect = FileNotFoundError

@@ -663,12 +663,6 @@ def run_recovery_preflight(
                 }
             ),
         )
-        expected_exit = (
-            0 if guest_terminal["outcome"] == "recovery-qualified" else 10
-        )
-        if probe_observation.exit_code != expected_exit:
-            raise RecoveryPreflightError("probe-exit-evidence-mismatch")
-
         stage = "target-handle-pid-terminal"
         argv = runtime_control.targeted_lsof_argv(request, backend_pid)
         observation = command_runner.run(argv, request.command_timeout_seconds)
@@ -755,7 +749,15 @@ def run_recovery_preflight(
             "file_push_invocations": file_push_invocations,
             "format": EVIDENCE_FORMAT,
             "guest_exec_invocations": guest_exec_invocations,
+            "guest_probe_transport_exit_code": (
+                probe_observation.exit_code if probe_invoked else None
+            ),
             "guest_probe_invocations": guest_probe_invocations,
+            "guest_recovery_outcome": (
+                guest_terminal.get("outcome")
+                if guest_terminal is not None
+                else "not-observed"
+            ),
             "identity_observation_count": identity_observation_count,
             "inventory_probe_invocations": 0,
             "maintenance_resume_invocations": 0,

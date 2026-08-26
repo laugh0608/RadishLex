@@ -74,6 +74,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_utm_install_artifacts_staged_new_boot_recovery_preflight.py"
 PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/linux-product/test_l6_utm_install_artifacts_staged_new_boot_recovery_preflight_result_bindings.py"
+PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_v4_install_artifacts_staged_new_boot_recovery_preflight.py"
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_v4_boot_transport_probe.py"

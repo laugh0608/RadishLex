@@ -57,16 +57,20 @@ def canonical_json(value: dict[str, object]) -> bytes:
     )
 
 
-def require_private_directory(path: Path, label: str) -> None:
+def require_directory(path: Path, label: str, mode: int) -> None:
     metadata = path.lstat()
     if (
         not stat.S_ISDIR(metadata.st_mode)
         or stat.S_ISLNK(metadata.st_mode)
         or metadata.st_uid != 0
         or metadata.st_gid != 0
-        or stat.S_IMODE(metadata.st_mode) != 0o700
+        or stat.S_IMODE(metadata.st_mode) != mode
     ):
         raise RecoveryPreflightError(f"directory-identity-invalid:{label}")
+
+
+def require_private_directory(path: Path, label: str) -> None:
+    require_directory(path, label, 0o700)
 
 
 def require_regular(
@@ -160,7 +164,7 @@ def load_resume_driver(path: Path, expected_sha256: str) -> ModuleType:
 
 
 def validate_persistent_transaction(driver: ModuleType) -> str:
-    driver.require_private_directory(driver.STATE_ROOT, "state-root")
+    require_directory(driver.STATE_ROOT, "state-root", 0o755)
     driver.require_regular(
         driver.RECEIPT_PATH,
         "receipt",
@@ -226,12 +230,12 @@ def validate_persistent_transaction(driver: ModuleType) -> str:
     ):
         raise RecoveryPreflightError("receipt-target-invalid")
     operations_root = driver.STATE_ROOT / "operations"
-    driver.require_private_directory(operations_root, "operations-root")
+    require_directory(operations_root, "operations-root", 0o755)
     operation_directories = tuple(operations_root.iterdir())
     if len(operation_directories) != 1 or operation_directories[0].name != operation_id:
         raise RecoveryPreflightError("operation-directory-count-invalid")
     operation_root = operation_directories[0]
-    driver.require_private_directory(operation_root, "operation-root")
+    require_private_directory(operation_root, "operation-root")
     if {item.name for item in operation_root.iterdir()} != {
         "target.deb",
         "target.evidence.json",

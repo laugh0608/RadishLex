@@ -24,11 +24,15 @@ class RecoveryRunner:
         *,
         result_payloads: list[bytes] | None = None,
         handles_present: bool = True,
+        phase: str = "complete",
+        probe_exit_code: int = 0,
     ) -> None:
         self.request = request
         self.binding = binding
         self.result_payloads = list(result_payloads or [])
         self.handles_present = handles_present
+        self.phase = phase
+        self.probe_exit_code = probe_exit_code
         self.calls: list[tuple[str, ...]] = []
         self.incoming: dict[str, bytes] = {}
         self.published: dict[str, bytes] = {}
@@ -68,7 +72,7 @@ class RecoveryRunner:
                 )
             elif path == self.request.guest_phase_path:
                 payload = guest_probe.canonical_json(
-                    {"format": guest_probe.PHASE_FORMAT, "phase": "complete"}
+                    {"format": guest_probe.PHASE_FORMAT, "phase": self.phase}
                 )
             else:
                 raise AssertionError(f"unexpected pull path: {path}")
@@ -77,7 +81,12 @@ class RecoveryRunner:
             if "/bin/mv" in argv:
                 incoming, final = argv[-2:]
                 self.published[final] = self.incoming[incoming]
-            return guest_agent_test.observation(argv)
+            exit_code = (
+                self.probe_exit_code
+                if argv == control.probe_argv(self.request, self.binding)
+                else 0
+            )
+            return guest_agent_test.observation(argv, exit_code=exit_code)
         raise AssertionError(f"unexpected command: {argv}")
 
 
@@ -134,8 +143,42 @@ class NewBootRecoveryPreflightTests(unittest.TestCase):
                 "artifacts-staged-preserved-no-resume",
             )
             self.assertEqual(terminal["file_push_invocations"], 2)
+            self.assertEqual(terminal["guest_probe_transport_exit_code"], 0)
+            self.assertEqual(
+                terminal["guest_recovery_outcome"], "recovery-qualified"
+            )
             self.assert_forbidden_actions_absent(runner.calls)
             runtime_test.assert_manifest_valid(self, request.output_root)
+
+    def test_guest_result_is_authoritative_when_exec_reports_zero(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            request = make_request(Path(temporary))
+            binding = make_binding()
+            rejected = rejected_payload(request)
+            runner = RecoveryRunner(
+                request,
+                binding,
+                result_payloads=[rejected, rejected],
+                phase="rejected",
+                probe_exit_code=0,
+            )
+
+            result, _ = run_case(request, binding, runner)
+
+            self.assertEqual(result.outcome, "recovery-rejected")
+            self.assertEqual(result.exit_code, control.EXIT_RECOVERY_REJECTED)
+            terminal = read_json(request.output_root / "terminal.json")
+            self.assertEqual(terminal["guest_probe_transport_exit_code"], 0)
+            self.assertEqual(
+                terminal["guest_recovery_outcome"], "recovery-rejected"
+            )
+            self.assertTrue(
+                (request.output_root / "target-handle-pid-terminal.json").exists()
+            )
+            self.assertTrue(
+                (request.output_root / "target-files-postflight.json").exists()
+            )
+            self.assert_forbidden_actions_absent(runner.calls)
 
     def test_double_readback_drift_is_state_indeterminate_after_probe(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -300,6 +343,19 @@ def qualified_payload(request: control.RecoveryPreflightRequest) -> bytes:
             "transaction": "artifacts-staged-preserved-no-resume",
         }
     )
+
+
+def rejected_payload(request: control.RecoveryPreflightRequest) -> bytes:
+    value = json.loads(qualified_payload(request))
+    value.pop("receipt_state")
+    value.pop("startup_gate")
+    value.update(
+        guard_profile="not-observed",
+        outcome="recovery-rejected",
+        phase="persistent-transaction",
+        reason="RecoveryPreflightError:synthetic-rejection",
+    )
+    return guest_probe.canonical_json(value)
 
 
 def run_case(
