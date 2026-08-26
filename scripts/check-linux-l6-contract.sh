@@ -66,6 +66,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_utm_install_artifacts_staged_guest_agent_resolution.py"
 PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/linux-product/test_l6_utm_install_artifacts_staged_guest_agent_result_bindings.py"
+PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_v4_boot_transport_probe.py"
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_v4_canonical_input_bundle.py"
@@ -74,4 +76,4 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_controller_contract.py"
 
-echo "Linux L6 matrix, guest-case, UTM start/clone/launch/network/input transfer/resolution/negative preflight/checkpoint/resume/backend resolution/reactivation/runtime, boot transport, boot start, and guest-agent resolution controls, bundle builder, and compile-identity contracts passed without guest or system mutation."
+echo "Linux L6 matrix, guest-case, UTM start/clone/launch/network/input transfer/resolution/negative preflight/checkpoint/resume/backend resolution/reactivation/runtime, boot transport, boot start, guest-agent resolution, and frozen guest-agent result binding controls, bundle builder, and compile-identity contracts passed without guest or system mutation."
