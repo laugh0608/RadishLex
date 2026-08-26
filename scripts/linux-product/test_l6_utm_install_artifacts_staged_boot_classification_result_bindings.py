@@ -25,6 +25,26 @@ class BootClassificationResultBindingTests(unittest.TestCase):
         self.assertEqual(len(baseline), 20)
         self.assertEqual(baseline[0].uuid, "uuid-0")
 
+    def test_first_runtime_handle_precedes_pid_discovery(self) -> None:
+        argv = ("/usr/sbin/lsof", "synthetic-target")
+        value = present_handle(argv, include_backend_pid=False)
+
+        bindings._require_present_handle(
+            value,
+            argv,
+            bindings.classification_bindings.EVIDENCE_FORMAT,
+            expected_backend_pid=None,
+        )
+
+        value["backend_pid"] = bindings.REQUIRED_BACKEND_PID
+        with self.assertRaisesRegex(ValueError, "present-handle-invalid"):
+            bindings._require_present_handle(
+                value,
+                argv,
+                bindings.classification_bindings.EVIDENCE_FORMAT,
+                expected_backend_pid=None,
+            )
+
     def test_manifest_binds_all_seventy_two_members_before_semantics(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             request = make_request(Path(temporary))
@@ -213,6 +233,33 @@ def make_upstream() -> SimpleNamespace:
             )
         ),
     )
+
+
+def present_handle(
+    argv: tuple[str, ...], *, include_backend_pid: bool
+) -> dict[str, object]:
+    value: dict[str, object] = {
+        "backend_command": "QEMULauncher",
+        "efi_handle_count": 1,
+        "format": bindings.classification_bindings.EVIDENCE_FORMAT,
+        "observation": {
+            "argv": list(argv),
+            "exit_code": 0,
+            "stderr": empty_stream(),
+            "stdout": {
+                "sha256": bindings.REQUIRED_HANDLE_STDOUT_SHA256,
+                "total_bytes": 378,
+                "truncated": False,
+            },
+            "timed_out": False,
+        },
+        "process_record_count": 1,
+        "qcow2_handle_count": 1,
+        "state": "present",
+    }
+    if include_backend_pid:
+        value["backend_pid"] = bindings.REQUIRED_BACKEND_PID
+    return value
 
 
 def prior_request(request: SimpleNamespace) -> dict[str, object]:

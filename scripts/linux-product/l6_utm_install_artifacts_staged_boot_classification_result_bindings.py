@@ -425,6 +425,7 @@ def _validate_prior_runtime(
         network_ready._read_json(root / "target-handles-runtime-001.json"),
         global_argv,
         classification_bindings.EVIDENCE_FORMAT,
+        expected_backend_pid=None,
     )
     _require_present_handle(
         network_ready._read_json(root / "target-handle-pid-discovery.json"),
@@ -717,14 +718,21 @@ def _require_present_handle(
     value: dict[str, object],
     expected_argv: tuple[str, ...],
     expected_format: str,
+    *,
+    expected_backend_pid: int | None = REQUIRED_BACKEND_PID,
 ) -> None:
     observation = value.get("observation")
     stdout = observation.get("stdout") if isinstance(observation, dict) else None
+    backend_pid_valid = (
+        "backend_pid" not in value
+        if expected_backend_pid is None
+        else value.get("backend_pid") == expected_backend_pid
+    )
     if (
         value.get("format") != expected_format
         or value.get("state") != "present"
         or value.get("backend_command") != "QEMULauncher"
-        or value.get("backend_pid") != REQUIRED_BACKEND_PID
+        or not backend_pid_valid
         or value.get("efi_handle_count") != 1
         or value.get("process_record_count") != 1
         or value.get("qcow2_handle_count") != 1
