@@ -197,6 +197,7 @@ package version 固定由 `<product-version>+<build>-<debian-revision>` 形成�
 | addon、FFI、Flutter/system-private `.so` | `root:root` | `0644` | 单 link 普通文件，不要求 executable bit |
 | RimeData、metadata、desktop、icon、license | `root:root` | `0644` | 单 link 普通文件 |
 | `/var/lib/radishlex/install-v1` | `root:root` | `0755` | 只允许 receipt 与固定 `operations` 目录 |
+| `/var/lib/radishlex/install-v1/operations` | `root:root` | `0755` | 只允许当前 receipt chain 绑定的 operation 私有目录 |
 | terminal/nonterminal `receipt.json` | `root:root` | `0644` | 单 link、非敏感、供用户进程只读 gate |
 | 写入中的 `receipt.json.tmp` | `root:root` | 创建时 `0600` | fsync 后改为 `0644` 再同目录原子替换；残留即阻断新 operation |
 | `operations/<operation-id>` 与本地 package 副本 | `root:root` | 目录 `0700`、文件 `0600` | 只接受固定 source/target 名称与单 link 普通文件 |

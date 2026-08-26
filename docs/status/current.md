@@ -38,8 +38,8 @@
 - runtime resolution v1/v2曾以唯一`list`观察v4 started、其余20台stopped及PID `61666`三次稳定确认，但两次boot hash均无有效输出；v2的18项manifest `e2e41235…c49e`闭合`state-indeterminate`，不证明boot或后续运行状态。
 - clean `dbce3a5`的repository-only boot transport绑定上述18项和全部上游。clean `8f59825`的唯一真实attempt只执行一次`list`，观察21台均registered stopped；target未过inventory gate，PID/probe/guest/file/result均为0，8项manifest `6a1ad09f…5140`闭合`state-indeterminate`。
 - clean `38b1bb8`新增boot start控制；clean `f972371`的唯一实机调用在21台全停后start，PID `39591`双句柄三次稳定，但首次guest root遇到`OSStatus -2700`/agent不可用；29项manifest `97959c55…c57d`闭合`state-indeterminate`。
-- clean `1d64916`最终离线binding闭合boot start 29项。唯一真实resolution一次readiness即ready，PID `39591`与双句柄稳定；probe传输/回读和调用返回成功，但marker不存在，26项manifest `eb7c42f1…d053`闭合`state-indeterminate`。日终审阅确认共享probe CLI只接受`boot-transport`根，而本控制传入`guest-agent`根，精确合成argv在marker前返回`control-root-invalid`；随后正常request关机，21台全停且零相关进程/target句柄。
-- manifest `a17920bd…0e17`闭合PID `92422`与`new-boot-started`。唯一真实恢复预检在持久目录校验处`recovery-rejected`，host因`exec`假exit 0误记`state-indeterminate`；38项manifest `1d593a8f…33c7`已由`c523fb3`绑定，证实零resume/dpkg/retry/stop，并修复`0755/0700`与结果权威性。
+- guest-agent attempt一次readiness即ready，但probe后marker不存在；26项manifest `eb7c42f1…d053`闭合`state-indeterminate`，根因为共享probe scope/root错配，现已修复且旧现场冻结。
+- manifest `a17920bd…0e17`闭合PID `92422`与`new-boot-started`。唯一真实恢复预检在持久目录校验处`recovery-rejected`，host因`exec`假exit 0误记`state-indeterminate`；38项manifest `1d593a8f…33c7`已由`c523fb3`绑定并修复。日终仅对v4发送一次正常关机请求，终态21台全stopped、零QEMULauncher/`utmctl`进程且target磁盘无句柄。
 
 ## 停止线
 
@@ -54,16 +54,16 @@
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
 - v4 launch至checkpoint及exact resume失败证据与UUID `50B75F88…8038`须冻结；不得复跑、覆盖、循环list/status、主动拉起backend或把无句柄归因为stopped。当前唯一有效transaction仍是manifest `3aca0576…0a4f7`证明的`artifacts_staged`；attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`及输出根`…-Exact-Resume-v1`已消费，不得重试或复用。
-- boot classification、恢复预检及上游attempt/host/guest根均冻结；预检terminal后VM状态未知。不得补拉、复跑、复用、清理或沿用授权查询、resume、retry/stop/quit。
+- boot classification、恢复预检及上游attempt/host/guest根均冻结；21台现全停。不得补拉、复跑、复用、清理或沿用旧授权start/query/resume/retry/stop/quit。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步（2026-08-26）
+## 明日事项（2026-08-27）
 
-1. 冻结manifest `a17920bd…0e17`与`1d593a8f…33c7`、全部attempt及host/guest根；VM状态未知。
-2. `c523fb3`已闭合真实失败binding及两处合同修复，当前不resume，也不把旧拒绝写成恢复资格已通过。
-3. 第二次真实预检须新attempt、absent host/guest根与单独授权；resume和受控停止继续分别授权，漂移即保留现场。
+1. 保持21台全停并冻结manifest `a17920bd…0e17`、`1d593a8f…33c7`及全部旧attempt/host/guest根；不把旧拒绝写成资格通过。
+2. 先repository-only设计“全停→单次启动→重新分类fresh boot→只读恢复资格”的新链；关机已结束`b757c8fc…4758` live boot，不能直接复用`c523fb3`的固定boot attempt。
+3. 新控制与门禁闭合后，再分别申请启动/分类、真实资格预检、resume和受控停止授权；每步使用新attempt与absent根，漂移即冻结。
 
 ## 验证入口
 
