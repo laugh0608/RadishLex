@@ -579,6 +579,12 @@ host因此以`guest-recovery-result-readback-1-stderr-not-empty`闭合`state-ind
 
 结果消歧attempt固定为`d75818f-v4-install-artifacts-staged-fresh-boot-recovery-result-resolution-20260827-v1`。未来真实调用必须重新授权，先按当前source/target/process、同PID/双句柄与无活动`utmctl`失败关闭；只允许对既有guest `preflight.evidence.json`连续pull两次并要求逐字一致，再pull既有`phase.json`一次并与terminal匹配，最后重验PID/process/target和source。它不调用inventory/list/status/start，不push、不exec、不重跑probe，也不运行resume/dpkg、retry/cleanup/stop/quit。首次result仍缺失、双读漂移、phase不一致或终态身份漂移均闭合`state-indeterminate`；只有稳定canonical guest payload可分别交付`recovery-qualified`或`recovery-rejected`，且两种结果都不自动进入resume或停止。
 
+用户单独授权真实消歧后，从clean `b2abff7`执行上述唯一attempt。调用前35项冻结链再次离线绑定历史HEAD `5cb8160`、当前HEAD、boot `d64b962e…b50`与PID `42349`，且新根absent。控制的preflight、三轮PID/双句柄确认与终态source/target/process复核全部通过；两次既有result pull均exit 0、stderr空、未超时，逐字读取同一945-byte payload，SHA-256均为`fb4961abbfb88788942b61fce21bb14eaba2c753cd0ae11f72f41f751d07263e`。唯一phase pull同样exit 0、stderr空、未超时，116-byte payload为`complete`。
+
+guest canonical结果为`recovery-qualified`/`persistent-artifacts-staged-new-boot-readonly-qualified`：current boot与host binding一致，receipt仍为`artifacts_staged`，guard为`absent-after-reboot`，Manager/Fcitx startup均由wire `0:1:3:14:2|error-absent`证明MaintenanceRequired，maintenance resume与dpkg mutation仍为0。host terminal闭合`deferred-readback-recovery-qualified`，file pull为3，push/exec/probe、inventory/list/status/start、业务guest、resume、retry/cleanup/stop/quit均为0，transaction保持`artifacts-staged-preserved-no-resume`。
+
+create-new host根`/Users/luobo/VirtualMachines/RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Fresh-Boot-Recovery-Result-Resolution-v1`含21个manifest成员，SHA-256 `181147204f3104319ef44a7d742063a7b81c6310e51f40caaee12d8358f3989b`逐项通过；根/文件为`0700`/`0600`、uid 501/gid 20、single-link且零xattr。该attempt、结果根与全部上游继续冻结；调用后未追加UTM查询或停止。`recovery-qualified`只闭合只读恢复资格，不代表transaction已resume或dpkg已运行；下一批先repository-only绑定21项并设计fresh-boot resume，真实resume与受控停止继续分别授权。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
