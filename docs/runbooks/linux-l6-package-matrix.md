@@ -603,6 +603,10 @@ create-new host根`/Users/luobo/VirtualMachines/RadishLex-L6-Crash-Install-Artif
 
 `450cfa8`新增47项fresh-boot resume result binding与5项回归，固定manifest顺序、历史执行HEAD `fb53cc6`与当前clean successor HEAD分离、私有树、source/target、PID/双句柄、readiness、三份交付、唯一driver、marker、稳定双terminal、`indeterminate` phase、1/1调用计数和精确禁止命令清单。clean提交后的真实链纯离线复核返回上述manifest、PID/boot、`state-indeterminate`及dpkg unknown；未调用UTM、进入guest或改写冻结证据。下一步先repository-only设计受控停止，任何真实stop仍须独立授权且不得携带guest、dpkg、retry或cleanup。
 
+日终用户新授权关闭全部VM。首次plain `utmctl list`只见v4 UUID `50B75F88…8038`为started、其余20台stopped；host只发送一次`utmctl stop 50B75F88…8038 --request`正常关机，未force、kill、进入guest、补拉、retry或cleanup。终态plain list为21台全部stopped，宿主无`QEMULauncher`或`qemu-system`进程。该操作结束boot `d64b962e…b50`、PID `42349`对应的live实例，但不改写47项manifest `ee1879e7…0798`、guest transient secret或任何上游，也不能把`state-indeterminate`提升为安装成功/失败。
+
+明日先在repository-only范围逐字段对照冻结双terminal与旧resume driver的completed postflight合同，定位`terminal-postflight-semantics-invalid`的精确失败谓词并补合成回归；不得放宽验证、倒写现场或猜测dpkg。只有根因和仓库修复闭合后，才设计从21台all-stopped出发的全新只读transaction-state resolution；任何真实list/start、guest读取与终态stop继续分别授权，不携带resume、dpkg mutation、retry或cleanup。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
