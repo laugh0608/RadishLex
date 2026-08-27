@@ -436,6 +436,10 @@ def run_recovery_preflight(
             expected_argv=network_ready._lsof_argv(request),
         )
         backend_pid = int(identity["backend_pid"])
+        if backend_pid != binding.prior_backend_pid:
+            raise RecoveryPreflightError(
+                "prior-boot-classification-backend-pid-drift"
+            )
         writer.write_json(
             stage + ".json",
             runtime_control._handle_identity_evidence(handle_observation, identity),

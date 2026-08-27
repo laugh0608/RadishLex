@@ -182,6 +182,23 @@ class NewBootRecoveryPreflightProbeTests(unittest.TestCase):
         self.assertEqual(driver.EXPECTED_BOOT_ID_SHA256, "prior")
         self.assertEqual(driver.EXPECTED_ACTIVE_GUARD_STARTUP, "active")
 
+    def test_fresh_attempt_accepts_bound_dynamic_boot_but_not_original(self) -> None:
+        current_boot = "c" * 64
+        control_root = probe.expected_control_root_for(
+            probe.FRESH_BOOT_RECOVERY_ATTEMPT_ID
+        )
+        args = probe.parse_args(
+            fresh_argv(control_root, "d" * 64, current_boot)
+        )
+
+        probe.validate_argument_contract(args)
+
+        args.current_boot_id_sha256 = probe.EXPECTED_PRIOR_BOOT_ID_SHA256
+        with self.assertRaisesRegex(
+            probe.RecoveryPreflightError, "fresh-boot-identity-not-new"
+        ):
+            probe.validate_argument_contract(args)
+
     def test_main_is_read_only_and_never_dispatches_resume(self) -> None:
         terminals: list[dict[str, object]] = []
         phases: list[str] = []
@@ -265,6 +282,17 @@ def valid_argv(control_root: Path, probe_sha256: str) -> list[str]:
         "--control-root",
         str(control_root),
     ]
+
+
+def fresh_argv(
+    control_root: Path, probe_sha256: str, current_boot: str
+) -> list[str]:
+    value = valid_argv(control_root, probe_sha256)
+    value[value.index(probe.EXPECTED_ATTEMPT_ID)] = (
+        probe.FRESH_BOOT_RECOVERY_ATTEMPT_ID
+    )
+    value[value.index(probe.EXPECTED_CURRENT_BOOT_ID_SHA256)] = current_boot
+    return value
 
 
 if __name__ == "__main__":

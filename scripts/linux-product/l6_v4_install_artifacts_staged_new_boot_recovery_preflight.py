@@ -23,6 +23,10 @@ EXPECTED_ATTEMPT_ID = (
     "d75818f-v4-install-artifacts-staged-new-boot-recovery-preflight-"
     "20260826-v1"
 )
+FRESH_BOOT_RECOVERY_ATTEMPT_ID = (
+    "d75818f-v4-install-artifacts-staged-fresh-boot-recovery-preflight-"
+    "20260827-v1"
+)
 EXPECTED_TARGET_UUID = "50B75F88-493D-42C0-A1DC-054DEC478038"
 EXPECTED_PRIOR_BOOT_ID_SHA256 = (
     "18f1ba063ecd3087a5624e6ae52a54624540a972df33cca00a34bca4ec00022a"
@@ -286,11 +290,15 @@ def classify_guard(driver: ModuleType) -> tuple[str, str]:
     return "present-valid-unlocked", EXPECTED_ACTIVE_GUARD_STARTUP
 
 
-def validate_live_new_boot(driver: ModuleType, startup_output: str) -> None:
+def validate_live_new_boot(
+    driver: ModuleType,
+    startup_output: str,
+    current_boot_id_sha256: str = EXPECTED_CURRENT_BOOT_ID_SHA256,
+) -> None:
     original_boot = driver.EXPECTED_BOOT_ID_SHA256
     original_startup = driver.EXPECTED_ACTIVE_GUARD_STARTUP
     try:
-        driver.EXPECTED_BOOT_ID_SHA256 = EXPECTED_CURRENT_BOOT_ID_SHA256
+        driver.EXPECTED_BOOT_ID_SHA256 = current_boot_id_sha256
         driver.EXPECTED_ACTIVE_GUARD_STARTUP = startup_output
         driver.validate_live_system()
     finally:
@@ -315,6 +323,39 @@ def sanitize_reason(value: str) -> str:
     return re.sub(r"(?<![0-9a-f])[0-9a-f]{32}(?![0-9a-f])", "[redacted]", value)
 
 
+def expected_control_root_for(attempt_id: str) -> Path:
+    if attempt_id == EXPECTED_ATTEMPT_ID:
+        return EXPECTED_CONTROL_ROOT
+    if attempt_id == FRESH_BOOT_RECOVERY_ATTEMPT_ID:
+        return Path(
+            "/var/tmp/radishlex-l6-v4-install-artifacts-staged-"
+            f"new-boot-recovery-preflight-{attempt_id}"
+        )
+    raise RecoveryPreflightError("attempt-id-not-authorized")
+
+
+def validate_argument_contract(args: argparse.Namespace) -> None:
+    expected = {
+        "target_uuid": EXPECTED_TARGET_UUID,
+        "prior_boot_id_sha256": EXPECTED_PRIOR_BOOT_ID_SHA256,
+        "expected_resume_driver_sha256": EXPECTED_RESUME_DRIVER_SHA256,
+    }
+    if any(getattr(args, key) != value for key, value in expected.items()):
+        raise RecoveryPreflightError("argument-contract-mismatch")
+    if (
+        not SAFE_ATTEMPT_ID.fullmatch(args.attempt_id)
+        or not HEX_64.fullmatch(args.current_boot_id_sha256)
+        or not HEX_64.fullmatch(args.expected_probe_sha256)
+        or args.control_root != expected_control_root_for(args.attempt_id)
+    ):
+        raise RecoveryPreflightError("argument-invalid")
+    if args.attempt_id == EXPECTED_ATTEMPT_ID:
+        if args.current_boot_id_sha256 != EXPECTED_CURRENT_BOOT_ID_SHA256:
+            raise RecoveryPreflightError("argument-contract-mismatch")
+    elif args.current_boot_id_sha256 == EXPECTED_PRIOR_BOOT_ID_SHA256:
+        raise RecoveryPreflightError("fresh-boot-identity-not-new")
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     phase = "arguments"
@@ -324,21 +365,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if os.geteuid() != 0:
             raise RecoveryPreflightError("root-required")
-        expected = {
-            "attempt_id": EXPECTED_ATTEMPT_ID,
-            "target_uuid": EXPECTED_TARGET_UUID,
-            "prior_boot_id_sha256": EXPECTED_PRIOR_BOOT_ID_SHA256,
-            "current_boot_id_sha256": EXPECTED_CURRENT_BOOT_ID_SHA256,
-            "expected_resume_driver_sha256": EXPECTED_RESUME_DRIVER_SHA256,
-        }
-        if any(getattr(args, key) != value for key, value in expected.items()):
-            raise RecoveryPreflightError("argument-contract-mismatch")
-        if (
-            not SAFE_ATTEMPT_ID.fullmatch(args.attempt_id)
-            or not HEX_64.fullmatch(args.expected_probe_sha256)
-            or args.control_root != EXPECTED_CONTROL_ROOT
-        ):
-            raise RecoveryPreflightError("argument-invalid")
+        validate_argument_contract(args)
         require_private_directory(args.control_root, "control-root")
         control_root_validated = True
         probe_path = Path(__file__)
@@ -375,7 +402,9 @@ def main(argv: list[str] | None = None) -> int:
 
         phase = "live-new-boot"
         replace_phase(args.control_root, phase)
-        validate_live_new_boot(driver, startup_output)
+        validate_live_new_boot(
+            driver, startup_output, args.current_boot_id_sha256
+        )
 
         phase = "complete"
         replace_phase(args.control_root, phase)
@@ -386,7 +415,7 @@ def main(argv: list[str] | None = None) -> int:
                 "automatic_quit": "not-performed",
                 "automatic_retry": "not-performed",
                 "automatic_stop": "not-performed",
-                "current_boot_id_sha256": EXPECTED_CURRENT_BOOT_ID_SHA256,
+                "current_boot_id_sha256": args.current_boot_id_sha256,
                 "dpkg_mutation_executed": False,
                 "format": EVIDENCE_FORMAT,
                 "guard_profile": guard_profile,
@@ -410,7 +439,7 @@ def main(argv: list[str] | None = None) -> int:
             "automatic_quit": "not-performed",
             "automatic_retry": "not-performed",
             "automatic_stop": "not-performed",
-            "current_boot_id_sha256": EXPECTED_CURRENT_BOOT_ID_SHA256,
+            "current_boot_id_sha256": args.current_boot_id_sha256,
             "dpkg_mutation_executed": False,
             "format": EVIDENCE_FORMAT,
             "guard_profile": guard_profile,
