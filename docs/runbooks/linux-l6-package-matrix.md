@@ -593,6 +593,16 @@ guest driver不修改历史冻结resume driver。它先用冻结recovery probe�
 
 host在唯一driver调用后只接受marker、两份逐字一致terminal与匹配phase；稳定guest terminal可以消歧不可靠transport exit，缺失或漂移则保持`state-indeterminate`且maintenance/postflight调用数标为unknown，不伪写0。成功仍须终态target/PID/process/source复核，控制自身不停止VM。新增result binding 4项、host 6项、guest 7项测试及默认L6门禁通过；本批没有调用`utmctl`、进入guest、创建真实attempt/root、重建secret、resume、dpkg或stop。真实resume、其结果绑定和受控停止继续分别使用独立授权。
 
+用户单独授权固定UUID `50B75F88…8038`与fresh-boot resume attempt，只允许create-new host/guest根、三份committed文件唯一交付、一次production resume及一次postflight；明确不含inventory/list/status/start、stop/restart/quit、retry/cleanup、再次资格probe、Manager/Fcitx或用户XDG动作。首次命令在本机`argparse`阶段因缺少冻结的`prior-recovery-preflight-attempt-id`退出，计划根仍absent且未调用UTM；补齐固定值后才进入唯一真实控制，不计为resume retry。
+
+真实控制从clean `fb53cc6`递归绑定21项qualified结果、boot `d64b962e…b50`、原boot `18f1ba06…022a`、PID `42349`及source/target；一次readiness、三轮confirmation、agent-ready与resume前门均保持同一EFI/qcow2双句柄且无活动`utmctl`。新guest私有根成功创建，冻结resume driver `0b649ecd…d05b`、recovery probe `e63c37e6…87c0`与fresh driver `90022dc6…b2ba`各push、归一化、publish和逐字readback一次；唯一driver transport exit 0且双流为空。
+
+guest稳定双terminal均为1097 bytes、SHA-256 `e27368b7…49a`，匹配118-byte `indeterminate` phase。它证明transient secret已重建、production resume与postflight各调用1次，但在验证terminal postflight语义时返回`ResumeDriverError:terminal-postflight-semantics-invalid`；因此`dpkg_mutation_executed=unknown`且transaction为`state-indeterminate`。transport exit 0、case postflight报告passed、终态PID/双句柄或source/target未漂移均不能把该结论提升为安装完成，也不能区分dpkg/receipt的实际终态。
+
+create-new host根`/Users/luobo/VirtualMachines/RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Fresh-Boot-Resume-v1`含47个manifest成员，SHA-256 `ee1879e7bcb8950ac6bd83630de4102aa87522a47cc2c64119d3d88b03420798`逐项通过；根/文件为`0700`/`0600`、uid 501/gid 20、single-link且零xattr。terminal固定file push/pull、guest exec为`3/7/11`，inventory/list/status/start、retry/cleanup/stop/quit均为0；调用后未追加UTM查询或停止，attempt、host/guest根、transient secret及所有上游立即冻结。
+
+`450cfa8`新增47项fresh-boot resume result binding与5项回归，固定manifest顺序、历史执行HEAD `fb53cc6`与当前clean successor HEAD分离、私有树、source/target、PID/双句柄、readiness、三份交付、唯一driver、marker、稳定双terminal、`indeterminate` phase、1/1调用计数和精确禁止命令清单。clean提交后的真实链纯离线复核返回上述manifest、PID/boot、`state-indeterminate`及dpkg unknown；未调用UTM、进入guest或改写冻结证据。下一步先repository-only设计受控停止，任何真实stop仍须独立授权且不得携带guest、dpkg、retry或cleanup。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
