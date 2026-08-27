@@ -4,10 +4,10 @@
 
 ## 当前判断
 
-- 复核日期：2026-08-26（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
+- 复核：2026-08-27；常态分支 `dev`，主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh与六类operation已有证据，首个crash已闭合。`install_artifacts_staged` v4保持`artifacts_staged`且未触发dpkg；新boot真实预检已在目录mode合同错误处拒绝，修复与冻结结果binding已闭合，第二次资格预检、resume、其余七个crash与连续L6仍未闭合。
+- L6 controller/pair/refresh、六类operation与首个crash已有证据。`install_artifacts_staged` v4仍为`artifacts_staged`且未触发dpkg；首次真实预检拒绝、修复binding及fresh-boot两阶段repository-only控制已闭合，第二次真实资格、resume、其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -40,6 +40,7 @@
 - clean `38b1bb8`新增boot start控制；clean `f972371`的唯一实机调用在21台全停后start，PID `39591`双句柄三次稳定，但首次guest root遇到`OSStatus -2700`/agent不可用；29项manifest `97959c55…c57d`闭合`state-indeterminate`。
 - guest-agent attempt一次readiness即ready，但probe后marker不存在；26项manifest `eb7c42f1…d053`闭合`state-indeterminate`，根因为共享probe scope/root错配，现已修复且旧现场冻结。
 - manifest `a17920bd…0e17`闭合PID `92422`与`new-boot-started`。唯一真实恢复预检在持久目录校验处`recovery-rejected`，host因`exec`假exit 0误记`state-indeterminate`；38项manifest `1d593a8f…33c7`已由`c523fb3`绑定并修复。日终仅对v4发送一次正常关机请求，终态21台全stopped、零QEMULauncher/`utmctl`进程且target磁盘无句柄。
+- clean `e9fdabc`闭合fresh-boot两阶段repository-only控制：全停单次启动/分类后，只有动态manifest、新boot与同一PID通过才允许一次只读资格probe；本批无真实系统动作。
 
 ## 停止线
 
@@ -59,11 +60,11 @@
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 明日事项（2026-08-27）
+## 下一步（2026-08-27）
 
 1. 保持21台全停并冻结manifest `a17920bd…0e17`、`1d593a8f…33c7`及全部旧attempt/host/guest根；不把旧拒绝写成资格通过。
-2. 先repository-only设计“全停→单次启动→重新分类fresh boot→只读恢复资格”的新链；关机已结束`b757c8fc…4758` live boot，不能直接复用`c523fb3`的固定boot attempt。
-3. 新控制与门禁闭合后，再分别申请启动/分类、真实资格预检、resume和受控停止授权；每步使用新attempt与absent根，漂移即冻结。
+2. 若继续实机，先单独授权attempt `d75818f-v4-install-artifacts-staged-fresh-boot-classification-20260827-v1`启动/分类；不包含资格、resume或停止。
+3. 仅当第一阶段完整闭合`new-boot-started`且PID/句柄稳定，才另行授权只读资格；之后仍先闭合resume仓库控制，停止另行授权。漂移即冻结。
 
 ## 验证入口
 
@@ -85,7 +86,7 @@
 git diff --check
 ```
 
-上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、boot classification、冻结结果binding、恢复资格及checkpoint/resume控制，但不替代实机。真实`install_artifacts_staged`已识别为新boot；首次资格预检失败已绑定，资格通过与resume仍未闭合，其余case、连续L6与发布亦未闭合。
+上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、boot classification、结果binding、fresh-boot资格及checkpoint/resume控制，但不替代实机。首次真实资格失败已绑定；第二次真实资格、resume、其余case、连续L6与发布未闭合。
 
 ## 阅读索引
 

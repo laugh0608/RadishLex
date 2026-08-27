@@ -559,6 +559,12 @@ host control要求clean committed binding递归复核72项真实boot classificat
 
 日终用户授权关闭全部VM。首次plain `utmctl list`只见v4 UUID `50B75F88…8038`为started、其余20台stopped；host只发送一次`utmctl stop 50B75F88…8038 --request`正常关机，未force、kill或进入guest。终态plain list为21台全stopped，宿主无QEMULauncher/`utmctl`进程，target EFI/qcow2也无打开句柄。该操作不改写38项冻结结果，也不证明恢复资格；正常关机已结束boot hash `b757c8fc…4758`对应的live实例，因此后续不能直接复用当前固定boot控制。下一批先repository-only形成从全停inventory、单次启动、fresh boot重新分类到只读恢复资格的新attempt链，真实启动/分类、资格预检、resume与受控停止继续分别授权。
 
+`e9fdabc`在repository-only范围新增fresh-boot两阶段控制。第一阶段attempt固定为`d75818f-v4-install-artifacts-staged-fresh-boot-classification-20260827-v1`：binding递归重验38项manifest `1d593a8f…33c7`、guest `recovery-rejected`、host旧`state-indeterminate`及结果权威，使用已经结束的boot hash `b757c8fc…4758`作为分类基线；真实调用仍须显式授权唯一plain `list`、全停inventory、三轮静止、一次foreground start、有限runtime/readiness、一次fixed-scope boot probe和双result回读。终态只有observed boot为不同canonical hash、同一PID/双句柄和禁止动作计数全部闭合才可交付`new-boot-started`；old boot、未知状态或任何漂移均失败关闭，不自动retry/stop/quit，也不进入恢复资格、业务guest、resume或dpkg。
+
+第二阶段attempt固定为`d75818f-v4-install-artifacts-staged-fresh-boot-recovery-preflight-20260827-v1`。它不以未提前知道的fresh boot hash或manifest常量伪造绑定，而是逐文件验证第一阶段create-new `0700`/`0600` evidence树、manifest顺序与hash、committed request/control/binding/probe身份、全停inventory/单次start、动态runtime/readiness、marker/双result、new-boot分类和全部禁止动作，再把observed boot与同一backend PID交给只读资格控制。资格控制自身不调用inventory/list/status/start；发现PID漂移即在guest delivery前拒绝，只向新的私有guest根交付固定resume driver与更新后的只读probe各一次。probe仅对该新attempt接受host已绑定的canonical current boot，继续重验持久receipt/staging、`0755/0755/0700`目录、guard/startup、package/dpkg、XDG/process/network，不运行resume或package mutation。
+
+3项fresh classification、5项fresh recovery和更新后的7项guest probe回归已接入默认L6门禁，覆盖最新拒绝结果拓扑、全停单次启动、动态manifest逐项校验、旧/原boot拒绝、same-PID门、资格通过及禁止动作；package transaction与startup gate相邻回归通过。该提交没有调用`utmctl`、进入guest、创建真实attempt/root、查询/启动/停止VM、resume、dpkg、retry或cleanup。后续真实启动/分类、只读资格、fresh-boot resume与受控停止仍须依次使用新根和独立授权。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
