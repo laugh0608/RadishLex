@@ -567,7 +567,7 @@ host control要求clean committed binding递归复核72项真实boot classificat
 
 用户单独授权第一阶段后，从clean `0be88ee`执行唯一attempt `d75818f-v4-install-artifacts-staged-fresh-boot-classification-20260827-v1`。离线binding先递归重验38项旧拒绝结果及全部上游，且新host根absent；唯一plain `list`观察target与其余20台均stopped，三轮静止后只执行一次foreground start。首轮runtime发现QEMULauncher PID `42349`，三次confirmation、10轮readiness与terminal均保持EFI/qcow2双句柄；前9轮agent unavailable，第10轮ready。随后固定scope boot probe只push一次、执行一次，marker与两份result逐字回读闭合，双result SHA-256均为`34d1f032…c4e6`。新boot `d64b962e…b50`不同于已结束boot `b757c8fc…4758`，terminal为`new-boot-started`；72项create-new host manifest SHA-256为`2211af7e…e60`。
 
-该调用没有执行恢复资格、maintenance resume、dpkg、业务guest、retry、cleanup、stop或quit，transaction保持`artifacts-staged-preserved-no-resume`；terminal后未再调用UTM查询或停止，故后续实际状态不从额外观察推断。纯离线第二阶段result binding已逐项验证72项manifest、动态boot与same-PID `42349`，计划host根`…-v4-Fresh-Boot-Recovery-Preflight-v1`仍absent；这只证明可以另行申请一次只读资格，不证明资格已经通过，也不沿用第一阶段授权。
+该调用没有执行恢复资格、maintenance resume、dpkg、业务guest、retry、cleanup、stop或quit，transaction保持`artifacts-staged-preserved-no-resume`；terminal后未再调用UTM查询或停止，故后续实际状态不从额外观察推断。实机记录提交前，clean `0be88ee`上的纯离线第二阶段binding逐项验证72项manifest、动态boot与same-PID `42349`，计划root仍absent；文档提交为`89639fd`后按新HEAD收尾复核则在`prior-fresh-boot-classification-request-invalid`失败关闭。根因是动态result binding把历史classification `request.json`的HEAD与当前资格控制clean HEAD当成同一字段比较；不得checkout/回退或绕过，须先repository-only拆分两项证明，并保持manifest、代码hash、boot和PID校验，再另行授权资格。
 
 ## 10. L6 完成与后续
 
