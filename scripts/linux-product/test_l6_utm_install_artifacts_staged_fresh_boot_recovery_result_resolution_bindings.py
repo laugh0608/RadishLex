@@ -197,11 +197,7 @@ def patched_validation(manifest_sha256: str):
         stack.enter_context(
             mock.patch.object(bindings.network_ready, "_require_committed_regular")
         )
-        stack.enter_context(
-            mock.patch.object(
-                bindings.legacy_result_bindings, "_validate_source_target"
-            )
-        )
+        stack.enter_context(mock.patch.object(bindings, "_validate_source_target"))
         stack.enter_context(
             mock.patch.object(
                 bindings.runtime_control, "_require_no_raw_operation_id"

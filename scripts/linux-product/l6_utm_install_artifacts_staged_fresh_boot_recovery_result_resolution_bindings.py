@@ -11,7 +11,6 @@ from typing import Protocol
 import l6_utm_guest_network_ready as network_ready
 import l6_utm_install_artifacts_staged_fresh_boot_recovery_preflight_result_bindings as prior_result_bindings
 import l6_utm_install_artifacts_staged_fresh_boot_recovery_result_resolution as resolution_control
-import l6_utm_install_artifacts_staged_new_boot_recovery_preflight_result_bindings as legacy_result_bindings
 import l6_utm_install_artifacts_staged_runtime_resolution as runtime_control
 import l6_utm_install_artifacts_staged_runtime_resolution_bindings as runtime_bindings
 import l6_utm_launch_transport_v2 as launch_transport
@@ -110,7 +109,7 @@ def validate_fresh_boot_recovery_result_resolution_result_bindings(
     _require_private_evidence_tree(root, manifest)
 
     prior_repository_head = _validate_request_and_binding(request, upstream, root)
-    legacy_result_bindings._validate_source_target(request, root)
+    _validate_source_target(request, root)
     handle_signature = _validate_host_identity(request, upstream, root)
     guest_terminal = _validate_result_and_phase(request, upstream, root)
     _validate_terminal(request, upstream, root, guest_terminal)
@@ -201,6 +200,40 @@ def _validate_request_and_binding(
     if network_ready._read_json(root / "binding-preflight.json") != expected_binding:
         raise ValueError("prior-recovery-result-resolution-binding-invalid")
     return prior_repository_head
+
+
+def _validate_source_target(
+    request: FreshBootRecoveryResultResolutionBindingRequest, root: Path
+) -> None:
+    source = network_ready._read_json(root / "source-bundle-preflight.json")
+    descriptor = source.get("descriptor")
+    if (
+        source.get("format")
+        != "radishlex-linux-l6-utm-canonical-input-transfer-v1"
+        or source.get("inventory_count") != 12
+        or not isinstance(descriptor, dict)
+        or descriptor.get("sha256") != request.source_bundle_sha256
+        or descriptor.get("size") != request.source_bundle_size
+        or network_ready._read_json(root / "source-bundle-postflight.json")
+        != {
+            "descriptor_unchanged": True,
+            "format": "radishlex-linux-l6-utm-canonical-input-transfer-v1",
+            "inventory_unchanged": True,
+            "sha256": request.source_bundle_sha256,
+            "size": request.source_bundle_size,
+        }
+    ):
+        raise ValueError("prior-recovery-result-resolution-source-invalid")
+    before = network_ready._read_json(root / "target-files-preflight.json")
+    after = network_ready._read_json(root / "target-files-postflight.json")
+    if (
+        before != after
+        or before.get("format") != network_ready.EVIDENCE_FORMAT
+        or before.get("target_package_name") != request.target_package_path.name
+        or before.get("target_package_path_sha256")
+        != network_ready._sha256_text(str(request.target_package_path))
+    ):
+        raise ValueError("prior-recovery-result-resolution-target-invalid")
 
 
 def _validate_host_identity(
