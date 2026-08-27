@@ -7,7 +7,7 @@
 - 复核：2026-08-27；常态分支 `dev`，主线 `master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh、六类operation与首个crash已闭合；v4为`artifacts_staged`，未触发dpkg；fresh-boot分类、资格与延迟消歧已闭合，resume、其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh、六类operation与首个crash已闭合；v4为`artifacts_staged`，未触发dpkg；fresh-boot分类、资格、延迟消歧与repository-only resume控制已闭合，真实resume、其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -24,12 +24,7 @@
 - `install_artifacts_staged`的typed guest合同固定target-only staging、package/dpkg未变、合法guard、XDG/process/network零漂移与resume重验/单次apply；首次安装精确Rust回归通过，production语义无需修改。
 - 第二个case的旧clone、v2和v3均在host失败关闭且未进入guest。v1-v7诊断最终只定位到UTM接收start后的AppKit主窗口断言，未证实更深根因；全部失败现场与manifest冻结，不再原地start/clone或试跑`--hide`。
 - v4 clone/prepared/foreground launch固定UUID `50B75F88…8038`、`Network=[]`与载体身份；launch manifest `6dbbdf40…fc3c`保持`state-indeterminate`，后续QEMU双句柄与network v2独立证明当前boot运行且仅loopback。plain list/status曾使backend再次出现，故不循环查询，也不把活动磁盘hash当terminal。
-- network v1在宿主参数解析失败关闭且guest调用为0；修正后的唯一v2完成脚本push/逐字回读、一次network probe与双结果回读。manifest `40be3f3f…38383`固定boot `1bcbd795…26ae3`、active仅`lo`且无nonloop接口或route；未进入业务input/operation/transaction或自动补救。
-- canonical input transfer强绑定network、source descriptor与12项USTAR；bundle唯一push/双回读后只允许私有staging和`RENAME_NOREPLACE`发布，host/guest证据均create-new，漂移即失败关闭且不进入operation/transaction。10项回归进入L6门禁。
-- canonical source bundle已由clean `59eaab3`在`…-v4-Canonical-Input-v1`冻结：92,825,600 bytes、SHA-256 `7bbeb291…403c`，七文件manifest `ffc990a3…e0de`；12项USTAR和文件身份通过，且未调用`utmctl`、guest或VM动作。
-- clean `6a23c37`的唯一attempt `d75818f-v4-input-20260823-v1`通过network/target/process/句柄、installer readback、bundle唯一push/双回读及source postflight。installer调用exit 0且空输出，但同秒首次pull报告`transfer.evidence.json`不存在，第二次result回读未执行，input root状态未知。create-new根`…-v4-Input-Transfer-v1`的19项及manifest `d1090e8d…dc09`通过，权限`0700`/`0600`、single-link且零xattr；terminal为`state-indeterminate`，无list/status/start、断网复跑、operation/transaction、retry/stop/quit。
-- clean `ca57dce`的唯一resolution双回读稳定passed result；一次probe证明installer/可疑进程均0、staging absent、final私有且12项inventory逐文件匹配。create-new host根`…-v4-Input-Resolution-v1`的21项与manifest `7bab8f20…4e4a`通过，权限`0700`/`0600`、single-link、零xattr；terminal为`input-ready`，原installer/bundle、operation/transaction、retry/stop/quit均未执行。
-- clean `8bd9e65`的唯一negative preflight绑定resolution `7bab8f20…4e4a`及全部前序身份；one-shot probe只读重验input/pair/package/dependency/font/startup/XDG/process/network。guest双回读为`passed`，host为`preflight-ready`；create-new根25项manifest `aba59811…0d7a`逐项通过。未执行case/maintenance/acceptance/dpkg/installer、operation/checkpoint/transaction或自动补救/VM动作。
+- v4断网、canonical bundle/input transfer、延迟resolution与negative preflight已按manifest `40be3f3f…38383`/`ffc990a3…e0de`/`d1090e8d…dc09`/`7bab8f20…4e4a`/`aba59811…0d7a`依次冻结并闭合`input-ready`、`preflight-ready`；过程不进入operation、dpkg或自动补救，精确阶段与权限见runbook。
 - repository-only checkpoint v1绑定25项preflight及前序manifest、source三元组和v4 target；guest driver以exclusive marker运行canonical `preflight`/`crash`/`inspect-crash`各一次，成功只导出operation ID hash并验证target-only staging、`artifacts_staged` receipt、合法guard、进程组SIGKILL、零dpkg mutation及系统静止。14项测试进入L6门禁；该批无真实系统动作。
 - clean `7bf6e04`的唯一checkpoint attempt `d75818f-v4-install-artifacts-staged-checkpoint-20260823-v1`通过全部冻结绑定与双回读；guest-local operation ID宿主只存hash `21041a89…111a`。acceptance调用1次并在`artifacts_staged`后SIGKILL完整进程组；checkpoint/receipt为`9cb4acb8…25e0`/`c759b5c6…5d34`，target-only staging、合法未锁guard、package absent、dpkg status/log未变、`ActiveGuard`双startup、XDG/process/network静止。create-new host根49项manifest `3aca0576…0a4f7`逐项通过且raw operation ID扫描为0；未resume、dpkg apply、retry、cleanup、stop、quit或plain list/status/start。
 - repository-only exact resume v1已逐项绑定49项checkpoint、`checkpoint-prepared`及operation/checkpoint/crash/receipt/boot/dpkg身份。guest仅在内部重验raw secret、staging与系统静止条件，再至多执行一次canonical `resume`和一次postflight；host只保存ID hash并双回读证据，任何漂移失败关闭。7项host、9项driver及相邻门禁通过；本批未调用真实`utmctl`、进入guest、resume/dpkg或操作VM。
@@ -41,6 +36,7 @@
 - guest-agent attempt一次readiness即ready，但probe后marker不存在；26项manifest `eb7c42f1…d053`闭合`state-indeterminate`，根因为共享probe scope/root错配，现已修复且旧现场冻结。
 - 今日第一阶段从21台全停单次启动v4，PID `42349`、boot `d64b962e…b50`与72项manifest `2211af7e…e60`闭合`new-boot-started`；clean `ef5d17f`分离历史/当前HEAD后纯离线binding通过。
 - clean `b2abff7`的唯一延迟消歧保持boot `d64b962e…b50`/PID `42349`；双份945-byte result hash均为`fb4961ab…263e`且phase `complete`。21项manifest `18114720…3989b`闭合`recovery-qualified`，receipt仍为`artifacts_staged`，零probe/resume/dpkg/list/start/stop。
+- clean `df4ef3c`已逐项绑定上述21项qualified结果并新增fresh-boot resume host/guest控制。真实链纯离线复核返回历史HEAD `b2abff7`、当前HEAD、boot `d64b962e…b50`、原boot `18f1ba06…022a`与同一PID `42349`；guest只在persistent transaction、absent guard/MaintenanceRequired、package/dpkg、XDG/process/network全部重验后，从receipt在guest内create-new重建transient secret，再至多调用一次canonical resume和一次postflight。17项新增回归及默认L6门禁通过；该批未调用UTM、进入guest、创建真实resume根、resume、dpkg或停止。
 
 ## 停止线
 
@@ -56,6 +52,7 @@
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
 - v4 launch至checkpoint及exact resume失败证据与UUID `50B75F88…8038`须冻结；不得复跑、覆盖、循环list/status、主动拉起backend或把无句柄归因为stopped。当前唯一有效transaction仍是manifest `3aca0576…0a4f7`证明的`artifacts_staged`；attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`及输出根`…-Exact-Resume-v1`已消费，不得重试或复用。
 - 旧boot、恢复、fresh两阶段及结果消歧根全部冻结，不复跑、覆盖、补拉或清理。`recovery-qualified`只证明只读恢复前门，不授权resume；无新授权不得query/start、resume、retry/stop/quit。
+- fresh-boot resume attempt `d75818f-v4-install-artifacts-staged-fresh-boot-resume-20260827-v1`与计划host根`…-v4-Fresh-Boot-Resume-v1`尚未消费；repository-only控制闭合不构成系统授权，不得提前创建host/guest根、重建transient secret或执行production resume。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
@@ -63,8 +60,8 @@
 ## 下一步（2026-08-27）
 
 1. 冻结manifest `18114720…3989b`、`39586a3b…e1bed`、全部关联host/guest根及当前live transaction；不追加UTM查询或补拉。
-2. 先repository-only绑定21项qualified结果并设计fresh-boot resume；必须重验current boot/PID、receipt/staging、package/dpkg、startup/guard、XDG/process/network与单次mutation边界。
-3. 真实resume与受控停止分别使用新attempt、absent根和单独授权；任一身份或运行态漂移即失败关闭，qualified不得直接解释为transaction完成。
+2. 真实fresh-boot resume须另行授权固定新attempt与absent根；调用前重新绑定clean HEAD、21项qualified结果、current boot/PID、receipt/staging、absent guard/MaintenanceRequired、package/dpkg、XDG/process/network，且授权create-new transient secret、一次production resume及一次postflight。任一漂移在mutation前拒绝；调用后结果缺失则保持`state-indeterminate`且不自动补救。
+3. 真实resume terminal经repository-only绑定后，再另行授权受控停止；resume、证据消费与stop不得合并沿用同一授权。
 
 ## 验证入口
 
@@ -86,7 +83,7 @@
 git diff --check
 ```
 
-上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、结果binding、fresh-boot资格、延迟消歧及checkpoint/resume控制，但不替代实机。fresh boot分类、资格与延迟消歧已闭合；fresh-boot resume、其余case、连续L6与发布未闭合。
+上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、结果binding、fresh-boot资格、延迟消歧及checkpoint/resume控制，但不替代实机。fresh boot分类、资格、延迟消歧与resume控制已闭合；真实fresh-boot resume、其余case、连续L6与发布未闭合。
 
 ## 阅读索引
 

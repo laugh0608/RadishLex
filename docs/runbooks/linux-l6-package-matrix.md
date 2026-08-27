@@ -585,6 +585,14 @@ guest canonical结果为`recovery-qualified`/`persistent-artifacts-staged-new-bo
 
 create-new host根`/Users/luobo/VirtualMachines/RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Fresh-Boot-Recovery-Result-Resolution-v1`含21个manifest成员，SHA-256 `181147204f3104319ef44a7d742063a7b81c6310e51f40caaee12d8358f3989b`逐项通过；根/文件为`0700`/`0600`、uid 501/gid 20、single-link且零xattr。该attempt、结果根与全部上游继续冻结；调用后未追加UTM查询或停止。`recovery-qualified`只闭合只读恢复资格，不代表transaction已resume或dpkg已运行；下一批先repository-only绑定21项并设计fresh-boot resume，真实resume与受控停止继续分别授权。
 
+`adf8b0d`/`df4ef3c`在repository-only范围闭合21项qualified result binding与fresh-boot resume控制。新binding逐项固定manifest `18114720…3989b`的成员顺序、`0700`/`0600`私有树、single-link、历史request HEAD `b2abff7`与当前clean committed HEAD分离、source descriptor、target preflight/postflight、同一PID/双句柄、两份945-byte result与116-byte `complete` phase、guest/host terminal和全部禁止动作。首次clean-HEAD实链复核暴露复用了资格阶段`target-files-agent-ready`拓扑，`df4ef3c`改为结果根实际存在的preflight/postflight前后门后，从全部真实冻结根返回21项、boot `d64b962e…b50`、原boot `18f1ba06…022a`、PID `42349`、`recovery-qualified`与零resume；未改写任何冻结文件。
+
+fresh-boot resume attempt固定为`d75818f-v4-install-artifacts-staged-fresh-boot-resume-20260827-v1`，未来计划host根固定为`/Users/luobo/VirtualMachines/RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Fresh-Boot-Resume-v1`且调用前必须absent。host先递归绑定上述21项结果，再重验source/target、无活动`utmctl`、PID `42349`/双句柄和有界agent readiness；随后只向create-new私有guest根各交付一次冻结resume driver `0b649ecd…d05b`、冻结recovery probe `e63c37e6…87c0`与当前fresh resume driver，逐字回读并在resume前再次复核target/PID/process。它不调用inventory/list/status/start或只读资格probe，不自动retry/cleanup/stop/quit。
+
+guest driver不修改历史冻结resume driver。它先用冻结recovery probe重验persistent `receipt.json`、唯一operation chain、`0755/0755/0700` staging、current fresh boot、guard absent与双startup `0:1:3:14:2|error-absent`、package/dpkg、XDG/process/network，并要求原`/run/radishlex-l6-crash-install-artifacts-staged` absent；随后仅从已验证receipt在guest内存取得raw operation ID，以create-new `root:root 0700` run root和`0600` single-link `operation-id.secret`重建旧canonical case所需的transient输入。派生terminal case后立即再验同一receipt/staging/secret hash/boot与静止条件，至多运行一次production `resume`及一次postflight；raw ID不进入host evidence。resume调用前失败交付`resume-rejected`并保留`artifacts_staged`现场，调用后任何丢失或漂移交付`state-indeterminate`；不为了重试删除transient root/secret。
+
+host在唯一driver调用后只接受marker、两份逐字一致terminal与匹配phase；稳定guest terminal可以消歧不可靠transport exit，缺失或漂移则保持`state-indeterminate`且maintenance/postflight调用数标为unknown，不伪写0。成功仍须终态target/PID/process/source复核，控制自身不停止VM。新增result binding 4项、host 6项、guest 7项测试及默认L6门禁通过；本批没有调用`utmctl`、进入guest、创建真实attempt/root、重建secret、resume、dpkg或stop。真实resume、其结果绑定和受控停止继续分别使用独立授权。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
