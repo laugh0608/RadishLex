@@ -5,9 +5,9 @@
 ## 当前判断
 
 - 复核：2026-08-27；常态分支 `dev`，主线 `master`。
-- 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
+- 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh、六类operation与首个crash已有证据。v4仍为`artifacts_staged`且未触发dpkg；fresh-boot分类、HEAD binding修复及一次只读资格attempt已闭合，结果消歧、resume、其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh、六类operation与首个crash已闭合；v4为`artifacts_staged`，未触发dpkg；fresh-boot分类、资格与延迟消歧已闭合，真实消歧、resume、其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -40,7 +40,7 @@
 - clean `38b1bb8`新增boot start控制；clean `f972371`的唯一实机调用在21台全停后start，PID `39591`双句柄三次稳定，但首次guest root遇到`OSStatus -2700`/agent不可用；29项manifest `97959c55…c57d`闭合`state-indeterminate`。
 - guest-agent attempt一次readiness即ready，但probe后marker不存在；26项manifest `eb7c42f1…d053`闭合`state-indeterminate`，根因为共享probe scope/root错配，现已修复且旧现场冻结。
 - 今日第一阶段从21台全停单次启动v4，PID `42349`、boot `d64b962e…b50`与72项manifest `2211af7e…e60`闭合`new-boot-started`；clean `ef5d17f`分离历史/当前HEAD后纯离线binding通过。
-- clean `5cb8160`的唯一第二阶段attempt绑定同一boot/PID；一次只读probe返回0，但首次result pull报告guest文件不存在，第二次未执行。35项manifest `39586a3b…e1bed`通过，terminal为`state-indeterminate`、guest结果`not-observed`；零inventory/start/resume/dpkg/stop，调用后未追加UTM查询。
+- clean `5cb8160`的资格attempt同boot/PID；probe后首个result缺失，35项manifest `39586a3b…e1bed`闭合`state-indeterminate`/`not-observed`。`368d386`新增结果binding与deferred resolution；离线复核35项、历史HEAD `5cb8160`、boot `d64b962e…b50`、PID `42349`且新根absent，零UTM/guest动作。
 
 ## 停止线
 
@@ -62,9 +62,9 @@
 
 ## 下一步（2026-08-27）
 
-1. 冻结manifest `39586a3b…e1bed`、`2211af7e…e60`、`1d593a8f…33c7`及全部旧根；不复跑probe、补拉当前root或解释`not-observed`。
-2. 先repository-only绑定35项并设计deferred-result resolution；它只消费冻结attempt和全新host根，不重跑probe或进入resume/dpkg，真实补拉另行授权。
-3. 只有稳定双读回把guest结果确定为qualified/rejected后才能分别决策；fresh-boot resume与受控停止继续独立实现、验证和授权，任何身份或运行态漂移即冻结。
+1. 冻结manifest `39586a3b…e1bed`、`2211af7e…e60`及全部旧根；不复跑probe、不补拉原host根，也不解释`not-observed`。
+2. 真实消歧须另行授权固定新attempt与absent host根：只允许同PID/双句柄门、两次既有result和一次phase回读；不inventory/list/status/start、push/exec/probe、resume/dpkg或停止。
+3. 仅稳定双读回可确定qualified/rejected；随后fresh-boot resume与受控停止仍分别实现、验证和授权，任一身份、结果或运行态漂移即冻结。
 
 ## 验证入口
 
@@ -86,7 +86,7 @@
 git diff --check
 ```
 
-上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、结果binding、fresh-boot资格及checkpoint/resume控制，但不替代实机。fresh boot分类已闭合；资格attempt因首次result不存在而失败关闭，结果消歧、resume、其余case、连续L6与发布未闭合。
+上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、结果binding、fresh-boot资格、延迟结果消歧及checkpoint/resume控制，但不替代实机。fresh boot分类已闭合；资格attempt因首次result不存在而失败关闭，真实消歧、resume、其余case、连续L6与发布未闭合。
 
 ## 阅读索引
 

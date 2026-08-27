@@ -575,6 +575,10 @@ clean `ef5d17f`修复该停止线：当前binding仍须由上游证明`repositor
 
 host因此以`guest-recovery-result-readback-1-stderr-not-empty`闭合`state-indeterminate`，guest recovery outcome为`not-observed`；probe/result readback为`1/1`，inventory/list/status/start、maintenance resume、dpkg mutation、retry/cleanup/stop/quit均为0，transaction保持`artifacts_staged-preserved-no-resume`。create-new host根`/Users/luobo/VirtualMachines/RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Fresh-Boot-Recovery-Preflight-v1`含35个manifest成员，SHA-256 `39586a3bb662d9a28a7a2a6e5721b49c4b5395baf47f4ad03bef3da1a20e1bed`逐项通过，根/文件为`0700`/`0600`、single-link且零xattr。该attempt与host/guest根冻结，不补拉、不重跑；调用后未再查询UTM，不能把transport exit 0或marker存在解释成资格通过。下一步先repository-only绑定35项并设计不重跑probe的deferred-result resolution，真实结果补拉、fresh-boot resume与停止继续分别授权。
 
+`368d386`在repository-only范围闭合冻结结果binding与deferred-result resolution。binding固定35项成员及manifest `39586a3b…e1bed`，逐项重验私有证据树、历史request HEAD `5cb8160`与当前committed HEAD分离、source/target、boot `d64b962e…b50`、同一backend PID `42349`、两份文件交付/readback、唯一probe、marker、首次result missing terminal及全部禁止动作；raw operation ID仍不得进入host evidence。clean提交后的真实链离线复核返回35项、上述boot/PID和两层binding格式，计划host根`…-v4-Fresh-Boot-Recovery-Result-Resolution-v1`仍absent；没有调用UTM、进入guest或改写冻结根。
+
+结果消歧attempt固定为`d75818f-v4-install-artifacts-staged-fresh-boot-recovery-result-resolution-20260827-v1`。未来真实调用必须重新授权，先按当前source/target/process、同PID/双句柄与无活动`utmctl`失败关闭；只允许对既有guest `preflight.evidence.json`连续pull两次并要求逐字一致，再pull既有`phase.json`一次并与terminal匹配，最后重验PID/process/target和source。它不调用inventory/list/status/start，不push、不exec、不重跑probe，也不运行resume/dpkg、retry/cleanup/stop/quit。首次result仍缺失、双读漂移、phase不一致或终态身份漂移均闭合`state-indeterminate`；只有稳定canonical guest payload可分别交付`recovery-qualified`或`recovery-rejected`，且两种结果都不自动进入resume或停止。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
