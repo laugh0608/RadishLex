@@ -30,6 +30,7 @@ BINDINGS_RELATIVE_PATH = Path(
     "l6_utm_install_artifacts_staged_fresh_boot_classification_result_bindings.py"
 )
 HEX_64 = re.compile(r"[0-9a-f]{64}")
+HEX_40 = re.compile(r"[0-9a-f]{40}")
 
 
 class FreshBootClassificationResultBindingRequest(
@@ -65,6 +66,12 @@ def validate_fresh_boot_classification_result_bindings(
 
     prior_request = _PriorFreshBootClassificationRequestView(request)
     upstream = bindings.validate_fresh_boot_classification_bindings(prior_request)
+    if (
+        upstream.evidence.get("repository_clean") is not True
+        or upstream.evidence.get("repository_head")
+        != request.expected_repository_head
+    ):
+        raise ValueError("current-fresh-boot-classification-binding-invalid")
     binding_path = request.repository_root / BINDINGS_RELATIVE_PATH
     network_ready._require_committed_regular(
         binding_path, "fresh_boot_classification_result_bindings"
@@ -91,9 +98,27 @@ def validate_fresh_boot_classification_result_bindings(
     ):
         raise ValueError("prior-fresh-boot-classification-entry-set-invalid")
 
-    if network_ready._read_json(root / "request.json") != control.FreshBootClassificationRequest.as_json(prior_request):
+    recorded_request = network_ready._read_json(root / "request.json")
+    prior_repository_head = recorded_request.get("expected_repository_head")
+    if (
+        not isinstance(prior_repository_head, str)
+        or not HEX_40.fullmatch(prior_repository_head)
+    ):
+        raise ValueError(
+            "prior-fresh-boot-classification-repository-head-invalid"
+        )
+    expected_request = control.FreshBootClassificationRequest.as_json(
+        prior_request
+    )
+    expected_request["expected_repository_head"] = prior_repository_head
+    if recorded_request != expected_request:
         raise ValueError("prior-fresh-boot-classification-request-invalid")
-    if network_ready._read_json(root / "binding-preflight.json") != upstream.evidence:
+    expected_binding = dict(upstream.evidence)
+    expected_binding["repository_head"] = prior_repository_head
+    if (
+        network_ready._read_json(root / "binding-preflight.json")
+        != expected_binding
+    ):
         raise ValueError("prior-fresh-boot-classification-binding-invalid")
 
     legacy_result._validate_prior_source_target(prior_request, root)
@@ -135,6 +160,9 @@ def validate_fresh_boot_classification_result_bindings(
                 request.prior_fresh_boot_classification_manifest_sha256
             ),
             "prior_fresh_boot_classification_outcome": "new-boot-started",
+            "prior_fresh_boot_classification_repository_head": (
+                prior_repository_head
+            ),
             "repository_clean": True,
             "repository_head": request.expected_repository_head,
             "target_uuid": request.target_uuid,

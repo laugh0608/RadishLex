@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import hashlib
 import json
 import tempfile
 import unittest
@@ -25,11 +26,20 @@ class FreshBootRecoveryPreflightTests(unittest.TestCase):
     def test_dynamic_fresh_boot_manifest_is_fully_validated(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            classification_request = classification_test.make_request(root)
+            prior_repository_head = "a" * 40
+            current_repository_head = "b" * 40
+            classification_request = classification_test.replace_request(
+                classification_test.make_request(root),
+                expected_repository_head=prior_repository_head,
+            )
             classification_binding = (
                 classification_test.classification_test.boot_test.make_binding()
             )
             classification_binding.expected_boot_id_sha256 = ENDED_BOOT_HASH
+            classification_binding.evidence.update(
+                repository_clean=True,
+                repository_head=prior_repository_head,
+            )
             runner = classification_test.classification_test.ClassificationRunner(
                 classification_request,
                 classification_binding.probe_bytes,
@@ -42,6 +52,26 @@ class FreshBootRecoveryPreflightTests(unittest.TestCase):
                 root,
                 prior_root=classification_result.evidence_root,
                 prior_manifest=classification_result.manifest_sha256,
+            )
+            request = replace_request(
+                request,
+                expected_repository_head=current_repository_head,
+            )
+
+            with mock.patch.object(
+                classification_result_bindings.bindings,
+                "validate_fresh_boot_classification_bindings",
+                return_value=classification_binding,
+            ), self.assertRaisesRegex(
+                ValueError,
+                "current-fresh-boot-classification-binding-invalid",
+            ):
+                classification_result_bindings.validate_fresh_boot_classification_result_bindings(
+                    request
+                )
+
+            classification_binding.evidence["repository_head"] = (
+                current_repository_head
             )
 
             with mock.patch.object(
@@ -56,6 +86,15 @@ class FreshBootRecoveryPreflightTests(unittest.TestCase):
             self.assertEqual(result.observed_boot_id_sha256, FRESH_BOOT_HASH)
             self.assertEqual(result.expected_boot_id_sha256, ENDED_BOOT_HASH)
             self.assertEqual(result.prior_backend_pid, 42)
+            self.assertEqual(
+                result.evidence[
+                    "prior_fresh_boot_classification_repository_head"
+                ],
+                prior_repository_head,
+            )
+            self.assertEqual(
+                result.evidence["repository_head"], current_repository_head
+            )
             self.assertEqual(
                 result.evidence[
                     "prior_fresh_boot_classification_outcome"
@@ -74,11 +113,67 @@ class FreshBootRecoveryPreflightTests(unittest.TestCase):
                     request
                 )
 
+    def test_historical_head_must_match_request_and_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            prior_repository_head = "a" * 40
+            current_repository_head = "b" * 40
+            classification_request = classification_test.replace_request(
+                classification_test.make_request(root),
+                expected_repository_head=prior_repository_head,
+            )
+            classification_binding = (
+                classification_test.classification_test.boot_test.make_binding()
+            )
+            classification_binding.expected_boot_id_sha256 = ENDED_BOOT_HASH
+            classification_binding.evidence.update(
+                repository_clean=True,
+                repository_head=prior_repository_head,
+            )
+            runner = classification_test.classification_test.ClassificationRunner(
+                classification_request,
+                classification_binding.probe_bytes,
+                boot_hash=FRESH_BOOT_HASH,
+            )
+            classification_result = classification_test.run_case(
+                classification_request, classification_binding, runner
+            )
+
+            request_path = classification_result.evidence_root / "request.json"
+            recorded_request = read_json(request_path)
+            recorded_request["expected_repository_head"] = "e" * 40
+            write_json(request_path, recorded_request)
+            manifest_sha256 = rewrite_manifest(classification_result.evidence_root)
+            request = replace_request(
+                make_request(
+                    root,
+                    prior_root=classification_result.evidence_root,
+                    prior_manifest=manifest_sha256,
+                ),
+                expected_repository_head=current_repository_head,
+            )
+            classification_binding.evidence["repository_head"] = (
+                current_repository_head
+            )
+
+            with mock.patch.object(
+                classification_result_bindings.bindings,
+                "validate_fresh_boot_classification_bindings",
+                return_value=classification_binding,
+            ), self.assertRaisesRegex(
+                ValueError,
+                "prior-fresh-boot-classification-binding-invalid",
+            ):
+                classification_result_bindings.validate_fresh_boot_classification_result_bindings(
+                    request
+                )
+
     def test_qualification_binding_carries_fresh_boot_and_same_backend(self) -> None:
         request = make_request(Path("/tmp/radishlex-fresh-recovery-binding"))
         upstream = SimpleNamespace(
             evidence={
-                "prior_fresh_boot_classification_entries_verified": 48
+                "prior_fresh_boot_classification_entries_verified": 48,
+                "prior_fresh_boot_classification_repository_head": "a" * 40,
             },
             expected_boot_id_sha256=bindings.REQUIRED_ENDED_BOOT_ID_SHA256,
             observed_boot_id_sha256=FRESH_BOOT_HASH,
@@ -99,6 +194,16 @@ class FreshBootRecoveryPreflightTests(unittest.TestCase):
             guest_probe.EXPECTED_PRIOR_BOOT_ID_SHA256,
         )
         self.assertEqual(binding.prior_backend_pid, 42)
+        self.assertEqual(
+            binding.evidence[
+                "prior_fresh_boot_classification_repository_head"
+            ],
+            "a" * 40,
+        )
+        self.assertEqual(
+            binding.evidence["repository_head"],
+            request.expected_repository_head,
+        )
 
         upstream.observed_boot_id_sha256 = bindings.REQUIRED_PRIOR_BOOT_ID_SHA256
         with mock.patch.object(
@@ -293,6 +398,25 @@ def read_json(path: Path) -> dict[str, object]:
     value = json.loads(path.read_text(encoding="utf-8"))
     assert isinstance(value, dict)
     return value
+
+
+def write_json(path: Path, value: dict[str, object]) -> None:
+    path.write_text(
+        json.dumps(value, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def rewrite_manifest(root: Path) -> str:
+    manifest = root / "files.sha256"
+    manifest_lines = manifest.read_text(encoding="utf-8").splitlines()
+    names = [line.split("  ", 1)[1] for line in manifest_lines]
+    lines = [
+        f"{hashlib.sha256((root / name).read_bytes()).hexdigest()}  {name}"
+        for name in names
+    ]
+    manifest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return hashlib.sha256(manifest.read_bytes()).hexdigest()
 
 
 if __name__ == "__main__":

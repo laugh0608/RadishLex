@@ -122,6 +122,11 @@ def validate_fresh_boot_recovery_preflight_bindings(
                 request.prior_fresh_boot_classification_manifest_sha256
             ),
             "prior_fresh_boot_classification_outcome": "new-boot-started",
+            "prior_fresh_boot_classification_repository_head": (
+                upstream.evidence[
+                    "prior_fresh_boot_classification_repository_head"
+                ]
+            ),
             "repository_clean": True,
             "repository_head": request.expected_repository_head,
             "target_uuid": request.target_uuid,
