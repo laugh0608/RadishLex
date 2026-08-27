@@ -7,7 +7,7 @@
 - 复核：2026-08-27；常态分支 `dev`，主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh、六类operation与首个crash已有证据。`install_artifacts_staged` v4仍为`artifacts_staged`且未触发dpkg；首次真实预检拒绝、修复binding及fresh-boot两阶段repository-only控制已闭合，第二次真实资格、resume、其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh、六类operation与首个crash已有证据。`install_artifacts_staged` v4仍为`artifacts_staged`且未触发dpkg；首次预检拒绝、修复binding、fresh-boot控制及真实启动分类已闭合，第二次真实资格、resume、其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -39,8 +39,7 @@
 - clean `dbce3a5`的repository-only boot transport绑定上述18项和全部上游。clean `8f59825`的唯一真实attempt只执行一次`list`，观察21台均registered stopped；target未过inventory gate，PID/probe/guest/file/result均为0，8项manifest `6a1ad09f…5140`闭合`state-indeterminate`。
 - clean `38b1bb8`新增boot start控制；clean `f972371`的唯一实机调用在21台全停后start，PID `39591`双句柄三次稳定，但首次guest root遇到`OSStatus -2700`/agent不可用；29项manifest `97959c55…c57d`闭合`state-indeterminate`。
 - guest-agent attempt一次readiness即ready，但probe后marker不存在；26项manifest `eb7c42f1…d053`闭合`state-indeterminate`，根因为共享probe scope/root错配，现已修复且旧现场冻结。
-- manifest `a17920bd…0e17`闭合PID `92422`与`new-boot-started`。唯一真实恢复预检在持久目录校验处`recovery-rejected`，host因`exec`假exit 0误记`state-indeterminate`；38项manifest `1d593a8f…33c7`已由`c523fb3`绑定并修复。日终仅对v4发送一次正常关机请求，终态21台全stopped、零QEMULauncher/`utmctl`进程且target磁盘无句柄。
-- clean `e9fdabc`闭合fresh-boot两阶段repository-only控制：全停单次启动/分类后，只有动态manifest、新boot与同一PID通过才允许一次只读资格probe；本批无真实系统动作。
+- 首次恢复预检在目录mode处`recovery-rejected`，38项manifest `1d593a8f…33c7`已绑定修复；日终正常关机后21台全停。clean `e9fdabc`闭合两阶段控制；今日唯一第一阶段从全停单次启动v4，PID `42349`、boot `d64b962e…b50`与72项manifest `2211af7e…e60`闭合`new-boot-started`，未资格/resume/stop，terminal后未再查询。
 
 ## 停止线
 
@@ -55,16 +54,16 @@
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
 - v4 launch至checkpoint及exact resume失败证据与UUID `50B75F88…8038`须冻结；不得复跑、覆盖、循环list/status、主动拉起backend或把无句柄归因为stopped。当前唯一有效transaction仍是manifest `3aca0576…0a4f7`证明的`artifacts_staged`；attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`及输出根`…-Exact-Resume-v1`已消费，不得重试或复用。
-- boot classification、恢复预检及上游attempt/host/guest根均冻结；21台现全停。不得补拉、复跑、复用、清理或沿用旧授权start/query/resume/retry/stop/quit。
+- 旧boot classification、恢复预检及上游根继续冻结；新fresh classification根也不得复跑、覆盖或清理。v4在terminal为started/PID `42349`，之后状态未查询；无新授权不得list/status/start、资格、resume、retry/stop/quit。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（2026-08-27）
 
-1. 保持21台全停并冻结manifest `a17920bd…0e17`、`1d593a8f…33c7`及全部旧attempt/host/guest根；不把旧拒绝写成资格通过。
-2. 若继续实机，先单独授权attempt `d75818f-v4-install-artifacts-staged-fresh-boot-classification-20260827-v1`启动/分类；不包含资格、resume或停止。
-3. 仅当第一阶段完整闭合`new-boot-started`且PID/句柄稳定，才另行授权只读资格；之后仍先闭合resume仓库控制，停止另行授权。漂移即冻结。
+1. 冻结manifest `2211af7e…e60`、`1d593a8f…33c7`及全部旧attempt/host/guest根；不复跑第一阶段，也不把旧拒绝写成资格通过。
+2. 若继续，单独授权attempt `d75818f-v4-install-artifacts-staged-fresh-boot-recovery-preflight-20260827-v1`只读资格；它不list/status/start/resume/dpkg/stop，且须保持PID `42349`。
+3. 资格通过后仍先repository-only闭合fresh-boot resume；resume与受控停止分别授权，漂移即冻结。
 
 ## 验证入口
 
@@ -86,7 +85,7 @@
 git diff --check
 ```
 
-上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、boot classification、结果binding、fresh-boot资格及checkpoint/resume控制，但不替代实机。首次真实资格失败已绑定；第二次真实资格、resume、其余case、连续L6与发布未闭合。
+上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、结果binding、fresh-boot资格及checkpoint/resume控制，但不替代实机。fresh boot真实分类已闭合；第二次真实资格、resume、其余case、连续L6与发布未闭合。
 
 ## 阅读索引
 
