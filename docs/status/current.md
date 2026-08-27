@@ -7,7 +7,7 @@
 - 复核：2026-08-27；常态分支 `dev`，主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh、六类operation与首个crash已有证据。`install_artifacts_staged` v4仍为`artifacts_staged`且未触发dpkg；fresh-boot真实分类及历史/当前HEAD binding修复已闭合，真实资格、resume、其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh、六类operation与首个crash已有证据。v4仍为`artifacts_staged`且未触发dpkg；fresh-boot分类、HEAD binding修复及一次只读资格attempt已闭合，结果消歧、resume、其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -39,7 +39,8 @@
 - clean `dbce3a5`的repository-only boot transport绑定上述18项和全部上游。clean `8f59825`的唯一真实attempt只执行一次`list`，观察21台均registered stopped；target未过inventory gate，PID/probe/guest/file/result均为0，8项manifest `6a1ad09f…5140`闭合`state-indeterminate`。
 - clean `38b1bb8`新增boot start控制；clean `f972371`的唯一实机调用在21台全停后start，PID `39591`双句柄三次稳定，但首次guest root遇到`OSStatus -2700`/agent不可用；29项manifest `97959c55…c57d`闭合`state-indeterminate`。
 - guest-agent attempt一次readiness即ready，但probe后marker不存在；26项manifest `eb7c42f1…d053`闭合`state-indeterminate`，根因为共享probe scope/root错配，现已修复且旧现场冻结。
-- 今日唯一第一阶段从21台全停单次启动v4，PID `42349`、boot `d64b962e…b50`与72项manifest `2211af7e…e60`闭合`new-boot-started`，未资格/resume/stop且terminal后未查询。clean `ef5d17f`分离历史HEAD `0be88ee`与当前HEAD后，真实冻结链纯离线binding通过，计划资格根仍absent；第二阶段未执行。
+- 今日第一阶段从21台全停单次启动v4，PID `42349`、boot `d64b962e…b50`与72项manifest `2211af7e…e60`闭合`new-boot-started`；clean `ef5d17f`分离历史/当前HEAD后纯离线binding通过。
+- clean `5cb8160`的唯一第二阶段attempt绑定同一boot/PID；一次只读probe返回0，但首次result pull报告guest文件不存在，第二次未执行。35项manifest `39586a3b…e1bed`通过，terminal为`state-indeterminate`、guest结果`not-observed`；零inventory/start/resume/dpkg/stop，调用后未追加UTM查询。
 
 ## 停止线
 
@@ -54,16 +55,16 @@
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
 - v4 launch至checkpoint及exact resume失败证据与UUID `50B75F88…8038`须冻结；不得复跑、覆盖、循环list/status、主动拉起backend或把无句柄归因为stopped。当前唯一有效transaction仍是manifest `3aca0576…0a4f7`证明的`artifacts_staged`；attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`及输出根`…-Exact-Resume-v1`已消费，不得重试或复用。
-- 旧boot classification、恢复预检及上游根继续冻结；新fresh classification根也不得复跑、覆盖或清理。v4在terminal为started/PID `42349`，之后状态未查询；无新授权不得list/status/start、资格、resume、retry/stop/quit。
+- 旧boot、恢复及fresh两阶段根全部冻结，不复跑、覆盖、补拉或清理。v4最后一次pre-probe观察绑定PID `42349`，probe后的VM/guest状态未查询；无新授权不得query/start、结果补拉、resume、retry/stop/quit。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（2026-08-27）
 
-1. 冻结manifest `2211af7e…e60`、`1d593a8f…33c7`及全部旧attempt/host/guest根；不复跑第一阶段，也不把旧拒绝写成资格通过。
-2. 若继续，单独授权attempt `d75818f-v4-install-artifacts-staged-fresh-boot-recovery-preflight-20260827-v1`只读资格；它不list/status/start/resume/dpkg/stop，且须保持PID `42349`。
-3. 资格通过后仍先repository-only闭合fresh-boot resume；resume与停止分别授权，漂移即冻结。
+1. 冻结manifest `39586a3b…e1bed`、`2211af7e…e60`、`1d593a8f…33c7`及全部旧根；不复跑probe、补拉当前root或解释`not-observed`。
+2. 先repository-only绑定35项并设计deferred-result resolution；它只消费冻结attempt和全新host根，不重跑probe或进入resume/dpkg，真实补拉另行授权。
+3. 只有稳定双读回把guest结果确定为qualified/rejected后才能分别决策；fresh-boot resume与受控停止继续独立实现、验证和授权，任何身份或运行态漂移即冻结。
 
 ## 验证入口
 
@@ -85,7 +86,7 @@
 git diff --check
 ```
 
-上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、结果binding、fresh-boot资格及checkpoint/resume控制，但不替代实机。fresh boot真实分类已闭合；第二次真实资格、resume、其余case、连续L6与发布未闭合。
+上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、结果binding、fresh-boot资格及checkpoint/resume控制，但不替代实机。fresh boot分类已闭合；资格attempt因首次result不存在而失败关闭，结果消歧、resume、其余case、连续L6与发布未闭合。
 
 ## 阅读索引
 
