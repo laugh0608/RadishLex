@@ -7,7 +7,7 @@
 - 复核：2026-08-27；常态分支 `dev`，主线 `master`。
 - 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh、六类operation与首个crash已有证据。`install_artifacts_staged` v4仍为`artifacts_staged`且未触发dpkg；fresh-boot真实分类已闭合，但第二阶段binding混用了历史/当前repository HEAD，须先修复，真实资格、resume、其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh、六类operation与首个crash已有证据。`install_artifacts_staged` v4仍为`artifacts_staged`且未触发dpkg；fresh-boot真实分类及历史/当前HEAD binding修复已闭合，真实资格、resume、其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -39,7 +39,7 @@
 - clean `dbce3a5`的repository-only boot transport绑定上述18项和全部上游。clean `8f59825`的唯一真实attempt只执行一次`list`，观察21台均registered stopped；target未过inventory gate，PID/probe/guest/file/result均为0，8项manifest `6a1ad09f…5140`闭合`state-indeterminate`。
 - clean `38b1bb8`新增boot start控制；clean `f972371`的唯一实机调用在21台全停后start，PID `39591`双句柄三次稳定，但首次guest root遇到`OSStatus -2700`/agent不可用；29项manifest `97959c55…c57d`闭合`state-indeterminate`。
 - guest-agent attempt一次readiness即ready，但probe后marker不存在；26项manifest `eb7c42f1…d053`闭合`state-indeterminate`，根因为共享probe scope/root错配，现已修复且旧现场冻结。
-- 首次预检的38项manifest `1d593a8f…33c7`已绑定修复。今日唯一第一阶段从21台全停单次启动v4，PID `42349`、boot `d64b962e…b50`与72项manifest `2211af7e…e60`闭合`new-boot-started`，未资格/resume/stop且terminal后未查询。提交实机记录后离线复核因历史HEAD `0be88ee`与当前`89639fd`被错误合并而拒绝，第二阶段未执行。
+- 今日唯一第一阶段从21台全停单次启动v4，PID `42349`、boot `d64b962e…b50`与72项manifest `2211af7e…e60`闭合`new-boot-started`，未资格/resume/stop且terminal后未查询。clean `ef5d17f`分离历史HEAD `0be88ee`与当前HEAD后，真实冻结链纯离线binding通过，计划资格根仍absent；第二阶段未执行。
 
 ## 停止线
 
@@ -62,8 +62,8 @@
 ## 下一步（2026-08-27）
 
 1. 冻结manifest `2211af7e…e60`、`1d593a8f…33c7`及全部旧attempt/host/guest根；不复跑第一阶段，也不把旧拒绝写成资格通过。
-2. 先repository-only修复result binding：分别证明历史classification HEAD与当前clean HEAD，同时保持72项manifest、代码hash、动态boot与same-PID严格绑定；门禁通过前不得资格。
-3. 修复后再单独授权attempt `d75818f-v4-install-artifacts-staged-fresh-boot-recovery-preflight-20260827-v1`只读资格；resume与停止仍分别授权，漂移即冻结。
+2. 若继续，单独授权attempt `d75818f-v4-install-artifacts-staged-fresh-boot-recovery-preflight-20260827-v1`只读资格；它不list/status/start/resume/dpkg/stop，且须保持PID `42349`。
+3. 资格通过后仍先repository-only闭合fresh-boot resume；resume与停止分别授权，漂移即冻结。
 
 ## 验证入口
 

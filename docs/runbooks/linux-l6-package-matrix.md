@@ -567,7 +567,9 @@ host control要求clean committed binding递归复核72项真实boot classificat
 
 用户单独授权第一阶段后，从clean `0be88ee`执行唯一attempt `d75818f-v4-install-artifacts-staged-fresh-boot-classification-20260827-v1`。离线binding先递归重验38项旧拒绝结果及全部上游，且新host根absent；唯一plain `list`观察target与其余20台均stopped，三轮静止后只执行一次foreground start。首轮runtime发现QEMULauncher PID `42349`，三次confirmation、10轮readiness与terminal均保持EFI/qcow2双句柄；前9轮agent unavailable，第10轮ready。随后固定scope boot probe只push一次、执行一次，marker与两份result逐字回读闭合，双result SHA-256均为`34d1f032…c4e6`。新boot `d64b962e…b50`不同于已结束boot `b757c8fc…4758`，terminal为`new-boot-started`；72项create-new host manifest SHA-256为`2211af7e…e60`。
 
-该调用没有执行恢复资格、maintenance resume、dpkg、业务guest、retry、cleanup、stop或quit，transaction保持`artifacts-staged-preserved-no-resume`；terminal后未再调用UTM查询或停止，故后续实际状态不从额外观察推断。实机记录提交前，clean `0be88ee`上的纯离线第二阶段binding逐项验证72项manifest、动态boot与same-PID `42349`，计划root仍absent；文档提交为`89639fd`后按新HEAD收尾复核则在`prior-fresh-boot-classification-request-invalid`失败关闭。根因是动态result binding把历史classification `request.json`的HEAD与当前资格控制clean HEAD当成同一字段比较；不得checkout/回退或绕过，须先repository-only拆分两项证明，并保持manifest、代码hash、boot和PID校验，再另行授权资格。
+该调用没有执行恢复资格、maintenance resume、dpkg、业务guest、retry、cleanup、stop或quit，transaction保持`artifacts-staged-preserved-no-resume`；terminal后未再调用UTM查询或停止，故后续实际状态不从额外观察推断。实机记录提交前，clean `0be88ee`上的纯离线第二阶段binding逐项验证72项manifest、动态boot与same-PID `42349`，计划root仍absent；文档提交为`89639fd`后按新HEAD收尾复核则在`prior-fresh-boot-classification-request-invalid`失败关闭。根因是动态result binding把历史classification `request.json`的HEAD与当前资格控制clean HEAD当成同一字段比较；未checkout、回退、绕过或执行资格。
+
+clean `ef5d17f`修复该停止线：当前binding仍须由上游证明`repository_clean=true`且HEAD等于当前请求；72项manifest验证后再从冻结`request.json`取得格式严格的历史HEAD，只在历史request/binding期望值中替换该字段，并要求两份冻结记录一致。current/historical HEAD、manifest、代码hash、新boot和same-PID任一漂移继续失败关闭；资格binding同时导出两项HEAD供后续证据审计。successor HEAD、当前HEAD错误、历史request/binding交叉篡改及manifest漂移回归进入默认L6门禁。clean提交后的真实冻结链纯离线复核返回历史`0be88ee`、当前`ef5d17f`、72项、boot `d64b962e…b50`、PID `42349`且计划root absent；未调用UTM、进入guest或执行资格。
 
 ## 10. L6 完成与后续
 
