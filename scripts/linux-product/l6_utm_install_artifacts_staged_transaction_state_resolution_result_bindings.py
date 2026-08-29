@@ -426,13 +426,18 @@ def _validate_handle_evidence(
         observation = value.get("observation")
         stdout = observation.get("stdout") if isinstance(observation, dict) else None
         expected_backend_pid = None if index == 0 else 36343
+        expected_format = (
+            runtime_control.EVIDENCE_FORMAT
+            if 1 <= index <= 4
+            else control.EVIDENCE_FORMAT
+        )
         expected_argv = (
             network_ready._lsof_argv(request)
             if index < 2
             else runtime_control.targeted_lsof_argv(request, 36343)
         )
         if (
-            value.get("format") != control.EVIDENCE_FORMAT
+            value.get("format") != expected_format
             or value.get("state") != "present"
             or value.get("backend_pid") != expected_backend_pid
             or value.get("backend_command") != "QEMULauncher"

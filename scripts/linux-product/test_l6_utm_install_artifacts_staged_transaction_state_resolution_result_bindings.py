@@ -174,7 +174,11 @@ class TransactionStateResolutionResultBindingTests(unittest.TestCase):
                     "backend_command": "QEMULauncher",
                     "backend_pid": None if index == 0 else 36343,
                     "efi_handle_count": 1,
-                    "format": bindings.control.EVIDENCE_FORMAT,
+                    "format": (
+                        bindings.runtime_control.EVIDENCE_FORMAT
+                        if 1 <= index <= 4
+                        else bindings.control.EVIDENCE_FORMAT
+                    ),
                     "observation": {
                         "argv": list(argv),
                         "exit_code": 0,
