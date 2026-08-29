@@ -34,15 +34,10 @@
 - clean `dbce3a5`的repository-only boot transport绑定上述18项和全部上游。clean `8f59825`的唯一真实attempt只执行一次`list`，观察21台均registered stopped；target未过inventory gate，PID/probe/guest/file/result均为0，8项manifest `6a1ad09f…5140`闭合`state-indeterminate`。
 - clean `38b1bb8`新增boot start控制；clean `f972371`的唯一实机调用在21台全停后start，PID `39591`双句柄三次稳定，但首次guest root遇到`OSStatus -2700`/agent不可用；29项manifest `97959c55…c57d`闭合`state-indeterminate`。
 - guest-agent attempt一次readiness即ready，但probe后marker不存在；26项manifest `eb7c42f1…d053`闭合`state-indeterminate`，根因为共享probe scope/root错配，现已修复且旧现场冻结。
-- 今日第一阶段从21台全停单次启动v4，PID `42349`、boot `d64b962e…b50`与72项manifest `2211af7e…e60`闭合`new-boot-started`；clean `ef5d17f`分离历史/当前HEAD后纯离线binding通过。
-- clean `b2abff7`的唯一延迟消歧保持boot `d64b962e…b50`/PID `42349`；双份945-byte result hash均为`fb4961ab…263e`且phase `complete`。21项manifest `18114720…3989b`闭合`recovery-qualified`，receipt仍为`artifacts_staged`，零probe/resume/dpkg/list/start/stop。
-- clean `df4ef3c`已绑定21项qualified结果并新增fresh-boot resume host/guest控制；guest仅在persistent transaction、package/dpkg和系统静止重验后重建transient secret并允许单次resume/postflight，17项回归及L6门禁通过。
-- clean `fb53cc6`的真实fresh-boot resume/postflight各调用一次；稳定双terminal闭合`state-indeterminate`，dpkg/transaction保持unknown。47项manifest `ee1879e7…0798`及禁止动作已由`450cfa8`绑定。
-- 审计确认prior/current boot混用；`202b64d`分开验证两者并解耦历史/successor driver。5项回归及门禁通过；真实47项链离线复核仍返回历史HEAD `fb53cc6`、当前HEAD `202b64d`和原`state-indeterminate`，未触碰UTM或guest。
-- 日终plain list仅v4 started；单次正常`stop --request`后21台stopped，宿主无`QEMULauncher`/`qemu-system`。未force/kill/guest/补拉/retry/cleanup；boot `d64b962e…b50`已结束，冻结结果与dpkg/transaction unknown结论不变。
-- `f05ebd7`修复外部QEMU误判；clean `a03edae`的v2以PID `36343`在第10轮ready，但首次result缺失；67项manifest `37058a86…08e4`闭合`state-indeterminate`。
-- clean `f66e32e`的deferred result保持PID/句柄；双份1259-byte result为`a40e1079…0eec`且phase `completed`。21项manifest `7fcef38e…0e3d`闭合transaction completed、package installed/startup allowed，resume/dpkg/list/start/stop为0；`7acbbde`已递归绑定。
-- clean `9485778`的terminal stop在双句柄确认后只发送一次正常stop；第2轮复核闭合21台all-stopped且目标句柄/相关进程absent。28项manifest `096fe01f…e133`通过；`ad77c22`以6项回归绑定该结果，实链离线复核通过。
+- v4 fresh-boot分类、只读恢复资格和resume控制均已冻结；原resume仍为`state-indeterminate`。`202b64d`分开验证prior/current boot并解耦历史/successor driver，没有倒写旧attempt。
+- `f05ebd7`排除非UTM QEMU误判；v2首次result缺失后，独立deferred resolution以双份1259-byte结果与completed phase闭合transaction `completed`，21项manifest `7fcef38e…0e3d`已由`7acbbde`递归绑定。
+- clean `9485778`只发送一次正常stop，第2轮闭合21台all-stopped及目标句柄/进程absent；28项manifest `096fe01f…e133`已由`ad77c22`递归绑定。
+- `9ec3218`/`8e55189`已固定第三个`upgrade_quiesced`的不可变S2、checkpoint/resume语义、六段授权及独立clone前门；尚未创建专用注册壳或真实target。
 
 ## 停止线
 
@@ -64,11 +59,11 @@
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一事项（2026-08-29）
+## 明日事项（2026-08-30）
 
-1. 冻结v1/v2、21项deferred-result与28项terminal-stop根，不复用、补拉、重复query/stop或倒写现场。
-2. `ad77c22`已闭合第二个`install_artifacts_staged` crash的completed transaction、正常停止及结果binding；不再为该case执行系统动作。
-3. `8e55189`已闭合第三个`upgrade quiesced`的独立clone前门；真实clone前仍须提供专用注册壳证据并新授权，后五段也分别授权。
+1. 开始前复核clean committed `dev`与冻结资产停止线；第二个case不再执行系统动作，也不补拉、query、stop或倒写证据。
+2. 先只在仓库内固定专用registration shell的准备、manifest与冻结证据合同：create-new、`Network=[]`、registration-only、从未进入guest，且不复用任何source/crash/transaction terminal。
+3. 合同与门禁闭合后，再提交精确壳体创建/注册方案请求独立系统授权；壳体证据通过后才另行授权真实clone。start、input-preflight、crash、resume与terminal-stop继续逐段关闭。
 
 ## 验证入口
 
@@ -90,7 +85,7 @@
 git diff --check
 ```
 
-上述合成入口覆盖现有L6 host/guest控制、结果binding、checkpoint/resume、只读transaction-state resolution、terminal stop及其冻结结果binding，但不替代实机。原resume仍冻结为`state-indeterminate`，后续独立只读结果已闭合`completed`且同一VM已正常停止；其余六个crash、连续L6与发布未闭合。
+上述合成入口覆盖现有L6 host/guest控制、结果binding、checkpoint/resume、只读transaction-state resolution、terminal stop、`upgrade_quiesced` case与clone前门，但不替代实机。原resume仍冻结为`state-indeterminate`，独立只读结果已闭合`completed`且同一VM已正常停止；其余六个crash、连续L6与发布未闭合。
 
 ## 阅读索引
 
