@@ -1,0 +1,160 @@
+{
+  "authorization_sequence": [
+    {
+      "id": "clone",
+      "next_state": "independent-clone-stopped-unstarted",
+      "ordinal": 1,
+      "single_authorized_effect": "create-independent-clone-from-immutable-s2"
+    },
+    {
+      "id": "start",
+      "next_state": "independent-clone-started-no-business-input",
+      "ordinal": 2,
+      "single_authorized_effect": "start-only-the-independent-clone"
+    },
+    {
+      "id": "input-preflight",
+      "next_state": "offline-source-installed-inputs-bound-preflight-passed",
+      "ordinal": 3,
+      "single_authorized_effect": "publish-exact-inputs-and-run-readonly-preflight"
+    },
+    {
+      "id": "crash",
+      "next_state": "upgrade-quiesced-process-group-terminated",
+      "ordinal": 4,
+      "single_authorized_effect": "run-once-to-quiesced-and-terminate-worker-process-group"
+    },
+    {
+      "id": "resume",
+      "next_state": "upgrade-completed-postflight-passed",
+      "ordinal": 5,
+      "single_authorized_effect": "resume-once-with-fresh-relationship-and-quiescence-proofs"
+    },
+    {
+      "id": "terminal-stop",
+      "next_state": "independent-clone-stopped-terminal-frozen",
+      "ordinal": 6,
+      "single_authorized_effect": "request-one-graceful-terminal-stop"
+    }
+  ],
+  "checkpoint": {
+    "dpkg_child": "absent",
+    "dpkg_log": "unchanged_from_preflight",
+    "dpkg_status": "unchanged_from_preflight",
+    "expected_terminal": "completed",
+    "guard": {
+      "advisory_lock": "unlocked_after_worker_exit",
+      "link_count": 1,
+      "mode": "0600",
+      "owner": "root:root",
+      "size_bytes": 0
+    },
+    "network": "unchanged_from_preflight",
+    "package_state": "source_installed",
+    "process_group": "terminated",
+    "process_group_member_count": 0,
+    "product_processes": "unchanged_from_preflight",
+    "receipt": {
+      "failure_code": null,
+      "manual_recovery_required": false,
+      "operation_chain_length": 2,
+      "operation_kind": "upgrade",
+      "required_staged_slots": [
+        "source",
+        "target"
+      ],
+      "source_artifact_present": true,
+      "source_proof_present": false,
+      "staged_slots": [
+        "source",
+        "target"
+      ],
+      "state": "quiesced",
+      "target_artifact_present": true,
+      "target_proof_present": false,
+      "version_relation": "target_newer"
+    },
+    "resume": {
+      "steps": [
+        "validate_staged_relationship",
+        "prove_target_quiescence",
+        "apply_target_once",
+        "verify_target",
+        "complete"
+      ],
+      "target_apply_total": 1
+    },
+    "startup_case": "active-guard",
+    "xdg_fingerprint": "unchanged_from_s2"
+  },
+  "format_version": 1,
+  "matrix": {
+    "checkpoint": "quiesced",
+    "expected_terminal": "completed",
+    "fault": "process_group_terminated",
+    "operation": "upgrade_target",
+    "restore_snapshot_after": true,
+    "scenario": "upgrade_quiesced"
+  },
+  "profile": "debian13-arm64-upgrade-quiesced-crash-v1",
+  "release_pair": {
+    "handoff_record_sha256": "c74fac1217fd0716a424e1b53c6c3f042131346bd566b66114d4cca342d49849",
+    "relationship": {
+      "data_contract_equal": true,
+      "installed_after": "target",
+      "installed_before": "source",
+      "operation_kind": "upgrade",
+      "required_staged_slots": [
+        "source",
+        "target"
+      ],
+      "version_relation": "target_newer"
+    },
+    "source": {
+      "artifact_evidence_filename": "radishlex_26.7.1+38-1_arm64.deb.evidence.json",
+      "artifact_evidence_sha256": "fe3d6297c08dccd8cacba13d50aa44dbb1c94b0ca8c2ab4df3a5c605466fcf94",
+      "artifact_evidence_size": 2376,
+      "package_filename": "radishlex_26.7.1+38-1_arm64.deb",
+      "package_sha256": "09ed122804b11767b8ac7cd69c323c1f6eef511fd6ae7284d75756fb60569bec",
+      "package_size": 40806592,
+      "package_version": "26.7.1+38-1",
+      "repository_commit": "55351f21536d6dca3f90ab053c2a81e2b9bea354",
+      "role": "source"
+    },
+    "target": {
+      "artifact_evidence_filename": "radishlex_26.7.1+38-2_arm64.deb.evidence.json",
+      "artifact_evidence_sha256": "9e646c86c33bc5027b82c8af0b659df7515722f66ffa92be09420f9974f63f17",
+      "artifact_evidence_size": 2376,
+      "package_filename": "radishlex_26.7.1+38-2_arm64.deb",
+      "package_sha256": "4dd0054051612654940a5973cc8a465be9b598a40a6fc036c7b263088aa5dcec",
+      "package_size": 40806592,
+      "package_version": "26.7.1+38-2",
+      "repository_commit": "d75818f764758bfc4d90102ed2a6b3208d1debcf",
+      "role": "target"
+    }
+  },
+  "start": {
+    "all_registered_vms_stopped_precondition": true,
+    "classification": "local-operator-recovery-point-not-canonical-session-evidence",
+    "clone_policy": "immutable-source-new-independent-target",
+    "config_sha256": "5111741c54a49068dbbacfd131891b0990a531001769db21942eb88ac6767d2b",
+    "efi_sha256": "365b5a170dca95bdf07c0e5e940fafd4580a353e43c141abede71c95f91261bc",
+    "identity": "S2-source-data-512e8ab-0c2cefd6",
+    "local_evidence_sha256": "d164de0f5e6e88afbfa76ccd1c7d321d7064bbfd3ee1e275d3d4842d0dfa5c74",
+    "prior_crash_clone_reuse": false,
+    "qcow2_sha256": "0c2cefd6b63420adf143e1f1d6e4e70f59841bf1ba56cb54e86d2e7a226f3eea",
+    "registered_with_utm": false,
+    "relative_path": "RadishLex-L6-Snapshots/S2-source-data-512e8ab",
+    "role": "S2-source-data",
+    "single_vm_runtime_limit": 1,
+    "source_artifact_evidence_sha256": "fe3d6297c08dccd8cacba13d50aa44dbb1c94b0ca8c2ab4df3a5c605466fcf94",
+    "source_dpkg_status_sha256": "33c4973d4bcccc1932de35b2b326c61140037ee46613c7a925f2cbdbd3d5cff1",
+    "source_operation_chain_length": 1,
+    "source_package_sha256": "09ed122804b11767b8ac7cd69c323c1f6eef511fd6ae7284d75756fb60569bec",
+    "source_package_version": "26.7.1+38-1",
+    "source_receipt_sha256": "e58b144e2d148a7bc37790045c27ef6746308cfdea2e4e0924aa9ed9afa63ab8",
+    "source_open_handles_required": 0,
+    "target_clone_must_be_absent": true,
+    "xdg_fingerprint_sha256": "f3df287fa0f1da1d5f1fb3169fe607a84ad7fb9b60aab1308ba2eeb410d0b86b"
+  }
+}

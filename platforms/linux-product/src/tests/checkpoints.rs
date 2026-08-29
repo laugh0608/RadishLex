@@ -10,6 +10,7 @@ use crate::{
 };
 
 const OPERATION_ID: &str = "10101010101010101010101010101010";
+const SOURCE_OPERATION_ID: &str = "01010101010101010101010101010101";
 
 #[derive(Debug)]
 struct InterruptAt {
@@ -228,6 +229,129 @@ fn install_artifacts_staged_checkpoint_preserves_absent_package_and_resumes_once
         completed.target_proof().and_then(PackageSnapshot::artifact),
         Some(&target.identity)
     );
+}
+
+#[test]
+fn upgrade_quiesced_checkpoint_reproves_relationship_and_quiescence() {
+    let environment = TestEnvironment::new("l6-upgrade-quiesced");
+    let source = artifact(&environment, "0.1.0-1", "l6-quiesced-source");
+    let target = artifact(&environment, "0.2.0-1", "l6-quiesced-target");
+    let install_case = OperationCase {
+        kind: LinuxOperationKind::Install,
+        relation: ArtifactVersionRelation::NotApplicable,
+        source: None,
+        target: Some(&source),
+    };
+    let guard = environment.store.acquire_guard().expect("acquire guard");
+    let mut install_port = FakeDpkg::new(PackageSnapshot::absent());
+    prepare_operation(
+        &environment.store,
+        &guard,
+        request(&install_case, SOURCE_OPERATION_ID),
+        &mut install_port,
+    )
+    .expect("prepare source install");
+    stage_case(&environment, &guard, &install_case);
+    assert_eq!(
+        resume_operation(&environment.store, &guard, &mut install_port)
+            .expect("complete source install"),
+        TransactionOutcome::Completed
+    );
+
+    let upgrade_case = OperationCase {
+        kind: LinuxOperationKind::Upgrade,
+        relation: ArtifactVersionRelation::TargetNewer,
+        source: Some(&source),
+        target: Some(&target),
+    };
+    let mut checkpoint_port =
+        FakeDpkg::new(PackageSnapshot::exact_installed(source.identity.clone()));
+    prepare_operation(
+        &environment.store,
+        &guard,
+        request(&upgrade_case, OPERATION_ID),
+        &mut checkpoint_port,
+    )
+    .expect("prepare source-to-target upgrade");
+    stage_case(&environment, &guard, &upgrade_case);
+
+    let mut checkpoints = InterruptAt::new(LinuxL6Checkpoint::Quiesced);
+    let error = resume_operation_with_checkpoints(
+        &environment.store,
+        &guard,
+        &mut checkpoint_port,
+        &mut checkpoints,
+    )
+    .expect_err("quiesced checkpoint simulates process termination");
+    assert!(matches!(error, TransactionError::Checkpoint(_)));
+    assert_eq!(
+        checkpoints.reached,
+        vec![
+            LinuxL6Checkpoint::ArtifactsStaged,
+            LinuxL6Checkpoint::Quiesced,
+        ]
+    );
+    assert_eq!(
+        checkpoint_port.staged_validation_states,
+        [LinuxInstallState::ArtifactsStaged]
+    );
+    assert_eq!(
+        checkpoint_port.quiescence_phases,
+        [DpkgQuiescencePhase::TargetMutation]
+    );
+    assert_eq!(checkpoint_port.apply_calls, 0);
+    assert!(checkpoint_port.consumed_permits.is_empty());
+    assert_eq!(checkpoint_port.issued_permits.len(), 1);
+    assert_eq!(checkpoint_port.snapshot.artifact(), Some(&source.identity));
+
+    let receipt = environment
+        .store
+        .load_receipt()
+        .expect("load quiesced receipt")
+        .expect("quiesced receipt exists");
+    assert_eq!(receipt.operation_kind(), LinuxOperationKind::Upgrade);
+    assert_eq!(
+        receipt.version_relation(),
+        ArtifactVersionRelation::TargetNewer
+    );
+    assert_eq!(receipt.state(), LinuxInstallState::Quiesced);
+    assert_eq!(
+        receipt.operation_chain(),
+        [SOURCE_OPERATION_ID, OPERATION_ID]
+    );
+    assert_eq!(receipt.source_artifact(), Some(&source.identity));
+    assert_eq!(receipt.target_artifact(), Some(&target.identity));
+    assert!(receipt.staged_artifact(ArtifactSlot::Source).is_some());
+    assert!(receipt.staged_artifact(ArtifactSlot::Target).is_some());
+    assert!(receipt.target_proof().is_none());
+    assert!(receipt.source_proof().is_none());
+    assert!(receipt.failure_code().is_none());
+    assert!(!receipt.manual_recovery_required());
+    drop(guard);
+
+    let guard = environment.store.acquire_guard().expect("reacquire guard");
+    let mut fresh_port = FakeDpkg::new(PackageSnapshot::exact_installed(source.identity.clone()));
+    assert_eq!(
+        resume_operation(&environment.store, &guard, &mut fresh_port)
+            .expect("resume quiesced upgrade"),
+        TransactionOutcome::Completed
+    );
+    assert_eq!(
+        fresh_port.staged_validation_states,
+        [
+            LinuxInstallState::Quiesced,
+            LinuxInstallState::PackageMutating,
+        ]
+    );
+    assert_eq!(
+        fresh_port.quiescence_phases,
+        [DpkgQuiescencePhase::TargetMutation]
+    );
+    assert_eq!(fresh_port.apply_calls, 1);
+    assert_eq!(fresh_port.consumed_permits.len(), 1);
+    assert!(fresh_port.issued_permits.is_empty());
+    assert_eq!(fresh_port.user_data_touches, 0);
+    assert_eq!(fresh_port.snapshot.artifact(), Some(&target.identity));
 }
 
 #[test]
