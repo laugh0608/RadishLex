@@ -88,6 +88,9 @@
 
 ## Git 与入口维护
 
+- `dev` 是常态开发与集成分支；串行推进的普通任务直接在 `dev` 开发和提交，不要求主题分支、Pull Request 或额外 worktree。
+- 只有项目所有者明确要求、外部贡献、并行写入、确有隔离价值的高风险改动或 hotfix 才创建主题分支；Agent 不自动创建 `codex/*` 等临时分支。
+- `dev` 当前不启用 branch protection，直接 push 不触发 GitHub Actions；直接开发按改动范围完成本地验证，需要评审或隔离时再通过 Pull Request 合入 `dev`。
 - 提交使用当前用户身份和 Conventional Commits，不添加 AI 署名；代码、文档和治理按主题拆分，提交前复验范围与必要门禁。
 - 禁止未授权 `git reset --hard`、checkout 覆盖、force push 或其他破坏性操作；推送、PR、Release、tag 和远端设置始终另行授权。
 - 一条规则只有同时满足“跨任务成立、跨阶段成立、必须启动即生效、无法仅由任务路由可靠承载”时，才进入 `AGENTS.md` / `CLAUDE.md`。

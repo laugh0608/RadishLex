@@ -20,8 +20,8 @@
 
 ## 工作流
 
-1. 普通变更从独立主题分支向 `dev` 发起 Pull Request；`master` 只接收阶段性 `dev` 晋级。
-2. 主题分支可使用 `feature/*`、`fix/*`、`docs/*`、`proposal/*`、`experiment/*`、`test/*` 或 `chore/*`。
+1. 项目所有者或已授权维护者串行推进普通任务时直接在 `dev` 开发和提交；外部贡献、并行写入、确有隔离价值的高风险改动或明确需要评审时，才从主题分支向 `dev` 发起 Pull Request。`master` 只接收阶段性 `dev` 晋级。
+2. 需要主题分支时，可使用 `feature/*`、`fix/*`、`docs/*`、`proposal/*`、`experiment/*`、`test/*` 或 `chore/*`；Agent 不因默认流程自动创建 `codex/*` 分支或额外 worktree。
 3. 不直接向 `master` push，不 force push 共享分支。`dev -> master` 合并后，按[仓库 Ruleset 说明](.github/rulesets/README.md)将 `master` 回流 `dev`。
 4. 提交遵循 Conventional Commits，并使用贡献者自己的 Git 身份，不添加 AI 协作者署名。
 
