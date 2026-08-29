@@ -70,7 +70,56 @@ class TransactionRunner(boot_test.FakeRunner):
         )
 
 
+class ExternalQemuRunner(TransactionRunner):
+    def run(self, argv, timeout_seconds, *, stdin_file=None):
+        if argv == (
+            resolution.boot_control.runtime_control.launch_transport.PROCESS_COMMAND
+        ):
+            self.calls.append(argv)
+            return boot_test.observation(
+                argv,
+                stdout=(
+                    runtime_test.quiet()
+                    + b"97570 74571 501 qemu-system-aarc\n"
+                ),
+            )
+        return super().run(
+            argv,
+            timeout_seconds,
+            stdin_file=stdin_file,
+        )
+
+
 class TransactionStateResolutionTests(unittest.TestCase):
+    def test_external_generic_qemu_does_not_block_utm_only_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            request = make_request(Path(temporary))
+            binding = make_binding()
+            runner = ExternalQemuRunner(request, binding, "completed")
+
+            result = run_case(request, binding, runner)
+
+            self.assertEqual(result.outcome, "transaction-completed")
+            preflight = boot_test.read_json(
+                request.output_root / "host-process-preflight.json"
+            )
+            self.assertEqual(preflight["relevant_process_count"], 0)
+            self.assertEqual(
+                preflight["excluded_generic_qemu_process_count"],
+                1,
+            )
+            self.assertEqual(
+                preflight["excluded_generic_qemu_processes"][0][
+                    "accounting_name"
+                ],
+                "qemu-system-aarc",
+            )
+            self.assertEqual(
+                preflight["process_scope"],
+                "utm-specific-accounting-v1",
+            )
+            self.assert_forbidden_actions_absent(runner.calls)
+
     def test_completed_is_observed_once_without_stop_or_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             request = make_request(Path(temporary))

@@ -407,9 +407,14 @@ class GuestProbeResolution:
 class GuestProbeWorkflow(Protocol):
     probe_relative_path: Path
     probe_stage_name: str
+    process_scope: str
     result_label: str
 
     def baseline_inventory(self, binding: object) -> tuple[start_control.RegisteredVm, ...]: ...
+
+    def filter_relevant_processes(
+        self, processes: tuple[dict[str, object], ...]
+    ) -> tuple[dict[str, object], ...]: ...
 
     def probe_argv(
         self, request: BootStartResolutionRequest, binding: object
@@ -442,6 +447,47 @@ class CommandRunner(Protocol):
 
 
 Sleeper = Callable[[float], None]
+
+
+def _observe_processes(
+    runner: CommandRunner,
+    request: BootStartResolutionRequest,
+    workflow: GuestProbeWorkflow | None,
+) -> tuple[
+    start_control.CommandObservation,
+    tuple[dict[str, object], ...],
+    tuple[dict[str, object], ...],
+]:
+    observation, observed = runtime_control._observe_processes(runner, request)
+    if workflow is None:
+        return observation, observed, ()
+    filtered = workflow.filter_relevant_processes(observed)
+    observed_pids = {int(item["pid"]) for item in observed}
+    filtered_pids = {int(item["pid"]) for item in filtered}
+    if not filtered_pids.issubset(observed_pids) or len(filtered) > len(observed):
+        raise BootStartResolutionError("workflow-process-filter-invalid")
+    excluded = tuple(
+        item for item in observed if int(item["pid"]) not in filtered_pids
+    )
+    return observation, filtered, excluded
+
+
+def _process_evidence(
+    observation: start_control.CommandObservation,
+    processes: tuple[dict[str, object], ...],
+    excluded_processes: tuple[dict[str, object], ...],
+    workflow: GuestProbeWorkflow | None,
+) -> dict[str, object]:
+    value = runtime_control._process_evidence(observation, processes)
+    if workflow is not None:
+        value.update(
+            {
+                "excluded_generic_qemu_process_count": len(excluded_processes),
+                "excluded_generic_qemu_processes": list(excluded_processes),
+                "process_scope": workflow.process_scope,
+            }
+        )
+    return value
 
 
 def run_boot_start_resolution(
@@ -539,13 +585,16 @@ def run_boot_start_resolution(
         writer.write_json("target-files-preflight.json", target_preflight)
 
         stage = "host-process-preflight"
-        process_observation, terminal_processes = runtime_control._observe_processes(
-            command_runner, request
+        process_observation, terminal_processes, excluded_processes = (
+            _observe_processes(command_runner, request, guest_probe_workflow)
         )
         writer.write_json(
             "host-process-preflight.json",
-            runtime_control._process_evidence(
-                process_observation, terminal_processes
+            _process_evidence(
+                process_observation,
+                terminal_processes,
+                excluded_processes,
+                guest_probe_workflow,
             ),
         )
         if terminal_processes:
@@ -604,13 +653,18 @@ def run_boot_start_resolution(
 
         stage = "post-list-quiescence"
         for index in range(1, request.quiescence_observations + 1):
-            process_observation, terminal_processes = (
-                runtime_control._observe_processes(command_runner, request)
+            process_observation, terminal_processes, excluded_processes = (
+                _observe_processes(
+                    command_runner, request, guest_probe_workflow
+                )
             )
             writer.write_json(
                 f"host-process-quiescence-{index:03d}.json",
-                runtime_control._process_evidence(
-                    process_observation, terminal_processes
+                _process_evidence(
+                    process_observation,
+                    terminal_processes,
+                    excluded_processes,
+                    guest_probe_workflow,
                 ),
             )
             handle_observation, handle_state, handle_details = _observe_handles(
@@ -653,13 +707,18 @@ def run_boot_start_resolution(
         stage = "target-runtime-discovery"
         for index in range(1, request.runtime_poll_attempts + 1):
             runtime_poll_count = index
-            process_observation, terminal_processes = (
-                runtime_control._observe_processes(command_runner, request)
+            process_observation, terminal_processes, excluded_processes = (
+                _observe_processes(
+                    command_runner, request, guest_probe_workflow
+                )
             )
             writer.write_json(
                 f"host-process-runtime-{index:03d}.json",
-                runtime_control._process_evidence(
-                    process_observation, terminal_processes
+                _process_evidence(
+                    process_observation,
+                    terminal_processes,
+                    excluded_processes,
+                    guest_probe_workflow,
                 ),
             )
             handle_observation, handle_state, handle_details = _observe_handles(
@@ -718,13 +777,18 @@ def run_boot_start_resolution(
             )
             if int(identity["backend_pid"]) != backend_pid:
                 raise BootStartResolutionError("target-backend-pid-drift")
-            process_observation, terminal_processes = (
-                runtime_control._observe_processes(command_runner, request)
+            process_observation, terminal_processes, excluded_processes = (
+                _observe_processes(
+                    command_runner, request, guest_probe_workflow
+                )
             )
             writer.write_json(
                 f"host-process-confirmation-{index:03d}.json",
-                runtime_control._process_evidence(
-                    process_observation, terminal_processes
+                _process_evidence(
+                    process_observation,
+                    terminal_processes,
+                    excluded_processes,
+                    guest_probe_workflow,
                 ),
             )
             runtime_control._require_no_utmctl(
@@ -789,15 +853,20 @@ def run_boot_start_resolution(
                         "target-backend-pid-readiness-drift"
                     )
 
-                process_observation, terminal_processes = (
-                    runtime_control._observe_processes(
-                        command_runner, request
-                    )
+                (
+                    process_observation,
+                    terminal_processes,
+                    excluded_processes,
+                ) = _observe_processes(
+                    command_runner, request, guest_probe_workflow
                 )
                 writer.write_json(
                     f"host-process-readiness-{index:03d}.json",
-                    runtime_control._process_evidence(
-                        process_observation, terminal_processes
+                    _process_evidence(
+                        process_observation,
+                        terminal_processes,
+                        excluded_processes,
+                        guest_probe_workflow,
                     ),
                 )
                 runtime_control._require_no_utmctl(
@@ -1035,13 +1104,16 @@ def run_boot_start_resolution(
             )
 
         stage = "host-process-terminal"
-        process_observation, terminal_processes = runtime_control._observe_processes(
-            command_runner, request
+        process_observation, terminal_processes, excluded_processes = (
+            _observe_processes(command_runner, request, guest_probe_workflow)
         )
         writer.write_json(
             "host-process-terminal.json",
-            runtime_control._process_evidence(
-                process_observation, terminal_processes
+            _process_evidence(
+                process_observation,
+                terminal_processes,
+                excluded_processes,
+                guest_probe_workflow,
             ),
         )
         runtime_control._require_no_utmctl(terminal_processes, "terminal")

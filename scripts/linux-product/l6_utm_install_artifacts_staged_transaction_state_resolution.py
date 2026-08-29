@@ -169,6 +169,7 @@ class TransactionStateResolutionRequest(resume_control.FreshBootResumeRequest):
 class TransactionStateProbeWorkflow:
     probe_relative_path = PROBE_RELATIVE_PATH
     probe_stage_name = "guest-transaction-state-probe-once"
+    process_scope = "utm-specific-accounting-v1"
     result_label = "guest-transaction-state-result"
 
     def baseline_inventory(
@@ -179,6 +180,16 @@ class TransactionStateProbeWorkflow:
                 "transaction-state-binding-type-invalid"
             )
         return binding.baseline_inventory
+
+    def filter_relevant_processes(
+        self, processes: tuple[dict[str, object], ...]
+    ) -> tuple[dict[str, object], ...]:
+        return tuple(
+            process
+            for process in processes
+            if process.get("role")
+            in {"utm-app", "utmctl", "qemu-helper", "qemu-launcher"}
+        )
 
     def probe_argv(
         self,
