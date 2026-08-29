@@ -117,6 +117,37 @@ EXPECTED_AUTHORIZATION_SEQUENCE = [
     },
 ]
 
+EXPECTED_CLONE_FRONT_DOOR = {
+    "control_sequence": [
+        "clone-once-from-dedicated-registration-shell",
+        "materialize-s2-efi-and-qcow2-once",
+    ],
+    "failure_policy": {
+        "automatic_delete": False,
+        "automatic_retry": False,
+        "automatic_rollback": False,
+        "automatic_start": False,
+        "partial_target_is_state_indeterminate": True,
+    },
+    "materialization": {
+        "config_policy": "registration-shell-except-name-and-uuid",
+        "copy_primitive": "apfs-clonefile",
+        "members": [
+            "Data/efi_vars.fd",
+            "Data/FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+        ],
+        "replacement_count": 2,
+        "source_config_is_not_copied": True,
+    },
+    "registration_shell": {
+        "dedicated_case_evidence_required": True,
+        "may_reuse_frozen_crash_clone": False,
+        "may_reuse_frozen_transaction_terminal": False,
+        "network": [],
+        "purpose": "registration-only-no-guest-state-reuse",
+    },
+}
+
 
 def load_repository_contract(
     repository_root: Path = REPOSITORY_ROOT,
@@ -137,6 +168,7 @@ def validate_upgrade_quiesced_case_contract(
         contract,
         {
             "authorization_sequence",
+            "clone_front_door",
             "checkpoint",
             "format_version",
             "matrix",
@@ -155,6 +187,10 @@ def validate_upgrade_quiesced_case_contract(
 
     _validate_matrix(contract["matrix"], matrix)
     _validate_start(contract["start"])
+    if contract["clone_front_door"] != EXPECTED_CLONE_FRONT_DOOR:
+        raise UpgradeQuiescedCaseContractError(
+            "clone front door must keep a dedicated shell and exact S2 materialization"
+        )
     _validate_release_pair(
         contract["release_pair"], contract["start"], matrix, release_pair
     )

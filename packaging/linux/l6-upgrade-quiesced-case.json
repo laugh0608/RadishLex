@@ -37,6 +37,36 @@
       "single_authorized_effect": "request-one-graceful-terminal-stop"
     }
   ],
+  "clone_front_door": {
+    "control_sequence": [
+      "clone-once-from-dedicated-registration-shell",
+      "materialize-s2-efi-and-qcow2-once"
+    ],
+    "failure_policy": {
+      "automatic_delete": false,
+      "automatic_retry": false,
+      "automatic_rollback": false,
+      "automatic_start": false,
+      "partial_target_is_state_indeterminate": true
+    },
+    "materialization": {
+      "config_policy": "registration-shell-except-name-and-uuid",
+      "copy_primitive": "apfs-clonefile",
+      "members": [
+        "Data/efi_vars.fd",
+        "Data/FFF05A20-E829-493C-8F40-B40884425A3F.qcow2"
+      ],
+      "replacement_count": 2,
+      "source_config_is_not_copied": true
+    },
+    "registration_shell": {
+      "dedicated_case_evidence_required": true,
+      "may_reuse_frozen_crash_clone": false,
+      "may_reuse_frozen_transaction_terminal": false,
+      "network": [],
+      "purpose": "registration-only-no-guest-state-reuse"
+    }
+  },
   "checkpoint": {
     "dpkg_child": "absent",
     "dpkg_log": "unchanged_from_preflight",

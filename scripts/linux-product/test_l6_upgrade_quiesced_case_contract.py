@@ -45,6 +45,11 @@ class LinuxL6UpgradeQuiescedCaseContractTests(unittest.TestCase):
                 "terminal-stop",
             ],
         )
+        self.assertFalse(
+            self.contract["clone_front_door"]["registration_shell"][
+                "may_reuse_frozen_transaction_terminal"
+            ]
+        )
 
     def test_snapshot_or_installed_source_drift_is_rejected(self) -> None:
         for field, value in (
@@ -104,6 +109,19 @@ class LinuxL6UpgradeQuiescedCaseContractTests(unittest.TestCase):
     def test_authorization_phases_cannot_be_collapsed(self) -> None:
         contract = copy.deepcopy(self.contract)
         contract["authorization_sequence"].pop(2)
+
+        with self.assertRaises(
+            case_contract.UpgradeQuiescedCaseContractError
+        ):
+            case_contract.validate_upgrade_quiesced_case_contract(
+                contract, self.matrix, self.release_pair
+            )
+
+    def test_clone_front_door_cannot_reuse_a_frozen_terminal(self) -> None:
+        contract = copy.deepcopy(self.contract)
+        contract["clone_front_door"]["registration_shell"][
+            "may_reuse_frozen_transaction_terminal"
+        ] = True
 
         with self.assertRaises(
             case_contract.UpgradeQuiescedCaseContractError
