@@ -391,6 +391,46 @@ class BootStartResolutionResult:
     result_readback_invocations: int
 
 
+@dataclass(frozen=True)
+class GuestProbeResolution:
+    outcome: str
+    exit_code: int
+    transaction: str
+    reason: str
+    observed_boot_id_sha256: str | None
+    evidence_name: str
+    evidence: dict[str, object]
+    business_guest_action: str
+    operation_id_disposition: str
+
+
+class GuestProbeWorkflow(Protocol):
+    probe_relative_path: Path
+    probe_stage_name: str
+    result_label: str
+
+    def baseline_inventory(self, binding: object) -> tuple[start_control.RegisteredVm, ...]: ...
+
+    def probe_argv(
+        self, request: BootStartResolutionRequest, binding: object
+    ) -> tuple[str, ...]: ...
+
+    def marker_bytes(
+        self,
+        request: BootStartResolutionRequest,
+        binding: object,
+        probe_sha256: str,
+    ) -> bytes: ...
+
+    def parse_result(
+        self,
+        payload: bytes,
+        request: BootStartResolutionRequest,
+        binding: object,
+        probe_sha256: str,
+    ) -> GuestProbeResolution: ...
+
+
 class CommandRunner(Protocol):
     def run(
         self,
@@ -414,8 +454,16 @@ def run_boot_start_resolution(
     target_validator=None,
     sleeper: Sleeper = time.sleep,
     evidence_format: str = EVIDENCE_FORMAT,
+    guest_probe_workflow: GuestProbeWorkflow | None = None,
 ) -> BootStartResolutionResult:
     request.validate()
+    control_attempt_id = str(
+        getattr(
+            request,
+            "probe_workflow_attempt_id",
+            request.boot_start_attempt_id,
+        )
+    )
     writer = start_control.EvidenceWriter.create(request.output_root)
     writer.write_json("request.json", request.as_json())
     command_runner = runner or input_transfer.SubprocessCommandRunner()
@@ -444,6 +492,13 @@ def run_boot_start_resolution(
     terminal_processes: tuple[dict[str, object], ...] = ()
     observed_boot_hash: str | None = None
     boot_classification = "not-generated"
+    transaction = (
+        "state-indeterminate"
+        if guest_probe_workflow is not None
+        else "artifacts-staged-preserved-no-resume"
+    )
+    business_guest_action = "not-performed"
+    operation_id_disposition = "not-read-or-generated"
     agent_readiness_invocations = 0
     agent_readiness_state = "not-observed"
     readiness_identity_observation_count = 0
@@ -521,7 +576,11 @@ def run_boot_start_resolution(
         )
         writer.write_json("utmctl-list-once.json", list_observation.as_json())
         inventory = start_control.parse_utmctl_list(list_observation)
-        baseline = binding.upstream.upstream.upstream.baseline_inventory
+        baseline = (
+            guest_probe_workflow.baseline_inventory(binding)
+            if guest_probe_workflow is not None
+            else binding.upstream.upstream.upstream.baseline_inventory
+        )
         if (
             reactivation_control._require_inventory(
                 inventory, baseline, request
@@ -801,7 +860,12 @@ def run_boot_start_resolution(
 
         stage = "guest-probe-push"
         file_push_invocations = 1
-        with (request.repository_root / PROBE_RELATIVE_PATH).open("rb") as source:
+        probe_relative_path = (
+            guest_probe_workflow.probe_relative_path
+            if guest_probe_workflow is not None
+            else PROBE_RELATIVE_PATH
+        )
+        with (request.repository_root / probe_relative_path).open("rb") as source:
             push_observation = command_runner.run(
                 (
                     "utmctl",
@@ -849,11 +913,20 @@ def run_boot_start_resolution(
             exact=binding.probe_bytes,
         )
 
-        stage = "guest-boot-transport-probe-once"
+        stage = (
+            guest_probe_workflow.probe_stage_name
+            if guest_probe_workflow is not None
+            else "guest-boot-transport-probe-once"
+        )
         guest_exec_invocations += 1
         guest_probe_invocations = 1
         probe_observation = command_runner.run(
-            probe_argv(request, binding), request.command_timeout_seconds
+            (
+                guest_probe_workflow.probe_argv(request, binding)
+                if guest_probe_workflow is not None
+                else probe_argv(request, binding)
+            ),
+            request.command_timeout_seconds,
         )
         writer.write_json(
             f"{stage}.json",
@@ -869,8 +942,14 @@ def run_boot_start_resolution(
         pull(
             request.guest_marker_path,
             "guest-marker-readback",
-            exact=guest_probe.marker_bytes(
-                request.boot_start_attempt_id, probe_sha256
+            exact=(
+                guest_probe_workflow.marker_bytes(
+                    request, binding, probe_sha256
+                )
+                if guest_probe_workflow is not None
+                else guest_probe.marker_bytes(
+                    request.boot_start_attempt_id, probe_sha256
+                )
             ),
         )
         result_payloads = []
@@ -883,29 +962,54 @@ def run_boot_start_resolution(
                 )
             )
         result_payload = resume_evidence.require_equal_payloads(
-            result_payloads, "guest-boot-start-result"
+            result_payloads,
+            (
+                guest_probe_workflow.result_label
+                if guest_probe_workflow is not None
+                else "guest-boot-start-result"
+            ),
         )
-        observed_boot_hash = parse_guest_result(
-            result_payload, request, probe_sha256
-        )
+        if guest_probe_workflow is not None:
+            probe_resolution = guest_probe_workflow.parse_result(
+                result_payload,
+                request,
+                binding,
+                probe_sha256,
+            )
+            observed_boot_hash = probe_resolution.observed_boot_id_sha256
+            boot_classification = "not-applicable"
+            transaction = probe_resolution.transaction
+            business_guest_action = probe_resolution.business_guest_action
+            operation_id_disposition = (
+                probe_resolution.operation_id_disposition
+            )
+            writer.write_json(
+                probe_resolution.evidence_name,
+                probe_resolution.evidence,
+            )
+        else:
+            observed_boot_hash = parse_guest_result(
+                result_payload, request, probe_sha256
+            )
         boot_control._require_successful_empty_observation(
-            probe_observation, "guest-boot-transport-probe-once"
+            probe_observation, stage
         )
-        boot_classification = (
-            "original-boot-restored"
-            if observed_boot_hash == binding.expected_boot_id_sha256
-            else "new-boot-started"
-        )
-        writer.write_json(
-            "boot-classification.json",
-            {
-                "classification": boot_classification,
-                "expected_boot_id_sha256": binding.expected_boot_id_sha256,
-                "format": evidence_format,
-                "observed_boot_id_sha256": observed_boot_hash,
-                "transport": "foreground-start-private-double-readback",
-            },
-        )
+        if guest_probe_workflow is None:
+            boot_classification = (
+                "original-boot-restored"
+                if observed_boot_hash == binding.expected_boot_id_sha256
+                else "new-boot-started"
+            )
+            writer.write_json(
+                "boot-classification.json",
+                {
+                    "classification": boot_classification,
+                    "expected_boot_id_sha256": binding.expected_boot_id_sha256,
+                    "format": evidence_format,
+                    "observed_boot_id_sha256": observed_boot_hash,
+                    "transport": "foreground-start-private-double-readback",
+                },
+            )
 
         stage = "target-handle-pid-terminal"
         terminal_argv = runtime_control.targeted_lsof_argv(
@@ -949,19 +1053,24 @@ def run_boot_start_resolution(
             target_started, target_postflight
         )
 
-        outcome = boot_classification
-        if outcome == "original-boot-restored":
-            exit_code = EXIT_ORIGINAL_BOOT_RESTORED
-            reason = (
-                "single-start-private-double-readback-original-boot-"
-                "and-terminal-target-stable"
-            )
+        if guest_probe_workflow is not None:
+            outcome = probe_resolution.outcome
+            exit_code = probe_resolution.exit_code
+            reason = probe_resolution.reason
         else:
-            exit_code = EXIT_NEW_BOOT_STARTED
-            reason = (
-                "single-start-private-double-readback-new-boot-"
-                "and-terminal-target-stable"
-            )
+            outcome = boot_classification
+            if outcome == "original-boot-restored":
+                exit_code = EXIT_ORIGINAL_BOOT_RESTORED
+                reason = (
+                    "single-start-private-double-readback-original-boot-"
+                    "and-terminal-target-stable"
+                )
+            else:
+                exit_code = EXIT_NEW_BOOT_STARTED
+                reason = (
+                    "single-start-private-double-readback-new-boot-"
+                    "and-terminal-target-stable"
+                )
     except (
         BootStartResolutionError,
         boot_control.BootTransportResolutionError,
@@ -979,6 +1088,8 @@ def run_boot_start_resolution(
         if inventory_probe_invocations == 1:
             outcome = "state-indeterminate"
             exit_code = EXIT_STATE_INDETERMINATE
+            if guest_probe_workflow is not None:
+                transaction = "state-indeterminate"
     finally:
         if source_bundle is not None:
             try:
@@ -996,6 +1107,8 @@ def run_boot_start_resolution(
                 if inventory_probe_invocations == 1:
                     outcome = "state-indeterminate"
                     exit_code = EXIT_STATE_INDETERMINATE
+                    if guest_probe_workflow is not None:
+                        transaction = "state-indeterminate"
                 else:
                     outcome = "precondition-rejected"
                     exit_code = EXIT_PRECONDITION_REJECTED
@@ -1008,8 +1121,8 @@ def run_boot_start_resolution(
         "automatic_stop": "not-performed",
         "backend_pid": backend_pid,
         "boot_classification": boot_classification,
-        "boot_start_attempt_id": request.boot_start_attempt_id,
-        "business_guest_action": "not-performed",
+        "boot_start_attempt_id": control_attempt_id,
+        "business_guest_action": business_guest_action,
         "file_pull_invocations": file_pull_invocations,
         "file_push_invocations": file_push_invocations,
         "foreground_start_invocations": foreground_start_invocations,
@@ -1020,7 +1133,7 @@ def run_boot_start_resolution(
         "inventory_probe_invocations": inventory_probe_invocations,
         "maintenance_resume_invocations": 0,
         "observed_boot_id_sha256": observed_boot_hash,
-        "operation_id": "not-read-or-generated",
+        "operation_id": operation_id_disposition,
         "outcome": outcome,
         "plain_utmctl_list": (
             "attempted-once-as-potential-backend-reactivation"
@@ -1036,7 +1149,7 @@ def run_boot_start_resolution(
         "target_name": request.target_name,
         "target_uuid": request.target_uuid,
         "terminal_relevant_host_process_count": len(terminal_processes),
-        "transaction": "artifacts-staged-preserved-no-resume",
+        "transaction": transaction,
     }
     if int(getattr(request, "agent_readiness_attempts", 0)) > 0:
         terminal.update(
