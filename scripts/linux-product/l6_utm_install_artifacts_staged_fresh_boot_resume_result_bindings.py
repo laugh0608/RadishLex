@@ -5,7 +5,7 @@ import base64
 import hashlib
 import re
 import stat
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol
 
@@ -35,6 +35,10 @@ REQUIRED_PRIOR_REPOSITORY_HEAD = "fb53cc672f393d23f7c945a70e6e30b166aa90cd"
 REQUIRED_TERMINAL_CASE_SHA256 = (
     "5216dd2c14464df40bcc19a3f62c46733dfb80b8c1e50c349d0308ef0822b563"
 )
+REQUIRED_PRIOR_FRESH_BOOT_RESUME_DRIVER_SHA256 = (
+    "90022dc65a96a1480e8ddff9ada2035b8921916bb3c6a6cb08a9085af1d4b2ba"
+)
+REQUIRED_PRIOR_FRESH_BOOT_RESUME_DRIVER_SIZE = 17_390
 REQUIRED_REASON = "ResumeDriverError:terminal-postflight-semantics-invalid"
 HEX_40 = re.compile(r"[0-9a-f]{40}")
 REQUIRED_ENTRY_NAMES = (
@@ -114,6 +118,48 @@ class FreshBootResumeResultBinding:
     postflight_invocations: int
 
 
+def _prior_fresh_boot_resume_driver_bytes(
+    request: FreshBootResumeResultBindingRequest, root: Path
+) -> bytes:
+    payload = _read_payload(
+        root / "guest-fresh-boot-resume-driver-readback.json",
+        [
+            "utmctl",
+            "file",
+            "pull",
+            request.target_uuid,
+            request.guest_fresh_boot_resume_driver_path,
+        ],
+        "prior-fresh-boot-resume-driver-readback",
+    )
+    if (
+        len(payload) != REQUIRED_PRIOR_FRESH_BOOT_RESUME_DRIVER_SIZE
+        or hashlib.sha256(payload).hexdigest()
+        != REQUIRED_PRIOR_FRESH_BOOT_RESUME_DRIVER_SHA256
+    ):
+        raise ValueError("prior-fresh-boot-resume-driver-identity-invalid")
+    return payload
+
+
+def _bind_prior_fresh_boot_resume_driver(
+    upstream: control.FreshBootResumeBinding, payload: bytes
+) -> control.FreshBootResumeBinding:
+    digest = hashlib.sha256(payload).hexdigest()
+    if (
+        len(payload) != REQUIRED_PRIOR_FRESH_BOOT_RESUME_DRIVER_SIZE
+        or digest != REQUIRED_PRIOR_FRESH_BOOT_RESUME_DRIVER_SHA256
+    ):
+        raise ValueError("prior-fresh-boot-resume-driver-identity-invalid")
+    evidence = dict(upstream.evidence)
+    evidence["fresh_boot_resume_driver_sha256"] = digest
+    evidence["fresh_boot_resume_driver_size"] = len(payload)
+    return replace(
+        upstream,
+        evidence=evidence,
+        fresh_boot_resume_driver_bytes=payload,
+    )
+
+
 def validate_fresh_boot_resume_result_bindings(
     request: FreshBootResumeResultBindingRequest,
 ) -> FreshBootResumeResultBinding:
@@ -142,14 +188,18 @@ def validate_fresh_boot_resume_result_bindings(
         raise ValueError("prior-fresh-boot-resume-entry-set-invalid")
     _require_private_evidence_tree(root, manifest)
 
-    prior_repository_head = _validate_request_and_binding(request, upstream, root)
+    prior_driver = _prior_fresh_boot_resume_driver_bytes(request, root)
+    prior_upstream = _bind_prior_fresh_boot_resume_driver(upstream, prior_driver)
+    prior_repository_head = _validate_request_and_binding(
+        request, prior_upstream, root
+    )
     result_bindings._validate_source_target(request, root)
-    handle_signature = _validate_host_identity(request, upstream, root)
+    handle_signature = _validate_host_identity(request, prior_upstream, root)
     _validate_readiness(request, root)
-    _validate_delivery(request, upstream, root)
-    guest_terminal = _validate_execution(request, upstream, root)
-    _validate_terminal(request, upstream, root, guest_terminal)
-    _validate_command_inventory(request, upstream, root)
+    _validate_delivery(request, prior_upstream, root)
+    guest_terminal = _validate_execution(request, prior_upstream, root)
+    _validate_terminal(request, prior_upstream, root, guest_terminal)
+    _validate_command_inventory(request, prior_upstream, root)
     runtime_control._require_no_raw_operation_id(root)
 
     return FreshBootResumeResultBinding(

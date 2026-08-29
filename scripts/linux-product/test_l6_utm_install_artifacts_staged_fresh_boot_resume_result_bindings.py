@@ -37,6 +37,35 @@ class FreshBootResumeResultBindingTests(unittest.TestCase):
             self.assertEqual(result.postflight_invocations, 1)
             self.assertEqual(result.evidence["dpkg_mutation_executed"], "unknown")
 
+    def test_prior_driver_identity_is_decoupled_from_successor_driver(self) -> None:
+        request = make_request(Path("/tmp/radishlex-prior-driver-binding"))
+        upstream = resume_test.make_binding(request)
+        successor_driver = upstream.fresh_boot_resume_driver_bytes
+        prior_driver = b"synthetic-prior-fresh-boot-resume-driver"
+        prior_sha256 = hashlib.sha256(prior_driver).hexdigest()
+
+        with mock.patch.object(
+            bindings,
+            "REQUIRED_PRIOR_FRESH_BOOT_RESUME_DRIVER_SHA256",
+            prior_sha256,
+        ), mock.patch.object(
+            bindings,
+            "REQUIRED_PRIOR_FRESH_BOOT_RESUME_DRIVER_SIZE",
+            len(prior_driver),
+        ):
+            prior = bindings._bind_prior_fresh_boot_resume_driver(
+                upstream, prior_driver
+            )
+
+        self.assertEqual(prior.fresh_boot_resume_driver_bytes, prior_driver)
+        self.assertEqual(
+            prior.evidence["fresh_boot_resume_driver_sha256"], prior_sha256
+        )
+        self.assertEqual(
+            upstream.fresh_boot_resume_driver_bytes,
+            successor_driver,
+        )
+
     def test_manifest_order_drift_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             request = make_request(Path(temporary))
@@ -196,6 +225,7 @@ def make_request(root: Path) -> SimpleNamespace:
 @contextlib.contextmanager
 def patched_validation(manifest_sha256: str):
     upstream = resume_test.make_binding(make_request(Path("/tmp/radishlex-binding")))
+    prior_driver = upstream.fresh_boot_resume_driver_bytes
     with contextlib.ExitStack() as stack:
         stack.enter_context(
             mock.patch.object(
@@ -211,6 +241,27 @@ def patched_validation(manifest_sha256: str):
         )
         stack.enter_context(
             mock.patch.object(bindings.network_ready, "_require_committed_regular")
+        )
+        stack.enter_context(
+            mock.patch.object(
+                bindings,
+                "REQUIRED_PRIOR_FRESH_BOOT_RESUME_DRIVER_SHA256",
+                hashlib.sha256(prior_driver).hexdigest(),
+            )
+        )
+        stack.enter_context(
+            mock.patch.object(
+                bindings,
+                "REQUIRED_PRIOR_FRESH_BOOT_RESUME_DRIVER_SIZE",
+                len(prior_driver),
+            )
+        )
+        stack.enter_context(
+            mock.patch.object(
+                bindings,
+                "_prior_fresh_boot_resume_driver_bytes",
+                return_value=prior_driver,
+            )
         )
         stack.enter_context(
             mock.patch.object(bindings, "_validate_request_and_binding", return_value=bindings.REQUIRED_PRIOR_REPOSITORY_HEAD)

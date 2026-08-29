@@ -50,6 +50,119 @@ class FreshBootResumeDriverTests(unittest.TestCase):
             ):
                 driver.reconstruct_transient_secret(frozen, RAW_SECRET)
 
+    def test_completed_result_keeps_postflight_on_prior_boot(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            raw_boot = "11111111-2222-3333-4444-555555555555"
+            boot_path = root / "boot-id"
+            boot_path.write_text(raw_boot + "\n", encoding="ascii")
+            prior_boot = "a" * 64
+            current_boot = hashlib.sha256(raw_boot.encode("ascii")).hexdigest()
+            observed_boots: list[str] = []
+            frozen = SimpleNamespace(
+                EXPECTED_BOOT_ID_SHA256=prior_boot,
+                GUARD_PATH=root / "guard",
+                sha256_bytes=lambda value: hashlib.sha256(value).hexdigest(),
+            )
+
+            def validate_resume_result() -> dict[str, object]:
+                observed_boots.append(frozen.EXPECTED_BOOT_ID_SHA256)
+                if frozen.EXPECTED_BOOT_ID_SHA256 != prior_boot:
+                    raise ValueError("terminal-postflight-semantics-invalid")
+                return completed_artifacts()
+
+            frozen.validate_resume_result = validate_resume_result
+            with mock.patch.object(driver, "BOOT_ID_PATH", boot_path):
+                completed = driver.validate_completed_result(
+                    frozen, prior_boot, current_boot
+                )
+
+            self.assertEqual(completed, completed_artifacts())
+            self.assertEqual(observed_boots, [prior_boot])
+            self.assertEqual(frozen.EXPECTED_BOOT_ID_SHA256, prior_boot)
+
+    def test_completed_result_rejects_postflight_boot_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            raw_boot = "11111111-2222-3333-4444-555555555555"
+            boot_path = root / "boot-id"
+            boot_path.write_text(raw_boot + "\n", encoding="ascii")
+            prior_boot = "a" * 64
+            current_boot = hashlib.sha256(raw_boot.encode("ascii")).hexdigest()
+            postflight_boot = current_boot
+            frozen = SimpleNamespace(
+                EXPECTED_BOOT_ID_SHA256=prior_boot,
+                GUARD_PATH=root / "guard",
+                sha256_bytes=lambda value: hashlib.sha256(value).hexdigest(),
+            )
+
+            def validate_resume_result() -> dict[str, object]:
+                if postflight_boot != frozen.EXPECTED_BOOT_ID_SHA256:
+                    raise ValueError("terminal-postflight-semantics-invalid")
+                return completed_artifacts()
+
+            frozen.validate_resume_result = validate_resume_result
+            with mock.patch.object(
+                driver, "BOOT_ID_PATH", boot_path
+            ), self.assertRaisesRegex(
+                ValueError,
+                "terminal-postflight-semantics-invalid",
+            ):
+                driver.validate_completed_result(frozen, prior_boot, current_boot)
+
+    def test_completed_result_rejects_current_boot_drift_before_postflight(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            boot_path = root / "boot-id"
+            boot_path.write_text(
+                "11111111-2222-3333-4444-555555555555\n", encoding="ascii"
+            )
+            validations: list[str] = []
+            frozen = SimpleNamespace(
+                EXPECTED_BOOT_ID_SHA256="a" * 64,
+                GUARD_PATH=root / "guard",
+                sha256_bytes=lambda value: hashlib.sha256(value).hexdigest(),
+                validate_resume_result=lambda: validations.append("postflight"),
+            )
+            with mock.patch.object(
+                driver, "BOOT_ID_PATH", boot_path
+            ), self.assertRaisesRegex(
+                driver.FreshBootResumeDriverError,
+                "current-boot-id-drift",
+            ):
+                driver.validate_completed_result(frozen, "a" * 64, "b" * 64)
+
+            self.assertEqual(validations, [])
+
+    def test_completed_result_rechecks_current_boot_after_postflight(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            raw_boot = "11111111-2222-3333-4444-555555555555"
+            boot_path = root / "boot-id"
+            boot_path.write_text(raw_boot + "\n", encoding="ascii")
+            prior_boot = "a" * 64
+            current_boot = hashlib.sha256(raw_boot.encode("ascii")).hexdigest()
+            frozen = SimpleNamespace(
+                EXPECTED_BOOT_ID_SHA256=prior_boot,
+                GUARD_PATH=root / "guard",
+                sha256_bytes=lambda value: hashlib.sha256(value).hexdigest(),
+            )
+
+            def validate_resume_result() -> dict[str, object]:
+                boot_path.write_text(
+                    "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\n", encoding="ascii"
+                )
+                return completed_artifacts()
+
+            frozen.validate_resume_result = validate_resume_result
+            with mock.patch.object(
+                driver, "BOOT_ID_PATH", boot_path
+            ), self.assertRaisesRegex(
+                driver.FreshBootResumeDriverError,
+                "current-boot-id-drift",
+            ):
+                driver.validate_completed_result(frozen, prior_boot, current_boot)
+
     def test_main_runs_exactly_one_resume_and_postflight(self) -> None:
         calls: list[str] = []
         result, terminal = run_main_case(calls=calls)
@@ -133,12 +246,20 @@ def run_main_case(
             driver.FreshBootResumeDriverError(f"case-{phase}-failed")
         )
     )
+    frozen.EXPECTED_BOOT_ID_SHA256 = driver.EXPECTED_PRIOR_BOOT_ID_SHA256
+    frozen.sha256_bytes = lambda _value: driver.EXPECTED_CURRENT_BOOT_ID_SHA256
+    frozen.validate_resume_result = completed_artifacts
 
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
+        boot_path = root / "boot-id"
+        boot_path.write_text("synthetic-fresh-boot\n", encoding="ascii")
+        frozen.GUARD_PATH = root / "guard"
         driver_sha = hashlib.sha256(Path(driver.__file__).read_bytes()).hexdigest()
         with mock.patch.object(driver.os, "geteuid", return_value=0), mock.patch.object(
             driver, "EXPECTED_CONTROL_ROOT", root
+        ), mock.patch.object(
+            driver, "BOOT_ID_PATH", boot_path
         ), mock.patch.object(driver, "require_private_directory"), mock.patch.object(
             driver, "require_regular"
         ), mock.patch.object(
@@ -156,8 +277,6 @@ def run_main_case(
             driver, "reconstruct_transient_secret"
         ), mock.patch.object(
             driver, "revalidate_before_resume"
-        ), mock.patch.object(
-            driver, "validate_completed_result", return_value=completed_artifacts()
         ), mock.patch.object(
             driver,
             "publish_terminal",

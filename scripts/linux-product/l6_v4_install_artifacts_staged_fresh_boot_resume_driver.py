@@ -49,6 +49,7 @@ EXPECTED_CONTROL_ROOT = Path(
     "/var/tmp/radishlex-l6-v4-install-artifacts-staged-fresh-boot-resume-"
     f"{EXPECTED_ATTEMPT_ID}"
 )
+BOOT_ID_PATH = Path("/proc/sys/kernel/random/boot_id")
 SAFE_ATTEMPT_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,95}")
 HEX_64 = re.compile(r"[0-9a-f]{64}")
 
@@ -203,17 +204,39 @@ def revalidate_before_resume(
         raise FreshBootResumeDriverError("operation-secret-drift")
 
 
-def validate_completed_result(
+def validate_current_boot_identity(
     driver: ModuleType, current_boot_id_sha256: str
-) -> dict[str, object]:
-    original_boot = driver.EXPECTED_BOOT_ID_SHA256
+) -> None:
     try:
-        driver.EXPECTED_BOOT_ID_SHA256 = current_boot_id_sha256
-        completed = driver.validate_resume_result()
-    finally:
-        driver.EXPECTED_BOOT_ID_SHA256 = original_boot
+        raw_boot = BOOT_ID_PATH.read_text(encoding="ascii").strip()
+    except (OSError, UnicodeError) as exc:
+        raise FreshBootResumeDriverError("current-boot-id-unreadable") from exc
+    if (
+        not raw_boot
+        or driver.sha256_bytes(raw_boot.encode("ascii"))
+        != current_boot_id_sha256
+    ):
+        raise FreshBootResumeDriverError("current-boot-id-drift")
+
+
+def validate_completed_result(
+    driver: ModuleType,
+    prior_boot_id_sha256: str,
+    current_boot_id_sha256: str,
+) -> dict[str, object]:
+    if driver.EXPECTED_BOOT_ID_SHA256 != prior_boot_id_sha256:
+        raise FreshBootResumeDriverError(
+            "terminal-postflight-prior-boot-contract-invalid"
+        )
+    validate_current_boot_identity(driver, current_boot_id_sha256)
+    completed = driver.validate_resume_result()
+    if driver.EXPECTED_BOOT_ID_SHA256 != prior_boot_id_sha256:
+        raise FreshBootResumeDriverError(
+            "terminal-postflight-prior-boot-contract-drift"
+        )
     if driver.GUARD_PATH.exists() or driver.GUARD_PATH.is_symlink():
         raise FreshBootResumeDriverError("completed-guard-still-present")
+    validate_current_boot_identity(driver, current_boot_id_sha256)
     return completed
 
 
@@ -347,7 +370,11 @@ def main(argv: list[str] | None = None) -> int:
             b"install_artifacts_staged_postflight_outcome=passed\n",
             "postflight",
         )
-        completed = validate_completed_result(driver, args.current_boot_id_sha256)
+        completed = validate_completed_result(
+            driver,
+            args.prior_boot_id_sha256,
+            args.current_boot_id_sha256,
+        )
 
         phase = "complete"
         replace_phase(args.control_root, phase)
