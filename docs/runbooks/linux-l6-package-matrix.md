@@ -639,6 +639,8 @@ create-new result root含21个manifest成员，SHA-256 `7fcef38e05b7fff0d2c0fcb6
 
 `7acbbde`新增completed result递归binding与6项回归并接入默认L6门禁。binding固定21项manifest顺序、私有权限/owner/link、历史执行HEAD `f66e32e`与successor HEAD分离、source/target、五轮process与PID `36343`双句柄签名、两份1259-byte canonical result、113-byte completed phase、parsed result、terminal计数、精确命令inventory及raw operation ID absent；任何字段、格式、顺序、PID、hash或调用漂移均拒绝。clean `7acbbde`对全部真实冻结链纯离线复核返回21项、历史HEAD、boot `26beda73…70e6`、handle `6ad7484b…4286`/378 bytes、result `a40e1079…0eec`、receipt `fec8b23a…f73d`/3786 bytes与`transaction=completed`。该批未调用UTM或改写现场；下一步只先设计terminal stop前门，真实stop继续单独授权。
 
+`177b53c`新增repository-only terminal stop前门与9项回归。固定attempt为`d75818f-v4-install-artifacts-staged-terminal-stop-20260829-v1`，计划create-new host根为`/Users/luobo/VirtualMachines/RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Terminal-Stop-v1`。前门递归绑定21项completed结果和20台旧baseline，只允许一次preflight list与一次terminal list；若target started，先稳定绑定当前PID/双句柄和target身份，再至多调用一次`utmctl stop UUID --request`，若已all-stopped则零stop。后置只做最多60轮host process/lsof静止、all-stopped inventory、无UTM backend/target句柄和target固定身份复核；命令异常即使观察到stopped也不晋升。status/start、guest/file、resume/dpkg、retry/repair/cleanup、force/kill/quit均无入口。clean `177b53c`纯离线真实链复核返回21项、20台baseline、历史PID/句柄、`transaction=completed`且计划根absent；本批没有调用UTM，真实stop仍须独立授权。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：

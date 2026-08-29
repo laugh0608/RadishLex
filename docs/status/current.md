@@ -7,7 +7,7 @@
 - 复核：2026-08-29；常态分支 `dev`，主线 `master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh、六类operation与首个crash已闭合；v4 fresh-boot resume已调用但terminal为`state-indeterminate`，其跨重启postflight校验根因已在仓库修复，dpkg/transaction真实终态仍未知；21台VM已all-stopped，其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh、六类operation与首个crash已闭合；v4只读transaction与延迟双结果已真实闭合`completed`并完成binding；terminal stop前门已在仓库闭合但未实机，其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -55,7 +55,7 @@
 - v2 clone失败证据`65160b12…c1859`须原样保留；不得沿用本批授权重试clone、重启UTM或把exit 0记为成功。
 - 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
-- v4 launch至checkpoint及exact resume失败证据与UUID `50B75F88…8038`须冻结；不得复跑、覆盖、循环list/status、主动拉起backend或把无句柄归因为stopped。当前唯一有效transaction仍是manifest `3aca0576…0a4f7`证明的`artifacts_staged`；attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`及输出根`…-Exact-Resume-v1`已消费，不得重试或复用。
+- v4 launch至exact resume失败证据与UUID `50B75F88…8038`须冻结，不得复跑、覆盖、循环query或主动拉起backend。`3aca0576…0a4f7`只保留为resume前检查点；当前终态权威是21项`7fcef38e…0e3d`闭合的`completed`。旧attempt/root已消费，不得重试或复用。
 - 旧boot、恢复、fresh两阶段及结果消歧根全部冻结，不复跑、覆盖、补拉或清理。`recovery-qualified`只证明只读恢复前门，不授权resume；无新授权不得query/start、resume、retry/stop/quit。
 - fresh-boot resume attempt `d75818f-v4-install-artifacts-staged-fresh-boot-resume-20260827-v1`与host/guest根已消费并冻结；不得补拉、复跑、重建secret、retry/cleanup、再次resume/postflight或据`state-indeterminate`修补现场。调用后不得无授权追加query/start/stop/quit。
 - transaction-state v1/v2及deferred-result根冻结。21项结果只证明该boot为`completed`；不得补拉、复跑probe、resume/dpkg/retry/repair/cleanup或改写现场。调用后无query/stop，stop另授权。
@@ -66,8 +66,8 @@
 ## 下一事项（2026-08-29）
 
 1. 冻结v1/v2及21项deferred-result根，不复用、补拉或倒写现场。
-2. 21项binding已闭合；下一步repository-only设计terminal stop前门。
-3. 真实stop另授权；不得追加query/start、guest、resume/dpkg、retry/repair/cleanup。
+2. clean `177b53c`已闭合terminal stop前门；固定attempt与计划create-new根仍未消费。
+3. 下一步若获独立授权，只执行两次list、至多一次`stop --request`及有界host静止复核；其余系统动作禁止。
 
 ## 验证入口
 
@@ -89,7 +89,7 @@
 git diff --check
 ```
 
-上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、结果binding、fresh-boot资格、延迟消歧、checkpoint/resume及all-stopped只读transaction-state resolution，但不替代实机。真实resume仍冻结为`state-indeterminate`，日终全停不消歧安装；transaction真实终态、其余case、连续L6与发布未闭合。
+上述合成入口覆盖现有L6 host/guest控制、结果binding、checkpoint/resume、只读transaction-state resolution及terminal stop前门，但不替代实机。原resume仍冻结为`state-indeterminate`，后续独立只读结果已闭合`completed`；真实stop、其余case、连续L6与发布未闭合。
 
 ## 阅读索引
 
