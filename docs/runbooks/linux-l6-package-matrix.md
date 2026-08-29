@@ -625,6 +625,12 @@ host控制只允许一次plain `list`证明21台全停、三轮process/handle静
 
 terminal固定inventory/start/guest probe/result readback为`1/1/1/1`、backend PID `36343`、10轮readiness和terminal handles present；file push/pull、guest exec为`1/3/13`。maintenance resume、dpkg mutation、retry、repair、cleanup、stop、quit、plain status/start均未执行。调用后未追加UTM查询或停止，不从最后句柄证据推断当前运行状态。v2 attempt与host/guest根立即冻结；下一步先repository-only绑定67项并设计只读deferred-result resolution，真实既有result/phase读取和terminal stop继续分别授权。
 
+`9555d46`及后续精确修复在repository-only范围闭合67项transaction-state v2结果binding与deferred-result resolution控制。binding逐项固定manifest `37058a86…08e4`的成员顺序、`0700`/`0600`私有树、single-link、历史执行HEAD `a03edae`与successor HEAD分离、source/target、21台all-stopped inventory、excluded generic QEMU、start/readiness、probe/marker、首次result missing与全部禁止动作。句柄链按原证据语义区分：最初runtime观察尚未给出backend PID，discovery及三次confirmation和十轮readiness均固定PID `36343`；15份present观察stdout一致为SHA-256 `6ad7484b…4286`、378 bytes，discovery/confirmation沿用`runtime-resolution-v2`格式，其余使用transaction格式。
+
+新attempt固定为`d75818f-v4-install-artifacts-staged-transaction-state-result-resolution-20260829-v1`，计划create-new host根为`/Users/luobo/VirtualMachines/RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Transaction-State-Result-Resolution-v1`。控制调用前后只复核source/target、transaction workflow process scope与同一PID/同一句柄签名；唯一guest transport范围是两次既有`transaction-state.evidence.json` pull和一次与其transaction一致的既有`phase.json` pull。它不执行inventory/list/status/start、file push、guest exec/probe、resume/dpkg、retry/repair/cleanup或自动stop；首次缺失、双读非canonical/不一致、phase漂移或任一身份漂移均失败关闭。
+
+5项binding与7项控制回归、默认L6、package transaction、startup gate和文本门禁通过。clean `5e981f2`对全部真实冻结链纯离线复核返回67项、历史HEAD `a03edae`、PID `36343`、句柄签名 `6ad7484b…4286`/378 bytes与probe `e706d622…d0e3`；新host根仍absent。该批未调用`utmctl`、查询VM、进入guest、创建现场根或读取真实result/phase，故当前VM/guest状态未知；真实result resolution与terminal stop继续分别授权。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：

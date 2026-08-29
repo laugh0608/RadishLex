@@ -41,6 +41,7 @@
 - 审计确认prior/current boot混用；`202b64d`分开验证两者并解耦历史/successor driver。5项回归及门禁通过；真实47项链离线复核仍返回历史HEAD `fb53cc6`、当前HEAD `202b64d`和原`state-indeterminate`，未触碰UTM或guest。
 - 日终plain list仅v4 started；单次正常`stop --request`后21台stopped，宿主无`QEMULauncher`/`qemu-system`。未force/kill/guest/补拉/retry/cleanup；boot `d64b962e…b50`已结束，冻结结果与dpkg/transaction unknown结论不变。
 - `f05ebd7`修复transaction-state v1的Android QEMU误判；clean `a03edae`的唯一v2从21台全停启动target，PID `36343`/双句柄稳定且第10轮agent ready。probe exit 0、marker存在但首次result pull仍缺失；67项manifest `37058a86…08e4`闭合`state-indeterminate`，未补拉或自动stop。
+- clean `5e981f2`闭合v2 result binding/control；离线绑定67项、双HEAD及PID `36343`，root absent。
 
 ## 停止线
 
@@ -65,8 +66,8 @@
 ## 下一事项（2026-08-29）
 
 1. 冻结v1/v2及其host/guest根，不复用、补拉或推断终态。
-2. repository-only绑定v2的67项manifest并设计deferred-result resolution；只允许在source/target、同PID/双句柄与无活动`utmctl`闭合后双读既有result、单读phase，缺失或漂移继续不确定。
-3. 真实读取用新attempt/absent host根授权，不含inventory/start、push/exec/probe、resume/dpkg/retry/repair/cleanup；stop另授权。
+2. 实机另授权；source/target、PID/句柄、无`utmctl`后才双读result/单读phase。
+3. 缺失/漂移不确定；inventory/list/status/start/push/exec/probe/resume/dpkg/retry/repair/cleanup/自动stop禁止，stop另授权。
 
 ## 验证入口
 
