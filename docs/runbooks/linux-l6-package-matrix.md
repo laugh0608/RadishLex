@@ -615,6 +615,10 @@ repository-only逐字段审计已定位精确谓词：冻结canonical `case.sh`�
 
 host控制只允许一次plain `list`证明21台全停、三轮process/handle静止、一次foreground start、有限runtime/readiness、committed probe唯一交付与执行、marker及结果双回读和终态source/target/PID复核。guest probe只读receipt/state/staging/guard/transient root、dpkg status/config/log/updates/info、package verify/audit、startup gate、process/XDG/network，并按互斥分支交付：完整旧terminal postflight与当前installed系统全部匹配才是`completed`；精确冻结staging与未安装dpkg基线、重启后guard absent及MaintenanceRequired startup全部匹配才是`artifacts_staged`；其余一律`state-indeterminate`。unknown receipt不fallback，host只保存operation hash；resume、dpkg mutation、retry、repair、cleanup及自动stop均禁止。9项host与5项guest回归进入默认L6门禁；真实inventory/start/read-only observation须新授权，terminal stop仍另行授权。
 
+用户授权v1的inventory/start/read-only observation后，clean `6858ec6`先离线绑定47项与20台基线且新根absent。正式控制在`host-process-preflight`发现PID `97570`、accounting `qemu-system-aarc`，按旧广义规则以`relevant-host-process-before-inventory`失败关闭；inventory/list、start、guest/file/result均为0，transaction保持`state-indeterminate`。create-new v1 host根含7项manifest成员，SHA-256 `a3d049e38bfd31203503a3777747bedff18db2dca77ec425e27ce8a5a2f615cd`。控制返回后本机包装器读取不存在的便捷属性产生`AttributeError`，不影响已落盘terminal、manifest或零调用计数。
+
+因正式控制没有消费list，随后按同一授权执行唯一manual `utmctl list`，证明21台注册UTM均stopped。只读PID/lsof诊断证明上述generic QEMU只持有Android Emulator AVD qcow2而无UTM target句柄；未kill、stop或干扰该进程。`f05ebd7`把custom workflow进程门收敛为UTM专属accounting roles，并在每份process evidence中记录excluded generic QEMU的脱敏结构；默认boot-start无custom workflow时保持原严格语义。真实重试改用attempt `d75818f-v4-install-artifacts-staged-transaction-state-resolution-20260829-v2`与absent host根`…-v4-Transaction-State-Resolution-v2`，probe SHA-256 `e706d622…d0e3`。10项host、5项guest及相邻门禁通过；clean v2真实链纯离线绑定返回47项、20台基线、旧transaction不确定/dpkg unknown，尚未执行v2、start或guest，重试与terminal stop分别重新授权。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：

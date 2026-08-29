@@ -40,7 +40,7 @@
 - clean `fb53cc6`的真实fresh-boot resume/postflight各调用一次；稳定双terminal闭合`state-indeterminate`，dpkg/transaction保持unknown。47项manifest `ee1879e7…0798`及禁止动作已由`450cfa8`绑定。
 - 审计确认prior/current boot混用；`202b64d`分开验证两者并解耦历史/successor driver。5项回归及门禁通过；真实47项链离线复核仍返回历史HEAD `fb53cc6`、当前HEAD `202b64d`和原`state-indeterminate`，未触碰UTM或guest。
 - 日终plain list仅v4 started；单次正常`stop --request`后21台stopped，宿主无`QEMULauncher`/`qemu-system`。未force/kill/guest/补拉/retry/cleanup；boot `d64b962e…b50`已结束，冻结结果与dpkg/transaction unknown结论不变。
-- clean `43ae490`已闭合all-stopped只读transaction-state resolution：递归绑定47项结果与20台基线，只允许单次inventory/start/guest只读观察；`completed`、精确`artifacts_staged`与`state-indeterminate`互斥。真实链离线复核保持旧transaction不确定及dpkg unknown；未操作UTM/guest或transaction。
+- clean `43ae490`闭合只读transaction-state resolution。真实v1在inventory前因Android Emulator generic QEMU误判失败关闭：7项manifest `a3d049e3…15cd`，list/start/guest均0；随后唯一manual list证明21台UTM全停。`f05ebd7`仅把UTM专属进程作为阻塞并以脱敏excluded证据保留其他QEMU；全新v2真实链离线绑定通过，尚未实跑。
 
 ## 停止线
 
@@ -64,8 +64,8 @@
 
 ## 下一事项（2026-08-29）
 
-1. 继续冻结两个manifest、关联host/guest根与all-stopped终态；新控制不倒写旧attempt，也不把仓库修复解释为真实transaction已完成。
-2. 若推进实机，先为固定attempt `d75818f-v4-install-artifacts-staged-transaction-state-resolution-20260829-v1`、absent新host/guest根、一次all-stopped inventory、一次foreground start及一次guest只读观察取得逐项授权；不得携带resume、dpkg mutation、retry、repair、cleanup或自动stop。
+1. 冻结v1失败根、旧resume链与manual all-stopped观察；不得复用v1或把误判修复解释为transaction已完成。
+2. 若推进实机，须重新授权固定attempt `d75818f-v4-install-artifacts-staged-transaction-state-resolution-20260829-v2`、absent v2 host/guest根、一次inventory/start/guest只读观察；不含resume、dpkg mutation、retry、repair、cleanup或自动stop。
 3. 只读观察后再按互斥terminal决定后续；受控stop始终独立授权，本控制不自动执行。
 
 ## 验证入口
