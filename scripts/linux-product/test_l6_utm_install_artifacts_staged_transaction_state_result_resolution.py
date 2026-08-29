@@ -60,7 +60,7 @@ class ResolutionRunner:
                 return guest_agent_test.observation(
                     argv, stdout=self.result_payloads.pop(0)
                 )
-            if path == self.request.guest_phase_path:
+            if path == self.request.guest_transaction_phase_path:
                 transaction = json.loads(self.result_payloads_used[0])[
                     "transaction"
                 ]

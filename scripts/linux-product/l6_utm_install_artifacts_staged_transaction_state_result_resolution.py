@@ -63,7 +63,7 @@ class TransactionStateResultResolutionRequest(
     )
 
     @property
-    def guest_phase_path(self) -> str:
+    def guest_transaction_phase_path(self) -> str:
         return f"{self.guest_control_root}/phase.json"
 
     def validate(self) -> None:
@@ -128,7 +128,9 @@ class TransactionStateResultResolutionRequest(
         value.update(
             {
                 "format": EVIDENCE_FORMAT,
-                "guest_transaction_state_phase_path": self.guest_phase_path,
+                "guest_transaction_state_phase_path": (
+                    self.guest_transaction_phase_path
+                ),
                 "guest_transaction_state_result_path": self.guest_result_path,
                 "prior_transaction_state_resolution_attempt_id": (
                     self.prior_transaction_state_resolution_attempt_id
@@ -417,7 +419,7 @@ def run_transaction_state_result_resolution(
 
         phase_readback_invocations = 1
         pull(
-            request.guest_phase_path,
+            request.guest_transaction_phase_path,
             "existing-transaction-state-phase-readback",
             exact=prior_control.guest_probe.canonical_json(
                 {
