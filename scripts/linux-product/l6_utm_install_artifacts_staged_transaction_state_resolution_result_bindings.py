@@ -425,6 +425,7 @@ def _validate_handle_evidence(
         value = network_ready._read_json(root / name)
         observation = value.get("observation")
         stdout = observation.get("stdout") if isinstance(observation, dict) else None
+        expected_backend_pid = None if index == 0 else 36343
         expected_argv = (
             network_ready._lsof_argv(request)
             if index < 2
@@ -433,7 +434,7 @@ def _validate_handle_evidence(
         if (
             value.get("format") != control.EVIDENCE_FORMAT
             or value.get("state") != "present"
-            or value.get("backend_pid") != 36343
+            or value.get("backend_pid") != expected_backend_pid
             or value.get("backend_command") != "QEMULauncher"
             or value.get("process_record_count") != 1
             or value.get("efi_handle_count") != 1

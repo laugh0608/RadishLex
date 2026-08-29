@@ -111,6 +111,102 @@ class TransactionStateResolutionResultBindingTests(unittest.TestCase):
             ):
                 bindings._validate_request_and_binding(request, upstream, root)
 
+    def test_handles_bind_unscoped_runtime_then_discovered_pid(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            request = make_request(Path(temporary))
+            root = request.prior_transaction_state_resolution_root
+            root.mkdir(mode=0o700)
+            empty = {
+                "sha256": (
+                    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                ),
+                "total_bytes": 0,
+                "truncated": False,
+            }
+            for name in (
+                "target-handles-preflight.json",
+                "target-handles-quiescence-001.json",
+                "target-handles-quiescence-002.json",
+                "target-handles-quiescence-003.json",
+            ):
+                write_json(
+                    root / name,
+                    {
+                        "backend_command": None,
+                        "backend_pid": None,
+                        "efi_handle_count": 0,
+                        "format": bindings.control.EVIDENCE_FORMAT,
+                        "observation": {
+                            "argv": list(bindings.network_ready._lsof_argv(request)),
+                            "exit_code": 1,
+                            "stderr": empty,
+                            "stdout": empty,
+                            "timed_out": False,
+                        },
+                        "process_record_count": 0,
+                        "qcow2_handle_count": 0,
+                        "state": "absent",
+                    },
+                )
+
+            names = (
+                "target-handles-runtime-001.json",
+                "target-handle-pid-discovery.json",
+                *(
+                    f"target-handle-pid-confirmation-{index:03d}.json"
+                    for index in range(1, 4)
+                ),
+                *(
+                    f"target-handle-readiness-{index:03d}.json"
+                    for index in range(1, 11)
+                ),
+            )
+            present: dict[str, dict[str, object]] = {}
+            for index, name in enumerate(names):
+                argv = (
+                    bindings.network_ready._lsof_argv(request)
+                    if index < 2
+                    else bindings.runtime_control.targeted_lsof_argv(
+                        request, 36343
+                    )
+                )
+                value = {
+                    "backend_command": "QEMULauncher",
+                    "backend_pid": None if index == 0 else 36343,
+                    "efi_handle_count": 1,
+                    "format": bindings.control.EVIDENCE_FORMAT,
+                    "observation": {
+                        "argv": list(argv),
+                        "exit_code": 0,
+                        "stderr": empty,
+                        "stdout": {
+                            "sha256": "d" * 64,
+                            "total_bytes": 378,
+                            "truncated": False,
+                        },
+                        "timed_out": False,
+                    },
+                    "process_record_count": 1,
+                    "qcow2_handle_count": 1,
+                    "state": "present",
+                }
+                present[name] = value
+                write_json(root / name, value)
+
+            self.assertEqual(
+                bindings._validate_handle_evidence(request, root),
+                ("d" * 64, 378),
+            )
+
+            discovery = present["target-handle-pid-discovery.json"]
+            discovery["backend_pid"] = None
+            write_json(root / "target-handle-pid-discovery.json", discovery)
+            with self.assertRaisesRegex(
+                ValueError,
+                "prior-transaction-state-resolution-present-handle-invalid",
+            ):
+                bindings._validate_handle_evidence(request, root)
+
     def test_terminal_and_forbidden_action_boundary_are_exact(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             request = make_request(Path(temporary))
