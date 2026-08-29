@@ -102,6 +102,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_utm_install_artifacts_staged_transaction_state_result_resolution.py"
 PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/linux-product/test_l6_utm_install_artifacts_staged_transaction_state_result_resolution_result_bindings.py"
+PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_v4_boot_transport_probe.py"
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_v4_canonical_input_bundle.py"
@@ -110,4 +112,4 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_controller_contract.py"
 
-echo "Linux L6 matrix, guest-case, UTM start/clone/launch/network/input transfer/resolution/negative preflight/checkpoint/resume/backend resolution/reactivation/runtime, boot transport, boot start, guest-agent resolution, frozen guest-agent and boot-classification result bindings, stopped-inventory boot classification controls, new-boot and fresh-boot read-only recovery qualification, deferred fresh-boot recovery result resolution, qualified-result binding, fresh-boot resume controls and frozen result binding, all-stopped read-only transaction-state resolution, frozen transaction-state result binding, deferred transaction-state result resolution, bundle builder, and compile-identity contracts passed without guest or system mutation."
+echo "Linux L6 matrix, guest-case, UTM start/clone/launch/network/input transfer/resolution/negative preflight/checkpoint/resume/backend resolution/reactivation/runtime, boot transport, boot start, guest-agent resolution, frozen guest-agent and boot-classification result bindings, stopped-inventory boot classification controls, new-boot and fresh-boot read-only recovery qualification, deferred fresh-boot recovery result resolution, qualified-result binding, fresh-boot resume controls and frozen result binding, all-stopped read-only transaction-state resolution, frozen transaction-state result binding, deferred transaction-state result resolution and frozen completed result binding, bundle builder, and compile-identity contracts passed without guest or system mutation."
