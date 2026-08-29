@@ -605,7 +605,13 @@ create-new host根`/Users/luobo/VirtualMachines/RadishLex-L6-Crash-Install-Artif
 
 日终用户新授权关闭全部VM。首次plain `utmctl list`只见v4 UUID `50B75F88…8038`为started、其余20台stopped；host只发送一次`utmctl stop 50B75F88…8038 --request`正常关机，未force、kill、进入guest、补拉、retry或cleanup。终态plain list为21台全部stopped，宿主无`QEMULauncher`或`qemu-system`进程。该操作结束boot `d64b962e…b50`、PID `42349`对应的live实例，但不改写47项manifest `ee1879e7…0798`、guest transient secret或任何上游，也不能把`state-indeterminate`提升为安装成功/失败。
 
-明日先在repository-only范围逐字段对照冻结双terminal与旧resume driver的completed postflight合同，定位`terminal-postflight-semantics-invalid`的精确失败谓词并补合成回归；不得放宽验证、倒写现场或猜测dpkg。只有根因和仓库修复闭合后，才设计从21台all-stopped出发的全新只读transaction-state resolution；任何真实list/start、guest读取与终态stop继续分别授权，不携带resume、dpkg mutation、retry或cleanup。
+repository-only逐字段审计已定位精确谓词：冻结canonical `case.sh`在真实postflight全部系统检查通过后，把`terminal-postflight.boot_id_sha256`从原mutation preflight写出，因此其语义是checkpoint/prior boot；fresh wrapper却临时把冻结resume driver的`EXPECTED_BOOT_ID_SHA256`改为current fresh boot再调用旧validator。两值分别为`18f1ba06…022a`与`d64b962e…b50`，故在其他postflight字段之后触发通用`terminal-postflight-semantics-invalid`。该结论来自冻结case、driver与稳定terminal的纯离线对照，不读取guest新文件，也不推断dpkg或receipt实际终态。
+
+`202b64d`修复该合同：terminal postflight继续由未修改的冻结driver严格绑定prior boot；外层在completed artifact验证前后分别重读current boot并要求`d64b962e…b50`，不再改写冻结模块全局常量。四项新增driver回归覆盖prior/current分离、postflight字段漂移、current前门漂移和验证后boot漂移；主成功路径不再mock整个completed validator。47项结果binding同时从冻结readback取得历史fresh driver，固定`90022dc6…b2ba`/17390-byte身份，再与successor driver分开绑定；新增回归拒绝二者混用。
+
+定向测试、默认L6、package transaction与startup gate通过。clean `202b64d`使用固定Python 3.14.5对全部真实冻结链纯离线复核，返回47项、历史执行HEAD `fb53cc6`、当前HEAD `202b64d`以及原`state-indeterminate`/transaction unknown；没有调用`utmctl`、进入guest、创建输出根、补拉、resume、dpkg、retry、cleanup或stop。旧attempt与manifest `ee1879e7…0798`结论不变。
+
+下一批只在repository-only范围设计从21台all-stopped出发的全新只读transaction-state resolution：必须重新绑定47项不确定结果、all-stopped终态、source/target和冻结transaction身份，并把inventory、单次start、guest只读观察及终态stop拆成独立授权。该控制不得携带resume、dpkg mutation、retry、repair或cleanup，也不得把仓库修复倒推成旧现场已经completed。
 
 ## 10. L6 完成与后续
 

@@ -4,10 +4,10 @@
 
 ## 当前判断
 
-- 复核：2026-08-27；常态分支 `dev`，主线 `master`。
+- 复核：2026-08-29；常态分支 `dev`，主线 `master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh、六类operation与首个crash已闭合；v4 fresh-boot resume已调用但terminal为`state-indeterminate`，dpkg/transaction终态未知；21台VM已all-stopped，其余七个crash与连续L6未闭合。
+- L6 controller/pair/refresh、六类operation与首个crash已闭合；v4 fresh-boot resume已调用但terminal为`state-indeterminate`，其跨重启postflight校验根因已在仓库修复，dpkg/transaction真实终态仍未知；21台VM已all-stopped，其余七个crash与连续L6未闭合。
 
 ## 冻结基线与固定边界
 
@@ -37,7 +37,8 @@
 - 今日第一阶段从21台全停单次启动v4，PID `42349`、boot `d64b962e…b50`与72项manifest `2211af7e…e60`闭合`new-boot-started`；clean `ef5d17f`分离历史/当前HEAD后纯离线binding通过。
 - clean `b2abff7`的唯一延迟消歧保持boot `d64b962e…b50`/PID `42349`；双份945-byte result hash均为`fb4961ab…263e`且phase `complete`。21项manifest `18114720…3989b`闭合`recovery-qualified`，receipt仍为`artifacts_staged`，零probe/resume/dpkg/list/start/stop。
 - clean `df4ef3c`已逐项绑定上述21项qualified结果并新增fresh-boot resume host/guest控制。真实链纯离线复核返回历史HEAD `b2abff7`、当前HEAD、boot `d64b962e…b50`、原boot `18f1ba06…022a`与同一PID `42349`；guest只在persistent transaction、absent guard/MaintenanceRequired、package/dpkg、XDG/process/network全部重验后，从receipt在guest内create-new重建transient secret，再至多调用一次canonical resume和一次postflight。17项新增回归及默认L6门禁通过；该批未调用UTM、进入guest、创建真实resume根、resume、dpkg或停止。
-- clean `fb53cc6`的唯一真实fresh-boot resume已执行一次production resume与一次postflight；稳定双terminal和`indeterminate` phase给出`terminal-postflight-semantics-invalid`，故dpkg mutation与transaction保持unknown，不得把transport exit 0、postflight已调用或终态同PID/双句柄解释为安装成功。47项host manifest `ee1879e7…0798`逐项通过，clean `450cfa8`已离线绑定历史/current HEAD、PID `42349`、三份driver/probe交付、唯一driver、双terminal及全部禁止动作。
+- clean `fb53cc6`的真实fresh-boot resume/postflight各调用一次；稳定双terminal闭合`state-indeterminate`，dpkg/transaction保持unknown。47项manifest `ee1879e7…0798`及禁止动作已由`450cfa8`绑定。
+- 审计确认prior/current boot混用；`202b64d`分开验证两者并解耦历史/successor driver。5项回归及门禁通过；真实47项链离线复核仍返回历史HEAD `fb53cc6`、当前HEAD `202b64d`和原`state-indeterminate`，未触碰UTM或guest。
 - 日终plain list仅v4 started；单次正常`stop --request`后21台stopped，宿主无`QEMULauncher`/`qemu-system`。未force/kill/guest/补拉/retry/cleanup；boot `d64b962e…b50`已结束，冻结结果与dpkg/transaction unknown结论不变。
 
 ## 停止线
@@ -60,11 +61,11 @@
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 明日事项（2026-08-28）
+## 下一事项（2026-08-29）
 
-1. 冻结manifest `ee1879e7…0798`、`18114720…3989b`、关联host/guest根与all-stopped终态；不追加UTM查询、补拉、guest读取、resume、retry或cleanup。
-2. 先在repository-only范围逐字段对照真实稳定双terminal与冻结resume driver的completed postflight合同，为`terminal-postflight-semantics-invalid`定位精确谓词并补合成回归；不得改写冻结证据、猜测dpkg终态或用放宽验证冒充完成。
-3. 根因与仓库修复闭合后，再设计all-stopped起点的只读transaction-state resolution；真实list/start、guest读取与stop分别重新授权，不携带resume、dpkg mutation、retry或cleanup。
+1. 继续冻结manifest `ee1879e7…0798`、`18114720…3989b`、关联host/guest根与all-stopped终态；仓库修复不倒写旧attempt，不追加UTM查询、补拉、guest读取、resume、retry或cleanup。
+2. 只在repository-only范围设计all-stopped起点的全新只读transaction-state resolution，递归绑定47项不确定结果、all-stopped终态、source/target与transaction身份；completed、仍为`artifacts_staged`及无法判定必须形成互斥、失败关闭的终态。
+3. 控制与回归闭合后，真实inventory/list、单次start、guest只读transaction观察与终态stop分别重新授权；不得携带resume、dpkg mutation、retry、repair或cleanup。
 
 ## 验证入口
 
