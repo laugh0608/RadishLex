@@ -631,6 +631,12 @@ terminal固定inventory/start/guest probe/result readback为`1/1/1/1`、backend 
 
 5项binding与7项控制回归、默认L6、package transaction、startup gate和文本门禁通过。clean `5e981f2`对全部真实冻结链纯离线复核返回67项、历史HEAD `a03edae`、PID `36343`、句柄签名 `6ad7484b…4286`/378 bytes与probe `e706d622…d0e3`；新host根仍absent。该批未调用`utmctl`、查询VM、进入guest、创建现场根或读取真实result/phase，故当前VM/guest状态未知；真实result resolution与terminal stop继续分别授权。
 
+用户单独授权上述deferred-result范围后，clean `f66e32e`再次离线绑定67项且create-new root absent。唯一真实控制的调用前、三次confirmation及terminal复核均保持PID `36343`、EFI/qcow2双句柄和378-byte handle签名 `6ad7484b…4286`；各阶段relevant UTM process为0，Android Emulator继续仅作为一项excluded generic QEMU记录。没有inventory/list/status/start、push/exec/probe或其他guest动作。
+
+两次既有`transaction-state.evidence.json` pull均exit 0、stderr空、未超时，1259-byte canonical payload SHA-256同为`a40e107942f7a1af2cba616c4264eadf7060b60b9eeac30b4bec3272a3530eec`；唯一113-byte phase SHA-256为`99620979…f3a4`并精确为`completed`。guest只读结果绑定v2 attempt/probe与boot `26beda73…70e6`，闭合`transaction=completed`、package `installed-verified`、startup `allowed`、guard `absent-after-reboot`和receipt `fec8b23a…f73d`/3786 bytes；maintenance/resume为0，dpkg profile只读且mutation为`not-performed`，没有产品状态写入。
+
+create-new result root含21个manifest成员，SHA-256 `7fcef38e05b7fff0d2c0fcb661bd4957343848cd06b8f5222f9dec9ef4540e3d`；逐项hash、`0700`/`0600`、uid 501/gid 20、single-link、零xattr和raw operation ID absent通过。terminal为`transaction-completed`，result/phase/file pull为`2/1/3`，push/exec/probe、inventory/list/status/start、resume/dpkg mutation及全部自动补救为0。调用后未追加UTM查询或停止，不从terminal handles推断当前状态；attempt与result root立即冻结。下一步先repository-only绑定21项并设计terminal stop，真实stop另行授权。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：

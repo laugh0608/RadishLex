@@ -40,8 +40,8 @@
 - clean `fb53cc6`的真实fresh-boot resume/postflight各调用一次；稳定双terminal闭合`state-indeterminate`，dpkg/transaction保持unknown。47项manifest `ee1879e7…0798`及禁止动作已由`450cfa8`绑定。
 - 审计确认prior/current boot混用；`202b64d`分开验证两者并解耦历史/successor driver。5项回归及门禁通过；真实47项链离线复核仍返回历史HEAD `fb53cc6`、当前HEAD `202b64d`和原`state-indeterminate`，未触碰UTM或guest。
 - 日终plain list仅v4 started；单次正常`stop --request`后21台stopped，宿主无`QEMULauncher`/`qemu-system`。未force/kill/guest/补拉/retry/cleanup；boot `d64b962e…b50`已结束，冻结结果与dpkg/transaction unknown结论不变。
-- `f05ebd7`修复transaction-state v1的Android QEMU误判；clean `a03edae`的唯一v2从21台全停启动target，PID `36343`/双句柄稳定且第10轮agent ready。probe exit 0、marker存在但首次result pull仍缺失；67项manifest `37058a86…08e4`闭合`state-indeterminate`，未补拉或自动stop。
-- clean `5e981f2`闭合v2 result binding/control；离线绑定67项、双HEAD及PID `36343`，root absent。
+- `f05ebd7`修复外部QEMU误判；clean `a03edae`的v2以PID `36343`在第10轮ready，但首次result缺失；67项manifest `37058a86…08e4`闭合`state-indeterminate`。
+- clean `f66e32e`的deferred result保持PID/句柄；双份1259-byte result为`a40e1079…0eec`且phase `completed`。21项manifest `7fcef38e…0e3d`闭合transaction completed、package installed/startup allowed，resume/dpkg/list/start/stop均为0。
 
 ## 停止线
 
@@ -58,16 +58,16 @@
 - v4 launch至checkpoint及exact resume失败证据与UUID `50B75F88…8038`须冻结；不得复跑、覆盖、循环list/status、主动拉起backend或把无句柄归因为stopped。当前唯一有效transaction仍是manifest `3aca0576…0a4f7`证明的`artifacts_staged`；attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`及输出根`…-Exact-Resume-v1`已消费，不得重试或复用。
 - 旧boot、恢复、fresh两阶段及结果消歧根全部冻结，不复跑、覆盖、补拉或清理。`recovery-qualified`只证明只读恢复前门，不授权resume；无新授权不得query/start、resume、retry/stop/quit。
 - fresh-boot resume attempt `d75818f-v4-install-artifacts-staged-fresh-boot-resume-20260827-v1`与host/guest根已消费并冻结；不得补拉、复跑、重建secret、retry/cleanup、再次resume/postflight或据`state-indeterminate`修补现场。调用后不得无授权追加query/start/stop/quit。
-- transaction-state v1/v2及host/guest根已消费并冻结。v2最后证据为PID `36343`、双句柄存在和result首次readback missing；不得补拉、复跑probe、resume/dpkg/retry/repair/cleanup或据exit 0/marker推断终态。调用后无UTM query或stop，result消歧与stop分别授权。
+- transaction-state v1/v2及deferred-result根冻结。21项结果只证明该boot为`completed`；不得补拉、复跑probe、resume/dpkg/retry/repair/cleanup或改写现场。调用后无query/stop，stop另授权。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一事项（2026-08-29）
 
-1. 冻结v1/v2及其host/guest根，不复用、补拉或推断终态。
-2. 实机另授权；source/target、PID/句柄、无`utmctl`后才双读result/单读phase。
-3. 缺失/漂移不确定；inventory/list/status/start/push/exec/probe/resume/dpkg/retry/repair/cleanup/自动stop禁止，stop另授权。
+1. 冻结v1/v2及21项deferred-result根，不复用、补拉或倒写现场。
+2. repository-only绑定21项`completed`结果并设计terminal stop前门。
+3. 真实stop另授权；不得追加query/start、guest、resume/dpkg、retry/repair/cleanup。
 
 ## 验证入口
 
