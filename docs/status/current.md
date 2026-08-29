@@ -40,7 +40,7 @@
 - clean `fb53cc6`的真实fresh-boot resume/postflight各调用一次；稳定双terminal闭合`state-indeterminate`，dpkg/transaction保持unknown。47项manifest `ee1879e7…0798`及禁止动作已由`450cfa8`绑定。
 - 审计确认prior/current boot混用；`202b64d`分开验证两者并解耦历史/successor driver。5项回归及门禁通过；真实47项链离线复核仍返回历史HEAD `fb53cc6`、当前HEAD `202b64d`和原`state-indeterminate`，未触碰UTM或guest。
 - 日终plain list仅v4 started；单次正常`stop --request`后21台stopped，宿主无`QEMULauncher`/`qemu-system`。未force/kill/guest/补拉/retry/cleanup；boot `d64b962e…b50`已结束，冻结结果与dpkg/transaction unknown结论不变。
-- clean `43ae490`闭合只读transaction-state resolution。真实v1在inventory前因Android Emulator generic QEMU误判失败关闭：7项manifest `a3d049e3…15cd`，list/start/guest均0；随后唯一manual list证明21台UTM全停。`f05ebd7`仅把UTM专属进程作为阻塞并以脱敏excluded证据保留其他QEMU；全新v2真实链离线绑定通过，尚未实跑。
+- `f05ebd7`修复transaction-state v1的Android QEMU误判；clean `a03edae`的唯一v2从21台全停启动target，PID `36343`/双句柄稳定且第10轮agent ready。probe exit 0、marker存在但首次result pull仍缺失；67项manifest `37058a86…08e4`闭合`state-indeterminate`，未补拉或自动stop。
 
 ## 停止线
 
@@ -57,16 +57,16 @@
 - v4 launch至checkpoint及exact resume失败证据与UUID `50B75F88…8038`须冻结；不得复跑、覆盖、循环list/status、主动拉起backend或把无句柄归因为stopped。当前唯一有效transaction仍是manifest `3aca0576…0a4f7`证明的`artifacts_staged`；attempt `d75818f-v4-install-artifacts-staged-resume-20260824-v1`及输出根`…-Exact-Resume-v1`已消费，不得重试或复用。
 - 旧boot、恢复、fresh两阶段及结果消歧根全部冻结，不复跑、覆盖、补拉或清理。`recovery-qualified`只证明只读恢复前门，不授权resume；无新授权不得query/start、resume、retry/stop/quit。
 - fresh-boot resume attempt `d75818f-v4-install-artifacts-staged-fresh-boot-resume-20260827-v1`与host/guest根已消费并冻结；不得补拉、复跑、重建secret、retry/cleanup、再次resume/postflight或据`state-indeterminate`修补现场。调用后不得无授权追加query/start/stop/quit。
-- 日终全停授权已消费；all-stopped不构成恢复资格，也不授权start、guest、transaction读取、resume/retry/cleanup或复用旧boot。
+- transaction-state v1/v2及host/guest根已消费并冻结。v2最后证据为PID `36343`、双句柄存在和result首次readback missing；不得补拉、复跑probe、resume/dpkg/retry/repair/cleanup或据exit 0/marker推断终态。调用后无UTM query或stop，result消歧与stop分别授权。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一事项（2026-08-29）
 
-1. 冻结v1失败根、旧resume链与manual all-stopped观察；不得复用v1或把误判修复解释为transaction已完成。
-2. 若推进实机，须重新授权固定attempt `d75818f-v4-install-artifacts-staged-transaction-state-resolution-20260829-v2`、absent v2 host/guest根、一次inventory/start/guest只读观察；不含resume、dpkg mutation、retry、repair、cleanup或自动stop。
-3. 只读观察后再按互斥terminal决定后续；受控stop始终独立授权，本控制不自动执行。
+1. 冻结v1/v2及其host/guest根，不复用、补拉或推断终态。
+2. repository-only绑定v2的67项manifest并设计deferred-result resolution；只允许在source/target、同PID/双句柄与无活动`utmctl`闭合后双读既有result、单读phase，缺失或漂移继续不确定。
+3. 真实读取用新attempt/absent host根授权，不含inventory/start、push/exec/probe、resume/dpkg/retry/repair/cleanup；stop另授权。
 
 ## 验证入口
 

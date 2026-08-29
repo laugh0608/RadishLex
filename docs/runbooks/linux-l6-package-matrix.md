@@ -619,6 +619,12 @@ host控制只允许一次plain `list`证明21台全停、三轮process/handle静
 
 因正式控制没有消费list，随后按同一授权执行唯一manual `utmctl list`，证明21台注册UTM均stopped。只读PID/lsof诊断证明上述generic QEMU只持有Android Emulator AVD qcow2而无UTM target句柄；未kill、stop或干扰该进程。`f05ebd7`把custom workflow进程门收敛为UTM专属accounting roles，并在每份process evidence中记录excluded generic QEMU的脱敏结构；默认boot-start无custom workflow时保持原严格语义。真实重试改用attempt `d75818f-v4-install-artifacts-staged-transaction-state-resolution-20260829-v2`与absent host根`…-v4-Transaction-State-Resolution-v2`，probe SHA-256 `e706d622…d0e3`。10项host、5项guest及相邻门禁通过；clean v2真实链纯离线绑定返回47项、20台基线、旧transaction不确定/dpkg unknown，尚未执行v2、start或guest，重试与terminal stop分别重新授权。
 
+用户独立授权v2后，clean `a03edae`的递归binding再次返回47项、20台基线、21台期望inventory与probe `e706d622…d0e3`，且新root absent。唯一plain `utmctl list`证明target及其余20台均stopped；三轮静止后只执行一次foreground launch。PID `36343`的EFI/qcow2双句柄在三次confirmation与10轮readiness保持一致，第10轮agent ready；Android Emulator PID `97570`在各process证据中作为excluded generic QEMU记录，relevant UTM process为0。
+
+固定probe只push、normalize、readback和exec各一次；exec transport exit 0且stdout/stderr为空，268-byte marker读回并绑定v2 attempt/probe。固定10秒settle后的首次result pull却返回`OSStatus -2700`与`transaction-state.evidence.json`不存在，因此没有第二次result读回，host以`guest-result-readback-1-stderr-not-empty`闭合`state-indeterminate`，不能确认guest transaction、dpkg或receipt终态。create-new v2 host根含67项manifest成员，SHA-256 `37058a86c830e8aed040d3ef24893c92fbd7b9ebf08820aa513546be7fe308e4`；逐项hash、`0700`/`0600`、uid 501/gid 20、single-link、零xattr与raw operation ID absent均通过。
+
+terminal固定inventory/start/guest probe/result readback为`1/1/1/1`、backend PID `36343`、10轮readiness和terminal handles present；file push/pull、guest exec为`1/3/13`。maintenance resume、dpkg mutation、retry、repair、cleanup、stop、quit、plain status/start均未执行。调用后未追加UTM查询或停止，不从最后句柄证据推断当前运行状态。v2 attempt与host/guest根立即冻结；下一步先repository-only绑定67项并设计只读deferred-result resolution，真实既有result/phase读取和terminal stop继续分别授权。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
