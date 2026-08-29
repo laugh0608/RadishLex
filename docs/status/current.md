@@ -41,7 +41,7 @@
 - 审计确认prior/current boot混用；`202b64d`分开验证两者并解耦历史/successor driver。5项回归及门禁通过；真实47项链离线复核仍返回历史HEAD `fb53cc6`、当前HEAD `202b64d`和原`state-indeterminate`，未触碰UTM或guest。
 - 日终plain list仅v4 started；单次正常`stop --request`后21台stopped，宿主无`QEMULauncher`/`qemu-system`。未force/kill/guest/补拉/retry/cleanup；boot `d64b962e…b50`已结束，冻结结果与dpkg/transaction unknown结论不变。
 - `f05ebd7`修复外部QEMU误判；clean `a03edae`的v2以PID `36343`在第10轮ready，但首次result缺失；67项manifest `37058a86…08e4`闭合`state-indeterminate`。
-- clean `f66e32e`的deferred result保持PID/句柄；双份1259-byte result为`a40e1079…0eec`且phase `completed`。21项manifest `7fcef38e…0e3d`闭合transaction completed、package installed/startup allowed，resume/dpkg/list/start/stop均为0。
+- clean `f66e32e`的deferred result保持PID/句柄；双份1259-byte result为`a40e1079…0eec`且phase `completed`。21项manifest `7fcef38e…0e3d`闭合transaction completed、package installed/startup allowed，resume/dpkg/list/start/stop为0；`7acbbde`已递归绑定。
 
 ## 停止线
 
@@ -66,7 +66,7 @@
 ## 下一事项（2026-08-29）
 
 1. 冻结v1/v2及21项deferred-result根，不复用、补拉或倒写现场。
-2. repository-only绑定21项`completed`结果并设计terminal stop前门。
+2. 21项binding已闭合；下一步repository-only设计terminal stop前门。
 3. 真实stop另授权；不得追加query/start、guest、resume/dpkg、retry/repair/cleanup。
 
 ## 验证入口

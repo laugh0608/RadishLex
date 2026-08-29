@@ -637,6 +637,8 @@ terminal固定inventory/start/guest probe/result readback为`1/1/1/1`、backend 
 
 create-new result root含21个manifest成员，SHA-256 `7fcef38e05b7fff0d2c0fcb661bd4957343848cd06b8f5222f9dec9ef4540e3d`；逐项hash、`0700`/`0600`、uid 501/gid 20、single-link、零xattr和raw operation ID absent通过。terminal为`transaction-completed`，result/phase/file pull为`2/1/3`，push/exec/probe、inventory/list/status/start、resume/dpkg mutation及全部自动补救为0。调用后未追加UTM查询或停止，不从terminal handles推断当前状态；attempt与result root立即冻结。下一步先repository-only绑定21项并设计terminal stop，真实stop另行授权。
 
+`7acbbde`新增completed result递归binding与6项回归并接入默认L6门禁。binding固定21项manifest顺序、私有权限/owner/link、历史执行HEAD `f66e32e`与successor HEAD分离、source/target、五轮process与PID `36343`双句柄签名、两份1259-byte canonical result、113-byte completed phase、parsed result、terminal计数、精确命令inventory及raw operation ID absent；任何字段、格式、顺序、PID、hash或调用漂移均拒绝。clean `7acbbde`对全部真实冻结链纯离线复核返回21项、历史HEAD、boot `26beda73…70e6`、handle `6ad7484b…4286`/378 bytes、result `a40e1079…0eec`、receipt `fec8b23a…f73d`/3786 bytes与`transaction=completed`。该批未调用UTM或改写现场；下一步只先设计terminal stop前门，真实stop继续单独授权。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
