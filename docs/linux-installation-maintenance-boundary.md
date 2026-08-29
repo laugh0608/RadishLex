@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix；六类真实operation已有独立证据，首个`install_prepared`已闭合checkpoint与exact resume。第二个`install_artifacts_staged`已闭合checkpoint、fresh-boot分类、只读恢复资格和一次性resume控制；真实production resume/postflight各调用一次后因terminal postflight语义不匹配冻结为不确定状态。该不匹配已在仓库定位为prior preflight boot与current fresh boot共用同一validator期望并完成合同修复，但不能据此倒写旧attempt、dpkg或transaction终态。连续完整L6、其余crash与P05C仍未闭合。精确case进度、冻结资产和下一授权只读[`docs/status/current.md`](status/current.md)与[L6 runbook](runbooks/linux-l6-package-matrix.md)。
+M5-P05A 已完成 metadata/rootfs、双 addon 构建身份与真实 Debian 13.6 ARM64 载荷门禁。P05B 已完成确定性 `.deb`、actual package streaming relationship、恢复型 receipt/advisory guard、fixed-path observer/executor、concrete mutable `DpkgTransactionPort`、`/proc` quiescence、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix；六类真实operation已有独立证据，首个`install_prepared`已闭合checkpoint与exact resume。第二个`install_artifacts_staged`在一次production resume/postflight后先因terminal postflight语义不匹配冻结为不确定状态；该validator合同漂移已在仓库修复但未倒写旧attempt，随后独立只读transaction结果以稳定双结果和completed phase闭合真实`completed`，再由单次正常stop及host交叉检查闭合`stopped-verified`，两层结果均已递归binding。连续完整L6、其余六个crash与P05C仍未闭合。精确case进度、冻结资产和下一授权只读[`docs/status/current.md`](status/current.md)与[L6 runbook](runbooks/linux-l6-package-matrix.md)。
 
 - 首个完整产品安装载体固定为 Debian 13 ARM64 的单一系统级本地 `.deb`，package 名固定为 `radishlex`；它是未发布的本地验收载体，不是 apt repository、正式 Release 或通用 Linux 安装包。
 - Fcitx addon、两份产品 FFI、Manager bundle、锁定 RimeData、desktop entry、图标和产品 manifest 由同一个 package 绑定；不拆成可独立漂移的 Manager/addon 包。
@@ -443,7 +443,7 @@ controller 为 worker 创建独立 process group，命中 checkpoint 后以固�
 4. 稳定入口 `./scripts/check-linux-product-metadata.sh` 与 `./scripts/check-linux-product-layout.sh` 已加入仓库门禁，覆盖缺字体 dependency、错误 multiarch、版本漂移、缺文件、宽权限、symlink/hardlink、FFI 不同、RimeData/license 漂移和构建路径泄漏。
 5. 保留 `./scripts/check-linux-fcitx5.sh` 与 `./scripts/check-manager-linux-product.sh` 的开发/staged 职责；新门禁不能把二者改名为安装，也不能执行 `dpkg`、启动 GUI/Fcitx 或修改系统。
 
-P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移，首个crash已闭合checkpoint与exact resume。`install_artifacts_staged`由typed guest合同、首次安装回归，以及host单次launch/network/input/preflight/checkpoint、fresh-boot恢复资格与resume控制固定；真实resume后的不确定terminal继续失败关闭，不能由transport、分散postflight或repository-only回归冒充系统完成。其他crash、连续完整L6、process/external lifecycle与P05C继续关闭，精确进度和下一步不在本Boundary复制。
+P05A 只证明 committed 产品输入能形成 Debian 目标布局。P05B 已完成确定性 `.deb`、actual relationship、恢复事务、production system port/host、共用startup gate、L6 format与controller；六类operation已有独立证据且XDG零漂移，前两个crash已分别闭合checkpoint、恢复与终态冻结。`install_artifacts_staged`由typed guest合同、首次安装回归，以及host单次launch/network/input/preflight/checkpoint、fresh-boot恢复资格与resume控制固定；原resume的不确定terminal仍原样失败关闭，后续独立只读双结果才证明transaction `completed`，单次正常stop与host交叉检查另行证明VM `stopped-verified`。其余六个crash、连续完整L6、process/external lifecycle与P05C继续关闭，精确进度和下一步不在本Boundary复制。
 
 ## 实机授权边界
 
