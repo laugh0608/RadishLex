@@ -68,7 +68,7 @@
 
 1. 冻结v1/v2、21项deferred-result与28项terminal-stop根，不复用、补拉、重复query/stop或倒写现场。
 2. `ad77c22`已闭合第二个`install_artifacts_staged` crash的completed transaction、正常停止及结果binding；不再为该case执行系统动作。
-3. `9ec3218`已冻结第三个`upgrade quiesced`的S2起点、载体关系、恢复语义与六段授权；下一步先repository-only实现独立clone前门，真实clone/start/input/crash/resume/stop仍分别授权。
+3. `8e55189`已闭合第三个`upgrade quiesced`的独立clone前门；真实clone前仍须提供专用注册壳证据并新授权，后五段也分别授权。
 
 ## 验证入口
 

@@ -651,6 +651,8 @@ create-new host根含28个manifest成员，SHA-256 `096fe01f5f082a4f494ddf6219b1
 
 `9ec3218`在repository-only范围新增[`l6-upgrade-quiesced-case.json`](../../packaging/linux/l6-upgrade-quiesced-case.json)、严格validator与6项回归。合同固定未注册且不可改写的`S2-source-data-512e8ab-0c2cefd6`、config/EFI/qcow2/local evidence、source receipt/dpkg/XDG及零句柄/全停/单VM前门；source精确绑定`09ed1228…bec`，target与record精确绑定`4dd00540…cec`/`c74fac12…849`，并拒绝复用旧crash clone。checkpoint固定upgrade/target_newer、chain 2、source/target双staging、source installed、dpkg未变、合法未锁guard、双proof absent和`ActiveGuard`；resume须重新验证staging relationship与静止、全程target apply总数为1。授权面拆为clone、start、input-preflight、crash、resume、terminal-stop六段，不能合并沿用。compile-isolated Rust回归与完整L6/controller/package/startup门禁通过；本批没有调用UTM、创建clone、进入guest、执行transaction或改写冻结资产。下一步只先repository-only实现从不可变S2产生独立stopped target的clone前门；六段真实动作仍逐段授权。
 
+`8e55189`闭合该case的repository-only clone前门与10项fake-runner回归。前门要求clean committed HEAD、精确case合同、单成员专用注册壳manifest、全停canonical inventory、target package absent、S2与壳体零句柄且同属APFS；专用壳必须是registration-only、未复用guest/source terminal、`Network=[]`，冻结crash/transaction terminal均不能充当壳体。通过后只允许一次`utmctl clone`，再以两次`/bin/cp -c`把S2的EFI/qcow2物化到target-local incoming并逐项hash，最后各一次`/bin/mv -f`替换；source config不复制，target config除Name/UUID外须与壳体一致。任何clone后身份漂移、部分物化、terminal inventory变化或命令异常均保持`state-indeterminate`，不自动delete、retry、rollback或start。完整L6、controller、package、startup与整仓门禁通过；本批没有调用UTM、创建真实target、进入guest或改写冻结资产。真实clone前仍须另行形成并冻结当次专用注册壳证据，再按clone阶段单独授权；后续start、input-preflight、crash、resume、terminal-stop仍各自授权。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
