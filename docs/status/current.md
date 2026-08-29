@@ -25,9 +25,9 @@
 - 第二个case的旧clone、v2和v3均在host失败关闭且未进入guest。v1-v7诊断最终只定位到UTM接收start后的AppKit主窗口断言，未证实更深根因；全部失败现场与manifest冻结，不再原地start/clone或试跑`--hide`。
 - v4 clone/prepared/foreground launch固定UUID `50B75F88…8038`、`Network=[]`与载体身份；launch manifest `6dbbdf40…fc3c`保持`state-indeterminate`，后续QEMU双句柄与network v2独立证明当前boot运行且仅loopback。plain list/status曾使backend再次出现，故不循环查询，也不把活动磁盘hash当terminal。
 - v4断网、canonical bundle/input transfer、延迟resolution与negative preflight已按manifest `40be3f3f…38383`/`ffc990a3…e0de`/`d1090e8d…dc09`/`7bab8f20…4e4a`/`aba59811…0d7a`依次冻结并闭合`input-ready`、`preflight-ready`；过程不进入operation、dpkg或自动补救，精确阶段与权限见runbook。
-- repository-only checkpoint v1绑定25项preflight及前序manifest、source三元组和v4 target；guest driver以exclusive marker运行canonical `preflight`/`crash`/`inspect-crash`各一次，成功只导出operation ID hash并验证target-only staging、`artifacts_staged` receipt、合法guard、进程组SIGKILL、零dpkg mutation及系统静止。14项测试进入L6门禁；该批无真实系统动作。
+- repository-only checkpoint v1绑定25项preflight、前序manifest、source/target与exclusive marker，固定canonical三阶段、operation ID hash-only、`artifacts_staged`/零dpkg mutation及系统静止；14项测试进入L6门禁，未执行真实系统动作。
 - clean `7bf6e04`的唯一checkpoint attempt `d75818f-v4-install-artifacts-staged-checkpoint-20260823-v1`通过全部冻结绑定与双回读；guest-local operation ID宿主只存hash `21041a89…111a`。acceptance调用1次并在`artifacts_staged`后SIGKILL完整进程组；checkpoint/receipt为`9cb4acb8…25e0`/`c759b5c6…5d34`，target-only staging、合法未锁guard、package absent、dpkg status/log未变、`ActiveGuard`双startup、XDG/process/network静止。create-new host根49项manifest `3aca0576…0a4f7`逐项通过且raw operation ID扫描为0；未resume、dpkg apply、retry、cleanup、stop、quit或plain list/status/start。
-- repository-only exact resume v1已逐项绑定49项checkpoint、`checkpoint-prepared`及operation/checkpoint/crash/receipt/boot/dpkg身份。guest仅在内部重验raw secret、staging与系统静止条件，再至多执行一次canonical `resume`和一次postflight；host只保存ID hash并双回读证据，任何漂移失败关闭。7项host、9项driver及相邻门禁通过；本批未调用真实`utmctl`、进入guest、resume/dpkg或操作VM。
+- repository-only exact resume v1逐项绑定49项checkpoint及transaction/boot/dpkg身份，只允许guest重验后单次resume/postflight、host ID hash-only和双回读，漂移即失败关闭；7项host、9项driver及相邻门禁通过，未执行真实系统动作。
 - clean `7309313`的唯一exact resume attempt在host `target-handles-preflight`失败关闭：冻结绑定、source、target与process门通过，但相关进程为0且`lsof` exit 1。create-new根7项manifest `a436677c…adc7`逐项通过；file pull/push、guest exec、maintenance resume与postflight均为0，transaction仍为`artifacts-staged-preserved`。该观察只证明当时backend/句柄不满足资格，不证明VM已停止；未调用plain list/status/start、retry、stop或quit。
 - backend resolution单次`status`证明registered stopped；reactivation单次`list`与foreground start后出现稳定QEMU句柄，但process合同矛盾，manifest `2a477730…c5c4c`闭合`state-indeterminate`且未进入guest/resume/retry/stop。
 - runtime resolution v1/v2曾以唯一`list`观察v4 started、其余20台stopped及PID `61666`三次稳定确认，但两次boot hash均无有效输出；v2的18项manifest `e2e41235…c49e`闭合`state-indeterminate`，不证明boot或后续运行状态。
@@ -40,6 +40,7 @@
 - clean `fb53cc6`的真实fresh-boot resume/postflight各调用一次；稳定双terminal闭合`state-indeterminate`，dpkg/transaction保持unknown。47项manifest `ee1879e7…0798`及禁止动作已由`450cfa8`绑定。
 - 审计确认prior/current boot混用；`202b64d`分开验证两者并解耦历史/successor driver。5项回归及门禁通过；真实47项链离线复核仍返回历史HEAD `fb53cc6`、当前HEAD `202b64d`和原`state-indeterminate`，未触碰UTM或guest。
 - 日终plain list仅v4 started；单次正常`stop --request`后21台stopped，宿主无`QEMULauncher`/`qemu-system`。未force/kill/guest/补拉/retry/cleanup；boot `d64b962e…b50`已结束，冻结结果与dpkg/transaction unknown结论不变。
+- clean `43ae490`已闭合all-stopped只读transaction-state resolution：递归绑定47项结果与20台基线，只允许单次inventory/start/guest只读观察；`completed`、精确`artifacts_staged`与`state-indeterminate`互斥。真实链离线复核保持旧transaction不确定及dpkg unknown；未操作UTM/guest或transaction。
 
 ## 停止线
 
@@ -63,9 +64,9 @@
 
 ## 下一事项（2026-08-29）
 
-1. 继续冻结manifest `ee1879e7…0798`、`18114720…3989b`、关联host/guest根与all-stopped终态；仓库修复不倒写旧attempt，不追加UTM查询、补拉、guest读取、resume、retry或cleanup。
-2. 只在repository-only范围设计all-stopped起点的全新只读transaction-state resolution，递归绑定47项不确定结果、all-stopped终态、source/target与transaction身份；completed、仍为`artifacts_staged`及无法判定必须形成互斥、失败关闭的终态。
-3. 控制与回归闭合后，真实inventory/list、单次start、guest只读transaction观察与终态stop分别重新授权；不得携带resume、dpkg mutation、retry、repair或cleanup。
+1. 继续冻结两个manifest、关联host/guest根与all-stopped终态；新控制不倒写旧attempt，也不把仓库修复解释为真实transaction已完成。
+2. 若推进实机，先为固定attempt `d75818f-v4-install-artifacts-staged-transaction-state-resolution-20260829-v1`、absent新host/guest根、一次all-stopped inventory、一次foreground start及一次guest只读观察取得逐项授权；不得携带resume、dpkg mutation、retry、repair、cleanup或自动stop。
+3. 只读观察后再按互斥terminal决定后续；受控stop始终独立授权，本控制不自动执行。
 
 ## 验证入口
 
@@ -87,7 +88,7 @@
 git diff --check
 ```
 
-上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、结果binding、fresh-boot资格、延迟消歧及checkpoint/resume控制，但不替代实机。真实resume冻结为`state-indeterminate`，日终全停不消歧安装；transaction终态、其余case、连续L6与发布未闭合。
+上述合成入口覆盖start/clone、launch/network/input、backend/runtime/boot分流、结果binding、fresh-boot资格、延迟消歧、checkpoint/resume及all-stopped只读transaction-state resolution，但不替代实机。真实resume仍冻结为`state-indeterminate`，日终全停不消歧安装；transaction真实终态、其余case、连续L6与发布未闭合。
 
 ## 阅读索引
 

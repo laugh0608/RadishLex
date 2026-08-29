@@ -611,7 +611,9 @@ repository-only逐字段审计已定位精确谓词：冻结canonical `case.sh`�
 
 定向测试、默认L6、package transaction与startup gate通过。clean `202b64d`使用固定Python 3.14.5对全部真实冻结链纯离线复核，返回47项、历史执行HEAD `fb53cc6`、当前HEAD `202b64d`以及原`state-indeterminate`/transaction unknown；没有调用`utmctl`、进入guest、创建输出根、补拉、resume、dpkg、retry、cleanup或stop。旧attempt与manifest `ee1879e7…0798`结论不变。
 
-下一批只在repository-only范围设计从21台all-stopped出发的全新只读transaction-state resolution：必须重新绑定47项不确定结果、all-stopped终态、source/target和冻结transaction身份，并把inventory、单次start、guest只读观察及终态stop拆成独立授权。该控制不得携带resume、dpkg mutation、retry、repair或cleanup，也不得把仓库修复倒推成旧现场已经completed。
+`43ae490`在repository-only范围闭合all-stopped只读transaction-state resolution。新attempt固定为`d75818f-v4-install-artifacts-staged-transaction-state-resolution-20260829-v1`，计划host根为`/Users/luobo/VirtualMachines/RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Transaction-State-Resolution-v1`，guest根为`/var/tmp/radishlex-l6-transaction-state-<attempt>`；两者在任何真实调用前都必须absent。binding递归消费47项manifest `ee1879e7…0798`及全部上游，拒绝把历史fresh driver与successor control混用，并提取20台旧基线inventory。clean `43ae490`使用固定Python 3.14.5对真实冻结链纯离线复核通过，返回47项、20台基线、旧`transaction=state-indeterminate`与`dpkg=unknown`，probe SHA-256为`62d846dd…298c`；没有调用UTM、进入guest或创建现场根。
+
+host控制只允许一次plain `list`证明21台全停、三轮process/handle静止、一次foreground start、有限runtime/readiness、committed probe唯一交付与执行、marker及结果双回读和终态source/target/PID复核。guest probe只读receipt/state/staging/guard/transient root、dpkg status/config/log/updates/info、package verify/audit、startup gate、process/XDG/network，并按互斥分支交付：完整旧terminal postflight与当前installed系统全部匹配才是`completed`；精确冻结staging与未安装dpkg基线、重启后guard absent及MaintenanceRequired startup全部匹配才是`artifacts_staged`；其余一律`state-indeterminate`。unknown receipt不fallback，host只保存operation hash；resume、dpkg mutation、retry、repair、cleanup及自动stop均禁止。9项host与5项guest回归进入默认L6门禁；真实inventory/start/read-only observation须新授权，terminal stop仍另行授权。
 
 ## 10. L6 完成与后续
 
