@@ -101,7 +101,7 @@
 
 ### 当前本地资产登记（非发布证据）
 
-冻结资产宿主根为 `/Users/luobo/VirtualMachines`；第四、第五、第六套、三台 repair clone、第三台rollback、独立remove/reinstall、旧pair真实checkpoint、第三台clean retry source terminal及第二个case新旧clone位于 UTM 默认 Documents 目录。第五套为 `rolled_back` failure/recovery 现场；第六套已形成 target `completed` terminal与未改写 S3；其余terminal与失败现场均不得复用。两台rollback失败clone、旧network失败clone与两台新pair harness失败clone已在持久归档后按授权删除，只保留host evidence。最新plain `utmctl` 枚举21台且全部stopped；第三台clean retry已冻结为source terminal，第二个case旧clone与v3均在host启动门失败关闭，v4已冻结checkpoint、new-boot classification与恢复预检拒绝现场。`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。全部 failure/mismatch/rolled-back/terminal/crash clone、handoff、snapshot与host evidence只作各自真相源，不原地重试、清理或混用。UTM只使用`PATH`中的plain `utmctl`，任何时刻最多运行一台VM。
+冻结资产宿主根为 `/Users/luobo/VirtualMachines`；第四、第五、第六套、三台 repair clone、第三台rollback、独立remove/reinstall、旧pair真实checkpoint、第三台clean retry source terminal及第二个case新旧clone位于 UTM 默认 Documents 目录。第五套为 `rolled_back` failure/recovery 现场；第六套已形成 target `completed` terminal与未改写 S3；其余terminal与失败现场均不得复用。两台rollback失败clone、旧network失败clone与两台新pair harness失败clone已在持久归档后按授权删除，只保留host evidence。最新冻结plain `utmctl`枚举22台且全部stopped；第三台clean retry已冻结为source terminal，第二个case旧clone与v3均在host启动门失败关闭，v4已冻结`completed` transaction与`stopped-verified`终态，registration shell已闭合`frozen`。`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。全部 failure/mismatch/rolled-back/terminal/crash clone、handoff、snapshot与host evidence只作各自真相源，不原地重试或混用；raw VM/snapshot退休只按[资产生命周期账本](linux-l6-asset-lifecycle.md)逐项只读prepare并另行授权，候选分类本身不授权清理。UTM只使用`PATH`中的plain `utmctl`，任何时刻最多运行一台VM。
 
 | 相对路径 | UTM 状态 | 唯一职责与保留线 |
 | --- | --- | --- |
@@ -701,9 +701,11 @@ UI Move完成后，`complete-move-once`使用新attempt `d75818f-upgrade-quiesce
 
 complete v2闭合`frozen`，inventory query/update为`2/1`，无start、clone、delete/retry/rollback、guest/file、operation或transaction。20项control manifest SHA-256为`91778f4801ab950850dc08ce5ed728cfaf9fb6ac896a2d14acd512ac18a2c438`，单成员`Evidence-v5` manifest为`c37b552ead715d5b9716cfcc60ffc80f2ce62c99960ae9e4a904759765e5f715`；逐项hash、`0700`/`0600`、owner `501:20`、single-link通过。全部registration shell现场现冻结，不再update、move、start、delete或复用授权；下一步只可按六段序列另行授权clone前门，从专用壳产生新stopped target并物化不可变S2 EFI/qcow2，后续五段仍关闭。
 
+项目所有者随后批准P05B收敛：八个crash合同和自动门禁继续完整保留，真实系统阻塞样本固定为`install_prepared`、`install_artifacts_staged`、`upgrade_quiesced`，其余五个真实crash转为后续hardening。当前22台注册项未收敛到5台目标前暂停clone；23个VM bundle、7个snapshot的精确建议处置及未来清理控制边界见[资产生命周期账本](linux-l6-asset-lifecycle.md)。该批准不含任何UTM query、clone、start、delete、snapshot quarantine/purge或guest动作。
+
 ## 10. L6 完成与后续
 
-L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
+P05B L6只有在下列条件同时满足后完成：同一新guest、同一release pair与连续session闭合六步主序列；字体/dependency、startup正负向、XDG零写入/保留、真实process/package-manager lifecycle、断网与guest reboot对照通过；八个crash case的matrix/controller/checkpoint/resume自动合同全部通过；真实系统证据覆盖`install_prepared`、`install_artifacts_staged`和`upgrade_quiesced`三个代表恢复边界。其余五个真实crash属于后续hardening，不阻塞P05B/M5退出，也不得表述为真实通过。完成后仍然：
 
 - 不清理 operation staging、receipt、artifact input 或 evidence；
 - 不复用 L6 guest 作为 P04/P05C 日常环境；

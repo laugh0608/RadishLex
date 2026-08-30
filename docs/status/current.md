@@ -7,7 +7,7 @@
 - 复核：2026-08-30；常态分支 `dev`，主线 `master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 controller/pair/refresh、六类operation与前两个crash已闭合；v4只读transaction与延迟双结果已真实闭合`completed`，terminal stop也已真实闭合`stopped-verified`并完成递归binding；其余六个crash与连续L6未闭合。
+- 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
 
 ## 冻结基线与固定边界
 
@@ -45,6 +45,7 @@
 
 ## 停止线
 
+- 资产账本只固定建议处置，不授权清理；历史停止线在逐项prepare并取得删除授权前继续有效。候选不得直接delete、注销、搬移或purge。
 - 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
 - 不重新启动、恢复、清理或复用前四个 stopped L6 failure/mismatch disk；第五套 terminal `rolled_back` 现场只作失败/恢复取证，仍不得启动、重试或复用。各套 evidence 分属不同 config/boot/receipt 身份，不得混用。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
@@ -60,7 +61,7 @@
 - fresh-boot resume attempt `d75818f-v4-install-artifacts-staged-fresh-boot-resume-20260827-v1`与host/guest根已消费并冻结；不得补拉、复跑、重建secret、retry/cleanup、再次resume/postflight或据`state-indeterminate`修补现场。调用后不得无授权追加query/start/stop/quit。
 - transaction-state v1/v2、deferred-result及terminal-stop根冻结。21项结果只证明该boot的transaction为`completed`，28项stop结果只证明同一授权调用内目标已正常停止并完成host交叉检查；不得补拉、复跑probe、query/start/stop、resume/dpkg/retry/repair/cleanup或改写现场。
 - registration shell v1-v3 control根与manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`/`ae3fb81b…4a511`冻结；不得覆盖、复用或解释为已创建。
-- v4、prepare v1/v2、complete v1/v2与`Evidence-v5`均冻结；专用壳位于既定外部package且默认路径absent。下一步只允许另行授权独立clone前门；不得改写壳体、start/delete/retry或进入guest。
+- v4、prepare v1/v2、complete v1/v2与`Evidence-v5`均冻结；专用壳位于既定外部package且默认路径absent。注册项收敛到预算前不得进入clone前门；不得改写壳体、start/delete/retry或进入guest。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
@@ -68,8 +69,9 @@
 ## 下一步事项（2026-08-30）
 
 1. registration shell已以`91778f48…c438`/`c37b552e…f715`闭合`frozen`；22台全停、`Network=[]`、磁盘身份和零句柄通过。
-2. 下一步另行授权一次clone前门：从专用壳clone新stopped target，再仅以APFS clonefile物化不可变S2的EFI/qcow2；失败不自动删除、重试、回滚或启动。
-3. clone前门闭合前，start、input-preflight、crash、resume与terminal-stop五段继续关闭。
+2. 已冻结23个VM/7个snapshot账本；17个旧VM与5个旧snapshot进入候选，当前未授权清理。
+3. 下一步repository-only实现allowlist、只读prepare与fake-runner；注册项从22台收敛到5台目标前不创建target。
+4. 收敛后只新增一个`upgrade_quiesced` target；退休后再以一台新guest完成连续L6。P05C仍使用独立guest。
 
 ## 验证入口
 
@@ -91,7 +93,7 @@
 git diff --check
 ```
 
-上述合成入口覆盖现有L6 host/guest控制、结果binding、checkpoint/resume、只读transaction-state resolution、terminal stop，以及`upgrade_quiesced` case、registration shell创建/Move恢复与clone前门，但不替代实机。其余六个crash、连续L6与发布未闭合。
+上述入口覆盖八个crash合同和现有L6控制，但不替代实机。`upgrade_quiesced`、连续L6与发布未闭合；其余五个真实crash转为hardening。
 
 ## 阅读索引
 
@@ -100,4 +102,5 @@ git diff --check
 - [Linux Fcitx5 平台边界](../linux-fcitx5-boundary.md)
 - [Linux Manager 本地验收边界](../linux-manager-local-acceptance.md)
 - [Linux L6 Debian package matrix runbook](../runbooks/linux-l6-package-matrix.md)
+- [Linux L6 收敛与本地资产生命周期](../runbooks/linux-l6-asset-lifecycle.md)
 - [本周周志](../devlogs/2026-W35.md)

@@ -174,7 +174,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 2. `M5-P02`：实现 C++/CMake addon、Rust FFI 接线、确定性开发构建和自动 contract。
 3. `M5-P03`：完成真实 Wayland 主路径、X11 兼容、常见应用输入、生命周期和隐私验收。
 4. `M5-P04`：完成 Linux Flutter Manager、同库并发、本地学习、删除/恢复、导入导出和 explain 验收。
-5. `M5-P05`：完成安装、升级、修复、默认移除、rollback、数据保留和发行载体。首个载体固定为 Debian 13 ARM64 的系统级本地 `.deb`；P05A 已完成 metadata/rootfs、双构建身份与真实 ARM64 载荷门禁。P05B 已完成确定性载体、实际 `.deb` 流式关系校验、恢复型 receipt/advisory guard、固定系统 observer/executor、concrete mutable port、`/proc` 静止检查、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix；L6 format v1、compile-isolated acceptance controller 与 canonical 脱敏 envelope 也已完成。第四套暴露source chain不连续，第五套为`rolled_back`，第六套形成target `completed`与S3；独立clone又闭合真实repair、rollback、remove与reinstall。首个`install_prepared`暴露的Debian `01777` startup漂移已修复并闭合有效checkpoint、exact resume terminal与关机冻结。第二个`install_artifacts_staged`已闭合typed合同、首次安装回归、launch/断网/canonical input/negative preflight、checkpoint、fresh boot、只读transaction `completed`与正常停止，并完成冻结结果binding；第三个`upgrade_quiesced`已闭合repository-only case、专用registration shell创建/原生Move恢复控制与clone前门，真实六段尚未开始。其余六个crash与连续完整L6仍未闭合。v1不携带RadishLex自有maintainer scripts，P05C最后进入独立guest授权实机；精确现场与下一顺位只读[`docs/status/current.md`](status/current.md)和[L6 runbook](runbooks/linux-l6-package-matrix.md)。
+5. `M5-P05`：完成安装、升级、修复、默认移除、rollback、数据保留和发行载体。首个载体固定为 Debian 13 ARM64 的系统级本地 `.deb`；P05A 已完成 metadata/rootfs、双构建身份与真实 ARM64 载荷门禁。P05B 已完成确定性载体、实际 `.deb` 流式关系校验、恢复型 receipt/advisory guard、固定系统 observer/executor、concrete mutable port、`/proc` 静止检查、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix；L6 format v1、compile-isolated acceptance controller 与 canonical 脱敏 envelope 也已完成。第四套暴露source chain不连续，第五套为`rolled_back`，第六套形成target `completed`与S3；独立clone又闭合真实repair、rollback、remove与reinstall。首个`install_prepared`暴露的Debian `01777` startup漂移已修复并闭合有效checkpoint、exact resume terminal与关机冻结。第二个`install_artifacts_staged`已闭合typed合同、首次安装回归、launch/断网/canonical input/negative preflight、checkpoint、fresh boot、只读transaction `completed`与正常停止，并完成冻结结果binding；第三个`upgrade_quiesced`已闭合repository-only case、专用registration shell创建/原生Move恢复控制与clone前门，真实六段尚未开始。八个crash场景继续保留完整合同与自动门禁，真实系统阻塞样本收敛为上述三个不同恢复边界；其余五个真实crash转为后续hardening，不阻塞P05B/M5。连续完整L6仍未闭合。v1不携带RadishLex自有maintainer scripts，P05C最后进入独立guest授权实机；精确现场与下一顺位只读[`docs/status/current.md`](status/current.md)、[L6 runbook](runbooks/linux-l6-package-matrix.md)和[资产生命周期](runbooks/linux-l6-asset-lifecycle.md)。
 
 交付：
 
@@ -202,7 +202,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 - Debian 13 ARM64 的安装、同数据 contract 升级、修复、rollback、默认程序移除和 reinstall 具有自动门禁与独立实机证据。
 - 默认 remove/purge 不遍历 home、不删除用户 XDG 数据；package 不自动改 Fcitx profile、autostart、输入源或桌面会话。
 - Manager 与 Fcitx panel 的中文、Latin 和数字字体依赖可复验；首个 Debian profile 使用发行版硬依赖，不把系统字体偶然 fallback 写成产品证据。
-- L6 必须复验已连接的 startup dependency、发行版字体 family/glyph/owner、真实 process/package-manager lifecycle 与 crash-command 证据。
+- L6 必须在一台新guest的同一连续session复验六类operation、已连接的startup dependency、发行版字体family/glyph/owner、真实process/package-manager lifecycle、XDG保留、断网与reboot；八个crash checkpoint均须通过自动合同，真实crash证据至少覆盖`install_prepared`、`install_artifacts_staged`和`upgrade_quiesced`三个不同恢复边界。其余五个真实crash属于后续hardening，不阻塞M5退出。
 - macOS 冻结参考基线与仓库门禁继续通过，真实用户同步继续关闭。
 
 完整运行边界见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)，安装维护边界见 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)。

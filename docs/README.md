@@ -28,7 +28,7 @@ RadishLex（萝卜词核）是由 Rust 输入核心、Go 自部署同步后端�
 - `docs/*.md`：稳定的架构、协议、平台、隐私、Guide、Boundary 或 Reference。
 - 各组件 `README.md`：组件职责、就地开发入口和局部验证方式。
 
-Linux 当前安装工作从 [Linux 安装维护边界](linux-installation-maintenance-boundary.md) 与 [L6 package matrix](runbooks/linux-l6-package-matrix.md) 进入；输入平台与 Manager 分别见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md) 和 [Linux Manager 本地验收边界](linux-manager-local-acceptance.md)。其他专题从当前状态、技术方案或仓库结构继续下钻。
+Linux 当前安装工作从 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)、[L6 package matrix](runbooks/linux-l6-package-matrix.md) 与 [L6 资产生命周期](runbooks/linux-l6-asset-lifecycle.md) 进入；输入平台与 Manager 分别见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md) 和 [Linux Manager 本地验收边界](linux-manager-local-acceptance.md)。其他专题从当前状态、技术方案或仓库结构继续下钻。
 
 ## 维护规则
 

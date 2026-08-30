@@ -1,0 +1,157 @@
+# Linux L6 收敛与本地资产生命周期
+
+本文固定 M5-P05B 的收敛退出口径、当前 UTM 资产账本、保留/归档/删除建议和未来安全清理控制器边界。读者是准备收口 Linux L6 或维护本地 UTM 资产的维护者。本文不授权启动、克隆、注销、删除或清理任何 VM、快照、guest 数据、host evidence，也不把账面磁盘占用表述为实际可回收空间。
+
+## 1. 收敛判断
+
+P05B 不再把八个 crash checkpoint 全部执行为真实系统阻塞项。八个场景仍由 committed matrix、compile-isolated acceptance controller、checkpoint/resume 合同、fake runner 和 canonical evidence schema 完整覆盖；真实系统只保留三个具有不同恢复边界的代表场景：
+
+1. `install_prepared`：已闭合，覆盖首次安装 prepared、完整 process group crash、合法 guard 与 exact resume。
+2. `install_artifacts_staged`：已闭合，覆盖 target-only staging、fresh boot、延迟结果消歧、`completed` 与正常停止。
+3. `upgrade_quiesced`：尚未执行，覆盖已有 source、运行程序静止、upgrade quiesced 与 exact resume。
+
+`upgrade_before_dpkg`、`upgrade_after_dpkg`、`upgrade_rollback_required`、`upgrade_before_source_restore` 和 `upgrade_after_source_restore` 的真实系统执行转为后续 hardening，不再阻塞 P05B 或 M5 退出。它们不得从 matrix、测试、validator 或文档合同中删除，也不能把未执行的真实系统结果写成通过。
+
+P05B 剩余阻塞项为：
+
+- 在资产收敛后完成一次真实 `upgrade_quiesced`；
+- 在一台新的 disposable guest、同一 release pair 和同一连续 session 中依次闭合 `install_source`、`upgrade_target`、`repair_target`、`rollback_source`、`remove_source`、`reinstall_target`；
+- 同一连续 session 复验 dependency/font、startup 正负向、XDG 零写入/保留、process/package-manager lifecycle、断网与 guest reboot 对照；
+- P05C 仍使用另一台独立 guest，并重新取得系统授权。
+
+真实 VM 数量受预算约束：常驻注册锚点目标为 5 台，任一时刻最多增加 1 台 P05B disposable target，因此 P05B 注册预算上限为 6 台。当前注册项未从 22 台收敛前，不创建 `upgrade_quiesced` target；一个 disposable target 形成持久证据并退休后，才允许创建下一台。失败不会自动增加替代 clone。
+
+## 2. 审计基线与计量口径
+
+本账本基于 2026-08-30 已冻结的 complete v2 清单，不追加 UTM 查询：
+
+- inventory：`/Users/luobo/VirtualMachines/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-Move-Complete-Control-v2/utmctl-list-postupdate.json`；
+- canonical inventory：22 台全部 `stopped`，hash `1074717ca5ff9f8666e53974b9002d1c4697a33de877e5cdfbdcf24299f4714f`；
+- 物理资产：23 个 `.utm` bundle，其中 22 个已注册，`Debian13-ARM64-DependencyFrozen.utm` 故意未注册；
+- bundle 的 `du` 合计为 220.08 GiB；其中 14 个 UTM 默认 Documents bundle 合计 130.05 GiB；
+- 7 个 APFS snapshot 的 `du` 合计为 65.25 GiB；
+- Data volume 当次只读观察约有 527 GiB 可用，不构成立即容量事故。
+
+表中 GiB 是 `du -sk / 1048576` 的账面值。APFS clonefile 和 clone 共享物理块，逐项求和会重复计算共享块；删除候选的账面值只用于排序，不能承诺同等可回收容量。host evidence、handoff 和 control root 体积远小于 VM/snapshot，默认保留而不是优先清理。
+
+以下使用两个路径缩写：
+
+- `OP` = `/Users/luobo/VirtualMachines`
+- `DOC` = `/Users/luobo/Library/Containers/com.utmapp.UTM/Data/Documents`
+
+## 3. VM bundle 账本
+
+“证据归档后删除候选”表示持久 host/guest manifest 继续保留，而 raw `.utm` package 只有在逐项 preflight 通过并取得另一份精确删除授权后才可删除。它不是当前删除授权。当前没有经过验证的“只注销但保留 bundle”路径；plain `utmctl delete` 会同时移除注册项与 package，不得把它描述为 archive。
+
+| # | Bundle / UUID | GiB | 当前角色 | 建议处置 |
+| --- | --- | ---: | --- | --- |
+| 1 | `DOC/RadishLex-Debian13-ARM64-L6-1ebbdab.utm`<br>`9C5638D7-0F97-4BD8-8A83-ABCDFCADAC6C` | 9.00 | 第五套 rolled-back terminal | 证据归档后删除候选 |
+| 2 | `DOC/RadishLex-Debian13-ARM64-L6-56dd4de.utm`<br>`A3F757B1-CE75-4F23-9509-CAD033260AA1` | 9.44 | 第四套 chain mismatch | 证据归档后删除候选 |
+| 3 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-crash-install-prepared-v2.utm`<br>`FD24ADFF-B160-46F0-B100-10BAAF17C056` | 9.39 | 旧 pair crash 失败/诊断现场 | 证据归档后删除候选 |
+| 4 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-reinstall.utm`<br>`E671DB9C-5E2C-447B-9425-8D91D2CFD465` | 9.06 | reinstall completed terminal | 证据归档后删除候选 |
+| 5 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-remove.utm`<br>`5EA2BAA2-B9A1-46CC-B496-B37826DD27A2` | 9.47 | remove completed terminal | 证据归档后删除候选 |
+| 6 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-repair.utm`<br>`A3022255-ED08-4C66-92D3-075A6BB93107` | 9.45 | repair aborted-preserved | 证据归档后删除候选 |
+| 7 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-rollback-v3.utm`<br>`EFD15599-7177-4D55-BF17-173EE1F0BBDD` | 9.46 | rollback completed terminal | 证据归档后删除候选 |
+| 8 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce.utm`<br>`193179D5-2595-4628-A063-9EFB73F8EC05` | 9.44 | 第六套 target completed；已有 S3 | 证据归档后删除候选 |
+| 9 | `DOC/RadishLex-Debian13-ARM64-L6-823afca-repair.utm`<br>`394217A7-BFC9-43C8-94E6-539FF3F2B6FB` | 9.46 | repair completed terminal | 证据归档后删除候选 |
+| 10 | `DOC/RadishLex-Debian13-ARM64-L6-b891ed1-repair.utm`<br>`BE3579E0-B150-438D-ABE0-53A8D46137F8` | 9.45 | repair completed-noop | 证据归档后删除候选 |
+| 11 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v3.utm`<br>`5B19AEF1-0F29-40B6-8F24-1B1929117DAB` | 9.39 | 第二场景 host start 失败现场 | 证据归档后删除候选 |
+| 12 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v4.utm`<br>`50B75F88-493D-42C0-A1DC-054DEC478038` | 8.85 | 第二场景 completed/stopped-verified terminal | 证据归档后删除候选 |
+| 13 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged.utm`<br>`B0B826F6-D7D3-433C-8987-E2D6993A87B3` | 9.39 | 第二场景旧 start 失败现场 | 证据归档后删除候选 |
+| 14 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-prepared-v3.utm`<br>`3EC83EB9-094B-492B-9756-D47E61C593B9` | 8.79 | 第一场景 completed terminal | 证据归档后删除候选 |
+| 15 | `OP/Debian13-ARM64-CleanBase.utm`<br>`21197987-AEBB-46E6-ABDC-B9762F5C0CE4` | 7.06 | rescue clean base | 保留；常驻注册锚点 |
+| 16 | `OP/Debian13-ARM64-DependencyFrozen.utm`<br>`755199B1-1C18-4441-8A1E-D423C8DE0022` | 9.39 | immutable COW source；故意未注册 | 保留；不启动、不改写 |
+| 17 | `OP/Debian13-ARM64-L6-2fa1b8c.utm`<br>`EBF12F50-33B1-4711-B693-B57D419EAE2A` | 9.40 | 第二套 pre-receipt failure | 证据归档后删除候选 |
+| 18 | `OP/Debian13-ARM64-L6-512e8ab.utm`<br>`99FF4B3F-4894-4913-BBE3-4934DC27BEEB` | 8.72 | 第三套 source terminal；已有 S2 | 证据归档后删除候选 |
+| 19 | `OP/Debian13-ARM64-L6.utm`<br>`6F73F6DC-66DF-40EC-86B8-228C1FDA1195` | 9.42 | 首套 pre-receipt failure | 证据归档后删除候选 |
+| 20 | `OP/Debian13-ARM64.utm`<br>`755199B1-1C18-4441-8A1E-D423C8DE0022` | 11.65 | 通用 builder；与未注册冻结源共享历史 UUID | 保留；常驻注册锚点 |
+| 21 | `OP/RadishLex-L6-PairBuilder-2fa1b8c-v2.utm`<br>`E2F5624C-B0F9-4102-B149-5F72C1851D49` | 17.14 | 隔离 release-pair builder | 保留；常驻注册锚点 |
+| 22 | `OP/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-v1.utm`<br>`0BAA7355-A55A-463E-97FE-82A785E252A7` | 0.00 | `upgrade_quiesced` registration-only shell | 保留至第三场景 target 建立；随后另评估退休 |
+| 23 | `OP/RadishLex/VMs/RadishLex-Debian13-ARM64.utm`<br>`E0168AA6-AFDA-4C81-9327-590DAC48C49B` | 17.24 | P04 已验收现场 | 保留；常驻注册锚点，不作 P05 mutation |
+
+17 个 raw VM 删除候选账面合计 157.60 GiB。全部候选通过后，注册列表才可能从 22 台降至 5 台；任一候选未通过证据或身份 preflight 时必须继续保留，因此“5 台”是目标而不是清理结果承诺。
+
+## 4. Snapshot 账本
+
+| # | Snapshot | GiB | 当前角色 | 建议处置 |
+| --- | --- | ---: | --- | --- |
+| 1 | `OP/RadishLex-L6-Snapshots/S0-clean-e5b6da1` | 9.42 | 旧 pair S0 取证 | 隔离后删除候选 |
+| 2 | `OP/RadishLex-L6-Snapshots/S0-clean-2fa1b8c` | 9.40 | 第二套 S0 取证 | 隔离后删除候选 |
+| 3 | `OP/RadishLex-L6-Snapshots/S0-clean-512e8ab` | 9.40 | 第三套 clean baseline | 隔离后删除候选；CleanBase 可承担新建基线 |
+| 4 | `OP/RadishLex-L6-Snapshots/S1-source-installed-512e8ab` | 9.41 | S2 前 source-installed 恢复点 | 隔离后删除候选；S2 是当前 upgrade 起点 |
+| 5 | `OP/RadishLex-L6-Snapshots/S2-preflight-wal-drift-512e8ab` | 8.75 | WAL/SHM 误读漂移取证 | 隔离后删除候选；不得作为恢复源 |
+| 6 | `OP/RadishLex-L6-Snapshots/S2-source-data-512e8ab` | 9.42 | `upgrade_quiesced` immutable source/data 起点 | 保留；第三场景与收敛验证的关键锚点 |
+| 7 | `OP/RadishLex-L6-Snapshots/S3-target-installed-80e49ce` | 9.44 | 已完成 maintenance/operation 的 target anchor | 保留至 P05B 退出复核 |
+
+5 个 snapshot 删除候选账面合计 46.39 GiB。snapshot 先做同文件系统、no-replace 的隔离改名，再在另一批授权中清除；隔离本身不回收空间。S2、S3 任一身份或持久 manifest 校验失败时，全部 snapshot 清理停止。
+
+## 5. 保留的证据资产
+
+下列资产默认保留，不进入空间清理优先级：
+
+- committed matrix、controller、bindings、测试和文档；
+- canonical pair/handoff、refresh handoff、package/evidence archive；
+- host/guest manifest、terminal、request、binding、command/result 摘要和清理 manifest；
+- operation ID hash-only、脱敏 receipt/dpkg/startup/XDG/network/process 摘要；
+- registration shell complete/evidence、S2/S3 manifest 与未来收敛清理证据。
+
+保留证据仍须满足 privacy redline：不得为补齐归档重新拉取 raw operation ID、完整 receipt、完整 dpkg log、真实用户数据或冻结现场中不存在的材料。raw VM 删除前只验证既存材料，不补写或“修复”历史 evidence。
+
+## 6. 安全清理控制器设计
+
+未来控制器必须拆为 repository-only 实现、只读 prepare、VM mutation、snapshot quarantine 和 snapshot purge 五个互不继承授权的阶段。设计本身不授权其中任何系统动作。
+
+### 6.1 静态 allowlist
+
+- committed allowlist 逐项固定 asset kind、精确 UUID、绝对路径、期望 lifecycle action、引用的 terminal/evidence manifest 和 config/EFI/qcow2 identity；
+- `retain`、P04、CleanBase、DependencyFrozen、builder、registration shell、S2、S3 永远不能由默认选择进入 mutation；
+- 调用方必须逐字传入 batch ID、attempt ID、allowlist digest 和目标 ID；不接受 glob、目录扫描自动扩面、名称前缀或“全部候选”；
+- 单个 VM batch 最多 4 台，snapshot batch 最多 2 个；目标变化即产生新 batch、新 attempt 和新授权。
+
+### 6.2 只读 prepare
+
+prepare 只允许读取仓库、冻结 evidence、bundle/snapshot 文件、句柄和一次 plain `utmctl list`。它必须：
+
+1. 绑定 clean committed HEAD、allowlist digest、absent create-new 输出根和精确授权声明；
+2. 确认 inventory 与授权输入完全一致、所有注册 VM 均为 `stopped`，且目标 name/UUID 唯一；
+3. 以 `lstat`/`openat` no-follow 语义确认目标位于允许根、没有 symlink、owner/mode/link count 合法；
+4. 逐项复验 config/EFI/qcow2 或 snapshot identity 与既存 terminal/evidence manifest；
+5. 逐项复验持久 evidence manifest 的成员、hash、权限和 privacy 扫描，不要求或生成历史上不存在的证据；
+6. 对目标及其关键文件执行两轮零句柄检查；
+7. 确认目标没有被 S2/S3、当前 handoff、registration shell、P04、builder 或待执行 batch 引用；
+8. 只写 request、binding、preflight、inventory 和 terminal manifest；任一失败闭合 `precondition-rejected`，mutation count 必须为 0。
+
+prepare 结果只能是某一精确 batch 的授权输入，不能直接触发删除，也不能跨 HEAD、inventory 或 asset identity 复用。
+
+### 6.3 VM mutation
+
+- VM 删除前重新执行 prepare 的全部关键身份、全停和零句柄检查；
+- 每台只允许一次 plain `utmctl delete <exact-uuid>`，不得使用 GUI delete、名称匹配、shell expansion、自动 retry 或并行删除；
+- 每次调用后只允许一次 plain list，必须证明恰好移除该 UUID、其 package absent、其余 inventory 成员不变且全部 stopped，才可进入下一台；
+- exit 0、注册项消失和 package absent 三者必须同时成立；任一矛盾为 `state-indeterminate`，停止 batch，不自动 rollback、重建、补删或继续下一台；
+- terminal manifest 固定每次 argv、exit/timed-out、before/after canonical inventory、package observation 和未授权目标不变证明。
+
+当前没有可靠的 unregister-only primitive；如果未来发现该能力，必须先做新的 repository-only 设计和独立授权，不能把 `utmctl delete` 包装成注销。
+
+### 6.4 Snapshot quarantine 与 purge
+
+- quarantine 只允许将精确 snapshot 以同文件系统、no-replace rename 移入 create-new batch 目录；目标目录、父目录、manifest 和 S2/S3 身份必须调用前后复验；
+- rename 后 snapshot 不得被启动、恢复或作为 clone source，控制写入原路径 absent、新路径 identity 相同和未授权 snapshot 不变证明；
+- purge 是另一份授权，只接受已冻结 quarantine manifest 和精确隔离路径；不得递归作用于 `OP`、snapshot 根、batch 父目录或由环境变量/通配符推导的路径；
+- purge 后只证明精确隔离成员 absent，不用 `du` 或 `df` 代替身份与删除终态。
+
+### 6.5 失败关闭与授权边界
+
+下列情况全部停止，不自动处理：HEAD 或 inventory 漂移、目标已启动、句柄出现、UUID/name/path/hash/owner/mode/link 漂移、evidence 不完整、S2/S3 漂移、package 部分存在、命令超时、UTM 返回与文件系统矛盾、未授权注册项变化或磁盘空间观察异常。
+
+实际 mutation 每批必须重新向项目所有者列出：精确目标、UUID/路径、账面 GiB、持久证据 manifest、命令次数、失败后保留状态和不可恢复影响。授权不从本设计、历史清理批次或上一批 prepare 自动继承。
+
+## 7. 推荐执行顺序
+
+1. repository-only 实现 allowlist、prepare 和 fake-runner 回归；不调用 UTM、不改资产。
+2. 用当前冻结 inventory 对第一批最多 4 台低价值失败现场做只读 prepare。
+3. 单独授权并执行第一批 VM mutation，复核清理 manifest 后再决定下一批。
+4. 注册项降至预算后，才创建唯一 `upgrade_quiesced` disposable target；case 闭合后先退休该 target。
+5. 建立一台新的连续 L6 guest，完成六类 operation 和完整正常生命周期，然后退休。
+6. snapshot 以两项一批 quarantine；确认 P05B 不再依赖后，另行 purge。
+7. P05B 收口后重新评估 registration shell 和 S3；P05C 使用独立 guest 与独立授权。
