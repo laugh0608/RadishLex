@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核：2026-08-29；常态分支 `dev`，主线 `master`。
+- 复核：2026-08-30；常态分支 `dev`，主线 `master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - L6 controller/pair/refresh、六类operation与前两个crash已闭合；v4只读transaction与延迟双结果已真实闭合`completed`，terminal stop也已真实闭合`stopped-verified`并完成递归binding；其余六个crash与连续L6未闭合。
@@ -37,7 +37,7 @@
 - v4 fresh-boot分类、只读恢复资格和resume控制均已冻结；原resume仍为`state-indeterminate`。`202b64d`分开验证prior/current boot并解耦历史/successor driver，没有倒写旧attempt。
 - `f05ebd7`排除非UTM QEMU误判；v2首次result缺失后，独立deferred resolution以双份1259-byte结果与completed phase闭合transaction `completed`，21项manifest `7fcef38e…0e3d`已由`7acbbde`递归绑定。
 - clean `9485778`只发送一次正常stop，第2轮闭合21台all-stopped及目标句柄/进程absent；28项manifest `096fe01f…e133`已由`ad77c22`递归绑定。
-- `9ec3218`/`8e55189`已固定第三个`upgrade_quiesced`的不可变S2、checkpoint/resume语义、六段授权及独立clone前门；尚未创建专用注册壳或真实target。
+- `9ec3218`/`8e55189`/`2f91d2a`已固定第三个`upgrade_quiesced`的不可变S2、checkpoint/resume语义、专用registration shell创建/冻结控制、六段授权及独立clone前门；尚未执行真实壳体创建/注册，也没有真实target。
 
 ## 停止线
 
@@ -59,11 +59,11 @@
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 明日事项（2026-08-30）
+## 下一步事项（2026-08-30）
 
-1. 开始前复核clean committed `dev`与冻结资产停止线；第二个case不再执行系统动作，也不补拉、query、stop或倒写证据。
-2. 先只在仓库内固定专用registration shell的准备、manifest与冻结证据合同：create-new、`Network=[]`、registration-only、从未进入guest，且不复用任何source/crash/transaction terminal。
-3. 合同与门禁闭合后，再提交精确壳体创建/注册方案请求独立系统授权；壳体证据通过后才另行授权真实clone。start、input-preflight、crash、resume与terminal-stop继续逐段关闭。
+1. `2f91d2a`已在repository-only范围闭合专用registration shell的准备、创建控制、单成员manifest与冻结证据合同；本批未调用真实创建控制、`utmctl`或UTM，也未创建壳体或target。
+2. 下一次真实动作前，先对clean committed HEAD、精确attempt、absent control/evidence/package路径、当次全停inventory数量与hash、不可变S2身份及UTM `4.7.5` build `118`重新绑定，并请求独立系统授权。
+3. 壳体阶段授权面只允许S2零句柄检查、precreate/postcreate/terminal三次plain `utmctl list`及一次committed AppleScript `make new virtual machine`；不含status/start/clone/delete、guest、dpkg、重试或清理。只有单成员壳体manifest闭合后才另行授权真实clone；后续start、input-preflight、crash、resume与terminal-stop继续逐段关闭。
 
 ## 验证入口
 
@@ -85,7 +85,7 @@
 git diff --check
 ```
 
-上述合成入口覆盖现有L6 host/guest控制、结果binding、checkpoint/resume、只读transaction-state resolution、terminal stop、`upgrade_quiesced` case与clone前门，但不替代实机。原resume仍冻结为`state-indeterminate`，独立只读结果已闭合`completed`且同一VM已正常停止；其余六个crash、连续L6与发布未闭合。
+上述合成入口覆盖现有L6 host/guest控制、结果binding、checkpoint/resume、只读transaction-state resolution、terminal stop，以及`upgrade_quiesced` case、专用registration shell创建/冻结控制与clone前门，但不替代实机。原resume仍冻结为`state-indeterminate`，独立只读结果已闭合`completed`且同一VM已正常停止；其余六个crash、连续L6与发布未闭合。
 
 ## 阅读索引
 
