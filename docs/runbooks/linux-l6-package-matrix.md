@@ -665,6 +665,12 @@ create-new host根含28个manifest成员，SHA-256 `096fe01f5f082a4f494ddf6219b1
 
 v3证明内联和显式record class都不足以让包含全部字段的configuration通过UTM联合record coercion，不再以新attempt逐字段试探。官方脚本接口另有确定路径：先用文档中的最小QEMU配置create，再读取VM返回的typed configuration、在stopped状态修改并`update configuration`。该替代会把真实动作面从一次create扩大为一次create加一次update；create成功而update失败时，可能留下一个stopped但带默认shared network的部分壳体，必须冻结为`state-indeterminate`且仍不得自动delete/retry。故v4 attempt/root尚未定义，须先单独批准该风险和动作面，再实现repository-only控制、调用计数、部分创建证据及回归；真实v4、clone及后续五段继续关闭。
 
+用户批准repository-only两阶段设计后，`17d10a6`将control evidence升为v2，同一committed AppleScript只接受`create`/`update`两个显式模式。create严格采用UTM官方最小QEMU形状，仅传name、`aarch64`与单个1024 MiB VirtIO空盘；control以postcreate plain list、package和bundle校验只新增一个stopped专用壳体后，才按UUID调用update。update先在AppleScript内复核stopped、读取VM返回的typed configuration，再固定name/icon/notes、`aarch64`/`virt`、4096 MiB、CPU default、Hypervisor/UEFI、VirtFS、`Network=[]`、`Serial=[]`、单个VirtIO GPU与零additional arguments，最多执行一次`update configuration`。编译/反编译固定AppleEvent为一次`make`、读取`CoFg`、写`NtIf`/原始SDEF `SrPt`与一次`UTMcUpDt`；transport SHA-256为`4753be7ef29e26801f219d4fd741e9d5d3f823c04f723296afca9f6fed96b02f`。
+
+control分别记录create/update调用、postcreate默认配置、postupdate inventory/package/bundle观察与terminal；create未落地仍可闭合`failed-closed-absent`，create一旦调用后其他失败均为`state-indeterminate`。update失败时仍执行一次postupdate观察，保留可能带默认shared network的stopped部分壳体；任何命令、UUID、network、disk/EFI、package、handle或inventory漂移均不写shell evidence，也不自动delete/retry/rollback/start/clone、进入guest或transaction。13项fake-runner覆盖两阶段成功、双授权、create absent/invalid、update失败、默认网络残留、更新后网络/磁盘与terminal inventory漂移；L6与controller定向门禁通过。clean `17d10a6`只读binding再次固定S2、UTM `4.7.5` build `118`、SDEF `b4fd52c…928b3`及transport；本批没有执行AppleScript、`utmctl`或真实系统动作。
+
+下一真实attempt固定为`d75818f-upgrade-quiesced-registration-shell-20260830-v4`，control/evidence根分别为`/Users/luobo/VirtualMachines/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-Control-v4`与`/Users/luobo/VirtualMachines/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-Evidence-v4`，package为同目录`RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-v1.utm`；三路径于repository-only收尾时均absent。真实调用前必须重绑新的clean HEAD、实际全停inventory、S2/UTM及三个absent路径，并取得同时覆盖一次minimal create、一次条件式stopped update和四次plain list的独立系统授权；v1-v3冻结根不得覆盖、复用或清理。真实v4、clone及后续五段当前仍关闭。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
