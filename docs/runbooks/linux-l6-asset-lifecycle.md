@@ -19,7 +19,7 @@ P05B 剩余阻塞项为：
 - 同一连续 session 复验 dependency/font、startup 正负向、XDG 零写入/保留、process/package-manager lifecycle、断网与 guest reboot 对照；
 - P05C 仍使用另一台独立 guest，并重新取得系统授权。
 
-真实 VM 数量受预算约束：常驻注册锚点目标为 5 台，任一时刻最多增加 1 台 P05B disposable target，因此 P05B 注册预算上限为 6 台。当前注册项未从 22 台收敛前，不创建 `upgrade_quiesced` target；一个 disposable target 形成持久证据并退休后，才允许创建下一台。失败不会自动增加替代 clone。
+真实 VM 数量受预算约束：常驻注册锚点目标为 5 台，任一时刻最多增加 1 台 P05B disposable target，因此 P05B 注册预算上限为 6 台。注册项已由历史基线 22 台降至 18 台，但在进一步收敛至 5 台前仍不创建 `upgrade_quiesced` target；一个 disposable target 形成持久证据并退休后，才允许创建下一台。失败不会自动增加替代 clone。
 
 ## 2. 审计基线与计量口径
 
@@ -160,7 +160,7 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 1. repository-only allowlist、prepare 和 fake-runner 回归已实现并通过门禁；实现阶段未调用 UTM、未改资产。
 2. `first-four-v1`的4台低价值失败现场已完成一次只读prepare并冻结manifest。
-3. 第一批VM mutation已闭合`deleted`并复核manifest；下一步另选第二批、重新prepare并单独授权。
+3. 第一批VM mutation已闭合`deleted`并复核manifest；2026-08-31先在repository-only范围从剩余13台中固定不超过4台的第二批，再基于届时18成员inventory重新prepare并单独授权。UTM注册列表清理不得退化为GUI批量删除或名称匹配。
 4. 注册项降至预算后，才创建唯一 `upgrade_quiesced` disposable target；case 闭合后先退休该 target。
 5. 建立一台新的连续 L6 guest，完成六类 operation 和完整正常生命周期，然后退休。
 6. snapshot 以两项一批 quarantine；确认 P05B 不再依赖后，另行 purge。

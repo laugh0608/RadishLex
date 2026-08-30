@@ -101,7 +101,7 @@
 
 ### 当前本地资产登记（非发布证据）
 
-冻结资产宿主根为 `/Users/luobo/VirtualMachines`；第四、第五、第六套、三台 repair clone、第三台rollback、独立remove/reinstall、旧pair真实checkpoint、第三台clean retry source terminal及第二个case新旧clone位于 UTM 默认 Documents 目录。第五套为 `rolled_back` failure/recovery 现场；第六套已形成 target `completed` terminal与未改写 S3；其余terminal与失败现场均不得复用。两台rollback失败clone、旧network失败clone与两台新pair harness失败clone已在持久归档后按授权删除，只保留host evidence。最新冻结plain `utmctl`枚举22台且全部stopped；第三台clean retry已冻结为source terminal，第二个case旧clone与v3均在host启动门失败关闭，v4已冻结`completed` transaction与`stopped-verified`终态，registration shell已闭合`frozen`。`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。全部 failure/mismatch/rolled-back/terminal/crash clone、handoff、snapshot与host evidence只作各自真相源，不原地重试或混用；raw VM/snapshot退休只按[资产生命周期账本](linux-l6-asset-lifecycle.md)逐项只读prepare并另行授权，候选分类本身不授权清理。UTM只使用`PATH`中的plain `utmctl`，任何时刻最多运行一台VM。
+冻结资产宿主根为 `/Users/luobo/VirtualMachines`；第四、第五、第六套、三台 repair clone、第三台rollback、独立remove/reinstall、旧pair真实checkpoint、第三台clean retry source terminal及第二个case新旧clone曾位于 UTM 默认 Documents 目录。第五套为 `rolled_back` failure/recovery 现场；第六套已形成 target `completed` terminal与未改写 S3；其余terminal与失败现场均不得复用。complete v2曾冻结22台全stopped清单；`first-four-v1`随后以精确delete把注册项按22→21→20→19→18收敛，终态18台全部stopped且4个bundle absent。第三台clean retry已冻结为source terminal，第二个case旧clone与v3均在host启动门失败关闭，v4已冻结`completed` transaction与`stopped-verified`终态，registration shell已闭合`frozen`。`Debian13-ARM64-DependencyFrozen.utm` 故意未注册并继续作为只读 COW 来源。全部 failure/mismatch/rolled-back/terminal/crash clone、handoff、snapshot与host evidence只作各自真相源，不原地重试或混用；raw VM/snapshot退休只按[资产生命周期账本](linux-l6-asset-lifecycle.md)逐项只读prepare并另行授权，候选分类本身不授权清理。UTM只使用`PATH`中的plain `utmctl`，任何时刻最多运行一台VM。
 
 | 相对路径 | UTM 状态 | 唯一职责与保留线 |
 | --- | --- | --- |
@@ -109,11 +109,11 @@
 | `Debian13-ARM64-CleanBase.utm` | 已注册；rescue | 依赖安装前的纯 Debian 13 救援基线；不是 L6 S0，不写入 |
 | `Debian13-ARM64-DependencyFrozen.utm` | 未注册 | 工作 VM 的 dependency-frozen APFS COW 恢复源；不是执行 guest，不启动或改写 |
 | `Debian13-ARM64.utm` | 已注册；builder | Flutter/cache/source/build 与真实 release pair 的构建 VM；不执行 L6 package transaction |
-| `Debian13-ARM64-L6.utm` | 已注册；旧 L6 stopped | 旧 pre-receipt failure disk；运行内存状态不再保留，package/evidence root 与 controller evidence 仍 absent，不重启、清理或复用 |
+| `Debian13-ARM64-L6.utm` | 已删除；证据保留 | 旧 pre-receipt failure disk；已由`first-four-v1`精确移除注册项与package，历史证据继续保留，不恢复或复用 |
 | `RadishLex-L6-Snapshots/S0-clean-e5b6da1` | 非 VM；旧 S0 | 未注册、不可启动的 APFS COW 恢复点；绑定旧 pair 的 config/EFI/qcow、guest/dpkg/XDG/handoff baseline，只作取证，不用于修复后重试 |
 | `RadishLex-L6-Handoff-e5b6da1` | 非 VM；旧 handoff | host 上冻结的旧 canonical pair 副本；作为失败输入保留，不覆盖、安装或执行 |
 | `RadishLex-L6-PairBuilder-2fa1b8c-v2.utm` | 已注册；builder stopped | 2223 隔离 builder；保留第四套、第六套、`823afca` refresh与`d75818f` pair build root/控制证据，不覆盖旧输出。最新关机后config/EFI/qcow2为`1f509c73…d4f`/`ecaefd2a…0699`/`84314201…573d`且qcow2复算一致、零句柄；不执行package transaction |
-| `Debian13-ARM64-L6-2fa1b8c.utm` | 已注册；第二个 L6 failure stopped | 从 DependencyFrozen 独立 COW 创建，2224 转发；仅有空 state/operations root，运行内存状态不再保留，不重启、清理或复用 |
+| `Debian13-ARM64-L6-2fa1b8c.utm` | 已删除；证据保留 | 从 DependencyFrozen 独立 COW 创建的第二套failure；已由`first-four-v1`精确移除注册项与package，历史证据继续保留，不恢复或复用 |
 | `RadishLex-L6-Snapshots/S0-clean-2fa1b8c` | 非 VM；第二个 S0 | 未注册、不可启动；identity `S0-clean-2fa1b8c-5683d120`，现只作第二次失败的基线与取证，不用于原地重试 |
 | `RadishLex-L6-Handoff-2fa1b8c` | 非 VM；第二个 handoff | host 上独立复验的 8 文件 canonical pair；现作为第二次失败输入保留，不覆盖或执行 |
 | `Debian13-ARM64-L6-512e8ab.utm` | 已注册；第三个 L6 failure stopped | source revision 1 terminal installed；upgrade 在新 receipt 前因 target manifest profile 失败关闭。config/EFI/qcow2 SHA-256 为 `5111741c…d2b`/`8f36df35…1ee`/`0cb75b38…f387`，不重启、清理或复用 |
@@ -146,10 +146,10 @@
 | `RadishLex-L6-Preflight-1ebbdab` | 非 VM；修复前 host local evidence | local evidence `74932b8c…4f51`，input-switch/readonly evidence `70833344…70f8`/`6e44f027…6e48`；记录 UTM runtime adapter 偏差、断网边界、chain/startup/XDG 与旧 config `27cb…c3c`，不是修复后 config 身份或 canonical session evidence |
 | `RadishLex-L6-Preflight-1ebbdab-post-repair` | 非 VM；修复后 host local evidence | readonly/JSON evidence `9ecd7f54…3089`/`bf2e0591…d09f`；绑定 `Network=[]` 冷启动、loopback-only/双路由为空、chain/startup/XDG/进程静止与 postflight disk identity；`0700` 目录、`0600` 文件，不是 canonical session evidence |
 | `RadishLex-L6-Upgrade-1ebbdab-rolled-back` | 非 VM；upgrade failure/recovery evidence | text/JSON `98319405…2378`/`64d5395f…e3d8`；CLI、dpkg log、receipt 摘要与 rolled-back startup/XDG postflight 均为 `0600`，只含 operation ID SHA-256；startup revision `1` 根因已离线复现并补门禁，现场仍不得复用 |
-| `UTM Documents/RadishLex-Debian13-ARM64-L6-56dd4de.utm` | 已注册；第四套 mismatch stopped | UUID `A3F757B1-CE75-4F23-9509-CAD033260AA1`；operation ID/CLI 前确认 artifact chain 不连续并停止。config/EFI/qcow2 SHA-256 为 `61daca92…9239`/`d32181b0…1960`/`5afb3356…b6d0`；不重启、覆盖、恢复或复用 |
+| `UTM Documents/RadishLex-Debian13-ARM64-L6-56dd4de.utm` | 已删除；证据保留 | UUID `A3F757B1-CE75-4F23-9509-CAD033260AA1`；operation ID/CLI 前确认 artifact chain 不连续并停止，后由`first-four-v1`精确移除注册项与package；历史证据继续保留，不恢复或复用 |
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-1ebbdab.utm` | 已注册；第五套 rolled-back stopped | UUID `9C5638D7-0F97-4BD8-8A83-ABCDFCADAC6C`；target validation 失败后自动恢复 source，terminal receipt/source startup/XDG 通过；config/EFI/qcow2 `402a5840…3e9`/`cb8a697b…bd65`/`e684f829…8904`。不启动或重试 |
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-80e49ce.utm` | 已注册；第六套 target completed stopped | UUID `193179D5-2595-4628-A063-9EFB73F8EC05`；单次 upgrade 后 target `38-2`、receipt/startup/XDG postflight 通过；config/EFI/qcow2 `00bac87d…456`/`0846b1d3…9741`/`6b22499b…b137`。S3 已冻结，原现场继续保留且不直接 repair |
-| `UTM Documents/RadishLex-Debian13-ARM64-L6-80e49ce-repair.utm` | 已注册；repair aborted-preserved stopped | UUID `A3022255-ED08-4C66-92D3-075A6BB93107`；唯一 maintenance invocation 在 staged preflight 以 `version_relation_invalid` 终止，未进入 dpkg。terminal package/startup/XDG通过；关机后 config/EFI/qcow2 `584bf2b5…f59b`/`3b117def…8f0`/`adcc92fd…3a4`。只作取证，不resume、重试、恢复或复用 |
+| `UTM Documents/RadishLex-Debian13-ARM64-L6-80e49ce-repair.utm` | 已删除；证据保留 | UUID `A3022255-ED08-4C66-92D3-075A6BB93107`；唯一 maintenance invocation 在 staged preflight 以 `version_relation_invalid` 终止，未进入 dpkg；后由`first-four-v1`精确移除注册项与package，历史terminal证据继续保留，不恢复或复用 |
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-b891ed1-repair.utm` | 已注册；repair completed-noop stopped | UUID `BE3579E0-B150-438D-ABE0-53A8D46137F8`；唯一production maintenance invocation hash `615d768a…b528`形成receipt `75c2152f…af21`，但健康product validation在dpkg前提前成功，status/log/mtime未变。关机后config/EFI/qcow2 `b06691d1…0ea9`/`3b117def…8f0`/`3ddd82a8…4ddf`；只作取证，不resume、重试、恢复或复用 |
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-823afca-repair.utm` | 已注册；repair completed stopped | UUID `394217A7-BFC9-43C8-94E6-539FF3F2B6FB`；唯一production invocation形成`repair/same_release/completed`且dpkg确实同版重装，operation count 3，startup/XDG postflight通过。关机后config/EFI/qcow2 `818d8725…7425`/`3b117def…8f0`/`79adac93…03f6`，qcow2复算一致且零句柄；不resume、重试、恢复、再次调用或复用 |
 | `UTM Documents/RadishLex-Debian13-ARM64-L6-80e49ce-rollback.utm` | 已删除；host evidence retained | UUID `9FE6265D-2F3C-40C2-8830-19AA7641AE28`；曾在运行态断网通过、完整只读preflight必需result absent后失败关闭。经明确清理授权由plain `utmctl delete`移除注册项与package；host manifest `6b7ac641…a51d`保留，不得凭证据目录恢复或复用 |
@@ -701,7 +701,7 @@ UI Move完成后，`complete-move-once`使用新attempt `d75818f-upgrade-quiesce
 
 complete v2闭合`frozen`，inventory query/update为`2/1`，无start、clone、delete/retry/rollback、guest/file、operation或transaction。20项control manifest SHA-256为`91778f4801ab950850dc08ce5ed728cfaf9fb6ac896a2d14acd512ac18a2c438`，单成员`Evidence-v5` manifest为`c37b552ead715d5b9716cfcc60ffc80f2ce62c99960ae9e4a904759765e5f715`；逐项hash、`0700`/`0600`、owner `501:20`、single-link通过。全部registration shell现场现冻结，不再update、move、start、delete或复用授权；下一步只可按六段序列另行授权clone前门，从专用壳产生新stopped target并物化不可变S2 EFI/qcow2，后续五段仍关闭。
 
-项目所有者随后批准P05B收敛：八个crash合同和自动门禁继续完整保留，真实系统阻塞样本固定为`install_prepared`、`install_artifacts_staged`、`upgrade_quiesced`，其余五个真实crash转为后续hardening。当前22台注册项未收敛到5台目标前暂停clone；23个VM bundle、7个snapshot的精确建议处置及未来清理控制边界见[资产生命周期账本](linux-l6-asset-lifecycle.md)。该批准不含任何UTM query、clone、start、delete、snapshot quarantine/purge或guest动作。
+项目所有者随后批准P05B收敛：八个crash合同和自动门禁继续完整保留，真实系统阻塞样本固定为`install_prepared`、`install_artifacts_staged`、`upgrade_quiesced`，其余五个真实crash转为后续hardening。`first-four-v1`已把注册项从22台降至18台，仍未收敛到5台目标，因此继续暂停clone；剩余VM bundle、7个snapshot的精确建议处置及未来清理控制边界见[资产生命周期账本](linux-l6-asset-lifecycle.md)。后续批次不继承首批prepare或删除授权。
 
 ## 10. L6 完成与后续
 

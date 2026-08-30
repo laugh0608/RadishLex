@@ -65,12 +65,12 @@
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步事项（2026-08-30）
+## 明日事项（2026-08-31）
 
-1. registration shell已以`91778f48…c438`/`c37b552e…f715`闭合`frozen`；22台全停、`Network=[]`、磁盘身份和零句柄通过。
-2. `first-four-v1`已闭合`deleted`：4次精确delete均clean success，inventory按22→21→20→19→18且全stopped，4个bundle absent；21项manifest为`d6369fb2…0449`。
-3. 仍有13个旧注册VM候选；下一步先repository-only选择第二批并重新prepare/授权，不沿用首批授权，不创建`upgrade_quiesced` target。
-4. 收敛后只新增一个`upgrade_quiesced` target；退休后再以一台新guest完成连续L6。P05C仍使用独立guest。
+1. repository-only复核剩余13个旧注册VM，固定不超过4台的`second-batch-v1`allowlist；绑定UUID、绝对路径、磁盘与既存证据，不调用UTM。
+2. 回归闭合后，以新attempt、absent根和届时18成员inventory执行只读prepare；不复用`first-four-v1`的HEAD、证据或授权。
+3. prepare通过后列出精确目标、账面影响与不可恢复风险并另行申请删除；逐台清理UTM注册列表、验证单成员delta，分批从18台收敛至5个注册锚点，不使用GUI批量删除、名称匹配或自动重试。
+4. 注册列表收敛前不创建`upgrade_quiesced` target；snapshot另行quarantine/purge。收敛后只新增一个第三场景target，再以一台新guest完成连续L6；P05C仍使用独立guest。
 
 ## 验证入口
 
