@@ -334,7 +334,10 @@ class LinuxL6UpgradeQuiescedRegistrationShellTests(unittest.TestCase):
 
         self.assertEqual(source, bindings.CREATE_SOURCE)
         self.assertIn(b"make new virtual machine", source)
-        self.assertIn(b"configuration:{name:shellName", source)
+        self.assertIn(
+            b"configuration:{class:qemu configuration, name:shellName",
+            source,
+        )
         self.assertIn(b"network interfaces:{}", source)
         self.assertNotIn(b"set shellConfiguration", source)
         self.assertNotIn(b"start shellMachine", source)
