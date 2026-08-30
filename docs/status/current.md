@@ -68,8 +68,8 @@
 ## 下一步事项（2026-08-30）
 
 1. registration shell已以`91778f48…c438`/`c37b552e…f715`闭合`frozen`；22台全停、`Network=[]`、磁盘身份和零句柄通过。
-2. 已冻结23个VM/7个snapshot账本；17个旧VM与5个旧snapshot进入候选。首批4台的repository-only allowlist、只读prepare与fake-runner已闭合，仍未授权删除。
-3. 下一步只对`first-four-v1`执行一次真实只读prepare；它至多调用一次plain list和两轮`lsof`，不启动、进入、移动、克隆、注销或删除VM。只有`prepared`及manifest复核通过后才另行列出删除授权请求。
+2. 首批4台的只读prepare已闭合`prepared`：22台全停、7个证据锚点、两轮磁盘hash与两轮零句柄通过；9项manifest为`68ce05b0…f44e`，删除仍未授权。
+3. 下一步只列出`first-four-v1`的精确删除影响并请求独立授权；prepare本身不授权启动、进入、移动、克隆、注销或删除VM，也不能跨HEAD/inventory复用。
 4. 收敛后只新增一个`upgrade_quiesced` target；退休后再以一台新guest完成连续L6。P05C仍使用独立guest。
 
 ## 验证入口

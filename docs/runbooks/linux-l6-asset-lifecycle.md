@@ -123,7 +123,9 @@ prepare 只允许读取仓库、冻结 evidence、bundle/snapshot 文件、句�
 
 prepare 结果只能是某一精确 batch 的授权输入，不能直接触发删除，也不能跨 HEAD、inventory 或 asset identity 复用。
 
-2026-08-30 已实现首个repository-only控制：`packaging/linux/l6-asset-retirement-allowlist.json`只列出`first-four-v1`的4台候选并固定两个绝对storage root、UUID/name/path、config/EFI/qcow2和7个既存证据锚点；`scripts/linux-product/l6_utm_asset_retirement_prepare.py`没有mutation命令面，只接受一次plain list、两轮`lsof`和两轮完整asset hash。7项fake-runner覆盖成功、inventory/句柄/磁盘/证据漂移及授权缺失并进入默认L6门禁。此记录只证明仓库实现，真实prepare尚未执行，删除仍关闭。
+2026-08-30 已实现首个repository-only控制：`packaging/linux/l6-asset-retirement-allowlist.json`只列出`first-four-v1`的4台候选并固定两个绝对storage root、UUID/name/path、config/EFI/qcow2和7个既存证据锚点；`scripts/linux-product/l6_utm_asset_retirement_prepare.py`没有mutation命令面，只接受一次plain list、两轮`lsof`和两轮完整asset hash。7项fake-runner覆盖成功、inventory/句柄/磁盘/证据漂移及授权缺失并进入默认L6门禁。
+
+随后在clean `4a34ae3`执行唯一只读attempt `l6-asset-retirement-prepare-20260830-v1`：一次list确认22台全stopped及canonical inventory `1074717c…714f`，7个证据锚点、4个bundle的两轮完整hash和两轮零句柄均通过，闭合`prepared`。create-new根`RadishLex-L6-Asset-Retirement-Prepare-20260830-v1`的9项manifest SHA-256为`68ce05b012fa5f821e9d5c47835830123777a08c0ba05c1ea2a70bd6e0d4f44e`；delete/start/clone/move/guest计数均为0。该结果只可作为本批删除授权输入，不自动触发mutation。
 
 ### 6.3 VM mutation
 
@@ -151,8 +153,8 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 ## 7. 推荐执行顺序
 
 1. repository-only allowlist、prepare 和 fake-runner 回归已实现并通过门禁；实现阶段未调用 UTM、未改资产。
-2. 下一步用当前冻结 inventory 对`first-four-v1`的4台低价值失败现场做一次只读 prepare。
-3. 单独授权并执行第一批 VM mutation，复核清理 manifest 后再决定下一批。
+2. `first-four-v1`的4台低价值失败现场已完成一次只读prepare并冻结manifest。
+3. 下一步单独授权并执行第一批 VM mutation，复核清理 manifest 后再决定下一批。
 4. 注册项降至预算后，才创建唯一 `upgrade_quiesced` disposable target；case 闭合后先退休该 target。
 5. 建立一台新的连续 L6 guest，完成六类 operation 和完整正常生命周期，然后退休。
 6. snapshot 以两项一批 quarantine；确认 P05B 不再依赖后，另行 purge。
