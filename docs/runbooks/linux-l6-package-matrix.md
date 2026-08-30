@@ -689,6 +689,10 @@ UI Move完成后，`complete-move-once`使用新attempt `d75818f-upgrade-quiesce
 
 用户重新授权v2 prepare后，从clean `f7ac982`执行唯一attempt。binding递归通过冻结v4、UTM `4.7.5` build `118`、S2、默认部分壳精确三文件及位置策略；授权目标package、`Evidence-v5`与新control根调用前均absent。S2/default/目标父目录同device，两轮固定`lsof`均精确exit 1且空输出；唯一plain list观察22台全部stopped、canonical inventory `1074717ca5ff9f8666e53974b9002d1c4697a33de877e5cdfbdcf24299f4714f`。source与default部分壳terminal身份不漂移，外部目标仍absent；15项manifest SHA-256 `dc6b0d01a892d6d54259342e4d795d2d7aa8a6d8f81dac3dce544f7e4cd738e0`逐项语义/hash复核通过，根/文件为`0700`/`0600`、owner `501:20`、single-link。terminal闭合`move-ready`，inventory query为1，UI Move/update/start/clone/delete/retry、guest/file和transaction均为0，调用后没有追加UTM query。v2 prepare根现冻结；下一批只能单独授权一次UTM原生UI Move到既定外部package，不含update或query，complete仍须再授权。
 
+项目所有者随后独立授权唯一一次UTM UI原生Move。通过UTM可访问性界面选中精确名称的stopped部分壳，点击`Move`，确认UTM明确提示的“复制到新位置、删除原始位置并创建快捷方式”事务，再在原生位置选择器中指定`/Users/luobo/VirtualMachines/`和原`.utm`名称；没有出现覆盖确认，UTM主界面返回后仍显示同名VM为stopped，路径已切换到既定外部package。该UI批次没有调用`utmctl`、typed update、start、clone、额外delete、retry、guest或transaction，也没有手工搬bundle或修改全局storage。
+
+随后的纯文件系统离线复核确认默认`Documents` package已absent，外部package和`Data`均为目录，`config.plist`、`efi_vars.fd`与`EF62CC7C-DF55-4A83-8633-F4630CF3B234.qcow2`分别为2631、329216、196624 bytes，SHA-256仍为`711db7f11293c2a485f480bb34b3f9e66b317d59e04101a80e1f141027c76479`、`7b0a7f26192011e6e98c770694269b40f8b70620ca58fc4973a232fb223600d5`和`ae44c4d0b6b789f232932cc0dfbda31dcd54edfb6849ed97e3a4a0c228c2b94b`。这只闭合Move动作与磁盘身份，不形成`Evidence-v5`或最终壳体证据；下一步仍须为`complete-move-once`的两次list和一次条件式stopped typed update单独授权，任何异常均不重试或清理。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：

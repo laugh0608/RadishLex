@@ -42,6 +42,7 @@
 - clean `7ab855b`的唯一v4最小create返回UUID `0BAA7355…52A7`及22台全停inventory；授权路径absent使update为0，14项manifest `70251467…fb04`闭合`state-indeterminate`。默认`Documents`中的同名部分壳无句柄但位置不合规，shell evidence与真实target仍不存在。
 - `9300ed7`闭合repository-only原生Move恢复与8项回归：prepare只读绑定，UI Move是外部独立动作，complete仅在路径/磁盘身份不变后单次typed update；完整L6通过。
 - prepare v1因HEAD误写在首门拒绝，2项manifest `4d32f219…2750`且list为0；clean `f7ac982`的v2以一次list闭合22台全停及15项`move-ready` manifest `dc6b0d01…738e`，Move/update为0。
+- 唯一授权的UTM UI Move已把同名stopped部分壳移至`/Users/luobo/VirtualMachines/…v1.utm`；离线确认默认路径absent、外部三文件SHA-256不变，未query/update/start/clone/retry或进入guest。
 
 ## 停止线
 
@@ -60,7 +61,7 @@
 - fresh-boot resume attempt `d75818f-v4-install-artifacts-staged-fresh-boot-resume-20260827-v1`与host/guest根已消费并冻结；不得补拉、复跑、重建secret、retry/cleanup、再次resume/postflight或据`state-indeterminate`修补现场。调用后不得无授权追加query/start/stop/quit。
 - transaction-state v1/v2、deferred-result及terminal-stop根冻结。21项结果只证明该boot的transaction为`completed`，28项stop结果只证明同一授权调用内目标已正常停止并完成host交叉检查；不得补拉、复跑probe、query/start/stop、resume/dpkg/retry/repair/cleanup或改写现场。
 - registration shell v1-v3 control根与manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`/`ae3fb81b…4a511`冻结；不得覆盖、复用或解释为已创建。
-- v4 control与prepare v1/v2根冻结，不覆盖或补写；UUID `0BAA7355…52A7`的默认部分壳只允许下一次单独授权的UTM UI Move，除此不得update/delete/start/clone/retry/query。授权目录package/evidence仍absent。
+- v4 control与prepare v1/v2根冻结；UUID `0BAA7355…52A7`的部分壳已迁至既定外部package，默认路径和`Evidence-v5`均absent。下一步只允许另行授权complete；不得手工修补、update/delete/start/clone/retry/query。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
@@ -68,8 +69,8 @@
 ## 下一步事项（2026-08-30）
 
 1. `9300ed7`已固定prepare/UI Move/complete边界；create/clone固定默认目录，SDEF export/import不能替代UTM原生UI Move。
-2. prepare v2已闭合`move-ready`并冻结；下一步只单独授权一次UTM原生UI Move到既定`/Users/luobo/VirtualMachines/…v1.utm`，不含update或追加query。
-3. Move后另行授权complete的两次list与一次stopped typed update；壳体manifest形成前关闭真实clone及后续五段。
+2. prepare v2和唯一UTM原生UI Move已完成；默认路径absent，外部三文件SHA-256与冻结值一致，未update或追加query。
+3. 下一步另行授权complete的两次list与一次stopped typed update；壳体manifest形成前关闭真实clone及后续五段。
 
 ## 验证入口
 
