@@ -693,6 +693,10 @@ UI Move完成后，`complete-move-once`使用新attempt `d75818f-upgrade-quiesce
 
 随后的纯文件系统离线复核确认默认`Documents` package已absent，外部package和`Data`均为目录，`config.plist`、`efi_vars.fd`与`EF62CC7C-DF55-4A83-8633-F4630CF3B234.qcow2`分别为2631、329216、196624 bytes，SHA-256仍为`711db7f11293c2a485f480bb34b3f9e66b317d59e04101a80e1f141027c76479`、`7b0a7f26192011e6e98c770694269b40f8b70620ca58fc4973a232fb223600d5`和`ae44c4d0b6b789f232932cc0dfbda31dcd54edfb6849ed97e3a4a0c228c2b94b`。这只闭合Move动作与磁盘身份，不形成`Evidence-v5`或最终壳体证据；下一步仍须为`complete-move-once`的两次list和一次条件式stopped typed update单独授权，任何异常均不重试或清理。
 
+项目所有者授权complete后，从clean `cbba328`执行唯一v1 attempt。控制在`binding-preflight`以`prepare-evidence-semantic-drift`闭合`state-indeterminate`：实现错误地要求冻结prepare请求的历史HEAD `f7ac982`等于本次complete HEAD，尚未进入路径、清单或update阶段。terminal精确记录inventory query/update均为0，且无start、clone、delete/retry、guest或transaction；create-new根只含request/terminal两项，manifest SHA-256 `1fd1dc946f92f12b95c6a031d8259db6b84650070e0c280e1aa8b7e15a29ceb7`逐项hash通过，根/文件为`0700`/`0600`、owner `501:20`、single-link。该v1根冻结，不覆盖、删除或复用；外部package未被本调用修改，`Evidence-v5`仍absent。
+
+`9da8d0f`把跨阶段规则修正为prepare request HEAD与其冻结binding HEAD内部一致，同时仍要求complete绑定自己的当前clean HEAD；新增回归显式使用不同的prepare/complete HEAD并闭合一次update/两次list成功路径。8项定向与完整`./scripts/check-linux-l6-contract.sh`通过，未执行新的系统动作。下一候选必须使用attempt `d75818f-upgrade-quiesced-registration-shell-move-complete-20260830-v2`和absent根`/Users/luobo/VirtualMachines/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-Move-Complete-Control-v2`，绑定届时最终clean HEAD并重新取得授权；不得沿用v1授权重跑。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
