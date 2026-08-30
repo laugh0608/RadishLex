@@ -12,13 +12,12 @@ from pathlib import Path
 from typing import Protocol
 
 import l6_upgrade_quiesced_case_contract as case_contract
+import l6_upgrade_quiesced_registration_shell_bindings as shell_bindings
 import l6_utm_clone_once as clone_control
 
 
 EVIDENCE_FORMAT = "radishlex-linux-l6-upgrade-quiesced-clone-front-door-v1"
-SHELL_EVIDENCE_FORMAT = (
-    "radishlex-linux-l6-upgrade-quiesced-dedicated-registration-shell-v1"
-)
+SHELL_EVIDENCE_FORMAT = shell_bindings.SHELL_EVIDENCE_FORMAT
 CONTROL_RELATIVE_PATH = Path(
     "scripts/linux-product/l6_upgrade_quiesced_clone_front_door.py"
 )
@@ -96,23 +95,7 @@ def validate_clone_front_door_bindings(
     shell = _read_bundle(
         request.registration_shell_package_path, root_mode=0o755
     )
-    expected = {
-        "case_profile": "debian13-arm64-upgrade-quiesced-crash-v1",
-        "config_sha256": shell.config_sha256,
-        "dedicated_to_case": True,
-        "efi_sha256": shell.efi_sha256,
-        "format": SHELL_EVIDENCE_FORMAT,
-        "guest_state_reuse": False,
-        "network": [],
-        "package_path_sha256": sha256_text(
-            str(request.registration_shell_package_path)
-        ),
-        "qcow2_name": shell.qcow2_name,
-        "qcow2_sha256": shell.qcow2_sha256,
-        "source_terminal_reuse": False,
-        "vm_name": request.registration_shell_name,
-        "vm_uuid": request.registration_shell_uuid,
-    }
+    expected = shell_bindings.expected_shell_evidence(request, shell)
     if evidence != expected:
         raise CloneBindingError(
             "dedicated-registration-shell-evidence-invalid"
