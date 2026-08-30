@@ -697,6 +697,10 @@ UI Move完成后，`complete-move-once`使用新attempt `d75818f-upgrade-quiesce
 
 `9da8d0f`把跨阶段规则修正为prepare request HEAD与其冻结binding HEAD内部一致，同时仍要求complete绑定自己的当前clean HEAD；新增回归显式使用不同的prepare/complete HEAD并闭合一次update/两次list成功路径。8项定向与完整`./scripts/check-linux-l6-contract.sh`通过，未执行新的系统动作。下一候选必须使用attempt `d75818f-upgrade-quiesced-registration-shell-move-complete-20260830-v2`和absent根`/Users/luobo/VirtualMachines/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-Move-Complete-Control-v2`，绑定届时最终clean HEAD并重新取得授权；不得沿用v1授权重跑。
 
+项目所有者重新授权后，从clean `e6968bf`执行唯一complete v2。binding递归通过v4 14项、prepare v2 15项、不可变S2、UTM `4.7.5`、默认路径absent及外部部分壳原始三文件身份；preupdate首次list与postupdate第二次list均为22台全stopped、canonical inventory `1074717c…714f`。唯一typed update未超时、exit 0、stdout仅为UUID `0BAA7355…52A7`且stderr为空；最终config SHA-256为`a3c60c94795b6c9fa5a1a33acea02d79c19013be96873730377fcf1a11f419d8`，完整QEMU `aarch64`/`virt`、4096 MiB、UEFI/Hypervisor、单个1024 MiB VirtIO disk、VirtIO GPU、`Network=[]`与零串口合同通过，EFI/qcow2仍为`7b0a7f26…00d5`/`ae44c4d0…b94b`，terminal source/壳体句柄均absent。
+
+complete v2闭合`frozen`，inventory query/update为`2/1`，无start、clone、delete/retry/rollback、guest/file、operation或transaction。20项control manifest SHA-256为`91778f4801ab950850dc08ce5ed728cfaf9fb6ac896a2d14acd512ac18a2c438`，单成员`Evidence-v5` manifest为`c37b552ead715d5b9716cfcc60ffc80f2ce62c99960ae9e4a904759765e5f715`；逐项hash、`0700`/`0600`、owner `501:20`、single-link通过。全部registration shell现场现冻结，不再update、move、start、delete或复用授权；下一步只可按六段序列另行授权clone前门，从专用壳产生新stopped target并物化不可变S2 EFI/qcow2，后续五段仍关闭。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
