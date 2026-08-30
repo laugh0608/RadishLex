@@ -42,7 +42,6 @@
 - clean `7ab855b`的唯一v4最小create返回UUID `0BAA7355…52A7`及22台全停inventory；授权路径absent使update为0，14项manifest `70251467…fb04`闭合`state-indeterminate`。默认`Documents`中的同名部分壳无句柄但位置不合规，shell evidence与真实target仍不存在。
 - `9300ed7`闭合原生Move恢复；prepare v1首门拒绝，v2以一次list闭合22台全停与15项`move-ready` manifest `dc6b0d01…738e`；唯一UI Move将部分壳移至授权路径且三文件身份不变。
 - complete v1因跨阶段HEAD误绑零调用失败；`9da8d0f`修复后，clean `e6968bf`的v2以两次全停list和一次update闭合`frozen`。20项manifest `91778f48…c438`、单成员壳体manifest `c37b552e…f715`通过，最终`Network=[]`且EFI/qcow2不变。
-
 ## 停止线
 
 - 资产账本只固定建议处置，不授权清理；历史停止线在逐项prepare并取得删除授权前继续有效。候选不得直接delete、注销、搬移或purge。
@@ -69,8 +68,8 @@
 ## 下一步事项（2026-08-30）
 
 1. registration shell已以`91778f48…c438`/`c37b552e…f715`闭合`frozen`；22台全停、`Network=[]`、磁盘身份和零句柄通过。
-2. 已冻结23个VM/7个snapshot账本；17个旧VM与5个旧snapshot进入候选，当前未授权清理。
-3. 下一步repository-only实现allowlist、只读prepare与fake-runner；注册项从22台收敛到5台目标前不创建target。
+2. 已冻结23个VM/7个snapshot账本；17个旧VM与5个旧snapshot进入候选。首批4台的repository-only allowlist、只读prepare与fake-runner已闭合，仍未授权删除。
+3. 下一步只对`first-four-v1`执行一次真实只读prepare；它至多调用一次plain list和两轮`lsof`，不启动、进入、移动、克隆、注销或删除VM。只有`prepared`及manifest复核通过后才另行列出删除授权请求。
 4. 收敛后只新增一个`upgrade_quiesced` target；退休后再以一台新guest完成连续L6。P05C仍使用独立guest。
 
 ## 验证入口

@@ -1,0 +1,134 @@
+{
+  "format": "radishlex-linux-l6-asset-retirement-allowlist-v1",
+  "storage_roots": {
+    "operator": "/Users/luobo/VirtualMachines",
+    "utm-documents": "/Users/luobo/Library/Containers/com.utmapp.UTM/Data/Documents"
+  },
+  "assets": [
+    {
+      "id": "legacy-l6-e5b6da1",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "operator",
+      "relative_path": "Debian13-ARM64-L6.utm",
+      "name": "RadishLex-Debian13-ARM64-L6",
+      "uuid": "6F73F6DC-66DF-40EC-86B8-228C1FDA1195",
+      "role": "pre-receipt-failure",
+      "config_sha256": "d3d7fb4946361b0c9a87a2a0611ef9ed085b3635c4331e254f5cbe359ecf88c6",
+      "efi_sha256": "35fa4cdbbd72ba81c00da179cd4327cccaf30007eedc871d37b701c02f8dcafb",
+      "qcow2_sha256": "deff08b1da61043a838f71474d350f83998a34d8de59a42091a99005af070e22",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Snapshots/S0-clean-e5b6da1/local-snapshot.evidence.json",
+          "sha256": "50dcc48bfba7f65fce56184b2a21183f8e263611eb0f86d62cdafc6f306b1f08",
+          "mode": "0600",
+          "semantic": "snapshot-source-vm"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Handoff-e5b6da1/release-pair-e5b6da1/release-pair.evidence.json",
+          "sha256": "a9bcf35762b460a23ad9bc062611f8d5edb57e7303861bbcb99e1efb40703dfd",
+          "mode": "0644",
+          "semantic": "release-pair"
+        }
+      ]
+    },
+    {
+      "id": "legacy-l6-2fa1b8c",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "operator",
+      "relative_path": "Debian13-ARM64-L6-2fa1b8c.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-2fa1b8c",
+      "uuid": "EBF12F50-33B1-4711-B693-B57D419EAE2A",
+      "role": "pre-receipt-failure",
+      "config_sha256": "ae4807ca590815329fd251a868bcd9d088f0ce4113bf3d8968bf82c2f0192043",
+      "efi_sha256": "35fa4cdbbd72ba81c00da179cd4327cccaf30007eedc871d37b701c02f8dcafb",
+      "qcow2_sha256": "5683d1205871e21eceaa0aae63216544a0056e2cbef72b01bfb10b9f3205bec5",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Snapshots/S0-clean-2fa1b8c/local-snapshot.evidence.json",
+          "sha256": "d741d07b90b554bd77b4b2a66447fe142c95b635064bbd9aa46b04e333d23f7c",
+          "mode": "0600",
+          "semantic": "snapshot-source-vm"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Handoff-2fa1b8c/release-pair-2fa1b8c/release-pair.evidence.json",
+          "sha256": "a5a0ee0deeb48a1e82e87e0bb9eb848e118d21c83274dc2689fcc136dcb38664",
+          "mode": "0644",
+          "semantic": "release-pair"
+        }
+      ]
+    },
+    {
+      "id": "chain-mismatch-56dd4de",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-56dd4de.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-56dd4de",
+      "uuid": "A3F757B1-CE75-4F23-9509-CAD033260AA1",
+      "role": "chain-mismatch-before-operation-id",
+      "config_sha256": "61daca925e0080d0718aa4b54e1c9633b74bcef9e375bac1e8a73b95c77f9239",
+      "efi_sha256": "d32181b0867378a95ed2511e956090160407115e508b8d58ab0f16a50a3d1960",
+      "qcow2_sha256": "5afb335680bc424ae84ffd9a61c6d74acc9090acd27db9ee5754d79a8b3eb6d0",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Handoff-56dd4de/release-pair-56dd4de/release-pair.evidence.json",
+          "sha256": "70a394eae293cf95924fa250bca8daf0e11fe45c46342bc8e6f94a03db38139a",
+          "mode": "0644",
+          "semantic": "release-pair"
+        }
+      ]
+    },
+    {
+      "id": "repair-aborted-80e49ce",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-80e49ce-repair.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-80e49ce-repair",
+      "uuid": "A3022255-ED08-4C66-92D3-075A6BB93107",
+      "role": "repair-aborted-preserved",
+      "config_sha256": "584bf2b55a1145231ca2ccff06aafd7f82b3db4488e1a44346b4c8bda24f59b7",
+      "efi_sha256": "3b117deffb09523584fb3658d0af1ea1aecf47671eef6e7943472488ac28a8f0",
+      "qcow2_sha256": "adcc92fdc34ab7930ae6802bb4be866c6039b5c4cbc02f77cfb18686b826d3a4",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Repair-80e49ce-Aborted-Preserved/terminal.evidence.json",
+          "sha256": "87190852e1b3b1e77c23df9a0f76cd6431dd12b3132fa1ca3b8e83676db5881f",
+          "mode": "0600",
+          "semantic": "repair-terminal"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Repair-80e49ce-Aborted-Preserved/final-evidence.bundle.tar",
+          "sha256": "2d300ae6749074e6cc4d927ad9c079ed6fbef1b6b2be81552128baa354b2c8da",
+          "mode": "0600",
+          "semantic": "opaque-hash"
+        }
+      ]
+    }
+  ],
+  "batches": [
+    {
+      "id": "first-four-v1",
+      "asset_ids": [
+        "legacy-l6-e5b6da1",
+        "legacy-l6-2fa1b8c",
+        "chain-mismatch-56dd4de",
+        "repair-aborted-80e49ce"
+      ],
+      "accounting_gib": "37.71"
+    }
+  ]
+}
