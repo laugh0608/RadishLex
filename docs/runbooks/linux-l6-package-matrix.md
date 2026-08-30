@@ -685,6 +685,8 @@ prepare真实候选固定attempt `d75818f-upgrade-quiesced-registration-shell-mo
 
 UI Move完成后，`complete-move-once`使用新attempt `d75818f-upgrade-quiesced-registration-shell-move-complete-20260830-v1`和新根`/Users/luobo/VirtualMachines/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-Move-Complete-Control-v1`递归绑定prepare；默认路径必须absent，授权路径必须保留同一name/UUID及create后原始config/EFI/qcow2 identity，且新`/Users/luobo/VirtualMachines/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-Evidence-v5`仍absent。通过同device、零句柄和首次22台全停清单后才允许一次committed typed update；第二次list、最终`Network=[]`配置、未变EFI/qcow2、terminal零句柄、S2/default/外部路径终态全部通过后，才写单成员壳体manifest和20项complete manifest并闭合`frozen`。complete任何异常均保留`state-indeterminate`，不delete、retry、rollback、start、clone或进入guest。8项定向回归、既有registration shell/clone前门回归及完整L6合同通过；本批没有执行真实prepare、UTM query、GUI Move、update或其他系统动作。
 
+用户授权真实prepare后，执行前先以`fe8b4b6`修正了授权证据语义：请求只记录“允许输出下一外部动作提示”，不把尚未授权的UI Move写成已授权；8项定向与完整L6门禁通过。随后唯一v1调用误把expected HEAD写成`fe8b4b6b1a41c0cbeae3b43e091ca1101a53aeb1`，实际clean HEAD为`fe8b4b6ea3cd21e0a16236f941cff0b9fcbbfe93`，故控制在`binding-preflight:repository-head-drift`首门闭合`precondition-rejected`。create-new v1根只含request/terminal两个manifest成员，SHA-256 `4d32f219f1947bb56cb3e4ddd24aee01741f80a4bfbbaa73192fe3b329002750`，逐项hash、`0700`/`0600`、owner `501:20`与single-link复核通过；inventory query、UI Move、update、start、clone、delete/retry、guest和transaction均为0。v1根冻结，不覆盖、删除或复用；下一候选改用attempt `d75818f-upgrade-quiesced-registration-shell-move-prepare-20260830-v2`和新根`/Users/luobo/VirtualMachines/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-Move-Prepare-Control-v2`，须重绑届时精确clean HEAD并重新授权，UI Move与complete继续关闭。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
