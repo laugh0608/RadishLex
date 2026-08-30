@@ -69,7 +69,7 @@
 
 1. registration shell已以`91778f48…c438`/`c37b552e…f715`闭合`frozen`；22台全停、`Network=[]`、磁盘身份和零句柄通过。
 2. 首批4台的只读prepare已闭合`prepared`：22台全停、7个证据锚点、两轮磁盘hash与两轮零句柄通过；9项manifest为`68ce05b0…f44e`，删除仍未授权。
-3. 下一步只列出`first-four-v1`的精确删除影响并请求独立授权；prepare本身不授权启动、进入、移动、克隆、注销或删除VM，也不能跨HEAD/inventory复用。
+3. 项目所有者已独立授权`first-four-v1`删除；下一步在最终clean HEAD以新控制重验prepare、全停、磁盘和句柄，再逐台至多一次delete。异常立即停止且不retry/rollback。
 4. 收敛后只新增一个`upgrade_quiesced` target；退休后再以一台新guest完成连续L6。P05C仍使用独立guest。
 
 ## 验证入口

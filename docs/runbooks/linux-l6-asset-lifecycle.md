@@ -137,6 +137,8 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 当前没有可靠的 unregister-only primitive；如果未来发现该能力，必须先做新的 repository-only 设计和独立授权，不能把 `utmctl delete` 包装成注销。
 
+2026-08-30 项目所有者明确授权执行`first-four-v1`后，新增`l6_utm_asset_retirement_delete.py`：它递归绑定9项prepare manifest与语义、clean committed HEAD、allowlist和固定storage roots，mutation前重新执行一次全停list、两轮完整asset hash与两轮零句柄。随后每台只形成一次`utmctl delete <exact-uuid>`和一次post-list，必须同时满足clean command success、精确单成员inventory delta、其余成员不变/全stopped与package absent；任何矛盾闭合`state-indeterminate`并停止，不retry、rollback、补删或继续下一台。7项fake-runner已进入默认L6门禁；此记录尚不表示真实delete已调用。
+
 ### 6.4 Snapshot quarantine 与 purge
 
 - quarantine 只允许将精确 snapshot 以同文件系统、no-replace rename 移入 create-new batch 目录；目标目录、父目录、manifest 和 S2/S3 身份必须调用前后复验；
