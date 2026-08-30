@@ -37,9 +37,10 @@
 - v4 fresh-boot分类、只读恢复资格和resume控制均已冻结；原resume仍为`state-indeterminate`。`202b64d`分开验证prior/current boot并解耦历史/successor driver，没有倒写旧attempt。
 - `f05ebd7`排除非UTM QEMU误判；v2首次result缺失后，独立deferred resolution以双份1259-byte结果与completed phase闭合transaction `completed`，21项manifest `7fcef38e…0e3d`已由`7acbbde`递归绑定。
 - clean `9485778`只发送一次正常stop，第2轮闭合21台all-stopped及目标句柄/进程absent；28项manifest `096fe01f…e133`已由`ad77c22`递归绑定。
-- `9ec3218`/`8e55189`/`2f91d2a`已固定第三个`upgrade_quiesced`的不可变S2、checkpoint/resume语义、专用registration shell创建/冻结控制、六段授权及独立clone前门；尚未形成有效专用壳体，也没有真实target。
+- `9ec3218`/`8e55189`/`2f91d2a`已固定第三个`upgrade_quiesced`的不可变S2、checkpoint/resume语义、专用registration shell创建/冻结控制、六段授权及独立clone前门；v4只形成位置不合规的默认配置部分壳，没有有效壳体证据或真实target。
 - registration shell v1-v3从clean `346191d`/`d0696b4`/`9603ab6`绑定21台全停inventory `d328e2cd…4f19`、UTM `4.7.5` build `118`及S2；普通、内联和显式`class:qemu configuration`三种record均返回`-1700`/exit 1。库存不变且package/evidence absent，14项manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`/`ae3fb81b…4a511`均闭合`failed-closed-absent`；未启动、clone、delete或进入guest。
-- v3证明显式record class仍不足。`17d10a6`已将control升为v2：最小create并校验唯一新增stopped壳后，读取typed configuration并单次update；部分壳、磁盘及inventory漂移均失败关闭。13项定向与L6/controller门禁通过；真实v4未执行，有效壳和target仍不存在。
+- v3证明显式record class仍不足。`17d10a6`已将control升为v2：最小create并校验唯一新增stopped壳后，读取typed configuration并单次update；部分壳、磁盘及inventory漂移均失败关闭。13项定向与L6/controller门禁通过。
+- clean `7ab855b`的唯一v4最小create返回UUID `0BAA7355…52A7`，postcreate为22台全停；预期`/Users/luobo/VirtualMachines/…v1.utm`仍absent，故update为0并闭合`state-indeterminate`，14项manifest为`70251467…fb04`。离线定位到UTM默认`Documents`中的同名默认配置部分壳且无打开句柄；位置不合规，shell evidence与真实target仍不存在，精确身份见runbook。
 
 ## 停止线
 
@@ -57,16 +58,17 @@
 - 旧boot、恢复、fresh两阶段及结果消歧根全部冻结，不复跑、覆盖、补拉或清理。`recovery-qualified`只证明只读恢复前门，不授权resume；无新授权不得query/start、resume、retry/stop/quit。
 - fresh-boot resume attempt `d75818f-v4-install-artifacts-staged-fresh-boot-resume-20260827-v1`与host/guest根已消费并冻结；不得补拉、复跑、重建secret、retry/cleanup、再次resume/postflight或据`state-indeterminate`修补现场。调用后不得无授权追加query/start/stop/quit。
 - transaction-state v1/v2、deferred-result及terminal-stop根冻结。21项结果只证明该boot的transaction为`completed`，28项stop结果只证明同一授权调用内目标已正常停止并完成host交叉检查；不得补拉、复跑probe、query/start/stop、resume/dpkg/retry/repair/cleanup或改写现场。
-- registration shell v1-v3 control根与manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`/`ae3fb81b…4a511`冻结；不得覆盖、复用或解释为已创建。v2两阶段control虽已实现，但真实v4仍须独立系统授权，不得据repository-only结果重试、查询、delete或清理。
+- registration shell v1-v3 control根与manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`/`ae3fb81b…4a511`冻结；不得覆盖、复用或解释为已创建。
+- v4 control根、UUID `0BAA7355…52A7`及默认`Documents`内的部分壳冻结；不得更新、移动、删除、启动、clone、重试、补写evidence或追加query。授权目录package/evidence仍absent，位置合同与壳体manifest均未通过。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步事项（2026-08-30）
 
-1. `17d10a6`已闭合两阶段repository-only合同、13项失败矩阵、UTM 4.7.5 SDEF binding及AppleScript编译/反编译；固定一次`make`、typed `CoFg`与一次`UTMcUpDt`，无start/delete/duplicate，不代表真实创建成功。
-2. 下一attempt固定`d75818f-upgrade-quiesced-registration-shell-20260830-v4`；`/Users/luobo/VirtualMachines/`下对应`…-Control-v4`、`…-Evidence-v4`及既定`…-v1.utm`均absent。调用前仍须重绑最终clean HEAD、全停inventory、S2和UTM。
-3. v4尚未系统授权：最多一次minimal create、条件式stopped update和四次plain list；create后异常均冻结`state-indeterminate`，update失败可保留默认网络部分壳，禁止自动补救、guest与transaction。壳体manifest闭合后才另行授权clone及后续五段。
+1. v4已消费：create/list为`1/2`、update为0；UTM落盘到默认`Documents`，control在update前失败关闭，未进入clone、guest或transaction。
+2. UTM 4.7.5源码确认create/clone固定默认目录；受支持的move仅由UI暴露，SDEF的export/import不能替代。
+3. 下一步先在仓库固定“一次UI Move+路径/UUID/磁盘绑定+条件式update”控制；真实move/update/query另行授权，壳体manifest形成前关闭后续阶段。
 
 ## 验证入口
 
