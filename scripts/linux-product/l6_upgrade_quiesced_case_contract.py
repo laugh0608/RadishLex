@@ -141,6 +141,12 @@ EXPECTED_CLONE_FRONT_DOOR = {
     },
     "registration_shell": {
         "dedicated_case_evidence_required": True,
+        "location_policy": {
+            "authoritative_root": "operator-asset-root",
+            "default_storage_partial_is_clone_source": False,
+            "move_before_configuration_update": True,
+            "move_primitive": "utm-native-ui",
+        },
         "may_reuse_frozen_crash_clone": False,
         "may_reuse_frozen_transaction_terminal": False,
         "network": [],

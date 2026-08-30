@@ -50,6 +50,17 @@ class LinuxL6UpgradeQuiescedCaseContractTests(unittest.TestCase):
                 "may_reuse_frozen_transaction_terminal"
             ]
         )
+        self.assertEqual(
+            self.contract["clone_front_door"]["registration_shell"][
+                "location_policy"
+            ],
+            {
+                "authoritative_root": "operator-asset-root",
+                "default_storage_partial_is_clone_source": False,
+                "move_before_configuration_update": True,
+                "move_primitive": "utm-native-ui",
+            },
+        )
 
     def test_snapshot_or_installed_source_drift_is_rejected(self) -> None:
         for field, value in (
@@ -122,6 +133,21 @@ class LinuxL6UpgradeQuiescedCaseContractTests(unittest.TestCase):
         contract["clone_front_door"]["registration_shell"][
             "may_reuse_frozen_transaction_terminal"
         ] = True
+
+        with self.assertRaises(
+            case_contract.UpgradeQuiescedCaseContractError
+        ):
+            case_contract.validate_upgrade_quiesced_case_contract(
+                contract, self.matrix, self.release_pair
+            )
+
+    def test_registration_shell_cannot_use_default_storage_as_source(
+        self,
+    ) -> None:
+        contract = copy.deepcopy(self.contract)
+        contract["clone_front_door"]["registration_shell"][
+            "location_policy"
+        ]["default_storage_partial_is_clone_source"] = True
 
         with self.assertRaises(
             case_contract.UpgradeQuiescedCaseContractError

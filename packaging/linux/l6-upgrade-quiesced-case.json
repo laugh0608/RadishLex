@@ -61,6 +61,12 @@
     },
     "registration_shell": {
       "dedicated_case_evidence_required": true,
+      "location_policy": {
+        "authoritative_root": "operator-asset-root",
+        "default_storage_partial_is_clone_source": false,
+        "move_before_configuration_update": true,
+        "move_primitive": "utm-native-ui"
+      },
       "may_reuse_frozen_crash_clone": false,
       "may_reuse_frozen_transaction_terminal": false,
       "network": [],
