@@ -661,6 +661,10 @@ create-new host根含28个manifest成员，SHA-256 `096fe01f5f082a4f494ddf6219b1
 
 离线对照UTM 4.7.5 SDEF、官方create示例、`UTMScriptingCreateCommand`与`UTMScriptingConfigImpl`后，根因边界收敛为传入configuration仍是默认`record` class，而create参数要求`qemu configuration`或`apple configuration`；问题发生在UTM处理record字段之前。`1b94b5f`保留一次`make`及全部禁止动作，为内联record显式加入`class:qemu configuration`，并由`osacompile`确认编码为SDEF `QeCf`；10项定向、默认L6、controller、package transaction与startup门禁通过。该修正尚未真实执行，不将编译或源码分析表述为创建成功。下一次仅可在独立授权下使用attempt `d75818f-upgrade-quiesced-registration-shell-20260830-v3`、absent control/evidence根`/Users/luobo/VirtualMachines/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-Control-v3`与`/Users/luobo/VirtualMachines/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-Evidence-v3`、同一absent `.utm` package；v1/v2根不得覆盖、复用或清理，clone及后续五段仍不在该范围。
 
+用户独立授权v3后，从clean `9603ab6`执行唯一attempt `d75818f-upgrade-quiesced-registration-shell-20260830-v3`。binding重新固定S2、UTM `4.7.5` build `118`/SDEF、显式class AppleScript `4aad56cb…04dd`、21台全stopped inventory `d328e2cd…4f19`及三个absent路径；source零句柄、同device和precreate门通过。唯一create未超时、exit 1，stderr仍为`-1700`，且错误值已显示`class:qemu configuration`；唯一postcreate list及canonical hash不变，package/evidence absent，因此闭合`failed-closed-absent`。v3 control根14项manifest SHA-256 `ae3fb81bfc4fd0b790f1d7254da8f48c191c575544d4466b9fe1619addb4a511`逐项通过，根/文件为`0700`/`0600`、owner `501:20`、single-link且零xattr；create/list为`1/2`，clone/start/delete/retry、guest/file、operation/transaction为0，调用后未追加UTM查询。
+
+v3证明内联和显式record class都不足以让包含全部字段的configuration通过UTM联合record coercion，不再以新attempt逐字段试探。官方脚本接口另有确定路径：先用文档中的最小QEMU配置create，再读取VM返回的typed configuration、在stopped状态修改并`update configuration`。该替代会把真实动作面从一次create扩大为一次create加一次update；create成功而update失败时，可能留下一个stopped但带默认shared network的部分壳体，必须冻结为`state-indeterminate`且仍不得自动delete/retry。故v4 attempt/root尚未定义，须先单独批准该风险和动作面，再实现repository-only控制、调用计数、部分创建证据及回归；真实v4、clone及后续五段继续关闭。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：

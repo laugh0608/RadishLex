@@ -38,8 +38,8 @@
 - `f05ebd7`排除非UTM QEMU误判；v2首次result缺失后，独立deferred resolution以双份1259-byte结果与completed phase闭合transaction `completed`，21项manifest `7fcef38e…0e3d`已由`7acbbde`递归绑定。
 - clean `9485778`只发送一次正常stop，第2轮闭合21台all-stopped及目标句柄/进程absent；28项manifest `096fe01f…e133`已由`ad77c22`递归绑定。
 - `9ec3218`/`8e55189`/`2f91d2a`已固定第三个`upgrade_quiesced`的不可变S2、checkpoint/resume语义、专用registration shell创建/冻结控制、六段授权及独立clone前门；尚未形成有效专用壳体，也没有真实target。
-- registration shell v1/v2从clean `346191d`/`d0696b4`绑定21台全停inventory `d328e2cd…4f19`、UTM `4.7.5` build `118`及S2；两次唯一create均因普通record无法转换为`qemu configuration`返回`-1700`/exit 1。库存不变且package/evidence absent，14项manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`均闭合`failed-closed-absent`；未启动、clone、delete或进入guest。
-- `1b94b5f`已显式绑定`class:qemu configuration`并通过完整`osacompile`与相关回归；尚未真实创建，专用壳和target仍不存在。
+- registration shell v1-v3从clean `346191d`/`d0696b4`/`9603ab6`绑定21台全停inventory `d328e2cd…4f19`、UTM `4.7.5` build `118`及S2；普通、内联和显式`class:qemu configuration`三种record均返回`-1700`/exit 1。库存不变且package/evidence absent，14项manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`/`ae3fb81b…4a511`均闭合`failed-closed-absent`；未启动、clone、delete或进入guest。
+- v3证明`1b94b5f`的显式record class仍不足；有效专用壳和target不存在，未批准改变为“最小create后读取并update typed configuration”的两阶段动作面。
 
 ## 停止线
 
@@ -57,16 +57,16 @@
 - 旧boot、恢复、fresh两阶段及结果消歧根全部冻结，不复跑、覆盖、补拉或清理。`recovery-qualified`只证明只读恢复前门，不授权resume；无新授权不得query/start、resume、retry/stop/quit。
 - fresh-boot resume attempt `d75818f-v4-install-artifacts-staged-fresh-boot-resume-20260827-v1`与host/guest根已消费并冻结；不得补拉、复跑、重建secret、retry/cleanup、再次resume/postflight或据`state-indeterminate`修补现场。调用后不得无授权追加query/start/stop/quit。
 - transaction-state v1/v2、deferred-result及terminal-stop根冻结。21项结果只证明该boot的transaction为`completed`，28项stop结果只证明同一授权调用内目标已正常停止并完成host交叉检查；不得补拉、复跑probe、query/start/stop、resume/dpkg/retry/repair/cleanup或改写现场。
-- registration shell v1/v2 control根与manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`冻结；不得覆盖、复用或解释为已创建。真实重试须使用新attempt/root并重新授权。
+- registration shell v1-v3 control根与manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`/`ae3fb81b…4a511`冻结；不得覆盖、复用或解释为已创建。两阶段合同批准并实现前不得再试。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步事项（2026-08-30）
 
-1. v2已闭合`failed-closed-absent`并冻结；`1b94b5f`显式绑定AppleScript `qemu configuration` record class，编译和repository-only回归通过，但不倒推真实create成功。
-2. 下一次仅可使用新attempt `d75818f-upgrade-quiesced-registration-shell-20260830-v3`、absent control root `/Users/luobo/VirtualMachines/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-Control-v3`、evidence root `/Users/luobo/VirtualMachines/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-Evidence-v3`及同一absent `.utm` package；调用前重绑最终clean HEAD、21台全停inventory、S2和UTM，并请求独立授权。
-3. v3授权面仍只允许S2零句柄检查、precreate/postcreate/terminal三次plain `utmctl list`及一次committed AppleScript `make new virtual machine`；不含status/start/clone/delete、guest、dpkg、自动重试或清理。只有单成员壳体manifest闭合后才另行授权真实clone；后续start、input-preflight、crash、resume与terminal-stop继续逐段关闭。
+1. v3已闭合`failed-closed-absent`并冻结；显式`qemu configuration` class仍触发同一联合record coercion错误，不继续堆叠单次create语法试探。
+2. 下一步先确认是否把壳体合同改为同一脚本内“官方最小create、读取typed configuration、stopped update一次、再严格校验”；该方案会新增一次configuration update，且update失败时可能冻结一个stopped、默认shared-network的部分壳体，须先批准风险和动作面再实现repository-only控制。
+3. v4 attempt/root尚未定义或授权；不得沿用v3授权重试、查询、delete或清理。只有专用壳体单成员manifest闭合后才另行授权真实clone；后续start、input-preflight、crash、resume与terminal-stop继续逐段关闭。
 
 ## 验证入口
 
