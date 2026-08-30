@@ -38,9 +38,9 @@
 - `f05ebd7`排除非UTM QEMU误判；v2首次result缺失后，独立deferred resolution以双份1259-byte结果与completed phase闭合transaction `completed`，21项manifest `7fcef38e…0e3d`已由`7acbbde`递归绑定。
 - clean `9485778`只发送一次正常stop，第2轮闭合21台all-stopped及目标句柄/进程absent；28项manifest `096fe01f…e133`已由`ad77c22`递归绑定。
 - `9ec3218`/`8e55189`/`2f91d2a`已固定第三个`upgrade_quiesced`的不可变S2、checkpoint/resume语义、专用registration shell创建/冻结控制、六段授权及独立clone前门；v4只形成位置不合规的默认配置部分壳，没有有效壳体证据或真实target。
-- registration shell v1-v3从clean `346191d`/`d0696b4`/`9603ab6`绑定21台全停inventory `d328e2cd…4f19`、UTM `4.7.5` build `118`及S2；普通、内联和显式`class:qemu configuration`三种record均返回`-1700`/exit 1。库存不变且package/evidence absent，14项manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`/`ae3fb81b…4a511`均闭合`failed-closed-absent`；未启动、clone、delete或进入guest。
-- v3证明显式record class仍不足。`17d10a6`已将control升为v2：最小create并校验唯一新增stopped壳后，读取typed configuration并单次update；部分壳、磁盘及inventory漂移均失败关闭。13项定向与L6/controller门禁通过。
-- clean `7ab855b`的唯一v4最小create返回UUID `0BAA7355…52A7`，postcreate为22台全停；预期`/Users/luobo/VirtualMachines/…v1.utm`仍absent，故update为0并闭合`state-indeterminate`，14项manifest为`70251467…fb04`。离线定位到UTM默认`Documents`中的同名默认配置部分壳且无打开句柄；位置不合规，shell evidence与真实target仍不存在，精确身份见runbook。
+- registration shell v1-v3三种configuration record均以`-1700`失败关闭且package/evidence absent；三个14项manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`/`ae3fb81b…4a511`冻结。`17d10a6`改为最小create后typed update并通过13项回归。
+- clean `7ab855b`的唯一v4最小create返回UUID `0BAA7355…52A7`及22台全停inventory；授权路径absent使update为0，14项manifest `70251467…fb04`闭合`state-indeterminate`。默认`Documents`中的同名部分壳无句柄但位置不合规，shell evidence与真实target仍不存在。
+- `9300ed7`闭合repository-only原生Move恢复：15项prepare只绑定冻结v4、默认部分壳、目标absent、同device、零句柄及一次全停清单；UI Move保持外部独立动作，20项complete仅在默认路径absent且授权路径三文件身份不变后执行一次typed update并冻结新壳体证据。8项定向及完整L6门禁通过，尚未执行真实prepare、Move、update或query。
 
 ## 停止线
 
@@ -66,9 +66,9 @@
 
 ## 下一步事项（2026-08-30）
 
-1. v4已消费：create/list为`1/2`、update为0；UTM落盘到默认`Documents`，control在update前失败关闭，未进入clone、guest或transaction。
-2. UTM 4.7.5源码确认create/clone固定默认目录；受支持的move仅由UI暴露，SDEF的export/import不能替代。
-3. 下一步先在仓库固定“一次UI Move+路径/UUID/磁盘绑定+条件式update”控制；真实move/update/query另行授权，壳体manifest形成前关闭后续阶段。
+1. `9300ed7`已固定prepare/UI Move/complete边界；create/clone固定默认目录，SDEF export/import不能替代UTM原生UI Move。
+2. 下一步只单独授权一次真实prepare：离线递归绑定v4并执行一次plain list，预期形成`move-ready`；不执行GUI Move、update、start、clone、guest或transaction。
+3. prepare冻结后再分别授权一次UTM UI Move与complete；complete最多两次list、一次stopped typed update，壳体manifest形成前关闭真实clone及后续五段。
 
 ## 验证入口
 
@@ -90,7 +90,7 @@
 git diff --check
 ```
 
-上述合成入口覆盖现有L6 host/guest控制、结果binding、checkpoint/resume、只读transaction-state resolution、terminal stop，以及`upgrade_quiesced` case、专用registration shell创建/冻结控制与clone前门，但不替代实机。原resume仍冻结为`state-indeterminate`，独立只读结果已闭合`completed`且同一VM已正常停止；其余六个crash、连续L6与发布未闭合。
+上述合成入口覆盖现有L6 host/guest控制、结果binding、checkpoint/resume、只读transaction-state resolution、terminal stop，以及`upgrade_quiesced` case、registration shell创建/Move恢复与clone前门，但不替代实机。其余六个crash、连续L6与发布未闭合。
 
 ## 阅读索引
 
