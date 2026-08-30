@@ -33,6 +33,11 @@ class FakeRunner:
         create_exit_code: int = 0,
         create_stderr: bytes = b"",
         create_stdout: bytes | None = None,
+        update_lands: bool = True,
+        update_exit_code: int = 0,
+        update_stderr: bytes = b"",
+        update_stdout: bytes | None = None,
+        update_disk_drift: bool = False,
         shell_network: object = None,
         terminal_inventory_drift: bool = False,
     ) -> None:
@@ -47,6 +52,15 @@ class FakeRunner:
             if create_stdout is None
             else create_stdout
         )
+        self.update_lands = update_lands
+        self.update_exit_code = update_exit_code
+        self.update_stderr = update_stderr
+        self.update_stdout = (
+            f"{SHELL_UUID}\n".encode("ascii")
+            if update_stdout is None
+            else update_stdout
+        )
+        self.update_disk_drift = update_disk_drift
         self.shell_network = [] if shell_network is None else shell_network
         self.terminal_inventory_drift = terminal_inventory_drift
         self.calls: list[tuple[str, ...]] = []
@@ -67,7 +81,10 @@ class FakeRunner:
             return observation(argv, exit_code=1)
         if argv == ("utmctl", "list"):
             self.list_calls += 1
-            if self.list_calls == 1 or not self.request.registration_shell_package_path.exists():
+            if (
+                self.list_calls == 1
+                or not self.request.registration_shell_package_path.exists()
+            ):
                 return observation(
                     argv,
                     stdout=baseline_list(
@@ -82,7 +99,7 @@ class FakeRunner:
                     peer_status=(
                         "started"
                         if self.terminal_inventory_drift
-                        and self.list_calls >= 3
+                        and self.list_calls >= 4
                         else "stopped"
                     )
                 ),
@@ -94,8 +111,8 @@ class FakeRunner:
                     mode=0o755,
                     name=self.request.registration_shell_name,
                     vm_uuid=SHELL_UUID,
-                    network=self.shell_network,
-                    notes=bindings.REQUIRED_SHELL_NOTES,
+                    network=[{"Mode": "Shared"}],
+                    notes="",
                     registration_shell=True,
                 )
             return observation(
@@ -103,6 +120,29 @@ class FakeRunner:
                 exit_code=self.create_exit_code,
                 stdout=self.create_stdout,
                 stderr=self.create_stderr,
+            )
+        if argv == control._update_argv(self.request, SHELL_UUID):
+            if self.update_lands:
+                make_bundle(
+                    self.request.registration_shell_package_path,
+                    mode=0o755,
+                    name=self.request.registration_shell_name,
+                    vm_uuid=SHELL_UUID,
+                    network=self.shell_network,
+                    notes=bindings.REQUIRED_SHELL_NOTES,
+                    registration_shell=True,
+                )
+                if self.update_disk_drift:
+                    (
+                        self.request.registration_shell_package_path
+                        / "Data"
+                        / QCOW2_NAME
+                    ).write_bytes(b"synthetic-update-disk-drift")
+            return observation(
+                argv,
+                exit_code=self.update_exit_code,
+                stdout=self.update_stdout,
+                stderr=self.update_stderr,
             )
         raise AssertionError(f"unexpected command: {argv}")
 
@@ -160,11 +200,16 @@ class LinuxL6UpgradeQuiescedRegistrationShellTests(unittest.TestCase):
         self.assertEqual(result.outcome, "frozen")
         self.assertEqual(result.exit_code, control.EXIT_FROZEN)
         self.assertEqual(result.create_invocations, 1)
+        self.assertEqual(result.update_invocations, 1)
         self.assertEqual(result.registration_shell_uuid, SHELL_UUID)
         self.assertEqual(
             runner.calls.count(control._create_argv(request)), 1
         )
-        self.assertEqual(runner.calls.count(("utmctl", "list")), 3)
+        self.assertEqual(
+            runner.calls.count(control._update_argv(request, SHELL_UUID)),
+            1,
+        )
+        self.assertEqual(runner.calls.count(("utmctl", "list")), 4)
         self.assertFalse(
             any(
                 call[:2]
@@ -181,6 +226,13 @@ class LinuxL6UpgradeQuiescedRegistrationShellTests(unittest.TestCase):
             request, SHELL_UUID
         )
         self.assertEqual(shell.network, [])
+        self.assertEqual(
+            read_json(
+                request.output_root
+                / "registration-shell-bundle-preupdate.json"
+            )["network"],
+            [{"Mode": "Shared"}],
+        )
         self.assertEqual(
             read_json(self.shell_evidence / "registration-shell.json"),
             bindings.expected_shell_evidence(request, shell),
@@ -205,6 +257,7 @@ class LinuxL6UpgradeQuiescedRegistrationShellTests(unittest.TestCase):
         self.assertEqual(terminal["clone_invocations"], 0)
         self.assertEqual(terminal["guest_exec_invocations"], 0)
         self.assertEqual(terminal["transaction"], "not-performed")
+        self.assertEqual(terminal["update_invocations"], 1)
         assert_manifest_valid(request.output_root)
 
     def test_running_peer_rejects_before_create(self) -> None:
@@ -217,6 +270,7 @@ class LinuxL6UpgradeQuiescedRegistrationShellTests(unittest.TestCase):
 
         self.assertEqual(result.outcome, "precondition-rejected")
         self.assertEqual(result.create_invocations, 0)
+        self.assertEqual(result.update_invocations, 0)
         self.assertNotIn(control._create_argv(request), runner.calls)
         self.assertFalse(self.shell.exists())
 
@@ -230,6 +284,7 @@ class LinuxL6UpgradeQuiescedRegistrationShellTests(unittest.TestCase):
 
         self.assertEqual(result.outcome, "precondition-rejected")
         self.assertEqual(result.create_invocations, 0)
+        self.assertEqual(result.update_invocations, 0)
         self.assertNotIn(control._create_argv(request), runner.calls)
 
     def test_existing_shell_package_rejects_without_host_command(self) -> None:
@@ -268,6 +323,7 @@ class LinuxL6UpgradeQuiescedRegistrationShellTests(unittest.TestCase):
 
         self.assertEqual(result.outcome, "failed-closed-absent")
         self.assertEqual(result.create_invocations, 1)
+        self.assertEqual(result.update_invocations, 0)
         self.assertFalse(self.shell.exists())
         self.assertFalse(self.shell_evidence.exists())
 
@@ -282,6 +338,7 @@ class LinuxL6UpgradeQuiescedRegistrationShellTests(unittest.TestCase):
         )
 
         self.assertEqual(result.outcome, "state-indeterminate")
+        self.assertEqual(result.update_invocations, 1)
         self.assertTrue(self.shell.exists())
         self.assertFalse(self.shell_evidence.exists())
         self.assertFalse(
@@ -297,6 +354,7 @@ class LinuxL6UpgradeQuiescedRegistrationShellTests(unittest.TestCase):
         )
 
         self.assertEqual(result.outcome, "state-indeterminate")
+        self.assertEqual(result.update_invocations, 0)
         self.assertTrue(self.shell.exists())
         self.assertFalse(self.shell_evidence.exists())
 
@@ -309,7 +367,61 @@ class LinuxL6UpgradeQuiescedRegistrationShellTests(unittest.TestCase):
         )
 
         self.assertEqual(result.outcome, "state-indeterminate")
+        self.assertEqual(result.update_invocations, 1)
         self.assertFalse(self.shell_evidence.exists())
+
+    def test_update_failure_freezes_partial_shell_without_cleanup(self) -> None:
+        request = self.request(attempt_id="update-failure")
+        runner = FakeRunner(
+            request,
+            update_lands=False,
+            update_exit_code=1,
+            update_stdout=b"",
+            update_stderr=b"synthetic update failure\n",
+        )
+
+        result = control.run_registration_shell_once(
+            request, runner=runner, binding_validator=valid_binding
+        )
+
+        self.assertEqual(result.outcome, "state-indeterminate")
+        self.assertEqual(result.create_invocations, 1)
+        self.assertEqual(result.update_invocations, 1)
+        self.assertTrue(self.shell.exists())
+        self.assertFalse(self.shell_evidence.exists())
+        postupdate = read_json(
+            request.output_root
+            / "registration-shell-bundle-postupdate-observation.json"
+        )
+        self.assertEqual(postupdate["state"], "readable")
+        self.assertEqual(postupdate["network"], [{"Mode": "Shared"}])
+        terminal = read_json(request.output_root / "terminal.json")
+        self.assertIn(
+            "update-command-not-silent-success", terminal["reason"]
+        )
+        self.assertEqual(terminal["automatic_delete"], "not-performed")
+        self.assertEqual(terminal["automatic_retry"], "not-performed")
+        self.assertFalse(
+            any(call[:2] == ("utmctl", "delete") for call in runner.calls)
+        )
+        assert_manifest_valid(request.output_root)
+
+    def test_update_disk_drift_does_not_freeze_shell(self) -> None:
+        request = self.request(attempt_id="update-disk-drift")
+        runner = FakeRunner(request, update_disk_drift=True)
+
+        result = control.run_registration_shell_once(
+            request, runner=runner, binding_validator=valid_binding
+        )
+
+        self.assertEqual(result.outcome, "state-indeterminate")
+        self.assertEqual(result.update_invocations, 1)
+        self.assertFalse(self.shell_evidence.exists())
+        terminal = read_json(request.output_root / "terminal.json")
+        self.assertIn(
+            "registration-shell-disk-drift-during-update",
+            terminal["reason"],
+        )
 
     def test_missing_authorization_fails_before_output_creation(self) -> None:
         request = self.request(
@@ -325,23 +437,56 @@ class LinuxL6UpgradeQuiescedRegistrationShellTests(unittest.TestCase):
 
         self.assertFalse(request.output_root.exists())
 
-    def test_create_transport_source_is_exact_and_has_no_start(self) -> None:
+    def test_missing_update_authorization_fails_before_output_creation(
+        self,
+    ) -> None:
+        request = self.request(
+            attempt_id="missing-update-authorization",
+            authorized_one_stopped_configuration_update=False,
+        )
+
+        with self.assertRaisesRegex(
+            control.RegistrationShellError,
+            "one-stopped-configuration-update-authorization-required",
+        ):
+            control.run_registration_shell_once(request)
+
+        self.assertFalse(request.output_root.exists())
+
+    def test_configuration_transport_is_two_stage_and_has_no_start(
+        self,
+    ) -> None:
         source = (
             Path(__file__).with_name(
                 "l6_upgrade_quiesced_registration_shell.applescript"
             )
         ).read_bytes()
 
-        self.assertEqual(source, bindings.CREATE_SOURCE)
-        self.assertIn(b"make new virtual machine", source)
+        self.assertEqual(source, bindings.TRANSPORT_SOURCE)
+        self.assertEqual(source.count(b"make new virtual machine"), 1)
         self.assertIn(
-            b"configuration:{class:qemu configuration, name:shellName",
+            b"configuration:{name:shellName, architecture:\"aarch64\"",
             source,
         )
-        self.assertIn(b"network interfaces:{}", source)
-        self.assertNotIn(b"set shellConfiguration", source)
+        self.assertNotIn(b"class:qemu configuration", source)
+        self.assertIn(
+            b"set shellConfiguration to configuration of shellMachine",
+            source,
+        )
+        self.assertIn(
+            b"set network interfaces of shellConfiguration to {}", source
+        )
+        self.assertIn(
+            "set «class SrPt» of shellConfiguration to {}".encode("utf-8"),
+            source,
+        )
+        self.assertEqual(source.count(b"update configuration"), 1)
+        self.assertIn(
+            b"if status of shellMachine is not stopped", source
+        )
         self.assertNotIn(b"start shellMachine", source)
         self.assertNotIn(b"duplicate", source)
+        self.assertNotIn(b"delete", source)
 
     def request(
         self, **overrides: object
@@ -363,9 +508,11 @@ class LinuxL6UpgradeQuiescedRegistrationShellTests(unittest.TestCase):
                 clone_control.canonical_inventory_sha256(baseline)
             ),
             "create_timeout_seconds": 30,
+            "update_timeout_seconds": 30,
             "command_timeout_seconds": 5,
             "authorized_upgrade_quiesced_registration_shell": True,
             "authorized_one_create_new_registration_only_shell": True,
+            "authorized_one_stopped_configuration_update": True,
             "authorized_no_clone_start_guest_delete_retry_or_transaction": (
                 True
             ),
@@ -419,7 +566,7 @@ def make_bundle(
     registration_shell: bool,
 ) -> None:
     data = root / "Data"
-    data.mkdir(mode=mode, parents=True)
+    data.mkdir(mode=mode, parents=True, exist_ok=True)
     root.chmod(mode)
     data.chmod(mode)
     config = {
@@ -494,7 +641,7 @@ def valid_binding(
         "binding_control_sha256": "b" * 64,
         "case_contract": "validated",
         "control_sha256": "c" * 64,
-        "create_transport_sha256": "d" * 64,
+        "configuration_transport_sha256": "d" * 64,
         "expected_precreate_inventory_sha256": (
             request.expected_precreate_inventory_sha256
         ),

@@ -48,9 +48,11 @@ class RegistrationShellRequest:
     expected_vm_count: int
     expected_precreate_inventory_sha256: str
     create_timeout_seconds: int
+    update_timeout_seconds: int
     command_timeout_seconds: int
     authorized_upgrade_quiesced_registration_shell: bool
     authorized_one_create_new_registration_only_shell: bool
+    authorized_one_stopped_configuration_update: bool
     authorized_no_clone_start_guest_delete_retry_or_transaction: bool
 
     def validate(self) -> None:
@@ -143,6 +145,10 @@ class RegistrationShellRequest:
             raise RegistrationShellError(
                 "create-timeout-seconds-out-of-range"
             )
+        if not 1 <= self.update_timeout_seconds <= 300:
+            raise RegistrationShellError(
+                "update-timeout-seconds-out-of-range"
+            )
         if not 1 <= self.command_timeout_seconds <= 60:
             raise RegistrationShellError(
                 "command-timeout-seconds-out-of-range"
@@ -155,6 +161,10 @@ class RegistrationShellRequest:
             (
                 self.authorized_one_create_new_registration_only_shell,
                 "one-create-new-registration-only-shell-authorization-required",
+            ),
+            (
+                self.authorized_one_stopped_configuration_update,
+                "one-stopped-configuration-update-authorization-required",
             ),
             (
                 self.authorized_no_clone_start_guest_delete_retry_or_transaction,
@@ -171,10 +181,12 @@ class RegistrationShellRequest:
             "authorization": {
                 "no_clone_start_guest_delete_retry_or_transaction": True,
                 "one_create_new_registration_only_shell": True,
+                "one_stopped_configuration_update": True,
                 "upgrade_quiesced_registration_shell": True,
             },
             "command_timeout_seconds": self.command_timeout_seconds,
             "create_timeout_seconds": self.create_timeout_seconds,
+            "update_timeout_seconds": self.update_timeout_seconds,
             "expected_precreate_inventory_sha256": (
                 self.expected_precreate_inventory_sha256
             ),
@@ -208,6 +220,7 @@ class RegistrationShellResult:
     evidence_root: Path
     manifest_sha256: str
     create_invocations: int
+    update_invocations: int
     registration_shell_uuid: str | None
     registration_shell_manifest_sha256: str | None
 
@@ -242,7 +255,9 @@ def run_registration_shell_once(
     exit_code = EXIT_PRECONDITION_REJECTED
     reason = "not-run"
     create_invocations = 0
+    update_invocations = 0
     create_observation: clone_control.CommandObservation | None = None
+    update_observation: clone_control.CommandObservation | None = None
     shell_uuid: str | None = None
     shell_manifest_sha256: str | None = None
     shell_package_state = "not-observed"
@@ -372,13 +387,80 @@ def run_registration_shell_once(
                 "registration-shell-package-not-created"
             )
 
-        stage = "registration-shell-bundle-postcreate"
+        stage = "registration-shell-bundle-preupdate"
+        partial_shell = bindings.validate_registration_shell_before_update(
+            request, shell_uuid
+        )
+        writer.write_json(
+            "registration-shell-bundle-preupdate.json",
+            partial_shell.as_json(),
+        )
+
+        stage = "update-registration-shell-configuration"
+        update_invocations = 1
+        update_observation = command_runner.run(
+            _update_argv(request, shell_uuid),
+            request.update_timeout_seconds,
+        )
+        writer.write_json(
+            "update-registration-shell-configuration.json",
+            update_observation.as_json(),
+        )
+
+        stage = "utmctl-list-postupdate"
+        postupdate_list = command_runner.run(
+            ("utmctl", "list"), request.command_timeout_seconds
+        )
+        writer.write_json(
+            "utmctl-list-postupdate.json", postupdate_list.as_json()
+        )
+        postupdate_vms = clone_control.parse_utmctl_list(postupdate_list)
+        writer.write_json(
+            "inventory-postupdate.json", _inventory_evidence(postupdate_vms)
+        )
+
+        stage = "registration-shell-package-postupdate"
+        shell_postupdate = clone_control.observe_target_package(
+            request.registration_shell_package_path
+        )
+        shell_package_state = str(shell_postupdate["state"])
+        writer.write_json(
+            "registration-shell-package-postupdate.json", shell_postupdate
+        )
+        writer.write_json(
+            "registration-shell-bundle-postupdate-observation.json",
+            _observe_shell_bundle(request.registration_shell_package_path),
+        )
+
+        stage = "update-registration-shell-configuration-result"
+        updated_uuid = _parse_updated_uuid(update_observation)
+        if updated_uuid != shell_uuid:
+            raise RegistrationShellError(
+                "update-command-uuid-differs-from-created-shell"
+            )
+        _validate_created_inventory(
+            precreate_vms, postupdate_vms, request, shell_uuid
+        )
+        if shell_package_state != "directory":
+            raise RegistrationShellError(
+                "registration-shell-package-not-preserved-after-update"
+            )
+
+        stage = "registration-shell-bundle-postupdate"
         shell = bindings.validate_registration_shell_bundle(
             request, shell_uuid
         )
         writer.write_json(
-            "registration-shell-bundle-postcreate.json", shell.as_json()
+            "registration-shell-bundle-postupdate.json", shell.as_json()
         )
+        if (
+            shell.efi_sha256 != partial_shell.efi_sha256
+            or shell.qcow2_name != partial_shell.qcow2_name
+            or shell.qcow2_sha256 != partial_shell.qcow2_sha256
+        ):
+            raise RegistrationShellError(
+                "registration-shell-disk-drift-during-update"
+            )
         if source.efi_path.stat().st_dev != shell.efi_path.stat().st_dev:
             raise RegistrationShellError(
                 "source-and-registration-shell-not-on-same-device"
@@ -415,7 +497,7 @@ def run_registration_shell_once(
             "inventory-terminal.json", _inventory_evidence(terminal_vms)
         )
         if clone_control.canonical_inventory_sha256(terminal_vms) != (
-            clone_control.canonical_inventory_sha256(postcreate_vms)
+            clone_control.canonical_inventory_sha256(postupdate_vms)
         ):
             raise RegistrationShellError("terminal-inventory-drift")
         _validate_created_inventory(
@@ -435,7 +517,7 @@ def run_registration_shell_once(
         outcome = "frozen"
         exit_code = EXIT_FROZEN
         reason = (
-            "create-new-registered-stopped-networkless-shell-frozen"
+            "create-new-then-update-stopped-networkless-shell-frozen"
         )
     except _TerminalOutcome:
         pass
@@ -476,6 +558,13 @@ def run_registration_shell_once(
         "registration_shell_package_state": shell_package_state,
         "registration_shell_uuid": shell_uuid,
         "transaction": "not-performed",
+        "update_command_exit_code": (
+            update_observation.exit_code if update_observation else None
+        ),
+        "update_command_timed_out": (
+            update_observation.timed_out if update_observation else False
+        ),
+        "update_invocations": update_invocations,
     }
     writer.write_json("terminal.json", terminal)
     manifest_sha256 = writer.write_manifest()
@@ -485,6 +574,7 @@ def run_registration_shell_once(
         evidence_root=request.output_root,
         manifest_sha256=manifest_sha256,
         create_invocations=create_invocations,
+        update_invocations=update_invocations,
         registration_shell_uuid=shell_uuid,
         registration_shell_manifest_sha256=shell_manifest_sha256,
     )
@@ -559,23 +649,38 @@ def _create_failed_closed_absent(
 def _parse_created_uuid(
     observation: clone_control.CommandObservation,
 ) -> str:
+    return _parse_command_uuid(observation, "create")
+
+
+def _parse_updated_uuid(
+    observation: clone_control.CommandObservation,
+) -> str:
+    return _parse_command_uuid(observation, "update")
+
+
+def _parse_command_uuid(
+    observation: clone_control.CommandObservation,
+    action: str,
+) -> str:
     if (
         observation.timed_out
         or observation.exit_code != 0
         or observation.stderr.total_bytes != 0
         or observation.stdout.truncated
     ):
-        raise RegistrationShellError("create-command-not-silent-success")
+        raise RegistrationShellError(
+            f"{action}-command-not-silent-success"
+        )
     try:
         value = observation.stdout.prefix.decode("ascii").strip()
         canonical = str(uuid.UUID(value)).upper()
     except (UnicodeDecodeError, ValueError) as exc:
         raise RegistrationShellError(
-            "create-command-uuid-output-invalid"
+            f"{action}-command-uuid-output-invalid"
         ) from exc
     if value != canonical:
         raise RegistrationShellError(
-            "create-command-uuid-output-not-canonical"
+            f"{action}-command-uuid-output-not-canonical"
         )
     return canonical
 
@@ -598,9 +703,39 @@ def _create_argv(
 ) -> tuple[str, ...]:
     return (
         OSASCRIPT_PATH,
-        str(request.repository_root / bindings.CREATE_RELATIVE_PATH),
+        str(request.repository_root / bindings.TRANSPORT_RELATIVE_PATH),
+        "create",
         request.registration_shell_name,
     )
+
+
+def _update_argv(
+    request: RegistrationShellRequest,
+    shell_uuid: str,
+) -> tuple[str, ...]:
+    return (
+        OSASCRIPT_PATH,
+        str(request.repository_root / bindings.TRANSPORT_RELATIVE_PATH),
+        "update",
+        shell_uuid,
+        request.registration_shell_name,
+    )
+
+
+def _observe_shell_bundle(root: Path) -> dict[str, object]:
+    try:
+        identity = bindings.read_bundle(root, root_mode=0o755)
+    except bindings.RegistrationShellBindingError as exc:
+        return {
+            "format": EVIDENCE_FORMAT,
+            "reason": str(exc),
+            "state": "invalid",
+        }
+    return {
+        **identity.as_json(),
+        "format": EVIDENCE_FORMAT,
+        "state": "readable",
+    }
 
 
 def _lsof_argv(
@@ -641,8 +776,8 @@ def _require_zero_handles(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Create and freeze one dedicated stopped registration-only UTM "
-            "shell for the upgrade_quiesced L6 case."
+            "Create, update, and freeze one dedicated stopped "
+            "registration-only UTM shell for the upgrade_quiesced L6 case."
         )
     )
     parser.add_argument("command", choices=("create-freeze-once",))
@@ -669,6 +804,9 @@ def parse_args() -> argparse.Namespace:
         "--create-timeout-seconds", type=int, default=120
     )
     parser.add_argument(
+        "--update-timeout-seconds", type=int, default=120
+    )
+    parser.add_argument(
         "--command-timeout-seconds", type=int, default=15
     )
     parser.add_argument(
@@ -677,6 +815,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--authorized-one-create-new-registration-only-shell",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--authorized-one-stopped-configuration-update",
         action="store_true",
     )
     parser.add_argument(
@@ -707,12 +849,16 @@ def main() -> int:
             args.expected_precreate_inventory_sha256
         ),
         create_timeout_seconds=args.create_timeout_seconds,
+        update_timeout_seconds=args.update_timeout_seconds,
         command_timeout_seconds=args.command_timeout_seconds,
         authorized_upgrade_quiesced_registration_shell=(
             args.authorized_upgrade_quiesced_registration_shell
         ),
         authorized_one_create_new_registration_only_shell=(
             args.authorized_one_create_new_registration_only_shell
+        ),
+        authorized_one_stopped_configuration_update=(
+            args.authorized_one_stopped_configuration_update
         ),
         authorized_no_clone_start_guest_delete_retry_or_transaction=(
             args.authorized_no_clone_start_guest_delete_retry_or_transaction

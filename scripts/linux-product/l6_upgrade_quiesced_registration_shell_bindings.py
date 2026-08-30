@@ -16,7 +16,7 @@ import l6_utm_clone_once as clone_control
 
 
 CONTROL_FORMAT = (
-    "radishlex-linux-l6-upgrade-quiesced-registration-shell-control-v1"
+    "radishlex-linux-l6-upgrade-quiesced-registration-shell-control-v2"
 )
 SHELL_EVIDENCE_FORMAT = (
     "radishlex-linux-l6-upgrade-quiesced-dedicated-registration-shell-v1"
@@ -28,25 +28,56 @@ BINDING_RELATIVE_PATH = Path(
     "scripts/linux-product/"
     "l6_upgrade_quiesced_registration_shell_bindings.py"
 )
-CREATE_RELATIVE_PATH = Path(
+TRANSPORT_RELATIVE_PATH = Path(
     "scripts/linux-product/"
     "l6_upgrade_quiesced_registration_shell.applescript"
 )
-CREATE_SOURCE = (
+TRANSPORT_SOURCE = (
     'on run arguments\n'
-    '    if (count of arguments) is not 1 then error '
-    '"expected-one-shell-name"\n'
-    '    set shellName to item 1 of arguments\n'
+    '    if (count of arguments) is less than 2 then error '
+    '"expected-action-and-shell-name"\n'
+    '    set shellAction to item 1 of arguments\n'
     '    tell application id "com.utmapp.UTM"\n'
-    '        set shellMachine to make new virtual machine with properties '
-    '{backend:qemu, configuration:{class:qemu configuration, '
-    'name:shellName, icon:"linux", '
-    'notes:"RadishLex L6 upgrade_quiesced registration-only shell; never '
-    'started.", architecture:"aarch64", machine:"virt", memory:4096, '
-    'cpu cores:0, hypervisor:true, uefi:true, directory share mode:VirtFS, '
-    'drives:{{interface:VirtIO, guest size:1024, raw:false}}, network '
-    'interfaces:{}, serial ports:{}, displays:{{hardware:"virtio-gpu-pci"}}, '
-    'qemu additional arguments:{}}}\n'
+    '        if shellAction is "create" then\n'
+    '            if (count of arguments) is not 2 then error '
+    '"create-expected-shell-name"\n'
+    '            set shellName to item 2 of arguments\n'
+    '            set shellMachine to make new virtual machine with '
+    'properties {backend:qemu, configuration:{name:shellName, '
+    'architecture:"aarch64", drives:{{interface:VirtIO, guest size:1024, '
+    'raw:false}}}}\n'
+    '        else if shellAction is "update" then\n'
+    '            if (count of arguments) is not 3 then error '
+    '"update-expected-shell-id-and-name"\n'
+    '            set shellIdentifier to item 2 of arguments\n'
+    '            set shellName to item 3 of arguments\n'
+    '            set shellMachine to virtual machine id shellIdentifier\n'
+    '            if status of shellMachine is not stopped then error '
+    '"registration-shell-not-stopped"\n'
+    '            set shellConfiguration to configuration of shellMachine\n'
+    '            set name of shellConfiguration to shellName\n'
+    '            set icon of shellConfiguration to "linux"\n'
+    '            set notes of shellConfiguration to "RadishLex L6 '
+    'upgrade_quiesced registration-only shell; never started."\n'
+    '            set architecture of shellConfiguration to "aarch64"\n'
+    '            set machine of shellConfiguration to "virt"\n'
+    '            set memory of shellConfiguration to 4096\n'
+    '            set cpu cores of shellConfiguration to 0\n'
+    '            set hypervisor of shellConfiguration to true\n'
+    '            set uefi of shellConfiguration to true\n'
+    '            set directory share mode of shellConfiguration to '
+    'VirtFS\n'
+    '            set network interfaces of shellConfiguration to {}\n'
+    '            set «class SrPt» of shellConfiguration to {}\n'
+    '            set displays of shellConfiguration to '
+    '{{hardware:"virtio-gpu-pci", dynamic resolution:true}}\n'
+    '            set qemu additional arguments of shellConfiguration to '
+    '{}\n'
+    '            update configuration of shellMachine with '
+    'shellConfiguration\n'
+    '        else\n'
+    '            error "unsupported-registration-shell-action"\n'
+    '        end if\n'
     '        return id of shellMachine\n'
     '    end tell\n'
     'end run\n'
@@ -146,11 +177,11 @@ def validate_registration_shell_bindings(
 def validate_control_identity(repository_root: Path) -> dict[str, object]:
     control_path = repository_root / CONTROL_RELATIVE_PATH
     binding_path = repository_root / BINDING_RELATIVE_PATH
-    create_path = repository_root / CREATE_RELATIVE_PATH
+    transport_path = repository_root / TRANSPORT_RELATIVE_PATH
     for path, label in (
         (control_path, "executed-control"),
         (binding_path, "binding-control"),
-        (create_path, "create-transport"),
+        (transport_path, "configuration-transport"),
     ):
         _validate_committed_control_file(path, label)
     if Path(__file__).absolute() != binding_path:
@@ -158,19 +189,19 @@ def validate_control_identity(repository_root: Path) -> dict[str, object]:
             "executed-binding-control-path-mismatch"
         )
     try:
-        create_source = create_path.read_bytes()
+        transport_source = transport_path.read_bytes()
     except OSError as exc:
         raise RegistrationShellBindingError(
-            "create-transport-unreadable"
+            "configuration-transport-unreadable"
         ) from exc
-    if create_source != CREATE_SOURCE:
+    if transport_source != TRANSPORT_SOURCE:
         raise RegistrationShellBindingError(
-            "create-transport-source-contract-drift"
+            "configuration-transport-source-contract-drift"
         )
     return {
         "binding_control_sha256": sha256_file(binding_path),
         "control_sha256": sha256_file(control_path),
-        "create_transport_sha256": sha256_file(create_path),
+        "configuration_transport_sha256": sha256_file(transport_path),
     }
 
 
@@ -258,6 +289,38 @@ def validate_registration_shell_bundle(
     ):
         raise RegistrationShellBindingError(
             "registration-shell-disk-contract-drift"
+        )
+    return identity
+
+
+def validate_registration_shell_before_update(
+    request: RegistrationShellRequestLike,
+    expected_uuid: str,
+) -> BundleIdentity:
+    identity = read_bundle(
+        request.registration_shell_package_path, root_mode=0o755
+    )
+    if (
+        identity.name != request.registration_shell_name
+        or identity.name != REQUIRED_SHELL_NAME
+        or identity.uuid != expected_uuid
+    ):
+        raise RegistrationShellBindingError(
+            "registration-shell-preupdate-identity-drift"
+        )
+    config = _read_plist(
+        identity.config_path, "registration-shell-preupdate-config"
+    )
+    system = config.get("System")
+    if (
+        config.get("Backend") != "QEMU"
+        or config.get("ConfigurationVersion") != 4
+        or not isinstance(system, dict)
+        or system.get("Architecture") != "aarch64"
+        or system.get("Target") != "virt"
+    ):
+        raise RegistrationShellBindingError(
+            "registration-shell-preupdate-configuration-drift"
         )
     return identity
 
@@ -419,6 +482,22 @@ def sha256_text(value: str) -> str:
 def _validate_sdef_configuration_contract(
     root: element_tree.Element,
 ) -> None:
+    vm_extensions = [
+        item
+        for item in root.iter("class-extension")
+        if item.get("extends") == "virtual machine"
+        and any(
+            child.get("name") == "configuration"
+            and child.get("code") == "CoFg"
+            for child in item.findall("property")
+        )
+    ]
+    update_commands = [
+        item
+        for item in root.iter("command")
+        if item.get("name") == "update configuration"
+        and item.get("code") == "UTMcUpDt"
+    ]
     qemu_records = [
         item
         for item in root.iter("record-type")
@@ -437,28 +516,64 @@ def _validate_sdef_configuration_contract(
         if item.get("name") == "qemu drive interface"
         and item.get("code") == "QeDi"
     ]
-    if len(qemu_records) != 1 or len(drive_records) != 1 or len(drive_enums) != 1:
+    if (
+        len(vm_extensions) != 1
+        or len(update_commands) != 1
+        or len(qemu_records) != 1
+        or len(drive_records) != 1
+        or len(drive_enums) != 1
+    ):
         raise RegistrationShellBindingError(
             "utm-sdef-qemu-create-contract-invalid"
         )
+    configuration_properties = [
+        item
+        for item in vm_extensions[0].findall("property")
+        if item.get("name") == "configuration"
+        and item.get("code") == "CoFg"
+        and item.get("access") == "r"
+    ]
+    update_parameters = [
+        item
+        for item in update_commands[0].findall("parameter")
+        if item.get("name") == "with" and item.get("code") == "UpCf"
+    ]
+    if (
+        len(configuration_properties) != 1
+        or {
+            item.get("type")
+            for item in configuration_properties[0].findall("type")
+        }
+        != {"qemu configuration", "apple configuration"}
+        or len(update_parameters) != 1
+        or {
+            item.get("type")
+            for item in update_parameters[0].findall("type")
+        }
+        != {"qemu configuration", "apple configuration"}
+    ):
+        raise RegistrationShellBindingError(
+            "utm-sdef-qemu-update-contract-invalid"
+        )
     qemu_properties = {
-        item.get("name") for item in qemu_records[0].findall("property")
+        item.get("name"): item.get("code")
+        for item in qemu_records[0].findall("property")
     }
     if not {
-        "name",
-        "architecture",
-        "machine",
-        "memory",
-        "cpu cores",
-        "hypervisor",
-        "uefi",
-        "directory share mode",
-        "drives",
-        "network interfaces",
-        "serial ports",
-        "displays",
-        "qemu additional arguments",
-    }.issubset(qemu_properties):
+        "name": "pnam",
+        "architecture": "ArCh",
+        "machine": "MaCh",
+        "memory": "MeMy",
+        "cpu cores": "CpUc",
+        "hypervisor": "HyPr",
+        "uefi": "UeFi",
+        "directory share mode": "DrSm",
+        "drives": "DrVs",
+        "network interfaces": "NtIf",
+        "serial ports": "SrPt",
+        "displays": "DiPs",
+        "qemu additional arguments": "QeAd",
+    }.items() <= qemu_properties.items():
         raise RegistrationShellBindingError(
             "utm-sdef-qemu-configuration-fields-invalid"
         )
