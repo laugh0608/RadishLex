@@ -687,6 +687,8 @@ UI Move完成后，`complete-move-once`使用新attempt `d75818f-upgrade-quiesce
 
 用户授权真实prepare后，执行前先以`fe8b4b6`修正了授权证据语义：请求只记录“允许输出下一外部动作提示”，不把尚未授权的UI Move写成已授权；8项定向与完整L6门禁通过。随后唯一v1调用误把expected HEAD写成`fe8b4b6b1a41c0cbeae3b43e091ca1101a53aeb1`，实际clean HEAD为`fe8b4b6ea3cd21e0a16236f941cff0b9fcbbfe93`，故控制在`binding-preflight:repository-head-drift`首门闭合`precondition-rejected`。create-new v1根只含request/terminal两个manifest成员，SHA-256 `4d32f219f1947bb56cb3e4ddd24aee01741f80a4bfbbaa73192fe3b329002750`，逐项hash、`0700`/`0600`、owner `501:20`与single-link复核通过；inventory query、UI Move、update、start、clone、delete/retry、guest和transaction均为0。v1根冻结，不覆盖、删除或复用；下一候选改用attempt `d75818f-upgrade-quiesced-registration-shell-move-prepare-20260830-v2`和新根`/Users/luobo/VirtualMachines/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-Move-Prepare-Control-v2`，须重绑届时精确clean HEAD并重新授权，UI Move与complete继续关闭。
 
+用户重新授权v2 prepare后，从clean `f7ac982`执行唯一attempt。binding递归通过冻结v4、UTM `4.7.5` build `118`、S2、默认部分壳精确三文件及位置策略；授权目标package、`Evidence-v5`与新control根调用前均absent。S2/default/目标父目录同device，两轮固定`lsof`均精确exit 1且空输出；唯一plain list观察22台全部stopped、canonical inventory `1074717ca5ff9f8666e53974b9002d1c4697a33de877e5cdfbdcf24299f4714f`。source与default部分壳terminal身份不漂移，外部目标仍absent；15项manifest SHA-256 `dc6b0d01a892d6d54259342e4d795d2d7aa8a6d8f81dac3dce544f7e4cd738e0`逐项语义/hash复核通过，根/文件为`0700`/`0600`、owner `501:20`、single-link。terminal闭合`move-ready`，inventory query为1，UI Move/update/start/clone/delete/retry、guest/file和transaction均为0，调用后没有追加UTM query。v2 prepare根现冻结；下一批只能单独授权一次UTM原生UI Move到既定外部package，不含update或query，complete仍须再授权。
+
 ## 10. L6 完成与后续
 
 L6 只有在主序列、八个 crash case、字体/dependency、startup 正负向、XDG 零写入/保留和 guest reboot 对照均由同一 release pair 闭合后完成。完成后仍然：
