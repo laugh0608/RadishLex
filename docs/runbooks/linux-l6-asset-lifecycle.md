@@ -32,6 +32,8 @@ P05B 剩余阻塞项为：
 - 7 个 APFS snapshot 的 `du` 合计为 65.25 GiB；
 - Data volume 当次只读观察约有 527 GiB 可用，不构成立即容量事故。
 
+`first-four-v1`于2026-08-30删除4个注册bundle后，当前为19个物理`.utm`、18个注册项和1个故意未注册的DependencyFrozen bundle；snapshot仍为7个。此处不以`df`变化反推实际回收量。
+
 表中 GiB 是 `du -sk / 1048576` 的账面值。APFS clonefile 和 clone 共享物理块，逐项求和会重复计算共享块；删除候选的账面值只用于排序，不能承诺同等可回收容量。host evidence、handoff 和 control root 体积远小于 VM/snapshot，默认保留而不是优先清理。
 
 以下使用两个路径缩写：
@@ -46,11 +48,11 @@ P05B 剩余阻塞项为：
 | # | Bundle / UUID | GiB | 当前角色 | 建议处置 |
 | --- | --- | ---: | --- | --- |
 | 1 | `DOC/RadishLex-Debian13-ARM64-L6-1ebbdab.utm`<br>`9C5638D7-0F97-4BD8-8A83-ABCDFCADAC6C` | 9.00 | 第五套 rolled-back terminal | 证据归档后删除候选 |
-| 2 | `DOC/RadishLex-Debian13-ARM64-L6-56dd4de.utm`<br>`A3F757B1-CE75-4F23-9509-CAD033260AA1` | 9.44 | 第四套 chain mismatch | 证据归档后删除候选 |
+| 2 | `DOC/RadishLex-Debian13-ARM64-L6-56dd4de.utm`<br>`A3F757B1-CE75-4F23-9509-CAD033260AA1` | 9.44 | 第四套 chain mismatch | 已删除；证据保留 |
 | 3 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-crash-install-prepared-v2.utm`<br>`FD24ADFF-B160-46F0-B100-10BAAF17C056` | 9.39 | 旧 pair crash 失败/诊断现场 | 证据归档后删除候选 |
 | 4 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-reinstall.utm`<br>`E671DB9C-5E2C-447B-9425-8D91D2CFD465` | 9.06 | reinstall completed terminal | 证据归档后删除候选 |
 | 5 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-remove.utm`<br>`5EA2BAA2-B9A1-46CC-B496-B37826DD27A2` | 9.47 | remove completed terminal | 证据归档后删除候选 |
-| 6 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-repair.utm`<br>`A3022255-ED08-4C66-92D3-075A6BB93107` | 9.45 | repair aborted-preserved | 证据归档后删除候选 |
+| 6 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-repair.utm`<br>`A3022255-ED08-4C66-92D3-075A6BB93107` | 9.45 | repair aborted-preserved | 已删除；证据保留 |
 | 7 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-rollback-v3.utm`<br>`EFD15599-7177-4D55-BF17-173EE1F0BBDD` | 9.46 | rollback completed terminal | 证据归档后删除候选 |
 | 8 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce.utm`<br>`193179D5-2595-4628-A063-9EFB73F8EC05` | 9.44 | 第六套 target completed；已有 S3 | 证据归档后删除候选 |
 | 9 | `DOC/RadishLex-Debian13-ARM64-L6-823afca-repair.utm`<br>`394217A7-BFC9-43C8-94E6-539FF3F2B6FB` | 9.46 | repair completed terminal | 证据归档后删除候选 |
@@ -61,15 +63,15 @@ P05B 剩余阻塞项为：
 | 14 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-prepared-v3.utm`<br>`3EC83EB9-094B-492B-9756-D47E61C593B9` | 8.79 | 第一场景 completed terminal | 证据归档后删除候选 |
 | 15 | `OP/Debian13-ARM64-CleanBase.utm`<br>`21197987-AEBB-46E6-ABDC-B9762F5C0CE4` | 7.06 | rescue clean base | 保留；常驻注册锚点 |
 | 16 | `OP/Debian13-ARM64-DependencyFrozen.utm`<br>`755199B1-1C18-4441-8A1E-D423C8DE0022` | 9.39 | immutable COW source；故意未注册 | 保留；不启动、不改写 |
-| 17 | `OP/Debian13-ARM64-L6-2fa1b8c.utm`<br>`EBF12F50-33B1-4711-B693-B57D419EAE2A` | 9.40 | 第二套 pre-receipt failure | 证据归档后删除候选 |
+| 17 | `OP/Debian13-ARM64-L6-2fa1b8c.utm`<br>`EBF12F50-33B1-4711-B693-B57D419EAE2A` | 9.40 | 第二套 pre-receipt failure | 已删除；证据保留 |
 | 18 | `OP/Debian13-ARM64-L6-512e8ab.utm`<br>`99FF4B3F-4894-4913-BBE3-4934DC27BEEB` | 8.72 | 第三套 source terminal；已有 S2 | 证据归档后删除候选 |
-| 19 | `OP/Debian13-ARM64-L6.utm`<br>`6F73F6DC-66DF-40EC-86B8-228C1FDA1195` | 9.42 | 首套 pre-receipt failure | 证据归档后删除候选 |
+| 19 | `OP/Debian13-ARM64-L6.utm`<br>`6F73F6DC-66DF-40EC-86B8-228C1FDA1195` | 9.42 | 首套 pre-receipt failure | 已删除；证据保留 |
 | 20 | `OP/Debian13-ARM64.utm`<br>`755199B1-1C18-4441-8A1E-D423C8DE0022` | 11.65 | 通用 builder；与未注册冻结源共享历史 UUID | 保留；常驻注册锚点 |
 | 21 | `OP/RadishLex-L6-PairBuilder-2fa1b8c-v2.utm`<br>`E2F5624C-B0F9-4102-B149-5F72C1851D49` | 17.14 | 隔离 release-pair builder | 保留；常驻注册锚点 |
 | 22 | `OP/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-v1.utm`<br>`0BAA7355-A55A-463E-97FE-82A785E252A7` | 0.00 | `upgrade_quiesced` registration-only shell | 保留至第三场景 target 建立；随后另评估退休 |
 | 23 | `OP/RadishLex/VMs/RadishLex-Debian13-ARM64.utm`<br>`E0168AA6-AFDA-4C81-9327-590DAC48C49B` | 17.24 | P04 已验收现场 | 保留；常驻注册锚点，不作 P05 mutation |
 
-17 个 raw VM 删除候选账面合计 157.60 GiB。全部候选通过后，注册列表才可能从 22 台降至 5 台；任一候选未通过证据或身份 preflight 时必须继续保留，因此“5 台”是目标而不是清理结果承诺。
+首批已删除4个raw VM，账面37.71 GiB；剩余13个删除候选账面119.89 GiB。注册列表已从22台降至18台；全部剩余候选通过后才可能降至5台，任一候选未通过preflight时必须继续保留。
 
 ## 4. Snapshot 账本
 
@@ -139,6 +141,8 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 2026-08-30 项目所有者明确授权执行`first-four-v1`后，新增`l6_utm_asset_retirement_delete.py`：它递归绑定9项prepare manifest与语义、clean committed HEAD、allowlist和固定storage roots，mutation前重新执行一次全停list、两轮完整asset hash与两轮零句柄。随后每台只形成一次`utmctl delete <exact-uuid>`和一次post-list，必须同时满足clean command success、精确单成员inventory delta、其余成员不变/全stopped与package absent；任何矛盾闭合`state-indeterminate`并停止，不retry、rollback、补删或继续下一台。7项fake-runner已进入默认L6门禁；此记录尚不表示真实delete已调用。
 
+随后在clean `93abcb0`执行唯一attempt `l6-asset-retirement-delete-20260830-v1`。preflight重新闭合7个锚点、两轮完整hash、22台全停inventory与两轮零句柄；4次delete均exit 0、无stdout/stderr/timeout，post-list严格为22→21→20→19→18且全stopped，4个精确package均absent。terminal为`deleted`，list/delete为`5/4`，无retry/rollback/start/clone/move/guest；21项manifest SHA-256为`d6369fb297a53213537947b5c168aa68c8af4d97e588f4ffaed09b62e36d0449`。
+
 ### 6.4 Snapshot quarantine 与 purge
 
 - quarantine 只允许将精确 snapshot 以同文件系统、no-replace rename 移入 create-new batch 目录；目标目录、父目录、manifest 和 S2/S3 身份必须调用前后复验；
@@ -156,7 +160,7 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 1. repository-only allowlist、prepare 和 fake-runner 回归已实现并通过门禁；实现阶段未调用 UTM、未改资产。
 2. `first-four-v1`的4台低价值失败现场已完成一次只读prepare并冻结manifest。
-3. 下一步单独授权并执行第一批 VM mutation，复核清理 manifest 后再决定下一批。
+3. 第一批VM mutation已闭合`deleted`并复核manifest；下一步另选第二批、重新prepare并单独授权。
 4. 注册项降至预算后，才创建唯一 `upgrade_quiesced` disposable target；case 闭合后先退休该 target。
 5. 建立一台新的连续 L6 guest，完成六类 operation 和完整正常生命周期，然后退休。
 6. snapshot 以两项一批 quarantine；确认 P05B 不再依赖后，另行 purge。

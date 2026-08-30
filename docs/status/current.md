@@ -44,9 +44,9 @@
 - complete v1因跨阶段HEAD误绑零调用失败；`9da8d0f`修复后，clean `e6968bf`的v2以两次全停list和一次update闭合`frozen`。20项manifest `91778f48…c438`、单成员壳体manifest `c37b552e…f715`通过，最终`Network=[]`且EFI/qcow2不变。
 ## 停止线
 
-- 资产账本只固定建议处置，不授权清理；历史停止线在逐项prepare并取得删除授权前继续有效。候选不得直接delete、注销、搬移或purge。
+- 资产账本默认只固定建议处置；仅`first-four-v1`已按独立授权删除并以`d6369fb2…0449`冻结，其他候选仍不得直接delete、注销、搬移或purge。
 - 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
-- 不重新启动、恢复、清理或复用前四个 stopped L6 failure/mismatch disk；第五套 terminal `rolled_back` 现场只作失败/恢复取证，仍不得启动、重试或复用。各套 evidence 分属不同 config/boot/receipt 身份，不得混用。
+- `first-four-v1`的4个raw bundle已absent，prepare/delete证据与旧snapshot/handoff继续保留；其余failure/mismatch disk仍不得启动、恢复、清理或复用。各套evidence不得混用。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
 - 首台与第二台rollback只保留host evidence；第三台`EFD15599…BBDD`、remove clone `5EA2BAA2…27A2`与reinstall clone `E671DB9C…D465`均为冻结terminal；不得resume、重试、再次调用、清理、恢复、直接复用或用于其他矩阵。
 - 旧pair的network失败clone只保留host evidence；真实checkpoint clone `FD24ADFF…17C056`不得resume、替换FFI、补写crash-state evidence、再次执行acceptance或用于后续case。新pair两台retry也只保留持久host evidence，不得据此恢复package或复用。
@@ -68,8 +68,8 @@
 ## 下一步事项（2026-08-30）
 
 1. registration shell已以`91778f48…c438`/`c37b552e…f715`闭合`frozen`；22台全停、`Network=[]`、磁盘身份和零句柄通过。
-2. 首批4台的只读prepare已闭合`prepared`：22台全停、7个证据锚点、两轮磁盘hash与两轮零句柄通过；9项manifest为`68ce05b0…f44e`，删除仍未授权。
-3. 项目所有者已独立授权`first-four-v1`删除；下一步在最终clean HEAD以新控制重验prepare、全停、磁盘和句柄，再逐台至多一次delete。异常立即停止且不retry/rollback。
+2. `first-four-v1`已闭合`deleted`：4次精确delete均clean success，inventory按22→21→20→19→18且全stopped，4个bundle absent；21项manifest为`d6369fb2…0449`。
+3. 仍有13个旧注册VM候选；下一步先repository-only选择第二批并重新prepare/授权，不沿用首批授权，不创建`upgrade_quiesced` target。
 4. 收敛后只新增一个`upgrade_quiesced` target；退休后再以一台新guest完成连续L6。P05C仍使用独立guest。
 
 ## 验证入口
