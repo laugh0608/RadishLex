@@ -362,6 +362,9 @@ def validate_prepare_evidence(
         request.prepare_root / "terminal.json", "prepare-terminal"
     )
     authorization = prepared_request.get("authorization")
+    prepare_repository_head = prepared_request.get(
+        "expected_repository_head"
+    )
     if (
         prepared_request.get("format") != EVIDENCE_FORMAT
         or prepared_request.get("phase") != "prepare"
@@ -374,8 +377,7 @@ def validate_prepare_evidence(
             "one_pre_move_inventory_query": True,
             "upgrade_quiesced_registration_shell_move_prepare": True,
         }
-        or prepared_request.get("expected_repository_head")
-        != request.expected_repository_head
+        or not isinstance(prepare_repository_head, str)
         or prepared_request.get("prior_v4_manifest_sha256")
         != request.prior_v4_manifest_sha256
         or prepared_request.get("registration_shell_uuid")
@@ -388,7 +390,7 @@ def validate_prepare_evidence(
         != shell_bindings.sha256_text(
             str(request.registration_shell_package_path)
         )
-        or binding.get("repository_head") != request.expected_repository_head
+        or binding.get("repository_head") != prepare_repository_head
         or default_shell.get("config_sha256")
         != EXPECTED_V4_PARTIAL["config_sha256"]
         or default_shell.get("efi_sha256")

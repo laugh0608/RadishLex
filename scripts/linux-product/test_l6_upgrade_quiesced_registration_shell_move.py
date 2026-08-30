@@ -215,9 +215,17 @@ class LinuxL6RegistrationShellMoveTests(unittest.TestCase):
     def test_complete_adopts_move_updates_once_and_freezes(self) -> None:
         prepare, prepare_result = self.successful_prepare()
         self.default_shell.rename(self.external_shell)
-        request = self.complete_request(prepare, prepare_result)
+        request = self.complete_request(
+            prepare,
+            prepare_result,
+            expected_repository_head="b" * 40,
+        )
         runner = FakeRunner(request)
 
+        self.assertNotEqual(
+            prepare.expected_repository_head,
+            request.expected_repository_head,
+        )
         self.assertEqual(
             bindings.validate_prepare_evidence(request)["outcome"],
             "move-ready",
