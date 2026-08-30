@@ -361,9 +361,19 @@ def validate_prepare_evidence(
     terminal = _read_json(
         request.prepare_root / "terminal.json", "prepare-terminal"
     )
+    authorization = prepared_request.get("authorization")
     if (
         prepared_request.get("format") != EVIDENCE_FORMAT
         or prepared_request.get("phase") != "prepare"
+        or authorization
+        != {
+            "emit_next_external_action_one_utm_ui_move": True,
+            "no_move_update_start_clone_delete_retry_guest_or_transaction": (
+                True
+            ),
+            "one_pre_move_inventory_query": True,
+            "upgrade_quiesced_registration_shell_move_prepare": True,
+        }
         or prepared_request.get("expected_repository_head")
         != request.expected_repository_head
         or prepared_request.get("prior_v4_manifest_sha256")

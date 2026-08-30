@@ -198,7 +198,7 @@ class MoveRequestBase:
 class MovePrepareRequest(MoveRequestBase):
     authorized_upgrade_quiesced_registration_shell_move_prepare: bool
     authorized_one_pre_move_inventory_query: bool
-    authorized_next_external_action_one_utm_ui_move: bool
+    authorized_emit_next_external_action_one_utm_ui_move: bool
     authorized_no_move_update_start_clone_delete_retry_guest_or_transaction: (
         bool
     )
@@ -208,7 +208,7 @@ class MovePrepareRequest(MoveRequestBase):
         required = (
             self.authorized_upgrade_quiesced_registration_shell_move_prepare,
             self.authorized_one_pre_move_inventory_query,
-            self.authorized_next_external_action_one_utm_ui_move,
+            self.authorized_emit_next_external_action_one_utm_ui_move,
             (
                 self.authorized_no_move_update_start_clone_delete_retry_guest_or_transaction
             ),
@@ -220,7 +220,7 @@ class MovePrepareRequest(MoveRequestBase):
         return {
             **self.common_json("prepare"),
             "authorization": {
-                "next_external_action_one_utm_ui_move": True,
+                "emit_next_external_action_one_utm_ui_move": True,
                 "no_move_update_start_clone_delete_retry_guest_or_transaction": True,
                 "one_pre_move_inventory_query": True,
                 "upgrade_quiesced_registration_shell_move_prepare": True,
@@ -840,7 +840,7 @@ def parse_args() -> argparse.Namespace:
         "--authorized-one-pre-move-inventory-query", action="store_true"
     )
     parser.add_argument(
-        "--authorized-next-external-action-one-utm-ui-move",
+        "--authorized-emit-next-external-action-one-utm-ui-move",
         action="store_true",
     )
     parser.add_argument(
@@ -901,8 +901,8 @@ def main() -> int:
                 authorized_one_pre_move_inventory_query=(
                     args.authorized_one_pre_move_inventory_query
                 ),
-                authorized_next_external_action_one_utm_ui_move=(
-                    args.authorized_next_external_action_one_utm_ui_move
+                authorized_emit_next_external_action_one_utm_ui_move=(
+                    args.authorized_emit_next_external_action_one_utm_ui_move
                 ),
                 authorized_no_move_update_start_clone_delete_retry_guest_or_transaction=(
                     args.authorized_no_move_update_start_clone_delete_retry_guest_or_transaction

@@ -314,7 +314,7 @@ class LinuxL6RegistrationShellMoveTests(unittest.TestCase):
     def test_missing_authorization_fails_before_evidence_creation(self) -> None:
         request = self.prepare_request(
             attempt_id="prepare-missing-auth",
-            authorized_next_external_action_one_utm_ui_move=False,
+            authorized_emit_next_external_action_one_utm_ui_move=False,
         )
 
         with self.assertRaisesRegex(
@@ -347,7 +347,7 @@ class LinuxL6RegistrationShellMoveTests(unittest.TestCase):
                     True
                 ),
                 "authorized_one_pre_move_inventory_query": True,
-                "authorized_next_external_action_one_utm_ui_move": True,
+                "authorized_emit_next_external_action_one_utm_ui_move": True,
                 "authorized_no_move_update_start_clone_delete_retry_guest_or_transaction": (
                     True
                 ),
