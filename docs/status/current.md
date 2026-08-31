@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核：2026-08-30；常态分支 `dev`，主线 `master`。
+- 复核：2026-08-31；常态分支 `dev`，主线 `master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
@@ -42,9 +42,10 @@
 - clean `7ab855b`的唯一v4最小create返回UUID `0BAA7355…52A7`及22台全停inventory；授权路径absent使update为0，14项manifest `70251467…fb04`闭合`state-indeterminate`。默认`Documents`中的同名部分壳无句柄但位置不合规，shell evidence与真实target仍不存在。
 - `9300ed7`闭合原生Move恢复；prepare v1首门拒绝，v2以一次list闭合22台全停与15项`move-ready` manifest `dc6b0d01…738e`；唯一UI Move将部分壳移至授权路径且三文件身份不变。
 - complete v1因跨阶段HEAD误绑零调用失败；`9da8d0f`修复后，clean `e6968bf`的v2以两次全停list和一次update闭合`frozen`。20项manifest `91778f48…c438`、单成员壳体manifest `c37b552e…f715`通过，最终`Network=[]`且EFI/qcow2不变。
+- `a2c7f07`闭合`second-batch-v1`的repository-only候选与回归；未调用UTM或执行prepare/delete，精确范围见资产账本。
 ## 停止线
 
-- 资产账本默认只固定建议处置；仅`first-four-v1`已按独立授权删除并以`d6369fb2…0449`冻结，其他候选仍不得直接delete、注销、搬移或purge。
+- 资产账本默认只固定建议处置；仅`first-four-v1`已按独立授权删除并以`d6369fb2…0449`冻结。`second-batch-v1`只是静态候选，prepare与删除须分段授权。
 - 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
 - `first-four-v1`的4个raw bundle已absent，prepare/delete证据与旧snapshot/handoff继续保留；其余failure/mismatch disk仍不得启动、恢复、清理或复用。各套evidence不得混用。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
@@ -65,12 +66,11 @@
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 明日事项（2026-08-31）
+## 下一步（自 2026-08-31）
 
-1. repository-only复核剩余13个旧注册VM，固定不超过4台的`second-batch-v1`allowlist；绑定UUID、绝对路径、磁盘与既存证据，不调用UTM。
-2. 回归闭合后，以新attempt、absent根和届时18成员inventory执行只读prepare；不复用`first-four-v1`的HEAD、证据或授权。
-3. prepare通过后列出精确目标、账面影响与不可恢复风险并另行申请删除；逐台清理UTM注册列表、验证单成员delta，分批从18台收敛至5个注册锚点，不使用GUI批量删除、名称匹配或自动重试。
-4. 注册列表收敛前不创建`upgrade_quiesced` target；snapshot另行quarantine/purge。收敛后只新增一个第三场景target，再以一台新guest完成连续L6；P05C仍使用独立guest。
+1. 下一系统动作须单独授权：以新attempt、absent根和届时18成员inventory执行第二批只读prepare，不复用首批输入或授权。
+2. prepare通过后列出精确目标、账面影响与不可恢复风险并另行申请删除；逐台验证单成员delta，分批从18台收敛至5个注册锚点。
+3. 收敛前不创建`upgrade_quiesced` target；snapshot另行quarantine/purge。收敛后闭合第三场景，再以一台新guest完成连续L6；P05C使用独立guest。
 
 ## 验证入口
 

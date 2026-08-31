@@ -109,6 +109,7 @@ P05B 剩余阻塞项为：
 - `retain`、P04、CleanBase、DependencyFrozen、builder、registration shell、S2、S3 永远不能由默认选择进入 mutation；
 - 调用方必须逐字传入 batch ID、attempt ID、allowlist digest 和目标 ID；不接受 glob、目录扫描自动扩面、名称前缀或“全部候选”；
 - 单个 VM batch 最多 4 台，snapshot batch 最多 2 个；目标变化即产生新 batch、新 attempt 和新授权。
+- allowlist内的asset ID、path、UUID和name全局唯一，每个asset必须且只能属于一个batch；跨batch复用或存在未分配asset均失败关闭。
 
 ### 6.2 只读 prepare
 
@@ -128,6 +129,8 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 2026-08-30 已实现首个repository-only控制：`packaging/linux/l6-asset-retirement-allowlist.json`只列出`first-four-v1`的4台候选并固定两个绝对storage root、UUID/name/path、config/EFI/qcow2和7个既存证据锚点；`scripts/linux-product/l6_utm_asset_retirement_prepare.py`没有mutation命令面，只接受一次plain list、两轮`lsof`和两轮完整asset hash。7项fake-runner覆盖成功、inventory/句柄/磁盘/证据漂移及授权缺失并进入默认L6门禁。
 
 随后在clean `4a34ae3`执行唯一只读attempt `l6-asset-retirement-prepare-20260830-v1`：一次list确认22台全stopped及canonical inventory `1074717c…714f`，7个证据锚点、4个bundle的两轮完整hash和两轮零句柄均通过，闭合`prepared`。create-new根`RadishLex-L6-Asset-Retirement-Prepare-20260830-v1`的9项manifest SHA-256为`68ce05b012fa5f821e9d5c47835830123777a08c0ba05c1ea2a70bd6e0d4f44e`；delete/start/clone/move/guest计数均为0。该结果只可作为本批删除授权输入，不自动触发mutation。
+
+2026-08-31的repository-only提交`a2c7f07`新增互不重叠的`second-batch-v1`，固定4台、37.62 GiB、7个既存证据锚点与完整bundle身份。prepare新增窄语义校验，分别绑定旧`install_prepared`失败关闭、两类UTM start失败关闭及maintenance repair completed-noop终态；allowlist加载器同时拒绝跨batch复用和未分配asset。13项prepare回归、默认L6门禁与全仓基线通过；纯文件系统离线复核也通过全部锚点及4个bundle身份。此阶段未调用UTM、未创建prepare输出根，删除控制器仍只接受`first-four-v1`，因此不构成第二批prepare或mutation授权。
 
 ### 6.3 VM mutation
 
@@ -160,7 +163,7 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 1. repository-only allowlist、prepare 和 fake-runner 回归已实现并通过门禁；实现阶段未调用 UTM、未改资产。
 2. `first-four-v1`的4台低价值失败现场已完成一次只读prepare并冻结manifest。
-3. 第一批VM mutation已闭合`deleted`并复核manifest；2026-08-31先在repository-only范围从剩余13台中固定不超过4台的第二批，再基于届时18成员inventory重新prepare并单独授权。UTM注册列表清理不得退化为GUI批量删除或名称匹配。
+3. 第一批VM mutation已闭合`deleted`并复核manifest；第二批4台已在repository-only范围固定，下一步只可在新授权下基于届时18成员inventory执行独立只读prepare。prepare通过后仍须另行授权mutation；UTM注册列表清理不得退化为GUI批量删除或名称匹配。
 4. 注册项降至预算后，才创建唯一 `upgrade_quiesced` disposable target；case 闭合后先退休该 target。
 5. 建立一台新的连续 L6 guest，完成六类 operation 和完整正常生命周期，然后退休。
 6. snapshot 以两项一批 quarantine；确认 P05B 不再依赖后，另行 purge。
