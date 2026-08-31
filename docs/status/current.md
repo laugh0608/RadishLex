@@ -42,19 +42,17 @@
 - clean `7ab855b`的唯一v4最小create返回UUID `0BAA7355…52A7`及22台全停inventory；授权路径absent使update为0，14项manifest `70251467…fb04`闭合`state-indeterminate`。默认`Documents`中的同名部分壳无句柄但位置不合规，shell evidence与真实target仍不存在。
 - `9300ed7`闭合原生Move恢复；prepare v1首门拒绝，v2以一次list闭合22台全停与15项`move-ready` manifest `dc6b0d01…738e`；唯一UI Move将部分壳移至授权路径且三文件身份不变。
 - complete v1因跨阶段HEAD误绑零调用失败；`9da8d0f`修复后，clean `e6968bf`的v2以两次全停list和一次update闭合`frozen`。20项manifest `91778f48…c438`、单成员壳体manifest `c37b552e…f715`通过，最终`Network=[]`且EFI/qcow2不变。
-- clean `f99ab2d`的第二批prepare以`d802f331…8ac60`闭合；`3e8796a`新增独立删除授权位并以10项回归绑定该结果，未调用UTM或delete。
+- clean `f99ab2d`的第二批prepare以`d802f331…8ac60`闭合；`3e8796a`新增独立授权位。项目所有者随后授权真实mutation，从clean `fd6d501`执行唯一attempt：4次精确delete与5次list闭合18→17→16→15→14，4个package均absent；21项manifest `d29ae273…bd88f`通过。
 ## 停止线
 
-- 仅`first-four-v1`已按独立授权删除并以`d6369fb2…0449`冻结。第二批控制已实现，但真实mutation仍须另行批准。
+- `first-four-v1`与`second-batch-v1`均已按各自独立授权闭合`deleted`，manifest分别为`d6369fb2…0449`与`d29ae273…bd88f`；两次授权均已消费，不得复跑。
 - 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
-- `first-four-v1`的4个raw bundle已absent，prepare/delete证据与旧snapshot/handoff继续保留；其余failure/mismatch disk仍不得启动、恢复、清理或复用。各套evidence不得混用。
+- 两批共8个raw bundle已absent，prepare/delete证据与旧snapshot/handoff继续保留；其余failure/mismatch disk仍不得启动、恢复、清理或复用。各套evidence不得混用。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
 - 首台与第二台rollback只保留host evidence；第三台`EFD15599…BBDD`、remove clone `5EA2BAA2…27A2`与reinstall clone `E671DB9C…D465`均为冻结terminal；不得resume、重试、再次调用、清理、恢复、直接复用或用于其他矩阵。
-- 旧pair的network失败clone只保留host evidence；真实checkpoint clone `FD24ADFF…17C056`不得resume、替换FFI、补写crash-state evidence、再次执行acceptance或用于后续case。新pair两台retry也只保留持久host evidence，不得据此恢复package或复用。
+- 旧pair与新pair失败现场只保留持久证据；已删除的`FD24ADFF…17C056`、`B0B826F6…87B3`、`5B19AEF1…7DAB`及`BE3579E0…37F8`不得恢复package、重新注册、重建或复用。
 - 新`d75818f` handoff只允许作为独立clean clone的冻结输入；第三台clone现为stopped source terminal，不得重启、复用、运行下一checkpoint、覆盖、热替换或与旧pair跨套混搭。
-- 第二个case clone `B0B826F6…87B3`须保持stopped并冻结为双start失败现场；不得第三次start、进入guest、修补注册/config、复用或与第一case混用。
 - v2 clone失败证据`65160b12…c1859`须原样保留；不得沿用本批授权重试clone、重启UTM或把exit 0记为成功。
-- 新v3 clean clone `5B19AEF1…7DAB`现冻结为单次start失败现场；不得第二次start、重复物化、替换config/磁盘、传input、进入guest或transaction，也不得把全停结果记为case通过。
 - 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
 - v4 launch至exact resume失败证据与UUID `50B75F88…8038`须冻结，不得复跑、覆盖、循环query或主动拉起backend。`3aca0576…0a4f7`只保留为resume前检查点；transaction权威是21项`7fcef38e…0e3d`闭合的`completed`，VM终态权威是28项`096fe01f…e133`闭合的`stopped-verified`。旧attempt/root已消费，不得重试或复用。
 - 旧boot、恢复、fresh两阶段及结果消歧根全部冻结，不复跑、覆盖、补拉或清理。`recovery-qualified`只证明只读恢复前门，不授权resume；无新授权不得query/start、resume、retry/stop/quit。
@@ -68,9 +66,9 @@
 
 ## 下一步（自 2026-08-31）
 
-1. 列出第二批4个精确目标、37.62 GiB账面影响与不可恢复风险，另行申请真实删除授权；授权不得从prepare或控制实现继承。
-2. 获批后只执行唯一attempt，逐台验证18→17→16→15→14单成员delta；异常停止且不retry、rollback或继续下一台。
-3. 收敛前不创建`upgrade_quiesced` target；snapshot另行quarantine/purge。收敛后闭合第三场景，再以一台新guest完成连续L6；P05C使用独立guest。
+1. 在repository-only范围复核剩余9个删除候选，按不超过4台的新batch固定身份与既存证据；不调用UTM或继承前两批授权。
+2. 注册项尚为14台，收敛至5台前不创建`upgrade_quiesced` target；新batch仍须分别取得只读prepare与真实删除授权，snapshot另行quarantine/purge。
+3. 收敛后闭合第三场景，再以一台新guest完成连续L6；P05C使用独立guest。
 
 ## 验证入口
 
