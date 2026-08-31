@@ -43,9 +43,11 @@
 - `9300ed7`闭合原生Move恢复；prepare v1首门拒绝，v2以一次list闭合22台全停与15项`move-ready` manifest `dc6b0d01…738e`；唯一UI Move将部分壳移至授权路径且三文件身份不变。
 - complete v1因跨阶段HEAD误绑零调用失败；`9da8d0f`修复后，clean `e6968bf`的v2以两次全停list和一次update闭合`frozen`。20项manifest `91778f48…c438`、单成员壳体manifest `c37b552e…f715`通过，最终`Network=[]`且EFI/qcow2不变。
 - clean `f99ab2d`的第二批prepare以`d802f331…8ac60`闭合；`3e8796a`新增独立授权位。项目所有者随后授权真实mutation，从clean `fd6d501`执行唯一attempt：4次精确delete与5次list闭合18→17→16→15→14，4个package均absent；21项manifest `d29ae273…bd88f`通过。
+- `1d671e9`固定`third-batch-v1`的rollback/remove/reinstall三台terminal clone共27.99 GiB；3个锚点与双轮bundle身份离线通过，UTM查询/输出为0。repair因既存evidence owner tuple不符而失败关闭；delete控制器仍拒绝第三批。
 ## 停止线
 
 - `first-four-v1`与`second-batch-v1`均已按各自独立授权闭合`deleted`，manifest分别为`d6369fb2…0449`与`d29ae273…bd88f`；两次授权均已消费，不得复跑。
+- `third-batch-v1`当前只是仓库冻结候选，不构成prepare或删除授权；三台目标及其证据保持原状，不得沿用前两批授权调用UTM。
 - 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
 - 两批共8个raw bundle已absent，prepare/delete证据与旧snapshot/handoff继续保留；其余failure/mismatch disk仍不得启动、恢复、清理或复用。各套evidence不得混用。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
@@ -66,8 +68,8 @@
 
 ## 下一步（自 2026-08-31）
 
-1. 在repository-only范围复核剩余9个删除候选，按不超过4台的新batch固定身份与既存证据；不调用UTM或继承前两批授权。
-2. 注册项尚为14台，收敛至5台前不创建`upgrade_quiesced` target；新batch仍须分别取得只读prepare与真实删除授权，snapshot另行quarantine/purge。
+1. 为`third-batch-v1`请求独立只读prepare授权；绑定clean HEAD、14成员inventory和create-new根，仅限一次list、两轮句柄及两轮hash。
+2. prepare闭合后才在repository-only范围扩展第三批delete授权面，并再次单独请求真实删除授权；注册项收敛至5台前不创建`upgrade_quiesced` target，snapshot另行quarantine/purge。
 3. 收敛后闭合第三场景，再以一台新guest完成连续L6；P05C使用独立guest。
 
 ## 验证入口

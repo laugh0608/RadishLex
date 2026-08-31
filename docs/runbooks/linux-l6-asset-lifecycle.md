@@ -134,6 +134,8 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 项目所有者随后只授权第二批只读prepare。从clean `f99ab2d`执行唯一attempt `l6-asset-retirement-prepare-20260831-second-batch-v1`：一次plain list确认18台全stopped及canonical inventory `bc4b55dd…31eb2`，4台目标唯一在册；7个锚点、两轮12文件零句柄和两轮完整bundle身份均通过。create-new根`RadishLex-L6-Asset-Retirement-Prepare-20260831-Second-Batch-v1`含9项manifest成员，SHA-256为`d802f331ac0d338ae25dc62b193f86446cd8e0191143172b7761e4d6bed8ac60`；terminal为`prepared`，delete/start/clone/move/guest/retry均为0。该结果冻结为后续控制输入，不授权删除；当前删除控制器仍硬锁`first-four-v1`。
 
+`1d671e9`在repository-only范围固定第三个互不重叠的`third-batch-v1`：`EFD15599…BBDD` rollback、`5EA2BAA2…27A2` remove与`E671DB9C…D465` reinstall三台completed terminal clone，账面27.99 GiB。新增`completed-operation-terminal`窄语义，逐类绑定format、UUID、maintenance完成态、receipt尾部、全停/零句柄字段及config/EFI/qcow2身份；rollback使用remove归档树中与原件byte-identical且满足owner `501:20`的既存副本。`394217A7…6682` repair completed clone原始host summary及父树为`501:0`，不满足prepare要求的operator root owner tuple，故失败关闭并移出本批，没有修改历史证据或放宽权限合同。14项prepare与10项delete回归、默认L6门禁通过；纯文件系统双轮复核通过3个锚点与3个bundle，allowlist SHA-256为`038a1522c065006d210091792985f36e721e85c6498699bc9443f34658c8e70a`。该阶段UTM查询为0，未来prepare根保持absent，delete控制器继续在创建输出前拒绝第三批，因此不构成prepare或mutation授权。
+
 ### 6.3 VM mutation
 
 - VM 删除前重新执行 prepare 的全部关键身份、全停和零句柄检查；
@@ -169,7 +171,7 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 1. repository-only allowlist、prepare 和 fake-runner 回归已实现并通过门禁；实现阶段未调用 UTM、未改资产。
 2. `first-four-v1`与`second-batch-v1`均已分别完成只读prepare、独立授权的唯一mutation并冻结manifest。
-3. 下一步只在repository-only范围从剩余9个候选中设计不超过4台的新batch；后续prepare与mutation继续各自独立授权，UTM注册列表清理不得退化为GUI批量删除或名称匹配。
+3. `third-batch-v1`已在repository-only范围固定3台；下一步只为它请求独立只读prepare授权。prepare闭合后还须先单独扩展delete控制授权面，再请求真实mutation授权；UTM注册列表清理不得退化为GUI批量删除或名称匹配。
 4. 注册项降至预算后，才创建唯一 `upgrade_quiesced` disposable target；case 闭合后先退休该 target。
 5. 建立一台新的连续 L6 guest，完成六类 operation 和完整正常生命周期，然后退休。
 6. snapshot 以两项一批 quarantine；确认 P05B 不再依赖后，另行 purge。

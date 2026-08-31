@@ -703,6 +703,8 @@ complete v2闭合`frozen`，inventory query/update为`2/1`，无start、clone、
 
 项目所有者随后批准P05B收敛：八个crash合同和自动门禁继续完整保留，真实系统阻塞样本固定为`install_prepared`、`install_artifacts_staged`、`upgrade_quiesced`，其余五个真实crash转为后续hardening。`first-four-v1`与`second-batch-v1`已按两份独立授权把注册项从22台降至14台，8个精确package均absent。当前仍未收敛到5台目标，因此继续暂停clone；剩余9个VM bundle、7个snapshot的精确建议处置及未来清理控制边界见[资产生命周期账本](linux-l6-asset-lifecycle.md)。后续批次不继承前两批prepare或删除授权。
 
+`1d671e9`随后只在repository-only范围固定`third-batch-v1`：rollback/remove/reinstall三台completed terminal clone共27.99 GiB，新增语义校验绑定各自历史终态与完整磁盘身份。repair completed clone因既存host evidence owner tuple不合规而失败关闭，不修改证据或放宽合同。3个锚点与3个bundle经纯文件系统双轮复核，默认L6门禁通过；未调用UTM或创建prepare根，delete控制器仍拒绝第三批。下一步仅可先为该批取得独立只读prepare授权，仍不授权clone、delete或其他mutation。
+
 ## 10. L6 完成与后续
 
 P05B L6只有在下列条件同时满足后完成：同一新guest、同一release pair与连续session闭合六步主序列；字体/dependency、startup正负向、XDG零写入/保留、真实process/package-manager lifecycle、断网与guest reboot对照通过；八个crash case的matrix/controller/checkpoint/resume自动合同全部通过；真实系统证据覆盖`install_prepared`、`install_artifacts_staged`和`upgrade_quiesced`三个代表恢复边界。其余五个真实crash属于后续hardening，不阻塞P05B/M5退出，也不得表述为真实通过。完成后仍然：
