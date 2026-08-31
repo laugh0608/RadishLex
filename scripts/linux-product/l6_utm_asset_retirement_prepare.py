@@ -32,7 +32,16 @@ HEX_64 = re.compile(r"[0-9a-f]{64}")
 SAFE_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,95}")
 STORAGES = frozenset(("operator", "utm-documents"))
 SEMANTICS = frozenset(
-    ("snapshot-source-vm", "release-pair", "repair-terminal", "opaque-hash")
+    (
+        "snapshot-source-vm",
+        "release-pair",
+        "repair-terminal",
+        "opaque-hash",
+        "frozen-disk-identity",
+        "utm-start-terminal",
+        "maintenance-repair-terminal",
+        "install-prepared-failed-closed-terminal",
+    )
 )
 
 
@@ -406,6 +415,7 @@ def load_allowlist(path: Path) -> RetirementAllowlist:
         uuids.add(asset.uuid)
         names.add(asset.name)
     batches: dict[str, RetirementBatch] = {}
+    assigned_asset_ids: set[str] = set()
     for item in value["batches"]:
         _require_keys(item, {"id", "asset_ids", "accounting_gib"}, "batch")
         batch_id = _require_safe_id(item["id"], "batch-id")
@@ -414,6 +424,8 @@ def load_allowlist(path: Path) -> RetirementAllowlist:
             raise RetirementPrepareError("batch-asset-count-or-duplicates-invalid")
         if any(asset_id not in assets for asset_id in asset_ids):
             raise RetirementPrepareError("batch-asset-not-allowlisted")
+        if assigned_asset_ids.intersection(asset_ids):
+            raise RetirementPrepareError("batch-asset-reused")
         accounting_gib = item["accounting_gib"]
         if not isinstance(accounting_gib, str) or not re.fullmatch(
             r"[0-9]{1,3}\.[0-9]{2}", accounting_gib
@@ -427,8 +439,11 @@ def load_allowlist(path: Path) -> RetirementAllowlist:
             accounting_gib=accounting_gib,
             assets=tuple(assets[asset_id] for asset_id in asset_ids),
         )
+        assigned_asset_ids.update(asset_ids)
     if not batches:
         raise RetirementPrepareError("allowlist-batches-empty")
+    if assigned_asset_ids != set(assets):
+        raise RetirementPrepareError("allowlist-assets-not-assigned-once")
     return RetirementAllowlist(
         operator_asset_root=operator_asset_root,
         utm_documents_root=utm_documents_root,
@@ -542,6 +557,12 @@ def _validate_anchor_semantics(
 ) -> None:
     if anchor.semantic == "opaque-hash":
         return
+    if anchor.semantic == "frozen-disk-identity":
+        _validate_frozen_disk_identity(path, asset)
+        return
+    if anchor.semantic == "install-prepared-failed-closed-terminal":
+        _validate_install_prepared_failed_closed(path)
+        return
     try:
         value = json.loads(path.read_bytes())
     except (OSError, json.JSONDecodeError) as exc:
@@ -579,6 +600,12 @@ def _validate_anchor_semantics(
         if actual != expected:
             raise RetirementPrepareError("snapshot-restorable-identity-mismatch")
         return
+    if anchor.semantic == "utm-start-terminal":
+        _validate_utm_start_terminal(value, asset)
+        return
+    if anchor.semantic == "maintenance-repair-terminal":
+        _validate_maintenance_repair_terminal(value, asset)
+        return
     if value.get("format") != "radishlex-linux-l6-repair-aborted-preserved-host-evidence-v1":
         raise RetirementPrepareError("repair-terminal-format-invalid")
     guest = value.get("guest")
@@ -595,6 +622,145 @@ def _validate_anchor_semantics(
     }
     if after != expected_after:
         raise RetirementPrepareError("repair-terminal-disk-identity-mismatch")
+
+
+def _validate_frozen_disk_identity(path: Path, asset: RetirementAsset) -> None:
+    value = _parse_key_value_evidence(path)
+    evidence_format = value.get("format")
+    if evidence_format == (
+        "radishlex-linux-l6-install-prepared-failed-closed-disk-identity-v1"
+    ):
+        uuid_key = "clone_uuid"
+        config_key = "config_sha256"
+        efi_key = "efi_sha256"
+        qcow2_key = "qcow2_sha256"
+        if (
+            value.get("registered_vms") != "all-stopped"
+            or value.get("clone_disk_handles") != "0"
+            or value.get("disposable_restore") != "passed"
+        ):
+            raise RetirementPrepareError("frozen-disk-terminal-invalid")
+    elif evidence_format == (
+        "radishlex-linux-l6-install-artifacts-staged-start-retry-"
+        "failure-postverify-d75818f-v1"
+    ):
+        uuid_key = None
+        config_key = "clone_config_sha256"
+        efi_key = "clone_efi_sha256"
+        qcow2_key = "clone_qcow2_sha256"
+        if (
+            value.get("registered_vms") != "all-stopped"
+            or value.get("target_vm") != "stopped"
+            or value.get("source_and_clone_disk_handles") != "0"
+            or value.get("terminal") != "failed-closed-stopped"
+            or value.get("postverify") != "failed-closed-preserved"
+        ):
+            raise RetirementPrepareError("frozen-disk-terminal-invalid")
+    elif evidence_format == "radishlex-linux-l6-d75818f-v3-start-failure-postverify-v1":
+        uuid_key = "target_uuid"
+        config_key = "target_config_sha256"
+        efi_key = "target_efi_sha256"
+        qcow2_key = "target_qcow2_sha256"
+        if (
+            value.get("registered_vms") != "all-stopped"
+            or value.get("target_vm") != "stopped"
+            or value.get("source_target_handles") != "0"
+            or value.get("terminal") != "failed-closed-stopped"
+            or value.get("postverify") != "failed-closed-preserved"
+        ):
+            raise RetirementPrepareError("frozen-disk-terminal-invalid")
+    else:
+        raise RetirementPrepareError("frozen-disk-evidence-format-invalid")
+    if uuid_key is not None and value.get(uuid_key) != asset.uuid:
+        raise RetirementPrepareError("frozen-disk-uuid-mismatch")
+    if (
+        value.get(config_key) != asset.config_sha256
+        or value.get(efi_key) != asset.efi_sha256
+        or value.get(qcow2_key) != asset.qcow2_sha256
+    ):
+        raise RetirementPrepareError("frozen-disk-identity-mismatch")
+
+
+def _validate_install_prepared_failed_closed(path: Path) -> None:
+    value = _parse_key_value_evidence(path)
+    if (
+        value.get("format")
+        != "radishlex-linux-l6-install-prepared-failed-closed-host-summary-v1"
+        or value.get("case") != "install_prepared"
+        or value.get("acceptance_invocations") != "1"
+        or value.get("checkpoint_count") != "1"
+        or value.get("dpkg_mutation") != "not_started"
+        or value.get("resume_invocations") != "0"
+        or value.get("postflight_invocations") != "0"
+        or value.get("outcome") != "failed-closed"
+    ):
+        raise RetirementPrepareError("install-prepared-terminal-invalid")
+
+
+def _validate_utm_start_terminal(
+    value: dict[str, object], asset: RetirementAsset
+) -> None:
+    if (
+        value.get("format") != "radishlex-linux-l6-utm-start-once-v1"
+        or value.get("clone_name") != asset.name
+        or value.get("clone_uuid") != asset.uuid
+        or value.get("outcome") != "failed-closed-stopped"
+        or value.get("start_invocations") != 1
+        or value.get("automatic_retry") != "not-performed"
+        or value.get("automatic_stop") != "not-performed"
+        or value.get("guest_exec") != "not-performed"
+        or value.get("input_transfer") != "not-performed"
+        or value.get("operation_id") != "not-generated"
+        or value.get("transaction") != "not-performed"
+    ):
+        raise RetirementPrepareError("utm-start-terminal-invalid")
+
+
+def _validate_maintenance_repair_terminal(
+    value: dict[str, object], asset: RetirementAsset
+) -> None:
+    clone = value.get("clone")
+    terminal = value.get("terminal")
+    virtual_machines = value.get("virtual_machines")
+    after = clone.get("after_shutdown") if isinstance(clone, dict) else None
+    if (
+        value.get("format")
+        != "radishlex-linux-l6-maintenance-refresh-repair-completed-noop-local-evidence-v1"
+        or not isinstance(clone, dict)
+        or not isinstance(after, dict)
+        or not isinstance(terminal, dict)
+        or not isinstance(virtual_machines, dict)
+        or clone.get("name") != asset.name
+        or clone.get("uuid") != asset.uuid
+        or after.get("config_sha256") != asset.config_sha256
+        or after.get("efi_sha256") != asset.efi_sha256
+        or after.get("qcow2_sha256") != asset.qcow2_sha256
+        or after.get("qcow2_open_handles") != 0
+        or terminal.get("maintenance_outcome") != "completed"
+        or terminal.get("terminal_classification")
+        != "completed_without_package_reapply"
+        or terminal.get("dpkg_mutation_executed") is not False
+        or virtual_machines.get("all_stopped_after") is not True
+    ):
+        raise RetirementPrepareError("maintenance-repair-terminal-invalid")
+
+
+def _parse_key_value_evidence(path: Path) -> dict[str, str]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise RetirementPrepareError("key-value-evidence-invalid") from exc
+    value: dict[str, str] = {}
+    for line in lines:
+        if not line or "=" not in line:
+            raise RetirementPrepareError("key-value-evidence-invalid")
+        key, item = line.split("=", 1)
+        if not re.fullmatch(r"[a-z0-9_]+", key) or key in value:
+            raise RetirementPrepareError("key-value-evidence-invalid")
+        value[key] = item
+    if not value:
+        raise RetirementPrepareError("key-value-evidence-invalid")
+    return value
 
 
 def read_batch_identities(

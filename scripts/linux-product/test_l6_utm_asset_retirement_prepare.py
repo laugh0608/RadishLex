@@ -256,6 +256,189 @@ class LinuxL6AssetRetirementPrepareTests(unittest.TestCase):
             with self.assertRaises(retirement.RetirementPrepareError):
                 retirement.load_allowlist(path)
 
+    def test_allowlist_rejects_asset_reuse_across_batches(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            fixture = Fixture.create(root)
+            path = root / "allowlist.json"
+            payload = {
+                "format": retirement.ALLOWLIST_FORMAT,
+                "storage_roots": {
+                    "operator": str(fixture.request.operator_asset_root),
+                    "utm-documents": str(fixture.request.utm_documents_root),
+                },
+                "assets": [fixture.allowlist_asset()],
+                "batches": [
+                    {
+                        "id": "synthetic-batch-one",
+                        "asset_ids": [ASSET_ID],
+                        "accounting_gib": "0.01",
+                    },
+                    {
+                        "id": "synthetic-batch-two",
+                        "asset_ids": [ASSET_ID],
+                        "accounting_gib": "0.01",
+                    },
+                ],
+            }
+            path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+            with self.assertRaises(retirement.RetirementPrepareError):
+                retirement.load_allowlist(path)
+
+            payload["batches"] = payload["batches"][:1]
+            unassigned = dict(payload["assets"][0])
+            unassigned["id"] = "synthetic-unassigned-candidate"
+            unassigned["relative_path"] = "Synthetic-Unassigned.utm"
+            unassigned["name"] = "Synthetic-Unassigned"
+            unassigned["uuid"] = "DDDDDDDD-DDDD-4DDD-8DDD-DDDDDDDDDDDD"
+            payload["assets"].append(unassigned)
+            path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+            with self.assertRaises(retirement.RetirementPrepareError):
+                retirement.load_allowlist(path)
+
+    def test_repository_allowlist_fixes_two_disjoint_four_asset_batches(self) -> None:
+        repository_root = Path(__file__).resolve().parents[2]
+        allowlist = retirement.load_allowlist(
+            repository_root
+            / "packaging/linux/l6-asset-retirement-allowlist.json"
+        )
+
+        first = allowlist.batches["first-four-v1"]
+        second = allowlist.batches["second-batch-v1"]
+        self.assertEqual(len(first.assets), 4)
+        self.assertEqual(
+            second.asset_ids,
+            (
+                "install-prepared-old-pair-failed-closed-80e49ce",
+                "install-artifacts-staged-double-start-failed-d75818f",
+                "install-artifacts-staged-single-start-failed-d75818f-v3",
+                "repair-completed-noop-b891ed1",
+            ),
+        )
+        self.assertEqual(second.accounting_gib, "37.62")
+        self.assertTrue(set(first.asset_ids).isdisjoint(second.asset_ids))
+        self.assertEqual(
+            {
+                anchor.semantic
+                for asset in second.assets
+                for anchor in asset.evidence_anchors
+            },
+            {
+                "frozen-disk-identity",
+                "install-prepared-failed-closed-terminal",
+                "maintenance-repair-terminal",
+                "utm-start-terminal",
+            },
+        )
+
+    def test_frozen_disk_identity_binds_uuid_and_current_hashes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = Fixture.create(Path(temporary).resolve())
+            asset = fixture.batch.assets[0]
+            evidence = Path(temporary) / "postverify.evidence.txt"
+            payload = (
+                "format=radishlex-linux-l6-d75818f-v3-start-failure-postverify-v1\n"
+                f"target_uuid={asset.uuid}\n"
+                "registered_vms=all-stopped\n"
+                "target_vm=stopped\n"
+                "source_target_handles=0\n"
+                "terminal=failed-closed-stopped\n"
+                "postverify=failed-closed-preserved\n"
+                f"target_config_sha256={asset.config_sha256}\n"
+                f"target_efi_sha256={asset.efi_sha256}\n"
+                f"target_qcow2_sha256={asset.qcow2_sha256}\n"
+            )
+            evidence.write_text(payload, encoding="utf-8")
+
+            retirement._validate_frozen_disk_identity(evidence, asset)
+            evidence.write_text(
+                payload.replace(asset.qcow2_sha256, "0" * 64),
+                encoding="utf-8",
+            )
+            with self.assertRaises(retirement.RetirementPrepareError):
+                retirement._validate_frozen_disk_identity(evidence, asset)
+
+    def test_failed_start_terminal_binds_target_and_zero_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = Fixture.create(Path(temporary).resolve())
+            asset = fixture.batch.assets[0]
+            value = {
+                "format": "radishlex-linux-l6-utm-start-once-v1",
+                "clone_name": asset.name,
+                "clone_uuid": asset.uuid,
+                "outcome": "failed-closed-stopped",
+                "start_invocations": 1,
+                "automatic_retry": "not-performed",
+                "automatic_stop": "not-performed",
+                "guest_exec": "not-performed",
+                "input_transfer": "not-performed",
+                "operation_id": "not-generated",
+                "transaction": "not-performed",
+            }
+
+            retirement._validate_utm_start_terminal(value, asset)
+            value["guest_exec"] = "performed"
+            with self.assertRaises(retirement.RetirementPrepareError):
+                retirement._validate_utm_start_terminal(value, asset)
+
+    def test_completed_noop_repair_terminal_binds_shutdown_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = Fixture.create(Path(temporary).resolve())
+            asset = fixture.batch.assets[0]
+            value = {
+                "format": (
+                    "radishlex-linux-l6-maintenance-refresh-repair-"
+                    "completed-noop-local-evidence-v1"
+                ),
+                "clone": {
+                    "name": asset.name,
+                    "uuid": asset.uuid,
+                    "after_shutdown": {
+                        "config_sha256": asset.config_sha256,
+                        "efi_sha256": asset.efi_sha256,
+                        "qcow2_sha256": asset.qcow2_sha256,
+                        "qcow2_open_handles": 0,
+                    },
+                },
+                "terminal": {
+                    "maintenance_outcome": "completed",
+                    "terminal_classification": (
+                        "completed_without_package_reapply"
+                    ),
+                    "dpkg_mutation_executed": False,
+                },
+                "virtual_machines": {"all_stopped_after": True},
+            }
+
+            retirement._validate_maintenance_repair_terminal(value, asset)
+            value["terminal"]["dpkg_mutation_executed"] = True
+            with self.assertRaises(retirement.RetirementPrepareError):
+                retirement._validate_maintenance_repair_terminal(value, asset)
+
+    def test_install_prepared_terminal_requires_failed_closed_no_dpkg(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            evidence = Path(temporary) / "terminal.evidence.txt"
+            payload = (
+                "format=radishlex-linux-l6-install-prepared-failed-closed-host-summary-v1\n"
+                "case=install_prepared\n"
+                "acceptance_invocations=1\n"
+                "checkpoint_count=1\n"
+                "dpkg_mutation=not_started\n"
+                "resume_invocations=0\n"
+                "postflight_invocations=0\n"
+                "outcome=failed-closed\n"
+            )
+            evidence.write_text(payload, encoding="utf-8")
+
+            retirement._validate_install_prepared_failed_closed(evidence)
+            evidence.write_text(
+                payload.replace("dpkg_mutation=not_started", "dpkg_mutation=started"),
+                encoding="utf-8",
+            )
+            with self.assertRaises(retirement.RetirementPrepareError):
+                retirement._validate_install_prepared_failed_closed(evidence)
+
 
 class Fixture:
     def __init__(

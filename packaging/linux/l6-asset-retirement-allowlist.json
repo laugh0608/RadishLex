@@ -117,6 +117,119 @@
           "semantic": "opaque-hash"
         }
       ]
+    },
+    {
+      "id": "install-prepared-old-pair-failed-closed-80e49ce",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-80e49ce-crash-install-prepared-v2.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-80e49ce-crash-install-prepared-v2",
+      "uuid": "FD24ADFF-B160-46F0-B100-10BAAF17C056",
+      "role": "install-prepared-old-pair-failed-closed",
+      "config_sha256": "cfb5d343a4fb10fd9384f470075169986a2a43b95aaf909b68af37eddd871f2d",
+      "efi_sha256": "0b797641e80ea0314017006730332811a44d0170dd334910fb52088b5b521418",
+      "qcow2_sha256": "4967234b09963df4f6bcd6d44f906c66d18e782092e727a0a220381b580e4b18",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Prepared-80e49ce-Failed-Closed/disk-identity.evidence.txt",
+          "sha256": "1c1d07e19e80e7fb0f7ba4f8686eb15a358c57f41becb629e112b9a3dad0b685",
+          "mode": "0600",
+          "semantic": "frozen-disk-identity"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Prepared-80e49ce-Failed-Closed/host-summary.evidence.txt",
+          "sha256": "dab8cde5b46547c2612f37a9282ba05e6de29c0ce4bb6866a070ffbee6561905",
+          "mode": "0600",
+          "semantic": "install-prepared-failed-closed-terminal"
+        }
+      ]
+    },
+    {
+      "id": "install-artifacts-staged-double-start-failed-d75818f",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged",
+      "uuid": "B0B826F6-D7D3-433C-8987-E2D6993A87B3",
+      "role": "install-artifacts-staged-double-start-failed",
+      "config_sha256": "038274cb1edb14009f70b536490315ea5d8ec73ba0a18a3a15f689c9d0c1af32",
+      "efi_sha256": "0b797641e80ea0314017006730332811a44d0170dd334910fb52088b5b521418",
+      "qcow2_sha256": "4967234b09963df4f6bcd6d44f906c66d18e782092e727a0a220381b580e4b18",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-Start-Retry-Failed-Closed/start-control/terminal.json",
+          "sha256": "73fa8da2aa2248775635df36f2914b931b1d974c670089a26f6ab38921429269",
+          "mode": "0600",
+          "semantic": "utm-start-terminal"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-Start-Retry-Failed-Closed/start-retry-failure.postverify.evidence.txt",
+          "sha256": "c77da8262fd1d1b66229b7327388faacaf7a46c3c0571cb8a80fddd90d9cb8e7",
+          "mode": "0600",
+          "semantic": "frozen-disk-identity"
+        }
+      ]
+    },
+    {
+      "id": "install-artifacts-staged-single-start-failed-d75818f-v3",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v3.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v3",
+      "uuid": "5B19AEF1-0F29-40B6-8F24-1B1929117DAB",
+      "role": "install-artifacts-staged-single-start-failed",
+      "config_sha256": "d04b00e173dc02065b5f4f4aab325b6d5d2614c43f37ae16abdc9f432c161ff4",
+      "efi_sha256": "0b797641e80ea0314017006730332811a44d0170dd334910fb52088b5b521418",
+      "qcow2_sha256": "4967234b09963df4f6bcd6d44f906c66d18e782092e727a0a220381b580e4b18",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v3-Start-Once/terminal.json",
+          "sha256": "1b1b38d12907c1d1f182cff42504987d5bac5661834b191746368586452acf4b",
+          "mode": "0600",
+          "semantic": "utm-start-terminal"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v3-Start-Failure-Postverify/postverify.evidence.txt",
+          "sha256": "a3788b3a7193df7f005e425e2aa68d05945ba279b17a05ecec331f3f8d182f45",
+          "mode": "0600",
+          "semantic": "frozen-disk-identity"
+        }
+      ]
+    },
+    {
+      "id": "repair-completed-noop-b891ed1",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-b891ed1-repair.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-b891ed1-repair",
+      "uuid": "BE3579E0-B150-438D-ABE0-53A8D46137F8",
+      "role": "repair-completed-without-package-reapply",
+      "config_sha256": "b06691d1d78e7659531c1513ee2d0ce2f909335a3a9ac6af13e05d970ba40ea9",
+      "efi_sha256": "3b117deffb09523584fb3658d0af1ea1aecf47671eef6e7943472488ac28a8f0",
+      "qcow2_sha256": "3ddd82a8109006ee6c0d68cfee4cd7d6b81147120e682e58fe9cb8aee47d4ddf",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Repair-b891ed1-Completed-Noop/local-evidence.json",
+          "sha256": "655f19f4911dc3792c00c1efb1334d6fa2ae28cac5bf91040bfdbfb3e67ab428",
+          "mode": "0600",
+          "semantic": "maintenance-repair-terminal"
+        }
+      ]
     }
   ],
   "batches": [
@@ -129,6 +242,16 @@
         "repair-aborted-80e49ce"
       ],
       "accounting_gib": "37.71"
+    },
+    {
+      "id": "second-batch-v1",
+      "asset_ids": [
+        "install-prepared-old-pair-failed-closed-80e49ce",
+        "install-artifacts-staged-double-start-failed-d75818f",
+        "install-artifacts-staged-single-start-failed-d75818f-v3",
+        "repair-completed-noop-b891ed1"
+      ],
+      "accounting_gib": "37.62"
     }
   ]
 }
