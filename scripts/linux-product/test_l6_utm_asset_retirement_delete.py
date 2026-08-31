@@ -264,7 +264,7 @@ class LinuxL6AssetRetirementDeleteTests(unittest.TestCase):
                 deletion.run_delete(ambiguous_first, runner=FakeRunner([]))
             self.assertFalse(ambiguous_first.output_root.exists())
 
-    def test_unknown_batch_is_rejected_before_output(self) -> None:
+    def test_unapproved_third_batch_is_rejected_before_output(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             fixture = DeleteFixture.create(Path(temporary).resolve())
             request = fixture.request_with(batch_id="third-batch-v1")

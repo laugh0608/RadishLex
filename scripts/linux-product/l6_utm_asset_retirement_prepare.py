@@ -41,6 +41,7 @@ SEMANTICS = frozenset(
         "utm-start-terminal",
         "maintenance-repair-terminal",
         "install-prepared-failed-closed-terminal",
+        "completed-operation-terminal",
     )
 )
 
@@ -563,6 +564,9 @@ def _validate_anchor_semantics(
     if anchor.semantic == "install-prepared-failed-closed-terminal":
         _validate_install_prepared_failed_closed(path)
         return
+    if anchor.semantic == "completed-operation-terminal":
+        _validate_completed_operation_terminal(path, asset)
+        return
     try:
         value = json.loads(path.read_bytes())
     except (OSError, json.JSONDecodeError) as exc:
@@ -695,6 +699,87 @@ def _validate_install_prepared_failed_closed(path: Path) -> None:
         or value.get("outcome") != "failed-closed"
     ):
         raise RetirementPrepareError("install-prepared-terminal-invalid")
+
+
+def _validate_completed_operation_terminal(
+    path: Path, asset: RetirementAsset
+) -> None:
+    value = _parse_key_value_evidence(path)
+    role = asset.role
+    if role == "rollback-completed-terminal":
+        expected_format = "radishlex-linux-l6-rollback-host-summary-v1"
+        operation = "rollback"
+        relation = "target_older"
+        completed_key = "rollback_completed"
+        config_key = "clone_final_config"
+        efi_key = "clone_final_efi"
+        qcow2_key = "clone_final_qcow2"
+        stopped = (
+            value.get("registered_vms") == value.get("registered_vms_stopped")
+            and value.get("registered_vms", "").isdigit()
+            and value.get("clone_qcow2_open_handles") == "0"
+            and value.get("vm_shutdown") == "normal-request|stopped"
+            and value.get("maintenance_retry") == "false"
+            and value.get("rollback_retry") == "false"
+        )
+    elif role == "remove-completed-terminal":
+        expected_format = "radishlex-linux-l6-remove-host-v1"
+        operation = "remove"
+        relation = "not_applicable"
+        completed_key = "remove_completed"
+        config_key = "clone_final_config"
+        efi_key = "clone_final_efi"
+        qcow2_key = "clone_final_qcow2"
+        stopped = (
+            value.get("registered_vms", "").endswith("|all-stopped")
+            and value.get("remove_rollback_s3_disk_handles") == "0"
+            and value.get("product_tree") == "absent"
+            and value.get("dpkg_info") == "absent"
+        )
+    elif role == "reinstall-completed-terminal":
+        expected_format = "radishlex-linux-l6-reinstall-host-v1"
+        operation = "install"
+        relation = "not_applicable"
+        completed_key = "reinstall_completed"
+        config_key = "clone_final_config"
+        efi_key = "clone_final_efi"
+        qcow2_key = "clone_final_qcow2"
+        stopped = (
+            value.get("registered_vms", "").endswith("|all-stopped")
+            and value.get("reinstall_remove_rollback_s3_disk_handles") == "0"
+            and value.get("remove_rollback_s3_disks") == "unchanged"
+        )
+    else:
+        raise RetirementPrepareError("completed-operation-role-invalid")
+
+    receipt = value.get("receipt", "").split("|")
+    if (
+        value.get("format") != expected_format
+        or value.get("clone_uuid") != asset.uuid
+        or value.get("maintenance_invocations") != "1"
+        or value.get("maintenance_outcome") != "completed"
+        or not receipt
+        or not HEX_64.fullmatch(receipt[0])
+        or receipt[-3:] != [operation, relation, "completed"]
+        or value.get(completed_key) != "true"
+        or value.get("acceptance_cli_executed") != "false"
+        or value.get("user_xdg_modified") != "false"
+        or not stopped
+    ):
+        raise RetirementPrepareError("completed-operation-terminal-invalid")
+    if (
+        _key_value_identity_hash(value, config_key) != asset.config_sha256
+        or _key_value_identity_hash(value, efi_key) != asset.efi_sha256
+        or _key_value_identity_hash(value, qcow2_key) != asset.qcow2_sha256
+    ):
+        raise RetirementPrepareError("completed-operation-disk-identity-mismatch")
+
+
+def _key_value_identity_hash(value: dict[str, str], key: str) -> str:
+    item = value.get(key)
+    if item is None:
+        return ""
+    return item.split("|", 1)[0]
 
 
 def _validate_utm_start_terminal(

@@ -297,7 +297,7 @@ class LinuxL6AssetRetirementPrepareTests(unittest.TestCase):
             with self.assertRaises(retirement.RetirementPrepareError):
                 retirement.load_allowlist(path)
 
-    def test_repository_allowlist_fixes_two_disjoint_four_asset_batches(self) -> None:
+    def test_repository_allowlist_fixes_three_disjoint_bounded_batches(self) -> None:
         repository_root = Path(__file__).resolve().parents[2]
         allowlist = retirement.load_allowlist(
             repository_root
@@ -306,6 +306,7 @@ class LinuxL6AssetRetirementPrepareTests(unittest.TestCase):
 
         first = allowlist.batches["first-four-v1"]
         second = allowlist.batches["second-batch-v1"]
+        third = allowlist.batches["third-batch-v1"]
         self.assertEqual(len(first.assets), 4)
         self.assertEqual(
             second.asset_ids,
@@ -319,6 +320,17 @@ class LinuxL6AssetRetirementPrepareTests(unittest.TestCase):
         self.assertEqual(second.accounting_gib, "37.62")
         self.assertTrue(set(first.asset_ids).isdisjoint(second.asset_ids))
         self.assertEqual(
+            third.asset_ids,
+            (
+                "rollback-completed-80e49ce-v3",
+                "remove-completed-80e49ce",
+                "reinstall-completed-80e49ce",
+            ),
+        )
+        self.assertEqual(third.accounting_gib, "27.99")
+        self.assertTrue(set(first.asset_ids).isdisjoint(third.asset_ids))
+        self.assertTrue(set(second.asset_ids).isdisjoint(third.asset_ids))
+        self.assertEqual(
             {
                 anchor.semantic
                 for asset in second.assets
@@ -331,6 +343,95 @@ class LinuxL6AssetRetirementPrepareTests(unittest.TestCase):
                 "utm-start-terminal",
             },
         )
+        self.assertEqual(
+            {
+                anchor.semantic
+                for asset in third.assets
+                for anchor in asset.evidence_anchors
+            },
+            {"completed-operation-terminal"},
+        )
+
+    def test_completed_operation_terminals_bind_role_uuid_and_disk(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = Fixture.create(Path(temporary).resolve())
+            asset = fixture.batch.assets[0]
+            terminal = Path(temporary) / "terminal.evidence.txt"
+            cases = (
+                (
+                    "rollback-completed-terminal",
+                    "radishlex-linux-l6-rollback-host-summary-v1",
+                    "rollback|target_older|completed",
+                    "rollback_completed=true\n"
+                    "registered_vms=7\n"
+                    "registered_vms_stopped=7\n"
+                    "clone_qcow2_open_handles=0\n"
+                    "vm_shutdown=normal-request|stopped\n"
+                    "maintenance_retry=false\n"
+                    "rollback_retry=false\n",
+                ),
+                (
+                    "remove-completed-terminal",
+                    "radishlex-linux-l6-remove-host-v1",
+                    "remove|not_applicable|completed",
+                    "remove_completed=true\n"
+                    "registered_vms=7|all-stopped\n"
+                    "remove_rollback_s3_disk_handles=0\n"
+                    "product_tree=absent\n"
+                    "dpkg_info=absent\n",
+                ),
+                (
+                    "reinstall-completed-terminal",
+                    "radishlex-linux-l6-reinstall-host-v1",
+                    "install|not_applicable|completed",
+                    "reinstall_completed=true\n"
+                    "registered_vms=7|all-stopped\n"
+                    "reinstall_remove_rollback_s3_disk_handles=0\n"
+                    "remove_rollback_s3_disks=unchanged\n",
+                ),
+            )
+            for role, evidence_format, receipt, role_fields in cases:
+                with self.subTest(role=role):
+                    candidate = retirement.RetirementAsset(
+                        asset_id=asset.asset_id,
+                        storage=asset.storage,
+                        relative_path=asset.relative_path,
+                        name=asset.name,
+                        uuid=asset.uuid,
+                        role=role,
+                        config_sha256=asset.config_sha256,
+                        efi_sha256=asset.efi_sha256,
+                        qcow2_sha256=asset.qcow2_sha256,
+                        qcow2_name=asset.qcow2_name,
+                        evidence_anchors=asset.evidence_anchors,
+                    )
+                    payload = (
+                        f"format={evidence_format}\n"
+                        f"clone_uuid={candidate.uuid}\n"
+                        "maintenance_invocations=1\n"
+                        "maintenance_outcome=completed\n"
+                        f"receipt={'0' * 64}|{receipt}\n"
+                        "acceptance_cli_executed=false\n"
+                        "user_xdg_modified=false\n"
+                        f"clone_final_config={candidate.config_sha256}\n"
+                        f"clone_final_efi={candidate.efi_sha256}\n"
+                        f"clone_final_qcow2={candidate.qcow2_sha256}|verified\n"
+                        f"{role_fields}"
+                    )
+                    terminal.write_text(payload, encoding="utf-8")
+                    retirement._validate_completed_operation_terminal(
+                        terminal, candidate
+                    )
+                    terminal.write_text(
+                        payload.replace(
+                            candidate.qcow2_sha256, "0" * 64
+                        ),
+                        encoding="utf-8",
+                    )
+                    with self.assertRaises(retirement.RetirementPrepareError):
+                        retirement._validate_completed_operation_terminal(
+                            terminal, candidate
+                        )
 
     def test_frozen_disk_identity_binds_uuid_and_current_hashes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -230,6 +230,75 @@
           "semantic": "maintenance-repair-terminal"
         }
       ]
+    },
+    {
+      "id": "rollback-completed-80e49ce-v3",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-80e49ce-rollback-v3.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-80e49ce-rollback-v3",
+      "uuid": "EFD15599-7177-4D55-BF17-173EE1F0BBDD",
+      "role": "rollback-completed-terminal",
+      "config_sha256": "6295c4ed8c4e24fa5d1cf28ad06ecffd2df3ca4819589a1ffe048416e4fa29ae",
+      "efi_sha256": "3b117deffb09523584fb3658d0af1ea1aecf47671eef6e7943472488ac28a8f0",
+      "qcow2_sha256": "9a28509a81a9a2f1befa15f4e178b7bdc46fa60ecb948933a29d722caa46995a",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Remove-80e49ce/source-rollback-host-summary.evidence.txt",
+          "sha256": "96b0f112e4b84f6b66bcfab2e713d761f9e2ca0f000ef53a019cebb467c3ce03",
+          "mode": "0600",
+          "semantic": "completed-operation-terminal"
+        }
+      ]
+    },
+    {
+      "id": "remove-completed-80e49ce",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-80e49ce-remove.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-80e49ce-remove",
+      "uuid": "5EA2BAA2-B9A1-46CC-B496-B37826DD27A2",
+      "role": "remove-completed-terminal",
+      "config_sha256": "92568d225c91f5af26cb8afc2f8e80639005ccbc5608447c590d63494b02626a",
+      "efi_sha256": "abea62d2ee3646c13f99c6cbe65b450c5b1597b907537c935225eddf5583c8fc",
+      "qcow2_sha256": "ad8a6c6bb719e76518cc21f452dbe24c8ba0ba42822d77e0070b2f3eeeeb55fa",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Remove-80e49ce/host-summary.evidence.txt",
+          "sha256": "4f546574a9a8d3c02446db161724854e3a02e59a863ea173b75e7d20ad3b6a98",
+          "mode": "0600",
+          "semantic": "completed-operation-terminal"
+        }
+      ]
+    },
+    {
+      "id": "reinstall-completed-80e49ce",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-80e49ce-reinstall.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-80e49ce-reinstall",
+      "uuid": "E671DB9C-5E2C-447B-9425-8D91D2CFD465",
+      "role": "reinstall-completed-terminal",
+      "config_sha256": "db1e59aecc8aac5ad222dc40c5d8284196f253adaecf06ada15d7ff9c5113b90",
+      "efi_sha256": "767537509fff2777c0226c0b03d56371e42229613bd2b8dea4f6b9810529a1c3",
+      "qcow2_sha256": "feb2ba7ec458b1e03175abc2a0aee0ae56cab318578389ca89e32afc88dcaaa5",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Reinstall-80e49ce/host-summary.evidence.txt",
+          "sha256": "cab5d5da4a2b0f44f77913d32977c52b09bf85462a1cbbecdaed973336f7157f",
+          "mode": "0600",
+          "semantic": "completed-operation-terminal"
+        }
+      ]
     }
   ],
   "batches": [
@@ -252,6 +321,15 @@
         "repair-completed-noop-b891ed1"
       ],
       "accounting_gib": "37.62"
+    },
+    {
+      "id": "third-batch-v1",
+      "asset_ids": [
+        "rollback-completed-80e49ce-v3",
+        "remove-completed-80e49ce",
+        "reinstall-completed-80e49ce"
+      ],
+      "accounting_gib": "27.99"
     }
   ]
 }
