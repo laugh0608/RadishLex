@@ -202,40 +202,117 @@ class LinuxL6AssetRetirementDeleteTests(unittest.TestCase):
                     )
                 self.assertFalse(request.output_root.exists())
 
+    def test_second_batch_uses_distinct_authorization_and_terminal_reason(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = DeleteFixture.create(
+                Path(temporary).resolve(), batch_id="second-batch-v1"
+            )
+            handles = fixture.handles_argv()
+            delete_argv = ("utmctl", "delete", prepare_test.ASSET_UUID)
+            runner = FakeRunner(
+                [
+                    observation(("utmctl", "list"), stdout=predelete_inventory()),
+                    observation(handles, exit_code=1),
+                    observation(handles, exit_code=1),
+                    observation(delete_argv),
+                    observation(("utmctl", "list"), stdout=postdelete_inventory()),
+                ],
+                after_call={4: fixture.remove_bundle},
+            )
+
+            result = deletion.run_delete(
+                fixture.request,
+                runner=runner,
+                binding_validator=fixture.binding,
+            )
+
+            self.assertEqual(result.outcome, "deleted")
+            request = read_json(fixture.request.output_root / "request.json")
+            self.assertEqual(
+                request["authorization"],
+                {
+                    "acknowledge_irreversible_bundle_removal": True,
+                    "at_most_one_delete_per_asset": True,
+                    "delete_second_batch_v1": True,
+                    "stop_without_retry_or_rollback": True,
+                },
+            )
+            terminal = read_json(fixture.request.output_root / "terminal.json")
+            self.assertEqual(
+                terminal["reason"], "second-batch-v1-deleted-and-verified"
+            )
+
+    def test_batch_authorization_must_match_before_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            second = DeleteFixture.create(root / "second", batch_id="second-batch-v1")
+            wrong_second = second.request_with(
+                authorized_delete_first_four_v1=True,
+                authorized_delete_second_batch_v1=False,
+            )
+            with self.assertRaises(deletion.RetirementDeleteError):
+                deletion.run_delete(wrong_second, runner=FakeRunner([]))
+            self.assertFalse(wrong_second.output_root.exists())
+
+            first = DeleteFixture.create(root / "first")
+            ambiguous_first = first.request_with(
+                authorized_delete_second_batch_v1=True
+            )
+            with self.assertRaises(deletion.RetirementDeleteError):
+                deletion.run_delete(ambiguous_first, runner=FakeRunner([]))
+            self.assertFalse(ambiguous_first.output_root.exists())
+
+    def test_unknown_batch_is_rejected_before_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = DeleteFixture.create(Path(temporary).resolve())
+            request = fixture.request_with(batch_id="third-batch-v1")
+            with self.assertRaises(deletion.RetirementDeleteError):
+                deletion.run_delete(request, runner=FakeRunner([]))
+            self.assertFalse(request.output_root.exists())
+
     def test_prior_prepare_is_recursively_bound_and_rejects_extra_entry(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            fixture = DeleteFixture.create(Path(temporary).resolve())
-            prior_root = fixture.request.prior_prepare_root
-            prepare_request = fixture.prepare_request(prior_root)
-            handles = fixture.handles_argv()
-            result = prepare.run_prepare(
-                prepare_request,
-                runner=prepare_test.FakeRunner(
-                    [
-                        observation(
-                            ("utmctl", "list"), stdout=predelete_inventory()
-                        ),
-                        observation(handles, exit_code=1),
-                        observation(handles, exit_code=1),
-                    ]
-                ),
-                binding_validator=fixture.prepare_binding,
-            )
-            self.assertEqual(result.outcome, "prepared")
-            fixture.request = fixture.request_with(
-                prior_prepare_manifest_sha256=result.manifest_sha256
-            )
+            root = Path(temporary).resolve()
+            for batch_id in ("first-four-v1", "second-batch-v1"):
+                fixture = DeleteFixture.create(root / batch_id, batch_id=batch_id)
+                prior_root = fixture.request.prior_prepare_root
+                prepare_request = fixture.prepare_request(prior_root)
+                handles = fixture.handles_argv()
+                result = prepare.run_prepare(
+                    prepare_request,
+                    runner=prepare_test.FakeRunner(
+                        [
+                            observation(
+                                ("utmctl", "list"), stdout=predelete_inventory()
+                            ),
+                            observation(handles, exit_code=1),
+                            observation(handles, exit_code=1),
+                        ]
+                    ),
+                    binding_validator=fixture.prepare_binding,
+                )
+                self.assertEqual(result.outcome, "prepared")
+                fixture.request = fixture.request_with(
+                    prior_prepare_manifest_sha256=result.manifest_sha256
+                )
 
-            self.assertEqual(
-                deletion.validate_prior_prepare(fixture.request, fixture.batch), 9
-            )
-            extra = prior_root / "unexpected.json"
-            extra.write_text("{}\n", encoding="utf-8")
-            extra.chmod(0o600)
-            with self.assertRaises(deletion.RetirementDeleteError):
-                deletion.validate_prior_prepare(fixture.request, fixture.batch)
+                self.assertEqual(
+                    deletion.validate_prior_prepare(
+                        fixture.request, fixture.batch
+                    ),
+                    9,
+                )
+                extra = prior_root / "unexpected.json"
+                extra.write_text("{}\n", encoding="utf-8")
+                extra.chmod(0o600)
+                with self.assertRaises(deletion.RetirementDeleteError):
+                    deletion.validate_prior_prepare(
+                        fixture.request, fixture.batch
+                    )
 
 
 class DeleteFixture:
@@ -250,10 +327,12 @@ class DeleteFixture:
         self.batch = batch
 
     @classmethod
-    def create(cls, root: Path) -> DeleteFixture:
+    def create(
+        cls, root: Path, *, batch_id: str = "first-four-v1"
+    ) -> DeleteFixture:
         fixture = prepare_test.Fixture.create(root)
         batch = prepare.RetirementBatch(
-            batch_id="first-four-v1",
+            batch_id=batch_id,
             asset_ids=fixture.batch.asset_ids,
             accounting_gib=fixture.batch.accounting_gib,
             assets=fixture.batch.assets,
@@ -266,7 +345,7 @@ class DeleteFixture:
             operator_asset_root=fixture.request.operator_asset_root,
             utm_documents_root=fixture.request.utm_documents_root,
             expected_allowlist_sha256="b" * 64,
-            batch_id="first-four-v1",
+            batch_id=batch_id,
             prior_prepare_root=(
                 fixture.request.operator_asset_root / "prior-prepare-evidence"
             ),
@@ -277,7 +356,8 @@ class DeleteFixture:
             ),
             command_timeout_seconds=15,
             delete_timeout_seconds=60,
-            authorized_delete_first_four_v1=True,
+            authorized_delete_first_four_v1=batch_id == "first-four-v1",
+            authorized_delete_second_batch_v1=batch_id == "second-batch-v1",
             authorized_at_most_one_delete_per_asset=True,
             authorized_stop_without_retry_or_rollback=True,
             acknowledge_irreversible_bundle_removal=True,
