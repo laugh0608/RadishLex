@@ -701,7 +701,7 @@ UI Move完成后，`complete-move-once`使用新attempt `d75818f-upgrade-quiesce
 
 complete v2闭合`frozen`，inventory query/update为`2/1`，无start、clone、delete/retry/rollback、guest/file、operation或transaction。20项control manifest SHA-256为`91778f4801ab950850dc08ce5ed728cfaf9fb6ac896a2d14acd512ac18a2c438`，单成员`Evidence-v5` manifest为`c37b552ead715d5b9716cfcc60ffc80f2ce62c99960ae9e4a904759765e5f715`；逐项hash、`0700`/`0600`、owner `501:20`、single-link通过。全部registration shell现场现冻结，不再update、move、start、delete或复用授权；下一步只可按六段序列另行授权clone前门，从专用壳产生新stopped target并物化不可变S2 EFI/qcow2，后续五段仍关闭。
 
-项目所有者随后批准P05B收敛：八个crash合同和自动门禁继续完整保留，真实系统阻塞样本固定为`install_prepared`、`install_artifacts_staged`、`upgrade_quiesced`，其余五个真实crash转为后续hardening。`first-four-v1`已把注册项从22台降至18台；`second-batch-v1`已在repository-only范围固定另4台候选，但尚未执行只读prepare或取得删除授权。当前仍未收敛到5台目标，因此继续暂停clone；剩余VM bundle、7个snapshot的精确建议处置及未来清理控制边界见[资产生命周期账本](linux-l6-asset-lifecycle.md)。后续批次不继承首批prepare或删除授权。
+项目所有者随后批准P05B收敛：八个crash合同和自动门禁继续完整保留，真实系统阻塞样本固定为`install_prepared`、`install_artifacts_staged`、`upgrade_quiesced`，其余五个真实crash转为后续hardening。`first-four-v1`已把注册项从22台降至18台；`second-batch-v1`的4台候选已闭合独立只读prepare，但删除控制与真实mutation仍关闭。当前仍未收敛到5台目标，因此继续暂停clone；剩余VM bundle、7个snapshot的精确建议处置及未来清理控制边界见[资产生命周期账本](linux-l6-asset-lifecycle.md)。后续批次不继承首批prepare或删除授权。
 
 ## 10. L6 完成与后续
 
