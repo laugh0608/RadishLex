@@ -148,6 +148,8 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 随后在clean `93abcb0`执行唯一attempt `l6-asset-retirement-delete-20260830-v1`。preflight重新闭合7个锚点、两轮完整hash、22台全停inventory与两轮零句柄；4次delete均exit 0、无stdout/stderr/timeout，post-list严格为22→21→20→19→18且全stopped，4个精确package均absent。terminal为`deleted`，list/delete为`5/4`，无retry/rollback/start/clone/move/guest；21项manifest SHA-256为`d6369fb297a53213537947b5c168aa68c8af4d97e588f4ffaed09b62e36d0449`。
 
+2026-08-31的repository-only提交`3e8796a`将同一逐台控制精确扩展到`second-batch-v1`：首批与第二批使用两个互斥授权位，未知batch、缺失授权或同时授权均在创建输出根前拒绝；request和terminal按实际batch记录授权与终态原因。10项fake-runner覆盖第二批成功、错授权、未知batch及两批prepare递归绑定；真实`d802f331…8ac60` prepare的9个成员也由新逻辑离线复核通过，未来delete根保持absent。此实现未调用UTM或delete，不构成真实mutation授权。
+
 ### 6.4 Snapshot quarantine 与 purge
 
 - quarantine 只允许将精确 snapshot 以同文件系统、no-replace rename 移入 create-new batch 目录；目标目录、父目录、manifest 和 S2/S3 身份必须调用前后复验；
@@ -165,7 +167,7 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 1. repository-only allowlist、prepare 和 fake-runner 回归已实现并通过门禁；实现阶段未调用 UTM、未改资产。
 2. `first-four-v1`的4台低价值失败现场已完成一次只读prepare并冻结manifest。
-3. 第一批VM mutation已闭合`deleted`；第二批4台的独立只读prepare也已闭合。下一步先在repository-only范围新增第二批精确删除控制与回归，再列明风险并另行授权真实mutation；UTM注册列表清理不得退化为GUI批量删除或名称匹配。
+3. 第一批VM mutation已闭合`deleted`；第二批prepare与精确删除控制也已在各自范围闭合。下一步列明风险并另行授权真实mutation；UTM注册列表清理不得退化为GUI批量删除或名称匹配。
 4. 注册项降至预算后，才创建唯一 `upgrade_quiesced` disposable target；case 闭合后先退休该 target。
 5. 建立一台新的连续 L6 guest，完成六类 operation 和完整正常生命周期，然后退休。
 6. snapshot 以两项一批 quarantine；确认 P05B 不再依赖后，另行 purge。
