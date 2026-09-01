@@ -715,6 +715,8 @@ complete v2闭合`frozen`，inventory query/update为`2/1`，无start、clone、
 
 `0ad0fc2`随后新增第四批独立且互斥的delete授权位、3资产精确约束及错授权/未知batch失败关闭。10项delete、15项prepare、完整L6和全仓门禁通过；clean HEAD对真实`9fca2876…b388`的9项成员完成纯离线递归绑定，精确返回3资产/27.09 GiB，未来delete根仍absent。未调用UTM或执行mutation；真实第四批删除仍须独立授权。
 
+项目所有者随后授权第四批唯一真实删除。从clean `de14d7c`重新闭合全部preflight，3次精确UUID delete与4次list严格形成11→10→9→8；三个package均absent，其余VM不变且全stopped，最终inventory `667af901…8d701`。18项manifest `d1e54838…3ed94`闭合`deleted`，无retry/rollback/start/clone/move/guest。四批授权均已消费；下一步只可repository-only设计剩余3个困难候选的第五批。
+
 ## 10. L6 完成与后续
 
 P05B L6只有在下列条件同时满足后完成：同一新guest、同一release pair与连续session闭合六步主序列；字体/dependency、startup正负向、XDG零写入/保留、真实process/package-manager lifecycle、断网与guest reboot对照通过；八个crash case的matrix/controller/checkpoint/resume自动合同全部通过；真实系统证据覆盖`install_prepared`、`install_artifacts_staged`和`upgrade_quiesced`三个代表恢复边界。其余五个真实crash属于后续hardening，不阻塞P05B/M5退出，也不得表述为真实通过。完成后仍然：
