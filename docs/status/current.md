@@ -45,14 +45,14 @@
 - clean `f99ab2d`的第二批prepare以`d802f331…8ac60`闭合；`3e8796a`新增独立授权位。项目所有者随后授权真实mutation，从clean `fd6d501`执行唯一attempt：4次精确delete与5次list闭合18→17→16→15→14，4个package均absent；21项manifest `d29ae273…bd88f`通过。
 - clean `2e49353`的第三批唯一delete以3次精确调用和4次list闭合14→13→12→11，3个package均absent；18项manifest `74e2ac3c…5ebdc`通过，无retry/rollback/start/clone/move/guest。
 - `8172c49`固定`fourth-batch-v1`三台/27.09 GiB；clean `edd58b0`的唯一prepare闭合`9fca2876…b388`，`0ad0fc2`新增delete授权位。clean `de14d7c`的唯一delete以3次调用、4次全停list闭合11→10→9→8，manifest `d1e54838…ed94`。
-- clean `3f51dbf`的第五批唯一prepare以8台全停、4个anchor、两轮零句柄/身份闭合`prepared`，manifest `ef4d45ea…ad3163`；授权已消费。delete控制固定3次并递归绑定prepare，10项/L6/全仓通过；未执行mutation。
+- 第五批prepare以8台全停、4个anchor闭合`ef4d45ea…ad3163`。clean `da15e97`的唯一delete以3次调用、4次全停list闭合8→5，package全absent；manifest `a65abab2…1b106`与最终inventory `dc91dd99…30fe8`通过。
 
 ## 停止线
 
-- 四个VM退休batch均闭合`deleted`，manifest为`d6369fb2…0449`、`d29ae273…bd88f`、`74e2ac3c…5ebdc`与`d1e54838…ed94`；授权均已消费，不得复跑。
-- 第五批prepare冻结、授权消费；delete/mutation未授权，三台bundle保留。
+- 五批均闭合`deleted`，第五批manifest为`a65abab2…1b106`；授权均已消费，不得复跑。
+- 第五批证据、projection与S2冻结，三台bundle已absent；不得恢复、重建、注册或复用。
 - 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
-- 四批共14个raw bundle已absent，账面130.41 GiB；prepare/delete证据与旧snapshot/handoff保留，其余disk不得启动、恢复、清理或复用。
+- 五批共17个raw bundle已absent，账面157.60 GiB；prepare/delete证据与旧snapshot/handoff保留，其余disk不得启动、恢复、清理或复用。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
 - 第三台rollback `EFD15599…BBDD`、remove `5EA2BAA2…27A2`与reinstall `E671DB9C…D465`的bundle均已删除；终态与退休证据冻结，不得恢复、重建、注册或复用。
 - 旧pair与新pair失败现场只保留持久证据；已删除的`FD24ADFF…17C056`、`B0B826F6…87B3`、`5B19AEF1…7DAB`及`BE3579E0…37F8`不得恢复package、重新注册、重建或复用。
@@ -64,16 +64,16 @@
 - fresh-boot resume attempt `d75818f-v4-install-artifacts-staged-fresh-boot-resume-20260827-v1`与host/guest根已消费并冻结；不得补拉、复跑、重建secret、retry/cleanup、再次resume/postflight或据`state-indeterminate`修补现场。调用后不得无授权追加query/start/stop/quit。
 - transaction-state v1/v2、deferred-result及terminal-stop根冻结。21项结果只证明该boot的transaction为`completed`，28项stop结果只证明同一授权调用内目标已正常停止并完成host交叉检查；不得补拉、复跑probe、query/start/stop、resume/dpkg/retry/repair/cleanup或改写现场。
 - registration shell v1-v3 control根与manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`/`ae3fb81b…4a511`冻结；不得覆盖、复用或解释为已创建。
-- v4、prepare v1/v2、complete v1/v2与`Evidence-v5`均冻结；专用壳位于既定外部package且默认路径absent。注册项收敛到预算前不得进入clone前门；不得改写壳体、start/delete/retry或进入guest。
+- v4、prepare v1/v2、complete v1/v2与`Evidence-v5`均冻结；专用壳位于既定外部package且默认路径absent。注册项现为5台预算；clone前门须重新绑定当前inventory，且不得改写壳体、start/delete/retry或进入guest。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（自 2026-09-01）
 
-1. 仅可另行授权第五批唯一mutation，绑定clean HEAD、8台inventory、prepare manifest与absent根。
-2. 三台验证删除后才可8→5；失败即停，不retry/rollback。
-3. 收敛后闭合第三场景，再以一台新guest完成连续L6；P05C使用独立guest。
+1. 先只在仓库内重新闭合`upgrade_quiesced` target的clone前门与当前5台inventory边界。
+2. 真实clone、start、input-preflight、crash、resume与terminal-stop仍分段授权；第五批不得复跑或恢复。
+3. 第三场景闭合后，以一台新guest完成连续L6；P05C使用独立guest。
 
 ## 验证入口
 
