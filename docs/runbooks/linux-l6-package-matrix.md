@@ -707,6 +707,8 @@ complete v2闭合`frozen`，inventory query/update为`2/1`，无start、clone、
 
 2026-09-01项目所有者授权唯一只读prepare后，从clean `e2098bb`以一次list确认14台全部stopped及inventory `4005023b…04bac`，3个锚点、两轮零句柄与双轮bundle身份通过；9项manifest `7bcfa513…f7f38`闭合`prepared`，无delete/start/clone/move/guest/retry。`22dcf30`随后在repository-only范围新增第三批独立delete授权位、3资产精确约束及错授权/未知batch失败关闭，并离线递归绑定该prepare；未执行删除，真实mutation继续单独授权。
 
+项目所有者随后授权第三批唯一真实删除。从clean `2e49353`重新闭合全部preflight后，3次精确UUID delete与4次list严格形成14→13→12→11，三个package均absent且其余VM全stopped；18项manifest `74e2ac3c…5ebdc`闭合`deleted`，无retry/rollback/start/clone/move/guest。前三批授权均已消费；当前仍高于5台预算，下一步只可先repository-only设计剩余6个候选的新batch。
+
 ## 10. L6 完成与后续
 
 P05B L6只有在下列条件同时满足后完成：同一新guest、同一release pair与连续session闭合六步主序列；字体/dependency、startup正负向、XDG零写入/保留、真实process/package-manager lifecycle、断网与guest reboot对照通过；八个crash case的matrix/controller/checkpoint/resume自动合同全部通过；真实系统证据覆盖`install_prepared`、`install_artifacts_staged`和`upgrade_quiesced`三个代表恢复边界。其余五个真实crash属于后续hardening，不阻塞P05B/M5退出，也不得表述为真实通过。完成后仍然：

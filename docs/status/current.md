@@ -43,15 +43,14 @@
 - `9300ed7`闭合原生Move恢复；prepare v1首门拒绝，v2以一次list闭合22台全停与15项`move-ready` manifest `dc6b0d01…738e`；唯一UI Move将部分壳移至授权路径且三文件身份不变。
 - complete v1因跨阶段HEAD误绑零调用失败；`9da8d0f`修复后，clean `e6968bf`的v2以两次全停list和一次update闭合`frozen`。20项manifest `91778f48…c438`、单成员壳体manifest `c37b552e…f715`通过，最终`Network=[]`且EFI/qcow2不变。
 - clean `f99ab2d`的第二批prepare以`d802f331…8ac60`闭合；`3e8796a`新增独立授权位。项目所有者随后授权真实mutation，从clean `fd6d501`执行唯一attempt：4次精确delete与5次list闭合18→17→16→15→14，4个package均absent；21项manifest `d29ae273…bd88f`通过。
-- clean `e2098bb`的第三批只读prepare以一次list确认14台全停，3个锚点、双轮零句柄/身份通过，9项manifest `7bcfa513…f7f38`闭合`prepared`。`22dcf30`新增第三批独立delete授权位并离线递归绑定该证据；尚未删除。
+- clean `2e49353`的第三批唯一delete以3次精确调用和4次list闭合14→13→12→11，3个package均absent；18项manifest `74e2ac3c…5ebdc`通过，无retry/rollback/start/clone/move/guest。
 ## 停止线
 
-- `first-four-v1`与`second-batch-v1`均已按各自独立授权闭合`deleted`，manifest分别为`d6369fb2…0449`与`d29ae273…bd88f`；两次授权均已消费，不得复跑。
-- `third-batch-v1` prepare已冻结且授权已消费，不得复跑；真实删除未授权，三台目标保持原状，不得沿用前两批授权。
+- 三个VM退休batch均按各自独立授权闭合`deleted`，manifest为`d6369fb2…0449`、`d29ae273…bd88f`与`74e2ac3c…5ebdc`；授权均已消费，不得复跑。
 - 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
-- 两批共8个raw bundle已absent，prepare/delete证据与旧snapshot/handoff继续保留；其余failure/mismatch disk仍不得启动、恢复、清理或复用。各套evidence不得混用。
+- 三批共11个raw bundle已absent，prepare/delete证据与旧snapshot/handoff继续保留；其余failure/mismatch disk仍不得启动、恢复、清理或复用。各套evidence不得混用。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
-- 首台与第二台rollback只保留host evidence；第三台`EFD15599…BBDD`、remove clone `5EA2BAA2…27A2`与reinstall clone `E671DB9C…D465`均为冻结terminal；不得resume、重试、再次调用、清理、恢复、直接复用或用于其他矩阵。
+- 第三台rollback `EFD15599…BBDD`、remove `5EA2BAA2…27A2`与reinstall `E671DB9C…D465`的bundle均已删除；终态与退休证据冻结，不得恢复、重建、注册或复用。
 - 旧pair与新pair失败现场只保留持久证据；已删除的`FD24ADFF…17C056`、`B0B826F6…87B3`、`5B19AEF1…7DAB`及`BE3579E0…37F8`不得恢复package、重新注册、重建或复用。
 - 新`d75818f` handoff只允许作为独立clean clone的冻结输入；第三台clone现为stopped source terminal，不得重启、复用、运行下一checkpoint、覆盖、热替换或与旧pair跨套混搭。
 - v2 clone失败证据`65160b12…c1859`须原样保留；不得沿用本批授权重试clone、重启UTM或把exit 0记为成功。
@@ -68,8 +67,8 @@
 
 ## 下一步（自 2026-09-01）
 
-1. 为`third-batch-v1`三个精确UUID另行请求唯一真实删除授权；逐台至多一次delete并验证单成员delta，异常即停且不retry/rollback。
-2. 注册项收敛至5台前不创建`upgrade_quiesced` target；snapshot另行quarantine/purge。
+1. 在repository-only范围从剩余6个候选中固定不超过4台的新batch；不调用UTM或继承前三批授权。
+2. 注册项尚为11台，收敛至5台前不创建`upgrade_quiesced` target；snapshot另行quarantine/purge。
 3. 收敛后闭合第三场景，再以一台新guest完成连续L6；P05C使用独立guest。
 
 ## 验证入口
