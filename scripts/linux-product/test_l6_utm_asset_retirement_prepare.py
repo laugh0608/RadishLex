@@ -297,7 +297,7 @@ class LinuxL6AssetRetirementPrepareTests(unittest.TestCase):
             with self.assertRaises(retirement.RetirementPrepareError):
                 retirement.load_allowlist(path)
 
-    def test_repository_allowlist_fixes_three_disjoint_bounded_batches(self) -> None:
+    def test_repository_allowlist_fixes_four_disjoint_bounded_batches(self) -> None:
         repository_root = Path(__file__).resolve().parents[2]
         allowlist = retirement.load_allowlist(
             repository_root
@@ -307,6 +307,7 @@ class LinuxL6AssetRetirementPrepareTests(unittest.TestCase):
         first = allowlist.batches["first-four-v1"]
         second = allowlist.batches["second-batch-v1"]
         third = allowlist.batches["third-batch-v1"]
+        fourth = allowlist.batches["fourth-batch-v1"]
         self.assertEqual(len(first.assets), 4)
         self.assertEqual(
             second.asset_ids,
@@ -331,6 +332,17 @@ class LinuxL6AssetRetirementPrepareTests(unittest.TestCase):
         self.assertTrue(set(first.asset_ids).isdisjoint(third.asset_ids))
         self.assertTrue(set(second.asset_ids).isdisjoint(third.asset_ids))
         self.assertEqual(
+            fourth.asset_ids,
+            (
+                "upgrade-completed-80e49ce",
+                "install-prepared-completed-stopped-d75818f-v3",
+                "install-artifacts-staged-completed-stopped-d75818f-v4",
+            ),
+        )
+        self.assertEqual(fourth.accounting_gib, "27.09")
+        for prior in (first, second, third):
+            self.assertTrue(set(prior.asset_ids).isdisjoint(fourth.asset_ids))
+        self.assertEqual(
             {
                 anchor.semantic
                 for asset in second.assets
@@ -350,6 +362,20 @@ class LinuxL6AssetRetirementPrepareTests(unittest.TestCase):
                 for anchor in asset.evidence_anchors
             },
             {"completed-operation-terminal"},
+        )
+        self.assertEqual(
+            {
+                anchor.semantic
+                for asset in fourth.assets
+                for anchor in asset.evidence_anchors
+            },
+            {
+                "install-artifacts-staged-stopped-disk",
+                "install-artifacts-staged-terminal-stop",
+                "install-prepared-stopped-terminal",
+                "opaque-hash",
+                "retained-terminal-snapshot",
+            },
         )
 
     def test_completed_operation_terminals_bind_role_uuid_and_disk(self) -> None:
@@ -432,6 +458,158 @@ class LinuxL6AssetRetirementPrepareTests(unittest.TestCase):
                         retirement._validate_completed_operation_terminal(
                             terminal, candidate
                         )
+
+    def test_fourth_batch_semantics_bind_retained_and_stopped_terminals(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fixture = Fixture.create(Path(temporary).resolve())
+            original = fixture.batch.assets[0]
+            retained = retirement.RetirementAsset(
+                asset_id=original.asset_id,
+                storage="utm-documents",
+                relative_path=original.relative_path,
+                name=original.name,
+                uuid=original.uuid,
+                role="upgrade-completed-terminal-with-retained-s3",
+                config_sha256=original.config_sha256,
+                efi_sha256=original.efi_sha256,
+                qcow2_sha256=original.qcow2_sha256,
+                qcow2_name=original.qcow2_name,
+                evidence_anchors=original.evidence_anchors,
+            )
+            snapshot = {
+                "format": "radishlex-linux-l6-local-snapshot-evidence-v1",
+                "source_vm": {
+                    "relative_path": f"UTM Documents/{retained.relative_path}",
+                    "name": retained.name,
+                    "uuid": retained.uuid,
+                    "source_vm_started_for_snapshot": False,
+                    "source_vm_stopped_before_snapshot": True,
+                    "source_vm_stopped_after_snapshot": True,
+                    "all_registered_vms_stopped_before_snapshot": True,
+                    "all_registered_vms_stopped_after_snapshot": True,
+                    "registered_running_vm_count_before_snapshot": 0,
+                    "registered_running_vm_count_after_snapshot": 0,
+                    "source_qcow_open_handles_before_snapshot": 0,
+                    "snapshot_qcow_open_handles_before_publish": 0,
+                },
+                "snapshot": {
+                    "relative_path": (
+                        "RadishLex-L6-Snapshots/"
+                        "S3-target-installed-80e49ce"
+                    ),
+                    "restorable_files": [
+                        {
+                            "path": "config.plist",
+                            "sha256": retained.config_sha256,
+                        },
+                        {
+                            "path": "Data/efi_vars.fd",
+                            "sha256": retained.efi_sha256,
+                        },
+                        {
+                            "path": f"Data/{retained.qcow2_name}",
+                            "sha256": retained.qcow2_sha256,
+                        },
+                    ],
+                },
+            }
+            retirement._validate_retained_terminal_snapshot(snapshot, retained)
+            snapshot["source_vm"]["uuid"] = PEER_UUID
+            with self.assertRaises(retirement.RetirementPrepareError):
+                retirement._validate_retained_terminal_snapshot(snapshot, retained)
+
+            prepared = retirement.RetirementAsset(
+                **{
+                    **retained.__dict__,
+                    "role": "install-prepared-completed-stopped",
+                }
+            )
+            stopped = Path(temporary) / "stopped.evidence.txt"
+            stopped.write_text(
+                "format=radishlex-linux-l6-host-stop-freeze-v1\n"
+                f"vm_uuid={prepared.uuid}\n"
+                "registered_vm_state=all_stopped\n"
+                "stop_kind=normal_host_request\n"
+                f"terminal_manifest_sha256={'0' * 64}\n"
+                f"config_sha256={prepared.config_sha256}\n"
+                f"efi_sha256={prepared.efi_sha256}\n"
+                f"qcow2_sha256={prepared.qcow2_sha256}\n"
+                "qcow2_hash_passes=2\n"
+                "controlled_file_open_handles=0\n"
+                "guest_commands_after_terminal=0\n"
+                "maintenance_invocations_after_terminal=0\n"
+                "next_case_started=false\n",
+                encoding="utf-8",
+            )
+            retirement._validate_install_prepared_stopped_terminal(
+                stopped, prepared
+            )
+            stopped.write_text(
+                stopped.read_text(encoding="utf-8").replace(
+                    "registered_vm_state=all_stopped",
+                    "registered_vm_state=started",
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaises(retirement.RetirementPrepareError):
+                retirement._validate_install_prepared_stopped_terminal(
+                    stopped, prepared
+                )
+
+            staged = retirement.RetirementAsset(
+                **{
+                    **retained.__dict__,
+                    "role": "install-artifacts-staged-completed-stopped",
+                }
+            )
+            terminal = {
+                "format": (
+                    "radishlex-linux-l6-utm-install-artifacts-staged-"
+                    "terminal-stop-v1"
+                ),
+                "target_name": staged.name,
+                "target_uuid": staged.uuid,
+                "outcome": "stopped-verified",
+                "reason": "single-graceful-request-and-all-stopped-cross-check",
+                "transaction": "completed-frozen-before-stop",
+                "registered_status_preflight": "started",
+                "graceful_stop_invocations": 1,
+                "maintenance_resume_invocations": 0,
+                "guest_exec_invocations": 0,
+                "file_push_invocations": 0,
+                "file_pull_invocations": 0,
+                "target_handles_terminal": "absent",
+                "terminal_relevant_host_process_count": 0,
+                "operation_id": "not-read-or-generated",
+                "automatic_retry": "not-performed",
+                "automatic_cleanup": "not-performed",
+                "automatic_force": "not-performed",
+                "automatic_kill": "not-performed",
+                "automatic_quit": "not-performed",
+                "automatic_repair": "not-performed",
+            }
+            retirement._validate_install_artifacts_staged_terminal_stop(
+                terminal, staged
+            )
+            disk = {
+                "format": "radishlex-linux-l6-utm-guest-network-ready-v1",
+                "target_package_name": staged.relative_path,
+                "target_package_path_sha256": "0" * 64,
+                "target_config_sha256": staged.config_sha256,
+                "target_descriptors": {
+                    "config": {"mode": "0644", "size": 3004},
+                    "efi": {"mode": "0644", "size": 655360},
+                    "qcow2": {"mode": "0644", "size": 10089988096},
+                },
+            }
+            retirement._validate_install_artifacts_staged_stopped_disk(
+                disk, staged
+            )
+            terminal["automatic_retry"] = "performed"
+            with self.assertRaises(retirement.RetirementPrepareError):
+                retirement._validate_install_artifacts_staged_terminal_stop(
+                    terminal, staged
+                )
 
     def test_frozen_disk_identity_binds_uuid_and_current_hashes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

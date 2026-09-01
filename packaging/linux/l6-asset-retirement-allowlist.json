@@ -299,6 +299,89 @@
           "semantic": "completed-operation-terminal"
         }
       ]
+    },
+    {
+      "id": "upgrade-completed-80e49ce",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-80e49ce.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-80e49ce",
+      "uuid": "193179D5-2595-4628-A063-9EFB73F8EC05",
+      "role": "upgrade-completed-terminal-with-retained-s3",
+      "config_sha256": "00bac87d0ae2a7803d89adc124c0900110ce7ee572d124a6077e919fa1956456",
+      "efi_sha256": "0846b1d30d19da1613d7021920d0fefa5502ea13f5889f804f596506a8459741",
+      "qcow2_sha256": "6b22499bda82e1f375bad9d3e6dc89e7bbee2c17001036e0470928e8bcd3b137",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Snapshots/S3-target-installed-80e49ce/local-snapshot.evidence.json",
+          "sha256": "79a3a170fa9e0c60a2de954cf8129e3fed5578a3bffb69d3f77ea42010e7494b",
+          "mode": "0600",
+          "semantic": "retained-terminal-snapshot"
+        }
+      ]
+    },
+    {
+      "id": "install-prepared-completed-stopped-d75818f-v3",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-d75818f-crash-install-prepared-v3.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-d75818f-crash-install-prepared-v3",
+      "uuid": "3EC83EB9-094B-492B-9756-D47E61C593B9",
+      "role": "install-prepared-completed-stopped",
+      "config_sha256": "62040cc9bf11508a89e3ffff8ba057367659ab85765a638c09fb1b7aab566eb9",
+      "efi_sha256": "f762ee52ca1a36caee51e88ae9c5ca9811090a0a52ba05bd52c805e856698e76",
+      "qcow2_sha256": "95e89df3b78bd5f7f80d332561a71f1859b14846e75a56b56a18db6fc810cb69",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Prepared-d75818f-v3-Stopped/host-summary.evidence.txt",
+          "sha256": "30ddb08a5d2c33e9b17410bcb2f4d1d03fcb6d66fe0f2addc430d2ce1e05a2b6",
+          "mode": "0600",
+          "semantic": "install-prepared-stopped-terminal"
+        }
+      ]
+    },
+    {
+      "id": "install-artifacts-staged-completed-stopped-d75818f-v4",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v4.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v4",
+      "uuid": "50B75F88-493D-42C0-A1DC-054DEC478038",
+      "role": "install-artifacts-staged-completed-stopped",
+      "config_sha256": "2de7280bbf906a8e899662c8686cb108755c83263150f5bd455490b050536195",
+      "efi_sha256": "7d78cb36070d7d4aa4e61c81173457ac8a200dcfd5f0796e86f5edb56a809839",
+      "qcow2_sha256": "758a606242ea1cec97bb82091bc033c702cf6bad9e6a84accfd01009f38a47ec",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Terminal-Stop-v1/terminal.json",
+          "sha256": "a2805550813e52f8ee22e44ee4ccf754849decb3e2b060fb0a210f8e7dcb9626",
+          "mode": "0600",
+          "semantic": "install-artifacts-staged-terminal-stop"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Terminal-Stop-v1/target-files-postflight.json",
+          "sha256": "2f42630b488859f8498e1ea5dcc7552870cd563e74cd3f65b57b54116ee0e000",
+          "mode": "0600",
+          "semantic": "install-artifacts-staged-stopped-disk"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Terminal-Stop-v1/files.sha256",
+          "sha256": "096fe01f5f082a4f494ddf6219b14add91f178c37a6a12b8fb1df635a6d5e133",
+          "mode": "0600",
+          "semantic": "opaque-hash"
+        }
+      ]
     }
   ],
   "batches": [
@@ -330,6 +413,15 @@
         "reinstall-completed-80e49ce"
       ],
       "accounting_gib": "27.99"
+    },
+    {
+      "id": "fourth-batch-v1",
+      "asset_ids": [
+        "upgrade-completed-80e49ce",
+        "install-prepared-completed-stopped-d75818f-v3",
+        "install-artifacts-staged-completed-stopped-d75818f-v4"
+      ],
+      "accounting_gib": "27.09"
     }
   ]
 }

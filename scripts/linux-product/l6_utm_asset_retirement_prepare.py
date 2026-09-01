@@ -42,6 +42,10 @@ SEMANTICS = frozenset(
         "maintenance-repair-terminal",
         "install-prepared-failed-closed-terminal",
         "completed-operation-terminal",
+        "retained-terminal-snapshot",
+        "install-prepared-stopped-terminal",
+        "install-artifacts-staged-terminal-stop",
+        "install-artifacts-staged-stopped-disk",
     )
 )
 
@@ -567,6 +571,9 @@ def _validate_anchor_semantics(
     if anchor.semantic == "completed-operation-terminal":
         _validate_completed_operation_terminal(path, asset)
         return
+    if anchor.semantic == "install-prepared-stopped-terminal":
+        _validate_install_prepared_stopped_terminal(path, asset)
+        return
     try:
         value = json.loads(path.read_bytes())
     except (OSError, json.JSONDecodeError) as exc:
@@ -603,6 +610,15 @@ def _validate_anchor_semantics(
         }
         if actual != expected:
             raise RetirementPrepareError("snapshot-restorable-identity-mismatch")
+        return
+    if anchor.semantic == "retained-terminal-snapshot":
+        _validate_retained_terminal_snapshot(value, asset)
+        return
+    if anchor.semantic == "install-artifacts-staged-terminal-stop":
+        _validate_install_artifacts_staged_terminal_stop(value, asset)
+        return
+    if anchor.semantic == "install-artifacts-staged-stopped-disk":
+        _validate_install_artifacts_staged_stopped_disk(value, asset)
         return
     if anchor.semantic == "utm-start-terminal":
         _validate_utm_start_terminal(value, asset)
@@ -773,6 +789,134 @@ def _validate_completed_operation_terminal(
         or _key_value_identity_hash(value, qcow2_key) != asset.qcow2_sha256
     ):
         raise RetirementPrepareError("completed-operation-disk-identity-mismatch")
+
+
+def _validate_retained_terminal_snapshot(
+    value: dict[str, object], asset: RetirementAsset
+) -> None:
+    source = value.get("source_vm")
+    snapshot = value.get("snapshot")
+    if (
+        asset.role != "upgrade-completed-terminal-with-retained-s3"
+        or value.get("format") != "radishlex-linux-l6-local-snapshot-evidence-v1"
+        or not isinstance(source, dict)
+        or not isinstance(snapshot, dict)
+        or source.get("relative_path") != f"UTM Documents/{asset.relative_path}"
+        or source.get("name") != asset.name
+        or source.get("uuid") != asset.uuid
+        or source.get("source_vm_started_for_snapshot") is not False
+        or source.get("source_vm_stopped_before_snapshot") is not True
+        or source.get("source_vm_stopped_after_snapshot") is not True
+        or source.get("all_registered_vms_stopped_before_snapshot") is not True
+        or source.get("all_registered_vms_stopped_after_snapshot") is not True
+        or source.get("registered_running_vm_count_before_snapshot") != 0
+        or source.get("registered_running_vm_count_after_snapshot") != 0
+        or source.get("source_qcow_open_handles_before_snapshot") != 0
+        or source.get("snapshot_qcow_open_handles_before_publish") != 0
+        or snapshot.get("relative_path")
+        != "RadishLex-L6-Snapshots/S3-target-installed-80e49ce"
+    ):
+        raise RetirementPrepareError("retained-terminal-snapshot-invalid")
+    files = snapshot.get("restorable_files")
+    if not isinstance(files, list):
+        raise RetirementPrepareError("retained-terminal-snapshot-files-invalid")
+    actual = {
+        item.get("path"): item.get("sha256")
+        for item in files
+        if isinstance(item, dict)
+    }
+    expected = {
+        "config.plist": asset.config_sha256,
+        "Data/efi_vars.fd": asset.efi_sha256,
+        f"Data/{asset.qcow2_name}": asset.qcow2_sha256,
+    }
+    if actual != expected:
+        raise RetirementPrepareError("retained-terminal-snapshot-identity-mismatch")
+
+
+def _validate_install_prepared_stopped_terminal(
+    path: Path, asset: RetirementAsset
+) -> None:
+    value = _parse_key_value_evidence(path)
+    if (
+        asset.role != "install-prepared-completed-stopped"
+        or value.get("format") != "radishlex-linux-l6-host-stop-freeze-v1"
+        or value.get("vm_uuid") != asset.uuid
+        or value.get("registered_vm_state") != "all_stopped"
+        or value.get("stop_kind") != "normal_host_request"
+        or not HEX_64.fullmatch(value.get("terminal_manifest_sha256", ""))
+        or value.get("config_sha256") != asset.config_sha256
+        or value.get("efi_sha256") != asset.efi_sha256
+        or value.get("qcow2_sha256") != asset.qcow2_sha256
+        or value.get("qcow2_hash_passes") != "2"
+        or value.get("controlled_file_open_handles") != "0"
+        or value.get("guest_commands_after_terminal") != "0"
+        or value.get("maintenance_invocations_after_terminal") != "0"
+        or value.get("next_case_started") != "false"
+    ):
+        raise RetirementPrepareError("install-prepared-stopped-terminal-invalid")
+
+
+def _validate_install_artifacts_staged_terminal_stop(
+    value: dict[str, object], asset: RetirementAsset
+) -> None:
+    if (
+        asset.role != "install-artifacts-staged-completed-stopped"
+        or value.get("format")
+        != "radishlex-linux-l6-utm-install-artifacts-staged-terminal-stop-v1"
+        or value.get("target_name") != asset.name
+        or value.get("target_uuid") != asset.uuid
+        or value.get("outcome") != "stopped-verified"
+        or value.get("reason")
+        != "single-graceful-request-and-all-stopped-cross-check"
+        or value.get("transaction") != "completed-frozen-before-stop"
+        or value.get("registered_status_preflight") != "started"
+        or value.get("graceful_stop_invocations") != 1
+        or value.get("maintenance_resume_invocations") != 0
+        or value.get("guest_exec_invocations") != 0
+        or value.get("file_push_invocations") != 0
+        or value.get("file_pull_invocations") != 0
+        or value.get("target_handles_terminal") != "absent"
+        or value.get("terminal_relevant_host_process_count") != 0
+        or value.get("operation_id") != "not-read-or-generated"
+        or value.get("automatic_retry") != "not-performed"
+        or value.get("automatic_cleanup") != "not-performed"
+        or value.get("automatic_force") != "not-performed"
+        or value.get("automatic_kill") != "not-performed"
+        or value.get("automatic_quit") != "not-performed"
+        or value.get("automatic_repair") != "not-performed"
+    ):
+        raise RetirementPrepareError(
+            "install-artifacts-staged-terminal-stop-invalid"
+        )
+
+
+def _validate_install_artifacts_staged_stopped_disk(
+    value: dict[str, object], asset: RetirementAsset
+) -> None:
+    descriptors = value.get("target_descriptors")
+    config = descriptors.get("config") if isinstance(descriptors, dict) else None
+    efi = descriptors.get("efi") if isinstance(descriptors, dict) else None
+    qcow2 = descriptors.get("qcow2") if isinstance(descriptors, dict) else None
+    if (
+        asset.role != "install-artifacts-staged-completed-stopped"
+        or value.get("format") != "radishlex-linux-l6-utm-guest-network-ready-v1"
+        or value.get("target_package_name") != asset.relative_path
+        or value.get("target_config_sha256") != asset.config_sha256
+        or not HEX_64.fullmatch(value.get("target_package_path_sha256", ""))
+        or not isinstance(config, dict)
+        or not isinstance(efi, dict)
+        or not isinstance(qcow2, dict)
+        or config.get("mode") != "0644"
+        or efi.get("mode") != "0644"
+        or qcow2.get("mode") != "0644"
+        or config.get("size") != 3004
+        or efi.get("size") != 655360
+        or qcow2.get("size") != 10089988096
+    ):
+        raise RetirementPrepareError(
+            "install-artifacts-staged-stopped-disk-invalid"
+        )
 
 
 def _key_value_identity_hash(value: dict[str, str], key: str) -> str:

@@ -287,13 +287,20 @@ class LinuxL6AssetRetirementDeleteTests(unittest.TestCase):
                 deletion.run_delete(wrong_third, runner=FakeRunner([]))
             self.assertFalse(wrong_third.output_root.exists())
 
-    def test_unknown_batch_is_rejected_before_output(self) -> None:
+    def test_fourth_and_unknown_batches_are_rejected_before_output(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             fixture = DeleteFixture.create(Path(temporary).resolve())
-            request = fixture.request_with(batch_id="unknown-batch-v1")
-            with self.assertRaises(deletion.RetirementDeleteError):
-                deletion.run_delete(request, runner=FakeRunner([]))
-            self.assertFalse(request.output_root.exists())
+            for batch_id in ("fourth-batch-v1", "unknown-batch-v1"):
+                with self.subTest(batch_id=batch_id):
+                    request = fixture.request_with(
+                        batch_id=batch_id,
+                        output_root=fixture.request.output_root.with_name(
+                            f"{fixture.request.output_root.name}-{batch_id}"
+                        ),
+                    )
+                    with self.assertRaises(deletion.RetirementDeleteError):
+                        deletion.run_delete(request, runner=FakeRunner([]))
+                    self.assertFalse(request.output_root.exists())
 
     def test_prior_prepare_is_recursively_bound_and_rejects_extra_entry(
         self,
