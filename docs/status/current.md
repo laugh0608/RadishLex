@@ -44,9 +44,11 @@
 - complete v1因跨阶段HEAD误绑零调用失败；`9da8d0f`修复后，clean `e6968bf`的v2以两次全停list和一次update闭合`frozen`。20项manifest `91778f48…c438`、单成员壳体manifest `c37b552e…f715`通过，最终`Network=[]`且EFI/qcow2不变。
 - clean `f99ab2d`的第二批prepare以`d802f331…8ac60`闭合；`3e8796a`新增独立授权位。项目所有者随后授权真实mutation，从clean `fd6d501`执行唯一attempt：4次精确delete与5次list闭合18→17→16→15→14，4个package均absent；21项manifest `d29ae273…bd88f`通过。
 - clean `2e49353`的第三批唯一delete以3次精确调用和4次list闭合14→13→12→11，3个package均absent；18项manifest `74e2ac3c…5ebdc`通过，无retry/rollback/start/clone/move/guest。
+- `8172c49`以repository-only方式固定`fourth-batch-v1`三台/27.09 GiB；allowlist `850f31b1…1a47`及离线身份通过，未调用UTM或prepare，delete仍拒绝本批。
 ## 停止线
 
 - 三个VM退休batch均按各自独立授权闭合`deleted`，manifest为`d6369fb2…0449`、`d29ae273…bd88f`与`74e2ac3c…5ebdc`；授权均已消费，不得复跑。
+- 第四批仅为committed设计，未授权prepare/delete；不得据此调用UTM或mutation。
 - 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
 - 三批共11个raw bundle已absent，prepare/delete证据与旧snapshot/handoff继续保留；其余failure/mismatch disk仍不得启动、恢复、清理或复用。各套evidence不得混用。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
@@ -67,8 +69,8 @@
 
 ## 下一步（自 2026-09-01）
 
-1. 在repository-only范围从剩余6个候选中固定不超过4台的新batch；不调用UTM或继承前三批授权。
-2. 注册项尚为11台，收敛至5台前不创建`upgrade_quiesced` target；snapshot另行quarantine/purge。
+1. 下一步仅可另行授权`fourth-batch-v1`唯一只读prepare：一次list、两轮句柄/身份，不含mutation或guest。
+2. 注册项尚为11台；第四批即使删除也只降至8台，仍须独立设计第五批。收敛至5台前不创建`upgrade_quiesced` target；snapshot另行处理。
 3. 收敛后闭合第三场景，再以一台新guest完成连续L6；P05C使用独立guest。
 
 ## 验证入口

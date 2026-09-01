@@ -19,7 +19,7 @@ P05B 剩余阻塞项为：
 - 同一连续 session 复验 dependency/font、startup 正负向、XDG 零写入/保留、process/package-manager lifecycle、断网与 guest reboot 对照；
 - P05C 仍使用另一台独立 guest，并重新取得系统授权。
 
-真实 VM 数量受预算约束：常驻注册锚点目标为 5 台，任一时刻最多增加 1 台 P05B disposable target，因此 P05B 注册预算上限为 6 台。注册项已由历史基线 22 台降至 14 台，但在进一步收敛至 5 台前仍不创建 `upgrade_quiesced` target；一个 disposable target 形成持久证据并退休后，才允许创建下一台。失败不会自动增加替代 clone。
+真实 VM 数量受预算约束：常驻注册锚点目标为 5 台，任一时刻最多增加 1 台 P05B disposable target，因此 P05B 注册预算上限为 6 台。注册项已由历史基线 22 台降至 11 台，但在进一步收敛至 5 台前仍不创建 `upgrade_quiesced` target；一个 disposable target 形成持久证据并退休后，才允许创建下一台。失败不会自动增加替代 clone。
 
 ## 2. 审计基线与计量口径
 
@@ -54,13 +54,13 @@ P05B 剩余阻塞项为：
 | 5 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-remove.utm`<br>`5EA2BAA2-B9A1-46CC-B496-B37826DD27A2` | 9.47 | remove completed terminal | 已删除；证据保留 |
 | 6 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-repair.utm`<br>`A3022255-ED08-4C66-92D3-075A6BB93107` | 9.45 | repair aborted-preserved | 已删除；证据保留 |
 | 7 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-rollback-v3.utm`<br>`EFD15599-7177-4D55-BF17-173EE1F0BBDD` | 9.46 | rollback completed terminal | 已删除；证据保留 |
-| 8 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce.utm`<br>`193179D5-2595-4628-A063-9EFB73F8EC05` | 9.44 | 第六套 target completed；已有 S3 | 证据归档后删除候选 |
+| 8 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce.utm`<br>`193179D5-2595-4628-A063-9EFB73F8EC05` | 9.44 | 第六套 target completed；已有 S3 | 已固定 `fourth-batch-v1`；prepare 待授权 |
 | 9 | `DOC/RadishLex-Debian13-ARM64-L6-823afca-repair.utm`<br>`394217A7-BFC9-43C8-94E6-539FF3F2B6FB` | 9.46 | repair completed terminal | 证据归档后删除候选 |
 | 10 | `DOC/RadishLex-Debian13-ARM64-L6-b891ed1-repair.utm`<br>`BE3579E0-B150-438D-ABE0-53A8D46137F8` | 9.45 | repair completed-noop | 已删除；证据保留 |
 | 11 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v3.utm`<br>`5B19AEF1-0F29-40B6-8F24-1B1929117DAB` | 9.39 | 第二场景 host start 失败现场 | 已删除；证据保留 |
-| 12 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v4.utm`<br>`50B75F88-493D-42C0-A1DC-054DEC478038` | 8.85 | 第二场景 completed/stopped-verified terminal | 证据归档后删除候选 |
+| 12 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v4.utm`<br>`50B75F88-493D-42C0-A1DC-054DEC478038` | 8.85 | 第二场景 completed/stopped-verified terminal | 已固定 `fourth-batch-v1`；prepare 待授权 |
 | 13 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged.utm`<br>`B0B826F6-D7D3-433C-8987-E2D6993A87B3` | 9.39 | 第二场景旧 start 失败现场 | 已删除；证据保留 |
-| 14 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-prepared-v3.utm`<br>`3EC83EB9-094B-492B-9756-D47E61C593B9` | 8.79 | 第一场景 completed terminal | 证据归档后删除候选 |
+| 14 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-prepared-v3.utm`<br>`3EC83EB9-094B-492B-9756-D47E61C593B9` | 8.79 | 第一场景 completed terminal | 已固定 `fourth-batch-v1`；prepare 待授权 |
 | 15 | `OP/Debian13-ARM64-CleanBase.utm`<br>`21197987-AEBB-46E6-ABDC-B9762F5C0CE4` | 7.06 | rescue clean base | 保留；常驻注册锚点 |
 | 16 | `OP/Debian13-ARM64-DependencyFrozen.utm`<br>`755199B1-1C18-4441-8A1E-D423C8DE0022` | 9.39 | immutable COW source；故意未注册 | 保留；不启动、不改写 |
 | 17 | `OP/Debian13-ARM64-L6-2fa1b8c.utm`<br>`EBF12F50-33B1-4711-B693-B57D419EAE2A` | 9.40 | 第二套 pre-receipt failure | 已删除；证据保留 |
@@ -72,6 +72,8 @@ P05B 剩余阻塞项为：
 | 23 | `OP/RadishLex/VMs/RadishLex-Debian13-ARM64.utm`<br>`E0168AA6-AFDA-4C81-9327-590DAC48C49B` | 17.24 | P04 已验收现场 | 保留；常驻注册锚点，不作 P05 mutation |
 
 三批已删除11个raw VM，账面103.32 GiB；剩余6个删除候选账面54.28 GiB。注册列表已从22台降至11台；全部剩余候选通过后才可能降至5台，任一候选未通过preflight时必须继续保留。
+
+第四批只选择其中3台：第六套target/S3、第一场景completed terminal和第二场景completed/stopped-verified terminal，精确账面27.09 GiB。第五套rolled-back与repair completed的既存终态证据树均为历史owner tuple `501:0`；第三套source terminal的最终EFI/qcow2又不同于更早的S2恢复点。三者继续作为候选保留，但不得修改历史证据、放宽`501:20`合同或把S2错误表述为当前bundle逐字节副本；它们须在后续第五批单独建模。
 
 ## 4. Snapshot 账本
 
@@ -138,6 +140,8 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 2026-09-01项目所有者独立授权第三批只读prepare。从clean `e2098bb`执行唯一attempt `l6-asset-retirement-prepare-20260901-third-batch-v1`：一次plain list确认14台全部stopped、canonical inventory `4005023b…04bac`且三台目标唯一在册；3个终态锚点、两轮9文件零句柄及两轮完整bundle身份均通过。create-new根`RadishLex-L6-Asset-Retirement-Prepare-20260901-Third-Batch-v1`为`0700`，10个文件均为`0600`/owner `501:20`/single-link且零xattr；9项manifest SHA-256为`7bcfa513debbe7e276a509509b44953abe0ecb9218aa78da41c7b533eb5f7f38`。terminal闭合`prepared`，inventory/handle/hash为`1/2/2`，delete/start/clone/move/guest/retry均为0；该授权已消费，不得复跑。
 
+`8172c49`在repository-only范围固定互不重叠的`fourth-batch-v1`：`193179D5…EC05`第六套target/S3、`3EC83EB9…593B9`第一场景completed terminal与`50B75F88…8038`第二场景completed/stopped-verified terminal，共27.09 GiB。新增窄语义分别绑定保留S3与source terminal一致身份、正常stop后的双重qcow2和零句柄、completed transaction后的唯一graceful stop/全停交叉检查；第二场景另绑定28项terminal-stop manifest。5个既存锚点均为`0600`/owner `501:20`，三套config/EFI/qcow2经两轮纯文件系统复核一致，allowlist SHA-256为`850f31b13e64dfa4a8fb253b30dbb89212beee3e022540d455302cf07caf1a47`。15项prepare、10项delete与默认L6门禁通过；UTM查询、prepare输出和mutation均为0，delete控制器显式拒绝第四批，因此下一步仍只能另行授权只读prepare。
+
 ### 6.3 VM mutation
 
 - VM 删除前重新执行 prepare 的全部关键身份、全停和零句柄检查；
@@ -177,7 +181,7 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 1. repository-only allowlist、prepare 和 fake-runner 回归已实现并通过门禁；实现阶段未调用 UTM、未改资产。
 2. 三个VM退休batch均已分别完成只读prepare、独立授权的唯一mutation并冻结manifest。
-3. 下一步只在repository-only范围从剩余6个候选中设计不超过4台的新batch；后续prepare与mutation继续各自独立授权，UTM注册列表清理不得退化为GUI批量删除或名称匹配。
+3. `fourth-batch-v1`已在repository-only范围固定3台；下一步只能另行授权其唯一只读prepare，mutation继续关闭。其余3个困难候选后续组成独立第五批，不修改历史证据或放宽owner/身份合同。
 4. 注册项降至预算后，才创建唯一 `upgrade_quiesced` disposable target；case 闭合后先退休该 target。
 5. 建立一台新的连续 L6 guest，完成六类 operation 和完整正常生命周期，然后退休。
 6. snapshot 以两项一批 quarantine；确认 P05B 不再依赖后，另行 purge。

@@ -709,6 +709,8 @@ complete v2闭合`frozen`，inventory query/update为`2/1`，无start、clone、
 
 项目所有者随后授权第三批唯一真实删除。从clean `2e49353`重新闭合全部preflight后，3次精确UUID delete与4次list严格形成14→13→12→11，三个package均absent且其余VM全stopped；18项manifest `74e2ac3c…5ebdc`闭合`deleted`，无retry/rollback/start/clone/move/guest。前三批授权均已消费；当前仍高于5台预算，下一步只可先repository-only设计剩余6个候选的新batch。
 
+`8172c49`随后只在repository-only范围固定`fourth-batch-v1`：第六套target/S3 `193179D5…EC05`、第一场景terminal `3EC83EB9…593B9`与第二场景terminal `50B75F88…8038`共27.09 GiB。5个既存锚点和三套config/EFI/qcow2经纯文件系统双轮复核，allowlist `850f31b1…1a47`、15项prepare、10项delete及默认L6合同通过；未调用UTM或创建prepare根，delete控制器仍拒绝第四批。另三台因历史owner tuple或S2后续身份差异留给独立第五批；下一步只能为第四批另行取得只读prepare授权，仍不授权delete/start/clone/move/guest/retry。
+
 ## 10. L6 完成与后续
 
 P05B L6只有在下列条件同时满足后完成：同一新guest、同一release pair与连续session闭合六步主序列；字体/dependency、startup正负向、XDG零写入/保留、真实process/package-manager lifecycle、断网与guest reboot对照通过；八个crash case的matrix/controller/checkpoint/resume自动合同全部通过；真实系统证据覆盖`install_prepared`、`install_artifacts_staged`和`upgrade_quiesced`三个代表恢复边界。其余五个真实crash属于后续hardening，不阻塞P05B/M5退出，也不得表述为真实通过。完成后仍然：
