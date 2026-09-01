@@ -45,12 +45,12 @@
 - clean `f99ab2d`的第二批prepare以`d802f331…8ac60`闭合；`3e8796a`新增独立授权位。项目所有者随后授权真实mutation，从clean `fd6d501`执行唯一attempt：4次精确delete与5次list闭合18→17→16→15→14，4个package均absent；21项manifest `d29ae273…bd88f`通过。
 - clean `2e49353`的第三批唯一delete以3次精确调用和4次list闭合14→13→12→11，3个package均absent；18项manifest `74e2ac3c…5ebdc`通过，无retry/rollback/start/clone/move/guest。
 - `8172c49`固定`fourth-batch-v1`三台/27.09 GiB；clean `edd58b0`的唯一prepare闭合`9fca2876…b388`，`0ad0fc2`新增delete授权位。clean `de14d7c`的唯一delete以3次调用、4次全停list闭合11→10→9→8，manifest `d1e54838…ed94`。
-- `fifth-batch-v1`仓库模型固定3台/27.19 GiB：`501:0`历史仅作reference，`501:20` Git projection为anchor；S2仅作与当前EFI/qcow2不同的predecessor。4个anchor、L6/全仓门禁通过；未调用UTM/prepare，delete仍拒绝。
+- clean `3f51dbf`的第五批唯一prepare以8台全停、4个anchor、两轮零句柄/身份闭合`prepared`，manifest `ef4d45ea…ad3163`；授权已消费。delete控制固定3次并递归绑定prepare，10项/L6/全仓通过；未执行mutation。
 
 ## 停止线
 
 - 四个VM退休batch均闭合`deleted`，manifest为`d6369fb2…0449`、`d29ae273…bd88f`、`74e2ac3c…5ebdc`与`d1e54838…ed94`；授权均已消费，不得复跑。
-- 第五批未授权现场动作或delete；三台bundle、历史证据与S2保留。
+- 第五批prepare冻结、授权消费；delete/mutation未授权，三台bundle保留。
 - 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
 - 四批共14个raw bundle已absent，账面130.41 GiB；prepare/delete证据与旧snapshot/handoff保留，其余disk不得启动、恢复、清理或复用。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
@@ -71,8 +71,8 @@
 
 ## 下一步（自 2026-09-01）
 
-1. 仅可另行授权第五批只读prepare，绑定届时clean HEAD、8台inventory、absent输出根及查询预算。
-2. 通过后仍须仓库内扩展delete并另行授权mutation；三台验证删除后才可8→5。
+1. 仅可另行授权第五批唯一mutation，绑定clean HEAD、8台inventory、prepare manifest与absent根。
+2. 三台验证删除后才可8→5；失败即停，不retry/rollback。
 3. 收敛后闭合第三场景，再以一台新guest完成连续L6；P05C使用独立guest。
 
 ## 验证入口

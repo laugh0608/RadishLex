@@ -719,6 +719,8 @@ complete v2闭合`frozen`，inventory query/update为`2/1`，无start、clone、
 
 repository-only `fifth-batch-v1`现固定剩余3台/27.19 GiB。`501:0`的rolled-back与repair历史文件仅作为hash reference，新的Git-tracked最小projection为唯一合规terminal语义入口，prepare仍要求其当前文件owner `501:20`；第三台同时绑定当前失败终态和保留S2，并强制S2是EFI/qcow2不同的predecessor、不是当前bundle副本。allowlist/projection为`0fd8426f…bcc3c2`/`f80b1bdf…0cfed`；4个anchor、三台bundle双轮纯文件系统复核、默认L6与全仓门禁通过，未调用UTM或创建prepare根。delete控制器继续拒绝第五批；下一步只能另行授权只读prepare，不能从本设计推导mutation。
 
+项目所有者随后只授权第五批唯一只读prepare。clean `3f51dbf`以一次list闭合8台全stopped与inventory `667af901…8d701`，4个anchor、两轮9文件零句柄及两轮bundle身份通过；9项manifest `ef4d45ea…ad3163`闭合`prepared`，delete/start/clone/move/guest/retry均为0且授权已消费。repository-only delete控制再新增独立第五批授权位，精确限制3个asset ID/3次上限并递归绑定prepare全部成员与专用控制hash；10项回归、默认L6、全仓门禁及真实manifest离线复核通过，未来delete根仍absent。真实mutation尚未授权。
+
 ## 10. L6 完成与后续
 
 P05B L6只有在下列条件同时满足后完成：同一新guest、同一release pair与连续session闭合六步主序列；字体/dependency、startup正负向、XDG零写入/保留、真实process/package-manager lifecycle、断网与guest reboot对照通过；八个crash case的matrix/controller/checkpoint/resume自动合同全部通过；真实系统证据覆盖`install_prepared`、`install_artifacts_staged`和`upgrade_quiesced`三个代表恢复边界。其余五个真实crash属于后续hardening，不阻塞P05B/M5退出，也不得表述为真实通过。完成后仍然：

@@ -40,12 +40,14 @@ BATCH_AUTHORIZATION_FIELDS = {
     "second-batch-v1": "delete_second_batch_v1",
     "third-batch-v1": "delete_third_batch_v1",
     "fourth-batch-v1": "delete_fourth_batch_v1",
+    "fifth-batch-v1": "delete_fifth_batch_v1",
 }
 BATCH_ASSET_COUNTS = {
     "first-four-v1": 4,
     "second-batch-v1": 4,
     "third-batch-v1": 3,
     "fourth-batch-v1": 3,
+    "fifth-batch-v1": 3,
 }
 SUPPORTED_BATCH_IDS = frozenset(BATCH_AUTHORIZATION_FIELDS)
 
@@ -74,6 +76,7 @@ class DeleteRequest:
     authorized_delete_second_batch_v1: bool
     authorized_delete_third_batch_v1: bool
     authorized_delete_fourth_batch_v1: bool
+    authorized_delete_fifth_batch_v1: bool
     authorized_at_most_one_delete_per_asset: bool
     authorized_stop_without_retry_or_rollback: bool
     acknowledge_irreversible_bundle_removal: bool
@@ -126,6 +129,7 @@ class DeleteRequest:
             "second-batch-v1": self.authorized_delete_second_batch_v1,
             "third-batch-v1": self.authorized_delete_third_batch_v1,
             "fourth-batch-v1": self.authorized_delete_fourth_batch_v1,
+            "fifth-batch-v1": self.authorized_delete_fifth_batch_v1,
         }
         if not batch_authorizations[self.batch_id]:
             raise RetirementDeleteError(
@@ -402,30 +406,47 @@ def validate_delete_bindings(request: DeleteRequest) -> DeleteBinding:
         batch is None
         or expected_asset_count is None
         or len(batch.assets) != expected_asset_count
+        or (
+            request.batch_id == "fifth-batch-v1"
+            and batch.asset_ids != prepare.FIFTH_BATCH_ASSET_IDS
+        )
     ):
         raise RetirementDeleteError("retirement-batch-invalid")
-    prior = validate_prior_prepare(request, batch)
-    return DeleteBinding(
-        evidence={
-            "allowlist_asset_count": len(batch.assets),
-            "allowlist_sha256": allowlist_sha256,
-            "batch_accounting_gib": batch.accounting_gib,
-            "batch_id": batch.batch_id,
-            "control_sha256": control_sha256,
-            "format": EVIDENCE_FORMAT,
-            "prior_prepare_entries_verified": prior,
-            "prior_prepare_manifest_sha256": (
-                request.prior_prepare_manifest_sha256
-            ),
-            "repository_clean": True,
-            "repository_head": head,
-        },
-        batch=batch,
+    fifth_batch_control_sha256 = None
+    if request.batch_id == "fifth-batch-v1":
+        fifth_batch_control_sha256 = prepare._validate_repository_file(
+            request.repository_root / prepare.FIFTH_BATCH_CONTROL_RELATIVE_PATH,
+            Path(prepare.fifth_batch.__file__),
+        )
+    prior = validate_prior_prepare(
+        request,
+        batch,
+        expected_fifth_batch_control_sha256=fifth_batch_control_sha256,
     )
+    evidence = {
+        "allowlist_asset_count": len(batch.assets),
+        "allowlist_sha256": allowlist_sha256,
+        "batch_accounting_gib": batch.accounting_gib,
+        "batch_id": batch.batch_id,
+        "control_sha256": control_sha256,
+        "format": EVIDENCE_FORMAT,
+        "prior_prepare_entries_verified": prior,
+        "prior_prepare_manifest_sha256": (
+            request.prior_prepare_manifest_sha256
+        ),
+        "repository_clean": True,
+        "repository_head": head,
+    }
+    if fifth_batch_control_sha256 is not None:
+        evidence["fifth_batch_control_sha256"] = fifth_batch_control_sha256
+    return DeleteBinding(evidence=evidence, batch=batch)
 
 
 def validate_prior_prepare(
-    request: DeleteRequest, batch: prepare.RetirementBatch
+    request: DeleteRequest,
+    batch: prepare.RetirementBatch,
+    *,
+    expected_fifth_batch_control_sha256: str | None = None,
 ) -> int:
     manifest = request.prior_prepare_root / "files.sha256"
     if clone_control._sha256_file(manifest) != request.prior_prepare_manifest_sha256:
@@ -475,6 +496,12 @@ def validate_prior_prepare(
         or prior_binding.get("repository_clean") is not True
     ):
         raise RetirementDeleteError("prior-prepare-binding-semantic-drift")
+    if request.batch_id == "fifth-batch-v1" and (
+        expected_fifth_batch_control_sha256 is None
+        or prior_binding.get("fifth_batch_control_sha256")
+        != expected_fifth_batch_control_sha256
+    ):
+        raise RetirementDeleteError("prior-prepare-fifth-control-drift")
     if (
         prior_terminal.get("format") != prepare.EVIDENCE_FORMAT
         or prior_terminal.get("batch_id") != request.batch_id
@@ -495,6 +522,10 @@ def validate_prior_prepare(
     if first != second:
         raise RetirementDeleteError("prior-prepare-identity-round-drift")
     validate_prior_identities(first, batch)
+    validate_prior_anchors(
+        _read_json(request.prior_prepare_root / "evidence-anchors.json"),
+        batch,
+    )
     prior_inventory = _observation_from_json(
         request.prior_prepare_root / "utmctl-list-once.json",
         ("utmctl", "list"),
@@ -509,6 +540,28 @@ def validate_prior_prepare(
         )
         prepare._require_zero_handles(observation, expected_lsof)
     return entries
+
+
+def validate_prior_anchors(
+    value: dict[str, object], batch: prepare.RetirementBatch
+) -> None:
+    expected = [
+        {
+            "asset_id": asset.asset_id,
+            "index": index,
+            "semantic": anchor.semantic,
+            "sha256": anchor.sha256,
+        }
+        for asset in batch.assets
+        for index, anchor in enumerate(asset.evidence_anchors, start=1)
+    ]
+    if value != {
+        "anchors_verified": len(expected),
+        "assets_verified": len(batch.assets),
+        "format": prepare.EVIDENCE_FORMAT,
+        "verified": expected,
+    }:
+        raise RetirementDeleteError("prior-prepare-anchors-drift")
 
 
 def validate_prior_identities(
@@ -703,6 +756,9 @@ def parse_args() -> argparse.Namespace:
         "--authorized-delete-fourth-batch-v1", action="store_true"
     )
     parser.add_argument(
+        "--authorized-delete-fifth-batch-v1", action="store_true"
+    )
+    parser.add_argument(
         "--authorized-at-most-one-delete-per-asset", action="store_true"
     )
     parser.add_argument(
@@ -742,6 +798,9 @@ def main() -> int:
         ),
         authorized_delete_fourth_batch_v1=(
             args.authorized_delete_fourth_batch_v1
+        ),
+        authorized_delete_fifth_batch_v1=(
+            args.authorized_delete_fifth_batch_v1
         ),
         authorized_at_most_one_delete_per_asset=(
             args.authorized_at_most_one_delete_per_asset

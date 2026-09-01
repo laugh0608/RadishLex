@@ -211,6 +211,7 @@ class LinuxL6AssetRetirementDeleteTests(unittest.TestCase):
                 ("second-batch-v1", "delete_second_batch_v1"),
                 ("third-batch-v1", "delete_third_batch_v1"),
                 ("fourth-batch-v1", "delete_fourth_batch_v1"),
+                ("fifth-batch-v1", "delete_fifth_batch_v1"),
             ):
                 with self.subTest(batch_id=batch_id):
                     fixture = DeleteFixture.create(
@@ -299,16 +300,24 @@ class LinuxL6AssetRetirementDeleteTests(unittest.TestCase):
                 deletion.run_delete(wrong_fourth, runner=FakeRunner([]))
             self.assertFalse(wrong_fourth.output_root.exists())
 
-    def test_fifth_and_unknown_batches_are_rejected_before_output(self) -> None:
+            fifth = DeleteFixture.create(
+                root / "fifth", batch_id="fifth-batch-v1"
+            )
+            wrong_fifth = fifth.request_with(
+                authorized_delete_fourth_batch_v1=True,
+                authorized_delete_fifth_batch_v1=False,
+            )
+            with self.assertRaises(deletion.RetirementDeleteError):
+                deletion.run_delete(wrong_fifth, runner=FakeRunner([]))
+            self.assertFalse(wrong_fifth.output_root.exists())
+
+    def test_unknown_batch_is_rejected_before_output(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary).resolve()
-            for batch_id in ("fifth-batch-v1", "unknown-batch-v1"):
-                with self.subTest(batch_id=batch_id):
-                    fixture = DeleteFixture.create(root / batch_id)
-                    request = fixture.request_with(batch_id=batch_id)
-                    with self.assertRaises(deletion.RetirementDeleteError):
-                        deletion.run_delete(request, runner=FakeRunner([]))
-                    self.assertFalse(request.output_root.exists())
+            fixture = DeleteFixture.create(Path(temporary).resolve())
+            request = fixture.request_with(batch_id="unknown-batch-v1")
+            with self.assertRaises(deletion.RetirementDeleteError):
+                deletion.run_delete(request, runner=FakeRunner([]))
+            self.assertFalse(request.output_root.exists())
 
     def test_prior_prepare_is_recursively_bound_and_rejects_extra_entry(
         self,
@@ -320,6 +329,7 @@ class LinuxL6AssetRetirementDeleteTests(unittest.TestCase):
                 "second-batch-v1",
                 "third-batch-v1",
                 "fourth-batch-v1",
+                "fifth-batch-v1",
             ):
                 fixture = DeleteFixture.create(root / batch_id, batch_id=batch_id)
                 prior_root = fixture.request.prior_prepare_root
@@ -345,16 +355,38 @@ class LinuxL6AssetRetirementDeleteTests(unittest.TestCase):
 
                 self.assertEqual(
                     deletion.validate_prior_prepare(
-                        fixture.request, fixture.batch
+                        fixture.request,
+                        fixture.batch,
+                        expected_fifth_batch_control_sha256=(
+                            "e" * 64
+                            if batch_id == "fifth-batch-v1"
+                            else None
+                        ),
                     ),
                     9,
                 )
+                if batch_id == "fifth-batch-v1":
+                    with self.assertRaisesRegex(
+                        deletion.RetirementDeleteError,
+                        "prior-prepare-fifth-control-drift",
+                    ):
+                        deletion.validate_prior_prepare(
+                            fixture.request,
+                            fixture.batch,
+                            expected_fifth_batch_control_sha256="f" * 64,
+                        )
                 extra = prior_root / "unexpected.json"
                 extra.write_text("{}\n", encoding="utf-8")
                 extra.chmod(0o600)
                 with self.assertRaises(deletion.RetirementDeleteError):
                     deletion.validate_prior_prepare(
-                        fixture.request, fixture.batch
+                        fixture.request,
+                        fixture.batch,
+                        expected_fifth_batch_control_sha256=(
+                            "e" * 64
+                            if batch_id == "fifth-batch-v1"
+                            else None
+                        ),
                     )
 
 
@@ -403,6 +435,7 @@ class DeleteFixture:
             authorized_delete_second_batch_v1=batch_id == "second-batch-v1",
             authorized_delete_third_batch_v1=batch_id == "third-batch-v1",
             authorized_delete_fourth_batch_v1=batch_id == "fourth-batch-v1",
+            authorized_delete_fifth_batch_v1=batch_id == "fifth-batch-v1",
             authorized_at_most_one_delete_per_asset=True,
             authorized_stop_without_retry_or_rollback=True,
             acknowledge_irreversible_bundle_removal=True,
@@ -435,17 +468,20 @@ class DeleteFixture:
     def prepare_binding(
         self, request: prepare.PrepareRequest
     ) -> prepare.BindingResult:
+        evidence = {
+            "allowlist_asset_count": len(self.batch.assets),
+            "allowlist_sha256": request.expected_allowlist_sha256,
+            "batch_accounting_gib": self.batch.accounting_gib,
+            "batch_id": self.batch.batch_id,
+            "control_sha256": "d" * 64,
+            "format": prepare.EVIDENCE_FORMAT,
+            "repository_clean": True,
+            "repository_head": request.expected_repository_head,
+        }
+        if self.batch.batch_id == "fifth-batch-v1":
+            evidence["fifth_batch_control_sha256"] = "e" * 64
         return prepare.BindingResult(
-            evidence={
-                "allowlist_asset_count": len(self.batch.assets),
-                "allowlist_sha256": request.expected_allowlist_sha256,
-                "batch_accounting_gib": self.batch.accounting_gib,
-                "batch_id": self.batch.batch_id,
-                "control_sha256": "d" * 64,
-                "format": prepare.EVIDENCE_FORMAT,
-                "repository_clean": True,
-                "repository_head": request.expected_repository_head,
-            },
+            evidence=evidence,
             batch=self.batch,
         )
 

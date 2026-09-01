@@ -174,6 +174,10 @@ repository-only `fifth-batch-v1`随后固定最后三台：`9C5638D7…AC6C` rol
 
 allowlist SHA-256为`0fd8426f31334f2e746c570b2495ca6fbb7f6ece6c8fe8d5a8e1f4cb97bcc3c2`。离线只读复核通过3个projection anchor、1个S2 anchor及三台current config/EFI/qcow2双轮完整hash；没有调用UTM、`lsof`、prepare、delete、start、clone、move或guest，也没有创建外部输出根。通用prepare 15项、第五批专属2项、delete 10项、默认L6与全仓门禁通过；delete控制器显式拒绝`fifth-batch-v1`，因此下一步仍只能另行授权只读prepare，真实mutation还须后续repository-only控制扩展和另一份授权。
 
+项目所有者随后只授权`fifth-batch-v1`唯一只读prepare。从clean `3f51dbf`执行attempt `l6-asset-retirement-prepare-20260901-fifth-batch-v1`：一次plain list确认8台全部stopped且canonical inventory仍为`667af901…8d701`，三个目标唯一在册；3个projection anchor与1个S2 anchor、两轮9文件零句柄及两轮完整bundle身份全部通过。create-new根`RadishLex-L6-Asset-Retirement-Prepare-20260901-Fifth-Batch-v1`为`0700`，9个manifest成员均为`0600`/owner `501:20`/single-link且零xattr；manifest SHA-256为`ef4d45ea330682cd447f6faca5383d3d69b5a97f543ead93959effae33ad3163`。terminal闭合`prepared`，inventory/handle/hash为`1/2/2`，delete/start/clone/move/guest/retry均为0；授权已消费且不得复跑。
+
+repository-only delete控制随后新增第五批独立且互斥的授权位，只接受精确3个asset ID及最多3次逐UUID delete；preflight递归绑定上述9项prepare成员、4个anchor、专用第五批控制hash、两轮bundle身份、8台inventory和两轮零句柄。10项fake-runner、默认L6与全仓门禁通过；新逻辑对真实`ef4d45ea…ad3163`完成纯离线复核，未来delete根仍absent。该阶段未调用UTM或执行mutation；真实删除必须另行授权。
+
 ### 6.4 Snapshot quarantine 与 purge
 
 - quarantine 只允许将精确 snapshot 以同文件系统、no-replace rename 移入 create-new batch 目录；目标目录、父目录、manifest 和 S2/S3 身份必须调用前后复验；
@@ -191,7 +195,7 @@ allowlist SHA-256为`0fd8426f31334f2e746c570b2495ca6fbb7f6ece6c8fe8d5a8e1f4cb97b
 
 1. repository-only allowlist、prepare 和 fake-runner 回归已实现并通过门禁；实现阶段未调用 UTM、未改资产。
 2. 四个VM退休batch均已分别完成只读prepare、独立授权的唯一mutation并冻结manifest。
-3. 第五批repository-only模型已闭合；下一步只能先取得独立只读prepare授权，不修改历史证据、放宽owner/身份合同或继承前四批授权。
+3. 第五批只读prepare已闭合且授权消费，repository-only delete控制与门禁通过；下一步只能另行请求唯一真实mutation授权。
 4. 注册项降至预算后，才创建唯一 `upgrade_quiesced` disposable target；case 闭合后先退休该 target。
 5. 建立一台新的连续 L6 guest，完成六类 operation 和完整正常生命周期，然后退休。
 6. snapshot 以两项一批 quarantine；确认 P05B 不再依赖后，另行 purge。
