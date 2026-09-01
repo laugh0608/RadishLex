@@ -54,13 +54,13 @@ P05B 剩余阻塞项为：
 | 5 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-remove.utm`<br>`5EA2BAA2-B9A1-46CC-B496-B37826DD27A2` | 9.47 | remove completed terminal | 已删除；证据保留 |
 | 6 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-repair.utm`<br>`A3022255-ED08-4C66-92D3-075A6BB93107` | 9.45 | repair aborted-preserved | 已删除；证据保留 |
 | 7 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce-rollback-v3.utm`<br>`EFD15599-7177-4D55-BF17-173EE1F0BBDD` | 9.46 | rollback completed terminal | 已删除；证据保留 |
-| 8 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce.utm`<br>`193179D5-2595-4628-A063-9EFB73F8EC05` | 9.44 | 第六套 target completed；已有 S3 | `fourth-batch-v1` prepare 已闭合；delete 未授权 |
+| 8 | `DOC/RadishLex-Debian13-ARM64-L6-80e49ce.utm`<br>`193179D5-2595-4628-A063-9EFB73F8EC05` | 9.44 | 第六套 target completed；已有 S3 | `fourth-batch-v1` delete 控制就绪；mutation 未授权 |
 | 9 | `DOC/RadishLex-Debian13-ARM64-L6-823afca-repair.utm`<br>`394217A7-BFC9-43C8-94E6-539FF3F2B6FB` | 9.46 | repair completed terminal | 证据归档后删除候选 |
 | 10 | `DOC/RadishLex-Debian13-ARM64-L6-b891ed1-repair.utm`<br>`BE3579E0-B150-438D-ABE0-53A8D46137F8` | 9.45 | repair completed-noop | 已删除；证据保留 |
 | 11 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v3.utm`<br>`5B19AEF1-0F29-40B6-8F24-1B1929117DAB` | 9.39 | 第二场景 host start 失败现场 | 已删除；证据保留 |
-| 12 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v4.utm`<br>`50B75F88-493D-42C0-A1DC-054DEC478038` | 8.85 | 第二场景 completed/stopped-verified terminal | `fourth-batch-v1` prepare 已闭合；delete 未授权 |
+| 12 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v4.utm`<br>`50B75F88-493D-42C0-A1DC-054DEC478038` | 8.85 | 第二场景 completed/stopped-verified terminal | `fourth-batch-v1` delete 控制就绪；mutation 未授权 |
 | 13 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged.utm`<br>`B0B826F6-D7D3-433C-8987-E2D6993A87B3` | 9.39 | 第二场景旧 start 失败现场 | 已删除；证据保留 |
-| 14 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-prepared-v3.utm`<br>`3EC83EB9-094B-492B-9756-D47E61C593B9` | 8.79 | 第一场景 completed terminal | `fourth-batch-v1` prepare 已闭合；delete 未授权 |
+| 14 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-crash-install-prepared-v3.utm`<br>`3EC83EB9-094B-492B-9756-D47E61C593B9` | 8.79 | 第一场景 completed terminal | `fourth-batch-v1` delete 控制就绪；mutation 未授权 |
 | 15 | `OP/Debian13-ARM64-CleanBase.utm`<br>`21197987-AEBB-46E6-ABDC-B9762F5C0CE4` | 7.06 | rescue clean base | 保留；常驻注册锚点 |
 | 16 | `OP/Debian13-ARM64-DependencyFrozen.utm`<br>`755199B1-1C18-4441-8A1E-D423C8DE0022` | 9.39 | immutable COW source；故意未注册 | 保留；不启动、不改写 |
 | 17 | `OP/Debian13-ARM64-L6-2fa1b8c.utm`<br>`EBF12F50-33B1-4711-B693-B57D419EAE2A` | 9.40 | 第二套 pre-receipt failure | 已删除；证据保留 |
@@ -144,6 +144,8 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 项目所有者随后独立授权第四批唯一只读prepare。从clean `edd58b0`执行attempt `l6-asset-retirement-prepare-20260901-fourth-batch-v1`：一次plain list确认11台全部stopped、canonical inventory `be170018…603b1f3`且三个目标唯一在册；5个终态锚点、两轮9文件零句柄及两轮完整bundle身份均通过。create-new根`RadishLex-L6-Asset-Retirement-Prepare-20260901-Fourth-Batch-v1`为`0700`，10个文件均为`0600`/owner `501:20`/single-link且零xattr；9项manifest SHA-256为`9fca287626c95482c070a7c7a90834adc2eb295d264d2e83a18287e9ccc7b388`。terminal闭合`prepared`，inventory/handle/hash为`1/2/2`，delete/start/clone/move/guest/retry均为0；授权已消费且不得复跑，delete仍须repository-only扩展控制并取得独立mutation授权。
 
+`0ad0fc2`将逐台删除控制扩展至`fourth-batch-v1`：新增独立且与前三批互斥的授权位，资产数精确固定为3；错授权、未知batch、prepare额外成员或身份漂移均在输出前失败关闭。10项delete、15项prepare、完整L6与全仓门禁通过；clean `0ad0fc2`对真实`9fca2876…b388`的9项prepare成员纯离线递归绑定成功，精确返回3个资产/27.09 GiB，未来delete根仍absent。本批未调用UTM或执行mutation；真实删除须独立授权。
+
 ### 6.3 VM mutation
 
 - VM 删除前重新执行 prepare 的全部关键身份、全停和零句柄检查；
@@ -183,7 +185,7 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 1. repository-only allowlist、prepare 和 fake-runner 回归已实现并通过门禁；实现阶段未调用 UTM、未改资产。
 2. 三个VM退休batch均已分别完成只读prepare、独立授权的唯一mutation并冻结manifest。
-3. `fourth-batch-v1`的唯一只读prepare已闭合并冻结；下一步只在repository-only范围扩展其delete授权面，真实mutation仍关闭。其余3个困难候选后续组成独立第五批，不修改历史证据或放宽owner/身份合同。
+3. `fourth-batch-v1`的prepare与delete控制已闭合；下一步只能另行授权唯一真实mutation。其余3个困难候选后续组成独立第五批，不修改历史证据或放宽owner/身份合同。
 4. 注册项降至预算后，才创建唯一 `upgrade_quiesced` disposable target；case 闭合后先退休该 target。
 5. 建立一台新的连续 L6 guest，完成六类 operation 和完整正常生命周期，然后退休。
 6. snapshot 以两项一批 quarantine；确认 P05B 不再依赖后，另行 purge。

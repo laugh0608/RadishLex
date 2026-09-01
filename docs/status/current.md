@@ -44,11 +44,11 @@
 - complete v1因跨阶段HEAD误绑零调用失败；`9da8d0f`修复后，clean `e6968bf`的v2以两次全停list和一次update闭合`frozen`。20项manifest `91778f48…c438`、单成员壳体manifest `c37b552e…f715`通过，最终`Network=[]`且EFI/qcow2不变。
 - clean `f99ab2d`的第二批prepare以`d802f331…8ac60`闭合；`3e8796a`新增独立授权位。项目所有者随后授权真实mutation，从clean `fd6d501`执行唯一attempt：4次精确delete与5次list闭合18→17→16→15→14，4个package均absent；21项manifest `d29ae273…bd88f`通过。
 - clean `2e49353`的第三批唯一delete以3次精确调用和4次list闭合14→13→12→11，3个package均absent；18项manifest `74e2ac3c…5ebdc`通过，无retry/rollback/start/clone/move/guest。
-- `8172c49`以repository-only方式固定`fourth-batch-v1`三台/27.09 GiB；clean `edd58b0`的唯一只读prepare以一次11台全停list、5个锚点、两轮9文件零句柄和双轮身份闭合`prepared`，manifest `9fca2876…b388`；delete仍拒绝本批。
+- `8172c49`固定`fourth-batch-v1`三台/27.09 GiB；clean `edd58b0`的唯一prepare以一次11台全停list、5个锚点、两轮9文件零句柄和双轮身份闭合`9fca2876…b388`。`0ad0fc2`新增独立delete授权位并离线绑定该manifest。
 ## 停止线
 
 - 三个VM退休batch均按各自独立授权闭合`deleted`，manifest为`d6369fb2…0449`、`d29ae273…bd88f`与`74e2ac3c…5ebdc`；授权均已消费，不得复跑。
-- 第四批prepare授权已消费，证据冻结且不得复跑；delete尚未扩展或授权。
+- 第四批prepare授权已消费且不得复跑；delete控制已就绪，但mutation未授权。
 - 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
 - 三批共11个raw bundle已absent，prepare/delete证据与旧snapshot/handoff继续保留；其余failure/mismatch disk仍不得启动、恢复、清理或复用。各套evidence不得混用。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
@@ -69,8 +69,8 @@
 
 ## 下一步（自 2026-09-01）
 
-1. 下一步仅repository-only扩展第四批delete授权面并绑定冻结prepare；不得调用UTM或mutation。
-2. 控制实现和离线复核通过后，真实第四批删除仍须另行列出精确UUID、调用次数与不可恢复影响并取得独立授权。注册项尚为11台；即使删除第四批也只降至8台，仍须独立设计第五批。
+1. 下一步仅可另行授权`fourth-batch-v1`唯一真实删除：3次精确delete、4次list，失败即停，不retry/rollback/start/clone/move/guest。
+2. 注册项尚为11台；删除第四批也只降至8台，仍须独立设计第五批。
 3. 收敛后闭合第三场景，再以一台新guest完成连续L6；P05C使用独立guest。
 
 ## 验证入口
