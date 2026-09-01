@@ -202,47 +202,61 @@ class LinuxL6AssetRetirementDeleteTests(unittest.TestCase):
                     )
                 self.assertFalse(request.output_root.exists())
 
-    def test_second_batch_uses_distinct_authorization_and_terminal_reason(
+    def test_later_batches_use_distinct_authorization_and_terminal_reason(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            fixture = DeleteFixture.create(
-                Path(temporary).resolve(), batch_id="second-batch-v1"
-            )
-            handles = fixture.handles_argv()
-            delete_argv = ("utmctl", "delete", prepare_test.ASSET_UUID)
-            runner = FakeRunner(
-                [
-                    observation(("utmctl", "list"), stdout=predelete_inventory()),
-                    observation(handles, exit_code=1),
-                    observation(handles, exit_code=1),
-                    observation(delete_argv),
-                    observation(("utmctl", "list"), stdout=postdelete_inventory()),
-                ],
-                after_call={4: fixture.remove_bundle},
-            )
+            root = Path(temporary).resolve()
+            for batch_id, authorization in (
+                ("second-batch-v1", "delete_second_batch_v1"),
+                ("third-batch-v1", "delete_third_batch_v1"),
+            ):
+                with self.subTest(batch_id=batch_id):
+                    fixture = DeleteFixture.create(
+                        root / batch_id, batch_id=batch_id
+                    )
+                    handles = fixture.handles_argv()
+                    delete_argv = ("utmctl", "delete", prepare_test.ASSET_UUID)
+                    runner = FakeRunner(
+                        [
+                            observation(
+                                ("utmctl", "list"), stdout=predelete_inventory()
+                            ),
+                            observation(handles, exit_code=1),
+                            observation(handles, exit_code=1),
+                            observation(delete_argv),
+                            observation(
+                                ("utmctl", "list"), stdout=postdelete_inventory()
+                            ),
+                        ],
+                        after_call={4: fixture.remove_bundle},
+                    )
 
-            result = deletion.run_delete(
-                fixture.request,
-                runner=runner,
-                binding_validator=fixture.binding,
-            )
+                    result = deletion.run_delete(
+                        fixture.request,
+                        runner=runner,
+                        binding_validator=fixture.binding,
+                    )
 
-            self.assertEqual(result.outcome, "deleted")
-            request = read_json(fixture.request.output_root / "request.json")
-            self.assertEqual(
-                request["authorization"],
-                {
-                    "acknowledge_irreversible_bundle_removal": True,
-                    "at_most_one_delete_per_asset": True,
-                    "delete_second_batch_v1": True,
-                    "stop_without_retry_or_rollback": True,
-                },
-            )
-            terminal = read_json(fixture.request.output_root / "terminal.json")
-            self.assertEqual(
-                terminal["reason"], "second-batch-v1-deleted-and-verified"
-            )
+                    self.assertEqual(result.outcome, "deleted")
+                    request = read_json(
+                        fixture.request.output_root / "request.json"
+                    )
+                    self.assertEqual(
+                        request["authorization"],
+                        {
+                            "acknowledge_irreversible_bundle_removal": True,
+                            "at_most_one_delete_per_asset": True,
+                            authorization: True,
+                            "stop_without_retry_or_rollback": True,
+                        },
+                    )
+                    terminal = read_json(
+                        fixture.request.output_root / "terminal.json"
+                    )
+                    self.assertEqual(
+                        terminal["reason"], f"{batch_id}-deleted-and-verified"
+                    )
 
     def test_batch_authorization_must_match_before_output(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -264,10 +278,19 @@ class LinuxL6AssetRetirementDeleteTests(unittest.TestCase):
                 deletion.run_delete(ambiguous_first, runner=FakeRunner([]))
             self.assertFalse(ambiguous_first.output_root.exists())
 
-    def test_unapproved_third_batch_is_rejected_before_output(self) -> None:
+            third = DeleteFixture.create(root / "third", batch_id="third-batch-v1")
+            wrong_third = third.request_with(
+                authorized_delete_second_batch_v1=True,
+                authorized_delete_third_batch_v1=False,
+            )
+            with self.assertRaises(deletion.RetirementDeleteError):
+                deletion.run_delete(wrong_third, runner=FakeRunner([]))
+            self.assertFalse(wrong_third.output_root.exists())
+
+    def test_unknown_batch_is_rejected_before_output(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             fixture = DeleteFixture.create(Path(temporary).resolve())
-            request = fixture.request_with(batch_id="third-batch-v1")
+            request = fixture.request_with(batch_id="unknown-batch-v1")
             with self.assertRaises(deletion.RetirementDeleteError):
                 deletion.run_delete(request, runner=FakeRunner([]))
             self.assertFalse(request.output_root.exists())
@@ -277,7 +300,11 @@ class LinuxL6AssetRetirementDeleteTests(unittest.TestCase):
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()
-            for batch_id in ("first-four-v1", "second-batch-v1"):
+            for batch_id in (
+                "first-four-v1",
+                "second-batch-v1",
+                "third-batch-v1",
+            ):
                 fixture = DeleteFixture.create(root / batch_id, batch_id=batch_id)
                 prior_root = fixture.request.prior_prepare_root
                 prepare_request = fixture.prepare_request(prior_root)
@@ -358,6 +385,7 @@ class DeleteFixture:
             delete_timeout_seconds=60,
             authorized_delete_first_four_v1=batch_id == "first-four-v1",
             authorized_delete_second_batch_v1=batch_id == "second-batch-v1",
+            authorized_delete_third_batch_v1=batch_id == "third-batch-v1",
             authorized_at_most_one_delete_per_asset=True,
             authorized_stop_without_retry_or_rollback=True,
             acknowledge_irreversible_bundle_removal=True,

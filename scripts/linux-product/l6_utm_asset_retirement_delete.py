@@ -35,7 +35,17 @@ PRIOR_PREPARE_FILES = frozenset(
 EXIT_DELETED = 0
 EXIT_PRECONDITION_REJECTED = 11
 EXIT_STATE_INDETERMINATE = 12
-SUPPORTED_BATCH_IDS = frozenset(("first-four-v1", "second-batch-v1"))
+BATCH_AUTHORIZATION_FIELDS = {
+    "first-four-v1": "delete_first_four_v1",
+    "second-batch-v1": "delete_second_batch_v1",
+    "third-batch-v1": "delete_third_batch_v1",
+}
+BATCH_ASSET_COUNTS = {
+    "first-four-v1": 4,
+    "second-batch-v1": 4,
+    "third-batch-v1": 3,
+}
+SUPPORTED_BATCH_IDS = frozenset(BATCH_AUTHORIZATION_FIELDS)
 
 
 class RetirementDeleteError(ValueError):
@@ -60,6 +70,7 @@ class DeleteRequest:
     delete_timeout_seconds: int
     authorized_delete_first_four_v1: bool
     authorized_delete_second_batch_v1: bool
+    authorized_delete_third_batch_v1: bool
     authorized_at_most_one_delete_per_asset: bool
     authorized_stop_without_retry_or_rollback: bool
     acknowledge_irreversible_bundle_removal: bool
@@ -107,20 +118,17 @@ class DeleteRequest:
             raise RetirementDeleteError("command-timeout-seconds-out-of-range")
         if not 1 <= self.delete_timeout_seconds <= 120:
             raise RetirementDeleteError("delete-timeout-seconds-out-of-range")
-        if self.batch_id == "first-four-v1":
-            if not self.authorized_delete_first_four_v1:
-                raise RetirementDeleteError(
-                    "first-four-v1-delete-authorization-required"
-                )
-            if self.authorized_delete_second_batch_v1:
-                raise RetirementDeleteError("batch-delete-authorization-not-exact")
-        else:
-            if not self.authorized_delete_second_batch_v1:
-                raise RetirementDeleteError(
-                    "second-batch-v1-delete-authorization-required"
-                )
-            if self.authorized_delete_first_four_v1:
-                raise RetirementDeleteError("batch-delete-authorization-not-exact")
+        batch_authorizations = {
+            "first-four-v1": self.authorized_delete_first_four_v1,
+            "second-batch-v1": self.authorized_delete_second_batch_v1,
+            "third-batch-v1": self.authorized_delete_third_batch_v1,
+        }
+        if not batch_authorizations[self.batch_id]:
+            raise RetirementDeleteError(
+                f"{self.batch_id}-delete-authorization-required"
+            )
+        if sum(batch_authorizations.values()) != 1:
+            raise RetirementDeleteError("batch-delete-authorization-not-exact")
         if not self.authorized_at_most_one_delete_per_asset:
             raise RetirementDeleteError("one-delete-per-asset-authorization-required")
         if not self.authorized_stop_without_retry_or_rollback:
@@ -129,11 +137,7 @@ class DeleteRequest:
             raise RetirementDeleteError("irreversible-removal-acknowledgement-required")
 
     def as_json(self) -> dict[str, object]:
-        batch_authorization = (
-            "delete_first_four_v1"
-            if self.batch_id == "first-four-v1"
-            else "delete_second_batch_v1"
-        )
+        batch_authorization = BATCH_AUTHORIZATION_FIELDS[self.batch_id]
         return {
             "attempt_id": self.attempt_id,
             "authorization": {
@@ -389,7 +393,12 @@ def validate_delete_bindings(request: DeleteRequest) -> DeleteBinding:
     ):
         raise RetirementDeleteError("allowlist-storage-root-drift")
     batch = allowlist.batches.get(request.batch_id)
-    if batch is None or len(batch.assets) != 4:
+    expected_asset_count = BATCH_ASSET_COUNTS.get(request.batch_id)
+    if (
+        batch is None
+        or expected_asset_count is None
+        or len(batch.assets) != expected_asset_count
+    ):
         raise RetirementDeleteError("retirement-batch-invalid")
     prior = validate_prior_prepare(request, batch)
     return DeleteBinding(
@@ -684,6 +693,9 @@ def parse_args() -> argparse.Namespace:
         "--authorized-delete-second-batch-v1", action="store_true"
     )
     parser.add_argument(
+        "--authorized-delete-third-batch-v1", action="store_true"
+    )
+    parser.add_argument(
         "--authorized-at-most-one-delete-per-asset", action="store_true"
     )
     parser.add_argument(
@@ -717,6 +729,9 @@ def main() -> int:
         authorized_delete_first_four_v1=args.authorized_delete_first_four_v1,
         authorized_delete_second_batch_v1=(
             args.authorized_delete_second_batch_v1
+        ),
+        authorized_delete_third_batch_v1=(
+            args.authorized_delete_third_batch_v1
         ),
         authorized_at_most_one_delete_per_asset=(
             args.authorized_at_most_one_delete_per_asset
