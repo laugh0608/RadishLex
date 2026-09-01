@@ -39,11 +39,13 @@ BATCH_AUTHORIZATION_FIELDS = {
     "first-four-v1": "delete_first_four_v1",
     "second-batch-v1": "delete_second_batch_v1",
     "third-batch-v1": "delete_third_batch_v1",
+    "fourth-batch-v1": "delete_fourth_batch_v1",
 }
 BATCH_ASSET_COUNTS = {
     "first-four-v1": 4,
     "second-batch-v1": 4,
     "third-batch-v1": 3,
+    "fourth-batch-v1": 3,
 }
 SUPPORTED_BATCH_IDS = frozenset(BATCH_AUTHORIZATION_FIELDS)
 
@@ -71,6 +73,7 @@ class DeleteRequest:
     authorized_delete_first_four_v1: bool
     authorized_delete_second_batch_v1: bool
     authorized_delete_third_batch_v1: bool
+    authorized_delete_fourth_batch_v1: bool
     authorized_at_most_one_delete_per_asset: bool
     authorized_stop_without_retry_or_rollback: bool
     acknowledge_irreversible_bundle_removal: bool
@@ -122,6 +125,7 @@ class DeleteRequest:
             "first-four-v1": self.authorized_delete_first_four_v1,
             "second-batch-v1": self.authorized_delete_second_batch_v1,
             "third-batch-v1": self.authorized_delete_third_batch_v1,
+            "fourth-batch-v1": self.authorized_delete_fourth_batch_v1,
         }
         if not batch_authorizations[self.batch_id]:
             raise RetirementDeleteError(
@@ -696,6 +700,9 @@ def parse_args() -> argparse.Namespace:
         "--authorized-delete-third-batch-v1", action="store_true"
     )
     parser.add_argument(
+        "--authorized-delete-fourth-batch-v1", action="store_true"
+    )
+    parser.add_argument(
         "--authorized-at-most-one-delete-per-asset", action="store_true"
     )
     parser.add_argument(
@@ -732,6 +739,9 @@ def main() -> int:
         ),
         authorized_delete_third_batch_v1=(
             args.authorized_delete_third_batch_v1
+        ),
+        authorized_delete_fourth_batch_v1=(
+            args.authorized_delete_fourth_batch_v1
         ),
         authorized_at_most_one_delete_per_asset=(
             args.authorized_at_most_one_delete_per_asset
