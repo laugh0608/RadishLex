@@ -136,6 +136,8 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 `1d671e9`在repository-only范围固定第三个互不重叠的`third-batch-v1`：`EFD15599…BBDD` rollback、`5EA2BAA2…27A2` remove与`E671DB9C…D465` reinstall三台completed terminal clone，账面27.99 GiB。新增`completed-operation-terminal`窄语义，逐类绑定format、UUID、maintenance完成态、receipt尾部、全停/零句柄字段及config/EFI/qcow2身份；rollback使用remove归档树中与原件byte-identical且满足owner `501:20`的既存副本。`394217A7…6682` repair completed clone原始host summary及父树为`501:0`，不满足prepare要求的operator root owner tuple，故失败关闭并移出本批，没有修改历史证据或放宽权限合同。14项prepare与10项delete回归、默认L6门禁通过；纯文件系统双轮复核通过3个锚点与3个bundle，allowlist SHA-256为`038a1522c065006d210091792985f36e721e85c6498699bc9443f34658c8e70a`。该阶段UTM查询为0，未来prepare根保持absent，delete控制器继续在创建输出前拒绝第三批，因此不构成prepare或mutation授权。
 
+2026-09-01项目所有者独立授权第三批只读prepare。从clean `e2098bb`执行唯一attempt `l6-asset-retirement-prepare-20260901-third-batch-v1`：一次plain list确认14台全部stopped、canonical inventory `4005023b…04bac`且三台目标唯一在册；3个终态锚点、两轮9文件零句柄及两轮完整bundle身份均通过。create-new根`RadishLex-L6-Asset-Retirement-Prepare-20260901-Third-Batch-v1`为`0700`，10个文件均为`0600`/owner `501:20`/single-link且零xattr；9项manifest SHA-256为`7bcfa513debbe7e276a509509b44953abe0ecb9218aa78da41c7b533eb5f7f38`。terminal闭合`prepared`，inventory/handle/hash为`1/2/2`，delete/start/clone/move/guest/retry均为0；该授权已消费，不得复跑。
+
 ### 6.3 VM mutation
 
 - VM 删除前重新执行 prepare 的全部关键身份、全停和零句柄检查；
@@ -154,6 +156,8 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 项目所有者随后明确授权`second-batch-v1`唯一真实mutation。从clean `fd6d501`执行attempt `l6-asset-retirement-delete-20260831-second-batch-v1`：preflight重新闭合7个锚点、两轮完整hash、18台全停inventory与两轮零句柄；4次精确delete均exit 0、stdout/stderr为空，post-list严格为18→17→16→15→14且其余成员全stopped，4个package均absent。terminal闭合`deleted`，list/delete为`5/4`，无retry/rollback/start/clone/move/guest；21项manifest SHA-256为`d29ae2733ee5ad0c6175797f31b4dfb7f1aeab4b8ceb3fbaa917091ceb8bd88f`。该授权已消费，不得复跑。
 
+`22dcf30`在repository-only范围把同一逐台控制扩展到`third-batch-v1`：三个batch各有独立且互斥的授权位，第三批资产数精确固定为3；未知batch、缺失/错配/多个batch授权均在创建输出根前拒绝。10项fake-runner覆盖第三批成功terminal、错授权、未知batch及三批prepare递归绑定，默认L6门禁通过。新逻辑对真实`7bcfa513…f7f38`的9项prepare成员完成纯离线递归复核，未来delete根保持absent；未调用UTM或delete，不构成真实mutation授权。
+
 ### 6.4 Snapshot quarantine 与 purge
 
 - quarantine 只允许将精确 snapshot 以同文件系统、no-replace rename 移入 create-new batch 目录；目标目录、父目录、manifest 和 S2/S3 身份必须调用前后复验；
@@ -171,7 +175,7 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 1. repository-only allowlist、prepare 和 fake-runner 回归已实现并通过门禁；实现阶段未调用 UTM、未改资产。
 2. `first-four-v1`与`second-batch-v1`均已分别完成只读prepare、独立授权的唯一mutation并冻结manifest。
-3. `third-batch-v1`已在repository-only范围固定3台；下一步只为它请求独立只读prepare授权。prepare闭合后还须先单独扩展delete控制授权面，再请求真实mutation授权；UTM注册列表清理不得退化为GUI批量删除或名称匹配。
+3. `third-batch-v1`的3台已闭合独立只读prepare并完成delete控制扩展；下一步只请求唯一真实mutation授权，UTM注册列表清理不得退化为GUI批量删除或名称匹配。
 4. 注册项降至预算后，才创建唯一 `upgrade_quiesced` disposable target；case 闭合后先退休该 target。
 5. 建立一台新的连续 L6 guest，完成六类 operation 和完整正常生命周期，然后退休。
 6. snapshot 以两项一批 quarantine；确认 P05B 不再依赖后，另行 purge。

@@ -705,6 +705,8 @@ complete v2闭合`frozen`，inventory query/update为`2/1`，无start、clone、
 
 `1d671e9`随后只在repository-only范围固定`third-batch-v1`：rollback/remove/reinstall三台completed terminal clone共27.99 GiB，新增语义校验绑定各自历史终态与完整磁盘身份。repair completed clone因既存host evidence owner tuple不合规而失败关闭，不修改证据或放宽合同。3个锚点与3个bundle经纯文件系统双轮复核，默认L6门禁通过；未调用UTM或创建prepare根，delete控制器仍拒绝第三批。下一步仅可先为该批取得独立只读prepare授权，仍不授权clone、delete或其他mutation。
 
+2026-09-01项目所有者授权唯一只读prepare后，从clean `e2098bb`以一次list确认14台全部stopped及inventory `4005023b…04bac`，3个锚点、两轮零句柄与双轮bundle身份通过；9项manifest `7bcfa513…f7f38`闭合`prepared`，无delete/start/clone/move/guest/retry。`22dcf30`随后在repository-only范围新增第三批独立delete授权位、3资产精确约束及错授权/未知batch失败关闭，并离线递归绑定该prepare；未执行删除，真实mutation继续单独授权。
+
 ## 10. L6 完成与后续
 
 P05B L6只有在下列条件同时满足后完成：同一新guest、同一release pair与连续session闭合六步主序列；字体/dependency、startup正负向、XDG零写入/保留、真实process/package-manager lifecycle、断网与guest reboot对照通过；八个crash case的matrix/controller/checkpoint/resume自动合同全部通过；真实系统证据覆盖`install_prepared`、`install_artifacts_staged`和`upgrade_quiesced`三个代表恢复边界。其余五个真实crash属于后续hardening，不阻塞P05B/M5退出，也不得表述为真实通过。完成后仍然：
