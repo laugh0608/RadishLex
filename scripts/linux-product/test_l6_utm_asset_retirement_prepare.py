@@ -297,7 +297,7 @@ class LinuxL6AssetRetirementPrepareTests(unittest.TestCase):
             with self.assertRaises(retirement.RetirementPrepareError):
                 retirement.load_allowlist(path)
 
-    def test_repository_allowlist_fixes_four_disjoint_bounded_batches(self) -> None:
+    def test_repository_allowlist_fixes_five_disjoint_bounded_batches(self) -> None:
         repository_root = Path(__file__).resolve().parents[2]
         allowlist = retirement.load_allowlist(
             repository_root
@@ -308,6 +308,7 @@ class LinuxL6AssetRetirementPrepareTests(unittest.TestCase):
         second = allowlist.batches["second-batch-v1"]
         third = allowlist.batches["third-batch-v1"]
         fourth = allowlist.batches["fourth-batch-v1"]
+        fifth = allowlist.batches["fifth-batch-v1"]
         self.assertEqual(len(first.assets), 4)
         self.assertEqual(
             second.asset_ids,
@@ -343,6 +344,21 @@ class LinuxL6AssetRetirementPrepareTests(unittest.TestCase):
         for prior in (first, second, third):
             self.assertTrue(set(prior.asset_ids).isdisjoint(fourth.asset_ids))
         self.assertEqual(
+            fifth.asset_ids,
+            retirement.FIFTH_BATCH_ASSET_IDS,
+        )
+        self.assertEqual(fifth.accounting_gib, "27.19")
+        for prior in (first, second, third, fourth):
+            self.assertTrue(set(prior.asset_ids).isdisjoint(fifth.asset_ids))
+        self.assertEqual(
+            {asset.uuid for asset in fifth.assets},
+            {
+                "9C5638D7-0F97-4BD8-8A83-ABCDFCADAC6C",
+                "394217A7-BFC9-43C8-94E6-539FF3F2B6FB",
+                "99FF4B3F-4894-4913-BBE3-4934DC27BEEB",
+            },
+        )
+        self.assertEqual(
             {
                 anchor.semantic
                 for asset in second.assets
@@ -376,6 +392,25 @@ class LinuxL6AssetRetirementPrepareTests(unittest.TestCase):
                 "opaque-hash",
                 "retained-terminal-snapshot",
             },
+        )
+        self.assertEqual(
+            {
+                anchor.semantic
+                for asset in fifth.assets
+                for anchor in asset.evidence_anchors
+            },
+            {
+                "fifth-batch-terminal-projection",
+                "retained-predecessor-snapshot",
+            },
+        )
+        self.assertEqual(
+            sum(
+                anchor.storage == "repository"
+                for asset in fifth.assets
+                for anchor in asset.evidence_anchors
+            ),
+            3,
         )
 
     def test_completed_operation_terminals_bind_role_uuid_and_disk(self) -> None:

@@ -382,6 +382,82 @@
           "semantic": "opaque-hash"
         }
       ]
+    },
+    {
+      "id": "upgrade-rolled-back-1ebbdab",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-1ebbdab.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-1ebbdab",
+      "uuid": "9C5638D7-0F97-4BD8-8A83-ABCDFCADAC6C",
+      "role": "upgrade-rolled-back-terminal-projected",
+      "config_sha256": "402a584095e9150543023a155575b3492053371efc39ee2fd0d03616534c83e9",
+      "efi_sha256": "cb8a697bae3108e8197ba0e44da6c89f5fee33b3761c735d59d4247db58fbd65",
+      "qcow2_sha256": "e684f829c1fb1df1cc593596a8f0d37f49b7bcbff9b48a4f7d45a85752418904",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "repository",
+          "relative_path": "packaging/linux/l6-asset-retirement-fifth-batch-projections.json",
+          "sha256": "f80b1bdf7da70d9dd45049b1a8321a2a0057e786938f08a7a70e6bed2180cfed",
+          "mode": "0644",
+          "semantic": "fifth-batch-terminal-projection"
+        }
+      ]
+    },
+    {
+      "id": "repair-completed-823afca",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-823afca-repair.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-823afca-repair",
+      "uuid": "394217A7-BFC9-43C8-94E6-539FF3F2B6FB",
+      "role": "repair-completed-terminal-projected",
+      "config_sha256": "818d8725a20b5a1ee252b269af6bb3fcca5b960f7a204db5be5b10b270137425",
+      "efi_sha256": "3b117deffb09523584fb3658d0af1ea1aecf47671eef6e7943472488ac28a8f0",
+      "qcow2_sha256": "79adac93b63a2b51b21766afe0848b8ff391da4dda315f1a0f1f1aeeabe003f6",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "repository",
+          "relative_path": "packaging/linux/l6-asset-retirement-fifth-batch-projections.json",
+          "sha256": "f80b1bdf7da70d9dd45049b1a8321a2a0057e786938f08a7a70e6bed2180cfed",
+          "mode": "0644",
+          "semantic": "fifth-batch-terminal-projection"
+        }
+      ]
+    },
+    {
+      "id": "source-terminal-after-s2-512e8ab",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "operator",
+      "relative_path": "Debian13-ARM64-L6-512e8ab.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-512e8ab",
+      "uuid": "99FF4B3F-4894-4913-BBE3-4934DC27BEEB",
+      "role": "source-terminal-post-s2-failed-closed",
+      "config_sha256": "5111741c54a49068dbbacfd131891b0990a531001769db21942eb88ac6767d2b",
+      "efi_sha256": "8f36df35444b83ca414a1fe9b6c7be57c94478830a48909f2aa45e65bb5ae1ee",
+      "qcow2_sha256": "0cb75b38c62fd8d5731f452eb91717ffdfac2103d597e667c675e96c95c0f387",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "repository",
+          "relative_path": "packaging/linux/l6-asset-retirement-fifth-batch-projections.json",
+          "sha256": "f80b1bdf7da70d9dd45049b1a8321a2a0057e786938f08a7a70e6bed2180cfed",
+          "mode": "0644",
+          "semantic": "fifth-batch-terminal-projection"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Snapshots/S2-source-data-512e8ab/local-snapshot.evidence.json",
+          "sha256": "d164de0f5e6e88afbfa76ccd1c7d321d7064bbfd3ee1e275d3d4842d0dfa5c74",
+          "mode": "0600",
+          "semantic": "retained-predecessor-snapshot"
+        }
+      ]
     }
   ],
   "batches": [
@@ -422,6 +498,15 @@
         "install-artifacts-staged-completed-stopped-d75818f-v4"
       ],
       "accounting_gib": "27.09"
+    },
+    {
+      "id": "fifth-batch-v1",
+      "asset_ids": [
+        "upgrade-rolled-back-1ebbdab",
+        "repair-completed-823afca",
+        "source-terminal-after-s2-512e8ab"
+      ],
+      "accounting_gib": "27.19"
     }
   ]
 }

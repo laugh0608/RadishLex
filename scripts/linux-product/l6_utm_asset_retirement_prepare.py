@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Callable, Protocol
 
+import l6_asset_retirement_fifth_batch as fifth_batch
 import l6_utm_clone_once as clone_control
 
 
@@ -25,12 +26,18 @@ CONTROL_RELATIVE_PATH = Path(
 ALLOWLIST_RELATIVE_PATH = Path(
     "packaging/linux/l6-asset-retirement-allowlist.json"
 )
+FIFTH_BATCH_CONTROL_RELATIVE_PATH = Path(
+    "scripts/linux-product/l6_asset_retirement_fifth_batch.py"
+)
 EXIT_PREPARED = 0
 EXIT_PRECONDITION_REJECTED = 11
 HEX_40 = re.compile(r"[0-9a-f]{40}")
 HEX_64 = re.compile(r"[0-9a-f]{64}")
 SAFE_ID = re.compile(r"[a-z0-9][a-z0-9-]{0,95}")
-STORAGES = frozenset(("operator", "utm-documents"))
+ASSET_STORAGES = frozenset(("operator", "utm-documents"))
+EVIDENCE_STORAGES = frozenset((*ASSET_STORAGES, "repository"))
+FIFTH_BATCH_ASSET_IDS = fifth_batch.ASSET_IDS
+FIFTH_BATCH_S2_PREDECESSOR = fifth_batch.S2_PREDECESSOR
 SEMANTICS = frozenset(
     (
         "snapshot-source-vm",
@@ -46,6 +53,8 @@ SEMANTICS = frozenset(
         "install-prepared-stopped-terminal",
         "install-artifacts-staged-terminal-stop",
         "install-artifacts-staged-stopped-disk",
+        "fifth-batch-terminal-projection",
+        "retained-predecessor-snapshot",
     )
 )
 
@@ -359,17 +368,23 @@ def validate_prepare_bindings(request: PrepareRequest) -> BindingResult:
     batch = allowlist.batches.get(request.batch_id)
     if batch is None:
         raise RetirementPrepareError("batch-not-allowlisted")
+    evidence = {
+        "allowlist_asset_count": len(batch.assets),
+        "allowlist_sha256": allowlist_sha256,
+        "batch_accounting_gib": batch.accounting_gib,
+        "batch_id": batch.batch_id,
+        "control_sha256": control_sha256,
+        "format": EVIDENCE_FORMAT,
+        "repository_clean": True,
+        "repository_head": head,
+    }
+    if batch.batch_id == "fifth-batch-v1":
+        evidence["fifth_batch_control_sha256"] = _validate_repository_file(
+            request.repository_root / FIFTH_BATCH_CONTROL_RELATIVE_PATH,
+            Path(fifth_batch.__file__),
+        )
     return BindingResult(
-        evidence={
-            "allowlist_asset_count": len(batch.assets),
-            "allowlist_sha256": allowlist_sha256,
-            "batch_accounting_gib": batch.accounting_gib,
-            "batch_id": batch.batch_id,
-            "control_sha256": control_sha256,
-            "format": EVIDENCE_FORMAT,
-            "repository_clean": True,
-            "repository_head": head,
-        },
+        evidence=evidence,
         batch=batch,
     )
 
@@ -477,7 +492,7 @@ def _parse_asset(value: object) -> RetirementAsset:
         raise RetirementPrepareError("asset-kind-invalid")
     if value["action"] != "evidence-archived-delete-candidate":
         raise RetirementPrepareError("asset-action-not-delete-candidate")
-    storage = _require_storage(value["storage"])
+    storage = _require_asset_storage(value["storage"])
     relative_path = _require_relative(value["relative_path"], "asset-path")
     name = _require_text(value["name"], "asset-name")
     if "/" in relative_path or not relative_path.endswith(".utm"):
@@ -619,6 +634,12 @@ def _validate_anchor_semantics(
         return
     if anchor.semantic == "install-artifacts-staged-stopped-disk":
         _validate_install_artifacts_staged_stopped_disk(value, asset)
+        return
+    if anchor.semantic == "fifth-batch-terminal-projection":
+        _validate_fifth_batch_terminal_projection(value, asset)
+        return
+    if anchor.semantic == "retained-predecessor-snapshot":
+        _validate_retained_predecessor_snapshot(value, asset)
         return
     if anchor.semantic == "utm-start-terminal":
         _validate_utm_start_terminal(value, asset)
@@ -832,6 +853,24 @@ def _validate_retained_terminal_snapshot(
     }
     if actual != expected:
         raise RetirementPrepareError("retained-terminal-snapshot-identity-mismatch")
+
+
+def _validate_fifth_batch_terminal_projection(
+    value: dict[str, object], asset: RetirementAsset
+) -> None:
+    try:
+        fifth_batch.validate_terminal_projection(value, asset)
+    except fifth_batch.ProjectionValidationError as exc:
+        raise RetirementPrepareError(str(exc)) from exc
+
+
+def _validate_retained_predecessor_snapshot(
+    value: dict[str, object], asset: RetirementAsset
+) -> None:
+    try:
+        fifth_batch.validate_retained_predecessor_snapshot(value, asset)
+    except fifth_batch.ProjectionValidationError as exc:
+        raise RetirementPrepareError(str(exc)) from exc
 
 
 def _validate_install_prepared_stopped_terminal(
@@ -1104,11 +1143,13 @@ def _require_zero_handles(
 
 
 def _storage_root(request: PrepareRequest, storage: str) -> Path:
-    return (
-        request.operator_asset_root
-        if storage == "operator"
-        else request.utm_documents_root
-    )
+    if storage == "operator":
+        return request.operator_asset_root
+    if storage == "utm-documents":
+        return request.utm_documents_root
+    if storage == "repository":
+        return request.repository_root
+    raise RetirementPrepareError("storage-invalid")
 
 
 def _root_owner(root: Path) -> tuple[int, int]:
@@ -1207,8 +1248,14 @@ def _require_safe_id(value: object, label: str) -> str:
 
 
 def _require_storage(value: object) -> str:
-    if value not in STORAGES:
+    if value not in EVIDENCE_STORAGES:
         raise RetirementPrepareError("storage-invalid")
+    return str(value)
+
+
+def _require_asset_storage(value: object) -> str:
+    if value not in ASSET_STORAGES:
+        raise RetirementPrepareError("asset-storage-invalid")
     return str(value)
 
 

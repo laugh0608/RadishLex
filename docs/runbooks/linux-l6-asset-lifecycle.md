@@ -19,11 +19,11 @@ P05B 剩余阻塞项为：
 - 同一连续 session 复验 dependency/font、startup 正负向、XDG 零写入/保留、process/package-manager lifecycle、断网与 guest reboot 对照；
 - P05C 仍使用另一台独立 guest，并重新取得系统授权。
 
-真实 VM 数量受预算约束：常驻注册锚点目标为 5 台，任一时刻最多增加 1 台 P05B disposable target，因此 P05B 注册预算上限为 6 台。注册项已由历史基线 22 台降至 11 台，但在进一步收敛至 5 台前仍不创建 `upgrade_quiesced` target；一个 disposable target 形成持久证据并退休后，才允许创建下一台。失败不会自动增加替代 clone。
+真实 VM 数量受预算约束：常驻注册锚点目标为 5 台，任一时刻最多增加 1 台 P05B disposable target，因此 P05B 注册预算上限为 6 台。注册项已由历史基线 22 台降至 8 台，但在进一步收敛至 5 台前仍不创建 `upgrade_quiesced` target；一个 disposable target 形成持久证据并退休后，才允许创建下一台。失败不会自动增加替代 clone。
 
 ## 2. 审计基线与计量口径
 
-本账本的历史基线来自 2026-08-30 已冻结的 complete v2 清单；当前注册数再由三批冻结 delete manifest 的精确成员 delta 推进，不为更新账本追加 UTM 查询：
+本账本的历史基线来自 2026-08-30 已冻结的 complete v2 清单；当前注册数再由四批冻结 delete manifest 的精确成员 delta 推进，不为更新账本追加 UTM 查询：
 
 - inventory：`/Users/luobo/VirtualMachines/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-Move-Complete-Control-v2/utmctl-list-postupdate.json`；
 - canonical inventory：22 台全部 `stopped`，hash `1074717ca5ff9f8666e53974b9002d1c4697a33de877e5cdfbdcf24299f4714f`；
@@ -32,7 +32,7 @@ P05B 剩余阻塞项为：
 - 7 个 APFS snapshot 的 `du` 合计为 65.25 GiB；
 - Data volume 当次只读观察约有 527 GiB 可用，不构成立即容量事故。
 
-三个batch先后删除11个注册bundle后，当前为12个物理`.utm`、11个注册项和1个故意未注册的DependencyFrozen bundle；snapshot仍为7个。此处不以`df`变化反推实际回收量。
+四个batch先后删除14个注册bundle后，当前为9个物理`.utm`、8个注册项和1个故意未注册的DependencyFrozen bundle；snapshot仍为7个。此处不以`df`变化反推实际回收量。
 
 表中 GiB 是 `du -sk / 1048576` 的账面值。APFS clonefile 和 clone 共享物理块，逐项求和会重复计算共享块；删除候选的账面值只用于排序，不能承诺同等可回收容量。host evidence、handoff 和 control root 体积远小于 VM/snapshot，默认保留而不是优先清理。
 
@@ -170,6 +170,10 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 项目所有者随后授权`fourth-batch-v1`唯一真实mutation。从clean `de14d7c`执行attempt `l6-asset-retirement-delete-20260901-fourth-batch-v1`：preflight重新闭合5个锚点、两轮完整身份、11台全停inventory与两轮9文件零句柄；按第六套target、第一场景terminal、第二场景terminal顺序执行3次精确delete，均exit 0、未超时且stdout/stderr为空。post-list严格为11→10→9→8，三个package均absent，其余成员不变且全stopped；最终inventory hash为`667af90157c9aaf001439b7dc403b8f5d978ca79ecbb53a79ddcbb683a48d701`。terminal闭合`deleted/fourth-batch-v1-deleted-and-verified`，list/delete为`4/3`，无retry/rollback/start/clone/move/guest；18项manifest SHA-256为`d1e548388275a28412e531e85d01a460aedb5b8c81d5c0ae436d5fad1335ed94`。授权已消费，不得复跑或恢复bundle。
 
+repository-only `fifth-batch-v1`随后固定最后三台：`9C5638D7…AC6C` rolled-back、`394217A7…B6FB` repair completed与`99FF4B3F…BEEB` source terminal，共27.19 GiB。新增Git追踪的最小terminal projection，SHA-256为`f80b1bdf7da70d9dd45049b1a8321a2a0057e786938f08a7a70e6bed2180cfed`；前两台历史`501:0`文件只登记路径/hash/observed owner且明确为`reference-only-never-runtime-anchor`，prepare必须验证projection自身为`501:20`、`0644`、single-link并绑定clean committed HEAD，没有修改或“修复”历史证据，也没有放宽operator owner合同。第三台projection固定S2为`retained-predecessor-not-current-bundle-copy`；专用语义同时解析S2 evidence的source UUID、全停/零句柄与三文件身份，并要求S2 EFI/qcow2分别不同于当前终态。
+
+allowlist SHA-256为`0fd8426f31334f2e746c570b2495ca6fbb7f6ece6c8fe8d5a8e1f4cb97bcc3c2`。离线只读复核通过3个projection anchor、1个S2 anchor及三台current config/EFI/qcow2双轮完整hash；没有调用UTM、`lsof`、prepare、delete、start、clone、move或guest，也没有创建外部输出根。通用prepare 15项、第五批专属2项、delete 10项、默认L6与全仓门禁通过；delete控制器显式拒绝`fifth-batch-v1`，因此下一步仍只能另行授权只读prepare，真实mutation还须后续repository-only控制扩展和另一份授权。
+
 ### 6.4 Snapshot quarantine 与 purge
 
 - quarantine 只允许将精确 snapshot 以同文件系统、no-replace rename 移入 create-new batch 目录；目标目录、父目录、manifest 和 S2/S3 身份必须调用前后复验；
@@ -187,7 +191,7 @@ prepare 结果只能是某一精确 batch 的授权输入，不能直接触发�
 
 1. repository-only allowlist、prepare 和 fake-runner 回归已实现并通过门禁；实现阶段未调用 UTM、未改资产。
 2. 四个VM退休batch均已分别完成只读prepare、独立授权的唯一mutation并冻结manifest。
-3. 下一步只在repository-only范围设计剩余3个困难候选的第五批，不修改历史证据或放宽owner/身份合同。
+3. 第五批repository-only模型已闭合；下一步只能先取得独立只读prepare授权，不修改历史证据、放宽owner/身份合同或继承前四批授权。
 4. 注册项降至预算后，才创建唯一 `upgrade_quiesced` disposable target；case 闭合后先退休该 target。
 5. 建立一台新的连续 L6 guest，完成六类 operation 和完整正常生命周期，然后退休。
 6. snapshot 以两项一批 quarantine；确认 P05B 不再依赖后，另行 purge。
