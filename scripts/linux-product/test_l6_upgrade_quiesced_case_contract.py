@@ -61,6 +61,10 @@ class LinuxL6UpgradeQuiescedCaseContractTests(unittest.TestCase):
                 "move_primitive": "utm-native-ui",
             },
         )
+        self.assertEqual(
+            self.contract["clone_front_door"]["preclone_baseline"],
+            case_contract.EXPECTED_CLONE_FRONT_DOOR["preclone_baseline"],
+        )
 
     def test_snapshot_or_installed_source_drift_is_rejected(self) -> None:
         for field, value in (
@@ -155,6 +159,24 @@ class LinuxL6UpgradeQuiescedCaseContractTests(unittest.TestCase):
             case_contract.validate_upgrade_quiesced_case_contract(
                 contract, self.matrix, self.release_pair
             )
+
+    def test_clone_front_door_rejects_retirement_baseline_drift(self) -> None:
+        for field, value in (
+            ("registered_vm_count", 8),
+            ("inventory_sha256", "0" * 64),
+            ("deleted_packages_must_remain_absent", False),
+        ):
+            with self.subTest(field=field):
+                contract = copy.deepcopy(self.contract)
+                contract["clone_front_door"]["preclone_baseline"][field] = (
+                    value
+                )
+                with self.assertRaises(
+                    case_contract.UpgradeQuiescedCaseContractError
+                ):
+                    case_contract.validate_upgrade_quiesced_case_contract(
+                        contract, self.matrix, self.release_pair
+                    )
 
 
 if __name__ == "__main__":

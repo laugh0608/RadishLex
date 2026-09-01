@@ -3,9 +3,7 @@ from __future__ import annotations
 
 import argparse
 import os
-import plistlib
 import re
-import stat
 import sys
 import uuid
 from dataclasses import dataclass
@@ -42,6 +40,9 @@ class CloneFrontDoorRequest:
     output_root: Path
     attempt_id: str
     operator_asset_root: Path
+    utm_documents_root: Path
+    asset_retirement_delete_root: Path
+    asset_retirement_delete_manifest_sha256: str
     source_snapshot_root: Path
     registration_shell_evidence_root: Path
     registration_shell_manifest_sha256: str
@@ -63,6 +64,11 @@ class CloneFrontDoorRequest:
             (self.repository_root, "repository-root"),
             (self.output_root, "output-root"),
             (self.operator_asset_root, "operator-asset-root"),
+            (self.utm_documents_root, "utm-documents-root"),
+            (
+                self.asset_retirement_delete_root,
+                "asset-retirement-delete-root",
+            ),
             (self.source_snapshot_root, "source-snapshot-root"),
             (
                 self.registration_shell_evidence_root,
@@ -85,6 +91,11 @@ class CloneFrontDoorRequest:
             raise CloneFrontDoorError("output-root-must-be-outside-repository")
         for protected, label in (
             (self.source_snapshot_root, "source-snapshot"),
+            (self.utm_documents_root, "utm-documents-root"),
+            (
+                self.asset_retirement_delete_root,
+                "asset-retirement-delete-evidence",
+            ),
             (self.registration_shell_evidence_root, "shell-evidence"),
             (self.registration_shell_package_path, "registration-shell"),
             (self.target_package_path, "target-package"),
@@ -96,12 +107,26 @@ class CloneFrontDoorRequest:
         )
         if self.source_snapshot_root != expected_snapshot:
             raise CloneFrontDoorError("source-snapshot-path-differs-from-case")
+        baseline = case_contract.EXPECTED_CLONE_FRONT_DOOR[
+            "preclone_baseline"
+        ]
+        expected_delete_root = self.operator_asset_root / str(
+            baseline["delete_evidence_relative_path"]
+        )
+        if self.asset_retirement_delete_root != expected_delete_root:
+            raise CloneFrontDoorError(
+                "asset-retirement-delete-root-differs-from-case"
+            )
         if not HEX_40.fullmatch(self.expected_repository_head):
             raise CloneFrontDoorError("expected-repository-head-invalid")
         for digest, label in (
             (
                 self.registration_shell_manifest_sha256,
                 "registration-shell-manifest-sha256",
+            ),
+            (
+                self.asset_retirement_delete_manifest_sha256,
+                "asset-retirement-delete-manifest-sha256",
             ),
             (
                 self.expected_preclone_inventory_sha256,
@@ -140,6 +165,16 @@ class CloneFrontDoorRequest:
             )
         if not 1 <= self.expected_vm_count <= 128:
             raise CloneFrontDoorError("expected-vm-count-out-of-range")
+        if (
+            self.asset_retirement_delete_manifest_sha256
+            != baseline["delete_manifest_sha256"]
+            or self.expected_vm_count != baseline["registered_vm_count"]
+            or self.expected_preclone_inventory_sha256
+            != baseline["inventory_sha256"]
+        ):
+            raise CloneFrontDoorError(
+                "post-retirement-preclone-baseline-mismatch"
+            )
         if not 1 <= self.clone_timeout_seconds <= 300:
             raise CloneFrontDoorError("clone-timeout-seconds-out-of-range")
         if not 1 <= self.command_timeout_seconds <= 60:
@@ -167,6 +202,12 @@ class CloneFrontDoorRequest:
             },
             "clone_timeout_seconds": self.clone_timeout_seconds,
             "command_timeout_seconds": self.command_timeout_seconds,
+            "asset_retirement_delete_manifest_sha256": (
+                self.asset_retirement_delete_manifest_sha256
+            ),
+            "asset_retirement_delete_root_sha256": _sha256_text(
+                str(self.asset_retirement_delete_root)
+            ),
             "expected_preclone_inventory_sha256": (
                 self.expected_preclone_inventory_sha256
             ),
@@ -193,6 +234,9 @@ class CloneFrontDoorRequest:
             "target_name": self.target_name,
             "target_package_path_sha256": _sha256_text(
                 str(self.target_package_path)
+            ),
+            "utm_documents_root_sha256": _sha256_text(
+                str(self.utm_documents_root)
             ),
         }
 
@@ -536,41 +580,13 @@ def validate_clone_front_door_bindings(
 def validate_source_snapshot(
     request: CloneFrontDoorRequest,
 ) -> BundleIdentity:
-    identity = _read_bundle(request.source_snapshot_root, root_mode=0o700)
-    expected = case_contract.EXPECTED_START
-    if (
-        identity.config_sha256 != expected["config_sha256"]
-        or identity.efi_sha256 != expected["efi_sha256"]
-        or identity.qcow2_sha256 != expected["qcow2_sha256"]
-    ):
-        raise CloneFrontDoorError("source-snapshot-disk-identity-drift")
-    evidence_path = (
-        request.source_snapshot_root / "local-snapshot.evidence.json"
-    )
-    _validate_regular_file(
-        evidence_path,
-        0o600,
-        str(expected["local_evidence_sha256"]),
-        "source-local-evidence",
-    )
-    return identity
+    return clone_bindings.validate_source_snapshot(request)
 
 
 def validate_registration_shell(
     request: CloneFrontDoorRequest,
 ) -> BundleIdentity:
-    identity = _read_bundle(
-        request.registration_shell_package_path, root_mode=0o755
-    )
-    if (
-        identity.uuid != request.registration_shell_uuid
-        or identity.name != request.registration_shell_name
-        or identity.network != []
-    ):
-        raise CloneFrontDoorError(
-            "registration-shell-runtime-identity-drift"
-        )
-    return identity
+    return clone_bindings.validate_registration_shell(request)
 
 
 def validate_target_bundle(
@@ -581,85 +597,12 @@ def validate_target_bundle(
     materialized: bool,
     source: BundleIdentity | None = None,
 ) -> BundleIdentity:
-    identity = _read_bundle(request.target_package_path, root_mode=0o755)
-    if identity.name != request.target_name or identity.uuid != target_uuid:
-        raise CloneFrontDoorError("target-name-or-uuid-drift")
-    if identity.network != []:
-        raise CloneFrontDoorError("target-network-must-be-empty")
-    if _normalized_plist(registration.config_path) != _normalized_plist(
-        identity.config_path
-    ):
-        raise CloneFrontDoorError(
-            "target-config-differs-beyond-name-and-uuid"
-        )
-    expected_efi = (
-        source.efi_sha256
-        if materialized and source is not None
-        else registration.efi_sha256
-    )
-    expected_qcow2 = (
-        source.qcow2_sha256
-        if materialized and source is not None
-        else registration.qcow2_sha256
-    )
-    if (
-        identity.efi_sha256 != expected_efi
-        or identity.qcow2_sha256 != expected_qcow2
-    ):
-        raise CloneFrontDoorError("target-materialization-state-mismatch")
-    return identity
-
-
-def _read_bundle(root: Path, *, root_mode: int) -> BundleIdentity:
-    _validate_directory(root, root_mode, "bundle-root")
-    data = root / "Data"
-    _validate_directory(data, root_mode, "bundle-data")
-    config = root / "config.plist"
-    _validate_regular_file(config, 0o644, None, "config")
-    try:
-        value = plistlib.loads(config.read_bytes())
-    except (OSError, plistlib.InvalidFileException) as exc:
-        raise CloneFrontDoorError("config-plist-invalid") from exc
-    if not isinstance(value, dict):
-        raise CloneFrontDoorError("config-plist-root-invalid")
-    information = value.get("Information")
-    drives = value.get("Drive")
-    if not isinstance(information, dict) or not isinstance(drives, list):
-        raise CloneFrontDoorError("config-required-fields-invalid")
-    disks = [
-        item
-        for item in drives
-        if isinstance(item, dict) and item.get("ImageType") == "Disk"
-    ]
-    if len(disks) != 1 or disks[0].get("Interface") != "VirtIO":
-        raise CloneFrontDoorError("config-disk-contract-invalid")
-    qcow2_name = disks[0].get("ImageName")
-    if (
-        not isinstance(qcow2_name, str)
-        or Path(qcow2_name).name != qcow2_name
-        or not qcow2_name.endswith(".qcow2")
-    ):
-        raise CloneFrontDoorError("config-qcow2-name-invalid")
-    name = information.get("Name")
-    vm_uuid = information.get("UUID")
-    if not isinstance(name, str) or not isinstance(vm_uuid, str):
-        raise CloneFrontDoorError("config-information-invalid")
-    _validate_uuid(vm_uuid, "config-uuid")
-    efi = data / "efi_vars.fd"
-    qcow2 = data / qcow2_name
-    _validate_regular_file(efi, 0o644, None, "efi")
-    _validate_regular_file(qcow2, 0o644, None, "qcow2")
-    return BundleIdentity(
-        config_path=config,
-        efi_path=efi,
-        qcow2_path=qcow2,
-        config_sha256=_sha256_file(config),
-        efi_sha256=_sha256_file(efi),
-        qcow2_sha256=_sha256_file(qcow2),
-        qcow2_name=qcow2_name,
-        name=name,
-        uuid=vm_uuid,
-        network=value.get("Network"),
+    return clone_bindings.validate_target_bundle(
+        request,
+        registration,
+        target_uuid,
+        materialized=materialized,
+        source=source,
     )
 
 
@@ -773,64 +716,9 @@ def _require_silent_success(
         raise CloneFrontDoorError(f"{label}-failed")
 
 
-def _normalized_plist(path: Path) -> object:
-    try:
-        value = plistlib.loads(path.read_bytes())
-    except (OSError, plistlib.InvalidFileException) as exc:
-        raise CloneFrontDoorError("config-plist-invalid") from exc
-    if (
-        not isinstance(value, dict)
-        or not isinstance(value.get("Information"), dict)
-    ):
-        raise CloneFrontDoorError("config-information-invalid")
-    result = dict(value)
-    information = dict(result["Information"])
-    information.pop("Name", None)
-    information.pop("UUID", None)
-    result["Information"] = information
-    return result
-
-
-def _validate_directory(path: Path, mode: int, label: str) -> None:
-    try:
-        metadata = path.lstat()
-    except OSError as exc:
-        raise CloneFrontDoorError(f"{label}-unavailable") from exc
-    if (
-        not stat.S_ISDIR(metadata.st_mode)
-        or stat.S_ISLNK(metadata.st_mode)
-        or stat.S_IMODE(metadata.st_mode) != mode
-        or metadata.st_uid != os.getuid()
-        or metadata.st_gid != os.getgid()
-    ):
-        raise CloneFrontDoorError(f"{label}-identity-invalid")
-
-
-def _validate_regular_file(
-    path: Path,
-    mode: int,
-    expected_sha256: str | None,
-    label: str,
-) -> None:
-    try:
-        metadata = path.lstat()
-    except OSError as exc:
-        raise CloneFrontDoorError(f"{label}-unavailable") from exc
-    if (
-        not stat.S_ISREG(metadata.st_mode)
-        or stat.S_ISLNK(metadata.st_mode)
-        or stat.S_IMODE(metadata.st_mode) != mode
-        or metadata.st_uid != os.getuid()
-        or metadata.st_gid != os.getgid()
-        or metadata.st_nlink != 1
-    ):
-        raise CloneFrontDoorError(f"{label}-identity-invalid")
-    if expected_sha256 is not None and _sha256_file(path) != expected_sha256:
-        raise CloneFrontDoorError(f"{label}-sha256-mismatch")
-
-
 _sha256_file = clone_bindings.sha256_file
 _sha256_text = clone_bindings.sha256_text
+_validate_regular_file = clone_bindings._validate_regular_file
 
 
 def _validate_uuid(value: str, label: str) -> None:
@@ -872,6 +760,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--attempt-id", required=True)
     parser.add_argument("--operator-asset-root", type=Path, required=True)
+    parser.add_argument("--utm-documents-root", type=Path, required=True)
+    parser.add_argument(
+        "--asset-retirement-delete-root", type=Path, required=True
+    )
+    parser.add_argument(
+        "--asset-retirement-delete-manifest-sha256", required=True
+    )
     parser.add_argument("--source-snapshot-root", type=Path, required=True)
     parser.add_argument(
         "--registration-shell-evidence-root", type=Path, required=True
@@ -909,6 +804,11 @@ def main() -> int:
         output_root=args.output_root,
         attempt_id=args.attempt_id,
         operator_asset_root=args.operator_asset_root,
+        utm_documents_root=args.utm_documents_root,
+        asset_retirement_delete_root=args.asset_retirement_delete_root,
+        asset_retirement_delete_manifest_sha256=(
+            args.asset_retirement_delete_manifest_sha256
+        ),
         source_snapshot_root=args.source_snapshot_root,
         registration_shell_evidence_root=(
             args.registration_shell_evidence_root

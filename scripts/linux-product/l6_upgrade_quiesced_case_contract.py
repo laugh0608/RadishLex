@@ -139,6 +139,25 @@ EXPECTED_CLONE_FRONT_DOOR = {
         "replacement_count": 2,
         "source_config_is_not_copied": True,
     },
+    "preclone_baseline": {
+        "all_registered_vms_stopped": True,
+        "delete_batch_id": "fifth-batch-v1",
+        "delete_evidence_relative_path": (
+            "RadishLex-L6-Asset-Retirement-Delete-20260901-"
+            "Fifth-Batch-v1"
+        ),
+        "delete_manifest_sha256": (
+            "a65abab201530518d0ccfec6de60a0c09d156197fce7a30950b97a605181b106"
+        ),
+        "delete_repository_head": (
+            "da15e97087bd9ff793c0c04e878bb086b62b9eb2"
+        ),
+        "deleted_packages_must_remain_absent": True,
+        "inventory_sha256": (
+            "dc91dd99d10b01399886e592343973a9518dba1ebb8dda61b9299c8c99630fe8"
+        ),
+        "registered_vm_count": 5,
+    },
     "registration_shell": {
         "dedicated_case_evidence_required": True,
         "location_policy": {

@@ -121,6 +121,13 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.operator_asset_root = self.root / "assets"
+        self.utm_documents_root = self.root / "utm-documents"
+        self.utm_documents_root.mkdir(mode=0o700)
+        self.retirement_root = self.operator_asset_root / str(
+            case_contract.EXPECTED_CLONE_FRONT_DOOR[
+                "preclone_baseline"
+            ]["delete_evidence_relative_path"]
+        )
         self.source = self.operator_asset_root / str(
             case_contract.EXPECTED_START["relative_path"]
         )
@@ -163,8 +170,20 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
             case_contract.EXPECTED_START, expected
         )
         self.expected_patch.start()
+        self.baseline_patch = mock.patch.dict(
+            case_contract.EXPECTED_CLONE_FRONT_DOOR[
+                "preclone_baseline"
+            ],
+            {
+                "delete_manifest_sha256": "e" * 64,
+                "inventory_sha256": inventory_sha256(preclone_list()),
+                "registered_vm_count": 2,
+            },
+        )
+        self.baseline_patch.start()
 
     def tearDown(self) -> None:
+        self.baseline_patch.stop()
         self.expected_patch.stop()
         self.temporary.cleanup()
 
@@ -331,8 +350,23 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
                 target_package_path=other_parent / f"{TARGET_NAME}.utm"
             ).validate()
 
+        for override in (
+            {"expected_vm_count": 8},
+            {"expected_preclone_inventory_sha256": "0" * 64},
+            {"asset_retirement_delete_manifest_sha256": "0" * 64},
+            {
+                "asset_retirement_delete_root": (
+                    self.operator_asset_root / "unbound-delete-root"
+                )
+            },
+        ):
+            with self.subTest(retirement_override=override):
+                with self.assertRaises(front_door.CloneFrontDoorError):
+                    self.request(**override).validate()
+
     def test_dedicated_shell_evidence_binds_role_and_disk_identity(self) -> None:
         request = self.request(attempt_id="shell-binding")
+        request = self.write_retirement_evidence(request)
         shell = clone_bindings._read_bundle(self.shell, root_mode=0o755)
         evidence = {
             "case_profile": "debian13-arm64-upgrade-quiesced-crash-v1",
@@ -371,6 +405,21 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
                 bound_request
             )
             self.assertTrue(result["dedicated_registration_shell"])
+            self.assertEqual(
+                result["asset_retirement_delete_entries_verified"], 18
+            )
+            self.assertEqual(result["post_retirement_vm_count"], 2)
+
+            resurrected = (
+                self.utm_documents_root
+                / "RadishLex-Debian13-ARM64-L6-1ebbdab.utm"
+            )
+            resurrected.mkdir()
+            with self.assertRaises(clone_bindings.CloneBindingError):
+                clone_bindings.validate_clone_front_door_bindings(
+                    bound_request
+                )
+            resurrected.rmdir()
 
             evidence["source_terminal_reuse"] = True
             drifted_request = self.write_shell_evidence(
@@ -379,6 +428,24 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
             with self.assertRaises(clone_bindings.CloneBindingError):
                 clone_bindings.validate_clone_front_door_bindings(
                     drifted_request
+                )
+
+            terminal_path = self.retirement_root / "terminal.json"
+            terminal = json.loads(terminal_path.read_text(encoding="utf-8"))
+            terminal["outcome"] = "prepared"
+            terminal_path.write_text(
+                json.dumps(terminal, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            terminal_path.chmod(0o600)
+            semantic_request = self.refresh_retirement_manifest(
+                bound_request
+            )
+            with self.assertRaisesRegex(
+                clone_bindings.CloneBindingError, "terminal"
+            ):
+                clone_bindings.validate_clone_front_door_bindings(
+                    semantic_request
                 )
 
     def request(
@@ -391,6 +458,9 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
             / f"evidence-{overrides.get('attempt_id', 'prepared')}",
             "attempt_id": "upgrade-quiesced-synthetic",
             "operator_asset_root": self.operator_asset_root,
+            "utm_documents_root": self.utm_documents_root,
+            "asset_retirement_delete_root": self.retirement_root,
+            "asset_retirement_delete_manifest_sha256": "e" * 64,
             "source_snapshot_root": self.source,
             "registration_shell_evidence_root": self.shell_evidence,
             "registration_shell_manifest_sha256": "b" * 64,
@@ -411,6 +481,70 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
         }
         values.update(overrides)
         return front_door.CloneFrontDoorRequest(**values)  # type: ignore[arg-type]
+
+    def write_retirement_evidence(
+        self, request: front_door.CloneFrontDoorRequest
+    ) -> front_door.CloneFrontDoorRequest:
+        self.retirement_root.mkdir(mode=0o700)
+        values: dict[str, object] = {
+            name: {"synthetic": name}
+            for name in clone_bindings.ASSET_RETIREMENT_DELETE_FILES
+        }
+        baseline = case_contract.EXPECTED_CLONE_FRONT_DOOR[
+            "preclone_baseline"
+        ]
+        values["request.json"] = {
+            "batch_id": baseline["delete_batch_id"],
+            "expected_repository_head": baseline[
+                "delete_repository_head"
+            ],
+            "format": clone_bindings.ASSET_RETIREMENT_DELETE_FORMAT,
+            "operator_asset_root_sha256": clone_bindings.sha256_text(
+                str(self.operator_asset_root)
+            ),
+            "utm_documents_root_sha256": clone_bindings.sha256_text(
+                str(self.utm_documents_root)
+            ),
+        }
+        values["terminal.json"] = clone_bindings.EXPECTED_DELETE_TERMINAL
+        values["delete-03-post-list.json"] = observation(
+            ("utmctl", "list"), stdout=preclone_list()
+        ).as_json()
+        for index in range(1, 4):
+            values[f"delete-{index:02d}-package.json"] = {
+                "format": clone_bindings.ASSET_RETIREMENT_DELETE_FORMAT,
+                "state": "absent",
+            }
+        for name in clone_bindings.ASSET_RETIREMENT_DELETE_FILES:
+            path = self.retirement_root / name
+            path.write_text(
+                json.dumps(values[name], sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            path.chmod(0o600)
+        return self.refresh_retirement_manifest(request)
+
+    def refresh_retirement_manifest(
+        self, request: front_door.CloneFrontDoorRequest
+    ) -> front_door.CloneFrontDoorRequest:
+        manifest = self.retirement_root / "files.sha256"
+        manifest.write_text(
+            "".join(
+                f"{sha256(self.retirement_root / name)}  {name}\n"
+                for name in clone_bindings.ASSET_RETIREMENT_DELETE_FILES
+            ),
+            encoding="ascii",
+        )
+        manifest.chmod(0o600)
+        manifest_sha256 = sha256(manifest)
+        baseline = case_contract.EXPECTED_CLONE_FRONT_DOOR[
+            "preclone_baseline"
+        ]
+        baseline["delete_manifest_sha256"] = manifest_sha256
+        return replace(
+            request,
+            asset_retirement_delete_manifest_sha256=manifest_sha256,
+        )
 
     def write_shell_evidence(
         self,
@@ -486,10 +620,19 @@ def valid_binding(
     request: front_door.CloneFrontDoorRequest,
 ) -> dict[str, object]:
     return {
+        "asset_retirement_delete_entries_verified": 18,
+        "asset_retirement_delete_manifest_sha256": (
+            request.asset_retirement_delete_manifest_sha256
+        ),
         "case_contract": "validated",
         "control_sha256": "d" * 64,
         "dedicated_registration_shell": True,
+        "deleted_packages_absent": 3,
         "format": front_door.EVIDENCE_FORMAT,
+        "post_retirement_inventory_sha256": (
+            request.expected_preclone_inventory_sha256
+        ),
+        "post_retirement_vm_count": request.expected_vm_count,
         "registration_shell_entries_verified": 1,
         "registration_shell_manifest_sha256": (
             request.registration_shell_manifest_sha256
