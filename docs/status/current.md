@@ -37,7 +37,7 @@
 - v4 fresh-boot分类、只读恢复资格和resume控制均已冻结；原resume仍为`state-indeterminate`。`202b64d`分开验证prior/current boot并解耦历史/successor driver，没有倒写旧attempt。
 - `f05ebd7`排除非UTM QEMU误判；v2首次result缺失后，独立deferred resolution以双份1259-byte结果与completed phase闭合transaction `completed`，21项manifest `7fcef38e…0e3d`已由`7acbbde`递归绑定。
 - clean `9485778`只发送一次正常stop，第2轮闭合21台all-stopped及目标句柄/进程absent；28项manifest `096fe01f…e133`已由`ad77c22`递归绑定。
-- clone v1因foreign started零调用拒绝。clean `2811ef3`的v2以7→8全停新增stopped `2672A88A…224A`，因包落默认Documents且授权路径absent以零物化闭合`0fa2cd29…084ff/state-indeterminate`。repository-only恢复现拆为Move prepare/UI/adopt/双文件物化，11/12项回归、L6及全仓通过；真实动作未授权。
+- clone v1因foreign started零调用拒绝。clean `2811ef3`的v2以7→8全停新增stopped `2672A88A…224A`，包落默认Documents而以零物化闭合`0fa2cd29…084ff/state-indeterminate`。clean `7765f1c`的partial `move-prepare`以一次list闭合8台全停，16项`fa6e7335…33ea5/move-ready`冻结；未Move或物化。
 - registration shell v1-v3三种configuration record均以`-1700`失败关闭且package/evidence absent；三个14项manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`/`ae3fb81b…4a511`冻结。`17d10a6`改为最小create后typed update并通过13项回归。
 - clean `7ab855b`的唯一v4最小create返回UUID `0BAA7355…52A7`及22台全停inventory；授权路径absent使update为0，14项manifest `70251467…fb04`闭合`state-indeterminate`。默认`Documents`中的同名部分壳无句柄但位置不合规，shell evidence与真实target仍不存在。
 - `9300ed7`闭合原生Move恢复；prepare v1首门拒绝，v2以一次list闭合22台全停与15项`move-ready` manifest `dc6b0d01…738e`；唯一UI Move将部分壳移至授权路径且三文件身份不变。
@@ -71,7 +71,7 @@
 
 ## 下一步（自 2026-09-01）
 
-1. 只可先另行授权`move-prepare`的一次list；UI Move、`move-adopt`与物化继续分段授权。
+1. 只可先另行授权一次UTM原生UI Move；`move-adopt`与物化继续分段授权。
 2. start、input-preflight、crash、resume与terminal-stop仍分段授权；第五批与clone不得复跑。
 3. 第三场景闭合后，以一台新guest完成连续L6；P05C使用独立guest。
 

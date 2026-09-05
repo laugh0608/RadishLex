@@ -731,6 +731,8 @@ clean `2811ef3`的唯一clone v2以7台全停`d9103084…9bb1`通过严格overla
 
 repository-only partial recovery v1精确绑定上述12项、历史HEAD、7→8 inventory、target UUID和壳体/S2差异，固定三个absent create-new根与attempt。`move-prepare`只读允许1次list并仅输出独立UI Move提示；`move-adopt`以2次同hash全停list和零句柄证明同一partial已由UTM原生移至operator root，仍不物化；`materialize-once`再以独立授权执行2次APFS clonefile、2次原子替换和5轮句柄门，config/source/inventory不变才闭合。11项case合同、12项合成回归、完整L6与全仓门禁及真实v2纯离线binding通过；本批未调用UTM、move/copy/replace/start/delete或进入guest，三个未来根均absent。
 
+clean `7765f1c`随后执行获授权的唯一partial `move-prepare`控制器attempt；此前直接运行0644脚本只在shell前exit 126，根保持absent且UTM query为0。正式控制递归绑定v2 `0fa2cd29…084ff`、S2、registration shell与全部路径，两轮9文件零句柄；唯一list闭合8台全stopped、6 managed + 2 foreign及`4fdf8692…12a0`，默认partial三文件与终态均不漂移，operator-root target保持absent。16项manifest `fa6e7335…33ea5`离线递归闭合`move-ready`，根/文件权限、owner和single-link通过；move/copy/replace/start/clone/delete/retry、guest/transaction均为0。该根与授权冻结；下一步只可另行授权一次UTM原生UI Move到固定operator-root路径，不含query、物化、update或`move-adopt`。
+
 ## 10. L6 完成与后续
 
 P05B L6只有在下列条件同时满足后完成：同一新guest、同一release pair与连续session闭合六步主序列；字体/dependency、startup正负向、XDG零写入/保留、真实process/package-manager lifecycle、断网与guest reboot对照通过；八个crash case的matrix/controller/checkpoint/resume自动合同全部通过；真实系统证据覆盖`install_prepared`、`install_artifacts_staged`和`upgrade_quiesced`三个代表恢复边界。其余五个真实crash属于后续hardening，不阻塞P05B/M5退出，也不得表述为真实通过。完成后仍然：

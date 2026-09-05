@@ -191,6 +191,8 @@ clean `2811ef3`的唯一v2以一次preclone list闭合7台全stopped、5 managed
 
 repository-only partial recovery v1随后把真实12项根、历史HEAD `2811ef3`、7→8 inventory `d9103084…9bb1`/`4fdf8692…12a0`、UUID及壳体三文件身份纳入case并递归验证。恢复严格拆为三段：`move-prepare`只可一次list、两轮零句柄并输出一次外部UTM UI Move提示；`move-adopt`在UI Move后用两次同hash全停list、路径互斥、三文件不变和terminal零句柄只读收证；`materialize-once`另取授权后才可两次`cp -c`和两次`mv -f`，在list后、替换前、两次替换之间及terminal共5轮句柄门，保持config/source不变并要求EFI/qcow2精确等于S2。三个create-new根依次固定为`RadishLex-L6-Crash-Upgrade-Quiesced-d75818f-Clone-Partial-Move-Prepare-v1`、`…Move-Adopt-v1`和`…Materialize-v1`，当前均absent；11项case合同、12项合成回归、完整L6与全仓门禁及真实v2纯离线binding通过。本批没有调用UTM、移动或改写bundle、创建证据根、进入guest或执行transaction。
 
+项目所有者随后只授权上述`move-prepare`。首次直接执行0644脚本在控制器启动前由shell以exit 126拒绝，输出根仍absent且UTM query为0；同一授权改由`/usr/bin/python3`从clean `7765f1c`执行唯一控制器attempt。冻结binding、S2、registration shell、v2 partial和默认/授权路径门均通过，两轮9文件`lsof`精确exit 1；唯一plain list闭合8台全stopped、6 managed + 2 foreign及inventory `4fdf8692…12a0`，terminal身份不漂移且operator-root target仍absent。16项manifest SHA-256为`fa6e7335c59b7adc97d811a88048be795ebfc0f4df0f8fda4f03cbc434233ea5`，根/文件为`0700`/`0600`、owner `501:20`、single-link并经离线递归binding闭合`move-ready`；move/copy/replace/start/clone/delete/retry、guest和transaction均为0，授权已消费且根冻结。下一步只可另行授权UTM原生UI Move，把同一UUID partial从默认Documents移至`/Users/luobo/VirtualMachines/RadishLex-Debian13-ARM64-L6-d75818f-upgrade-quiesced.utm`；不得手工搬移、查询、物化、update、重试或清理，`move-adopt`仍须后续独立授权。
+
 ### 6.4 Snapshot quarantine 与 purge
 
 - quarantine 只允许将精确 snapshot 以同文件系统、no-replace rename 移入 create-new batch 目录；目标目录、父目录、manifest 和 S2/S3 身份必须调用前后复验；
