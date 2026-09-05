@@ -18,7 +18,10 @@ import l6_upgrade_quiesced_registration_shell_bindings as shell_bindings
 import l6_utm_clone_once as clone_control
 
 
-EVIDENCE_FORMAT = "radishlex-linux-l6-upgrade-quiesced-clone-front-door-v2"
+EVIDENCE_FORMAT = "radishlex-linux-l6-upgrade-quiesced-clone-front-door-v3"
+PREDECESSOR_EVIDENCE_FORMAT = (
+    "radishlex-linux-l6-upgrade-quiesced-clone-front-door-v2"
+)
 SHELL_EVIDENCE_FORMAT = shell_bindings.SHELL_EVIDENCE_FORMAT
 CONTROL_RELATIVE_PATH = Path(
     "scripts/linux-product/l6_upgrade_quiesced_clone_front_door.py"
@@ -44,6 +47,16 @@ ASSET_RETIREMENT_DELETE_FILES = (
     "delete-03-command.json",
     "delete-03-post-list.json",
     "delete-03-package.json",
+    "terminal.json",
+)
+PREDECESSOR_FAILURE_FILES = (
+    "request.json",
+    "binding-preflight.json",
+    "source-snapshot-preflight.json",
+    "registration-shell-preflight.json",
+    "target-package-preclone.json",
+    "source-and-shell-handles-preflight.json",
+    "utmctl-list-preclone.json",
     "terminal.json",
 )
 DELETED_PACKAGE_LOCATIONS = (
@@ -73,6 +86,28 @@ EXPECTED_DELETE_TERMINAL = {
     "reason": "fifth-batch-v1-deleted-and-verified",
     "start": "not-performed",
 }
+EXPECTED_PREDECESSOR_TERMINAL = {
+    "automatic_delete": "not-performed",
+    "automatic_retry": "not-performed",
+    "automatic_rollback": "not-performed",
+    "automatic_start": "not-performed",
+    "clone_command_exit_code": None,
+    "clone_command_timed_out": False,
+    "clone_invocations": 0,
+    "format": PREDECESSOR_EVIDENCE_FORMAT,
+    "guest_exec": "not-performed",
+    "input_transfer": "not-performed",
+    "operation_id": "not-generated",
+    "outcome": "precondition-rejected",
+    "reason": "utmctl-list-preclone:preclone-vm-count-mismatch",
+    "replacement_count": 0,
+    "target_name": (
+        "RadishLex-Debian13-ARM64-L6-d75818f-upgrade-quiesced"
+    ),
+    "target_package_state": "not-observed",
+    "target_uuid": None,
+    "transaction": "not-performed",
+}
 
 
 class CloneBindingError(ValueError):
@@ -86,6 +121,8 @@ class FrontDoorRequest(Protocol):
     utm_documents_root: Path
     asset_retirement_delete_root: Path
     asset_retirement_delete_manifest_sha256: str
+    predecessor_failure_root: Path
+    predecessor_failure_manifest_sha256: str
     source_snapshot_root: Path
     registration_shell_evidence_root: Path
     registration_shell_manifest_sha256: str
@@ -136,6 +173,7 @@ def validate_clone_front_door_bindings(
     case_contract.validate_repository_contract(request.repository_root)
     control_sha256 = _validate_control_identity(request.repository_root)
     retirement = validate_post_retirement_baseline(request)
+    predecessor = validate_predecessor_failure(request)
 
     manifest_path = request.registration_shell_evidence_root / "files.sha256"
     if sha256_file(manifest_path) != request.registration_shell_manifest_sha256:
@@ -165,6 +203,7 @@ def validate_clone_front_door_bindings(
         "dedicated_registration_shell": True,
         "format": EVIDENCE_FORMAT,
         **retirement,
+        **predecessor,
         "registration_shell_entries_verified": entries,
         "registration_shell_manifest_sha256": (
             request.registration_shell_manifest_sha256
@@ -191,12 +230,8 @@ def validate_post_retirement_baseline(
         raise CloneBindingError(
             "asset-retirement-delete-manifest-not-approved"
         )
-    if (
-        request.expected_vm_count != baseline["registered_vm_count"]
-        or request.expected_preclone_inventory_sha256
-        != baseline["inventory_sha256"]
-    ):
-        raise CloneBindingError("post-retirement-inventory-request-drift")
+    if request.expected_vm_count < baseline["registered_vm_count"]:
+        raise CloneBindingError("live-inventory-smaller-than-managed-baseline")
 
     _validate_directory(
         request.operator_asset_root, 0o755, "operator-asset-root"
@@ -290,6 +325,9 @@ def validate_post_retirement_baseline(
         != baseline["inventory_sha256"]
     ):
         raise CloneBindingError("asset-retirement-final-inventory-drift")
+    managed, foreign = _classify_managed_inventory(registered)
+    if len(managed) != baseline["registered_vm_count"] or foreign:
+        raise CloneBindingError("asset-retirement-managed-inventory-drift")
     shell = [
         item
         for item in registered
@@ -315,6 +353,164 @@ def validate_post_retirement_baseline(
         "post_retirement_inventory_sha256": baseline["inventory_sha256"],
         "post_retirement_vm_count": len(registered),
     }
+
+
+def validate_predecessor_failure(
+    request: FrontDoorRequest,
+) -> dict[str, object]:
+    expected = case_contract.EXPECTED_CLONE_FRONT_DOOR[
+        "predecessor_failure"
+    ]
+    expected_root = request.operator_asset_root / str(
+        expected["evidence_relative_path"]
+    )
+    if request.predecessor_failure_root != expected_root:
+        raise CloneBindingError("predecessor-failure-root-drift")
+    if request.predecessor_failure_manifest_sha256 != expected[
+        "manifest_sha256"
+    ]:
+        raise CloneBindingError("predecessor-failure-manifest-not-approved")
+    _validate_directory(
+        request.predecessor_failure_root, 0o700, "predecessor-failure-root"
+    )
+    manifest = request.predecessor_failure_root / "files.sha256"
+    if sha256_file(manifest) != request.predecessor_failure_manifest_sha256:
+        raise CloneBindingError("predecessor-failure-manifest-drift")
+    try:
+        entries = clone_control._verify_sha256_manifest(
+            request.predecessor_failure_root, manifest
+        )
+        actual_names = {
+            item.name for item in request.predecessor_failure_root.iterdir()
+        }
+    except (clone_control.CloneControlError, OSError) as exc:
+        raise CloneBindingError("predecessor-failure-evidence-invalid") from exc
+    expected_names = set(PREDECESSOR_FAILURE_FILES) | {"files.sha256"}
+    if (
+        entries != len(PREDECESSOR_FAILURE_FILES)
+        or actual_names != expected_names
+    ):
+        raise CloneBindingError("predecessor-failure-entry-set-drift")
+
+    previous_request = _read_json(
+        request.predecessor_failure_root / "request.json"
+    )
+    baseline = case_contract.EXPECTED_CLONE_FRONT_DOOR[
+        "preclone_baseline"
+    ]
+    if (
+        previous_request.get("format") != PREDECESSOR_EVIDENCE_FORMAT
+        or previous_request.get("attempt_id") != expected["attempt_id"]
+        or previous_request.get("expected_repository_head")
+        != expected["repository_head"]
+        or previous_request.get("expected_vm_count")
+        != baseline["registered_vm_count"]
+        or previous_request.get("expected_preclone_inventory_sha256")
+        != baseline["inventory_sha256"]
+        or previous_request.get("target_name") != request.target_name
+        or previous_request.get("target_package_path_sha256")
+        != sha256_text(str(request.target_package_path))
+    ):
+        raise CloneBindingError("predecessor-failure-request-drift")
+    terminal = _read_json(
+        request.predecessor_failure_root / "terminal.json"
+    )
+    if terminal != EXPECTED_PREDECESSOR_TERMINAL:
+        raise CloneBindingError("predecessor-failure-terminal-drift")
+    target = _read_json(
+        request.predecessor_failure_root / "target-package-preclone.json"
+    )
+    if target != {
+        "package_name": request.target_package_path.name,
+        "package_path_sha256": sha256_text(str(request.target_package_path)),
+        "state": "absent",
+    }:
+        raise CloneBindingError("predecessor-failure-target-drift")
+    observation = _observation_from_json(
+        request.predecessor_failure_root / "utmctl-list-preclone.json",
+        ("utmctl", "list"),
+        "predecessor-failure",
+    )
+    try:
+        registered = clone_control.parse_utmctl_list(observation)
+    except clone_control.CloneControlError as exc:
+        raise CloneBindingError("predecessor-failure-inventory-invalid") from exc
+    _, foreign = _classify_managed_inventory(registered)
+    if (
+        len(registered) != expected["registered_vm_count"]
+        or clone_control.canonical_inventory_sha256(registered)
+        != expected["inventory_sha256"]
+        or len(foreign) != expected["foreign_vm_count"]
+        or sum(item.status == "started" for item in foreign)
+        != expected["started_foreign_vm_count"]
+    ):
+        raise CloneBindingError("predecessor-failure-inventory-drift")
+    return {
+        "predecessor_failure_entries_verified": entries,
+        "predecessor_failure_foreign_vm_count": len(foreign),
+        "predecessor_failure_manifest_sha256": (
+            request.predecessor_failure_manifest_sha256
+        ),
+        "predecessor_failure_outcome": expected["outcome"],
+    }
+
+
+def validate_live_preclone_inventory(
+    registered: tuple[clone_control.RegisteredVm, ...],
+    request: FrontDoorRequest,
+) -> dict[str, object]:
+    policy = case_contract.EXPECTED_CLONE_FRONT_DOOR[
+        "live_inventory_policy"
+    ]
+    if len(registered) != request.expected_vm_count:
+        raise CloneBindingError("preclone-vm-count-mismatch")
+    if any(item.status != "stopped" for item in registered):
+        raise CloneBindingError("preclone-vm-not-all-stopped")
+    if clone_control.canonical_inventory_sha256(registered) != (
+        request.expected_preclone_inventory_sha256
+    ):
+        raise CloneBindingError("preclone-inventory-sha256-mismatch")
+    managed, foreign = _classify_managed_inventory(registered)
+    if foreign and not policy["foreign_overlay_allowed"]:
+        raise CloneBindingError("preclone-foreign-overlay-not-allowed")
+    if any(item.name == request.target_name for item in registered):
+        raise CloneBindingError("target-name-already-registered")
+    return {
+        "all_registered_vms_stopped": True,
+        "foreign_overlay_allowed": bool(policy["foreign_overlay_allowed"]),
+        "foreign_vm_count": len(foreign),
+        "inventory_sha256": request.expected_preclone_inventory_sha256,
+        "managed_vm_count": len(managed),
+        "registered_vm_count": len(registered),
+    }
+
+
+def _classify_managed_inventory(
+    registered: tuple[clone_control.RegisteredVm, ...],
+) -> tuple[
+    tuple[clone_control.RegisteredVm, ...],
+    tuple[clone_control.RegisteredVm, ...],
+]:
+    baseline = case_contract.EXPECTED_CLONE_FRONT_DOOR[
+        "preclone_baseline"
+    ]
+    expected_members = tuple(
+        clone_control.RegisteredVm(
+            str(item["uuid"]), "stopped", str(item["name"])
+        )
+        for item in baseline["managed_members"]
+    )
+    actual_by_uuid = {item.uuid: item for item in registered}
+    for expected in expected_members:
+        if actual_by_uuid.get(expected.uuid) != expected:
+            raise CloneBindingError("managed-preclone-member-drift")
+        if sum(item.name == expected.name for item in registered) != 1:
+            raise CloneBindingError("managed-preclone-name-not-unique")
+    managed_uuids = {item.uuid for item in expected_members}
+    foreign = tuple(
+        item for item in registered if item.uuid not in managed_uuids
+    )
+    return expected_members, foreign
 
 
 def validate_source_snapshot(request: FrontDoorRequest) -> BundleIdentity:
@@ -549,15 +745,17 @@ def _run_git(repository_root: Path, arguments: tuple[str, ...]) -> bytes:
 
 
 def _observation_from_json(
-    path: Path, expected_argv: tuple[str, ...]
+    path: Path,
+    expected_argv: tuple[str, ...],
+    evidence_label: str = "asset-retirement",
 ) -> clone_control.CommandObservation:
     value = _read_json(path)
     if set(value) != {"argv", "exit_code", "timed_out", "stdout", "stderr"}:
-        raise CloneBindingError("asset-retirement-observation-keys-invalid")
+        raise CloneBindingError(f"{evidence_label}-observation-keys-invalid")
     if value["argv"] != list(expected_argv):
-        raise CloneBindingError("asset-retirement-observation-argv-drift")
-    stdout = _captured_bytes(value["stdout"], "stdout")
-    stderr = _captured_bytes(value["stderr"], "stderr")
+        raise CloneBindingError(f"{evidence_label}-observation-argv-drift")
+    stdout = _captured_bytes(value["stdout"], "stdout", evidence_label)
+    stderr = _captured_bytes(value["stderr"], "stderr", evidence_label)
     observation = clone_control.CommandObservation.from_bytes(
         expected_argv,
         exit_code=value["exit_code"],
@@ -566,27 +764,25 @@ def _observation_from_json(
         stderr=stderr,
     )
     if observation.as_json() != value:
-        raise CloneBindingError(
-            "asset-retirement-observation-content-drift"
-        )
+        raise CloneBindingError(f"{evidence_label}-observation-content-drift")
     return observation
 
 
-def _captured_bytes(value: object, label: str) -> bytes:
+def _captured_bytes(
+    value: object, label: str, evidence_label: str
+) -> bytes:
     if not isinstance(value, dict):
-        raise CloneBindingError(
-            f"asset-retirement-observation-{label}-invalid"
-        )
+        raise CloneBindingError(f"{evidence_label}-observation-{label}-invalid")
     encoded = value.get("prefix_base64")
     if not isinstance(encoded, str):
         raise CloneBindingError(
-            f"asset-retirement-observation-{label}-base64-invalid"
+            f"{evidence_label}-observation-{label}-base64-invalid"
         )
     try:
         return base64.b64decode(encoded, validate=True)
     except (ValueError, binascii.Error) as exc:
         raise CloneBindingError(
-            f"asset-retirement-observation-{label}-base64-invalid"
+            f"{evidence_label}-observation-{label}-base64-invalid"
         ) from exc
 
 

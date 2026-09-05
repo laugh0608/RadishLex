@@ -182,6 +182,10 @@ repository-only delete控制随后新增第五批独立且互斥的授权位，�
 
 repository-only clone前门随后升级为v2并把第五批终态纳入case合同：请求只能接受上述delete根/manifest、5台inventory `dc91dd99…30fe8`及其operator/UTM Documents路径关系，旧8台基线在创建输出根前拒绝。binding逐项重验18个manifest成员、`deleted` terminal、最终全停list、三份absent记录及三条当前package absent事实，再继续验证专用壳和不可变S2；控制中的重复bundle校验已收敛到同一bindings实现。9项case、10项clone回归与完整L6、全仓门禁通过；真实冻结根纯离线返回`18/5/3`，没有调用UTM、`lsof`、clone、start、delete、guest或创建外部输出。下一系统动作只可另行授权唯一clone，后续五段仍关闭。
 
+2026-09-02的唯一clone v1先通过第五批、S2、专用壳、target absent和零句柄门，随后一次plain list观察5台RadishLex managed均stopped，但同机另有2台Windows overlay，其中1台started；旧v2合同因全局`7 != 5`在clone前拒绝。8项manifest SHA-256为`79901be8bb19c18b71eef775c4ef11267ec580e294a8fa64cb65146611f5265f`，terminal为`precondition-rejected/preclone-vm-count-mismatch`，clone/replacement均为0，target持续absent；该根与授权冻结，不得重试或复用。
+
+获新授权后的一次plain list只读观察同样7个注册项且现均stopped，不作为持久成功证据。clone前门v3据此保留第五批5成员/hash作为managed基线，新增递归绑定上述零clone前驱，并允许调用方绑定完整live inventory的count/hash；foreign overlay必须全部stopped，clone前后逐UUID/name/status不变，唯一允许新增项仍是stopped target。全局预算可含foreign，RadishLex managed预算仍为5→6；任何managed缺失、foreign started、live hash或terminal overlay漂移均失败关闭。10项case、11项clone、完整L6与全仓门禁通过；v1冻结根纯离线复核通过，本批未再次查询或操作UTM。
+
 ### 6.4 Snapshot quarantine 与 purge
 
 - quarantine 只允许将精确 snapshot 以同文件系统、no-replace rename 移入 create-new batch 目录；目标目录、父目录、manifest 和 S2/S3 身份必须调用前后复验；
@@ -200,7 +204,7 @@ repository-only clone前门随后升级为v2并把第五批终态纳入case合�
 1. repository-only allowlist、prepare 和 fake-runner 回归已实现并通过门禁；实现阶段未调用 UTM、未改资产。
 2. 五个VM退休batch均已分别完成只读prepare、独立授权的唯一mutation并冻结manifest。
 3. 第五批以8→5闭合且prepare/delete授权均已消费；不得复跑、恢复或重建三台bundle。
-4. 注册项已降至预算且clone前门已绑定第五批终态；下一步只能另行授权唯一 `upgrade_quiesced` disposable target clone，case闭合后先退休该target。
+4. RadishLex managed注册项已降至5台；clone v1零调用失败根冻结，v3允许严格全停foreign overlay。下一步只用新attempt执行获授权的唯一 `upgrade_quiesced` disposable target clone，case闭合后先退休该target。
 5. 建立一台新的连续 L6 guest，完成六类 operation 和完整正常生命周期，然后退休。
 6. snapshot 以两项一批 quarantine；确认 P05B 不再依赖后，另行 purge。
 7. P05B 收口后重新评估 registration shell 和 S3；P05C 使用独立 guest 与独立授权。

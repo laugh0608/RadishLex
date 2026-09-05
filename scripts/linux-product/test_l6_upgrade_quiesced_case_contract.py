@@ -65,6 +65,18 @@ class LinuxL6UpgradeQuiescedCaseContractTests(unittest.TestCase):
             self.contract["clone_front_door"]["preclone_baseline"],
             case_contract.EXPECTED_CLONE_FRONT_DOOR["preclone_baseline"],
         )
+        self.assertEqual(
+            self.contract["clone_front_door"]["live_inventory_policy"],
+            case_contract.EXPECTED_CLONE_FRONT_DOOR[
+                "live_inventory_policy"
+            ],
+        )
+        self.assertEqual(
+            self.contract["clone_front_door"]["predecessor_failure"],
+            case_contract.EXPECTED_CLONE_FRONT_DOOR[
+                "predecessor_failure"
+            ],
+        )
 
     def test_snapshot_or_installed_source_drift_is_rejected(self) -> None:
         for field, value in (
@@ -164,6 +176,7 @@ class LinuxL6UpgradeQuiescedCaseContractTests(unittest.TestCase):
         for field, value in (
             ("registered_vm_count", 8),
             ("inventory_sha256", "0" * 64),
+            ("managed_members", []),
             ("deleted_packages_must_remain_absent", False),
         ):
             with self.subTest(field=field):
@@ -171,6 +184,30 @@ class LinuxL6UpgradeQuiescedCaseContractTests(unittest.TestCase):
                 contract["clone_front_door"]["preclone_baseline"][field] = (
                     value
                 )
+                with self.assertRaises(
+                    case_contract.UpgradeQuiescedCaseContractError
+                ):
+                    case_contract.validate_upgrade_quiesced_case_contract(
+                        contract, self.matrix, self.release_pair
+                    )
+
+    def test_clone_front_door_rejects_overlay_or_predecessor_drift(
+        self,
+    ) -> None:
+        mutations = (
+            ("live_inventory_policy", "foreign_overlay_allowed", False),
+            (
+                "live_inventory_policy",
+                "foreign_overlay_must_remain_unchanged",
+                False,
+            ),
+            ("predecessor_failure", "manifest_sha256", "0" * 64),
+            ("predecessor_failure", "clone_invocations", 1),
+        )
+        for section, field, value in mutations:
+            with self.subTest(section=section, field=field):
+                contract = copy.deepcopy(self.contract)
+                contract["clone_front_door"][section][field] = value
                 with self.assertRaises(
                     case_contract.UpgradeQuiescedCaseContractError
                 ):

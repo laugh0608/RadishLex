@@ -24,6 +24,7 @@ SOURCE_UUID = "BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB"
 TARGET_UUID = "CCCCCCCC-CCCC-4CCC-8CCC-CCCCCCCCCCCC"
 TARGET_NAME = "RadishLex-Debian13-ARM64-L6-d75818f-upgrade-quiesced"
 PEER_UUID = "11111111-1111-4111-8111-111111111111"
+FOREIGN_UUID = "22222222-2222-4222-8222-222222222222"
 QCOW2_NAME = "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2"
 
 
@@ -128,6 +129,11 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
                 "preclone_baseline"
             ]["delete_evidence_relative_path"]
         )
+        self.predecessor_root = self.operator_asset_root / str(
+            case_contract.EXPECTED_CLONE_FRONT_DOOR[
+                "predecessor_failure"
+            ]["evidence_relative_path"]
+        )
         self.source = self.operator_asset_root / str(
             case_contract.EXPECTED_START["relative_path"]
         )
@@ -176,13 +182,42 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
             ],
             {
                 "delete_manifest_sha256": "e" * 64,
-                "inventory_sha256": inventory_sha256(preclone_list()),
+                "inventory_sha256": inventory_sha256(baseline_list()),
+                "managed_members": [
+                    {"name": SHELL_NAME, "uuid": SHELL_UUID},
+                    {"name": "Synthetic-Peer", "uuid": PEER_UUID},
+                ],
                 "registered_vm_count": 2,
             },
         )
         self.baseline_patch.start()
+        self.predecessor_patch = mock.patch.dict(
+            case_contract.EXPECTED_CLONE_FRONT_DOOR[
+                "predecessor_failure"
+            ],
+            {
+                "foreign_vm_count": 1,
+                "inventory_sha256": inventory_sha256(
+                    preclone_list(peer_status="started")
+                ),
+                "manifest_sha256": "f" * 64,
+                "registered_vm_count": 3,
+                "repository_head": "a" * 40,
+                "started_foreign_vm_count": 1,
+            },
+        )
+        self.predecessor_patch.start()
+        self.live_policy_patch = mock.patch.dict(
+            case_contract.EXPECTED_CLONE_FRONT_DOOR[
+                "live_inventory_policy"
+            ],
+            {"managed_vm_count": 2},
+        )
+        self.live_policy_patch.start()
 
     def tearDown(self) -> None:
+        self.live_policy_patch.stop()
+        self.predecessor_patch.stop()
         self.baseline_patch.stop()
         self.expected_patch.stop()
         self.temporary.cleanup()
@@ -214,6 +249,11 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
         self.assertEqual(target_config["Network"], [])
         self.assertEqual(target_config["Information"]["UUID"], TARGET_UUID)
         self.assertEqual(runner.calls.count(front_door._clone_argv(request)), 1)
+        classification = read_json(
+            request.output_root / "inventory-classification-preclone.json"
+        )
+        self.assertEqual(classification["managed_vm_count"], 2)
+        self.assertEqual(classification["foreign_vm_count"], 1)
         self.assertFalse(
             any(
                 call[:2]
@@ -247,6 +287,21 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
     def test_running_peer_rejects_before_clone(self) -> None:
         request = self.request(attempt_id="running-peer")
         runner = FakeRunner(request, running_peer=True)
+
+        result = front_door.run_clone_front_door(
+            request, runner=runner, binding_validator=valid_binding
+        )
+
+        self.assertEqual(result.outcome, "precondition-rejected")
+        self.assertEqual(result.clone_invocations, 0)
+        self.assertNotIn(front_door._clone_argv(request), runner.calls)
+
+    def test_live_inventory_hash_drift_rejects_before_clone(self) -> None:
+        request = self.request(
+            attempt_id="live-inventory-drift",
+            expected_preclone_inventory_sha256="0" * 64,
+        )
+        runner = FakeRunner(request)
 
         result = front_door.run_clone_front_door(
             request, runner=runner, binding_validator=valid_binding
@@ -351,12 +406,17 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
             ).validate()
 
         for override in (
-            {"expected_vm_count": 8},
-            {"expected_preclone_inventory_sha256": "0" * 64},
+            {"expected_vm_count": 1},
             {"asset_retirement_delete_manifest_sha256": "0" * 64},
+            {"predecessor_failure_manifest_sha256": "0" * 64},
             {
                 "asset_retirement_delete_root": (
                     self.operator_asset_root / "unbound-delete-root"
+                )
+            },
+            {
+                "predecessor_failure_root": (
+                    self.operator_asset_root / "unbound-predecessor-root"
                 )
             },
         ):
@@ -367,6 +427,7 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
     def test_dedicated_shell_evidence_binds_role_and_disk_identity(self) -> None:
         request = self.request(attempt_id="shell-binding")
         request = self.write_retirement_evidence(request)
+        request = self.write_predecessor_evidence(request)
         shell = clone_bindings._read_bundle(self.shell, root_mode=0o755)
         evidence = {
             "case_profile": "debian13-arm64-upgrade-quiesced-crash-v1",
@@ -409,6 +470,9 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
                 result["asset_retirement_delete_entries_verified"], 18
             )
             self.assertEqual(result["post_retirement_vm_count"], 2)
+            self.assertEqual(
+                result["predecessor_failure_entries_verified"], 8
+            )
 
             resurrected = (
                 self.utm_documents_root
@@ -461,6 +525,8 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
             "utm_documents_root": self.utm_documents_root,
             "asset_retirement_delete_root": self.retirement_root,
             "asset_retirement_delete_manifest_sha256": "e" * 64,
+            "predecessor_failure_root": self.predecessor_root,
+            "predecessor_failure_manifest_sha256": "f" * 64,
             "source_snapshot_root": self.source,
             "registration_shell_evidence_root": self.shell_evidence,
             "registration_shell_manifest_sha256": "b" * 64,
@@ -469,7 +535,7 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
             "registration_shell_package_path": self.shell,
             "target_name": TARGET_NAME,
             "target_package_path": self.target,
-            "expected_vm_count": 2,
+            "expected_vm_count": 3,
             "expected_preclone_inventory_sha256": inventory_sha256(
                 preclone_list()
             ),
@@ -508,7 +574,7 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
         }
         values["terminal.json"] = clone_bindings.EXPECTED_DELETE_TERMINAL
         values["delete-03-post-list.json"] = observation(
-            ("utmctl", "list"), stdout=preclone_list()
+            ("utmctl", "list"), stdout=baseline_list()
         ).as_json()
         for index in range(1, 4):
             values[f"delete-{index:02d}-package.json"] = {
@@ -544,6 +610,70 @@ class LinuxL6UpgradeQuiescedCloneFrontDoorTests(unittest.TestCase):
         return replace(
             request,
             asset_retirement_delete_manifest_sha256=manifest_sha256,
+        )
+
+    def write_predecessor_evidence(
+        self, request: front_door.CloneFrontDoorRequest
+    ) -> front_door.CloneFrontDoorRequest:
+        self.predecessor_root.mkdir(mode=0o700)
+        expected = case_contract.EXPECTED_CLONE_FRONT_DOOR[
+            "predecessor_failure"
+        ]
+        baseline = case_contract.EXPECTED_CLONE_FRONT_DOOR[
+            "preclone_baseline"
+        ]
+        values: dict[str, object] = {
+            name: {"synthetic": name}
+            for name in clone_bindings.PREDECESSOR_FAILURE_FILES
+        }
+        values["request.json"] = {
+            "attempt_id": expected["attempt_id"],
+            "expected_preclone_inventory_sha256": baseline[
+                "inventory_sha256"
+            ],
+            "expected_repository_head": expected["repository_head"],
+            "expected_vm_count": baseline["registered_vm_count"],
+            "format": clone_bindings.PREDECESSOR_EVIDENCE_FORMAT,
+            "target_name": TARGET_NAME,
+            "target_package_path_sha256": clone_bindings.sha256_text(
+                str(self.target)
+            ),
+        }
+        values["target-package-preclone.json"] = {
+            "package_name": self.target.name,
+            "package_path_sha256": clone_bindings.sha256_text(
+                str(self.target)
+            ),
+            "state": "absent",
+        }
+        values["utmctl-list-preclone.json"] = observation(
+            ("utmctl", "list"),
+            stdout=preclone_list(peer_status="started"),
+        ).as_json()
+        values["terminal.json"] = (
+            clone_bindings.EXPECTED_PREDECESSOR_TERMINAL
+        )
+        for name in clone_bindings.PREDECESSOR_FAILURE_FILES:
+            path = self.predecessor_root / name
+            path.write_text(
+                json.dumps(values[name], sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            path.chmod(0o600)
+        manifest = self.predecessor_root / "files.sha256"
+        manifest.write_text(
+            "".join(
+                f"{sha256(self.predecessor_root / name)}  {name}\n"
+                for name in clone_bindings.PREDECESSOR_FAILURE_FILES
+            ),
+            encoding="ascii",
+        )
+        manifest.chmod(0o600)
+        manifest_sha256 = sha256(manifest)
+        expected["manifest_sha256"] = manifest_sha256
+        return replace(
+            request,
+            predecessor_failure_manifest_sha256=manifest_sha256,
         )
 
     def write_shell_evidence(
@@ -619,6 +749,9 @@ def write_plist(path: Path, value: object) -> None:
 def valid_binding(
     request: front_door.CloneFrontDoorRequest,
 ) -> dict[str, object]:
+    baseline = case_contract.EXPECTED_CLONE_FRONT_DOOR[
+        "preclone_baseline"
+    ]
     return {
         "asset_retirement_delete_entries_verified": 18,
         "asset_retirement_delete_manifest_sha256": (
@@ -629,10 +762,14 @@ def valid_binding(
         "dedicated_registration_shell": True,
         "deleted_packages_absent": 3,
         "format": front_door.EVIDENCE_FORMAT,
-        "post_retirement_inventory_sha256": (
-            request.expected_preclone_inventory_sha256
+        "post_retirement_inventory_sha256": baseline["inventory_sha256"],
+        "post_retirement_vm_count": baseline["registered_vm_count"],
+        "predecessor_failure_entries_verified": 8,
+        "predecessor_failure_foreign_vm_count": 1,
+        "predecessor_failure_manifest_sha256": (
+            request.predecessor_failure_manifest_sha256
         ),
-        "post_retirement_vm_count": request.expected_vm_count,
+        "predecessor_failure_outcome": "precondition-rejected",
         "registration_shell_entries_verified": 1,
         "registration_shell_manifest_sha256": (
             request.registration_shell_manifest_sha256
@@ -658,7 +795,8 @@ def preclone_list(*, peer_status: str = "stopped") -> bytes:
     return (
         "UUID Status Name\n"
         f"{SHELL_UUID} stopped {SHELL_NAME}\n"
-        f"{PEER_UUID} {peer_status} Synthetic-Peer\n"
+        f"{PEER_UUID} stopped Synthetic-Peer\n"
+        f"{FOREIGN_UUID} {peer_status} Foreign-Peer\n"
     ).encode("utf-8")
 
 
@@ -666,8 +804,17 @@ def created_list(*, peer_status: str = "stopped") -> bytes:
     return (
         "UUID Status Name\n"
         f"{SHELL_UUID} stopped {SHELL_NAME}\n"
-        f"{PEER_UUID} {peer_status} Synthetic-Peer\n"
+        f"{PEER_UUID} stopped Synthetic-Peer\n"
+        f"{FOREIGN_UUID} {peer_status} Foreign-Peer\n"
         f"{TARGET_UUID} stopped {TARGET_NAME}\n"
+    ).encode("utf-8")
+
+
+def baseline_list() -> bytes:
+    return (
+        "UUID Status Name\n"
+        f"{SHELL_UUID} stopped {SHELL_NAME}\n"
+        f"{PEER_UUID} stopped Synthetic-Peer\n"
     ).encode("utf-8")
 
 

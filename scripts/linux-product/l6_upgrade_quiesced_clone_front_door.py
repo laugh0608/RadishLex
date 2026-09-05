@@ -43,6 +43,8 @@ class CloneFrontDoorRequest:
     utm_documents_root: Path
     asset_retirement_delete_root: Path
     asset_retirement_delete_manifest_sha256: str
+    predecessor_failure_root: Path
+    predecessor_failure_manifest_sha256: str
     source_snapshot_root: Path
     registration_shell_evidence_root: Path
     registration_shell_manifest_sha256: str
@@ -69,6 +71,7 @@ class CloneFrontDoorRequest:
                 self.asset_retirement_delete_root,
                 "asset-retirement-delete-root",
             ),
+            (self.predecessor_failure_root, "predecessor-failure-root"),
             (self.source_snapshot_root, "source-snapshot-root"),
             (
                 self.registration_shell_evidence_root,
@@ -96,6 +99,7 @@ class CloneFrontDoorRequest:
                 self.asset_retirement_delete_root,
                 "asset-retirement-delete-evidence",
             ),
+            (self.predecessor_failure_root, "predecessor-failure-evidence"),
             (self.registration_shell_evidence_root, "shell-evidence"),
             (self.registration_shell_package_path, "registration-shell"),
             (self.target_package_path, "target-package"),
@@ -117,6 +121,16 @@ class CloneFrontDoorRequest:
             raise CloneFrontDoorError(
                 "asset-retirement-delete-root-differs-from-case"
             )
+        predecessor = case_contract.EXPECTED_CLONE_FRONT_DOOR[
+            "predecessor_failure"
+        ]
+        expected_predecessor_root = self.operator_asset_root / str(
+            predecessor["evidence_relative_path"]
+        )
+        if self.predecessor_failure_root != expected_predecessor_root:
+            raise CloneFrontDoorError(
+                "predecessor-failure-root-differs-from-case"
+            )
         if not HEX_40.fullmatch(self.expected_repository_head):
             raise CloneFrontDoorError("expected-repository-head-invalid")
         for digest, label in (
@@ -127,6 +141,10 @@ class CloneFrontDoorRequest:
             (
                 self.asset_retirement_delete_manifest_sha256,
                 "asset-retirement-delete-manifest-sha256",
+            ),
+            (
+                self.predecessor_failure_manifest_sha256,
+                "predecessor-failure-manifest-sha256",
             ),
             (
                 self.expected_preclone_inventory_sha256,
@@ -168,9 +186,9 @@ class CloneFrontDoorRequest:
         if (
             self.asset_retirement_delete_manifest_sha256
             != baseline["delete_manifest_sha256"]
-            or self.expected_vm_count != baseline["registered_vm_count"]
-            or self.expected_preclone_inventory_sha256
-            != baseline["inventory_sha256"]
+            or self.predecessor_failure_manifest_sha256
+            != predecessor["manifest_sha256"]
+            or self.expected_vm_count < baseline["registered_vm_count"]
         ):
             raise CloneFrontDoorError(
                 "post-retirement-preclone-baseline-mismatch"
@@ -216,6 +234,12 @@ class CloneFrontDoorRequest:
             "format": EVIDENCE_FORMAT,
             "operator_asset_root_sha256": _sha256_text(
                 str(self.operator_asset_root)
+            ),
+            "predecessor_failure_manifest_sha256": (
+                self.predecessor_failure_manifest_sha256
+            ),
+            "predecessor_failure_root_sha256": _sha256_text(
+                str(self.predecessor_failure_root)
             ),
             "registration_shell_evidence_root_sha256": _sha256_text(
                 str(self.registration_shell_evidence_root)
@@ -285,6 +309,7 @@ def run_clone_front_door(
     target_uuid: str | None = None
     clone_observation: clone_control.CommandObservation | None = None
     target_state = "not-observed"
+    preclone_inventory: dict[str, object] | None = None
 
     try:
         writer.write_json(
@@ -336,7 +361,12 @@ def run_clone_front_door(
             "utmctl-list-preclone.json", preclone_list.as_json()
         )
         preclone_vms = clone_control.parse_utmctl_list(preclone_list)
-        _validate_preclone_inventory(preclone_vms, request)
+        preclone_inventory = _validate_preclone_inventory(
+            preclone_vms, request
+        )
+        writer.write_json(
+            "inventory-classification-preclone.json", preclone_inventory
+        )
 
         stage = "utmctl-clone"
         clone_invocations = 1
@@ -551,6 +581,7 @@ def run_clone_front_door(
         "input_transfer": "not-performed",
         "operation_id": "not-generated",
         "outcome": outcome,
+        "preclone_inventory": preclone_inventory,
         "reason": reason,
         "replacement_count": replacement_count,
         "target_name": request.target_name,
@@ -609,29 +640,10 @@ def validate_target_bundle(
 def _validate_preclone_inventory(
     registered: tuple[clone_control.RegisteredVm, ...],
     request: CloneFrontDoorRequest,
-) -> None:
-    if len(registered) != request.expected_vm_count:
-        raise CloneFrontDoorError("preclone-vm-count-mismatch")
-    if any(item.status != "stopped" for item in registered):
-        raise CloneFrontDoorError("preclone-vm-not-all-stopped")
-    shell = next(
-        (
-            item
-            for item in registered
-            if item.uuid == request.registration_shell_uuid
-        ),
-        None,
+) -> dict[str, object]:
+    return clone_bindings.validate_live_preclone_inventory(
+        registered, request
     )
-    if shell is None or shell.name != request.registration_shell_name:
-        raise CloneFrontDoorError(
-            "registration-shell-not-uniquely-registered"
-        )
-    if any(item.name == request.target_name for item in registered):
-        raise CloneFrontDoorError("target-name-already-registered")
-    if clone_control.canonical_inventory_sha256(registered) != (
-        request.expected_preclone_inventory_sha256
-    ):
-        raise CloneFrontDoorError("preclone-inventory-sha256-mismatch")
 
 
 def _as_clone_request(
@@ -767,6 +779,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--asset-retirement-delete-manifest-sha256", required=True
     )
+    parser.add_argument("--predecessor-failure-root", type=Path, required=True)
+    parser.add_argument(
+        "--predecessor-failure-manifest-sha256", required=True
+    )
     parser.add_argument("--source-snapshot-root", type=Path, required=True)
     parser.add_argument(
         "--registration-shell-evidence-root", type=Path, required=True
@@ -808,6 +824,10 @@ def main() -> int:
         asset_retirement_delete_root=args.asset_retirement_delete_root,
         asset_retirement_delete_manifest_sha256=(
             args.asset_retirement_delete_manifest_sha256
+        ),
+        predecessor_failure_root=args.predecessor_failure_root,
+        predecessor_failure_manifest_sha256=(
+            args.predecessor_failure_manifest_sha256
         ),
         source_snapshot_root=args.source_snapshot_root,
         registration_shell_evidence_root=(

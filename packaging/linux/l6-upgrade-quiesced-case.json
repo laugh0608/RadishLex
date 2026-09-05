@@ -67,7 +67,50 @@
       "delete_repository_head": "da15e97087bd9ff793c0c04e878bb086b62b9eb2",
       "deleted_packages_must_remain_absent": true,
       "inventory_sha256": "dc91dd99d10b01399886e592343973a9518dba1ebb8dda61b9299c8c99630fe8",
+      "managed_members": [
+        {
+          "name": "RadishLex-Debian13-ARM64",
+          "uuid": "E0168AA6-AFDA-4C81-9327-590DAC48C49B"
+        },
+        {
+          "name": "Debian13-ARM64",
+          "uuid": "755199B1-1C18-4441-8A1E-D423C8DE0022"
+        },
+        {
+          "name": "Debian13-ARM64-CleanBase",
+          "uuid": "21197987-AEBB-46E6-ABDC-B9762F5C0CE4"
+        },
+        {
+          "name": "RadishLex-L6-PairBuilder-2fa1b8c-v2",
+          "uuid": "E2F5624C-B0F9-4102-B149-5F72C1851D49"
+        },
+        {
+          "name": "RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-v1",
+          "uuid": "0BAA7355-A55A-463E-97FE-82A785E252A7"
+        }
+      ],
       "registered_vm_count": 5
+    },
+    "predecessor_failure": {
+      "attempt_id": "d75818f-upgrade-quiesced-clone-20260902-v1",
+      "clone_invocations": 0,
+      "evidence_relative_path": "RadishLex-L6-Crash-Upgrade-Quiesced-d75818f-Clone-Once-v1",
+      "foreign_vm_count": 2,
+      "inventory_sha256": "738b950ad2ba78f03273cc519a6521a6f8ccae4bdd6848cc173355e1f9b905cc",
+      "manifest_sha256": "79901be8bb19c18b71eef775c4ef11267ec580e294a8fa64cb65146611f5265f",
+      "outcome": "precondition-rejected",
+      "reason": "utmctl-list-preclone:preclone-vm-count-mismatch",
+      "registered_vm_count": 7,
+      "replacement_count": 0,
+      "repository_head": "b3e8491d9bcc16082e91e085f50631064307fe18",
+      "started_foreign_vm_count": 1
+    },
+    "live_inventory_policy": {
+      "all_registered_vms_must_be_stopped": true,
+      "foreign_overlay_allowed": true,
+      "foreign_overlay_must_remain_unchanged": true,
+      "managed_vm_count": 5,
+      "target_is_only_allowed_addition": true
     },
     "registration_shell": {
       "dedicated_case_evidence_required": true,

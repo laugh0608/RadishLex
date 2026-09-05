@@ -725,6 +725,8 @@ repository-only `fifth-batch-v1`现固定剩余3台/27.19 GiB。`501:0`的rolled
 
 repository-only clone前门v2现把上述第五批终态升级为运行前递归输入：case固定delete manifest `a65abab2…1b106`、5台inventory `dc91dd99…30fe8`与三条package持续absent；request不再接受任意count/hash。binding重验18项、`deleted` terminal、最终全停list、路径hash/owner及当前absent后才进入专用壳/S2校验，合成测试另覆盖旧8台参数、复活package与重签名语义漂移。9项case、10项clone与完整L6、全仓门禁通过，真实冻结根纯离线闭合`18/5/3`；未调用UTM、`lsof`、clone/start/delete或进入guest，也未创建外部证据根。下一步只能另行授权唯一clone；其余五段仍关闭。
 
+2026-09-02唯一clone v1通过第五批/S2/壳体/target absent/零句柄后，一次list观察5台RadishLex均stopped，另有2台Windows overlay且1台started；旧合同在`7 != 5`门拒绝，clone/replacement为0/0、target持续absent。8项manifest `79901be8…26f`冻结，不重试或复用。新授权恢复后的一次非持久只读list观察相同7项现均stopped；clone前门v3将第五批5项固定为managed基线，递归绑定v1前驱，并要求完整live count/hash、全体stopped、foreign逐项全程不变及target唯一新增。外部项不计RadishLex 5→6预算，但任何live或overlay漂移均失败关闭。10项case、11项clone、完整L6与全仓门禁通过；v1真实冻结根纯离线闭合，未再次查询或操作UTM。
+
 ## 10. L6 完成与后续
 
 P05B L6只有在下列条件同时满足后完成：同一新guest、同一release pair与连续session闭合六步主序列；字体/dependency、startup正负向、XDG零写入/保留、真实process/package-manager lifecycle、断网与guest reboot对照通过；八个crash case的matrix/controller/checkpoint/resume自动合同全部通过；真实系统证据覆盖`install_prepared`、`install_artifacts_staged`和`upgrade_quiesced`三个代表恢复边界。其余五个真实crash属于后续hardening，不阻塞P05B/M5退出，也不得表述为真实通过。完成后仍然：
