@@ -186,6 +186,8 @@ repository-only clone前门随后升级为v2并把第五批终态纳入case合�
 
 获新授权后的一次plain list只读观察同样7个注册项且现均stopped，不作为持久成功证据。clone前门v3据此保留第五批5成员/hash作为managed基线，新增递归绑定上述零clone前驱，并允许调用方绑定完整live inventory的count/hash；foreign overlay必须全部stopped，clone前后逐UUID/name/status不变，唯一允许新增项仍是stopped target。全局预算可含foreign，RadishLex managed预算仍为5→6；任何managed缺失、foreign started、live hash或terminal overlay漂移均失败关闭。10项case、11项clone、完整L6与全仓门禁通过；v1冻结根纯离线复核通过，本批未再次查询或操作UTM。
 
+clean `2811ef3`的唯一v2以一次preclone list闭合7台全stopped、5 managed + 2 foreign及`d9103084…9bb1`，唯一clone exit 0并只新增stopped UUID `2672A88A…224A`。UTM把新包创建到默认Documents，请求绑定的operator-root路径仍absent，因此控制在S2物化前闭合`state-indeterminate/target-package-postclone:clone-postconditions-indeterminate`，replacement为0。默认包EFI/qcow2仍与专用壳相同并不同于S2；12项manifest `0fa2cd29…084ff`逐项通过，未start/delete/retry/rollback或进入guest。该根与新增stopped壳体冻结；不得重跑clone或把当前包表述为S2副本，下一步只先repository-only设计原生Move恢复及后续exact materialization。
+
 ### 6.4 Snapshot quarantine 与 purge
 
 - quarantine 只允许将精确 snapshot 以同文件系统、no-replace rename 移入 create-new batch 目录；目标目录、父目录、manifest 和 S2/S3 身份必须调用前后复验；
@@ -204,7 +206,7 @@ repository-only clone前门随后升级为v2并把第五批终态纳入case合�
 1. repository-only allowlist、prepare 和 fake-runner 回归已实现并通过门禁；实现阶段未调用 UTM、未改资产。
 2. 五个VM退休batch均已分别完成只读prepare、独立授权的唯一mutation并冻结manifest。
 3. 第五批以8→5闭合且prepare/delete授权均已消费；不得复跑、恢复或重建三台bundle。
-4. RadishLex managed注册项已降至5台；clone v1零调用失败根冻结，v3允许严格全停foreign overlay。下一步只用新attempt执行获授权的唯一 `upgrade_quiesced` disposable target clone，case闭合后先退休该target。
+4. RadishLex managed基线为5台；v2已新增1台stopped但未物化的target壳体并冻结为`state-indeterminate`。下一步先repository-only绑定v2并设计原生Move恢复与exact materialization；不得重跑clone，真实move/物化另行授权。
 5. 建立一台新的连续 L6 guest，完成六类 operation 和完整正常生命周期，然后退休。
 6. snapshot 以两项一批 quarantine；确认 P05B 不再依赖后，另行 purge。
 7. P05B 收口后重新评估 registration shell 和 S3；P05C 使用独立 guest 与独立授权。

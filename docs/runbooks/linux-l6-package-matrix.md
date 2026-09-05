@@ -727,6 +727,8 @@ repository-only clone前门v2现把上述第五批终态升级为运行前递归
 
 2026-09-02唯一clone v1通过第五批/S2/壳体/target absent/零句柄后，一次list观察5台RadishLex均stopped，另有2台Windows overlay且1台started；旧合同在`7 != 5`门拒绝，clone/replacement为0/0、target持续absent。8项manifest `79901be8…26f`冻结，不重试或复用。新授权恢复后的一次非持久只读list观察相同7项现均stopped；clone前门v3将第五批5项固定为managed基线，递归绑定v1前驱，并要求完整live count/hash、全体stopped、foreign逐项全程不变及target唯一新增。外部项不计RadishLex 5→6预算，但任何live或overlay漂移均失败关闭。10项case、11项clone、完整L6与全仓门禁通过；v1真实冻结根纯离线闭合，未再次查询或操作UTM。
 
+clean `2811ef3`的唯一clone v2以7台全停`d9103084…9bb1`通过严格overlay门；唯一clone exit 0，postclone只新增stopped `2672A88A…224A`且原7项不变。UTM将包创建在默认Documents，operator-root target仍absent，控制遂在物化前闭合`state-indeterminate`，replacement为0；新包EFI/qcow2仍为壳体hash而非S2。12项manifest `0fa2cd29…084ff`逐项通过，无start/delete/retry/rollback/guest/transaction。v2与当前未物化壳体冻结，不重跑clone；下一步先repository-only设计原生Move恢复及exact materialization，真实动作另行授权。
+
 ## 10. L6 完成与后续
 
 P05B L6只有在下列条件同时满足后完成：同一新guest、同一release pair与连续session闭合六步主序列；字体/dependency、startup正负向、XDG零写入/保留、真实process/package-manager lifecycle、断网与guest reboot对照通过；八个crash case的matrix/controller/checkpoint/resume自动合同全部通过；真实系统证据覆盖`install_prepared`、`install_artifacts_staged`和`upgrade_quiesced`三个代表恢复边界。其余五个真实crash属于后续hardening，不阻塞P05B/M5退出，也不得表述为真实通过。完成后仍然：
