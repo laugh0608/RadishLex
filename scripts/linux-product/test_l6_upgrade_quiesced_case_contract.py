@@ -215,6 +215,31 @@ class LinuxL6UpgradeQuiescedCaseContractTests(unittest.TestCase):
                         contract, self.matrix, self.release_pair
                     )
 
+    def test_clone_front_door_rejects_partial_recovery_drift(self) -> None:
+        mutations = (
+            ("partial_clone", "replacement_count", 2),
+            ("partial_clone", "postclone_managed_vm_count", 5),
+            ("move", "primitive", "filesystem-rename"),
+            (
+                "materialization",
+                "authorization_is_separate_from_move",
+                False,
+            ),
+            ("materialization", "handle_rounds", 1),
+        )
+        for section, field, value in mutations:
+            with self.subTest(section=section, field=field):
+                contract = copy.deepcopy(self.contract)
+                contract["clone_front_door"]["partial_recovery"][section][
+                    field
+                ] = value
+                with self.assertRaises(
+                    case_contract.UpgradeQuiescedCaseContractError
+                ):
+                    case_contract.validate_upgrade_quiesced_case_contract(
+                        contract, self.matrix, self.release_pair
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()

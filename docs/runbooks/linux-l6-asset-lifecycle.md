@@ -19,11 +19,11 @@ P05B 剩余阻塞项为：
 - 同一连续 session 复验 dependency/font、startup 正负向、XDG 零写入/保留、process/package-manager lifecycle、断网与 guest reboot 对照；
 - P05C 仍使用另一台独立 guest，并重新取得系统授权。
 
-真实 VM 数量受预算约束：常驻注册锚点目标为 5 台，任一时刻最多增加 1 台 P05B disposable target，因此 P05B 注册预算上限为 6 台。注册项已由历史基线 22 台降至 5 台；只有独立授权的唯一 `upgrade_quiesced` disposable target 可使其临时升至 6 台。一个 disposable target 形成持久证据并退休后，才允许创建下一台；失败不会自动增加替代 clone。
+真实 RadishLex VM 数量受预算约束：常驻注册锚点目标为 5 台，任一时刻最多增加 1 台 P05B disposable target，因此 managed 注册预算上限为 6 台。五批删除已把 managed 注册项由22台降至5台，唯一`upgrade_quiesced` clone v2现新增1台stopped partial target并达到6台上限；另有2台foreign overlay，不进入RadishLex预算但必须保持全停且身份不变。当前target形成持久终态并退休前，不允许创建替代clone。
 
 ## 2. 审计基线与计量口径
 
-本账本的历史基线来自 2026-08-30 已冻结的 complete v2 清单；当前注册数再由五批冻结 delete manifest 的精确成员 delta 推进，不为更新账本追加 UTM 查询：
+本账本的历史基线来自 2026-08-30 已冻结的 complete v2 清单；当前managed注册数由五批冻结delete manifest及clone v2的冻结postclone delta推进，不为更新账本追加UTM查询：
 
 - inventory：`/Users/luobo/VirtualMachines/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-Move-Complete-Control-v2/utmctl-list-postupdate.json`；
 - canonical inventory：22 台全部 `stopped`，hash `1074717ca5ff9f8666e53974b9002d1c4697a33de877e5cdfbdcf24299f4714f`；
@@ -32,7 +32,7 @@ P05B 剩余阻塞项为：
 - 7 个 APFS snapshot 的 `du` 合计为 65.25 GiB；
 - Data volume 当次只读观察约有 527 GiB 可用，不构成立即容量事故。
 
-五个batch先后删除17个注册bundle后，当前为6个物理`.utm`、5个注册项和1个故意未注册的DependencyFrozen bundle；snapshot仍为7个。此处不以`df`变化反推实际回收量。
+五个batch先后删除17个注册bundle、clone v2新增partial target后，当前为7个RadishLex物理`.utm`、6个managed注册项和1个故意未注册的DependencyFrozen bundle；另有2个foreign注册overlay，不列入本账本；snapshot仍为7个。此处不以`df`变化反推实际回收量。
 
 表中 GiB 是 `du -sk / 1048576` 的账面值。APFS clonefile 和 clone 共享物理块，逐项求和会重复计算共享块；删除候选的账面值只用于排序，不能承诺同等可回收容量。host evidence、handoff 和 control root 体积远小于 VM/snapshot，默认保留而不是优先清理。
 
@@ -70,8 +70,9 @@ P05B 剩余阻塞项为：
 | 21 | `OP/RadishLex-L6-PairBuilder-2fa1b8c-v2.utm`<br>`E2F5624C-B0F9-4102-B149-5F72C1851D49` | 17.14 | 隔离 release-pair builder | 保留；常驻注册锚点 |
 | 22 | `OP/RadishLex-L6-Registration-Shell-d75818f-Upgrade-Quiesced-v1.utm`<br>`0BAA7355-A55A-463E-97FE-82A785E252A7` | 0.00 | `upgrade_quiesced` registration-only shell | 保留至第三场景 target 建立；随后另评估退休 |
 | 23 | `OP/RadishLex/VMs/RadishLex-Debian13-ARM64.utm`<br>`E0168AA6-AFDA-4C81-9327-590DAC48C49B` | 17.24 | P04 已验收现场 | 保留；常驻注册锚点，不作 P05 mutation |
+| 24 | `DOC/RadishLex-Debian13-ARM64-L6-d75818f-upgrade-quiesced.utm`<br>`2672A88A-91D6-4677-9793-9BC83B46224A` | 0.00 | stopped partial target；仍为壳体EFI/qcow2 | 冻结；只按Move恢复链推进，不start/delete/reclone |
 
-五批已删除17个raw VM，账面157.60 GiB；注册列表已从22台降至5台，第五批allowlist不再有待退休成员。
+五批已删除17个raw VM，账面157.60 GiB；RadishLex managed注册项由22降至5后又因唯一partial target升至6，第五批allowlist不再有待退休成员。
 
 第四批只选择其中3台：第六套target/S3、第一场景completed terminal和第二场景completed/stopped-verified terminal，精确账面27.09 GiB。第五套rolled-back与repair completed的既存终态证据树均为历史owner tuple `501:0`；第三套source terminal的最终EFI/qcow2又不同于更早的S2恢复点。三者当时继续作为候选保留，后由第五批在不修改历史证据、不放宽`501:20`合同且不把S2表述为当前bundle副本的前提下独立建模。
 
@@ -187,6 +188,8 @@ repository-only clone前门随后升级为v2并把第五批终态纳入case合�
 获新授权后的一次plain list只读观察同样7个注册项且现均stopped，不作为持久成功证据。clone前门v3据此保留第五批5成员/hash作为managed基线，新增递归绑定上述零clone前驱，并允许调用方绑定完整live inventory的count/hash；foreign overlay必须全部stopped，clone前后逐UUID/name/status不变，唯一允许新增项仍是stopped target。全局预算可含foreign，RadishLex managed预算仍为5→6；任何managed缺失、foreign started、live hash或terminal overlay漂移均失败关闭。10项case、11项clone、完整L6与全仓门禁通过；v1冻结根纯离线复核通过，本批未再次查询或操作UTM。
 
 clean `2811ef3`的唯一v2以一次preclone list闭合7台全stopped、5 managed + 2 foreign及`d9103084…9bb1`，唯一clone exit 0并只新增stopped UUID `2672A88A…224A`。UTM把新包创建到默认Documents，请求绑定的operator-root路径仍absent，因此控制在S2物化前闭合`state-indeterminate/target-package-postclone:clone-postconditions-indeterminate`，replacement为0。默认包EFI/qcow2仍与专用壳相同并不同于S2；12项manifest `0fa2cd29…084ff`逐项通过，未start/delete/retry/rollback或进入guest。该根与新增stopped壳体冻结；不得重跑clone或把当前包表述为S2副本，下一步只先repository-only设计原生Move恢复及后续exact materialization。
+
+repository-only partial recovery v1随后把真实12项根、历史HEAD `2811ef3`、7→8 inventory `d9103084…9bb1`/`4fdf8692…12a0`、UUID及壳体三文件身份纳入case并递归验证。恢复严格拆为三段：`move-prepare`只可一次list、两轮零句柄并输出一次外部UTM UI Move提示；`move-adopt`在UI Move后用两次同hash全停list、路径互斥、三文件不变和terminal零句柄只读收证；`materialize-once`另取授权后才可两次`cp -c`和两次`mv -f`，在list后、替换前、两次替换之间及terminal共5轮句柄门，保持config/source不变并要求EFI/qcow2精确等于S2。三个create-new根依次固定为`RadishLex-L6-Crash-Upgrade-Quiesced-d75818f-Clone-Partial-Move-Prepare-v1`、`…Move-Adopt-v1`和`…Materialize-v1`，当前均absent；11项case合同、12项合成回归、完整L6与全仓门禁及真实v2纯离线binding通过。本批没有调用UTM、移动或改写bundle、创建证据根、进入guest或执行transaction。
 
 ### 6.4 Snapshot quarantine 与 purge
 

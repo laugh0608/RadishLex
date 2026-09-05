@@ -729,6 +729,8 @@ repository-only clone前门v2现把上述第五批终态升级为运行前递归
 
 clean `2811ef3`的唯一clone v2以7台全停`d9103084…9bb1`通过严格overlay门；唯一clone exit 0，postclone只新增stopped `2672A88A…224A`且原7项不变。UTM将包创建在默认Documents，operator-root target仍absent，控制遂在物化前闭合`state-indeterminate`，replacement为0；新包EFI/qcow2仍为壳体hash而非S2。12项manifest `0fa2cd29…084ff`逐项通过，无start/delete/retry/rollback/guest/transaction。v2与当前未物化壳体冻结，不重跑clone；下一步先repository-only设计原生Move恢复及exact materialization，真实动作另行授权。
 
+repository-only partial recovery v1精确绑定上述12项、历史HEAD、7→8 inventory、target UUID和壳体/S2差异，固定三个absent create-new根与attempt。`move-prepare`只读允许1次list并仅输出独立UI Move提示；`move-adopt`以2次同hash全停list和零句柄证明同一partial已由UTM原生移至operator root，仍不物化；`materialize-once`再以独立授权执行2次APFS clonefile、2次原子替换和5轮句柄门，config/source/inventory不变才闭合。11项case合同、12项合成回归、完整L6与全仓门禁及真实v2纯离线binding通过；本批未调用UTM、move/copy/replace/start/delete或进入guest，三个未来根均absent。
+
 ## 10. L6 完成与后续
 
 P05B L6只有在下列条件同时满足后完成：同一新guest、同一release pair与连续session闭合六步主序列；字体/dependency、startup正负向、XDG零写入/保留、真实process/package-manager lifecycle、断网与guest reboot对照通过；八个crash case的matrix/controller/checkpoint/resume自动合同全部通过；真实系统证据覆盖`install_prepared`、`install_artifacts_staged`和`upgrade_quiesced`三个代表恢复边界。其余五个真实crash属于后续hardening，不阻塞P05B/M5退出，也不得表述为真实通过。完成后仍然：

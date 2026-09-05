@@ -112,6 +112,57 @@
       "managed_vm_count": 5,
       "target_is_only_allowed_addition": true
     },
+    "partial_recovery": {
+      "materialization": {
+        "authorization_is_separate_from_move": true,
+        "copy_invocations": 2,
+        "evidence_relative_path": "RadishLex-L6-Crash-Upgrade-Quiesced-d75818f-Clone-Partial-Materialize-v1",
+        "handle_rounds": 5,
+        "inventory_queries": 2,
+        "attempt_id": "d75818f-upgrade-quiesced-clone-partial-materialize-20260905-v1",
+        "replacement_count": 2,
+        "source_s2_must_remain_unchanged": true,
+        "target_config_must_remain_unchanged": true
+      },
+      "move": {
+        "adopt_attempt_id": "d75818f-upgrade-quiesced-clone-partial-move-adopt-20260905-v1",
+        "adopt_evidence_relative_path": "RadishLex-L6-Crash-Upgrade-Quiesced-d75818f-Clone-Partial-Move-Adopt-v1",
+        "adopt_inventory_queries": 2,
+        "adopt_is_read_only": true,
+        "destination_location": "operator-asset-root",
+        "external_action_is_separately_authorized": true,
+        "prepare_inventory_queries": 1,
+        "prepare_attempt_id": "d75818f-upgrade-quiesced-clone-partial-move-prepare-20260905-v1",
+        "prepare_evidence_relative_path": "RadishLex-L6-Crash-Upgrade-Quiesced-d75818f-Clone-Partial-Move-Prepare-v1",
+        "primitive": "utm-native-ui",
+        "source_location": "utm-documents-root"
+      },
+      "partial_clone": {
+        "attempt_id": "d75818f-upgrade-quiesced-clone-20260905-v2",
+        "clone_invocations": 1,
+        "control_sha256": "64e895aa253be8c24d2921103ef53bbd550ff17c5397d4d84a7671a3d3df411a",
+        "default_package": {
+          "config_sha256": "0bac8867d9c1522059f91716324b03f3032373d761a8861b4ba05b521d190a8f",
+          "efi_sha256": "7b0a7f26192011e6e98c770694269b40f8b70620ca58fc4973a232fb223600d5",
+          "qcow2_name": "EF62CC7C-DF55-4A83-8633-F4630CF3B234.qcow2",
+          "qcow2_sha256": "ae44c4d0b6b789f232932cc0dfbda31dcd54edfb6849ed97e3a4a0c228c2b94b"
+        },
+        "evidence_relative_path": "RadishLex-L6-Crash-Upgrade-Quiesced-d75818f-Clone-Once-v2",
+        "foreign_vm_count": 2,
+        "manifest_sha256": "0fa2cd297be9d0739485c3e9d0d4e47d3193ed5c9ef6f1527f6522c61f3084ff",
+        "outcome": "state-indeterminate",
+        "postclone_inventory_sha256": "4fdf86920dbf7c569e18ba7b97f3aca4527def3eb3f63186ecc0cb421eb412a0",
+        "postclone_managed_vm_count": 6,
+        "postclone_registered_vm_count": 8,
+        "preclone_inventory_sha256": "d91030846f2c9b4118fe91a6e43437d663317d79cd529710b3678b4f43da9bb1",
+        "preclone_registered_vm_count": 7,
+        "reason": "target-package-postclone:clone-postconditions-indeterminate",
+        "replacement_count": 0,
+        "repository_head": "2811ef399c5308a281d5ca512b3a557968f55aa9",
+        "target_name": "RadishLex-Debian13-ARM64-L6-d75818f-upgrade-quiesced",
+        "target_uuid": "2672A88A-91D6-4677-9793-9BC83B46224A"
+      }
+    },
     "registration_shell": {
       "dedicated_case_evidence_required": true,
       "location_policy": {

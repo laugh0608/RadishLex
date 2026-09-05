@@ -38,6 +38,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 \
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_upgrade_quiesced_clone_front_door.py"
 PYTHONDONTWRITEBYTECODE=1 python3 \
+  "${repo_root}/scripts/linux-product/test_l6_upgrade_quiesced_clone_partial_recovery.py"
+PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_utm_launch_diagnostics.py"
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_utm_launch_diagnostics_v5.py"

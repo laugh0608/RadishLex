@@ -37,7 +37,7 @@
 - v4 fresh-boot分类、只读恢复资格和resume控制均已冻结；原resume仍为`state-indeterminate`。`202b64d`分开验证prior/current boot并解耦历史/successor driver，没有倒写旧attempt。
 - `f05ebd7`排除非UTM QEMU误判；v2首次result缺失后，独立deferred resolution以双份1259-byte结果与completed phase闭合transaction `completed`，21项manifest `7fcef38e…0e3d`已由`7acbbde`递归绑定。
 - clean `9485778`只发送一次正常stop，第2轮闭合21台all-stopped及目标句柄/进程absent；28项manifest `096fe01f…e133`已由`ad77c22`递归绑定。
-- clone v1因foreign started零调用拒绝，`79901be8…26f`冻结；v3门禁通过。clean `2811ef3`的唯一v2在7台全停后clone出stopped `2672A88A…224A`，但包落入默认Documents且授权路径absent，replacement=0；`0fa2cd29…084ff`闭合`state-indeterminate`，不重试/启动/删除。
+- clone v1因foreign started零调用拒绝。clean `2811ef3`的v2以7→8全停新增stopped `2672A88A…224A`，因包落默认Documents且授权路径absent以零物化闭合`0fa2cd29…084ff/state-indeterminate`。repository-only恢复现拆为Move prepare/UI/adopt/双文件物化，11/12项回归、L6及全仓通过；真实动作未授权。
 - registration shell v1-v3三种configuration record均以`-1700`失败关闭且package/evidence absent；三个14项manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`/`ae3fb81b…4a511`冻结。`17d10a6`改为最小create后typed update并通过13项回归。
 - clean `7ab855b`的唯一v4最小create返回UUID `0BAA7355…52A7`及22台全停inventory；授权路径absent使update为0，14项manifest `70251467…fb04`闭合`state-indeterminate`。默认`Documents`中的同名部分壳无句柄但位置不合规，shell evidence与真实target仍不存在。
 - `9300ed7`闭合原生Move恢复；prepare v1首门拒绝，v2以一次list闭合22台全停与15项`move-ready` manifest `dc6b0d01…738e`；唯一UI Move将部分壳移至授权路径且三文件身份不变。
@@ -64,15 +64,15 @@
 - fresh-boot resume attempt `d75818f-v4-install-artifacts-staged-fresh-boot-resume-20260827-v1`与host/guest根已消费并冻结；不得补拉、复跑、重建secret、retry/cleanup、再次resume/postflight或据`state-indeterminate`修补现场。调用后不得无授权追加query/start/stop/quit。
 - transaction-state v1/v2、deferred-result及terminal-stop根冻结。21项结果只证明该boot的transaction为`completed`，28项stop结果只证明同一授权调用内目标已正常停止并完成host交叉检查；不得补拉、复跑probe、query/start/stop、resume/dpkg/retry/repair/cleanup或改写现场。
 - registration shell v1-v3 control根与manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`/`ae3fb81b…4a511`冻结；不得覆盖、复用或解释为已创建。
-- clone v1根与`Evidence-v5`冻结；v3只接受5台managed基线与全停、全程不变的foreign overlay，新attempt不得复用v1根。
+- clone v1/v2根、`Evidence-v5`与默认Documents partial target冻结；不得reclone、start、delete、手工搬移或冒充S2。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## 下一步（自 2026-09-01）
 
-1. repository-only绑定clone v2 partial现场，设计原生Move恢复与后续exact materialization；真实move/物化另行授权。
-2. 真实clone、start、input-preflight、crash、resume与terminal-stop仍分段授权；第五批不得复跑或恢复。
+1. 只可先另行授权`move-prepare`的一次list；UI Move、`move-adopt`与物化继续分段授权。
+2. start、input-preflight、crash、resume与terminal-stop仍分段授权；第五批与clone不得复跑。
 3. 第三场景闭合后，以一台新guest完成连续L6；P05C使用独立guest。
 
 ## 验证入口
@@ -105,4 +105,4 @@ git diff --check
 - [Linux Manager 本地验收边界](../linux-manager-local-acceptance.md)
 - [Linux L6 Debian package matrix runbook](../runbooks/linux-l6-package-matrix.md)
 - [Linux L6 收敛与本地资产生命周期](../runbooks/linux-l6-asset-lifecycle.md)
-- [本周周志](../devlogs/2026-W35.md)
+- [本周周志](../devlogs/2026-W36.md)
