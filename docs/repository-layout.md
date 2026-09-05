@@ -129,17 +129,9 @@ RadishLex/
 | `tests/` | 跨模块共享 fixture | 不存真实用户或敏感数据 |
 | `.github/` | PR、Release 和仓库治理 workflow | 门禁应覆盖真实交付链 |
 
-## 当前成熟度边界
+## 能力状态路由
 
-| 范围 | 已有工程形态 | 尚未形成的产品能力 |
-| --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v9、Manager 产品状态与隔离资格 run、管理查询和共库证据；M4-P02 数据协调、M4-P03 外层 receipt/guard、双程序切换/恢复、两段终态、manifest/code-signature adapter、跨核心协调、Installer driver/executor/bridge 已形成独立边界 | 身份绑定的终态材料清理与真实跨发布兼容证据 |
-| 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
-| 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
-| Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁；M4 外层 install gate、数据 gate 与升级 validation helper；M5 Linux runner、固定 `.so`、共享 XDG/privacy source contract、ARM64 Release bundle、同库学习/删除/导入导出与重启实机证据，以及 Flutter 初始化前的 Linux 只读 startup gate | Linux system package 实机；真实用户同步入口与首版后的目标部署证据 |
-| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；build 38 双 bundle、locked RimeData、数据/安装 gate、Installer、社区 ad-hoc identity、DMG evidence、首次安装/输入/修复/默认移除实机证据；Linux Fcitx5 C++/CMake addon、ABI/XDG/staged/system runtime-layout/Manager runtime/privacy/classifier contract、Debian 13 ARM64 Wayland/X11 输入及 Manager 同库个人化证据；Linux metadata/rootfs、真实 ARM64 product payload、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控 CLI、Manager/Fcitx 共用 startup gate、L6 format/controller/pair、六类真实operation分散证据、前两个代表crash终态、第三个case注册壳/clone控制与VM资产退休控制；Android Keystore 能力验证桥 | macOS 真实跨发布升级；Linux `upgrade_quiesced`代表crash、连续完整L6、linked startup动态负向与P05C；其余五个真实crash hardening；完整 Android IME、Windows TSF 与 iOS Keyboard Extension |
-
-具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
+目录存在仅说明实现归属。各平台能力、自动/实机证据、用户开放、公开发布和当前缺口统一查阅 [current](status/current.md)；本页不复制批次、构建号、现场流水或整改状态。以下模块说明解释职责，不能单独作为产品退出证据。
 
 ## Rust crates
 
@@ -418,7 +410,7 @@ R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-
 
 - `docs/README.md`：文档职责、默认阅读顺序和按任务导航，不保存阶段快照。
 - `docs/status/current.md`：唯一当前阶段短入口。
-- `docs/remediation/`：仅在当前状态明确引用活动临时专题时使用；当前无活动专题。
+- `docs/remediation/`：仅在当前状态明确引用活动临时专题时使用；事项编号、证据、待决策方案与关闭条件归该专题，关闭后退出日常阅读链。
 - `docs/archive/`：已关闭且退出默认阅读链的历史专题与 review-only 材料。
 - `docs/adr/`：已决策且需要长期追溯的架构选择。
 - `docs/runbooks/`：可重复操作步骤、环境前提和停止线。

@@ -19,6 +19,8 @@
 
 P0 数据不写 selection event、negative feedback、user term 或同步摘要。平台无法可靠判断时，应优先按更严格等级处理。当前隐私模式可以只读使用隐私模式开启前已经存在的本地 P2 排序摘要，但本次输入仍按 P0 处理且不产生任何学习写入；secure input、敏感应用或上下文无法可靠判断时连既有个人化摘要也不读取，只使用 engine 顺序。
 
+P0 是整个输入系统的合同，包含底层 engine 的学习存储、缓存与日志。engine-only 只描述 RadishLex 重排策略，不能单独证明底层引擎未使用既有偏好；RadishLex SQLite 零增量也不能证明底层零学习。已发现的 Rime 接线与验证范围缺口由 [current](status/current.md) 激活的审阅专题跟踪，原始验收材料不倒写。
+
 ### P1：本地学习、默认不同步
 
 - 原始选择事件。
@@ -205,6 +207,8 @@ macOS wrapped epoch material 使用独立 Secure Enclave P-256 key-agreement ide
 - 显式恢复必须是新的用户意图，并使用比 tombstone 更新的稳定版本。
 - 同时间戳冲突使用确定性 device/object tie-break，不能依赖到达顺序。
 - 合并必须把本地当前状态作为一等输入，并满足交换律、结合律和幂等性。
+
+当前删词事务保留 deleted 词条与 tombstone，移除对应 ranker 权重并追加负反馈；不会同时清除既有原始选择事件。该合同是防复活与显式恢复语义，不代表全部记录已经擦除，也不保证基础 engine 永不再提供同文候选。原始事件保留期限、清除入口及所有底层学习数据的处理仍需独立方案；不得以清理为由直接移除防复活信息。
 
 ## 恢复码与恢复记录
 
