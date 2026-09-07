@@ -161,7 +161,7 @@ M4-P03 以未公证社区 ad-hoc DMG 内的独立用户域 Installer app 承担�
 - 负反馈；
 - suppressed 与 deleted 惩罚。
 
-每次排序必须能输出 explain。权重调整必须依赖固定合成评测集和指标，不依赖单次主观体验。
+每次排序必须能输出 explain。权重调整必须依赖固定合成评测集和指标，不依赖单次主观体验。当前 ranker 的 Cargo 依赖仍通过 `ime-userdb` 取得摘要类型，并传递引入持久化、同步与加密依赖；算法不执行这些操作不等于构建依赖已经隔离。窄摘要类型的改进方案由当前审阅专题跟踪，尚未实施。
 
 ### ime-crypto
 
@@ -295,7 +295,7 @@ production Debian 层已固定 `/usr/bin/dpkg` identity、私有 staged argv、�
 
 第三套pair完成source install/S1/S2，第四套暴露source chain不连续，第五套为`rolled_back`，第六套形成target `completed`与S3。healthy repair短路已修复为fresh repair必须消费permit并apply一次、只有proof-backed retry可零重复；当前Linux product默认119项、L6-feature 124项测试覆盖共享锁父目录与五类operation。maintenance-refresh锚定未改写target package/evidence和production-only ELF；独立clone已依次真实闭合repair、rollback、默认remove与reinstall，形成chain 3/4/5，完整payload或移除语义、startup、XDG零漂移、进程与断网postflight均通过。各clone和host evidence只承担各自真相源，精确receipt、dpkg delta与磁盘identity进入L6 runbook/devlog，不在架构计划重复流水。
 
-首个`install_prepared`在旧pair上因startup遗漏Debian精确`01777`共享锁父目录合同而于resume/dpkg前失败关闭；共享策略已修复，target `d75818f`的新pair已冻结。两台新pair retry又分别暴露canonical inventory/file-name与fresh-absent startup预期的host harness缺陷，均未进入transaction并已归档清理。committed离线回归固定互斥预期后，第三台clean absent clone已在同一断网boot闭合input、fresh-absent preflight、prepared checkpoint与exact resume；source `38-1` installed、receipt completed、guard absent、`AllowedProduct` startup及XDG零写入均有持久证据，关机磁盘和原十八台all-stopped状态也已冻结。第二个case `install_artifacts_staged`已由typed合同、首次安装Rust回归和matrix交叉校验固定；既有clone两次start均在host失败关闭，repository-only start-once控制以clean head、失败manifest、全停VM与逐次status构成独立边界。后续v2 clone又观察到exit 0/stderr `-1712`且无注册/package，证明host动作必须依赖后置事实而非返回码。下一步先离线闭合clone-once控制，再分别授权真实clone、启动与运行态断网；其余七个crash实机case、连续完整L6和P05C仍未闭合。IBus仅在Fcitx5退出后有明确需求时评估。完整边界见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)、[Linux Manager 本地验收边界](linux-manager-local-acceptance.md)、[Linux 安装维护边界](linux-installation-maintenance-boundary.md) 与 [L6 runbook](runbooks/linux-l6-package-matrix.md)。
+首个`install_prepared`曾因startup遗漏Debian精确`01777`共享锁父目录合同而于resume/dpkg前失败关闭；共享策略修复后，clean clone已在同一断网boot闭合input、fresh-absent preflight、prepared checkpoint与exact resume。第二个`install_artifacts_staged`以typed guest合同、首次安装Rust回归和matrix交叉校验固定不同于前一case的receipt/staging/startup预期。host orchestration不能以CLI退出码单独判定成功：start/clone/launch/network/input/preflight/checkpoint控制均须绑定clean head、冻结manifest、精确target与create-new输出，并以terminal list/status/backend、descriptor文件身份或guest逐字回读等后置事实联合判定；未知状态失败关闭且不自动retry/cleanup/stop。canonical input使用确定性USTAR、私有guest staging、no-replace原子切换与state resolution；negative preflight在生成operation ID前固定package/state/dpkg/startup/XDG/process/network，checkpoint控制只在这些条件保持时生成一个guest-local ID、调用一次acceptance并向host导出hash。repository-only合成门禁不替代真实系统证据，精确实机进度、资产和下一授权只读`current`与L6 runbook。其余crash、连续完整L6和P05C仍未闭合；IBus仅在Fcitx5退出后有明确需求时评估。完整边界见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)、[Linux Manager 本地验收边界](linux-manager-local-acceptance.md)、[Linux 安装维护边界](linux-installation-maintenance-boundary.md) 与 [L6 runbook](runbooks/linux-l6-package-matrix.md)。
 
 ### Android
 
@@ -344,7 +344,7 @@ production Debian 层已固定 `/usr/bin/dpkg` identity、私有 staged argv、�
 - Flutter manager：format、analyze、unit/widget test、真实 FFI smoke 和产品 bundle 检查。
 - 平台壳：对应平台 build、自动契约测试与非敏感人工输入 smoke。
 
-默认先运行精确验证；跨边界、阶段交付和发布前运行仓库级门禁。快速或合成验证不能替代真实平台、真实 bundle 或真实设备证据。
+默认先运行精确验证；跨边界、阶段交付和发布前运行仓库级门禁。快速或合成验证不能替代真实平台、真实 bundle 或真实设备证据。检查覆盖按实际入口、host、feature 和产物判断；上述分层是验证职责，不表示现有 CI 已全部接线。当前覆盖与工具链声明差异由 current 激活的审阅专题记录。
 
 ## 主要风险
 
@@ -367,9 +367,9 @@ M2 退出至少同时满足：
 
 M2 不以远端同步、设备授权或最终发布包为退出条件。
 
-## v1 成功标准
+## 完整同步产品目标与首个正式版本
 
-在 M2 基础上，v1 还必须满足：
+完整同步产品在 M2 基础上的目标如下；首个正式版本依照路线图保持真实用户同步关闭，不能将这些长期能力目标解释为首版已经开放同步：
 
 - 两个真实客户端能安全同步 P2 密文，服务端无法读取明文。
 - manager 产品包使用真实 FFI、持久化配置和平台文件访问。

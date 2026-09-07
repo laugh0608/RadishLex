@@ -42,12 +42,16 @@ class CapturedOutput:
     truncated: bool
 
     @classmethod
-    def from_bytes(cls, value: bytes) -> CapturedOutput:
+    def from_bytes(
+        cls, value: bytes, *, max_capture_bytes: int = MAX_CAPTURE_BYTES
+    ) -> CapturedOutput:
+        if max_capture_bytes < 1:
+            raise ValueError("max-capture-bytes-must-be-positive")
         return cls(
-            prefix=value[:MAX_CAPTURE_BYTES],
+            prefix=value[:max_capture_bytes],
             total_bytes=len(value),
             sha256=hashlib.sha256(value).hexdigest(),
-            truncated=len(value) > MAX_CAPTURE_BYTES,
+            truncated=len(value) > max_capture_bytes,
         )
 
     def as_json(self) -> dict[str, object]:
@@ -103,6 +107,11 @@ class CommandRunner(Protocol):
 
 
 class SubprocessCommandRunner:
+    def __init__(self, *, max_capture_bytes: int = MAX_CAPTURE_BYTES) -> None:
+        if max_capture_bytes < 1:
+            raise ValueError("max-capture-bytes-must-be-positive")
+        self.max_capture_bytes = max_capture_bytes
+
     def run(
         self, argv: tuple[str, ...], timeout_seconds: int
     ) -> CommandObservation:
@@ -137,8 +146,12 @@ class SubprocessCommandRunner:
                 argv=argv,
                 exit_code=exit_code,
                 timed_out=timed_out,
-                stdout=_capture_file(stdout_file),
-                stderr=_capture_file(stderr_file),
+                stdout=_capture_file(
+                    stdout_file, max_capture_bytes=self.max_capture_bytes
+                ),
+                stderr=_capture_file(
+                    stderr_file, max_capture_bytes=self.max_capture_bytes
+                ),
             )
 
 
@@ -582,7 +595,11 @@ def _require_successful_observation(
         raise StartControlError(f"{label}-stderr-not-empty")
 
 
-def _capture_file(file_object: BinaryIO) -> CapturedOutput:
+def _capture_file(
+    file_object: BinaryIO, *, max_capture_bytes: int = MAX_CAPTURE_BYTES
+) -> CapturedOutput:
+    if max_capture_bytes < 1:
+        raise ValueError("max-capture-bytes-must-be-positive")
     file_object.seek(0, os.SEEK_END)
     total_bytes = file_object.tell()
     file_object.seek(0)
@@ -593,13 +610,13 @@ def _capture_file(file_object: BinaryIO) -> CapturedOutput:
         if not chunk:
             break
         digest.update(chunk)
-        if len(prefix) < MAX_CAPTURE_BYTES:
-            prefix.extend(chunk[: MAX_CAPTURE_BYTES - len(prefix)])
+        if len(prefix) < max_capture_bytes:
+            prefix.extend(chunk[: max_capture_bytes - len(prefix)])
     return CapturedOutput(
         prefix=bytes(prefix),
         total_bytes=total_bytes,
         sha256=digest.hexdigest(),
-        truncated=total_bytes > MAX_CAPTURE_BYTES,
+        truncated=total_bytes > max_capture_bytes,
     )
 
 

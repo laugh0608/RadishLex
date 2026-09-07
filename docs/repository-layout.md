@@ -129,17 +129,9 @@ RadishLex/
 | `tests/` | 跨模块共享 fixture | 不存真实用户或敏感数据 |
 | `.github/` | PR、Release 和仓库治理 workflow | 门禁应覆盖真实交付链 |
 
-## 当前成熟度边界
+## 能力状态路由
 
-| 范围 | 已有工程形态 | 尚未形成的产品能力 |
-| --- | --- | --- |
-| Rust input | core、进程级 Rime runtime、产品个人化 runtime、CLI、ABI v9、Manager 产品状态与隔离资格 run、管理查询和共库证据；M4-P02 数据协调、M4-P03 外层 receipt/guard、双程序切换/恢复、两段终态、manifest/code-signature adapter、跨核心协调、Installer driver/executor/bridge 已形成独立边界 | 身份绑定的终态材料清理与真实跨发布兼容证据 |
-| 本地学习 | schema v9 userdb、事务化用户意图、本地导入批次关联、确定性 ranker、产品热路径、并发 migration/WAL、同步 cursor/journal/outbox、原子 apply、可信 public lifecycle、wrapped ciphertext 与 recovery lifecycle cache | 明文 master key/shared secret 只短暂进入 Rust snapshot，不进入 SQLite/settings |
-| 同步 | P2 crypto/sync、Ed25519/P-256 profile、Go server、Rust HTTP/TLS transport、关闭态 orchestration、通用 processor、生产 provider、设备 lifecycle 验证、wrapped epoch v1、Apple signing/key-agreement 产品资格、双 userdb Go HTTP 收敛、本地 Caddy HTTPS、Manager 受控资格执行链 | 真实用户入口开放评审、首版后的发布级目标部署 |
-| Flutter manager | 默认 product/显式 demo、Release FFI bundle、固定平台路径、隐私 method channel、deleted restore、导入批次审计、双端刷新、同步产品 status、本地 HTTPS 合成资格 run、widget/FFI/产品门禁；M4 外层 install gate、数据 gate 与升级 validation helper；M5 Linux runner、固定 `.so`、共享 XDG/privacy source contract、ARM64 Release bundle、同库学习/删除/导入导出与重启实机证据，以及 Flutter 初始化前的 Linux 只读 startup gate | Linux system package 实机；真实用户同步入口与首版后的目标部署证据 |
-| 平台 | macOS InputMethodKit 薄壳、contract/native bundle、生产 LearningContext 与 privacy/清理 contract；build 38 双 bundle、locked RimeData、数据/安装 gate、Installer、社区 ad-hoc identity、DMG evidence、首次安装/输入/修复/默认移除实机证据；Linux Fcitx5 C++/CMake addon、ABI/XDG/staged/system runtime-layout/Manager runtime/privacy/classifier contract、Debian 13 ARM64 Wayland/X11 输入及 Manager 同库个人化证据；Linux metadata/rootfs、真实 ARM64 product payload、确定性 `.deb`、actual package relationship、恢复事务、固定系统 observer/executor、mutable port、受控 CLI、Manager/Fcitx 共用 startup gate、L6 format/controller/pair、六类真实operation分散证据、首个crash exact resume与host start-once控制；Android Keystore 能力验证桥 | macOS 真实跨发布升级；Linux 其余七个crash、连续完整L6、linked startup动态负向与P05C；完整 Android IME、Windows TSF 与 iOS Keyboard Extension |
-
-具体当前批次和停止线只在 `docs/status/current.md` 维护，本表只表达目录的产品边界。
+目录存在仅说明实现归属。各平台能力、自动/实机证据、用户开放、公开发布和当前缺口统一查阅 [current](status/current.md)；本页不复制批次、构建号、现场流水或整改状态。以下模块说明解释职责，不能单独作为产品退出证据。
 
 ## Rust crates
 
@@ -385,7 +377,7 @@ startup observer 只读 `/var/lib/dpkg/status`、guard/tmp/receipt、terminal ac
 
 `platforms/linux-l6-acceptance/` 是独立 workspace crate 和二进制 compile identity。它只通过 production crate 默认关闭的 `l6-acceptance-checkpoints` feature 取得八个 hook；production maintenance main 不链接调用入口、不识别参数，也没有环境/路径开关。worker 通过继承 pipe 在确定位置暂停，controller 杀独立完整 process group、等待 `SIGKILL` 并复验 `/proc/*/stat` 中 group member 为零且无 `dpkg` child，之后才形成 canonical `radishlex-linux-l6-checkpoint-evidence-v1`。envelope 只保存 operation ID hash 与稳定分类，不保存 PID、原始路径、proc/dpkg 原文或用户数据。
 
-`packaging/linux/l6-matrix.json` 与 `scripts/linux-product/l6_contract.py` 固定独立 Debian 13 ARM64 guest、相邻 revision、六步主序列和八个 crash checkpoint；`l6_guest_case_contract.py`固定guest input/readback与状态预期，`l6_utm_start_once.py`则把host start限制为绑定clean head/失败manifest/全停VM的单次调用，逐次持久化有界诊断、status和terminal list，不自动stop/retry或进入guest。controller 合同另固定 compile identity、进程组终止与 evidence 边界。release-pair builder 只从 clean target 构建并由target production Rust verifier逐侧解析。第六套已完成 target `completed` 与 S3；独立clone闭合真实repair、rollback、remove与reinstall。第三台clean retry闭合首个crash；第二个case两次start及后续v2 clone均在host失败关闭，下一步补对称的clone-once控制，其余七个crash case未闭合。
+`packaging/linux/l6-matrix.json` 与 `scripts/linux-product/l6_contract.py` 固定独立 Debian 13 ARM64 guest、相邻 revision、六步主序列和八个 crash checkpoint；`l6_guest_case_contract.py`固定guest input/readback与状态预期，`l6_utm_start_once.py`把host start限制为绑定clean head/失败manifest/全停VM的单次调用，逐次持久化有界诊断、status和terminal list。对称的`l6_utm_clone_once.py`绑定clean head/前序manifest/canonical全停清单/registered source与目标package absent，只调用一次clone并联合命令、terminal注册清单和精确package判定结果；两者都不自动补救或进入guest。第三个`upgrade_quiesced` case先由`l6_upgrade_quiesced_registration_shell.py`及bindings/committed AppleScript绑定clean HEAD、不可变S2、UTM create API、`Network=[]`与单成员壳体证据，再由`l6_upgrade_quiesced_clone_front_door.py`及bindings递归绑定第五批delete manifest、5台managed inventory、零clone前驱与全停foreign overlay；clone后只允许新增唯一target并要求overlay不变，再以EFI/qcow2的APFS clonefile物化，任何部分结果均不自动删除、重试、回滚或启动。若UTM把partial clone放入默认Documents，`l6_upgrade_quiesced_clone_partial_recovery.py`及bindings只允许固定的只读move-prepare、外部原生UI Move、只读move-adopt和独立授权的双文件物化，逐阶段递归绑定且不继承授权。`l6_utm_launch_diagnostics.py`只允许list/status、紧凑host process和有界UTM/utmctl/QEMU unified log读取，`l6_utm_launch_transport_v2.py`及bindings把新transport限定为committed AppleScript的单次`activate`+UUID start，并绑定前序manifest、authoritative package路径、两次descriptor磁盘身份与进程零门。canonical input由`l6_v4_canonical_input_bundle.py`从冻结证据确定性生成host USTAR，`l6_utm_canonical_input_transfer.py`与guest installer负责精确source三元组、双重回读、私有staging和no-replace switch；`l6_utm_canonical_input_resolution.py`在未知态下只读消歧，`l6_utm_canonical_input_preflight.py`固定不生成operation ID的负向现场，`l6_utm_install_artifacts_staged_checkpoint.py`与guest driver才允许一次checkpoint并只向host导出operation ID hash。所有host控制均以独立bindings/evidence模块固定identity、create-new输出和失败关闭，repository-only builder/测试不调用真实UTM或进入guest。当前实机进度、manifest与停止线只读`docs/status/current.md`和L6 runbook。
 
 当前 macOS 机器不直接安装 Linux 工具链；`./scripts/build-linux-fcitx5-container.sh` 在 Docker Desktop 的 Linux VM 中以 Debian 13 ARM64、Fcitx5 Core 5.1.12 和 librime 1.13.1 编译 native-rime FFI 与 `radishlex.so`，仓库只读挂载，Cargo cache/target 使用独立 named volume。该入口还执行 staged addon-relative 装配、ELF `$ORIGIN`/依赖/构建路径门禁和 headless native loader probe；这些结果不是 Wayland/X11、Fcitx daemon 或真实应用输入证据。开发入口与停止线见 [Fcitx5 addon README](../platforms/linux-fcitx5/README.md)。
 
@@ -407,7 +399,7 @@ R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-
 
 平台目录按主线顺序创建：
 
-1. `platforms/linux-fcitx5/`、`platforms/linux-product/` 与 `platforms/linux-l6-acceptance/`：前者承载输入/Manager与C++ startup binding；中者承载actual `.deb` relationship、恢复事务、system port、受控CLI和startup decision；后者只承载compile-isolated checkpoint/process-group/evidence controller。载体、pair、refresh与matrix归属`packaging/linux/`，验证/构建及host一次性控制归属`scripts/linux-product/`。第六套terminal/S3及真实repair、rollback、remove、reinstall已冻结，第三台clean clone闭合首个crash；第二个case两次start与后续v2 clone均在host失败关闭，下一步先离线补clone-once控制，而非复用旧clone、热替换pair或重建source package。
+1. `platforms/linux-fcitx5/`、`platforms/linux-product/` 与 `platforms/linux-l6-acceptance/`：前者承载输入/Manager与C++ startup binding；中者承载actual `.deb` relationship、恢复事务、system port、受控CLI和startup decision；后者只承载compile-isolated checkpoint/process-group/evidence controller。载体、pair、refresh与matrix归属`packaging/linux/`，验证/构建及host一次性start/clone/launch诊断/foreground transport/network/canonical input/preflight/checkpoint控制归属`scripts/linux-product/`。实机资产、case进度、停止线与下一授权不在目录说明中复制，只读`docs/status/current.md`和L6 runbook。
 2. `platforms/android-ime/`：在现有 keystore bridge 之外补完整 IME。
 3. `platforms/windows-tsf/`。
 4. `platforms/ios-keyboard/`。
@@ -418,7 +410,7 @@ R01B 实机与回滚遵循 [专用 runbook](runbooks/macos-r01b-personalization-
 
 - `docs/README.md`：文档职责、默认阅读顺序和按任务导航，不保存阶段快照。
 - `docs/status/current.md`：唯一当前阶段短入口。
-- `docs/remediation/`：仅在当前状态明确引用活动临时专题时使用；当前无活动专题。
+- `docs/remediation/`：仅在当前状态明确引用活动临时专题时使用；事项编号、证据、待决策方案与关闭条件归该专题，关闭后退出日常阅读链。
 - `docs/archive/`：已关闭且退出默认阅读链的历史专题与 review-only 材料。
 - `docs/adr/`：已决策且需要长期追溯的架构选择。
 - `docs/runbooks/`：可重复操作步骤、环境前提和停止线。

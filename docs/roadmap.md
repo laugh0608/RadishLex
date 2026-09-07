@@ -13,6 +13,8 @@
 - 合成 fixture、CLI 输出、设计草案和 local smoke 只能证明对应边界，不替代真实平台、真实 bundle、真实客户端或目标部署证据。
 - 个人开发阶段按平台类型维护一条真实主路径证据，不要求为同一平台凑齐所有硬件、虚拟化或 CI 负向矩阵；暂不可得的环境证据必须标记为延期补测，不能伪造，但不得无限冻结后续里程碑开发。
 
+里程碑退出、实现存在、自动验证、实机验证、用户开放和公开发布是不同维度，当前能力矩阵在 [current](status/current.md)。退出后发现的缺口保留原始验收记录，并在 current 激活的审阅专题中单独跟踪，不能仅以旧阶段已退出证明新发现已解决。
+
 ## M0：方向与工程基础
 
 目标：
@@ -174,7 +176,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 2. `M5-P02`：实现 C++/CMake addon、Rust FFI 接线、确定性开发构建和自动 contract。
 3. `M5-P03`：完成真实 Wayland 主路径、X11 兼容、常见应用输入、生命周期和隐私验收。
 4. `M5-P04`：完成 Linux Flutter Manager、同库并发、本地学习、删除/恢复、导入导出和 explain 验收。
-5. `M5-P05`：完成安装、升级、修复、默认移除、rollback、数据保留和发行载体。首个载体固定为 Debian 13 ARM64 的系统级本地 `.deb`；P05A 已完成 metadata/rootfs、双构建身份与真实 ARM64 载荷门禁。P05B 已完成确定性载体、实际 `.deb` 流式关系校验、恢复型 receipt/advisory guard、固定系统 observer/executor、concrete mutable port、`/proc` 静止检查、opaque authorized CLI、startup dependency 连接与 fake command/crash matrix；L6 format v1、compile-isolated acceptance controller 与 canonical 脱敏 envelope 也已完成。第四套暴露source chain不连续，第五套为`rolled_back`，第六套形成target `completed`与S3；独立clone又闭合真实repair、rollback、remove与reinstall。首个`install_prepared`暴露的Debian `01777` startup漂移已修复并冻结`d75818f`新pair；第三台clean retry已闭合有效checkpoint、exact resume terminal与关机冻结。`install_artifacts_staged`合同、首次安装回归、clean clone身份及repository-only单次start控制均已闭合；同一clone两次start均未进入guest，后续v2 clone又出现exit 0/stderr `-1712`且无注册/package的host假成功。下一顺位先离线闭合clone-once控制与回归，再另行授权新clone和启动/断网；v1不携带RadishLex自有maintainer scripts，P05C最后进入独立guest授权实机。
+5. `M5-P05`：完成安装、升级、修复、默认移除、rollback、数据保留和发行载体。P05A 负责 metadata/rootfs 与真实载荷，P05B 负责确定性 `.deb`、实际载体关系、恢复事务、只读 startup gate 和 L6，P05C 进入独立 guest 的授权实机验收。首个载体为 Debian 13 ARM64 系统级本地 `.deb`，不携带 RadishLex 自有 maintainer scripts。精确进度、失败现场与下一授权只读 [current](status/current.md)、[L6 runbook](runbooks/linux-l6-package-matrix.md)和[资产生命周期](runbooks/linux-l6-asset-lifecycle.md)。
 
 交付：
 
@@ -202,7 +204,7 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 - Debian 13 ARM64 的安装、同数据 contract 升级、修复、rollback、默认程序移除和 reinstall 具有自动门禁与独立实机证据。
 - 默认 remove/purge 不遍历 home、不删除用户 XDG 数据；package 不自动改 Fcitx profile、autostart、输入源或桌面会话。
 - Manager 与 Fcitx panel 的中文、Latin 和数字字体依赖可复验；首个 Debian profile 使用发行版硬依赖，不把系统字体偶然 fallback 写成产品证据。
-- L6 必须复验已连接的 startup dependency、发行版字体 family/glyph/owner、真实 process/package-manager lifecycle 与 crash-command 证据。
+- L6 必须在一台新guest的同一连续session复验六类operation、已连接的startup dependency、发行版字体family/glyph/owner、真实process/package-manager lifecycle、XDG保留、断网与reboot；八个crash checkpoint均须通过自动合同，真实crash证据至少覆盖`install_prepared`、`install_artifacts_staged`和`upgrade_quiesced`三个不同恢复边界。其余五个真实crash属于后续hardening，不阻塞M5退出。
 - macOS 冻结参考基线与仓库门禁继续通过，真实用户同步继续关闭。
 
 完整运行边界见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md)，安装维护边界见 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)。
@@ -212,6 +214,22 @@ M3 开发期间，真实用户同步在退出标准全部满足前保持关闭�
 M5 退出后依次推进 Android `InputMethodService`、Windows TSF 和 iOS Keyboard Extension；不得并行展开多条真实平台主线。每个平台都必须复用 Rust core、userdb、ranker、sync、privacy 和稳定 FFI，平台壳不得复制业务真相源。
 
 当前对外正式发布延期到计划内 macOS、Linux Fcitx5、Android、Windows 与 iOS 均达到各自退出标准之后。届时单独评审平台兼容矩阵、签名/商店/发行身份、跨版本升级、隐私披露和真实用户同步开关；达到平台退出标准不会自动触发公开发布。
+
+小范围试用或提前用户研究属于可讨论的反馈方案，尚未改变上述统一发布决策。正式采纳前需说明目标用户、支持平台、许可范围、数据边界与反馈方式；讨论本身不授权分发、联系用户或开放同步。审阅建议只由 [current](status/current.md) 激活的专题跟踪。
+
+## Future Topic：候选词双语释义与输入中学习辅助
+
+这是未排期的产品构想：未来可探索在中文候选词旁按需展示简短外语释义，让用户在正常输入过程中顺带识别和积累词汇。它不属于当前或任何既定里程碑，不改变现有平台顺序、批次、退出标准、资源投入或发布时间；进入条件未满足前不设计实现、不建立当前任务，也不阻塞既有交付。
+
+截图中基于 macOS 本地翻译能力的实现只作为需求灵感，不构成 RadishLex 的技术选型、平台承诺或 UI 规格。未来若评估该能力，至少先满足：
+
+- 有明确的用户场景和可用性验证，证明附加释义不会显著挤压候选面板、干扰候选编号、选择、commit、辅助功能或快速输入。
+- 候选生成、排序、展示和提交不依赖翻译成功；释义只能作为可选增强，超时、缺失或不支持时不得阻塞按键热路径、改变候选顺序或伪造结果。
+- 默认使用本机可用的离线能力，候选文本和上下文不因该功能离开设备；若未来评估联网提供方，必须另行完成明确授权、数据分级、隐私披露、日志脱敏和关闭路径设计，P0 仍不得上传。
+- 分别评估各平台的本地模型/API 可用性、语言覆盖、质量、延迟、内存、能耗、许可证和发布限制；Apple Translation 只能是 macOS 候选方案之一，不能反向进入跨平台 core 或成为其他平台的隐式依赖。
+- 先定义可测试的异步结果身份、session/composition 失效处理与缓存边界，确保旧释义不会附着到新候选，学习辅助数据也不会自动写入 userdb、排序或同步真相源。
+
+进入正式规划时，应重新确定支持语言、开关与默认值、离线资源分发、平台降级、无障碍展示、性能预算和真实产品验收矩阵；在此之前不新增依赖、模型、权限、网络请求、ABI 或候选面板行为。
 
 ## Future Topic：自研 Rust Engine
 

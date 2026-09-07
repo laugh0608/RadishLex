@@ -1,0 +1,512 @@
+{
+  "format": "radishlex-linux-l6-asset-retirement-allowlist-v1",
+  "storage_roots": {
+    "operator": "/Users/luobo/VirtualMachines",
+    "utm-documents": "/Users/luobo/Library/Containers/com.utmapp.UTM/Data/Documents"
+  },
+  "assets": [
+    {
+      "id": "legacy-l6-e5b6da1",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "operator",
+      "relative_path": "Debian13-ARM64-L6.utm",
+      "name": "RadishLex-Debian13-ARM64-L6",
+      "uuid": "6F73F6DC-66DF-40EC-86B8-228C1FDA1195",
+      "role": "pre-receipt-failure",
+      "config_sha256": "d3d7fb4946361b0c9a87a2a0611ef9ed085b3635c4331e254f5cbe359ecf88c6",
+      "efi_sha256": "35fa4cdbbd72ba81c00da179cd4327cccaf30007eedc871d37b701c02f8dcafb",
+      "qcow2_sha256": "deff08b1da61043a838f71474d350f83998a34d8de59a42091a99005af070e22",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Snapshots/S0-clean-e5b6da1/local-snapshot.evidence.json",
+          "sha256": "50dcc48bfba7f65fce56184b2a21183f8e263611eb0f86d62cdafc6f306b1f08",
+          "mode": "0600",
+          "semantic": "snapshot-source-vm"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Handoff-e5b6da1/release-pair-e5b6da1/release-pair.evidence.json",
+          "sha256": "a9bcf35762b460a23ad9bc062611f8d5edb57e7303861bbcb99e1efb40703dfd",
+          "mode": "0644",
+          "semantic": "release-pair"
+        }
+      ]
+    },
+    {
+      "id": "legacy-l6-2fa1b8c",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "operator",
+      "relative_path": "Debian13-ARM64-L6-2fa1b8c.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-2fa1b8c",
+      "uuid": "EBF12F50-33B1-4711-B693-B57D419EAE2A",
+      "role": "pre-receipt-failure",
+      "config_sha256": "ae4807ca590815329fd251a868bcd9d088f0ce4113bf3d8968bf82c2f0192043",
+      "efi_sha256": "35fa4cdbbd72ba81c00da179cd4327cccaf30007eedc871d37b701c02f8dcafb",
+      "qcow2_sha256": "5683d1205871e21eceaa0aae63216544a0056e2cbef72b01bfb10b9f3205bec5",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Snapshots/S0-clean-2fa1b8c/local-snapshot.evidence.json",
+          "sha256": "d741d07b90b554bd77b4b2a66447fe142c95b635064bbd9aa46b04e333d23f7c",
+          "mode": "0600",
+          "semantic": "snapshot-source-vm"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Handoff-2fa1b8c/release-pair-2fa1b8c/release-pair.evidence.json",
+          "sha256": "a5a0ee0deeb48a1e82e87e0bb9eb848e118d21c83274dc2689fcc136dcb38664",
+          "mode": "0644",
+          "semantic": "release-pair"
+        }
+      ]
+    },
+    {
+      "id": "chain-mismatch-56dd4de",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-56dd4de.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-56dd4de",
+      "uuid": "A3F757B1-CE75-4F23-9509-CAD033260AA1",
+      "role": "chain-mismatch-before-operation-id",
+      "config_sha256": "61daca925e0080d0718aa4b54e1c9633b74bcef9e375bac1e8a73b95c77f9239",
+      "efi_sha256": "d32181b0867378a95ed2511e956090160407115e508b8d58ab0f16a50a3d1960",
+      "qcow2_sha256": "5afb335680bc424ae84ffd9a61c6d74acc9090acd27db9ee5754d79a8b3eb6d0",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Handoff-56dd4de/release-pair-56dd4de/release-pair.evidence.json",
+          "sha256": "70a394eae293cf95924fa250bca8daf0e11fe45c46342bc8e6f94a03db38139a",
+          "mode": "0644",
+          "semantic": "release-pair"
+        }
+      ]
+    },
+    {
+      "id": "repair-aborted-80e49ce",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-80e49ce-repair.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-80e49ce-repair",
+      "uuid": "A3022255-ED08-4C66-92D3-075A6BB93107",
+      "role": "repair-aborted-preserved",
+      "config_sha256": "584bf2b55a1145231ca2ccff06aafd7f82b3db4488e1a44346b4c8bda24f59b7",
+      "efi_sha256": "3b117deffb09523584fb3658d0af1ea1aecf47671eef6e7943472488ac28a8f0",
+      "qcow2_sha256": "adcc92fdc34ab7930ae6802bb4be866c6039b5c4cbc02f77cfb18686b826d3a4",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Repair-80e49ce-Aborted-Preserved/terminal.evidence.json",
+          "sha256": "87190852e1b3b1e77c23df9a0f76cd6431dd12b3132fa1ca3b8e83676db5881f",
+          "mode": "0600",
+          "semantic": "repair-terminal"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Repair-80e49ce-Aborted-Preserved/final-evidence.bundle.tar",
+          "sha256": "2d300ae6749074e6cc4d927ad9c079ed6fbef1b6b2be81552128baa354b2c8da",
+          "mode": "0600",
+          "semantic": "opaque-hash"
+        }
+      ]
+    },
+    {
+      "id": "install-prepared-old-pair-failed-closed-80e49ce",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-80e49ce-crash-install-prepared-v2.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-80e49ce-crash-install-prepared-v2",
+      "uuid": "FD24ADFF-B160-46F0-B100-10BAAF17C056",
+      "role": "install-prepared-old-pair-failed-closed",
+      "config_sha256": "cfb5d343a4fb10fd9384f470075169986a2a43b95aaf909b68af37eddd871f2d",
+      "efi_sha256": "0b797641e80ea0314017006730332811a44d0170dd334910fb52088b5b521418",
+      "qcow2_sha256": "4967234b09963df4f6bcd6d44f906c66d18e782092e727a0a220381b580e4b18",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Prepared-80e49ce-Failed-Closed/disk-identity.evidence.txt",
+          "sha256": "1c1d07e19e80e7fb0f7ba4f8686eb15a358c57f41becb629e112b9a3dad0b685",
+          "mode": "0600",
+          "semantic": "frozen-disk-identity"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Prepared-80e49ce-Failed-Closed/host-summary.evidence.txt",
+          "sha256": "dab8cde5b46547c2612f37a9282ba05e6de29c0ce4bb6866a070ffbee6561905",
+          "mode": "0600",
+          "semantic": "install-prepared-failed-closed-terminal"
+        }
+      ]
+    },
+    {
+      "id": "install-artifacts-staged-double-start-failed-d75818f",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged",
+      "uuid": "B0B826F6-D7D3-433C-8987-E2D6993A87B3",
+      "role": "install-artifacts-staged-double-start-failed",
+      "config_sha256": "038274cb1edb14009f70b536490315ea5d8ec73ba0a18a3a15f689c9d0c1af32",
+      "efi_sha256": "0b797641e80ea0314017006730332811a44d0170dd334910fb52088b5b521418",
+      "qcow2_sha256": "4967234b09963df4f6bcd6d44f906c66d18e782092e727a0a220381b580e4b18",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-Start-Retry-Failed-Closed/start-control/terminal.json",
+          "sha256": "73fa8da2aa2248775635df36f2914b931b1d974c670089a26f6ab38921429269",
+          "mode": "0600",
+          "semantic": "utm-start-terminal"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-Start-Retry-Failed-Closed/start-retry-failure.postverify.evidence.txt",
+          "sha256": "c77da8262fd1d1b66229b7327388faacaf7a46c3c0571cb8a80fddd90d9cb8e7",
+          "mode": "0600",
+          "semantic": "frozen-disk-identity"
+        }
+      ]
+    },
+    {
+      "id": "install-artifacts-staged-single-start-failed-d75818f-v3",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v3.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v3",
+      "uuid": "5B19AEF1-0F29-40B6-8F24-1B1929117DAB",
+      "role": "install-artifacts-staged-single-start-failed",
+      "config_sha256": "d04b00e173dc02065b5f4f4aab325b6d5d2614c43f37ae16abdc9f432c161ff4",
+      "efi_sha256": "0b797641e80ea0314017006730332811a44d0170dd334910fb52088b5b521418",
+      "qcow2_sha256": "4967234b09963df4f6bcd6d44f906c66d18e782092e727a0a220381b580e4b18",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v3-Start-Once/terminal.json",
+          "sha256": "1b1b38d12907c1d1f182cff42504987d5bac5661834b191746368586452acf4b",
+          "mode": "0600",
+          "semantic": "utm-start-terminal"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v3-Start-Failure-Postverify/postverify.evidence.txt",
+          "sha256": "a3788b3a7193df7f005e425e2aa68d05945ba279b17a05ecec331f3f8d182f45",
+          "mode": "0600",
+          "semantic": "frozen-disk-identity"
+        }
+      ]
+    },
+    {
+      "id": "repair-completed-noop-b891ed1",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-b891ed1-repair.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-b891ed1-repair",
+      "uuid": "BE3579E0-B150-438D-ABE0-53A8D46137F8",
+      "role": "repair-completed-without-package-reapply",
+      "config_sha256": "b06691d1d78e7659531c1513ee2d0ce2f909335a3a9ac6af13e05d970ba40ea9",
+      "efi_sha256": "3b117deffb09523584fb3658d0af1ea1aecf47671eef6e7943472488ac28a8f0",
+      "qcow2_sha256": "3ddd82a8109006ee6c0d68cfee4cd7d6b81147120e682e58fe9cb8aee47d4ddf",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Repair-b891ed1-Completed-Noop/local-evidence.json",
+          "sha256": "655f19f4911dc3792c00c1efb1334d6fa2ae28cac5bf91040bfdbfb3e67ab428",
+          "mode": "0600",
+          "semantic": "maintenance-repair-terminal"
+        }
+      ]
+    },
+    {
+      "id": "rollback-completed-80e49ce-v3",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-80e49ce-rollback-v3.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-80e49ce-rollback-v3",
+      "uuid": "EFD15599-7177-4D55-BF17-173EE1F0BBDD",
+      "role": "rollback-completed-terminal",
+      "config_sha256": "6295c4ed8c4e24fa5d1cf28ad06ecffd2df3ca4819589a1ffe048416e4fa29ae",
+      "efi_sha256": "3b117deffb09523584fb3658d0af1ea1aecf47671eef6e7943472488ac28a8f0",
+      "qcow2_sha256": "9a28509a81a9a2f1befa15f4e178b7bdc46fa60ecb948933a29d722caa46995a",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Remove-80e49ce/source-rollback-host-summary.evidence.txt",
+          "sha256": "96b0f112e4b84f6b66bcfab2e713d761f9e2ca0f000ef53a019cebb467c3ce03",
+          "mode": "0600",
+          "semantic": "completed-operation-terminal"
+        }
+      ]
+    },
+    {
+      "id": "remove-completed-80e49ce",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-80e49ce-remove.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-80e49ce-remove",
+      "uuid": "5EA2BAA2-B9A1-46CC-B496-B37826DD27A2",
+      "role": "remove-completed-terminal",
+      "config_sha256": "92568d225c91f5af26cb8afc2f8e80639005ccbc5608447c590d63494b02626a",
+      "efi_sha256": "abea62d2ee3646c13f99c6cbe65b450c5b1597b907537c935225eddf5583c8fc",
+      "qcow2_sha256": "ad8a6c6bb719e76518cc21f452dbe24c8ba0ba42822d77e0070b2f3eeeeb55fa",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Remove-80e49ce/host-summary.evidence.txt",
+          "sha256": "4f546574a9a8d3c02446db161724854e3a02e59a863ea173b75e7d20ad3b6a98",
+          "mode": "0600",
+          "semantic": "completed-operation-terminal"
+        }
+      ]
+    },
+    {
+      "id": "reinstall-completed-80e49ce",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-80e49ce-reinstall.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-80e49ce-reinstall",
+      "uuid": "E671DB9C-5E2C-447B-9425-8D91D2CFD465",
+      "role": "reinstall-completed-terminal",
+      "config_sha256": "db1e59aecc8aac5ad222dc40c5d8284196f253adaecf06ada15d7ff9c5113b90",
+      "efi_sha256": "767537509fff2777c0226c0b03d56371e42229613bd2b8dea4f6b9810529a1c3",
+      "qcow2_sha256": "feb2ba7ec458b1e03175abc2a0aee0ae56cab318578389ca89e32afc88dcaaa5",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Reinstall-80e49ce/host-summary.evidence.txt",
+          "sha256": "cab5d5da4a2b0f44f77913d32977c52b09bf85462a1cbbecdaed973336f7157f",
+          "mode": "0600",
+          "semantic": "completed-operation-terminal"
+        }
+      ]
+    },
+    {
+      "id": "upgrade-completed-80e49ce",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-80e49ce.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-80e49ce",
+      "uuid": "193179D5-2595-4628-A063-9EFB73F8EC05",
+      "role": "upgrade-completed-terminal-with-retained-s3",
+      "config_sha256": "00bac87d0ae2a7803d89adc124c0900110ce7ee572d124a6077e919fa1956456",
+      "efi_sha256": "0846b1d30d19da1613d7021920d0fefa5502ea13f5889f804f596506a8459741",
+      "qcow2_sha256": "6b22499bda82e1f375bad9d3e6dc89e7bbee2c17001036e0470928e8bcd3b137",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Snapshots/S3-target-installed-80e49ce/local-snapshot.evidence.json",
+          "sha256": "79a3a170fa9e0c60a2de954cf8129e3fed5578a3bffb69d3f77ea42010e7494b",
+          "mode": "0600",
+          "semantic": "retained-terminal-snapshot"
+        }
+      ]
+    },
+    {
+      "id": "install-prepared-completed-stopped-d75818f-v3",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-d75818f-crash-install-prepared-v3.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-d75818f-crash-install-prepared-v3",
+      "uuid": "3EC83EB9-094B-492B-9756-D47E61C593B9",
+      "role": "install-prepared-completed-stopped",
+      "config_sha256": "62040cc9bf11508a89e3ffff8ba057367659ab85765a638c09fb1b7aab566eb9",
+      "efi_sha256": "f762ee52ca1a36caee51e88ae9c5ca9811090a0a52ba05bd52c805e856698e76",
+      "qcow2_sha256": "95e89df3b78bd5f7f80d332561a71f1859b14846e75a56b56a18db6fc810cb69",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Prepared-d75818f-v3-Stopped/host-summary.evidence.txt",
+          "sha256": "30ddb08a5d2c33e9b17410bcb2f4d1d03fcb6d66fe0f2addc430d2ce1e05a2b6",
+          "mode": "0600",
+          "semantic": "install-prepared-stopped-terminal"
+        }
+      ]
+    },
+    {
+      "id": "install-artifacts-staged-completed-stopped-d75818f-v4",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v4.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-d75818f-crash-install-artifacts-staged-v4",
+      "uuid": "50B75F88-493D-42C0-A1DC-054DEC478038",
+      "role": "install-artifacts-staged-completed-stopped",
+      "config_sha256": "2de7280bbf906a8e899662c8686cb108755c83263150f5bd455490b050536195",
+      "efi_sha256": "7d78cb36070d7d4aa4e61c81173457ac8a200dcfd5f0796e86f5edb56a809839",
+      "qcow2_sha256": "758a606242ea1cec97bb82091bc033c702cf6bad9e6a84accfd01009f38a47ec",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Terminal-Stop-v1/terminal.json",
+          "sha256": "a2805550813e52f8ee22e44ee4ccf754849decb3e2b060fb0a210f8e7dcb9626",
+          "mode": "0600",
+          "semantic": "install-artifacts-staged-terminal-stop"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Terminal-Stop-v1/target-files-postflight.json",
+          "sha256": "2f42630b488859f8498e1ea5dcc7552870cd563e74cd3f65b57b54116ee0e000",
+          "mode": "0600",
+          "semantic": "install-artifacts-staged-stopped-disk"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Crash-Install-Artifacts-Staged-d75818f-v4-Terminal-Stop-v1/files.sha256",
+          "sha256": "096fe01f5f082a4f494ddf6219b14add91f178c37a6a12b8fb1df635a6d5e133",
+          "mode": "0600",
+          "semantic": "opaque-hash"
+        }
+      ]
+    },
+    {
+      "id": "upgrade-rolled-back-1ebbdab",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-1ebbdab.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-1ebbdab",
+      "uuid": "9C5638D7-0F97-4BD8-8A83-ABCDFCADAC6C",
+      "role": "upgrade-rolled-back-terminal-projected",
+      "config_sha256": "402a584095e9150543023a155575b3492053371efc39ee2fd0d03616534c83e9",
+      "efi_sha256": "cb8a697bae3108e8197ba0e44da6c89f5fee33b3761c735d59d4247db58fbd65",
+      "qcow2_sha256": "e684f829c1fb1df1cc593596a8f0d37f49b7bcbff9b48a4f7d45a85752418904",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "repository",
+          "relative_path": "packaging/linux/l6-asset-retirement-fifth-batch-projections.json",
+          "sha256": "f80b1bdf7da70d9dd45049b1a8321a2a0057e786938f08a7a70e6bed2180cfed",
+          "mode": "0644",
+          "semantic": "fifth-batch-terminal-projection"
+        }
+      ]
+    },
+    {
+      "id": "repair-completed-823afca",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "utm-documents",
+      "relative_path": "RadishLex-Debian13-ARM64-L6-823afca-repair.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-823afca-repair",
+      "uuid": "394217A7-BFC9-43C8-94E6-539FF3F2B6FB",
+      "role": "repair-completed-terminal-projected",
+      "config_sha256": "818d8725a20b5a1ee252b269af6bb3fcca5b960f7a204db5be5b10b270137425",
+      "efi_sha256": "3b117deffb09523584fb3658d0af1ea1aecf47671eef6e7943472488ac28a8f0",
+      "qcow2_sha256": "79adac93b63a2b51b21766afe0848b8ff391da4dda315f1a0f1f1aeeabe003f6",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "repository",
+          "relative_path": "packaging/linux/l6-asset-retirement-fifth-batch-projections.json",
+          "sha256": "f80b1bdf7da70d9dd45049b1a8321a2a0057e786938f08a7a70e6bed2180cfed",
+          "mode": "0644",
+          "semantic": "fifth-batch-terminal-projection"
+        }
+      ]
+    },
+    {
+      "id": "source-terminal-after-s2-512e8ab",
+      "kind": "utm-vm-bundle",
+      "action": "evidence-archived-delete-candidate",
+      "storage": "operator",
+      "relative_path": "Debian13-ARM64-L6-512e8ab.utm",
+      "name": "RadishLex-Debian13-ARM64-L6-512e8ab",
+      "uuid": "99FF4B3F-4894-4913-BBE3-4934DC27BEEB",
+      "role": "source-terminal-post-s2-failed-closed",
+      "config_sha256": "5111741c54a49068dbbacfd131891b0990a531001769db21942eb88ac6767d2b",
+      "efi_sha256": "8f36df35444b83ca414a1fe9b6c7be57c94478830a48909f2aa45e65bb5ae1ee",
+      "qcow2_sha256": "0cb75b38c62fd8d5731f452eb91717ffdfac2103d597e667c675e96c95c0f387",
+      "qcow2_name": "FFF05A20-E829-493C-8F40-B40884425A3F.qcow2",
+      "evidence_anchors": [
+        {
+          "storage": "repository",
+          "relative_path": "packaging/linux/l6-asset-retirement-fifth-batch-projections.json",
+          "sha256": "f80b1bdf7da70d9dd45049b1a8321a2a0057e786938f08a7a70e6bed2180cfed",
+          "mode": "0644",
+          "semantic": "fifth-batch-terminal-projection"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Snapshots/S2-source-data-512e8ab/local-snapshot.evidence.json",
+          "sha256": "d164de0f5e6e88afbfa76ccd1c7d321d7064bbfd3ee1e275d3d4842d0dfa5c74",
+          "mode": "0600",
+          "semantic": "retained-predecessor-snapshot"
+        }
+      ]
+    }
+  ],
+  "batches": [
+    {
+      "id": "first-four-v1",
+      "asset_ids": [
+        "legacy-l6-e5b6da1",
+        "legacy-l6-2fa1b8c",
+        "chain-mismatch-56dd4de",
+        "repair-aborted-80e49ce"
+      ],
+      "accounting_gib": "37.71"
+    },
+    {
+      "id": "second-batch-v1",
+      "asset_ids": [
+        "install-prepared-old-pair-failed-closed-80e49ce",
+        "install-artifacts-staged-double-start-failed-d75818f",
+        "install-artifacts-staged-single-start-failed-d75818f-v3",
+        "repair-completed-noop-b891ed1"
+      ],
+      "accounting_gib": "37.62"
+    },
+    {
+      "id": "third-batch-v1",
+      "asset_ids": [
+        "rollback-completed-80e49ce-v3",
+        "remove-completed-80e49ce",
+        "reinstall-completed-80e49ce"
+      ],
+      "accounting_gib": "27.99"
+    },
+    {
+      "id": "fourth-batch-v1",
+      "asset_ids": [
+        "upgrade-completed-80e49ce",
+        "install-prepared-completed-stopped-d75818f-v3",
+        "install-artifacts-staged-completed-stopped-d75818f-v4"
+      ],
+      "accounting_gib": "27.09"
+    },
+    {
+      "id": "fifth-batch-v1",
+      "asset_ids": [
+        "upgrade-rolled-back-1ebbdab",
+        "repair-completed-823afca",
+        "source-terminal-after-s2-512e8ab"
+      ],
+      "accounting_gib": "27.19"
+    }
+  ]
+}

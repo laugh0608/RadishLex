@@ -4,10 +4,29 @@
 
 ## 当前判断
 
-- 复核日期：2026-08-20（Asia/Shanghai）；常态分支 `dev`，稳定主线 `master`。
-- 当前里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
+- 复核：2026-09-05；常态分支 `dev`，主线 `master`。
+- 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
-- L6 format/controller、release-pair与maintenance refresh已完成，六类operation均有独立证据。首个crash已闭合；`install_artifacts_staged`两次start及后续v2 clone均在host失败关闭，未进入guest。十九台VM全部stopped，其余七个crash实机case和连续完整L6未闭合。
+- 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
+
+## 能力与开放状态
+
+里程碑退出记录只表示当时范围；实现、自动验证、实机验证、用户开放与公开发布分别判断。下表中的历史验收不覆盖新发现的验证缺口。
+
+| 能力 | 实现与自动验证 | 实机证据 | 产品开放与发布 |
+| --- | --- | --- | --- |
+| macOS 离线输入与本地管理 | runtime、FFI、Manager、产品 bundle 与合同测试 | build 38 单版本验收及此前输入/个人化记录 | 已验收范围可供受控本地使用；尚未公开发布 |
+| Linux 输入与本地管理 | Fcitx5 addon、共享 XDG/FFI、Manager | P04 Wayland/X11 与同库验收 | 受控本地验收；尚未公开发布 |
+| Linux 安装维护 | `.deb`、事务、startup gate、八个 crash 自动合同 | 六类 operation 分散证据、两个代表 crash 终态 | 第三个代表 crash、连续 L6 与 P05C 未闭合 |
+| 加密同步 | 协议、服务、客户端及受控合成资格链 | macOS key backend 与本地 HTTPS 资格记录 | 真实用户同步关闭；目标生产部署未验收 |
+| Android / Windows / iOS | Android 仅有 Keystore 能力桥；其他平台壳未落地 | 不构成完整 IME 验收 | 后续串行计划 |
+
+## 综合审阅跟踪
+
+- 激活[2026-09 产品审阅与改进跟踪](../remediation/product-review-2026-09.md)，基线 `a5345b8`。本轮完成文档登记，未修复实现、更新依赖或重新验收平台。
+- 首要风险为 Rime 自有学习未纳入已观察的隐私控制范围，以及 bundled SQLite 的 WAL-reset 版本风险；均未在本次审阅中复现实际泄露或损坏。历史 SQLite 零增量不能扩展为所有底层存储零学习。
+- 次要事项为输入回调锁等待、新词召回/评测、删除与事件保留、MSRV/CI；维护成本、Manager 易用性和早期反馈列为后续建议。具体证据、未知项与关闭条件只在跟踪专题维护。
+- 风险优先级供下一任务选择；本轮未改变 M5 里程碑、系统操作顺位、发布政策或冻结现场。涉及边界调整的方案仍需确认后实施。
 
 ## 冻结基线与固定边界
 
@@ -16,35 +35,41 @@
 - 五类 operation 默认对用户 XDG 零写入并保留数据；首批升降级只接受 ABI/schema/XDG/settings/privacy/Rime contract 相同的 artifact。v1 package 不含 RadishLex maintainer scripts，外部 scripts/triggers 不能代表产品 transaction completed。
 - actual `.deb`、依赖/版本/dpkg status、receipt/staging/guard、固定 `/usr/bin/dpkg` executor、`/proc/*/maps` 静止与只读 startup gate 的完整合同见 Linux 安装维护边界；current 不重复设计细节。
 
-## 当前证据
+## 当前证据摘要
 
-- P05A carrier、production relationship、恢复事务、system port/CLI/startup gate、L6 format/controller/pair/refresh均已闭合；合成矩阵不替代真实现场。
-- 六类真实operation均有分散证据：第六套形成target completed/S3，独立clone闭合repair、rollback、remove与reinstall；这些不能冒充同一连续session。精确receipt、package、guest/host manifest和磁盘身份进入L6 runbook/周志。
-- 旧pair唯一`install_prepared`调用形成prepared checkpoint且未触发dpkg；后续startup因遗漏合法`01777 /run/lock`失败关闭，manifest `5d8c914a…3e42a`与clone `FD24ADFF…17C056`冻结。store/startup现共用权限策略且119项默认/124项L6-feature测试通过，旧case仍不计通过。
-- 修复target `d75818f`的handoff record `c74fac12…9849`已冻结。第三台clone `3EC83EB9…593B9`只生成一次operation ID、只调用一次controller与一次production exact resume；checkpoint/crash-state `3fd5df67…4a70`/`e18bde6c…8719`先证明prepared与无dpkg child。terminal postflight/postverify `5319db07…52a0`/`001b5be1…e2cc`再证明source `38-1` installed、receipt `completed`、guard absent、startup `AllowedProduct`、XDG/进程/断网稳定；terminal/关机manifest为`679b7e04…c544`/`036bace8…f3b8`，后者固定config/EFI/qcow2 `62040cc9…eb9`/`f762ee52…e76`/`95e89df3…cb69`、双重qcow2与零句柄。
-- repository-only guest-case合同除canonical input/readback/startup预期外，现固定`install_artifacts_staged`的target-only staging、package/dpkg未变、合法guard、XDG/process/network零漂移与resume重验/单次apply，并与matrix交叉校验。首次安装精确Rust回归通过，production语义无需修改。
-- 第二个case clone-only/首次start/单次控制retry manifest为`ce430efb…aeb8`/`34c0918d…c8d8`/`337007ff…7ebbb`。retry唯一start在90秒无stdout/stderr后timeout，60次status与terminal list均为stopped，返回10；失败后磁盘未变、十九台全停且无guest/input/operation/transaction。离线差分确认其config除Name/UUID外与已成功启动的第三台及reinstall壳相同，Registry可见结构也一致，未获得可归因的UTM/QEMU根因。
-- 后续v2 clone-only从clean `992a307`、`337007ff…7ebbb`、十九台全停及冻结DependencyFrozen开始；唯一`utmctl clone`进程exit 0却在stderr报告OSStatus `-1712`，后置清单仍为原十九台且目标注册/package均absent，因此没有替换磁盘、启动或进入guest。失败目录不可覆盖发布，manifest `65160b12…c1859`逐项通过；这证明返回码不能替代注册与package后置条件，不证明具体UTM根因。
+- Linux 输入与 Manager 已有 P04 实机记录；P05 的六类 operation 为分散证据，尚不能证明连续 L6。
+- `install_prepared` 与 `install_artifacts_staged` 已取得代表 crash 恢复终态；第二场景 transaction 权威为 `7fcef38e…0e3d/completed`，停止权威为 `096fe01f…e133/stopped-verified`。
+- `upgrade_quiesced` 当前为 partial `move-ready`：`7765f1c` 的唯一 prepare 观察 8 台全停，manifest `fa6e7335…33ea5` 冻结；未执行 UI Move 或物化。
+- 五批 VM 退休共 17 个 raw bundle 已 absent，旧 snapshot/handoff 与失败证据保留。
+- 原入口中的精确证据流水已原样移入[本周周志的入口归档](../devlogs/2026-W36.md#2026-09-05入口历史证据归档)。这是文档迁移，不是现场复验；操作前仍需按 runbook 重新满足资格与授权。
 
 ## 停止线
 
+- 五批均闭合`deleted`，第五批manifest为`a65abab2…1b106`；授权均已消费，不得复跑。
+- 第五批证据、projection与S2冻结，三台bundle已absent；不得恢复、重建、注册或复用。
 - 未获后续单步授权不得在真实 guest 再运行产品 `dpkg`、写 `/usr`/`/var` 或用户 XDG、修改 Fcitx profile/autostart/systemd、启停 Manager/Fcitx/桌面会话，或执行 upgrade/repair/remove/rollback/reinstall。
-- 不重新启动、恢复、清理或复用前四个 stopped L6 failure/mismatch disk；第五套 terminal `rolled_back` 现场只作失败/恢复取证，仍不得启动、重试或复用。各套 evidence 分属不同 config/boot/receipt 身份，不得混用。
+- 五批共17个raw bundle已absent，账面157.60 GiB；prepare/delete证据与旧snapshot/handoff保留，其余disk不得启动、恢复、清理或复用。
 - UTM 只使用 `PATH` 中的 plain `utmctl`；任何时刻最多运行一台 VM，启动前必须确认其他注册 VM 全部停止。
-- 首台与第二台rollback只保留host evidence；第三台`EFD15599…BBDD`、remove clone `5EA2BAA2…27A2`与reinstall clone `E671DB9C…D465`均为冻结terminal；不得resume、重试、再次调用、清理、恢复、直接复用或用于其他矩阵。
-- 旧pair的network失败clone只保留host evidence；真实checkpoint clone `FD24ADFF…17C056`不得resume、替换FFI、补写crash-state evidence、再次执行acceptance或用于后续case。新pair两台retry也只保留持久host evidence，不得据此恢复package或复用。
-- 新`d75818f` handoff只允许作为独立clean clone的冻结输入；第三台clone现为stopped source terminal，不得重启、复用、运行下一checkpoint、覆盖、热替换或与旧pair跨套混搭。
-- 第二个case clone `B0B826F6…87B3`须保持stopped并冻结为双start失败现场；不得第三次start、进入guest、修补注册/config、复用或与第一case混用。
+- 第三台rollback `EFD15599…BBDD`、remove `5EA2BAA2…27A2`与reinstall `E671DB9C…D465`的bundle均已删除；终态与退休证据冻结，不得恢复、重建、注册或复用。
+- 旧pair与新pair失败现场只保留持久证据；已删除的`FD24ADFF…17C056`、`B0B826F6…87B3`、`5B19AEF1…7DAB`及`BE3579E0…37F8`不得恢复package、重新注册、重建或复用。
+- 新`d75818f` handoff仅作为冻结输入；第三台clone bundle已删除，不得恢复、重建、注册、复用或与旧pair混搭。
 - v2 clone失败证据`65160b12…c1859`须原样保留；不得沿用本批授权重试clone、重启UTM或把exit 0记为成功。
+- 七次host诊断证据`158fe177…77c`/`8ccdbb9f…dc7`/`f952953a…e5ddf`/`34ae0563…743e`/`9da78f78…08ae`/`44043282…4ae8`/`206aa335…7b56c`均须冻结，不覆盖、补写或复用。v7只定位host UTM/AppKit失败机制，不授权原target retry、`--hide`试跑、GUI动作或把更深根因写成已证实。
+- v4 launch至exact resume证据与UUID `50B75F88…8038`须冻结；bundle已删除，不得恢复、重建、注册或复跑。transaction权威仍是`7fcef38e…0e3d`的`completed`，删除前VM终态权威是`096fe01f…e133`的`stopped-verified`。
+- 旧boot、恢复、fresh两阶段及结果消歧根全部冻结，不复跑、覆盖、补拉或清理。`recovery-qualified`只证明只读恢复前门，不授权resume；无新授权不得query/start、resume、retry/stop/quit。
+- fresh-boot resume attempt `d75818f-v4-install-artifacts-staged-fresh-boot-resume-20260827-v1`与host/guest根已消费并冻结；不得补拉、复跑、重建secret、retry/cleanup、再次resume/postflight或据`state-indeterminate`修补现场。调用后不得无授权追加query/start/stop/quit。
+- transaction-state v1/v2、deferred-result及terminal-stop根冻结。21项结果只证明该boot的transaction为`completed`，28项stop结果只证明同一授权调用内目标已正常停止并完成host交叉检查；不得补拉、复跑probe、query/start/stop、resume/dpkg/retry/repair/cleanup或改写现场。
+- registration shell v1-v3 control根与manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`/`ae3fb81b…4a511`冻结；不得覆盖、复用或解释为已创建。
+- clone v1/v2根、`Evidence-v5`与默认Documents partial target冻结；不得reclone、start、delete、手工搬移或冒充S2。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
 - 不发布 macOS build 38 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步（2026-08-20）
+## 系统操作下一步（顺位不变，2026-09-05 复核）
 
-1. 先在repository-only范围固定clone-once控制：精确绑定clean head/前序manifest/全停清单/source与注册壳，单次调用同时捕获exit、timeout、stdout/stderr和terminal list；stderr诊断、注册/package缺失或数量漂移均失败关闭，任何终态不自动retry/delete/start。以合成UTM回归覆盖exit 0伴随`-1712`、正常注册、部分落地和并发状态后再提交。
-2. 控制闭合后仍须新授权，才可从DependencyFrozen建立另一台独立clean clone并冻结UUID/config/EFI/qcow2/`Network=[]`；clone-only不得启动、传input、生成operation ID或运行controller。新clone启动与首条guest断网继续单独授权。
-3. 只有target started、其余全停且双重文件回读证明仅`lo`/双main route为空，才可再分批进入input/preflight。checkpoint仍须精确命中`install_artifacts_staged/artifacts_staged`；resume、关机、其余crash、连续完整L6、P05C、发布、推送和其他平台继续关闭。
+1. 只可先另行授权一次UTM原生UI Move；`move-adopt`与物化继续分段授权。
+2. start、input-preflight、crash、resume与terminal-stop仍分段授权；第五批与clone不得复跑。
+3. 第三场景闭合后，以一台新guest完成连续L6；P05C使用独立guest。
 
 ## 验证入口
 
@@ -66,7 +91,7 @@
 git diff --check
 ```
 
-上述入口以合成执行器证明单次start、四类terminal和零自动stop/retry，不调用真实UTM。clone-once控制尚待repository-only闭合；第二个case未进入guest，八case整体、连续完整L6与发布未闭合。
+上述入口覆盖八个crash合同和现有L6控制，但不替代实机。`upgrade_quiesced`、连续L6与发布未闭合；其余五个真实crash转为hardening。
 
 ## 阅读索引
 
@@ -75,4 +100,5 @@ git diff --check
 - [Linux Fcitx5 平台边界](../linux-fcitx5-boundary.md)
 - [Linux Manager 本地验收边界](../linux-manager-local-acceptance.md)
 - [Linux L6 Debian package matrix runbook](../runbooks/linux-l6-package-matrix.md)
-- [本周周志](../devlogs/2026-W34.md)
+- [Linux L6 收敛与本地资产生命周期](../runbooks/linux-l6-asset-lifecycle.md)
+- [本周周志](../devlogs/2026-W36.md)

@@ -41,6 +41,8 @@
 
 userdb/ranker 读取失败时，runtime 必须保留 engine 原始顺序并返回明确的个人化退化状态：`ready` 表示个人化路径可用（当前页可以没有匹配信号），`policy_blocked` 表示策略强制 engine-only，`storage_unavailable` 表示数据库打开或迁移不可用，`read_failed` 与 `rank_failed` 分别表示本次摘要读取或排序失败。engine 已产生的 commit 不得因学习写入失败而丢失；key/select 结果同时携带 commit 和 `recorded`、`deferred`、`skipped_by_policy`、`failed` 等学习结果。错误诊断不得包含输入码、候选文本、数据库路径或原始应用信息。
 
+当前实现只重排 engine 当次提供的候选；添加或导入 userdb 词条不等于已提供独立的新词召回。上述“不学习”是全系统合同，现有 runtime/SQLite 证据仅证明其实际观察范围；底层 Rime 存储控制缺口与新词行为方案由 [current](status/current.md) 激活的审阅专题跟踪。
+
 ## 目标
 
 - 建立本地 SQLite userdb。
@@ -81,6 +83,8 @@ userdb/ranker 读取失败时，runtime 必须保留 engine 原始顺序并返�
 - P1 事件日志可以压缩为 `ranker.weights` P2 权重摘要，但原始事件、负反馈明细和上下文统计默认不进入同步。
 - P2 数据被删除时必须产生 tombstone 或等价语义，避免旧设备和旧备份复活词条。
 - 日志、测试 fixture、golden 输出和截图不得包含真实明文输入历史或敏感上下文。
+
+当前选择路径同步写学习事务后才返回 commit；5 秒 busy timeout 是实现配置，不能作为输入线程已有延迟保障的证据。现有合成/内存性能基线未覆盖真实文件、长写锁和平台提交链；延迟预算、竞争测试及实现方案由当前审阅专题跟踪，本次未调整数据库策略。
 
 ## 核心概念
 

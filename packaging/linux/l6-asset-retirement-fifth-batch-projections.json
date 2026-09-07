@@ -1,0 +1,124 @@
+{
+  "format": "radishlex-linux-l6-asset-retirement-fifth-batch-projections-v1",
+  "batch_id": "fifth-batch-v1",
+  "policy": {
+    "current_bundle_identity": "direct-full-sha256-required-at-prepare",
+    "historical_evidence_owner": "501:20-required",
+    "nonconforming_historical_evidence": "reference-only-never-runtime-anchor",
+    "projection": "committed-minimal-facts-without-history-rewrite",
+    "retained_snapshot_relation": "predecessor-only-never-current-bundle-copy"
+  },
+  "assets": [
+    {
+      "asset_id": "upgrade-rolled-back-1ebbdab",
+      "name": "RadishLex-Debian13-ARM64-L6-1ebbdab",
+      "uuid": "9C5638D7-0F97-4BD8-8A83-ABCDFCADAC6C",
+      "role": "upgrade-rolled-back-terminal-projected",
+      "current_bundle_identity": {
+        "config_sha256": "402a584095e9150543023a155575b3492053371efc39ee2fd0d03616534c83e9",
+        "efi_sha256": "cb8a697bae3108e8197ba0e44da6c89f5fee33b3761c735d59d4247db58fbd65",
+        "qcow2_sha256": "e684f829c1fb1df1cc593596a8f0d37f49b7bcbff9b48a4f7d45a85752418904"
+      },
+      "terminal": {
+        "operation": "upgrade",
+        "relationship": "target_newer",
+        "outcome": "rolled_back",
+        "maintenance_invocations": 1,
+        "package_effect": "target-installed-then-source-restored",
+        "source_recovery": "completed",
+        "retry": "not-performed",
+        "terminal_vm_state": "stopped",
+        "qcow_open_handles": 0
+      },
+      "historical_sources": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Upgrade-1ebbdab-rolled-back/radishlex-l6-upgrade-1ebbdab-rolled-back.evidence.txt",
+          "sha256": "98319405d53c294c95ea2331a2b866610475124d399f195a18c9c867f0862378",
+          "observed_owner": "501:0",
+          "status": "reference-only-never-runtime-anchor"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Upgrade-1ebbdab-rolled-back/radishlex-l6-upgrade-1ebbdab-rolled-back.local-evidence.json",
+          "sha256": "64d5395f618adbc0c22ff5f8723446c2a6e6e069758078d255491855a74be3d8",
+          "observed_owner": "501:0",
+          "status": "reference-only-never-runtime-anchor"
+        }
+      ],
+      "retained_predecessor": null
+    },
+    {
+      "asset_id": "repair-completed-823afca",
+      "name": "RadishLex-Debian13-ARM64-L6-823afca-repair",
+      "uuid": "394217A7-BFC9-43C8-94E6-539FF3F2B6FB",
+      "role": "repair-completed-terminal-projected",
+      "current_bundle_identity": {
+        "config_sha256": "818d8725a20b5a1ee252b269af6bb3fcca5b960f7a204db5be5b10b270137425",
+        "efi_sha256": "3b117deffb09523584fb3658d0af1ea1aecf47671eef6e7943472488ac28a8f0",
+        "qcow2_sha256": "79adac93b63a2b51b21766afe0848b8ff391da4dda315f1a0f1f1aeeabe003f6"
+      },
+      "terminal": {
+        "operation": "repair",
+        "relationship": "same_release",
+        "outcome": "completed",
+        "maintenance_invocations": 1,
+        "package_effect": "same-release-package-reapplied",
+        "operation_chain_length": 3,
+        "retry": "not-performed",
+        "terminal_vm_state": "stopped",
+        "qcow_open_handles": 0
+      },
+      "historical_sources": [
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Repair-823afca/radishlex-l6-823afca-repair-host-summary.evidence.txt",
+          "sha256": "6129996579e69525855530a7c99ad18d0de4d6c9aa6382dd4ec84b421fa74f07",
+          "observed_owner": "501:0",
+          "status": "reference-only-never-runtime-anchor"
+        },
+        {
+          "storage": "operator",
+          "relative_path": "RadishLex-L6-Repair-823afca/files.sha256",
+          "sha256": "116e3f06ddcefd21857b827030aea2ed3ccaec8422b8b4d35da9ba0c6445e90f",
+          "observed_owner": "501:0",
+          "status": "reference-only-never-runtime-anchor"
+        }
+      ],
+      "retained_predecessor": null
+    },
+    {
+      "asset_id": "source-terminal-after-s2-512e8ab",
+      "name": "RadishLex-Debian13-ARM64-L6-512e8ab",
+      "uuid": "99FF4B3F-4894-4913-BBE3-4934DC27BEEB",
+      "role": "source-terminal-post-s2-failed-closed",
+      "current_bundle_identity": {
+        "config_sha256": "5111741c54a49068dbbacfd131891b0990a531001769db21942eb88ac6767d2b",
+        "efi_sha256": "8f36df35444b83ca414a1fe9b6c7be57c94478830a48909f2aa45e65bb5ae1ee",
+        "qcow2_sha256": "0cb75b38c62fd8d5731f452eb91717ffdfac2103d597e667c675e96c95c0f387"
+      },
+      "terminal": {
+        "operation": "upgrade",
+        "relationship": "target_newer",
+        "outcome": "failed-closed-before-receipt",
+        "maintenance_invocations": 1,
+        "package_effect": "not-started",
+        "source_receipt": "completed-preserved",
+        "retry": "not-performed",
+        "terminal_vm_state": "stopped",
+        "qcow_open_handles": 0
+      },
+      "historical_sources": [],
+      "retained_predecessor": {
+        "storage": "operator",
+        "relative_path": "RadishLex-L6-Snapshots/S2-source-data-512e8ab/local-snapshot.evidence.json",
+        "sha256": "d164de0f5e6e88afbfa76ccd1c7d321d7064bbfd3ee1e275d3d4842d0dfa5c74",
+        "identity": "S2-source-data-512e8ab-0c2cefd6",
+        "config_sha256": "5111741c54a49068dbbacfd131891b0990a531001769db21942eb88ac6767d2b",
+        "efi_sha256": "365b5a170dca95bdf07c0e5e940fafd4580a353e43c141abede71c95f91261bc",
+        "qcow2_sha256": "0c2cefd6b63420adf143e1f1d6e4e70f59841bf1ba56cb54e86d2e7a226f3eea",
+        "relation": "retained-predecessor-not-current-bundle-copy"
+      }
+    }
+  ]
+}

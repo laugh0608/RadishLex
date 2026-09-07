@@ -6,6 +6,27 @@ import unittest
 import l6_guest_case_contract
 
 
+def crash_matrix_cases() -> list[dict[str, object]]:
+    return [
+        {
+            "id": "install_artifacts_staged",
+            "operation": "install_source",
+            "checkpoint": "artifacts_staged",
+            "fault": "process_group_terminated",
+            "expected_terminal": "completed",
+            "restore_snapshot_after": True,
+        },
+        {
+            "id": "upgrade_quiesced",
+            "operation": "upgrade_target",
+            "checkpoint": "quiesced",
+            "fault": "process_group_terminated",
+            "expected_terminal": "completed",
+            "restore_snapshot_after": True,
+        },
+    ]
+
+
 class LinuxL6GuestCaseContractTests(unittest.TestCase):
     def test_input_inventory_is_canonical_and_uses_one_environment_name(self) -> None:
         inventory = l6_guest_case_contract.canonical_input_inventory(
@@ -159,34 +180,70 @@ class LinuxL6GuestCaseContractTests(unittest.TestCase):
         )
         self.assertEqual(expectation.expected_terminal, "completed")
         l6_guest_case_contract.validate_crash_checkpoint_matrix(
-            [
-                {
-                    "id": "install_artifacts_staged",
-                    "operation": "install_source",
-                    "checkpoint": "artifacts_staged",
-                    "fault": "process_group_terminated",
-                    "expected_terminal": "completed",
-                    "restore_snapshot_after": True,
-                }
-            ]
+            crash_matrix_cases()
         )
 
     def test_install_artifacts_staged_rejects_matrix_drift(self) -> None:
         with self.assertRaises(
             l6_guest_case_contract.LinuxL6GuestCaseContractError
         ):
-            l6_guest_case_contract.validate_crash_checkpoint_matrix(
-                [
-                    {
-                        "id": "install_artifacts_staged",
-                        "operation": "install_source",
-                        "checkpoint": "prepared",
-                        "fault": "process_group_terminated",
-                        "expected_terminal": "completed",
-                        "restore_snapshot_after": True,
-                    }
-                ]
-            )
+            scenarios = crash_matrix_cases()
+            scenarios[0]["checkpoint"] = "prepared"
+            l6_guest_case_contract.validate_crash_checkpoint_matrix(scenarios)
+
+    def test_upgrade_quiesced_checkpoint_is_exact(self) -> None:
+        expectation = l6_guest_case_contract.crash_checkpoint_expectation(
+            "upgrade_quiesced"
+        )
+
+        self.assertEqual(expectation.matrix_operation, "upgrade_target")
+        self.assertEqual(expectation.checkpoint, "quiesced")
+        self.assertEqual(expectation.receipt.operation_kind, "upgrade")
+        self.assertEqual(expectation.receipt.version_relation, "target_newer")
+        self.assertEqual(expectation.receipt.state, "quiesced")
+        self.assertEqual(expectation.receipt.operation_chain_length, 2)
+        self.assertEqual(
+            expectation.receipt.required_staged_slots, ("source", "target")
+        )
+        self.assertTrue(expectation.receipt.source_artifact_present)
+        self.assertTrue(expectation.receipt.target_artifact_present)
+        self.assertEqual(
+            expectation.receipt.staged_slots, ("source", "target")
+        )
+        self.assertFalse(expectation.receipt.target_proof_present)
+        self.assertFalse(expectation.receipt.source_proof_present)
+        self.assertIsNone(expectation.receipt.failure_code)
+        self.assertFalse(expectation.receipt.manual_recovery_required)
+        self.assertEqual(expectation.package_state, "source_installed")
+        self.assertEqual(expectation.dpkg_status, "unchanged_from_preflight")
+        self.assertEqual(expectation.dpkg_log, "unchanged_from_preflight")
+        self.assertEqual(expectation.startup_case, "active-guard")
+        self.assertEqual(expectation.process_group, "terminated")
+        self.assertEqual(expectation.process_group_member_count, 0)
+        self.assertEqual(expectation.dpkg_child, "absent")
+        self.assertEqual(expectation.xdg, "unchanged_from_s2")
+        self.assertEqual(
+            expectation.resume_steps,
+            (
+                "validate_staged_relationship",
+                "prove_target_quiescence",
+                "apply_target_once",
+                "verify_target",
+                "complete",
+            ),
+        )
+        self.assertEqual(expectation.expected_terminal, "completed")
+        l6_guest_case_contract.validate_crash_checkpoint_matrix(
+            crash_matrix_cases()
+        )
+
+    def test_upgrade_quiesced_rejects_matrix_drift(self) -> None:
+        with self.assertRaises(
+            l6_guest_case_contract.LinuxL6GuestCaseContractError
+        ):
+            scenarios = crash_matrix_cases()
+            scenarios[1]["checkpoint"] = "package_mutating_before_dpkg"
+            l6_guest_case_contract.validate_crash_checkpoint_matrix(scenarios)
 
     def test_unknown_startup_case_is_rejected(self) -> None:
         with self.assertRaises(

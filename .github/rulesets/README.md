@@ -5,7 +5,7 @@
 ## 建议流程
 
 1. 日常开发提交到 `dev` 或功能分支。
-2. 功能、文档、规范类变更默认先合并到 `dev`。
+2. 串行普通开发直接在 `dev` 推进；只有外部贡献、并行写入、风险隔离或明确评审需求才通过主题分支合入 `dev`。
 3. 直接 push 到 `dev` 不触发 GitHub Actions；以 `dev` 或 `master` 为目标的 Pull Request 触发 `PR Checks`。
 4. 以 `dev` 为目标的检查为协作反馈，不作为当前未保护 `dev` 的强制门禁。
 5. 阶段性稳定后，从 `dev` 发起到 `master` 的 Pull Request；聚合 `Candidate Quality` 和已解决会话共同构成合并门禁。
@@ -31,6 +31,7 @@
 - 当前阶段不启用 branch protection。
 - 直接 push 到 `dev` 不触发 GitHub Actions；以 `dev` 为目标的 Pull Request 会触发完整 `PR Checks`，供其他开发者和并行分支协作使用。
 - 因 `dev` 当前未保护，这些检查不会强制阻止合并；提交者仍须记录风险匹配的本地验证。
+- Agent 不因默认流程自动创建 `codex/*` 主题分支或额外 worktree。
 - 每次 `dev -> master` PR 合并后，必须把最新 `master` merge 回 `dev`；该回同步是阶段性 PR 的收尾，不是可选的反向功能流。
 - `dev` 是共享分支，回同步不使用 rebase 或 force push；完成后应确认 `git merge-base --is-ancestor origin/master dev` 返回成功。
 - 如后续进入多人并行开发，再评估是否对 `dev` 追加保护。

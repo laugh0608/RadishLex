@@ -15,7 +15,7 @@ RadishLex（萝卜词核）是由 Rust 输入核心、Go 自部署同步后端�
 - [仓库结构](repository-layout.md)：实际目录、模块职责与尚未落地的边界。
 - [隐私与同步](privacy-sync.md)：数据分级、密钥、删除、恢复和威胁模型。
 
-处理任务时先遵循根协作入口并读取当前状态，再按任务选择最少的稳定专题；涉及授权、范围、验证或文档归位时进入 Agent 协作专题。只有 `current` 明确引用的临时专题才进入日常阅读链。
+处理任务时先遵循根协作入口并读取当前状态，再按任务选择最少的稳定专题；涉及授权、范围、验证或文档归位时进入 Agent 协作专题。只有 `current` 明确引用的临时专题才进入日常阅读链。综合审阅的事项编号、证据与关闭条件进入该专题；能力与开放状态仍从 `current` 查询，不在导航页复制。
 
 ## 按职责查找
 
@@ -28,7 +28,7 @@ RadishLex（萝卜词核）是由 Rust 输入核心、Go 自部署同步后端�
 - `docs/*.md`：稳定的架构、协议、平台、隐私、Guide、Boundary 或 Reference。
 - 各组件 `README.md`：组件职责、就地开发入口和局部验证方式。
 
-Linux 当前安装工作从 [Linux 安装维护边界](linux-installation-maintenance-boundary.md) 与 [L6 package matrix](runbooks/linux-l6-package-matrix.md) 进入；输入平台与 Manager 分别见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md) 和 [Linux Manager 本地验收边界](linux-manager-local-acceptance.md)。其他专题从当前状态、技术方案或仓库结构继续下钻。
+Linux 当前安装工作从 [Linux 安装维护边界](linux-installation-maintenance-boundary.md)、[L6 package matrix](runbooks/linux-l6-package-matrix.md) 与 [L6 资产生命周期](runbooks/linux-l6-asset-lifecycle.md) 进入；输入平台与 Manager 分别见 [Linux Fcitx5 平台边界](linux-fcitx5-boundary.md) 和 [Linux Manager 本地验收边界](linux-manager-local-acceptance.md)。其他专题从当前状态、技术方案或仓库结构继续下钻。
 
 ## 维护规则
 

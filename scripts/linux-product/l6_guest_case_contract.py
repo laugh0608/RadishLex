@@ -161,6 +161,50 @@ CRASH_CHECKPOINT_EXPECTATIONS = {
         ),
         expected_terminal="completed",
     ),
+    "upgrade_quiesced": CrashCheckpointExpectation(
+        matrix_operation="upgrade_target",
+        checkpoint="quiesced",
+        fault="process_group_terminated",
+        receipt=CrashReceiptExpectation(
+            operation_kind="upgrade",
+            version_relation="target_newer",
+            state="quiesced",
+            operation_chain_length=2,
+            required_staged_slots=("source", "target"),
+            source_artifact_present=True,
+            target_artifact_present=True,
+            staged_slots=("source", "target"),
+            target_proof_present=False,
+            source_proof_present=False,
+            failure_code=None,
+            manual_recovery_required=False,
+        ),
+        package_state="source_installed",
+        dpkg_status="unchanged_from_preflight",
+        dpkg_log="unchanged_from_preflight",
+        guard=CrashGuardExpectation(
+            owner="root:root",
+            mode="0600",
+            size_bytes=0,
+            link_count=1,
+            advisory_lock="unlocked_after_worker_exit",
+        ),
+        startup_case="active-guard",
+        process_group="terminated",
+        process_group_member_count=0,
+        dpkg_child="absent",
+        xdg="unchanged_from_s2",
+        product_processes="unchanged_from_preflight",
+        network="unchanged_from_preflight",
+        resume_steps=(
+            "validate_staged_relationship",
+            "prove_target_quiescence",
+            "apply_target_once",
+            "verify_target",
+            "complete",
+        ),
+        expected_terminal="completed",
+    ),
 }
 
 
@@ -263,21 +307,43 @@ def validate_guest_case_contract() -> None:
             "fresh absent and removed terminal startup states must remain distinct"
         )
 
+    for scenario, expectation in CRASH_CHECKPOINT_EXPECTATIONS.items():
+        active_guard = startup_expectation(expectation.startup_case)
+        if (
+            expectation.receipt.state != expectation.checkpoint
+            or expectation.receipt.required_staged_slots
+            != expectation.receipt.staged_slots
+            or expectation.process_group != "terminated"
+            or expectation.process_group_member_count != 0
+            or expectation.dpkg_child != "absent"
+            or active_guard.decision != "MaintenanceRequired"
+            or active_guard.reason != "ActiveGuard"
+            or active_guard.receipt_terminal is not None
+        ):
+            raise LinuxL6GuestCaseContractError(
+                f"L6 guest crash state is inconsistent: {scenario}"
+            )
+
     staged = crash_checkpoint_expectation("install_artifacts_staged")
-    active_guard = startup_expectation(staged.startup_case)
+    if staged.package_state != "not_installed":
+        raise LinuxL6GuestCaseContractError(
+            "install artifacts-staged package state is inconsistent"
+        )
+
+    quiesced = crash_checkpoint_expectation("upgrade_quiesced")
     if (
-        staged.receipt.state != staged.checkpoint
-        or staged.receipt.required_staged_slots != staged.receipt.staged_slots
-        or staged.package_state != "not_installed"
-        or staged.process_group != "terminated"
-        or staged.process_group_member_count != 0
-        or staged.dpkg_child != "absent"
-        or active_guard.decision != "MaintenanceRequired"
-        or active_guard.reason != "ActiveGuard"
-        or active_guard.receipt_terminal is not None
+        quiesced.receipt.operation_kind != "upgrade"
+        or quiesced.receipt.version_relation != "target_newer"
+        or quiesced.receipt.operation_chain_length != 2
+        or not quiesced.receipt.source_artifact_present
+        or not quiesced.receipt.target_artifact_present
+        or quiesced.receipt.target_proof_present
+        or quiesced.receipt.source_proof_present
+        or quiesced.package_state != "source_installed"
+        or quiesced.xdg != "unchanged_from_s2"
     ):
         raise LinuxL6GuestCaseContractError(
-            "install artifacts-staged crash state is inconsistent"
+            "upgrade quiesced crash state is inconsistent"
         )
 
 
