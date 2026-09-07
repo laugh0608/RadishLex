@@ -337,8 +337,9 @@ def make_request(
         target_uuid=resolution.REQUIRED_TARGET_UUID,
         target_name=target_name,
         target_package_path=(
-            Path("/Users/luobo/Library/Containers/com.utmapp.UTM/Data/Documents")
-            / f"{target_name}.utm"
+            resolution.transport_bindings.expected_target_package_path(
+                target_name
+            )
         ),
         poll_attempts=poll_attempts,
         poll_interval_seconds=1,
