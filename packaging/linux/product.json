@@ -20,7 +20,7 @@
   "ffi_abi_version": 9,
   "userdb_schema_version": 9,
   "rime_data_manifest_version": 1,
-  "rime_data_lock_sha256": "5d5a2959f7d40256ae8b530e9bcaada57cc40d5c2608c49104b2c4a804f6759d",
+  "rime_data_lock_sha256": "5722b2f31769758d392db395e0c367f2a30e189f25e7cc23bf05a3e3385698a1",
   "rime_schema_id": "radishlex_pinyin",
   "manager_application_id": "dev.radishlex.radishlexManager",
   "fcitx_minimum_version": "5.1.9",

@@ -1,4 +1,4 @@
-//! Opt-in diagnosis, not a privacy acceptance gate. Uses only fresh synthetic data.
+//! Opt-in native privacy regression with fresh synthetic data; no platform claims.
 #![cfg(feature = "native-rime")]
 
 use std::collections::BTreeMap;
@@ -24,15 +24,15 @@ const CASES: &[&str] = &[
     "privacy-to-normal",
     "normal-to-unknown",
     "unknown-to-normal",
-    "no-userdict-normal",
-    "no-userdict-privacy",
-    "no-userdict-unknown",
+    "seeded-normal",
+    "seeded-privacy",
+    "seeded-unknown",
 ];
 const PHASES: &[&str] = &["baseline", "cancel", "commit", "reopen"];
-const MARKER: &str = "RadishLex synthetic REV-01 probe v1\n";
+const MARKER: &str = "RadishLex synthetic REV-01 probe v2\n";
 
 #[test]
-#[ignore = "explicit isolated native diagnosis; requires librime and rime_dict_manager"]
+#[ignore = "explicit isolated native regression; requires librime and rime_dict_manager"]
 fn rime_privacy_storage_probe() {
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -53,28 +53,16 @@ fn rime_privacy_storage_probe() {
         .output()
         .unwrap();
     assert!(output.status.success(), "product data: {:?}", output);
-    let output = Command::new("python3")
-        .arg(repo.join("scripts/rime-product/product_data.py"))
-        .args(["assemble", "--output"])
-        .arg(root.join("shared-disabled"))
-        .output()
-        .unwrap();
-    assert!(output.status.success(), "variant data: {:?}", output);
-    let schema_path = root.join("shared-disabled/radishlex_pinyin.schema.yaml");
-    let schema = fs::read_to_string(&schema_path).unwrap();
-    assert_eq!(schema.matches("enable_user_dict: true").count(), 1);
-    // A diagnostic A/B variant only. The committed schema and source lock stay intact.
-    fs::write(
-        schema_path,
-        schema.replace("enable_user_dict: true", "enable_user_dict: false"),
-    )
-    .unwrap();
-    let mut reports = Vec::new();
+    let mut reports: Vec<Value> = Vec::new();
     for case in CASES {
         let case_root = root.join(case);
         private_dir(&case_root);
         private_dir(&case_root.join("user"));
         private_dir(&case_root.join("logs"));
+        if case.starts_with("seeded-") {
+            seed_userdict(&case_root);
+        }
+        let initial_userdict = userdict_files(&case_root);
         let mut previous_files = BTreeMap::new();
         let mut stages = Vec::new();
         for phase in PHASES {
@@ -114,9 +102,14 @@ fn rime_privacy_storage_probe() {
                 .cloned()
                 .collect();
             previous_files = files;
-            let rows = export_rows(&case_root, phase, case.starts_with("no-userdict-"));
+            assert_eq!(
+                userdict_files(&case_root),
+                initial_userdict,
+                "adapter must never create or modify Rime learned data: {case}/{phase}"
+            );
+            let rows = export_rows(&case_root, phase, !case.starts_with("seeded-"));
             if *phase == "baseline" || *phase == "cancel" {
-                assert!(rows.is_empty(), "input-free/cancel control must not learn");
+                assert_eq!(rows.len(), usize::from(case.starts_with("seeded-")));
                 assert_eq!(stage["selection_events"], 0);
             }
             stage["rime_rows"] = json!(rows);
@@ -140,6 +133,25 @@ fn rime_privacy_storage_probe() {
             })
             .map(|(name, _)| name.clone())
             .collect();
+        assert!(!persisted, "selected text must not enter Rime userdict");
+        assert_eq!(
+            stages[1]["candidates"], stages[3]["candidates"],
+            "engine-only order must survive commit/restart without learned influence"
+        );
+        assert_eq!(
+            stages[3]["selection_events"],
+            u64::from(*case == "normal" || *case == "seeded-normal")
+        );
+        assert!(
+            log_matches.is_empty(),
+            "designated log directory contains synthetic selection"
+        );
+        if case.starts_with("seeded-") {
+            assert_eq!(
+                stages[3]["candidates"], reports[0]["stages"][3]["candidates"],
+                "old Rime userdict must not affect engine-only candidates"
+            );
+        }
         let report = json!({
             "case": case,
             "selected_persisted_in_rime_after_restart": persisted,
@@ -162,7 +174,7 @@ fn rime_privacy_storage_probe() {
     fs::write(
         root.join("report.json"),
         serde_json::to_vec_pretty(&json!({
-            "purpose": "diagnostic observations, not privacy acceptance",
+            "purpose": "native privacy regression, not real platform acceptance",
             "synthetic_input": "shi",
             "schema": "radishlex_pinyin",
             "reports": reports,
@@ -195,12 +207,8 @@ fn rime_privacy_probe_worker() {
     let phase = env::var("RADISHLEX_PRIVACY_PROBE_PHASE").unwrap();
     assert!(CASES.contains(&case.as_str()) && PHASES.contains(&phase.as_str()));
     let case_root = root.join(&case);
-    let (policy_case, shared_name) = if let Some(kind) = case.strip_prefix("no-userdict-") {
-        (kind, "shared-disabled")
-    } else {
-        (case.as_str(), "shared")
-    };
-    let shared = path_string(&root.join(shared_name));
+    let policy_case = case.strip_prefix("seeded-").unwrap_or(&case);
+    let shared = path_string(&root.join("shared"));
     let user = path_string(&case_root.join("user"));
     let logs = path_string(&case_root.join("logs"));
     let db = path_string(&case_root.join("radishlex.sqlite3"));
@@ -270,7 +278,7 @@ fn rime_privacy_probe_worker() {
             assert_eq!(text, before[1]);
             selected = Some(text);
             let actual = unsafe { radishlex_key_result_learning_disposition(result) };
-            let expected = if final_context == "normal" {
+            let expected = if initial == "normal" && final_context == "normal" {
                 RADISHLEX_LEARNING_RECORDED
             } else {
                 RADISHLEX_LEARNING_SKIPPED_BY_POLICY
@@ -305,6 +313,30 @@ fn rime_privacy_probe_worker() {
         .unwrap(),
     )
     .unwrap();
+}
+
+fn seed_userdict(case_root: &Path) {
+    let user = case_root.join("user");
+    let seed = case_root.join("seed.txt");
+    fs::write(&seed, "# Rime user dictionary\n#@/db_name\tpinyin_simp\n#@/db_type\tuserdb\n合成隐私回归词\tshi \t1000000\n").unwrap();
+    let output = Command::new("rime_dict_manager")
+        .args(["--import", "pinyin_simp"])
+        .arg(&seed)
+        .env("GLOG_log_dir", case_root.join("logs"))
+        .current_dir(&user)
+        .output()
+        .unwrap();
+    assert!(output.status.success(), "synthetic seed: {:?}", output);
+    assert!(!userdict_files(case_root).is_empty());
+}
+
+fn userdict_files(case_root: &Path) -> BTreeMap<String, Vec<u8>> {
+    read_files(&case_root.join("user"))
+        .into_iter()
+        .filter(|(name, _)| {
+            name.starts_with("pinyin_simp.userdb/") || name.ends_with(".userdb.txt")
+        })
+        .collect()
 }
 
 fn private_dir(path: &Path) {

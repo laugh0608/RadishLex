@@ -559,7 +559,7 @@ fn rime_session_native_invalid_schema_reports_engine_error() {
     );
 
     let message = unsafe { error_message(error) };
-    assert!(message.contains("select_schema"));
+    assert!(message.contains("learning_guard"));
     assert!(message.contains("radishlex_missing_schema_ffi_smoke"));
     unsafe {
         radishlex_error_free(error);
@@ -578,7 +578,7 @@ fn rime_native_sessions_share_runtime_and_survive_peer_release() {
     let user_data = std::env::var("RADISHLEX_RIME_USER_DATA")
         .expect("RADISHLEX_RIME_USER_DATA must point to isolated Rime user data");
     let schema =
-        std::env::var("RADISHLEX_RIME_SCHEMA").unwrap_or_else(|_| "luna_pinyin".to_owned());
+        std::env::var("RADISHLEX_RIME_SCHEMA").unwrap_or_else(|_| "radishlex_pinyin".to_owned());
     let shared_data = CString::new(shared_data).expect("shared data path");
     let user_data = CString::new(user_data).expect("user data path");
     let schema = CString::new(schema).expect("schema");

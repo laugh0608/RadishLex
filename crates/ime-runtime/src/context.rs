@@ -11,6 +11,16 @@ pub enum PersonalizationPolicy {
     ReadWrite,
 }
 
+impl PersonalizationPolicy {
+    pub(crate) fn restricted_by(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::EngineOnly, _) | (_, Self::EngineOnly) => Self::EngineOnly,
+            (Self::ReadOnly, _) | (_, Self::ReadOnly) => Self::ReadOnly,
+            (Self::ReadWrite, Self::ReadWrite) => Self::ReadWrite,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LearningContext {
     secure_input: bool,

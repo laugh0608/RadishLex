@@ -59,18 +59,7 @@ def write_elf(path: Path, *, acceptance: bool) -> None:
 class ReleasePairFixture:
     def __init__(self, root: Path) -> None:
         self.root = root
-        target_metadata = json.loads(
-            (l6_release_pair.REPO_ROOT / l6_release_pair.METADATA_RELATIVE).read_text(
-                encoding="utf-8"
-            )
-        )
-        source_metadata = copy.deepcopy(target_metadata)
-        source_metadata["debian_revision"] = "1"
-        source_metadata["package_version"] = "26.7.1+38-1"
-        self.repository_contract = l6_release_pair.load_contract(
-            source_metadata=source_metadata,
-            target_metadata=target_metadata,
-        )
+        self.repository_contract = l6_release_pair.load_frozen_contract()
         self.source = self.release("source", "1", b"source-package")
         self.target = self.release("target", "2", b"target-package")
         self.contract = copy.deepcopy(self.repository_contract)
@@ -197,6 +186,22 @@ class L6ReleasePairTests(unittest.TestCase):
         self.assertFalse(contract["build"]["source_rebuild"])
         self.assertEqual(contract["target"]["package_version"], "26.7.1+38-2")
         self.assertEqual(contract["shared_contract"]["ffi_abi_version"], 9)
+
+    def test_current_privacy_data_cannot_qualify_as_the_frozen_target(self) -> None:
+        with self.assertRaisesRegex(
+            l6_release_pair.L6ReleasePairError, "rime_data_lock_sha256"
+        ):
+            l6_release_pair.load_contract()
+
+    def test_frozen_declaration_does_not_hide_other_metadata_drift(self) -> None:
+        source = l6_release_pair.git_json_at_commit(
+            l6_release_pair.REPO_ROOT, l6_release_pair.SOURCE_COMMIT,
+            l6_release_pair.METADATA_RELATIVE,
+        )
+        target = dict(source, debian_revision="2", package_version="26.7.1+38-2")
+        target["privacy_format_version"] += 1
+        with self.assertRaisesRegex(l6_release_pair.L6ReleasePairError, "privacy_format_version"):
+            l6_release_pair.load_contract(source_metadata=source, target_metadata=target)
 
     def test_clean_root_rejects_preexisting_ignored_build_output(self) -> None:
         clean = self.root / "clean-output-test"

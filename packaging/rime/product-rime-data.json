@@ -19,14 +19,14 @@
       "kind": "schema",
       "source_path": "data/radishlex_pinyin.schema.yaml",
       "runtime_path": "radishlex_pinyin.schema.yaml",
-      "sha256": "cf0d8e049d251537f8ec69bec38468625367073a7497e9a2bebcc767b3b31127",
+      "sha256": "1b94cc5bd763b34dc86e782bdcfb46b9b14b1f8a9973af9e7864bd4754335bf1",
       "license_id": "Apache-2.0",
       "provenance": {
         "type": "radishlex-maintained",
         "upstream_repository": "https://github.com/rime/rime-pinyin-simp.git",
         "upstream_commit": "0c6861ef7420ee780270ca6d993d18d4101049d0",
         "upstream_path": "pinyin_simp.schema.yaml",
-        "modifications": "Removed stroke reverse lookup and LGPL preset imports; added RadishLex punctuation and key bindings."
+        "modifications": "Removed stroke reverse lookup and LGPL preset imports; added RadishLex punctuation and key bindings. Disabled Rime user dictionary; RadishLex exclusively owns learning."
       }
     },
     {
