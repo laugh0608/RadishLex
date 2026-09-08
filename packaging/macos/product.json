@@ -2,7 +2,7 @@
   "format_version": 3,
   "product_id": "radishlex-macos",
   "product_version": "26.7.1",
-  "build_number": "38",
+  "build_number": "39",
   "minimum_macos": "13.0",
   "ffi_abi_version": 9,
   "userdb_schema_version": 9,

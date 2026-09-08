@@ -188,9 +188,22 @@ class L6ReleasePairTests(unittest.TestCase):
         self.assertEqual(contract["shared_contract"]["ffi_abi_version"], 9)
 
     def test_current_privacy_data_cannot_qualify_as_the_frozen_target(self) -> None:
+        source = l6_release_pair.git_json_at_commit(
+            l6_release_pair.REPO_ROOT, l6_release_pair.SOURCE_COMMIT,
+            l6_release_pair.METADATA_RELATIVE,
+        )
+        target = dict(source, debian_revision="2", package_version="26.7.1+38-2")
+        current = json.loads(
+            (l6_release_pair.REPO_ROOT / l6_release_pair.METADATA_RELATIVE).read_text()
+        )
+        target["rime_data_lock_sha256"] = current["rime_data_lock_sha256"]
         with self.assertRaisesRegex(
             l6_release_pair.L6ReleasePairError, "rime_data_lock_sha256"
         ):
+            l6_release_pair.load_contract(source_metadata=source, target_metadata=target)
+
+    def test_current_build_cannot_qualify_as_the_frozen_target(self) -> None:
+        with self.assertRaisesRegex(l6_release_pair.L6ReleasePairError, "build_number"):
             l6_release_pair.load_contract()
 
     def test_frozen_declaration_does_not_hide_other_metadata_drift(self) -> None:
@@ -387,14 +400,13 @@ class L6ReleasePairTests(unittest.TestCase):
     def test_shared_contract_drift_is_rejected(self) -> None:
         contract = copy.deepcopy(self.fixture.contract)
         contract["shared_contract"]["userdb_schema_version"] = 10
-        target_metadata = json.loads(
-            (l6_release_pair.REPO_ROOT / l6_release_pair.METADATA_RELATIVE).read_text(
-                encoding="utf-8"
-            )
+        source_metadata = l6_release_pair.git_json_at_commit(
+            l6_release_pair.REPO_ROOT, l6_release_pair.SOURCE_COMMIT,
+            l6_release_pair.METADATA_RELATIVE,
         )
-        source_metadata = copy.deepcopy(target_metadata)
-        source_metadata["debian_revision"] = "1"
-        source_metadata["package_version"] = "26.7.1+38-1"
+        target_metadata = dict(
+            source_metadata, debian_revision="2", package_version="26.7.1+38-2"
+        )
         with self.assertRaisesRegex(l6_release_pair.L6ReleasePairError, "shared product"):
             l6_release_pair.validate_metadata_pair(
                 source_metadata, target_metadata, contract

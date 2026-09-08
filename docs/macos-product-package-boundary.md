@@ -65,14 +65,14 @@ source build 必须唯一、严格早于 target，不能使用 target 副本、q
 
 仓库根 `version.json` 是产品版本与 Flutter build number 的唯一人工真相源；`packaging/macos/product.json` 是 macOS ABI、schema、布局和 distribution identity 真相源。门禁必须验证两者及各构建系统镜像一致。
 
-当前首个 M4 候选固定：
+产品合同固定如下；当前版本/build 的数值只从根 `version.json` 读取，历史候选记录保留在 runbook/devlog：
 
 | 字段 | 值 | 约束 |
 | --- | --- | --- |
 | product ID | `radishlex-macos` | manifest 稳定标识 |
 | ProductManifest format | `3` | v3 使用显式 distribution identity；旧结构失败关闭 |
-| product version | `26.7.1` | Radish `YY.M.RELEASE`，Manager 与 InputMethod 相同 |
-| build number | `35` | 正整数且两个 bundle 相同 |
+| product version | `version.json.productVersion` | Radish `YY.M.RELEASE`，Manager 与 InputMethod 相同 |
+| build number | `version.json.flutterBuildNumber` | 正整数且两个 bundle 相同 |
 | minimum macOS | `13.0` | 取两端真实支持范围的交集 |
 | FFI ABI | `9` | 保留数据 startup/validation contract，增加独立外层 install startup gate |
 | userdb schema | `9` | 不允许旧产品打开未来 schema |

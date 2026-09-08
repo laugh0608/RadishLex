@@ -7,8 +7,8 @@
   "compression": "none",
   "source_date_epoch": 0,
   "dependency_analysis_profile": "dpkg-shlibdeps-debian13-arm64-v1",
-  "package_filename": "radishlex_26.7.1+38-2_arm64.deb",
-  "evidence_filename": "radishlex_26.7.1+38-2_arm64.deb.evidence.json",
+  "package_filename": "radishlex_26.7.1+39-2_arm64.deb",
+  "evidence_filename": "radishlex_26.7.1+39-2_arm64.deb.evidence.json",
   "control_members": [
     "control",
     "md5sums"

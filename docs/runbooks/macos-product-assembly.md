@@ -28,6 +28,8 @@ target/macos-product/<product-version>-<build-number>/
 - `RIME_INCLUDE_DIR` 指向 headers 根目录，`RIME_LIB_DIR` 指向包含 `librime` 及其可打包依赖的目录；
 - 工作区没有需要保留但尚未提交的同路径构建配置修改。
 
+Manager 构建使用 `flutter build macos --release --no-pub`，要求已存在与锁文件匹配的 package config/cache。装配不隐式解析或更新 Dart 依赖；缺少缓存时先按依赖授权流程处理，不在候选构建中升级工具链或 lockfile。
+
 装配不联网获取 schema 或词典，不读取 `~/Library/Rime`、Squirrel 数据或 RadishLex Application Support。RimeData 只来自 [仓库锁定输入](../../packaging/rime/README.md)。
 
 ## 第一步：校验源码契约

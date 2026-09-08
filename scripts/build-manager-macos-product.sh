@@ -21,7 +21,7 @@ product_build="$(python3 "${product_tool}" field build_number)"
 
 (
   cd "${manager_dir}"
-  flutter build macos --release \
+  flutter build macos --release --no-pub \
     --build-name="${product_version}" \
     --build-number="${product_build}" \
     --dart-define=RADISHLEX_MANAGER_MODE=product
