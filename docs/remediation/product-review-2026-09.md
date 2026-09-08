@@ -13,7 +13,7 @@
 | 编号 | 建议优先级 | 事项 | 当前证据性质 | 状态 |
 | --- | --- | --- | --- | --- |
 | REV-01 | 首要 | Rime 自有学习与隐私控制 | 源码与隔离 native 存储/重启对照 | 仓库修复与隔离 native 回归通过，真实平台复验和质量评测仍开放 |
-| REV-02 | 首要 | SQLite WAL-reset 修复版本 | bundled 升级、WAL/旧库回归与新 FFI 身份 | Rust 3.51.3；Go 保持 3.53.2；新平台候选与工具链门禁仍开放 |
+| REV-02 | 首要 | SQLite WAL-reset 修复版本 | bundled 升级、WAL/旧库回归与新 FFI 身份 | Rust 3.51.3；macOS build 39 已准备，平台实测/Linux 候选/工具链仍开放 |
 | REV-03 | 次要 | 学习写入阻塞输入回调 | 同步调用链与 5 秒 busy timeout | 待竞争测试与延迟预算 |
 | REV-04 | 次要 | 新词召回与个人化实际收益 | 当前候选重排实现及合成评测 | 待行为规格与评测设计 |
 | REV-05 | 次要 | 删词、事件保留与用户预期 | 删除事务和 Manager 文案 | 待保留策略与交互方案 |
@@ -106,7 +106,15 @@ REV-01 **未整体关闭**：本批完成仓库实现、Rust/native 回归与全
 - 常规身份测试查询 SQLite **3.51.3**，source id 为 `2026-03-13 10:38:09 737ae4a34738ffa0c3ff7f9bb18df914dd1cad163f28fd6b6e114a344fe6d618`。新 `aarch64-apple-darwin` release FFI（native-rime、apple-keychain）静态库 SHA-256 为 `2d1463a91f2d83e7af0ce12408117714575fa004a0bd8f2bbe81f61e5bbb7b93`，dylib 为 `d48528d478ab7b956728ce7ac984d474661db03cd03a82337b70051e4202f9c4`；两者包含新 source id。C probe 从该静态库链接 SQLite，查询同一版本/source id 并完成内存 SQL 和 mock FFI session 生命周期。没有给产品 ABI 新增版本查询入口，也没有调用真实 Keychain。
 - SQLite 升级后 48 进程隐私存储与 12 进程有效配置回归通过；具体根、命令、产物身份和最终全仓门禁见 [当周记录](../devlogs/2026-W37.md)。Rust 身份最低版本断言已纳入常规测试，打印命令见 [runbook](../runbooks/rime-privacy-probe.md#sqlite-运行时身份)。
 
-REV-02 **未整体关闭**：本批证明源码依赖链、主机回归和新独立 FFI 包含修复；未制作或替换 macOS app/DMG、Linux `.deb`，未核验 Linux 新产物或部署服务，也未执行实机输入/安装事务。旧 build 38 与冻结 L6 资产仍保持原身份；平台候选合同、适用实机门禁及 REV-06 工具链声明需要后续明确。
+该依赖批未制作或替换 macOS app/DMG、Linux `.deb`，也未执行实机输入/安装事务；后续已批准的候选准备结果如下。REV-02 **未整体关闭**，旧 build 38 与冻结 L6 资产仍保持原身份。
+
+### 2026-09-08：REV-01 / REV-02 macOS 联合候选准备
+
+- 项目所有者批准先准备新 macOS 候选、固定工具链与实际产物身份，并编写后续实机矩阵。版本元数据提交 `5e9b0a8` 将单一产品 build 提升至 39，联动 Linux 版本投影；未生成 Linux 新包、替换冻结 pair 或改变安装合同。
+- 完成 `26.7.1 (39)` 双组件和本地 community ad-hoc Installer。ProductManifest、双份 payload、ReleaseIdentity、资源/native 依赖与签名验证通过；双 FFI 包含 SQLite 3.51.3 新 source id，旧 source id 不存在。具体 hash、工具链与边界见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md)。
+- 最终包内 InputMethod FFI 七个独立合成场景通过：普通学习为一条，六类受限/往返场景为零，commit 保留且无 Rime 自有学习库；包内 Manager FFI smoke 通过。C 上下文注入不等于真实 macOS 隐私路由；此前 native 分段/重启证据不填充本候选实机矩阵。
+- 完整仓库门禁、平台元数据与 L6 合同、Flutter analyze 与 99 项测试通过。旧 build 38 的 104 项树记录一致，Cargo/pub 锁与冻结 L6 声明不变。新增 smoke 只使用新建合成临时数据。
+- 未安装或启动产品 GUI、未制作新 DMG、未操作系统输入法/Keychain/guest，也未发布。Installer 的历史升级源为空，下一步应先明确首次安装资格，不能直接执行 build 38 → 39 升级。两平台真实复验、Linux 新 pair/产物、输入质量与 REV-06 继续开放。
 
 ## REV-03：输入线程的数据库等待
 
