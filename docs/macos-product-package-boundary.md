@@ -57,7 +57,7 @@ source build 必须唯一、严格早于 target，不能使用 target 副本、q
 
 `packaging/rime/product-rime-data.json` 是首个候选的 RimeData 来源锁。产品构建只从锁定的 committed 文件离线装配，不在构建时联网，不读取用户、Squirrel 或其他输入法的数据目录。锁必须绑定每个资产的仓库来源、完整 commit、源路径、运行时路径、SHA-256 和许可证映射。
 
-首个候选固定使用 RadishLex 维护的 `radishlex_pinyin` schema 和 Apache-2.0 `pinyin_simp.dict.yaml`。产品 schema 保留简体全拼、用户词典、常用中西文标点和候选翻页，明确移除 upstream `stroke` reverse lookup 及 `prelude` preset 导入；因此不携带 LGPL `rime-stroke`、`rime-prelude`、`luna_pinyin` 或 `essay`。若未来增加笔画反查或扩展符号表，必须重新完成行为设计、来源与逐包许可证评审，不能向现有锁静默追加文件。
+首个候选固定使用 RadishLex 维护的 `radishlex_pinyin` schema 和 Apache-2.0 `pinyin_simp.dict.yaml`。产品 schema 保留简体全拼、常用中西文标点和候选翻页，禁用 Rime 用户词典并由 RadishLex userdb 独占学习，明确移除 upstream `stroke` reverse lookup 及 `prelude` preset 导入；因此不携带 LGPL `rime-stroke`、`rime-prelude`、`luna_pinyin` 或 `essay`。若未来增加笔画反查或扩展符号表，必须重新完成行为设计、来源与逐包许可证评审，不能向现有锁静默追加文件。
 
 装配后的 `RimeData/` 必须携带与锁字节一致的 `SourceManifest.json` 和 `Licenses/<component>/LICENSE|AUTHORS`。RimeData manifest v2 对所有数据和许可证文件计算 hash，并单独绑定来源 manifest 与许可证集合；额外文件、hash 漂移、空许可证或 symlink 均失败关闭。
 

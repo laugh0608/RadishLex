@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核：2026-09-08（本轮为仓库与隔离 native 诊断，未复验实机现场）；常态分支 `dev`，主线 `master`。
+- 复核：2026-09-08（本轮为仓库隐私修复与隔离 native 回归，未复验实机现场）；常态分支 `dev`，主线 `master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
@@ -23,10 +23,10 @@
 
 ## 综合审阅跟踪
 
-- 激活[2026-09 产品审阅与改进跟踪](../remediation/product-review-2026-09.md)，初审基线 `a5345b8`；2026-09-08 从 `1496901` 补隔离 native 诊断与 SQLite 身份核验，尚未修复产品实现、更新依赖或重新验收平台。
-- REV-01 已用合成输入复现受限上下文下 SQLite 零增量但 Rime 用户词典持久化并影响重启后候选，以及受限 composition 切回普通模式后进入 SQLite 学习；不代表真实系统密码泄露。REV-02 确认 Rust 测试链接 SQLite 3.46.0、Go 测试链接 3.53.2；macOS build 38 双 FFI 静态身份仍对应 3.46.0，未复现数据库损坏。修复与依赖方案待批准，关闭条件只在专题维护。
+- 激活[2026-09 产品审阅与改进跟踪](../remediation/product-review-2026-09.md)，初审基线 `a5345b8`；2026-09-08 完成隔离诊断与 SQLite 身份核验，随后按批准方案修复 REV-01 仓库实现；未更新依赖或重新验收平台。
+- REV-01 已落实 RadishLex 独占学习与 composition 最严格策略保留；native 48 进程存储/旧合成库回归及 12 进程配置回归通过，平台复验与输入质量评测仍开放。REV-02 Rust SQLite 仍为 3.46.0、Go 为 3.53.2；未更新依赖、复现损坏或替换冻结产物。结果与关闭条件只在专题维护。
 - 次要事项为输入回调锁等待、新词召回/评测、删除与事件保留、MSRV/CI；维护成本、Manager 易用性和早期反馈列为后续建议。具体证据、未知项与关闭条件只在跟踪专题维护。
-- 风险优先级供下一任务选择；本轮未改变 M5 里程碑、系统操作顺位、发布政策或冻结现场。涉及边界调整的方案仍需确认后实施。
+- 当前 Rime 来源锁已变化，不能作为冻结 Linux L6 pair 的新 target；现有构建资格检查继续拒绝混配。旧 pair、M5 系统操作顺位和冻结现场保持原状；新 pair 或平台实机动作仍须单独明确范围。
 
 ## 冻结基线与固定边界
 

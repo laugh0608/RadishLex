@@ -19,7 +19,7 @@
 
 P0 数据不写 selection event、negative feedback、user term 或同步摘要。平台无法可靠判断时，应优先按更严格等级处理。当前隐私模式可以只读使用隐私模式开启前已经存在的本地 P2 排序摘要，但本次输入仍按 P0 处理且不产生任何学习写入；secure input、敏感应用或上下文无法可靠判断时连既有个人化摘要也不读取，只使用 engine 顺序。
 
-P0 是整个输入系统的合同，包含底层 engine 的学习存储、缓存与日志。engine-only 只描述 RadishLex 重排策略，不能单独证明底层引擎未使用既有偏好；RadishLex SQLite 零增量也不能证明底层零学习。已发现的 Rime 接线与验证范围缺口由 [current](status/current.md) 激活的审阅专题跟踪，原始验收材料不倒写。
+P0 是整个输入系统的合同，包含底层 engine 的学习存储、缓存与日志。engine-only 只描述 RadishLex 重排策略，不能单独证明底层引擎未使用既有偏好；RadishLex SQLite 零增量也不能证明底层零学习。当前产品由 RadishLex userdb 独占学习，Rime 用户词典在 native session 创建前强制禁用，旧文件保留。composition 曾经过受限上下文后，即使恢复普通上下文也保持最严格策略，直到确认 composition 与 input code 均为空；不得因禁学丢掉用户待提交文本。实现细节见 [个人化学习](personalization-learning.md) 与 [adapter](engine-rime-adapter.md#单一学习存储与有效配置)。平台复验与验证范围缺口由 [current](status/current.md) 激活的审阅专题跟踪，原始验收材料不倒写。
 
 ### P1：本地学习、默认不同步
 

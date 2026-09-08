@@ -47,6 +47,8 @@ crates/ime-engine-rime/
     keymap.rs
     runtime.rs
     runtime_config.rs
+    learning_guard.rs
+    runtime_tests.rs
     session.rs
     convert.rs
 ```
@@ -59,6 +61,7 @@ crates/ime-engine-rime/
 - `convert.rs`：把 Rime context、composition、menu、candidate 转换为 RadishLex `Composition` / `Candidate`。
 - `runtime.rs`：管理进程级 API、setup / initialize / finalize、共享配置、session 计数和 native 调用串行化。
 - `runtime_config.rs`：保存进程级目录 / deploy 配置和需要跨 initialize 生命周期保活的 native traits 字符串。
+- `learning_guard.rs`：在 native engine 创建前检查并保活有效配置，禁止底层用户词典与未审阅的组件路径。
 - `session.rs`：实现单个 `RimeEngine` session，对外只暴露 `ime-core::Engine`。
 - `error.rs`：把 Rime 初始化、会话、schema、候选、编码和 FFI 生命周期错误转换为可诊断错误。
 
@@ -100,6 +103,7 @@ native-rime = []
 首个 RimeEngine::new(config)
   -> process RimeRuntime
   -> validate API / setup / initialize
+  -> validate and pin effective default / schema configs
   -> create_session
 
 后续 RimeEngine::new(compatible config)
@@ -142,6 +146,7 @@ Drop
 process teardown
   -> radishlex_rime_runtime_shutdown
   -> reject if any session is active
+  -> close pinned configs
   -> finalize
 ```
 
@@ -161,6 +166,21 @@ process teardown
 - `get_context` 的 composition cursor 经过 adapter 转换到 `Composition` 要求的 UTF-8 byte boundary，并覆盖 ASCII、中文和越界值；平台层再按宿主 API 需要转换为 UTF-16 索引。
 - `get_input` 只复制当前输入码字符串，用于 `ime-runtime` 的候选身份查询；返回值不作为 Rime 私有对象 ID 保存。
 - schema 包部署和产品目录准备由平台安装流程固定；`deploy_on_start` 只用于显式开发 / smoke 配置，不得由不同活动 session 分别决定。
+
+## 单一学习存储与有效配置
+
+RadishLex 独占学习，Rime 只提供基础候选。产品 schema 明确设置 `translator/enable_user_dict: false`；已有 Rime 用户词典不读取、不写入、不升级、不删除或迁移。这会停用 Rime 历史自学词与新词召回，RadishLex ranker 只重排当前 engine 已返回的候选，不能补出缺失候选。
+
+此合同统一应用于产品、CLI、legacy FFI 与 personalized FFI 的 `RimeEngine`，没有可选的启学分支。`learning_guard` 通过公开 `config_open` / `schema_open` 检查 **实际部署后的** `default` 与其 `schema_list` 中每个 schema，包括未选中项；不能等到 `create_session` 后才检查，因为 native session 初始化可能先恢复上次 schema。
+
+- 必须有 1–64 个可解析的 schema 条目；拒绝点前缀、路径及不受支持的标识。调用方只能选择该已验证列表里的 schema。
+- 每个 schema 的 `translator/enable_user_dict` 必须为显式 false；缺失、true 或无法解析均失败关闭。
+- engine pipeline 只接受 [guard 中已审阅的内建组件集合](../crates/ime-engine-rime/src/learning_guard.rs)，不支持 namespaced/custom translator、filter 或 Lua。其他 schema 即使同名也须满足完整检查；不承诺任意 upstream schema 可用。
+- runtime 保留公开 config handles，利用 librime 共享的 ConfigData 缓存保持已检查配置的生命周期，覆盖多 session、切 schema 与零 session 间隙。文件替换在本 runtime 内不触发重载；显式 shutdown 关闭 handles 后，下次初始化重新检查。未使用 config setter，避免把临时覆盖写回用户配置。
+- `deploy_on_start` 只调用公开 `run_task("installation_update")` 与 `run_task("workspace_update")`；不调用还包含 `user_dict_upgrade` / `cleanup_trash` 的完整 deploy。配置编译和安装元数据允许变化，学习文件必须保留。
+- 旧部署仍开启 user_dict 或用户定制重新启用时，创建返回可诊断的 `learning_guard` 错误，不能退回旧学习行为。更新产品数据后必须在新的受控实例重新部署并验收；不自动修改冻结实机配置。
+
+上述公共 API 与缓存语义对照 [librime API 实现](https://github.com/rime/librime/blob/1.17.0/src/rime_api_impl.h)、[ConfigComponent](https://github.com/rime/librime/blob/1.17.0/src/rime/config/config_component.cc) 与 [UserDictionary](https://github.com/rime/librime/blob/1.17.0/src/rime/dict/user_dictionary.cc)。native 回归见 [隐私隔离 runbook](runbooks/rime-privacy-probe.md)。该约束不对外部插件、其他旧版本进程或任意修改后的 librime 作保证；旧版本重新运行仍遵循旧合同，不能据新版本测试宣称旧数据已擦除或所有平台已验收。
 
 ## 数据目录策略
 
@@ -245,8 +265,8 @@ Rime candidate 转 RadishLex candidate 时只保留稳定字段：
 
 ```text
 radishlex-ime-cli demo <input-code> [candidate-index]
-radishlex-ime-cli rime --schema luna_pinyin --shared-data <path> --user-data <path> [--key <name> ...] <input-code> [candidate-index]
-radishlex-ime-cli rime snapshot --schema luna_pinyin --shared-data <path> --user-data <fresh-empty-path> --deploy-on-start <0|1> [--rank-db <path>] [--context <kind>] <input-code>
+radishlex-ime-cli rime --schema radishlex_pinyin --shared-data <path> --user-data <path> [--key <name> ...] <input-code> [candidate-index]
+radishlex-ime-cli rime snapshot --schema radishlex_pinyin --shared-data <path> --user-data <fresh-empty-path> --deploy-on-start <0|1> [--rank-db <path>] [--context <kind>] <input-code>
 ```
 
 规则：
@@ -299,6 +319,6 @@ RADISHLEX_RIME_SHARED_DATA=<path> RADISHLEX_RIME_USER_DATA=<path> cargo test -p 
 
 进程级 runtime 已闭合 setup / initialize / explicit shutdown / finalize、多 session 共享、零 session 间隙、配置冲突和 deploy / session / schema 失败回滚；schema 创建与切换同时验证已部署列表和选择后回读。stub API 测试可精确复验调用次数，`ime-ffi` 另有需要隔离 Rime 数据目录的 gated 单/双 session 与无效 schema smoke。
 
-R01A build 32 已在真实 TextEdit/Codex 中完成基础输入、双 client、进程重启和离线证据。R01B build 34 又从产品个人化 session 完成真实选择重排、进程重启保持、删除/恢复、隐私/unknown/P0 零写入，以及 secure 场景的 macOS 系统路由旁路与数据库零增量证据。这些记录证明当时验收覆盖的输入链和 RadishLex 数据库观察结果，不能扩展为 Rime 自有学习存储、缓存与日志均无写入。产品 schema 开启自有用户词典，而隐私策略到 Rime 的接线与存储控制存在待修复缺口，详见 [current](status/current.md) 激活的审阅专题；不倒写历史 smoke。
+R01A build 32 已在真实 TextEdit/Codex 中完成基础输入、双 client、进程重启和离线证据。R01B build 34 又从产品个人化 session 完成真实选择重排、进程重启保持、删除/恢复、隐私/unknown/P0 零写入，以及 secure 场景的 macOS 系统路由旁路与数据库零增量证据。这些记录证明当时验收覆盖的输入链和 RadishLex 数据库观察结果，不能扩展为 Rime 自有学习存储、缓存与日志均无写入。当时产品 schema 开启了自有用户词典；当前 adapter 已按下述单一学习存储合同实现检查，平台复验与剩余限制详见 [current](status/current.md) 激活的审阅专题；不倒写历史 smoke。
 
 M2 Manager 本地产品模式已完成对应验收，不改变 adapter 职责。同步不进入输入热路径；产品中的 `librime` 与 schema 分发归 M4 产品包边界。当前阶段、真实用户同步开放状态与后续平台顺位只读 [current](status/current.md)。
