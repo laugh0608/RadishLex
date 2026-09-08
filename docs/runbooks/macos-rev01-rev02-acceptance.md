@@ -48,7 +48,9 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 
 ## 实机前置条件与停止条件
 
-1. 下一阶段先做只读现场盘点：明确验收用户/主机、固定双 bundle 路径、现有 build、外层 receipt/guard、相关进程与输入源状态；不读取真实 P1 明文记录，也不从旧授权推断可停进程或覆盖安装。
+项目所有者已将测试留到 2026-09-09；当日优先事项见[周志](../devlogs/2026-W37.md#2026-09-09明日事项)。下面的前置检查应在执行时重新满足，不能把 09-08 的空路径与静止观察当作次日仍成立。
+
+1. 先重新只读盘点本机现有 `luobo` 账户：固定双 bundle 路径、现有 build、外层 receipt/guard、相关进程与输入源状态；不读取真实 P1 明文记录，也不从旧授权推断可停进程或覆盖安装。
 2. 以[产品包边界](../macos-product-package-boundary.md)和[Installer 边界](../macos-installer-app-boundary.md)为准，确认安装资格。有效 completed remove 可以再次 first install，不要求更换系统账户；已有数据、receipt 或身份差异必须有明确处置范围，不能靠删记录或忽略检查伪装为空基线。需要升级则另行准备经过资格验证的历史 source 载体。
 3. 确定合格的验收账户与合成数据范围后，单独批准 Installer GUI、实际安装及双组件启动。固定目标为该用户的 `Applications/RadishLex Manager.app`、`Library/Input Methods/RadishLexInputMethod.app` 和 `Library/Application Support/RadishLex`；默认保留数据，禁止绕过 Installer 手工复制 app。
 4. 系统设置、输入源切换、按键输入、退出/重启各按明确动作授权；任何自动点击或合成按键同样在此范围内。真实密码、联系人、证件等不得用作测试材料。

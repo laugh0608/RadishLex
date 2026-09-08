@@ -78,6 +78,8 @@ p1_rows: omitted
 
 ### 用法
 
+shared data 应按 [Rime Native Smoke Runbook](runbooks/rime-native-smoke.md)从来源锁装配，使用显式关闭 Rime 自有学习的产品 schema；未审阅的上游 schema 或配置会被 adapter 拒绝。
+
 ```bash
 mkdir -m 700 /tmp/radishlex-rime-snapshot.<id>
 
@@ -85,7 +87,7 @@ RIME_INCLUDE_DIR=<include> \
 RIME_LIB_DIR=<lib> \
 cargo run -p radishlex-ime-cli --features native-rime -- \
   rime snapshot \
-  --schema pinyin_simp \
+  --schema radishlex_pinyin \
   --shared-data <isolated-shared-data> \
   --user-data /tmp/radishlex-rime-snapshot.<id> \
   --deploy-on-start 1 \
@@ -106,7 +108,7 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
 - 不得位于当前用户的 Rime、Squirrel、Input Methods 或 RadishLex Rime 数据路径及其后代。
 - 安全检查得到的 canonical 路径就是传给 Rime 的实际路径；启动前目录设备号和 inode 不得漂移。
 
-该约束隔离 Rime 自身学习和既有配置。每次需要可归属的新快照都应准备新的 fresh empty 目录；Rime 启动后会在目录中生成配置或 build 数据，因此不能把同一目录再次当作 fresh 基线。
+该约束隔离既有配置和构建缓存；adapter 另行保证 Rime 自有学习关闭。每次需要可归属的新快照都应准备新的 fresh empty 目录；Rime 启动后会在目录中生成配置或 build 数据，因此不能把同一目录再次当作 fresh 基线。
 
 ### 运行与输出
 
