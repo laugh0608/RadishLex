@@ -2,7 +2,7 @@
 
 本文面向维护者与后续实现者，保存 2026-09-05 综合审阅的证据、风险、建议和关闭条件。源码基线为 `a5345b8`；审阅是文档与关键路径抽查，不是全面安全审计、真实系统验收或发布认证。当前执行顺位与现场停止线仍只读 [current](../status/current.md)。
 
-项目所有者已授权整理项目文档；这不构成依赖更新、架构或隐私方案变更、运行时修改、真实系统操作及发布授权。本专题登记改进建议，不改写既有里程碑退出记录，不把历史证据扩展为未测能力。关闭事项必须关联修复提交、实际验证及剩余限制；全部处理后按文档规则退出日常阅读链。
+初次登记只获文档整理授权。2026-09-08 项目所有者批准启动隔离诊断与版本核验，新增 opt-in 测试和本轮结果；仍不构成依赖更新、架构或隐私方案变更、产品运行时修改、真实系统操作及发布授权。本专题不改写既有里程碑退出记录，不把历史证据扩展为未测能力。关闭事项必须关联修复提交、实际验证及剩余限制；全部处理后按文档规则退出日常阅读链。
 
 ## 总体判断
 
@@ -12,8 +12,8 @@
 
 | 编号 | 建议优先级 | 事项 | 当前证据性质 | 状态 |
 | --- | --- | --- | --- | --- |
-| REV-01 | 首要 | Rime 自有学习与隐私控制 | 配置、源码与测试观察范围交叉核对 | 待隔离 native 验证与方案决策 |
-| REV-02 | 首要 | SQLite WAL-reset 修复版本 | 锁定依赖、本地依赖源码与上游公告 | 待产物核验与依赖方案批准 |
+| REV-01 | 首要 | Rime 自有学习与隐私控制 | 源码与隔离 native 存储/重启对照 | 已复现底层学习与上下文切换缺口，待修复方案批准 |
+| REV-02 | 首要 | SQLite WAL-reset 修复版本 | 实际链接版本、冻结 macOS FFI 静态身份与上游公告 | Rust 3.46.0，Go 3.53.2；待客户端依赖方案批准与完整产物核验 |
 | REV-03 | 次要 | 学习写入阻塞输入回调 | 同步调用链与 5 秒 busy timeout | 待竞争测试与延迟预算 |
 | REV-04 | 次要 | 新词召回与个人化实际收益 | 当前候选重排实现及合成评测 | 待行为规格与评测设计 |
 | REV-05 | 次要 | 删词、事件保留与用户预期 | 删除事务和 Manager 文案 | 待保留策略与交互方案 |
@@ -41,6 +41,29 @@
 
 关闭条件：批准的方案覆盖所有输入衍生存储，native 正负向验证与重启观察通过，相关平台回归完成，历史证据仍按原观察范围保留。
 
+### 2026-09-08：隔离复现与待批准方案
+
+从 `1496901` 的产品实现开始，新增 [native 诊断测试](../../crates/ime-ffi/tests/native_rime_privacy_probe.rs)，使用本机 librime 1.17.0、锁定产品 schema 和全新合成目录。执行方法、48 个独立进程与观察限制见 [隔离诊断 runbook](../runbooks/rime-privacy-probe.md)。结果如下：
+
+| 场景 | 提交后 RadishLex selection_events | 新进程后 Rime 导出词条 | 结论 |
+| --- | --- | --- | --- |
+| normal | 1 | 1 | 两套存储均学习，正向对照成立 |
+| privacy / unknown / secure / sensitive | 各 0 | 各 1 | FFI 返回 skipped_by_policy，但底层仍持久化合成选择 |
+| normal→privacy / normal→unknown | 各 0 | 各 1 | 提交前收紧策略不能阻止 Rime 学习 |
+| privacy→normal / unknown→normal | 各 1 | 各 1 | 提交时的宽松策略允许此前受限 composition 进入 RadishLex 学习 |
+| 临时关闭 Rime user_dict：normal | 1 | 0，未创建 Rime userdb | RadishLex 普通学习仍可执行 |
+| 临时关闭 Rime user_dict：privacy / unknown | 各 0 | 0，未创建 Rime userdb | 新库 A/B 中未观察到两套词条学习 |
+
+各场景 baseline 和输入后 cancel 均无导出词条、无 SQLite selection_events。产品 schema 九项场景重开后，受策略阻断 RadishLex ranker 的候选仍由原首候选变为刚选过的第二候选；这把持久化学习与 Rime 读取影响关联起来。指定日志目录未匹配合成选择的 UTF-8 文本，只能保留这一窄观察结论。未操作系统输入法，secure 测试不代表真实系统密码已泄露。
+
+建议下一实现批采用 **RadishLex 独占学习，Rime 提供基础候选**，并为 composition 保留“曾经过禁学上下文”的状态：在 privacy/unknown/secure/sensitive 中产生或继续处理的 composition，恢复普通模式后也不得学习；仍允许完成输入，状态只在对应 composition 完成或 reset 后释放。实现应同时检查按键自动 commit、候选选择、分段选择、schema/context 切换与失败路径，不能只补一个选择入口。
+
+该方案会改变候选质量与数据读取合同，尚未批准：停用 Rime 用户词典意味着不再依赖它的历史自学词和新词召回；RadishLex 现有重排不会自动补足缺失候选。既有 Rime 用户数据默认保留，不自动清除、迁移或宣称已物理擦除。实现前需明确产品配置强制性、旧部署配置/缓存的处理，以及混合新旧版本时的兼容边界；临时关闭一个 YAML flag 不足以交付产品修复。新词召回实现如需扩展，仍按 REV-04 单独批准。
+
+备选方案是把 Rime 学习完整纳入统一策略，并补读取、写入、删除、防复活、恢复和 explain 的跨存储合同。它可争取保留 Rime 自学收益，但涉及更大的双存储一致性与 adapter 边界，当前不建议仅靠某个 incognito option 局部修补。
+
+批准后的验证须将当前诊断观察改为明确的隐私正负向断言，补既有词典读取与配置漂移、上下文双向切换、多 session、重启、分段/自动 commit、删除恢复、普通输入质量对照，并运行 Rust/native/全仓及适用平台回归。当前 REV-01 仍开放，生产实现与产品 schema 均未修改。
+
 ## REV-02：SQLite WAL-reset 修复版本
 
 [userdb manifest](../../crates/ime-userdb/Cargo.toml) 使用 bundled `rusqlite 0.32.1`，[Cargo.lock](../../Cargo.lock) 锁定 `libsqlite3-sys 0.30.1`。审阅时本地该依赖的 `sqlite3.h` 声明 `SQLITE_VERSION = 3.46.0`；这证明默认 bundled 输入版本，不替代每个已冻结发布产物的版本取证。
@@ -50,6 +73,14 @@
 建议核对 Rust 客户端、Go 服务端及产品内其他 SQLite 使用者各自的实际版本，不能以系统 `sqlite3` 版本替代 bundled library。依赖方案需单独批准，冻结载体不原位替换。
 
 关闭条件：实际产物确认包含修复，依赖和 lockfile 变更可追溯，多连接写入/checkpoint、迁移、备份恢复及适用平台门禁通过。未命中罕见竞争的普通压力测试不能单独证明旧版本安全。
+
+### 2026-09-08：版本核验与依赖候选
+
+- 新增 Rust/Go opt-in 身份入口，命令见 [runbook](../runbooks/rime-privacy-probe.md#sqlite-运行时身份)。Rust userdb 测试查询实际链接 SQLite 为 **3.46.0**，source id 为 `2024-05-23 13:25:27 96c92aba00c8375bc32fafcdf12429c58bd8aabfcadab6683e35bbb9cdebf19e`；Go `modernc.org/sqlite v1.53.0` 的测试为 **3.53.2**，source id 为 `2026-06-03 19:12:13 d6e03d8c777cfa2d35e3b60d8ec3e0187f3e9f99d8e2ee9cac695fd6fcdf1a24`。
+- 只读扫描 macOS `26.7.1-38` 的 InputMethod/Manager FFI 二进制，两者都含 `3.46.0` 与同一 SQLite source id。SHA-256 分别为 `d90ce52dca275fd88b2c90a9c4e2ef859f81f9a5768d732bb33f07253c797172`、`9f9117f417d34d0bba528149a0670fffda48859f585851a98060dc008f300ad7`。这是静态内嵌身份，未启动 bundle、未查询其中运行时、未修改冻结载体；Linux 制品与部署服务尚未取证。
+- 当日重新核对 [SQLite WAL-reset 公告](https://www.sqlite.org/wal.html#walresetbug)，Rust 版本位于公告受影响范围；Go 测试版本已晚于修复版本。本轮没有执行损坏复现，不能因 Go 通过版本核验就宣称部署服务或所有数据库安全。
+- 可审议的具体候选为上游 [rusqlite v0.39.0](https://github.com/rusqlite/rusqlite/blob/v0.39.0/Cargo.toml) 与其 `libsqlite3-sys 0.37.0`，该 tag 的 [bundled header](https://github.com/rusqlite/rusqlite/blob/v0.39.0/libsqlite3-sys/sqlite3/sqlite3.h) 固定 SQLite 3.51.3。该候选用于缩小方案范围，不代表已选择最新版本或已通过兼容验证。
+- 下一依赖批建议只升级 Rust 客户端 SQLite 链，保留 bundled、backup 与 WAL 数据格式合同；批准后才解析依赖和更新 lockfile，核查 API/feature 差异及完整依赖图的 MSRV，并验证多连接 write/checkpoint、迁移、备份恢复和两平台新产物身份。若需要提高支持工具链版本，应联动 REV-06 明确批准；不改变 Go 依赖，不替换冻结包，不以系统 SQLite 代替 bundled，也不自维护 SQLite 补丁分叉。
 
 ## REV-03：输入线程的数据库等待
 

@@ -299,6 +299,6 @@ RADISHLEX_RIME_SHARED_DATA=<path> RADISHLEX_RIME_USER_DATA=<path> cargo test -p 
 
 进程级 runtime 已闭合 setup / initialize / explicit shutdown / finalize、多 session 共享、零 session 间隙、配置冲突和 deploy / session / schema 失败回滚；schema 创建与切换同时验证已部署列表和选择后回读。stub API 测试可精确复验调用次数，`ime-ffi` 另有需要隔离 Rime 数据目录的 gated 单/双 session 与无效 schema smoke。
 
-R01A build 32 已在真实 TextEdit/Codex 中完成基础输入、双 client、进程重启和离线证据。R01B build 34 又从产品个人化 session 完成真实选择重排、进程重启保持、删除/恢复、隐私/unknown/P0 零写入，以及 secure 场景的 macOS 系统路由旁路与数据库零增量证据。这些记录证明当时验收覆盖的输入链和 RadishLex 数据库观察结果，不能扩展为 Rime 自有学习存储、缓存与日志均无写入。产品 schema 开启自有用户词典，而隐私策略到 Rime 的接线与存储观察存在待核验缺口，详见 [current](status/current.md) 激活的审阅专题；不倒写历史 smoke。
+R01A build 32 已在真实 TextEdit/Codex 中完成基础输入、双 client、进程重启和离线证据。R01B build 34 又从产品个人化 session 完成真实选择重排、进程重启保持、删除/恢复、隐私/unknown/P0 零写入，以及 secure 场景的 macOS 系统路由旁路与数据库零增量证据。这些记录证明当时验收覆盖的输入链和 RadishLex 数据库观察结果，不能扩展为 Rime 自有学习存储、缓存与日志均无写入。产品 schema 开启自有用户词典，而隐私策略到 Rime 的接线与存储控制存在待修复缺口，详见 [current](status/current.md) 激活的审阅专题；不倒写历史 smoke。
 
 M2 Manager 本地产品模式已完成对应验收，不改变 adapter 职责。同步不进入输入热路径；产品中的 `librime` 与 schema 分发归 M4 产品包边界。当前阶段、真实用户同步开放状态与后续平台顺位只读 [current](status/current.md)。
