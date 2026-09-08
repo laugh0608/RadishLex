@@ -61,18 +61,18 @@ cargo test --offline --locked -p radishlex-ime-ffi --features native-rime \
 
 ## SQLite 运行时身份
 
-以下 opt-in 入口只创建内存数据库，返回测试产物实际链接的 SQLite 版本与 source id；不代表部署服务或冻结 bundle 已执行验证：
+Rust 身份检查已纳入常规测试，要求实际链接的 bundled SQLite 不低于 3.51.3，并核对 SQL 与库函数报告的版本。以下命令创建内存数据库并打印版本/source id；不代表部署服务或冻结 bundle 已执行验证：
 
 ```bash
 cargo test --offline --locked -p radishlex-ime-userdb \
-  --test sqlite_library_identity -- --ignored --nocapture
+  --test sqlite_library_identity -- --nocapture
 ```
 
-在 `server/sync-server` 执行：
+Go 身份打印仍为 opt-in。在 `server/sync-server` 执行：
 
 ```bash
 GOPROXY=off GOTOOLCHAIN=local RADISHLEX_SQLITE_IDENTITY_PROBE=1 \
 go test ./internal/storage -run '^TestSQLiteLibraryIdentity$' -count=1 -v
 ```
 
-升级关闭条件仍须覆盖产物版本、多连接 WAL/checkpoint、迁移、备份恢复和适用平台门禁；版本打印不是数据安全验收。
+`cargo test --offline --locked -p radishlex-ime-userdb` 覆盖三个学习写者与 PASSIVE/RESTART/TRUNCATE checkpoint 的并发回归、读事务阻止 WAL 重置、[SQLite 3.46.0 合成旧库](../../crates/ime-userdb/tests/fixtures/README.md)的升级/删除/备份恢复及既有 migration/事务失败测试。压力测试没有注入上游 WAL-reset 罕见竞争，不能用其未失败证明旧版本安全。升级关闭条件仍须覆盖实际平台产物和适用门禁。
