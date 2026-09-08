@@ -49,8 +49,8 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 ## 实机前置条件与停止条件
 
 1. 下一阶段先做只读现场盘点：明确验收用户/主机、固定双 bundle 路径、现有 build、外层 receipt/guard、相关进程与输入源状态；不读取真实 P1 明文记录，也不从旧授权推断可停进程或覆盖安装。
-2. 以[产品包边界](../macos-product-package-boundary.md)和[Installer 边界](../macos-installer-app-boundary.md)为准，确认首次安装资格。已有程序、receipt、guard 或未知残留时停止，不能删除数据或把已有安装伪装为空用户域；需要升级则另行准备经过资格验证的历史 source 载体。
-3. 确定独立、合格的验收账户与合成数据范围后，单独批准 Installer GUI、实际安装及双组件启动。固定目标为该用户的 `Applications/RadishLex Manager.app`、`Library/Input Methods/RadishLexInputMethod.app` 和 `Library/Application Support/RadishLex`；默认保留数据，禁止绕过 Installer 手工复制 app。
+2. 以[产品包边界](../macos-product-package-boundary.md)和[Installer 边界](../macos-installer-app-boundary.md)为准，确认安装资格。有效 completed remove 可以再次 first install，不要求更换系统账户；已有数据、receipt 或身份差异必须有明确处置范围，不能靠删记录或忽略检查伪装为空基线。需要升级则另行准备经过资格验证的历史 source 载体。
+3. 确定合格的验收账户与合成数据范围后，单独批准 Installer GUI、实际安装及双组件启动。固定目标为该用户的 `Applications/RadishLex Manager.app`、`Library/Input Methods/RadishLexInputMethod.app` 和 `Library/Application Support/RadishLex`；默认保留数据，禁止绕过 Installer 手工复制 app。
 4. 系统设置、输入源切换、按键输入、退出/重启各按明确动作授权；任何自动点击或合成按键同样在此范围内。真实密码、联系人、证件等不得用作测试材料。
 5. 安装后重新交叉核验 receipt 终态、双组件身份、固定路径与实际运行程序，再开始输入矩阵。发现身份漂移、事务未知、越界学习、commit 丢失或异常持久化，立即停止当前场景并保留现场，不自动 repair、retry 或 cleanup。
 
@@ -60,8 +60,22 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 - Application Support 仍为当前用户 `0700` 目录，保留 Rime、SQLite、WAL/SHM 与 `.radishlex-install-v1/receipt.json`。仅读取路径元数据和安装 receipt，未打开数据库或读取 P1 正文。
 - receipt 为 build 38 的 `remove_programs/completed`，operation `262d275f187ed2b46abd547527398ec1`，无记录的 failure 或 manual recovery 标记。receipt SHA-256 为 `d463175c3cf1ad0cbed0b7eb83d0724a28d5c65531b8c94b5ee67b0bbf6b97de`；这些字段不表示其当前身份校验已通过。
 - receipt 的 data-root device id 为 `16777230`，实际目录为 `16777234`，已在沙盒外交叉确认；inode `18234715`、uid 501 与 `0700` 一致。安装核心要求完整 root identity 相等，当前差异不能静默忽略；本轮未启动 Installer 取得 driver snapshot，也未确定设备号变化原因。
-- 本轮不把该保留数据现场作为新候选可写目标，不改写 receipt、不删除旧库、不执行安装。下一步由项目所有者指定独立测试账户，再只读核验其资格；账户创建、登录切换与产品系统操作另行说明并授权。
+- 本次盘点未把该保留数据现场作为新候选可写目标，未改写 receipt、删除旧库或执行安装。当时建议独立测试账户；项目所有者随后选择继续使用本机现有账户，当前方向以下节为准。
 - 新证据根为 `/private/tmp/radishlex-build39-host-inventory-lgqvz4r8/`。`inventory.json` 保留初始沙盒观察；其中 TIS XPC 错误和 `process=unavailable` 不作为通过依据，沙盒外确认结果另存 `confirmed-observations.json`。冻结历史材料未补写。
+
+## 本机保留式整理：2026-09-08
+
+项目所有者明确倾向本机测试，并允许清理或整理之前的记录。本批据此准备把旧现场整体归档，保留原始数据库与证据，不创建宿主账户或虚拟机，也不调整生产安装器的身份比较规则。独立账户不是安装器的必要条件，之前的建议不再作为当前前置要求。
+
+- 精确范围：当前用户 `Library/Application Support/RadishLex` 一项，以及 `Applications`、`Library/Input Methods` 下各八项 `.radishlex-install-<operation>`，共 17 个目录根、305857438 bytes 文件内容；目录只含已盘点的原数据、空事务目录或 build 35/37/38 的 `source-backup.app`。
+- 八个 operation 为 `1f7d24f7f47e4aec432efe77d625251e`、`262d275f187ed2b46abd547527398ec1`、`412ec3c9c986e62e27d03ba4f2b1682d`、`63f3fb75783962623c0fe98c7d1173b8`、`7dcbddb367633069b365ef6662dd16c1`、`819d8d7f2f14b30fe4777271c216b8de`、`99696cf4e293c18313f10aa83bde0485`、`f88e9b979b32845bfdd9712e88157619`。命名或版本归属不替代完整历史事务资格；本批只保管原对象，不将其声明为新升级源。
+- 目标为当前用户 `Library/Application Support/RadishLex-Archives/20260908-before-build39/original-home/`，保留各对象的原 home-relative 路径结构；归档父目录私有 `0700`。采用同文件系统 rename，保留文件内容、inode、mode 与内部相对 symlink，不永久删除、不重写 receipt、不单独移动 SQLite 主文件而遗漏 WAL/SHM。
+- 准备材料为 `/private/tmp/radishlex-macos-history-archive-20260908/` 的 `archive.py`、`plan.json`、`prepare.log`；计划 SHA-256 为 `1b1bd39276f4a17fac662041bf2760aa1b3eb145cc89d060aea011cdfbb13c6a`。只读 prepare 绑定精确父目录身份、每个节点元数据/hash/link、已观察 receipt 与脚本 hash。
+- 执行前再次核验全部树、输入源归零、产品进程停止、无打开句柄和 guard。目标碰撞、跨设备、未知条目、源漂移或检查不可用均停止；每个 rename 前后核验并持久记录 journal，中断保留部分归档，禁止自动重试或回滚。
+- 执行状态：按上述计划取得精确系统写入授权后，17 项已全部归档，未执行安装。合成测试覆盖同设备 rename 保持内容/inode/mode/link、目标存在与源漂移时零 mutation、外部 symlink 拒绝；真实执行逐项记录于归档根的 `moves.jsonl`，`completed.json` 为 `archived`，永久删除数为 0。
+- 独立读回确认原 17 项路径全部 absent，归档内 545 个节点的 device/inode/owner/group/mode/mtime、文件大小/hash 与内部链接一致；receipt 原 hash 保留。执行前后产品进程与打开句柄均为零，TIS 为 `0/0/0`；最后独立 `--status` 确认正式 data root、Rime、userdb/sidecars 和 InputMethod bundle 均 absent、进程 stopped。build 39 最终 ProductManifest 再次验证通过。
+
+当前已形成新的空安装路径；之后的 build 39 安装会创建新的合成测试数据，不自动导入旧学习库。归档属于本轮明确整理范围，build 38 候选制品、历史验收文档及 Linux 冻结资产不在移动范围。设备号变化的触发原因仍未证实，生产长期身份与重新挂载兼容问题另行评估。归档不是安装事务恢复或生产身份修复；不要把旧资料直接覆盖回新的运行目录，恢复/再利用必须另行确定范围并检查目标状态。
 
 ## 待执行实机矩阵
 
