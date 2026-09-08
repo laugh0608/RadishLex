@@ -26,6 +26,7 @@
 - 激活[2026-09 产品审阅与改进跟踪](../remediation/product-review-2026-09.md)，初审基线 `a5345b8`；2026-09-08 完成隔离诊断，随后按批准方案修复 REV-01 并升级 REV-02 Rust SQLite 依赖；未重新验收平台。
 - REV-01 已落实 RadishLex 独占学习与 composition 最严格策略保留；升级 SQLite 后 native 48 进程存储/旧合成库回归及 12 进程配置回归通过。REV-02 Rust 链已升至 bundled SQLite 3.51.3，WAL/旧库/备份恢复与新 macOS FFI 身份核验通过；Go 依赖和冻结产物未更换。两项的平台复验、输入质量与工具链限制仍开放，结果与关闭条件只在专题维护。
 - macOS `26.7.1 (39)` 双组件与本地 ad-hoc Installer 已构建，包内 FFI 合成 smoke、资源/载荷身份、完整仓库门禁及 Manager 99 项测试通过。后续按[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md)先明确现场与首次安装资格，再单独授权实机动作；此载体无历史升级源，未安装、未制作新 DMG、未发布。
+- 本机只读盘点确认旧 build 38 为保留数据的 completed remove，且 receipt/data-root device id 不一致；当前账户不进入 build 39 安装。等待指定独立测试账户后再核验资格，旧库和 receipt 原样保留；具体观察只在联合验收入口维护。
 - 次要事项为输入回调锁等待、新词召回/评测、删除与事件保留、MSRV/CI；维护成本、Manager 易用性和早期反馈列为后续建议。具体证据、未知项与关闭条件只在跟踪专题维护。
 - 当前 Rime 来源锁已变化，不能作为冻结 Linux L6 pair 的新 target；现有构建资格检查继续拒绝混配。旧 pair、M5 系统操作顺位和冻结现场保持原状；新 pair 或平台实机动作仍须单独明确范围。
 

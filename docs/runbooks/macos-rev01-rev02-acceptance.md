@@ -54,6 +54,15 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 4. 系统设置、输入源切换、按键输入、退出/重启各按明确动作授权；任何自动点击或合成按键同样在此范围内。真实密码、联系人、证件等不得用作测试材料。
 5. 安装后重新交叉核验 receipt 终态、双组件身份、固定路径与实际运行程序，再开始输入矩阵。发现身份漂移、事务未知、越界学习、commit 丢失或异常持久化，立即停止当前场景并保留现场，不自动 repair、retry 或 cleanup。
 
+## 当前账户只读盘点：2026-09-08
+
+- 当前 console 与进程用户均为 `luobo` / uid 501。固定双 bundle 不存在；沙盒外 TIS 状态为 `matches=0 enabled=0 selected=0`，精确产品进程查询无 InputMethod、Manager 或 Installer。
+- Application Support 仍为当前用户 `0700` 目录，保留 Rime、SQLite、WAL/SHM 与 `.radishlex-install-v1/receipt.json`。仅读取路径元数据和安装 receipt，未打开数据库或读取 P1 正文。
+- receipt 为 build 38 的 `remove_programs/completed`，operation `262d275f187ed2b46abd547527398ec1`，无记录的 failure 或 manual recovery 标记。receipt SHA-256 为 `d463175c3cf1ad0cbed0b7eb83d0724a28d5c65531b8c94b5ee67b0bbf6b97de`；这些字段不表示其当前身份校验已通过。
+- receipt 的 data-root device id 为 `16777230`，实际目录为 `16777234`，已在沙盒外交叉确认；inode `18234715`、uid 501 与 `0700` 一致。安装核心要求完整 root identity 相等，当前差异不能静默忽略；本轮未启动 Installer 取得 driver snapshot，也未确定设备号变化原因。
+- 本轮不把该保留数据现场作为新候选可写目标，不改写 receipt、不删除旧库、不执行安装。下一步由项目所有者指定独立测试账户，再只读核验其资格；账户创建、登录切换与产品系统操作另行说明并授权。
+- 新证据根为 `/private/tmp/radishlex-build39-host-inventory-lgqvz4r8/`。`inventory.json` 保留初始沙盒观察；其中 TIS XPC 错误和 `process=unavailable` 不作为通过依据，沙盒外确认结果另存 `confirmed-observations.json`。冻结历史材料未补写。
+
 ## 待执行实机矩阵
 
 所有条目当前均为 **待执行**。仅对独立合成验收库记录必要计数/摘要；截图不得含真实输入历史。
