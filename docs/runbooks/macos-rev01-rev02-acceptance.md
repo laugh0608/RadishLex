@@ -90,13 +90,13 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 
 ## 待执行实机矩阵
 
-首次安装与双端固定路径启动、普通 `shi → 时` 学习及隐私模式完整 composition 零学习已验证；恢复普通后的精确身份恢复学习，但全库额外增量仍待归属。其余覆盖仍待执行。仅对本轮新建验收库记录必要计数/摘要；截图不得含真实输入历史。
+首次安装与双端固定路径启动、普通 `shi → 时` 学习、全程隐私零学习及关闭隐私后目标词恢复学习已验证。恢复区间经项目所有者确认含其他输入，不作为单次全库精确增量用例；其余覆盖仍待执行。仅对本轮新建验收库记录必要计数/摘要；截图不得含真实输入历史。
 
 | 场景 | 需要的实机证据 |
 | --- | --- |
 | 首次安装和固定路径启动 | 09-09：首次安装 completed、双 bundle 身份/无 quarantine、固定路径 Manager 和 InputMethod 正常启动；Manager UI 与真实输入路径分别证明前置 gate 允许，未采集成功 gate 数值 |
 | 普通拼音、选候选、翻页与中英切换 | 09-09：TextEdit `shi → 时` 数字 2 选择、再次候选 1 空格提交及同库学习增量通过；翻页、产品内中英切换与重开仍待执行 |
-| 隐私模式与 composition 中双向切换 | 09-09：全程隐私 `shi → 时` 正确提交且零学习，普通恢复后目标频次递增；恢复区间额外全库增量待归属，未提交 composition 内双向切换仍待执行 |
+| 隐私模式与 composition 中双向切换 | 09-09：全程隐私 `shi → 时` 正确提交且零学习，普通恢复后目标频次递增；恢复区间含用户确认的其他输入，未提交 composition 内双向切换仍待执行 |
 | secure input / 敏感应用 / unknown 路由 | 记录系统实际是否把事件交给 IME；系统绕过与控制器收到受限上下文分别判定，不用 C 注入结果填充实机通过 |
 | 分段候选和自动 commit | 完整文本、分段归属与最严格隐私状态跨段保持，无隐私尾段补学习 |
 | Manager 与输入法共享状态 | 同一合成库的条目、删除、显式恢复及候选变化一致；删除后重启/迟到选择不复活 |
@@ -119,14 +119,27 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 - 项目所有者先在 Manager 打开隐私开关，首轮只读前置检查仍为 `privacy_mode=absent`，设置文件不存在；未进行测试输入。CUA 观察到编辑草案的开关为开，保存按钮在下方，滚动后由项目所有者点击“保存草案”并反馈保存成功。此后沙盒外平台 API 和 `manager-settings.json` 均为 true。草案状态不代替系统生效；没有将最初的“已开启”解释为已验证成功，原前置观察与后续消歧分别保留。
 - 完整 composition 隐私用例 `build39-textedit-private-shi-time-v1`：开启保存后，从新的 TextEdit `shi` composition 选择“时”一次，项目所有者反馈候选 1、提交“时”、未感到卡顿。前后平台隐私状态均为 true；term/selection/ranker 总数保持 `3/4/3`，全部六类聚合零增量，精确 `shi → 时` 的 term、频次 2、last-used/updated 时间戳及其余采集字段逐项不变，Rime `*.userdb*` 仍为零。此用例的正常提交与零学习通过。
 - 项目所有者按步骤关闭隐私开关并保存，再开始新的 `shi → 时`；反馈候选 1、提交正确、未感到卡顿。事后平台与 Manager 持久设置均为 false，精确 `editor` frequency 从 2 增至 3；固定合成身份 selection 总数为 3，证明该身份恢复学习。
-- 恢复区间的全库 term/selection/ranker 从 `3/4/3` 变为 `5/7/5`，即事件增 3 而非单次输入预期的 1；两个额外事件及新增词条/摘要尚未归属。已仅询问期间是否另有 RadishLex 输入，不索取或读取内容；在澄清或补充干净用例前，不将该区间写成单次全库精确恢复通过，也不能据此推断隐私阶段泄漏。
+- 恢复区间的全库 term/selection/ranker 从 `3/4/3` 变为 `5/7/5`，即事件增 3 而非单次输入预期的 1。项目所有者随后确认关闭隐私后另有 RadishLex 输入，因此该区间包含其他输入；没有索取、读取或逐条映射其内容。保留目标词频次 2→3 的恢复学习结论，全库增量不作为单次精确用例，不再将该差异列作原因不明的阻塞，也不据此推断隐私阶段泄漏。
 - 两次提交后只读 TIS 均为 `2/2/0`，InputMethod 固定路径继续运行，数据根、userdb 与 completed receipt 身份不变。仅查询聚合和固定合成身份，无 P1 行。隐私键从本轮最初 absent 经用户 GUI 保存变为 true，再变为显式 false；当前不是键 absent，也没有执行脚本式原值恢复。
 - 本组尚不覆盖未提交 composition 中途切换策略、secure/sensitive/unknown、分段/自动 commit、重启或删除恢复。不能通过切到 Manager 后输入新 composition 冒充同一 composition 的策略往返；平台 deactivate 会取消未提交 composition，后续用例需要保持被测输入上下文。
+
+## 未提交 composition 切换：下一组待授权
+
+切换应用可能触发 IMK deactivate 并取消 composition，因此本组需在同一 TextEdit 测试文稿保持焦点，通过后台隐私控制工具改变系统设置，并让下一次真实按键观察到新策略。仅点击 Manager 后重新输入不能替代此组。
+
+| 场景 | 操作顺序 | 预期 |
+| --- | --- | --- |
+| 隐私 → 普通 | 隐私开启时键入 `shi` 保持未提交，后台恢复普通后选“时” | 正常提交，原 composition 零学习 |
+| 普通 → 隐私 | 普通模式键入 `shi` 保持未提交，后台启用隐私后选“时” | 正常提交，原 composition 零学习 |
+| 普通 → 隐私 → 普通 | 普通键入 `s`，启用隐私后键入 `h` 使 IME 观察限制，恢复普通后键入 `i` 并选“时” | 同一 composition 保留最严格策略，正常提交且零学习 |
+| 新普通 composition | 各受限场景结束、隐私恢复为原 false 后，新输入 `shi` 并选“时” | 新选择可学习，事件及目标频次各增 1 |
+
+待授权范围：只在新的空白 TextEdit 测试文稿用 CUA 发送上述合成按键并观察候选/commit；使用既有 `./scripts/manage-macos-imk-privacy-mode.sh` 的 `--capture-baseline`、`--authorized-enable`、`--authorized-restore`，各场景创建自己的临时基线，工具按身份恢复本组初值并消费本组基线记录；持久证据单独保留。输入源仍由项目所有者手动选择。每段读取实际设置、数据身份和聚合；出现焦点/输入源变化、composition 被取消、身份或设置漂移、额外输入、commit 不符或越界学习即暂停，不自动重试、清库或停止进程。正常结束恢复本组开始时的 false；异常只在恢复前提仍可验证时执行已批准恢复，否则保留状态并报告。本段是待执行方案，不是已取得授权或实机通过。
 
 ## 证据位置
 
 - 09-09 普通输入：`/private/tmp/radishlex-build39-input-20260909-_drd2sd7/`，含 `before-shi-time.json`、`after-first-shi-time.json`、`after-second-shi-time.json`；人工反馈与只读聚合分别注明来源。
-- 同目录隐私记录：`before-private-shi-time.json`、`privacy-enable-precheck-not-qualified.json` 保留未生效的初次前置与消歧；有效基线为 `before-private-shi-time-saved.json`，后续为 `after-private-shi-time.json`、`after-restored-normal-shi-time.json` 和 `privacy-roundtrip-status-and-discrepancy.json`。额外全库增量的归属仍待补证，禁止改写原快照。
+- 同目录隐私记录：`before-private-shi-time.json`、`privacy-enable-precheck-not-qualified.json` 保留未生效的初次前置与消歧；有效基线为 `before-private-shi-time-saved.json`，后续为 `after-private-shi-time.json`、`after-restored-normal-shi-time.json` 和 `privacy-roundtrip-status-and-discrepancy.json`。`normal-return-additional-input-confirmed.json` 追加用户确认，保留原先待核对快照，不改写原证据。
 
 - 09-09 安装前：`/private/tmp/radishlex-build39-preinstall-20260909-oyfvjeis/`，含 `inventory.json` 与沙盒外 `confirmed-observations.json`；初始沙盒失败日志保留。
 - 09-09 首次安装：`/private/tmp/radishlex-build39-first-install-20260909-y8ikrpku/`，含 `prepared-receipt.json`、`installed-receipt.json`、`postinstall.json` 与 `manager-startup.json`；UI 观察与真实进程查询分别注明来源。
