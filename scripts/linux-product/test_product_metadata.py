@@ -14,8 +14,8 @@ class LinuxProductMetadataTest(unittest.TestCase):
         metadata, layout = product_metadata.validate_source_contract()
 
         self.assertEqual(metadata.product_version, "26.7.1")
-        self.assertEqual(metadata.build_number, "39")
-        self.assertEqual(metadata.package_version, "26.7.1+39-2")
+        self.assertEqual(metadata.build_number, "40")
+        self.assertEqual(metadata.package_version, "26.7.1+40-2")
         self.assertEqual(layout["layout_id"], "debian-system-v1")
         self.assertEqual(layout["installation_scope"], "system")
 
@@ -26,7 +26,7 @@ class LinuxProductMetadataTest(unittest.TestCase):
         second = product_metadata.render_control(metadata)
 
         self.assertEqual(first, second)
-        self.assertIn("Version: 26.7.1+39-2\n", first)
+        self.assertIn("Version: 26.7.1+40-2\n", first)
         self.assertIn("Architecture: arm64\n", first)
         self.assertIn("fonts-dejavu-core, fonts-noto-cjk\n", first)
         self.assertNotIn("Recommends:", first)
