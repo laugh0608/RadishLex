@@ -18,6 +18,8 @@
 
 核心向组合层提供只读的 current receipt/guard、`ProgramSwitchStore` binding 校验，以及 `InstallProgramValidationPort`。这些接口只证明程序事务输入仍属于当前 operation；数据 receipt 的 operation/root/release 绑定和成功/失败映射仍由组合层负责。
 
+`InstallReceiptStore::open_existing` 只打开并复验既有状态目录，缺失时失败，不创建对象。`load_for_recovery_inspection` 拒绝中断 receipt、活动或无法判定的 guard；对已确认 connection refused 且前后身份一致的 stale socket 只读保留，后续授权 `acquire_guard` 才按既有机制获取 guard。该 inspection 会探测 socket，不能替代产品 startup gate 的严格只读、存在 guard 即阻断规则。
+
 ## 稳定状态
 
 状态目录固定为：

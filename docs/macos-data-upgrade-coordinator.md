@@ -185,6 +185,8 @@ receipt 不保存：
 - token、密钥、签名、恢复码、wrapped material；
 - 数据内容 hash、可跨设备关联的用户数据指纹或调试 SQL。
 
+上述“不保存内容 hash”约束针对 v1 数据 receipt；显式切换前中止的本地保留证据独立存放固定槽位摘要，范围见[保留证据合同](#显式切换前中止的保留证据)，不把这些摘要输出到普通日志或同步数据。
+
 operation ID 只接受协调层生成的固定长度小写十六进制随机标识。产品版本、build、layout、状态与 failure code 使用封闭类型；未知字段、未知枚举、格式漂移和不一致状态一律拒绝。
 
 普通文件必须保持 `link count = 1`。APFS 目录的 link count 会随目录项变化，只作为观察字段记录，不参与稳定身份等值；目录稳定身份由对象类型、device、inode、owner、mode 与 canonical path 共同证明。
@@ -195,11 +197,11 @@ operation ID 只接受协调层生成的固定长度小写十六进制随机标�
 
 进程静止是产品升级前置条件，但不能单独证明 SQLite 主文件包含 WAL 中的最新提交。协调器必须通过 SQLite backup API 或等价的 SQLite 一致快照能力生成候选基础，不能用普通文件复制拼装数据库 family。
 
-当前 `ime-userdb` 使用仓库既有 `rusqlite 0.32.1` 的 backup feature 提供两个分离入口：`estimate_snapshot` 在只读事务中读取 schema、`page_size`、`page_count` 并执行 `quick_check(1)`；`create_consistent_snapshot` 只接受调用方已创建的独立空普通文件，以同一只读事务通过 SQLite backup API 复制全部页。backup 完成后目标必须转为单文件 `DELETE` journal、再次通过 `quick_check(1)`，并与源事务的 schema/page 元数据一致；目标不得留下 WAL/SHM，也不执行 migration。schema 0 的零字节数据库按一个将被 materialize 的 SQLite header page 计入预算。
+当前 `ime-userdb` 使用[组件依赖声明](../crates/ime-userdb/Cargo.toml)与 Cargo.lock 锁定的 `rusqlite` backup feature 提供两个分离入口：`estimate_snapshot` 在只读事务中读取 schema、`page_size`、`page_count` 并执行 `quick_check(1)`；`create_consistent_snapshot` 只接受调用方已创建的独立空普通文件，以同一只读事务通过 SQLite backup API 复制全部页。backup 完成后目标必须转为单文件 `DELETE` journal、再次通过 `quick_check(1)`，并与源事务的 schema/page 元数据一致；目标不得留下 WAL/SHM，也不执行 migration。schema 0 的零字节数据库按一个将被 materialize 的 SQLite header page 计入预算。
 
 协调层只允许固定 `userdb.sqlite3` 作为源、固定 `source-snapshot.sqlite3.tmp` / `source-snapshot.sqlite3` 作为目标；源主文件与 snapshot 在操作前后都校验 type、device、inode、owner、`0600`、`link count = 1` 和 byte length。当前保守空间预算为 `3 * logical_snapshot_bytes + 64 MiB`，覆盖 snapshot、后续 migration candidate、切换/rollback 工作余量和最低文件系统余量；真实 available bytes 必须由固定 data root 的平台文件系统端口提供，不能接受 UI 或任意路径调用方自报。预算不足或算术溢出在创建临时文件前失败。
 
-snapshot 写入顺序固定为：`create_new` 私有临时文件、SQLite backup/validation、文件 `fsync`、原子 rename、状态目录 `fsync`、先把 snapshot identity 追加到仍为 `quiesced` 的 receipt，再单独持久化 `snapshot_ready`。故障注入覆盖临时文件创建后、backup 后、rename 后和 receipt evidence 后：临时文件残留或已 rename 但尚未记录 identity 时启动加载失败关闭；identity 已持久化而状态仍为 `quiesced` 时允许读取证据，但当前不会自动猜测并推进状态，恢复动作留给后续 crash-recovery 切面。
+snapshot 写入顺序固定为：`create_new` 私有临时文件、SQLite backup/validation、文件 `fsync`、原子 rename、状态目录 `fsync`、先把 snapshot identity 追加到仍为 `quiesced` 的 receipt，再单独持久化 `snapshot_ready`。故障注入覆盖临时文件创建后、backup 后、rename 后和 receipt evidence 后：临时文件残留或已 rename 但尚未记录 identity 时启动加载失败关闭；identity 已持久化而状态仍为 `quiesced` 时，`resume_recorded_snapshot` 重新验证源/快照身份、schema/page 元数据与空间预算，再只补写 `snapshot_ready`；不重新复制快照。
 
 快照完成后必须：
 
@@ -217,7 +219,7 @@ snapshot 写入顺序固定为：`create_new` 私有临时文件、SQLite backup
 
 candidate 成功顺序固定为：复制 snapshot 到临时 candidate、隔离 migration/validation、文件 `fsync`、复验临时文件与 snapshot 身份、原子 rename、状态目录 `fsync`、先把 candidate identity 追加到仍为 `snapshot_ready` 的 receipt，再单独持久化 `candidate_migrated`。当前 schema 返回 `migrated = false`，schema 0 与受支持旧 schema 返回真实源/目标版本；未来 schema、损坏 snapshot、目标版本不符或身份漂移均不得生成可切换 candidate。
 
-故障注入覆盖临时文件创建后、snapshot copy 后、migration 后、rename 后和 receipt evidence 后。临时 candidate 或无 receipt identity 的最终 candidate 会使加载失败关闭；identity 已持久化而状态仍为 `snapshot_ready` 时只允许读取既有证据，不自动猜测并推进状态。原 `userdb.sqlite3` 和 `source-snapshot.sqlite3` 在整个 migration 过程中保持不变。
+故障注入覆盖临时文件创建后、snapshot copy 后、migration 后、rename 后和 receipt evidence 后。临时 candidate 或无 receipt identity 的最终 candidate 会使加载失败关闭；identity 已持久化而状态仍为 `snapshot_ready` 时，`resume_recorded_candidate` 复验 snapshot/candidate 状态与 schema/integrity，再只补写 `candidate_migrated`，不重复 migration。原 `userdb.sqlite3` 和 `source-snapshot.sqlite3` 在整个 migration 过程中保持不变。
 
 ### 切换
 

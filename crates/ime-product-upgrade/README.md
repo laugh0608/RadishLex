@@ -46,6 +46,8 @@ macOS product host
 
 `UpgradeReceiptStore::open` 属于升级协调写路径：状态目录不存在时可以创建并持久化它。产品普通启动不能调用该入口，必须调用完全只读的 `inspect_startup_gate`。
 
+恢复 UI 可以使用 `UpgradeReceiptStore::open_existing` 和 `load_for_recovery_inspection`：只打开已有状态，检查 canonical receipt、snapshot/candidate/settings/switch relationship，不创建目录或打开 SQLite。inspection 对 guard socket 做连接探测，活动或未知状态阻断；connection refused 且身份稳定的 stale socket 保留给后续授权执行，不删除。产品普通启动仍只用 `inspect_startup_gate`，不会采用恢复 inspection 放宽 guard 规则。
+
 ## Receipt 与状态转换
 
 receipt format 固定为 `radishlex-product-upgrade-receipt-v1`，最大 64 KiB，使用 canonical UTF-8 JSON 和单个末尾换行。operation ID 是 32 位小写十六进制；release、layout、schema 和既有 artifact identity 在同一 operation 内不可改写，artifact 只能追加。
@@ -101,9 +103,11 @@ receipt 不保存 host 输出、任意布尔数组、绝对路径、数据库正
 
 ### 原子切换与重启恢复
 
-`switch_userdb_candidate` 只接受固定原库、candidate 与 backup 路径。它先把旧库 identity 以 `BackupDatabase` 追加到 receipt 并持久化 `switch_prepared`，随后执行旧库到 `source-backup.sqlite3`、candidate 到 `userdb.sqlite3` 的同文件系统 rename。每次跨目录 rename 后按目标目录、源目录顺序执行目录 `fsync`，最终复验两个 inode 与 sidecar 零残留后才持久化 `switched`。
+`switch_userdb_candidate` 只接受固定原库、candidate 与 backup 路径。它先要求三个数据库路径都没有 WAL/SHM/journal，再把旧库 identity 以 `BackupDatabase` 追加到 receipt 并持久化 `switch_prepared`，随后执行旧库到 `source-backup.sqlite3`、candidate 到 `userdb.sqlite3` 的同文件系统 rename。每次跨目录 rename 后按目标目录、源目录顺序执行目录 `fsync`，最终复验两个 inode 与 sidecar 零残留后才持久化 `switched`。
 
 调用可从 `candidate_verified`、`switch_prepared` 或 `switched` 恢复。恢复只接受 receipt 所证明的原路径、单次 rename 后现场、两次 rename 后现场或完整 switched 现场；其他缺失、重复、替换、跨设备、sidecar 或未知对象组合失败关闭且不清理。`switched` 幂等重放不会再次移动文件，backup 默认保留。
+
+合法 WAL 中的提交可以通过 SQLite backup 进入 snapshot/candidate，但该事实不满足源库 standalone 切换条件；正常关闭也可能因后续只读连接重建 sidecar 而被拒。macOS 组合层的显式切换前中止只恢复源程序并保留数据；它不在本核心增加 checkpoint、源库 journal-mode 转换或新升级协议。具体保留证据见[数据升级边界](../../docs/macos-data-upgrade-coordinator.md#显式切换前中止的保留证据)。
 
 ### 最终验证与回滚
 
