@@ -185,7 +185,7 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 - 最终 InputMethod executable 仍为 `f32fbc9c…2d07`，包含客户端身份修复诊断，没有 `frontmostApplication` 或 contract 注入入口。双 FFI 与已通过 Manager/输入法 smoke 的 build 40 装配字节相同。再次直接链接最终 Product 运行七个隐私场景，普通学习 1 条、其余 0，SQLite 完整性及无 Rime 自有 userdb 均通过；这仍不证明真实 IMK 路由。
 - 本次只新增封装产物与文档；源码版本已在双组件准备批通过完整仓库门禁，本封装批执行最终载荷/签名核验、最终包内七场景及文档/文本/差异检查，不把前批全仓结果写成本批重跑。
 
-### 下一组待授权：真实正常升级与定向复验
+### 本组已授权范围：真实正常升级与定向复验
 
 1. 用户先手动切回中立输入源；重新只读确认 TIS、已安装 source 身份、receipt/guard、数据根身份与进程。Manager/旧 Installer 如重新运行则正常退出；只对精确验证的已安装 InputMethod 使用 `./scripts/stop-macos-imk-process.sh --authorized-stop-process`，再次确认静止。不得自动选择或移除输入源。
 2. 启动上述固定 build 40 Installer，通过原生 UI 执行正常 39→40 upgrade，逐步读回 `prepared` 与其后的合法状态，并完成安装器要求的静止确认和继续动作。默认保留用户数据，事务可能生成 staging、backup 和切换后的数据目录；全部材料保留。本组不做故障注入、独立 rollback、repair、retry 或清理。
@@ -193,10 +193,24 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 4. 在新的空白 TextEdit 文稿自动输入固定合成 `shi → 时`：先一组普通对照验证实际 `editor` 学习、既有 `code` 摘要不增；再执行本入口前述隐私→普通、普通→隐私、普通→隐私→普通三组，每组后跟全新普通对照。只发送必要字母和已观察到的候选选择键；待提交 composition 期间不切换前台。
 5. 隐私控制继续使用既有 `--capture-baseline`、`--authorized-enable`、`--authorized-restore`，在后台切换；开始前核实当前为普通且无遗留基线，结束时恢复原值。持久化核验限只读聚合、固定合成身份与目录身份，不读取 P1 正文。任何前置不符、身份/焦点漂移、未知事务、commit 异常或学习增量异常均暂停并保留；只有满足既有恢复前置时才恢复隐私键，不自动补跑。
 
-上述是真实系统和合成输入的新动作范围，等待单独授权；已批准的升级源及 Installer 封装不等于已授权或完成实际升级。其余 secure/sensitive、分段、重启、删除恢复与完整矩阵仍开放。
+项目所有者随后明确确认上述范围；执行在异常停止条件触发后暂停，结果如下。剩余启动和输入动作不越过此次冻结现场的恢复前置。其余 secure/sensitive、分段、重启、删除恢复与完整矩阵仍开放。
+
+## build 39→40 实机升级暂停：2026-09-09
+
+- 从 clean `874c772` / `dev` ahead 10 开始；只读确认 RadishLex `selected=0`、Manager/旧 Installer 已退出、privacy false、无临时隐私基线。原双程序、completed receipt `514bd2af…3962` 与 data-root 身份一致；聚合为 5 词条 / 8 选择事件 / 6 ranker 记录，固定合成 `shi → 时` 为 `editor` frequency 3、`code` frequency 1。
+- 按授权通过既有精确进程脚本停止 InputMethod，复核 `process=stopped` 后启动固定 build 40 Installer。UI 正确提供 `begin_upgrade`；确认后外层新 operation `aad9cf8ac2dae71b2b659e96a91ea706` 为 `upgrade/prepared`，source 39、target 40，关联原 first-install operation。重新检查输入源未选中及 InputMethod 停止，再确认静止。
+- 静止确认后外层为 `data_coordinating/resume_operation/error=none`；执行一次继续后读到数据 `candidate_verified`。随后一次继续仍保持相同的外层和数据 receipt，UI 仍为 `error=none`，因此停止后续点击。不能把此前看到的普通进度投影当作协调调用成功，也不能把这几次操作表述为正常分段全部通过。
+- 当前固定路径双程序完整文件记录、strict code identity、receipt filesystem identity 均为 build 40；Manager 53 个节点、InputMethod 48 个节点无 quarantine。两个 `.radishlex-install-aad9cf8ac2dae71b2b659e96a91ea706/source-backup.app` 分别位于用户 Applications 与 Library/Input Methods，其 inode 仍为 32912800 / 32912854，完整树及签名与原 build 39 一致。
+- data root inode 32912651、原 `userdb.sqlite3` inode 32913103 未变。原 WAL 为 177192 bytes、SHM 为 32768 bytes；数据 receipt 的 snapshot inode 33021377、candidate inode 33021470 均存在，`source-backup.sqlite3` 尚不存在，原库尚未切换。settings/Rime 根保持原身份，settings backup 已存在。外层和数据 receipt 均未记录 failure code，但都没有 completed。
+- 只读源码检查确认：[switch.rs](../../crates/ime-product-upgrade/src/switch.rs) 在 `prepare_switch` 中要求 active/candidate/backup 均无 sidecar，存在任一 WAL/SHM/journal 即返回 `InterruptedSwitch`，且尚未记录 backup 或进入 `switch_prepared`；现场满足该拒绝条件。[InstallerBridge](../../platforms/macos-product/InstallerBridge/src/lib.rs) 的 `production_perform` 在 dispatch 失败后，只要刷新得到非零 receipt state 就返回旧投影，可把错误显示为无错误的进行中。这里确定了一个足以阻断的现场条件和错误投影缺陷；未拿到生产调用的原始错误枚举，不能宣称其为唯一失败点或推断 WAL 全生命周期根因已证实。
+- 运行既有 `sidecars_and_unproven_backup_fail_before_any_path_change` 合同，1 项通过：有 sidecar 时保持 `candidate_verified`、原路径和候选，backup 不产生。该用例只写合成 sidecar，不代表真实合法 WAL 在停止、快照、切换、恢复全路径已回归。暂停后不再打开真实 SQLite connection 或执行产品 helper，只记录已知文件 metadata、receipt 及程序身份。
+- 最后状态：RadishLex 未选中，InputMethod 停止，privacy false；Manager 未启动，Installer 保持非终态页面。TextEdit 普通对照与三组隐私切换一项也未执行。没有追加 retry、repair、rollback、手动 checkpoint、sidecar 删除、清理或复写候选。
+
+**冻结与下一范围**：保存上述 operation 的全部 receipt、原库/WAL/SHM、snapshot/candidate、settings backup、程序备份与原始 build 39/40，禁止用手动删除 sidecar 或改 receipt 绕过门禁。先明确仓库内的 WAL 残留一致性与恢复方案、执行错误可见性修复，以及合法 WAL、busy/身份漂移、切换前后中断的隔离回归；不得在冻结库上试验。方案涉及安装事务和源数据处理边界，须由项目所有者确认，真实恢复另外绑定当前 operation、source/target 和实际静止状态。
 
 ## 证据位置
 
+- 09-09 build 39→40 升级：`/private/tmp/radishlex-build40-upgrade-20260909-a7j14g5b/`，保存 preflight、原/准备/协调/暂停 receipt、`paused-filesystem.json`、`paused-installed-programs.json`、`paused-program-backups.json` 与 `observations-and-pause.json`。UI 操作顺序、直接观察与代码推断分别标明；本目录及真实现场保留，不用于补跑或覆盖。
 - 09-09 build 40 Installer：构建日志 `/private/tmp/radishlex-build40-installer-20260909.log`；最终身份与不变性记录 `/private/tmp/radishlex-build40-installer-20260909-wduesl7i/verification.json`、`preserved-after.json`。最终七场景日志 `/private/tmp/radishlex-build40-bundled-privacy-final-20260909.log`，系统临时新根 `radishlex-bundled-privacy-l99upr6_`。
 - 09-09 build 40：`/private/tmp/radishlex-build40-prepare-20260909-ivm777oq/` 保存 `preserved-before.json`、`preserved-after.json`、`assembly-identity.json`、`build39-readonly-qualification.json` 及独立 Manager smoke 目录。构建日志为 `/private/tmp/radishlex-build40-assembly-escalated-20260909.log`，包内 FFI 日志为 `/private/tmp/radishlex-build40-bundled-privacy-20260909.log`、`/private/tmp/radishlex-build40-manager-smoke-escalated-20260909.log`；去掉 `escalated` 的相应日志保留沙盒失败。七场景新根为系统临时目录下 `radishlex-bundled-privacy-67ec_vtc`。
 - build 40 完整仓库日志：`/private/tmp/radishlex-build40-check-repo-escalated-20260909.log` 为通过结果，`/private/tmp/radishlex-build40-check-repo-20260909.log` 保留初始沙盒 guard 失败。

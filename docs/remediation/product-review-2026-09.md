@@ -146,6 +146,10 @@ Manager 隐私草案首次尚未保存时前置检查未通过；项目所有者
 
 版本提交 `1636acf` 后已装配 build 40 双组件，二进制确认包含客户端身份修复且不含 contract 注入入口；包内 InputMethod 七场景与 Manager FFI smoke 通过，ABI/schema、双 FFI 与 Rime 来源不变。项目所有者随后明确批准以原 build 39 为本次 39→40 唯一受控本地升级源，Installer 已封装完成；最终双 payload、sealed requirements、source/target strict identity 和最终包内七场景通过，原载体与锁文件保持不变。已安装组件仍为 build 39；真实静止、升级与新版本定向输入复验尚待授权。本地候选例外不追认为历史正式发布，构建或合成测试不关闭 REV-01/REV-02。完整身份、动作及停止条件见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#build-40-installer-封装完成2026-09-09)。
 
+### 2026-09-09：真实升级停在数据候选验证之后
+
+项目所有者批准正常 39→40 升级及定向输入后，operation `aad9cf8a…a706` 已替换双程序，但外层停在 `data_coordinating`、数据停在 `candidate_verified`；一次继续后 receipt 未再推进，UI 仍显示 `error=none`。已暂停并冻结现场：固定原库 inode 和 WAL/SHM 保留，数据未切换，原 build 39 双程序备份身份已核实。源码表明 sidecar 会阻断切换，同时 bridge 的失败分支可丢弃执行错误并返回旧进度；具体生产错误枚举未被暴露，尚未证明唯一失败点。既有合成 sidecar 拒绝合同通过，但不能替代合法 WAL 残留全路径回归。新版本启动、TextEdit 分类及三组隐私切换均未开始，REV-01/REV-02 仍不关闭。仓库修复/隔离回归与真实现场恢复须按[冻结入口](../runbooks/macos-rev01-rev02-acceptance.md#build-3940-实机升级暂停2026-09-09)另行明确边界。
+
 ## REV-03：输入线程的数据库等待
 
 [候选选择](../../crates/ime-runtime/src/session.rs)在返回结果前同步执行 `record_selection`；[学习事务](../../crates/ime-userdb/src/store/learning.rs)取得 `Immediate` 写事务，[连接策略](../../crates/ime-userdb/src/store/connection.rs)配置 `busy_timeout = 5000 ms`。平台收到结果后才向宿主提交文本，存在写锁竞争拖住输入回调的风险。
