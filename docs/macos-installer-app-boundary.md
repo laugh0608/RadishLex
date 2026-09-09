@@ -77,7 +77,7 @@ phase=<code> action=<code> error=<code> state=<code>
 
 ## 用户授权
 
-refresh 是唯一不要求确认的 action。first install、upgrade、repair、resume、retry 和 remove 都必须对当前重新读取的 snapshot 调用 `authorize_installer_action`；旧窗口中的 action 若已不再提供，必须以 `ActionNotOffered` 拒绝。
+refresh 是唯一不要求确认的 action。first install、upgrade、repair、resume、retry、remove 和切换前中止恢复都必须对当前重新读取的 snapshot 调用 `authorize_installer_action`；旧窗口中的 action 若已不再提供，必须以 `ActionNotOffered` 拒绝。
 
 用户确认只形成 `AuthorizedInstallerIntent`：
 
@@ -113,6 +113,16 @@ first install 的零写入 snapshot 允许固定 data root 尚不存在；只有
 begin/retry/remove intent 先在外层 guard 内回读 current receipt、验证 operation/source/target chain，并要求 target-only manifest-bound preflight 的 version/build 与 InstallPayload target 精确匹配，再持久化新的 `prepared` 并返回 UI。只有重新投影出的 `ConfirmQuiescence` intent 能推进 `quiesced`；执行前再次 preflight，随后按 receipt evidence 幂等完成双 bundle 切换。
 
 first install、repair、remove 进入统一程序终态。upgrade 在外层 `prepared` 后从外层 source/target、固定 data root、只读 `userdb.sqlite3` schema/identity 与可选 settings/Rime identity bootstrap M4-P02 `preflighted` receipt；若 data receipt 已存在，则只接受同 operation、root、source/target release 与当前 target schema 的持久化链。中断在 `final_verified` 时可重新打开已到 `completed` 的 data receipt，只重新验证终态与双程序，不重复 migration。active guard、stale intent、缺失/漂移 context、platform preflight 失败或任何 receipt/identity 漂移均失败关闭，错误日志只能使用稳定 code。
+
+## 显式切换前中止恢复
+
+`AbortPreSwitchUpgrade` / `abort_pre_switch_upgrade` 只提供给外层 upgrade `data_coordinating`、内层无失败的 `candidate_verified`，以及持有同一份恢复证据的中止/程序恢复重放。它要求显式确认、数据保留、中立输入源与 Manager 关闭四项授权。Rust intent 绑定 operation、data root 的 device/inode/owner/mode、source/target manifest digest 与 build；执行时在 guard 内重验，UI 不能提供路径或身份。ABI v1 的 POD、symbol 和 contract version 不变，整数 action 9 为可加扩展；新 bridge/native 双向映射覆盖此值，旧 reader 对未知值失败关闭。
+
+只读恢复投影使用 `open_existing` 和 `load_for_recovery_inspection`，不 bootstrap、不创建目录、不打开 SQLite。活动或无法判断的 guard 阻断；已确认无监听且身份稳定的 stale guard 只读保留，后续授权执行才按既有机制取得 guard。执行按外层 install、内层 upgrade 顺序加锁，再核对 receipt relationship、真实 preflight、sealed source/target 程序、数据保留证据及恢复各检查点。
+
+首次中止前在固定 data root 下独占创建 `.radishlex-pre-switch-recovery-v1/<operation>/evidence.json`，记录原始双 receipt、受控数据文件身份/摘要与可选 Rime 根身份。文件只读保存原 DB/WAL/SHM 与备份摘要，不打开数据库；详细合同见[数据升级边界](macos-data-upgrade-coordinator.md#显式切换前中止的保留证据)。首次创建后不可重建或改写；证据不完整、缺失或漂移失败关闭。已中止的专用恢复状态不能绕过证据走普通 resume。该证据目录独立于旧状态目录，保留旧 source 的 v1 receipt/startup reader 兼容。
+
+协调器合法持久化内层 `aborted_preserved`，经过共享程序恢复路径到外层 `rolled_back`；每个程序恢复前和两次外层终态前重验真实静止、完整程序身份、双 receipt 与同一份数据证据。失败保留现场，重开须 fresh 授权，不重新记录数据基线。不接受已进入 `switch_prepared` 的数据事务，不提供 checkpoint、清理 sidecar 或自动重试升级。
 
 ## 验证
 

@@ -77,6 +77,16 @@ receipt 的 `candidate_verified` 状态本身是双端成功的持久化证明�
 
 M4-P03 已选择未公证社区 ad-hoc DMG 中的独立用户域 Installer app。Installer 只能调用稳定协调入口并展示结果；它负责程序 bundle 的安装与恢复，不创建数据库 migration SQL，不解析数据 receipt 内部字段，不删除真实用户数据。载体、固定目标与外层程序事务见 [ADR 0008](adr/0008-macos-installation-carrier.md)。
 
+## 显式切换前中止的保留证据
+
+macOS 安装组合层提供 `abort_pre_switch_install_upgrade`，只接受数据无失败的 `candidate_verified` 和外层 `data_coordinating`，或同一 operation 已由本入口产生的 `aborted_preserved / switch_failed / failure_after=candidate_verified` 恢复阶段。核心 receipt 格式与既有合法转换保持不变，普通数据升级流程仍严格拒绝非 standalone 源库。
+
+生产 Executor 在首次中止前持有外层/内层 guard，重新验证 root、两份 receipt、受控程序 source/target 与静止条件。平台 adapter 独占创建 `.radishlex-pre-switch-recovery-v1/<operation>/evidence.json`，格式 v1、最大 256 KiB、目录 0700、普通单链接文件 0600。证据保存初始外层 receipt、原始数据 receipt 字节和固定文件槽的 device/inode/owner/mode/length/SHA-256：active DB 及 WAL/SHM/journal、settings、snapshot/candidate 及 sidecar、settings backup、source backup 及 sidecar；缺失本身也是证据。可选 Rime 只记录根身份，不读取部署正文。初始 snapshot/candidate 必须存在，原库 journal、source backup 和非 active DB sidecar 必须不存在。
+
+所有文件通过只读流式 hash 和打开前/后 metadata 比较取证，不使用 SQLite connection、checkpoint 或迁移。证据写入使用 `create_new`、fsync 和回读；部分写、未知目录项、link、owner/mode、inode 或摘要漂移停止，不删除、重建或采用新基线。目录位于旧 receipt 状态目录之外，避免破坏 source 程序的旧状态目录白名单。Rime 内部字节不在此保留摘要合同内。
+
+中止通过既有 `abort_preserved(SwitchFailed, false)` 原子推进；两个 source 程序恢复前、`programs_restored` 前及 `rolled_back` 前均重验同一证据、当前双 receipt、全部程序树/签名与静止条件。恢复不切换数据库，不调用 validation host 打开原库，不清理 snapshot/candidate/backup/sidecar。重放只接受初始双 receipt 的合法派生状态；证据缺失的专用中止状态禁止退回普通 Installer resume。原 DB/WAL 字节/inode 保留与学习/tombstone 语义由隔离测试验证，真实系统行为仍需独立授权和证据。
+
 ## 受控数据范围
 
 | 对象 | M4-P02 行为 | 边界 |

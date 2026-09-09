@@ -215,6 +215,18 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 - Installer、macOS install coordinator 和完整仓库门禁通过；恢复生产入口尚未实现。详细前置、合法中止/恢复状态、重放合同、验证缺口及日志统一进入 [WAL 升级与恢复方案](../remediation/macos-wal-upgrade-recovery-2026-09.md)。
 - 下一范围为批准实现显式切换前中止/源程序恢复入口，完成隔离资格并准备独立恢复载体；载体与动作可审阅后，再请求当前 operation 的真实恢复授权。当前不继续点击旧 Installer、不打开真实 SQLite、不 checkpoint/删除 sidecar，不启动双组件或补跑输入。
 
+## 显式恢复入口实施：2026-09-09
+
+项目所有者已批准实现切换前中止入口和准备独立恢复 Installer。生产 action、双 guard/receipt/source/target/root 绑定、不可改写数据保留证据和逐端恢复检查点已实现；八项恢复父测试、Rust/Objective-C 原生 Installer 门禁、真实 39/40 payload 副本资格与完整仓库门禁通过。旧诊断批“入口尚未实现”的记录仅描述当时状态，当前实现与证据统一见 [WAL 升级与恢复方案](../remediation/macos-wal-upgrade-recovery-2026-09.md#恢复入口实施批验证与证据)。
+
+实际操作仍只针对冻结 operation `aad9cf8ac2dae71b2b659e96a91ea706`，待独立载体核验后另行授权：
+
+1. 正常退出旧 Installer；重新核对新载体 sealed identity、原 source/target 程序材料、固定根/双 receipt 与冻结 metadata，以及中立输入源、Manager/InputMethod 停止。任一漂移或不可证即停止。
+2. 启动新独立 Installer，确认“中止本次升级并恢复源程序”；在既有固定目标通过产品事务恢复 source 39 双程序。入口只读 hash 原 DB/WAL/SHM，追加保留证据并合法推进双 receipt，不打开 SQLite、checkpoint 或删除 sidecar。
+3. 核验外层 `rolled_back`、内层 `aborted_preserved`、原 DB/WAL 字节/inode 与保留证据一致、源程序完整树/签名及原 inode、source 双端 startup gate 允许且 target 拒绝。保留全部候选、snapshot、settings backup、恢复证据与 displaced target，不自动清理。
+
+本步骤不包含恢复后启动双组件、输入复验、重新升级 40 或永久 WAL 方案；源 39 的 IMK 上下文缺陷仍在。长时间完整程序验证不视为完成；错误或未知状态停止并保留现场，不反复点“继续”。当前没有执行以上系统动作。
+
 ## 证据位置
 
 - 09-09 build 39→40 升级：`/private/tmp/radishlex-build40-upgrade-20260909-a7j14g5b/`，保存 preflight、原/准备/协调/暂停 receipt、`paused-filesystem.json`、`paused-installed-programs.json`、`paused-program-backups.json` 与 `observations-and-pause.json`。UI 操作顺序、直接观察与代码推断分别标明；本目录及真实现场保留，不用于补跑或覆盖。
