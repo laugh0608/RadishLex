@@ -4,9 +4,9 @@
 
 ## 当前结论
 
-错误呈现与五项 WAL 特征场景完成后，项目所有者另行批准实现显式恢复入口并准备独立恢复 Installer。恢复入口现已实现，Executor 八项恢复父测试、原生 Installer 门禁及真实 source 39/target 40 副本资格通过；长期 WAL 处理仍未实现。冻结 operation `aad9cf8ac2dae71b2b659e96a91ea706` 仍未恢复，本批没有打开真实用户 SQLite connection、在真实用户目录运行 helper、点击 Installer 或改变原载体。
+错误呈现与五项 WAL 特征场景完成后，项目所有者另行批准实现显式恢复入口并准备独立恢复 Installer。恢复入口现已实现，Executor 八项恢复父测试、原生 Installer 门禁及真实 source 39/target 40 副本资格通过；长期 WAL 处理仍未实现。项目所有者随后单独确认真实恢复，operation `aad9cf8ac2dae71b2b659e96a91ea706` 已经独立 Installer 中止并恢复 source 39 双程序，外层 `rolled_back` / 数据 `aborted_preserved`；没有打开真实 SQLite connection 或更改原载体。
 
-现已为切换前事务增加显式中止入口，通过既有状态机保留原数据库并恢复 source 39 双程序；独立载体已准备并核验，真实恢复待另行授权。之后单独实现面向新 operation 的 WAL 源库准备合同。恢复到 39 仅返回已知基线，其 IMK 上下文缺陷仍在，不能据此关闭 REV-01/REV-02 或完成 build 40 输入验收。
+现已为切换前事务增加显式中止入口，通过既有状态机保留原数据库并恢复 source 39 双程序；独立载体已准备并核验，随后获单独授权完成了本次真实恢复。之后单独实现面向新 operation 的 WAL 源库准备合同。恢复到 39 仅返回已知基线，其 IMK 上下文缺陷仍在，不能据此关闭 REV-01/REV-02 或完成 build 40 输入验收。
 
 ## 已证实的两个缺口
 
@@ -98,7 +98,7 @@
 - 沙盒 Unix guard 限制的初始失败日志保留，必要验证提权不扩大到真实用户目录或 GUI。没有依赖或 lockfile 变化。
 - 完整 `CARGO_NET_OFFLINE=true ./scripts/check-repo.sh` 通过，最终 `Repository baseline passed`；日志 `/private/tmp/radishlex-pre-switch-recovery-check-repo-20260909.log`。qualification feature 的 Clippy 另行通过，日志 `/private/tmp/radishlex-recovery-qualified-clippy-20260909.log`。文档、文本、差异与恢复封装脚本路径保留负向检查通过。
 
-## 独立恢复 Installer：已准备，未启动
+## 独立恢复 Installer：准备批身份记录
 
 - 构建源码：clean `b7513ab72ce27c4c33b8afa05f0e16a749d0f095`，包含实现提交 `670b70a`；版本仍为 26.7.1 / 40，目标程序及唯一受控 source 39 内容不变，修复仅进入独立 Installer executable。
 - 路径：`target/macos-recovery/26.7.1-40-pre-switch-20260909-v1/RadishLex Installer.app`；没有覆盖原 `target/macos-release/26.7.1-39` 或 `26.7.1-40`。开发输出 `target/macos-product/installer-app` 已按既有构建流程更新。
@@ -106,4 +106,14 @@
 - ReleaseIdentity SHA-256：`abeed29fd3e4b7949211a16680caabc7f0eccb0b1ba9220ec88af1f245667387`；payload manifest SHA-256：`e7adf08d69429bb5d4db85c4e5026242dc63091fe50cb8e12bda354cdb1952c8`。ReleaseIdentity 对 Installer 使用既有 bundle requirement、不内嵌自身 cdhash，因此其字节与原载体相同不表示 executable 相同。
 - 构建内完成 strict/deep signature、ReleaseIdentity 回读、内嵌 payload 全内容/mode/link 与输入一致性，以及原输入完整 identity/hash 不变性验证。原生 executable 带未知参数直接 exit 2、stdout/stderr 为空，按 `main` 的参数拒绝分支未创建 NSApplication；二进制包含 `abort_pre_switch_upgrade`。
 - 输出目录中的 `RecoveryBuild.json`、`input-inventory.json`、`input-postflight.json`、`FinalVerification.json` 保存本次身份与范围；构建日志 `/private/tmp/radishlex-recovery-installer-build-20260909.log`。输出全部保留，不重建或覆盖。
-- 未启动新 GUI、未停止旧 Installer、未执行冻结 operation 恢复，未打开真实 SQLite 或启动双组件。下一实际范围见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#显式恢复入口实施2026-09-09)，确认后还须 fresh 身份/静止观察；不是直接沿用旧状态。
+- 准备批结束时未启动新 GUI、未停止旧 Installer、未执行冻结 operation 恢复，未打开真实 SQLite 或启动双组件。当时提出的实际范围见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#显式恢复入口实施2026-09-09)，确认后还须 fresh 身份/静止观察；不是直接沿用旧状态。
+
+## 真实恢复结果：2026-09-09
+
+项目所有者单独确认正常退出旧 Installer、fresh 现场核验、启动独立载体并中止恢复及后置检查。执行基线 clean `4e36c3e`；旧 Installer 正常退出后，冻结双 receipt、数据 metadata、source backup/installed target 的完整树、strict signature 和 inode 均匹配。沙盒 TIS/XPC 与进程观察不可用时停止采用该结果，获准沙盒外只读核验后确认 RadishLex 未选中、双组件停止，再启动已核验的新载体。
+
+UI 选择并确认一次 `abort_pre_switch_upgrade` 后显示 `rolled_back/error=none`。独立文件回读确认同一 operation 外层 `rolled_back`、内层 `aborted_preserved / switch_failed / failure_after=candidate_verified`、manual recovery false；source 39 Manager/InputMethod 恢复原 inode 32912800 / 32912854，target 40 原 inode 33021254 / 33021311 保留在各自 `staged.app`。原 DB/WAL/SHM、snapshot/candidate/settings backup 的 inode、metadata 与本次恢复前摘要一致；18 槽持久保留证据逐项独立核对通过。原库未打开 SQLite connection，未 checkpoint、删除 sidecar、执行数据验证 host 或查询学习正文。
+
+只读 startup API 以已独立验证的 source/target 程序身份对真实 receipt 作正反对照：source 两端为 `AllowedTerminalReceipt`，target 两端为 `ProgramIdentityChanged`，data 为 `AllowedTerminalReceipt`。独立观察器链接本次既有 Rust rlib，只调用读取 API；未启动 Manager/InputMethod，不把它称为双端实际启动或输入验收。最后 RadishLex 未选中、双组件停止、privacy false；恢复 Installer 留在终态窗口，未点击重新执行/移除。
+
+证据根 `/private/tmp/radishlex-real-pre-switch-recovery-20260909-uar7b722/`：`pre/post-files.json`、双 receipt、`pre/post-programs.json`、`post-preservation-evidence.json`、`startup-gate.log`、系统状态及 `recovery-completed.json`。本次 fresh hash 不追记成旧冻结时已采集的 hash。原历史证据、39/40 载体与恢复输出保持原样；当前恢复结果与程序 staging/data evidence 一并保留。本次只完成已批准的恢复，不代表正常 39→40 升级或永久 WAL 合同已经完成。

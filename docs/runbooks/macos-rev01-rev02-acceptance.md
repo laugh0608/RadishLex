@@ -219,17 +219,29 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 
 项目所有者已批准实现切换前中止入口和准备独立恢复 Installer。生产 action、双 guard/receipt/source/target/root 绑定、不可改写数据保留证据和逐端恢复检查点已实现；八项恢复父测试、Rust/Objective-C 原生 Installer 门禁、真实 39/40 payload 副本资格与完整仓库门禁通过。旧诊断批“入口尚未实现”的记录仅描述当时状态，当前实现与证据统一见 [WAL 升级与恢复方案](../remediation/macos-wal-upgrade-recovery-2026-09.md#恢复入口实施批验证与证据)。
 
-独立载体已从 clean `b7513ab` 构建：`target/macos-recovery/26.7.1-40-pre-switch-20260909-v1/RadishLex Installer.app`。Installer executable SHA-256 为 `78fe5c6649e81f5cb99acaa0976101dad67a93cf83da31da8df018888d6b43f7`；签名、sealed identity、内嵌 payload 与原件一致性及原输入身份不变性均通过，GUI 未启动。完整摘要和验证记录只在 [WAL 专题](../remediation/macos-wal-upgrade-recovery-2026-09.md#独立恢复-installer已准备未启动)维护。
+独立载体已从 clean `b7513ab` 构建：`target/macos-recovery/26.7.1-40-pre-switch-20260909-v1/RadishLex Installer.app`。Installer executable SHA-256 为 `78fe5c6649e81f5cb99acaa0976101dad67a93cf83da31da8df018888d6b43f7`；签名、sealed identity、内嵌 payload 与原件一致性及原输入身份不变性均通过，GUI 未启动。完整摘要和验证记录只在 [WAL 专题](../remediation/macos-wal-upgrade-recovery-2026-09.md#独立恢复-installer准备批身份记录)维护。
 
-实际操作仍只针对冻结 operation `aad9cf8ac2dae71b2b659e96a91ea706`，须另行授权：
+实际动作针对冻结 operation `aad9cf8ac2dae71b2b659e96a91ea706`；以下范围提出后已获项目所有者单独确认并执行，结果见下一节：
 
 1. 正常退出旧 Installer；重新核对新载体 sealed identity、原 source/target 程序材料、固定根/双 receipt 与冻结 metadata，以及中立输入源、Manager/InputMethod 停止。任一漂移或不可证即停止。
 2. 启动新独立 Installer，确认“中止本次升级并恢复源程序”；在既有固定目标通过产品事务恢复 source 39 双程序。入口只读 hash 原 DB/WAL/SHM，追加保留证据并合法推进双 receipt，不打开 SQLite、checkpoint 或删除 sidecar。
 3. 核验外层 `rolled_back`、内层 `aborted_preserved`、原 DB/WAL 字节/inode 与保留证据一致、源程序完整树/签名及原 inode、source 双端 startup gate 允许且 target 拒绝。保留全部候选、snapshot、settings backup、恢复证据与 displaced target，不自动清理。
 
-本步骤不包含恢复后启动双组件、输入复验、重新升级 40 或永久 WAL 方案；源 39 的 IMK 上下文缺陷仍在。长时间完整程序验证不视为完成；错误或未知状态停止并保留现场，不反复点“继续”。当前没有执行以上系统动作。
+本步骤不包含恢复后启动双组件、输入复验、重新升级 40 或永久 WAL 方案；源 39 的 IMK 上下文缺陷仍在。长时间完整程序验证不视为完成；错误或未知状态停止并保留现场，不反复点“继续”。以上系统动作的实际结果见下一节，不把授权扩展为后续重新升级或组件启动。
+
+## 切换前中止与 source 39 实机恢复完成：2026-09-09
+
+- clean `4e36c3e` / `dev` ahead 17 起，按本轮明确授权通过旧 Installer 正常退出菜单快捷键退出；只读核验无旧 Installer/Manager/InputMethod 进程。冻结双 receipt 与全部已记录数据 metadata 一致，源备份和目标程序完整树、strict identity 与 inode 匹配，新 Installer executable/ReleaseIdentity/payload及原输入不变性再次通过。
+- RadishLex TIS `selected=0`、InputMethod stopped、Manager 不在运行、privacy false。一次沙盒查询产生 XPC 错误及 process unavailable，不作为证据；按最小范围提权只读复核真实状态后继续。未选择输入源、停止双组件或修改设置。
+- 从确切独立路径启动新 Installer，UI 提供“中止升级并恢复源程序”；选择后确认一次，返回 `phase=recovery_available action=retry_operation error=none state=rolled_back`。没有点击普通继续、重新执行或移除。
+- 同一 `aad9cf8a…a706` 外层 `rolled_back`，failure `data_coordination_failed`；数据 `aborted_preserved`，failure `switch_failed`、after `candidate_verified`；两者 manual false。Manager/InputMethod 原 source 39 inode 32912800 / 32912854 恢复固定路径；旧 target 40 inode 33021254 / 33021311 保留在各自事务 `staged.app`。完整树和 strict signature 分别与原 source/target 一致。
+- 原 DB inode 32913103、WAL inode 32916811、SHM inode 32916812 及 snapshot/candidate/settings backup 的 inode、metadata、SHA-256 与本次恢复前一致；固定 18 槽证据独立复核通过，Rime 根保持原 metadata。source-backup.sqlite3 仍不存在。原库未开 SQLite connection，未 checkpoint/删除 sidecar，不查询学习正文；早先只有 metadata 的冻结记录不被补称已有 hash。
+- 独立临时观察器调用现有 Rust 只读 startup API，真实 receipt 下 source 两端允许、target 两端因 ProgramIdentityChanged 拒绝，data gate 允许。程序身份另由完整 tree/signature/inode 核验；不是启动真实组件。初版临时观察器编译误用不存在的 enum 方法，改为枚举比较后才构建执行，未影响生产代码或现场。
+- 后置 TIS `selected=0`、InputMethod stopped、privacy false；精确进程查询仅见新恢复 Installer（观察 PID 44506）。Manager/InputMethod 未启动，无输入复验、retry 40、cleanup 或发布。旧证据、原载体、恢复载体与新 evidence/staging 全部保留；本次恢复授权已经完成。
 
 ## 证据位置
+
+- 09-09 实机中止恢复：`/private/tmp/radishlex-real-pre-switch-recovery-20260909-uar7b722/`，保存前后文件摘要/metadata、双 receipt、程序身份、保留证据、startup gate 正反例、TIS/进程/隐私观察和 `recovery-completed.json`。当前终态与所有新旧资产保留，不复跑恢复或清理。
 
 - 09-09 build 39→40 升级：`/private/tmp/radishlex-build40-upgrade-20260909-a7j14g5b/`，保存 preflight、原/准备/协调/暂停 receipt、`paused-filesystem.json`、`paused-installed-programs.json`、`paused-program-backups.json` 与 `observations-and-pause.json`。UI 操作顺序、直接观察与代码推断分别标明；本目录及真实现场保留，不用于补跑或覆盖。
 - 09-09 build 40 Installer：构建日志 `/private/tmp/radishlex-build40-installer-20260909.log`；最终身份与不变性记录 `/private/tmp/radishlex-build40-installer-20260909-wduesl7i/verification.json`、`preserved-after.json`。最终七场景日志 `/private/tmp/radishlex-build40-bundled-privacy-final-20260909.log`，系统临时新根 `radishlex-bundled-privacy-l99upr6_`。
