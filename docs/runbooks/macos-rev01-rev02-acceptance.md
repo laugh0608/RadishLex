@@ -206,7 +206,14 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 - 运行既有 `sidecars_and_unproven_backup_fail_before_any_path_change` 合同，1 项通过：有 sidecar 时保持 `candidate_verified`、原路径和候选，backup 不产生。该用例只写合成 sidecar，不代表真实合法 WAL 在停止、快照、切换、恢复全路径已回归。暂停后不再打开真实 SQLite connection 或执行产品 helper，只记录已知文件 metadata、receipt 及程序身份。
 - 最后状态：RadishLex 未选中，InputMethod 停止，privacy false；Manager 未启动，Installer 保持非终态页面。TextEdit 普通对照与三组隐私切换一项也未执行。没有追加 retry、repair、rollback、手动 checkpoint、sidecar 删除、清理或复写候选。
 
-**冻结与下一范围**：保存上述 operation 的全部 receipt、原库/WAL/SHM、snapshot/candidate、settings backup、程序备份与原始 build 39/40，禁止用手动删除 sidecar 或改 receipt 绕过门禁。先明确仓库内的 WAL 残留一致性与恢复方案、执行错误可见性修复，以及合法 WAL、busy/身份漂移、切换前后中断的隔离回归；不得在冻结库上试验。方案涉及安装事务和源数据处理边界，须由项目所有者确认，真实恢复另外绑定当前 operation、source/target 和实际静止状态。
+**冻结与下一范围**：保存上述 operation 的全部 receipt、原库/WAL/SHM、snapshot/candidate、settings backup、程序备份与原始 build 39/40，禁止用手动删除 sidecar 或改 receipt 绕过门禁。项目所有者随后批准仓库错误呈现修复、WAL 升级/恢复方案与隔离验证，结果见下节；该授权不包含冻结库试验或实际恢复。
+
+## WAL 仓库诊断与恢复方案：2026-09-09
+
+- bridge 执行失败现已保留实际 receipt 进度，同时显式 `blocked + refresh`；没有更具体稳定错误时显示既有 `unknown_driver_result`。UI 不再把当前失败显示成无错误的普通进度。本修复没有替换正在运行的旧 Installer 或改真实 receipt。
+- 新增五项合法 SQLite WAL 场景：未 checkpoint 的提交可进入快照/候选但在切换前被拒；正常关闭的 WAL 模式源库也因后续只读快照重建零长 WAL/SHM 而被拒。切换前中止后保留原 DB/WAL、恢复 source 程序的隔离路径通过，恢复静止/程序验证失败和 inode 漂移均拒绝推进。平台与程序 port 为合成对象，不将结果写成真实 macOS 恢复通过。
+- Installer、macOS install coordinator 和完整仓库门禁通过；恢复生产入口尚未实现。详细前置、合法中止/恢复状态、重放合同、验证缺口及日志统一进入 [WAL 升级与恢复方案](../remediation/macos-wal-upgrade-recovery-2026-09.md)。
+- 下一范围为批准实现显式切换前中止/源程序恢复入口，完成隔离资格并准备独立恢复载体；载体与动作可审阅后，再请求当前 operation 的真实恢复授权。当前不继续点击旧 Installer、不打开真实 SQLite、不 checkpoint/删除 sidecar，不启动双组件或补跑输入。
 
 ## 证据位置
 

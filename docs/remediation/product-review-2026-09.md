@@ -150,6 +150,10 @@ Manager 隐私草案首次尚未保存时前置检查未通过；项目所有者
 
 项目所有者批准正常 39→40 升级及定向输入后，operation `aad9cf8a…a706` 已替换双程序，但外层停在 `data_coordinating`、数据停在 `candidate_verified`；一次继续后 receipt 未再推进，UI 仍显示 `error=none`。已暂停并冻结现场：固定原库 inode 和 WAL/SHM 保留，数据未切换，原 build 39 双程序备份身份已核实。源码表明 sidecar 会阻断切换，同时 bridge 的失败分支可丢弃执行错误并返回旧进度；具体生产错误枚举未被暴露，尚未证明唯一失败点。既有合成 sidecar 拒绝合同通过，但不能替代合法 WAL 残留全路径回归。新版本启动、TextEdit 分类及三组隐私切换均未开始，REV-01/REV-02 仍不关闭。仓库修复/隔离回归与真实现场恢复须按[冻结入口](../runbooks/macos-rev01-rev02-acceptance.md#build-3940-实机升级暂停2026-09-09)另行明确边界。
 
+### 2026-09-09：错误呈现修复与合法 WAL 隔离诊断
+
+随后获准的仓库修复已将执行失败投影为显式 blocked/refresh，并保留实际 receipt 进度；bridge、原生 UI 和完整仓库门禁通过。五项新隔离场景使用真实 SQLite WAL，确认未 checkpoint WAL 与正常关闭后只读快照重建的 sidecar 均阻断当前 standalone 切换；合成程序/平台 port 下，显式切换前中止可恢复 source 程序并保留原 DB/WAL、学习和 tombstone。生产恢复入口尚未实现，真实现场保持冻结；下一步及长期 WAL 源库准备边界详见新激活的 [WAL 升级与恢复方案](macos-wal-upgrade-recovery-2026-09.md)。这不改变 SQLite 依赖，也不关闭 REV-01/REV-02 或补齐新版本输入验收。
+
 ## REV-03：输入线程的数据库等待
 
 [候选选择](../../crates/ime-runtime/src/session.rs)在返回结果前同步执行 `record_selection`；[学习事务](../../crates/ime-userdb/src/store/learning.rs)取得 `Immediate` 写事务，[连接策略](../../crates/ime-userdb/src/store/connection.rs)配置 `busy_timeout = 5000 ms`。平台收到结果后才向宿主提交文本，存在写锁竞争拖住输入回调的风险。

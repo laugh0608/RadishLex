@@ -73,6 +73,8 @@ phase=<code> action=<code> error=<code> state=<code>
 
 不输出路径、operation ID、bundle identity、签名 requirement、PID、命令行或底层错误正文。未知 contract 版本、phase/action/error/state、进度或 prompt 统一投影为 `blocked + refresh + unknown_driver_result`。
 
+执行 action 返回错误时，bridge 保留重新读取的 receipt state、operation 和持久化进度，但强制 `blocked + refresh`，清除其他 action/manual prompt；保留已有稳定错误，没有时使用既有 `unknown_driver_result`。合法 receipt 甚至 completed 状态不能掩盖当前执行失败。日志只输出固定授权/执行错误类别，不输出底层正文。UI 只启用 snapshot 实际提供的 action，blocked 时只允许 refresh，并提示当前进度不代表上次操作成功。此错误投影不写回 receipt；后续 refresh/重开重新读取持久化状态，不能据其恢复普通投影断言失败原因已经消除。
+
 ## 用户授权
 
 refresh 是唯一不要求确认的 action。first install、upgrade、repair、resume、retry 和 remove 都必须对当前重新读取的 snapshot 调用 `authorize_installer_action`；旧窗口中的 action 若已不再提供，必须以 `ActionNotOffered` 拒绝。

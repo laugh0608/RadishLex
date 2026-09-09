@@ -8,4 +8,6 @@ Rust `dispatch_installer_action` 每次从只读 receipt 投影重新授权当�
 
 ad-hoc 开发构建不携带 `ReleaseIdentity.json`，也没有 production fallback。身份、payload 和用户域均通过后，bridge 会从 fresh snapshot 解码已知 authorization bits，装配 macOS install adapter、target preflight、receipt store 和系统随机 operation ID。first install、repair、默认程序移除及其 resume 使用现有真实 mutation port；first install 只在显式 action 后创建缺失的固定目录，绝不 chmod 既有对象。upgrade 在没有 manifest-bound 历史 source assembly 时先返回 `driver_unavailable`，不会先持久化 `prepared` 或切换 bundle。
 
-隔离测试使用合成 `0700` data root，证明 fresh snapshot 重新授权、`prepared` 持久化、重启投影、stale action 与 active guard 阻断。upgrade 的完整执行和 receipt bootstrap 由 `InstallerExecutor` 测试继续覆盖。
+执行失败不能被有效 receipt 或 completed 进度遮蔽：生产 bridge 保留 fresh receipt 的 operation/state/progress，同时返回 `blocked + refresh`；已有稳定错误保留，否则使用 ABI v1 已有的 `unknown_driver_result`，仅记录固定授权/执行错误类别。错误投影不改 receipt，成功 refresh 仍重新读取持久化状态，不代表先前失败已解决。
+
+隔离测试使用合成 `0700` data root，证明 fresh snapshot 重新授权、`prepared` 持久化、重启投影、stale action、active guard 阻断及执行错误呈现；失败分支覆盖非终态、completed 和已有诊断，保留实际持久化阶段。upgrade 的完整执行和 receipt bootstrap 由 `InstallerExecutor` 测试继续覆盖。
