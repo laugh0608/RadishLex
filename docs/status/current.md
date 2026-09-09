@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核：2026-09-09（macOS build 39 普通对照出现客户端/前台上下文差异后暂停；客户端身份来源已在仓库修复并通过合同/native/全仓验证，新候选与实机复验待执行）；常态分支 `dev`，主线 `master`。
+- 复核：2026-09-09（客户端身份来源已修复；build 40 双组件和包内 smoke 已完成，build 39 作为本次受控本地升级源的范围待确认，Installer 与实机复验未执行）；常态分支 `dev`，主线 `master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
@@ -27,7 +27,7 @@
 - REV-01 已落实 RadishLex 独占学习与 composition 最严格策略保留；升级 SQLite 后 native 48 进程存储/旧合成库回归及 12 进程配置回归通过。REV-02 Rust 链已升至 bundled SQLite 3.51.3，WAL/旧库/备份恢复与新 macOS FFI 身份核验通过；Go 依赖和冻结产物未更换。两项的平台复验、输入质量与工具链限制仍开放，结果与关闭条件只在专题维护。
 - macOS `26.7.1 (39)` 双组件与本地 ad-hoc Installer 已构建，包内 FFI 合成 smoke、资源/载荷身份、完整仓库门禁及 Manager 99 项测试通过。2026-09-09 首次安装到达 `completed`，双程序身份与无 quarantine 检查通过；Manager 从固定路径启动，显示 `local_only`。项目所有者已手动添加/选择输入源，固定 TextEdit `shi → 时` 两次选择与本地学习增量通过，候选由 2 升至 1。后续按[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md)验证隐私及其余矩阵；此载体无历史升级源，未制作新 DMG、未发布。
 - 项目所有者选择本机现有账户测试；此前 17 个旧目录根已原样归档，545 个节点核对通过。build 39 新验收库未导入旧资料，全程隐私零学习与目标词普通恢复已验证；先前混合输入区间不作为单次精确用例。另行授权的 composition 隐私→普通组观察到零学习，但新普通对照在 TextEdit 提交后记入 `code` 而非 `editor`，已暂停后两组。暂停时隐私键已恢复显式 false、临时基线已消费，输入源选中且 InputMethod 运行；后续仓库修复未再操作该现场。
-- 按项目所有者批准，`6a55782` 改用 IMK 输入客户端身份，缺失/无效/查询失败保持 unknown 禁读禁学。九类身份、五条提交入口及策略/失败路由合同、native 48 进程存储回归和完整仓库门禁通过；不代表真实 IMK 新路由已经通过。已安装 build 39 与原候选未替换，下一步需明确新候选版本、构建及安装/实机范围；详情见联合验收入口，REV-01/REV-02 继续开放。
+- 按项目所有者批准，`6a55782` 改用 IMK 输入客户端身份，缺失/无效/查询失败保持 unknown 禁读禁学；合同/native/全仓验证通过。`1636acf` 已准备 build 40 双组件并通过包内七场景和 Manager FFI smoke，原 build 39 及其已安装双组件身份一致。下一步须明确把本地 build 39 候选作为 39→40 唯一受控升级源的范围，再封装 Installer；当前还没有 build 40 Installer，也没有替换已安装版本。详情见联合验收入口，REV-01/REV-02 与真实 IMK 路由复验继续开放。
 - 次要事项为输入回调锁等待、新词召回/评测、删除与事件保留、MSRV/CI；维护成本、Manager 易用性和早期反馈列为后续建议。具体证据、未知项与关闭条件只在跟踪专题维护。
 - 当前 Rime 来源锁已变化，不能作为冻结 Linux L6 pair 的新 target；现有构建资格检查继续拒绝混配。旧 pair、M5 系统操作顺位和冻结现场保持原状；新 pair 或平台实机动作仍须单独明确范围。
 
@@ -65,7 +65,7 @@
 - registration shell v1-v3 control根与manifest `3e21aa02…e3c34`/`3c9c7ee8…3f604`/`ae3fb81b…4a511`冻结；不得覆盖、复用或解释为已创建。
 - clone v1/v2根、`Evidence-v5`与默认Documents partial target冻结；不得reclone、start、delete、手工搬移或冒充S2。
 - 不复跑 P04 验收，不清理、reset、覆盖或改写其 guest 资产；不自动清理 operation、receipt、失败材料或 staging。
-- 不发布 macOS build 38/39 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
+- 不发布 macOS build 38/39/40 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
 ## Linux M5 系统操作下一步（顺位不变，2026-09-05 复核）
@@ -94,7 +94,7 @@
 git diff --check
 ```
 
-上述入口覆盖八个crash合同和现有L6控制，但不替代实机。release-pair 门禁验证冻结声明及合成合同，不表示当前 build 39 满足旧 pair 的 target 资格；实际构建仍需通过独立资格检查。`upgrade_quiesced`、连续L6与发布未闭合；其余五个真实crash转为hardening。
+上述入口覆盖八个crash合同和现有L6控制，但不替代实机。release-pair 门禁验证冻结声明及合成合同，不表示当前 build 40 满足旧 pair 的 target 资格；实际构建仍需通过独立资格检查。`upgrade_quiesced`、连续L6与发布未闭合；其余五个真实crash转为hardening。
 
 ## 阅读索引
 

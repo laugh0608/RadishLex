@@ -155,8 +155,31 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 - `./scripts/check-macos-imk.sh` 全部通过。既有 native 存储回归在新根运行 12 场景 / 48 进程：普通学习各一条，受限和往返场景零条，未创建新的 Rime 自有 userdb，旧合成词典字节不变。完整 `./scripts/check-repo.sh` 在沙盒 Unix socket guard 受限后获准提权通过；保留初始失败日志。
 - 这里只修复与验证仓库代码。build 39 候选、已安装双组件、验收数据、系统输入源/设置/进程和暂停文稿没有被本修复批替换或操作。新版本候选与实际安装后的 TextEdit/client 分类、剩余隐私往返和其余矩阵仍待执行，REV-01/REV-02 不关闭。
 
+## build 40 双组件准备与升级衔接：2026-09-09
+
+项目所有者要求继续推进后，从 clean `978d1af` 开始准备新候选；版本提交 `1636acf` 把产品统一推进至 `26.7.1 (40)`，包含客户端身份修复 `6a55782`。Linux 仅同步版本投影 `26.7.1+40-2`，没有生成新 `.deb` 或改变冻结 L6 pair。此前 Installer/Manager 已按单独授权正常退出并核对进程，InputMethod 保持运行；本准备批不再操作系统 GUI、输入源或进程。
+
+- 双组件已装配至 `target/macos-product/26.7.1-40/`，Manager 使用 `--no-pub`，Cargo 显式离线；未下载依赖。ABI/schema 仍为 9，Rime 来源与单一学习配置不变。初次 Flutter 构建受 SDK 缓存写权限限制，最小范围提权后完成，保留受限日志。
+- 装配 ProductManifest SHA-256 为 `f612ebaaac6fe9a5d827d00d3144b72fd783c42c65bc7951d35849a478b59c90`，InputMethod executable 为 `f32fbc9ca4c321f07d6f3517d8e7d3795c5946094517fa893db86aa2b67b2d07`。双 FFI hash 与上方 build 39 相同，均含 SQLite 3.51.3 source id；本修复只改变 Objective-C 控制器。输入法二进制包含固定客户端身份诊断，已无 `frontmostApplication` selector 和 contract 初始化/策略注入入口。文件树、版本及 strict signature 核验通过；这些是装配身份，后续 Installer 封装/签名身份须独立读回。
+- 直接链接装配内 InputMethod FFI 的七个合成场景通过；包内 Manager FFI 在全新临时目录通过，`platformControl` 未注入，不写真实平台隐私键。Manager smoke 初次受沙盒本地资格初始化限制，另建目录提权后通过；原失败文件保留。包内 smoke 不执行真实 IMK 客户端路由。
+- 重新只读核对原始 `target/macos-release/26.7.1-39/Product`：既有历史 source verifier 通过，manifest 仍为 `de1bf1ea…8362f`。已安装双组件的完整 manifest 文件记录与该源相同，strict ad-hoc requirement 一致；安装 receipt 仍是 `514bd2af…3962/completed`，data-root identity 一致，state 仅有 receipt。未查询数据库正文或执行真实升级 helper。
+- 对 build 39 release 树与 Cargo/pub 锁、冻结 L6 JSON 共 336 项记录进行前后核对，文件字节、mode 和 symlink target 均不变。未创建 `target/macos-release/26.7.1-40/`，尚无 build 40 Installer 或 DMG，未执行安装或发布。
+- macOS/Linux 元数据和冻结 L6 release-pair 合同通过；完整仓库门禁因沙盒合成 Unix socket guard 受限，获准提权后为 `Repository baseline passed`。最终文档、文本与差异检查通过，保留两个既有长文档预算警告。当前 build 40 仍不满足旧 Linux L6 target 资格。
+
+**待单独确认的下一范围**：允许把上述已核验且确实安装过的 build 39 原始产品，作为本次 **仅本机 build 39 → 40** 的唯一受控升级源；随后用既有命令封装 Installer：
+
+```bash
+./scripts/build-macos-release-installer.sh \
+  --upgrade-source-product-root \
+  /Users/luobo/Code/RadishLex/target/macos-release/26.7.1-39/Product
+```
+
+这是针对本地验收候选的明确范围，不把 build 39 追认为公开或已全面验收的版本。[产品包边界](../macos-product-package-boundary.md#installpayload-与历史升级源)当前规定首发没有历史正式发布时 `UpgradeSources` 保持空；build 39 尚未公开发布，因此本准备批没有自行把它加入该集合。源只在新的 payload 中复制并绑定原始身份，不改原包、不用当前代码伪造旧版本。通过后再复核 source/target 载荷与 sealed requirements，并具体授权真实静止、Installer 升级及新版本实机复验；技术身份检查通过不等于已经授权或完成升级。
+
 ## 证据位置
 
+- 09-09 build 40：`/private/tmp/radishlex-build40-prepare-20260909-ivm777oq/` 保存 `preserved-before.json`、`preserved-after.json`、`assembly-identity.json`、`build39-readonly-qualification.json` 及独立 Manager smoke 目录。构建日志为 `/private/tmp/radishlex-build40-assembly-escalated-20260909.log`，包内 FFI 日志为 `/private/tmp/radishlex-build40-bundled-privacy-20260909.log`、`/private/tmp/radishlex-build40-manager-smoke-escalated-20260909.log`；去掉 `escalated` 的相应日志保留沙盒失败。七场景新根为系统临时目录下 `radishlex-bundled-privacy-67ec_vtc`。
+- build 40 完整仓库日志：`/private/tmp/radishlex-build40-check-repo-escalated-20260909.log` 为通过结果，`/private/tmp/radishlex-build40-check-repo-20260909.log` 保留初始沙盒 guard 失败。
 - 09-09 客户端修复：`/private/tmp/radishlex-imk-client-context-final-20260909.log` 为最终 macOS 合同，`/private/tmp/radishlex-imk-client-native-privacy-20260909.log` 为 native 回归，`/private/tmp/radishlex-imk-client-check-repo-escalated-20260909.log` 为完整仓库通过结果；同前缀不含 `escalated` 的全仓日志保留沙盒 guard 失败。native 合成根为系统临时目录下 `radishlex-rime-privacy-2978-1788956612652471000`，不复用先前现场。
 - 09-09 composition 组：`/private/tmp/radishlex-build39-composition-20260909-2a52kqy6/`，含只读采集器 `snapshot.py`、`a-before.json`、`a-after-private.json`、`a-after-normal.json` 和 `a-observations-and-pause.json`。最后一项记录真实 UI/脚本操作、上下文差异、停止位置与尚未证实的机制；SQL 仍只读聚合及固定合成身份，不读取 P1 行。
 - 09-09 普通输入：`/private/tmp/radishlex-build39-input-20260909-_drd2sd7/`，含 `before-shi-time.json`、`after-first-shi-time.json`、`after-second-shi-time.json`；人工反馈与只读聚合分别注明来源。
