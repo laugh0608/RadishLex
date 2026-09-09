@@ -143,12 +143,21 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 - 接着新输入 `shi`，实际候选 1 仍为“时”，空格后文稿为“时时”。全库变为 `5/8/6`：只新增一条选择事件、没有新增词条，但固定合成身份新增 `code` frequency=1 的 ranker 行，原 `editor` frequency=3 不变，目标选择计数到 4。因此“普通新输入恢复一次学习”成立，预设的同一 `editor` 上下文对照不成立；原 `expected_aggregate_delta_matches=false` 证据保留，不调整预期来冒充通过。
 - 发现上下文差异后立即停止后两组按键与设置操作。普通→隐私、普通→隐私→普通及各自普通对照均未开始。事后平台隐私键为 false，临时 `privacy-mode-baseline` 不存在，TIS 为 `2/2/1`、InputMethod 仍为 `running_verified`；数据根、数据库身份和 completed receipt 保持一致。测试文稿保留两次合成提交，未清库、重试或停止进程。
 
-只读诊断发现，[控制器](../../platforms/macos-imk/Sources/RadishLexInputController.m)的 `updateLearningContextForClient:` 显式忽略 `sender`，使用 `NSWorkspace.frontmostApplication.bundleIdentifier`；[分类器](../../platforms/macos-imk/Sources/RadishLexLearningContext.m)中只有 `com.openai.codex` 映射到 `code`。这与自动输入送达 TextEdit、持久摘要却为 `code` 的差异一致；尚未确定前台变化时点、自动化激活机制或真实敏感应用的影响。不能把 AX 中的文本焦点等同于控制器读取到的最前台身份。
+当时只读诊断发现，build 39 的 `updateLearningContextForClient:` 显式忽略 `sender`，使用 `NSWorkspace.frontmostApplication.bundleIdentifier`；[分类器](../../platforms/macos-imk/Sources/RadishLexLearningContext.m)中只有 `com.openai.codex` 映射到 `code`。这与自动输入送达 TextEdit、持久摘要却为 `code` 的差异一致；尚未确定前台变化时点、自动化激活机制或真实敏感应用的影响。不能把 AX 中的文本焦点等同于控制器读取到的最前台身份。
 
-后续建议先修复并验证输入客户端身份来源：本机 SDK 的公开 `IMKTextInput.bundleIdentifier` 表示该 input session 所属进程，应以它分类；缺失或无效身份保持 unknown 禁学，不回退到另一个最前台已知应用放宽策略。保留现有系统 secure input、隐私开关、敏感应用分类及 composition 最严格策略。仓库回归需覆盖客户端/最前台不一致、缺失身份、敏感/unknown 客户端与普通恢复；涉及隐私路由与平台运行时来源变化，实施前单独确认此范围。新候选构建、安装或重新执行实机用例仍需明确后续动作，不原位修改 build 39。
+当时提出先修复输入客户端身份来源，项目所有者随后批准仓库修复与对应验证，结果见下节。新候选构建、安装或重新执行实机用例仍需明确后续动作，不原位修改 build 39。
+
+## 客户端身份来源修复：2026-09-09
+
+- 修复提交 `6a55782`：[控制器](../../platforms/macos-imk/Sources/RadishLexInputController.m)改为读取当前 `IMKTextInput.bundleIdentifier`，不依赖最前台应用。缺失接口、nil/空值、非字符串、未知身份或查询异常保持 unknown 禁读禁学；查询异常只记录固定错误类别。现有应用允许表、系统 secure input、隐私开关、Rust composition 最严格策略、FFI ABI 与数据库 schema 不变。
+- [上下文合同](../../platforms/macos-imk/Tests/input_context_contract.m)通过九类身份，包括客户端/前台不一致的两组对照、敏感与 unknown、nil/空/非字符串、缺失接口和查询异常。五条提交入口为空格、数字键、候选按钮、accessibility press、`commitComposition`；均先刷新策略和 snapshot。另覆盖独立 privacy/secure 信号、composition 中策略收紧与返回普通，以及桥接策略更新失败时不提交且不提前缓存成功。
+- 合同使用合成客户端、demo engine 和记录调用的 bridge；仅在短生命周期测试进程替换前台查询，没有激活应用或发送系统按键。测试验证控制器路由，不冒充 Rust 真实持久化或真实 IMK 客户端复验。注入入口与属性只编译进 contract build，生产分支通过 Clang `-Wall -Wextra -Werror` 语法检查。
+- `./scripts/check-macos-imk.sh` 全部通过。既有 native 存储回归在新根运行 12 场景 / 48 进程：普通学习各一条，受限和往返场景零条，未创建新的 Rime 自有 userdb，旧合成词典字节不变。完整 `./scripts/check-repo.sh` 在沙盒 Unix socket guard 受限后获准提权通过；保留初始失败日志。
+- 这里只修复与验证仓库代码。build 39 候选、已安装双组件、验收数据、系统输入源/设置/进程和暂停文稿没有被本修复批替换或操作。新版本候选与实际安装后的 TextEdit/client 分类、剩余隐私往返和其余矩阵仍待执行，REV-01/REV-02 不关闭。
 
 ## 证据位置
 
+- 09-09 客户端修复：`/private/tmp/radishlex-imk-client-context-final-20260909.log` 为最终 macOS 合同，`/private/tmp/radishlex-imk-client-native-privacy-20260909.log` 为 native 回归，`/private/tmp/radishlex-imk-client-check-repo-escalated-20260909.log` 为完整仓库通过结果；同前缀不含 `escalated` 的全仓日志保留沙盒 guard 失败。native 合成根为系统临时目录下 `radishlex-rime-privacy-2978-1788956612652471000`，不复用先前现场。
 - 09-09 composition 组：`/private/tmp/radishlex-build39-composition-20260909-2a52kqy6/`，含只读采集器 `snapshot.py`、`a-before.json`、`a-after-private.json`、`a-after-normal.json` 和 `a-observations-and-pause.json`。最后一项记录真实 UI/脚本操作、上下文差异、停止位置与尚未证实的机制；SQL 仍只读聚合及固定合成身份，不读取 P1 行。
 - 09-09 普通输入：`/private/tmp/radishlex-build39-input-20260909-_drd2sd7/`，含 `before-shi-time.json`、`after-first-shi-time.json`、`after-second-shi-time.json`；人工反馈与只读聚合分别注明来源。
 - 同目录隐私记录：`before-private-shi-time.json`、`privacy-enable-precheck-not-qualified.json` 保留未生效的初次前置与消歧；有效基线为 `before-private-shi-time-saved.json`，后续为 `after-private-shi-time.json`、`after-restored-normal-shi-time.json` 和 `privacy-roundtrip-status-and-discrepancy.json`。`normal-return-additional-input-confirmed.json` 追加用户确认，保留原先待核对快照，不改写原证据。

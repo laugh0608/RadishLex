@@ -153,6 +153,8 @@ R01B 使用两个相互独立的授权边界。授权 A 覆盖 Apple Development
 
 生产分类已抽取为 `RadishLexLearningContext`，正式 controller 使用该实现，分类 contract 也直接编译同一生产源码。TextEdit 映射为已知 `editor`，Codex 映射为已知 `code`；Passwords、Keychain Access、1Password 8 和旧版 1Password 7 的固定 Bundle ID 标记为 P0 敏感应用；其他应用一律为未知 `other`，只使用 engine 顺序。unknown/P0 `ValidationHost` 本体只提供固定 Bundle ID、普通输入框和 `NSSecureTextField`，分类 contract 以这两个身份覆盖生产判断；host 不读取、记录或持久化内容，仓库门禁只构建、不启动 GUI。secure input 只通过公开 `IsSecureEventInputEnabled()` 观察，验证宿主不得调用 enable/disable API。若 macOS 在 secure field 中直接旁路第三方输入法，实机记录必须写“系统 secure 路由旁路，controller secure 分支未由本组实机执行”，不能误记为 `policy_blocked`。
 
+应用身份必须来自当前 IMK 输入客户端的公开 `bundleIdentifier`，即接收该输入会话的进程；不得使用 `NSWorkspace.frontmostApplication` 代替。每次事件、候选选择和 `commitComposition` 都重新读取客户端身份，候选点击使用 controller 所属 client。客户端缺失身份接口、返回 nil/空值/非字符串、标识不在允许表中或查询抛出异常时，均按 unknown 禁读禁学；不得回退到最前台普通应用放宽策略。查询异常只记录固定错误类别，不记录异常正文或 App ID；系统 secure input 与显式隐私开关继续独立生效。上下文回归直接调用控制器事件和提交入口，以合成客户端及桥接调用观察验证身份来源、策略传递和更新失败时停止提交；它不替代真实 IMK 路由或 Rust 持久化回归。
+
 隐私模式读取固定输入法 domain 的 `RadishLexPrivacyMode` 布尔设置，缺省为关闭；开启后只读既有本地摘要且不写当前选择。任一信号变化都会先更新 Rust learning context；已有 composition 时必须刷新 snapshot，使旧 display/engine mapping 失效后再处理选择。
 
 R01B 固定合成 case 为 `r01b-shi-time-v1`：`pinyin_simp` / `shi` / `时` / reading absent / `editor`；隔离初始页为 `是、时、事、使、市`，目标 display/engine index 为 `1/1`。一次真实选择后，fresh isolated non-selection snapshot 可得到 `0/1`。删除与显式恢复必须同时使用精确 `case-status` DTO 的目标 term/ranker/tombstone、聚合增减量和 fresh isolated Rime user-data snapshot 取证；librime 自身 user data 也会影响顺序，不能只凭候选 UI 宣称 RadishLex ranker 生效。

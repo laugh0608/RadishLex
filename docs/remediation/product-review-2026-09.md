@@ -136,7 +136,11 @@ Manager 隐私草案首次尚未保存时前置检查未通过；项目所有者
 
 项目所有者批准后台隐私控制和新 TextEdit 文稿合成按键。第一组隐私→普通在同一 marked `shi` 保留后提交“时”，全部聚合和固定合成身份零变化；随后新普通输入提交正确且选择事件增 1，却新增 `code` frequency=1，原 `editor` frequency=3 不变。执行者按停止线暂停，后两组未开始；隐私键已恢复 false、临时基线已消费、数据身份未漂移，输入源仍选中且进程运行。该组保留零学习与普通一次学习观察，但不作为 TextEdit 上下文路由完整通过，证据见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#未提交-composition-切换2026-09-09-部分执行后暂停)。
 
-只读源码确认控制器忽略 `sender`，按最前台应用分类；`code` 唯一映射为 Codex，与本次差异一致。尚未确定激活时点，也未实测真实敏感应用受影响。建议以公开 IMK 输入客户端 bundle identity 作为来源，缺失/无效时 unknown 禁学，不借最前台已知应用放宽；保留 secure/private/sensitive 与 composition 锁定策略。该隐私路由修复、相关合同回归和后续候选/实机动作待单独明确范围，REV-01/REV-02 继续开放。
+当时源码确认 build 39 控制器忽略 `sender`，按最前台应用分类；`code` 唯一映射为 Codex，与本次差异一致。尚未确定激活时点，也未实测真实敏感应用受影响。当时建议以公开 IMK 输入客户端 bundle identity 作为来源，缺失/无效时 unknown 禁学，不借最前台已知应用放宽；保留 secure/private/sensitive 与 composition 锁定策略。项目所有者随后批准仓库修复及回归，结果如下。
+
+### 2026-09-09：输入客户端身份仓库修复
+
+`6a55782` 已将应用分类来源改为当前 IMK client 的 `bundleIdentifier`；缺失/无效或查询异常保持 unknown，固定异常日志不包含 App ID 或异常正文。九类身份、五条提交路径、独立隐私/secure 信号、策略往返及更新失败合同通过；既有 native 12 场景 / 48 进程存储回归与完整仓库门禁通过。控制器合同记录 bridge 入参和调用顺序，native 回归验证 Rust 持久化，二者不合并宣称真实 IMK 路由通过。ABI/schema、应用允许表和 runtime 策略不变。已安装 build 39 与原候选仍是修复前版本；新候选、安装后实测及剩余矩阵未执行，REV-01/REV-02 继续开放，详情见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#客户端身份来源修复2026-09-09)。
 
 ## REV-03：输入线程的数据库等待
 
