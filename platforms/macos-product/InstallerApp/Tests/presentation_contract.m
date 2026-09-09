@@ -88,6 +88,23 @@ int main(void) {
                     isEqualToString:@"继续未完成操作"],
                 @"restart action must be explicit");
 
+        RLXInstallerPresentation *failedUpgrade = [[RLXInstallerPresentation alloc]
+            initWithDriverSnapshot:Snapshot(
+                @"blocked", @"refresh", @"none", @"unknown_driver_result",
+                @"data_coordinating", @"upgrade", 7, @"none")];
+        Require(failedUpgrade.failedClosed && failedUpgrade.progressStep == 7,
+                @"failed execution must retain durable progress while blocked");
+        Require([failedUpgrade.statusDetail containsString:@"上次操作返回错误"],
+                @"an execution error must not look like normal progress");
+        Require([failedUpgrade isActionEnabled:@"refresh"] &&
+                ![failedUpgrade isActionEnabled:@"resume_operation"] &&
+                ![failedUpgrade isActionEnabled:@"retry_operation"],
+                @"failed execution may only refresh; it cannot offer another mutation");
+        Require([failedUpgrade.stableDiagnosticSummary
+                    isEqualToString:@"phase=blocked action=refresh "
+                                    "error=unknown_driver_result state=data_coordinating"],
+                @"error diagnostics must retain the actual receipt stage");
+
         RLXInstallerPresentation *removal = [[RLXInstallerPresentation alloc]
             initWithDriverSnapshot:Snapshot(
                 @"ready", @"begin_repair", @"remove_programs", @"none",

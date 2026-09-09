@@ -206,7 +206,7 @@ fn production_perform(
     } else {
         ProductionUpgradePort::Unavailable
     };
-    match dispatch_installer_action(
+    let result = dispatch_installer_action(
         environment.context.data_root(),
         environment.context.owner_id(),
         environment.product_situation,
@@ -217,19 +217,33 @@ fn production_perform(
         &mut preflight,
         &mut operation_ids,
         &mut upgrade,
-    ) {
-        Ok(_) => production_snapshot(),
-        Err(_) => {
-            let refreshed = production_snapshot();
-            if refreshed.phase == phase_value(InstallerViewPhase::Blocked)
-                || refreshed.receipt_state != 0
-            {
-                refreshed
-            } else {
-                unavailable_snapshot(InstallerStableError::UnknownDriverResult)
-            }
-        }
+    );
+    project_action_result(result, production_snapshot())
+}
+
+fn project_action_result(
+    result: Result<InstallerBridgeDispatch, InstallerBridgeError>,
+    mut refreshed: RadishLexInstallerBridgeSnapshotV1,
+) -> RadishLexInstallerBridgeSnapshotV1 {
+    let Err(error) = result else {
+        return refreshed;
+    };
+    let failure_code = match error {
+        InstallerBridgeError::Authorization(_) => "authorization_failed",
+        InstallerBridgeError::Execution(error) => error.code(),
+    };
+    eprintln!("RadishLex Installer action failed: {failure_code}");
+
+    // A receipt describes durable progress, not the outcome of this action.
+    // Keep that progress visible without offering another mutation after failure.
+    refreshed.phase = phase_value(InstallerViewPhase::Blocked);
+    refreshed.primary_action = action_value(InstallerAction::Refresh);
+    refreshed.secondary_action = action_value(InstallerAction::None);
+    refreshed.manual_prompt = prompt_value(InstallerManualPrompt::None);
+    if refreshed.stable_error == error_value(InstallerStableError::None) {
+        refreshed.stable_error = error_value(InstallerStableError::UnknownDriverResult);
     }
+    refreshed
 }
 
 struct ProductionInstallerEnvironment {

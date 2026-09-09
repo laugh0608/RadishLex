@@ -258,6 +258,157 @@ fn bridge_reauthorizes_fresh_snapshot_and_recovers_prepared_state() {
 }
 
 #[test]
+fn failed_dispatch_with_valid_receipt_is_visible_without_changing_progress() {
+    struct FailedPreflight;
+
+    impl InstallerPreflightPort for FailedPreflight {
+        fn inspect_preflight(
+            &mut self,
+            _target_product: &ProductArtifactIdentity,
+        ) -> Result<InstallerPreflightEvidence, InstallerExecutionError> {
+            Err(InstallerExecutionError::PreflightNotProven)
+        }
+    }
+
+    let mut fixture = TestFixture::new();
+    fixture
+        .dispatch(InstallerAction::BeginFirstInstall)
+        .expect("prepare through bridge");
+    let before = fixture.store.load().expect("receipt read");
+    let failed = dispatch_installer_action(
+        &fixture.data_root,
+        fixture.owner_id,
+        InstallerProductSituation::NotInstalled,
+        InstallerAction::ConfirmQuiescence,
+        InstallerUserAuthorization {
+            explicit_action_confirmed: true,
+            neutral_input_source_selected: true,
+            manager_closed: true,
+            ..InstallerUserAuthorization::default()
+        },
+        &fixture.store,
+        &mut fixture.programs,
+        &mut FailedPreflight,
+        &mut fixture.operation_ids,
+        &mut UnusedUpgradePort,
+    );
+    assert!(matches!(
+        failed,
+        Err(InstallerBridgeError::Execution(
+            InstallerExecutionError::PreflightNotProven
+        ))
+    ));
+    let snapshot = inspect_installer_view(
+        &fixture.data_root,
+        fixture.owner_id,
+        InstallerProductSituation::NotInstalled,
+    );
+    assert_eq!(snapshot.stable_error(), InstallerStableError::None);
+    let projected = project_action_result(failed, encode_installer_snapshot(snapshot));
+    assert_eq!(projected.phase, phase_value(InstallerViewPhase::Blocked));
+    assert_eq!(
+        projected.primary_action,
+        action_value(InstallerAction::Refresh)
+    );
+    assert_eq!(
+        projected.secondary_action,
+        action_value(InstallerAction::None)
+    );
+    assert_eq!(
+        projected.stable_error,
+        error_value(InstallerStableError::UnknownDriverResult)
+    );
+    assert_eq!(
+        projected.receipt_state,
+        state_value(Some(InstallState::Prepared))
+    );
+    assert_eq!(
+        projected.operation_kind,
+        operation_value(Some(InstallOperationKind::FirstInstall))
+    );
+    assert_eq!(projected.progress_step, 1);
+    assert_eq!(
+        projected.manual_prompt,
+        prompt_value(InstallerManualPrompt::None)
+    );
+    assert_eq!(fixture.store.load().expect("receipt after error"), before);
+
+    let refreshed = project_action_result(
+        Ok(InstallerBridgeDispatch::Refreshed(snapshot)),
+        encode_installer_snapshot(snapshot),
+    );
+    assert_eq!(
+        refreshed.primary_action,
+        action_value(InstallerAction::ConfirmQuiescence)
+    );
+    assert_eq!(
+        refreshed.stable_error,
+        error_value(InstallerStableError::None)
+    );
+}
+
+#[test]
+fn failed_action_cannot_be_hidden_by_progress_completion_or_existing_diagnostics() {
+    for state in [InstallState::DataCoordinating, InstallState::Completed] {
+        for existing_error in [
+            InstallerStableError::None,
+            InstallerStableError::RootIdentityChanged,
+        ] {
+            let refreshed = RadishLexInstallerBridgeSnapshotV1 {
+                contract_version: INSTALLER_BRIDGE_CONTRACT_VERSION,
+                phase: phase_value(if state == InstallState::Completed {
+                    InstallerViewPhase::Completed
+                } else {
+                    InstallerViewPhase::InProgress
+                }),
+                primary_action: action_value(InstallerAction::ResumeOperation),
+                secondary_action: action_value(InstallerAction::RetryOperation),
+                stable_error: error_value(existing_error),
+                operation_kind: operation_value(Some(InstallOperationKind::Upgrade)),
+                receipt_state: state_value(Some(state)),
+                progress_step: if state == InstallState::Completed {
+                    10
+                } else {
+                    7
+                },
+                manual_prompt: prompt_value(InstallerManualPrompt::None),
+            };
+            let failed = project_action_result(
+                Err(InstallerBridgeError::Execution(InstallerExecutionError::UpgradeFilesystem(
+                    radishlex_ime_product_upgrade::UpgradeFilesystemErrorCode::InterruptedSwitch,
+                ))),
+                refreshed,
+            );
+            assert_eq!(failed.phase, phase_value(InstallerViewPhase::Blocked));
+            assert_eq!(
+                failed.primary_action,
+                action_value(InstallerAction::Refresh)
+            );
+            assert_eq!(failed.secondary_action, action_value(InstallerAction::None));
+            assert_eq!(failed.receipt_state, state_value(Some(state)));
+            assert_eq!(
+                failed.operation_kind,
+                operation_value(Some(InstallOperationKind::Upgrade))
+            );
+            assert_eq!(
+                failed.progress_step,
+                if state == InstallState::Completed {
+                    10
+                } else {
+                    7
+                }
+            );
+            let expected_error = if existing_error == InstallerStableError::None {
+                InstallerStableError::UnknownDriverResult
+            } else {
+                existing_error
+            };
+            assert_eq!(failed.stable_error, error_value(expected_error));
+        }
+    }
+}
+
+#[test]
 fn ffi_contract_is_versioned_and_fails_closed_without_release_identity() {
     assert_eq!(
         radishlex_installer_bridge_contract_version(),

@@ -141,6 +141,10 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
         return @"请先手动切换到其他输入源并关闭萝卜词核管理器。确认后安装器仍会通过公开平台接口重新检查，勾选状态不作为静止证明。";
     }
     if (self.failedClosed) {
+        if ([self.errorCode isEqualToString:RLXUnknownDriverResult] &&
+            ![self.stateCode isEqualToString:@"none"]) {
+            return @"上次操作返回错误，当前进度只表示已保存的阶段。请保留现场并按诊断码排查；刷新只重新检查状态。";
+        }
         return @"安装器无法安全确认产品或事务状态。请保留现场并使用下方稳定诊断码排查。";
     }
     if ([self.phaseCode isEqualToString:@"completed"]) {
@@ -167,6 +171,9 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
 - (BOOL)isActionEnabled:(NSString *)actionCode {
     return [actionCode isKindOfClass:NSString.class] &&
         ![actionCode isEqualToString:RLXNoAction] &&
+        ([actionCode isEqualToString:self.primaryActionCode] ||
+         [actionCode isEqualToString:self.secondaryActionCode]) &&
+        (!self.failedClosed || [actionCode isEqualToString:RLXRefreshAction]) &&
         [[self titleForAction:actionCode] length] > 0;
 }
 
