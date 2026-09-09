@@ -152,7 +152,7 @@ Manager 隐私草案首次尚未保存时前置检查未通过；项目所有者
 
 ### 2026-09-09：错误呈现修复与合法 WAL 隔离诊断
 
-随后获准的仓库修复已将执行失败投影为显式 blocked/refresh，并保留实际 receipt 进度；bridge、原生 UI 和完整仓库门禁通过。五项新隔离场景使用真实 SQLite WAL，确认未 checkpoint WAL 与正常关闭后只读快照重建的 sidecar 均阻断当前 standalone 切换；合成程序/平台 port 下，显式切换前中止可恢复 source 程序并保留原 DB/WAL、学习和 tombstone。随后另行批准的生产恢复入口已实现，八项恢复父测试、原生 Installer 门禁与真实 39/40 payload 副本隔离资格通过，独立载体准备中；真实现场保持冻结。后续实际恢复仍须单独授权，长期 WAL 源库准备边界详见 [WAL 升级与恢复方案](macos-wal-upgrade-recovery-2026-09.md)。这不改变 SQLite 依赖，也不关闭 REV-01/REV-02 或补齐新版本输入验收。
+随后获准的仓库修复已将执行失败投影为显式 blocked/refresh，并保留实际 receipt 进度；bridge、原生 UI 和完整仓库门禁通过。五项新隔离场景使用真实 SQLite WAL，确认未 checkpoint WAL 与正常关闭后只读快照重建的 sidecar 均阻断当前 standalone 切换；合成程序/平台 port 下，显式切换前中止可恢复 source 程序并保留原 DB/WAL、学习和 tombstone。随后另行批准的生产恢复入口已实现，八项恢复父测试、原生 Installer 门禁与真实 39/40 payload 副本隔离资格通过，独立载体已准备并核验；真实现场保持冻结。后续实际恢复仍须单独授权，长期 WAL 源库准备边界详见 [WAL 升级与恢复方案](macos-wal-upgrade-recovery-2026-09.md)。这不改变 SQLite 依赖，也不关闭 REV-01/REV-02 或补齐新版本输入验收。
 
 ## REV-03：输入线程的数据库等待
 

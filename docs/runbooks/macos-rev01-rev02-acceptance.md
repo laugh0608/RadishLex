@@ -219,7 +219,9 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 
 项目所有者已批准实现切换前中止入口和准备独立恢复 Installer。生产 action、双 guard/receipt/source/target/root 绑定、不可改写数据保留证据和逐端恢复检查点已实现；八项恢复父测试、Rust/Objective-C 原生 Installer 门禁、真实 39/40 payload 副本资格与完整仓库门禁通过。旧诊断批“入口尚未实现”的记录仅描述当时状态，当前实现与证据统一见 [WAL 升级与恢复方案](../remediation/macos-wal-upgrade-recovery-2026-09.md#恢复入口实施批验证与证据)。
 
-实际操作仍只针对冻结 operation `aad9cf8ac2dae71b2b659e96a91ea706`，待独立载体核验后另行授权：
+独立载体已从 clean `b7513ab` 构建：`target/macos-recovery/26.7.1-40-pre-switch-20260909-v1/RadishLex Installer.app`。Installer executable SHA-256 为 `78fe5c6649e81f5cb99acaa0976101dad67a93cf83da31da8df018888d6b43f7`；签名、sealed identity、内嵌 payload 与原件一致性及原输入身份不变性均通过，GUI 未启动。完整摘要和验证记录只在 [WAL 专题](../remediation/macos-wal-upgrade-recovery-2026-09.md#独立恢复-installer已准备未启动)维护。
+
+实际操作仍只针对冻结 operation `aad9cf8ac2dae71b2b659e96a91ea706`，须另行授权：
 
 1. 正常退出旧 Installer；重新核对新载体 sealed identity、原 source/target 程序材料、固定根/双 receipt 与冻结 metadata，以及中立输入源、Manager/InputMethod 停止。任一漂移或不可证即停止。
 2. 启动新独立 Installer，确认“中止本次升级并恢复源程序”；在既有固定目标通过产品事务恢复 source 39 双程序。入口只读 hash 原 DB/WAL/SHM，追加保留证据并合法推进双 receipt，不打开 SQLite、checkpoint 或删除 sidecar。

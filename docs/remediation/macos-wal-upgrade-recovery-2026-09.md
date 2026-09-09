@@ -4,9 +4,9 @@
 
 ## 当前结论
 
-错误呈现与五项 WAL 特征场景完成后，项目所有者另行批准实现显式恢复入口并准备独立恢复 Installer。恢复入口现已实现，Executor 八项恢复父测试、原生 Installer 门禁及真实 source 39/target 40 副本资格通过；长期 WAL 处理仍未实现。冻结 operation `aad9cf8ac2dae71b2b659e96a91ea706` 仍未恢复，本批没有打开真实 SQLite connection、运行真实 helper、点击 Installer 或改变原载体。
+错误呈现与五项 WAL 特征场景完成后，项目所有者另行批准实现显式恢复入口并准备独立恢复 Installer。恢复入口现已实现，Executor 八项恢复父测试、原生 Installer 门禁及真实 source 39/target 40 副本资格通过；长期 WAL 处理仍未实现。冻结 operation `aad9cf8ac2dae71b2b659e96a91ea706` 仍未恢复，本批没有打开真实用户 SQLite connection、在真实用户目录运行 helper、点击 Installer 或改变原载体。
 
-现已为切换前事务增加显式中止入口，通过既有状态机保留原数据库并恢复 source 39 双程序；真实恢复待独立载体准备完成及另行授权。之后单独实现面向新 operation 的 WAL 源库准备合同。恢复到 39 仅返回已知基线，其 IMK 上下文缺陷仍在，不能据此关闭 REV-01/REV-02 或完成 build 40 输入验收。
+现已为切换前事务增加显式中止入口，通过既有状态机保留原数据库并恢复 source 39 双程序；独立载体已准备并核验，真实恢复待另行授权。之后单独实现面向新 operation 的 WAL 源库准备合同。恢复到 39 仅返回已知基线，其 IMK 上下文缺陷仍在，不能据此关闭 REV-01/REV-02 或完成 build 40 输入验收。
 
 ## 已证实的两个缺口
 
@@ -66,7 +66,7 @@
 
 后续已批准实施批新增八项 Executor 父测试：成功保留已提交 WAL/学习/tombstone、四个程序恢复检查点中断重放、外层/内层 guard 与 preflight 拒绝、文件内容/inode/link/mode/sidecar 漂移、部分证据不重建、完整证据丢失禁止普通 resume、跨 root/目标版本授权拒绝、只读投影零创建。真实 payload 资格还覆盖 source backup 未知对象拒绝、中止后 Manager 已恢复而 InputMethod 未恢复的中断、重载证据后完成、source/target 双端 startup 正反对照。资格使用真实 39/40 payload 的新副本、实际程序 tree/strict signature adapter、临时合成用户数据；不证明冻结用户事务或真实 GUI 已恢复。
 
-独立载体脚本 `scripts/macos-product/recovery_payload.py` 的 `qualify` 只在新临时根复制 source/target，`build` 拒绝已存在或与输入重叠的输出。构建只更新开发 Installer，再复制到独立输出、生成 ReleaseIdentity 并签名；封装前后比较内嵌 payload 内容与原输入，原 payload 完整身份/内容不变性另记证据。此脚本不启动 GUI 或安装程序。完整仓库门禁和封装结果完成后，才请求绑定冻结 operation 的真实恢复授权。
+独立载体脚本 `scripts/macos-product/recovery_payload.py` 的 `qualify` 只在新临时根复制 source/target，`build` 拒绝已存在或与输入重叠的输出。构建只更新开发 Installer，再复制到独立输出、生成 ReleaseIdentity 并签名；封装前后比较内嵌 payload 内容与原输入，原 payload 完整身份/内容不变性另记证据。此脚本不启动 GUI 或安装程序。完整仓库门禁和封装已通过，实际动作仍须绑定冻结 operation 另行授权。
 
 ## 后续新升级的 WAL 合同
 
@@ -97,3 +97,13 @@
 - source 39/target 40 的完整实际程序资格套件通过（单一集成入口内含既有恢复及新增 WAL 中止恢复），耗时 487.47 秒。日志 `/private/tmp/radishlex-recovery-payload-qualification-escalated-20260909.log`；证据根 `/private/var/folders/dp/rzjx58m54kng6tn5k5gjw71h0000gn/T/radishlex-recovery-payload-qualification-wg6qpm3r/`，`input-postflight.json` 确认原输入不变，`qualification-result.json` 记录范围。
 - 沙盒 Unix guard 限制的初始失败日志保留，必要验证提权不扩大到真实用户目录或 GUI。没有依赖或 lockfile 变化。
 - 完整 `CARGO_NET_OFFLINE=true ./scripts/check-repo.sh` 通过，最终 `Repository baseline passed`；日志 `/private/tmp/radishlex-pre-switch-recovery-check-repo-20260909.log`。qualification feature 的 Clippy 另行通过，日志 `/private/tmp/radishlex-recovery-qualified-clippy-20260909.log`。文档、文本、差异与恢复封装脚本路径保留负向检查通过。
+
+## 独立恢复 Installer：已准备，未启动
+
+- 构建源码：clean `b7513ab72ce27c4c33b8afa05f0e16a749d0f095`，包含实现提交 `670b70a`；版本仍为 26.7.1 / 40，目标程序及唯一受控 source 39 内容不变，修复仅进入独立 Installer executable。
+- 路径：`target/macos-recovery/26.7.1-40-pre-switch-20260909-v1/RadishLex Installer.app`；没有覆盖原 `target/macos-release/26.7.1-39` 或 `26.7.1-40`。开发输出 `target/macos-product/installer-app` 已按既有构建流程更新。
+- Installer executable SHA-256：`78fe5c6649e81f5cb99acaa0976101dad67a93cf83da31da8df018888d6b43f7`。该摘要区分原/新同版本 Installer。
+- ReleaseIdentity SHA-256：`abeed29fd3e4b7949211a16680caabc7f0eccb0b1ba9220ec88af1f245667387`；payload manifest SHA-256：`e7adf08d69429bb5d4db85c4e5026242dc63091fe50cb8e12bda354cdb1952c8`。ReleaseIdentity 对 Installer 使用既有 bundle requirement、不内嵌自身 cdhash，因此其字节与原载体相同不表示 executable 相同。
+- 构建内完成 strict/deep signature、ReleaseIdentity 回读、内嵌 payload 全内容/mode/link 与输入一致性，以及原输入完整 identity/hash 不变性验证。原生 executable 带未知参数直接 exit 2、stdout/stderr 为空，按 `main` 的参数拒绝分支未创建 NSApplication；二进制包含 `abort_pre_switch_upgrade`。
+- 输出目录中的 `RecoveryBuild.json`、`input-inventory.json`、`input-postflight.json`、`FinalVerification.json` 保存本次身份与范围；构建日志 `/private/tmp/radishlex-recovery-installer-build-20260909.log`。输出全部保留，不重建或覆盖。
+- 未启动新 GUI、未停止旧 Installer、未执行冻结 operation 恢复，未打开真实 SQLite 或启动双组件。下一实际范围见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#显式恢复入口实施2026-09-09)，确认后还须 fresh 身份/静止观察；不是直接沿用旧状态。
