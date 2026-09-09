@@ -90,13 +90,13 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 
 ## 待执行实机矩阵
 
-首次安装与双端固定路径启动已验证；普通输入已完成下方 `shi → 时` 两次选择，其余覆盖仍待执行。仅对本轮新建验收库记录必要计数/摘要；截图不得含真实输入历史。
+首次安装与双端固定路径启动、普通 `shi → 时` 学习及隐私模式完整 composition 零学习已验证；恢复普通后的精确身份恢复学习，但全库额外增量仍待归属。其余覆盖仍待执行。仅对本轮新建验收库记录必要计数/摘要；截图不得含真实输入历史。
 
 | 场景 | 需要的实机证据 |
 | --- | --- |
 | 首次安装和固定路径启动 | 09-09：首次安装 completed、双 bundle 身份/无 quarantine、固定路径 Manager 和 InputMethod 正常启动；Manager UI 与真实输入路径分别证明前置 gate 允许，未采集成功 gate 数值 |
 | 普通拼音、选候选、翻页与中英切换 | 09-09：TextEdit `shi → 时` 数字 2 选择、再次候选 1 空格提交及同库学习增量通过；翻页、产品内中英切换与重开仍待执行 |
-| 隐私模式与 composition 中双向切换 | P0 composition 不产生学习；退回普通模式后仅新合格 composition 可学习；输入与 commit 不丢失 |
+| 隐私模式与 composition 中双向切换 | 09-09：全程隐私 `shi → 时` 正确提交且零学习，普通恢复后目标频次递增；恢复区间额外全库增量待归属，未提交 composition 内双向切换仍待执行 |
 | secure input / 敏感应用 / unknown 路由 | 记录系统实际是否把事件交给 IME；系统绕过与控制器收到受限上下文分别判定，不用 C 注入结果填充实机通过 |
 | 分段候选和自动 commit | 完整文本、分段归属与最严格隐私状态跨段保持，无隐私尾段补学习 |
 | Manager 与输入法共享状态 | 同一合成库的条目、删除、显式恢复及候选变化一致；删除后重启/迟到选择不复活 |
@@ -112,11 +112,21 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 - 固定用例 `build39-textedit-shi-time-v1`：在 TextEdit 空白文稿输入 `shi`，第一次按实际候选数字 `2` 选择“时”；第二次“时”位于候选 `1`，按空格选择。两次候选编号、实际提交“时”和未感到卡顿均来自项目所有者人工反馈，不是自动抓取的候选/commit 或延迟测量。两轮反馈后只读 TIS 均为 selected=0；只证明检查时已切离 RadishLex，没有连续输入源监视证据。
 - 第一轮前全库 user_terms/selection_events/ranker_weights 均为 `2`，不是空库；仅读取计数，不追溯两条既有记录正文。精确 `shi → 时` 身份当时无 term/ranker/tombstone。第一次之后三项总数均为 `3`，精确身份出现 `engine_selection/active` 词条和 `editor` frequency=1 的排序摘要。第二次之后总数为 `3/4/3`，精确 frequency=2，未产生重复词条/排序行。
 - 三次只读快照均为 schema 9，deleted_terms、negative_feedback、import_batches 为零；Rime `*.userdb*` 条目计数为零。查询仅用 SQLite `mode=ro`、`query_only=ON` 和同一读事务读取聚合与固定合成身份，未调用可能维护权限/迁移的 CLI，也未读取 P1 行。
-- 本组验证真实普通选词、学习持久化及同会话候选变化；没有 fresh-engine 独立排序对照、重启、压力延迟或广泛输入质量结论。当前隐私键状态为 absent，尚未启用隐私模式；下一组需按明确范围测试隐私零学习和恢复普通学习，不能据本组关闭 REV-01/REV-02。
+- 本组验证真实普通选词、学习持久化及同会话候选变化；没有 fresh-engine 独立排序对照、重启、压力延迟或广泛输入质量结论。本组结束时隐私键为 absent，后续设置与隐私用例见下节，不能据本组关闭 REV-01/REV-02。
+
+## 隐私模式与恢复普通学习：2026-09-09
+
+- 项目所有者先在 Manager 打开隐私开关，首轮只读前置检查仍为 `privacy_mode=absent`，设置文件不存在；未进行测试输入。CUA 观察到编辑草案的开关为开，保存按钮在下方，滚动后由项目所有者点击“保存草案”并反馈保存成功。此后沙盒外平台 API 和 `manager-settings.json` 均为 true。草案状态不代替系统生效；没有将最初的“已开启”解释为已验证成功，原前置观察与后续消歧分别保留。
+- 完整 composition 隐私用例 `build39-textedit-private-shi-time-v1`：开启保存后，从新的 TextEdit `shi` composition 选择“时”一次，项目所有者反馈候选 1、提交“时”、未感到卡顿。前后平台隐私状态均为 true；term/selection/ranker 总数保持 `3/4/3`，全部六类聚合零增量，精确 `shi → 时` 的 term、频次 2、last-used/updated 时间戳及其余采集字段逐项不变，Rime `*.userdb*` 仍为零。此用例的正常提交与零学习通过。
+- 项目所有者按步骤关闭隐私开关并保存，再开始新的 `shi → 时`；反馈候选 1、提交正确、未感到卡顿。事后平台与 Manager 持久设置均为 false，精确 `editor` frequency 从 2 增至 3；固定合成身份 selection 总数为 3，证明该身份恢复学习。
+- 恢复区间的全库 term/selection/ranker 从 `3/4/3` 变为 `5/7/5`，即事件增 3 而非单次输入预期的 1；两个额外事件及新增词条/摘要尚未归属。已仅询问期间是否另有 RadishLex 输入，不索取或读取内容；在澄清或补充干净用例前，不将该区间写成单次全库精确恢复通过，也不能据此推断隐私阶段泄漏。
+- 两次提交后只读 TIS 均为 `2/2/0`，InputMethod 固定路径继续运行，数据根、userdb 与 completed receipt 身份不变。仅查询聚合和固定合成身份，无 P1 行。隐私键从本轮最初 absent 经用户 GUI 保存变为 true，再变为显式 false；当前不是键 absent，也没有执行脚本式原值恢复。
+- 本组尚不覆盖未提交 composition 中途切换策略、secure/sensitive/unknown、分段/自动 commit、重启或删除恢复。不能通过切到 Manager 后输入新 composition 冒充同一 composition 的策略往返；平台 deactivate 会取消未提交 composition，后续用例需要保持被测输入上下文。
 
 ## 证据位置
 
 - 09-09 普通输入：`/private/tmp/radishlex-build39-input-20260909-_drd2sd7/`，含 `before-shi-time.json`、`after-first-shi-time.json`、`after-second-shi-time.json`；人工反馈与只读聚合分别注明来源。
+- 同目录隐私记录：`before-private-shi-time.json`、`privacy-enable-precheck-not-qualified.json` 保留未生效的初次前置与消歧；有效基线为 `before-private-shi-time-saved.json`，后续为 `after-private-shi-time.json`、`after-restored-normal-shi-time.json` 和 `privacy-roundtrip-status-and-discrepancy.json`。额外全库增量的归属仍待补证，禁止改写原快照。
 
 - 09-09 安装前：`/private/tmp/radishlex-build39-preinstall-20260909-oyfvjeis/`，含 `inventory.json` 与沙盒外 `confirmed-observations.json`；初始沙盒失败日志保留。
 - 09-09 首次安装：`/private/tmp/radishlex-build39-first-install-20260909-y8ikrpku/`，含 `prepared-receipt.json`、`installed-receipt.json`、`postinstall.json` 与 `manager-startup.json`；UI 观察与真实进程查询分别注明来源。

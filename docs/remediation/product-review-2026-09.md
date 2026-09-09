@@ -128,6 +128,10 @@ REV-01 **未整体关闭**：本批完成仓库实现、Rust/native 回归与全
 
 项目所有者完成 TextEdit `shi → 时` 两次选择，反馈候选由 2 升至 1、提交正确且未感到卡顿。只读核对首轮 selection/term/ranker 各增 1，第二轮仅 selection 增 1，精确 `editor` frequency 从 1 增至 2；未发现 Rime 自有 userdb。固定路径 InputMethod 已运行，安装与数据身份不变。该组只覆盖普通选择和同会话候选变化，不替代隐私路由、重启、独立排序对照、输入质量或竞争延迟测试；REV-01/REV-02 继续开放。明细见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#普通输入与同会话学习2026-09-09)。
 
+### 2026-09-09：全程隐私输入与普通恢复观察
+
+Manager 隐私草案首次尚未保存时前置检查未通过；项目所有者保存后，平台 API 与设置文件均为 true。新的 TextEdit `shi → 时` composition 提交正确，全库聚合、目标频次与时间戳零变化，Rime 自有 userdb 为零；该全程隐私用例通过。关闭并保存后平台键为显式 false，目标频次 2→3；同区间全库 selection 却增 3，额外两条事件仍待项目所有者澄清是否另有输入或补充干净用例，未读取其内容。未提交 composition 中途双向切换及其余矩阵仍待执行，REV-01/REV-02 继续开放。具体边界见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#隐私模式与恢复普通学习2026-09-09)。
+
 ## REV-03：输入线程的数据库等待
 
 [候选选择](../../crates/ime-runtime/src/session.rs)在返回结果前同步执行 `record_selection`；[学习事务](../../crates/ime-userdb/src/store/learning.rs)取得 `Immediate` 写事务，[连接策略](../../crates/ime-userdb/src/store/connection.rs)配置 `busy_timeout = 5000 ms`。平台收到结果后才向宿主提交文本，存在写锁竞争拖住输入回调的风险。
