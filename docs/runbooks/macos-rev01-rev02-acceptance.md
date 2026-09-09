@@ -96,7 +96,7 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 | --- | --- |
 | 首次安装和固定路径启动 | 09-09：首次安装 completed、双 bundle 身份/无 quarantine、固定路径 Manager 和 InputMethod 正常启动；Manager UI 与真实输入路径分别证明前置 gate 允许，未采集成功 gate 数值 |
 | 普通拼音、选候选、翻页与中英切换 | 09-09：TextEdit `shi → 时` 数字 2 选择、再次候选 1 空格提交及同库学习增量通过；翻页、产品内中英切换与重开仍待执行 |
-| 隐私模式与 composition 中双向切换 | 09-09：全程隐私 `shi → 时` 正确提交且零学习，普通恢复后目标频次递增；恢复区间含用户确认的其他输入，未提交 composition 内双向切换仍待执行 |
+| 隐私模式与 composition 中双向切换 | 09-09：全程隐私零学习通过；未提交 composition 隐私→普通观察到正确提交且零学习，但其普通对照被记入 `code` 上下文，整组暂停；普通→隐私及三段往返未执行 |
 | secure input / 敏感应用 / unknown 路由 | 记录系统实际是否把事件交给 IME；系统绕过与控制器收到受限上下文分别判定，不用 C 注入结果填充实机通过 |
 | 分段候选和自动 commit | 完整文本、分段归属与最严格隐私状态跨段保持，无隐私尾段补学习 |
 | Manager 与输入法共享状态 | 同一合成库的条目、删除、显式恢复及候选变化一致；删除后重启/迟到选择不复活 |
@@ -123,7 +123,7 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 - 两次提交后只读 TIS 均为 `2/2/0`，InputMethod 固定路径继续运行，数据根、userdb 与 completed receipt 身份不变。仅查询聚合和固定合成身份，无 P1 行。隐私键从本轮最初 absent 经用户 GUI 保存变为 true，再变为显式 false；当前不是键 absent，也没有执行脚本式原值恢复。
 - 本组尚不覆盖未提交 composition 中途切换策略、secure/sensitive/unknown、分段/自动 commit、重启或删除恢复。不能通过切到 Manager 后输入新 composition 冒充同一 composition 的策略往返；平台 deactivate 会取消未提交 composition，后续用例需要保持被测输入上下文。
 
-## 未提交 composition 切换：下一组待授权
+## 未提交 composition 切换：2026-09-09 部分执行后暂停
 
 切换应用可能触发 IMK deactivate 并取消 composition，因此本组需在同一 TextEdit 测试文稿保持焦点，通过后台隐私控制工具改变系统设置，并让下一次真实按键观察到新策略。仅点击 Manager 后重新输入不能替代此组。
 
@@ -134,10 +134,22 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 | 普通 → 隐私 → 普通 | 普通键入 `s`，启用隐私后键入 `h` 使 IME 观察限制，恢复普通后键入 `i` 并选“时” | 同一 composition 保留最严格策略，正常提交且零学习 |
 | 新普通 composition | 各受限场景结束、隐私恢复为原 false 后，新输入 `shi` 并选“时” | 新选择可学习，事件及目标频次各增 1 |
 
-待授权范围：只在新的空白 TextEdit 测试文稿用 CUA 发送上述合成按键并观察候选/commit；使用既有 `./scripts/manage-macos-imk-privacy-mode.sh` 的 `--capture-baseline`、`--authorized-enable`、`--authorized-restore`，各场景创建自己的临时基线，工具按身份恢复本组初值并消费本组基线记录；持久证据单独保留。输入源仍由项目所有者手动选择。每段读取实际设置、数据身份和聚合；出现焦点/输入源变化、composition 被取消、身份或设置漂移、额外输入、commit 不符或越界学习即暂停，不自动重试、清库或停止进程。正常结束恢复本组开始时的 false；异常只在恢复前提仍可验证时执行已批准恢复，否则保留状态并报告。本段是待执行方案，不是已取得授权或实机通过。
+项目所有者已批准的范围：只在新的空白 TextEdit 测试文稿用 CUA 发送上述合成按键并观察候选/commit；使用既有 `./scripts/manage-macos-imk-privacy-mode.sh` 的 `--capture-baseline`、`--authorized-enable`、`--authorized-restore`，各场景创建自己的临时基线，工具按身份恢复本组初值并消费本组基线记录；持久证据单独保留。输入源仍由项目所有者手动选择。每段读取实际设置、数据身份和聚合；出现焦点/输入源变化、composition 被取消、身份或设置漂移、额外输入、commit 不符或越界学习即暂停，不自动重试、清库或停止进程。正常结束恢复本组开始时的 false；异常只在恢复前提仍可验证时执行已批准恢复，否则保留状态并报告。
+
+本次结果：
+
+- 使用新建 TextEdit 文稿“未命名2”，项目所有者手动选择 RadishLex，执行前 TIS 为 `2/2/1`、固定路径 InputMethod 为 `running_verified`。先捕获显式 false 基线，再后台启用隐私。CUA 发送 `s h i` 后，TextEdit 可访问性和截图显示 marked `shi`，已安装输入法候选窗口显示首候选“时”。后台恢复 false 并消费基线后，marked text 与候选仍在，按空格得到“时”。
+- 受限提交前后 term/selection/ranker 保持 `5/7/5`，六类聚合全部零变化；固定 `shi → 时` 的词条、`editor` frequency=3、时间戳及选择计数 3 完全不变，Rime `*.userdb*` 为零。保留该 composition 正常提交且零学习的窄观察；没有连续采样最前台应用，不能据此宣称 TextEdit 上下文路由全程正确。
+- 接着新输入 `shi`，实际候选 1 仍为“时”，空格后文稿为“时时”。全库变为 `5/8/6`：只新增一条选择事件、没有新增词条，但固定合成身份新增 `code` frequency=1 的 ranker 行，原 `editor` frequency=3 不变，目标选择计数到 4。因此“普通新输入恢复一次学习”成立，预设的同一 `editor` 上下文对照不成立；原 `expected_aggregate_delta_matches=false` 证据保留，不调整预期来冒充通过。
+- 发现上下文差异后立即停止后两组按键与设置操作。普通→隐私、普通→隐私→普通及各自普通对照均未开始。事后平台隐私键为 false，临时 `privacy-mode-baseline` 不存在，TIS 为 `2/2/1`、InputMethod 仍为 `running_verified`；数据根、数据库身份和 completed receipt 保持一致。测试文稿保留两次合成提交，未清库、重试或停止进程。
+
+只读诊断发现，[控制器](../../platforms/macos-imk/Sources/RadishLexInputController.m)的 `updateLearningContextForClient:` 显式忽略 `sender`，使用 `NSWorkspace.frontmostApplication.bundleIdentifier`；[分类器](../../platforms/macos-imk/Sources/RadishLexLearningContext.m)中只有 `com.openai.codex` 映射到 `code`。这与自动输入送达 TextEdit、持久摘要却为 `code` 的差异一致；尚未确定前台变化时点、自动化激活机制或真实敏感应用的影响。不能把 AX 中的文本焦点等同于控制器读取到的最前台身份。
+
+后续建议先修复并验证输入客户端身份来源：本机 SDK 的公开 `IMKTextInput.bundleIdentifier` 表示该 input session 所属进程，应以它分类；缺失或无效身份保持 unknown 禁学，不回退到另一个最前台已知应用放宽策略。保留现有系统 secure input、隐私开关、敏感应用分类及 composition 最严格策略。仓库回归需覆盖客户端/最前台不一致、缺失身份、敏感/unknown 客户端与普通恢复；涉及隐私路由与平台运行时来源变化，实施前单独确认此范围。新候选构建、安装或重新执行实机用例仍需明确后续动作，不原位修改 build 39。
 
 ## 证据位置
 
+- 09-09 composition 组：`/private/tmp/radishlex-build39-composition-20260909-2a52kqy6/`，含只读采集器 `snapshot.py`、`a-before.json`、`a-after-private.json`、`a-after-normal.json` 和 `a-observations-and-pause.json`。最后一项记录真实 UI/脚本操作、上下文差异、停止位置与尚未证实的机制；SQL 仍只读聚合及固定合成身份，不读取 P1 行。
 - 09-09 普通输入：`/private/tmp/radishlex-build39-input-20260909-_drd2sd7/`，含 `before-shi-time.json`、`after-first-shi-time.json`、`after-second-shi-time.json`；人工反馈与只读聚合分别注明来源。
 - 同目录隐私记录：`before-private-shi-time.json`、`privacy-enable-precheck-not-qualified.json` 保留未生效的初次前置与消歧；有效基线为 `before-private-shi-time-saved.json`，后续为 `after-private-shi-time.json`、`after-restored-normal-shi-time.json` 和 `privacy-roundtrip-status-and-discrepancy.json`。`normal-return-additional-input-confirmed.json` 追加用户确认，保留原先待核对快照，不改写原证据。
 

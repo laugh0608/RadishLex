@@ -132,6 +132,12 @@ REV-01 **未整体关闭**：本批完成仓库实现、Rust/native 回归与全
 
 Manager 隐私草案首次尚未保存时前置检查未通过；项目所有者保存后，平台 API 与设置文件均为 true。新的 TextEdit `shi → 时` composition 提交正确，全库聚合、目标频次与时间戳零变化，Rime 自有 userdb 为零；该全程隐私用例通过。关闭并保存后平台键为显式 false，目标频次 2→3；同区间全库 selection 增 3，项目所有者随后确认另有 RadishLex 输入，未索取或读取其内容。该区间保留目标词恢复学习结论，不当作单次全库精确用例，不再将额外增量列作未知缺陷。未提交 composition 中途双向切换及其余矩阵仍待执行，REV-01/REV-02 继续开放。具体边界见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#隐私模式与恢复普通学习2026-09-09)。
 
+### 2026-09-09：composition 切换部分执行与上下文差异
+
+项目所有者批准后台隐私控制和新 TextEdit 文稿合成按键。第一组隐私→普通在同一 marked `shi` 保留后提交“时”，全部聚合和固定合成身份零变化；随后新普通输入提交正确且选择事件增 1，却新增 `code` frequency=1，原 `editor` frequency=3 不变。执行者按停止线暂停，后两组未开始；隐私键已恢复 false、临时基线已消费、数据身份未漂移，输入源仍选中且进程运行。该组保留零学习与普通一次学习观察，但不作为 TextEdit 上下文路由完整通过，证据见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#未提交-composition-切换2026-09-09-部分执行后暂停)。
+
+只读源码确认控制器忽略 `sender`，按最前台应用分类；`code` 唯一映射为 Codex，与本次差异一致。尚未确定激活时点，也未实测真实敏感应用受影响。建议以公开 IMK 输入客户端 bundle identity 作为来源，缺失/无效时 unknown 禁学，不借最前台已知应用放宽；保留 secure/private/sensitive 与 composition 锁定策略。该隐私路由修复、相关合同回归和后续候选/实机动作待单独明确范围，REV-01/REV-02 继续开放。
+
 ## REV-03：输入线程的数据库等待
 
 [候选选择](../../crates/ime-runtime/src/session.rs)在返回结果前同步执行 `record_selection`；[学习事务](../../crates/ime-userdb/src/store/learning.rs)取得 `Immediate` 写事务，[连接策略](../../crates/ime-userdb/src/store/connection.rs)配置 `busy_timeout = 5000 ms`。平台收到结果后才向宿主提交文本，存在写锁竞争拖住输入回调的风险。
