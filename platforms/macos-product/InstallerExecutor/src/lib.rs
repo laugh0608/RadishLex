@@ -25,10 +25,12 @@ use radishlex_macos_product_install_coordinator::{
 use radishlex_macos_upgrade_coordinator::{MacOsProductPreflightAdapter, MacOsUpgradeAdapterError};
 
 mod bootstrap;
+mod recovery;
 pub use bootstrap::{
     bootstrap_upgrade_receipt, BootstrappedUpgradeReceipt, UpgradeBootstrapError,
     UpgradeBootstrapErrorCode,
 };
+pub use recovery::inspect_installer_view_with_recovery;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InstallerPreflightEvidence {
@@ -100,6 +102,15 @@ impl InstallerOperationIdSource for SystemInstallerOperationIdSource {
 pub trait InstallerProgramPort: InstallFinalizationPort + InstallProgramValidationPort {
     fn target_product(&self) -> &ProductArtifactIdentity;
 
+    fn verify_recovery_material(
+        &mut self,
+        _manager: &ProgramSwitchStore,
+        _input_method: &ProgramSwitchStore,
+        _receipt: &InstallReceipt,
+    ) -> Result<(), InstallerExecutionError> {
+        Err(InstallerExecutionError::InvalidState)
+    }
+
     fn open_program_store(
         &self,
         receipt_store: &InstallReceiptStore,
@@ -128,6 +139,19 @@ pub trait InstallerProgramPort: InstallFinalizationPort + InstallProgramValidati
 impl InstallerProgramPort for MacOsProductInstallAdapter {
     fn target_product(&self) -> &ProductArtifactIdentity {
         self.target_product()
+    }
+
+    fn verify_recovery_material(
+        &mut self,
+        manager: &ProgramSwitchStore,
+        input_method: &ProgramSwitchStore,
+        receipt: &InstallReceipt,
+    ) -> Result<(), InstallerExecutionError> {
+        for program in [manager, input_method] {
+            self.verify_program_recovery_material(program, receipt)
+                .map_err(|error| InstallerExecutionError::InstallAdapter(error.code()))?;
+        }
+        Ok(())
     }
 
     fn open_program_store(
@@ -226,6 +250,9 @@ where
         self.upgrade_store
             .verify_current(&upgrade_guard, self.upgrade_receipt)
             .map_err(|error| InstallerExecutionError::UpgradeFilesystem(error.code()))?;
+        if recovery::is_pre_switch_abort(self.upgrade_receipt) {
+            return Err(InstallerExecutionError::InvalidIntent);
+        }
         if matches!(
             install_receipt.state(),
             InstallState::DataSettled | InstallState::FinalVerified | InstallState::Completed
@@ -333,6 +360,7 @@ pub enum InstallerExecutionError {
     UpgradeFinalization(InstallProductFinalizationError),
     UpgradeFilesystem(radishlex_ime_product_upgrade::UpgradeFilesystemErrorCode),
     UpgradeBootstrap(UpgradeBootstrapErrorCode),
+    RecoveryEvidence(radishlex_macos_product_install::RecoveryEvidenceError),
 }
 
 impl fmt::Display for InstallerExecutionError {
@@ -352,6 +380,7 @@ impl fmt::Display for InstallerExecutionError {
             Self::UpgradeFinalization(_) => "Installer upgrade finalization failure",
             Self::UpgradeFilesystem(_) => "Installer upgrade receipt filesystem failure",
             Self::UpgradeBootstrap(_) => "Installer upgrade receipt bootstrap failure",
+            Self::RecoveryEvidence(_) => "Installer recovery preservation evidence failure",
         })
     }
 }
@@ -375,6 +404,7 @@ impl InstallerExecutionError {
             Self::UpgradeFinalization(_) => "upgrade_finalization_failure",
             Self::UpgradeFilesystem(_) => "upgrade_filesystem_failure",
             Self::UpgradeBootstrap(_) => "upgrade_bootstrap_failure",
+            Self::RecoveryEvidence(_) => "recovery_evidence_failure",
         }
     }
 }
@@ -396,6 +426,32 @@ where
     I: InstallerOperationIdSource,
     U: UpgradeCoordinatorPort,
 {
+    let data_root = data_root.as_ref();
+    if intent.action() == InstallerAction::AbortPreSwitchUpgrade {
+        return recovery::execute_pre_switch_recovery(
+            intent,
+            install_store,
+            data_root,
+            expected_owner_id,
+            programs,
+            preflight,
+            upgrade_port,
+        );
+    }
+    // An existing preservation baseline belongs to the explicit recovery action.
+    // A stale ordinary Resume intent must not bypass its checks.
+    if intent.operation_kind() == Some(InstallOperationKind::Upgrade) && intent.resume_existing() {
+        let outer = install_store
+            .load_for_recovery_inspection()
+            .map_err(|error| InstallerExecutionError::InstallFilesystem(error.code()))?
+            .ok_or(InstallerExecutionError::InvalidState)?;
+        if radishlex_macos_product_install::PreSwitchRecoveryEvidence::load(data_root, &outer)
+            .map_err(InstallerExecutionError::RecoveryEvidence)?
+            .is_some()
+        {
+            return Err(InstallerExecutionError::InvalidIntent);
+        }
+    }
     if intent.operation_kind() != Some(InstallOperationKind::Upgrade) {
         return execute_authorized_intent(
             intent,

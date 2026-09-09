@@ -24,6 +24,9 @@ use serde::Deserialize;
 mod codesign;
 mod copy;
 mod manifest;
+mod recovery_evidence;
+
+pub use recovery_evidence::{PreSwitchRecoveryEvidence, RecoveryEvidenceError};
 
 #[cfg(feature = "qualification-harness")]
 use codesign::CodesignQualificationCodeSignatureVerifier;
@@ -480,6 +483,79 @@ impl MacOsProductInstallAdapter {
             .ok_or_else(|| error(MacOsInstallAdapterErrorCode::InvalidOperation))?
             .program(program_store.component());
         self.verify_program(program_store.target_path(), expected)
+    }
+
+    /// Verifies both source and target wherever the core restore state places them.
+    /// This also covers interruption between the two renames of a component.
+    pub fn verify_program_recovery_material(
+        &self,
+        program_store: &ProgramSwitchStore,
+        receipt: &InstallReceipt,
+    ) -> Result<(), MacOsInstallAdapterError> {
+        self.verify_store_binding(program_store, receipt)?;
+        let source = receipt
+            .source_product()
+            .ok_or_else(|| error(MacOsInstallAdapterErrorCode::InvalidOperation))?;
+        let target = receipt
+            .target_product()
+            .ok_or_else(|| error(MacOsInstallAdapterErrorCode::InvalidOperation))?;
+        if self.payload.upgrade_source_product(source.release()) != Some(source)
+            || target != self.payload.target_product()
+        {
+            return Err(error(MacOsInstallAdapterErrorCode::ProductChanged));
+        }
+        let source_at_backup = !path_is_absent(program_store.source_backup_bundle_path())?;
+        let target_at_stage = !path_is_absent(program_store.staged_bundle_path())?;
+        if receipt.state() == InstallState::DataCoordinating
+            && (!source_at_backup || target_at_stage)
+        {
+            return Err(error(MacOsInstallAdapterErrorCode::InvalidOperation));
+        }
+        if !source_at_backup && !target_at_stage {
+            return Err(error(MacOsInstallAdapterErrorCode::InvalidOperation));
+        }
+        let source_path = if source_at_backup {
+            program_store.source_backup_bundle_path()
+        } else {
+            program_store.target_path()
+        };
+        let target_path = if target_at_stage {
+            program_store.staged_bundle_path()
+        } else {
+            program_store.target_path()
+        };
+        let (source_slot, target_slot) = match program_store.component() {
+            ProgramComponent::Manager => (
+                radishlex_ime_product_install::InstallArtifactSlot::SourceManager,
+                radishlex_ime_product_install::InstallArtifactSlot::InstalledManager,
+            ),
+            ProgramComponent::InputMethod => (
+                radishlex_ime_product_install::InstallArtifactSlot::SourceInputMethod,
+                radishlex_ime_product_install::InstallArtifactSlot::InstalledInputMethod,
+            ),
+        };
+        for (path, slot) in [(source_path, source_slot), (target_path, target_slot)] {
+            let expected = receipt
+                .artifact(slot)
+                .ok_or_else(|| error(MacOsInstallAdapterErrorCode::InvalidOperation))?
+                .filesystem_identity();
+            let metadata = fs::symlink_metadata(path)
+                .map_err(|_| error(MacOsInstallAdapterErrorCode::ProductChanged))?;
+            if !metadata.is_dir()
+                || metadata.dev() != expected.device_id()
+                || metadata.ino() != expected.inode()
+                || metadata.uid() != expected.owner_id()
+                || metadata.mode() & 0o7777 != expected.mode()
+            {
+                return Err(error(MacOsInstallAdapterErrorCode::ProductChanged));
+            }
+        }
+        self.verify_program(source_path, source.program(program_store.component()))?;
+        self.verify_program(target_path, target.program(program_store.component()))?;
+        if source_at_backup && target_at_stage && !path_is_absent(program_store.target_path())? {
+            return Err(error(MacOsInstallAdapterErrorCode::InvalidOperation));
+        }
+        Ok(())
     }
 
     fn load_with_services(

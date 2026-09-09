@@ -107,6 +107,20 @@ int main(void) {
 
         RLXInstallerPresentation *removal = [[RLXInstallerPresentation alloc]
             initWithDriverSnapshot:Snapshot(
+                @"recovery_available", @"abort_pre_switch_upgrade", @"none", @"none",
+                @"data_coordinating", @"upgrade", 7,
+                @"select_neutral_input_source_and_close_manager")];
+        Require([removal isActionEnabled:@"abort_pre_switch_upgrade"] &&
+                [removal requiresConfirmationForAction:@"abort_pre_switch_upgrade"] &&
+                removal.requiresManualQuiescence,
+                @"recovery must be offered explicitly and require confirmation");
+        Require([[removal confirmationTextForAction:@"abort_pre_switch_upgrade"]
+                    containsString:@"WAL"] &&
+                ![removal isActionEnabled:@"resume_operation"],
+                @"recovery must explain preservation and reject stale resume");
+
+        removal = [[RLXInstallerPresentation alloc]
+            initWithDriverSnapshot:Snapshot(
                 @"ready", @"begin_repair", @"remove_programs", @"none",
                 @"none", @"repair", 0, @"none")];
         NSString *removalConfirmation =

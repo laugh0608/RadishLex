@@ -40,6 +40,7 @@ static NSString *_Nullable RLXActionCode(uint32_t value) {
     case RADISHLEX_INSTALLER_ACTION_RESUME_OPERATION: return @"resume_operation";
     case RADISHLEX_INSTALLER_ACTION_RETRY_OPERATION: return @"retry_operation";
     case RADISHLEX_INSTALLER_ACTION_REMOVE_PROGRAMS: return @"remove_programs";
+    case RADISHLEX_INSTALLER_ACTION_ABORT_PRE_SWITCH_UPGRADE: return @"abort_pre_switch_upgrade";
     default: return nil;
     }
 }
@@ -145,6 +146,7 @@ static uint32_t RLXActionValue(NSString *actionCode) {
         @"resume_operation": @(RADISHLEX_INSTALLER_ACTION_RESUME_OPERATION),
         @"retry_operation": @(RADISHLEX_INSTALLER_ACTION_RETRY_OPERATION),
         @"remove_programs": @(RADISHLEX_INSTALLER_ACTION_REMOVE_PROGRAMS),
+        @"abort_pre_switch_upgrade": @(RADISHLEX_INSTALLER_ACTION_ABORT_PRE_SWITCH_UPGRADE),
     };
     return actions[actionCode].unsignedIntValue ?: UINT32_MAX;
 }
@@ -154,14 +156,16 @@ static uint32_t RLXAuthorizationFlags(NSString *actionCode) {
         return 0;
     }
     uint32_t flags = RADISHLEX_INSTALLER_AUTH_EXPLICIT_CONFIRMATION;
-    if ([actionCode isEqualToString:@"remove_programs"]) {
+    if ([actionCode isEqualToString:@"remove_programs"] ||
+        [actionCode isEqualToString:@"abort_pre_switch_upgrade"]) {
         flags |= RADISHLEX_INSTALLER_AUTH_DATA_RETENTION;
     }
     if ([actionCode isEqualToString:@"begin_upgrade"] ||
         [actionCode isEqualToString:@"begin_repair"] ||
         [actionCode isEqualToString:@"confirm_quiescence"] ||
         [actionCode isEqualToString:@"retry_operation"] ||
-        [actionCode isEqualToString:@"remove_programs"]) {
+        [actionCode isEqualToString:@"remove_programs"] ||
+        [actionCode isEqualToString:@"abort_pre_switch_upgrade"]) {
         flags |= RADISHLEX_INSTALLER_AUTH_NEUTRAL_INPUT_SOURCE;
         flags |= RADISHLEX_INSTALLER_AUTH_MANAGER_CLOSED;
     }

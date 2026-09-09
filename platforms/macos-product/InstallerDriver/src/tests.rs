@@ -305,3 +305,75 @@ fn stable_summary_contains_only_codes_and_no_paths_or_operation_identifier() {
     assert!(!summary.contains("RadishLex"));
     assert!(!summary.contains('/'));
 }
+
+#[test]
+fn pre_switch_recovery_requires_fresh_offering_and_all_acknowledgements() {
+    let base = snapshot(
+        InstallerViewPhase::InProgress,
+        InstallerAction::ResumeOperation,
+        InstallerAction::None,
+        InstallerStableError::None,
+        InstallerManualPrompt::None,
+        Some(InstallOperationKind::Upgrade),
+        Some(InstallState::DataCoordinating),
+        None,
+    );
+    let full = InstallerUserAuthorization {
+        explicit_action_confirmed: true,
+        data_retention_acknowledged: true,
+        neutral_input_source_selected: true,
+        manager_closed: true,
+    };
+    assert_eq!(
+        authorize_installer_action(base, InstallerAction::AbortPreSwitchUpgrade, full),
+        Err(InstallerAuthorizationError::ActionNotOffered)
+    );
+    let id = "00112233445566778899aabbccddeeff";
+    let root = radishlex_ime_product_install::InstallRootIdentity::new(1, 2, 501, 0o700).unwrap();
+    let receipt = InstallReceipt::new(
+        id,
+        None,
+        InstallOperationKind::Upgrade,
+        root.clone(),
+        Some(product("1.0.0", 1)),
+        Some(product("2.0.0", 2)),
+    )
+    .unwrap();
+    let eligible = base.with_pre_switch_recovery(&receipt, false);
+    for bit in 0..4 {
+        let mut missing = full;
+        match bit {
+            0 => missing.explicit_action_confirmed = false,
+            1 => missing.data_retention_acknowledged = false,
+            2 => missing.neutral_input_source_selected = false,
+            3 => missing.manager_closed = false,
+            _ => unreachable!(),
+        }
+        assert!(authorize_installer_action(
+            eligible,
+            InstallerAction::AbortPreSwitchUpgrade,
+            missing
+        )
+        .is_err());
+    }
+    let intent =
+        authorize_installer_action(eligible, InstallerAction::AbortPreSwitchUpgrade, full).unwrap();
+    assert!(intent.resume_existing() && intent.requires_platform_preflight());
+    assert!(intent.matches_recovery_receipt(&receipt));
+    let changed = InstallReceipt::new(
+        "11112222333344445555666677778888",
+        None,
+        InstallOperationKind::Upgrade,
+        root,
+        Some(product("1.0.0", 1)),
+        Some(product("2.0.0", 2)),
+    )
+    .unwrap();
+    assert!(!intent.matches_recovery_receipt(&changed));
+    let recovering = base.with_pre_switch_recovery(&receipt, true);
+    assert!(recovering.offers(InstallerAction::AbortPreSwitchUpgrade));
+    assert!(!recovering.offers(InstallerAction::ResumeOperation));
+    assert!(!blocked_snapshot(InstallerStableError::InvalidReceipt)
+        .with_pre_switch_recovery(&receipt, true)
+        .offers(InstallerAction::AbortPreSwitchUpgrade));
+}

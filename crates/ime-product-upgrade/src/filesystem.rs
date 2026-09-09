@@ -240,6 +240,57 @@ impl UpgradeReceiptStore {
         &self.root.identity
     }
 
+    /// Opens an existing state directory without creating or changing any object.
+    pub fn open_existing(root: VerifiedDataRoot) -> Result<Self, UpgradeFilesystemError> {
+        root.revalidate()?;
+        let state_directory = root.path.join(STATE_DIRECTORY_NAME);
+        let metadata = fs::symlink_metadata(&state_directory)
+            .map_err(|_| error(UpgradeFilesystemErrorCode::UnsafeStateDirectory))?;
+        verify_private_directory(&metadata, root.expected_owner_id, 0o700)?;
+        let store = Self {
+            guard_socket_path: build_guard_socket_path(&root.identity, root.expected_owner_id)?,
+            root,
+            state_directory,
+            state_directory_identity: DirectoryIdentity::from_metadata(&metadata),
+        };
+        store.revalidate()?;
+        store.validate_known_entries()?;
+        Ok(store)
+    }
+
+    /// Read-only recovery inspection. A refused, identity-checked stale socket is
+    /// retained for a later authorized guard acquisition; live/unknown guards block.
+    pub fn load_for_recovery_inspection(
+        &self,
+    ) -> Result<Option<UpgradeReceipt>, UpgradeFilesystemError> {
+        self.revalidate()?;
+        self.validate_known_entries()?;
+        if path_exists(&self.staged_receipt_path())? {
+            return Err(error(UpgradeFilesystemErrorCode::InterruptedReceiptWrite));
+        }
+        if path_exists(&self.guard_path())? {
+            let before = fs::symlink_metadata(self.guard_path())
+                .map_err(|_| error(UpgradeFilesystemErrorCode::IdentityChanged))?;
+            verify_private_socket(&before, self.root.expected_owner_id)?;
+            match UnixStream::connect(self.guard_path()) {
+                Err(io) if io.kind() == ErrorKind::ConnectionRefused => {}
+                _ => return Err(error(UpgradeFilesystemErrorCode::OperationAlreadyActive)),
+            }
+            let after = fs::symlink_metadata(self.guard_path())
+                .map_err(|_| error(UpgradeFilesystemErrorCode::IdentityChanged))?;
+            verify_private_socket(&after, self.root.expected_owner_id)?;
+            if FileIdentity::from_metadata(&before) != FileIdentity::from_metadata(&after) {
+                return Err(error(UpgradeFilesystemErrorCode::IdentityChanged));
+            }
+        }
+        let receipt = self.load_current_internal()?.map(|(receipt, _, _)| receipt);
+        snapshot::validate_snapshot_state(self, receipt.as_ref())?;
+        candidate::validate_candidate_state(self, receipt.as_ref())?;
+        settings::validate_settings_backup_state(self, receipt.as_ref())?;
+        switch::validate_switch_state(self, receipt.as_ref())?;
+        Ok(receipt)
+    }
+
     pub fn acquire_guard(&self) -> Result<UpgradeProcessGuard, UpgradeFilesystemError> {
         self.revalidate()?;
         self.validate_known_entries()?;

@@ -15,9 +15,29 @@ use radishlex_ime_product_install::{
 use radishlex_ime_product_upgrade::{
     ProductRelease as UpgradeProductRelease, UpgradeCandidateValidationReport,
     UpgradeCoordinatorCheckpoint, UpgradeCoordinatorDisposition, UpgradeCoordinatorError,
-    UpgradeCoordinatorPort, UpgradePostSwitchValidationReport, UpgradeProcessGuard, UpgradeReceipt,
-    UpgradeReceiptStore, UpgradeRollbackValidationEvidence, UpgradeState,
+    UpgradeCoordinatorPort, UpgradeFailureCode, UpgradePostSwitchValidationReport,
+    UpgradeProcessGuard, UpgradeReceipt, UpgradeReceiptStore, UpgradeRollbackValidationEvidence,
+    UpgradeState,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreSwitchRecoveryCheckpoint {
+    BeforeAbort,
+    BeforeManagerRestore,
+    BeforeInputMethodRestore,
+    BeforeProgramsRestored,
+    BeforeRolledBack,
+}
+
+pub trait PreSwitchRecoveryValidationPort: InstallProgramValidationPort {
+    fn validate_recovery_checkpoint(
+        &mut self,
+        manager: &ProgramSwitchStore,
+        input_method: &ProgramSwitchStore,
+        receipt: &InstallReceipt,
+        checkpoint: PreSwitchRecoveryCheckpoint,
+    ) -> bool;
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InstallProgramValidationStage {
@@ -50,6 +70,7 @@ pub enum InstallDataCoordinationError {
     InvalidBinding,
     InvalidState,
     ProgramValidationNotProven(InstallProgramValidationStage),
+    RecoveryValidationNotProven(PreSwitchRecoveryCheckpoint),
 }
 
 impl fmt::Display for InstallDataCoordinationError {
@@ -70,6 +91,9 @@ impl fmt::Display for InstallDataCoordinationError {
             }
             Self::ProgramValidationNotProven(_) => {
                 formatter.write_str("install program validation was not proven")
+            }
+            Self::RecoveryValidationNotProven(_) => {
+                formatter.write_str("pre-switch recovery preservation was not proven")
             }
         }
     }
@@ -256,8 +280,135 @@ where
             input_method,
             upgrade_port,
             program_validation,
+            |_, _, _, _| Ok(()),
         ),
     }
+}
+
+/// Explicitly aborts only a verified, unswitched candidate and restores source
+/// programs. Preservation and platform checks run at every restore boundary.
+#[allow(clippy::too_many_arguments)]
+pub fn abort_pre_switch_install_upgrade<U, V>(
+    install_store: &InstallReceiptStore,
+    install_guard: &InstallProcessGuard,
+    install_receipt: &mut InstallReceipt,
+    manager: &ProgramSwitchStore,
+    input_method: &ProgramSwitchStore,
+    upgrade_store: &UpgradeReceiptStore,
+    upgrade_guard: &UpgradeProcessGuard,
+    upgrade_receipt: &mut UpgradeReceipt,
+    upgrade_port: &mut U,
+    validation: &mut V,
+) -> Result<InstallDataCoordinationSummary, InstallDataCoordinationError>
+where
+    U: UpgradeCoordinatorPort,
+    V: PreSwitchRecoveryValidationPort,
+{
+    validate_binding(
+        install_store,
+        install_guard,
+        install_receipt,
+        manager,
+        input_method,
+        upgrade_store,
+        upgrade_guard,
+        upgrade_receipt,
+    )?;
+    let initial = upgrade_receipt.state() == UpgradeState::CandidateVerified
+        && install_receipt.state() == InstallState::DataCoordinating
+        && upgrade_receipt.failure_code().is_none();
+    let resuming = upgrade_receipt.state() == UpgradeState::AbortedPreserved
+        && upgrade_receipt.failure_code() == Some(UpgradeFailureCode::SwitchFailed)
+        && upgrade_receipt.failure_after_state() == Some(UpgradeState::CandidateVerified)
+        && !upgrade_receipt.manual_recovery_required()
+        && matches!(
+            install_receipt.state(),
+            InstallState::DataCoordinating
+                | InstallState::RollbackRequired
+                | InstallState::ProgramsRestored
+        );
+    if !initial && !resuming {
+        return Err(InstallDataCoordinationError::InvalidState);
+    }
+    validate_recovery_boundary(
+        upgrade_port,
+        validation,
+        manager,
+        input_method,
+        install_receipt,
+        PreSwitchRecoveryCheckpoint::BeforeAbort,
+    )?;
+    validate_binding(
+        install_store,
+        install_guard,
+        install_receipt,
+        manager,
+        input_method,
+        upgrade_store,
+        upgrade_guard,
+        upgrade_receipt,
+    )?;
+    if initial {
+        let mut next = upgrade_receipt.clone();
+        next.abort_preserved(UpgradeFailureCode::SwitchFailed, false)
+            .map_err(|_| InstallDataCoordinationError::InvalidState)?;
+        upgrade_store
+            .persist(upgrade_guard, &next)
+            .map_err(|error| {
+                InstallDataCoordinationError::Upgrade(UpgradeCoordinatorError::Filesystem(
+                    error.code(),
+                ))
+            })?;
+        *upgrade_receipt = next;
+    }
+    settle_failed_data(
+        install_store,
+        install_guard,
+        install_receipt,
+        manager,
+        input_method,
+        upgrade_port,
+        validation,
+        |upgrade, validation, receipt, checkpoint| {
+            validate_binding(
+                install_store,
+                install_guard,
+                receipt,
+                manager,
+                input_method,
+                upgrade_store,
+                upgrade_guard,
+                upgrade_receipt,
+            )?;
+            validate_recovery_boundary(
+                upgrade,
+                validation,
+                manager,
+                input_method,
+                receipt,
+                checkpoint,
+            )
+        },
+    )
+}
+
+fn validate_recovery_boundary<U: UpgradeCoordinatorPort, V: PreSwitchRecoveryValidationPort>(
+    upgrade: &mut U,
+    validation: &mut V,
+    manager: &ProgramSwitchStore,
+    input_method: &ProgramSwitchStore,
+    receipt: &InstallReceipt,
+    checkpoint: PreSwitchRecoveryCheckpoint,
+) -> Result<(), InstallDataCoordinationError> {
+    if !upgrade.confirm_quiescence(UpgradeCoordinatorCheckpoint::BeforeRollbackRestore)
+        || !validation.validate_recovery_checkpoint(manager, input_method, receipt, checkpoint)
+        || !upgrade.confirm_quiescence(UpgradeCoordinatorCheckpoint::BeforeRollbackRestore)
+    {
+        return Err(InstallDataCoordinationError::RecoveryValidationNotProven(
+            checkpoint,
+        ));
+    }
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -453,7 +604,7 @@ where
 }
 
 #[allow(clippy::too_many_arguments)]
-fn settle_failed_data<U, V>(
+fn settle_failed_data<U, V, F>(
     install_store: &InstallReceiptStore,
     install_guard: &InstallProcessGuard,
     install_receipt: &mut InstallReceipt,
@@ -461,10 +612,17 @@ fn settle_failed_data<U, V>(
     input_method: &ProgramSwitchStore,
     upgrade_port: &mut U,
     program_validation: &mut V,
+    mut recovery_check: F,
 ) -> Result<InstallDataCoordinationSummary, InstallDataCoordinationError>
 where
     U: UpgradeCoordinatorPort,
     V: InstallProgramValidationPort,
+    F: FnMut(
+        &mut U,
+        &mut V,
+        &InstallReceipt,
+        PreSwitchRecoveryCheckpoint,
+    ) -> Result<(), InstallDataCoordinationError>,
 {
     if install_receipt.state() == InstallState::DataCoordinating {
         prove_installed_target(
@@ -483,13 +641,31 @@ where
     }
 
     if install_receipt.state() == InstallState::RollbackRequired {
+        recovery_check(
+            upgrade_port,
+            program_validation,
+            install_receipt,
+            PreSwitchRecoveryCheckpoint::BeforeManagerRestore,
+        )?;
         restore_program_source(install_store, install_guard, manager, install_receipt)?;
+        recovery_check(
+            upgrade_port,
+            program_validation,
+            install_receipt,
+            PreSwitchRecoveryCheckpoint::BeforeInputMethodRestore,
+        )?;
         restore_program_source(install_store, install_guard, input_method, install_receipt)?;
         if !program_validation.validate_restored_sources(manager, input_method, install_receipt) {
             return Err(InstallDataCoordinationError::ProgramValidationNotProven(
                 InstallProgramValidationStage::RestoredSource,
             ));
         }
+        recovery_check(
+            upgrade_port,
+            program_validation,
+            install_receipt,
+            PreSwitchRecoveryCheckpoint::BeforeProgramsRestored,
+        )?;
         finish_program_restore(
             install_store,
             install_guard,
@@ -500,6 +676,12 @@ where
     }
 
     if install_receipt.state() == InstallState::ProgramsRestored {
+        recovery_check(
+            upgrade_port,
+            program_validation,
+            install_receipt,
+            PreSwitchRecoveryCheckpoint::BeforeRolledBack,
+        )?;
         if !program_validation.validate_restored_sources(manager, input_method, install_receipt) {
             return Err(InstallDataCoordinationError::ProgramValidationNotProven(
                 InstallProgramValidationStage::RestoredSource,

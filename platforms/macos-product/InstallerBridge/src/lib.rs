@@ -14,13 +14,14 @@ use radishlex_ime_product_upgrade::{
     UpgradeRollbackValidationEvidence,
 };
 use radishlex_macos_installer_driver::{
-    authorize_installer_action, inspect_installer_view, InstallerAction,
-    InstallerAuthorizationError, InstallerManualPrompt, InstallerProductSituation,
-    InstallerStableError, InstallerUserAuthorization, InstallerViewPhase, InstallerViewSnapshot,
+    authorize_installer_action, InstallerAction, InstallerAuthorizationError,
+    InstallerManualPrompt, InstallerProductSituation, InstallerStableError,
+    InstallerUserAuthorization, InstallerViewPhase, InstallerViewSnapshot,
     INSTALLER_VIEW_CONTRACT_VERSION,
 };
 use radishlex_macos_installer_executor::{
-    execute_authorized_intent_with_upgrade_bootstrap, InstallerExecutionError,
+    execute_authorized_intent_with_upgrade_bootstrap,
+    inspect_installer_view_with_recovery as inspect_installer_view, InstallerExecutionError,
     InstallerExecutionSummary, InstallerOperationIdSource, InstallerPreflightPort,
     InstallerProgramPort, SystemInstallerOperationIdSource, UpgradeCoordinatorPort,
 };
@@ -183,7 +184,7 @@ fn production_perform(
         };
     let mut operation_ids = SystemInstallerOperationIdSource;
     let mut upgrade = if intent.operation_kind() == Some(InstallOperationKind::Upgrade) {
-        let current = match store.load() {
+        let current = match store.load_for_recovery_inspection() {
             Ok(Some(receipt)) => receipt,
             _ => return unavailable_snapshot(InstallerStableError::UnknownDriverResult),
         };
@@ -483,6 +484,7 @@ fn decode_action(value: u32) -> Option<InstallerAction> {
         6 => Some(InstallerAction::ResumeOperation),
         7 => Some(InstallerAction::RetryOperation),
         8 => Some(InstallerAction::RemovePrograms),
+        9 => Some(InstallerAction::AbortPreSwitchUpgrade),
         _ => None,
     }
 }
@@ -540,6 +542,7 @@ const fn action_value(action: InstallerAction) -> u32 {
         InstallerAction::ResumeOperation => 6,
         InstallerAction::RetryOperation => 7,
         InstallerAction::RemovePrograms => 8,
+        InstallerAction::AbortPreSwitchUpgrade => 9,
     }
 }
 

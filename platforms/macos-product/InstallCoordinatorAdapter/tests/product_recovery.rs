@@ -32,10 +32,8 @@ const SOURCE_PRODUCT_ENV: &str = "RADISHLEX_INSTALL_QUALIFICATION_SOURCE_PRODUCT
 const TARGET_PRODUCT_ENV: &str = "RADISHLEX_INSTALL_QUALIFICATION_TARGET_PRODUCT";
 const SOURCE_PAYLOAD_ENV: &str = "RADISHLEX_INSTALL_QUALIFICATION_SOURCE_PAYLOAD";
 const TARGET_PAYLOAD_ENV: &str = "RADISHLEX_INSTALL_QUALIFICATION_TARGET_PAYLOAD";
-const SOURCE_VERSION: &str = "26.6.1";
-const SOURCE_BUILD: u64 = 34;
-const TARGET_VERSION: &str = "26.7.1";
-const TARGET_BUILD: u64 = 35;
+#[path = "support/pre_switch_recovery.rs"]
+mod pre_switch_recovery;
 
 #[test]
 fn isolated_real_product_install_and_data_recovery_gate() {
@@ -43,6 +41,7 @@ fn isolated_real_product_install_and_data_recovery_gate() {
     interrupted_finalization_resumes_and_opens_both_gates(&roots);
     candidate_failure_restores_exact_source_product(&roots);
     partial_program_commit_restarts_into_completed_product(&roots);
+    pre_switch_recovery::preserves_wal_and_restarts_with_exact_source_programs(&roots);
 }
 
 struct QualificationRoots {
@@ -87,7 +86,7 @@ struct ProductFixture<'a> {
 
 impl<'a> ProductFixture<'a> {
     fn prepared(roots: &'a QualificationRoots, name: &str, operation_id: &'static str) -> Self {
-        Self::prepared_with_program_commit(roots, name, operation_id, true)
+        Self::prepared_with_program_commit(roots, name, operation_id, true, false)
     }
 
     fn prepared_with_program_commit(
@@ -95,6 +94,7 @@ impl<'a> ProductFixture<'a> {
         name: &str,
         operation_id: &'static str,
         commit_input_method: bool,
+        wal_source: bool,
     ) -> Self {
         let scenario_root = roots.qualification.join("install-scenarios").join(name);
         let home = scenario_root.join("home");
@@ -230,8 +230,30 @@ impl<'a> ProductFixture<'a> {
         drop(install_guard);
 
         let database = data_root.join("userdb.sqlite3");
-        drop(UserDb::open(&database).expect("create source database"));
-        UserDb::migrate_and_validate(&database).expect("stabilize source database");
+        let mut db = UserDb::open(&database).expect("create source database");
+        if wal_source {
+            db.record_selection(radishlex_ime_userdb::SelectionEventDraft::new(
+                "recovery-qualified",
+                "shi",
+                "时",
+                0,
+                1,
+            ))
+            .unwrap();
+            db.record_selection(radishlex_ime_userdb::SelectionEventDraft::new(
+                "recovery-qualified",
+                "shanchu",
+                "删除测试",
+                0,
+                1,
+            ))
+            .unwrap();
+            db.delete_term("shanchu", "删除测试", None).unwrap();
+        }
+        drop(db);
+        if !wal_source {
+            UserDb::migrate_and_validate(&database).expect("stabilize source database");
+        }
         let settings = data_root.join("manager-settings.json");
         fs::write(
             &settings,
@@ -247,8 +269,16 @@ impl<'a> ProductFixture<'a> {
         let upgrade_receipt = UpgradeReceipt::new(
             operation_id,
             None,
-            UpgradeProductRelease::new(SOURCE_VERSION, SOURCE_BUILD).expect("source release"),
-            UpgradeProductRelease::new(TARGET_VERSION, TARGET_BUILD).expect("target release"),
+            UpgradeProductRelease::new(
+                source_adapter.target_product().release().product_version(),
+                source_adapter.target_product().release().build_number(),
+            )
+            .expect("source release"),
+            UpgradeProductRelease::new(
+                target_adapter.target_product().release().product_version(),
+                target_adapter.target_product().release().build_number(),
+            )
+            .expect("target release"),
             Some(UserDb::supported_schema_version()),
             UserDb::supported_schema_version(),
             vec![
@@ -523,6 +553,7 @@ fn partial_program_commit_restarts_into_completed_product(roots: &QualificationR
         roots,
         "partial-program-commit",
         "1234567890abcdef1234567890abcdef",
+        false,
         false,
     );
     assert_eq!(

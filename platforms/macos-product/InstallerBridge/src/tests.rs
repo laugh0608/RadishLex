@@ -411,6 +411,12 @@ fn failed_action_cannot_be_hidden_by_progress_completion_or_existing_diagnostics
 #[test]
 fn ffi_contract_is_versioned_and_fails_closed_without_release_identity() {
     assert_eq!(
+        decode_action(9),
+        Some(InstallerAction::AbortPreSwitchUpgrade)
+    );
+    assert_eq!(action_value(InstallerAction::AbortPreSwitchUpgrade), 9);
+    assert_eq!(decode_action(10), None);
+    assert_eq!(
         radishlex_installer_bridge_contract_version(),
         INSTALLER_BRIDGE_CONTRACT_VERSION
     );

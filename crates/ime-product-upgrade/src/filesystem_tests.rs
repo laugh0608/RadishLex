@@ -96,6 +96,30 @@ fn data_root_rejects_non_private_mode_and_symlink() {
 }
 
 #[test]
+fn recovery_inspection_never_creates_state_or_reclaims_a_stale_guard() {
+    let fixture = TestDataRoot::new();
+    assert!(UpgradeReceiptStore::open_existing(fixture.verified()).is_err());
+    assert!(!fixture.data_root.join(STATE_DIRECTORY_NAME).exists());
+    let store = UpgradeReceiptStore::open(fixture.verified()).unwrap();
+    let guard = store.acquire_guard().unwrap();
+    assert_eq!(
+        store.load_for_recovery_inspection().unwrap_err().code(),
+        UpgradeFilesystemErrorCode::OperationAlreadyActive
+    );
+    drop(guard);
+    let socket = store.guard_path();
+    let stale = UnixListener::bind(&socket).unwrap();
+    fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
+    drop(stale);
+    let before = fs::metadata(&socket).unwrap().ino();
+    assert!(store.load_for_recovery_inspection().unwrap().is_none());
+    assert_eq!(fs::metadata(&socket).unwrap().ino(), before);
+    let authorized = store.acquire_guard().unwrap();
+    drop(authorized);
+    assert!(!socket.exists());
+}
+
+#[test]
 fn opened_store_rejects_data_root_mode_drift() {
     let fixture = TestDataRoot::new();
     let store = UpgradeReceiptStore::open(fixture.verified()).expect("store opens");

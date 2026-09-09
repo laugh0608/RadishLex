@@ -182,6 +182,30 @@ fn new_upgrade_receipt(
     .map_err(|_| error(UpgradeBootstrapErrorCode::InvalidInstallReceipt))
 }
 
+pub(super) fn verify_existing_upgrade_binding(
+    outer: &InstallReceipt,
+    inner: &UpgradeReceipt,
+    store: &UpgradeReceiptStore,
+) -> Result<(), UpgradeBootstrapError> {
+    let source = outer
+        .source_product()
+        .ok_or_else(|| error(UpgradeBootstrapErrorCode::InvalidInstallReceipt))?;
+    let target = outer
+        .target_product()
+        .ok_or_else(|| error(UpgradeBootstrapErrorCode::InvalidInstallReceipt))?;
+    verify_outer_root_binding(outer, store.data_root_identity())?;
+    if !persisted_receipt_binding_matches(
+        inner,
+        outer,
+        store.data_root_identity(),
+        &upgrade_release(source.release())?,
+        &upgrade_release(target.release())?,
+    ) {
+        return Err(error(UpgradeBootstrapErrorCode::ReceiptBindingChanged));
+    }
+    Ok(())
+}
+
 fn persisted_receipt_binding_matches(
     current: &UpgradeReceipt,
     install_receipt: &InstallReceipt,
@@ -194,10 +218,15 @@ fn persisted_receipt_binding_matches(
         && current.source_release() == source_release
         && current.target_release() == target_release
         && current.target_schema_version() == UserDb::supported_schema_version()
-        && current
-            .artifacts()
-            .iter()
-            .any(|artifact| artifact == data_root)
+        && current.artifacts().iter().any(|artifact| {
+            // Directory link counts change as operation evidence directories
+            // are added. Match the same stable identity as the receipt store.
+            artifact.slot() == UpgradeArtifactSlot::DataRoot
+                && artifact.device_id() == data_root.device_id()
+                && artifact.inode() == data_root.inode()
+                && artifact.owner_id() == data_root.owner_id()
+                && artifact.mode() == data_root.mode()
+        })
 }
 
 fn verify_outer_root_binding(
