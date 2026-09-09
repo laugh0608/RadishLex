@@ -90,12 +90,12 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 
 ## 待执行实机矩阵
 
-首项已完成安装与 Manager 启动部分，InputMethod 启动仍待执行；其余条目均待执行。仅对本轮新建合成验收库记录必要计数/摘要；截图不得含真实输入历史。
+首次安装与双端固定路径启动已验证；普通输入已完成下方 `shi → 时` 两次选择，其余覆盖仍待执行。仅对本轮新建验收库记录必要计数/摘要；截图不得含真实输入历史。
 
 | 场景 | 需要的实机证据 |
 | --- | --- |
-| 首次安装和固定路径启动 | 09-09：首次安装 completed、双 bundle 身份/无 quarantine、固定路径 Manager 与其两层 gate 允许已验证；InputMethod 进程身份及 gate 待手动添加输入源后验证 |
-| 普通拼音、选候选、翻页与中英切换 | 宿主收到准确 commit；正常选择进入 RadishLex userdb，重复选择/重开后的重排可解释 |
+| 首次安装和固定路径启动 | 09-09：首次安装 completed、双 bundle 身份/无 quarantine、固定路径 Manager 和 InputMethod 正常启动；Manager UI 与真实输入路径分别证明前置 gate 允许，未采集成功 gate 数值 |
+| 普通拼音、选候选、翻页与中英切换 | 09-09：TextEdit `shi → 时` 数字 2 选择、再次候选 1 空格提交及同库学习增量通过；翻页、产品内中英切换与重开仍待执行 |
 | 隐私模式与 composition 中双向切换 | P0 composition 不产生学习；退回普通模式后仅新合格 composition 可学习；输入与 commit 不丢失 |
 | secure input / 敏感应用 / unknown 路由 | 记录系统实际是否把事件交给 IME；系统绕过与控制器收到受限上下文分别判定，不用 C 注入结果填充实机通过 |
 | 分段候选和自动 commit | 完整文本、分段归属与最严格隐私状态跨段保持，无隐私尾段补学习 |
@@ -106,7 +106,17 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 
 本候选准备不关闭 REV-01/REV-02，也不改变 Linux M5 系统操作顺位；Linux 新 pair 与新制品、真实平台回归、输入质量和 MSRV 仍需各自闭合。原 build 38、P04、M4 历史数据与 L6 冻结资产不得用作本批可写测试目标。
 
+## 普通输入与同会话学习：2026-09-09
+
+- 项目所有者手动添加并选择输入源后，只读状态为 `org.radishlex.inputmethod.macos.Pinyin` selected=1，TIS `matches/enabled/selected=2/2/1`；InputMethod 为固定安装路径 `running_verified`，运行数据与 sidecars 已存在。首次安装 receipt 仍为相同 operation 的 `completed`，data root 与 userdb 身份保持一致。
+- 固定用例 `build39-textedit-shi-time-v1`：在 TextEdit 空白文稿输入 `shi`，第一次按实际候选数字 `2` 选择“时”；第二次“时”位于候选 `1`，按空格选择。两次候选编号、实际提交“时”和未感到卡顿均来自项目所有者人工反馈，不是自动抓取的候选/commit 或延迟测量。两轮反馈后只读 TIS 均为 selected=0；只证明检查时已切离 RadishLex，没有连续输入源监视证据。
+- 第一轮前全库 user_terms/selection_events/ranker_weights 均为 `2`，不是空库；仅读取计数，不追溯两条既有记录正文。精确 `shi → 时` 身份当时无 term/ranker/tombstone。第一次之后三项总数均为 `3`，精确身份出现 `engine_selection/active` 词条和 `editor` frequency=1 的排序摘要。第二次之后总数为 `3/4/3`，精确 frequency=2，未产生重复词条/排序行。
+- 三次只读快照均为 schema 9，deleted_terms、negative_feedback、import_batches 为零；Rime `*.userdb*` 条目计数为零。查询仅用 SQLite `mode=ro`、`query_only=ON` 和同一读事务读取聚合与固定合成身份，未调用可能维护权限/迁移的 CLI，也未读取 P1 行。
+- 本组验证真实普通选词、学习持久化及同会话候选变化；没有 fresh-engine 独立排序对照、重启、压力延迟或广泛输入质量结论。当前隐私键状态为 absent，尚未启用隐私模式；下一组需按明确范围测试隐私零学习和恢复普通学习，不能据本组关闭 REV-01/REV-02。
+
 ## 证据位置
+
+- 09-09 普通输入：`/private/tmp/radishlex-build39-input-20260909-_drd2sd7/`，含 `before-shi-time.json`、`after-first-shi-time.json`、`after-second-shi-time.json`；人工反馈与只读聚合分别注明来源。
 
 - 09-09 安装前：`/private/tmp/radishlex-build39-preinstall-20260909-oyfvjeis/`，含 `inventory.json` 与沙盒外 `confirmed-observations.json`；初始沙盒失败日志保留。
 - 09-09 首次安装：`/private/tmp/radishlex-build39-first-install-20260909-y8ikrpku/`，含 `prepared-receipt.json`、`installed-receipt.json`、`postinstall.json` 与 `manager-startup.json`；UI 观察与真实进程查询分别注明来源。

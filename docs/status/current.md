@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核：2026-09-09（macOS build 39 首次安装与固定路径 Manager 启动通过；输入源添加、InputMethod 启动与输入矩阵待执行）；常态分支 `dev`，主线 `master`。
+- 复核：2026-09-09（macOS build 39 首次安装、双端固定路径启动及普通选词/同会话学习通过；隐私等其余输入矩阵待执行）；常态分支 `dev`，主线 `master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
@@ -15,7 +15,7 @@
 
 | 能力 | 实现与自动验证 | 实机证据 | 产品开放与发布 |
 | --- | --- | --- | --- |
-| macOS 离线输入与本地管理 | runtime、FFI、Manager、产品 bundle 与合同测试 | build 38 历史验收；build 39 首次安装与 Manager 启动通过，输入复验待执行 | 已验收范围可供受控本地使用；尚未公开发布 |
+| macOS 离线输入与本地管理 | runtime、FFI、Manager、产品 bundle 与合同测试 | build 38 历史验收；build 39 安装、双端启动及普通选词/学习通过，其余复验待执行 | 已验收范围可供受控本地使用；尚未公开发布 |
 | Linux 输入与本地管理 | Fcitx5 addon、共享 XDG/FFI、Manager | P04 Wayland/X11 与同库验收 | 受控本地验收；尚未公开发布 |
 | Linux 安装维护 | `.deb`、事务、startup gate、八个 crash 自动合同 | 六类 operation 分散证据、两个代表 crash 终态 | 第三个代表 crash、连续 L6 与 P05C 未闭合 |
 | 加密同步 | 协议、服务、客户端及受控合成资格链 | macOS key backend 与本地 HTTPS 资格记录 | 真实用户同步关闭；目标生产部署未验收 |
@@ -25,8 +25,8 @@
 
 - 激活[2026-09 产品审阅与改进跟踪](../remediation/product-review-2026-09.md)，初审基线 `a5345b8`；2026-09-08 完成隔离诊断，随后按批准方案修复 REV-01 并升级 REV-02 Rust SQLite 依赖；新构建的真实输入复验尚未完成。
 - REV-01 已落实 RadishLex 独占学习与 composition 最严格策略保留；升级 SQLite 后 native 48 进程存储/旧合成库回归及 12 进程配置回归通过。REV-02 Rust 链已升至 bundled SQLite 3.51.3，WAL/旧库/备份恢复与新 macOS FFI 身份核验通过；Go 依赖和冻结产物未更换。两项的平台复验、输入质量与工具链限制仍开放，结果与关闭条件只在专题维护。
-- macOS `26.7.1 (39)` 双组件与本地 ad-hoc Installer 已构建，包内 FFI 合成 smoke、资源/载荷身份、完整仓库门禁及 Manager 99 项测试通过。2026-09-09 重新核验现场并取得本次授权后，首次安装到达 `completed`，双程序身份与无 quarantine 检查通过；Manager 从固定路径启动，显示空词库与 `local_only`。后续按[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md)由项目所有者手动添加/选择输入源，再执行合成输入矩阵；此载体无历史升级源，未制作新 DMG、未发布。
-- 项目所有者选择本机现有账户测试；此前 17 个旧目录根已原样归档，545 个节点核对通过。build 39 已在正式路径创建新的安装状态和空 userdb，未导入旧资料；本次结束时 Installer 与 Manager 运行，InputMethod 未运行。归档位置、身份差异与当前现场在联合验收入口维护，不再要求独立账户或虚拟机。
+- macOS `26.7.1 (39)` 双组件与本地 ad-hoc Installer 已构建，包内 FFI 合成 smoke、资源/载荷身份、完整仓库门禁及 Manager 99 项测试通过。2026-09-09 首次安装到达 `completed`，双程序身份与无 quarantine 检查通过；Manager 从固定路径启动，显示 `local_only`。项目所有者已手动添加/选择输入源，固定 TextEdit `shi → 时` 两次选择与本地学习增量通过，候选由 2 升至 1。后续按[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md)验证隐私及其余矩阵；此载体无历史升级源，未制作新 DMG、未发布。
+- 项目所有者选择本机现有账户测试；此前 17 个旧目录根已原样归档，545 个节点核对通过。build 39 已在正式路径创建新的安装状态与验收 userdb，未导入旧资料；InputMethod 已运行，普通选词后已手动切回系统输入源。归档位置、身份差异与当前现场在联合验收入口维护，不再要求独立账户或虚拟机。
 - 次要事项为输入回调锁等待、新词召回/评测、删除与事件保留、MSRV/CI；维护成本、Manager 易用性和早期反馈列为后续建议。具体证据、未知项与关闭条件只在跟踪专题维护。
 - 当前 Rime 来源锁已变化，不能作为冻结 Linux L6 pair 的新 target；现有构建资格检查继续拒绝混配。旧 pair、M5 系统操作顺位和冻结现场保持原状；新 pair 或平台实机动作仍须单独明确范围。
 
