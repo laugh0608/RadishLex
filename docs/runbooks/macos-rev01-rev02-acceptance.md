@@ -48,7 +48,7 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 
 ## 实机前置条件与停止条件
 
-项目所有者已将测试留到 2026-09-09；当日优先事项见[周志](../devlogs/2026-W37.md#2026-09-09明日事项)。下面的前置检查应在执行时重新满足，不能把 09-08 的空路径与静止观察当作次日仍成立。
+项目所有者已于 2026-09-09 授权并完成首次安装及 Manager 启动，结果见下方实机记录；原当日计划保留在[周志](../devlogs/2026-W37.md#2026-09-09明日事项)。下面的前置检查应在对应操作前重新满足，不能把历史空路径与静止观察当作当前仍成立。
 
 1. 先重新只读盘点本机现有 `luobo` 账户：固定双 bundle 路径、现有 build、外层 receipt/guard、相关进程与输入源状态；不读取真实 P1 明文记录，也不从旧授权推断可停进程或覆盖安装。
 2. 以[产品包边界](../macos-product-package-boundary.md)和[Installer 边界](../macos-installer-app-boundary.md)为准，确认安装资格。有效 completed remove 可以再次 first install，不要求更换系统账户；已有数据、receipt 或身份差异必须有明确处置范围，不能靠删记录或忽略检查伪装为空基线。需要升级则另行准备经过资格验证的历史 source 载体。
@@ -77,15 +77,24 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 - 执行状态：按上述计划取得精确系统写入授权后，17 项已全部归档，未执行安装。合成测试覆盖同设备 rename 保持内容/inode/mode/link、目标存在与源漂移时零 mutation、外部 symlink 拒绝；真实执行逐项记录于归档根的 `moves.jsonl`，`completed.json` 为 `archived`，永久删除数为 0。
 - 独立读回确认原 17 项路径全部 absent，归档内 545 个节点的 device/inode/owner/group/mode/mtime、文件大小/hash 与内部链接一致；receipt 原 hash 保留。执行前后产品进程与打开句柄均为零，TIS 为 `0/0/0`；最后独立 `--status` 确认正式 data root、Rime、userdb/sidecars 和 InputMethod bundle 均 absent、进程 stopped。build 39 最终 ProductManifest 再次验证通过。
 
-当前已形成新的空安装路径；之后的 build 39 安装会创建新的合成测试数据，不自动导入旧学习库。归档属于本轮明确整理范围，build 38 候选制品、历史验收文档及 Linux 冻结资产不在移动范围。设备号变化的触发原因仍未证实，生产长期身份与重新挂载兼容问题另行评估。归档不是安装事务恢复或生产身份修复；不要把旧资料直接覆盖回新的运行目录，恢复/再利用必须另行确定范围并检查目标状态。
+09-08 归档完成时形成了新的空安装路径；09-09 的 build 39 安装和 Manager 启动已创建新的测试数据根与空 userdb，未导入旧学习库。归档属于此前明确整理范围，build 38 候选制品、历史验收文档及 Linux 冻结资产不在移动范围。设备号变化的触发原因仍未证实，生产长期身份与重新挂载兼容问题另行评估。归档不是安装事务恢复或生产身份修复；不要把旧资料直接覆盖回新的运行目录，恢复/再利用必须另行确定范围并检查目标状态。
+
+## 本机首次安装与 Manager 启动：2026-09-09
+
+- 安装前在现有 `luobo` / uid 501 账户重新核验：ProductManifest、Installer 内外 payload 和 strict ad-hoc release identity 全部通过，候选摘要与上方冻结身份相同，历史升级源为空；正式双程序、数据/事务根和残留 operation 目录均 absent。输入源为 `0/0/0`，三个产品进程均未运行。沙盒内 TIS XPC 错误及进程查询不可用单独保留，使用沙盒外获准的只读查询确认，不将沙盒失败当作通过。
+- 项目所有者明确授权启动本地 build 39 Installer、通过界面首次安装及静止确认、核验终态并启动 Manager。Installer 先显示 `begin_first_install`；首次确认后持久化 `prepared`，此时复核输入源为零、仅 Installer 运行，再确认推进。operation `514bd2af74b57ee131b66104b1333962` 到达 `first_install/completed`，无 failure 或 manual recovery；UI 随后投影为已安装后的 `begin_repair`，本轮未点击 repair/remove。
+- 已安装 Manager 53 个节点、InputMethod 48 个节点均完成递归 xattr 只读检查，无 quarantine；双程序 ProductManifest/tree、ReleaseIdentity/strict ad-hoc 及版本 `26.7.1 (39)` 验证通过。新 data root 为 uid 501 / `0700`，device `16777234`、inode `32912651` 与 receipt 完全一致；外层 state 仅有 receipt，无残留 guard。安装完成、Manager 启动前无 userdb/settings/Rime。
+- Manager 经固定 `Applications/RadishLex Manager.app` 启动，真实进程路径不在 App Translocation；界面进入空词库，显示 `local_only`、无可显示词条、无 deleted tombstone、导入历史零批次。结合普通启动路径在 Flutter 前强制执行两层 gate，此结果证明 Manager 启动门禁允许；没有采集或编造成功 gate 数值。启动后创建 uid 501 / `0600` 的 `userdb.sqlite3`，receipt 字节保持不变，未读取库正文或导入旧资料。
+- 本批结束时 Installer 和 Manager 继续运行；InputMethod 进程未运行，尚未手动添加/选择输入源，也未执行输入、隐私、删除恢复、重启或旧合成库矩阵。本次不复验 DMG 下载/Gatekeeper，不关闭 REV-01/REV-02，不操作 Linux、旧归档、repair/retry/remove 或发布。
+- 下一步由项目所有者手动在系统设置添加并选择 RadishLex，再以公开合成文本开始普通输入验收；AI 不程序化注册或切换输入源，按实际结果推进后续矩阵。
 
 ## 待执行实机矩阵
 
-所有条目当前均为 **待执行**。仅对独立合成验收库记录必要计数/摘要；截图不得含真实输入历史。
+首项已完成安装与 Manager 启动部分，InputMethod 启动仍待执行；其余条目均待执行。仅对本轮新建合成验收库记录必要计数/摘要；截图不得含真实输入历史。
 
 | 场景 | 需要的实机证据 |
 | --- | --- |
-| 首次安装和固定路径启动 | Installer 完整终态、receipt 与双 bundle/进程身份一致、双端 startup gate 允许 |
+| 首次安装和固定路径启动 | 09-09：首次安装 completed、双 bundle 身份/无 quarantine、固定路径 Manager 与其两层 gate 允许已验证；InputMethod 进程身份及 gate 待手动添加输入源后验证 |
 | 普通拼音、选候选、翻页与中英切换 | 宿主收到准确 commit；正常选择进入 RadishLex userdb，重复选择/重开后的重排可解释 |
 | 隐私模式与 composition 中双向切换 | P0 composition 不产生学习；退回普通模式后仅新合格 composition 可学习；输入与 commit 不丢失 |
 | secure input / 敏感应用 / unknown 路由 | 记录系统实际是否把事件交给 IME；系统绕过与控制器收到受限上下文分别判定，不用 C 注入结果填充实机通过 |
@@ -99,6 +108,8 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 
 ## 证据位置
 
+- 09-09 安装前：`/private/tmp/radishlex-build39-preinstall-20260909-oyfvjeis/`，含 `inventory.json` 与沙盒外 `confirmed-observations.json`；初始沙盒失败日志保留。
+- 09-09 首次安装：`/private/tmp/radishlex-build39-first-install-20260909-y8ikrpku/`，含 `prepared-receipt.json`、`installed-receipt.json`、`postinstall.json` 与 `manager-startup.json`；UI 观察与真实进程查询分别注明来源。
 - 身份与冻结输入核对：`/private/tmp/radishlex-build39-preflight/candidate-identity.json`；前置快照在同目录。
 - 装配、Installer、完整门禁与 artifact verify：`/private/tmp/radishlex-build39-{assembly-escalated,installer,check-repo-escalated,artifact-verify}.log`。
 - 最终七场景：系统临时目录下 `radishlex-bundled-privacy-jw_2a6y3/result.json`，入口输出保存于 `/private/tmp/radishlex-build39-bundled-privacy-final.log`。
