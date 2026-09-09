@@ -166,7 +166,7 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
 - 对 build 39 release 树与 Cargo/pub 锁、冻结 L6 JSON 共 336 项记录进行前后核对，文件字节、mode 和 symlink target 均不变。未创建 `target/macos-release/26.7.1-40/`，尚无 build 40 Installer 或 DMG，未执行安装或发布。
 - macOS/Linux 元数据和冻结 L6 release-pair 合同通过；完整仓库门禁因沙盒合成 Unix socket guard 受限，获准提权后为 `Repository baseline passed`。最终文档、文本与差异检查通过，保留两个既有长文档预算警告。当前 build 40 仍不满足旧 Linux L6 target 资格。
 
-**待单独确认的下一范围**：允许把上述已核验且确实安装过的 build 39 原始产品，作为本次 **仅本机 build 39 → 40** 的唯一受控升级源；随后用既有命令封装 Installer：
+**随后已确认并完成的范围**：项目所有者明确批准把上述已核验且确实安装过的 build 39 原始产品，作为本次 **仅本机 build 39 → 40** 的唯一受控升级源，并用既有命令封装 Installer：
 
 ```bash
 ./scripts/build-macos-release-installer.sh \
@@ -174,10 +174,30 @@ python3 scripts/macos-imk/check_bundled_privacy.py \
   /Users/luobo/Code/RadishLex/target/macos-release/26.7.1-39/Product
 ```
 
-这是针对本地验收候选的明确范围，不把 build 39 追认为公开或已全面验收的版本。[产品包边界](../macos-product-package-boundary.md#installpayload-与历史升级源)当前规定首发没有历史正式发布时 `UpgradeSources` 保持空；build 39 尚未公开发布，因此本准备批没有自行把它加入该集合。源只在新的 payload 中复制并绑定原始身份，不改原包、不用当前代码伪造旧版本。通过后再复核 source/target 载荷与 sealed requirements，并具体授权真实静止、Installer 升级及新版本实机复验；技术身份检查通过不等于已经授权或完成升级。
+这是针对本地验收候选的单批明确范围，不把 build 39 追认为公开或已全面验收的版本。[产品包边界](../macos-product-package-boundary.md#installpayload-与历史升级源)当前规定首发没有历史正式发布时 `UpgradeSources` 保持空；本批按项目所有者明确批准使用本地候选例外，不改变后续发布默认合同。源只在新的 payload 中复制并绑定原始身份，不改原包、不用当前代码伪造旧版本。
+
+## build 40 Installer 封装完成：2026-09-09
+
+- 从 clean `90f2d81` 执行上述命令，生成 `target/macos-release/26.7.1-40/RadishLex Installer.app`，包含独立 `Product/` 与 `InstallPayload/`。构建在沙盒内完成，未启动 GUI、执行安装、停止进程或修改输入源；没有制作 DMG 或发布。
+- 最终 ProductManifest SHA-256 为 `feab640e75a852e611d93b00c7d4f33931b880ddf16359f7f129e681221b624a`；InstallPayloadManifest 为 `e7adf08d69429bb5d4db85c4e5026242dc63091fe50cb8e12bda354cdb1952c8`；Installer 内 ReleaseIdentity 为 `abeed29fd3e4b7949211a16680caabc7f0eccb0b1ba9220ec88af1f245667387`。这些是封装后的身份，不沿用前节装配 manifest。
+- 既有 product/payload/identity verifier 全部通过；内外两份 payload 的完整文件、mode 与 symlink target 一致。唯一 source 为 `UpgradeSources/26.7.1-39`，与原 build 39 Product 完整树一致；sealed requirements 对 Manager/InputMethod 各精确包含 source 和 target 两个身份。Installer、source、target strict signatures 均验证通过。
+- 已安装双组件文件记录及 strict identity 仍与原 build 39 相同；原 release 树、Cargo/pub 锁与冻结 L6 JSON 共 336 项前后不变。初次辅助核验误用 executable 文件名而中断只读检查，随后改为读取实际 `CFBundleExecutable` 完成核验，没有重建或改写载体。
+- 最终 InputMethod executable 仍为 `f32fbc9c…2d07`，包含客户端身份修复诊断，没有 `frontmostApplication` 或 contract 注入入口。双 FFI 与已通过 Manager/输入法 smoke 的 build 40 装配字节相同。再次直接链接最终 Product 运行七个隐私场景，普通学习 1 条、其余 0，SQLite 完整性及无 Rime 自有 userdb 均通过；这仍不证明真实 IMK 路由。
+- 本次只新增封装产物与文档；源码版本已在双组件准备批通过完整仓库门禁，本封装批执行最终载荷/签名核验、最终包内七场景及文档/文本/差异检查，不把前批全仓结果写成本批重跑。
+
+### 下一组待授权：真实正常升级与定向复验
+
+1. 用户先手动切回中立输入源；重新只读确认 TIS、已安装 source 身份、receipt/guard、数据根身份与进程。Manager/旧 Installer 如重新运行则正常退出；只对精确验证的已安装 InputMethod 使用 `./scripts/stop-macos-imk-process.sh --authorized-stop-process`，再次确认静止。不得自动选择或移除输入源。
+2. 启动上述固定 build 40 Installer，通过原生 UI 执行正常 39→40 upgrade，逐步读回 `prepared` 与其后的合法状态，并完成安装器要求的静止确认和继续动作。默认保留用户数据，事务可能生成 staging、backup 和切换后的数据目录；全部材料保留。本组不做故障注入、独立 rollback、repair、retry 或清理。
+3. 成功后交叉核验 completed receipt、source/target、实际双 bundle、数据关系、无 quarantine 和固定路径启动门禁；启动 Manager，由用户手动选择 RadishLex 使新 InputMethod 启动。未满足这些前提不得开始输入复验。
+4. 在新的空白 TextEdit 文稿自动输入固定合成 `shi → 时`：先一组普通对照验证实际 `editor` 学习、既有 `code` 摘要不增；再执行本入口前述隐私→普通、普通→隐私、普通→隐私→普通三组，每组后跟全新普通对照。只发送必要字母和已观察到的候选选择键；待提交 composition 期间不切换前台。
+5. 隐私控制继续使用既有 `--capture-baseline`、`--authorized-enable`、`--authorized-restore`，在后台切换；开始前核实当前为普通且无遗留基线，结束时恢复原值。持久化核验限只读聚合、固定合成身份与目录身份，不读取 P1 正文。任何前置不符、身份/焦点漂移、未知事务、commit 异常或学习增量异常均暂停并保留；只有满足既有恢复前置时才恢复隐私键，不自动补跑。
+
+上述是真实系统和合成输入的新动作范围，等待单独授权；已批准的升级源及 Installer 封装不等于已授权或完成实际升级。其余 secure/sensitive、分段、重启、删除恢复与完整矩阵仍开放。
 
 ## 证据位置
 
+- 09-09 build 40 Installer：构建日志 `/private/tmp/radishlex-build40-installer-20260909.log`；最终身份与不变性记录 `/private/tmp/radishlex-build40-installer-20260909-wduesl7i/verification.json`、`preserved-after.json`。最终七场景日志 `/private/tmp/radishlex-build40-bundled-privacy-final-20260909.log`，系统临时新根 `radishlex-bundled-privacy-l99upr6_`。
 - 09-09 build 40：`/private/tmp/radishlex-build40-prepare-20260909-ivm777oq/` 保存 `preserved-before.json`、`preserved-after.json`、`assembly-identity.json`、`build39-readonly-qualification.json` 及独立 Manager smoke 目录。构建日志为 `/private/tmp/radishlex-build40-assembly-escalated-20260909.log`，包内 FFI 日志为 `/private/tmp/radishlex-build40-bundled-privacy-20260909.log`、`/private/tmp/radishlex-build40-manager-smoke-escalated-20260909.log`；去掉 `escalated` 的相应日志保留沙盒失败。七场景新根为系统临时目录下 `radishlex-bundled-privacy-67ec_vtc`。
 - build 40 完整仓库日志：`/private/tmp/radishlex-build40-check-repo-escalated-20260909.log` 为通过结果，`/private/tmp/radishlex-build40-check-repo-20260909.log` 保留初始沙盒 guard 失败。
 - 09-09 客户端修复：`/private/tmp/radishlex-imk-client-context-final-20260909.log` 为最终 macOS 合同，`/private/tmp/radishlex-imk-client-native-privacy-20260909.log` 为 native 回归，`/private/tmp/radishlex-imk-client-check-repo-escalated-20260909.log` 为完整仓库通过结果；同前缀不含 `escalated` 的全仓日志保留沙盒 guard 失败。native 合成根为系统临时目录下 `radishlex-rime-privacy-2978-1788956612652471000`，不复用先前现场。

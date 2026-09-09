@@ -142,9 +142,9 @@ Manager 隐私草案首次尚未保存时前置检查未通过；项目所有者
 
 `6a55782` 已将应用分类来源改为当前 IMK client 的 `bundleIdentifier`；缺失/无效或查询异常保持 unknown，固定异常日志不包含 App ID 或异常正文。九类身份、五条提交路径、独立隐私/secure 信号、策略往返及更新失败合同通过；既有 native 12 场景 / 48 进程存储回归与完整仓库门禁通过。控制器合同记录 bridge 入参和调用顺序，native 回归验证 Rust 持久化，二者不合并宣称真实 IMK 路由通过。ABI/schema、应用允许表和 runtime 策略不变。已安装 build 39 与原候选仍是修复前版本；新候选、安装后实测及剩余矩阵未执行，REV-01/REV-02 继续开放，详情见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#客户端身份来源修复2026-09-09)。
 
-### 2026-09-09：build 40 双组件与受控升级源待确认
+### 2026-09-09：build 40 双组件与受控 Installer 完成
 
-版本提交 `1636acf` 后已装配 build 40 双组件，二进制确认包含客户端身份修复且不含 contract 注入入口；包内 InputMethod 七场景与 Manager FFI smoke 通过，ABI/schema、双 FFI 与 Rime 来源不变。原 build 39 候选与实际已安装组件的完整树和签名一致，completed receipt/data-root identity 一致，原载体与锁文件保持不变。本轮未生成 build 40 Installer、安装、执行真实输入或发布；需先单独确认把 build 39 本地候选作为本次 39→40 唯一受控升级源，再按既有 payload/identity 机制封装。不能以本地候选冒充历史正式发布，也不据构建或合成测试关闭 REV-01/REV-02。完整身份与下一范围见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#build-40-双组件准备与升级衔接2026-09-09)。
+版本提交 `1636acf` 后已装配 build 40 双组件，二进制确认包含客户端身份修复且不含 contract 注入入口；包内 InputMethod 七场景与 Manager FFI smoke 通过，ABI/schema、双 FFI 与 Rime 来源不变。项目所有者随后明确批准以原 build 39 为本次 39→40 唯一受控本地升级源，Installer 已封装完成；最终双 payload、sealed requirements、source/target strict identity 和最终包内七场景通过，原载体与锁文件保持不变。已安装组件仍为 build 39；真实静止、升级与新版本定向输入复验尚待授权。本地候选例外不追认为历史正式发布，构建或合成测试不关闭 REV-01/REV-02。完整身份、动作及停止条件见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#build-40-installer-封装完成2026-09-09)。
 
 ## REV-03：输入线程的数据库等待
 
