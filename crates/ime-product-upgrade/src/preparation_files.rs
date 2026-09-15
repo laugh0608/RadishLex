@@ -47,6 +47,14 @@ impl PreparationJournalStore {
     }
 
     pub(super) fn family(&self, hasher: &impl PreparationHasher) -> Result<PreparationFamily> {
+        let family = self.read_family(hasher)?;
+        if family.journal.is_some() {
+            return Err(Error::Maintenance(UserDbMaintenanceError::SidecarRemaining));
+        }
+        Ok(family)
+    }
+
+    pub(super) fn read_family(&self, hasher: &impl PreparationHasher) -> Result<PreparationFamily> {
         let source = self.source_path();
         let optional = |suffix: &str| -> Result<Option<PreparationFileIdentity>> {
             let path = sidecar(&source, suffix);
@@ -75,9 +83,6 @@ impl PreparationJournalStore {
             if !inodes.insert(file.inode) {
                 return Err(Error::EvidenceChanged);
             }
-        }
-        if family.journal.is_some() {
-            return Err(Error::Maintenance(UserDbMaintenanceError::SidecarRemaining));
         }
         Ok(family)
     }

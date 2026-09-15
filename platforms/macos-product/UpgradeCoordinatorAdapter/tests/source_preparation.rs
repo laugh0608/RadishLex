@@ -588,6 +588,147 @@ fn child(root: &Path, point: &str) -> std::process::ExitStatus {
         .unwrap()
 }
 
+fn hot_recovery_fixture() -> (Fixture, PreparationJournalStore, UpgradeProcessGuard, Port) {
+    let fixture = Fixture::new();
+    put(
+        &fixture.source(),
+        include_bytes!("../../../../crates/ime-userdb/tests/fixtures/journal-before.sqlite3"),
+    );
+    let (store, guard, mut port) = fixture.reserve();
+    port.fail = Some(Point::BeforeMaintenance);
+    assert!(store
+        .prepare_userdb_source(&guard, &mut port, &MacOsPreparationHasher)
+        .is_err());
+    assert_eq!(
+        store.load_guarded(&guard).unwrap().unwrap().phase(),
+        PreparationPhase::MaintenanceIntent
+    );
+    // Reproduce the real SQLite spill fixture in the already bound main inode.
+    // The separate userdb tests generate real hot journals in exiting processes;
+    // this layer tests durable coordination, not a continuous product crash.
+    fs::write(
+        fixture.source(),
+        include_bytes!("../../../../crates/ime-userdb/tests/fixtures/journal-spilled.sqlite3"),
+    )
+    .unwrap();
+    put(
+        &fixture.0.join("userdb.sqlite3-journal"),
+        include_bytes!(
+            "../../../../crates/ime-userdb/tests/fixtures/journal-spilled.sqlite3-journal"
+        ),
+    );
+    port.fail = None;
+    (fixture, store, guard, port)
+}
+
+#[test]
+fn hot_journal_recovery_records_identity_and_resumes_after_real_process_exit() {
+    for point in [
+        Point::BeforeJournalRecovery,
+        Point::JournalRecoveryIntentRecorded,
+        Point::JournalRecovered,
+    ] {
+        let (fixture, store, guard, mut port) = hot_recovery_fixture();
+        let protected = fs::read(fixture.0.join(SNAPSHOT)).unwrap();
+        drop(guard);
+        drop(store);
+        assert_eq!(child(&fixture.0, &format!("{point:?}")).code(), Some(74));
+        let (store, guard) = fixture.reload();
+        let result = store
+            .prepare_userdb_source(&guard, &mut port, &MacOsPreparationHasher)
+            .unwrap();
+        assert_eq!(result.phase(), PreparationPhase::SourcePrepared);
+        assert!(result.journal_recovery().is_some());
+        assert!(!fixture.0.join("userdb.sqlite3-journal").exists());
+        assert_eq!(fs::read(fixture.0.join(SNAPSHOT)).unwrap(), protected);
+        assert_eq!(
+            UserDb::verify_prepared_source(fixture.source(), fixture.0.join(SNAPSHOT)).unwrap(),
+            9
+        );
+    }
+}
+
+#[test]
+fn recorded_journal_replacement_or_hash_drift_is_preserved_and_rejected() {
+    for replace_inode in [false, true] {
+        let (fixture, store, guard, mut port) = hot_recovery_fixture();
+        port.fail = Some(Point::JournalRecoveryIntentRecorded);
+        assert!(store
+            .prepare_userdb_source(&guard, &mut port, &MacOsPreparationHasher)
+            .is_err());
+        let receipt = store.load_guarded(&guard).unwrap().unwrap();
+        assert!(receipt.journal_recovery().is_some());
+        let journal = fixture.0.join("userdb.sqlite3-journal");
+        let mut bytes = fs::read(&journal).unwrap();
+        if replace_inode {
+            fs::rename(&journal, fixture.0.join("original-journal")).unwrap();
+            put(&journal, &bytes);
+        } else {
+            bytes[100] ^= 1;
+            fs::write(&journal, &bytes).unwrap();
+        }
+        let before = fs::read(fixture.source()).unwrap();
+        port.fail = None;
+        assert_eq!(
+            store.prepare_userdb_source(&guard, &mut port, &MacOsPreparationHasher),
+            Err(SourcePreparationError::EvidenceChanged)
+        );
+        assert_eq!(fs::read(fixture.source()).unwrap(), before);
+        assert_eq!(fs::read(&journal).unwrap(), bytes);
+        assert_eq!(store.load_guarded(&guard).unwrap().unwrap(), receipt);
+    }
+}
+
+#[test]
+fn hot_journal_needs_intent_quiescence_and_single_database_family() {
+    for kind in [
+        "authority",
+        "capacity",
+        "snapshot",
+        "mixed",
+        "super-journal",
+    ] {
+        let (fixture, store, guard, mut port) = hot_recovery_fixture();
+        match kind {
+            "authority" => port.fail = Some(Point::BeforeJournalRecovery),
+            "capacity" => port.capacity = 0,
+            "snapshot" => {
+                let path = fixture.0.join(SNAPSHOT);
+                let mut bytes = fs::read(&path).unwrap();
+                bytes[100] ^= 1;
+                fs::write(path, bytes).unwrap();
+            }
+            "mixed" => put(&fixture.0.join("userdb.sqlite3-wal"), b""),
+            "super-journal" => {
+                let path = fixture.0.join("userdb.sqlite3-journal");
+                let mut bytes = fs::read(&path).unwrap();
+                bytes.extend_from_slice(&[0xd9, 0xd5, 0x05, 0xf9, 0x20, 0xa1, 0x63, 0xd7]);
+                fs::write(path, bytes).unwrap();
+            }
+            _ => unreachable!(),
+        }
+        let source = fs::read(fixture.source()).unwrap();
+        let journal = fs::read(fixture.0.join("userdb.sqlite3-journal")).unwrap();
+        assert!(
+            store
+                .prepare_userdb_source(&guard, &mut port, &MacOsPreparationHasher)
+                .is_err(),
+            "{kind}"
+        );
+        assert_eq!(fs::read(fixture.source()).unwrap(), source);
+        assert_eq!(
+            fs::read(fixture.0.join("userdb.sqlite3-journal")).unwrap(),
+            journal
+        );
+        assert!(store
+            .load_guarded(&guard)
+            .unwrap()
+            .unwrap()
+            .journal_recovery()
+            .is_none());
+    }
+}
+
 #[test]
 #[ignore = "entered only by the parent process-exit matrix"]
 fn source_preparation_child() {
@@ -622,6 +763,11 @@ fn source_preparation_child() {
     );
     port.exit = POINTS
         .into_iter()
+        .chain([
+            Point::BeforeJournalRecovery,
+            Point::JournalRecoveryIntentRecorded,
+            Point::JournalRecovered,
+        ])
         .find(|value| format!("{value:?}") == point);
     assert!(port.exit.is_some());
     store

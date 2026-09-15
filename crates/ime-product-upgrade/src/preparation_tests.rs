@@ -67,6 +67,51 @@ fn prepared() -> PreparationReceipt {
     receipt.record_prepared_source(source).unwrap();
     receipt
 }
+
+#[test]
+fn recovery_identity_is_an_append_only_intent_and_old_bytes_stay_canonical() {
+    let reserved = fixture();
+    assert!(!String::from_utf8(reserved.encode().unwrap())
+        .unwrap()
+        .contains("journal_recovery"));
+    assert_eq!(
+        PreparationReceipt::decode(&reserved.encode().unwrap()).unwrap(),
+        reserved
+    );
+    let mut intent = snapshot_ready();
+    intent.begin_maintenance().unwrap();
+    let mut family = intent.initial_source().clone();
+    family.wal = None;
+    family.shm = None;
+    family.journal = Some(file(24));
+    let mut too_early = reserved.clone();
+    assert!(too_early.record_journal_recovery(family.clone()).is_err());
+    let previous = intent.clone();
+    intent.record_journal_recovery(family.clone()).unwrap();
+    assert!(intent.can_replace(&previous));
+    assert!(!previous.can_replace(&intent));
+    assert_eq!(
+        PreparationReceipt::decode(&intent.encode().unwrap()).unwrap(),
+        intent
+    );
+    assert!(intent.record_journal_recovery(family.clone()).is_err());
+    let mut forged = intent.clone();
+    forged
+        .journal_recovery
+        .as_mut()
+        .unwrap()
+        .journal
+        .as_mut()
+        .unwrap()
+        .sha256 = digest('f');
+    assert!(!forged.can_replace(&intent));
+    let mut mixed = previous.clone();
+    family.wal = Some(file(21));
+    assert!(mixed.record_journal_recovery(family).is_err());
+    intent.record_prepared_source(file(20)).unwrap();
+    assert!(intent.journal_recovery().is_some());
+    assert!(!intent.can_replace(&PreparationReceipt::decode(&previous.encode().unwrap()).unwrap()));
+}
 fn upgrade(receipt: &PreparationReceipt) -> UpgradeReceipt {
     let binding = receipt.binding();
     let source = receipt.prepared_source().unwrap();

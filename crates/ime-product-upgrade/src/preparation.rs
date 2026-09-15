@@ -214,6 +214,8 @@ pub struct PreparationReceipt {
     prepared_source: Option<PreparationFileIdentity>,
     archived_inventory_sha256: Option<String>,
     handoff_receipt_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    journal_recovery: Option<PreparationFamily>,
 }
 impl PreparationReceipt {
     pub fn new(
@@ -229,6 +231,7 @@ impl PreparationReceipt {
             prepared_source: None,
             archived_inventory_sha256: None,
             handoff_receipt_sha256: None,
+            journal_recovery: None,
         };
         receipt.validate()?;
         Ok(receipt)
@@ -253,6 +256,20 @@ impl PreparationReceipt {
     }
     pub fn maintenance_source(&self) -> Option<&PreparationFamily> {
         self.snapshot.as_ref().map(|value| &value.source_family)
+    }
+    pub fn journal_recovery(&self) -> Option<&PreparationFamily> {
+        self.journal_recovery.as_ref()
+    }
+
+    /// Append exactly one recovery identity before any SQLite recovery write.
+    /// The coordinator separately qualifies the journal and proves both guards.
+    pub fn record_journal_recovery(&mut self, family: PreparationFamily) -> Result<(), Error> {
+        if self.phase != PreparationPhase::MaintenanceIntent || self.journal_recovery.is_some() {
+            return Err(Error::InvalidPhase);
+        }
+        let mut next = self.clone();
+        next.journal_recovery = Some(family);
+        self.replace_with(next)
     }
 
     pub fn record_snapshot(
@@ -401,7 +418,11 @@ impl PreparationReceipt {
                     PreparationPhase::HandoffReady
                 )
         );
-        successor
+        let recovery_append = previous.phase == PreparationPhase::MaintenanceIntent
+            && self.phase == PreparationPhase::MaintenanceIntent
+            && previous.journal_recovery.is_none()
+            && self.journal_recovery.is_some();
+        (recovery_append || (successor && self.journal_recovery == previous.journal_recovery))
             && preserves(&previous.snapshot, &self.snapshot)
             && preserves(&previous.prepared_source, &self.prepared_source)
             && preserves(
@@ -427,6 +448,29 @@ impl PreparationReceipt {
         }
         self.binding.validate()?;
         self.initial_source.validate(&self.binding.data_root)?;
+        if let Some(family) = &self.journal_recovery {
+            if self.phase < PreparationPhase::MaintenanceIntent
+                || family.wal.is_some()
+                || family.shm.is_some()
+            {
+                return Err(Error::InvalidPhase);
+            }
+            let journal = family.journal.as_ref().ok_or(Error::InvalidIdentity)?;
+            journal.validate()?;
+            family.database.validate()?;
+            if !family.database.same_object(&self.initial_source.database)
+                || journal.device_id != self.binding.data_root.device_id
+                || journal.owner_id != self.binding.data_root.owner_id
+                || journal.byte_len <= 512
+                || journal.inode == family.database.inode
+                || self
+                    .snapshot
+                    .as_ref()
+                    .is_some_and(|snapshot| journal.inode == snapshot.identity.inode)
+            {
+                return Err(Error::InvalidIdentity);
+            }
+        }
         if self.snapshot.is_some() != (self.phase >= PreparationPhase::SnapshotReady)
             || self.prepared_source.is_some() != (self.phase >= PreparationPhase::SourcePrepared)
             || self.archived_inventory_sha256.is_some()

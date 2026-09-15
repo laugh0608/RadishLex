@@ -263,8 +263,9 @@ fn validate_pair(source: &Path, snapshot: &Path) -> Result<(Metadata, Metadata),
         }
     }
     // A journal present before entry has no durable identity at this layer.
-    // The coordinator must explicitly qualify recovery before any future API
-    // accepts hot rollback journals; this API fails closed.
+    // This normal preparation API fails closed. The separate
+    // qualify_maintenance_journal / recover_maintenance_journal APIs require
+    // coordinator-owned durable recovery evidence before SQLite replay.
     require_absent(&sidecar(source, "-journal"))?;
     Ok((a, b))
 }
@@ -329,3 +330,6 @@ fn require_no_sidecars(path: &Path) -> Result<(), Error> {
 #[cfg(test)]
 #[path = "maintenance_tests.rs"]
 mod tests;
+
+#[path = "maintenance_recovery.rs"]
+mod recovery;

@@ -6,6 +6,8 @@ use radishlex_ime_userdb::{UserDb, UserDbMaintenanceError};
 
 #[path = "preparation_files.rs"]
 mod files;
+#[path = "preparation_recovery.rs"]
+mod recovery;
 use files::{no_sidecars, readonly_family, same_object};
 
 /// A trusted platform implementation of SHA-256 over the complete stream.
@@ -25,6 +27,9 @@ pub enum SourcePreparationCheckpoint {
     SnapshotDirectorySynced,
     SnapshotRecorded,
     MaintenanceIntentRecorded,
+    JournalRecoveryIntentRecorded,
+    BeforeJournalRecovery,
+    JournalRecovered,
     BeforeMaintenance,
     SourceMaintained,
     SourceFileSynced,
@@ -352,6 +357,18 @@ impl PreparationJournalStore {
         hasher: &impl PreparationHasher,
         record: &PreparationReceipt,
     ) -> Result<PreparationReceipt> {
+        let observed = self.read_family(hasher)?;
+        if record.journal_recovery().is_some() && (observed.wal.is_some() || observed.shm.is_some())
+        {
+            return Err(Error::EvidenceChanged);
+        }
+        let recovered;
+        let record = if observed.journal.is_some() {
+            recovered = self.recover_source_journal(guard, port, hasher, record)?;
+            &recovered
+        } else {
+            record
+        };
         self.checkpoint(
             guard,
             port,
