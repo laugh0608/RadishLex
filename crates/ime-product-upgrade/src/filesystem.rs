@@ -242,6 +242,14 @@ impl UpgradeReceiptStore {
 
     /// Opens an existing state directory without creating or changing any object.
     pub fn open_existing(root: VerifiedDataRoot) -> Result<Self, UpgradeFilesystemError> {
+        let store = Self::open_existing_directory(root)?;
+        store.validate_known_entries()?;
+        Ok(store)
+    }
+
+    // The preparation journal has its own strict object grammar. This helper
+    // verifies only the shared directory; public readers still check theirs.
+    fn open_existing_directory(root: VerifiedDataRoot) -> Result<Self, UpgradeFilesystemError> {
         root.revalidate()?;
         let state_directory = root.path.join(STATE_DIRECTORY_NAME);
         let metadata = fs::symlink_metadata(&state_directory)
@@ -254,7 +262,6 @@ impl UpgradeReceiptStore {
             state_directory_identity: DirectoryIdentity::from_metadata(&metadata),
         };
         store.revalidate()?;
-        store.validate_known_entries()?;
         Ok(store)
     }
 
@@ -294,6 +301,11 @@ impl UpgradeReceiptStore {
     pub fn acquire_guard(&self) -> Result<UpgradeProcessGuard, UpgradeFilesystemError> {
         self.revalidate()?;
         self.validate_known_entries()?;
+        self.acquire_directory_guard()
+    }
+
+    fn acquire_directory_guard(&self) -> Result<UpgradeProcessGuard, UpgradeFilesystemError> {
+        self.revalidate()?;
         let socket_path = self.guard_path();
         let listener = match UnixListener::bind(&socket_path) {
             Ok(listener) => listener,
@@ -850,6 +862,10 @@ const fn error(code: UpgradeFilesystemErrorCode) -> UpgradeFilesystemError {
 #[cfg(test)]
 #[path = "filesystem_tests.rs"]
 mod tests;
+
+#[path = "preparation_journal.rs"]
+mod preparation_journal;
+pub use preparation_journal::{PreparationJournalError, PreparationJournalStore};
 
 #[path = "snapshot.rs"]
 mod snapshot;
