@@ -1,6 +1,6 @@
 # macOS WAL 源库准备与新事务接续设计
 
-本文是面向 `ime-userdb`、数据升级核心和 macOS Installer 维护者的已批准设计，定义新 operation 的源库准备、旧事务保留、持久化恢复与验证范围。它不代表功能已实现，不改变现行 v1 合同，也不授权真实数据库、冻结载体或现场操作。问题及历史证据见 [WAL 整改专题](macos-wal-upgrade-recovery-2026-09.md)，执行顺位见 [current](../status/current.md)。
+本文是面向 `ime-userdb`、数据升级核心和 macOS Installer 维护者的已批准设计，定义新 operation 的源库准备、旧事务保留、持久化恢复与验证范围。完整设计不代表整链已实现，已落地范围见文末实施状态；它不改变现行 v1 合同，也不授权真实数据库、冻结载体或现场操作。问题及历史证据见 [WAL 整改专题](macos-wal-upgrade-recovery-2026-09.md)，执行顺位见 [current](../status/current.md)。
 
 ## 设计结论与批准范围
 
@@ -25,7 +25,7 @@
 | [switch](../../crates/ime-product-upgrade/src/switch.rs) | active/candidate/backup 均无 sidecar 后才记录 backup identity | 保留该门禁；准备成功不能仅凭 WAL 长度为零 |
 | [终态加载](../../crates/ime-product-upgrade/src/switch.rs) / [rollback](../../crates/ime-product-upgrade/src/rollback.rs) | `Completed` 和 `RolledBack` 仍验证零 sidecar 与活动库历史长度 | 源码显示正常 WAL 写入后可能阻止再次启动；须覆盖终态释放，不能仅修好首次升级；尚未运行该缺口的复现测试 |
 | [Executor](../../platforms/macos-product/InstallerExecutor/src/lib.rs) | 先创建 outer operation，再独立 bootstrap，guard 跨步骤释放 | 新路径须在统一锁顺序和持久准备意图下交接，不能把当前 bootstrap 简单前移 |
-| [snapshot](../../crates/ime-userdb/src/store/snapshot.rs) | backup 读取 WAL 一致视图；现有连接主要依赖析构关闭 | 新维护成功条件必须包含显式关闭；snapshot 成功不等于原库可切换 |
+| [snapshot](../../crates/ime-userdb/src/store/snapshot.rs) | backup 读取 WAL 一致视图；A 段已将 estimate/backup 成功路径改为显式检查连接关闭 | 继续保留显式关闭条件；snapshot 成功不等于原库可切换 |
 
 后续升级还必须接受正常使用后发生的合法学习。旧终态中的源 identity/hash 是历史事实，不得用它要求今天的 active DB 仍与上次升级时逐字节一致；本次源身份由 fresh 静止观察建立，历史 snapshot/candidate/backup 则继续按原记录保护。
 

@@ -42,7 +42,7 @@ macOS product host
   source-settings.json.tmp
 ```
 
-状态目录必须为 `0700`，普通文件必须为 `0600`、单 link 普通文件。目录只接受上述白名单对象；未知文件、symlink、hardlink、owner/mode 漂移和中断临时对象均失败关闭并保留现场。
+状态目录必须为 `0700`，普通文件必须为 `0600`、单 link 普通文件。普通 v1 store/startup reader 只接受上述白名单对象；下节专用准备入口另识别准备记录和保护快照槽，不能据此放宽普通 reader。未知文件、symlink、hardlink、owner/mode 漂移和中断临时对象均失败关闭并保留现场。
 
 `UpgradeReceiptStore::open` 属于升级协调写路径：状态目录不存在时可以创建并持久化它。产品普通启动不能调用该入口，必须调用完全只读的 `inspect_startup_gate`。
 
@@ -70,7 +70,7 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 ### 新源库准备合同
 
-`PreparationReceipt` 是已批准 WAL 新升级方案的独立版本化合同：绑定新 operation、两条前驱链、产品摘要、root/state identity、初始源 family、保护快照及准备后 identity。阶段从 `reserved` 单步推进至 `handoff_ready`，canonical 编码最大 256 KiB；未知格式/字段、证据改写和跨 operation 替换失败关闭。它不修改既有 v1 receipt 的 source，也不由类型本身授予文件写入。
+`PreparationReceipt` 是已批准 WAL 新升级方案的独立版本化合同：绑定新 operation、两条前驱链、产品摘要、root/state identity、初始源 family、保护快照及准备后 identity。类型定义从 `reserved` 至 `handoff_ready` 的单步合同；当前实际源库编排只推进至 `source_prepared`，归档和 handoff 的类型方法不证明文件已移动或新事务已持久化。canonical 编码最大 256 KiB；未知格式/字段、证据改写和跨 operation 替换失败关闭。它不修改既有 v1 receipt 的 source，也不由类型本身授予文件写入。
 
 `PreparationJournalStore` 提供该记录的持久化层：复用原 v1 状态目录 inode 和 `UpgradeProcessGuard`，只写固定 `source-preparation.json` / `.tmp`；严格校验 root/state 绑定、canonical bytes、前一记录与单步替换。写入经过独占创建、文件 fsync、身份复验、rename、目录 fsync 和回读；相同字节重放也补做文件及目录 fsync。无证明的临时记录、孤立准备快照、未知对象及身份漂移保留并阻断。普通 v1 store/startup reader 继续拒绝准备槽，专用入口不扩展原白名单。
 

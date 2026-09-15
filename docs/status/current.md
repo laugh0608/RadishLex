@@ -70,9 +70,9 @@
 - 不发布 macOS build 38/39/40 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步：B 段持久化编排与事务接续（2026-09-15）
+## 下一步：B 段历史材料与新事务接续（2026-09-16）
 
-按已确认的[具体设计、影响及 A–D 分段](../remediation/macos-wal-source-preparation-design.md)，A 段和 B 段至 `source_prepared` 的核心编排已实现；受限单库 journal 恢复与持久身份已实现，下一步继续历史 inventory/材料接续、新 v1 handoff、明确中止和终态封存，再完成 C–D 的 outer guard/真实产品接线和独立程序副本资格。合成静止/授权 port 不证明真实产品可执行；WAL 模式转换/pager 内部断电恢复资格仍开放，B 段尚未完成。新升级真正完成后，才继续客户端身份和 composition 隐私实测；不直接重试 40。原[09-10 交接顺序](../devlogs/2026-W37.md#2026-09-10明日事项)保留为历史，新设计不授予系统动作或冻结材料搬移。[本周记录](../devlogs/2026-W38.md)记录本批实际实现与检查结果。
+按已确认的[具体设计、影响及 A–D 分段](../remediation/macos-wal-source-preparation-design.md)，A 段和 B 段至 `source_prepared` 的核心编排已实现；受限单库 journal 恢复与持久身份已实现，下一步继续历史 inventory/材料接续、新 v1 handoff、明确中止和终态封存，再完成 C–D 的 outer guard/真实产品接线和独立程序副本资格。合成静止/授权 port 不证明真实产品可执行；WAL 模式转换/pager 内部断电恢复资格仍开放，B 段尚未完成。新升级真正完成后，才继续客户端身份和 composition 隐私实测；不直接重试 40。原[09-10 交接顺序](../devlogs/2026-W37.md#2026-09-10明日事项)保留为历史，新设计不授予系统动作或冻结材料搬移。明天先完成历史 inventory 的实物核验与旧槽保留接续，具体执行顺序、验收重点和停止线见[09-16 明日事项](../devlogs/2026-W38.md#2026-09-16明日事项)；今天的全部提交与文档核对结果见[收尾复盘](../devlogs/2026-W38.md#2026-09-15收尾复盘)。
 
 ## Linux M5 系统操作下一步（顺位不变，2026-09-05 复核）
 

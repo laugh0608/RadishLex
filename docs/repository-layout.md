@@ -194,7 +194,9 @@ SQLite 用户数据层：
 
 本地原始事件和 P2 同步摘要必须有明确转换边界。若 `ime-userdb` 依赖同步协议类型，应通过窄 adapter 或中立领域模型控制依赖方向。
 
-产品升级使用独立的只读 inspection、SQLite backup snapshot 和候选 migration/validation 接口。snapshot 在一个只读事务中纳入 WAL 可见内容，输出 standalone `DELETE` journal 文件；协调器只能把隔离副本交给修改型入口，不能用运行时打开原地升级真实 Application Support 数据。
+产品升级使用独立的只读 inspection、SQLite backup snapshot 和候选 migration/validation 接口。snapshot 在一个只读事务中纳入 WAL 可见内容，输出 standalone `DELETE` journal 文件，成功返回前显式检查连接关闭；migration/validation 的修改型入口只接受隔离候选，不能用运行时打开原地升级真实 Application Support 数据。
+
+`store/maintenance.rs` 承担独立的受控源库维护：调用方先持久化准备意图、证明静止并绑定保护快照，随后由 SQLite checkpoint/转换日志模式；`maintenance_compare.rs` 逐表校验 schema、rowid、storage class 与内容等价，`maintenance_recovery.rs` 只处理取得持久恢复身份的受限单库 journal。维护不执行 migration、不替代协调授权，失败可能已经改变物理文件。具体成功条件与恢复限制见[数据升级边界](macos-data-upgrade-coordinator.md#新升级的源库维护原语)。
 
 ### ime-product-upgrade
 
@@ -214,8 +216,9 @@ SQLite 用户数据层：
 - 失败新库回迁、旧库原 inode 恢复、source-release evidence 与 `rolled_back`
 - settings/snapshot/candidate evidence-only 崩溃恢复与 guard-bound checkpoint 驱动
 - 稳定失败分类和中断恢复判断
+- 独立 `PreparationReceipt` / `PreparationJournalStore`、源 family 摘要、保护快照、受控 SQLite 准备及受限 journal 恢复；准备 marker 保持阻断，新 v1 handoff 和终态释放须另有完整编排
 
-该 crate 当前已闭合固定布局内从 `preflighted` 到终态的核心调度与数据恢复，但仍不停止进程、不定位或启动产品 host，也不提供安装载体；API、副作用与验证入口见 [ime-product-upgrade 组件说明](../crates/ime-product-upgrade/README.md)，macOS 完整状态机见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。
+该 crate 的既有 v1 路径已闭合固定布局内从 `preflighted` 到终态的核心调度与数据恢复，但仍不停止进程、不定位或启动产品 host，也不提供安装载体；API、副作用与验证入口见 [ime-product-upgrade 组件说明](../crates/ime-product-upgrade/README.md)，macOS 完整状态机见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。
 
 ### ime-product-install
 
