@@ -72,7 +72,9 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 `PreparationReceipt` 是已批准 WAL 新升级方案的独立版本化合同：绑定新 operation、两条前驱链、产品摘要、root/state identity、初始源 family、保护快照及准备后 identity。阶段从 `reserved` 单步推进至 `handoff_ready`，canonical 编码最大 256 KiB；未知格式/字段、证据改写和跨 operation 替换失败关闭。它不修改既有 v1 receipt 的 source，也不由类型本身授予文件写入。
 
-本批仅提供类型及 `ime-userdb` 维护原语，尚未接入 store/Installer。实际文件持久化、guard、历史接续、终态封存和产品资格按[已批准方案](../../docs/remediation/macos-wal-source-preparation-design.md)继续；不能在旧 v1 receipt 已绑定后单独调用维护 API。
+`PreparationJournalStore` 提供该记录的持久化层：复用原 v1 状态目录 inode 和 `UpgradeProcessGuard`，只写固定 `source-preparation.json` / `.tmp`；严格校验 root/state 绑定、canonical bytes、前一记录与单步替换。写入经过独占创建、文件 fsync、身份复验、rename、目录 fsync 和回读；相同字节重放也补做文件及目录 fsync。无证明的临时记录、孤立准备快照、未知对象及身份漂移保留并阻断。普通 v1 store/startup reader 继续拒绝准备槽，专用入口不扩展原白名单。
+
+这个层只证明记录持久化，不证明记录中描述的 DB、快照、产品和归档已经验证；它不打开 SQLite、不搬移 artifact、不移走启动阻断 marker。产品协调层仍须在 outer guard 后取得 inner guard，并 fresh 证明授权、静止、源 family、摘要及完整历史关系。SQLite 编排、旧 operation 接续、终态封存和 Installer 接线按[已批准方案](../../docs/remediation/macos-wal-source-preparation-design.md)继续；不能在旧 v1 receipt 已绑定后单独调用维护 API。
 
 ### 启动门禁
 

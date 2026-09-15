@@ -65,7 +65,9 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 - `UserDb::prepare_source_for_upgrade` 在调用方已持久化意图、证明静止并验证文件 family 后，使用不含 CREATE 且带 NOFOLLOW 的连接，完整 truncate WAL、转为 DELETE、显式检查关闭、复验内容等价及零 sidecar；不调用普通 `UserDb::open` 或 migration。错误只返回固定分类，物理文件可能已变化，错误不表示回滚。
 - snapshot 估算与复制的成功返回也检查连接显式关闭。维护 API 拒绝未证明的已有 journal；维护途中 hot journal 的授权恢复分支仍待后续协调实现，不能以原语单独证明所有 crash 已恢复。
 
-准备记录的版本化类型由 `ime-product-upgrade::PreparationReceipt` 提供，绑定不同的前一 outer/data operation、产品摘要、root/state identity、初始源 family、保护快照、准备后源 identity 和 v1 handoff。已记录证据只能保留并单步追加；格式/字段/身份不符、跳阶段或跨 operation 替换均拒绝。此类型本身没有文件写入或系统操作权限，持久化 store、双 guard 编排、接续和终态封存由后续分段实现。
+准备记录的版本化类型由 `ime-product-upgrade::PreparationReceipt` 提供，绑定不同的前一 outer/data operation、产品摘要、root/state identity、初始源 family、保护快照、准备后源 identity 和 v1 handoff。已记录证据只能保留并单步追加；格式/字段/身份不符、跳阶段或跨 operation 替换均拒绝。此类型本身没有文件写入或系统操作权限。
+
+`PreparationJournalStore` 已提供独立的记录持久化层，复用原状态目录 inode 与 inner guard，支持严格 canonical 写入、重载和单步比较替换。rename 后未确认目录 fsync 的同字节重放必须重新同步文件和目录；未完成的临时对象保留并阻断，不自动认领。原 v1 reader/startup 白名单不变，准备 marker 仍阻止业务初始化。该层只验证记录与目录身份，不认证记录中的产品、DB family 或历史 artifact；outer guard、fresh 静止与实物摘要、SQLite 准备、接续、明确中止和终态封存仍由后续产品协调层完成，不能以 journal `handoff_ready` 单独声称产品交接已完成。
 
 ### Manager 与 InputMethod
 
