@@ -61,6 +61,26 @@ pub struct UserDbMaintenanceSummary {
 }
 
 impl UserDb {
+    /// Read-only verification of an already prepared source. WAL mode is not
+    /// accepted even when its sidecars happen to be absent before opening.
+    pub fn verify_prepared_source(
+        source: impl AsRef<Path>,
+        snapshot: impl AsRef<Path>,
+    ) -> Result<i64, Error> {
+        let source = source.as_ref();
+        require_no_sidecars(source)?;
+        validate_pair(source, snapshot.as_ref())?;
+        let connection = open(source, false)?;
+        let mode = journal_mode(&connection);
+        close(connection)?;
+        if mode? != "delete" {
+            return Err(Error::UnsupportedJournalMode);
+        }
+        let schema = Self::verify_maintenance_snapshot(source, snapshot)?;
+        require_no_sidecars(source)?;
+        Ok(schema)
+    }
+
     /// Compares all supported persistent data without migration or WAL configuration.
     /// Callers must hold their guards and prove quiescence. Reading a WAL source
     /// may create SQLite sidecars; the protected snapshot must be standalone.

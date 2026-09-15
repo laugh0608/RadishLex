@@ -865,7 +865,11 @@ mod tests;
 
 #[path = "preparation_journal.rs"]
 mod preparation_journal;
-pub use preparation_journal::{PreparationJournalError, PreparationJournalStore};
+pub use preparation_journal::{
+    PreparationHasher, PreparationJournalError, PreparationJournalStore,
+    SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,
+    SourcePreparationSpaceBudget,
+};
 
 #[path = "snapshot.rs"]
 mod snapshot;

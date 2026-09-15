@@ -1,6 +1,7 @@
 //! Durable metadata only. The coordinator must independently prove outer
 //! authority, quiescence, source/snapshot hashes and archive relationships.
-//! This store never opens SQLite, moves an artifact or removes a marker.
+//! Journal read/write primitives never open SQLite, move an artifact or remove
+//! a marker. The child source_preparation module enforces SQLite orchestration.
 
 use crate::{
     PreparationDirectoryIdentity, PreparationPhase, PreparationReceipt,
@@ -418,3 +419,10 @@ impl FaultInjector for NoFaults {}
 #[cfg(test)]
 #[path = "preparation_journal_tests.rs"]
 mod tests;
+
+#[path = "source_preparation.rs"]
+mod source_preparation;
+pub use source_preparation::{
+    PreparationHasher, SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,
+    SourcePreparationSpaceBudget,
+};

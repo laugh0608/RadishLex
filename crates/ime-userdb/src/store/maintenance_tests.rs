@@ -65,11 +65,16 @@ fn normal_close_wal_prepares_without_migration_and_keeps_deletion() {
     let fixture = Fixture::new();
     fixture.populate();
     fixture.snapshot();
+    assert!(UserDb::verify_prepared_source(&fixture.source, &fixture.snapshot).is_err());
     let protected = fs::read(&fixture.snapshot).unwrap();
     let summary = UserDb::prepare_source_for_upgrade(&fixture.source, &fixture.snapshot).unwrap();
     assert_eq!(summary.schema_version, UserDb::supported_schema_version());
     assert!(summary.checkpointed_wal);
     require_no_sidecars(&fixture.source).unwrap();
+    assert_eq!(
+        UserDb::verify_prepared_source(&fixture.source, &fixture.snapshot).unwrap(),
+        summary.schema_version
+    );
     assert_eq!(fs::read(&fixture.snapshot).unwrap(), protected);
     assert!(
         !UserDb::prepare_source_for_upgrade(&fixture.source, &fixture.snapshot)

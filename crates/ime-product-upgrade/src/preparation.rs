@@ -248,6 +248,9 @@ impl PreparationReceipt {
     pub fn snapshot_identity(&self) -> Option<&PreparationFileIdentity> {
         self.snapshot.as_ref().map(|value| &value.identity)
     }
+    pub fn snapshot_schema_version(&self) -> Option<i64> {
+        self.snapshot.as_ref().map(|value| value.schema_version)
+    }
     pub fn maintenance_source(&self) -> Option<&PreparationFamily> {
         self.snapshot.as_ref().map(|value| &value.source_family)
     }
