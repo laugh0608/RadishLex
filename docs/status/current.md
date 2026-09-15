@@ -27,9 +27,9 @@
 - REV-01 已落实 RadishLex 独占学习与 composition 最严格策略保留；升级 SQLite 后 native 48 进程存储/旧合成库回归及 12 进程配置回归通过。REV-02 Rust 链已升至 bundled SQLite 3.51.3，WAL/旧库/备份恢复与新 macOS FFI 身份核验通过；Go 依赖和冻结产物未更换。两项的平台复验、输入质量与工具链限制仍开放，结果与关闭条件只在专题维护。
 - macOS `26.7.1 (39)` 双组件与本地 ad-hoc Installer 已构建，包内 FFI 合成 smoke、资源/载荷身份、完整仓库门禁及 Manager 99 项测试通过。2026-09-09 首次安装到达 `completed`，双程序身份与无 quarantine 检查通过；Manager 从固定路径启动，显示 `local_only`。项目所有者已手动添加/选择输入源，固定 TextEdit `shi → 时` 两次选择与本地学习增量通过，候选由 2 升至 1。后续按[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md)验证隐私及其余矩阵；此载体无历史升级源，未制作新 DMG、未发布。
 - 项目所有者选择本机现有账户测试；此前 17 个旧目录根已原样归档，545 个节点核对通过。build 39 新验收库未导入旧资料，全程隐私零学习与目标词普通恢复已验证；先前混合输入区间不作为单次精确用例。另行授权的 composition 隐私→普通组观察到零学习，但新普通对照在 TextEdit 提交后记入 `code` 而非 `editor`，已暂停后两组。暂停时隐私键已恢复显式 false、临时基线已消费，输入源选中且 InputMethod 运行；后续仓库修复未再操作该现场。
-- `6a55782` 已修复 IMK 客户端身份来源，build 40 升级曾停于 `data_coordinating` / `candidate_verified`。错误呈现、合法 WAL 特征回归及显式恢复入口已实现，原生/全仓门禁与真实程序副本资格通过。项目所有者随后单独确认实际恢复：独立 Installer 对同一 `aad9cf8a…a706` 完成 source 39 双程序原 inode 恢复，外层 `rolled_back`、内层 `aborted_preserved`；原 DB/WAL/SHM、snapshot/candidate/settings backup 的身份、metadata 和摘要保留，target 40 留在 staging。source 双端及数据只读 startup gate 允许，target 双端拒绝；未启动双组件或执行新输入。继续激活 [WAL 升级与恢复方案](../remediation/macos-wal-upgrade-recovery-2026-09.md)：永久 WAL 源库准备设计已确认、实现与资格待完成，不能直接重试 40。REV-01/REV-02 继续开放，实际结果见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#切换前中止与-source-39-实机恢复完成2026-09-09)。
+- `6a55782` 已修复 IMK 客户端身份来源，build 40 升级曾停于 `data_coordinating` / `candidate_verified`。错误呈现、合法 WAL 特征回归及显式恢复入口已实现，原生/全仓门禁与真实程序副本资格通过。项目所有者随后单独确认实际恢复：独立 Installer 对同一 `aad9cf8a…a706` 完成 source 39 双程序原 inode 恢复，外层 `rolled_back`、内层 `aborted_preserved`；原 DB/WAL/SHM、snapshot/candidate/settings backup 的身份、metadata 和摘要保留，target 40 留在 staging。source 双端及数据只读 startup gate 允许，target 双端拒绝；未启动双组件或执行新输入。继续激活 [WAL 升级与恢复方案](../remediation/macos-wal-upgrade-recovery-2026-09.md)：永久 WAL 源库准备的 A 段原语与合同已实现，B–D 编排和产品资格待完成，不能直接重试 40。REV-01/REV-02 继续开放，实际结果见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#切换前中止与-source-39-实机恢复完成2026-09-09)。
 - 次要事项为输入回调锁等待、新词召回/评测、删除与事件保留、MSRV/CI；维护成本、Manager 易用性和早期反馈列为后续建议。具体证据、未知项与关闭条件只在跟踪专题维护。
-- 2026-09-15 完成[WAL 源库准备与新事务接续设计](../remediation/macos-wal-source-preparation-design.md)，随后获项目所有者确认 A–D 仓库实施与隔离资格范围；包含准备前快照、版本化意图、旧事务保留、新 v1 接续及终态封存。旧 operation 接续与终态后正常 WAL 使用的源码缺口一并列入，未实现或实机验证，不关闭 REV-01/REV-02。
+- 2026-09-15 完成[WAL 源库准备与新事务接续设计](../remediation/macos-wal-source-preparation-design.md)，随后获项目所有者确认 A–D 仓库实施与隔离资格范围；包含准备前快照、版本化意图、旧事务保留、新 v1 接续及终态封存。A 段源库维护、全量内容等价与准备记录合同已实现并通过完整仓库门禁；旧 operation 接续、终态封存和产品接线仍待 B–D，未进行实机验证，不关闭 REV-01/REV-02。
 - 当前 Rime 来源锁已变化，不能作为冻结 Linux L6 pair 的新 target；现有构建资格检查继续拒绝混配。旧 pair、M5 系统操作顺位和冻结现场保持原状；新 pair 或平台实机动作仍须单独明确范围。
 
 ## 冻结基线与固定边界
@@ -70,9 +70,9 @@
 - 不发布 macOS build 38/39/40 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步：实施 WAL 准备与事务接续（2026-09-15）
+## 下一步：B 段持久化编排与事务接续（2026-09-15）
 
-按已确认的[具体设计、影响及 A–D 分段](../remediation/macos-wal-source-preparation-design.md)，先实施仓库合同与合成验证，再进行独立程序副本资格。新升级真正完成后，才继续客户端身份和 composition 隐私实测；不直接重试 40。原[09-10 交接顺序](../devlogs/2026-W37.md#2026-09-10明日事项)保留为历史，新设计不授予系统动作或冻结材料搬移。[本周记录](../devlogs/2026-W38.md)只记本批设计与检查结果。
+按已确认的[具体设计、影响及 A–D 分段](../remediation/macos-wal-source-preparation-design.md)，A 段已完成，接续 B 段的双 guard、准备记录持久化、历史材料接续与终态封存，再完成 C–D 产品接线和独立程序副本资格。新升级真正完成后，才继续客户端身份和 composition 隐私实测；不直接重试 40。原[09-10 交接顺序](../devlogs/2026-W37.md#2026-09-10明日事项)保留为历史，新设计不授予系统动作或冻结材料搬移。[本周记录](../devlogs/2026-W38.md)只记本批设计与检查结果。
 
 ## Linux M5 系统操作下一步（顺位不变，2026-09-05 复核）
 

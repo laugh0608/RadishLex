@@ -46,7 +46,7 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 ### `ime-userdb`
 
-`ime-userdb` 继续是 SQLite schema、事务 migration 与数据库结构校验的唯一真相源，并提供四类语义分离的产品能力：
+`ime-userdb` 继续是 SQLite schema、事务 migration 与数据库结构校验的唯一真相源。既有产品链使用以下四类能力：
 
 1. `inspect_file`：以只读方式读取 schema 并执行完整性检查，不创建数据库、不配置 WAL、不收紧权限、不执行 migration；
 2. `estimate_snapshot` / `create_consistent_snapshot`：在只读事务中估算 logical bytes，并通过 SQLite backup API 把 WAL 可见内容复制到调用方已创建的独立空文件，不迁移源或目标；
@@ -56,6 +56,16 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 `ime-userdb` 不负责证明候选是否真的隔离，不停止进程，不生成产品 receipt，也不切换 Application Support 文件。
 
 现有运行时 `UserDb::open` 仍可以为正常产品连接执行 migration。升级协调器不能用该入口检查原库，因为它会改变现场。
+
+### 新升级的源库维护原语
+
+已批准的 [WAL 准备与接续方案](remediation/macos-wal-source-preparation-design.md)先增加以下仓库原语；尚未接入生产 Installer，不改变现有活动事务：
+
+- `UserDb::verify_maintenance_snapshot` 在只读事务中比较源库与独立 standalone 保护快照。比较受支持的表和索引定义、数据库属性、所有表的 rowid 与逐列 storage class/值，保留重复记录和 sequence 语义；未知表、视图、trigger、未支持的隐藏列或 WITHOUT ROWID 表失败关闭。不向协调层输出行内容。
+- `UserDb::prepare_source_for_upgrade` 在调用方已持久化意图、证明静止并验证文件 family 后，使用不含 CREATE 且带 NOFOLLOW 的连接，完整 truncate WAL、转为 DELETE、显式检查关闭、复验内容等价及零 sidecar；不调用普通 `UserDb::open` 或 migration。错误只返回固定分类，物理文件可能已变化，错误不表示回滚。
+- snapshot 估算与复制的成功返回也检查连接显式关闭。维护 API 拒绝未证明的已有 journal；维护途中 hot journal 的授权恢复分支仍待后续协调实现，不能以原语单独证明所有 crash 已恢复。
+
+准备记录的版本化类型由 `ime-product-upgrade::PreparationReceipt` 提供，绑定不同的前一 outer/data operation、产品摘要、root/state identity、初始源 family、保护快照、准备后源 identity 和 v1 handoff。已记录证据只能保留并单步追加；格式/字段/身份不符、跳阶段或跨 operation 替换均拒绝。此类型本身没有文件写入或系统操作权限，持久化 store、双 guard 编排、接续和终态封存由后续分段实现。
 
 ### Manager 与 InputMethod
 

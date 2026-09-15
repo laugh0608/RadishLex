@@ -68,6 +68,12 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 ## 主要能力
 
+### 新源库准备合同
+
+`PreparationReceipt` 是已批准 WAL 新升级方案的独立版本化合同：绑定新 operation、两条前驱链、产品摘要、root/state identity、初始源 family、保护快照及准备后 identity。阶段从 `reserved` 单步推进至 `handoff_ready`，canonical 编码最大 256 KiB；未知格式/字段、证据改写和跨 operation 替换失败关闭。它不修改既有 v1 receipt 的 source，也不由类型本身授予文件写入。
+
+本批仅提供类型及 `ime-userdb` 维护原语，尚未接入 store/Installer。实际文件持久化、guard、历史接续、终态封存和产品资格按[已批准方案](../../docs/remediation/macos-wal-source-preparation-design.md)继续；不能在旧 v1 receipt 已绑定后单独调用维护 API。
+
 ### 启动门禁
 
 `inspect_startup_gate(data_root, expected_owner_id)` 不创建、删除、chmod、连接 socket 或清理任何对象：

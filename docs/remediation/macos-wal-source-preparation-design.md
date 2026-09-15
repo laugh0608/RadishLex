@@ -203,6 +203,8 @@ checkpoint 结果和关闭语义依据 [SQLite checkpoint API](https://sqlite.or
 
 ## 实施分段与验收矩阵
 
+2026-09-15：A 段的维护/内容等价原语、snapshot 显式关闭和严格准备记录类型已实现，完整仓库门禁通过。B–D 的文件编排、热 journal 恢复资格、接续、终态封存和产品接线尚未实现；阶段实现结果见[本周周志](../devlogs/2026-W38.md)。
+
 按以下顺序串行实施，每段完成匹配检查后再进入下一段；支持 schema、历史接续和旧 reader 兼容属于必要工作，不能只交付一个 checkpoint helper。
 
 | 分段 | 实现范围 | 退出条件 |
