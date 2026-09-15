@@ -70,6 +70,8 @@
 
 ## 后续新升级的 WAL 合同
 
+2026-09-15 已按继续推进要求完成[源库准备与新事务接续设计](macos-wal-source-preparation-design.md)，随后获项目所有者确认，进入 A–D 仓库实施与隔离资格范围。源码审阅另发现旧 data operation 无法直接接续，以及 v1 `completed` / `rolled_back` 仍按零 sidecar 与历史长度验证活动库；后者尚未运行复现测试。方案将准备记录、保留式接续、旧 reader 阻断和终态封存纳入完整验证范围。本节以下为原方向说明，不代表新合同已实施或真实现场已变化。
+
 建议保留 runtime 的 WAL 使用策略，在新升级的源库身份最终绑定及程序切换之前，由 SQLite 自身完成 standalone 源库准备。该变化涉及数据写入、源 artifact 身份、持久化阶段和中断恢复，须作为独立设计/实现范围批准，不把当前 v1 已绑定 source 原位转换后强行 resume。
 
 - 使用只打开既有文件、禁止 create/自动 migration 的专用维护连接；在 guard 和静止证明下核对当前 schema、完整性、文件身份及一致快照，不调用会启用 WAL/迁移的普通 `UserDb::open`。
