@@ -246,7 +246,7 @@ fn finalize_standalone_candidate(path: &Path) -> UserDbResult<()> {
     Ok(())
 }
 
-fn validate_current_schema_on(connection: &Connection) -> UserDbResult<()> {
+pub(super) fn validate_current_schema_on(connection: &Connection) -> UserDbResult<()> {
     let schema_version = read_schema_version(connection)?;
     if schema_version != SCHEMA_VERSION {
         return Err(UserDbError::invalid_input(

@@ -13,6 +13,8 @@ use crate::model::{
 mod connection;
 mod identity;
 mod learning;
+mod maintenance;
+mod maintenance_compare;
 mod ranking;
 mod snapshot;
 mod sync_apply;
@@ -23,6 +25,7 @@ mod wrapped_epoch_material;
 
 use identity::has_deleted_tombstone_on;
 use learning::now_ms;
+pub use maintenance::{UserDbMaintenanceError, UserDbMaintenanceSummary};
 pub use ranking::{DeletedTermIdentity, RankingCandidateIdentity, RankingSignals};
 pub use sync_apply::UserDbSyncApplySummary;
 

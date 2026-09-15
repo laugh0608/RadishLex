@@ -7,6 +7,13 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+mod preparation;
+pub use preparation::{
+    PreparationBinding, PreparationDirectoryIdentity, PreparationFamily, PreparationFileIdentity,
+    PreparationPhase, PreparationReceipt, PreparationReceiptError, MAX_PREPARATION_RECEIPT_BYTES,
+    PREPARATION_RECEIPT_FORMAT,
+};
+
 #[cfg(unix)]
 mod filesystem;
 #[cfg(unix)]

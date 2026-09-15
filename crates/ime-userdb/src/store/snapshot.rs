@@ -24,6 +24,7 @@ impl UserDb {
             .map_err(|error| preserved_database_error(path, "estimate snapshot", error))?;
         verify_integrity(&connection)
             .map_err(|error| preserved_database_error(path, "estimate snapshot", error))?;
+        close_snapshot_connection(path, connection)?;
         Ok(estimate)
     }
 
@@ -66,7 +67,10 @@ impl UserDb {
                 "snapshot page metadata does not match the source transaction",
             ));
         }
-        drop(destination_connection);
+        let source_closed = close_snapshot_connection(source, source_connection);
+        let destination_closed = close_snapshot_connection(destination, destination_connection);
+        source_closed?;
+        destination_closed?;
         let snapshot_file_bytes = fs::metadata(destination)
             .map_err(|error| UserDbError::Io {
                 path: destination.to_path_buf(),
@@ -83,6 +87,12 @@ impl UserDb {
             snapshot_file_bytes,
         })
     }
+}
+
+fn close_snapshot_connection(path: &Path, connection: Connection) -> UserDbResult<()> {
+    connection.close().map_err(|(_connection, error)| {
+        preserved_database_error(path, "close snapshot connection", error)
+    })
 }
 
 fn validate_snapshot_paths(source: &Path, destination: &Path) -> UserDbResult<()> {
