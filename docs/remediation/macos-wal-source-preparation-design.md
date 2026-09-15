@@ -203,7 +203,7 @@ checkpoint 结果和关闭语义依据 [SQLite checkpoint API](https://sqlite.or
 
 ## 实施分段与验收矩阵
 
-2026-09-15：A 段的维护/内容等价原语、snapshot 显式关闭和严格准备记录类型已实现，完整仓库门禁通过。B 段已增加准备记录持久化层：复用原状态目录及 inner guard，严格比较替换、同字节重放补做 fsync，原 reader 保持阻断。该层仅处理记录，不认证实物证据；双 guard 与 SQLite 编排、热 journal 恢复资格、旧材料接续、明确中止、终态封存和 C–D 产品接线/资格尚未完成，B 段未达到退出条件。阶段实现结果见[本周周志](../devlogs/2026-W38.md)。
+2026-09-15：A 段已实现并通过完整仓库门禁。B 段已实现准备记录持久化和 `reserved → snapshot_ready → maintenance_intent → source_prepared` 的核心 SQLite 编排，复用原状态目录及 inner guard，核验真实文件身份/SHA-256、准备前快照、维护后等价及同步；原 reader 保持阻断。macOS hasher 复用已有依赖，合成 port 尚不证明真实 outer/产品授权。热 journal 恢复资格、旧材料 inventory/接续、新 v1 handoff、明确中止、终态封存和 C–D 产品接线/资格仍待完成，B 段未达到退出条件。阶段实现结果见[本周周志](../devlogs/2026-W38.md)。
 
 按以下顺序串行实施，每段完成匹配检查后再进入下一段；支持 schema、历史接续和旧 reader 兼容属于必要工作，不能只交付一个 checkpoint helper。
 

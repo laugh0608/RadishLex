@@ -74,7 +74,11 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 `PreparationJournalStore` 提供该记录的持久化层：复用原 v1 状态目录 inode 和 `UpgradeProcessGuard`，只写固定 `source-preparation.json` / `.tmp`；严格校验 root/state 绑定、canonical bytes、前一记录与单步替换。写入经过独占创建、文件 fsync、身份复验、rename、目录 fsync 和回读；相同字节重放也补做文件及目录 fsync。无证明的临时记录、孤立准备快照、未知对象及身份漂移保留并阻断。普通 v1 store/startup reader 继续拒绝准备槽，专用入口不扩展原白名单。
 
-这个层只证明记录持久化，不证明记录中描述的 DB、快照、产品和归档已经验证；它不打开 SQLite、不搬移 artifact、不移走启动阻断 marker。产品协调层仍须在 outer guard 后取得 inner guard，并 fresh 证明授权、静止、源 family、摘要及完整历史关系。SQLite 编排、旧 operation 接续、终态封存和 Installer 接线按[已批准方案](../../docs/remediation/macos-wal-source-preparation-design.md)继续；不能在旧 v1 receipt 已绑定后单独调用维护 API。
+单独调用 journal 的读写方法只证明记录持久化，不认证记录中的 DB、快照、产品和归档。`observe_source_family` 从固定 `userdb.sqlite3` 及 sidecar 读取真实文件身份与摘要；`prepare_userdb_source` 则在匹配 inner guard、已持久化 reservation 和每个 checkpoint 的 `SourcePreparationPort` 确认下推进至 `source_prepared`。它先建立独立保护快照，再持久化 `maintenance_intent`，之后才调用 SQLite 维护；最终复验 DELETE、零 sidecar、原 inode、schema 和全量内容等价，并同步主文件及 data root。准备记录及保护快照保留，原 v1 私有槽不动，不能将 `source_prepared` 解释为已交接或允许启动。
+
+摘要通过可信 `PreparationHasher` 对已打开并前后复验的完整文件流计算；macOS adapter 复用已有 SHA-256 依赖，不接受外部自报摘要。快照和维护前重新计算保守预算：`6 * max(logical_bytes, source_main_bytes) + settings_bytes + 64 MiB`，溢出、容量不足或无法取得 fresh 容量均拒绝。只有 `maintenance_intent` 允许 SQLite 改变主库长度/摘要；主 inode、安全 metadata、快照摘要与逻辑内容仍严格验证。临时/孤立快照不自动认领，未经资格验证的 journal 阻断；维护失败不自动恢复快照覆盖源库。
+
+`SourcePreparationPort` 的产品实现必须持有并复验 outer guard、相同 `prepared` operation、受控 source/target 产品、前驱 receipt/inventory 和 fresh 静止观察；合成 port 不证明产品授权。这部分 Executor 接线、hot journal 恢复资格、旧 operation 接续、明确中止、终态封存和完整产品资格按[已批准方案](../../docs/remediation/macos-wal-source-preparation-design.md)继续；不能在旧 v1 receipt 已绑定后单独调用维护 API。
 
 ### 启动门禁
 
