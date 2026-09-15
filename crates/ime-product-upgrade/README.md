@@ -78,7 +78,11 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 摘要通过可信 `PreparationHasher` 对已打开并前后复验的完整文件流计算；macOS adapter 复用已有 SHA-256 依赖，不接受外部自报摘要。快照和维护前重新计算保守预算：`6 * max(logical_bytes, source_main_bytes) + settings_bytes + 64 MiB`，溢出、容量不足或无法取得 fresh 容量均拒绝。只有 `maintenance_intent` 允许 SQLite 改变主库长度/摘要；主 inode、安全 metadata、快照摘要与逻辑内容仍严格验证。临时/孤立快照不自动认领，未经资格验证的 journal 阻断；维护失败不自动恢复快照覆盖源库。
 
-`SourcePreparationPort` 的产品实现必须持有并复验 outer guard、相同 `prepared` operation、受控 source/target 产品、前驱 receipt/inventory 和 fresh 静止观察；合成 port 不证明产品授权。这部分 Executor 接线、hot journal 恢复资格、旧 operation 接续、明确中止、终态封存和完整产品资格按[已批准方案](../../docs/remediation/macos-wal-source-preparation-design.md)继续；不能在旧 v1 receipt 已绑定后单独调用维护 API。
+`maintenance_intent` 下的受限单库 hot rollback journal 可经独立资格检查进入恢复：固定路径、原主 inode、私有 metadata、保护快照摘要、fresh 授权/静止/容量均通过后，先在同一阶段追加并持久化 `journal_recovery` family 身份，再交 SQLite 重放。后续只能接受同一 journal 身份/摘要；WAL/SHM 混存、super-journal 尾标、未知或不完整头部拒绝。源主文件允许同 inode 的页恢复变化，仍须完成 DELETE、零 sidecar 和全量等价复核。日志已消失也必须经过完整准备验证，不能据此推断成功。失败可能已发生 SQLite 物理重放，仍保留记录与快照，不自动覆盖源库。
+
+未使用恢复字段的准备记录继续保持原 canonical 字节；字段仅在持久维护意图阶段追加一次并永久保留，既有严格准备 reader 拒绝含新字段的记录。新 v1 数据 receipt 和 startup 白名单不变。当前证据包括实际 SQLite spill/进程退出、合成 WAL 文件头恢复及组合核心重载；不覆盖 pager 内部任意断电、多库恢复或完整产品升级。
+
+`SourcePreparationPort` 的产品实现必须持有并复验 outer guard、相同 `prepared` operation、受控 source/target 产品、前驱 receipt/inventory 和 fresh 静止观察；合成 port 不证明产品授权。这部分 Executor 接线、旧 operation 接续、明确中止、终态封存和完整产品资格按[已批准方案](../../docs/remediation/macos-wal-source-preparation-design.md)继续；不能在旧 v1 receipt 已绑定后单独调用维护 API。
 
 ### 启动门禁
 

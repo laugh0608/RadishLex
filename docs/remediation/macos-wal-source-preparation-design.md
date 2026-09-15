@@ -139,6 +139,8 @@ WAL 模式跨连接保留，WAL 包含可能尚未进入主文件的已提交数
 
 checkpoint 结果和关闭语义依据 [SQLite checkpoint API](https://sqlite.org/c3ref/wal_checkpoint_v2.html)、[SQLite close API](https://sqlite.org/c3ref/close.html)。成功 checkpoint 和成功 close 各自只是步骤条件，均不单独代表准备成功。
 
+维护意图下遇到已验证形态的单库 hot journal 时，先按[数据升级边界的受限恢复合同](../macos-data-upgrade-coordinator.md#维护中断的受限-journal-恢复)只读核验，追加并持久化不可改认的 journal 身份，再交 SQLite 恢复。此追加不推进阶段；恢复与最终准备验证全部完成后才能写 `source_prepared`。准备前的 journal、WAL/SHM 混存、多库标记与未知格式保持失败关闭。当前实现仅取得明确列出的合成资格，不将所有维护中断推断为可恢复。
+
 ### 内容等价与物理身份
 
 维护后的主文件字节可合法变化，因此源主文件 SHA-256 不与准备前强求相等。由 `ime-userdb` 提供受支持 schema 的流式内容等价检查：比较 schema 对象、全部持久表/列/记录及 multiplicity，按确定性键与 SQLite storage class 比较值，覆盖内部 sequence、学习、tombstone、配置与同步相关数据；不得只比较行数、活跃词或测试样例。未知 schema 对象/未支持的比较规则拒绝准备，不能忽略它们。
@@ -203,7 +205,7 @@ checkpoint 结果和关闭语义依据 [SQLite checkpoint API](https://sqlite.or
 
 ## 实施分段与验收矩阵
 
-2026-09-15：A 段已实现并通过完整仓库门禁。B 段已实现准备记录持久化和 `reserved → snapshot_ready → maintenance_intent → source_prepared` 的核心 SQLite 编排，复用原状态目录及 inner guard，核验真实文件身份/SHA-256、准备前快照、维护后等价及同步；原 reader 保持阻断。macOS hasher 复用已有依赖，合成 port 尚不证明真实 outer/产品授权。热 journal 恢复资格、旧材料 inventory/接续、新 v1 handoff、明确中止、终态封存和 C–D 产品接线/资格仍待完成，B 段未达到退出条件。阶段实现结果见[本周周志](../devlogs/2026-W38.md)。
+2026-09-15：A 段已实现并通过完整仓库门禁。B 段已实现准备记录持久化和 `reserved → snapshot_ready → maintenance_intent → source_prepared` 的核心 SQLite 编排，复用原状态目录及 inner guard，核验真实文件身份/SHA-256、准备前快照、维护后等价及同步；原 reader 保持阻断。macOS hasher 复用已有依赖，合成 port 尚不证明真实 outer/产品授权。受限单库 hot journal 的资格、持久恢复身份和核心重载已实现，含实际 spill/进程退出、合成 WAL 页一及组合核心测试；WAL→DELETE 与 pager 内部真实断电资格未闭合。旧材料 inventory/接续、新 v1 handoff、明确中止、终态封存和 C–D 产品接线/资格仍待完成，B 段未达到退出条件。阶段实现结果见[本周周志](../devlogs/2026-W38.md)。
 
 按以下顺序串行实施，每段完成匹配检查后再进入下一段；支持 schema、历史接续和旧 reader 兼容属于必要工作，不能只交付一个 checkpoint helper。
 

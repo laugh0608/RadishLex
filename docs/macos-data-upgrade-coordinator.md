@@ -64,15 +64,23 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 - `UserDb::verify_maintenance_snapshot` 在只读事务中比较源库与独立 standalone 保护快照。比较受支持的表和索引定义、数据库属性、所有表的 rowid 与逐列 storage class/值，保留重复记录和 sequence 语义；未知表、视图、trigger、未支持的隐藏列或 WITHOUT ROWID 表失败关闭。不向协调层输出行内容。
 - `UserDb::prepare_source_for_upgrade` 在调用方已持久化意图、证明静止并验证文件 family 后，使用不含 CREATE 且带 NOFOLLOW 的连接，完整 truncate WAL、转为 DELETE、显式检查关闭、复验内容等价及零 sidecar；不调用普通 `UserDb::open` 或 migration。错误只返回固定分类，物理文件可能已变化，错误不表示回滚。
 - `UserDb::verify_prepared_source` 只读复核已准备结果：必须为 DELETE、零 sidecar、相同 schema 和与保护快照全量等价；不能把“打开前没有 sidecar”的持久 WAL 库视为已准备。
-- snapshot 估算与复制的成功返回也检查连接显式关闭。维护 API 拒绝未证明的已有 journal；维护途中 hot journal 的授权恢复分支仍待后续协调实现，不能以原语单独证明所有 crash 已恢复。
+- snapshot 估算与复制的成功返回也检查连接显式关闭。普通维护 API 继续拒绝已有 journal。独立 `qualify_maintenance_journal` 只读检查受限单库日志与保护快照，不通过 SQLite 打开源库；协调层持久化恢复身份后才调用 `recover_maintenance_journal`，由 SQLite 加锁和重放，随后验证全量等价并完成原准备原语。不能以这些原语单独证明所有 crash 已恢复。
 
 准备记录的版本化类型由 `ime-product-upgrade::PreparationReceipt` 提供，绑定不同的前一 outer/data operation、产品摘要、root/state identity、初始源 family、保护快照、准备后源 identity 和 v1 handoff。已记录证据只能保留并单步追加；格式/字段/身份不符、跳阶段或跨 operation 替换均拒绝。此类型本身没有文件写入或系统操作权限。
 
 `PreparationJournalStore` 的 journal 读写层复用原状态目录 inode 与 inner guard，支持严格 canonical 写入、重载和单步比较替换。rename 后未确认目录 fsync 的同字节重放必须重新同步文件和目录；未完成的临时对象保留并阻断，不自动认领。原 v1 reader/startup 白名单不变，准备 marker 仍阻止业务初始化；单独持久化记录不认证其产品、DB family 或历史 artifact。
 
-专用 `prepare_userdb_source` 编排已经串接保护快照、持久维护意图、SQLite 准备及 `source_prepared` 复核；固定路径与实际文件的 owner/mode/link/device/inode/length/SHA-256 由核心检查。快照读取阶段允许受限 SHM/零长 WAL 辅助变化，原主库和既有 WAL 内容不变；进入维护窗口后仍要求同一主 inode、保护快照和全量逻辑内容一致。文件/目录 fsync、rename、记录回读及后置静止缺一不可；无证明 snapshot 残留和 hot journal 阻断，不自动清理或恢复源库。
+专用 `prepare_userdb_source` 编排已经串接保护快照、持久维护意图、SQLite 准备及 `source_prepared` 复核；固定路径与实际文件的 owner/mode/link/device/inode/length/SHA-256 由核心检查。快照读取阶段允许受限 SHM/零长 WAL 辅助变化，原主库和既有 WAL 内容不变；进入维护窗口后仍要求同一主 inode、保护快照和全量逻辑内容一致。文件/目录 fsync、rename、记录回读及后置静止缺一不可；无证明 snapshot 残留或不满足下述资格的 journal 阻断，不自动清理或用快照覆盖源库。
 
-快照及维护前 fresh 容量预算为 `6 * max(logical_bytes, source_main_bytes) + settings_bytes + 64 MiB`，覆盖原三份工作余量、准备快照、源库增长和 journal，使用 checked arithmetic。`SourcePreparationPort` 的真实产品实现必须持有 outer guard，逐 checkpoint 复验同一 `prepared` outer、两代受控产品、旧 receipt/inventory 和静止状态；`MacOsPreparationHasher` 只提供现有 SHA-256 实现，不替代上述授权。Executor 接线、hot journal 恢复资格、接续、明确中止和终态封存仍待完成，不能以 `source_prepared` 或单独 journal `handoff_ready` 声称产品交接完成。
+快照及维护前 fresh 容量预算为 `6 * max(logical_bytes, source_main_bytes) + settings_bytes + 64 MiB`，覆盖原三份工作余量、准备快照、源库增长和 journal，使用 checked arithmetic。`SourcePreparationPort` 的真实产品实现必须持有 outer guard，逐 checkpoint 复验同一 `prepared` outer、两代受控产品、旧 receipt/inventory 和静止状态；`MacOsPreparationHasher` 只提供现有 SHA-256 实现，不替代上述授权。Executor 接线、接续、明确中止和终态封存仍待完成，不能以 `source_prepared` 或单独 journal `handoff_ready` 声称产品交接完成。
+
+#### 维护中断的受限 journal 恢复
+
+只在已持久化 `maintenance_intent` 下恢复。核心重新证明 guard、授权、静止、容量、原主 inode 和保护快照 SHA-256，再对固定 `userdb.sqlite3-journal` 检查私有单链接身份、无 WAL/SHM、有效非零首段头、页/扇区边界及与快照相符的原始页数；末尾带 super-journal magic 一律拒绝，避免 SQLite 跟随多库日志路径。资格检查不执行自行编写的页重放；SQLite 继续负责锁、busy、校验和、回滚及删除日志。[SQLite 日志格式](https://www.sqlite.org/fileformat2.html#the_rollback_journal)、[SQLite hot journal 恢复](https://www.sqlite.org/lockingv3.html)
+
+恢复前在同一阶段追加一次 `journal_recovery` family 身份，持久化并回读后再进行可写 SQLite 访问。续跑时 journal 的 inode、metadata、长度和摘要必须精确匹配；主库只允许同一 inode 内的页恢复变化。恢复字段永久保留，无字段记录的 canonical 字节不变，旧严格准备 reader 拒绝新字段。日志被 SQLite 删除后，仍须执行 schema、全量内容、DELETE、零 sidecar、显式关闭及文件/目录同步验证，才可记录 `source_prepared`。
+
+重放失败或内容不等价可能发生在 SQLite 已改主库、已删除 journal 之后，错误不代表物理回滚。保留保护快照和意图，不自动覆盖源库或改认新 journal。当前测试覆盖真实 spill 生成的单库热日志及 API 边界进程退出；WAL 页一恢复是显式构造的合成变体，编排测试是组合 fixture。WAL→DELETE 内部断电、pager 中途断电、混合 sidecar 和多库日志没有恢复资格；不据此解除 marker 或宣称完整产品升级可用。
 
 ### Manager 与 InputMethod
 
