@@ -31,6 +31,7 @@
 - 次要事项为输入回调锁等待、新词召回/评测、删除与事件保留、MSRV/CI；维护成本、Manager 易用性和早期反馈列为后续建议。具体证据、未知项与关闭条件只在跟踪专题维护。
 - 2026-09-15 完成[WAL 源库准备与新事务接续设计](../remediation/macos-wal-source-preparation-design.md)，随后获项目所有者确认 A–D 仓库实施与隔离资格范围；包含准备前快照、版本化意图、旧事务保留、新 v1 接续及终态封存。当日 A 段已完成；B 段已实现记录持久化及推进至 `source_prepared` 的核心 SQLite 编排和实物摘要核验，受限单库 hot journal 恢复及持久身份已获合成验证；旧 operation 接续、新 v1 handoff、终态封存和真实产品接线仍待完成，未进行实机验证，不关闭 REV-01/REV-02。
 - 2026-09-25 继续 B 段：旧终态 inventory 实物核验、私有目录/文件身份封存及保留接续已实现，核心可从 `source_prepared` 推进至 `previous_archived`；准备和归档检查点均复验前驱材料，marker、保护快照和原状态目录 inode 保持。新 v1 handoff、明确中止、终态封存、已释放历史前驱索引和 C–D 产品接线/资格仍开放；本批只使用隔离合成目录，未复验或操作冻结现场。代码与文档已分别提交为 `8212325` / `48a8d47`；项目所有者解除 Xcode 许可阻塞后，本批完整仓库门禁补跑通过。验证与限制见[本周记录](../devlogs/2026-W39.md)。
+- 2026-09-25 后续 B 段完成仓库级新 v1 handoff：先持久绑定新回执及目录身份，再移入活动 `preflighted`，封存保护快照并最后移出 marker；两条前驱、准备后 DB 身份及原状态目录/guard 保持。新回执已活动和 marker 已移出两类中断可精确重载；未知或漂移材料继续保留阻断，普通 v1 白名单和启动停止线不变。代码已提交为 `ea3610d`，workspace check/Clippy 与完整仓库门禁通过。真实产品接线、明确中止及终态释放仍未完成；本批验证口径见[本周记录](../devlogs/2026-W39.md)。
 - 当前 Rime 来源锁已变化，不能作为冻结 Linux L6 pair 的新 target；现有构建资格检查继续拒绝混配。旧 pair、M5 系统操作顺位和冻结现场保持原状；新 pair 或平台实机动作仍须单独明确范围。
 
 ## 冻结基线与固定边界
@@ -71,9 +72,9 @@
 - 不发布 macOS build 38/39/40 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步：B 段新 v1 handoff（2026-09-25）
+## 下一步：B 段明确中止与终态封存（2026-09-25）
 
-完整仓库门禁已补齐。按已确认的[具体设计与 A–D 分段](../remediation/macos-wal-source-preparation-design.md)，继续从 `previous_archived` 创建精确绑定准备后源身份的新 v1 `preflighted`：保留前一 outer/data 两条链、旧材料和保护快照，完成 canonical 回读及准备证明封存后再移出 marker；不得放宽原 `can_replace` 或提前允许启动。随后补明确中止、终态封存与历史释放索引，再进入 C–D 的 outer guard/真实产品接线和独立程序副本资格。当前实现只覆盖旧活动终态的保留接续，不代表 B 段退出；合成 port 不证明真实产品授权，WAL 模式转换/pager 内部断电资格仍开放。
+按已确认的[具体设计与 A–D 分段](../remediation/macos-wal-source-preparation-design.md)，接下来补齐维护前/后的明确中止、终态保留封存及历史释放索引，让完成或恢复后的正常 WAL 使用不再被旧活动 receipt 的历史身份阻断，再进入 C–D 的 outer guard/真实产品接线和独立程序副本资格。新 v1 handoff 已完成仓库实现，不代表 B 段退出；不得手动搬走 receipt 解除门禁，合成 port 不证明真实产品授权，WAL 模式转换/pager 内部断电资格仍开放。
 
 新升级真正完成后，才继续客户端身份和 composition 隐私实测；不直接重试 40。09-16 的历史 inventory 待办已由本批承接，原记录仍保留在[前周周志](../devlogs/2026-W38.md#2026-09-16明日事项)，本批交付和下一步见[本周周志](../devlogs/2026-W39.md)。
 

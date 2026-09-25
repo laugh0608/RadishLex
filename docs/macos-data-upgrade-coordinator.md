@@ -72,7 +72,7 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 专用 `prepare_userdb_source` 编排已经串接保护快照、持久维护意图、SQLite 准备及 `source_prepared` 复核；固定路径与实际文件的 owner/mode/link/device/inode/length/SHA-256 由核心检查。快照读取阶段允许受限 SHM/零长 WAL 辅助变化，原主库和既有 WAL 内容不变；进入维护窗口后仍要求同一主 inode、保护快照和全量逻辑内容一致。文件/目录 fsync、rename、记录回读及后置静止缺一不可；无证明 snapshot 残留或不满足下述资格的 journal 阻断，不自动清理或用快照覆盖源库。
 
-快照及维护前 fresh 容量预算为 `6 * max(logical_bytes, source_main_bytes) + settings_bytes + 64 MiB`，覆盖原三份工作余量、准备快照、源库增长和 journal，使用 checked arithmetic。`SourcePreparationPort` 的真实产品实现必须持有 outer guard，逐 checkpoint 复验同一 `prepared` outer、两代受控产品、旧 receipt/inventory 和静止状态；`MacOsPreparationHasher` 只提供现有 SHA-256 实现，不替代上述授权。Executor 接线、新 v1 handoff、明确中止和终态封存仍待完成，不能以 `source_prepared` 或单独 journal `handoff_ready` 声称产品交接完成。
+快照及维护前 fresh 容量预算为 `6 * max(logical_bytes, source_main_bytes) + settings_bytes + 64 MiB`，覆盖原三份工作余量、准备快照、源库增长和 journal，使用 checked arithmetic。`SourcePreparationPort` 的真实产品实现必须持有 outer guard，逐 checkpoint 复验同一 `prepared` outer、两代受控产品、旧 receipt/inventory 和静止状态；`MacOsPreparationHasher` 只提供现有 SHA-256 实现，不替代上述授权。Executor 接线、明确中止和终态封存仍待完成，不能以 `source_prepared` 或单独 journal `handoff_ready` 声称产品交接完成。
 
 #### 旧事务 inventory 与保留接续
 
@@ -82,7 +82,15 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 只有精确的两槽互斥位置和有序移动前缀可以重放；最多一个移动可领先其持久位置证明，重放必须补做同步。冲突、缺失、inode/owner/mode/link/hash 漂移、未知对象和无证明临时记录保留并阻断。初始化产生的已有私有 operation 不认领；仅空共享父目录可重新核验并同步。首次无 data receipt 且无历史目录可用显式空清单；已释放历史前驱的索引路径留待终态封存接线，当前拒绝扫描猜测。
 
-原 v1 data receipt 编码与普通 reader 不变；新增准备字段只在使用时编码，旧严格准备 reader 拒绝它们。核心可推进至 `previous_archived`，marker 和准备快照仍留在活动目录。前一 outer canonical 字节的产品级保存、真实双 guard、new v1 handoff、明确中止和终态封存仍须完成，不能据此允许产品启动或对真实目录执行升级。
+原 v1 data receipt 编码与普通 reader 不变；新增准备字段只在使用时编码，旧严格准备 reader 拒绝它们。归档核心推进至 `previous_archived` 时，marker 和准备快照仍留在活动目录，之后必须经过独立 handoff。前一 outer canonical 字节的产品级保存、真实双 guard、明确中止和终态封存仍须完成，不能据此允许产品启动或对真实目录执行升级。
+
+#### 新 v1 handoff 与准备证明封存
+
+`handoff_userdb_source` 已实现从 `previous_archived` 到新 v1 `preflighted` 的受控交接，调用方须明确预期新 operation 并持有原 guard。新回执取准备后 DB 身份、已绑定 release/schema、当前可选 settings/Rime，数据前驱不与 outer 前驱混用。先在新 operation 历史固定 `receipt.json` 创建并同步回执，于准备记录追加 `handoff_intent`，绑定 canonical 回执、文件 inode/metadata/hash、两层目录和 settings 身份，才允许移入活动槽；已有未知目标保留阻断。
+
+新 v1 活动回执完成目标/源目录同步及精确回读后，记录 `handoff_ready`，再保留式移动保护快照，最后移动 marker 为历史 `preparation.json`。每个检查点复验当前授权、guard、旧 inventory/私有槽、DB/保护快照等价与身份、settings/Rime 和唯一槽位关系；同字节但不同 inode 的已绑定材料同样拒绝。新回执已写或 marker 已封存的中断可在 fresh guard 下精确重放，不重复维护、不另开 ID、不改写最终证明；未绑定的目录/文件、未知版本/临时对象和冲突保持阻断。
+
+成功返回同一 guard 可用的普通 v1 store，其后可生成独立 migration snapshot。marker 存在时旧 reader 拒绝；marker 移出后普通 reader 可读新回执，非终态 startup gate 仍拒绝。当前仅验证合成产品 port、真实私有文件/SHA-256/SQLite 与子进程重载，尚非真实双产品升级资格。
 
 #### 维护中断的受限 journal 恢复
 

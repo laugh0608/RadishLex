@@ -55,6 +55,7 @@ WAL 模式跨连接保留，WAL 包含可能尚未进入主文件的已提交数
   ...既有 v1 固定槽位...
 <data-root>/.radishlex-upgrade-history-v1/<operation-id>/
   inventory.json
+  receipt.json                      # 仅新 v1 handoff 写入并封存身份后移入活动槽
   preparation.json
   preparation-snapshot.sqlite3
   previous-install-receipt.json
@@ -159,6 +160,8 @@ checkpoint 结果和关闭语义依据 [SQLite checkpoint API](https://sqlite.or
 
 新 v1 receipt 的 operation 等于新 outer；`previous_operation_id` 等于旧 data operation（首次为 null）。新准备记录另绑定前一 outer；中间发生 repair 等操作时，两条前驱链不得混淆。已支持的 source release/schema 必须由 fresh source 与 sealed payload 证明，不能从前一 receipt 的 target 字段猜测。
 
+handoff 的新目录和回执先独占创建、同步并回读，在 `previous_archived` 追加一次 `handoff_intent`，封存历史根/新 operation 目录身份、canonical 新 v1 回执及文件身份和可选 settings 身份；意图一旦落盘不可改认。当前 settings/Rime 与准备后 DB 均从实物核验；普通 v1 receipt 不增加摘要。新回执从历史固定 `receipt.json` 原 inode 移入活动槽，按目标/源目录 fsync 后回读，再写 `handoff_ready`。保护快照移入历史后，marker 最后原 inode 移为 `preparation.json`；成功返回保持原 guard 的普通 v1 store。无意图绑定的目录/文件即使字节看似正确也不认领，保留阻断。
+
 准备快照移到新 operation 的私有历史槽继续保留，随后既有 v1 链从准备后的 source 创建自己的 snapshot/candidate。两份快照用途不同：前者保护准备写入，后者服务数据 migration；先保持现有核心的路径和 artifact 合同，不在首批合并二者。
 
 空间预算在既有三份 logical snapshot + 64 MiB 基础上，增加一份准备 snapshot、源主库可能增长的上界、settings 副本和维护 journal 余量；使用 checked arithmetic，每个昂贵写入前 fresh 检查。历史已有文件的 rename 不按重新复制计费；不通过删除旧材料腾空间。
@@ -207,9 +210,11 @@ checkpoint 结果和关闭语义依据 [SQLite checkpoint API](https://sqlite.or
 
 2026-09-25：A 段已实现。B 段已实现准备记录持久化、至 `source_prepared` 的 SQLite 编排、受限单库 journal 恢复，以及旧终态 inventory 的实物封存和至 `previous_archived` 的逐槽保留接续。准备记录新增可选 `previous_inventory_identity` 和只追加的 `archived_slots`；未使用新字段的原编码保持，旧严格准备 reader 拒绝新字段，原 v1 data receipt 不变。准备及归档 checkpoint 均核验历史实物；旧 data receipt 和实际私有材料按终态位置解释，不用运行库的历史长度否定正常学习。
 
-本批只接续仍位于活动 v1 槽的旧终态；已释放历史前驱的索引加载、前一 outer canonical 保存和真实双 guard 留待后续编排接线，缺少活动 receipt 但存在历史目录时拒绝猜测首次路径。初始化的未知私有 operation 或临时记录保留阻断；归档中只允许有序前缀和一个尚未记录进度的精确移动，补同步后再追加证明。marker 和准备快照不移出，普通 reader 继续拒绝。
+旧槽归档只接续仍位于活动 v1 槽的旧终态；已释放历史前驱的索引加载、前一 outer canonical 保存和真实双 guard 留待后续编排接线，缺少活动 receipt 但存在历史目录时拒绝猜测首次路径。初始化的未知私有 operation 或临时记录保留阻断；归档中只允许有序前缀和一个尚未记录进度的精确移动，补同步后再追加证明。达到 `previous_archived` 时 marker 和准备快照不移出，普通 reader 继续拒绝。
 
-新 v1 handoff、明确中止、终态封存及 C–D 产品接线/独立程序副本资格仍待完成；WAL→DELETE/pager 内部真实断电资格仍开放，B 段尚未退出。09-15 各批结果保留在[前周周志](../devlogs/2026-W38.md)，本批 Rust/Go 与文档检查通过；代码与文档按指令提交后，项目所有者解除系统 Git/Xcode 许可阻塞，完整仓库门禁补跑通过，验证与限制见[本周周志](../devlogs/2026-W39.md)。
+2026-09-25 后续批次实现新 v1 handoff：新增可选只追加的 `handoff_intent`，封存新回执与目录身份后精确移动，复验后记录 `handoff_ready`，保留保护快照并最后移出 marker。支持新回执已活动、marker 尚在以及 marker 已移出后的 fresh guard 重载；原 v1 编码/`can_replace`/普通 reader 不变，交接后仍由非终态回执阻止启动。首次和三种旧终态、文件/目录同步边界、授权失效、子进程退出、身份漂移和冲突以隔离合成目录验证，不能解释为实机或旧程序资格。
+
+明确中止、终态封存及 C–D 产品接线/独立程序副本资格仍待完成；WAL→DELETE/pager 内部真实断电资格仍开放，B 段尚未退出。09-15 各批结果保留在[前周周志](../devlogs/2026-W38.md)，09-25 各批验证和环境限制见[本周周志](../devlogs/2026-W39.md)。
 
 按以下顺序串行实施，每段完成匹配检查后再进入下一段；支持 schema、历史接续和旧 reader 兼容属于必要工作，不能只交付一个 checkpoint helper。
 
