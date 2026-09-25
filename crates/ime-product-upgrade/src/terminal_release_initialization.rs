@@ -25,7 +25,9 @@ impl TerminalReleaseStore {
         }
         let mut files: [Option<PreparationFileIdentity>; 5] = std::array::from_fn(|_| None);
         for (i, slot) in SLOTS.iter().copied().enumerate() {
-            files[i] = self.optional_file(&self.active(slot_name(slot)), hasher)?;
+            files[i] = self
+                .history()
+                .optional_file(&self.active(slot_name(slot)), hasher)?;
         }
         let root = self.journal.store.root.path.join(HISTORY);
         let operation = root.join(&binding.operation_id);
@@ -36,8 +38,10 @@ impl TerminalReleaseStore {
             self.journal.history_directory(&operation)?;
         }
         let preparation = [
-            self.optional_file(&operation.join(PREPARATION[0]), hasher)?,
-            self.optional_file(&operation.join(PREPARATION[1]), hasher)?,
+            self.history()
+                .optional_file(&operation.join(PREPARATION[0]), hasher)?,
+            self.history()
+                .optional_file(&operation.join(PREPARATION[1]), hasher)?,
         ];
         if path_exists(&operation)?
             && (preparation[0].is_none()
@@ -47,11 +51,11 @@ impl TerminalReleaseStore {
         {
             return Err(Error::EvidenceChanged);
         }
-        let previous_index = self.load_index(hasher)?;
+        let previous_index = self.history().load_index(hasher)?;
         if let Some(previous) = &previous_index {
-            self.resolve_index(&previous.index, hasher)?;
+            self.history().resolve_index(&previous.index, hasher)?;
         }
-        let settings = self.optional_file(
+        let settings = self.history().optional_file(
             &self.journal.store.root.path.join("manager-settings.json"),
             hasher,
         )?;
@@ -172,11 +176,11 @@ impl TerminalReleaseStore {
                     return Err(Error::EvidenceChanged);
                 }
             }
-            self.verify_directories(record, true)?;
-            self.verify_files(record, hasher, false)?;
-            self.verify_runtime(record, hasher)?;
-            self.verify_preparation(record, hasher)?;
-            if self.load_index(hasher)? != record.previous_index {
+            self.history().verify_directories(record, true)?;
+            self.history().verify_files(record, hasher, false)?;
+            self.history().verify_runtime(record, hasher)?;
+            self.history().verify_preparation(record, hasher)?;
+            if self.history().load_index(hasher)? != record.previous_index {
                 return Err(Error::EvidenceChanged);
             }
             Ok(())

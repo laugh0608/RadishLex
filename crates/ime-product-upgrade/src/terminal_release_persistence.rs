@@ -41,10 +41,10 @@ impl TerminalReleaseStore {
             return Err(Error::InvalidPhase);
         }
         let path = self.active(RELEASE);
-        let current = self.optional_file(&path, hasher)?;
+        let current = self.history().optional_file(&path, hasher)?;
         let bytes = next.encode()?;
         if let Some(identity) = &current {
-            let stored = self.read_release(&path, hasher)?;
+            let stored = self.history().read_release(&path, hasher)?;
             if stored == *next {
                 self.sync_file(&path, identity, hasher)?;
                 sync_directory(&self.journal.store.state_directory)?;
@@ -110,7 +110,7 @@ impl TerminalReleaseStore {
         if identity.device_id != metadata.dev()
             || identity.inode != metadata.ino()
             || self.journal.read_history_bytes(&staged)? != bytes
-            || self.optional_file(&path, hasher)? != current
+            || self.history().optional_file(&path, hasher)? != current
         {
             return Err(Error::EvidenceChanged);
         }
@@ -141,7 +141,7 @@ impl TerminalReleaseStore {
         self.journal.verify_guard(guard)?;
         self.validate_active_entries()?;
         if self.journal.evidence(&path, hasher)? != identity
-            || self.read_release(&path, hasher)? != *next
+            || self.history().read_release(&path, hasher)? != *next
         {
             return Err(Error::EvidenceChanged);
         }
@@ -171,22 +171,28 @@ impl TerminalReleaseStore {
                 }
                 self.journal.private_metadata(&entry.path())?;
             }
-            if self.optional_file(&self.active(RELEASE), hasher)?.as_ref() != current
+            if self
+                .history()
+                .optional_file(&self.active(RELEASE), hasher)?
+                .as_ref()
+                != current
                 || self
+                    .history()
                     .optional_file(&self.active(RELEASE_TEMP), hasher)?
                     .as_ref()
                     != staged
             {
                 return Err(Error::EvidenceChanged);
             }
-            self.verify_directories(next, false)?;
-            self.verify_files(next, hasher, false)?;
-            self.verify_runtime(next, hasher)?;
-            self.verify_preparation(next, hasher)?;
-            let index = self.load_index(hasher)?;
+            self.history().verify_directories(next, false)?;
+            self.history().verify_files(next, hasher, false)?;
+            self.history().verify_runtime(next, hasher)?;
+            self.history().verify_preparation(next, hasher)?;
+            let index = self.history().load_index(hasher)?;
             if index != next.previous_index
                 && !(next.phase == TerminalReleasePhase::ReleaseReady
-                    && index.as_ref().map(|v| &v.index) == Some(&self.index_for(next, hasher)?))
+                    && index.as_ref().map(|v| &v.index)
+                        == Some(&self.history().index_for(next, hasher)?))
             {
                 return Err(Error::EvidenceChanged);
             }
@@ -217,14 +223,14 @@ impl TerminalReleaseStore {
             Point::BeforeIndexWrite,
             TerminalReleaseOuterRequirement::Nonterminal,
         )?;
-        let expected = self.index_for(record, hasher)?;
+        let expected = self.history().index_for(record, hasher)?;
         let root = &self.paths(record)[0];
         let path = root.join(INDEX);
-        if let Some(current) = self.load_index(hasher)? {
+        if let Some(current) = self.history().load_index(hasher)? {
             if current.index == expected {
                 self.sync_file(&path, &current.identity, hasher)?;
                 sync_directory(root)?;
-                return self.require_published_index(record, hasher);
+                return self.history().require_published_index(record, hasher);
             }
         }
         let staged = root.join(INDEX_TEMP);
@@ -260,7 +266,10 @@ impl TerminalReleaseStore {
         )?;
         if self.journal.read_history_bytes(&staged)? != bytes
             || self.journal.evidence(&staged, hasher)? != written
-            || self.load_index_with_temp(hasher, Some(&written))? != record.previous_index
+            || self
+                .history()
+                .load_index_with_temp(hasher, Some(&written))?
+                != record.previous_index
         {
             return Err(Error::EvidenceChanged);
         }
@@ -282,7 +291,7 @@ impl TerminalReleaseStore {
             Point::IndexDirectorySynced,
             TerminalReleaseOuterRequirement::Nonterminal,
         )?;
-        self.require_published_index(record, hasher)
+        self.history().require_published_index(record, hasher)
     }
     fn index_checkpoint(
         &self,

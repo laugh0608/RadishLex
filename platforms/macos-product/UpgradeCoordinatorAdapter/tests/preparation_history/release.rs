@@ -11,6 +11,8 @@ use radishlex_ime_product_upgrade::{
 
 #[path = "release_failures.rs"]
 mod failures;
+#[path = "release_predecessor.rs"]
+mod predecessor;
 
 struct ProductPort(State);
 impl UpgradeCoordinatorPort for ProductPort {

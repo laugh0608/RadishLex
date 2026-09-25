@@ -141,7 +141,9 @@ impl PreparationJournalStore {
                 .enumerate()
                 .filter_map(|(index, slot)| inventory.files[index].as_ref().map(|_| *slot))
                 .collect();
-            if record.archived_slots() != expected_slots {
+            if (inventory.released.is_some() && !record.archived_slots().is_empty())
+                || (inventory.released.is_none() && record.archived_slots() != expected_slots)
+            {
                 return Err(Error::EvidenceChanged);
             }
             for (index, slot) in SLOTS.iter().copied().enumerate() {
@@ -168,6 +170,12 @@ impl PreparationJournalStore {
                     None if path_exists(&path)? => return Err(Error::EvidenceChanged),
                     None => {}
                 }
+            }
+            if inventory.released.is_some() {
+                // The shared release reader checked the root, sealed proof and
+                // every old private file. Older retained operations are allowed;
+                // the new operation still has its own exclusive handoff contract.
+                return Ok(());
             }
         } else {
             if record.previous_inventory_identity().is_some() || !record.archived_slots().is_empty()

@@ -236,6 +236,8 @@ pub struct PreparationReceipt {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     previous_inventory_identity: Option<PreparationFileIdentity>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    previous_release_index_identity: Option<PreparationFileIdentity>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     handoff_intent: Option<PreparationHandoffIntent>,
 }
 impl PreparationReceipt {
@@ -255,6 +257,7 @@ impl PreparationReceipt {
             journal_recovery: None,
             archived_slots: Vec::new(),
             previous_inventory_identity: None,
+            previous_release_index_identity: None,
             handoff_intent: None,
         };
         receipt.validate()?;
@@ -291,6 +294,28 @@ impl PreparationReceipt {
 
     pub fn previous_inventory_identity(&self) -> Option<&PreparationFileIdentity> {
         self.previous_inventory_identity.as_ref()
+    }
+
+    pub fn previous_release_index_identity(&self) -> Option<&PreparationFileIdentity> {
+        self.previous_release_index_identity.as_ref()
+    }
+
+    /// Bind a released predecessor before persisting the reservation. The proof
+    /// supplies the inventory; the index must retain its exact physical identity.
+    pub fn bind_released_predecessor(
+        &mut self,
+        proof: PreparationFileIdentity,
+        index: PreparationFileIdentity,
+    ) -> Result<(), Error> {
+        if self.phase != PreparationPhase::Reserved || self.previous_inventory_identity.is_some() {
+            return Err(Error::InvalidPhase);
+        }
+        let mut next = self.clone();
+        next.previous_inventory_identity = Some(proof);
+        next.previous_release_index_identity = Some(index);
+        next.validate()?;
+        *self = next;
+        Ok(())
     }
 
     pub(crate) fn handoff_intent(&self) -> Option<&PreparationHandoffIntent> {
@@ -477,6 +502,7 @@ impl PreparationReceipt {
             || self.binding != previous.binding
             || self.initial_source != previous.initial_source
             || self.previous_inventory_identity != previous.previous_inventory_identity
+            || self.previous_release_index_identity != previous.previous_release_index_identity
         {
             return false;
         }
@@ -552,6 +578,21 @@ impl PreparationReceipt {
             intent.validate(self)?;
         }
         self.initial_source.validate(&self.binding.data_root)?;
+        if let Some(index) = &self.previous_release_index_identity {
+            index.validate()?;
+            if self.previous_inventory_identity.is_none()
+                || self.binding.previous_data_operation_id.is_none()
+                || index.device_id != self.binding.data_root.device_id
+                || index.owner_id != self.binding.data_root.owner_id
+                || self
+                    .previous_inventory_identity
+                    .as_ref()
+                    .is_some_and(|proof| proof.inode == index.inode)
+                || !self.archived_slots.is_empty()
+            {
+                return Err(Error::InvalidIdentity);
+            }
+        }
         if let Some(identity) = &self.previous_inventory_identity {
             identity.validate()?;
             if self.binding.previous_inventory_sha256.as_ref() != Some(&identity.sha256)

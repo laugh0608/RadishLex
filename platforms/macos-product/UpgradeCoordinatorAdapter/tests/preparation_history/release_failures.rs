@@ -80,7 +80,7 @@ fn continue_release(fixture: &Fixture, mut port: ReleasePort) -> bool {
         .finish_terminal_release(&guard, NEW, &mut port, &Hasher)
         .is_ok()
 }
-fn tree(root: &Path) -> Vec<(PathBuf, u64, u32, Vec<u8>)> {
+pub(super) fn tree(root: &Path) -> Vec<(PathBuf, u64, u32, Vec<u8>)> {
     fn walk(root: &Path, path: &Path, out: &mut Vec<(PathBuf, u64, u32, Vec<u8>)>) {
         let metadata = fs::symlink_metadata(path).unwrap();
         let bytes = if metadata.is_file() {

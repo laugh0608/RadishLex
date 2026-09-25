@@ -45,7 +45,7 @@ impl PreparationJournalStore {
         if record.phase() == PreparationPhase::PreviousArchived {
             return Ok(record);
         }
-        if inventory.receipt.is_some() {
+        if inventory.receipt.is_some() && inventory.released.is_none() {
             let paths = inventory.paths(self)?;
             for (index, slot) in SLOTS.iter().copied().enumerate() {
                 let Some(identity) = &inventory.files[index] else {
@@ -185,6 +185,9 @@ impl PreparationJournalStore {
         hasher: &impl PreparationHasher,
     ) -> Result<PreviousInventory> {
         let binding = record.binding();
+        if record.previous_release_index_identity().is_some() {
+            return self.load_released_inventory(record, hasher);
+        }
         let Some(previous) = &binding.previous_data_operation_id else {
             if path_exists(&self.store.root.path.join(HISTORY))?
                 || record.previous_inventory_identity().is_some()
@@ -280,6 +283,13 @@ impl PreparationJournalStore {
         record: Option<&PreparationReceipt>,
     ) -> Result<()> {
         self.validate_entries()?;
+        if inventory.released.is_some() {
+            if record.is_some_and(|record| !record.archived_slots().is_empty()) {
+                return Err(Error::EvidenceChanged);
+            }
+            self.verify_empty_v1_slots()?;
+            return self.verify_released_inventory(inventory, hasher);
+        }
         let history = if inventory.directories.is_some() {
             self.verify_history_directories(inventory, record.is_some())?;
             Some(inventory.paths(self)?[2].clone())

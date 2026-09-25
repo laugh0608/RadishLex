@@ -27,9 +27,23 @@ pub struct PreviousInventory {
     pub(super) directories: Option<[PreparationDirectoryIdentity; 3]>,
     pub(super) receipt: Option<UpgradeReceipt>,
     pub(super) files: [Option<crate::PreparationFileIdentity>; 5],
+    // Released inventories are projections of the sealed release, never a new
+    // inventory.json. This in-memory discriminator cannot be decoded from disk.
+    #[serde(skip)]
+    pub(super) released: Option<ReleasedInventoryEvidence>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct ReleasedInventoryEvidence {
+    pub proof: crate::PreparationFileIdentity,
+    pub index: crate::PreparationFileIdentity,
+    pub installed_product_sha256: String,
 }
 
 impl PreviousInventory {
+    pub fn release_index_identity(&self) -> Option<&crate::PreparationFileIdentity> {
+        self.released.as_ref().map(|value| &value.index)
+    }
     pub fn receipt_sha256(&self) -> Option<&str> {
         self.files[0]
             .as_ref()
@@ -53,10 +67,14 @@ impl PreviousInventory {
             directories: None,
             receipt: None,
             files: std::array::from_fn(|_| None),
+            released: None,
         })
     }
 
     pub(super) fn encode(&self) -> Result<Vec<u8>> {
+        if self.released.is_some() {
+            return Err(Error::EvidenceChanged);
+        }
         let mut bytes = serde_json::to_vec(self).map_err(|_| Error::EvidenceChanged)?;
         bytes.push(b'\n');
         if bytes.len() > MAX_PREPARATION_RECEIPT_BYTES {
@@ -186,9 +204,18 @@ impl PreparationJournalStore {
             }
             inventory.receipt = Some(receipt);
         } else {
-            if previous_data.is_some() || path_exists(&self.store.root.path.join(HISTORY))? {
-                // A released-history predecessor needs the later terminal-release
-                // reader, never a scan or an invented first-upgrade inventory.
+            if previous_data.is_some() {
+                return self.capture_released_inventory(
+                    guard,
+                    operation,
+                    previous_install,
+                    previous_data,
+                    hasher,
+                );
+            }
+            if path_exists(&self.store.root.path.join(HISTORY))? {
+                // History requires an explicit predecessor, never a scan or an
+                // invented first-upgrade inventory.
                 return Err(Error::EvidenceChanged);
             }
             self.verify_inventory_files(&inventory, hasher, None)?;
@@ -283,6 +310,12 @@ impl PreparationJournalStore {
         self.verify_guard(guard)?;
         self.validate_entries()?;
         self.reject_staged_record()?;
+        if let Some(released) = &inventory.released {
+            self.verify_released_inventory(inventory, hasher)?;
+            self.verify_empty_v1_slots()?;
+            self.verify_guard(guard)?;
+            return Ok(Some(released.proof.clone()));
+        }
         if inventory.data_root != self.data_root_identity()
             || inventory.state_directory != self.state_directory_identity()
         {

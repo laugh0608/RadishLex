@@ -18,18 +18,6 @@ impl TerminalReleaseStore {
         }
         Ok(())
     }
-    pub(super) fn read_release(
-        &self,
-        path: &Path,
-        hasher: &impl PreparationHasher,
-    ) -> Result<TerminalReleaseReceipt> {
-        let identity = self.journal.evidence(path, hasher)?;
-        let result = TerminalReleaseReceipt::decode(&self.journal.read_history_bytes(path)?)?;
-        if self.journal.evidence(path, hasher)? != identity {
-            return Err(Error::EvidenceChanged);
-        }
-        Ok(result)
-    }
     pub(super) fn verify_live(
         &self,
         guard: &UpgradeProcessGuard,
@@ -48,342 +36,30 @@ impl TerminalReleaseStore {
         self.journal.verify_guard(guard)?;
         self.validate_active_entries()?;
         record.validate()?;
-        self.verify_directories(record, false)?;
+        self.history().verify_directories(record, false)?;
         let paths = self.paths(record);
         let marker = self.unique_location(&self.active(RELEASE), &paths[1].join(RELEASE))?;
-        if self.read_release(&marker, hasher)? != *record
+        if self.history().read_release(&marker, hasher)? != *record
             || (marker != self.active(RELEASE)
                 && record.phase != TerminalReleasePhase::ReleaseReady)
         {
             return Err(Error::EvidenceChanged);
         }
-        self.verify_files(record, hasher, false)?;
-        self.verify_runtime(record, hasher)?;
-        self.verify_preparation(record, hasher)?;
-        let actual = self.load_index_with_temp(hasher, temporary)?;
+        self.history().verify_files(record, hasher, false)?;
+        self.history().verify_runtime(record, hasher)?;
+        self.history().verify_preparation(record, hasher)?;
+        let actual = self.history().load_index_with_temp(hasher, temporary)?;
         if actual != record.previous_index
             && !(record.phase == TerminalReleasePhase::ReleaseReady
-                && actual.as_ref().map(|v| &v.index) == Some(&self.index_for(record, hasher)?))
+                && actual.as_ref().map(|v| &v.index)
+                    == Some(&self.history().index_for(record, hasher)?))
         {
             return Err(Error::EvidenceChanged);
         }
         if marker != self.active(RELEASE) {
-            self.require_published_index(record, hasher)?;
+            self.history().require_published_index(record, hasher)?;
         }
         self.journal.verify_guard(guard)?;
         Ok(())
-    }
-    pub(super) fn verify_directories(
-        &self,
-        record: &TerminalReleaseReceipt,
-        initializing: bool,
-    ) -> Result<()> {
-        if record.data_root != self.journal.data_root_identity()
-            || record.state_directory != self.journal.state_directory_identity()
-        {
-            return Err(Error::EvidenceChanged);
-        }
-        let paths = self.paths(record);
-        if path_exists(&paths[0])? {
-            self.journal.history_directory(&paths[0])?;
-            for entry in fs::read_dir(&paths[0]).map_err(|_| Error::Io)? {
-                let entry = entry.map_err(|_| Error::Io)?;
-                let name = entry.file_name();
-                if name == INDEX || name == INDEX_TEMP {
-                    self.journal.private_metadata(&entry.path())?;
-                } else if name.to_str().is_some_and(valid_id) {
-                    self.journal.history_directory(&entry.path())?;
-                } else {
-                    return Err(Error::EvidenceChanged);
-                }
-            }
-        }
-        for (path, expected) in paths.iter().zip(&record.directories) {
-            if self.journal.history_directory(path)? != *expected {
-                return Err(Error::EvidenceChanged);
-            }
-        }
-        if initializing && record.directories.len() < 2 {
-            return Ok(());
-        }
-        for entry in fs::read_dir(&paths[1]).map_err(|_| Error::Io)? {
-            let entry = entry.map_err(|_| Error::Io)?;
-            let name = entry.file_name();
-            if name == "data" {
-                if initializing && record.directories.len() < 3 {
-                    return Err(Error::EvidenceChanged);
-                }
-            } else if !PREPARATION.iter().any(|allowed| name == *allowed) && name != RELEASE {
-                return Err(Error::EvidenceChanged);
-            } else {
-                self.journal.private_metadata(&entry.path())?;
-            }
-        }
-        if !initializing || record.directories.len() == 3 {
-            for entry in fs::read_dir(&paths[2]).map_err(|_| Error::Io)? {
-                let entry = entry.map_err(|_| Error::Io)?;
-                if !SLOTS
-                    .iter()
-                    .any(|slot| entry.file_name() == slot_name(*slot))
-                {
-                    return Err(Error::EvidenceChanged);
-                }
-                self.journal.private_metadata(&entry.path())?;
-            }
-        }
-        Ok(())
-    }
-    pub(super) fn verify_files(
-        &self,
-        record: &TerminalReleaseReceipt,
-        hasher: &impl PreparationHasher,
-        historical: bool,
-    ) -> Result<()> {
-        let data = &self.paths(record)[2];
-        let expected_slots: Vec<_> = SLOTS
-            .iter()
-            .enumerate()
-            .filter_map(|(i, slot)| record.files[i].as_ref().map(|_| *slot))
-            .collect();
-        let mut moved = Vec::new();
-        let mut active_seen = false;
-        for (i, slot) in SLOTS.iter().copied().enumerate() {
-            let target = data.join(slot_name(slot));
-            let source = self.active(slot_name(slot));
-            let location = if historical {
-                target.clone()
-            } else {
-                match (path_exists(&source)?, path_exists(&target)?) {
-                    (true, false) => {
-                        active_seen = true;
-                        source
-                    }
-                    (false, true) => {
-                        if active_seen {
-                            return Err(Error::EvidenceChanged);
-                        }
-                        moved.push(slot);
-                        target
-                    }
-                    (false, false) if record.files[i].is_none() => continue,
-                    _ => return Err(Error::EvidenceChanged),
-                }
-            };
-            match &record.files[i] {
-                Some(identity) => {
-                    if self.journal.evidence(&location, hasher)? != *identity {
-                        return Err(Error::EvidenceChanged);
-                    }
-                    if slot == Slot::Receipt
-                        && (self.journal.read_history_bytes(&location)?
-                            != record
-                                .receipt
-                                .encode()
-                                .map_err(|_| Error::EvidenceChanged)?
-                            || self.journal.evidence(&location, hasher)? != *identity)
-                    {
-                        return Err(Error::EvidenceChanged);
-                    }
-                }
-                None if path_exists(&location)? => return Err(Error::EvidenceChanged),
-                None => {}
-            }
-        }
-        if !historical
-            && (!moved.starts_with(&record.archived_slots)
-                || moved.len() > record.archived_slots.len() + 1
-                || (record.phase == TerminalReleasePhase::ReleaseReady && moved != expected_slots))
-        {
-            return Err(Error::EvidenceChanged);
-        }
-        Ok(())
-    }
-    pub(super) fn verify_runtime(
-        &self,
-        record: &TerminalReleaseReceipt,
-        hasher: &impl PreparationHasher,
-    ) -> Result<()> {
-        no_sidecars(&self.journal.source_path())?;
-        if self.journal.evidence(&self.journal.source_path(), hasher)? != record.database {
-            return Err(Error::EvidenceChanged);
-        }
-        let settings = self.journal.store.root.path.join("manager-settings.json");
-        if self.optional_file(&settings, hasher)? != record.settings {
-            return Err(Error::EvidenceChanged);
-        }
-        let rime = self.journal.store.root.path.join("Rime");
-        let actual = if path_exists(&rime)? {
-            Some(self.journal.history_directory(&rime)?)
-        } else {
-            None
-        };
-        if actual != record.rime {
-            return Err(Error::EvidenceChanged);
-        }
-        Ok(())
-    }
-    pub(super) fn verify_preparation(
-        &self,
-        record: &TerminalReleaseReceipt,
-        hasher: &impl PreparationHasher,
-    ) -> Result<()> {
-        let operation = &self.paths(record)[1];
-        for (name, expected) in PREPARATION.iter().zip(&record.preparation) {
-            if self.optional_file(&operation.join(name), hasher)? != *expected {
-                return Err(Error::EvidenceChanged);
-            }
-        }
-        if record.preparation[0].is_some() {
-            let proof = PreparationReceipt::decode(
-                &self
-                    .journal
-                    .read_history_bytes(&operation.join(PREPARATION[0]))?,
-            )
-            .map_err(|_| Error::EvidenceChanged)?;
-            let intent = proof.handoff_intent().ok_or(Error::EvidenceChanged)?;
-            let original = &intent.receipt;
-            if self.journal.history_directory(&self.paths(record)[0])? != intent.directories[0]
-                || self.journal.history_directory(operation)? != intent.directories[1]
-            {
-                return Err(Error::EvidenceChanged);
-            }
-            if proof.phase() != PreparationPhase::HandoffReady
-                || proof.binding().operation_id != record.binding.operation_id
-                || proof.binding().data_root != record.data_root
-                || proof.binding().state_directory != record.state_directory
-                || proof.snapshot_identity() != record.preparation[1].as_ref()
-                || original.operation_id() != record.receipt.operation_id()
-                || original.previous_operation_id() != record.receipt.previous_operation_id()
-                || original.source_release() != record.receipt.source_release()
-                || original.target_release() != record.receipt.target_release()
-                || original.source_schema_version() != record.receipt.source_schema_version()
-                || original.target_schema_version() != record.receipt.target_schema_version()
-                || original
-                    .artifacts()
-                    .iter()
-                    .any(|item| !record.receipt.artifacts().contains(item))
-            {
-                return Err(Error::EvidenceChanged);
-            }
-            let product = if record.receipt.state() == UpgradeState::Completed {
-                &proof.binding().target_product_sha256
-            } else {
-                &proof.binding().source_product_sha256
-            };
-            if product != &record.binding.installed_product_sha256 {
-                return Err(Error::EvidenceChanged);
-            }
-        }
-        Ok(())
-    }
-    pub(super) fn optional_file(
-        &self,
-        path: &Path,
-        hasher: &impl PreparationHasher,
-    ) -> Result<Option<PreparationFileIdentity>> {
-        if path_exists(path)? {
-            Ok(Some(self.journal.evidence(path, hasher)?))
-        } else {
-            Ok(None)
-        }
-    }
-    pub(super) fn load_index(
-        &self,
-        hasher: &impl PreparationHasher,
-    ) -> Result<Option<PreviousIndex>> {
-        self.load_index_with_temp(hasher, None)
-    }
-    pub(super) fn load_index_with_temp(
-        &self,
-        hasher: &impl PreparationHasher,
-        temporary: Option<&PreparationFileIdentity>,
-    ) -> Result<Option<PreviousIndex>> {
-        let root = self.journal.store.root.path.join(HISTORY);
-        if !path_exists(&root)? {
-            return Ok(None);
-        }
-        self.journal.history_directory(&root)?;
-        if let Some(identity) = temporary {
-            if self.journal.evidence(&root.join(INDEX_TEMP), hasher)? != *identity {
-                return Err(Error::EvidenceChanged);
-            }
-        } else if path_exists(&root.join(INDEX_TEMP))? {
-            return Err(Error::EvidenceChanged);
-        }
-        let path = root.join(INDEX);
-        let Some(identity) = self.optional_file(&path, hasher)? else {
-            return Ok(None);
-        };
-        let index: ReleaseIndex = decode(&self.journal.read_history_bytes(&path)?)?;
-        index.validate()?;
-        if self.journal.evidence(&path, hasher)? != identity {
-            return Err(Error::EvidenceChanged);
-        }
-        Ok(Some(PreviousIndex { identity, index }))
-    }
-    pub(super) fn index_for(
-        &self,
-        record: &TerminalReleaseReceipt,
-        hasher: &impl PreparationHasher,
-    ) -> Result<ReleaseIndex> {
-        if record.phase != TerminalReleasePhase::ReleaseReady {
-            return Err(Error::InvalidPhase);
-        }
-        let bytes = record.encode()?;
-        let digest: String = hasher
-            .sha256(&mut bytes.as_slice())
-            .map_err(|_| Error::Io)?
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect();
-        Ok(ReleaseIndex {
-            format: INDEX_FORMAT.to_owned(),
-            operation_id: record.binding.operation_id.clone(),
-            data_operation_id: record.receipt.operation_id().to_owned(),
-            installed_release: record.binding.installed_release.clone(),
-            data_root: record.data_root.clone(),
-            release_sha256: digest,
-        })
-    }
-    pub(super) fn require_published_index(
-        &self,
-        record: &TerminalReleaseReceipt,
-        hasher: &impl PreparationHasher,
-    ) -> Result<()> {
-        if self.load_index(hasher)?.as_ref().map(|v| &v.index)
-            != Some(&self.index_for(record, hasher)?)
-        {
-            return Err(Error::EvidenceChanged);
-        }
-        Ok(())
-    }
-    pub(super) fn resolve_index(
-        &self,
-        index: &ReleaseIndex,
-        hasher: &impl PreparationHasher,
-    ) -> Result<TerminalReleaseReceipt> {
-        index.validate()?;
-        if path_exists(&self.active(RELEASE))?
-            && self
-                .read_release(&self.active(RELEASE), hasher)?
-                .binding
-                .operation_id
-                == index.operation_id
-        {
-            return Err(Error::EvidenceChanged);
-        }
-        let root = self.journal.store.root.path.join(HISTORY);
-        self.journal.history_directory(&root)?;
-        let operation = root.join(&index.operation_id);
-        self.journal.history_directory(&operation)?;
-        let record = self.read_release(&operation.join(RELEASE), hasher)?;
-        if self.index_for(&record, hasher)? != *index {
-            return Err(Error::EvidenceChanged);
-        }
-        record.validate()?;
-        self.verify_directories(&record, false)?;
-        self.verify_files(&record, hasher, true)?;
-        self.verify_preparation(&record, hasher)?;
-        Ok(record)
     }
 }

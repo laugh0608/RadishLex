@@ -16,10 +16,15 @@ use record::{decode, encode, valid_id, PreviousIndex, ReleaseIndex};
 pub use record::{TerminalReleaseBinding, TerminalReleasePhase, TerminalReleaseReceipt};
 #[path = "terminal_release_evidence.rs"]
 mod evidence;
+#[path = "terminal_release_history.rs"]
+mod history_reader;
+use history_reader::ReleaseHistory;
 #[path = "terminal_release_initialization.rs"]
 mod initialization;
 #[path = "terminal_release_persistence.rs"]
 mod persistence;
+#[path = "preparation_released_predecessor.rs"]
+mod released_predecessor;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TerminalReleaseDirectory {
@@ -88,6 +93,11 @@ pub struct TerminalReleaseStore {
 }
 
 impl TerminalReleaseStore {
+    fn history(&self) -> ReleaseHistory<'_> {
+        ReleaseHistory {
+            journal: &self.journal,
+        }
+    }
     pub fn open_existing(root: VerifiedDataRoot) -> Result<Self> {
         let value = Self {
             journal: PreparationJournalStore {
@@ -122,7 +132,7 @@ impl TerminalReleaseStore {
         self.journal.verify_guard(guard)?;
         self.validate_active_entries()?;
         let mut record = if path_exists(&self.active(RELEASE))? {
-            self.read_release(&self.active(RELEASE), hasher)?
+            self.history().read_release(&self.active(RELEASE), hasher)?
         } else {
             self.initialize(guard, binding, port, hasher)?
         };
@@ -261,7 +271,7 @@ impl TerminalReleaseStore {
             .join(operation)
             .join(RELEASE);
         let location = self.unique_location(&self.active(RELEASE), &history)?;
-        let record = self.read_release(&location, hasher)?;
+        let record = self.history().read_release(&location, hasher)?;
         if record.phase != TerminalReleasePhase::ReleaseReady
             || record.binding.operation_id != operation
         {
@@ -275,7 +285,7 @@ impl TerminalReleaseStore {
             Point::BeforeMarkerMove,
             TerminalReleaseOuterRequirement::MatchingTerminal,
         )?;
-        self.require_published_index(&record, hasher)?;
+        self.history().require_published_index(&record, hasher)?;
         let identity = self.journal.evidence(&location, hasher)?;
         self.sync_file(&location, &identity, hasher)?;
         if location != history {
@@ -336,8 +346,9 @@ impl TerminalReleaseStore {
     ) -> Result<Option<TerminalReleaseReceipt>> {
         self.journal.verify_guard(guard)?;
         let result = self
+            .history()
             .load_index(hasher)?
-            .map(|value| self.resolve_index(&value.index, hasher))
+            .map(|value| self.history().resolve_index(&value.index, hasher))
             .transpose()?;
         self.journal.verify_guard(guard)?;
         Ok(result)

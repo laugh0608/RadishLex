@@ -426,3 +426,57 @@ fn first_data_upgrade_requires_explicit_empty_predecessor_evidence() {
     binding.previous_inventory_sha256 = None;
     assert!(PreparationReceipt::new(binding, fixture().initial_source).is_ok());
 }
+
+#[test]
+fn released_predecessor_binding_is_optional_immutable_and_never_archive_progress() {
+    let mut record = fixture();
+    let original = record.encode().unwrap();
+    assert!(!String::from_utf8(original.clone())
+        .unwrap()
+        .contains("previous_release_index_identity"));
+    assert_eq!(
+        PreparationReceipt::decode(&original)
+            .unwrap()
+            .encode()
+            .unwrap(),
+        original
+    );
+    let mut proof = file(30);
+    proof.sha256 = digest('e');
+    let index = file(31);
+    record
+        .bind_released_predecessor(proof.clone(), index.clone())
+        .unwrap();
+    assert_eq!(
+        PreparationReceipt::decode(&record.encode().unwrap()).unwrap(),
+        record
+    );
+    assert!(record
+        .bind_released_predecessor(proof.clone(), index)
+        .is_err());
+    let mut changed = record.clone();
+    changed
+        .previous_release_index_identity
+        .as_mut()
+        .unwrap()
+        .inode += 1;
+    assert!(!changed.can_replace(&record));
+    changed = record.clone();
+    changed.previous_release_index_identity = None;
+    assert!(!changed.can_replace(&record));
+    changed = record.clone();
+    changed.previous_inventory_identity = None;
+    assert!(changed.encode().is_err());
+    assert!(fixture()
+        .bind_released_predecessor(proof.clone(), proof)
+        .is_err());
+    record
+        .record_snapshot(file(22), record.initial_source.clone(), 9)
+        .unwrap();
+    record.begin_maintenance().unwrap();
+    record.record_prepared_source(file(20)).unwrap();
+    assert!(record
+        .record_archived_slot(PreparationArchiveSlot::Receipt)
+        .is_err());
+    record.record_previous_archive(digest('e')).unwrap();
+}
