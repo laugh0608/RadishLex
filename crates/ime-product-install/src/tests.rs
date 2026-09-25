@@ -413,6 +413,33 @@ fn failure_branch_depends_on_the_first_committed_program_boundary() {
 }
 
 #[test]
+fn v1_abort_requires_known_failure_and_cannot_encode_user_cancellation() {
+    let mut aborted = receipt(InstallOperationKind::Upgrade);
+    aborted
+        .abort_preserved(InstallFailureCode::StagingFailed)
+        .expect("actual pre-commit failure remains supported");
+    let bytes = aborted.encode().expect("valid terminal receipt");
+    assert_eq!(InstallReceipt::decode(&bytes).expect("v1 reader"), aborted);
+
+    let text = String::from_utf8(bytes).expect("UTF-8 receipt");
+    let cancellation = text.replace("\"staging_failed\"", "\"user_cancelled\"");
+    assert_ne!(cancellation, text);
+    assert!(InstallReceipt::decode(cancellation.as_bytes()).is_err());
+
+    aborted.failure_code = None;
+    // Preserve the receipt's field order so this checks the failure contract,
+    // rather than rejection caused by JSON canonicalization alone.
+    let mut missing_failure = serde_json::to_vec(&aborted).expect("struct serializes");
+    missing_failure.push(b'\n');
+    assert_eq!(
+        serde_json::from_slice::<InstallReceipt>(&missing_failure).expect("valid JSON shape"),
+        aborted
+    );
+    assert!(aborted.encode().is_err());
+    assert!(InstallReceipt::decode(&missing_failure).is_err());
+}
+
+#[test]
 fn decoded_receipt_rejects_artifacts_that_appear_before_their_stage() {
     let mut forged = receipt(InstallOperationKind::FirstInstall);
     forged
@@ -475,6 +502,8 @@ fn terminal_receipt_allows_only_a_chained_operation_with_matching_source() {
     )
     .expect("next operation");
     assert!(next.can_replace(&completed));
+    // Cancellation cannot restore a predecessor through ordinary persistence.
+    assert!(!completed.can_replace(&next));
 
     let wrong_previous = InstallReceipt::new(
         "ffeeddccbbaa99887766554433221100",
