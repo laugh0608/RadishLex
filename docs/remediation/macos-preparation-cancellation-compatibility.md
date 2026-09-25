@@ -14,9 +14,13 @@
 
 首步已实现独立 `PreparationCancellationRequest` 与 `PreparationCancellationStore` 的不可撤回取消意图。`radishlex-preparation-cancellation-v1` 当前仅接受 `requested` / `user_requested`，绑定原完整准备记录及文件身份、fresh 源 family，沿用准备记录中的产品、outer/data 前驱和历史证明。核心验证实际准备 marker、保护快照、inventory/已释放索引及私有材料；outer guard、前一 outer 原 canonical 的保存和真实程序授权仍是产品 port 的责任，当前资格仅使用合成 port。
 
-请求成功后，普通准备、归档、handoff、v1 与 startup reader 都保持阻断。专用入口只可严格重载同一请求并补同步，不更新准备记录，不调用 SQLite，不归档材料、不改 outer 或索引，也不表示取消完成。维护意图后的 source identity 只用于固定取消请求的观察，不能替代逻辑等价与最终释放证明。当前入口拒绝仍存在 journal 的源 family，受控恢复和维护收尾须通过后续专用取消协调器接入，不能删除取消 marker 后调用旧入口。
+请求成功后，普通准备、归档、handoff、v1 与 startup reader 都保持阻断。请求自身及原准备记录不更新；开始源库收尾后，请求重放入口拒绝继续，改用 `load_source_guarded` / `finish_source` 恢复同一取消。维护意图后的初始 source identity 只固定请求观察，不能替代逻辑等价与最终释放证明。
 
-已存在 handoff 意图、无合法 outer 前驱绑定、未知/不安全对象、未绑定临时文件及身份漂移均阻断。原准备与 v1 序列化、正常状态转换和白名单不变；旧 reader 对新增取消槽失败关闭。最终取消证明所需的 outer 实物封存、兼容回执恢复、v2 索引、维护收尾及 marker 最后释放尚未实现；真实产品/旧程序副本资格与 UI 入口仍开放，不宣称 B 段退出。
+第二步已接入 `CancellationSourceReceipt` 与专用源库收尾。固定 `cancellation-source.json` / `.tmp` 使用严格 `radishlex-cancellation-source-v1`，绑定取消请求的完整文件身份及工作准备副本，只允许 `finishing` → `source_ready` 和既有单 journal 恢复意图；原准备 marker、取消请求、保护快照及旧材料保持。维护前不打开 SQLite，以请求 family 原身份/字节证明保持；维护意图后在 fresh 授权/静止与容量证明下完成同一准备，核验 standalone、源 schema、完整持久内容/删除语义，关闭连接、同步源文件及数据根后才记录就绪。已经准备好的路径重新验证等价，不重做归档。
+
+请求入口仍拒绝尚有 journal 的 family；只有取消收尾意图已持久化后，专用恢复才可检查同一源 inode、无 WAL/SHM 的单 journal，沿用现有资格验证、持久化恢复身份、恢复后再次准备/等价验证。未知或变化 journal、busy、身份/内容漂移、容量/授权失效均保留阻断。中断临时进度不自动认领或删除；已 rename 的精确记录可以补同步重载。`load_source_guarded` 只核验物理证据，不能代替 `finish_source` 的 fresh 授权和逻辑复验。
+
+已存在 handoff 意图、无合法 outer 前驱绑定、未知/不安全对象、未绑定临时文件及身份漂移均阻断。原准备与 v1 序列化、正常状态转换和白名单不变；旧 reader 对新增取消槽失败关闭。源库 `source_ready` 不表示 `cancel_ready`，最终取消证明所需的材料封存、outer 实物封存、兼容回执恢复、v2 索引及 marker 最后释放尚未实现；真实产品/旧程序副本资格与 UI 入口仍开放，不宣称 B 段退出。
 
 ## 已验证的兼容约束
 
@@ -74,7 +78,7 @@
 
 ## 持久化顺序与恢复
 
-始终按 outer install guard → inner upgrade guard 取得双锁，每次动作 fresh 核验 source 产品、静止、私有对象及授权；固定状态目录不移动，guard 不更换。以下是待实现的专用协议，不是人工文件搬移步骤。
+始终按 outer install guard → inner upgrade guard 取得双锁，每次动作 fresh 核验 source 产品、静止、私有对象及授权；固定状态目录不移动，guard 不更换。以下是专用协议的完整目标；源库收尾已接入，后续封存/兼容恢复/释放仍待实现，不是人工文件搬移步骤。
 
 1. 保存不可改认的取消意图，绑定准备记录与前驱，阻止继续 handoff。活动准备 marker 与新增取消 marker 均保持；旧 reader 对未知对象失败关闭。
 2. 按请求时点完成源库证明。必要时仅恢复原维护意图，旧 data 私有材料依原 inventory 封存；此前尚未具备 `source_prepared` 的取消归档须由此专用证明授权，不能放宽 B4 原状态转换。

@@ -73,11 +73,11 @@
 - 不发布 macOS build 38/39/40 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步：B 段取消维护收尾与外层兼容封存（2026-09-25）
+## 下一步：B 段取消材料封存与外层兼容恢复（2026-09-25）
 
-项目所有者已确认[准备中止兼容补充设计](../remediation/macos-preparation-cancellation-compatibility.md)，授权仓库实现与隔离验证。首步已实现不可撤回的取消意图：绑定完整原准备记录、实物身份与 fresh 源 family，逐检查点核验保护快照和旧材料；取消 marker/临时槽阻断普通准备、归档、handoff 与启动。专用入口只可重载同一请求并补同步，不改数据库、outer、历史材料或索引，不表示取消完成。代码 `22c14e1` 的 workspace check/Clippy 和完整仓库门禁通过，具体范围见[本周记录](../devlogs/2026-W39.md)。
+项目所有者已确认[准备中止兼容补充设计](../remediation/macos-preparation-cancellation-compatibility.md)，授权仓库实现与隔离验证。不可撤回取消请求之后已接入专用源库收尾：原请求/准备文件保持，维护前证明 family 未变，维护后按既有受控准备和 journal 资格核验 standalone、源 schema、完整内容/tombstone 等价；独立进度持久化、精确重载和中断阻断保持。`source_ready` 只表示源库收尾完成，不解除启动 gate，也不是完整取消。验证结果和提交见[本周记录](../devlogs/2026-W39.md)。
 
-下一步在同一批准范围接入取消专用维护收尾、outer 原件封存/兼容回执恢复、v2 生命周期索引和最终 marker 释放；不能删除取消 marker 后调用旧准备入口，也不能伪造失败码。真实 outer port、旧程序副本及产品 UI 仍未接入，未授权操作冻结现场。
+下一步在同一批准范围接入取消材料封存、outer 原件封存/兼容回执恢复、v2 生命周期索引和最终 marker 释放；不能删除取消 marker 后调用旧准备入口，也不能伪造失败码。真实 outer port、旧程序副本及产品 UI 仍未接入，未授权操作冻结现场。
 
 其余范围延续已确认的[具体设计与 A–D 分段](../remediation/macos-wal-source-preparation-design.md)。新 v1 handoff、真实数据终态封存、释放索引及已释放前驱向新准备的接续已完成仓库实现；无新 data receipt 的取消与 C–D outer guard/真实产品接线、独立程序副本资格仍开放，B 段未退出。不得手动搬走 receipt 解除门禁，合成 port 不证明真实产品授权，WAL 模式转换/pager 内部断电资格仍开放。
 
