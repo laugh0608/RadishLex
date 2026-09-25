@@ -306,6 +306,55 @@ fn every_write_boundary_reloads_exact_successor_or_preserves_blocking_temp() {
 }
 
 #[test]
+fn archive_progress_write_boundaries_keep_exact_evidence_or_blocking_temporary() {
+    for (index, point) in POINTS.into_iter().enumerate() {
+        let fixture = Fixture::new();
+        let (store, guard) = fixture.start();
+        let mut reserved = record(&store);
+        let mut inventory = reserved.initial_source().database.clone();
+        inventory.inode = 20;
+        inventory.sha256 = "e".repeat(64);
+        reserved.bind_previous_inventory(inventory).unwrap();
+        store.persist(&guard, None, &reserved).unwrap();
+        let snapshot = ready(&reserved);
+        store.persist(&guard, Some(&reserved), &snapshot).unwrap();
+        let mut intent = snapshot.clone();
+        intent.begin_maintenance().unwrap();
+        store.persist(&guard, Some(&snapshot), &intent).unwrap();
+        let mut prepared = intent.clone();
+        prepared
+            .record_prepared_source(prepared.initial_source().database.clone())
+            .unwrap();
+        store.persist(&guard, Some(&intent), &prepared).unwrap();
+        let mut next = prepared.clone();
+        next.record_archived_slot(crate::PreparationArchiveSlot::Receipt)
+            .unwrap();
+        assert_eq!(
+            store.persist_with_faults(&guard, Some(&prepared), &next, &StopAt(point)),
+            Err(Error::Io)
+        );
+        drop(guard);
+        let (store, guard) = fixture.reload();
+        if index < 5 {
+            let bytes = fs::read(store.path(STAGED_JOURNAL)).unwrap();
+            assert_eq!(store.load_guarded(&guard), Err(Error::InterruptedWrite));
+            assert_eq!(
+                store.persist(&guard, Some(&prepared), &next),
+                Err(Error::InterruptedWrite)
+            );
+            assert_eq!(fs::read(store.path(STAGED_JOURNAL)).unwrap(), bytes);
+            assert_eq!(
+                fs::read(store.path(JOURNAL)).unwrap(),
+                prepared.encode().unwrap()
+            );
+        } else {
+            assert_eq!(store.load_guarded(&guard).unwrap(), Some(next.clone()));
+            store.persist(&guard, Some(&prepared), &next).unwrap();
+        }
+    }
+}
+
+#[test]
 fn replay_requires_file_and_directory_sync_even_when_bytes_already_match() {
     let fixture = Fixture::new();
     let (store, guard) = fixture.start();

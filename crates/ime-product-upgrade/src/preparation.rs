@@ -195,6 +195,17 @@ pub enum PreparationPhase {
     HandoffReady,
 }
 
+/// Fixed private v1 slots, in archive order. Runtime data never enters this list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PreparationArchiveSlot {
+    Receipt,
+    Snapshot,
+    Candidate,
+    Backup,
+    Settings,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SnapshotEvidence {
@@ -216,6 +227,10 @@ pub struct PreparationReceipt {
     handoff_receipt_sha256: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     journal_recovery: Option<PreparationFamily>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    archived_slots: Vec<PreparationArchiveSlot>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    previous_inventory_identity: Option<PreparationFileIdentity>,
 }
 impl PreparationReceipt {
     pub fn new(
@@ -232,6 +247,8 @@ impl PreparationReceipt {
             archived_inventory_sha256: None,
             handoff_receipt_sha256: None,
             journal_recovery: None,
+            archived_slots: Vec::new(),
+            previous_inventory_identity: None,
         };
         receipt.validate()?;
         Ok(receipt)
@@ -259,6 +276,41 @@ impl PreparationReceipt {
     }
     pub fn journal_recovery(&self) -> Option<&PreparationFamily> {
         self.journal_recovery.as_ref()
+    }
+
+    pub fn archived_slots(&self) -> &[PreparationArchiveSlot] {
+        &self.archived_slots
+    }
+
+    pub fn previous_inventory_identity(&self) -> Option<&PreparationFileIdentity> {
+        self.previous_inventory_identity.as_ref()
+    }
+
+    /// Bind before the first reservation is persisted; later replacements cannot change it.
+    pub fn bind_previous_inventory(
+        &mut self,
+        identity: PreparationFileIdentity,
+    ) -> Result<(), Error> {
+        if self.phase != PreparationPhase::Reserved || self.previous_inventory_identity.is_some() {
+            return Err(Error::InvalidPhase);
+        }
+        let mut next = self.clone();
+        next.previous_inventory_identity = Some(identity);
+        next.validate()?;
+        *self = next;
+        Ok(())
+    }
+
+    /// Append only after the unique historical slot and both directories are durable.
+    pub fn record_archived_slot(&mut self, slot: PreparationArchiveSlot) -> Result<(), Error> {
+        if self.phase != PreparationPhase::SourcePrepared
+            || self.archived_slots.last().is_some_and(|last| *last >= slot)
+        {
+            return Err(Error::InvalidPhase);
+        }
+        let mut next = self.clone();
+        next.archived_slots.push(slot);
+        self.replace_with(next)
     }
 
     /// Append exactly one recovery identity before any SQLite recovery write.
@@ -392,6 +444,7 @@ impl PreparationReceipt {
             || previous.validate().is_err()
             || self.binding != previous.binding
             || self.initial_source != previous.initial_source
+            || self.previous_inventory_identity != previous.previous_inventory_identity
         {
             return false;
         }
@@ -422,7 +475,15 @@ impl PreparationReceipt {
             && self.phase == PreparationPhase::MaintenanceIntent
             && previous.journal_recovery.is_none()
             && self.journal_recovery.is_some();
-        (recovery_append || (successor && self.journal_recovery == previous.journal_recovery))
+        let archive_append = previous.phase == PreparationPhase::SourcePrepared
+            && self.phase == PreparationPhase::SourcePrepared
+            && self.archived_slots.len() == previous.archived_slots.len() + 1
+            && self.archived_slots.starts_with(&previous.archived_slots);
+        ((recovery_append && self.archived_slots == previous.archived_slots)
+            || (archive_append && self.journal_recovery == previous.journal_recovery)
+            || (successor
+                && self.journal_recovery == previous.journal_recovery
+                && self.archived_slots == previous.archived_slots))
             && preserves(&previous.snapshot, &self.snapshot)
             && preserves(&previous.prepared_source, &self.prepared_source)
             && preserves(
@@ -448,6 +509,35 @@ impl PreparationReceipt {
         }
         self.binding.validate()?;
         self.initial_source.validate(&self.binding.data_root)?;
+        if let Some(identity) = &self.previous_inventory_identity {
+            identity.validate()?;
+            if self.binding.previous_inventory_sha256.as_ref() != Some(&identity.sha256)
+                || identity.device_id != self.binding.data_root.device_id
+                || identity.owner_id != self.binding.data_root.owner_id
+            {
+                return Err(Error::InvalidIdentity);
+            }
+        }
+        if (!self.archived_slots.is_empty()
+            && (self.phase < PreparationPhase::SourcePrepared
+                || self.binding.previous_data_operation_id.is_none()
+                || self.previous_inventory_identity.is_none()
+                || self.archived_slots.first() != Some(&PreparationArchiveSlot::Receipt)))
+            || self
+                .archived_slots
+                .windows(2)
+                .any(|pair| pair[0] >= pair[1])
+        {
+            return Err(Error::InvalidPhase);
+        }
+        if let (Some(expected), Some(actual)) = (
+            &self.binding.previous_inventory_sha256,
+            &self.archived_inventory_sha256,
+        ) {
+            if expected != actual {
+                return Err(Error::EvidenceChanged);
+            }
+        }
         if let Some(family) = &self.journal_recovery {
             if self.phase < PreparationPhase::MaintenanceIntent
                 || family.wal.is_some()

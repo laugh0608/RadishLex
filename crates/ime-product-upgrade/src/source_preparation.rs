@@ -35,7 +35,20 @@ pub enum SourcePreparationCheckpoint {
     SourceFileSynced,
     SourceSynced,
     SourceRecorded,
+    ArchiveBegin,
+    ArchiveBeforeFileSync(crate::PreparationArchiveSlot),
+    ArchiveFileSynced(crate::PreparationArchiveSlot),
+    ArchiveBeforeRename(crate::PreparationArchiveSlot),
+    ArchiveRenamed(crate::PreparationArchiveSlot),
+    ArchiveTargetSynced(crate::PreparationArchiveSlot),
+    ArchiveSourceSynced(crate::PreparationArchiveSlot),
+    ArchiveSlotRecorded(crate::PreparationArchiveSlot),
+    ArchiveCompleted,
 }
+
+#[path = "preparation_history.rs"]
+mod history;
+pub use history::PreviousInventory;
 
 /// The product implementation must own and revalidate the outer install guard,
 /// exact matching prepared outer operation, sealed source/target products and
@@ -155,7 +168,13 @@ impl PreparationJournalStore {
         {
             return Err(Error::InvalidPhase);
         }
-        self.checkpoint(guard, port, &record, SourcePreparationCheckpoint::Begin)?;
+        self.checkpoint(
+            guard,
+            port,
+            hasher,
+            &record,
+            SourcePreparationCheckpoint::Begin,
+        )?;
         // A readable marker following an interrupted rename is not sufficient:
         // finish its durability before any SQLite call can change the source.
         self.persist(guard, Some(&record), &record)?;
@@ -174,6 +193,7 @@ impl PreparationJournalStore {
             self.checkpoint(
                 guard,
                 port,
+                hasher,
                 &record,
                 SourcePreparationCheckpoint::MaintenanceIntentRecorded,
             )?;
@@ -185,6 +205,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             &record,
             SourcePreparationCheckpoint::SourceRecorded,
         )?;
@@ -199,6 +220,7 @@ impl PreparationJournalStore {
         &self,
         guard: &UpgradeProcessGuard,
         port: &mut impl SourcePreparationPort,
+        hasher: &impl PreparationHasher,
         record: &PreparationReceipt,
         checkpoint: SourcePreparationCheckpoint,
     ) -> Result<()> {
@@ -223,6 +245,10 @@ impl PreparationJournalStore {
         if !port.confirm_authority_and_quiescence(record, checkpoint) {
             return Err(Error::AuthorityNotProven);
         }
+        // Physical predecessor proof is required before SQLite writes as well
+        // as before archive renames; a product port cannot waive this evidence.
+        let inventory = self.load_previous_inventory(record, hasher)?;
+        self.verify_inventory_files(&inventory, hasher, Some(record))?;
         self.verify_guard(guard)?;
         if self.read_record()?.as_ref().map(|value| &value.receipt) != Some(record) {
             return Err(Error::EvidenceChanged);
@@ -253,6 +279,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             record,
             SourcePreparationCheckpoint::SnapshotEstimated,
         )?;
@@ -261,6 +288,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             record,
             SourcePreparationCheckpoint::SnapshotEstimated,
         )?;
@@ -282,6 +310,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             record,
             SourcePreparationCheckpoint::SnapshotCreated,
         )?;
@@ -294,6 +323,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             record,
             SourcePreparationCheckpoint::SnapshotCopied,
         )?;
@@ -311,6 +341,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             record,
             SourcePreparationCheckpoint::SnapshotSynced,
         )?;
@@ -322,6 +353,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             record,
             SourcePreparationCheckpoint::SnapshotRenamed,
         )?;
@@ -329,6 +361,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             record,
             SourcePreparationCheckpoint::SnapshotDirectorySynced,
         )?;
@@ -344,6 +377,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             &next,
             SourcePreparationCheckpoint::SnapshotRecorded,
         )?;
@@ -372,6 +406,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             record,
             SourcePreparationCheckpoint::BeforeMaintenance,
         )?;
@@ -400,6 +435,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             record,
             SourcePreparationCheckpoint::BeforeMaintenance,
         )?;
@@ -417,6 +453,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             record,
             SourcePreparationCheckpoint::BeforeMaintenance,
         )?;
@@ -431,6 +468,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             record,
             SourcePreparationCheckpoint::SourceMaintained,
         )?;
@@ -447,6 +485,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             record,
             SourcePreparationCheckpoint::SourceFileSynced,
         )?;
@@ -454,6 +493,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             record,
             SourcePreparationCheckpoint::SourceSynced,
         )?;

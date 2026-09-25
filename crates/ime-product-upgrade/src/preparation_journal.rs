@@ -423,6 +423,6 @@ mod tests;
 #[path = "source_preparation.rs"]
 mod source_preparation;
 pub use source_preparation::{
-    PreparationHasher, SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,
-    SourcePreparationSpaceBudget,
+    PreparationHasher, PreviousInventory, SourcePreparationCheckpoint, SourcePreparationError,
+    SourcePreparationPort, SourcePreparationSpaceBudget,
 };

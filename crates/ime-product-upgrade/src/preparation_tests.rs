@@ -69,6 +69,67 @@ fn prepared() -> PreparationReceipt {
 }
 
 #[test]
+fn archive_progress_and_inventory_identity_are_append_only_and_strict() {
+    let mut reserved = fixture();
+    let old_bytes = reserved.encode().unwrap();
+    assert!(!String::from_utf8(old_bytes.clone())
+        .unwrap()
+        .contains("archived_slots"));
+    assert!(!String::from_utf8(old_bytes)
+        .unwrap()
+        .contains("previous_inventory_identity"));
+    let mut identity = file(30);
+    identity.sha256 = digest('e');
+    reserved.bind_previous_inventory(identity.clone()).unwrap();
+    assert!(reserved.bind_previous_inventory(identity.clone()).is_err());
+    let mut changed = reserved.clone();
+    changed.previous_inventory_identity.as_mut().unwrap().inode += 1;
+    assert!(!changed.can_replace(&reserved));
+    assert!(!fixture().can_replace(&reserved));
+    assert!(reserved
+        .record_archived_slot(PreparationArchiveSlot::Receipt)
+        .is_err());
+    reserved
+        .record_snapshot(file(22), reserved.initial_source.clone(), 9)
+        .unwrap();
+    reserved.begin_maintenance().unwrap();
+    reserved.record_prepared_source(file(20)).unwrap();
+    assert!(reserved
+        .record_archived_slot(PreparationArchiveSlot::Snapshot)
+        .is_err());
+    let previous = reserved.clone();
+    reserved
+        .record_archived_slot(PreparationArchiveSlot::Receipt)
+        .unwrap();
+    assert!(reserved.can_replace(&previous));
+    assert!(!previous.can_replace(&reserved));
+    assert!(reserved
+        .record_archived_slot(PreparationArchiveSlot::Receipt)
+        .is_err());
+    let before_snapshot = reserved.clone();
+    reserved
+        .record_archived_slot(PreparationArchiveSlot::Snapshot)
+        .unwrap();
+    assert!(reserved.can_replace(&before_snapshot));
+    assert!(!reserved.can_replace(&previous));
+    assert!(reserved.record_previous_archive(digest('f')).is_err());
+    reserved.record_previous_archive(digest('e')).unwrap();
+    assert!(reserved
+        .record_archived_slot(PreparationArchiveSlot::Candidate)
+        .is_err());
+    assert_eq!(
+        PreparationReceipt::decode(&reserved.encode().unwrap()).unwrap(),
+        reserved
+    );
+    for extra in ["\"unknown\"", "\"receipt\",\"receipt\""] {
+        let bytes = String::from_utf8(reserved.encode().unwrap())
+            .unwrap()
+            .replace("\"receipt\",\"snapshot\"", extra);
+        assert!(PreparationReceipt::decode(bytes.as_bytes()).is_err());
+    }
+}
+
+#[test]
 fn recovery_identity_is_an_append_only_intent_and_old_bytes_stay_canonical() {
     let reserved = fixture();
     assert!(!String::from_utf8(reserved.encode().unwrap())

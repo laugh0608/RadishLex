@@ -866,7 +866,7 @@ mod tests;
 #[path = "preparation_journal.rs"]
 mod preparation_journal;
 pub use preparation_journal::{
-    PreparationHasher, PreparationJournalError, PreparationJournalStore,
+    PreparationHasher, PreparationJournalError, PreparationJournalStore, PreviousInventory,
     SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,
     SourcePreparationSpaceBudget,
 };

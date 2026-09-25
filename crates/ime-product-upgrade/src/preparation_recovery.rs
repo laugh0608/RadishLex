@@ -14,6 +14,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             record,
             SourcePreparationCheckpoint::BeforeJournalRecovery,
         )?;
@@ -50,6 +51,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             record,
             SourcePreparationCheckpoint::BeforeJournalRecovery,
         )?;
@@ -66,6 +68,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             &next,
             SourcePreparationCheckpoint::JournalRecoveryIntentRecorded,
         )?;
@@ -86,6 +89,7 @@ impl PreparationJournalStore {
         self.checkpoint(
             guard,
             port,
+            hasher,
             &next,
             SourcePreparationCheckpoint::JournalRecovered,
         )?;

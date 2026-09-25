@@ -9,9 +9,9 @@ use serde::{Deserialize, Serialize};
 
 mod preparation;
 pub use preparation::{
-    PreparationBinding, PreparationDirectoryIdentity, PreparationFamily, PreparationFileIdentity,
-    PreparationPhase, PreparationReceipt, PreparationReceiptError, MAX_PREPARATION_RECEIPT_BYTES,
-    PREPARATION_RECEIPT_FORMAT,
+    PreparationArchiveSlot, PreparationBinding, PreparationDirectoryIdentity, PreparationFamily,
+    PreparationFileIdentity, PreparationPhase, PreparationReceipt, PreparationReceiptError,
+    MAX_PREPARATION_RECEIPT_BYTES, PREPARATION_RECEIPT_FORMAT,
 };
 
 #[cfg(unix)]
@@ -19,7 +19,7 @@ mod filesystem;
 #[cfg(unix)]
 pub use filesystem::{
     inspect_startup_gate, PreparationHasher, PreparationJournalError, PreparationJournalStore,
-    SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,
+    PreviousInventory, SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,
     SourcePreparationSpaceBudget, StartupGateDecision, StartupGateErrorCode, StartupGateResult,
     UpgradeCandidateSummary, UpgradeCandidateValidationDisposition,
     UpgradeCandidateValidationReport, UpgradeCandidateValidationSummary,
