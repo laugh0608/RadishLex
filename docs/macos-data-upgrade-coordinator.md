@@ -72,7 +72,7 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 专用 `prepare_userdb_source` 编排已经串接保护快照、持久维护意图、SQLite 准备及 `source_prepared` 复核；固定路径与实际文件的 owner/mode/link/device/inode/length/SHA-256 由核心检查。快照读取阶段允许受限 SHM/零长 WAL 辅助变化，原主库和既有 WAL 内容不变；进入维护窗口后仍要求同一主 inode、保护快照和全量逻辑内容一致。文件/目录 fsync、rename、记录回读及后置静止缺一不可；无证明 snapshot 残留或不满足下述资格的 journal 阻断，不自动清理或用快照覆盖源库。
 
-快照及维护前 fresh 容量预算为 `6 * max(logical_bytes, source_main_bytes) + settings_bytes + 64 MiB`，覆盖原三份工作余量、准备快照、源库增长和 journal，使用 checked arithmetic。`SourcePreparationPort` 的真实产品实现必须持有 outer guard，逐 checkpoint 复验同一 `prepared` outer、两代受控产品、旧 receipt/inventory 和静止状态；`MacOsPreparationHasher` 只提供现有 SHA-256 实现，不替代上述授权。Executor 接线、明确中止和终态封存仍待完成，不能以 `source_prepared` 或单独 journal `handoff_ready` 声称产品交接完成。
+快照及维护前 fresh 容量预算为 `6 * max(logical_bytes, source_main_bytes) + settings_bytes + 64 MiB`，覆盖原三份工作余量、准备快照、源库增长和 journal，使用 checked arithmetic。`SourcePreparationPort` 的真实产品实现必须持有 outer guard，逐 checkpoint 复验同一 `prepared` outer、两代受控产品、旧 receipt/inventory 和静止状态；`MacOsPreparationHasher` 只提供现有 SHA-256 实现，不替代上述授权。Executor 接线、完整准备取消及终态封存的产品接线仍待完成；下述 handoff、终态释放和取消源库收尾已实现核心编排，不能以 `source_prepared` 或单独 journal `handoff_ready` 声称产品交接完成。
 
 #### 旧事务 inventory 与保留接续
 
@@ -110,11 +110,15 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 已释放的旧槽从不再归档，`archived_slots` 必须为空；核心核验后推进 `previous_archived`，后续按既有 handoff 意图接入新 v1。重复调用须按当前阶段路由：`previous_archived` 直接继续 handoff，不能重新归档已有新回执。连续多次准备/释放及检查点重载已纳入合成资格，仍不代表真实 outer finalization、旧 source 程序副本或实机升级通过。
 
-#### 准备取消请求与普通入口阻断
+#### 准备取消请求、源库收尾与普通入口阻断
 
 已批准的[取消兼容补充设计](remediation/macos-preparation-cancellation-compatibility.md)先以 `PreparationCancellationStore` 持久化独立 `requested` / `user_requested`，不改变双层 v1 失败码。请求绑定原完整准备记录及文件身份、当前源 family，核对保护快照和活动/部分归档/已释放的旧私有材料。产品 port 须每次持有 outer guard、复验前一 outer 原字节及匹配源程序/静止；合成 port 仅用于仓库资格。
 
-取消 marker 与 `.tmp` 都不进入普通准备或 v1 白名单，已有普通 store 句柄也不能继续准备、归档或 handoff。专用重载只接受同一不可改认请求，同字节重试补同步；未知临时文件或漂移原样保留并阻断。入口不执行 SQLite，不移动材料、不修改 outer 或索引，维护意图中的物理观察也不等于内容等价。维护收尾、outer 兼容封存/恢复、v2 索引、最终 marker 释放和产品 UI 仍未接入，不能显示“取消完成”。
+取消 marker 与 `.tmp` 都不进入普通准备或 v1 白名单，已有普通 store 句柄也不能继续准备、归档或 handoff。请求写入/重载不执行 SQLite；一旦源库收尾进度存在，原请求入口拒绝重放，转由专用 `load_source_guarded` / `finish_source` 继续。
+
+源库收尾已接入独立 `CancellationSourceReceipt`，在固定 `cancellation-source.json` / `.tmp` 中绑定不可改认的请求文件身份与工作准备副本；只允许 `finishing`、受限 journal 恢复身份追加及 `source_ready`，不改原准备记录、请求或保护快照。维护意图前不打开 SQLite，保持请求 family 原身份/字节；维护意图后在 `CancellationSourcePort` 的 fresh outer/产品/静止与容量证明下完成原准备，核验 standalone、源 schema、全量内容/删除语义和显式关闭，再同步主文件与数据根。已准备/已归档路径重新校验等价，旧私有材料只核验，不搬动。
+
+请求入口仍拒绝现存 journal；只有取消收尾意图已持久化，专用恢复才可在同一主 inode、无 WAL/SHM 和下述单 journal 资格成立后记录恢复身份并重放。物理 `load_source_guarded` 不代表 fresh 授权或逻辑复验；这些由 `finish_source` 完成。未知临时进度、身份/内容漂移、busy 或授权/容量不足均保留阻断。`source_ready` 不等于 `cancel_ready`；取消材料与 outer 兼容封存/恢复、v2 生命周期索引、最终 marker 释放和产品 UI 仍未接入，不能显示“取消完成”。
 
 #### 维护中断的受限 journal 恢复
 

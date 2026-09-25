@@ -216,11 +216,15 @@ SQLite 用户数据层：
 - 失败新库回迁、旧库原 inode 恢复、source-release evidence 与 `rolled_back`
 - settings/snapshot/candidate evidence-only 崩溃恢复与 guard-bound checkpoint 驱动
 - 稳定失败分类和中断恢复判断
-- 独立 `PreparationReceipt` / `PreparationJournalStore`、源 family 摘要、保护快照、受控 SQLite 准备及受限 journal 恢复；准备 marker 保持阻断，新 v1 handoff 和终态释放须另有完整编排
+- 独立 `PreparationReceipt` / `PreparationJournalStore`、源 family 摘要、保护快照、受控 SQLite 准备及受限 journal 恢复
+- 旧终态 inventory 与逐槽保留接续、新 v1 handoff、终态封存/释放索引及已释放前驱的连续准备
+- 独立取消请求与源库维护收尾；`source_ready` 保持启动阻断，完整取消及真实产品接线仍另需资格
 
 该 crate 的既有 v1 路径已闭合固定布局内从 `preflighted` 到终态的核心调度与数据恢复，但仍不停止进程、不定位或启动产品 host，也不提供安装载体；API、副作用与验证入口见 [ime-product-upgrade 组件说明](../crates/ime-product-upgrade/README.md)，macOS 完整状态机见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。
 
-`preparation_inventory.rs` 封存旧终态及固定私有材料清单，`preparation_history.rs` 在原 guard 下逐槽保留接续并核验位置证明；两者不移动运行数据或释放启动 marker，新 v1 handoff 与终态封存按当前激活设计继续。
+`preparation_inventory.rs` / `preparation_history.rs` 管理旧终态清单与私有槽位置；`preparation_handoff*` 负责新 v1 回执交接和准备证明封存；`terminal_release*` 负责真实数据终态保留、外层结果确认及唯一释放索引，`preparation_released_predecessor.rs` 只读消费已释放前驱。业务 DB/settings/Rime 不移入历史槽，真实 outer/程序授权仍由产品组合层提供。
+
+`preparation_cancellation*` 保存独立不可撤回请求，`cancellation_source*` 分担源库收尾、严格记录、持久化与受限 journal 恢复；不回用普通准备入口，不修改双层 v1 失败码，也不以源库就绪解除启动门禁。完整合同见组件说明和当前激活设计。
 
 ### ime-product-install
 

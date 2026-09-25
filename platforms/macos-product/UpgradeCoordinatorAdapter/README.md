@@ -14,7 +14,7 @@ adapter 实现 `UpgradeCoordinatorPort`，把平台无关协调核心绑定到�
 
 调用方应先执行 `inspect_preflight()` 取得容量，再把同一 adapter 交给 `UpgradeReceiptStore::resume_userdb_upgrade`。M4-P03 安装载体还必须在调用前证明产品根的固定来源、版本化 distribution identity 与 strict ad-hoc code identity；本 crate 不把 manifest hash 当作发布 identity。
 
-`MacOsPreparationHasher` 为源库准备核心提供完整文件流 SHA-256，复用本 adapter 已有依赖，读取错误直接失败。`tests/source_preparation.rs` 以新合成目录、真实 SQLite 与该 hasher 验证准备快照、维护意图、源库准备、异常/退出重载及学习/tombstone 保留；授权/静止 port 使用合成实现，不能当作真实 outer guard、程序资格或 Installer 接线通过。新增 journal 测试使用仓库冻结的纯合成 SQLite family，在持久维护意图之后组合出中断状态，验证恢复身份先落盘、三处进程退出重载与漂移拒绝；它不代表真实 WAL 模式转换的连续崩溃现场。真实 spill/重放边界的独立进程测试位于 userdb。准备流程及历史接续分别在 `source_prepared` / `previous_archived` 保留启动阻断，后续产品接线和新 v1 handoff 按[已批准设计](../../../docs/remediation/macos-wal-source-preparation-design.md)继续。
+`MacOsPreparationHasher` 为源库准备核心提供完整文件流 SHA-256，复用本 adapter 已有依赖，读取错误直接失败。`tests/source_preparation.rs` 以新合成目录、真实 SQLite 与该 hasher 验证准备快照、维护意图、源库准备、异常/退出重载及学习/tombstone 保留；授权/静止 port 使用合成实现，不能当作真实 outer guard、程序资格或 Installer 接线通过。新增 journal 测试使用仓库冻结的纯合成 SQLite family，在持久维护意图之后组合出中断状态，验证恢复身份先落盘、三处进程退出重载与漂移拒绝；它不代表真实 WAL 模式转换的连续崩溃现场。真实 spill/重放边界的独立进程测试位于 userdb。准备流程及历史接续分别在 `source_prepared` / `previous_archived` 保留启动阻断；核心后续 handoff 与终态释放已纳入下述合成测试，真实产品接线按[已批准设计](../../../docs/remediation/macos-wal-source-preparation-design.md)继续。
 
 验证入口：
 
@@ -25,4 +25,6 @@ adapter 实现 `UpgradeCoordinatorPort`，把平台无关协调核心绑定到�
 
 前者验证 adapter contract 和 feature 编译边界；后者重新装配真实双端产品，只在私有合成 user home/Application Support 中执行 manifest-bound 协调资格，不读取真实用户目录，也不安装或启动 GUI 产品。
 
-`tests/preparation_history.rs` 使用真实 SQLite、SHA-256 与私有文件验证旧终态 inventory、准备前前驱核验、逐槽保留接续、进程退出重载和目标冲突。旧 v1 receipt/产品身份及静止 port 为合成材料；测试不启动真实 Manager/InputMethod，也不证明 outer guard、Installer 接线或冻结 source/target 副本资格。核心 inventory 的初始化 I/O/进程退出矩阵另在升级核心 crate 中维护。
+`tests/preparation_history.rs` 及子模块使用真实 SQLite、SHA-256 与私有文件验证旧终态 inventory、逐槽保留接续、新 v1 handoff、三类终态封存/释放、已释放前驱的连续准备及中断/漂移拒绝。旧 v1 receipt/产品身份及静止 port 为合成材料；测试不启动真实 Manager/InputMethod，也不证明 outer guard、Installer 接线或冻结 source/target 副本资格。核心 inventory 的初始化 I/O/进程退出矩阵另在升级核心 crate 中维护。
+
+`tests/source_preparation/cancellation.rs` 与源库收尾子模块验证独立取消请求、维护前的 family 保持、维护后的完整等价、受控 journal 恢复和持久进度重载。历史套件同时验证取消源库收尾不搬动或重写旧材料；原准备/v1 与 startup 入口仍阻断。这些测试使用合成取消/源库授权 port；本 adapter 尚未实现对应真实 outer 接线、旧程序取消资格或 UI 入口，`source_ready` 不能解释为取消完成。

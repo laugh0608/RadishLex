@@ -4,9 +4,9 @@
 
 ## 当前结论
 
-错误呈现与五项 WAL 特征场景完成后，项目所有者另行批准实现显式恢复入口并准备独立恢复 Installer。恢复入口现已实现，Executor 八项恢复父测试、原生 Installer 门禁及真实 source 39/target 40 副本资格通过；长期 WAL 处理仍未实现。项目所有者随后单独确认真实恢复，operation `aad9cf8ac2dae71b2b659e96a91ea706` 已经独立 Installer 中止并恢复 source 39 双程序，外层 `rolled_back` / 数据 `aborted_preserved`；没有打开真实 SQLite connection 或更改原载体。
+错误呈现与五项 WAL 特征场景完成后，项目所有者另行批准实现显式恢复入口并准备独立恢复 Installer。恢复入口现已实现，Executor 八项恢复父测试、原生 Installer 门禁及真实 source 39/target 40 副本资格通过；截至该次恢复，长期 WAL 处理尚未实现。项目所有者随后单独确认真实恢复，operation `aad9cf8ac2dae71b2b659e96a91ea706` 已经独立 Installer 中止并恢复 source 39 双程序，外层 `rolled_back` / 数据 `aborted_preserved`；没有打开真实 SQLite connection 或更改原载体。
 
-现已为切换前事务增加显式中止入口，通过既有状态机保留原数据库并恢复 source 39 双程序；独立载体已准备并核验，随后获单独授权完成了本次真实恢复。之后单独实现面向新 operation 的 WAL 源库准备合同。恢复到 39 仅返回已知基线，其 IMK 上下文缺陷仍在，不能据此关闭 REV-01/REV-02 或完成 build 40 输入验收。
+现已为切换前事务增加显式中止入口，通过既有状态机保留原数据库并恢复 source 39 双程序；独立载体已准备并核验，随后获单独授权完成了本次真实恢复。后续面向新 operation 的仓库实现已推进至源库准备、旧事务保留、新 v1 handoff、终态释放/前驱接续及取消源库收尾；真实产品接线和完整取消仍开放，当前范围以[准备设计](macos-wal-source-preparation-design.md)及其[取消补充设计](macos-preparation-cancellation-compatibility.md)为准。恢复到 39 仅返回已知基线，其 IMK 上下文缺陷仍在，不能据此关闭 REV-01/REV-02 或完成 build 40 输入验收。
 
 ## 已证实的两个缺口
 

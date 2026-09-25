@@ -126,13 +126,17 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 新 family 和保护快照从当前运行数据重新取得，允许上次释放后的合法 WAL 学习/删除。准备和 handoff 各检查点复验已固定的索引、证明及历史材料；已释放槽不再移动，`archived_slots` 保持空，`previous_archived` 只记录既有封存证明通过。新 v1 handoff、后续终态释放和下一次准备继续使用同一套历史校验；多个保留的旧 operation 不被认领或改写。真实 outer/Executor 和明确中止仍待完成，合成产品 port 不构成产品授权。
 
-### 准备取消意图
+### 准备取消意图与源库收尾
 
 `PreparationCancellationStore` 消费普通准备 store、复用原目录和 guard，在 handoff 意图出现前持久化独立的 `PreparationCancellationRequest`。记录为严格 canonical、最大 256 KiB 的 `radishlex-preparation-cancellation-v1`，当前只接受 `requested` / `user_requested`；绑定原准备记录及文件 inode/metadata/hash、fresh 源 family，并复验保护快照、旧 inventory/已释放前驱及其私有材料。必须已有前一 outer 绑定；journal、未知或不安全对象、handoff 意图和临时写入残留均拒绝。
 
 `request_cancellation` 的成功只表示取消请求已持久化。文件独占创建、同步、受控 rename、目录同步与回读全部完成后才返回；同请求重试重新同步且不替换 inode，临时文件不自动认领。`PreparationCancellationPort` 每个检查点负责真实 outer guard、前一 outer 原字节、未切换的 source 程序和 fresh 静止证明；核心在回调前后复验实物。当前测试的 port 为合成，不能据此宣称产品授权或完整取消已完成。
 
-普通准备/归档/handoff、v1 reader 与 startup gate 不认识取消槽，继续失败关闭；专用 `load_guarded` 只读核验请求，不解除阻断。该入口不调用 SQLite，不移动旧材料或修改 outer/索引。维护后的内容等价、外层原件封存与兼容恢复、v2 索引和最终 marker 释放仍须接入专用取消协调器；不能删 marker 后借普通入口继续。详见[已批准的补充设计](../../docs/remediation/macos-preparation-cancellation-compatibility.md)。
+普通准备/归档/handoff、v1 reader 与 startup gate 不认识取消槽，继续失败关闭。请求入口不调用 SQLite；`load_guarded` 只用于尚未开始收尾的请求。收尾进度一旦存在，请求重放和原请求加载均拒绝，必须经 `load_source_guarded` / `finish_source` 继续同一取消，不能删 marker 后借普通入口继续。
+
+`CancellationSourceReceipt` 在固定 `cancellation-source.json` / `.tmp` 中以严格 `radishlex-cancellation-source-v1` 绑定请求文件身份和工作准备副本。`finishing` 只可追加既有单 journal 恢复身份或推进至 `source_ready`；原准备 marker、取消请求和保护快照保持。`reserved` / `snapshot_ready` 路径不打开 SQLite，以请求 family 原身份和字节证明保持；维护意图后重新取得授权/静止/容量，完成同一受控准备，复验 standalone、源 schema、全量内容/tombstone 等价、关闭与源文件/数据根同步。已经准备好的路径重新验证等价，不重复归档旧材料。
+
+请求仍拒绝现存 journal；取消收尾意图落盘后，专用恢复才可沿用单 journal 资格检查、精确恢复身份持久化和 SQLite 重放。`CancellationSourcePort` 每个检查点确认 fresh 产品授权；未知临时进度、busy、容量不足、身份/内容漂移均保留阻断。`load_source_guarded` 只核验物理关系，不能代替 `finish_source` 的 fresh 授权与内容复验。源库 `source_ready` 不表示完整取消；材料封存、外层原件封存与兼容恢复、v2 生命周期索引和最终 marker 释放仍须接入专用协调器，详见[已批准的补充设计](../../docs/remediation/macos-preparation-cancellation-compatibility.md)。
 
 ### 启动门禁
 
