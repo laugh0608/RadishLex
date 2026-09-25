@@ -23,6 +23,8 @@ const OLD: &str = "22222222222222222222222222222222";
 const OUTER: &str = "33333333333333333333333333333333";
 #[path = "preparation_history/handoff.rs"]
 mod handoff;
+#[path = "preparation_history/release.rs"]
+mod terminal_release;
 const STATE: &str = ".radishlex-upgrade-v1";
 const HISTORY: &str = ".radishlex-upgrade-history-v1";
 const FILES: [(Slot, &str); 5] = [

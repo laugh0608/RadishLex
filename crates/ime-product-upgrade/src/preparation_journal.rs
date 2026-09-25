@@ -424,5 +424,7 @@ mod tests;
 mod source_preparation;
 pub use source_preparation::{
     PreparationHasher, PreviousInventory, SourcePreparationCheckpoint, SourcePreparationError,
-    SourcePreparationPort, SourcePreparationSpaceBudget,
+    SourcePreparationPort, SourcePreparationSpaceBudget, TerminalReleaseBinding,
+    TerminalReleaseCheckpoint, TerminalReleaseDirectory, TerminalReleaseOuterRequirement,
+    TerminalReleasePhase, TerminalReleasePort, TerminalReleaseReceipt, TerminalReleaseStore,
 };

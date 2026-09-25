@@ -868,7 +868,9 @@ mod preparation_journal;
 pub use preparation_journal::{
     PreparationHasher, PreparationJournalError, PreparationJournalStore, PreviousInventory,
     SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,
-    SourcePreparationSpaceBudget,
+    SourcePreparationSpaceBudget, TerminalReleaseBinding, TerminalReleaseCheckpoint,
+    TerminalReleaseDirectory, TerminalReleaseOuterRequirement, TerminalReleasePhase,
+    TerminalReleasePort, TerminalReleaseReceipt, TerminalReleaseStore,
 };
 
 #[path = "snapshot.rs"]

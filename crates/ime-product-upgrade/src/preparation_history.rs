@@ -10,6 +10,14 @@ use inventory::{expected_private, matches_artifact, slot_name, HISTORY, INVENTOR
 #[path = "preparation_handoff.rs"]
 mod handoff;
 
+#[path = "terminal_release.rs"]
+mod terminal_release;
+pub use terminal_release::{
+    TerminalReleaseBinding, TerminalReleaseCheckpoint, TerminalReleaseDirectory,
+    TerminalReleaseOuterRequirement, TerminalReleasePhase, TerminalReleasePort,
+    TerminalReleaseReceipt, TerminalReleaseStore,
+};
+
 impl PreparationJournalStore {
     /// Exact, guard-bound continuation from source_prepared. The preparation
     /// marker remains active; this neither creates v1 state nor allows startup.

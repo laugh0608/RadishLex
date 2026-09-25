@@ -74,7 +74,11 @@ pub enum SourcePreparationCheckpoint {
 
 #[path = "preparation_history.rs"]
 mod history;
-pub use history::PreviousInventory;
+pub use history::{
+    PreviousInventory, TerminalReleaseBinding, TerminalReleaseCheckpoint, TerminalReleaseDirectory,
+    TerminalReleaseOuterRequirement, TerminalReleasePhase, TerminalReleasePort,
+    TerminalReleaseReceipt, TerminalReleaseStore,
+};
 
 /// The product implementation must own and revalidate the outer install guard,
 /// exact matching prepared outer operation, sealed source/target products and
