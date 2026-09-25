@@ -358,6 +358,66 @@ fn handoff_requires_prepared_source_and_exact_v1_binding() {
 }
 
 #[test]
+fn physical_handoff_intent_is_append_only_and_preserves_old_encoding() {
+    let mut record = prepared();
+    record.record_previous_archive(digest('e')).unwrap();
+    let old_bytes = record.encode().unwrap();
+    assert!(!String::from_utf8(old_bytes.clone())
+        .unwrap()
+        .contains("handoff_intent"));
+    assert_eq!(PreparationReceipt::decode(&old_bytes).unwrap(), record);
+    let directory = |inode| PreparationDirectoryIdentity {
+        device_id: 1,
+        inode,
+        owner_id: 501,
+        mode: 0o700,
+    };
+    let intent = PreparationHandoffIntent {
+        directories: [directory(50), directory(51)],
+        receipt: upgrade(&record),
+        receipt_identity: file(60),
+        settings: None,
+    };
+    assert!(prepared().bind_handoff_intent(intent.clone()).is_err());
+    let before = record.clone();
+    record.bind_handoff_intent(intent.clone()).unwrap();
+    assert!(record.can_replace(&before));
+    assert!(!before.can_replace(&record));
+    assert!(record.bind_handoff_intent(intent.clone()).is_err());
+    assert_eq!(
+        PreparationReceipt::decode(&record.encode().unwrap()).unwrap(),
+        record
+    );
+    for case in 0..5 {
+        let mut changed = record.clone();
+        let value = changed.handoff_intent.as_mut().unwrap();
+        match case {
+            0 => value.receipt_identity.inode += 1,
+            1 => value.directories[1].inode += 1,
+            2 => value.settings = Some(file(70)),
+            3 => value.receipt_identity.sha256 = digest('f'),
+            _ => changed.handoff_intent = None,
+        }
+        assert!(!changed.can_replace(&record));
+    }
+    assert!(record.record_handoff(&intent.receipt, digest('f')).is_err());
+    record
+        .record_handoff(&intent.receipt, intent.receipt_identity.sha256)
+        .unwrap();
+    assert!(!record.can_replace(&before));
+    assert_eq!(
+        PreparationReceipt::decode(&record.encode().unwrap()).unwrap(),
+        record
+    );
+    let canonical = String::from_utf8(record.encode().unwrap()).unwrap();
+    let unknown = canonical.replace(
+        "\"handoff_intent\":{",
+        "\"handoff_intent\":{\"unknown\":true,",
+    );
+    assert!(PreparationReceipt::decode(unknown.as_bytes()).is_err());
+}
+
+#[test]
 fn first_data_upgrade_requires_explicit_empty_predecessor_evidence() {
     let mut binding = fixture().binding;
     binding.previous_data_operation_id = None;

@@ -29,6 +29,10 @@ impl fmt::Display for PreparationReceiptError {
 impl std::error::Error for PreparationReceiptError {}
 type Error = PreparationReceiptError;
 
+#[path = "preparation_handoff_contract.rs"]
+mod handoff;
+pub(crate) use handoff::PreparationHandoffIntent;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PreparationDirectoryIdentity {
@@ -231,6 +235,8 @@ pub struct PreparationReceipt {
     archived_slots: Vec<PreparationArchiveSlot>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     previous_inventory_identity: Option<PreparationFileIdentity>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    handoff_intent: Option<PreparationHandoffIntent>,
 }
 impl PreparationReceipt {
     pub fn new(
@@ -249,6 +255,7 @@ impl PreparationReceipt {
             journal_recovery: None,
             archived_slots: Vec::new(),
             previous_inventory_identity: None,
+            handoff_intent: None,
         };
         receipt.validate()?;
         Ok(receipt)
@@ -284,6 +291,26 @@ impl PreparationReceipt {
 
     pub fn previous_inventory_identity(&self) -> Option<&PreparationFileIdentity> {
         self.previous_inventory_identity.as_ref()
+    }
+
+    pub(crate) fn handoff_intent(&self) -> Option<&PreparationHandoffIntent> {
+        self.handoff_intent.as_ref()
+    }
+
+    pub(crate) fn archived_inventory_sha256(&self) -> Option<&str> {
+        self.archived_inventory_sha256.as_deref()
+    }
+
+    pub(crate) fn bind_handoff_intent(
+        &mut self,
+        intent: PreparationHandoffIntent,
+    ) -> Result<(), Error> {
+        if self.phase != PreparationPhase::PreviousArchived || self.handoff_intent.is_some() {
+            return Err(Error::InvalidPhase);
+        }
+        let mut next = self.clone();
+        next.handoff_intent = Some(intent);
+        self.replace_with(next)
     }
 
     /// Bind before the first reservation is persisted; later replacements cannot change it.
@@ -381,6 +408,14 @@ impl PreparationReceipt {
         if self.phase != PreparationPhase::PreviousArchived {
             return Err(Error::InvalidPhase);
         }
+        self.check_handoff_receipt(receipt)?;
+        let mut next = self.clone();
+        next.handoff_receipt_sha256 = Some(sha256);
+        next.phase = PreparationPhase::HandoffReady;
+        self.replace_with(next)
+    }
+
+    fn check_handoff_receipt(&self, receipt: &UpgradeReceipt) -> Result<(), Error> {
         let source = self.prepared_source.as_ref().ok_or(Error::InvalidPhase)?;
         let snapshot = self.snapshot.as_ref().ok_or(Error::InvalidPhase)?;
         let source_matches = receipt.artifacts().iter().any(|artifact| {
@@ -411,10 +446,7 @@ impl PreparationReceipt {
         {
             return Err(Error::InvalidBinding);
         }
-        let mut next = self.clone();
-        next.handoff_receipt_sha256 = Some(sha256);
-        next.phase = PreparationPhase::HandoffReady;
-        self.replace_with(next)
+        Ok(())
     }
 
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
@@ -479,11 +511,19 @@ impl PreparationReceipt {
             && self.phase == PreparationPhase::SourcePrepared
             && self.archived_slots.len() == previous.archived_slots.len() + 1
             && self.archived_slots.starts_with(&previous.archived_slots);
+        let handoff_append = previous.phase == PreparationPhase::PreviousArchived
+            && self.phase == PreparationPhase::PreviousArchived
+            && previous.handoff_intent.is_none()
+            && self.handoff_intent.is_some();
         ((recovery_append && self.archived_slots == previous.archived_slots)
             || (archive_append && self.journal_recovery == previous.journal_recovery)
+            || (handoff_append
+                && self.journal_recovery == previous.journal_recovery
+                && self.archived_slots == previous.archived_slots)
             || (successor
                 && self.journal_recovery == previous.journal_recovery
                 && self.archived_slots == previous.archived_slots))
+            && (self.handoff_intent == previous.handoff_intent || handoff_append)
             && preserves(&previous.snapshot, &self.snapshot)
             && preserves(&previous.prepared_source, &self.prepared_source)
             && preserves(
@@ -508,6 +548,9 @@ impl PreparationReceipt {
             return Err(Error::InvalidEncoding);
         }
         self.binding.validate()?;
+        if let Some(intent) = &self.handoff_intent {
+            intent.validate(self)?;
+        }
         self.initial_source.validate(&self.binding.data_root)?;
         if let Some(identity) = &self.previous_inventory_identity {
             identity.validate()?;

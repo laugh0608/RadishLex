@@ -7,6 +7,9 @@ mod inventory;
 pub use inventory::PreviousInventory;
 use inventory::{expected_private, matches_artifact, slot_name, HISTORY, INVENTORY, SLOTS};
 
+#[path = "preparation_handoff.rs"]
+mod handoff;
+
 impl PreparationJournalStore {
     /// Exact, guard-bound continuation from source_prepared. The preparation
     /// marker remains active; this neither creates v1 state nor allows startup.
