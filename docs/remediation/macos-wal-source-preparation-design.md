@@ -212,7 +212,7 @@ handoff 的新目录和回执先独占创建、同步并回读，在 `previous_a
 
 2026-09-25：A 段已实现。B 段已实现准备记录持久化、至 `source_prepared` 的 SQLite 编排、受限单库 journal 恢复，以及旧终态 inventory 的实物封存和至 `previous_archived` 的逐槽保留接续。准备记录新增可选 `previous_inventory_identity` 和只追加的 `archived_slots`；未使用新字段的原编码保持，旧严格准备 reader 拒绝新字段，原 v1 data receipt 不变。准备及归档 checkpoint 均核验历史实物；旧 data receipt 和实际私有材料按终态位置解释，不用运行库的历史长度否定正常学习。
 
-旧槽归档只接续仍位于活动 v1 槽的旧终态；新准备消费已释放历史前驱、前一 outer canonical 保存和真实双 guard 留待后续编排接线，缺少活动 receipt 但存在历史目录时拒绝猜测首次路径。初始化的未知私有 operation 或临时记录保留阻断；归档中只允许有序前缀和一个尚未记录进度的精确移动，补同步后再追加证明。达到 `previous_archived` 时 marker 和准备快照不移出，普通 reader 继续拒绝。
+旧槽归档接续仍位于活动 v1 槽的旧终态；已释放前驱另走只读证明接续，前一 outer canonical 保存和真实双 guard 留待产品接线。缺少活动 receipt 但存在历史目录时仍拒绝猜测首次路径。初始化的未知私有 operation 或临时记录保留阻断；归档中只允许有序前缀和一个尚未记录进度的精确移动，补同步后再追加证明。达到 `previous_archived` 时 marker 和准备快照不移出，普通 reader 继续拒绝。
 
 2026-09-25 后续批次实现新 v1 handoff：新增可选只追加的 `handoff_intent`，封存新回执与目录身份后精确移动，复验后记录 `handoff_ready`，保留保护快照并最后移出 marker。支持新回执已活动、marker 尚在以及 marker 已移出后的 fresh guard 重载；原 v1 编码/`can_replace`/普通 reader 不变，交接后仍由非终态回执阻止启动。首次和三种旧终态、文件/目录同步边界、授权失效、子进程退出、身份漂移和冲突以隔离合成目录验证，不能解释为实机或旧程序资格。
 
@@ -220,7 +220,9 @@ handoff 的新目录和回执先独占创建、同步并回读，在 `previous_a
 
 `finish_terminal_release` 在 fresh 外层终态、安装产品及同一完整证明确认后才最后移走 marker；原 v1/store/startup 白名单不变。`load_latest_release` 只读交叉核验已经封存的证明和材料，允许后续正常 WAL/学习/删除改变运行数据。资格仅为真实 SQLite/私有文件和合成产品 port，覆盖文件/目录/记录/索引边界的中断；没有执行真实 outer finalization 或旧程序副本。
 
-明确中止、新准备入口消费已释放前驱，以及 C–D 产品接线/独立程序副本资格仍待完成；WAL→DELETE/pager 内部真实断电资格仍开放，B 段尚未退出。09-15 各批结果保留在[前周周志](../devlogs/2026-W38.md)，09-25 各批验证和环境限制见[本周周志](../devlogs/2026-W39.md)。
+2026-09-25 新准备入口已接通已释放前驱：显式 data ID 与最新索引交叉核验，复用 release 中的 inventory，首次 reservation 以 `bind_released_predecessor` 固定证明与索引身份。新增可选 `previous_release_index_identity` 不可改认；无字段编码及原 v1 合同保持，旧严格准备 reader 拒绝新字段。当前源 release/product 与已释放结果一致，重新观察合法 WAL family 并生成保护快照；已释放槽不再移动，`archived_slots` 保持空。准备、归档确认与 handoff 均复验历史，三种初始终态之后的完整准备/升级/释放，以及第三次新 v1 接续使用真实 SQLite/文件和合成产品 port 验证。
+
+明确中止及其取消原因兼容、C–D 产品接线/独立程序副本资格仍待完成；WAL→DELETE/pager 内部真实断电资格仍开放，B 段尚未退出。09-15 各批结果保留在[前周周志](../devlogs/2026-W38.md)，09-25 各批验证和环境限制见[本周周志](../devlogs/2026-W39.md)。
 
 按以下顺序串行实施，每段完成匹配检查后再进入下一段；支持 schema、历史接续和旧 reader 兼容属于必要工作，不能只交付一个 checkpoint helper。
 

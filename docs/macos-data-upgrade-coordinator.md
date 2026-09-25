@@ -80,7 +80,7 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 `archive_previous_upgrade` 保持活动状态目录与 inner guard，逐项把旧 receipt 和实际仍在私有槽的 snapshot/candidate/backup/settings 移入历史 `data/`；每项先同步文件，rename 后按目标目录、源目录顺序 fsync，再持久化不可回退的 `archived_slots`。运行中的 DB/settings/Rime 不在清单内；正常学习造成的活动库长度/内容变化不按旧 receipt 否定，本次源库仍须符合 fresh 准备证据。
 
-只有精确的两槽互斥位置和有序移动前缀可以重放；最多一个移动可领先其持久位置证明，重放必须补做同步。冲突、缺失、inode/owner/mode/link/hash 漂移、未知对象和无证明临时记录保留并阻断。初始化产生的已有私有 operation 不认领；仅空共享父目录可重新核验并同步。首次无 data receipt 且无历史目录可用显式空清单；已释放历史前驱的索引路径留待终态封存接线，当前拒绝扫描猜测。
+只有精确的两槽互斥位置和有序移动前缀可以重放；最多一个移动可领先其持久位置证明，重放必须补做同步。冲突、缺失、inode/owner/mode/link/hash 漂移、未知对象和无证明临时记录保留并阻断。初始化产生的已有私有 operation 不认领；仅空共享父目录可重新核验并同步。首次无 data receipt 且无历史目录可用显式空清单；已释放历史前驱通过下述固定索引核验，缺少明确前驱时仍拒绝扫描猜测。
 
 原 v1 data receipt 编码与普通 reader 不变；新增准备字段只在使用时编码，旧严格准备 reader 拒绝它们。归档核心推进至 `previous_archived` 时，marker 和准备快照仍留在活动目录，之后必须经过独立 handoff。前一 outer canonical 字节的产品级保存、真实双 guard、明确中止和终态封存的产品接线仍须完成，不能据此允许产品启动或对真实目录执行升级。
 
@@ -100,7 +100,15 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 只有 `finish_terminal_release` 的每个检查点都证明外层已针对同一完整 release 证明和实际安装版本落到匹配终态，才最后移走 marker 并回读空活动 v1 槽。普通 reader 的白名单保持，因此 marker 期间继续拒绝；合成资格覆盖 marker 移出后 `AllowedNoUpgradeState` 和正常 WAL 学习/删除，不等于真实产品启动资格。无 proof 的索引、错误外层终态或不同证明均不得解除阻断。
 
-`load_latest_release` 为后续生命周期提供只读定位和历史材料核验，不授予 startup 或 mutation 权限；已释放后的运行数据允许正常变化。当前新准备入口还未消费该已释放前驱，明确中止的无 data receipt 分支、主动取消原因与旧 reader 兼容处理，以及 outer/Executor/真实程序资格仍开放。不得用该入口搬移被冻结的 source 39 事务。
+`load_latest_release` 为后续生命周期提供只读定位和历史材料核验，不授予 startup 或 mutation 权限；已释放后的运行数据允许正常变化。明确中止的无 data receipt 分支、主动取消原因与旧 reader 兼容处理，以及 outer/Executor/真实程序资格仍开放。不得用该入口搬移被冻结的 source 39 事务。
+
+#### 已释放前驱的连续准备
+
+活动 v1 槽为空时，新 reservation 可通过明确 data 前驱读取最新 release 索引及其终态证明；必须保留真实 outer/data 两条前驱，不能从目录扫描或旧 target 猜测当前产品。`capture_previous_inventory` 返回已封存 inventory 的只读投影，`previous_inventory_identity` 为 release 证明身份，`release_index_identity` 为索引身份；以 `bind_released_predecessor` 在首次持久化前同时固定，不再向旧历史写 `inventory.json`。
+
+新增可选 `previous_release_index_identity` 不改变无字段编码或旧 v1 合同；旧严格准备 reader 拒绝新字段。新准备每个 checkpoint 核验索引和证明的 inode/metadata/hash、目录、私有材料、安装 release/product 与显式 data 前驱；源库从当前 family 新建保护快照，保留正常学习及 tombstone。错误前驱、索引漂移、无证明的新 operation 目录或活动 v1 残留在 SQLite 写入前拒绝。
+
+已释放的旧槽从不再归档，`archived_slots` 必须为空；核心核验后推进 `previous_archived`，后续按既有 handoff 意图接入新 v1。重复调用须按当前阶段路由：`previous_archived` 直接继续 handoff，不能重新归档已有新回执。连续多次准备/释放及检查点重载已纳入合成资格，仍不代表真实 outer finalization、旧 source 程序副本或实机升级通过。
 
 #### 维护中断的受限 journal 恢复
 

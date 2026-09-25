@@ -92,7 +92,7 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 `archive_previous_upgrade` 仅从 `source_prepared` / `previous_archived` 执行，按 receipt、snapshot、candidate、backup、settings 的固定顺序，将实际存在的旧私有槽 rename 到同 operation 的 `data/`。`completed` 的 candidate 已在活动路径，`rolled_back` 的 backup 已恢复到活动路径，因此各自不当作私有槽归档。每次移动先复验授权、guard、源库/快照与全部 inventory，随后同步文件、rename、同步目标/源目录，再在准备记录追加 `archived_slots` 位置证明。原活动状态目录 inode 和 guard 始终保持；活动 DB、settings、Rime、准备快照及 marker 不移动。
 
-恢复只接受按顺序归档的前缀，最多允许一个已有精确 inventory 身份、但位置证明尚未落盘的移动；重新同步后才追加进度。两槽同时存在/缺失、逆序、已记录移动被撤回、未知对象或身份漂移均保留并阻断。inventory 初始化的私有 operation 目录若已存在，不重新创建或认领；尚未创建 operation 的空共享父目录可以重新核验并同步。无旧 receipt 但已有历史目录不能冒充首次升级，后续需终态释放索引接线。
+恢复只接受按顺序归档的前缀，最多允许一个已有精确 inventory 身份、但位置证明尚未落盘的移动；重新同步后才追加进度。两槽同时存在/缺失、逆序、已记录移动被撤回、未知对象或身份漂移均保留并阻断。inventory 初始化的私有 operation 目录若已存在，不重新创建或认领；尚未创建 operation 的空共享父目录可以重新核验并同步。无旧 receipt 但已有历史目录不能冒充首次升级；有明确已释放前驱时走下述索引接续。
 
 无新增字段的准备记录保持原编码；旧严格 reader 拒绝新增 `previous_inventory_identity` / `archived_slots` 字段。v1 data receipt 与 startup 白名单不变。达到 `previous_archived` 仍保持启动阻断，不表示新 v1 handoff、明确中止、终态释放或产品升级已经完成。
 
@@ -116,7 +116,15 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 准备完成仍保留活动 marker，不表示外层已终结或允许启动。`finish_terminal_release` 必须通过 `TerminalReleasePort` fresh 证明匹配同一完整 release 证明的外层终态、安装产品和静止状态，才把 marker 最后原 inode 移为历史 `terminal-release.json`，同步两目录并回读。port 接收完整证明；初始化回调仅为尚未封存的观察草稿，只有 `release_ready` 可绑定外层最终结果。合成 port 的状态和字节比较不能替代真实 outer guard/落盘验证。
 
-`load_latest_release` 只读定位并交叉核验已封存证明、目录、私有材料及准备证据；索引单独存在、marker 仍活动或证明不匹配均不能认定已释放。此查询不是 startup 授权，也不以历史运行 DB hash 拒绝后续正常学习、删除和 WAL。已释放前驱向下一次源库准备的接线、无新 data receipt 的准备中止及真实外层接线仍待完成；本批不新增 v1 失败码或伪造主动取消的错误原因。
+`load_latest_release` 只读定位并交叉核验已封存证明、目录、私有材料及准备证据；索引单独存在、marker 仍活动或证明不匹配均不能认定已释放。此查询不是 startup 授权，也不以历史运行 DB hash 拒绝后续正常学习、删除和 WAL。无新 data receipt 的准备中止及真实外层接线仍待完成；本批不新增 v1 失败码或伪造主动取消的错误原因。
+
+### 已释放前驱向新准备接续
+
+活动 v1 槽为空且明确提供前一 data operation 时，`capture_previous_inventory` 通过共享只读 release reader 定位 `latest-release.json`，核验最终证明、目录、旧回执/私有材料及准备证据；不写新 inventory，不扫描猜测前驱。`previous_inventory_identity` 此时返回 release 证明身份，`release_index_identity` 返回索引身份；调用方在首次 reservation 前使用 `bind_released_predecessor` 同时绑定两者，普通旧槽仍使用 `bind_previous_inventory`。
+
+准备记录新增可选且不可改认的 `previous_release_index_identity`，原字段缺失时编码保持，旧严格准备 reader 拒绝新字段。证明摘要复用 `previous_inventory_sha256`，数据回执摘要仍绑定真正的旧 v1 receipt；前一 outer/data 链分别保留。源 release/product 必须与已释放证明匹配；索引或证明即使同字节换 inode 也拒绝，缺失、冲突、临时文件或提前出现的未绑定新 operation 目录不能进入 SQLite 写路径。
+
+新 family 和保护快照从当前运行数据重新取得，允许上次释放后的合法 WAL 学习/删除。准备和 handoff 各检查点复验已固定的索引、证明及历史材料；已释放槽不再移动，`archived_slots` 保持空，`previous_archived` 只记录既有封存证明通过。新 v1 handoff、后续终态释放和下一次准备继续使用同一套历史校验；多个保留的旧 operation 不被认领或改写。真实 outer/Executor 和明确中止仍待完成，合成产品 port 不构成产品授权。
 
 ### 启动门禁
 

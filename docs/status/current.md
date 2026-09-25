@@ -30,10 +30,10 @@
 - `6a55782` 已修复 IMK 客户端身份来源，build 40 升级曾停于 `data_coordinating` / `candidate_verified`。错误呈现、合法 WAL 特征回归及显式恢复入口已实现，原生/全仓门禁与真实程序副本资格通过。项目所有者随后单独确认实际恢复：独立 Installer 对同一 `aad9cf8a…a706` 完成 source 39 双程序原 inode 恢复，外层 `rolled_back`、内层 `aborted_preserved`；原 DB/WAL/SHM、snapshot/candidate/settings backup 的身份、metadata 和摘要保留，target 40 留在 staging。source 双端及数据只读 startup gate 允许，target 双端拒绝；未启动双组件或执行新输入。继续激活 [WAL 升级与恢复方案](../remediation/macos-wal-upgrade-recovery-2026-09.md)：永久 WAL 源库准备的 A 段原语与合同已实现，B–D 编排和产品资格待完成，不能直接重试 40。REV-01/REV-02 继续开放，实际结果见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#切换前中止与-source-39-实机恢复完成2026-09-09)。
 - 次要事项为输入回调锁等待、新词召回/评测、删除与事件保留、MSRV/CI；维护成本、Manager 易用性和早期反馈列为后续建议。具体证据、未知项与关闭条件只在跟踪专题维护。
 - 2026-09-15 完成[WAL 源库准备与新事务接续设计](../remediation/macos-wal-source-preparation-design.md)，随后获项目所有者确认 A–D 仓库实施与隔离资格范围；包含准备前快照、版本化意图、旧事务保留、新 v1 接续及终态封存。当日 A 段已完成；B 段已实现记录持久化及推进至 `source_prepared` 的核心 SQLite 编排和实物摘要核验，受限单库 hot journal 恢复及持久身份已获合成验证；旧 operation 接续、新 v1 handoff、终态封存和真实产品接线仍待完成，未进行实机验证，不关闭 REV-01/REV-02。
-- 2026-09-25 继续 B 段：旧终态 inventory 实物核验、私有目录/文件身份封存及保留接续已实现，核心可从 `source_prepared` 推进至 `previous_archived`；准备和归档检查点均复验前驱材料，marker、保护快照和原状态目录 inode 保持。新 v1 handoff、明确中止、终态封存、已释放历史前驱索引和 C–D 产品接线/资格仍开放；本批只使用隔离合成目录，未复验或操作冻结现场。代码与文档已分别提交为 `8212325` / `48a8d47`；项目所有者解除 Xcode 许可阻塞后，本批完整仓库门禁补跑通过。验证与限制见[本周记录](../devlogs/2026-W39.md)。
-- 2026-09-25 后续 B 段完成仓库级新 v1 handoff：先持久绑定新回执及目录身份，再移入活动 `preflighted`，封存保护快照并最后移出 marker；两条前驱、准备后 DB 身份及原状态目录/guard 保持。新回执已活动和 marker 已移出两类中断可精确重载；未知或漂移材料继续保留阻断，普通 v1 白名单和启动停止线不变。代码已提交为 `ea3610d`，workspace check/Clippy 与完整仓库门禁通过。真实产品接线、明确中止及终态释放仍未完成；本批验证口径见[本周记录](../devlogs/2026-W39.md)。
+- 2026-09-25 B 段先后完成旧终态 inventory/保留接续、新 v1 handoff、终态封存与释放索引，代码为 `8212325`、`ea3610d`、`02e1227`。状态目录和 guard 保持，保护快照与历史证明保留，普通 v1 reader/startup 合同不变；授权失效、真实子进程退出、对象漂移及释放后正常 WAL 已取得合成验证。系统 Git 许可阻塞解除后完整仓库门禁通过，后两批 workspace check/Clippy 与完整门禁均通过。明确中止缺少既有 v1 主动取消原因，不能伪造失败码；真实产品接线仍开放。详细结果与停止线见[本周记录](../devlogs/2026-W39.md)。
 - 当前 Rime 来源锁已变化，不能作为冻结 Linux L6 pair 的新 target；现有构建资格检查继续拒绝混配。旧 pair、M5 系统操作顺位和冻结现场保持原状；新 pair 或平台实机动作仍须单独明确范围。
-- 2026-09-25 本批继续 B 段，已实现三种真实数据终态的保留封存、绑定完整证明的外层确认接口、释放索引与只读历史核验。活动 marker 最后移出，原 v1 reader/startup 合同不变；合成资格覆盖释放后正常 WAL 学习/删除，53 个检查点的授权失效与真实子进程退出矩阵通过。代码已提交为 `02e1227`，workspace check/Clippy 与完整仓库门禁通过。明确中止发现既有 v1 缺少主动取消原因的兼容约束，本批先完成共用释放基础，不伪造失败码；新准备消费已释放前驱及真实产品接线仍开放，结果与限制见[本周记录](../devlogs/2026-W39.md)。
+
+- 2026-09-25 后续 B 段已接通已释放前驱到新准备：固定索引/证明身份，从正常使用后的 WAL 重新生成保护快照，旧槽只核验不搬动。三种终态、下一次完整升级释放及第三次新 v1 接续、14 边界中断矩阵通过合成验证。代码已提交为 `907d1ac`，workspace check/Clippy 与完整仓库门禁通过；详情见[本周记录](../devlogs/2026-W39.md)；明确中止和 C–D 产品接线仍开放，未操作冻结现场。
 
 ## 冻结基线与固定边界
 
@@ -73,9 +73,9 @@
 - 不发布 macOS build 38/39/40 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步：B 段已释放前驱接续与明确中止（2026-09-25）
+## 下一步：B 段明确中止与取消原因兼容（2026-09-25）
 
-按已确认的[具体设计与 A–D 分段](../remediation/macos-wal-source-preparation-design.md)，接下来让新准备入口消费已释放历史前驱，并补齐维护前/后的明确中止及其原因兼容处理，再进入 C–D 的 outer guard/真实产品接线和独立程序副本资格。新 v1 handoff、真实数据终态封存与释放索引已完成仓库实现，尚不覆盖无新 data receipt 的准备中止，也不代表 B 段退出；不得手动搬走 receipt 解除门禁，合成 port 不证明真实产品授权，WAL 模式转换/pager 内部断电资格仍开放。
+按已确认的[具体设计与 A–D 分段](../remediation/macos-wal-source-preparation-design.md)，接下来补齐维护前/后的明确中止及其原因兼容处理，再进入 C–D 的 outer guard/真实产品接线和独立程序副本资格。新 v1 handoff、真实数据终态封存、释放索引及已释放前驱向新准备的接续已完成仓库实现，尚不覆盖无新 data receipt 的准备中止，也不代表 B 段退出；不得手动搬走 receipt 解除门禁，合成 port 不证明真实产品授权，WAL 模式转换/pager 内部断电资格仍开放。
 
 新升级真正完成后，才继续客户端身份和 composition 隐私实测；不直接重试 40。09-16 的历史 inventory 待办已由本批承接，原记录仍保留在[前周周志](../devlogs/2026-W38.md#2026-09-16明日事项)，本批交付和下一步见[本周周志](../devlogs/2026-W39.md)。
 
