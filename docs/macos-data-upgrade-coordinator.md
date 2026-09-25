@@ -72,7 +72,17 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 专用 `prepare_userdb_source` 编排已经串接保护快照、持久维护意图、SQLite 准备及 `source_prepared` 复核；固定路径与实际文件的 owner/mode/link/device/inode/length/SHA-256 由核心检查。快照读取阶段允许受限 SHM/零长 WAL 辅助变化，原主库和既有 WAL 内容不变；进入维护窗口后仍要求同一主 inode、保护快照和全量逻辑内容一致。文件/目录 fsync、rename、记录回读及后置静止缺一不可；无证明 snapshot 残留或不满足下述资格的 journal 阻断，不自动清理或用快照覆盖源库。
 
-快照及维护前 fresh 容量预算为 `6 * max(logical_bytes, source_main_bytes) + settings_bytes + 64 MiB`，覆盖原三份工作余量、准备快照、源库增长和 journal，使用 checked arithmetic。`SourcePreparationPort` 的真实产品实现必须持有 outer guard，逐 checkpoint 复验同一 `prepared` outer、两代受控产品、旧 receipt/inventory 和静止状态；`MacOsPreparationHasher` 只提供现有 SHA-256 实现，不替代上述授权。Executor 接线、接续、明确中止和终态封存仍待完成，不能以 `source_prepared` 或单独 journal `handoff_ready` 声称产品交接完成。
+快照及维护前 fresh 容量预算为 `6 * max(logical_bytes, source_main_bytes) + settings_bytes + 64 MiB`，覆盖原三份工作余量、准备快照、源库增长和 journal，使用 checked arithmetic。`SourcePreparationPort` 的真实产品实现必须持有 outer guard，逐 checkpoint 复验同一 `prepared` outer、两代受控产品、旧 receipt/inventory 和静止状态；`MacOsPreparationHasher` 只提供现有 SHA-256 实现，不替代上述授权。Executor 接线、新 v1 handoff、明确中止和终态封存仍待完成，不能以 `source_prepared` 或单独 journal `handoff_ready` 声称产品交接完成。
+
+#### 旧事务 inventory 与保留接续
+
+新 reservation 前，`capture_previous_inventory` 核验旧 canonical receipt 和私有 artifact，分别绑定前一 outer/data operation；只接受首次无前驱或 `completed` / `aborted_preserved` / `rolled_back`，旧非终态、manual recovery、重复 ID、错误前驱、未知或无证明对象失败关闭。目录和文件身份及摘要以严格私有 `inventory.json` 保存在固定历史 operation 下；准备记录在首次持久化前绑定 inventory 文件身份，此后不可改认。每个准备 checkpoint 在 SQLite 写入前也核验这一实物关系，合成产品 port 不能免除核心检查。
+
+`archive_previous_upgrade` 保持活动状态目录与 inner guard，逐项把旧 receipt 和实际仍在私有槽的 snapshot/candidate/backup/settings 移入历史 `data/`；每项先同步文件，rename 后按目标目录、源目录顺序 fsync，再持久化不可回退的 `archived_slots`。运行中的 DB/settings/Rime 不在清单内；正常学习造成的活动库长度/内容变化不按旧 receipt 否定，本次源库仍须符合 fresh 准备证据。
+
+只有精确的两槽互斥位置和有序移动前缀可以重放；最多一个移动可领先其持久位置证明，重放必须补做同步。冲突、缺失、inode/owner/mode/link/hash 漂移、未知对象和无证明临时记录保留并阻断。初始化产生的已有私有 operation 不认领；仅空共享父目录可重新核验并同步。首次无 data receipt 且无历史目录可用显式空清单；已释放历史前驱的索引路径留待终态封存接线，当前拒绝扫描猜测。
+
+原 v1 data receipt 编码与普通 reader 不变；新增准备字段只在使用时编码，旧严格准备 reader 拒绝它们。核心可推进至 `previous_archived`，marker 和准备快照仍留在活动目录。前一 outer canonical 字节的产品级保存、真实双 guard、new v1 handoff、明确中止和终态封存仍须完成，不能据此允许产品启动或对真实目录执行升级。
 
 #### 维护中断的受限 journal 恢复
 

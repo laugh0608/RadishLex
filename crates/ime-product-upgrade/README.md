@@ -70,7 +70,7 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 ### 新源库准备合同
 
-`PreparationReceipt` 是已批准 WAL 新升级方案的独立版本化合同：绑定新 operation、两条前驱链、产品摘要、root/state identity、初始源 family、保护快照及准备后 identity。类型定义从 `reserved` 至 `handoff_ready` 的单步合同；当前实际源库编排只推进至 `source_prepared`，归档和 handoff 的类型方法不证明文件已移动或新事务已持久化。canonical 编码最大 256 KiB；未知格式/字段、证据改写和跨 operation 替换失败关闭。它不修改既有 v1 receipt 的 source，也不由类型本身授予文件写入。
+`PreparationReceipt` 是已批准 WAL 新升级方案的独立版本化合同：绑定新 operation、两条前驱链、产品摘要、root/state identity、初始源 family、保护快照及准备后 identity。类型定义从 `reserved` 至 `handoff_ready` 的单步合同；源库编排推进至 `source_prepared`，独立历史接续编排可进一步推进至 `previous_archived`；handoff 类型方法仍不证明新事务已持久化。canonical 编码最大 256 KiB；未知格式/字段、证据改写和跨 operation 替换失败关闭。它不修改既有 v1 receipt 的 source，也不由类型本身授予文件写入。
 
 `PreparationJournalStore` 提供该记录的持久化层：复用原 v1 状态目录 inode 和 `UpgradeProcessGuard`，只写固定 `source-preparation.json` / `.tmp`；严格校验 root/state 绑定、canonical bytes、前一记录与单步替换。写入经过独占创建、文件 fsync、身份复验、rename、目录 fsync 和回读；相同字节重放也补做文件及目录 fsync。无证明的临时记录、孤立准备快照、未知对象及身份漂移保留并阻断。普通 v1 store/startup reader 继续拒绝准备槽，专用入口不扩展原白名单。
 
@@ -82,7 +82,19 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 未使用恢复字段的准备记录继续保持原 canonical 字节；字段仅在持久维护意图阶段追加一次并永久保留，既有严格准备 reader 拒绝含新字段的记录。新 v1 数据 receipt 和 startup 白名单不变。当前证据包括实际 SQLite spill/进程退出、合成 WAL 文件头恢复及组合核心重载；不覆盖 pager 内部任意断电、多库恢复或完整产品升级。
 
-`SourcePreparationPort` 的产品实现必须持有并复验 outer guard、相同 `prepared` operation、受控 source/target 产品、前驱 receipt/inventory 和 fresh 静止观察；合成 port 不证明产品授权。这部分 Executor 接线、旧 operation 接续、明确中止、终态封存和完整产品资格按[已批准方案](../../docs/remediation/macos-wal-source-preparation-design.md)继续；不能在旧 v1 receipt 已绑定后单独调用维护 API。
+`SourcePreparationPort` 的产品实现必须持有并复验 outer guard、相同 `prepared` operation、受控 source/target 产品、前驱 receipt/inventory 和 fresh 静止观察；合成 port 不证明产品授权。这部分 Executor 接线、新 v1 handoff、明确中止、终态封存和完整产品资格按[已批准方案](../../docs/remediation/macos-wal-source-preparation-design.md)继续；不能在旧 v1 receipt 已绑定后单独调用维护 API。
+
+### 历史清单与旧私有槽接续
+
+`capture_previous_inventory` 在 reservation 前核验旧 v1 canonical receipt、终态、数据根和固定私有 artifact，分开绑定新 operation、前一 outer 和前一 data operation。历史清单固定保存在 `.radishlex-upgrade-history-v1/<old-data-operation>/inventory.json`，最大 256 KiB、严格 canonical JSON；目录身份、原 receipt 与各槽 inode/owner/mode/link/length/SHA-256、显式缺失一并封存。调用方仍须持有真实 outer guard 和 fresh 产品/静止授权；核心不通过调用方参数证明外层 receipt 已核验。
+
+`previous_inventory_identity` 复验实物后返回清单文件身份，必须在首次准备记录持久化前通过 `bind_previous_inventory` 绑定，后续不能替换。准备链每个 checkpoint 都核验历史清单及私有材料；错误前驱或材料漂移在 SQLite 写入前即拒绝。旧终态中的运行库 identity 是历史事实，不要求活动库仍保持上次升级的长度/内容；本次 family 由 fresh 准备观察和保护快照证明。
+
+`archive_previous_upgrade` 仅从 `source_prepared` / `previous_archived` 执行，按 receipt、snapshot、candidate、backup、settings 的固定顺序，将实际存在的旧私有槽 rename 到同 operation 的 `data/`。`completed` 的 candidate 已在活动路径，`rolled_back` 的 backup 已恢复到活动路径，因此各自不当作私有槽归档。每次移动先复验授权、guard、源库/快照与全部 inventory，随后同步文件、rename、同步目标/源目录，再在准备记录追加 `archived_slots` 位置证明。原活动状态目录 inode 和 guard 始终保持；活动 DB、settings、Rime、准备快照及 marker 不移动。
+
+恢复只接受按顺序归档的前缀，最多允许一个已有精确 inventory 身份、但位置证明尚未落盘的移动；重新同步后才追加进度。两槽同时存在/缺失、逆序、已记录移动被撤回、未知对象或身份漂移均保留并阻断。inventory 初始化的私有 operation 目录若已存在，不重新创建或认领；尚未创建 operation 的空共享父目录可以重新核验并同步。无旧 receipt 但已有历史目录不能冒充首次升级，后续需终态释放索引接线。
+
+无新增字段的准备记录保持原编码；旧严格 reader 拒绝新增 `previous_inventory_identity` / `archived_slots` 字段。v1 data receipt 与 startup 白名单不变。达到 `previous_archived` 仍保持启动阻断，不表示新 v1 handoff、明确中止、终态释放或产品升级已经完成。
 
 ### 启动门禁
 

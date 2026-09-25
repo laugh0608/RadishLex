@@ -205,7 +205,11 @@ checkpoint 结果和关闭语义依据 [SQLite checkpoint API](https://sqlite.or
 
 ## 实施分段与验收矩阵
 
-2026-09-15：A 段已实现并通过完整仓库门禁。B 段已实现准备记录持久化和 `reserved → snapshot_ready → maintenance_intent → source_prepared` 的核心 SQLite 编排，复用原状态目录及 inner guard，核验真实文件身份/SHA-256、准备前快照、维护后等价及同步；原 reader 保持阻断。macOS hasher 复用已有依赖，合成 port 尚不证明真实 outer/产品授权。受限单库 hot journal 的资格、持久恢复身份和核心重载已实现，含实际 spill/进程退出、合成 WAL 页一及组合核心测试；WAL→DELETE 与 pager 内部真实断电资格未闭合。旧材料 inventory/接续、新 v1 handoff、明确中止、终态封存和 C–D 产品接线/资格仍待完成，B 段未达到退出条件。阶段实现结果见[本周周志](../devlogs/2026-W38.md)。
+2026-09-25：A 段已实现。B 段已实现准备记录持久化、至 `source_prepared` 的 SQLite 编排、受限单库 journal 恢复，以及旧终态 inventory 的实物封存和至 `previous_archived` 的逐槽保留接续。准备记录新增可选 `previous_inventory_identity` 和只追加的 `archived_slots`；未使用新字段的原编码保持，旧严格准备 reader 拒绝新字段，原 v1 data receipt 不变。准备及归档 checkpoint 均核验历史实物；旧 data receipt 和实际私有材料按终态位置解释，不用运行库的历史长度否定正常学习。
+
+本批只接续仍位于活动 v1 槽的旧终态；已释放历史前驱的索引加载、前一 outer canonical 保存和真实双 guard 留待后续编排接线，缺少活动 receipt 但存在历史目录时拒绝猜测首次路径。初始化的未知私有 operation 或临时记录保留阻断；归档中只允许有序前缀和一个尚未记录进度的精确移动，补同步后再追加证明。marker 和准备快照不移出，普通 reader 继续拒绝。
+
+新 v1 handoff、明确中止、终态封存及 C–D 产品接线/独立程序副本资格仍待完成；WAL→DELETE/pager 内部真实断电资格仍开放，B 段尚未退出。09-15 各批结果保留在[前周周志](../devlogs/2026-W38.md)，本批 Rust/Go 与文档检查通过；完整仓库门禁仍受系统 Git/Xcode 许可阻断，项目所有者明确要求先做本地提交，验证与限制见[本周周志](../devlogs/2026-W39.md)。
 
 按以下顺序串行实施，每段完成匹配检查后再进入下一段；支持 schema、历史接续和旧 reader 兼容属于必要工作，不能只交付一个 checkpoint helper。
 

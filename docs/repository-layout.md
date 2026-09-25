@@ -220,6 +220,8 @@ SQLite 用户数据层：
 
 该 crate 的既有 v1 路径已闭合固定布局内从 `preflighted` 到终态的核心调度与数据恢复，但仍不停止进程、不定位或启动产品 host，也不提供安装载体；API、副作用与验证入口见 [ime-product-upgrade 组件说明](../crates/ime-product-upgrade/README.md)，macOS 完整状态机见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。
 
+`preparation_inventory.rs` 封存旧终态及固定私有材料清单，`preparation_history.rs` 在原 guard 下逐槽保留接续并核验位置证明；两者不移动运行数据或释放启动 marker，新 v1 handoff 与终态封存按当前激活设计继续。
+
 ### ime-product-install
 
 产品程序安装事务 contract：

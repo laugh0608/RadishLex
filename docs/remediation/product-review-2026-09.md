@@ -158,6 +158,10 @@ Manager 隐私草案首次尚未保存时前置检查未通过；项目所有者
 
 按已批准方案实现源库维护原语、版本化准备记录及持久化、至 `source_prepared` 的 SQLite 编排和受限单库 journal 恢复；各批完整仓库门禁通过。新事务接续、终态封存、真实产品接线与独立程序副本资格尚未闭合，今天没有实机操作或新输入证据，REV-01/REV-02 保持开放。实现分段见[准备设计](macos-wal-source-preparation-design.md#实施分段与验收矩阵)，当日提交复盘见[本周周志](../devlogs/2026-W38.md#2026-09-15收尾复盘)。
 
+### 2026-09-25：旧事务材料保留接续
+
+B 段新增旧终态 inventory 的实物核验与持久封存、准备前前驱复验和逐槽保留接续，核心可到达 `previous_archived`，准备 marker 仍保持启动阻断。新 v1 handoff、明确中止、终态封存和真实产品接线尚未完成；本批无实机或输入证据，REV-01/REV-02 仍开放。测试、工具链限制和后续顺位见[本周记录](../devlogs/2026-W39.md)。
+
 ## REV-03：输入线程的数据库等待
 
 [候选选择](../../crates/ime-runtime/src/session.rs)在返回结果前同步执行 `record_selection`；[学习事务](../../crates/ime-userdb/src/store/learning.rs)取得 `Immediate` 写事务，[连接策略](../../crates/ime-userdb/src/store/connection.rs)配置 `busy_timeout = 5000 ms`。平台收到结果后才向宿主提交文本，存在写锁竞争拖住输入回调的风险。
