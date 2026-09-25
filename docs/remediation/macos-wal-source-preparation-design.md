@@ -209,7 +209,7 @@ checkpoint 结果和关闭语义依据 [SQLite checkpoint API](https://sqlite.or
 
 本批只接续仍位于活动 v1 槽的旧终态；已释放历史前驱的索引加载、前一 outer canonical 保存和真实双 guard 留待后续编排接线，缺少活动 receipt 但存在历史目录时拒绝猜测首次路径。初始化的未知私有 operation 或临时记录保留阻断；归档中只允许有序前缀和一个尚未记录进度的精确移动，补同步后再追加证明。marker 和准备快照不移出，普通 reader 继续拒绝。
 
-新 v1 handoff、明确中止、终态封存及 C–D 产品接线/独立程序副本资格仍待完成；WAL→DELETE/pager 内部真实断电资格仍开放，B 段尚未退出。09-15 各批结果保留在[前周周志](../devlogs/2026-W38.md)，本批 Rust/Go 与文档检查通过；完整仓库门禁仍受系统 Git/Xcode 许可阻断，项目所有者明确要求先做本地提交，验证与限制见[本周周志](../devlogs/2026-W39.md)。
+新 v1 handoff、明确中止、终态封存及 C–D 产品接线/独立程序副本资格仍待完成；WAL→DELETE/pager 内部真实断电资格仍开放，B 段尚未退出。09-15 各批结果保留在[前周周志](../devlogs/2026-W38.md)，本批 Rust/Go 与文档检查通过；代码与文档按指令提交后，项目所有者解除系统 Git/Xcode 许可阻塞，完整仓库门禁补跑通过，验证与限制见[本周周志](../devlogs/2026-W39.md)。
 
 按以下顺序串行实施，每段完成匹配检查后再进入下一段；支持 schema、历史接续和旧 reader 兼容属于必要工作，不能只交付一个 checkpoint helper。
 
