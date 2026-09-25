@@ -13,8 +13,9 @@ use files::{no_sidecars, readonly_family, same_object};
 #[path = "preparation_cancellation.rs"]
 mod cancellation;
 pub use cancellation::{
-    PreparationCancellationCheckpoint, PreparationCancellationPort, PreparationCancellationRequest,
-    PreparationCancellationStore,
+    CancellationSourceCheckpoint, CancellationSourcePhase, CancellationSourcePort,
+    CancellationSourceReceipt, PreparationCancellationCheckpoint, PreparationCancellationPort,
+    PreparationCancellationRequest, PreparationCancellationStore,
 };
 
 /// A trusted platform implementation of SHA-256 over the complete stream.

@@ -7,6 +7,7 @@ const NEXT: &str = "44444444444444444444444444444444";
 #[test]
 fn cancellation_binds_released_history_without_moving_or_rewriting_it() {
     use radishlex_ime_product_upgrade::{
+        CancellationSourceCheckpoint, CancellationSourcePort, CancellationSourceReceipt,
         PreparationCancellationCheckpoint, PreparationCancellationPort,
         PreparationCancellationRequest, PreparationCancellationStore,
     };
@@ -21,6 +22,20 @@ fn cancellation_binds_released_history_without_moving_or_rewriting_it() {
             true
         }
     }
+    impl CancellationSourcePort for Admit {
+        fn confirm_authority_and_quiescence(
+            &mut self,
+            request: &PreparationCancellationRequest,
+            _: &CancellationSourceReceipt,
+            _: CancellationSourceCheckpoint,
+        ) -> bool {
+            assert_eq!(request.preparation().binding(), &self.0);
+            true
+        }
+        fn available_bytes(&mut self) -> Option<u64> {
+            Some(u64::MAX)
+        }
+    }
     for state in [State::Completed, State::AbortedPreserved, State::RolledBack] {
         let fixture = Fixture::new();
         let prior = released(&fixture, state);
@@ -29,15 +44,25 @@ fn cancellation_binds_released_history_without_moving_or_rewriting_it() {
         let (store, guard, binding) = reserve(&fixture, &prior, NEXT);
         let cancel = PreparationCancellationStore::attach(store, &guard).unwrap();
         let request = cancel
-            .request_cancellation(&guard, NEXT, &mut Admit(binding), &Hasher)
+            .request_cancellation(&guard, NEXT, &mut Admit(binding.clone()), &Hasher)
             .unwrap();
         assert_eq!(cancel.load_guarded(&guard, &Hasher).unwrap(), Some(request));
+        let ready = cancel
+            .finish_source(&guard, &mut Admit(binding.clone()), &Hasher)
+            .unwrap();
+        assert_eq!(
+            cancel.load_source_guarded(&guard, &Hasher).unwrap(),
+            Some(ready)
+        );
         assert_eq!(failures::tree(&old_root), before);
         let index = old_root.join("latest-release.json");
         let bytes = fs::read(&index).unwrap();
         fs::rename(&index, fixture.0.join("retained-index")).unwrap();
         put(&index, &bytes);
-        assert!(cancel.load_guarded(&guard, &Hasher).is_err());
+        assert!(cancel.load_source_guarded(&guard, &Hasher).is_err());
+        assert!(cancel
+            .finish_source(&guard, &mut Admit(binding), &Hasher)
+            .is_err());
     }
 }
 

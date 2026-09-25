@@ -672,3 +672,6 @@ fn cancellation_rejects_temp_replacement_collisions_and_marker_races() {
         );
     }
 }
+
+#[path = "source_finishing.rs"]
+mod source_finishing;

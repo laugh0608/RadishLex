@@ -1,5 +1,5 @@
-//! Durable cancellation admission. No SQLite calls, artifact moves, outer
-//! replacement or startup release occur here. Ordinary readers remain blocked.
+//! Durable cancellation admission and dedicated source finishing. Artifact
+//! moves, outer replacement and startup release remain separate obligations.
 use super::*;
 use crate::PreparationFileIdentity;
 
@@ -9,6 +9,12 @@ const STAGED_REQUEST: &str = "preparation-cancellation.json.tmp";
 #[path = "preparation_cancellation_record.rs"]
 mod record;
 pub use record::PreparationCancellationRequest;
+#[path = "cancellation_source.rs"]
+mod source;
+pub use source::{
+    CancellationSourceCheckpoint, CancellationSourcePhase, CancellationSourcePort,
+    CancellationSourceReceipt,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PreparationCancellationCheckpoint {
@@ -70,8 +76,9 @@ impl PreparationCancellationStore {
         Ok(self.journal.store.acquire_directory_guard()?)
     }
 
-    /// Reloads an unchanged request with its bound preparation, source family
-    /// and predecessor inventory. No outer/product authorization is inferred.
+    /// Reloads an unchanged request before source finishing has started, with
+    /// its bound preparation, source family and predecessor inventory. After
+    /// progress exists use load_source_guarded. No product authority is inferred.
     pub fn load_guarded(
         &self,
         guard: &UpgradeProcessGuard,
@@ -81,6 +88,11 @@ impl PreparationCancellationStore {
         self.validate_entries()?;
         self.reject_staged()?;
         let Some((request, identity)) = self.read_request(hasher)? else {
+            for name in [source::SOURCE_PROGRESS, source::STAGED_SOURCE_PROGRESS] {
+                if path_exists(&self.journal.path(name))? {
+                    return Err(Error::InvalidPhase);
+                }
+            }
             return Ok(None);
         };
         self.verify_request(guard, &request, hasher)?;
@@ -297,6 +309,24 @@ impl PreparationCancellationStore {
         request: &PreparationCancellationRequest,
         hasher: &impl PreparationHasher,
     ) -> Result<()> {
+        for name in [source::SOURCE_PROGRESS, source::STAGED_SOURCE_PROGRESS] {
+            if path_exists(&self.journal.path(name))? {
+                return Err(Error::InvalidPhase);
+            }
+        }
+        self.verify_bound_materials(guard, request, hasher)?;
+        if self.journal.family(hasher)? != *request.observed_source() {
+            return Err(Error::EvidenceChanged);
+        }
+        Ok(())
+    }
+
+    fn verify_bound_materials(
+        &self,
+        guard: &UpgradeProcessGuard,
+        request: &PreparationCancellationRequest,
+        hasher: &impl PreparationHasher,
+    ) -> Result<()> {
         self.journal.verify_guard(guard)?;
         self.validate_entries()?;
         self.journal.reject_staged_record()?;
@@ -310,7 +340,6 @@ impl PreparationCancellationStore {
             != Some(prep)
             || self.journal.evidence(&self.journal.path(JOURNAL), hasher)?
                 != *request.preparation_identity()
-            || self.journal.family(hasher)? != *request.observed_source()
         {
             return Err(Error::EvidenceChanged);
         }
@@ -322,9 +351,8 @@ impl PreparationCancellationStore {
         let inventory = self.journal.load_previous_inventory(prep, hasher)?;
         self.journal
             .verify_inventory_objects(&inventory, hasher, Some(prep))?;
-        if self.journal.family(hasher)? != *request.observed_source()
-            || self.journal.evidence(&self.journal.path(JOURNAL), hasher)?
-                != *request.preparation_identity()
+        if self.journal.evidence(&self.journal.path(JOURNAL), hasher)?
+            != *request.preparation_identity()
         {
             return Err(Error::EvidenceChanged);
         }
@@ -352,10 +380,7 @@ impl PreparationCancellationStore {
     }
 
     fn validate_entries(&self) -> Result<()> {
-        self.journal.store.revalidate()?;
-        self.journal
-            .validate_entries_with_extra(&[REQUEST, STAGED_REQUEST])?;
-        Ok(())
+        self.validate_source_entries()
     }
 
     fn reject_staged(&self) -> Result<()> {

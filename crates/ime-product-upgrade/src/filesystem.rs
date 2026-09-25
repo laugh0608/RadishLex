@@ -866,13 +866,14 @@ mod tests;
 #[path = "preparation_journal.rs"]
 mod preparation_journal;
 pub use preparation_journal::{
-    PreparationCancellationCheckpoint, PreparationCancellationPort, PreparationCancellationRequest,
-    PreparationCancellationStore, PreparationHasher, PreparationJournalError,
-    PreparationJournalStore, PreviousInventory, SourcePreparationCheckpoint,
-    SourcePreparationError, SourcePreparationPort, SourcePreparationSpaceBudget,
-    TerminalReleaseBinding, TerminalReleaseCheckpoint, TerminalReleaseDirectory,
-    TerminalReleaseOuterRequirement, TerminalReleasePhase, TerminalReleasePort,
-    TerminalReleaseReceipt, TerminalReleaseStore,
+    CancellationSourceCheckpoint, CancellationSourcePhase, CancellationSourcePort,
+    CancellationSourceReceipt, PreparationCancellationCheckpoint, PreparationCancellationPort,
+    PreparationCancellationRequest, PreparationCancellationStore, PreparationHasher,
+    PreparationJournalError, PreparationJournalStore, PreviousInventory,
+    SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,
+    SourcePreparationSpaceBudget, TerminalReleaseBinding, TerminalReleaseCheckpoint,
+    TerminalReleaseDirectory, TerminalReleaseOuterRequirement, TerminalReleasePhase,
+    TerminalReleasePort, TerminalReleaseReceipt, TerminalReleaseStore,
 };
 
 #[path = "snapshot.rs"]

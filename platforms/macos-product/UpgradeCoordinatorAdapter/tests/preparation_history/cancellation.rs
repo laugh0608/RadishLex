@@ -1,5 +1,6 @@
 use super::*;
 use radishlex_ime_product_upgrade::{
+    CancellationSourceCheckpoint, CancellationSourcePort, CancellationSourceReceipt,
     PreparationCancellationCheckpoint, PreparationCancellationPort, PreparationCancellationRequest,
     PreparationCancellationStore,
 };
@@ -13,6 +14,21 @@ impl PreparationCancellationPort for Admission {
     ) -> bool {
         assert_eq!(request.preparation().binding(), &self.0);
         true // Synthetic outer authorization; private material checks are real.
+    }
+}
+
+impl CancellationSourcePort for Admission {
+    fn confirm_authority_and_quiescence(
+        &mut self,
+        request: &PreparationCancellationRequest,
+        _: &CancellationSourceReceipt,
+        _: CancellationSourceCheckpoint,
+    ) -> bool {
+        assert_eq!(request.preparation().binding(), &self.0);
+        true
+    }
+    fn available_bytes(&mut self) -> Option<u64> {
+        Some(u64::MAX)
     }
 }
 
@@ -48,10 +64,17 @@ fn cancellation_preserves_three_old_terminal_inventories_at_every_archive_positi
             let source = fs::read(fixture.source()).unwrap();
             let cancel = PreparationCancellationStore::attach(store, &guard).unwrap();
             let request = cancel
-                .request_cancellation(&guard, NEW, &mut Admission(port.binding), &Hasher)
+                .request_cancellation(&guard, NEW, &mut Admission(port.binding.clone()), &Hasher)
                 .unwrap();
             assert_eq!(request.preparation(), &prep);
             assert_eq!(cancel.load_guarded(&guard, &Hasher).unwrap(), Some(request));
+            let ready = cancel
+                .finish_source(&guard, &mut Admission(port.binding.clone()), &Hasher)
+                .unwrap();
+            assert_eq!(
+                cancel.load_source_guarded(&guard, &Hasher).unwrap(),
+                Some(ready)
+            );
             for (path, inode, bytes) in &before {
                 assert_eq!(fs::metadata(path).unwrap().ino(), *inode);
                 assert_eq!(fs::read(path).unwrap(), *bytes);
@@ -64,7 +87,10 @@ fn cancellation_preserves_three_old_terminal_inventories_at_every_archive_positi
                 .unwrap()
                 .0;
             fs::write(path, b"changed old snapshot").unwrap();
-            assert!(cancel.load_guarded(&guard, &Hasher).is_err());
+            assert!(cancel.load_source_guarded(&guard, &Hasher).is_err());
+            assert!(cancel
+                .finish_source(&guard, &mut Admission(port.binding), &Hasher)
+                .is_err());
         }
     }
 }

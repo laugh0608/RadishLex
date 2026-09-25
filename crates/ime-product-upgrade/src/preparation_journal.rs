@@ -430,9 +430,10 @@ mod tests;
 #[path = "source_preparation.rs"]
 mod source_preparation;
 pub use source_preparation::{
-    PreparationCancellationCheckpoint, PreparationCancellationPort, PreparationCancellationRequest,
-    PreparationCancellationStore, PreparationHasher, PreviousInventory,
-    SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,
+    CancellationSourceCheckpoint, CancellationSourcePhase, CancellationSourcePort,
+    CancellationSourceReceipt, PreparationCancellationCheckpoint, PreparationCancellationPort,
+    PreparationCancellationRequest, PreparationCancellationStore, PreparationHasher,
+    PreviousInventory, SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,
     SourcePreparationSpaceBudget, TerminalReleaseBinding, TerminalReleaseCheckpoint,
     TerminalReleaseDirectory, TerminalReleaseOuterRequirement, TerminalReleasePhase,
     TerminalReleasePort, TerminalReleaseReceipt, TerminalReleaseStore,
