@@ -73,9 +73,11 @@
 - 不发布 macOS build 38/39/40 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步：B 段明确中止与取消原因兼容（2026-09-25）
+## 下一步：确认 B 段明确中止的兼容补充设计（2026-09-25）
 
-按已确认的[具体设计与 A–D 分段](../remediation/macos-wal-source-preparation-design.md)，接下来补齐维护前/后的明确中止及其原因兼容处理，再进入 C–D 的 outer guard/真实产品接线和独立程序副本资格。新 v1 handoff、真实数据终态封存、释放索引及已释放前驱向新准备的接续已完成仓库实现，尚不覆盖无新 data receipt 的准备中止，也不代表 B 段退出；不得手动搬走 receipt 解除门禁，合成 port 不证明真实产品授权，WAL 模式转换/pager 内部断电资格仍开放。
+复核和回归测试已确认数据/外层 v1 均没有主动取消原因，未知取消码与 null 失败码都被拒绝，原设计不能直接把取消结清为双层 `aborted_preserved`。已形成[准备中止兼容补充设计](../remediation/macos-preparation-cancellation-compatibility.md)：独立取消证明、保留新 outer 原件、受控恢复原 outer 兼容回执及生命周期前驱。该调整涉及安装事务边界，待项目所有者确认后再实施；本批只补合同测试和设计，未新增取消行为。
+
+其余范围延续已确认的[具体设计与 A–D 分段](../remediation/macos-wal-source-preparation-design.md)。新 v1 handoff、真实数据终态封存、释放索引及已释放前驱向新准备的接续已完成仓库实现；无新 data receipt 的取消与 C–D outer guard/真实产品接线、独立程序副本资格仍开放，B 段未退出。不得手动搬走 receipt 解除门禁，合成 port 不证明真实产品授权，WAL 模式转换/pager 内部断电资格仍开放。
 
 新升级真正完成后，才继续客户端身份和 composition 隐私实测；不直接重试 40。09-16 的历史 inventory 待办已由本批承接，原记录仍保留在[前周周志](../devlogs/2026-W38.md#2026-09-16明日事项)，本批交付和下一步见[本周周志](../devlogs/2026-W39.md)。
 

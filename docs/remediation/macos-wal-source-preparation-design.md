@@ -180,9 +180,11 @@ handoff 的新目录和回执先独占创建、同步并回读，在 `previous_a
 | 准备 marker 已移出、返回前 crash | 新 v1 receipt 与历史 `handoff_ready` 记录交叉核验，幂等认定交接；不能重新开新 operation |
 | 已交接后的 candidate/switch/rollback 失败 | 使用原 v1 状态机；准备记录只提供历史身份关系，不修改原 v1 source 字段 |
 
-明确中止分两种：维护意图前可在证明源业务数据未修改后封存准备记录、保持旧活动槽并结清新 outer；维护意图后必须先证明 prepared source 仍等价、standalone、旧版本兼容，再创建/结清新 v1 `aborted_preserved` 并结清 outer，不能直接回写旧 receipt。准备完成前程序未切换，outer 复用 `InstallReceipt::abort_preserved` 的合法终态，不伪造 `programs_restored`；guard-bound 的数据后置验证和 UI 入口仍须新增并测试。
+原批准方案中的明确中止分两种：维护意图前可在证明源业务数据未修改后封存准备记录、保持旧活动槽并结清新 outer；维护意图后必须先证明 prepared source 仍等价、standalone、旧版本兼容，再创建/结清新 v1 `aborted_preserved` 并结清 outer，不能直接回写旧 receipt。准备完成前程序未切换，outer 拟复用 `InstallReceipt::abort_preserved` 的合法终态，不伪造 `programs_restored`。下述兼容复核表明这条主动取消路径不能按原描述直接实施；guard-bound 的数据后置验证和 UI 入口仍未交付。
 
-实施复核发现，现有 v1 的 `aborted_preserved` 必须携带既有 `UpgradeFailureCode`，其中没有主动取消原因；不能把用户取消伪装成 snapshot/switch 失败，也不能在保持旧 reader 兼容的承诺下直接新增未知枚举值。因此先完成三类真实数据终态共用的封存基础；主动取消的表示方式和旧 reader 资格须在中止接线前明确，当前不宣称中止入口已交付。
+实施复核发现，现有 v1 的 `aborted_preserved` 必须携带既有 `UpgradeFailureCode`，其中没有主动取消原因；2026-09-25 进一步确认外层 `InstallFailureCode` 也有相同缺口，双层回归测试均拒绝未知取消码及 null 失败码。不能把用户取消伪装成 snapshot/switch/安装失败，也不能在保持旧 reader 兼容的承诺下直接新增未知枚举值。三类真实数据终态共用的封存基础已实现，但不能用于无新 data receipt 的取消。
+
+[准备中止兼容补充设计](macos-preparation-cancellation-compatibility.md)已形成待确认方案：独立取消证明、完整封存新 outer、受控恢复原 outer 兼容回执及独立生命周期前驱。它改变本节原定结清方式，尚未获准实施，不修改本设计其他已批准部分，也不允许直接人工回写旧 receipt。B 段未退出，旧程序资格与真实产品接线仍开放。
 
 维护后无法证明内容等价、关闭完成或源安全时，不提供“已中止且可启动”终态。保留原 family、保护快照和记录；从快照替换真实原库属于另行设计的恢复动作，不包含在本方案的自动 fallback 内。此停止结果须向用户明确呈现，不能伪装为普通 retry 可以解决。
 
