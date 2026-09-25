@@ -35,6 +35,9 @@ const POINTS: [Point; 14] = [
     Point::SourceRecorded,
 ];
 
+#[path = "source_preparation/cancellation.rs"]
+mod cancellation;
+
 struct Fixture(PathBuf);
 impl Fixture {
     fn new() -> Self {
@@ -58,6 +61,12 @@ impl Fixture {
         populate(&self.source());
     }
     fn reserve(&self) -> (PreparationJournalStore, UpgradeProcessGuard, Port) {
+        self.reserve_with_previous(false)
+    }
+    fn reserve_with_previous(
+        &self,
+        previous_outer: bool,
+    ) -> (PreparationJournalStore, UpgradeProcessGuard, Port) {
         let v1 = UpgradeReceiptStore::open(self.verified()).unwrap();
         let guard = v1.acquire_guard().unwrap();
         let store = PreparationJournalStore::attach(v1, &guard).unwrap();
@@ -66,13 +75,14 @@ impl Fixture {
             .unwrap();
         let binding = PreparationBinding {
             operation_id: "11111111111111111111111111111111".to_owned(),
-            previous_install_operation_id: None,
+            previous_install_operation_id: previous_outer
+                .then(|| "22222222222222222222222222222222".to_owned()),
             previous_data_operation_id: None,
             source_release: ProductRelease::new("26.7.1", 39).unwrap(),
             target_release: ProductRelease::new("26.7.1", 41).unwrap(),
             source_product_sha256: "a".repeat(64),
             target_product_sha256: "b".repeat(64),
-            previous_install_receipt_sha256: None,
+            previous_install_receipt_sha256: previous_outer.then(|| "c".repeat(64)),
             previous_data_receipt_sha256: None,
             previous_inventory_sha256: None,
             target_schema_version: 9,

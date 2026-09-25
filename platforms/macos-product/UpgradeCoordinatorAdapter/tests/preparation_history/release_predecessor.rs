@@ -4,6 +4,43 @@ use radishlex_ime_product_upgrade::PreparationPhase;
 
 const NEXT: &str = "44444444444444444444444444444444";
 
+#[test]
+fn cancellation_binds_released_history_without_moving_or_rewriting_it() {
+    use radishlex_ime_product_upgrade::{
+        PreparationCancellationCheckpoint, PreparationCancellationPort,
+        PreparationCancellationRequest, PreparationCancellationStore,
+    };
+    struct Admit(PreparationBinding);
+    impl PreparationCancellationPort for Admit {
+        fn confirm_authority_and_quiescence(
+            &mut self,
+            request: &PreparationCancellationRequest,
+            _: PreparationCancellationCheckpoint,
+        ) -> bool {
+            assert_eq!(request.preparation().binding(), &self.0);
+            true
+        }
+    }
+    for state in [State::Completed, State::AbortedPreserved, State::RolledBack] {
+        let fixture = Fixture::new();
+        let prior = released(&fixture, state);
+        let old_root = fixture.0.join(HISTORY);
+        let before = failures::tree(&old_root);
+        let (store, guard, binding) = reserve(&fixture, &prior, NEXT);
+        let cancel = PreparationCancellationStore::attach(store, &guard).unwrap();
+        let request = cancel
+            .request_cancellation(&guard, NEXT, &mut Admit(binding), &Hasher)
+            .unwrap();
+        assert_eq!(cancel.load_guarded(&guard, &Hasher).unwrap(), Some(request));
+        assert_eq!(failures::tree(&old_root), before);
+        let index = old_root.join("latest-release.json");
+        let bytes = fs::read(&index).unwrap();
+        fs::rename(&index, fixture.0.join("retained-index")).unwrap();
+        put(&index, &bytes);
+        assert!(cancel.load_guarded(&guard, &Hasher).is_err());
+    }
+}
+
 fn released(fixture: &Fixture, state: State) -> Binding {
     let (store, guard, binding, mut port) = terminal(fixture, true, state);
     store

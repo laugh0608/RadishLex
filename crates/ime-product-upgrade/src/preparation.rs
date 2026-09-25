@@ -62,7 +62,7 @@ pub struct PreparationFileIdentity {
     pub sha256: String,
 }
 impl PreparationFileIdentity {
-    fn validate(&self) -> Result<(), Error> {
+    pub(crate) fn validate(&self) -> Result<(), Error> {
         if self.inode == 0 || self.mode != 0o600 || self.link_count != 1 || !hex(&self.sha256, 64) {
             return Err(Error::InvalidIdentity);
         }
@@ -86,7 +86,7 @@ pub struct PreparationFamily {
     pub journal: Option<PreparationFileIdentity>,
 }
 impl PreparationFamily {
-    fn validate(&self, root: &PreparationDirectoryIdentity) -> Result<(), Error> {
+    pub(crate) fn validate(&self, root: &PreparationDirectoryIdentity) -> Result<(), Error> {
         let mut identities = std::collections::BTreeSet::new();
         for file in [
             Some(&self.database),

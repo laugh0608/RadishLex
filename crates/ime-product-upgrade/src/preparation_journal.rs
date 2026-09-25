@@ -262,6 +262,12 @@ impl PreparationJournalStore {
     }
 
     fn validate_entries(&self) -> Result<()> {
+        self.validate_entries_with_extra(&[])
+    }
+
+    // Only specialized lifecycle stores may recognize their own fixed slots.
+    // Ordinary preparation and v1 entry points keep the original whitelist.
+    fn validate_entries_with_extra(&self, extra: &[&str]) -> Result<()> {
         for entry in fs::read_dir(&self.store.state_directory).map_err(|_| Error::Io)? {
             let entry = entry.map_err(|_| Error::Io)?;
             let name = entry.file_name();
@@ -281,6 +287,7 @@ impl PreparationJournalStore {
                 STAGED_PREPARATION_SNAPSHOT,
             ]
             .iter()
+            .chain(extra.iter())
             .any(|allowed| name == *allowed)
             {
                 return Err(Error::UnexpectedObject);
@@ -423,8 +430,10 @@ mod tests;
 #[path = "source_preparation.rs"]
 mod source_preparation;
 pub use source_preparation::{
-    PreparationHasher, PreviousInventory, SourcePreparationCheckpoint, SourcePreparationError,
-    SourcePreparationPort, SourcePreparationSpaceBudget, TerminalReleaseBinding,
-    TerminalReleaseCheckpoint, TerminalReleaseDirectory, TerminalReleaseOuterRequirement,
-    TerminalReleasePhase, TerminalReleasePort, TerminalReleaseReceipt, TerminalReleaseStore,
+    PreparationCancellationCheckpoint, PreparationCancellationPort, PreparationCancellationRequest,
+    PreparationCancellationStore, PreparationHasher, PreviousInventory,
+    SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,
+    SourcePreparationSpaceBudget, TerminalReleaseBinding, TerminalReleaseCheckpoint,
+    TerminalReleaseDirectory, TerminalReleaseOuterRequirement, TerminalReleasePhase,
+    TerminalReleasePort, TerminalReleaseReceipt, TerminalReleaseStore,
 };

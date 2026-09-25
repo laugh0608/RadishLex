@@ -283,6 +283,16 @@ impl PreparationJournalStore {
         record: Option<&PreparationReceipt>,
     ) -> Result<()> {
         self.validate_entries()?;
+        self.verify_inventory_objects(inventory, hasher, record)
+    }
+
+    // Caller must validate its own complete active-slot whitelist first.
+    pub(super) fn verify_inventory_objects(
+        &self,
+        inventory: &PreviousInventory,
+        hasher: &impl PreparationHasher,
+        record: Option<&PreparationReceipt>,
+    ) -> Result<()> {
         if inventory.released.is_some() {
             if record.is_some_and(|record| !record.archived_slots().is_empty()) {
                 return Err(Error::EvidenceChanged);

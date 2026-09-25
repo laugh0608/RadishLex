@@ -21,6 +21,8 @@ static SEQUENCE: AtomicU64 = AtomicU64::new(0);
 const NEW: &str = "11111111111111111111111111111111";
 const OLD: &str = "22222222222222222222222222222222";
 const OUTER: &str = "33333333333333333333333333333333";
+#[path = "preparation_history/cancellation.rs"]
+mod cancellation;
 #[path = "preparation_history/handoff.rs"]
 mod handoff;
 #[path = "preparation_history/release.rs"]
