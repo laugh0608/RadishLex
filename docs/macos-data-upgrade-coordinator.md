@@ -82,7 +82,7 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 只有精确的两槽互斥位置和有序移动前缀可以重放；最多一个移动可领先其持久位置证明，重放必须补做同步。冲突、缺失、inode/owner/mode/link/hash 漂移、未知对象和无证明临时记录保留并阻断。初始化产生的已有私有 operation 不认领；仅空共享父目录可重新核验并同步。首次无 data receipt 且无历史目录可用显式空清单；已释放历史前驱的索引路径留待终态封存接线，当前拒绝扫描猜测。
 
-原 v1 data receipt 编码与普通 reader 不变；新增准备字段只在使用时编码，旧严格准备 reader 拒绝它们。归档核心推进至 `previous_archived` 时，marker 和准备快照仍留在活动目录，之后必须经过独立 handoff。前一 outer canonical 字节的产品级保存、真实双 guard、明确中止和终态封存仍须完成，不能据此允许产品启动或对真实目录执行升级。
+原 v1 data receipt 编码与普通 reader 不变；新增准备字段只在使用时编码，旧严格准备 reader 拒绝它们。归档核心推进至 `previous_archived` 时，marker 和准备快照仍留在活动目录，之后必须经过独立 handoff。前一 outer canonical 字节的产品级保存、真实双 guard、明确中止和终态封存的产品接线仍须完成，不能据此允许产品启动或对真实目录执行升级。
 
 #### 新 v1 handoff 与准备证明封存
 
@@ -91,6 +91,16 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 新 v1 活动回执完成目标/源目录同步及精确回读后，记录 `handoff_ready`，再保留式移动保护快照，最后移动 marker 为历史 `preparation.json`。每个检查点复验当前授权、guard、旧 inventory/私有槽、DB/保护快照等价与身份、settings/Rime 和唯一槽位关系；同字节但不同 inode 的已绑定材料同样拒绝。新回执已写或 marker 已封存的中断可在 fresh guard 下精确重放，不重复维护、不另开 ID、不改写最终证明；未绑定的目录/文件、未知版本/临时对象和冲突保持阻断。
 
 成功返回同一 guard 可用的普通 v1 store，其后可生成独立 migration snapshot。marker 存在时旧 reader 拒绝；marker 移出后普通 reader 可读新回执，非终态 startup gate 仍拒绝。当前仅验证合成产品 port、真实私有文件/SHA-256/SQLite 与子进程重载，尚非真实双产品升级资格。
+
+#### 终态封存、外层确认与释放索引
+
+`TerminalReleaseStore` 已实现刚完成的三类合法 v1 数据终态的保留封存，当前 outer/data ID 必须相同，manual recovery、非终态、错误安装 release/product、sidecar 或身份漂移均拒绝。初始化还核验既有 handoff canonical 证明、两层历史目录及保护快照，或走无准备证明的独立 v1 终态路径；不认领未知 operation/data 目录。完整 inventory 内嵌于严格 canonical、最大 256 KiB 的 `radishlex-terminal-release-v1` 记录，外层批准和真实产品验证仍由 port 负责。
+
+`prepare_terminal_release` 在 outer 非终态下持久化意图，逐个把 receipt/snapshot/candidate/backup/settings 私有槽移入历史 `data/`，保留 inode/字节/权限，逐项同步并追加进度。准备证据、运行 DB/settings/Rime 保持；原状态目录和 guard 不换对象。归档完整后记录 `release_ready`，以最终证明摘要原子发布 `latest-release.json`，旧索引的值和身份留在意图内；任何无法证明的临时对象或冲突保留阻断。
+
+只有 `finish_terminal_release` 的每个检查点都证明外层已针对同一完整 release 证明和实际安装版本落到匹配终态，才最后移走 marker 并回读空活动 v1 槽。普通 reader 的白名单保持，因此 marker 期间继续拒绝；合成资格覆盖 marker 移出后 `AllowedNoUpgradeState` 和正常 WAL 学习/删除，不等于真实产品启动资格。无 proof 的索引、错误外层终态或不同证明均不得解除阻断。
+
+`load_latest_release` 为后续生命周期提供只读定位和历史材料核验，不授予 startup 或 mutation 权限；已释放后的运行数据允许正常变化。当前新准备入口还未消费该已释放前驱，明确中止的无 data receipt 分支、主动取消原因与旧 reader 兼容处理，以及 outer/Executor/真实程序资格仍开放。不得用该入口搬移被冻结的 source 39 事务。
 
 #### 维护中断的受限 journal 恢复
 

@@ -82,7 +82,7 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 未使用恢复字段的准备记录继续保持原 canonical 字节；字段仅在持久维护意图阶段追加一次并永久保留，既有严格准备 reader 拒绝含新字段的记录。新 v1 数据 receipt 和 startup 白名单不变。当前证据包括实际 SQLite spill/进程退出、合成 WAL 文件头恢复及组合核心重载；不覆盖 pager 内部任意断电、多库恢复或完整产品升级。
 
-`SourcePreparationPort` 的产品实现必须持有并复验 outer guard、相同 `prepared` operation、受控 source/target 产品、前驱 receipt/inventory 和 fresh 静止观察；合成 port 不证明产品授权。这部分 Executor 接线、明确中止、终态封存和完整产品资格按[已批准方案](../../docs/remediation/macos-wal-source-preparation-design.md)继续；不能在旧 v1 receipt 已绑定后单独调用维护 API。
+`SourcePreparationPort` 的产品实现必须持有并复验 outer guard、相同 `prepared` operation、受控 source/target 产品、前驱 receipt/inventory 和 fresh 静止观察；合成 port 不证明产品授权。这部分 Executor 接线、明确中止、终态封存的产品接线和完整产品资格按[已批准方案](../../docs/remediation/macos-wal-source-preparation-design.md)继续；不能在旧 v1 receipt 已绑定后单独调用维护 API。
 
 ### 历史清单与旧私有槽接续
 
@@ -105,6 +105,18 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 中断重载只接续持久意图绑定的唯一对象；新回执已活动或 marker 已封存时均交叉核验旧 inventory、准备后 DB、保护快照、当前 settings/Rime、目录和回执。未封存身份的新 operation 目录/文件、两槽冲突、未知记录/版本/临时对象、缺失及身份漂移保持原样并阻断。只有已存在且匹配前驱 inventory 的共享历史根可在新 operation 创建前重新核验；首次路径留下但未绑定的历史根不能认领。marker 移出后的同 operation 重放补做同步并回读，不改写历史证明，也不重复维护 SQLite。
 
 `handoff_intent` 是可选新字段，无字段编码保持；旧严格准备 reader 拒绝含该字段的记录。交接后的 v1 仍非终态，startup gate 继续拒绝启动；原 v1 链创建自己的 migration snapshot，保留独立保护快照。真实 outer/Executor 尚未接线，本能力仅取得仓库合成资格。
+
+### 终态保留封存与释放索引
+
+`TerminalReleaseStore` 复用原状态目录和 guard，独立识别固定 `terminal-release.json`，不放宽普通 v1 reader。当前只接收同一 outer/data operation 的合法 `completed`、`aborted_preserved`、`rolled_back`，且 manual recovery 为 false；原终态加载、零 sidecar、当前 DB/settings/Rime 与回执身份均须成立。不能借此清理已经恢复正常 WAL 的旧事务或冻结现场。
+
+`prepare_terminal_release` 要求 outer 仍非终态。它封存当前实际回执、私有 artifact 与运行数据身份、目录身份、可选 handoff 证明/保护快照、安装 release/product 摘要和前驱索引，持久化 `radishlex-terminal-release-v1` 意图后逐槽同步文件并原 inode 移入本 operation 历史 `data/`。每项按目标/源目录顺序 fsync 后记录不可回退的移动进度；最多一个精确移动可领先记录。源 DB/settings/Rime 不移动，历史准备证明不改写。
+
+完整归档后记录 `release_ready`，原子发布 `radishlex-latest-release-v1` 索引，绑定 outer/data operation、安装 release、数据根及最终证明 SHA-256。索引旧值和实物身份在 release 意图内保留，重放只接受已绑定旧值或精确新值；已有目标漂移、临时文件、未知对象和身份冲突保留阻断。已有未知私有 operation/data 目录不认领；尚未创建 operation 的安全共享历史根可重新核验。
+
+准备完成仍保留活动 marker，不表示外层已终结或允许启动。`finish_terminal_release` 必须通过 `TerminalReleasePort` fresh 证明匹配同一完整 release 证明的外层终态、安装产品和静止状态，才把 marker 最后原 inode 移为历史 `terminal-release.json`，同步两目录并回读。port 接收完整证明；初始化回调仅为尚未封存的观察草稿，只有 `release_ready` 可绑定外层最终结果。合成 port 的状态和字节比较不能替代真实 outer guard/落盘验证。
+
+`load_latest_release` 只读定位并交叉核验已封存证明、目录、私有材料及准备证据；索引单独存在、marker 仍活动或证明不匹配均不能认定已释放。此查询不是 startup 授权，也不以历史运行 DB hash 拒绝后续正常学习、删除和 WAL。已释放前驱向下一次源库准备的接线、无新 data receipt 的准备中止及真实外层接线仍待完成；本批不新增 v1 失败码或伪造主动取消的错误原因。
 
 ### 启动门禁
 

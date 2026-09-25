@@ -182,6 +182,8 @@ handoff 的新目录和回执先独占创建、同步并回读，在 `previous_a
 
 明确中止分两种：维护意图前可在证明源业务数据未修改后封存准备记录、保持旧活动槽并结清新 outer；维护意图后必须先证明 prepared source 仍等价、standalone、旧版本兼容，再创建/结清新 v1 `aborted_preserved` 并结清 outer，不能直接回写旧 receipt。准备完成前程序未切换，outer 复用 `InstallReceipt::abort_preserved` 的合法终态，不伪造 `programs_restored`；guard-bound 的数据后置验证和 UI 入口仍须新增并测试。
 
+实施复核发现，现有 v1 的 `aborted_preserved` 必须携带既有 `UpgradeFailureCode`，其中没有主动取消原因；不能把用户取消伪装成 snapshot/switch 失败，也不能在保持旧 reader 兼容的承诺下直接新增未知枚举值。因此先完成三类真实数据终态共用的封存基础；主动取消的表示方式和旧 reader 资格须在中止接线前明确，当前不宣称中止入口已交付。
+
 维护后无法证明内容等价、关闭完成或源安全时，不提供“已中止且可启动”终态。保留原 family、保护快照和记录；从快照替换真实原库属于另行设计的恢复动作，不包含在本方案的自动 fallback 内。此停止结果须向用户明确呈现，不能伪装为普通 retry 可以解决。
 
 交接步骤先写新 v1 receipt，再封存完整准备记录及快照，最后移走阻断 marker；最后一步前后都必须验证不存在“outer 允许 + data 无记录 + 准备未完成”的可启动窗口。出现任何 fsync 错误都不报告成功。
@@ -210,11 +212,15 @@ handoff 的新目录和回执先独占创建、同步并回读，在 `previous_a
 
 2026-09-25：A 段已实现。B 段已实现准备记录持久化、至 `source_prepared` 的 SQLite 编排、受限单库 journal 恢复，以及旧终态 inventory 的实物封存和至 `previous_archived` 的逐槽保留接续。准备记录新增可选 `previous_inventory_identity` 和只追加的 `archived_slots`；未使用新字段的原编码保持，旧严格准备 reader 拒绝新字段，原 v1 data receipt 不变。准备及归档 checkpoint 均核验历史实物；旧 data receipt 和实际私有材料按终态位置解释，不用运行库的历史长度否定正常学习。
 
-旧槽归档只接续仍位于活动 v1 槽的旧终态；已释放历史前驱的索引加载、前一 outer canonical 保存和真实双 guard 留待后续编排接线，缺少活动 receipt 但存在历史目录时拒绝猜测首次路径。初始化的未知私有 operation 或临时记录保留阻断；归档中只允许有序前缀和一个尚未记录进度的精确移动，补同步后再追加证明。达到 `previous_archived` 时 marker 和准备快照不移出，普通 reader 继续拒绝。
+旧槽归档只接续仍位于活动 v1 槽的旧终态；新准备消费已释放历史前驱、前一 outer canonical 保存和真实双 guard 留待后续编排接线，缺少活动 receipt 但存在历史目录时拒绝猜测首次路径。初始化的未知私有 operation 或临时记录保留阻断；归档中只允许有序前缀和一个尚未记录进度的精确移动，补同步后再追加证明。达到 `previous_archived` 时 marker 和准备快照不移出，普通 reader 继续拒绝。
 
 2026-09-25 后续批次实现新 v1 handoff：新增可选只追加的 `handoff_intent`，封存新回执与目录身份后精确移动，复验后记录 `handoff_ready`，保留保护快照并最后移出 marker。支持新回执已活动、marker 尚在以及 marker 已移出后的 fresh guard 重载；原 v1 编码/`can_replace`/普通 reader 不变，交接后仍由非终态回执阻止启动。首次和三种旧终态、文件/目录同步边界、授权失效、子进程退出、身份漂移和冲突以隔离合成目录验证，不能解释为实机或旧程序资格。
 
-明确中止、终态封存及 C–D 产品接线/独立程序副本资格仍待完成；WAL→DELETE/pager 内部真实断电资格仍开放，B 段尚未退出。09-15 各批结果保留在[前周周志](../devlogs/2026-W38.md)，09-25 各批验证和环境限制见[本周周志](../devlogs/2026-W39.md)。
+2026-09-25 后续批次实现同一 outer/data ID 的三种合法数据终态的保留封存。`prepare_terminal_release` 在外层非终态时固定实物 inventory，逐槽移入历史 `data/` 并记录 `release_ready`，再发布绑定最终证明的 `radishlex-latest-release-v1` 索引；前驱索引值/身份保留，不以索引单独判定释放。完整 inventory 内嵌于 release 证明，无需再写一份重复清单。若已有 handoff 证明则保留并复验其目录和保护快照身份。
+
+`finish_terminal_release` 在 fresh 外层终态、安装产品及同一完整证明确认后才最后移走 marker；原 v1/store/startup 白名单不变。`load_latest_release` 只读交叉核验已经封存的证明和材料，允许后续正常 WAL/学习/删除改变运行数据。资格仅为真实 SQLite/私有文件和合成产品 port，覆盖文件/目录/记录/索引边界的中断；没有执行真实 outer finalization 或旧程序副本。
+
+明确中止、新准备入口消费已释放前驱，以及 C–D 产品接线/独立程序副本资格仍待完成；WAL→DELETE/pager 内部真实断电资格仍开放，B 段尚未退出。09-15 各批结果保留在[前周周志](../devlogs/2026-W38.md)，09-25 各批验证和环境限制见[本周周志](../devlogs/2026-W39.md)。
 
 按以下顺序串行实施，每段完成匹配检查后再进入下一段；支持 schema、历史接续和旧 reader 兼容属于必要工作，不能只交付一个 checkpoint helper。
 
