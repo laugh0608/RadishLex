@@ -110,6 +110,12 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 已释放的旧槽从不再归档，`archived_slots` 必须为空；核心核验后推进 `previous_archived`，后续按既有 handoff 意图接入新 v1。重复调用须按当前阶段路由：`previous_archived` 直接继续 handoff，不能重新归档已有新回执。连续多次准备/释放及检查点重载已纳入合成资格，仍不代表真实 outer finalization、旧 source 程序副本或实机升级通过。
 
+#### 准备取消请求与普通入口阻断
+
+已批准的[取消兼容补充设计](remediation/macos-preparation-cancellation-compatibility.md)先以 `PreparationCancellationStore` 持久化独立 `requested` / `user_requested`，不改变双层 v1 失败码。请求绑定原完整准备记录及文件身份、当前源 family，核对保护快照和活动/部分归档/已释放的旧私有材料。产品 port 须每次持有 outer guard、复验前一 outer 原字节及匹配源程序/静止；合成 port 仅用于仓库资格。
+
+取消 marker 与 `.tmp` 都不进入普通准备或 v1 白名单，已有普通 store 句柄也不能继续准备、归档或 handoff。专用重载只接受同一不可改认请求，同字节重试补同步；未知临时文件或漂移原样保留并阻断。入口不执行 SQLite，不移动材料、不修改 outer 或索引，维护意图中的物理观察也不等于内容等价。维护收尾、outer 兼容封存/恢复、v2 索引、最终 marker 释放和产品 UI 仍未接入，不能显示“取消完成”。
+
 #### 维护中断的受限 journal 恢复
 
 只在已持久化 `maintenance_intent` 下恢复。核心重新证明 guard、授权、静止、容量、原主 inode 和保护快照 SHA-256，再对固定 `userdb.sqlite3-journal` 检查私有单链接身份、无 WAL/SHM、有效非零首段头、页/扇区边界及与快照相符的原始页数；末尾带 super-journal magic 一律拒绝，避免 SQLite 跟随多库日志路径。资格检查不执行自行编写的页重放；SQLite 继续负责锁、busy、校验和、回滚及删除日志。[SQLite 日志格式](https://www.sqlite.org/fileformat2.html#the_rollback_journal)、[SQLite hot journal 恢复](https://www.sqlite.org/lockingv3.html)

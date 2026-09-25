@@ -126,6 +126,14 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 新 family 和保护快照从当前运行数据重新取得，允许上次释放后的合法 WAL 学习/删除。准备和 handoff 各检查点复验已固定的索引、证明及历史材料；已释放槽不再移动，`archived_slots` 保持空，`previous_archived` 只记录既有封存证明通过。新 v1 handoff、后续终态释放和下一次准备继续使用同一套历史校验；多个保留的旧 operation 不被认领或改写。真实 outer/Executor 和明确中止仍待完成，合成产品 port 不构成产品授权。
 
+### 准备取消意图
+
+`PreparationCancellationStore` 消费普通准备 store、复用原目录和 guard，在 handoff 意图出现前持久化独立的 `PreparationCancellationRequest`。记录为严格 canonical、最大 256 KiB 的 `radishlex-preparation-cancellation-v1`，当前只接受 `requested` / `user_requested`；绑定原准备记录及文件 inode/metadata/hash、fresh 源 family，并复验保护快照、旧 inventory/已释放前驱及其私有材料。必须已有前一 outer 绑定；journal、未知或不安全对象、handoff 意图和临时写入残留均拒绝。
+
+`request_cancellation` 的成功只表示取消请求已持久化。文件独占创建、同步、受控 rename、目录同步与回读全部完成后才返回；同请求重试重新同步且不替换 inode，临时文件不自动认领。`PreparationCancellationPort` 每个检查点负责真实 outer guard、前一 outer 原字节、未切换的 source 程序和 fresh 静止证明；核心在回调前后复验实物。当前测试的 port 为合成，不能据此宣称产品授权或完整取消已完成。
+
+普通准备/归档/handoff、v1 reader 与 startup gate 不认识取消槽，继续失败关闭；专用 `load_guarded` 只读核验请求，不解除阻断。该入口不调用 SQLite，不移动旧材料或修改 outer/索引。维护后的内容等价、外层原件封存与兼容恢复、v2 索引和最终 marker 释放仍须接入专用取消协调器；不能删 marker 后借普通入口继续。详见[已批准的补充设计](../../docs/remediation/macos-preparation-cancellation-compatibility.md)。
+
 ### 启动门禁
 
 `inspect_startup_gate(data_root, expected_owner_id)` 不创建、删除、chmod、连接 socket 或清理任何对象：
