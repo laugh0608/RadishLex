@@ -12,6 +12,8 @@ RadishLex/
   CLAUDE.md
   Cargo.toml
   Cargo.lock
+  .cargo/
+    config.toml
   .github/
     workflows/
   crates/

@@ -94,7 +94,7 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 #### 终态封存、外层确认与释放索引
 
-`TerminalReleaseStore` 已实现刚完成的三类合法 v1 数据终态的保留封存，当前 outer/data ID 必须相同，manual recovery、非终态、错误安装 release/product、sidecar 或身份漂移均拒绝。初始化还核验既有 handoff canonical 证明、两层历史目录及保护快照，或走无准备证明的独立 v1 终态路径；不认领未知 operation/data 目录。完整 inventory 内嵌于严格 canonical、最大 256 KiB 的 `radishlex-terminal-release-v1` 记录，外层批准和真实产品验证仍由 port 负责。
+`TerminalReleaseStore` 已实现刚完成的三类合法 v1 数据终态的保留封存，当前 outer/data ID 必须相同，manual recovery、非终态、错误安装 release/product、sidecar 或身份漂移均拒绝。初始化还核验既有 handoff canonical 证明、两层历史目录及保护快照，或走无准备证明的独立 v1 终态路径；不认领未知 operation/data 目录。完整 inventory 内嵌于严格 canonical、最大 256 KiB 的终态释放记录；新意图使用 `radishlex-terminal-release-v2`，已有 v1 意图/历史保持原格式，外层批准和真实产品验证仍由 port 负责。
 
 `prepare_terminal_release` 在 outer 非终态下持久化意图，逐个把 receipt/snapshot/candidate/backup/settings 私有槽移入历史 `data/`，保留 inode/字节/权限，逐项同步并追加进度。准备证据、运行 DB/settings/Rime 保持；原状态目录和 guard 不换对象。归档完整后记录 `release_ready`，以最终证明摘要原子发布 `latest-release.json`，旧索引的值和身份留在意图内；任何无法证明的临时对象或冲突保留阻断。
 
@@ -102,7 +102,9 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 `load_latest_release` 为后续生命周期提供只读定位和历史材料核验，不授予 startup 或 mutation 权限；已释放后的运行数据允许正常变化。明确中止的无 data receipt 分支、主动取消原因与旧 reader 兼容处理，以及 outer/Executor/真实程序资格仍开放。不得用该入口搬移被冻结的 source 39 事务。
 
-历史核验沿证明内绑定的 `previous_index` 迭代至链首，每代检查严格 v1 格式、证明/目录/私有材料/准备证据及实际 data 前驱、source release 连续性；重复 operation、缺失或漂移失败关闭。保存的旧索引须与其 canonical 字节长度和摘要一致，已绑定的准备证据还须匹配原索引及前代证明身份。旧索引被原子替换后不要求其 inode 仍位于当前索引槽，不制造历史索引副本。查询完成前复验当前索引身份；准备接续及终态释放的初始化、记录写入、索引发布和 marker 协调回调前后都复验祖先链。此核验不重写 v1 历史，也不检查已经恢复正常使用的旧运行库 hash。
+历史核验沿证明内绑定的 `previous_index` 迭代至链首，每代检查对应版本的严格格式、证明/目录/私有材料/准备证据及实际 data 前驱、source release 连续性；重复 operation、缺失或漂移失败关闭。保存的旧索引须与其 canonical 字节长度和摘要一致，已绑定的准备证据还须匹配原索引及前代证明身份。旧索引被原子替换后不要求其 inode 仍位于当前索引槽，不制造历史索引副本。查询完成前复验当前索引身份；准备接续及终态释放的初始化、记录写入、索引发布和 marker 协调回调前后都复验祖先链。此核验不重写 v1 历史，也不检查已经恢复正常使用的旧运行库 hash。
+
+v2 索引使用 `radishlex-latest-release-v2`，显式包含 `operation_id`、`legacy_outer_operation_id`、可空类型的 `data_operation_id` 和带 `kind` / `sha256` 的 `proof`，同时保留 installed release 与 data root。当前只接收真实终态的 `terminal_release`，三个 ID 必须相同，data 不能为空；取消 kind 在完整证明与解析器接入前严格拒绝。v2 可绑定原 v1 或 v2 前驱，v1 证明不能绑定 v2 前驱；索引和最终证明必须同版本、同类型、同摘要。首次 v2 的空索引须以当前 operation 及明确绑定的旧未释放 inventory 证明，已有不相关历史或丢失索引拒绝；旧 inventory 的原件及实物继续核验。v1→v2→v2 新准备/真实终态释放保持三类 v1 数据终态合同和原持久化顺序。
 
 #### 已释放前驱的连续准备
 

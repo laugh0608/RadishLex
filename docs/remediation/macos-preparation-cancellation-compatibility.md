@@ -20,7 +20,7 @@
 
 请求入口仍拒绝尚有 journal 的 family；只有取消收尾意图已持久化后，专用恢复才可检查同一源 inode、无 WAL/SHM 的单 journal，沿用现有资格验证、持久化恢复身份、恢复后再次准备/等价验证。未知或变化 journal、busy、身份/内容漂移、容量/授权失效均保留阻断。中断临时进度不自动认领或删除；已 rename 的精确记录可以补同步重载。`load_source_guarded` 只核验物理证据，不能代替 `finish_source` 的 fresh 授权和逻辑复验。
 
-已存在 handoff 意图、无合法 outer 前驱绑定、未知/不安全对象、未绑定临时文件及身份漂移均阻断。原准备与 v1 序列化、正常状态转换和白名单不变；旧 reader 对新增取消槽失败关闭。源库 `source_ready` 不表示 `cancel_ready`，本轮已继续实现下述材料封存与 outer 兼容恢复；v2 索引及 marker 最后释放仍未实现，真实产品/旧程序副本资格与 UI 入口仍开放，不宣称 B 段退出。
+已存在 handoff 意图、无合法 outer 前驱绑定、未知/不安全对象、未绑定临时文件及身份漂移均阻断。原准备与 v1 序列化、正常状态转换和白名单不变；旧 reader 对新增取消槽失败关闭。源库 `source_ready` 不表示 `cancel_ready`，本轮已继续实现下述材料封存与 outer 兼容恢复；取消类型的 v2 证明/索引及 marker 最后释放仍未实现，真实产品/旧程序副本资格与 UI 入口仍开放，不宣称 B 段退出。
 
 ### 2026-09-29：取消材料封存与 outer 兼容恢复
 
@@ -35,6 +35,14 @@
 组合层 `CancellationArchiveAuthority` 持有真实 outer guard，将取消证明的 root、两代 release/manifest 与 `ime-product-install` 的严格旧/新回执合同交叉核验，并逐检查点调用 fresh 产品授权接口。隔离测试使用真实双 guard、回执、文件和 SQLite，但产品观察仍为合成；真实双程序观察、Executor、UI 和独立旧程序副本资格仍待接入。源库等价在接续入口重新验证，之后每个回调前后固定物理摘要，任何内容变化均阻断。
 
 本批始终保留活动 `preparation-cancellation.json` 和 `cancellation-archive.json`，不发布或修改 `latest-release.json`，不解除数据 startup gate。后续 v2 协调器须消费完整封存证明与兼容回执，再按批准顺序封存剩余活动记录、发布唯一生命周期索引及最后释放 marker。验证结果见[本周记录](../devlogs/2026-W40.md)。
+
+## 2026-09-29 实施：真实终态 v2 接续
+
+唯一定位索引现已支持严格 v1 与真实终态 v2。新 `radishlex-terminal-release-v2` 证明发布 `radishlex-latest-release-v2`，显式记录 `operation_id`、`legacy_outer_operation_id`、`data_operation_id` 与 `proof.kind = terminal_release` / `proof.sha256`；真实终态要求三者同 ID 且 data 非空。旧 v1 证明按原格式重放并发布 v1，不改写既有材料；v2 可绑定 v1/v2 前驱，v1 不接受 v2 前驱。每代继续校验保存的前驱 canonical、文件身份及完整祖先材料。
+
+首次 v2 除精确绑定的旧索引外，只允许有证明的空值：历史根仅含当前 operation 和准备证明绑定的未释放旧 inventory，旧槽实物须逐一核验。已有其他历史但定位索引丢失时拒绝初始化，不能扫描选择或降级为首次。新准备复用同一 reader，真实 SQLite 合成资格覆盖 v1→v2→v2、三类旧终态、旧格式中断重放、历史原件保留及版本/类型/引用/空值漂移。
+
+本步未开放取消 proof kind 或空 data 引用；`CancellationArchiveStore` 仅扩展保留 v1/v2 真实终态前驱的回归覆盖，仍停在 `preserved`。取消不可变证明、连续取消、取消后新准备及最终 marker 释放继续按下文设计推进，不宣称取消已完成或 B 段退出。
 
 ## 已验证的兼容约束
 

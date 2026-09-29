@@ -110,9 +110,9 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 `TerminalReleaseStore` 复用原状态目录和 guard，独立识别固定 `terminal-release.json`，不放宽普通 v1 reader。当前只接收同一 outer/data operation 的合法 `completed`、`aborted_preserved`、`rolled_back`，且 manual recovery 为 false；原终态加载、零 sidecar、当前 DB/settings/Rime 与回执身份均须成立。不能借此清理已经恢复正常 WAL 的旧事务或冻结现场。
 
-`prepare_terminal_release` 要求 outer 仍非终态。它封存当前实际回执、私有 artifact 与运行数据身份、目录身份、可选 handoff 证明/保护快照、安装 release/product 摘要和前驱索引，持久化 `radishlex-terminal-release-v1` 意图后逐槽同步文件并原 inode 移入本 operation 历史 `data/`。每项按目标/源目录顺序 fsync 后记录不可回退的移动进度；最多一个精确移动可领先记录。源 DB/settings/Rime 不移动，历史准备证明不改写。
+`prepare_terminal_release` 要求 outer 仍非终态。它封存当前实际回执、私有 artifact 与运行数据身份、目录身份、可选 handoff 证明/保护快照、安装 release/product 摘要和前驱索引，新建 `radishlex-terminal-release-v2` 意图后逐槽同步文件并原 inode 移入本 operation 历史 `data/`。已有 v1 意图按原格式恢复，不能改写为 v2。每项按目标/源目录顺序 fsync 后记录不可回退的移动进度；最多一个精确移动可领先记录。源 DB/settings/Rime 不移动，历史准备证明不改写。
 
-完整归档后记录 `release_ready`，原子发布 `radishlex-latest-release-v1` 索引，绑定 outer/data operation、安装 release、数据根及最终证明 SHA-256。索引旧值和实物身份在 release 意图内保留，重放只接受已绑定旧值或精确新值；已有目标漂移、临时文件、未知对象和身份冲突保留阻断。已有未知私有 operation/data 目录不认领；尚未创建 operation 的安全共享历史根可重新核验。
+完整归档后记录 `release_ready`，原子发布与证明版本匹配的 `latest-release.json`。v2 显式记录 lifecycle operation、legacy outer operation、data operation、安装 release、数据根及带类型的证明摘要；当前只接受 `terminal_release`，三个 ID 必须相同且 data 非空。v1 字段与 canonical 顺序保留。索引旧值和实物身份在 release 意图内保留，重放只接受已绑定旧值或精确新值；已有目标漂移、临时文件、未知对象和身份冲突保留阻断。已有历史而丢失索引不得当作首次 v2；无索引只允许当前 operation 及准备证明明确绑定的旧未释放 inventory。
 
 准备完成仍保留活动 marker，不表示外层已终结或允许启动。`finish_terminal_release` 必须通过 `TerminalReleasePort` fresh 证明匹配同一完整 release 证明的外层终态、安装产品和静止状态，才把 marker 最后原 inode 移为历史 `terminal-release.json`，同步两目录并回读。port 接收完整证明；初始化回调仅为尚未封存的观察草稿，只有 `release_ready` 可绑定外层最终结果。合成 port 的状态和字节比较不能替代真实 outer guard/落盘验证。
 
@@ -217,4 +217,4 @@ cargo clippy -p radishlex-ime-product-upgrade --all-targets -- -D warnings
 
 数据核心处理受证明约束的字节和文件关系，不解析外层 v1 状态或接管程序 staging/backup；`ime-product-install` 校验旧终态与无 artifact 的新 `prepared` 合同，组合层持有 outer guard 并绑定 root/产品/授权。每次动作重新核验物理身份；源库等价在接续入口复验；未知或未绑定临时对象失败关闭。固定外层历史槽、文件顺序和产品前置条件见[取消兼容设计](../../docs/remediation/macos-preparation-cancellation-compatibility.md#2026-09-29取消材料封存与-outer-兼容恢复)。
 
-返回 `preserved` 仍保留活动请求与封存进度，旧 reader/startup gate 继续阻断；不发布生命周期索引、不解除 marker、不表示完整取消或旧程序资格。真实产品观察与 Executor 尚未接入；测试只证明仓库与隔离合成范围。
+返回 `preserved` 仍保留活动请求与封存进度，旧 reader/startup gate 继续阻断；不发布取消生命周期索引、不解除 marker、不表示完整取消或旧程序资格。真实终态的 v2 索引与接续已接入，取消 proof 类型及其接续仍拒绝。真实产品观察与 Executor 尚未接入；测试只证明仓库与隔离合成范围。
