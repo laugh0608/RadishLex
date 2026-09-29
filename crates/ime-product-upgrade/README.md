@@ -118,6 +118,8 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 `load_latest_release` 只读定位并交叉核验已封存证明、目录、私有材料及准备证据；索引单独存在、marker 仍活动或证明不匹配均不能认定已释放。此查询不是 startup 授权，也不以历史运行 DB hash 拒绝后续正常学习、删除和 WAL。无新 data receipt 的准备中止及真实外层接线仍待完成；本批不新增 v1 失败码或伪造主动取消的错误原因。
 
+共享 reader 沿绑定的 `previous_index` 逐级复验所有祖先，校验旧 canonical 索引的长度/摘要、data 前驱和 source release 连续性及准备证据中的索引/证明身份；重复 operation、缺失和漂移拒绝。查询前后固定当前索引；释放各写入/发布/marker 检查点前后也复验祖先，不能靠最新证明或产品回调豁免旧材料损坏。v1 格式与历史字节保持，具体合同见[数据协调边界](../../docs/macos-data-upgrade-coordinator.md#终态封存外层确认与释放索引)。
+
 ### 已释放前驱向新准备接续
 
 活动 v1 槽为空且明确提供前一 data operation 时，`capture_previous_inventory` 通过共享只读 release reader 定位 `latest-release.json`，核验最终证明、目录、旧回执/私有材料及准备证据；不写新 inventory，不扫描猜测前驱。`previous_inventory_identity` 此时返回 release 证明身份，`release_index_identity` 返回索引身份；调用方在首次 reservation 前使用 `bind_released_predecessor` 同时绑定两者，普通旧槽仍使用 `bind_previous_inventory`。

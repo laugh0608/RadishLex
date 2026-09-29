@@ -102,6 +102,8 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 `load_latest_release` 为后续生命周期提供只读定位和历史材料核验，不授予 startup 或 mutation 权限；已释放后的运行数据允许正常变化。明确中止的无 data receipt 分支、主动取消原因与旧 reader 兼容处理，以及 outer/Executor/真实程序资格仍开放。不得用该入口搬移被冻结的 source 39 事务。
 
+历史核验沿证明内绑定的 `previous_index` 迭代至链首，每代检查严格 v1 格式、证明/目录/私有材料/准备证据及实际 data 前驱、source release 连续性；重复 operation、缺失或漂移失败关闭。保存的旧索引须与其 canonical 字节长度和摘要一致，已绑定的准备证据还须匹配原索引及前代证明身份。旧索引被原子替换后不要求其 inode 仍位于当前索引槽，不制造历史索引副本。查询完成前复验当前索引身份；准备接续及终态释放的初始化、记录写入、索引发布和 marker 协调回调前后都复验祖先链。此核验不重写 v1 历史，也不检查已经恢复正常使用的旧运行库 hash。
+
 #### 已释放前驱的连续准备
 
 活动 v1 槽为空时，新 reservation 可通过明确 data 前驱读取最新 release 索引及其终态证明；必须保留真实 outer/data 两条前驱，不能从目录扫描或旧 target 猜测当前产品。`capture_previous_inventory` 返回已封存 inventory 的只读投影，`previous_inventory_identity` 为 release 证明身份，`release_index_identity` 为索引身份；以 `bind_released_predecessor` 在首次持久化前同时固定，不再向旧历史写 `inventory.json`。

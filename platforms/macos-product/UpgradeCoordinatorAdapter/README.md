@@ -27,6 +27,8 @@ adapter 实现 `UpgradeCoordinatorPort`，把平台无关协调核心绑定到�
 
 `tests/preparation_history.rs` 及子模块使用真实 SQLite、SHA-256 与私有文件验证旧终态 inventory、逐槽保留接续、新 v1 handoff、三类终态封存/释放、已释放前驱的连续准备及中断/漂移拒绝。旧 v1 receipt/产品身份及静止 port 为合成材料；测试不启动真实 Manager/InputMethod，也不证明 outer guard、Installer 接线或冻结 source/target 副本资格。核心 inventory 的初始化 I/O/进程退出矩阵另在升级核心 crate 中维护。
 
+`tests/preparation_history/release_chain.rs` 覆盖多代已释放祖先的缺失、内容/身份/权限/链接漂移、错误前驱和回调内篡改，要求只读查询、下一次准备与释放写入都拒绝继续；正常后续学习/WAL 仍允许历史查询。所有材料均为临时合成 fixture。
+
 `tests/source_preparation/cancellation.rs` 与源库收尾子模块验证独立取消请求、维护前的 family 保持、维护后的完整等价、受控 journal 恢复和持久进度重载。历史套件同时验证取消源库收尾不搬动或重写旧材料；原准备/v1 与 startup 入口仍阻断。这些测试使用合成取消/源库授权 port；本 adapter 尚未实现对应真实 outer 接线、旧程序取消资格或 UI 入口，`source_ready` 不能解释为取消完成。
 
 `tests/preparation_history/cancellation_archive*.rs` 与已释放前驱回归验证取消材料封存、精确位置重载、outer 原件保留及兼容副本发布，覆盖维护前后、三类旧终态、部分归档、无 data 前驱、已释放 v1 历史、身份漂移/冲突及授权失效/真实子进程退出。结果为 `preserved`，活动请求与封存记录仍阻断启动，产品 authority 为合成。双 guard 与严格外层回执的组合测试位于 `InstallCoordinatorAdapter/tests/cancellation_archive.rs`；它也不代表真实程序/Installer 资格。
