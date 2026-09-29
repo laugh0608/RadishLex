@@ -250,6 +250,7 @@ impl ReleaseIndex {
         if self.format != INDEX_FORMAT
             || !valid_id(&self.operation_id)
             || !valid_id(&self.data_operation_id)
+            || self.operation_id != self.data_operation_id
             || !valid_hash(&self.release_sha256)
             || self.data_root.inode == 0
             || self.data_root.mode != 0o700

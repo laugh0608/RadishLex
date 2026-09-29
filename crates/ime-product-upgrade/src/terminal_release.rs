@@ -345,11 +345,16 @@ impl TerminalReleaseStore {
         hasher: &impl PreparationHasher,
     ) -> Result<Option<TerminalReleaseReceipt>> {
         self.journal.verify_guard(guard)?;
-        let result = self
-            .history()
-            .load_index(hasher)?
+        self.validate_active_entries()?;
+        let index = self.history().load_index(hasher)?;
+        let result = index
+            .as_ref()
             .map(|value| self.history().resolve_index(&value.index, hasher))
             .transpose()?;
+        if self.history().load_index(hasher)? != index {
+            return Err(Error::EvidenceChanged);
+        }
+        self.validate_active_entries()?;
         self.journal.verify_guard(guard)?;
         Ok(result)
     }

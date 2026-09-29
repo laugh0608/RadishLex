@@ -226,6 +226,26 @@ impl ReleaseHistory<'_> {
             if product != &record.binding.installed_product_sha256 {
                 return Err(Error::EvidenceChanged);
             }
+            if let Some(identity) = proof.previous_release_index_identity() {
+                let previous = record
+                    .previous_index
+                    .as_ref()
+                    .ok_or(Error::EvidenceChanged)?;
+                let previous_path = self
+                    .journal
+                    .store
+                    .root
+                    .path
+                    .join(HISTORY)
+                    .join(&previous.index.operation_id)
+                    .join(RELEASE);
+                if identity != &previous.identity
+                    || proof.previous_inventory_identity()
+                        != Some(&self.journal.evidence(&previous_path, hasher)?)
+                {
+                    return Err(Error::EvidenceChanged);
+                }
+            }
         }
         Ok(())
     }
@@ -315,6 +335,54 @@ impl ReleaseHistory<'_> {
         index: &ReleaseIndex,
         hasher: &impl PreparationHasher,
     ) -> Result<TerminalReleaseReceipt> {
+        let record = self.resolve_one(index, hasher)?;
+        self.verify_ancestors(&record, hasher)?;
+        Ok(record)
+    }
+
+    /// Follow only bound locators. Historical runtime hashes are deliberately
+    /// not checked: normal learning after release may have changed that data.
+    /// Iteration avoids stack growth and rejects repeated operation identities.
+    pub(super) fn verify_ancestors(
+        &self,
+        record: &TerminalReleaseReceipt,
+        hasher: &impl PreparationHasher,
+    ) -> Result<()> {
+        let mut seen = std::collections::BTreeSet::from([record.binding.operation_id.clone()]);
+        let mut current = record.clone();
+        while let Some(previous) = &current.previous_index {
+            if !seen.insert(previous.index.operation_id.clone())
+                || current.receipt.previous_operation_id()
+                    != Some(previous.index.data_operation_id.as_str())
+                || current.receipt.source_release() != &previous.index.installed_release
+            {
+                return Err(Error::EvidenceChanged);
+            }
+            // The old index inode is no longer at latest-release.json after
+            // atomic publication; verify its saved canonical bytes, not the
+            // new locator's identity or an invented historical file.
+            let bytes = encode(&previous.index)?;
+            let digest: String = hasher
+                .sha256(&mut bytes.as_slice())
+                .map_err(|_| Error::Io)?
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect();
+            if previous.identity.byte_len != bytes.len() as u64
+                || previous.identity.sha256 != digest
+            {
+                return Err(Error::EvidenceChanged);
+            }
+            current = self.resolve_one(&previous.index, hasher)?;
+        }
+        Ok(())
+    }
+
+    fn resolve_one(
+        &self,
+        index: &ReleaseIndex,
+        hasher: &impl PreparationHasher,
+    ) -> Result<TerminalReleaseReceipt> {
         index.validate()?;
         if path_exists(&self.active(RELEASE))?
             && self
@@ -329,7 +397,9 @@ impl ReleaseHistory<'_> {
         self.journal.history_directory(&root)?;
         let operation = root.join(&index.operation_id);
         self.journal.history_directory(&operation)?;
-        let record = self.read_release(&operation.join(RELEASE), hasher)?;
+        let path = operation.join(RELEASE);
+        let identity = self.journal.evidence(&path, hasher)?;
+        let record = self.read_release(&path, hasher)?;
         if self.index_for(&record, hasher)? != *index {
             return Err(Error::EvidenceChanged);
         }
@@ -337,6 +407,9 @@ impl ReleaseHistory<'_> {
         self.verify_directories(&record, false)?;
         self.verify_files(&record, hasher, true)?;
         self.verify_preparation(&record, hasher)?;
+        if self.journal.evidence(&path, hasher)? != identity {
+            return Err(Error::EvidenceChanged);
+        }
         Ok(record)
     }
 }

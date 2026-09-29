@@ -9,6 +9,8 @@ use radishlex_ime_product_upgrade::{
     UpgradePostSwitchValidationReport, UpgradeRollbackValidationEvidence,
 };
 
+#[path = "release_chain.rs"]
+mod chain;
 #[path = "release_failures.rs"]
 mod failures;
 #[path = "release_predecessor.rs"]

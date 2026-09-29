@@ -188,6 +188,7 @@ impl TerminalReleaseStore {
             self.history().verify_files(next, hasher, false)?;
             self.history().verify_runtime(next, hasher)?;
             self.history().verify_preparation(next, hasher)?;
+            self.history().verify_ancestors(next, hasher)?;
             let index = self.history().load_index(hasher)?;
             if index != next.previous_index
                 && !(next.phase == TerminalReleasePhase::ReleaseReady
