@@ -28,7 +28,7 @@
 
 前一 outer 原件必须已封存在同一 data root 的 `.radishlex-install-history-v1/<previous-outer-operation>/receipt.json`，目录 `0700`、原件 `0600` 单链接，并匹配准备记录中的原摘要；本入口不扫描寻找前驱，也不负责事后制造旧原件。该固定槽是后续真实 Executor 接线的前置输入，冻结现场没有创建或搬动此目录。新 outer 尚未创建时核验仍活动的旧回执；已创建时必须是同 ID、同产品、无 artifact 的 `prepared`。
 
-旧 data 私有材料依原 inventory 的固定 `data/` 槽逐项保留；已经释放的历史只核验原证明及 v1 索引，不重归档。当前 operation 的历史目录保留 `preparation.json`、可空 `preparation-snapshot.sqlite3`、`cancellation-source.json` 和可空 `cancelled-outer.json`，原文件 inode/字节不变。业务 DB/settings/Rime 不移入历史槽。
+旧 data 私有材料依原 inventory 的固定 `data/` 槽逐项保留；已经释放的历史只核验原证明及对应版本的 v1/v2 真实终态索引，不重归档、不改写索引；取消类型索引仍未开放。当前 operation 的历史目录保留 `preparation.json`、可空 `preparation-snapshot.sqlite3`、`cancellation-source.json` 和可空 `cancelled-outer.json`，原文件 inode/字节不变。业务 DB/settings/Rime 不移入历史槽。
 
 新 outer 原 inode 封存后，在当前 operation 的 `compatibility-outer.json` 独占创建旧 outer canonical 字节副本，先同步并在取消进度中持久绑定新 inode，再原子发布到活动 outer `receipt.json`，同步目标/源目录并回读。旧 outer 历史原件继续保留；普通 v1 `persist` / `can_replace` 不变。每次 rename 只接受唯一合法位置；已绑定中断可补同步接续，未绑定目录、临时进度、兼容临时副本、冲突或身份漂移全部保留阻断，不自动认领或清理。
 

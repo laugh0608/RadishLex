@@ -224,9 +224,9 @@ SQLite 用户数据层：
 
 该 crate 的既有 v1 路径已闭合固定布局内从 `preflighted` 到终态的核心调度与数据恢复，但仍不停止进程、不定位或启动产品 host，也不提供安装载体；API、副作用与验证入口见 [ime-product-upgrade 组件说明](../crates/ime-product-upgrade/README.md)，macOS 完整状态机见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。
 
-`preparation_inventory.rs` / `preparation_history.rs` 管理旧终态清单与私有槽位置；`preparation_handoff*` 负责新 v1 回执交接和准备证明封存；`terminal_release*` 负责真实数据终态保留、外层结果确认及唯一释放索引，`preparation_released_predecessor.rs` 只读消费已释放前驱。业务 DB/settings/Rime 不移入历史槽，真实 outer/程序授权仍由产品组合层提供。
+`preparation_inventory.rs` / `preparation_history.rs` 管理旧终态清单与私有槽位置；`preparation_handoff*` 负责新 v1 回执交接和准备证明封存；`terminal_release*` 负责真实数据终态保留、外层结果确认及绑定祖先核验，`lifecycle_index.rs` 负责唯一释放索引的严格 v1/v2 编码，`preparation_released_predecessor.rs` 只读消费已释放前驱。业务 DB/settings/Rime 不移入历史槽，真实 outer/程序授权仍由产品组合层提供。
 
-`preparation_cancellation*` 保存独立不可撤回请求，`cancellation_source*` 分担源库收尾、严格记录、持久化与受限 journal 恢复；不回用普通准备入口，不修改双层 v1 失败码，也不以源库就绪解除启动门禁。完整合同见组件说明和当前激活设计。
+`preparation_cancellation*` 保存独立不可撤回请求，`cancellation_source*` 分担源库收尾、严格记录、持久化与受限 journal 恢复，`cancellation_archive*` 保留取消材料并受控恢复 outer 兼容投影；不回用普通准备入口，不修改双层 v1 失败码，也不以 `source_ready` 或 `preserved` 解除启动门禁。完整合同见组件说明和当前激活设计。
 
 ### ime-product-install
 

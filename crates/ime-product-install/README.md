@@ -36,6 +36,12 @@ receipt format 是 `radishlex-product-install-receipt-v1`。data root/状态目�
 
 每个 component 的事务目录固定为 `<target-parent>/.radishlex-install-<operation-id>/`，权限为 `0700`，只允许 `staged.app` 与 `source-backup.app`。程序根只接受目标 uid 所有、同设备、非 symlink 的 `0700`/`0755` 目录；source/backup 与 staged/installed 必须分别保持同一 inode。每次 rename 后依次同步目标目录和源目录，重试只接受 inode 位于预期两个槽位之一的现场。
 
+## 准备取消的外层回执校验
+
+`validate_preparation_cancellation_outer` 供专用取消协调器校验已绑定的旧/新 canonical v1 回执字节。旧回执须为同 root、匹配当前 source 的合法终态且无需人工恢复；新回执可空，存在时须精确等于同 operation/source/target 的无 artifact `prepared`，并满足原正常 `can_replace` 前驱关系。未知格式、非 canonical 字节、身份或产品不匹配均拒绝。
+
+该函数仅校验回执合同，不读写文件、不恢复活动回执、不授予启动或产品授权。调用方仍须按 outer → inner 顺序持有双 guard，核验封存原件和实物身份，并逐检查点重新证明源程序、静止和授权；[安装协调组合层](../../platforms/macos-product/InstallCoordinatorAdapter/README.md#准备取消的外层绑定)负责连接这些条件。普通 `persist` / `can_replace` 和 v1 失败码保持不变；取消封存的 `preserved` 仍保留数据启动阻断，完整合同见[取消兼容设计](../../docs/remediation/macos-preparation-cancellation-compatibility.md)。
+
 ## 验证
 
 ```bash

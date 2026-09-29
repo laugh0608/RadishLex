@@ -72,13 +72,13 @@
 
 ## 下一步：B 段取消生命周期证明与最终 marker 协调（2026-09-29）
 
+今日已收尾，下一工作日先按[2026-09-30 明日事项](../devlogs/2026-W40.md#2026-09-30明日事项)推进取消完整证明与解析器；当天全部提交及文档复核见[09-29 收尾复盘](../devlogs/2026-W40.md#2026-09-29收尾复盘)。
+
 按已批准的[准备中止兼容设计](../remediation/macos-preparation-cancellation-compatibility.md)，取消材料封存与 outer 兼容恢复已接入仓库。`CancellationArchiveStore` 保留旧 inventory/已释放历史及原件，专用路径恢复旧 outer canonical 兼容副本；返回 `preserved` 后仍保留活动取消请求与封存进度，不发布索引、不解除 startup gate。本批验证与限制见[本周记录](../devlogs/2026-W40.md)。
 
 唯一 `latest-release.json` 已接入真实终态 v2 分支，显式绑定 lifecycle、legacy outer 与 data，三者在真实数据终态下仍须同一 ID。支持严格 v1 重放、v1→v2→v2 连续准备/升级/释放及完整绑定祖先核验；首个 v2 只接受精确旧索引或有证明的空值，丢失索引的旧历史不当作首次路径。取消类型和空 data 引用当前仍拒绝，旧 v1 历史不改写。
 
 下一步补取消类型的完整不可变证明与解析器，再接连续取消、取消后新准备/升级/释放及最终 marker 协调。最终 marker 必须最后移走，且放行前具备完整实物与旧程序资格；不能把 `preserved` 直接变为产品取消成功，不能删除 marker 后调用旧准备入口。
-
-接续检查先发现并修复 v1 reader 仅核验最新一代的缺口：现在沿绑定索引逐级核验祖先材料、前驱连续性和原索引摘要，并在释放回调前后复验；不改写 v1 历史。此项已作为真实终态 v2 的前置核验复用，不表示取消最终释放已实现，验证进度见[本周记录](../devlogs/2026-W40.md)。
 
 之后按[已批准的 A–D 分段](../remediation/macos-wal-source-preparation-design.md)继续真实 outer/Executor 观察与 C–D 产品接线、独立旧程序副本资格。当前外层类型绑定桥与合成 port 不证明真实产品授权；WAL 模式转换/pager 内部断电资格仍开放，B 段未退出。新升级真正完成后才继续客户端身份和 composition 隐私实测，不直接重试 40。
 
