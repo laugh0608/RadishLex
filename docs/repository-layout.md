@@ -218,7 +218,7 @@ SQLite 用户数据层：
 - 稳定失败分类和中断恢复判断
 - 独立 `PreparationReceipt` / `PreparationJournalStore`、源 family 摘要、保护快照、受控 SQLite 准备及受限 journal 恢复
 - 旧终态 inventory 与逐槽保留接续、新 v1 handoff、终态封存/释放索引及已释放前驱的连续准备
-- 独立取消请求与源库维护收尾；`source_ready` 保持启动阻断，完整取消及真实产品接线仍另需资格
+- 独立取消请求、源库维护收尾、材料封存与受控 outer 兼容投影；`source_ready` / `preserved` 保持启动阻断，完整取消及真实产品接线仍另需资格
 
 该 crate 的既有 v1 路径已闭合固定布局内从 `preflighted` 到终态的核心调度与数据恢复，但仍不停止进程、不定位或启动产品 host，也不提供安装载体；API、副作用与验证入口见 [ime-product-upgrade 组件说明](../crates/ime-product-upgrade/README.md)，macOS 完整状态机见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。
 

@@ -136,7 +136,7 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 `CancellationSourceReceipt` 在固定 `cancellation-source.json` / `.tmp` 中以严格 `radishlex-cancellation-source-v1` 绑定请求文件身份和工作准备副本。`finishing` 只可追加既有单 journal 恢复身份或推进至 `source_ready`；原准备 marker、取消请求和保护快照保持。`reserved` / `snapshot_ready` 路径不打开 SQLite，以请求 family 原身份和字节证明保持；维护意图后重新取得授权/静止/容量，完成同一受控准备，复验 standalone、源 schema、全量内容/tombstone 等价、关闭与源文件/数据根同步。已经准备好的路径重新验证等价，不重复归档旧材料。
 
-请求仍拒绝现存 journal；取消收尾意图落盘后，专用恢复才可沿用单 journal 资格检查、精确恢复身份持久化和 SQLite 重放。`CancellationSourcePort` 每个检查点确认 fresh 产品授权；未知临时进度、busy、容量不足、身份/内容漂移均保留阻断。`load_source_guarded` 只核验物理关系，不能代替 `finish_source` 的 fresh 授权与内容复验。源库 `source_ready` 不表示完整取消；材料封存、外层原件封存与兼容恢复、v2 生命周期索引和最终 marker 释放仍须接入专用协调器，详见[已批准的补充设计](../../docs/remediation/macos-preparation-cancellation-compatibility.md)。
+请求仍拒绝现存 journal；取消收尾意图落盘后，专用恢复才可沿用单 journal 资格检查、精确恢复身份持久化和 SQLite 重放。`CancellationSourcePort` 每个检查点确认 fresh 产品授权；未知临时进度、busy、容量不足、身份/内容漂移均保留阻断。`load_source_guarded` 只核验物理关系，不能代替 `finish_source` 的 fresh 授权与内容复验。源库 `source_ready` 不表示完整取消；后续材料封存与兼容恢复已接入 `CancellationArchiveStore`，v2 生命周期索引和最终 marker 释放仍待完成，详见[已批准的补充设计](../../docs/remediation/macos-preparation-cancellation-compatibility.md)。
 
 ### 启动门禁
 
@@ -208,3 +208,11 @@ cargo clippy -p radishlex-ime-product-upgrade --all-targets -- -D warnings
 ```
 
 测试只使用隔离合成目录。生产 preflight executable、Manager/InputMethod validation host 和真实产品不得在普通仓库门禁中对真实 Application Support 执行。
+
+### 取消材料封存与外层兼容投影
+
+`CancellationArchiveStore::preserve_cancellation` 在独立 `cancellation-archive.json` 中固定取消请求、`source_ready` 原件、运行数据身份、旧 inventory/已释放证明、历史目录和 outer 原字节。逐槽原 inode 封存旧私有材料、准备记录、保护快照与源库进度；新 outer 已创建时先封存原件，再从已封存的旧 canonical 字节创建并持久绑定兼容副本，最后发布到固定活动 outer 槽。新 outer 尚未创建时仅核验仍活动的旧回执。
+
+数据核心处理受证明约束的字节和文件关系，不解析外层 v1 状态或接管程序 staging/backup；`ime-product-install` 校验旧终态与无 artifact 的新 `prepared` 合同，组合层持有 outer guard 并绑定 root/产品/授权。每次动作重新核验物理身份；源库等价在接续入口复验；未知或未绑定临时对象失败关闭。固定外层历史槽、文件顺序和产品前置条件见[取消兼容设计](../../docs/remediation/macos-preparation-cancellation-compatibility.md#2026-09-29取消材料封存与-outer-兼容恢复)。
+
+返回 `preserved` 仍保留活动请求与封存进度，旧 reader/startup gate 继续阻断；不发布生命周期索引、不解除 marker、不表示完整取消或旧程序资格。真实产品观察与 Executor 尚未接入；测试只证明仓库与隔离合成范围。

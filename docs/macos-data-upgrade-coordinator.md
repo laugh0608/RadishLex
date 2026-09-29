@@ -118,7 +118,7 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 源库收尾已接入独立 `CancellationSourceReceipt`，在固定 `cancellation-source.json` / `.tmp` 中绑定不可改认的请求文件身份与工作准备副本；只允许 `finishing`、受限 journal 恢复身份追加及 `source_ready`，不改原准备记录、请求或保护快照。维护意图前不打开 SQLite，保持请求 family 原身份/字节；维护意图后在 `CancellationSourcePort` 的 fresh outer/产品/静止与容量证明下完成原准备，核验 standalone、源 schema、全量内容/删除语义和显式关闭，再同步主文件与数据根。已准备/已归档路径重新校验等价，旧私有材料只核验，不搬动。
 
-请求入口仍拒绝现存 journal；只有取消收尾意图已持久化，专用恢复才可在同一主 inode、无 WAL/SHM 和下述单 journal 资格成立后记录恢复身份并重放。物理 `load_source_guarded` 不代表 fresh 授权或逻辑复验；这些由 `finish_source` 完成。未知临时进度、身份/内容漂移、busy 或授权/容量不足均保留阻断。`source_ready` 不等于 `cancel_ready`；取消材料与 outer 兼容封存/恢复、v2 生命周期索引、最终 marker 释放和产品 UI 仍未接入，不能显示“取消完成”。
+请求入口仍拒绝现存 journal；只有取消收尾意图已持久化，专用恢复才可在同一主 inode、无 WAL/SHM 和下述单 journal 资格成立后记录恢复身份并重放。物理 `load_source_guarded` 不代表 fresh 授权或逻辑复验；这些由 `finish_source` 完成。未知临时进度、身份/内容漂移、busy 或授权/容量不足均保留阻断。`source_ready` 不等于 `cancel_ready`。后续 `CancellationArchiveStore` 已实现取消材料封存与 outer 兼容恢复，固定原件、目录和逐槽位置证明；组合层持有真实 outer guard 并调用安装核心严格校验旧/新 v1 合同。返回 `preserved` 仍保留活动取消请求与封存进度；v2 生命周期索引、最终 marker 释放、真实产品观察/Executor 和产品 UI 仍未接入，不能显示“取消完成”。固定槽位、顺序与验证口径见[取消兼容设计](remediation/macos-preparation-cancellation-compatibility.md)。
 
 #### 维护中断的受限 journal 恢复
 
