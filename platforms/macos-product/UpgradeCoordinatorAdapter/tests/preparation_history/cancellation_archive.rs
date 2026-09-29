@@ -299,99 +299,80 @@ fn every_archive_boundary_revokes_authority_and_survives_process_exit() {
             selected.push((index, point));
         }
     }
-    std::thread::scope(|scope| {
-        for chunk in selected.chunks(selected.len().div_ceil(4)) {
-            scope.spawn(move || {
-                for (index, point) in chunk.iter().copied() {
-                    for crash in [false, true] {
-                        let fixture = Fixture::new();
-                        let (store, guard, outer) =
-                            prepare(&fixture, Some(State::RolledBack), 3, true);
-                        if crash {
-                            drop(guard);
-                            let output = Command::new(std::env::current_exe().unwrap())
-                                .args([
-                                    "--exact",
-                                    "cancellation_archive::archive_crash_child",
-                                    "--nocapture",
-                                    "--ignored",
-                                ])
-                                .env("RADISHLEX_CANCEL_ARCHIVE_CHILD", &fixture.0)
-                                .env("RADISHLEX_CANCEL_ARCHIVE_POINT", index.to_string())
-                                .output()
-                                .unwrap();
-                            assert_eq!(
-                                output.status.code(),
-                                Some(77),
-                                "{index}: {point:?}: {}",
-                                String::from_utf8_lossy(&output.stdout)
-                            );
-                        } else {
-                            let mut authority = Authority::new();
-                            authority.fail = Some(index);
-                            assert!(
-                                store
-                                    .preserve_cancellation(&guard, &outer, &mut authority, &Hasher)
-                                    .is_err(),
-                                "{point:?}"
-                            );
-                            drop(guard);
-                        }
-                        assert!(fixture.state("preparation-cancellation.json").exists());
-                        // Unbound directory/temp interruption must remain blocked. Every
-                        // durably bound move/publication must recover with a fresh guard.
-                        let unbound = fixture.state("cancellation-archive.json.tmp").exists()
-                            || (!fixture.state("cancellation-archive.json").exists()
-                                && fixture.0.join(HISTORY).join(NEW).exists());
-                        if unbound {
-                            if let Ok(store) =
-                                CancellationArchiveStore::open_existing(fixture.verified())
-                            {
-                                let guard = store.acquire_guard().unwrap();
-                                assert!(store
-                                    .preserve_cancellation(
-                                        &guard,
-                                        &outer,
-                                        &mut Authority::new(),
-                                        &Hasher
-                                    )
-                                    .is_err());
-                            }
-                            continue;
-                        }
-                        let store =
-                            CancellationArchiveStore::open_existing(fixture.verified()).unwrap();
-                        let guard = store.acquire_guard().unwrap();
-                        let loaded = store.load_guarded(&guard, &Hasher);
-                        if loaded.is_err() {
-                            assert!(
-                                fixture
-                                    .0
-                                    .join(HISTORY)
-                                    .join(NEW)
-                                    .join("compatibility-outer.json")
-                                    .exists(),
-                                "{index}: {point:?}: {loaded:?}"
-                            );
-                            assert!(store
-                                .preserve_cancellation(
-                                    &guard,
-                                    &outer,
-                                    &mut Authority::new(),
-                                    &Hasher
-                                )
-                                .is_err());
-                            continue;
-                        }
-                        let record = store
-                            .preserve_cancellation(&guard, &outer, &mut Authority::new(), &Hasher)
-                            .unwrap_or_else(|e| panic!("{index}: {point:?}: {e:?}"));
-                        assert_preserved(&fixture, &record);
-                    }
+    // Keep the full failure matrix inside one libtest worker.
+    for (index, point) in selected {
+        for crash in [false, true] {
+            let fixture = Fixture::new();
+            let (store, guard, outer) = prepare(&fixture, Some(State::RolledBack), 3, true);
+            if crash {
+                drop(guard);
+                let output = Command::new(std::env::current_exe().unwrap())
+                    .args([
+                        "--exact",
+                        "cancellation_archive::archive_crash_child",
+                        "--nocapture",
+                        "--ignored",
+                    ])
+                    .env("RADISHLEX_CANCEL_ARCHIVE_CHILD", &fixture.0)
+                    .env("RADISHLEX_CANCEL_ARCHIVE_POINT", index.to_string())
+                    .output()
+                    .unwrap();
+                assert_eq!(
+                    output.status.code(),
+                    Some(77),
+                    "{index}: {point:?}: {}",
+                    String::from_utf8_lossy(&output.stdout)
+                );
+            } else {
+                let mut authority = Authority::new();
+                authority.fail = Some(index);
+                assert!(
+                    store
+                        .preserve_cancellation(&guard, &outer, &mut authority, &Hasher)
+                        .is_err(),
+                    "{point:?}"
+                );
+                drop(guard);
+            }
+            assert!(fixture.state("preparation-cancellation.json").exists());
+            // Unbound directory/temp interruption must remain blocked. Every
+            // durably bound move/publication must recover with a fresh guard.
+            let unbound = fixture.state("cancellation-archive.json.tmp").exists()
+                || (!fixture.state("cancellation-archive.json").exists()
+                    && fixture.0.join(HISTORY).join(NEW).exists());
+            if unbound {
+                if let Ok(store) = CancellationArchiveStore::open_existing(fixture.verified()) {
+                    let guard = store.acquire_guard().unwrap();
+                    assert!(store
+                        .preserve_cancellation(&guard, &outer, &mut Authority::new(), &Hasher)
+                        .is_err());
                 }
-            });
+                continue;
+            }
+            let store = CancellationArchiveStore::open_existing(fixture.verified()).unwrap();
+            let guard = store.acquire_guard().unwrap();
+            let loaded = store.load_guarded(&guard, &Hasher);
+            if loaded.is_err() {
+                assert!(
+                    fixture
+                        .0
+                        .join(HISTORY)
+                        .join(NEW)
+                        .join("compatibility-outer.json")
+                        .exists(),
+                    "{index}: {point:?}: {loaded:?}"
+                );
+                assert!(store
+                    .preserve_cancellation(&guard, &outer, &mut Authority::new(), &Hasher)
+                    .is_err());
+                continue;
+            }
+            let record = store
+                .preserve_cancellation(&guard, &outer, &mut Authority::new(), &Hasher)
+                .unwrap_or_else(|e| panic!("{index}: {point:?}: {e:?}"));
+            assert_preserved(&fixture, &record);
         }
-    });
+    }
 }
 
 #[path = "cancellation_archive_rejection.rs"]

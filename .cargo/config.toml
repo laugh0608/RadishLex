@@ -1,0 +1,6 @@
+# Repository defaults; explicit caller settings can select another budget.
+[build]
+jobs = 2
+
+[env]
+RUST_TEST_THREADS = { value = "2", force = false }

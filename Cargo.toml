@@ -28,3 +28,8 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.80"
 repository = "https://github.com/laugh0608/RadishLex"
+
+# History fault matrices repeatedly hash complete evidence files. Optimize only
+# this existing dependency in tests; keep application code/debug checks intact.
+[profile.test.package."sha2:0.10.9"]
+opt-level = 3
