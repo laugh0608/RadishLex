@@ -180,6 +180,7 @@ impl TerminalReleaseStore {
             self.history().verify_files(record, hasher, false)?;
             self.history().verify_runtime(record, hasher)?;
             self.history().verify_preparation(record, hasher)?;
+            self.history().verify_index_origin(record)?;
             self.history().verify_ancestors(record, hasher)?;
             if self.history().load_index(hasher)? != record.previous_index {
                 return Err(Error::EvidenceChanged);

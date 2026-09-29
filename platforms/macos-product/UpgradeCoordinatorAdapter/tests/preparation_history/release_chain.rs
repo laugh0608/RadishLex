@@ -192,7 +192,7 @@ fn replace_latest_proof(fixture: &Fixture, bytes: &[u8]) {
     let index = fixture.0.join(HISTORY).join("latest-release.json");
     let original = fs::read_to_string(&index).unwrap();
     let json: serde_json::Value = serde_json::from_str(&original).unwrap();
-    let old_hash = json["release_sha256"].as_str().unwrap();
+    let old_hash = json["proof"]["sha256"].as_str().unwrap();
     let mut input = bytes;
     let new_hash: String = Hasher
         .sha256(&mut input)
@@ -225,7 +225,7 @@ fn exact_latest_digest_cannot_waive_invalid_predecessor_bindings() {
             1 => json["previous_index"]["identity"]["byte_len"] = serde_json::json!(1),
             2 => {
                 json["previous_index"]["index"]["format"] =
-                    serde_json::json!("radishlex-latest-release-v2")
+                    serde_json::json!("radishlex-latest-release-v99")
             }
             3 => json["previous_index"]["index"]["data_operation_id"] = serde_json::json!(OLD),
             4 => json["previous_index"]["index"]["operation_id"] = serde_json::json!(SECOND),
@@ -235,7 +235,7 @@ fn exact_latest_digest_cannot_waive_invalid_predecessor_bindings() {
             }
             6 => json["receipt"]["previous_operation_id"] = serde_json::json!(OLD),
             7 => {
-                json["previous_index"]["index"]["release_sha256"] =
+                json["previous_index"]["index"]["proof"]["sha256"] =
                     serde_json::json!("f".repeat(64))
             }
             8 => json["previous_index"]["identity"]["mode"] = serde_json::json!(0o644),
@@ -244,8 +244,13 @@ fn exact_latest_digest_cannot_waive_invalid_predecessor_bindings() {
         // Serialize through the real field ordering, deliberately bypassing
         // encode validation to simulate an invalid on-disk proof. Rebind the
         // latest digest so rejection must inspect the predecessor contract.
-        let typed: Proof = serde_json::from_value(json).unwrap();
-        let mut bytes = serde_json::to_vec(&typed).unwrap();
+        let mut bytes = if case == 2 {
+            // This format is rejected during tagged deserialization itself.
+            serde_json::to_vec(&json).unwrap()
+        } else {
+            let typed: Proof = serde_json::from_value(json).unwrap();
+            serde_json::to_vec(&typed).unwrap()
+        };
         bytes.push(b'\n');
         replace_latest_proof(&fixture, &bytes);
         let (store, guard) = reload(&fixture);

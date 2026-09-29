@@ -247,7 +247,7 @@ fn drift_unknown_objects_and_conflicts_remain_untouched() {
                 let bytes = String::from_utf8(fs::read(&path).unwrap())
                     .unwrap()
                     .replace(
-                        "radishlex-terminal-release-v1",
+                        "radishlex-terminal-release-v2",
                         "radishlex-terminal-release-v9",
                     );
                 fs::write(path, bytes).unwrap();
@@ -322,8 +322,8 @@ fn strict_contract_rejects_unknown_fields_invalid_phase_and_changed_source_bindi
         text.replacen("{", "{\"unknown\":true,", 1),
         text.replace("release_ready", "released"),
         text.replace(
-            "radishlex-terminal-release-v1",
             "radishlex-terminal-release-v2",
+            "radishlex-terminal-release-v9",
         ),
         text.replacen("\"mode\":448", "\"mode\":493", 1),
         text.trim_end().to_owned(),

@@ -38,16 +38,6 @@ pub struct TerminalReleaseReceipt {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct ReleaseIndex {
-    pub format: String,
-    pub operation_id: String,
-    pub data_operation_id: String,
-    pub installed_release: crate::ProductRelease,
-    pub data_root: PreparationDirectoryIdentity,
-    pub release_sha256: String,
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub(super) struct PreviousIndex {
     pub identity: PreparationFileIdentity,
     pub index: ReleaseIndex,
@@ -82,7 +72,7 @@ impl TerminalReleaseReceipt {
         self.validate_inputs()
     }
     pub(super) fn validate_inputs(&self) -> Result<()> {
-        if self.format != FORMAT
+        if !matches!(self.format.as_str(), LEGACY_FORMAT | FORMAT)
             || !valid_id(&self.binding.operation_id)
             || self.binding.operation_id != self.receipt.operation_id()
             || !valid_hash(&self.binding.installed_product_sha256)
@@ -210,8 +200,9 @@ impl TerminalReleaseReceipt {
         }
         if let Some(previous) = &self.previous_index {
             previous.index.validate()?;
-            if previous.index.operation_id == self.binding.operation_id
-                || previous.index.data_root != self.data_root
+            if (self.format == LEGACY_FORMAT && !previous.index.is_legacy())
+                || previous.index.operation_id() == self.binding.operation_id
+                || previous.index.data_root() != &self.data_root
                 || previous.identity.mode != 0o600
                 || previous.identity.link_count != 1
                 || previous.identity.inode == 0
@@ -245,30 +236,10 @@ impl TerminalReleaseReceipt {
     }
 }
 
-impl ReleaseIndex {
-    pub fn validate(&self) -> Result<()> {
-        if self.format != INDEX_FORMAT
-            || !valid_id(&self.operation_id)
-            || !valid_id(&self.data_operation_id)
-            || self.operation_id != self.data_operation_id
-            || !valid_hash(&self.release_sha256)
-            || self.data_root.inode == 0
-            || self.data_root.mode != 0o700
-        {
-            return Err(Error::EvidenceChanged);
-        }
-        crate::ProductRelease::new(
-            self.installed_release.product_version(),
-            self.installed_release.build_number(),
-        )
-        .map_err(|_| Error::EvidenceChanged)?;
-        Ok(())
-    }
-}
 pub(super) fn valid_id(id: &str) -> bool {
     hex(id, 32)
 }
-fn valid_hash(hash: &str) -> bool {
+pub(super) fn valid_hash(hash: &str) -> bool {
     hex(hash, 64)
 }
 fn hex(value: &str, length: usize) -> bool {

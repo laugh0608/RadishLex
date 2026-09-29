@@ -155,6 +155,8 @@ fn reserve_with_outer_digest(
 
 #[path = "cancellation_released.rs"]
 mod cancellation_released;
+#[path = "lifecycle.rs"]
+mod lifecycle;
 
 fn advance(
     store: PreparationJournalStore,

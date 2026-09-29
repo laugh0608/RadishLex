@@ -2,8 +2,8 @@
 use super::*;
 use crate::PreparationFileIdentity;
 
-const FORMAT: &str = "radishlex-terminal-release-v1";
-const INDEX_FORMAT: &str = "radishlex-latest-release-v1";
+const LEGACY_FORMAT: &str = "radishlex-terminal-release-v1";
+const FORMAT: &str = "radishlex-terminal-release-v2";
 const RELEASE: &str = "terminal-release.json";
 const RELEASE_TEMP: &str = "terminal-release.json.tmp";
 const INDEX: &str = "latest-release.json";
@@ -12,7 +12,10 @@ const PREPARATION: [&str; 2] = ["preparation.json", PREPARATION_SNAPSHOT];
 
 #[path = "terminal_release_record.rs"]
 mod record;
-use record::{decode, encode, valid_id, PreviousIndex, ReleaseIndex};
+use record::{decode, encode, valid_id, PreviousIndex};
+#[path = "lifecycle_index.rs"]
+mod lifecycle_index;
+use lifecycle_index::ReleaseIndex;
 pub use record::{TerminalReleaseBinding, TerminalReleasePhase, TerminalReleaseReceipt};
 #[path = "terminal_release_evidence.rs"]
 mod evidence;

@@ -237,7 +237,7 @@ impl ReleaseHistory<'_> {
                     .root
                     .path
                     .join(HISTORY)
-                    .join(&previous.index.operation_id)
+                    .join(previous.index.operation_id())
                     .join(RELEASE);
                 if identity != &previous.identity
                     || proof.previous_inventory_identity()
@@ -245,6 +245,51 @@ impl ReleaseHistory<'_> {
                 {
                     return Err(Error::EvidenceChanged);
                 }
+            } else if record.format == FORMAT
+                && proof.binding().previous_data_operation_id.is_some()
+            {
+                let inventory = self.journal.load_previous_inventory(&proof, hasher)?;
+                let data = &inventory.paths(self.journal)?[2];
+                for (slot, expected) in SLOTS.iter().zip(&inventory.files) {
+                    if self.optional_file(&data.join(slot_name(*slot)), hasher)? != *expected {
+                        return Err(Error::EvidenceChanged);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// During a new v2 release, absence of a locator is accepted only alongside
+    /// the current operation and its explicitly bound unreleased inventory.
+    /// An orphan release/cancellation directory is never a first lifecycle.
+    /// This is a live check: a historical chain head can have later descendants.
+    pub(super) fn verify_index_origin(&self, record: &TerminalReleaseReceipt) -> Result<()> {
+        if record.format != FORMAT || record.previous_index.is_some() {
+            return Ok(());
+        }
+        let root = self.journal.store.root.path.join(HISTORY);
+        if !path_exists(&root)? {
+            return Ok(());
+        }
+        self.journal.history_directory(&root)?;
+        let legacy_data = if record.preparation[0].is_some() {
+            record.receipt.previous_operation_id()
+        } else {
+            None
+        };
+        for entry in fs::read_dir(root).map_err(|_| Error::Io)? {
+            let entry = entry.map_err(|_| Error::Io)?;
+            let name = entry.file_name();
+            if name == INDEX || name == INDEX_TEMP {
+                // The caller independently requires the exact old/new locator
+                // or its own exclusive temp, including identity and contents.
+                continue;
+            }
+            if name != record.binding.operation_id.as_str()
+                && !legacy_data.is_some_and(|id| name == id)
+            {
+                return Err(Error::EvidenceChanged);
             }
         }
         Ok(())
@@ -309,14 +354,7 @@ impl ReleaseHistory<'_> {
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect();
-        Ok(ReleaseIndex {
-            format: INDEX_FORMAT.to_owned(),
-            operation_id: record.binding.operation_id.clone(),
-            data_operation_id: record.receipt.operation_id().to_owned(),
-            installed_release: record.binding.installed_release.clone(),
-            data_root: record.data_root.clone(),
-            release_sha256: digest,
-        })
+        ReleaseIndex::for_terminal(record, digest)
     }
     pub(super) fn require_published_index(
         &self,
@@ -351,10 +389,9 @@ impl ReleaseHistory<'_> {
         let mut seen = std::collections::BTreeSet::from([record.binding.operation_id.clone()]);
         let mut current = record.clone();
         while let Some(previous) = &current.previous_index {
-            if !seen.insert(previous.index.operation_id.clone())
-                || current.receipt.previous_operation_id()
-                    != Some(previous.index.data_operation_id.as_str())
-                || current.receipt.source_release() != &previous.index.installed_release
+            if !seen.insert(previous.index.operation_id().to_owned())
+                || current.receipt.previous_operation_id() != previous.index.data_operation_id()
+                || current.receipt.source_release() != previous.index.installed_release()
             {
                 return Err(Error::EvidenceChanged);
             }
@@ -389,13 +426,13 @@ impl ReleaseHistory<'_> {
                 .read_release(&self.active(RELEASE), hasher)?
                 .binding
                 .operation_id
-                == index.operation_id
+                == index.operation_id()
         {
             return Err(Error::EvidenceChanged);
         }
         let root = self.journal.store.root.path.join(HISTORY);
         self.journal.history_directory(&root)?;
-        let operation = root.join(&index.operation_id);
+        let operation = root.join(index.operation_id());
         self.journal.history_directory(&operation)?;
         let path = operation.join(RELEASE);
         let identity = self.journal.evidence(&path, hasher)?;

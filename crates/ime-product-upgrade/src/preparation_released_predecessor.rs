@@ -40,8 +40,8 @@ impl PreparationJournalStore {
         let mut inventory = PreviousInventory::empty(self, operation, previous_install)?;
         let reader = ReleaseHistory { journal: self };
         let index = reader.load_index(hasher)?.ok_or(Error::EvidenceChanged)?;
-        if Some(index.index.data_operation_id.as_str()) != previous_data
-            || index.index.operation_id == operation
+        if index.index.data_operation_id() != previous_data
+            || index.index.operation_id() == operation
         {
             return Err(Error::EvidenceChanged);
         }
@@ -50,7 +50,7 @@ impl PreparationJournalStore {
             .root
             .path
             .join(HISTORY)
-            .join(&index.index.operation_id)
+            .join(index.index.operation_id())
             .join(RELEASE);
         let identity = self.evidence(&path, hasher)?;
         let proof = reader.resolve_index(&index.index, hasher)?;
