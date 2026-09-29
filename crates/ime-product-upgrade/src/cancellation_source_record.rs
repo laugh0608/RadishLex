@@ -63,7 +63,7 @@ impl CancellationSourceReceipt {
         next.source_ready = Some(family);
         Ok(next)
     }
-    pub(super) fn validate_request(&self, request: &PreparationCancellationRequest) -> Result<()> {
+    pub(crate) fn validate_request(&self, request: &PreparationCancellationRequest) -> Result<()> {
         self.encode()?;
         let original = request.preparation();
         let mut expected = original.clone();

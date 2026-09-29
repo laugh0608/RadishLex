@@ -99,6 +99,19 @@ fn reserve(
     UpgradeProcessGuard,
     PreparationBinding,
 ) {
+    reserve_with_outer_digest(fixture, prior, operation, "d".repeat(64))
+}
+
+fn reserve_with_outer_digest(
+    fixture: &Fixture,
+    prior: &Binding,
+    operation: &str,
+    outer_digest: String,
+) -> (
+    PreparationJournalStore,
+    UpgradeProcessGuard,
+    PreparationBinding,
+) {
     let (store, guard) = fixture.reload();
     let inventory = store
         .capture_previous_inventory(
@@ -121,7 +134,7 @@ fn reserve(
         target_release: release(prior.installed_release.build_number() + 2),
         source_product_sha256: prior.installed_product_sha256.clone(),
         target_product_sha256: "c".repeat(64),
-        previous_install_receipt_sha256: Some("d".repeat(64)),
+        previous_install_receipt_sha256: Some(outer_digest),
         previous_data_receipt_sha256: inventory.receipt_sha256().map(str::to_owned),
         previous_inventory_sha256: Some(proof.sha256.clone()),
         target_schema_version: 9,
@@ -139,6 +152,9 @@ fn reserve(
     store.persist(&guard, None, &record).unwrap();
     (store, guard, binding)
 }
+
+#[path = "cancellation_released.rs"]
+mod cancellation_released;
 
 fn advance(
     store: PreparationJournalStore,

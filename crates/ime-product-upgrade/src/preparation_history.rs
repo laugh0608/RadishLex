@@ -10,6 +10,13 @@ use inventory::{expected_private, matches_artifact, slot_name, HISTORY, INVENTOR
 #[path = "preparation_handoff.rs"]
 mod handoff;
 
+#[path = "cancellation_archive.rs"]
+mod cancellation_archive;
+pub use cancellation_archive::{
+    CancellationArchiveCheckpoint, CancellationArchivePort, CancellationArchiveReceipt,
+    CancellationArchiveSlot, CancellationArchiveStore, CancellationOuterBinding,
+};
+
 #[path = "terminal_release.rs"]
 mod terminal_release;
 pub use terminal_release::{

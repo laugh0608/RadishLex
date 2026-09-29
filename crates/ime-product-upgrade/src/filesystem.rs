@@ -866,6 +866,8 @@ mod tests;
 #[path = "preparation_journal.rs"]
 mod preparation_journal;
 pub use preparation_journal::{
+    CancellationArchiveCheckpoint, CancellationArchivePort, CancellationArchiveReceipt,
+    CancellationArchiveSlot, CancellationArchiveStore, CancellationOuterBinding,
     CancellationSourceCheckpoint, CancellationSourcePhase, CancellationSourcePort,
     CancellationSourceReceipt, PreparationCancellationCheckpoint, PreparationCancellationPort,
     PreparationCancellationRequest, PreparationCancellationStore, PreparationHasher,

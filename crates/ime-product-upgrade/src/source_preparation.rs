@@ -83,7 +83,9 @@ pub enum SourcePreparationCheckpoint {
 #[path = "preparation_history.rs"]
 mod history;
 pub use history::{
-    PreviousInventory, TerminalReleaseBinding, TerminalReleaseCheckpoint, TerminalReleaseDirectory,
+    CancellationArchiveCheckpoint, CancellationArchivePort, CancellationArchiveReceipt,
+    CancellationArchiveSlot, CancellationArchiveStore, CancellationOuterBinding, PreviousInventory,
+    TerminalReleaseBinding, TerminalReleaseCheckpoint, TerminalReleaseDirectory,
     TerminalReleaseOuterRequirement, TerminalReleasePhase, TerminalReleasePort,
     TerminalReleaseReceipt, TerminalReleaseStore,
 };

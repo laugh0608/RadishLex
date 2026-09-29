@@ -430,6 +430,8 @@ mod tests;
 #[path = "source_preparation.rs"]
 mod source_preparation;
 pub use source_preparation::{
+    CancellationArchiveCheckpoint, CancellationArchivePort, CancellationArchiveReceipt,
+    CancellationArchiveSlot, CancellationArchiveStore, CancellationOuterBinding,
     CancellationSourceCheckpoint, CancellationSourcePhase, CancellationSourcePort,
     CancellationSourceReceipt, PreparationCancellationCheckpoint, PreparationCancellationPort,
     PreparationCancellationRequest, PreparationCancellationStore, PreparationHasher,

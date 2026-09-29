@@ -4,6 +4,9 @@
 
 use std::fmt;
 
+mod cancellation_archive;
+pub use cancellation_archive::{CancellationArchiveAuthority, CancellationProductAuthority};
+
 use radishlex_ime_product_install::{
     finish_program_restore, restore_program_source, resume_install_finalization,
     InstallFailureCode, InstallFilesystemError, InstallFilesystemErrorCode,

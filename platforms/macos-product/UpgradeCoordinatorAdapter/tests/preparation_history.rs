@@ -23,6 +23,8 @@ const OLD: &str = "22222222222222222222222222222222";
 const OUTER: &str = "33333333333333333333333333333333";
 #[path = "preparation_history/cancellation.rs"]
 mod cancellation;
+#[path = "preparation_history/cancellation_archive.rs"]
+mod cancellation_archive;
 #[path = "preparation_history/handoff.rs"]
 mod handoff;
 #[path = "preparation_history/release.rs"]
@@ -86,6 +88,13 @@ impl Fixture {
         (store, guard)
     }
     fn legacy(&self, state: Option<State>) -> (PreparationJournalStore, UpgradeProcessGuard) {
+        self.legacy_with_learning(state, 80)
+    }
+    fn legacy_with_learning(
+        &self,
+        state: Option<State>,
+        learned: usize,
+    ) -> (PreparationJournalStore, UpgradeProcessGuard) {
         let v1 = UpgradeReceiptStore::open(self.verified()).unwrap();
         let guard = v1.acquire_guard().unwrap();
         if let Some(state) = state {
@@ -172,7 +181,7 @@ impl Fixture {
             // Real normal learning after the old terminal: old active length is
             // deliberately stale, but immutable private artifacts still match.
             let mut db = UserDb::open(self.source()).unwrap();
-            for i in 0..80 {
+            for i in 0..learned {
                 db.record_selection(SelectionEventDraft::new(
                     "synthetic-new-learning",
                     "xin",

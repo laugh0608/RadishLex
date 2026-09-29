@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "cancellation_contract_tests.rs"]
+mod cancellation_contract_tests;
+
 fn hash(byte: char) -> String {
     byte.to_string().repeat(64)
 }

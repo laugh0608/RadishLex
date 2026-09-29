@@ -18,7 +18,9 @@ pub use preparation::{
 mod filesystem;
 #[cfg(unix)]
 pub use filesystem::{
-    inspect_startup_gate, CancellationSourceCheckpoint, CancellationSourcePhase,
+    inspect_startup_gate, CancellationArchiveCheckpoint, CancellationArchivePort,
+    CancellationArchiveReceipt, CancellationArchiveSlot, CancellationArchiveStore,
+    CancellationOuterBinding, CancellationSourceCheckpoint, CancellationSourcePhase,
     CancellationSourcePort, CancellationSourceReceipt, PreparationCancellationCheckpoint,
     PreparationCancellationPort, PreparationCancellationRequest, PreparationCancellationStore,
     PreparationHasher, PreparationJournalError, PreparationJournalStore, PreviousInventory,
