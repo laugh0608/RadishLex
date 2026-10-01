@@ -109,11 +109,11 @@ cargo run -p radishlex-ime-cli -- rank explain \
   --db /tmp/radishlex-userdb.sqlite --input luobo --candidate 萝卜
 ```
 
-真实 Rime adapter 需要本机 `librime` 和隔离 schema 数据：
+真实 Rime adapter 需要本机 `librime`、按来源锁装配的产品 RimeData 和隔离 user data；数据准备见下方 native runbook。产品 schema 显式关闭 Rime 自有学习，由 RadishLex userdb 管理学习：
 
 ```bash
 cargo run -p radishlex-ime-cli --features native-rime -- \
-  rime --schema luna_pinyin --shared-data <path> --user-data <path> luobo
+  rime --schema radishlex_pinyin --shared-data <product-data-path> --user-data <isolated-user-path> luobo
 ```
 
 详细命令见 [CLI 说明](docs/cli.md)，精确学习状态与非选择候选快照见 [学习取证 CLI 参考](docs/cli-learning-evidence.md)，本机 Rime 环境见 [Rime Native Smoke Runbook](docs/runbooks/rime-native-smoke.md)。

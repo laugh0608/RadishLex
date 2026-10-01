@@ -39,3 +39,9 @@
 - active install/data guard、外层非终态与终态 target/source 身份的两层只读 gate 决策。
 
 资格入口只接受固定 temp marker、私有合成 home/payload 和严格 ad-hoc identity；production 还要求 sealed requirement 集合。两类测试均不会访问真实用户目录、系统设置、Keychain 或网络，也不清理 staging/backup/历史 operation 材料。
+
+## 准备取消的外层绑定
+
+`CancellationArchiveAuthority` 为专用取消封存协调器提供真实 outer guard 校验、共同 data root、source/target release/manifest 绑定以及 `ime-product-install` 的严格回执核验。旧回执必须是匹配 source 的合法终态，新回执可空或精确匹配无 artifact 的 `prepared`；活动槽暂缺时仍核验已绑定原件，不能以普通 `persist` 倒退覆盖。回调前后验证 guard，并要求 `CancellationProductAuthority` fresh 证明源程序、静止和当前授权。
+
+此桥尚未接真实双 bundle 观察或 Installer Executor/UI。`tests/cancellation_archive.rs` 使用隔离目录、真实双 guard/回执和合成产品观察，普通安装协调门禁以 `qualification-harness --test cancellation_archive` 精确运行此目标；不会运行需要真实载体环境的其他资格目标。取消 `preserved` 仍保留内层阻断 marker，完整取消释放另需取消类型的 v2 证明/索引及旧程序资格。真实数据终态的 v1/v2 索引与接续已在升级核心实现，不代表此桥已具备取消释放能力。

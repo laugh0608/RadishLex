@@ -5,8 +5,8 @@
 use std::path::Path;
 
 use radishlex_ime_product_install::{
-    inspect_install_status, InstallFailureCode, InstallOperationKind, InstallStartupGateErrorCode,
-    InstallState, InstallStatusDecision,
+    inspect_install_status, InstallFailureCode, InstallOperationKind, InstallReceipt,
+    InstallStartupGateErrorCode, InstallState, InstallStatusDecision,
 };
 
 pub const INSTALLER_VIEW_CONTRACT_VERSION: u32 = 1;
@@ -44,6 +44,7 @@ pub enum InstallerAction {
     ResumeOperation,
     RetryOperation,
     RemovePrograms,
+    AbortPreSwitchUpgrade,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -97,6 +98,48 @@ pub enum InstallerDataPolicy {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RecoveryIntentBinding {
+    operation_id: [u8; 32],
+    root: (u64, u64, u32, u32),
+    source_manifest: [u8; 32],
+    target_manifest: [u8; 32],
+    builds: (u64, u64),
+}
+
+impl RecoveryIntentBinding {
+    fn from_receipt(receipt: &InstallReceipt) -> Option<Self> {
+        receipt.encode().ok()?;
+        if receipt.operation_kind() != InstallOperationKind::Upgrade {
+            return None;
+        }
+        let root = receipt.root_identity();
+        let source = receipt.source_product()?;
+        let target = receipt.target_product()?;
+        Some(Self {
+            operation_id: receipt.operation_id().as_bytes().try_into().ok()?,
+            root: (root.device_id(), root.inode(), root.owner_id(), root.mode()),
+            source_manifest: Self::manifest_digest(source.product_manifest_sha256())?,
+            target_manifest: Self::manifest_digest(target.product_manifest_sha256())?,
+            builds: (
+                source.release().build_number(),
+                target.release().build_number(),
+            ),
+        })
+    }
+
+    fn manifest_digest(hex: &str) -> Option<[u8; 32]> {
+        if hex.len() != 64 {
+            return None;
+        }
+        let mut digest = [0u8; 32];
+        for (output, pair) in digest.iter_mut().zip(hex.as_bytes().chunks_exact(2)) {
+            *output = u8::from_str_radix(std::str::from_utf8(pair).ok()?, 16).ok()?;
+        }
+        Some(digest)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InstallerViewSnapshot {
     version: u32,
     phase: InstallerViewPhase,
@@ -109,9 +152,55 @@ pub struct InstallerViewSnapshot {
     receipt_state: Option<InstallState>,
     failure_code: Option<InstallFailureCode>,
     progress_step: u8,
+    recovery_binding: Option<RecoveryIntentBinding>,
 }
 
 impl InstallerViewSnapshot {
+    /// Eligibility comes from the composition layer's freshly inspected, bound
+    /// receipts, never from an AppKit parameter.
+    pub fn with_pre_switch_recovery(
+        mut self,
+        receipt: &InstallReceipt,
+        recovery_started: bool,
+    ) -> Self {
+        let Some(binding) = RecoveryIntentBinding::from_receipt(receipt) else {
+            return self.with_recovery_inspection_error(InstallerStableError::InvalidReceipt);
+        };
+        if self.operation_kind != Some(InstallOperationKind::Upgrade)
+            || !matches!(
+                self.receipt_state,
+                Some(
+                    InstallState::DataCoordinating
+                        | InstallState::RollbackRequired
+                        | InstallState::ProgramsRestored
+                )
+            )
+            || self.phase == InstallerViewPhase::Blocked
+            || self.stable_error == InstallerStableError::OperationActive
+        {
+            return self;
+        }
+        self.phase = InstallerViewPhase::RecoveryAvailable;
+        self.recovery_binding = Some(binding);
+        self.manual_prompt = InstallerManualPrompt::SelectNeutralInputSourceAndCloseManager;
+        if recovery_started {
+            self.primary_action = InstallerAction::AbortPreSwitchUpgrade;
+            self.secondary_action = InstallerAction::None;
+        } else {
+            self.secondary_action = InstallerAction::AbortPreSwitchUpgrade;
+        }
+        self
+    }
+
+    pub fn with_recovery_inspection_error(mut self, error: InstallerStableError) -> Self {
+        self.phase = InstallerViewPhase::Blocked;
+        self.primary_action = InstallerAction::Refresh;
+        self.secondary_action = InstallerAction::None;
+        self.stable_error = error;
+        self.manual_prompt = InstallerManualPrompt::None;
+        self
+    }
+
     pub const fn version(self) -> u32 {
         self.version
     }
@@ -414,6 +503,7 @@ fn snapshot(
         receipt_state,
         failure_code,
         progress_step: receipt_state.map_or(0, progress_step),
+        recovery_binding: None,
     }
 }
 
@@ -439,9 +529,15 @@ pub struct AuthorizedInstallerIntent {
     operation_kind: Option<InstallOperationKind>,
     resume_existing: bool,
     requires_platform_preflight: bool,
+    recovery_binding: Option<RecoveryIntentBinding>,
 }
 
 impl AuthorizedInstallerIntent {
+    pub fn matches_recovery_receipt(self, receipt: &InstallReceipt) -> bool {
+        self.action == InstallerAction::AbortPreSwitchUpgrade
+            && self.recovery_binding.is_some()
+            && self.recovery_binding == RecoveryIntentBinding::from_receipt(receipt)
+    }
     pub const fn action(self) -> InstallerAction {
         self.action
     }
@@ -473,12 +569,20 @@ pub fn authorize_installer_action(
             operation_kind: snapshot.operation_kind,
             resume_existing: false,
             requires_platform_preflight: false,
+            recovery_binding: None,
         });
     }
     if !authorization.explicit_action_confirmed {
         return Err(InstallerAuthorizationError::ExplicitConfirmationRequired);
     }
-    if action == InstallerAction::RemovePrograms && !authorization.data_retention_acknowledged {
+    if action == InstallerAction::AbortPreSwitchUpgrade && snapshot.recovery_binding.is_none() {
+        return Err(InstallerAuthorizationError::ActionNotOffered);
+    }
+    if matches!(
+        action,
+        InstallerAction::RemovePrograms | InstallerAction::AbortPreSwitchUpgrade
+    ) && !authorization.data_retention_acknowledged
+    {
         return Err(InstallerAuthorizationError::DataRetentionAcknowledgementRequired);
     }
     if matches!(
@@ -488,6 +592,7 @@ pub fn authorize_installer_action(
             | InstallerAction::ConfirmQuiescence
             | InstallerAction::RetryOperation
             | InstallerAction::RemovePrograms
+            | InstallerAction::AbortPreSwitchUpgrade
     ) && (!authorization.neutral_input_source_selected || !authorization.manager_closed)
     {
         return Err(InstallerAuthorizationError::ManualQuiescenceAcknowledgementRequired);
@@ -499,7 +604,8 @@ pub fn authorize_installer_action(
         InstallerAction::RemovePrograms => Some(InstallOperationKind::RemovePrograms),
         InstallerAction::ConfirmQuiescence
         | InstallerAction::ResumeOperation
-        | InstallerAction::RetryOperation => snapshot.operation_kind,
+        | InstallerAction::RetryOperation
+        | InstallerAction::AbortPreSwitchUpgrade => snapshot.operation_kind,
         InstallerAction::None | InstallerAction::Refresh => None,
     };
     Ok(AuthorizedInstallerIntent {
@@ -507,9 +613,16 @@ pub fn authorize_installer_action(
         operation_kind,
         resume_existing: matches!(
             action,
-            InstallerAction::ConfirmQuiescence | InstallerAction::ResumeOperation
+            InstallerAction::ConfirmQuiescence
+                | InstallerAction::ResumeOperation
+                | InstallerAction::AbortPreSwitchUpgrade
         ),
         requires_platform_preflight: true,
+        recovery_binding: if action == InstallerAction::AbortPreSwitchUpgrade {
+            snapshot.recovery_binding
+        } else {
+            None
+        },
     })
 }
 
@@ -576,6 +689,7 @@ const fn action_code(action: InstallerAction) -> &'static str {
         InstallerAction::ResumeOperation => "resume_operation",
         InstallerAction::RetryOperation => "retry_operation",
         InstallerAction::RemovePrograms => "remove_programs",
+        InstallerAction::AbortPreSwitchUpgrade => "abort_pre_switch_upgrade",
     }
 }
 

@@ -17,4 +17,4 @@ radishlex-ime-ranker = { path = "../ime-ranker" }
 radishlex-ime-userdb = { path = "../ime-userdb" }
 
 [dev-dependencies]
-rusqlite = { version = "0.32.1", features = ["bundled"] }
+rusqlite = { version = "0.39.0", features = ["bundled"] }

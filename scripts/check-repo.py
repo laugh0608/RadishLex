@@ -14,6 +14,7 @@ from repository_governance import check_community_governance, check_markdown_lin
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MAX_COMMITTED_PATH_LENGTH = 180
 REQUIRED_FILES = [
+    ".cargo/config.toml",
     ".editorconfig",
     ".gitattributes",
     ".gitignore",

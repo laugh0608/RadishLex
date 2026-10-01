@@ -51,6 +51,10 @@ struct TestEngine {
     buffer: String,
     segmented_selection: bool,
     pending_commit: Option<String>,
+    fail_next_reset: bool,
+    fail_next_schema: bool,
+    fail_next_selection: bool,
+    retain_after_auto_commit: bool,
 }
 
 impl TestEngine {
@@ -68,6 +72,10 @@ impl TestEngine {
             buffer: String::new(),
             segmented_selection,
             pending_commit: None,
+            fail_next_reset: false,
+            fail_next_schema: false,
+            fail_next_selection: false,
+            retain_after_auto_commit: false,
         }
     }
 
@@ -95,6 +103,9 @@ impl TestEngine {
 
 impl Engine for TestEngine {
     fn reset(&mut self) -> CoreResult<()> {
+        if std::mem::take(&mut self.fail_next_reset) {
+            return Err(CoreError::engine("synthetic reset failure"));
+        }
         self.buffer.clear();
         self.pending_commit = None;
         Ok(())
@@ -105,6 +116,10 @@ impl Engine for TestEngine {
             return Ok(KeyOutcome::ignored());
         }
         match key.key() {
+            Key::Char('!') => {
+                self.buffer = "luobo".to_owned();
+                Err(CoreError::engine("synthetic failure after partial input"))
+            }
             Key::Char(ch) if ch.is_ascii_alphanumeric() => {
                 self.buffer.push(ch.to_ascii_lowercase());
                 Ok(KeyOutcome::consumed())
@@ -124,6 +139,16 @@ impl Engine for TestEngine {
                 self.buffer.pop();
                 Ok(KeyOutcome::consumed())
             }
+            Key::Named(NamedKey::Space) if !self.current_candidates().is_empty() => {
+                let candidate = self.current_candidates().remove(0);
+                if !self.retain_after_auto_commit {
+                    self.buffer.clear();
+                }
+                Ok(KeyOutcome::committed(Commit::new(
+                    candidate.text(),
+                    CommitSource::Engine,
+                )))
+            }
             _ => Ok(KeyOutcome::ignored()),
         }
     }
@@ -141,6 +166,9 @@ impl Engine for TestEngine {
     }
 
     fn select_candidate(&mut self, index: usize) -> CoreResult<KeyOutcome> {
+        if std::mem::take(&mut self.fail_next_selection) {
+            return Err(CoreError::engine("synthetic selection failure"));
+        }
         let candidates = self.current_candidates();
         let candidate = candidates
             .get(index)
@@ -162,6 +190,12 @@ impl Engine for TestEngine {
     }
 
     fn set_schema(&mut self, schema: SchemaId) -> CoreResult<()> {
+        if std::mem::take(&mut self.fail_next_schema) {
+            return Err(CoreError::engine("synthetic schema failure"));
+        }
+        if schema == self.schema {
+            return Ok(());
+        }
         self.schema = schema;
         self.reset()
     }
@@ -369,11 +403,321 @@ fn context_change_clears_deferred_selection() {
     assert!(committed.outcome().commit().is_some());
     assert_eq!(
         committed.learning_disposition(),
-        LearningDisposition::NotApplicable
+        LearningDisposition::SkippedByPolicy
     );
     drop(session);
     let db = UserDb::open(temp.path()).expect("userdb opens");
     assert_eq!(db.selection_event_count().expect("count"), 0);
+}
+
+fn restricted_contexts() -> [LearningContext; 4] {
+    [
+        LearningContext::default().with_privacy_mode(true),
+        LearningContext::default().with_context_known(false),
+        LearningContext::default().with_secure_input(true),
+        LearningContext::default().with_sensitive_application(true),
+    ]
+}
+
+#[test]
+fn restricted_input_stays_unlearned_after_returning_to_normal_then_next_input_learns() {
+    for context in restricted_contexts() {
+        for enter_mid_composition in [false, true] {
+            let temp = TempUserDb::new("sticky-policy");
+            let mut session =
+                PersonalizedInputSession::open(TestEngine::immediate(), temp.path(), "sticky")
+                    .unwrap();
+            if enter_mid_composition {
+                type_input(&mut session, "lu");
+                session.set_learning_context(context.clone());
+                type_input(&mut session, "obo");
+            } else {
+                session.set_learning_context(context.clone());
+                type_input(&mut session, "luobo");
+            }
+            session.set_learning_context(LearningContext::default());
+            let result = session.select_candidate(1).unwrap();
+            assert_eq!(result.outcome().commit().unwrap().text(), "萝卜");
+            assert_eq!(
+                result.learning_disposition(),
+                LearningDisposition::SkippedByPolicy
+            );
+            let db = UserDb::open(temp.path()).unwrap();
+            assert_eq!(db.selection_event_count().unwrap(), 0);
+            type_input(&mut session, "luobo");
+            assert_eq!(
+                session.select_candidate(1).unwrap().learning_disposition(),
+                LearningDisposition::Recorded
+            );
+            assert_eq!(db.selection_event_count().unwrap(), 1);
+        }
+    }
+}
+
+#[test]
+fn context_round_trip_taints_existing_composition_even_without_a_key_in_between() {
+    for context in restricted_contexts() {
+        let temp = TempUserDb::new("context-round-trip");
+        let mut session =
+            PersonalizedInputSession::open(TestEngine::immediate(), temp.path(), "round-trip")
+                .unwrap();
+        type_input(&mut session, "luobo");
+        session.set_learning_context(context);
+        session.set_learning_context(LearningContext::default());
+        assert_eq!(
+            session.select_candidate(1).unwrap().learning_disposition(),
+            LearningDisposition::SkippedByPolicy
+        );
+        assert_eq!(
+            UserDb::open(temp.path())
+                .unwrap()
+                .selection_event_count()
+                .unwrap(),
+            0
+        );
+    }
+}
+
+#[test]
+fn idle_context_changes_do_not_block_a_future_normal_composition() {
+    for context in restricted_contexts() {
+        let db = UserDb::open_in_memory().unwrap();
+        let mut session =
+            PersonalizedInputSession::with_userdb(TestEngine::immediate(), db, "idle").unwrap();
+        session.set_learning_context(context);
+        session.set_learning_context(LearningContext::default());
+        type_input(&mut session, "luobo");
+        assert_eq!(
+            session.select_candidate(1).unwrap().learning_disposition(),
+            LearningDisposition::Recorded
+        );
+    }
+}
+
+#[test]
+fn blocked_read_policy_survives_return_to_normal_for_the_same_composition() {
+    let temp = TempUserDb::new("sticky-read");
+    let mut seed = UserDb::open(temp.path()).unwrap();
+    seed.record_selection(
+        SelectionEventDraft::new("seed", "luobo", "萝卜", 1, 2).with_reading("luobo"),
+    )
+    .unwrap();
+    let mut session =
+        PersonalizedInputSession::open(TestEngine::immediate(), temp.path(), "read").unwrap();
+    session.set_learning_context(LearningContext::default().with_context_known(false));
+    type_input(&mut session, "luobo");
+    session.set_learning_context(LearningContext::default().with_privacy_mode(true));
+    session.set_learning_context(LearningContext::default());
+    let snapshot = session.snapshot().unwrap();
+    assert_eq!(
+        snapshot.personalization_status(),
+        PersonalizationStatus::PolicyBlocked
+    );
+    assert_eq!(snapshot.candidates()[0].candidate().text(), "落泊");
+    session.reset().unwrap();
+    type_input(&mut session, "luobo");
+    assert_eq!(candidate_texts(&mut session)[0], "萝卜");
+}
+
+#[test]
+fn deferred_and_automatic_commits_keep_privacy_provenance() {
+    for context in restricted_contexts() {
+        let temp = TempUserDb::new("deferred-private");
+        let mut session =
+            PersonalizedInputSession::open(TestEngine::segmented(), temp.path(), "deferred")
+                .unwrap();
+        session.set_learning_context(context.clone());
+        type_input(&mut session, "luobo");
+        session.set_learning_context(LearningContext::default());
+        let partial = session.select_candidate(1).unwrap();
+        assert_eq!(
+            partial.learning_disposition(),
+            LearningDisposition::SkippedByPolicy
+        );
+        assert!(partial.outcome().commit().is_none());
+        let result = session
+            .handle_key(KeyEvent::press(Key::Named(NamedKey::Enter)))
+            .unwrap();
+        assert_eq!(result.outcome().commit().unwrap().text(), "萝卜");
+        assert_eq!(
+            result.learning_disposition(),
+            LearningDisposition::SkippedByPolicy
+        );
+        assert_eq!(
+            UserDb::open(temp.path())
+                .unwrap()
+                .selection_event_count()
+                .unwrap(),
+            0
+        );
+
+        let db = UserDb::open_in_memory().unwrap();
+        let mut session =
+            PersonalizedInputSession::with_userdb(TestEngine::immediate(), db, "automatic")
+                .unwrap();
+        session.set_learning_context(context);
+        type_input(&mut session, "luobo");
+        session.set_learning_context(LearningContext::default());
+        let result = session
+            .handle_key(KeyEvent::press(Key::Named(NamedKey::Space)))
+            .unwrap();
+        assert_eq!(result.outcome().commit().unwrap().text(), "落泊");
+        assert_eq!(
+            result.learning_disposition(),
+            LearningDisposition::SkippedByPolicy
+        );
+    }
+}
+
+#[test]
+fn automatic_commit_with_remaining_composition_does_not_clear_privacy() {
+    let db = UserDb::open_in_memory().unwrap();
+    let mut engine = TestEngine::immediate();
+    engine.retain_after_auto_commit = true;
+    let mut session = PersonalizedInputSession::with_userdb(engine, db, "remainder").unwrap();
+    session.set_learning_context(LearningContext::default().with_privacy_mode(true));
+    type_input(&mut session, "luobo");
+    session.set_learning_context(LearningContext::default());
+    let result = session
+        .handle_key(KeyEvent::press(Key::Named(NamedKey::Space)))
+        .unwrap();
+    assert!(result.outcome().commit().is_some());
+    assert!(!result.snapshot().composition().is_empty());
+    assert_eq!(
+        session.select_candidate(1).unwrap().learning_disposition(),
+        LearningDisposition::SkippedByPolicy
+    );
+}
+
+#[test]
+fn only_observed_empty_composition_releases_privacy_after_reset_or_schema_change() {
+    for failure in ["reset", "schema", "selection", "key", "same-schema"] {
+        let db = UserDb::open_in_memory().unwrap();
+        let mut engine = TestEngine::immediate();
+        engine.fail_next_reset = failure == "reset";
+        engine.fail_next_schema = failure == "schema";
+        engine.fail_next_selection = failure == "selection";
+        let mut session =
+            PersonalizedInputSession::with_userdb(engine, db, "failed-action").unwrap();
+        session.set_learning_context(LearningContext::default().with_privacy_mode(true));
+        if failure == "key" {
+            assert!(session.handle_key(KeyEvent::press_char('!')).is_err());
+        } else {
+            type_input(&mut session, "luobo");
+        }
+        match failure {
+            "reset" => assert!(session.reset().is_err()),
+            "schema" => assert!(session.set_schema(SchemaId::new("other").unwrap()).is_err()),
+            "selection" => assert!(session.select_candidate(1).is_err()),
+            "same-schema" => session
+                .set_schema(SchemaId::new("test.pinyin").unwrap())
+                .unwrap(),
+            "key" => (),
+            _ => unreachable!(),
+        }
+        session.set_learning_context(LearningContext::default());
+        let result = session.select_candidate(1).unwrap();
+        assert_eq!(result.outcome().commit().unwrap().text(), "萝卜");
+        assert_eq!(
+            result.learning_disposition(),
+            LearningDisposition::SkippedByPolicy
+        );
+        type_input(&mut session, "luobo");
+        assert_eq!(
+            session.select_candidate(1).unwrap().learning_disposition(),
+            LearningDisposition::Recorded
+        );
+    }
+}
+
+#[test]
+fn reset_schema_change_and_backspacing_to_empty_allow_fresh_normal_input() {
+    for action in ["reset", "schema", "backspace"] {
+        let db = UserDb::open_in_memory().unwrap();
+        let mut session =
+            PersonalizedInputSession::with_userdb(TestEngine::immediate(), db, "fresh").unwrap();
+        session.set_learning_context(LearningContext::default().with_privacy_mode(true));
+        type_input(&mut session, "luobo");
+        match action {
+            "reset" => session.reset().unwrap(),
+            "schema" => session.set_schema(SchemaId::new("other").unwrap()).unwrap(),
+            "backspace" => {
+                for _ in 0..5 {
+                    session
+                        .handle_key(KeyEvent::press(Key::Named(NamedKey::Backspace)))
+                        .unwrap();
+                }
+            }
+            _ => unreachable!(),
+        }
+        session.set_learning_context(LearningContext::default());
+        type_input(&mut session, "luobo");
+        assert_eq!(
+            session.select_candidate(1).unwrap().learning_disposition(),
+            LearningDisposition::Recorded
+        );
+    }
+}
+
+#[test]
+fn private_session_does_not_taint_a_peer_using_the_same_userdb() {
+    let temp = TempUserDb::new("peers");
+    let mut private =
+        PersonalizedInputSession::open(TestEngine::immediate(), temp.path(), "private").unwrap();
+    let mut normal =
+        PersonalizedInputSession::open(TestEngine::immediate(), temp.path(), "normal").unwrap();
+    private.set_learning_context(LearningContext::default().with_privacy_mode(true));
+    type_input(&mut private, "luobo");
+    private.set_learning_context(LearningContext::default());
+    type_input(&mut normal, "luobo");
+    assert_eq!(
+        normal.select_candidate(1).unwrap().learning_disposition(),
+        LearningDisposition::Recorded
+    );
+    assert_eq!(
+        private.select_candidate(1).unwrap().learning_disposition(),
+        LearningDisposition::SkippedByPolicy
+    );
+    assert_eq!(
+        UserDb::open(temp.path())
+            .unwrap()
+            .selection_event_count()
+            .unwrap(),
+        1
+    );
+}
+
+#[test]
+fn precomposed_or_directly_mutated_engine_has_no_learnable_provenance() {
+    let mut engine = TestEngine::new(false);
+    for ch in "luobo".chars() {
+        engine.push_key(KeyEvent::press_char(ch)).unwrap();
+    }
+    let mut session = PersonalizedInputSession::with_userdb(
+        engine,
+        UserDb::open_in_memory().unwrap(),
+        "precomposed-engine",
+    )
+    .unwrap();
+    assert_eq!(
+        session.select_candidate(1).unwrap().learning_disposition(),
+        LearningDisposition::SkippedByPolicy
+    );
+    type_input(&mut session, "luobo");
+    assert_eq!(
+        session.select_candidate(1).unwrap().learning_disposition(),
+        LearningDisposition::Recorded
+    );
+    for ch in "luobo".chars() {
+        session
+            .engine_mut()
+            .push_key(KeyEvent::press_char(ch))
+            .unwrap();
+    }
+    assert_eq!(
+        session.select_candidate(1).unwrap().learning_disposition(),
+        LearningDisposition::SkippedByPolicy
+    );
 }
 
 #[test]

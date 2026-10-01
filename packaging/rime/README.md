@@ -19,3 +19,5 @@
 ```
 
 输出目录必须是新建的隔离目录，不能指向用户或运行时 Rime 数据。完整双 bundle 构建、产物解释和失败处理见 [macOS 产品装配 Runbook](../../docs/runbooks/macos-product-assembly.md)。
+
+产品 schema 使用 `enable_user_dict: false`，学习由 RadishLex userdb 独占。native adapter 还检查有效部署配置，旧编译配置或 custom patch 重新开启学习会拒绝创建 session。既有 Rime 学习数据保留且不迁移；基础词典仍用于候选生成，旧自学词/新词召回不再使用。具体合同与兼容限制见 [Rime adapter](../../docs/engine-rime-adapter.md#单一学习存储与有效配置)。

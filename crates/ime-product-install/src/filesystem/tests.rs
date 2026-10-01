@@ -114,6 +114,34 @@ fn first_install_receipt(store: &InstallReceiptStore) -> InstallReceipt {
     .expect("receipt")
 }
 
+#[test]
+fn recovery_inspection_preserves_missing_state_and_stale_guard() {
+    let fixture = Fixture::new(true);
+    assert!(InstallReceiptStore::open_existing(
+        VerifiedInstallRoot::verify(&fixture.data_root, fixture.owner_id).unwrap()
+    )
+    .is_err());
+    assert!(!fixture.data_root.join(STATE_DIRECTORY_NAME).exists());
+    let store = fixture.store();
+    let guard = store.acquire_guard().unwrap();
+    let receipt = first_install_receipt(&store);
+    store.persist(&guard, &receipt).unwrap();
+    assert_eq!(
+        store.load_for_recovery_inspection().unwrap_err().code(),
+        InstallFilesystemErrorCode::OperationAlreadyActive
+    );
+    drop(guard);
+    let socket = store.guard_path();
+    let stale = UnixListener::bind(&socket).unwrap();
+    fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
+    drop(stale);
+    let before = fs::metadata(&socket).unwrap().ino();
+    assert_eq!(store.load_for_recovery_inspection().unwrap(), Some(receipt));
+    assert_eq!(fs::metadata(&socket).unwrap().ino(), before);
+    drop(store.acquire_guard().unwrap());
+    assert!(!socket.exists());
+}
+
 fn evidence(receipt: &InstallReceipt, slot: InstallArtifactSlot) -> InstallArtifactEvidence {
     let target = receipt.target_product().expect("target");
     let inode = match slot {

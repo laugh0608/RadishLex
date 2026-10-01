@@ -7,6 +7,21 @@
 #import "RadishLexLearningContext.h"
 #import "RadishLexRuntime.h"
 
+static NSString *RLXInputClientBundleIdentifier(id client) {
+  // The frontmost application can differ from the recipient of an IMK event.
+  // Missing or failed client identity must remain an unknown context.
+  @try {
+    if (![client respondsToSelector:@selector(bundleIdentifier)])
+      return nil;
+    id identifier = [(id<IMKTextInput>)client bundleIdentifier];
+    return [identifier isKindOfClass:NSString.class] ? identifier : nil;
+  } @catch (NSException *exception) {
+    (void)exception;
+    NSLog(@"RadishLex input client identity query failed");
+    return nil;
+  }
+}
+
 static BOOL RLXNullableStringsEqual(NSString *left, NSString *right) {
   return left == right || [left isEqualToString:right];
 }
@@ -51,6 +66,9 @@ static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
 @property(nonatomic, copy) NSString *learningContextKind;
 #if RADISHLEX_CONTRACT_SMOKE
 @property(nonatomic, strong) id contractClient;
+@property(nonatomic) BOOL contractLearningContextEnabled;
+@property(nonatomic) BOOL contractPrivacyMode;
+@property(nonatomic) BOOL contractSecureInput;
 #endif
 - (BOOL)prepareSessionAndCandidatePanel;
 - (BOOL)moveCandidateSelectionByOffset:(NSInteger)offset;
@@ -117,6 +135,23 @@ static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
   if (self.contractClient != nil)
     return (id<IMKTextInput, NSObject>)self.contractClient;
   return [super client];
+}
+
+- (instancetype)initForContractWithClient:(id)inputClient
+                                 session:(RLXSessionBridge *)session {
+  self = [super init];
+  if (self == nil)
+    return nil;
+  self.contractClient = inputClient;
+  self.contractLearningContextEnabled = YES;
+  self.session = session;
+  NSError *error = nil;
+  self.snapshot = [session snapshotWithError:&error];
+  if (self.snapshot == nil)
+    return nil;
+  self.candidatePanel = [RLXCandidatePanel sharedPanel];
+  self.candidatePanelIndex = NSNotFound;
+  return self;
 }
 #endif
 
@@ -324,19 +359,25 @@ static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
 }
 
 - (BOOL)updateLearningContextForClient:(id)sender {
-  (void)sender;
 #if RADISHLEX_CONTRACT_SMOKE
-  return YES;
-#else
+  // The legacy demo session used by presentation tests has no learning API.
+  if (!self.contractLearningContextEnabled)
+    return YES;
+#endif
   BOOL sensitiveApplication = NO;
   BOOL contextKnown = NO;
   NSString *contextKind = nil;
   RLXClassifyApplicationBundleIdentifier(
-      NSWorkspace.sharedWorkspace.frontmostApplication.bundleIdentifier,
+      RLXInputClientBundleIdentifier(sender),
       &sensitiveApplication, &contextKnown, &contextKind);
+#if RADISHLEX_CONTRACT_SMOKE
+  BOOL privacyMode = self.contractPrivacyMode;
+  BOOL secureInput = self.contractSecureInput;
+#else
   BOOL privacyMode =
       [[NSUserDefaults standardUserDefaults] boolForKey:@"RadishLexPrivacyMode"];
   BOOL secureInput = IsSecureEventInputEnabled() != 0;
+#endif
   BOOL contextChanged =
       !self.hasLearningContext || self.learningSecureInput != secureInput ||
       self.learningSensitiveApplication != sensitiveApplication ||
@@ -376,7 +417,6 @@ static BOOL RLXSnapshotsHaveSameCandidatePresentation(RLXSnapshot *left,
   if (refreshed != nil)
     [self applySnapshot:refreshed client:sender];
   return YES;
-#endif
 }
 
 - (BOOL)cancelCompositionForClient:(id)sender {

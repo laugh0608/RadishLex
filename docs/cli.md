@@ -82,6 +82,8 @@ cargo run -p radishlex-ime-cli -- demo luobo 1
 
 ## rime 命令
 
+先按 [Rime Native Smoke Runbook](runbooks/rime-native-smoke.md)从来源锁装配产品 shared data，并准备隔离 user data。以下 `<id>` 替换为本次临时目录标识；不要使用系统输入法目录或未关闭自有学习的上游 schema。
+
 用法：
 
 ```bash
@@ -89,7 +91,7 @@ RIME_INCLUDE_DIR=/opt/homebrew/opt/librime/include \
 RIME_LIB_DIR=/opt/homebrew/opt/librime/lib \
 cargo run -p radishlex-ime-cli --features native-rime -- \
   rime \
-  --schema luna_pinyin \
+  --schema radishlex_pinyin \
   --shared-data /tmp/radishlex-rime-smoke.<id>/shared \
   --user-data /tmp/radishlex-rime-smoke.<id>/user \
   luobo
@@ -102,7 +104,7 @@ RIME_INCLUDE_DIR=/opt/homebrew/opt/librime/include \
 RIME_LIB_DIR=/opt/homebrew/opt/librime/lib \
 cargo run -p radishlex-ime-cli --features native-rime -- \
   rime \
-  --schema luna_pinyin \
+  --schema radishlex_pinyin \
   --shared-data /tmp/radishlex-rime-smoke.<id>/shared \
   --user-data /tmp/radishlex-rime-smoke.<id>/user \
   luobo --key page-down 0
@@ -117,9 +119,9 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
 
 参数：
 
-- `--schema <schema>`：Rime schema id，例如 `luna_pinyin`。
-- `--shared-data <path>`：Rime shared data 目录，包含 schema 和公开词典数据。
-- `--user-data <path>`：Rime user data 目录，保存本次 smoke 的用户配置和 build 产物。
+- `--schema <schema>`：Rime schema id，产品数据使用 `radishlex_pinyin`；必须属于 adapter 已验证的 schema 列表。
+- `--shared-data <path>`：按来源锁装配的产品 RimeData，包含 default、schema 和公开词典数据。
+- `--user-data <path>`：隔离 Rime user data 目录，保存本次 smoke 的配置和 build 产物；Rime 自有学习关闭，旧 Rime 学习库不参与候选。
 - `--key <name>`：可重复，用于在输入码之后追加命名键事件，只作为 CLI smoke 调试入口。
 - `--rank-db <path>`：可选 SQLite userdb 路径；传入后会对当前 Rime candidates 执行重排和 explain。
 - `--context <kind>`：可选上下文分类，只在传入 `--rank-db` 时有效，默认 `general`。
@@ -146,7 +148,7 @@ RIME_INCLUDE_DIR=/opt/homebrew/opt/librime/include \
 RIME_LIB_DIR=/opt/homebrew/opt/librime/lib \
 cargo run -p radishlex-ime-cli --features native-rime -- \
   rime \
-  --schema luna_pinyin \
+  --schema radishlex_pinyin \
   --shared-data /tmp/radishlex-rime-smoke.<id>/shared \
   --user-data /tmp/radishlex-rime-smoke.<id>/user \
   --rank-db /tmp/radishlex-userdb.sqlite \
@@ -157,7 +159,7 @@ cargo run -p radishlex-ime-cli --features native-rime -- \
 输出形态：
 
 ```text
-schema: luna_pinyin
+schema: radishlex_pinyin
 input: luobo
 composition: luo bo
 rank_context: chat
@@ -483,7 +485,7 @@ cargo run -p radishlex-ime-cli -- \
 - `rime command requires building ... --features native-rime`：当前构建未启用真实 Rime feature；用 `cargo run -p radishlex-ime-cli --features native-rime -- rime ...` 复验。
 - `missing --schema`：`rime` 命令缺少 schema id；同时提供 `--schema`、`--shared-data` 和 `--user-data`。
 - `candidate index must be a non-negative integer`：候选索引必须是 `0`、`1`、`2` 这类非负整数。
-- `candidate index ... did not produce commit text`：先确认当前候选列表，再选择存在的候选索引；真实 Rime 候选文本会受数据版本和隔离 user data 学习状态影响。
+- `candidate index ... did not produce commit text`：先确认候选索引和是否仍处于分段 composition；候选受产品词典/schema 版本影响，启用 `--rank-db` 后也受 RadishLex 排序信号影响。Rime 自有学习已关闭，不能再用旧 Rime 学习状态解释候选变化。
 - `unknown key name: ...`：`--key` 只接受文档列出的命名键，例如 `page-down`、`page-up`、`arrow-down`、`arrow-up`。
 - `--context requires --rank-db for rime`：`rime --context` 只在 rank smoke 中有效，必须同时传入 `--rank-db`。
 - `missing --db`：`dict`、`learn` 或 `rank explain` 必须显式指定 SQLite 路径。

@@ -88,7 +88,38 @@ int main(void) {
                     isEqualToString:@"继续未完成操作"],
                 @"restart action must be explicit");
 
+        RLXInstallerPresentation *failedUpgrade = [[RLXInstallerPresentation alloc]
+            initWithDriverSnapshot:Snapshot(
+                @"blocked", @"refresh", @"none", @"unknown_driver_result",
+                @"data_coordinating", @"upgrade", 7, @"none")];
+        Require(failedUpgrade.failedClosed && failedUpgrade.progressStep == 7,
+                @"failed execution must retain durable progress while blocked");
+        Require([failedUpgrade.statusDetail containsString:@"上次操作返回错误"],
+                @"an execution error must not look like normal progress");
+        Require([failedUpgrade isActionEnabled:@"refresh"] &&
+                ![failedUpgrade isActionEnabled:@"resume_operation"] &&
+                ![failedUpgrade isActionEnabled:@"retry_operation"],
+                @"failed execution may only refresh; it cannot offer another mutation");
+        Require([failedUpgrade.stableDiagnosticSummary
+                    isEqualToString:@"phase=blocked action=refresh "
+                                    "error=unknown_driver_result state=data_coordinating"],
+                @"error diagnostics must retain the actual receipt stage");
+
         RLXInstallerPresentation *removal = [[RLXInstallerPresentation alloc]
+            initWithDriverSnapshot:Snapshot(
+                @"recovery_available", @"abort_pre_switch_upgrade", @"none", @"none",
+                @"data_coordinating", @"upgrade", 7,
+                @"select_neutral_input_source_and_close_manager")];
+        Require([removal isActionEnabled:@"abort_pre_switch_upgrade"] &&
+                [removal requiresConfirmationForAction:@"abort_pre_switch_upgrade"] &&
+                removal.requiresManualQuiescence,
+                @"recovery must be offered explicitly and require confirmation");
+        Require([[removal confirmationTextForAction:@"abort_pre_switch_upgrade"]
+                    containsString:@"WAL"] &&
+                ![removal isActionEnabled:@"resume_operation"],
+                @"recovery must explain preservation and reject stale resume");
+
+        removal = [[RLXInstallerPresentation alloc]
             initWithDriverSnapshot:Snapshot(
                 @"ready", @"begin_repair", @"remove_programs", @"none",
                 @"none", @"repair", 0, @"none")];

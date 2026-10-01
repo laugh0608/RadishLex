@@ -62,13 +62,15 @@ pub struct RimeApi {
     pub free_schema_list: Option<unsafe extern "C" fn(*mut RimeSchemaList)>,
     pub get_current_schema: Option<unsafe extern "C" fn(RimeSessionId, *mut c_char, usize) -> Bool>,
     pub select_schema: Option<unsafe extern "C" fn(RimeSessionId, *const c_char) -> Bool>,
-    pub _schema_open: Option<OpaqueRimeApiFunction>,
-    pub _config_open: Option<OpaqueRimeApiFunction>,
-    pub _config_close: Option<OpaqueRimeApiFunction>,
-    pub _config_get_bool: Option<OpaqueRimeApiFunction>,
+    pub schema_open: Option<unsafe extern "C" fn(*const c_char, *mut RimeConfig) -> Bool>,
+    pub config_open: Option<unsafe extern "C" fn(*const c_char, *mut RimeConfig) -> Bool>,
+    pub config_close: Option<unsafe extern "C" fn(*mut RimeConfig) -> Bool>,
+    pub config_get_bool:
+        Option<unsafe extern "C" fn(*mut RimeConfig, *const c_char, *mut Bool) -> Bool>,
     pub _config_get_int: Option<OpaqueRimeApiFunction>,
     pub _config_get_double: Option<OpaqueRimeApiFunction>,
-    pub _config_get_string: Option<OpaqueRimeApiFunction>,
+    pub config_get_string:
+        Option<unsafe extern "C" fn(*mut RimeConfig, *const c_char, *mut c_char, usize) -> Bool>,
     pub _config_get_cstring: Option<OpaqueRimeApiFunction>,
     pub _config_update_signature: Option<OpaqueRimeApiFunction>,
     pub _config_begin_map: Option<OpaqueRimeApiFunction>,
@@ -77,7 +79,7 @@ pub struct RimeApi {
     pub _simulate_key_sequence: Option<OpaqueRimeApiFunction>,
     pub _register_module: Option<OpaqueRimeApiFunction>,
     pub _find_module: Option<OpaqueRimeApiFunction>,
-    pub _run_task: Option<OpaqueRimeApiFunction>,
+    pub run_task: Option<unsafe extern "C" fn(*const c_char) -> Bool>,
     pub _get_shared_data_dir: Option<OpaqueRimeApiFunction>,
     pub _get_user_data_dir: Option<OpaqueRimeApiFunction>,
     pub _get_sync_dir: Option<OpaqueRimeApiFunction>,
@@ -94,7 +96,7 @@ pub struct RimeApi {
     pub _config_clear: Option<OpaqueRimeApiFunction>,
     pub _config_create_list: Option<OpaqueRimeApiFunction>,
     pub _config_create_map: Option<OpaqueRimeApiFunction>,
-    pub _config_list_size: Option<OpaqueRimeApiFunction>,
+    pub config_list_size: Option<unsafe extern "C" fn(*mut RimeConfig, *const c_char) -> usize>,
     pub _config_begin_list: Option<OpaqueRimeApiFunction>,
     pub get_input: Option<unsafe extern "C" fn(RimeSessionId) -> *const c_char>,
     pub _get_caret_pos: Option<OpaqueRimeApiFunction>,
@@ -103,6 +105,11 @@ pub struct RimeApi {
     pub _set_caret_pos: Option<OpaqueRimeApiFunction>,
     pub select_candidate_on_current_page:
         Option<unsafe extern "C" fn(RimeSessionId, usize) -> Bool>,
+}
+
+#[repr(C)]
+pub struct RimeConfig {
+    pub ptr: *mut c_void,
 }
 
 #[repr(C)]

@@ -86,6 +86,16 @@ impl VerifiedInstallPayload {
             .map(|source| source.product_root.as_path())
     }
 
+    pub(crate) fn upgrade_source_product(
+        &self,
+        release: &ProductRelease,
+    ) -> Option<&ProductArtifactIdentity> {
+        self.upgrade_sources
+            .iter()
+            .find(|source| &source.release == release)
+            .map(|source| &source.product)
+    }
+
     pub(crate) fn revalidate(
         &self,
         verifier: &dyn MacOsCodeSignatureVerifier,

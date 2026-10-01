@@ -261,6 +261,18 @@ def load_contract(
     return contract
 
 
+def load_frozen_contract() -> dict[str, Any]:
+    """Check the frozen declaration without qualifying today's product as its target.
+
+    The frozen pair permits only the adjacent Debian revision. Derive that
+    declared target from its committed source; this is not artifact evidence.
+    Build/mutation entry points still call load_contract() against current data.
+    """
+    source = git_json_at_commit(REPO_ROOT, SOURCE_COMMIT, METADATA_RELATIVE)
+    target = dict(source, debian_revision="2", package_version="26.7.1+38-2")
+    return load_contract(source_metadata=source, target_metadata=target)
+
+
 def require_real_file(path: Path, label: str, mode: int) -> Path:
     if not path.is_absolute() or path.is_symlink() or not path.is_file():
         raise L6ReleasePairError(f"{label} must be an absolute regular file")
@@ -904,6 +916,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Freeze or verify an ARM64 L6 release pair identity.")
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("validate-contract")
+    subparsers.add_parser("validate-frozen-contract")
     target = subparsers.add_parser("validate-target")
     target.add_argument("--target-root", type=Path, required=True)
     stage = subparsers.add_parser("stage-source")
@@ -931,6 +944,10 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     try:
+        if args.command == "validate-frozen-contract":
+            load_frozen_contract()
+            print("Frozen L6 declaration valid; current target eligibility is checked separately by validate-contract/validate-target.")
+            return 0
         contract = load_contract()
         if args.command == "validate-contract":
             return 0

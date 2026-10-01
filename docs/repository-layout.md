@@ -12,6 +12,8 @@ RadishLex/
   CLAUDE.md
   Cargo.toml
   Cargo.lock
+  .cargo/
+    config.toml
   .github/
     workflows/
   crates/
@@ -194,7 +196,9 @@ SQLite 用户数据层：
 
 本地原始事件和 P2 同步摘要必须有明确转换边界。若 `ime-userdb` 依赖同步协议类型，应通过窄 adapter 或中立领域模型控制依赖方向。
 
-产品升级使用独立的只读 inspection、SQLite backup snapshot 和候选 migration/validation 接口。snapshot 在一个只读事务中纳入 WAL 可见内容，输出 standalone `DELETE` journal 文件；协调器只能把隔离副本交给修改型入口，不能用运行时打开原地升级真实 Application Support 数据。
+产品升级使用独立的只读 inspection、SQLite backup snapshot 和候选 migration/validation 接口。snapshot 在一个只读事务中纳入 WAL 可见内容，输出 standalone `DELETE` journal 文件，成功返回前显式检查连接关闭；migration/validation 的修改型入口只接受隔离候选，不能用运行时打开原地升级真实 Application Support 数据。
+
+`store/maintenance.rs` 承担独立的受控源库维护：调用方先持久化准备意图、证明静止并绑定保护快照，随后由 SQLite checkpoint/转换日志模式；`maintenance_compare.rs` 逐表校验 schema、rowid、storage class 与内容等价，`maintenance_recovery.rs` 只处理取得持久恢复身份的受限单库 journal。维护不执行 migration、不替代协调授权，失败可能已经改变物理文件。具体成功条件与恢复限制见[数据升级边界](macos-data-upgrade-coordinator.md#新升级的源库维护原语)。
 
 ### ime-product-upgrade
 
@@ -214,8 +218,15 @@ SQLite 用户数据层：
 - 失败新库回迁、旧库原 inode 恢复、source-release evidence 与 `rolled_back`
 - settings/snapshot/candidate evidence-only 崩溃恢复与 guard-bound checkpoint 驱动
 - 稳定失败分类和中断恢复判断
+- 独立 `PreparationReceipt` / `PreparationJournalStore`、源 family 摘要、保护快照、受控 SQLite 准备及受限 journal 恢复
+- 旧终态 inventory 与逐槽保留接续、新 v1 handoff、终态封存/释放索引及已释放前驱的连续准备
+- 独立取消请求、源库维护收尾、材料封存与受控 outer 兼容投影；`source_ready` / `preserved` 保持启动阻断，完整取消及真实产品接线仍另需资格
 
-该 crate 当前已闭合固定布局内从 `preflighted` 到终态的核心调度与数据恢复，但仍不停止进程、不定位或启动产品 host，也不提供安装载体；API、副作用与验证入口见 [ime-product-upgrade 组件说明](../crates/ime-product-upgrade/README.md)，macOS 完整状态机见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。
+该 crate 的既有 v1 路径已闭合固定布局内从 `preflighted` 到终态的核心调度与数据恢复，但仍不停止进程、不定位或启动产品 host，也不提供安装载体；API、副作用与验证入口见 [ime-product-upgrade 组件说明](../crates/ime-product-upgrade/README.md)，macOS 完整状态机见 [数据升级协调器边界](macos-data-upgrade-coordinator.md)。
+
+`preparation_inventory.rs` / `preparation_history.rs` 管理旧终态清单与私有槽位置；`preparation_handoff*` 负责新 v1 回执交接和准备证明封存；`terminal_release*` 负责真实数据终态保留、外层结果确认及绑定祖先核验，`lifecycle_index.rs` 负责唯一释放索引的严格 v1/v2 编码，`preparation_released_predecessor.rs` 只读消费已释放前驱。业务 DB/settings/Rime 不移入历史槽，真实 outer/程序授权仍由产品组合层提供。
+
+`preparation_cancellation*` 保存独立不可撤回请求，`cancellation_source*` 分担源库收尾、严格记录、持久化与受限 journal 恢复，`cancellation_archive*` 保留取消材料并受控恢复 outer 兼容投影；不回用普通准备入口，不修改双层 v1 失败码，也不以 `source_ready` 或 `preserved` 解除启动门禁。完整合同见组件说明和当前激活设计。
 
 ### ime-product-install
 

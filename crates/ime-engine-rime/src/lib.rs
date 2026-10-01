@@ -9,6 +9,8 @@ mod error;
 mod ffi;
 mod keymap;
 #[cfg(feature = "native-rime")]
+mod learning_guard;
+#[cfg(feature = "native-rime")]
 mod runtime;
 #[cfg(feature = "native-rime")]
 mod runtime_config;

@@ -14,13 +14,14 @@ use radishlex_ime_product_upgrade::{
     UpgradeRollbackValidationEvidence,
 };
 use radishlex_macos_installer_driver::{
-    authorize_installer_action, inspect_installer_view, InstallerAction,
-    InstallerAuthorizationError, InstallerManualPrompt, InstallerProductSituation,
-    InstallerStableError, InstallerUserAuthorization, InstallerViewPhase, InstallerViewSnapshot,
+    authorize_installer_action, InstallerAction, InstallerAuthorizationError,
+    InstallerManualPrompt, InstallerProductSituation, InstallerStableError,
+    InstallerUserAuthorization, InstallerViewPhase, InstallerViewSnapshot,
     INSTALLER_VIEW_CONTRACT_VERSION,
 };
 use radishlex_macos_installer_executor::{
-    execute_authorized_intent_with_upgrade_bootstrap, InstallerExecutionError,
+    execute_authorized_intent_with_upgrade_bootstrap,
+    inspect_installer_view_with_recovery as inspect_installer_view, InstallerExecutionError,
     InstallerExecutionSummary, InstallerOperationIdSource, InstallerPreflightPort,
     InstallerProgramPort, SystemInstallerOperationIdSource, UpgradeCoordinatorPort,
 };
@@ -183,7 +184,7 @@ fn production_perform(
         };
     let mut operation_ids = SystemInstallerOperationIdSource;
     let mut upgrade = if intent.operation_kind() == Some(InstallOperationKind::Upgrade) {
-        let current = match store.load() {
+        let current = match store.load_for_recovery_inspection() {
             Ok(Some(receipt)) => receipt,
             _ => return unavailable_snapshot(InstallerStableError::UnknownDriverResult),
         };
@@ -206,7 +207,7 @@ fn production_perform(
     } else {
         ProductionUpgradePort::Unavailable
     };
-    match dispatch_installer_action(
+    let result = dispatch_installer_action(
         environment.context.data_root(),
         environment.context.owner_id(),
         environment.product_situation,
@@ -217,19 +218,33 @@ fn production_perform(
         &mut preflight,
         &mut operation_ids,
         &mut upgrade,
-    ) {
-        Ok(_) => production_snapshot(),
-        Err(_) => {
-            let refreshed = production_snapshot();
-            if refreshed.phase == phase_value(InstallerViewPhase::Blocked)
-                || refreshed.receipt_state != 0
-            {
-                refreshed
-            } else {
-                unavailable_snapshot(InstallerStableError::UnknownDriverResult)
-            }
-        }
+    );
+    project_action_result(result, production_snapshot())
+}
+
+fn project_action_result(
+    result: Result<InstallerBridgeDispatch, InstallerBridgeError>,
+    mut refreshed: RadishLexInstallerBridgeSnapshotV1,
+) -> RadishLexInstallerBridgeSnapshotV1 {
+    let Err(error) = result else {
+        return refreshed;
+    };
+    let failure_code = match error {
+        InstallerBridgeError::Authorization(_) => "authorization_failed",
+        InstallerBridgeError::Execution(error) => error.code(),
+    };
+    eprintln!("RadishLex Installer action failed: {failure_code}");
+
+    // A receipt describes durable progress, not the outcome of this action.
+    // Keep that progress visible without offering another mutation after failure.
+    refreshed.phase = phase_value(InstallerViewPhase::Blocked);
+    refreshed.primary_action = action_value(InstallerAction::Refresh);
+    refreshed.secondary_action = action_value(InstallerAction::None);
+    refreshed.manual_prompt = prompt_value(InstallerManualPrompt::None);
+    if refreshed.stable_error == error_value(InstallerStableError::None) {
+        refreshed.stable_error = error_value(InstallerStableError::UnknownDriverResult);
     }
+    refreshed
 }
 
 struct ProductionInstallerEnvironment {
@@ -469,6 +484,7 @@ fn decode_action(value: u32) -> Option<InstallerAction> {
         6 => Some(InstallerAction::ResumeOperation),
         7 => Some(InstallerAction::RetryOperation),
         8 => Some(InstallerAction::RemovePrograms),
+        9 => Some(InstallerAction::AbortPreSwitchUpgrade),
         _ => None,
     }
 }
@@ -526,6 +542,7 @@ const fn action_value(action: InstallerAction) -> u32 {
         InstallerAction::ResumeOperation => 6,
         InstallerAction::RetryOperation => 7,
         InstallerAction::RemovePrograms => 8,
+        InstallerAction::AbortPreSwitchUpgrade => 9,
     }
 }
 

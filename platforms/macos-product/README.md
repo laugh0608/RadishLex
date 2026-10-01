@@ -104,15 +104,17 @@ staging 使用 `/usr/bin/ditto --extattr --noqtn` 复制 resource fork、quarant
 
 upgrade 产品终态在 `final_verified` 与 `completed` 前分别复验外层/data receipt、双 guard、Application Support identity、source/target release、data `completed` 和 installed 双 bundle。ABI v9 外层 startup gate 不接收运行 identity；它只从当前 executable 所在固定用户域 bundle 形成 Info.plist release、完整 tree 与 strict ad-hoc code identity，并在 Manager/InputMethod 的既有数据 gate 和全部业务初始化之前执行。
 
+`abort_pre_switch_install_upgrade` 是显式切换前中止入口：仅接受无失败的 `candidate_verified` 或带同一保留证据的合法恢复阶段，复用程序恢复路径，在内层中止、逐端恢复和外层终态前校验静止、双 receipt、完整程序材料与数据证据。`InstallAdapter::PreSwitchRecoveryEvidence` 只保存固定槽位的本地只读身份/摘要，不打开 SQLite；证据独立于旧状态目录。详细合同见[数据升级边界](../../docs/macos-data-upgrade-coordinator.md#显式切换前中止的保留证据)。
+
 ## InstallerExecutor
 
-执行器只接受 `InstallerDriver` 已授权的 intent，但仍在 guard 内重新读取 current receipt 并执行 manifest-bound preflight。begin/retry/remove 先持久化 `prepared` 并返回；用户重新确认静止后才进入 `quiesced` 和程序 mutation。first install、repair、remove 共用外层程序终态；upgrade 从外层 receipt 和固定 data root bootstrap 或重绑同 operation 的 M4-P02 receipt，并从任一已持久化状态继续数据协调、程序恢复或两段终态。
+执行器只接受 `InstallerDriver` 已授权的 intent，但仍在 guard 内重新读取 current receipt 并执行 manifest-bound preflight。begin/retry/remove 先持久化 `prepared` 并返回；用户重新确认静止后才进入 `quiesced` 和程序 mutation。first install、repair、remove 共用外层程序终态；upgrade 从外层 receipt 和固定 data root bootstrap 或重绑同 operation 的 M4-P02 receipt，并按已证明状态继续数据协调、程序恢复或两段终态；专用 `AbortPreSwitchUpgrade` 不走普通 resume/bootstrap，先只读检查双 receipt，再绑定原 operation 和不可改写保留证据执行。
 
 执行器不接受 UI 路径、`HOME`、release、bundle identity 或 available bytes 自报值。随机 operation ID 来自系统熵；active guard、stale intent、缺失 upgrade context、preflight/receipt/identity 失败均关闭。
 
 ## InstallerBridge
 
-ABI v1 固定整数 enum、POD snapshot 与 contract/snapshot/perform 三个 symbol。AppKit 已静态链接并实际调用；Objective-C 不解释 receipt，只把已知 enum 映射为 driver snapshot。Rust dispatch 每次重新投影并授权 fresh action，再调用 executor。隔离测试证明 prepared/restart/stale/active guard。
+ABI v1 固定整数 enum、POD snapshot 与 contract/snapshot/perform 三个 symbol。AppKit 已静态链接并实际调用；Objective-C 不解释 receipt，只把已知 enum 映射为 driver snapshot。Rust dispatch 每次重新投影并授权 fresh action，再调用 executor。可加 action 9 对应显式切换前中止，POD/symbol/version 不变；未知值仍失败关闭。执行失败保留 receipt 进度但强制 blocked/refresh，不由非零 receipt 掩盖错误。隔离测试证明 prepared/restart/stale/active guard、错误呈现及新动作双向映射。
 
 生产只读 bootstrap 通过 `geteuid/getpwuid_r` 取得 authoritative current-user home，从当前 executable 固定推导 Installer resources，并严格读取 sealed `ReleaseIdentity.json` 与内嵌 InstallPayload。Installer 自身先过 strict ad-hoc 结构验证；resource 绑定 Manager/InputMethod target 与全部历史 source 的 exact requirement 集合。身份与 payload 通过后四类 operation 都进入真实 executor；upgrade 从外层 receipt 选择 exact release 的 `UpgradeSources/<version>-<build>`。缺失 source 返回 `driver_unavailable`；source manifest/tree/signature、release 顺序或 helper 漂移返回产品身份阻断。
 

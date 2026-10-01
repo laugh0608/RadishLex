@@ -22,6 +22,9 @@ use serde::Deserialize;
 mod manifest;
 mod runner;
 
+mod preparation_hash;
+pub use preparation_hash::MacOsPreparationHasher;
+
 use manifest::{ProductRole, VerifiedExecutable, VerifiedProductAssembly};
 use runner::{HostMode, HostOutput, ProcessProductHostRunner, ProductHostRunner};
 

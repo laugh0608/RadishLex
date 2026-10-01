@@ -26,6 +26,9 @@ use super::*;
 
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
+#[path = "recovery_tests.rs"]
+mod recovery_tests;
+
 struct Fixture {
     root: PathBuf,
     data_root: PathBuf,
@@ -71,6 +74,8 @@ impl Fixture {
                 fail_input_stage_once: false,
                 reject_finalization_completion: false,
                 installed_validation_calls: 0,
+                recovery_checks: 0,
+                reject_recovery_check: None,
             },
             preflight: TestPreflight::successful(),
             operation_ids: TestOperationIds::new(),
@@ -170,6 +175,8 @@ struct TestPrograms {
     fail_input_stage_once: bool,
     reject_finalization_completion: bool,
     installed_validation_calls: usize,
+    recovery_checks: usize,
+    reject_recovery_check: Option<usize>,
 }
 
 impl TestPrograms {
@@ -184,6 +191,24 @@ impl TestPrograms {
 }
 
 impl InstallerProgramPort for TestPrograms {
+    fn verify_recovery_material(
+        &mut self,
+        manager: &ProgramSwitchStore,
+        input_method: &ProgramSwitchStore,
+        _receipt: &InstallReceipt,
+    ) -> Result<(), InstallerExecutionError> {
+        self.recovery_checks += 1;
+        if self.reject_recovery_check == Some(self.recovery_checks) {
+            return Err(InstallerExecutionError::PreflightNotProven);
+        }
+        for store in [manager, input_method] {
+            if !store.source_backup_bundle_path().is_dir() && !store.target_path().is_dir() {
+                return Err(InstallerExecutionError::InvalidState);
+            }
+        }
+        Ok(())
+    }
+
     fn target_product(&self) -> &ProductArtifactIdentity {
         &self.target_product
     }

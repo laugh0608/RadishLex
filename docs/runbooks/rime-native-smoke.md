@@ -1,254 +1,64 @@
 # Rime Native Smoke Runbook
 
-本文档用于指导开发者在 macOS 本机准备隔离的 `librime` smoke 环境，并运行 `radishlex-ime-cli rime` 与 `ime-ffi` native smoke 验证真实 Rime adapter 链路。读者是需要复验 `ime-engine-rime` native 路径和 FFI Rime session 入口的维护者和协作者。本文不包含系统输入法安装、真实用户词库导入、Rime schema 版权评估、平台壳联调或长期 CI 配置。
+本文面向维护者，指导在隔离目录中验证 CLI、FFI 和 native adapter 的输入链。使用仓库锁定的 `radishlex_pinyin` 产品数据；不包含系统输入法安装、真实用户词库、GUI、平台实机验收或依赖安装。Rime 自有学习已禁用，任意 upstream schema 不再是本入口的默认输入。
 
-## 目的
+## 前置与边界
 
-本 runbook 验证以下链路：
-
-```text
-radishlex-ime-cli rime
-  -> ime-core::InputSession
-  -> ime-engine-rime::RimeEngine
-  -> librime C API
-  -> luna_pinyin schema
-  -> composition / candidates / commit
-
-ime-ffi native smoke
-  -> radishlex_session_new_rime
-  -> RadishLexSession opaque handle
-  -> ime-engine-rime::RimeEngine
-  -> snapshot / candidates / commit
-```
-
-通过标准：
-
-- `native-rime` feature 能链接本机 `librime`。
-- `native-rime` feature 测试能覆盖必需 Rime API 缺失并映射为 `MissingApiFunction`。
-- CLI 能用隔离的 Rime 数据目录输出真实候选。
-- `ime-ffi` 在显式 `native-rime` feature 下能通过 Rime session options 创建真实 Rime session。
-- 不读取真实 Rime 用户目录，不使用真实输入历史或真实用户词库。
-
-## 安全边界
-
-- 不在仓库根目录创建 `private/`、`tmp/` 或 schema 数据目录。
-- 不使用 `~/Library/Rime`、`~/.config/ibus/rime` 或其他真实输入法用户目录。
-- 不提交下载的 Rime schema、词库、build 产物、日志或 smoke 输出。
-- 只输入合成测试串，例如 `luobo`。
-- 所有 smoke 数据放在 `mktemp` 创建的系统临时目录中。
-
-macOS 上 `/tmp` 通常指向 `/private/tmp`，但命令中统一使用 `/tmp`，避免误把 `/private/tmp` 理解为仓库内目录。
-
-## 前置条件
-
-确认已安装 `librime`：
-
-```bash
-brew --prefix librime
-ls "$(brew --prefix librime)/include/rime_api.h"
-ls "$(brew --prefix librime)/lib/"*rime*
-command -v rime_deployer
-```
-
-预期能看到：
-
-- `rime_api.h`
-- `librime.dylib`
-- `rime_deployer`
+- 已安装 librime、Python 3，Rust 依赖已缓存。macOS 可用 `brew --prefix librime` 只读确认路径；其他平台明确指定已安装库路径。
+- 所有测试使用新的临时 user 目录与合成输入，串行执行；不使用真实 Rime 目录、冻结现场或历史失败目录。
+- adapter 检查实际生效的 default/schema 配置；`learning_guard` 错误通常表示旧配置、custom patch 或不受支持的组件，不能靠启用 user_dict 解决。
+- 基础候选来自 Rime，学习来自 RadishLex。原始 Rime Arrow/Space 高亮遵循 engine 顺序；平台可见候选通过 display index 选择，不能将两者序号混用。
 
 ## 标准流程（默认看这里）
 
-如果 `/tmp/radishlex-rime-smoke.*` 已经删除，或不确定上一次 smoke 是否污染了用户数据，从本节重新准备。下面是当前唯一推荐的日常 smoke 路径；后面的“常见问题”和“可选清理”只用于排错和收尾。
-
-### 1. 创建隔离目录并下载数据
-
-在任意终端执行：
+在仓库根目录，使用本机实际安装路径：
 
 ```bash
-cd /Users/luobo/Code/RadishLex
-
-export RIME_PREFIX="$(brew --prefix librime)"
-export RIME_INCLUDE_DIR="$RIME_PREFIX/include"
-export RIME_LIB_DIR="$RIME_PREFIX/lib"
-
+export RIME_INCLUDE_DIR=/opt/homebrew/opt/librime/include
+export RIME_LIB_DIR=/opt/homebrew/opt/librime/lib
 export SMOKE="$(mktemp -d /tmp/radishlex-rime-smoke.XXXXXX)"
-mkdir -p "$SMOKE/src" "$SMOKE/shared" "$SMOKE/user" "$SMOKE/user/build"
+./scripts/prepare-rime-product-data.sh assemble --output "$SMOKE/shared"
+mkdir "$SMOKE/behavior-user" "$SMOKE/peer-user" "$SMOKE/invalid-user" "$SMOKE/cli-user"
+export RADISHLEX_RIME_SHARED_DATA="$SMOKE/shared"
+export RADISHLEX_RIME_SCHEMA=radishlex_pinyin
+export RADISHLEX_EXPECTED_CANDIDATE_PAGE_SIZE=5
 
-echo "$SMOKE"
+cargo check --offline --locked -p radishlex-ime-cli --features native-rime
+cargo test --offline --locked -p radishlex-ime-engine-rime --features native-rime
 
-git clone --depth 1 https://github.com/rime/rime-prelude "$SMOKE/src/rime-prelude"
-git clone --depth 1 https://github.com/rime/rime-luna-pinyin "$SMOKE/src/rime-luna-pinyin"
-git clone --depth 1 https://github.com/rime/rime-essay "$SMOKE/src/rime-essay"
+RADISHLEX_RIME_USER_DATA="$SMOKE/behavior-user" \
+cargo test --offline --locked -p radishlex-ime-ffi --features native-rime \
+  --test native_rime_behavior rime_session_native_smoke_uses_ffi_entrypoint \
+  -- --ignored --exact --nocapture
+RADISHLEX_RIME_USER_DATA="$SMOKE/peer-user" \
+cargo test --offline --locked -p radishlex-ime-ffi --features native-rime \
+  --test ffi_contract_and_dictionary rime_native_sessions_share_runtime_and_survive_peer_release \
+  -- --ignored --exact --nocapture
+RADISHLEX_RIME_USER_DATA="$SMOKE/invalid-user" \
+cargo test --offline --locked -p radishlex-ime-ffi --features native-rime \
+  --test ffi_contract_and_dictionary rime_session_native_invalid_schema_reports_engine_error \
+  -- --ignored --exact --nocapture
 
-cp "$SMOKE/src/rime-prelude"/*.yaml "$SMOKE/shared"/
-cp "$SMOKE/src/rime-luna-pinyin"/*.yaml "$SMOKE/shared"/
-cp "$SMOKE/src/rime-essay"/essay.txt "$SMOKE/shared"/
+cargo run --offline --locked -p radishlex-ime-cli --features native-rime -- \
+  rime --schema radishlex_pinyin --shared-data "$SMOKE/shared" \
+  --user-data "$SMOKE/cli-user" luobo
 ```
 
-确认 `echo "$SMOKE"` 输出以 `/tmp/radishlex-rime-smoke.` 开头。下载的公开 Rime 数据只放在 `$SMOKE/src`，不进入 RadishLex 仓库。
+FFI smoke 自行部署 schema，覆盖稳定 input code、完整/分段选择、同库学习、删除恢复、普通/隐私/secure 策略、翻页和基础按键。异常 schema 在 session 创建前返回 `EngineError` 与 `learning_guard` 阶段；多 session 测试验证释放一个 session 后另一个仍可输入。默认 ignored 不算已执行。
 
-### 2. 部署隔离 Rime 用户数据
+CLI 可另用 `luobo 1` 检查非首候选、`luobo --key page-down 0` 检查翻页、`luobo 999` 检查越界失败。rank smoke 可在本次临时目录创建独立 SQLite，用 `dict add --db <path> --input luobo --text <当前确有的合成候选>` 添加词条，再用 `rime --rank-db <path> --context chat ...` 检查 engine_index、score、explain 与 commit_engine_index；不把新词添加误解成候选召回已实现。
 
-必须进入 `$SMOKE/user` 后再执行 `rime_deployer --add-schema`，不要在仓库根目录执行：
+两套学习存储、旧合成 Rime userdb、上下文往返、独立进程重启和配置漂移必须另跑 [隐私隔离回归](rime-privacy-probe.md)。本入口不能替代那些隐私断言，也不证明真实平台键盘/密码路由通过。
 
-```bash
-cd "$SMOKE/user"
-rime_deployer --add-schema luna_pinyin
-rime_deployer --set-active-schema luna_pinyin
-rime_deployer --build "$SMOKE/user" "$SMOKE/shared" "$SMOKE/user/build"
-```
+## 记录与排错
 
-检查必要文件和 build 产物：
+记录 source commit、librime 版本与路径、schema 来源锁、临时目录和实际执行入口。新旧测试目录不得混用；失败时保留现场。头文件/动态库缺失时核对 include/lib 路径，缺少依赖另行授权安装；配置失败时回读本次 `user/build` 与 custom patch，使用新目录重做隔离部署，不编辑真实用户配置来绕过 guard。
 
-```bash
-ls "$SMOKE/shared/default.yaml"
-ls "$SMOKE/shared/symbols.yaml"
-ls "$SMOKE/shared/luna_pinyin.schema.yaml"
-ls "$SMOKE/shared/luna_pinyin.dict.yaml"
-ls "$SMOKE/shared/essay.txt"
-find "$SMOKE/user/build" -maxdepth 1 -type f | sort
-```
+清理只针对确认属于本次且不再作为证据的临时目录，并遵循任务授权；本 runbook 不自动清理历史目录。
 
-### 3. 运行 native smoke
+## 历史 smoke 事实（不用于现行重跑）
 
-回到仓库根目录，先做 native feature 类型检查：
-
-```bash
-cd /Users/luobo/Code/RadishLex
-
-RIME_INCLUDE_DIR="$RIME_INCLUDE_DIR" \
-RIME_LIB_DIR="$RIME_LIB_DIR" \
-cargo check -p radishlex-ime-cli --features native-rime
-```
-
-再运行 Rime adapter feature 测试，确认必需 native API 表和缺失函数错误映射可复验：
-
-```bash
-RIME_INCLUDE_DIR="$RIME_INCLUDE_DIR" \
-RIME_LIB_DIR="$RIME_LIB_DIR" \
-cargo test -p radishlex-ime-engine-rime --features native-rime
-```
-
-然后依次运行四条 smoke：
-
-```bash
-# 首候选提交，预期成功。
-RIME_INCLUDE_DIR="$RIME_INCLUDE_DIR" \
-RIME_LIB_DIR="$RIME_LIB_DIR" \
-cargo run -p radishlex-ime-cli --features native-rime -- \
-  rime --schema luna_pinyin --shared-data "$SMOKE/shared" --user-data "$SMOKE/user" luobo
-
-# 非首候选提交，预期提交当前候选列表里的 1 号候选。
-RIME_INCLUDE_DIR="$RIME_INCLUDE_DIR" \
-RIME_LIB_DIR="$RIME_LIB_DIR" \
-cargo run -p radishlex-ime-cli --features native-rime -- \
-  rime --schema luna_pinyin --shared-data "$SMOKE/shared" --user-data "$SMOKE/user" luobo 1
-
-# 翻页后提交当前页 0 号候选，预期成功。
-RIME_INCLUDE_DIR="$RIME_INCLUDE_DIR" \
-RIME_LIB_DIR="$RIME_LIB_DIR" \
-cargo run -p radishlex-ime-cli --features native-rime -- \
-  rime --schema luna_pinyin --shared-data "$SMOKE/shared" --user-data "$SMOKE/user" luobo --key page-down 0
-
-# 越界候选，预期失败且错误信息明确。
-RIME_INCLUDE_DIR="$RIME_INCLUDE_DIR" \
-RIME_LIB_DIR="$RIME_LIB_DIR" \
-cargo run -p radishlex-ime-cli --features native-rime -- \
-  rime --schema luna_pinyin --shared-data "$SMOKE/shared" --user-data "$SMOKE/user" luobo 999
-```
-
-最后一条越界候选命令预期失败，返回非 0 退出码是正确结果；重点检查错误信息是否明确。
-
-同一个 `$SMOKE/user` 目录不要并行运行多条 Rime smoke 命令。Rime userdb 使用本地数据库锁，并发打开同一隔离用户目录可能触发 LevelDB `LOCK` 或 corruption 报错；遇到这种情况应丢弃该 `$SMOKE`，重新创建隔离目录后串行重跑。
-
-### 4. 运行 rank smoke
-
-rank smoke 用于确认真实 Rime candidates 能进入 `ime-ranker`，并且重排后的候选能映射回原始 engine index 提交。
-
-先创建临时 userdb，并把上一步 `luobo` 输出中确实存在的候选文本写入 userdb。下面的 `<candidate-text>` 需要替换为当前 smoke 输出里的候选文本，不要使用真实个人词库数据：
-
-```bash
-RANK_DB="$SMOKE/radishlex-userdb.sqlite"
-
-cargo run -p radishlex-ime-cli -- \
-  dict add \
-  --db "$RANK_DB" \
-  --input luobo \
-  --text "<candidate-text>"
-```
-
-然后运行带 ranker 的 Rime smoke：
-
-```bash
-RIME_INCLUDE_DIR="$RIME_INCLUDE_DIR" \
-RIME_LIB_DIR="$RIME_LIB_DIR" \
-cargo run -p radishlex-ime-cli --features native-rime -- \
-  rime \
-  --schema luna_pinyin \
-  --shared-data "$SMOKE/shared" \
-  --user-data "$SMOKE/user" \
-  --rank-db "$RANK_DB" \
-  --context chat \
-  luobo
-```
-
-重点检查：
-
-- 输出包含 `rank_context: chat`。
-- candidates 行包含 `engine_index=<n>` 和 `score=<score>`。
-- explain 行包含 `user_term`、`frequency`、`context`、`negative`、`suppressed`、`deleted`。
-- 若发生提交，输出包含 `commit_engine_index: <n>`。
-- `candidate-index` 在该模式下表示重排后的索引，而不是底层 engine 原始索引。
-
-### 5. 运行 FFI native smoke
-
-FFI native smoke 用于确认 `radishlex_session_new_personalized_rime` 能通过当前 ABI v9（沿用 v5 options 布局）创建真实 Rime 产品 session，并能完成稳定 input code、按键输入、candidate snapshot、完整/分段候选选择和本地学习策略。测试会在隔离的 `$SMOKE/user/userdb.sqlite3` 写入合成 selection，断言完整选择为 `recorded`、分段选择为 `deferred`、隐私模式不增加事件、secure input 返回 engine-only `policy_blocked`。该测试默认标记为 ignored，必须显式传入隔离 Rime 数据目录后运行；只有调用方额外设置 `RADISHLEX_EXPECTED_CANDIDATE_PAGE_SIZE` 时才断言页大小，macOS 产品 native 门禁固定传入 `5`。
-
-```bash
-RIME_INCLUDE_DIR="$RIME_INCLUDE_DIR" \
-RIME_LIB_DIR="$RIME_LIB_DIR" \
-RADISHLEX_RIME_SHARED_DATA="$SMOKE/shared" \
-RADISHLEX_RIME_USER_DATA="$SMOKE/user" \
-cargo test -p radishlex-ime-ffi --features native-rime \
-  rime_session_native_smoke_uses_ffi_entrypoint -- --ignored
-```
-
-FFI native 异常 smoke 用于确认错误 schema 会通过 C ABI 映射为稳定 `EngineError`，并保留 `select_schema` 阶段信息：
-
-```bash
-RIME_INCLUDE_DIR="$RIME_INCLUDE_DIR" \
-RIME_LIB_DIR="$RIME_LIB_DIR" \
-RADISHLEX_RIME_SHARED_DATA="$SMOKE/shared" \
-RADISHLEX_RIME_USER_DATA="$SMOKE/user" \
-cargo test -p radishlex-ime-ffi --features native-rime \
-  rime_session_native_invalid_schema_reports_engine_error -- --ignored
-```
-
-重点检查：
-
-- 测试结果为 `ok`。
-- 命令只使用 `$SMOKE/shared`、`$SMOKE/user` 和其中新建的合成 userdb，不读取真实 Rime/userdb 用户目录。
-- 正常 smoke 完成后可只读检查 `$SMOKE/user/userdb.sqlite3`，但不得把数据库内容或选择文本复制进日志；销毁整个 `$SMOKE` 临时目录即可清理。
-- 正常 smoke 不验证平台壳、系统输入法候选窗或 Flutter bridge。
-- 异常 smoke 预期错误码为 `EngineError`，错误消息包含 `select_schema` 和缺失 schema 名。
-
-### 6. 记录结论
-
-记录时不要复制整段命令输出，只保留可复验事实：
-
-- `librime` 路径：`brew --prefix librime`
-- schema：`luna_pinyin`
-- smoke 目录：`$SMOKE`
-- `cargo check -p radishlex-ime-cli --features native-rime` 是否通过
-- `cargo test -p radishlex-ime-engine-rime --features native-rime` 是否通过，必需 API 缺失映射是否可复验
-- 首候选、非首候选、翻页后候选是否都能按当前输出候选提交
-- 越界候选索引是否返回明确错误
-- rank smoke 是否输出 `rank_context`、`engine_index`、explain 和 `commit_engine_index`
-- FFI native smoke 是否通过 `rime_session_native_smoke_uses_ffi_entrypoint`，并覆盖 personalized session、selection/deferred、隐私零增量和 secure 阻断
-- FFI native 异常 smoke 是否通过 `rime_session_native_invalid_schema_reports_engine_error`
-- 是否发现 candidate index 或 `select_keys` 行为异常
-
-候选文本取决于 Rime 数据版本和 `$SMOKE/user` 内的学习状态。同一个 `$SMOKE` 目录内重复提交候选后，后续候选顺序可能变化；如果需要稳定复现首轮结果，重新创建一个新的 `$SMOKE` 目录。
+下列原始记录使用当时的 `luna_pinyin` 和旧学习合同，只证明当时范围，保留原样；不将其命令或目录作为当前输入。
 
 2026-06-25 本机日志 `log/log-202606251903.txt` 的结论：
 
@@ -275,94 +85,3 @@ cargo test -p radishlex-ime-ffi --features native-rime \
 - `RADISHLEX_RIME_SHARED_DATA=/tmp/radishlex-rime-smoke.HpbV0l/shared RADISHLEX_RIME_USER_DATA=/tmp/radishlex-rime-smoke.HpbV0l/user cargo test -p radishlex-ime-ffi --features native-rime rime_session_native_smoke_uses_ffi_entrypoint -- --ignored` 通过。
 - 该时点 smoke 覆盖普通 `radishlex_session_new_rime -> key result -> snapshot -> select_candidate`；当前同名 smoke 已按上文升级为 personalized Rime session，并继续区分完整候选提交与分段候选只更新 composition 的结果。
 - 本次 smoke 继续使用隔离 Rime shared / user data，不使用真实个人词库或真实 Rime 用户目录。
-
-若运行时报 `dyld` 找不到 `librime`，执行：
-
-```bash
-export DYLD_LIBRARY_PATH="$RIME_LIB_DIR${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
-```
-
-然后重新运行对应 `cargo run` 命令。
-
-## 常见问题
-
-### 找不到 `rime_api.h`
-
-确认环境变量：
-
-```bash
-echo "$RIME_INCLUDE_DIR"
-ls "$RIME_INCLUDE_DIR/rime_api.h"
-```
-
-`RIME_INCLUDE_DIR` 必须指向包含 `rime_api.h` 的目录。
-
-### 找不到 `librime.dylib`
-
-确认：
-
-```bash
-echo "$RIME_LIB_DIR"
-ls "$RIME_LIB_DIR/"*rime*
-```
-
-如果运行时报 `dyld` 找不到动态库，可临时设置：
-
-```bash
-export DYLD_LIBRARY_PATH="$RIME_LIB_DIR${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
-```
-
-然后重新执行 `cargo run`。
-
-### `select_schema` 失败
-
-优先检查：
-
-```bash
-ls "$SMOKE/shared/luna_pinyin.schema.yaml"
-ls "$SMOKE/user/build"
-```
-
-然后重新执行：
-
-```bash
-cd "$SMOKE/user"
-rime_deployer --add-schema luna_pinyin
-rime_deployer --set-active-schema luna_pinyin
-rime_deployer --build "$SMOKE/user" "$SMOKE/shared" "$SMOKE/user/build"
-```
-
-### 没有候选
-
-检查 `shared` 目录是否至少包含：
-
-```text
-default.yaml
-symbols.yaml
-luna_pinyin.schema.yaml
-luna_pinyin.dict.yaml
-essay.txt
-```
-
-如果文件存在但仍无候选，保留完整命令输出，用于判断是 Rime 数据部署问题还是 RadishLex adapter 转换问题。
-
-## 可选清理
-
-确认 `$SMOKE` 是本次 `mktemp` 创建的临时目录后再清理：
-
-```bash
-case "$SMOKE" in
-  /tmp/radishlex-rime-smoke.*|/private/tmp/radishlex-rime-smoke.*)
-    /bin/rm -rf -- "$SMOKE"
-    ;;
-  *)
-    echo "Refuse to remove unexpected SMOKE path: $SMOKE"
-    ;;
-esac
-```
-
-如果本机将 `rm` alias 到 `trash`，也可以在确认路径后手动执行：
-
-```bash
-trash "$SMOKE"
-```

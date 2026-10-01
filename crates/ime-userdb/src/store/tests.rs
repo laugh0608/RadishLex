@@ -1315,3 +1315,4 @@ fn learning_status_reports_only_aggregate_counts_and_timestamps() {
 
 mod r02l;
 mod snapshot;
+mod wal;

@@ -49,6 +49,18 @@ CLANG_MODULE_CACHE_PATH="${module_cache}" clang \
   -o "${contract_test}"
 "${contract_test}"
 
+# Test both C/Objective-C directions without discovering a real Installer or user root.
+CLANG_MODULE_CACHE_PATH="${module_cache}" clang \
+  -fobjc-arc -fblocks -fmodules -Wall -Wextra -Werror \
+  "-mmacosx-version-min=${minimum_macos}" \
+  -I "${script_dir}/Sources" \
+  -I "${repo_root}/platforms/macos-product/InstallerBridge/include" \
+  "${script_dir}/Sources/RLXInstallerBridge.m" \
+  "${script_dir}/Sources/RLXInstallerPresentation.m" \
+  "${script_dir}/Tests/bridge_mapping_contract.m" \
+  -framework Cocoa -o "${output_root}/installer-bridge-mapping-contract"
+"${output_root}/installer-bridge-mapping-contract"
+
 expected_bundle_id="$(python3 "${layout_tool}" field installer_bundle_id)"
 actual_bundle_id="$(plutil -extract CFBundleIdentifier raw "${bundle}/Contents/Info.plist")"
 if [[ "${actual_bundle_id}" != "${expected_bundle_id}" ]]; then

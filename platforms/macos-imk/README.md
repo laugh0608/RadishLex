@@ -42,7 +42,9 @@ Rust snapshot 的 cursor 是允许落在 composition 末尾的插入位置，但
 
 native 产品 session 通过当前 ABI v9 中兼容保留的 personalized Rime 构造入口持有独立 userdb connection；该入口最初由 ABI v5 引入，数据库固定为 `~/Library/Application Support/RadishLex/userdb.sqlite3`。Objective-C 只创建并收紧 `RadishLex` 父目录到 `0700`，SQLite migration、WAL、busy timeout、文件权限、排序、selection 事务和失败回退都由 Rust 负责。每个事件前平台只传 secure input、隐私模式、上下文可信度与粗粒度类别；当前 Alpha 只把 TextEdit 和 Codex 识别为允许学习的普通上下文，其他未知应用默认 engine-only，敏感应用与 secure input 同样不读取、不写入个人化数据。
 
-当前分类把 TextEdit 映射为 `editor`、Codex 映射为 `code`；Passwords、Keychain Access、1Password 8/7 与固定 P0 验证宿主标记为敏感，其余应用（包括固定 unknown 验证宿主）映射为未知 `other`。隐私模式由输入法 `NSUserDefaults` 中的 `RadishLexPrivacyMode` 布尔值控制，缺省关闭；开启后仍可使用既有本地排序摘要，但不会记录当前 selection 或更新 user term/ranker weight。设置或前台/secure 状态变化时，controller 会先刷新 Rust learning context 和候选 snapshot，再接受 display index 选择。
+当前分类把 TextEdit 映射为 `editor`、Codex 映射为 `code`；Passwords、Keychain Access、1Password 8/7 与固定 P0 验证宿主标记为敏感，其余应用（包括固定 unknown 验证宿主）映射为未知 `other`。身份取自每次事件/提交对应的 `IMKTextInput.bundleIdentifier`，不取最前台应用；接口缺失、nil/空值、非字符串或查询异常保持 unknown 禁读禁学，异常日志不含客户端身份或异常正文。隐私模式由输入法 `NSUserDefaults` 中的 `RadishLexPrivacyMode` 布尔值控制，缺省关闭；开启后仍可使用既有本地排序摘要，但不会记录当前 selection 或更新 user term/ranker weight。设置或客户端分类/secure 状态变化时，controller 会先刷新 Rust learning context 和候选 snapshot，再接受 display index 选择。
+
+`Tests/input_context_contract.m` 在隔离测试进程中替换前台查询，注入合成 IMK client 和记录调用的 demo bridge，覆盖客户端与前台不一致、缺失/无效/失败身份、五条提交路径、策略往返和更新失败。测试不读取真实前台身份、不发送系统按键或打开用户数据库；Rust 的禁学持久化与 composition 最严格策略另由 runtime/native 回归验证。该合同纳入 `./scripts/check-macos-imk.sh`，测试初始化和注入属性仅存在于 contract build。
 
 `userdb.sqlite3` 不是临时 Rime 数据，卸载或普通开发清理不得删除。`--status` 分别报告 bundle、固定删除路径祖先安全性、RadishLex 父目录的存在性/类型/权限、Rime 目录、userdb、已知 SQLite sidecar 和进程；悬空 symlink 也视为存在或不安全，但这些 metadata 不自动证明数据归属。R01B 在复制前必须捕获 privacy 与空父目录 receipts；授权 A 完成普通清理和隐私恢复后，授权 B 才能通过专用 helper 精确删除本轮四个 SQLite 文件并恢复预存父目录 `0755`。当前父目录不得删除，完整 case、增减量和停止线见 `docs/runbooks/macos-r01b-personalization-acceptance.md`。
 

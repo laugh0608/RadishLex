@@ -15,7 +15,8 @@ fn rime_session_native_smoke_uses_ffi_entrypoint() {
         .expect("RADISHLEX_RIME_SHARED_DATA must point to isolated Rime shared data");
     let user_data = env::var("RADISHLEX_RIME_USER_DATA")
         .expect("RADISHLEX_RIME_USER_DATA must point to isolated Rime user data");
-    let schema = env::var("RADISHLEX_RIME_SCHEMA").unwrap_or_else(|_| "luna_pinyin".to_owned());
+    let schema =
+        env::var("RADISHLEX_RIME_SCHEMA").unwrap_or_else(|_| "radishlex_pinyin".to_owned());
     let userdb_path = PathBuf::from(&user_data).join("userdb.sqlite3");
 
     let shared_data = CString::new(shared_data).expect("shared data path");
@@ -375,8 +376,16 @@ fn rime_session_native_smoke_uses_ffi_entrypoint() {
         RadishLexStatusCode::Ok
     );
 
+    // This tail checks raw Rime highlight keys, whose indices follow engine
+    // order. Product shells own their visible cursor and use display-index
+    // selection (covered above); learned ranker order may differ from Rime.
+    set_learning_context(session, false, false, false, &mut error);
     push_text(session, "shi", &mut error);
     let snapshot = radishlex_session_snapshot_new(session, &mut error);
+    assert_eq!(
+        radishlex_snapshot_personalization_status(snapshot),
+        RADISHLEX_PERSONALIZATION_STATUS_POLICY_BLOCKED
+    );
     assert!(radishlex_snapshot_candidate_count(snapshot) > 1);
     let expected_highlighted = unsafe { candidate_text(snapshot, 1, &mut error) };
     unsafe {
@@ -398,12 +407,106 @@ fn rime_session_native_smoke_uses_ffi_entrypoint() {
 
     unsafe {
         radishlex_key_result_free(space);
+    }
+    assert_restricted_segment_and_automatic_commits(session, &userdb_path, &mut error);
+    unsafe {
         radishlex_session_free(session);
     }
     assert_eq!(
         unsafe { radishlex_rime_runtime_shutdown(&mut error) },
         RadishLexStatusCode::Ok
     );
+}
+
+fn assert_restricted_segment_and_automatic_commits(
+    session: *mut RadishLexSession,
+    db: &CString,
+    error: &mut *mut RadishLexError,
+) {
+    for (secure, private, known) in [
+        (false, true, true),
+        (false, false, false),
+        (true, false, true),
+    ] {
+        let count = manager_learning_status(db, error).selection_events;
+        set_learning_context(session, secure, private, known, error);
+        push_text(session, "luobo", error);
+        let mut partial = ptr::null_mut();
+        assert_eq!(
+            unsafe { radishlex_session_select_candidate(session, 1, &mut partial, error) },
+            RadishLexStatusCode::Ok
+        );
+        assert_eq!(unsafe { radishlex_key_result_commit_present(partial) }, 0);
+        assert_eq!(
+            unsafe { radishlex_key_result_learning_disposition(partial) },
+            RADISHLEX_LEARNING_SKIPPED_BY_POLICY
+        );
+        unsafe {
+            radishlex_key_result_free(partial);
+        }
+        set_learning_context(session, false, false, true, error);
+        let mut committed = false;
+        for _ in 0..5 {
+            let mut result = ptr::null_mut();
+            assert_eq!(
+                unsafe { radishlex_session_select_candidate(session, 0, &mut result, error) },
+                RadishLexStatusCode::Ok
+            );
+            assert_eq!(
+                unsafe { radishlex_key_result_learning_disposition(result) },
+                RADISHLEX_LEARNING_SKIPPED_BY_POLICY
+            );
+            committed = unsafe { radishlex_key_result_commit_present(result) } == 1;
+            if committed {
+                assert!(!unsafe { view_to_string(radishlex_key_result_commit(result)) }.is_empty());
+                assert!(unsafe { result_preedit(result) }.is_empty());
+            }
+            unsafe {
+                radishlex_key_result_free(result);
+            }
+            if committed {
+                break;
+            }
+        }
+        assert!(committed, "restricted segmented input must still finish");
+        assert_eq!(manager_learning_status(db, error).selection_events, count);
+
+        set_learning_context(session, secure, private, known, error);
+        push_text(session, "nihao", error);
+        set_learning_context(session, false, false, true, error);
+        let enter = unsafe { handle_named(session, RADISHLEX_NAMED_KEY_ENTER, error) };
+        assert_eq!(unsafe { radishlex_key_result_commit_present(enter) }, 1);
+        assert_eq!(
+            unsafe { view_to_string(radishlex_key_result_commit(enter)) },
+            "nihao"
+        );
+        assert_eq!(
+            unsafe { radishlex_key_result_learning_disposition(enter) },
+            RADISHLEX_LEARNING_SKIPPED_BY_POLICY
+        );
+        unsafe {
+            radishlex_key_result_free(enter);
+        }
+        assert_eq!(manager_learning_status(db, error).selection_events, count);
+
+        push_text(session, "shi", error);
+        let mut fresh = ptr::null_mut();
+        assert_eq!(
+            unsafe { radishlex_session_select_candidate(session, 0, &mut fresh, error) },
+            RadishLexStatusCode::Ok
+        );
+        assert_eq!(
+            unsafe { radishlex_key_result_learning_disposition(fresh) },
+            RADISHLEX_LEARNING_RECORDED
+        );
+        unsafe {
+            radishlex_key_result_free(fresh);
+        }
+        assert_eq!(
+            manager_learning_status(db, error).selection_events,
+            count + 1
+        );
+    }
 }
 
 fn set_learning_context(

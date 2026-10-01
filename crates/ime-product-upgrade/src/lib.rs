@@ -7,19 +7,36 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+mod preparation;
+pub use preparation::{
+    PreparationArchiveSlot, PreparationBinding, PreparationDirectoryIdentity, PreparationFamily,
+    PreparationFileIdentity, PreparationPhase, PreparationReceipt, PreparationReceiptError,
+    MAX_PREPARATION_RECEIPT_BYTES, PREPARATION_RECEIPT_FORMAT,
+};
+
 #[cfg(unix)]
 mod filesystem;
 #[cfg(unix)]
 pub use filesystem::{
-    inspect_startup_gate, StartupGateDecision, StartupGateErrorCode, StartupGateResult,
-    UpgradeCandidateSummary, UpgradeCandidateValidationDisposition,
-    UpgradeCandidateValidationReport, UpgradeCandidateValidationSummary,
-    UpgradeCompletionDisposition, UpgradeCoordinatorCheckpoint, UpgradeCoordinatorDisposition,
-    UpgradeCoordinatorError, UpgradeCoordinatorPort, UpgradeCoordinatorSummary,
-    UpgradeFilesystemError, UpgradeFilesystemErrorCode, UpgradeInputMethodValidationEvidence,
-    UpgradeManagerValidationEvidence, UpgradePostSwitchValidationDisposition,
-    UpgradePostSwitchValidationReport, UpgradePostSwitchValidationSummary, UpgradeProcessGuard,
-    UpgradeReceiptStore, UpgradeRollbackRestoreDisposition, UpgradeRollbackRestoreSummary,
+    inspect_startup_gate, CancellationArchiveCheckpoint, CancellationArchivePort,
+    CancellationArchiveReceipt, CancellationArchiveSlot, CancellationArchiveStore,
+    CancellationOuterBinding, CancellationSourceCheckpoint, CancellationSourcePhase,
+    CancellationSourcePort, CancellationSourceReceipt, PreparationCancellationCheckpoint,
+    PreparationCancellationPort, PreparationCancellationRequest, PreparationCancellationStore,
+    PreparationHasher, PreparationJournalError, PreparationJournalStore, PreviousInventory,
+    SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,
+    SourcePreparationSpaceBudget, StartupGateDecision, StartupGateErrorCode, StartupGateResult,
+    TerminalReleaseBinding, TerminalReleaseCheckpoint, TerminalReleaseDirectory,
+    TerminalReleaseOuterRequirement, TerminalReleasePhase, TerminalReleasePort,
+    TerminalReleaseReceipt, TerminalReleaseStore, UpgradeCandidateSummary,
+    UpgradeCandidateValidationDisposition, UpgradeCandidateValidationReport,
+    UpgradeCandidateValidationSummary, UpgradeCompletionDisposition, UpgradeCoordinatorCheckpoint,
+    UpgradeCoordinatorDisposition, UpgradeCoordinatorError, UpgradeCoordinatorPort,
+    UpgradeCoordinatorSummary, UpgradeFilesystemError, UpgradeFilesystemErrorCode,
+    UpgradeInputMethodValidationEvidence, UpgradeManagerValidationEvidence,
+    UpgradePostSwitchValidationDisposition, UpgradePostSwitchValidationReport,
+    UpgradePostSwitchValidationSummary, UpgradeProcessGuard, UpgradeReceiptStore,
+    UpgradeRollbackRestoreDisposition, UpgradeRollbackRestoreSummary,
     UpgradeRollbackValidationDisposition, UpgradeRollbackValidationEvidence,
     UpgradeRollbackValidationSummary, UpgradeSettingsBackupSummary, UpgradeSnapshotSpaceBudget,
     UpgradeSnapshotSummary, UpgradeSwitchDisposition, UpgradeSwitchSummary, VerifiedDataRoot,

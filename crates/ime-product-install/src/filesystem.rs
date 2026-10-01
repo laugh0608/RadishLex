@@ -178,6 +178,52 @@ impl InstallReceiptStore {
         &self.root.identity
     }
 
+    /// Opens an existing transaction without creating or changing any object.
+    pub fn open_existing(root: VerifiedInstallRoot) -> Result<Self, InstallFilesystemError> {
+        root.revalidate()?;
+        let state_directory = root.path.join(STATE_DIRECTORY_NAME);
+        let metadata = fs::symlink_metadata(&state_directory)
+            .map_err(|_| error(InstallFilesystemErrorCode::UnsafeStateDirectory))?;
+        verify_private_directory(&metadata, root.expected_owner_id, 0o700)?;
+        let store = Self {
+            guard_socket_path: build_guard_socket_path(&root.identity, root.expected_owner_id)?,
+            root,
+            state_directory,
+            state_directory_identity: DirectoryIdentity::from_metadata(&metadata),
+        };
+        store.revalidate()?;
+        store.validate_known_entries()?;
+        Ok(store)
+    }
+
+    /// Inspects a receipt without removing a stale guard or changing transaction state.
+    pub fn load_for_recovery_inspection(
+        &self,
+    ) -> Result<Option<InstallReceipt>, InstallFilesystemError> {
+        self.revalidate()?;
+        self.validate_known_entries()?;
+        if path_exists(&self.staged_receipt_path())? {
+            return Err(error(InstallFilesystemErrorCode::InterruptedReceiptWrite));
+        }
+        if path_exists(&self.guard_path())? {
+            let before = fs::symlink_metadata(self.guard_path())
+                .map_err(|_| error(InstallFilesystemErrorCode::IdentityChanged))?;
+            verify_private_socket(&before, self.root.expected_owner_id)?;
+            match UnixStream::connect(self.guard_path()) {
+                Err(io) if io.kind() == ErrorKind::ConnectionRefused => {}
+                _ => return Err(error(InstallFilesystemErrorCode::OperationAlreadyActive)),
+            }
+            let after = fs::symlink_metadata(self.guard_path())
+                .map_err(|_| error(InstallFilesystemErrorCode::IdentityChanged))?;
+            verify_private_socket(&after, self.root.expected_owner_id)?;
+            if FileIdentity::from_metadata(&before) != FileIdentity::from_metadata(&after) {
+                return Err(error(InstallFilesystemErrorCode::IdentityChanged));
+            }
+        }
+        self.load_current_internal()
+            .map(|current| current.map(|(receipt, _, _)| receipt))
+    }
+
     pub fn acquire_guard(&self) -> Result<InstallProcessGuard, InstallFilesystemError> {
         self.revalidate()?;
         self.validate_known_entries()?;

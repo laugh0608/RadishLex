@@ -210,6 +210,8 @@ M4-P02 数据 receipt 只能在 `upgrade` 的 `data_coordinating` 阶段运行�
 
 外层 receipt/guard、artifact contract、程序切换恢复、macOS manifest/code-signature adapter、数据协调映射、两段终态与双端启动入口均已实现。隔离真实产品资格进一步证明 `final_verified` 中断续跑、candidate 失败恢复 source 双程序、Manager 单端已提交后的重启续跑，以及 active/non-terminal/terminal 双端启动决策；终态材料清理仍在后续独立切面。
 
+显式切换前中止入口使用同一程序恢复实现，但在写入内层中止、逐端恢复和外层终态前附加 fresh 静止、全部程序材料与不可改写数据保留证据检查。外层/数据 receipt 格式均保持 v1；证据独立于旧状态目录。该入口只恢复未切换原库的升级，详细授权与可加 action 映射见 [Installer 边界](macos-installer-app-boundary.md#显式切换前中止恢复)，文件保留合同见[数据升级边界](macos-data-upgrade-coordinator.md#显式切换前中止的保留证据)。
+
 ## Startup decision
 
 Manager 与 InputMethod 必须在 M4-P02 数据 gate、userdb、settings、Rime runtime 和 Flutter/IMK 业务初始化之前调用 ABI v9 外层只读 gate。FFI 不接受运行 identity 字段；macOS 实现只从当前 executable 反向绑定固定用户域 bundle，再读取 Info.plist、计算完整 tree 并形成 strict ad-hoc code identity。UI、settings、`HOME` 或调用方自报 bundle/release/hash 均不能成为身份输入。

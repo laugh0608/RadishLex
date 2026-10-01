@@ -42,6 +42,13 @@ struct CoordinationFixture {
 
 impl CoordinationFixture {
     fn new() -> Self {
+        Self::with_source_database(|database| {
+            drop(UserDb::open(database).expect("source database"));
+            UserDb::migrate_and_validate(database).expect("standalone source database");
+        })
+    }
+
+    fn with_source_database(initialize: impl FnOnce(&Path)) -> Self {
         let container = fs::canonicalize(std::env::temp_dir())
             .expect("temp root")
             .join(format!(
@@ -142,8 +149,7 @@ impl CoordinationFixture {
         drop(install_guard);
 
         let database = data_root.join("userdb.sqlite3");
-        drop(UserDb::open(&database).expect("source database"));
-        UserDb::migrate_and_validate(&database).expect("standalone source database");
+        initialize(&database);
         let database_metadata = fs::metadata(&database).expect("database metadata");
         let source_database_inode = database_metadata.ino();
         let source_database = UpgradeArtifactIdentity::private_file(
@@ -259,6 +265,9 @@ impl CoordinationFixture {
             .ino()
     }
 }
+
+#[path = "wal_residue_tests.rs"]
+mod wal_residue_tests;
 
 impl Drop for CoordinationFixture {
     fn drop(&mut self) {

@@ -8,7 +8,7 @@
 
 个人化能力不改变底层 engine adapter 边界：
 
-- `ime-engine-rime` 继续只负责真实候选生成和候选转换。
+- `ime-engine-rime` 提供基础候选、转换和无底层学习的配置检查；Rime 用户词典由 adapter 禁用。
 - `ime-core` 继续定义平台无关输入模型。
 - `ime-userdb` 保存本地学习数据和用户词库。
 - `ime-ranker` 根据 engine candidates 与 userdb summary 输出重排后的候选。
@@ -23,7 +23,7 @@
 一次候选快照按以下顺序形成：
 
 1. 从 engine 读取 composition、候选和稳定 `input_code`。
-2. 根据平台传入的 secure input、敏感应用、隐私模式和上下文可信度决定个人化策略。
+2. 根据平台上下文及本 composition 经历过的最严格策略决定个人化策略。
 3. 对允许读取个人化数据的路径，在同一只读事务中一次取得当前候选身份匹配的 user term、ranker weight 与 tombstone，避免候选级 N+1 查询和跨查询状态漂移。
 4. ranker 输出带 `original_index` 的确定性顺序；runtime 固化 display index 到 engine index 的映射，平台只使用 display index，真正选择时由 Rust 映射回 engine index。
 
@@ -37,11 +37,15 @@
 
 平台只传递枚举化 `context_kind` 和布尔策略信号，不传、不持久化原始 App ID、窗口标题或文档文本。当前稳定类别为 `general`、`browser`、`chat`、`code`、`editor`、`office`、`terminal`、`other`；未知类别必须拒绝，FFI view 另限制为不超过 32 个 UTF-8 bytes。上下文变化必须显式更新 runtime；切换到禁止学习的上下文时，清除尚未由 commit 确认的选择意图。
 
+一个 composition 一旦经过隐私模式、secure、敏感应用或 unknown，上下文恢复普通后仍禁学；曾进入 engine-only 的 composition 也不恢复摘要读取。收紧策略即生效，即使切换期间没有按键；空闲时切换不影响下一次普通输入。策略在 engine 操作前收紧，只有实际观察到 composition 与 input code 均为空才释放，不能凭某次 commit、reset/schema 调用成功或相同 schema 选择就推断完成。分段、自动 commit 留有余串、失败和重试都保留限制；下一次全新普通输入仍能学习。策略仅属于当前 session，不污染共享 userdb 的其他 session。
+
+直接传入已含 composition 的 engine 或通过 `engine_mut` 绕过 runtime 的输入缺少隐私来源，保留输入但按 engine-only 处理，直到确认空 composition。候选选择与自动 commit 先判定禁学，再更新状态；不为禁学清空待提交文本。
+
 选择前，runtime 从当前快照捕获 input code、候选规范身份、display/engine index、候选数和受控 context kind。engine 立即返回匹配 commit 时记录一次 selection；分段选择没有立即 commit 时只保存待确认意图，后续仅在匹配 commit 到达时记录。reset、schema/client/context 变化、取消或不匹配 commit 必须丢弃待确认意图；无法关联候选的原始 engine commit 不推断学习。当前产品 runtime 不通过退格、改选或时间窗口自动推断负反馈。
 
 userdb/ranker 读取失败时，runtime 必须保留 engine 原始顺序并返回明确的个人化退化状态：`ready` 表示个人化路径可用（当前页可以没有匹配信号），`policy_blocked` 表示策略强制 engine-only，`storage_unavailable` 表示数据库打开或迁移不可用，`read_failed` 与 `rank_failed` 分别表示本次摘要读取或排序失败。engine 已产生的 commit 不得因学习写入失败而丢失；key/select 结果同时携带 commit 和 `recorded`、`deferred`、`skipped_by_policy`、`failed` 等学习结果。错误诊断不得包含输入码、候选文本、数据库路径或原始应用信息。
 
-当前实现只重排 engine 当次提供的候选；添加或导入 userdb 词条不等于已提供独立的新词召回。上述“不学习”是全系统合同，现有 runtime/SQLite 证据仅证明其实际观察范围；底层 Rime 存储控制缺口与新词行为方案由 [current](status/current.md) 激活的审阅专题跟踪。
+当前实现只重排 engine 当次提供的候选；添加或导入 userdb 词条不等于已提供独立的新词召回。上述“不学习”是全系统合同，现有 runtime/SQLite 证据仅证明其实际观察范围；底层 Rime 已按 [adapter 合同](engine-rime-adapter.md#单一学习存储与有效配置) 禁止用户词典读取和写入；旧数据保留、真实平台复验与新词行为方案由 [current](status/current.md) 激活的审阅专题跟踪。
 
 ## 目标
 

@@ -127,6 +127,33 @@ fn pre_switch_failure_preserves_original_as_terminal_result() {
 }
 
 #[test]
+fn v1_abort_requires_known_failure_and_cannot_encode_user_cancellation() {
+    let mut aborted = receipt();
+    aborted
+        .abort_preserved(UpgradeFailureCode::SnapshotFailed, false)
+        .expect("actual pre-switch failure remains supported");
+    let bytes = aborted.encode().expect("valid terminal receipt");
+    assert_eq!(UpgradeReceipt::decode(&bytes).expect("v1 reader"), aborted);
+
+    let text = String::from_utf8(bytes).expect("UTF-8 receipt");
+    let cancellation = text.replace("\"snapshot_failed\"", "\"user_cancelled\"");
+    assert_ne!(cancellation, text);
+    assert!(UpgradeReceipt::decode(cancellation.as_bytes()).is_err());
+
+    aborted.failure_code = None;
+    // Serialize the original struct to retain its field order. The failure must
+    // come from the v1 contract, not a reordered/non-canonical JSON object.
+    let mut missing_failure = serde_json::to_vec(&aborted).expect("struct serializes");
+    missing_failure.push(b'\n');
+    assert_eq!(
+        serde_json::from_slice::<UpgradeReceipt>(&missing_failure).expect("valid JSON shape"),
+        aborted
+    );
+    assert!(aborted.encode().is_err());
+    assert!(UpgradeReceipt::decode(&missing_failure).is_err());
+}
+
+#[test]
 fn post_switch_failure_requires_explicit_rollback_completion() {
     let mut receipt = receipt();
     receipt

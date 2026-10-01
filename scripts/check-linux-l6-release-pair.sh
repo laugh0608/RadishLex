@@ -10,7 +10,7 @@ if [[ $# -ne 0 ]]; then
 fi
 
 PYTHONDONTWRITEBYTECODE=1 python3 \
-  "${repo_root}/scripts/linux-product/l6_release_pair.py" validate-contract
+  "${repo_root}/scripts/linux-product/l6_release_pair.py" validate-frozen-contract
 PYTHONDONTWRITEBYTECODE=1 python3 \
   "${repo_root}/scripts/linux-product/test_l6_release_pair.py"
 PYTHONDONTWRITEBYTECODE=1 python3 \

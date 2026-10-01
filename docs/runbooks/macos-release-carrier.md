@@ -4,12 +4,18 @@
 
 ## 发布口径
 
-- 产品版本由仓库根 `version.json` 唯一确定；当前修复候选为 `26.7.1 (38)`，标准 tag 为 `v26.7.1-release`。`26.7.1 (35)` 把 quarantine 传播到最终程序，`26.7.1 (36)` 又无法清除只读 dylib 的 quarantine；二者均失效，不得作为首发 assembly。build 37 已完成真实安装证据，但因 Installer 生命周期代码变化不再作为最终发布载体。
+- 产品版本由仓库根 `version.json` 唯一确定，标准 tag 格式为 `v<product_version>-release`。当前候选与开放范围以 [current](../status/current.md)为准；本轮 build 39 只有本地 Installer，尚未制作 DMG，身份与待执行矩阵见[联合验收入口](macos-rev01-rev02-acceptance.md)。
 - `ProductManifest.json` format v3 固定 `distribution_identity=community-adhoc-v1`。
 - Installer、Manager 与 InputMethod 使用严格 ad-hoc code signature。该签名用于检测包内意外变化和绑定事务 identity，不提供 Apple 认可的发布者认证。
 - DMG 不签名、不提交公证、不含 ticket。`notarize-macos-release-dmg.sh` 在当前模式必须稳定失败关闭。
 - 对外必须同时发布 DMG 与 `CommunityReleaseEvidence.json`；后者精确绑定版本、文件名、大小、DMG SHA-256 和 sealed release identity SHA-256。
-- 当前候选 `RadishLex-26.7.1-38.dmg` 大小为 `32196093` bytes，SHA-256 为 `f171e74bdc0a429655a84b30429481bce3926b17076d09298feed77d9ce4ce4e`；远端 draft 仅含匹配的 DMG、checksum 和 evidence，仍未发布且没有正式 Git tag。Chrome 独立下载副本已同时匹配大小与 SHA-256，逐字节比较一致，并带有真实 quarantine 和 GitHub Release 来源元数据；该副本的标准 Application 菜单、`⌘Q`、关闭最后窗口终止进程、`prepared` 重启续跑、首次安装、固定路径 Manager 启动、公开合成输入、repair 与默认程序 remove 已通过人工复验。双 bundle 在安装与 repair 后均精确匹配 manifest/release identity 且无 quarantine，repair 保持 Application Support、Rime 与 userdb inode；默认 remove 后双 bundle/TIS/进程清零且数据对象继续保留。候选证据链已闭合，但正式发布、tag 与 Release 仍需独立授权。
+
+### M4 build 38 历史验收
+
+以下为当时的载体与验收记录，不覆盖 build 39 的隐私/SQLite 修复，也不是本次对远端状态的重新查询：
+
+- `26.7.1 (35)` 把 quarantine 传播到最终程序，`26.7.1 (36)` 又无法清除只读 dylib 的 quarantine；二者均失效，不得作为首发 assembly。build 37 已完成真实安装证据，但因 Installer 生命周期代码变化不再作为最终发布载体。
+- `RadishLex-26.7.1-38.dmg` 大小为 `32196093` bytes，SHA-256 为 `f171e74bdc0a429655a84b30429481bce3926b17076d09298feed77d9ce4ce4e`；当时远端 draft 仅含匹配的 DMG、checksum 和 evidence，未发布且没有正式 Git tag。Chrome 独立下载副本已同时匹配大小与 SHA-256，逐字节比较一致，并带有真实 quarantine 和 GitHub Release 来源元数据；该副本的标准 Application 菜单、`⌘Q`、关闭最后窗口终止进程、`prepared` 重启续跑、首次安装、固定路径 Manager 启动、公开合成输入、repair 与默认程序 remove 已通过人工复验。双 bundle 在安装与 repair 后均精确匹配 manifest/release identity 且无 quarantine，repair 保持 Application Support、Rime 与 userdb inode；默认 remove 后双 bundle/TIS/进程清零且数据对象继续保留。此单版本候选证据链已闭合；正式发布、tag 与 Release 仍需独立授权。
 
 ## 构建
 
@@ -21,12 +27,12 @@
 ./scripts/build-macos-release-dmg.sh
 ```
 
-首发输出固定在：
+输出目录由版本元数据确定。以下 `<version>` 和 `<build>` 须替换为本次实际版本，只有执行 DMG 构建后才存在对应 DMG/evidence：
 
 ```text
-target/macos-release/26.7.1-38/
+target/macos-release/<version>-<build>/
 ├── RadishLex Installer.app
-├── RadishLex-26.7.1-38.dmg
+├── RadishLex-<version>-<build>.dmg
 ├── CommunityReleaseEvidence.json
 ├── InstallPayload/
 └── Product/
@@ -40,9 +46,9 @@ target/macos-release/26.7.1-38/
 ./scripts/check-macos-release-carrier.sh
 
 python3 scripts/macos-product/community_release.py verify \
-  --carrier "$PWD/target/macos-release/26.7.1-38/RadishLex-26.7.1-38.dmg" \
-  --identity "$PWD/target/macos-release/26.7.1-38/RadishLex Installer.app/Contents/Resources/ReleaseIdentity.json" \
-  --evidence "$PWD/target/macos-release/26.7.1-38/CommunityReleaseEvidence.json"
+  --carrier "$PWD/target/macos-release/<version>-<build>/RadishLex-<version>-<build>.dmg" \
+  --identity "$PWD/target/macos-release/<version>-<build>/RadishLex Installer.app/Contents/Resources/ReleaseIdentity.json" \
+  --evidence "$PWD/target/macos-release/<version>-<build>/CommunityReleaseEvidence.json"
 ```
 
 发布页必须明确写明“未使用 Apple Developer ID、未公证，需要用户手动批准”，并直接列出 DMG SHA-256。不能使用“已签名”“Apple 已验证”“通过 Gatekeeper”或等价表述。
@@ -52,7 +58,7 @@ python3 scripts/macos-product/community_release.py verify \
 用户应先对下载文件执行：
 
 ```bash
-shasum -a 256 "$HOME/Downloads/RadishLex-26.7.1-38.dmg"
+shasum -a 256 "$HOME/Downloads/RadishLex-<version>-<build>.dmg"
 ```
 
 结果必须与发布页及 `CommunityReleaseEvidence.json` 的 `carrier_sha256` 完全一致。随后打开 DMG 并尝试启动 `RadishLex Installer.app`。macOS 阻止启动时，首选系统支持的人工路径：
@@ -92,7 +98,7 @@ Installer 只管理以下当前用户对象，不写 `/Applications` 或系统�
 - “移除程序”默认只移除 Manager 和 InputMethod，保留 userdb、settings、Rime 数据、receipt、staging、backup 与历史 operation。用户应先在系统设置中手动移除输入源；删除个人数据不是该动作的一部分。
 - Installer 被关闭或异常退出后，应重新打开同一冻结 artifact，按显示的“继续”或“重试”从已持久化状态恢复。不要手工删除 receipt、`.radishlex-install-*`、staging、backup 或 Application Support 来绕过门禁。
 
-`product_identity_unavailable` 表示当前 Installer/payload/sealed identity 缺失或漂移，应重新核对 DMG SHA-256 和发布来源；`driver_unavailable` 常见于请求升级但 payload 没有匹配的历史 source。active guard、非终态/损坏 receipt、未知对象、身份漂移或 completed remove 都会失败关闭。日志只输出稳定 `phase/action/error/state`，不会提供可安全复制执行的底层路径修复命令。
+`product_identity_unavailable` 表示当前 Installer/payload/sealed identity 缺失或漂移，应重新核对载体与发布来源；`driver_unavailable` 常见于请求升级但 payload 没有匹配的历史 source。有效非终态按 snapshot 提供继续或恢复动作；active guard、损坏 receipt、未知对象或身份漂移会失败关闭。有效 completed remove 在固定双程序未安装且保留数据/receipt 身份校验通过后，可以再次 first install，详见 [Installer 边界](../macos-installer-app-boundary.md)。日志只输出稳定 `phase/action/error/state`，不会提供可安全复制执行的底层路径修复命令。
 
 ## 升级与失败关闭
 

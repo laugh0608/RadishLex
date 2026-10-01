@@ -9,7 +9,9 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 
 mod artifact;
+mod cancellation_contract;
 pub use artifact::{InstallArtifactEvidence, InstallArtifactSlot, ProgramFilesystemIdentity};
+pub use cancellation_contract::validate_preparation_cancellation_outer;
 #[cfg(unix)]
 mod filesystem;
 #[cfg(unix)]

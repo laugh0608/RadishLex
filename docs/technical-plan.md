@@ -117,7 +117,7 @@ M4 产品升级把运行时打开与产品迁移分开：`ime-userdb` 提供不�
 
 ### ime-product-upgrade
 
-`ime-product-upgrade` 保存产品数据升级的状态机、版本化 receipt、固定对象身份与稳定失败分类：
+`ime-product-upgrade` 保存产品数据升级的状态机、版本化 receipt、固定对象身份与稳定失败分类。既有 v1 数据事务遵守以下合同：
 
 - 状态只能按 preflight、静止、快照、候选 migration、双端验证、切换和最终验证的证据顺序推进；
 - 切换前失败保留原数据，切换后失败只能进入显式 rollback；
@@ -134,6 +134,8 @@ M4 产品升级把运行时打开与产品迁移分开：`ime-userdb` 提供不�
 - guard-bound 驱动在每个写入、产品 validation 前后与 rollback validation 前后通过平台 port 重新证明静止；核心不定位或启动平台 executable；
 - macOS adapter 从 source/target `ProductManifest.json` 固定解析双端 helper，target preflight 负责全部 checkpoint，target/source 双端分别形成升级与回滚 evidence；执行前复验 manifest 长度/hash，版本化 distribution identity 与固定安装来源由 M4-P03 绑定；
 - 平台 host 负责固定路径、进程静止和文件系统适配，`ime-userdb` 继续独占 schema 与 migration 语义。
+
+WAL 源库准备使用独立 `PreparationReceipt` / `PreparationJournalStore`，复用状态目录 inode 与 inner guard。它保存私有文件身份/SHA-256 和保护快照证明，在持久维护意图及 fresh 授权/静止条件下调用 `ime-userdb` 专用维护入口；正常 runtime 的 WAL 策略与隔离 candidate migration 职责保持。准备错误可能留下物理变化，须以内容及 tombstone 等价判断，不能承诺准备前字节不变。准备记录与既有 v1 receipt 的编码、摘要范围和阶段分别验证；`source_prepared` 不等于新事务交接或产品可启动，实际接线及退出进度只读[当前状态](status/current.md)。
 
 该 crate 不进入输入热路径，不承载安装器 UI、SQLite migration SQL、macOS 进程控制或调用方自定义路径。完整边界见 [macOS 数据升级协调器](macos-data-upgrade-coordinator.md)。
 

@@ -43,7 +43,7 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
     NSSet<NSString *> *actions = [NSSet setWithArray:@[
         RLXNoAction, RLXRefreshAction, @"begin_first_install", @"begin_upgrade",
         @"begin_repair", @"confirm_quiescence", @"resume_operation",
-        @"retry_operation", @"remove_programs"
+        @"retry_operation", @"remove_programs", @"abort_pre_switch_upgrade"
     ]];
     NSSet<NSString *> *errors = [NSSet setWithArray:@[
         @"none", @"operation_active", @"unsafe_data_root",
@@ -137,10 +137,18 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
 }
 
 - (NSString *)statusDetail {
+    if ([self.primaryActionCode isEqualToString:@"abort_pre_switch_upgrade"] ||
+        [self.secondaryActionCode isEqualToString:@"abort_pre_switch_upgrade"]) {
+        return @"可以中止尚未切换数据的升级并恢复原版本程序。原词库及备份全部保留；已开始的恢复会继续同一事务。请先切换到其他输入源并关闭管理器。";
+    }
     if (self.requiresManualQuiescence) {
         return @"请先手动切换到其他输入源并关闭萝卜词核管理器。确认后安装器仍会通过公开平台接口重新检查，勾选状态不作为静止证明。";
     }
     if (self.failedClosed) {
+        if ([self.errorCode isEqualToString:RLXUnknownDriverResult] &&
+            ![self.stateCode isEqualToString:@"none"]) {
+            return @"上次操作返回错误，当前进度只表示已保存的阶段。请保留现场并按诊断码排查；刷新只重新检查状态。";
+        }
         return @"安装器无法安全确认产品或事务状态。请保留现场并使用下方稳定诊断码排查。";
     }
     if ([self.phaseCode isEqualToString:@"completed"]) {
@@ -160,6 +168,7 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
         @"resume_operation": @"继续未完成操作",
         @"retry_operation": @"重新执行",
         @"remove_programs": @"移除两个程序",
+        @"abort_pre_switch_upgrade": @"中止升级并恢复源程序",
     };
     return titles[actionCode] ?: @"";
 }
@@ -167,6 +176,9 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
 - (BOOL)isActionEnabled:(NSString *)actionCode {
     return [actionCode isKindOfClass:NSString.class] &&
         ![actionCode isEqualToString:RLXNoAction] &&
+        ([actionCode isEqualToString:self.primaryActionCode] ||
+         [actionCode isEqualToString:self.secondaryActionCode]) &&
+        (!self.failedClosed || [actionCode isEqualToString:RLXRefreshAction]) &&
         [[self titleForAction:actionCode] length] > 0;
 }
 
@@ -176,6 +188,9 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
 }
 
 - (NSString *)confirmationTextForAction:(NSString *)actionCode {
+    if ([actionCode isEqualToString:@"abort_pre_switch_upgrade"]) {
+        return @"确认中止本次尚未切换数据的升级，并从已验证备份恢复原版本 Manager 和 InputMethod。原词库、WAL、候选与事务证据均保留。若恢复已开始，将继续同一事务。请确认已手动切换到其他输入源并关闭管理器；安装器会重新验证静止、程序身份及数据保留条件。";
+    }
     if ([actionCode isEqualToString:@"remove_programs"]) {
         return @"确认只移除 RadishLex Manager 与 InputMethod 两个程序。Application Support、用户词库、备份和历史事务材料都会保留。";
     }

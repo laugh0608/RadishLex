@@ -317,6 +317,24 @@ clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
   -framework AppKit -framework Carbon -framework InputMethodKit \
   -o "${smoke_dir}/input-controller-contract"
 "${smoke_dir}/input-controller-contract"
+
+clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+  -mmacosx-version-min=13.0 \
+  -DRADISHLEX_CONTRACT_SMOKE=1 \
+  -I"${platform_dir}/Sources" \
+  -I"${platform_dir}/Tests" \
+  -I"${repo_root}/crates/ime-ffi/include" \
+  "${platform_dir}/Sources/RadishLexBridge.m" \
+  "${platform_dir}/Sources/RadishLexCandidatePanel.m" \
+  "${platform_dir}/Sources/RadishLexLearningContext.m" \
+  "${platform_dir}/Sources/RadishLexRuntime.m" \
+  "${platform_dir}/Sources/RadishLexInputController.m" \
+  "${platform_dir}/Tests/input_context_contract.m" \
+  -L"${repo_root}/target/debug" -lradishlex_ime_ffi \
+  -Wl,-rpath,"${repo_root}/target/debug" \
+  -framework AppKit -framework Carbon -framework InputMethodKit \
+  -o "${smoke_dir}/input-context-contract"
+"${smoke_dir}/input-context-contract"
 "${platform_dir}/ValidationHost/check.sh"
 "${repo_root}/platforms/macos-product/UpgradeValidationHosts/check.sh"
 

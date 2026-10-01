@@ -16,7 +16,13 @@ fi
 (
   cd "${repo_root}"
   cargo test --locked -p radishlex-macos-product-install-coordinator --all-targets
+  # This target uses only synthetic products and isolated files; enabling the
+  # harness here does not execute real-product qualification targets.
+  cargo test --locked -p radishlex-macos-product-install-coordinator \
+    --features qualification-harness --test cancellation_archive
   cargo clippy --locked -p radishlex-macos-product-install-coordinator --all-targets -- -D warnings
+  cargo clippy --locked -p radishlex-macos-product-install-coordinator \
+    --features qualification-harness --test cancellation_archive -- -D warnings
 )
 
 echo "macOS product install coordinator gate passed."
