@@ -128,7 +128,7 @@ impl Drop for Fixture {
         fs::remove_dir_all(&self.path).unwrap();
     }
 }
-fn product(build: u64, marker: char) -> ProductArtifactIdentity {
+pub(super) fn product(build: u64, marker: char) -> ProductArtifactIdentity {
     let bundle = |component, id| {
         ProgramBundleIdentity::new(
             component,

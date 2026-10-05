@@ -2,7 +2,9 @@
 use radishlex_ime_product_upgrade::PreparationDirectoryIdentity;
 use serde::Deserialize;
 
-use crate::{HostMode, MacOsProductPreflightAdapter, MacOsUpgradeAdapterError};
+use crate::{
+    HostMode, MacOsProductPreflightAdapter, MacOsUpgradeAdapterError, MacOsUpgradePreflight,
+};
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -24,7 +26,7 @@ impl MacOsProductPreflightAdapter {
         &mut self,
         root: &PreparationDirectoryIdentity,
         target_manifest_sha256: &str,
-    ) -> Result<(), MacOsUpgradeAdapterError> {
+    ) -> Result<MacOsUpgradePreflight, MacOsUpgradeAdapterError> {
         self.product.verify_manifest(target_manifest_sha256)?;
         let executable = self
             .product
@@ -51,6 +53,8 @@ impl MacOsProductPreflightAdapter {
         {
             return Err(MacOsUpgradeAdapterError::PreflightRejected);
         }
-        Ok(())
+        Ok(MacOsUpgradePreflight {
+            available_bytes: value.available_bytes,
+        })
     }
 }

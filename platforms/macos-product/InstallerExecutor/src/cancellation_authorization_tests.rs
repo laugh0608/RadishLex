@@ -72,7 +72,7 @@ fn task_rejects_foreign_proof_source_and_expiration_before_observation() {
     )
     .unwrap();
     assert!(!task.verify(&f.proof, &changed));
-    task.expires = Instant::now();
+    task.grant.expires = Instant::now();
     assert_eq!(
         task.observe(&f.proof, &f.source, || panic!(
             "expired task must not launch host"

@@ -26,6 +26,7 @@ use radishlex_macos_upgrade_coordinator::{MacOsProductPreflightAdapter, MacOsUpg
 
 mod bootstrap;
 mod cancellation_authorization;
+mod cancellation_execution;
 mod cancellation_observation;
 mod maintenance_inspection;
 mod recovery;
@@ -37,6 +38,11 @@ pub use cancellation_authorization::{
     authorize_cancellation_release, CancellationQuiescenceFailure, CancellationTaskAuthorization,
     CancellationTaskAuthorizationError, CancellationTaskControl,
     MacOsCancellationQuiescenceAuthority,
+};
+pub use cancellation_execution::{
+    authorize_cancellation_preservation, finish_preparation_cancellation,
+    preserve_preparation_cancellation, CancellationExecutionError,
+    CancellationPreservationAuthorization,
 };
 pub use cancellation_observation::{
     CancellationProductObservationFailure, CancellationQuiescenceAuthority,

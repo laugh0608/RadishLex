@@ -1,7 +1,9 @@
 //! Read-only installed-product observation for the cancellation release bridge.
 //! No Installer action or qualification issuer is enabled by this module.
 use radishlex_ime_product_install::{InstallRootIdentity, ProductArtifactIdentity};
-use radishlex_ime_product_upgrade::{CancellationReleaseCheckpoint, CancellationReleaseReceipt};
+use radishlex_ime_product_upgrade::{
+    CancellationReleaseCheckpoint, CancellationReleaseReceipt, PreparationDirectoryIdentity,
+};
 use radishlex_macos_product_install::MacOsProductInstallAdapter;
 use radishlex_macos_product_install_coordinator::CancellationReleaseProductAuthority;
 
@@ -52,16 +54,12 @@ impl<'a, Q> MacOsCancellationProductAuthority<'a, Q> {
         source: &ProductArtifactIdentity,
         target: &ProductArtifactIdentity,
     ) -> bool {
-        let root = &proof.preparation().binding().data_root;
-        let Ok(root) =
-            InstallRootIdentity::new(root.device_id, root.inode, root.owner_id, root.mode)
-        else {
-            return false;
-        };
-        self.programs.verify_data_root(&root).is_ok()
-            && self.programs.revalidate_target_product().as_ref() == Ok(target)
-            && self.programs.verify_installed_product(Some(source)).is_ok()
-            && self.programs.verify_data_root(&root).is_ok()
+        verify_cancellation_programs(
+            self.programs,
+            &proof.preparation().binding().data_root,
+            source,
+            target,
+        )
     }
 }
 
@@ -93,4 +91,21 @@ impl<Q: CancellationQuiescenceAuthority> CancellationReleaseProductAuthority
         }
         true
     }
+}
+
+/// Verify both installed bundles, the sealed target and the physical root.
+pub(super) fn verify_cancellation_programs(
+    programs: &MacOsProductInstallAdapter,
+    root: &PreparationDirectoryIdentity,
+    source: &ProductArtifactIdentity,
+    target: &ProductArtifactIdentity,
+) -> bool {
+    let Ok(root) = InstallRootIdentity::new(root.device_id, root.inode, root.owner_id, root.mode)
+    else {
+        return false;
+    };
+    programs.verify_data_root(&root).is_ok()
+        && programs.revalidate_target_product().as_ref() == Ok(target)
+        && programs.verify_installed_product(Some(source)).is_ok()
+        && programs.verify_data_root(&root).is_ok()
 }

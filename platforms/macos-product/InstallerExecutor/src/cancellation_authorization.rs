@@ -39,10 +39,40 @@ impl Drop for CancellationTaskControl {
 }
 
 pub struct CancellationTaskAuthorization {
-    proof: CancellationReleaseReceipt,
-    source: ProductArtifactIdentity,
+    pub(super) proof: CancellationReleaseReceipt,
+    pub(super) source: ProductArtifactIdentity,
+    pub(super) grant: CancellationTaskGrant,
+}
+
+/// Shared lifetime rules for preservation and final release. The bound
+/// immutable evidence stays in each task's distinct authorization type.
+pub(super) struct CancellationTaskGrant {
     active: Arc<AtomicBool>,
-    expires: Instant,
+    pub(super) expires: Instant,
+}
+
+impl CancellationTaskGrant {
+    pub(super) fn active(&self) -> bool {
+        self.active.load(Ordering::SeqCst) && Instant::now() < self.expires
+    }
+
+    pub(super) fn new(
+        confirmation: InstallerUserAuthorization,
+        duration: Duration,
+    ) -> Result<(Self, CancellationTaskControl), CancellationTaskAuthorizationError> {
+        validate_confirmation(confirmation)?;
+        if duration.is_zero() || duration > MAX_TASK_DURATION {
+            return Err(CancellationTaskAuthorizationError::InvalidDuration);
+        }
+        let active = Arc::new(AtomicBool::new(true));
+        Ok((
+            Self {
+                active: active.clone(),
+                expires: Instant::now() + duration,
+            },
+            CancellationTaskControl { active },
+        ))
+    }
 }
 
 /// Called only for a freshly confirmed cancellation-release task. Persisted
@@ -57,6 +87,30 @@ pub fn authorize_cancellation_release(
     (CancellationTaskAuthorization, CancellationTaskControl),
     CancellationTaskAuthorizationError,
 > {
+    use CancellationTaskAuthorizationError as Error;
+    validate_confirmation(confirmation)?;
+    let binding = proof.preparation().binding();
+    if proof.encode().is_err()
+        || source.product_manifest_sha256() != binding.source_product_sha256
+        || source.release().product_version() != binding.source_release.product_version()
+        || source.release().build_number() != binding.source_release.build_number()
+    {
+        return Err(Error::InvalidBinding);
+    }
+    let (grant, control) = CancellationTaskGrant::new(confirmation, duration)?;
+    Ok((
+        CancellationTaskAuthorization {
+            proof: proof.clone(),
+            source: source.clone(),
+            grant,
+        },
+        control,
+    ))
+}
+
+fn validate_confirmation(
+    confirmation: InstallerUserAuthorization,
+) -> Result<(), CancellationTaskAuthorizationError> {
     use CancellationTaskAuthorizationError as Error;
     use InstallerAuthorizationError as UserError;
     if !confirmation.explicit_action_confirmed {
@@ -74,35 +128,16 @@ pub fn authorize_cancellation_release(
             UserError::ManualQuiescenceAcknowledgementRequired,
         ));
     }
-    let binding = proof.preparation().binding();
-    if proof.encode().is_err()
-        || source.product_manifest_sha256() != binding.source_product_sha256
-        || source.release().product_version() != binding.source_release.product_version()
-        || source.release().build_number() != binding.source_release.build_number()
-    {
-        return Err(Error::InvalidBinding);
-    }
-    if duration.is_zero() || duration > MAX_TASK_DURATION {
-        return Err(Error::InvalidDuration);
-    }
-    let active = Arc::new(AtomicBool::new(true));
-    Ok((
-        CancellationTaskAuthorization {
-            proof: proof.clone(),
-            source: source.clone(),
-            active: active.clone(),
-            expires: Instant::now() + duration,
-        },
-        CancellationTaskControl { active },
-    ))
+    Ok(())
 }
 
 impl CancellationTaskAuthorization {
-    fn verify(&self, proof: &CancellationReleaseReceipt, source: &ProductArtifactIdentity) -> bool {
-        self.active.load(Ordering::SeqCst)
-            && Instant::now() < self.expires
-            && &self.proof == proof
-            && &self.source == source
+    pub(super) fn verify(
+        &self,
+        proof: &CancellationReleaseReceipt,
+        source: &ProductArtifactIdentity,
+    ) -> bool {
+        self.grant.active() && &self.proof == proof && &self.source == source
     }
 
     fn observe(

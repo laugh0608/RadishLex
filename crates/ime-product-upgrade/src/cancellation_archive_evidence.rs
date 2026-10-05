@@ -254,7 +254,7 @@ impl CancellationArchiveStore {
         let compatibility_temp =
             temporary.filter(|(path, _)| *path == directory.join(COMPATIBILITY));
         self.verify_outer(
-            &record.request,
+            record.request.preparation(),
             &record.outer,
             record
                 .compatibility
@@ -361,7 +361,7 @@ impl CancellationArchiveStore {
 
     pub(super) fn verify_outer(
         &self,
-        request: &PreparationCancellationRequest,
+        prep: &PreparationReceipt,
         outer: &CancellationOuterBinding,
         compatibility: Option<&PreparationFileIdentity>,
         moved: bool,
@@ -369,7 +369,6 @@ impl CancellationArchiveStore {
         hasher: &impl PreparationHasher,
     ) -> Result<()> {
         let root = &self.journal.store.root.path;
-        let prep = request.preparation();
         let previous = prep
             .binding()
             .previous_install_operation_id

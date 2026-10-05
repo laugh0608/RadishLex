@@ -37,9 +37,13 @@ fn cancellation_observation_is_fresh_and_bound_to_root_and_exact_manifest() {
     let (runner, state) = FakeRunner::new([output(&cancellation_response(&root())), failed()]);
     let mut adapter =
         MacOsProductPreflightAdapter::with_runner(&fixture.target, Box::new(runner)).unwrap();
-    assert!(adapter
-        .inspect_cancellation_quiescence(&root(), &digest(&fixture))
-        .is_ok());
+    assert_eq!(
+        adapter
+            .inspect_cancellation_quiescence(&root(), &digest(&fixture))
+            .unwrap()
+            .available_bytes(),
+        100
+    );
     assert!(adapter
         .inspect_cancellation_quiescence(&root(), &digest(&fixture))
         .is_err());

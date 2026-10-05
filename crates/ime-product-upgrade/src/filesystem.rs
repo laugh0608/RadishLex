@@ -616,7 +616,10 @@ impl fmt::Debug for UpgradeProcessGuard {
 
 impl UpgradeProcessGuard {
     fn belongs_to(&self, store: &UpgradeReceiptStore) -> bool {
-        self.root_identity == store.root.identity
+        // Creating a bound history directory changes the root's link count.
+        // Root identity is the same stable tuple used by filesystem revalidation
+        // and receipt binding; state directory and socket remain pinned too.
+        directory_artifacts_match(&self.root_identity, &store.root.identity)
             && self.state_directory_identity == store.state_directory_identity
             && self.socket_path == store.guard_path()
     }
