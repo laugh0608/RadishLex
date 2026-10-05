@@ -528,6 +528,12 @@ const fn phase_value(phase: InstallerViewPhase) -> u32 {
         InstallerViewPhase::Completed => 4,
         InstallerViewPhase::RecoveryAvailable => 5,
         InstallerViewPhase::Blocked => 6,
+        InstallerViewPhase::PreparingSource => 7,
+        InstallerViewPhase::CancellationRequested => 8,
+        InstallerViewPhase::CancellationFinishingSource => 9,
+        InstallerViewPhase::CancellationPreserving => 10,
+        InstallerViewPhase::CancellationAwaitingQualification => 11,
+        InstallerViewPhase::CancellationCompleted => 12,
     }
 }
 

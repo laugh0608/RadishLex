@@ -114,6 +114,34 @@ impl CancellationReleaseStore {
         }
         Ok(())
     }
+    pub(in super::super) fn inspect_pending(
+        &self,
+        operation: &str,
+        hasher: &impl PreparationHasher,
+    ) -> Result<(CancellationReleaseReceipt, bool)> {
+        if !valid_id(operation) || !path_exists(&self.active(REQUEST))? {
+            return Err(Error::InvalidPhase);
+        }
+        let path = self.directory(operation).join(CANCELLATION_RELEASE);
+        let identity = self.journal.evidence(&path, hasher)?;
+        let proof = self.history().read_cancellation(&path, hasher)?;
+        if proof.operation_id() != operation {
+            return Err(Error::EvidenceChanged);
+        }
+        self.verify_live_readonly(&proof, Some(&identity), None, hasher)?;
+        let indexed = self
+            .history()
+            .load_index(hasher)?
+            .as_ref()
+            .map(|v| &v.index)
+            == Some(&self.history().cancellation_index(&proof, hasher)?);
+        let awaiting_qualification = indexed && !path_exists(&self.active(ARCHIVE))?;
+        if self.journal.evidence(&path, hasher)? != identity {
+            return Err(Error::EvidenceChanged);
+        }
+        Ok((proof, awaiting_qualification))
+    }
+
     /// Persist a complete immutable proof, seal the archive and publish the one
     /// lifecycle locator. The request remains active and startup stays blocked.
     pub fn prepare_cancellation_release(

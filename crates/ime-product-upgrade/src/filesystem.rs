@@ -275,27 +275,39 @@ impl UpgradeReceiptStore {
         if path_exists(&self.staged_receipt_path())? {
             return Err(error(UpgradeFilesystemErrorCode::InterruptedReceiptWrite));
         }
-        if path_exists(&self.guard_path())? {
-            let before = fs::symlink_metadata(self.guard_path())
-                .map_err(|_| error(UpgradeFilesystemErrorCode::IdentityChanged))?;
-            verify_private_socket(&before, self.root.expected_owner_id)?;
-            match UnixStream::connect(self.guard_path()) {
-                Err(io) if io.kind() == ErrorKind::ConnectionRefused => {}
-                _ => return Err(error(UpgradeFilesystemErrorCode::OperationAlreadyActive)),
-            }
-            let after = fs::symlink_metadata(self.guard_path())
-                .map_err(|_| error(UpgradeFilesystemErrorCode::IdentityChanged))?;
-            verify_private_socket(&after, self.root.expected_owner_id)?;
-            if FileIdentity::from_metadata(&before) != FileIdentity::from_metadata(&after) {
-                return Err(error(UpgradeFilesystemErrorCode::IdentityChanged));
-            }
-        }
+        let guard = self.inspection_guard_identity()?;
         let receipt = self.load_current_internal()?.map(|(receipt, _, _)| receipt);
         snapshot::validate_snapshot_state(self, receipt.as_ref())?;
         candidate::validate_candidate_state(self, receipt.as_ref())?;
         settings::validate_settings_backup_state(self, receipt.as_ref())?;
         switch::validate_switch_state(self, receipt.as_ref())?;
+        if self.inspection_guard_identity()? != guard {
+            return Err(error(UpgradeFilesystemErrorCode::IdentityChanged));
+        }
         Ok(receipt)
+    }
+
+    // Observation only: never binds, removes or adopts a guard socket.
+    fn inspection_guard_identity(&self) -> Result<Option<FileIdentity>, UpgradeFilesystemError> {
+        self.revalidate()?;
+        if !path_exists(&self.guard_path())? {
+            return Ok(None);
+        }
+        let before = fs::symlink_metadata(self.guard_path())
+            .map_err(|_| error(UpgradeFilesystemErrorCode::IdentityChanged))?;
+        verify_private_socket(&before, self.root.expected_owner_id)?;
+        match UnixStream::connect(self.guard_path()) {
+            Err(io) if io.kind() == ErrorKind::ConnectionRefused => {}
+            _ => return Err(error(UpgradeFilesystemErrorCode::OperationAlreadyActive)),
+        }
+        let after = fs::symlink_metadata(self.guard_path())
+            .map_err(|_| error(UpgradeFilesystemErrorCode::IdentityChanged))?;
+        verify_private_socket(&after, self.root.expected_owner_id)?;
+        let identity = FileIdentity::from_metadata(&before);
+        if identity != FileIdentity::from_metadata(&after) {
+            return Err(error(UpgradeFilesystemErrorCode::IdentityChanged));
+        }
+        Ok(Some(identity))
     }
 
     pub fn acquire_guard(&self) -> Result<UpgradeProcessGuard, UpgradeFilesystemError> {
@@ -866,18 +878,19 @@ mod tests;
 #[path = "preparation_journal.rs"]
 mod preparation_journal;
 pub use preparation_journal::{
-    CancellationArchiveCheckpoint, CancellationArchivePort, CancellationArchiveReceipt,
-    CancellationArchiveSlot, CancellationArchiveStore, CancellationOuterBinding,
-    CancellationReleaseCheckpoint, CancellationReleasePort, CancellationReleaseReceipt,
-    CancellationReleaseRequirement, CancellationReleaseStore, CancellationSourceCheckpoint,
-    CancellationSourcePhase, CancellationSourcePort, CancellationSourceReceipt,
-    LifecycleReleaseReceipt, PreparationCancellationCheckpoint, PreparationCancellationPort,
-    PreparationCancellationRequest, PreparationCancellationStore, PreparationHasher,
-    PreparationJournalError, PreparationJournalStore, PreviousInventory,
-    SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,
-    SourcePreparationSpaceBudget, TerminalReleaseBinding, TerminalReleaseCheckpoint,
-    TerminalReleaseDirectory, TerminalReleaseOuterRequirement, TerminalReleasePhase,
-    TerminalReleasePort, TerminalReleaseReceipt, TerminalReleaseStore,
+    inspect_maintenance, CancellationArchiveCheckpoint, CancellationArchivePort,
+    CancellationArchiveReceipt, CancellationArchiveSlot, CancellationArchiveStore,
+    CancellationOuterBinding, CancellationReleaseCheckpoint, CancellationReleasePort,
+    CancellationReleaseReceipt, CancellationReleaseRequirement, CancellationReleaseStore,
+    CancellationSourceCheckpoint, CancellationSourcePhase, CancellationSourcePort,
+    CancellationSourceReceipt, LifecycleReleaseReceipt, MaintenanceInspection, MaintenancePhase,
+    PreparationCancellationCheckpoint, PreparationCancellationPort, PreparationCancellationRequest,
+    PreparationCancellationStore, PreparationHasher, PreparationJournalError,
+    PreparationJournalStore, PreviousInventory, SourcePreparationCheckpoint,
+    SourcePreparationError, SourcePreparationPort, SourcePreparationSpaceBudget,
+    TerminalReleaseBinding, TerminalReleaseCheckpoint, TerminalReleaseDirectory,
+    TerminalReleaseOuterRequirement, TerminalReleasePhase, TerminalReleasePort,
+    TerminalReleaseReceipt, TerminalReleaseStore,
 };
 
 #[path = "snapshot.rs"]

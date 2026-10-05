@@ -27,6 +27,10 @@ pub use terminal_release::{
     TerminalReleaseReceipt, TerminalReleaseStore,
 };
 
+#[path = "maintenance_inspection.rs"]
+mod maintenance_inspection;
+pub use maintenance_inspection::{inspect_maintenance, MaintenanceInspection, MaintenancePhase};
+
 impl PreparationJournalStore {
     /// Exact, guard-bound continuation from source_prepared. The preparation
     /// marker remains active; this neither creates v1 state nor allows startup.

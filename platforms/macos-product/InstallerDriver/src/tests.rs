@@ -377,3 +377,56 @@ fn pre_switch_recovery_requires_fresh_offering_and_all_acknowledgements() {
         .with_pre_switch_recovery(&receipt, true)
         .offers(InstallerAction::AbortPreSwitchUpgrade));
 }
+
+#[test]
+fn maintenance_views_offer_only_refresh_even_after_historical_completion() {
+    let fixture = Fixture::new(false);
+    let base = inspect_installer_view(
+        &fixture.data_root,
+        fixture.owner_id,
+        InstallerProductSituation::OlderReleaseInstalled,
+    );
+    for phase in [
+        InstallerViewPhase::PreparingSource,
+        InstallerViewPhase::CancellationRequested,
+        InstallerViewPhase::CancellationFinishingSource,
+        InstallerViewPhase::CancellationPreserving,
+        InstallerViewPhase::CancellationAwaitingQualification,
+        InstallerViewPhase::CancellationCompleted,
+    ] {
+        let view = base.with_maintenance(phase);
+        assert_eq!(view.phase(), phase);
+        assert_eq!(view.receipt_state(), None);
+        assert_eq!(view.progress_step(), 0);
+        assert_eq!(view.manual_prompt(), InstallerManualPrompt::None);
+        assert!(authorize_installer_action(
+            view,
+            InstallerAction::Refresh,
+            InstallerUserAuthorization::default()
+        )
+        .is_ok());
+        for action in [
+            InstallerAction::BeginUpgrade,
+            InstallerAction::BeginRepair,
+            InstallerAction::RetryOperation,
+            InstallerAction::RemovePrograms,
+            InstallerAction::ConfirmQuiescence,
+            InstallerAction::ResumeOperation,
+            InstallerAction::AbortPreSwitchUpgrade,
+        ] {
+            assert_eq!(
+                authorize_installer_action(
+                    view,
+                    action,
+                    InstallerUserAuthorization {
+                        explicit_action_confirmed: true,
+                        data_retention_acknowledged: true,
+                        neutral_input_source_selected: true,
+                        manager_closed: true,
+                    }
+                ),
+                Err(InstallerAuthorizationError::ActionNotOffered)
+            );
+        }
+    }
+}

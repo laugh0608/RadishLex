@@ -628,3 +628,33 @@ fn create_directory(path: &Path, mode: u32) {
         .expect("create directory");
     fs::set_permissions(path, fs::Permissions::from_mode(mode)).expect("directory mode");
 }
+
+#[test]
+fn maintenance_phases_keep_v1_layout_and_encode_only_refresh() {
+    let base = radishlex_macos_installer_driver::inspect_installer_view(
+        "/not-a-real-radishlex-maintenance-root",
+        0,
+        InstallerProductSituation::OlderReleaseInstalled,
+    );
+    for (phase, number) in [
+        (InstallerViewPhase::PreparingSource, 7),
+        (InstallerViewPhase::CancellationRequested, 8),
+        (InstallerViewPhase::CancellationFinishingSource, 9),
+        (InstallerViewPhase::CancellationPreserving, 10),
+        (InstallerViewPhase::CancellationAwaitingQualification, 11),
+        (InstallerViewPhase::CancellationCompleted, 12),
+    ] {
+        let encoded = encode_installer_snapshot(base.with_maintenance(phase));
+        assert_eq!(encoded.phase, number);
+        assert_eq!(encoded.contract_version, 1);
+        assert_eq!(encoded.primary_action, 1);
+        assert_eq!(encoded.secondary_action, 0);
+        assert_eq!(encoded.receipt_state, 0);
+        assert_eq!(encoded.progress_step, 0);
+        assert_eq!(encoded.manual_prompt, 0);
+    }
+    assert_eq!(
+        std::mem::size_of::<RadishLexInstallerBridgeSnapshotV1>(),
+        9 * 4
+    );
+}

@@ -25,6 +25,12 @@ static NSString *_Nullable RLXPhaseCode(uint32_t value) {
     case RADISHLEX_INSTALLER_PHASE_COMPLETED: return @"completed";
     case RADISHLEX_INSTALLER_PHASE_RECOVERY_AVAILABLE: return @"recovery_available";
     case RADISHLEX_INSTALLER_PHASE_BLOCKED: return @"blocked";
+    case RADISHLEX_INSTALLER_PHASE_PREPARING_SOURCE: return @"preparing_source";
+    case RADISHLEX_INSTALLER_PHASE_CANCELLATION_REQUESTED: return @"cancellation_requested";
+    case RADISHLEX_INSTALLER_PHASE_CANCELLATION_FINISHING_SOURCE: return @"cancellation_finishing_source";
+    case RADISHLEX_INSTALLER_PHASE_CANCELLATION_PRESERVING: return @"cancellation_preserving";
+    case RADISHLEX_INSTALLER_PHASE_CANCELLATION_AWAITING_QUALIFICATION: return @"cancellation_awaiting_qualification";
+    case RADISHLEX_INSTALLER_PHASE_CANCELLATION_COMPLETED: return @"cancellation_completed";
     default: return nil;
     }
 }

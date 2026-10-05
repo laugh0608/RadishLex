@@ -20,6 +20,7 @@ FOUNDATION_EXPORT NSString *const RLXInstallerDriverManualPromptKey;
 @property(nonatomic, readonly, copy) NSString *errorCode;
 @property(nonatomic, readonly, copy) NSString *stateCode;
 @property(nonatomic, readonly, copy) NSString *operationCode;
+@property(nonatomic, readonly) BOOL showsReceiptProgress;
 @property(nonatomic, readonly) NSInteger progressStep;
 @property(nonatomic, readonly) BOOL requiresManualQuiescence;
 @property(nonatomic, readonly) BOOL failedClosed;

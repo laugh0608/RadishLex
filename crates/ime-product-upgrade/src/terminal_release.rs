@@ -369,6 +369,16 @@ impl TerminalReleaseStore {
         hasher: &impl PreparationHasher,
     ) -> Result<Option<LifecycleReleaseReceipt>> {
         self.journal.verify_guard(guard)?;
+        let result = self.inspect_latest_lifecycle(hasher)?;
+        self.journal.verify_guard(guard)?;
+        Ok(result)
+    }
+
+    pub(super) fn inspect_latest_lifecycle(
+        &self,
+        hasher: &impl PreparationHasher,
+    ) -> Result<Option<LifecycleReleaseReceipt>> {
+        self.journal.store.revalidate()?;
         self.validate_active_entries()?;
         let index = self.history().load_index(hasher)?;
         let root = self.journal.store.root.path.join(HISTORY);
@@ -386,7 +396,7 @@ impl TerminalReleaseStore {
             return Err(Error::EvidenceChanged);
         }
         self.validate_active_entries()?;
-        self.journal.verify_guard(guard)?;
+        self.journal.store.revalidate()?;
         Ok(result)
     }
 

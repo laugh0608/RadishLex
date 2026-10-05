@@ -138,6 +138,17 @@ impl CancellationArchiveStore {
         temporary: Option<(&Path, &PreparationFileIdentity)>,
     ) -> Result<()> {
         self.journal.verify_guard(guard)?;
+        self.verify_readonly(record, hasher, temporary)?;
+        Ok(self.journal.verify_guard(guard)?)
+    }
+
+    pub(super) fn verify_readonly(
+        &self,
+        record: &CancellationArchiveReceipt,
+        hasher: &impl PreparationHasher,
+        temporary: Option<(&Path, &PreparationFileIdentity)>,
+    ) -> Result<()> {
+        self.journal.store.revalidate()?;
         record.validate()?;
         self.validate_entries(temporary.map(|v| v.0))?;
         let prep = record.request.preparation();
@@ -258,7 +269,7 @@ impl CancellationArchiveStore {
                 return Err(Error::EvidenceChanged);
             }
         }
-        self.journal.verify_guard(guard)?;
+        self.journal.store.revalidate()?;
         Ok(())
     }
 

@@ -309,25 +309,34 @@ impl PreparationCancellationStore {
         request: &PreparationCancellationRequest,
         hasher: &impl PreparationHasher,
     ) -> Result<()> {
+        self.journal.verify_guard(guard)?;
+        self.verify_request_readonly(request, hasher)?;
+        Ok(self.journal.verify_guard(guard)?)
+    }
+
+    fn verify_request_readonly(
+        &self,
+        request: &PreparationCancellationRequest,
+        hasher: &impl PreparationHasher,
+    ) -> Result<()> {
         for name in [source::SOURCE_PROGRESS, source::STAGED_SOURCE_PROGRESS] {
             if path_exists(&self.journal.path(name))? {
                 return Err(Error::InvalidPhase);
             }
         }
-        self.verify_bound_materials(guard, request, hasher)?;
+        self.verify_bound_materials_readonly(request, hasher)?;
         if self.journal.family(hasher)? != *request.observed_source() {
             return Err(Error::EvidenceChanged);
         }
         Ok(())
     }
 
-    fn verify_bound_materials(
+    fn verify_bound_materials_readonly(
         &self,
-        guard: &UpgradeProcessGuard,
         request: &PreparationCancellationRequest,
         hasher: &impl PreparationHasher,
     ) -> Result<()> {
-        self.journal.verify_guard(guard)?;
+        self.journal.store.revalidate()?;
         self.validate_entries()?;
         self.journal.reject_staged_record()?;
         request.encode()?;
@@ -356,7 +365,7 @@ impl PreparationCancellationStore {
         {
             return Err(Error::EvidenceChanged);
         }
-        self.journal.verify_guard(guard)?;
+        self.journal.store.revalidate()?;
         Ok(())
     }
 

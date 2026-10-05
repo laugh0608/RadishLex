@@ -38,7 +38,8 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
 
     NSSet<NSString *> *phases = [NSSet setWithArray:@[
         @"ready", @"awaiting_user_action", @"in_progress", @"completed",
-        @"recovery_available", @"blocked"
+        @"recovery_available", @"blocked",
+        @"preparing_source", @"cancellation_requested", @"cancellation_finishing_source", @"cancellation_preserving", @"cancellation_awaiting_qualification", @"cancellation_completed"
     ]];
     NSSet<NSString *> *actions = [NSSet setWithArray:@[
         RLXNoAction, RLXRefreshAction, @"begin_first_install", @"begin_upgrade",
@@ -87,6 +88,17 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
         ([manualPrompt isEqualToString:@"none"] ||
          [manualPrompt isEqualToString:@"select_neutral_input_source_and_close_manager"]);
 
+    NSSet<NSString *> *maintenancePhases = [NSSet setWithArray:@[
+        @"preparing_source", @"cancellation_requested", @"cancellation_finishing_source",
+        @"cancellation_preserving", @"cancellation_awaiting_qualification", @"cancellation_completed"
+    ]];
+    if (valid && [maintenancePhases containsObject:phase]) {
+        valid = [primary isEqualToString:RLXRefreshAction] &&
+            [secondary isEqualToString:RLXNoAction] && [error isEqualToString:@"none"] &&
+            [state isEqualToString:@"none"] && [operation isEqualToString:@"upgrade"] &&
+            progress.integerValue == 0 && [manualPrompt isEqualToString:@"none"];
+    }
+
     if (!valid) {
         self.phaseCode = @"blocked";
         self.primaryActionCode = RLXRefreshAction;
@@ -124,6 +136,10 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
     return titles[self.operationCode] ?: @"无已确认操作";
 }
 
+- (BOOL)showsReceiptProgress {
+    return ![self.stateCode isEqualToString:@"none"];
+}
+
 - (NSString *)statusTitle {
     NSDictionary<NSString *, NSString *> *titles = @{
         @"ready": @"可以开始",
@@ -132,11 +148,27 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
         @"completed": @"操作已完成",
         @"recovery_available": @"可以继续恢复",
         @"blocked": @"当前不能继续",
+        @"preparing_source": @"源词库准备尚未完成",
+        @"cancellation_requested": @"已记录取消请求",
+        @"cancellation_finishing_source": @"取消前的词库收尾尚未完成",
+        @"cancellation_preserving": @"取消材料尚未完成封存",
+        @"cancellation_awaiting_qualification": @"取消仍被阻断",
+        @"cancellation_completed": @"本次升级准备已取消",
     };
     return titles[self.phaseCode] ?: @"当前不能继续";
 }
 
 - (NSString *)statusDetail {
+    NSDictionary<NSString *, NSString *> *maintenanceDetails = @{
+        @"preparing_source": @"准备记录尚未完成。当前只提供状态查看，刷新不会继续维护或开始升级；已有词库及事务材料保持保留。",
+        @"cancellation_requested": @"取消请求已保存，但取消尚未完成。源词库收尾及材料保留仍需核验，当前只能刷新状态。",
+        @"cancellation_finishing_source": @"取消所需的源词库收尾尚未完成。请保留现场；刷新只重新检查状态，不会继续处理词库。",
+        @"cancellation_preserving": @"源词库收尾已有记录，取消材料的封存与最终释放尚未完成。请保留现场，当前不能重新升级或移除程序。",
+        @"cancellation_awaiting_qualification": @"取消材料已保留，仍需完成旧版本兼容性验证，当前尚未解除启动阻断。刷新不会执行验证或完成取消。",
+        @"cancellation_completed": @"已核验本次准备取消的完整历史记录及最终释放状态，原版本安装回执保留。此页只查看结果，不会启动程序或重新升级。",
+    };
+    NSString *maintenanceDetail = maintenanceDetails[self.phaseCode];
+    if (maintenanceDetail != nil) { return maintenanceDetail; }
     if ([self.primaryActionCode isEqualToString:@"abort_pre_switch_upgrade"] ||
         [self.secondaryActionCode isEqualToString:@"abort_pre_switch_upgrade"]) {
         return @"可以中止尚未切换数据的升级并恢复原版本程序。原词库及备份全部保留；已开始的恢复会继续同一事务。请先切换到其他输入源并关闭管理器。";

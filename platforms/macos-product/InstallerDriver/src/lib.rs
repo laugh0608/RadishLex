@@ -31,6 +31,26 @@ pub enum InstallerViewPhase {
     Completed,
     RecoveryAvailable,
     Blocked,
+    PreparingSource,
+    CancellationRequested,
+    CancellationFinishingSource,
+    CancellationPreserving,
+    CancellationAwaitingQualification,
+    CancellationCompleted,
+}
+
+impl InstallerViewPhase {
+    pub const fn is_maintenance(self) -> bool {
+        matches!(
+            self,
+            Self::PreparingSource
+                | Self::CancellationRequested
+                | Self::CancellationFinishingSource
+                | Self::CancellationPreserving
+                | Self::CancellationAwaitingQualification
+                | Self::CancellationCompleted
+        )
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -198,6 +218,26 @@ impl InstallerViewSnapshot {
         self.secondary_action = InstallerAction::None;
         self.stable_error = error;
         self.manual_prompt = InstallerManualPrompt::None;
+        self
+    }
+
+    /// Read-only maintenance projection. No phase here authorizes a mutation,
+    /// even when historical cancellation evidence is fully released.
+    pub fn with_maintenance(mut self, phase: InstallerViewPhase) -> Self {
+        if !phase.is_maintenance() {
+            return self.with_recovery_inspection_error(InstallerStableError::UnknownDriverResult);
+        }
+        self.phase = phase;
+        self.primary_action = InstallerAction::Refresh;
+        self.secondary_action = InstallerAction::None;
+        self.stable_error = InstallerStableError::None;
+        self.manual_prompt = InstallerManualPrompt::None;
+        self.operation_kind = Some(InstallOperationKind::Upgrade);
+        // Preparation/cancellation are not v1 receipt states or v1 progress.
+        self.receipt_state = None;
+        self.failure_code = None;
+        self.progress_step = 0;
+        self.recovery_binding = None;
         self
     }
 
@@ -675,6 +715,14 @@ const fn phase_code(phase: InstallerViewPhase) -> &'static str {
         InstallerViewPhase::Completed => "completed",
         InstallerViewPhase::RecoveryAvailable => "recovery_available",
         InstallerViewPhase::Blocked => "blocked",
+        InstallerViewPhase::PreparingSource => "preparing_source",
+        InstallerViewPhase::CancellationRequested => "cancellation_requested",
+        InstallerViewPhase::CancellationFinishingSource => "cancellation_finishing_source",
+        InstallerViewPhase::CancellationPreserving => "cancellation_preserving",
+        InstallerViewPhase::CancellationAwaitingQualification => {
+            "cancellation_awaiting_qualification"
+        }
+        InstallerViewPhase::CancellationCompleted => "cancellation_completed",
     }
 }
 

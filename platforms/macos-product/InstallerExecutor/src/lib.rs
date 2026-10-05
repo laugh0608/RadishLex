@@ -27,6 +27,7 @@ use radishlex_macos_upgrade_coordinator::{MacOsProductPreflightAdapter, MacOsUpg
 mod bootstrap;
 mod cancellation_authorization;
 mod cancellation_observation;
+mod maintenance_inspection;
 mod recovery;
 pub use bootstrap::{
     bootstrap_upgrade_receipt, BootstrappedUpgradeReceipt, UpgradeBootstrapError,
@@ -438,6 +439,7 @@ where
     U: UpgradeCoordinatorPort,
 {
     let data_root = data_root.as_ref();
+    maintenance_inspection::require_no_maintenance(install_store)?;
     if intent.action() == InstallerAction::AbortPreSwitchUpgrade {
         return recovery::execute_pre_switch_recovery(
             intent,
@@ -528,6 +530,7 @@ where
     let guard = install_store
         .acquire_guard()
         .map_err(|error| InstallerExecutionError::InstallFilesystem(error.code()))?;
+    maintenance_inspection::require_no_maintenance(install_store)?;
     let current = install_store
         .load_guarded(&guard)
         .map_err(|error| InstallerExecutionError::InstallFilesystem(error.code()))?;
@@ -821,3 +824,7 @@ fn summary(receipt: &InstallReceipt) -> Result<InstallerExecutionSummary, Instal
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "cancellation_authorization_fixture.rs"]
+mod cancellation_fixture;

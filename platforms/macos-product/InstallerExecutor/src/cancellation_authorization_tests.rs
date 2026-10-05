@@ -1,7 +1,5 @@
 use super::*;
-#[path = "cancellation_authorization_fixture.rs"]
-mod fixture;
-use fixture::Fixture;
+use crate::cancellation_fixture::Fixture;
 
 fn confirmation() -> InstallerUserAuthorization {
     InstallerUserAuthorization {

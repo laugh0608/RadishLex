@@ -5,6 +5,7 @@
 
 static uint32_t receivedAction;
 static uint32_t receivedFlags;
+static uint32_t responsePhase = RADISHLEX_INSTALLER_PHASE_RECOVERY_AVAILABLE;
 static uint32_t responseAction = RADISHLEX_INSTALLER_ACTION_ABORT_PRE_SWITCH_UPGRADE;
 
 uint32_t radishlex_installer_bridge_contract_version(void) {
@@ -12,16 +13,17 @@ uint32_t radishlex_installer_bridge_contract_version(void) {
 }
 
 RadishLexInstallerBridgeSnapshotV1 radishlex_installer_bridge_snapshot_v1(void) {
+    BOOL maintenance = responsePhase >= 7 && responsePhase <= 12;
     return (RadishLexInstallerBridgeSnapshotV1){
         .contract_version = RADISHLEX_INSTALLER_BRIDGE_CONTRACT_VERSION,
-        .phase = RADISHLEX_INSTALLER_PHASE_RECOVERY_AVAILABLE,
+        .phase = responsePhase,
         .primary_action = responseAction,
         .secondary_action = RADISHLEX_INSTALLER_ACTION_NONE,
         .stable_error = RADISHLEX_INSTALLER_ERROR_NONE,
         .operation_kind = RADISHLEX_INSTALLER_OPERATION_UPGRADE,
-        .receipt_state = RADISHLEX_INSTALLER_STATE_DATA_COORDINATING,
-        .progress_step = 7,
-        .manual_prompt = RADISHLEX_INSTALLER_PROMPT_SELECT_NEUTRAL_AND_CLOSE_MANAGER,
+        .receipt_state = maintenance ? RADISHLEX_INSTALLER_STATE_NONE : RADISHLEX_INSTALLER_STATE_DATA_COORDINATING,
+        .progress_step = maintenance ? 0 : 7,
+        .manual_prompt = maintenance ? RADISHLEX_INSTALLER_PROMPT_NONE : RADISHLEX_INSTALLER_PROMPT_SELECT_NEUTRAL_AND_CLOSE_MANAGER,
     };
 }
 
@@ -44,6 +46,23 @@ int main(void) {
             RADISHLEX_INSTALLER_AUTH_DATA_RETENTION | RADISHLEX_INSTALLER_AUTH_NEUTRAL_INPUT_SOURCE |
             RADISHLEX_INSTALLER_AUTH_MANAGER_CLOSED));
         Require([result[RLXInstallerDriverPrimaryActionKey] isEqualToString:@"abort_pre_switch_upgrade"]);
+        responseAction = RADISHLEX_INSTALLER_ACTION_REFRESH;
+        NSArray<NSString *> *phases = @[@"preparing_source", @"cancellation_requested",
+            @"cancellation_finishing_source", @"cancellation_preserving",
+            @"cancellation_awaiting_qualification", @"cancellation_completed"];
+        for (NSUInteger index = 0; index < phases.count; ++index) {
+            responsePhase = (uint32_t)index + 7;
+            result = RLXInstallerBridgePerformAction(@"refresh");
+            Require(receivedAction == RADISHLEX_INSTALLER_ACTION_REFRESH && receivedFlags == 0);
+            Require([result[RLXInstallerDriverPhaseKey] isEqualToString:phases[index]]);
+            RLXInstallerPresentation *view = [[RLXInstallerPresentation alloc] initWithDriverSnapshot:result];
+            Require([view isActionEnabled:@"refresh"] && ![view isActionEnabled:@"retry_operation"]);
+            Require(!view.showsReceiptProgress && !view.requiresManualQuiescence);
+        }
+        responsePhase = 99;
+        result = RLXInstallerBridgeSnapshot();
+        Require([result[RLXInstallerDriverErrorKey] isEqualToString:@"unknown_driver_result"]);
+        responsePhase = RADISHLEX_INSTALLER_PHASE_RECOVERY_AVAILABLE;
         responseAction = 999;
         result = RLXInstallerBridgeSnapshot();
         Require([result[RLXInstallerDriverPhaseKey] isEqualToString:@"blocked"]);

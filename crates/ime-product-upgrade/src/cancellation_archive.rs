@@ -162,6 +162,21 @@ impl CancellationArchiveStore {
         Ok(Some(record))
     }
 
+    pub(super) fn inspect_record(
+        &self,
+        hasher: &impl PreparationHasher,
+    ) -> Result<Option<CancellationArchiveReceipt>> {
+        self.validate_entries(None)?;
+        let Some((record, identity)) = self.read_record(hasher)? else {
+            return Ok(None);
+        };
+        self.verify_readonly(&record, hasher, None)?;
+        if self.journal.evidence(&self.active(ARCHIVE), hasher)? != identity {
+            return Err(Error::EvidenceChanged);
+        }
+        Ok(Some(record))
+    }
+
     /// Preserve material and restore the old outer projection. Keeps REQUEST
     /// and ARCHIVE active; v2 lifecycle publication/release is a later protocol.
     pub fn preserve_cancellation(

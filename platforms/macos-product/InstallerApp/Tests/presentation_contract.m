@@ -64,6 +64,31 @@ int main(void) {
         Require([unknownBridge.errorCode isEqualToString:@"unknown_driver_result"],
                 @"unknown native action must fail closed");
 
+        NSArray<NSString *> *maintenancePhases = @[@"preparing_source", @"cancellation_requested",
+            @"cancellation_finishing_source", @"cancellation_preserving",
+            @"cancellation_awaiting_qualification", @"cancellation_completed"];
+        for (NSString *phase in maintenancePhases) {
+            NSDictionary *value = Snapshot(phase, @"refresh", @"none", @"none", @"none", @"upgrade", 0, @"none");
+            RLXInstallerPresentation *view = [[RLXInstallerPresentation alloc] initWithDriverSnapshot:value];
+            Require([view.phaseCode isEqualToString:phase], @"maintenance phase must survive mapping");
+            Require([view isActionEnabled:@"refresh"] && ![view requiresConfirmationForAction:@"refresh"], @"refresh stays read-only");
+            Require(![view isActionEnabled:@"retry_operation"] && ![view isActionEnabled:@"remove_programs"], @"maintenance must suppress old outer actions");
+            Require(!view.showsReceiptProgress && view.progressStep == 0, @"old terminal progress is not maintenance progress");
+            if ([phase isEqualToString:@"cancellation_awaiting_qualification"]) {
+                Require([view.statusTitle isEqualToString:@"取消仍被阻断"], @"proof and index cannot imply success");
+            }
+            for (NSString *key in @[RLXInstallerDriverPrimaryActionKey, RLXInstallerDriverStateKey,
+                RLXInstallerDriverProgressKey, RLXInstallerDriverManualPromptKey]) {
+                NSMutableDictionary *bad = [value mutableCopy];
+                if ([key isEqualToString:RLXInstallerDriverPrimaryActionKey]) { bad[key] = @"retry_operation"; }
+                if ([key isEqualToString:RLXInstallerDriverStateKey]) { bad[key] = @"completed"; }
+                if ([key isEqualToString:RLXInstallerDriverProgressKey]) { bad[key] = @10; }
+                if ([key isEqualToString:RLXInstallerDriverManualPromptKey]) { bad[key] = @"select_neutral_input_source_and_close_manager"; }
+                RLXInstallerPresentation *rejected = [[RLXInstallerPresentation alloc] initWithDriverSnapshot:bad];
+                Require(rejected.failedClosed && [rejected.errorCode isEqualToString:@"unknown_driver_result"], @"contradictory maintenance view must fail closed");
+            }
+        }
+
         RLXInstallerPresentation *prepared = [[RLXInstallerPresentation alloc]
             initWithDriverSnapshot:Snapshot(
                 @"awaiting_user_action", @"confirm_quiescence", @"none",

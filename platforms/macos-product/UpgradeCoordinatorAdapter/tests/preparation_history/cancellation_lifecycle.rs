@@ -287,3 +287,6 @@ fn cancellation_lifecycle_continuous_cancellations_keep_null_and_legacy_data_pre
 
 #[path = "cancellation_lifecycle_failures.rs"]
 mod failures;
+
+#[path = "maintenance_inspection.rs"]
+mod inspection;

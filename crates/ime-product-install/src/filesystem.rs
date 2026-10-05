@@ -174,6 +174,11 @@ impl InstallReceiptStore {
         Ok(store)
     }
 
+    /// Fixed verified root for composition-layer read-only checks under our guard.
+    pub fn data_root_path(&self) -> &Path {
+        &self.root.path
+    }
+
     pub fn root_identity(&self) -> &InstallRootIdentity {
         &self.root.identity
     }

@@ -711,3 +711,35 @@ fn create_bundle(path: &Path, marker: &str) {
     create_directory(path, 0o755);
     fs::write(path.join("marker.txt"), marker.as_bytes()).expect("bundle marker");
 }
+
+#[test]
+fn stale_ordinary_intent_stops_before_mutation_when_maintenance_appears() {
+    for bootstrap in [false, true] {
+        let mut fixture = Fixture::new(product("1.0.0", 1, 0));
+        fixture.begin_and_confirm(
+            InstallerProductSituation::NotInstalled,
+            InstallerAction::BeginFirstInstall,
+        );
+        let intent = fixture.authorize(
+            InstallerProductSituation::MatchingReleaseInstalled,
+            InstallerAction::BeginRepair,
+        );
+        let receipt = fixture.receipt();
+        let ids = fixture.operation_ids.ids.clone();
+        let state = fixture.data_root.join(".radishlex-upgrade-v1");
+        create_directory(&state, 0o700);
+        let marker = state.join("preparation-cancellation.json");
+        fs::write(&marker, b"{}\n").unwrap();
+        fs::set_permissions(&marker, fs::Permissions::from_mode(0o600)).unwrap();
+        let result = if bootstrap {
+            fixture.execute_with_upgrade_bootstrap(intent, &mut TestUpgradePort)
+        } else {
+            fixture.execute(intent, &mut NoUpgradeExecution)
+        };
+        assert_eq!(result, Err(InstallerExecutionError::InvalidState));
+        assert_eq!(fixture.receipt(), receipt);
+        assert_eq!(fixture.operation_ids.ids, ids);
+        assert_eq!(fs::read(&marker).unwrap(), b"{}\n");
+        assert_eq!(fs::read_dir(&state).unwrap().count(), 1);
+    }
+}

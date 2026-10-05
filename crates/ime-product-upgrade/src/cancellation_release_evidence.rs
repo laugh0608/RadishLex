@@ -294,6 +294,18 @@ impl CancellationReleaseStore {
         hasher: &impl PreparationHasher,
     ) -> Result<()> {
         self.journal.verify_guard(guard)?;
+        self.verify_live_readonly(proof, identity, temporary, hasher)?;
+        Ok(self.journal.verify_guard(guard)?)
+    }
+
+    pub(super) fn verify_live_readonly(
+        &self,
+        proof: &CancellationReleaseReceipt,
+        identity: Option<&PreparationFileIdentity>,
+        temporary: Option<(&Path, &PreparationFileIdentity)>,
+        hasher: &impl PreparationHasher,
+    ) -> Result<()> {
+        self.journal.store.revalidate()?;
         self.validate_active()?;
         let directory = self.directory(proof.operation_id());
         let path = directory.join(CANCELLATION_RELEASE);
@@ -392,6 +404,6 @@ impl CancellationReleaseStore {
         {
             return Err(Error::EvidenceChanged);
         }
-        Ok(self.journal.verify_guard(guard)?)
+        Ok(self.journal.store.revalidate()?)
     }
 }

@@ -9,24 +9,24 @@ use radishlex_macos_upgrade_coordinator::MacOsPreparationHasher;
 use std::fs::{self, DirBuilder};
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
 use std::path::PathBuf;
-use std::sync::atomic::AtomicU64;
 
-static NEXT: AtomicU64 = AtomicU64::new(0);
 const OLD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const NEW: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 pub(super) struct Fixture {
-    path: PathBuf,
+    pub(super) path: PathBuf,
     pub(super) proof: CancellationReleaseReceipt,
     pub(super) source: ProductArtifactIdentity,
 }
 impl Fixture {
     pub(super) fn new() -> Self {
+        let mut nonce = [0_u8; 8];
+        getrandom::getrandom(&mut nonce).unwrap();
         let path = fs::canonicalize(std::env::temp_dir())
             .unwrap()
             .join(format!(
                 "radishlex-cancel-authorization-{}-{}",
                 std::process::id(),
-                NEXT.fetch_add(1, Ordering::Relaxed)
+                u64::from_ne_bytes(nonce)
             ));
         DirBuilder::new().mode(0o700).create(&path).unwrap();
         let owner = fs::metadata(&path).unwrap().uid();

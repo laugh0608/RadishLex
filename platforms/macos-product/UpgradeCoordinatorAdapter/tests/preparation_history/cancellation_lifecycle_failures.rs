@@ -1,6 +1,6 @@
 use super::*;
 
-fn tree(root: &Path) -> Vec<(PathBuf, u64, u32, Vec<u8>)> {
+pub(super) fn tree(root: &Path) -> Vec<(PathBuf, u64, u32, Vec<u8>)> {
     let mut result = vec![];
     let mut paths = vec![root.to_owned()];
     while let Some(path) = paths.pop() {
@@ -129,6 +129,35 @@ fn cancellation_lifecycle_all_boundaries_recover_or_retain_unbound_evidence() {
                     assert!(!continue_release(&fixture, &mut port), "{point:?}");
                 }
                 let before = tree(&fixture.0);
+                let observed = radishlex_ime_product_upgrade::inspect_maintenance(
+                    &fixture.0,
+                    fs::metadata(&fixture.0).unwrap().uid(),
+                    &Hasher,
+                );
+                assert_eq!(
+                    tree(&fixture.0),
+                    before,
+                    "inspection after {point:?} must preserve interruption evidence"
+                );
+                let released = observed
+                    .as_ref()
+                    .ok()
+                    .and_then(|value| value.as_ref())
+                    .is_some_and(|value| {
+                        value.phase()
+                            == radishlex_ime_product_upgrade::MaintenancePhase::CancellationReleased
+                    });
+                assert_eq!(
+                    released,
+                    matches!(
+                        point,
+                        RP::MarkerMoved
+                            | RP::MarkerTargetSynced
+                            | RP::MarkerSourceSynced
+                            | RP::Released
+                    ),
+                    "{point:?}, child {child}, maintained {maintained}: {observed:?}"
+                );
                 let continued = continue_release(&fixture, &mut ReleaseAuthority::new());
                 assert_eq!(
                     continued,
