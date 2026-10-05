@@ -78,7 +78,7 @@
 
 专用 cancellation preflight 核对实际 root、双 bundle ID 和 target manifest；任务授权绑定 proof/source，最长 5 分钟、可撤销，helper 返回后复查。取消 reader 拒绝旧预检响应；尚未接生产 dispatch/UI，未运行冻结现场。
 
-下一批完成独立旧程序资格的专用副本验证与证据生成/读取/失效校验，再按[已批准 A–D 分段](../remediation/macos-wal-source-preparation-design.md)推进 Executor dispatch/只读 UI。既有 source validation host 面向 v1 数据事务，不能证明取消后正常双 gate、打开/再学习/重启资格，不能用其退出码或结构化资格对象放行最后 marker。程序实物观察和当前任务授权已有实现，但缺少独立资格仍阻断，不提前开放取消按钮。WAL 模式转换/pager 内部断电资格继续开放，B 段未退出。
+已定位精确 source 39 release，文件记录及签名通过；普通 39 装配身份不同。项目所有者拒绝新增用户/切换登录，已撤回独立账户建议，后续保持当前 Agent 会话。按[当前会话约束](../remediation/macos-preparation-cancellation-compatibility.md#2026-10-05-资格前置审计与当前会话约束)继续不依赖真实旧程序资格的仓库验证与产品接线准备；正常双程序启动资格仍待可行方案。外置 probe、validation host 或结构化对象不能代替该资格，最终 marker 与取消按钮继续阻断；WAL/pager 内部断电与 B 段退出仍开放。
 
 新升级真正完成后才继续客户端身份和 composition 隐私实测，不直接重试 40。冻结 macOS 39/40、用户数据、Linux/UTM 与系统操作均不在本批范围内；任何实机动作须另行明确目标与授权。09-30 的历史待办由本批承接，原交接保留在[2026-W40](../devlogs/2026-W40.md#2026-09-30明日事项)。
 

@@ -158,6 +158,27 @@ Executor 新增程序实物观察组合，复用安装适配器的签名/tree/ma
 
 B 段仍未退出；本补充获确认也不等于产品已支持取消。真实源码/旧二进制若不能满足任一前置条件，应保留阻断并回报设计差异，不削弱 v1 gate。WAL/pager 内部真实断电资格、C–D 产品接线、REV-01/REV-02 和所有冻结现场停止线保持。
 
+## 2026-10-05 资格前置审计与当前会话约束
+
+本轮只读盘点发现本地保留 build 35–40 的历史 release 装配。既有 `verify_historical_product_root` 对六份 release 的完整文件记录、版本、许可证和运行资源关系均通过；这不是旧程序运行资格。当前绑定的 source 39 原始 release 仍可定位，完整摘要与签名核对结果保存在 [W41](../devlogs/2026-W41.md)。35–38 的存在不能代替 source 39；同为 39 的普通装配与 release manifest 不同，也不得混用。原始 39/40 仍冻结，本轮没有复制或运行它们。
+
+### 已查明的执行约束
+
+- [旧 FFI 的外层 gate](../../crates/ime-ffi/src/product_install.rs) 从 `current_exe` 推导运行身份，要求进程位于固定用户域双 bundle 的 `Contents/MacOS`，再核验完整 tree 与签名。外置 probe 即使链接精确旧 dylib，也不能取得相同的正向运行身份；把 probe 插入 bundle 或重新签名会改变被验证对象。
+- [Manager 正常启动](../../apps/radishlex-manager/macos/Runner/AppDelegate.swift)和 [InputMethod 正常启动](../../platforms/macos-imk/Sources/main.m)均先执行 outer/data 两道 gate。InputMethod 随后创建 `IMKServer` 并进入 `NSApplication` 会话；仅重定向 Foundation home 不能证明 GUI/InputMethodKit 命名空间已隔离。
+- 既有 validation host 只验证指定 v1 candidate/PostSwitch 数据；包内 FFI smoke 可以补充存储与学习证据，二者都不替代原始双程序的正常 gate、打开、再学习和重启。只读校验或退出码不能直接生成 `CancellationSourceQualification`。
+
+### 当前会话约束与可继续范围
+
+项目所有者已明确拒绝新增 macOS 用户或切换登录账户：操作成本过高，且会打断当前 Agent 会话。原独立账户建议撤回，不再作为下一步或资格工作的必要环境条件；本轮没有创建账户、切换会话或制作程序副本。后续工作须保持当前账户和 Agent 会话连续。
+
+1. 仓库内继续推进合成数据的协调器回归、失败关闭检查及产品接线准备。真实旧程序资格尚缺时，最终 marker 与取消按钮继续阻断；这个运行资格缺口不阻止不依赖它的仓库工作。
+2. 在当前会话可执行的 headless 验证中，既有 validation host 与 FFI smoke 只能证明各自的数据验证/存储/学习范围；使用精确冻结程序或 dylib 的副本仍须单独明确范围。不得将临时 HOME、外置 probe、注入/补丁或重新签名当作原始双程序正常启动的等价证据。
+3. 原始双程序的正常 gate、打开、再学习、重启资格保留未完成。当前尚无经验证的无干扰执行方案，不自动在工作会话启动旧 InputMethod，也不将其他账户、虚拟机或新环境作为默认替代要求。后续若确需实机动作，应先形成保持当前 Agent 会话的具体方案，再明确目标、影响和授权。
+4. 原有资格矩阵、精确 source/schema/proof 绑定与证据失效条件保持。静态资产检查、合成结果和 headless 子项不得升级为完整生产资格；不能为了继续开发而增加默认合格提供者或减弱 gate。
+
+本轮落实的是资产定位与执行边界审计，以及按项目所有者要求撤回不合适的环境建议。没有新生产资格、dispatch/UI 或 B 段退出结论；冻结原件、真实数据和既有现场停止线保持，仓库实现授权继续有效。
+
 ## 备选方案与取舍
 
 | 方案 | 取舍 |
