@@ -110,9 +110,11 @@ upgrade 产品终态在 `final_verified` 与 `completed` 前分别复验外层/d
 
 ## InstallerExecutor
 
-执行器只接受 `InstallerDriver` 已授权的 intent，但仍在 guard 内重新读取 current receipt 并执行 manifest-bound preflight。begin/retry/remove 先持久化 `prepared` 并返回；用户重新确认静止后才进入 `quiesced` 和程序 mutation。first install、repair、remove 共用外层程序终态；upgrade 从外层 receipt 和固定 data root bootstrap 或重绑同 operation 的 M4-P02 receipt，并按已证明状态继续数据协调、程序恢复或两段终态；专用 `AbortPreSwitchUpgrade` 不走普通 resume/bootstrap，先只读检查双 receipt，再绑定原 operation 和不可改写保留证据执行。
+普通 v1 执行器只接受 `InstallerDriver` 已授权的 intent，但仍在 guard 内重新读取 current receipt 并执行 manifest-bound preflight。begin/retry/remove 先持久化 `prepared` 并返回；用户重新确认静止后才进入 `quiesced` 和程序 mutation。first install、repair、remove 共用外层程序终态；upgrade 从外层 receipt 和固定 data root bootstrap 或重绑同 operation 的 M4-P02 receipt，并按已证明状态继续数据协调、程序恢复或两段终态；专用 `AbortPreSwitchUpgrade` 不走普通 resume/bootstrap，先只读检查双 receipt，再绑定原 operation 和不可改写保留证据执行。
 
 执行器不接受 UI 路径、`HOME`、release、bundle identity 或 available bytes 自报值。随机 operation ID 来自系统熵；active guard、stale intent、缺失 upgrade context、preflight/receipt/identity 失败均关闭。
+
+准备/取消维护查询已接入 Driver/Bridge/AppKit，六类状态全部只刷新，并在普通 v1 guard 内再次拒绝旧 intent。取消另用独立可撤销任务：连续持有 outer → inner 双锁，组合程序实物与专用 native 静止/容量观察，接续请求、源库收尾、材料封存和证明发布；成功仍保留最后 marker，最终释放另需 proof 授权及独立旧程序资格。新准备入口、Bridge/action 与资格提供者仍未完成，详见 [Executor 说明](InstallerExecutor/README.md#准备取消任务)。
 
 ## InstallerBridge
 

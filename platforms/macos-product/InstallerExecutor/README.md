@@ -21,6 +21,14 @@ first install、repair 和 remove 在 `programs_committed` 后共用核心终态
 
 该动作不创建新 operation、不改变 v1 receipt 格式、不实现 WAL 源库准备或后续升级重试。详细证据格式、检查点与旧 reader 兼容见 [Installer 边界](../../../docs/macos-installer-app-boundary.md#显式切换前中止恢复)和[数据升级边界](../../../docs/macos-data-upgrade-coordinator.md#显式切换前中止的保留证据)。
 
+## 准备取消任务
+
+`authorize_cancellation_preservation` 为已有准备记录创建独立、最长 5 分钟的可撤销任务，绑定完整 preparation 和两侧程序身份。`preserve_preparation_cancellation` 按 outer → inner 取得并连续持有双 guard，重新核验准备与 outer 原件，接续取消请求、必要源库收尾、材料保留/兼容恢复及证明/索引发布；返回完整 proof 仅表示等待资格，最后 marker 始终保留。前一 outer 原件必须已经在固定历史槽，不扫描补造；源库维护仍由核心执行。
+
+`finish_preparation_cancellation` 要求针对该完整 proof 另取 `authorize_cancellation_release` 授权，并显式传入可信独立资格提供者；没有默认实现。核心要求资格时才允许最后释放，提供者返回后重新核验 outer、程序、静止和任务有效性。生产入口固定使用真实安装适配器与专用 native 预检，不暴露可替换的合成观察器；预检现保留经验证的实际可用容量供源库预算使用。
+
+重开任务重新授权，执行器不从持久请求续权。各阶段中断按核心证明继续同一 operation，active outer 暂缺也只能沿已有封存证明恢复；未绑定临时文件、handoff 或材料漂移保持拒绝。新准备入口及 Bridge/UI action 尚未接入，真实资格未完成时最终 marker 与按钮继续阻断。细节见 [Installer 边界](../../../docs/macos-installer-app-boundary.md#取消-executor-任务入口)。
+
 ## 失败关闭
 
 `MacOsCancellationProductAuthority` 为独立取消释放 authority 提供程序观察组合：复用 `MacOsProductInstallAdapter` 校验精确 data root、sealed target 与安装中的 source 双 bundle，在 `CancellationQuiescenceAuthority` 回调前后重新检查。该回调必须绑定本次完整证明、源程序、当前任务授权与双端静止；只有 target release/容量的旧 preflight 回答不足以填入此接口，也不能用 UI 确认或资格测试成功代替。观察组合不复制或运行产品、不打开用户 SQLite；现有签名验证仍通过受控 `codesign` 执行。
@@ -29,7 +37,7 @@ first install、repair 和 remove 在 `programs_committed` 后共用核心终态
 
 `MacOsCancellationQuiescenceAuthority` 在每次调用中运行专用 native cancellation preflight，核对实际 root 与绑定 target manifest，并在 helper 返回后复查授权未撤销/到期。程序实物观察仍由上层在其前后执行。普通 v1 preflight 响应不被专用路径接受；没有默认放行或环境开关。
 
-准备/取消的只读维护查询已接入 driver/bridge/UI；六个维护阶段均只提供刷新，普通 v1 执行器在 outer guard 内复核维护记录以拒绝旧 intent。查询不创建目录、取得 guard 或打开 SQLite，损坏/缺失证据继续阻断；完整规则见 [Installer 边界](../../../docs/macos-installer-app-boundary.md#准备与取消的只读维护投影)。尚未接取消 mutation dispatch/action，也没有独立旧程序资格提供者。现有 source validation host 不能证明无新 data receipt 的正常打开/再学习/重启资格；必须通过专用副本验证取得对应证据，缺少时仍阻断最后 marker。产品入口完整接线按[取消设计](../../../docs/remediation/macos-preparation-cancellation-compatibility.md)推进。
+准备/取消的只读维护查询已接入 driver/bridge/UI；六个维护阶段均只提供刷新，普通 v1 执行器在 outer guard 内复核维护记录以拒绝旧 intent。查询不创建目录、取得 guard 或打开 SQLite，损坏/缺失证据继续阻断；完整规则见 [Installer 边界](../../../docs/macos-installer-app-boundary.md#准备与取消的只读维护投影)。取消任务执行入口已接入本 crate，Bridge/action 与独立旧程序资格提供者仍缺失。现有 source validation host 不能证明无新 data receipt 的正常打开/再学习/重启资格；必须通过专用副本验证取得对应证据，缺少时仍阻断最后 marker。产品入口完整接线按[取消设计](../../../docs/remediation/macos-preparation-cancellation-compatibility.md)推进。
 
 - active guard、中断/损坏 receipt、未知对象、root/程序身份漂移由核心或平台 port 保留稳定错误并拒绝执行；
 - stale begin/confirm/resume intent、operation/source/target 不匹配和缺失 upgrade context 均拒绝；

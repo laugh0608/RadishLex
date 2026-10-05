@@ -14,7 +14,7 @@ adapter 实现 `UpgradeCoordinatorPort`，把平台无关协调核心绑定到�
 
 调用方应先执行 `inspect_preflight()` 取得容量，再把同一 adapter 交给 `UpgradeReceiptStore::resume_userdb_upgrade`。M4-P03 安装载体还必须在调用前证明产品根的固定来源、版本化 distribution identity 与 strict ad-hoc code identity；本 crate 不把 manifest hash 当作发布 identity。
 
-取消释放使用 `MacOsProductPreflightAdapter::inspect_cancellation_quiescence` 的独立严格响应：target helper 以 `--cancellation-release` 观察系统选择的固定用户根与固定双 bundle，返回实际 root 身份；调用前后复验 target manifest 摘要及 helper，拒绝旧响应、异 root、非静止、错误 bundle ID、未知/重复字段和 stderr。该观察没有任务授权或旧程序资格，必须与 Executor 的可撤销任务授权、安装程序实物观察及双 guard 组合使用。普通无参数预检格式保持不变。
+取消释放使用 `MacOsProductPreflightAdapter::inspect_cancellation_quiescence` 的独立严格响应：target helper 以 `--cancellation-release` 观察系统选择的固定用户根与固定双 bundle，返回实际 root 身份与可用容量；Rust 观察结果保留经验证的容量供取消源库预算使用，调用前后复验 target manifest 摘要及 helper，拒绝旧响应、异 root、非静止、错误 bundle ID、未知/重复字段和 stderr。该观察没有任务授权或旧程序资格，必须与 Executor 的可撤销任务授权、安装程序实物观察及双 guard 组合使用。普通无参数预检格式保持不变。
 
 `MacOsPreparationHasher` 为源库准备核心提供完整文件流 SHA-256，复用本 adapter 已有依赖，读取错误直接失败。`tests/source_preparation.rs` 以新合成目录、真实 SQLite 与该 hasher 验证准备快照、维护意图、源库准备、异常/退出重载及学习/tombstone 保留；授权/静止 port 使用合成实现，不能当作真实 outer guard、程序资格或 Installer 接线通过。新增 journal 测试使用仓库冻结的纯合成 SQLite family，在持久维护意图之后组合出中断状态，验证恢复身份先落盘、三处进程退出重载与漂移拒绝；它不代表真实 WAL 模式转换的连续崩溃现场。真实 spill/重放边界的独立进程测试位于 userdb。准备流程及历史接续分别在 `source_prepared` / `previous_archived` 保留启动阻断；核心后续 handoff 与终态释放已纳入下述合成测试，真实产品接线按[已批准设计](../../../docs/remediation/macos-wal-source-preparation-design.md)继续。
 
@@ -35,6 +35,6 @@ adapter 实现 `UpgradeCoordinatorPort`，把平台无关协调核心绑定到�
 
 `tests/preparation_history/cancellation_archive*.rs` 与已释放前驱回归验证取消材料封存、精确位置重载、outer 原件保留及兼容副本发布，覆盖维护前后、三类旧终态、部分归档、无 data 前驱、已释放 v1/v2 真实终态历史、身份漂移/冲突及授权失效/真实子进程退出。结果为 `preserved`，活动请求与封存记录仍阻断启动，产品 authority 为合成。双 guard 与严格外层回执的组合测试位于 `InstallCoordinatorAdapter/tests/cancellation_archive.rs`；它也不代表真实程序/Installer 资格。
 
-`tests/preparation_history/cancellation_lifecycle*.rs` 验证独立完整取消证明、v2 索引、无 data/旧 inventory/已释放 v1/v2 前驱、连续取消及取消后新准备/真实数据终态释放；覆盖严格解析、历史漂移、回调冲突和记录/索引/归档/最后 marker 的真实子进程退出。`prepare_cancellation_release` 始终保留活动请求，只有独立 `QualifiedSource` 步骤才能最后封存请求。测试明确使用合成旧程序资格，真实 port/Executor/旧程序副本仍待完成，不运行冻结程序。
+`tests/preparation_history/cancellation_lifecycle*.rs` 验证独立完整取消证明、v2 索引、无 data/旧 inventory/已释放 v1/v2 前驱、连续取消及取消后新准备/真实数据终态释放；覆盖严格解析、历史漂移、回调冲突和记录/索引/归档/最后 marker 的真实子进程退出。`prepare_cancellation_release` 始终保留活动请求，只有独立 `QualifiedSource` 步骤才能最后封存请求。测试明确使用合成旧程序资格；产品组合与取消 Executor 已另行接入，独立旧程序资格及 Bridge/action 仍缺失，不运行冻结程序。`maintenance_inspection.rs` 及生命周期故障矩阵同时核验六类只读状态、零创建/零改写、最终 marker 和后续学习边界。
 
 仓库 `.cargo/config.toml` 默认限制为 2 个编译任务和 2 个 Rust 测试线程；历史套件的取消故障矩阵在单个测试 worker 内串行覆盖全部 I/O/授权/进程退出边界。重型测试期间不要同时编译或运行 Clippy，避免 CPU 叠加及正在运行的子测试可执行文件被重编译替换。显式调用参数可覆盖默认值；专门的多进程合同仍保留其必要并发，不承诺硬 CPU 上限。测试 profile 只优化现有 `sha2 0.10.9` 依赖，保留完整流式校验与业务代码默认调试检查；生产构建 profile 不变。

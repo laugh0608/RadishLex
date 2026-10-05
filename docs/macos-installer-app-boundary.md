@@ -94,7 +94,25 @@ phase=<code> action=<code> error=<code> state=<code>
 
 Bridge ABI v1 的结构大小、字段、symbol 与 contract version 保持；phase 整数 7–12 为上述六项的顺序扩展。新 Rust/C/Objective-C 映射一致，旧 reader 对未知 phase 失败关闭。新原生 reader 同时拒绝维护 phase 与 mutation action、旧 receipt state/进度或手动静止 prompt 的矛盾组合。稳定摘要仍仅含既有四个 code 字段。
 
-普通 v1 Executor 在取得 outer guard 后再次检查维护状态，拒绝查询后已过期的旧 intent；upgrade bootstrap 前也检查，避免先创建新的数据事务。新准备/取消 mutation dispatch 和资格提供者尚未接入，维护查询不会调用它们，也没有新增取消按钮。
+普通 v1 Executor 在取得 outer guard 后再次检查维护状态，拒绝查询后已过期的旧 intent；upgrade bootstrap 前也检查，避免先创建新的数据事务。新准备入口、Bridge mutation action 和资格提供者尚未接入；下述取消 Executor 任务入口不会由维护查询调用，也没有新增取消按钮。
+
+## 取消 Executor 任务入口
+
+取消执行使用独立的类型化任务，不复用普通 v1 intent 或只读 snapshot 的 refresh：
+
+| 入口 | 授权与结果 |
+| --- | --- |
+| `authorize_cancellation_preservation` | 固定当前完整 preparation、source/target 双程序身份，要求当次四项确认和最多 5 分钟的可撤销授权 |
+| `preserve_preparation_cancellation` | 从已有准备/取消状态接续请求、源库收尾、材料封存和证明/索引发布；成功仅表示等待独立资格，最后请求 marker 保留 |
+| `finish_preparation_cancellation` | 使用另外取得的 `authorize_cancellation_release` 授权及显式独立资格提供者，核验同一完整证明后才执行最终释放 |
+
+两个执行入口都先取得 outer guard，再取得 inner guard；同一调用内连续持有双锁，不在阶段切换时释放再取。创建私有历史目录会改变数据根目录链接数，guard 的根匹配使用与原 filesystem/receipt revalidation 相同的 device/inode/owner/mode；state directory 与 socket 身份仍固定，异根、目录替换或权限变化继续拒绝。
+
+请求/源库阶段在每个检查点核验前一 outer 的封存原件、当前合法 old terminal 或 artifact-free prepared new outer；封存中允许核心证明所绑定的 active outer 暂缺与兼容发布位置。全过程复用安装适配器核验实际 source 双 bundle、sealed target 和 root，再执行专用 native 静止/容量观察，返回后重新核验程序与任务授权。容量直接使用此次专用响应，不能从 UI 或旧 target-only preflight 填入。
+
+持久请求不恢复任务授权。撤销、到期、进程退出后须重新确认；续跑只采用核心能够验证的已绑定位置，未知或未绑定临时文件原样阻断。已进入 handoff、记录变化、错误 root/产品、活动 guard 或证据漂移都不能转入取消。preservation 任务不会调用旧程序资格、不会移动最后 marker；最终入口没有默认资格提供者，资格返回后再次核验 outer、程序、静止与授权。
+
+本步只接仓库 Executor：普通 v1 action 保持原规则，C ABI/UI action 未扩展。新准备入口及 Bridge/action 仍待接线，生产旧程序资格尚缺，不表示真实用户已可点击取消。回归使用合成用户根、显式合成资格和进程退出，不启动真实 GUI、复制冻结程序或试开真实用户库。
 
 ## 用户授权
 

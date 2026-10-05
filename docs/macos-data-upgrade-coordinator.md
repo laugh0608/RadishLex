@@ -72,7 +72,7 @@ M4-P02 要证明程序升级不会把用户数据置于只有新版本能打开�
 
 专用 `prepare_userdb_source` 编排已经串接保护快照、持久维护意图、SQLite 准备及 `source_prepared` 复核；固定路径与实际文件的 owner/mode/link/device/inode/length/SHA-256 由核心检查。快照读取阶段允许受限 SHM/零长 WAL 辅助变化，原主库和既有 WAL 内容不变；进入维护窗口后仍要求同一主 inode、保护快照和全量逻辑内容一致。文件/目录 fsync、rename、记录回读及后置静止缺一不可；无证明 snapshot 残留或不满足下述资格的 journal 阻断，不自动清理或用快照覆盖源库。
 
-快照及维护前 fresh 容量预算为 `6 * max(logical_bytes, source_main_bytes) + settings_bytes + 64 MiB`，覆盖原三份工作余量、准备快照、源库增长和 journal，使用 checked arithmetic。`SourcePreparationPort` 的真实产品实现必须持有 outer guard，逐 checkpoint 复验同一 `prepared` outer、两代受控产品、旧 receipt/inventory 和静止状态；`MacOsPreparationHasher` 只提供现有 SHA-256 实现，不替代上述授权。Executor 接线、完整准备取消及终态封存的产品接线仍待完成；下述 handoff、终态释放和取消源库收尾已实现核心编排，不能以 `source_prepared` 或单独 journal `handoff_ready` 声称产品交接完成。
+快照及维护前 fresh 容量预算为 `6 * max(logical_bytes, source_main_bytes) + settings_bytes + 64 MiB`，覆盖原三份工作余量、准备快照、源库增长和 journal，使用 checked arithmetic。`SourcePreparationPort` 的真实产品实现必须持有 outer guard，逐 checkpoint 复验同一 `prepared` outer、两代受控产品、旧 receipt/inventory 和静止状态；`MacOsPreparationHasher` 只提供现有 SHA-256 实现，不替代上述授权。新准备与终态封存的产品接线仍待完成，取消 Executor 已按下述任务入口接线；下述 handoff、终态释放和取消源库收尾已实现核心编排，不能以 `source_prepared` 或单独 journal `handoff_ready` 声称产品交接完成。
 
 #### 旧事务 inventory 与保留接续
 
@@ -122,9 +122,11 @@ v2 索引使用 `radishlex-latest-release-v2`，显式包含 `operation_id`、`l
 
 源库收尾已接入独立 `CancellationSourceReceipt`，在固定 `cancellation-source.json` / `.tmp` 中绑定不可改认的请求文件身份与工作准备副本；只允许 `finishing`、受限 journal 恢复身份追加及 `source_ready`，不改原准备记录、请求或保护快照。维护意图前不打开 SQLite，保持请求 family 原身份/字节；维护意图后在 `CancellationSourcePort` 的 fresh outer/产品/静止与容量证明下完成原准备，核验 standalone、源 schema、全量内容/删除语义和显式关闭，再同步主文件与数据根。已准备/已归档路径重新校验等价，旧私有材料只核验，不搬动。
 
-请求入口仍拒绝现存 journal；只有取消收尾意图已持久化，专用恢复才可在同一主 inode、无 WAL/SHM 和下述单 journal 资格成立后记录恢复身份并重放。物理 `load_source_guarded` 不代表 fresh 授权或逻辑复验；这些由 `finish_source` 完成。未知临时进度、身份/内容漂移、busy 或授权/容量不足均保留阻断。`source_ready` 不等于 `cancel_ready`。后续 `CancellationArchiveStore` 已实现取消材料封存与 outer 兼容恢复，固定原件、目录和逐槽位置证明；组合层持有真实 outer guard 并调用安装核心严格校验旧/新 v1 合同。返回 `preserved` 仍保留活动取消请求与封存进度；独立 `CancellationReleaseStore` 已接入完整不可变证明、v2 取消索引和受资格约束的最后 marker 协调，真实产品观察/Executor、旧程序资格和产品 UI 仍未接入，不能显示产品“取消完成”。固定槽位、顺序与验证口径见[取消兼容设计](remediation/macos-preparation-cancellation-compatibility.md)。
+请求入口仍拒绝现存 journal；只有取消收尾意图已持久化，专用恢复才可在同一主 inode、无 WAL/SHM 和下述单 journal 资格成立后记录恢复身份并重放。物理 `load_source_guarded` 不代表 fresh 授权或逻辑复验；这些由 `finish_source` 完成。未知临时进度、身份/内容漂移、busy 或授权/容量不足均保留阻断。`source_ready` 不等于 `cancel_ready`。后续 `CancellationArchiveStore` 已实现取消材料封存与 outer 兼容恢复，固定原件、目录和逐槽位置证明；组合层持有真实 outer guard 并调用安装核心严格校验旧/新 v1 合同。返回 `preserved` 仍保留活动取消请求与封存进度；独立 `CancellationReleaseStore` 已接入完整不可变证明、v2 取消索引和受资格约束的最后 marker 协调，取消 Executor 已组合真实产品观察与双锁任务，旧程序资格及 Bridge/action 仍缺；只读 UI 按完整证明和 marker 位置区分状态，不开放执行按钮。固定槽位、顺序与验证口径见[取消兼容设计](remediation/macos-preparation-cancellation-compatibility.md)。
 
-`CancellationReleaseStore::prepare_cancellation_release` 消费完整封存证据，独占发布历史 `cancellation-release.json`，封存原 archive，再发布唯一索引；活动原请求继续阻断。独立 `finish_cancellation_release` 必须在每个检查点取得 `QualifiedSource` port 证明，才最后原 inode 移走请求、同步两目录并回读。组合层 `CancellationReleaseAuthority` 持有真实 outer guard，核验严格旧/新 v1 原件及活动旧终态，并绑定 source 完整双程序身份、schema 和本次完整证明的资格返回值；资格回调后复验产品/静止，两类回调前后核对外层。Executor 已提供绑定完整 proof/source、可撤销且最长 5 分钟的内存任务授权与专用 native 静止观察，helper 前后复核授权及 target manifest，核对实际 root。结构化资格返回值不是独立旧程序资格本身；资格提供者及 dispatch/UI 尚未接线，不能放行产品取消。源库等价在每次恢复入口重新验证，各 I/O 回调前后复验全部实物。
+`CancellationReleaseStore::prepare_cancellation_release` 消费完整封存证据，独占发布历史 `cancellation-release.json`，封存原 archive，再发布唯一索引；活动原请求继续阻断。独立 `finish_cancellation_release` 必须在每个检查点取得 `QualifiedSource` port 证明，才最后原 inode 移走请求、同步两目录并回读。组合层 `CancellationReleaseAuthority` 持有真实 outer guard，核验严格旧/新 v1 原件及活动旧终态，并绑定 source 完整双程序身份、schema 和本次完整证明的资格返回值；资格回调后复验产品/静止，两类回调前后核对外层。Executor 已提供绑定完整 proof/source、可撤销且最长 5 分钟的内存任务授权与专用 native 静止观察，helper 前后复核授权及 target manifest，核对实际 root。结构化资格返回值不是独立旧程序资格本身；资格提供者及 Bridge/action 尚未接线，不能放行真实产品取消。源库等价在每次恢复入口重新验证，各 I/O 回调前后复验全部实物。
+
+取消 Executor 的 preservation 任务完整接续请求、源库收尾、封存与证明发布，成功只表示等待资格；最终释放另需完整 proof 授权和显式独立资格。两个入口在同一调用中连续持有 outer → inner 双锁，阶段切换不释放再取；root guard 复验与下述目录身份合同一致，创建历史目录引起的链接数变化不改变锁归属。程序实物、专用 native 静止及容量、任务撤销/到期均在回调前后重新核验。未绑定临时材料不接纳，执行器不清理证据，详见 [Installer 任务入口](macos-installer-app-boundary.md#取消-executor-任务入口)。
 
 历史查询不检查旧运行库 hash，但继续验证请求、封存证明、准备/保护快照、旧 outer 原件、兼容关系及真实 data 材料。取消首次封存但没有旧 release proof 的 inventory 由取消证明承载，不能猜造终态；连续取消及取消后新准备分别绑定 lifecycle、outer、data 链。缺失索引且存在历史不能回退首次路径。新记录、索引、归档及最后 marker 的子进程中断测试只证明仓库恢复语义，不代表内部 pager 断电或旧程序资格。
 

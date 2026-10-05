@@ -13,6 +13,8 @@
 
 未知字段、未知 contract 版本和未知 action 失败关闭，只允许刷新。UI 不读取 receipt、不解析 `HOME`、不接受路径参数、不调用 TIS 修改 API，也不把用户勾选当作平台静止证明。
 
+准备/取消维护状态显示独立文案，只提供刷新，隐藏旧 receipt 进度并清除旧状态与手动静止提示。等待资格不显示为完成；完整取消证明和最终 marker 的严格检查由 Rust 完成，UI 不推断成功。当前尚无准备取消按钮，Executor 任务接口不等于 UI action 已开放。
+
 正常退出只终止 Installer UI 进程，不代表取消或完成事务，也不清理 receipt、guard、staging、backup 或历史 operation。重新打开后由 Rust bridge 重新读取持久化状态并形成 fresh snapshot。
 
 ABI 使用固定整数 enum、POD snapshot 与三个已绑定 symbol。Objective-C 只做已知值映射；未知版本、action、error、state、prompt 或进度失败关闭。Rust 隔离 dispatch 已把 fresh snapshot 授权接入 restartable executor，UI controller 不含文件操作。

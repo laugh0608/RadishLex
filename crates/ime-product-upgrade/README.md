@@ -126,7 +126,7 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 准备记录新增可选且不可改认的 `previous_release_index_identity`，原字段缺失时编码保持，旧严格准备 reader 拒绝新字段。证明摘要复用 `previous_inventory_sha256`，数据回执摘要仍绑定真正的旧 v1 receipt；前一 outer/data 链分别保留。源 release/product 必须与已释放证明匹配；索引或证明即使同字节换 inode 也拒绝，缺失、冲突、临时文件或提前出现的未绑定新 operation 目录不能进入 SQLite 写路径。
 
-新 family 和保护快照从当前运行数据重新取得，允许上次释放后的合法 WAL 学习/删除。准备和 handoff 各检查点复验已固定的索引、证明及历史材料；已释放槽不再移动，`archived_slots` 保持空，`previous_archived` 只记录既有封存证明通过。新 v1 handoff、后续终态释放和下一次准备继续使用同一套历史校验；多个保留的旧 operation 不被认领或改写。真实 outer/Executor 和旧程序取消资格仍待完成，合成产品 port 不构成产品授权。
+新 family 和保护快照从当前运行数据重新取得，允许上次释放后的合法 WAL 学习/删除。准备和 handoff 各检查点复验已固定的索引、证明及历史材料；已释放槽不再移动，`archived_slots` 保持空，`previous_archived` 只记录既有封存证明通过。新 v1 handoff、后续终态释放和下一次准备继续使用同一套历史校验；多个保留的旧 operation 不被认领或改写。新准备/handoff/终态释放的产品入口与旧程序取消资格仍待完成；取消 Executor 的实现不补齐这些入口，合成产品 port 不构成产品授权。
 
 ### 准备取消意图与源库收尾
 
@@ -139,6 +139,10 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 `CancellationSourceReceipt` 在固定 `cancellation-source.json` / `.tmp` 中以严格 `radishlex-cancellation-source-v1` 绑定请求文件身份和工作准备副本。`finishing` 只可追加既有单 journal 恢复身份或推进至 `source_ready`；原准备 marker、取消请求和保护快照保持。`reserved` / `snapshot_ready` 路径不打开 SQLite，以请求 family 原身份和字节证明保持；维护意图后重新取得授权/静止/容量，完成同一受控准备，复验 standalone、源 schema、全量内容/tombstone 等价、关闭与源文件/数据根同步。已经准备好的路径重新验证等价，不重复归档旧材料。
 
 请求仍拒绝现存 journal；取消收尾意图落盘后，专用恢复才可沿用单 journal 资格检查、精确恢复身份持久化和 SQLite 重放。`CancellationSourcePort` 每个检查点确认 fresh 产品授权；未知临时进度、busy、容量不足、身份/内容漂移均保留阻断。`load_source_guarded` 只核验物理关系，不能代替 `finish_source` 的 fresh 授权与内容复验。源库 `source_ready` 不表示完整取消；后续材料封存与兼容恢复已接入 `CancellationArchiveStore`，后续完整证明、v2 生命周期索引与受资格约束的核心 marker 释放由 `CancellationReleaseStore` 承接，详见[已批准的补充设计](../../docs/remediation/macos-preparation-cancellation-compatibility.md)。
+
+### 准备与取消的只读检查
+
+`inspect_maintenance` 返回经过严格记录、文件身份/摘要和历史祖先核验的 `MaintenanceInspection`，区分准备、取消请求、源库收尾、封存、等待资格及已释放取消。证明或索引已发布仍不能代替最后请求 marker 的释放；已释放历史允许后续正常学习/WAL。查询前后复验 guard 和材料，活动 guard、身份漂移、缺失或孤立对象失败关闭；稳定 stale guard 原样保留，不取得锁、不创建目录、不补同步、不打开 SQLite。它不授予 mutation 或 startup 权限，产品层还须交叉核验实际 outer 与程序绑定。
 
 ### 启动门禁
 
@@ -217,11 +221,11 @@ cargo clippy -p radishlex-ime-product-upgrade --all-targets -- -D warnings
 
 数据核心处理受证明约束的字节和文件关系，不解析外层 v1 状态或接管程序 staging/backup；`ime-product-install` 校验旧终态与无 artifact 的新 `prepared` 合同，组合层持有 outer guard 并绑定 root/产品/授权。每次动作重新核验物理身份；源库等价在接续入口复验；未知或未绑定临时对象失败关闭。固定外层历史槽、文件顺序和产品前置条件见[取消兼容设计](../../docs/remediation/macos-preparation-cancellation-compatibility.md#2026-09-29取消材料封存与-outer-兼容恢复)。
 
-返回 `preserved` 仍保留活动请求与封存进度，旧 reader/startup gate 继续阻断；不发布取消生命周期索引、不解除 marker、不表示完整取消或旧程序资格。独立取消释放协调器承接完整证明、v2 取消分支及接续；本封存入口不承担这些步骤。真实产品观察与 Executor 尚未接入；测试只证明仓库与隔离合成范围。
+返回 `preserved` 仍保留活动请求与封存进度，旧 reader/startup gate 继续阻断；不发布取消生命周期索引、不解除 marker、不表示完整取消或旧程序资格。独立取消释放协调器承接完整证明、v2 取消分支及接续；本封存入口不承担这些步骤。macOS Executor 已组合真实程序观察、专用静止/容量预检、可撤销任务授权与连续双 guard；Bridge/action 和独立旧程序资格仍缺失。测试只证明仓库与隔离合成范围，详见 [Executor 说明](../../platforms/macos-product/InstallerExecutor/README.md#准备取消任务)。
 
 
 ### 取消完整证明与类型化生命周期
 
-`CancellationReleaseReceipt` 是独立 `radishlex-cancellation-release-v1` 不可变证明，绑定 `preserved` 原件、请求/源库/准备/旧 outer/私有材料、可空真实 data receipt 和精确前驱索引。`prepare_cancellation_release` 将证明保存为历史 `cancellation-release.json`，保留原 archive，再发布唯一 v2 索引；请求 marker 仍活动。`finish_cancellation_release` 只有在 `CancellationReleasePort` 逐检查点证明 `QualifiedSource` 时才最后移出原请求并同步/回读；旧程序资格不成立即阻断。当前没有生产 port，合成测试不证明产品可取消。
+`CancellationReleaseReceipt` 是独立 `radishlex-cancellation-release-v1` 不可变证明，绑定 `preserved` 原件、请求/源库/准备/旧 outer/私有材料、可空真实 data receipt 和精确前驱索引。`prepare_cancellation_release` 将证明保存为历史 `cancellation-release.json`，保留原 archive，再发布唯一 v2 索引；请求 marker 仍活动。`finish_cancellation_release` 只有在 `CancellationReleasePort` 逐检查点证明 `QualifiedSource` 时才最后移出原请求并同步/回读；旧程序资格不成立即阻断。macOS 产品组合层与取消 Executor 已实现该 port 的 guard/程序/授权接线；独立旧程序资格提供者仍缺失，没有默认放行实现，合成测试不证明产品可取消。
 
 `load_latest_lifecycle` 返回 `LifecycleReleaseReceipt::Terminal` 或 `Cancellation`，核验完整祖先链。无索引而有历史、未知类型/版本、活动 marker、错误前驱、循环和实物身份漂移拒绝；原 `load_latest_release` 只返回真实数据终态。取消后新准备分别绑定 lifecycle 证明、旧 outer 和实际 data（可空），复用已封存材料，不改写 v1 历史，也不把取消 ID 写成新 v1 data 前驱。详细文件顺序、资格边界与矩阵见[取消兼容设计](../../docs/remediation/macos-preparation-cancellation-compatibility.md)。

@@ -180,11 +180,11 @@ handoff 的新目录和回执先独占创建、同步并回读，在 `previous_a
 | 准备 marker 已移出、返回前 crash | 新 v1 receipt 与历史 `handoff_ready` 记录交叉核验，幂等认定交接；不能重新开新 operation |
 | 已交接后的 candidate/switch/rollback 失败 | 使用原 v1 状态机；准备记录只提供历史身份关系，不修改原 v1 source 字段 |
 
-原批准方案中的明确中止分两种：维护意图前可在证明源业务数据未修改后封存准备记录、保持旧活动槽并结清新 outer；维护意图后必须先证明 prepared source 仍等价、standalone、旧版本兼容，再创建/结清新 v1 `aborted_preserved` 并结清 outer，不能直接回写旧 receipt。准备完成前程序未切换，outer 拟复用 `InstallReceipt::abort_preserved` 的合法终态，不伪造 `programs_restored`。下述兼容复核表明这条主动取消路径不能按原描述直接实施；用于取消最终释放的完整 guard-bound 后置证明和 UI 入口仍未交付。
+原批准方案中的明确中止分两种：维护意图前可在证明源业务数据未修改后封存准备记录、保持旧活动槽并结清新 outer；维护意图后必须先证明 prepared source 仍等价、standalone、旧版本兼容，再创建/结清新 v1 `aborted_preserved` 并结清 outer，不能直接回写旧 receipt。准备完成前程序未切换，outer 拟复用 `InstallReceipt::abort_preserved` 的合法终态，不伪造 `programs_restored`。下述兼容复核表明这条主动取消路径不能按原描述直接实施；当前采用后述独立取消证明；guard-bound 组合与取消 Executor 已实现，最终旧程序资格及 UI action 仍未交付。
 
 实施复核发现，现有 v1 的 `aborted_preserved` 必须携带既有 `UpgradeFailureCode`，其中没有主动取消原因；2026-09-25 进一步确认外层 `InstallFailureCode` 也有相同缺口，双层回归测试均拒绝未知取消码及 null 失败码。不能把用户取消伪装成 snapshot/switch/安装失败，也不能在保持旧 reader 兼容的承诺下直接新增未知枚举值。三类真实数据终态共用的封存基础已实现，但不能用于无新 data receipt 的取消。
 
-[准备中止兼容补充设计](macos-preparation-cancellation-compatibility.md)已于 2026-09-25 获项目所有者确认：独立取消证明、完整封存新 outer、受控恢复原 outer 兼容回执及生命周期前驱。它替代本节原定主动取消结清方式，不修改本设计其他已批准部分，也不允许直接人工回写旧 receipt。已实现只表示 `requested` 的取消意图持久化、普通入口阻断及专用源库维护收尾；后者以独立 `source_ready` 证明源保持/等价，原准备与请求记录不改写。2026-09-29 已继续实现取消材料与 outer 兼容封存/恢复，`preserved` 保持活动 marker；10-05 已继续接入取消完整证明、v2 索引及受资格约束的核心释放，尚无产品 port。B 段未退出，旧程序资格与真实产品接线仍开放。
+[准备中止兼容补充设计](macos-preparation-cancellation-compatibility.md)已于 2026-09-25 获项目所有者确认：独立取消证明、完整封存新 outer、受控恢复原 outer 兼容回执及生命周期前驱。它替代本节原定主动取消结清方式，不修改本设计其他已批准部分，也不允许直接人工回写旧 receipt。已实现只表示 `requested` 的取消意图持久化、普通入口阻断及专用源库维护收尾；后者以独立 `source_ready` 证明源保持/等价，原准备与请求记录不改写。2026-09-29 已继续实现取消材料与 outer 兼容封存/恢复，`preserved` 保持活动 marker；10-05 已继续接入取消完整证明、v2 索引、受资格约束的释放组合、专用静止/任务授权、只读 UI 与取消 Executor。B 段未退出，新准备入口、Bridge/action 和独立旧程序资格仍开放。
 
 维护后无法证明内容等价、关闭完成或源安全时，不提供“已中止且可启动”终态。保留原 family、保护快照和记录；从快照替换真实原库属于另行设计的恢复动作，不包含在本方案的自动 fallback 内。此停止结果须向用户明确呈现，不能伪装为普通 retry 可以解决。
 
@@ -263,3 +263,5 @@ handoff 的新目录和回执先独占创建、同步并回读，在 `previous_a
 2026-10-05：取消的完整不可变证明、v2 取消索引、类型化历史解析、连续取消及取消后新准备/新 v1/真实终态释放已接入。独立核心释放步骤要求 `QualifiedSource`，原 archive 与请求分别原 inode 保留，请求 marker 最后移走；当前仅有合成 port，尚无真实产品取消释放实现。B 段仍未退出，后续为真实双 guard/产品观察/Executor 接线与旧 source 程序副本资格；WAL/pager 内部断电与全部冻结现场停止线保持。验证见[2026-W41](../devlogs/2026-W41.md)。
 
 2026-10-05 后续：已实现取消释放组合层的真实双 guard、活动旧终态、source 完整身份/schema/取消证明资格绑定，以及资格回调后的产品/静止复验。Executor 提供复用现有安装适配器的程序实物观察；生产静止/任务授权、独立旧程序资格证据提供者及 dispatch/UI 仍待接线，结构化资格对象与隔离合成回归不等于产品资格。下一步及停止线见 [current](../status/current.md)，B 段保持开放。
+
+2026-10-05 收尾：专用 native 静止/容量观察、可撤销任务授权、六类只读 UI 与取消 Executor 双锁执行均已接入。取消任务分为材料保留与最终释放，后者另需完整 proof 授权和显式独立资格；当前没有生产旧程序资格提供者。新准备/handoff 的产品入口与 Bridge/action 仍待完成，保持现有账户和 Agent 会话，不新增用户或切换登录；精确顺位见 [current](../status/current.md)，今日验证及明日事项见 [W41](../devlogs/2026-W41.md#2026-10-06明日事项)。
