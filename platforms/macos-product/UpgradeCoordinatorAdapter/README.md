@@ -33,4 +33,6 @@ adapter 实现 `UpgradeCoordinatorPort`，把平台无关协调核心绑定到�
 
 `tests/preparation_history/cancellation_archive*.rs` 与已释放前驱回归验证取消材料封存、精确位置重载、outer 原件保留及兼容副本发布，覆盖维护前后、三类旧终态、部分归档、无 data 前驱、已释放 v1/v2 真实终态历史、身份漂移/冲突及授权失效/真实子进程退出。结果为 `preserved`，活动请求与封存记录仍阻断启动，产品 authority 为合成。双 guard 与严格外层回执的组合测试位于 `InstallCoordinatorAdapter/tests/cancellation_archive.rs`；它也不代表真实程序/Installer 资格。
 
+`tests/preparation_history/cancellation_lifecycle*.rs` 验证独立完整取消证明、v2 索引、无 data/旧 inventory/已释放 v1/v2 前驱、连续取消及取消后新准备/真实数据终态释放；覆盖严格解析、历史漂移、回调冲突和记录/索引/归档/最后 marker 的真实子进程退出。`prepare_cancellation_release` 始终保留活动请求，只有独立 `QualifiedSource` 步骤才能最后封存请求。测试明确使用合成旧程序资格，真实 port/Executor/旧程序副本仍待完成，不运行冻结程序。
+
 仓库 `.cargo/config.toml` 默认限制为 2 个编译任务和 2 个 Rust 测试线程；历史套件的取消故障矩阵在单个测试 worker 内串行覆盖全部 I/O/授权/进程退出边界。重型测试期间不要同时编译或运行 Clippy，避免 CPU 叠加及正在运行的子测试可执行文件被重编译替换。显式调用参数可覆盖默认值；专门的多进程合同仍保留其必要并发，不承诺硬 CPU 上限。测试 profile 只优化现有 `sha2 0.10.9` 依赖，保留完整流式校验与业务代码默认调试检查；生产构建 profile 不变。

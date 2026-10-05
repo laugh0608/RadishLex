@@ -112,21 +112,21 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 `prepare_terminal_release` 要求 outer 仍非终态。它封存当前实际回执、私有 artifact 与运行数据身份、目录身份、可选 handoff 证明/保护快照、安装 release/product 摘要和前驱索引，新建 `radishlex-terminal-release-v2` 意图后逐槽同步文件并原 inode 移入本 operation 历史 `data/`。已有 v1 意图按原格式恢复，不能改写为 v2。每项按目标/源目录顺序 fsync 后记录不可回退的移动进度；最多一个精确移动可领先记录。源 DB/settings/Rime 不移动，历史准备证明不改写。
 
-完整归档后记录 `release_ready`，原子发布与证明版本匹配的 `latest-release.json`。v2 显式记录 lifecycle operation、legacy outer operation、data operation、安装 release、数据根及带类型的证明摘要；当前只接受 `terminal_release`，三个 ID 必须相同且 data 非空。v1 字段与 canonical 顺序保留。索引旧值和实物身份在 release 意图内保留，重放只接受已绑定旧值或精确新值；已有目标漂移、临时文件、未知对象和身份冲突保留阻断。已有历史而丢失索引不得当作首次 v2；无索引只允许当前 operation 及准备证明明确绑定的旧未释放 inventory。
+完整归档后记录 `release_ready`，原子发布与证明版本匹配的 `latest-release.json`。v2 显式记录 lifecycle operation、legacy outer operation、data operation、安装 release、数据根及带类型的证明摘要；`terminal_release` 要求三个 ID 相同且 data 非空；取消类型由下述独立完整证明承载。v1 字段与 canonical 顺序保留。索引旧值和实物身份在 release 意图内保留，重放只接受已绑定旧值或精确新值；已有目标漂移、临时文件、未知对象和身份冲突保留阻断。已有历史而丢失索引不得当作首次 v2；无索引只允许当前 operation 及准备证明明确绑定的旧未释放 inventory。
 
 准备完成仍保留活动 marker，不表示外层已终结或允许启动。`finish_terminal_release` 必须通过 `TerminalReleasePort` fresh 证明匹配同一完整 release 证明的外层终态、安装产品和静止状态，才把 marker 最后原 inode 移为历史 `terminal-release.json`，同步两目录并回读。port 接收完整证明；初始化回调仅为尚未封存的观察草稿，只有 `release_ready` 可绑定外层最终结果。合成 port 的状态和字节比较不能替代真实 outer guard/落盘验证。
 
-`load_latest_release` 只读定位并交叉核验已封存证明、目录、私有材料及准备证据；索引单独存在、marker 仍活动或证明不匹配均不能认定已释放。此查询不是 startup 授权，也不以历史运行 DB hash 拒绝后续正常学习、删除和 WAL。无新 data receipt 的准备中止及真实外层接线仍待完成；本批不新增 v1 失败码或伪造主动取消的错误原因。
+`load_latest_release` 只读定位并交叉核验已封存证明、目录、私有材料及准备证据；索引单独存在、marker 仍活动或证明不匹配均不能认定已释放。此查询不是 startup 授权，也不以历史运行 DB hash 拒绝后续正常学习、删除和 WAL。无新 data receipt 的取消由 `load_latest_lifecycle` 返回独立类型，旧查询对该类型拒绝；真实外层接线仍待完成；本批不新增 v1 失败码或伪造主动取消的错误原因。
 
 共享 reader 沿绑定的 `previous_index` 逐级复验所有祖先，校验旧 canonical 索引的长度/摘要、data 前驱和 source release 连续性及准备证据中的索引/证明身份；重复 operation、缺失和漂移拒绝。查询前后固定当前索引；释放各写入/发布/marker 检查点前后也复验祖先，不能靠最新证明或产品回调豁免旧材料损坏。v1 格式与历史字节保持，具体合同见[数据协调边界](../../docs/macos-data-upgrade-coordinator.md#终态封存外层确认与释放索引)。
 
 ### 已释放前驱向新准备接续
 
-活动 v1 槽为空且明确提供前一 data operation 时，`capture_previous_inventory` 通过共享只读 release reader 定位 `latest-release.json`，核验最终证明、目录、旧回执/私有材料及准备证据；不写新 inventory，不扫描猜测前驱。`previous_inventory_identity` 此时返回 release 证明身份，`release_index_identity` 返回索引身份；调用方在首次 reservation 前使用 `bind_released_predecessor` 同时绑定两者，普通旧槽仍使用 `bind_previous_inventory`。
+活动 v1 槽为空且明确提供前一 data operation（取消类型可为空）时，`capture_previous_inventory` 通过共享只读 release reader 定位 `latest-release.json`，核验最终证明、目录、旧回执/私有材料及准备证据；不写新 inventory，不扫描猜测前驱。`previous_inventory_identity` 此时返回 release 证明身份，`release_index_identity` 返回索引身份；调用方在首次 reservation 前使用 `bind_released_predecessor` 同时绑定两者，普通旧槽仍使用 `bind_previous_inventory`。
 
 准备记录新增可选且不可改认的 `previous_release_index_identity`，原字段缺失时编码保持，旧严格准备 reader 拒绝新字段。证明摘要复用 `previous_inventory_sha256`，数据回执摘要仍绑定真正的旧 v1 receipt；前一 outer/data 链分别保留。源 release/product 必须与已释放证明匹配；索引或证明即使同字节换 inode 也拒绝，缺失、冲突、临时文件或提前出现的未绑定新 operation 目录不能进入 SQLite 写路径。
 
-新 family 和保护快照从当前运行数据重新取得，允许上次释放后的合法 WAL 学习/删除。准备和 handoff 各检查点复验已固定的索引、证明及历史材料；已释放槽不再移动，`archived_slots` 保持空，`previous_archived` 只记录既有封存证明通过。新 v1 handoff、后续终态释放和下一次准备继续使用同一套历史校验；多个保留的旧 operation 不被认领或改写。真实 outer/Executor 和明确中止仍待完成，合成产品 port 不构成产品授权。
+新 family 和保护快照从当前运行数据重新取得，允许上次释放后的合法 WAL 学习/删除。准备和 handoff 各检查点复验已固定的索引、证明及历史材料；已释放槽不再移动，`archived_slots` 保持空，`previous_archived` 只记录既有封存证明通过。新 v1 handoff、后续终态释放和下一次准备继续使用同一套历史校验；多个保留的旧 operation 不被认领或改写。真实 outer/Executor 和旧程序取消资格仍待完成，合成产品 port 不构成产品授权。
 
 ### 准备取消意图与源库收尾
 
@@ -138,7 +138,7 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 `CancellationSourceReceipt` 在固定 `cancellation-source.json` / `.tmp` 中以严格 `radishlex-cancellation-source-v1` 绑定请求文件身份和工作准备副本。`finishing` 只可追加既有单 journal 恢复身份或推进至 `source_ready`；原准备 marker、取消请求和保护快照保持。`reserved` / `snapshot_ready` 路径不打开 SQLite，以请求 family 原身份和字节证明保持；维护意图后重新取得授权/静止/容量，完成同一受控准备，复验 standalone、源 schema、全量内容/tombstone 等价、关闭与源文件/数据根同步。已经准备好的路径重新验证等价，不重复归档旧材料。
 
-请求仍拒绝现存 journal；取消收尾意图落盘后，专用恢复才可沿用单 journal 资格检查、精确恢复身份持久化和 SQLite 重放。`CancellationSourcePort` 每个检查点确认 fresh 产品授权；未知临时进度、busy、容量不足、身份/内容漂移均保留阻断。`load_source_guarded` 只核验物理关系，不能代替 `finish_source` 的 fresh 授权与内容复验。源库 `source_ready` 不表示完整取消；后续材料封存与兼容恢复已接入 `CancellationArchiveStore`，v2 生命周期索引和最终 marker 释放仍待完成，详见[已批准的补充设计](../../docs/remediation/macos-preparation-cancellation-compatibility.md)。
+请求仍拒绝现存 journal；取消收尾意图落盘后，专用恢复才可沿用单 journal 资格检查、精确恢复身份持久化和 SQLite 重放。`CancellationSourcePort` 每个检查点确认 fresh 产品授权；未知临时进度、busy、容量不足、身份/内容漂移均保留阻断。`load_source_guarded` 只核验物理关系，不能代替 `finish_source` 的 fresh 授权与内容复验。源库 `source_ready` 不表示完整取消；后续材料封存与兼容恢复已接入 `CancellationArchiveStore`，后续完整证明、v2 生命周期索引与受资格约束的核心 marker 释放由 `CancellationReleaseStore` 承接，详见[已批准的补充设计](../../docs/remediation/macos-preparation-cancellation-compatibility.md)。
 
 ### 启动门禁
 
@@ -217,4 +217,11 @@ cargo clippy -p radishlex-ime-product-upgrade --all-targets -- -D warnings
 
 数据核心处理受证明约束的字节和文件关系，不解析外层 v1 状态或接管程序 staging/backup；`ime-product-install` 校验旧终态与无 artifact 的新 `prepared` 合同，组合层持有 outer guard 并绑定 root/产品/授权。每次动作重新核验物理身份；源库等价在接续入口复验；未知或未绑定临时对象失败关闭。固定外层历史槽、文件顺序和产品前置条件见[取消兼容设计](../../docs/remediation/macos-preparation-cancellation-compatibility.md#2026-09-29取消材料封存与-outer-兼容恢复)。
 
-返回 `preserved` 仍保留活动请求与封存进度，旧 reader/startup gate 继续阻断；不发布取消生命周期索引、不解除 marker、不表示完整取消或旧程序资格。真实终态的 v2 索引与接续已接入，取消 proof 类型及其接续仍拒绝。真实产品观察与 Executor 尚未接入；测试只证明仓库与隔离合成范围。
+返回 `preserved` 仍保留活动请求与封存进度，旧 reader/startup gate 继续阻断；不发布取消生命周期索引、不解除 marker、不表示完整取消或旧程序资格。独立取消释放协调器承接完整证明、v2 取消分支及接续；本封存入口不承担这些步骤。真实产品观察与 Executor 尚未接入；测试只证明仓库与隔离合成范围。
+
+
+### 取消完整证明与类型化生命周期
+
+`CancellationReleaseReceipt` 是独立 `radishlex-cancellation-release-v1` 不可变证明，绑定 `preserved` 原件、请求/源库/准备/旧 outer/私有材料、可空真实 data receipt 和精确前驱索引。`prepare_cancellation_release` 将证明保存为历史 `cancellation-release.json`，保留原 archive，再发布唯一 v2 索引；请求 marker 仍活动。`finish_cancellation_release` 只有在 `CancellationReleasePort` 逐检查点证明 `QualifiedSource` 时才最后移出原请求并同步/回读；旧程序资格不成立即阻断。当前没有生产 port，合成测试不证明产品可取消。
+
+`load_latest_lifecycle` 返回 `LifecycleReleaseReceipt::Terminal` 或 `Cancellation`，核验完整祖先链。无索引而有历史、未知类型/版本、活动 marker、错误前驱、循环和实物身份漂移拒绝；原 `load_latest_release` 只返回真实数据终态。取消后新准备分别绑定 lifecycle 证明、旧 outer 和实际 data（可空），复用已封存材料，不改写 v1 历史，也不把取消 ID 写成新 v1 data 前驱。详细文件顺序、资格边界与矩阵见[取消兼容设计](../../docs/remediation/macos-preparation-cancellation-compatibility.md)。
