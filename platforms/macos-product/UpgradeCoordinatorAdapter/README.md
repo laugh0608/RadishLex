@@ -14,6 +14,8 @@ adapter 实现 `UpgradeCoordinatorPort`，把平台无关协调核心绑定到�
 
 调用方应先执行 `inspect_preflight()` 取得容量，再把同一 adapter 交给 `UpgradeReceiptStore::resume_userdb_upgrade`。M4-P03 安装载体还必须在调用前证明产品根的固定来源、版本化 distribution identity 与 strict ad-hoc code identity；本 crate 不把 manifest hash 当作发布 identity。
 
+取消释放使用 `MacOsProductPreflightAdapter::inspect_cancellation_quiescence` 的独立严格响应：target helper 以 `--cancellation-release` 观察系统选择的固定用户根与固定双 bundle，返回实际 root 身份；调用前后复验 target manifest 摘要及 helper，拒绝旧响应、异 root、非静止、错误 bundle ID、未知/重复字段和 stderr。该观察没有任务授权或旧程序资格，必须与 Executor 的可撤销任务授权、安装程序实物观察及双 guard 组合使用。普通无参数预检格式保持不变。
+
 `MacOsPreparationHasher` 为源库准备核心提供完整文件流 SHA-256，复用本 adapter 已有依赖，读取错误直接失败。`tests/source_preparation.rs` 以新合成目录、真实 SQLite 与该 hasher 验证准备快照、维护意图、源库准备、异常/退出重载及学习/tombstone 保留；授权/静止 port 使用合成实现，不能当作真实 outer guard、程序资格或 Installer 接线通过。新增 journal 测试使用仓库冻结的纯合成 SQLite family，在持久维护意图之后组合出中断状态，验证恢复身份先落盘、三处进程退出重载与漂移拒绝；它不代表真实 WAL 模式转换的连续崩溃现场。真实 spill/重放边界的独立进程测试位于 userdb。准备流程及历史接续分别在 `source_prepared` / `previous_archived` 保留启动阻断；核心后续 handoff 与终态释放已纳入下述合成测试，真实产品接线按[已批准设计](../../../docs/remediation/macos-wal-source-preparation-design.md)继续。
 
 验证入口：

@@ -48,7 +48,7 @@ platforms/macos-product/
 
 ## UpgradePreflightHost
 
-生产 executable 不接受参数，只从用户域 `Application Support/RadishLex` 解析固定 data root，并使用从 `packaging/macos/product.json` 编译注入的 Manager/InputMethod bundle ID。它执行：
+生产 executable 的普通调用不带参数；新增的唯一专用模式为 `--cancellation-release`，两种模式都不接受路径或进程名，只从用户域 `Application Support/RadishLex` 解析固定 data root，并使用从 `packaging/macos/product.json` 编译注入的 Manager/InputMethod bundle ID。它执行：
 
 - 同时读取 important-usage 与普通 volume available capacity，取可用正值中的保守值；
 - 检查 data root 为当前用户所有的 canonical `0700` 目录；
@@ -58,7 +58,9 @@ platforms/macos-product/
 
 输出为 `radishlex-upgrade-preflight-v1` JSON，只包含 result、available bytes、quiescent、固定 blocker/error 和必要数值错误码，不输出路径、PID、命令行或 `lsof` 正文。host 不创建目录、不 chmod、不清理文件、不停止进程，也不能阻止旧产品在点时检查后重新启动；持续静止必须由 startup gate 与 upgrade guard 共同保证。
 
-`./scripts/check-macos-upgrade-preflight.sh` 构建生产 host，但只执行拒绝参数路径；真实检查逻辑由合成 contract executable 在私有临时目录验证。普通门禁不得无参数运行生产 host，因为那会读取真实 Application Support 的只读状态。
+取消模式使用独立 `radishlex-cancellation-preflight-v1`，额外返回实际 data root 的 device/inode/owner/mode 和两个固定 bundle ID；观察前后必须为同一安全 root。Rust 调用方核对精确取消证明的 root/target manifest，并另外绑定当前任务授权与完整 source 双程序。输出不包含 proof、路径或数据库内容，不提供旧程序兼容资格。
+
+`./scripts/check-macos-upgrade-preflight.sh` 构建生产 host，但只执行未知参数的拒绝路径。真实检查逻辑在私有临时目录验证；另以固定合成 bundle ID 编译同一 CLI，并用隔离 Foundation home 检查两种 JSON 输出、root 实物身份、零文件创建与多余参数拒绝。普通门禁不得无参数或以取消模式运行具有生产 ID/当前用户路径的 host。
 
 ## UpgradeValidationHosts
 

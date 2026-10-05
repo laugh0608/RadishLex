@@ -124,7 +124,7 @@ v2 索引使用 `radishlex-latest-release-v2`，显式包含 `operation_id`、`l
 
 请求入口仍拒绝现存 journal；只有取消收尾意图已持久化，专用恢复才可在同一主 inode、无 WAL/SHM 和下述单 journal 资格成立后记录恢复身份并重放。物理 `load_source_guarded` 不代表 fresh 授权或逻辑复验；这些由 `finish_source` 完成。未知临时进度、身份/内容漂移、busy 或授权/容量不足均保留阻断。`source_ready` 不等于 `cancel_ready`。后续 `CancellationArchiveStore` 已实现取消材料封存与 outer 兼容恢复，固定原件、目录和逐槽位置证明；组合层持有真实 outer guard 并调用安装核心严格校验旧/新 v1 合同。返回 `preserved` 仍保留活动取消请求与封存进度；独立 `CancellationReleaseStore` 已接入完整不可变证明、v2 取消索引和受资格约束的最后 marker 协调，真实产品观察/Executor、旧程序资格和产品 UI 仍未接入，不能显示产品“取消完成”。固定槽位、顺序与验证口径见[取消兼容设计](remediation/macos-preparation-cancellation-compatibility.md)。
 
-`CancellationReleaseStore::prepare_cancellation_release` 消费完整封存证据，独占发布历史 `cancellation-release.json`，封存原 archive，再发布唯一索引；活动原请求继续阻断。独立 `finish_cancellation_release` 必须在每个检查点取得 `QualifiedSource` port 证明，才最后原 inode 移走请求、同步两目录并回读。组合层 `CancellationReleaseAuthority` 持有真实 outer guard，核验严格旧/新 v1 原件及活动旧终态，并绑定 source 完整双程序身份、schema 和本次完整证明的资格返回值；资格回调后复验产品/静止，两类回调前后核对外层。结构化返回值不是独立旧程序资格本身；生产静止/任务授权和资格提供者及 dispatch/UI 尚未接线，不能放行产品取消。源库等价在每次恢复入口重新验证，各 I/O 回调前后复验全部实物。
+`CancellationReleaseStore::prepare_cancellation_release` 消费完整封存证据，独占发布历史 `cancellation-release.json`，封存原 archive，再发布唯一索引；活动原请求继续阻断。独立 `finish_cancellation_release` 必须在每个检查点取得 `QualifiedSource` port 证明，才最后原 inode 移走请求、同步两目录并回读。组合层 `CancellationReleaseAuthority` 持有真实 outer guard，核验严格旧/新 v1 原件及活动旧终态，并绑定 source 完整双程序身份、schema 和本次完整证明的资格返回值；资格回调后复验产品/静止，两类回调前后核对外层。Executor 已提供绑定完整 proof/source、可撤销且最长 5 分钟的内存任务授权与专用 native 静止观察，helper 前后复核授权及 target manifest，核对实际 root。结构化资格返回值不是独立旧程序资格本身；资格提供者及 dispatch/UI 尚未接线，不能放行产品取消。源库等价在每次恢复入口重新验证，各 I/O 回调前后复验全部实物。
 
 历史查询不检查旧运行库 hash，但继续验证请求、封存证明、准备/保护快照、旧 outer 原件、兼容关系及真实 data 材料。取消首次封存但没有旧 release proof 的 inventory 由取消证明承载，不能猜造终态；连续取消及取消后新准备分别绑定 lifecycle、outer、data 链。缺失索引且存在历史不能回退首次路径。新记录、索引、归档及最后 marker 的子进程中断测试只证明仓库恢复语义，不代表内部 pager 断电或旧程序资格。
 
@@ -365,6 +365,8 @@ Manager 与 InputMethod 在产品启动前必须检查是否存在非终态升�
 新调用先验证既有对象确为同用户私有 socket：连接成功视为活动 operation；仅在精确 socket 返回 `ConnectionRefused` 时按异常退出残留删除并重新绑定。symlink、普通文件、owner/mode/type 漂移或其他连接错误一律失败关闭且不删除现场。guard 释放时也只删除与取得时 device/inode 身份完全一致的 socket，不扫描或清理其他临时内容。
 
 macOS preflight host 不接受调用方路径或进程名。它从产品 manifest 固定 Manager/InputMethod bundle ID，通过 `NSRunningApplication` 判断双端是否仍运行，并以系统固定 `/usr/sbin/lsof` 检查已存在的 `userdb.sqlite3` family、`manager-settings.json` 与其原子写临时文件是否仍有打开句柄；输出只包含 format、result、available bytes、quiescent 和稳定 blocker，不回显路径、进程详情或 `lsof` 内容。unsafe root/file、容量不可得或检测工具异常都失败关闭。
+
+专用 `--cancellation-release` 模式另用严格 `radishlex-cancellation-preflight-v1`，增加实际 root 的 device/inode/owner/mode 与固定双 bundle ID；观察前后 root 身份不一致即拒绝。旧无参数响应不变，取消 reader 不接受旧响应作为证明。此模式不接收 proof 或路径，也不打开 SQLite；proof/source/当前任务授权绑定由 Rust 组合层完成，完整合同见[取消设计](remediation/macos-preparation-cancellation-compatibility.md)。
 
 这份结果只是同一时刻的只读证据：它不停止进程，也不能阻止旧版本在检测后、snapshot 前重新启动。数据 startup gate 继续由 ABI v9 兼容保留，并位于外层 install gate 之后、Manager `super.applicationWillFinishLaunching` 与 InputMethod `IMKServer` 之前；只读允许 data root/state absent 与终态 receipt，active guard、所有非终态、损坏 receipt、中断 artifact、未知对象和身份漂移均阻止业务初始化。它不创建目录、不改权限、不连接或清理 guard。
 

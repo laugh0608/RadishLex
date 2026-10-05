@@ -25,7 +25,11 @@ first install、repair 和 remove 在 `programs_committed` 后共用核心终态
 
 `MacOsCancellationProductAuthority` 为独立取消释放 authority 提供程序观察组合：复用 `MacOsProductInstallAdapter` 校验精确 data root、sealed target 与安装中的 source 双 bundle，在 `CancellationQuiescenceAuthority` 回调前后重新检查。该回调必须绑定本次完整证明、源程序、当前任务授权与双端静止；只有 target release/容量的旧 preflight 回答不足以填入此接口，也不能用 UI 确认或资格测试成功代替。观察组合不复制或运行产品、不打开用户 SQLite；现有签名验证仍通过受控 `codesign` 执行。
 
-本批未接取消 dispatch、driver action 或 UI，也没有默认静止授权或旧程序资格提供者。独立程序资格与产品入口完整接线仍按[取消设计](../../../docs/remediation/macos-preparation-cancellation-compatibility.md)推进；缺少提供者时不能把结构化资格对象当作实机已通过。
+`authorize_cancellation_release` 要求本次显式确认、保留数据确认、中立输入源及 Manager 关闭声明，生成只在内存存活的任务授权，完整绑定 proof 和 source 双程序；期限由调用者指定且最多 5 分钟。任务所有者独立持有 `CancellationTaskControl`，撤销或释放 control 即永久失效；到期/中断后的新任务必须重新确认，不能从持久化 `user_requested` 自动续权。声明不替代实际静止检查。
+
+`MacOsCancellationQuiescenceAuthority` 在每次调用中运行专用 native cancellation preflight，核对实际 root 与绑定 target manifest，并在 helper 返回后复查授权未撤销/到期。程序实物观察仍由上层在其前后执行。普通 v1 preflight 响应不被专用路径接受；没有默认放行或环境开关。
+
+本批未接取消 dispatch、driver action 或 UI，也没有独立旧程序资格提供者。现有 source validation host 不能证明无新 data receipt 的正常打开/再学习/重启资格；必须通过专用副本验证取得对应证据，缺少时仍阻断最后 marker。产品入口完整接线按[取消设计](../../../docs/remediation/macos-preparation-cancellation-compatibility.md)推进。
 
 - active guard、中断/损坏 receipt、未知对象、root/程序身份漂移由核心或平台 port 保留稳定错误并拒绝执行；
 - stale begin/confirm/resume intent、operation/source/target 不匹配和缺失 upgrade context 均拒绝；

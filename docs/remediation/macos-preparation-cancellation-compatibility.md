@@ -82,6 +82,14 @@ Executor 新增程序实物观察组合，复用安装适配器的签名/tree/ma
 
 隔离合同覆盖维护前后、outer 创建前后、错误 root/双 guard/产品/schema/资格证明、各 marker 边界资格丢失、回调期间 outer/源库漂移和移动后重载。移动前资格失效保留活动 marker；移动后检查失败保留历史原件且不报告成功，重新接续仍须 fresh 资格。全量结果见[2026-W41](../devlogs/2026-W41.md)，B 段与实机停止线不变。
 
+## 2026-10-05 后续：专用静止观察与当前任务授权
+
+`UpgradePreflightHost --cancellation-release` 在固定用户域运行同一只读进程/句柄检查，以独立 `radishlex-cancellation-preflight-v1` 返回实际 root 的 device/inode/owner/mode 和固定双 bundle ID；观察前后再次验证同一安全 root。它不接受调用方路径、不打开 SQLite、不运行旧 runtime。Rust 专用 reader 在 helper 前后验证精确 target manifest 与 executable，严格核对 root、bundle ID 和 ready/quiescent，拒绝旧响应及未知/重复字段。普通无参数 v1 输出保持不变。
+
+`authorize_cancellation_release` 只为当前明确确认的任务生成内存授权，固定完整取消证明和 source 双程序；要求保留数据、中立输入源及 Manager 关闭确认，但这些声明不替代 native 检查。授权期限由调用者指定、最长 5 分钟，任务所有者另持 control；显式撤销、control 释放或期限届满均失效，不可序列化、不可自动续权。专用 `MacOsCancellationQuiescenceAuthority` 在 native 调用前后复验授权，外层程序 authority 在其两侧继续验证真实 source/target/root。
+
+本批只完成上述可独立验证的提供者，不开放 UI 或 dispatch。核对旧 source validation host 后确认，其既有 candidate/PostSwitch 合同无法证明无新 data receipt 的正常 gate、再学习和重启；独立资格必须由专用程序副本验证产生，不能把现有 host 退出码包装成合格证据。该资格提供者及证据生成/读取/失效校验仍是下一顺位，最终 marker 继续要求真实资格。native 合同在新合成目录验证，任务/reader 负向测试不代表旧二进制或真实用户取消验收。
+
 ## 取消入口与数据保持
 
 仅在本次准备存在、真实双程序仍为已绑定 source，且没有持久化 `handoff_intent` 时提供取消。`reserved`、`snapshot_ready`、`maintenance_intent`、`source_prepared`、`previous_archived` 均需按其实际对象关系核验，阶段名称本身不能授权。
