@@ -432,8 +432,10 @@ mod source_preparation;
 pub use source_preparation::{
     CancellationArchiveCheckpoint, CancellationArchivePort, CancellationArchiveReceipt,
     CancellationArchiveSlot, CancellationArchiveStore, CancellationOuterBinding,
-    CancellationSourceCheckpoint, CancellationSourcePhase, CancellationSourcePort,
-    CancellationSourceReceipt, PreparationCancellationCheckpoint, PreparationCancellationPort,
+    CancellationReleaseCheckpoint, CancellationReleasePort, CancellationReleaseReceipt,
+    CancellationReleaseRequirement, CancellationReleaseStore, CancellationSourceCheckpoint,
+    CancellationSourcePhase, CancellationSourcePort, CancellationSourceReceipt,
+    LifecycleReleaseReceipt, PreparationCancellationCheckpoint, PreparationCancellationPort,
     PreparationCancellationRequest, PreparationCancellationStore, PreparationHasher,
     PreviousInventory, SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,
     SourcePreparationSpaceBudget, TerminalReleaseBinding, TerminalReleaseCheckpoint,

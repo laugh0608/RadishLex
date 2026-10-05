@@ -12,6 +12,9 @@ use sha2::{Digest, Sha256};
 const OLD_BYTES: &[u8] = b"{\"synthetic_outer\":\"old_terminal\"}\n";
 const NEW_BYTES: &[u8] = b"{\"synthetic_outer\":\"new_prepared\"}\n";
 
+#[path = "cancellation_lifecycle.rs"]
+mod lifecycle;
+
 struct Authority {
     fail: Option<usize>,
     exit: bool,

@@ -29,12 +29,53 @@ pub(super) enum ReleaseIndex {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub(super) enum LifecycleProofReference {
-    TerminalRelease { sha256: String },
-    // Cancellation is deliberately not accepted until its complete immutable
-    // proof and material resolver exist. A preserved archive is insufficient.
+    TerminalRelease {
+        sha256: String,
+    },
+    PreparationCancellation {
+        sha256: String,
+        file_identity: PreparationFileIdentity,
+    },
 }
 
 impl ReleaseIndex {
+    pub(super) fn for_cancellation(
+        record: &CancellationReleaseReceipt,
+        identity: PreparationFileIdentity,
+    ) -> Result<Self> {
+        record.validate()?;
+        let result = Self::V2 {
+            operation_id: record.operation_id().to_owned(),
+            legacy_outer_operation_id: record.legacy_outer_operation_id().to_owned(),
+            data_operation_id: record.data_receipt().map(|v| v.operation_id().to_owned()),
+            installed_release: record.preparation().binding().source_release.clone(),
+            data_root: record.preparation().binding().data_root.clone(),
+            proof: LifecycleProofReference::PreparationCancellation {
+                sha256: identity.sha256.clone(),
+                file_identity: identity,
+            },
+        };
+        result.validate()?;
+        Ok(result)
+    }
+    pub(super) fn proof_file_name(&self) -> &'static str {
+        match self {
+            Self::V2 {
+                proof: LifecycleProofReference::PreparationCancellation { .. },
+                ..
+            } => cancellation_release::CANCELLATION_RELEASE,
+            _ => RELEASE,
+        }
+    }
+    pub(super) fn legacy_outer_operation_id(&self) -> &str {
+        match self {
+            Self::V1 { operation_id, .. } => operation_id,
+            Self::V2 {
+                legacy_outer_operation_id,
+                ..
+            } => legacy_outer_operation_id,
+        }
+    }
     pub(super) fn for_terminal(record: &TerminalReleaseReceipt, digest: String) -> Result<Self> {
         let result = match record.format.as_str() {
             LEGACY_FORMAT => Self::V1 {
@@ -98,20 +139,39 @@ impl ReleaseIndex {
                 legacy_outer_operation_id,
                 proof,
                 ..
-            } => {
-                // A real data terminal still has the same outer/data operation.
-                // Future cancellation requires a different proof/resolver, not
-                // relaxed terminal validation or a synthetic data transaction.
-                if legacy_outer_operation_id != self.operation_id() {
-                    return Err(Error::EvidenceChanged);
+            } => match proof {
+                LifecycleProofReference::TerminalRelease { sha256 } => {
+                    if legacy_outer_operation_id != self.operation_id()
+                        || self.data_operation_id() != Some(self.operation_id())
+                    {
+                        return Err(Error::EvidenceChanged);
+                    }
+                    sha256
                 }
-                match proof {
-                    LifecycleProofReference::TerminalRelease { sha256 } => sha256,
+                LifecycleProofReference::PreparationCancellation {
+                    sha256,
+                    file_identity,
+                } => {
+                    file_identity
+                        .validate()
+                        .map_err(|_| Error::EvidenceChanged)?;
+                    if !valid_id(legacy_outer_operation_id)
+                        || legacy_outer_operation_id == self.operation_id()
+                        || self
+                            .data_operation_id()
+                            .is_some_and(|id| !valid_id(id) || id == self.operation_id())
+                        || file_identity.sha256 != *sha256
+                        || file_identity.owner_id != self.data_root().owner_id
+                        || file_identity.device_id != self.data_root().device_id
+                    {
+                        return Err(Error::EvidenceChanged);
+                    }
+                    sha256
                 }
-            }
+            },
         };
         if !valid_id(self.operation_id())
-            || self.data_operation_id() != Some(self.operation_id())
+            || (self.is_legacy() && self.data_operation_id() != Some(self.operation_id()))
             || !record::valid_hash(digest)
             || self.data_root().inode == 0
             || self.data_root().mode != 0o700

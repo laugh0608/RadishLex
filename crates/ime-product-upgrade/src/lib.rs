@@ -20,8 +20,10 @@ mod filesystem;
 pub use filesystem::{
     inspect_startup_gate, CancellationArchiveCheckpoint, CancellationArchivePort,
     CancellationArchiveReceipt, CancellationArchiveSlot, CancellationArchiveStore,
-    CancellationOuterBinding, CancellationSourceCheckpoint, CancellationSourcePhase,
-    CancellationSourcePort, CancellationSourceReceipt, PreparationCancellationCheckpoint,
+    CancellationOuterBinding, CancellationReleaseCheckpoint, CancellationReleasePort,
+    CancellationReleaseReceipt, CancellationReleaseRequirement, CancellationReleaseStore,
+    CancellationSourceCheckpoint, CancellationSourcePhase, CancellationSourcePort,
+    CancellationSourceReceipt, LifecycleReleaseReceipt, PreparationCancellationCheckpoint,
     PreparationCancellationPort, PreparationCancellationRequest, PreparationCancellationStore,
     PreparationHasher, PreparationJournalError, PreparationJournalStore, PreviousInventory,
     SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,

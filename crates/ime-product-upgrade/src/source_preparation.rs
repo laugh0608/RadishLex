@@ -84,8 +84,10 @@ pub enum SourcePreparationCheckpoint {
 mod history;
 pub use history::{
     CancellationArchiveCheckpoint, CancellationArchivePort, CancellationArchiveReceipt,
-    CancellationArchiveSlot, CancellationArchiveStore, CancellationOuterBinding, PreviousInventory,
-    TerminalReleaseBinding, TerminalReleaseCheckpoint, TerminalReleaseDirectory,
+    CancellationArchiveSlot, CancellationArchiveStore, CancellationOuterBinding,
+    CancellationReleaseCheckpoint, CancellationReleasePort, CancellationReleaseReceipt,
+    CancellationReleaseRequirement, CancellationReleaseStore, LifecycleReleaseReceipt,
+    PreviousInventory, TerminalReleaseBinding, TerminalReleaseCheckpoint, TerminalReleaseDirectory,
     TerminalReleaseOuterRequirement, TerminalReleasePhase, TerminalReleasePort,
     TerminalReleaseReceipt, TerminalReleaseStore,
 };

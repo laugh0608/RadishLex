@@ -238,7 +238,7 @@ impl ReleaseHistory<'_> {
                     .path
                     .join(HISTORY)
                     .join(previous.index.operation_id())
-                    .join(RELEASE);
+                    .join(previous.index.proof_file_name());
                 if identity != &previous.identity
                     || proof.previous_inventory_identity()
                         != Some(&self.journal.evidence(&previous_path, hasher)?)
@@ -372,45 +372,56 @@ impl ReleaseHistory<'_> {
         &self,
         index: &ReleaseIndex,
         hasher: &impl PreparationHasher,
-    ) -> Result<TerminalReleaseReceipt> {
+    ) -> Result<LifecycleReleaseReceipt> {
         let record = self.resolve_one(index, hasher)?;
-        self.verify_ancestors(&record, hasher)?;
+        self.verify_lifecycle_ancestors(&record, hasher)?;
         Ok(record)
     }
 
-    /// Follow only bound locators. Historical runtime hashes are deliberately
-    /// not checked: normal learning after release may have changed that data.
-    /// Iteration avoids stack growth and rejects repeated operation identities.
     pub(super) fn verify_ancestors(
         &self,
         record: &TerminalReleaseReceipt,
         hasher: &impl PreparationHasher,
     ) -> Result<()> {
-        let mut seen = std::collections::BTreeSet::from([record.binding.operation_id.clone()]);
+        self.verify_lifecycle_ancestors(
+            &LifecycleReleaseReceipt::Terminal(Box::new(record.clone())),
+            hasher,
+        )
+    }
+
+    /// Follow only bound locators, iteratively. Runtime hashes intentionally do
+    /// not constrain historical queries after subsequent learning or upgrades.
+    pub(super) fn verify_lifecycle_ancestors(
+        &self,
+        record: &LifecycleReleaseReceipt,
+        hasher: &impl PreparationHasher,
+    ) -> Result<()> {
+        let mut seen = std::collections::BTreeSet::from([record.operation_id().to_owned()]);
         let mut current = record.clone();
-        while let Some(previous) = &current.previous_index {
+        while let Some(previous) = current.previous_index() {
             if !seen.insert(previous.index.operation_id().to_owned())
-                || current.receipt.previous_operation_id() != previous.index.data_operation_id()
-                || current.receipt.source_release() != previous.index.installed_release()
+                || current.previous_data_id() != previous.index.data_operation_id()
+                || current.source_release() != previous.index.installed_release()
             {
                 return Err(Error::EvidenceChanged);
             }
-            // The old index inode is no longer at latest-release.json after
-            // atomic publication; verify its saved canonical bytes, not the
-            // new locator's identity or an invented historical file.
             let bytes = encode(&previous.index)?;
-            let digest: String = hasher
-                .sha256(&mut bytes.as_slice())
-                .map_err(|_| Error::Io)?
-                .iter()
-                .map(|byte| format!("{byte:02x}"))
-                .collect();
             if previous.identity.byte_len != bytes.len() as u64
-                || previous.identity.sha256 != digest
+                || previous.identity.sha256
+                    != cancellation_release::evidence::hash_bytes(&bytes, hasher)?
             {
                 return Err(Error::EvidenceChanged);
             }
-            current = self.resolve_one(&previous.index, hasher)?;
+            let ancestor = self.resolve_one(&previous.index, hasher)?;
+            if matches!(current, LifecycleReleaseReceipt::Cancellation(_))
+                && (current.data_receipt() != ancestor.data_receipt()
+                    || current.files() != ancestor.files()
+                    || current.data_directories()? != ancestor.data_directories()?
+                    || current.product_sha256() != ancestor.product_sha256())
+            {
+                return Err(Error::EvidenceChanged);
+            }
+            current = ancestor;
         }
         Ok(())
     }
@@ -419,8 +430,38 @@ impl ReleaseHistory<'_> {
         &self,
         index: &ReleaseIndex,
         hasher: &impl PreparationHasher,
-    ) -> Result<TerminalReleaseReceipt> {
+    ) -> Result<LifecycleReleaseReceipt> {
         index.validate()?;
+        if index.proof_file_name() == cancellation_release::CANCELLATION_RELEASE {
+            let root = self.journal.store.root.path.join(HISTORY);
+            let path = root
+                .join(index.operation_id())
+                .join(index.proof_file_name());
+            let identity = self.journal.evidence(&path, hasher)?;
+            let record = self.read_cancellation(&path, hasher)?;
+            if self.cancellation_index(&record, hasher)? != *index {
+                return Err(Error::EvidenceChanged);
+            }
+            self.verify_cancellation_materials(&record, true, None, hasher)?;
+            // A current matching active request is never historical completion.
+            let active = self
+                .journal
+                .store
+                .state_directory
+                .join("preparation-cancellation.json");
+            if path_exists(&active)? {
+                let request = PreparationCancellationRequest::decode(
+                    &self.journal.read_history_bytes(&active)?,
+                )?;
+                if request.preparation().binding().operation_id == index.operation_id() {
+                    return Err(Error::EvidenceChanged);
+                }
+            }
+            if self.journal.evidence(&path, hasher)? != identity {
+                return Err(Error::EvidenceChanged);
+            }
+            return Ok(LifecycleReleaseReceipt::Cancellation(Box::new(record)));
+        }
         if path_exists(&self.active(RELEASE))?
             && self
                 .read_release(&self.active(RELEASE), hasher)?
@@ -447,6 +488,6 @@ impl ReleaseHistory<'_> {
         if self.journal.evidence(&path, hasher)? != identity {
             return Err(Error::EvidenceChanged);
         }
-        Ok(record)
+        Ok(LifecycleReleaseReceipt::Terminal(Box::new(record)))
     }
 }

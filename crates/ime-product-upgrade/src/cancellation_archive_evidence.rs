@@ -298,7 +298,9 @@ impl CancellationArchiveStore {
         hasher: &impl PreparationHasher,
     ) -> Result<()> {
         let prep = record.request.preparation();
-        let inventory = if prep.binding().previous_data_operation_id.is_none() {
+        let inventory = if prep.binding().previous_data_operation_id.is_none()
+            && prep.previous_release_index_identity().is_none()
+        {
             PreviousInventory::empty(
                 &self.journal,
                 &prep.binding().operation_id,
@@ -311,6 +313,9 @@ impl CancellationArchiveStore {
             || inventory.directories != record.previous_directories
         {
             return Err(Error::EvidenceChanged);
+        }
+        if inventory.released.is_some() && inventory.receipt.is_none() {
+            return self.journal.verify_empty_v1_slots();
         }
         if inventory.released.is_some() {
             // load_previous_inventory resolves the exact v1 index and complete

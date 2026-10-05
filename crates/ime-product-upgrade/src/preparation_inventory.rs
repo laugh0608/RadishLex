@@ -204,7 +204,16 @@ impl PreparationJournalStore {
             }
             inventory.receipt = Some(receipt);
         } else {
-            if previous_data.is_some() {
+            if previous_data.is_some()
+                || path_exists(
+                    &self
+                        .store
+                        .root
+                        .path
+                        .join(HISTORY)
+                        .join("latest-release.json"),
+                )?
+            {
                 return self.capture_released_inventory(
                     guard,
                     operation,

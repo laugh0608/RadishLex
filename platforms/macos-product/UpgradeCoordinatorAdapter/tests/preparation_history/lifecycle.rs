@@ -39,7 +39,11 @@ pub(super) fn legacy_release(fixture: &Fixture, state: State) -> (Binding, Proof
     (binding, proof)
 }
 
-fn next_release(fixture: &Fixture, prior: &Binding, operation: &str) -> (Binding, Proof) {
+pub(super) fn next_release(
+    fixture: &Fixture,
+    prior: &Binding,
+    operation: &str,
+) -> (Binding, Proof) {
     let (store, guard, binding) = reserve(fixture, prior, operation);
     let (v1, mut receipt) =
         advance(store, &guard, &binding, &mut Port::new(binding.clone())).unwrap();

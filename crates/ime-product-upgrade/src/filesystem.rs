@@ -868,8 +868,10 @@ mod preparation_journal;
 pub use preparation_journal::{
     CancellationArchiveCheckpoint, CancellationArchivePort, CancellationArchiveReceipt,
     CancellationArchiveSlot, CancellationArchiveStore, CancellationOuterBinding,
-    CancellationSourceCheckpoint, CancellationSourcePhase, CancellationSourcePort,
-    CancellationSourceReceipt, PreparationCancellationCheckpoint, PreparationCancellationPort,
+    CancellationReleaseCheckpoint, CancellationReleasePort, CancellationReleaseReceipt,
+    CancellationReleaseRequirement, CancellationReleaseStore, CancellationSourceCheckpoint,
+    CancellationSourcePhase, CancellationSourcePort, CancellationSourceReceipt,
+    LifecycleReleaseReceipt, PreparationCancellationCheckpoint, PreparationCancellationPort,
     PreparationCancellationRequest, PreparationCancellationStore, PreparationHasher,
     PreparationJournalError, PreparationJournalStore, PreviousInventory,
     SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,

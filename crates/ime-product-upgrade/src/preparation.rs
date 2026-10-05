@@ -160,16 +160,20 @@ impl PreparationBinding {
                 &self.previous_data_operation_id,
                 &self.previous_data_receipt_sha256,
             ),
-            (
-                &self.previous_data_operation_id,
-                &self.previous_inventory_sha256,
-            ),
         ] {
             if previous.is_some() != digest.is_some()
                 || digest.as_ref().is_some_and(|hash| !hex(hash, 64))
             {
                 return Err(Error::InvalidBinding);
             }
+        }
+        if (self.previous_data_operation_id.is_some() && self.previous_inventory_sha256.is_none())
+            || self
+                .previous_inventory_sha256
+                .as_ref()
+                .is_some_and(|hash| !hex(hash, 64))
+        {
+            return Err(Error::InvalidBinding);
         }
         self.data_root.validate()?;
         self.state_directory.validate()?;
@@ -581,7 +585,6 @@ impl PreparationReceipt {
         if let Some(index) = &self.previous_release_index_identity {
             index.validate()?;
             if self.previous_inventory_identity.is_none()
-                || self.binding.previous_data_operation_id.is_none()
                 || index.device_id != self.binding.data_root.device_id
                 || index.owner_id != self.binding.data_root.owner_id
                 || self

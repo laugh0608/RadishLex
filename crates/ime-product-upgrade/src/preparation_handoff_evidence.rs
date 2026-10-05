@@ -133,6 +133,16 @@ impl PreparationJournalStore {
             }
         }
         let previous = &record.binding().previous_data_operation_id;
+        if previous.is_none() && record.previous_release_index_identity().is_some() {
+            let inventory = self.load_released_inventory(record, hasher)?;
+            if inventory.receipt.is_some()
+                || inventory.files.iter().any(Option::is_some)
+                || !record.archived_slots().is_empty()
+            {
+                return Err(Error::EvidenceChanged);
+            }
+            return Ok(());
+        }
         if previous.is_some() {
             let inventory = self.load_previous_inventory(record, hasher)?;
             let directory = inventory.paths(self)?[2].clone();

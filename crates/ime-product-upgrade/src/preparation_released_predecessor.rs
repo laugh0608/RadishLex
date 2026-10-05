@@ -51,27 +51,29 @@ impl PreparationJournalStore {
             .path
             .join(HISTORY)
             .join(index.index.operation_id())
-            .join(RELEASE);
+            .join(index.index.proof_file_name());
         let identity = self.evidence(&path, hasher)?;
         let proof = reader.resolve_index(&index.index, hasher)?;
-        self.verify_previous_receipt(&proof.receipt, operation)?;
+        if let Some(receipt) = proof.data_receipt() {
+            self.verify_previous_receipt(receipt, operation)?;
+        }
+        if matches!(proof, LifecycleReleaseReceipt::Cancellation(_))
+            && previous_install != Some(index.index.legacy_outer_operation_id())
+        {
+            return Err(Error::EvidenceChanged);
+        }
         if self.evidence(&path, hasher)? != identity
             || reader.load_index(hasher)?.as_ref() != Some(&index)
         {
             return Err(Error::EvidenceChanged);
         }
-        inventory.directories = Some(
-            proof
-                .directories
-                .try_into()
-                .map_err(|_| Error::EvidenceChanged)?,
-        );
-        inventory.receipt = Some(proof.receipt);
-        inventory.files = proof.files;
+        inventory.directories = proof.data_directories()?;
+        inventory.receipt = proof.data_receipt().cloned();
+        inventory.files = proof.files().clone();
         inventory.released = Some(inventory::ReleasedInventoryEvidence {
             proof: identity,
             index: index.identity,
-            installed_product_sha256: proof.binding.installed_product_sha256,
+            installed_product_sha256: proof.product_sha256().to_owned(),
         });
         Ok(inventory)
     }

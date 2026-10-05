@@ -4,13 +4,13 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CancellationOuterBinding {
-    pub(super) state_directory: PreparationDirectoryIdentity,
-    pub(super) history_root: PreparationDirectoryIdentity,
-    pub(super) previous_directory: PreparationDirectoryIdentity,
-    pub(super) previous_identity: PreparationFileIdentity,
-    pub(super) previous_bytes: String,
-    pub(super) active_identity: PreparationFileIdentity,
-    pub(super) new_bytes: Option<String>,
+    pub(in super::super) state_directory: PreparationDirectoryIdentity,
+    pub(in super::super) history_root: PreparationDirectoryIdentity,
+    pub(in super::super) previous_directory: PreparationDirectoryIdentity,
+    pub(in super::super) previous_identity: PreparationFileIdentity,
+    pub(in super::super) previous_bytes: String,
+    pub(in super::super) active_identity: PreparationFileIdentity,
+    pub(in super::super) new_bytes: Option<String>,
 }
 impl CancellationOuterBinding {
     pub fn previous_bytes(&self) -> &[u8] {
@@ -38,20 +38,20 @@ pub enum CancellationArchiveSlot {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CancellationArchiveReceipt {
-    pub(super) format: String,
-    pub(super) request: PreparationCancellationRequest,
-    pub(super) source: CancellationSourceReceipt,
-    pub(super) source_identity: PreparationFileIdentity,
-    pub(super) outer: CancellationOuterBinding,
-    pub(super) directories: Vec<PreparationDirectoryIdentity>,
-    pub(super) history_entries: Vec<String>,
-    pub(super) settings: Option<PreparationFileIdentity>,
-    pub(super) rime: Option<PreparationDirectoryIdentity>,
-    pub(super) previous_files: [Option<PreparationFileIdentity>; 5],
-    pub(super) previous_directories: Option<[PreparationDirectoryIdentity; 3]>,
-    pub(super) moved: Vec<ArchiveSlot>,
-    pub(super) compatibility: Option<PreparationFileIdentity>,
-    pub(super) preserved: bool,
+    pub(in super::super) format: String,
+    pub(in super::super) request: PreparationCancellationRequest,
+    pub(in super::super) source: CancellationSourceReceipt,
+    pub(in super::super) source_identity: PreparationFileIdentity,
+    pub(in super::super) outer: CancellationOuterBinding,
+    pub(in super::super) directories: Vec<PreparationDirectoryIdentity>,
+    pub(in super::super) history_entries: Vec<String>,
+    pub(in super::super) settings: Option<PreparationFileIdentity>,
+    pub(in super::super) rime: Option<PreparationDirectoryIdentity>,
+    pub(in super::super) previous_files: [Option<PreparationFileIdentity>; 5],
+    pub(in super::super) previous_directories: Option<[PreparationDirectoryIdentity; 3]>,
+    pub(in super::super) moved: Vec<ArchiveSlot>,
+    pub(in super::super) compatibility: Option<PreparationFileIdentity>,
+    pub(in super::super) preserved: bool,
 }
 impl CancellationArchiveReceipt {
     pub fn request(&self) -> &PreparationCancellationRequest {
@@ -85,7 +85,7 @@ impl CancellationArchiveReceipt {
         }
         Ok(value)
     }
-    pub(super) fn expected_slots(&self) -> Vec<ArchiveSlot> {
+    pub(in super::super) fn expected_slots(&self) -> Vec<ArchiveSlot> {
         let mut result = Vec::new();
         if self
             .request
@@ -108,7 +108,7 @@ impl CancellationArchiveReceipt {
         }
         result
     }
-    pub(super) fn validate(&self) -> Result<()> {
+    pub(in super::super) fn validate(&self) -> Result<()> {
         self.request.encode()?;
         self.source.validate_request(&self.request)?;
         let prep = self.request.preparation();
@@ -189,7 +189,7 @@ impl CancellationArchiveReceipt {
         }
         Ok(())
     }
-    pub(super) fn can_replace(&self, old: &Self) -> bool {
+    pub(in super::super) fn can_replace(&self, old: &Self) -> bool {
         if self == old {
             return true;
         }

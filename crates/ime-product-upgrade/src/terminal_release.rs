@@ -16,6 +16,15 @@ use record::{decode, encode, valid_id, PreviousIndex};
 #[path = "lifecycle_index.rs"]
 mod lifecycle_index;
 use lifecycle_index::ReleaseIndex;
+#[path = "cancellation_release.rs"]
+mod cancellation_release;
+pub use cancellation_release::{
+    CancellationReleaseCheckpoint, CancellationReleasePort, CancellationReleaseReceipt,
+    CancellationReleaseRequirement, CancellationReleaseStore,
+};
+#[path = "lifecycle_release.rs"]
+mod lifecycle_release;
+pub use lifecycle_release::LifecycleReleaseReceipt;
 pub use record::{TerminalReleaseBinding, TerminalReleasePhase, TerminalReleaseReceipt};
 #[path = "terminal_release_evidence.rs"]
 mod evidence;
@@ -347,9 +356,28 @@ impl TerminalReleaseStore {
         guard: &UpgradeProcessGuard,
         hasher: &impl PreparationHasher,
     ) -> Result<Option<TerminalReleaseReceipt>> {
+        match self.load_latest_lifecycle(guard, hasher)? {
+            Some(LifecycleReleaseReceipt::Terminal(proof)) => Ok(Some(*proof)),
+            Some(LifecycleReleaseReceipt::Cancellation(_)) => Err(Error::InvalidPhase),
+            None => Ok(None),
+        }
+    }
+
+    pub fn load_latest_lifecycle(
+        &self,
+        guard: &UpgradeProcessGuard,
+        hasher: &impl PreparationHasher,
+    ) -> Result<Option<LifecycleReleaseReceipt>> {
         self.journal.verify_guard(guard)?;
         self.validate_active_entries()?;
         let index = self.history().load_index(hasher)?;
+        let root = self.journal.store.root.path.join(HISTORY);
+        if index.is_none()
+            && path_exists(&root)?
+            && fs::read_dir(&root).map_err(|_| Error::Io)?.next().is_some()
+        {
+            return Err(Error::EvidenceChanged);
+        }
         let result = index
             .as_ref()
             .map(|value| self.history().resolve_index(&value.index, hasher))
