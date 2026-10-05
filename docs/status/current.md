@@ -29,7 +29,7 @@
 - 项目所有者选择本机现有账户测试；此前 17 个旧目录根已原样归档，545 个节点核对通过。build 39 新验收库未导入旧资料，全程隐私零学习与目标词普通恢复已验证；先前混合输入区间不作为单次精确用例。另行授权的 composition 隐私→普通组观察到零学习，但新普通对照在 TextEdit 提交后记入 `code` 而非 `editor`，已暂停后两组。暂停时隐私键已恢复显式 false、临时基线已消费，输入源选中且 InputMethod 运行；后续仓库修复未再操作该现场。
 - `6a55782` 已修复 IMK 客户端身份来源，build 40 升级曾停于 `data_coordinating` / `candidate_verified`。错误呈现、合法 WAL 特征回归及显式恢复入口已实现，原生/全仓门禁与真实程序副本资格通过。项目所有者随后单独确认实际恢复：独立 Installer 对同一 `aad9cf8a…a706` 完成 source 39 双程序原 inode 恢复，外层 `rolled_back`、内层 `aborted_preserved`；原 DB/WAL/SHM、snapshot/candidate/settings backup 的身份、metadata 和摘要保留，target 40 留在 staging。source 双端及数据只读 startup gate 允许，target 双端拒绝；未启动双组件或执行新输入。继续激活 [WAL 升级与恢复方案](../remediation/macos-wal-upgrade-recovery-2026-09.md)：永久 WAL 源库准备的 A 段原语与合同已实现，B–D 编排和产品资格待完成，不能直接重试 40。REV-01/REV-02 继续开放，实际结果见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#切换前中止与-source-39-实机恢复完成2026-09-09)。
 - 次要事项为输入回调锁等待、新词召回/评测、删除与事件保留、MSRV/CI；维护成本、Manager 易用性和早期反馈列为后续建议。具体证据、未知项与关闭条件只在跟踪专题维护。
-- WAL 新升级已按批准范围完成 A 段原语及 B 段大部分仓库编排：保护快照/持久维护意图、受限 journal 恢复、旧终态保留接续、新 v1 handoff、真实数据终态封存、严格 v1/v2 释放索引及已释放前驱的连续准备；新真实终态发布 v2，旧 v1 保持原格式重放。独立取消请求、源库收尾、取消材料封存与 outer 兼容恢复已实现，`source_ready` / `preserved` 均保留启动阻断；取消完整证明、类型化生命周期解析、连续取消/取消后新准备及受资格约束的核心 marker 协调已接入；尚无生产取消释放 port。新增组合层校验真实 outer guard 与严格 v1 回执，产品观察仍为合成；真实产品接线/旧程序资格及 WAL/pager 内部断电仍开放，B 段未退出。本批实现与验证见[2026-W41](../devlogs/2026-W41.md)，09-29 结果保留在[2026-W40](../devlogs/2026-W40.md)，前批提交及环境恢复记录保留在[09-25 复盘](../devlogs/2026-W39.md#2026-09-25收尾复盘)。
+- WAL 新升级已按批准范围完成 A 段原语及 B 段大部分仓库编排：保护快照/持久维护意图、受限 journal 恢复、旧终态保留接续、新 v1 handoff、真实数据终态封存、严格 v1/v2 释放索引及已释放前驱的连续准备；新真实终态发布 v2，旧 v1 保持原格式重放。独立取消请求、源库收尾、材料封存与 outer 兼容恢复、取消完整证明、类型化生命周期接续及受资格约束的核心 marker 协调已接入。取消释放组合层新增真实双 guard/活动旧终态校验、完整 source/schema/证明资格绑定和回调后复验；程序实物观察复用安装适配器。生产静止/任务授权与独立旧程序资格提供者、dispatch/UI 仍未接入；隔离测试的资格与静止为合成。WAL/pager 内部断电仍开放，B 段未退出。本批实现与验证见[2026-W41](../devlogs/2026-W41.md)，09-29 结果保留在[2026-W40](../devlogs/2026-W40.md)，前批提交及环境恢复记录保留在[09-25 复盘](../devlogs/2026-W39.md#2026-09-25收尾复盘)。
 - 当前 Rime 来源锁已变化，不能作为冻结 Linux L6 pair 的新 target；现有构建资格检查继续拒绝混配。旧 pair、M5 系统操作顺位和冻结现场保持原状；新 pair 或平台实机动作仍须单独明确范围。
 
 ## 冻结基线与固定边界
@@ -70,13 +70,13 @@
 - 不发布 macOS build 38/39/40 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步：B 段取消释放组合层与旧程序资格（2026-10-05）
+## 下一步：B 段取消释放的生产授权与旧程序资格（2026-10-05）
 
 按已批准的[准备中止兼容设计](../remediation/macos-preparation-cancellation-compatibility.md)，本批已接入 `CancellationReleaseReceipt`、唯一 v2 取消索引和 `load_latest_lifecycle`，分别核验 lifecycle、legacy outer、可空 data 及完整祖先。取消首次封存但没有 release proof 的旧 inventory 保留原件；旧 v1 格式与历史不改写。连续取消、取消后新准备/新 v1/真实数据终态释放均走同一解析器，不能以缺失索引回退首次路径。具体验证和限制见[2026-W41](../devlogs/2026-W41.md)。
 
-核心 `prepare_cancellation_release` 封存完整证明及原 archive，发布索引后仍保留活动取消请求；独立 `finish_cancellation_release` 要求每个检查点具备 `QualifiedSource` 才最后移动请求 marker。当前资格 port 为合成，尚无真实产品实现，因此不能把 `preserved`、证明发布或仓库测试写成产品取消成功。
+核心 `prepare_cancellation_release` 封存完整证明及原 archive，发布索引后仍保留活动取消请求；独立 `finish_cancellation_release` 要求每个检查点具备 `QualifiedSource` 才最后移动请求 marker。新增 `CancellationReleaseAuthority` 将其绑定到真实 outer guard、当前旧终态、完整双程序身份与精确取消证明；资格返回后再次观察产品/静止。结构化资格对象只作绑定校验，不能代替独立证据。
 
-下一批先将取消释放要求接入持有真实双 guard 的产品组合层，固定严格 outer/源程序身份、静止观察与独立旧程序资格的绑定；再按[已批准 A–D 分段](../remediation/macos-wal-source-preparation-design.md)推进 Executor/只读 UI 和独立 source 双程序的 gate、打开/再学习/重启验证。缺少资格保持阻断，不提前开放取消按钮。WAL 模式转换/pager 内部断电资格继续开放，B 段未退出。
+下一批先实现绑定本次 proof/root/source 双程序的生产静止与当前任务授权提供者，以及独立旧程序资格证据的生成/读取与失效校验；已有 target-only preflight 不能直接填入该接口。随后按[已批准 A–D 分段](../remediation/macos-wal-source-preparation-design.md)推进 Executor dispatch/只读 UI 和独立 source 双程序的 gate、打开/再学习/重启验证。程序实物观察代码已经提供，但当前没有完整生产授权链，缺少资格继续阻断，不提前开放取消按钮。WAL 模式转换/pager 内部断电资格继续开放，B 段未退出。
 
 新升级真正完成后才继续客户端身份和 composition 隐私实测，不直接重试 40。冻结 macOS 39/40、用户数据、Linux/UTM 与系统操作均不在本批范围内；任何实机动作须另行明确目标与授权。09-30 的历史待办由本批承接，原交接保留在[2026-W40](../devlogs/2026-W40.md#2026-09-30明日事项)。
 

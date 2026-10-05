@@ -23,6 +23,10 @@ first install、repair 和 remove 在 `programs_committed` 后共用核心终态
 
 ## 失败关闭
 
+`MacOsCancellationProductAuthority` 为独立取消释放 authority 提供程序观察组合：复用 `MacOsProductInstallAdapter` 校验精确 data root、sealed target 与安装中的 source 双 bundle，在 `CancellationQuiescenceAuthority` 回调前后重新检查。该回调必须绑定本次完整证明、源程序、当前任务授权与双端静止；只有 target release/容量的旧 preflight 回答不足以填入此接口，也不能用 UI 确认或资格测试成功代替。观察组合不复制或运行产品、不打开用户 SQLite；现有签名验证仍通过受控 `codesign` 执行。
+
+本批未接取消 dispatch、driver action 或 UI，也没有默认静止授权或旧程序资格提供者。独立程序资格与产品入口完整接线仍按[取消设计](../../../docs/remediation/macos-preparation-cancellation-compatibility.md)推进；缺少提供者时不能把结构化资格对象当作实机已通过。
+
 - active guard、中断/损坏 receipt、未知对象、root/程序身份漂移由核心或平台 port 保留稳定错误并拒绝执行；
 - stale begin/confirm/resume intent、operation/source/target 不匹配和缺失 upgrade context 均拒绝；
 - preflight 在任何 receipt 或程序 mutation 前执行，manifest target release 必须与 InstallPayload target 精确匹配，`available_bytes == 0` 不构成证据；

@@ -44,4 +44,14 @@
 
 `CancellationArchiveAuthority` 为专用取消封存协调器提供真实 outer guard 校验、共同 data root、source/target release/manifest 绑定以及 `ime-product-install` 的严格回执核验。旧回执必须是匹配 source 的合法终态，新回执可空或精确匹配无 artifact 的 `prepared`；活动槽暂缺时仍核验已绑定原件，不能以普通 `persist` 倒退覆盖。回调前后验证 guard，并要求 `CancellationProductAuthority` fresh 证明源程序、静止和当前授权。
 
-此桥尚未接真实双 bundle 观察或 Installer Executor/UI。`tests/cancellation_archive.rs` 使用隔离目录、真实双 guard/回执和合成产品观察，普通安装协调门禁以 `qualification-harness --test cancellation_archive` 精确运行此目标；不会运行需要真实载体环境的其他资格目标。取消 `preserved` 仍保留内层阻断 marker，完整取消释放须接入升级核心的 `CancellationReleaseStore`，并绑定真实产品观察与独立旧程序资格；本桥尚未实现该生产 port。核心的 v1/v2 终态/取消索引与接续不代表此桥已具备产品取消释放能力。
+此桥尚未接真实双 bundle 观察或 Installer Executor/UI。`tests/cancellation_archive.rs` 使用隔离目录、真实双 guard/回执和合成产品观察，普通安装协调门禁以 `qualification-harness --test cancellation_archive` 精确运行此目标；不会运行需要真实载体环境的其他资格目标。取消 `preserved` 仍保留内层阻断 marker，完整释放由下述独立 authority 承接。
+
+## 取消释放的双 guard 与资格绑定
+
+`CancellationReleaseAuthority` 消费 `CancellationReleaseStore` 的完整证明，持有真实 outer guard；inner guard 由核心在回调两侧核验，取得顺序仍为 outer → inner。每次回调严格核对共同 data root、source/target release 与 manifest、旧/新原 canonical，以及当前活动 outer 必须已恢复为同一旧合法终态。封存原件存在不能代替当前槽回读，普通 v1 持久化规则保持。
+
+`Preserve` 只需 fresh 产品/静止/当前任务授权。`QualifiedSource` 还要求 `CancellationSourceQualificationAuthority` 每次复验独立证据，并返回绑定精确双程序身份、source schema 和本次完整证明的 `CancellationSourceQualification`；相同 release/manifest 但双程序不同、其他 root/取消证明、缺失资格或 snapshot schema 不匹配均拒绝。资格对象构造只作结构检查，不执行或证明旧程序验证；维护前没有 snapshot schema 时，提供者必须另证本次 source family 的 schema，不能套用 target schema。
+
+资格回调后再次观察产品/静止，并在两类外部回调前后复验 outer guard 和活动回执；数据核心继续复验源 family、证明及全部材料。`failure()` 保留最近一次 authority 回调的具体失败类别，调用方仍须优先处理核心错误。marker 已移动后的失败不报告成功；重载必须重新取得 guard 和资格，不能凭 marker 缺失认定完成。
+
+`tests/cancellation_release/` 纳入既有 `cancellation_archive` 测试目标，覆盖维护前后、outer 创建前后、错 root/双 guard/产品/证明/schema、各 marker 检查点资格失效、回调期间 outer/源库漂移、产品复验失败与移动后恢复。资格与静止观察仍为合成；Executor 提供基于现有安装适配器的程序实物观察组合，但尚无生产静止/当前任务授权提供者、独立旧程序资格提供者或 Installer dispatch/UI 接线，不能开放取消按钮。

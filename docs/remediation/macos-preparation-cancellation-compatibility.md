@@ -72,6 +72,16 @@ v2 索引增加 `proof.kind = preparation_cancellation`，`proof.sha256` 与 `pr
 
 连续取消、取消后新准备/新 v1/真实数据终态释放及 v1/v2→取消→新释放均使用同一解析器，运行 DB 的后续正常学习/WAL 不受历史物理摘要约束；尚在取消中的恢复仍要求原静止条件、源内容关系和 fresh 授权。B 段仍未退出，真实组合层/Executor/UI、独立旧程序资格与 WAL/pager 内部断电证据继续开放。验证见 [2026-W41](../devlogs/2026-W41.md)。
 
+## 2026-10-05 后续：取消释放组合层与资格绑定
+
+`InstallCoordinatorAdapter::CancellationReleaseAuthority` 已将核心 `Preserve` / `QualifiedSource` 要求接到真实 outer guard、共同 root、两代产品和严格旧/新 v1 原件核验；释放阶段还必须回读活动旧终态。产品观察与独立资格两类回调前后均复验外层，资格返回后再次观察程序和静止。核心在回调两侧继续核验 inner guard、源 family 与所有不可变材料，不允许提供者绕过实物关系。
+
+`CancellationSourceQualification` 是可信资格提供者的结构化返回值，固定 source 完整双程序身份、source schema 和本次不可变取消证明；其他证明/程序、缺失或失效资格、与 snapshot 不同的 schema 均拒绝。构造该类型只验证结构，不运行旧程序、不形成资格证据。维护前可能无 snapshot schema，提供者必须以精确 source family 另证 schema，不能把 target schema 或字段缺失当作资格。尚无生产资格提供者；测试中的合成实现仅验证组合层拒绝和接续合同。
+
+Executor 新增程序实物观察组合，复用安装适配器的签名/tree/manifest 校验，在静止/任务授权回调前后验证同一用户域 root、sealed target 和安装 source。它未接 Installer dispatch/UI；生产静止/任务授权提供者、独立旧程序 gate/打开/再学习/重启资格及其证据验证仍开放。既有 target-only preflight 不具备完整 proof/root/源双程序绑定，不能直接当作该提供者。
+
+隔离合同覆盖维护前后、outer 创建前后、错误 root/双 guard/产品/schema/资格证明、各 marker 边界资格丢失、回调期间 outer/源库漂移和移动后重载。移动前资格失效保留活动 marker；移动后检查失败保留历史原件且不报告成功，重新接续仍须 fresh 资格。全量结果见[2026-W41](../devlogs/2026-W41.md)，B 段与实机停止线不变。
+
 ## 取消入口与数据保持
 
 仅在本次准备存在、真实双程序仍为已绑定 source，且没有持久化 `handoff_intent` 时提供取消。`reserved`、`snapshot_ready`、`maintenance_intent`、`source_prepared`、`previous_archived` 均需按其实际对象关系核验，阶段名称本身不能授权。
@@ -114,7 +124,7 @@ v2 索引增加 `proof.kind = preparation_cancellation`，`proof.sha256` 与 `pr
 
 ## 持久化顺序与恢复
 
-始终按 outer install guard → inner upgrade guard 取得双锁，每次动作 fresh 核验 source 产品、静止、私有对象及授权；固定状态目录不移动，guard 不更换。以下是专用协议的完整目标；源库收尾及封存/兼容恢复已接入仓库，最终索引/释放仍待实现，不是人工文件搬移步骤。
+始终按 outer install guard → inner upgrade guard 取得双锁，每次动作 fresh 核验 source 产品、静止、私有对象及授权；固定状态目录不移动，guard 不更换。以下专用协议的核心持久化顺序已接入仓库，生产授权/资格提供者和产品入口仍待接线；这不是人工文件搬移步骤。
 
 1. 保存不可改认的取消意图，绑定准备记录与前驱，阻止继续 handoff。活动准备 marker 与新增取消 marker 均保持；旧 reader 对未知对象失败关闭。
 2. 按请求时点完成源库证明。必要时仅恢复原维护意图，旧 data 私有材料依原 inventory 封存；此前尚未具备 `source_prepared` 的取消归档须由此专用证明授权，不能放宽 B4 原状态转换。

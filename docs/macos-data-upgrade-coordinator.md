@@ -124,7 +124,7 @@ v2 索引使用 `radishlex-latest-release-v2`，显式包含 `operation_id`、`l
 
 请求入口仍拒绝现存 journal；只有取消收尾意图已持久化，专用恢复才可在同一主 inode、无 WAL/SHM 和下述单 journal 资格成立后记录恢复身份并重放。物理 `load_source_guarded` 不代表 fresh 授权或逻辑复验；这些由 `finish_source` 完成。未知临时进度、身份/内容漂移、busy 或授权/容量不足均保留阻断。`source_ready` 不等于 `cancel_ready`。后续 `CancellationArchiveStore` 已实现取消材料封存与 outer 兼容恢复，固定原件、目录和逐槽位置证明；组合层持有真实 outer guard 并调用安装核心严格校验旧/新 v1 合同。返回 `preserved` 仍保留活动取消请求与封存进度；独立 `CancellationReleaseStore` 已接入完整不可变证明、v2 取消索引和受资格约束的最后 marker 协调，真实产品观察/Executor、旧程序资格和产品 UI 仍未接入，不能显示产品“取消完成”。固定槽位、顺序与验证口径见[取消兼容设计](remediation/macos-preparation-cancellation-compatibility.md)。
 
-`CancellationReleaseStore::prepare_cancellation_release` 消费完整封存证据，独占发布历史 `cancellation-release.json`，封存原 archive，再发布唯一索引；活动原请求继续阻断。独立 `finish_cancellation_release` 必须在每个检查点取得 `QualifiedSource` port 证明，才最后原 inode 移走请求、同步两目录并回读。port 须持有真实 outer guard，绑定旧程序身份/schema 的 gate、打开/再学习/重启资格与 fresh 静止条件；目前仅有合成 port，未提供产品实现。源库等价在每次恢复入口重新验证，各 I/O 回调前后复验全部实物。
+`CancellationReleaseStore::prepare_cancellation_release` 消费完整封存证据，独占发布历史 `cancellation-release.json`，封存原 archive，再发布唯一索引；活动原请求继续阻断。独立 `finish_cancellation_release` 必须在每个检查点取得 `QualifiedSource` port 证明，才最后原 inode 移走请求、同步两目录并回读。组合层 `CancellationReleaseAuthority` 持有真实 outer guard，核验严格旧/新 v1 原件及活动旧终态，并绑定 source 完整双程序身份、schema 和本次完整证明的资格返回值；资格回调后复验产品/静止，两类回调前后核对外层。结构化返回值不是独立旧程序资格本身；生产静止/任务授权和资格提供者及 dispatch/UI 尚未接线，不能放行产品取消。源库等价在每次恢复入口重新验证，各 I/O 回调前后复验全部实物。
 
 历史查询不检查旧运行库 hash，但继续验证请求、封存证明、准备/保护快照、旧 outer 原件、兼容关系及真实 data 材料。取消首次封存但没有旧 release proof 的 inventory 由取消证明承载，不能猜造终态；连续取消及取消后新准备分别绑定 lifecycle、outer、data 链。缺失索引且存在历史不能回退首次路径。新记录、索引、归档及最后 marker 的子进程中断测试只证明仓库恢复语义，不代表内部 pager 断电或旧程序资格。
 
