@@ -16,11 +16,13 @@
 static int RLXWriteJSON(NSDictionary<NSString *, id> *object);
 
 int main(int argc, const char *argv[]) {
-  (void)argv;
   @autoreleasepool {
-    if (argc != 1) {
+    BOOL cancellation = argc == 2 && strcmp(argv[1], "--cancellation-release") == 0;
+    if (argc != 1 && !cancellation) {
       return 2;
     }
+    NSString *format = cancellation ? @"radishlex-cancellation-preflight-v1"
+                                   : @"radishlex-upgrade-preflight-v1";
     NSArray<NSURL *> *applicationSupport =
         [[NSFileManager defaultManager]
             URLsForDirectory:NSApplicationSupportDirectory
@@ -30,7 +32,7 @@ int main(int argc, const char *argv[]) {
                         isDirectory:YES];
     if (dataRootURL == nil) {
       return RLXWriteJSON(@{
-        @"format" : @"radishlex-upgrade-preflight-v1",
+        @"format" : format,
         @"result" : @"failed",
         @"error" : @"data_root_unavailable"
       });
@@ -42,18 +44,23 @@ int main(int argc, const char *argv[]) {
         @RLX_STRINGIFY(RLX_INPUT_METHOD_BUNDLE_ID), &error);
     if (result == nil) {
       return RLXWriteJSON(@{
-        @"format" : @"radishlex-upgrade-preflight-v1",
+        @"format" : format,
         @"result" : @"failed",
         @"error" : @"preflight_inspection_failed",
         @"error_code" : @(error.code)
       });
     }
     NSMutableDictionary<NSString *, id> *output = [@{
-      @"format" : @"radishlex-upgrade-preflight-v1",
+      @"format" : format,
       @"result" : result.isQuiescent ? @"ready" : @"blocked",
       @"available_bytes" : @(result.availableBytes),
       @"quiescent" : @(result.isQuiescent)
     } mutableCopy];
+    if (cancellation) {
+      output[@"data_root"] = result.dataRootIdentity;
+      output[@"manager_bundle_id"] = @RLX_STRINGIFY(RLX_MANAGER_BUNDLE_ID);
+      output[@"input_method_bundle_id"] = @RLX_STRINGIFY(RLX_INPUT_METHOD_BUNDLE_ID);
+    }
     if (result.blocker != nil) {
       output[@"blocker"] = result.blocker;
     }

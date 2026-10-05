@@ -13,6 +13,7 @@ const MAX_HOST_OUTPUT_BYTES: usize = 16 * 1024;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum HostMode {
     Preflight,
+    CancellationPreflight,
     Candidate,
     PostSwitch,
 }
@@ -55,6 +56,9 @@ impl ProductHostRunner for ProcessProductHostRunner {
         let mut command = Command::new(executable.path());
         if mode == HostMode::PostSwitch {
             command.arg("--post-switch");
+        }
+        if mode == HostMode::CancellationPreflight {
+            command.arg("--cancellation-release");
         }
         for (key, _) in std::env::vars_os() {
             if key.to_string_lossy().starts_with("DYLD_") || key == "CFFIXED_USER_HOME" {

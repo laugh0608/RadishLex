@@ -17,6 +17,7 @@ typedef NS_ERROR_ENUM(RLXUpgradePreflightErrorDomain, RLXUpgradePreflightErrorCo
 @property(nonatomic, readonly) unsigned long long availableBytes;
 @property(nonatomic, readonly, getter=isQuiescent) BOOL quiescent;
 @property(nonatomic, copy, readonly, nullable) NSString *blocker;
+@property(nonatomic, copy, readonly) NSDictionary<NSString *, NSNumber *> *dataRootIdentity;
 
 - (instancetype)init NS_UNAVAILABLE;
 

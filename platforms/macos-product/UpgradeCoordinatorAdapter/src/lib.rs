@@ -22,6 +22,7 @@ use serde::Deserialize;
 mod manifest;
 mod runner;
 
+mod cancellation_preflight;
 mod preparation_hash;
 pub use preparation_hash::MacOsPreparationHasher;
 
