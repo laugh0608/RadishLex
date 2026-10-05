@@ -29,7 +29,7 @@ first install、repair 和 remove 在 `programs_committed` 后共用核心终态
 
 `MacOsCancellationQuiescenceAuthority` 在每次调用中运行专用 native cancellation preflight，核对实际 root 与绑定 target manifest，并在 helper 返回后复查授权未撤销/到期。程序实物观察仍由上层在其前后执行。普通 v1 preflight 响应不被专用路径接受；没有默认放行或环境开关。
 
-本批未接取消 dispatch、driver action 或 UI，也没有独立旧程序资格提供者。现有 source validation host 不能证明无新 data receipt 的正常打开/再学习/重启资格；必须通过专用副本验证取得对应证据，缺少时仍阻断最后 marker。产品入口完整接线按[取消设计](../../../docs/remediation/macos-preparation-cancellation-compatibility.md)推进。
+准备/取消的只读维护查询已接入 driver/bridge/UI；六个维护阶段均只提供刷新，普通 v1 执行器在 outer guard 内复核维护记录以拒绝旧 intent。查询不创建目录、取得 guard 或打开 SQLite，损坏/缺失证据继续阻断；完整规则见 [Installer 边界](../../../docs/macos-installer-app-boundary.md#准备与取消的只读维护投影)。尚未接取消 mutation dispatch/action，也没有独立旧程序资格提供者。现有 source validation host 不能证明无新 data receipt 的正常打开/再学习/重启资格；必须通过专用副本验证取得对应证据，缺少时仍阻断最后 marker。产品入口完整接线按[取消设计](../../../docs/remediation/macos-preparation-cancellation-compatibility.md)推进。
 
 - active guard、中断/损坏 receipt、未知对象、root/程序身份漂移由核心或平台 port 保留稳定错误并拒绝执行；
 - stale begin/confirm/resume intent、operation/source/target 不匹配和缺失 upgrade context 均拒绝；

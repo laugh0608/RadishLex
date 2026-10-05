@@ -56,7 +56,7 @@ UI 不直接读取 `.radishlex-install-v1/receipt.json`，不根据 bundle 是�
 `InstallerViewSnapshot` 固定携带：
 
 - contract version；
-- phase：`ready`、`awaiting_user_action`、`in_progress`、`completed`、`recovery_available` 或 `blocked`；
+- phase：既有安装阶段，以及下述准备/取消的只读维护阶段；
 - primary/secondary action；
 - operation、receipt state、failure code；
 - 0–10 的 receipt 持久化进度；
@@ -74,6 +74,27 @@ phase=<code> action=<code> error=<code> state=<code>
 不输出路径、operation ID、bundle identity、签名 requirement、PID、命令行或底层错误正文。未知 contract 版本、phase/action/error/state、进度或 prompt 统一投影为 `blocked + refresh + unknown_driver_result`。
 
 执行 action 返回错误时，bridge 保留重新读取的 receipt state、operation 和持久化进度，但强制 `blocked + refresh`，清除其他 action/manual prompt；保留已有稳定错误，没有时使用既有 `unknown_driver_result`。合法 receipt 甚至 completed 状态不能掩盖当前执行失败。日志只输出固定授权/执行错误类别，不输出底层正文。UI 只启用 snapshot 实际提供的 action，blocked 时只允许 refresh，并提示当前进度不代表上次操作成功。此错误投影不写回 receipt；后续 refresh/重开重新读取持久化状态，不能据其恢复普通投影断言失败原因已经消除。
+
+## 准备与取消的只读维护投影
+
+查询先检查固定数据根的维护记录，再决定是否使用旧 outer 事务投影。准备 marker、取消请求、源库收尾、封存证明及唯一 lifecycle 索引由 upgrade 核心的 `inspect_maintenance` 检查；Executor 另外核验严格 outer canonical、root、operation 和 source/target release/manifest 关系。旧 outer 的 completed/aborted/rolled_back 不能覆盖活动维护状态，也不能继续提供 retry/remove。
+
+| phase | 展示含义 |
+| --- | --- |
+| `preparing_source` | 已有准备记录，准备尚未完成 |
+| `cancellation_requested` | 仅已保存取消请求 |
+| `cancellation_finishing_source` | 已记录源库收尾，尚未完成 |
+| `cancellation_preserving` | 源库收尾已有记录，封存或索引发布尚未完成 |
+| `cancellation_awaiting_qualification` | 完整证明和索引就绪，活动请求 marker 仍阻断最后释放 |
+| `cancellation_completed` | 完整历史、祖先、当前旧 outer 和 marker 最终位置已核验 |
+
+这些阶段均只提供 `refresh`，无 secondary action/manual prompt；operation 为 upgrade，receipt state 为 none，进度为 0。它们不冒充 v1 receipt 状态，界面隐藏 receipt 进度条。`cancellation_completed` 只描述持久化取消结果，不重新认证旧程序资格，也不授权启动、重试或移除；活动请求存在时绝不显示该阶段。
+
+读取使用现有严格 decoder 和共享物理关系检查，不创建目录、不取得或清理 guard、不写回/补同步记录、不打开 SQLite。活动/未知 guard 阻断；已确认拒绝连接且身份稳定的 stale guard 原样保留。读取前后核对 guard、私有文件和索引身份，并复读结果；缺失索引但有历史、孤立记录、未知/临时对象、证明损坏或身份漂移均失败关闭。历史取消完成后的正常学习不受旧运行库摘要约束；中间状态仍核对其绑定的物理材料。只读观察不能代替执行时的双 guard、逻辑等价、静止或独立资格。
+
+Bridge ABI v1 的结构大小、字段、symbol 与 contract version 保持；phase 整数 7–12 为上述六项的顺序扩展。新 Rust/C/Objective-C 映射一致，旧 reader 对未知 phase 失败关闭。新原生 reader 同时拒绝维护 phase 与 mutation action、旧 receipt state/进度或手动静止 prompt 的矛盾组合。稳定摘要仍仅含既有四个 code 字段。
+
+普通 v1 Executor 在取得 outer guard 后再次检查维护状态，拒绝查询后已过期的旧 intent；upgrade bootstrap 前也检查，避免先创建新的数据事务。新准备/取消 mutation dispatch 和资格提供者尚未接入，维护查询不会调用它们，也没有新增取消按钮。
 
 ## 用户授权
 

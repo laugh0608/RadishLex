@@ -90,6 +90,12 @@ Executor 新增程序实物观察组合，复用安装适配器的签名/tree/ma
 
 本批只完成上述可独立验证的提供者，不开放 UI 或 dispatch。核对旧 source validation host 后确认，其既有 candidate/PostSwitch 合同无法证明无新 data receipt 的正常 gate、再学习和重启；独立资格必须由专用程序副本验证产生，不能把现有 host 退出码包装成合格证据。该资格提供者及证据生成/读取/失效校验仍是下一顺位，最终 marker 继续要求真实资格。native 合同在新合成目录验证，任务/reader 负向测试不代表旧二进制或真实用户取消验收。
 
+## 2026-10-05 后续：准备/取消只读展示
+
+`inspect_maintenance` 复用严格记录及物理材料检查，识别准备、请求、源库收尾、封存、等待资格和已释放的历史取消；Executor 将其与当前严格 outer 绑定，Bridge/AppKit 显示对应状态。完整证明或索引单独存在不构成完成，最后请求 marker 仍活动时显示资格阻断。缺失/损坏/孤立证据与未知状态失败关闭；历史已释放后允许正常学习改变运行库，不以旧物理摘要封死后续读取。
+
+只读链不创建文件、不取得/清理 guard、不补同步、不打开 SQLite、不执行维护；观察期间身份/材料变化阻断。六项状态均只提供刷新，state/进度不套用旧 v1，普通 v1 mutation 在 outer guard 内再次拒绝维护状态。ABI v1 POD 与 symbol 不变，新 phase 对旧 reader 仍失败关闭；映射与具体语义见 [Installer 边界](../macos-installer-app-boundary.md#准备与取消的只读维护投影)。本步不生成独立旧程序资格，不开放取消 action，不启动真实程序；测试仅用合成数据与显式合成资格。
+
 ## 取消入口与数据保持
 
 仅在本次准备存在、真实双程序仍为已绑定 source，且没有持久化 `handoff_intent` 时提供取消。`reserved`、`snapshot_ready`、`maintenance_intent`、`source_prepared`、`previous_archived` 均需按其实际对象关系核验，阶段名称本身不能授权。
