@@ -25,10 +25,15 @@ use radishlex_macos_product_install_coordinator::{
 use radishlex_macos_upgrade_coordinator::{MacOsProductPreflightAdapter, MacOsUpgradeAdapterError};
 
 mod bootstrap;
+mod cancellation_observation;
 mod recovery;
 pub use bootstrap::{
     bootstrap_upgrade_receipt, BootstrappedUpgradeReceipt, UpgradeBootstrapError,
     UpgradeBootstrapErrorCode,
+};
+pub use cancellation_observation::{
+    CancellationProductObservationFailure, CancellationQuiescenceAuthority,
+    MacOsCancellationProductAuthority,
 };
 pub use recovery::inspect_installer_view_with_recovery;
 

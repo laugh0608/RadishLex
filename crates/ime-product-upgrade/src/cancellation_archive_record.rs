@@ -57,6 +57,9 @@ impl CancellationArchiveReceipt {
     pub fn request(&self) -> &PreparationCancellationRequest {
         &self.request
     }
+    pub fn source(&self) -> &CancellationSourceReceipt {
+        &self.source
+    }
     pub fn outer(&self) -> &CancellationOuterBinding {
         &self.outer
     }

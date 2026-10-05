@@ -6,6 +6,12 @@ use std::fmt;
 
 mod cancellation_archive;
 pub use cancellation_archive::{CancellationArchiveAuthority, CancellationProductAuthority};
+mod cancellation_release;
+pub use cancellation_release::{
+    CancellationQualificationError, CancellationReleaseAuthority,
+    CancellationReleaseAuthorityFailure, CancellationReleaseProductAuthority,
+    CancellationSourceQualification, CancellationSourceQualificationAuthority,
+};
 
 use radishlex_ime_product_install::{
     finish_program_restore, restore_program_source, resume_install_finalization,

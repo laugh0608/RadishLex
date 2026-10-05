@@ -520,6 +520,41 @@ fn layout_payload_and_product_mutations_fail_closed() {
 }
 
 #[test]
+fn readonly_product_root_binding_rejects_foreign_or_replaced_root_without_creating_state() {
+    let fixture = Fixture::new("0.1.0", "35", "source");
+    let adapter = fixture
+        .adapter(
+            Arc::new(SignatureState::default()),
+            Arc::new(CopyState::default()),
+        )
+        .unwrap();
+    let root = VerifiedInstallRoot::verify(fixture.data_root(), fixture.owner_id).unwrap();
+    let store = InstallReceiptStore::open(root).unwrap();
+    let identity = store.root_identity().clone();
+    adapter.verify_data_root(&identity).unwrap();
+    let foreign = Fixture::new("0.1.0", "35", "other");
+    let foreign_store = InstallReceiptStore::open(
+        VerifiedInstallRoot::verify(foreign.data_root(), foreign.owner_id).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        adapter
+            .verify_data_root(foreign_store.root_identity())
+            .unwrap_err()
+            .code(),
+        MacOsInstallAdapterErrorCode::UnsafeTarget
+    );
+    let retained = fixture.container.join("retained-root");
+    fs::rename(fixture.data_root(), &retained).unwrap();
+    assert!(adapter.verify_data_root(&identity).is_err());
+    assert!(!fixture.data_root().exists());
+    create_directory(&fixture.data_root(), 0o700);
+    assert!(adapter.verify_data_root(&identity).is_err());
+    assert_eq!(fs::read_dir(fixture.data_root()).unwrap().count(), 0);
+    assert!(retained.join(".radishlex-install-v1").is_dir());
+}
+
+#[test]
 fn historical_upgrade_sources_are_release_bound_and_revalidated() {
     let fixture = Fixture::new("0.1.0", "35", "target");
     add_upgrade_source(&fixture.payload, "0.0.9", "34", "source");
