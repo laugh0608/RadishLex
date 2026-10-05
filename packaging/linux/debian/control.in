@@ -1,7 +1,7 @@
 Package: @PACKAGE_NAME@
 Version: @PACKAGE_VERSION@
 Architecture: @DEBIAN_ARCHITECTURE@
-Maintainer: RadishLex <laugh0608@foxmail.com>
+Maintainer: RadishLex <luobo@radishx.com>
 Section: utils
 Priority: optional
 Depends: @HARD_DEPENDENCIES@

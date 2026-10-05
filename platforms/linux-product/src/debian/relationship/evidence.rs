@@ -317,7 +317,7 @@ impl BinaryControlSnapshot {
                 .map(|(_, value)| value.as_str())
                 .ok_or_else(binary_control_error)
         };
-        if field("Maintainer")? != "RadishLex <laugh0608@foxmail.com>"
+        if field("Maintainer")? != "RadishLex <luobo@radishx.com>"
             || field("Section")? != "utils"
             || field("Priority")? != "optional"
             || field("Homepage")? != "https://github.com/laugh0608/RadishLex"
