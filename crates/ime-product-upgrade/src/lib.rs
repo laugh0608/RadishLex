@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 mod preparation;
 pub use preparation::{
     PreparationArchiveSlot, PreparationBinding, PreparationDirectoryIdentity, PreparationFamily,
-    PreparationFileIdentity, PreparationPhase, PreparationReceipt, PreparationReceiptError,
-    MAX_PREPARATION_RECEIPT_BYTES, PREPARATION_RECEIPT_FORMAT,
+    PreparationFileIdentity, PreparationInstallEvidence, PreparationPhase, PreparationReceipt,
+    PreparationReceiptError, MAX_PREPARATION_RECEIPT_BYTES, PREPARATION_RECEIPT_FORMAT,
 };
 
 #[cfg(unix)]

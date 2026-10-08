@@ -104,6 +104,12 @@ Executor 已提供独立的 preservation 授权/执行入口，连接已有准�
 
 最终释放另用完整 proof 的当次授权及显式独立资格提供者；缺失、错误绑定或资格返回后授权失效均保留阻断。已绑定中断位置支持同 operation 续跑，未绑定临时文件不能被接纳。合成回归覆盖所有可取消准备阶段、新 outer 有无、各阶段续跑及真实子进程退出；这不提供实际旧程序资格。新准备入口和 Bridge/action 仍待接线，UI 继续仅刷新，实际取消按钮不开启。具体入口和失败语义见 [Installer 边界](../macos-installer-app-boundary.md#取消-executor-任务入口)。
 
+## 2026-10-08：新准备产品任务承接
+
+Executor 已在旧 outer 活动槽未改变前独占保存 canonical 字节，完成同步/回读后绑定 `previous_install_evidence`，再持久化 reservation 和新 outer。该可选证据固定原件文件与目录身份，禁止持久替换中追加/移除/改认；取消封存对带证据的新准备交叉检查，旧无字段准备的编码和读取保持。连续取消的新准备只可经完整 lifecycle 核验复用同一个旧 outer 原件；取消后的合法学习不受旧 DB 物理摘要限制。
+
+新准备任务贯穿双 guard 并连接源库准备、旧槽保留与 v1 handoff。成功仍是 `prepared` outer / `preflighted` data；Bridge/action、交接后产品接续及独立旧程序资格未开放，取消最后 marker 的独立资格要求不变。具体入口见 [Installer 边界](../macos-installer-app-boundary.md#新准备-executor-任务入口)，验证见 [W41](../devlogs/2026-W41.md)。
+
 ## 取消入口与数据保持
 
 仅在本次准备存在、真实双程序仍为已绑定 source，且没有持久化 `handoff_intent` 时提供取消。`reserved`、`snapshot_ready`、`maintenance_intent`、`source_prepared`、`previous_archived` 均需按其实际对象关系核验，阶段名称本身不能授权。

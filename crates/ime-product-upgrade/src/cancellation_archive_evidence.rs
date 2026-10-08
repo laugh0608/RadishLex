@@ -369,6 +369,12 @@ impl CancellationArchiveStore {
         hasher: &impl PreparationHasher,
     ) -> Result<()> {
         let root = &self.journal.store.root.path;
+        if prep
+            .previous_install_evidence()
+            .is_some_and(|expected| *expected != outer.previous_install_evidence())
+        {
+            return Err(Error::EvidenceChanged);
+        }
         let previous = prep
             .binding()
             .previous_install_operation_id

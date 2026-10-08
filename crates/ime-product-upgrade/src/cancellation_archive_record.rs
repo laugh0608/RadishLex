@@ -22,6 +22,14 @@ impl CancellationOuterBinding {
     pub fn state_directory(&self) -> &PreparationDirectoryIdentity {
         &self.state_directory
     }
+    pub fn previous_install_evidence(&self) -> crate::PreparationInstallEvidence {
+        crate::PreparationInstallEvidence {
+            state_directory: self.state_directory.clone(),
+            history_root: self.history_root.clone(),
+            previous_directory: self.previous_directory.clone(),
+            previous_receipt: self.previous_identity.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

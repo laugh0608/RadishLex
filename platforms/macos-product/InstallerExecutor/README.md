@@ -21,13 +21,23 @@ first install、repair 和 remove 在 `programs_committed` 后共用核心终态
 
 该动作不创建新 operation、不改变 v1 receipt 格式、不实现 WAL 源库准备或后续升级重试。详细证据格式、检查点与旧 reader 兼容见 [Installer 边界](../../../docs/macos-installer-app-boundary.md#显式切换前中止恢复)和[数据升级边界](../../../docs/macos-data-upgrade-coordinator.md#显式切换前中止的保留证据)。
 
+## 新源库准备任务
+
+`authorize_source_preparation` 绑定已观察的合法旧 outer 终态、固定 root 与 source/target 双程序；`authorize_preparation_resume` 绑定精确准备记录。两者均要求四项当次确认，授权最长 5 分钟，可撤销且不能从持久记录续权。生产 `prepare_upgrade_source` 固定组合实际安装适配器、root/target manifest 绑定的双程序静止与容量预检，不公开合成 observer。
+
+入口连续持有 outer → inner 双 guard。首次执行先从严格活动 data 或完整 lifecycle 索引确定真实数据前驱，再把旧 outer canonical 字节独占封存到 `.radishlex-install-history-v1/<previous-outer-operation>/receipt.json`；经文件/目录同步与回读后，将文件及目录身份作为 `previous_install_evidence` 绑定到首次 reservation。旧 outer 活动槽此时不变。只有完整取消生命周期证明可以复用已有封存原件；孤立目录、临时副本或单独存在的相同字节均不被认领。
+
+准备意图持久化后才创建同 ID、无程序 artifact 的新 `prepared` outer，然后接源库保护/维护、旧 data 私有槽保留与新 v1 handoff。每个核心检查点前后重新核验 outer、封存原件、程序实物、静止及任务授权。首次无 data、三类未释放旧终态、已释放 v1/v2 与取消前驱分别处理；取消 ID 不会冒充 data 前驱。已绑定中断重开后重新授权，只继续同一 operation；没有 reservation 的部分初始化保留阻断，不自动清理。
+
+成功仅返回新的 `preflighted` 数据回执，outer 仍为 `prepared`，双程序未 staging/切换，startup gate 仍阻断。`load_preparation_for_operation` 可按精确 ID 读取活动准备或已封存 handoff 元数据供重开任务使用；它不授予执行权限，执行仍复验实物和数据等价。Bridge/action 尚未接入此入口；后续必须明确交接后查询与严格数据重绑，不能把带历史前驱的新回执送入只接受空 data 前驱的普通 bootstrap。
+
 ## 准备取消任务
 
 `authorize_cancellation_preservation` 为已有准备记录创建独立、最长 5 分钟的可撤销任务，绑定完整 preparation 和两侧程序身份。`preserve_preparation_cancellation` 按 outer → inner 取得并连续持有双 guard，重新核验准备与 outer 原件，接续取消请求、必要源库收尾、材料保留/兼容恢复及证明/索引发布；返回完整 proof 仅表示等待资格，最后 marker 始终保留。前一 outer 原件必须已经在固定历史槽，不扫描补造；源库维护仍由核心执行。
 
 `finish_preparation_cancellation` 要求针对该完整 proof 另取 `authorize_cancellation_release` 授权，并显式传入可信独立资格提供者；没有默认实现。核心要求资格时才允许最后释放，提供者返回后重新核验 outer、程序、静止和任务有效性。生产入口固定使用真实安装适配器与专用 native 预检，不暴露可替换的合成观察器；预检现保留经验证的实际可用容量供源库预算使用。
 
-重开任务重新授权，执行器不从持久请求续权。各阶段中断按核心证明继续同一 operation，active outer 暂缺也只能沿已有封存证明恢复；未绑定临时文件、handoff 或材料漂移保持拒绝。新准备入口及 Bridge/UI action 尚未接入，真实资格未完成时最终 marker 与按钮继续阻断。细节见 [Installer 边界](../../../docs/macos-installer-app-boundary.md#取消-executor-任务入口)。
+重开任务重新授权，执行器不从持久请求续权。各阶段中断按核心证明继续同一 operation，active outer 暂缺也只能沿已有封存证明恢复；未绑定临时文件、handoff 或材料漂移保持拒绝。新准备任务已接入 Executor，Bridge/UI action 尚未接入，真实资格未完成时最终 marker 与按钮继续阻断。细节见 [Installer 边界](../../../docs/macos-installer-app-boundary.md#取消-executor-任务入口)。
 
 ## 失败关闭
 

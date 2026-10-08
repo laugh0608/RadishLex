@@ -29,6 +29,7 @@ mod cancellation_authorization;
 mod cancellation_execution;
 mod cancellation_observation;
 mod maintenance_inspection;
+mod preparation_execution;
 mod recovery;
 pub use bootstrap::{
     bootstrap_upgrade_receipt, BootstrappedUpgradeReceipt, UpgradeBootstrapError,
@@ -47,6 +48,11 @@ pub use cancellation_execution::{
 pub use cancellation_observation::{
     CancellationProductObservationFailure, CancellationQuiescenceAuthority,
     MacOsCancellationProductAuthority,
+};
+pub use preparation_execution::{
+    authorize_preparation_resume, authorize_source_preparation, prepare_upgrade_source,
+    PreparationExecutionError, PreparationTaskAuthorization, PreparationTaskAuthorizationError,
+    PreparationTaskControl,
 };
 pub use recovery::inspect_installer_view_with_recovery;
 

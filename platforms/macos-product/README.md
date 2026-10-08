@@ -114,7 +114,7 @@ upgrade 产品终态在 `final_verified` 与 `completed` 前分别复验外层/d
 
 执行器不接受 UI 路径、`HOME`、release、bundle identity 或 available bytes 自报值。随机 operation ID 来自系统熵；active guard、stale intent、缺失 upgrade context、preflight/receipt/identity 失败均关闭。
 
-准备/取消维护查询已接入 Driver/Bridge/AppKit，六类状态全部只刷新，并在普通 v1 guard 内再次拒绝旧 intent。取消另用独立可撤销任务：连续持有 outer → inner 双锁，组合程序实物与专用 native 静止/容量观察，接续请求、源库收尾、材料封存和证明发布；成功仍保留最后 marker，最终释放另需 proof 授权及独立旧程序资格。新准备入口、Bridge/action 与资格提供者仍未完成，详见 [Executor 说明](InstallerExecutor/README.md#准备取消任务)。
+准备/取消维护查询已接入 Driver/Bridge/AppKit，六类状态全部只刷新，并在普通 v1 guard 内再次拒绝旧 intent。新准备任务已在 Executor 接通旧 outer 封存、reservation、新 outer、源库准备及新 v1 handoff；成功仅为非终态交接，尚未接入 Bridge/action。取消另用独立可撤销任务：连续持有 outer → inner 双锁，组合程序实物与专用 native 静止/容量观察，接续请求、源库收尾、材料封存和证明发布；成功仍保留最后 marker，最终释放另需 proof 授权及独立旧程序资格。交接后产品接续、Bridge/action 与资格提供者仍未完成，详见 [Executor 说明](InstallerExecutor/README.md#新源库准备任务)。
 
 ## InstallerBridge
 

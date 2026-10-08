@@ -141,6 +141,47 @@ impl PreviousInventory {
 }
 
 impl PreparationJournalStore {
+    /// Observe the exact active terminal or the strictly resolved lifecycle.
+    /// This does not compare today's learned source with a historical DB hash.
+    /// The subsequent inventory capture still validates all private artifacts.
+    pub fn observe_preparation_predecessor(
+        &self,
+        guard: &UpgradeProcessGuard,
+        operation: &str,
+        hasher: &impl PreparationHasher,
+    ) -> Result<(Option<UpgradeReceipt>, Option<LifecycleReleaseReceipt>)> {
+        if self.load_guarded(guard)?.is_some() {
+            return Err(Error::InvalidPhase);
+        }
+        let path = self.path(RECEIPT_FILE_NAME);
+        let result = if path_exists(&path)? {
+            let identity = self.evidence(&path, hasher)?;
+            let bytes = self.read_history_bytes(&path)?;
+            let receipt = UpgradeReceipt::decode(&bytes).map_err(|_| Error::EvidenceChanged)?;
+            self.verify_previous_receipt(&receipt, operation)?;
+            if self.evidence(&path, hasher)? != identity
+                || receipt.encode().map_err(|_| Error::EvidenceChanged)? != bytes
+            {
+                return Err(Error::EvidenceChanged);
+            }
+            (Some(receipt), None)
+        } else {
+            let root =
+                VerifiedDataRoot::verify(&self.store.root.path, self.store.root.expected_owner_id)?;
+            let release =
+                TerminalReleaseStore::open_existing(root)?.load_latest_lifecycle(guard, hasher)?;
+            (
+                release
+                    .as_ref()
+                    .and_then(LifecycleReleaseReceipt::data_receipt)
+                    .cloned(),
+                release,
+            )
+        };
+        self.verify_guard(guard)?;
+        Ok(result)
+    }
+
     /// Call under the outer guard and fresh product/quiescence authorization,
     /// before persisting a reservation. Only private history metadata is created.
     /// Existing operation targets or interrupted initialization are never adopted.
@@ -443,7 +484,7 @@ pub(super) fn matches_artifact(
         && file.link_count == artifact.link_count()
         && file.byte_len == artifact.byte_len()
 }
-fn valid_id(id: &str) -> bool {
+pub(super) fn valid_id(id: &str) -> bool {
     id.len() == 32
         && id
             .bytes()

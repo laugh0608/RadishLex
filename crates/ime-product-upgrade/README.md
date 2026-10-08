@@ -72,6 +72,10 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 `PreparationReceipt` 是已批准 WAL 新升级方案的独立版本化合同：绑定新 operation、两条前驱链、产品摘要、root/state identity、初始源 family、保护快照及准备后 identity。类型定义从 `reserved` 至 `handoff_ready` 的单步合同；源库、历史接续及 handoff 编排可依次完成准备、旧槽归档和新 v1 交接；单独调用类型方法仍不证明新事务已持久化。canonical 编码最大 256 KiB；未知格式/字段、证据改写和跨 operation 替换失败关闭。它不修改既有 v1 receipt 的 source，也不由类型本身授予文件写入。
 
+产品任务在首次 reservation 前通过 `bind_previous_install` 绑定可选 `previous_install_evidence`：固定 outer 状态目录、历史根、旧 operation 目录与封存 canonical 回执的文件身份/摘要。该绑定不能在持久替换中追加、删除或改认；旧无字段编码保持，新产品准备必须具备它，旧严格 preparation reader 拒绝新字段。取消封存也交叉核验该证据。它属于外围准备证明，既有 v1 安装/数据回执和 FFI ABI 不变。
+
+`observe_preparation_predecessor` 在 inner guard 下严格观察实际旧 data 终态或完整 lifecycle；不以旧源 DB 的历史长度限制后来的合法学习。观察不写入，随后仍须执行完整 inventory 捕获/实物核验。`load_preparation_for_operation` 按精确 ID 读取活动准备或封存 handoff 元数据，未知临时文件仍拒绝，不扫描猜测操作，不打开 SQLite，也不替代执行期物理/逻辑验证。
+
 `PreparationJournalStore` 提供该记录的持久化层：复用原 v1 状态目录 inode 和 `UpgradeProcessGuard`，只写固定 `source-preparation.json` / `.tmp`；严格校验 root/state 绑定、canonical bytes、前一记录与单步替换。写入经过独占创建、文件 fsync、身份复验、rename、目录 fsync 和回读；相同字节重放也补做文件及目录 fsync。无证明的临时记录、孤立准备快照、未知对象及身份漂移保留并阻断。普通 v1 store/startup reader 继续拒绝准备槽，专用入口不扩展原白名单。
 
 单独调用 journal 的读写方法只证明记录持久化，不认证记录中的 DB、快照、产品和归档。`observe_source_family` 从固定 `userdb.sqlite3` 及 sidecar 读取真实文件身份与摘要；`prepare_userdb_source` 则在匹配 inner guard、已持久化 reservation 和每个 checkpoint 的 `SourcePreparationPort` 确认下推进至 `source_prepared`。它先建立独立保护快照，再持久化 `maintenance_intent`，之后才调用 SQLite 维护；最终复验 DELETE、零 sidecar、原 inode、schema 和全量内容等价，并同步主文件及 data root。准备记录及保护快照保留，原 v1 私有槽不动，不能将 `source_prepared` 解释为已交接或允许启动。

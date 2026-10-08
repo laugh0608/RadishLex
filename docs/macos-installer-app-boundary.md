@@ -96,6 +96,16 @@ Bridge ABI v1 的结构大小、字段、symbol 与 contract version 保持；ph
 
 普通 v1 Executor 在取得 outer guard 后再次检查维护状态，拒绝查询后已过期的旧 intent；upgrade bootstrap 前也检查，避免先创建新的数据事务。新准备入口、Bridge mutation action 和资格提供者尚未接入；下述取消 Executor 任务入口不会由维护查询调用，也没有新增取消按钮。
 
+## 新准备 Executor 任务入口
+
+`authorize_source_preparation` 绑定合法旧 outer 终态与完整 source/target，`authorize_preparation_resume` 绑定精确准备记录；两者均要求当次显式动作、数据保留、中立输入源和 Manager 关闭四项确认，生成最长 5 分钟、可撤销的内存任务。生产 `prepare_upgrade_source` 不接受 UI 路径或可替换 observer，固定使用安装适配器与既有 root/manifest 绑定的 native 双程序静止/容量观察。
+
+同一次调用连续持有 outer → inner guard，顺序为：严格核对旧 data/lifecycle 前驱 → 独占保存旧 outer canonical 字节并同步/回读 → 绑定原件物理证据并持久化 reservation → 创建同 ID 的 artifact-free `prepared` outer → 源库准备 → 旧槽保留 → 新 v1 handoff。固定封存槽为 `.radishlex-install-history-v1/<previous-outer-operation>/receipt.json`；首次 reservation 的 `previous_install_evidence` 固定状态目录、历史目录与文件身份，后续不能改认。只有完整取消生命周期证明允许复用已有原件；无意图的部分初始化、临时文件、冲突、身份漂移保留阻断。
+
+新 outer 创建前中断只允许 `reserved` 与精确旧终态接续；创建后必须保持同一个 `prepared` outer。每个检查点复核源/目标实物、双锁、当前授权、静止及封存材料，回调前后相同字节的 active outer 文件替换也拒绝。旧运行库在前次终态后的合法学习不受历史长度约束，旧私有材料仍逐件验证；无 data、未释放终态、v1/v2/取消前驱不混用。
+
+成功仅返回 `preflighted` 数据回执，outer 仍为 `prepared`；没有程序切换或正常启动资格。新准备与取消的 Bridge/action 尚未开放，交接后查询和严格数据重绑仍需产品接线，普通 bootstrap 的空 data 前驱限制不在本批放宽。此入口不代表 B 段退出、旧程序资格或真实用户升级完成。
+
 ## 取消 Executor 任务入口
 
 取消执行使用独立的类型化任务，不复用普通 v1 intent 或只读 snapshot 的 refresh：
@@ -112,7 +122,7 @@ Bridge ABI v1 的结构大小、字段、symbol 与 contract version 保持；ph
 
 持久请求不恢复任务授权。撤销、到期、进程退出后须重新确认；续跑只采用核心能够验证的已绑定位置，未知或未绑定临时文件原样阻断。已进入 handoff、记录变化、错误 root/产品、活动 guard 或证据漂移都不能转入取消。preservation 任务不会调用旧程序资格、不会移动最后 marker；最终入口没有默认资格提供者，资格返回后再次核验 outer、程序、静止与授权。
 
-本步只接仓库 Executor：普通 v1 action 保持原规则，C ABI/UI action 未扩展。新准备入口及 Bridge/action 仍待接线，生产旧程序资格尚缺，不表示真实用户已可点击取消。回归使用合成用户根、显式合成资格和进程退出，不启动真实 GUI、复制冻结程序或试开真实用户库。
+本步只接仓库 Executor：普通 v1 action 保持原规则，C ABI/UI action 未扩展。新准备任务已接上述专用入口，Bridge/action 仍待接线，生产旧程序资格尚缺，不表示真实用户已可点击取消。回归使用合成用户根、显式合成资格和进程退出，不启动真实 GUI、复制冻结程序或试开真实用户库。
 
 ## 用户授权
 

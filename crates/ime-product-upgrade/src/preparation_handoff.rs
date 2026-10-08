@@ -12,6 +12,31 @@ mod creation;
 mod evidence;
 
 impl PreparationJournalStore {
+    /// Metadata-only lookup for a task that already names the exact operation.
+    /// The execution path must still validate all physical and logical evidence.
+    pub fn load_preparation_for_operation(
+        &self,
+        guard: &UpgradeProcessGuard,
+        operation: &str,
+        hasher: &impl PreparationHasher,
+    ) -> Result<PreparationReceipt> {
+        if !inventory::valid_id(operation) {
+            return Err(Error::EvidenceChanged);
+        }
+        self.verify_guard(guard)?;
+        self.validate_entries()?;
+        self.reject_staged_record()?;
+        let record = match self.load_guarded(guard)? {
+            Some(record) => record,
+            None => self.read_handoff_proof(operation, hasher)?,
+        };
+        if record.binding().operation_id != operation {
+            return Err(Error::EvidenceChanged);
+        }
+        self.verify_guard(guard)?;
+        Ok(record)
+    }
+
     /// Consume the preparation store and return the same guarded v1 store.
     /// The caller must supply the expected NEW outer operation on every retry.
     /// Success leaves a nonterminal preflighted receipt: it never allows startup.
