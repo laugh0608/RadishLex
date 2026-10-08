@@ -106,11 +106,11 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 `handoff_userdb_source` 消费准备 store，要求明确的新 outer operation ID、同一 inner guard 和每个检查点的 fresh 产品授权/静止确认，成功返回原 v1 store 与 `preflighted` receipt。前驱取旧 data operation，source 取准备后身份，release/schema 取已绑定产品上下文；当前可选 settings 和 Rime 从实物取身份，settings 摘要另在准备证明封存。
 
-先在新 operation 历史目录独占创建 `receipt.json`，同步文件和目录，再于 `previous_archived` 追加不可改认的 `handoff_intent`（两层历史目录身份、canonical 新回执及其文件身份、settings 身份）。随后将该回执原 inode 移入活动槽，同步两目录并验证 canonical 字节，持久化 `handoff_ready`；保护快照移入新历史目录后，最后才把 marker 原 inode 移为 `preparation.json`。全部动作保持状态目录和 guard，不放宽普通 v1 白名单或 `can_replace`。
+先在新 operation 历史目录独占创建 `receipt.json`，同步文件和目录，再于 `previous_archived` 追加不可改认的 `handoff_intent`（两层历史目录身份、canonical 新回执及其文件身份、settings 身份）。随后将该回执原 inode 移入活动槽，同步两目录并验证 canonical 字节，持久化 `handoff_ready`；保护快照移入新历史目录后，最后才把 marker 原 inode 移为 `preparation.json`。全部动作保持状态目录和 guard，不放宽普通 v1 白名单或 `can_replace`。已记录 `handoff_ready` 的重放也重新同步活动 receipt 及移动两侧父目录；不能仅凭阶段可见省略接续前的持久化重验。
 
 中断重载只接续持久意图绑定的唯一对象；新回执已活动或 marker 已封存时均交叉核验旧 inventory、准备后 DB、保护快照、当前 settings/Rime、目录和回执。未封存身份的新 operation 目录/文件、两槽冲突、未知记录/版本/临时对象、缺失及身份漂移保持原样并阻断。只有已存在且匹配前驱 inventory 的共享历史根可在新 operation 创建前重新核验；首次路径留下但未绑定的历史根不能认领。marker 移出后的同 operation 重放补做同步并回读，不改写历史证明，也不重复维护 SQLite。
 
-`handoff_intent` 是可选新字段，无字段编码保持；旧严格准备 reader 拒绝含该字段的记录。交接后的 v1 仍非终态，startup gate 继续拒绝启动；原 v1 链创建自己的 migration snapshot，保留独立保护快照。真实 outer/Executor 尚未接线，本能力仅取得仓库合成资格。
+`handoff_intent` 是可选新字段，无字段编码保持；旧严格准备 reader 拒绝含该字段的记录。交接后的 v1 仍非终态，startup gate 继续拒绝启动；原 v1 链创建自己的 migration snapshot，保留独立保护快照。macOS 新准备 outer/Executor 及初始接续准入已接线，后续程序/data/终态执行链和 Bridge/action 仍待闭合；本能力仅取得仓库合成验证。
 
 ### 终态保留封存与释放索引
 
@@ -132,7 +132,7 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 准备记录新增可选且不可改认的 `previous_release_index_identity`，原字段缺失时编码保持，旧严格准备 reader 拒绝新字段。证明摘要复用 `previous_inventory_sha256`，数据回执摘要仍绑定真正的旧 v1 receipt；前一 outer/data 链分别保留。源 release/product 必须与已释放证明匹配；索引或证明即使同字节换 inode 也拒绝，缺失、冲突、临时文件或提前出现的未绑定新 operation 目录不能进入 SQLite 写路径。
 
-新 family 和保护快照从当前运行数据重新取得，允许上次释放后的合法 WAL 学习/删除。准备和 handoff 各检查点复验已固定的索引、证明及历史材料；已释放槽不再移动，`archived_slots` 保持空，`previous_archived` 只记录既有封存证明通过。新 v1 handoff、后续终态释放和下一次准备继续使用同一套历史校验；多个保留的旧 operation 不被认领或改写。新准备/handoff/终态释放的产品入口与旧程序取消资格仍待完成；取消 Executor 的实现不补齐这些入口，合成产品 port 不构成产品授权。
+新 family 和保护快照从当前运行数据重新取得，允许上次释放后的合法 WAL 学习/删除。准备和 handoff 各检查点复验已固定的索引、证明及历史材料；已释放槽不再移动，`archived_slots` 保持空，`previous_archived` 只记录既有封存证明通过。新 v1 handoff、后续终态释放和下一次准备继续使用同一套历史校验；多个保留的旧 operation 不被认领或改写。新准备/handoff 产品入口及初始接续准入已接，后续执行、终态释放产品入口与旧程序取消资格仍待完成；取消 Executor 不补齐这些入口，合成产品 port 不构成产品授权。
 
 ### 准备取消意图与源库收尾
 

@@ -257,6 +257,8 @@ Executor 已接 `authorize_source_preparation` / `authorize_preparation_resume` 
 
 同日后续接入 handoff 中间位置和完成位置的只读查询，以及 `rebind_prepared_upgrade` 严格数据重绑。固定旧历史/保护快照与可推进的 v1 receipt 分别核验，保留两个前驱 ID、产品、schema、原 artifact 和目录/文件身份；v1 switch 中断沿真实槽位解释。查询和重绑不打开 SQLite 或补同步，不能确认最后一次 rename 的持久化，也不授予执行权限。UI 仍为只读维护投影；下一步固定专用 continuation、fresh 授权和首个 v1 mutation 前的 handoff 持久化重验，再接 Driver/Bridge/action，详细合同见 [Installer 边界](../macos-installer-app-boundary.md#handoff-后的只读检查与严格重绑)。
 
+同日接续准入实现：新增精确 `prepared/preflighted` 任务授权与持有双锁的 `PreparedContinuationTask`，重验 actual 产品/静止和 sealed 历史，补同步 outer 与全部 handoff 移动材料。回归定位并修正 `HandoffReady` 重放未再次同步 data receipt 的遗漏；outer/proof 相同字节 inode 替换阻断。Driver/Bridge action `10` 的完整开放合同已固定，当前仍未知值拒绝；程序、data 与终态执行必须在同一任务内逐检查点复验后再接入，不能把准入结果作为解锁后的执行凭证。详细范围见 [Installer 合同](../macos-installer-app-boundary.md#专用接续准入与待开放动作合同)，验证记录见 W41。
+
 ## 进入实机前必须另行确定
 
 仓库实现和独立产品资格通过后，再确定新候选版本/构建身份、唯一 source、当前数据库与旧事务归档清单、准备写入与停止条件，并请求一次新的实机授权。9 月 9 日恢复授权已消费，本方案不授权复跑恢复、直接重试 target 40、手工 checkpoint、删除 sidecar 或搬移冻结材料。

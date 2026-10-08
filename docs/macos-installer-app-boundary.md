@@ -112,6 +112,29 @@ Bridge ABI v1 的结构大小、字段、symbol 与 contract version 保持；ph
 
 `rebind_prepared_upgrade` 由已经持有 outer guard 的调用方使用，取得并返回 inner guard，绑定精确 preparation 与已存在的 v1 链。它不创建 receipt、不补同步、不打开 SQLite，也不赋予 mutation 权限；未知或部分终态释放材料交由后续专用流程，不能被重绑认领。首个 v1 mutation 前仍须 fresh 任务授权、程序/静止观察及 handoff 持久化重验。当前所有交接后查询沿用 `preparing_source + refresh`，普通 intent 继续阻断，Driver/Bridge action 和 ABI 保持不变。
 
+### 专用接续准入与待开放动作合同
+
+`authorize_prepared_continuation` 绑定精确新 outer 与 `HandoffReady` preparation，要求四项当次确认、最多 5 分钟且可撤销的任务授权。当前准入范围严格为无程序 artifact 的 outer `prepared` 与原始 data `preflighted`；已推进、取消、部分交接、错误产品/root/前驱均不进入此入口。旧 `authorize_preparation_resume` 不能代替接续授权。
+
+`admit_prepared_continuation` 先取得 outer → inner 双锁，核验完整旧历史与新交接关系，再同步旧 outer 原件及祖先目录、当前 outer、handoff receipt、保护快照与 proof 及各自移动的两侧父目录。`HandoffReady` 重放也必须重新同步活动 data receipt；此前记录可见不能证明 rename 已持久化。各检查点前后核验任务期限、当前回执、封存证据与文件身份，并观察实际 source/target 双程序和 manifest/root 绑定的 native 静止状态；交接原语在锁内复验 SQLite 源库/快照等价。相同字节的 outer 或 proof inode 替换也拒绝。
+
+成功返回 `PreparedContinuationTask`，持有双锁且不推进任何 v1 状态；不输出 stores、guards 或可序列化的执行凭证。`revalidate` 在同一双锁下重复整个准入检查。任务释放、撤销、到期或进程退出后，不能把曾经准入的结果用作后来调用的授权。此入口完成的是接续前的授权与持久化重验，程序切换、数据升级与终态释放尚未接入任务。
+
+Driver/Bridge 后续开放按以下合同实施，当前不注册新 action：
+
+| 环节 | 合同 |
+| --- | --- |
+| 动作身份 | 预留 `ContinuePreparedUpgrade` / `continue_prepared_upgrade` / action 整数 `10`；ABI v1 POD、symbol 与版本保持。当前双方仍将 `10` 视为未知值并失败关闭，不能先开放按钮 |
+| Driver 投影 | 仅完整、fresh 的 handoff/outer/data 关系可提供动作；活动 guard、未知/部分证明、取消材料、产品或 root 漂移只提供刷新或阻断。UI 不传路径、产品身份或 operation ID |
+| 授权 | 对本次重新读取的 snapshot 要求四项确认；task 绑定当前精确 outer、preparation、data 状态及产品/root。旧窗口动作、普通 confirm/resume、持久 intent 和上次成功准入都不续权 |
+| Bridge dispatch | 从系统 authoritative 用户根与 sealed payload 重建实际适配器，再取得本任务的双锁。先重验持久化，再在同一个任务内执行，不拆成“准入成功后释放锁，再调用普通 executor” |
+| 修改前检查 | 程序 staging/preserve/逐端 commit、数据协调的每个修改检查点及终态前，均复验授权、双锁、实际程序槽位与 native 静止；回调后再检查。程序已移动时使用对应阶段的槽位关系，不能一直套用“旧程序仍在安装位置”的准入观察 |
+| 中断与重启 | 新授权绑定进展后的 exact outer/data 与不可变交接祖先，并按阶段复验持久化；当前仅初始 `prepared/preflighted` 准入，推进态禁止 fallback 到本入口或普通 bootstrap |
+| 完成与错误 | 产品完成须同时满足 outer/data 终态与专用终态封存/释放合同；返回准入成功不显示升级完成。撤权、静止丢失、身份漂移或同步失败停止并保留现场，不能吞错或自动降级 |
+| 开放门禁 | 同一任务覆盖程序→data→终态实际路径、各阶段中断续跑、撤权与漂移矩阵，以及 Rust/native 双向 action 映射、未知值拒绝和完整仓库门禁之后，才启用 `10`；取消动作与独立旧程序资格另行闭合 |
+
+此合同没有开放真实系统操作；repository-only 文件与进程退出测试不能证明真实断电、WAL/pager 故障或旧程序启动资格。
+
 ## 取消 Executor 任务入口
 
 取消执行使用独立的类型化任务，不复用普通 v1 intent 或只读 snapshot 的 refresh：

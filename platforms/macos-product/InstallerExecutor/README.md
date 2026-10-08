@@ -31,7 +31,13 @@ first install、repair 和 remove 在 `programs_committed` 后共用核心终态
 
 成功仅返回新的 `preflighted` 数据回执，outer 仍为 `prepared`，双程序未 staging/切换，startup gate 仍阻断。`load_preparation_for_operation` 可按精确 ID 读取活动准备或已封存 handoff 元数据供重开任务使用；它不授予执行权限，执行仍复验实物和数据等价。Bridge/action 尚未接入此入口，普通 bootstrap 继续只接受空 data 前驱。
 
-### 交接后查询与重绑
+### 接续准入任务
+
+`authorize_prepared_continuation` / `admit_prepared_continuation` 只接精确 `prepared/preflighted` 的完整 handoff。四项确认、期限与撤销绑定在任务内；生产入口固定复验真实双程序和 native 静止。准入重同步旧 outer 历史、活动 outer、交接 receipt/保护快照/proof 与移动两侧父目录，重复 SQLite 等价核验，成功返回持续持有双锁的 `PreparedContinuationTask`。
+
+任务不推进 v1、不导出 store/guard 或执行凭证；`revalidate` 可在同一锁内重验，任务退出后必须重新授权。进展后的程序/data/终态执行尚待接入，当前 Driver/Bridge 保持刷新；action `10` 的开放条件见 [Installer 合同](../../../docs/macos-installer-app-boundary.md#专用接续准入与待开放动作合同)。
+
+## 交接后查询与重绑
 
 `inspect_maintenance` 识别 handoff 的已绑定中间位置，以及 marker 已移入历史后的 `PreparationHandedOff`；后者同时返回经过严格 v1 reader 核验的活动数据回执。历史材料仍按准备证明固定身份核验，当前 v1 回执按不可变 operation/前驱/release/schema 和只追加 artifact 关系接续；数据切换中断由原 v1 reader 检查实际槽位，不因活动 DB 暂缺而打开 SQLite 或猜测修复。准备证明缺失、错误前驱及孤立材料不能回退成首次 bootstrap。
 

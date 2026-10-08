@@ -86,23 +86,28 @@ impl PreparationJournalStore {
         let history = self.handoff_directory(&record);
         if record.phase() == PreparationPhase::PreviousArchived {
             self.persist(guard, Some(&record), &record)?;
-            self.handoff_move(
-                guard,
-                port,
-                hasher,
-                &record,
-                (
-                    &history.join(RECEIPT_FILE_NAME),
-                    &self.path(RECEIPT_FILE_NAME),
-                ),
-                &intent.receipt_identity,
-                [
-                    Point::HandoffBeforeReceiptRename,
-                    Point::HandoffReceiptRenamed,
-                    Point::HandoffReceiptTargetSynced,
-                    Point::HandoffReceiptSourceSynced,
-                ],
-            )?;
+        }
+        // A recorded HandoffReady is observable after a process restart, but
+        // is not an acknowledgement that the earlier rename reached storage.
+        // Reaffirm the receipt and both parents even after the marker moved.
+        self.handoff_move(
+            guard,
+            port,
+            hasher,
+            &record,
+            (
+                &history.join(RECEIPT_FILE_NAME),
+                &self.path(RECEIPT_FILE_NAME),
+            ),
+            &intent.receipt_identity,
+            [
+                Point::HandoffBeforeReceiptRename,
+                Point::HandoffReceiptRenamed,
+                Point::HandoffReceiptTargetSynced,
+                Point::HandoffReceiptSourceSynced,
+            ],
+        )?;
+        if record.phase() == PreparationPhase::PreviousArchived {
             let mut next = record.clone();
             next.record_handoff(&intent.receipt, intent.receipt_identity.sha256.clone())
                 .map_err(|_| Error::EvidenceChanged)?;

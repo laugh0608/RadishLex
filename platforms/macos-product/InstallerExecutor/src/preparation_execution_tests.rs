@@ -4,7 +4,7 @@ use std::fs;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 
 #[path = "preparation_execution_fixture.rs"]
-mod fixture;
+pub(crate) mod fixture;
 use fixture::*;
 
 #[path = "preparation_lifecycle_tests.rs"]

@@ -512,4 +512,4 @@ impl PreparationTaskAuthorization {
 
 #[cfg(test)]
 #[path = "preparation_execution_tests.rs"]
-mod tests;
+pub(crate) mod tests;

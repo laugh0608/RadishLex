@@ -41,13 +41,25 @@ fn file(
     path: &Path,
     root: &PreparationDirectoryIdentity,
 ) -> Result<(PreparationFileIdentity, Vec<u8>)> {
+    bounded_file(
+        path,
+        root,
+        radishlex_ime_product_install::MAX_INSTALL_RECEIPT_BYTES,
+    )
+}
+
+fn bounded_file(
+    path: &Path,
+    root: &PreparationDirectoryIdentity,
+    limit: usize,
+) -> Result<(PreparationFileIdentity, Vec<u8>)> {
     let metadata = fs::symlink_metadata(path).map_err(|_| Error::InvalidBinding)?;
     if !metadata.is_file()
         || metadata.dev() != root.device_id
         || metadata.uid() != root.owner_id
         || metadata.mode() & 0o7777 != 0o600
         || metadata.nlink() != 1
-        || metadata.len() > radishlex_ime_product_install::MAX_INSTALL_RECEIPT_BYTES as u64
+        || metadata.len() > limit as u64
         || fs::canonicalize(path).map_err(|_| Error::InvalidBinding)? != path
     {
         return Err(Error::InvalidBinding);
@@ -59,7 +71,7 @@ fn file(
     }
     let mut bytes = vec![];
     opened
-        .take(radishlex_ime_product_install::MAX_INSTALL_RECEIPT_BYTES as u64 + 1)
+        .take(limit as u64 + 1)
         .read_to_end(&mut bytes)
         .map_err(|_| Error::Io)?;
     let after = fs::symlink_metadata(path).map_err(|_| Error::Io)?;
@@ -322,7 +334,7 @@ pub(super) fn seal(
     Ok(evidence)
 }
 
-pub(super) fn sync_active(install: &InstallReceiptStore, expected: &InstallReceipt) -> Result<()> {
+pub(crate) fn sync_active(install: &InstallReceiptStore, expected: &InstallReceipt) -> Result<()> {
     let root = directory_identity(install);
     let state = install.data_root_path().join(STATE);
     let path = state.join("receipt.json");
@@ -345,4 +357,50 @@ pub(crate) fn active_identity(install: &InstallReceiptStore) -> Result<Preparati
         &directory_identity(install),
     )
     .map(|value| value.0)
+}
+
+pub(crate) fn preparation_proof_identity(
+    install: &InstallReceiptStore,
+    preparation: &PreparationReceipt,
+) -> Result<PreparationFileIdentity> {
+    let binding = preparation.binding();
+    let path = install
+        .data_root_path()
+        .join(".radishlex-upgrade-history-v1")
+        .join(&binding.operation_id)
+        .join("preparation.json");
+    bounded_file(
+        &path,
+        &binding.data_root,
+        radishlex_ime_product_upgrade::MAX_PREPARATION_RECEIPT_BYTES,
+    )
+    .map(|value| value.0)
+}
+
+/// Reaffirm the retained predecessor's durability without replacing its inode.
+pub(crate) fn sync_preparation_history(
+    install: &InstallReceiptStore,
+    preparation: &PreparationReceipt,
+    mut checkpoint: impl FnMut() -> Result<()>,
+) -> Result<()> {
+    let previous = verify_preparation(install, preparation)?;
+    let history = install.data_root_path().join(HISTORY);
+    let operation = history.join(previous.operation_id());
+    for path in [
+        operation.join("receipt.json"),
+        operation,
+        history,
+        install.data_root_path().to_path_buf(),
+    ] {
+        checkpoint()?;
+        if verify_preparation(install, preparation)? != previous {
+            return Err(Error::InvalidBinding);
+        }
+        sync(&path)?;
+        if verify_preparation(install, preparation)? != previous {
+            return Err(Error::InvalidBinding);
+        }
+        checkpoint()?;
+    }
+    Ok(())
 }

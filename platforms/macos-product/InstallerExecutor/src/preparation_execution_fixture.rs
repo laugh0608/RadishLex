@@ -13,14 +13,14 @@ pub(super) const OLD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 pub(super) const DATA: &str = "dddddddddddddddddddddddddddddddd";
 pub(super) const NEW: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 pub(super) const STATE: &str = ".radishlex-upgrade-v1";
-pub(super) struct Fixture {
-    pub(super) path: PathBuf,
+pub(crate) struct Fixture {
+    pub(crate) path: PathBuf,
     pub(super) source: ProductArtifactIdentity,
     pub(super) target: ProductArtifactIdentity,
     pub(super) previous: InstallReceipt,
 }
 impl Fixture {
-    pub(super) fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let mut nonce = [0; 8];
         getrandom::getrandom(&mut nonce).unwrap();
         let path = fs::canonicalize(std::env::temp_dir())
@@ -78,7 +78,7 @@ impl Fixture {
             previous,
         }
     }
-    pub(super) fn reopen(path: PathBuf) -> Self {
+    pub(crate) fn reopen(path: PathBuf) -> Self {
         let owner = fs::metadata(&path).unwrap().uid();
         let store =
             InstallReceiptStore::open_existing(VerifiedInstallRoot::verify(&path, owner).unwrap())
@@ -108,13 +108,13 @@ impl Fixture {
             previous,
         }
     }
-    pub(super) fn install(&self) -> InstallReceiptStore {
+    pub(crate) fn install(&self) -> InstallReceiptStore {
         InstallReceiptStore::open_existing(
             VerifiedInstallRoot::verify(&self.path, self.owner()).unwrap(),
         )
         .unwrap()
     }
-    pub(super) fn owner(&self) -> u32 {
+    pub(crate) fn owner(&self) -> u32 {
         fs::metadata(&self.path).unwrap().uid()
     }
     pub(super) fn grant(&self) -> (PreparationTaskAuthorization, PreparationTaskControl) {
@@ -126,7 +126,7 @@ impl Fixture {
         )
         .unwrap()
     }
-    pub(super) fn preparation(&self) -> PreparationReceipt {
+    pub(crate) fn preparation(&self) -> PreparationReceipt {
         let journal = PreparationJournalStore::open_existing(
             VerifiedDataRoot::verify(&self.path, self.owner()).unwrap(),
         )
@@ -146,7 +146,7 @@ impl Fixture {
         )
         .unwrap()
     }
-    pub(super) fn run(&self, observer: &mut Observer) -> Result<UpgradeReceipt> {
+    pub(crate) fn run(&self, observer: &mut Observer) -> Result<UpgradeReceipt> {
         let (auth, _control) = self.grant();
         execute(auth, &self.install(), observer, &mut Ids)
     }
@@ -262,7 +262,7 @@ pub(super) fn artifact(slot: UpgradeArtifactSlot, path: &Path) -> UpgradeArtifac
     let m = fs::metadata(path).unwrap();
     UpgradeArtifactIdentity::private_file(slot, m.dev(), m.ino(), m.uid(), m.len()).unwrap()
 }
-pub(super) fn confirmation() -> InstallerUserAuthorization {
+pub(crate) fn confirmation() -> InstallerUserAuthorization {
     InstallerUserAuthorization {
         explicit_action_confirmed: true,
         data_retention_acknowledged: true,
@@ -293,7 +293,7 @@ impl InstallerOperationIdSource for NoIds {
     }
 }
 #[derive(Default)]
-pub(super) struct Observer {
+pub(crate) struct Observer {
     pub(super) seen: Vec<ExecutionPoint>,
     pub(super) fail: Option<ExecutionPoint>,
     pub(super) mutation: Option<(ExecutionPoint, Box<dyn FnOnce()>)>,

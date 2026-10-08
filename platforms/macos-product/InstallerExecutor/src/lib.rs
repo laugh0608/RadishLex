@@ -29,7 +29,12 @@ mod cancellation_authorization;
 mod cancellation_execution;
 mod cancellation_observation;
 mod maintenance_inspection;
+mod preparation_continuation;
 mod preparation_execution;
+pub use preparation_continuation::{
+    admit_prepared_continuation, authorize_prepared_continuation,
+    PreparedContinuationAuthorization, PreparedContinuationTask,
+};
 mod recovery;
 pub use bootstrap::{
     bootstrap_upgrade_receipt, BootstrappedUpgradeReceipt, UpgradeBootstrapError,
