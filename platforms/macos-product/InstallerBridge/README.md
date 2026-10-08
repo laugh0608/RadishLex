@@ -6,7 +6,7 @@
 
 `RADISHLEX_INSTALLER_ACTION_ABORT_PRE_SWITCH_UPGRADE = 9` 是 ABI v1 的可加 action；POD、symbol 与 contract version 保持不变。旧 reader 对未知 action 失败关闭，当前 Rust/Objective-C 双向映射和四项 authorization bits 由合同测试覆盖。恢复状态经 Executor 双 receipt 只读检查投影；生产入口不把普通 resume 当作中止恢复。
 
-维护 phase 7–12 对应准备、取消请求、源库收尾、材料保留、等待资格与已完成取消；保持 ABI v1 的 POD、symbol 和 version，旧 reader 对未知值失败关闭。六项状态全部仅刷新，原生 reader 拒绝它们与 mutation action、旧 receipt state/进度或手动提示并存。取消 Executor 的独立任务尚未接入 Bridge/action，查询不会调用写入口。
+维护 phase 7–12 对应准备、取消请求、源库收尾、材料保留、等待资格与已完成取消；保持 ABI v1 的 POD、symbol 和 version，旧 reader 对未知值失败关闭。六项状态全部仅刷新，原生 reader 拒绝它们与 mutation action、旧 receipt state/进度或手动提示并存。新准备、初始接续准入和取消 Executor 的独立任务尚未接入 Bridge/action，查询不会调用写入口。`ContinuePreparedUpgrade` / action `10` 仅为 [待开放合同](../../../docs/macos-installer-app-boundary.md#专用接续准入与待开放动作合同)，当前 decoder 和原生 reader 仍拒绝此值；不能将文档预留解释为已注册动作。
 
 Rust `dispatch_installer_action` 每次从只读 receipt 投影重新授权当前 action，再进入 restartable executor，不接受 UI 自报 operation、路径、receipt state 或产品身份。生产 bootstrap 使用 `geteuid/getpwuid_r` 取得 authoritative current-user home，只从当前 executable 固定反推 `RadishLex Installer.app/Contents/Resources`，并严格读取 sealed `ReleaseIdentity.json` 和内嵌 InstallPayload。路径、owner、resource、Installer strict ad-hoc identity、双 component exact requirement 集合或 payload identity 任一不可得时稳定返回 `blocked + product_identity_unavailable`。
 

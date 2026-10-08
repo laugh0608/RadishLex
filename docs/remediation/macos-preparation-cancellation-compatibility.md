@@ -2,7 +2,7 @@
 
 状态：**2026-09-25 项目所有者已确认，授权继续仓库实现与隔离验证。** 本文补充[已批准的 WAL 源库准备设计](macos-wal-source-preparation-design.md)，只处理新 v1 handoff 前的主动取消。设计批准不代表整条取消链已实现；分步实施范围见下节，执行顺位以 [current](../status/current.md) 为准。
 
-截至 2026-10-05 收尾，核心证明/生命周期、产品组合、专用静止与任务授权、只读 UI 和取消 Executor 已实现；后续各日期小节保留当时的分步事实。当前未完成项为新准备入口、Bridge/action 与独立旧程序资格，最终 marker 仍受资格约束，B 段未退出；继续保持现有账户与 Agent 会话。明日顺位见 [W41](../devlogs/2026-W41.md#2026-10-06明日事项)。
+截至 2026-10-08 收尾，取消核心/产品组合、专用静止与任务授权、只读 UI、取消 Executor，以及新准备、交接查询/重绑和初始接续准入均已接线；各日期小节保留当时的分步事实。当前未完成项为同一任务内的后续执行链、Bridge/action 与独立旧程序资格，最终取消 marker 仍受资格约束，B 段未退出；继续保持现有账户与 Agent 会话。明日顺位见 [W41](../devlogs/2026-W41.md#2026-10-09明日事项)。
 
 ## 已批准的调整
 
@@ -110,6 +110,8 @@ Executor 已在旧 outer 活动槽未改变前独占保存 canonical 字节，�
 
 新准备任务贯穿双 guard 并连接源库准备、旧槽保留与 v1 handoff。成功仍是 `prepared` outer / `preflighted` data；Bridge/action、交接后产品接续及独立旧程序资格未开放，取消最后 marker 的独立资格要求不变。具体入口见 [Installer 边界](../macos-installer-app-boundary.md#新准备-executor-任务入口)，验证见 [W41](../devlogs/2026-W41.md)。
 
+同日收尾补充：handoff 后的查询与严格重绑、初始 `prepared/preflighted` 接续准入也已实现，均不开放取消或升级按钮；持锁准入不能代替后续程序/data/终态执行。action `10` 仅固定了待开放合同，当前仍按未知值拒绝；详细状态以 [Installer 合同](../macos-installer-app-boundary.md#专用接续准入与待开放动作合同)和 [current](../status/current.md) 为准。
+
 ## 取消入口与数据保持
 
 仅在本次准备存在、真实双程序仍为已绑定 source，且没有持久化 `handoff_intent` 时提供取消。`reserved`、`snapshot_ready`、`maintenance_intent`、`source_prepared`、`previous_archived` 均需按其实际对象关系核验，阶段名称本身不能授权。
@@ -152,7 +154,7 @@ Executor 已在旧 outer 活动槽未改变前独占保存 canonical 字节，�
 
 ## 持久化顺序与恢复
 
-始终按 outer install guard → inner upgrade guard 取得双锁，每次动作 fresh 核验 source 产品、静止、私有对象及授权；固定状态目录不移动，guard 不更换。以下专用协议的核心持久化顺序已接入仓库，生产授权/资格提供者和产品入口仍待接线；这不是人工文件搬移步骤。
+始终按 outer install guard → inner upgrade guard 取得双锁，每次动作 fresh 核验 source 产品、静止、私有对象及授权；固定状态目录不移动，guard 不更换。以下专用协议的核心持久化顺序、产品组合、可撤销授权和取消 Executor 已接入仓库；独立旧程序资格提供者及 Bridge/action 仍待接线。这不是人工文件搬移步骤。
 
 1. 保存不可改认的取消意图，绑定准备记录与前驱，阻止继续 handoff。活动准备 marker 与新增取消 marker 均保持；旧 reader 对未知对象失败关闭。
 2. 按请求时点完成源库证明。必要时仅恢复原维护意图，旧 data 私有材料依原 inventory 封存；此前尚未具备 `source_prepared` 的取消归档须由此专用证明授权，不能放宽 B4 原状态转换。

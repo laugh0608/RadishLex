@@ -76,7 +76,7 @@
 
 取消证明/索引发布后仍保留活动请求；最后 marker 释放要求当次授权及独立 `QualifiedSource`，不能用结构化对象代替证据。真实双 guard、旧终态、程序身份和专用 native 静止/容量观察已组合；任务最多 5 分钟、可撤销，回调后复查。只读 UI 已接，mutation Bridge/action 未开放。
 
-取消 Executor 已接通请求、源库收尾、封存与证明发布，保留最后 marker；最终释放另需当次授权和独立资格。[10-06 明日事项](../devlogs/2026-W41.md#2026-10-06明日事项)中的新准备任务入口已完成仓库接线与定向验证；完整门禁结果在本周周志维护。handoff 后的只读查询与严格数据重绑已接线，仍只提供刷新，不补同步或授予执行权限。初始接续准入已补授权和持久化重验，Driver/Bridge action 合同已固定；下一步在同一双锁任务中接程序、data 与终态执行及各阶段重启恢复，再开放动作。普通 bootstrap 的空前驱限制保持。缺资格时不开放最终取消。已定位精确 source 39，正常双程序启动资格仍缺可行方案。按[当前会话约束](../remediation/macos-preparation-cancellation-compatibility.md#2026-10-05-资格前置审计与当前会话约束)保持现有账户和 Agent 会话，不新增用户或切换登录。取消按钮、WAL/pager 内部断电与 B 段退出继续开放。
+取消 Executor、新准备入口、handoff 查询与严格重绑，以及初始接续准入均已完成仓库接线。查询只提供刷新；准入仅接受 `prepared/preflighted`，连续持双锁补同步，不推进状态。明日按 [10-09 事项](../devlogs/2026-W41.md#2026-10-09明日事项)先接同一任务内的程序、data、终态执行及进展态重启，再按 [Driver/Bridge 合同](../macos-installer-app-boundary.md#专用接续准入与待开放动作合同)开放动作；`10` 当前仍是未知值，普通 bootstrap 的空前驱限制保持。独立 source 39 正常双程序资格仍缺可行方案，最终取消不开放。按[当前会话约束](../remediation/macos-preparation-cancellation-compatibility.md#2026-10-05-资格前置审计与当前会话约束)保持现有账户和 Agent 会话，不新增用户或切换登录；WAL/pager 内部断电与 B 段退出继续开放。
 
 新升级真正完成后才继续客户端身份和 composition 隐私实测，不直接重试 40。冻结 macOS 39/40、用户数据、Linux/UTM 与系统操作均不在本批范围内；任何实机动作须另行明确目标与授权。09-30 的历史待办由本批承接，原交接保留在[2026-W40](../devlogs/2026-W40.md#2026-09-30明日事项)。
 

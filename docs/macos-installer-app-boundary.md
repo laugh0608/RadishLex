@@ -116,7 +116,7 @@ Bridge ABI v1 的结构大小、字段、symbol 与 contract version 保持；ph
 
 `authorize_prepared_continuation` 绑定精确新 outer 与 `HandoffReady` preparation，要求四项当次确认、最多 5 分钟且可撤销的任务授权。当前准入范围严格为无程序 artifact 的 outer `prepared` 与原始 data `preflighted`；已推进、取消、部分交接、错误产品/root/前驱均不进入此入口。旧 `authorize_preparation_resume` 不能代替接续授权。
 
-`admit_prepared_continuation` 先取得 outer → inner 双锁，核验完整旧历史与新交接关系，再同步旧 outer 原件及祖先目录、当前 outer、handoff receipt、保护快照与 proof 及各自移动的两侧父目录。`HandoffReady` 重放也必须重新同步活动 data receipt；此前记录可见不能证明 rename 已持久化。各检查点前后核验任务期限、当前回执、封存证据与文件身份，并观察实际 source/target 双程序和 manifest/root 绑定的 native 静止状态；交接原语在锁内复验 SQLite 源库/快照等价。相同字节的 outer 或 proof inode 替换也拒绝。
+`admit_prepared_continuation` 先拒绝授权 root 与 store 不匹配的调用，再取得 outer → inner 双锁，核验完整旧历史与新交接关系，再同步旧 outer 原件及祖先目录、当前 outer、handoff receipt、保护快照与 proof 及各自移动的两侧父目录。`HandoffReady` 重放也必须重新同步活动 data receipt；此前记录可见不能证明 rename 已持久化。各检查点前后核验任务期限、当前回执、封存证据与文件身份，并观察实际 source/target 双程序和 manifest/root 绑定的 native 静止状态；交接原语在锁内复验 SQLite 源库/快照等价。相同字节的 outer 或 proof inode 替换也拒绝。
 
 成功返回 `PreparedContinuationTask`，持有双锁且不推进任何 v1 状态；不输出 stores、guards 或可序列化的执行凭证。`revalidate` 在同一双锁下重复整个准入检查。任务释放、撤销、到期或进程退出后，不能把曾经准入的结果用作后来调用的授权。此入口完成的是接续前的授权与持久化重验，程序切换、数据升级与终态释放尚未接入任务。
 
