@@ -148,7 +148,7 @@ pub(super) fn verify(
     Ok(())
 }
 
-pub(super) fn verify_preparation(
+pub(crate) fn verify_preparation(
     install: &InstallReceiptStore,
     prep: &PreparationReceipt,
 ) -> Result<InstallReceipt> {
@@ -339,7 +339,7 @@ pub(super) fn sync_active(install: &InstallReceiptStore, expected: &InstallRecei
     Ok(())
 }
 
-pub(super) fn active_identity(install: &InstallReceiptStore) -> Result<PreparationFileIdentity> {
+pub(crate) fn active_identity(install: &InstallReceiptStore) -> Result<PreparationFileIdentity> {
     file(
         &install.data_root_path().join(STATE).join("receipt.json"),
         &directory_identity(install),

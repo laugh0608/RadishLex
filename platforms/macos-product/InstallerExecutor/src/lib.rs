@@ -54,6 +54,8 @@ pub use preparation_execution::{
     PreparationExecutionError, PreparationTaskAuthorization, PreparationTaskAuthorizationError,
     PreparationTaskControl,
 };
+mod preparation_rebinding;
+pub use preparation_rebinding::rebind_prepared_upgrade;
 pub use recovery::inspect_installer_view_with_recovery;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

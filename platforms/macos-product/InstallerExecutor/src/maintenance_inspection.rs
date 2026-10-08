@@ -39,11 +39,25 @@ pub(super) fn inspect(
                 .map_err(|_| InstallerStableError::UnsafeDataRoot)?,
         )
         .map_err(|_| InstallerStableError::InvalidReceipt)?;
+        let identity = super::preparation_execution::outer::active_identity(&store)
+            .map_err(|_| InstallerStableError::InvalidReceipt)?;
         let outer = store
             .load_for_recovery_inspection()
             .map_err(|_| InstallerStableError::InvalidReceipt)?
             .ok_or(InstallerStableError::InvalidReceipt)?;
-        verify_outer(&observation, &outer)?;
+        if observation.phase() == MaintenancePhase::PreparationHandedOff {
+            super::preparation_rebinding::verify_outer(&store, observation.preparation(), &outer)
+                .map_err(|_| InstallerStableError::InvalidReceipt)?;
+            super::preparation_rebinding::verify_state_pair(
+                &outer,
+                observation
+                    .handed_off_receipt()
+                    .ok_or(InstallerStableError::InvalidReceipt)?,
+            )
+            .map_err(|_| InstallerStableError::InvalidReceipt)?;
+        } else {
+            verify_outer(&observation, &outer)?;
+        }
         // Reobserve both domains: a view is not a lock and grants no intent.
         if inspect_maintenance(root, owner, &MacOsPreparationHasher).map_err(map_error)?
             != Some(observation.clone())
@@ -52,8 +66,15 @@ pub(super) fn inspect(
                 .map_err(|_| InstallerStableError::InvalidReceipt)?
                 .as_ref()
                 != Some(&outer)
+            || super::preparation_execution::outer::active_identity(&store)
+                .map_err(|_| InstallerStableError::InvalidReceipt)?
+                != identity
         {
             return Err(InstallerStableError::RootIdentityChanged);
+        }
+        if observation.phase() == MaintenancePhase::PreparationHandedOff {
+            super::preparation_rebinding::verify_outer(&store, observation.preparation(), &outer)
+                .map_err(|_| InstallerStableError::InvalidReceipt)?;
         }
         Ok(())
     };
@@ -69,7 +90,9 @@ pub(super) fn inspect(
         );
     }
     let phase = match observation.phase() {
-        MaintenancePhase::Preparing => InstallerViewPhase::PreparingSource,
+        MaintenancePhase::Preparing | MaintenancePhase::PreparationHandedOff => {
+            InstallerViewPhase::PreparingSource
+        }
         MaintenancePhase::CancellationRequested => InstallerViewPhase::CancellationRequested,
         MaintenancePhase::CancellationFinishingSource => {
             InstallerViewPhase::CancellationFinishingSource

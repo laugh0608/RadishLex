@@ -253,7 +253,9 @@ handoff 的新目录和回执先独占创建、同步并回读，在 `previous_a
 
 Executor 已接 `authorize_source_preparation` / `authorize_preparation_resume` / `prepare_upgrade_source`：先封存旧 outer canonical 字节，绑定不可改认的 `previous_install_evidence` 后持久化 reservation，再创建新 outer；连续双锁连接源库准备、旧槽保留与新 v1 handoff。新证据只扩展外围准备记录，无字段的旧编码以及原 v1 安装/数据回执和 FFI ABI 保持。严格 reader 对未知字段继续拒绝。
 
-已释放取消前驱只可通过完整 lifecycle 证明复用精确旧 outer 原件，不能凭相同字节或残留目录认领。新任务/重开任务需要 fresh 确认、可撤销期限与实际程序/静止观察；未知临时材料保持阻断。成功仅交接非终态数据回执，后续 Driver/Bridge/action、交接后查询与严格重绑另行接线，不复用普通 bootstrap 的首次 data 假设。实现边界见 [Executor](../../platforms/macos-product/InstallerExecutor/README.md#新源库准备任务)，验证见 [W41](../devlogs/2026-W41.md)。独立旧程序资格、WAL/pager 内部断电与 B 段退出仍开放，冻结现场不变。
+已释放取消前驱只可通过完整 lifecycle 证明复用精确旧 outer 原件，不能凭相同字节或残留目录认领。新任务/重开任务需要 fresh 确认、可撤销期限与实际程序/静止观察；未知临时材料保持阻断。成功仅交接非终态数据回执，不复用普通 bootstrap 的首次 data 假设。实现边界见 [Executor](../../platforms/macos-product/InstallerExecutor/README.md#新源库准备任务)，验证见 [W41](../devlogs/2026-W41.md)。独立旧程序资格、WAL/pager 内部断电与 B 段退出仍开放，冻结现场不变。
+
+同日后续接入 handoff 中间位置和完成位置的只读查询，以及 `rebind_prepared_upgrade` 严格数据重绑。固定旧历史/保护快照与可推进的 v1 receipt 分别核验，保留两个前驱 ID、产品、schema、原 artifact 和目录/文件身份；v1 switch 中断沿真实槽位解释。查询和重绑不打开 SQLite 或补同步，不能确认最后一次 rename 的持久化，也不授予执行权限。UI 仍为只读维护投影；下一步固定专用 continuation、fresh 授权和首个 v1 mutation 前的 handoff 持久化重验，再接 Driver/Bridge/action，详细合同见 [Installer 边界](../macos-installer-app-boundary.md#handoff-后的只读检查与严格重绑)。
 
 ## 进入实机前必须另行确定
 

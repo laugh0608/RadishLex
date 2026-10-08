@@ -10,6 +10,8 @@ const PROOF: &str = "preparation.json";
 mod creation;
 #[path = "preparation_handoff_evidence.rs"]
 mod evidence;
+#[path = "preparation_rebinding.rs"]
+mod rebinding;
 
 impl PreparationJournalStore {
     /// Metadata-only lookup for a task that already names the exact operation.

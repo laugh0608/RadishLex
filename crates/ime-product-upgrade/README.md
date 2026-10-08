@@ -102,6 +102,8 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 ### 新 v1 handoff
 
+`inspect_maintenance` 对带 handoff intent 的中间状态只校验物理关系；marker 移入历史后返回 `PreparationHandedOff` 与严格读取的活动 v1 receipt。`rebind_handed_off_upgrade` 在匹配 guard 下绑定调用方预期的 preparation，验证完整旧历史、保护快照及新 v1 的不可变字段和只追加 artifact，返回现存 store/receipt。初始 `preflighted` 仍须符合 intent 中的精确 receipt 身份，后续进度由 v1 reader 核验实际槽位。查询/重绑均不打开 SQLite、不补同步、不恢复授权；执行期持久化、静止和逻辑等价要求保持。macOS 产品层另核验 outer 原件与当前产品/状态关系，普通 bootstrap 不因此放宽。
+
 `handoff_userdb_source` 消费准备 store，要求明确的新 outer operation ID、同一 inner guard 和每个检查点的 fresh 产品授权/静止确认，成功返回原 v1 store 与 `preflighted` receipt。前驱取旧 data operation，source 取准备后身份，release/schema 取已绑定产品上下文；当前可选 settings 和 Rime 从实物取身份，settings 摘要另在准备证明封存。
 
 先在新 operation 历史目录独占创建 `receipt.json`，同步文件和目录，再于 `previous_archived` 追加不可改认的 `handoff_intent`（两层历史目录身份、canonical 新回执及其文件身份、settings 身份）。随后将该回执原 inode 移入活动槽，同步两目录并验证 canonical 字节，持久化 `handoff_ready`；保护快照移入新历史目录后，最后才把 marker 原 inode 移为 `preparation.json`。全部动作保持状态目录和 guard，不放宽普通 v1 白名单或 `can_replace`。

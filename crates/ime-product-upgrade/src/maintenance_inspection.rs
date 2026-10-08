@@ -10,6 +10,7 @@ const PROOF: &str = "cancellation-release.json";
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MaintenancePhase {
     Preparing,
+    PreparationHandedOff,
     CancellationRequested,
     CancellationFinishingSource,
     CancellationPreserving,
@@ -21,6 +22,7 @@ pub enum MaintenancePhase {
 pub struct MaintenanceInspection {
     phase: MaintenancePhase,
     preparation: PreparationReceipt,
+    handed_off_receipt: Option<UpgradeReceipt>,
 }
 
 impl MaintenanceInspection {
@@ -30,6 +32,10 @@ impl MaintenanceInspection {
 
     pub fn preparation(&self) -> &PreparationReceipt {
         &self.preparation
+    }
+
+    pub fn handed_off_receipt(&self) -> Option<&UpgradeReceipt> {
+        self.handed_off_receipt.as_ref()
     }
 }
 
@@ -93,6 +99,21 @@ fn inspection_stamp(
     if path_exists(&index)? {
         entries.push((index.clone(), journal.evidence(&index, hasher)?));
     }
+    let active = journal.path(RECEIPT_FILE_NAME);
+    if path_exists(&active)? {
+        let receipt = UpgradeReceipt::decode(&journal.read_history_bytes(&active)?)
+            .map_err(|_| Error::EvidenceChanged)?;
+        let proof = journal
+            .store
+            .root
+            .path
+            .join(HISTORY)
+            .join(receipt.operation_id())
+            .join("preparation.json");
+        if path_exists(&proof)? {
+            entries.push((proof.clone(), journal.evidence(&proof, hasher)?));
+        }
+    }
     entries.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(entries)
 }
@@ -130,6 +151,7 @@ fn inspect_existing(
                     MaintenancePhase::CancellationPreserving
                 },
                 preparation: proof.preparation().clone(),
+                handed_off_receipt: None,
             }
         } else if path_exists(&journal.path(ARCHIVE))? {
             let store = CancellationArchiveStore::open_existing(verified()?)?;
@@ -139,6 +161,7 @@ fn inspect_existing(
             MaintenanceInspection {
                 phase: MaintenancePhase::CancellationPreserving,
                 preparation: record.request().preparation().clone(),
+                handed_off_receipt: None,
             }
         } else {
             let store = PreparationCancellationStore::open_existing(verified()?)?;
@@ -155,6 +178,7 @@ fn inspect_existing(
             MaintenanceInspection {
                 phase,
                 preparation: request.preparation().clone(),
+                handed_off_receipt: None,
             }
         };
         if journal.evidence(&journal.path(REQUEST), hasher)? != identity {
@@ -168,6 +192,14 @@ fn inspect_existing(
             .read_record()?
             .ok_or(Error::EvidenceChanged)?
             .receipt;
+        if record.handoff_intent().is_some() {
+            journal.verify_handoff_files(hasher, &record)?;
+            return Ok(Some(MaintenanceInspection {
+                phase: MaintenancePhase::Preparing,
+                preparation: record,
+                handed_off_receipt: None,
+            }));
+        }
         let inventory = journal.load_previous_inventory(&record, hasher)?;
         journal.verify_inventory_objects(&inventory, hasher, Some(&record))?;
         if record.snapshot_identity().is_some() {
@@ -203,6 +235,7 @@ fn inspect_existing(
         MaintenanceInspection {
             phase: MaintenancePhase::Preparing,
             preparation: record,
+            handed_off_receipt: None,
         }
     } else {
         // No record is not a first-use fallback for orphaned cancellation slots.
@@ -213,13 +246,52 @@ fn inspect_existing(
             return Err(Error::EvidenceChanged);
         }
         if !path_exists(&journal.store.root.path.join(HISTORY))? {
-            journal.store.load_for_recovery_inspection()?;
+            if journal
+                .store
+                .load_for_recovery_inspection()?
+                .is_some_and(|receipt| receipt.previous_operation_id().is_some())
+            {
+                return Err(Error::EvidenceChanged);
+            }
             return Ok(None);
+        }
+        if path_exists(&journal.path(RECEIPT_FILE_NAME))? {
+            let current = journal
+                .store
+                .load_for_recovery_inspection()?
+                .ok_or(Error::EvidenceChanged)?;
+            let proof = journal
+                .store
+                .root
+                .path
+                .join(HISTORY)
+                .join(current.operation_id())
+                .join("preparation.json");
+            if path_exists(&proof)? {
+                let record = journal.read_handoff_proof(current.operation_id(), hasher)?;
+                journal.verify_completed_handoff(&record, &current, hasher)?;
+                return Ok(Some(MaintenanceInspection {
+                    phase: MaintenancePhase::PreparationHandedOff,
+                    preparation: record,
+                    handed_off_receipt: Some(current),
+                }));
+            }
         }
         let store = TerminalReleaseStore::open_existing(verified()?)?;
         let latest = store.inspect_latest_lifecycle(hasher)?;
         if path_exists(&journal.path(RECEIPT_FILE_NAME))? {
-            journal.store.load_for_recovery_inspection()?;
+            let current = journal
+                .store
+                .load_for_recovery_inspection()?
+                .ok_or(Error::EvidenceChanged)?;
+            if !current.state().is_terminal()
+                || latest
+                    .as_ref()
+                    .and_then(LifecycleReleaseReceipt::data_receipt)
+                    != Some(&current)
+            {
+                return Err(Error::EvidenceChanged);
+            }
             return Ok(None);
         }
         if fs::read_dir(&journal.store.state_directory)
@@ -233,6 +305,7 @@ fn inspect_existing(
             Some(LifecycleReleaseReceipt::Cancellation(proof)) => MaintenanceInspection {
                 phase: MaintenancePhase::CancellationReleased,
                 preparation: proof.preparation().clone(),
+                handed_off_receipt: None,
             },
             _ => return Ok(None),
         }

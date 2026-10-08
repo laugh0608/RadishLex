@@ -81,7 +81,7 @@ phase=<code> action=<code> error=<code> state=<code>
 
 | phase | 展示含义 |
 | --- | --- |
-| `preparing_source` | 已有准备记录，准备尚未完成 |
+| `preparing_source` | 已有准备记录，或已观察到 handoff、等待专用产品接续 |
 | `cancellation_requested` | 仅已保存取消请求 |
 | `cancellation_finishing_source` | 已记录源库收尾，尚未完成 |
 | `cancellation_preserving` | 源库收尾已有记录，封存或索引发布尚未完成 |
@@ -94,7 +94,7 @@ phase=<code> action=<code> error=<code> state=<code>
 
 Bridge ABI v1 的结构大小、字段、symbol 与 contract version 保持；phase 整数 7–12 为上述六项的顺序扩展。新 Rust/C/Objective-C 映射一致，旧 reader 对未知 phase 失败关闭。新原生 reader 同时拒绝维护 phase 与 mutation action、旧 receipt state/进度或手动静止 prompt 的矛盾组合。稳定摘要仍仅含既有四个 code 字段。
 
-普通 v1 Executor 在取得 outer guard 后再次检查维护状态，拒绝查询后已过期的旧 intent；upgrade bootstrap 前也检查，避免先创建新的数据事务。新准备入口、Bridge mutation action 和资格提供者尚未接入；下述取消 Executor 任务入口不会由维护查询调用，也没有新增取消按钮。
+普通 v1 Executor 在取得 outer guard 后再次检查维护状态，拒绝查询后已过期的旧 intent；upgrade bootstrap 前也检查，避免先创建新的数据事务。新准备与取消 Executor 任务已接入，但 Bridge mutation action 和资格提供者尚未接入；任务入口不会由维护查询调用，也没有新增取消按钮。
 
 ## 新准备 Executor 任务入口
 
@@ -104,7 +104,13 @@ Bridge ABI v1 的结构大小、字段、symbol 与 contract version 保持；ph
 
 新 outer 创建前中断只允许 `reserved` 与精确旧终态接续；创建后必须保持同一个 `prepared` outer。每个检查点复核源/目标实物、双锁、当前授权、静止及封存材料，回调前后相同字节的 active outer 文件替换也拒绝。旧运行库在前次终态后的合法学习不受历史长度约束，旧私有材料仍逐件验证；无 data、未释放终态、v1/v2/取消前驱不混用。
 
-成功仅返回 `preflighted` 数据回执，outer 仍为 `prepared`；没有程序切换或正常启动资格。新准备与取消的 Bridge/action 尚未开放，交接后查询和严格数据重绑仍需产品接线，普通 bootstrap 的空 data 前驱限制不在本批放宽。此入口不代表 B 段退出、旧程序资格或真实用户升级完成。
+成功仅返回 `preflighted` 数据回执，outer 仍为 `prepared`；没有程序切换或正常启动资格。新准备与取消的 Bridge/action 尚未开放，普通 bootstrap 的空 data 前驱限制保持。此入口不代表 B 段退出、旧程序资格或真实用户升级完成。
+
+### handoff 后的只读检查与严格重绑
+
+准备查询复用 handoff 的物理关系核验，覆盖 receipt、保护快照和 marker 的已绑定移动位置；不调用 SQLite 等价检查。marker 已位于历史时，核心返回 `PreparationHandedOff` 及活动 v1 receipt，复验准备证明、保护快照、旧 inventory/lifecycle 全链和当前 receipt 的不可变字段及原始 artifact 子集。后续 v1 新快照、候选、备份使用原 v1 reader；`switch_prepared` 的三种 rename 场景沿实际槽位检查。查询前后核对活动 receipt、准备 proof、索引与 guard 身份；Executor 另核验 sealed 旧 outer、当前 outer 产品/前驱、outer/data 状态组合，并前后复验 outer 文件身份。没有证明时不能把活动新事务当成旧终态或首次路径。
+
+`rebind_prepared_upgrade` 由已经持有 outer guard 的调用方使用，取得并返回 inner guard，绑定精确 preparation 与已存在的 v1 链。它不创建 receipt、不补同步、不打开 SQLite，也不赋予 mutation 权限；未知或部分终态释放材料交由后续专用流程，不能被重绑认领。首个 v1 mutation 前仍须 fresh 任务授权、程序/静止观察及 handoff 持久化重验。当前所有交接后查询沿用 `preparing_source + refresh`，普通 intent 继续阻断，Driver/Bridge action 和 ABI 保持不变。
 
 ## 取消 Executor 任务入口
 

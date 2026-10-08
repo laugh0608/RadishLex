@@ -2,7 +2,7 @@
 use super::*;
 
 impl PreparationJournalStore {
-    pub(super) fn read_handoff_proof(
+    pub(in super::super) fn read_handoff_proof(
         &self,
         operation: &str,
         hasher: &impl PreparationHasher,
@@ -31,6 +31,29 @@ impl PreparationJournalStore {
         record: &PreparationReceipt,
     ) -> Result<()> {
         self.verify_guard(guard)?;
+        let snapshot = self.verify_handoff_files(hasher, record)?;
+        if Some(UserDb::verify_prepared_source(
+            self.source_path(),
+            &snapshot,
+        )?) != record.snapshot_schema_version()
+            || self.evidence(&snapshot, hasher)?
+                != *record.snapshot_identity().ok_or(Error::EvidenceChanged)?
+            || record.prepared_source() != Some(&self.family(hasher)?.database)
+        {
+            return Err(Error::EvidenceChanged);
+        }
+        self.verify_handoff_runtime_artifacts(record, hasher)?;
+        self.verify_guard(guard)?;
+        Ok(())
+    }
+
+    /// Physical observation only. This never opens SQLite or acknowledges the
+    /// durability of an interrupted move; execution still uses verify_handoff.
+    pub(in super::super) fn verify_handoff_files(
+        &self,
+        hasher: &impl PreparationHasher,
+        record: &PreparationReceipt,
+    ) -> Result<PathBuf> {
         self.verify_binding(record)?;
         self.validate_entries()?;
         self.reject_staged_record()?;
@@ -91,16 +114,19 @@ impl PreparationJournalStore {
         }
         no_sidecars(&snapshot)?;
         no_sidecars(&self.source_path())?;
-        if record.prepared_source() != Some(&self.family(hasher)?.database)
-            || Some(UserDb::verify_prepared_source(
-                self.source_path(),
-                &snapshot,
-            )?) != record.snapshot_schema_version()
-            || self.evidence(&snapshot, hasher)? != *expected_snapshot
-            || record.prepared_source() != Some(&self.family(hasher)?.database)
-        {
+        if record.prepared_source() != Some(&self.family(hasher)?.database) {
             return Err(Error::EvidenceChanged);
         }
+        self.verify_handoff_runtime_artifacts(record, hasher)?;
+        Ok(snapshot)
+    }
+
+    pub(super) fn verify_handoff_runtime_artifacts(
+        &self,
+        record: &PreparationReceipt,
+        hasher: &impl PreparationHasher,
+    ) -> Result<()> {
+        let intent = record.handoff_intent().ok_or(Error::EvidenceChanged)?;
         let (artifacts, settings) = self.handoff_artifacts(hasher)?;
         // Directory link count can change when fixed history directories are
         // created. Stable root identity was checked above and in the contract.
@@ -116,7 +142,6 @@ impl PreparationJournalStore {
         {
             return Err(Error::EvidenceChanged);
         }
-        self.verify_guard(guard)?;
         Ok(())
     }
 
@@ -132,6 +157,16 @@ impl PreparationJournalStore {
                 return Err(Error::EvidenceChanged);
             }
         }
+        self.verify_preserved_predecessor(record, hasher)
+    }
+
+    /// The predecessor remains sealed after the new v1 transaction starts
+    /// adding its own active artifacts. Those are checked by the v1 store.
+    pub(super) fn verify_preserved_predecessor(
+        &self,
+        record: &PreparationReceipt,
+        hasher: &impl PreparationHasher,
+    ) -> Result<()> {
         let previous = &record.binding().previous_data_operation_id;
         if previous.is_none() && record.previous_release_index_identity().is_some() {
             let inventory = self.load_released_inventory(record, hasher)?;

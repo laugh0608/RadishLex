@@ -236,6 +236,7 @@ fn released_v1_and_v2_predecessors_preserve_history_after_new_learning() {
             .previous_release_index_identity()
             .is_some());
         assert!(fixture.preparation().archived_slots().is_empty());
+        rebinding::assert_product_binding(&fixture, &receipt);
     }
 }
 
@@ -297,6 +298,7 @@ fn cancelled_predecessors_and_repeated_cancellation_reuse_only_proven_outer_orig
         .unwrap();
         assert_eq!(receipt.previous_operation_id(), data.map(|_| DATA));
         assert_eq!(tree(&old_original), before);
+        rebinding::assert_product_binding(&fixture, &receipt);
     }
 }
 

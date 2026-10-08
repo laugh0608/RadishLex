@@ -24,7 +24,7 @@ use crate::{InstallerOperationIdSource, SystemInstallerOperationIdSource};
 #[path = "preparation_authority.rs"]
 mod authority;
 #[path = "preparation_outer.rs"]
-mod outer;
+pub(super) mod outer;
 use authority::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

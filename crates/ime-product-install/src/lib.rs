@@ -458,6 +458,10 @@ impl InstallReceipt {
         &self.operation_id
     }
 
+    pub fn previous_operation_id(&self) -> Option<&str> {
+        self.previous_operation_id.as_deref()
+    }
+
     pub const fn operation_kind(&self) -> InstallOperationKind {
         self.operation_kind
     }

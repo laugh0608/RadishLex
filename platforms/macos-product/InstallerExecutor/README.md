@@ -29,7 +29,15 @@ first install、repair 和 remove 在 `programs_committed` 后共用核心终态
 
 准备意图持久化后才创建同 ID、无程序 artifact 的新 `prepared` outer，然后接源库保护/维护、旧 data 私有槽保留与新 v1 handoff。每个核心检查点前后重新核验 outer、封存原件、程序实物、静止及任务授权。首次无 data、三类未释放旧终态、已释放 v1/v2 与取消前驱分别处理；取消 ID 不会冒充 data 前驱。已绑定中断重开后重新授权，只继续同一 operation；没有 reservation 的部分初始化保留阻断，不自动清理。
 
-成功仅返回新的 `preflighted` 数据回执，outer 仍为 `prepared`，双程序未 staging/切换，startup gate 仍阻断。`load_preparation_for_operation` 可按精确 ID 读取活动准备或已封存 handoff 元数据供重开任务使用；它不授予执行权限，执行仍复验实物和数据等价。Bridge/action 尚未接入此入口；后续必须明确交接后查询与严格数据重绑，不能把带历史前驱的新回执送入只接受空 data 前驱的普通 bootstrap。
+成功仅返回新的 `preflighted` 数据回执，outer 仍为 `prepared`，双程序未 staging/切换，startup gate 仍阻断。`load_preparation_for_operation` 可按精确 ID 读取活动准备或已封存 handoff 元数据供重开任务使用；它不授予执行权限，执行仍复验实物和数据等价。Bridge/action 尚未接入此入口，普通 bootstrap 继续只接受空 data 前驱。
+
+### 交接后查询与重绑
+
+`inspect_maintenance` 识别 handoff 的已绑定中间位置，以及 marker 已移入历史后的 `PreparationHandedOff`；后者同时返回经过严格 v1 reader 核验的活动数据回执。历史材料仍按准备证明固定身份核验，当前 v1 回执按不可变 operation/前驱/release/schema 和只追加 artifact 关系接续；数据切换中断由原 v1 reader 检查实际槽位，不因活动 DB 暂缺而打开 SQLite 或猜测修复。准备证明缺失、错误前驱及孤立材料不能回退成首次 bootstrap。
+
+`rebind_prepared_upgrade` 要求调用者持有匹配 outer guard，取得 inner guard 后核验封存旧 outer、当前完整产品关系、外层/内层合法状态组合和准备证明，再返回现存 store、inner guard 与数据回执；不创建或重写回执。查询和重绑均不打开 SQLite、不补同步，不宣称持久化边界已确认，也不授予执行权限。后续 mutation 仍须当次任务授权、实际程序/静止观察，并在首个 v1 mutation 前通过准备任务接续确认 handoff 持久化。
+
+当前 UI 将交接后状态继续投影为 `preparing_source + refresh`；普通 intent 保持阻断，尚无新的 action/ABI 映射。下一步固定专用 continuation 的授权、持久化重验、双 guard 生命周期和 Driver/Bridge 合同后再开放执行。
 
 ## 准备取消任务
 

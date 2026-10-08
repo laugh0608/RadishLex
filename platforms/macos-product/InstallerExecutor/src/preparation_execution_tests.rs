@@ -9,6 +9,8 @@ use fixture::*;
 
 #[path = "preparation_lifecycle_tests.rs"]
 mod lifecycle;
+#[path = "preparation_rebinding_tests.rs"]
+mod rebinding;
 
 #[test]
 fn first_and_three_old_terminals_reach_new_v1_without_switching_programs() {
@@ -66,6 +68,7 @@ fn first_and_three_old_terminals_reach_new_v1_without_switching_programs() {
         assert_eq!(receipt, fixture.resume(&mut Observer::default()).unwrap());
         let gate = inspect_startup_gate(&fixture.path, fixture.owner());
         assert!(!gate.is_allowed());
+        rebinding::assert_product_binding(&fixture, &receipt);
     }
 }
 
