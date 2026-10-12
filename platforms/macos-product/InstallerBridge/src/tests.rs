@@ -373,7 +373,7 @@ fn failed_action_cannot_be_hidden_by_progress_completion_or_existing_diagnostics
                 },
                 manual_prompt: prompt_value(InstallerManualPrompt::None),
             };
-            let failed = project_action_result(
+            let failed = project_action_result::<()>(
                 Err(InstallerBridgeError::Execution(InstallerExecutionError::UpgradeFilesystem(
                     radishlex_ime_product_upgrade::UpgradeFilesystemErrorCode::InterruptedSwitch,
                 ))),
@@ -415,7 +415,12 @@ fn ffi_contract_is_versioned_and_fails_closed_without_release_identity() {
         Some(InstallerAction::AbortPreSwitchUpgrade)
     );
     assert_eq!(action_value(InstallerAction::AbortPreSwitchUpgrade), 9);
-    assert_eq!(decode_action(10), None);
+    assert_eq!(
+        decode_action(10),
+        Some(InstallerAction::ContinuePreparedUpgrade)
+    );
+    assert_eq!(action_value(InstallerAction::ContinuePreparedUpgrade), 10);
+    assert_eq!(decode_action(11), None);
     assert_eq!(
         radishlex_installer_bridge_contract_version(),
         INSTALLER_BRIDGE_CONTRACT_VERSION

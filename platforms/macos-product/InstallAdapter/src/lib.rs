@@ -22,6 +22,7 @@ use radishlex_ime_product_install::{
 use serde::Deserialize;
 
 mod codesign;
+mod continuation;
 mod copy;
 mod manifest;
 mod recovery_evidence;

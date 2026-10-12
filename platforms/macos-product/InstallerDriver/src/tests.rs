@@ -13,6 +13,70 @@ use super::*;
 
 static SEQUENCE: AtomicU64 = AtomicU64::new(1);
 
+#[test]
+fn prepared_continuation_requires_fresh_offering_and_all_four_confirmations() {
+    let base = snapshot(
+        InstallerViewPhase::PreparingSource,
+        InstallerAction::Refresh,
+        InstallerAction::None,
+        InstallerStableError::None,
+        InstallerManualPrompt::None,
+        Some(InstallOperationKind::Upgrade),
+        None,
+        None,
+    );
+    let receipt = InstallReceipt::new(
+        "00112233445566778899aabbccddeeff",
+        None,
+        InstallOperationKind::Upgrade,
+        radishlex_ime_product_install::InstallRootIdentity::new(1, 2, 501, 0o700).unwrap(),
+        Some(product("1.0.0", 1)),
+        Some(product("2.0.0", 2)),
+    )
+    .unwrap();
+    let full = InstallerUserAuthorization {
+        explicit_action_confirmed: true,
+        data_retention_acknowledged: true,
+        neutral_input_source_selected: true,
+        manager_closed: true,
+    };
+    assert_eq!(
+        authorize_installer_action(base, InstallerAction::ContinuePreparedUpgrade, full),
+        Err(InstallerAuthorizationError::ActionNotOffered)
+    );
+    let eligible = base.with_prepared_continuation(&receipt);
+    for bit in 0..4 {
+        let mut missing = full;
+        match bit {
+            0 => missing.explicit_action_confirmed = false,
+            1 => missing.data_retention_acknowledged = false,
+            2 => missing.neutral_input_source_selected = false,
+            _ => missing.manager_closed = false,
+        }
+        assert!(authorize_installer_action(
+            eligible,
+            InstallerAction::ContinuePreparedUpgrade,
+            missing
+        )
+        .is_err());
+    }
+    let intent =
+        authorize_installer_action(eligible, InstallerAction::ContinuePreparedUpgrade, full)
+            .unwrap();
+    assert!(intent.resume_existing() && intent.requires_platform_preflight());
+    assert_eq!(
+        eligible.primary_action(),
+        InstallerAction::ContinuePreparedUpgrade
+    );
+    assert!(!eligible
+        .with_maintenance(InstallerViewPhase::CancellationAwaitingQualification)
+        .offers(InstallerAction::ContinuePreparedUpgrade));
+    assert!(!base
+        .with_recovery_inspection_error(InstallerStableError::OperationActive)
+        .with_prepared_continuation(&receipt)
+        .offers(InstallerAction::ContinuePreparedUpgrade));
+}
+
 struct Fixture {
     container: PathBuf,
     data_root: PathBuf,

@@ -30,6 +30,12 @@ mod cancellation_execution;
 mod cancellation_observation;
 mod maintenance_inspection;
 mod preparation_continuation;
+mod prepared_execution;
+pub use prepared_execution::{
+    authorize_prepared_upgrade_resume, continue_prepared_upgrade,
+    inspect_prepared_upgrade_continuation, resume_prepared_upgrade, PreparedUpgradeData,
+    PreparedUpgradeObservation, PreparedUpgradeResumeAuthorization, PreparedUpgradeSummary,
+};
 mod preparation_execution;
 pub use preparation_continuation::{
     admit_prepared_continuation, authorize_prepared_continuation,

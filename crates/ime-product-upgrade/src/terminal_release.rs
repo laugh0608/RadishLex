@@ -131,6 +131,73 @@ impl TerminalReleaseStore {
         self.validate_active_entries()?;
         Ok(self.journal.store.acquire_directory_guard()?)
     }
+    pub fn verify_process_guard(&self, guard: &UpgradeProcessGuard) -> Result<()> {
+        Ok(self.journal.verify_guard(guard)?)
+    }
+
+    /// Exact guarded lookup for an interrupted release, including its one
+    /// bound move ahead of recorded progress. No scanning or startup authority.
+    pub fn inspect_terminal_release(
+        &self,
+        guard: &UpgradeProcessGuard,
+        operation: &str,
+        hasher: &impl PreparationHasher,
+    ) -> Result<TerminalReleaseReceipt> {
+        if !valid_id(operation) {
+            return Err(Error::EvidenceChanged);
+        }
+        self.journal.verify_guard(guard)?;
+        self.validate_active_entries()?;
+        let history = self
+            .journal
+            .store
+            .root
+            .path
+            .join(HISTORY)
+            .join(operation)
+            .join(RELEASE);
+        let location = self.unique_location(&self.active(RELEASE), &history)?;
+        let record = self.history().read_release(&location, hasher)?;
+        if record.binding.operation_id != operation {
+            return Err(Error::EvidenceChanged);
+        }
+        self.verify_live(guard, &record, hasher)?;
+        Ok(record)
+    }
+
+    /// Read-only projection for a fixed operation. Active or unknown guards
+    /// block; stale socket observations are retained, never consumed here.
+    pub fn inspect_terminal_release_readonly(
+        &self,
+        operation: &str,
+        hasher: &impl PreparationHasher,
+    ) -> Result<(TerminalReleaseReceipt, PreparationReceipt)> {
+        if !valid_id(operation) {
+            return Err(Error::EvidenceChanged);
+        }
+        let guard = self.journal.store.inspection_guard_identity()?;
+        let history = self.journal.store.root.path.join(HISTORY).join(operation);
+        let path = self.unique_location(&self.active(RELEASE), &history.join(RELEASE))?;
+        let identity = self.journal.evidence(&path, hasher)?;
+        let record = self.history().read_release(&path, hasher)?;
+        if record.binding.operation_id != operation {
+            return Err(Error::EvidenceChanged);
+        }
+        self.verify_live_material_with_index_temp(&record, hasher, None)?;
+        let preparation = PreparationReceipt::decode(
+            &self
+                .journal
+                .read_history_bytes(&history.join("preparation.json"))?,
+        )
+        .map_err(|_| Error::EvidenceChanged)?;
+        self.verify_live_material_with_index_temp(&record, hasher, None)?;
+        if self.journal.store.inspection_guard_identity()? != guard
+            || self.journal.evidence(&path, hasher)? != identity
+        {
+            return Err(Error::EvidenceChanged);
+        }
+        Ok((record, preparation))
+    }
 
     /// Archive a real terminal v1 result and publish its locator while retaining
     /// the active marker. This does NOT finalize outer or authorize startup.

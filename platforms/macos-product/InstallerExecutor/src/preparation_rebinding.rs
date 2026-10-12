@@ -25,7 +25,13 @@ pub fn rebind_prepared_upgrade(
     let current = install
         .load_guarded(outer_guard)?
         .ok_or(Error::InvalidBinding)?;
-    if current.state().is_terminal() || current.manual_recovery_required() {
+    if current.state().is_terminal()
+        || (current.manual_recovery_required()
+            && !matches!(
+                current.state(),
+                InstallState::RollbackRequired | InstallState::ProgramsRestored
+            ))
+    {
         return Err(Error::InvalidPhase);
     }
     verify_outer(install, expected, &current)?;

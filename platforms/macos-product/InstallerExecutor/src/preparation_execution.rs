@@ -37,6 +37,8 @@ pub enum PreparationExecutionError {
     Preparation(SourcePreparationError),
     ProductObservation,
     NativeObservation,
+    Execution(crate::InstallerExecutionError),
+    Coordination(radishlex_ime_product_upgrade::UpgradeCoordinatorError),
     Io,
 }
 impl PreparationExecutionError {
@@ -50,6 +52,8 @@ impl PreparationExecutionError {
             Self::Preparation(_) => "preparation_source_rejected",
             Self::ProductObservation => "preparation_product_observation",
             Self::NativeObservation => "preparation_native_observation",
+            Self::Execution(_) => "prepared_upgrade_execution",
+            Self::Coordination(_) => "prepared_upgrade_coordination",
             Self::Io => "preparation_persistence_failed",
         }
     }
@@ -78,6 +82,16 @@ impl From<radishlex_ime_product_upgrade::UpgradeFilesystemError> for Preparation
 impl From<radishlex_ime_product_install::InstallFilesystemError> for PreparationExecutionError {
     fn from(value: radishlex_ime_product_install::InstallFilesystemError) -> Self {
         Self::InstallFilesystem(value.code())
+    }
+}
+impl From<crate::InstallerExecutionError> for PreparationExecutionError {
+    fn from(value: crate::InstallerExecutionError) -> Self {
+        Self::Execution(value)
+    }
+}
+impl From<radishlex_ime_product_upgrade::UpgradeCoordinatorError> for PreparationExecutionError {
+    fn from(value: radishlex_ime_product_upgrade::UpgradeCoordinatorError) -> Self {
+        Self::Coordination(value)
     }
 }
 type Result<T> = std::result::Result<T, PreparationExecutionError>;

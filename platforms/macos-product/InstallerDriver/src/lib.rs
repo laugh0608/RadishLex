@@ -65,6 +65,7 @@ pub enum InstallerAction {
     RetryOperation,
     RemovePrograms,
     AbortPreSwitchUpgrade,
+    ContinuePreparedUpgrade,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -173,6 +174,7 @@ pub struct InstallerViewSnapshot {
     failure_code: Option<InstallFailureCode>,
     progress_step: u8,
     recovery_binding: Option<RecoveryIntentBinding>,
+    prepared_continuation: bool,
 }
 
 impl InstallerViewSnapshot {
@@ -218,6 +220,7 @@ impl InstallerViewSnapshot {
         self.secondary_action = InstallerAction::None;
         self.stable_error = error;
         self.manual_prompt = InstallerManualPrompt::None;
+        self.prepared_continuation = false;
         self
     }
 
@@ -238,6 +241,43 @@ impl InstallerViewSnapshot {
         self.failure_code = None;
         self.progress_step = 0;
         self.recovery_binding = None;
+        self.prepared_continuation = false;
+        self
+    }
+
+    /// The composition layer must prove the complete fresh handoff or release
+    /// first. This view never replaces the executor's exact task authorization.
+    pub fn with_prepared_continuation(mut self, receipt: &InstallReceipt) -> Self {
+        if !matches!(
+            self.stable_error,
+            InstallerStableError::None
+                | InstallerStableError::ProductIdentityUnavailable
+                | InstallerStableError::ManualRecoveryRequired
+        ) {
+            return self.with_recovery_inspection_error(self.stable_error);
+        }
+        if receipt.operation_kind() != InstallOperationKind::Upgrade
+            || receipt.encode().is_err()
+            || (receipt.manual_recovery_required()
+                && !matches!(
+                    receipt.state(),
+                    InstallState::RollbackRequired | InstallState::ProgramsRestored
+                ))
+            || receipt.state() == InstallState::AbortedPreserved
+        {
+            return self.with_recovery_inspection_error(InstallerStableError::InvalidReceipt);
+        }
+        self.phase = InstallerViewPhase::PreparingSource;
+        self.primary_action = InstallerAction::ContinuePreparedUpgrade;
+        self.secondary_action = InstallerAction::None;
+        self.stable_error = InstallerStableError::None;
+        self.manual_prompt = InstallerManualPrompt::SelectNeutralInputSourceAndCloseManager;
+        self.operation_kind = Some(InstallOperationKind::Upgrade);
+        self.receipt_state = Some(receipt.state());
+        self.failure_code = receipt.failure_code();
+        self.progress_step = progress_step(receipt.state());
+        self.recovery_binding = None;
+        self.prepared_continuation = true;
         self
     }
 
@@ -544,6 +584,7 @@ fn snapshot(
         failure_code,
         progress_step: receipt_state.map_or(0, progress_step),
         recovery_binding: None,
+        prepared_continuation: false,
     }
 }
 
@@ -618,9 +659,14 @@ pub fn authorize_installer_action(
     if action == InstallerAction::AbortPreSwitchUpgrade && snapshot.recovery_binding.is_none() {
         return Err(InstallerAuthorizationError::ActionNotOffered);
     }
+    if action == InstallerAction::ContinuePreparedUpgrade && !snapshot.prepared_continuation {
+        return Err(InstallerAuthorizationError::ActionNotOffered);
+    }
     if matches!(
         action,
-        InstallerAction::RemovePrograms | InstallerAction::AbortPreSwitchUpgrade
+        InstallerAction::RemovePrograms
+            | InstallerAction::AbortPreSwitchUpgrade
+            | InstallerAction::ContinuePreparedUpgrade
     ) && !authorization.data_retention_acknowledged
     {
         return Err(InstallerAuthorizationError::DataRetentionAcknowledgementRequired);
@@ -633,6 +679,7 @@ pub fn authorize_installer_action(
             | InstallerAction::RetryOperation
             | InstallerAction::RemovePrograms
             | InstallerAction::AbortPreSwitchUpgrade
+            | InstallerAction::ContinuePreparedUpgrade
     ) && (!authorization.neutral_input_source_selected || !authorization.manager_closed)
     {
         return Err(InstallerAuthorizationError::ManualQuiescenceAcknowledgementRequired);
@@ -645,7 +692,8 @@ pub fn authorize_installer_action(
         InstallerAction::ConfirmQuiescence
         | InstallerAction::ResumeOperation
         | InstallerAction::RetryOperation
-        | InstallerAction::AbortPreSwitchUpgrade => snapshot.operation_kind,
+        | InstallerAction::AbortPreSwitchUpgrade
+        | InstallerAction::ContinuePreparedUpgrade => snapshot.operation_kind,
         InstallerAction::None | InstallerAction::Refresh => None,
     };
     Ok(AuthorizedInstallerIntent {
@@ -656,6 +704,7 @@ pub fn authorize_installer_action(
             InstallerAction::ConfirmQuiescence
                 | InstallerAction::ResumeOperation
                 | InstallerAction::AbortPreSwitchUpgrade
+                | InstallerAction::ContinuePreparedUpgrade
         ),
         requires_platform_preflight: true,
         recovery_binding: if action == InstallerAction::AbortPreSwitchUpgrade {
@@ -738,6 +787,7 @@ const fn action_code(action: InstallerAction) -> &'static str {
         InstallerAction::RetryOperation => "retry_operation",
         InstallerAction::RemovePrograms => "remove_programs",
         InstallerAction::AbortPreSwitchUpgrade => "abort_pre_switch_upgrade",
+        InstallerAction::ContinuePreparedUpgrade => "continue_prepared_upgrade",
     }
 }
 

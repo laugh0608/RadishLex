@@ -31,7 +31,10 @@ pub(super) fn assert_product_binding(fixture: &Fixture, expected: &UpgradeReceip
     );
     assert_eq!(view.phase(), InstallerViewPhase::PreparingSource);
     assert_eq!(view.stable_error(), InstallerStableError::None);
-    assert_eq!(view.primary_action(), InstallerAction::Refresh);
+    assert_eq!(
+        view.primary_action(),
+        InstallerAction::ContinuePreparedUpgrade
+    );
     assert_eq!(view.secondary_action(), InstallerAction::None);
     let install = fixture.install();
     let outer = install.acquire_guard().unwrap();

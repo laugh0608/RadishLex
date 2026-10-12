@@ -29,7 +29,9 @@ pub(super) fn inspect(
     };
     if !matches!(
         snapshot.stable_error(),
-        InstallerStableError::None | InstallerStableError::ProductIdentityUnavailable
+        InstallerStableError::None
+            | InstallerStableError::ProductIdentityUnavailable
+            | InstallerStableError::ManualRecoveryRequired
     ) {
         return Some(snapshot.with_recovery_inspection_error(snapshot.stable_error()));
     }
@@ -45,7 +47,10 @@ pub(super) fn inspect(
             .load_for_recovery_inspection()
             .map_err(|_| InstallerStableError::InvalidReceipt)?
             .ok_or(InstallerStableError::InvalidReceipt)?;
-        if observation.phase() == MaintenancePhase::PreparationHandedOff {
+        if matches!(
+            observation.phase(),
+            MaintenancePhase::PreparationHandedOff | MaintenancePhase::PreparationTerminalRelease
+        ) {
             super::preparation_rebinding::verify_outer(&store, observation.preparation(), &outer)
                 .map_err(|_| InstallerStableError::InvalidReceipt)?;
             super::preparation_rebinding::verify_state_pair(
@@ -55,6 +60,12 @@ pub(super) fn inspect(
                     .ok_or(InstallerStableError::InvalidReceipt)?,
             )
             .map_err(|_| InstallerStableError::InvalidReceipt)?;
+            if observation
+                .terminal_release()
+                .is_some_and(|r| !super::prepared_execution::release_pair(&outer, r))
+            {
+                return Err(InstallerStableError::InvalidReceipt);
+            }
         } else {
             verify_outer(&observation, &outer)?;
         }
@@ -72,7 +83,10 @@ pub(super) fn inspect(
         {
             return Err(InstallerStableError::RootIdentityChanged);
         }
-        if observation.phase() == MaintenancePhase::PreparationHandedOff {
+        if matches!(
+            observation.phase(),
+            MaintenancePhase::PreparationHandedOff | MaintenancePhase::PreparationTerminalRelease
+        ) {
             super::preparation_rebinding::verify_outer(&store, observation.preparation(), &outer)
                 .map_err(|_| InstallerStableError::InvalidReceipt)?;
         }
@@ -80,6 +94,26 @@ pub(super) fn inspect(
     };
     if let Err(error) = checked() {
         return Some(snapshot.with_recovery_inspection_error(error));
+    }
+    if matches!(
+        observation.phase(),
+        MaintenancePhase::PreparationHandedOff | MaintenancePhase::PreparationTerminalRelease
+    ) {
+        let store = match VerifiedInstallRoot::verify(root, owner)
+            .and_then(InstallReceiptStore::open_existing)
+        {
+            Ok(store) => store,
+            Err(_) => {
+                return Some(
+                    snapshot.with_recovery_inspection_error(InstallerStableError::InvalidReceipt),
+                )
+            }
+        };
+        let continuation = super::inspect_prepared_upgrade_continuation(&store);
+        return Some(match continuation {
+            Ok(Some(current)) => snapshot.with_prepared_continuation(current.install_receipt()),
+            _ => snapshot.with_recovery_inspection_error(InstallerStableError::InvalidReceipt),
+        });
     }
     if observation.phase() == MaintenancePhase::CancellationReleased
         && situation == InstallerProductSituation::IdentityUnavailable
@@ -90,9 +124,9 @@ pub(super) fn inspect(
         );
     }
     let phase = match observation.phase() {
-        MaintenancePhase::Preparing | MaintenancePhase::PreparationHandedOff => {
-            InstallerViewPhase::PreparingSource
-        }
+        MaintenancePhase::Preparing
+        | MaintenancePhase::PreparationHandedOff
+        | MaintenancePhase::PreparationTerminalRelease => InstallerViewPhase::PreparingSource,
         MaintenancePhase::CancellationRequested => InstallerViewPhase::CancellationRequested,
         MaintenancePhase::CancellationFinishingSource => {
             InstallerViewPhase::CancellationFinishingSource

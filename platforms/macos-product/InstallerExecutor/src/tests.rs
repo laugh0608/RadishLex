@@ -167,7 +167,7 @@ impl Drop for Fixture {
     }
 }
 
-struct TestPrograms {
+pub(crate) struct TestPrograms {
     target_product: ProductArtifactIdentity,
     manager_parent: PathBuf,
     input_method_parent: PathBuf,
@@ -180,7 +180,51 @@ struct TestPrograms {
 }
 
 impl TestPrograms {
-    fn target_path(&self, component: ProgramComponent) -> PathBuf {
+    pub(crate) fn for_prepared_upgrade(
+        root: &Path,
+        target_product: ProductArtifactIdentity,
+    ) -> Self {
+        let manager_parent = root.join("synthetic-programs/Applications");
+        let input_method_parent = root.join("synthetic-programs/Input Methods");
+        create_directory(&manager_parent, 0o700);
+        create_directory(&input_method_parent, 0o700);
+        create_bundle(
+            &manager_parent.join("RadishLex Manager.app"),
+            "source-manager",
+        );
+        create_bundle(
+            &input_method_parent.join("RadishLexInputMethod.app"),
+            "source-input-method",
+        );
+        Self {
+            target_product,
+            manager_parent,
+            input_method_parent,
+            owner_id: fs::metadata(root).unwrap().uid(),
+            fail_input_stage_once: false,
+            reject_finalization_completion: false,
+            installed_validation_calls: 0,
+            recovery_checks: 0,
+            reject_recovery_check: None,
+        }
+    }
+    pub(crate) fn reopen_prepared_upgrade(
+        root: &Path,
+        target_product: ProductArtifactIdentity,
+    ) -> Self {
+        Self {
+            target_product,
+            manager_parent: root.join("synthetic-programs/Applications"),
+            input_method_parent: root.join("synthetic-programs/Input Methods"),
+            owner_id: fs::metadata(root).unwrap().uid(),
+            fail_input_stage_once: false,
+            reject_finalization_completion: false,
+            installed_validation_calls: 0,
+            recovery_checks: 0,
+            reject_recovery_check: None,
+        }
+    }
+    pub(crate) fn target_path(&self, component: ProgramComponent) -> PathBuf {
         match component {
             ProgramComponent::Manager => self.manager_parent.join("RadishLex Manager.app"),
             ProgramComponent::InputMethod => {

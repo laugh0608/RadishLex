@@ -11,12 +11,12 @@ use std::path::{Path, PathBuf};
 
 pub(super) const OLD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 pub(super) const DATA: &str = "dddddddddddddddddddddddddddddddd";
-pub(super) const NEW: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+pub(crate) const NEW: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 pub(super) const STATE: &str = ".radishlex-upgrade-v1";
 pub(crate) struct Fixture {
     pub(crate) path: PathBuf,
     pub(super) source: ProductArtifactIdentity,
-    pub(super) target: ProductArtifactIdentity,
+    pub(crate) target: ProductArtifactIdentity,
     pub(super) previous: InstallReceipt,
 }
 impl Fixture {

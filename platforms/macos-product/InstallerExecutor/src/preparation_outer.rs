@@ -48,6 +48,39 @@ fn file(
     )
 }
 
+pub(crate) fn active_data_identity(
+    install: &InstallReceiptStore,
+) -> Result<PreparationFileIdentity> {
+    Ok(bounded_file(
+        &install
+            .data_root_path()
+            .join(".radishlex-upgrade-v1/receipt.json"),
+        &directory_identity(install),
+        256 * 1024,
+    )?
+    .0)
+}
+
+pub(crate) fn terminal_identity(
+    install: &InstallReceiptStore,
+    operation: &str,
+) -> Result<PreparationFileIdentity> {
+    let active = install
+        .data_root_path()
+        .join(".radishlex-upgrade-v1/terminal-release.json");
+    let history = install
+        .data_root_path()
+        .join(".radishlex-upgrade-history-v1")
+        .join(operation)
+        .join("terminal-release.json");
+    let path = match (present(&active)?, present(&history)?) {
+        (true, false) => active,
+        (false, true) => history,
+        _ => return Err(Error::InvalidBinding),
+    };
+    Ok(bounded_file(&path, &directory_identity(install), 256 * 1024)?.0)
+}
+
 fn bounded_file(
     path: &Path,
     root: &PreparationDirectoryIdentity,

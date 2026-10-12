@@ -26,9 +26,9 @@ type Result<T> = std::result::Result<T, Error>;
 /// Consumed by admission. A recorded intent or a previous admission cannot
 /// recreate this grant. The task owner retains the revocation control.
 pub struct PreparedContinuationAuthorization {
-    outer: InstallReceipt,
-    preparation: PreparationReceipt,
-    grant: CancellationTaskGrant,
+    pub(super) outer: InstallReceipt,
+    pub(super) preparation: PreparationReceipt,
+    pub(super) grant: CancellationTaskGrant,
 }
 
 pub fn authorize_prepared_continuation(
@@ -96,14 +96,14 @@ pub fn authorize_prepared_continuation(
 /// grant are deliberately not exported as a reusable execution capability.
 /// Subsequent execution must be integrated here with checks at every mutation.
 pub struct PreparedContinuationTask<'a> {
-    install: &'a InstallReceiptStore,
-    outer_guard: InstallProcessGuard,
-    data: UpgradeReceiptStore,
-    inner_guard: UpgradeProcessGuard,
-    receipt: UpgradeReceipt,
-    authorization: PreparedContinuationAuthorization,
-    outer_identity: PreparationFileIdentity,
-    proof_identity: PreparationFileIdentity,
+    pub(super) install: &'a InstallReceiptStore,
+    pub(super) outer_guard: InstallProcessGuard,
+    pub(super) data: UpgradeReceiptStore,
+    pub(super) inner_guard: UpgradeProcessGuard,
+    pub(super) receipt: UpgradeReceipt,
+    pub(super) authorization: PreparedContinuationAuthorization,
+    pub(super) outer_identity: PreparationFileIdentity,
+    pub(super) proof_identity: PreparationFileIdentity,
 }
 
 impl PreparedContinuationTask<'_> {
@@ -254,7 +254,7 @@ pub fn admit_prepared_continuation<'a>(
     Ok(task)
 }
 
-fn bind(
+pub(super) fn bind(
     authorization: PreparedContinuationAuthorization,
     install: &InstallReceiptStore,
 ) -> Result<PreparedContinuationTask<'_>> {

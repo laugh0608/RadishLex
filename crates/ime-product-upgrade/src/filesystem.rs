@@ -240,6 +240,62 @@ impl UpgradeReceiptStore {
         &self.root.identity
     }
 
+    /// Verify the already-held lock without interpreting another lifecycle's
+    /// directory grammar. This never grants permission to mutate or load v1.
+    pub fn verify_process_guard(
+        &self,
+        guard: &UpgradeProcessGuard,
+    ) -> Result<(), UpgradeFilesystemError> {
+        self.revalidate()?;
+        if !guard.belongs_to(self) {
+            return Err(error(UpgradeFilesystemErrorCode::IdentityChanged));
+        }
+        guard.revalidate()
+    }
+
+    /// Reaffirm an observed v1 state after restart without replacing its inode.
+    /// The strict reader validates partial switch scenes before and after fsync.
+    pub fn reaffirm_current(
+        &self,
+        guard: &UpgradeProcessGuard,
+        receipt: &UpgradeReceipt,
+    ) -> Result<(), UpgradeFilesystemError> {
+        self.verify_current(guard, receipt)?;
+        for entry in fs::read_dir(&self.state_directory)
+            .map_err(|_| error(UpgradeFilesystemErrorCode::Io))?
+        {
+            let path = entry
+                .map_err(|_| error(UpgradeFilesystemErrorCode::Io))?
+                .path();
+            let metadata =
+                fs::symlink_metadata(&path).map_err(|_| error(UpgradeFilesystemErrorCode::Io))?;
+            if metadata.is_file() {
+                File::open(&path)
+                    .and_then(|file| file.sync_all())
+                    .map_err(|_| error(UpgradeFilesystemErrorCode::Io))?;
+            }
+        }
+        for name in ["userdb.sqlite3", "manager-settings.json"] {
+            if name == "manager-settings.json"
+                && !receipt
+                    .artifacts()
+                    .iter()
+                    .any(|a| a.slot() == UpgradeArtifactSlot::SourceSettings)
+            {
+                continue;
+            }
+            let path = self.root.path.join(name);
+            if path_exists(&path)? {
+                File::open(&path)
+                    .and_then(|file| file.sync_all())
+                    .map_err(|_| error(UpgradeFilesystemErrorCode::Io))?;
+            }
+        }
+        sync_directory(&self.state_directory)?;
+        sync_directory(&self.root.path)?;
+        self.verify_current(guard, receipt)
+    }
+
     /// Opens an existing state directory without creating or changing any object.
     pub fn open_existing(root: VerifiedDataRoot) -> Result<Self, UpgradeFilesystemError> {
         let store = Self::open_existing_directory(root)?;

@@ -89,6 +89,15 @@ int main(void) {
             }
         }
 
+        NSDictionary *continuationValue = Snapshot(@"preparing_source",@"continue_prepared_upgrade",@"none",@"none",@"data_coordinating",@"upgrade",7,@"select_neutral_input_source_and_close_manager");
+        RLXInstallerPresentation *continuation = [[RLXInstallerPresentation alloc] initWithDriverSnapshot:continuationValue];
+        Require([continuation isActionEnabled:@"continue_prepared_upgrade"] && continuation.requiresManualQuiescence,@"continuation requires fresh manual confirmation");
+        Require([[continuation confirmationTextForAction:@"continue_prepared_upgrade"] containsString:@"保留用户数据"],@"confirmation includes data retention");
+        for (NSString *key in @[RLXInstallerDriverPhaseKey,RLXInstallerDriverStateKey,RLXInstallerDriverManualPromptKey]) {
+            NSMutableDictionary *bad=[continuationValue mutableCopy];
+            bad[key]=[key isEqualToString:RLXInstallerDriverPhaseKey]?@"cancellation_awaiting_qualification":@"none";
+            Require([[[RLXInstallerPresentation alloc] initWithDriverSnapshot:bad] failedClosed],@"contradictory continuation must fail closed");
+        }
         RLXInstallerPresentation *prepared = [[RLXInstallerPresentation alloc]
             initWithDriverSnapshot:Snapshot(
                 @"awaiting_user_action", @"confirm_quiescence", @"none",

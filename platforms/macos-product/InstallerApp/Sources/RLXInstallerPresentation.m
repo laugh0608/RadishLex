@@ -44,7 +44,7 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
     NSSet<NSString *> *actions = [NSSet setWithArray:@[
         RLXNoAction, RLXRefreshAction, @"begin_first_install", @"begin_upgrade",
         @"begin_repair", @"confirm_quiescence", @"resume_operation",
-        @"retry_operation", @"remove_programs", @"abort_pre_switch_upgrade"
+        @"retry_operation", @"remove_programs", @"abort_pre_switch_upgrade", @"continue_prepared_upgrade"
     ]];
     NSSet<NSString *> *errors = [NSSet setWithArray:@[
         @"none", @"operation_active", @"unsafe_data_root",
@@ -92,11 +92,23 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
         @"preparing_source", @"cancellation_requested", @"cancellation_finishing_source",
         @"cancellation_preserving", @"cancellation_awaiting_qualification", @"cancellation_completed"
     ]];
+    if (valid && ([primary isEqualToString:@"continue_prepared_upgrade"] ||
+                  [secondary isEqualToString:@"continue_prepared_upgrade"])) {
+        valid = [phase isEqualToString:@"preparing_source"] &&
+            [primary isEqualToString:@"continue_prepared_upgrade"] &&
+            [secondary isEqualToString:RLXNoAction];
+    }
     if (valid && [maintenancePhases containsObject:phase]) {
-        valid = [primary isEqualToString:RLXRefreshAction] &&
+        BOOL continuation = [phase isEqualToString:@"preparing_source"] &&
+            [primary isEqualToString:@"continue_prepared_upgrade"];
+        valid = [secondary isEqualToString:RLXNoAction] && [error isEqualToString:@"none"] &&
+            [operation isEqualToString:@"upgrade"] && (continuation ?
+                (![state isEqualToString:@"none"] && ![state isEqualToString:@"aborted_preserved"] &&
+                 [manualPrompt isEqualToString:@"select_neutral_input_source_and_close_manager"]) :
+            ([primary isEqualToString:RLXRefreshAction] &&
             [secondary isEqualToString:RLXNoAction] && [error isEqualToString:@"none"] &&
             [state isEqualToString:@"none"] && [operation isEqualToString:@"upgrade"] &&
-            progress.integerValue == 0 && [manualPrompt isEqualToString:@"none"];
+            progress.integerValue == 0 && [manualPrompt isEqualToString:@"none"]));
     }
 
     if (!valid) {
@@ -141,6 +153,7 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
 }
 
 - (NSString *)statusTitle {
+    if ([self.primaryActionCode isEqualToString:@"continue_prepared_upgrade"]) { return @"等待继续升级的确认"; }
     NSDictionary<NSString *, NSString *> *titles = @{
         @"ready": @"可以开始",
         @"awaiting_user_action": @"等待你的确认",
@@ -159,6 +172,9 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
 }
 
 - (NSString *)statusDetail {
+    if ([self.primaryActionCode isEqualToString:@"continue_prepared_upgrade"]) {
+        return @"词库准备已完成交接，升级尚未完成。继续前请切换到其他输入源并关闭管理器；安装器会核验当前进度与程序身份，完成升级或继续已记录的恢复。";
+    }
     NSDictionary<NSString *, NSString *> *maintenanceDetails = @{
         @"preparing_source": @"准备记录尚未完成。当前只提供状态查看，刷新不会继续维护或开始升级；已有词库及事务材料保持保留。",
         @"cancellation_requested": @"取消请求已保存，但取消尚未完成。源词库收尾及材料保留仍需核验，当前只能刷新状态。",
@@ -201,6 +217,7 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
         @"retry_operation": @"重新执行",
         @"remove_programs": @"移除两个程序",
         @"abort_pre_switch_upgrade": @"中止升级并恢复源程序",
+        @"continue_prepared_upgrade": @"继续升级或恢复",
     };
     return titles[actionCode] ?: @"";
 }
@@ -220,6 +237,9 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
 }
 
 - (NSString *)confirmationTextForAction:(NSString *)actionCode {
+    if ([actionCode isEqualToString:@"continue_prepared_upgrade"]) {
+        return @"确认继续本次已完成词库准备的升级，并保留用户数据。请确认已手动切换到其他输入源并关闭管理器。安装器会重新读取当前状态、检查静止和程序身份；若事务已进入回滚，将继续同一事务的恢复。只有程序、数据与终态封存全部完成后才报告完成。";
+    }
     if ([actionCode isEqualToString:@"abort_pre_switch_upgrade"]) {
         return @"确认中止本次尚未切换数据的升级，并从已验证备份恢复原版本 Manager 和 InputMethod。原词库、WAL、候选与事务证据均保留。若恢复已开始，将继续同一事务。请确认已手动切换到其他输入源并关闭管理器；安装器会重新验证静止、程序身份及数据保留条件。";
     }

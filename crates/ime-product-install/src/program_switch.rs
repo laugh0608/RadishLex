@@ -116,6 +116,21 @@ impl ProgramSwitchStore {
             Err(io_error) if io_error.kind() == ErrorKind::AlreadyExists => {}
             Err(_) => return Err(error(ProgramSwitchErrorCode::Io)),
         }
+        Self::open_existing(target, operation_id)
+    }
+
+    /// Inspect an already-created transaction without creating directories or
+    /// acknowledging prior rename durability.
+    pub fn open_existing(
+        target: VerifiedProgramTarget,
+        operation_id: &str,
+    ) -> Result<Self, ProgramSwitchError> {
+        validate_operation_id(operation_id, "operation_id")
+            .map_err(|_| error(ProgramSwitchErrorCode::InvalidOperationState))?;
+        target.revalidate()?;
+        let transaction_directory = target
+            .parent
+            .join(format!(".radishlex-install-{operation_id}"));
         let metadata = fs::symlink_metadata(&transaction_directory)
             .map_err(|_| error(ProgramSwitchErrorCode::UnsafeTransactionDirectory))?;
         verify_private_transaction_directory(
