@@ -88,13 +88,13 @@ phase=<code> action=<code> error=<code> state=<code>
 | `cancellation_awaiting_qualification` | 完整证明和索引就绪，活动请求 marker 仍阻断最后释放 |
 | `cancellation_completed` | 完整历史、祖先、当前旧 outer 和 marker 最终位置已核验 |
 
-这些阶段均只提供 `refresh`，无 secondary action/manual prompt；operation 为 upgrade，receipt state 为 none，进度为 0。它们不冒充 v1 receipt 状态，界面隐藏 receipt 进度条。`cancellation_completed` 只描述持久化取消结果，不重新认证旧程序资格，也不授权启动、重试或移除；活动请求存在时绝不显示该阶段。
+准备未交接与取消阶段只提供 `refresh`，无 secondary action/manual prompt；operation 为 upgrade，receipt state 为 none，进度为 0，界面隐藏旧 receipt 进度。完整 handoff 或终态封存经 Executor 与生产 Bridge 核验后，`preparing_source` 可提供专用 `continue_prepared_upgrade`、实际 outer state/progress 和手动静止提示；这表示等待当次确认，不表示升级完成。`cancellation_completed` 只描述持久化取消结果，不重新认证旧程序资格，也不授权启动、重试或移除；活动请求存在时绝不显示该阶段。
 
 读取使用现有严格 decoder 和共享物理关系检查，不创建目录、不取得或清理 guard、不写回/补同步记录、不打开 SQLite。活动/未知 guard 阻断；已确认拒绝连接且身份稳定的 stale guard 原样保留。读取前后核对 guard、私有文件和索引身份，并复读结果；缺失索引但有历史、孤立记录、未知/临时对象、证明损坏或身份漂移均失败关闭。历史取消完成后的正常学习不受旧运行库摘要约束；中间状态仍核对其绑定的物理材料。只读观察不能代替执行时的双 guard、逻辑等价、静止或独立资格。
 
-Bridge ABI v1 的结构大小、字段、symbol 与 contract version 保持；phase 整数 7–12 为上述六项的顺序扩展。新 Rust/C/Objective-C 映射一致，旧 reader 对未知 phase 失败关闭。新原生 reader 同时拒绝维护 phase 与 mutation action、旧 receipt state/进度或手动静止 prompt 的矛盾组合。稳定摘要仍仅含既有四个 code 字段。
+Bridge ABI v1 的结构大小、字段、symbol 与 contract version 保持；phase 整数 7–12 为上述六项的顺序扩展。新 Rust/C/Objective-C 映射一致，旧 reader 对未知 phase 失败关闭。新原生 reader 只接受完整接续投影中的 action `10` 与 preparing_source/upgrade/实际 outer 进度/静止提示组合；准备未交接及取消 phase 与 mutation action、旧 receipt 进度或提示的矛盾组合仍拒绝。稳定摘要仍仅含既有四个 code 字段。
 
-普通 v1 Executor 在取得 outer guard 后再次检查维护状态，拒绝查询后已过期的旧 intent；upgrade bootstrap 前也检查，避免先创建新的数据事务。新准备与取消 Executor 任务已接入，但 Bridge mutation action 和资格提供者尚未接入；任务入口不会由维护查询调用，也没有新增取消按钮。
+普通 v1 Executor 在取得 outer guard 后再次检查维护状态，拒绝查询后已过期的旧 intent；upgrade bootstrap 前也检查，避免先创建新的数据事务。新准备与取消 Executor 任务已接入；完成交接后的专用 continuation action `10` 已接 Bridge。新准备/取消 dispatch 和独立资格提供者尚未接入，维护查询不调用写入口，也没有新增取消按钮。
 
 ## 新准备 Executor 任务入口
 
@@ -110,7 +110,7 @@ Bridge ABI v1 的结构大小、字段、symbol 与 contract version 保持；ph
 
 准备查询复用 handoff 的物理关系核验，覆盖 receipt、保护快照和 marker 的已绑定移动位置；不调用 SQLite 等价检查。marker 已位于历史时，核心返回 `PreparationHandedOff` 及活动 v1 receipt，复验准备证明、保护快照、旧 inventory/lifecycle 全链和当前 receipt 的不可变字段及原始 artifact 子集。后续 v1 新快照、候选、备份使用原 v1 reader；`switch_prepared` 的三种 rename 场景沿实际槽位检查。查询前后核对活动 receipt、准备 proof、索引与 guard 身份；Executor 另核验 sealed 旧 outer、当前 outer 产品/前驱、outer/data 状态组合，并前后复验 outer 文件身份。没有证明时不能把活动新事务当成旧终态或首次路径。
 
-`rebind_prepared_upgrade` 由已经持有 outer guard 的调用方使用，取得并返回 inner guard，绑定精确 preparation 与已存在的 v1 链。它不创建 receipt、不补同步、不打开 SQLite，也不赋予 mutation 权限；未知或部分终态释放材料交由后续专用流程，不能被重绑认领。首个 v1 mutation 前仍须 fresh 任务授权、程序/静止观察及 handoff 持久化重验。当前所有交接后查询沿用 `preparing_source + refresh`，普通 intent 继续阻断，Driver/Bridge action 和 ABI 保持不变。
+`rebind_prepared_upgrade` 由已经持有 outer guard 的调用方使用，取得并返回 inner guard，绑定精确 preparation 与已存在的 v1 链。它不创建 receipt、不补同步、不打开 SQLite，也不赋予 mutation 权限；未知或部分终态释放材料交由后续专用流程，不能被重绑认领。首个 v1 mutation 前仍须 fresh 任务授权、程序/静止观察及 handoff 持久化重验。完整交接或终态封存关系可提供 `preparing_source + continue_prepared_upgrade`；部分交接/取消状态继续只刷新，普通 intent 仍阻断。ABI v1 POD/symbol/version 不变。
 
 ### 专用接续准入与待开放动作合同
 
@@ -118,20 +118,24 @@ Bridge ABI v1 的结构大小、字段、symbol 与 contract version 保持；ph
 
 `admit_prepared_continuation` 先拒绝授权 root 与 store 不匹配的调用，再取得 outer → inner 双锁，核验完整旧历史与新交接关系，再同步旧 outer 原件及祖先目录、当前 outer、handoff receipt、保护快照与 proof 及各自移动的两侧父目录。`HandoffReady` 重放也必须重新同步活动 data receipt；此前记录可见不能证明 rename 已持久化。各检查点前后核验任务期限、当前回执、封存证据与文件身份，并观察实际 source/target 双程序和 manifest/root 绑定的 native 静止状态；交接原语在锁内复验 SQLite 源库/快照等价。相同字节的 outer 或 proof inode 替换也拒绝。
 
-成功返回 `PreparedContinuationTask`，持有双锁且不推进任何 v1 状态；不输出 stores、guards 或可序列化的执行凭证。`revalidate` 在同一双锁下重复整个准入检查。任务释放、撤销、到期或进程退出后，不能把曾经准入的结果用作后来调用的授权。此入口完成的是接续前的授权与持久化重验，程序切换、数据升级与终态释放尚未接入任务。
+成功返回 `PreparedContinuationTask`，持有双锁且不推进任何 v1 状态；不输出 stores、guards 或可序列化的执行凭证。`revalidate` 在同一双锁下重复整个准入检查。任务释放、撤销、到期或进程退出后，不能把曾经准入的结果用作后来调用的授权。此入口只完成接续前的授权与持久化重验。`continue_prepared_upgrade` 消费此任务，在同一 outer → inner 双锁内连接程序 staging/preserve/逐端 commit、v1 数据协调及终态释放，不经普通 executor 重新取锁。
 
-Driver/Bridge 后续开放按以下合同实施，当前不注册新 action：
+进展态另用 `authorize_prepared_upgrade_resume` / `resume_prepared_upgrade`，精确绑定当前 outer、完整 preparation 和 `PreparedUpgradeData::Active` 或 `Releasing`，重取四项确认、最长 5 分钟及可撤销任务。活动 v1 通过 handoff 严格 reader 重绑并补同步实际文件/目录，不改回执 inode；封存开始后的移动位置由 terminal reader 核验。合法 `rollback_required` / `programs_restored` 可在这个专用任务下恢复，未知恢复状态及未绑定临时材料保留阻断。
+
+成功数据先达到 outer `data_settled`，失败数据先恢复双 source 至 `programs_restored`；再将真实 v1 终态及私有材料封存、发布 `release_ready`/索引，以完整证明和实际程序身份结清 outer，最后原 inode 释放 marker 并同步/回读。回调及各程序 rename 边界重复授权、双 guard、物理槽位和专用 native 静止检查；终态前固定 ready proof 的文件身份。`PreparedUpgradeSummary` 只在最后释放验证后返回，正常 WAL 学习不会再受旧 v1 活动回执的历史长度约束。
+
+Driver/Bridge/AppKit 已按以下预留合同接入 action `10`；新准备/取消动作另行收敛，普通 bootstrap 的空 data 前驱限制保持：
 
 | 环节 | 合同 |
 | --- | --- |
-| 动作身份 | 预留 `ContinuePreparedUpgrade` / `continue_prepared_upgrade` / action 整数 `10`；ABI v1 POD、symbol 与版本保持。当前双方仍将 `10` 视为未知值并失败关闭，不能先开放按钮 |
+| 动作身份 | `ContinuePreparedUpgrade` / `continue_prepared_upgrade` / action 整数 `10` 已完成双向映射；ABI v1 POD、symbol 与版本保持，其他未知值及旧 reader 不认识的 `10` 继续失败关闭 |
 | Driver 投影 | 仅完整、fresh 的 handoff/outer/data 关系可提供动作；活动 guard、未知/部分证明、取消材料、产品或 root 漂移只提供刷新或阻断。UI 不传路径、产品身份或 operation ID |
 | 授权 | 对本次重新读取的 snapshot 要求四项确认；task 绑定当前精确 outer、preparation、data 状态及产品/root。旧窗口动作、普通 confirm/resume、持久 intent 和上次成功准入都不续权 |
 | Bridge dispatch | 从系统 authoritative 用户根与 sealed payload 重建实际适配器，再取得本任务的双锁。先重验持久化，再在同一个任务内执行，不拆成“准入成功后释放锁，再调用普通 executor” |
 | 修改前检查 | 程序 staging/preserve/逐端 commit、数据协调的每个修改检查点及终态前，均复验授权、双锁、实际程序槽位与 native 静止；回调后再检查。程序已移动时使用对应阶段的槽位关系，不能一直套用“旧程序仍在安装位置”的准入观察 |
-| 中断与重启 | 新授权绑定进展后的 exact outer/data 与不可变交接祖先，并按阶段复验持久化；当前仅初始 `prepared/preflighted` 准入，推进态禁止 fallback 到本入口或普通 bootstrap |
+| 中断与重启 | 新授权绑定进展后的 exact outer/data 与不可变交接祖先，并按阶段复验持久化；初始准入仍只接 `prepared/preflighted`；推进态或封存态通过各自精确记录重新授权、核验实际槽位并补同步，禁止 fallback 到初始入口或普通 bootstrap |
 | 完成与错误 | 产品完成须同时满足 outer/data 终态与专用终态封存/释放合同；返回准入成功不显示升级完成。撤权、静止丢失、身份漂移或同步失败停止并保留现场，不能吞错或自动降级 |
-| 开放门禁 | 同一任务覆盖程序→data→终态实际路径、各阶段中断续跑、撤权与漂移矩阵，以及 Rust/native 双向 action 映射、未知值拒绝和完整仓库门禁之后，才启用 `10`；取消动作与独立旧程序资格另行闭合 |
+| 开放门禁 | 同一任务覆盖程序→data→终态、各阶段中断续跑、撤权/漂移矩阵和 Rust/native 双向映射、未知值拒绝；专用检查及完整仓库门禁的本批结果见 W42。该动作不开放新准备或主动取消，独立程序资格与实机另行闭合 |
 
 此合同没有开放真实系统操作；repository-only 文件与进程退出测试不能证明真实断电、WAL/pager 故障或旧程序启动资格。
 

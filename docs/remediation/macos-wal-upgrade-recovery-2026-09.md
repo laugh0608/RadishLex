@@ -6,7 +6,7 @@
 
 错误呈现与五项 WAL 特征场景完成后，项目所有者另行批准实现显式恢复入口并准备独立恢复 Installer。恢复入口现已实现，Executor 八项恢复父测试、原生 Installer 门禁及真实 source 39/target 40 副本资格通过；截至该次恢复，长期 WAL 处理尚未实现。项目所有者随后单独确认真实恢复，operation `aad9cf8ac2dae71b2b659e96a91ea706` 已经独立 Installer 中止并恢复 source 39 双程序，外层 `rolled_back` / 数据 `aborted_preserved`；没有打开真实 SQLite connection 或更改原载体。
 
-现已为切换前事务增加显式中止入口，通过既有状态机保留原数据库并恢复 source 39 双程序；独立载体已准备并核验，随后获单独授权完成了本次真实恢复。后续面向新 operation 的仓库实现已推进至源库准备、旧事务保留、新 v1 handoff、真实终态 v1/v2 释放与完整祖先接续，以及取消源库收尾、材料封存和 outer 兼容恢复；取消完整证明/生命周期接续、真实双 guard 与程序观察、专用 native 静止/任务授权、只读 UI、取消 Executor 及新准备产品任务入口已接入；交接后的只读查询、严格数据重绑和初始接续准入也已接入；后续执行链、Bridge/action 与独立旧程序资格仍开放，当前范围以[准备设计](macos-wal-source-preparation-design.md)及其[取消补充设计](macos-preparation-cancellation-compatibility.md)为准。恢复到 39 仅返回已知基线，其 IMK 上下文缺陷仍在，不能据此关闭 REV-01/REV-02 或完成 build 40 输入验收。
+现已为切换前事务增加显式中止入口，通过既有状态机保留原数据库并恢复 source 39 双程序；独立载体已准备并核验，随后获单独授权完成了本次真实恢复。后续面向新 operation 的仓库实现已推进至源库准备、旧事务保留、新 v1 handoff、真实终态 v1/v2 释放与完整祖先接续，以及取消源库收尾、材料封存和 outer 兼容恢复；取消完整证明/生命周期接续、真实双 guard 与程序观察、专用 native 静止/任务授权、只读 UI、取消 Executor 及新准备产品任务入口已接入；交接后的只读查询、严格数据重绑和初始接续准入也已接入；同锁程序/data/终态执行、进展态恢复与接续 action `10` 已于 2026-10-12 接线；新准备/取消 dispatch、独立旧程序资格及实机仍开放，当前范围以[准备设计](macos-wal-source-preparation-design.md)及其[取消补充设计](macos-preparation-cancellation-compatibility.md)为准。恢复到 39 仅返回已知基线，其 IMK 上下文缺陷仍在，不能据此关闭 REV-01/REV-02 或完成 build 40 输入验收。
 
 ## 已证实的两个缺口
 
@@ -70,7 +70,7 @@
 
 ## 后续新升级的 WAL 合同
 
-2026-09-15 已按继续推进要求完成[源库准备与新事务接续设计](macos-wal-source-preparation-design.md)，随后获项目所有者确认，进入 A–D 仓库实施与隔离资格范围。源码审阅另发现旧 data operation 无法直接接续，以及 v1 `completed` / `rolled_back` 仍按零 sidecar 与历史长度验证活动库；后者尚未运行复现测试。方案将准备记录、保留式接续、旧 reader 阻断和终态封存纳入完整验证范围。A 段已完成，B 段已实现记录持久化和至 `source_prepared` 的核心编排；受限单库 hot journal 的资格与持久恢复身份也已实现，但不覆盖 SQLite 内部任意断电；旧材料接续、新 v1 handoff、终态封存及取消核心随后已实现；新准备产品入口、交接查询/重绑及初始准入随后已实现，当前尚缺同一任务内的后续执行链、Bridge/action 和独立旧程序资格。本节以下为原方向说明，不代表整条新升级链已实施或真实现场已变化。
+2026-09-15 已按继续推进要求完成[源库准备与新事务接续设计](macos-wal-source-preparation-design.md)，随后获项目所有者确认，进入 A–D 仓库实施与隔离资格范围。源码审阅另发现旧 data operation 无法直接接续，以及 v1 `completed` / `rolled_back` 仍按零 sidecar 与历史长度验证活动库；后者尚未运行复现测试。方案将准备记录、保留式接续、旧 reader 阻断和终态封存纳入完整验证范围。A 段已完成，B 段已实现记录持久化和至 `source_prepared` 的核心编排；受限单库 hot journal 的资格与持久恢复身份也已实现，但不覆盖 SQLite 内部任意断电；旧材料接续、新 v1 handoff、终态封存及取消核心随后已实现；新准备产品入口、交接查询/重绑及初始准入随后已实现，同锁后续执行和进展态恢复、接续 action `10` 已于 2026-10-12 接线；新准备/取消 dispatch 和独立旧程序资格仍缺。本节以下为原方向说明，不代表整条新升级链已实施或真实现场已变化。
 
 建议保留 runtime 的 WAL 使用策略，在新升级的源库身份最终绑定及程序切换之前，由 SQLite 自身完成 standalone 源库准备。该变化涉及数据写入、源 artifact 身份、持久化阶段和中断恢复，须作为独立设计/实现范围批准，不把当前 v1 已绑定 source 原位转换后强行 resume。
 

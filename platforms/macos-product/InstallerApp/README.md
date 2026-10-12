@@ -13,7 +13,7 @@
 
 未知字段、未知 contract 版本和未知 action 失败关闭，只允许刷新。UI 不读取 receipt、不解析 `HOME`、不接受路径参数、不调用 TIS 修改 API，也不把用户勾选当作平台静止证明。
 
-准备/取消维护状态显示独立文案，只提供刷新，隐藏旧 receipt 进度并清除旧状态与手动静止提示。等待资格不显示为完成；完整取消证明和最终 marker 的严格检查由 Rust 完成，UI 不推断成功。handoff 已完成时仍显示准备维护状态并只允许刷新；当前尚无新准备、接续或取消按钮。Executor 的严格重绑与初始准入不等于 UI action 已开放，预留 action `10` 仍按未知值拒绝。
+准备未交接及取消状态只提供刷新，隐藏旧 receipt 进度并清除旧状态与手动静止提示。完整 handoff 或终态封存关系可显示“继续升级或恢复”（action `10`）、实际 outer 进度及手动静止提示；点击重新确认保留数据、切换其他输入源及关闭 Manager，Rust 再读取并授权同一事务。原生 reader 拒绝矛盾的 phase/action/state/prompt 组合，未知值继续失败关闭。等待旧程序资格仍不显示为完成，新准备和主动取消按钮未开放；完整证明与最后 marker 的校验由 Rust 执行。
 
 正常退出只终止 Installer UI 进程，不代表取消或完成事务，也不清理 receipt、guard、staging、backup 或历史 operation。重新打开后由 Rust bridge 重新读取持久化状态并形成 fresh snapshot。
 

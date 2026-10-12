@@ -259,6 +259,12 @@ Executor 已接 `authorize_source_preparation` / `authorize_preparation_resume` 
 
 同日接续准入实现：新增精确 `prepared/preflighted` 任务授权与持有双锁的 `PreparedContinuationTask`，重验 actual 产品/静止和 sealed 历史，补同步 outer 与全部 handoff 移动材料。回归定位并修正 `HandoffReady` 重放未再次同步 data receipt 的遗漏；outer/proof 相同字节 inode 替换阻断。Driver/Bridge action `10` 的完整开放合同已固定，当前仍未知值拒绝；程序、data 与终态执行必须在同一任务内逐检查点复验后再接入，不能把准入结果作为解锁后的执行凭证。详细范围见 [Installer 合同](../macos-installer-app-boundary.md#专用接续准入与待开放动作合同)，验证记录见 W41。
 
+### 2026-10-12：同锁接续执行与进展态恢复
+
+接续任务已连接程序 staging/preserve/逐端 commit、v1 数据协调及成功/失败恢复；数据终态先封存，再持久化匹配 outer 终态，最后释放 marker。进展态和终态封存使用各自严格 reader，重新绑定完整 preparation/outer/data 或 release 并取得 fresh 任务授权；合法回滚状态可接续，未绑定临时材料保留阻断。Core 原 v1 编码、失败码与普通 bootstrap 的空前驱限制保持。
+
+Driver/Bridge/AppKit 已接 `ContinuePreparedUpgrade` / `10`，仅完整交接/封存可提供动作。生产 Bridge 在 authoritative root 与 sealed payload 下重读关系并核验实际程序槽位，再执行同一双锁任务；普通 UI action 不替代任务授权。新准备/取消 dispatch、独立 source 39 正常双程序资格及 WAL/pager 内部断电仍开放，不构成 B 段退出或真实升级完成。实现与验证记录见 [W42](../devlogs/2026-W42.md)。
+
 ## 进入实机前必须另行确定
 
 仓库实现和独立产品资格通过后，再确定新候选版本/构建身份、唯一 source、当前数据库与旧事务归档清单、准备写入与停止条件，并请求一次新的实机授权。9 月 9 日恢复授权已消费，本方案不授权复跑恢复、直接重试 target 40、手工 checkpoint、删除 sidecar 或搬移冻结材料。

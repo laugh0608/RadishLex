@@ -110,7 +110,9 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 中断重载只接续持久意图绑定的唯一对象；新回执已活动或 marker 已封存时均交叉核验旧 inventory、准备后 DB、保护快照、当前 settings/Rime、目录和回执。未封存身份的新 operation 目录/文件、两槽冲突、未知记录/版本/临时对象、缺失及身份漂移保持原样并阻断。只有已存在且匹配前驱 inventory 的共享历史根可在新 operation 创建前重新核验；首次路径留下但未绑定的历史根不能认领。marker 移出后的同 operation 重放补做同步并回读，不改写历史证明，也不重复维护 SQLite。
 
-`handoff_intent` 是可选新字段，无字段编码保持；旧严格准备 reader 拒绝含该字段的记录。交接后的 v1 仍非终态，startup gate 继续拒绝启动；原 v1 链创建自己的 migration snapshot，保留独立保护快照。macOS 新准备 outer/Executor 及初始接续准入已接线，后续程序/data/终态执行链和 Bridge/action 仍待闭合；本能力仅取得仓库合成验证。
+`handoff_intent` 是可选新字段，无字段编码保持；旧严格准备 reader 拒绝含该字段的记录。交接后的 v1 仍非终态，startup gate 继续拒绝启动；原 v1 链创建自己的 migration snapshot，保留独立保护快照。macOS 新准备 outer/Executor、初始接续准入及同锁程序/data/终态执行已接线，完成交接后可由 Bridge action `10` 重读并授权；新准备/取消 dispatch 与独立程序资格仍待闭合，本能力仍仅取得仓库合成验证。
+
+`reaffirm_current` 在已持有 guard 和严格 v1 场景校验下补同步当前文件与父目录，不替换回执 inode、不赋予后续执行权。`verify_process_guard` 只核验锁及目录归属，不能绕过各生命周期 reader 的对象白名单。
 
 ### 终态保留封存与释放索引
 
@@ -122,7 +124,9 @@ preflighted -> quiesced -> snapshot_ready -> candidate_migrated
 
 准备完成仍保留活动 marker，不表示外层已终结或允许启动。`finish_terminal_release` 必须通过 `TerminalReleasePort` fresh 证明匹配同一完整 release 证明的外层终态、安装产品和静止状态，才把 marker 最后原 inode 移为历史 `terminal-release.json`，同步两目录并回读。port 接收完整证明；初始化回调仅为尚未封存的观察草稿，只有 `release_ready` 可绑定外层最终结果。合成 port 的状态和字节比较不能替代真实 outer guard/落盘验证。
 
-`load_latest_release` 只读定位并交叉核验已封存证明、目录、私有材料及准备证据；索引单独存在、marker 仍活动或证明不匹配均不能认定已释放。此查询不是 startup 授权，也不以历史运行 DB hash 拒绝后续正常学习、删除和 WAL。无新 data receipt 的取消由 `load_latest_lifecycle` 返回独立类型，旧查询对该类型拒绝；真实外层接线仍待完成；本批不新增 v1 失败码或伪造主动取消的错误原因。
+`inspect_terminal_release` 在匹配 guard 下定位精确 operation 的活动/历史 marker，严格核验完整材料及最多一个已绑定的领先移动。`inspect_terminal_release_readonly` 用于零写入投影，活动/未知 guard 阻断；`inspect_maintenance` 将活动封存标记为 `PreparationTerminalRelease`，不把已经移走的 v1 receipt 当作丢失或首次路径。这些观察均不是启动或修改授权。
+
+`load_latest_release` 只读定位并交叉核验已封存证明、目录、私有材料及准备证据；索引单独存在、marker 仍活动或证明不匹配均不能认定已释放。此查询不是 startup 授权，也不以历史运行 DB hash 拒绝后续正常学习、删除和 WAL。无新 data receipt 的取消由 `load_latest_lifecycle` 返回独立类型，旧查询对该类型拒绝；接续 Executor 已在真实双 guard 下先封存数据结果，再核验完整证明并结清 outer，最后释放 marker；新准备/取消产品入口及独立程序资格仍待完成。不新增 v1 失败码或伪造主动取消的错误原因。
 
 共享 reader 沿绑定的 `previous_index` 逐级复验所有祖先，校验旧 canonical 索引的长度/摘要、data 前驱和 source release 连续性及准备证据中的索引/证明身份；重复 operation、缺失和漂移拒绝。查询前后固定当前索引；释放各写入/发布/marker 检查点前后也复验祖先，不能靠最新证明或产品回调豁免旧材料损坏。v1 格式与历史字节保持，具体合同见[数据协调边界](../../docs/macos-data-upgrade-coordinator.md#终态封存外层确认与释放索引)。
 

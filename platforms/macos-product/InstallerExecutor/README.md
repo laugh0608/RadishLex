@@ -35,7 +35,13 @@ first install、repair 和 remove 在 `programs_committed` 后共用核心终态
 
 `authorize_prepared_continuation` / `admit_prepared_continuation` 只接精确 `prepared/preflighted` 的完整 handoff。四项确认、期限与撤销绑定在任务内；生产入口固定复验真实双程序和 native 静止。准入重同步旧 outer 历史、活动 outer、交接 receipt/保护快照/proof 与移动两侧父目录，重复 SQLite 等价核验，成功返回持续持有双锁的 `PreparedContinuationTask`。
 
-任务不推进 v1、不导出 store/guard 或执行凭证；`revalidate` 可在同一锁内重验，任务退出后必须重新授权。进展后的程序/data/终态执行尚待接入，当前 Driver/Bridge 保持刷新；action `10` 的开放条件见 [Installer 合同](../../../docs/macos-installer-app-boundary.md#专用接续准入与待开放动作合同)。
+初始准入本身仍不推进 v1、不导出 store/guard 或执行凭证；`revalidate` 在同一锁内重验。`continue_prepared_upgrade` 消费此任务并保留原双锁，顺序连接程序 staging、source preserve、逐组件 commit、v1 数据协调及终态封存/释放。每个程序 rename、数据验证回调和释放检查点重新核验授权、锁、阶段对应的实际程序槽位、静止及证明；回调后再次核验。取消、到期或任务退出后不能沿用准入结果。
+
+进展态通过 `authorize_prepared_upgrade_resume` 绑定精确 outer、preparation 和 `PreparedUpgradeData`，重新取得四项确认与最长 5 分钟的可撤销授权。`Active` 使用严格 handoff/v1 reader，并通过 `reaffirm_current` 补同步实际文件和两侧目录而不替换回执 inode；`Releasing` 使用专用 terminal reader 检查已绑定移动位置。合法 `rollback_required` / `programs_restored` 可在专用任务下接续，其他需要人工恢复的状态保持阻断；不回退普通 bootstrap 或初始准入。
+
+数据成功先到外层 `data_settled`，数据失败先恢复源程序至 `programs_restored`；两者均先封存实际数据终态、生成 `release_ready` 和索引，再在完整证明及程序实物校验下持久化 outer `completed` / `rolled_back`。marker 最后原 inode 移入历史并同步/回读后，才返回 `PreparedUpgradeSummary`。历史数据回执、保护快照与旧 outer 原件保留，后续正常 WAL 学习不再被历史 v1 长度阻断。未知临时材料、无记录的 staging 或 release 初始化材料保留并拒绝自动接纳。
+
+`inspect_prepared_upgrade_continuation` 只读投影完整活动交接或终态封存关系，不创建目录、取得 guard、打开 SQLite 或确认持久化。Driver/Bridge/AppKit 已接 `ContinuePreparedUpgrade` / `10`；Bridge 从 fresh 系统根与 sealed payload 重建适配器，再重新读取完整关系并授权同一任务。新准备和主动取消的 Bridge dispatch 仍未开放；独立旧程序资格及实机停止线见 [Installer 合同](../../../docs/macos-installer-app-boundary.md#专用接续准入与待开放动作合同)。
 
 ## 交接后查询与重绑
 
@@ -43,7 +49,7 @@ first install、repair 和 remove 在 `programs_committed` 后共用核心终态
 
 `rebind_prepared_upgrade` 要求调用者持有匹配 outer guard，取得 inner guard 后核验封存旧 outer、当前完整产品关系、外层/内层合法状态组合和准备证明，再返回现存 store、inner guard 与数据回执；不创建或重写回执。查询和重绑均不打开 SQLite、不补同步，不宣称持久化边界已确认，也不授予执行权限。后续 mutation 仍须当次任务授权、实际程序/静止观察，并在首个 v1 mutation 前通过准备任务接续确认 handoff 持久化。
 
-当前 UI 将交接后状态继续投影为 `preparing_source + refresh`；普通 intent 保持阻断，尚无新的 action/ABI 映射。下一步固定专用 continuation 的授权、持久化重验、双 guard 生命周期和 Driver/Bridge 合同后再开放执行。
+完整交接或终态封存关系可投影 `preparing_source + continue_prepared_upgrade`，展示实际 outer 进度及手动静止提示；部分交接或取消状态继续只刷新。普通 intent 保持阻断，ABI v1 POD/symbol/version 不变，专用 action `10` 不能用于普通 bootstrap、新准备或主动取消。
 
 ## 准备取消任务
 

@@ -15,7 +15,7 @@ UI 不得解析 `receipt.json`、读取 `HOME`、接受自定义路径或根据 
 
 `AbortPreSwitchUpgrade` 由 Executor 的双 receipt 只读检查补充到 snapshot；driver 本身不读取数据 receipt 或恢复证据。授权 intent 绑定 operation、root 的 device/inode/owner/mode 与 source/target manifest digest、build，执行器在 guard 内重新核验。证据已存在的专用恢复只提供本动作；缺失或不合法证据不能回退普通 resume。完整范围见 [Installer 边界](../../../docs/macos-installer-app-boundary.md#显式切换前中止恢复)。
 
-准备/取消状态由 Executor 的严格维护检查追加投影，driver 不自行读取准备文件或证明。六种维护 phase 仅提供 refresh，清除旧 receipt state、进度和手动静止提示；证明/索引发布不能代替最后 marker 释放，不能仅凭其存在显示完成。handoff 完成后的检查仍映射到 `preparing_source + refresh`，不能因严格重绑或初始准入成功而提供普通 resume。新准备、接续及取消 action 尚未开放，独立任务授权不能由旧 `AuthorizedInstallerIntent` 替代；完整映射见 [Installer 边界](../../../docs/macos-installer-app-boundary.md#准备与取消的只读维护投影)。
+准备/取消状态由 Executor 的严格维护检查追加投影，driver 不自行读取准备文件或证明。准备未交接及取消 phase 仅提供 refresh，清除旧 receipt state、进度和手动静止提示；证明/索引发布不能代替最后 marker 释放。完整 handoff 或终态封存关系由组合层核验后，可提供 `preparing_source + ContinuePreparedUpgrade`，展示实际 outer 进度并要求四项当次确认；普通 resume/retry/remove 仍阻断。新准备及取消 action 尚未开放，接续的独立任务授权不能由旧 `AuthorizedInstallerIntent` 替代；完整映射见 [Installer 边界](../../../docs/macos-installer-app-boundary.md#准备与取消的只读维护投影)。
 
 ```bash
 cargo test --locked -p radishlex-macos-installer-driver --all-targets
