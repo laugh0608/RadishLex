@@ -21,6 +21,8 @@
 | 加密同步 | 协议、服务、客户端及受控合成资格链 | macOS key backend 与本地 HTTPS 资格记录 | 真实用户同步关闭；目标生产部署未验收 |
 | Android / Windows / iOS | Android 仅有 Keystore 能力桥；其他平台壳未落地 | 不构成完整 IME 验收 | 后续串行计划 |
 
+2026-10-12 已确认[客户端连接规划](../client-server-connection-plan.md)：同包选官方 / 自部署，无需重编译；同步仍关闭。
+
 ## 综合审阅跟踪
 
 - 激活[2026-09 产品审阅与改进跟踪](../remediation/product-review-2026-09.md)，初审基线 `a5345b8`；2026-09-08 完成隔离诊断，随后按批准方案修复 REV-01 并升级 REV-02 Rust SQLite 依赖；新构建的真实输入复验尚未完成。

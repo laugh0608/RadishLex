@@ -41,6 +41,12 @@ M5 Linux Manager 继续复用同一 product bootstrap 和 `ManagerBridge`，但�
 
 M2 产品运行态的验收至少覆盖：无 shell 环境变量启动、bundle 内 native library 加载、固定路径与权限、空库初始化与既有 schema 打开、active / suppressed / deleted 查询、删除后重启、explicit restore 后重启、隐私偏好写入读回、输入法与 manager 双连接读写、失败可见性，以及 demo/product 隔离。测试数据只能使用合成词和临时目录；自动化不得读取开发者真实 userdb 正文。
 
+## 官方端点与自部署连接目标
+
+2026-10-12 已确认[客户端连接规划](client-server-connection-plan.md)：同一官方产品包由 Manager 在运行时选择官方同步端点或用户自部署地址，无需重新编译。连接发现、实例 / 同步域配置、授权与切换状态经 Rust / FFI 收口；Manager 不拥有另一套同步、密钥或数据迁移语义。
+
+这是后续产品要求，当前地址配置仍为草案，普通真实用户同步与恢复 / 设备成功入口继续受既有 gate 控制。官方托管所需用户隔离、真实目标部署和同一产品包双端点证据未完成前，不将配置成功标为同步可用。
+
 ## 职责范围
 
 M2 本地管理能力应优先覆盖：

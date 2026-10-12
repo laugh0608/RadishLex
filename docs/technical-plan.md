@@ -264,6 +264,8 @@ Go server 不做候选排序、云端实时转换、明文合并或客户端密�
 
 ## Flutter Manager
 
+2026-10-12 已确认[官方客户端与同步服务器连接规划](client-server-connection-plan.md)：同一官方产品包支持运行时选择官方端点或自部署后端，无需重新编译。Manager 提供选择与状态，Rust runtime / FFI 保持同步和域隔离真相；具体协议、凭据与旧配置迁移在后续产品批次冻结，当前 gate 不变。
+
 Flutter manager 负责：
 
 - 本地词库和学习摘要管理；
