@@ -2,6 +2,16 @@
 use super::*;
 use serde::{Deserialize, Serialize};
 
+/// Read-only classification of the already validated predecessor locator.
+/// This is not a new persisted state or an authorization to release anything.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CancellationPredecessorKind {
+    NoIndex,
+    TerminalV1,
+    TerminalV2,
+    CancellationV2,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CancellationReleaseReceipt {
@@ -32,6 +42,20 @@ impl CancellationReleaseReceipt {
     }
     pub fn data_receipt(&self) -> Option<&UpgradeReceipt> {
         self.data_receipt.as_ref()
+    }
+    pub fn predecessor_kind(&self) -> CancellationPredecessorKind {
+        match self.previous_index.as_ref().map(|value| &value.index) {
+            None => CancellationPredecessorKind::NoIndex,
+            Some(ReleaseIndex::V1 { .. }) => CancellationPredecessorKind::TerminalV1,
+            Some(ReleaseIndex::V2 {
+                proof: LifecycleProofReference::TerminalRelease { .. },
+                ..
+            }) => CancellationPredecessorKind::TerminalV2,
+            Some(ReleaseIndex::V2 {
+                proof: LifecycleProofReference::PreparationCancellation { .. },
+                ..
+            }) => CancellationPredecessorKind::CancellationV2,
+        }
     }
     pub fn encode(&self) -> Result<Vec<u8>> {
         self.validate()?;

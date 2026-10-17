@@ -939,17 +939,17 @@ mod preparation_journal;
 pub use preparation_journal::{
     inspect_maintenance, CancellationArchiveCheckpoint, CancellationArchivePort,
     CancellationArchiveReceipt, CancellationArchiveSlot, CancellationArchiveStore,
-    CancellationOuterBinding, CancellationReleaseCheckpoint, CancellationReleasePort,
-    CancellationReleaseReceipt, CancellationReleaseRequirement, CancellationReleaseStore,
-    CancellationSourceCheckpoint, CancellationSourcePhase, CancellationSourcePort,
-    CancellationSourceReceipt, LifecycleReleaseReceipt, MaintenanceInspection, MaintenancePhase,
-    PreparationCancellationCheckpoint, PreparationCancellationPort, PreparationCancellationRequest,
-    PreparationCancellationStore, PreparationHasher, PreparationJournalError,
-    PreparationJournalStore, PreviousInventory, SourcePreparationCheckpoint,
-    SourcePreparationError, SourcePreparationPort, SourcePreparationSpaceBudget,
-    TerminalReleaseBinding, TerminalReleaseCheckpoint, TerminalReleaseDirectory,
-    TerminalReleaseOuterRequirement, TerminalReleasePhase, TerminalReleasePort,
-    TerminalReleaseReceipt, TerminalReleaseStore,
+    CancellationOuterBinding, CancellationPredecessorKind, CancellationReleaseCheckpoint,
+    CancellationReleasePort, CancellationReleaseReceipt, CancellationReleaseRequirement,
+    CancellationReleaseStore, CancellationSourceCheckpoint, CancellationSourcePhase,
+    CancellationSourcePort, CancellationSourceReceipt, LifecycleReleaseReceipt,
+    MaintenanceInspection, MaintenancePhase, PreparationCancellationCheckpoint,
+    PreparationCancellationPort, PreparationCancellationRequest, PreparationCancellationStore,
+    PreparationHasher, PreparationJournalError, PreparationJournalStore, PreviousInventory,
+    SourcePreparationCheckpoint, SourcePreparationError, SourcePreparationPort,
+    SourcePreparationSpaceBudget, TerminalReleaseBinding, TerminalReleaseCheckpoint,
+    TerminalReleaseDirectory, TerminalReleaseOuterRequirement, TerminalReleasePhase,
+    TerminalReleasePort, TerminalReleaseReceipt, TerminalReleaseStore,
 };
 
 #[path = "snapshot.rs"]

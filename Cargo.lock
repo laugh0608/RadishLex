@@ -849,11 +849,15 @@ dependencies = [
 name = "radishlex-macos-product-install-coordinator"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "radishlex-ime-product-install",
  "radishlex-ime-product-upgrade",
  "radishlex-ime-userdb",
  "radishlex-macos-product-install",
  "radishlex-macos-upgrade-coordinator",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
 ]
 
 [[package]]

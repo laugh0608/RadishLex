@@ -85,10 +85,10 @@ mod history;
 pub use history::{
     inspect_maintenance, CancellationArchiveCheckpoint, CancellationArchivePort,
     CancellationArchiveReceipt, CancellationArchiveSlot, CancellationArchiveStore,
-    CancellationOuterBinding, CancellationReleaseCheckpoint, CancellationReleasePort,
-    CancellationReleaseReceipt, CancellationReleaseRequirement, CancellationReleaseStore,
-    LifecycleReleaseReceipt, MaintenanceInspection, MaintenancePhase, PreviousInventory,
-    TerminalReleaseBinding, TerminalReleaseCheckpoint, TerminalReleaseDirectory,
+    CancellationOuterBinding, CancellationPredecessorKind, CancellationReleaseCheckpoint,
+    CancellationReleasePort, CancellationReleaseReceipt, CancellationReleaseRequirement,
+    CancellationReleaseStore, LifecycleReleaseReceipt, MaintenanceInspection, MaintenancePhase,
+    PreviousInventory, TerminalReleaseBinding, TerminalReleaseCheckpoint, TerminalReleaseDirectory,
     TerminalReleaseOuterRequirement, TerminalReleasePhase, TerminalReleasePort,
     TerminalReleaseReceipt, TerminalReleaseStore,
 };

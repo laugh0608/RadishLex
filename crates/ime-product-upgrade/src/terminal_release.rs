@@ -15,12 +15,12 @@ mod record;
 use record::{decode, encode, valid_id, PreviousIndex};
 #[path = "lifecycle_index.rs"]
 mod lifecycle_index;
-use lifecycle_index::ReleaseIndex;
+use lifecycle_index::{LifecycleProofReference, ReleaseIndex};
 #[path = "cancellation_release.rs"]
 mod cancellation_release;
 pub use cancellation_release::{
-    CancellationReleaseCheckpoint, CancellationReleasePort, CancellationReleaseReceipt,
-    CancellationReleaseRequirement, CancellationReleaseStore,
+    CancellationPredecessorKind, CancellationReleaseCheckpoint, CancellationReleasePort,
+    CancellationReleaseReceipt, CancellationReleaseRequirement, CancellationReleaseStore,
 };
 #[path = "lifecycle_release.rs"]
 mod lifecycle_release;

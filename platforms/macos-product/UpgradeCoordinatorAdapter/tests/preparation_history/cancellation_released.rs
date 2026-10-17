@@ -159,9 +159,17 @@ fn cancellation_lifecycle_v1_and_v2_then_cancellation_then_new_upgrade_release()
             drop(guard);
             let store = CancellationReleaseStore::open_existing(fixture.verified()).unwrap();
             let guard = store.acquire_guard().unwrap();
-            store
+            let ready = store
                 .prepare_cancellation_release(&guard, NEXT, &mut ReleaseAdmission, &Hasher)
                 .unwrap();
+            assert_eq!(
+                ready.predecessor_kind(),
+                if legacy {
+                    radishlex_ime_product_upgrade::CancellationPredecessorKind::TerminalV1
+                } else {
+                    radishlex_ime_product_upgrade::CancellationPredecessorKind::TerminalV2
+                }
+            );
             store
                 .finish_cancellation_release(&guard, NEXT, &mut ReleaseAdmission, &Hasher)
                 .unwrap();

@@ -20,11 +20,11 @@ pub use cancellation_archive::{
 #[path = "terminal_release.rs"]
 mod terminal_release;
 pub use terminal_release::{
-    CancellationReleaseCheckpoint, CancellationReleasePort, CancellationReleaseReceipt,
-    CancellationReleaseRequirement, CancellationReleaseStore, LifecycleReleaseReceipt,
-    TerminalReleaseBinding, TerminalReleaseCheckpoint, TerminalReleaseDirectory,
-    TerminalReleaseOuterRequirement, TerminalReleasePhase, TerminalReleasePort,
-    TerminalReleaseReceipt, TerminalReleaseStore,
+    CancellationPredecessorKind, CancellationReleaseCheckpoint, CancellationReleasePort,
+    CancellationReleaseReceipt, CancellationReleaseRequirement, CancellationReleaseStore,
+    LifecycleReleaseReceipt, TerminalReleaseBinding, TerminalReleaseCheckpoint,
+    TerminalReleaseDirectory, TerminalReleaseOuterRequirement, TerminalReleasePhase,
+    TerminalReleasePort, TerminalReleaseReceipt, TerminalReleaseStore,
 };
 
 #[path = "maintenance_inspection.rs"]

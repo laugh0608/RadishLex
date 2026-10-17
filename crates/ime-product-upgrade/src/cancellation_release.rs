@@ -11,7 +11,7 @@ const OUTER_HISTORY: &str = ".radishlex-install-history-v1";
 
 #[path = "cancellation_release_record.rs"]
 mod record;
-pub use record::CancellationReleaseReceipt;
+pub use record::{CancellationPredecessorKind, CancellationReleaseReceipt};
 #[path = "cancellation_release_evidence.rs"]
 pub(super) mod evidence;
 #[path = "cancellation_release_persistence.rs"]

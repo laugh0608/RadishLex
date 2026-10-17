@@ -249,6 +249,12 @@ fn cancellation_lifecycle_continuous_cancellations_keep_null_and_legacy_data_pre
         cancel_next(&fixture, THIRD, state.map(|_| OLD));
         let result = query(&fixture);
         assert_eq!(result.operation_id(), THIRD);
+        assert!(matches!(
+            &result,
+            LifecycleReleaseReceipt::Cancellation(proof)
+                if proof.predecessor_kind()
+                    == radishlex_ime_product_upgrade::CancellationPredecessorKind::CancellationV2
+        ));
         assert_eq!(result.legacy_outer_operation_id(), OUTER);
         assert_eq!(
             result.data_receipt().map(UpgradeReceipt::operation_id),

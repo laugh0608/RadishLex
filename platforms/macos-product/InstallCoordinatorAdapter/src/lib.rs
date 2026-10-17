@@ -1,6 +1,9 @@
 //! Guard-bound composition of RadishLex program installation and data upgrade transactions.
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+pub mod qualification_reader;
 
 use std::fmt;
 
