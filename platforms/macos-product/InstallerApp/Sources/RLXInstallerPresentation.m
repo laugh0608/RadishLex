@@ -44,7 +44,8 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
     NSSet<NSString *> *actions = [NSSet setWithArray:@[
         RLXNoAction, RLXRefreshAction, @"begin_first_install", @"begin_upgrade",
         @"begin_repair", @"confirm_quiescence", @"resume_operation",
-        @"retry_operation", @"remove_programs", @"abort_pre_switch_upgrade", @"continue_prepared_upgrade"
+        @"retry_operation", @"remove_programs", @"abort_pre_switch_upgrade", @"continue_prepared_upgrade",
+        @"begin_source_preparation", @"resume_source_preparation", @"preserve_preparation_cancellation"
     ]];
     NSSet<NSString *> *errors = [NSSet setWithArray:@[
         @"none", @"operation_active", @"unsafe_data_root",
@@ -92,13 +93,36 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
         @"preparing_source", @"cancellation_requested", @"cancellation_finishing_source",
         @"cancellation_preserving", @"cancellation_awaiting_qualification", @"cancellation_completed"
     ]];
+    NSSet<NSString *> *preparationActions = [NSSet setWithArray:@[
+        @"begin_source_preparation", @"resume_source_preparation", @"preserve_preparation_cancellation"
+    ]];
+    BOOL hasPreparationAction = valid &&
+        ([preparationActions containsObject:primary] || [preparationActions containsObject:secondary]);
+    if (hasPreparationAction) {
+        BOOL preparing = [phase isEqualToString:@"preparing_source"];
+        BOOL cancellation = [phase isEqualToString:@"cancellation_requested"] ||
+            [phase isEqualToString:@"cancellation_finishing_source"] ||
+            [phase isEqualToString:@"cancellation_preserving"];
+        BOOL begin = preparing && [primary isEqualToString:@"begin_source_preparation"] &&
+            [secondary isEqualToString:RLXNoAction];
+        BOOL resume = preparing && [primary isEqualToString:@"resume_source_preparation"] &&
+            ([secondary isEqualToString:RLXNoAction] ||
+             [secondary isEqualToString:@"preserve_preparation_cancellation"]);
+        BOOL preserve = (preparing || cancellation) &&
+            [primary isEqualToString:@"preserve_preparation_cancellation"] &&
+            [secondary isEqualToString:RLXNoAction];
+        valid = (begin || resume || preserve) && [error isEqualToString:@"none"] &&
+            [operation isEqualToString:@"upgrade"] && [state isEqualToString:@"none"] &&
+            progress.doubleValue == 0 &&
+            [manualPrompt isEqualToString:@"select_neutral_input_source_and_close_manager"];
+    }
     if (valid && ([primary isEqualToString:@"continue_prepared_upgrade"] ||
                   [secondary isEqualToString:@"continue_prepared_upgrade"])) {
         valid = [phase isEqualToString:@"preparing_source"] &&
             [primary isEqualToString:@"continue_prepared_upgrade"] &&
             [secondary isEqualToString:RLXNoAction];
     }
-    if (valid && [maintenancePhases containsObject:phase]) {
+    if (valid && !hasPreparationAction && [maintenancePhases containsObject:phase]) {
         BOOL continuation = [phase isEqualToString:@"preparing_source"] &&
             [primary isEqualToString:@"continue_prepared_upgrade"];
         valid = [secondary isEqualToString:RLXNoAction] && [error isEqualToString:@"none"] &&
@@ -154,6 +178,8 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
 
 - (NSString *)statusTitle {
     if ([self.primaryActionCode isEqualToString:@"continue_prepared_upgrade"]) { return @"等待继续升级的确认"; }
+    if ([self.primaryActionCode isEqualToString:@"begin_source_preparation"]) { return @"等待准备升级词库的确认"; }
+    if ([self.primaryActionCode isEqualToString:@"resume_source_preparation"]) { return @"等待继续词库准备的确认"; }
     NSDictionary<NSString *, NSString *> *titles = @{
         @"ready": @"可以开始",
         @"awaiting_user_action": @"等待你的确认",
@@ -174,6 +200,13 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
 - (NSString *)statusDetail {
     if ([self.primaryActionCode isEqualToString:@"continue_prepared_upgrade"]) {
         return @"词库准备已完成交接，升级尚未完成。继续前请切换到其他输入源并关闭管理器；安装器会核验当前进度与程序身份，完成升级或继续已记录的恢复。";
+    }
+    if ([self.primaryActionCode isEqualToString:@"begin_source_preparation"] ||
+        [self.primaryActionCode isEqualToString:@"resume_source_preparation"]) {
+        return @"请先切换到其他输入源并关闭管理器，再确认准备升级词库。准备过程保留用户数据；准备成功后仍需再次确认继续升级，尚不表示升级完成。";
+    }
+    if ([self.primaryActionCode isEqualToString:@"preserve_preparation_cancellation"]) {
+        return @"可以确认保存取消请求与材料，必要时继续安全的源词库收尾。所有数据与事务材料保留；保存后仍等待旧版本兼容性资格，暂不能启动旧版本，也不能回到本次升级。保存材料不等于完成取消。";
     }
     NSDictionary<NSString *, NSString *> *maintenanceDetails = @{
         @"preparing_source": @"准备记录尚未完成。当前只提供状态查看，刷新不会继续维护或开始升级；已有词库及事务材料保持保留。",
@@ -218,6 +251,9 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
         @"remove_programs": @"移除两个程序",
         @"abort_pre_switch_upgrade": @"中止升级并恢复源程序",
         @"continue_prepared_upgrade": @"继续升级或恢复",
+        @"begin_source_preparation": @"准备升级词库",
+        @"resume_source_preparation": @"继续词库准备",
+        @"preserve_preparation_cancellation": @"保存取消请求与材料",
     };
     return titles[actionCode] ?: @"";
 }
@@ -237,6 +273,13 @@ static NSString *const RLXUnknownDriverResult = @"unknown_driver_result";
 }
 
 - (NSString *)confirmationTextForAction:(NSString *)actionCode {
+    if ([actionCode isEqualToString:@"begin_source_preparation"] ||
+        [actionCode isEqualToString:@"resume_source_preparation"]) {
+        return @"确认准备升级词库，并保留全部用户数据和事务材料。请确认已手动切换到其他输入源并关闭管理器；安装器会重新检查当前状态、静止与程序身份。准备成功只表示词库已准备就绪，继续升级仍需新的确认。";
+    }
+    if ([actionCode isEqualToString:@"preserve_preparation_cancellation"]) {
+        return @"确认保存取消请求与材料；取消后不可回到本次升级。必要时安装器会完成安全的源词库收尾，所有数据与事务材料都会保留。此操作仍需等待旧版本兼容性资格，暂不能启动旧版本；保存材料不等于完成取消。请确认已手动切换到其他输入源并关闭管理器，安装器会重新核验静止与程序身份。";
+    }
     if ([actionCode isEqualToString:@"continue_prepared_upgrade"]) {
         return @"确认继续本次已完成词库准备的升级，并保留用户数据。请确认已手动切换到其他输入源并关闭管理器。安装器会重新读取当前状态、检查静止和程序身份；若事务已进入回滚，将继续同一事务的恢复。只有程序、数据与终态封存全部完成后才报告完成。";
     }

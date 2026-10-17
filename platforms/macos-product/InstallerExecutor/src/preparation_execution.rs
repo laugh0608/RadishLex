@@ -470,7 +470,7 @@ fn same_release(release: &ProductRelease, product: &ProductArtifactIdentity) -> 
     release.product_version() == product.release().product_version()
         && release.build_number() == product.release().build_number()
 }
-fn matches_products(
+pub(crate) fn matches_products(
     prep: &PreparationReceipt,
     source: &ProductArtifactIdentity,
     target: &ProductArtifactIdentity,

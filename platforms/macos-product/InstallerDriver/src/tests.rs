@@ -494,3 +494,96 @@ fn maintenance_views_offer_only_refresh_even_after_historical_completion() {
         }
     }
 }
+
+#[test]
+fn preparation_actions_require_each_fresh_confirmation_and_hide_old_receipt_progress() {
+    let base = inspect_installer_view(
+        "/not-a-real-preparation-action-root",
+        0,
+        InstallerProductSituation::OlderReleaseInstalled,
+    );
+    let confirmed = InstallerUserAuthorization {
+        explicit_action_confirmed: true,
+        data_retention_acknowledged: true,
+        neutral_input_source_selected: true,
+        manager_closed: true,
+    };
+    for (view, action) in [
+        (
+            base.with_source_preparation(false, false),
+            InstallerAction::BeginSourcePreparation,
+        ),
+        (
+            base.with_source_preparation(true, true),
+            InstallerAction::ResumeSourcePreparation,
+        ),
+        (
+            base.with_source_preparation(true, true),
+            InstallerAction::PreservePreparationCancellation,
+        ),
+        (
+            base.with_maintenance(InstallerViewPhase::CancellationPreserving)
+                .with_cancellation_preservation(),
+            InstallerAction::PreservePreparationCancellation,
+        ),
+    ] {
+        assert_eq!(view.operation_code(), "upgrade");
+        assert_eq!(view.receipt_state_code(), "none");
+        assert_eq!(view.progress_step(), 0);
+        assert_eq!(view.stable_error(), InstallerStableError::None);
+        assert_eq!(
+            view.manual_prompt(),
+            InstallerManualPrompt::SelectNeutralInputSourceAndCloseManager
+        );
+        assert!(authorize_installer_action(view, action, confirmed).is_ok());
+        for missing in 0..4 {
+            let mut auth = confirmed;
+            match missing {
+                0 => auth.explicit_action_confirmed = false,
+                1 => auth.data_retention_acknowledged = false,
+                2 => auth.neutral_input_source_selected = false,
+                3 => auth.manager_closed = false,
+                _ => unreachable!(),
+            }
+            assert!(
+                authorize_installer_action(view, action, auth).is_err(),
+                "{action:?} / {missing}"
+            );
+        }
+        assert_eq!(
+            authorize_installer_action(view, InstallerAction::ContinuePreparedUpgrade, confirmed),
+            Err(InstallerAuthorizationError::ActionNotOffered)
+        );
+    }
+    assert_eq!(
+        base.with_source_preparation(false, true).secondary_action(),
+        InstallerAction::None
+    );
+    assert_eq!(
+        base.with_source_preparation(true, false).secondary_action(),
+        InstallerAction::None
+    );
+    for phase in [
+        InstallerViewPhase::CancellationAwaitingQualification,
+        InstallerViewPhase::CancellationCompleted,
+    ] {
+        let view = base.with_maintenance(phase);
+        assert_eq!(
+            authorize_installer_action(
+                view,
+                InstallerAction::PreservePreparationCancellation,
+                confirmed
+            ),
+            Err(InstallerAuthorizationError::ActionNotOffered)
+        );
+        assert_eq!(
+            view.with_cancellation_preservation().phase(),
+            InstallerViewPhase::Blocked
+        );
+    }
+    let blocked = base.with_recovery_inspection_error(InstallerStableError::OperationActive);
+    assert_eq!(
+        blocked.with_source_preparation(true, true).stable_error(),
+        InstallerStableError::OperationActive
+    );
+}

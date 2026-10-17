@@ -92,6 +92,7 @@ pub fn authorize_cancellation_preservation(
 > {
     let preparation = observation.preparation();
     if observation.phase() == MaintenancePhase::CancellationReleased
+        || preparation.handoff_started()
         || preparation.phase() == PreparationPhase::HandoffReady
         || preparation
             .binding()

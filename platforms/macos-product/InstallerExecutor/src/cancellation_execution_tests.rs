@@ -193,6 +193,55 @@ fn cancellation_execution_resumes_every_stage_with_fresh_task_and_same_outer_gua
                 "interrupted outer absence must be recoverable"
             );
         }
+        if matches!(
+            point,
+            P::Archive(A::Moved(Slot::NewOuter) | A::CompatibilityPublished)
+        ) {
+            use radishlex_macos_installer_driver::{
+                InstallerAction, InstallerProductSituation, InstallerStableError,
+            };
+            let before = tree(&fixture.path);
+            let view = crate::inspect_installer_view_with_recovery(
+                &fixture.path,
+                fixture.owner(),
+                InstallerProductSituation::IdentityUnavailable,
+            );
+            let selected = crate::inspect_source_preparation(&install, &fixture.target)
+                .unwrap()
+                .unwrap();
+            let projected = selected.project(view);
+            assert_eq!(projected.stable_error(), InstallerStableError::None);
+            assert_eq!(
+                projected.primary_action(),
+                InstallerAction::PreservePreparationCancellation
+            );
+            assert!(!selected.offers(InstallerAction::ResumeSourcePreparation));
+            assert!(!selected.offers(InstallerAction::BeginSourcePreparation));
+            assert_eq!(tree(&fixture.path), before, "restart query must not write");
+            let (fresh, _control) = authorize_cancellation_preservation(
+                selected.maintenance().unwrap(),
+                selected.source(),
+                selected.target(),
+                confirmation(),
+                Duration::from_secs(300),
+            )
+            .unwrap();
+            preserve_with_observer(fresh, &install, &mut Observer::default()).unwrap();
+            assert!(crate::inspect_source_preparation(&install, &fixture.target)
+                .unwrap()
+                .is_none());
+            let finished = crate::inspect_installer_view_with_recovery(
+                &fixture.path,
+                fixture.owner(),
+                InstallerProductSituation::IdentityUnavailable,
+            );
+            assert_eq!(finished.primary_action(), InstallerAction::Refresh);
+            assert!(fixture
+                .path
+                .join(STATE)
+                .join("preparation-cancellation.json")
+                .exists());
+        }
         drop(control);
         let (fresh, _control) = fixture.grant();
         let proof = preserve_with_observer(fresh, &install, &mut Observer::default())

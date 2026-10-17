@@ -32,6 +32,7 @@ use radishlex_macos_upgrade_coordinator::{
 };
 
 mod bootstrap;
+mod preparation;
 mod prepared;
 use bootstrap::InstallerBootstrapContext;
 #[cfg(test)]
@@ -50,6 +51,7 @@ pub enum InstallerBridgeError {
     Authorization(InstallerAuthorizationError),
     Execution(InstallerExecutionError),
     Prepared(radishlex_macos_installer_executor::PreparationExecutionError),
+    Cancellation(radishlex_macos_installer_executor::CancellationExecutionError),
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -174,16 +176,17 @@ fn production_perform(
             return unavailable_snapshot(InstallerStableError::ProductIdentityUnavailable);
         }
     };
-    let store_result = if action == InstallerAction::ContinuePreparedUpgrade {
-        VerifiedInstallRoot::verify(
-            environment.context.data_root(),
-            environment.context.owner_id(),
-        )
-        .and_then(InstallReceiptStore::open_existing)
-        .map_err(|_| ())
-    } else {
-        programs.open_install_store().map_err(|_| ())
-    };
+    let store_result =
+        if action == InstallerAction::ContinuePreparedUpgrade || preparation::is_action(action) {
+            VerifiedInstallRoot::verify(
+                environment.context.data_root(),
+                environment.context.owner_id(),
+            )
+            .and_then(InstallReceiptStore::open_existing)
+            .map_err(|_| ())
+        } else {
+            programs.open_install_store().map_err(|_| ())
+        };
     let store = match store_result {
         Ok(store) => store,
         Err(_) => return unavailable_snapshot(InstallerStableError::UnknownDriverResult),
@@ -195,6 +198,17 @@ fn production_perform(
                 return unavailable_snapshot(InstallerStableError::ProductIdentityUnavailable)
             }
         };
+    if preparation::is_action(action) {
+        let result = preparation::dispatch(
+            &store,
+            &programs,
+            &mut preflight,
+            &environment.context.product_root(),
+            action,
+            authorization,
+        );
+        return project_action_result(result, production_snapshot());
+    }
     let mut operation_ids = SystemInstallerOperationIdSource;
     if action == InstallerAction::ContinuePreparedUpgrade {
         let result = prepared::dispatch(
@@ -256,6 +270,7 @@ fn project_action_result<T>(
         InstallerBridgeError::Authorization(_) => "authorization_failed",
         InstallerBridgeError::Execution(error) => error.code(),
         InstallerBridgeError::Prepared(error) => error.code(),
+        InstallerBridgeError::Cancellation(error) => error.code(),
     };
     eprintln!("RadishLex Installer action failed: {failure_code}");
 
@@ -342,6 +357,27 @@ impl ProductionInstallerEnvironment {
                 snapshot,
             });
         }
+        if matches!(
+            blocked.phase(),
+            InstallerViewPhase::PreparingSource
+                | InstallerViewPhase::CancellationRequested
+                | InstallerViewPhase::CancellationFinishingSource
+                | InstallerViewPhase::CancellationPreserving
+        ) {
+            let result =
+                Self::preparation_view(&context, requirements.clone(), &target_product, blocked);
+            let snapshot = match result {
+                Ok(view) => view,
+                Err(error) => blocked.with_recovery_inspection_error(error),
+            };
+            return Ok(Self {
+                context,
+                requirements,
+                target_product,
+                product_situation: InstallerProductSituation::IdentityUnavailable,
+                snapshot,
+            });
+        }
         if status.decision() == InstallStatusDecision::FailedClosed
             || blocked.stable_error() == InstallerStableError::OperationActive
         {
@@ -359,8 +395,24 @@ impl ProductionInstallerEnvironment {
             &target_product,
             status.decision(),
         )?;
-        let snapshot =
+        let mut snapshot =
             inspect_installer_view(context.data_root(), context.owner_id(), product_situation);
+        // WAL preparation is the sole production upgrade entry. A missing or
+        // invalid preparation prerequisite cannot expose the old bootstrap.
+        if snapshot.offers(InstallerAction::BeginUpgrade)
+            || (snapshot.offers(InstallerAction::RetryOperation)
+                && product_situation == InstallerProductSituation::OlderReleaseInstalled)
+        {
+            snapshot = match Self::preparation_view(
+                &context,
+                requirements.clone(),
+                &target_product,
+                snapshot,
+            ) {
+                Ok(view) => view,
+                Err(error) => snapshot.with_recovery_inspection_error(error),
+            };
+        }
         Ok(Self {
             context,
             requirements,
@@ -368,6 +420,28 @@ impl ProductionInstallerEnvironment {
             product_situation,
             snapshot,
         })
+    }
+
+    fn preparation_view(
+        context: &InstallerBootstrapContext,
+        requirements: CodeSignatureRequirements,
+        target: &ProductArtifactIdentity,
+        view: InstallerViewSnapshot,
+    ) -> Result<InstallerViewSnapshot, InstallerStableError> {
+        let programs = MacOsProductInstallAdapter::load(
+            &context.payload_root(),
+            context.user_home(),
+            context.owner_id(),
+            requirements,
+        )
+        .map_err(|_| InstallerStableError::ProductIdentityUnavailable)?;
+        if programs.target_product() != target {
+            return Err(InstallerStableError::ProductIdentityUnavailable);
+        }
+        let store = VerifiedInstallRoot::verify(context.data_root(), context.owner_id())
+            .and_then(InstallReceiptStore::open_existing)
+            .map_err(|_| InstallerStableError::InvalidReceipt)?;
+        preparation::project(&store, &programs, &context.product_root(), view)
     }
 
     fn load_program_adapter(
@@ -555,6 +629,9 @@ fn decode_action(value: u32) -> Option<InstallerAction> {
         8 => Some(InstallerAction::RemovePrograms),
         9 => Some(InstallerAction::AbortPreSwitchUpgrade),
         10 => Some(InstallerAction::ContinuePreparedUpgrade),
+        11 => Some(InstallerAction::BeginSourcePreparation),
+        12 => Some(InstallerAction::ResumeSourcePreparation),
+        13 => Some(InstallerAction::PreservePreparationCancellation),
         _ => None,
     }
 }
@@ -620,6 +697,9 @@ const fn action_value(action: InstallerAction) -> u32 {
         InstallerAction::RemovePrograms => 8,
         InstallerAction::AbortPreSwitchUpgrade => 9,
         InstallerAction::ContinuePreparedUpgrade => 10,
+        InstallerAction::BeginSourcePreparation => 11,
+        InstallerAction::ResumeSourcePreparation => 12,
+        InstallerAction::PreservePreparationCancellation => 13,
     }
 }
 

@@ -98,6 +98,14 @@ fn maintenance_inspection_requires_final_marker_and_preserves_later_learning() {
                 observe(&fixture).unwrap(),
                 Some(Phase::CancellationAwaitingQualification)
             );
+            let observation = inspect_maintenance(
+                &fixture.0,
+                fixture.verified().identity().owner_id(),
+                &Hasher,
+            )
+            .unwrap()
+            .unwrap();
+            assert!(observation.cancellation_outer().is_some());
             let guard = store.acquire_guard().unwrap();
             let mut unqualified = ReleaseAuthority::new();
             unqualified.qualified = false;
@@ -118,6 +126,15 @@ fn maintenance_inspection_requires_final_marker_and_preserves_later_learning() {
                 observe(&fixture).unwrap(),
                 Some(Phase::CancellationReleased)
             );
+            let journal = PreparationJournalStore::open_existing(fixture.verified()).unwrap();
+            let before = failures::tree(&fixture.0);
+            let (data, lifecycle) = journal.inspect_preparation_predecessor(&Hasher).unwrap();
+            assert_eq!(data.as_ref().map(UpgradeReceipt::state), prior);
+            assert!(matches!(
+                lifecycle,
+                Some(radishlex_ime_product_upgrade::LifecycleReleaseReceipt::Cancellation(_))
+            ));
+            assert_eq!(failures::tree(&fixture.0), before);
             let mut db = UserDb::open(fixture.source()).unwrap();
             db.record_selection(SelectionEventDraft::new(
                 "synthetic-after-cancel",
@@ -183,6 +200,14 @@ fn maintenance_inspection_rejects_missing_changed_and_orphaned_materials() {
         } else {
             assert!(observe(&fixture).is_err(), "mutation {mutation}");
         }
+        let before = failures::tree(&fixture.0);
+        if let Ok(journal) = PreparationJournalStore::open_existing(fixture.verified()) {
+            assert!(
+                journal.inspect_preparation_predecessor(&Hasher).is_err(),
+                "new preparation must reject incomplete lifecycle {mutation}"
+            );
+        }
+        assert_eq!(failures::tree(&fixture.0), before);
     }
 }
 

@@ -27,12 +27,14 @@ pub(super) fn inspect(
         Ok(Some(value)) => value,
         Err(error) => return Some(snapshot.with_recovery_inspection_error(map_error(error))),
     };
-    if !matches!(
+    if !(matches!(
         snapshot.stable_error(),
         InstallerStableError::None
             | InstallerStableError::ProductIdentityUnavailable
             | InstallerStableError::ManualRecoveryRequired
-    ) {
+    ) || (observation.cancellation_outer().is_some()
+        && snapshot.stable_error() == InstallerStableError::InvalidReceipt))
+    {
         return Some(snapshot.with_recovery_inspection_error(snapshot.stable_error()));
     }
     let checked = || -> Result<(), InstallerStableError> {
@@ -41,6 +43,16 @@ pub(super) fn inspect(
                 .map_err(|_| InstallerStableError::UnsafeDataRoot)?,
         )
         .map_err(|_| InstallerStableError::InvalidReceipt)?;
+        if observation.cancellation_outer().is_some() {
+            verify_cancellation_outer(&store, &observation)?;
+            if inspect_maintenance(root, owner, &MacOsPreparationHasher).map_err(map_error)?
+                != Some(observation.clone())
+            {
+                return Err(InstallerStableError::RootIdentityChanged);
+            }
+            verify_cancellation_outer(&store, &observation)?;
+            return Ok(());
+        }
         let identity = super::preparation_execution::outer::active_identity(&store)
             .map_err(|_| InstallerStableError::InvalidReceipt)?;
         let outer = store
@@ -140,7 +152,81 @@ pub(super) fn inspect(
     Some(snapshot.with_maintenance(phase))
 }
 
-fn verify_outer(
+/// Only core-proven archive relationships permit an absent active outer.
+/// No path probing or history scan is used to infer a cancellation predecessor.
+pub(crate) fn verify_cancellation_outer(
+    store: &InstallReceiptStore,
+    observation: &MaintenanceInspection,
+) -> Result<(), InstallerStableError> {
+    let rejected = InstallerStableError::InvalidReceipt;
+    let evidence = observation.cancellation_outer().ok_or(rejected)?;
+    // This reader also checks the outer process guard even when its receipt
+    // has moved to the core-proven archive slot.
+    let active = store.load_for_recovery_inspection().map_err(|_| rejected)?;
+    let active_identity = if active.is_some() {
+        Some(super::preparation_execution::outer::active_identity(store).map_err(|_| rejected)?)
+    } else {
+        None
+    };
+    let previous = InstallReceipt::decode(evidence.previous_bytes()).map_err(|_| rejected)?;
+    let binding = observation.preparation().binding();
+    if previous.encode().map_err(|_| rejected)? != evidence.previous_bytes()
+        || previous.root_identity() != store.root_identity()
+        || binding.previous_install_operation_id.as_deref() != Some(previous.operation_id())
+        || !previous.state().is_terminal()
+        || previous.manual_recovery_required()
+        || !matches_product(previous.installed_product(), binding, true)
+    {
+        return Err(rejected);
+    }
+    if let Some(bytes) = evidence.new_bytes() {
+        let new = InstallReceipt::decode(bytes).map_err(|_| rejected)?;
+        if !matches_product(new.target_product(), binding, false) {
+            return Err(rejected);
+        }
+        radishlex_ime_product_install::validate_preparation_cancellation_outer(
+            evidence.previous_bytes(),
+            Some(bytes),
+            &binding.operation_id,
+            previous.operation_id(),
+            store.root_identity(),
+            previous.installed_product().ok_or(rejected)?,
+            new.target_product().ok_or(rejected)?,
+        )
+        .map_err(|_| rejected)?;
+    } else {
+        let identity =
+            super::preparation_execution::outer::active_identity(store).map_err(|_| rejected)?;
+        if store
+            .load_for_recovery_inspection()
+            .map_err(|_| rejected)?
+            .as_ref()
+            != Some(&previous)
+            || super::preparation_execution::outer::active_identity(store).map_err(|_| rejected)?
+                != identity
+        {
+            return Err(rejected);
+        }
+    }
+    let root = store.root_identity();
+    if root.device_id() != binding.data_root.device_id
+        || root.inode() != binding.data_root.inode
+        || root.owner_id() != binding.data_root.owner_id
+        || root.mode() != binding.data_root.mode
+    {
+        return Err(rejected);
+    }
+    if store.load_for_recovery_inspection().map_err(|_| rejected)? != active
+        || active_identity.is_some_and(|identity| {
+            super::preparation_execution::outer::active_identity(store).ok() != Some(identity)
+        })
+    {
+        return Err(rejected);
+    }
+    Ok(())
+}
+
+pub(crate) fn verify_outer(
     observation: &MaintenanceInspection,
     outer: &InstallReceipt,
 ) -> Result<(), InstallerStableError> {

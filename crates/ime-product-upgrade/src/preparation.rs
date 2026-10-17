@@ -360,6 +360,12 @@ impl PreparationReceipt {
         self.handoff_intent.as_ref()
     }
 
+    /// A persisted handoff intent forbids cancellation even before HandoffReady.
+    /// This is record state only; callers must still verify its physical proof.
+    pub fn handoff_started(&self) -> bool {
+        self.handoff_intent.is_some()
+    }
+
     pub(crate) fn archived_inventory_sha256(&self) -> Option<&str> {
         self.archived_inventory_sha256.as_deref()
     }

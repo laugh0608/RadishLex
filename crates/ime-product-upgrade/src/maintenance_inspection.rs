@@ -25,6 +25,7 @@ pub struct MaintenanceInspection {
     preparation: PreparationReceipt,
     handed_off_receipt: Option<UpgradeReceipt>,
     terminal_release: Option<TerminalReleaseReceipt>,
+    cancellation_outer: Option<CancellationOuterBinding>,
 }
 
 impl MaintenanceInspection {
@@ -41,6 +42,12 @@ impl MaintenanceInspection {
     }
     pub fn terminal_release(&self) -> Option<&TerminalReleaseReceipt> {
         self.terminal_release.as_ref()
+    }
+
+    /// Canonical outer bytes whose exact active/archive positions were checked
+    /// by the cancellation reader. This never grants mutation or final release.
+    pub fn cancellation_outer(&self) -> Option<&CancellationOuterBinding> {
+        self.cancellation_outer.as_ref()
     }
 }
 
@@ -86,7 +93,7 @@ pub fn inspect_maintenance(
     Ok(result)
 }
 
-fn inspection_stamp(
+pub(super) fn inspection_stamp(
     journal: &PreparationJournalStore,
     hasher: &impl PreparationHasher,
 ) -> Result<Vec<(PathBuf, PreparationFileIdentity)>> {
@@ -158,6 +165,7 @@ fn inspect_existing(
                 preparation: proof.preparation().clone(),
                 handed_off_receipt: None,
                 terminal_release: None,
+                cancellation_outer: Some(proof.archive().outer().clone()),
             }
         } else if path_exists(&journal.path(ARCHIVE))? {
             let store = CancellationArchiveStore::open_existing(verified()?)?;
@@ -169,6 +177,7 @@ fn inspect_existing(
                 preparation: record.request().preparation().clone(),
                 handed_off_receipt: None,
                 terminal_release: None,
+                cancellation_outer: Some(record.outer().clone()),
             }
         } else {
             let store = PreparationCancellationStore::open_existing(verified()?)?;
@@ -187,6 +196,7 @@ fn inspect_existing(
                 preparation: request.preparation().clone(),
                 handed_off_receipt: None,
                 terminal_release: None,
+                cancellation_outer: None,
             }
         };
         if journal.evidence(&journal.path(REQUEST), hasher)? != identity {
@@ -207,6 +217,7 @@ fn inspect_existing(
                 preparation: record,
                 handed_off_receipt: None,
                 terminal_release: None,
+                cancellation_outer: None,
             }));
         }
         let inventory = journal.load_previous_inventory(&record, hasher)?;
@@ -246,6 +257,7 @@ fn inspect_existing(
             preparation: record,
             handed_off_receipt: None,
             terminal_release: None,
+            cancellation_outer: None,
         }
     } else if path_exists(&journal.path("terminal-release.json"))? {
         let record = TerminalReleaseReceipt::decode(
@@ -259,6 +271,7 @@ fn inspect_existing(
             preparation,
             handed_off_receipt: Some(release.data_receipt().clone()),
             terminal_release: Some(release),
+            cancellation_outer: None,
         }
     } else {
         // No record is not a first-use fallback for orphaned cancellation slots.
@@ -298,6 +311,7 @@ fn inspect_existing(
                     preparation: record,
                     handed_off_receipt: Some(current),
                     terminal_release: None,
+                    cancellation_outer: None,
                 }));
             }
         }
@@ -331,6 +345,7 @@ fn inspect_existing(
                 preparation: proof.preparation().clone(),
                 handed_off_receipt: None,
                 terminal_release: None,
+                cancellation_outer: Some(proof.archive().outer().clone()),
             },
             _ => return Ok(None),
         }

@@ -10,7 +10,7 @@ use std::path::Path;
 const HISTORY: &str = ".radishlex-install-history-v1";
 const STATE: &str = ".radishlex-install-v1";
 
-pub(super) fn present(path: &Path) -> Result<bool> {
+pub(crate) fn present(path: &Path) -> Result<bool> {
     match fs::symlink_metadata(path) {
         Ok(_) => Ok(true),
         Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),
@@ -161,7 +161,7 @@ fn only(path: &Path, allowed: &[&str]) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn verify(
+pub(crate) fn verify(
     install: &InstallReceiptStore,
     previous: &str,
     evidence: &PreparationInstallEvidence,
@@ -434,6 +434,21 @@ pub(crate) fn sync_preparation_history(
             return Err(Error::InvalidBinding);
         }
         checkpoint()?;
+    }
+    Ok(())
+}
+
+/// A bare existing original cannot be adopted without a resolved cancellation lifecycle.
+pub(crate) fn require_new_history_slot(
+    install: &InstallReceiptStore,
+    operation: &str,
+) -> Result<()> {
+    let history = install.data_root_path().join(HISTORY);
+    if present(&history)? {
+        directory(&history, &directory_identity(install))?;
+        if present(&history.join(operation))? {
+            return Err(Error::InvalidBinding);
+        }
     }
     Ok(())
 }

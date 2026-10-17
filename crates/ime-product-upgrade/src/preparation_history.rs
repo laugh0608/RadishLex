@@ -31,6 +31,9 @@ pub use terminal_release::{
 mod maintenance_inspection;
 pub use maintenance_inspection::{inspect_maintenance, MaintenanceInspection, MaintenancePhase};
 
+#[path = "preparation_predecessor_inspection.rs"]
+mod predecessor_inspection;
+
 impl PreparationJournalStore {
     /// Exact, guard-bound continuation from source_prepared. The preparation
     /// marker remains active; this neither creates v1 state nor allows startup.

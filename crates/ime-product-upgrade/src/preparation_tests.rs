@@ -362,6 +362,7 @@ fn physical_handoff_intent_is_append_only_and_preserves_old_encoding() {
     let mut record = prepared();
     record.record_previous_archive(digest('e')).unwrap();
     let old_bytes = record.encode().unwrap();
+    assert!(!record.handoff_started());
     assert!(!String::from_utf8(old_bytes.clone())
         .unwrap()
         .contains("handoff_intent"));
@@ -381,6 +382,7 @@ fn physical_handoff_intent_is_append_only_and_preserves_old_encoding() {
     assert!(prepared().bind_handoff_intent(intent.clone()).is_err());
     let before = record.clone();
     record.bind_handoff_intent(intent.clone()).unwrap();
+    assert!(record.handoff_started());
     assert!(record.can_replace(&before));
     assert!(!before.can_replace(&record));
     assert!(record.bind_handoff_intent(intent.clone()).is_err());

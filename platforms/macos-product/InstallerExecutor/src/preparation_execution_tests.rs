@@ -7,6 +7,8 @@ use std::os::unix::fs::{MetadataExt, PermissionsExt};
 pub(crate) mod fixture;
 use fixture::*;
 
+#[path = "preparation_action_tests.rs"]
+mod actions;
 #[path = "preparation_lifecycle_tests.rs"]
 mod lifecycle;
 #[path = "preparation_rebinding_tests.rs"]

@@ -66,6 +66,9 @@ pub enum InstallerAction {
     RemovePrograms,
     AbortPreSwitchUpgrade,
     ContinuePreparedUpgrade,
+    BeginSourcePreparation,
+    ResumeSourcePreparation,
+    PreservePreparationCancellation,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -278,6 +281,53 @@ impl InstallerViewSnapshot {
         self.progress_step = progress_step(receipt.state());
         self.recovery_binding = None;
         self.prepared_continuation = true;
+        self
+    }
+
+    /// Supplied only after the composition layer checks the authoritative root,
+    /// sealed products and strict lifecycle predecessor. Execution rechecks it.
+    pub fn with_source_preparation(mut self, resume: bool, cancellable: bool) -> Self {
+        if !matches!(
+            self.stable_error,
+            InstallerStableError::None
+                | InstallerStableError::ProductIdentityUnavailable
+                | InstallerStableError::ManualRecoveryRequired
+        ) {
+            return self.with_recovery_inspection_error(self.stable_error);
+        }
+        self = self.with_maintenance(InstallerViewPhase::PreparingSource);
+        self.primary_action = if resume {
+            InstallerAction::ResumeSourcePreparation
+        } else {
+            InstallerAction::BeginSourcePreparation
+        };
+        self.secondary_action = if resume && cancellable {
+            InstallerAction::PreservePreparationCancellation
+        } else {
+            InstallerAction::None
+        };
+        self.manual_prompt = InstallerManualPrompt::SelectNeutralInputSourceAndCloseManager;
+        self
+    }
+
+    /// Preservation requests/continues cancellation; it never releases its marker.
+    pub fn with_cancellation_preservation(mut self) -> Self {
+        if self.stable_error != InstallerStableError::None
+            || self.receipt_state.is_some()
+            || self.progress_step != 0
+            || !matches!(
+                self.phase,
+                InstallerViewPhase::PreparingSource
+                    | InstallerViewPhase::CancellationRequested
+                    | InstallerViewPhase::CancellationFinishingSource
+                    | InstallerViewPhase::CancellationPreserving
+            )
+        {
+            return self.with_recovery_inspection_error(InstallerStableError::UnknownDriverResult);
+        }
+        self.primary_action = InstallerAction::PreservePreparationCancellation;
+        self.secondary_action = InstallerAction::None;
+        self.manual_prompt = InstallerManualPrompt::SelectNeutralInputSourceAndCloseManager;
         self
     }
 
@@ -667,6 +717,9 @@ pub fn authorize_installer_action(
         InstallerAction::RemovePrograms
             | InstallerAction::AbortPreSwitchUpgrade
             | InstallerAction::ContinuePreparedUpgrade
+            | InstallerAction::BeginSourcePreparation
+            | InstallerAction::ResumeSourcePreparation
+            | InstallerAction::PreservePreparationCancellation
     ) && !authorization.data_retention_acknowledged
     {
         return Err(InstallerAuthorizationError::DataRetentionAcknowledgementRequired);
@@ -680,6 +733,9 @@ pub fn authorize_installer_action(
             | InstallerAction::RemovePrograms
             | InstallerAction::AbortPreSwitchUpgrade
             | InstallerAction::ContinuePreparedUpgrade
+            | InstallerAction::BeginSourcePreparation
+            | InstallerAction::ResumeSourcePreparation
+            | InstallerAction::PreservePreparationCancellation
     ) && (!authorization.neutral_input_source_selected || !authorization.manager_closed)
     {
         return Err(InstallerAuthorizationError::ManualQuiescenceAcknowledgementRequired);
@@ -693,7 +749,10 @@ pub fn authorize_installer_action(
         | InstallerAction::ResumeOperation
         | InstallerAction::RetryOperation
         | InstallerAction::AbortPreSwitchUpgrade
-        | InstallerAction::ContinuePreparedUpgrade => snapshot.operation_kind,
+        | InstallerAction::ContinuePreparedUpgrade
+        | InstallerAction::BeginSourcePreparation
+        | InstallerAction::ResumeSourcePreparation
+        | InstallerAction::PreservePreparationCancellation => snapshot.operation_kind,
         InstallerAction::None | InstallerAction::Refresh => None,
     };
     Ok(AuthorizedInstallerIntent {
@@ -705,6 +764,8 @@ pub fn authorize_installer_action(
                 | InstallerAction::ResumeOperation
                 | InstallerAction::AbortPreSwitchUpgrade
                 | InstallerAction::ContinuePreparedUpgrade
+                | InstallerAction::ResumeSourcePreparation
+                | InstallerAction::PreservePreparationCancellation
         ),
         requires_platform_preflight: true,
         recovery_binding: if action == InstallerAction::AbortPreSwitchUpgrade {
@@ -788,6 +849,9 @@ const fn action_code(action: InstallerAction) -> &'static str {
         InstallerAction::RemovePrograms => "remove_programs",
         InstallerAction::AbortPreSwitchUpgrade => "abort_pre_switch_upgrade",
         InstallerAction::ContinuePreparedUpgrade => "continue_prepared_upgrade",
+        InstallerAction::BeginSourcePreparation => "begin_source_preparation",
+        InstallerAction::ResumeSourcePreparation => "resume_source_preparation",
+        InstallerAction::PreservePreparationCancellation => "preserve_preparation_cancellation",
     }
 }
 

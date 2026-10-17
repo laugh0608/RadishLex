@@ -37,10 +37,12 @@ pub use prepared_execution::{
     PreparedUpgradeObservation, PreparedUpgradeResumeAuthorization, PreparedUpgradeSummary,
 };
 mod preparation_execution;
+mod preparation_inspection;
 pub use preparation_continuation::{
     admit_prepared_continuation, authorize_prepared_continuation,
     PreparedContinuationAuthorization, PreparedContinuationTask,
 };
+pub use preparation_inspection::{inspect_source_preparation, SourcePreparationObservation};
 mod recovery;
 pub use bootstrap::{
     bootstrap_upgrade_receipt, BootstrappedUpgradeReceipt, UpgradeBootstrapError,
@@ -463,6 +465,7 @@ where
     I: InstallerOperationIdSource,
     U: UpgradeCoordinatorPort,
 {
+    reject_dedicated_action(intent.action())?;
     let data_root = data_root.as_ref();
     maintenance_inspection::require_no_maintenance(install_store)?;
     if intent.action() == InstallerAction::AbortPreSwitchUpgrade {
@@ -549,6 +552,7 @@ where
     I: InstallerOperationIdSource,
     U: InstallerUpgradeExecution<P>,
 {
+    reject_dedicated_action(intent.action())?;
     if intent.action() == InstallerAction::Refresh || !intent.requires_platform_preflight() {
         return Err(InstallerExecutionError::InvalidIntent);
     }
@@ -853,3 +857,16 @@ mod tests;
 #[cfg(test)]
 #[path = "cancellation_authorization_fixture.rs"]
 mod cancellation_fixture;
+
+fn reject_dedicated_action(action: InstallerAction) -> Result<(), InstallerExecutionError> {
+    if matches!(
+        action,
+        InstallerAction::ContinuePreparedUpgrade
+            | InstallerAction::BeginSourcePreparation
+            | InstallerAction::ResumeSourcePreparation
+            | InstallerAction::PreservePreparationCancellation
+    ) {
+        return Err(InstallerExecutionError::InvalidIntent);
+    }
+    Ok(())
+}
