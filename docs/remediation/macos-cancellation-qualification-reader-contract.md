@@ -103,7 +103,7 @@ reader 不创建目录、guard、日志或修复文件，不执行包内命令�
 
 - reader 不接受调用者提供的 `covered=true`、旧版本号字符串或任意 case ID 作为场景判断；取值必须来自验证过的 proof 和产品/环境上下文。声明 source tree 与 manifest 不一致即拒绝。
 - 当前 proof 的 canonical bytes/摘要、完整 typed source、data root、旧 outer/data、family 和索引关系留在请求绑定中；不能只按 operation ID 匹配。实验的 operation 不与真实 operation 作相等匹配。
-- 有 snapshot schema 时须与证据支持的 source schema 严格相等。维护前无 snapshot 时，不从 target schema 猜测，也不把缺失 schema 当通配；必须有来自当前 exact source family 的受信 schema 观察。[源 schema 观察合同](macos-source-schema-observation-contract.md)已形成设计草案：拟由连续双锁下的私有字节副本及独立 WAL 准入、SQLite/layout 验证提供，原库不建立 SQLite 连接。观察器、副本生命周期及 reader 接入均未实施，仍需 A5 单独批准；当前缺少时保持 unavailable。
+- 有 snapshot schema 时须与证据支持的 source schema 严格相等。维护前无 snapshot 时，不从 target schema 猜测，也不把缺失 schema 当通配；必须有来自当前 exact source family 的受信 schema 观察。[源 schema 观察合同](macos-source-schema-observation-contract.md)已有获批的仅合成实现：私有字节副本、WAL 准入、SQLite/layout 验证及 proof 绑定均留在测试路径，原库不建立 SQLite 连接。2026-10-18 收尾时实现尚未提交，完整门禁中断；生产副本生命周期与 reader 接入仍未实施，仍需 A5 单独批准。当前 reader 缺少 snapshot 时继续返回 `SchemaObservationUnavailable`。
 - 源内容等价、当前程序及静止来自既有核心和产品观察，reader 不重新实现源库验证。合法学习后的历史查询不被旧 DB hash 封死；尚待释放的当次 family 则仍受现有 proof 规则约束。
 - 为避免循环证明，独立兼容性实验先验证隔离的后置状态样本；不得先用假 issuer 释放真实 marker，再用启动成功为该 issuer 背书。
 
@@ -139,13 +139,13 @@ reader 的内部原因应比现有四类 qualification 错误更具体，供诊�
 
 离线固定目录只能执行它已知道的撤销，无法保证旧 Installer 得知后来撤销；本地墙钟或文件 mtime 也不能证明策略是最新。这是生产 issuer 的开放阻塞，不能用目录版本自报值或普通用户文件中的最低版本解除。未来 A5 必须单独批准策略更新/防降级或每次运行的新鲜批准来源；在该机制成立前，reader 最多给出只读报告，不能支撑生产最终取消开放。
 
-当前尚缺三个独立条件：可信且完整的 source 39 正常运行证据、无 snapshot 时对当前源 family 的可信 schema 观察实现及验证、生产策略新鲜度/撤销合同。schema 观察草案不表示其临时敏感副本、WAL 支持范围或生产读取已获批准；reader 的文件解析和覆盖设计完成不代表这些条件完成。
+当前尚缺三个独立条件：可信且完整的 source 39 正常运行证据、无 snapshot 时对当前源 family 的生产 schema 观察及验证、生产策略新鲜度/撤销合同。仅合成 observer 的实现和局部测试不授权真实敏感副本或生产读取，也不能消除上述阻塞。
 
 ## 实施边界与验收设计
 
 本批已获准实现 macOS 产品协调层的独立只读 reader；生产 provider、目录装配与最终按钮仍留在独立批准批次。通用核心只新增既有前驱分类的只读 getter，不读取产品资格包；AppKit 不直接解析证据。action `10–13`、FFI、v1/v2 回执格式与双 gate 不变。
 
-协调层经单独批准直接引用锁文件中已有的 `serde 1.0.228`、`serde_json 1.0.150`、`sha2 0.10.9` 与 `libc 0.2.186`，没有下载或升级依赖。私有文件读取模块是唯一 POSIX `unsafe` 例外：逐级目录句柄、`openat` / `fstatat` / `O_NOFOLLOW`、descriptor ACL 和每段读取后的身份复核。其余协调层保持 `deny(unsafe_code)`。macOS 实际执行验证；Linux 分支尚未在本批环境执行，其他平台不编译此 reader。
+协调层经单独批准直接引用锁文件中已有的 `serde 1.0.228`、`serde_json 1.0.150`、`sha2 0.10.9` 与 `libc 0.2.186`，没有下载或升级依赖。reader 内部只有私有文件读取模块允许 POSIX `unsafe`：逐级目录句柄、`openat` / `fstatat` / `O_NOFOLLOW`、descriptor ACL 和每段读取后的身份复核。协调层根级 `deny(unsafe_code)` 保持；另行批准的合成 observer 测试模块例外只由其[观察合同](macos-source-schema-observation-contract.md#实施接口与依赖边界)约束，不扩大 reader 权限。macOS 实际执行验证；Linux 分支尚未在本批环境执行，其他平台不编译此 reader。
 
 实现采用以下保守约束：包内路径只接受安全 ASCII，拒绝大小写冲突及非 ASCII，避免未实现的 Unicode 归一化猜测；包内与祖先存在任何 ACL 均拒绝，Darwin 无 ACL 的 `ENOENT` 仅在 descriptor 身份复核后接受，其余未知失败关闭。目录扫描最多 8192 个节点、4096 附件加一个 manifest；附件以 64 KiB 块流式 hash，不保留全文。`ReadControl` 使用单调时钟、最多 300 秒并支持撤销，每次扫描/读块前后检查；这不是系统调用超时或 CPU/RSS 硬配额。
 

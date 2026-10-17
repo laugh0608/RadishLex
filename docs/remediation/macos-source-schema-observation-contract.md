@@ -1,8 +1,8 @@
 # macOS 无 snapshot 源 schema 观察合同
 
-本文供 userdb、升级核心与 macOS 产品协调层维护者审阅，限定准备取消时缺少 snapshot schema 的观察来源、请求绑定、失效与验收条件。状态：**2026-10-17 设计草案，已补齐仅合成验证的目录、生命周期及预算，未实施、未采集；不提供生产资格。** 本轮仅改文档，不操作冻结资产、真实库、账户或会话。
+本文供 userdb、升级核心与 macOS 产品协调层维护者审阅，限定准备取消时缺少 snapshot schema 的观察来源、请求绑定、失效与验收条件。状态：**2026-10-18 收尾：获批的仅合成实现留在工作区、尚未提交；完整门禁按用户要求停止，最终验证未完成。生产接入未实施，不提供生产资格。** 合成实现的验证结果与限制见下文实施记录；不操作冻结资产、真实库、账户或会话。
 
-上游为[资格证据 reader 合同](macos-cancellation-qualification-reader-contract.md)及[准备取消兼容合同](macos-preparation-cancellation-compatibility.md)。本设计不改变 v1/v2 回执、action `10–13`、双 guard/gate 或最终 marker；生产目录为空，issuer 未接入。源码定位基线为 `ad15bf7`，配套文档提交为 `f16e46b`。
+上游为[资格证据 reader 合同](macos-cancellation-qualification-reader-contract.md)及[准备取消兼容合同](macos-preparation-cancellation-compatibility.md)。本设计不改变 v1/v2 回执、action `10–13`、双 guard/gate 或最终 marker；生产目录为空，issuer 未接入。设计源码定位基线为 `ad15bf7`，仅合成实施参数提交为 `ee6a11b`。
 
 ## 已有事实与不能推出的结论
 
@@ -18,11 +18,11 @@
 
 SQLite 的 `user_version` 是应用设置的版本整数，本身不验证表结构；WAL 可以持有尚未 checkpoint 的已提交内容，读取主 DB 文件头不能代表完整视图。SQLite 的 WAL 只读连接也有 sidecar 条件，而 `immutable=1` 会跳过锁和变化检测，不能把它当作原库不变的证明。依据：[文件格式](https://sqlite.org/fileformat.html#user_version_number)、[WAL 读取](https://sqlite.org/wal.html#how_wal_works)、[只读 WAL](https://sqlite.org/wal.html#read_only_databases)、[immutable 参数](https://sqlite.org/uri.html#uriimmutable)。
 
-## 选定的拟议路径与范围
+## 选定路径与范围
 
 首选**当前 family 的受控私有字节副本，由既有 SQLite 引擎观察**。源侧只通过受验证文件句柄读取字节；SQLite 仅看到本次新建的私有副本。它不是 preparation snapshot，不回填 `SnapshotEvidence`，不进入 archive/inventory/lifecycle，不成为备份、可重放资格包或新的数据真相源。
 
-该方案会增加临时敏感数据副本及创建、资源管理和清理责任。**设计授权不包含这项实施或真实数据复制授权。** 后续须先批准副本位置、生命周期、资源预算及跨模块接口，再仅在全新合成目录实施验证；真实部署还须另行满足产品操作授权。现有只读 reader 的无写入承诺保持，副本管理不能塞入 `review_evidence`。
+该方案会增加临时敏感数据副本及创建、资源管理和清理责任。**本次追加授权只覆盖下述合成实施包及其 `hooks` / 最小 POSIX 边界，不包含真实数据复制。** 真实部署仍须另行批准生产目录、生命周期及产品操作授权。现有只读 reader 的无写入承诺保持，副本管理不能塞入 `review_evidence`。
 
 | 候选路径 | 本设计取舍 |
 | --- | --- |
@@ -30,7 +30,7 @@ SQLite 的 `user_version` 是应用设置的版本整数，本身不验证表结
 | 原库直接 `mode=ro`、`query_only` 或 `immutable=1` | 不选；不能据选项名称证明源侧零业务写入和一致性 |
 | 只读主文件头，或自行归并 WAL 并解释 schema | 不选；前者漏 WAL，后者新增 SQLite 页视图/schema 解释器；下面的有限 WAL 格式准入校验不能代替 SQLite 读取 |
 | 专用内存 VFS 或完整内存数据库映像 | 不在最小批次；新增 VFS/FFI、内存预算及 WAL 重建合同 |
-| 私有 DB/WAL 副本 + 既有 SQLite | 作为待批准实施路径；必须通过下述完整性、只读与生命周期验收，失败不切换其他路径 |
+| 私有 DB/WAL 副本 + 既有 SQLite | 作为已批准的合成实施路径；产品接入仍须满足下述完整性、只读与生命周期验收，失败不切换其他路径 |
 
 ## 可信来源与职责
 
@@ -65,11 +65,11 @@ SQLite 的 `user_version` 是应用设置的版本整数，本身不验证表结
 - 对 salt 不匹配、损坏、截断或无法解释的尾部，首版一律拒绝，不截短副本后重开。这也可能拒绝 SQLite 正常接受的 WAL reset 残留或崩溃尾部；这是保守支持边界，不称为源已损坏、不自动 checkpoint。若独立资格矩阵需要这些形状，须先扩充并审阅准入规则，不能把它们计为已覆盖。
 - 校验器不证明任意两份格式合法的 DB/WAL 在历史上属于同一库；SQLite 没有供本合同直接比较的持久“库 UUID”。归属只能来自本次核心 proof 的完整 family 和捕获关系，不能通过页大小或 salt 相同补出来源。对于 proof 本身已记录的原始内容，观察结论仅限该视图及 layout，不声明历史数据真实或业务语义正确。
 
-这一路径仍新增有限 WAL 格式校验的维护成本，属于后续实施批准项；若不接受该成本，或不能证明实际 SQLite 选项对准入 WAL 的读取行为，保持 unavailable。本轮没有认可任何实际 source 39 family 满足这些条件，也不把简单无 WAL 样本视为主路径验收。
+这一路径新增有限 WAL 格式校验的维护成本，已纳入合成实施授权，尚未批准产品接入；若不接受该成本，或不能证明实际 SQLite 选项对准入 WAL 的读取行为，保持 unavailable。本轮没有认可任何实际 source 39 family 满足这些条件，也不把简单无 WAL 样本视为主路径验收。
 
 ## proof/family 绑定与结果语义
 
-拟议结果 `SourceSchemaObservation` 为内部不可序列化、不可由调用方构造的短命对象；名称仅为设计标识，本轮不新增 API。它必须由上述全流程构造，至少关联以下字段：
+拟议结果 `SourceSchemaObservation` 为内部不可序列化、不可由调用方构造的短命对象；合成实现位于测试私有模块，不新增产品 API。它必须由上述全流程构造，至少关联以下字段：
 
 | 绑定组 | 必需内容 |
 | --- | --- |
@@ -104,17 +104,17 @@ SQLite 的 `user_version` 是应用设置的版本整数，本身不验证表结
 
 - 源侧承诺不发起 SQLite 连接或文件写入，不改数据、sidecar、权限及事务材料；普通文件读取可能受文件系统 atime 策略影响，不承诺 atime 永不变化，也不通过 utime“恢复”原件。mtime/ctime 或已绑定身份异常必须拒绝。
 - 副本含与原库相同等级的敏感数据，不属于合成 fixture、日志或证据附件；不得进入 reader pack、仓库、上传、同步、崩溃附件或诊断。只保留固定错误码和必要非敏感计数；不能输出路径、SQL、原始行或原库摘要作为公共日志。
-- source family 预算与 reader 附件预算独立定义；下面的合成验证 profile 固定首批数字，实际容量边界尚待合成实测，不代表真实库已经适配。单线程逐块读取、串行 SQLite 检查，控制期限不超过任务剩余时间且最多 300 秒。调度降载不等于系统调用超时、CPU/RSS 硬配额。
+- source family 预算与 reader 附件预算独立定义；下面的合成验证 profile 固定首批数字，实际容量结果只按下文合成实测记录，不代表真实库已经适配。单线程逐块读取、串行 SQLite 检查，控制期限不超过任务剩余时间且最多 300 秒。调度降载不等于系统调用超时、CPU/RSS 硬配额。
 - scratch 位置须排除同步/备份用途并说明系统备份、swap 和崩溃残留边界；私有权限和 unlink 不代表不可恢复擦除。若不能接受明文副本的残留风险，不能以“临时”命名绕过，应另行设计内存/VFS 路线。
-- 正常、失败、取消均只清理已核验属于本次调用的对象；授权应预先包含这些生命周期动作。撤销或到期后只允许已批准的资源关闭/清理，不继续查询或返回成功；清理不延长业务授权，无法完成时记录失败与私有残留。进程崩溃后的残留不复用、不自动认领，清理范围另行核验和授权；未知对象原样保留，不能递归删除整个父目录。本轮没有创建任何 scratch 或批准此类清理。
+- 正常、失败、取消均只清理已核验属于本次调用的对象；授权应预先包含这些生命周期动作。撤销或到期后只允许已批准的资源关闭/清理，不继续查询或返回成功；清理不延长业务授权，无法完成时记录失败与私有残留。进程崩溃后的残留不复用、不自动认领，清理范围另行核验和授权；未知对象原样保留，不能递归删除整个父目录。本批只创建合成 scratch；正常及预定故障的 fixture 处置在实施授权内，意外残留仍须单独登记和授权。
 
 ## 最小实施方案：仅合成验证
 
-本节固定待审的 `schema-observer-synthetic-v1` 实施包。它只允许仓库测试 fixture 生成器建立虚构 source、proof 与数据，不能接受真实数据路径参数、环境变量或拖入的文件；路径位于临时目录本身不证明数据是合成的。fixture 来源须由测试内构造能力及创建记录证明，禁止复制冻结资产或真实库来制作 fixture。这里的数字是首批工程验收界限，不是已有性能结论。
+本节固定已批准的 `schema-observer-synthetic-v1` 实施包。它只允许仓库测试 fixture 生成器建立虚构 source、proof 与数据，不能接受真实数据路径参数、环境变量或拖入的文件；路径位于临时目录本身不证明数据是合成的。fixture 来源须由测试内构造能力及创建记录证明，禁止复制冻结资产或真实库来制作 fixture。这里的数字是首批工程验收界限，不是已有性能结论。
 
 ### 位置与独占规则
 
-首批固定 macOS 本机目录模板如下；`<euid>` 来自当前进程有效用户 ID，不能由 CLI 或环境覆盖。本轮不查询或创建该目录。
+首批固定 macOS 本机目录模板如下；`<euid>` 来自当前进程有效用户 ID，不能由 CLI 或环境覆盖。该固定目录只由本批合成测试独占创建。
 
 ```text
 /private/tmp/radishlex-schema-observer-synthetic-v1-<euid>/
@@ -183,13 +183,13 @@ SQLite 缓存是建议值，`temp_store` 还受编译配置影响，progress 回
 ### 实施接口与依赖边界
 
 - 测试宿主创建 synthetic fixture 与目录能力；协调层只接受本次能力和完整 proof，不提供接受任意原库路径的产品命令。observer 的测试成功不会改变生产目录、reader 的无 snapshot 拒绝或最终取消动作。
-- `ime-userdb` 保留 `forbid(unsafe_code)`，使用当前锁定 SQLite/rusqlite 的安全接口。当前依赖只启用 `backup` / `bundled`；拟议 progress handler 需要评审启用同版本 rusqlite 的 `hooks` feature，不能用新增裸 FFI 或放宽 unsafe 规则绕过。此 feature 变更是后续实施审批项，本轮不改 Cargo 或 lockfile、不下载依赖。
-- scratch 的目录句柄创建/删除能力与现有只读 reader 文件模块隔离；原模块的 unsafe 例外不能自动覆盖新写入/清理实现。拟在产品协调层单独审阅最小 POSIX 范围：`mkdirat` 独占建目录、`openat` 配合 `O_EXCL` / `O_NOFOLLOW` 创建或打开、`fstat` / `fstatat` 校验、`unlinkat` 逐文件及空目录删除，以及必要的目录枚举/ACL 读取；文件 IO 和 fd 所有权优先用标准库。沿用已锁定 `libc`，不新增依赖版本；不得包含递归移除、全局 umask、chmod 旧对象、进程控制或任意路径执行。该新模块的 unsafe 例外须单独批准，调用集合扩大时重新确认。
+- `ime-userdb` 保留 `forbid(unsafe_code)`，使用当前锁定 SQLite/rusqlite 的安全接口。新增默认关闭的 `synthetic-schema-observer` feature，仅启用同版本 rusqlite 的 `hooks`；产品协调层只以 dev-dependency 启用。沿用 `backup` / `bundled` 和现有锁定版本，未改 lockfile、未下载依赖，不新增裸 SQLite FFI 或放宽 userdb 的 unsafe 规则。
+- scratch 的目录句柄创建/删除能力与现有只读 reader 文件模块隔离；原模块的 unsafe 例外不能自动覆盖新写入/清理实现。本次已单独批准产品协调层测试模块的最小 POSIX 范围：`mkdirat` 独占建目录、`openat` 配合 `O_EXCL` / `O_NOFOLLOW` 创建或打开、`fstat` / `fstatat` 校验、`unlinkat` 逐文件及空目录删除，以及必要的目录枚举/ACL 读取；文件 IO 和 fd 所有权优先用标准库。沿用已锁定 `libc`，不新增依赖版本；不得包含递归移除、全局 umask、chmod 旧对象、进程控制或任意路径执行。该新模块使用独立的测试态 unsafe 例外，调用集合扩大时仍须重新确认。
 - 不新增后台清理器、daemon、GUI、全局注册、系统输入法操作或新的持久产品协议。`batch.json` / `case.json` 只服务合成测试残留辨认，没有迁移、恢复或可信报告导入接口。
 
 ### 实施包验收与停止线
 
-在已有 S01–S18 之外，首批补充下列可检查条件；这里只固定测试方案，不声称已经通过。
+在 S01–S18 之外，首批补充下列可检查条件；表格是验收要求，实际执行与尚未覆盖项以实施记录为准，不能把整表视为通过。
 
 | 编号 | 必须验证的边界 |
 | --- | --- |
@@ -206,7 +206,7 @@ SQLite 缓存是建议值，`temp_store` 还受编译配置影响，progress 回
 
 ## 负向与正向验收条件
 
-以下是未来实现的验收清单，本轮没有运行这些实验。全部只用全新合成目录；每项不仅断言错误码，还核对原 DB/WAL/SHM 的身份、内容和存在状态、未知对象保留、无 marker/回执/索引变化，以及 scratch 处置结果。
+以下为完整目标验收清单；本批实际覆盖与限制单列在实施记录，不把生产场景或未执行故障计为通过。全部只用全新合成目录；每项不仅断言错误码，还核对原 DB/WAL/SHM 的身份、内容和存在状态、未知对象保留、无 marker/回执/索引变化，以及 scratch 处置结果。
 
 | 编号 | 样本/注入 | 必须观察到的结果 |
 | --- | --- | --- |
@@ -231,8 +231,32 @@ SQLite 缓存是建议值，`temp_store` 还受编译配置影响，progress 回
 
 原件不变的断言须同时配合文件操作范围观测，不能仅靠前后 hash 相同排除“先写后恢复”。合成故障点应覆盖复制中断、事务开始/读版本/验证 layout、close、清理及返回前；SQLite 查询对照不能使用观察器自己的期望常量。
 
-## 后续实施停止线
+## 2026-10-17 合成实施记录
 
-本轮已固定仅合成验证的 scratch 位置、生命周期、残留和数字预算，仍不声称 schema 缺口已补齐。下一次若批准本实施包及列出的 feature/底层能力边界，才按目录处置→SQLite/WAL→proof 绑定顺序实施；达不到原件零业务写入、有效 WAL 视图或明确错误分类时停止，不直接接 reader/issuer。生产目录与真实敏感副本授权仍未定义，不能沿用合成测试参数开放产品调用。
+本节区分已实现的测试能力与产品合同。协调层四个模块仅在 `cfg(all(test, target_os = "macos"))` 编译；`ime-userdb` 的 `synthetic-schema-observer` 默认关闭，只有协调层 dev-dependency 启用。无产品 CLI、任意原库路径入口、reader 接入、资格 issuer 或可序列化观察结果。真实 source 39 的 schema 仍未知。
 
-源 schema observer 的新增接口、临时数据复制及必要底层能力须按协作规则单独批准。reader 现有无 snapshot 拒绝不变；真实 source 39 运行证据、Q2 隔离及策略新鲜度/撤销仍独立阻塞。检查继续降载串行，本设计批次只运行文档、文本与差异检查，不启动 source、重跑 A1 或执行全仓重型矩阵。
+- 文件捕获使用独占固定 batch、目录句柄、无链接打开、owner/mode/ACL 检查与逐项身份核验；DB/WAL 按 64 KiB 块复制，源 SHM 只读核验。成功返回前明确 close、复核源/副本、逐项移除 scratch 并确认缺失；SQLite 或文件句柄 close 未确认均优先保留，不能被此前校验错误覆盖。已见 SHM 的身份不能在再次核验时换成另一 inode。
+- WAL 准入按锁定 SQLite 实际生成的样本校验格式及 checksum，最终 schema 仍由单一 SQLite 读事务读取。`synthetic-fresh-schema9-exact-v1` 只支持当前编译 schema 9 的精确 manifest；负数、未来版本或相同版本但不同结构拒绝。它不是对历史 source 39 的 layout 认证。
+- WAL 模式主 DB 缺失 WAL 时保守拒绝：不能允许只读 SQLite 在 scratch 补出原 family 没有的零长 WAL。合法无 WAL 样本使用 SQLite 生成的 rollback-journal 模式主库。salt 不同的旧 generation 尾部仍拒绝，不宣称源已损坏；合成矩阵使用真实 SQLite `RESTART` 生成并核对旧 salt 残留，而非仅修改首 frame。`HotJournal` 用例仅验证 journal 存在即阻断，不是热 journal 恢复实验。
+- 主 DB 旧版本/WAL 新版本用另一个同字节合成副本上的独立 SQLite 查询对照；部分 checkpoint fixture 构造期间短暂持有 reader/writer 两个连接以生成真实形状，均在封存源前关闭。观察窗口本身仍只有一个连接，没有启动真实程序或 writer。
+- 严格核心 proof 覆盖 no-index、旧 data、v1/v2 终态、取消 v2 与重复取消前驱；旧 data 的 operation 与 outer 不同。当前最后 marker 始终保留，完整 proof/family/product/call ID 绑定消费一次，撤销、跨调用或重放拒绝。历史 fixture 的已完成标记不代表当前取消已释放。
+
+专用容量测试均在既有降载入口串行执行，计时进程不包含编译，包含 fixture、完整核心证明构造、观察、消费和收尾；未提高预算：
+
+| 合成样本 | DB / WAL 字节 | 显式读取计费 / 复制写入字节 | 整进程 wall | 峰值 RSS |
+| --- | --- | --- | --- | --- |
+| DB 恰好 256 MiB | 268435456 / 0 | 2986121324 / 268435456 | 608.44 秒 | 25182208 字节（24.02 MiB） |
+| 4096 字节页的 WAL 边界 | 143360 / 134217272 | 1647570540 / 134360632 | 304.23 秒 | 11190272 字节（10.67 MiB） |
+| 512 字节页的最大 frame 数 | 28160 / 134217648 | 1646249124 / 134245808 | 309.33 秒 | 12681216 字节（12.09 MiB） |
+
+整进程 wall 不是单 observer 时长；观察与消费成功仍经过原单调期限检查，但未额外测分段耗时。三次 `/usr/bin/time -l` 的 block input/output operation 计数均为 0；它们不是字节数，不能推断实际磁盘无 IO。SQLite VFS/OS 实际 IO 字节未测，完整统计与实际验证记录在[本周周志](../devlogs/2026-W42.md)。全目标 S01–S18 / R01–R08 不能仅凭上述实现描述整体判为通过：本批没有真实 source writer、真实程序静止/授权、实际跨挂载或换 owner、磁盘耗尽、内核真实 close 故障、WAL/pager 内部断电或对任意 syscall 的硬超时证据。owner/device/预算边界有纯函数负向测试，close/unlink/rmdir 用预定故障注入；ACL 在新模块中实际读取检查，但未新增需要 ACL 写能力的系统注入。既有 reader 的 ACL 用例不能冒充本模块的新写入生命周期覆盖。
+
+故意退出子进程用例仅从本次父进程的私有 stdout 管道传递创建记录；父进程验证固定退出码、完整闭合清单、实物身份与摘要后，按预先批准计划拆除自己的 fixture。下一普通 batch 仍只报告占用，不读磁盘 JSON 接管；这不提供意外崩溃恢复能力。实施期间两次意外残留分别重新登记并取得单次精确清理授权，处理经过见周志。
+
+2026-10-18 收尾时，第二次完整门禁已通过前段平台专项、Linux repository-only 与 Go 检查，并在工作区阶段再次通过 userdb observer 及安装协调层测试；随后在升级历史矩阵中由项目所有者要求停止，退出码 `143`，不是完整门禁通过。最后的文件 close 注入断言已被工作区测试覆盖，但改动后的定向全目标 Clippy 尚未复验。后台验证进程组及其临时服务已停止，固定 observer 根已确认缺失；中断的其他合成测试材料与日志保留。后续收口顺序见[接下来的事项](../devlogs/2026-W42.md#接下来的事项)，今晚只提交文档。
+
+## 后续接入停止线
+
+本轮只实施获批的合成验证包，仍不声称产品 schema 缺口已补齐。目录处置、SQLite/WAL 和 proof 绑定均隔离于测试路径；达不到原件零业务写入、有效 WAL 视图或明确错误分类时停止，不直接接 reader/issuer。生产目录与真实敏感副本授权仍未定义，不能沿用合成测试参数开放产品调用。
+
+将源 schema observer 接入产品的新接口、真实临时数据复制及扩大底层能力仍须按协作规则单独批准。reader 现有无 snapshot 拒绝不变；真实 source 39 运行证据、Q2 隔离及策略新鲜度/撤销仍独立阻塞。检查继续降载串行；本实施批次执行合成测试和适用仓库门禁，不启动真实 source、重跑 A1 或执行真实产品资格目标。
