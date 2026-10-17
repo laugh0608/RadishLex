@@ -1,6 +1,6 @@
 # macOS 无 snapshot 源 schema 观察合同
 
-本文供 userdb、升级核心与 macOS 产品协调层维护者审阅，限定准备取消时缺少 snapshot schema 的观察来源、请求绑定、失效与验收条件。状态：**2026-10-17 设计草案，未实施、未采集；不提供生产资格。** 本轮仅改文档，不操作冻结资产、真实库、账户或会话。
+本文供 userdb、升级核心与 macOS 产品协调层维护者审阅，限定准备取消时缺少 snapshot schema 的观察来源、请求绑定、失效与验收条件。状态：**2026-10-17 设计草案，已补齐仅合成验证的目录、生命周期及预算，未实施、未采集；不提供生产资格。** 本轮仅改文档，不操作冻结资产、真实库、账户或会话。
 
 上游为[资格证据 reader 合同](macos-cancellation-qualification-reader-contract.md)及[准备取消兼容合同](macos-preparation-cancellation-compatibility.md)。本设计不改变 v1/v2 回执、action `10–13`、双 guard/gate 或最终 marker；生产目录为空，issuer 未接入。源码定位基线为 `ad15bf7`，配套文档提交为 `f16e46b`。
 
@@ -104,9 +104,105 @@ SQLite 的 `user_version` 是应用设置的版本整数，本身不验证表结
 
 - 源侧承诺不发起 SQLite 连接或文件写入，不改数据、sidecar、权限及事务材料；普通文件读取可能受文件系统 atime 策略影响，不承诺 atime 永不变化，也不通过 utime“恢复”原件。mtime/ctime 或已绑定身份异常必须拒绝。
 - 副本含与原库相同等级的敏感数据，不属于合成 fixture、日志或证据附件；不得进入 reader pack、仓库、上传、同步、崩溃附件或诊断。只保留固定错误码和必要非敏感计数；不能输出路径、SQL、原始行或原库摘要作为公共日志。
-- 不把 source family 套用 reader 附件 256 MiB 上限。实施批准前必须为观察器单独固定 `max_family_bytes`、scratch 空间预留、连接缓存/临时文件预算及 IO 总量上限，并以合成 WAL 最大样本实测；预算未定时禁止生产调用。单线程逐块读取、串行 SQLite 检查，控制期限不超过任务剩余时间且最多 300 秒。调度降载不等于系统调用超时、CPU/RSS 硬配额。
+- source family 预算与 reader 附件预算独立定义；下面的合成验证 profile 固定首批数字，实际容量边界尚待合成实测，不代表真实库已经适配。单线程逐块读取、串行 SQLite 检查，控制期限不超过任务剩余时间且最多 300 秒。调度降载不等于系统调用超时、CPU/RSS 硬配额。
 - scratch 位置须排除同步/备份用途并说明系统备份、swap 和崩溃残留边界；私有权限和 unlink 不代表不可恢复擦除。若不能接受明文副本的残留风险，不能以“临时”命名绕过，应另行设计内存/VFS 路线。
 - 正常、失败、取消均只清理已核验属于本次调用的对象；授权应预先包含这些生命周期动作。撤销或到期后只允许已批准的资源关闭/清理，不继续查询或返回成功；清理不延长业务授权，无法完成时记录失败与私有残留。进程崩溃后的残留不复用、不自动认领，清理范围另行核验和授权；未知对象原样保留，不能递归删除整个父目录。本轮没有创建任何 scratch 或批准此类清理。
+
+## 最小实施方案：仅合成验证
+
+本节固定待审的 `schema-observer-synthetic-v1` 实施包。它只允许仓库测试 fixture 生成器建立虚构 source、proof 与数据，不能接受真实数据路径参数、环境变量或拖入的文件；路径位于临时目录本身不证明数据是合成的。fixture 来源须由测试内构造能力及创建记录证明，禁止复制冻结资产或真实库来制作 fixture。这里的数字是首批工程验收界限，不是已有性能结论。
+
+### 位置与独占规则
+
+首批固定 macOS 本机目录模板如下；`<euid>` 来自当前进程有效用户 ID，不能由 CLI 或环境覆盖。本轮不查询或创建该目录。
+
+```text
+/private/tmp/radishlex-schema-observer-synthetic-v1-<euid>/
+  batch.json
+  case-0001/
+    case.json
+    source/                 # 本批生成的合成源及事务 fixture
+    scratch/
+      userdb.sqlite3
+      userdb.sqlite3-wal     # 仅源 family 存在时复制
+      userdb.sqlite3-shm     # 仅允许 SQLite 在副本上建立
+```
+
+- batch 根用独占创建取得本次所有权；任何既有对象，包括正确 owner/mode 的空目录，都返回 `ScratchOccupied`。不检查 PID 后“接管”，不删除、不另换随机根绕过。固定入口也使一次失败残留阻止同一用户继续累积批次；这不是系统级跨用户锁。
+- 创建前验证 `/private/tmp` 的实际目录与祖先、受信 owner/mode/sticky 属性；拒绝 root 或 real/effective UID 不同的运行方式，不用 `/tmp` 别名、`TMPDIR`、当前工作目录或 `canonicalize` 后忽略原路径链接。所有新目录 `0700`、普通文件 `0600`，无扩权 ACL；普通文件 link count 1，目录按平台目录规则检查，不能要求目录 nlink 也为 1。不 chmod 或修复已有对象。
+- `case-NNNN` 在本批内单调分配、最多 64 个；同一时刻只存在一个活动 case。源与 scratch 为不同的新目录，句柄固定其身份；不通过前缀字符串判断隔离，不允许跨挂载、目录重叠、链接或复用先前 case。
+- scratch 的闭合文件集只有上述 DB、按源存在性决定的 WAL，以及可能产生的 SHM；journal、临时数据库、额外子目录或其他文件均使 case 失败。原 `source` 中的事务材料由合成 fixture 合同验证，不将 scratch 清单套用到它们。
+- `batch.json` / `case.json` 各最多 16 KiB，只记录测试协议版本、run/case ID、创建者和实物身份、固定阶段/错误码及资源计数。它们不是产品 receipt、schema 观察结果或清理授权；PID、内容 hash、同名标记都不能单独证明残留可删。run ID 使用操作系统随机来源；随机性不能代替实物核验。
+
+该 `/private/tmp` 位置**仅供合成验证**，不表示系统不会备份、交换或保留文件。真实数据的生产目录、备份排除及残留风险尚未批准，不在首批代码中提供默认位置或回退路径；不得因合成测试通过直接接受真实 source。
+
+### 生命周期与失败残留
+
+| 阶段 | 本批可以做什么 | 离开阶段的条件 |
+| --- | --- | --- |
+| 独占建立 | 测试宿主创建 batch/case、合成 source 和控制记录；尚未观察 | 全部对象来源、owner/mode/身份及 fixture 关闭状态可证 |
+| 捕获 | observer 持有已验证 source 与 scratch 目录能力，按合同复制 DB/WAL | 源 family 复核、复制 hash、资源计数和 WAL 准入全部通过 |
+| 读取 | 单 SQLite 连接只访问 scratch，执行固定读事务 | 版本、完整性/layout、事务结束和显式 close 全部成功 |
+| 处置 | observer 核验 scratch 条目，逐文件移除，最后移除空 scratch 目录 | 所有连接/句柄已结束，目录项身份无漂移且实际缺失 |
+| 返回 | 内存结果经过最后 source/proof/授权复核交给测试调用方 | 只有此阶段可返回成功观察；不落盘、不接 reader 或 issuer |
+| 测试收尾 | fixture 宿主核验原 source 未被 observer 改写，关闭自有 fixture 后清理 case；批末清理 batch | 只处置本批亲自创建并仍可证明所有权的对象，逐项核验缺失 |
+
+观察器只拥有 scratch 的清理权，不能删除 `source`、case 或 batch。测试宿主拥有合成 fixture 的独立生命周期；这不改变“观察全过程原 family 不变”的断言。源不变须在 fixture teardown 之前验证，不能用删除测试输入掩盖失败。全部清理使用目录句柄和逐项身份核对，不调用递归删除父目录或 glob 清理。
+
+- 正常成功必须先完成 scratch 处置；失败/取消也按同一自有对象规则尝试关闭与清理，失败则不返回可消费对象。任何 close 未确认、未知对象、链接、权限/身份漂移或 unlink/rmdir 错误均保留现场，返回 `ScratchRetained` 及原始固定失败原因，并停止该批剩余 case。
+- 进程崩溃后无内存所有权上下文，固定 batch 根保持占用。下一次仅报告占用，不加载旧结果、重开残留 DB、接管进程或按 TTL/PID 清理。先另行只读登记精确路径、身份、owner、条目及进程状态，再针对本次残留单独授权清理；清理输入若再次漂移立即停止。无自动重试、重命名隔离、压缩上传或启动时清扫。
+- 对预先列入测试计划的“故意制造残留/崩溃”用例，测试宿主可在验证拒绝后按该计划拆除自己登记的合成注入对象；这属于事先批准的 fixture teardown，不是 observer 的未知残留恢复能力。未登记对象或真实失败不能套用这项许可；子进程退出仅限测试自己安排的故障点，不 kill 用户进程。
+- 取消后的处置预先包含在测试包授权内，最多使用下述保留窗口；不得继续 SQL 或生成成功结果。系统调用不返回时，期限不能强制保证终止；不自动 kill/restart，报告状态未定并保留占用，不能写成清理完成。
+
+### 首批数字预算
+
+MiB/GiB 均按 1024 进制。下列入参上限在读取或分配前用 checked arithmetic 验证；超限拒绝，不拆分、截断、提高预算或省略 hash。整个批次经 `run-low-impact.sh`，不得与其他重型构建/测试并行。
+
+| 项目 | `schema-observer-synthetic-v1` 固定值 | 性质与超限处理 |
+| --- | --- | --- |
+| 并发 | 1 个 batch、1 个 case、1 个 observer、1 个 SQLite 连接；辅助 SQL 线程 0 | 入场约束；既有对象/并发调用拒绝 |
+| 源 family | DB ≤ 256 MiB、WAL ≤ 128 MiB、SHM ≤ 8 MiB，三者总计 ≤ 256 MiB；journal 必须缺失 | 身份声明与实际长度双检；零/缺失语义仍按主合同，不凭长度放行 |
+| WAL frame | ≤ 262144 个，页大小仅 SQLite 格式合法值 | 格式及计数上限；超过即拒绝 |
+| 复制缓存 | 每块 64 KiB，同时持有的文件字节缓冲合计 ≤ 256 KiB | 实现分配上限；禁止整库/整 WAL 读入内存 |
+| scratch | 逻辑文件总长 ≤ 272 MiB；其中 DB+WAL ≤ 256 MiB，生成 SHM ≤ 8 MiB | 应用写入前检查；SQLite 自生文件前后检查，不能冒称文件系统硬配额 |
+| batch 保留量 | 同时最多 1 份 source 与 1 份 scratch；含控制材料逻辑总长 ≤ 544 MiB | 不累积成功 case；失败保留后停止，无第二个 batch 绕过 |
+| 磁盘余量 | 创建 fixture 前、复制前均须可用空间 ≥ 1 GiB | 预检余量，非预分配/独占保证；运行中 ENOSPC 仍失败 |
+| 显式文件读取 | 每次 observer 的累计应用层读取 ≤ 3 GiB | 含源全量复核、复制、WAL 准入、副本复核及其控制材料；每块计费，不因重读/缓存命中免计 |
+| 显式文件写入 | 每次 observer 的累计应用层写入 ≤ 256 MiB | 仅 DB/WAL 副本；控制记录由宿主管理，各 16 KiB，不允许 observer 写额外材料 |
+| SQLite 缓存与临时页 | `cache_size=-8192`（约 8 MiB 建议值）、`mmap_size=0`、`temp_store=MEMORY`、`threads=0` | 连接内设置并回读；验证实际编译配置支持，不改全局 temp 路径或 heap 设置 |
+| schema/layout 材料 | 最多 64 个 schema 对象，返回到 Rust 的结构材料累计 ≤ 256 KiB | 固定查询逐行消费，超限拒绝；不输出 SQL/行内容到日志 |
+| 内存验收 | 单个专用测试进程峰值 RSS ≤ 96 MiB，排除编译；同进程生成 fixture 的占用一并计入 | 实测验收阈值，非分配器/系统硬上限；不能重新开始采样抹去峰值，超出则性能项失败，不杀进程或削减检查 |
+| 观察窗口 | `end = min(任务截止时间, 入场单调时刻 + 120 秒)`；预留最后 10 秒处置，入场剩余不足 15 秒直接拒绝 | 到 `end-10秒` 停止观察、转关闭/清理；超过 end 不可返回成功，不自动续权 |
+| SQLite busy / 控制检查 | busy timeout 100 ms；progress handler 每 1000 VM 指令检查撤销/单调期限；所有 IO 块与阶段前后也检查 | 无 busy 重试循环；这是协作式检查，不能保证阻塞 syscall 的硬超时 |
+| 诊断输出 | 每 case ≤ 16 KiB、每 batch ≤ 256 KiB | 仅固定错误/计数/用例 ID；截断诊断不得掩盖结果状态，不含原始 SQL、行数据或文件字节 |
+
+3 GiB 只约束可由本实现计数的文件读取，**不包含 SQLite VFS 内部读取、OS 预读或文件系统重试，不能称为总磁盘 IO 硬上限**。首批必须另记录 wall time、RSS 和平台可得的 IO 统计，无法取得的项目明确标为未测；不为伪造完整计数新增 VFS/全局拦截器。输入体积、语句集合和期限共同限制 SQLite 工作量，不能据此承诺固定 CPU 百分比。
+
+SQLite 缓存是建议值，`temp_store` 还受编译配置影响，progress 回调也不是任意系统调用的超时器。依据：[cache_size](https://sqlite.org/pragma.html#pragma_cache_size)、[temp_store](https://sqlite.org/pragma.html#pragma_temp_store)、[progress handler](https://sqlite.org/c3ref/progress_handler.html)。首批设置只作用于新建测试连接，不设置 `soft_heap_limit`、`hard_heap_limit`、全局 temp 目录或系统资源限额。数值边界不能在测试超时/超内存后自动放宽；调整须提交原因和新的验收范围。
+
+### 实施接口与依赖边界
+
+- 测试宿主创建 synthetic fixture 与目录能力；协调层只接受本次能力和完整 proof，不提供接受任意原库路径的产品命令。observer 的测试成功不会改变生产目录、reader 的无 snapshot 拒绝或最终取消动作。
+- `ime-userdb` 保留 `forbid(unsafe_code)`，使用当前锁定 SQLite/rusqlite 的安全接口。当前依赖只启用 `backup` / `bundled`；拟议 progress handler 需要评审启用同版本 rusqlite 的 `hooks` feature，不能用新增裸 FFI 或放宽 unsafe 规则绕过。此 feature 变更是后续实施审批项，本轮不改 Cargo 或 lockfile、不下载依赖。
+- scratch 的目录句柄创建/删除能力与现有只读 reader 文件模块隔离；原模块的 unsafe 例外不能自动覆盖新写入/清理实现。拟在产品协调层单独审阅最小 POSIX 范围：`mkdirat` 独占建目录、`openat` 配合 `O_EXCL` / `O_NOFOLLOW` 创建或打开、`fstat` / `fstatat` 校验、`unlinkat` 逐文件及空目录删除，以及必要的目录枚举/ACL 读取；文件 IO 和 fd 所有权优先用标准库。沿用已锁定 `libc`，不新增依赖版本；不得包含递归移除、全局 umask、chmod 旧对象、进程控制或任意路径执行。该新模块的 unsafe 例外须单独批准，调用集合扩大时重新确认。
+- 不新增后台清理器、daemon、GUI、全局注册、系统输入法操作或新的持久产品协议。`batch.json` / `case.json` 只服务合成测试残留辨认，没有迁移、恢复或可信报告导入接口。
+
+### 实施包验收与停止线
+
+在已有 S01–S18 之外，首批补充下列可检查条件；这里只固定测试方案，不声称已经通过。
+
+| 编号 | 必须验证的边界 |
+| --- | --- |
+| R01 | 固定根已存在、错误 owner/mode/ACL、替换祖先或并发第二次入场均拒绝；不回退其他根 |
+| R02 | source/scratch 句柄错配、跨挂载、同 inode/link、未知 scratch 条目及清理前替换均拒绝；源与无关哨兵原样保留 |
+| R03 | 捕获、SQL、close、清理各阶段失败；成功只在 scratch 实际缺失后返回，失败残留阻止后续 batch |
+| R04 | 关闭后才可 unlink；每个 unlink/rmdir 错误及故意崩溃都记录可核验状态，不自动接管或递归扫除 |
+| R05 | 每项长度/计数/累计 IO 上限的等号与加一边界，组合上限及整数溢出；虚假声明和短读不能绕过 |
+| R06 | 小于 15 秒入场、工作截止、撤销和处置超时；保留窗口不能续成业务授权，busy 不循环重试 |
+| R07 | 256 MiB family、最大允许 WAL 及多轮完整 hash 的单项容量实测；另测 schema/layout 上限，记录各自最坏 wall/RSS/可得 IO，不用稀疏文件或缓存单样本冒充全部上界 |
+| R08 | PRAGMA 回读、实际编译配置、progress handler 中断和无辅助线程；observer 写入范围与 SQLite 生成对象全部可核验 |
+
+先实现并验收目录能力/处置和预算，再验证 SQLite/WAL 观察，最后组合 proof 绑定；任何一层不能达到上述合同都停止接线。未来实施可使用低成本故障注入覆盖错误路径，真实大容量样本只串行运行一次匹配边界；新改动或未解释失败才重跑。不得以 quick 检查或一项性能结果替代完整必要验收。
 
 ## 负向与正向验收条件
 
@@ -137,6 +233,6 @@ SQLite 的 `user_version` 是应用设置的版本整数，本身不验证表结
 
 ## 后续实施停止线
 
-本轮完成来源盘点、候选路线及验收合同，不声称 schema 缺口已补齐。下一次若批准实施，先固定 scratch 隐私/生命周期和数字预算，再做合成 observer 原型及 WAL 拒绝能力验证；达不到原件零业务写入、有效 WAL 视图或明确错误分类时停止，不直接接 reader/issuer。
+本轮已固定仅合成验证的 scratch 位置、生命周期、残留和数字预算，仍不声称 schema 缺口已补齐。下一次若批准本实施包及列出的 feature/底层能力边界，才按目录处置→SQLite/WAL→proof 绑定顺序实施；达不到原件零业务写入、有效 WAL 视图或明确错误分类时停止，不直接接 reader/issuer。生产目录与真实敏感副本授权仍未定义，不能沿用合成测试参数开放产品调用。
 
 源 schema observer 的新增接口、临时数据复制及必要底层能力须按协作规则单独批准。reader 现有无 snapshot 拒绝不变；真实 source 39 运行证据、Q2 隔离及策略新鲜度/撤销仍独立阻塞。检查继续降载串行，本设计批次只运行文档、文本与差异检查，不启动 source、重跑 A1 或执行全仓重型矩阵。
