@@ -1,12 +1,12 @@
 # source 39 独立双程序资格执行方案
 
-本文用于审查准备取消的旧程序资格前置条件、证据与逐步授权，不是当前机器上的启动或释放指令。读者为项目所有者、Installer 与 macOS 验证维护者。状态：**2026-10-17 方案待审；仅仓库只读审计与文档完成，尚无完整运行资格。**
+本文用于审查准备取消的旧程序资格前置条件、证据与逐步授权，不是当前机器上的启动或释放指令。读者为项目所有者、Installer 与 macOS 验证维护者。状态：**2026-10-17 A1/Q1 已按单步授权执行，路径重定向被拒绝；Q2 仍阻塞，尚无完整运行资格。**
 
 ## 当前结论与范围
 
 项目所有者确认没有备用 Mac 或独立 macOS 测试环境，要求保持当前账户与 Agent 会话、不动冻结现场。不得把新增用户、切换登录、VM 或远端设备当作已经存在或默认接受的前提。
 
-在这些约束下，**尚未找到可证明安全、且能覆盖原始 source 39 正常双程序运行的本机隔离路径**。这不是证明 macOS 上绝无实现方式，而是现有证据不足以开放运行。可立即执行的仓库审计已完成；可安排下一步短命的路径解析实验，但它最多排除一种隔离方案，不能产生双程序资格。只有数据与会话隔离两项都被独立证明后，才可申请精确程序副本的运行授权。
+在这些约束下，**尚未找到可证明安全、且能覆盖原始 source 39 正常双程序运行的本机隔离路径**。这不是证明 macOS 上绝无实现方式，而是现有证据不足以开放运行。仓库审计和单次短命路径实验已完成；本次仅设置 `CFFIXED_USER_HOME` 未改变任何观测路径，该方案不能作为本机数据隔离前提。只有数据与会话隔离两项都被独立证明后，才可申请精确程序副本的运行授权。
 
 本方案不改变最终 marker 门禁，不新增生产资格提供者、不开放最终取消动作，也不启动 GUI、复制冻结程序、访问真实用户 SQLite 或调整输入源。冻结资产停止线以 [current](../status/current.md) 为准。
 
@@ -17,7 +17,7 @@
 | 精确 source 是 release 装配 26.7.1-39 | [W41 只读资产审计](../devlogs/2026-W41.md#2026-10-05-后续旧程序资格资产与会话边界审计) | 候选输入为 `target/macos-release/26.7.1-39/Product`，历史 manifest SHA-256 为 `de1bf1ea937f742242975ad05a1d639e1d3899454e9acfb41eb28e089fe8362f`；同版本普通装配摘要不同，不能互换。本轮未重新核验载体或签名 |
 | outer gate 绑定真正运行的程序 | [FFI gate](../../crates/ime-ffi/src/product_install.rs) 的 `running_program_identity` | 从 `current_exe` 和数据根推导同一 home 下的固定双 bundle，再验证程序身份。外置 probe、注入、修改 bundle ID 或重新签名不能代表原 source |
 | 正常程序先过双 gate，再进入业务路径 | [Manager](../../apps/radishlex-manager/macos/Runner/AppDelegate.swift)、[InputMethod](../../platforms/macos-imk/Sources/main.m) | Manager 的正常路径与 smoke 分支不同；InputMethod 随后创建 `IMKServer` 并进入 AppKit 事件循环，启动进程不等于已打开 runtime 或完成输入学习 |
-| 数据目录由 Foundation 用户域解析 | [Manager 路径](../../apps/radishlex-manager/macos/Runner/MainFlutterWindow.swift)、[InputMethod runtime](../../platforms/macos-imk/Sources/RadishLexRuntime.m) | 临时 `HOME`/`CFFIXED_USER_HOME` 的路径效果须实测；即使数据路径重定向正确，也不证明偏好、注册、Keychain、输入源与会话连接隔离 |
+| 数据目录由 Foundation 用户域解析 | [Manager 路径](../../apps/radishlex-manager/macos/Runner/MainFlutterWindow.swift)、[InputMethod runtime](../../platforms/macos-imk/Sources/RadishLexRuntime.m) | 本次 Q1 中 `CFFIXED_USER_HOME` 未改变观测路径，`HOME` 保持不变。即使其他样本数据路径重定向正确，也不证明偏好、注册、Keychain、输入源与会话连接隔离 |
 | 现有 host 只覆盖指定验证子项 | [host runner](../../platforms/macos-product/UpgradeCoordinatorAdapter/src/runner.rs)、[InputMethod validation host](../../platforms/macos-product/UpgradeValidationHosts/Sources/input_method_main.m) | qualification harness 的固定 home 只用于既有 host；不得扩展解释成正常双程序支持的隔离模式 |
 | 资格对象不是证据本身 | [取消释放组合层](../../platforms/macos-product/InstallCoordinatorAdapter/src/cancellation_release.rs) | `from_verified_source` 仅检查结构；生产 issuer 必须独立核验 source/schema/覆盖范围，并逐检查点绑定本次 proof、复验程序与静止 |
 
@@ -33,18 +33,33 @@ Apple 对 [IMKServer](https://developer.apple.com/documentation/inputmethodkit/i
 - 固定下文资格矩阵、证据项、授权包和资源边界。
 - 将“完整资格已具备”与“方案/局部验证完成”分开记录；最终取消仍阻断。
 
-### Q1：路径解析的短命可行性实验——可申请，尚未执行
+### Q1：路径解析的短命可行性实验——已执行，重定向被拒绝
 
 目标仅为回答 Foundation 是否在当前系统按指定临时 home 返回同一组路径；实验不加载 RadishLex dylib、不调用 gate、不建立 IMKServer，也不证明正常启动。
 
-待批准后才实施的小型实验：
+仓库探针准备与静态验证完成后，项目所有者单独批准 A1，按以下固定范围执行了一次实验：
 
 1. 在新建 `0700` 的临时实验目录内编译一个最小 Foundation 命令行程序，只使用现有系统工具链。程序只打印合成目录下的解析结果和布尔校验；不读真实文件、偏好、SQLite 或账户凭据。
-2. 在显式子进程环境中分别检查默认值、仅 `HOME`、仅 `CFFIXED_USER_HOME` 与两者一致的路径结果；不修改父进程或全局环境。默认值仅作为字符串对照，日志用 `real_user_domain` 标记代替真实路径。
+2. 串行检查默认环境和仅设置 `CFFIXED_USER_HOME` 的子进程环境；保留 `HOME`、`CODEX_HOME` 和父进程环境，不覆盖系统保留变量。已有 `CFFIXED_USER_HOME` 时拒绝实验，不隐式清除。默认值仅作为字符串对照，输出只保留路径分类，不输出真实 home；本批不覆盖 `HOME` 单独重定向或两变量组合。
 3. 核对 Application Support、Rime/userdb/settings 的推导是否都位于同一合成根，及外层 gate 期望的双 bundle 路径形状。所有样本串行，单个子进程必须短命；不通过复制 source 来试探。
-4. 不一致、解析落回真实用户域、别名/链接逃逸或未知结果即记录拒绝并停止。结果一致只能记为“路径实验通过”，Q2 仍关闭。
+4. 重定向样本不一致、解析落回真实用户域或未知结果即记录拒绝并停止。默认对照在合成根之外是预期结果。结果一致只能记为“路径字符串实验通过”，未打开这些业务路径，不能据此声称排除了其文件系统链接或证明实际写入隔离；Q2 仍关闭。
 
-编译与执行均由 `./scripts/run-low-impact.sh <具体命令>` 启动，命令、实验根和所生成文件清单在执行申请中固定。工具缺失时停止，不下载 SDK 或安装依赖。源文件、二进制与输出原样保留，删除另授权。该探针还未实现，本文件不把它写成现有可调用检查器。
+编译与执行均由 `./scripts/run-low-impact.sh <具体命令>` 启动，命令、实验根和所生成文件清单在执行申请中固定。工具缺失时停止，不下载 SDK 或安装依赖。源文件、二进制与输出原样保留，删除另授权。工具为 [Foundation 探针](../../scripts/macos-product/source39-path-probe.m)及[串行 runner](../../scripts/probe-macos-source39-paths.py)；没有 `--execute` 时不编译或运行。它不含 GUI、正常旧程序资格、会话操作或自动 kill/清理。
+
+本次已执行的精确命令（仓库根执行；该目录现已存在并保留，命令不得复跑）：
+
+```bash
+./scripts/run-low-impact.sh python3 scripts/probe-macos-source39-paths.py \
+  --execute --run-root /private/tmp/radishlex-source39-paths-20261017-q1-a1
+```
+
+该命令仅使用现有 Python/Clang/Foundation；在新 `0700` 根内保留 `source39-path-probe.m`、`source39-path-probe`、`module-cache/`、`compiler-tmp/`、`synthetic-home/`，以及 `compile` / `baseline` / `cffixed` 三阶段的 `.pid`、`.stdout.log`、`.stderr.log`，通过校验的 `baseline.json` 和汇总 `result.json`。`cffixed` 未通过校验，只有原始脱敏输出，没有生成 `cffixed.json`。编译子进程的 `TMPDIR` 指向 `compiler-tmp/`，两次探针的环境仅相差 `CFFIXED_USER_HOME`。本次无重试、kill 或清理，后续包无自动授权。
+
+本次结果：runner 退出码 `1`，`status=rejected`、`reason=path_resolution_rejected`，`completed=[compile, baseline]`。编译与两个短命探针均正常返回，三个 stderr 均为空；`cffixed` 的 8 项路径与默认对照完全相同，全部为 `real_user_domain`，`in_synthetic_home=false`。合成 home 为空。路径返回不符合隔离前提，拒绝属于实验的有效负向结果，不改宽校验或重跑寻找通过。
+
+已只读交叉核对源副本与仓库源一致、SHA-256 与结果记录一致，四个私有目录为当前用户所有且 `0700`，输出、PID 与拒绝结果齐全。源 SHA-256 为 `a182e62558a9af0cfd01135c125825be7ab65a9752e87354ae46a08fa7e9d696`，`result.json` SHA-256 为 `9a010da5c6aefd7ddd762c452932e2ea679d4c4d1b1da625fff181dd6bed4828`。这只描述本次最小 Foundation 样本，不推广为所有 macOS 环境或精确 source 二进制的行为。
+
+下一步判断：停止该变量方案的本机运行路线，不进入 A2 复制或 A4 双程序启动。若保持现有账户、会话与无独立环境的约束，后续可先设计仓库内资格证据 reader 的来源、覆盖和拒绝合同；按 A5 另行确认后实施。reader 本身不能补出缺失的真实运行证据或解除最后 marker。
 
 ### Q2：会话隔离准入——当前阻塞
 
@@ -102,7 +117,7 @@ source/签名/架构/schema/OS 覆盖条件变化、缺行、证据被替换或�
 | 包 | 操作与影响 | 当前状态/授权需求 |
 | --- | --- | --- |
 | A0 | 仓库代码/文档只读审计、方案文档、降载文档检查 | 本轮已授权并完成；不产生程序资格 |
-| A1 | Q1 最小 Foundation 命令行探针的编译与短命执行，仅新实验根与子进程环境 | 待明确批准；不含任何旧程序/库、GUI、输入注册、Keychain 或会话操作；可独立拒绝 |
+| A1 | Q1 最小 Foundation 命令行探针的编译与短命执行，仅新实验根与子进程环境 | 已单独批准并执行一次，重定向拒绝，授权已消费、材料保留；不含任何旧程序/库、GUI、输入注册、Keychain 或会话操作，不复跑 |
 | A2 | 只读复验精确 release 源的 metadata/hash/codesign；独立复制整份载体 | 只读核验本身不构成系统 mutation；复制冻结载体必须单独授权。源与目的地、保留项、容量和核验命令须先固定；本轮两者均未执行 |
 | A3 | Q2 可能需要的会话/服务/输入命名空间操作 | **未有可批准的具体方案，不执行。** 不请求笼统授权，不新增用户/切换登录，不以 VM 为默认后备 |
 | A4 | Q3 正常 Manager/InputMethod 启动、选择输入源、人工输入、正常退出与重启 | Q2 通过后才可单独申请；只限实验自己的进程与合成数据。自动输入、强制终止、超时清理须另列明确操作，不能隐含在 harness 中 |
@@ -113,4 +128,4 @@ source/签名/架构/schema/OS 覆盖条件变化、缺行、证据被替换或�
 
 编译、测试和检查均使用 `./scripts/run-low-impact.sh`；Cargo/libtest/Go 预算为 1，macOS 后台调度，不并行运行重型任务。该入口不提供 CPU/RSS 硬配额。Q1 只允许短命程序；完整资格矩阵开始前须另给资源预算、每批规模与停止方案，不能让降载后超时被当作通过或自动放宽现有任务期限。
 
-本轮仅验证文档链接、文本规范和差异；不跑全仓矩阵、不启动 source、不新增资格证据。当前可供决策的结果是：A1 可形成独立小批实验，A3/Q2 仍是完整资格的明确阻塞，A2/A4/A5 不能依靠 A1 结果自动放行。
+工具静态检查与 runner 拒绝路径完成后，本批已在单独授权下串行完成 A1，并只读复核结果，实际记录见[本周记录](../devlogs/2026-W42.md)。没有重跑全仓矩阵、启动 source 或取得程序资格。A1 的实际结果排除了本次变量方案，A3/Q2 仍是完整资格的明确阻塞，A2/A4/A5 均未放行。

@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核：2026-10-17（仅仓库实施与验证；最新实机记录仍为 09-09 的 source 39 恢复，外层 `rolled_back` / 数据 `aborted_preserved`，原 DB/WAL 与受控资产保留，恢复后双组件未启动，今日未复验现场）；常态分支 `dev`，主线 `master`。
+- 复核：2026-10-17（仓库实施、验证及已授权的短命路径实验；最新实机记录仍为 09-09 的 source 39 恢复，外层 `rolled_back` / 数据 `aborted_preserved`，原 DB/WAL 与受控资产保留，恢复后双组件未启动，今日未复验现场）；常态分支 `dev`，主线 `master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
@@ -78,7 +78,7 @@
 
 同锁程序/data/终态执行、进展态恢复和接续 action `10` 已接线。初始准入仅接 `prepared/preflighted`；推进态和终态封存重新绑定精确 outer/preparation/data 或 release，并取得四项确认、最多 5 分钟且可撤销的任务授权。`10` 只处理完整交接/封存，普通 bootstrap 空前驱限制保持，不能用它开始源库准备或取消。
 
-2026-10-17 已接通准备/取消保留产品入口：`11` 开始准备、`12` 恢复准备、`13` 取消并封存，均从只读新观察取得四项确认及最多 5 分钟可撤销任务授权；准备完成后仍须单独确认 `10`，取消封存停在等待独立资格且保留最后 marker。ABI v1 布局、旧动作数值及普通 bootstrap 空前驱限制保持。独立 source 39 的[执行方案与授权清单](../remediation/macos-source39-qualification-plan.md)已完成只读审计：当前无独立环境，临时 home 不能证明 IMK 会话隔离；仅可先审查短命路径实验，正常双程序运行仍阻塞。按[当前会话约束](../remediation/macos-preparation-cancellation-compatibility.md#2026-10-05-资格前置审计与当前会话约束)保持现有账户和 Agent 会话，不新增用户或切换登录。WAL/pager 内部断电与 B 段退出继续开放；详细交接与本批验证见[2026-W42](../devlogs/2026-W42.md)。
+2026-10-17 已接通准备/取消保留产品入口：`11` 开始准备、`12` 恢复准备、`13` 取消并封存，均从只读新观察取得四项确认及最多 5 分钟可撤销任务授权；准备完成后仍须单独确认 `10`，取消封存停在等待独立资格且保留最后 marker。ABI v1 布局、旧动作数值及普通 bootstrap 空前驱限制保持。独立 source 39 的[执行方案与授权清单](../remediation/macos-source39-qualification-plan.md)已完成 A1 路径实验：仅设置 `CFFIXED_USER_HOME` 后，8 项路径仍在真实用户域，拒绝结果保留、不复跑。该变量方案不能隔离数据，Q2 仍阻塞，不复制/启动旧程序。后续可设计 A5 证据 reader 合同，不能替代真实资格。按[当前会话约束](../remediation/macos-preparation-cancellation-compatibility.md#2026-10-05-资格前置审计与当前会话约束)保持现有账户和 Agent 会话，不新增用户或切换登录。WAL/pager 内部断电与 B 段退出继续开放；详细交接与本批验证见[2026-W42](../devlogs/2026-W42.md)。
 
 新升级真正完成后才继续客户端身份与 composition 隐私实测，不直接重试 40。冻结 macOS 39/40、用户数据、Linux/UTM 与系统动作均不在本批范围；实机动作仍须另行明确目标与授权。10-09 的待办由本批承接，历史交接保留在[2026-W41](../devlogs/2026-W41.md#2026-10-09明日事项)。
 
