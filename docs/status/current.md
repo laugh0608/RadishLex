@@ -4,7 +4,7 @@
 
 ## 当前判断
 
-- 复核：2026-10-12（仅仓库实施与验证；最新实机记录仍为 09-09 的 source 39 恢复，外层 `rolled_back` / 数据 `aborted_preserved`，原 DB/WAL 与受控资产保留，恢复后双组件未启动，今日未复验现场）；常态分支 `dev`，主线 `master`。
+- 复核：2026-10-17（仅仓库实施与验证；最新实机记录仍为 09-09 的 source 39 恢复，外层 `rolled_back` / 数据 `aborted_preserved`，原 DB/WAL 与受控资产保留，恢复后双组件未启动，今日未复验现场）；常态分支 `dev`，主线 `master`。
 - 里程碑：M5 Linux Fcitx5 离线输入与个人化产品；当前主批次 M5-P05B package transaction/startup gate。
 - 已退出 M0-M3、M4 macOS build 38 单版本产品验收、M5-P01-P05A。Linux P05B 已有确定性 `.deb`、实际载体流式关系校验、恢复型事务核心、固定系统 observer/executor、concrete mutable port、受控维护 CLI 与 Manager/Fcitx 共用只读 startup gate。
 - 八个crash自动合同与六类operation分散证据已闭合；真实阻塞样本固定三项，前两项已闭合，`upgrade_quiesced`与连续L6未闭合；其余五项真实crash转为hardening。
@@ -31,7 +31,7 @@
 - 项目所有者选择本机现有账户测试；此前 17 个旧目录根已原样归档，545 个节点核对通过。build 39 新验收库未导入旧资料，全程隐私零学习与目标词普通恢复已验证；先前混合输入区间不作为单次精确用例。另行授权的 composition 隐私→普通组观察到零学习，但新普通对照在 TextEdit 提交后记入 `code` 而非 `editor`，已暂停后两组。暂停时隐私键已恢复显式 false、临时基线已消费，输入源选中且 InputMethod 运行；后续仓库修复未再操作该现场。
 - `6a55782` 已修复 IMK 客户端身份来源，build 40 升级曾停于 `data_coordinating` / `candidate_verified`。错误呈现、合法 WAL 特征回归及显式恢复入口已实现，原生/全仓门禁与真实程序副本资格通过。项目所有者随后单独确认实际恢复：独立 Installer 对同一 `aad9cf8a…a706` 完成 source 39 双程序原 inode 恢复，外层 `rolled_back`、内层 `aborted_preserved`；原 DB/WAL/SHM、snapshot/candidate/settings backup 的身份、metadata 和摘要保留，target 40 留在 staging。source 双端及数据只读 startup gate 允许，target 双端拒绝；未启动双组件或执行新输入。继续激活 [WAL 升级与恢复方案](../remediation/macos-wal-upgrade-recovery-2026-09.md)：永久 WAL 源库准备的 A 段原语与合同已实现，B–D 编排和产品资格待完成，不能直接重试 40。REV-01/REV-02 继续开放，实际结果见[联合验收入口](../runbooks/macos-rev01-rev02-acceptance.md#切换前中止与-source-39-实机恢复完成2026-09-09)。
 - 次要事项为输入回调锁等待、新词召回/评测、删除与事件保留、MSRV/CI；维护成本、Manager 易用性和早期反馈列为后续建议。具体证据、未知项与关闭条件只在跟踪专题维护。
-- WAL 新升级已完成 A 段、准备/旧槽保留/handoff、取消证明与生命周期核心；接续任务现已在连续双锁下连接程序、data、成功/失败恢复及终态封存/释放，并支持进展态重新授权。完整交接/封存的 action `10` 已接 Driver/Bridge/AppKit；新准备与主动取消的 Bridge dispatch、独立 source 39 正常双程序资格与 WAL/pager 内部断电仍开放，B 段未退出。本批只在合成目录验证，未操作冻结现场；本批记录见[2026-W42](../devlogs/2026-W42.md)，前批准备/准入记录见[2026-W41](../devlogs/2026-W41.md)。
+- WAL 新升级已完成 A 段、准备/旧槽保留/handoff、取消证明与生命周期核心；接续任务现已在连续双锁下连接程序、data、成功/失败恢复及终态封存/释放，并支持进展态重新授权。完整交接/封存的 action `10` 及新准备/续跑/取消保存 `11–13` 已接 Driver/Bridge/AppKit；最终取消释放、独立 source 39 正常双程序资格与 WAL/pager 内部断电仍开放，B 段未退出。本批只在合成目录验证，未操作冻结现场；本批记录见[2026-W42](../devlogs/2026-W42.md)，前批准备/准入记录见[2026-W41](../devlogs/2026-W41.md)。
 - 当前 Rime 来源锁已变化，不能作为冻结 Linux L6 pair 的新 target；现有构建资格检查继续拒绝混配。旧 pair、M5 系统操作顺位和冻结现场保持原状；新 pair 或平台实机动作仍须单独明确范围。
 
 ## 冻结基线与固定边界
@@ -72,13 +72,13 @@
 - 不发布 macOS build 38/39/40 或 Linux package，不推送、创建 tag/Release、修改远端设置；不并行推进 Android、Windows 或 iOS。
 - 输入热路径保持本地；P0 永不学习/同步，P1 原始事件只本地，P2 只允许端到端加密对象。
 
-## 下一步：准备/取消产品入口与独立程序资格
+## 下一步：独立程序资格与最终取消门禁
 
 按已批准的[准备中止兼容设计](../remediation/macos-preparation-cancellation-compatibility.md)，完整取消证明、唯一 v2 索引及严格 lifecycle 保留旧 v1 和历史原件，缺失索引不能回退首次路径。取消最后 marker 仍要求当次授权及独立 `QualifiedSource`，结构化对象不能代替证据，最终取消按钮继续关闭。
 
 同锁程序/data/终态执行、进展态恢复和接续 action `10` 已接线。初始准入仅接 `prepared/preflighted`；推进态和终态封存重新绑定精确 outer/preparation/data 或 release，并取得四项确认、最多 5 分钟且可撤销的任务授权。`10` 只处理完整交接/封存，普通 bootstrap 空前驱限制保持，不能用它开始源库准备或取消。
 
-下一批先收敛新准备/取消的 Driver/Bridge 动作与任务生命周期合同，再按资格开放对应 dispatch；动作或既有合同发生实质变化先说明范围。独立 source 39 正常双程序资格仍缺可行方案，按[当前会话约束](../remediation/macos-preparation-cancellation-compatibility.md#2026-10-05-资格前置审计与当前会话约束)保持现有账户和 Agent 会话，不新增用户或切换登录。WAL/pager 内部断电与 B 段退出继续开放；详细交接与本批验证见[2026-W42](../devlogs/2026-W42.md)。
+2026-10-17 已接通准备/取消保留产品入口：`11` 开始准备、`12` 恢复准备、`13` 取消并封存，均从只读新观察取得四项确认及最多 5 分钟可撤销任务授权；准备完成后仍须单独确认 `10`，取消封存停在等待独立资格且保留最后 marker。ABI v1 布局、旧动作数值及普通 bootstrap 空前驱限制保持。独立 source 39 正常双程序资格仍缺可行方案，按[当前会话约束](../remediation/macos-preparation-cancellation-compatibility.md#2026-10-05-资格前置审计与当前会话约束)保持现有账户和 Agent 会话，不新增用户或切换登录。WAL/pager 内部断电与 B 段退出继续开放；详细交接与本批验证见[2026-W42](../devlogs/2026-W42.md)。
 
 新升级真正完成后才继续客户端身份与 composition 隐私实测，不直接重试 40。冻结 macOS 39/40、用户数据、Linux/UTM 与系统动作均不在本批范围；实机动作仍须另行明确目标与授权。10-09 的待办由本批承接，历史交接保留在[2026-W41](../devlogs/2026-W41.md#2026-10-09明日事项)。
 
@@ -90,7 +90,7 @@
 
 ## 验证入口
 
-仓库默认 Cargo build jobs 为 2、Rust test threads 为 2；取消故障矩阵内部串行，重型测试与编译/Clippy 串行运行。完整门禁与覆盖范围保留，资源约束及显式覆盖规则见[协作细则](../agent-collaboration.md)。
+仓库默认 Cargo build jobs 为 1、Rust test threads 为 1；`check-repo.sh` 自动使用低优先级入口（macOS 后台调度），仅约束新启动的验证进程树，不构成 CPU/RSS 硬配额；取消故障矩阵内部串行，重型测试与编译/Clippy 串行运行。完整门禁与覆盖范围保留，资源约束及显式覆盖规则见[协作细则](../agent-collaboration.md)。
 
 ```bash
 ./scripts/check-linux-product-metadata.sh

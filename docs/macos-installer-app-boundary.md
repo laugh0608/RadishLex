@@ -81,20 +81,20 @@ phase=<code> action=<code> error=<code> state=<code>
 
 | phase | 展示含义 |
 | --- | --- |
-| `preparing_source` | 已有准备记录，或已观察到 handoff、等待专用产品接续 |
+| `preparing_source` | 新准备等待确认、已有准备待续跑，或已观察到 handoff、等待专用产品接续 |
 | `cancellation_requested` | 仅已保存取消请求 |
 | `cancellation_finishing_source` | 已记录源库收尾，尚未完成 |
 | `cancellation_preserving` | 源库收尾已有记录，封存或索引发布尚未完成 |
 | `cancellation_awaiting_qualification` | 完整证明和索引就绪，活动请求 marker 仍阻断最后释放 |
 | `cancellation_completed` | 完整历史、祖先、当前旧 outer 和 marker 最终位置已核验 |
 
-准备未交接与取消阶段只提供 `refresh`，无 secondary action/manual prompt；operation 为 upgrade，receipt state 为 none，进度为 0，界面隐藏旧 receipt 进度。完整 handoff 或终态封存经 Executor 与生产 Bridge 核验后，`preparing_source` 可提供专用 `continue_prepared_upgrade`、实际 outer state/progress 和手动静止提示；这表示等待当次确认，不表示升级完成。`cancellation_completed` 只描述持久化取消结果，不重新认证旧程序资格，也不授权启动、重试或移除；活动请求存在时绝不显示该阶段。
+维护阶段的基础投影只提供 `refresh`，无 secondary action/manual prompt；operation 为 upgrade，receipt state 为 none，进度为 0，界面隐藏旧 receipt 进度。新准备、准备续跑与取消保存经专用只读准入后，按下文 `11–13` 合同提供动作和静止提示。完整 handoff 或终态封存经 Executor 与生产 Bridge 核验后，`preparing_source` 可提供专用 `continue_prepared_upgrade`、实际 outer state/progress 和手动静止提示；这表示等待当次确认，不表示升级完成。`cancellation_completed` 只描述持久化取消结果，不重新认证旧程序资格，也不授权启动、重试或移除；活动请求存在时绝不显示该阶段。
 
 读取使用现有严格 decoder 和共享物理关系检查，不创建目录、不取得或清理 guard、不写回/补同步记录、不打开 SQLite。活动/未知 guard 阻断；已确认拒绝连接且身份稳定的 stale guard 原样保留。读取前后核对 guard、私有文件和索引身份，并复读结果；缺失索引但有历史、孤立记录、未知/临时对象、证明损坏或身份漂移均失败关闭。历史取消完成后的正常学习不受旧运行库摘要约束；中间状态仍核对其绑定的物理材料。只读观察不能代替执行时的双 guard、逻辑等价、静止或独立资格。
 
-Bridge ABI v1 的结构大小、字段、symbol 与 contract version 保持；phase 整数 7–12 为上述六项的顺序扩展。新 Rust/C/Objective-C 映射一致，旧 reader 对未知 phase 失败关闭。新原生 reader 只接受完整接续投影中的 action `10` 与 preparing_source/upgrade/实际 outer 进度/静止提示组合；准备未交接及取消 phase 与 mutation action、旧 receipt 进度或提示的矛盾组合仍拒绝。稳定摘要仍仅含既有四个 code 字段。
+Bridge ABI v1 的结构大小、字段、symbol 与 contract version 保持；phase 整数 7–12 为上述六项的顺序扩展。新 Rust/C/Objective-C 映射一致，旧 reader 对未知 phase/action 失败关闭。action `10` 只接受完整接续投影与 preparing_source/upgrade/实际 outer 进度/静止提示组合；`11–13` 只接受下文列出的无 v1 进度组合。其他维护动作、旧 receipt 进度或提示的矛盾组合仍拒绝。稳定摘要仍仅含既有四个 code 字段。
 
-普通 v1 Executor 在取得 outer guard 后再次检查维护状态，拒绝查询后已过期的旧 intent；upgrade bootstrap 前也检查，避免先创建新的数据事务。新准备与取消 Executor 任务已接入；完成交接后的专用 continuation action `10` 已接 Bridge。新准备/取消 dispatch 和独立资格提供者尚未接入，维护查询不调用写入口，也没有新增取消按钮。
+普通 v1 Executor 在取得 outer guard 后再次检查维护状态，拒绝查询后已过期的旧 intent；upgrade bootstrap 前也检查，避免先创建新的数据事务。专用 `10–13` 不得经普通 v1 Executor 执行。新准备/续跑、取消保存和交接后的升级接续各自进入专用任务；维护查询不调用写入口。独立资格提供者及最终取消释放动作未开放。
 
 ## 新准备 Executor 任务入口
 
@@ -104,7 +104,7 @@ Bridge ABI v1 的结构大小、字段、symbol 与 contract version 保持；ph
 
 新 outer 创建前中断只允许 `reserved` 与精确旧终态接续；创建后必须保持同一个 `prepared` outer。每个检查点复核源/目标实物、双锁、当前授权、静止及封存材料，回调前后相同字节的 active outer 文件替换也拒绝。旧运行库在前次终态后的合法学习不受历史长度约束，旧私有材料仍逐件验证；无 data、未释放终态、v1/v2/取消前驱不混用。
 
-成功仅返回 `preflighted` 数据回执，outer 仍为 `prepared`；没有程序切换或正常启动资格。新准备与取消的 Bridge/action 尚未开放，普通 bootstrap 的空 data 前驱限制保持。此入口不代表 B 段退出、旧程序资格或真实用户升级完成。
+成功仅返回 `preflighted` 数据回执，outer 仍为 `prepared`；没有程序切换或正常启动资格。Bridge 的 `11/12` 连接本任务，普通 bootstrap 的空 data 前驱限制保持。此入口不代表 B 段退出、旧程序资格或真实用户升级完成。
 
 ### handoff 后的只读检查与严格重绑
 
@@ -124,7 +124,7 @@ Bridge ABI v1 的结构大小、字段、symbol 与 contract version 保持；ph
 
 成功数据先达到 outer `data_settled`，失败数据先恢复双 source 至 `programs_restored`；再将真实 v1 终态及私有材料封存、发布 `release_ready`/索引，以完整证明和实际程序身份结清 outer，最后原 inode 释放 marker 并同步/回读。回调及各程序 rename 边界重复授权、双 guard、物理槽位和专用 native 静止检查；终态前固定 ready proof 的文件身份。`PreparedUpgradeSummary` 只在最后释放验证后返回，正常 WAL 学习不会再受旧 v1 活动回执的历史长度约束。
 
-Driver/Bridge/AppKit 已按以下预留合同接入 action `10`；新准备/取消动作另行收敛，普通 bootstrap 的空 data 前驱限制保持：
+Driver/Bridge/AppKit 已按以下合同接入 action `10`；新准备/取消保存按下文独立动作合同执行，普通 bootstrap 的空 data 前驱限制保持：
 
 | 环节 | 合同 |
 | --- | --- |
@@ -155,9 +155,33 @@ Driver/Bridge/AppKit 已按以下预留合同接入 action `10`；新准备/取�
 
 持久请求不恢复任务授权。撤销、到期、进程退出后须重新确认；续跑只采用核心能够验证的已绑定位置，未知或未绑定临时文件原样阻断。已进入 handoff、记录变化、错误 root/产品、活动 guard 或证据漂移都不能转入取消。preservation 任务不会调用旧程序资格、不会移动最后 marker；最终入口没有默认资格提供者，资格返回后再次核验 outer、程序、静止与授权。
 
-本步只接仓库 Executor：普通 v1 action 保持原规则，C ABI/UI action 未扩展。新准备任务已接上述专用入口，Bridge/action 仍待接线，生产旧程序资格尚缺，不表示真实用户已可点击取消。回归使用合成用户根、显式合成资格和进程退出，不启动真实 GUI、复制冻结程序或试开真实用户库。
+Bridge 的 action `13` 只连接 preservation，不连接最终释放。生产旧程序资格尚缺，保存成功仍显示等待资格且保持启动阻断；最终取消按钮关闭。回归使用合成用户根、显式合成资格和进程退出，不启动真实 GUI、复制冻结程序或试开真实用户库。
 
 ## 用户授权
+
+### 新准备与取消保存动作合同（2026-10-17）
+
+本批按以下合同接线；实现与验证完成情况以 `current` 和当周周志为准。准备、取消保存与最终取消释放是独立任务，不以普通升级或 action `10` 替代。
+
+| 动作 | 身份 | 准入与成功结果 |
+| --- | --- | --- |
+| 开始源库准备 | `BeginSourcePreparation` / `begin_source_preparation` / `11` | 严格旧 outer 合法终态、实际 source 双程序、sealed target、数据根和前驱链一致；调用现有新准备任务，成功仅为 outer `prepared` / data `preflighted` |
+| 继续源库准备 | `ResumeSourcePreparation` / `resume_source_preparation` / `12` | 精确绑定当前准备及旧 outer 原件；只续跑同一准备，完成交接后由另外确认的 action `10` 继续升级 |
+| 保存取消请求与材料 | `PreservePreparationCancellation` / `preserve_preparation_cancellation` / `13` | 仅可取消的准备或已有取消请求/收尾/封存；调用现有取消 preservation 任务，成功仅进入等待独立资格，最后 marker 保留 |
+
+三项动作沿用 ABI v1 POD、symbol 和 contract version；既有 `0–10` 不变，未知动作失败关闭。不增加最终取消释放动作，不提供默认合格提供者，不调用最终释放入口。取消保存的确认文字必须说明：取消请求记录后本次准备不能转回升级，必要时继续安全的源库收尾，数据和材料保留，但独立旧程序资格未完成时仍不能启动旧版本。不能用“已取消”描述保存成功。
+
+展示合同：
+
+- 开始和续跑均为 `preparing_source + upgrade + state none + progress 0 + error none`，并提供手动中立输入源/关闭 Manager 提示；开始动作只作为 primary，secondary 为 none。
+- 续跑作为 primary；只有严格证明尚无交接意图且可取消时，secondary 才能为 `13`。已记录交接意图后不得请求取消；可验证的部分交接只由准备续跑处理。
+- 取消保存可以在可取消的准备阶段作为独立 primary 或续跑的 secondary；已有 `cancellation_requested`、`cancellation_finishing_source`、`cancellation_preserving` 只可提供 primary `13`，并保留上述无 v1 进度和手动提示的合同。
+- `cancellation_awaiting_qualification` 与 `cancellation_completed` 继续只刷新；最终取消按钮关闭。完整交接和终态封存仍使用 action `10` 既有投影，不能混入 `11–13`。
+- 缺失、未知、未绑定材料或矛盾投影失败关闭；取消封存中的 outer 暂缺只能由核心已有的精确封存位置证明解释，不能退回首次安装或扫描认领。
+
+每次 perform 从 authoritative 用户根和 sealed payload 重新读取、重验提供的动作，取得四项当次确认和最多 5 分钟的可撤销内存任务。control 持有到本次同步调用结束；退出、释放、撤销或到期后不得复用。只读 snapshot 不创建目录/guard、不打开 SQLite、不补同步；执行仍由既有 Executor 在连续 outer → inner 双锁中完成，UI 不传路径、身份或 operation ID。
+
+实际 source/target 或前驱资格不满足时不开放新准备，旧普通 bootstrap 的空 data 前驱限制保持，不能用旧升级动作绕过新准备检查。新准备成功不自动串接 action `10`；取消保存不自动请求独立资格或最终释放。错误投影仍为 blocked + refresh，持久化进度不能掩盖本次执行错误。
 
 refresh 是唯一不要求确认的 action。first install、upgrade、repair、resume、retry、remove 和切换前中止恢复都必须对当前重新读取的 snapshot 调用 `authorize_installer_action`；旧窗口中的 action 若已不再提供，必须以 `ActionNotOffered` 拒绝。
 
