@@ -1,6 +1,6 @@
-# macOS 取消资格证据 reader 合同草案
+# macOS 取消资格证据 reader 合同
 
-本文定义准备取消所需独立程序资格证据的只读 reader，供 Installer、验证与安全边界维护者审查。状态：**2026-10-17 设计完成待审，未实现 reader、可信目录或生产 issuer，最终取消门禁保持关闭。** 本文不授权采集证据、运行 source、操作冻结资产或释放 marker。
+本文定义准备取消所需独立程序资格证据的只读 reader，供 Installer、验证与安全边界维护者审查。状态：**2026-10-17 按批准合同实现只读 reader 与合成负向测试；生产审阅目录为空，未接生产 issuer，最终取消门禁保持关闭。** 本文不授权采集证据、运行 source、操作冻结资产或释放 marker。
 
 上游事实以[资格执行方案](macos-source39-qualification-plan.md)和[准备取消兼容合同](macos-preparation-cancellation-compatibility.md)为准。A1 已证明本次仅设置 `CFFIXED_USER_HOME` 的样本未达到路径隔离要求；Q2 仍阻塞。设计 reader 不能消除这个缺口。
 
@@ -38,6 +38,8 @@ reader 回答三个问题：证据是否来自明确批准的来源、内容是�
 
 原始记录只使用合成身份和数据。脱敏发生在归档审阅前，脱敏规则与对应原始证据的受控核对过程进入审阅记录；不能在 reader 验证后临时删改证据。缺乏可审查原始依据时不准入。
 
+reader 在 manifest 内验证结构化事件、预期/实际断言及样本链，附件按闭合清单验证字节摘要和实物身份；它不把任意日志、视频或附件脚本自动解释成行为事实。结构化记录与原始附件之间的真实性核对属于独立审阅，随后由固定 manifest/附件摘要保全；测试目录不能替代这次审阅。
+
 | 材料 | 可支持的结论 | 能否单独进入完整资格来源 |
 | --- | --- | --- |
 | 精确 source 的正常 Manager/InputMethod 实际运行材料 | 指定环境下的双 gate、真实 runtime、客户端学习与重启 | 仍须完整矩阵、原件关联和审阅 |
@@ -49,17 +51,17 @@ reader 回答三个问题：证据是否来自明确批准的来源、内容是�
 
 ## 输入、输出与只读边界
 
-以下为拟议内部合同，不是新 ABI、命令或已存在的 Rust API。
+以下为协调层 Rust 内部合同，不是新 FFI ABI 或产品命令。实现入口为 [`qualification_reader::review_evidence`](../../platforms/macos-product/InstallCoordinatorAdapter/src/qualification_reader.rs)，请求由 `CancellationEvidenceRequest::new` 从严格核心 proof 派生。
 
 输入分为四组：受信策略及产品绑定、明确指定的证据根、待匹配的精确 source/运行环境、从既有严格核心 reader 得到的本次 proof 描述。缺少 proof 时可以只做证据审计，但不能输出“本次场景匹配”。
 
-reader 返回 `EvidenceReview`，至少包含：策略/条目/pack 摘要、文件身份观察、source/schema/环境键、逐行覆盖结果、缺失/矛盾列表、请求匹配结果和结构化拒绝原因。报告状态只有 `rejected`、`reviewed_unbound`、`reviewed_matching_request`；后两者均不叫 `qualified`，不能转换成授权令牌。报告只在本次调用内有效；缓存或序列化的旧报告不能进入后续授权判断。
+reader 返回 `EvidenceReview`：安全读取完成后包含策略/条目/pack 摘要、文件身份观察、source/schema/环境键、逐行覆盖及请求绑定；覆盖缺失保留逐行结果，其余错误在最先失败处返回固定原因，不暴露不可信内容。报告状态只有 `rejected`、`reviewed_unbound`、`reviewed_matching_request`；后两者均不叫 `qualified`。实现不提供报告序列化、可信目录的公开构造或资格转换入口，旧报告不能进入后续授权判断。
 
 reader 不创建目录、guard、日志或修复文件，不执行包内命令，不打开 SQLite、不装载 dylib、不启动 source，不修改偏好、输入源、receipt、index、marker 或任务期限。输入包不存在时报告缺失，不扫描其他路径寻找“最近一次通过”，也不联网补齐。必要日志由上层输出固定原因码和非敏感计数，不输出真实路径、proof 内容、DB 内容或凭据。
 
 ## 证据包的逻辑格式
 
-首版命名为拟议的 `radishlex-cancellation-qualification-evidence-v1`；本批不建立持久格式或文件。采用严格 UTF-8 JSON manifest 与精确列出的普通文件，拒绝 BOM、重复键、未知字段、错误类型、超界整数和非有限数。摘要针对原始文件字节，不采用会吞掉未知字段或重复键的“规范化后等价”。manifest 摘要存放在受信目录，避免自摘要循环。
+首版 reader 接受 `radishlex-cancellation-qualification-evidence-v1`，仅在测试中构造合成包；没有生产 writer 或已准入真实证据。采用严格 UTF-8 JSON manifest 与精确列出的普通文件，拒绝 BOM、重复键、未知字段、错误类型、超界整数及非整数数值。摘要针对原始文件字节，不采用会吞掉未知字段或重复键的“规范化后等价”。manifest 摘要存放在受信目录，避免自摘要循环。
 
 | 字段组 | 必须绑定的内容 |
 | --- | --- |
@@ -73,7 +75,9 @@ reader 不创建目录、guard、日志或修复文件，不执行包内命令�
 
 实验文件 inode/root 只用于证明同一次采集的连续性，不要求部署后的用户 root 与实验 inode 相等。程序内容身份必须相等，部署实物的物理身份由当前产品观察独立验证。禁止将实验 receipt 的 operation/root/inode 复制到真实 proof。
 
-首版解析上限建议固定为：manifest 1 MiB、覆盖行和文件各最多 4096 项、相对路径最多 180 个 UTF-8 字节、JSON 深度 16、单文件 16 MiB、总计 256 MiB。流式散列、单线程读取，不把全部附件载入内存。超过上限报 `resource_limit`，不静默截断、跳过或自动拆包；如果真实采集材料需要更大预算，先修改和审查合同。大视频等外部引用不算已读取证据，不能以 URL 代替必需文件。
+程序内容及启动事件的结构化路径相对于各自 component 的 bundle，例如 `Contents/MacOS/radishlex_manager`；bundle 名和用户目录不进入此相对路径。实际固定路径启动及其来源仍须由原始材料、双 gate 与环境准入审阅证明。reader 只校验这些记录和附件，不沿记录的程序路径访问实物。
+
+首版解析上限固定为：manifest 1 MiB、覆盖行和附件各最多 4096 项、相对路径最多 180 字节、JSON 深度 16、单附件 16 MiB、含 manifest 总计 256 MiB。流式散列、单线程读取，不把全部附件载入内存。超过上限报 `resource_limit`，不静默截断、跳过或自动拆包；如果真实采集材料需要更大预算，先修改和审查合同。大视频等外部引用不算已读取证据，不能以 URL 代替必需文件。
 
 ## 覆盖与匹配规则
 
@@ -139,7 +143,13 @@ reader 的内部原因应比现有四类 qualification 错误更具体，供诊�
 
 ## 实施边界与验收设计
 
-本批只提交设计材料，不新增运行依赖、持久格式、FFI 或产品 action，不修改 action `10–13`、v1/v2 回执与双 gate。后续若获准，先实现可独立测试的只读 reader；生产 provider、目录装配与最终按钮仍留在独立批准批次。建议职责归属为 macOS 产品协调层，通用核心不读取产品资格包，AppKit 不直接解析证据。
+本批已获准实现 macOS 产品协调层的独立只读 reader；生产 provider、目录装配与最终按钮仍留在独立批准批次。通用核心只新增既有前驱分类的只读 getter，不读取产品资格包；AppKit 不直接解析证据。action `10–13`、FFI、v1/v2 回执格式与双 gate 不变。
+
+协调层经单独批准直接引用锁文件中已有的 `serde 1.0.228`、`serde_json 1.0.150`、`sha2 0.10.9` 与 `libc 0.2.186`，没有下载或升级依赖。私有文件读取模块是唯一 POSIX `unsafe` 例外：逐级目录句柄、`openat` / `fstatat` / `O_NOFOLLOW`、descriptor ACL 和每段读取后的身份复核。其余协调层保持 `deny(unsafe_code)`。macOS 实际执行验证；Linux 分支尚未在本批环境执行，其他平台不编译此 reader。
+
+实现采用以下保守约束：包内路径只接受安全 ASCII，拒绝大小写冲突及非 ASCII，避免未实现的 Unicode 归一化猜测；包内与祖先存在任何 ACL 均拒绝，Darwin 无 ACL 的 `ENOENT` 仅在 descriptor 身份复核后接受，其余未知失败关闭。目录扫描最多 8192 个节点、4096 附件加一个 manifest；附件以 64 KiB 块流式 hash，不保留全文。`ReadControl` 使用单调时钟、最多 300 秒并支持撤销，每次扫描/读块前后检查；这不是系统调用超时或 CPU/RSS 硬配额。
+
+签名记录明确区分 `ad_hoc` 与 `developer_id`：前者 Team ID 必须为空，后者必须为合法非空值；不会为 source 39 的 ad-hoc 身份伪造 Team ID。后置数据保持断言必须指向 `Postcondition` 后的最终存储观察，初始绿色状态或中间绿色观察不能掩盖后续漂移；双组件的学习/重开状态按各自进程链核对。真实后置实验、审阅批准和可信目录仍不能由合成 pack 替代。
 
 最小验收必须包含以下可观察行为，不能仅测试字段枚举或构造器：
 

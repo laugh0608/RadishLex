@@ -78,7 +78,7 @@
 
 同锁程序/data/终态执行、进展态恢复和接续 action `10` 已接线。初始准入仅接 `prepared/preflighted`；推进态和终态封存重新绑定精确 outer/preparation/data 或 release，并取得四项确认、最多 5 分钟且可撤销的任务授权。`10` 只处理完整交接/封存，普通 bootstrap 空前驱限制保持，不能用它开始源库准备或取消。
 
-2026-10-17 已接通准备/取消保留产品入口 `11–13`，四项确认与最多 5 分钟可撤销授权保持；准备完成须单独确认 `10`，取消保存停在等待资格并保留最后 marker。ABI v1、旧动作数值和普通 bootstrap 空前驱限制保持。[A1 路径实验](../remediation/macos-source39-qualification-plan.md)中仅设置 `CFFIXED_USER_HOME` 后 8 项路径仍在真实用户域，拒绝材料保留、不复跑；Q2 仍阻塞，不复制/启动旧程序。按授权形成[资格证据 reader 合同草案](../remediation/macos-cancellation-qualification-reader-contract.md)，尚未实现；真实运行证据、源 schema 观察及策略新鲜度仍缺，不能开放最终取消。按[当前会话约束](../remediation/macos-preparation-cancellation-compatibility.md#2026-10-05-资格前置审计与当前会话约束)保持现有账户和 Agent 会话。WAL/pager 内部断电与 B 段退出继续开放；记录见[2026-W42](../devlogs/2026-W42.md)。
+2026-10-17 已接通准备/取消保留入口 `11–13`；准备完成须单独确认 `10`，取消保存仍保留最后 marker。ABI v1、四项确认、5 分钟可撤销授权和普通 bootstrap 空前驱限制保持。[A1 实验](../remediation/macos-source39-qualification-plan.md)设置 `CFFIXED_USER_HOME` 后 8 项路径仍在真实用户域；材料保留、不复跑，Q2 阻塞，不复制/启动旧程序。[资格证据 reader](../remediation/macos-cancellation-qualification-reader-contract.md)已实现只读核验与合成负向测试；生产目录为空，未接 issuer。真实运行证据、无 snapshot 的源 schema 观察及策略新鲜度仍缺，最终取消关闭。按[会话约束](../remediation/macos-preparation-cancellation-compatibility.md#2026-10-05-资格前置审计与当前会话约束)保持现有账户和 Agent 会话。WAL/pager 内部断电与 B 段退出仍开放；记录见[2026-W42](../devlogs/2026-W42.md)。
 
 新升级真正完成后才继续客户端身份与 composition 隐私实测，不直接重试 40。冻结 macOS 39/40、用户数据、Linux/UTM 与系统动作均不在本批范围；实机动作仍须另行明确目标与授权。10-09 的待办由本批承接，历史交接保留在[2026-W41](../devlogs/2026-W41.md#2026-10-09明日事项)。
 

@@ -213,7 +213,7 @@ B 段仍未退出；本补充获确认也不等于产品已支持取消。真实
 
 ## 2026-10-17：独立 source 39 资格方案复核
 
-项目所有者确认没有备用 Mac 或独立 macOS 环境，继续保持当前账户、Agent 会话和冻结现场。新增[资格执行方案与逐包授权清单](macos-source39-qualification-plan.md)，固定精确历史 source 身份、矩阵、证据与失效规则。单独授权的 A1 短命 Foundation 实验已经执行：仅设置 `CFFIXED_USER_HOME` 后 8 项路径仍位于真实用户域，按合同拒绝并保留材料，不复跑。当前变量方案不能提供数据隔离，也未证明正常 IMK/GUI 会话隔离；不进入复制/启动 source。随后按授权形成[证据 reader 合同草案](macos-cancellation-qualification-reader-contract.md)，A5 实施仍需另行确认。未实现 issuer，最终 marker 保持阻断。
+项目所有者确认没有备用 Mac 或独立 macOS 环境，继续保持当前账户、Agent 会话和冻结现场。新增[资格执行方案与逐包授权清单](macos-source39-qualification-plan.md)，固定精确历史 source 身份、矩阵、证据与失效规则。单独授权的 A1 短命 Foundation 实验已经执行：仅设置 `CFFIXED_USER_HOME` 后 8 项路径仍位于真实用户域，按合同拒绝并保留材料，不复跑。当前变量方案不能提供数据隔离，也未证明正常 IMK/GUI 会话隔离；不进入复制/启动 source。随后按批准的[证据 reader 合同](macos-cancellation-qualification-reader-contract.md)实现只读核验及合成负向测试；生产目录为空，报告不生成资格对象。writer、生产 issuer 与最终入口仍须独立批准，最终 marker 保持阻断。
 
 ## 备选方案与取舍
 
