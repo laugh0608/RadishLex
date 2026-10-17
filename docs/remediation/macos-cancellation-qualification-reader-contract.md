@@ -103,7 +103,7 @@ reader 不创建目录、guard、日志或修复文件，不执行包内命令�
 
 - reader 不接受调用者提供的 `covered=true`、旧版本号字符串或任意 case ID 作为场景判断；取值必须来自验证过的 proof 和产品/环境上下文。声明 source tree 与 manifest 不一致即拒绝。
 - 当前 proof 的 canonical bytes/摘要、完整 typed source、data root、旧 outer/data、family 和索引关系留在请求绑定中；不能只按 operation ID 匹配。实验的 operation 不与真实 operation 作相等匹配。
-- 有 snapshot schema 时须与证据支持的 source schema 严格相等。维护前无 snapshot 时，不从 target schema 猜测，也不把缺失 schema 当通配；必须有来自当前 exact source family 的受信 schema 观察。该观察如何在不试开真实业务库的前提下取得，尚需 A5 单独落实；缺少时保持 unavailable。
+- 有 snapshot schema 时须与证据支持的 source schema 严格相等。维护前无 snapshot 时，不从 target schema 猜测，也不把缺失 schema 当通配；必须有来自当前 exact source family 的受信 schema 观察。[源 schema 观察合同](macos-source-schema-observation-contract.md)已形成设计草案：拟由连续双锁下的私有字节副本及独立 WAL 准入、SQLite/layout 验证提供，原库不建立 SQLite 连接。观察器、副本生命周期及 reader 接入均未实施，仍需 A5 单独批准；当前缺少时保持 unavailable。
 - 源内容等价、当前程序及静止来自既有核心和产品观察，reader 不重新实现源库验证。合法学习后的历史查询不被旧 DB hash 封死；尚待释放的当次 family 则仍受现有 proof 规则约束。
 - 为避免循环证明，独立兼容性实验先验证隔离的后置状态样本；不得先用假 issuer 释放真实 marker，再用启动成功为该 issuer 背书。
 
@@ -139,7 +139,7 @@ reader 的内部原因应比现有四类 qualification 错误更具体，供诊�
 
 离线固定目录只能执行它已知道的撤销，无法保证旧 Installer 得知后来撤销；本地墙钟或文件 mtime 也不能证明策略是最新。这是生产 issuer 的开放阻塞，不能用目录版本自报值或普通用户文件中的最低版本解除。未来 A5 必须单独批准策略更新/防降级或每次运行的新鲜批准来源；在该机制成立前，reader 最多给出只读报告，不能支撑生产最终取消开放。
 
-当前尚缺三个独立条件：可信且完整的 source 39 正常运行证据、无 snapshot 时对当前源 family 的 schema 观察合同、生产策略新鲜度/撤销合同。reader 的文件解析和覆盖设计完成不代表这些条件完成。
+当前尚缺三个独立条件：可信且完整的 source 39 正常运行证据、无 snapshot 时对当前源 family 的可信 schema 观察实现及验证、生产策略新鲜度/撤销合同。schema 观察草案不表示其临时敏感副本、WAL 支持范围或生产读取已获批准；reader 的文件解析和覆盖设计完成不代表这些条件完成。
 
 ## 实施边界与验收设计
 
