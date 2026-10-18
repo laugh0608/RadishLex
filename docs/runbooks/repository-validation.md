@@ -4,7 +4,7 @@
 
 ## 入口与覆盖
 
-完整验收使用 `./scripts/check-repo.sh`；它自动应用 `run-low-impact.sh` 的单编译任务、单测试线程、单 Go 并发及低优先级设置。`--plan` 只显示阶段与 Rust 命令，不执行验证。各平台 `check-*.sh` 无参数入口仍执行完整专项。
+完整验收使用 `./scripts/check-repo.sh`；启动前须说明必要性、范围、命令、预计耗时及资源影响，并取得用户对本轮的明确允许。完整专项回归同样适用，不能更换入口或拆分命令绕过；失败/中断后重跑须在明确授权范围内。该入口自动应用 `run-low-impact.sh` 的单编译任务、单测试线程、单 Go 并发及低优先级设置。`--plan` 只显示阶段与 Rust 命令，不执行验证。各平台 `check-*.sh` 无参数入口仍执行完整专项。
 
 完整仓库入口顺序为文档/治理自检、Rust 格式和 macOS/core Clippy、原生及 Linux repository-only 合同、Go、workspace 默认目标及 doc-test、额外 feature 测试。Linux 专项保留自己的 check/test/Clippy 顺序；本次重点去除 macOS 长矩阵的重复，未声称所有短测试均已去重。
 
@@ -37,6 +37,6 @@ HTTP 集成 fixture 先 `go build` 到本次合成目录，再直接启动二进
 
 ## 修改门禁时的验证
 
-先运行 `python3 -m unittest discover -s scripts -p 'test_repository_*.py'`，覆盖计划中默认目标/doc-test 唯一性、feature 保留、独立入口完整性、部分结果措辞及正常/失败/中断收尾。再运行完整仓库门禁及改动涉及的专项，记录旧/新耗时、编译时间与执行时间的区别。
+先运行 `python3 -m unittest discover -s scripts -p 'test_repository_*.py'`，覆盖计划中默认目标/doc-test 唯一性、feature 保留、独立入口完整性、部分结果措辞及正常/失败/中断收尾。随后提出完整仓库门禁及相关专项的运行计划，获用户明确允许后执行，记录旧/新耗时、编译时间与执行时间的区别；未获允许则如实保留完整门禁待验证状态。
 
 本机降载与证据表述以[协作细则](../agent-collaboration.md#验证与证据口径)为准；最新未完项见[当前状态](../status/current.md)。
