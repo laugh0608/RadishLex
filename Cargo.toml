@@ -33,3 +33,11 @@ repository = "https://github.com/laugh0608/RadishLex"
 # this existing dependency in tests; keep application code/debug checks intact.
 [profile.test.package."sha2:0.10.9"]
 opt-level = 3
+
+# The history matrices repeatedly decode and revalidate complete proof chains.
+# Optimize this crate only in tests; keep debug assertions and overflow checks.
+# No production profile, fixture, checkpoint, hash or durability check changes.
+[profile.test.package.radishlex-ime-product-upgrade]
+opt-level = 1
+debug-assertions = true
+overflow-checks = true

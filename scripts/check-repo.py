@@ -5,10 +5,13 @@ import argparse
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
 from repository_governance import check_community_governance, check_markdown_links
+from validation_process import run_command as run_validation_command
+from validation_suites import repository_rust_commands, run_suite
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -388,6 +391,9 @@ REQUIRED_FILES = [
     "scripts/check-sync-server-connection-health.sh",
     "scripts/check-text-files.py",
     "scripts/check-text-files.sh",
+    "scripts/validation_process.py",
+    "scripts/validation_suites.py",
+    "scripts/test_repository_validation.py",
     "tests/fixtures/sync-deployment-evidence-valid.txt",
     "apps/radishlex-manager/README.md",
     "apps/radishlex-manager/pubspec.yaml",
@@ -414,18 +420,11 @@ def run_script(script_name: str, args: list[str] | None = None) -> None:
     command = [sys.executable, str(REPO_ROOT / "scripts" / script_name)]
     if args:
         command.extend(args)
-    result = subprocess.run(command, cwd=REPO_ROOT)
-    if result.returncode != 0:
-        raise SystemExit(result.returncode)
+    run_command(command)
 
 
 def run_command(command: list[str], cwd: Path = REPO_ROOT) -> None:
-    try:
-        result = subprocess.run(command, cwd=cwd)
-    except FileNotFoundError as exc:
-        raise SystemExit(f"{command[0]} is required to run repository baseline checks.") from exc
-    if result.returncode != 0:
-        raise SystemExit(result.returncode)
+    run_validation_command(command, cwd)
 
 
 def read_text(relative_path: str) -> str:
@@ -579,25 +578,25 @@ def check_macos_product_metadata() -> None:
 
 
 def check_product_install_core() -> None:
-    run_command([str(REPO_ROOT / "scripts/check-product-install-core.sh")])
+    run_suite("product-install-core", "native")
 
 
 def check_macos_install_adapter() -> None:
     if sys.platform != "darwin":
         return
-    run_command([str(REPO_ROOT / "scripts/check-macos-install-adapter.sh")])
+    run_suite("macos-install-adapter", "native")
 
 
 def check_macos_install_coordinator() -> None:
     if sys.platform != "darwin":
         return
-    run_command([str(REPO_ROOT / "scripts/check-macos-install-coordinator.sh")])
+    run_suite("macos-install-coordinator", "native")
 
 
 def check_macos_installer() -> None:
     if sys.platform != "darwin":
         return
-    run_command([str(REPO_ROOT / "scripts/check-macos-installer.sh")])
+    run_suite("macos-installer", "native")
 
 
 def check_macos_release_carrier() -> None:
@@ -607,7 +606,7 @@ def check_macos_release_carrier() -> None:
 def check_macos_upgrade_preflight() -> None:
     if sys.platform != "darwin":
         return
-    run_command([str(REPO_ROOT / "scripts/check-macos-upgrade-coordinator.sh")])
+    run_suite("macos-upgrade-coordinator", "native")
 
 
 def check_linux_fcitx5() -> None:
@@ -757,8 +756,8 @@ def check_path_budget() -> None:
 
 
 def check_rust_workspace() -> None:
-    run_command(["cargo", "fmt", "--check"])
-    run_command(["cargo", "test", "--workspace"])
+    for command in repository_rust_commands(sys.platform, "tests"):
+        run_command(command)
 
 
 def check_go_server() -> None:
@@ -810,11 +809,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--skip-docs", action="store_true", help="Skip documentation budget checks.")
     parser.add_argument("--skip-rust", action="store_true", help="Skip Rust workspace checks.")
     parser.add_argument("--skip-go", action="store_true", help="Skip Go server checks.")
+    parser.add_argument("--plan", action="store_true", help="Show phases and Rust coverage without running checks.")
     return parser.parse_args()
 
 
 def main() -> int:
+    started = time.monotonic()
     args = parse_args()
+    print("Validation: serial low-impact execution; no cached results or resume.", flush=True)
+    print("Order: hygiene/contracts -> Rust static checks -> native/Linux/Go -> workspace targets/doc-tests -> feature tests.", flush=True)
+    print("Previous macOS baseline: Installer ~29 min, upgrade history ~60 min; previously each ran twice. Allow 90-120 min plus cold compilation until remeasured.", flush=True)
+    if args.plan:
+        for phase in ("static", "tests"):
+            print(f"Rust {phase}:")
+            for command in repository_rust_commands(sys.platform, phase):
+                print("  " + " ".join(command))
+        print("Native/platform contracts remain mandatory; --plan executes nothing.")
+        return 0
 
     if not args.skip_text_files:
         run_script("check-text-files.py", [str(REPO_ROOT)])
@@ -827,6 +838,9 @@ def main() -> int:
     check_collaboration_docs()
     check_license_wording()
     check_manager_product_runtime_contract()
+    if not args.skip_rust:
+        for command in repository_rust_commands(sys.platform, "static"):
+            run_command(command)
     check_macos_product_metadata()
     check_product_install_core()
     check_macos_install_adapter()
@@ -854,7 +868,11 @@ def main() -> int:
     if not args.skip_rust:
         check_rust_workspace()
 
-    print("Repository baseline passed.")
+    if any((args.skip_text_files, args.skip_docs, args.skip_rust, args.skip_go)):
+        print("Partial repository checks passed; skipped checks prevent a full baseline result.")
+    else:
+        print("Repository baseline passed.")
+    print(f"Repository checks elapsed: {time.monotonic() - started:.2f}s", flush=True)
     return 0
 
 

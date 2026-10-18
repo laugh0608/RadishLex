@@ -25,7 +25,7 @@ const OBJECT_KEY_ID: &str = "object-key-v1";
 
 #[test]
 fn http_transport_round_trips_encrypted_object_through_go_sync_server() {
-    let Some(server) = GoSyncServer::try_spawn() else {
+    let Some(mut server) = GoSyncServer::try_spawn() else {
         return;
     };
     let transport =
@@ -132,6 +132,12 @@ fn http_transport_round_trips_encrypted_object_through_go_sync_server() {
         }
         other => panic!("expected stale conflict from Go server, got {other:?}"),
     }
+    server.stop().expect("stop and reap the actual Go server");
+    assert!(server
+        .child
+        .try_wait()
+        .expect("confirm server exit")
+        .is_some());
 }
 
 fn create_domain(transport: &HttpSyncRemoteTransport, public_key: &DeviceSigningPublicKey) {
@@ -252,50 +258,80 @@ impl GoSyncServer {
             Err(error) => panic!("reserve loopback port: {error}"),
         };
         let root = temp_root();
-        fs::create_dir_all(root.join("objects")).expect("create temp blob dir");
+        let server_store = root.join("server-store");
+        fs::create_dir_all(server_store.join("objects")).expect("create temp blob dir");
         let server_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../server/sync-server");
-        let mut child = match Command::new("go")
-            .args(["run", "./cmd/radishlex-sync-server"])
+        // `go run` owns a launcher, not the server: killing that Child can leave
+        // the compiled server alive. Build locally, then own the real process.
+        let executable = root.join(format!("sync-server{}", std::env::consts::EXE_SUFFIX));
+        let built = match Command::new("go")
+            .args(["build", "-o"])
+            .arg(&executable)
+            .arg("./cmd/radishlex-sync-server")
             .current_dir(&server_dir)
+            .output()
+        {
+            Ok(output) => output,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                eprintln!("skipping Go sync server integration: go command not found");
+                fs::remove_dir_all(&root).expect("remove unused synthetic fixture");
+                return None;
+            }
+            Err(error) => panic!("build Go sync server: {error}"),
+        };
+        assert!(
+            built.status.success(),
+            "build Go sync server: {}",
+            String::from_utf8_lossy(&built.stderr)
+        );
+        let child = Command::new(executable)
             .env("RADISHLEX_SYNC_LISTEN", format!("127.0.0.1:{port}"))
             .env(
                 "RADISHLEX_SYNC_METADATA_PATH",
-                root.join("sync-server.sqlite"),
+                server_store.join("sync-server.sqlite"),
             )
-            .env("RADISHLEX_SYNC_BLOB_DIR", root.join("objects"))
+            .env("RADISHLEX_SYNC_BLOB_DIR", server_store.join("objects"))
             .env("RADISHLEX_SYNC_MAX_OBJECT_BYTES", "16777216")
             .env("RADISHLEX_SYNC_RECOVERY_READS_PER_HOUR", "12")
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
             .spawn()
-        {
-            Ok(child) => child,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                eprintln!("skipping Go sync server integration: go command not found");
-                let _ = fs::remove_dir_all(&root);
-                return None;
-            }
-            Err(error) => panic!("spawn Go sync server: {error}"),
-        };
+            .expect("spawn compiled Go sync server");
         let base_url = format!("http://127.0.0.1:{port}");
-        wait_until_ready(&base_url, &mut child);
-        Some(Self {
+        let mut server = Self {
             child,
             root,
             base_url,
-        })
+        };
+        // Construct the owner first so readiness panics also reap the server.
+        wait_until_ready(&server.base_url, &mut server.child);
+        Some(server)
     }
 
     fn base_url(&self) -> String {
         self.base_url.clone()
     }
+
+    fn stop(&mut self) -> io::Result<()> {
+        if self.child.try_wait()?.is_none() {
+            self.child.kill()?;
+        }
+        self.child.wait()?;
+        Ok(())
+    }
 }
 
 impl Drop for GoSyncServer {
     fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-        let _ = fs::remove_dir_all(&self.root);
+        if let Err(error) = self.stop() {
+            eprintln!("Go test server shutdown unconfirmed; fixture retained: {error}");
+            return;
+        }
+        if std::thread::panicking() {
+            eprintln!("Go HTTP test failed; synthetic fixture retained");
+        } else if let Err(error) = fs::remove_dir_all(&self.root) {
+            panic!("remove stopped Go server fixture: {error}");
+        }
     }
 }
 
