@@ -10,6 +10,7 @@ RadishLex（萝卜词核）是由 Rust 输入核心、Go 自部署同步后端�
 
 - [当前状态](status/current.md)：当前里程碑、批次、冻结基线、停止线、下一步和本周周志入口；这是唯一阶段快照。
 - [Agent 协作与执行规则](agent-collaboration.md)：任务类型、方案确认、授权范围、文档归位、风险分层验证和根协作入口维护细则。
+- [仓库门禁与测试运行](runbooks/repository-validation.md)：验证分层、长矩阵去重、耗时反馈、测试构建与本次子进程收尾。
 - [技术方案](technical-plan.md)：稳定架构、模块职责、输入链、平台策略和验证分层。
 - [产品交付路线图](roadmap.md)：长期里程碑、交付物和退出标准，不记录逐批进度。
 - [官方客户端与同步服务器连接规划](client-server-connection-plan.md)：同一产品包的运行时官方 / 自部署选择、同步域隔离与后续验收。

@@ -103,7 +103,7 @@ reader 不创建目录、guard、日志或修复文件，不执行包内命令�
 
 - reader 不接受调用者提供的 `covered=true`、旧版本号字符串或任意 case ID 作为场景判断；取值必须来自验证过的 proof 和产品/环境上下文。声明 source tree 与 manifest 不一致即拒绝。
 - 当前 proof 的 canonical bytes/摘要、完整 typed source、data root、旧 outer/data、family 和索引关系留在请求绑定中；不能只按 operation ID 匹配。实验的 operation 不与真实 operation 作相等匹配。
-- 有 snapshot schema 时须与证据支持的 source schema 严格相等。维护前无 snapshot 时，不从 target schema 猜测，也不把缺失 schema 当通配；必须有来自当前 exact source family 的受信 schema 观察。[源 schema 观察合同](macos-source-schema-observation-contract.md)已有获批的仅合成实现：私有字节副本、WAL 准入、SQLite/layout 验证及 proof 绑定均留在测试路径，原库不建立 SQLite 连接。2026-10-18 收尾时实现尚未提交，完整门禁中断；生产副本生命周期与 reader 接入仍未实施，仍需 A5 单独批准。当前 reader 缺少 snapshot 时继续返回 `SchemaObservationUnavailable`。
+- 有 snapshot schema 时须与证据支持的 source schema 严格相等。维护前无 snapshot 时，不从 target schema 猜测，也不把缺失 schema 当通配；必须有来自当前 exact source family 的受信 schema 观察。[源 schema 观察合同](macos-source-schema-observation-contract.md)已有获批的仅合成实现：私有字节副本、WAL 准入、SQLite/layout 验证及 proof 绑定均留在测试路径，原库不建立 SQLite 连接。2026-10-18 实现已提交并通过完整仓库门禁；生产副本生命周期与 reader 接入仍未实施，仍需 A5 单独批准。当前 reader 缺少 snapshot 时继续返回 `SchemaObservationUnavailable`。
 - 源内容等价、当前程序及静止来自既有核心和产品观察，reader 不重新实现源库验证。合法学习后的历史查询不被旧 DB hash 封死；尚待释放的当次 family 则仍受现有 proof 规则约束。
 - 为避免循环证明，独立兼容性实验先验证隔离的后置状态样本；不得先用假 issuer 释放真实 marker，再用启动成功为该 issuer 背书。
 
