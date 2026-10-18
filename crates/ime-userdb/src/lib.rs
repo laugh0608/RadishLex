@@ -7,6 +7,9 @@ mod model;
 mod store;
 mod sync_decode;
 
+#[cfg(feature = "synthetic-schema-observer")]
+pub mod schema_observer;
+
 pub use error::{UserDbError, UserDbResult};
 pub use model::{
     DeletedTermTombstone, DictionaryImportBatch, DictionaryImportSummary, DictionaryTermRecord,

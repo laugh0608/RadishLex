@@ -31,4 +31,4 @@ sha2 = "0.10.9"
 libc = "0.2.186"
 
 [dev-dependencies]
-radishlex-ime-userdb = { path = "../../../crates/ime-userdb" }
+radishlex-ime-userdb = { path = "../../../crates/ime-userdb", features = ["synthetic-schema-observer"] }
