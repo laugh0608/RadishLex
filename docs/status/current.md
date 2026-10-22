@@ -120,4 +120,4 @@ git diff --check
 - [Linux Manager 本地验收边界](../linux-manager-local-acceptance.md)
 - [Linux L6 Debian package matrix runbook](../runbooks/linux-l6-package-matrix.md)
 - [Linux L6 收敛与本地资产生命周期](../runbooks/linux-l6-asset-lifecycle.md)
-- [本周周志](../devlogs/2026-W42.md)
+- [本周周志](../devlogs/2026-W43.md)
